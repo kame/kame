@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.7 2003/10/23 05:44:35 ono Exp $	*/
+/*	$KAME: dccp_var.h,v 1.8 2003/10/30 07:36:53 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -52,15 +52,15 @@ struct dccpcb {
 	u_int32_t	retrans;
 
 	u_int32_t	seq_snd;
-	u_int32_t       ack_snd; /* ack num to send in Ack or DataAck packet */
+	u_int32_t	ack_snd; /* ack num to send in Ack or DataAck packet */
 	u_int32_t	gsn_rcv; /* Greatest received sequence number */
 
 	/* values representing last incoming packet. are set in dccp_input */
-	u_int32_t	seq_rcv;        /* Seq num of received packet */
-	u_int32_t       ack_rcv;        /* Ack num received in Ack or DataAck packet */
-	u_int8_t        type_rcv;       /* Type of packet received */
-	u_int32_t       len_rcv;        /* Length of data received */
-        u_int8_t        ndp_rcv;        /* ndp value of received packet */
+	u_int32_t	seq_rcv;	/* Seq num of received packet */
+	u_int32_t	ack_rcv;	/* Ack num received in Ack or DataAck packet */
+	u_int8_t	type_rcv;	/* Type of packet received */
+	u_int32_t	len_rcv;	/* Length of data received */
+	u_int8_t	ndp_rcv;	/* ndp value of received packet */
 
 	u_int8_t	cslen;		/* How much of outgoing packets
 					   are covered by the checksum */
@@ -70,23 +70,37 @@ struct dccpcb {
 	u_int16_t	ack_ratio;	/* Ack Ratio Feature */
 	int8_t		cc_in_use[2];	/* Current CC in use
 					   (in each direction) */
-	void 		*cc_state[2];
-	struct inpcb	*d_inpcb;	/* Pointer back to Internet PCB  */
+	void		*cc_state[2];
+	struct inpcb	*d_inpcb;	/* Pointer back to Internet PCB	 */
+#ifdef __NetBSD__
+	struct in6pcb	*d_in6pcb;
+#endif
 	u_int32_t	d_maxseg;	/* Maximum segment size */
-        char	        options[DCCP_MAX_OPTIONS];
+	char		options[DCCP_MAX_OPTIONS];
 	u_int8_t	optlen;
-        char	        features[DCCP_MAX_OPTIONS];
+	char		features[DCCP_MAX_OPTIONS];
 	u_int8_t	featlen;
 
 	u_int32_t	avgpsize;	/* Average packet size */
 
 	/* variables for the local (receiver-side) ack vector */
 	u_char *ackvector;  /* For acks, 2 bits per packet */
-	u_char *av_hp;  /* head ptr for ackvector */
+	u_char *av_hp;	/* head ptr for ackvector */
 	u_int16_t av_size;
 	u_int32_t av_hs, av_ts; /* highest/lowest seq no in ackvector */
 	
 	u_int8_t remote_ackvector; /* Is recv side using AckVector? */
+#ifndef __FreeBSD__
+#ifndef INP_IPV6
+#define INP_IPV6	0x1
+#endif
+#ifndef INP_IPV4
+#define INP_IPV4	0x2
+#endif
+	u_int8_t	inp_vflag;
+	u_int8_t	inp_ip_ttl;
+	u_int8_t	inp_ip_tos;
+#endif
 };
 
 struct inp_dp {
@@ -106,7 +120,14 @@ struct xdccpcb {
 #endif
 
 #define	intodccpcb(ip)	((struct dccpcb *)(ip)->inp_ppcb)
-#define	in6todccpcb(ip)	((struct dccpcb *)(ip)->inp_ppcb)
+#define	in6todccpcb(ip)	((struct dccpcb *)(ip)->in6p_ppcb)
+
+#ifdef __FreeBSD__
+#define	dptosocket(dp)	((dp)->d_inpcb->inp_socket)
+#else
+#define	dptosocket(dp)	(((dp)->d_inpcb) ? (dp)->d_inpcb->inp_socket : \
+			(((dp)->d_in6pcb) ? (dp)->d_in6pcb->in6p_socket : NULL))
+#endif
 
 struct	dccpstat {
 	u_long	dccps_connattempt;	/* Initiated connections */
@@ -119,36 +140,36 @@ struct	dccpstat {
 	u_long	dccps_badseq;		/* Sequence number not inside loss_window  */
 	u_long	dccps_noport;		/* No socket on port */
 
-        /* TFRC Sender */
-        u_long  tfrcs_send_conn;        /* Number of conn used TFRC sender */
-        u_long  tfrcs_send_noopt;       /* No options on feedback packet */
-        u_long  tfrcs_send_nomem;       /* Send refused: No mem for history */
-        u_long  tfrcs_send_fbacks;      /* Correct feedback packets received */
-        u_long  tfrcs_send_erropt;      /* Err add option on data */
+	/* TFRC Sender */
+	u_long	tfrcs_send_conn;	/* Number of conn used TFRC sender */
+	u_long	tfrcs_send_noopt;	/* No options on feedback packet */
+	u_long	tfrcs_send_nomem;	/* Send refused: No mem for history */
+	u_long	tfrcs_send_fbacks;	/* Correct feedback packets received */
+	u_long	tfrcs_send_erropt;	/* Err add option on data */
   
-        /* TFRC Receiver */
-        u_long  tfrcs_recv_conn;        /* Number of conn used TFRC receiver */
-        u_long  tfrcs_recv_noopt;       /* Packet lost: No options on packet */
-        u_long  tfrcs_recv_nomem;       /* Packet lost: No mem for history */
-        u_long  tfrcs_recv_losts;       /* Detected lost packets */
-        u_long  tfrcs_recv_fbacks;      /* Feedback packets sent */
-        u_long  tfrcs_recv_erropt;      /* Err add option on feedback */      
+	/* TFRC Receiver */
+	u_long	tfrcs_recv_conn;	/* Number of conn used TFRC receiver */
+	u_long	tfrcs_recv_noopt;	/* Packet lost: No options on packet */
+	u_long	tfrcs_recv_nomem;	/* Packet lost: No mem for history */
+	u_long	tfrcs_recv_losts;	/* Detected lost packets */
+	u_long	tfrcs_recv_fbacks;	/* Feedback packets sent */
+	u_long	tfrcs_recv_erropt;	/* Err add option on feedback */      
 
 	/* TCPlike Sender */
-	u_long  tcplikes_send_conn;     /* Connections established */
-	u_long  tcplikes_send_reploss;  /* Data packets reported lost */
-	u_long  tcplikes_send_assloss;  /* Data packets assumed lost */
-	u_long  tcplikes_send_ackrecv;  /* Acknowledgement (w/ Ack Vector) packets received */
-	u_long  tcplikes_send_missack;  /* Ack packets assumed lost */
-	u_long  tcplikes_send_badseq;   /* Bad sequence number on outgoing packet */
-	u_long  tcplikes_send_memerr;   /* Memory allocation errors */
+	u_long	tcplikes_send_conn;	/* Connections established */
+	u_long	tcplikes_send_reploss;	/* Data packets reported lost */
+	u_long	tcplikes_send_assloss;	/* Data packets assumed lost */
+	u_long	tcplikes_send_ackrecv;	/* Acknowledgement (w/ Ack Vector) packets received */
+	u_long	tcplikes_send_missack;	/* Ack packets assumed lost */
+	u_long	tcplikes_send_badseq;	/* Bad sequence number on outgoing packet */
+	u_long	tcplikes_send_memerr;	/* Memory allocation errors */
 	
 	/* TCPlike Receiver */
-	u_long  tcplikes_recv_conn;     /* Connections established */
-	u_long  tcplikes_recv_datarecv; /* Number of data packets received */
-	u_long  tcplikes_recv_ackack;   /* Ack-on-acks received */
-	u_long  tcplikes_recv_acksent;  /* Acknowledgement (w/ Ack Vector) packets sent */
-	u_long  tcplikes_recv_memerr;   /* Memory allocation errors */
+	u_long	tcplikes_recv_conn;	/* Connections established */
+	u_long	tcplikes_recv_datarecv; /* Number of data packets received */
+	u_long	tcplikes_recv_ackack;	/* Ack-on-acks received */
+	u_long	tcplikes_recv_acksent;	/* Acknowledgement (w/ Ack Vector) packets sent */
+	u_long	tcplikes_recv_memerr;	/* Memory allocation errors */
 	
 	/*	Some CCID statistic should also be here */
 
@@ -168,6 +189,8 @@ struct	dccpstat {
 #define DCCPS_SERVER_CLOSE	5
 #define DCCPS_CLIENT_CLOSE	6
 #define DCCPS_TIME_WAIT 7
+
+#define DCCP_NSTATES	8
 
 #ifdef DCCPSTATES
 const char *dccpstates[] = {
@@ -190,11 +213,15 @@ const char *dccpstates[] = {
 #define	DCCPCTL_DEFCCID		1	/* Default CCID */
 #define DCCPCTL_STATS		2	/* statistics (read-only) */
 #define DCCPCTL_PCBLIST		3
+#define DCCPCTL_SENDSPACE	4
+#define DCCPCTL_RECVSPACE	5
 
 #define DCCPCTL_NAMES { \
 	{ 0, 0 }, \
 	{ "defccid", CTLTYPE_INT }, \
 	{ "stats", CTLTYPE_STRUCT }, \
+	{ "sendspace", CTLTYPE_INT }, \
+	{ "recvspace", CTLTYPE_INT }, \
 }
 
 #ifdef _KERNEL
@@ -235,14 +262,18 @@ struct inpcb *
 void
 #endif
 	dccp_notify(struct inpcb *, int);
+#ifdef __FreeBSD__
 struct dccpcb *
 	dccp_newdccpcb(struct inpcb *);
-
+#else
+struct dccpcb *
+	dccp_newdccpcb(int, void *);
+#endif
 int	dccp_shutdown(struct socket *);
 
-int     dccp_output(struct dccpcb *, u_int8_t);
+int	dccp_output(struct dccpcb *, u_int8_t);
 
-int     dccp_add_option(struct dccpcb *, u_int8_t, char *, u_int8_t);
+int	dccp_add_option(struct dccpcb *, u_int8_t, char *, u_int8_t);
 
 /* No cc functions */
 void* dccp_nocc_init(struct dccpcb *);

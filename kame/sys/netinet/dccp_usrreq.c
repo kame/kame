@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.15 2003/10/23 05:44:35 ono Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.16 2003/10/30 07:36:53 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -67,6 +67,11 @@
 
 #ifdef __FreeBSD__
 #include "opt_inet6.h"
+#include "opt_inet.h"
+#else
+#ifdef __NetBSD__
+#include "opt_inet.h"
+#endif
 #endif
 #include "opt_dccp.h"
 
@@ -74,6 +79,9 @@
 #include <sys/systm.h>
 #include <sys/domain.h>
 #include <sys/kernel.h>
+#ifdef __NetBSD__
+#include <sys/pool.h>
+#endif
 #include <sys/lock.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -125,6 +133,10 @@
 #include <machine/in_cksum.h>
 #endif
 
+#ifndef __FreeBSD__
+#include <machine/stdarg.h>
+#endif
+
 #undef DEBUG
 #undef ACKDEBUG
 
@@ -162,10 +174,19 @@ SYSCTL_INT(_net_inet_dccp, OID_AUTO, dccp_log_in_vain, CTLFLAG_RW,
 #endif
 
 struct	inpcbhead dccpb;		/* from dccp_var.h */
+struct	in6pcb dccpb6;
+#ifdef __FreeBSD__
 struct	inpcbinfo dccpbinfo;
+#else
+struct	inpcbtable dccpbtable;
+#endif
 
-#ifndef UDBHASHSIZE
-#define UDBHASHSIZE 16
+#ifndef DCCPBHASHSIZE
+#define DCCPBHASHSIZE 16
+#endif
+
+#ifndef __FreeBSD__
+struct	pool dccpcb_pool;
 #endif
 
 u_long	dccp_sendspace = 32768;
@@ -180,10 +201,14 @@ SYSCTL_STRUCT(_net_inet_dccp, DCCPCTL_STATS, stats, CTLFLAG_RW,
 static struct	sockaddr_in dccp_in = { sizeof(dccp_in), AF_INET };
 
 static int dccp_detach(struct socket *);
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-static int dccp_doconnect(struct dccpcb *, struct sockaddr *, struct thread *, int);
+#ifdef __FreeBSD__
+#if __FreeBSD_version >= 500000
+static int dccp_doconnect(struct socket *, struct sockaddr *, struct thread *, int);
 #else
-static int dccp_doconnect(struct dccpcb *, struct sockaddr *, struct proc *, int);
+static int dccp_doconnect(struct socket *, struct sockaddr *, struct proc *, int);
+#endif
+#else
+static int dccp_doconnect(struct socket *, struct mbuf *, struct proc *, int);
 #endif
 static struct dccpcb * dccp_close(struct dccpcb *);
 static int dccp_disconnect2(struct dccpcb *);
@@ -213,20 +238,28 @@ u_char dccp_ackvector_state(struct dccpcb *, u_int32_t);
 void
 dccp_init()
 {
+#ifdef __FreeBSD__
 	INP_INFO_LOCK_INIT(&dccpbinfo, "dccp");
 	DCCP_DEBUG((LOG_INFO, "Initializing DCCP!\n"));
 	LIST_INIT(&dccpb);
 	dccpbinfo.listhead = &dccpb;
-	dccpbinfo.hashbase = hashinit(UDBHASHSIZE, M_PCB, &dccpbinfo.hashmask);
-	dccpbinfo.porthashbase = hashinit(UDBHASHSIZE, M_PCB,
+	dccpbinfo.hashbase = hashinit(DCCPBHASHSIZE, M_PCB, &dccpbinfo.hashmask);
+	dccpbinfo.porthashbase = hashinit(DCCPBHASHSIZE, M_PCB,
 					&dccpbinfo.porthashmask);
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if __FreeBSD_version >= 500000
 	dccpbinfo.ipi_zone = uma_zcreate("dccpcb", sizeof(struct inp_dp), NULL,
 	    NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
 	uma_zone_set_max(dccpbinfo.ipi_zone, maxsockets);
 #else
 	dccpbinfo.ipi_zone = zinit("udpcb", sizeof(struct inp_dp), maxsockets,
 				 ZONE_INTERRUPT, 0);
+#endif
+#else
+	pool_init(&dccpcb_pool, sizeof(struct dccpcb), 0, 0, 0, "dccpcbpl", NULL);
+	in_pcbinit(&dccpbtable, DCCPBHASHSIZE, DCCPBHASHSIZE);
+#ifdef INET6
+	dccpb6.in6p_next = dccpb6.in6p_prev = &dccpb6;
+#endif
 #endif
 }
 
@@ -245,13 +278,21 @@ dccp6_input(struct mbuf **mp, int *offp, int proto)
 }
 #endif
 
+#ifdef __FreeBSD__
 void
 dccp_input(struct mbuf *m, int off)
+#else
+void
+dccp_input(struct mbuf *m, ...)
+#endif
 {
-	int iphlen = off;
+	int iphlen;
 	struct ip *ip = NULL;
 	struct dccphdr *dh;
 	struct inpcb *inp, *oinp;
+#ifndef __FreeBSD__
+	struct in6pcb *in6p;
+#endif
 	struct dccpcb *dp;
 	struct ipovly *ipov = NULL;
 	struct dccp_requesthdr *drqh;
@@ -271,6 +312,16 @@ dccp_input(struct mbuf *m, int off)
 	struct sockaddr_in6 src_sa6, dst_sa6;
 #endif
 
+#ifndef __FreeBSD__
+	int off;
+	va_list ap;
+	
+	va_start(ap, m);
+	iphlen = off = va_arg(ap, int);
+	va_end(ap);
+#else
+	iphlen = off;
+#endif
 
 	DCCP_DEBUG((LOG_INFO, "Got DCCP packet!\n"));
 
@@ -351,9 +402,11 @@ dccp_input(struct mbuf *m, int off)
 	if (isipv6)
 		len = m->m_pkthdr.len - off;
 	else
+#endif
 		len = ip->ip_len;
-#else
-	len = ip->ip_len;
+
+#ifdef __NetBSD__
+	len -= ip->ip_hl << 2;
 #endif
 
 	if (len < sizeof(struct dccphdr)) {
@@ -418,16 +471,43 @@ dccp_input(struct mbuf *m, int off)
 	if (isipv6) {
 		if (ip6_getpktaddrs(m, &src_sa6, &dst_sa6))
 			goto badunlocked;
+#ifdef __FreeBSD__
 		inp = in6_pcblookup_hash(&dccpbinfo, &src_sa6, dh->dh_sport,
 		    &dst_sa6, dh->dh_dport, 1, m->m_pkthdr.rcvif);
+#else
+		in6p = in6_pcblookup_connect(&dccpb6, &src_sa6, dh->dh_sport,
+		    &dst_sa6, dh->dh_dport, 0);
+		if (in6p == NULL) {
+			/* XXX stats increment? */
+			in6p = in6_pcblookup_bind(&dccpb6, &dst_sa6, dh->dh_dport, 0);
+		}
+#endif
 	} else
 #endif
 	{
+#ifdef __FreeBSD__
 		inp = in_pcblookup_hash(&dccpbinfo, ip->ip_src, dh->dh_sport,
 		    ip->ip_dst, dh->dh_dport, 1, m->m_pkthdr.rcvif);
+#else
+		inp = in_pcblookup_connect(&dccpbtable, ip->ip_src, dh->dh_sport,
+		    ip->ip_dst, dh->dh_dport);
+		log(LOG_INFO,
+		    "INP=%x, Connection attempt to DCCP %s:%d from %s:%d\n",
+		    (unsigned int )inp,
+		    inet_ntoa(ip->ip_dst), ntohs(dh->dh_dport), inet_ntoa(ip->ip_src),
+		    ntohs(dh->dh_sport));
+		if (inp == NULL) {
+			/* XXX stats increment? */
+			inp = in_pcblookup_bind(&dccpbtable, ip->ip_dst, dh->dh_dport);
+		}
+#endif
 	}
 
+#ifdef __FreeBSD__
 	if (inp == NULL) {
+#else
+	if (isipv6 ? in6p == NULL : inp == NULL) {
+#endif
 		if (dccp_log_in_vain) {
 #ifdef INET6
 			char dbuf[INET6_ADDRSTRLEN+2], sbuf[INET6_ADDRSTRLEN+2];
@@ -472,7 +552,14 @@ dccp_input(struct mbuf *m, int off)
 	}
 	INP_LOCK(inp);
 
+#ifdef __FreeBSD__
 	dp = (struct dccpcb *)inp->inp_ppcb;
+#else
+	if (isipv6)
+		dp = in6todccpcb(in6p);
+	else
+		dp = intodccpcb(inp);
+#endif
 
 	if (dp == 0) {
 		INP_UNLOCK(inp);
@@ -489,7 +576,14 @@ dccp_input(struct mbuf *m, int off)
 		goto badunlocked;
 	}
 
+#ifdef __FreeBSD__
 	so = inp->inp_socket;
+#else
+	if (isipv6)
+		so = in6p->in6p_socket;
+	else
+		so = inp->inp_socket;
+#endif
 
 	if (so->so_options & SO_ACCEPTCONN) {
 		DCCP_DEBUG((LOG_INFO, "so->options & SO_ACCEPTCONN! dp->state = %i\n", dp->state));
@@ -502,30 +596,56 @@ dccp_input(struct mbuf *m, int off)
 		}
 
 		oinp = inp;
+#ifdef __FreeBSD__
 		inp = sotoinpcb(so);
 		INP_LOCK(inp);
+#endif
 
 #ifdef INET6
 		if (isipv6) {
+#ifdef __FreeBSD__
 			inp->in6p_laddr = ip6->ip6_dst;
 			inp->in6p_faddr = ip6->ip6_src;
+			inp->inp_lport = dh->dh_dport;
+			inp->inp_fport = dh->dh_sport;
+#else
+			in6p = sotoin6pcb(so);
+			in6p->in6p_laddr = ip6->ip6_dst;
+			in6p->in6p_faddr = ip6->ip6_src;
+			in6p->in6p_lport = dh->dh_dport;
+			in6p->in6p_fport = dh->dh_sport;
+#endif
 		} else 
 #endif
 		{
+#ifndef __FreeBSD__
+			inp = sotoinpcb(so);
+#endif
 			inp->inp_laddr = ip->ip_dst;
 			inp->inp_faddr = ip->ip_src;
+			inp->inp_lport = dh->dh_dport;
+			inp->inp_fport = dh->dh_sport;
 		}
-		inp->inp_lport = dh->dh_dport;
-		inp->inp_fport = dh->dh_sport;
 
+#ifdef __FreeBSD__
 		if (in_pcbinshash(inp) != 0) {
 			DCCP_DEBUG((LOG_INFO, "Error, in_pcbinshash failed!\n"));
 			INP_UNLOCK(inp);
 			INP_INFO_WUNLOCK(&dccpbinfo);
 			goto badunlocked;
 		}
+#else
+		in_pcbstate(inp, INP_BOUND);
+#endif
 
+#ifdef __FreeBSD__
 		dp = (struct dccpcb *)inp->inp_ppcb;
+#else
+		if (isipv6)
+			dp = (struct dccpcb *)in6p->in6p_ppcb;
+		else
+			dp = (struct dccpcb *)inp->inp_ppcb;
+#endif
 		dp->state = DCCPS_LISTEN;
 		dp->who = DCCP_SERVER;
 		dp->cslen = ((struct dccpcb *)oinp->inp_ppcb)->cslen;
@@ -543,7 +663,7 @@ dccp_input(struct mbuf *m, int off)
 
 	seqnr = ntohl(dh->dh_seq << 8);
 	
-	if (dp->gsn_rcv == 1073741824)  {
+	if (dp->gsn_rcv == 1073741824)	{
 		dp->gsn_rcv = seqnr;
 	}
 
@@ -627,6 +747,7 @@ dccp_input(struct mbuf *m, int off)
 				dccp_add_feature(dp, DCCP_OPT_CHANGE, DCCP_FEATURE_CC, test, 2);
 			}
 			if (len > data_off) {
+				DCCP_DEBUG((LOG_INFO, "XXX: len=%d, data_off=%d\n", len, data_off));
 				dccp_add_option(dp, DCCP_OPT_DATA_DISCARD, test, 0);
 			}
 			callout_reset(&dp->connect_timer, DCCP_CONNECT_TIMER, dccp_connect_t, dp);
@@ -670,7 +791,14 @@ dccp_input(struct mbuf *m, int off)
 				DCCP_DEBUG((LOG_INFO, "Setting DCCPS_ESTAB & soisconnected\n"));
 				dp->state = DCCPS_ESTAB;
 				dccpstat.dccps_connects++;
+#ifdef __FreeBSD__
 				soisconnected(inp->inp_socket);
+#else
+				if (isipv6)
+					soisconnected(in6p->in6p_socket);
+				else
+					soisconnected(inp->inp_socket);
+#endif
 			} else {
 				dp->state = DCCPS_RESPOND;
 				DCCP_DEBUG((LOG_INFO, "CC negotiation is not finished, cc_in_use[0] = %u, cc_in_use[1] = %u\n",dp->cc_in_use[0], dp->cc_in_use[1]));
@@ -714,7 +842,14 @@ dccp_input(struct mbuf *m, int off)
 				DCCP_DEBUG((LOG_INFO, "Setting DCCPS_ESTAB & soisconnected\n"));
 				dp->state = DCCPS_ESTAB;
 				dccpstat.dccps_connects++;
+#ifdef __FreeBSD__
 				soisconnected(inp->inp_socket);
+#else
+				if (isipv6)
+					soisconnected(in6p->in6p_socket);
+				else
+					soisconnected(inp->inp_socket);
+#endif
 			} else {
 				DCCP_DEBUG((LOG_INFO, "CC negotiation is not finished, cc_in_use[0] = %u, cc_in_use[1] = %u\n",dp->cc_in_use[0], dp->cc_in_use[1]));
 				/* Force an output!!! */
@@ -919,7 +1054,11 @@ dccp_notify(struct inpcb *inp, int errno)
  * Called when we get ICMP errors (destination unrechable,
  * parameter problem, source quench, time exceeded and redirects)
  */
+#ifdef __FreeBSD__
 void
+#else
+void *
+#endif
 dccp_ctlinput(int cmd, struct sockaddr *sa, void *vip)
 {
 	struct ip *ip = vip;
@@ -929,13 +1068,17 @@ dccp_ctlinput(int cmd, struct sockaddr *sa, void *vip)
 #else
 	void (*notify)(struct inpcb *, int) = dccp_notify;
 #endif
-        struct in_addr faddr;
+	struct in_addr faddr;
 	struct inpcb *inp;
 	int s;
 
 	faddr = ((struct sockaddr_in *)sa)->sin_addr;
 	if (sa->sa_family != AF_INET || faddr.s_addr == INADDR_ANY)
-        	return;
+#ifdef __FreeBSD__
+		return;
+#else
+		return NULL;
+#endif
 
 	if (PRC_IS_REDIRECT(cmd)) {
 		ip = 0;
@@ -943,13 +1086,22 @@ dccp_ctlinput(int cmd, struct sockaddr *sa, void *vip)
 	} else if (cmd == PRC_HOSTDEAD)
 		ip = 0;
 	else if ((unsigned)cmd >= PRC_NCMDS || inetctlerrmap[cmd] == 0)
+#ifdef __FreeBSD__
 		return;
+#else
+		return NULL;
+#endif
 	if (ip) {
 		s = splnet();
 		dh = (struct dccphdr *)((caddr_t)ip + (ip->ip_hl << 2));
 		INP_INFO_RLOCK(&dccpbinfo);
+#ifdef __FreeBSD__
 		inp = in_pcblookup_hash(&dccpbinfo, faddr, dh->dh_dport,
-                    ip->ip_src, dh->dh_sport, 0, NULL);
+		    ip->ip_src, dh->dh_sport, 0, NULL);
+#else
+		in_pcbnotify(&dccpbtable, faddr, dh->dh_dport,
+		    ip->ip_src, dh->dh_sport, inetctlerrmap[cmd], notify); 
+#endif
 		if (inp != NULL) {
 			INP_LOCK(inp);
 			if (inp->inp_socket != NULL) {
@@ -960,10 +1112,20 @@ dccp_ctlinput(int cmd, struct sockaddr *sa, void *vip)
 		INP_INFO_RUNLOCK(&dccpbinfo);
 		splx(s);
 	} else
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
+#if __FreeBSD_version >= 500000
 		in_pcbnotifyall(&dccpbinfo, faddr, inetctlerrmap[cmd], notify);
 #else
 		in_pcbnotifyall(&dccpb, faddr, inetctlerrmap[cmd], notify);
+#endif
+#else /* !FreeBSD */
+		in_pcbnotifyall(&dccpbtable, faddr, inetctlerrmap[cmd], notify);
+#endif
+
+#ifdef __FreeBSD__
+	return;
+#else
+	return NULL;
 #endif
 }
 
@@ -972,23 +1134,128 @@ void
 dccp6_ctlinput(int cmd, struct sockaddr *sa, void *d)
 {
 	if (sa->sa_family != AF_INET6 || sa->sa_len != sizeof(struct sockaddr_in6))
-        	return;
+		return;
 	
 	/* FIX LATER */
 }
 #endif
 
+static int
+dccp_optsset(struct dccpcb *dp, int opt, struct mbuf **mp)
+{
+	struct mbuf *m;
+	int optval;
+	int error = 0;
+
+	if (mp == NULL)
+		return EINVAL;
+	m = *mp;
+	if (m == NULL)
+		return EINVAL;
+	
+	switch (opt) {
+	case DCCP_CCID:
+	case DCCP_CSLEN:
+	case DCCP_TFRC_AVGPSIZE:
+	case DCCP_MAXSEG:
+		
+		if (m->m_len < sizeof(int)) {
+			error = EINVAL;
+			break;
+		}
+		optval = *mtod(m, int *);
+		switch (opt) {
+		case DCCP_CCID:
+				/* Add check that optval is a CCID we support!!! */
+			if (optval == 2 || optval == 3 || optval == 0) {
+				dp->pref_cc = optval;
+			} else {
+				error = EINVAL;
+			}
+			break;
+		case DCCP_CSLEN:
+			if (optval > 15 || optval < 0) {
+				error = EINVAL;
+			} else {
+				dp->cslen = optval;
+			}
+			break;
+		case DCCP_TFRC_AVGPSIZE:
+			if (optval > 65536 || optval < 0) {
+				error = EINVAL;
+			} else {
+				dp->avgpsize = optval;
+			}
+			break;
+		case DCCP_MAXSEG:
+			if (optval > 0 && optval <= dp->d_maxseg) {
+				dp->d_maxseg = optval;
+			} else {
+				error = EINVAL;
+			}
+			break;
+		}
+		
+		break;
+		
+	default:
+		error = ENOPROTOOPT;
+	}
+
+	return error;
+}
+
+static int	
+dccp_optsget(struct dccpcb *dp, int opt, struct mbuf **mp)
+{
+	struct mbuf *m;
+	int optval = 0;
+	int error = 0;
+
+	m = *mp;
+
+	if (m->m_len < sizeof(optval)) {
+		error = EINVAL;
+		return error;
+	}
+
+	switch (opt) {
+	case DCCP_CCID:
+		optval = dp->pref_cc;
+		break;
+	case DCCP_CSLEN:
+		optval = dp->cslen;
+		break;
+	case DCCP_TFRC_AVGPSIZE:
+		optval = dp->avgpsize;
+		break;
+	case DCCP_MAXSEG:
+		optval = dp->d_maxseg;
+		break;
+	default:
+		error = ENOPROTOOPT;
+	}
+
+	if (error == 0) {
+		*mtod(m, int *) = optval;
+		m->m_len = sizeof(optval);
+	}
+	
+	return error;
+}
+
 /* 
  * Called by getsockopt and setsockopt.
  *
  */
+#ifdef __FreeBSD__
 int
 dccp_ctloutput(struct socket *so, struct sockopt *sopt)
 {
-	int optval, s, error = 0;
+	int s, error = 0;
 	struct inpcb	*inp;
 	struct dccpcb	*dp;
-
+	struct mbuf	*m;
 
 	s = splnet();
 	INP_INFO_RLOCK(&dccpbinfo);
@@ -1009,97 +1276,147 @@ dccp_ctloutput(struct socket *so, struct sockopt *sopt)
 		else 
 #endif
 			error = ip_ctloutput(so, sopt);
-		INP_UNLOCK(inp);
-		splx(s);
-		return(error);
+		goto out;
 	}
 
-	dp = (struct dccpcb *)inp->inp_ppcb;
-	switch (sopt->sopt_dir) {
-	case SOPT_SET:
-	      switch (sopt->sopt_name) {
-		case DCCP_CCID:
-		case DCCP_CSLEN:
-		case DCCP_TFRC_AVGPSIZE:
-		case DCCP_MAXSEG:
-			error = sooptcopyin(sopt, &optval, sizeof optval, sizeof optval);
+	if (sopt->sopt_valsize > MCLBYTES) {
+		/*
+		 * Restrict us down to a cluster size, that's all we can
+		 * pass either way...
+		 */
+		sopt->sopt_valsize = MCLBYTES;
+	}
+	if (sopt->sopt_valsize) {
 
-			if (error)
-				break;
-
-			switch (sopt->sopt_name) {
-			case DCCP_CCID:
-				/* Add check that optval is a CCID we support!!! */
-				if (optval == 2 || optval == 3 || optval == 0) {
-					dp->pref_cc = optval;
-				} else {
-					error = EINVAL;
-				}
-				break;
-			case DCCP_CSLEN:
-				if (optval > 15 || optval < 0) {
-					error = EINVAL;
-				} else {
-					dp->cslen = optval;
-				}
-				break;
-			case DCCP_TFRC_AVGPSIZE:
-				if (optval > 65536 || optval < 0) {
-					error = EINVAL;
-				} else {
-					dp->avgpsize = optval;
-				}
-				break;
-			case DCCP_MAXSEG:
-				if (optval > 0 && optval <= dp->d_maxseg) {
-					dp->d_maxseg = optval;
-				} else {
-					error = EINVAL;
-				}
-				break;
+		m = m_get(M_WAIT, MT_DATA);
+		if (sopt->sopt_valsize > MLEN) {
+			MCLGET(m, M_DONTWAIT);
+			if ((m->m_flags & M_EXT) == 0) {
+				m_freem(m);
+				error = ENOBUFS;
+				goto out;
 			}
-
-			break;
-
-		default:
-			error = ENOPROTOOPT;
 		}
-
-	      break;
-
-	case SOPT_GET:
-		switch (sopt->sopt_name) {
-		case DCCP_CCID:
-			optval = dp->pref_cc;
-			break;
-		case DCCP_CSLEN:
-			optval = dp->cslen;
-			break;
-		case DCCP_TFRC_AVGPSIZE:
-			optval = dp->avgpsize;
-			break;
-		case DCCP_MAXSEG:
-			optval = dp->d_maxseg;
-			break;
-		default:
-			error = ENOPROTOOPT;
+		error = sooptcopyin(sopt, mtod(m, caddr_t), sopt->sopt_valsize,
+				    sopt->sopt_valsize);
+		if (error) {
+			(void) m_free(m);
+			goto out;
 		}
+		m->m_len = sopt->sopt_valsize;
+	}
+	
+	dp = intodccpcb(inp);
 
-		if (error == 0) {
-			error = sooptcopyout(sopt, &optval, sizeof optval);
+	if (sopt->sopt_dir == SOPT_SET) {
+		error = dccp_optsset(dp, sopt->sopt_name, &m);
+	} else if (sopt->sopt_dir == SOPT_GET) {
+		error = dccp_optsget(dp, sopt->sopt_name, &m);
+		if (error == 0 && m != NULL) {
+			error = sooptcopyout(sopt, mtod(m, caddr_t), m->m_len);
 		}
+	} else {
+		error = EINVAL;
+	}
+	if (m != NULL)
+		m_freem(m);
+ out:
+	INP_UNLOCK(inp);
+	splx(s);
+	return (error);
+}
+
+#else /* NetBSD and OpenBSD */
+int
+dccp_ctloutput(int op, struct socket *so, int level, int optname, struct mbuf **mp)
+{
+	int s, error = 0;
+	struct inpcb	*inp;
+#ifdef INET6
+	struct in6pcb *in6p;
+#endif
+	struct dccpcb	*dp;
+	int family;	/* family of the socket */
+
+	family = so->so_proto->pr_domain->dom_family;
+	error = 0;
+
+	s = splsoftnet();
+	switch (family) {
+	case PF_INET:
+		inp = sotoinpcb(so);
+#ifdef INET6
+		in6p = NULL;
+#endif
 		break;
+#ifdef INET6
+	case PF_INET6:
+		inp = NULL;
+		in6p = sotoin6pcb(so);
+		break;
+#endif
+	default:
+		splx(s);
+		return EAFNOSUPPORT;
+	}
+#ifndef INET6
+	if (inp == NULL)
+#else
+	if (inp == NULL && in6p == NULL)
+#endif
+	{
+		splx(s);
+		if (op == PRCO_SETOPT && *mp)
+			(void) m_free(*mp);
+		return (ECONNRESET);
+	}
+	if (level != IPPROTO_DCCP) {
+		switch (family) {
+		case PF_INET:
+			error = ip_ctloutput(op, so, level, optname, mp);
+			break;
+#ifdef INET6
+		case PF_INET6:
+			error = ip6_ctloutput(op, so, level, optname, mp);
+			break;
+#endif
+		}
+		splx(s);
+		return (error);
 	}
 
-	INP_UNLOCK(inp);
+	if (inp)
+		dp = intodccpcb(inp);
+#ifdef INET6
+	else if (in6p)
+		dp = in6todccpcb(in6p);
+#endif
+	else
+		dp = NULL;
+
+	if (op == PRCO_SETOPT) {
+		error = dccp_optsset(dp, optname, mp);
+		if (*mp)
+			(void) m_free(*mp);
+	} else if (op ==  PRCO_GETOPT) {
+		*mp = m_get(M_WAIT, MT_SOOPTS);
+		(*mp)->m_len = MLEN;
+		error = dccp_optsget(dp, optname, mp);
+	} else {
+		error = EINVAL;
+	}
 	splx(s);
 	return error;
 }
+#endif
 
 int
 dccp_output(struct dccpcb *dp, u_int8_t extra)
 {
 	struct inpcb *inp = dp->d_inpcb;
+#ifndef __FreeBSD__
+	struct in6pcb *in6p = NULL;
+#endif
 	struct socket *so = inp->inp_socket;
 	struct mbuf *m;
 
@@ -1119,7 +1436,11 @@ dccp_output(struct dccpcb *dp, u_int8_t extra)
 #ifdef INET6
 	struct ip6_hdr *ip6 = NULL;
 
+#ifdef __FreeBSD__
 	isipv6 = (dp->d_inpcb->inp_vflag & INP_IPV6) != 0;
+#else
+	isipv6 = (dp->inp_vflag & INP_IPV6) != 0;
+#endif
 #endif
 
 	DCCP_DEBUG((LOG_INFO, "Going to send a DCCP packet!\n"));
@@ -1127,6 +1448,12 @@ dccp_output(struct dccpcb *dp, u_int8_t extra)
 	mtx_assert(&dp->d_inpcb->inp_mtx, MA_OWNED);
 #endif
 
+#ifndef __FreeBSD__
+	if (isipv6) {
+		inp = 0;
+		in6p = sotoin6pcb(so);
+	}
+#endif
 	if (dp->state != DCCPS_ESTAB && extra == 1) {
 		/* Only let cc decide when to resend if we are in establised state */
 		return 0;
@@ -1137,7 +1464,7 @@ again:
 
 
 	off = 0; /* off not needed for dccp because we do not need to wait for ACK
-		    before removing the packet   */
+		    before removing the packet	 */
 	len = (long)so->so_snd.sb_cc;
 	optlen = 0;
 
@@ -1295,12 +1622,21 @@ again:
 		ip6 = mtod(m, struct ip6_hdr *);
 		dh = (struct dccphdr *)(ip6 + 1);
 		ip6->ip6_flow = (ip6->ip6_flow & ~IPV6_FLOWINFO_MASK) |
+#ifdef __FreeBSD__
 			(inp->in6p_flowinfo & IPV6_FLOWINFO_MASK);
+#else
+			(in6p->in6p_flowinfo & IPV6_FLOWINFO_MASK);
+#endif
 		ip6->ip6_vfc = (ip6->ip6_vfc & ~IPV6_VERSION_MASK) |
 			 (IPV6_VERSION & IPV6_VERSION_MASK);
 		ip6->ip6_nxt = IPPROTO_DCCP;
+#ifdef __FreeBSD__
 		ip6->ip6_src = inp->in6p_laddr;
 		ip6->ip6_dst = inp->in6p_faddr;
+#else
+		ip6->ip6_src = in6p->in6p_laddr;
+		ip6->ip6_dst = in6p->in6p_faddr;
+#endif
 	} else 
 #endif
 	{
@@ -1312,8 +1648,16 @@ again:
 		ip->ip_dst = inp->inp_faddr;
 	}
 
-	dh->dh_sport = inp->inp_lport;
-	dh->dh_dport = inp->inp_fport;
+	if (inp) {
+		dh->dh_sport = inp->inp_lport;
+		dh->dh_dport = inp->inp_fport;
+	}
+#ifndef __FreeBSD__
+	else if (in6p) {
+		dh->dh_sport = in6p->in6p_lport;
+		dh->dh_dport = in6p->in6p_fport;
+	}
+#endif
 	dh->dh_cslen = dp->cslen;
 	dh->dh_ndp = (dp->ndp % 16);
 	dh->dh_type = type;
@@ -1374,7 +1718,11 @@ again:
 	/*
 	 * Set up checksum 
 	 */
+#ifdef __FreeBSD__
 	m->m_pkthdr.csum_flags = CSUM_IP; /* Do not allow the network card to calculate the checksum */
+#else
+	m->m_pkthdr.csum_flags = 0;
+#endif
 
 #ifdef INET6
 	if (isipv6) {
@@ -1382,14 +1730,28 @@ again:
 	} else
 #endif
 	{
-	      	dh->dh_sum = in_pseudo(ip->ip_src.s_addr, ip->ip_dst.s_addr,
-		    htons((u_short)len + sizeof(struct dccphdr) + extrah_len + optlen + IPPROTO_DCCP)); 
+#ifdef __FreeBSD__
+		dh->dh_sum = in_pseudo(ip->ip_src.s_addr, ip->ip_dst.s_addr,
+		    htons((u_short)len + sizeof(struct dccphdr) +
+		    extrah_len + optlen + IPPROTO_DCCP)); 
 		dh->dh_sum = in_cksum_skip(m, hdrlen + cslen, 20);
+#else
+		dh->dh_sum = in_cksum_phdr(ip->ip_src.s_addr,
+		    ip->ip_dst.s_addr, htons((u_short)len +
+		    sizeof(struct dccphdr) + extrah_len + optlen +
+		    IPPROTO_DCCP));
+		dh->dh_sum = in4_cksum(m, 0, 20, hdrlen + cslen - 20);
+#endif
 		m->m_pkthdr.csum_data = offsetof(struct dccphdr, dh_sum);
 
 		ip->ip_len = hdrlen + len;
+#ifdef __FreeBSD__
 		ip->ip_ttl = inp->inp_ip_ttl;	/* XXX */
 		ip->ip_tos = inp->inp_ip_tos;	/* XXX */
+#else
+		ip->ip_ttl = dp->inp_ip_ttl;	/* XXX */
+		ip->ip_tos = dp->inp_ip_tos;	/* XXX */
+#endif
 	}
 
 	DCCP_DEBUG((LOG_INFO, "Calculated checksum,  dh->dh_cslen = %u, cslen = %u, len = %li hdrlen = %u, dh->dh_sum = 0x%04x\n", dh->dh_cslen, cslen, len, hdrlen, dh->dh_sum));
@@ -1400,8 +1762,13 @@ again:
 #ifdef INET6
 	if (isipv6) {
 		DCCP_DEBUG((LOG_INFO, "Calling ip_output6, mbuf->m_len = %u, mbuf->m_pkthdr.len = %u\n", m->m_len, m->m_pkthdr.len));
+#ifdef __FreeBSD__
 		error = ip6_output(m, inp->in6p_outputopts, &inp->in6p_route,
 		    (inp->inp_socket->so_options & SO_DONTROUTE), NULL, NULL, inp);
+#else
+		error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route,
+		    (inp->inp_socket->so_options & SO_DONTROUTE), NULL, NULL);
+#endif
 	} else
 #endif
 	{
@@ -1463,8 +1830,12 @@ dccp_abort(struct socket *so)
 static struct dccpcb *
 dccp_close(struct dccpcb *dp)
 {
+	struct socket *so;
 	struct inpcb *inp = dp->d_inpcb;
-	struct socket *so = inp->inp_socket;
+#ifndef __FreeBSD__
+	struct in6pcb *in6p = dp->d_in6pcb;
+#endif
+	so = dptosocket(dp);
 
 	DCCP_DEBUG((LOG_INFO, "Entering dccp_close!\n"));
 
@@ -1479,10 +1850,26 @@ dccp_close(struct dccpcb *dp)
 	if (dp->cc_in_use[1] > 0)
 		(*cc_sw[dp->cc_in_use[1]].cc_recv_free)(dp->cc_state[1]);
 
+#ifdef __FreeBSD__
 	inp->inp_ppcb = NULL;
 	dp->d_inpcb = NULL;
 	soisdisconnected(so);
 	in_pcbdetach(inp);
+#else
+	pool_put(&dccpcb_pool, dp);
+	if (inp) {
+		inp->inp_ppcb = NULL;
+		soisdisconnected(so);
+		in_pcbdetach(inp);
+	}
+#ifdef INET6
+	else if (in6p) {
+		in6p->in6p_ppcb = 0;
+		soisdisconnected(so);
+		in6_pcbdetach(in6p);
+	}
+#endif
+#endif
 	return ((struct dccpcb *)0);
 }
 
@@ -1498,26 +1885,107 @@ dccp_attach(struct socket *so, int proto, struct proc *td)
 #endif
 {
 	struct inpcb *inp;
+#ifndef __FreeBSD__
+	struct in6pcb *in6p;
+#endif
 	struct dccpcb *dp;
 	int error = 0;
 	int s = splnet();
+#ifndef __FreeBSD__
+	int family;
+#endif
 
 	DCCP_DEBUG((LOG_INFO, "Entering dccp_attach!\n"));
 	INP_INFO_WLOCK(&dccpbinfo);
-
+	
+#ifdef __FreeBSD__
 	inp = sotoinpcb(so);
 	if (inp != 0) {
 		error = EINVAL;
 		goto out;
 	}
-
 	error = soreserve(so, dccp_sendspace, dccp_recvspace);
+	if (error)
+		goto out;
 	error = in_pcballoc(so, &dccpbinfo, td);
 	if (error)
 		goto out;
 
 	inp = sotoinpcb(so);
+#else
+	family = so->so_proto->pr_domain->dom_family;
+	switch (family) {
+	case PF_INET:
+		inp = sotoinpcb(so);
+		if (inp != 0) {
+			error = EINVAL;
+			goto out;
+		}
+		error = soreserve(so, dccp_sendspace, dccp_recvspace);
+		if (error)
+			goto out;
+		error = in_pcballoc(so, &dccpbtable);
+		if (error)
+			goto out;
+		inp = sotoinpcb(so);
+		in6p = NULL;
+		break;
+	case PF_INET6:
+		in6p = sotoin6pcb(so);
+		if (in6p != 0) {
+			error = EINVAL;
+			goto out;
+		}
+		error = soreserve(so, dccp_sendspace, dccp_recvspace);
+		if (error)
+			goto out;
+		error = in6_pcballoc(so, &dccpb6);
+		if (error)
+			goto out;
+		in6p = sotoin6pcb(so);
+		inp = NULL;
+		break;
+	default:
+		error = EAFNOSUPPORT;
+		goto out;
+	}
 
+#endif
+
+#ifdef __FreeBSD__
+	if (inp)
+		dp = dccp_newdccpcb((void *)inp);
+	else
+		dp = NULL;
+#else
+	if (inp)
+		dp = dccp_newdccpcb(PF_INET, (void *)inp);
+	else if (in6p)
+		dp = dccp_newdccpcb(PF_INET6, (void *)in6p);
+	else
+		dp = NULL;
+#endif
+
+	if (dp == 0) {
+		int nofd = so->so_state & SS_NOFDREF;
+		so->so_state &= ~SS_NOFDREF;
+#ifdef INET6
+#ifdef __FreeBSD__
+		if (INP_CHECK_SOCKAF(so, AF_INET6)) {
+			in6_pcbdetach(inp);
+#else
+		if (family == AF_INET6) {
+			in6_pcbdetach(in6p);
+#endif
+		} else
+#endif
+			in_pcbdetach(inp);
+		so->so_state |= nofd;
+		error = ENOBUFS;
+		goto out;
+	}
+
+#ifdef __FreeBSD__
 #ifdef INET6
 	if (INP_CHECK_SOCKAF(so, AF_INET6)) {
 		DCCP_DEBUG((LOG_INFO, "We are a ipv6 socket!!!\n"));
@@ -1526,21 +1994,15 @@ dccp_attach(struct socket *so, int proto, struct proc *td)
 #endif
 		inp->inp_vflag |= INP_IPV4;
 	inp->inp_ip_ttl = ip_defttl;
-
-	dp = dccp_newdccpcb(inp);
-	if (dp == 0) {
-		int nofd = so->so_state & SS_NOFDREF;
-		so->so_state &= ~SS_NOFDREF;
-#ifdef INET6
-		if (INP_CHECK_SOCKAF(so, AF_INET6)) {
-			in6_pcbdetach(inp);
-		} else
+#else
+	if (so->so_proto->pr_domain->dom_family == AF_INET6) {
+		DCCP_DEBUG((LOG_INFO, "We are a ipv6 socket!!!\n"));
+		dp->inp_vflag |= INP_IPV6;
+	} else 
+		dp->inp_vflag |= INP_IPV4;
+	dp->inp_ip_ttl = ip_defttl;
 #endif
-			in_pcbdetach(inp);
-		so->so_state |= nofd;
-		error = ENOBUFS;
-		goto out;
-	}
+
 	dp->state = DCCPS_CLOSED;
 out:
 	INP_INFO_WUNLOCK(&dccpbinfo);
@@ -1549,15 +2011,22 @@ out:
 }
 
 static int
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
+#if __FreeBSD_version >= 500000
 dccp_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 #else
 dccp_bind(struct socket *so, struct sockaddr *nam, struct proc *td)
+#endif
+#else
+dccp_bind(struct socket *so, struct mbuf *m, struct proc *td)
 #endif
 {
 	struct inpcb *inp;
 	int s, error;
 	struct sockaddr_in *sinp;
+#ifndef __FreeBSD__
+	struct sockaddr *nam;
+#endif
 
 	DCCP_DEBUG((LOG_INFO, "Entering dccp_bind!\n"));
 	s = splnet();
@@ -1570,14 +2039,22 @@ dccp_bind(struct socket *so, struct sockaddr *nam, struct proc *td)
 	}
 
 	/* Do not bind to multicast addresses! */
+#ifndef __FreeBSD__
+	nam = mtod(m, struct sockaddr *);
+#endif
 	sinp = (struct sockaddr_in *)nam;
 	if (sinp->sin_family == AF_INET &&
 		IN_MULTICAST(ntohl(sinp->sin_addr.s_addr))) {
 		INP_INFO_WUNLOCK(&dccpbinfo);
+		splx(s);
 		return EAFNOSUPPORT;
 	}
 	INP_LOCK(inp);
+#ifdef __FreeBSD__
 	error = in_pcbbind(inp, nam, td);
+#else
+	error = in_pcbbind(inp, m, td);
+#endif
 	INP_UNLOCK(inp);
 	INP_INFO_WUNLOCK(&dccpbinfo);
 	splx(s);
@@ -1586,19 +2063,29 @@ dccp_bind(struct socket *so, struct sockaddr *nam, struct proc *td)
 
 #ifdef INET6
 static int
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
+#if __FreeBSD_version >= 500000
 dccp6_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 #else
 dccp6_bind(struct socket *so, struct sockaddr *nam, struct proc *td)
 #endif
+#else
+dccp6_bind(struct socket *so, struct mbuf *m, struct proc *td)
+#endif
 {
+#ifdef __FreeBSD__
 	struct inpcb *inp;
+#else
+	struct in6pcb *in6p;
+	struct sockaddr *nam;
+#endif
 	int s, error;
 	struct sockaddr_in6 *sin6p;
 
 	DCCP_DEBUG((LOG_INFO, "Entering dccp6_bind!\n"));
 	s = splnet();
 	INP_INFO_WLOCK(&dccpbinfo);
+#ifdef __FreeBSD__
 	inp = sotoinpcb(so);
 	if (inp == 0) {
 		INP_INFO_WUNLOCK(&dccpbinfo);
@@ -1606,19 +2093,40 @@ dccp6_bind(struct socket *so, struct sockaddr *nam, struct proc *td)
 		splx(s);
 		return EINVAL;
 	}
+#else
+	in6p = sotoin6pcb(so);
+	if (in6p == 0) {
+		DCCP_DEBUG((LOG_INFO, "dccp6_bind: in6p == 0!\n"));
+		splx(s);
+		return EINVAL;
+	}
+#endif
 	/* Do not bind to multicast addresses! */
+#ifndef __FreeBSD__
+	nam = mtod(m, struct sockaddr *);
+#endif
 	sin6p = (struct sockaddr_in6 *)nam;
 	if (sin6p->sin6_family == AF_INET6 &&
 		IN6_IS_ADDR_MULTICAST(&sin6p->sin6_addr)) {
 		INP_INFO_WUNLOCK(&dccpbinfo);
+		splx(s);
 		return EAFNOSUPPORT;
 	}
 	INP_LOCK(inp);
 
+#ifdef __FreeBSD__
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
+#else
+	in6todccpcb(in6p)->inp_vflag &= ~INP_IPV4;
+	in6todccpcb(in6p)->inp_vflag |= INP_IPV6;
+#endif
 	
+#ifdef __FreeBSD__
 	error = in6_pcbbind(inp, nam, td);
+#else
+	error = in6_pcbbind(in6p, m, td);
+#endif
 	INP_UNLOCK(inp);
 	INP_INFO_WUNLOCK(&dccpbinfo);
 	splx(s);
@@ -1631,14 +2139,21 @@ dccp6_bind(struct socket *so, struct sockaddr *nam, struct proc *td)
  * Called by the connect system call.
  */
 static int
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
+#if __FreeBSD_version >= 500000
 dccp_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 #else
 dccp_connect(struct socket *so, struct sockaddr *nam, struct proc *td)
 #endif
+#else /* !FreeBSD */
+dccp_connect(struct socket *so, struct mbuf *m, struct proc *td)
+#endif
 {
 	struct inpcb *inp;
 	struct dccpcb *dp;
+#ifndef __FreeBSD__
+	struct sockaddr *nam;
+#endif
 	int s, error;
 	struct sockaddr_in *sin;
 	char test[2];
@@ -1671,6 +2186,9 @@ dccp_connect(struct socket *so, struct sockaddr *nam, struct proc *td)
 
 	dccpstat.dccps_connattempt++;
 
+#ifndef __FreeBSD__
+	nam = mtod(m, struct sockaddr *);
+#endif
 	sin = (struct sockaddr_in *)nam;
 	if (sin->sin_family == AF_INET
 	    && IN_MULTICAST(ntohl(sin->sin_addr.s_addr))) {
@@ -1679,7 +2197,11 @@ dccp_connect(struct socket *so, struct sockaddr *nam, struct proc *td)
 		goto bad;
 	}
 
-	error = dccp_doconnect(dp, nam, td, 0);
+#ifdef __FreeBSD__
+	error = dccp_doconnect(so, nam, td, 0);
+#else
+	error = dccp_doconnect(so, m, td, 0);
+#endif
 
 	if (error != 0)
 		goto bad;
@@ -1708,16 +2230,23 @@ bad:
 
 #ifdef INET6
 static int
+#ifdef __FreeBSD__
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 dccp6_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 #else
 dccp6_connect(struct socket *so, struct sockaddr *nam, struct proc *td)
+#endif
+#else
+dccp6_connect(struct socket *so, struct mbuf *m, struct proc *td)
 #endif
 {
 	struct inpcb *inp;
 	struct dccpcb *dp;
 	int s, error;
 	struct sockaddr_in *sin;
+#ifndef __FreeBSD__
+	struct sockaddr *nam;
+#endif
 	char test[2];
 
 	DCCP_DEBUG((LOG_INFO, "Entering dccp6_connect!\n"));
@@ -1754,11 +2283,20 @@ dccp6_connect(struct socket *so, struct sockaddr *nam, struct proc *td)
 		goto bad;
 	}
 
+#ifdef __FreeBSD__
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
 	inp->inp_inc.inc_isipv6 = 1;
+#else
+	dp->inp_vflag &= ~INP_IPV4;
+	dp->inp_vflag |= INP_IPV6;
+#endif
 
-	error = dccp_doconnect(dp, nam, td, 1);
+#ifdef __FreeBSD__
+	error = dccp_doconnect(so, nam, td, 1);
+#else
+	error = dccp_doconnect(so, m, td, 1);
+#endif
 
 	if (error != 0)
 		goto bad;
@@ -1791,98 +2329,87 @@ bad:
  *
  */
 static int
-dccp_doconnect(struct dccpcb *dp, struct sockaddr *nam,
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
+dccp_doconnect(struct socket *so, struct sockaddr *nam,
+#if __FreeBSD_version >= 500000
     struct thread *td,
 #else
     struct proc *td,
 #endif
     int isipv6)
-{ 
-	struct inpcb *inp = dp->d_inpcb;
-	struct socket *so = inp->inp_socket;
-#ifdef INET6
-	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)nam;
-	struct sockaddr_in6 *addr6;
-#endif
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	struct in_addr laddr;
-	u_short	lport;
 #else
-	struct inpcb *oinp;
-	struct sockaddr_in *sin = (struct sockaddr_in *)nam;
-	struct sockaddr_in *ifaddr;
+dccp_doconnect(struct socket *so, struct mbuf *m,
+    struct proc *td, int isipv6)
+#endif
+{ 
+	struct inpcb *inp;
+#ifndef __FreeBSD__
+#ifdef INET6
+	struct in6pcb *in6p;
+#endif
 #endif
 	int error = 0;
 
 	DCCP_DEBUG((LOG_INFO, "Entering dccp_doconnect!\n"));
 
+#ifndef __FreeBSD__
+	if (isipv6) {
+		in6p = sotoin6pcb(so);
+		inp = 0;
+	} else
+#endif
+	{
+		inp = sotoinpcb(so);
+#ifndef __FreeBSD__
+		in6p = 0;
+#endif
+	}
 
 	if (inp->inp_lport == 0) {
 #ifdef INET6
 		if (isipv6) {
 			DCCP_DEBUG((LOG_INFO, "Running in6_pcbbind!\n"));
+#ifdef __FreeBSD__
 			error = in6_pcbbind(inp, (struct sockaddr *)0, td);
-		} else
+#else
+			error = in6_pcbbind(in6p, (struct mbuf *)0, td);
 #endif
+		} else
+#endif /* INET6 */
+		{
+#ifdef __FreeBSD__
 			error = in_pcbbind(inp, (struct sockaddr *)0, td);
+#else
+			error = in_pcbbind(inp, (struct mbuf *)0, td);
+#endif
+		}
 		if (error)
 			return error;
 	}
-
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	laddr = inp->inp_laddr;
-        lport = inp->inp_lport;
-#endif
 
 #ifdef INET6
 	if (isipv6)
-		error = in6_pcbladdr(inp, nam, &addr6);
+#ifdef __FreeBSD__
+		error = in6_pcbconnect(inp, nam, td);
+#else
+		error = in6_pcbconnect(in6p, m);
+#endif
 	else
 #endif
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-		error = in_pcbconnect_setup(inp, nam, &laddr.s_addr, &lport,
-			&inp->inp_faddr.s_addr, &inp->inp_fport, NULL, td);
+#ifdef __FreeBSD__
+#if __FreeBSD_version >= 500000
+		error = in_pcbconnect(inp, nam, td);
 #else
 	{
-		error = in_pcbladdr(inp, nam, &ifaddr);
-		if (error)
-			return error;
-		oinp = in_pcblookup_hash(inp->inp_pcbinfo,
-		    sin->sin_addr, sin->sin_port,
-		    inp->inp_laddr.s_addr != INADDR_ANY ? inp->inp_laddr
-		    : ifaddr->sin_addr,
-		    inp->inp_lport,  0, NULL);
-		if (oinp) {
-			return EADDRINUSE;
-		}
-		if (inp->inp_laddr.s_addr == INADDR_ANY)
-			inp->inp_laddr = ifaddr->sin_addr;
-		inp->inp_faddr = sin->sin_addr;
-		inp->inp_fport = sin->sin_port;
+		error = in_pcbconnect(inp, nam, td);
 	}
+#endif
+#else /* !FreeBSD */
+		error = in_pcbconnect(inp, m);
 #endif
 	if (error)
 		return error;
 
-#ifdef INET6
-	if (isipv6) {
-		if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa)) {
-			inp->in6p_lsa.sin6_addr = addr6->sin6_addr;
-			inp->in6p_lsa.sin6_scope_id = addr6->sin6_scope_id;
-		}
-		inp->in6p_faddr = sin6->sin6_addr;
-		inp->inp_fport = sin6->sin6_port;
-		if ((sin6->sin6_flowinfo & IPV6_FLOWINFO_MASK) != 0)
-			inp->in6p_flowinfo = sin6->sin6_flowinfo;
-	} else
-#endif
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	inp->inp_laddr = laddr;
-#endif
-
-	in_pcbrehash(inp);
-	
 	soisconnecting(so);
 	return error;
 }
@@ -1957,7 +2484,7 @@ dccp_disconnect(struct socket *so)
 static int
 dccp_disconnect2(struct dccpcb *dp)
 {
-	struct socket *so = dp->d_inpcb->inp_socket;
+	struct socket *so = dptosocket(dp);
 
 	DCCP_DEBUG((LOG_INFO, "Entering dccp_disconnect2!\n"));
 
@@ -1983,6 +2510,7 @@ dccp_disconnect2(struct dccpcb *dp)
 }
 
 static int
+#ifdef __FreeBSD__
 dccp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
     struct mbuf *control, 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
@@ -1990,9 +2518,16 @@ dccp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 #else
     struct proc *td)
 #endif
+#else
+dccp_send(struct socket *so, int flags, struct mbuf *m, struct mbuf *m_addr,
+    struct mbuf *control, struct proc *td)
+#endif
 {
 	struct inpcb	*inp;
 	struct dccpcb	*dp;
+#ifndef __FreeBSD__
+	struct sockaddr *addr;
+#endif
 	int		error = 0;
 	int		isipv6 = 0;
 
@@ -2006,6 +2541,13 @@ dccp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		return EINVAL;
 	}
 	INP_LOCK(inp);
+
+#ifndef __FreeBSD__
+	if (m_addr == 0)
+		addr = NULL;
+	else
+		addr = mtod(m_addr, struct sockaddr *);
+#endif
 
 #ifdef INET6
 	isipv6 = addr && addr->sa_family == AF_INET6;
@@ -2034,7 +2576,11 @@ dccp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	sbappend(&so->so_snd, m);
 
 	if (addr && dp->state == DCCPS_CLOSED) {
-		error = dccp_doconnect(dp, addr, td, isipv6);
+#ifdef __FreeBSD__
+		error = dccp_doconnect(so, addr, td, isipv6);
+#else
+		error = dccp_doconnect(so, m_addr, td, isipv6);
+#endif
 		if (error)
 			goto out;
 	}
@@ -2094,7 +2640,11 @@ dccp_listen(struct socket *so, struct proc *td)
 	INP_INFO_RUNLOCK(&dccpbinfo);
 	dp = (struct dccpcb *)inp->inp_ppcb;
 	if (inp->inp_lport == 0)
+#ifdef __FreeBSD__
 		error = in_pcbbind(inp, (struct sockaddr *)0, td);
+#else
+		error = in_pcbbind(inp, (struct mbuf *)0, td);
+#endif
 	if (error == 0) {
 		dp->state = DCCPS_LISTEN;
 		dp->who = DCCP_LISTENER;
@@ -2112,7 +2662,11 @@ dccp6_listen(struct socket *so, struct thread *td)
 dccp6_listen(struct socket *so, struct proc *td)
 #endif
 {
+#ifdef __FreeBSD__
 	struct inpcb *inp;
+#else
+	struct in6pcb *in6p;
+#endif
 	struct dccpcb *dp;
 	int error = 0;
 	int s = splnet();
@@ -2120,6 +2674,7 @@ dccp6_listen(struct socket *so, struct proc *td)
 	DCCP_DEBUG((LOG_INFO, "Entering dccp6_listen!\n"));
 
 	INP_INFO_RLOCK(&dccpbinfo);
+#ifdef __FreeBSD__
 	inp = sotoinpcb(so);
 	if (inp == 0) {
 		INP_INFO_RUNLOCK(&dccpbinfo);
@@ -2136,6 +2691,21 @@ dccp6_listen(struct socket *so, struct proc *td)
 			inp->inp_vflag |= INP_IPV4;
 		error = in6_pcbbind(inp, (struct sockaddr *)0, td);
 	}
+#else
+	in6p = sotoin6pcb(so);
+	if (in6p == 0) {
+		splx(s);
+		return EINVAL;
+	}
+	dp = in6todccpcb(in6p);
+	DCCP_DEBUG((LOG_INFO, "Checking inp->inp_lport!\n"));
+	if (in6p->in6p_lport == 0) {
+		dp->inp_vflag &= ~INP_IPV4;
+		if ((in6p->in6p_flags & IN6P_IPV6_V6ONLY) == 0)
+			dp->inp_vflag |= INP_IPV4;
+		error = in6_pcbbind(in6p, (struct mbuf *)0, td);
+	}
+#endif
 	if (error == 0) {
 		dp->state = DCCPS_LISTEN;
 		dp->who = DCCP_LISTENER;
@@ -2151,7 +2721,11 @@ dccp6_listen(struct socket *so, struct proc *td)
  * Accepts a connection (accept system call)
  */
 static int
+#ifdef __FreeBSD__
 dccp_accept(struct socket *so, struct sockaddr **nam)
+#else
+dccp_accept(struct socket *so, struct mbuf *nam)
+#endif
 {
 	struct inpcb *inp = NULL;
 	struct dccpcb *dp = NULL;
@@ -2181,27 +2755,39 @@ dccp_accept(struct socket *so, struct sockaddr **nam)
 	INP_LOCK(inp);
 	INP_INFO_RUNLOCK(&dccpbinfo);
 	dp = (struct dccpcb *)inp->inp_ppcb;
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
+#if __FreeBSD_version >= 500000
 	port = inp->inp_fport;
 	addr = inp->inp_faddr;
-#else
-	in_setpeeraddr(so, nam);
-#endif
 
 	INP_UNLOCK(inp);
 	splx(s);
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	if (error == 0)
 		*nam = in_sockaddr(port, &addr);
+#else /* FreeBSD4 */
+	in_setpeeraddr(so, nam);
+	splx(s);
 #endif
+#else /* !FreeBSD */
+	in_setpeeraddr(inp, nam);
+	splx(s);
+#endif /* FreeBSD */
+
 	return error;
 }
 
 static int
+#ifdef __FreeBSD__
 dccp6_accept(struct socket *so, struct sockaddr **nam)
+#else
+dccp6_accept(struct socket *so, struct mbuf *m)
+#endif
 {
+#ifdef __FreeBSD__
 	struct inpcb *inp = NULL;
-	struct dccpcb *dp = NULL;
+#else
+	struct in6pcb *in6p = NULL;
+#endif
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	struct in_addr	addr;
 	struct in6_addr	addr6;
@@ -2221,16 +2807,24 @@ dccp6_accept(struct socket *so, struct sockaddr **nam)
 	s = splnet();
 
 	INP_INFO_RLOCK(&dccpbinfo);
+#ifdef __FreeBSD__
 	inp = sotoinpcb(so);
 	if (inp == 0) {
 		INP_INFO_RUNLOCK(&dccpbinfo);
 		splx(s);
 		return EINVAL;
 	}
+#else
+	in6p = sotoin6pcb(so);
+	if (in6p == 0) {
+		splx(s);
+		return EINVAL;
+	}
+#endif
 	INP_LOCK(inp);
 	INP_INFO_RUNLOCK(&dccpbinfo);
-	dp = (struct dccpcb *)inp->inp_ppcb;
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#ifdef __FreeBSD__
+#if __FreeBSD_version >= 500000
 	port = inp->inp_fport;
 
 	if (inp->inp_vflag & INP_IPV4) {
@@ -2241,6 +2835,9 @@ dccp6_accept(struct socket *so, struct sockaddr **nam)
 	}
 #else
 	in6_mapped_peeraddr(so, nam);
+#endif
+#else
+	in6_setpeeraddr(in6p, m);
 #endif
 
 	INP_UNLOCK(inp);
@@ -2261,15 +2858,30 @@ dccp6_accept(struct socket *so, struct sockaddr **nam)
  * (in_pcballoc in attach has already allocated memory for it)
  */
 struct dccpcb *
+#ifdef __FreeBSD__
 dccp_newdccpcb(struct inpcb *inp)
+#else
+dccp_newdccpcb(int family, void *aux)
+#endif
 {
+#ifdef __FreeBSD__
 	struct inp_dp		*id;
+#else
+	struct inpcb *inp;
+	struct in6pcb *in6p;
+#endif
 	struct dccpcb	*dp;
 
 	DCCP_DEBUG((LOG_INFO, "Creating a new dccpcb!\n"));
 
+#ifdef __FreeBSD__
 	id = (struct inp_dp *)inp;
 	dp = &id->dp;
+#else
+	dp = pool_get(&dccpcb_pool, PR_NOWAIT);
+	if (dp == NULL)
+		return NULL;
+#endif
 	bzero((char *) dp, sizeof(struct dccpcb));
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
@@ -2284,7 +2896,6 @@ dccp_newdccpcb(struct inpcb *inp)
 	callout_init(&dp->timewait_timer);
 #endif
 
-	dp->d_inpcb = inp;
 	dp->ndp = 0;
 	dp->loss_window = 1000;
 	dp->cslen = 15;
@@ -2301,8 +2912,29 @@ dccp_newdccpcb(struct inpcb *inp)
 	dp->retrans = 200;
 	dp->avgpsize = 0;
 	dp->d_maxseg = 1400;
-	
+
+#ifdef __FreeBSD__	
+	dp->d_inpcb = inp;
 	inp->inp_ppcb = (caddr_t)dp;
+#else
+	switch (family) {
+	case PF_INET:
+		inp = (struct inpcb *)aux;
+		dp->d_inpcb = inp;
+		inp->inp_ip.ip_ttl = ip_defttl;
+		inp->inp_ppcb = (caddr_t)dp;
+		break;
+	case PF_INET6:
+		in6p = (struct in6pcb *)aux;
+		dp->d_in6pcb = in6p;
+		in6p->in6p_ip6.ip6_hlim = in6_selecthlim(in6p,
+			in6p->in6p_route.ro_rt ? in6p->in6p_route.ro_rt->rt_ifp
+					       : NULL);
+		in6p->in6p_ppcb = (caddr_t)dp;
+		break;
+	}
+	
+#endif
 	return dp;
 }
 
@@ -2620,12 +3252,12 @@ dccp_feature_neg(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, u_int8_t val
 			}
 			break;
 			
-        	case DCCP_FEATURE_ACKRATIO:
-                        if (opt == DCCP_OPT_CHANGE) {
+		case DCCP_FEATURE_ACKRATIO:
+			if (opt == DCCP_OPT_CHANGE) {
 				bcopy(val , &(dp->ack_ratio), 1);
-                                ACK_DEBUG((LOG_INFO, "Feature: Change Ack Ratio to %u\n", dp->ack_ratio));
-                        }
-                        break;
+				ACK_DEBUG((LOG_INFO, "Feature: Change Ack Ratio to %u\n", dp->ack_ratio));
+			}
+			break;
 			
 		case DCCP_FEATURE_ECN:
 		case DCCP_FEATURE_MOBILITY:
@@ -2638,6 +3270,7 @@ dccp_feature_neg(struct dccpcb *dp, u_int8_t opt, u_int8_t feature, u_int8_t val
 	}
 }
 
+#ifdef __FreeBSD__
 static int
 dccp_pcblist(SYSCTL_HANDLER_ARGS)
 {
@@ -2654,9 +3287,9 @@ dccp_pcblist(SYSCTL_HANDLER_ARGS)
 	if (req->oldptr == 0) {
 		n = dccpbinfo.ipi_count;
 		req->oldidx = 2 * (sizeof xig)
-		        + (n + n/8) * sizeof(struct xdccpcb);
+			+ (n + n/8) * sizeof(struct xdccpcb);
 		return 0;
-        }
+	}
 
 
 	if (req->newptr != 0)
@@ -2673,7 +3306,7 @@ dccp_pcblist(SYSCTL_HANDLER_ARGS)
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	sysctl_wire_old_buffer(req, 2 * (sizeof xig)
-	        + n * sizeof(struct xdccpcb));
+		+ n * sizeof(struct xdccpcb));
 #endif
 
 	xig.xig_len = sizeof xig;
@@ -2687,7 +3320,7 @@ dccp_pcblist(SYSCTL_HANDLER_ARGS)
 	inp_list = malloc(n * sizeof *inp_list, M_TEMP, M_WAITOK);
 	if (inp_list == 0)
 		return ENOMEM;
-        
+	
 	s = splnet();
 	INP_INFO_RLOCK(&dccpbinfo);
 
@@ -2724,10 +3357,10 @@ INP_LOCK(inp);
 			else
 				bzero((char *) &xd.xd_dp, sizeof xd.xd_dp);
 			if (inp->inp_socket)
-       				 sotoxsocket(inp->inp_socket, &xd.xd_socket);
+				 sotoxsocket(inp->inp_socket, &xd.xd_socket);
 			error = SYSCTL_OUT(req, &xd, sizeof xd);
 		}
-                INP_UNLOCK(inp);
+		INP_UNLOCK(inp);
 	}
 	if (!error) {
 		/*
@@ -2751,10 +3384,39 @@ INP_LOCK(inp);
 	free(inp_list, M_TEMP);
 	return error;
 }
+#endif
 
 #ifdef __FreeBSD__
 SYSCTL_PROC(_net_inet_dccp, DCCPCTL_PCBLIST, pcblist, CTLFLAG_RD, 0, 0,
     dccp_pcblist, "S,xdccpcb", "List of active DCCP sockets");
+#endif
+
+#ifndef __FreeBSD__
+int
+dccp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
+	int *name;
+	u_int namelen;
+	void *oldp;
+	size_t *oldlenp;
+	void *newp;
+	size_t newlen;
+{
+	/* All sysctl names at this level are terminal. */
+	if (namelen != 1)
+		return (ENOTDIR);
+
+	switch (name[0]) {
+	case DCCPCTL_SENDSPACE:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    (int *) &dccp_sendspace));
+	case DCCPCTL_RECVSPACE:
+		return (sysctl_int(oldp, oldlenp, newp, newlen, 
+		    (int *) &dccp_recvspace));
+	default:
+		return (ENOPROTOOPT);
+	}
+	/* NOTREACHED */
+}
 #endif
 
 void
@@ -2834,6 +3496,7 @@ dccp_retrans_t(void *dcb)
 }
 
 
+#ifdef __FreeBSD__
 /*
  * This is the wrapper function for in_setsockaddr.  We just pass down 
  * the pcbinfo for in_setsockaddr to lock.  We don't want to do the locking 
@@ -2842,7 +3505,7 @@ dccp_retrans_t(void *dcb)
 static int
 dccp_sockaddr(struct socket *so, struct sockaddr **nam)
 {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if __FreeBSD_version >= 500000
 	return (in_setsockaddr(so, nam, &dccpbinfo));
 #else
 	return (in_setsockaddr(so, nam));
@@ -2856,13 +3519,15 @@ dccp_sockaddr(struct socket *so, struct sockaddr **nam)
 static int
 dccp_peeraddr(struct socket *so, struct sockaddr **nam)
 {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if __FreeBSD_version >= 500000
 	return (in_setpeeraddr(so, nam, &dccpbinfo));
 #else
 	return (in_setpeeraddr(so, nam));
 #endif
 }
+#endif /* FreeBSD */
 
+#ifdef __FreeBSD__
 struct pr_usrreqs dccp_usrreqs = {
 	dccp_abort, dccp_accept, dccp_attach, dccp_bind, dccp_connect, 
 	pru_connect2_notsupp, in_control, dccp_detach, dccp_disconnect, 
@@ -2879,6 +3544,218 @@ struct pr_usrreqs dccp6_usrreqs = {
 	pru_rcvoob_notsupp, dccp_send, pru_sense_null, dccp_shutdown,
 	in6_mapped_sockaddr, sosend, soreceive, sopoll
 };
+#endif
+#else
+#ifdef __NetBSD__
+int
+dccp_usrreq(so, req, m, nam, control, p)
+     struct socket *so;
+     int req;
+     struct mbuf *m, *nam, *control;
+     struct proc *p;
+#else /* OpenBSD */
+int
+dccp_usrreq(so, req, m, nam, control)
+     struct socket *so;
+     int req;
+     struct mbuf *m, *nam, *control;
+#endif
+{
+	struct inpcb *inp;
+#ifdef INET6
+	struct in6pcb *in6p;
+#endif
+#ifdef __OpenBSD__
+	struct proc *p = NULL;
+#endif	
+	int s;
+	int error = 0;
+	int family;
+
+	family = so->so_proto->pr_domain->dom_family;
+
+	if (req == PRU_CONTROL) {
+		switch (family) {
+		case PF_INET:
+			error = in_control(so, (long)m, (caddr_t)nam,
+			    (struct ifnet *)control, p);
+			break;
+#ifdef INET6
+		case PF_INET6:
+			error = in6_control(so, (long)m, (caddr_t)nam,
+			    (struct ifnet *)control, p);
+			break;
+#endif
+		default:
+			error =	 EAFNOSUPPORT;
+		}
+		return (error);
+	}
+#ifdef __NetBSD__
+	if (req == PRU_PURGEIF) {
+		struct ifnet *ifn = (struct ifnet *)control;
+		switch (family) {
+		case PF_INET:
+			in_pcbpurgeif0(&dccpbtable, ifn);
+			in_purgeif (ifn);
+			in_pcbpurgeif(&dccpbtable, ifn);
+			break;
+#ifdef INET6
+		case PF_INET6:
+			in6_pcbpurgeif0(&dccpb6, ifn);
+			in6_purgeif (ifn);
+			in6_pcbpurgeif(&dccpb6, ifn);
+			break;
+#endif /* INET6 */
+		default:
+			return (EAFNOSUPPORT);
+		}
+		return (0);
+	}
+#endif
+
+	s = splsoftnet();
+
+	switch (family) {
+#ifdef INET
+	case PF_INET:
+		inp = sotoinpcb(so);
+#ifdef INET6
+		in6p = NULL;
+#endif
+		break;
+#endif
+#ifdef INET6
+	case PF_INET6:
+		inp = NULL;
+		in6p = sotoin6pcb(so);
+		break;
+#endif
+	default:
+		splx(s);
+		return EAFNOSUPPORT;
+	}
+
+#ifndef INET6
+	if (inp == 0 && req != PRU_ATTACH)
+#else
+	if ((inp == 0 && in6p == 0) && req != PRU_ATTACH)
+#endif
+	{
+		error = EINVAL;
+		goto release;
+	}
+
+	switch (req) {
+	case PRU_ATTACH:
+		error = dccp_attach(so, family, p);
+		break;
+	case PRU_DETACH:
+		error = dccp_detach(so);
+		break;
+	case PRU_BIND:
+		if (!nam) {
+			splx(s);
+			return (EINVAL);
+		}
+		if (inp)
+			error  = dccp_bind(so, nam, p);
+		if (in6p)
+			error  = dccp6_bind(so, nam, p);
+		break;
+	case PRU_LISTEN:
+		if (inp)
+			error = dccp_listen(so, p);
+		if (in6p)
+			error = dccp6_listen(so, p);
+		break;
+	case PRU_CONNECT:
+		if (!nam) {
+			splx(s);
+			return (EINVAL);
+		}
+		if (inp)
+			error = dccp_connect(so, nam, p);
+		if (in6p)
+			error = dccp6_connect(so, nam, p);
+		break;
+	case PRU_DISCONNECT:
+		error = dccp_disconnect(so);
+		break;
+	case PRU_ACCEPT:
+		if (!nam) {
+			splx(s);
+			return (EINVAL);
+		}
+		if (inp)
+			error = dccp_accept(so, nam);
+		if (in6p)
+			error = dccp6_accept(so, nam);
+		break;
+	case PRU_SHUTDOWN:
+		error = dccp_shutdown(so);
+		break;
+
+	case PRU_RCVD:
+		error = EAFNOSUPPORT;
+		break;
+
+	case PRU_SEND:
+		if (control && control->m_len) {
+			m_freem(control);
+			m_freem(m);
+			error = EINVAL;
+			break;
+		}
+		/* Flags are ignored */
+		error = dccp_send(so, 0, m, nam, control, p);
+		break;
+	case PRU_ABORT:
+		error = dccp_abort(so);
+		break;
+	case PRU_SENSE:
+		error = 0;
+		break;
+	case PRU_RCVOOB:
+		error = EAFNOSUPPORT;
+		break;
+	case PRU_SENDOOB:
+		error = EAFNOSUPPORT;
+		break;
+	case PRU_PEERADDR:
+		if (!nam) {
+			splx(s);
+			return (EINVAL);
+		}
+		if (inp)
+			in_setpeeraddr(inp, nam);
+#ifdef INET6
+		if (in6p)
+			in6_setpeeraddr(in6p, nam);
+#endif
+		break;
+	case PRU_SOCKADDR:
+		if (!nam) {
+			splx(s);
+			return (EINVAL);
+		}
+		if (inp)
+			in_setsockaddr(inp, nam);
+#ifdef INET6
+		if (in6p)
+			in6_setsockaddr(in6p, nam);
+#endif
+		break;
+	case PRU_SLOWTIMO:
+		error = 0;
+		break;
+	default:
+	};
+
+ release:
+	splx(s);
+	return (error);
+}
 #endif
 
 /****** Ack Vector functions *********/
@@ -2975,7 +3852,7 @@ dccp_increment_ackvector(struct dccpcb *dp, u_int32_t seqnr)
 		/* gap is bigger than ackvector size? baaad */
 		/* maybe we should increase the ackvector here */
 		DCCP_DEBUG((LOG_INFO, "increment_ackvector error. gap: %d, av_size: %d, seqnr: %d\n",
-                            gap, dp->av_size, seqnr));
+			    gap, dp->av_size, seqnr));
 		return;
 	}
 	

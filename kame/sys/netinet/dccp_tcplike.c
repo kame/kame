@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.c,v 1.7 2003/10/23 05:44:35 ono Exp $	*/
+/*	$KAME: dccp_tcplike.c,v 1.8 2003/10/30 07:36:53 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -56,10 +56,10 @@
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
+#include <netinet/ip.h>
 #include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
 
-#include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/icmp_var.h>
 #include <netinet/ip_var.h>
