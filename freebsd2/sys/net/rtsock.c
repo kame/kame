@@ -102,8 +102,10 @@ static int	 route_output __P((struct mbuf *, struct socket *));
 static int	 route_usrreq __P((struct socket *,
 	    int, struct mbuf *, struct mbuf *, struct mbuf *));
 static void	 rt_setmetrics __P((u_long, struct rt_metrics *, struct rt_metrics *));
+#ifdef BBNHACK
 static void	rt_setif __P((struct rtentry *, struct sockaddr *, struct sockaddr *,
 			      struct sockaddr *));
+#endif
 
 /* Sleazy use of local variables throughout file, warning!!!! */
 #define dst	info.rti_info[RTAX_DST]
@@ -189,6 +191,9 @@ route_output(m, so)
 	struct rt_addrinfo info;
 	int len, error = 0;
 	struct ifnet *ifp = 0;
+#ifndef BBNHACK
+	struct ifaddr *ifa = 0;
+#endif
 
 #define senderr(e) { error = e; goto flush;}
 	if (m == 0 || ((m->m_len < sizeof(long)) &&
@@ -238,6 +243,7 @@ route_output(m, so)
 		error = rtrequest(RTM_ADD, dst, gate, netmask,
 					rtm->rtm_flags, &saved_nrt);
 		if (error == 0 && saved_nrt) {
+#ifdef BBNHACK
 		    /* 
 		     * If the route request specified an interface with
 		     * IFA and/or IFP, we set the requested interface on
@@ -267,6 +273,7 @@ route_output(m, so)
 		     */
 
 			rt_setif(saved_nrt, ifpaddr, ifaaddr, gate);
+#endif
 			rt_setmetrics(rtm->rtm_inits,
 				&rtm->rtm_rmx, &saved_nrt->rt_rmx);
 			saved_nrt->rt_rmx.rmx_locks &= ~(rtm->rtm_inits);
@@ -347,10 +354,39 @@ route_output(m, so)
 			if ((rt->rt_flags & RTF_GATEWAY) && !gate)
 				gate = rt->rt_gateway;
 
-			rt_setif(rt, ifpaddr, ifaaddr, gate);
-
+#ifndef BBNHACK
+			/* new gateway could require new ifaddr, ifp;
+			   flags may also be different; ifp may be specified
+			   by ll sockaddr when protocol address is ambiguous */
+			if (ifpaddr && (ifa = ifa_ifwithnet(ifpaddr)) &&
+			    (ifp = ifa->ifa_ifp) && (ifaaddr || gate))
+				ifa = ifaof_ifpforaddr(ifaaddr ? ifaaddr : gate,
+							ifp);
+			else if ((ifaaddr && (ifa = ifa_ifwithaddr(ifaaddr))) ||
+				 (gate && (ifa = ifa_ifwithroute(rt->rt_flags,
+							rt_key(rt), gate))))
+				ifp = ifa->ifa_ifp;
+			if (ifa) {
+				register struct ifaddr *oifa = rt->rt_ifa;
+				if (oifa != ifa) {
+				    if (oifa && oifa->ifa_rtrequest)
+					oifa->ifa_rtrequest(RTM_DELETE,
+								rt, gate);
+				    IFAFREE(rt->rt_ifa);
+				    rt->rt_ifa = ifa;
+				    ifa->ifa_refcnt++;
+				    rt->rt_ifp = ifp;
+				}
+			}
 			rt_setmetrics(rtm->rtm_inits, &rtm->rtm_rmx,
 					&rt->rt_rmx);
+			if (rt->rt_ifa && rt->rt_ifa->ifa_rtrequest)
+			       rt->rt_ifa->ifa_rtrequest(RTM_ADD, rt, gate);
+#else
+			rt_setif(rt, ifpaddr, ifaaddr, gate);
+			rt_setmetrics(rtm->rtm_inits, &rtm->rtm_rmx,
+					&rt->rt_rmx);
+#endif
 			if (genmask)
 				rt->rt_genmask = genmask;
 			/*
@@ -424,6 +460,7 @@ rt_setmetrics(which, in, out)
 #undef metric
 }
 
+#ifdef BBNHACK
 /*
  * Set route's interface given ifpaddr, ifaaddr, and gateway.
  */
@@ -472,6 +509,7 @@ rt_setif(rt, Ifpaddr, Ifaaddr, Gate)
 	if (rt->rt_ifa && rt->rt_ifa->ifa_rtrequest)
 		rt->rt_ifa->ifa_rtrequest(RTM_ADD, rt, Gate);
 }
+#endif
 
 
 #define ROUNDUP(a) \
