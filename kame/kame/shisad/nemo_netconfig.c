@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.6 2005/03/02 19:39:05 ryuji Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.7 2005/03/02 19:42:42 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -474,8 +474,7 @@ set_nemo_ifinfo() {
 					     nif1 = nif2) {
 						nif2 = LIST_NEXT(nif1, nemo_ifentry);
 						if (nif2 == NULL) {
-							LIST_INSERT_AFTER(&nemo_ifhead, nif1, 
-									  nemo_ifentry);
+							LIST_INSERT_AFTER(nif1, nif, nemo_ifentry);
 							break;
 						}
 					}
