@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.27 2002/06/18 07:35:14 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.28 2002/07/12 03:17:51 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -311,30 +311,6 @@ main(argc, argv)
 		       mip6_config.mcfg_debug ? "enable" : "disable");
 	}
 
-	if (enablemn) {
-		int subcmd = SIOCSMIP6CFG_ENABLEMN;
-		if(ioctl(s, SIOCSMIP6CFG, (caddr_t)&subcmd) == -1) {
-			perror("ioctl");
-			exit(1);
-		}
-	}
-
-	if (disablemn) {
-		int subcmd = SIOCSMIP6CFG_DISABLEMN;
-		if(ioctl(s, SIOCSMIP6CFG, (caddr_t)&subcmd) == -1) {
-			perror("ioctl");
-			exit(1);
-		}
-	}
-
-	if (enableha) {
-		int subcmd = SIOCSMIP6CFG_ENABLEHA;
-		if(ioctl(s, SIOCSMIP6CFG, (caddr_t)&subcmd) == -1) {
-			perror("ioctl");
-			exit(1);
-		}
-	}
-
 	if (smhparg && pfxarg) {
 		struct hif_ifreq *ifr;
 		struct mip6_prefix *mpfx;
@@ -357,6 +333,30 @@ main(argc, argv)
 		mpfx->mpfx_vltime = 0xffff; /* XXX */
 		mpfx->mpfx_pltime = 0xff00; /* XXX */
 		if(ioctl(s, SIOCAHOMEPREFIX_HIF, (caddr_t)ifr) == -1) {
+			perror("ioctl");
+			exit(1);
+		}
+	}
+
+	if (enablemn) {
+		int subcmd = SIOCSMIP6CFG_ENABLEMN;
+		if(ioctl(s, SIOCSMIP6CFG, (caddr_t)&subcmd) == -1) {
+			perror("ioctl");
+			exit(1);
+		}
+	}
+
+	if (disablemn) {
+		int subcmd = SIOCSMIP6CFG_DISABLEMN;
+		if(ioctl(s, SIOCSMIP6CFG, (caddr_t)&subcmd) == -1) {
+			perror("ioctl");
+			exit(1);
+		}
+	}
+
+	if (enableha) {
+		int subcmd = SIOCSMIP6CFG_ENABLEHA;
+		if(ioctl(s, SIOCSMIP6CFG, (caddr_t)&subcmd) == -1) {
 			perror("ioctl");
 			exit(1);
 		}
