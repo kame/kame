@@ -1,6 +1,6 @@
 TODOs for KAME/OpenBSD
 KAME project
-$Id: TODO,v 1.9 1999/09/27 09:21:33 itojun Exp $
+$Id: TODO,v 1.10 1999/10/04 15:03:21 itojun Exp $
 
 
 Things we can do with the current code:
@@ -16,10 +16,11 @@ Things we can do with the current code:
   it means OpenBSD IPsec.  KAME IPsec is not available (and will never be 
   available as OpenBSD group will not be switching IPsec code).
   Because of this IPv6 IPsec is not available.
+- hoplimit control advapi works fine.
 
 Things we can't do with the current code:
 - setsockopt(), ioctl and advapi needs checking
-- interface selection APIs (both userland and kernel)
+- check advanced APIs (both userland and kernel)
 - multicast related items need checking
 	I was told that OpenBSD guys will never replace IPsec code.
 	Since we use same symbol (#ifdef IPSEC) to control ipsec code,
@@ -29,7 +30,6 @@ Things we can't do with the current code:
 Cleanup todo:
 - move in6_select{src,hlim} out of kame/sys/netinet6/in6_pcb.c, put somewhere
   in kame/sys/netinet6/*.c, so that we can share the code among all the
-  platforms
-	(after kame/openbsd is stabilized enough)
+  platforms (after kame/openbsd is stabilized enough)
 - nuke unnecessary #ifdef NRL tcp/udp layer, for more readability
 	(is it okay to do it?)
