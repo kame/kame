@@ -26,14 +26,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.h,v 1.3 2000/01/09 01:31:20 itojun Exp $ */
+/* YIPS @(#)$Id: admin.h,v 1.4 2000/01/11 21:22:14 itojun Exp $ */
 
 /* command for administration. */
 /* NOTE: host byte order. */
 struct admin_com {
 	u_int16_t ac_len;	/* total packet length including data */
 	u_int16_t ac_cmd;
-	u_int16_t ac_errno;
+	int16_t ac_errno;
 	u_int16_t ac_proto;
 };
 
