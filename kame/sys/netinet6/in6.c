@@ -2028,9 +2028,9 @@ in6_ifawithscope(oifp, dst)
 	}
 
 	/*
-	 * We first look for addresses in the same scope on all interfaces.
-	 * If there is only one, just return it.
-	 * If two or more exist, return one which matches the dst longest.
+	 * We search for all addresses on all interfaces from the beginning.
+	 * Comparing an interface with the outgoing interface will be done
+	 * only at the final stage of tiebreaking.
 	 */
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	for (ifp = ifnet; ifp; ifp = ifp->if_next)
