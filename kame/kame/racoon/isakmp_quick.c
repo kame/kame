@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.46 2000/08/09 19:39:13 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.47 2000/08/23 13:53:11 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1030,10 +1030,11 @@ quick_r1recv(iph2, msg0)
 		goto end;
 	}
 
-	/* If initiator requests PFS, we must check to ready to do that. */
-	if (iph2->dhpub_p != NULL && iph2->proposal->pfs_group == 0) {
+	/* check KE and attribute of PFS */
+	if ((iph2->dhpub_p != NULL && iph2->approval->pfs_group == 0)
+	 || (iph2->dhpub_p == NULL && iph2->approval->pfs_group != 0)) {
 		plog(logp, LOCATION, NULL,
-			"responder is not ready to do PFS.\n");
+			"KE payload and PFS attribute mismatched.\n");
 		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
 		goto end;
 	}
