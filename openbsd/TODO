@@ -1,6 +1,6 @@
 TODOs for KAME/OpenBSD
 KAME project
-$Id: TODO,v 1.6 1999/09/21 15:06:08 itojun Exp $
+$Id: TODO,v 1.7 1999/09/22 17:36:06 itojun Exp $
 
 
 Things we can do with the current code:
@@ -15,11 +15,13 @@ Things we can do with the current code:
 
 Things we can't do with the current code:
 - setsockopt(), ioctl and advapi needs checking
+- interface selection APIs (both userland and kernel)
 - multicast related items need checking
 - "options IPSEC" does not even compile
 	I was told that OpenBSD guys will never replace IPsec code.
 	Since we use same symbol (#ifdef IPSEC) to control ipsec code,
 	we need to wrap KAME shared ipsec code by "#ifndef __OpenBSD__".
+- enable KAME "goto ours" hack (check routing table code)
 
 Cleanup todo:
 - move in6_select{src,hlim} out of kame/sys/netinet6/in6_pcb.c, put somewhere
