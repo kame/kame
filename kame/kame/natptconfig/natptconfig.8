@@ -1,8 +1,8 @@
-.\"	$KAME: natptconfig.8,v 1.9 2000/12/04 06:28:24 itojun Exp $
+.\"	$KAME: natptconfig.8,v 1.10 2001/09/02 19:32:28 fujisawa Exp $
 .\"
-.\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+.\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
-.\" 
+.\"
 .\" Redistribution and use in source and binary forms, with or without
 .\" modification, are permitted provided that the following conditions
 .\" are met:
@@ -14,7 +14,7 @@
 .\" 3. Neither the name of the project nor the names of its contributors
 .\"    may be used to endorse or promote products derived from this software
 .\"    without specific prior written permission.
-.\" 
+.\"
 .\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
 .\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
 .\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -41,328 +41,24 @@
 .Nd configure IPv6-to-IPv4 translator
 .\"
 .Sh SYNOPSIS
-.Nm natptconfig
-.Op Fl d Ar debuglevel
-.Fl f Ar configfile
-.Nm natptconfig
-.Op Fl d Ar debuglevel
-.Ar subcommand Op Ar args...
 .\"
 .Sh DESCRIPTION
-.Nm
-configures and control the IPv6-to-IPv4 translator implemented in the
-kernel.
-.Pp
-.Nm
-takes the following command line options.
-.Bl -tag -width Ds
-.It Fl d Ar debuglevel
-Set debug level to
-.Ar debuglevel .
-.It Fl f Ar configfile
-Evaluate the content of file specified by
-.Ar configfile ,
-as configuration directives.
-By specifying
-.Dq Li - ,
-standard input is used.
-.Pp
-.El
-The first form 
-.Pq with Fl f
-takes directives from the specified configuration file.
-The second form is to give single directive directly from the command line.
 .\"
 .Sh DIRECTIVES
-Each rule processed by translater is added in the kernel internal
-lists if there is no parsing problems.	Rules are added to the end of
-the internal lists using "map" natptconfig directive, matching the
-order in which they appear when given in natptconfig.
-.Pp
-The following directives are available in the configuration file.
-.Bl -tag -width Ds
-.\"
-.It Xo
-.Li interface
-.Ar interfaceName
-.Li (internal|external)
-.Xc
-Mark interface <interfaceName> as external (outside) or internal
-(inside).  External (outside) means that the interface is on the
-Internet side, and internal (inside) means that the interface is on
-the private side.  Only packets arriving on this interface will be
-subject to IPv6-to-IPv4 protocol translation.
-.\"
-.It Xo
-.Li prefix natpt
-.Ar v6addr Li / Ar prefixlen
-.Xc
-Set NAT-PT prefix, and packet addressed to this prefix will subject to
-translate.  A number followed by a slash (/) represent the number of
-bits significant in the IP address.  96bit prefix is used in case of
-most.
-.\"
-.It Xo
-.Li map (inbound|outbound) from
-.Ar v6addr
-.Op Ar port
-.Li to
-.Ar v4addr
-.Op Ar port
-.Xc
-Add translater rule into the kernel internal lists.  Outgoing or
-incoming packet mathes this rule will subject to translate.  The rules
-for returning packet is not appear in this map list.
-.\"
-.It Xo
-.Li map flush [(static|dynamic)]
-.Xc
-Remove all rules from the kernel.  If static or dynamic was specified,
-corresponding rule will removed.
-.\"
-.It Xo
-.Li map (enable|disable)
-.Xc
-Enable or disable translation.
-.El
-.Pp
-The following directives are available in interactive use.
-.Bl -tag -width Ds
-.\"
-.It Xo
-.Li ?
-.Xc
-Show available actions on each stage.
-.\"
-.It Xo
-.Li set Ar var Li = Ar value
-.Xc
-This option allows to setting of the following variables:
-.Bl -tag -width XXX
-.It natpt_debug
-.It natpt_dump
-When set, dump mbuf or ip packet.  You must run natptlog command to
-show its dump.
-.El
-.Pp
-Value can use decimal or hexadecimal (begin with 0x) notation.
-Currently, blank of each side of '=' is not allowed.
-.\"
-.It Xo
-.Li show Ar subcommand Op Ar args...
-.Xc
-Show various useful information.
-.Nm natptconfig
-read this information from kernel, so you must have read permission of
-/dev/kmem.
-Available subcommands are listed below.
-.Bl -tag -width XXX
-.It ?
-Show available subcommands on each stage.
-.It interface
-Show interface setting.
-.It prefix
-Show NAT-PT prefix and prefix mask.
-.It static
-Show NAT-PT rules which set by statically.
-.It dynamic
-Show NAT-PT rules which set by dynamically.
-.It Xo
-.Li xlate
-.Op Li long
-.Op Ar interval
-.Xc
-Show NAT-PT current translation table entry.
-.Ar interval
-is a number, and this option specified,
-.Nm natptconfig
-will continuously display the information which is shown with xlate
-subcommand in specified second interval.
-.Pp
-By default, this command display IPv6 as short format (22 columns per
-address), when 'long' specified, this command display IPv6 address
-without omitting it.
-.Pp
-It is useful to see this
-table entry when this translator seems not to work.  See
-.Em TABLE FORMAT
-section below for more detail.
-.It variables
-Show variables set with set subcommand.
-.It mapping
-Show current mapping status.  Status is displayed as "enable" or "disable".
-.El
-.It test Ar subcommand Op Ar args...
-Test log system.  You must run natptlog command.  When only log
-specified, send LOGTESTPATTERN to translator, and translator send this
-pattern to log system.  When you running natptlog command, this
-command display LOGTESTPATTERN.  Current available subcommands are
-shown.
-.Bl -tag -width XXX
-.It ?
-Show available subcommands on each stage.
-.It log
-Send predefined pattern LOGTESTPATTERN to the log system.
-.It log Ar name
-Send one word to the log system.
-.It log Ar string
-Send double quoted string to the log system.  String should be double
-quoted.
-.El
 .\"
 .Sh RUNNING NAT-PT
-The following steps are necessary before attempting to run
-.Nm Ns :
-.Bl -enum
-.It
-Build a custom kernel with uncomment the following options:
-
-    options NATPT
-
-This options is commented with distributed GENERIC.V6 as a default.
-Refer to the handbook for detailed instructions on building a custom
-kernel.
-.It
-Ensure that your machine is acting as a gateway.  This can be done by
-specifying the line
-
-    ip6router=YES
-
-in
-.Pa /usr/local/v6/etc/rc.net6 .
-.It
-Write natpt configuration and set its configuration into kernel.
-See
-.Em EXAMPLE 1
-section below for more detail.
-.It
-When NAT-PT seems not to work properly, try next procedure.
-.Bl -enum
-.It
-Use show xlate command, and see current translation table entry.
-.It
-Set the natpt_dump variable to appropriately value, and see mbuf or ip
-packet dump generated with natptlog command.
-.El
-.El
 .\"
 .Sh EXAMPLE 1
-The following is an example of '?' directive.
-.Bd -literal -offset Ds
-% natptconfig ?
-	interface	Mark interface as outside or inside.
-	map		Set translation rule.
-	set		Set  value to in-kernel variable.
-	show		Show setting.
-% natptconfig interface ?
-	<interfaceName> (internal|external)
-%
-.Ed
-.Pp
-The following is an example of a typical usage
-of the
-.Nm
-command:
-.Pp
-.Dl % natptconfig -f natpt.conf
-.Pp
-The following is an example of a content of the
-.Nm
-configuration file.
-.Pp
-.Bd -literal -offset
-% cat natptconfig.conf
-interface fxp0 external
-prefix natpt 3ffe:0501:4819:c1ad::/96
-map outbound from 3ffe:0501:4819:6000::/64 to 172.16.196.1 port 28672 - 32767
-map enable
-%
-.Ed
 .Sh EXAMPLE 2
-Assume mapping rule was set as follows,
-.Bd -literal -offset indent
-map inbound  from 203.178.141.196 port 65303 \\
-	     to 3ffe:501:4819:6000:200:f4ff:fe5c:3599 port 23
-.Ed
-.Pp
-When v4 packet is coming from outside to this machine, and when its
-packet's dstaddr == 203.178.141.196 and dstport == 65303, this v4
-packet is translated to v6, dstaddr == 3ffe:..3559 and desport == 23,
-so this packet will send to v6 machine to telnet port.
-.Pp
-So, this function is restricted with TCP and UDP, and you must know
-destination address and port number (in this case 65303) before send 
-packet.
-.Pp
-Some people say this function is enough and this restriction (to
-know port mapping ahead of making session, and cannot connect any
-port before set mapping configuration) is acceptable.
 .\"
 .Sh TABLE FORMAT
-This is a one sample of 'show xlate' output.  Sorry, this table entry
-was too long, show this entry over two lines.
-.Bd -literal -offset
-tcp 3ffe:501:4819:c1ad::857b:10bf.23 3ffe:501:4819:6001:2e0:18ff:fea8:4e66.1041
-  133.123.16.193.28686 133.123.16.191.23 00:00:01 SYN_SENT
-.Ed
-.Pp
-This entry has 7 fields.  The leftmost field shows protocol.  The
-second and third field shows src.port and dst.port of internal side.
-The forth and fifth field show src.port and dst.port of external side.
-The sixth field shows the time (second) from last packet matches this
-entry.  The last field has TCP inner status.  Of course, the last
-field appears only protocol is TCP.
-.Pp
-When use 'long' directive with 'show xlate', these table show as below
-.Bd -literal -offset
-tcp 3ffe=857b:10bf.23 3ffe=fea8:4e66.1041 
-  133.123.16.193.28686 133.123.16.191.23 00:00:01 SYN_SENT
-.Ed
-.Pp
-This entry has same field as above, but IPv6 address was shrinked to
-14 columns, so it is easy to see this table entry.  Each IPv6 address
-was shown as first 4 column and last 9 column connecting with '='
-character.
 .\"
 .Sh FILES
-.Bl -tag -width /dev/kmemxxx -compact
-.It Pa /kernel
-default kernel namelist
-.It Pa /dev/kmem
-default memory file
-.El
 .\"
 .Sh SEE ALSO
-.Xr natptd 8 ,
-.Xr natptlog 8
-.Rs
-.%A George Tsirtsis
-.%R RFC
-.%N 2766
-.%D February 2000
-.%T "Network Address Translation - Protocol Translation (NAT-PT)"
-.Re
-.El
 .\"
 .Sh DIAGNOSTICS
-(to be written)
 .\"
 .Sh BUGS
-The
-.Nm
-command is now under development.  It's user interface and overall
-functionality are subjects to future improvements and changes.
-.Pp
-This translator will not automatically perform proxy ARP.  Therefore,
-you may need to configure the translator box for proxy ARP, or
-configure alias IP address by using
-.Xr ifconfig 8 .
-.Pp
-.Nm
-show subcommand read many information from kernel device
-(ie. /dev/kmem), so you must have read permission of this device.
 .\"
 .Sh HISTORY
-.Nm
-was implemented by Shin-ichi Fujisawa
-.Li <fujisawa@kame.net> .

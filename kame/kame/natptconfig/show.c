@@ -1,7 +1,9 @@
+/*	$KAME: show.c,v 1.15 2001/09/02 19:32:28 fujisawa Exp $	*/
+
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -25,324 +27,236 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$Id: show.c,v 1.14 2001/05/05 11:50:07 fujisawa Exp $
  */
 
-#include <sys/types.h>
-#include <sys/fcntl.h>
-#include <sys/ioctl.h>
 #include <sys/param.h>
+#include <sys/errno.h>
+#include <sys/queue.h>
 #include <sys/socket.h>
-#include <sys/sysctl.h>
-#include <sys/syslog.h>
 
+#include <err.h>
+#include <fcntl.h>
+#include <kvm.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <err.h>
-#include <errno.h>
-#include <netdb.h>
-#include <paths.h>
 
-#include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
-
-#include <netinet6/natpt_defs.h>
-#include <netinet6/natpt_soctl.h>
+#include <netinet/ip6.h>
 
 #include <arpa/inet.h>
+
+#include <netinet6/natpt_defs.h>
 
 #include "defs.h"
 #include "miscvar.h"
 #include "showvar.h"
-#include "showsubs.h"
+#include "cfparse.h"
 
 
 /*
  *
  */
 
-#ifdef readKMEM
+#define	TYPE_INT		1
 
-#include <kvm.h>
 
-kvm_t	*kd;
+kvm_t		*kd;
 
-static	struct nlist	nl[] =
+static struct nlist	nl[] =
 {
-    { "__cell_used" },
-    { "__cell_free" },
-    { "_tSlotEntryUsed" },
-    { "_tSlotEntryMax" },
-    { "_natptStatic" },
-    { "_natptDynamic" },
-    { "_tSlotEntry" },
-    { "_natpt_initialized" },
-    { "_natpt_debug" },
-    { "_natpt_dump" },
-    { "_natpt_prefix" },
-    { "_natpt_prefixmask" },
-    { "_ip6_protocol_tr" },
-    { NULL }
+#define	NL_TR			0
+	{ "_ip6_protocol_tr" },
+#define	NL_PREFIX		1
+	{ "_natpt_prefix" },
+#define NL_CSLHEAD		2
+	{ "_csl_head" },
+#define NL_TSLHEAD		3
+	{ "_tsl_head" },
+#define NL_DEBUG		4
+	{ "_natpt_debug" },
+#define NL_DUMP			5
+	{ "_natpt_dump" },
+	{ NULL },
 };
-#endif	/* ifdef readKMEM	*/
 
 
-static void	_showRuleStatic		__P((int, struct _cSlot *));
-static void	_showRuleDynamic	__P((int, struct _cSlot *));
-static void	_showXlate		__P((int, u_long));
-static void	_writeXlateHeader	__P((void));
+int		 readNL		__P((void *, int, int));
+int		 openKvm	__P((void));
+int		 readKvm	__P((void *, int, void *));
+void		 closeKvm	__P((void));
+
+void		 makeCSlotLine	__P((char *, int, struct cSlot *));
+void		 makeTSlotLine	__P((char *, int, struct tSlot *,
+				     struct tcpstate *, int));
+
 
 /*
  *
  */
-
-void
-showInterface(char *ifName)
-{
-    struct natpt_msgBox	mBox;
-
-    extern	int		_fd;
-
-    bzero(&mBox, sizeof(struct natpt_msgBox));
-    if (ifName)
-	strcpy(mBox.m_aux, ifName);
-
-    if (soctl(_fd, SIOCGETIF, &mBox) < 0)
-	err(errno, "showInterface: soctl failure");
-}
-
 
 void
 showPrefix()
 {
-    int			rv;
-    struct in6_addr	prefix;
-    struct in6_addr	prefixmask;
+	const char *fn = __FUNCTION__;
 
-    if ((rv = readNL((caddr_t)&prefix, sizeof(prefix), "_natpt_prefix")) > 0)
-    {
-	if (rv != sizeof(struct in6_addr))
-	    errx(1, "failure on read prefix");
-	else
-	{
-	    char	in6txt[INET6_ADDRSTRLEN];
+	struct in6_addr	prefix;
+	char		in6txt[INET6_ADDRSTRLEN];
 
-	    inet_ntop(AF_INET6, (char *)&prefix, in6txt, INET6_ADDRSTRLEN);
-	    printf("prefix: %s\n", in6txt);
-	}
-    }
+	if (readNL((void *)&prefix, sizeof(prefix), NL_PREFIX) <= 0)
+		err(1, "%s(): failure on read prefix", fn);
 
-    if ((rv = readNL((caddr_t)&prefixmask, sizeof(prefixmask), "_natpt_prefixmask")) > 0)
-    {
-	if (rv != sizeof(struct in6_addr))
-	    errx(1, "failure on read prefixmask");
-	else
-	{
-	    char	in6txt[INET6_ADDRSTRLEN];
-
-	    inet_ntop(AF_INET6, (char *)&prefixmask, in6txt, INET6_ADDRSTRLEN);
-	    printf("prefixmask: %s ", in6txt);
-	    printf("prefixlen %d\n", in6_mask2len(&prefixmask));
-	}
-    }
+	inet_ntop(AF_INET6, (char *)&prefix, in6txt, INET6_ADDRSTRLEN);
+	printf("prefix: %s\n", in6txt);
 }
 
 
 void
-showRule(int type)
+showRules(int all)
 {
-    struct _cell	 cons;
-    char		*n_name = "_natptStatic";
-    int			 num = 0;
-    u_long		 pos;
-    int			 rv;
+	const char *fn = __FUNCTION__;
 
-    if (type == NATPT_DYNAMIC)
-	n_name = "_natptDynamic";
+	int			 num = 0;
+	struct cSlot		 csl;
+	TAILQ_HEAD(,cSlot)	 csl_head;
+	char			 Wow[BUFSIZ];
 
-    if ((rv = readNL((caddr_t)&pos, sizeof(pos), n_name)) <= 0)
-	return ;
-    
-    while (pos)
-    {
-	readKvm((caddr_t)&cons, sizeof(struct _cell), pos);
-	if (cons.car)
-	{
-	    struct _cSlot	acs;
+	if (readNL(&csl_head, sizeof(csl_head), NL_CSLHEAD) <= 0)
+		err(1, "%s(): failure on read csl_head", fn);
 
-	    readKvm((void *)&acs, sizeof(struct _cSlot), (u_long)cons.car);
-	    switch (acs.type)
-	    {
-	      case NATPT_STATIC:	_showRuleStatic(num, &acs);	break;
-	      case NATPT_DYNAMIC:	_showRuleDynamic(num, &acs);	break;
-	    }
+	if ((csl_head.tqh_first == NULL)
+	    && (csl_head.tqh_last == NULL))
+		errx(0, "%s(): cSlot not initialized", fn);
+
+	if (TAILQ_EMPTY(&csl_head))
+		errx(0, "No Rules.\n");
+
+	readKvm(&csl, sizeof(struct cSlot), TAILQ_FIRST(&csl_head));
+	while (TRUE) {
+		makeCSlotLine(Wow, sizeof(Wow), &csl);
+		printf("%3d: %s\n", num, Wow);
+		if (TAILQ_NEXT(&csl, csl_list) == NULL)
+			break;
+		readKvm(&csl, sizeof(struct cSlot), TAILQ_NEXT(&csl, csl_list));
+		num++;
 	}
-	num++;
-	pos = (u_long)cons.cdr;
-    }
-}
-
-
-void
-showVariables()
-{
-    u_int	value;
-
-    if (readNL((caddr_t)&value, sizeof(value), "_tSlotEntryUsed") > 0)
-	printf("%12s: 0x%08x (%d)\n", "tSlotEntryUsed", value, value);
-
-    if (readNL((caddr_t)&value, sizeof(value), "_tSlotEntryMax") > 0)
-	printf("%12s: 0x%08x (%d)\n", "tSlotEntryMax", value, value);
-
-    if (readNL((caddr_t)&value, sizeof(value), "__cell_used") > 0)
-	printf("%12s: 0x%08x (%d)\n", "cell_used", value, value);
-
-    if (readNL((caddr_t)&value, sizeof(value), "__cell_free") > 0)
-	printf("%12s: 0x%08x (%d)\n", "cell_free", value, value);
-
-    if (readNL((caddr_t)&value, sizeof(value), "_ip6_protocol_tr") > 0)
-	printf("%12s: 0x%08x (%d)\n", "ipn6_protocol_tr", value, value);
-
-    if (readNL((caddr_t)&value, sizeof(value), "_natpt_initialized") > 0)
-	printf("%12s: 0x%08x (%d)\n", "natpt_initialized", value, value);
-
-    if (readNL((caddr_t)&value, sizeof(value), "_natpt_debug") > 0)
-	printf("%12s: 0x%08x (%d)\n", "natpt_debug", value, value);
-
-    if (readNL((caddr_t)&value, sizeof(value), "_natpt_dump") > 0)
-	printf("%12s: 0x%08x (%d)\n", "natpt_dump",  value, value);
-}
-
-
-void
-showMapping()
-{
-    int		rv;
-    int		map;
-
-    if ((rv = readNL((caddr_t)&map, sizeof(map), "_ip6_protocol_tr")) > 0)
-    {
-	if (rv != sizeof(int))
-	    errx(1, "failure on read ip6_protocol_tr");
-	else
-	{
-	    printf("mapping: %s\n", (map != 0) ? "enable" : "disable");
-	}
-    }
-}
-
-
-void
-showCSlotEntry(struct _cSlot *cslot)
-{
-    struct logmsg	*lmsg = composeCSlotEntry(cslot);
-
-    printf("%s", (char *)&lmsg->lmsg_data[0]);
-    free(lmsg);
 }
 
 
 void
 showXlate(int type, int interval)
 {
-    int		 pos;
-    int		 rv;
+	const char *fn = __FUNCTION__;
 
-    while (TRUE)
-    {
-	if ((rv = readNL((caddr_t)&pos, sizeof(pos), "_tSlotEntry")) <= 0)
-	    return ;
+	struct tSlot		tsl;
+	struct tcpstate		ts;
+	TAILQ_HEAD(,tSlot)	tsl_head;
+	char			Wow[BUFSIZ];
 
-	if (pos == 0)
-	    printf("No active xlate\n");
-	else
-	    _showXlate(type, pos);
+	if (readNL(&tsl_head, sizeof(tsl_head), NL_TSLHEAD) <= 0)
+		err(1, "%s(): line %d: failure on read tsl_head",
+		    fn, __LINE__);
 
-	if (interval <= 0)
-	    break ;
+	if ((tsl_head.tqh_first == NULL)
+	    && (tsl_head.tqh_last == NULL))
+		errx(0, "%s(): cSlot does not initialized", fn);
 
-	sleep(interval);
-    }
+	while (TRUE) {
+		writeXlateHeader(type);
+		if (!TAILQ_EMPTY(&tsl_head)) {
+			readKvm(&tsl, sizeof(struct tSlot),
+				TAILQ_FIRST(&tsl_head));
+			while (TRUE) {
+				if (tsl.suit.tcps){
+					readKvm(&ts, sizeof(struct tcpstate),
+						tsl.suit.tcps);
+					makeTSlotLine(Wow, sizeof(Wow),
+						      &tsl, &ts, type);
+				} else {
+					makeTSlotLine(Wow, sizeof(Wow),
+						      &tsl, NULL, type);
+				}
 
-    closeKvm();
-}
+				printf("%s\n", Wow);
+				if (TAILQ_NEXT(&tsl, tsl_list) == NULL)
+					break;
+				readKvm(&tsl, sizeof(struct tSlot),
+					TAILQ_NEXT(&tsl, tsl_list));
+			}
+		}
 
+		if (interval <= 0)
+			break;
 
-/*
- *
- */
-
-static void
-_showRuleStatic(int num, struct _cSlot *acs)
-{
-    printf("%3d: ", num);
-
-    showCSlotEntry(acs);
-
-    printf("\n");
-}
-
-
-static void
-_showRuleDynamic(int num, struct _cSlot *acs)
-{
-    printf("%3d: ", num);
-
-    showCSlotEntry(acs);
-
-    printf("\n");
-}
-
-
-static void
-_showXlate(int type, u_long pos)
-{
-    Cell	 cons;
-
-    _writeXlateHeader();
-
-    while (pos)
-    {
-	readKvm((void *)&cons, sizeof(Cell), pos);
-	if (cons.car)
-	{
-	    struct logmsg	*lmsg;
-	    struct _tSlot	 tslot;
-	    struct _tcpstate	 ts;
-
-	    readKvm((void *)&tslot, sizeof(struct _tSlot), (u_long)cons.car);
-	    if (tslot.ip_payload == IPPROTO_TCP)
-		readKvm((void *)&ts, sizeof(struct _tcpstate), (u_long)tslot.suit.tcp);
-
-	    lmsg = composeTSlotEntry(&tslot, &ts, type);
-
-	    printf("%s\n", (char *)&lmsg->lmsg_data[0]);
-	    free(lmsg);
+		sleep(interval);
+		if (readNL(&tsl_head, sizeof(tsl_head), NL_TSLHEAD) <= 0)
+			err(1, "%s(): line %d: failure on read tsl_head",
+			    fn, __LINE__);
 	}
-	pos = (u_long)cons.cdr;
-    }
 }
 
 
-static void
-_writeXlateHeader()
+void
+writeXlateHeader(int type)
 {
-    printf("%-6s",  "Proto");
-    printf("%-22s", "Local Address (src)");
-    printf("%-22s", "Local Address (dst)");
-    printf("%-22s", "Remote Address (src)");
-    printf("%-22s", "Remote Address (dst)");
-    printf("%6s",  "Ipkts");
-    printf("%6s",  "Opkts");
-    printf(" ");
+	if (type == SLONG) {
+		;
+	} else {
+		printf("%-6s",	"Proto");
+		printf("%-22s", "Local Address (src)");
+		printf("%-22s", "Local Address (dst)");
+		printf("%-22s", "Remote Address (src)");
+		printf("%-22s", "Remote Address (dst)");
+		printf("%6s",  "Ipkts");
+		printf("%6s",  "Opkts");
+		printf(" ");
 
-    printf("%-8s",  "  Idle");
-    printf("%-8s",  " (state)");
-    printf("\n");
+		printf("%-8s",	"  Idle");
+		printf("%-8s",	" (state)");
+		printf("\n");
+	}
+
+}
+
+
+void
+showVariables()
+{
+	showVariable(NL_TR,    TYPE_INT);
+	showVariable(NL_DEBUG, TYPE_INT);
+	showVariable(NL_DUMP,  TYPE_INT);
+}
+
+
+void
+showVariable(int n_idx, int type)
+{
+	int	val;
+
+	switch (type) {
+	case TYPE_INT:
+		readNL(&val, sizeof(int), n_idx);
+		printf("%16s: 0x%08x (%d)\n",
+		       nl[n_idx].n_name, val, val);
+		break;
+	}
+}
+
+
+void
+showMapping()
+{
+	const char *fn = __FUNCTION__;
+
+	int	map;
+
+	if (readNL((void *)&map, sizeof(map), NL_TR) <= 0)
+		err(1, "%s(): failure on read mapping", fn);
+
+	printf("mapping: %s\n", map ? "enable" : "disable");
 }
 
 
@@ -350,63 +264,63 @@ _writeXlateHeader()
  *
  */
 
-#ifdef readKMEM
 int
-readNL(void *buf, int nbytes, char *n_name)
+readNL(void *buf, int nbytes, int n_idx)
 {
-    int			 rv;
-    struct nlist	*nlp;
+	if ((kd == NULL) && (openKvm() < 0))
+		return (-1);
 
-    if ((kd == NULL) && ((rv = openKvm()) < 0))
-	return (0);
-
-    for (nlp = nl; nlp->n_name; nlp++)
-    {
-	if ((strlen(nlp->n_name) == strlen(n_name))
-	    && (strncmp(nlp->n_name, n_name, strlen(n_name)) == SAME))
-	    return (readKvm(buf, nbytes, nlp->n_value));
-    }
-
-    return (0);
+	return (readKvm(buf, nbytes, (void *)nl[n_idx].n_value));
 }
 
 
-u_long
+int
 openKvm()
 {
-    int		rv;
+	const char *fn = __FUNCTION__;
 
-    if ((kd = kvm_open(NULL, NULL, NULL, O_RDONLY, "kvm_open")) <= (kvm_t *)0)
-	err(errno, "Open failure on kvm_open");
+	int	rv;
 
-    if ((rv = kvm_nlist(kd, nl)) < 0)
-	err(errno, "Read failure on kvm_nlist");
+	if ((kd = kvm_open(NULL, NULL, NULL, O_RDONLY, "kvm_open")) == NULL)
+		err(errno, "%s(): open failure", fn);
 
-    return ((u_long)kd);
+	if ((rv = kvm_nlist(kd, nl)) < 0)
+		err(errno, "%s(): read failure", fn);
+
+	return (rv);
 }
 
 
 int
-readKvm(void *buf, int nbytes, u_long pos)
+readKvm(void *buf, int nbytes, void *pos)
 {
-    int	rv;
+	const char *fn = __FUNCTION__;
 
-    if (nbytes <= 0)
-	return (-1);
+	int	rv;
 
-    if (kd <= (kvm_t *)0)
-	return (-1);
+	if (nbytes <= 0)
+		return (-1);
 
-    if ((rv = kvm_read(kd, pos, buf, nbytes)) <= 0)
-	err(errno, "Read failure on kvm_read");
+	if (kd <= (kvm_t *)0)
+		return (-1);
 
-    return (rv);
+	if ((rv = kvm_read(kd, (u_long)pos, buf, nbytes)) <= 0)
+		err(errno, "%s(): read failure", fn);
+
+	return (rv);
 }
 
 
 void
 closeKvm()
 {
-    kvm_close(kd);
+	kvm_close(kd);
 }
-#endif	/* ifdef readKMEM	*/
+
+
+void
+clean_show()
+{
+	if (kd != NULL)
+		closeKvm();
+}

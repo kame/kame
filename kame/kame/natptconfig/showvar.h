@@ -1,7 +1,9 @@
+/*	$KAME: showvar.h,v 1.6 2001/09/02 19:32:28 fujisawa Exp $	*/
+
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -25,22 +27,14 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$Id: showvar.h,v 1.5 2000/03/09 02:59:55 fujisawa Exp $
  */
 
-void	 showInterface		__P((char *));
-void	 showPrefix		__P((void));
-void	 showRule		__P((int));
-void	 showCSlotEntry		__P((struct _cSlot *cslot));
-void	 showXlate		__P((int, int));
-void	 showVariables		__P((void));
-void	 showMapping		__P((void));
+void		showPrefix		__P((void));
+void		showRules		__P((int));
+void		showXlate		__P((int, int));
+void		writeXlateHeader	__P((int));
+void		showVariables		__P((void));
+void		showVariable		__P((int, int));
+void		showMapping		__P((void));
 
-
-#ifdef readKMEM
-int	 readNL			__P((void *, int, char *));
-u_long	 openKvm		__P((void));
-int	 readKvm		__P((void *, int, u_long));
-void	 closeKvm		__P((void));
-#endif	/* ifdef readKMEM	*/
+void		clean_show		__P((void));

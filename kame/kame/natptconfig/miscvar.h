@@ -1,7 +1,9 @@
+/*	$KAME: miscvar.h,v 1.6 2001/09/02 19:32:28 fujisawa Exp $	*/
+
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -25,36 +27,23 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$Id: miscvar.h,v 1.5 2001/05/05 11:50:07 fujisawa Exp $
  */
 
-void		 setInterface		__P((char *, int));
-void		 setPrefix		__P((int, struct addrinfo *, int));
-void		 setRule		__P((int, int, struct pAddr *, struct pAddr *));
-void		 setFromAnyRule		__P((int, int, int, u_short *, struct pAddr *));
-void		 flushRule		__P((int));
-void		 enableTranslate	__P((int));
+void		 setPrefix		__P((struct addrinfo *));
+void		 setRules		__P((int type, struct ruletab *));
+void		 flushRules		__P((int));
+void		 setOnOff		__P((int));
 void		 setValue		__P((char *, int));
 void		 testLog		__P((char *));
 void		 debugBreak		__P((void));
-
 int		 soctl			__P((int, u_long, ...));
-
-struct addrinfo	*getAddrInfo		__P((int, char *));
-struct pAddr	*getAddrPort		__P((int, int, struct addrinfo *, void *));
-struct pAddr	*setAddrPort		__P((struct pAddr *, u_short *));
+void		 soctlFailure		__P((const char *));
 
 int		 in6_prefix2len		__P((struct in6_addr *));
-
-int		 in4_mask2len		__P((struct in_addr *));
-int		 in6_mask2len		__P((struct in6_addr *));
-struct in_addr	*in4_len2mask		__P((int));
 struct in6_addr *in6_len2mask		__P((int));
+int		 in6_mask2len		__P((struct in6_addr *));
+struct pAddr	*getAddrs		__P((int, int, struct addrinfo *, void *));
+struct addrinfo *getAddrInfo		__P((int, char *));
 
-void		 debugProbe		__P((char *));
-void		 openFD			__P((void));
-void		 closeFD		__P((void));
+void		 clean_misc		__P((void));
 void		 init_misc		__P((void));
-
-

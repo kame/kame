@@ -1,7 +1,9 @@
+/*	$KAME: yylex.c,v 1.7 2001/09/02 19:32:28 fujisawa Exp $	*/
+
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -25,66 +27,52 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$Id: yylex.c,v 1.6 2001/05/05 11:50:07 fujisawa Exp $
  */
+
+#include <sys/types.h>
 
 #include <stdio.h>
 #include <string.h>
 
-#include <sys/types.h>
-#include <sys/syslog.h>
-
+#include "cfparse.h"
 #include "defs.h"
-#include "natptconfig.y.h"
 
 
-/*
- *
- */
+int		_yylex			__P((void));
+int		yylex			__P((void));
+int		yylexExitHook		__P((int));
 
-int	_yylex		__P((void));
 
 struct
 {
-    char    *word;
-    int	     token;
-    char    *tokenstring;
-}   keyTable[] =
+	char	*word;
+	int	 token;
+	char	*tokenstring;
+}	keyTable[] =
 {
-    { "any4",		SANY4,		"SANY4",	},
-    { "any6",		SANY6,		"SANY6",	},
-    { "bidir",		SBIDIR,		"SBIDIR",	},
-    { "break",		SBREAK,		"SBREAK",	},
-    { "disable",	SDISABLE,	"SDISABLE",	},
-    { "dynamic",	SDYNAMIC,	"SDYNAMIC",	},
-    { "enable",		SENABLE,	"SENABLE",	},
-    { "external",	SEXTERNAL,	"SEXTERNAL",	},
-    { "flush",		SFLUSH,		"SFLUSH",	},
-    { "from",		SFROM,		"SFROM",	},
-    { "inbound",	SINBOUND,	"SINBOUND",	},
-    { "incoming",	SINCOMING,	"SINCOMING",	},
-    { "interface",	SINTERFACE,	"SINTERFACE",	},
-    { "internal",	SINTERNAL,	"SINTERNAL",	},
-    { "log",		SLOG,		"SLOG",		},
-    { "long",		SLONG,		"SLONG",	},
-    { "map",		SMAP,		"SMAP",		},
-    { "mapping",	SMAPPING,	"SMAPPING",	},
-    { "natpt",		SNATPT,		"SNATPT",	},
-    { "outbound",	SOUTBOUND,	"SOUTBOUND",	},
-    { "outgoing",	SOUTGOING,	"SOUTGOING",	},
-    { "port",		SPORT,		"SPORT",	},
-    { "prefix",		SPREFIX,	"SPREFIX",	},
-    { "set",		SSET,		"SSET",		},
-    { "show",		SSHOW,		"SSHOW",	},
-    { "static",		SSTATIC,	"SSTATIC",	},
-    { "tcp",		STCP,		"STCP",		},
-    { "test",		STEST,		"STEST",	},
-    { "to",		STO,		"STO",		},
-    { "udp",		SUDP,		"SUDP",		},
-    { "variables",	SVARIABLES,	"SVARIABLES",	},
-    { "xlate",		SXLATE,		"SXLATE",	},
-    {  NULL,		NULL,		 NULL,		},
+	{ "any6",	SANY6,		"SANY6",	},
+	{ "break",	SBREAK,		"SBREAK",	},
+	{ "disable",	SDISABLE,	"SDISABLE",	},
+	{ "enable",	SENABLE,	"SENABLE",	},
+	{ "flush",	SFLUSH,		"SFLUSH",	},
+	{ "from",	SFROM,		"SFROM",	},
+	{ "icmp",	SICMP,		"SICMP",	},
+	{ "log",	SLOG,		"SLOG",		},
+	{ "long",	SLONG,		"SLONG",	},
+	{ "map",	SMAP,		"SMAP",		},
+	{ "mapping",	SMAPPING,	"SMAPPING",	},
+	{ "port",	SPORT,		"SPORT",	},
+	{ "prefix",	SPREFIX,	"SPREFIX",	},
+	{ "rules",	SRULES,		"SRULES",	},
+	{ "set",	SSET,		"SSET",		},
+	{ "show",	SSHOW,		"SSHOW",	},
+	{ "tcp",	STCP,		"STCP",		},
+	{ "test",	STEST,		"STEST",	},
+	{ "to",		STO,		"STO",		},
+	{ "udp",	SUDP,		"SUDP",		},
+	{ "variables",	SVARIABLES,	"SVARIABLES",	},
+	{ "xlate",	SXLATE,		"SXLATE",	},
+	{  NULL,	NULL,		 NULL,		},
 };
 
 
@@ -95,74 +83,81 @@ struct
 int
 yylex(void)
 {
-    int     token;
+	int	token;
 
-    extern  int	    yylexExitHook	__P((int));
-    extern  int     __yylex		__P((void));
-
-    while ((token = yylexExitHook(_yylex())) == SEOS) ;
-    return (token);
+	while ((token = yylexExitHook(_yylex())) == SEOS)
+		;
+	return (token);
 }
 
 
 int
 yylexExitHook(int token)
 {
-    int     rv = token;
+	int	rv = token;
 
-    extern  char    *yytext;
+	if (isDebug(D_LEXTOKEN)) {
+		if ((token > SEOS) && (token < SOTHER))	{
+			int	iter;
 
-    if (isDebug(D_LEXTOKEN))
-    {
-	if ((token > SEOS) && (token < SOTHER))
-	{
-	    int     iter;
-
-	    for (iter = 0; keyTable[iter].token; iter++)
-	    {
-		if (keyTable[iter].token == token)
-		{
-		    fprintf(stderr, " %s", keyTable[iter].tokenstring);
-		    goto    EXIT;
+			for (iter = 0; keyTable[iter].token; iter++) {
+				if (keyTable[iter].token == token) {
+					fprintf(stderr, " %s", keyTable[iter].tokenstring);
+					return (rv);
+				}
+			}
+			fprintf(stderr, " unknown IDENTIFIER(%d)", token);
+			return (rv);
 		}
-	    }
-	    fprintf(stderr, " unknown IDENTIFIER(%d)", token);
-	    goto    EXIT;
+
+		switch (token) {
+		case SEOS:
+			fprintf(stderr, " [SEOS]\n");
+			break;
+
+		case SOTHER:
+			fprintf(stderr, " Unknown:%s", yytext);
+			break;
+
+		case SSLASH:
+			fprintf(stderr, " /");
+			break;
+
+		case SNAME:
+			fprintf(stderr, " [%s]", yytext);
+			break;
+
+		case SDECIMAL:
+			fprintf(stderr, " [%s]", yytext);
+			break;
+
+		case SSTRING:
+			fprintf(stderr, " \"%s\"", yytext);
+			break;
+
+		case SIPV4ADDR:
+			fprintf(stderr, " [v4:%s]", yytext);
+			break;
+
+		case SIPV6ADDR:
+			fprintf(stderr, " [v6:%s]", yytext);
+			break;
+		}
 	}
 
-	switch (token)
-	{
-	  case SEOS:	fprintf(stderr, " [SEOS]\n");			break;
-
-	  case SOTHER:	fprintf(stderr, " Unknown:%s", yytext);		break;
-
-	  case SNAME:	fprintf(stderr, " [%s]", yytext);		break;
-	  case SDECIMAL:fprintf(stderr, " [%s]", yytext);		break;
-	  case SSTRING:	fprintf(stderr, " \"%s\"", yytext);		break;
-
-	  case IPV4ADDR:fprintf(stderr, " [v4:%s]", yytext);		break;
-	  case IPV6ADDR:fprintf(stderr, " [v6:%s]", yytext);		break;
-
-	  case SCOMMENT:fprintf(stderr, " SCOMMENT: %s", yytext);	break;
-	  case SPERIOD:	fprintf(stderr, " SPERIOD");			break;
-	  case SSLASH:	fprintf(stderr, " SSLASH");			break;
-	}
-    }
-
-    EXIT:;
-    return (rv);
+	return (rv);
 }
 
 
 int
 SNAMEorKeyword(char *yytext)
 {
-    int     iter;
+	int	iter;
 
-    for (iter = 0; keyTable[iter].word; iter++)
-    {
-	if (strncmp(keyTable[iter].word, yytext, strlen(yytext)) == SAME)
-	    return (keyTable[iter].token);
-    }
-    return (SNAME);
+	for (iter = 0; keyTable[iter].word; iter++)
+		if (strncasecmp(keyTable[iter].word, yytext,
+				strlen(keyTable[iter].word)) == 0)
+			return (keyTable[iter].token);
+
+	return (SNAME);
 }

@@ -1,7 +1,9 @@
+/*	$KAME: main.c,v 1.8 2001/09/02 19:32:28 fujisawa Exp $	*/
+
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -25,55 +27,35 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$Id: main.c,v 1.7 2001/05/08 04:36:32 itojun Exp $
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <string.h>
-#include <unistd.h>
 #include <ctype.h>
 #include <err.h>
+#include <netdb.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
-#include <sys/syslog.h>
-#include <sys/time.h>
+#include <netinet/in.h>
 
+#include "cfparse.h"
 #include "defs.h"
-#include "natptconfig.y.h"
+#include "miscvar.h"
+#include "showvar.h"
 
-
-/*
- *
- */
-
-u_int		u_debug;
+int		 u_debug;
 
 
 char		*parseArgument		__P((int, char *[]));
-void		 printHelp		__P((int, char *));
+int		 prepParse		__P((char *));
 void		 printDirectiveHelp	__P((void));
-void		 printInterfaceHelp	__P((void));
 void		 printPrefixHelp	__P((void));
-void		 printRuleHelp		__P((void));
+void		 printMapHelp		__P((void));
 void		 printSetHelp		__P((void));
 void		 printShowHelp		__P((void));
 void		 printTestHelp		__P((void));
-
-void		init_main		__P((void));
-
-/*	misc.c							*/
-void		openFD			__P((void));
-void		closeFD			__P((void));
-void		init_misc		__P((void));
-
-/*	natptconfig.y						*/
-int		yyparse			__P((void));
-
-/*	natptconfing.l						*/
-void		switchToBuffer		__P((char *));
-void		reassembleCommandLine	__P((int, char *[], char *));
+void		 init_main		__P((void));
 
 
 /*
@@ -83,201 +65,201 @@ void		reassembleCommandLine	__P((int, char *[], char *));
 int
 main(int argc, char *argv[])
 {
-    char	*fname = NULL;
+	char	*fname = NULL;
+	extern int	 yylineno;
+	extern char	*yyfilename;
 
-    extern	int	 yylineno;
-    extern	char	*yyfilename;
+	init_main();
 
-    fname = parseArgument(argc, argv);
+	if ((fname = parseArgument(argc, argv)) == NULL) {
+		yyfilename = "commandline";
+		yylineno = 0;
+		yyparse();
+	} else {
+		FILE	*fp = NULL;
+		char	 buf[BUFSIZ];
 
-    openFD();
-    init_main();
+		fp = stdin;
+		yyfilename = "stdin";
+		if (strcmp(fname, "-") != 0) {
+			if ((fp = fopen(fname, "r")) == NULL)
+				err(1, "fopen failure");
 
-    if (fname == NULL)
-    {
-	yyfilename = "commandline";
-	yylineno = 0;
-	yyparse();
-    }
-    else
-    {
-	FILE	*fp = NULL;
-	char	 buf[BUFSIZ];
+			yyfilename = fname;
+		}
 
-	fp = stdin;
-	yyfilename = "stdin";
-	if (strcmp(fname, "-") != 0)
-	{
-	    if ((fp = fopen(fname, "r")) == NULL)
-		err(1, "fopen failure");
-
-	    yyfilename = fname;
+		yylineno = 0;
+		while (fgets(buf, sizeof(buf), fp)) {
+			yylineno++;
+			if (prepParse(buf) == TRUE) {
+				switchToBuffer(buf);
+				yyparse();
+			}
+		}
+		fclose(fp);
 	}
-	yylineno = 0;
-	while (fgets(buf, sizeof(buf), fp))
-	{
-	    yylineno++;
-	    switchToBuffer(buf);
-	    yyparse();
-	}
-	fclose (fp);
-    }
 
-    closeFD();
-    return (0);
+	clean_misc();
+	clean_show();
+	return (0);
 }
 
 
 char *
 parseArgument(int argc, char *argv[])
 {
-    int		 ch;
-    char	*fname = NULL;
+	int	 ch;
+	char	*fname = NULL;
 
-    extern	 char	*optarg;
-    extern	 int	 optind;
+	extern int	 optind;
+	extern char	*optarg;
 
-    while ((ch = getopt(argc, argv, "d:f:n:")) != -1)
-    {
-	switch (ch)
-	{
-	  case 'd':
-	    u_debug = strtoul(optarg, NULL, 0);
+	while ((ch = getopt(argc, argv, "d:f:")) != -1) {
+		switch (ch) {
+		case 'd':
+			u_debug = strtoul(optarg, NULL, 0);
 #ifdef YYDEBUG
-	    {
-		extern	int	yydebug;
+			{
+				extern int	yydebug;
 
-		if (isDebug(D_YYDEBUG))		yydebug = 1;
-	    }
+				if (isDebug(D_YYDEBUG)) {
+					yydebug = 1;
+				}
+			}
 #endif
-	    break;
+			break;
 
-	  case 'f':
-	    fname = optarg;
-	    break;
+		case 'f':
+			fname = optarg;
+			break;
 
-	  case 'n':
-	    if (strcmp(optarg, "osocket") == SAME)
-		u_debug |= D_NOSOCKET;
-	    break;
+		default:
+			break;
+		}
 	}
-    }
 
-    argc -= optind;
-    argv += optind;
+	argc -= optind;
+	argv += optind;
 
-    if (argc)
-    {
-	char	Wow[BUFSIZ];
+	if (argc) {
+		reassembleCommandLine(argc, argv);
+		return (NULL);
+	}
 
-	bzero(Wow, sizeof(Wow));
+	return (fname);
+}
 
-	reassembleCommandLine(argc, argv, Wow);
-	return (NULL);
-    }
 
-    return (fname);
+int
+prepParse(char *line)
+{
+	char	*d;
+
+	d = line;
+	while (*d == ' ' || *d == '\t')
+		d++;
+
+	if (*d == '#' || *d == '\n' || *d == '\0')
+		return (FALSE);
+
+	return (TRUE);
 }
 
 
 void
 printHelp(int type, char *complaint)
 {
-    if ((complaint != NULL)
-	&& (isprint(*complaint) != 0))
-    {
-	printf("%s\n", complaint);
-    }
+	if ((complaint != NULL)
+	    && (isprint(*complaint) != 0)) {
+		printf("%s\n", complaint);
+	}
 
-    switch (type)
-    {
-      case SQUESTION:	printDirectiveHelp();	break;
-      case SINTERFACE:	printInterfaceHelp();	break;
-      case SPREFIX:	printPrefixHelp();	break;
-      case SMAP:	printRuleHelp();	break;
-      case SSET:	printSetHelp();		break;
-      case SSHOW:	printShowHelp();	break;
-      case STEST:	printTestHelp();	break;
-    }
+	switch (type) {
+	case SQUESTION:
+		printDirectiveHelp();
+		break;
 
-    exit(0);
+	case SPREFIX:
+		printPrefixHelp();
+		break;
+
+	case SMAP:
+		printMapHelp();
+		break;
+
+	case SSET:
+		printSetHelp();
+		break;
+
+	case SSHOW:
+		printShowHelp();
+		break;
+
+	case STEST:
+		printTestHelp();
+		break;
+	}
 }
 
 
 void
 printDirectiveHelp()
 {
-    printf("Available directives are\n");
-    printf("	    interface	 Mark interface as outside or inside.\n");
-    printf("	    map		 Set translation rule.\n");
-    printf("	    set		 Set  value to in-kernel variable.\n");
-    printf("	    show	 Show setting.\n");
-    printf("	    test	 test logging system.\n");
-    printf("\n");
-}
-
-
-void
-printInterfaceHelp()
-{
-    printf("	    <interfaceName> {internal|external}\n");
-    printf("\n");
+	printf("Available directives are\n");
+	printf("	prefix	Set NAT-PT prefix.\n");
+	printf("	map	Set translation rule.\n");
+	printf("	show	Show settings.\n");
+	printf("	test	Test log system.\n");
+	printf("\n");
 }
 
 
 void
 printPrefixHelp()
 {
-    printf("	    natpt <ipv6addr>\n");
-    printf("	    natpt <ipv6addr> / <decimal>\n");
+	printf("	prefix <ipv6addr>\n");
 }
 
 
 void
-printRuleHelp()
+printMapHelp()
 {
-    printf("	    map from <dir> from any4 to <ipaddrport>\n");
-    printf("	    map from <dir> from any6 to <ipaddrport>\n");
-    printf("	    map from <dir> from <ipaddrport> to <ipaddrport>\n");
-    printf("	    map flush [{static|dynamic}]\n");
+	printf("	map flush\n");
 
-    printf("	    map enable\n");
-    printf("	    map disable\n");
+	printf("	map {enable|disable}\n");
 }
 
 
 void
 printSetHelp()
 {
-    printf("	    set natpt_debug=<value>\n");
-    printf("	    set natpt_dump=<value>\n");
+	printf("	set natpt_debug=<value>\n");
+	printf("	set natpt_dump=<value>\n");
 }
 
 
 void
 printShowHelp()
 {
-    printf("	    show interface\n");
-    printf("	    show prefix\n");
-    printf("	    show static\n");
-    printf("	    show dynamic\n");
-    printf("	    show xlate [<interval>]\n");
-    printf("	    show varibles\n");
-    printf("	    show mapping\n");
+	printf("	show prefix\n");
+	printf("	show rule\n");
+	printf("	show xlate [\"long\"] [<interval>]\n");
+	printf("	show variables\n");
+	printf("	show mapping\n");
 }
 
 
 void
 printTestHelp()
 {
-    printf("	    test log\n");
-    printf("	    test log <name>\n");
-    printf("	    test log \"<string>\"\n");
+	printf("	test log\n");
+	printf("	test log <name>\n");
+	printf("	test log \"string\"\n");
 }
 
 
 void
 init_main()
 {
-    init_misc();
+	init_misc();
 }

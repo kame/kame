@@ -1,7 +1,9 @@
+/*	$KAME: misc.c,v 1.11 2001/09/02 19:32:28 fujisawa Exp $	*/
+
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -25,23 +27,20 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$Id: misc.c,v 1.10 2001/05/05 11:50:07 fujisawa Exp $
  */
 
+#include <sys/param.h>
 #include <sys/ioctl.h>
-#include <sys/types.h>
+#include <sys/queue.h>
 #include <sys/socket.h>
-#include <sys/syslog.h>
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <stdarg.h>
-#include <string.h>
-#include <unistd.h>
 #include <err.h>
 #include <errno.h>
 #include <netdb.h>
+#include <stdarg.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
 
 #include <net/if.h>
 #include <netinet/in.h>
@@ -50,20 +49,17 @@
 #include <netinet6/natpt_defs.h>
 #include <netinet6/natpt_soctl.h>
 
+#include "cfparse.h"
 #include "defs.h"
-#include "natptconfig.y.h"
 #include "miscvar.h"
 #include "showvar.h"
-#include "showsubs.h"
 
-/*
- *
- */
 
 #define	LOGTESTPATTERN	"The quick brown fox jumped over the lazy dog."
 
-int	_fd;
-u_long	mtobits[33];
+
+int		 sfd;
+u_long		 mtobits[33];
 
 
 /*
@@ -71,430 +67,174 @@ u_long	mtobits[33];
  */
 
 void
-setInterface(char *ifname, int inex)
+setPrefix(struct addrinfo *prefix)
 {
-    struct natpt_msgBox	 mBox;
+	const char *fn = __FUNCTION__;
 
-    bzero(&mBox, sizeof(natpt_msgBox));
-    strcpy(mBox.m_ifName, ifname);
-    mBox.flags = inex;
+	struct natpt_msgBox	 mBox;
 
-    if (soctl(_fd, SIOCSETIF, &mBox) < 0)
-	err(errno, "setInterface: soctl failure");
+	bzero(&mBox, sizeof(struct natpt_msgBox));
+	mBox.m_in6addr = SIN6(prefix->ai_addr)->sin6_addr;
+
+	if (soctl(sfd, SIOCSETPREFIX, &mBox) < 0)
+		soctlFailure(fn);
+
+	freeaddrinfo(prefix);
 }
 
 
 void
-getInterface()
+setRules(int type, struct ruletab *ruletab)
 {
+	const char *fn = __FUNCTION__;
+
+	struct natpt_msgBox	 mBox;
+	struct cSlot		*f;
+
+	bzero(&mBox, sizeof(struct natpt_msgBox));
+	mBox.size = sizeof(struct cSlot);
+	f = (struct cSlot *)malloc(sizeof(struct cSlot));
+	bzero(f, sizeof(struct cSlot));
+	mBox.freight = (caddr_t)f;
+
+	switch (type) {
+	case NATPT_MAP64:
+		if (ruletab->from)
+			f->local = *(ruletab->from);
+		else {
+			f->local.sa_family = AF_INET6;
+			f->local.aType = ADDR_ANY;
+		}
+		f->remote = *ruletab->to;
+		break;
+
+	case NATPT_MAP46:
+	case NATPT_MAP44:
+		if (ruletab->from)
+			f->local = *ruletab->from;
+		else {
+			f->local.sa_family = AF_INET;
+			f->local.aType = ADDR_ANY;
+		}
+		f->remote = *ruletab->to;
+		break;
+
+	default:
+		err(1, "%s(): illegal rule type: %d", fn, type);
+		break;
+	}
+
+	if (ruletab->sports) {
+		f->map = NATPT_REMAP_SPORT;
+		f->remote.pType = ruletab->sports[0];
+		f->remote.port[0] = ruletab->sports[1];
+		f->remote.port[1] = ruletab->sports[2];
+	}
+
+	if (ruletab->proto) {
+		f->proto = ruletab->proto;
+	}
+
+	f->type = NATPT_RULE_STATIC;
+	if (soctl(sfd, SIOCSETRULES, &mBox) < 0)
+		soctlFailure(fn);
 }
 
 
 void
-setPrefix(int type, struct addrinfo *prefix, int masklen)
+flushRules(int all)
 {
-    struct natpt_msgBox	 mBox;
-    struct pAddr	*freight;
+	const char *fn = __FUNCTION__;
 
-    bzero(&mBox, sizeof(struct natpt_msgBox));
-    mBox.flags = type;
-    mBox.size = sizeof(struct pAddr);
-    mBox.freight = (caddr_t)(freight = (struct pAddr *)malloc(mBox.size));
+	struct natpt_msgBox	 mBox;
 
-    bzero(freight, mBox.size);
-    freight->addr[0].in6 = ((struct sockaddr_in6 *)prefix->ai_addr)->sin6_addr;
+	bzero(&mBox, sizeof(struct natpt_msgBox));
+	if (all)
+		mBox.flags = NATPT_FLUSHALL;
 
-    if (masklen <= 0)
-	masklen = in6_prefix2len(&((struct sockaddr_in6 *)prefix->ai_addr)->sin6_addr);
-    freight->ad.prefix = masklen;
-    freight->addr[1].in6 = *in6_len2mask(masklen);
-
-    if (soctl(_fd, SIOCSETPREFIX, &mBox) < 0)
-	err(errno, "setPrefix: soctl failure");
+	if (soctl(sfd, SIOCFLUSHRULE, &mBox) < 0)
+		soctlFailure(fn);
 }
 
 
 void
-setRule(int dir, int proto, struct pAddr *from, struct pAddr *to)
+setOnOff(int flag)
 {
-    struct natpt_msgBox	 mBox;
-    struct _cSlot	*freight;
-    struct pAddr	*local, *remote;
+	const char *fn = __FUNCTION__;
 
-    bzero(&mBox, sizeof(struct natpt_msgBox));
-    mBox.flags = NATPT_STATIC;
-    mBox.size  = sizeof(struct _cSlot);
-    mBox.freight = (caddr_t)(freight = (struct _cSlot *)malloc(mBox.size));
+	switch (flag) {
+	case SENABLE:
+		if (soctl(sfd, SIOCENBTRANS) < 0)
+			soctlFailure(fn);
+		break;
 
-    bzero(freight, mBox.size);
-    freight->type = NATPT_STATIC;
-    freight->dir  = dir;
-    freight->proto = proto;
-
-    freight->prefix  = from->ad.prefix;
-
-    local = from, remote = to;
-    if (dir == NATPT_INBOUND)
-	local = to, remote = from;
-
-    freight->local  = *local;
-    freight->remote = *remote;
-
-    if (to->port[0] != 0)
-    {
-	freight->map |= NATPT_PORT_MAP;
-	if (to->port[1] != 0)
-	    freight->map |= NATPT_PORT_MAP_DYNAMIC;
-    }
-
-    if (isDebug(D_SHOWCSLOT))		showCSlotEntry(freight), printf("\n");
-
-    if (soctl(_fd, SIOCSETRULE, &mBox) < 0)
-	err(errno, "setRule: soctl failure");
-}
-
-
-void
-setFromAnyRule(int dir, int proto, int any, u_short *port, struct pAddr *to)
-{
-    struct natpt_msgBox	 mBox;
-    struct _cSlot	*freight;
-    struct pAddr	 from;
-    struct pAddr	*local, *remote;
-
-#if 0
-    if ((*(port+0) != 0) && (*(port+1) != 0))
-	errx(1, "port range specified at \"from\" address.");
-#endif
-
-    bzero(&mBox, sizeof(struct natpt_msgBox));
-    mBox.flags = NATPT_STATIC;
-    mBox.size  = sizeof(struct _cSlot);
-    mBox.freight = (caddr_t)(freight = (struct _cSlot *)malloc(mBox.size));
-
-    bzero(freight, mBox.size);
-    freight->type = NATPT_STATIC;
-    freight->dir  = dir;
-    freight->proto = proto;
-
-    bzero(&from, sizeof(struct pAddr));
-    from.sa_family = (any == SANY4) ? AF_INET : AF_INET6;
-    from.ad.type = ADDR_ANY;
-    if (port)
-    {
-	from._sport = *(port+0);
-	from._dport = *(port+1);
-    }
-
-    local = &from, remote = to;
-    if (dir == NATPT_INBOUND)
-	local = to, remote = &from;
-
-    freight->local  = *local;
-    freight->remote = *remote;
-
-    if (to->port[0] != 0)
-    {
-	freight->map |= NATPT_PORT_MAP;
-	if (to->port[1] != 0)
-	    freight->map |= NATPT_PORT_MAP_DYNAMIC;
-    }
-
-    if (isDebug(D_SHOWCSLOT))		showCSlotEntry(freight), printf("\n");
-
-    if (soctl(_fd, SIOCSETRULE, &mBox) < 0)
-	err(errno, "setRule: soctl failure");
-}
-
-
-void
-flushRule(int type)
-{
-    struct natpt_msgBox	 mBox;
-
-    bzero(&mBox, sizeof(struct natpt_msgBox));
-
-    switch (type)
-    {
-      case NATPT_STATIC:	mBox.flags = FLUSH_STATIC;			break;
-      case NATPT_DYNAMIC:	mBox.flags = FLUSH_DYNAMIC;			break;
-      default:			mBox.flags = (FLUSH_STATIC | FLUSH_DYNAMIC);	break;
-    }
-    
-    if (soctl(_fd, SIOCFLUSHRULE, &mBox) < 0)
-	err(errno, "flushRule: soctl failure");
-}
-
-
-void
-enableTranslate(int flag)
-{
-    switch (flag)
-    {
-      case SENABLE:
-	if (soctl(_fd, SIOCENBTRANS) < 0)
-	    err(errno, "enableTranslate: soctl failure");
-	break;
-
-      case SDISABLE:
-	if (soctl(_fd, SIOCDSBTRANS) < 0)
-	    err(errno, "enableTranslate: soctl failure");
-	break;
-    }
+	case SDISABLE:
+		if (soctl(sfd, SIOCDSBTRANS) < 0)
+			soctlFailure(fn);
+		break;
+	}
 }
 
 
 void
 setValue(char *name, int val)
 {
-    int			type = 0;
-    struct natpt_msgBox	mBox;
+	const char *fn = __FUNCTION__;
 
-    bzero(&mBox, sizeof(struct natpt_msgBox));
+	int			type = 0;
+	struct natpt_msgBox	mBox;
 
-    if (strcmp(name, "natpt_debug") == 0)		type =NATPT_DEBUG;
-    else if (strcmp(name, "natpt_dump") == 0)		type =NATPT_DUMP;
+	bzero(&mBox, sizeof(struct natpt_msgBox));
 
-    if (type == 0)
-	errx(1, "%s: no such variable\n", name);
+	if (strcmp(name, "natpt_debug") == 0)		type = NATPT_DEBUG;
+	else if (strcmp(name, "natpt_dump") == 0)	type = NATPT_DUMP;
 
-    mBox.flags = type;
-    mBox.size = sizeof(int);
-    *((u_int *)mBox.m_aux) = val;
+	if (type == 0)
+		errx(1, "%s(): %s: no such variable\n", fn, name);
 
-    if (soctl(_fd, SIOCSETVALUE, &mBox) < 0)
-	err(errno, "setValue: soctl failure");
+	mBox.flags = type;
+	mBox.m_uint = val;
+
+	if (soctl(sfd, SIOCSETVALUE, &mBox) < 0)
+		soctlFailure(fn);
 }
 
 
 void
 testLog(char *str)
 {
-    int			 slen;
-    char		*freight;
-    struct natpt_msgBox	 mBox;
+	const char *fn = __FUNCTION__;
 
-    bzero(&mBox, sizeof(struct natpt_msgBox));
+	int			 slen;
+	char			*freight;
+	struct natpt_msgBox	 mBox;
 
-    if (str == NULL)
-	str = LOGTESTPATTERN;
+	bzero(&mBox, sizeof(struct natpt_msgBox));
 
-    slen = ROUNDUP(strlen(str)+1);
-    freight = malloc(slen);
-    bzero(freight, slen);
-    strcpy(freight, str);
-    mBox.size = slen;
-    mBox.freight = freight;
+	if (str == NULL)
+		str = LOGTESTPATTERN;
 
-    if (soctl(_fd, SIOCTESTLOG, &mBox) < 0)
-	err(errno, "testLog: soctl failure");
+	slen = ROUNDUP(strlen(str)+1);
+	if ((freight = malloc(slen)) == NULL)
+		err(errno, "%s():", fn);
+
+	bzero(freight, slen);
+	strncpy(freight, str, strlen(str));
+	mBox.size = slen;
+	mBox.freight = freight;
+
+	if (soctl(sfd, SIOCTESTLOG, &mBox) < 0)
+		soctlFailure(fn);
 }
 
 
 void
 debugBreak()
 {
-    if (soctl(_fd, SIOCBREAK) < 0)
-	err(errno, "debugBreak: soctl failure");
-}
+	const char *fn = __FUNCTION__;
 
-
-int
-soctl(int fd, u_long request, ...)
-{
-    int		rv = 0;
-    va_list	ap;
-
-    if (_fd == -1)
-    {
-	errno = EPERM;
-	return (-1);
-    }
-    
-    va_start(ap, request);
-
-    if (!isDebug(D_NOSOCKET))
-	rv = ioctl(fd, request, va_arg(ap, void *));
-
-    va_end(ap);
-
-    return (rv);
-}
-
-
-struct addrinfo *
-getAddrInfo(int family, char *text)
-{
-    int			 rv;
-    struct addrinfo	 hints;
-    struct addrinfo	*res;
-
-    bzero(&hints, sizeof(struct addrinfo));
-    hints.ai_family = family;
-
-    if ((rv = getaddrinfo(text, NULL, &hints, &res)) != 0)
-	errx(errno, "getAddrInfo: %s\n", gai_strerror(rv));
-
-    if (res->ai_addr->sa_family != family)
-	errx(1, "getAddrInfo: unexpected address family %d (%d)",
-	     res->ai_addr->sa_family, family);
-    
-    return (res);
-}
-
-
-struct pAddr *
-getAddrPort(int family, int type, struct addrinfo *one, void *two)
-{
-    struct sockaddr_in	*sin4;
-    struct sockaddr_in6	*sin6;
-    struct pAddr	*block;
-
-    block = malloc(sizeof(struct pAddr));
-    bzero(block, sizeof(struct pAddr));
-
-    block->sa_family = family;
-    block->ad.type  = type;
-
-    switch (family)
-    {
-      case AF_INET:
-	sin4 = (struct sockaddr_in *)one->ai_addr;
-	block->in4Addr = sin4->sin_addr;
-	break;
-
-      case AF_INET6:
-	sin6 = (struct sockaddr_in6 *)one->ai_addr;
-	block->in6Addr = sin6->sin6_addr;
-	break;
-    }
-
-    if (two)
-    {
-	switch (type)
-	{
-	  case ADDR_SINGLE:
-	    break;
-
-	  case ADDR_MASK:
-	    switch (family)
-	    {
-	      case AF_INET:
-	      case AF_INET6:
-		block->ad.prefix = *(int *)two;
-		break;
-	    }
-	    break;
-
-	  case ADDR_RANGE:
-	    if (family == AF_INET)
-	    {
-		block->in4Mask = ((struct sockaddr_in *)two)->sin_addr;
-	    }
-	}
-    }
-
-    return (block);
-}
-
-
-struct pAddr *
-setAddrPort(struct pAddr *aport, u_short *optPort)
-{
-    aport->port[0] = *(optPort+0);
-    aport->port[1] = *(optPort+1);
-    free(optPort);
-    return (aport);
-}
-
-
-int
-in6_prefix2len(struct in6_addr *prefix)
-{
-    int		 plen, byte, bit;
-    u_char	*addr;
-
-    plen = sizeof(struct in6_addr) * NBBY;
-    addr = (u_char *)prefix;
-    for (byte = sizeof(struct in6_addr)-1; byte >= 0; byte--)
-	for (bit = 0; bit < NBBY; bit++, plen--)
-	    if (addr[byte] & (1 << bit))
-		return (plen);
-
-    return (0);
-}
-
-
-int
-in4_mask2len(struct in_addr *mask)
-{
-    int x, y;
-    u_char	*cmask = (u_char *)mask;
-
-    for (x = 0; x < sizeof(struct in_addr); x++)
-    {
-	if (*(cmask+x) != 0xff)
-	    break;
-    }
-    y = 0;
-    if (x < sizeof(struct in_addr))
-    {
-	for (y = 0; y < 8; y++)
-	{
-	    if ((cmask[x] & (0x80 >> y)) == 0)
-		break;
-	}
-    }
-    return (x * 8 + y);
-}
-
-
-int
-in6_mask2len(struct in6_addr *mask)
-{
-    int x, y;
-
-    for (x = 0; x < sizeof(*mask); x++)
-    {
-	if (mask->s6_addr[x] != 0xff)
-	    break;
-    }
-    y = 0;
-    if (x < sizeof(*mask))
-    {
-	for (y = 0; y < 8; y++)
-	{
-	    if ((mask->s6_addr[x] & (0x80 >> y)) == 0)
-		break;
-	}
-    }
-    return (x * 8 + y);
-}
-
-
-struct in_addr *
-in4_len2mask(int masklen)
-{
-    static	struct in_addr	in4mask;
-
-    in4mask.s_addr = mtobits[masklen];
-    return (&in4mask);
-}
-
-
-struct in6_addr *
-in6_len2mask(int masklen)
-{
-    int i;
-    static	struct in6_addr	mask;
-
-    bzero(&mask, sizeof(mask));
-    for (i = 0; i < masklen / 8; i++)
-	mask.s6_addr[i] = 0xff;
-    if (masklen % 8)
-	mask.s6_addr[i] = (0xff00 >> (masklen % 8)) & 0xff;
-
-    return (&mask);
+	if (soctl(sfd, SIOCBREAK) < 0)
+		soctlFailure(fn);
 }
 
 
@@ -502,46 +242,178 @@ in6_len2mask(int masklen)
  *
  */
 
-void
-debugProbe(char *msg)
+int
+soctl(int fd, u_long request, ...)
 {
-    warnx("%s", msg);
+	int		 rv = 0;
+	va_list		 ap;
+
+	if (sfd == -1) {
+		if ((sfd = socket(PF_INET, SOCK_RAW, IPPROTO_AHIP)) < 0)
+			return (-1);
+	}
+
+	va_start(ap, request);
+	rv = ioctl(sfd, request, va_arg(ap, void *))
+		va_end(ap);
+
+	return (rv);
 }
 
 
 void
-openFD()
+soctlFailure(const char *fn)
 {
-    if (_fd != 0)
-	return ;
+	err(errno, "%s(): soctl failure", fn);
+}
 
-    if ((!isDebug(D_NOSOCKET)
-	 && (_fd = socket(PF_INET, SOCK_RAW, IPPROTO_AHIP)) < 0))
-	warnx("openFD: socket open failure: %s", strerror(errno));
 
-/* These two function call are equivalent in output.			*/
-/*	warn ("openFD: socket open failure");				*/
-/*	warnx("openFD: socket open failure: %s", strerror(errno));	*/
+/*
+ *
+ */
+
+
+int
+in6_prefix2len(struct in6_addr *prefix)
+{
+	int	 plen, byte, bit;
+	u_char	*addr;
+
+	plen = sizeof(struct in6_addr) * NBBY;
+	addr = (u_char *)prefix;
+	for (byte = sizeof(struct in6_addr) - 1; byte >= 0; byte--)
+		for (bit = 0; bit < NBBY; bit++, plen--)
+			if (addr[byte] & (1 << bit))
+				return (plen);
+
+	return (0);
+}
+
+
+struct in6_addr *
+in6_len2mask(int masklen)
+{
+	int			i;
+	static struct in6_addr	mask;
+
+	bzero(&mask, sizeof(struct in6_addr));
+	for (i = 0; i < masklen / 8; i++) {
+		mask.s6_addr[i] = 0xff;
+	}
+	if (masklen & 8)
+		mask.s6_addr[i] = (0xff00 >> (masklen % 8)) & 0xff;
+
+	return (&mask);
+}
+
+
+int
+in6_mask2len(struct in6_addr *mask)
+{
+	int x, y;
+
+	for (x = 0; x < sizeof(*mask); x++) {
+		if (mask->s6_addr[x] != 0xff)
+			break;
+	}
+	y = 0;
+	if (x < sizeof(*mask)) {
+		for (y = 0; y < 8; y++)	{
+			if ((mask->s6_addr[x] & (0x80 >> y)) == 0)
+				break;
+		}
+	}
+	return (x * 8 + y);
+}
+
+
+struct pAddr *
+getAddrs(int family, int type, struct addrinfo *addr, void *aux)
+{
+	struct sockaddr_in	*sin4;
+	struct sockaddr_in6	*sin6;
+	struct pAddr		*block;
+
+	block = (struct pAddr *)malloc(sizeof(struct pAddr));
+	bzero(block, sizeof(struct pAddr));
+
+	block->sa_family = family;
+	switch (family) {
+	case AF_INET:
+		sin4 = (struct sockaddr_in *)addr->ai_addr;
+		block->in4Addr = sin4->sin_addr;
+		break;
+
+	case AF_INET6:
+		sin6 = (struct sockaddr_in6 *)addr->ai_addr;
+		block->in6Addr = sin6->sin6_addr;
+		break;
+	}
+
+	block->aType = type;
+	if (aux) {
+		switch (type) {
+		case ADDR_SINGLE:
+			break;
+
+		case ADDR_MASK:
+			if ((family == AF_INET)
+			    || (family == AF_INET6)) {
+				block->prefix = *(int *)aux;
+			}
+			break;
+
+		case ADDR_RANGE:
+			if (family == AF_INET) {
+				block->in4Mask = ((struct sockaddr_in *)aux)->sin_addr;
+			}
+		}
+	}
+
+	return (block);
+}
+
+
+struct addrinfo *
+getAddrInfo(int family, char *text)
+{
+	const char *fn = __FUNCTION__;
+	int		 rv;
+	struct addrinfo	 hints;
+	struct addrinfo *res;
+
+	bzero(&hints, sizeof(struct addrinfo));
+	hints.ai_family = family;
+
+	if ((rv = getaddrinfo(text, NULL, &hints, &res)) != 0)
+		errx(errno, "%s(): %s", fn, gai_strerror(rv));
+
+	if (res->ai_addr->sa_family != family)
+		errx(1, "%s(): unexpected address family %d (%d)",
+		     fn, res->ai_addr->sa_family, family);
+
+	return (res);
 }
 
 
 void
-closeFD()
+clean_misc()
 {
-    close(_fd);
+	if (sfd != -1)
+		close(sfd);
 }
 
 
 void
 init_misc()
 {
-    int		iter, mask;
+	int	iter, mask;
 
-    bzero(mtobits, sizeof(mtobits));
-    mask = 0x80000000;
-    for (iter = 1; iter <= 32; iter++)
-    {
-	mtobits[iter] = htonl((u_long)mask);
-	mask >>= 1;
-    }
+	sfd = -1;
+	bzero(mtobits, sizeof(mtobits));
+	mask = 0x80000000;
+	for (iter = 1; iter <= 32; iter++) {
+		mtobits[iter] = htonl((u_long)mask);
+		mask >>= 1;
+	}
 }

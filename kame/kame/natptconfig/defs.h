@@ -1,7 +1,9 @@
+/*	$KAME: defs.h,v 1.6 2001/09/02 19:32:27 fujisawa Exp $	*/
+
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -13,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -25,24 +27,23 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$Id: defs.h,v 1.5 2000/05/16 16:22:33 fujisawa Exp $
  */
+
+#ifndef TRUE
+#define	TRUE			1
+#define FALSE			0
+#endif
 
 /*
  *
  */
 
-#define	ERROR			(-1)
-#define	SAME			(0)
+#define	PROTO_ICMP		0x01
+#define	PROTO_TCP		0x02
+#define	PROTO_UDP		0x04
 
-#ifndef TRUE
-#define	TRUE			(1)
-#define	FALSE			(~TRUE)
-#endif
 
-#define	LONG			(1)
-#define	SHORT			(2)
+#define	GETA			64
 
 #define	ROUNDUP(x)		roundup(x, sizeof(void *))
 
@@ -51,10 +52,9 @@
 #define	roundup2(x, y)		(((x)+((y)-1))&(~((y)-1))) /* if y is powers of two */
 #endif
 
+#define SIN6(s)			((struct sockaddr_in6 *)s)
 
 #define	isDebug(d)		(u_debug & (d))
-extern	u_int	u_debug;
-
 
 /* Bit assign for _debug						*/
 #define	D_LEXTOKEN		0x00000001
@@ -62,4 +62,35 @@ extern	u_int	u_debug;
 #define	D_SHOWROUTE		0x00000100
 #define	D_SHOWCSLOT		0x00000200
 #define	D_DUMPIOCTL		0x00010000
-#define	D_NOSOCKET		0x01000000
+
+struct ruletab
+{
+	struct pAddr	*from;
+	struct pAddr	*to;
+	u_short		*sports;
+	u_short		 dport;
+	int		 proto;
+	int		 bidir;
+};
+
+
+/*
+ *
+ */
+
+extern int	 u_debug;
+extern char	*yytext;
+
+
+/* cfparse.y */
+int		yyparse			__P((void));
+
+/* cftoken.l */
+void		 switchToBuffer		__P((char *));
+void		 reassembleCommandLine	__P((int, char *[]));
+
+/* main.c */
+void		 printHelp		__P((int, char *));
+
+
+/* End of defs.h */
