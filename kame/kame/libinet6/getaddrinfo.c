@@ -36,7 +36,7 @@
  * - IPv4 classful (shortened) form.  RFC2553 is silent about it.  XNET 5.2
  *   says to use inet_aton() to convert IPv4 numeric to binary (alows
  *   classful form as a result).
- *   current code - allow classful form for IPv4 (due to use of inet_aton).
+ *   current code - disallow classful form for IPv4 (due to use of inet_pton).
  * - freeaddrinfo(NULL).  RFC2553 is silent about it.  XNET 5.2 says it is
  *   invalid.
  *   current code - SEGV on freeaddrinfo(NULL)
@@ -749,7 +749,7 @@ explore_numeric(pai, hostname, servname, res)
 	flags = pai->ai_flags;
 
 	switch (afd->a_af) {
-#if 1 /*X/Open spec*/
+#if 0 /*X/Open spec*/
 	case AF_INET:
 		if (inet_aton(hostname, (struct in_addr *)pton) == 1) {
 			if (pai->ai_family == afd->a_af ||
