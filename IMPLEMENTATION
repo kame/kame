@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/07 06:02:16 $
+			$Date: 1999/10/07 06:16:28 $
 
 1. IPv6
 
@@ -847,9 +847,9 @@ to replace it.  IPv6 support for IPsec is, therefore, lacking on KAME/OpenBSD.
 
 The kernel implements experimental policy management code.  There are two way
 to to manage security policy.  One is to configure per-socket policy using
-setsockopt(3).  The other is to configure kernel packet filter-based policy
-using PF_KEY interface, via setkey(8).  In both cases, IPsec policy must be
-specified with syntax described in ipsec_set_policy(3).
+setsockopt(3).  In this cases, policy configuration is described in
+ipsec_set_policy(3).  The other is to configure kernel packet filter-based
+policy using PF_KEY interface, via setkey(8).
 
 The policy entry is not re-ordered with its
 indexes, so the order of entry when you add is very significant.
