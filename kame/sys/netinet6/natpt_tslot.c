@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.70 2002/12/16 09:21:50 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.71 2002/12/18 07:26:41 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1015,6 +1015,7 @@ natpt_duplicateXLate()
 		bcopy(tslq, tsln, sizeof(struct tSlot));
 		tsln->csl = NULL;
 		tsln->frg = NULL;
+		tsln->suit.tcps = NULL;
 
 		if ((tslq->ip_p == IPPROTO_TCP)
 		    && (tslq->suit.tcps != NULL)) {
@@ -1026,6 +1027,7 @@ natpt_duplicateXLate()
 			bcopy(tslq->suit.tcps, ts, sizeof(struct tcpstate));
 			ts->pkthdr[0] = NULL;
 			ts->pkthdr[1] = NULL;
+			tsln->suit.tcps = ts;
 		}
 
 		TAILQ_INSERT_TAIL(&tsl_xlate_head, tsln, tsl_list);
