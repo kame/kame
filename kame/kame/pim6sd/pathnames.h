@@ -1,4 +1,4 @@
-/*	$KAME: pathnames.h,v 1.9 2001/06/25 04:54:29 itojun Exp $	*/
+/*	$KAME: pathnames.h,v 1.10 2002/12/02 02:42:33 itojun Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -58,7 +58,7 @@
 #ifndef PATHNAMES_H
 #define PATHNAMES_H
 
-#define _PATH_PIM6D_CONF	"/usr/local/v6/etc/pim6sd.conf"
+#define _PATH_PIM6D_CONF	"/etc/pim6sd.conf"
 #define _PATH_PIM6D_LOGFILE	"/var/log/pim6sd.log"
 
 #if (defined(BSD) && (BSD >= 199103))

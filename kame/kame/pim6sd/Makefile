@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.14 2002/06/26 18:09:20 itojun Exp $
+#	$KAME: Makefile,v 1.15 2002/12/02 02:42:32 itojun Exp $
 #
 # Copyright (c) 1999 WIDE Project. All rights reserved.
 #
@@ -118,11 +118,11 @@ YFLAGS+=-d
 
 CLEANFILES+=	y.tab.h cfparse.h
 
-.if (${OPSYS} != "NetBSD")
+.if (${OPSYS} == "NetBSD") || (${OPSYS} == "OpenBSD")
+MAN=	pim6sd.8 pim6sd.conf.5
+.else
 MAN5=	pim6sd.conf.5
 MAN8=	pim6sd.8
-.else
-MAN=	pim6sd.8 pim6sd.conf.5
 .endif
 
 realinstall:
