@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.73 2001/08/16 17:33:53 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.74 2001/08/17 02:28:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -324,7 +324,9 @@ gif_output(ifp, m, dst, rt)
 #endif
 	int s;
 
+#ifdef ALTQ
 	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+#endif
 
 	/*
 	 * gif may cause infinite recursion calls when misconfigured.
@@ -376,11 +378,15 @@ gif_output(ifp, m, dst, rt)
 	*mtod(m, int *) = dst->sa_family;
 
 	s = splnet();
+#ifdef ALTQ
 	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
 	if (error) {
 		splx(s);
 		goto end;
 	}
+#else
+	IF_ENQUEUE(&ifp->if_snd, m);
+#endif /* ALTQ */
 	splx(s);
 
 #ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
