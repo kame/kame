@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.177 2003/03/28 08:22:21 suz Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.178 2003/04/07 11:54:17 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1664,20 +1664,13 @@ mip6_bc_proxy_control(target, local, cmd)
 					 ip6_sprintf(&target->sin6_addr)));
 				return (EEXIST);
 			}
-#if 0
-			if ((rt->rt_flags & (RTF_LLINFO | RTF_CLONING |
-#ifdef __FreeBSD__
-					     RTF_PRCLONING |
-#endif
-					     RTF_CACHE)) != 0) {
+			if ((rt->rt_flags & RTF_LLINFO) != 0) {
 				/* nd cache exist */
 				rtrequest(RTM_DELETE, rt_key(rt),
 					  (struct sockaddr *)0,
 					  rt_mask(rt), 0, (struct rtentry **)0);
 				rt = NULL;
-			} else
-#endif /* 0 */
-			{
+			} else {
 				/* XXX Path MTU entry? */
 				mip6log((LOG_ERR,
 					 "%s:%d: entry exist %s: rt_flags=0x%x\n",
