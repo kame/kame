@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: misc.c,v 1.3 2000/02/14 09:58:04 itojun Exp $
+ *	$Id: misc.c,v 1.4 2000/02/29 00:56:30 itojun Exp $
  */
 
 #include <stdio.h>
@@ -61,6 +61,8 @@
 #include <resolv.h>
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
+
+#include <ifaddrs.h>
 
 #include "defs.h"
 
@@ -846,8 +848,10 @@ toMyAddress(struct sockaddr *from)
 		    {
 			struct in6_addr	*adr6, *ptr6;
 
+#if 0
 			if (ifap->ifa_flags6 & IN6_IFF_ANYCAST)
 			    continue;
+#endif
 
 			adr6 = &((struct sockaddr_in6 *)ifap->ifa_addr)->sin6_addr;
 			ptr6 = &((struct sockaddr_in6 *)from)->sin6_addr;
@@ -982,6 +986,7 @@ openSocket6(struct ifaddrs *ifap)
 	return (-1);
     }
 
+#if 0
     ifap->ifa_flags6 = ifr6.ifr_ifru.ifru_flags6;
     if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_ANYCAST)
     {
@@ -991,6 +996,7 @@ openSocket6(struct ifaddrs *ifap)
 	close (sd6);
 	return (-1);
     }
+#endif
 
     sin6.sin6_port   = htons(NAMESERVER_PORT);
     if (bind(sd6, (struct sockaddr *)&sin6, sizeof(struct sockaddr_in6)) < 0)
@@ -1004,122 +1010,6 @@ openSocket6(struct ifaddrs *ifap)
 
     return (sd6);
 }
-
-
-/*
- *
- */
-
-#if defined(NET_RT_IFLIST) && (defined(__FreeBSD__) || defined(__NetBSD__))
-
-int
-getifaddrs(struct ifaddrs **pif)
-{
-    int			 mib[6];
-    size_t		 needed;
-    char		*buf, *lim, *next;
-    struct rt_msghdr	*rtm;
-    struct ifaddrs	*ifa, *ifc, *ift, *cif;
-
-    ifa = ifc = ift = cif = NULL;
-
-    mib[0] = CTL_NET;
-    mib[1] = PF_ROUTE;
-    mib[2] = 0;
-    mib[3] = 0;
-    mib[4] = NET_RT_IFLIST;
-    mib[5] = 0;
-
-    if (sysctl(mib, 6, NULL, &needed, NULL, 0) < 0)
-	perror("sysctl"), quitting(errno);
-
-    if ((buf = xmalloc(needed)) == NULL)
-	perror("xmalloc"), quitting(errno);
-
-    if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0)
-	perror("sysctl"), quitting(errno);
-
-    lim = buf + needed;
-    for (next = buf; next < lim; next += rtm->rtm_msglen)
-    {
-	rtm = (struct rt_msghdr *)next;
-	if (rtm->rtm_version != RTM_VERSION)
-	    continue;
-
-	switch (rtm->rtm_type)
-	{
-	  case RTM_IFINFO:
-	    {
-		struct if_msghdr	*ifm;
-		struct sockaddr_dl	*dl;
-
-		ifm =  (struct if_msghdr *)rtm;
-		if (ifm->ifm_addrs & RTA_IFP)
-		{
-		    dl = (struct sockaddr_dl *)(ifm+1);
-
-		    ifc = (struct ifaddrs *)calloc(1, sizeof(struct ifaddrs));
-		    ifc->ifa_addr = (struct sockaddr *)dl;
-
-		    ifc->ifa_name = (char *)calloc(1, ROUNDUP(dl->sdl_nlen + 1));
-		    bcopy(dl->sdl_data, ifc->ifa_name, dl->sdl_nlen);
-		    ifc->ifa_flags = (int)ifm->ifm_flags;
-
-		    if (ifa == NULL)	ifa = ifc;
-		    if (ift == NULL)	ift = ifc;
-		    else		ift->ifa_next = ifc, ift = ifc;
-		    cif = ifc;
-		}
-	    }
-	    break;
-
-	  case RTM_NEWADDR:
-	    {
-		int			 bits;
-		struct ifa_msghdr	*ifam;
-		struct sockaddr		*sa;
-
-		ifc = (struct ifaddrs *)calloc(1, sizeof(struct ifaddrs));
-		ifc->ifa_name  = cif->ifa_name;
-		ifc->ifa_flags = cif->ifa_flags;
-
-		if (ifa == NULL)	ifa = ifc;
-		if (ift == NULL)	ift = ifc;
-		else		ift->ifa_next = ifc, ift = ifc;
-
-		ifam = (struct ifa_msghdr *)rtm;
-		sa = (struct sockaddr *)(ifam+1);
-
-		for (bits = 1; bits <= 0x80; bits <<= 1)
-		{
-		    if ((ifam->ifam_addrs & bits) == 0)
-			continue;
-		    
-		    switch (bits)
-		    {
-		      case RTA_NETMASK:
-			ifc->ifa_netmask = sa;
-			break;
-
-		      case RTA_IFA:
-			ifc->ifa_addr = sa;
-			break;
-
-		      case RTA_BRD:
-			ifc->ifa_broadaddr = sa;
-			break;
-		    }
-		    sa = (struct sockaddr *)((char *)sa + ROUNDUP(sa->sa_len));
-		}
-	    }
-	    break;
-	}
-    }
-    *pif = ifa;
-    return (0);
-}
-
-#endif	/* defined(NET_RT_IFLIST) && (defined(__FreeBSD__) || defined(__NetBSD__))	*/
 
 
 struct ifnets *

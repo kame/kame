@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: defs.h,v 1.1 2000/01/07 15:08:34 fujisawa Exp $
+ *	$Id: defs.h,v 1.2 2000/02/29 00:56:30 itojun Exp $
  */
 
 #ifndef TRUE
@@ -77,20 +77,6 @@ struct ifnets
     /* #define	noSide			(0)					*/
     /* #define	inSide			(1)					*/
     /* #define	outSide			(2)					*/
-};
-
-
-struct ifaddrs
-{
-    struct ifaddrs	*ifa_next;
-    char		*ifa_name;
-    u_int		 ifa_flags;
-    u_int		 ifa_flags6;		/* ifr6.ifr_ifru.ifru_flags6	*/
-    struct sockaddr	*ifa_addr;
-    struct sockaddr	*ifa_netmask;
-    struct sockaddr	*ifa_dstaddr;
-    /*	  char		*ifa_fqdn;						*/
-    void		*ifa_data;		/* Now point to upper ifnets{}	*/
 };
 
 
