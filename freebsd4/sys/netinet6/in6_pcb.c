@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.9 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.63 2004/02/05 11:01:43 suz Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.64 2004/02/09 18:55:32 t-momose Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -464,15 +464,15 @@ in6_setsockaddr(so, nam)
 	if (!inp) {
 		splx(s);
 		free(sin6, M_SONAME);
-		return EINVAL;
+		return (EINVAL);
 	}
 	sin6->sin6_port = inp->inp_lport;
-	sin6->sin6_addr = inp->in6p_laddr;
+	if (in6_recoverscope(sin6, &inp->in6p_laddr, NULL)) {
+		splx(s);
+		free(sin6, M_SONAME);
+		return (EINVAL);
+	}
 	splx(s);
-
-#ifndef SCOPEDROUTING
-	in6_clearscope(&sin6->sin6_addr);
-#endif
 
 	*nam = (struct sockaddr *)sin6;
 	return 0;
@@ -503,12 +503,12 @@ in6_setpeeraddr(so, nam)
 		return EINVAL;
 	}
 	sin6->sin6_port = inp->inp_fport;
-	sin6->sin6_addr = inp->in6p_faddr;
+	if (in6_recoverscope(sin6, &inp->in6p_faddr, NULL)) {
+		splx(s);
+		free(sin6, M_SONAME);
+		return (EINVAL);
+	}
 	splx(s);
-
-#ifndef SCOPEDROUTING
-	in6_clearscope(&sin6->sin6_addr);
-#endif
 
 	*nam = (struct sockaddr *)sin6;
 	return 0;
