@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.46 2000/09/22 16:39:00 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.47 2000/09/22 17:27:51 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -236,15 +236,10 @@ The following type can be defined as
 .Ar idtype .
 .Ic address
 is default.
-.Ic fqdn , user_fqdn , keyid
+.Ic fqdn , user_fqdn , keyid and certname
 are linked to
 .Ic identifier
 directive.
-When you use some authentication method with a certificate,
-you can define either
-.Ic certname
-or
-.Ic certaltname .
 .\"
 .It Ic certificate_type Ar certspec ;
 specifies a certificate specification.
