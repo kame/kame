@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.21 2001/03/20 13:08:56 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.22 2001/04/04 05:17:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -473,13 +473,18 @@ translatingICMPv4To6(struct _cv *cv4, struct pAddr *pad)
 	icmp4len = icmp4end - (caddr_t)cv4->_payload._icmp4;
 
 	MGETHDR(m6, M_NOWAIT, MT_HEADER);
-	if (m6 == NULL)
-	{
+	if (m6 && MHLEN < (sizeof(struct ip6_hdr) + icmp4len)) {
+	    MCLGET(m6, M_NOWAIT);
+	    if ((m6->m_flags & M_EXT) == 0) {
+		m_freem(m6);
+		m6 = NULL;
+	    }
+	}
+	if (!m6) {
 	    errno = ENOBUFS;
 	    return (NULL);
 	}
-	if (MHLEN < (sizeof(struct ip6_hdr) + icmp4len))
-	    MCLGET(m6, M_NOWAIT);
+	m6->m_pkthdr.rcvif = NULL;
     }
 
     cv6.m = m6;
@@ -848,6 +853,7 @@ translatingTCPUDPv4To6(struct _cv *cv4, struct pAddr *pad, struct _cv *cv6)
 	    MGETHDR(m6, M_NOWAIT, MT_HEADER);
 	    ReturnEnobufs(m6);
 
+	    m6->m_pkthdr.rcvif = NULL;
 	    m6->m_next	= m6next;
 	    m6->m_data += (MHLEN - sizeof(struct ip6_hdr));
 	    m6->m_len	= sizeof(struct ip6_hdr);
@@ -871,6 +877,7 @@ translatingTCPUDPv4To6(struct _cv *cv4, struct pAddr *pad, struct _cv *cv6)
 		errno = ENOBUFS;
 		return (NULL);
 	    }
+	    m6->m_pkthdr.rcvif = NULL;
 
 	    ip6 = mtod(m6, struct ip6_hdr *);
 	    tcp4 = (caddr_t)cv4->_payload._tcp4;
@@ -894,9 +901,16 @@ translatingTCPUDPv4To6(struct _cv *cv4, struct pAddr *pad, struct _cv *cv6)
 	caddr_t	tcp6;
 
 	MGETHDR(m6, M_NOWAIT, MT_HEADER);
+	if (m6 && MHLEN < sizeof(struct ip6_hdr) + cv4->plen) {
+	    MCLGET(m6, M_NOWAIT);
+	    if ((m6->m_flags & M_EXT) == 0) {
+		m_freem(m6);
+		m6 = NULL;
+	    }
+	}
 	ReturnEnobufs(m6);
-	MCLGET(m6, M_NOWAIT);
 
+	m6->m_pkthdr.rcvif = NULL;
 	m6->m_data += 128;	/* make struct ether_header{} space. -- too many?	*/
 	m6->m_pkthdr.len = m6->m_len   = sizeof(struct ip6_hdr) + cv4->plen;
 	ip6 = mtod(m6, struct ip6_hdr *);
@@ -922,6 +936,7 @@ translatingTCPUDPv4To6(struct _cv *cv4, struct pAddr *pad, struct _cv *cv6)
 	    errno = ENOBUFS;
 	    return (NULL);
 	}
+	m6->m_pkthdr.rcvif = NULL;
 
 	cv6->m = m6;
 	ip6 = mtod(m6, struct ip6_hdr *);
@@ -1034,13 +1049,19 @@ translatingICMPv6To4(struct _cv *cv6, struct pAddr *pad)
 	int		 icmp6len = icmp6end - (caddr_t)cv6->_payload._icmp6;
 
 	MGETHDR(m4, M_NOWAIT, MT_HEADER);
+	if (m4 && MHLEN < (sizeof(struct ip) + icmp6len)) {
+	    MCLGET(m4, M_NOWAIT);
+	    if ((m4->m_flags & M_EXT) == 0) {
+		m_freem(m4);
+		m4 = NULL;
+	    }
+	}
 	if (m4 == NULL)
 	{
 	    errno = ENOBUFS;
 	    return (NULL);
 	}
-	if (MHLEN < (sizeof(struct ip) + icmp6len))
-	    MCLGET(m4, M_NOWAIT);
+	m4->m_pkthdr.rcvif = NULL;
     }
 
     cv4.m = m4;

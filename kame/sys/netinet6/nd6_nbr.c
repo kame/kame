@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.62 2001/02/23 09:01:10 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.63 2001/04/04 05:17:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -392,6 +392,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 	}
 	if (m == NULL)
 		return;
+	m->m_pkthdr.rcvif = NULL;
 
 	if (daddr6 == NULL || IN6_IS_ADDR_MULTICAST(daddr6)) {
 		m->m_flags |= M_MCAST;
@@ -884,6 +885,7 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	}
 	if (m == NULL)
 		return;
+	m->m_pkthdr.rcvif = NULL;
 
 	if (IN6_IS_ADDR_MULTICAST(daddr6)) {
 		m->m_flags |= M_MCAST;

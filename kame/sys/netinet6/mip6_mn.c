@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mn.c,v 1.23 2001/03/29 05:34:32 itojun Exp $	*/
+/*	$KAME: mip6_mn.c,v 1.24 2001/04/04 05:17:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -2835,6 +2835,7 @@ mip6_rs_output(ifp)
 #endif
  		return;
 	}
+	m->m_pkthdr.rcvif = NULL;
 
 	m->m_flags |= M_MCAST;
 	im6o.im6o_multicast_ifp = ifp;
@@ -2978,6 +2979,7 @@ mip6_tunneled_rs_output(src, dst)
 	}
 	if (m == NULL)
 		return ENOBUFS;
+	m->m_pkthdr.rcvif = NULL;
 
 /*	m->m_flags |= M_MCAST;
 	im6o.im6o_multicast_ifp = ifp;

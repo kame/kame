@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.26 2001/02/16 14:50:35 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.27 2001/04/04 05:17:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -444,6 +444,7 @@ mld6_sendpkt(in6m, type, dst)
 	}
 	mh->m_next = md;
 
+	mh->m_pkthdr.rcvif = NULL;
 	mh->m_pkthdr.len = sizeof(struct ip6_hdr) + sizeof(struct mld6_hdr);
 	mh->m_len = sizeof(struct ip6_hdr);
 	MH_ALIGN(mh, sizeof(struct ip6_hdr));

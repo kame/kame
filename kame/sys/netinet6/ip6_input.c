@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.189 2001/04/01 09:08:57 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.190 2001/04/04 05:17:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -534,10 +534,8 @@ ip6_input(m)
 			return;	/*ENOBUFS*/
 
 		m_copydata(m, 0, m->m_pkthdr.len, mtod(n, caddr_t));
-		n->m_pkthdr = m->m_pkthdr;
+		M_COPY_PKTHDR(n, m);
 		n->m_len = m->m_pkthdr.len;
-		n->m_pkthdr.aux = m->m_pkthdr.aux;
-		m->m_pkthdr.aux = (struct mbuf *)NULL;
 		m_freem(m);
 		m = n;
 	}

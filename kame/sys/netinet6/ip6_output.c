@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.175 2001/03/30 04:48:10 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.176 2001/04/04 05:17:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1352,6 +1352,7 @@ skip_ipsec2:;
 				ip6stat.ip6s_odropped++;
 				goto sendorfree;
 			}
+			m->m_pkthdr.rcvif = NULL;
 			m->m_flags = m0->m_flags & M_COPYFLAGS;
 			*mnext = m;
 			mnext = &m->m_nextpkt;

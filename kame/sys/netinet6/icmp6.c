@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.208 2001/03/29 05:34:30 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.209 2001/04/04 05:17:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -789,6 +789,7 @@ icmp6_input(mp, offp, proto)
 				/* Give up remote */
 				break;
 			}
+			n->m_pkthdr.rcvif = NULL;
 			n->m_len = 0;
 			maxhlen = M_TRAILINGSPACE(n) - maxlen;
 			if (maxhlen > hostnamelen)
@@ -2736,6 +2737,7 @@ icmp6_redirect_output(m0, rt)
 		MCLGET(m, M_DONTWAIT);
 	if (!m)
 		goto fail;
+	m->m_pkthdr.rcvif = NULL;
 	m->m_len = 0;
 	maxlen = M_TRAILINGSPACE(m);
 	maxlen = min(IPV6_MMTU, maxlen);

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.100 2001/04/02 11:47:35 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.101 2001/04/04 05:17:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3429,6 +3429,7 @@ ipsec_copypkt(m)
 					MGETHDR(mn, M_DONTWAIT, MT_HEADER);
 					if (mn == NULL)
 						goto fail;
+					mn->m_pkthdr.rcvif = NULL;
 					mm->m_next = mn;
 					mm = mn;
 				}
