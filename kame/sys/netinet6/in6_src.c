@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.66 2001/09/05 12:17:47 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.67 2001/09/05 12:42:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -254,7 +254,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	/*
 	 * Adjust the "outgoing" interface.  If we're going to loop the packet
 	 * back to ourselves, the ifp would be the loopback interface.
-	 * However, we'd rather to know the interface associated to the
+	 * However, we'd rather know the interface associated to the
 	 * destination address (which should probably be one of our own
 	 * addresses.)
 	 */
