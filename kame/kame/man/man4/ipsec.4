@@ -1,4 +1,4 @@
-.\"	$KAME: ipsec.4,v 1.6 2000/04/14 09:09:50 itojun Exp $
+.\"	$KAME: ipsec.4,v 1.7 2000/04/20 08:01:41 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -228,6 +228,10 @@ The IPsec support is subject to change as the IPsec protocols develop.
 .Pp
 There is no single standard for policy engine API,
 so the policy engine API described herein is just for KAME implementation.
+.Pp
+AH tunnel may not work as you might expect.
+Packets will be exchanged just fine, however,
+policy engine will not consider the encapsulated packet to be authentic.
 .\"
 .Sh HISTORY
 The implementation described herein appeared in WIDE/KAME IPv6/IPsec stack.
