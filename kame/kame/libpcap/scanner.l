@@ -22,7 +22,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/scanner.l,v 1.1 1999/08/08 23:30:19 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/scanner.l,v 1.2 1999/08/16 03:31:19 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/types.h>
@@ -30,6 +30,7 @@ static const char rcsid[] =
 
 #include <ctype.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "pcap-int.h"
 
