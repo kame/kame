@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1616 2001/03/21 20:01:25 sakane Exp $
+$KAME: CHANGELOG,v 1.1617 2001/03/21 22:02:51 jinmei Exp $
 
 <200103>
+2001-03-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_cache_lladdr): set nd6_gctimer to
+	ln_expire just after the state transition to STALE.  This change
+	fixed a bug that a longer timer value was mistakenly set, after
+	transition to the delay ND state.  The bug could delay NUD, but it
+	does not happen in a normal operation.  Thus, you do not
+	necessarily have to update the kernel in a hurry.
+
+	The bug was introduced around Jan 20th, 2001, and was found by a
+	recent TAHI coformance check.
+
 Thu Mar 22 04:56:57 JST 2001 sakane@ydc.co.jp
 	* racoon/policy.c:
 	fixed to compare between policies when the responder decides to
