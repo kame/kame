@@ -594,6 +594,24 @@ file crypto/rc5/rc5_cbc.c		ipsec & ipsec_esp
 file netinet6/ipcomp_core.c		ipsec
 file netinet6/ipcomp_input.c		ipsec
 file netinet6/ipcomp_output.c		ipsec
+file netinet6/ip6_fw.c			ipv6firewall
+file netinet6/ptr_dispatch.c		inet6 & ptr
+file netinet6/ptr_list.c		inet6 & ptr
+file netinet6/ptr_log.c			inet6 & ptr
+file netinet6/ptr_rule.c		inet6 & ptr
+file netinet6/ptr_trans.c		inet6 & ptr
+file netinet6/ptr_tslot.c		inet6 & ptr
+file netinet6/ptr_usrreq.c		inet6 & ptr
+file netpm/pm_aTT.c			pm
+file netpm/pm_ams.c			pm
+file netpm/pm_dispatch.c		pm
+file netpm/pm_filter.c			pm
+file netpm/pm_list.c			pm
+file netpm/pm_log.c			pm
+file netpm/pm_nat.c			pm
+file netpm/pm_pmd.c			pm
+file netpm/pm_route.c			pm
+file netpm/pm_usrreq.c			pm
 #file net/if_eif.c			eif & ipsec
 file kern/exec_elf32.c			exec_elf32
 file kern/exec_elf64.c			exec_elf64
