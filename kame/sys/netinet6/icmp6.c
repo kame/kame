@@ -885,7 +885,7 @@ icmp6_input(mp, offp, proto)
 			default:
 				/*
 				 * This case includes ESP and the No Next
-				 * Header. In such cases goting to the notify
+				 * Header. In such cases going to the notify
 				 * label does not have any meaning
 				 * (i.e. ctlfunc will be NULL), but we go
 				 * anyway since we might have to update
