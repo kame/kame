@@ -25,18 +25,19 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ipsec_set_policy.3,v 1.8 2000/01/27 17:59:12 itojun Exp $
+.\"     $Id: ipsec_set_policy.3,v 1.9 2000/05/05 16:57:23 sumikawa Exp $
 .\"
 .Dd May 5, 1998
 .Dt IPSEC_SET_POLICY 3
 .Os KAME
-.\"
 .Sh NAME
 .Nm ipsec_set_policy ,
 .Nm ipsec_get_policylen ,
 .Nm ipsec_dump_policy
 .Nd manipulate IPsec policy specification structure from readable string
 .\"
+.Sh LIBRARY
+.Lb libipsec
 .Sh SYNOPSIS
 .Fd #include <netinet6/ipsec.h>
 .Ft "char *"
@@ -45,7 +46,6 @@
 .Fn ipsec_get_policylen "char *buf"
 .Ft "char *"
 .Fn ipsec_dump_policy "char *buf" "char *delim"
-.\"
 .Sh DESCRIPTION
 .Fn ipsec_set_policy
 generates IPsec policy specification structure, namely
@@ -88,7 +88,6 @@ returns pointer to dynamically allocated string.
 It is caller's responsibility to reclaim the region, by using
 .Xr free 3 .
 .Pp
-.\"
 .Fa policy
 is formatted as either of the following:
 .Bl -tag  -width "discard"
@@ -106,9 +105,7 @@ means to consult to SPD defined by
 .It Ar direction Li bypass
 .Li bypass
 means to be bypassed the IPsec processing.
-.Po
-packet will be transmitted in clear
-.Pc .
+.Pq packet will be transmitted in clear .
 This is for privileged socket.
 .It Xo
 .Ar direction
@@ -239,7 +236,6 @@ out ipsec esp/transport/10.1.1.2-10.1.1.1/use
 in ipsec ipcomp/transport/10.1.1.2-10.1.1.1/use
         esp/transport/10.1.1.2-10.1.1.1/use
 .Ed
-.\"
 .Sh RETURN VALUES
 .Fn ipsec_set_policy
 returns a pointer to the allocated buffer of policy specification if successful; otherwise a NULL pointer is returned.
@@ -252,14 +248,9 @@ returns a pointer to dynamically allocated region on success,
 and
 .Dv NULL
 on errors.
-.\"
 .Sh SEE ALSO
 .Xr ipsec_strerror 3 ,
 .Xr ispec 4 ,
 .Xr setkey 8
-.\"
 .Sh HISTORY
 The functions first appeared in WIDE/KAME IPv6 protocol stack kit.
-.\"
-.\" .Sh BUGS
-.\" (to be written)
