@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/02/16 01:36:56 $
+			$Date: 2000/02/17 06:40:50 $
 
 1. IPv6
 
@@ -115,9 +115,8 @@ draft-ietf-ngtrans-tcpudp-relay-00.txt:
 
 Neighbor Discovery is fairly stable.  Currently Address Resolution,
 Duplicated Address Detection, and Neighbor Unreachability Detection
-are supported.  In the near future we will be adding Proxy Neighbor
-Advertisement support in the kernel and Unsolicited Neighbor Advertisement
-transmission command as admin tool.
+are supported.  In the near future we will be adding Unsolicited Neighbor
+Advertisement transmission command as admin tool.
 
 Duplicated Address Detection (DAD) will be performed when an IPv6 address
 is assigned to a network interface, or the network interface is enabled
@@ -165,6 +164,24 @@ attached to RA, only the first 10 prefixes will be recognized.
 If this troubles you, please contact KAME team and/or modify
 nd6_maxndopt in sys/netinet6/nd6.c.  If there are high demands we may
 provide sysctl knob for the variable.
+
+Proxy Neighbor Advertisement support is implemented in the kernel.
+You can configure it by using the following command:
+	# ndp -s fe80:1::1234 0:1:2:3:4:5 proxy
+You need to fill in scope index into the address - see 1.3.3.
+There are certain limitations, though:
+- It does not send unsolicited multicast NA on configuration.  This is MAY
+  behavior in RFC2461.
+- It does not add random delay before transmission of solicited NA.  This is
+  SHOULD behavior in RFC2461.
+- We cannot configure proxy NDP for off-link address.  The target address for
+  proxying must be link-local address, or must be in prefixes configured to
+  node which does proxy NDP.
+- RFC2461 is unclear about if it is legal for a host to perform proxy ND.
+  We do not prohibit hosts from doing proxy ND, but there will be very limited
+  use in it.
+Due to a bug in sys/net/rtsock.c, it may not be abailable on your platform.
+Check CHANGELOG entry for this (Feb 17 2000).
 
 1.3 Scope Index
 
@@ -245,8 +262,8 @@ This may seem to be opposite from IPv6's premise to support "dentist office"
 situation.  We believe that specifications need some improvements for this.
 
 The only exception to the above rule would be when you configure routing table
-manually by route(8).  Gateway portion of IPv6 routing entry must be an
-link-local address (otherwise ICMPv6 redirect will not work), and in this
+manually by route(8), or ndp(8).  Gateway portion of IPv6 routing entry must
+be an link-local address (otherwise ICMPv6 redirect will not work), and in this
 case you'll need to configure it by putting interface index into the address:
 	# route add -inet6 default fe80:2::9876:5432:1234:5678
 	(when interface index for outgoing interface = 2)
