@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1827 2001/08/01 16:57:58 jinmei Exp $
+$KAME: CHANGELOG,v 1.1828 2001/08/03 09:16:35 sakane Exp $
 
 <200108>
 2001-08-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -19,6 +19,11 @@ $KAME: CHANGELOG,v 1.1827 2001/08/01 16:57:58 jinmei Exp $
 <200107>
 Tue Jul 31 22:54:57 JST 2001	suz@sdl.hitachi.co.jp
 	* kame/kame/pim6sd/cfparse.y: command-line debug-option works now.
+
+Tue Jul 31 sakane@kame.net
+	* kame/racoon:
+	the phase1 deletion should be postponed until there is no phase2.
+	this was probably made a consensus at vpn bakeoff on Oct, 1998.
 
 2001-07-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/(several files): several improvements on the
