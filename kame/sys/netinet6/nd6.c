@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.356 2004/04/19 04:37:24 keiichi Exp $	*/
+/*	$KAME: nd6.c,v 1.357 2004/05/19 09:09:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2217,11 +2217,8 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 #endif
 			{
 				rt->rt_refcnt--;
-				if (rt->rt_ifp != ifp) {
-					/* XXX: loop care? */
-					return (nd6_output(ifp, origifp, m0,
-					    dst, rt));
-				}
+				if (rt->rt_ifp != ifp)
+					senderr(EHOSTUNREACH);
 			} else
 				senderr(EHOSTUNREACH);
 		}
