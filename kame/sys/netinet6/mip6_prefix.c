@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.24 2003/08/15 12:49:55 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.25 2003/08/20 12:58:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -289,14 +289,20 @@ mip6_prefix_timer(arg)
 			    __FILE__, __LINE__));
 		}
 
-		mip6_prefix_settimer(mpfx,
-		    MIP6_MOBILE_PREFIX_SOL_INTERVAL * hz);
+		if (mpfx->mpfx_vlexpire >
+		    mono_time.tv_sec + MIP6_MOBILE_PREFIX_SOL_INTERVAL) {
+			mip6_prefix_settimer(mpfx,
+			    MIP6_MOBILE_PREFIX_SOL_INTERVAL * hz);
+		} else {
+			mip6_prefix_settimer(mpfx,
+			    (mpfx->mpfx_vlexpire - mono_time.tv_sec) * hz);
+		}
 		mpfx->mpfx_state = MIP6_PREFIX_STATE_EXPIRING;
 		break;
 
 	case MIP6_PREFIX_STATE_EXPIRING:
 		if (mpfx->mpfx_vlexpire < mono_time.tv_sec) {
-			/* XXX remove entry. */
+			mip6_prefix_list_remove(&mip6_prefix_list, mpfx);
 			break;
 		}
 
@@ -307,8 +313,14 @@ mip6_prefix_timer(arg)
 			    __FILE__, __LINE__));
 		}
 
-		mip6_prefix_settimer(mpfx,
-		    MIP6_MOBILE_PREFIX_SOL_INTERVAL * hz);
+		if (mpfx->mpfx_vlexpire >
+		    mono_time.tv_sec + MIP6_MOBILE_PREFIX_SOL_INTERVAL) {
+			mip6_prefix_settimer(mpfx,
+			    MIP6_MOBILE_PREFIX_SOL_INTERVAL * hz);
+		} else {
+			mip6_prefix_settimer(mpfx,
+			    (mpfx->mpfx_vlexpire - mono_time.tv_sec) * hz);
+		}
 		mpfx->mpfx_state = MIP6_PREFIX_STATE_EXPIRING;
 		break;
 	}
