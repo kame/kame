@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.319 2003/06/28 03:56:15 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.320 2003/06/28 07:39:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -548,7 +548,7 @@ ip6_input(m)
 	/*
 	 * Packet filter
 	 */
-#ifdef IPSEC
+#if defined(IPSEC) && !defined(__OpenBSD__)
 	if (!ipsec_getnhist(m))
 #else
 	if (1)
