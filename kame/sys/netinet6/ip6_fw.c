@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.24 2001/06/26 02:08:40 sumikawa Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.25 2001/06/28 05:28:11 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -498,7 +498,7 @@ ip6fw_report(struct ip6_fw *f, struct ip6_hdr *ip6,
 			    icmp6->icmp6_type, icmp6->icmp6_code);
 		else
 			len = snprintf(SNPARGS(proto, 0), "IPV6-ICMP ");
-		len = snprintf(SNPARGS(proto, len), "[%s]",
+		len += snprintf(SNPARGS(proto, len), "[%s]",
 		    ip6_sprintf(&ip6->ip6_src));
 		snprintf(SNPARGS(proto, len), " [%s]",
 		    ip6_sprintf(&ip6->ip6_dst));
