@@ -960,6 +960,7 @@ in_addmulti(ap, ifp)
 	struct ias_head *newhead = NULL;/* this may become new ims_cur->head */
 	u_int curmode;			/* current filter mode */
 	u_int newmode;			/* newly calculated filter mode */
+	u_int16_t curnumsrc;		/* current ims_cur->numsrc */
 	u_int16_t newnumsrc;		/* new ims_cur->numsrc */
 	int timer_init = 1;		/* indicate timer initialization */
 	int buflen = 0;
@@ -1001,6 +1002,9 @@ in_addmulti(ap, ifp)
 		return inm;
 	    }
 
+	    /* inm_source is already allocated. */
+	    curmode = inm->inm_source->ims_mode;
+	    curnumsrc= inm->inm_source->ims_cur->numsrc;
 	    /*
 	     * Add each source address to inm_source and get new source
 	     * filter mode and its calculated source list.
@@ -1010,7 +1014,6 @@ in_addmulti(ap, ifp)
 		splx(s);
 		return NULL;
 	    }
-	    curmode = inm->inm_source->ims_mode;
 	    if (newhead != NULL) {
  		/*
 		 * Merge new source list to current pending report's source
@@ -1041,14 +1044,16 @@ in_addmulti(ap, ifp)
 	     * TO_EX State-Change Report will be sent in any case.
 	     */
 	    if (inm->inm_rti->rti_type == IGMP_v3_ROUTER) {
-		if (curmode != newmode) {
-		    if (newmode == MCAST_INCLUDE)
-			type = CHANGE_TO_INCLUDE_MODE;
-		    else
-			type = CHANGE_TO_EXCLUDE_MODE;
-		    }
-		    igmp_send_state_change_report
+		if (curmode != newmode || curnumsrc != newnumsrc) {
+			if (curmode != newmode) {
+			    if (newmode == MCAST_INCLUDE)
+				type = CHANGE_TO_INCLUDE_MODE;
+			    else
+				type = CHANGE_TO_EXCLUDE_MODE;
+			    }
+			    igmp_send_state_change_report
 				(&m, &buflen, inm, type, timer_init);
+		}
 	    } else {
 		/*
 		 * If MSF's pending records exist, they must be deleted.
@@ -1201,6 +1206,7 @@ in_delmulti(inm)
 	struct ias_head *newhead = NULL;/* this may become new ims_cur->head */
 	u_int curmode;			/* current filter mode */
 	u_int newmode;			/* newly calculated filter mode */
+	u_int16_t curnumsrc;		/* current ims_cur->numsrc */
 	u_int16_t newnumsrc;		/* new ims_cur->numsrc */
 	int timer_init = 1;		/* indicate timer initialization */
 	int buflen = 0;
@@ -1236,6 +1242,8 @@ in_delmulti(inm)
 		return;
 	}
 
+	curmode = inm->inm_source->ims_mode;
+	curnumsrc = inm->inm_source->ims_cur->numsrc;
 	/*
 	 * Delete each source address from inm_source and get new source
 	 * filter mode and its calculated source list, and send State-Change
@@ -1246,7 +1254,6 @@ in_delmulti(inm)
 		splx(s);
 		return;
 	}
-	curmode = inm->inm_source->ims_mode;
 	if (newhead != NULL) {
 		if ((*error = in_merge_msf_state
 				(inm, newhead, newmode, newnumsrc)) > 0) {
@@ -1270,14 +1277,16 @@ in_delmulti(inm)
 		--inm->inm_refcount;
 
 	if (inm->inm_rti->rti_type == IGMP_v3_ROUTER) {
-		if (curmode != newmode) {
-			if (newmode == MCAST_INCLUDE)
-				type = CHANGE_TO_INCLUDE_MODE;
-			else
-				type = CHANGE_TO_EXCLUDE_MODE;
-		}
-		igmp_send_state_change_report
+		if (curmode != newmode || curnumsrc != newnumsrc) {
+			if (curmode != newmode) {
+				if (newmode == MCAST_INCLUDE)
+					type = CHANGE_TO_INCLUDE_MODE;
+				else
+					type = CHANGE_TO_EXCLUDE_MODE;
+			}
+			igmp_send_state_change_report
 				(&m, &buflen, inm, type, timer_init);
+		}
 	} else {
 		/*
 		 * If MSF's pending records exist, they must be deleted.
@@ -1369,9 +1378,10 @@ in_modmulti(ap, ifp, numsrc, ss, mode,
 	struct ifreq ifr;
 	struct in_ifaddr *ia;
 	struct ias_head *newhead = NULL;/* this becomes new ims_cur->head */
+	u_int curmode;			/* current filter mode */
 	u_int newmode;			/* newly calculated filter mode */
+	u_int16_t curnumsrc;		/* current ims_cur->numsrc */
 	u_int16_t newnumsrc;		/* new ims_cur->numsrc */
-	u_int curmode;
 	int timer_init = 1;		/* indicate timer initialization */
 	int buflen = 0;
 	u_int8_t type = 0;		/* State-Change report type */
@@ -1431,13 +1441,14 @@ in_modmulti(ap, ifp, numsrc, ss, mode,
 		}
 	    }
 
+	    curmode = inm->inm_source->ims_mode;
+	    curnumsrc = inm->inm_source->ims_cur->numsrc;
 	    if ((*error = in_modmultisrc(inm, numsrc, ss, mode,
 					old_num, old_ss, old_mode, grpjoin,
 					&newhead, &newmode, &newnumsrc)) != 0) {
 		splx(s);
 		return NULL;
 	    }
-	    curmode = inm->inm_source->ims_mode;
 	    if (newhead != NULL) {
 		/*
 		 * Merge new source list to current pending report's source
@@ -1465,14 +1476,16 @@ in_modmulti(ap, ifp, numsrc, ss, mode,
 	     * TO_EX State-Change Report will be sent in any case.
 	     */
 	    if (inm->inm_rti->rti_type == IGMP_v3_ROUTER) {
-		if (curmode != newmode) {
-		    if (newmode == MCAST_INCLUDE)
-			type = CHANGE_TO_INCLUDE_MODE;
-		    else
-			type = CHANGE_TO_EXCLUDE_MODE;
-		}
-		igmp_send_state_change_report
+		if (curmode != newmode || curnumsrc != newnumsrc || old_num) {
+			if (curmode != newmode) {
+			    if (newmode == MCAST_INCLUDE)
+				type = CHANGE_TO_INCLUDE_MODE;
+			    else
+				type = CHANGE_TO_EXCLUDE_MODE;
+			}
+			igmp_send_state_change_report
 				(&m, &buflen, inm, type, timer_init);
+		}
 	    } else {
 		/*
 		 * If MSF's pending records exist, they must be deleted.

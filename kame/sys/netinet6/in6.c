@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.304 2002/09/12 09:34:21 suz Exp $	*/
+/*	$KAME: in6.c,v 1.305 2002/09/20 13:05:59 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2213,9 +2213,8 @@ in6_addmulti(maddr6, ifp, errorp)
 	struct	i6as_head *newhead = NULL;/* this may become new current head */
 	u_int	curmode;		/* current filter mode */
 	u_int	newmode;		/* newly calculated filter mode */
+	u_int16_t curnumsrc;		/* current i6ms_cur->numsrc */
 	u_int16_t newnumsrc;		/* new i6ms_cur->numsrc */
-	int	timer_init = 1;		/* indicate timer initialization */
-	int	buflen = 0;
 	u_int8_t type = 0;		/* State-Change report type */
 	struct	router6_info *rt6i;
 #endif
@@ -2254,6 +2253,8 @@ in6_addmulti(maddr6, ifp, errorp)
 		 * Found it; merge source addresses in in6m_source and send
 		 * State-Change Report.
 		 */
+		curmode = in6m->in6m_source->i6ms_mode;
+		curnumsrc = in6m->in6m_source->i6ms_cur->numsrc;
 		/*
 		 * Add each source address to in6m_source and get new source
 		 * filter mode and its calculated source list.
@@ -2263,7 +2264,6 @@ in6_addmulti(maddr6, ifp, errorp)
 			splx(s);
 			return NULL;
 		}
-		curmode = in6m->in6m_source->i6ms_mode;
 		if (newhead != NULL) {
 			/*
 			 * Merge new source list to current pending report's
@@ -2295,14 +2295,16 @@ in6_addmulti(maddr6, ifp, errorp)
 		 * a TO_EX State-Change Report will be sent in any case.
 		 */
 		if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER) {
-			if (curmode != newmode) {
-				if (newmode == MCAST_INCLUDE)
-					type = CHANGE_TO_INCLUDE_MODE;
-				else
-					type = CHANGE_TO_EXCLUDE_MODE;
+			if (curmode != newmode || curnumsrc != newnumsrc) {
+				if (curmode != newmode) {
+					if (newmode == MCAST_INCLUDE)
+						type = CHANGE_TO_INCLUDE_MODE;
+					else
+						type = CHANGE_TO_EXCLUDE_MODE;
+				}
+				mld_send_state_change_report
+				(&m, &buflen, in6m, type, timer_init);
 			}
-			mld_send_state_change_report
-					(&m, &buflen, in6m, type, timer_init);
 		} else {
 			/*
 			 * If MSF's pending records exist, they must be deleted.
@@ -2457,13 +2459,11 @@ in6_delmulti(in6m)
 {
 	struct	in6_ifreq ifr;
 #ifdef MLDV2
-	struct	mbuf *m = NULL;
 	struct	i6as_head *newhead = NULL;/* this may become new current head */
 	u_int	curmode;		/* current filter mode */
 	u_int	newmode;		/* newly calculated filter mode */
+	u_int16_t curnumsrc;		/* current i6ms_cur->numsrc */
 	u_int16_t newnumsrc;		/* new i6ms_cur->numsrc */
-	int	timer_init = 1;		/* indicate timer initialization */
-	int	buflen = 0;
 	u_int8_t type = 0;		/* State-Change report type */
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -2503,6 +2503,8 @@ in6_delmulti(in6m)
 		return; 
 	}
 
+	curmode = in6m->in6m_source->i6ms_mode;
+	curnumsrc = in6m->in6m_source->i6ms_cur->numsrc;
 	/*
 	 * Delete each source address from in6m_source and get new source
 	 * filter mode and its calculated source list, and send State-Change
@@ -2513,7 +2515,6 @@ in6_delmulti(in6m)
 		splx(s);
 		return;
 	}
-	curmode = in6m->in6m_source->i6ms_mode;
 	if (newhead != NULL) {
 		if ((*errorp = in6_merge_msf_state
 				(in6m, newhead, newmode, newnumsrc)) > 0) {
@@ -2529,19 +2530,21 @@ in6_delmulti(in6m)
 		in6m->in6m_source->i6ms_cur->numsrc = newnumsrc;
 	}
 
+	/* for this group address, final leave request by the socket. */
 	if (final)
-		/* for this group address, final leave request by the
-		 * socket. */
 		--in6m->in6m_refcount;
+
 	if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER) {
-		if (curmode != newmode) {
-			if (newmode == MCAST_INCLUDE)
-				type = CHANGE_TO_INCLUDE_MODE;
-			else
-				type = CHANGE_TO_EXCLUDE_MODE;
-		}
-		mld_send_state_change_report
+		if (curmode != newmode || curnumsrc != newnumsrc) {
+			if (curmode != newmode) {
+				if (newmode == MCAST_INCLUDE)
+					type = CHANGE_TO_INCLUDE_MODE;
+				else
+					type = CHANGE_TO_EXCLUDE_MODE;
+			}
+			mld_send_state_change_report
 				(&m, &buflen, in6m, type, timer_init);
+		}
 	} else {
 		/*
 		 * If MSF's pending records exist, they must be deleted.
@@ -2635,16 +2638,14 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 	int init;			/* indicate initial join by socket */
 	u_int grpjoin;			/* on/off of (*,G) join by socket */
 {
-	struct mbuf *m = NULL;
 	struct in6_multi *in6m;
 	struct ifreq ifr;
 	struct in6_ifaddr *ia;
 	struct i6as_head *newhead = NULL;/* this becomes new ims_cur->head */
+	u_int curmode;			/* current filter mode */
 	u_int newmode;			/* newly calculated filter mode */
 	u_int16_t newnumsrc;		/* new ims_cur->numsrc */
-	u_int curmode;
-	int timer_init = 1;		/* indicate timer initialization */
-	int buflen = 0;
+	u_int16_t curnumsrc;		/* current ims_cur->numsrc */
 	u_int8_t type = 0;		/* State-Change report type */
 	struct router6_info *rti;
 	int s;
@@ -2705,13 +2706,14 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 		}
 	    }
 
+	    curmode = in6m->in6m_source->i6ms_mode;
+	    curnumsrc = in6m->in6m_source->i6ms_cur->numsrc;
 	    if ((*error = in6_modmultisrc(in6m, numsrc, src, mode,
 					old_num, old_src, old_mode, grpjoin,
 					&newhead, &newmode, &newnumsrc)) != 0) {
 		splx(s);
 		return NULL;
 	    }
-	    curmode = in6m->in6m_source->i6ms_mode;
 	    if (newhead != NULL) {
 		/*
 		 * Merge new source list to current pending report's source
@@ -2739,14 +2741,16 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 	     * TO_EX State-Change Report will be sent in any case.
 	     */
 	    if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER) {
-		if (curmode != newmode) {
-		    if (newmode == MCAST_INCLUDE)
-			type = CHANGE_TO_INCLUDE_MODE;
-		    else
-			type = CHANGE_TO_EXCLUDE_MODE;
-		}
-		mld_send_state_change_report
+		if (curmode != newmode || curnumsrc != newnumsrc || old_num) {
+			if (curmode != newmode) {
+			    if (newmode == MCAST_INCLUDE)
+				type = CHANGE_TO_INCLUDE_MODE;
+			    else
+				type = CHANGE_TO_EXCLUDE_MODE;
+			}
+			mld_send_state_change_report
 				(&m, &buflen, in6m, type, timer_init);
+		}
 	    } else {
 		/*
 		 * If MSF's pending records exist, they must be deleted.
@@ -2911,6 +2915,7 @@ in6_addmulti(maddr6, ifp, errorp)
 	struct i6as_head *newhead = NULL;/* this may become new ims_cur->head */
 	u_int curmode;			/* current filter mode */
 	u_int newmode;			/* newly calculated filter mode */
+	u_int16_t curnumsrc;		/* current ims_cur->numsrc */
 	u_int16_t newnumsrc;		/* new ims_cur->numsrc */
 	int timer_init = 1;		/* indicate timer initialization */
 	int buflen = 0;
@@ -2961,6 +2966,8 @@ in6_addmulti(maddr6, ifp, errorp)
 			return in6m;
 		}
 
+		curmode = in6m->in6m_source->i6ms_mode;
+		curnumsrc = in6m->in6m_source->i6ms_cur->numsrc;
 		/*
 	 	 * Add each source address to in6m_source and get new source
 		 * filter mode and its calculated source list.
@@ -2970,7 +2977,6 @@ in6_addmulti(maddr6, ifp, errorp)
 			splx(s);
 			return NULL;
 		}
-		curmode = in6m->in6m_source->i6ms_mode;
 		if (newhead != NULL) {
 			/*
 			 * Merge new source list to current pending report's 
@@ -3003,14 +3009,16 @@ in6_addmulti(maddr6, ifp, errorp)
 		 * TO_EX State-Change Report will be sent in any case.
 		 */
 		if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER) {
-			if (curmode != newmode) {
-				if (newmode == MCAST_INCLUDE)
-					type = CHANGE_TO_INCLUDE_MODE;
-				else
-					type = CHANGE_TO_EXCLUDE_MODE;
+			if (curmode != newmode || curnumsrc != newnumsrc) {
+				if (curmode != newmode) {
+					if (newmode == MCAST_INCLUDE)
+						type = CHANGE_TO_INCLUDE_MODE;
+					else
+						type = CHANGE_TO_EXCLUDE_MODE;
+				}
+				mld_send_state_change_report
+					(&m, &buflen, in6m, type, timer_init);
 			}
-			mld_send_state_change_report
-				(&m, &buflen, in6m, type, timer_init);
 		} else {
 			/*
 			 * If MSF's pending records exist, they must be deleted.
@@ -3139,6 +3147,7 @@ in6_delmulti(in6m)
 	struct i6as_head *newhead = NULL;/* this may become new ims_cur->head */
 	u_int curmode;			/* current filter mode */
 	u_int newmode;			/* newly calculated filter mode */
+	u_int16_t curnumsrc;		/* current ims_cur->numsrc */
 	u_int16_t newnumsrc;		/* new ims_cur->numsrc */
 	int timer_init = 1;		/* indicate timer initialization */
 	int buflen = 0;
@@ -3165,6 +3174,8 @@ in6_delmulti(in6m)
 		return;
 	}
 
+	curmode = in6m->in6m_source->i6ms_mode;
+	curnumsrc = in6m->in6m_source->i6ms_cur->numsrc;
 	/*
 	 * Delete each source address from inm_source and get new source
 	 * filter mode and its calculated source list, and send State-Change
@@ -3175,7 +3186,6 @@ in6_delmulti(in6m)
 		splx(s);
 		return;
 	}
-	curmode = in6m->in6m_source->i6ms_mode;
 	if (newhead != NULL) {
 		if ((*error = in6_merge_msf_state
 				(in6m, newhead, newmode, newnumsrc)) > 0) {
@@ -3202,14 +3212,16 @@ in6_delmulti(in6m)
 		--ifma->ifma_refcount;
 
 	if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER) {
-		if (curmode != newmode) {
-			if (newmode == MCAST_INCLUDE)
-				type = CHANGE_TO_INCLUDE_MODE;
-			else
-				type = CHANGE_TO_EXCLUDE_MODE;
-		}
-		mld_send_state_change_report
+		if (curmode != newmode || curnumsrc != newnumsrc) {
+			if (curmode != newmode) {
+				if (newmode == MCAST_INCLUDE)
+					type = CHANGE_TO_INCLUDE_MODE;
+				else
+					type = CHANGE_TO_EXCLUDE_MODE;
+			}
+			mld_send_state_change_report
 				(&m, &buflen, in6m, type, timer_init);
+		}
 	} else {
 		/*
 		 * If MSF's pending records exist, they must be deleted.
@@ -3290,9 +3302,10 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 	struct in6_multi *in6m;
 	struct ifreq ifr;
 	struct i6as_head *newhead = NULL;/* this becomes new i6ms_cur->head */
+	u_int curmode;			/* current filter mode */
 	u_int newmode;			/* newly calculated filter mode */
+	u_int16_t curnumsrc;		/* current i6ms_cur->numsrc */
 	u_int16_t newnumsrc;		/* new i6ms_cur->numsrc */
-	u_int curmode;
 	int timer_init = 1;		/* indicate timer initialization */
 	int buflen = 0;
 	u_int8_t type = 0;		/* State-Change report type */
@@ -3350,13 +3363,14 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 		}
 	    }
 
+	    curmode = in6m->in6m_source->i6ms_mode;
+	    curnumsrc = in6m->in6m_source->i6ms_cur->numsrc;
 	    if ((*error = in6_modmultisrc(in6m, numsrc, src, mode,
 					  old_num, old_src, old_mode, grpjoin,
 					  &newhead, &newmode, &newnumsrc)) != 0) {
 		splx(s);
 		return NULL;
 	    }
-	    curmode = in6m->in6m_source->i6ms_mode;
 	    if (newhead != NULL) {
 		/*
 		 * Merge new source list to current pending report's source
@@ -3384,14 +3398,16 @@ in6_modmulti(ap, ifp, error, numsrc, src, mode,
 	     * TO_EX State-Change Report will be sent in any case.
 	     */
 	    if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER) {
-		if (curmode != newmode) {
-		    if (newmode == MCAST_INCLUDE)
-			type = CHANGE_TO_INCLUDE_MODE;
-		    else
-			type = CHANGE_TO_EXCLUDE_MODE;
-		}
-		mld_send_state_change_report
+		if (curmode != newmode || curnumsrc != newnumsrc || old_num) {
+			if (curmode != newmode) {
+			    if (newmode == MCAST_INCLUDE)
+				type = CHANGE_TO_INCLUDE_MODE;
+			    else
+				type = CHANGE_TO_EXCLUDE_MODE;
+			}
+			mld_send_state_change_report
 				(&m, &buflen, in6m, type, timer_init);
+		}
 	    } else {
 		/*
 		 * If MSF's pending records exist, they must be deleted.
