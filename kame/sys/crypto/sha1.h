@@ -54,7 +54,7 @@ struct sha1_ctxt {
 #if defined(KERNEL) || defined(_KERNEL)
 extern void sha1_init __P((struct sha1_ctxt *));
 extern void sha1_pad __P((struct sha1_ctxt *));
-extern void sha1_loop __P((struct sha1_ctxt *, caddr_t, size_t));
+extern void sha1_loop __P((struct sha1_ctxt *, const caddr_t, size_t));
 extern void sha1_result __P((struct sha1_ctxt *, caddr_t));
 
 /* compatibilty with other SHA1 source codes */
