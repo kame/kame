@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.66 2001/06/02 08:17:29 jinmei Exp $	*/
+/*	$KAME: ndp.c,v 1.67 2001/06/02 08:20:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -611,7 +611,7 @@ again:;
 		 * lo0).  Such routes entry would annoy getnbrinfo() below,
 		 * so we skip them.
 		 * XXX: such routes should have the GATEWAY flag, not the
-		 * LINK flag.  However, there are rotten routing software
+		 * LINK flag.  However, there is rotten routing software
 		 * that advertises all routes that have the GATEWAY flag.
 		 * Thus, KAME kernel intentionally does not set the LINK flag.
 		 * What is to be fixed is not ndp, but such routing software
