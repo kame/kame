@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.339 2003/03/19 08:15:59 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.340 2003/03/19 08:17:25 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3220,8 +3220,8 @@ icmp6_redirect_output(m0, rt)
 		/* connect m0 to m */
 #if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 		m_tag_delete_chain(m0, NULL);
-		m0->m_flags &= ~M_PKTHDR;
 #endif
+		m0->m_flags &= ~M_PKTHDR;
 		m->m_next = m0;
 		m->m_pkthdr.len = m->m_len + m0->m_len;
 		m0 = NULL;
