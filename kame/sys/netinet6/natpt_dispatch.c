@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.62 2002/07/01 04:20:16 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.63 2002/07/11 05:29:22 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -234,14 +234,14 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 		/* fragmented packet */
 		if (isFirstFragment(&cv4)) {
 			/* first fragmented packet */
-			if ((frg = natpt_internFragment4(&cv4)) == NULL)
-				return (IPPROTO_IP);
 			if ((cv4.ats = natpt_lookForHash4(&cv4)) == NULL) {
 				if ((acs = natpt_lookForRule4(&cv4)) == NULL)
 					return (IPPROTO_IP);
 				if ((cv4.ats = natpt_internHash4(acs, &cv4)) == NULL)
 					return (IPPROTO_IP);
 			}
+			if ((frg = natpt_internFragment4(&cv4)) == NULL)
+				return (IPPROTO_IP);
 			frg->tslot = cv4.ats;
 		} else {
 			/* fragmented packet after the first */

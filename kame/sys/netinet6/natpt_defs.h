@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.54 2002/06/12 04:36:23 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.55 2002/07/11 05:29:22 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -220,6 +220,7 @@ struct fragment {
 	TAILQ_ENTRY(fragment)	frg_list;
 	u_int8_t	 fg_family;		/* AF_INET{,6} (sa_family_t) */
 	u_int8_t	 fg_proto;		/* protocol */
+	u_char		 fg_fromto;
 	u_short		 fg_id;		/* identification in v4 header */
 	union inaddr	 fg_src;		/* source address */
 	union inaddr	 fg_dst;		/* destination address */

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.56 2002/07/01 21:12:21 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.57 2002/07/11 05:29:22 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -627,6 +627,7 @@ natpt_internFragment4(struct pcv *cv4)
 	bzero(frg, sizeof(struct fragment));
 	frg->fg_family = AF_INET;
 	frg->fg_proto = cv4->ip_p;
+	frg->fg_fromto = cv4->fromto;
 	frg->fg_id = cv4->ip.ip4->ip_id;
 	frg->fg_src.in4 = cv4->ip.ip4->ip_src;
 	frg->fg_dst.in4 = cv4->ip.ip4->ip_dst;
@@ -678,6 +679,8 @@ natpt_lookForFragment4(struct pcv *cv4)
 			continue;
 		if (frg->fg_dst.in4.s_addr != cv4->ip.ip4->ip_dst.s_addr)
 			continue;
+
+		cv4->fromto = frg->fg_fromto;
 		return (frg->tslot);
 	}
 
