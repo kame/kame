@@ -1,5 +1,5 @@
 /*	$NetBSD: policy_parse.y,v 1.14 2003/11/23 08:33:13 itojun Exp $	*/
-/*	$KAME: policy_parse.y,v 1.23 2004/06/19 21:11:09 itojun Exp $	*/
+/*	$KAME: policy_parse.y,v 1.24 2004/06/19 21:17:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -111,7 +111,7 @@ extern char *__libyytext;	/*XXX*/
 %token DIR ACTION
 %token IPADDRESS
 %token ME ANY
-%token SLASH HYPHEN
+%token SLASH HYPHEN ENCAP
 %type <level> level level_specify
 %type <num> DIR ACTION protocol mode PROTOCOL MODE LEVEL
 %type <val> LEVEL_SPECIFY IPADDRESS
