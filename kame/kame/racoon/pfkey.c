@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.129 2001/10/02 02:39:18 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.130 2001/10/10 08:33:45 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1531,15 +1531,16 @@ pk_recvacquire(mhp)
 	spidx.ul_proto = sp_out->spidx.ul_proto;
 
 	sp_in = getsp_r(&spidx);
-	if (!sp_in) {
-		plog(LLV_ERROR, LOCATION, NULL,
+	if (sp_in) {
+		plog(LLV_DEBUG, LOCATION, NULL,
+			"suitable inbound SP found: %s.\n",
+			spidx2str(&sp_in->spidx));
+	} else {
+		plog(LLV_NOTIFY, LOCATION, NULL,
 			"no in-bound policy found: %s\n",
 			spidx2str(&spidx));
-		return -1;
 	}
     }
-	plog(LLV_DEBUG, LOCATION, NULL,
-		"suitable inbound SP found: %s.\n", spidx2str(&sp_in->spidx));
 
 	memset(iph2, 0, MAXNESTEDSA);
 
@@ -1608,7 +1609,7 @@ pk_recvacquire(mhp)
 	}
     }
 
-	if (set_proposal_from_policy(iph2[n], sp_in, sp_out) < 0) {
+	if (set_proposal_from_policy(iph2[n], sp_out, sp_in) < 0) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to create saprop.\n");
 		delph2(iph2[n]);
