@@ -61,5 +61,5 @@ pseudo-device 	pflog
 pseudo-device 	pfsync
 
 # Datagram Congestion Control Protocol
-options		DCCP
-#options		DCCP_TFRC
+options 	DCCP
+#options 	DCCP_TFRC
