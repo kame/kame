@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.183 2001/02/04 03:46:30 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.184 2001/02/04 10:17:32 jinmei Exp $
 
 1. IPv6
 
@@ -486,13 +486,15 @@ Roughly speaking, the selection policy is as follows:
   destination.
 - addresses that have equal or larger scope than the scope of the
   destination are preferred.
-- if multiple addresses have the equal scope, one which is longest
-  prefix matching against the destination is preferred.
 - a deprecated address is not used in new communications if an
   alternate (non-deprecated) address is available and has sufficient
   scope.
+- a temporary address (in terms of RFC 3041 privacy extension) are
+  preferred to a public address.
 - if none of above conditions tie-breaks, addresses assigned on the
   outgoing interface are preferred.
+- if none of above conditions tie-breaks, one which is longest prefix
+  matching against the destination is preferred as the last resort.
 
 For instance, ::1 is selected for ff01::1,
 fe80::200:f8ff:fe01:6317%ne0 for fe80::2a0:24ff:feab:839b%ne0.
@@ -511,13 +513,16 @@ The precise desripction of the algorithm is quite complicated. To
 describe the algorithm, we introduce the following notation:
 
 For a given destination D,
-  samescope(D): A set of addresses that have the same scope as D.
-  largerscope(D): A set of addresses that have a larger scope than D.
-  smallerscope(D): A set of addresses that have a smaller scope than D.
+  samescope(D): The set of addresses that have the same scope as D.
+  largerscope(D): The set of addresses that have a larger scope than D.
+  smallerscope(D): The set of addresses that have a smaller scope than D.
 
 For a given set of addresses A,
-  DEP(A): a set of deprecated addresses in A.
+  DEP(A): the set of deprecated addresses in A.
   nonDEP(A): A - DEP(A).
+
+For a given sset of addresses A,
+  tmp(A): the set of temporary autoconfigured addresses in A.
 
 Also, the algorithm assumes that the outgoing interface for the
 destination D is determined. We call the interface "I".
@@ -528,27 +533,41 @@ later are not considered at all.
 
   0. If there is no address in the same scope zone as D, just give up;
      the packet will not be sent.
-  1. If nonDEP(samescope(D)) is not empty,
-     choose a longest matching address against D. If more than one
-     address is longest matching, choose arbitrary one provided that
-     an address on I is always preferred.
-  2. If nonDEP(largerscope(D)) is not empty,
+  1. If A1 = nonDEP(samescope(D)) is not empty,
+     if tmp(A1) is not empty and we use temporary addresses, consider
+     addresses in tmp(A1) only. Otherwise, consider all addresses in A1.
+     Then choose an address that is on the interface I.  If every
+     address is on I, or every address is on a different interface
+     from I, choose arbitrary one provided that an address logest
+     matching against D is always preferred.
+  2. If A2 = nonDEP(largerscope(D)) is not empty,
+     if tmp(A2) is not empty and we use temporary addresses, consider
+     addresses in tmp(A2) only. Otherwise, consider all addresses in A2.
      choose an address that has the smallest scope. If more than one
      address has the smallest scope, choose arbitrary one provided
      that an address on I is always preferred.
-  3. If DEP(samescope(D)) is not empty,
-     choose a longest matching address against D. If more than one
-     address is longest matching, choose arbitrary one provided that
-     an address on I is always preferred.
-  4. If DEP(largerscope(D)) is not empty,
+  3. If A3 = DEP(samescope(D)) is not empty,
+     if tmp(A3) is not empty and we use temporary addresses, consider
+     addresses in tmp(A3) only. Otherwise, consider all addresses in A3.
+     Then choose an address that is on the interface I.  If every
+     address is on I, or every address is on a different interface
+     from I, choose arbitrary one provided that an address logest
+     matching against D is always preferred.
+  4. A4 = If DEP(largerscope(D)) is not empty,
+     if tmp(A4) is not empty and we use temporary addresses, consider
+     addresses in tmp(A4) only. Otherwise, consider all addresses in A4.
      choose an address that has the smallest scope. If more than one
      address has the smallest scope, choose arbitrary one provided
      that an address on I is always preferred.
-  5. if nonDEP(smallerscope(D)) is not empty,
+  5. if A5 = nonDEP(smallerscope(D)) is not empty,
+     if tmp(A5) is not empty and we use temporary addresses, consider
+     addresses in tmp(A5) only. Otherwise, consider all addresses in A5.
      choose an address that has the largest scope. If more than one
      address has the largest scope, choose arbitrary one provided
      that an address on I is always preferred.
-  6. if DEP(smallerscope(D)) is not empty,
+  6. if A6 = DEP(smallerscope(D)) is not empty,
+     if tmp(A6) is not empty and we use temporary addresses, consider
+     addresses in tmp(A6) only. Otherwise, consider all addresses in A6.
      choose an address that has the largest scope. If more than one
      address has the largest scope, choose arbitrary one provided
      that an address on I is always preferred.
