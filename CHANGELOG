@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.901 2000/05/18 15:21:59 jinmei Exp $
+$Id: CHANGELOG,v 1.902 2000/05/18 15:30:45 itojun Exp $
 
 <200005>
+Fri May 19 00:30:04 JST 2000 itojun@iijlab.net
+	* kame/pim6dd/vif.c: allocate uv_querier struct as necessary on
+	  initialization.  it will avoid SEGV right after invocation.
+
 2000-05-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/scope6.c (scope6_addr2default): was added to
 	get the default scope zone for a specified address.
