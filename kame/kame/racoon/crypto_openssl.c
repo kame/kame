@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.76 2003/06/29 04:46:14 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.77 2003/07/01 23:38:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -84,6 +84,11 @@
 #include <openssl/sha2.h>
 #else
 #include "crypto/sha2/sha2.h"
+#endif
+
+/* 0.9.7 stuff? */
+#ifndef GENERAL_NAMES
+typedef STACK_OF(GENERAL_NAME) GENERAL_NAMES;
 #endif
 
 #include "var.h"
