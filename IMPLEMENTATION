@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.237 2001/07/21 05:53:09 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.238 2001/07/21 05:57:58 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1335,6 +1335,18 @@ compatibility support in KAME tree.  To enumerate:
   strict/loose bitmap.  2292bis document is based on RFC2460 IPv6, and it has
   no strict/loose bitmap (it was removed from RFC2460).  KAME tree obeys
   RFC2460 IPv6, and lacks support for strict/loose bitmap.
+
+1.17 DNS resolver
+
+KAME ships with modified DNS resolver, in libinet6.a.
+libinet6.a has a comple of extensions against libc DNS resolver:
+- Can take "options insecure1" and "options insecure2" in /etc/resolv.conf,
+  which toggles RES_INSECURE[12] option flag bit.
+- EDNS0 receive buffer size notification support.  It can be enabled by
+  "options edns0" in /etc/resolv.conf.  See USAGE for details.
+- IPv6 transport support (queries/responses over IPv6).  Most of BSD official
+  releases now has it already.
+- Partial A6 chain chasing support (KAME/BSDI4).
 
 2. Network Drivers
 
