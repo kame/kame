@@ -34,6 +34,7 @@
 #pragma ident "@(#)cbq.h  1.18     98/05/13 SMI"
 
 #include <sys/ioccom.h>
+#include <netinet/altq.h>
 
 #ifdef __cplusplus
 extern "C" {

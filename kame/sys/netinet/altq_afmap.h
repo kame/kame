@@ -23,13 +23,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_afmap.h,v 1.1 1999/08/05 17:18:18 itojun Exp $
+ * $Id: altq_afmap.h,v 1.2 1999/08/16 20:03:56 shin Exp $
  */
 
 #ifndef _NETINET_ALTQ_AFMAP_H_
 #define _NETINET_ALTQ_AFMAP_H_
 
 #include <sys/queue.h>
+#include <netinet/altq.h>
 
 struct atm_flowmap {
 	char		af_ifname[IFNAMSIZ];	/* if name, e.g. "en0" */

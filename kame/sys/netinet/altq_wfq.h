@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_wfq.h,v 1.1 1999/08/05 17:18:21 itojun Exp $
+ * $Id: altq_wfq.h,v 1.2 1999/08/16 20:03:57 shin Exp $
  */
 /*
  *  March 27, 1997.  Written by Hiroshi Kyusojin of Keio University
@@ -33,7 +33,8 @@
 #ifndef _NETINET_ALTQ_WFQ_H_
 #define _NETINET_ALTQ_WFQ_H_
 
-#include<netinet/in.h>
+#include <netinet/in.h>
+#include <netinet/altq.h>
 
 #define DEFAULT_QSIZE	256
 #define MAX_QSIZE	2048

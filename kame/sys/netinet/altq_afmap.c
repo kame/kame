@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_afmap.c,v 1.1 1999/08/05 17:18:17 itojun Exp $
+ * $Id: altq_afmap.c,v 1.2 1999/08/16 20:03:56 shin Exp $
  */
 
 /*
@@ -58,7 +58,6 @@
 #include <net/altq_conf.h>
 
 #include <netinet/in.h>
-#include <netinet/altq.h>
 #include <netinet/altq_afmap.h>
 
 LIST_HEAD(, afm_head) afhead_chain;
