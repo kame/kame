@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.61 2002/05/21 23:23:27 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.62 2002/05/21 23:26:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -54,6 +54,10 @@
 #include <string.h>
 #include <stdlib.h>
 #include <syslog.h>
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+#include <util.h>
+#endif
+
 #include "rtadvd.h"
 #include "rrenum.h"
 #include "advcap.h"
@@ -76,7 +80,9 @@ struct sockaddr_in6 from;
 struct sockaddr_in6 sin6_allnodes = {sizeof(sin6_allnodes), AF_INET6};
 struct in6_addr in6a_site_allrouters;
 static char *dumpfilename = "/var/run/rtadvd.dump"; /* XXX: should be configurable */
+#if !defined(__NetBSD__) && !defined(__OpenBSD__)
 static char *pidfilename = "/var/run/rtadvd.pid"; /* should be configurable */
+#endif
 static char *mcastif;
 int sock;
 int rtsock = -1;
@@ -253,11 +259,13 @@ main(argc, argv)
 	sock_open();
 
 	/* record the current PID */
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#ifdef __NetBSD__
+	pidfile(NULL);
+#elif defined(__OpenBSD__)
 	if (pidfile(NULL) < 0) {
 		syslog(LOG_ERR,
 		    "<%s> failed to open a log file, run anyway.",
-		    __FUNCTION__, pidfilename);
+		    __FUNCTION__);
 	}
 #else
 	pid = getpid();
