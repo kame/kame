@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.139 2002/07/31 07:40:27 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.140 2002/08/05 05:26:06 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -251,6 +251,15 @@ natpt_translateIPv6To4(struct pcv *cv6, struct pAddr *pad)
 	switch (cv6->ip_p) {
 	case IPPROTO_ICMPV6:
 		m4 = natpt_translateICMPv6To4(cv6, pad);
+		{
+			struct cSlot *csl;
+			struct ip    *ip4;
+
+			if ((csl = natpt_lookForRule6(cv6)) != NULL) {
+				ip4 = mtod(m4, struct ip *);
+				ip4->ip_src = csl->Remote.in4src;
+			}
+		}
 		break;
 
 	case IPPROTO_TCP:
@@ -1156,8 +1165,20 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 	icmpip6->ip6_src  = pad->in6dst;
 	icmpip6->ip6_dst  = pad->in6src;
 #else
-	icmpip6->ip6_src  = pad->in6src;
-	icmpip6->ip6_dst  = pad->in6dst;
+	if (cv4->flags & NATPT_noFootPrint) {
+		struct in6_addr	in6addr;
+
+		in6addr = natpt_prefix;
+
+		in6addr.s6_addr32[3] = icmpip4->ip_src.s_addr;
+		icmpip6->ip6_src = in6addr;
+		in6addr.s6_addr32[3] = icmpip4->ip_dst.s_addr;
+		icmpip6->ip6_dst = in6addr;
+	} else {
+		icmpip6->ip6_src  = pad->in6src;
+		icmpip6->ip6_dst  = pad->in6dst;
+	}
+	
 #endif
 
 	switch (cv4->pyld.icmp4->icmp_type) {
@@ -1169,7 +1190,7 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 
 	case ICMP_UNREACH:
 	case ICMP_TIMXCEED:
-		{
+		if ((cv4->flags & NATPT_noFootPrint) == 0) {
 			struct udphdr	*icmpudp6;
 
 			icmpudp6 = (struct udphdr *)((caddr_t)icmpip6 +
