@@ -38,6 +38,7 @@
 #include "opt_ipx.h"
 #include "opt_ipsec.h"
 #include "opt_inet6.h"
+#include "opt_natpt.h"
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -94,6 +95,12 @@
 #ifdef NSIP
 #include <netns/ns.h>
 #include <netns/ns_if.h>
+#endif
+
+#ifdef NATPT
+void	natpt_init	__P((void));
+int	natpt_ctloutput	__P((int, struct socket *, int, int, struct mbuf **));
+struct pr_usrreqs natpt_usrreqs;
 #endif
 
 extern	struct domain inetdomain;
@@ -195,6 +202,14 @@ struct ipprotosw inetsw[] = {
   0,
   0,		0,		0,		0,
   &rip_usrreqs
+},
+#endif
+#ifdef NATPT
+{ SOCK_RAW,	&inetdomain,	IPPROTO_AHIP,	PR_ATOMIC|PR_ADDR,
+  0,		0,		0,		0,
+  0,
+  natpt_init,	0,		0,		0,
+ &natpt_usrreqs
 },
 #endif
 	/* raw wildcard */
