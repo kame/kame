@@ -115,6 +115,7 @@ static void       startup __P((void));
 static void       chkhost __P((struct sockaddr *));
 static int	  ckqueue __P((struct printer *));
 static void	  usage __P((void));
+static int	  *socksetup __P((int, int));
 /* From rcmd.c: */
 extern int __ivaliduser_af __P((FILE *, const void *, const char *,
 	const char *, int, int));
@@ -122,18 +123,15 @@ extern int __ivaliduser_af __P((FILE *, const void *, const char *,
 
 uid_t	uid, euid;
 
-u_char family = AF_INET;
-
 int
 main(argc, argv)
 	int argc;
 	char **argv;
 {
-	int f, funix, finet, finet6, options, fromlen, i, errs;
+	int f, funix, *finet, options, fromlen, i, errs;
 	fd_set defreadfds;
 	struct sockaddr_un un, fromunix;
-	struct sockaddr_in sin, frominet;
-	struct sockaddr_in6 sin6, frominet6;
+	struct sockaddr_storage frominet;
 	int lfd;
 	sigset_t omask, nmask;
 	struct servent *sp, serv;
@@ -162,18 +160,18 @@ main(argc, argv)
 			pflag++;
 			break;
 		case '4':
-			family = AF_INET;
+			family = PF_INET;
 			inet_flag++;
 			break;
 		case '6':
-			family = AF_INET6;
+			family = PF_INET6;
 			inet6_flag++;
 			break;
 		default:
 			errs++;
 		}
 	if (inet_flag && inet6_flag)
-		family = AF_UNSPEC;
+		family = PF_UNSPEC;
 	argc -= optind;
 	argv += optind;
 	if (errs)
@@ -297,52 +295,20 @@ main(argc, argv)
 	FD_ZERO(&defreadfds);
 	FD_SET(funix, &defreadfds);
 	listen(funix, 5);
-	if (pflag == 0) {
-		finet = -1;
-		if (family == AF_INET || family == AF_UNSPEC)
-			finet = socket(AF_INET, SOCK_STREAM, 0);
-		if (finet >= 0) {
-			if (options & SO_DEBUG &&
-			    setsockopt(finet, SOL_SOCKET, SO_DEBUG, 0, 0) < 0) {
-				syslog(LOG_ERR, "setsockopt (SO_DEBUG): %m");
-				mcleanup(0);
-			}
-			memset(&sin, 0, sizeof(sin));
-			sin.sin_family = AF_INET;
-			sin.sin_port = sp->s_port;
-			if (bind(finet, (struct sockaddr *)&sin,
-			    sizeof(sin)) < 0) {
-				syslog(LOG_ERR, "bind: %m");
-				mcleanup(0);
-			}
-			FD_SET(finet, &defreadfds);
-			listen(finet, 5);
-		}
-		finet6 = -1;
-		if (family == AF_INET6 || family == AF_UNSPEC)
-			finet6 = socket(AF_INET6, SOCK_STREAM, 0);
-		if (finet6 >= 0) {
-			if (options & SO_DEBUG)
-				if (setsockopt(finet6, SOL_SOCKET, SO_DEBUG, 0, 0) < 0) {
-					syslog(LOG_ERR, "setsockopt (SO_DEBUG): %m");
-					mcleanup(0);
-				}
-			memset(&sin6, 0, sizeof(sin6));
-			sin6.sin6_family = AF_INET6;
-			sin6.sin6_port = sp->s_port;
-			if (bind(finet6, (struct sockaddr *)&sin6, sizeof(sin6)) < 0) {
-				syslog(LOG_ERR, "bind: %m");
-				mcleanup(0);
-			}
-			FD_SET(finet6, &defreadfds);
-			listen(finet6, 5);
+	if (pflag == 0)
+		finet = socksetup(family, options);
+	else
+		finet = NULL;	/* pretend we couldn't open TCP socket. */
+	if (finet) {
+		for (i = 1; i <= *finet; i++) {
+			FD_SET(finet[i], &defreadfds);
+			listen(finet[i], 5);
 		}
 	}
 	/*
 	 * Main loop: accept, do a request, continue.
 	 */
 	memset(&frominet, 0, sizeof(frominet));
-	memset(&frominet6, 0, sizeof(frominet6));
 	memset(&fromunix, 0, sizeof(fromunix));
 	/*
 	 * XXX - should be redone for multi-protocol
@@ -362,22 +328,15 @@ main(argc, argv)
 			domain = AF_UNIX, fromlen = sizeof(fromunix);
 			s = accept(funix,
 			    (struct sockaddr *)&fromunix, &fromlen);
- 		} else if (pflag == 0 && finet6 >= 0)  {
- 			domain = AF_INET6, fromlen = sizeof(frominet6);
- 			s = accept(finet6,
-				   (struct sockaddr *)&frominet6, &fromlen);
- 			if (frominet6.sin6_port == htons(20)) {
- 				close(s);
-				continue;
- 			}
-		} else if (pflag == 0 && finet >= 0)  {
-			domain = AF_INET, fromlen = sizeof(frominet);
-			s = accept(finet,
-			    (struct sockaddr *)&frominet, &fromlen);
-			if (frominet.sin_port == htons(20)) {
-				close(s);
-				continue;
-			}
+ 		} else {
+                        for (i = 1; i <= *finet; i++) 
+				if (FD_ISSET(finet[i], &readfds)) {
+					domain = AF_INET;
+					fromlen = sizeof(frominet);
+					s = accept(finet[i],
+					    (struct sockaddr *)&frominet,
+					    &fromlen);
+				}
 		}
 		if (s < 0) {
 			if (errno != EINTR)
@@ -391,19 +350,16 @@ main(argc, argv)
 			signal(SIGQUIT, SIG_IGN);
 			signal(SIGTERM, SIG_IGN);
 			(void) close(funix);
-			if (pflag == 0) {
-				if (finet >= 0)
-					(void) close(finet);
-				if (finet6 >= 0)
-					(void) close(finet6);
+			if (pflag == 0 && finet) {
+                        	for (i = 1; i <= *finet; i++) 
+					(void)close(finet[i]);
 			}
 			dup2(s, 1);
 			(void) close(s);
- 			if (domain == AF_INET || domain == AF_INET6) {
+ 			if (domain == AF_INET) {
+				/* for both AF_INET and AF_INET6 */
 				from_remote = 1;
- 				chkhost((domain == AF_INET ?
-					 (struct sockaddr *) &frominet :
-					 (struct sockaddr *) &frominet6));
+ 				chkhost((struct sockaddr *)&frominet);
 			} else
 				from_remote = 0;
 			doit();
@@ -636,48 +592,75 @@ static void
 chkhost(f)
 	struct sockaddr *f;
 {
-	register struct hostent *hp;
+	struct addrinfo hints, *res, *r;
 	register FILE *hostf;
 	int first = 1;
 	int good = 0;
-	int err;
-	char numerichost[INET6_ADDRSTRLEN];
-	caddr_t addr = f->sa_family == AF_INET ?
-			(caddr_t) &((struct sockaddr_in *) f)->sin_addr :
-			(caddr_t) &((struct sockaddr_in6 *) f)->sin6_addr;
+	char host[NI_MAXHOST], ip[NI_MAXHOST];
+	char serv[NI_MAXSERV];
+	int error, addrlen;
+	caddr_t addr;
 
-	/* Need real hostname for temporary filenames */
-	err = getnameinfo(f, f->sa_len, numerichost, sizeof(numerichost), 0, 0, NI_NUMERICHOST);
-	if (err) {
-		syslog(LOG_ERR, "getnameinfo: failed %d", err);
-		exit(1);
+	error = getnameinfo(f, f->sa_len, NULL, 0, serv, sizeof(serv),
+			    NI_NUMERICSERV);
+	if (error || atoi(serv) >= IPPORT_RESERVED)
+		fatal(0, "Malformed from address");
+
+	error = getnameinfo(f, f->sa_len, host, sizeof(host), NULL, 0,
+			    NI_NAMEREQD);
+	if (error) {
+		error = getnameinfo(f, f->sa_len, host, sizeof(host), NULL, 0,
+				    NI_NUMERICHOST);
+		if (error)
+			fatal(0, "Host name for your address unknown");
+		else
+			fatal(0, "Host name for your address (%s) unknown",
+			      host);
 	}
-	err = getnameinfo(f, f->sa_len, fromb, sizeof(fromb), 0, 0, NI_NAMEREQD);
-	if (err)
-		fatal(0, "Host name for your address (%s) unknown",
-		      numerichost);
+
+	(void)strncpy(fromb, host, sizeof(fromb) - 1);
+	fromb[sizeof(fromb) - 1] = '\0';
 	from = fromb;
 
+	/* need address in stringform for comparison (no DNS lookup here) */
+	error = getnameinfo(f, f->sa_len, host, sizeof(host), NULL, 0,
+			    NI_NUMERICHOST);
+	if (error)
+		fatal(0, "Cannot print address");
+
 	/* Check for spoof, ala rlogind */
-	hp = gethostbyname2(fromb, f->sa_family);
-	if (!hp)
-		fatal(0, "hostname for your address (%s) unknown",
-		      numerichost);
-	for (; good == 0 && hp->h_addr_list[0] != NULL; hp->h_addr_list++) {
-		if (!bcmp(hp->h_addr_list[0], addr, hp->h_length))
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = family;
+	hints.ai_socktype = SOCK_DGRAM;	/*dummy*/
+	error = getaddrinfo(fromb, NULL, &hints, &res);
+	if (error) {
+		fatal(0, "hostname for your address (%s) unknown: %s", host,
+		      gai_strerror(error));
+	}
+	good = 0;
+	for (r = res; good == 0 && r; r = r->ai_next) {
+		error = getnameinfo(r->ai_addr, r->ai_addrlen, ip, sizeof(ip),
+				    NULL, 0, NI_NUMERICHOST);
+		if (!error && !strcmp(host, ip))
 			good = 1;
 	}
-	if (good == 0) {
-		fatal(0, "address for your hostname (%s) not matched",
-		      numerichost);
-  	}
+	if (res)
+		freeaddrinfo(res);
+	if (good == 0)
+		fatal(0, "address for your hostname (%s) not matched", host);
 
 	hostf = fopen(_PATH_HOSTSEQUIV, "r");
 again:
 	if (hostf) {
-		if (__ivaliduser_af(hostf, addr,
-		    DUMMY, DUMMY,
-		    hp->h_addrtype, hp->h_length) == 0) {
+		if (f->sa_family == AF_INET) {
+			addr = (caddr_t)&((struct sockaddr_in *)f)->sin_addr;
+			addrlen = sizeof(struct in_addr);
+		} else {
+			addr = (caddr_t)&((struct sockaddr_in6 *)f)->sin6_addr;
+			addrlen = sizeof(struct in6_addr);
+		}
+		if (__ivaliduser_af(hostf, addr, DUMMY, DUMMY,
+				    f->sa_family, addrlen) == 0) {
 			(void) fclose(hostf);
 			return;
 		}
@@ -697,4 +680,80 @@ usage()
 {
 	fprintf(stderr, "usage: lpd [-dlp] [port#]\n");
 	exit(EX_USAGE);
+}
+
+/* setup server socket for specified address family */
+/* if af is PF_UNSPEC more than one socket may be returned */
+/* the returned list is dynamically allocated, so caller needs to free it */
+static int *
+socksetup(af, options)
+        int af, options;
+{
+	struct addrinfo hints, *res, *r;
+	int error, maxs, *s, *socks;
+	const int on = 1;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_flags = AI_PASSIVE;
+	hints.ai_family = af;
+	hints.ai_socktype = SOCK_STREAM;
+	error = getaddrinfo(NULL, "printer", &hints, &res);
+	if (error) {
+		syslog(LOG_ERR, "%s", gai_strerror(error));
+		mcleanup(0);
+	}
+
+	/* Count max number of sockets we may open */
+	for (maxs = 0, r = res; r; r = r->ai_next, maxs++)
+		;
+	socks = malloc((maxs + 1) * sizeof(int));
+	if (!socks) {
+		syslog(LOG_ERR, "couldn't allocate memory for sockets");
+		mcleanup(0);
+	}
+
+	*socks = 0;   /* num of sockets counter at start of array */
+	s = socks + 1;
+	for (r = res; r; r = r->ai_next) {
+		*s = socket(r->ai_family, r->ai_socktype, r->ai_protocol);
+		if (*s < 0) {
+			syslog(LOG_DEBUG, "socket(): %m");
+			continue;
+		}
+		if (options & SO_DEBUG)
+			if (setsockopt(*s, SOL_SOCKET, SO_DEBUG,
+				       &on, sizeof(on)) < 0) {
+				syslog(LOG_ERR, "setsockopt (SO_DEBUG): %m");
+				close(*s);
+				continue;
+			}
+#if defined(IPV6_BINDV6ONLY) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
+		if (r->ai_family == AF_INET6) {
+			if (setsockopt(*s, IPPROTO_IPV6, IPV6_BINDV6ONLY,
+				       &on, sizeof(on)) < 0) {
+				syslog(LOG_ERR,
+				       "setsockopt (IPV6_BINDV6ONLY): %m");
+				close(*s);
+				continue;
+			}
+		}
+#endif
+		if (bind(*s, r->ai_addr, r->ai_addrlen) < 0) {
+			syslog(LOG_DEBUG, "bind(): %m");
+			close(*s);
+			continue;
+		}
+		(*socks)++;
+		s++;
+	}
+
+	if (res)
+		freeaddrinfo(res);
+
+	if (*socks == 0) {
+		syslog(LOG_ERR, "Couldn't bind to any socket");
+		free(socks);
+		mcleanup(0);
+	}
+	return(socks);
 }

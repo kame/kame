@@ -69,7 +69,15 @@ static const char rcsid[] =
 char	host[MAXHOSTNAMELEN];
 char	*from = host;	/* client's machine name */
 
+#ifdef INET6
+u_char	family = PF_UNSPEC;
+#else
+u_char	family = PF_INET;
+#endif
+
 extern uid_t	uid, euid;
+
+static int addr_equal __P((struct sockaddr *, struct sockaddr *));
 
 /*
  * Create a TCP connection to host "rhost" at port "rport".
@@ -81,7 +89,7 @@ getport(const struct printer *pp, const char *rhost, int rport)
 {
 	struct addrinfo hints, *res, *ai;
 	int s, timo = 1, lport = IPPORT_RESERVED - 1;
-	int err;
+	int err, refused = 0;
 
 	/*
 	 * Get the host address and port number to connect to.
@@ -89,10 +97,11 @@ getport(const struct printer *pp, const char *rhost, int rport)
 	if (rhost == NULL)
 		fatal(pp, "no remote host to connect to");
 	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
+	hints.ai_family = family;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = 0;
-	err = getaddrinfo(rhost, (rport == 0 ? "printer" : NULL), &hints, &res);
+	err = getaddrinfo(rhost, (rport == 0 ? "printer" : NULL),
+			  &hints, &res);
 	if (err)
 		fatal(pp, "%s\n", gai_strerror(err));
 	if (rport != 0)
@@ -106,8 +115,21 @@ retry:
 	seteuid(euid);
 	s = rresvport_af(&lport, ai->ai_family);
 	seteuid(uid);
-	if (s < 0)
+	if (s < 0) {
+		if (ai->ai_next != NULL) {
+			ai = ai->ai_next;
+			goto retry;
+		}
+		if (refused && timo <= 16) {
+			sleep(timo);
+			timo *= 2;
+			refused = 0;
+			ai = res;
+			goto retry;
+		}
+		freeaddrinfo(res);
 		return(-1);
+	}
 	if (connect(s, ai->ai_addr, ai->ai_addrlen) < 0) {
 		err = errno;
 		(void) close(s);
@@ -121,13 +143,18 @@ retry:
 		if (errno == EADDRINUSE)
 			goto retry;
 
-		if (errno == ECONNREFUSED && timo <= 16) {
-			sleep(timo);
-			timo *= 2;
-			goto retry;
-		}
+		if (errno == ECONNREFUSED)
+			refused++;
+
 		if (ai->ai_next != NULL) {
 			ai = ai->ai_next;
+			goto retry;
+		}
+		if (refused && timo <= 16) {
+			sleep(timo);
+			timo *= 2;
+			refused = 0;
+			ai = res;
 			goto retry;
 		}
 		freeaddrinfo(res);
@@ -151,10 +178,9 @@ char *
 checkremote(struct printer *pp)
 {
 	char name[MAXHOSTNAMELEN];
-	register struct hostent *hp;
+	struct addrinfo hints, *local_res, *remote_res, *lr, *rr;
 	char *err;
-	struct in_addr *localaddrs;
-	int i, j, nlocaladdrs, ncommonaddrs;
+	int ncommonaddrs, error;
 
 	if (!pp->rp_matches_local) { /* Remote printer doesn't match local */
 		pp->remote = 1;
@@ -166,46 +192,37 @@ checkremote(struct printer *pp)
 		/* get the addresses of the local host */
 		gethostname(name, sizeof(name));
 		name[sizeof(name) - 1] = '\0';
-		hp = gethostbyname2(name, AF_INET6);
-		if (hp == NULL)
-		    hp = gethostbyname2(name, AF_INET);
-		if (hp == (struct hostent *) NULL) {
+
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = family;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_flags = AI_PASSIVE;
+		if ((error = getaddrinfo(name, NULL,
+					 &hints, &local_res)) != 0) {
 			asprintf(&err, "unable to get official name "
 				 "for local machine %s: %s",
-				 name, hstrerror(h_errno));
+				 name, gai_strerror(error));
 			return err;
 		}
-		for (i = 0; hp->h_addr_list[i]; i++)
-			;
-		nlocaladdrs = i;
-		localaddrs = malloc(i * sizeof(struct in_addr));
-		if (localaddrs == 0) {
-			asprintf(&err, "malloc %lu bytes failed",
-				 (u_long)i * sizeof(struct in_addr));
-			return err;
-		}
-		for (i = 0; hp->h_addr_list[i]; i++)
-			localaddrs[i] = *(struct in_addr *)hp->h_addr_list[i];
 
 		/* get the official name of RM */
-		hp = gethostbyname2(pp->remote_host, AF_INET6);
-		if (hp == NULL)
-		    hp = gethostbyname2(pp->remote_host, AF_INET);
-		hp = gethostbyname2(pp->remote_host, AF_INET);
-		if (hp == (struct hostent *) NULL) {
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = family;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_flags = AI_PASSIVE;
+		if ((error = getaddrinfo(pp->remote_host, NULL,
+					 &hints, &remote_res)) != 0) {
 			asprintf(&err, "unable to get address list for "
 				 "remote machine %s: %s",
-				 pp->remote_host, hstrerror(h_errno));
-			free(localaddrs);
+				 pp->remote_host, gai_strerror(error));
+			freeaddrinfo(local_res);
 			return err;
 		}
 
 		ncommonaddrs = 0;
-		for (i = 0; i < nlocaladdrs; i++) {
-			for (j = 0; hp->h_addr_list[j]; j++) {
-				char *them = hp->h_addr_list[j];
-				if (localaddrs[i].s_addr ==
-				    (*(struct in_addr *)them).s_addr)
+		for (lr = local_res; lr; lr = lr->ai_next) {
+			for (rr = remote_res; rr; rr = rr->ai_next) {
+				if (addr_equal(lr->ai_addr, rr->ai_addr))
 					ncommonaddrs++;
 			}
 		}
@@ -216,9 +233,35 @@ checkremote(struct printer *pp)
 		 */
 		if (ncommonaddrs == 0)
 			pp->remote = 1;
-		free(localaddrs);
+		freeaddrinfo(local_res);
+		freeaddrinfo(remote_res);
 	}
 	return NULL;
+}
+
+static int
+addr_equal(struct sockaddr *l, struct sockaddr *r)
+{
+	struct sockaddr_in *l4, *r4;
+	struct sockaddr_in6 *l6, *r6;
+
+	if (l->sa_family != r->sa_family)
+		return 0;
+	if (l->sa_family == AF_INET) {
+		r4 = (struct sockaddr_in *)l;
+		l4 = (struct sockaddr_in *)r;
+		if (l4->sin_addr.s_addr != r4->sin_addr.s_addr)
+			return 0;
+	} else if (l->sa_family == AF_INET6) {
+		r6 = (struct sockaddr_in6 *)l;
+		l6 = (struct sockaddr_in6 *)r;
+		if (l6->sin6_scope_id != r6->sin6_scope_id)
+			return 0;
+		if (!IN6_ARE_ADDR_EQUAL(&l6->sin6_addr, &r6->sin6_addr))
+			return 0;
+	} else
+		return 0;
+	return 1;
 }
 
 /*

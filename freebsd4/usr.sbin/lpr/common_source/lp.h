@@ -148,6 +148,7 @@ extern int	requests;	/* # of spool requests */
 extern char	*user[];        /* users to process */
 extern int	users;		/* # of users in user array */
 extern char	*person;	/* name of person doing lprm */
+extern u_char	family;		/* address family */
 
 /*
  * Structure used for building a sorted list of control files.
