@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.57 2001/02/08 09:11:10 jinmei Exp $	*/
+/*	$KAME: ndp.c,v 1.58 2001/02/15 11:04:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -966,6 +966,53 @@ ifinfo(argc, argv)
 void
 rtrlist()
 {
+#ifdef ICMPV6CTL_ND6_DRLIST
+	int mib[] = { CTL_NET, PF_INET6, IPPROTO_ICMPV6, ICMPV6CTL_ND6_DRLIST };
+	char *buf;
+	struct in6_defrouter *p, *ep;
+	size_t l;
+	struct timeval time;
+
+	if (sysctl(mib, sizeof(mib) / sizeof(mib[0]), NULL, &l, NULL, 0) < 0) {
+		err(1, "sysctl(ICMPV6CTL_ND6_DRLIST)");
+		/*NOTREACHED*/
+	}
+	buf = malloc(l);
+	if (!buf) {
+		errx(1, "not enough core");
+		/*NOTREACHED*/
+	}
+	if (sysctl(mib, sizeof(mib) / sizeof(mib[0]), buf, &l, NULL, 0) < 0) {
+		err(1, "sysctl(ICMPV6CTL_ND6_DRLIST)");
+		/*NOTREACHED*/
+	}
+
+	ep = (struct in6_defrouter *)(buf + l);
+	for (p = (struct in6_defrouter *)buf; p < ep; p++) {
+		struct sockaddr_in6 sin6;
+
+		bzero(&sin6, sizeof(sin6));
+		sin6.sin6_family = AF_INET6;
+		sin6.sin6_len = sizeof(sin6);
+		sin6.sin6_addr = p->rtaddr;
+		getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len, host_buf,
+			    sizeof(host_buf), NULL, 0,
+			    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
+		
+		printf("%s if=%s", host_buf,
+		       if_indextoname(p->if_index, ifix_buf));
+		printf(", flags=%s%s",
+		       p->flags & ND_RA_FLAG_MANAGED ? "M" : "",
+		       p->flags & ND_RA_FLAG_OTHER   ? "O" : "");
+		gettimeofday(&time, 0);
+		if (p->expire == 0)
+			printf(", expire=Never\n");
+		else
+			printf(", expire=%s\n",
+				sec2str(p->expire - time.tv_sec));
+	}
+	free(buf);
+#else
 	struct in6_drlist dr;
 	int s, i;
 	struct timeval time;
@@ -1006,6 +1053,7 @@ rtrlist()
 	}
 #undef DR
 	close(s);
+#endif
 }
 
 void
