@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.52 2000/12/12 10:54:06 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.53 2000/12/12 17:26:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -90,7 +90,7 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet/icmp6.h>
-#if defined(__OpenBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/in_pcb.h>
