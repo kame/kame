@@ -34,7 +34,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: debug.c,v 1.5 2000/03/27 22:35:42 itojun Exp $
+ *  $Id: debug.c,v 1.6 2000/04/30 10:50:31 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -66,6 +66,36 @@ unsigned long debug = 0x00000000;        /* If (long) is smaller than
 static char dumpfilename[] = _PATH_PIM6D_DUMP;
 static char cachefilename[] = _PATH_PIM6D_CACHE; /* TODO: notused */
 
+static char *
+sec2str(total)
+	time_t total;
+{
+	static char result[256];
+	int days, hours, mins, secs;
+	int first = 1;
+	char *p = result;
+
+	days = total / 3600 / 24;
+	hours = (total / 3600) % 24;
+	mins = (total / 60) % 60;
+	secs = total % 60;
+
+	if (days) {
+		first = 0;
+		p += sprintf(p, "%dd", days);
+	}
+	if (!first || hours) {
+		first = 0;
+		p += sprintf(p, "%dh", hours);
+	}
+	if (!first || mins) {
+		first = 0;
+		p += sprintf(p, "%dm", mins);
+	}
+	sprintf(p, "%ds", secs);
+
+	return(result);
+}
 
 char *
 packet_kind(proto, type, code)
@@ -196,6 +226,7 @@ fdump(i)
     fp = fopen(dumpfilename, "w");
     if (fp != NULL) {
 	dump_vifs(fp);
+	dump_mldqueriers(fp);
 	dump_pim_mrt(fp);
 	dump_lcl_grp(fp);
 	(void) fclose(fp);
@@ -284,6 +315,8 @@ dump_vifs(fp)
 			    fprintf(fp, " %-12s", "NO-NBR");
 			    width += 6;
 		    }
+		    if (v->uv_flags & VIFF_QUERIER)
+			    fprintf(fp, " QRY");
 
 		    if ((n = v->uv_pim_neighbors) != NULL) {
 			    /* Print the first neighbor on the same line */
@@ -383,6 +416,36 @@ log(severity, syserr, format, va_alist)
     
     if (severity <= LOG_ERR) exit(-1);
 }
+
+void
+dump_mldqueriers(fp)
+	FILE *fp;
+{
+	struct uvif *v;
+	vifi_t vifi;
+	pim_nbr_entry_t *n;
+	time_t now;
+
+	fprintf(fp, "MLD Querier List\n");
+	fprintf(fp, " %-3s %6s %-40s %-5s %15s\n",
+		"Mif", "PhyIF", "Address", "Timer", "Last");
+	(void)time(&now);
+
+	for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
+		if (v->uv_querier) {
+			fprintf(fp, " %-3u %6s", vifi,
+				(v->uv_flags & MIFF_REGISTER) ? "regist":
+				v->uv_name);
+
+			fprintf(fp, " %-40s %5u %15s\n",
+				inet6_fmt(&v->uv_querier->al_addr.sin6_addr),
+				v->uv_querier->al_timer,
+				sec2str(now - v->uv_querier->al_ctime));
+		}
+	}
+
+	fprintf(fp, "\n");
+} 
 
 /* TODO: format the output for better readability */
 void 

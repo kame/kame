@@ -62,7 +62,7 @@
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
  *
- *  $Id: mld6_proto.c,v 1.2 1999/09/12 17:00:09 jinmei Exp $
+ *  $Id: mld6_proto.c,v 1.3 2000/04/30 10:50:31 jinmei Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.
@@ -176,19 +176,10 @@ accept_listener_query(src, dst, group, tmo)
 			if (!v->uv_querier) {
 				v->uv_querier = (struct listaddr *)
 					malloc(sizeof(struct listaddr));
-				v->uv_querier->al_next = (struct listaddr *)NULL;
-				v->uv_querier->al_timer = 0;
-				v->uv_querier->al_genid = 0;
-				v->uv_querier->al_pv = 0;
-				v->uv_querier->al_mv = 0;
-				v->uv_querier->al_old = 0;
-				v->uv_querier->al_index = 0;
-				v->uv_querier->al_timerid = 0;
-				v->uv_querier->al_query = 0;
-				v->uv_querier->al_flags = 0;
-
-				v->uv_flags &= ~VIFF_QUERIER;
+				memset(v->uv_querier, 0,
+				       sizeof(struct listaddr));
 			}
+			v->uv_flags &= ~VIFF_QUERIER;
 			v->uv_querier->al_addr = *src;
 			time(&v->uv_querier->al_ctime);
 		}
@@ -198,7 +189,7 @@ accept_listener_query(src, dst, group, tmo)
 	 * Reset the timer since we've received a query.
 	 */
 	if (v->uv_querier && inet6_equal(src, &v->uv_querier->al_addr))
-		v->uv_querier->al_timer = 0;
+		v->uv_querier->al_timer = MLD6_OTHER_QUERIER_PRESENT_INTERVAL;
 
 	/*
 	 * If this is a Group-Specific query which we did not source,

@@ -61,7 +61,7 @@
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
  *
- *  $Id: pim6_proto.c,v 1.4 1999/10/27 11:40:30 jinmei Exp $
+ *  $Id: pim6_proto.c,v 1.5 2000/04/30 10:50:31 jinmei Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.
@@ -209,7 +209,6 @@ receive_pim6_hello(src, pim_message, datalen)
 		 * DR address and it wins (is >) over the local address.
 		 */
 		v->uv_flags &= ~VIFF_DR;
-		v->uv_flags &= ~VIFF_QUERIER;
 	}
 
 	/*
@@ -285,7 +284,6 @@ delete_pim6_nbr(nbr_delete)
 			 * DR address, but the local address is the winner.
 			 */
 			v->uv_flags |= VIFF_DR;
-			v->uv_flags |= VIFF_QUERIER;
 		}
 	}
 

@@ -34,7 +34,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: vif.c,v 1.3 1999/09/12 17:00:11 jinmei Exp $
+ *  $Id: vif.c,v 1.4 2000/04/30 10:50:31 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -256,6 +256,9 @@ start_vif(vifi)
      * query.
      */
     v->uv_flags |= VIFF_QUERIER;
+    v->uv_querier->al_addr = v->uv_linklocal->pa_addr;
+    v->uv_querier->al_timer = MLD6_OTHER_QUERIER_PRESENT_INTERVAL;
+    time(&v->uv_querier->al_ctime); /* reset timestamp */
     query_groups(v);
 
     /*
