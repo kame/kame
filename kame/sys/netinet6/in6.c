@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.288 2002/06/08 10:10:41 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.289 2002/06/08 18:24:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -219,6 +219,7 @@ in6_ifloop_request(int cmd, struct ifaddr *ifa)
 	e = rtrequest(cmd, ifa->ifa_addr, ifa->ifa_addr,
 	    (struct sockaddr *)&all1_sa, RTF_UP|RTF_HOST|RTF_LLINFO, &nrt);
 	if (e != 0) {
+		/* XXX need more descriptive message */
 		log(LOG_ERR, "in6_ifloop_request: "
 		    "%s operation failed for %s (errno=%d)\n",
 		    cmd == RTM_ADD ? "ADD" : "DELETE",
