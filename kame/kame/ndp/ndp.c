@@ -391,7 +391,6 @@ set(argc, argv)
 			flags |= RTF_ANNOUNCE;
 		argv++;
 	}
-tryagain:
 	if (rtmsg(RTM_GET) < 0) {
 		perror(host);
 		return (1);
@@ -406,8 +405,12 @@ tryagain:
 		case IFT_ISO88024: case IFT_ISO88025:
 			goto overwrite;
 		}
-		goto tryagain;
+		/*
+		 * IPv4 arp command retries with sin_other = SIN_PROXY here.
+		 */
+		return 1;
 	}
+
 overwrite:
 	if (sdl->sdl_family != AF_LINK) {
 		printf("cannot intuit interface index and type for %s\n", host);
@@ -474,7 +477,6 @@ delete(host)
 		return 1;
 	}
 	sin->sin6_addr = ((struct sockaddr_in6 *)res->ai_addr)->sin6_addr;
-/*tryagain:*/
 	if (rtmsg(RTM_GET) < 0) {
 		perror(host);
 		return (1);
@@ -491,8 +493,11 @@ delete(host)
 				goto delete;
 			}
 		}
+		/*
+		 * IPv4 arp command retries with sin_other = SIN_PROXY here.
+		 */
+		return 1;
 	}
-	return 0;
 
 delete:
 	if (sdl->sdl_family != AF_LINK) {
