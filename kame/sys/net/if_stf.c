@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.68 2001/10/19 09:46:28 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.69 2001/10/19 16:03:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -167,7 +167,9 @@ struct stf_softc {
 };
 
 static struct stf_softc *stf;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 static int nstf;
+#endif
 
 #if NGIF > 0
 extern int ip_gif_ttl;	/*XXX*/
@@ -178,15 +180,15 @@ static int ip_gif_ttl = 40;	/*XXX*/
 extern struct domain inetdomain;
 struct protosw in_stf_protosw =
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
-  in_stf_input, rip_output,	0,		rip_ctloutput,
+  in_stf_input, rip_input,	0,		rip_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
 #else
   rip_usrreq,
 #endif
-  0,            0,              0,              0
+  0,            0,              0,              0,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-  &rip_usrreqs,
+  &rip_usrreqs
 #endif
 };
 
@@ -258,10 +260,12 @@ stfmodevent(mod, type, data)
 #endif
 		sc->sc_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
 		if_attach(&sc->sc_if);
+#if NBPFILTER > 0
 #ifdef HAVE_OLD_BPF
 		bpfattach(&sc->sc_if, DLT_NULL, sizeof(u_int));
 #else
 		bpfattach(&sc->sc_if.if_bpf, &sc->sc_if, DLT_NULL, sizeof(u_int));
+#endif
 #endif
 		break;
 	case MOD_UNLOAD:
