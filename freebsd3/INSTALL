@@ -1,6 +1,6 @@
 Installation procedure - FreeBSD 3.3
 KAME project
-$Id: INSTALL,v 1.8 1999/09/22 05:50:30 sumikawa Exp $
+$Id: INSTALL,v 1.9 1999/10/06 06:52:01 k-sugyou Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -31,7 +31,7 @@ A-2. Backup /usr/include directory, if you want an untouched tree to be
 
 B. Kernel build
 ===============
-Consult NetBSD documentations for more detail.
+Consult FreeBSD documentations for more detail.
 
 B-1. Go down to sys/i386/conf.
 	% cd sys/i386/conf
