@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.c,v 1.10 2000/08/23 13:39:39 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.c,v 1.11 2000/08/25 10:51:12 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -182,7 +182,7 @@ cmpsaprop_alloc(ph1, pp1, pp2)
 
 	/* see proposal.h about lifetime/key length and PFS selection. */
 
-	/* check lifetime */
+	/* check time/bytes lifetime and PFS */
 	switch (ph1->rmconf->pcheck_level) {
 	case PROP_CHECK_OBEY:
 		newpp->lifetime = pp1->lifetime;
