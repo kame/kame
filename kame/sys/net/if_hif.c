@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.13 2001/12/03 12:19:24 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.14 2001/12/03 12:28:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -157,11 +157,6 @@ static int hif_ha_list_update_withioctl __P((struct hif_softc *, caddr_t));
 void hifattach __P((void *));
 #else
 void hifattach __P((int));
-#endif
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__)
-static void hif_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
-#else
-static void hif_rtrequest __P((int, struct rtentry *, struct sockaddr *));
 #endif
 
 #ifdef __FreeBSD__
@@ -929,32 +924,6 @@ hif_subnet_list_update_withmpfx(sc, data)
 		mpfx->mpfx_plremain = mpfx->mpfx_pltime;
 	}
 	return (0);
-}
-
-static void
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__)
-hif_rtrequest(cmd, rt, info)
-	int cmd;
-	struct rtentry *rt;
-	struct rt_addrinfo *info;
-#else
-hif_rtrequest(cmd, rt, sa)
-	int cmd;
-	struct rtentry *rt;
-	struct sockaddr *sa;
-#endif
-{
-	/* Copyed from lortrequest. */
-	if (rt) {
-		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu; /* for ISO */
-		/*
-		 * For optimal performance, the send and receive buffers
-		 * should be at least twice the MTU plus a little more for
-		 * overhead.
-		 */
-		rt->rt_rmx.rmx_recvpipe =
-			rt->rt_rmx.rmx_sendpipe = 3 * HIF_MTU;
-	}
 }
 
 int
