@@ -7,7 +7,7 @@ CATEGORIES=		security net
 MASTER_SITES=		ftp://ftp.appli.se/pub/isakmpd/
 
 PATCH_SITES=		ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=		isakmpd-20000220-20000328a.diff.gz
+PATCHFILES=		isakmpd-20000220-20000427a.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=		itojun@kame.net
