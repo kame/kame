@@ -227,6 +227,8 @@ struct	cmd {
 	{ "-anycast",	-IN6_IFF_ANYCAST,	0,	setia6flags },
 	{ "tentative",	IN6_IFF_TENTATIVE,	0,	setia6flags },
 	{ "-tentative",	-IN6_IFF_TENTATIVE,	0,	setia6flags },
+	{ "autoconf",	IN6_IFF_AUTOCONF,	0,	setia6flags },
+	{ "-autoconf",	-IN6_IFF_AUTOCONF,	0,	setia6flags },
 	{ "pltime",	NEXTARG,	0,		setia6pltime },
 	{ "vltime",	NEXTARG,	0,		setia6vltime },
 #endif /*INET6*/
@@ -1524,6 +1526,8 @@ in6_alias(creq)
 			printf(" detached");
 		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DEPRECATED)
 			printf(" deprecated");
+		if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_AUTOCONF)
+			printf(" autoconf");
 	}
 
 	if (scopeid)
