@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.328 1999/12/10 00:38:33 jinmei Exp $
+$Id: CHANGELOG,v 1.329 1999/12/10 05:00:36 sumikawa Exp $
 
 <199912>
+Fri Dec 10 13:57:35 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/sys/i386/isa/if_ed.c, if_ep.c, if_fe.c, if_sr.c: remove
+	  calling in6_ifattach() from all of drivers. These are no need
+	  anymore.
+
 1999-12-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ndp/ndp.c: a new option '-I interface' was added to
 	specify the default interface used for a default route when there
