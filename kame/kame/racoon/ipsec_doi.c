@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.109 2000/09/21 06:24:14 itojun Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.110 2000/09/21 15:12:43 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.109 2000/09/21 06:24:14 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.110 2000/09/21 15:12:43 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -287,7 +287,6 @@ get_ph1approvalx(p, proposal)
 			trns->t_no,
 			s_ipsecdoi_trns(prop->proto_id, trns->t_id)));
 
-	/* XXX Is it good to compare directly ? */
 	memset(&sa, 0, sizeof(sa));
 	if (t2isakmpsa(trns, &sa) < 0)
 		return NULL;
@@ -2094,9 +2093,6 @@ ahmismatch:
 						"invalid length of LD\n"));
 					return -1;
 				}
-
-				/* XXX to be checked the value of duration. */
-				/* i.g. too short duration */
 			}
 			break;
 
@@ -2247,9 +2243,6 @@ check_attr_ipcomp(trns)
 						"invalid length of LD\n"));
 					return -1;
 				}
-
-				/* XXX to be checked the value of duration. */
-				/* i.g. too short duration */
 			}
 			break;
 
@@ -2998,7 +2991,8 @@ ipsecdoi_setid1(iph1)
 			goto err;
 		id_b.type = genid2doi(type);
 		if (id_b.type == 0) {
-			printf("XXXX");
+			plog(logp, LOCATION, NULL,
+				"ERROR: failed to get GeneralName.\n");
 			goto err;
 		}
 		len = snprintf(idbuf, sizeof(idbuf), "%s", altname);
@@ -3149,8 +3143,8 @@ ipsecdoi_sockaddr2id(saddr, prefixlen, ul_proto)
 	u_short port;
 
 	/*
-	 * XXXX:
 	 * Q. When type is SUBNET, is it allowed to be ::1/128.
+	 * A. Yes. (consensus at bake-off)
 	 */
 	switch (saddr->sa_family) {
 	case AF_INET:
