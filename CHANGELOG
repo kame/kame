@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2716 2005/01/16 02:48:30 suz Exp $
+$KAME: CHANGELOG,v 1.2717 2005/01/17 09:53:51 suz Exp $
 
 <200501>
+2005-01-17  suz@crl.hitachi.co.jp
+	* kame/sys/netinet6/icmp6.c: ignores ICMPv6 code field in case of 
+	  ICMPv6 Packet-Too-Big.
+
 2005-01-15  suz@crl.hitachi.co.jp
 	* kame/sys/netinet6/ip6_output: fixed a path MTU discovery failure 
 	  on FreeBSD5.

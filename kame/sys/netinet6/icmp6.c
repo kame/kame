@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.395 2005/01/15 01:37:34 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.396 2005/01/17 09:53:52 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -696,8 +696,6 @@ icmp6_input(mp, offp, proto)
 
 	case ICMP6_PACKET_TOO_BIG:
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_pkttoobig);
-		if (code != 0)
-			goto badcode;
 
 		/* validation is made in icmp6_mtudisc_update */
 
