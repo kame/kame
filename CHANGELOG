@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2114 2002/04/05 15:47:05 jinmei Exp $
+$KAME: CHANGELOG,v 1.2115 2002/04/06 11:38:03 jinmei Exp $
 
 <200204>
+2002-04-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_mtudisc_update): revised the
+	case that the reported path MTU is less than the minimum MTU so
+	that the minimum MTU would be used instead.  The former behavior,
+	which disabled path MTU discovery, was probably just derived from
+	the IPv4 code, and was meaningless for IPv6, because path MTU
+	discovery is mandatory in IPv6.  The previous behavior may even be
+	exploited by some DoS attacks that intentionally send a too big
+	message with an MTU less than the minimum.
+
 2002-04-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_lookup): specified RTF_CACHE for a
 	newly created route so that the route entry would be subject to
