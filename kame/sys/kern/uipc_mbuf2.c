@@ -64,11 +64,24 @@
  *	@(#)uipc_mbuf.c	8.4 (Berkeley) 2/14/95
  */
 
+#define PULLDOWN_STAT
+
+#ifdef PULLDOWN_TEST
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#include "opt_inet.h"
+#endif
+#endif
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
+#if defined(PULLDOWN_STAT) && defined(INET6)
+#include <netinet/in.h>
+#include <netinet6/ip6.h>
+#include <netinet6/ip6_var.h>
+#endif
 
 /*
  * ensure that [off, off + len) is contiguous on the mbuf chain "m".
@@ -101,6 +114,10 @@ m_pulldown(m, off, len, offp)
 		return NULL;	/* impossible */
 	}
 
+#if defined(PULLDOWN_STAT) && defined(INET6)
+	ip6stat.ip6s_pulldown++;
+#endif
+
 #ifdef PULLDOWN_DEBUG
     {
 	struct mbuf *t;
@@ -128,6 +145,10 @@ m_pulldown(m, off, len, offp)
 	 */
 	if ((off == 0 || offp) && len <= n->m_len - off)
 		goto ok;
+
+#if defined(PULLDOWN_STAT) && defined(INET6)
+	ip6stat.ip6s_pulldown_copy++;
+#endif
 
 	/*
 	 * when len < n->m_len - off and off != 0, it is a special case.
@@ -213,6 +234,9 @@ m_pulldown(m, off, len, offp)
 	 * now, we need to do the hard way.  don't m_copy as there's no room
 	 * on both end.
 	 */
+#if defined(PULLDOWN_STAT) && defined(INET6)
+	ip6stat.ip6s_pulldown_alloc++;
+#endif
 	MGET(o, M_DONTWAIT, m->m_type);
 	if (o == NULL) {
 		m_freem(m);

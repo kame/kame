@@ -168,6 +168,10 @@ struct	ip6stat {
 	u_long	ip6s_exthdrtoolong;	/* ext hdr are not continuous */
 	u_long	ip6s_nogif;		/* no match gif found */
 	u_long	ip6s_toomanyhdr;	/* discarded due to too many headers */
+	/* XXX the following two items are not really AF_INET6 thing */
+	u_long	ip6s_pulldown;		/* # of calls to m_pulldown */
+	u_long	ip6s_pulldown_copy;	/* # of mbuf copies in m_pulldown */
+	u_long	ip6s_pulldown_alloc;	/* # of mbuf allocs in m_pulldown */
 };
 
 #ifdef _KERNEL
