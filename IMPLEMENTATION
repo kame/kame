@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.307 2002/06/10 08:27:13 sakane Exp $
+	$KAME: IMPLEMENTATION,v 1.308 2002/06/21 06:56:18 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -197,7 +197,7 @@ RFC3152: Delegation of IP6.ARPA
       the ip6.arpa domain (with the nibble format) for IPv6 reverse
       lookups.
 draft-ietf-ipngwg-icmp-name-lookups-09: IPv6 Name Lookups Through ICMP
-draft-ietf-dhc-dhcpv6-24.txt: DHCPv6
+draft-ietf-dhc-dhcpv6-26.txt: DHCPv6
 draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
     * kame/dhcp6 has test implementation, which will not be compiled in
       default compilation.
@@ -255,6 +255,7 @@ draft-itojun-ipv6-transition-abuse-01.txt:
     * See section 1.12.6 and 1.14 for more details.
 draft-itojun-ipv6-flowlabel-api-01.txt: Socket API for IPv6 flow label field
     * no consideration is made against the use of routing headers and such.
+draft-troan-dhcpv6-opt-prefix-delegation-01.txt: IPv6 Prefix Options for DHCPv6
 
 1.2 Neighbor Discovery
 
