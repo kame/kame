@@ -3,14 +3,16 @@
 PROG=	pfctl
 SRCS=	pfctl.c parse.y pfctl_parser.c pf_print_state.c pfctl_altq.c
 SRCS+=	pfctl_radix.c pfctl_table.c pfctl_qstats.c
-CFLAGS+= -Wall -Wmissing-prototypes -Wno-uninitialized
-CFLAGS+= -Wstrict-prototypes
+#CFLAGS+= -Wall -Wmissing-prototypes -Wno-uninitialized
+#CFLAGS+= -Wstrict-prototypes
 YFLAGS=
 MAN=	pfctl.8
 
 LDADD+=	-lm
 DPADD+=	${LIBM}
 
-.PATH: ${.CURDIR}/../../../kame/kame/pfctl
+SRCS+=	arc4random.c
+
+.PATH: ${.CURDIR}/../../../kame/kame/pfctl ${.CURDIR}/../../../kame/kame/libinet6
 
 .include <bsd.prog.mk>
