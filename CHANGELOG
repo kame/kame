@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.381 1999/12/27 20:35:40 sumikawa Exp $
+$Id: CHANGELOG,v 1.382 1999/12/28 05:18:08 itojun Exp $
 
 <199912>
+Tue Nov  2 13:27:36 JST 1999  itojun@iijlab.net
+	* freebsd2/ports/sendmail.beta, netbsd/pkgsrc/mail/sendmail.beta:
+	  upgrade to sendmail 8.10.0beta10.
+
 Tue Dec 28 05:35:02 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/ja-mnews: add IPv6-ready port directory for
 	  version 1.22.
