@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.21 2000/11/08 10:21:54 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.22 2000/11/08 12:00:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -304,8 +304,7 @@ getconfig(intface)
 			pfx->validlifetime = (u_int32_t)val;
 
 			makeentry(entbuf, i, "vltimedecr", added);
-			MAYHAVE(val, entbuf, 0); /* 0 = not decrement */
-			if (val != 0) {
+			if (agetflag(entbuf)) {
 				struct timeval now;
 				gettimeofday(&now, 0);
 				pfx->vltimeexpire =
@@ -323,8 +322,7 @@ getconfig(intface)
 			pfx->preflifetime = (u_int32_t)val;
 
 			makeentry(entbuf, i, "pltimedecr", added);
-			MAYHAVE(val, entbuf, 0); /* 0 = not decrement */
-			if (val != 0) {
+			if (agetflag(entbuf)) {
 				struct timeval now;
 				gettimeofday(&now, 0);
 				pfx->pltimeexpire =
