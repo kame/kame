@@ -429,8 +429,6 @@ in6_pcbdetach(inp)
 		so->so_pcb = NULL;
 		sotryfree(so);
 	}
-	sotoinpcb(so) = 0;
-	sotryfree(so);
 
  	ip6_freepcbopts(inp->in6p_outputopts);
  	ip6_freemoptions(inp->in6p_moptions);
