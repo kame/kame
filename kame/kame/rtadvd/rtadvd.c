@@ -66,6 +66,7 @@ struct iovec sndiov[2];
 struct sockaddr_in6 from;
 struct sockaddr_in6 sin6_allnodes = {sizeof(sin6_allnodes), AF_INET6};
 int sock, rtsock;
+int mobileip6 = 0;
 int accept_rr = 0;
 int dflag = 0, sflag = 0;
 
@@ -154,6 +155,9 @@ main(argc, argv)
 		 case 'f':
 			 fflag = 1;
 			 break;
+		 case 'm':
+			 mobileip6 = 1;
+			 break;
 		 case 'R':
 			 accept_rr = 1;
 			 break;
@@ -166,7 +170,7 @@ main(argc, argv)
 	argv += optind;
 	if (argc == 0) {
 		fprintf(stderr,
-			"usage: rtadvd [-dDfsR] [-c conffile] "
+			"usage: rtadvd [-dDfmRs] [-c conffile] "
 			"interfaces...\n");
 		exit(1);
 	}

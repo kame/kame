@@ -41,10 +41,11 @@
 #define DEF_ADVVALIDLIFETIME 2592000
 #define DEF_ADVPREFERREDLIFETIME 604800
 
+/*XXX int-to-double comparison for INTERVAL items */
 #define MAXROUTERLIFETIME 9000
-#define MIN_MAXINTERVAL 4
+#define MIN_MAXINTERVAL (mobileip6 ? 1.5 : 4.0)
 #define MAX_MAXINTERVAL 1800
-#define MIN_MININTERVAL 3
+#define MIN_MININTERVAL	(mobileip6 ? 0.5 : 3)
 #define MAXREACHABLETIME 3600000
 
 #define MAX_INITIAL_RTR_ADVERT_INTERVAL  16
@@ -61,6 +62,7 @@ struct prefix {
 	u_int32_t preflifetime;	/* AdvPreferredLifetime */
 	u_int onlinkflg;	/* bool: AdvOnLinkFlag */
 	u_int autoconfflg;	/* bool: AdvAutonomousFlag */
+	u_int routeraddr;	/* bool: RouterAddress */
 	int	prefixlen;
 	struct in6_addr prefix;
 };
@@ -88,12 +90,16 @@ struct	rainfo {
 	u_int	mininterval;	/* MinRtrAdvInterval */
 	int 	managedflg;	/* AdvManagedFlag */
 	int	otherflg;	/* AdvOtherConfigFlag */
+	int	haflg;		/* HAFlag */
 	u_int32_t linkmtu;	/* AdvLinkMTU */
 	u_int32_t reachabletime; /* AdvReachableTime */
 	u_int32_t retranstimer;	/* AdvRetransTimer */
 	u_int	hoplimit;	/* AdvCurHopLimit */
 	struct prefix prefix;	/* AdvPrefixList(link head) */
 	int	pfxs;		/* number of prefixes */
+
+	u_short	hapref;		/* Home Agent Preference */
+	u_short	hatime;		/* Home Agent Lifetime */
 
 	/* actual RA packet data and its length */
 	size_t ra_datalen;
@@ -102,3 +108,5 @@ struct	rainfo {
 
 void ra_timeout __P((void *));
 void ra_timer_update __P((void *, struct timeval *));
+
+extern int mobileip6;
