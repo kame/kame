@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.30 2000/01/12 21:00:03 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.31 2000/01/12 21:42:00 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2572,6 +2572,10 @@ setph1attr(sa, buf)
 /*
  * create phase2 proposal from policy configuration.
  * INCLUDING isakmp general header of SA payload.
+ *
+ * XXX the routine disagrees with other code in terms of interpretation of
+ * "bundle" pointer.  we'll need to have more appropriate structure for
+ * ipsecsa.
  */
 vchar_t *
 ipsecdoi_setph2proposal(iph2, keys)
