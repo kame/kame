@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.72 2002/05/01 10:54:54 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.73 2002/05/01 10:58:36 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -704,10 +704,7 @@ client6_recv(ifp)
 	return(0);		/* we've done */
 }
 
-/*
- * 18.1.6. Receipt of Reply message in response to a Information-request
- * message
- */
+/* 18.1.6. Receipt of Reply message */
 static int
 client6_recvreply(ifp, dh6, len)
 	struct dhcp_if *ifp;
@@ -724,7 +721,7 @@ client6_recvreply(ifp, dh6, len)
 
 	/*
 	 * The ``transaction-ID'' field value MUST match the value we
-	 * used in our Information-request message.
+	 * used in our original message.
 	 */
 	if (ifp->xid != (ntohl(dh6->dh6_xid) & DH6_XIDMASK)) {
 		dprintf(LOG_INFO, "client6_recvreply: XID mismatch");
