@@ -739,6 +739,7 @@ nofilt:;
 		 * See if we belong to the destination multicast group on the
 		 * arrival interface.
 		 */
+		/* XXX: ToDo: SSM support for non-UDP packet (e.g. ICMP) */
 		IN_LOOKUP_MULTI(ip->ip_dst, m->m_pkthdr.rcvif, inm);
 		if (inm == NULL) {
 			ipstat.ips_cantforward++;
