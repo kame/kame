@@ -1346,22 +1346,22 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 					mp = &(*mp)->m_next;
 				break;   
 			}
-			case IPPROTO_UDP:
-			case IPPROTO_TCP:
-			case IPPROTO_ICMPV6:
+			case IPPROTO_HOPOPTS:
+			case IPPROTO_AH: /* is it possible? */
+				break;
+
 			default:
 				/*
-				  * stop search if we encounter an upper
-				  * layer protocol headers.
-				  */
+			 	 * other cases have been filtered in the above.
+				 * noone will visit this case.  here we supply
+				 * the code just in case (nxt overwritten or
+				 * other cases).
+				 */
 #ifdef PULLDOWN_TEST
 				m_freem(ext);
 #endif
 				goto loopend;
 
-			case IPPROTO_HOPOPTS:
-			case IPPROTO_AH: /* is it possible? */
-				break;
 			}
 
 			/* proceed with the next header. */
