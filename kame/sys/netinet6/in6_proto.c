@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.46 2000/03/29 03:45:57 sumikawa Exp $	*/
+/*	$KAME: in6_proto.c,v 1.47 2000/03/29 07:37:22 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -132,7 +132,9 @@
 #endif
 
 #if !defined(__OpenBSD__) && !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #include <netinet6/udp6.h>
+#endif
 #include <netinet6/udp6_var.h>
 #endif
 
