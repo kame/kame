@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.71 2003/11/02 23:04:02 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.72 2003/11/03 02:47:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -173,7 +173,7 @@ udp6_output(in6p, m, addr6, control)
 #endif
 	u_int16_t fport;
 	int error = 0;
-	struct ip6_pktopts opt, *stickyopt = in6p->in6p_outputopts;
+	struct ip6_pktopts *optp, opt;
 	int priv;
 	int af = AF_INET6, hlen = sizeof(struct ip6_hdr);
 #ifdef INET
@@ -225,11 +225,13 @@ udp6_output(in6p, m, addr6, control)
 	}
 
 	if (control) {
-		if ((error = ip6_setpktopts(control, &opt, stickyopt, priv,
-		    0, IPPROTO_UDP)) != 0)
+		if ((error = ip6_setpktopts(control, &opt,
+		    in6p->in6p_outputopts, priv, 0, IPPROTO_UDP)) != 0)
 			goto release;
-		in6p->in6p_outputopts = &opt;
-	}
+		optp = &opt;
+	} else
+		optp = in6p->in6p_outputopts;
+		
 
 	if (fsa6) {
 		/*
@@ -289,7 +291,7 @@ udp6_output(in6p, m, addr6, control)
 		}
 
 		if (!IN6_IS_ADDR_V4MAPPED(&fsa6->sin6_addr)) {
-			lsa6 = in6_selectsrc(fsa6, in6p->in6p_outputopts,
+			lsa6 = in6_selectsrc(fsa6, optp,
 					     in6p->in6p_moptions,
 					     &in6p->in6p_route,
 					     &in6p->in6p_lsa, &oifp, &error);
@@ -452,7 +454,7 @@ udp6_output(in6p, m, addr6, control)
 			error = ENOBUFS;
 			goto release;
 		}
-		error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route,
+		error = ip6_output(m, optp, &in6p->in6p_route,
 				   flags, in6p->in6p_moptions, NULL
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 				   ,NULL
@@ -554,8 +556,7 @@ release:
 
 releaseopt:
 	if (control) {
-		ip6_clearpktopts(in6p->in6p_outputopts, -1);
-		in6p->in6p_outputopts = stickyopt;
+		ip6_clearpktopts(&opt, -1);
 		m_freem(control);
 	}
 	return (error);
