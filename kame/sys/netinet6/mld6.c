@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.101 2004/06/14 06:53:16 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.102 2004/06/15 12:53:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -867,16 +867,6 @@ in6_addmulti(maddr6, ifp, errorp)
 	int	s = splnet();
 
 	*errorp = 0;
-
-	/*
-	 * if we have the group already, use it
-	 */
-	IN6_LOOKUP_MULTI(*maddr6, ifp, in6m);
-	if (in6m) {
-		in6m->in6m_refcount++;
-		splx(s);
-		return (NULL);
-	}
 
 	/*
 	 * Call generic routine to add membership or increment
