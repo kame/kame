@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.265 2002/11/05 03:48:34 itojun Exp $	*/
+/*	$KAME: key.c,v 1.266 2002/12/06 11:08:05 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1794,7 +1794,7 @@ key_spdadd(so, m, mhp)
 			default:
 				break;
 			}
-			sa = (struct sockaddr *)(src0 + 1);
+			sa = (struct sockaddr *)(dst0 + 1);
 			switch (sa->sa_family) {
 			case AF_INET:
 				if (((struct sockaddr_in *)sa)->sin_port) {
