@@ -1,4 +1,4 @@
-/*	$KAME: ip6opt.c,v 1.14 2003/10/27 04:55:44 itojun Exp $	*/
+/*	$KAME: ip6opt.c,v 1.15 2004/06/01 12:59:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -456,8 +456,7 @@ inet6_opt_append(void *extbuf, socklen_t extlen, int offset, u_int8_t type,
 			/* insert a Pad1 option */
 			*optp = IP6OPT_PAD1;
 			optp++;
-		}
-		else if (padlen > 0) {
+		} else if (padlen > 0) {
 			/* insert a PadN option for alignment */
 			*optp++ = IP6OPT_PADN;
 			*optp++ = padlen - 2;
