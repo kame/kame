@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.43 2000/07/02 23:19:59 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.44 2000/07/10 12:07:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1749,6 +1749,14 @@ rt6_deleteroute(rn, arg)
 		return(0);
 
 	if (!IN6_ARE_ADDR_EQUAL(gate, &SIN6(rt->rt_gateway)->sin6_addr))
+		return(0);
+
+	/*
+	 * Do not delete a static route.
+	 * XXX: this seems to be a bit ad-hoc. Should we consider the
+	 * 'cloned' bit instead?
+	 */
+	if ((rt->rt_flags & RTF_STATIC) != 0)
 		return(0);
 
 	/*
