@@ -1039,7 +1039,8 @@ icmp6_stats(off, name)
 	    "\t%qu error%s not generated because old message was icmp6 error or so\n");
 	p(icp6s_toofreq,
 	  "\t%qu error%s not generated because of rate limitation\n");
-	for (first = 1, i = 0; i < 256; i++)
+#define NELEM (sizeof(icmp6stat.icp6s_outhist)/sizeof(icmp6stat.icp6s_outhist[0]))
+	for (first = 1, i = 0; i < NELEM; i++)
 		if (icmp6stat.icp6s_outhist[i] != 0) {
 			if (first) {
 				printf("\tOutput histogram:\n");
@@ -1048,11 +1049,13 @@ icmp6_stats(off, name)
 			printf("\t\t%s: %qu\n", icmp6names[i],
 				icmp6stat.icp6s_outhist[i]);
 		}
+#undef NELEM
 	p(icp6s_badcode, "\t%qu message%s with bad code fields\n");
 	p(icp6s_tooshort, "\t%qu message%s < minimum length\n");
 	p(icp6s_checksum, "\t%qu bad checksum%s\n");
 	p(icp6s_badlen, "\t%qu message%s with bad length\n");
-	for (first = 1, i = 0; i < ICMP6_MAXTYPE; i++)
+#define NELEM (sizeof(icmp6stat.icp6s_inhist)/sizeof(icmp6stat.icp6s_inhist[0]))
+	for (first = 1, i = 0; i < NELEM; i++)
 		if (icmp6stat.icp6s_inhist[i] != 0) {
 			if (first) {
 				printf("\tInput histogram:\n");
@@ -1061,6 +1064,7 @@ icmp6_stats(off, name)
 			printf("\t\t%s: %qu\n", icmp6names[i],
 				icmp6stat.icp6s_inhist[i]);
 		}
+#undef NELEM
 	printf("\tHistogram of error messages to be generated:\n");
 	p_5(icp6s_odst_unreach_noroute, "\t\t%qu no route\n");
 	p_5(icp6s_odst_unreach_admin, "\t\t%qu administratively prohibited\n");
