@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.12 2005/02/18 06:04:19 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.13 2005/02/18 17:22:41 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -504,7 +504,9 @@ had_add_hal(hpfx_entry, gladdr, lladdr, lifetime, preference, flag)
 	hal->hal_preference = preference;
 	hal->hal_flag = flag;
 
-	if (hal->hal_flag != MIP6_HAL_OWN)
+	if (hal->hal_expire)
+		update_callout_entry(hal->hal_expire, hal->hal_lifetime);
+	else if (hal->hal_flag != MIP6_HAL_OWN)
 		hal_set_expire_timer(hal, hal->hal_lifetime);
 
 	if (debug)

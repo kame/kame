@@ -1,4 +1,4 @@
-/*      $KAME: common.c,v 1.14 2005/02/18 05:57:44 t-momose Exp $  */
+/*      $KAME: common.c,v 1.15 2005/02/18 17:22:41 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -84,7 +84,7 @@ static const struct in6_addr haanyaddr_ifidnn = {
 
 #ifndef MIP_CN
 struct nd6options {
-	struct nd_opt_prefix_info *ndpi;
+	struct nd_opt_prefix_info *ndpi_start, *ndpi_end;	/* could be multiple */
 	struct nd_opt_adv_interval *ndadvi;
 	struct nd_opt_homeagent_info *ndhai;
 } ndopts;
@@ -210,17 +210,16 @@ mip6_get_nd6options(ndoptions, options, total)
 			/* we don't need these */
 			break;
 		case ND_OPT_PREFIX_INFORMATION:
-			ndoptions->ndpi = (struct nd_opt_prefix_info *)hdr;
-			if (IN6_IS_ADDR_MULTICAST(&ndoptions->ndpi->nd_opt_pi_prefix) ||
-			    IN6_IS_ADDR_LINKLOCAL(&ndoptions->ndpi->nd_opt_pi_prefix))
+			if (ndoptions->ndpi_start == NULL)
+				ndoptions->ndpi_start = (struct nd_opt_prefix_info *)hdr;
+			ndoptions->ndpi_end = (struct nd_opt_prefix_info *)hdr;
+			if (IN6_IS_ADDR_MULTICAST(&ndoptions->ndpi_end->nd_opt_pi_prefix) ||
+			    IN6_IS_ADDR_LINKLOCAL(&ndoptions->ndpi_end->nd_opt_pi_prefix))
 				return (EINVAL);
 			
                          /* aggregatable unicast address, rfc2374 XXX */
-			if (ndoptions->ndpi->nd_opt_pi_prefix_len != 64)
+			if (ndoptions->ndpi_end->nd_opt_pi_prefix_len != 64)
 				return (EINVAL);
-			
-			
-
 			break;
 		case ND_OPT_ADV_INTERVAL:
 			ndoptions->ndadvi = (struct nd_opt_adv_interval *)hdr;
@@ -431,6 +430,7 @@ icmp6_input_common(fd)
 	struct mip6_hpfxl *hpfx = NULL;
 	struct mip6_hpfx_list *hpfxhead = NULL; 
 	struct home_agent_list *hal = NULL;
+	struct nd_opt_hdr *pt;
 
 	struct nd_router_advert *ra;
         uint16_t       hai_preference = 0;
@@ -573,11 +573,25 @@ icmp6_input_common(fd)
 			break;
 
 		hai_lifetime = ntohs(ra->nd_ra_router_lifetime);
-		if (ndopts.ndpi) {
-			hai_pfxlen = ndopts.ndpi->nd_opt_pi_prefix_len;
-			in6_gladdr = &ndopts.ndpi->nd_opt_pi_prefix;
+
+		for (pt = (struct nd_opt_hdr *)ndopts.ndpi_start;
+		     pt <= (struct nd_opt_hdr *)ndopts.ndpi_end;
+		     pt = (struct nd_opt_hdr *)((caddr_t)pt +
+						(pt->nd_opt_len << 3))) {
+			struct nd_opt_prefix_info *pi;
+			
+			if (pt->nd_opt_type != ND_OPT_PREFIX_INFORMATION)
+				continue;
+			pi = (struct nd_opt_prefix_info *)pt;
+
+			hai_preference = 0;
+			hai_lifetime = ntohs(ra->nd_ra_router_lifetime);
+			hai_pfxlen = pi->nd_opt_pi_prefix_len;
+			in6_gladdr = &pi->nd_opt_pi_prefix;
+#if 0
 			if (hai_lifetime == 0)
-				hai_lifetime = ntohl(ndopts.ndpi->nd_opt_pi_valid_time);
+				hai_lifetime = ntohl(pi->nd_opt_pi_valid_time);
+#endif
 			
 /*
 			if (debug)
@@ -585,117 +599,106 @@ icmp6_input_common(fd)
 */
 
                         /* check H flag */
-			if (!(ndopts.ndpi->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ROUTER)) {
+			if (!(pi->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ROUTER)) {
 #if defined(MIP_HA)
 				/* delete HAL */
-				hpfx = mip6_get_hpfxlist(&ndopts.ndpi->nd_opt_pi_prefix, 
-							 ndopts.ndpi->nd_opt_pi_prefix_len, 
+				hpfx = mip6_get_hpfxlist(&pi->nd_opt_pi_prefix, 
+							 pi->nd_opt_pi_prefix_len, 
 							 hpfxhead);
 				if (hpfx == NULL) 
-					break;
+					continue;
+
+				if ((hal = mip6_get_hal(hpfx, in6_gladdr)))
+					mip6_delete_hal(hpfx, &pi->nd_opt_pi_prefix);
+#endif /* MIP_HA */
+				continue; /* MN ignores RA which not having R flag */
+			}
+
+			/* 
+			 * when the prefix field does not
+			 * have global address, it should
+			 * be ignored 
+			 */
+			if (IN6_IS_ADDR_LINKLOCAL(in6_gladdr)
+			    || IN6_IS_ADDR_MULTICAST(in6_gladdr)
+			    || IN6_IS_ADDR_LOOPBACK(in6_gladdr)
+			    || IN6_IS_ADDR_V4MAPPED(in6_gladdr)
+			    || IN6_IS_ADDR_UNSPECIFIED(in6_gladdr)) 
+				continue;
+
+			/* 
+			 * when the prefix field does not
+			 * contain 128-bit address, it should
+			 * be ignored 
+			 */				
+			if ((in6_gladdr->s6_addr[15] == 0) && 
+			    (in6_gladdr->s6_addr[14] == 0) &&
+			    (in6_gladdr->s6_addr[13] == 0) &&
+			    (in6_gladdr->s6_addr[12] == 0) &&
+			    (in6_gladdr->s6_addr[11] == 0) &&
+			    (in6_gladdr->s6_addr[10] == 0))
+				continue;
+
+			if (debug)
+				syslog(LOG_INFO, "RA received from HA (%s)\n", 
+				       ip6_sprintf(&pi->nd_opt_pi_prefix));
+			/* Home Agent Information Option */
+			if (ndopts.ndhai) {
+				hai_preference = ntohs(ndopts.ndhai->nd_opt_hai_preference);
+				hai_lifetime = ntohs(ndopts.ndhai->nd_opt_hai_lifetime);
+
+				if (debug)
+					syslog(LOG_INFO, 
+					       "hainfo option found in RA (pref=%d,life=%d)\n", 
+					       hai_preference, hai_lifetime);
+			}
+
+			/* 
+			 * if lifetime is zero, correspondent HA must be 
+			 * removed from home agent list 
+			 */
+			if (hai_lifetime == 0 || 
+			    !(ra->nd_ra_flags_reserved & ND_RA_FLAG_HOME_AGENT)) {
+				hpfx = mip6_get_hpfxlist(&pi->nd_opt_pi_prefix, 
+						 pi->nd_opt_pi_prefix_len, 
+						 hpfxhead);
+				if (hpfx == NULL) 
+					continue;
 
 				hal = mip6_get_hal(hpfx, in6_gladdr);
 				if (hal == NULL) 
-					break;
-				
-				mip6_delete_hal(hpfx, &ndopts.ndpi->nd_opt_pi_prefix);
-				break;
-#else /* MIP_MN */
-				break; /* MN ignores RA which not having R flag */
-#endif /* MIP_HA */
-			} else {
-				/* 
-				 * when the prefix field does not
-				 * have global address, it should
-				 * be ignored 
-				 */
-			        if (IN6_IS_ADDR_LINKLOCAL(in6_gladdr)
-            				|| IN6_IS_ADDR_MULTICAST(in6_gladdr)
-            				|| IN6_IS_ADDR_LOOPBACK(in6_gladdr)
-            				|| IN6_IS_ADDR_V4MAPPED(in6_gladdr)
-            				|| IN6_IS_ADDR_UNSPECIFIED(in6_gladdr)) 
-					break;
-
-				/* 
-				 * when the prefix field does not
-				 * contain 128-bit address, it should
-				 * be ignored 
-				 */				
-				if ((in6_gladdr->s6_addr[15] == 0) && 
-				    (in6_gladdr->s6_addr[14] == 0) &&
-				    (in6_gladdr->s6_addr[13] == 0) &&
-				    (in6_gladdr->s6_addr[12] == 0) &&
-				    (in6_gladdr->s6_addr[11] == 0) &&
-				    (in6_gladdr->s6_addr[10] == 0))
-					break;
-			}
-			if (debug)
-				syslog(LOG_INFO, "RA received from HA (%s)\n", 
-				       ip6_sprintf(&ndopts.ndpi->nd_opt_pi_prefix));
-		}
-		
-		/* Home Agent Information Option */
-		if (ndopts.ndhai) {
-			hai_preference = ntohs(ndopts.ndhai->nd_opt_hai_preference);
-			hai_lifetime = ntohs(ndopts.ndhai->nd_opt_hai_lifetime);
-
-			if (debug)
-				syslog(LOG_INFO, 
-				       "hainfo option found in RA (pref=%d,life=%d)\n", 
-				       hai_preference, hai_lifetime);
-		}
-
-		/* 
-		 * if lifetime is zero, correspondent HA must be 
-		 * removed from home agent list 
-		 */
-		if (hai_lifetime == 0 || 
-		    !(ra->nd_ra_flags_reserved & ND_RA_FLAG_HOME_AGENT)) {
-			/* if prefix is not specified, just ignore RA */
-			if (ndopts.ndpi == NULL)
-				break;
-			hpfx = mip6_get_hpfxlist(&ndopts.ndpi->nd_opt_pi_prefix, 
-						 ndopts.ndpi->nd_opt_pi_prefix_len, 
-						 hpfxhead);
-			if (hpfx == NULL) 
-				break;
-
-			hal = mip6_get_hal(hpfx, in6_gladdr);
-			if (hal == NULL) 
-				break;
+					continue;
 			
-			mip6_delete_hal(hpfx, &ndopts.ndpi->nd_opt_pi_prefix);
-			break;
-		}
-
-
-		/* need both linklocal and global address to add home prefix info */
-		if (in6_gladdr == NULL)
-			break;
-
-		hpfx = mip6_get_hpfxlist(in6_gladdr, hai_pfxlen, hpfxhead);
-		if (hpfx == NULL) {
+				mip6_delete_hal(hpfx, &pi->nd_opt_pi_prefix);
+			} else {
+				/* need both linklocal and
+				   global address to add home prefix info */
+				if (in6_gladdr == NULL)
+					continue;
+				
+				hpfx = mip6_get_hpfxlist(in6_gladdr, hai_pfxlen, hpfxhead);
+				if (hpfx == NULL) {
 #if defined(MIP_HA)			
-			break;
+					continue;
 #else
-			/* add_hpfx */
+					/* add_hpfx XXXX ? */
 #endif /* MIP_HA */
-		}
+				}
 #ifdef MIP_HA
-		if (ndopts.ndpi) {
-			hpfx->hpfx_vltime = ntohl(ndopts.ndpi->nd_opt_pi_valid_time);
-			hpfx->hpfx_pltime = ntohl(ndopts.ndpi->nd_opt_pi_preferred_time);
-		}
-		
-		/* add or update home agent list */
-		hal = had_add_hal(hpfx, in6_gladdr, 
-				  in6_lladdr, hai_lifetime, hai_preference, 0);
-		if (hal == NULL) {
-			error = EINVAL;
-			break;
+				hpfx->hpfx_vltime = ntohl(pi->nd_opt_pi_valid_time);
+				hpfx->hpfx_pltime = ntohl(pi->nd_opt_pi_preferred_time);
+				
+				/* add or update home agent list */
+				if (had_add_hal(hpfx, in6_gladdr,
+						in6_lladdr, hai_lifetime, hai_preference, 0) == NULL) {
+					/* error = EINVAL; */
+					/* break; */
+					continue;
+				}
+#endif /* MIP_HA */
+			}
 		}
 
-#endif /* MIP_HA */
 		break;
 #endif /* MIP_CN */
 
@@ -818,27 +821,25 @@ icmp6_input_common(fd)
                  * BU entries anyway 
 		 */
 		bul = bul_get(&dst, &from.sin6_addr);
-		if (bul) {
-			if (bul_kick_fsm(bul,
-				MIP6_BUL_FSM_EVENT_ICMP6_PARAM_PROB,
-				NULL) == -1) {
-				syslog(LOG_ERR,
-				    "state transision by "
-				    "MIP6_BUL_FSM_EVENT_ICMP6_PARAM_PROB "
-				    "failed.\n");
-			}
+		if (bul == NULL)
+			break;
+
+		if (bul_kick_fsm(bul,
+				 MIP6_BUL_FSM_EVENT_ICMP6_PARAM_PROB,
+				 NULL) == -1) {
+			syslog(LOG_ERR,
+			       "state transision by "
+			       "MIP6_BUL_FSM_EVENT_ICMP6_PARAM_PROB "
+			       "failed.\n");
 		}
 		break;
 	case MIP6_PREFIX_ADVERT:
 	{
-		char *options;
+		int done = 0;
 		struct mip6_mipif *mif;
 		struct mip6_hpfx_mn_exclusive mnoption;
-		struct nd_opt_hdr *hdr;
-		struct nd_opt_prefix_info *ndpi;
-		int optlen = 0, total = 0;
 
-		mpsadv = (struct mip6_prefix_advert *)msg.msg_iov[0].iov_base;
+		mpsadv = (struct mip6_prefix_advert *)icp;
 
 		/* Check MPS ID */
 		LIST_FOREACH(mif, &mipifhead, mipif_entry) {
@@ -847,42 +848,46 @@ icmp6_input_common(fd)
 		}
 		if (mif == NULL)
 			break;
+
+		memset(&ndopts, 0, sizeof(ndopts));
+		error = mip6_get_nd6options(&ndopts,
+					    (char *)icp + sizeof(struct mip6_prefix_advert),
+					    readlen - sizeof(struct mip6_prefix_advert));
 		
-		options = (char *)icp + sizeof(struct mip6_prefix_advert);
-                total = readlen - sizeof(struct mip6_prefix_advert);
+		for (pt = (struct nd_opt_hdr *)ndopts.ndpi_start;
+		     pt <= (struct nd_opt_hdr *)ndopts.ndpi_end;
+		     pt = (struct nd_opt_hdr *)((caddr_t)pt +
+						(pt->nd_opt_len << 3))) {
+			struct nd_opt_prefix_info *pi;
+			
+			if (pt->nd_opt_type != ND_OPT_PREFIX_INFORMATION)
+				continue;
+			pi = (struct nd_opt_prefix_info *)pt;
+			
+			if (IN6_IS_ADDR_MULTICAST(&pi->nd_opt_pi_prefix) ||
+			    IN6_IS_ADDR_LINKLOCAL(&pi->nd_opt_pi_prefix))
+				continue;
 
-		for (;total > 0; total -= optlen) {
-                        options += optlen;
-                        hdr = (struct nd_opt_hdr *)options; 
-                        optlen = hdr->nd_opt_len << 3;
+			/* aggregatable unicast address, rfc2374 XXX */
+			if (pi->nd_opt_pi_prefix_len != 64)
+				continue;
 
-			switch (hdr->nd_opt_type) {
-                        case ND_OPT_PREFIX_INFORMATION:
-                                ndpi = (struct nd_opt_prefix_info *)hdr;
-                                
-				if (IN6_IS_ADDR_MULTICAST(&ndpi->nd_opt_pi_prefix) ||
-				    IN6_IS_ADDR_LINKLOCAL(&ndpi->nd_opt_pi_prefix))
-                                        break;
+			memset(&mnoption, 0, sizeof(mnoption)); 
+			mnoption.hpfxlist_vltime = 
+				ntohl(pi->nd_opt_pi_valid_time);
+			mnoption.hpfxlist_pltime = 
+				ntohl(pi->nd_opt_pi_preferred_time);
+			
+			mnd_add_hpfxlist(&pi->nd_opt_pi_prefix,
+					 pi->nd_opt_pi_prefix_len,
+					 &mnoption, mif);
+			done = 1;
+		}
 
-				/* aggregatable unicast address, rfc2374 XXX */
-				if (ndpi->nd_opt_pi_prefix_len != 64)
-					return (EINVAL);
-
-				memset(&mnoption, 0, sizeof(mnoption)); 
-				mnoption.hpfxlist_vltime = 
-					ntohl(ndpi->nd_opt_pi_valid_time);
-				mnoption.hpfxlist_pltime = 
-					ntohl(ndpi->nd_opt_pi_preferred_time);
-
-				mnd_add_hpfxlist(&ndpi->nd_opt_pi_prefix,
-						 ndpi->nd_opt_pi_prefix_len,
-						 &mnoption,
-						 mif);
-                                break;
-                        default:
-                                break;
-                        }
-                }
+		if (!done) {
+			error = EINVAL;
+			syslog(LOG_ERR, "Could not find valid PI in MPA\n");
+		}
 		break;
 	}
 #endif /* MIP_MN */
@@ -1844,3 +1849,4 @@ show_hal(s, head)
 		}
 	}
 }
+
