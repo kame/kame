@@ -1,54 +1,29 @@
-# New ports collection makefile for:	gated-ipv6
-# Version required:	199903
-# Date created:		Wed Oct 21 11:39:18 JST 1998
-# Whom:			itojun
-#
-# $Id: Makefile,v 1.1 1999/08/09 01:37:01 itojun Exp $
+# $Id: Makefile,v 1.2 2000/02/08 16:45:52 itojun Exp $
 #
 
-DISTNAME=	gated-pubipv6-snapshot.031999
-PKGNAME=	gated-ipv6-19990300
+DISTNAME=	gated-pub-ipv6-snapshot20000203
+PKGNAME=	gated-ipv6-20000203
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.gated.org/net-research/gated/
 
-PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	gatedv6-snap0399-19990330.diff.gz
-PATCH_DIST_STRIP=	-p2
-
 MAINTAINER=	itojun@itojun.org
+HOMEPAGE=	http://www.gated.org/
 
 NO_PACKAGE=	"binary redistribution restricted to members"
 NO_CDROM=	"binary redistribution restricted to members"
 
-WRKSRC=		${WRKDIR}/gated-pub-ipv6-snapshot-0399/src
-CONFIGFILE=	${FILESDIR}/Config
-OBJDIR=		${WRKSRC}/obj.`${WRKSRC}/util/archtype`
-
-MAN8=	gated.8 gdc.8 ripquery.8
-DOCS=	Acknowledgements BUGS CHANGES CHANGES.1 Consortium_Agreement \
-	Copyright Copyright.ISIS Copyright.OSPF INSTALL \
-	ISIS-config.ps Licensing README README.bgp README.make \
-	README.v6 RELEASE TODO
-
-post-patch:
-	${MKDIR} ${OBJDIR}
-	${SED} -e 's#@PREFIX@#${PREFIX}#g' ${CONFIGFILE} > ${OBJDIR}/Config
-
-do-configure:
-	(cd ${WRKSRC}; make config)
+WRKSRC=		${WRKDIR}/gated-public-v6-snapshot000203
+GNU_CONFIGURE=	YES
+CONFIGURE_ARGS+=--disable-bgp4mp
+CONFIGURE_ARGS+=--disable-bgp
+CONFIGURE_ARGS+=--disable-mpbgp
+CONFIGURE_ARGS+=--disable-ospf
+CONFIGURE_ARGS+=--disable-gii
 
 post-install:
-	for i in ${MAN8}; do \
-		${CP} ${OBJDIR}/$$i ${PREFIX}/man/man8; \
-	done
-.if !defined(NOPORTDOCS)
-	${MKDIR} ${PREFIX}/share/doc/gated-ipv6
-	${CP} -r ${WRKSRC}/../doc/* ${PREFIX}/share/doc/gated-ipv6
-	${MKDIR} ${PREFIX}/share/examples/gated-ipv6
-	${CP} -r ${WRKSRC}/../conf/* ${PREFIX}/share/examples/gated-ipv6
-	for i in ${DOCS}; do \
-		${CP} ${WRKSRC}/../$$i ${PREFIX}/share/doc/gated-ipv6; \
-	done
-.endif
+	${INSTALL_PROGRAM} ${WRKSRC}/src/gdc/gdc ${PREFIX}/sbin
+	${INSTALL_PROGRAM} ${WRKSRC}/src/gated/filter ${PREFIX}/bin
+	${INSTALL_PROGRAM} ${WRKSRC}/src/rip6query/rip6query ${PREFIX}/bin
+	${INSTALL_PROGRAM} ${WRKSRC}/src/ripquery/ripquery ${PREFIX}/bin
 
 .include <bsd.port.mk>
