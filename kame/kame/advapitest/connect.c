@@ -1,4 +1,4 @@
-/*	$KAME: connect.c,v 1.11 2001/09/18 11:02:55 jinmei Exp $ */
+/*	$KAME: connect.c,v 1.12 2002/02/02 10:38:38 jinmei Exp $ */
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -39,6 +39,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <err.h>
+#include <arpa/inet.h>
 
 #include "common.h"
 
@@ -52,13 +53,21 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	int ch, ret_ga, hlim = -1;
+	int ch, ret_ga, hlim = -1, ngate = 0, rthlen;
 	struct addrinfo hints, *res;
 	struct sockaddr_in6 dst;
 	char readbuf[1024], *port = DEFAULTPORT;
+	char **gate;
+	struct ip6_rthdr *rthdr;
 
-	while((ch = getopt(argc, argv, "h:p:")) != -1)
+	if ((gate = malloc((sizeof(char *)) * argc)) == NULL)
+		err(1, "malloc");
+
+	while((ch = getopt(argc, argv, "h:p:g:")) != -1)
 		switch(ch) {
+		case 'g':
+			gate[ngate++] = optarg;
+			break;
 		case 'h':
 			hlim = atoi(optarg);
 			break;
@@ -80,7 +89,7 @@ main(argc, argv)
 	hints.ai_protocol = IPPROTO_TCP;
 	ret_ga = getaddrinfo(argv[0], port, &hints, &res);
 	if (ret_ga)
-		errx(1, "connect: %s\n", gai_strerror(ret_ga));
+		errx(1, "getaddrinfo: %s\n", gai_strerror(ret_ga));
 
 	if ((s = socket(res->ai_family, res->ai_socktype, 0)) < 0)
 		err(1, "socket");
@@ -88,6 +97,43 @@ main(argc, argv)
 	if (hlim > 0 &&
 	    setsockopt(s, IPPROTO_IPV6, IPV6_HOPLIMIT, &hlim, sizeof(hlim))) {
 		warn("setsockopt(IPV6_HOPLIMIT %d)", hlim); /* assert? */
+	}
+	if (hlim > 0 &&
+	    setsockopt(s, IPPROTO_IPV6, IPV6_UNICAST_HOPS,
+		       &hlim, sizeof(hlim))) {
+		err(1, "setsockopt(IPV6_UNICAST_HOPS %d)", hlim);
+	}
+
+	if (ngate > 0) {
+		int i;
+
+		rthlen = inet6_rth_space(IPV6_RTHDR_TYPE_0, ngate);
+		if ((rthdr = malloc(rthlen)) == NULL)
+			err(1, "malloc (%d) failed", rthlen);
+		inet6_rth_init((void *)rthdr, rthlen,
+			       IPV6_RTHDR_TYPE_0, ngate);
+
+		for (i = 0; i < ngate; i++) {
+			struct in6_addr g;
+			int e;
+
+			if ((e = inet_pton(AF_INET6, gate[i], &g)) != 1) {
+				if (e)
+					warn("inet_pton(%s) failed", gate[i]);
+				else
+					warnx("inet_pton(%s) failed", gate[i]);
+				exit(1);
+			}
+
+			if (inet6_rth_add(rthdr, &g))
+				errx(1, "inet6_rth_add failed");
+		}
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_RTHDR,
+			       (void *)rthdr, rthlen))
+			err(1, "setsockopt(IPV6_RTHDR)");
+
+		free(rthdr);
+		free(gate);
 	}
 
 	if (connect(s, res->ai_addr, res->ai_addrlen) < 0)
@@ -127,8 +173,7 @@ main(argc, argv)
 #endif
 #ifdef IPV6_RTHDR_TYPE_0
 		if (strncasecmp(readbuf, "rthdr", 5) == 0) {
-			struct ip6_rthdr *rthdr = NULL;
-			int i, hops = atoi(&readbuf[5]), rthlen = 0;
+			int i, hops = atoi(&readbuf[5]);
 
 			if (hops == 0)
 				goto setrth; /* remove the header */
@@ -248,5 +293,6 @@ setopthdr(optlen, hdrtype)
 void
 usage()
 {
-	fprintf(stderr, "usage: connect [-h hoplimit] [-p port] addr\n");
+	fprintf(stderr, "usage: connect [-h hoplimit] [-p port] "
+		"[-g hop1 [-g hop2...]] addr\n");
 }
