@@ -1371,7 +1371,6 @@ rt_timer_timer(arg)
 	     rtq = LIST_NEXT(rtq, rtq_link)) {
 		while ((r = TAILQ_FIRST(&rtq->rtq_head)) != NULL &&
 		    (r->rtt_time + rtq->rtq_timeout) < current_time) {
-			printf("rt_timer_timer: remove an entry: %p\n", r);
 			LIST_REMOVE(r, rtt_link);
 			TAILQ_REMOVE(&rtq->rtq_head, r, rtt_next);
 			RTTIMER_CALLOUT(r);
