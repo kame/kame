@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/11/05 09:18:45 $
+			$Date: 1999/11/20 20:47:49 $
 
 1. IPv6
 
@@ -702,6 +702,9 @@ tools may not work correctly (routing daemons are typical example).
 In the following sections, "official support" means that KAME developers
 are using that ethernet card/driver frequently.
 
+(NOTE: In the past we required all pcmcia drivers to have a call to
+in6_ifattach().  We have no such requirement any more)
+
 2.1 FreeBSD 2.2.x-RELEASE
 
 Here is a list of FreeBSD 2.2.x-RELEASE drivers and its conditions:
@@ -739,9 +742,9 @@ then up, the kernel may hang up.  We have disabled frame-relay support from
 sr driver and after that this looks to be working fine.  If you need
 frame-relay support to come back, please contact KAME developers.
 
-2.2 BSD/OS
+2.2 BSD/OS 3.x
 
-The following lists BSD/OS device drivers and its conditions:
+The following lists BSD/OS 3.x device drivers and its conditions:
 
 	driver	mbuf(1)		multicast(2)	official
 						support?
@@ -771,7 +774,6 @@ You may want to use "@insert" directive in /etc/pccard.conf to invoke
 2.3 NetBSD
 
 The following table lists the network drivers we have tried so far.
-Note that, for NetBSD, we do not need one-liner patch to PCMCIA driver.
 
 	driver		mbuf(1)	multicast(2)	official
 						support?
@@ -806,6 +808,18 @@ Here is a list of FreeBSD 3.x-RELEASE drivers and its conditions:
 
 More drivers will just simply work on KAME FreeBSD 3.x-RELEASE but have not
 been checked yet.
+
+2.5 OpenBSD 2.x
+
+Here is a list of OpenBSD 2.x drivers and its conditions:
+
+	driver		mbuf(1)		multicast(2)	official
+							support?
+	---		---		---		---
+	(Ethernet)
+	ne pci/i386	ok		ok		yes
+	ne pcmcia/i386	ok		ok		yes
+	le sbus/sparc	ok		ok		yes
 
 3. Translator
 
