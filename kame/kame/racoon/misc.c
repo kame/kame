@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: misc.c,v 1.5 1999/09/01 05:39:39 sakane Exp $ */
+/* YIPS @(#)$Id: misc.c,v 1.6 1999/09/02 21:05:12 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -683,7 +683,7 @@ setsockopt_bypass(so, family)
 	}
 	if (setsockopt(so, level,
 	               (level == IPPROTO_IP ?
-	                         IP_IPSEC_POLICY_IN : IPV6_IPSEC_POLICY_IN),
+	                         IP_IPSEC_POLICY : IPV6_IPSEC_POLICY),
 	               buf, len) < 0) {
 		plog(LOCATION, "setsockopt (%s)\n",
 			strerror(errno));
@@ -697,7 +697,7 @@ setsockopt_bypass(so, family)
 	}
 	if (setsockopt(so, level,
 	               (level == IPPROTO_IP ?
-	                         IP_IPSEC_POLICY_OUT : IPV6_IPSEC_POLICY_OUT),
+	                         IP_IPSEC_POLICY : IPV6_IPSEC_POLICY),
 	               buf, len) < 0) {
 		plog(LOCATION, "setsockopt (%s)\n",
 			strerror(errno));

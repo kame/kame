@@ -24,7 +24,7 @@ static const char copyright[] =
     "@(#) Copyright (c) 1988, 1989, 1991, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n";
 static const char rcsid[] =
-    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.2 1999/09/01 05:36:01 sakane Exp $ (LBL)";
+    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.3 1999/09/02 21:05:13 sakane Exp $ (LBL)";
 #endif
 
 /*
@@ -581,7 +581,7 @@ main(int argc, char **argv)
 		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
 		exit(1);
 	}
-	if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_IN, buf, len) < 0) {
+	if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY, buf, len) < 0) {
 		Fprintf(stderr, "%s: setsockopt(IP_IPSEC_POLICY 1): %s\n", prog, strerror(errno));
 		exit(1);
 	}
@@ -589,7 +589,7 @@ main(int argc, char **argv)
 		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
 		exit(1);
 	}
-	if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_OUT, buf, len) < 0) {
+	if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY, buf, len) < 0) {
 		Fprintf(stderr, "%s: setsockopt(IP_IPSEC_POLICY 1): %s\n", prog, strerror(errno));
 		exit(1);
 	}
@@ -704,7 +704,7 @@ main(int argc, char **argv)
 		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
 		exit(1);
 	}
-	if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_IN, buf, len) < 0) {
+	if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY, buf, len) < 0) {
 		Fprintf(stderr, "%s: setsockopt(IP_IPSEC_POLICY 2): %s\n", prog, strerror(errno));
 		exit(1);
 	}
@@ -712,7 +712,7 @@ main(int argc, char **argv)
 		Fprintf(stderr, "%s: %s\n", prog, ipsec_strerror());
 		exit(1);
 	}
-	if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_OUT, buf, len) < 0) {
+	if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY, buf, len) < 0) {
 		Fprintf(stderr, "%s: setsockopt(IP_IPSEC_POLICY 2): %s\n", prog, strerror(errno));
 		exit(1);
 	}

@@ -472,7 +472,7 @@ main(argc, argv)
 				err(1, "malloc");
 			if ((len = ipsec_set_policy(buf, len, policy_in)) < 0)
 				errx(1, ipsec_strerror());
-			if (setsockopt(s, IPPROTO_IPV6, IPV6_IPSEC_POLICY_IN,
+			if (setsockopt(s, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
 					buf, len) < 0)
 				warnx("Unable to set IPSec policy");
 			free(buf);
@@ -484,7 +484,7 @@ main(argc, argv)
 				err(1, "malloc");
 			if ((len = ipsec_set_policy(buf, len, policy_out)) < 0)
 				errx(1, ipsec_strerror());
-			if (setsockopt(s, IPPROTO_IPV6, IPV6_IPSEC_POLICY_OUT,
+			if (setsockopt(s, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
 					buf, len) < 0)
 				warnx("Unable to set IPSec policy");
 			free(buf);
