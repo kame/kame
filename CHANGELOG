@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.140 1999/09/27 03:29:22 sumikawa Exp $
+$Id: CHANGELOG,v 1.141 1999/09/27 13:25:52 itojun Exp $
 
 <199909>
+Mon Sep 27 22:25:00 JST 1999  itojun@iijlab.net
+	* kame/{libpcap,tcpdump}: support OpenBSD.
+
 Mon Sep 27 12:28:13 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/ethereal: upgrade to 0.7.5.
 
