@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: session.c,v 1.1 1999/08/08 23:31:25 itojun Exp $ */
+/* YIPS @(#)$Id: session.c,v 1.2 1999/10/20 15:06:09 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -87,7 +87,6 @@ int session(void)
 	FD_SET(rtsock, &mask0);
 	nfds = (nfds > rtsock ? nfds : rtsock);
 
-	nfds = (sock_admin > sock_pfkey ? sock_admin : sock_pfkey);
 	for (p = myaddrs; p; p = p->next) {
 		if (!p->addr)
 			continue;
