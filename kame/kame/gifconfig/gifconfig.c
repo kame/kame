@@ -1,4 +1,4 @@
-/*	$KAME: gifconfig.c,v 1.10 2000/05/22 02:53:21 itojun Exp $	*/
+/*	$KAME: gifconfig.c,v 1.11 2000/05/22 03:01:43 itojun Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -566,17 +566,28 @@ phys_status(force)
 	int flags = NI_NUMERICHOST;
 	struct ifreq *ifrp;
 	char *ver = "";
+#ifdef INET6
+	int s6;
+#endif
 
 	force = 0;	/*fool gcc*/
 
 	psrcaddr[0] = pdstaddr[0] = '\0';
 
 #ifdef INET6
-	srccmd = SIOCGIFPSRCADDR_IN6;
-	dstcmd = SIOCGIFPDSTADDR_IN6;
-	ifrp = (struct ifreq *)&in6_ifr;
+	s6 = socket(AF_INET6, SOCK_DGRAM, 0);
+	if (s6 < 0) {
+		ifrp = &ifr;
+		srccmd = SIOCGIFPSRCADDR;
+		dstcmd = SIOCGIFPDSTADDR;
+	} else {
+		close(s6);
+		srccmd = SIOCGIFPSRCADDR_IN6;
+		dstcmd = SIOCGIFPDSTADDR_IN6;
+		ifrp = (struct ifreq *)&in6_ifr;
+	}
 #else /* INET6 */
-	ifrp = ifr;
+	ifrp = &ifr;
 	srccmd = SIOCGIFPSRCADDR;
 	dstcmd = SIOCGIFPDSTADDR;
 #endif /* INET6 */
