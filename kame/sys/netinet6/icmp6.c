@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.296 2002/04/08 14:15:03 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.297 2002/04/09 12:17:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -671,6 +671,17 @@ icmp6_input(mp, offp, proto)
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_pkttoobig);
 		if (code != 0)
 			goto badcode;
+
+		/*
+		 * RFC 1981 says that we may receive a Too Big message
+		 * reporting a next-hop MTU that is less than the minimum MTU,
+		 * but this can only happen when using an SIIT style
+		 * translation.
+		 * Since we do not support SIIT, it should be better to ignore
+		 * those messages.
+		 */
+		if (ntohl(icmp6->icmp6_mtu) < IPV6_MMTU)
+			break;	/* or just drop it? */
 
 		code = PRC_MSGSIZE;
 
@@ -1381,16 +1392,13 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 #endif
 
 	/*
-	 * RFC 1981 says that we may receive a Too Big message reporting a
-	 * next-hop MTU that is less than the minimum MTU, but the behavior
-	 * which should be taken in that case is not very clear.
-	 * We can perhaps discard such a message, but we dare to reduce the
-	 * MTU to the minimum MTU; using a too small MTU reduces performance,
-	 * whereas using a too large MTU causes reachability problem.
-	 * The former should be better.
+	 * Ignore MTU less than the minimum link MTU.  See comments in
+	 * icmp6_input().  Although the function drops such a case from the
+	 * wire, we may also fall into the situation if we're called from
+	 * ip6_output() via pfctlinput2(), perhaps due to an internal bug.
 	 */
 	if (mtu < IPV6_MMTU)
-		mtu = IPV6_MMTU;
+		return;
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	/*
@@ -1444,7 +1452,6 @@ icmp6_mtudisc_update(ip6cp, dst, validated)
 
 	if (rt && (rt->rt_flags & RTF_HOST) &&
 	    !(rt->rt_rmx.rmx_locks & RTV_MTU) &&
-	    mtu >= IPV6_MMTU &&	/* this is actually ensured already */
 	    mtu < rt->rt_rmx.rmx_mtu) {
 		if (mtu < nd_ifinfo[rt->rt_ifp->if_index].linkmtu) {
 			icmp6stat.icp6s_pmtuchg++;
