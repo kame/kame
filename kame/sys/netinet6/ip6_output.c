@@ -197,6 +197,9 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	struct route_in6 *ro_pmtu = NULL;
 	int hdrsplit = 0;
 	int needipsec = 0;
+#if defined(__bsdi__) && _BSDI_VERSION < 199802
+	struct ifnet *loifp = &loif;
+#endif
 #ifdef IPSEC
 	int needipsectun = 0;
 	struct socket *so;
@@ -207,9 +210,6 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	m->m_pkthdr.rcvif = NULL;
 	ip6 = mtod(m, struct ip6_hdr *);
 #endif /* IPSEC */
-#if defined(__bsdi__) && _BSDI_VERSION < 199802
-	struct ifnet *loifp = &loif;
-#endif
 
 #define MAKE_EXTHDR(hp,mp)						\
     {									\
