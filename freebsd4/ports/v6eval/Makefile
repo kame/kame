@@ -2,11 +2,11 @@
 # Date created:		26 Mar 1999 23:00 JST
 # Whom:			TANAKA Takashi <tanaka@tahi.org>
 #
-# $KAME: Makefile,v 1.1 2000/08/21 17:35:45 sumikawa Exp $
+# $KAME: Makefile,v 1.2 2000/12/01 11:14:26 sumikawa Exp $
 #
 
 PORTNAME=	v6eval
-PORTVERSION=	1.1
+PORTVERSION=	1.2
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.tahi.org/pub/TAHI/v6eval/
 # you might need debugging, it's a developer release !
@@ -23,6 +23,6 @@ USE_PERL5=	yes
 PERLLIBDIR=	${PREFIX}/lib/perl5/site_perl/${PERL_VER}
 
 post-install:
-	@${SED} -e 's#/usr/local#${PREFIX}#' ${PKGDIR}/MESSAGE
+	@${SED} -e 's#/usr/local#${PREFIX}#' ${PKGMESSAGE}
 
 .include <bsd.port.mk>
