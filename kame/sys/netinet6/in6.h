@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.158 2005/03/18 10:23:05 suz Exp $	*/
+/*	$KAME: in6.h,v 1.159 2005/03/19 07:28:59 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -801,7 +801,7 @@ struct ip6_mtuinfo {
 	{ "use_defaultzone", CTLTYPE_INT }, \
 	{ "maxfrags", CTLTYPE_INT }, \
 	{ "ifq", CTLTYPE_NODE }, \
-	( "mcast_pmtu", CTLTYPE_INT }, \
+	{ "mcast_pmtu", CTLTYPE_INT }, \
 }
 #endif /* !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
 
