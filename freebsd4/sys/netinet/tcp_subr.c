@@ -414,7 +414,7 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 #define xchg(a,b,type) { type t; t=a; a=b; b=t; }
 #ifdef INET6
 		if (isipv6) {
-			if (!ip6_getpktaddrs(m, &src6, &dst6)) {
+			if (ip6_getpktaddrs(m, &src6, &dst6)) {
 				m_freem(m);
 				return;
 			}
