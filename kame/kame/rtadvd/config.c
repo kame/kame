@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.31 2001/01/28 10:14:59 itojun Exp $	*/
+/*	$KAME: config.c,v 1.32 2001/02/01 09:12:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -84,6 +84,7 @@ getconfig(intface)
 	char tbuf[BUFSIZ];
 	struct rainfo *tmp;
 	long val;
+	long long val64;
 	char buf[BUFSIZ];
 	char *bp = buf;
 	char *addr;
@@ -215,13 +216,13 @@ getconfig(intface)
 	}
 	tmp->reachabletime = (u_int32_t)val;
 
-	MAYHAVE(val, "retrans", DEF_ADVRETRANSTIMER);
-	if (val < 0 || val > 0xffffffff) {
+	MAYHAVE(val64, "retrans", DEF_ADVRETRANSTIMER);
+	if (val64 < 0 || val64 > 0xffffffff) {
 		syslog(LOG_ERR,
 		       "<%s> retrans time out of range", __FUNCTION__);
 		exit(1);
 	}
-	tmp->retranstimer = (u_int32_t)val;
+	tmp->retranstimer = (u_int32_t)val64;
 
 #ifndef MIP6
 	if (agetstr("hapref", &bp) || agetstr("hatime", &bp)) {
@@ -329,14 +330,14 @@ getconfig(intface)
 #endif
 
 			makeentry(entbuf, i, "vltime", added);
-			MAYHAVE(val, entbuf, DEF_ADVVALIDLIFETIME);
-			if (val < 0 || val > 0xffffffff) {
+			MAYHAVE(val64, entbuf, DEF_ADVVALIDLIFETIME);
+			if (val64 < 0 || val64 > 0xffffffff) {
 				syslog(LOG_ERR,
 				       "<%s> vltime out of range",
 				       __FUNCTION__);
 				exit(1);
 			}
-			pfx->validlifetime = (u_int32_t)val;
+			pfx->validlifetime = (u_int32_t)val64;
 
 			makeentry(entbuf, i, "vltimedecr", added);
 			if (agetflag(entbuf)) {
@@ -347,14 +348,14 @@ getconfig(intface)
 			}
 
 			makeentry(entbuf, i, "pltime", added);
-			MAYHAVE(val, entbuf, DEF_ADVPREFERREDLIFETIME);
-			if (val < 0 || val > 0xffffffff) {
+			MAYHAVE(val64, entbuf, DEF_ADVPREFERREDLIFETIME);
+			if (val64 < 0 || val64 > 0xffffffff) {
 				syslog(LOG_ERR,
 				       "<%s> pltime out of range",
 				       __FUNCTION__);
 				exit(1);
 			}
-			pfx->preflifetime = (u_int32_t)val;
+			pfx->preflifetime = (u_int32_t)val64;
 
 			makeentry(entbuf, i, "pltimedecr", added);
 			if (agetflag(entbuf)) {
