@@ -920,7 +920,7 @@ syncache_add(inc, to, th, sop, m)
 		sc->sc_inc.inc6_fsa.sin6_family =
 			sc->sc_inc.inc6_lsa.sin6_family = AF_INET6;
 		sc->sc_inc.inc6_fsa.sin6_len = sc->sc_inc.inc6_lsa.sin6_len
-			 = sizeof(struct sockaddr_in6);
+			= sizeof(struct sockaddr_in6);
 		sa6_copy_addr(&inc->inc6_fsa, &sc->sc_inc.inc6_fsa); 
 		sa6_copy_addr(&inc->inc6_lsa, &sc->sc_inc.inc6_lsa); 
 		sc->sc_route6.ro_rt = NULL;
