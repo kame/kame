@@ -63,6 +63,7 @@ static char *ipsec_errlist[] = {
 "Must get supported algorithms list first",	/*EIPSEC_DO_GET_SUPP_LIST*/
 "Protocol mismatch",				/*EIPSEC_PROTO_MISMATCH*/
 "Family mismatch",				/*EIPSEC_FAMILY_MISMATCH*/
+"Too few arguments",				/*EIPSEC_FEW_ARGUMENTS*/
 NULL,						/*EIPSEC_SYSTEM_ERROR*/
 "Unknown error",				/*EIPSEC_MAX*/
 };

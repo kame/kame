@@ -133,11 +133,6 @@ static char *_str_alg_comp[] = {
 	"lzs",
 };
 
-static char *_str_dir[] = {
-	"outbound",
-	"inbound",
-};
-
 /*
  * dump SADB_MSG formated.  For debugging, you should use kdebug_sadb().
  */

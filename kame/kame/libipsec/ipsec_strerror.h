@@ -55,5 +55,6 @@ extern void ipsec_set_strerror(char *str);
 #define EIPSEC_DO_GET_SUPP_LIST	22	/*must get supported algorithm first*/
 #define EIPSEC_PROTO_MISMATCH	23	/*protocol mismatch*/
 #define EIPSEC_FAMILY_MISMATCH	24	/*family mismatch*/
-#define EIPSEC_SYSTEM_ERROR	25	/*system error*/
-#define EIPSEC_MAX		26	/*unknown error*/
+#define EIPSEC_FEW_ARGUMENTS	25	/*Too few arguments*/
+#define EIPSEC_SYSTEM_ERROR	26	/*system error*/
+#define EIPSEC_MAX		27	/*unknown error*/

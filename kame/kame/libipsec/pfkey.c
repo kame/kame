@@ -28,7 +28,7 @@
  */
 
 #ifndef lint
-static char *rcsid = "@(#) pfkey.c $Revision: 1.6 $";
+static char *rcsid = "@(#) pfkey.c $Revision: 1.7 $";
 #endif
 
 #include <sys/types.h>
@@ -444,7 +444,7 @@ pfkey_recv_register(so)
 	    || newmsg->sadb_msg_pid != pid);
 
 	/* check and fix */
-	newmsg->sadb_msg_len = PFKEY_UNUNIT64(newmsg->sadb_msg_len);
+	newmsg->sadb_msg_len = PFKEY_EXTLEN(newmsg);
 
 	tlen = newmsg->sadb_msg_len - sizeof(struct sadb_msg);
 	p = (caddr_t)newmsg + sizeof(struct sadb_msg);
@@ -454,7 +454,7 @@ pfkey_recv_register(so)
 		case SADB_EXT_SUPPORTED_AUTH:
 		case SADB_EXT_SUPPORTED_ENCRYPT:
 			sup->sadb_supported_len =
-				PFKEY_UNUNIT64(sup->sadb_supported_len);
+				PFKEY_EXTLEN(sup);
 			break;
 		default:
 			ipsec_errcode = EIPSEC_INVAL_SATYPE;
@@ -1015,7 +1015,7 @@ pfkey_recv(so)
 	}
 
 	/* read real message */
-	reallen = PFKEY_UNUNIT64(buf.sadb_msg_len);
+	reallen = PFKEY_EXTLEN(&buf);
 	if ((newmsg = CALLOC(reallen, struct sadb_msg *)) == 0) {
 		ipsec_set_strerror(strerror(errno));
 		return NULL;
@@ -1092,7 +1092,7 @@ pfkey_align(msg, mhp)
 
 	mhp[0] = (caddr_t)msg;
 
-	tlen = PFKEY_UNUNIT64(msg->sadb_msg_len) - sizeof(struct sadb_msg);
+	tlen = PFKEY_EXTLEN(msg) - sizeof(struct sadb_msg);
 	ext = (struct sadb_ext *)((caddr_t)msg + sizeof(struct sadb_msg));
 
 	while (tlen > 0) {
@@ -1131,7 +1131,7 @@ pfkey_align(msg, mhp)
 			return -1;
 		}
 
-		extlen = PFKEY_UNUNIT64(ext->sadb_ext_len);
+		extlen = PFKEY_EXTLEN(ext);
 		tlen -= extlen;
 		ext = (struct sadb_ext *)((caddr_t)ext + extlen);
 	}
