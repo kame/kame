@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.142 2001/11/09 07:04:14 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.143 2001/11/09 07:35:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -301,7 +301,7 @@ main(argc, argv)
 	fd_set *fdmaskp;
 	int fdmasks;
 	int cc, i;
-	int ch, fromlen, hold, packlen, preload, optval, ret_ga;
+	int ch, hold, packlen, preload, optval, ret_ga;
 	u_char *datap, *packet;
 	char *e, *target, *ifname = NULL;
 	int ip6optlen = 0;
@@ -1069,7 +1069,6 @@ main(argc, argv)
 		} else if (cc == 0)
 			continue;
 
-		fromlen = sizeof(from);
 		m.msg_name = (caddr_t)&from;
 		m.msg_namelen = sizeof(from);
 		memset(&iov, 0, sizeof(iov));
