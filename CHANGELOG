@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2382 2003/04/11 13:12:22 jinmei Exp $
+$KAME: CHANGELOG,v 1.2383 2003/04/11 13:41:37 jinmei Exp $
 
 <200304>
+2003-04-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtsold/rtsold.c (main): corrected over-killing
+	pid-file generation.
+
 2003-04-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6c: added the -p pid-file option.
 
