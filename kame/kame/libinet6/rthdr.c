@@ -66,7 +66,9 @@ inet6_rthdr_init(bp, type)
     int type;
 {
     register struct cmsghdr *ch = (struct cmsghdr *)bp;
-    register struct ip6_rthdr *rthdr = (struct ip6_rthdr *)(ch + 1);
+    register struct ip6_rthdr *rthdr;
+
+    rthdr = (struct ip6_rthdr *)CMSG_DATA(ch);
 
     ch->cmsg_level = IPPROTO_IPV6;
     ch->cmsg_type = IPV6_RTHDR;
@@ -97,7 +99,9 @@ inet6_rthdr_add(cmsg, addr, flags)
     const struct in6_addr *addr;
     u_int flags;
 {
-    register struct ip6_rthdr *rthdr = (struct ip6_rthdr *)(cmsg + 1);
+    register struct ip6_rthdr *rthdr;
+
+    rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
 
     switch(rthdr->ip6r_type) {
      case IPV6_RTHDR_TYPE_0:
@@ -148,7 +152,9 @@ inet6_rthdr_lasthop(cmsg, flags)
     struct cmsghdr *cmsg;
     unsigned int flags;
 {
-    register struct ip6_rthdr *rthdr = (struct ip6_rthdr *)(cmsg + 1);
+    register struct ip6_rthdr *rthdr;
+
+    rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
 
     switch(rthdr->ip6r_type) {
      case IPV6_RTHDR_TYPE_0:
@@ -206,7 +212,9 @@ int
 inet6_rthdr_segments(cmsg)
     const struct cmsghdr *cmsg;
 {
-    register struct ip6_rthdr *rthdr = (struct ip6_rthdr *)(cmsg + 1);
+    register struct ip6_rthdr *rthdr;
+
+    rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
 
     switch(rthdr->ip6r_type) {
     case IPV6_RTHDR_TYPE_0:
@@ -238,7 +246,9 @@ inet6_rthdr_getaddr(cmsg, index)
     struct cmsghdr *cmsg;
     int index;
 {
-    register struct ip6_rthdr *rthdr = (struct ip6_rthdr *)(cmsg + 1);
+    register struct ip6_rthdr *rthdr;
+
+    rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
 
     switch(rthdr->ip6r_type) {
     case IPV6_RTHDR_TYPE_0:
@@ -277,7 +287,9 @@ inet6_rthdr_getflags(cmsg, index)
     const struct cmsghdr *cmsg;
     int index;
 {
-    register struct ip6_rthdr *rthdr = (struct ip6_rthdr *)(cmsg + 1);
+    register struct ip6_rthdr *rthdr;
+
+    rthdr = (struct ip6_rthdr *)CMSG_DATA(cmsg);
 
     switch(rthdr->ip6r_type) {
     case IPV6_RTHDR_TYPE_0:
