@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1979 2001/11/13 16:00:13 jinmei Exp $
+$KAME: CHANGELOG,v 1.1980 2001/11/14 14:50:48 jinmei Exp $
 
 <200111>
+2001-11-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/raw_ip6.c (rip6_usrreq):
+	* freebsd4/sys/netinet6/raw_ip6.c (rip6_send):
+	allow (with warning messages) an unspecified address family for
+	the destination address to provide backward compatibility to
+	buggy(!) applications.
+	We may change our mind later on this.
+
 2001-11-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/(many files): removed all references to
 	NI_WITHSCOPEID.
