@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.133 2001/11/26 05:11:14 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.134 2001/12/03 09:08:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2063,7 +2063,7 @@ ipsec_hdrsiz(sp)
 	size_t siz, clen;
 
 	KEYDEBUG(KEYDEBUG_IPSEC_DATA,
-		printf("ipsec_in_reject: using SP\n");
+		printf("ipsec_hdrsiz: using SP\n");
 		kdebug_secpolicy(sp));
 
 	/* check policy */
