@@ -1,4 +1,4 @@
-/*	$NetBSD: ns_ip.c,v 1.29 2001/11/13 01:08:11 lukem Exp $	*/
+/*	$NetBSD: ns_ip.c,v 1.37 2003/11/14 15:04:48 itojun Exp $	*/
 
 /*
  * Copyright (c) 1984, 1985, 1986, 1987, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -40,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ns_ip.c,v 1.29 2001/11/13 01:08:11 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ns_ip.c,v 1.37 2003/11/14 15:04:48 itojun Exp $");
 
 #include "opt_ns.h"		/* options NSIP, needed by ns_if.h */
 
@@ -239,8 +235,8 @@ idpip_input(va_alist)
 	idp = mtod(m, struct idp *);
 	len = ntohs(idp->idp_len);
 	if (len & 1) len++;		/* Preserve Garbage Byte */
-	if (ip->ip_len != len) {
-		if (len > ip->ip_len) {
+	if (ntohs(ip->ip_len) - (ip->ip_hl << 2) != len) {
+		if (len > ntohs(ip->ip_len) - (ip->ip_hl << 2)) {
 			nsipif.if_ierrors++;
 			if (nsip_badlen) m_freem(nsip_badlen);
 			nsip_badlen = m;
@@ -309,6 +305,7 @@ nsipoutput(ifp, m, dst, rt)
 		m0->m_next = m;
 		m0->m_len = sizeof (struct ip);
 		m0->m_pkthdr.len = m0->m_len + m->m_len;
+		m_tag_delete_chain(m, NULL);
 		m->m_flags &= ~M_PKTHDR;
 	} else {
 		M_PREPEND(m, sizeof (struct ip), M_DONTWAIT);
@@ -323,13 +320,18 @@ nsipoutput(ifp, m, dst, rt)
 	ip->ip_p = IPPROTO_IDP;
 	ip->ip_src = ifn->ifen_src;
 	ip->ip_dst = ifn->ifen_dst;
-	ip->ip_len = (u_int16_t)len + sizeof (struct ip);
+	if (len + sizeof (struct ip) > IP_MAXPACKET) {
+		m_freem(m);
+		return (EMSGSIZE);
+	}
+	ip->ip_len = htons(len + sizeof (struct ip));
 	ip->ip_ttl = MAXTTL;
 
 	/*
 	 * Output final datagram.
 	 */
-	error =  (ip_output(m, (struct mbuf *)0, ro, SO_BROADCAST, NULL));
+	error = ip_output(m, (struct mbuf *)0, ro, SO_BROADCAST,
+	    (struct ip_moptions *)NULL, (struct socket *)NULL);
 	if (error) {
 		ifn->ifen_ifnet.if_oerrors++;
 		ifn->ifen_ifnet.if_ierrors = error;
@@ -341,7 +343,7 @@ void
 nsipstart(ifp)
 	struct ifnet *ifp;
 {
-	panic("nsip_start called\n");
+	panic("nsip_start called");
 }
 
 struct ifreq ifr = {"nsip0"};		/* XXX */
@@ -380,12 +382,12 @@ nsip_route(m)
 		struct in_ifaddr *ia;
 		struct ifnet *ifp = ro.ro_rt->rt_ifp;
 
-		for (ia = in_ifaddr.tqh_first; ia != 0;
+		for (ia = in_ifaddrhead.tqh_first; ia != 0;
 		    ia = ia->ia_list.tqe_next)
 			if (ia->ia_ifp == ifp)
 				break;
 		if (ia == 0)
-			ia = in_ifaddr.tqh_first;
+			ia = in_ifaddrhead.tqh_first;
 		if (ia == 0) {
 			RTFREE(ro.ro_rt);
 			return (EADDRNOTAVAIL);

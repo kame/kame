@@ -1,4 +1,4 @@
-/*	$NetBSD: dlt.h,v 1.3 2001/09/10 23:11:06 bjh21 Exp $	*/
+/*	$NetBSD: dlt.h,v 1.7 2003/11/16 09:02:42 dyoung Exp $	*/
 
 /*
  * Copyright (c) 1990, 1991, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -70,9 +66,13 @@
 
 /* NetBSD-specific types */
 #define	DLT_PPP_SERIAL	50	/* PPP over serial (async and sync) */
-#define	DLT_PPP_ETHER	51	/* XXX - depreceated! PPP over Ethernet; session only, w/o ether header */
+#define	DLT_PPP_ETHER	51	/* XXX - deprecated! PPP over Ethernet; session only, w/o ether header */
 
-#define DLT_ECONET	115	/* Acorn Econet */
+#define DLT_IEEE802_11		105	/* IEEE 802.11 wireless */
+#define DLT_ECONET		115	/* Acorn Econet */
+#define DLT_PRISM_HEADER	119	/* 802.11 header plus Prism II info. */
+#define DLT_AIRONET_HEADER 	120	/* 802.11 header plus Aironet info. */
+#define DLT_IEEE802_11_RADIO 	127	/* 802.11 header plus radio info. */
 
 /*
  * NetBSD-specific generic "raw" link type.  The upper 16-bits indicate

@@ -1928,17 +1928,9 @@ struct mbuf *m0, **mpp;
 fr_info_t *fin;
 frdest_t *fdp;
 {
-#ifdef NEW_STRUCT_ROUTE
-	struct route ip6route;
-#else
 	struct route_in6 ip6route;
-#endif
 	struct sockaddr_in6 *dst6;
-#ifdef NEW_STRUCT_ROUTE
-	struct route *ro;
-#else
 	struct route_in6 *ro;
-#endif
 	struct ifnet *ifp;
 	frentry_t *fr;
 	int error;

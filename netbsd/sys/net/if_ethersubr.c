@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ethersubr.c,v 1.95.2.5 2003/06/30 03:17:56 grant Exp $	*/
+/*	$NetBSD: if_ethersubr.c,v 1.114.2.2 2004/07/14 11:08:01 tron Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,11 +41,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -65,13 +61,15 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ethersubr.c,v 1.95.2.5 2003/06/30 03:17:56 grant Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ethersubr.c,v 1.114.2.2 2004/07/14 11:08:01 tron Exp $");
 
 #include "opt_inet.h"
 #include "opt_atalk.h"
 #include "opt_ccitt.h"
 #include "opt_llc.h"
 #include "opt_iso.h"
+#include "opt_ipx.h"
+#include "opt_mbuftrace.h"
 #include "opt_ns.h"
 #include "opt_gateway.h"
 #include "opt_pfil_hooks.h"
@@ -106,7 +104,7 @@ __KERNEL_RCSID(0, "$NetBSD: if_ethersubr.c,v 1.95.2.5 2003/06/30 03:17:56 grant 
 /*
  * XXX there should really be a way to issue this warning from within config(8)
  */
-#error You have included a pseudo-device in your configuration that depends on the presence of ethernet interfaces, but have no such interfaces configured. Check if you really need pseudo-device bridge, ppppoe or vlan.
+#error You have included NETATALK or a pseudo-device in your configuration that depends on the presence of ethernet interfaces, but have no such interfaces configured. Check if you really need pseudo-device bridge, pppoe, vlan or options NETATALK.
 #endif
 
 #if NBPFILTER > 0 
@@ -212,6 +210,9 @@ ether_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,
 #endif /* NETATALK */
 	short mflags;
 
+#ifdef MBUFTRACE
+	m_claimm(m, ifp->if_mowner);
+#endif
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
 	if ((rt = rt0) != NULL) {
@@ -243,7 +244,7 @@ ether_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,
 		}
 		if (rt->rt_flags & RTF_REJECT)
 			if (rt->rt_rmx.rmx_expire == 0 ||
-			    time.tv_sec < rt->rt_rmx.rmx_expire)
+			    (u_long) time.tv_sec < rt->rt_rmx.rmx_expire)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
 
@@ -278,7 +279,7 @@ ether_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,
 		
 		ah->ar_hrd = htons(ARPHRD_ETHER);
 
-		switch(ntohs(ah->ar_op)) {
+		switch (ntohs(ah->ar_op)) {
 		case ARPOP_REVREQUEST:
 		case ARPOP_REVREPLY:
 			etype = htons(ETHERTYPE_REVARP);
@@ -296,7 +297,7 @@ ether_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,
 	case AF_INET6:
 		if (!nd6_storelladdr(ifp, rt, m, dst, (u_char *)edst)){
 			/* something bad happened */
-			return(0);
+			return (0);
 		}
 		etype = htons(ETHERTYPE_IPV6);
 		break;
@@ -661,7 +662,6 @@ ether_input(struct ifnet *ifp, struct mbuf *m)
 	u_int16_t etype;
 	int s;
 	struct ether_header *eh;
-	struct m_tag *mtag;
 #if defined (ISO) || defined (LLC) || defined(NETATALK)
 	struct llc *l;
 #endif
@@ -671,6 +671,9 @@ ether_input(struct ifnet *ifp, struct mbuf *m)
 		return;
 	}
 
+#ifdef MBUFTRACE
+	m_claimm(m, &ec->ec_rx_mowner);
+#endif
 	eh = mtod(m, struct ether_header *);
 	etype = ntohs(eh->ether_type);
 
@@ -775,8 +778,7 @@ ether_input(struct ifnet *ifp, struct mbuf *m)
 	 * see if the device performed the decapsulation and
 	 * provided us with the tag.
 	 */
-	if (ec->ec_nvlans &&
-	    (mtag = m_tag_find(m, PACKET_TAG_VLAN, NULL)) != NULL) {
+	if (ec->ec_nvlans && m_tag_find(m, PACKET_TAG_VLAN, NULL) != NULL) {
 #if NVLAN > 0
 		/*
 		 * vlan_input() will either recursively call ether_input()
@@ -832,7 +834,7 @@ ether_input(struct ifnet *ifp, struct mbuf *m)
 			IF_ENQUEUE(inq, m);
 		splx(s);
 #ifndef __HAVE_GENERIC_SOFT_INTERRUPTS
-		if (!callout_active(&pppoe_softintr))
+		if (!callout_pending(&pppoe_softintr))
 			callout_reset(&pppoe_softintr, 1, pppoe_softintr_handler, NULL);
 #else
 		softintr_schedule(pppoe_softintr);
@@ -1079,6 +1081,7 @@ ether_sprintf(const u_char *ap)
 void
 ether_ifattach(struct ifnet *ifp, const u_int8_t *lla)
 {
+	struct ethercom *ec = (struct ethercom *)ifp;
 
 	ifp->if_type = IFT_ETHER;
 	ifp->if_addrlen = ETHER_ADDR_LEN;
@@ -1093,10 +1096,23 @@ ether_ifattach(struct ifnet *ifp, const u_int8_t *lla)
 	if_alloc_sadl(ifp);
 	memcpy(LLADDR(ifp->if_sadl), lla, ifp->if_addrlen);
 
-	LIST_INIT(&((struct ethercom *)ifp)->ec_multiaddrs);
+	LIST_INIT(&ec->ec_multiaddrs);
 	ifp->if_broadcastaddr = etherbroadcastaddr;
 #if NBPFILTER > 0
 	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
+#endif
+#ifdef MBUFTRACE
+	strlcpy(ec->ec_tx_mowner.mo_name, ifp->if_xname,
+	    sizeof(ec->ec_tx_mowner.mo_name));
+	strlcpy(ec->ec_tx_mowner.mo_descr, "tx",
+	    sizeof(ec->ec_tx_mowner.mo_descr));
+	strlcpy(ec->ec_rx_mowner.mo_name, ifp->if_xname,
+	    sizeof(ec->ec_rx_mowner.mo_name));
+	strlcpy(ec->ec_rx_mowner.mo_descr, "rx",
+	    sizeof(ec->ec_rx_mowner.mo_descr));
+	MOWNER_ATTACH(&ec->ec_tx_mowner);
+	MOWNER_ATTACH(&ec->ec_rx_mowner);
+	ifp->if_mowner = &ec->ec_tx_mowner;
 #endif
 }
 
@@ -1106,6 +1122,11 @@ ether_ifdetach(struct ifnet *ifp)
 	struct ethercom *ec = (void *) ifp;
 	struct ether_multi *enm;
 	int s;
+
+#if NBRIDGE > 0
+	if (ifp->if_bridge)
+		bridge_ifdetach(ifp);
+#endif
 
 #if NBPFILTER > 0
 	bpfdetach(ifp);
@@ -1119,7 +1140,7 @@ ether_ifdetach(struct ifnet *ifp)
 	s = splnet();
 	while ((enm = LIST_FIRST(&ec->ec_multiaddrs)) != NULL) {
 		LIST_REMOVE(enm, enm_list);
-		free(enm, M_IFADDR);
+		free(enm, M_IFMADDR);
 		ec->ec_multicnt--;
 	}
 	splx(s);
@@ -1127,6 +1148,9 @@ ether_ifdetach(struct ifnet *ifp)
 #if 0	/* done in if_detach() */
 	if_free_sadl(ifp);
 #endif
+
+	MOWNER_DETACH(&ec->ec_rx_mowner);
+	MOWNER_DETACH(&ec->ec_tx_mowner);
 }
 
 #if 0
@@ -1167,7 +1191,7 @@ ether_crc32_le(const u_int8_t *buf, size_t len)
 		0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
 	};
 	u_int32_t crc;
-	int i;
+	size_t i;
 
 	crc = 0xffffffffU;	/* initial value */
 

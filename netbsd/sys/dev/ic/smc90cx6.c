@@ -1,4 +1,4 @@
-/*	$NetBSD: smc90cx6.c,v 1.39 2001/11/13 13:14:44 lukem Exp $ */
+/*	$NetBSD: smc90cx6.c,v 1.41 2003/11/02 11:07:46 wiz Exp $ */
 
 /*-
  * Copyright (c) 1994, 1995, 1998 The NetBSD Foundation, Inc.
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: smc90cx6.c,v 1.39 2001/11/13 13:14:44 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: smc90cx6.c,v 1.41 2003/11/02 11:07:46 wiz Exp $");
 
 /* #define BAHSOFTCOPY */
 #define BAHRETRANSMIT /**/
@@ -350,7 +350,7 @@ bah_stop(sc)
 /*
  * Start output on interface. Get another datagram to send
  * off the interface queue, and copy it to the
- * interface becore starting the output
+ * interface before starting the output
  *
  * this assumes that it is called inside a critical section...
  * XXX hm... does it still?
@@ -644,7 +644,7 @@ cleanup:
 		sc->sc_rx_act = buffer;
 		sc->sc_intmask |= BAH_RI;
 
-		/* this also clears the RI flag interupt: */
+		/* this also clears the RI flag interrupt: */
 		PUTREG(BAHCMD, BAH_RXBC(buffer));
 		PUTREG(BAHSTAT, sc->sc_intmask);
 
@@ -677,7 +677,7 @@ bah_tint(sc, isr)
 
 	/*
 	 * retransmit code:  
-	 * Normal situtations first for fast path:
+	 * Normal situations first for fast path:
 	 * If acknowledgement received ok or broadcast, we're ok.
 	 * else if 
 	 */ 
@@ -834,7 +834,7 @@ bahintr(arg)
 				 * configured sender)
 				 */
 				log(LOG_WARNING, 
-				    "%s: spurious RX interupt or sender 0 "
+				    "%s: spurious RX interrupt or sender 0 "
 				    " (ignored)\n", sc->sc_dev.dv_xname);
 				/*
 				 * restart receiver on same buffer.
@@ -852,7 +852,7 @@ bahintr(arg)
 					/*
 					 * Start receiver on other receive
 					 * buffer. This also clears the RI
-					 * interupt flag.
+					 * interrupt flag.
 					 */
 					PUTREG(BAHCMD, BAH_RXBC(buffer));
 					/* in RX intr, so mask is ok for RX */

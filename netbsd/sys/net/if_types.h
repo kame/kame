@@ -1,4 +1,4 @@
-/*	$NetBSD: if_types.h,v 1.19 2001/11/07 12:14:17 bjh21 Exp $	*/
+/*	$NetBSD: if_types.h,v 1.22 2003/08/07 16:32:55 agc Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993, 1994
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -252,6 +248,14 @@
 #define IFT_SIPSIG		   0xcc /* SIP Signaling */
 #define IFT_DOCSCABLEUPSTREAMCHANNEL 0xcd /* CATV Upstream Channel */
 #define IFT_ECONET		   0xce /* Acorn Econet */
+#define IFT_PON155		   0xcf /* FSAN 155Mb Symetrical PON interface */
+#define IFT_PON622		   0xd0 /* FSAN 622Mb Symetrical PON interface */*/
+#define IFT_BRIDGE		   0xd1 /* Transparent bridge interface */
+#define IFT_LINEGROUP		   0xd2 /* Interface common to multiple lines */
+#define IFT_VOICEEMFGD		   0xd3 /* voice E&M Feature Group D */
+#define IFT_VOICEFGDEANA	   0xd4 /* voice FGD Exchange Access North American */
+#define IFT_VOICEDID		   0xd5 /* voice Direct Inward Dialing */
+#define IFT_STF			   0xd7	/* 6to4 interface */
 
 #define IFT_IEEE1394		   0x90	/* IEEE1394 High Performance SerialBus*/
 
@@ -265,4 +269,5 @@
 #define IFT_PFLOG	0xf6
 #define IFT_PFSYNC	0xf7
 #define IFT_IST		0xf9
+
 #endif /* _NET_IF_TYPES_H_ */

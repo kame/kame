@@ -1,4 +1,4 @@
-/*	$NetBSD: smc83c170.c,v 1.49.10.1 2003/01/26 16:14:22 he Exp $	*/
+/*	$NetBSD: smc83c170.c,v 1.55 2003/11/08 16:08:13 tsutsui Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: smc83c170.c,v 1.49.10.1 2003/01/26 16:14:22 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: smc83c170.c,v 1.55 2003/11/08 16:08:13 tsutsui Exp $");
 
 #include "bpfilter.h"
 
@@ -118,7 +118,8 @@ epic_attach(sc)
 	bus_space_tag_t st = sc->sc_st;
 	bus_space_handle_t sh = sc->sc_sh;
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
-	int i, rseg, error, miiflags;
+	int rseg, error, miiflags;
+	u_int i;
 	bus_dma_segment_t seg;
 	u_int8_t enaddr[ETHER_ADDR_LEN], devname[12 + 1];
 	u_int16_t myea[ETHER_ADDR_LEN / 2], mydevname[6];
@@ -133,7 +134,8 @@ epic_attach(sc)
 	if ((error = bus_dmamem_alloc(sc->sc_dmat,
 	    sizeof(struct epic_control_data) + ETHER_PAD_LEN, PAGE_SIZE, 0,
 	    &seg, 1, &rseg, BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: unable to allocate control data, error = %d\n",
+		aprint_error(
+		    "%s: unable to allocate control data, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail_0;
 	}
@@ -142,7 +144,7 @@ epic_attach(sc)
 	    sizeof(struct epic_control_data) + ETHER_PAD_LEN,
 	    (caddr_t *)&sc->sc_control_data,
 	    BUS_DMA_NOWAIT|BUS_DMA_COHERENT)) != 0) {
-		printf("%s: unable to map control data, error = %d\n",
+		aprint_error("%s: unable to map control data, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail_1;
 	}
@@ -154,7 +156,7 @@ epic_attach(sc)
 	    sizeof(struct epic_control_data), 1,
 	    sizeof(struct epic_control_data), 0, BUS_DMA_NOWAIT,
 	    &sc->sc_cddmamap)) != 0) {
-		printf("%s: unable to create control data DMA map, "
+		aprint_error("%s: unable to create control data DMA map, "
 		    "error = %d\n", sc->sc_dev.dv_xname, error);
 		goto fail_2;
 	}
@@ -162,7 +164,8 @@ epic_attach(sc)
 	if ((error = bus_dmamap_load(sc->sc_dmat, sc->sc_cddmamap,
 	    sc->sc_control_data, sizeof(struct epic_control_data), NULL,
 	    BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: unable to load control data DMA map, error = %d\n",
+		aprint_error(
+		    "%s: unable to load control data DMA map, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail_3;
 	}
@@ -174,7 +177,7 @@ epic_attach(sc)
 		if ((error = bus_dmamap_create(sc->sc_dmat, MCLBYTES,
 		    EPIC_NFRAGS, MCLBYTES, 0, BUS_DMA_NOWAIT,
 		    &EPIC_DSTX(sc, i)->ds_dmamap)) != 0) {
-			printf("%s: unable to create tx DMA map %d, "
+			aprint_error("%s: unable to create tx DMA map %d, "
 			    "error = %d\n", sc->sc_dev.dv_xname, i, error);
 			goto fail_4;
 		}
@@ -187,7 +190,7 @@ epic_attach(sc)
 		if ((error = bus_dmamap_create(sc->sc_dmat, MCLBYTES, 1,
 		    MCLBYTES, 0, BUS_DMA_NOWAIT,
 		    &EPIC_DSRX(sc, i)->ds_dmamap)) != 0) {
-			printf("%s: unable to create rx DMA map %d, "
+			aprint_error("%s: unable to create rx DMA map %d, "
 			    "error = %d\n", sc->sc_dev.dv_xname, i, error);
 			goto fail_5;
 		}
@@ -246,7 +249,7 @@ epic_attach(sc)
 			break;
 	}
 
-	printf("%s: %s, Ethernet address %s\n", sc->sc_dev.dv_xname,
+	aprint_normal("%s: %s, Ethernet address %s\n", sc->sc_dev.dv_xname,
 	    devname, ether_sprintf(enaddr));
 
 	miiflags = 0;
@@ -260,7 +263,7 @@ epic_attach(sc)
 	sc->sc_mii.mii_readreg = epic_mii_read;
 	sc->sc_mii.mii_writereg = epic_mii_write;
 	sc->sc_mii.mii_statchg = epic_statchg;
-	ifmedia_init(&sc->sc_mii.mii_media, 0, epic_mediachange,
+	ifmedia_init(&sc->sc_mii.mii_media, IFM_IMASK, epic_mediachange,
 	    epic_mediastatus);
 	mii_attach(&sc->sc_dev, &sc->sc_mii, 0xffffffff, MII_PHY_ANY,
 	    MII_OFFSET_ANY, miiflags);
@@ -277,7 +280,7 @@ epic_attach(sc)
 			    IFM_MAKEWORD(IFM_ETHER, IFM_10_2, 0,
 					 sc->sc_serinst),
 			    0, NULL);
-		printf("%s: 10base2/BNC\n", sc->sc_dev.dv_xname);
+		aprint_normal("%s: 10base2/BNC\n", sc->sc_dev.dv_xname);
 	} else
 		sc->sc_serinst = -1;
 
@@ -307,7 +310,7 @@ epic_attach(sc)
 	 */
 	sc->sc_sdhook = shutdownhook_establish(epic_shutdown, sc);
 	if (sc->sc_sdhook == NULL)
-		printf("%s: WARNING: unable to establish shutdown hook\n",
+		aprint_error("%s: WARNING: unable to establish shutdown hook\n",
 		    sc->sc_dev.dv_xname);
 	return;
 
@@ -368,6 +371,7 @@ epic_start(ifp)
 	struct epic_fraglist *fr;
 	bus_dmamap_t dmamap;
 	int error, firsttx, nexttx, opending, seg;
+	u_int len;
 
 	/*
 	 * Remember the previous txpending and the first transmit
@@ -450,10 +454,11 @@ epic_start(ifp)
 			fr->ef_frags[seg].ef_length =
 			    dmamap->dm_segs[seg].ds_len;
 		}
-		if (m0->m_pkthdr.len < ETHER_PAD_LEN) {
+		len = m0->m_pkthdr.len;
+		if (len < ETHER_PAD_LEN) {
 			fr->ef_frags[seg].ef_addr = sc->sc_nulldma;
-			fr->ef_frags[seg].ef_length =
-			    ETHER_PAD_LEN - m0->m_pkthdr.len;
+			fr->ef_frags[seg].ef_length = ETHER_PAD_LEN - len;
+			len = ETHER_PAD_LEN;
 			seg++;
 		}
 		fr->ef_nfrags = seg;
@@ -473,7 +478,6 @@ epic_start(ifp)
 		 * Fill in the transmit descriptor.
 		 */
 		txd->et_control = ET_TXCTL_LASTDESC | ET_TXCTL_FRAGLIST;
-		txd->et_txlength = max(m0->m_pkthdr.len, ETHER_PAD_LEN);
 
 		/*
 		 * If this is the first descriptor we're enqueueing,
@@ -481,9 +485,10 @@ epic_start(ifp)
 		 * a race condition.  We'll do it below.
 		 */
 		if (nexttx == firsttx)
-			txd->et_txstatus = 0;
+			txd->et_txstatus = TXSTAT_TXLENGTH(len);
 		else
-			txd->et_txstatus = ET_TXSTAT_OWNER;
+			txd->et_txstatus =
+			    TXSTAT_TXLENGTH(len) | ET_TXSTAT_OWNER;
 
 		EPIC_CDTXSYNC(sc, nexttx,
 		    BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
@@ -526,7 +531,7 @@ epic_start(ifp)
 		 * The entire packet chain is set up.  Give the
 		 * first descriptor to the EPIC now.
 		 */
-		EPIC_CDTX(sc, firsttx)->et_txstatus = ET_TXSTAT_OWNER;
+		EPIC_CDTX(sc, firsttx)->et_txstatus |= ET_TXSTAT_OWNER;
 		EPIC_CDTXSYNC(sc, firsttx,
 		    BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
 
@@ -609,8 +614,9 @@ epic_intr(arg)
 	struct epic_txdesc *txd;
 	struct epic_descsoft *ds;
 	struct mbuf *m;
-	u_int32_t intstat;
-	int i, len, claimed = 0;
+	u_int32_t intstat, rxstatus, txstatus;
+	int i, claimed = 0;
+	u_int len;
 
  top:
 	/*
@@ -639,7 +645,8 @@ epic_intr(arg)
 			EPIC_CDRXSYNC(sc, i,
 			    BUS_DMASYNC_POSTREAD|BUS_DMASYNC_POSTWRITE);
 
-			if (rxd->er_rxstatus & ER_RXSTAT_OWNER) {
+			rxstatus = rxd->er_rxstatus;
+			if (rxstatus & ER_RXSTAT_OWNER) {
 				/*
 				 * We have processed all of the
 				 * receive buffers.
@@ -653,11 +660,11 @@ epic_intr(arg)
 			 * The buffer will be reused the next time the
 			 * descriptor comes up in the ring.
 			 */
-			if ((rxd->er_rxstatus & ER_RXSTAT_PKTINTACT) == 0) {
-				if (rxd->er_rxstatus & ER_RXSTAT_CRCERROR)
+			if ((rxstatus & ER_RXSTAT_PKTINTACT) == 0) {
+				if (rxstatus & ER_RXSTAT_CRCERROR)
 					printf("%s: CRC error\n",
 					    sc->sc_dev.dv_xname);
-				if (rxd->er_rxstatus & ER_RXSTAT_ALIGNERROR)
+				if (rxstatus & ER_RXSTAT_ALIGNERROR)
 					printf("%s: alignment error\n",
 					    sc->sc_dev.dv_xname);
 				ifp->if_ierrors++;
@@ -671,7 +678,7 @@ epic_intr(arg)
 			/*
 			 * The EPIC includes the CRC with every packet.
 			 */
-			len = rxd->er_rxlength;
+			len = RXSTAT_RXLENGTH(rxstatus);
 
 			if (len < sizeof(struct ether_header)) {
 				/*
@@ -771,7 +778,8 @@ epic_intr(arg)
 			EPIC_CDTXSYNC(sc, i,
 			    BUS_DMASYNC_POSTREAD|BUS_DMASYNC_POSTWRITE);
 
-			if (txd->et_txstatus & ET_TXSTAT_OWNER)
+			txstatus = txd->et_txstatus;
+			if (txstatus & ET_TXSTAT_OWNER)
 				break;
 
 			EPIC_CDFLSYNC(sc, i, BUS_DMASYNC_POSTWRITE);
@@ -786,13 +794,13 @@ epic_intr(arg)
 			/*
 			 * Check for errors and collisions.
 			 */
-			if ((txd->et_txstatus & ET_TXSTAT_PACKETTX) == 0)
+			if ((txstatus & ET_TXSTAT_PACKETTX) == 0)
 				ifp->if_oerrors++;
 			else
 				ifp->if_opackets++;
 			ifp->if_collisions +=
-			    TXSTAT_COLLISIONS(txd->et_txstatus);
-			if (txd->et_txstatus & ET_TXSTAT_CARSENSELOST)
+			    TXSTAT_COLLISIONS(txstatus);
+			if (txstatus & ET_TXSTAT_CARSENSELOST)
 				printf("%s: lost carrier\n",
 				    sc->sc_dev.dv_xname);
 		}
@@ -1530,7 +1538,7 @@ epic_mediachange(ifp)
 	if (miisc->mii_flags & MIIF_HAVEFIBER) {
 		/* XXX XXX assume it's a Level1 - should check */
 
-		/* We have to powerup fiber tranceivers */
+		/* We have to powerup fiber transceivers */
 		cfg = PHY_READ(miisc, MII_LXTPHY_CONFIG);
 		if (IFM_SUBTYPE(media) == IFM_100_FX) {
 #ifdef EPICMEDIADEBUG

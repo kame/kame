@@ -1,4 +1,4 @@
-/*	$NetBSD: in.h,v 1.58.4.1 2003/04/28 12:46:03 tron Exp $	*/
+/*	$NetBSD: in.h,v 1.64.2.1 2004/05/10 15:00:59 tron Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -43,11 +43,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -152,6 +148,9 @@ typedef __sa_family_t	sa_family_t;
 
 /* last return value of *_input(), meaning "all job for this pkt is done".  */
 #define	IPPROTO_DONE		257
+
+/* sysctl placeholder for (FAST_)IPSEC */
+#define CTL_IPPROTO_IPSEC	258
 
 
 #include <sys/socket.h>
@@ -407,7 +406,7 @@ struct group_filter {
 #define	IP_PORTRANGE_HIGH	1	/* same as DEFAULT (FreeBSD compat) */
 #define	IP_PORTRANGE_LOW	2	/* use privileged range */
 
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 /*
  * Definitions for inet sysctl operations.
  *
@@ -496,7 +495,10 @@ struct group_filter {
 #define IPCTL_MAXFRAGPACKETS   18	/* max packets in reassembly queue */
 #define	IPCTL_GRE_TTL          19	/* default TTL for gre encap packet */
 #define IPCTL_MAXFRAGS	       20	/* max packets in reassembly queue */
-#define	IPCTL_MAXID	       21
+#define	IPCTL_CHECKINTERFACE   21	/* drop pkts in from 'wrong' iface */
+#define	IPCTL_IFQ	       22	/* ipintrq node */
+#define	IPCTL_RANDOMID	       23	/* use random IP ids (if configured) */
+#define	IPCTL_MAXID	       24
 
 #define	IPCTL_NAMES { \
 	{ 0, 0 }, \
@@ -520,8 +522,11 @@ struct group_filter {
 	{ "maxfragpackets", CTLTYPE_INT }, \
 	{ "grettl", CTLTYPE_INT }, \
 	{ "maxfrags", CTLTYPE_INT }, \
+	{ "checkinterface", CTLTYPE_INT }, \
+	{ "ifq", CTLTYPE_NODE }, \
+	{ "random_id", CTLTYPE_INT }, \
 }
-#endif /* !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
+#endif /* _NETBSD_SOURCE */
 
 /* INET6 stuff */
 #define	__KAME_NETINET_IN_H_INCLUDED_

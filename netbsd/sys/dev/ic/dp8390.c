@@ -1,4 +1,4 @@
-/*	$NetBSD: dp8390.c,v 1.49.10.1 2003/01/27 05:26:24 jmc Exp $	*/
+/*	$NetBSD: dp8390.c,v 1.52 2003/01/15 22:20:05 bouyer Exp $	*/
 
 /*
  * Device driver for National Semiconductor DS8390/WD83C690 based ethernet
@@ -14,7 +14,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: dp8390.c,v 1.49.10.1 2003/01/27 05:26:24 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: dp8390.c,v 1.52 2003/01/15 22:20:05 bouyer Exp $");
 
 #include "opt_ipkdb.h"
 #include "opt_inet.h"
@@ -70,6 +70,7 @@ __KERNEL_RCSID(0, "$NetBSD: dp8390.c,v 1.49.10.1 2003/01/27 05:26:24 jmc Exp $")
 
 #ifdef DEBUG
 #define __inline__	/* XXX for debugging porpoises */
+int	dp8390_debug = 0;
 #endif
 
 static __inline__ void	dp8390_xmit __P((struct dp8390_softc *));
@@ -82,8 +83,6 @@ static __inline__ int	dp8390_write_mbuf __P((struct dp8390_softc *,
 			    struct mbuf *, int));
 
 static int		dp8390_test_mem __P((struct dp8390_softc *));
-
-int	dp8390_debug = 0;
 
 /*
  * Standard media init routine for the dp8390.
@@ -425,7 +424,7 @@ dp8390_xmit(sc)
 		    sc->txb_next_tx, sc->txb_inuse, sc->txb_cnt, sc->txb_new);
 
 	if (sc->txb_inuse == 0)
-		panic("dp8390_xmit: no packets to xmit\n");
+		panic("dp8390_xmit: no packets to xmit");
 #endif
 
 	len = sc->txb_len[sc->txb_next_tx];

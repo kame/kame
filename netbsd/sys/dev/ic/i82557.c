@@ -1,4 +1,4 @@
-/*	$NetBSD: i82557.c,v 1.65.2.2 2003/06/17 10:41:21 msaitoh Exp $	*/
+/*	$NetBSD: i82557.c,v 1.81.2.2 2004/04/28 07:04:42 tron Exp $	*/
 
 /*-
  * Copyright (c) 1997, 1998, 1999, 2001, 2002 The NetBSD Foundation, Inc.
@@ -73,7 +73,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: i82557.c,v 1.65.2.2 2003/06/17 10:41:21 msaitoh Exp $");
+__KERNEL_RCSID(0, "$NetBSD: i82557.c,v 1.81.2.2 2004/04/28 07:04:42 tron Exp $");
 
 #include "bpfilter.h"
 #include "rnd.h"
@@ -190,6 +190,8 @@ void	fxp_stop(struct ifnet *, int);
 void	fxp_txintr(struct fxp_softc *);
 void	fxp_rxintr(struct fxp_softc *);
 
+int	fxp_rx_hwcksum(struct mbuf *, const struct fxp_rfa *);
+
 void	fxp_rxdrain(struct fxp_softc *);
 int	fxp_add_rfabuf(struct fxp_softc *, bus_dmamap_t, int);
 int	fxp_mdi_read(struct device *, int, int);
@@ -269,9 +271,6 @@ fxp_attach(struct fxp_softc *sc)
 
 	callout_init(&sc->sc_callout);
 
-	/* Start out using the standard RFA. */
-	sc->sc_rfa_size = RFA_SIZE;
-
 	/*
 	 * Enable some good stuff on i82558 and later.
 	 */
@@ -280,6 +279,22 @@ fxp_attach(struct fxp_softc *sc)
 		sc->sc_flags |= FXPF_EXT_TXCB;
 	}
 
+        /*
+	 * Enable use of extended RFDs and TCBs for 82550
+	 * and later chips. Note: we need extended TXCB support
+	 * too, but that's already enabled by the code above.
+	 * Be careful to do this only on the right devices.
+	 */
+	if (sc->sc_rev == FXP_REV_82550 || sc->sc_rev == FXP_REV_82550_C) {
+		sc->sc_flags |= FXPF_EXT_RFA | FXPF_IPCB;
+		sc->sc_txcmd = htole16(FXP_CB_COMMAND_IPCBXMIT);
+	} else {
+		sc->sc_txcmd = htole16(FXP_CB_COMMAND_XMIT);
+	}
+
+	sc->sc_rfa_size =
+	    (sc->sc_flags & FXPF_EXT_RFA) ? RFA_EXT_SIZE : RFA_SIZE;
+
 	/*
 	 * Allocate the control data structures, and create and load the
 	 * DMA map for it.
@@ -287,7 +302,8 @@ fxp_attach(struct fxp_softc *sc)
 	if ((error = bus_dmamem_alloc(sc->sc_dmat,
 	    sizeof(struct fxp_control_data), PAGE_SIZE, 0, &seg, 1, &rseg,
 	    0)) != 0) {
-		printf("%s: unable to allocate control data, error = %d\n",
+		aprint_error(
+		    "%s: unable to allocate control data, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail_0;
 	}
@@ -295,7 +311,7 @@ fxp_attach(struct fxp_softc *sc)
 	if ((error = bus_dmamem_map(sc->sc_dmat, &seg, rseg,
 	    sizeof(struct fxp_control_data), (caddr_t *)&sc->sc_control_data,
 	    BUS_DMA_COHERENT)) != 0) {
-		printf("%s: unable to map control data, error = %d\n",
+		aprint_error("%s: unable to map control data, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail_1;
 	}
@@ -307,7 +323,7 @@ fxp_attach(struct fxp_softc *sc)
 	if ((error = bus_dmamap_create(sc->sc_dmat,
 	    sizeof(struct fxp_control_data), 1,
 	    sizeof(struct fxp_control_data), 0, 0, &sc->sc_dmamap)) != 0) {
-		printf("%s: unable to create control data DMA map, "
+		aprint_error("%s: unable to create control data DMA map, "
 		    "error = %d\n", sc->sc_dev.dv_xname, error);
 		goto fail_2;
 	}
@@ -315,7 +331,8 @@ fxp_attach(struct fxp_softc *sc)
 	if ((error = bus_dmamap_load(sc->sc_dmat, sc->sc_dmamap,
 	    sc->sc_control_data, sizeof(struct fxp_control_data), NULL,
 	    0)) != 0) {
-		printf("%s: can't load control data DMA map, error = %d\n",
+		aprint_error(
+		    "%s: can't load control data DMA map, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail_3;
 	}
@@ -325,9 +342,9 @@ fxp_attach(struct fxp_softc *sc)
 	 */
 	for (i = 0; i < FXP_NTXCB; i++) {
 		if ((error = bus_dmamap_create(sc->sc_dmat, MCLBYTES,
-		    FXP_NTXSEG, MCLBYTES, 0, 0,
-		    &FXP_DSTX(sc, i)->txs_dmamap)) != 0) {
-			printf("%s: unable to create tx DMA map %d, "
+		    (sc->sc_flags & FXPF_IPCB) ? FXP_IPCB_NTXSEG : FXP_NTXSEG,
+		    MCLBYTES, 0, 0, &FXP_DSTX(sc, i)->txs_dmamap)) != 0) {
+			aprint_error("%s: unable to create tx DMA map %d, "
 			    "error = %d\n", sc->sc_dev.dv_xname, i, error);
 			goto fail_4;
 		}
@@ -339,7 +356,7 @@ fxp_attach(struct fxp_softc *sc)
 	for (i = 0; i < FXP_NRFABUFS; i++) {
 		if ((error = bus_dmamap_create(sc->sc_dmat, MCLBYTES, 1,
 		    MCLBYTES, 0, 0, &sc->sc_rxmaps[i])) != 0) {
-			printf("%s: unable to create rx DMA map %d, "
+			aprint_error("%s: unable to create rx DMA map %d, "
 			    "error = %d\n", sc->sc_dev.dv_xname, i, error);
 			goto fail_5;
 		}
@@ -348,7 +365,7 @@ fxp_attach(struct fxp_softc *sc)
 	/* Initialize MAC address and media structures. */
 	fxp_get_info(sc, enaddr);
 
-	printf("%s: Ethernet address %s\n", sc->sc_dev.dv_xname,
+	aprint_normal("%s: Ethernet address %s\n", sc->sc_dev.dv_xname,
 	    ether_sprintf(enaddr));
 
 	ifp = &sc->sc_ethercom.ec_if;
@@ -372,6 +389,23 @@ fxp_attach(struct fxp_softc *sc)
 	ifp->if_init = fxp_init;
 	ifp->if_stop = fxp_stop;
 	IFQ_SET_READY(&ifp->if_snd);
+
+	if (sc->sc_flags & FXPF_IPCB) {
+		KASSERT(sc->sc_flags & FXPF_EXT_RFA); /* we have both or none */
+		/*
+		 * IFCAP_CSUM_IPv4 seems to have a problem,
+		 * at least, on i82550 rev.12.
+		 * specifically, it doesn't calculate ipv4 checksum correctly
+		 * when sending 20 byte ipv4 header + 1 or 2 byte data.
+		 * FreeBSD driver has related comments.
+		 *
+		 * XXX we should have separate IFCAP flags
+		 * for transmit and receive.
+		 */
+		ifp->if_capabilities =
+		    /*IFCAP_CSUM_IPv4 |*/ IFCAP_CSUM_TCPv4 | IFCAP_CSUM_UDPv4;
+		sc->sc_ethercom.ec_capabilities |= ETHERCAP_VLAN_HWTAGGING;
+	}
 
 	/*
 	 * We can support 802.1Q VLAN-sized frames.
@@ -404,14 +438,14 @@ fxp_attach(struct fxp_softc *sc)
 	 */
 	sc->sc_sdhook = shutdownhook_establish(fxp_shutdown, sc);
 	if (sc->sc_sdhook == NULL)
-		printf("%s: WARNING: unable to establish shutdown hook\n",
+		aprint_error("%s: WARNING: unable to establish shutdown hook\n",
 		    sc->sc_dev.dv_xname);
-	/* 
+	/*
   	 * Add suspend hook, for similar reasons..
 	 */
 	sc->sc_powerhook = powerhook_establish(fxp_power, sc);
-	if (sc->sc_powerhook == NULL) 
-		printf("%s: WARNING: unable to establish power hook\n",
+	if (sc->sc_powerhook == NULL)
+		aprint_error("%s: WARNING: unable to establish power hook\n",
 		    sc->sc_dev.dv_xname);
 
 	/* The attach is successful. */
@@ -457,7 +491,7 @@ fxp_mii_initmedia(struct fxp_softc *sc)
 	sc->sc_mii.mii_readreg = fxp_mdi_read;
 	sc->sc_mii.mii_writereg = fxp_mdi_write;
 	sc->sc_mii.mii_statchg = fxp_statchg;
-	ifmedia_init(&sc->sc_mii.mii_media, 0, fxp_mii_mediachange,
+	ifmedia_init(&sc->sc_mii.mii_media, IFM_IMASK, fxp_mii_mediachange,
 	    fxp_mii_mediastatus);
 
 	flags = MIIF_NOISOLATE;
@@ -485,7 +519,7 @@ fxp_80c24_initmedia(struct fxp_softc *sc)
 	 * media is sensed automatically based on how the link partner
 	 * is configured.  This is, in essence, manual configuration.
 	 */
-	printf("%s: Seeq 80c24 AutoDUPLEX media interface present\n",
+	aprint_normal("%s: Seeq 80c24 AutoDUPLEX media interface present\n",
 	    sc->sc_dev.dv_xname);
 	ifmedia_init(&sc->sc_mii.mii_media, 0, fxp_80c24_mediachange,
 	    fxp_80c24_mediastatus);
@@ -552,18 +586,18 @@ fxp_get_info(struct fxp_softc *sc, u_int8_t *enaddr)
 	 * Reset to a stable state.
 	 */
 	CSR_WRITE_4(sc, FXP_CSR_PORT, FXP_PORT_SELECTIVE_RESET);
-	DELAY(10);
+	DELAY(100);
 
 	sc->sc_eeprom_size = 0;
 	fxp_autosize_eeprom(sc);
-	if(sc->sc_eeprom_size == 0) {
-	    printf("%s: failed to detect EEPROM size\n", sc->sc_dev.dv_xname);
-	    sc->sc_eeprom_size = 6; /* XXX panic here? */
+	if (sc->sc_eeprom_size == 0) {
+		aprint_error("%s: failed to detect EEPROM size\n",
+		    sc->sc_dev.dv_xname);
+		sc->sc_eeprom_size = 6; /* XXX panic here? */
 	}
 #ifdef DEBUG
-	printf("%s: detected %d word EEPROM\n", 
-	       sc->sc_dev.dv_xname, 
-	       1 << sc->sc_eeprom_size);
+	aprint_debug("%s: detected %d word EEPROM\n",
+	    sc->sc_dev.dv_xname, 1 << sc->sc_eeprom_size);
 #endif
 
 	/*
@@ -603,12 +637,19 @@ fxp_get_info(struct fxp_softc *sc, u_int8_t *enaddr)
 	if (sc->sc_flags & FXPF_HAS_RESUME_BUG) {
 		fxp_read_eeprom(sc, &data, 10, 1);
 		if (data & 0x02) {		/* STB enable */
-			printf("%s: WARNING: Disabling dynamic standby mode in EEPROM to work around a\n", sc->sc_dev.dv_xname);
-			printf("%s: WARNING: hardware bug.  You must reset the system before using this\n", sc->sc_dev.dv_xname);
-			printf("%s: WARNING: interface.\n", sc->sc_dev.dv_xname);
+			aprint_error("%s: WARNING: "
+			    "Disabling dynamic standby mode in EEPROM "
+			    "to work around a\n",
+			    sc->sc_dev.dv_xname);
+			aprint_normal(
+			    "%s: WARNING: hardware bug.  You must reset "
+			    "the system before using this\n",
+			    sc->sc_dev.dv_xname);
+			aprint_normal("%s: WARNING: interface.\n",
+			    sc->sc_dev.dv_xname);
 			data &= ~0x02;
 			fxp_write_eeprom(sc, &data, 10, 1);
-			printf("%s: new EEPROM ID: 0x%04x\n",
+			aprint_normal("%s: new EEPROM ID: 0x%04x\n",
 			    sc->sc_dev.dv_xname, data);
 			fxp_eeprom_update_cksum(sc);
 		}
@@ -622,17 +663,19 @@ fxp_eeprom_shiftin(struct fxp_softc *sc, int data, int len)
 	int x;
 
 	for (x = 1 << (len - 1); x != 0; x >>= 1) {
+		DELAY(40);
 		if (data & x)
 			reg = FXP_EEPROM_EECS | FXP_EEPROM_EEDI;
 		else
 			reg = FXP_EEPROM_EECS;
 		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, reg);
+		DELAY(40);
 		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL,
 		    reg | FXP_EEPROM_EESK);
-		DELAY(4);
+		DELAY(40);
 		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, reg);
-		DELAY(4);
 	}
+	DELAY(40);
 }
 
 /*
@@ -640,7 +683,7 @@ fxp_eeprom_shiftin(struct fxp_softc *sc, int data, int len)
  *
  * 559's can have either 64-word or 256-word EEPROMs, the 558
  * datasheet only talks about 64-word EEPROMs, and the 557 datasheet
- * talks about the existance of 16 to 256 word EEPROMs.
+ * talks about the existence of 16 to 256 word EEPROMs.
  *
  * The only known sizes are 64 and 256, where the 256 version is used
  * by CardBus cards to store CIS information.
@@ -657,7 +700,7 @@ fxp_eeprom_shiftin(struct fxp_softc *sc, int data, int len)
  * contents with a varying number of address bits, but no such
  * register seem to be available. The high bits of register 10 are 01
  * on the 558 and 559, but apparently not on the 557.
- * 
+ *
  * The Linux driver computes a checksum on the EEPROM data, but the
  * value of this checksum is not very well documented.
  */
@@ -668,6 +711,7 @@ fxp_autosize_eeprom(struct fxp_softc *sc)
 	int x;
 
 	CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, FXP_EEPROM_EECS);
+	DELAY(40);
 
 	/* Shift in read opcode. */
 	fxp_eeprom_shiftin(sc, FXP_EEPROM_OPC_READ, 3);
@@ -678,21 +722,23 @@ fxp_autosize_eeprom(struct fxp_softc *sc)
 	 */
 	for (x = 1; x <= 8; x++) {
 		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, FXP_EEPROM_EECS);
+		DELAY(40);
 		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL,
 		    FXP_EEPROM_EECS | FXP_EEPROM_EESK);
-		DELAY(4);
-		if((CSR_READ_2(sc, FXP_CSR_EEPROMCONTROL) & 
+		DELAY(40);
+		if ((CSR_READ_2(sc, FXP_CSR_EEPROMCONTROL) &
 		    FXP_EEPROM_EEDO) == 0)
 			break;
+		DELAY(40);
 		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, FXP_EEPROM_EECS);
-		DELAY(4);
+		DELAY(40);
 	}
 	CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, 0);
-	DELAY(4);
-	if(x != 6 && x != 8) {
+	DELAY(40);
+	if (x != 6 && x != 8) {
 #ifdef DEBUG
-		printf("%s: strange EEPROM size (%d)\n", 
-		       sc->sc_dev.dv_xname, 1 << x);
+		printf("%s: strange EEPROM size (%d)\n",
+		    sc->sc_dev.dv_xname, 1 << x);
 #endif
 	} else
 		sc->sc_eeprom_size = x;
@@ -727,15 +773,15 @@ fxp_read_eeprom(struct fxp_softc *sc, u_int16_t *data, int offset, int words)
 		for (x = 16; x > 0; x--) {
 			CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL,
 			    reg | FXP_EEPROM_EESK);
-			DELAY(4);
+			DELAY(40);
 			if (CSR_READ_2(sc, FXP_CSR_EEPROMCONTROL) &
 			    FXP_EEPROM_EEDO)
 				data[i] |= (1 << (x - 1));
 			CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, reg);
-			DELAY(4);
+			DELAY(40);
 		}
 		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, 0);
-		DELAY(4);
+		DELAY(40);
 	}
 }
 
@@ -843,6 +889,9 @@ fxp_start(struct ifnet *ifp)
 	 * descriptors.
 	 */
 	for (;;) {
+		struct fxp_tbd *tbdp;
+		int csum_flags;
+
 		/*
 		 * Grab a packet off the queue.
 		 */
@@ -878,6 +927,7 @@ fxp_start(struct ifnet *ifp)
 				    sc->sc_dev.dv_xname);
 				break;
 			}
+			MCLAIM(m, &sc->sc_ethercom.ec_tx_mowner);
 			if (m0->m_pkthdr.len > MHLEN) {
 				MCLGET(m, M_DONTWAIT);
 				if ((m->m_flags & M_EXT) == 0) {
@@ -899,16 +949,20 @@ fxp_start(struct ifnet *ifp)
 		}
 
 		IFQ_DEQUEUE(&ifp->if_snd, m0);
+		csum_flags = m0->m_pkthdr.csum_flags;
 		if (m != NULL) {
 			m_freem(m0);
 			m0 = m;
 		}
 
 		/* Initialize the fraglist. */
+		tbdp = txd->txd_tbd;
+		if (sc->sc_flags & FXPF_IPCB)
+			tbdp++;
 		for (seg = 0; seg < dmamap->dm_nsegs; seg++) {
-			txd->txd_tbd[seg].tb_addr =
+			tbdp[seg].tb_addr =
 			    htole32(dmamap->dm_segs[seg].ds_addr);
-			txd->txd_tbd[seg].tb_size =
+			tbdp[seg].tb_size =
 			    htole32(dmamap->dm_segs[seg].ds_len);
 		}
 
@@ -927,9 +981,61 @@ fxp_start(struct ifnet *ifp)
 		/* BIG_ENDIAN: no need to swap to store 0 */
 		txd->txd_txcb.cb_status = 0;
 		txd->txd_txcb.cb_command =
-		    htole16(FXP_CB_COMMAND_XMIT | FXP_CB_COMMAND_SF);
+		    sc->sc_txcmd | htole16(FXP_CB_COMMAND_SF);
 		txd->txd_txcb.tx_threshold = tx_threshold;
 		txd->txd_txcb.tbd_number = dmamap->dm_nsegs;
+
+		KASSERT((csum_flags & (M_CSUM_TCPv6 | M_CSUM_UDPv6)) == 0);
+		if (sc->sc_flags & FXPF_IPCB) {
+			struct fxp_ipcb *ipcb;
+			/*
+			 * Deal with TCP/IP checksum offload. Note that
+			 * in order for TCP checksum offload to work,
+			 * the pseudo header checksum must have already
+			 * been computed and stored in the checksum field
+			 * in the TCP header. The stack should have
+			 * already done this for us.
+			 */
+			ipcb = &txd->txd_u.txdu_ipcb;
+			memset(ipcb, 0, sizeof(*ipcb));
+			/*
+			 * always do hardware parsing.
+			 */
+			ipcb->ipcb_ip_activation_high =
+			    FXP_IPCB_HARDWAREPARSING_ENABLE;
+			/*
+			 * ip checksum offloading.
+			 */
+			if (csum_flags & M_CSUM_IPv4) {
+				ipcb->ipcb_ip_schedule |=
+				    FXP_IPCB_IP_CHECKSUM_ENABLE;
+			}
+			/*
+			 * TCP/UDP checksum offloading.
+			 */
+			if (csum_flags & (M_CSUM_TCPv4 | M_CSUM_UDPv4)) {
+				ipcb->ipcb_ip_schedule |=
+				    FXP_IPCB_TCPUDP_CHECKSUM_ENABLE;
+			}
+
+			/*
+			 * request VLAN tag insertion if needed.
+			 */
+			if (sc->sc_ethercom.ec_nvlans != 0) {
+				struct m_tag *vtag;
+
+				vtag = m_tag_find(m0, PACKET_TAG_VLAN, NULL);
+				if (vtag) {
+					ipcb->ipcb_vlan_id =
+					    htobe16(*(u_int *)(vtag + 1));
+					ipcb->ipcb_ip_activation_high |=
+					    FXP_IPCB_INSERTVLAN_ENABLE;
+				}
+			}
+		} else {
+			KASSERT((csum_flags &
+			    (M_CSUM_IPv4 | M_CSUM_TCPv4 | M_CSUM_UDPv4)) == 0);
+		}
 
 		FXP_CDTXSYNC(sc, nexttx,
 		    BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
@@ -1004,7 +1110,7 @@ fxp_intr(void *arg)
 	int claimed = 0;
 	u_int8_t statack;
 
-	if ((sc->sc_dev.dv_flags & DVF_ACTIVE) == 0)
+	if ((sc->sc_dev.dv_flags & DVF_ACTIVE) == 0 || sc->sc_enabled == 0)
 		return (0);
 	/*
 	 * If the interface isn't running, don't try to
@@ -1089,7 +1195,7 @@ fxp_txintr(struct fxp_softc *sc)
 
 	ifp->if_flags &= ~IFF_OACTIVE;
 	for (i = sc->sc_txdirty; sc->sc_txpending != 0;
-	     i = FXP_NEXTTX(i), sc->sc_txpending--) {
+	    i = FXP_NEXTTX(i), sc->sc_txpending--) {
 		txd = FXP_CDTX(sc, i);
 		txs = FXP_DSTX(sc, i);
 
@@ -1118,6 +1224,62 @@ fxp_txintr(struct fxp_softc *sc)
 	 */
 	if (sc->sc_txpending == 0)
 		ifp->if_timer = 0;
+}
+
+/*
+ * fxp_rx_hwcksum: check status of H/W offloading for received packets.
+ */
+
+int
+fxp_rx_hwcksum(struct mbuf *m, const struct fxp_rfa *rfa)
+{
+	u_int16_t rxparsestat;
+	u_int16_t csum_stat;
+	u_int32_t csum_data;
+	int csum_flags;
+
+	/*
+	 * check VLAN tag stripping.
+	 */
+
+	if (rfa->rfa_status & htole16(FXP_RFA_STATUS_VLAN)) {
+		struct m_tag *vtag;
+
+		vtag = m_tag_get(PACKET_TAG_VLAN, sizeof(u_int), M_NOWAIT);
+		if (vtag == NULL)
+			return ENOMEM;
+		*(u_int *)(vtag + 1) = be16toh(rfa->vlan_id);
+		m_tag_prepend(m, vtag);
+	}
+
+	/*
+	 * check H/W Checksumming.
+	 */
+
+	csum_stat = le16toh(rfa->cksum_stat);
+	rxparsestat = le16toh(rfa->rx_parse_stat);
+	if (!(rfa->rfa_status & htole16(FXP_RFA_STATUS_PARSE)))
+		return 0;
+
+	csum_flags = 0;
+	csum_data = 0;
+
+	if (csum_stat & FXP_RFDX_CS_IP_CSUM_BIT_VALID) {
+		csum_flags = M_CSUM_IPv4;
+		if (!(csum_stat & FXP_RFDX_CS_IP_CSUM_VALID))
+			csum_flags |= M_CSUM_IPv4_BAD;
+	}
+
+	if (csum_stat & FXP_RFDX_CS_TCPUDP_CSUM_BIT_VALID) {
+		csum_flags |= (M_CSUM_TCPv4|M_CSUM_UDPv4); /* XXX */
+		if (!(csum_stat & FXP_RFDX_CS_TCPUDP_CSUM_VALID))
+			csum_flags |= M_CSUM_TCP_UDP_BAD;
+	}
+
+	m->m_pkthdr.csum_flags = csum_flags;
+	m->m_pkthdr.csum_data = csum_data;
+
+	return 0;
 }
 
 /*
@@ -1182,6 +1344,12 @@ fxp_rxintr(struct fxp_softc *sc)
 			continue;
 		}
 
+		/* Do checksum checking. */
+		m->m_pkthdr.csum_flags = 0;
+		if (sc->sc_flags & FXPF_EXT_RFA)
+			if (fxp_rx_hwcksum(m, rfa))
+				goto dropit;
+
 		/*
 		 * If the packet is small enough to fit in a
 		 * single header mbuf, allocate one and copy
@@ -1197,8 +1365,11 @@ fxp_rxintr(struct fxp_softc *sc)
 			MGETHDR(m0, M_DONTWAIT, MT_DATA);
 			if (m0 == NULL)
 				goto dropit;
+			MCLAIM(m0, &sc->sc_ethercom.ec_rx_mowner);
 			memcpy(mtod(m0, caddr_t),
 			    mtod(m, caddr_t), len);
+			m0->m_pkthdr.csum_flags = m->m_pkthdr.csum_flags;
+			m0->m_pkthdr.csum_data = m->m_pkthdr.csum_data;
 			FXP_INIT_RFABUF(sc, m);
 			m = m0;
 		} else {
@@ -1282,7 +1453,7 @@ fxp_tick(void *arg)
 	 * the condition by reprogramming the multicast filter (actually,
 	 * resetting the interface). This is a work-around for a bug in
 	 * the 82557 where the receiver locks up if it gets certain types
-	 * of garbage in the syncronization bits prior to the packet header.
+	 * of garbage in the synchronization bits prior to the packet header.
 	 * This bug is supposed to only occur in 10Mbps mode, but has been
 	 * seen to occur in 100Mbps mode as well (perhaps due to a 10/100
 	 * speed transition).
@@ -1436,7 +1607,7 @@ fxp_init(struct ifnet *ifp)
 	struct fxp_cb_ias *cb_ias;
 	struct fxp_txdesc *txd;
 	bus_dmamap_t rxmap;
-	int i, prm, save_bf, lrxen, allm, error = 0;
+	int i, prm, save_bf, lrxen, vlan_drop, allm, error = 0;
 
 	if ((error = fxp_enable(sc)) != 0)
 		goto out;
@@ -1446,7 +1617,7 @@ fxp_init(struct ifnet *ifp)
 	 */
 	fxp_stop(ifp, 0);
 
-	/* 
+	/*
 	 * XXX just setting sc_flags to 0 here clears any FXPF_MII
 	 * flag, and this prevents the MII from detaching resulting in
 	 * a panic. The flags field should perhaps be split in runtime
@@ -1484,11 +1655,14 @@ fxp_init(struct ifnet *ifp)
 	 */
 	save_bf = 0;
 	lrxen = 0;
+	vlan_drop = 0;
 	if (sc->sc_ethercom.ec_capenable & ETHERCAP_VLAN_MTU) {
 		if (sc->sc_rev < FXP_REV_82558_A4)
 			save_bf = 1;
 		else
 			lrxen = 1;
+		if (sc->sc_rev >= FXP_REV_82550)
+			vlan_drop = 1;
 	}
 
 	/*
@@ -1522,7 +1696,8 @@ fxp_init(struct ifnet *ifp)
 	/* BIG_ENDIAN: no need to swap to store 0xffffffff */
 	cbp->link_addr =	0xffffffff; /* (no) next command */
 					/* bytes in config block */
-	cbp->byte_count =	FXP_CONFIG_LEN;
+	cbp->byte_count =	(sc->sc_flags & FXPF_EXT_RFA) ?
+				FXP_EXT_CONFIG_LEN : FXP_CONFIG_LEN;
 	cbp->rx_fifo_limit =	8;	/* rx fifo threshold (32 bytes) */
 	cbp->tx_fifo_limit =	0;	/* tx fifo threshold (0 bytes) */
 	cbp->adaptive_ifs =	0;	/* (no) adaptive interframe spacing */
@@ -1542,6 +1717,7 @@ fxp_init(struct ifnet *ifp)
 	cbp->save_bf =		save_bf;/* save bad frames */
 	cbp->disc_short_rx =	!prm;	/* discard short packets */
 	cbp->underrun_retry =	1;	/* retry mode (1) on DMA underrun */
+	cbp->ext_rfa =		(sc->sc_flags & FXPF_EXT_RFA) ? 1 : 0;
 	cbp->two_frames =	0;	/* do not limit FIFO to 2 frames */
 	cbp->dyn_tbd =		0;	/* (no) dynamic TBD mode */
 					/* interface mode */
@@ -1575,6 +1751,8 @@ fxp_init(struct ifnet *ifp)
 	cbp->fdx_pin_en =	1;	/* (enable) FDX# pin */
 	cbp->multi_ia =		0;	/* (don't) accept multiple IAs */
 	cbp->mc_all =		allm;	/* accept all multicasts */
+	cbp->ext_rx_mode =	(sc->sc_flags & FXPF_EXT_RFA) ? 1 : 0;
+	cbp->vlan_drop_en =	vlan_drop;
 
 	if (sc->sc_rev < FXP_REV_82558_A4) {
 		/*
@@ -1618,7 +1796,7 @@ fxp_init(struct ifnet *ifp)
 	if (i == 0) {
 		printf("%s at line %d: dmasync timeout\n",
 		    sc->sc_dev.dv_xname, __LINE__);
-		return ETIMEDOUT;
+		return (ETIMEDOUT);
 	}
 
 	/*
@@ -1650,7 +1828,7 @@ fxp_init(struct ifnet *ifp)
 	if (i == 0) {
 		printf("%s at line %d: dmasync timeout\n",
 		    sc->sc_dev.dv_xname, __LINE__);
-		return ETIMEDOUT;
+		return (ETIMEDOUT);
 	}
 
 	/*
@@ -1772,12 +1950,12 @@ fxp_mii_mediastatus(struct ifnet *ifp, struct ifmediareq *ifmr)
 {
 	struct fxp_softc *sc = ifp->if_softc;
 
-	if(sc->sc_enabled == 0) {
+	if (sc->sc_enabled == 0) {
 		ifmr->ifm_active = IFM_ETHER | IFM_NONE;
 		ifmr->ifm_status = 0;
 		return;
 	}
-	
+
 	mii_pollstat(&sc->sc_mii);
 	ifmr->ifm_status = sc->sc_mii.mii_media_status;
 	ifmr->ifm_active = sc->sc_mii.mii_media_active;
@@ -1821,6 +1999,7 @@ fxp_add_rfabuf(struct fxp_softc *sc, bus_dmamap_t rxmap, int unload)
 	if (m == NULL)
 		return (ENOBUFS);
 
+	MCLAIM(m, &sc->sc_ethercom.ec_rx_mowner);
 	MCLGET(m, M_DONTWAIT);
 	if ((m->m_flags & M_EXT) == 0) {
 		m_freem(m);
@@ -1832,8 +2011,8 @@ fxp_add_rfabuf(struct fxp_softc *sc, bus_dmamap_t rxmap, int unload)
 
 	M_SETCTX(m, rxmap);
 
-	error = bus_dmamap_load(sc->sc_dmat, rxmap,
-	    m->m_ext.ext_buf, m->m_ext.ext_size, NULL,
+	m->m_len = m->m_pkthdr.len = m->m_ext.ext_size;
+	error = bus_dmamap_load_mbuf(sc->sc_dmat, rxmap, m,
 	    BUS_DMA_READ|BUS_DMA_NOWAIT);
 	if (error) {
 		printf("%s: can't load rx DMA map %d, error = %d\n",
@@ -1856,8 +2035,8 @@ fxp_mdi_read(struct device *self, int phy, int reg)
 	CSR_WRITE_4(sc, FXP_CSR_MDICONTROL,
 	    (FXP_MDI_READ << 26) | (reg << 16) | (phy << 21));
 
-	while (((value = CSR_READ_4(sc, FXP_CSR_MDICONTROL)) & 0x10000000) == 0
-	    && count--)
+	while (((value = CSR_READ_4(sc, FXP_CSR_MDICONTROL)) &
+	    0x10000000) == 0 && count--)
 		DELAY(10);
 
 	if (count <= 0)
@@ -1883,7 +2062,7 @@ fxp_mdi_write(struct device *self, int phy, int reg, int value)
 	    (FXP_MDI_WRITE << 26) | (reg << 16) | (phy << 21) |
 	    (value & 0xffff));
 
-	while((CSR_READ_4(sc, FXP_CSR_MDICONTROL) & 0x10000000) == 0 &&
+	while ((CSR_READ_4(sc, FXP_CSR_MDICONTROL) & 0x10000000) == 0 &&
 	    count--)
 		DELAY(10);
 
@@ -2040,7 +2219,7 @@ static const uint32_t fxp_ucode_d102c[] = D102_C_RCVBUNDLE_UCODE;
 #define	UCODE(x)	x, sizeof(x)
 
 static const struct ucode {
-	uint32_t	revision;
+	int32_t		revision;
 	const uint32_t	*ucode;
 	size_t		length;
 	uint16_t	int_delay_offset;
@@ -2107,7 +2286,7 @@ fxp_load_ucode(struct fxp_softc *sc)
 	if (uc->bundle_max_offset)
 		*(uint16_t *) &cbp->ucode[uc->bundle_max_offset] =
 		    htole16(fxp_bundle_max);
-	
+
 	FXP_CDUCODESYNC(sc, BUS_DMASYNC_PREREAD|BUS_DMASYNC_PREWRITE);
 
 	/*
@@ -2156,7 +2335,7 @@ fxp_enable(struct fxp_softc *sc)
 			return (EIO);
 		}
 	}
-	
+
 	sc->sc_enabled = 1;
 	return (0);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: pci.c,v 1.65.2.1 2003/08/15 12:45:51 tron Exp $	*/
+/*	$NetBSD: pci.c,v 1.82 2003/08/18 05:39:07 itojun Exp $	*/
 
 /*
  * Copyright (c) 1995, 1996, 1997, 1998
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pci.c,v 1.65.2.1 2003/08/15 12:45:51 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pci.c,v 1.82 2003/08/18 05:39:07 itojun Exp $");
 
 #include "opt_pci.h"
 
@@ -48,6 +48,10 @@ __KERNEL_RCSID(0, "$NetBSD: pci.c,v 1.65.2.1 2003/08/15 12:45:51 tron Exp $");
 #include <dev/pci/pcivar.h>
 #include <dev/pci/pcidevs.h>
 
+#include <uvm/uvm_extern.h>
+
+#include "locators.h"
+
 #ifdef PCI_CONFIG_DUMP
 int pci_config_dump = 1;
 #else
@@ -57,9 +61,8 @@ int pci_config_dump = 0;
 int pcimatch __P((struct device *, struct cfdata *, void *));
 void pciattach __P((struct device *, struct device *, void *));
 
-struct cfattach pci_ca = {
-	sizeof(struct pci_softc), pcimatch, pciattach
-};
+CFATTACH_DECL(pci, sizeof(struct pci_softc),
+    pcimatch, pciattach, NULL, NULL);
 
 int	pciprint __P((void *, const char *));
 int	pcisubmatch __P((struct device *, struct cfdata *, void *));
@@ -98,7 +101,7 @@ pcimatch(parent, cf, aux)
 {
 	struct pcibus_attach_args *pba = aux;
 
-	if (strcmp(pba->pba_busname, cf->cf_driver->cd_name))
+	if (strcmp(pba->pba_busname, cf->cf_name))
 		return (0);
 
 	/* Check the locators */
@@ -128,7 +131,9 @@ pciattach(parent, self, aux)
 	const char *sep = "";
 
 	pci_attach_hook(parent, self, pba);
-	printf("\n");
+
+	aprint_naive("\n");
+	aprint_normal("\n");
 
 	io_enabled = (pba->pba_flags & PCI_FLAGS_IO_ENABLED);
 	mem_enabled = (pba->pba_flags & PCI_FLAGS_MEM_ENABLED);
@@ -137,19 +142,23 @@ pciattach(parent, self, aux)
 	mwi_enabled = (pba->pba_flags & PCI_FLAGS_MWI_OKAY);
 
 	if (io_enabled == 0 && mem_enabled == 0) {
-		printf("%s: no spaces enabled!\n", self->dv_xname);
+		aprint_error("%s: no spaces enabled!\n", self->dv_xname);
 		return;
 	}
 
-#define	PRINT(s)	do { printf("%s%s", sep, s); sep = ", "; } while (0)
+#define	PRINT(str)							\
+do {									\
+	aprint_normal("%s%s", sep, str);				\
+	sep = ", ";							\
+} while (/*CONSTCOND*/0)
 
-	printf("%s: ", self->dv_xname);
+	aprint_normal("%s: ", self->dv_xname);
 
 	if (io_enabled)
 		PRINT("i/o space");
 	if (mem_enabled)
 		PRINT("memory space");
-	printf(" enabled");
+	aprint_normal(" enabled");
 
 	if (mrl_enabled || mrm_enabled || mwi_enabled) {
 		if (mrl_enabled)
@@ -158,16 +167,17 @@ pciattach(parent, self, aux)
 			PRINT("rd/mult");
 		if (mwi_enabled)
 			PRINT("wr/inv");
-		printf(" ok");
+		aprint_normal(" ok");
 	}
 
-	printf("\n");
+	aprint_normal("\n");
 
 #undef PRINT
 
 	sc->sc_iot = pba->pba_iot;
 	sc->sc_memt = pba->pba_memt;
 	sc->sc_dmat = pba->pba_dmat;
+	sc->sc_dmat64 = pba->pba_dmat64;
 	sc->sc_pc = pba->pba_pc;
 	sc->sc_bus = pba->pba_bus;
 	sc->sc_bridgetag = pba->pba_bridgetag;
@@ -189,9 +199,9 @@ pciprint(aux, pnp)
 
 	if (pnp) {
 		pci_devinfo(pa->pa_id, pa->pa_class, 1, devinfo);
-		printf("%s at %s", devinfo, pnp);
+		aprint_normal("%s at %s", devinfo, pnp);
 	}
-	printf(" dev %d function %d", pa->pa_device, pa->pa_function);
+	aprint_normal(" dev %d function %d", pa->pa_device, pa->pa_function);
 	if (pci_config_dump) {
 		printf(": ");
 		pci_conf_print(pa->pa_pc, pa->pa_tag, NULL);
@@ -216,7 +226,11 @@ pciprint(aux, pnp)
 			printf(" no quirks");
 		} else {
 			bitmask_snprintf(qd->quirks,
-			    "\20\1multifn", devinfo, sizeof (devinfo));
+			    "\002\001multifn\002singlefn\003skipfunc0"
+			    "\004skipfunc1\005skipfunc2\006skipfunc3"
+			    "\007skipfunc4\010skipfunc5\011skipfunc6"
+			    "\012skipfunc8",
+			    devinfo, sizeof (devinfo));
 			printf(" quirks %s", devinfo);
 		}
 		printf(")");
@@ -238,7 +252,7 @@ pcisubmatch(parent, cf, aux)
 	if (cf->pcicf_function != PCI_UNK_FUNCTION &&
 	    cf->pcicf_function != pa->pa_function)
 		return (0);
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 int
@@ -270,6 +284,7 @@ pci_probe_device(struct pci_softc *sc, pcitag_t tag,
 	pa.pa_iot = sc->sc_iot;
 	pa.pa_memt = sc->sc_memt;
 	pa.pa_dmat = sc->sc_dmat;
+	pa.pa_dmat64 = sc->sc_dmat64;
 	pa.pa_pc = pc;
 	pa.pa_bus = bus;
 	pa.pa_device = device;
@@ -461,4 +476,171 @@ pci_enumerate_bus_generic(struct pci_softc *sc,
 		}
 	}
 	return (0);
+}
+
+/*
+ * Power Management Capability (Rev 2.2)
+ */
+
+int
+pci_set_powerstate(pci_chipset_tag_t pc, pcitag_t tag, int newstate)
+{
+	int offset;
+	pcireg_t value, cap, now;
+
+	if (!pci_get_capability(pc, tag, PCI_CAP_PWRMGMT, &offset, &value))
+		return (EOPNOTSUPP);
+
+	cap = value >> 16;
+	value = pci_conf_read(pc, tag, offset + PCI_PMCSR);
+	now    = value & PCI_PMCSR_STATE_MASK;
+	value &= ~PCI_PMCSR_STATE_MASK;
+	switch (newstate) {
+	case PCI_PWR_D0:
+		if (now == PCI_PMCSR_STATE_D0)
+			return (0);
+		value |= PCI_PMCSR_STATE_D0;
+		break;
+	case PCI_PWR_D1:
+		if (now == PCI_PMCSR_STATE_D1)
+			return (0);
+		if (now == PCI_PMCSR_STATE_D2 || now == PCI_PMCSR_STATE_D3)
+			return (EINVAL);
+		if (!(cap & PCI_PMCR_D1SUPP))
+			return (EOPNOTSUPP);
+		value |= PCI_PMCSR_STATE_D1;
+		break;
+	case PCI_PWR_D2:
+		if (now == PCI_PMCSR_STATE_D2)
+			return (0);
+		if (now == PCI_PMCSR_STATE_D3)
+			return (EINVAL);
+		if (!(cap & PCI_PMCR_D2SUPP))
+			return (EOPNOTSUPP);
+		value |= PCI_PMCSR_STATE_D2;
+		break;
+	case PCI_PWR_D3:
+		if (now == PCI_PMCSR_STATE_D3)
+			return (0);
+		value |= PCI_PMCSR_STATE_D3;
+		break;
+	default:
+		return (EINVAL);
+	}
+	pci_conf_write(pc, tag, offset + PCI_PMCSR, value);
+	DELAY(1000);
+
+	return (0);
+}
+
+int
+pci_get_powerstate(pci_chipset_tag_t pc, pcitag_t tag)
+{
+	int offset;
+	pcireg_t value;
+
+	if (!pci_get_capability(pc, tag, PCI_CAP_PWRMGMT, &offset, &value))
+		return (PCI_PWR_D0);
+	value = pci_conf_read(pc, tag, offset + PCI_PMCSR);
+	value &= PCI_PMCSR_STATE_MASK;
+	switch (value) {
+	case PCI_PMCSR_STATE_D0:
+		return (PCI_PWR_D0);
+	case PCI_PMCSR_STATE_D1:
+		return (PCI_PWR_D1);
+	case PCI_PMCSR_STATE_D2:
+		return (PCI_PWR_D2);
+	case PCI_PMCSR_STATE_D3:
+		return (PCI_PWR_D3);
+	}
+
+	return (PCI_PWR_D0);
+}
+
+/*
+ * Vital Product Data (PCI 2.2)
+ */
+
+int
+pci_vpd_read(pci_chipset_tag_t pc, pcitag_t tag, int offset, int count,
+    pcireg_t *data)
+{
+	uint32_t reg;
+	int ofs, i, j;
+
+	KASSERT(data != NULL);
+	KASSERT((offset + count) < 0x7fff);
+
+	if (pci_get_capability(pc, tag, PCI_CAP_VPD, &ofs, &reg) == 0)
+		return (1);
+
+	for (i = 0; i < count; offset += sizeof(*data), i++) {
+		reg &= 0x0000ffff;
+		reg &= ~PCI_VPD_OPFLAG;
+		reg |= PCI_VPD_ADDRESS(offset);
+		pci_conf_write(pc, tag, ofs, reg);
+
+		/*
+		 * PCI 2.2 does not specify how long we should poll
+		 * for completion nor whether the operation can fail.
+		 */
+		j = 0;
+		do {
+			if (j++ == 20)
+				return (1);
+			delay(4);
+			reg = pci_conf_read(pc, tag, ofs);
+		} while ((reg & PCI_VPD_OPFLAG) == 0);
+		data[i] = pci_conf_read(pc, tag, PCI_VPD_DATAREG(ofs));
+	}
+
+	return (0);
+}
+
+int
+pci_vpd_write(pci_chipset_tag_t pc, pcitag_t tag, int offset, int count,
+    pcireg_t *data)
+{
+	pcireg_t reg;
+	int ofs, i, j;
+
+	KASSERT(data != NULL);
+	KASSERT((offset + count) < 0x7fff);
+
+	if (pci_get_capability(pc, tag, PCI_CAP_VPD, &ofs, &reg) == 0)
+		return (1);
+
+	for (i = 0; i < count; offset += sizeof(*data), i++) {
+		pci_conf_write(pc, tag, PCI_VPD_DATAREG(ofs), data[i]);
+
+		reg &= 0x0000ffff;
+		reg |= PCI_VPD_OPFLAG;
+		reg |= PCI_VPD_ADDRESS(offset);
+		pci_conf_write(pc, tag, ofs, reg);
+
+		/*
+		 * PCI 2.2 does not specify how long we should poll
+		 * for completion nor whether the operation can fail.
+		 */
+		j = 0;
+		do {
+			if (j++ == 20)
+				return (1);
+			delay(1);
+			reg = pci_conf_read(pc, tag, ofs);
+		} while (reg & PCI_VPD_OPFLAG);
+	}
+
+	return (0);
+}
+
+int
+pci_dma64_available(struct pci_attach_args *pa)
+{        
+#ifdef _PCI_HAVE_DMA64
+	if (BUS_DMA_TAG_VALID(pa->pa_dmat64) &&
+		((uint64_t)physmem << PAGE_SHIFT) > 0xffffffffULL)
+                        return 1;
+#endif
+        return 0;
 }

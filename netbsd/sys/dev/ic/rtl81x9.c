@@ -1,4 +1,4 @@
-/*	$NetBSD: rtl81x9.c,v 1.40.10.1 2003/01/26 16:36:07 he Exp $	*/
+/*	$NetBSD: rtl81x9.c,v 1.45.4.1 2004/06/21 16:39:00 tron Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998
@@ -70,7 +70,7 @@
  * levels.
  *
  * It's impossible given this rotten design to really achieve decent
- * performance at 100Mbps, unless you happen to have a 400Mhz PII or
+ * performance at 100Mbps, unless you happen to have a 400MHz PII or
  * some equally overmuscled CPU to drive it.
  *
  * On the bright side, the 8139 does have a built-in PHY, although
@@ -86,7 +86,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rtl81x9.c,v 1.40.10.1 2003/01/26 16:36:07 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rtl81x9.c,v 1.45.4.1 2004/06/21 16:39:00 tron Exp $");
 
 #include "bpfilter.h"
 #include "rnd.h"
@@ -144,7 +144,6 @@ STATIC void rtk_shutdown	__P((void *));
 STATIC int rtk_ifmedia_upd	__P((struct ifnet *));
 STATIC void rtk_ifmedia_sts	__P((struct ifnet *, struct ifmediareq *));
 
-STATIC u_int16_t rtk_read_eeprom __P((struct rtk_softc *, int, int));
 STATIC void rtk_eeprom_putbyte	__P((struct rtk_softc *, int, int));
 STATIC void rtk_mii_sync	__P((struct rtk_softc *));
 STATIC void rtk_mii_send	__P((struct rtk_softc *, u_int32_t, int));
@@ -160,7 +159,6 @@ STATIC int rtk_enable		__P((struct rtk_softc *));
 STATIC void rtk_disable		__P((struct rtk_softc *));
 STATIC void rtk_power		__P((int, void *));
 
-STATIC void rtk_setmulti	__P((struct rtk_softc *));
 STATIC int rtk_list_tx_init	__P((struct rtk_softc *));
 
 #define EE_SET(x)					\
@@ -544,7 +542,7 @@ rtk_phy_statchg(v)
 /*
  * Program the 64-bit multicast hash filter.
  */
-STATIC void rtk_setmulti(sc)
+void rtk_setmulti(sc)
 	struct rtk_softc	*sc;
 {
 	struct ifnet		*ifp;
@@ -736,7 +734,7 @@ rtk_attach(sc)
 	sc->mii.mii_readreg = rtk_phy_readreg;
 	sc->mii.mii_writereg = rtk_phy_writereg;
 	sc->mii.mii_statchg = rtk_phy_statchg;
-	ifmedia_init(&sc->mii.mii_media, 0, rtk_ifmedia_upd, rtk_ifmedia_sts);
+	ifmedia_init(&sc->mii.mii_media, IFM_IMASK, rtk_ifmedia_upd, rtk_ifmedia_sts);
 	mii_attach(&sc->sc_dev, &sc->mii, 0xffffffff, 
 	    MII_PHY_ANY, MII_OFFSET_ANY, 0);
 
@@ -798,9 +796,9 @@ STATIC int rtk_list_tx_init(sc)
 	int i;
 
 	while ((txd = SIMPLEQ_FIRST(&sc->rtk_tx_dirty)) != NULL)
-		SIMPLEQ_REMOVE_HEAD(&sc->rtk_tx_dirty, txd, txd_q);
+		SIMPLEQ_REMOVE_HEAD(&sc->rtk_tx_dirty, txd_q);
 	while ((txd = SIMPLEQ_FIRST(&sc->rtk_tx_free)) != NULL)
-		SIMPLEQ_REMOVE_HEAD(&sc->rtk_tx_free, txd, txd_q);
+		SIMPLEQ_REMOVE_HEAD(&sc->rtk_tx_free, txd_q);
 
 	for (i = 0; i < RTK_TX_LIST_CNT; i++) {
 		txd = &sc->rtk_tx_descs[i];
@@ -981,7 +979,7 @@ STATIC void rtk_rxeof(sc)
         struct mbuf		*m;
         struct ifnet		*ifp;
 	caddr_t			rxbufpos, dst;
-	int			total_len, wrap = 0;
+	u_int			total_len, wrap = 0;
 	u_int32_t		rxstat;
 	u_int16_t		cur_rx, new_rx;
 	u_int16_t		limit;
@@ -1184,7 +1182,7 @@ STATIC void rtk_txeof(sc)
 		    RTK_TXSTAT_TX_UNDERRUN|RTK_TXSTAT_TXABRT)) == 0)
 			break;
 
-		SIMPLEQ_REMOVE_HEAD(&sc->rtk_tx_dirty, txd, txd_q);
+		SIMPLEQ_REMOVE_HEAD(&sc->rtk_tx_dirty, txd_q);
 
 		bus_dmamap_sync(sc->sc_dmat, txd->txd_dmamap, 0,
 		    txd->txd_dmamap->dm_mapsize, BUS_DMASYNC_POSTWRITE);
@@ -1351,7 +1349,7 @@ STATIC void rtk_start(ifp)
 		}
 		txd->txd_mbuf = m_head;
 
-		SIMPLEQ_REMOVE_HEAD(&sc->rtk_tx_free, txd, txd_q);
+		SIMPLEQ_REMOVE_HEAD(&sc->rtk_tx_free, txd_q);
 		SIMPLEQ_INSERT_TAIL(&sc->rtk_tx_dirty, txd, txd_q);
 
 		/*
@@ -1373,7 +1371,7 @@ STATIC void rtk_start(ifp)
 	 * full. Mark the NIC as busy until it drains some of the
 	 * packets from the queue.
 	 */
-	if (SIMPLEQ_FIRST(&sc->rtk_tx_free) == NULL)
+	if (SIMPLEQ_EMPTY(&sc->rtk_tx_free))
 		ifp->if_flags |= IFF_OACTIVE;
 
 	/*
@@ -1586,7 +1584,7 @@ STATIC void rtk_stop(ifp, disable)
 	 * Free the TX list buffers.
 	 */
 	while ((txd = SIMPLEQ_FIRST(&sc->rtk_tx_dirty)) != NULL) {
-		SIMPLEQ_REMOVE_HEAD(&sc->rtk_tx_dirty, txd, txd_q);
+		SIMPLEQ_REMOVE_HEAD(&sc->rtk_tx_dirty, txd_q);
 		bus_dmamap_unload(sc->sc_dmat, txd->txd_dmamap);
 		m_freem(txd->txd_mbuf);
 		txd->txd_mbuf = NULL;

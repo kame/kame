@@ -1,4 +1,4 @@
-/*	$NetBSD: uvm_mmap.c,v 1.63.4.1 2003/08/17 10:14:52 tron Exp $	*/
+/*	$NetBSD: uvm_mmap.c,v 1.82 2004/03/24 07:47:33 junyoung Exp $	*/
 
 /*
  * Copyright (c) 1997 Charles D. Cranor and Washington University.
@@ -51,7 +51,9 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: uvm_mmap.c,v 1.63.4.1 2003/08/17 10:14:52 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: uvm_mmap.c,v 1.82 2004/03/24 07:47:33 junyoung Exp $");
+
+#include "opt_compat_netbsd.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -68,11 +70,15 @@ __KERNEL_RCSID(0, "$NetBSD: uvm_mmap.c,v 1.63.4.1 2003/08/17 10:14:52 tron Exp $
 
 #include <miscfs/specfs/specdev.h>
 
+#include <sys/sa.h>
 #include <sys/syscallargs.h>
 
 #include <uvm/uvm.h>
 #include <uvm/uvm_device.h>
 
+#ifndef COMPAT_ZERODEV
+#define COMPAT_ZERODEV(dev)	(0)
+#endif
 
 /*
  * unimplemented VM system calls:
@@ -84,8 +90,8 @@ __KERNEL_RCSID(0, "$NetBSD: uvm_mmap.c,v 1.63.4.1 2003/08/17 10:14:52 tron Exp $
 
 /* ARGSUSED */
 int
-sys_sbrk(p, v, retval)
-	struct proc *p;
+sys_sbrk(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -104,8 +110,8 @@ sys_sbrk(p, v, retval)
 
 /* ARGSUSED */
 int
-sys_sstk(p, v, retval)
-	struct proc *p;
+sys_sstk(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -124,8 +130,8 @@ sys_sstk(p, v, retval)
 
 /* ARGSUSED */
 int
-sys_mincore(p, v, retval)
-	struct proc *p;
+sys_mincore(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -134,6 +140,7 @@ sys_mincore(p, v, retval)
 		syscallarg(size_t) len;
 		syscallarg(char *) vec;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	struct vm_page *pg;
 	char *vec, pgi;
 	struct uvm_object *uobj;
@@ -198,7 +205,7 @@ sys_mincore(p, v, retval)
 
 		if (UVM_ET_ISOBJ(entry)) {
 			KASSERT(!UVM_OBJ_IS_KERN_OBJECT(entry->object.uvm_obj));
-			if (!UVM_OBJ_IS_VNODE(entry->object.uvm_obj)) {
+			if (UVM_OBJ_IS_DEVICE(entry->object.uvm_obj)) {
 				for (/* nothing */; start < lim;
 				     start += PAGE_SIZE, vec++)
 					subyte(vec, 1);
@@ -262,15 +269,15 @@ sys_mincore(p, v, retval)
 /*
  * sys_mmap: mmap system call.
  *
- * => file offest and address may not be page aligned
+ * => file offset and address may not be page aligned
  *    - if MAP_FIXED, offset and address must have remainder mod PAGE_SIZE
  *    - if address isn't page aligned the mapping starts at trunc_page(addr)
  *      and the return value is adjusted up by the page offset.
  */
 
 int
-sys_mmap(p, v, retval)
-	struct proc *p;
+sys_mmap(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -283,6 +290,7 @@ sys_mmap(p, v, retval)
 		syscallarg(long) pad;
 		syscallarg(off_t) pos;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	vaddr_t addr;
 	struct vattr va;
 	off_t pos;
@@ -327,6 +335,16 @@ sys_mmap(p, v, retval)
 	if ((ssize_t) size < 0)
 		return (EINVAL);			/* don't allow wrap */
 
+#ifndef pmap_wired_count
+	/*
+	 * if we're going to wire the mapping, restrict it to superuser.
+	 */
+
+	if ((flags & MAP_WIRED) != 0 &&
+	    (error = suser(p->p_ucred, &p->p_acflag)) != 0)
+		return (error);
+#endif
+
 	/*
 	 * now check (MAP_FIXED) or get (!MAP_FIXED) the "addr"
 	 */
@@ -349,12 +367,19 @@ sys_mmap(p, v, retval)
 	} else if (addr == 0 || !(flags & MAP_TRYFIXED)) {
 
 		/*
-		 * not fixed: make sure we skip over the largest possible heap.
-		 * we will refine our guess later (e.g. to account for VAC, etc)
+		 * not fixed: make sure we skip over the largest
+		 * possible heap for non-topdown mapping arrangements.
+		 * we will refine our guess later (e.g. to account for
+		 * VAC, etc)
 		 */
 
-		addr = MAX(addr, round_page((vaddr_t)p->p_vmspace->vm_daddr +
-					    MAXDSIZ));
+		if (addr == 0 ||
+		    !(p->p_vmspace->vm_map.flags & VM_MAP_TOPDOWN))
+			addr = MAX(addr,
+			    VM_DEFAULT_ADDRESS(p->p_vmspace->vm_daddr, size));
+		else
+			addr = MIN(addr,
+			    VM_DEFAULT_ADDRESS(p->p_vmspace->vm_daddr, size));
 	}
 
 	/*
@@ -365,6 +390,8 @@ sys_mmap(p, v, retval)
 
 		if ((fp = fd_getfile(fdp, fd)) == NULL)
 			return (EBADF);
+
+		simple_unlock(&fp->f_slock);
 
 		if (fp->f_type != DTYPE_VNODE)
 			return (ENODEV);		/* only mmap vnodes! */
@@ -381,7 +408,8 @@ sys_mmap(p, v, retval)
 			return (EOVERFLOW);		/* no offset wrapping */
 
 		/* special case: catch SunOS style /dev/zero */
-		if (vp->v_type == VCHR && iszerodev(vp->v_rdev)) {
+		if (vp->v_type == VCHR
+		    && (vp->v_rdev == zerodev || COMPAT_ZERODEV(vp->v_rdev))) {
 			flags |= MAP_ANON;
 			goto is_anon;
 		}
@@ -395,7 +423,7 @@ sys_mmap(p, v, retval)
 		if ((flags & (MAP_SHARED|MAP_PRIVATE)) == 0) {
 #if defined(DEBUG)
 			printf("WARNING: defaulted mmap() share type to "
-			   "%s (pid %d comm %s)\n", vp->v_type == VCHR ?
+			   "%s (pid %d command %s)\n", vp->v_type == VCHR ?
 			   "MAP_SHARED" : "MAP_PRIVATE", p->p_pid,
 			    p->p_comm);
 #endif
@@ -499,8 +527,8 @@ sys_mmap(p, v, retval)
  */
 
 int
-sys___msync13(p, v, retval)
-	struct proc *p;
+sys___msync13(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -509,6 +537,7 @@ sys___msync13(p, v, retval)
 		syscallarg(size_t) len;
 		syscallarg(int) flags;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	vaddr_t addr;
 	vsize_t size, pageoff;
 	struct vm_map *map;
@@ -524,11 +553,11 @@ sys___msync13(p, v, retval)
 
 	/* sanity check flags */
 	if ((flags & ~(MS_ASYNC | MS_SYNC | MS_INVALIDATE)) != 0 ||
-			(flags & (MS_ASYNC | MS_SYNC | MS_INVALIDATE)) == 0 ||
-			(flags & (MS_ASYNC | MS_SYNC)) == (MS_ASYNC | MS_SYNC))
-	  return (EINVAL);
+	    (flags & (MS_ASYNC | MS_SYNC | MS_INVALIDATE)) == 0 ||
+	    (flags & (MS_ASYNC | MS_SYNC)) == (MS_ASYNC | MS_SYNC))
+		return (EINVAL);
 	if ((flags & (MS_ASYNC | MS_SYNC)) == 0)
-	  flags |= MS_SYNC;
+		flags |= MS_SYNC;
 
 	/*
 	 * align the address to a page boundary and adjust the size accordingly.
@@ -595,8 +624,8 @@ sys___msync13(p, v, retval)
  */
 
 int
-sys_munmap(p, v, retval)
-	struct proc *p;
+sys_munmap(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -604,6 +633,7 @@ sys_munmap(p, v, retval)
 		syscallarg(caddr_t) addr;
 		syscallarg(size_t) len;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	vaddr_t addr;
 	vsize_t size, pageoff;
 	struct vm_map *map;
@@ -649,10 +679,12 @@ sys_munmap(p, v, retval)
 	 */
 
 	vm_map_lock(map);
+#if 0
 	if (!uvm_map_checkprot(map, addr, addr + size, VM_PROT_NONE)) {
 		vm_map_unlock(map);
 		return (EINVAL);
 	}
+#endif
 	uvm_unmap_remove(map, addr, addr + size, &dead_entries);
 	vm_map_unlock(map);
 	if (dead_entries != NULL)
@@ -665,16 +697,17 @@ sys_munmap(p, v, retval)
  */
 
 int
-sys_mprotect(p, v, retval)
-	struct proc *p;
+sys_mprotect(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct sys_mprotect_args /* {
 		syscallarg(caddr_t) addr;
-		syscallarg(int) len;
+		syscallarg(size_t) len;
 		syscallarg(int) prot;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	vaddr_t addr;
 	vsize_t size, pageoff;
 	vm_prot_t prot;
@@ -695,10 +728,8 @@ sys_mprotect(p, v, retval)
 	pageoff = (addr & PAGE_MASK);
 	addr -= pageoff;
 	size += pageoff;
-	size = (vsize_t)round_page(size);
+	size = round_page(size);
 
-	if ((int)size < 0)
-		return (EINVAL);
 	error = uvm_map_protect(&p->p_vmspace->vm_map, addr, addr + size, prot,
 				FALSE);
 	return error;
@@ -709,8 +740,8 @@ sys_mprotect(p, v, retval)
  */
 
 int
-sys_minherit(p, v, retval)
-	struct proc *p;
+sys_minherit(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -719,6 +750,7 @@ sys_minherit(p, v, retval)
 		syscallarg(int) len;
 		syscallarg(int) inherit;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	vaddr_t addr;
 	vsize_t size, pageoff;
 	vm_inherit_t inherit;
@@ -750,8 +782,8 @@ sys_minherit(p, v, retval)
 
 /* ARGSUSED */
 int
-sys_madvise(p, v, retval)
-	struct proc *p;
+sys_madvise(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -760,6 +792,7 @@ sys_madvise(p, v, retval)
 		syscallarg(size_t) len;
 		syscallarg(int) behav;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	vaddr_t addr;
 	vsize_t size, pageoff;
 	int advice, error;
@@ -853,8 +886,8 @@ sys_madvise(p, v, retval)
  */
 
 int
-sys_mlock(p, v, retval)
-	struct proc *p;
+sys_mlock(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -862,6 +895,7 @@ sys_mlock(p, v, retval)
 		syscallarg(const void *) addr;
 		syscallarg(size_t) len;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	vaddr_t addr;
 	vsize_t size, pageoff;
 	int error;
@@ -908,8 +942,8 @@ sys_mlock(p, v, retval)
  */
 
 int
-sys_munlock(p, v, retval)
-	struct proc *p;
+sys_munlock(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
@@ -917,6 +951,7 @@ sys_munlock(p, v, retval)
 		syscallarg(const void *) addr;
 		syscallarg(size_t) len;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	vaddr_t addr;
 	vsize_t size, pageoff;
 	int error;
@@ -956,14 +991,15 @@ sys_munlock(p, v, retval)
  */
 
 int
-sys_mlockall(p, v, retval)
-	struct proc *p;
+sys_mlockall(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
 	struct sys_mlockall_args /* {
 		syscallarg(int) flags;
 	} */ *uap = v;
+	struct proc *p = l->l_proc;
 	int error, flags;
 
 	flags = SCARG(uap, flags);
@@ -987,11 +1023,12 @@ sys_mlockall(p, v, retval)
  */
 
 int
-sys_munlockall(p, v, retval)
-	struct proc *p;
+sys_munlockall(l, v, retval)
+	struct lwp *l;
 	void *v;
 	register_t *retval;
 {
+	struct proc *p = l->l_proc;
 
 	(void) uvm_map_pageable_all(&p->p_vmspace->vm_map, 0, 0);
 	return (0);
@@ -1018,6 +1055,7 @@ uvm_mmap(map, addr, size, prot, maxprot, flags, handle, foff, locklimit)
 {
 	struct uvm_object *uobj;
 	struct vnode *vp;
+	vaddr_t align = 0;
 	int error;
 	int advice = UVM_ADV_NORMAL;
 	uvm_flag_t uvmflag = 0;
@@ -1045,6 +1083,30 @@ uvm_mmap(map, addr, size, prot, maxprot, flags, handle, foff, locklimit)
 			return(EINVAL);
 		uvmflag |= UVM_FLAG_FIXED;
 		(void) uvm_unmap(map, *addr, *addr + size);
+	}
+
+	/*
+	 * Try to see if any requested alignment can even be attemped.
+	 * Make sure we can express the alignment (asking for a >= 4GB
+	 * alignment on an ILP32 architecure make no sense) and the
+	 * alignment is at least for a page sized quanitiy.  If the
+	 * request was for a fixed mapping, make sure supplied address
+	 * adheres to the request alignment.
+	 */
+	align = (flags & MAP_ALIGNMENT_MASK) >> MAP_ALIGNMENT_SHIFT;
+	if (align) {
+		if (align >= sizeof(vaddr_t) * NBBY)
+			return(EINVAL);
+		align = 1L << align;
+		if (align < PAGE_SIZE)
+			return(EINVAL);
+		if (align >= map->max_offset)
+			return(ENOMEM);
+		if (flags & MAP_FIXED) {
+			if ((*addr & (align-1)) != 0)
+				return(EINVAL);
+			align = 0;
+		}
 	}
 
 	/*
@@ -1117,7 +1179,7 @@ uvm_mmap(map, addr, size, prot, maxprot, flags, handle, foff, locklimit)
 	uvmflag = UVM_MAPFLAG(prot, maxprot,
 			(flags & MAP_SHARED) ? UVM_INH_SHARE : UVM_INH_COPY,
 			advice, uvmflag);
-	error = uvm_map(map, addr, size, uobj, foff, 0, uvmflag);
+	error = uvm_map(map, addr, size, uobj, foff, align, uvmflag);
 	if (error) {
 		if (uobj)
 			uobj->pgops->pgo_detach(uobj);
@@ -1127,6 +1189,8 @@ uvm_mmap(map, addr, size, prot, maxprot, flags, handle, foff, locklimit)
 	/*
 	 * POSIX 1003.1b -- if our address space was configured
 	 * to lock all future mappings, wire the one we just made.
+	 *
+	 * Also handle the MAP_WIRED flag here.
 	 */
 
 	if (prot == VM_PROT_NONE) {
@@ -1138,7 +1202,7 @@ uvm_mmap(map, addr, size, prot, maxprot, flags, handle, foff, locklimit)
 		return (0);
 	}
 	vm_map_lock(map);
-	if (map->flags & VM_MAP_WIREFUTURE) {
+	if ((flags & MAP_WIRED) != 0 || (map->flags & VM_MAP_WIREFUTURE) != 0) {
 		if ((atop(size) + uvmexp.wired) > uvmexp.wiredmax
 #ifdef pmap_wired_count
 		    || (locklimit != 0 && (size +

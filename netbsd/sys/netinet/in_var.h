@@ -1,4 +1,4 @@
-/*	$NetBSD: in_var.h,v 1.44 2002/05/12 20:33:50 matt Exp $	*/
+/*	$NetBSD: in_var.h,v 1.51 2003/11/11 20:25:26 jonathan Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -80,11 +80,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -153,6 +149,9 @@ struct	in_aliasreq {
 #ifndef IN_IFADDR_HASH_SIZE
 #define IN_IFADDR_HASH_SIZE 509	/* 61, 127, 251, 509, 1021, 2039 are good */
 #endif
+#ifndef IN_MULTI_HASH_SIZE
+#define IN_MULTI_HASH_SIZE 509	/* 61, 127, 251, 509, 1021, 2039 are good */
+#endif
 
 /*
  * This is a bit unconventional, and wastes a little bit of space, but
@@ -161,14 +160,22 @@ struct	in_aliasreq {
  */
 
 #define	IN_IFADDR_HASH(x) in_ifaddrhashtbl[(u_long)(x) % IN_IFADDR_HASH_SIZE]
+#define IN_MULTI_HASH(x, ifp) \
+	(in_multihashtbl[(u_long)((x) ^ (ifp->if_index)) % IN_MULTI_HASH_SIZE])
 
 LIST_HEAD(in_ifaddrhashhead, in_ifaddr);	/* Type of the hash head */
 TAILQ_HEAD(in_ifaddrhead, in_ifaddr);		/* Type of the list head */
+LIST_HEAD(in_multihashhead, in_multi);		/* Type of the hash head */
+
 
 extern	u_long in_ifaddrhash;			/* size of hash table - 1 */
 extern	int	in_ifaddrentries;		/* total number of addrs */
 extern  struct in_ifaddrhashhead *in_ifaddrhashtbl;	/* Hash table head */
-extern  struct in_ifaddrhead in_ifaddr;		/* List head (in ip_input) */
+extern  struct in_ifaddrhead in_ifaddrhead;		/* List head (in ip_input) */
+
+extern	u_long in_multihash;			/* size of hash table - 1 */
+extern	int	in_multientries;		/* total number of addrs */
+extern  struct in_multihashhead *in_multihashtbl;	/* Hash table head */
 
 extern	struct	ifqueue	ipintrq;		/* ip packet input queue */
 extern	const	int	inetctlerrmap[];
@@ -177,17 +184,13 @@ extern	const	int	inetctlerrmap[];
 /*
  * Macro for finding whether an internet address (in_addr) belongs to one
  * of our interfaces (in_ifaddr).  NULL if the address isn't ours.
- *
- * Note that even if we find an interface with the address we're looking
- * for, we should skip that interface if it is not up.
  */
 #define INADDR_TO_IA(addr, ia) \
 	/* struct in_addr addr; */ \
 	/* struct in_ifaddr *ia; */ \
 { \
 	LIST_FOREACH(ia, &IN_IFADDR_HASH((addr).s_addr), ia_hash) { \
-		if (in_hosteq(ia->ia_addr.sin_addr, (addr)) && \
-		    (ia->ia_ifp->if_flags & IFF_UP) != 0) \
+		if (in_hosteq(ia->ia_addr.sin_addr, (addr))) \
 			break; \
 	} \
 }
@@ -244,6 +247,7 @@ extern	const	int	inetctlerrmap[];
  * Per-interface router version information.
  */
 struct router_info {
+	LIST_ENTRY(router_info) rti_link;
 	struct	ifnet *rti_ifp;
 	int	rti_type;	/* type of router on this interface */
 	int	rti_age;	/* time since last v1 query */
@@ -253,7 +257,6 @@ struct router_info {
 	u_int	rti_qrv;	/* Querier Robustness Variable */
 	u_int	rti_qqi;	/* Querier Interval Variable */
 	u_int	rti_qri;	/* Querier Response Interval */
-	struct	router_info *rti_next;
 };
 
 /*
@@ -263,12 +266,12 @@ struct router_info {
  * structure.
  */
 struct in_multi {
-	struct	in_addr inm_addr;	/* IP multicast address */
+	LIST_ENTRY(in_multi) inm_list;	/* list of multicast addresses */
+	struct	router_info *inm_rti;	/* router version info */
 	struct	ifnet *inm_ifp;		/* back pointer to ifnet */
-	struct	in_ifaddr *inm_ia;	/* back pointer to in_ifaddr */
+	struct	in_addr inm_addr;	/* IP multicast address */
 	u_int	inm_refcount;		/* no. membership claims by sockets */
 	u_int	inm_timer;		/* IGMP membership report timer */
-	LIST_ENTRY(in_multi) inm_list;	/* list of multicast addresses */
 	u_int	inm_state;		/* state of membership */
 	struct	router_info *inm_rti;	/* router version info */
 	struct	in_multi_source *inm_source; /* filtered source list */
@@ -280,7 +283,7 @@ struct in_multi {
  * all of the in_multi records.
  */
 struct in_multistep {
-	struct in_ifaddr *i_ia;
+	int i_n;
 	struct in_multi *i_inm;
 };
 
@@ -293,16 +296,11 @@ struct in_multistep {
 	/* struct ifnet *ifp; */ \
 	/* struct in_multi *inm; */ \
 { \
-	struct in_ifaddr *ia; \
-\
-	IFP_TO_IA((ifp), ia); 			/* multicast */ \
-	if (ia == NULL) \
-		(inm) = NULL; \
-	else \
-		for ((inm) = LIST_FIRST(&ia->ia_multiaddrs); \
-		    (inm) != NULL && !in_hosteq((inm)->inm_addr, (addr)); \
-		     (inm) = LIST_NEXT((inm), inm_list)) \
-			 continue; \
+	LIST_FOREACH((inm), &IN_MULTI_HASH(((addr).s_addr), (ifp)), inm_list) {\
+		if (in_hosteq((inm)->inm_addr, (addr)) && \
+		    (inm)->inm_ifp == (ifp)) \
+			break; \
+	} \
 }
 
 /*
@@ -316,25 +314,18 @@ struct in_multistep {
 	/* struct in_multistep  step; */ \
 	/* struct in_multi *inm; */ \
 { \
+	while ((step).i_inm == NULL && (step).i_n < IN_MULTI_HASH_SIZE) \
+		(step).i_inm = LIST_FIRST(&in_multihashtbl[++(step).i_n]); \
 	if (((inm) = (step).i_inm) != NULL) \
 		(step).i_inm = LIST_NEXT((inm), inm_list); \
-	else \
-		while ((step).i_ia != NULL) { \
-			(inm) = LIST_FIRST(&(step).i_ia->ia_multiaddrs); \
-			(step).i_ia = TAILQ_NEXT((step).i_ia, ia_list); \
-			if ((inm) != NULL) { \
-				(step).i_inm = LIST_NEXT((inm), inm_list); \
-				break; \
-			} \
-		} \
 }
 
 #define IN_FIRST_MULTI(step, inm) \
 	/* struct in_multistep step; */ \
 	/* struct in_multi *inm; */ \
 { \
-	(step).i_ia = TAILQ_FIRST(&in_ifaddr); \
-	(step).i_inm = NULL; \
+	(step).i_n = 0; \
+	(step).i_inm = LIST_FIRST(&in_multihashtbl[0]); \
 	IN_NEXT_MULTI((step), (inm)); \
 }
 

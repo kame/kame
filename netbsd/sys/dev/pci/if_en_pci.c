@@ -1,4 +1,4 @@
-/*	$NetBSD: if_en_pci.c,v 1.15 2001/11/13 07:48:43 lukem Exp $	*/
+/*	$NetBSD: if_en_pci.c,v 1.20 2003/10/30 01:58:17 simonb Exp $	*/
 
 /*
  *
@@ -43,7 +43,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_en_pci.c,v 1.15 2001/11/13 07:48:43 lukem Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_en_pci.c,v 1.20 2003/10/30 01:58:17 simonb Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -128,9 +128,8 @@ static	void en_pci_attach __P((struct device *, struct device *, void *));
  * PCI autoconfig attachments
  */
 
-struct cfattach en_pci_ca = {
-    sizeof(struct en_pci_softc), en_pci_match, en_pci_attach,
-};
+CFATTACH_DECL(en_pci, sizeof(struct en_pci_softc),
+    en_pci_match, en_pci_attach, NULL, NULL);
 
 #if !defined(MIDWAY_ENIONLY)
 
@@ -207,7 +206,8 @@ void *aux;
   const char *intrstr;
   int retval;
 
-  printf("\n");
+  aprint_naive(": ATM controller\n");
+  aprint_normal("\n");
 
   sc->is_adaptec = (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_ADP) ? 1 : 0;
   scp->en_pc = pa->pa_pc;
@@ -224,19 +224,19 @@ void *aux;
    */
 
   if (pci_intr_map(pa, &ih)) {
-    printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
+    aprint_error("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
     return;
   }
   intrstr = pci_intr_string(scp->en_pc, ih);
   scp->sc_ih = pci_intr_establish(scp->en_pc, ih, IPL_NET, en_intr, sc);
   if (scp->sc_ih == NULL) {
-    printf("%s: couldn't establish interrupt\n", sc->sc_dev.dv_xname);
+    aprint_error("%s: couldn't establish interrupt\n", sc->sc_dev.dv_xname);
     if (intrstr != NULL)
-      printf(" at %s", intrstr);
-    printf("\n");
+      aprint_normal(" at %s", intrstr);
+    aprint_normal("\n");
     return;
   }
-  printf("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
+  aprint_normal("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
   sc->ipl = 1; /* XXX */
 
   /*
@@ -247,7 +247,7 @@ void *aux;
 			  PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT, 0,
 			  &sc->en_memt, &sc->en_base, NULL, &sc->en_obmemsz);
   if (retval) {
-    printf("%s: couldn't map memory\n", sc->sc_dev.dv_xname);
+    aprint_error("%s: couldn't map memory\n", sc->sc_dev.dv_xname);
     return;
   }
 	
@@ -334,7 +334,7 @@ eni_get_macaddr(scp, pa)
   struct en_softc *sc = (struct en_softc *)scp;
   pci_chipset_tag_t id = scp->en_pc;
   pcitag_t tag = pa->pa_tag;
-  int i, j, address, status;
+  int i, j, address;
   u_int32_t data, t_data;
   u_int8_t tmp;
   
@@ -370,7 +370,6 @@ eni_get_macaddr(scp, pa)
     data |= EN_PROM_CLK ;
     pci_conf_write(id, tag, EN_TONGA, data);
     data = pci_conf_read(id, tag, EN_TONGA);
-    status = data & EN_PROM_DATA;
     data &= ~EN_PROM_CLK ;
     pci_conf_write(id, tag, EN_TONGA, data);
     data |= EN_PROM_DATA ;
@@ -397,7 +396,6 @@ eni_get_macaddr(scp, pa)
     data |= EN_PROM_CLK ;
     pci_conf_write(id, tag, EN_TONGA, data);
     data = pci_conf_read(id, tag, EN_TONGA);
-    status = data & EN_PROM_DATA;
     data &= ~EN_PROM_CLK ;
     pci_conf_write(id, tag, EN_TONGA, data);
     data |= EN_PROM_DATA ;

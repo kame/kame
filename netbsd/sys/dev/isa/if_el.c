@@ -1,4 +1,4 @@
-/*	$NetBSD: if_el.c,v 1.66.10.1 2003/01/27 04:54:01 jmc Exp $	*/
+/*	$NetBSD: if_el.c,v 1.70 2003/01/15 22:01:16 bouyer Exp $	*/
 
 /*
  * Copyright (c) 1994, Matthew E. Kimmel.  Permission is hereby granted
@@ -19,7 +19,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_el.c,v 1.66.10.1 2003/01/27 04:54:01 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_el.c,v 1.70 2003/01/15 22:01:16 bouyer Exp $");
 
 #include "opt_inet.h"
 #include "opt_ns.h"
@@ -110,9 +110,8 @@ static inline void el_hardreset __P((struct el_softc *));
 int elprobe __P((struct device *, struct cfdata *, void *));
 void elattach __P((struct device *, struct device *, void *));
 
-struct cfattach el_ca = {
-	sizeof(struct el_softc), elprobe, elattach
-};
+CFATTACH_DECL(el, sizeof(struct el_softc),
+    elprobe, elattach, NULL, NULL);
 
 /*
  * Probe routine.

@@ -1,4 +1,4 @@
-/*	$NetBSD: elinkxl.c,v 1.63.4.1 2002/12/12 21:34:39 he Exp $	*/
+/*	$NetBSD: elinkxl.c,v 1.72.2.1 2004/07/02 18:32:55 he Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -37,7 +37,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: elinkxl.c,v 1.63.4.1 2002/12/12 21:34:39 he Exp $");
+__KERNEL_RCSID(0, "$NetBSD: elinkxl.c,v 1.72.2.1 2004/07/02 18:32:55 he Exp $");
 
 #include "bpfilter.h"
 #include "rnd.h"
@@ -94,6 +94,7 @@ void ex_media_stat __P((struct ifnet *ifp, struct ifmediareq *req));
 void ex_probe_media __P((struct ex_softc *));
 void ex_set_filter __P((struct ex_softc *));
 void ex_set_media __P((struct ex_softc *));
+void ex_set_xcvr __P((struct ex_softc *, u_int16_t));
 struct mbuf *ex_get __P((struct ex_softc *, int));
 u_int16_t ex_read_eeprom __P((struct ex_softc *, int));
 int ex_init __P((struct ifnet *));
@@ -104,8 +105,6 @@ void ex_getstats __P((struct ex_softc *));
 void ex_printstats __P((struct ex_softc *));
 void ex_tick __P((void *));
 
-int ex_enable __P((struct ex_softc *));
-void ex_disable __P((struct ex_softc *));
 void ex_power __P((int, void *));
 
 static int ex_eeprom_busy __P((struct ex_softc *));
@@ -206,7 +205,7 @@ ex_config(sc)
 	macaddr[4] = val >> 8;
 	macaddr[5] = val & 0xff;
 
-	printf("%s: MAC address %s\n", sc->sc_dev.dv_xname,
+	aprint_normal("%s: MAC address %s\n", sc->sc_dev.dv_xname,
 	    ether_sprintf(macaddr));
 
 	if (sc->ex_conf & (EX_CONF_INV_LED_POLARITY|EX_CONF_PHY_POWER)) {
@@ -218,6 +217,11 @@ ex_config(sc)
 			val |= ELINK_RESET_OPT_PHYPOWER;
 		bus_space_write_2(iot, ioh, ELINK_W2_RESET_OPTIONS, val);
 	}
+	if (sc->ex_conf & EX_CONF_NO_XCVR_PWR) {
+		GO_WINDOW(0);
+		bus_space_write_2(iot, ioh, ELINK_W0_MFG_ID,
+		    EX_XCVR_PWR_MAGICBITS);
+	}
 
 	attach_stage = 0;
 
@@ -228,7 +232,8 @@ ex_config(sc)
 	if ((error = bus_dmamem_alloc(sc->sc_dmat,
 	    EX_NUPD * sizeof (struct ex_upd), PAGE_SIZE, 0, &sc->sc_useg, 1, 
             &sc->sc_urseg, BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: can't allocate upload descriptors, error = %d\n",
+		aprint_error(
+		    "%s: can't allocate upload descriptors, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail;
 	}
@@ -238,7 +243,7 @@ ex_config(sc)
 	if ((error = bus_dmamem_map(sc->sc_dmat, &sc->sc_useg, sc->sc_urseg,
 	    EX_NUPD * sizeof (struct ex_upd), (caddr_t *)&sc->sc_upd,
 	    BUS_DMA_NOWAIT|BUS_DMA_COHERENT)) != 0) {
-		printf("%s: can't map upload descriptors, error = %d\n",
+		aprint_error("%s: can't map upload descriptors, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail;
 	}
@@ -249,7 +254,8 @@ ex_config(sc)
 	    EX_NUPD * sizeof (struct ex_upd), 1,
 	    EX_NUPD * sizeof (struct ex_upd), 0, BUS_DMA_NOWAIT,
 	    &sc->sc_upd_dmamap)) != 0) {
-		printf("%s: can't create upload desc. DMA map, error = %d\n",
+		aprint_error(
+		    "%s: can't create upload desc. DMA map, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail;
 	}
@@ -259,7 +265,8 @@ ex_config(sc)
 	if ((error = bus_dmamap_load(sc->sc_dmat, sc->sc_upd_dmamap,
 	    sc->sc_upd, EX_NUPD * sizeof (struct ex_upd), NULL,
 	    BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: can't load upload desc. DMA map, error = %d\n",
+		aprint_error(
+		    "%s: can't load upload desc. DMA map, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail;
 	}
@@ -273,7 +280,8 @@ ex_config(sc)
 	if ((error = bus_dmamem_alloc(sc->sc_dmat,
 	    EX_NDPD * sizeof (struct ex_dpd), PAGE_SIZE, 0, &sc->sc_dseg, 1, 
 	    &sc->sc_drseg, BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: can't allocate download descriptors, error = %d\n",
+		aprint_error(
+		    "%s: can't allocate download descriptors, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail;
 	}
@@ -283,7 +291,7 @@ ex_config(sc)
 	if ((error = bus_dmamem_map(sc->sc_dmat, &sc->sc_dseg, sc->sc_drseg,
 	    EX_NDPD * sizeof (struct ex_dpd), (caddr_t *)&sc->sc_dpd,
 	    BUS_DMA_NOWAIT|BUS_DMA_COHERENT)) != 0) {
-		printf("%s: can't map download descriptors, error = %d\n",
+		aprint_error("%s: can't map download descriptors, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail;
 	}
@@ -295,7 +303,8 @@ ex_config(sc)
 	    EX_NDPD * sizeof (struct ex_dpd), 1,
 	    EX_NDPD * sizeof (struct ex_dpd), 0, BUS_DMA_NOWAIT,
 	    &sc->sc_dpd_dmamap)) != 0) {
-		printf("%s: can't create download desc. DMA map, error = %d\n",
+		aprint_error(
+		    "%s: can't create download desc. DMA map, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail;
 	}
@@ -305,7 +314,8 @@ ex_config(sc)
 	if ((error = bus_dmamap_load(sc->sc_dmat, sc->sc_dpd_dmamap,
 	    sc->sc_dpd, EX_NDPD * sizeof (struct ex_dpd), NULL,
 	    BUS_DMA_NOWAIT)) != 0) {
-		printf("%s: can't load download desc. DMA map, error = %d\n",
+		aprint_error(
+		    "%s: can't load download desc. DMA map, error = %d\n",
 		    sc->sc_dev.dv_xname, error);
 		goto fail;
 	}
@@ -320,7 +330,8 @@ ex_config(sc)
 		if ((error = bus_dmamap_create(sc->sc_dmat, MCLBYTES,
 		    EX_NTFRAGS, MCLBYTES, 0, BUS_DMA_NOWAIT,
 		    &sc->sc_tx_dmamaps[i])) != 0) {
-			printf("%s: can't create tx DMA map %d, error = %d\n",
+			aprint_error(
+			    "%s: can't create tx DMA map %d, error = %d\n",
 			    sc->sc_dev.dv_xname, i, error);
 			goto fail;
 		}
@@ -335,7 +346,8 @@ ex_config(sc)
 		if ((error = bus_dmamap_create(sc->sc_dmat, MCLBYTES,
 		    EX_NRFRAGS, MCLBYTES, 0, BUS_DMA_NOWAIT,
 		    &sc->sc_rx_dmamaps[i])) != 0) {
-			printf("%s: can't create rx DMA map %d, error = %d\n",
+			aprint_error(
+			    "%s: can't create rx DMA map %d, error = %d\n",
 			    sc->sc_dev.dv_xname, i, error);
 			goto fail;
 		}
@@ -354,7 +366,7 @@ ex_config(sc)
 		sc->sc_upd[i].upd_frags[0].fr_len =
 		    htole32((MCLBYTES - 2) | EX_FR_LAST);
 		if (ex_add_rxbuf(sc, &sc->sc_rxdescs[i]) != 0) {
-			printf("%s: can't allocate or map rx buffers\n",
+			aprint_error("%s: can't allocate or map rx buffers\n",
 			    sc->sc_dev.dv_xname);
 			goto fail;
 		}
@@ -384,7 +396,7 @@ ex_config(sc)
 	sc->ex_mii.mii_readreg = ex_mii_readreg;
 	sc->ex_mii.mii_writereg = ex_mii_writereg;
 	sc->ex_mii.mii_statchg = ex_mii_statchg;
-	ifmedia_init(&sc->ex_mii.mii_media, 0, ex_media_chg,
+	ifmedia_init(&sc->ex_mii.mii_media, IFM_IMASK, ex_media_chg,
 	    ex_media_stat);
 
 	if (sc->ex_conf & EX_CONF_MII) {
@@ -392,19 +404,7 @@ ex_config(sc)
 		 * Find PHY, extract media information from it.
 		 * First, select the right transceiver.
 		 */
-		u_int32_t icfg;
-
-		GO_WINDOW(3);
-		icfg = bus_space_read_4(iot, ioh, ELINK_W3_INTERNAL_CONFIG);
-		icfg &= ~(CONFIG_XCVR_SEL << 16);
-		if (val & (ELINK_MEDIACAP_MII | ELINK_MEDIACAP_100BASET4))
-			icfg |= ELINKMEDIA_MII << (CONFIG_XCVR_SEL_SHIFT + 16);
-		if (val & ELINK_MEDIACAP_100BASETX)
-			icfg |= ELINKMEDIA_AUTO << (CONFIG_XCVR_SEL_SHIFT + 16);
-		if (val & ELINK_MEDIACAP_100BASEFX)
-			icfg |= ELINKMEDIA_100BASE_FX 
-				<< (CONFIG_XCVR_SEL_SHIFT + 16);
-		bus_space_write_4(iot, ioh, ELINK_W3_INTERNAL_CONFIG, icfg);
+		ex_set_xcvr(sc, val);
 
 		mii_attach(&sc->sc_dev, &sc->ex_mii, 0xffffffff,
 		    MII_PHY_ANY, MII_OFFSET_ANY, 0);
@@ -459,13 +459,13 @@ ex_config(sc)
 	/*  Establish callback to reset card when we reboot. */
 	sc->sc_sdhook = shutdownhook_establish(ex_shutdown, sc);
 	if (sc->sc_sdhook == NULL)
-		printf("%s: WARNING: unable to establish shutdown hook\n",
+		aprint_error("%s: WARNING: unable to establish shutdown hook\n",
 			sc->sc_dev.dv_xname);
 
 	/* Add a suspend hook to make sure we come back up after a resume. */
 	sc->sc_powerhook = powerhook_establish(ex_power, sc);
 	if (sc->sc_powerhook == NULL)
-		printf("%s: WARNING: unable to establish power hook\n",
+		aprint_error("%s: WARNING: unable to establish power hook\n",
 			sc->sc_dev.dv_xname);
 
 	/* The attach is successful. */
@@ -560,17 +560,17 @@ ex_probemedia(sc)
 
 	default_media = (config1 & CONFIG_MEDIAMASK) >> CONFIG_MEDIAMASK_SHIFT;
 
-	printf("%s: ", sc->sc_dev.dv_xname);
+	aprint_normal("%s: ", sc->sc_dev.dv_xname);
 
 	/* Sanity check that there are any media! */
 	if ((reset_options & ELINK_PCI_MEDIAMASK) == 0) {
-		printf("no media present!\n");
+		aprint_error("no media present!\n");
 		ifmedia_add(ifm, IFM_ETHER|IFM_NONE, 0, NULL);
 		ifmedia_set(ifm, IFM_ETHER|IFM_NONE);
 		return;
 	}
 
-#define	PRINT(str)	printf("%s%s", sep, str); sep = ", "
+#define	PRINT(str)	aprint_normal("%s%s", sep, str); sep = ", "
 
 	for (exm = ex_native_media; exm->exm_name != NULL; exm++) {
 		if (reset_options & exm->exm_mpbit) {
@@ -603,7 +603,7 @@ ex_probemedia(sc)
 		panic("ex_probemedia: impossible");
 #endif
 
-	printf(", default %s\n", defmedianame);
+	aprint_normal(", default %s\n", defmedianame);
 	ifmedia_set(ifm, defmedia);
 }
 
@@ -828,6 +828,30 @@ ex_media_chg(ifp)
 }
 
 void
+ex_set_xcvr(sc, media)
+	struct ex_softc *sc;
+	const u_int16_t media;
+{
+	bus_space_tag_t iot = sc->sc_iot;
+	bus_space_handle_t ioh = sc->sc_ioh;
+	u_int32_t icfg;
+
+	/*
+	 * We're already in Window 3
+	 */
+	icfg = bus_space_read_4(iot, ioh, ELINK_W3_INTERNAL_CONFIG);
+	icfg &= ~(CONFIG_XCVR_SEL << 16);
+	if (media & (ELINK_MEDIACAP_MII | ELINK_MEDIACAP_100BASET4))
+		icfg |= ELINKMEDIA_MII << (CONFIG_XCVR_SEL_SHIFT + 16);
+	if (media & ELINK_MEDIACAP_100BASETX)
+		icfg |= ELINKMEDIA_AUTO << (CONFIG_XCVR_SEL_SHIFT + 16);
+	if (media & ELINK_MEDIACAP_100BASEFX)
+		icfg |= ELINKMEDIA_100BASE_FX 
+			<< (CONFIG_XCVR_SEL_SHIFT + 16);
+	bus_space_write_4(iot, ioh, ELINK_W3_INTERNAL_CONFIG, icfg);
+}
+
+void
 ex_set_media(sc)
 	struct ex_softc *sc;
 {
@@ -850,14 +874,11 @@ ex_set_media(sc)
 	 * PHY which media to use.
 	 */
 	if (sc->ex_conf & EX_CONF_MII) {
+		u_int16_t val;
+
 		GO_WINDOW(3);
-
-		configreg = bus_space_read_4(iot, ioh, ELINK_W3_INTERNAL_CONFIG);
-
-		configreg &= ~(CONFIG_MEDIAMASK << 16);
-		configreg |= (ELINKMEDIA_MII << (CONFIG_MEDIAMASK_SHIFT + 16));
-
-		bus_space_write_4(iot, ioh, ELINK_W3_INTERNAL_CONFIG, configreg);
+		val = bus_space_read_2(iot, ioh, ELINK_W3_RESET_OPTIONS);
+		ex_set_xcvr(sc, val);
 		mii_mediachg(&sc->ex_mii);
 		return;
 	}
@@ -924,19 +945,24 @@ ex_media_stat(ifp, req)
 	struct ifmediareq *req;
 {
 	struct ex_softc *sc = ifp->if_softc;
+	u_int16_t help;
 
-	if (sc->ex_conf & EX_CONF_MII) {
-		mii_pollstat(&sc->ex_mii);
-		req->ifm_status = sc->ex_mii.mii_media_status;
-		req->ifm_active = sc->ex_mii.mii_media_active;
-	} else {
-		GO_WINDOW(4);
-		req->ifm_status = IFM_AVALID;
-		req->ifm_active = sc->ex_mii.mii_media.ifm_cur->ifm_media;
-		if (bus_space_read_2(sc->sc_iot, sc->sc_ioh,
-		    ELINK_W4_MEDIA_TYPE) & LINKBEAT_DETECT)
-			req->ifm_status |= IFM_ACTIVE;
-                GO_WINDOW(1);
+	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) == (IFF_UP|IFF_RUNNING)) {
+		if (sc->ex_conf & EX_CONF_MII) {
+			mii_pollstat(&sc->ex_mii);
+			req->ifm_status = sc->ex_mii.mii_media_status;
+			req->ifm_active = sc->ex_mii.mii_media_active;
+		} else {
+			GO_WINDOW(4);
+			req->ifm_status = IFM_AVALID;
+			req->ifm_active =
+			    sc->ex_mii.mii_media.ifm_cur->ifm_media;
+			help = bus_space_read_2(sc->sc_iot, sc->sc_ioh,
+						ELINK_W4_MEDIA_TYPE);
+			if (help & LINKBEAT_DETECT)
+				req->ifm_status |= IFM_ACTIVE;
+			GO_WINDOW(1);
+		}
 	}
 }
 
@@ -1326,6 +1352,11 @@ ex_intr(arg)
 						  ELINK_UPUNSTALL);
 			}
 		}
+
+#if NRND > 0
+		if (stat)
+			rnd_add_uint32(&sc->rnd_source, stat);
+#endif
 	}
 
 	/* no more interrupts */
@@ -1655,6 +1686,11 @@ ex_shutdown(arg)
 	struct ex_softc *sc = arg;
 
 	ex_stop(&sc->sc_ethercom.ec_if, 1);
+	/*
+	 * Make sure the interface is powered up when we reboot,
+	 * otherwise firmware on some systems gets really confused.
+	 */
+	(void) ex_enable(sc);
 }
 
 /*

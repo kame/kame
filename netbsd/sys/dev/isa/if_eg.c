@@ -1,4 +1,4 @@
-/*	$NetBSD: if_eg.c,v 1.57.10.1 2003/01/27 04:45:20 jmc Exp $	*/
+/*	$NetBSD: if_eg.c,v 1.62 2003/10/30 01:58:17 simonb Exp $	*/
 
 /*
  * Copyright (c) 1993 Dean Huxley <dean@fsa.ca>
@@ -40,7 +40,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_eg.c,v 1.57.10.1 2003/01/27 04:45:20 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_eg.c,v 1.62 2003/10/30 01:58:17 simonb Exp $");
 
 #include "opt_inet.h"
 #include "opt_ns.h"
@@ -129,9 +129,8 @@ struct eg_softc {
 int egprobe __P((struct device *, struct cfdata *, void *));
 void egattach __P((struct device *, struct device *, void *));
 
-struct cfattach eg_ca = {
-	sizeof(struct eg_softc), egprobe, egattach
-};
+CFATTACH_DECL(eg, sizeof(struct eg_softc),
+    egprobe, egattach, NULL, NULL);
 
 int egintr __P((void *));
 void eginit __P((struct eg_softc *));
@@ -274,7 +273,6 @@ egreadPCB(iot, ioh, pcb)
 	u_int8_t *pcb;
 {
 	int i;
-	u_int8_t b;
 
 	bus_space_write_1(iot, ioh, EG_CONTROL,
 	    (bus_space_read_1(iot, ioh, EG_CONTROL) & ~EG_PCB_STAT) | EG_PCB_NULL);
@@ -305,7 +303,7 @@ egreadPCB(iot, ioh, pcb)
 		return 1;
 	if (egreadPCBstat(iot, ioh, EG_PCB_DONE))
 		return 1;
-	if ((b = bus_space_read_1(iot, ioh, EG_COMMAND)) != pcb[1] + 2) {
+	if (bus_space_read_1(iot, ioh, EG_COMMAND) != pcb[1] + 2) {
 		DPRINTF(("%d != %d\n", b, pcb[1] + 2));
 		return 1;
 	}

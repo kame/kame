@@ -1,4 +1,4 @@
-/*	$NetBSD: elink3.c,v 1.102 2001/12/28 20:35:46 christos Exp $	*/
+/*	$NetBSD: elink3.c,v 1.106 2003/01/31 00:26:29 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2001 The NetBSD Foundation, Inc.
@@ -69,7 +69,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: elink3.c,v 1.102 2001/12/28 20:35:46 christos Exp $");
+__KERNEL_RCSID(0, "$NetBSD: elink3.c,v 1.106 2003/01/31 00:26:29 thorpej Exp $");
 
 #include "opt_inet.h"
 #include "opt_ns.h"
@@ -402,7 +402,8 @@ epconfig(sc, chipset, enaddr)
 		break;
 
 	default:
-		printf("%s: wrote 0x%x to TX_AVAIL_THRESH, read back 0x%x. "
+		aprint_error(
+		    "%s: wrote 0x%x to TX_AVAIL_THRESH, read back 0x%x. "
 		    "Interface disabled\n",
 		    sc->sc_dev.dv_xname, ELINK_LARGEWIN_PROBE, (int) i);
 		return (1);
@@ -448,7 +449,7 @@ epconfig(sc, chipset, enaddr)
 	 * Display some additional information, if pertinent.
 	 */
 	if (sc->ep_flags & ELINK_FLAGS_USEFIFOBUFFER)
-		printf("%s: RoadRunner FIFO buffer enabled\n",
+		aprint_normal("%s: RoadRunner FIFO buffer enabled\n",
 		    sc->sc_dev.dv_xname);
 
 	/*
@@ -459,7 +460,7 @@ epconfig(sc, chipset, enaddr)
 	sc->sc_mii.mii_readreg = ep_mii_readreg;
 	sc->sc_mii.mii_writereg = ep_mii_writereg;
 	sc->sc_mii.mii_statchg = ep_statchg;
-	ifmedia_init(&sc->sc_mii.mii_media, 0, ep_media_change,
+	ifmedia_init(&sc->sc_mii.mii_media, IFM_IMASK, ep_media_change,
 	    ep_media_status);
 
 	/*
@@ -546,12 +547,12 @@ ep_internalconfig(sc)
 	u_int config0;
 	u_int config1;
 
-	int  ram_size, ram_width, ram_speed, rom_size, ram_split;
+	int  ram_size, ram_width, ram_split;
 	/*
 	 * NVRAM buffer Rx:Tx config names for busmastering cards
 	 * (Demon, Vortex, and later).
 	 */
-	const char *onboard_ram_config[] = {
+	const char *const onboard_ram_config[] = {
 		"5:3", "3:1", "1:1", "3:5" };
 
 	GO_WINDOW(3);
@@ -562,12 +563,10 @@ ep_internalconfig(sc)
 
 	ram_size  = (config0 & CONFIG_RAMSIZE) >> CONFIG_RAMSIZE_SHIFT;
 	ram_width = (config0 & CONFIG_RAMWIDTH) >> CONFIG_RAMWIDTH_SHIFT;
-	ram_speed = (config0 & CONFIG_RAMSPEED) >> CONFIG_RAMSPEED_SHIFT;
-	rom_size  = (config0 & CONFIG_ROMSIZE) >> CONFIG_ROMSIZE_SHIFT;
 
 	ram_split  = (config1 & CONFIG_RAMSPLIT) >> CONFIG_RAMSPLIT_SHIFT;
 
-	printf("%s: address %s, %dKB %s-wide FIFO, %s Rx:Tx split\n",
+	aprint_normal("%s: address %s, %dKB %s-wide FIFO, %s Rx:Tx split\n",
 	       sc->sc_dev.dv_xname,
 	       ether_sprintf(LLADDR(sc->sc_ethercom.ec_if.if_sadl)),
 	       8 << ram_size,
@@ -599,11 +598,11 @@ ep_509_probemedia(sc)
 	GO_WINDOW(0);
 	ep_w0_config = bus_space_read_2(iot, ioh, ELINK_W0_CONFIG_CTRL);
 
-	printf("%s: ", sc->sc_dev.dv_xname);
+	aprint_normal("%s: ", sc->sc_dev.dv_xname);
 
 	/* Sanity check that there are any media! */
 	if ((ep_w0_config & ELINK_W0_CC_MEDIAMASK) == 0) {
-		printf("no media present!\n");
+		aprint_error("no media present!\n");
 		ifmedia_add(ifm, IFM_ETHER|IFM_NONE, 0, NULL);
 		ifmedia_set(ifm, IFM_ETHER|IFM_NONE);
 		return;
@@ -614,7 +613,7 @@ ep_509_probemedia(sc)
 	 */
 	port = ep_read_eeprom(sc, EEPROM_ADDR_CFG) >> 14;
 
-#define	PRINT(str)	printf("%s%s", sep, str); sep = ", "
+#define	PRINT(str)	aprint_normal("%s%s", sep, str); sep = ", "
 
 	for (epm = ep_509_media; epm->epm_name != NULL; epm++) {
 		if (ep_w0_config & epm->epm_mpbit) {
@@ -639,7 +638,7 @@ ep_509_probemedia(sc)
 		panic("ep_509_probemedia: impossible");
 #endif
 
-	printf(" (default %s)\n", defmedianame);
+	aprint_normal(" (default %s)\n", defmedianame);
 	ifmedia_set(ifm, defmedia);
 }
 
@@ -671,17 +670,17 @@ ep_vortex_probemedia(sc)
 
 	default_media = (config1 & CONFIG_MEDIAMASK) >> CONFIG_MEDIAMASK_SHIFT;
 
-	printf("%s: ", sc->sc_dev.dv_xname);
+	aprint_normal("%s: ", sc->sc_dev.dv_xname);
 
 	/* Sanity check that there are any media! */
 	if ((reset_options & ELINK_PCI_MEDIAMASK) == 0) {
-		printf("no media present!\n");
+		aprint_error("no media present!\n");
 		ifmedia_add(ifm, IFM_ETHER|IFM_NONE, 0, NULL);
 		ifmedia_set(ifm, IFM_ETHER|IFM_NONE);
 		return;
 	}
 
-#define	PRINT(str)	printf("%s%s", sep, str); sep = ", "
+#define	PRINT(str)	aprint_normal("%s%s", sep, str); sep = ", "
 
 	for (epm = ep_vortex_media; epm->epm_name != NULL; epm++) {
 		if (reset_options & epm->epm_mpbit) {
@@ -714,7 +713,7 @@ ep_vortex_probemedia(sc)
 		panic("ep_vortex_probemedia: impossible");
 #endif
 
-	printf(" (default %s)\n", defmedianame);
+	aprint_normal(" (default %s)\n", defmedianame);
 	ifmedia_set(ifm, defmedia);
 }
 

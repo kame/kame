@@ -1,4 +1,4 @@
-/*	$NetBSD: kernfs_vfsops.c,v 1.43 2001/11/15 09:48:22 lukem Exp $	*/
+/*	$NetBSD: kernfs_vfsops.c,v 1.58.2.1 2004/05/29 09:03:41 tron Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993, 1995
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -43,7 +39,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: kernfs_vfsops.c,v 1.54 2003/09/08 06:51:54 itojun Exp $");
+__KERNEL_RCSID(0, "$NetBSD: kernfs_vfsops.c,v 1.58.2.1 2004/05/29 09:03:41 tron Exp $");
 
 #ifdef _KERNEL_OPT
 #include "opt_compat_netbsd.h"
@@ -51,6 +47,7 @@ __KERNEL_RCSID(0, "$NetBSD: kernfs_vfsops.c,v 1.54 2003/09/08 06:51:54 itojun Ex
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/sysctl.h>
 #include <sys/conf.h>
 #include <sys/proc.h>
 #include <sys/vnode.h>
@@ -61,6 +58,8 @@ __KERNEL_RCSID(0, "$NetBSD: kernfs_vfsops.c,v 1.54 2003/09/08 06:51:54 itojun Ex
 
 #include <miscfs/specfs/specdev.h>
 #include <miscfs/kernfs/kernfs.h>
+
+MALLOC_DEFINE(M_KERNFSMNT, "kernfs mount", "kernfs mount structures");
 
 dev_t rrootdev = NODEV;
 
@@ -81,27 +80,28 @@ int	kernfs_fhtovp __P((struct mount *, struct fid *, struct vnode **));
 int	kernfs_checkexp __P((struct mount *, struct mbuf *, int *,
 			   struct ucred **));
 int	kernfs_vptofh __P((struct vnode *, struct fid *));
-int	kernfs_sysctl __P((int *, u_int, void *, size_t *, void *, size_t,
-			   struct proc *));
 
 void
 kernfs_init()
 {
-
+#ifdef _LKM
+	malloc_type_attach(M_KERNFSMNT);
+#endif
 	kernfs_hashinit();
 }
 
 void
 kernfs_reinit()
 {
-
 	kernfs_hashreinit();
 }
 
 void
 kernfs_done()
 {
-
+#ifdef _LKM
+	malloc_type_detach(M_KERNFSMNT);
+#endif
 	kernfs_hashdone();
 }
 
@@ -109,7 +109,6 @@ void
 kernfs_get_rrootdev()
 {
 	static int tried = 0;
-	int cmaj;
 
 	if (tried) {
 		/* Already did it once. */
@@ -119,11 +118,9 @@ kernfs_get_rrootdev()
 
 	if (rootdev == NODEV)
 		return;
-	for (cmaj = 0; cmaj < nchrdev; cmaj++) {
-		rrootdev = makedev(cmaj, minor(rootdev));
-		if (chrtoblk(rrootdev) == rootdev)
-			return;
-	}
+	rrootdev = devsw_blk2chr(rootdev);
+	if (rrootdev != NODEV)
+		return;
 	rrootdev = NODEV;
 	printf("kernfs_get_rrootdev: no raw root device\n");
 }
@@ -139,7 +136,7 @@ kernfs_mount(mp, path, data, ndp, p)
 	struct nameidata *ndp;
 	struct proc *p;
 {
-	size_t size;
+	int error = 0;
 	struct kernfs_mount *fmp;
 
 	if (UIO_MX & (UIO_MX - 1)) {
@@ -147,6 +144,8 @@ kernfs_mount(mp, path, data, ndp, p)
 		return (EINVAL);
 	}
 
+	if (mp->mnt_flag & MNT_GETARGS)
+		return 0;
 	/*
 	 * Update is a no-op
 	 */
@@ -154,21 +153,19 @@ kernfs_mount(mp, path, data, ndp, p)
 		return (EOPNOTSUPP);
 
 	MALLOC(fmp, struct kernfs_mount *, sizeof(struct kernfs_mount),
-	    M_MISCFSMNT, M_WAITOK);
+	    M_KERNFSMNT, M_WAITOK);
 	memset(fmp, 0, sizeof(*fmp));
 	TAILQ_INIT(&fmp->nodelist);
 
-	mp->mnt_data = (qaddr_t)fmp;
+	mp->mnt_data = fmp;
 	mp->mnt_flag |= MNT_LOCAL;
 	vfs_getnewfsid(mp);
 
-	(void) copyinstr(path, mp->mnt_stat.f_mntonname, MNAMELEN - 1, &size);
-	memset(mp->mnt_stat.f_mntonname + size, 0, MNAMELEN - size);
-	memset(mp->mnt_stat.f_mntfromname, 0, MNAMELEN);
-	memcpy(mp->mnt_stat.f_mntfromname, "kernfs", sizeof("kernfs"));
+	error = set_statfs_info(path, UIO_USERSPACE, "kernfs", UIO_SYSSPACE,
+	    mp, p);
 
 	kernfs_get_rrootdev();
-	return (0);
+	return error;
 }
 
 int
@@ -199,7 +196,7 @@ kernfs_unmount(mp, mntflags, p)
 	/*
 	 * Finally, throw away the kernfs_mount structure
 	 */
-	free(mp->mnt_data, M_MISCFSMNT);
+	free(mp->mnt_data, M_KERNFSMNT);
 	mp->mnt_data = 0;
 	return (0);
 }
@@ -211,7 +208,7 @@ kernfs_root(mp, vpp)
 {
 
 	/* setup "." */
-	return (kernfs_allocvp(mp, vpp, Pkern, &kern_targets[0], 0));
+	return (kernfs_allocvp(mp, vpp, KFSkern, &kern_targets[0], 0));
 }
 
 int
@@ -245,12 +242,7 @@ kernfs_statfs(mp, sbp, p)
 #else
 	sbp->f_type = 0;
 #endif
-	if (sbp != &mp->mnt_stat) {
-		memcpy(&sbp->f_fsid, &mp->mnt_stat.f_fsid, sizeof(sbp->f_fsid));
-		memcpy(sbp->f_mntonname, mp->mnt_stat.f_mntonname, MNAMELEN);
-		memcpy(sbp->f_mntfromname, mp->mnt_stat.f_mntfromname, MNAMELEN);
-	}
-	strncpy(sbp->f_fstypename, mp->mnt_op->vfs_name, MFSNAMELEN);
+	copy_statfs_info(sbp, mp);
 	return (0);
 }
 
@@ -313,17 +305,25 @@ kernfs_vptofh(vp, fhp)
 	return (EOPNOTSUPP);
 }
 
-int
-kernfs_sysctl(name, namelen, oldp, oldlenp, newp, newlen, p)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-	struct proc *p;
+SYSCTL_SETUP(sysctl_vfs_kernfs_setup, "sysctl vfs.kern subtree setup")
 {
-	return (EOPNOTSUPP);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "vfs", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_VFS, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "kernfs",
+		       SYSCTL_DESCR("/kern file system"),
+		       NULL, 0, NULL, 0,
+		       CTL_VFS, 11, CTL_EOL);
+	/*
+	 * XXX the "11" above could be dynamic, thereby eliminating one
+	 * more instance of the "number to vfs" mapping problem, but
+	 * "11" is the order as taken from sys/mount.h
+	 */
 }
 
 extern const struct vnodeopv_desc kernfs_vnodeop_opv_desc;
@@ -348,7 +348,7 @@ struct vfsops kernfs_vfsops = {
 	kernfs_init,
 	kernfs_reinit,
 	kernfs_done,
-	kernfs_sysctl,
+	NULL,
 	NULL,				/* vfs_mountroot */
 	kernfs_checkexp,
 	kernfs_vnodeopv_descs,

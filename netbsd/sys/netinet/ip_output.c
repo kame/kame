@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_output.c,v 1.95.10.3 2003/06/30 03:25:22 grant Exp $	*/
+/*	$NetBSD: ip_output.c,v 1.130 2004/03/02 02:28:28 thorpej Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -34,7 +34,7 @@
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -46,7 +46,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -109,11 +109,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -133,9 +129,10 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ip_output.c,v 1.95.10.3 2003/06/30 03:25:22 grant Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ip_output.c,v 1.130 2004/03/02 02:28:28 thorpej Exp $");
 
 #include "opt_pfil_hooks.h"
+#include "opt_inet.h"
 #include "opt_ipsec.h"
 #include "opt_mrouting.h"
 
@@ -146,6 +143,9 @@ __KERNEL_RCSID(0, "$NetBSD: ip_output.c,v 1.95.10.3 2003/06/30 03:25:22 grant Ex
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#ifdef FAST_IPSEC
+#include <sys/domain.h>
+#endif
 #include <sys/systm.h>
 #include <sys/proc.h>
 
@@ -180,6 +180,12 @@ __KERNEL_RCSID(0, "$NetBSD: ip_output.c,v 1.95.10.3 2003/06/30 03:25:22 grant Ex
 #if NPF > 0
 #include <net/pfvar.h>
 #endif
+
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#include <netipsec/key.h>
+#include <netipsec/xform.h>
+#endif	/* FAST_IPSEC*/
 
 static struct mbuf *ip_insertoptions __P((struct mbuf *, struct mbuf *, int *));
 static int ip_getmopt_ifargs
@@ -229,13 +235,20 @@ ip_output(m0, va_alist)
 	struct route *ro;
 	int flags, sw_csum;
 	int *mtu_p;
-	int mtu;
+	u_long mtu;
 	struct ip_moptions *imo;
+	struct socket *so;
 	va_list ap;
 #ifdef IPSEC
-	struct socket *so;
 	struct secpolicy *sp = NULL;
 #endif /*IPSEC*/
+#ifdef FAST_IPSEC
+	struct inpcb *inp;
+	struct m_tag *mtag;
+	struct secpolicy *sp = NULL;
+	struct tdb_ident *tdbi;
+	int s;
+#endif
 	u_int16_t ip_len;
 
 	len = 0;
@@ -244,16 +257,20 @@ ip_output(m0, va_alist)
 	ro = va_arg(ap, struct route *);
 	flags = va_arg(ap, int);
 	imo = va_arg(ap, struct ip_moptions *);
+	so = va_arg(ap, struct socket *);
 	if (flags & IP_RETURNMTU)
 		mtu_p = va_arg(ap, int *);
 	else
 		mtu_p = NULL;
 	va_end(ap);
 
-#ifdef IPSEC
-	so = ipsec_getsocket(m);
-	(void)ipsec_setsocket(m, NULL);
-#endif /*IPSEC*/
+	MCLAIM(m, &ip_tx_mowner);
+#ifdef FAST_IPSEC
+	if (so != NULL && so->so_proto->pr_domain->dom_family == AF_INET)
+		inp = (struct inpcb *)so->so_pcb;
+	else
+		inp = NULL;
+#endif /* FAST_IPSEC */
 
 #ifdef	DIAGNOSTIC
 	if ((m->m_flags & M_PKTHDR) == 0)
@@ -270,8 +287,8 @@ ip_output(m0, va_alist)
 	 */
 	if ((flags & (IP_FORWARDING|IP_RAWOUTPUT)) == 0) {
 		ip->ip_v = IPVERSION;
-		ip->ip_off = 0;
-		ip->ip_id = htons(ip_randomid());
+		ip->ip_off = htons(0);
+		ip->ip_id = ip_newid();
 		ip->ip_hl = hlen >> 2;
 		ipstat.ips_localout++;
 	} else {
@@ -381,7 +398,7 @@ ip_output(m0, va_alist)
 		 */
 		if (((m->m_flags & M_MCAST) &&
 		     (ifp->if_flags & IFF_MULTICAST) == 0) ||
-		    ((m->m_flags & M_BCAST) && 
+		    ((m->m_flags & M_BCAST) &&
 		     (ifp->if_flags & (IFF_BROADCAST|IFF_POINTOPOINT)) == 0))  {
 			ipstat.ips_noroute++;
 			error = ENETUNREACH;
@@ -461,7 +478,7 @@ ip_output(m0, va_alist)
 #endif
 
 	/*
-	 * packets with Class-D address as source are not valid per 
+	 * packets with Class-D address as source are not valid per
 	 * RFC 1112
 	 */
 	if (IN_MULTICAST(ip->ip_src.s_addr)) {
@@ -485,7 +502,7 @@ ip_output(m0, va_alist)
 			goto bad;
 		}
 		/* don't allow broadcast messages to be fragmented */
-		if ((u_int16_t)ip->ip_len > ifp->if_mtu) {
+		if (ntohs(ip->ip_len) > ifp->if_mtu) {
 			error = EMSGSIZE;
 			goto bad;
 		}
@@ -500,24 +517,22 @@ sendit:
 	 */
 	if ((flags & IP_MTUDISC) != 0 && ro->ro_rt != NULL &&
 	    (ro->ro_rt->rt_rmx.rmx_locks & RTV_MTU) == 0)
-		ip->ip_off |= IP_DF;
+		ip->ip_off |= htons(IP_DF);
 
-	/*
-	 * Remember the current ip_len and ip_off, and swap them into
-	 * network order.
-	 */
-	ip_len = ip->ip_len;
-
-	HTONS(ip->ip_len);
-	HTONS(ip->ip_off);
+	/* Remember the current ip_len */
+	ip_len = ntohs(ip->ip_len);
 
 #ifdef IPSEC
 	/* get SP for this packet */
 	if (so == NULL)
 		sp = ipsec4_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND,
 		    flags, &error);
-	else
+	else {
+		if (IPSEC_PCB_SKIP_IPSEC(sotoinpcb_hdr(so)->inph_sp,
+					 IPSEC_DIR_OUTBOUND))
+			goto skip_ipsec;
 		sp = ipsec4_getpolicybysock(m, IPSEC_DIR_OUTBOUND, so, &error);
+	}
 
 	if (sp == NULL) {
 		ipsecstat.out_inval++;
@@ -539,7 +554,7 @@ sendit:
 	case IPSEC_POLICY_NONE:
 		/* no need to do IPsec. */
 		goto skip_ipsec;
-	
+
 	case IPSEC_POLICY_IPSEC:
 		if (sp->req == NULL) {
 			/* acquire a policy */
@@ -640,9 +655,137 @@ sendit:
 		}
 	}
     }
-
 skip_ipsec:
 #endif /*IPSEC*/
+#ifdef FAST_IPSEC
+	/*
+	 * Check the security policy (SP) for the packet and, if
+	 * required, do IPsec-related processing.  There are two
+	 * cases here; the first time a packet is sent through
+	 * it will be untagged and handled by ipsec4_checkpolicy.
+	 * If the packet is resubmitted to ip_output (e.g. after
+	 * AH, ESP, etc. processing), there will be a tag to bypass
+	 * the lookup and related policy checking.
+	 */
+	mtag = m_tag_find(m, PACKET_TAG_IPSEC_PENDING_TDB, NULL);
+	s = splsoftnet();
+	if (mtag != NULL) {
+		tdbi = (struct tdb_ident *)(mtag + 1);
+		sp = ipsec_getpolicy(tdbi, IPSEC_DIR_OUTBOUND);
+		if (sp == NULL)
+			error = -EINVAL;	/* force silent drop */
+		m_tag_delete(m, mtag);
+	} else {
+		if (inp != NULL &&
+		    IPSEC_PCB_SKIP_IPSEC(inp->inp_sp, IPSEC_DIR_OUTBOUND))
+			goto spd_done;
+		sp = ipsec4_checkpolicy(m, IPSEC_DIR_OUTBOUND, flags,
+					&error, inp);
+	}
+	/*
+	 * There are four return cases:
+	 *    sp != NULL	 	    apply IPsec policy
+	 *    sp == NULL, error == 0	    no IPsec handling needed
+	 *    sp == NULL, error == -EINVAL  discard packet w/o error
+	 *    sp == NULL, error != 0	    discard packet, report error
+	 */
+	if (sp != NULL) {
+		/* Loop detection, check if ipsec processing already done */
+		IPSEC_ASSERT(sp->req != NULL, ("ip_output: no ipsec request"));
+		for (mtag = m_tag_first(m); mtag != NULL;
+		     mtag = m_tag_next(m, mtag)) {
+#ifdef MTAG_ABI_COMPAT
+			if (mtag->m_tag_cookie != MTAG_ABI_COMPAT)
+				continue;
+#endif
+			if (mtag->m_tag_id != PACKET_TAG_IPSEC_OUT_DONE &&
+			    mtag->m_tag_id != PACKET_TAG_IPSEC_OUT_CRYPTO_NEEDED)
+				continue;
+			/*
+			 * Check if policy has an SA associated with it.
+			 * This can happen when an SP has yet to acquire
+			 * an SA; e.g. on first reference.  If it occurs,
+			 * then we let ipsec4_process_packet do its thing.
+			 */
+			if (sp->req->sav == NULL)
+				break;
+			tdbi = (struct tdb_ident *)(mtag + 1);
+			if (tdbi->spi == sp->req->sav->spi &&
+			    tdbi->proto == sp->req->sav->sah->saidx.proto &&
+			    bcmp(&tdbi->dst, &sp->req->sav->sah->saidx.dst,
+				 sizeof (union sockaddr_union)) == 0) {
+				/*
+				 * No IPsec processing is needed, free
+				 * reference to SP.
+				 *
+				 * NB: null pointer to avoid free at
+				 *     done: below.
+				 */
+				KEY_FREESP(&sp), sp = NULL;
+				splx(s);
+				goto spd_done;
+			}
+		}
+
+		/*
+		 * Do delayed checksums now because we send before
+		 * this is done in the normal processing path.
+		 */
+		if (m->m_pkthdr.csum_flags & (M_CSUM_TCPv4|M_CSUM_UDPv4)) {
+			in_delayed_cksum(m);
+			m->m_pkthdr.csum_flags &= ~(M_CSUM_TCPv4|M_CSUM_UDPv4);
+		}
+
+#ifdef __FreeBSD__
+		ip->ip_len = htons(ip->ip_len);
+		ip->ip_off = htons(ip->ip_off);
+#endif
+
+		/* NB: callee frees mbuf */
+		error = ipsec4_process_packet(m, sp->req, flags, 0);
+		/*
+		 * Preserve KAME behaviour: ENOENT can be returned
+		 * when an SA acquire is in progress.  Don't propagate
+		 * this to user-level; it confuses applications.
+		 *
+		 * XXX this will go away when the SADB is redone.
+		 */
+		if (error == ENOENT)
+			error = 0;
+		splx(s);
+		goto done;
+	} else {
+		splx(s);
+
+		if (error != 0) {
+			/*
+			 * Hack: -EINVAL is used to signal that a packet
+			 * should be silently discarded.  This is typically
+			 * because we asked key management for an SA and
+			 * it was delayed (e.g. kicked up to IKE).
+			 */
+			if (error == -EINVAL)
+				error = 0;
+			goto bad;
+		} else {
+			/* No IPsec processing for this packet. */
+		}
+#ifdef notyet
+		/*
+		 * If deferred crypto processing is needed, check that
+		 * the interface supports it.
+		 */ 
+		mtag = m_tag_find(m, PACKET_TAG_IPSEC_OUT_CRYPTO_NEEDED, NULL);
+		if (mtag != NULL && (ifp->if_capenable & IFCAP_IPSEC) == 0) {
+			/* notify IPsec to do its own crypto */
+			ipsp_skipcrypto_unmark((struct tdb_ident *)(mtag + 1));
+			error = EHOSTUNREACH;
+			goto bad;
+		}
+#endif
+	}
+spd_done:
+#endif /* FAST_IPSEC */
 
 #ifdef PFIL_HOOKS
 	/*
@@ -670,6 +813,8 @@ skip_ipsec:
 	hlen = ip->ip_hl << 2;
 #endif
 
+	m->m_pkthdr.csum_flags |= M_CSUM_IPv4;
+	sw_csum = m->m_pkthdr.csum_flags & ~ifp->if_csum_flags_tx;
 	/*
 	 * If small enough for mtu of path, can just send directly.
 	 */
@@ -688,9 +833,6 @@ skip_ipsec:
 		 * checksumming requires this.
 		 */
 		ip->ip_sum = 0;
-		m->m_pkthdr.csum_flags |= M_CSUM_IPv4;
-
-		sw_csum = m->m_pkthdr.csum_flags & ~ifp->if_csum_flags_tx;
 
 		/*
 		 * Perform any checksums that the hardware can't do
@@ -699,13 +841,14 @@ skip_ipsec:
 		 * XXX Does any hardware require the {th,uh}_sum
 		 * XXX fields to be 0?
 		 */
-		if (sw_csum & M_CSUM_IPv4)
+		if (sw_csum & M_CSUM_IPv4) {
 			ip->ip_sum = in_cksum(m, hlen);
+			m->m_pkthdr.csum_flags &= ~M_CSUM_IPv4;
+		}
 		if (sw_csum & (M_CSUM_TCPv4|M_CSUM_UDPv4)) {
 			in_delayed_cksum(m);
-			sw_csum &= ~(M_CSUM_TCPv4|M_CSUM_UDPv4);
+			m->m_pkthdr.csum_flags &= ~(M_CSUM_TCPv4|M_CSUM_UDPv4);
 		}
-		m->m_pkthdr.csum_flags &= ifp->if_csum_flags_tx;
 
 #ifdef IPSEC
 		/* clean ipsec history once it goes out of the node */
@@ -729,15 +872,8 @@ skip_ipsec:
 	/*
 	 * Too large for interface; fragment if possible.
 	 * Must be able to put at least 8 bytes per fragment.
-	 *
-	 * Note we swap ip_len and ip_off into host order to make
-	 * the logic below a little simpler.
 	 */
-
-	NTOHS(ip->ip_len);
-	NTOHS(ip->ip_off);
-
-	if (ip->ip_off & IP_DF) {
+	if (ntohs(ip->ip_off) & IP_DF) {
 		if (flags & IP_RETURNMTU)
 			*mtu_p = mtu;
 		error = EMSGSIZE;
@@ -763,13 +899,15 @@ skip_ipsec:
 			INADDR_TO_IA(ip->ip_src, ia);
 			if (ia) {
 				ia->ia_ifa.ifa_data.ifad_outbytes +=
-					ntohs(ip->ip_len);
+				    ntohs(ip->ip_len);
 			}
 #endif
 #ifdef IPSEC
 			/* clean ipsec history once it goes out of the node */
 			ipsec_delaux(m);
 #endif
+			KASSERT((m->m_pkthdr.csum_flags &
+			    (M_CSUM_UDPv4 | M_CSUM_TCPv4)) == 0);
 			error = (*ifp->if_output)(ifp, m, sintosa(dst),
 			    ro->ro_rt);
 		} else
@@ -791,6 +929,10 @@ done:
 		key_freesp(sp);
 	}
 #endif /* IPSEC */
+#ifdef FAST_IPSEC
+	if (sp != NULL)
+		KEY_FREESP(&sp);
+#endif /* FAST_IPSEC */
 
 	return (error);
 bad:
@@ -799,26 +941,27 @@ bad:
 }
 
 int
-ip_fragment(m, ifp, mtu)
-	struct mbuf *m;
-	struct ifnet *ifp;
-	u_long mtu;
+ip_fragment(struct mbuf *m, struct ifnet *ifp, u_long mtu)
 {
 	struct ip *ip, *mhip;
 	struct mbuf *m0;
 	int len, hlen, off;
 	int mhlen, firstlen;
 	struct mbuf **mnext;
+	int sw_csum;
 	int fragments = 0;
 	int s;
 	int error = 0;
 
 	ip = mtod(m, struct ip *);
 	hlen = ip->ip_hl << 2;
+	sw_csum = m->m_pkthdr.csum_flags & ~ifp->if_csum_flags_tx;
 
 	len = (mtu - hlen) &~ 7;
-	if (len < 8)
+	if (len < 8) {
+		m_freem(m);
 		return (EMSGSIZE);
+	}
 
 	firstlen = len;
 	mnext = &m->m_nextpkt;
@@ -829,13 +972,14 @@ ip_fragment(m, ifp, mtu)
 	 */
 	m0 = m;
 	mhlen = sizeof (struct ip);
-	for (off = hlen + len; off < (u_int16_t)ip->ip_len; off += len) {
+	for (off = hlen + len; off < ntohs(ip->ip_len); off += len) {
 		MGETHDR(m, M_DONTWAIT, MT_HEADER);
 		if (m == 0) {
 			error = ENOBUFS;
 			ipstat.ips_odropped++;
 			goto sendorfree;
 		}
+		MCLAIM(m, m0->m_owner);
 		*mnext = m;
 		mnext = &m->m_nextpkt;
 		m->m_data += max_linkhdr;
@@ -848,13 +992,15 @@ ip_fragment(m, ifp, mtu)
 			mhip->ip_hl = mhlen >> 2;
 		}
 		m->m_len = mhlen;
-		mhip->ip_off = ((off - hlen) >> 3) + (ip->ip_off & ~IP_MF);
-		if (ip->ip_off & IP_MF)
+		mhip->ip_off = ((off - hlen) >> 3) +
+		    (ntohs(ip->ip_off) & ~IP_MF);
+		if (ip->ip_off & htons(IP_MF))
 			mhip->ip_off |= IP_MF;
-		if (off + len >= (u_int16_t)ip->ip_len)
-			len = (u_int16_t)ip->ip_len - off;
+		if (off + len >= ntohs(ip->ip_len))
+			len = ntohs(ip->ip_len) - off;
 		else
 			mhip->ip_off |= IP_MF;
+		HTONS(mhip->ip_off);
 		mhip->ip_len = htons((u_int16_t)(len + mhlen));
 		m->m_next = m_copy(m0, off, len);
 		if (m->m_next == 0) {
@@ -864,9 +1010,13 @@ ip_fragment(m, ifp, mtu)
 		}
 		m->m_pkthdr.len = mhlen + len;
 		m->m_pkthdr.rcvif = (struct ifnet *)0;
-		HTONS(mhip->ip_off);
 		mhip->ip_sum = 0;
-		mhip->ip_sum = in_cksum(m, mhlen);
+		if (sw_csum & M_CSUM_IPv4) {
+			mhip->ip_sum = in_cksum(m, mhlen);
+			KASSERT((m->m_pkthdr.csum_flags & M_CSUM_IPv4) == 0);
+		} else {
+			m->m_pkthdr.csum_flags |= M_CSUM_IPv4;
+		}
 		ipstat.ips_ofragments++;
 		fragments++;
 	}
@@ -875,13 +1025,17 @@ ip_fragment(m, ifp, mtu)
 	 * and updating header, then send each fragment (in order).
 	 */
 	m = m0;
-	m_adj(m, hlen + firstlen - (u_int16_t)ip->ip_len);
+	m_adj(m, hlen + firstlen - ntohs(ip->ip_len));
 	m->m_pkthdr.len = hlen + firstlen;
 	ip->ip_len = htons((u_int16_t)m->m_pkthdr.len);
-	ip->ip_off |= IP_MF;
-	HTONS(ip->ip_off);
+	ip->ip_off |= htons(IP_MF);
 	ip->ip_sum = 0;
-	ip->ip_sum = in_cksum(m, hlen);
+	if (sw_csum & M_CSUM_IPv4) {
+		ip->ip_sum = in_cksum(m, hlen);
+		m->m_pkthdr.csum_flags &= ~M_CSUM_IPv4;
+	} else {
+		KASSERT(m->m_pkthdr.csum_flags & M_CSUM_IPv4);
+	}
 sendorfree:
 	/*
 	 * If there is no room for all the fragments, don't queue
@@ -902,7 +1056,6 @@ sendorfree:
 			m_freem(m);
 		}
 	}
-
 	return (error);
 }
 
@@ -945,7 +1098,7 @@ ip_optlen(inp)
 	struct mbuf *m = inp->inp_options;
 
 	if (m && m->m_len > offsetof(struct ipoption, ipopt_dst))
-		return(m->m_len - offsetof(struct ipoption, ipopt_dst));
+		return (m->m_len - offsetof(struct ipoption, ipopt_dst));
 	else
 		return 0;
 }
@@ -968,15 +1121,17 @@ ip_insertoptions(m, opt, phlen)
 	unsigned optlen;
 
 	optlen = opt->m_len - sizeof(p->ipopt_dst);
-	if (optlen + (u_int16_t)ip->ip_len > IP_MAXPACKET)
+	if (optlen + ntohs(ip->ip_len) > IP_MAXPACKET)
 		return (m);		/* XXX should fail */
 	if (!in_nullhost(p->ipopt_dst))
 		ip->ip_dst = p->ipopt_dst;
-	if (m->m_flags & M_EXT || m->m_data - optlen < m->m_pktdat) {
+	if (M_READONLY(m) || M_LEADINGSPACE(m) < optlen) {
 		MGETHDR(n, M_DONTWAIT, MT_HEADER);
 		if (n == 0)
 			return (m);
-		M_MOVE_PKTHDR(n, m);
+		MCLAIM(n, m->m_owner);
+		M_COPY_PKTHDR(n, m);
+		m_tag_delete_chain(m, NULL);
 		m->m_flags &= ~M_PKTHDR;
 		m->m_len -= sizeof(struct ip);
 		m->m_data += sizeof(struct ip);
@@ -994,7 +1149,7 @@ ip_insertoptions(m, opt, phlen)
 	ip = mtod(m, struct ip *);
 	bcopy((caddr_t)p->ipopt_list, (caddr_t)(ip + 1), (unsigned)optlen);
 	*phlen = sizeof(struct ip) + optlen;
-	ip->ip_len += optlen;
+	ip->ip_len = htons(ntohs(ip->ip_len) + optlen);
 	return (m);
 }
 
@@ -1058,10 +1213,8 @@ ip_ctloutput(op, so, level, optname, mp)
 	struct mbuf *m = *mp;
 	int optval = 0;
 	int error = 0;
-#ifdef IPSEC
-#ifdef __NetBSD__
+#if defined(IPSEC) || defined(FAST_IPSEC)
 	struct proc *p = curproc;	/*XXX*/
-#endif
 #endif
 
 	if (level != IPPROTO_IP) {
@@ -1169,7 +1322,7 @@ ip_ctloutput(op, so, level, optname, mp)
 			}
 			break;
 
-#ifdef IPSEC
+#if defined(IPSEC) || defined(FAST_IPSEC)
 		case IP_IPSEC_POLICY:
 		{
 			caddr_t req = NULL;
@@ -1206,6 +1359,7 @@ ip_ctloutput(op, so, level, optname, mp)
 		case IP_OPTIONS:
 		case IP_RETOPTS:
 			*mp = m = m_get(M_WAIT, MT_SOOPTS);
+			MCLAIM(m, so->so_mowner);
 			if (inp->inp_options) {
 				m->m_len = inp->inp_options->m_len;
 				bcopy(mtod(inp->inp_options, caddr_t),
@@ -1222,6 +1376,7 @@ ip_ctloutput(op, so, level, optname, mp)
 		case IP_RECVIF:
 		case IP_ERRORMTU:
 			*mp = m = m_get(M_WAIT, MT_SOOPTS);
+			MCLAIM(m, so->so_mowner);
 			m->m_len = sizeof(int);
 			switch (optname) {
 
@@ -1258,7 +1413,7 @@ ip_ctloutput(op, so, level, optname, mp)
 			*mtod(m, int *) = optval;
 			break;
 
-#ifdef IPSEC
+#if defined(IPSEC) || defined(FAST_IPSEC)
 		case IP_IPSEC_POLICY:
 		{
 			caddr_t req = NULL;
@@ -1279,10 +1434,13 @@ ip_ctloutput(op, so, level, optname, mp)
 		case IP_ADD_MEMBERSHIP:
 		case IP_DROP_MEMBERSHIP:
 			error = ip_getmoptions(optname, inp->inp_moptions, mp);
+			if (*mp)
+				MCLAIM(*mp, so->so_mowner);
 			break;
 
 		case IP_PORTRANGE:
 			*mp = m = m_get(M_WAIT, MT_SOOPTS);
+			MCLAIM(m, so->so_mowner);
 			m->m_len = sizeof(int);
 
 			if (inp->inp_flags & INP_LOWPORT)
@@ -1395,7 +1553,7 @@ ip_pcbopts(pcbopt, m)
 			 * to close up the deleted entry.
 			 */
 			memmove(&cp[IPOPT_OFFSET+1],
-                            (caddr_t)(&cp[IPOPT_OFFSET+1] + sizeof(struct in_addr)),
+			    (caddr_t)(&cp[IPOPT_OFFSET+1] + sizeof(struct in_addr)),
 			    (unsigned)cnt + sizeof(struct in_addr));
 			break;
 		}
@@ -1419,7 +1577,8 @@ ip_multicast_if(a, ifindexp)
 	int *ifindexp;
 {
 	int ifindex;
-	struct ifnet *ifp;
+	struct ifnet *ifp = NULL;
+	struct in_ifaddr *ia;
 
 	if (ifindexp)
 		*ifindexp = 0;
@@ -1428,10 +1587,18 @@ ip_multicast_if(a, ifindexp)
 		if (ifindex < 0 || if_indexlim <= ifindex)
 			return NULL;
 		ifp = ifindex2ifnet[ifindex];
+		if (!ifp)
+			return NULL;
 		if (ifindexp)
 			*ifindexp = ifindex;
 	} else {
-		INADDR_TO_IFP(*a, ifp);
+		LIST_FOREACH(ia, &IN_IFADDR_HASH(a->s_addr), ia_hash) {
+			if (in_hosteq(ia->ia_addr.sin_addr, *a) &&
+			    (ia->ia_ifp->if_flags & IFF_MULTICAST) != 0) {
+				ifp = ia->ia_ifp;
+				break;
+			}
+		}
 	}
 	return ifp;
 }
@@ -2535,8 +2702,6 @@ ip_mloopback(ifp, m, dst)
 		 * than the interface's MTU.  Can this possibly matter?
 		 */
 		ip = mtod(copym, struct ip *);
-		HTONS(ip->ip_len);
-		HTONS(ip->ip_off);
 
 		if (copym->m_pkthdr.csum_flags & (M_CSUM_TCPv4|M_CSUM_UDPv4)) {
 			in_delayed_cksum(copym);

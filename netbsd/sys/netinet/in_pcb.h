@@ -1,9 +1,9 @@
-/*	$NetBSD: in_pcb.h,v 1.30 2001/07/02 15:25:35 itojun Exp $	*/
+/*	$NetBSD: in_pcb.h,v 1.36 2003/10/23 20:55:08 mycroft Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -15,7 +15,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -41,11 +41,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -68,6 +64,7 @@
 #define _NETINET_IN_PCB_H_
 
 #include <sys/queue.h>
+#include <netinet/in_pcb_hdr.h>
 
 /*
  * Common structure pcb for internet protocol implementation.
@@ -76,47 +73,28 @@
  * up (to a socket structure) and down (to a protocol-specific)
  * control block.
  */
-struct inpcbpolicy;
-
 struct inpcb {
-	LIST_ENTRY(inpcb) inp_hash;
-	CIRCLEQ_ENTRY(inpcb) inp_queue;
-	caddr_t	  inp_ppcb;		/* pointer to per-protocol pcb */
-	int	  inp_state;		/* bind/connect state */
+	struct inpcb_hdr inp_head;
+#define inp_hash	inp_head.inph_hash
+#define inp_queue	inp_head.inph_queue
+#define inp_af		inp_head.inph_af
+#define inp_ppcb	inp_head.inph_ppcb
+#define inp_state	inp_head.inph_state
+#define inp_socket	inp_head.inph_socket
+#define inp_table	inp_head.inph_table
+#define inp_sp		inp_head.inph_sp
+	struct	  route inp_route;	/* placeholder for routing entry */
 	u_int16_t inp_fport;		/* foreign port */
 	u_int16_t inp_lport;		/* local port */
-	struct	  socket *inp_socket;	/* back pointer to socket */
-	struct	  route inp_route;	/* placeholder for routing entry */
 	int	  inp_flags;		/* generic IP/datagram flags */
 	struct	  ip inp_ip;		/* header prototype; should have more */
 	struct	  mbuf *inp_options;	/* IP options */
 	struct	  ip_moptions *inp_moptions; /* IP multicast options */
 	int	  inp_errormtu;		/* MTU of last xmit status = EMSGSIZE */
-	struct	  inpcbtable *inp_table;
-#if 1 /*IPSEC*/
-	struct inpcbpolicy *inp_sp;	/* security policy. */
-#endif
 };
+
 #define	inp_faddr	inp_ip.ip_dst
 #define	inp_laddr	inp_ip.ip_src
-
-LIST_HEAD(inpcbhead, inpcb);
-
-struct inpcbtable {
-	CIRCLEQ_HEAD(, inpcb) inpt_queue;
-	struct	  inpcbhead *inpt_bindhashtbl;
-	struct	  inpcbhead *inpt_connecthashtbl;
-	u_long	  inpt_bindhash;
-	u_long	  inpt_connecthash;
-	u_int16_t inpt_lastport;
-	u_int16_t inpt_lastlow;
-};
-#define inpt_lasthi inpt_lastport
-
-/* states in inp_state: */
-#define	INP_ATTACHED		0
-#define	INP_BOUND		1
-#define	INP_CONNECTED		2
 
 /* flags in inp_flags: */
 #define	INP_RECVOPTS		0x01	/* receive incoming IP options */
@@ -140,6 +118,9 @@ int	in_pcbconnect __P((void *, struct mbuf *));
 void	in_pcbdetach __P((void *));
 void	in_pcbdisconnect __P((void *));
 void	in_pcbinit __P((struct inpcbtable *, int, int));
+struct inpcb *
+	in_pcblookup_port __P((struct inpcbtable *,
+	    struct in_addr, u_int, int));
 struct inpcb *
 	in_pcblookup_bind __P((struct inpcbtable *,
 	    struct in_addr, u_int));

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_lmc.c,v 1.18 2002/01/04 12:21:24 martin Exp $	*/
+/*	$NetBSD: if_lmc.c,v 1.20 2003/05/03 18:11:36 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1997-1999 LAN Media Corporation (LMC)
@@ -63,7 +63,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_lmc.c,v 1.18 2002/01/04 12:21:24 martin Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_lmc.c,v 1.20 2003/05/03 18:11:36 wiz Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -403,12 +403,9 @@ lmc_watchdog(int unit)
 	lmc_softc_t * const sc = LMC_UNIT_TO_SOFTC(unit);
 	struct ifnet *ifp = &sc->lmc_if;
 #endif
-	int state;
 	u_int32_t ostatus;
 	u_int32_t link_status;
 	u_int32_t ticks;
-
-	state = 0;
 
 	/*
 	 * Make sure the tx jabber and rx watchdog are off,
@@ -1145,7 +1142,7 @@ again:
 	free = ri->ri_free;
 #if defined(LMC_BUS_DMA) && !defined(LMC_BUS_DMA_NOTX)
 	/*
-	 * Reclaim some dma maps from if we are out.
+	 * Reclaim some DMA maps from if we are out.
 	 */
 	if (sc->lmc_txmaps_free == 0) {
 #if defined(LMC_DEBUG)

@@ -1,9 +1,41 @@
-/*	$NetBSD: ip_mroute.c,v 1.59.8.4 2003/07/11 14:23:40 tron Exp $	*/
+/*	$NetBSD: ip_mroute.c,v 1.82 2003/11/19 18:39:34 jonathan Exp $	*/
+
+/*
+ * Copyright (c) 1992, 1993
+ *      The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Stephen Deering of Stanford University.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *      @(#)ip_mroute.c 8.2 (Berkeley) 11/15/93
+ */
 
 /*
  * Copyright (c) 1989 Stephen Deering
- * Copyright (c) 1992, 1993
- *      The Regents of the University of California.  All rights reserved.
  *
  * This code is derived from software contributed to Berkeley by
  * Stephen Deering of Stanford University.
@@ -54,8 +86,9 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ip_mroute.c,v 1.59.8.4 2003/07/11 14:23:40 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ip_mroute.c,v 1.82 2003/11/19 18:39:34 jonathan Exp $");
 
+#include "opt_inet.h"
 #include "opt_ipsec.h"
 
 #include <sys/param.h>
@@ -88,6 +121,16 @@ __KERNEL_RCSID(0, "$NetBSD: ip_mroute.c,v 1.59.8.4 2003/07/11 14:23:40 tron Exp 
 #include <netinet6/ipsec.h>
 #endif
 
+#ifdef IPSEC
+#include <netinet6/ipsec.h>
+#include <netkey/key.h>
+#endif
+
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#include <netipsec/key.h>
+#endif
+
 #include <machine/stdarg.h>
 
 #define IP_MULTICASTOPTS 0
@@ -95,7 +138,7 @@ __KERNEL_RCSID(0, "$NetBSD: ip_mroute.c,v 1.59.8.4 2003/07/11 14:23:40 tron Exp 
 	do { \
 		if ((m) && ((m)->m_flags & M_EXT || (m)->m_len < (len))) \
 			(m) = m_pullup((m), (len)); \
-	} while (0)
+	} while (/*CONSTCOND*/ 0)
 
 /*
  * Globals.  All but ip_mrouter and ip_mrtproto could be static,
@@ -345,6 +388,7 @@ ip_mrouter_get(so, optname, m)
 		error = ENOPROTOOPT;
 	else {
 		*m = m_get(M_WAIT, MT_SOOPTS);
+		MCLAIM(*m, so->so_mowner);
 
 		switch (optname) {
 		case MRT_VERSION:
@@ -482,32 +526,6 @@ ip_mrouter_init(so, m)
 		log(LOG_DEBUG, "ip_mrouter_init\n");
 
 	return (0);
-}
-
-void
-ip_mrouter_detach(ifp)
-	struct ifnet *ifp;
-{
-	int vifi, i;
-	struct vif *vifp;
-	struct mfc *rt;
-	struct rtdetq *rte;
-
-	/* XXX not sure about sideeffect to userland routing daemon */
-	for (vifi = 0; vifi < numvifs; vifi++) {
-		vifp = &viftable[vifi];
-		if (vifp->v_ifp == ifp)
-			reset_vif(vifp);
-	}
-	for (i = 0; i < MFCTBLSIZ; i++) {
-		if (nexpire[i] == 0)
-			continue;
-		LIST_FOREACH(rt, &mfchashtbl[i], mfc_hash) {
-			for (rte = rt->mfc_stall; rte; rte = rte->next)
-				if (rte->ifp == ifp)
-					rte->ifp = NULL;
-		}
-	}
 }
 
 /*
@@ -1363,7 +1381,7 @@ ip_mdq(m, ifp, rt)
 	struct ip  *ip = mtod(m, struct ip *);
 	vifi_t vifi;
 	struct vif *vifp;
-	int plen = ntohs(ip->ip_len);
+	int plen = ntohs(ip->ip_len) - (ip->ip_hl << 2);
 
 /*
  * Macro to send packet on vif.  Since RSVP packets don't get counted on
@@ -1375,7 +1393,7 @@ ip_mdq(m, ifp, rt)
 		encap_send((ip), (vifp), (m));		\
 	else						\
 		phyint_send((ip), (vifp), (m));		\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #ifdef RSVP_ISI
 	/*
@@ -1509,7 +1527,7 @@ phyint_send(ip, vifp, m)
 		tbf_send_packet(vifp, mb_copy);
 	else
 		tbf_control(vifp, mb_copy, mtod(mb_copy, struct ip *),
-		    ip->ip_len);
+		    ntohs(ip->ip_len));
 }
 
 static void
@@ -1520,7 +1538,7 @@ encap_send(ip, vifp, m)
 {
 	struct mbuf *mb_copy;
 	struct ip *ip_copy;
-	int i, len = ip->ip_len + sizeof(multicast_encap_iphdr);
+	int i, len = ntohs(ip->ip_len) + sizeof(multicast_encap_iphdr);
 
 	/*
 	 * copy the old packet & pullup it's IP header into the
@@ -1550,8 +1568,8 @@ encap_send(ip, vifp, m)
 	 */
 	ip_copy = mtod(mb_copy, struct ip *);
 	*ip_copy = multicast_encap_iphdr;
-	ip_copy->ip_id = htons(ip_randomid());
-	ip_copy->ip_len = len;
+	ip_copy->ip_id = ip_newid();
+	ip_copy->ip_len = htons(len);
 	ip_copy->ip_src = vifp->v_lcl_addr;
 	ip_copy->ip_dst = vifp->v_rmt_addr;
 
@@ -1560,8 +1578,6 @@ encap_send(ip, vifp, m)
 	 */
 	ip = (struct ip *)((caddr_t)ip_copy + sizeof(multicast_encap_iphdr));
 	--ip->ip_ttl;
-	HTONS(ip->ip_len);
-	HTONS(ip->ip_off);
 	ip->ip_sum = 0;
 	mb_copy->m_data += sizeof(multicast_encap_iphdr);
 	ip->ip_sum = in_cksum(mb_copy, ip->ip_hl << 2);
@@ -1570,7 +1586,7 @@ encap_send(ip, vifp, m)
 	if (vifp->v_rate_limit <= 0)
 		tbf_send_packet(vifp, mb_copy);
 	else
-		tbf_control(vifp, mb_copy, ip, ip_copy->ip_len);
+		tbf_control(vifp, mb_copy, ip, ntohs(ip_copy->ip_len));
 }
 
 /*
@@ -1755,7 +1771,7 @@ tbf_process_q(vifp)
 	 * as possible.
 	 */
 	for (m = vifp->tbf_q; m != 0; m = vifp->tbf_q) {
-		len = mtod(m, struct ip *)->ip_len;
+		len = ntohs(mtod(m, struct ip *)->ip_len);
 
 		/* determine if the packet can be sent */
 		if (len <= vifp->tbf_n_tok) {
@@ -1835,12 +1851,9 @@ tbf_send_packet(vifp, m)
 
 	if (vifp->v_flags & VIFF_TUNNEL) {
 		/* If tunnel options */
-#ifdef IPSEC
-		/* Don't lookup socket in forwading case */
-		(void)ipsec_setsocket(m, NULL);
-#endif
 		ip_output(m, (struct mbuf *)0, &vifp->v_route,
-		    IP_FORWARDING, (struct ip_moptions *)0);
+		    IP_FORWARDING, (struct ip_moptions *)NULL,
+		    (struct socket *)NULL);
 	} else {
 		/* if physical interface option, extract the options and then send */
 		struct ip_moptions imo;
@@ -1852,12 +1865,9 @@ tbf_send_packet(vifp, m)
 		imo.imo_multicast_vif = -1;
 #endif
 
-#ifdef IPSEC
-		/* Don't lookup socket in forwading case */
-		(void)ipsec_setsocket(m, NULL);
-#endif
 		error = ip_output(m, (struct mbuf *)0, (struct route *)0,
-		    IP_FORWARDING|IP_MULTICASTOPTS, &imo);
+		    IP_FORWARDING|IP_MULTICASTOPTS, &imo,
+		    (struct socket *)NULL);
 
 		if (mrtdebug & DEBUG_XMIT)
 			log(LOG_DEBUG, "phyint_send on vif %ld err %d\n",

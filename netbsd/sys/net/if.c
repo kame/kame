@@ -1,4 +1,4 @@
-/*	$NetBSD: if.c,v 1.104.4.3 2003/09/10 19:00:09 tron Exp $	*/
+/*	$NetBSD: if.c,v 1.139.2.1 2004/05/28 07:24:37 tron Exp $	*/
 
 /*-
  * Copyright (c) 1999, 2000, 2001 The NetBSD Foundation, Inc.
@@ -77,11 +77,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -101,14 +97,17 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if.c,v 1.104.4.3 2003/09/10 19:00:09 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if.c,v 1.139.2.1 2004/05/28 07:24:37 tron Exp $");
 
 #include "opt_inet.h"
 
 #include "opt_compat_linux.h"
 #include "opt_compat_svr4.h"
+#include "opt_compat_ultrix.h"
 #include "opt_compat_43.h"
 #include "opt_atalk.h"
+#include "opt_ccitt.h"
+#include "opt_natm.h"
 #include "opt_pfil_hooks.h"
 
 #include <sys/param.h>
@@ -122,11 +121,14 @@ __KERNEL_RCSID(0, "$NetBSD: if.c,v 1.104.4.3 2003/09/10 19:00:09 tron Exp $");
 #include <sys/protosw.h>
 #include <sys/kernel.h>
 #include <sys/ioctl.h>
+#include <sys/sysctl.h>
 
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_ether.h>
-#include <net/if_ieee80211.h>
+#include <net/if_media.h>
+#include <net80211/ieee80211.h>
+#include <net80211/ieee80211_ioctl.h>
 #include <net/if_types.h>
 #include <net/radix.h>
 #include <net/route.h>
@@ -141,6 +143,9 @@ __KERNEL_RCSID(0, "$NetBSD: if.c,v 1.104.4.3 2003/09/10 19:00:09 tron Exp $");
 #include <netinet6/in6_var.h>
 #include <netinet6/nd6.h>
 #endif
+
+MALLOC_DEFINE(M_IFADDR, "ifaddr", "interface address");
+MALLOC_DEFINE(M_IFMADDR, "ether_multi", "link-level multicast address");
 
 int	ifqmaxlen = IFQ_MAXLEN;
 struct	callout if_slowtimo_ch;
@@ -250,8 +255,9 @@ if_nulldrain(ifp)
 	/* Nothing. */
 }
 
-static int if_index = 1;
+static u_int if_index = 1;
 struct ifnet_head ifnet;
+size_t if_indexlim = 0;
 struct ifaddr **ifnet_addrs = NULL;
 size_t if_indexlim = 0;
 struct ifnet **ifindex2ifnet = NULL;
@@ -371,7 +377,7 @@ if_attach(ifp)
 			 * If we hit USHRT_MAX, we skip back to 0 since
 			 * there are a number of places where the value
 			 * of if_index or if_index itself is compared
-			 * to to or stored in an unsigned short.  By
+			 * to or stored in an unsigned short.  By
 			 * jumping back, we won't botch those assignments
 			 * or comparisons.
 			 */
@@ -543,7 +549,7 @@ if_detach(ifp)
 	struct ifnet *ifp;
 {
 	struct socket so;
-	struct ifaddr *ifa, *next;
+	struct ifaddr *ifa, **ifap;
 #ifdef IFAREF_DEBUG
 	struct ifaddr *last_ifa = NULL;
 #endif
@@ -586,8 +592,8 @@ if_detach(ifp)
 	 * Rip all the addresses off the interface.  This should make
 	 * all of the routes go away.
 	 */
-	for (ifa = TAILQ_FIRST(&ifp->if_addrlist); ifa; ifa = next) {
-		next = TAILQ_NEXT(ifa, ifa_list);
+	ifap = &TAILQ_FIRST(&ifp->if_addrlist); /* XXX abstraction violation */
+	while ((ifa = *ifap)) {
 		family = ifa->ifa_addr->sa_family;
 #ifdef IFAREF_DEBUG
 		printf("if_detach: ifaddr %p, family %d, refcnt %d\n",
@@ -596,12 +602,14 @@ if_detach(ifp)
 			panic("if_detach: loop detected");
 		last_ifa = ifa;
 #endif
-		if (family == AF_LINK)
+		if (family == AF_LINK) {
+			ifap = &TAILQ_NEXT(ifa, ifa_list);
 			continue;
+		}
 		dp = pffinddomain(family);
 #ifdef DIAGNOSTIC
 		if (dp == NULL)
-			panic("if_detach: no domain for AF %d\n",
+			panic("if_detach: no domain for AF %d",
 			    family);
 #endif
 		purged = 0;
@@ -618,10 +626,11 @@ if_detach(ifp)
 		if (purged == 0) {
 			/*
 			 * XXX What's really the best thing to do
-			 * XXX here?  --thorpej@netbsd.org
+			 * XXX here?  --thorpej@NetBSD.org
 			 */
 			printf("if_detach: WARNING: AF %d not purged\n",
 			    family);
+			TAILQ_REMOVE(&ifp->if_addrlist, ifa, ifa_list);
 		}
 	}
 
@@ -655,7 +664,7 @@ if_detach(ifp)
 do { \
 	extern struct ifqueue x; \
 	if_detach_queues(ifp, & x); \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 #ifdef INET
 #if NARP > 0
 	IF_DETACH_QUEUES(arpintrq);
@@ -682,13 +691,16 @@ do { \
 #ifdef NATM
 	IF_DETACH_QUEUES(natmintrq);
 #endif
+#ifdef DECNET
+	IF_DETACH_QUEUES(decnetintrq);
+#endif
 #undef IF_DETACH_QUEUES
 
 	splx(s);
 }
 
 #if defined(INET) || defined(INET6) || defined(NETATALK) || defined(NS) || \
-    defined(ISO) || defined(CCITT) || defined(NATM)
+    defined(ISO) || defined(CCITT) || defined(NATM) || defined(DECNET)
 static void
 if_detach_queues(ifp, q)
 	struct ifnet *ifp;
@@ -999,7 +1011,7 @@ ifa_ifwithnet(addr)
 			if (sat2->sat_addr.s_net == sat->sat_addr.s_net)
 				return (ifa); /* exact match */
 			if (ifa_maybe == NULL) {
-				/* else keep the if with the rigth range */
+				/* else keep the if with the right range */
 				ifa_maybe = ifa;
 			}
 		}
@@ -1526,6 +1538,8 @@ ifioctl(so, cmd, data, p)
 	case SIOCS80211NWID:
 	case SIOCS80211NWKEY:
 	case SIOCS80211POWER:
+	case SIOCS80211BSSID:
+	case SIOCS80211CHANNEL:
 		/* XXX:  need to pass proc pointer through to driver... */
 		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
 			return (error);
@@ -1533,7 +1547,7 @@ ifioctl(so, cmd, data, p)
 	default:
 		if (so->so_proto == 0)
 			return (EOPNOTSUPP);
-#if !defined(COMPAT_43) && !defined(COMPAT_LINUX) && !defined(COMPAT_SVR4) && !defined(LKM)
+#if !defined(COMPAT_43) && !defined(COMPAT_LINUX) && !defined(COMPAT_SVR4) && !defined(COMPAT_ULTRIX) && !defined(LKM)
 		error = ((*so->so_proto->pr_usrreq)(so, PRU_CONTROL,
 		    (struct mbuf *)cmd, (struct mbuf *)data,
 		    (struct mbuf *)ifp, p));
@@ -1621,54 +1635,63 @@ ifconf(cmd, data)
 	struct ifaddr *ifa;
 	struct ifreq ifr, *ifrp;
 	int space = ifc->ifc_len, error = 0;
+	const int sz = (int)sizeof(ifr);
+	int sign;
 
-	ifrp = ifc->ifc_req;
+	if ((ifrp = ifc->ifc_req) == NULL) {
+		space = 0;
+		sign = -1;
+	} else {
+		sign = 1;
+	}
 	TAILQ_FOREACH(ifp, &ifnet, if_list) {
 		bcopy(ifp->if_xname, ifr.ifr_name, IFNAMSIZ);
 		if ((ifa = TAILQ_FIRST(&ifp->if_addrlist)) == 0) {
-			memset((caddr_t)&ifr.ifr_addr, 0, sizeof(ifr.ifr_addr));
-			if (space >= (int)sizeof (ifr)) {
-				error = copyout((caddr_t)&ifr, (caddr_t)ifrp,
-						sizeof(ifr));
+			memset(&ifr.ifr_addr, 0, sizeof(ifr.ifr_addr));
+			if (ifrp != NULL && space >= sz) {
+				error = copyout(&ifr, ifrp, sz);
 				if (error)
 					break;
+				ifrp++;
 			}
-			space -= sizeof (ifr), ifrp++;
-		} else 
-		    for (; ifa != 0; ifa = TAILQ_NEXT(ifa, ifa_list)) {
+			space -= sizeof(ifr) * sign;
+			continue;
+		}
+
+		for (; ifa != 0; ifa = TAILQ_NEXT(ifa, ifa_list)) {
 			struct sockaddr *sa = ifa->ifa_addr;
-#if defined(COMPAT_43) || defined(COMPAT_LINUX) || defined(COMPAT_SVR4)
+#if defined(COMPAT_43) || defined(COMPAT_LINUX) || defined(COMPAT_SVR4) || defined(COMPAT_ULTRIX)
 			if (cmd == OSIOCGIFCONF) {
 				struct osockaddr *osa =
 					 (struct osockaddr *)&ifr.ifr_addr;
+				/*
+				 * If it does not fit, we don't bother with it
+				 */
+				if (sa->sa_len > sizeof(*osa))
+					continue;
 				ifr.ifr_addr = *sa;
 				osa->sa_family = sa->sa_family;
-				if (space >= (int)sizeof (ifr)) {
-					error = copyout((caddr_t)&ifr,
-							(caddr_t)ifrp,
-							sizeof (ifr));
+				if (ifrp != NULL && space >= sz) {
+					error = copyout(&ifr, ifrp, sz);
 					ifrp++;
 				}
 			} else
 #endif
 			if (sa->sa_len <= sizeof(*sa)) {
 				ifr.ifr_addr = *sa;
-				if (space >= (int)sizeof (ifr)) {
-					error = copyout((caddr_t)&ifr,
-							(caddr_t)ifrp,
-							sizeof (ifr));
+				if (ifrp != NULL && space >= sz) {
+					error = copyout(&ifr, ifrp, sz);
 					ifrp++;
 				}
 			} else {
-				space -= sa->sa_len - sizeof(*sa);
-				if (space >= (int)sizeof (ifr)) {
-					error = copyout((caddr_t)&ifr,
-							(caddr_t)ifrp,
-							sizeof (ifr.ifr_name));
+				space -= (sa->sa_len - sizeof(*sa)) * sign;
+				if (ifrp != NULL && space >= sz) {
+					error = copyout(&ifr, ifrp,
+					    sizeof(ifr.ifr_name));
 					if (error == 0) {
-						error = copyout((caddr_t)sa,
-						  (caddr_t)&ifrp->ifr_addr,
-						  sa->sa_len);
+						error = copyout(sa,
+						    &ifrp->ifr_addr,
+						    sa->sa_len);
 					}
 					ifrp = (struct ifreq *)
 						(sa->sa_len +
@@ -1677,9 +1700,93 @@ ifconf(cmd, data)
 			}
 			if (error)
 				break;
-			space -= sizeof (ifr);
+			space -= sz * sign;
 		}
 	}
-	ifc->ifc_len -= space;
+	if (ifrp != NULL)
+		ifc->ifc_len -= space;
+	else
+		ifc->ifc_len = space;
 	return (error);
 }
+
+#if defined(INET) || defined(INET6)
+static void
+sysctl_net_ifq_setup(struct sysctllog **clog,
+		     int pf, const char *pfname,
+		     int ipn, const char *ipname,
+		     int qid, struct ifqueue *ifq)
+{
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "net", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_NET, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, pfname, NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_NET, pf, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, ipname, NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_NET, pf, ipn, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "ifq",
+		       SYSCTL_DESCR("Protocol input queue controls"),
+		       NULL, 0, NULL, 0,
+		       CTL_NET, pf, ipn, qid, CTL_EOL);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_INT, "len",
+		       SYSCTL_DESCR("Current input queue length"),
+		       NULL, 0, &ifq->ifq_len, 0,
+		       CTL_NET, pf, ipn, qid, IFQCTL_LEN, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "maxlen",
+		       SYSCTL_DESCR("Maximum allowed input queue length"),
+		       NULL, 0, &ifq->ifq_maxlen, 0,
+		       CTL_NET, pf, ipn, qid, IFQCTL_MAXLEN, CTL_EOL);
+#ifdef notyet
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_INT, "peak",
+		       SYSCTL_DESCR("Highest input queue length"),
+		       NULL, 0, &ifq->ifq_peak, 0,
+		       CTL_NET, pf, ipn, qid, IFQCTL_PEAK, CTL_EOL);
+#endif
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_INT, "drops",
+		       SYSCTL_DESCR("Packets dropped due to full input queue"),
+		       NULL, 0, &ifq->ifq_drops, 0,
+		       CTL_NET, pf, ipn, qid, IFQCTL_DROPS, CTL_EOL);
+}
+
+#ifdef INET
+SYSCTL_SETUP(sysctl_net_inet_ip_ifq_setup,
+	     "sysctl net.inet.ip.ifq subtree setup")
+{
+	extern struct ifqueue ipintrq;
+
+	sysctl_net_ifq_setup(clog, PF_INET, "inet", IPPROTO_IP, "ip",
+			     IPCTL_IFQ, &ipintrq);
+}
+#endif /* INET */
+
+#ifdef INET6
+SYSCTL_SETUP(sysctl_net_inet6_ip6_ifq_setup,
+	     "sysctl net.inet6.ip6.ifq subtree setup")
+{
+	extern struct ifqueue ip6intrq;
+
+	sysctl_net_ifq_setup(clog, PF_INET6, "inet6", IPPROTO_IPV6, "ip6",
+			     IPV6CTL_IFQ, &ip6intrq);
+}
+#endif /* INET6 */
+#endif /* INET || INET6 */

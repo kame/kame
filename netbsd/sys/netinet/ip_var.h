@@ -1,4 +1,4 @@
-/*	$NetBSD: ip_var.h,v 1.47 2002/05/07 02:59:38 matt Exp $	*/
+/*	$NetBSD: ip_var.h,v 1.65 2003/12/12 21:17:59 scw Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -43,11 +43,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -128,6 +124,7 @@ struct ipq {
 	u_int16_t ipq_id;		/* sequence id for reassembly */
 	struct	  ipqehead ipq_fragq;	/* to ip fragment queue */
 	struct	  in_addr ipq_src, ipq_dst;
+	u_int16_t ipq_nfrags;		/* frags in this queue entry */
 };
 
 /*
@@ -196,7 +193,7 @@ struct	ipstat {
 	u_quad_t ips_localout;		/* total ip packets generated here */
 	u_quad_t ips_odropped;		/* lost packets due to nobufs, etc. */
 	u_quad_t ips_reassembled;	/* total packets reassembled ok */
-	u_quad_t ips_fragmented;	/* datagrams sucessfully fragmented */
+	u_quad_t ips_fragmented;	/* datagrams successfully fragmented */
 	u_quad_t ips_ofragments;	/* output fragments created */
 	u_quad_t ips_cantfrag;		/* don't fragment flag was set, etc. */
 	u_quad_t ips_badoptions;	/* error in option processing */
@@ -227,6 +224,12 @@ struct ipflow {
 };
 
 #ifdef _KERNEL
+
+#ifdef _KERNEL_OPT
+#include "opt_gateway.h"
+#include "opt_mbuftrace.h"
+#endif
+
 /* flags passed to ip_output as last parameter */
 #define	IP_FORWARDING		0x1		/* most of ip header exists */
 #define	IP_RAWOUTPUT		0x2		/* raw ip header exists */
@@ -235,8 +238,14 @@ struct ipflow {
 #define	IP_ALLOWBROADCAST	SO_BROADCAST	/* can send broadcast packets */
 #define	IP_MTUDISC		0x0400		/* Path MTU Discovery; set DF */
 
+#ifdef __NO_STRICT_ALIGNMENT
+#define	IP_HDR_ALIGNED_P(ip)	1
+#else
+#define	IP_HDR_ALIGNED_P(ip)	((((vaddr_t) (ip)) & 3) == 0)
+#endif
+
 extern struct ipstat ipstat;		/* ip statistics */
-extern LIST_HEAD(ipqhead, ipq) ipq;	/* ip reass. queue */
+extern LIST_HEAD(ipqhead, ipq) ipq[];	/* ip reass. queue */
 extern int   ip_defttl;			/* default IP ttl */
 extern int   ipforwarding;		/* ip forwarding */
 extern int   ip_mtudisc;		/* mtu discovery */
@@ -248,9 +257,14 @@ extern int   lowportmax;		/* maximum reserved port */
 extern int   igmpmaxsrcfilter;		/* maximum num. of msf per interface */
 extern int   igmpsomaxsrc;		/* maximum num. of msf per socket */
 extern struct rttimer_queue *ip_mtudisc_timeout_q;
+#ifdef MBUFTRACE
+extern struct mowner ip_rx_mowner;
+extern struct mowner ip_tx_mowner;
+#endif
 #ifdef GATEWAY
 extern int ip_maxflows;
 #endif
+extern struct pool inmulti_pool;
 extern struct pool ipqent_pool;
 struct	 inpcb;
 
@@ -265,10 +279,10 @@ void	 ip_init __P((void));
 int	 ip_optcopy __P((struct ip *, struct ip *));
 u_int	 ip_optlen __P((struct inpcb *));
 int	 ip_output __P((struct mbuf *, ...));
-int	 ip_fragment __P((struct mbuf *, struct ifnet *, u_long));
+int	 ip_fragment(struct mbuf *, struct ifnet *, u_long);
 int	 ip_pcbopts __P((struct mbuf **, struct mbuf *));
 struct mbuf *
-	 ip_reass __P((struct ipqent *, struct ipq *));
+	 ip_reass __P((struct ipqent *, struct ipq *, struct ipqhead *));
 struct in_ifaddr *
 	 ip_rtaddr __P((struct in_addr));
 void	 ip_savecontrol __P((struct inpcb *, struct mbuf **, struct ip *,
@@ -296,8 +310,23 @@ void	ipflow_init __P((void));
 struct	ipflow *ipflow_reap __P((int));
 void	ipflow_create __P((const struct route *, struct mbuf *));
 void	ipflow_slowtimo __P((void));
+void	ipflow_invalidate_all __P((void));
+
+extern uint16_t	ip_id;
+static __inline uint16_t ip_newid __P((void));
 
 u_int16_t ip_randomid __P((void));
-#endif
+extern int ip_do_randomid;
+
+static __inline uint16_t
+ip_newid(void)
+{
+	if (ip_do_randomid)
+		return ip_randomid();
+
+	return htons(ip_id++);
+}
+
+#endif  /* _KERNEL */
 
 #endif /* _NETINET_IP_VAR_H_ */

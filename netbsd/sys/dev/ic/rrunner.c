@@ -1,4 +1,4 @@
-/*	$NetBSD: rrunner.c,v 1.30 2002/02/14 07:08:02 chs Exp $	*/
+/*	$NetBSD: rrunner.c,v 1.44 2003/11/03 03:05:25 ichiro Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998 The NetBSD Foundation, Inc.
@@ -42,7 +42,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rrunner.c,v 1.30 2002/02/14 07:08:02 chs Exp $");
+__KERNEL_RCSID(0, "$NetBSD: rrunner.c,v 1.44 2003/11/03 03:05:25 ichiro Exp $");
 
 #include "opt_inet.h"
 #include "opt_ns.h"
@@ -62,6 +62,7 @@ __KERNEL_RCSID(0, "$NetBSD: rrunner.c,v 1.30 2002/02/14 07:08:02 chs Exp $");
 #include <sys/device.h>
 #include <sys/proc.h>
 #include <sys/kernel.h>
+#include <sys/conf.h>
 
 #include <uvm/uvm_extern.h>
 
@@ -101,7 +102,7 @@ __KERNEL_RCSID(0, "$NetBSD: rrunner.c,v 1.30 2002/02/14 07:08:02 chs Exp $");
 #define ESH_PRINTF
 */
 
-/* Autoconfig defintion of driver back-end */
+/* Autoconfig definition of driver back-end */
 extern struct cfdriver esh_cd;
 
 struct esh_softc *esh_softc_debug[22];  /* for gdb */
@@ -122,19 +123,25 @@ void eshwatchdog __P((struct ifnet *));
 
 /* Routines to support FP operation */
 
-int esh_fpopen __P((dev_t dev, int oflags, int devtype, struct proc *p));
-int esh_fpclose __P((dev_t dev, int fflag, int devtype, struct proc *));
-int esh_fpread __P((dev_t dev, struct uio *uio, int ioflag));
-int esh_fpwrite __P((dev_t dev, struct uio *uio, int ioflag));
-static void esh_fpstrategy __P((struct buf *bp));
-int esh_fpioctl __P((dev_t dev, u_long cmd, caddr_t data,
-		     int fflag, struct proc *p));
-void esh_fpstop __P((struct tty *tp, int rw));
-int esh_fppoll __P((dev_t dev, int events, struct proc *p));
-
+dev_type_open(esh_fpopen);
+dev_type_close(esh_fpclose);
+dev_type_read(esh_fpread);
+dev_type_write(esh_fpwrite);
 #ifdef MORE_DONE
-paddr_t esh_fpmmap __P((dev_t, off_t, int));
+dev_type_mmap(esh_fpmmap);
 #endif
+dev_type_strategy(esh_fpstrategy);
+
+const struct cdevsw esh_cdevsw = {
+	esh_fpopen, esh_fpclose, esh_fpread, esh_fpwrite, nullioctl,
+	nostop, notty, nullpoll,
+#ifdef MORE_DONE
+	esh_fpmmap,
+#else
+	nommap,
+#endif
+	nullkqfilter,
+};
 
 /* General routines, not externally visable */
 
@@ -215,16 +222,16 @@ eshconfig(sc)
 		sizeof(struct rr_event) * RR_EVENT_RING_SIZE;
 	
 	error = bus_dmamem_alloc(sc->sc_dmat, sc->sc_dma_size, 
-				 0, RR_DMA_BOUNDRY, &sc->sc_dmaseg, 1, 
+				 0, RR_DMA_BOUNDARY, &sc->sc_dmaseg, 1, 
 				 &rseg, BUS_DMA_NOWAIT);
 	if (error) {
-		printf("%s:  couldn't allocate space for host-side"
+		aprint_error("%s: couldn't allocate space for host-side"
 		       "data structures\n", sc->sc_dev.dv_xname);
 		return;
 	}
 
 	if (rseg > 1) {
-		printf("%s:  contiguous memory not available\n",
+		aprint_error("%s: contiguous memory not available\n",
 		       sc->sc_dev.dv_xname);
 		goto bad_dmamem_map;
 	}	
@@ -233,22 +240,25 @@ eshconfig(sc)
 			       sc->sc_dma_size, &sc->sc_dma_addr,
 			       BUS_DMA_NOWAIT | BUS_DMA_COHERENT);
 	if (error) {
-		printf("%s:  couldn't map memory for host-side structures\n",
+		aprint_error(
+		       "%s: couldn't map memory for host-side structures\n",
 		       sc->sc_dev.dv_xname);
 		goto bad_dmamem_map;
 	}
     
 	if (bus_dmamap_create(sc->sc_dmat, sc->sc_dma_size, 
-			      1, sc->sc_dma_size, RR_DMA_BOUNDRY, 
+			      1, sc->sc_dma_size, RR_DMA_BOUNDARY, 
 			      BUS_DMA_ALLOCNOW | BUS_DMA_NOWAIT, 
 			      &sc->sc_dma)) {
-		printf("%s: couldn't create DMA map\n", sc->sc_dev.dv_xname);
+		aprint_error("%s: couldn't create DMA map\n",
+		    sc->sc_dev.dv_xname);
 		goto bad_dmamap_create;
 	}
     
 	if (bus_dmamap_load(sc->sc_dmat, sc->sc_dma, sc->sc_dma_addr, 
 			    sc->sc_dma_size, NULL, BUS_DMA_NOWAIT)) {
-		printf("%s: couldn't load DMA map\n", sc->sc_dev.dv_xname);
+		aprint_error("%s: couldn't load DMA map\n",
+		    sc->sc_dev.dv_xname);
 		goto bad_dmamap_load;
 	}
     
@@ -279,7 +289,8 @@ eshconfig(sc)
 
 #ifdef DIAGNOSTIC
 	if (size > sc->sc_dmaseg.ds_len) {
-		printf("%s:  bogus size calculation\n", sc->sc_dev.dv_xname);
+		aprint_error("%s: bogus size calculation\n",
+		    sc->sc_dev.dv_xname);
 		goto bad_other;
 	}
 #endif
@@ -291,24 +302,24 @@ eshconfig(sc)
 	 */
 
 	if (bus_dmamap_create(sc->sc_dmat, ESH_MAX_NSEGS * RR_DMA_MAX, 
-			      ESH_MAX_NSEGS, RR_DMA_MAX, RR_DMA_BOUNDRY, 
+			      ESH_MAX_NSEGS, RR_DMA_MAX, RR_DMA_BOUNDARY,
 			      BUS_DMA_ALLOCNOW | BUS_DMA_NOWAIT, 
 			      &sc->sc_send.ec_dma)) {
-		printf("%s:  failed bus_dmamap_create\n", 
+		aprint_error("%s: failed bus_dmamap_create\n", 
 		       sc->sc_dev.dv_xname);
 			goto bad_other;
 	}
 	sc->sc_send.ec_offset = 0;
 	sc->sc_send.ec_descr = sc->sc_send_ring;
     	TAILQ_INIT(&sc->sc_send.ec_di_queue);
-	BUFQ_INIT(&sc->sc_send.ec_buf_queue);
+	bufq_alloc(&sc->sc_send.ec_buf_queue, BUFQ_FCFS);
 
 	for (i = 0; i < RR_MAX_SNAP_RECV_RING_SIZE; i++)
 		if (bus_dmamap_create(sc->sc_dmat, RR_DMA_MAX, 1, RR_DMA_MAX, 
-				      RR_DMA_BOUNDRY, 
+				      RR_DMA_BOUNDARY, 
 				      BUS_DMA_ALLOCNOW | BUS_DMA_NOWAIT, 
 				      &sc->sc_snap_recv.ec_dma[i])) {
-			printf("%s:  failed bus_dmamap_create\n", 
+			aprint_error("%s: failed bus_dmamap_create\n", 
 			       sc->sc_dev.dv_xname);
 			for (i--; i >= 0; i--)
 				bus_dmamap_destroy(sc->sc_dmat, 
@@ -339,7 +350,7 @@ eshconfig(sc)
 
 	header_format = esh_read_eeprom(sc, RR_EE_HEADER_FORMAT);
 	if (header_format != RR_EE_HEADER_FORMAT_MAGIC) {
-		printf("%s:  bogus EEPROM header format value %x\n",
+		aprint_error("%s: bogus EEPROM header format value %x\n",
 		       sc->sc_dev.dv_xname, header_format);
 		goto bad_other;
 	}
@@ -800,7 +811,7 @@ esh_fpopen(dev, oflags, devtype, p)
 	TAILQ_INIT(&recv->ec_queue);
 
 	size = RR_FP_RECV_RING_SIZE * sizeof(struct rr_descr);
-	error = bus_dmamem_alloc(sc->sc_dmat, size, 0, RR_DMA_BOUNDRY, 
+	error = bus_dmamem_alloc(sc->sc_dmat, size, 0, RR_DMA_BOUNDARY, 
 				 &recv->ec_dmaseg, 1, 
 				 &rseg, BUS_DMA_WAITOK);
 
@@ -825,7 +836,7 @@ esh_fpopen(dev, oflags, devtype, p)
 		goto bad_fp_dmamem_map;
 	}
     
-	if (bus_dmamap_create(sc->sc_dmat, size, 1, size, RR_DMA_BOUNDRY, 
+	if (bus_dmamap_create(sc->sc_dmat, size, 1, size, RR_DMA_BOUNDARY, 
 			      BUS_DMA_ALLOCNOW | BUS_DMA_WAITOK, 
 			      &recv->ec_dma)) {
 		printf("%s: couldn't create DMA map for FP receive ring\n", 
@@ -1001,7 +1012,8 @@ esh_fpread(dev, uio, ioflag)
 	struct uio *uio;
 	int ioflag;
 {
-	struct proc *p = curproc;
+	struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
 	struct iovec *iovp;
 	struct esh_softc *sc;
 	struct esh_fp_ring_ctl *ring;
@@ -1039,7 +1051,7 @@ esh_fpread(dev, uio, ioflag)
 		}
 	}
 	
-	PHOLD(p);	/* Lock process info into memory */
+	PHOLD(l);	/* Lock process info into memory */
 
 	/* Lock down the pages */
 	for (i = 0; i < uio->uio_iovcnt; i++) {
@@ -1143,7 +1155,7 @@ esh_fpread(dev, uio, ioflag)
 		uvm_vsunlock(p, iovp->iov_base, iovp->iov_len);
 	}
 
-	PRELE(p);	/* Release process info */
+	PRELE(l);	/* Release process info */
 	esh_free_dmainfo(sc, di);
 
 fpread_done:
@@ -1161,7 +1173,8 @@ esh_fpwrite(dev, uio, ioflag)
 	struct uio *uio;
 	int ioflag;
 {
-	struct proc *p = curproc;
+	struct lwp *l = curlwp;
+	struct proc *p = l->l_proc;
 	struct iovec *iovp;
 	struct esh_softc *sc;
 	struct esh_send_ring_ctl *ring;
@@ -1199,7 +1212,7 @@ esh_fpwrite(dev, uio, ioflag)
 		}
 	}
 	
-	PHOLD(p);	/* Lock process info into memory */
+	PHOLD(l);	/* Lock process info into memory */
 
 	/* Lock down the pages */
 	for (i = 0; i < uio->uio_iovcnt; i++) {
@@ -1299,7 +1312,7 @@ esh_fpwrite(dev, uio, ioflag)
 		uvm_vsunlock(p, iovp->iov_base, iovp->iov_len);
 	}
 
-	PRELE(p);	/* Release process info */
+	PRELE(l);	/* Release process info */
 	esh_free_dmainfo(sc, di);
 
 fpwrite_done:
@@ -1308,13 +1321,9 @@ fpwrite_done:
 #endif
 	splx(s);
 	return error;
-
-/* To shut up compiler */
-	error = physio(esh_fpstrategy, NULL, dev, B_WRITE, minphys, uio);
-	return error;
 }
 
-static void 
+void 
 esh_fpstrategy(bp)
 	struct buf *bp;
 {
@@ -1397,7 +1406,7 @@ esh_fpstrategy(bp)
 		 */
 
 		struct esh_send_ring_ctl *ring = &sc->sc_send;
-		BUFQ_INSERT_TAIL(&ring->ec_buf_queue, bp);
+		BUFQ_PUT(&ring->ec_buf_queue, bp);
 #ifdef ESH_PRINTF
 		printf("esh_fpstrategy:  ready to call eshstart to write!\n");
 #endif
@@ -1414,36 +1423,6 @@ done:
 #endif
 	biodone(bp);
 }
-
-
-int 
-esh_fpioctl(dev, cmd, data, fflag, p)
-	dev_t dev;
-	u_long cmd;
-	caddr_t data;
-	int fflag;
-	struct proc *p;
-{
-	return 0;
-}
-
-
-void 
-esh_fpstop(tp, rw)
-	struct tty *tp;
-	int rw;
-{
-}
-
-int 
-esh_fppoll(dev, events, p)
-	dev_t dev;
-	int events;
-	struct proc *p;
-{
-	return 0;
-}
-
 
 /*
  * Handle interrupts.  This is basicly event handling code;  version two
@@ -2041,7 +2020,7 @@ eshstart(ifp)
 	if ((sc->sc_flags & ESH_FL_FP_RING_UP) != 0 &&
 	    send->ec_cur_mbuf == NULL && send->ec_cur_buf == NULL &&
 	    send->ec_cur_dmainfo == NULL &&
-	    BUFQ_FIRST(&send->ec_buf_queue) != NULL) {
+	    BUFQ_PEEK(&send->ec_buf_queue) != NULL) {
 		struct buf *bp;
 
 #ifdef ESH_PRINTF
@@ -2049,8 +2028,7 @@ eshstart(ifp)
 		       send->ec_queue);
 #endif
 
-		bp = send->ec_cur_buf = BUFQ_FIRST(&send->ec_buf_queue);
-		BUFQ_REMOVE(&send->ec_buf_queue, bp);
+		bp = send->ec_cur_buf = BUFQ_GET(&send->ec_buf_queue);
 		send->ec_offset = 0;
 		send->ec_len = bp->b_bcount;
 
@@ -3226,7 +3204,7 @@ esh_generic_ioctl(struct esh_softc *sc, u_long cmd, caddr_t data,
 		misc_local_ctl = bus_space_read_4(iot, ioh, RR_MISC_LOCAL_CTL);
 		value = misc_local_ctl & 
 			~(RR_LC_FAST_PROM | RR_LC_ADD_SRAM | RR_LC_PARITY_ON);
-		if (cmd == EIOCSEEPROM)   /* make writeable! */
+		if (cmd == EIOCSEEPROM)   /* make writable! */
 			value |= RR_LC_WRITE_PROM;
 		bus_space_write_4(iot, ioh, RR_MISC_LOCAL_CTL, value);
 	    
@@ -3357,7 +3335,6 @@ eshstop(sc)
 	struct ifnet *ifp = &sc->sc_if;
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
-	struct rr_ring_ctl *ring;
 	u_int32_t misc_host_ctl;
 	int i;
 
@@ -3375,7 +3352,6 @@ eshstop(sc)
 	sc->sc_flags = 0;
 	ifp->if_timer = 0;  /* turn off watchdog timer */
 
-	ring = sc->sc_recv_ring_table + HIPPI_ULP_802;
 	while (sc->sc_snap_recv.ec_consumer 
                != sc->sc_snap_recv.ec_producer) {
 		struct mbuf *m0;
@@ -3428,7 +3404,6 @@ eshstop(sc)
 
 	/* XXX:  doesn't clear bufs being sent */
 
-	ring = &sc->sc_gen_info->ri_send_ring_ctl;
 	bus_dmamap_unload(sc->sc_dmat, sc->sc_send.ec_dma);
 	if (sc->sc_send.ec_cur_mbuf) {
 		m_freem(sc->sc_send.ec_cur_mbuf);
@@ -3523,7 +3498,7 @@ esh_write_eeprom(sc, addr, value)
 	u_int32_t value;
 {
 	int i, j;
-	u_int32_t shifted_value, tmp;
+	u_int32_t shifted_value, tmp = 0;
  
 	/* If the offset hasn't been added, add it.  Otherwise pass through */
 
@@ -3716,7 +3691,7 @@ esh_new_dmainfo(sc)
 	assert(di != NULL);
 
 	if (bus_dmamap_create(sc->sc_dmat, ESH_MAX_NSEGS * RR_DMA_MAX, 
-			      ESH_MAX_NSEGS, RR_DMA_MAX, RR_DMA_BOUNDRY, 
+			      ESH_MAX_NSEGS, RR_DMA_MAX, RR_DMA_BOUNDARY, 
 			      BUS_DMA_ALLOCNOW | BUS_DMA_WAITOK, 
 			      &di->ed_dma)) {
 		printf("%s:  failed dmainfo bus_dmamap_create\n", 

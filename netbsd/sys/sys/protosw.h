@@ -1,4 +1,4 @@
-/*	$NetBSD: protosw.h,v 1.26 2001/03/21 19:22:29 thorpej Exp $	*/
+/*	$NetBSD: protosw.h,v 1.31 2003/12/04 19:38:25 atatat Exp $	*/
 
 /*-
  * Copyright (c) 1982, 1986, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -98,8 +94,7 @@ struct protosw {
 			__P((void));
 	void	(*pr_drain)		/* flush any excess space possible */
 			__P((void));
-	int	(*pr_sysctl)		/* sysctl for protocol */
-			__P((int *, u_int, void *, size_t *, void *, size_t));
+	int	*pr_wassysctl;		/* @@@ was sysctl for protocol, now obsolete */
 };
 
 #define	PR_SLOWHZ	2		/* 2 slow timeouts per second */
@@ -145,7 +140,7 @@ struct protosw {
 #define	PRU_SHUTDOWN		7	/* won't send any more data */
 #define	PRU_RCVD		8	/* have taken data; more room now */
 #define	PRU_SEND		9	/* send this data */
-#define	PRU_ABORT		10	/* abort (fast DISCONNECT, DETATCH) */
+#define	PRU_ABORT		10	/* abort (fast DISCONNECT, DETACH) */
 #define	PRU_CONTROL		11	/* control operations on protocol */
 #define	PRU_SENSE		12	/* return status into m */
 #define	PRU_RCVOOB		13	/* retrieve out of band data */

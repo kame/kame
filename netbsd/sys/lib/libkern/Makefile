@@ -1,11 +1,15 @@
-#	$NetBSD: Makefile,v 1.63.10.1 2002/06/19 00:03:25 lukem Exp $
+#	$NetBSD: Makefile,v 1.71 2003/07/07 13:20:17 dsl Exp $
 
-LIB=	kern
-NOPIC=	# defined
+LIB=		kern
+NOPIC=		# defined
+LLIBS=		# defined
 
 .include <bsd.own.mk>
 
-.if defined(MACHINE_ARCH) && !empty(MACHINE_ARCH) && \
+.if defined(LIBKERN_ARCH) && !empty(LIBKERN_ARCH) && \
+    exists(${KERNDIR}/arch/${LIBKERN_ARCH})
+ARCHSUBDIR=     ${LIBKERN_ARCH}
+.elif defined(MACHINE_ARCH) && !empty(MACHINE_ARCH) && \
     exists(${KERNDIR}/arch/${MACHINE_ARCH})
 ARCHSUBDIR=     ${MACHINE_ARCH}
 .elif defined(MACHINE_CPU) && !empty(MACHINE_CPU) && \
@@ -37,8 +41,11 @@ SRCS+=	adddi3.c anddi3.c ashldi3.c ashrdi3.c cmpdi2.c divdi3.c iordi3.c \
 
 # Other stuff
 SRCS+=	__cmsg_alignbytes.c inet_addr.c intoa.c md4c.c md5c.c sha1.c pmatch.c
-SRCS+=	_que.c
-SRCS+=	arc4random.c strlcpy.c strlcat.c
+SRCS+=	_que.c arc4random.c
+
+SRCS+=	strstr.c strlcpy.c strlcat.c
+
+SRCS+=	xlat_mbr_fstype.c
 
 # Files to clean up
 CLEANFILES+= lib${LIB}.o lib${LIB}.po

@@ -1,4 +1,4 @@
-/*	$NetBSD: pcmcia.c,v 1.28 2001/12/15 13:23:22 soren Exp $	*/
+/*	$NetBSD: pcmcia.c,v 1.36 2003/10/22 07:46:48 briggs Exp $	*/
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: pcmcia.c,v 1.28 2001/12/15 13:23:22 soren Exp $");
+__KERNEL_RCSID(0, "$NetBSD: pcmcia.c,v 1.36 2003/10/22 07:46:48 briggs Exp $");
 
 #include "opt_pcmciaverbose.h"
 
@@ -80,9 +80,8 @@ int pcmcia_card_intr __P((void *));
 int pcmcia_card_intrdebug __P((void *));
 #endif
 
-struct cfattach pcmcia_ca = {
-	sizeof(struct pcmcia_softc), pcmcia_match, pcmcia_attach
-};
+CFATTACH_DECL(pcmcia, sizeof(struct pcmcia_softc),
+    pcmcia_match, pcmcia_attach, NULL, NULL);
 
 int
 pcmcia_ccr_read(pf, ccr)
@@ -115,7 +114,7 @@ pcmcia_match(parent, match, aux)
 {
 	struct pcmciabus_attach_args *paa = aux;
 
-	if (strcmp(paa->paa_busname, match->cf_driver->cd_name)) {
+	if (strcmp(paa->paa_busname, match->cf_name)) {
 	    return 0;
 	}
 	/* if the autoconfiguration got this far, there's a socket here */
@@ -152,7 +151,7 @@ pcmcia_card_attach(dev)
 	/*
 	 * this is here so that when socket_enable calls gettype, trt happens
 	 */
-	sc->card.pf_head.sqh_first = NULL;
+	SIMPLEQ_FIRST(&sc->card.pf_head) = NULL;
 
 	pcmcia_chip_socket_enable(sc->pct, sc->pch);
 
@@ -169,7 +168,7 @@ pcmcia_card_attach(dev)
 
 	if (sc->card.error)
 		return (1);
-	if (sc->card.pf_head.sqh_first == NULL)
+	if (SIMPLEQ_EMPTY(&sc->card.pf_head))
 		return (1);
 
 	if (pcmcia_verbose)
@@ -177,9 +176,8 @@ pcmcia_card_attach(dev)
 
 	attached = 0;
 
-	for (pf = sc->card.pf_head.sqh_first; pf != NULL;
-	    pf = pf->pf_list.sqe_next) {
-		if (pf->cfe_head.sqh_first == NULL)
+	SIMPLEQ_FOREACH(pf, &sc->card.pf_head, pf_list) {
+		if (SIMPLEQ_EMPTY(&pf->cfe_head))
 			continue;
 
 #ifdef DIAGNOSTIC
@@ -197,9 +195,8 @@ pcmcia_card_attach(dev)
 		pf->ih_arg = NULL;
 	}
 
-	for (pf = sc->card.pf_head.sqh_first; pf != NULL;
-	    pf = pf->pf_list.sqe_next) {
-		if (pf->cfe_head.sqh_first == NULL)
+	SIMPLEQ_FOREACH(pf, &sc->card.pf_head, pf_list) {
+		if (SIMPLEQ_EMPTY(&pf->cfe_head))
 			continue;
 
 		paa.manufacturer = sc->card.manufacturer;
@@ -228,9 +225,8 @@ pcmcia_card_detach(dev, flags)
 	 * We are running on either the PCMCIA socket's event thread
 	 * or in user context detaching a device by user request.
 	 */
-	for (pf = SIMPLEQ_FIRST(&sc->card.pf_head); pf != NULL;
-	     pf = SIMPLEQ_NEXT(pf, pf_list)) {
-		if (SIMPLEQ_FIRST(&pf->cfe_head) == NULL)
+	SIMPLEQ_FOREACH(pf, &sc->card.pf_head, pf_list) {
+		if (SIMPLEQ_EMPTY(&pf->cfe_head))
 			continue;
 		if (pf->child == NULL)
 			continue;
@@ -257,9 +253,8 @@ pcmcia_card_deactivate(dev)
 	 * Deactivate the child driver.  The PCMCIA socket's
 	 * event thread will run later to finish the detach.
 	 */
-	for (pf = SIMPLEQ_FIRST(&sc->card.pf_head); pf != NULL;
-	     pf = SIMPLEQ_NEXT(pf, pf_list)) {
-		if (SIMPLEQ_FIRST(&pf->cfe_head) == NULL)
+	SIMPLEQ_FOREACH(pf, &sc->card.pf_head, pf_list) {
+		if (SIMPLEQ_EMPTY(&pf->cfe_head))
 			continue;
 		if (pf->child == NULL)
 			continue;
@@ -281,7 +276,7 @@ pcmcia_submatch(parent, cf, aux)
 	    cf->cf_loc[PCMCIACF_FUNCTION] != paa->pf->number)
 		return (0);
 
-	return ((*cf->cf_attach->ca_match)(parent, cf, aux));
+	return (config_match(parent, cf, aux));
 }
 
 int
@@ -296,9 +291,9 @@ pcmcia_print(arg, pnp)
 
 	if (pnp) {
 		pcmcia_devinfo(card, 1, devinfo, sizeof devinfo);
-		printf("%s at %s, ", devinfo, pnp);
+		aprint_normal("%s at %s, ", devinfo, pnp);
 	}
-	printf(" function %d", pa->pf->number);
+	aprint_normal(" function %d", pa->pf->number);
 
 	return (UNCONF);
 }
@@ -442,8 +437,7 @@ pcmcia_function_enable(pf)
 	 * underlying page.  Check for that.
 	 */
 
-	for (tmp = pf->sc->card.pf_head.sqh_first; tmp != NULL;
-	    tmp = tmp->pf_list.sqe_next) {
+	SIMPLEQ_FOREACH(tmp, &pf->sc->card.pf_head, pf_list) {
 		if ((tmp->pf_flags & PFF_ENABLED) &&
 		    (pf->ccr_base >= (tmp->ccr_base - tmp->pf_ccr_offset)) &&
 		    ((pf->ccr_base + PCMCIA_CCR_SIZE) <=
@@ -519,8 +513,7 @@ pcmcia_function_enable(pf)
 
 #ifdef PCMCIADEBUG
 	if (pcmcia_debug) {
-		for (tmp = pf->sc->card.pf_head.sqh_first; tmp != NULL;
-		     tmp = tmp->pf_list.sqe_next) {
+		SIMPLEQ_FOREACH(tmp, &pf->sc->card.pf_head, pf_list) {
 			printf("%s: function %d CCR at %d offset %lx: "
 			       "%x %x %x %x, %x %x %x %x, %x\n",
 			       tmp->sc->dev.dv_xname, tmp->number,
@@ -574,9 +567,9 @@ pcmcia_function_disable(pf)
 
 	if ((pf->pf_flags & PFF_ENABLED) == 0) {
 		/*
-		 * Don't do anything if we're already disabled.
+		 * Don't do anything but decrement if we're already disabled.
 		 */
-		return;
+		goto out;
 	}
 
 	/*
@@ -586,8 +579,7 @@ pcmcia_function_disable(pf)
 	 */
 
 	pf->pf_flags &= ~PFF_ENABLED;
-	for (tmp = pf->sc->card.pf_head.sqh_first; tmp != NULL;
-	    tmp = tmp->pf_list.sqe_next) {
+	SIMPLEQ_FOREACH(tmp, &pf->sc->card.pf_head, pf_list) {
 		if ((tmp->pf_flags & PFF_ENABLED) &&
 		    (pf->ccr_base >= (tmp->ccr_base - tmp->pf_ccr_offset)) &&
 		    ((pf->ccr_base + PCMCIA_CCR_SIZE) <=
@@ -601,6 +593,7 @@ pcmcia_function_disable(pf)
 		pcmcia_mem_free(pf, &pf->pf_pcmh);
 	}
 
+out:
 	/*
 	 * Decrement the reference count, and power down the socket, if
 	 * necessary.
@@ -705,8 +698,7 @@ pcmcia_intr_establish(pf, ipl, ih_fct, ih_arg)
 		hiipl = 0;	/* this is only here to keep the compiler
 				   happy */
 
-		for (pf2 = pf->sc->card.pf_head.sqh_first; pf2 != NULL;
-		     pf2 = pf2->pf_list.sqe_next) {
+		SIMPLEQ_FOREACH(pf2, &pf->sc->card.pf_head, pf_list) {
 			if (pf2->ih_fct) {
 				DPRINTF(("%s: function %d has ih_fct %p\n",
 					 pf->sc->dev.dv_xname, pf2->number,
@@ -817,8 +809,7 @@ pcmcia_intr_disestablish(pf, ih)
 		s = 0;		/* avoid compiler warning */
 		hiipl = 0;	/* avoid compiler warning */
 
-		for (pf2 = pf->sc->card.pf_head.sqh_first; pf2 != NULL;
-		     pf2 = pf2->pf_list.sqe_next) {
+		SIMPLEQ_FOREACH(pf2, &pf->sc->card.pf_head, pf_list) {
 			if (pf2 == pf)
 				continue;
 
@@ -903,8 +894,7 @@ pcmcia_card_intr(arg)
 
 	ret = 0;
 
-	for (pf = sc->card.pf_head.sqh_first; pf != NULL;
-	    pf = pf->pf_list.sqe_next) {
+	SIMPLEQ_FOREACH(pf, &sc->card.pf_head, pf_list) {
 		if (pf->ih_fct != NULL &&
 		    (pf->ccr_mask & (1 << (PCMCIA_CCR_STATUS / 2)))) {
 			reg = pcmcia_ccr_read(pf, PCMCIA_CCR_STATUS);
@@ -933,8 +923,7 @@ pcmcia_card_intrdebug(arg)
 
 	ret = 0;
 
-	for (pf = sc->card.pf_head.sqh_first; pf != NULL;
-	    pf = pf->pf_list.sqe_next) {
+	SIMPLEQ_FOREACH(pf, &sc->card.pf_head, pf_list) {
 		printf("%s: intr flags=%x fct=%d cor=%02x csr=%02x pin=%02x",
 		       sc->dev.dv_xname, pf->pf_flags, pf->number,
 		       pcmcia_ccr_read(pf, PCMCIA_CCR_OPTION),

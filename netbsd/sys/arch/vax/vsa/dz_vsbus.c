@@ -1,4 +1,4 @@
-/*	$NetBSD: dz_vsbus.c,v 1.22.4.1 2002/06/11 01:58:07 lukem Exp $ */
+/*	$NetBSD: dz_vsbus.c,v 1.34 2003/12/13 23:02:33 ad Exp $ */
 /*
  * Copyright (c) 1998 Ludd, University of Lule}, Sweden.
  * All rights reserved.
@@ -30,7 +30,8 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: dz_vsbus.c,v 1.34 2003/12/13 23:02:33 ad Exp $");
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -74,9 +75,8 @@ static  void    dz_vsbus_attach(struct device *, struct device *, void *);
 
 static	vaddr_t dz_regs; /* Used for console */
 
-struct  cfattach dz_vsbus_ca = {
-	sizeof(struct dz_softc), dz_vsbus_match, dz_vsbus_attach
-};
+CFATTACH_DECL(dz_vsbus, sizeof(struct dz_softc),
+    dz_vsbus_match, dz_vsbus_attach, NULL, NULL);
 
 #define REG(name)     short name; short X##name##X;
 static volatile struct ss_dz {/* base address of DZ-controller: 0x200A0000 */
@@ -92,7 +92,6 @@ static volatile struct ss_dz {/* base address of DZ-controller: 0x200A0000 */
 #undef REG
 
 cons_decl(dz);
-cdev_decl(dz);
 
 #if NDZKBD > 0 || NDZMS > 0
 static int
@@ -102,14 +101,14 @@ dz_print(void *aux, const char *name)
 #if NDZKBD > 0 || NDZMS > 0
 	struct dz_attach_args *dz_args = aux;
 	if (name == NULL) {
-		printf (" line %d", dz_args->line);
+		aprint_normal (" line %d", dz_args->line);
 		if (dz_args->hwflags & DZ_HWFLAG_CONSOLE)
-			printf (" (console)");
+			aprint_normal (" (console)");
 	}
 	return (QUIET);
 #else
 	if (name)
-		printf ("lkc at %s", name);
+		aprint_normal ("lkc at %s", name);
 	return (UNCONF);
 #endif
 #endif
@@ -148,18 +147,24 @@ dz_vsbus_attach(struct device *parent, struct device *self, void *aux)
 {
 	struct dz_softc *sc = (void *)self;
 	struct vsbus_attach_args *va = aux;
+#if NDZKBD > 0
+	extern const struct cdevsw dz_cdevsw;
+#endif
 #if NDZKBD > 0 || NDZMS > 0
 	struct dzkm_attach_args daa;
 #endif
-	int s;
+	int s, consline;
 
 	/* 
 	 * XXX - This is evil and ugly, but...
 	 * due to the nature of how bus_space_* works on VAX, this will
 	 * be perfectly good until everything is converted.
 	 */
-	if (dz_regs == 0) /* This isn't console */
+	if (dz_regs == 0) /* This isn't console */ {
 		dz_regs = vax_map_physmem(va->va_paddr, 1);
+		consline = -1;
+	} else
+		consline = minor(cn_tab->cn_dev);
 	sc->sc_ioh = dz_regs;
 	sc->sc_dr.dr_csr = 0;
 	sc->sc_dr.dr_rbuf = 4;
@@ -170,6 +175,9 @@ dz_vsbus_attach(struct device *parent, struct device *self, void *aux)
 	sc->sc_dr.dr_dcd = 13;
 	sc->sc_dr.dr_ring = 13;
 
+	sc->sc_dr.dr_firstreg = 0;
+	sc->sc_dr.dr_winsize = 14;
+
 	sc->sc_type = DZ_DZV;
 
 	sc->sc_dsr = 0x0f; /* XXX check if VS has modem ctrl bits */
@@ -179,12 +187,15 @@ dz_vsbus_attach(struct device *parent, struct device *self, void *aux)
 
 	printf("\n%s: 4 lines", self->dv_xname);
 
-	dzattach(sc, NULL);
+	dzattach(sc, NULL, consline);
 	DELAY(10000);
+
+	if (consline != -1)
+		cn_set_magic("\033D"); /* set VAX DDB escape sequence */
 
 #if NDZKBD > 0
 	/* Don't touch this port if this is the console */
-	if (cn_tab->cn_dev != makedev(getmajor(dzopen), 0)) {
+	if (cn_tab->cn_dev != makedev(cdevsw_lookup_major(&dz_cdevsw), 0)) {
 		dz->rbuf = DZ_LPR_RX_ENABLE | (DZ_LPR_B4800 << 8) 
 		    | DZ_LPR_8_BIT_CHAR;
 		daa.daa_line = 0;
@@ -194,7 +205,7 @@ dz_vsbus_attach(struct device *parent, struct device *self, void *aux)
 	}
 #endif
 #if NDZMS > 0
-	dz->rbuf = DZ_LPR_RX_ENABLE | (DZ_LPR_B4800 << 8) | DZ_LPR_7_BIT_CHAR \
+	dz->rbuf = DZ_LPR_RX_ENABLE | (DZ_LPR_B4800 << 8) | DZ_LPR_8_BIT_CHAR \
 	    | DZ_LPR_PARENB | DZ_LPR_OPAR | 1 /* line */;
 	daa.daa_line = 1;
 	daa.daa_flags = 0;
@@ -209,10 +220,11 @@ dz_vsbus_attach(struct device *parent, struct device *self, void *aux)
 int
 dzcngetc(dev_t dev)
 {
-	int c = 0;
+	int c = 0, s;
 	int mino = minor(dev);
 	u_short rbuf;
 
+	s = spltty();
 	do {
 		while ((dz->csr & 0x80) == 0)
 			; /* Wait for char */
@@ -221,6 +233,7 @@ dzcngetc(dev_t dev)
 			continue;
 		c = rbuf & 0x7f;
 	} while (c == 17 || c == 19);		/* ignore XON/XOFF */
+	splx(s);
 
 	if (c == 13)
 		c = 10;
@@ -234,6 +247,7 @@ dzcnprobe(struct consdev *cndev)
 	extern	vaddr_t iospace;
 	int diagcons;
 	paddr_t ioaddr = 0x200A0000;
+	extern const struct cdevsw dz_cdevsw;
 
 	switch (vax_boardtype) {
 	case VAX_BTYP_410:
@@ -250,7 +264,7 @@ dzcnprobe(struct consdev *cndev)
 	case VAX_BTYP_49:
 	case VAX_BTYP_53:
 		ioaddr = 0x25000000;
-		diagcons = 3;
+		diagcons = (vax_confdata & 8 ? 3 : 0);
 		break;
 
 	default:
@@ -261,7 +275,7 @@ dzcnprobe(struct consdev *cndev)
 		cndev->cn_pri = CN_REMOTE;
 	else
 		cndev->cn_pri = CN_NORMAL;
-	cndev->cn_dev = makedev(getmajor(dzopen), diagcons);
+	cndev->cn_dev = makedev(cdevsw_lookup_major(&dz_cdevsw), diagcons);
 	(vaddr_t)dz = dz_regs = iospace;
 	ioaccess(iospace, ioaddr, 1);
 }
@@ -282,11 +296,13 @@ dzcnputc(dev_t dev, int	ch)
 {
 	int timeout = 1<<15;            /* don't hang the machine! */
 	int mino = minor(dev);
+	int s;
 	u_short tcr;
 
 	if (mfpr(PR_MAPEN) == 0)
 		return;
 
+	s = spltty();
 	tcr = dz->tcr;	/* remember which lines to scan */
 	dz->tcr = (1 << mino);
 
@@ -300,6 +316,7 @@ dzcnputc(dev_t dev, int	ch)
 			break;
 
 	dz->tcr = tcr;
+	splx(s);
 }
 
 void 
@@ -318,28 +335,34 @@ int
 dzgetc(struct dz_linestate *ls)
 {
 	int line = ls->dz_line;
+	int s;
 	u_short rbuf;
 
+	s = spltty();
 	for (;;) {
 		for(; (dz->csr & DZ_CSR_RX_DONE) == 0;);
 		rbuf = dz->rbuf;
-		if (((rbuf >> 8) & 3) == line)
+		if (((rbuf >> 8) & 3) == line) {
+			splx(s);
 			return (rbuf & 0xff);
+		}
 	}
 }
 
 void
 dzputc(struct dz_linestate *ls, int ch)
 {
-	int line = 0; /* = ls->dz_line; */
+	int line;
 	u_short tcr;
 	int s;
+	extern const struct cdevsw dz_cdevsw;
 
 	/* if the dz has already been attached, the MI
 	   driver will do the transmitting: */
 	if (ls && ls->dz_sc) {
 		s = spltty();
-		putc(ch, &ls->dz_sc->sc_dz[line].dz_tty->t_outq);
+		line = ls->dz_line;
+		putc(ch, &ls->dz_tty->t_outq);
 		tcr = dz->tcr;
 		if (!(tcr & (1 << line)))
 			dz->tcr = tcr | (1 << line);
@@ -349,6 +372,6 @@ dzputc(struct dz_linestate *ls, int ch)
 	}
 
 	/* use dzcnputc to do the transmitting: */
-	dzcnputc(makedev(getmajor(dzopen), line), ch);
+	dzcnputc(makedev(cdevsw_lookup_major(&dz_cdevsw), 0), ch);
 }
 #endif /* NDZKBD > 0 || NDZMS > 0 */

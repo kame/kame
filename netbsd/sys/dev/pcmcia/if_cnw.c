@@ -1,4 +1,4 @@
-/*	$NetBSD: if_cnw.c,v 1.20 2001/12/15 13:23:22 soren Exp $	*/
+/*	$NetBSD: if_cnw.c,v 1.25 2003/11/10 08:55:41 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -95,11 +95,10 @@
  *
  * When this driver was developed, the Linux Netwave driver was used
  * as a hardware manual. That driver is Copyright (c) 1997 University
- * of Tromsø, Norway. It is part of the Linix pcmcia-cs package that
- * can be found at
- * http://hyper.stanford.edu/HyperNews/get/pcmcia/home.html. The most
- * recent version of the pcmcia-cs package when this driver was
- * written was 3.0.6.
+ * of Tromsø, Norway. It is part of the Linux pcmcia-cs package that
+ * can be found at http://pcmcia-cs.sourceforge.net/. The most recent
+ * version of the pcmcia-cs package when this driver was written was
+ * 3.0.6.
  *
  * Unfortunately, a lot of explicit numeric constants were used in the
  * Linux driver. I have tried to use symbolic names whenever possible,
@@ -113,7 +112,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_cnw.c,v 1.20 2001/12/15 13:23:22 soren Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_cnw.c,v 1.25 2003/11/10 08:55:41 wiz Exp $");
 
 #include "opt_inet.h"
 #include "bpfilter.h"
@@ -222,11 +221,8 @@ struct cnw_softc {
 #define CNW_RES_NET	8
 };
 
-struct cfattach cnw_ca = {
-	sizeof(struct cnw_softc), cnw_match, cnw_attach, cnw_detach,
-		cnw_activate
-};
-
+CFATTACH_DECL(cnw, sizeof(struct cnw_softc),
+    cnw_match, cnw_attach, cnw_detach, cnw_activate);
 
 void cnw_reset __P((struct cnw_softc *));
 void cnw_init __P((struct cnw_softc *));
@@ -518,7 +514,7 @@ cnw_attach(parent, self, aux)
 
 	/* Enable the card */
 	sc->sc_pf = pa->pf;
-	pcmcia_function_init(sc->sc_pf, sc->sc_pf->cfe_head.sqh_first);
+	pcmcia_function_init(sc->sc_pf, SIMPLEQ_FIRST(&sc->sc_pf->cfe_head));
 	if (pcmcia_function_enable(sc->sc_pf)) {
 		printf(": function enable failed\n");
 		return;

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_x25subr.c,v 1.28 2002/05/12 21:30:35 matt Exp $	*/
+/*	$NetBSD: if_x25subr.c,v 1.33 2003/11/11 20:25:26 jonathan Exp $	*/
 
 /*
  * Copyright (c) 1990, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -36,7 +32,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_x25subr.c,v 1.28 2002/05/12 21:30:35 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_x25subr.c,v 1.33 2003/11/11 20:25:26 jonathan Exp $");
 
 #include "opt_inet.h"
 #include "opt_iso.h"
@@ -98,9 +94,9 @@ struct sockaddr_x25 x25_dgmask = {
 	0,		/* _family */
 	0,		/* _net */
 	{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},	/* _addr */
-	{0},		/* opts */
+	{0, 0, 0, 0},		/* opts [flags, psize, wsize, speed] */
 	-1,		/* _udlen */
-	{-1}		/* _udata */
+	{-1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1},	/* _udata */
 };
 
 struct if_x25stats {
@@ -626,7 +622,7 @@ x25_dg_rtinit(dst, ia, af)
 			 */
 			struct in_ifaddr *ina;
 
-			for (ina = in_ifaddr.tqh_first; ina != 0;
+			for (ina = in_ifaddrhead.tqh_first; ina != 0;
 			     ina = ina->ia_list.tqe_next)
 				if (ina->ia_ifp == ia->ia_ifp) {
 					my_addr = ina->ia_addr.sin_addr;
@@ -770,7 +766,13 @@ pk_rtattach(so, m0)
 	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
 #define transfer_sockbuf(s, f, l) \
 	while ((m = (s)->sb_mb) != NULL) \
-		{(s)->sb_mb = m->m_nextpkt; m->m_nextpkt = 0; sbfree((s), m); f;}
+		{ \
+			(s)->sb_mb = m->m_nextpkt; \
+			SB_EMPTY_FIXUP((s)); \
+			m->m_nextpkt = 0; \
+			sbfree((s), m); \
+			f; \
+		}
 
 	if (rt)
 		rt->rt_refcnt--;

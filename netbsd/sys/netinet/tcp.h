@@ -1,4 +1,4 @@
-/*	$NetBSD: tcp.h,v 1.13 2001/05/26 21:40:55 matt Exp $	*/
+/*	$NetBSD: tcp.h,v 1.15 2003/08/07 16:33:15 agc Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -37,6 +33,10 @@
 
 #ifndef _NETINET_TCP_H_
 #define _NETINET_TCP_H_
+
+#include <sys/featuretest.h>
+
+#if defined(_NETBSD_SOURCE)
 
 typedef u_int32_t tcp_seq;
 /*
@@ -103,6 +103,8 @@ struct tcphdr {
 #define	TCP_MAX_WINSHIFT	14	/* maximum window shift */
 
 #define	TCP_MAXBURST	4	/* maximum segments in a burst */
+
+#endif /* _NETBSD_SOURCE */
 
 /*
  * User-settable options (used with setsockopt).

@@ -1,30 +1,46 @@
-/*	$NetBSD: if_ppp.c,v 1.77 2002/05/12 20:38:15 matt Exp $	*/
+/*	$NetBSD: if_ppp.c,v 1.88 2003/10/28 20:16:28 mycroft Exp $	*/
 /*	Id: if_ppp.c,v 1.6 1997/03/04 03:33:00 paulus Exp 	*/
 
 /*
  * if_ppp.c - Point-to-Point Protocol (PPP) Asynchronous driver.
  *
- * Copyright (c) 1989 Carnegie Mellon University.
- * All rights reserved.
+ * Copyright (c) 1984-2000 Carnegie Mellon University. All rights reserved.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that the above copyright notice and this paragraph are
- * duplicated in all such forms and that any documentation,
- * advertising materials, and other materials related to such
- * distribution and use acknowledge that the software was developed
- * by Carnegie Mellon University.  The name of the
- * University may not be used to endorse or promote products derived
- * from this software without specific prior written permission.
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
- * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
  *
- * Drew D. Perkins
- * Carnegie Mellon University
- * 4910 Forbes Ave.
- * Pittsburgh, PA 15213
- * (412) 268-8576
- * ddp@andrew.cmu.edu
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
+ *
+ * 3. The name "Carnegie Mellon University" must not be used to
+ *    endorse or promote products derived from this software without
+ *    prior written permission. For permission or any legal
+ *    details, please contact
+ *      Office of Technology Transfer
+ *      Carnegie Mellon University
+ *      5000 Forbes Avenue
+ *      Pittsburgh, PA  15213-3890
+ *      (412) 268-4387, fax: (412) 268-7395
+ *      tech-transfer@andrew.cmu.edu
+ *
+ * 4. Redistributions of any form whatsoever must retain the following
+ *    acknowledgment:
+ *    "This product includes software developed by Computing Services
+ *     at Carnegie Mellon University (http://www.cmu.edu/computing/)."
+ *
+ * CARNEGIE MELLON UNIVERSITY DISCLAIMS ALL WARRANTIES WITH REGARD TO
+ * THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS, IN NO EVENT SHALL CARNEGIE MELLON UNIVERSITY BE LIABLE
+ * FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+ * AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
+ * OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * Based on:
  *	@(#)if_sl.c	7.6.1.2 (Berkeley) 2/15/89
@@ -86,7 +102,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ppp.c,v 1.77 2002/05/12 20:38:15 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ppp.c,v 1.88 2003/10/28 20:16:28 mycroft Exp $");
 
 #include "ppp.h"
 
@@ -197,7 +213,7 @@ struct	ppp_softc ppp_softc[NPPP];
 extern struct compressor ppp_bsd_compress;
 extern struct compressor ppp_deflate, ppp_deflate_draft;
 
-struct compressor *ppp_compressors[8] = {
+struct compressor *ppp_compressors[PPP_COMPRESSORS_MAX] = {
 #if DO_BSD_COMPRESS && defined(PPP_BSDCOMP)
     &ppp_bsd_compress,
 #endif
@@ -394,6 +410,7 @@ pppioctl(sc, cmd, data, flag, p)
     struct npioctl *npi;
     time_t t;
 #ifdef PPP_FILTER
+/*###413 [cc] warning: `bp' might be used uninitialized in this function%%%*/
     struct bpf_program *bp, *nbp;
     struct bpf_insn *newcode, *oldcode;
     int newcodelen;
@@ -413,6 +430,21 @@ pppioctl(sc, cmd, data, flag, p)
 
     case PPPIOCGFLAGS:
 	*(u_int *)data = sc->sc_flags;
+	break;
+
+    case PPPIOCGRAWIN:
+	{
+	    struct ppp_rawin *rwin = (struct ppp_rawin *)data;
+	    u_char p, q = 0;
+
+	    for (p = sc->sc_rawin_start; p < sizeof(sc->sc_rawin.buf);)
+		rwin->buf[q++] = sc->sc_rawin.buf[p++];
+
+	    for (p = 0; p < sc->sc_rawin_start;)
+		rwin->buf[q++] = sc->sc_rawin.buf[p++];
+
+	    rwin->count = sc->sc_rawin.count;
+	}
 	break;
 
     case PPPIOCSFLAGS:
@@ -600,6 +632,9 @@ pppioctl(sc, cmd, data, flag, p)
 	case PPPIOCSOACTIVE:
 	    bp = &sc->sc_active_filt_out;
 	    break;
+	default:
+	    free(newcode, M_DEVBUF);
+	    return (EPASSTHROUGH);
 	}
 	oldcode = bp->bf_insns;
 	s = splnet();
@@ -690,7 +725,7 @@ pppsioctl(ifp, cmd, data)
 	    error = EAFNOSUPPORT;
 	    break;
 	}
-	switch(ifr->ifr_addr.sa_family) {
+	switch (ifr->ifr_addr.sa_family) {
 #ifdef INET
 	case AF_INET:
 	    break;
@@ -1126,12 +1161,12 @@ ppp_dequeue(sc)
     if (protocol != PPP_LCP && protocol != PPP_CCP
 	&& sc->sc_xc_state && (sc->sc_flags & SC_COMP_RUN)) {
 	struct mbuf *mcomp = NULL;
-	int slen, clen;
+	int slen;
 
 	slen = 0;
 	for (mp = m; mp != NULL; mp = mp->m_next)
 	    slen += mp->m_len;
-	clen = (*sc->sc_xcomp->compress)
+	(*sc->sc_xcomp->compress)
 	    (sc->sc_xc_state, &mcomp, m, slen, sc->sc_if.if_mtu + PPP_HDRLEN);
 	if (mcomp != NULL) {
 	    if (sc->sc_flags & SC_CCP_UP) {

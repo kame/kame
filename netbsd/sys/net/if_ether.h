@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ether.h,v 1.27.8.1 2003/06/30 03:17:18 grant Exp $	*/
+/*	$NetBSD: if_ether.h,v 1.34 2003/08/07 16:32:51 agc Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -37,6 +33,13 @@
 
 #ifndef _NET_IF_ETHER_H_
 #define _NET_IF_ETHER_H_
+
+#ifdef _KERNEL
+#ifdef _KERNEL_OPT
+#include "opt_mbuftrace.h"
+#endif
+#include <sys/mbuf.h>
+#endif
 
 /*
  * Some basic Ethernet constants.
@@ -143,17 +146,21 @@ struct	ether_header {
  * begins with this structure.
  */
 struct	ethercom {
-	struct	 ifnet ec_if;			/* network-visible interface */
+	struct	ifnet ec_if;			/* network-visible interface */
 	LIST_HEAD(, ether_multi) ec_multiaddrs;	/* list of ether multicast
 						   addrs */
-	int	 ec_multicnt;			/* length of ec_multiaddrs
+	int	ec_multicnt;			/* length of ec_multiaddrs
 						   list */
-	int	 ec_capabilities;		/* capabilities, provided by
+	int	ec_capabilities;		/* capabilities, provided by
 						   driver */
-	int	 ec_capenable;			/* tells hardware which
+	int	ec_capenable;			/* tells hardware which
 						   capabilities to enable */
 
-	int	 ec_nvlans;			/* # VLANs on this interface */
+	int	ec_nvlans;			/* # VLANs on this interface */
+#ifdef MBUFTRACE
+	struct	mowner ec_rx_mowner;		/* mbufs received */
+	struct	mowner ec_tx_mowner;		/* mbufs transmitted */
+#endif
 };
 
 #define	ETHERCAP_VLAN_MTU	0x00000001	/* VLAN-compatible MTU */
@@ -251,10 +258,10 @@ u_int32_t ether_crc32_be(const u_int8_t *, size_t);
  */
 #include <sys/cdefs.h>
 __BEGIN_DECLS
-char *	ether_ntoa __P((struct ether_addr *));
+char *	ether_ntoa __P((const struct ether_addr *));
 struct ether_addr *
 	ether_aton __P((const char *));
-int	ether_ntohost __P((char *, struct ether_addr *));
+int	ether_ntohost __P((char *, const struct ether_addr *));
 int	ether_hostton __P((const char *, struct ether_addr *));
 int	ether_line __P((const char *, struct ether_addr *, char *));
 __END_DECLS

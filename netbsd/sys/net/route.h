@@ -1,4 +1,4 @@
-/*	$NetBSD: route.h,v 1.29.4.2 2003/06/17 11:54:16 msaitoh Exp $	*/
+/*	$NetBSD: route.h,v 1.36 2003/08/07 16:32:57 agc Exp $	*/
 
 /*
  * Copyright (c) 1980, 1986, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -53,20 +49,10 @@
  * to a routing entry.  These are often held by protocols
  * in their control blocks, e.g. inpcb.
  */
-#if 1 /*def NEW_STRUCT_ROUTE*/
-struct route {
-	struct	rtentry *ro_rt;
-	struct sockaddr ro_dst;
-	/* trailing pad to store sockaddr_iso safely */
-	u_int8_t ro_pad[32 > sizeof(struct sockaddr) ?
-	    (32 - sizeof(struct sockaddr)) : 0];
-};
-#else
 struct route {
 	struct	rtentry *ro_rt;
 	struct	sockaddr ro_dst;
 };
-#endif
 
 /*
  * These numbers are used by reliable protocols for determining
@@ -77,8 +63,8 @@ struct rt_metrics {
 	u_long	rmx_mtu;	/* MTU for this path */
 	u_long	rmx_hopcount;	/* max hops expected */
 	u_long	rmx_expire;	/* lifetime for route, e.g. redirect */
-	u_long	rmx_recvpipe;	/* inbound delay-bandwith product */
-	u_long	rmx_sendpipe;	/* outbound delay-bandwith product */
+	u_long	rmx_recvpipe;	/* inbound delay-bandwidth product */
+	u_long	rmx_sendpipe;	/* outbound delay-bandwidth product */
 	u_long	rmx_ssthresh;	/* outbound gateway buffer limit */
 	u_long	rmx_rtt;	/* estimated round trip time */
 	u_long	rmx_rttvar;	/* estimated rtt variance */
@@ -305,7 +291,7 @@ do { \
 		rtfree(rt); \
 	else \
 		(rt)->rt_refcnt--; \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define	RTUSE(rt) \
 	do { \

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_arp.c,v 1.79.10.1 2003/10/01 06:08:59 tron Exp $	*/
+/*	$NetBSD: if_arp.c,v 1.94 2003/09/24 06:52:47 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1998, 2000 The NetBSD Foundation, Inc.
@@ -49,11 +49,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -79,7 +75,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_arp.c,v 1.79.10.1 2003/10/01 06:08:59 tron Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_arp.c,v 1.94 2003/09/24 06:52:47 itojun Exp $");
 
 #include "opt_ddb.h"
 #include "opt_inet.h"
@@ -110,7 +106,6 @@ __KERNEL_RCSID(0, "$NetBSD: if_arp.c,v 1.79.10.1 2003/10/01 06:08:59 tron Exp $"
 #include <net/if_types.h>
 #include <net/route.h>
 
-
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
@@ -126,7 +121,6 @@ __KERNEL_RCSID(0, "$NetBSD: if_arp.c,v 1.79.10.1 2003/10/01 06:08:59 tron Exp $"
 #if NFDDI > 0
 #include <net/if_fddi.h>
 #endif
-#include "token.h"
 #include "token.h"
 
 #define SIN(s) ((struct sockaddr_in *)s)
@@ -144,6 +138,8 @@ int	arpt_prune = (5*60*1);	/* walk list every 5 minutes */
 int	arpt_keep = (20*60);	/* once resolved, good for 20 more minutes */
 int	arpt_down = 20;		/* once declared down, don't send for 20 secs */
 #define	rt_expire rt_rmx.rmx_expire
+
+extern	struct domain arpdomain;
 
 static	void arprequest __P((struct ifnet *,
 	    struct in_addr *, struct in_addr *, u_int8_t *));
@@ -200,7 +196,7 @@ lla_snprintf(adrp, len)
 	    '0','1','2','3','4','5','6','7',
 	    '8','9','a','b','c','d','e','f'
 	};
-		
+
 	int i;
 	char *p;
 
@@ -230,9 +226,9 @@ struct protosw arpsw[] = {
 };
 
 
-struct domain arpdomain = 
+struct domain arpdomain =
 { 	PF_ARP,  "arp", 0, 0, 0,
-	arpsw, &arpsw[sizeof(arpsw)/sizeof(arpsw[0])] 
+	arpsw, &arpsw[sizeof(arpsw)/sizeof(arpsw[0])]
 };
 
 /*
@@ -249,8 +245,7 @@ struct domain arpdomain =
  * while the arp table is locked, we punt and try again later.
  */
 
-int	arp_locked;
-
+static int	arp_locked;
 static __inline int arp_lock_try __P((int));
 static __inline void arp_unlock __P((void));
 
@@ -290,14 +285,14 @@ do {									\
 		printf("%s:%d: arp already locked\n", __FILE__, __LINE__); \
 		panic("arp_lock");					\
 	}								\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 #define	ARP_LOCK_CHECK()						\
 do {									\
 	if (arp_locked == 0) {						\
 		printf("%s:%d: arp lock not held\n", __FILE__, __LINE__); \
 		panic("arp lock check");				\
 	}								\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 #else
 #define	ARP_LOCK(x)		(void) arp_lock_try(x)
 #define	ARP_LOCK_CHECK()	/* nothing */
@@ -316,12 +311,12 @@ arp_drain()
 	struct llinfo_arp *la, *nla;
 	int count = 0;
 	struct mbuf *mold;
-	
+
 	if (arp_lock_try(0) == 0) {
 		printf("arp_drain: locked; punting\n");
 		return;
 	}
-	
+
 	for (la = LIST_FIRST(&llinfo_arp); la != 0; la = nla) {
 		nla = LIST_NEXT(la, la_list);
 
@@ -367,7 +362,7 @@ arptimer(arg)
 	}
 
 	ARP_UNLOCK();
-	
+
 	splx(s);
 }
 
@@ -402,8 +397,38 @@ arp_rtrequest(req, rt, info)
 		callout_init(&arptimer_ch);
 		callout_reset(&arptimer_ch, hz, arptimer, NULL);
 	}
-	if (rt->rt_flags & RTF_GATEWAY)
+
+	if ((rt->rt_flags & RTF_GATEWAY) != 0) {
+		if (req != RTM_ADD)
+			return;
+
+		/*
+		 * linklayers with particular link MTU limitation.
+		 */
+		switch(rt->rt_ifp->if_type) {
+#if NFDDI > 0
+		case IFT_FDDI:
+			if (rt->rt_ifp->if_mtu > FDDIIPMTU)
+				rt->rt_rmx.rmx_mtu = FDDIIPMTU;
+			break;
+#endif
+#if NARC > 0
+		case IFT_ARCNET:
+		    {
+			int arcipifmtu;
+
+			if (rt->rt_ifp->if_flags & IFF_LINK0)
+				arcipifmtu = arc_ipmtu;
+			else
+				arcipifmtu = ARCMTU;
+			if (rt->rt_ifp->if_mtu > arcipifmtu)
+				rt->rt_rmx.rmx_mtu = arcipifmtu;
+			break;
+		    }
+#endif
+		}
 		return;
+	}
 
 	ARP_LOCK(1);		/* we may already be locked here. */
 
@@ -433,30 +458,37 @@ arp_rtrequest(req, rt, info)
 			 * from it do not need their expiration time set.
 			 */
 			rt->rt_expire = time.tv_sec;
+			/*
+			 * linklayers with particular link MTU limitation.
+			 */
+			switch (rt->rt_ifp->if_type) {
 #if NFDDI > 0
-			if (rt->rt_ifp->if_type == IFT_FDDI
-			    && (rt->rt_rmx.rmx_mtu > FDDIIPMTU
-				|| (rt->rt_rmx.rmx_mtu == 0
-				    && rt->rt_ifp->if_mtu > FDDIIPMTU))) {
-				rt->rt_rmx.rmx_mtu = FDDIIPMTU;
-			}
+			case IFT_FDDI:
+				if ((rt->rt_rmx.rmx_locks & RTV_MTU) == 0 &&
+				    (rt->rt_rmx.rmx_mtu > FDDIIPMTU ||
+				     (rt->rt_rmx.rmx_mtu == 0 &&
+				      rt->rt_ifp->if_mtu > FDDIIPMTU)))
+					rt->rt_rmx.rmx_mtu = FDDIIPMTU;
+				break;
 #endif
 #if NARC > 0
-			if (rt->rt_ifp->if_type == IFT_ARCNET) {
+			case IFT_ARCNET:
+			    {
 				int arcipifmtu;
-
 				if (rt->rt_ifp->if_flags & IFF_LINK0)
 					arcipifmtu = arc_ipmtu;
 				else
 					arcipifmtu = ARCMTU;
 
-			    	if (rt->rt_rmx.rmx_mtu > arcipifmtu ||
-				    (rt->rt_rmx.rmx_mtu == 0 &&
-				     rt->rt_ifp->if_mtu > arcipifmtu))
-
+				if ((rt->rt_rmx.rmx_locks & RTV_MTU) == 0 &&
+				    (rt->rt_rmx.rmx_mtu > arcipifmtu ||
+				     (rt->rt_rmx.rmx_mtu == 0 &&
+				      rt->rt_ifp->if_mtu > arcipifmtu)))
 					rt->rt_rmx.rmx_mtu = arcipifmtu;
-			}
+				break;
+			    }
 #endif
+			}
 			break;
 		}
 		/* Announce a new entry if requested. */
@@ -518,7 +550,7 @@ arp_rtrequest(req, rt, info)
 			 *
 			 * In 4.4BSD, the above "if" statement checked
 			 * rt->rt_ifa against rt_key(rt).  It was changed
-			 * to the current form so that we can provide a 
+			 * to the current form so that we can provide a
 			 * better support for multiple IPv4 addresses on a
 			 * interface.
 			 */
@@ -526,8 +558,7 @@ arp_rtrequest(req, rt, info)
 			rt->rt_expire = 0;
 			Bcopy(LLADDR(rt->rt_ifp->if_sadl),
 			    LLADDR(SDL(gate)),
-			    SDL(gate)->sdl_alen = 
-			    rt->rt_ifp->if_data.ifi_addrlen);
+			    SDL(gate)->sdl_alen = rt->rt_ifp->if_addrlen);
 #if NLOOP > 0
 			if (useloopback)
 				rt->rt_ifp = &loif[0];
@@ -566,7 +597,7 @@ arp_rtrequest(req, rt, info)
 		mold = la->la_hold;
 		la->la_hold = 0;
 		splx(s);
-		
+
 		if (mold)
 			m_freem(mold);
 
@@ -628,14 +659,32 @@ arprequest(ifp, sip, tip, enaddr)
 
 	if ((m = m_gethdr(M_DONTWAIT, MT_DATA)) == NULL)
 		return;
-	m->m_len = sizeof(*ah) + 2*sizeof(struct in_addr) +
-	    2*ifp->if_data.ifi_addrlen;
+	MCLAIM(m, &arpdomain.dom_mowner);
+	switch (ifp->if_type) {
+	case IFT_IEEE1394:
+		m->m_len = sizeof(*ah) + 2 * sizeof(struct in_addr) +
+		    ifp->if_addrlen;
+		break;
+	default:
+		m->m_len = sizeof(*ah) + 2 * sizeof(struct in_addr) +
+		    2 * ifp->if_addrlen;
+		break;
+	}
 	m->m_pkthdr.len = m->m_len;
 	MH_ALIGN(m, m->m_len);
 	ah = mtod(m, struct arphdr *);
 	bzero((caddr_t)ah, m->m_len);
+	switch (ifp->if_type) {
+	case IFT_IEEE1394:	/* RFC2734 */
+		/* fill it now for ar_tpa computation */
+		ah->ar_hrd = htons(ARPHRD_IEEE1394);
+		break;
+	default:
+		/* ifp->if_output will fill ar_hrd */
+		break;
+	}
 	ah->ar_pro = htons(ETHERTYPE_IP);
-	ah->ar_hln = ifp->if_data.ifi_addrlen;	/* hardware address length */
+	ah->ar_hln = ifp->if_addrlen;		/* hardware address length */
 	ah->ar_pln = sizeof(struct in_addr);	/* protocol address length */
 	ah->ar_op = htons(ARPOP_REQUEST);
 	bcopy((caddr_t)enaddr, (caddr_t)ar_sha(ah), ah->ar_hln);
@@ -671,7 +720,7 @@ arpresolve(ifp, rt, m, dst, desten)
 	struct sockaddr_dl *sdl;
 	struct mbuf *mold;
 	int s;
-	
+
 	if (rt)
 		la = (struct llinfo_arp *)rt->rt_llinfo;
 	else {
@@ -694,7 +743,7 @@ arpresolve(ifp, rt, m, dst, desten)
 	if ((rt->rt_expire == 0 || rt->rt_expire > time.tv_sec) &&
 	    sdl->sdl_family == AF_LINK && sdl->sdl_alen != 0) {
 		bcopy(LLADDR(sdl), desten,
-		    min(sdl->sdl_alen, ifp->if_data.ifi_addrlen));
+		    min(sdl->sdl_alen, ifp->if_addrlen));
 		return 1;
 	}
 	/*
@@ -713,7 +762,7 @@ arpresolve(ifp, rt, m, dst, desten)
 		arpstat.as_dfrdropped++;
 		m_freem(mold);
 	}
-	
+
 	/*
 	 * Re-send the ARP request when appropriate.
 	 */
@@ -754,6 +803,7 @@ arpintr()
 	struct mbuf *m;
 	struct arphdr *ar;
 	int s;
+	int arplen;
 
 	while (arpintrq.ifq_head) {
 		s = splnet();
@@ -762,15 +812,30 @@ arpintr()
 		if (m == 0 || (m->m_flags & M_PKTHDR) == 0)
 			panic("arpintr");
 
+		MCLAIM(m, &arpdomain.dom_mowner);
 		arpstat.as_rcvtotal++;
 
-		if (m->m_len >= sizeof(struct arphdr) &&
-		    (ar = mtod(m, struct arphdr *)) &&
-		    /* XXX ntohs(ar->ar_hrd) == ARPHRD_ETHER && */
-		    m->m_len >=
-		      sizeof(struct arphdr) + 2 * (ar->ar_hln + ar->ar_pln))
-			switch (ntohs(ar->ar_pro)) {
+		/*
+		 * First, make sure we have at least struct arphdr.
+		 */
+		if (m->m_len < sizeof(struct arphdr) ||
+		    (ar = mtod(m, struct arphdr *)) == NULL)
+			goto badlen;
 
+		switch (m->m_pkthdr.rcvif->if_type) {
+		case IFT_IEEE1394:
+			arplen = sizeof(struct arphdr) +
+			    ar->ar_hln + 2 * ar->ar_pln;
+			break;
+		default:
+			arplen = sizeof(struct arphdr) +
+			    2 * ar->ar_hln + 2 * ar->ar_pln;
+			break;
+		}
+
+		if (/* XXX ntohs(ar->ar_hrd) == ARPHRD_ETHER && */
+		    m->m_len >= arplen)
+			switch (ntohs(ar->ar_pro)) {
 			case ETHERTYPE_IP:
 			case ETHERTYPE_IPTRAILERS:
 				in_arpinput(m);
@@ -778,8 +843,10 @@ arpintr()
 			default:
 				arpstat.as_rcvbadproto++;
 			}
-		else
+		else {
+badlen:
 			arpstat.as_rcvbadlen++;
+		}
 		m_freem(m);
 	}
 }
@@ -816,9 +883,29 @@ in_arpinput(m)
 	int op;
 	struct mbuf *mold;
 	int s;
-	
+
 	ah = mtod(m, struct arphdr *);
 	op = ntohs(ah->ar_op);
+
+	/*
+	 * Fix up ah->ar_hrd if necessary, before using ar_tha() or
+	 * ar_tpa().
+	 */
+	switch (ifp->if_type) {
+	case IFT_IEEE1394:
+		if (ntohs(ah->ar_hrd) == ARPHRD_IEEE1394)
+			;
+		else {
+			/* XXX this is to make sure we compute ar_tha right */
+			/* XXX check ar_hrd more strictly? */
+			ah->ar_hrd = htons(ARPHRD_IEEE1394);
+		}
+		break;
+	default:
+		/* XXX check ar_hrd? */
+		break;
+	}
+
 	bcopy((caddr_t)ar_spa(ah), (caddr_t)&isaddr, sizeof (isaddr));
 	bcopy((caddr_t)ar_tpa(ah), (caddr_t)&itaddr, sizeof (itaddr));
 
@@ -896,14 +983,14 @@ in_arpinput(m)
 
 	/* XXX checks for bridge case? */
 	if (!bcmp((caddr_t)ar_sha(ah), LLADDR(ifp->if_sadl),
-	    ifp->if_data.ifi_addrlen)) {
+	    ifp->if_addrlen)) {
 		arpstat.as_rcvlocalsha++;
 		goto out;	/* it's from me, ignore it. */
 	}
 
 	/* XXX checks for bridge case? */
 	if (!bcmp((caddr_t)ar_sha(ah), (caddr_t)ifp->if_broadcastaddr,
-	    ifp->if_data.ifi_addrlen)) {
+	    ifp->if_addrlen)) {
 		arpstat.as_rcvbcastsha++;
 		log(LOG_ERR,
 		    "%s: arp: link address is broadcast for IP address %s!\n",
@@ -948,7 +1035,7 @@ in_arpinput(m)
 				    lla_snprintf(ar_sha(ah), ah->ar_hln));
 			}
 		}
-		/* 
+		/*
 		 * sanity check for the address length.
 		 * XXX this does not work for protocols with variable address
 		 * length. -is
@@ -956,16 +1043,16 @@ in_arpinput(m)
 		if (sdl->sdl_alen &&
 		    sdl->sdl_alen != ah->ar_hln) {
 			arpstat.as_rcvlenchg++;
-			log(LOG_WARNING, 
+			log(LOG_WARNING,
 			    "arp from %s: new addr len %d, was %d",
 			    in_fmtaddr(isaddr), ah->ar_hln, sdl->sdl_alen);
 		}
-		if (ifp->if_data.ifi_addrlen != ah->ar_hln) {
+		if (ifp->if_addrlen != ah->ar_hln) {
 			arpstat.as_rcvbadlen++;
-			log(LOG_WARNING, 
+			log(LOG_WARNING,
 			    "arp from %s: addr len: new %d, i/f %d (ignored)",
 			    in_fmtaddr(isaddr), ah->ar_hln,
-			    ifp->if_data.ifi_addrlen);
+			    ifp->if_addrlen);
 			goto reply;
 		}
 #if NTOKEN > 0
@@ -1023,14 +1110,18 @@ reply:
 	arpstat.as_rcvrequest++;
 	if (in_hosteq(itaddr, myaddr)) {
 		/* I am the target */
-		bcopy((caddr_t)ar_sha(ah), (caddr_t)ar_tha(ah), ah->ar_hln);
+		if (ar_tha(ah))
+			bcopy((caddr_t)ar_sha(ah), (caddr_t)ar_tha(ah),
+			    ah->ar_hln);
 		bcopy(LLADDR(ifp->if_sadl), (caddr_t)ar_sha(ah), ah->ar_hln);
 	} else {
 		la = arplookup(m, &itaddr, 0, SIN_PROXY);
 		if (la == 0)
 			goto out;
 		rt = la->la_rt;
-		bcopy((caddr_t)ar_sha(ah), (caddr_t)ar_tha(ah), ah->ar_hln);
+		if (ar_tha(ah))
+			bcopy((caddr_t)ar_sha(ah), (caddr_t)ar_tha(ah),
+			    ah->ar_hln);
 		sdl = SDL(rt->rt_gateway);
 		bcopy(LLADDR(sdl), (caddr_t)ar_sha(ah), ah->ar_hln);
 	}
@@ -1039,8 +1130,21 @@ reply:
 	bcopy((caddr_t)&itaddr, (caddr_t)ar_spa(ah), ah->ar_pln);
 	ah->ar_op = htons(ARPOP_REPLY);
 	ah->ar_pro = htons(ETHERTYPE_IP); /* let's be sure! */
-	m->m_flags &= ~(M_BCAST|M_MCAST); /* never reply by broadcast */
-	m->m_len = sizeof(*ah) + (2 * ah->ar_pln) + (2 * ah->ar_hln);
+	switch (ifp->if_type) {
+	case IFT_IEEE1394:
+		/*
+		 * ieee1394 arp reply is broadcast
+		 */
+		m->m_flags &= ~M_MCAST;
+		m->m_flags |= M_BCAST;
+		m->m_len = sizeof(*ah) + (2 * ah->ar_pln) + ah->ar_hln;
+		break;
+
+	default:
+		m->m_flags &= ~(M_BCAST|M_MCAST); /* never reply by broadcast */
+		m->m_len = sizeof(*ah) + (2 * ah->ar_pln) + (2 * ah->ar_hln);
+		break;
+	}
 	m->m_pkthdr.len = m->m_len;
 	sa.sa_family = AF_ARP;
 	sa.sa_len = 2;
@@ -1114,10 +1218,10 @@ arplookup(m, addr, create, proxy)
 		log(LOG_DEBUG, "arplookup: unable to enter address"
 		    " for %s@%s on %s (%s)\n",
 		    in_fmtaddr(*addr), lla_snprintf(ar_sha(ah), ah->ar_hln),
-		    ifp->if_xname, why);
+		    (ifp) ? ifp->if_xname : 0, why);
 		if (rt->rt_refcnt <= 0 && (rt->rt_flags & RTF_CLONED) != 0) {
 			rtrequest(RTM_DELETE, (struct sockaddr *)rt_key(rt),
-			    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
+		    	    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
 		}
 	}
 	return (0);
@@ -1173,7 +1277,6 @@ revarpinput(m)
 	if (m->m_len < sizeof(struct arphdr) + 2 * (ar->ar_hln + ar->ar_pln))
 		goto out;
 	switch (ntohs(ar->ar_pro)) {
-
 	case ETHERTYPE_IP:
 	case ETHERTYPE_IPTRAILERS:
 		in_revarpinput(m);
@@ -1207,6 +1310,15 @@ in_revarpinput(m)
 
 	ah = mtod(m, struct arphdr *);
 	op = ntohs(ah->ar_op);
+
+	switch (m->m_pkthdr.rcvif->if_type) {
+	case IFT_IEEE1394:
+		/* ARP without target hardware address is not supported */
+		goto out;
+	default:
+		break;
+	}
+
 	switch (op) {
 	case ARPOP_REQUEST:
 	case ARPOP_REPLY:	/* per RFC */
@@ -1251,14 +1363,15 @@ revarprequest(ifp)
 
 	if ((m = m_gethdr(M_DONTWAIT, MT_DATA)) == NULL)
 		return;
+	MCLAIM(m, &arpdomain.dom_mowner);
 	m->m_len = sizeof(*ah) + 2*sizeof(struct in_addr) +
-	    2*ifp->if_data.ifi_addrlen;
+	    2*ifp->if_addrlen;
 	m->m_pkthdr.len = m->m_len;
 	MH_ALIGN(m, m->m_len);
 	ah = mtod(m, struct arphdr *);
 	bzero((caddr_t)ah, m->m_len);
 	ah->ar_pro = htons(ETHERTYPE_IP);
-	ah->ar_hln = ifp->if_data.ifi_addrlen;	/* hardware address length */
+	ah->ar_hln = ifp->if_addrlen;		/* hardware address length */
 	ah->ar_pln = sizeof(struct in_addr);	/* protocol address length */
 	ah->ar_op = htons(ARPOP_REVREQUEST);
 
@@ -1284,7 +1397,7 @@ revarpwhoarewe(ifp, serv_in, clnt_in)
 	struct in_addr *clnt_in;
 {
 	int result, count = 20;
-	
+
 	myip_initialized = 0;
 	myip_ifp = ifp;
 
@@ -1299,7 +1412,7 @@ revarpwhoarewe(ifp, serv_in, clnt_in)
 
 	if (!myip_initialized)
 		return ENETUNREACH;
-	
+
 	bcopy((caddr_t)&srv_ip, serv_in, sizeof(*serv_in));
 	bcopy((caddr_t)&myip, clnt_in, sizeof(*clnt_in));
 	return 0;
@@ -1424,4 +1537,3 @@ db_show_arptab(addr, have_addr, count, modif)
 }
 #endif
 #endif /* INET */
-

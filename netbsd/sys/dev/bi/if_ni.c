@@ -1,4 +1,4 @@
-/*	$NetBSD: if_ni.c,v 1.14.10.1 2003/01/27 05:37:37 jmc Exp $ */
+/*	$NetBSD: if_ni.c,v 1.22 2003/11/06 00:25:50 he Exp $ */
 /*
  * Copyright (c) 2000 Ludd, University of Lule}, Sweden. All rights reserved.
  *
@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: if_ni.c,v 1.14.10.1 2003/01/27 05:37:37 jmc Exp $");
+__KERNEL_RCSID(0, "$NetBSD: if_ni.c,v 1.22 2003/11/06 00:25:50 he Exp $");
 
 #include "opt_inet.h"
 #include "bpfilter.h"
@@ -48,6 +48,8 @@ __KERNEL_RCSID(0, "$NetBSD: if_ni.c,v 1.14.10.1 2003/01/27 05:37:37 jmc Exp $");
 #include <sys/systm.h>
 #include <sys/sockio.h>
 #include <sys/sched.h>
+
+#include <uvm/uvm_extern.h>
 
 #include <net/if.h>
 #include <net/if_ether.h>
@@ -97,7 +99,7 @@ __KERNEL_RCSID(0, "$NetBSD: if_ni.c,v 1.14.10.1 2003/01/27 05:37:37 jmc Exp $");
  */
 #define	NRETRIES	100
 #define	INSQTI(e, h)	({						\
-	int ret, i;							\
+	int ret = 0, i;							\
 	for (i = 0; i < NRETRIES; i++) {				\
 		if ((ret = insqti(e, h)) != ILCK_FAILED)		\
 			break;						\
@@ -107,7 +109,7 @@ __KERNEL_RCSID(0, "$NetBSD: if_ni.c,v 1.14.10.1 2003/01/27 05:37:37 jmc Exp $");
 	ret;								\
 })
 #define	REMQHI(h)	({						\
-	int i;void *ret;						\
+	int i; void *ret = NULL;					\
 	for (i = 0; i < NRETRIES; i++) {				\
 		if ((ret = remqhi(h)) != (void *)ILCK_FAILED)		\
 			break;						\
@@ -153,9 +155,8 @@ static	int failtest(struct ni_softc *, int, int, int, char *);
 
 volatile int endwait, retry;	/* Used during autoconfig */
 
-struct	cfattach ni_ca = {
-	sizeof(struct ni_softc), nimatch, niattach
-};
+CFATTACH_DECL(ni, sizeof(struct ni_softc),
+    nimatch, niattach, NULL, NULL);
 
 #define NI_WREG(csr, val) \
 	bus_space_write_4(sc->sc_iot, sc->sc_ioh, csr, val)
@@ -196,7 +197,7 @@ ni_getpgs(struct ni_softc *sc, int size, caddr_t *v, paddr_t *p)
 	bus_dma_segment_t seg;
 	int nsegs, error;
 
-	if ((error = bus_dmamem_alloc(sc->sc_dmat, size, NBPG, 0, &seg, 1,
+	if ((error = bus_dmamem_alloc(sc->sc_dmat, size, PAGE_SIZE, 0, &seg, 1,
 	    &nsegs, BUS_DMA_NOWAIT)) != 0)
 		panic(" unable to allocate memory: error %d", error);
 
@@ -844,7 +845,7 @@ ni_setup(struct ni_softc *sc)
 			ETHER_FIRST_MULTI(step, &sc->sc_ec, enm);
 			i = 1;
 			while (enm != NULL) {
-				if (bcmp(enm->enm_addrlo, enm->enm_addrhi, 6)) {
+				if (memcmp(enm->enm_addrlo, enm->enm_addrhi, 6)) {
 					ifp->if_flags |= IFF_ALLMULTI;
 					ptdb->np_flags |= PTDB_AMC;
 					break;

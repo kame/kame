@@ -1,31 +1,47 @@
-/*	$NetBSD: ppp_tty.c,v 1.30 2002/03/17 19:41:11 atatat Exp $	*/
+/*	$NetBSD: ppp_tty.c,v 1.34 2003/09/01 16:51:27 christos Exp $	*/
 /*	Id: ppp_tty.c,v 1.3 1996/07/01 01:04:11 paulus Exp 	*/
 
 /*
  * ppp_tty.c - Point-to-Point Protocol (PPP) driver for asynchronous
  * 	       tty devices.
  *
- * Copyright (c) 1989 Carnegie Mellon University.
- * All rights reserved.
+ * Copyright (c) 1984-2000 Carnegie Mellon University. All rights reserved.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that the above copyright notice and this paragraph are
- * duplicated in all such forms and that any documentation,
- * advertising materials, and other materials related to such
- * distribution and use acknowledge that the software was developed
- * by Carnegie Mellon University.  The name of the
- * University may not be used to endorse or promote products derived
- * from this software without specific prior written permission.
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
- * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
  *
- * Drew D. Perkins
- * Carnegie Mellon University
- * 4910 Forbes Ave.
- * Pittsburgh, PA 15213
- * (412) 268-8576
- * ddp@andrew.cmu.edu
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in
+ *    the documentation and/or other materials provided with the
+ *    distribution.
+ *
+ * 3. The name "Carnegie Mellon University" must not be used to
+ *    endorse or promote products derived from this software without
+ *    prior written permission. For permission or any legal
+ *    details, please contact
+ *      Office of Technology Transfer
+ *      Carnegie Mellon University
+ *      5000 Forbes Avenue
+ *      Pittsburgh, PA  15213-3890
+ *      (412) 268-4387, fax: (412) 268-7395
+ *      tech-transfer@andrew.cmu.edu
+ *
+ * 4. Redistributions of any form whatsoever must retain the following
+ *    acknowledgment:
+ *    "This product includes software developed by Computing Services
+ *     at Carnegie Mellon University (http://www.cmu.edu/computing/)."
+ *
+ * CARNEGIE MELLON UNIVERSITY DISCLAIMS ALL WARRANTIES WITH REGARD TO
+ * THIS SOFTWARE, INCLUDING ALL IMPLIED WARRANTIES OF MERCHANTABILITY
+ * AND FITNESS, IN NO EVENT SHALL CARNEGIE MELLON UNIVERSITY BE LIABLE
+ * FOR ANY SPECIAL, INDIRECT OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+ * WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+ * AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING
+ * OUT OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  *
  * Based on:
  *	@(#)if_sl.c	7.6.1.2 (Berkeley) 2/15/89
@@ -77,7 +93,7 @@
 /* from NetBSD: if_ppp.c,v 1.15.2.2 1994/07/28 05:17:58 cgd Exp */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: ppp_tty.c,v 1.30 2002/03/17 19:41:11 atatat Exp $");
+__KERNEL_RCSID(0, "$NetBSD: ppp_tty.c,v 1.34 2003/09/01 16:51:27 christos Exp $");
 
 #include "ppp.h"
 
@@ -371,7 +387,7 @@ pppwrite(tp, uio, flag)
 	uio->uio_resid < PPP_HDRLEN)
 	return (EMSGSIZE);
     for (mp = &m0; uio->uio_resid; mp = &m->m_next) {
-	MGET(m, M_WAIT, MT_DATA);
+	m = m_get(M_WAIT, MT_DATA);
 	if ((*mp = m) == NULL) {
 	    m_freem(m0);
 	    return (ENOBUFS);
@@ -635,6 +651,7 @@ pppsyncstart(sc)
 {
 	struct tty *tp = (struct tty *) sc->sc_devp;
 	struct mbuf *m, *n;
+	const struct cdevsw *cdev;
 	int len;
     
 	for(m = sc->sc_outm;;) {
@@ -649,8 +666,10 @@ pppsyncstart(sc)
 			len += n->m_len;
 			
 		/* call device driver IOCTL to transmit a frame */
-		if ((*cdevsw[major(tp->t_dev)].d_ioctl)
-			(tp->t_dev, TIOCXMTFRAME, (caddr_t)&m, 0, 0)) {
+		cdev = cdevsw_lookup(tp->t_dev);
+		if (cdev == NULL ||
+		    (*cdev->d_ioctl)(tp->t_dev, TIOCXMTFRAME, (caddr_t)&m,
+				     0, 0)) {
 			/* busy or error, set as current packet */
 			sc->sc_outm = m;
 			break;
@@ -968,6 +987,7 @@ pppinput(c, tp)
 {
     struct ppp_softc *sc;
     struct mbuf *m;
+    const struct cdevsw *cdev;
     int ilen, s;
 
     sc = (struct ppp_softc *) tp->t_sc;
@@ -993,7 +1013,9 @@ pppinput(c, tp)
 	if (c == tp->t_cc[VSTOP] && tp->t_cc[VSTOP] != _POSIX_VDISABLE) {
 	    if ((tp->t_state & TS_TTSTOP) == 0) {
 		tp->t_state |= TS_TTSTOP;
-		(*cdevsw[major(tp->t_dev)].d_stop)(tp, 0);
+		cdev = cdevsw_lookup(tp->t_dev);
+		if (cdev != NULL)
+			(*cdev->d_stop)(tp, 0);
 	    }
 	    return 0;
 	}
@@ -1016,14 +1038,13 @@ pppinput(c, tp)
 	sc->sc_flags |= SC_RCV_EVNP;
     splx(s);
 
-    if (sc->sc_flags & SC_LOG_RAWIN)
-	ppplogchar(sc, c);
+    ppplogchar(sc, c);
 
     if (c == PPP_FLAG) {
 	ilen = sc->sc_ilen;
 	sc->sc_ilen = 0;
 
-	if (sc->sc_rawin_count > 0) 
+	if ((sc->sc_flags & SC_LOG_RAWIN) && sc->sc_rawin.count > 0) 
 	    ppplogchar(sc, -1);
 
 	/*
@@ -1212,13 +1233,20 @@ ppplogchar(sc, c)
     struct ppp_softc *sc;
     int c;
 {
-    if (c >= 0)
-	sc->sc_rawin[sc->sc_rawin_count++] = c;
-    if (sc->sc_rawin_count >= sizeof(sc->sc_rawin)
-	|| (c < 0 && sc->sc_rawin_count > 0)) {
-	printf("%s input: ", sc->sc_if.if_xname);
-	pppdumpb(sc->sc_rawin, sc->sc_rawin_count);
-	sc->sc_rawin_count = 0;
+    if (c >= 0) {
+	sc->sc_rawin.buf[sc->sc_rawin_start++] = c;
+	if (sc->sc_rawin.count < sizeof(sc->sc_rawin.buf))
+	    sc->sc_rawin.count++;
+    }
+    if (sc->sc_rawin_start >= sizeof(sc->sc_rawin.buf)
+	|| (c < 0 && sc->sc_rawin_start > 0)) {
+	if (sc->sc_flags & (SC_LOG_FLUSH|SC_LOG_RAWIN)) {
+	    printf("%s input: ", sc->sc_if.if_xname);
+	    pppdumpb(sc->sc_rawin.buf, sc->sc_rawin_start);
+	}
+	if (c < 0)
+	    sc->sc_rawin.count = 0;
+	sc->sc_rawin_start = 0;
     }
 }
 

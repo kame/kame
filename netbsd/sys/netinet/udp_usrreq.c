@@ -1,4 +1,4 @@
-/*	$NetBSD: udp_usrreq.c,v 1.93 2002/05/12 20:33:51 matt Exp $	*/
+/*	$NetBSD: udp_usrreq.c,v 1.116.2.4 2004/05/28 07:24:17 tron Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -35,7 +35,7 @@
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
- * 
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -47,7 +47,7 @@
  * 3. Neither the name of the project nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
- * 
+ *
  * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
@@ -73,11 +73,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -97,12 +93,13 @@
  */
 
 #include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: udp_usrreq.c,v 1.93 2002/05/12 20:33:51 matt Exp $");
+__KERNEL_RCSID(0, "$NetBSD: udp_usrreq.c,v 1.116.2.4 2004/05/28 07:24:17 tron Exp $");
 
 #include "opt_inet.h"
 #include "opt_ipsec.h"
 #include "opt_inet_csum.h"
 #include "opt_ipkdb.h"
+#include "opt_mbuftrace.h"
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -146,11 +143,9 @@ __KERNEL_RCSID(0, "$NetBSD: udp_usrreq.c,v 1.93 2002/05/12 20:33:51 matt Exp $")
 #endif
 #endif
 
-#ifdef PULLDOWN_TEST
 #ifndef INET6
 /* always need ip6.h for IP6_EXTHDR_GET */
 #include <netinet/ip6.h>
-#endif
 #endif
 
 #include "faith.h"
@@ -159,6 +154,14 @@ __KERNEL_RCSID(0, "$NetBSD: udp_usrreq.c,v 1.93 2002/05/12 20:33:51 matt Exp $")
 #endif
 
 #include <machine/stdarg.h>
+
+#ifdef FAST_IPSEC
+#include <netipsec/ipsec.h>
+#include <netipsec/ipsec_var.h>			/* XXX ipsecstat namespace */
+#ifdef INET6
+#include <netipsec/ipsec6.h>
+#endif
+#endif	/* FAST_IPSEC*/
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
@@ -203,6 +206,12 @@ static	void udp_notify __P((struct inpcb *, int));
 #endif
 int	udbhashsize = UDBHASHSIZE;
 
+#ifdef MBUFTRACE
+struct mowner udp_mowner = { "udp" };
+struct mowner udp_rx_mowner = { "udp", "rx" };
+struct mowner udp_tx_mowner = { "udp", "tx" };
+#endif
+
 #ifdef UDP_CSUM_COUNTERS
 #include <sys/device.h>
 
@@ -227,9 +236,7 @@ void
 udp_init()
 {
 
-#ifdef INET
 	in_pcbinit(&udbtable, udbhashsize, udbhashsize);
-#endif
 
 #ifdef UDP_CSUM_COUNTERS
 	evcnt_attach_static(&udp_hwcsum_bad);
@@ -237,6 +244,10 @@ udp_init()
 	evcnt_attach_static(&udp_hwcsum_data);
 	evcnt_attach_static(&udp_swcsum);
 #endif /* UDP_CSUM_COUNTERS */
+
+	MOWNER_ATTACH(&udp_tx_mowner);
+	MOWNER_ATTACH(&udp_rx_mowner);
+	MOWNER_ATTACH(&udp_mowner);
 }
 
 #ifdef INET
@@ -253,55 +264,29 @@ udp_input(m, va_alist)
 	struct sockaddr_in src, dst;
 	struct ip *ip;
 	struct udphdr *uh;
-	int iphlen, proto;
+	int iphlen;
 	int len;
 	int n;
+	u_int16_t ip_len;
 
 	va_start(ap, m);
 	iphlen = va_arg(ap, int);
-	proto = va_arg(ap, int);
+	(void)va_arg(ap, int);		/* ignore value, advance ap */
 	va_end(ap);
 
+	MCLAIM(m, &udp_rx_mowner);
 	udpstat.udps_ipackets++;
-
-#ifndef PULLDOWN_TEST
-	/*
-	 * Strip IP options, if any; should skip this,
-	 * make available to user, and use on returned packets,
-	 * but we don't yet have a way to check the checksum
-	 * with options still present.
-	 */
-	if (iphlen > sizeof (struct ip)) {
-		ip_stripoptions(m, (struct mbuf *)0);
-		iphlen = sizeof(struct ip);
-	}
-#else
-	/*
-	 * we may enable the above code if we save and pass IPv4 options
-	 * to the userland.
-	 */
-#endif
 
 	/*
 	 * Get IP and UDP header together in first mbuf.
 	 */
 	ip = mtod(m, struct ip *);
-#ifndef PULLDOWN_TEST
-	if (m->m_len < iphlen + sizeof(struct udphdr)) {
-		if ((m = m_pullup(m, iphlen + sizeof(struct udphdr))) == 0) {
-			udpstat.udps_hdrops++;
-			return;
-		}
-		ip = mtod(m, struct ip *);
-	}
-	uh = (struct udphdr *)((caddr_t)ip + iphlen);
-#else
 	IP6_EXTHDR_GET(uh, struct udphdr *, m, iphlen, sizeof(struct udphdr));
 	if (uh == NULL) {
 		udpstat.udps_hdrops++;
 		return;
 	}
-#endif
+	KASSERT(UDP_HDR_ALIGNED_P(uh));
 
 	/* destination port of 0 is illegal, based on RFC768. */
 	if (uh->uh_dport == 0)
@@ -311,13 +296,14 @@ udp_input(m, va_alist)
 	 * Make mbuf data length reflect UDP length.
 	 * If not enough data to reflect UDP length, drop.
 	 */
+	ip_len = ntohs(ip->ip_len);
 	len = ntohs((u_int16_t)uh->uh_ulen);
-	if (ip->ip_len != iphlen + len) {
-		if (ip->ip_len < iphlen + len || len < sizeof(struct udphdr)) {
+	if (ip_len != iphlen + len) {
+		if (ip_len < iphlen + len || len < sizeof(struct udphdr)) {
 			udpstat.udps_badlen++;
 			goto bad;
 		}
-		m_adj(m, iphlen + len - ip->ip_len);
+		m_adj(m, iphlen + len - ip_len);
 	}
 
 	/*
@@ -325,17 +311,23 @@ udp_input(m, va_alist)
 	 */
 	if (uh->uh_sum) {
 		switch (m->m_pkthdr.csum_flags &
-			((m->m_pkthdr.rcvif->if_csum_flags_rx & M_CSUM_UDPv4) |
-			 M_CSUM_TCP_UDP_BAD | M_CSUM_DATA)) {
+		    ((m->m_pkthdr.rcvif->if_csum_flags_rx & M_CSUM_UDPv4) |
+		    M_CSUM_TCP_UDP_BAD | M_CSUM_DATA)) {
 		case M_CSUM_UDPv4|M_CSUM_TCP_UDP_BAD:
 			UDP_CSUM_COUNTER_INCR(&udp_hwcsum_bad);
 			goto badcsum;
 
-		case M_CSUM_UDPv4|M_CSUM_DATA:
+		case M_CSUM_UDPv4|M_CSUM_DATA: {
+			u_int32_t hw_csum = m->m_pkthdr.csum_data;
 			UDP_CSUM_COUNTER_INCR(&udp_hwcsum_data);
-			if ((m->m_pkthdr.csum_data ^ 0xffff) != 0)
+			if (m->m_pkthdr.csum_flags & M_CSUM_NO_PSEUDOHDR)
+				hw_csum = in_cksum_phdr(ip->ip_src.s_addr,
+				    ip->ip_dst.s_addr,
+				    htons(hw_csum + len + IPPROTO_UDP));
+			if ((hw_csum ^ 0xffff) != 0)
 				goto badcsum;
 			break;
+		}
 
 		case M_CSUM_UDPv4:
 			/* Checksum was okay. */
@@ -432,9 +424,6 @@ udp6_input(mp, offp, proto)
 	struct udphdr *uh;
 	u_int32_t plen, ulen;
 
-#ifndef PULLDOWN_TEST
-	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
-#endif
 	ip6 = mtod(m, struct ip6_hdr *);
 
 #if defined(NFAITH) && 0 < NFAITH
@@ -449,15 +438,12 @@ udp6_input(mp, offp, proto)
 
 	/* check for jumbogram is done in ip6_input.  we can trust pkthdr.len */
 	plen = m->m_pkthdr.len - off;
-#ifndef PULLDOWN_TEST
-	uh = (struct udphdr *)((caddr_t)ip6 + off);
-#else
 	IP6_EXTHDR_GET(uh, struct udphdr *, m, off, sizeof(struct udphdr));
 	if (uh == NULL) {
 		ip6stat.ip6s_tooshort++;
 		return IPPROTO_DONE;
 	}
-#endif
+	KASSERT(UDP_HDR_ALIGNED_P(uh));
 	ulen = ntohs((u_short)uh->uh_ulen);
 
 	/*
@@ -534,9 +520,6 @@ udp4_sendup(m, off, src, so)
 	struct mbuf *opts = NULL;
 	struct mbuf *n;
 	struct inpcb *inp = NULL;
-#ifdef INET6
-	struct in6pcb *in6p = NULL;
-#endif
 
 	if (!so)
 		return;
@@ -546,14 +529,13 @@ udp4_sendup(m, off, src, so)
 		break;
 #ifdef INET6
 	case AF_INET6:
-		in6p = sotoin6pcb(so);
 		break;
 #endif
 	default:
 		return;
 	}
 
-#ifdef IPSEC
+#if defined(IPSEC) || defined(FAST_IPSEC)
 	/* check AH/ESP integrity. */
 	if (so != NULL && ipsec4_in_reject_so(m, so)) {
 		ipsecstat.in_polvio++;
@@ -600,11 +582,11 @@ udp6_sendup(m, off, src, so)
 		return;
 	in6p = sotoin6pcb(so);
 
-#ifdef IPSEC
+#if defined(IPSEC) || defined(FAST_IPSEC)
 	/* check AH/ESP integrity. */
 	if (so != NULL && ipsec6_in_reject_so(m, so)) {
 		ipsec6stat.in_polvio++;
-		if ((n = m_copy(n, 0, M_COPYALL)) != NULL)
+		if ((n = m_copy(m, 0, M_COPYALL)) != NULL)
 			icmp6_error(n, ICMP6_DST_UNREACH,
 			    ICMP6_DST_UNREACH_ADMIN, 0);
 		return;
@@ -639,6 +621,7 @@ udp4_realinput(src, dst, m, off)
 	u_int16_t *sport, *dport;
 	int rcvcnt;
 	struct in_addr *src4, *dst4;
+	struct inpcb_hdr *inph;
 	struct inpcb *inp;
 
 	rcvcnt = 0;
@@ -654,7 +637,6 @@ udp4_realinput(src, dst, m, off)
 
 	if (IN_MULTICAST(dst4->s_addr) ||
 	    in_broadcast(*dst4, m->m_pkthdr.rcvif)) {
-		struct inpcb *last;
 		/*
 		 * Deliver a multicast or broadcast datagram to *all* sockets
 		 * for which the local and remote addresses and ports match
@@ -678,7 +660,11 @@ udp4_realinput(src, dst, m, off)
 		/*
 		 * Locate pcb(s) for datagram.
 		 */
-		CIRCLEQ_FOREACH(inp, &udbtable.inpt_queue, inp_queue) {
+		CIRCLEQ_FOREACH(inph, &udbtable.inpt_queue, inph_queue) {
+			inp = (struct inpcb *)inph;
+			if (inp->inp_af != AF_INET)
+				continue;
+
 			if (inp->inp_lport != *dport)
 				continue;
 			if (!in_nullhost(inp->inp_laddr)) {
@@ -746,6 +732,7 @@ udp6_realinput(af, src, dst, m, off)
 	int rcvcnt;
 	struct in6_addr src6, dst6;
 	const struct in_addr *dst4;
+	struct inpcb_hdr *inph;
 	struct in6pcb *in6p;
 
 	rcvcnt = 0;
@@ -789,8 +776,11 @@ udp6_realinput(af, src, dst, m, off)
 		/*
 		 * Locate pcb(s) for datagram.
 		 */
-		for (in6p = udb6.in6p_next; in6p != &udb6;
-		     in6p = in6p->in6p_next) {
+		CIRCLEQ_FOREACH(inph, &udbtable.inpt_queue, inph_queue) {
+			in6p = (struct in6pcb *)inph;
+			if (in6p->in6p_af != AF_INET6)
+				continue;
+
 			if (in6p->in6p_lport != dport)
 				continue;
 			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
@@ -842,11 +832,11 @@ udp6_realinput(af, src, dst, m, off)
 		/*
 		 * Locate pcb for datagram.
 		 */
-		in6p = in6_pcblookup_connect(&udb6, &src6, sport, &dst6,
-		    dport, 0);
+		in6p = in6_pcblookup_connect(&udbtable, &src6, sport,
+		    &dst6, dport, 0);
 		if (in6p == 0) {
 			++udpstat.udps_pcbhashmiss;
-			in6p = in6_pcblookup_bind(&udb6, &dst6, dport, 0);
+			in6p = in6_pcblookup_bind(&udbtable, &dst6, dport, 0);
 			if (in6p == 0)
 				return rcvcnt;
 		}
@@ -926,6 +916,7 @@ udp_output(m, va_alist)
 	int error = 0;
 	va_list ap;
 
+	MCLAIM(m, &udp_tx_mowner);
 	va_start(ap, m);
 	inp = va_arg(ap, struct inpcb *);
 	va_end(ap);
@@ -944,7 +935,7 @@ udp_output(m, va_alist)
 	 * Compute the packet length of the IP header, and
 	 * punt if the length looks bogus.
 	 */
-	if ((len + sizeof(struct udpiphdr)) > IP_MAXPACKET) {
+	if (len + sizeof(struct udpiphdr) > IP_MAXPACKET) {
 		error = EMSGSIZE;
 		goto release;
 	}
@@ -976,21 +967,14 @@ udp_output(m, va_alist)
 		m->m_pkthdr.csum_data = offsetof(struct udphdr, uh_sum);
 	} else
 		ui->ui_sum = 0;
-	((struct ip *)ui)->ip_len = sizeof (struct udpiphdr) + len;
+	((struct ip *)ui)->ip_len = htons(sizeof (struct udpiphdr) + len);
 	((struct ip *)ui)->ip_ttl = inp->inp_ip.ip_ttl;	/* XXX */
 	((struct ip *)ui)->ip_tos = inp->inp_ip.ip_tos;	/* XXX */
 	udpstat.udps_opackets++;
 
-#ifdef IPSEC
-	if (ipsec_setsocket(m, inp->inp_socket) != 0) {
-		error = ENOBUFS;
-		goto release;
-	}
-#endif /*IPSEC*/
-
 	return (ip_output(m, inp->inp_options, &inp->inp_route,
 	    inp->inp_socket->so_options & (SO_DONTROUTE | SO_BROADCAST),
-	    inp->inp_moptions));
+	    inp->inp_moptions, inp->inp_socket));
 
 release:
 	m_freem(m);
@@ -1046,6 +1030,11 @@ udp_usrreq(so, req, m, nam, control, p)
 			error = EISCONN;
 			break;
 		}
+#ifdef MBUFTRACE
+		so->so_mowner = &udp_mowner;
+		so->so_rcv.sb_mowner = &udp_rx_mowner;
+		so->so_snd.sb_mowner = &udp_tx_mowner;
+#endif
 		if (so->so_snd.sb_hiwat == 0 || so->so_rcv.sb_hiwat == 0) {
 			error = soreserve(so, udp_sendspace, udp_recvspace);
 			if (error)
@@ -1114,11 +1103,8 @@ udp_usrreq(so, req, m, nam, control, p)
 				goto die;
 			}
 			error = in_pcbconnect(inp, nam);
-			if (error) {
-			die:
-				m_freem(m);
-				break;
-			}
+			if (error)
+				goto die;
 		} else {
 			if ((so->so_state & SS_ISCONNECTED) == 0) {
 				error = ENOTCONN;
@@ -1126,11 +1112,15 @@ udp_usrreq(so, req, m, nam, control, p)
 			}
 		}
 		error = udp_output(m, inp);
+		m = NULL;
 		if (nam) {
 			in_pcbdisconnect(inp);
 			inp->inp_laddr = laddr;		/* XXX */
 			in_pcbstate(inp, INP_BOUND);	/* XXX */
 		}
+	  die:
+		if (m)
+			m_freem(m);
 	}
 		break;
 
@@ -1171,31 +1161,46 @@ release:
 /*
  * Sysctl for udp variables.
  */
-int
-udp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
+SYSCTL_SETUP(sysctl_net_inet_udp_setup, "sysctl net.inet.udp subtree setup")
 {
-	/* All sysctl names at this level are terminal. */
-	if (namelen != 1)
-		return (ENOTDIR);
 
-	switch (name[0]) {
-	case UDPCTL_CHECKSUM:
-		return (sysctl_int(oldp, oldlenp, newp, newlen, &udpcksum));
-	case UDPCTL_SENDSPACE:
-		return (sysctl_int(oldp, oldlenp, newp, newlen,
-		    &udp_sendspace));
-	case UDPCTL_RECVSPACE:
-		return (sysctl_int(oldp, oldlenp, newp, newlen, 
-		    &udp_recvspace));
-	default:
-		return (ENOPROTOOPT);
-	}
-	/* NOTREACHED */
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "net", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_NET, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "inet", NULL,
+		       NULL, 0, NULL, 0,
+		       CTL_NET, PF_INET, CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT,
+		       CTLTYPE_NODE, "udp",
+		       SYSCTL_DESCR("UDPv4 related settings"),
+		       NULL, 0, NULL, 0,
+		       CTL_NET, PF_INET, IPPROTO_UDP, CTL_EOL);
+
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "checksum",
+		       SYSCTL_DESCR("Compute and check UDP checksums"),
+		       NULL, 0, &udpcksum, 0,
+		       CTL_NET, PF_INET, IPPROTO_UDP, UDPCTL_CHECKSUM,
+		       CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "sendspace",
+		       SYSCTL_DESCR("Default UDP send buffer size"),
+		       NULL, 0, &udp_sendspace, 0,
+		       CTL_NET, PF_INET, IPPROTO_UDP, UDPCTL_SENDSPACE,
+		       CTL_EOL);
+	sysctl_createv(clog, 0, NULL, NULL,
+		       CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
+		       CTLTYPE_INT, "recvspace",
+		       SYSCTL_DESCR("Default UDP receive buffer size"),
+		       NULL, 0, &udp_recvspace, 0,
+		       CTL_NET, PF_INET, IPPROTO_UDP, UDPCTL_RECVSPACE,
+		       CTL_EOL);
 }
 #endif

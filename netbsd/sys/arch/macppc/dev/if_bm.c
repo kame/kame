@@ -1,4 +1,4 @@
-/*	$NetBSD: if_bm.c,v 1.17 2002/03/05 04:12:57 itojun Exp $	*/
+/*	$NetBSD: if_bm.c,v 1.21 2003/07/15 02:43:28 lukem Exp $	*/
 
 /*-
  * Copyright (C) 1998, 1999, 2000 Tsubai Masanari.  All rights reserved.
@@ -25,6 +25,9 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: if_bm.c,v 1.21 2003/07/15 02:43:28 lukem Exp $");
 
 #include "opt_inet.h"
 #include "opt_ns.h"
@@ -124,9 +127,8 @@ void bmac_mii_tick __P((void *));
 u_int32_t bmac_mbo_read __P((struct device *));
 void bmac_mbo_write __P((struct device *, u_int32_t));
 
-struct cfattach bm_ca = {
-	sizeof(struct bmac_softc), bmac_match, bmac_attach
-};
+CFATTACH_DECL(bm, sizeof(struct bmac_softc),
+    bmac_match, bmac_attach, NULL, NULL);
 
 struct mii_bitbang_ops bmac_mbo = {
 	bmac_mbo_read, bmac_mbo_write,
@@ -212,7 +214,7 @@ bmac_attach(parent, self, aux)
 	ca->ca_reg[2] += ca->ca_baseaddr;
 	ca->ca_reg[4] += ca->ca_baseaddr;
 
-	sc->sc_regs = (vaddr_t)mapiodev(ca->ca_reg[0], NBPG);
+	sc->sc_regs = (vaddr_t)mapiodev(ca->ca_reg[0], PAGE_SIZE);
 
 	bmac_write_reg(sc, INTDISABLE, NoEventsMask);
 
@@ -223,8 +225,8 @@ bmac_attach(parent, self, aux)
 	}
 	memcpy(sc->sc_enaddr, laddr, 6);
 
-	sc->sc_txdma = mapiodev(ca->ca_reg[2], NBPG);
-	sc->sc_rxdma = mapiodev(ca->ca_reg[4], NBPG);
+	sc->sc_txdma = mapiodev(ca->ca_reg[2], PAGE_SIZE);
+	sc->sc_rxdma = mapiodev(ca->ca_reg[4], PAGE_SIZE);
 	sc->sc_txcmd = dbdma_alloc(BMAC_TXBUFS * sizeof(dbdma_command_t));
 	sc->sc_rxcmd = dbdma_alloc((BMAC_RXBUFS + 1) * sizeof(dbdma_command_t));
 	sc->sc_txbuf = malloc(BMAC_BUFLEN * BMAC_TXBUFS, M_DEVBUF, M_NOWAIT);
@@ -650,7 +652,7 @@ bmac_put(sc, buff, m)
 		tlen += len;
 		MFREE(m, n);
 	}
-	if (tlen > NBPG)
+	if (tlen > PAGE_SIZE)
 		panic("%s: putpacket packet overflow", sc->sc_dev.dv_xname);
 
 	return tlen;
