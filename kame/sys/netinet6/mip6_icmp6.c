@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.24 2001/11/29 04:38:39 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.25 2001/11/29 04:52:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1033,7 +1033,7 @@ mip6_icmp6_mp_sol_output(mpfx, mha)
 	ip6->ip6_hlim = ip6_defhlim;
 	ip6->ip6_src = mpfx->mpfx_haddr;
 	ip6->ip6_dst = mha->mha_gaddr;
-	mp_sol = (struct mobile_prefix_solicitation *)(ip6 + 1);
+	mp_sol = (struct mobile_prefix_solicit *)(ip6 + 1);
 	mp_sol->mp_sol_type = ICMP6_MOBILEPREFIX_SOLICIT;
 	mp_sol->mp_sol_code = 0;
 	mp_sol->mp_sol_reserved = 0;
