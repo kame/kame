@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.123 2002/05/01 03:39:51 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.124 2002/05/14 10:38:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -107,11 +107,13 @@
  * The range is IPPORT_RESERVEDMIN to IPPORT_RESERVEDMAX.
  */
 
+#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
 #define	IPV6PORT_RESERVED	1024
 #define	IPV6PORT_ANONMIN	49152
 #define	IPV6PORT_ANONMAX	65535
 #define	IPV6PORT_RESERVEDMIN	600
 #define	IPV6PORT_RESERVEDMAX	(IPV6PORT_RESERVED-1)
+#endif
 
 /*
  * IPv6 address
@@ -136,7 +138,7 @@ struct in6_addr {
 /*
  * Socket address for IPv6
  */
-#ifndef _XOPEN_SOURCE
+#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
 #define SIN6_LEN
 #endif
 struct sockaddr_in6 {
@@ -409,7 +411,7 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
  * IP6 route structure
  */
 #if !defined(__NetBSD__) && !defined(__OpenBSD__) && !defined(__FreeBSD__) && !(defined(__bsdi__) && _BSDI_VERSION >= 200105) 
-#ifndef _XOPEN_SOURCE
+#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
 #ifndef NEW_STRUCT_ROUTE
 struct route_in6 {
 	struct	rtentry *ro_rt;
@@ -569,7 +571,7 @@ struct ip6_mtuinfo {
 #define	IPV6_PORTRANGE_HIGH	1	/* "high" - request firewall bypass */
 #define	IPV6_PORTRANGE_LOW	2	/* "low" - vouchsafe security */
 
-#ifndef _XOPEN_SOURCE
+#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
 /*
  * Definitions for inet6 sysctl operations.
  *
@@ -840,7 +842,7 @@ struct ip6_mtuinfo {
 	&ip6_use_defzone,\
 }
 #endif
-#endif /* !_XOPEN_SOURCE */
+#endif /* !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 /*
@@ -883,6 +885,8 @@ extern void addrsel_policy_init __P((void));
 extern int      (*faithprefix_p)(struct in6_addr *);
 #endif
 #endif /* _KERNEL */
+
+#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
 
 __BEGIN_DECLS
 struct cmsghdr;
@@ -934,5 +938,6 @@ struct sockaddr;		/* XXX: to suppress compilation warnings */
 extern int addr2scopetype __P((struct sockaddr *));
 extern int inet_zoneid __P((int, int, char *, u_int32_t *));
 __END_DECLS
+#endif /* !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
 
 #endif /* !_NETINET6_IN6_H_ */
