@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.68 2001/09/25 14:15:24 sakane Exp $	*/
+/*	$KAME: parse.y,v 1.69 2002/05/14 11:16:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -484,10 +484,10 @@ spdadd_command
 
 			status = setkeymsg_spdaddr(SADB_X_SPDADD, $9, &$11,
 			    src, $4, dst, $7);
-			if (status < 0)
-				return -1;
 			freeaddrinfo(src);
 			freeaddrinfo(dst);
+			if (status < 0)
+				return -1;
 		}
 	;
 
@@ -522,10 +522,10 @@ spddelete_command
 
 			status = setkeymsg_spdaddr(SADB_X_SPDDELETE, $9, &$11,
 			    src, $4, dst, $7);
-			if (status < 0)
-				return -1;
 			freeaddrinfo(src);
 			freeaddrinfo(dst);
+			if (status < 0)
+				return -1;
 		}
 	;
 
