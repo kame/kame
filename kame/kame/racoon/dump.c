@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.2 2000/09/23 15:21:57 itojun Exp $	*/
+/*	$KAME: dump.c,v 1.3 2000/09/23 15:31:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -160,7 +160,23 @@ isakmp_dump(msg, from, my)
 	sf_hdr.ts.tv_sec = tv.tv_sec;
 	sf_hdr.ts.tv_usec = tv.tv_usec;
 
-	/* write out timestamp, llhdr and ip header */
+	/* write out timestamp and llhdr */
+	switch (af == AF_INET) {
+	case AF_INET:
+		sf_hdr.caplen = sf_hdr.len = sizeof(ip);
+		break;
+	case AF_INET6:
+		sf_hdr.caplen = sf_hdr.len = sizeof(ip6);
+		break;
+	}
+	sf_hdr.caplen += sizeof(af) + sizeof(uh) + msg->l;
+	sf_hdr.len += sizeof(af) + sizeof(uh) + msg->l;
+	if (write(fd, &sf_hdr, sizeof(sf_hdr)) < sizeof(sf_hdr))
+		return errno;
+	if (write(fd, &af, sizeof(af)) < sizeof(af))
+		return errno;
+
+	/* write out llhdr and ip header */
 	if (af == AF_INET) {
 		memset(&ip, 0, sizeof(ip));
 		ip.ip_v = IPVERSION;
@@ -172,11 +188,6 @@ isakmp_dump(msg, from, my)
 		ip.ip_p = IPPROTO_UDP;
 		ip.ip_ttl = 1;
 		ip.ip_len = htons(sizeof(ip) + sizeof(uh) + msg->l);
-		sf_hdr.caplen = sf_hdr.len = sizeof(af) + ntohs(ip.ip_len);
-		if (write(fd, &sf_hdr, sizeof(sf_hdr)) < sizeof(sf_hdr))
-			return errno;
-		if (write(fd, &af, sizeof(af)) < sizeof(af))
-			return errno;
 		if (write(fd, &ip, sizeof(ip)) < sizeof(ip))
 			return errno;
 	} else if (af == AF_INET6) {
@@ -189,12 +200,6 @@ isakmp_dump(msg, from, my)
 		ip6.ip6_nxt = IPPROTO_UDP;
 		ip6.ip6_plen = htons(sizeof(uh) + msg->l);
 		ip6.ip6_hlim = 1;
-		sf_hdr.caplen = sf_hdr.len =
-		    sizeof(af) + sizeof(ip6) + ntohs(ip6.ip6_plen);
-		if (write(fd, &sf_hdr, sizeof(sf_hdr)) < sizeof(sf_hdr))
-			return errno;
-		if (write(fd, &af, sizeof(af)) < sizeof(af))
-			return errno;
 		if (write(fd, &ip6, sizeof(ip6)) < sizeof(ip6))
 			return errno;
 	}
