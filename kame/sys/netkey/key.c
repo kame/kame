@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.72 2000/03/15 10:30:51 sakane Exp $	*/
+/*	$KAME: key.c,v 1.73 2000/03/15 13:07:59 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.72 2000/03/15 10:30:51 sakane Exp $ */
+/* KAME $Id: key.c,v 1.73 2000/03/15 13:07:59 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -119,6 +119,7 @@ u_int32_t key_debug_level = 0;
 static u_int key_spi_trycnt = 1000;
 static u_int32_t key_spi_minval = 0x100;
 static u_int32_t key_spi_maxval = 0x0fffffff;	/* XXX */
+static u_int32_t policy_id = 0;
 static u_int key_int_random = 60;	/*interval to initialize randseed,1(m)*/
 static u_int key_larval_lifetime = 30;	/* interval to expire acquiring, 30(s)*/
 static int key_blockacq_count = 10;	/* counter for blocking SADB_ACQUIRE.*/
@@ -287,8 +288,10 @@ static struct secasvar *key_do_allocsa_policy __P((struct secashead *sah,
 						u_int state));
 static void key_delsp __P((struct secpolicy *sp));
 static struct secpolicy *key_getsp __P((struct secpolicyindex *spidx));
+static struct secpolicy *key_getspbyid __P((u_int32_t id));
 static u_int32_t key_newreqid __P((void));
 static struct sadb_msg *key_spdadd __P((caddr_t *mhp));
+static u_int32_t key_getspid __P((void));
 static struct sadb_msg *key_spddelete __P((caddr_t *mhp));
 static int key_spdget __P((caddr_t *mhp, struct socket *so, int target));
 static struct sadb_msg *key_spdflush __P((caddr_t *mhp));
@@ -936,6 +939,38 @@ key_getsp(spidx)
 	return NULL;
 }
 
+/*
+ * get SP by index.
+ * OUT:	NULL	: not found
+ *	others	: found, pointer to a SP.
+ */
+static struct secpolicy *
+key_getspbyid(id)
+	u_int32_t id;
+{
+	struct secpolicy *sp;
+
+	LIST_FOREACH(sp, &sptree[IPSEC_DIR_INBOUND], chain) {
+		if (sp->state == IPSEC_SPSTATE_DEAD)
+			continue;
+		if (sp->id == id) {
+			sp->refcnt++;
+			return sp;
+		}
+	}
+
+	LIST_FOREACH(sp, &sptree[IPSEC_DIR_OUTBOUND], chain) {
+		if (sp->state == IPSEC_SPSTATE_DEAD)
+			continue;
+		if (sp->id == id) {
+			sp->refcnt++;
+			return sp;
+		}
+	}
+
+	return NULL;
+}
+
 struct secpolicy *
 key_newsp()
 {
@@ -1416,6 +1451,11 @@ key_spdadd(mhp)
 		return NULL;
 	}
 
+	if ((newsp->id = key_getspid()) == 0) {
+		msg0->sadb_msg_errno = ENOBUFS;
+		return NULL;
+	}
+
 	KEY_SETSECSPIDX(xpl0->sadb_x_policy_dir,
 	                src0 + 1,
 	                dst0 + 1,
@@ -1475,6 +1515,39 @@ key_spdadd(mhp)
 
 	return newmsg;
     }
+}
+
+/*
+ * get new policy id.
+ * OUT:
+ *	0:	failure.
+ *	others: success.
+ */
+static u_int32_t
+key_getspid()
+{
+	u_int32_t newid = 0;
+	int count = key_spi_trycnt;	/* XXX */
+	struct secpolicy *sp;
+
+	/* when requesting to allocate spi ranged */
+	while (count--) {
+		newid = (policy_id = (policy_id == ~0 ? 1 : ++policy_id));
+
+		if ((sp = key_getspbyid(newid)) == NULL)
+			break;
+
+		key_freesp(sp);
+	}
+
+	if (count == 0 || newid == 0) {
+#ifdef IPSEC_DEBUG
+		printf("key_getspid: to allocate policy id is failed.\n");
+#endif
+		return 0;
+	}
+
+	return newid;
 }
 
 /*
@@ -1932,7 +2005,7 @@ key_setdumpsp(sp, type, seq, pid)
 
 	/* sadb_msg->sadb_msg_len must be filled afterwards */
 	if (key_setsadbmsg_m(m, type, 0, SADB_SATYPE_UNSPEC, seq, pid,
-		    IPSEC_MODE_ANY, 0, 0, sp->refcnt) != 0) {
+		    IPSEC_MODE_ANY, 0, 0, sp->id) != 0) {
 		m_freem(m);
 		return NULL;
 	}
@@ -6400,6 +6473,7 @@ key_init()
 #ifndef IPSEC_NONBLOCK_ACQUIRE
 	LIST_INIT(&acqtree);
 #endif
+	LIST_INIT(&spacqtree);
 
 	/* system default */
 	ip4_def_policy.policy = IPSEC_POLICY_NONE;
