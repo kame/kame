@@ -1,7 +1,7 @@
 # $NetBSD$
 
-DISTNAME=	tcpdump-2000_07_03
-PKGNAME=	tcpdump-20000703
+DISTNAME=	tcpdump-2000_07_17
+PKGNAME=	tcpdump-20000717
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
 
