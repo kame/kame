@@ -1,4 +1,4 @@
-.\"	$KAME: wru.8,v 1.5 2002/01/21 08:25:54 jinmei Exp $
+.\"	$KAME: wru.8,v 1.6 2002/03/03 12:25:03 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -49,6 +49,9 @@ client
 .Op Fl i Ar interval
 .Ek
 .Bk -words
+.Op Fl z Ar zone
+.Ek
+.Bk -words
 .Op Ar host
 .Ek
 .Sh DESCRIPTION
@@ -65,6 +68,9 @@ is omitted,
 .Nm
 sends the query packets to the all-nodes link-local address (ff02::1).
 In this case the link zone is determined as follows:
+If the zone is specified by the
+.Fl z
+option, the zone is used.
 If the default interface is set via the
 .Xr ndp 8
 command, the interface is used.
@@ -126,6 +132,14 @@ This option is exclusive with the
 option.
 .It Fl v
 requires verbose output.
+.It Fl z Ar zone
+specifies the zone of the destination.
+This option is typically used when the target
+.Ar host
+is omitted and the default interface is unknown or undesirable.
+When the outgoing
+.Ar host
+is specified, this option assumes it is a numeric address.
 .El
 .Sh RETURN VALUES
 .Nm

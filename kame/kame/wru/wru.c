@@ -1,4 +1,4 @@
- /*	$KAME: wru.c,v 1.8 2002/01/28 06:57:01 itojun Exp $	*/
+ /*	$KAME: wru.c,v 1.9 2002/03/03 12:25:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -105,7 +105,7 @@ main(argc, argv)
 	int qdatalen = sizeof(struct in6_addr), qbuflen;
 	int count = 1;
 	int rsbsize = 81920;	/* about 40 clusters */
-	char *host, *qbuf, *qdata, rbuf[2048];
+	char *host, *zone = NULL, *qbuf, *qdata, rbuf[2048];
 	u_int16_t qflags = 0;
 	u_int8_t nonce[8];
 	struct addrinfo hints, *res, *res0;
@@ -120,7 +120,7 @@ main(argc, argv)
 	struct timeval tv;
 #endif
 
-	while ((ch = getopt(argc, argv, "1Ama:c:i:v")) != -1) {
+	while ((ch = getopt(argc, argv, "1Ama:c:i:vz:")) != -1) {
 		switch (ch) {
 		case '1':
 			opt_flags |= F_SINGLEWAIT;
@@ -187,6 +187,10 @@ main(argc, argv)
 			opt_flags |= F_VERBOSE;
 			break;
 
+		case 'z':
+			zone = optarg;
+			break;
+
 		default:
 			usage();
 		}
@@ -202,6 +206,23 @@ main(argc, argv)
 	else
 		host = argv[0];
 
+	if (zone) {
+		int newhostlen;
+		char *newhost, *cp;
+
+		/* construct host%zone */
+		newhostlen = strlen(host) + strlen(zone) + 1;
+		if ((newhost = malloc(newhostlen)) == NULL)
+			err(1, "malloc(%d)", newhostlen);
+		cp = newhost;
+		strcpy(cp, host);
+		cp += strlen(host);
+		*cp++ = '%';
+		strcpy(cp, zone);
+
+		host = newhost;
+	}
+
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
 	hints.ai_socktype = SOCK_RAW;
@@ -209,7 +230,7 @@ main(argc, argv)
 	ret_ga = getaddrinfo(host, NULL, &hints, &res0);
 	if (ret_ga)
 		errx(1, "%s", gai_strerror(ret_ga));
-	if (argc < 1) {
+	if (argc < 1 && !zone) {
 		/* try to set the default link ID */
 		if (res0->ai_next) {
 			errx(1,
@@ -778,6 +799,6 @@ static void
 usage()
 {
 	fprintf(stderr, "usage: wru [-(1|m)] [-Av] [-a [aAclsg]] "
-		"[-c count] [-i interval] [host]\n");
+		"[-c count] [-i interval] [-z zone] [host]\n");
 	exit(1);
 }
