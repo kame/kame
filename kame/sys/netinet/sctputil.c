@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.20 2003/11/25 06:40:54 ono Exp $	*/
+/*	$KAME: sctputil.c,v 1.21 2003/11/25 06:53:34 ono Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -883,7 +883,7 @@ sctp_timeout_handler(void *t)
 		sctp_pegs[SCTP_TMIT_TIMER]++;
 
 		tcb->asoc.num_send_timers_up--;
-		if(tcb->asoc.num_send_timers_up < 0) {
+		if (tcb->asoc.num_send_timers_up < 0) {
 			tcb->asoc.num_send_timers_up = 0;
 		}
 		sctp_t3rxt_timer(ep, tcb, net);
@@ -891,8 +891,8 @@ sctp_timeout_handler(void *t)
 		sctp_auditing(4, ep, tcb, net);
 #endif
 		sctp_chunk_output(ep, tcb, 1);
-		if((tcb->asoc.num_send_timers_up == 0) &&
-		   (tcb->asoc.sent_queue_cnt > 0)
+		if ((tcb->asoc.num_send_timers_up == 0) &&
+		    (tcb->asoc.sent_queue_cnt > 0)
 			) {
 			struct sctp_tmit_chunk *chk;
 			/* safeguard. If there on some on the sent queue somewhere but 
@@ -1189,7 +1189,7 @@ sctp_timer_start(int t_type, struct sctp_inpcb *ep, struct sctp_tcb *tcb,
 		if (tcb == NULL) {
 			return (EFAULT);
 		}
-		if(net == NULL) {
+		if (net == NULL) {
 			return (EFAULT);
 		}
 		to_ticks = ep->sctp_ep.sctp_timeoutticks[SCTP_TIMER_PMTU];
@@ -1271,7 +1271,7 @@ sctp_timer_start(int t_type, struct sctp_inpcb *ep, struct sctp_tcb *tcb,
 		return (EFAULT);
 	}
 	/* At this point we can proceed */
-	if(t_type == SCTP_TIMER_TYPE_SEND) {
+	if (t_type == SCTP_TIMER_TYPE_SEND) {
 		tcb->asoc.num_send_timers_up++;
 	}
 	tmr->type = t_type;
@@ -1339,7 +1339,7 @@ sctp_timer_stop(int t_type,
 		if (tcb == NULL) {
 			return (EFAULT);
 		}
-		if( net == NULL) {
+		if (net == NULL) {
 			return (EFAULT);
 		}
 		tmr = &net->pmtu_timer;
@@ -1456,10 +1456,10 @@ sctp_calculate_sum(m, pktlen, offset)
 	register int32_t tlen=0;
 	register struct mbuf *at;
 
-	if(pktlen == NULL)
+	if (pktlen == NULL)
 		return(0);
 	at = m;
-	while(at){
+	while (at) {
 		tlen += at->m_len;
 		at = at->m_next;
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.c,v 1.23 2003/11/25 06:40:53 ono Exp $	*/
+/*	$KAME: sctp_indata.c,v 1.24 2003/11/25 06:53:34 ono Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -2537,7 +2537,7 @@ sctp_handle_segments(struct sctp_tcb *stcb, struct sctp_association *asoc,
 								tp1->whoTo->net_ack2 += tp1->send_size;
 
 								/* update RTO too? */
-								if(tp1->do_rtt) {
+								if (tp1->do_rtt) {
 									tp1->whoTo->RTO =
 									    sctp_calculate_rto(stcb,
 									    asoc, tp1->whoTo, &tp1->sent_rcv_time);
@@ -2791,7 +2791,7 @@ sctp_strike_gap_ack_chunks(struct sctp_tcb *tcb,
 #endif
 			tp1->rec.data.doing_fast_retransmit = 1;
 			/* mark the sending seq for possible subsequent FR's */
-			if(TAILQ_EMPTY(&asoc->send_queue)) {
+			if (TAILQ_EMPTY(&asoc->send_queue)) {
 				/* If the queue of send is empty then its the
 				 * next sequence number that will be assigned so
 				 * we subtract one from this to get the one we

@@ -1,4 +1,4 @@
-/*	$Header: /usr/home/sumikawa/kame/kame/kame/kame/sctp/libsctp/sctp_sys_calls.c,v 1.6 2003/11/25 06:40:52 ono Exp $ */
+/*	$Header: /usr/home/sumikawa/kame/kame/kame/kame/sctp/libsctp/sctp_sys_calls.c,v 1.7 2003/11/25 06:54:38 ono Exp $ */
 
 /*
  * Copyright (C) 2002 Cisco Systems Inc,
@@ -345,7 +345,7 @@ sctp_recvmsg (int s,
 		 * the sctp_sndrcvinfo (if the user wants it).
 		 */
 		cmsg = (struct cmsghdr *)controlVector;
-		while(cmsg) {
+		while (cmsg) {
 			if (cmsg->cmsg_level == IPPROTO_SCTP) {
 				if (cmsg->cmsg_type == SCTP_SNDRCV) {
 					/* Got it */

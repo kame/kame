@@ -1,4 +1,4 @@
-/*	$KAME: sctp_input.c,v 1.15 2003/11/25 06:40:53 ono Exp $	*/
+/*	$KAME: sctp_input.c,v 1.16 2003/11/25 06:53:34 ono Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -155,7 +155,7 @@ sctp_handle_init(struct mbuf *m, struct sctp_init_chunk *cp,
 	init = &cp->init;
 	/* First are we accepting? */
 	if (((inp->sctp_flags & SCTP_PCB_FLAGS_ACCEPTING) == 0) ||
-	   (inp->sctp_socket->so_qlimit == 0)) {
+	    (inp->sctp_socket->so_qlimit == 0)) {
 		sctp_abort_association(inp, stcb, m, iphlen, op_err);
 		return;
 	}
@@ -374,7 +374,7 @@ sctp_process_init_ack(struct mbuf *m, int offset,
 		if (op_err != NULL) {
 		    /* should this be sending a ERROR not an ABORT? */
 		    M_PREPEND(op_err,sizeof(struct sctphdr), M_DONTWAIT);
-		    if(op_err != NULL) {
+		    if (op_err != NULL) {
 			struct sctphdr *ohdr;
 			ohdr = mtod(op_err, struct sctphdr *);
 			sctp_send_operr_to(m, 
@@ -599,7 +599,7 @@ sctp_handle_shutdown(struct sctp_shutdown_chunk *cp, struct sctp_tcb *stcb,
 	if (stcb == NULL)
 		return;
 
-	if(((stcb->asoc.state & SCTP_STATE_MASK) == SCTP_STATE_COOKIE_WAIT) ||
+	if (((stcb->asoc.state & SCTP_STATE_MASK) == SCTP_STATE_COOKIE_WAIT) ||
 	   ((stcb->asoc.state & SCTP_STATE_MASK) == SCTP_STATE_COOKIE_ECHOED)) {
 	    return;
 	}
@@ -1904,9 +1904,9 @@ sctp_handle_cookie_echo(struct mbuf *m, int offset, int iphlen,
 	cookie_offset = offset + sizeof(struct sctp_chunkhdr);
 	cookie_len = ntohs(cookie_cp->ch.chunk_length);
 
-	if((cookie->peerport != sctphdr->src_port) &&
-	   (cookie->myport != sctphdr->dest_port) &&
-	   (cookie->my_vtag != sctphdr->v_tag)){
+	if ((cookie->peerport != sctphdr->src_port) &&
+	    (cookie->myport != sctphdr->dest_port) &&
+	    (cookie->my_vtag != sctphdr->v_tag)) {
 		/* invalid bad ports or bad tag.
 		 * Note that we always leave the v_tag
 		 * in the header in network order and when
@@ -2479,7 +2479,7 @@ process_chunk_drop(struct sctp_tcb *stcb, struct sctp_chunk_desc *desc,
 			ddp = (u_int8_t *)(mtod(tp1->data, caddr_t) + sizeof(struct sctp_data_chunk));
 			{
 				int iii;
-				for(iii=0;iii<sizeof(desc->data_bytes);iii++) {
+				for (iii=0; iii<sizeof(desc->data_bytes); iii++) {
 					if (ddp[iii] != desc->data_bytes[iii]) {
 						return(-1);
 					}
@@ -2657,7 +2657,7 @@ sctp_handle_packet_dropped(struct sctp_tcb *stcb, struct sctp_packet_drop *pd,
 	chlen -= sizeof(struct sctp_packet_drop);
 	if (chlen == 0) {
 		ch = NULL;
-		if(pd->ch.chunk_flags & SCTP_FROM_MIDDLE_BOX)
+		if (pd->ch.chunk_flags & SCTP_FROM_MIDDLE_BOX)
 			sctp_pegs[SCTP_PDRP_BWRPT]++;
 	} else { 
 		ch = (struct sctp_chunkhdr *)(pd->data + sizeof(struct sctphdr));
@@ -2696,7 +2696,7 @@ sctp_handle_packet_dropped(struct sctp_tcb *stcb, struct sctp_packet_drop *pd,
 		desc.chunk_type = ch->chunk_type;
 		/* get amount we need to move */
 		at = ntohs(ch->chunk_length);
-		if(trunc_len == 0) {
+		if (trunc_len == 0) {
 			/* we are supposed to have all of it */
 			if (at > chlen) {
 				/* corrupt skip it */
@@ -2705,13 +2705,13 @@ sctp_handle_packet_dropped(struct sctp_tcb *stcb, struct sctp_packet_drop *pd,
 			}
 		} else {
 			/* is there enough of it left ? */
-			if(chlen < (sizeof(struct sctp_data_chunk) + sizeof(desc.data_bytes))) {
+			if (chlen < (sizeof(struct sctp_data_chunk) + sizeof(desc.data_bytes))) {
 				break;
 			}
 		}
 		if (desc.chunk_type == SCTP_DATA) {
 			/* can we get out the tsn? */
-			if((pd->ch.chunk_flags & SCTP_FROM_MIDDLE_BOX))
+			if ((pd->ch.chunk_flags & SCTP_FROM_MIDDLE_BOX))
 				sctp_pegs[SCTP_PDRP_MB_DA]++;
 
 			if (chlen >= (sizeof(struct sctp_chunkhdr) + sizeof(u_int32_t))) {
@@ -2719,7 +2719,7 @@ sctp_handle_packet_dropped(struct sctp_tcb *stcb, struct sctp_packet_drop *pd,
 				u_int8_t *ddp;
 				int iii;
 				ddp = (u_int8_t *)((caddr_t)ch + sizeof(struct sctp_data_chunk));
-				for(iii=0;iii<sizeof(desc.data_bytes);iii++)
+				for (iii=0; iii<sizeof(desc.data_bytes); iii++)
 					desc.data_bytes[iii] = ddp[iii];
 				desc.tsn_ifany = ((struct sctp_data_chunk *)ch)->dp.tsn;
 			} else {
@@ -2728,7 +2728,7 @@ sctp_handle_packet_dropped(struct sctp_tcb *stcb, struct sctp_packet_drop *pd,
 				break;
 			}
 		} else {
-			if((pd->ch.chunk_flags & SCTP_FROM_MIDDLE_BOX))
+			if ((pd->ch.chunk_flags & SCTP_FROM_MIDDLE_BOX))
 				sctp_pegs[SCTP_PDRP_MB_CT]++;
 		}
 		if (process_chunk_drop(stcb, &desc, netp, pd->ch.chunk_flags)) {
@@ -2766,7 +2766,7 @@ sctp_handle_packet_dropped(struct sctp_tcb *stcb, struct sctp_packet_drop *pd,
 
 		/* calculate the available space */
 		bw_avail = (bottle_bw*rtt)/1000;
-		if(bw_avail > bottle_bw) {
+		if (bw_avail > bottle_bw) {
 			/* Cap the growth to no more than the bottle neck. 
 			 * This can happen as RTT slides up due to queues.
 			 * It also means if you have more than a 1 second
@@ -3162,9 +3162,9 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 				*length = 0;
 				return (NULL);
 			}
-			if((stcb != NULL) && 
-			   ((stcb->asoc.state & SCTP_STATE_MASK) == SCTP_STATE_SHUTDOWN_ACK_SENT)
-			    ) {
+			if ((stcb != NULL) && 
+			    ((stcb->asoc.state & SCTP_STATE_MASK) == SCTP_STATE_SHUTDOWN_ACK_SENT)
+				) {
 			    sctp_send_shutdown_ack(stcb, stcb->asoc.primary_destination);
 			    *length = 0;
 			    return(NULL);

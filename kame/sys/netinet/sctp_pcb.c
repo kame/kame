@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.25 2003/11/25 06:40:53 ono Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.26 2003/11/25 06:53:34 ono Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -876,20 +876,20 @@ sctp_findassoc_by_vtag(struct sockaddr *from,
 	struct sctp_tcb *tcb;
 
 	head = &sctppcbinfo.sctp_asochash[SCTP_PCBHASH_ASOC(vtag, sctppcbinfo.hashasocmark)];
-	if(head == NULL) {
+	if (head == NULL) {
 		/* invalid vtag */
 		return(NULL);
 	}
 	LIST_FOREACH(tcb, head, sctp_asocs) {
-		if(tcb->asoc.my_vtag == vtag) {
+		if (tcb->asoc.my_vtag == vtag) {
 			/* candidate */
-			if(tcb->rport != port) {
+			if (tcb->rport != port) {
 				/* we could remove this if vtags are 
 				 * unique across the system.
 				 */
 				continue;
 			}
-			if(tcb->sctp_ep->sctp_lport != myport) {
+			if (tcb->sctp_ep->sctp_lport != myport) {
 				/* we could remove this if vtags are 
 				 * unique across the system.
 				 */
@@ -897,7 +897,7 @@ sctp_findassoc_by_vtag(struct sockaddr *from,
 			}
 
 			tnet = sctp_findnet(tcb, from);
-			if(tnet) {
+			if (tnet) {
 				/* yep its him. */
 				*netp = tnet;
 				sctp_pegs[SCTP_VTAG_EXPR]++;
@@ -990,10 +990,10 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 		sctp_print_address(from);
 	}
 #endif
-	if(vtag) {
+	if (vtag) {
 		/* we only go down this path if vtag is non-zero */
 		ret = sctp_findassoc_by_vtag(from, ntohl(vtag), inp, netp, port, my_port);
-		if(ret) {
+		if (ret) {
 			return(ret);
 		}
 	}
@@ -3266,7 +3266,7 @@ sctp_select_primary_destination(struct sctp_tcb *tcb)
 
 	TAILQ_FOREACH(net, &tcb->asoc.nets, sctp_next) {
 		/* for now, we'll just pick the first reachable one we find */
-		if(net->dest_state & SCTP_ADDR_UNCONFIRMED)
+		if (net->dest_state & SCTP_ADDR_UNCONFIRMED)
 			continue;
 		if (sctp_destination_is_reachable(tcb, (struct sockaddr *)&net->ra._l_addr)) {
 			/* found a reachable destination */

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.31 2003/11/25 06:40:54 ono Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.32 2003/11/25 06:53:34 ono Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -1526,7 +1526,7 @@ sctp_optsget(struct socket *so,
 		    (inp->sctp_flags & SCTP_PCB_FLAGS_IN_TCPPOOL)) {
 			struct sctp_tcb *tcb;
 			tcb = LIST_FIRST(&inp->sctp_asoc_list);
-			if(tcb)
+			if (tcb)
 				*segsize = sctp_get_frag_point(tcb,&tcb->asoc);
 			else
 				goto skipit;
@@ -2726,7 +2726,7 @@ sctp_optsset(struct socket *so,
 			}
 		}
 		if ((net != tcb->asoc.primary_destination) &&
-		    (!(net->dest_state & SCTP_ADDR_UNCONFIRMED))){
+		    (!(net->dest_state & SCTP_ADDR_UNCONFIRMED))) {
 				/* Ok we need to set it */
 			lnet = tcb->asoc.primary_destination;
 			lnet->next_tsn_at_change = net->next_tsn_at_change = tcb->asoc.sending_seq;

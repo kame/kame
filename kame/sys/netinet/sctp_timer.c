@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.18 2003/11/25 06:40:54 ono Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.19 2003/11/25 06:53:34 ono Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -417,18 +417,18 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 #ifdef SCTP_FR_LOGGING
 	sctp_log_fr(cur_rto,0,0, SCTP_FR_T3_MARK_TIME);
 #endif
-	if(cur_rto > now.tv_usec) {
+	if (cur_rto > now.tv_usec) {
 		uint32_t tmp_usec;
 		min_wait.tv_sec = now.tv_sec;
 		tmp_usec = now.tv_usec;
-		while(cur_rto > tmp_usec) {
+		while (cur_rto > tmp_usec) {
 			min_wait.tv_sec--;
 			tmp_usec += 1000000;
-			if(min_wait.tv_sec == 0) {
+			if (min_wait.tv_sec == 0) {
 				break;
 			}
 		}
-		if(cur_rto <= tmp_usec) {
+		if (cur_rto <= tmp_usec) {
 			min_wait.tv_usec = tmp_usec - cur_rto; 
 		} else {
 			/* if we hit the else, we don't
@@ -520,7 +520,7 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 				    chk->sent_rcv_time.tv_usec,
 				    SCTP_FR_T3_MARK_TIME);
 #endif
-			if(chk->sent_rcv_time.tv_sec > min_wait.tv_sec) {
+			if (chk->sent_rcv_time.tv_sec > min_wait.tv_sec) {
 				/* we have reached a chunk that was sent some
 				 * seconds past our min.. forget it we will
 				 * find no more to send.
@@ -535,7 +535,7 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 			} else if (chk->sent_rcv_time.tv_sec == min_wait.tv_sec) {
 				/* we must look at the micro seconds to know.
 				 */
-				if(chk->sent_rcv_time.tv_usec >= min_wait.tv_usec){
+				if (chk->sent_rcv_time.tv_usec >= min_wait.tv_usec) {
 					/* ok it was sent after our boundary time. */
 #ifdef SCTP_FR_LOGGING
 					sctp_log_fr(0,
@@ -896,7 +896,7 @@ sctp_t1init_timer(struct sctp_inpcb *ep,
 	if (tcb->asoc.numnets > 1) {
 		/* If we have more than one addr use it */
 		tcb->asoc.primary_destination = TAILQ_NEXT(net, sctp_next);
-		if(tcb->asoc.primary_destination == NULL) 
+		if (tcb->asoc.primary_destination == NULL) 
 			tcb->asoc.primary_destination = TAILQ_FIRST(&tcb->asoc.nets);
 	}
 	/* Send out a new init */
@@ -1241,18 +1241,18 @@ void sctp_pathmtu_timer(struct sctp_inpcb *ep,
 	
 	/* restart the timer in any case */
 	next_mtu = sctp_getnext_mtu(ep, pnet->mtu);
-	if(next_mtu <= pnet->mtu) {
+	if (next_mtu <= pnet->mtu) {
 	    /* nothing to do */
 	    return;
 	}
-	if(pnet->ra.ro_rt != NULL) {
+	if (pnet->ra.ro_rt != NULL) {
 		/* only if we have a route and interface do we 
 		 * set anything. Note we always restart
 		 * the timer though just in case it is updated
 		 * (i.e. the ifp) or route/ifp is populated.
 		 */
-		if(pnet->ra.ro_rt->rt_ifp != NULL) {
-			if(pnet->ra.ro_rt->rt_ifp->if_mtu > next_mtu) {
+		if (pnet->ra.ro_rt->rt_ifp != NULL) {
+			if (pnet->ra.ro_rt->rt_ifp->if_mtu > next_mtu) {
 				/* ok it will fit out the door */
 				pnet->mtu = next_mtu;
 			}

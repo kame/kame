@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.30 2003/11/25 06:40:53 ono Exp $	*/
+/*	$KAME: sctp_output.c,v 1.31 2003/11/25 06:53:34 ono Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -3085,11 +3085,11 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 
 	/* populate any tie tags */
 	if (asoc != NULL) {
-		if(asoc->my_vtag_nonce == 0)
+		if (asoc->my_vtag_nonce == 0)
 			asoc->my_vtag_nonce = sctp_select_a_tag(inp);
 		stc.tie_tag_my_vtag = asoc->my_vtag_nonce;
 
-		if(asoc->peer_vtag_nonce == 0)
+		if (asoc->peer_vtag_nonce == 0)
 			asoc->peer_vtag_nonce = sctp_select_a_tag(inp);
 		stc.tie_tag_peer_vtag = asoc->peer_vtag_nonce;
 
@@ -4981,7 +4981,7 @@ sctp_med_chunk_output(struct sctp_inpcb *inp,
 	}
 	TAILQ_FOREACH(net,&asoc->nets, sctp_next) {
 		/* how much can we send? */
-		if(net->ref_count < 2) {
+		if (net->ref_count < 2) {
 			/* Ref-count of 1 so
 			 * we cannot have data or control
 			 * queued to this address. Skip it.
@@ -8114,7 +8114,7 @@ sctp_send_packet_dropped(struct sctp_tcb *tcb, struct sctp_nets *net,
 	sctppcbinfo.ipi_gencnt_chunk++;
 
 	iph = mtod(m,struct ip *);
-	if(iph == NULL) {
+	if (iph == NULL) {
 		return;
 	}
 	if (iph->ip_v == IPVERSION) {
@@ -8130,7 +8130,7 @@ sctp_send_packet_dropped(struct sctp_tcb *tcb, struct sctp_nets *net,
 		ip6h = mtod(m,struct ip6_hdr *);
 		len = chk->send_size = htons(ip6h->ip6_plen);
 	}
-	if((len+iphlen) > m->m_pkthdr.len) {
+	if ((len+iphlen) > m->m_pkthdr.len) {
 		/* huh */
 		chk->send_size = len = m->m_pkthdr.len - iphlen;
 	}
@@ -8161,7 +8161,7 @@ sctp_send_packet_dropped(struct sctp_tcb *tcb, struct sctp_nets *net,
 		}
 	}
 	drp = mtod(chk->data, struct sctp_packet_drop *);
-	if(drp == NULL) {
+	if (drp == NULL) {
 		m_freem(chk->data);
 		chk->data = NULL;
 		goto jump_out;
@@ -8686,14 +8686,14 @@ sctp_copy_one(struct mbuf *m, struct uio *uio, int cpsz, int resv_upfront, int *
 	int left, cancpy, willcpy, error;
 	left = cpsz;
 	
-	if(m == NULL) {
+	if (m == NULL) {
 		/* TSNH */	
 		return(ENOMEM);
 	}
 	m->m_len = 0;
 	if ((left+resv_upfront) > MHLEN) {
 		MCLGET(m,M_WAIT);
-		if(m == NULL) {
+		if (m == NULL) {
 			return(ENOMEM);
 		}
 		if ((m->m_flags & M_EXT) == 0) {
@@ -8702,10 +8702,10 @@ sctp_copy_one(struct mbuf *m, struct uio *uio, int cpsz, int resv_upfront, int *
 	}
 	cancpy = M_TRAILINGSPACE(m);
 	willcpy = min(cancpy, left);
-	if((willcpy + resv_upfront) > cancpy) {
+	if ((willcpy + resv_upfront) > cancpy) {
 		willcpy -= resv_upfront;
 	}
-	while(left > 0) {
+	while (left > 0) {
 		/* Align data to the end */
 		if ((m->m_flags & M_EXT) == 0) {
 			if (m->m_flags & M_PKTHDR) {
@@ -8717,7 +8717,7 @@ sctp_copy_one(struct mbuf *m, struct uio *uio, int cpsz, int resv_upfront, int *
 			MC_ALIGN(m, willcpy);
 		}
 		error = uiomove(mtod(m, caddr_t), willcpy, uio);
-		if(error){
+		if (error) {
 			return(error);
 		}
 		m->m_len = willcpy;
@@ -8727,16 +8727,16 @@ sctp_copy_one(struct mbuf *m, struct uio *uio, int cpsz, int resv_upfront, int *
 		if (m->m_flags & M_EXT) {
 			*mbcnt += m->m_ext.ext_size;;
 		}
-		if(left > 0) { 
+		if (left > 0) { 
 			MGET(m->m_next, M_WAIT, MT_DATA);
-			if(m->m_next == NULL) {
+			if (m->m_next == NULL) {
 				return(ENOMEM);
 			}
 			m = m->m_next;
 			m->m_len = 0;
 			if (left > MHLEN) {
 				MCLGET(m,M_WAIT);
-				if(m == NULL) {
+				if (m == NULL) {
 					return(ENOMEM);
 				}
 				if ((m->m_flags & M_EXT) == 0) {
@@ -8898,7 +8898,7 @@ sctp_copy_it_in(struct sctp_inpcb *inp,
 		sctppcbinfo.ipi_gencnt_chunk++;
 		asoc->chunks_on_out_queue++;
 		MGETHDR(mm, M_WAIT, MT_DATA);
-		if(mm == NULL) {
+		if (mm == NULL) {
 			error = ENOMEM;
 			goto clean_up;
 		}
@@ -9024,7 +9024,7 @@ sctp_copy_it_in(struct sctp_inpcb *inp,
 			*chk = template;
 			chk->whoTo->ref_count++;
 			MGETHDR(chk->data, M_WAIT, MT_DATA);
-			if(chk->data == NULL) {
+			if (chk->data == NULL) {
 				error = ENOMEM;
 				goto clean_up;
 			}
