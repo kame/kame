@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.341 1999/12/15 08:08:02 jinmei Exp $
+$Id: CHANGELOG,v 1.342 1999/12/15 08:11:16 itojun Exp $
 
 <199912>
+Wed Dec 15 17:09:45 JST 1999  shin@kame.net, itojun@iijlab.net
+	* sys/netinet6 (bunch of places): do not overwrite traffic class
+	  bits when setting IP version field on IPv6 header.
+	  From: isaki@net.ipc.hiroshima-u.ac.jp
+
 1999-12-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/{libinet6, tcpdump, v6test}: changed not to use the
 	ip6r0_addr and ip6r0_slmap members of the ip6_rthdr0 structure
