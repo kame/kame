@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.319 2002/07/30 04:41:35 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.320 2002/07/31 06:31:50 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1631,9 +1631,6 @@ done:
 	return(error);
 
 freehdrs:
-#ifdef MIP6
-	mip6_destopt_discard(&mip6opt);
-#endif /* MIP6 */
 	m_freem(exthdrs.ip6e_hbh);	/* m_freem will check if mbuf is 0 */
 	m_freem(exthdrs.ip6e_dest1);
 	m_freem(exthdrs.ip6e_rthdr);
