@@ -38,12 +38,6 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <errno.h>
-#include <signal.h>
-#ifdef __STDC__
-#include <stdarg.h>
-#else
-#include <varargs.h>
-#endif
 #include "event.h"
 #include "prefix.h"
 #include "faithd.h"
