@@ -88,7 +88,7 @@
 #define REDUCE {l_util.l = sum; sum = l_util.s[0] + l_util.s[1]; ADDCARRY(sum);}
 
 int
-in_cksum4(m, nxt, off, len)
+in4_cksum(m, nxt, off, len)
 	register struct mbuf *m;
 	u_int8_t nxt;
 	register int off, len;
