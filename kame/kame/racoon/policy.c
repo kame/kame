@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.25 2000/06/08 15:46:53 sakane Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.26 2000/07/14 08:34:07 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -217,6 +217,11 @@ cmpspidx_wild(a, b)
 	YIPSDEBUG(DEBUG_MISC,
 		plog(logp, LOCATION, NULL, "sub:%p: %s\n", a, spidx2str(a));
 		plog(logp, LOCATION, NULL, "db: %p: %s\n", b, spidx2str(b)););
+
+	/* XXX don't check direction now, but it's to be checked carefully. */
+	if (a->prefs != b->prefs
+	 || a->prefd != b->prefd)
+		return 1;
 
 	if (!(b->dir == IPSEC_DIR_ANY || a->dir == b->dir))
 		return 1;
