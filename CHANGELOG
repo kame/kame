@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2035 2002/01/02 11:13:21 jinmei Exp $
+$KAME: CHANGELOG,v 1.2036 2002/01/02 16:12:53 jinmei Exp $
 
 <200201>
+2002-01-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netinet/ip_icmp.c (icmp_input): passed applications
+	icmp6 error packets that contained ipv6 over ipv4 packets,
+	even if the error packet did not have enough length to store the
+	whole IPv6 packets.  traceroute -6 in fact needed this behavior.
+
 2002-01-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/traceroute: added a new option "-6" to send IPv6 over
 	IPv4 probe packets.  This option will specifically be useful to
