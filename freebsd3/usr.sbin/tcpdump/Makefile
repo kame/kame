@@ -25,7 +25,7 @@ INCLS=	-I${SRCDIR}/../libpcap -I${SRCDIR} -I${.CURDIR}
 INCLS+=	-I${SRCDIR}/lbl
 # workarund to invite latest net/bpf.h
 INCLS+=	-I${SRCDIR}/../libpcap/bpf
-DEFS =  -DHAVE_FCNTL_H=1 -DHAVE_MEMORY_H=1 -DTIME_WITH_SYS_TIME=1 -DHAVE_NET_SLIP_H=1 -DINET6=1 -DHAVE_LIBINET6=1 -DHAVE_VFPRINTF=1 -DHAVE_STRCASECMP=1 -DHAVE_ETHER_NTOA=1 -DHAVE_SETLINEBUF=1 -DHAVE_LIBZ=1 -DHAVE_ZLIB_H=1 -DHAVE_NETINET6_IPCOMP_H=1 -DRETSIGTYPE=void -DRETSIGVAL= -DHAVE_SIGACTION=1 -DHAVE_SOCKADDR_SA_LEN=1 -DLBL_ALIGN=1  -DHAVE_FDDI -DHAVE_SIN6_LEN=1 -DHAVE_SIN_LEN=1
+DEFS =  -DHAVE_FCNTL_H=1 -DHAVE_MEMORY_H=1 -DTIME_WITH_SYS_TIME=1 -DHAVE_NET_SLIP_H=1 -DINET6=1 -DHAVE_LIBINET6=1 -DHAVE_VFPRINTF=1 -DHAVE_STRCASECMP=1 -DHAVE_ETHER_NTOA=1 -DHAVE_SETLINEBUF=1 -DHAVE_LIBZ=1 -DHAVE_ZLIB_H=1 -DHAVE_NETINET6_IPCOMP_H=1 -DRETSIGTYPE=void -DRETSIGVAL= -DHAVE_SIGACTION=1 -DHAVE_SOCKADDR_SA_LEN=1 -DLBL_ALIGN=1  -DHAVE_FDDI -DHAVE_SIN6_LEN=1 -DHAVE_SIN_LEN=1 -DINCLUDE_PATH_OPENSSL=1
 CFLAGS+=	-O2
 CFLAGS+=	${DEFS} ${INCLS}
 
@@ -42,10 +42,10 @@ DPADD+=	${.OBJDIR}/../../lib/libinet6/libinet6.a \
 .if exists(/usr/local/lib/libcrypto.a)
 CFLAGS+=-DCRYPTO=1
 .if exists(/usr/local/include/openssl/rc5.h)
-CFLAGS+=-DHAVE_RC5_H=1
+CFLAGS+=-DHAVE_OPENSSL_RC5_H=1
 .endif
 .if exists(/usr/local/include/openssl/cast.h)
-CFLAGS+=-DHAVE_CAST_H=1
+CFLAGS+=-DHAVE_OPENSSL_CAST_H=1
 .endif
 CFLAGS+=-I/usr/local/include
 LDADD+=	-L/usr/local/lib -lcrypto
@@ -53,10 +53,10 @@ DPADD+=	/usr/local/lib/libcrypto.a
 .elif exists(/usr/local/ssl/lib/libcrypto.a)
 CFLAGS+=-DCRYPTO=1
 .if exists(/usr/local/ssl/include/openssl/rc5.h)
-CFLAGS+=-DHAVE_RC5_H=1
+CFLAGS+=-DHAVE_OPENSSL_RC5_H=1
 .endif
 .if exists(/usr/local/ssl/include/openssl/cast.h)
-CFLAGS+=-DHAVE_CAST_H=1
+CFLAGS+=-DHAVE_OPENSSL_CAST_H=1
 .endif
 CFLAGS+=-I/usr/local/ssl/include
 LDADD+=	-L/usr/local/ssl/lib -lcrypto
