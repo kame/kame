@@ -636,7 +636,9 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	struct sockaddr_in6 *addr = (struct sockaddr_in6 *)nam;
 	struct in6_addr *in6a = NULL;
 	int error = 0;
+#ifdef ENABLE_DEFAULT_SCOPE
 	struct sockaddr_in6 tmp;
+#endif
 
 	if (nam->sa_len != sizeof(*addr))
 		return EINVAL;
