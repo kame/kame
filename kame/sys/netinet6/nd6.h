@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.70 2001/09/21 09:58:38 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.71 2001/10/19 03:04:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -262,7 +262,7 @@ struct nd_prefix {
  */
 struct inet6_ndpr_msghdr {
 	u_short	inpm_msglen;	/* to skip over non-understood messages */
-	u_char	inpm_version;	/* future binary compatability */
+	u_char	inpm_version;	/* future binary compatibility */
 	u_char	inpm_type;	/* message type */
 	struct in6_addr inpm_prefix;
 	u_long	prm_vltim;
