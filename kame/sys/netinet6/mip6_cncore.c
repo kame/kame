@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.46 2003/11/04 02:28:00 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.47 2003/11/04 04:35:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -166,6 +166,8 @@ mip6_nonce_t *nonce_head;	/* Current position of nonce on the array mip6_nonce *
 struct callout mip6_nonce_upd_ch = CALLOUT_INITIALIZER;
 #elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 struct callout mip6_nonce_upd_ch;
+#elif defined(__OpenBSD__)
+struct timeout mip6_nonce_upd_ch;
 #endif
 
 /*
@@ -207,7 +209,7 @@ static void mip6_bc_timeout(void *);
 /* return routability processing. */
 static void mip6_create_nonce(mip6_nonce_t *);
 static void mip6_create_nodekey(mip6_nodekey_t *);
-/*static void mip6_update_nonce_nodekey(void *);*/
+static void mip6_update_nonce_nodekey(void *);
 
 /* Mobility Header processing. */
 static int mip6_ip6mh_create(struct ip6_mobility **, struct sockaddr_in6 *,
@@ -245,7 +247,9 @@ mip6_init()
 	callout_reset(&mip6_nonce_upd_ch, hz * NONCE_UPDATE_PERIOD,
 		      mip6_update_nonce_nodekey, NULL);
 #elif defined(__OpenBSD__)
-	/* XXX */
+	timeout_set(&mip6_nonce_upd_ch, mip6_update_nonce_nodekey, NULL);
+	timeout_add(&mip6_nonce_upd_ch, mip6_update_nonce_nodekey,
+	    hz * NONCE_UPDATE_PERIOD);
 #else
 	timeout(mip6_update_nonce_nodekey, (caddr_t)0,
 		hz * NONCE_UPDATE_PERIOD);
@@ -1320,7 +1324,6 @@ mip6_create_nodekey(nodekey)
 		((u_long *)nodekey)[i] = random();
 }
 
-#if 0
 /* This function should be called periodically */
 static void
 mip6_update_nonce_nodekey(ignored_arg)
@@ -1337,7 +1340,9 @@ mip6_update_nonce_nodekey(ignored_arg)
 	callout_reset(&mip6_nonce_upd_ch, hz * NONCE_UPDATE_PERIOD,
 		      mip6_update_nonce_nodekey, NULL);
 #elif defined(__OpenBSD__)
-	/* XXX */
+	timeout_set(&mip6_nonce_upd_ch, mip6_update_nonce_nodekey, NULL);
+	timeout_add(&mip6_nonce_upd_ch, mip6_update_nonce_nodekey,
+	    hz * NONCE_UPDATE_PERIOD);
 #else
 	timeout(mip6_update_nonce_nodekey, (caddr_t)0,
 		hz * NONCE_UPDATE_PERIOD);
@@ -1352,7 +1357,6 @@ mip6_update_nonce_nodekey(ignored_arg)
 
 	splx(s);
 }
-#endif
 
 int
 mip6_get_nonce(index, nonce)
