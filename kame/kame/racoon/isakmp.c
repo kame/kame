@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.9 2000/01/01 08:30:37 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.10 2000/01/02 08:48:08 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -4147,12 +4147,6 @@ isakmp_aggressive_r1(msg, from, iph1)
 
 	/* send HDR;SA to responder */
 	if (isakmp_send(iph1, ret) < 0) goto end;
-
-	/* generate SKEYIDs & IV & final cipher key */
-	if (isakmp_compute_skeyids(iph1) < 0) goto end;
-	if (isakmp_compute_enckey(iph1) < 0) goto end;
-	if ((iph1->ivm = isakmp_new_iv(iph1)) == NULL)
-		goto end;
 
 	/* change status of isakmp status entry */
 	iph1->status = ISAKMP_STATE_2;
