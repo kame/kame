@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.14 2001/01/23 05:16:28 itojun Exp $	*/
+/*	$KAME: dest6.c,v 1.15 2001/01/23 06:47:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,7 +77,15 @@ dest6_input(mp, offp, proto)
 	struct mbuf *m = *mp;
 	int off = *offp, dstoptlen, optlen;
 	struct ip6_dest *dstopts;
+#ifdef ITOJUNMIP6CN
+	struct mbuf *n;
+	struct ip6_opt_home_address *haopt = NULL;
+	struct ip6aux *ip6a;
+#endif
 	u_int8_t *opt;
+	struct ip6_hdr *ip6;
+
+	ip6 = mtod(m, struct ip6_hdr *);
 
 	/* validation of the length of the header */
 #ifndef PULLDOWN_TEST
@@ -115,12 +123,50 @@ dest6_input(mp, offp, proto)
 			}
 			optlen = *(opt + 1) + 2;
 			break;
+#ifdef ITOJUNMIP6CN
+		case IP6OPT_HOME_ADDRESS:
+			if (dstoptlen < sizeof(*haopt)) {
+				ip6stat.ip6s_toosmall++;
+				goto bad;
+			}
 
+			/* HA option must appear only once */
+			n = ip6_addaux(m);
+			if (!n) {
+				/* not enough core */
+				goto bad;
+			}
+			ip6a = mtod(n, struct ip6aux *);
+			if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
+				/* XXX icmp6 paramprob? */
+				goto bad;
+			}
+
+			haopt = (struct ip6_opt_home_address *)opt;
+			optlen = haopt->ip6oh_len + 2;
+
+			/*
+			 * don't complain even if it is larger,
+			 * we don't support suboptions at this moment
+			 */
+			if (optlen < sizeof(*haopt)) {
+				ip6stat.ip6s_toosmall++;
+				goto bad;
+			}
+
+			/* XXX check header ordering */
+
+			bcopy(haopt->ip6oh_addr, &ip6a->ip6a_home, 
+			    sizeof(ip6a->ip6a_home));
+			bcopy(&ip6->ip6_src, &ip6a->ip6a_careof, 
+			    sizeof(ip6a->ip6a_careof));
+			ip6a->ip6a_flags |= IP6A_HASEEN;
+			break;
+#endif
 #ifdef MIP6
 		case IP6OPT_BINDING_UPDATE:
 		case IP6OPT_BINDING_ACK:
 		case IP6OPT_BINDING_REQ:
-		case IP6OPT_HOME_ADDRESS:
 			if (mip6_store_dstopt_pre_hook) {
 				if ((*mip6_store_dstopt_pre_hook)(m, opt,
 				    off, dstoptlen) != 0)
@@ -143,6 +189,19 @@ dest6_input(mp, offp, proto)
 			break;
 		}
 	}
+
+#ifdef ITOJUNMIP6CN
+	/* if haopt is non-NULL, we are sure we have seen fresh HA option */
+	if (haopt && ip6a && ip6a->ip6a_flags &&
+	    (ip6a->ip6a_flags & (IP6A_HASEEN | IP6A_SWAP)) == IP6A_HASEEN) {
+		/* XXX should we do this now or later? */
+		bcopy(&ip6a->ip6a_home, haopt->ip6oh_addr,
+		    sizeof(haopt->ip6oh_addr));
+		bcopy(&ip6->ip6_src, &ip6a->ip6a_careof,
+		    sizeof(ip6a->ip6a_careof));
+		ip6a->ip6a_flags |= IP6A_SWAP;
+	}
+#endif
 
 #ifdef MIP6
 	if (mip6_rec_ctrl_sig_hook) {

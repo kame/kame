@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.146 2001/01/21 08:46:34 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.147 2001/01/23 06:47:50 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -218,7 +218,6 @@ int ip6_fw_enable = 1;
 struct ip6stat ip6stat;
 
 static void ip6_init2 __P((void *));
-static void ip6_deldstifaddr __P((struct mbuf *));
 static struct mbuf *ip6_setdstifaddr __P((struct mbuf *, struct in6_ifaddr *));
 
 static int ip6_hopopts_input __P((u_int32_t *, u_int32_t *, struct mbuf **, int *));
@@ -445,9 +444,9 @@ ip6_input(m)
 #endif
 
 	/*
-	 * make sure we don't have address information into m_aux.
+	 * make sure we don't have onion peering information into m_aux.
 	 */
-	ip6_deldstifaddr(m);
+	ip6_delaux(m);
 
 	/*
 	 * mbuf statistics by kazu
@@ -1140,18 +1139,8 @@ ip6_input(m)
 
 /*
  * set/grab in6_ifaddr correspond to IPv6 destination address.
+ * XXX backward compatibility wrapper
  */
-static void
-ip6_deldstifaddr(m)
-	struct mbuf *m;
-{
-	struct mbuf *n;
-
-	n = m_aux_find(m, AF_INET6, IPPROTO_IPV6);
-	if (n)
-		m_aux_delete(m, n);
-}
-
 static struct mbuf *
 ip6_setdstifaddr(m, ia6)
 	struct mbuf *m;
@@ -1159,17 +1148,10 @@ ip6_setdstifaddr(m, ia6)
 {
 	struct mbuf *n;
 
-	n = m_aux_add(m, AF_INET6, IPPROTO_IPV6);
-	if (n) {
-		if (M_TRAILINGSPACE(n) >= sizeof(ia6)) {
-			n->m_len = sizeof(ia6);
-			*mtod(n, struct in6_ifaddr **) = ia6;
-		} else {
-			m_aux_delete(m, n);
-			n = NULL;
-		}
-	}
-	return n;
+	n = ip6_addaux(m);
+	if (n)
+		mtod(n, struct ip6aux *)->ip6a_dstia6 = ia6;
+	return n;	/*NULL if failed to set*/
 }
 
 struct in6_ifaddr *
@@ -1178,9 +1160,9 @@ ip6_getdstifaddr(m)
 {
 	struct mbuf *n;
 
-	n = m_aux_find(m, AF_INET6, IPPROTO_IPV6);
-	if (n && n->m_len == sizeof(struct in6_ifaddr *))
-		return *mtod(n, struct in6_ifaddr **);
+	n = ip6_findaux(m);
+	if (n)
+		return mtod(n, struct ip6aux *)->ip6a_dstia6;
 	else
 		return NULL;
 }
@@ -2377,6 +2359,55 @@ pfctlinput2(cmd, sa, ctlparam)
 			if (pr->pr_ctlinput)
 				(*pr->pr_ctlinput)(cmd, sa, ctlparam);
 	}
+}
+
+struct mbuf *
+ip6_addaux(m)
+	struct mbuf *m;
+{
+	struct mbuf *n;
+
+#ifdef DIAGNOSTIC
+	if (sizeof(struct ip6aux) > MHLEN)
+		panic("assumption failed on sizeof(ip6aux)");
+#endif
+	n = m_aux_find(m, AF_INET6, -1);
+	if (n) {
+		if (n->m_len < sizeof(struct ip6aux)) {
+			printf("conflicting use of ip6aux");
+			return NULL;
+		}
+	} else {
+		n = m_aux_add(m, AF_INET6, -1);
+		n->m_len = sizeof(struct ip6aux);
+		bzero(mtod(n, caddr_t), n->m_len);
+	}
+	return n;
+}
+
+struct mbuf *
+ip6_findaux(m)
+	struct mbuf *m;
+{
+	struct mbuf *n;
+
+	n = m_aux_find(m, AF_INET6, -1);
+	if (n && n->m_len < sizeof(struct ip6aux)) {
+		printf("conflicting use of ip6aux");
+		n = NULL;
+	}
+	return n;
+}
+
+void
+ip6_delaux(m)
+	struct mbuf *m;
+{
+	struct mbuf *n;
+
+	n = m_aux_find(m, AF_INET6, -1);
+	if (n)
+		m_aux_delete(m, n);
 }
 
 /*

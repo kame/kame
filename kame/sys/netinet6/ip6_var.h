@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.51 2001/01/16 14:14:17 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.52 2001/01/23 06:47:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -242,6 +242,30 @@ struct	ip6stat {
 };
 
 #ifdef _KERNEL
+/*
+ * IPv6 onion peeling state.
+ * it will be initialized when we come into ip6_input().
+ */
+struct ip6aux {
+	u_int32_t ip6a_flags;
+#define IP6A_SWAP	0x01		/* swapped home/care-of on packet */
+#define IP6A_HASEEN	0x02		/* HA was present */
+
+	/* ip6.ip6_src */
+	struct in6_addr ip6a_careof;	/* care-of address of the peer */
+	struct in6_addr ip6a_home;	/* home address of the peer */
+
+	/* ip6.ip6_dst */
+	struct in6_ifaddr *ip6a_dstia6;	/* my ifaddr that matches ip6_dst */
+
+	/*
+	 * decapsulation history will be here.
+	 * with IPsec it may not be accurate.
+	 */
+};
+#endif
+
+#ifdef _KERNEL
 /* flags passed to ip6_output as last parameter */
 #define	IPV6_DADOUTPUT		0x01	/* DAD */
 #define	IPV6_FORWARDING		0x02	/* most of IPv6 header exists */
@@ -316,6 +340,11 @@ int	ip6_unknown_opt __P((u_int8_t *, struct mbuf *, int));
 char *	ip6_get_prevhdr __P((struct mbuf *, int));
 int	ip6_nexthdr __P((struct mbuf *, int, int, int *));
 int	ip6_lasthdr __P((struct mbuf *, int, int, int *));
+
+struct mbuf *ip6_addaux __P((struct mbuf *));
+struct mbuf *ip6_findaux __P((struct mbuf *));
+void	ip6_delaux __P((struct mbuf *));
+
 int	ip6_mforward __P((struct ip6_hdr *, struct ifnet *, struct mbuf *));
 int	ip6_process_hopopts __P((struct mbuf *, u_int8_t *, int, u_int32_t *,
 				 u_int32_t *));
