@@ -216,7 +216,7 @@ search_matched_prefix(struct ifnet *ifp, struct in6_prefixreq *ipr)
 	}
 	if (ifpr != NULL)
 		log(LOG_ERR,  "in6_prefix.c: search_matched_prefix: addr %s"
-		    "has no pointer to prefix %s", ip6_sprintf(IFA_IN6(ifa)),
+		    "has no pointer to prefix %s\n", ip6_sprintf(IFA_IN6(ifa)),
 		    ip6_sprintf(IFPR_IN6(ifpr)));
 	return ifpr2rp(ifpr);
 }
@@ -278,7 +278,7 @@ mark_matched_prefixes(u_long cmd, struct ifnet *ifp, struct in6_rrenumreq *irr)
 		} else
 			log(LOG_WARNING, "in6_prefix.c: mark_matched_prefixes:"
 			    "no back pointer to ifprefix for %s. "
-			    "ND autoconfigured addr?",
+			    "ND autoconfigured addr?\n",
 			    ip6_sprintf(IFA_IN6(ifa)));
 	}
 	return matched;
@@ -477,7 +477,7 @@ in6_prefix_add_ifid(int iilen, struct in6_ifaddr *ia)
 		else if (rap->ra_addr != ia) {
 			/* There may be some inconsistencies between addrs. */
 			log(LOG_ERR, "ip6_prefix.c: addr %s/%d matched prefix"
-			    "has already another ia %p(%s) on its ifid list",
+			    "has already another ia %p(%s) on its ifid list\n",
 			    ip6_sprintf(IA6_IN6(ia)), plen,
 			    rap->ra_addr,
 			    ip6_sprintf(IA6_IN6(rap->ra_addr)));
@@ -558,7 +558,7 @@ add_each_addr(struct socket *so, struct rr_prefix *rpp, struct rp_addr *rap)
 		 * log it and return.
 		 */
 		log(LOG_ERR, "in6_prefix.c: add_each_addr: addition of an addr"
-		    "%s/%d failed because there is already another addr %s/%d",
+		    "%s/%d failed because there is already another addr %s/%d\n",
 		    ip6_sprintf(&ifra.ifra_addr.sin6_addr), rpp->rp_plen,
 		    ip6_sprintf(IA6_IN6(ia6)),
 		    in6_mask2len(&ia6->ia_prefixmask.sin6_addr));
@@ -574,7 +574,7 @@ add_each_addr(struct socket *so, struct rr_prefix *rpp, struct rp_addr *rap)
 			    );
 	if (error != 0)
 		log(LOG_ERR, "in6_prefix.c: add_each_addr: addition of an addr"
-		    "%s/%d failed because in6_control failed for error %d",
+		    "%s/%d failed because in6_control failed for error %d\n",
 		    ip6_sprintf(&ifra.ifra_addr.sin6_addr), rpp->rp_plen,
 		    error);
 		return;
@@ -655,7 +655,7 @@ rrpr_update(struct socket *so, struct rr_prefix *new)
 						 M_NOWAIT);
 		if (rpp == NULL) {
 			log(LOG_ERR, "in6_prefix.c: rrpr_update:%d"
-			    ": ENOBUFS for rr_prefix", __LINE__);
+			    ": ENOBUFS for rr_prefix\n", __LINE__);
 			return(ENOBUFS);
 		}
 		/* initilization */
@@ -759,7 +759,7 @@ create_ra_entry(struct rp_addr **rapp)
 					 M_NOWAIT);
 	if (*rapp == NULL) {
 		log(LOG_ERR, "in6_prefix.c: init_newprefix:%d: ENOBUFS"
-		    "for rp_addr", __LINE__);
+		    "for rp_addr\n", __LINE__);
 		return ENOBUFS;
 	}
 	bzero(*rapp, sizeof(*(*rapp)));
@@ -922,7 +922,7 @@ delete_each_prefix(struct socket *so, struct rr_prefix *rpp, u_char origin)
 		if (error != 0)
 			log(LOG_ERR, "in6_prefix.c: delete_each_prefix:"
 			    "deletion of an addr %s/%d failed because"
-			    "in6_control failed for error %d",
+			    "in6_control failed for error %d\n",
 			    ip6_sprintf(&ifra.ifra_addr.sin6_addr),
 			    rpp->rp_plen, error);
 
@@ -976,7 +976,7 @@ link_stray_ia6s(struct rr_prefix *rpp)
 						  rpp->rp_plen))
 				log(LOG_ERR, "in6_prefix.c: link_stray_ia6s:"
 				    "addr %s/%d already linked to a prefix"
-				    "and it matches also %s/%d",
+				    "and it matches also %s/%d\n",
 				    ip6_sprintf(IFA_IN6(ifa)), orpp->rp_plen,
 				    ip6_sprintf(RP_IN6(rpp)),
 				    rpp->rp_plen);
@@ -1019,7 +1019,7 @@ in6_prefix_ioctl(struct socket *so, u_long cmd, caddr_t data,
 		if (irr->irr_pltime > irr->irr_vltime) {
 			log(LOG_NOTICE,
 			    "in6_prefix_ioctl: preferred lifetime"
-			    "(%ld) is greater than valid lifetime(%ld)",
+			    "(%ld) is greater than valid lifetime(%ld)\n",
 			    (u_long)irr->irr_pltime, (u_long)irr->irr_vltime);
 			error = EINVAL;
 			break;
@@ -1054,7 +1054,7 @@ in6_prefix_ioctl(struct socket *so, u_long cmd, caddr_t data,
 		if (ipr->ipr_pltime > ipr->ipr_vltime) {
 			log(LOG_NOTICE,
 			    "in6_prefix_ioctl: preferred lifetime"
-			    "(%ld) is greater than valid lifetime(%ld)",
+			    "(%ld) is greater than valid lifetime(%ld)\n",
 			    (u_long)ipr->ipr_pltime, (u_long)ipr->ipr_vltime);
 			error = EINVAL;
 			break;
