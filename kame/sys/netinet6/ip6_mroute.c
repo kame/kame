@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.117 2003/12/09 13:44:37 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.118 2003/12/10 09:08:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -329,8 +329,8 @@ ip6_mrouter_set(so, sopt)
 #ifdef MRT6_OINIT
 	case MRT6_OINIT:
 #endif
-		error = sooptcopyin(sopt, &optval, sizeof (optval),
-		    sizeof (optval));
+		error = sooptcopyin(sopt, &optval, sizeof(optval),
+		    sizeof(optval));
 		if (error)
 			break;
 		error = ip6_mrouter_init(so, optval, sopt->sopt_name);
@@ -339,32 +339,32 @@ ip6_mrouter_set(so, sopt)
 		error = ip6_mrouter_done();
 		break;
 	case MRT6_ADD_MIF:
-		error = sooptcopyin(sopt, &mifc, sizeof (mifc), sizeof (mifc));
+		error = sooptcopyin(sopt, &mifc, sizeof(mifc), sizeof (mifc));
 		if (error)
 			break;
 		error = add_m6if(&mifc);
 		break;
 	case MRT6_ADD_MFC:
-		error = sooptcopyin(sopt, &mfcc, sizeof (mfcc), sizeof (mfcc));
+		error = sooptcopyin(sopt, &mfcc, sizeof(mfcc), sizeof (mfcc));
 		if (error)
 			break;
 		error = add_m6fc(&mfcc);
 		break;
 	case MRT6_DEL_MFC:
-		error = sooptcopyin(sopt, &mfcc, sizeof (mfcc), sizeof (mfcc));
+		error = sooptcopyin(sopt, &mfcc, sizeof(mfcc), sizeof (mfcc));
 		if (error)
 			break;
 		error = del_m6fc(&mfcc);
 		break;
 	case MRT6_DEL_MIF:
-		error = sooptcopyin(sopt, &mifi, sizeof (mifi), sizeof (mifi));
+		error = sooptcopyin(sopt, &mifi, sizeof(mifi), sizeof (mifi));
 		if (error)
 			break;
 		error = del_m6if(&mifi);
 		break;
 	case MRT6_PIM:
-		error = sooptcopyin(sopt, &optval, sizeof (optval),
-		    sizeof (optval));
+		error = sooptcopyin(sopt, &optval, sizeof(optval),
+		    sizeof(optval));
 		if (error)
 			break;
 		error = set_pim6(&optval);
@@ -391,29 +391,29 @@ ip6_mrouter_set(cmd, so, m)
 	case MRT6_OINIT:
 #endif
 	case MRT6_INIT:
-		if (m == NULL || m->m_len < sizeof (int))
+		if (m == NULL || m->m_len < sizeof(int))
 			return (EINVAL);
 		return (ip6_mrouter_init(so, *mtod(m, int *), cmd));
 	case MRT6_DONE:
 		return (ip6_mrouter_done());
 	case MRT6_ADD_MIF:
-		if (m == NULL || m->m_len < sizeof (struct mif6ctl))
+		if (m == NULL || m->m_len < sizeof(struct mif6ctl))
 			return (EINVAL);
 		return (add_m6if(mtod(m, struct mif6ctl *)));
 	case MRT6_DEL_MIF:
-		if (m == NULL || m->m_len < sizeof (mifi_t))
+		if (m == NULL || m->m_len < sizeof(mifi_t))
 			return (EINVAL);
 		return (del_m6if(mtod(m, mifi_t *)));
 	case MRT6_ADD_MFC:
-		if (m == NULL || m->m_len < sizeof (struct mf6cctl))
+		if (m == NULL || m->m_len < sizeof(struct mf6cctl))
 			return (EINVAL);
 		return (add_m6fc(mtod(m, struct mf6cctl *)));
 	case MRT6_DEL_MFC:
-		if (m == NULL || m->m_len < sizeof (struct mf6cctl))
+		if (m == NULL || m->m_len < sizeof(struct mf6cctl))
 			return (EINVAL);
 		return (del_m6fc(mtod(m,  struct mf6cctl *)));
 	case MRT6_PIM:
-		if (m == NULL || m->m_len < sizeof (int))
+		if (m == NULL || m->m_len < sizeof(int))
 			return (EINVAL);
 		return (set_pim6(mtod(m, int *)));
 	default:
@@ -942,7 +942,7 @@ del_m6if(mifip)
 	bzero((caddr_t)qtable[*mifip], sizeof(qtable[*mifip]));
 	bzero((caddr_t)mifp->m6_tbf, sizeof(*(mifp->m6_tbf)));
 #endif
-	bzero((caddr_t)mifp, sizeof (*mifp));
+	bzero((caddr_t)mifp, sizeof(*mifp));
 
 	/* Adjust nummifs down */
 	for (mifi = nummifs; mifi > 0; mifi--)
