@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.68 2000/10/18 21:54:27 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.69 2000/11/21 12:24:16 kawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -643,7 +643,11 @@ SYSCTL_NODE(_net_inet6,	IPPROTO_ESP,	ipsec6,	CTLFLAG_RW, 0,	"IPSEC6");
 
 /* net.inet6.ip6 */
 static int
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+sysctl_ip6_forwarding(SYSCTL_HANDLER_ARGS)
+#else
 sysctl_ip6_forwarding SYSCTL_HANDLER_ARGS
+#endif
 {
 	int error = 0;
 	int old_ip6_forwarding;
