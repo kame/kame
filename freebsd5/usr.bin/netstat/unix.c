@@ -31,13 +31,14 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
 #if 0
+#ifndef lint
 static char sccsid[] = "@(#)unix.c	8.1 (Berkeley) 6/6/93";
-#endif
-static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/unix.c,v 1.17 2002/07/24 03:02:43 jdp Exp $";
 #endif /* not lint */
+#endif
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/usr.bin/netstat/unix.c,v 1.18 2004/07/26 20:18:11 charnier Exp $");
 
 /*
  * Display protocol blocks in the unix domain.
@@ -88,7 +89,7 @@ unixpr(void)
 			continue;
 		}
 		if ((buf = malloc(len)) == 0) {
-			warn("malloc %lu bytes", (u_long)len);
+			warnx("malloc %lu bytes", (u_long)len);
 			return;
 		}
 		if (sysctlbyname(mibvar, buf, &len, 0, 0) < 0) {

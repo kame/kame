@@ -31,12 +31,12 @@
  *
  * so there!
  *
- * $FreeBSD: src/sbin/ifconfig/ifconfig.h,v 1.10 2003/04/28 16:37:38 sam Exp $
+ * $FreeBSD: src/sbin/ifconfig/ifconfig.h,v 1.12 2004/03/30 22:59:22 sam Exp $
  */
 
 extern struct ifreq ifr;
 
-extern char name[32];	/* name of interface */
+extern char name[IFNAMSIZ];	/* name of interface */
 extern int allmedia;
 extern int supmedia;
 struct afswtch;
@@ -64,6 +64,9 @@ extern void set80211wep(const char *, int, int, const struct afswtch *rafp);
 extern void set80211weptxkey(const char *, int, int, const struct afswtch *rafp);
 extern void set80211wepkey(const char *, int, int, const struct afswtch *rafp);
 extern void set80211nwkey(const char *, int, int, const struct afswtch *rafp);
+extern void set80211rtsthreshold(const char *, int, int, const struct afswtch *rafp);
+extern void set80211protmode(const char *, int, int, const struct afswtch *rafp);
+extern void set80211txpower(const char *, int, int, const struct afswtch *rafp);
 extern void ieee80211_status(int s, struct rt_addrinfo *);
 extern void maclabel_status(int s, struct rt_addrinfo *);
 extern void setifmaclabel(const char *, int, int, const struct afswtch *rafp);

@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.var.dist,v 1.68 2003/11/29 18:22:01 ru Exp $
+# $FreeBSD: src/etc/mtree/BSD.var.dist,v 1.69.2.1 2004/09/30 23:36:07 dougb Exp $
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -32,6 +32,8 @@
         ..
         pkg
         ..
+        ports
+        ..
     ..
     empty           mode=0555 flags=schg
     ..
@@ -44,6 +46,8 @@
     mail            gname=mail mode=0775
     ..
     msgs            uname=daemon
+    ..
+    named           uname=root
     ..
     preserve
     ..

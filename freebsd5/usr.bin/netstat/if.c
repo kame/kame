@@ -31,13 +31,14 @@
  * SUCH DAMAGE.
  */
 
+#if 0
 #ifndef lint
-/*
 static char sccsid[] = "@(#)if.c	8.3 (Berkeley) 4/28/95";
-*/
-static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/if.c,v 1.55 2003/11/28 17:34:23 bms Exp $";
 #endif /* not lint */
+#endif
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/usr.bin/netstat/if.c,v 1.58 2004/07/26 20:18:11 charnier Exp $");
 
 #include <sys/types.h>
 #include <sys/protosw.h>
@@ -163,6 +164,8 @@ intpr(int _interval, u_long ifnetaddr, void (*pfunc)(char *))
 	u_long ipackets;
 	u_long obytes;
 	u_long ibytes;
+	u_long omcasts;
+	u_long imcasts;
 	u_long oerrors;
 	u_long ierrors;
 	u_long collisions;
@@ -208,9 +211,9 @@ intpr(int _interval, u_long ifnetaddr, void (*pfunc)(char *))
 	}
 	ifaddraddr = 0;
 	while (ifnetaddr || ifaddraddr) {
-		struct sockaddr_in *sin;
+		struct sockaddr_in *sockin;
 #ifdef INET6
-		struct sockaddr_in6 *sin6;
+		struct sockaddr_in6 *sockin6;
 #endif
 		char *cp;
 		int n, m;
@@ -248,6 +251,8 @@ intpr(int _interval, u_long ifnetaddr, void (*pfunc)(char *))
 		ipackets = ifnet.if_ipackets;
 		obytes = ifnet.if_obytes;
 		ibytes = ifnet.if_ibytes;
+		omcasts = ifnet.if_omcasts;
+		imcasts = ifnet.if_imcasts;
 		oerrors = ifnet.if_oerrors;
 		ierrors = ifnet.if_ierrors;
 		collisions = ifnet.if_collisions;
@@ -287,7 +292,7 @@ intpr(int _interval, u_long ifnetaddr, void (*pfunc)(char *))
 				printf("%-15.15s ", "none");
 				break;
 			case AF_INET:
-				sin = (struct sockaddr_in *)sa;
+				sockin = (struct sockaddr_in *)sa;
 #ifdef notdef
 				/* can't use inet_makeaddr because kernel
 				 * keeps nets unshifted.
@@ -302,19 +307,19 @@ intpr(int _interval, u_long ifnetaddr, void (*pfunc)(char *))
 				    ifaddr.in.ia_subnetmask));
 #endif
 				printf("%-17.17s ",
-				    routename(sin->sin_addr.s_addr));
+				    routename(sockin->sin_addr.s_addr));
 
 				network_layer = 1;
 				break;
 #ifdef INET6
 			case AF_INET6:
-				sin6 = (struct sockaddr_in6 *)sa;
+				sockin6 = (struct sockaddr_in6 *)sa;
 				printf("%-13.13s ",
 				       netname6(&ifaddr.in6.ia_addr,
 						&ifaddr.in6.ia_prefixmask.sin6_addr));
 				printf("%-17.17s ",
 				    inet_ntop(AF_INET6,
-					&sin6->sin6_addr,
+					&sockin6->sin6_addr,
 					ntop_buf, sizeof(ntop_buf)));
 
 				network_layer = 1;
@@ -445,7 +450,8 @@ intpr(int _interval, u_long ifnetaddr, void (*pfunc)(char *))
 					break;
 #ifdef INET6
 				case AF_INET6:
-					printf("%23s %-19.19s(refs: %d)\n", "",
+					printf("%*s %-19.19s(refs: %d)\n",
+					       Wflag ? 27 : 25, "",
 					       inet_ntop(AF_INET6,
 							 &msa.in6.sin6_addr,
 							 ntop_buf,
@@ -464,8 +470,17 @@ intpr(int _interval, u_long ifnetaddr, void (*pfunc)(char *))
 					}
 					break;
 				}
-				if (fmt)
-					printf("%23s %s\n", "", fmt);
+				if (fmt) {
+					printf("%*s %-17.17s",
+					    Wflag ? 27 : 25, "", fmt);
+					if (msa.sa.sa_family == AF_LINK) {
+						printf(" %8lu", imcasts);
+						printf("%*s",
+						    bflag ? 17 : 6, "");
+						printf(" %8lu", omcasts);
+					}
+					putchar('\n');
+				}
 			}
 		}
 	}

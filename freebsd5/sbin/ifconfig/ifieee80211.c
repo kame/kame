@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sbin/ifconfig/ifieee80211.c,v 1.8 2003/11/01 00:03:20 brooks Exp $
+ * $FreeBSD: src/sbin/ifconfig/ifieee80211.c,v 1.10 2004/04/04 07:28:58 phk Exp $
  */
 
 /*-
@@ -286,6 +286,36 @@ set80211nwkey(const char *val, int d, int s, const struct afswtch *rafp)
 }
 
 void
+set80211rtsthreshold(const char *val, int d, int s, const struct afswtch *rafp)
+{
+	set80211(s, IEEE80211_IOC_RTSTHRESHOLD, atoi(val), 0, NULL);
+}
+
+void
+set80211protmode(const char *val, int d, int s, const struct afswtch *rafp)
+{
+	int	mode;
+
+	if (strcasecmp(val, "off") == 0) {
+		mode = IEEE80211_PROTMODE_OFF;
+	} else if (strcasecmp(val, "cts") == 0) {
+		mode = IEEE80211_PROTMODE_CTS;
+	} else if (strcasecmp(val, "rtscts") == 0) {
+		mode = IEEE80211_PROTMODE_RTSCTS;
+	} else {
+		err(1, "unknown protection mode");
+	}
+
+	set80211(s, IEEE80211_IOC_PROTMODE, mode, 0, NULL);
+}
+
+void
+set80211txpower(const char *val, int d, int s, const struct afswtch *rafp)
+{
+	set80211(s, IEEE80211_IOC_TXPOWER, atoi(val), 0, NULL);
+}
+
+void
 ieee80211_status (int s, struct rt_addrinfo *info __unused)
 {
 	int			i;
@@ -379,6 +409,42 @@ ieee80211_status (int s, struct rt_addrinfo *info __unused)
 	}
 
 	printf("\n");
+
+	spacer = '\t';
+	ireq.i_type = IEEE80211_IOC_RTSTHRESHOLD;
+	if (ioctl(s, SIOCG80211, &ireq) != -1) {
+		printf("%crtsthreshold %d", spacer, ireq.i_val);
+		spacer = ' ';
+	}
+
+	ireq.i_type = IEEE80211_IOC_PROTMODE;
+	if (ioctl(s, SIOCG80211, &ireq) != -1) {
+		printf("%cprotmode", spacer);
+		switch (ireq.i_val) {
+			case IEEE80211_PROTMODE_OFF:
+				printf(" OFF");
+				break;
+			case IEEE80211_PROTMODE_CTS:
+				printf(" CTS");
+				break;
+			case IEEE80211_PROTMODE_RTSCTS:
+				printf(" RTSCTS");
+				break;
+			default:
+				printf(" UNKNOWN");
+				break;
+		}
+		spacer = ' ';
+	}
+
+	ireq.i_type = IEEE80211_IOC_TXPOWER;
+	if (ioctl(s, SIOCG80211, &ireq) != -1) {
+		printf("%ctxpower %d", spacer, ireq.i_val);
+		spacer = ' ';
+	}
+
+	if (spacer != '\t')
+		printf("\n");
 
 	ireq.i_type = IEEE80211_IOC_WEP;
 	if (ioctl(s, SIOCG80211, &ireq) != -1 &&
@@ -480,17 +546,20 @@ get_string(const char *val, const char *sep, u_int8_t *buf, int *lenp)
 			break;
 		}
 		if (hexstr) {
-			if (!isxdigit((u_char)val[0]) ||
-			    !isxdigit((u_char)val[1])) {
+			if (!isxdigit((u_char)val[0])) {
 				warnx("bad hexadecimal digits");
 				return NULL;
 			}
+			if (!isxdigit((u_char)val[1])) {
+				warnx("odd count hexadecimal digits");
+				return NULL;
+			}
 		}
-		if (p > buf + len) {
+		if (p >= buf + len) {
 			if (hexstr)
 				warnx("hexadecimal digits too long");
 			else
-				warnx("strings too long");
+				warnx("string too long");
 			return NULL;
 		}
 		if (hexstr) {

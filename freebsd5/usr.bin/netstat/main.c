@@ -37,13 +37,14 @@ char const copyright[] =
 	Regents of the University of California.  All rights reserved.\n";
 #endif /* not lint */
 
-#ifndef lint
 #if 0
+#ifndef lint
 static char sccsid[] = "@(#)main.c	8.4 (Berkeley) 3/1/94";
-#endif
-static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/main.c,v 1.62 2003/08/07 18:21:21 hsu Exp $";
 #endif /* not lint */
+#endif
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/usr.bin/netstat/main.c,v 1.69 2004/07/26 20:18:11 charnier Exp $");
 
 #include <sys/param.h>
 #include <sys/file.h>
@@ -148,7 +149,7 @@ struct protox {
 					/* statistics printing routine */
 	void	(*pr_istats)(char *);	/* per/if statistics printing routine */
 	const char	*pr_name;		/* well-known name */
-	u_long	pr_usesysctl;		/* true if we use sysctl, not kvm */
+	u_long	pr_usesysctl;		/* non-zero if we use sysctl, not kvm */
 } protox[] = {
 	{ -1,		-1,		1,	protopr,
 	  tcp_stats,	NULL,		"tcp",	IPPROTO_TCP },
@@ -163,15 +164,15 @@ struct protox {
 	{ -1,		-1,		1,	protopr,
 	  igmp_stats,	NULL,		"igmp",	IPPROTO_IGMP },
 #ifdef IPSEC
-	{ -1,		N_IPSECSTAT,	1,	0,
+	{ -1,		N_IPSECSTAT,	1,	NULL,
 	  ipsec_stats,	NULL,		"ipsec",	0},
 #endif
-	{ -1,		-1,		1,	0,
+	{ -1,		-1,		1,	NULL,
 	  bdg_stats,	NULL,		"bdg",	1 /* bridging... */ },
 	{ -1,		-1,		1,	protopr,
 	  pim_stats,	NULL,		"pim",	IPPROTO_PIM },
-	{ -1,		-1,		0,	0,
-	  0,		NULL,		0,	0 }
+	{ -1,		-1,		0,	NULL,
+	  NULL,		NULL,		NULL,	0 }
 };
 
 #ifdef INET6
@@ -185,36 +186,36 @@ struct protox ip6protox[] = {
 	{ -1,		N_ICMP6STAT,	1,	protopr,
 	  icmp6_stats,	icmp6_ifstats,	"icmp6",IPPROTO_ICMPV6 },
 #ifdef IPSEC
-	{ -1,		N_IPSEC6STAT,	1,	0,
+	{ -1,		N_IPSEC6STAT,	1,	NULL,
 	  ipsec_stats,	NULL,		"ipsec6",0 },
 #endif
 #ifdef notyet
-	{ -1,		N_PIM6STAT,	1,	0,
+	{ -1,		N_PIM6STAT,	1,	NULL,
 	  pim6_stats,	NULL,		"pim6",	0 },
 #endif
-	{ -1,		-1,		1,	0,
+	{ -1,		-1,		1,	NULL,
 	  rip6_stats,	NULL,		"rip6",	0 },
-	{ -1,		-1,		1,	0,
+	{ -1,		-1,		1,	NULL,
 	  bdg_stats,	NULL,		"bdg",	1 /* bridging... */ },
-	{ -1,		-1,		0,	0,
-	  0,		NULL,		0,	0 }
+	{ -1,		-1,		0,	NULL,
+	  NULL,		NULL,		NULL,	0 }
 };
 #endif /*INET6*/
 
 #ifdef IPSEC
 struct protox pfkeyprotox[] = {
-	{ -1,		N_PFKEYSTAT,	1,	0,
+	{ -1,		N_PFKEYSTAT,	1,	NULL,
 	  pfkey_stats,	NULL,		"pfkey", 0 },
-	{ -1,		-1,		0,	0,
-	  0,		NULL,		0,	0 }
+	{ -1,		-1,		0,	NULL,
+	  NULL,		NULL,		NULL,	0 }
 };
 #endif
 
 struct protox atalkprotox[] = {
 	{ N_DDPCB,	N_DDPSTAT,	1,	atalkprotopr,
 	  ddp_stats,	NULL,		"ddp",	0 },
-	{ -1,		-1,		0,	0,
-	  0,		NULL,		0,	0 }
+	{ -1,		-1,		0,	NULL,
+	  NULL,		NULL,		NULL,	0 }
 };
 
 struct protox netgraphprotox[] = {
@@ -222,8 +223,8 @@ struct protox netgraphprotox[] = {
 	  NULL,		NULL,		"ctrl",	0 },
 	{ N_NGSOCKS,	-1,		1,	netgraphprotopr,
 	  NULL,		NULL,		"data",	0 },
-	{ -1,		NULL,		0,	0,
-	  0,		NULL,		0,	0 }
+	{ -1,		-1,		0,	NULL,
+	  NULL,		NULL,		NULL,	0 }
 };
 
 struct protox ipxprotox[] = {
@@ -231,8 +232,8 @@ struct protox ipxprotox[] = {
 	  ipx_stats,	NULL,		"ipx",	0 },
 	{ N_IPX,	N_SPXSTAT,	1,	ipxprotopr,
 	  spx_stats,	NULL,		"spx",	0 },
-	{ -1,		-1,		0,	0,
-	  0,		NULL,		0,	0 }
+	{ -1,		-1,		0,	NULL,
+	  NULL,		NULL,		0,	0 }
 };
 
 struct protox *protoprotox[] = {
@@ -245,10 +246,11 @@ struct protox *protoprotox[] = {
 #endif
 					 ipxprotox, atalkprotox, NULL };
 
-static void printproto (struct protox *, const char *);
-static void usage (void);
-static struct protox *name2protox (char *);
-static struct protox *knownname (char *);
+const char *pluralies(int);
+static void printproto(struct protox *, const char *);
+static void usage(void);
+static struct protox *name2protox(char *);
+static struct protox *knownname(char *);
 
 static kvm_t *kvmd;
 static char *nlistf = NULL, *memf = NULL;
@@ -285,7 +287,7 @@ main(int argc, char *argv[])
 
 	af = AF_UNSPEC;
 
-	while ((ch = getopt(argc, argv, "Aabdf:gI:iLlM:mN:np:rSstuWw:z")) != -1)
+	while ((ch = getopt(argc, argv, "Aabcdf:gI:iLlM:mN:np:rSstuWw:z")) != -1)
 		switch(ch) {
 		case 'A':
 			Aflag = 1;
@@ -485,6 +487,7 @@ main(int argc, char *argv[])
 					  nl[N_MIF6TABLE].n_value);
 #endif
 		}
+		ifmalist_dump();
 		exit(0);
 	}
 
@@ -686,8 +689,8 @@ usage(void)
 "       netstat -s [-s] [-z] [-f protocol_family | -p protocol] [-M core]",
 "       netstat -i | -I interface -s [-f protocol_family | -p protocol]\n"
 "               [-M core] [-N system]",
-"       netstat -m [-M core] [-N system]",
-"       netstat -r [-AanW] [-f address_family] [-M core] [-N system]",
+"       netstat -m [-c] [-M core] [-N system]",
+"       netstat -r [-AenW] [-f address_family] [-M core] [-N system]",
 "       netstat -rs [-s] [-M core] [-N system]",
 "       netstat -g [-W] [-f address_family] [-M core] [-N system]",
 "       netstat -gs [-s] [-f address_family] [-M core] [-N system]");

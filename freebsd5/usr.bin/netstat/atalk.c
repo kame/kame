@@ -31,13 +31,14 @@
  * SUCH DAMAGE.
  */
 
+#if 0
 #ifndef lint
-/*
 static char sccsid[] = "@(#)atalk.c	1.1 (Whistle) 6/6/96";
-*/
-static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/atalk.c,v 1.23 2002/09/05 17:06:51 dwmalone Exp $";
 #endif /* not lint */
+#endif
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/usr.bin/netstat/atalk.c,v 1.24 2004/07/26 20:18:11 charnier Exp $");
 
 #include <sys/param.h>
 #include <sys/queue.h>

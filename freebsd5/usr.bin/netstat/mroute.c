@@ -37,10 +37,8 @@
  *	@(#)mroute.c	8.2 (Berkeley) 4/28/95
  */
 
-#ifndef lint
-static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/mroute.c,v 1.21 2003/08/07 18:21:21 hsu Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/usr.bin/netstat/mroute.c,v 1.22 2004/07/26 20:18:11 charnier Exp $");
 
 /*
  * Print multicast routing structures and statistics.

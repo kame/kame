@@ -1,5 +1,5 @@
 /*	$NetBSD: ifconfig.c,v 1.34 1997/04/21 01:17:58 lukem Exp $	*/
-/* $FreeBSD: src/sbin/ifconfig/ifmedia.c,v 1.15 2003/06/25 15:05:17 sam Exp $ */
+/* $FreeBSD: src/sbin/ifconfig/ifmedia.c,v 1.16 2004/01/15 15:19:19 sam Exp $ */
 
 /*
  * Copyright (c) 1997 Jason R. Thorpe.
@@ -325,7 +325,7 @@ setmediamode(const char *val, int d, int s, const struct afswtch *afp)
 	free(mwords);
 
 	strncpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
-	ifr.ifr_media = (ifmr.ifm_current & ~IFM_MMASK) | IFM_MAKEMODE(mode);
+	ifr.ifr_media = (ifmr.ifm_current & ~IFM_MMASK) | mode;
 
 	if (ioctl(s, SIOCSIFMEDIA, (caddr_t)&ifr) < 0)
 		err(1, "SIOCSIFMEDIA (mode)");

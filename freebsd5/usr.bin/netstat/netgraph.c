@@ -30,14 +30,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
- *
- * $FreeBSD: src/usr.bin/netstat/netgraph.c,v 1.9 2002/09/05 17:06:51 dwmalone Exp $
  */
 
-#ifndef lint
-static const char rcsid[] =
-	"$Id: atalk.c,v 1.11 1998/07/06 21:01:22 bde Exp $";
-#endif /* not lint */
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/usr.bin/netstat/netgraph.c,v 1.10 2004/07/26 20:18:11 charnier Exp $");
 
 #include <sys/param.h>
 #include <sys/queue.h>

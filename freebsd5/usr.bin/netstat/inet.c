@@ -31,13 +31,14 @@
  * SUCH DAMAGE.
  */
 
+#if 0
 #ifndef lint
-/*
 static char sccsid[] = "@(#)inet.c	8.5 (Berkeley) 5/24/95";
-*/
-static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/inet.c,v 1.60 2003/10/23 13:53:19 ru Exp $";
 #endif /* not lint */
+#endif
+
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD: src/usr.bin/netstat/inet.c,v 1.67 2004/07/26 20:18:11 charnier Exp $");
 
 #include <sys/param.h>
 #include <sys/queue.h>
@@ -142,7 +143,7 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 		return;
 	}
 	if ((buf = malloc(len)) == 0) {
-		warn("malloc %lu bytes", (u_long)len);
+		warnx("malloc %lu bytes", (u_long)len);
 		return;
 	}
 	if (sysctlbyname(mibvar, buf, &len, 0, 0) < 0) {
@@ -186,7 +187,8 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 			continue;
 		if (!aflag &&
 		    (
-		     (af1 == AF_INET &&
+		     (istcp && tp->t_state == TCPS_LISTEN)
+		     || (af1 == AF_INET &&
 		      inet_lnaof(inp->inp_laddr) == INADDR_ANY)
 #ifdef INET6
 		     || (af1 == AF_INET6 &&
@@ -332,7 +334,7 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 			printf("Some %s sockets may have been created.\n",
 			       name);
 		} else {
-			printf("Some %s sockets may have been created or deleted",
+			printf("Some %s sockets may have been created or deleted.\n",
 			       name);
 		}
 	}
@@ -415,6 +417,7 @@ tcp_stats(u_long off __unused, const char *name, int af1 __unused)
 	p(tcps_accepts, "\t%lu connection accept%s\n");
 	p(tcps_badsyn, "\t%lu bad connection attempt%s\n");
 	p(tcps_listendrop, "\t%lu listen queue overflow%s\n");
+	p(tcps_badrst, "\t%lu ignored RSTs in the window%s\n");
 	p(tcps_connects, "\t%lu connection%s established (including accepts)\n");
 	p2(tcps_closed, tcps_drops,
 		"\t%lu connection%s closed (including %lu drop%s)\n");
@@ -451,6 +454,16 @@ tcp_stats(u_long off __unused, const char *name, int af1 __unused)
 	p(tcps_sc_zonefail, "\t\t%lu zone failure%s\n"); 
 	p(tcps_sc_sendcookie, "\t%lu cookie%s sent\n"); 
 	p(tcps_sc_recvcookie, "\t%lu cookie%s received\n"); 
+
+	p(tcps_sack_recovery_episode, "\t%lu SACK recovery episode%s\n"); 
+	p(tcps_sack_rexmits,
+		"\t%lu segment rexmit%s in SACK recovery episodes\n");
+	p(tcps_sack_rexmit_bytes,
+		"\t%lu byte rexmit%s in SACK recovery episodes\n"); 
+	p(tcps_sack_rcv_blocks,
+		"\t%lu SACK option%s (SACK blocks) received\n"); 
+	p(tcps_sack_send_blocks, "\t%lu SACK option%s (SACK blocks) sent\n"); 
+
 #undef p
 #undef p1a
 #undef p2
@@ -719,7 +732,8 @@ pim_stats(u_long off __unused, const char *name, int af1 __unused)
 		memset(&zerostat, 0, len);
 	if (sysctlbyname("net.inet.pim.stats", &pimstat, &len,
 	    zflag ? &zerostat : NULL, zflag ? len : 0) < 0) {
-		warn("sysctl: net.inet.pim.stats");
+		if (errno != ENOENT)
+			warn("sysctl: net.inet.pim.stats");
 		return;
 	}
 

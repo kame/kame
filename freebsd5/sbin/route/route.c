@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -42,7 +38,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)route.c	8.6 (Berkeley) 4/28/95";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/sbin/route/route.c,v 1.69 2003/04/16 12:06:53 ru Exp $";
+  "$FreeBSD: src/sbin/route/route.c,v 1.76 2004/06/16 06:29:41 bms Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -128,10 +124,6 @@ usage(cp)
 	/* NOTREACHED */
 }
 
-#define ROUNDUP(a) \
-	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
-#define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
-
 int
 main(argc, argv)
 	int argc;
@@ -209,7 +201,7 @@ flushroutes(argc, argv)
 	char *argv[];
 {
 	size_t needed;
-	int mib[6], rlen, seqno;
+	int mib[6], rlen, seqno, count = 0;
 	char *buf, *next, *lim;
 	struct rt_msghdr *rtm;
 
@@ -240,6 +232,7 @@ flushroutes(argc, argv)
 		} else
 bad:			usage(*argv);
 	}
+retry:
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
 	mib[2] = 0;		/* protocol */
@@ -250,8 +243,15 @@ bad:			usage(*argv);
 		err(EX_OSERR, "route-sysctl-estimate");
 	if ((buf = malloc(needed)) == NULL)
 		errx(EX_OSERR, "malloc failed");
-	if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0)
+	if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0) {
+		if (errno == ENOMEM && count++ < 10) {
+			warnx("Routing table grew, retrying");  
+			sleep(1);
+			free(buf);
+			goto retry;
+		}
 		err(EX_OSERR, "route-sysctl-get");
+	}
 	lim = buf + needed;
 	if (verbose)
 		(void) printf("Examining routing table from sysctl\n");
@@ -273,9 +273,13 @@ bad:			usage(*argv);
 		rtm->rtm_type = RTM_DELETE;
 		rtm->rtm_seq = seqno;
 		rlen = write(s, next, rtm->rtm_msglen);
+		if (rlen < 0 && errno == EPERM)
+			err(1, "write to routing socket");
 		if (rlen < (int)rtm->rtm_msglen) {
 			warn("write to routing socket");
 			(void) printf("got only %d for rlen\n", rlen);
+			free(buf);
+			goto retry;
 			break;
 		}
 		seqno++;
@@ -287,7 +291,7 @@ bad:			usage(*argv);
 			struct sockaddr *sa = (struct sockaddr *)(rtm + 1);
 			(void) printf("%-20.20s ", rtm->rtm_flags & RTF_HOST ?
 			    routename(sa) : netname(sa));
-			sa = (struct sockaddr *)(ROUNDUP(sa->sa_len) + (char *)sa);
+			sa = (struct sockaddr *)(SA_SIZE(sa) + (char *)sa);
 			(void) printf("%-20.20s ", routename(sa));
 			(void) printf("done\n");
 		}
@@ -982,7 +986,7 @@ getaddr(which, s, hpp)
 		memcpy(&su->sin6, res->ai_addr, sizeof(su->sin6));
 #ifdef __KAME__
 		if ((IN6_IS_ADDR_LINKLOCAL(&su->sin6.sin6_addr) ||
-		     IN6_IS_ADDR_LINKLOCAL(&su->sin6.sin6_addr)) &&
+		     IN6_IS_ADDR_MC_LINKLOCAL(&su->sin6.sin6_addr)) &&
 		    su->sin6.sin6_scope_id) {
 			*(u_int16_t *)&su->sin6.sin6_addr.s6_addr[2] =
 				htons(su->sin6.sin6_scope_id);
@@ -1036,7 +1040,7 @@ getaddr(which, s, hpp)
 	if ((which != RTA_DST || forcenet == 0) &&
 	    inet_aton(s, &su->sin.sin_addr)) {
 		val = su->sin.sin_addr.s_addr;
-		if (which != RTA_DST ||
+		if (which != RTA_DST || forcehost ||
 		    inet_lnaof(su->sin.sin_addr) != INADDR_ANY)
 			return (1);
 		else {
@@ -1113,9 +1117,10 @@ interfaces()
 {
 	size_t needed;
 	int mib[6];
-	char *buf, *lim, *next;
+	char *buf, *lim, *next, count = 0;
 	struct rt_msghdr *rtm;
 
+retry2:
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
 	mib[2] = 0;		/* protocol */
@@ -1126,8 +1131,15 @@ interfaces()
 		err(EX_OSERR, "route-sysctl-estimate");
 	if ((buf = malloc(needed)) == NULL)
 		errx(EX_OSERR, "malloc failed");
-	if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0)
+	if (sysctl(mib, 6, buf, &needed, NULL, 0) < 0) {
+		if (errno == ENOMEM && count++ < 10) {
+			warnx("Routing table grew, retrying");
+			sleep(1);
+			free(buf);
+			goto retry2;
+		}
 		err(EX_OSERR, "actual retrieval of interface table");
+	}
 	lim = buf + needed;
 	for (next = buf; next < lim; next += rtm->rtm_msglen) {
 		rtm = (struct rt_msghdr *)next;
@@ -1171,7 +1183,7 @@ rtmsg(cmd, flags)
 
 #define NEXTADDR(w, u) \
 	if (rtm_addrs & (w)) {\
-	    l = ROUNDUP(u.sa.sa_len); memmove(cp, &(u), l); cp += l;\
+	    l = SA_SIZE(&(u.sa)); memmove(cp, &(u), l); cp += l;\
 	    if (verbose) sodump(&(u),"u");\
 	}
 
@@ -1213,6 +1225,8 @@ rtmsg(cmd, flags)
 	if (debugonly)
 		return (0);
 	if ((rlen = write(s, (char *)&m_rtmsg, l)) < 0) {
+		if (errno == EPERM)
+			err(1, "writing to routing socket");
 		warn("writing to routing socket");
 		return (-1);
 	}
@@ -1308,6 +1322,7 @@ print_rtmsg(rtm, msglen)
 	struct ifma_msghdr *ifmam;
 #endif
 	struct if_announcemsghdr *ifan;
+	char *state;
 
 	if (verbose == 0)
 		return;
@@ -1324,7 +1339,19 @@ print_rtmsg(rtm, msglen)
 	switch (rtm->rtm_type) {
 	case RTM_IFINFO:
 		ifm = (struct if_msghdr *)rtm;
-		(void) printf("if# %d, flags:", ifm->ifm_index);
+		(void) printf("if# %d, ", ifm->ifm_index);
+		switch (ifm->ifm_data.ifi_link_state) {
+		case LINK_STATE_DOWN:
+			state = "down";
+			break;
+		case LINK_STATE_UP:
+			state = "up";
+			break;
+		default:
+			state = "unknown";
+			break;
+		}
+		(void) printf("link: %s, flags:", state);
 		bprintf(stdout, ifm->ifm_flags, ifnetflags);
 		pmsg_addrs((char *)(ifm + 1), ifm->ifm_addrs);
 		break;
@@ -1414,7 +1441,7 @@ print_getmsg(rtm, msglen)
 						ifp = (struct sockaddr_dl *)sa;
 					break;
 				}
-				ADVANCE(cp, sa);
+				cp += SA_SIZE(sa);
 			}
 	if (dst && mask)
 		mask->sa_family = dst->sa_family;	/* XXX */
@@ -1493,7 +1520,7 @@ pmsg_addrs(cp, addrs)
 		if (i & addrs) {
 			sa = (struct sockaddr *)cp;
 			(void) printf(" %s", routename(sa));
-			ADVANCE(cp, sa);
+			cp += SA_SIZE(sa);
 		}
 	(void) putchar('\n');
 	(void) fflush(stdout);
