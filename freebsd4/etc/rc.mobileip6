@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: rc.mobileip6,v 1.2 2002/11/19 03:19:20 k-sugyou Exp $
+# $Id: rc.mobileip6,v 1.3 2002/12/02 12:34:17 keiichi Exp $
 
 # Mobile IPv6 startup
 
@@ -21,6 +21,11 @@ mobileip6_pass1() {
 			done
 			echo -n ' enable'
 			mip6control -m
+			echo -n ' setkey'
+			for secparam in ${ipv6_mobile_security_db}/*
+			do
+				setkey -f ${secparam}
+			done
 			echo -n ' rtsold'
 			rtsold -a -m
 			;;
@@ -36,6 +41,11 @@ mobileip6_pass1() {
 			# mip6control -S 1
 			echo -n ' enable'
 			mip6control -g
+			echo -n ' setkey'
+			for secparam in ${ipv6_mobile_security_db}/*
+			do
+				setkey -f ${secparam}
+			done
 			echo -n ' rtadvd'
 			rtadvd -m ${ipv6_mobile_home_link}
 			echo -n ' had'
