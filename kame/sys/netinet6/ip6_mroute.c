@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.92 2003/05/14 17:00:39 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.93 2003/05/14 17:01:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1686,10 +1686,10 @@ ip6_mdq(m, ifp, rt)
 
 static void
 phyint_send(ip6, mifp, m, src, dst)
-    struct ip6_hdr *ip6;
-    struct mif6 *mifp;
-    struct mbuf *m;
-    struct sockaddr_in6 *src, *dst;
+	struct ip6_hdr *ip6;
+	struct mif6 *mifp;
+	struct mbuf *m;
+	struct sockaddr_in6 *src, *dst;
 {
 	struct mbuf *mb_copy;
 	struct ifnet *ifp = mifp->m6_ifp;
