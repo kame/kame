@@ -58,6 +58,7 @@ static int pfkey_send_x3 __P((int so, u_int type, u_int satype));
 static int pfkey_send_x4 __P((int so, u_int type,
 	struct sockaddr *src, u_int prefs, struct sockaddr *dst, u_int prefd,
 	u_int proto, char *policy, int policylen, u_int32_t seq));
+static int pfkey_send_x5 __P((int so, u_int type, u_int32_t));
 
 static caddr_t pfkey_setsadbmsg __P((caddr_t buf, u_int type, u_int tlen,
 	u_int satype, u_int mode, u_int32_t reqid, u_int32_t seq, pid_t pid));
@@ -624,30 +625,38 @@ pfkey_send_spddelete(so, src, prefs, dst, prefd, proto, policy, policylen, seq)
 }
 
 /*
+ * sending SADB_X_SPDDELETE message to the kernel.
+ * OUT:
+ *	positive: success and return length sent.
+ *	-1	: error occured, and set errno.
+ */
+int
+pfkey_send_spddelete2(so, spid)
+	int so;
+	u_int32_t spid;
+{
+	int len;
+
+	if ((len = pfkey_send_x5(so, SADB_X_SPDDELETE2, spid)) < 0)
+		return -1;
+
+	return len;
+}
+
+/*
  * sending SADB_X_SPDGET message to the kernel.
  * OUT:
  *	positive: success and return length sent.
  *	-1	: error occured, and set errno.
  */
 int
-pfkey_send_spdget(so, src, prefs, dst, prefd, proto, policy, policylen, seq)
+pfkey_send_spdget(so, spid)
 	int so;
-	struct sockaddr *src, *dst;
-	u_int prefs, prefd, proto;
-	caddr_t policy;
-	int policylen;
-	u_int32_t seq;
+	u_int32_t spid;
 {
 	int len;
 
-	if (policylen != sizeof(struct sadb_x_policy)) {
-		__ipsec_errcode = EIPSEC_INVAL_ARGUMENT;
-		return -1;
-	}
-
-	if ((len = pfkey_send_x4(so, SADB_X_SPDGET,
-				src, prefs, dst, prefd, proto,
-				policy, policylen, seq)) < 0)
+	if ((len = pfkey_send_x5(so, SADB_X_SPDGET, spid)) < 0)
 		return -1;
 
 	return len;
@@ -942,7 +951,7 @@ pfkey_send_x3(so, type, satype)
 	return len;
 }
 
-/* sending SADB_X_SPDADD or SADB_X_SPDDELETE message to the kernel */
+/* sending SADB_X_SPDADD message to the kernel */
 static int
 pfkey_send_x4(so, type, src, prefs, dst, prefd, proto, policy, policylen, seq)
 	int so;
@@ -998,6 +1007,49 @@ pfkey_send_x4(so, type, src, prefs, dst, prefd, proto, policy, policylen, seq)
 	                      prefd,
 	                      proto);
 	memcpy(p, policy, policylen);
+
+	/* send message */
+	len = pfkey_send(so, newmsg, len);
+	free(newmsg);
+
+	if (len < 0)
+		return -1;
+
+	__ipsec_errcode = EIPSEC_NO_ERROR;
+	return len;
+}
+
+/* sending SADB_X_SPDGET or SADB_X_SPDDELETE message to the kernel */
+static int
+pfkey_send_x5(so, type, spid)
+	int so;
+	u_int type;
+	u_int32_t spid;
+{
+	struct sadb_msg *newmsg;
+	struct sadb_x_policy xpl;
+	int len;
+	caddr_t p;
+
+	/* create new sadb_msg to reply. */
+	len = sizeof(struct sadb_msg)
+		+ sizeof(xpl);
+
+	if ((newmsg = CALLOC(len, struct sadb_msg *)) == NULL) {
+		__ipsec_set_strerror(strerror(errno));
+		return -1;
+	}
+
+	p = pfkey_setsadbmsg((caddr_t)newmsg, type, len,
+	                     SADB_SATYPE_UNSPEC, IPSEC_MODE_ANY, 0,
+			     0, getpid());
+
+	memset(&xpl, 0, sizeof(xpl));
+	xpl.sadb_x_policy_len = PFKEY_UNUNIT64(sizeof(xpl));
+	xpl.sadb_x_policy_exttype = SADB_X_EXT_POLICY;
+	xpl.sadb_x_policy_id = spid;
+
+	memcpy(p, &xpl, sizeof(xpl));
 
 	/* send message */
 	len = pfkey_send(so, newmsg, len);

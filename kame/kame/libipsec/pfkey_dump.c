@@ -362,12 +362,13 @@ pfkey_spdump(m)
 	free(d_xpl);
     }
 
-	printf("\tseq=%ld pid=%ld\n",
+	printf("\tspid=%ld seq=%ld pid=%ld\n",
+		(u_long)m_xpl->sadb_x_policy_id,
 		(u_long)m->sadb_msg_seq,
 		(u_long)m->sadb_msg_pid);
 
 	/* XXX TEST */
-	printf("\tspid=%u\n", m->sadb_msg_reserved2);
+	printf("\trefcnt=%u\n", m->sadb_msg_reserved2);
 
 	return;
 }
