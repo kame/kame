@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.306 2002/05/27 04:21:26 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.307 2002/05/29 05:07:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3669,17 +3669,17 @@ icmp6_mtudisc_timeout(rt, r)
 {
 	if (rt == NULL)
 		panic("icmp6_mtudisc_timeout: bad route to timeout");
-#if defined(__FreeBSD__) || defined(__NetBSD__)
+#if defined(__FreeBSD__)
 	if (!(rt->rt_rmx.rmx_locks & RTV_MTU))
 		rt->rt_rmx.rmx_mtu = IN6_LINKMTU(rt->rt_ifp);
-#else  /* i.e. netbsd and openbsd */
+#else /* netbsd or openbsd */
 	if ((rt->rt_flags & (RTF_DYNAMIC | RTF_HOST)) ==
 	    (RTF_DYNAMIC | RTF_HOST)) {
 		rtrequest((int) RTM_DELETE, (struct sockaddr *)rt_key(rt),
 		    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
 	} else {
-		if (!(rt->rt_rmx.rmx_locks & RTV_MTU))
-			rt->rt_rmx.rmx_mtu = IN6_LINKMTU(rt->rt_ifp);
+		if ((rt->rt_rmx.rmx_locks & RTV_MTU) == 0)
+			rt->rt_rmx.rmx_mtu = 0;
 	}
 #endif
 }
