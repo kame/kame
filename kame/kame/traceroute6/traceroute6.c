@@ -946,7 +946,7 @@ pr_type(t0)
 		cp = "Neighbor Advertisement";
 		break;
 	case ND_REDIRECT:
-		cp = "Ridirect";
+		cp = "Redirect";
 		break;
 	default:
 		cp = "Unknown";
