@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.64 2001/07/23 16:12:38 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.65 2001/07/26 06:53:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -185,8 +185,8 @@ struct	in6_ndifreq {
 #define NDPRF_HOME		0x4
 
 /* protocol constants */
-#define MAX_RTR_SOLICITATION_DELAY	1	/*1sec*/
-#define RTR_SOLICITATION_INTERVAL	4	/*4sec*/
+#define MAX_RTR_SOLICITATION_DELAY	1	/* 1sec */
+#define RTR_SOLICITATION_INTERVAL	4	/* 4sec */
 #define MAX_RTR_SOLICITATIONS		3
 
 #define ND6_INFINITE_LIFETIME		0xffffffff

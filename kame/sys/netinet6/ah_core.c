@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.44 2001/03/12 11:24:39 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.45 2001/07/26 06:53:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1174,7 +1174,7 @@ ah_update_mbuf(m, off, len, algo, algos)
 	if (!n)
 		panic("ah_update_mbuf: wrong offset specified");
 
-	for (/*nothing*/; n && len > 0; n = n->m_next) {
+	for (/* nothing */; n && len > 0; n = n->m_next) {
 		if (n->m_len == 0)
 			continue;
 		if (n->m_len - off < len)
@@ -1218,7 +1218,7 @@ ah4_calccksum(m, ahdat, len, algo, sav)
 		return EINVAL;
 
 	ahseen = 0;
-	hdrtype = -1;	/*dummy, it is called IPPROTO_IP*/
+	hdrtype = -1;	/* dummy, it is called IPPROTO_IP */
 
 	off = 0;
 
@@ -1226,12 +1226,12 @@ ah4_calccksum(m, ahdat, len, algo, sav)
 	if (error)
 		return error;
 
-	advancewidth = 0;	/*safety*/
+	advancewidth = 0;	/* safety */
 
 again:
 	/* gory. */
 	switch (hdrtype) {
-	case -1:	/*first one only*/
+	case -1:	/* first one only */
 	    {
 		/*
 		 * copy ip hdr, modify to fit the AH checksum rule,

@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_debug.c,v 1.6 2000/03/25 07:24:00 sumikawa Exp $	*/
+/*	$KAME: tcp6_debug.c,v 1.7 2001/07/26 06:53:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -112,7 +112,7 @@ tcp6_trace(act, ostate, t6p, ip6, th, req)
 #ifdef TCP6DEBUG
 	tcp6_seq seq, ack;
 	int len, flags;
-#endif /*TCP6DEBUG*/
+#endif /* TCP6DEBUG */
 	struct tcp6_debug *t6d = &tcp6_debug[tcp6_debx++];
 
 	if (tcp6_debx == TCP6_NDEBUG)

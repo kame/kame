@@ -1,4 +1,4 @@
-/*	$KAME: nd6_ind.c,v 1.2 2001/06/28 05:30:57 sumikawa Exp $	*/
+/*	$KAME: nd6_ind.c,v 1.3 2001/07/26 06:53:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -75,7 +75,7 @@
 #include <netinet6/nd6.h>
 #include <netinet/icmp6.h>
 
-#ifdef __OpenBSD__	/*don't confuse KAME ipsec with OpenBSD ipsec*/
+#ifdef __OpenBSD__	/* don't confuse KAME ipsec with OpenBSD ipsec */
 #undef IPSEC
 #endif
 

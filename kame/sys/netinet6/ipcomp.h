@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp.h,v 1.8 2000/09/26 07:55:14 itojun Exp $	*/
+/*	$KAME: ipcomp.h,v 1.9 2001/07/26 06:53:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -76,6 +76,6 @@ extern int ipcomp6_input __P((struct mbuf **, int *, int));
 extern int ipcomp6_output __P((struct mbuf *, u_char *, struct mbuf *,
 	struct ipsecrequest *));
 #endif
-#endif /*KERNEL*/
+#endif /* KERNEL */
 
-#endif /*_NETINET6_IPCOMP_H_*/
+#endif /* _NETINET6_IPCOMP_H_ */

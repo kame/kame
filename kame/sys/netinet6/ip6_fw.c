@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.26 2001/07/06 10:52:04 sumikawa Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.27 2001/07/26 06:53:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -826,7 +826,7 @@ got_match:
 	    && !IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
 		switch (rule->fw_reject_code) {
 		case IPV6_FW_REJECT_RST:
-#if 1	/*not tested*/
+#if 1	/* not tested */
 		  {
 			struct tcphdr *const tcp =
 				(struct tcphdr *) ((caddr_t)ip6 + off);

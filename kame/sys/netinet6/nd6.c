@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.179 2001/07/25 06:47:49 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.180 2001/07/26 06:53:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -905,7 +905,7 @@ nd6_lookup(addr6, create, ifp)
 	rt = rtalloc1((struct sockaddr *)&sin6, create
 #ifdef __FreeBSD__
 		      , 0UL
-#endif /*__FreeBSD__*/
+#endif /* __FreeBSD__ */
 		      );
 	if (rt && (rt->rt_flags & RTF_LLINFO) == 0) {
 		/*
@@ -1381,15 +1381,15 @@ nd6_rtrequest(req, rt, sa)
 #ifdef __bsdi__
 #if _BSDI_VERSION >= 199802
 				extern struct ifnet *loifp;
-				rt->rt_ifp = loifp;	/*XXX*/
+				rt->rt_ifp = loifp;	/* XXX */
 #else
 				extern struct ifnet loif;
-				rt->rt_ifp = &loif;	/*XXX*/
+				rt->rt_ifp = &loif;	/* XXX */
 #endif
 #elif defined(__OpenBSD__)
-				rt->rt_ifp = lo0ifp;	/*XXX*/
+				rt->rt_ifp = lo0ifp;	/* XXX */
 #else
-				rt->rt_ifp = &loif[0];	/*XXX*/
+				rt->rt_ifp = &loif[0];	/* XXX */
 #endif
 				/*
 				 * Make sure rt_ifa be equal to the ifaddr
@@ -1802,7 +1802,7 @@ fail:
 	 *	1	--	y	--	(7) * STALE
 	 */
 
-	if (lladdr) {		/*(3-5) and (7)*/
+	if (lladdr) {		/* (3-5) and (7) */
 		/*
 		 * Record source link-layer address
 		 * XXX is it dependent to ifp->if_type?
@@ -1812,17 +1812,17 @@ fail:
 	}
 
 	if (!is_newentry) {
-		if ((!olladdr && lladdr)		/*(3)*/
-		 || (olladdr && lladdr && llchange)) {	/*(5)*/
+		if ((!olladdr && lladdr)		/* (3) */
+		 || (olladdr && lladdr && llchange)) {	/* (5) */
 			do_update = 1;
 			newstate = ND6_LLINFO_STALE;
-		} else					/*(1-2,4)*/
+		} else					/* (1-2,4) */
 			do_update = 0;
 	} else {
 		do_update = 1;
-		if (!lladdr)				/*(6)*/
+		if (!lladdr)				/* (6) */
 			newstate = ND6_LLINFO_NOSTATE;
-		else					/*(7)*/
+		else					/* (7) */
 			newstate = ND6_LLINFO_STALE;
 	}
 
@@ -1891,7 +1891,7 @@ fail:
 		/*
 		 * New entry must have is_router flag cleared.
 		 */
-		if (is_newentry)	/*(6-7)*/
+		if (is_newentry)	/* (6-7) */
 			ln->ln_router = 0;
 		break;
 	case ND_REDIRECT:
@@ -1902,7 +1902,7 @@ fail:
 		 */
 		if (code == ND_REDIRECT_ROUTER)
 			ln->ln_router = 1;
-		else if (is_newentry) /*(6-7)*/
+		else if (is_newentry) /* (6-7) */
 			ln->ln_router = 0;
 		break;
 	case ND_ROUTER_SOLICIT:
@@ -1915,8 +1915,8 @@ fail:
 		/*
 		 * Mark an entry with lladdr as a router.
 		 */
-		if ((!is_newentry && (olladdr || lladdr))	/*(2-5)*/
-		 || (is_newentry && lladdr)) {			/*(7)*/
+		if ((!is_newentry && (olladdr || lladdr))	/* (2-5) */
+		 || (is_newentry && lladdr)) {			/* (7) */
 			ln->ln_router = 1;
 		}
 		break;

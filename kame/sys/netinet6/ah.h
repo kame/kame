@@ -1,4 +1,4 @@
-/*	$KAME: ah.h,v 1.13 2000/10/18 21:28:00 itojun Exp $	*/
+/*	$KAME: ah.h,v 1.14 2001/07/26 06:53:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,7 +64,7 @@ struct secasvar;
 
 struct ah_algorithm_state {
 	struct secasvar *sav;
-	void* foo;	/*per algorithm data - maybe*/
+	void* foo;	/* per algorithm data - maybe */
 };
 
 struct ah_algorithm {
@@ -91,7 +91,7 @@ extern int ah4_output __P((struct mbuf *, struct ipsecrequest *));
 extern int ah4_calccksum __P((struct mbuf *, caddr_t, size_t,
 	const struct ah_algorithm *, struct secasvar *));
 
-#if defined(__NetBSD__) && __NetBSD_Version__ >= 105080000	/*1.5H*/
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 105080000	/* 1.5H */
 extern void *ah4_ctlinput __P((int, struct sockaddr *, void *));
 #endif
 
@@ -105,6 +105,6 @@ extern int ah6_calccksum __P((struct mbuf *, caddr_t, size_t,
 extern void ah6_ctlinput __P((int, struct sockaddr *, void *));
 #endif /* INET6 */
 
-#endif /*_KERNEL*/
+#endif /* _KERNEL */
 
-#endif /*_NETINET6_AH_H_*/
+#endif /* _NETINET6_AH_H_ */

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.72 2001/07/24 10:04:04 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.73 2001/07/26 06:53:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,7 +75,7 @@
 #include <netinet6/nd6.h>
 #include <netinet/icmp6.h>
 
-#ifdef __OpenBSD__	/*don't confuse KAME ipsec with OpenBSD ipsec*/
+#ifdef __OpenBSD__	/* don't confuse KAME ipsec with OpenBSD ipsec */
 #undef IPSEC
 #endif
 
@@ -149,11 +149,11 @@ nd6_ns_input(m, off, icmp6len)
 	if (IN6_IS_ADDR_UNSPECIFIED(&saddr6)) {
 		/* dst has to be solicited node multicast address. */
 		if (daddr6.s6_addr16[0] == IPV6_ADDR_INT16_MLL
-		    /*don't check ifindex portion*/
+		    /* don't check ifindex portion */
 		    && daddr6.s6_addr32[1] == 0
 		    && daddr6.s6_addr32[2] == IPV6_ADDR_INT32_ONE
 		    && daddr6.s6_addr8[12] == 0xff) {
-			; /*good*/
+			; /* good */
 		} else {
 			nd6log((LOG_INFO, "nd6_ns_input: bad DAD packet "
 				"(wrong ip6 dst)\n"));
@@ -404,7 +404,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 
 	icmp6len = sizeof(*nd_ns);
 	m->m_pkthdr.len = m->m_len = sizeof(*ip6) + icmp6len;
-	m->m_data += max_linkhdr;	/*or MH_ALIGN() equivalent?*/
+	m->m_data += max_linkhdr;	/* or MH_ALIGN() equivalent? */
 
 	/* fill neighbor solicitation packet */
 	ip6 = mtod(m, struct ip6_hdr *);
@@ -440,7 +440,7 @@ nd6_ns_output(ifp, daddr6, taddr6, ln, dad)
 		 * - saddr6 belongs to the outgoing interface.
 		 * Otherwise, we perform a scope-wise match.
 		 */
-		struct ip6_hdr *hip6;		/*hold ip6*/
+		struct ip6_hdr *hip6;		/* hold ip6 */
 		struct in6_addr *saddr6;
 
 		if (ln && ln->ln_hold) {
@@ -886,7 +886,7 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 
 	icmp6len = sizeof(*nd_na);
 	m->m_pkthdr.len = m->m_len = sizeof(struct ip6_hdr) + icmp6len;
-	m->m_data += max_linkhdr;	/*or MH_ALIGN() equivalent?*/
+	m->m_data += max_linkhdr;	/* or MH_ALIGN() equivalent? */
 
 	/* fill neighbor advertisement packet */
 	ip6 = mtod(m, struct ip6_hdr *);
@@ -1143,7 +1143,7 @@ nd6_dad_start(ifa, tick)
 	 * (re)initialization.
 	 */
 	dp->dad_ifa = ifa;
-	IFAREF(ifa);	/*just for safety*/
+	IFAREF(ifa);	/* just for safety */
 	dp->dad_count = ip6_dad_count;
 	dp->dad_ns_icount = dp->dad_na_icount = 0;
 	dp->dad_ns_ocount = dp->dad_ns_tcount = 0;
@@ -1203,9 +1203,9 @@ nd6_dad_timer(ifa)
 	struct dadq *dp;
 
 #ifdef __NetBSD__
-	s = splsoftnet();	/*XXX*/
+	s = splsoftnet();	/* XXX */
 #else
-	s = splnet();		/*XXX*/
+	s = splnet();		/* XXX */
 #endif
 
 	/* Sanity check */
@@ -1271,7 +1271,7 @@ nd6_dad_timer(ifa)
 		}
 
 		if (dp->dad_ns_icount) {
-#if 0 /*heuristics*/
+#if 0 /* heuristics */
 			/*
 			 * if
 			 * - we have sent many(?) DAD NS, and

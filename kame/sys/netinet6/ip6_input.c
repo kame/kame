@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.207 2001/07/25 05:52:48 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.208 2001/07/26 06:53:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -115,7 +115,7 @@
 #ifdef INET
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
-#endif /*INET*/
+#endif /* INET */
 #include <netinet/ip6.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6_var.h>
@@ -439,7 +439,7 @@ ip6_input(m)
 	int nxt, ours = 0;
 	struct ifnet *deliverifp = NULL;
 #if 0
-	struct mbuf *mhist;	/*onion peeling history*/
+	struct mbuf *mhist;	/* onion peeling history */
 	caddr_t hist;
 #endif
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
@@ -478,11 +478,11 @@ ip6_input(m)
 		if (m->m_next) {
 			if (m->m_flags & M_LOOP) {
 #ifdef __bsdi__
-				ip6stat.ip6s_m2m[loifp->if_index]++;	/*XXX*/
+				ip6stat.ip6s_m2m[loifp->if_index]++; /* XXX */
 #elif defined(__OpenBSD__)
-				ip6stat.ip6s_m2m[lo0ifp->if_index]++;	/*XXX*/
+				ip6stat.ip6s_m2m[lo0ifp->if_index]++; /* XXX */
 #else
-				ip6stat.ip6s_m2m[loif[0].if_index]++;	/*XXX*/
+				ip6stat.ip6s_m2m[loif[0].if_index]++; /* XXX */
 #endif
 			} else if (m->m_pkthdr.rcvif->if_index < M2MMAX)
 				ip6stat.ip6s_m2m[m->m_pkthdr.rcvif->if_index]++;
@@ -497,11 +497,11 @@ ip6_input(m)
 	ip6stat.ip6s_total++;
 
 #ifndef PULLDOWN_TEST
-	/*
+	/* 
 	 * L2 bridge code and some other code can return mbuf chain
 	 * that does not conform to KAME requirement.  too bad.
 	 * XXX: fails to join if interface MTU > MCLBYTES.  jumbogram?
-	 */
+	  */
 	if (m && m->m_next != NULL && m->m_pkthdr.len < MCLBYTES) {
 		struct mbuf *n;
 
@@ -525,7 +525,7 @@ ip6_input(m)
 		m_freem(m);
 		m = n;
 	}
-	IP6_EXTHDR_CHECK(m, 0, sizeof(struct ip6_hdr), /*nothing*/);
+	IP6_EXTHDR_CHECK(m, 0, sizeof(struct ip6_hdr), /* nothing */);
 #endif
 
 	if (m->m_len < sizeof(struct ip6_hdr)) {
@@ -561,7 +561,7 @@ ip6_input(m)
 #ifdef IPSEC
 	if (!ipsec_gethist(m, NULL))
 #else
-	if (1 /*CONSTCOND*/)
+	if (1 /* CONSTCOND */)
 #endif
 	{
 		m0 = m;
@@ -965,7 +965,7 @@ ip6_input(m)
 		 && ip6_forward_rt.ro_rt->rt_ifp->if_type == IFT_FAITH) {
 			/* XXX do we need more sanity checks? */
 			ours = 1;
-			deliverifp = ip6_forward_rt.ro_rt->rt_ifp; /*faith*/
+			deliverifp = ip6_forward_rt.ro_rt->rt_ifp; /* faith */
 			goto hbhcheck;
 		}
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.99 2001/07/24 08:55:29 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.100 2001/07/26 06:53:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -172,7 +172,7 @@
 #endif
 #include <netinet6/ipcomp.h>
 #endif
-#endif /*IPSEC*/
+#endif /* IPSEC */
 
 #include <netinet6/ip6protosw.h>
 
@@ -277,7 +277,7 @@ struct ip6protosw inet6sw[] = {
 # endif
 #endif
 },
-#endif /*TCP6*/
+#endif /* TCP6 */
 { SOCK_RAW,	&inet6domain,	IPPROTO_RAW,	PR_ATOMIC|PR_ADDR,
   rip6_input,	rip6_output,	rip6_ctlinput,	rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -397,7 +397,7 @@ struct ip6protosw inet6sw[] = {
   &rip6_usrreqs
 #endif
 },
-#endif /*INET*/
+#endif /* INET */
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   encap6_input, rip6_output,	0,		rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -413,7 +413,7 @@ struct ip6protosw inet6sw[] = {
 #if defined(__NetBSD__) && defined(ISO)
 { SOCK_RAW,	&inet6domain,	IPPROTO_EON,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   encap6_input,	rip6_output,	0,		rip6_ctloutput,
-  rip6_usrreq,	/*XXX*/
+  rip6_usrreq,	/* XXX */
   encap_init,	0,		0,		0,
 },
 #endif
@@ -446,7 +446,7 @@ struct ip6protosw inet6sw[] = {
 
 #if NGIF > 0
 struct ip6protosw in6_gif_protosw =
-{ SOCK_RAW,	&inet6domain,	0/*IPPROTO_IPV[46]*/,	PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inet6domain,	0/* IPPROTO_IPV[46] */,	PR_ATOMIC|PR_ADDR,
   in6_gif_input, rip6_output,	0,		rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
@@ -458,7 +458,7 @@ struct ip6protosw in6_gif_protosw =
   &rip6_usrreqs
 #endif
 };
-#endif /*NGIF*/
+#endif /* NGIF */
 
 #ifdef __FreeBSD__
 extern int in6_inithead __P((void **, int));
@@ -640,7 +640,7 @@ int	tcp6_syn_cache_timeo = TCP6TV_KEEP_INIT;
 
 int	tcp6_roundsize = TCP6_ROUNDSIZE;
 int	tcp6_roundfrac = TCP6_ROUNDFRAC;
-#endif /*TCP6*/
+#endif /* TCP6 */
 
 /* UDP on IP6 parameters */
 int	udp6_sendspace = 9216;		/* really max datagram size */

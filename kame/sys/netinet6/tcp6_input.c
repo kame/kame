@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.42 2001/03/14 05:18:44 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.43 2001/07/26 06:53:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -79,7 +79,7 @@
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 #include "opt_inet.h"
-#ifdef __NetBSD__	/*XXX*/
+#ifdef __NetBSD__	/* XXX */
 #include "opt_ipsec.h"
 #endif
 #endif
@@ -120,7 +120,7 @@
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
-#endif /*IPSEC*/
+#endif /* IPSEC */
 
 #include "faith.h"
 #if defined(NFAITH) && NFAITH > 0
@@ -464,7 +464,7 @@ tcp6_input(mp, offp, proto)
 	struct socket *so = (struct socket *)NULL;
 	int todrop, acked, ourfinisacked, needoutput = 0;
 	int hdroptlen = 0;
-	short ostate = 0; /*just to avoid warning*/
+	short ostate = 0; /* just to avoid warning */
 #if 0
 	struct in6_addr laddr;
 #endif
@@ -584,7 +584,7 @@ findpcb:
 		ipsec6stat.in_polvio++;
 		goto drop;
 	}
-#endif /*IPSEC*/
+#endif /* IPSEC */
 
 	/*
 	 * Compute mbuf offset to TCP data segment.
@@ -598,7 +598,7 @@ findpcb:
 	NTOHL(th->th_ack);
 	NTOHS(th->th_win);
 	NTOHS(th->th_urp);
-/*	t6i->t6i_len = len;  */ /* xxx reass*/
+/* 	t6i->t6i_len = len;   */ /* xxx reass*/
 	
 	/*
 	 * If the state is CLOSED (i.e., TCB6 does not exist) then

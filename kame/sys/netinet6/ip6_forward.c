@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.75 2001/06/29 12:42:13 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.76 2001/07/26 06:53:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,7 +74,7 @@
 #include <netinet6/in6_pcb.h>
 #endif
 
-#ifdef __OpenBSD__ /*KAME IPSEC*/
+#ifdef __OpenBSD__ /* KAME IPSEC */
 #undef IPSEC
 #endif
 
@@ -177,7 +177,7 @@ ip6_forward(m, srcrt)
 		m_freem(m);
 		return;
 	}
-#endif /*IPSEC*/
+#endif /* IPSEC */
 
 	/*
 	 * Do not forward packets to multicast destination (should be handled
@@ -327,7 +327,7 @@ ip6_forward(m, srcrt)
 			break;
 		default:
 			printf("ip6_output (ipsec): error code %d\n", error);
-			/*fall through*/
+			/* fall through */
 		case ENOENT:
 			/* don't show these error codes to the user */
 			break;

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.221 2001/07/25 06:47:48 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.222 2001/07/26 06:53:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -465,7 +465,7 @@ in6_control(so, cmd, data, ifp)
 	case SIOCSIFINFO_FLAGS:
 		if (!privileged)
 			return(EPERM);
-		/*fall through*/
+		/* fall through */
 	case OSIOCGIFINFO_IN6:
 	case SIOCGIFINFO_IN6:
 	case SIOCGDRLST_IN6:
@@ -507,7 +507,7 @@ in6_control(so, cmd, data, ifp)
 	case SIOCDLIFADDR:
 		if (!privileged)
 			return(EPERM);
-		/*fall through*/
+		/* fall through */
 	case SIOCGLIFADDR:
 #if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 		return in6_lifaddr_ioctl(so, cmd, data, ifp, p);
@@ -1283,7 +1283,7 @@ in6_update_ifa(ifp, ifra, ia)
 	}
 
 	ia->ia6_flags = ifra->ifra_flags;
-	ia->ia6_flags &= ~IN6_IFF_DUPLICATED;	/*safety*/
+	ia->ia6_flags &= ~IN6_IFF_DUPLICATED;	/* safety */
 	ia->ia6_flags &= ~IN6_IFF_NODAD;	/* Mobile IPv6 */
 
 	ia->ia6_lifetime = ifra->ifra_lifetime;
@@ -1566,7 +1566,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 	/* sanity checks */
 	if (!data || !ifp) {
 		panic("invalid argument to in6_lifaddr_ioctl");
-		/*NOTRECHED*/
+		/* NOTRECHED */
 	}
 
 	switch (cmd) {
@@ -1574,7 +1574,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 		/* address must be specified on GET with IFLR_PREFIX */
 		if ((iflr->flags & IFLR_PREFIX) == 0)
 			break;
-		/*FALLTHROUGH*/
+		/* FALLTHROUGH */
 	case SIOCALIFADDR:
 	case SIOCDLIFADDR:
 		/* address must be specified on ADD and DELETE */
@@ -1590,10 +1590,10 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 		if (sa->sa_len && sa->sa_len != sizeof(struct sockaddr_in6))
 			return EINVAL;
 		break;
-	default: /*shouldn't happen*/
+	default: /* shouldn't happen */
 #if 0
 		panic("invalid cmd to in6_lifaddr_ioctl");
-		/*NOTREACHED*/
+		/* NOTREACHED */
 #else
 		return EOPNOTSUPP;
 #endif
@@ -1650,7 +1650,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 				hostid->s6_addr32[3];
 		}
 
-		if (((struct sockaddr *)&iflr->dstaddr)->sa_family) {	/*XXX*/
+		if (((struct sockaddr *)&iflr->dstaddr)->sa_family) { /* XXX */
 			bcopy(&iflr->dstaddr, &ifra.ifra_dstaddr,
 				((struct sockaddr *)&iflr->dstaddr)->sa_len);
 			if (hostid) {
@@ -1699,7 +1699,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 		} else {
 			if (cmd == SIOCGLIFADDR) {
 				/* on getting an address, take the 1st match */
-				cmp = 0;	/*XXX*/
+				cmp = 0;	/* XXX */
 			} else {
 				/* on deleting an address, do exact match */
 				in6_prefixlen2mask(&mask, 128);
@@ -1780,7 +1780,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 				in6_mask2len(&ia->ia_prefixmask.sin6_addr,
 					     NULL);
 
-			iflr->flags = ia->ia6_flags;	/*XXX*/
+			iflr->flags = ia->ia6_flags;	/* XXX */
 
 			return 0;
 		} else {
@@ -1815,7 +1815,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 	    }
 	}
 
-	return EOPNOTSUPP;	/*just for safety*/
+	return EOPNOTSUPP;	/* just for safety */
 }
 
 /*
@@ -2807,7 +2807,7 @@ in6_ifawithifp(ifp, dst)
 	int dst_scope =	in6_addrscope(dst), blen = -1, tlen;
 	struct ifaddr *ifa;
 	struct in6_ifaddr *besta = 0;
-	struct in6_ifaddr *dep[2];	/*last-resort: deprecated*/
+	struct in6_ifaddr *dep[2];	/* last-resort: deprecated */
 
 	dep[0] = dep[1] = NULL;
 
@@ -3045,7 +3045,7 @@ in6_sin_2_v4mapsin6_in_sock(struct sockaddr **nam)
 	FREE(*nam, M_SONAME);
 	*nam = (struct sockaddr *)sin6_p;
 }
-#endif /*freebsd3*/
+#endif /* freebsd3 */
 
 #ifdef MEASURE_PERFORMANCE
 #define IN6_MAXADDRHASH 1000

@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_output.c,v 1.15 2001/04/02 12:44:41 itojun Exp $	*/
+/*	$KAME: tcp6_output.c,v 1.16 2001/07/26 06:53:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -79,7 +79,7 @@
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 #include "opt_inet.h"
-#ifdef __NetBSD__	/*XXX*/
+#ifdef __NetBSD__	/* XXX */
 #include "opt_ipsec.h"
 #endif
 #endif
@@ -110,7 +110,7 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#endif /*IPSEC*/
+#endif /* IPSEC */
 
 #ifdef notyet
 extern struct mbuf *m_copypack();
@@ -152,7 +152,7 @@ tcp6_output(t6p)
 			 * slow start to get ack "clock" running again.
 			 */
 			t6p->snd_cwnd = 2*t6p->t_maxseg;
-#if 0 /*XXX*/
+#if 0 /* XXX */
 		if (somoretosend(so)) {
 			t6p->t_flags |= TF_WASIDLE;
 			idle = 0;
@@ -396,7 +396,7 @@ send:
  		optlen += TCP6OLEN_TSTAMP_APPA;
  	}
 
-#if 1 /*def already_accounted_for*/
+#if 1 /* def already_accounted_for */
 	/*
 	 * Adjust data length if insertion of options will
 	 * bump the packet length beyond the permissible segment length.
@@ -650,7 +650,7 @@ send:
 		error = ENOBUFS;
 		goto out;
 	}
-#endif /*IPSEC*/
+#endif /* IPSEC */
 
 	ip6oflags = 0;
 	if (t6p->t_in6pcb->in6p_flags & IN6P_MINMTU)

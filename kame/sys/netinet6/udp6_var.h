@@ -1,4 +1,4 @@
-/*	$KAME: udp6_var.h,v 1.11 2000/06/05 00:14:31 itojun Exp $	*/
+/*	$KAME: udp6_var.h,v 1.12 2001/07/26 06:53:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,7 +108,7 @@ struct	udp6stat {
 	{ __SENDSPACENAME, CTLTYPE_INT }, \
 	{ "recvspace", CTLTYPE_INT }, \
 }
-#endif /*__FreeBSD__||__NetBSD__*/
+#endif /* __FreeBSD__||__NetBSD__ */
 #ifdef __bsdi__
 /*
  * Names for UDP sysctl objects
@@ -133,7 +133,7 @@ struct	udp6stat {
 	&udp6_recvspace, \
 	0, \
 }
-#endif /*__bsdi__*/
+#endif /* __bsdi__ */
 
 #ifdef _KERNEL
 struct	in6pcb udb6;
@@ -160,4 +160,4 @@ int	udp6_usrreq __P((struct socket *,
 #endif
 #endif /* _KERNEL */
 
-#endif /*_NETINET6_UDP6_VAR_H_*/
+#endif /* _NETINET6_UDP6_VAR_H_ */

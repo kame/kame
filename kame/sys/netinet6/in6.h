@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.94 2001/07/24 00:43:28 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.95 2001/07/26 06:53:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -125,7 +125,7 @@ struct in6_addr {
 };
 
 #define s6_addr   __u6_addr.__u6_addr8
-#ifdef _KERNEL	/*XXX nonstandard*/
+#ifdef _KERNEL	/* XXX nonstandard */
 #define s6_addr8  __u6_addr.__u6_addr8
 #define s6_addr16 __u6_addr.__u6_addr16
 #define s6_addr32 __u6_addr.__u6_addr32
@@ -151,7 +151,7 @@ struct sockaddr_in6 {
 /*
  * Local definition for masks
  */
-#ifdef _KERNEL	/*XXX nonstandard*/
+#ifdef _KERNEL	/* XXX nonstandard */
 #define IN6MASK0	{{{ 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 }}}
 #define IN6MASK32	{{{ 0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00, \
 			    0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 }}}
@@ -176,7 +176,7 @@ extern const struct in6_addr in6mask128;
 /*
  * Macros started with IPV6_ADDR is KAME local
  */
-#ifdef _KERNEL	/*XXX nonstandard*/
+#ifdef _KERNEL	/* XXX nonstandard */
 #if BYTE_ORDER == BIG_ENDIAN
 #define IPV6_ADDR_INT32_ONE	1
 #define IPV6_ADDR_INT32_TWO	2
@@ -288,7 +288,7 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
  * KAME Scope Values
  */
 
-#ifdef _KERNEL	/*XXX nonstandard*/
+#ifdef _KERNEL	/* XXX nonstandard */
 #define IPV6_ADDR_SCOPE_NODELOCAL	0x01
 #define IPV6_ADDR_SCOPE_INTFACELOCAL	0x01
 #define IPV6_ADDR_SCOPE_LINKLOCAL	0x02
@@ -318,7 +318,7 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
  */
 #define IN6_IS_ADDR_MULTICAST(a)	((a)->s6_addr[0] == 0xff)
 
-#ifdef _KERNEL	/*XXX nonstandard*/
+#ifdef _KERNEL	/* XXX nonstandard */
 #define IPV6_ADDR_MC_SCOPE(a)		((a)->s6_addr[1] & 0x0f)
 #else
 #define __IPV6_ADDR_MC_SCOPE(a)		((a)->s6_addr[1] & 0x0f)
@@ -327,7 +327,7 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 /*
  * Multicast Scope
  */
-#ifdef _KERNEL	/*refers nonstandard items */
+#ifdef _KERNEL	/* refers nonstandard items  */
 #define IN6_IS_ADDR_MC_NODELOCAL(a)	\
 	(IN6_IS_ADDR_MULTICAST(a) &&	\
 	 (IPV6_ADDR_MC_SCOPE(a) == IPV6_ADDR_SCOPE_NODELOCAL))
@@ -364,7 +364,7 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 	 (__IPV6_ADDR_MC_SCOPE(a) == __IPV6_ADDR_SCOPE_GLOBAL))
 #endif
 
-#ifdef _KERNEL	/*nonstandard*/
+#ifdef _KERNEL	/* nonstandard */
 /*
  * KAME Scope
  */
@@ -441,12 +441,12 @@ struct route_in6 {
 #define IPV6_BINDV6ONLY		IPV6_V6ONLY
 #endif
 
-#if 1 /*IPSEC*/
+#if 1 /* IPSEC */
 #define IPV6_IPSEC_POLICY	28 /* struct; get/set security policy */
 #endif
 #define IPV6_FAITH		29 /* bool; accept FAITH'ed connections */
 
-#if 1 /*IPV6FIREWALL*/
+#if 1 /* IPV6FIREWALL */
 #define IPV6_FW_ADD		30 /* add a firewall rule to chain */
 #define IPV6_FW_DEL		31 /* delete a firewall rule from chain */
 #define IPV6_FW_FLUSH		32 /* flush firewall rule chain */
@@ -624,7 +624,7 @@ struct ip6_mtuinfo {
 #define IPV6CTL_KAME_VERSION	20
 #define IPV6CTL_USE_DEPRECATED	21	/* use deprecated addr (RFC2462 5.5.4) */
 #define IPV6CTL_RR_PRUNE	22	/* walk timer for router renumbering */
-#if 0	/*obsolete*/
+#if 0	/* obsolete */
 #define IPV6CTL_MAPPED_ADDR	23
 #endif
 #define IPV6CTL_V6ONLY		24
@@ -652,7 +652,7 @@ struct ip6_mtuinfo {
 #ifdef IPV6CTL_RTEXPIRE
 #define __IPV6CTL_NAMES_RTEXPIRE	"rtexpire"
 #define __IPV6CTL_TYPE_RTEXPIRE		CTLTYPE_INT
-#define __IPV6CTL_VARS_RTEXPIRE		0	/*&rtq_reallyold*/
+#define __IPV6CTL_VARS_RTEXPIRE		0	/* &rtq_reallyold */
 #else
 #define __IPV6CTL_NAMES_RTEXPIRE	0
 #define __IPV6CTL_TYPE_RTEXPIRE		0
@@ -662,7 +662,7 @@ struct ip6_mtuinfo {
 #ifdef IPV6CTL_RTMINEXPIRE
 #define __IPV6CTL_NAMES_RTMINEXPIRE	"minexpire"
 #define __IPV6CTL_TYPE_RTMINEXPIRE	CTLTYPE_INT
-#define __IPV6CTL_VARS_RTMINEXPIRE	0	/*&rtq_minreallyold*/
+#define __IPV6CTL_VARS_RTMINEXPIRE	0	/* &rtq_minreallyold */
 #else
 #define __IPV6CTL_NAMES_RTMINEXPIRE	0
 #define __IPV6CTL_TYPE_RTMINEXPIRE	0
@@ -672,7 +672,7 @@ struct ip6_mtuinfo {
 #ifdef IPV6CTL_RTMAXCACHE
 #define __IPV6CTL_NAMES_RTMAXCACHE	"maxcache"
 #define __IPV6CTL_TYPE_RTMAXCACHE	CTLTYPE_INT
-#define __IPV6CTL_VARS_RTMAXCACHE	0	/*&rtq_toomany*/
+#define __IPV6CTL_VARS_RTMAXCACHE	0	/* &rtq_toomany */
 #else
 #define __IPV6CTL_NAMES_RTMAXCACHE	0
 #define __IPV6CTL_TYPE_RTMAXCACHE	0

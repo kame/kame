@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_input.c,v 1.25 2001/03/01 09:12:09 itojun Exp $	*/
+/*	$KAME: ipcomp_input.c,v 1.26 2001/07/26 06:53:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -133,7 +133,7 @@ ipcomp4_input(m, va_alist)
 
 	md = m_pulldown(m, off, sizeof(*ipcomp), NULL);
 	if (!m) {
-		m = NULL;	/*already freed*/
+		m = NULL;	/* already freed */
 		ipseclog((LOG_DEBUG, "IPv4 IPComp input: assumption failed "
 		    "(pulldown failure)\n"));
 		ipsecstat.in_inval++;
@@ -156,7 +156,7 @@ ipcomp4_input(m, va_alist)
 		if (sav != NULL
 		 && (sav->state == SADB_SASTATE_MATURE
 		  || sav->state == SADB_SASTATE_DYING)) {
-			cpi = sav->alg_enc;	/*XXX*/
+			cpi = sav->alg_enc;	/* XXX */
 			/* other parameters to look at? */
 		}
 	}
@@ -282,7 +282,7 @@ ipcomp6_input(mp, offp, proto)
 
 	md = m_pulldown(m, off, sizeof(*ipcomp), NULL);
 	if (!m) {
-		m = NULL;	/*already freed*/
+		m = NULL;	/* already freed */
 		ipseclog((LOG_DEBUG, "IPv6 IPComp input: assumption failed "
 		    "(pulldown failure)\n"));
 		ipsec6stat.in_inval++;
@@ -300,7 +300,7 @@ ipcomp6_input(mp, offp, proto)
 		if (sav != NULL
 		 && (sav->state == SADB_SASTATE_MATURE
 		  || sav->state == SADB_SASTATE_DYING)) {
-			cpi = sav->alg_enc;	/*XXX*/
+			cpi = sav->alg_enc;	/* XXX */
 			/* other parameters to look at? */
 		}
 	}

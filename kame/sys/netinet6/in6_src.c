@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.43 2001/07/26 05:39:54 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.44 2001/07/26 06:53:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -249,7 +249,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 #else
 				ro->ro_rt = rtalloc1(&((struct route *)ro)
 						     ->ro_dst, 0);
-#endif /*__FreeBSD__*/
+#endif /* __FreeBSD__ */
 			} else {
 #ifdef __bsdi__  /* bsdi needs rtcalloc to make a host route */
 				rtcalloc((struct route *)ro);

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.44 2001/03/23 08:08:47 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.45 2001/07/26 06:53:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -134,7 +134,7 @@ struct secspacq {
 	int count;		/* for lifetime */
 	/* XXX: here is mbuf place holder to be sent ? */
 };
-#endif /*_KERNEL*/
+#endif /* _KERNEL */
 
 /* according to IANA assignment, port 0x0000 and proto 0xff are reserved. */
 #define IPSEC_PORT_ANY		0
@@ -231,7 +231,7 @@ struct ipsecstat {
 #define IPSECCTL_DEF_ESP_NETLEV		4	/* int; ESP tunnel mode */
 #define IPSECCTL_DEF_AH_TRANSLEV	5	/* int; AH transport mode */
 #define IPSECCTL_DEF_AH_NETLEV		6	/* int; AH tunnel mode */
-#if 0	/*obsolete, do not reuse*/
+#if 0	/* obsolete, do not reuse */
 #define IPSECCTL_INBOUND_CALL_IKE	7
 #endif
 #define	IPSECCTL_AH_CLEARTOS		8
@@ -363,7 +363,7 @@ extern struct secpolicy *ipsec6_getpolicybysock
 	__P((struct mbuf *, u_int, struct socket *, int *));
 extern struct secpolicy *ipsec6_getpolicybyaddr
 	__P((struct mbuf *, u_int, int, int *));
-#endif /*INET6*/
+#endif /* INET6 */
 
 struct inpcb;
 #ifdef INET6
@@ -399,7 +399,7 @@ extern int ipsec6_get_policy __P((struct in6pcb *in6p, caddr_t request,
 	size_t len, struct mbuf **mp));
 extern int ipsec6_in_reject __P((struct mbuf *, struct in6pcb *));
 #endif
-#endif /*INET6*/
+#endif /* INET6 */
 
 struct secas;
 struct tcpcb;
@@ -467,7 +467,7 @@ extern int ipsec_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 extern int ipsec6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 #endif /* __bsdi__ || __NetBSD__ */
 
-#endif /*_KERNEL*/
+#endif /* _KERNEL */
 
 #ifndef _KERNEL
 extern caddr_t ipsec_set_policy __P((char *, int));
@@ -475,6 +475,6 @@ extern int ipsec_get_policylen __P((caddr_t));
 extern char *ipsec_dump_policy __P((caddr_t, char *));
 
 extern const char *ipsec_strerror __P((void));
-#endif /*!_KERNEL*/
+#endif /* !_KERNEL */
 
-#endif /*_NETINET6_IPSEC_H_*/
+#endif /* _NETINET6_IPSEC_H_ */

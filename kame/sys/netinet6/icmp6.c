@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.231 2001/07/24 05:17:31 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.232 2001/07/26 06:53:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -113,7 +113,7 @@
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/ip6protosw.h>
 
-#ifdef __OpenBSD__ /*KAME IPSEC*/
+#ifdef __OpenBSD__ /* KAME IPSEC */
 #undef IPSEC
 #endif
 
@@ -333,7 +333,7 @@ icmp6_error(m, type, code, param)
 	/* count per-type-code statistics */
 	icmp6_errcount(&icmp6stat.icp6s_outerrhist, type, code);
 
-#ifdef M_DECRYPTED	/*not openbsd*/
+#ifdef M_DECRYPTED	/* not openbsd */
 	if (m->m_flags & M_DECRYPTED) {
 		icmp6stat.icp6s_canterror++;
 		goto freeit;
@@ -472,7 +472,7 @@ icmp6_error(m, type, code, param)
 	m->m_pkthdr.rcvif = NULL;
 
 	icmp6stat.icp6s_outhist[type]++;
-	icmp6_reflect(m, sizeof(struct ip6_hdr)); /*header order: IPv6 - ICMPv6*/
+	icmp6_reflect(m, sizeof(struct ip6_hdr)); /* header order: IPv6 - ICMPv6 */
 
 	return;
 
@@ -826,7 +826,7 @@ icmp6_input(mp, offp, proto)
 			bcopy(icmp6, nicmp6, sizeof(struct icmp6_hdr));
 			p = (u_char *)(nicmp6 + 1);
 			bzero(p, 4);
-			bcopy(hostname, p + 4, maxhlen); /*meaningless TTL*/
+			bcopy(hostname, p + 4, maxhlen); /* meaningless TTL */
 			noff = sizeof(struct ip6_hdr);
 			M_COPY_PKTHDR(n, m); /* just for recvif */
 			n->m_pkthdr.len = n->m_len = sizeof(struct ip6_hdr) +
@@ -1210,7 +1210,7 @@ icmp6_notify_error(m, off, icmp6len, code)
 			notifymtu = ntohl(icmp6->icmp6_mtu);
 			ip6cp.ip6c_cmdarg = (void *)&notifymtu;
 #if !(defined(__NetBSD__) || defined(__OpenBSD__))
-			icmp6_mtudisc_update(&ip6cp, 1);	/*XXX*/
+			icmp6_mtudisc_update(&ip6cp, 1);	/* XXX */
 #endif
 		}
 
@@ -1747,7 +1747,7 @@ ni6_nametodns(name, namelen, old)
 	}
 
 	panic("should not reach here");
-	/*NOTREACHED*/
+	/* NOTREACHED */
 
  fail:
 	if (m)
@@ -2365,7 +2365,7 @@ icmp6_reflect(m, off)
 #ifdef IPSEC
 	/* Don't lookup socket */
 	(void)ipsec_setsocket(m, NULL);
-#endif /*IPSEC*/
+#endif /* IPSEC */
 
 	/*
 	 * To avoid a "too big" situation at an intermediate router
@@ -2578,7 +2578,7 @@ icmp6_redirect_input(m, off)
 		struct sockaddr_in6 sgw;
 		struct sockaddr_in6 ssrc;
 #ifdef __bsdi__
-		extern int icmp_redirtimeout;	/*XXX*/
+		extern int icmp_redirtimeout;	/* XXX */
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		unsigned long rtcount;
@@ -2800,7 +2800,7 @@ icmp6_redirect_output(m0, rt)
 	if (!rt_router)
 		goto nolladdropt;
 	len = sizeof(*nd_opt) + ifp->if_addrlen;
-	len = (len + 7) & ~7;	/*round by 8*/
+	len = (len + 7) & ~7;	/* round by 8 */
 	/* safety check */
 	if (len + (p - (u_char *)ip6) > maxlen)
 		goto nolladdropt;
@@ -2822,7 +2822,7 @@ nolladdropt:;
 	m->m_pkthdr.len = m->m_len = p - (u_char *)ip6;
 
 	/* just to be safe */
-#ifdef M_DECRYPTED	/*not openbsd*/
+#ifdef M_DECRYPTED	/* not openbsd */
 	if (m0->m_flags & M_DECRYPTED)
 		goto noredhdropt;
 #endif
@@ -2925,7 +2925,7 @@ noredhdropt:;
 #ifdef IPSEC
 	/* Don't lookup socket */
 	(void)ipsec_setsocket(m, NULL);
-#endif /*IPSEC*/
+#endif /* IPSEC */
 	ip6_output(m, NULL, NULL, 0, NULL, &outif);
 	if (outif) {
 		icmp6_ifstat_inc(outif, ifs6_out_msg);
@@ -3130,7 +3130,7 @@ ppsratecheck(lasttime, curpps, maxpps)
 	else
 		rv = 0;
 
-#if 1 /*DIAGNOSTIC?*/
+#if 1 /* DIAGNOSTIC? */
 	/* be careful about wrap-around */
 	if (*curpps + 1 > *curpps)
 		*curpps = *curpps + 1;
@@ -3165,7 +3165,7 @@ icmp6_ratelimit(dst, type, code)
 {
 	int ret;
 
-	ret = 0;	/*okay to send*/
+	ret = 0;	/* okay to send */
 
 	/* PPS limit */
 	if (!ppsratecheck(&icmp6errppslim_last, &icmp6errpps_count,
@@ -3245,7 +3245,7 @@ icmp6_redirect_timeout(rt, r)
 		    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
 	}
 }
-#endif /*__NetBSD__ || __OpenBSD__*/
+#endif /* __NetBSD__ || __OpenBSD__ */
 
 #ifdef __bsdi__
 void
@@ -3290,7 +3290,7 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		    oldp, oldlenp, newp, newlen));
 	}
 }
-#endif /*__bsdi__*/
+#endif /* __bsdi__ */
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <vm/vm.h>

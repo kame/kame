@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.106 2001/07/25 06:35:28 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.107 2001/07/26 06:53:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -197,7 +197,7 @@ SYSCTL_INT(_net_inet6_ipsec6, IPSECCTL_DEBUG,
 	debug, CTLFLAG_RW,	&ipsec_debug,	0, "");
 SYSCTL_INT(_net_inet6_ipsec6, IPSECCTL_ESP_RANDPAD,
 	esp_randpad, CTLFLAG_RW,	&ip6_esp_randpad,	0, "");
-#endif /*__FreeBSD__*/
+#endif /* __FreeBSD__ */
 #endif /* INET6 */
 
 static int ipsec_setspidx_mbuf
@@ -1134,7 +1134,7 @@ ipsec_init_policy(so, pcb_sp)
 	bzero(new, sizeof(*new));
 
 #ifdef __NetBSD__
-	if (so->so_uid == 0)	/*XXX*/
+	if (so->so_uid == 0)	/* XXX */
 		new->priv = 1;
 	else
 		new->priv = 0;
@@ -1864,7 +1864,7 @@ ipsec_hdrsiz(sp)
 #ifdef IPSEC_ESP
 			clen = esp_hdrsiz(isr);
 #else
-			clen = 0;	/*XXX*/
+			clen = 0;	/* XXX */
 #endif
 			break;
 		case IPPROTO_AH:
@@ -1975,7 +1975,7 @@ ipsec6_hdrsiz(m, dir, in6p)
 
 	return size;
 }
-#endif /*INET6*/
+#endif /* INET6 */
 
 #ifdef INET
 /*
@@ -2071,13 +2071,13 @@ ipsec4_encapsulate(m, sav)
 	ip->ip_off &= htons(~IP_OFFMASK);
 	ip->ip_off &= htons(~IP_MF);
 	switch (ip4_ipsec_dfbit) {
-	case 0:	/*clear DF bit*/
+	case 0:	/* clear DF bit */
 		ip->ip_off &= htons(~IP_DF);
 		break;
-	case 1:	/*set DF bit*/
+	case 1:	/* set DF bit */
 		ip->ip_off |= htons(IP_DF);
 		break;
-	default:	/*copy DF bit*/
+	default:	/* copy DF bit */
 		break;
 	}
 	ip->ip_p = IPPROTO_IPIP;
@@ -2098,7 +2098,7 @@ ipsec4_encapsulate(m, sav)
 
 	return 0;
 }
-#endif /*INET*/
+#endif /* INET */
 
 #ifdef INET6
 static int
@@ -2178,7 +2178,7 @@ ipsec6_encapsulate(m, sav)
 
 	return 0;
 }
-#endif /*INET6*/
+#endif /* INET6 */
 
 /*
  * Check the variable replay window.
@@ -2423,7 +2423,7 @@ ipsec6_logpacketstr(ip6, spi)
 
 	return buf;
 }
-#endif /*INET6*/
+#endif /* INET6 */
 
 const char *
 ipsec_logsastr(sav)
@@ -2881,7 +2881,7 @@ ipsec6_output_trans(state, nexthdrp, mprev, sp, flags, tun)
 			ipseclog((LOG_ERR, "ipsec6_output_trans: "
 			    "IPsec with IPv6 jumbogram is not supported\n"));
 			ipsec6stat.out_inval++;
-			error = EINVAL;	/*XXX*/
+			error = EINVAL;	/* XXX */
 			goto bad;
 		}
 		ip6 = mtod(state->m, struct ip6_hdr *);
@@ -2937,7 +2937,7 @@ ipsec6_output_tunnel(state, sp, flags)
 			break;
 	}
 
-	for (/*already initialized*/; isr; isr = isr->next) {
+	for (/* already initialized */; isr; isr = isr->next) {
 		/* When tunnel mode, SA peers must be specified. */
 		bcopy(&isr->saidx, &saidx, sizeof(saidx));
 		if (key_checkrequest(isr, &saidx) == ENOENT) {
@@ -3067,7 +3067,7 @@ ipsec6_output_tunnel(state, sp, flags)
 			break;
 		case IPPROTO_IPCOMP:
 			/* XXX code should be here */
-			/*FALLTHROUGH*/
+			/* FALLTHROUGH */
 		default:
 			ipseclog((LOG_ERR, "ipsec6_output_tunnel: "
 			    "unknown ipsec protocol %d\n", isr->saidx.proto));
@@ -3085,7 +3085,7 @@ ipsec6_output_tunnel(state, sp, flags)
 			ipseclog((LOG_ERR, "ipsec6_output_tunnel: "
 			    "IPsec with IPv6 jumbogram is not supported\n"));
 			ipsec6stat.out_inval++;
-			error = EINVAL;	/*XXX*/
+			error = EINVAL;	/* XXX */
 			goto bad;
 		}
 		ip6 = mtod(state->m, struct ip6_hdr *);
@@ -3099,7 +3099,7 @@ bad:
 	state->m = NULL;
 	return error;
 }
-#endif /*INET6*/
+#endif /* INET6 */
 
 #ifdef INET
 /*
@@ -3560,7 +3560,7 @@ ipsec_addhist(m, proto, spi)
 	if (!n)
 		return ENOBUFS;
 	if (M_TRAILINGSPACE(n) < sizeof(*p))
-		return ENOSPC;	/*XXX*/
+		return ENOSPC;	/* XXX */
 	p = (struct ipsec_history *)(mtod(n, caddr_t) + n->m_len);
 	n->m_len += sizeof(*p);
 	bzero(p, sizeof(*p));
@@ -3731,8 +3731,8 @@ ipsec6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		    oldp, oldlenp, newp, newlen));
 	}
 }
-#endif /*INET6*/
-#endif /*__bsdi__*/
+#endif /* INET6 */
+#endif /* __bsdi__ */
 
 #ifdef __NetBSD__
 /*
@@ -3912,6 +3912,6 @@ ipsec6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	}
 	/* NOTREACHED */
 }
-#endif /*INET6*/
+#endif /* INET6 */
 
 #endif /* __NetBSD__ */

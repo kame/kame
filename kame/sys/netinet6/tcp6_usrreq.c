@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_usrreq.c,v 1.17 2001/07/25 16:51:56 itojun Exp $	*/
+/*	$KAME: tcp6_usrreq.c,v 1.18 2001/07/26 06:53:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -79,7 +79,7 @@
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 #include "opt_inet.h"
-#ifdef __NetBSD__	/*XXX*/
+#ifdef __NetBSD__	/* XXX */
 #include "opt_ipsec.h"
 #endif
 #endif
@@ -112,7 +112,7 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#endif /*IPSEC*/
+#endif /* IPSEC */
 
 /*
  * TCP6 protocol interface to socket abstraction.
@@ -124,7 +124,7 @@ extern	char *tcp6states[];
  * then m is the mbuf chain of send data.  If this is a timer expiration
  * (called from the software clock routine), then timertype tells which timer.
  */
-/*ARGSUSED*/
+/* ARGSUSED */
 int
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 tcp6_usrreq(so, req, m, nam, control, p)

@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.136 2001/07/24 12:28:42 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.137 2001/07/26 06:53:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -132,7 +132,7 @@ static int in6_ifattach_loopback __P((struct ifnet *));
 static int
 get_hostid_ifid(ifp, in6)
 	struct ifnet *ifp;
-	struct in6_addr *in6;	/*upper 64bits are preserved */
+	struct in6_addr *in6;	/* upper 64bits are preserved  */
 {
 	int off, len;
 	static u_int8_t allzero[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -174,7 +174,7 @@ get_hostid_ifid(ifp, in6)
 static int
 get_rand_ifid(ifp, in6)
 	struct ifnet *ifp;
-	struct in6_addr *in6;	/*upper 64bits are preserved */
+	struct in6_addr *in6;	/* upper 64bits are preserved  */
 {
 	MD5_CTX ctxt;
 	u_int8_t digest[16];
@@ -308,7 +308,7 @@ generate_tmp_ifid(seed0, seed1, ret)
 static int
 get_hw_ifid(ifp, in6)
 	struct ifnet *ifp;
-	struct in6_addr *in6;	/*upper 64bits are preserved */
+	struct in6_addr *in6;	/* upper 64bits are preserved  */
 {
 	struct ifaddr *ifa;
 	struct sockaddr_dl *sdl;
@@ -445,7 +445,7 @@ found:
 static int
 get_ifid(ifp0, altifp, in6)
 	struct ifnet *ifp0;
-	struct ifnet *altifp;	/*secondary EUI64 source*/
+	struct ifnet *altifp;	/* secondary EUI64 source */
 	struct in6_addr *in6;
 {
 	struct ifnet *ifp;
@@ -744,7 +744,7 @@ in6_nigroup(ifp, name, namelen, in6)
 	while (p && *p && *p != '.' && p - name < namelen)
 		p++;
 	if (p - name > sizeof(n) - 1)
-		return -1;	/*label too long*/
+		return -1;	/* label too long */
 	l = p - name;
 	strncpy(n, name, l);
 	n[(int)l] = '\0';
@@ -851,7 +851,7 @@ in6_ifattach(ifp, altifp)
 
 	/* some of the interfaces are inherently not IPv6 capable */
 	switch (ifp->if_type) {
-#ifdef IFT_BRIDGE	/*OpenBSD 2.8*/
+#ifdef IFT_BRIDGE	/* OpenBSD 2.8 */
 	case IFT_BRIDGE:
 		return;
 #endif

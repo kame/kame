@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.59 2001/05/16 04:01:27 jinmei Exp $	*/
+/*	$KAME: ah_input.c,v 1.60 2001/07/26 06:53:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,7 +66,7 @@
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
 #include <netinet/ip_ecn.h>
-#if defined(__NetBSD__) && __NetBSD_Version__ >= 105080000	/*1.5H*/
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 105080000	/* 1.5H */
 #include <netinet/ip_icmp.h>
 #endif
 
@@ -274,7 +274,7 @@ ah4_input(m, va_alist)
 	 */
 	if ((sav->flags & SADB_X_EXT_OLD) == 0 && sav->replay) {
 		if (ipsec_chkreplay(ntohl(((struct newah *)ah)->ah_seq), sav))
-			; /*okey*/
+			; /* okey */
 		else {
 			ipsecstat.in_ahreplay++;
 			ipseclog((LOG_WARNING,
@@ -392,8 +392,8 @@ ah4_input(m, va_alist)
 		m->m_flags &= ~M_AUTHIPHDR;
 		m->m_flags &= ~M_AUTHIPDGM;
 	}
-#endif /*INET6*/
-#endif /*0*/
+#endif /* INET6 */
+#endif /* 0 */
 
 	if (m->m_flags & M_AUTHIPHDR
 	 && m->m_flags & M_AUTHIPDGM) {
@@ -506,7 +506,7 @@ ah4_input(m, va_alist)
 		}
 		IF_ENQUEUE(&ipintrq, m);
 		m = NULL;
-		schednetisr(NETISR_IP);	/*can be skipped but to make sure*/
+		schednetisr(NETISR_IP);	/* can be skipped but to make sure */
 		splx(s);
 		nxt = IPPROTO_DONE;
 	} else {
@@ -606,7 +606,7 @@ fail:
 	return;
 }
 
-#if defined(__NetBSD__) && __NetBSD_Version__ >= 105080000	/*1.5H*/
+#if defined(__NetBSD__) && __NetBSD_Version__ >= 105080000	/* 1.5H */
 /* assumes that ip header and ah header are contiguous on mbuf */
 void *
 ah4_ctlinput(cmd, sa, v)
@@ -786,7 +786,7 @@ ah6_input(mp, offp, proto)
 	 */
 	if ((sav->flags & SADB_X_EXT_OLD) == 0 && sav->replay) {
 		if (ipsec_chkreplay(ntohl(((struct newah *)ah)->ah_seq), sav))
-			; /*okey*/
+			; /* okey */
 		else {
 			ipsec6stat.in_ahreplay++;
 			ipseclog((LOG_WARNING,
@@ -912,7 +912,7 @@ ah6_input(mp, offp, proto)
 		 * XXX more sanity checks
 		 * XXX relationship with gif?
 		 */
-		u_int32_t flowinfo;	/*net endian*/
+		u_int32_t flowinfo;	/* net endian */
 
 		flowinfo = ip6->ip6_flow;
 		m_adj(m, off + stripsiz);
@@ -972,7 +972,7 @@ ah6_input(mp, offp, proto)
 		}
 		IF_ENQUEUE(&ip6intrq, m);
 		m = NULL;
-		schednetisr(NETISR_IPV6); /*can be skipped but to make sure*/
+		schednetisr(NETISR_IPV6); /* can be skipped but to make sure */
 		splx(s);
 		nxt = IPPROTO_DONE;
 	} else {

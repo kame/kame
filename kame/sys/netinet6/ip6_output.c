@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.202 2001/07/25 05:18:01 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.203 2001/07/26 06:53:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -253,7 +253,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	struct tdb *tdb;
 	int s;
 
-	inp = NULL;     /*XXX*/
+	inp = NULL;     /* XXX */
 	if (inp && (inp->inp_flags & INP_IPV6) == 0)
 		panic("ip6_output: IPv4 pcb is passed");
 #else
@@ -585,7 +585,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 				break;
 			default:
 				printf("ip6_output (ipsec): error code %d\n", error);
-				/*fall through*/
+				/* fall through */
 			case ENOENT:
 				/* don't show these error codes to the user */
 				error = 0;
@@ -777,7 +777,7 @@ skip_ipsec2:;
 				break;
 			default:
 				printf("ip6_output (ipsec): error code %d\n", error);
-				/*fall through*/
+				/* fall through */
 			case ENOENT:
 				/* don't show these error codes to the user */
 				error = 0;
@@ -788,8 +788,8 @@ skip_ipsec2:;
 
 		exthdrs.ip6e_ip6 = m;
 	}
-#endif /*OpenBSD*/
-#endif /*IPSEC*/
+#endif /* OpenBSD */
+#endif /* IPSEC */
 
 	if (!IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
 		/* Unicast */
@@ -1137,7 +1137,7 @@ skip_ipsec2:;
         if (ip6_fw_chk_ptr) {
 #endif
 		u_short port = 0;
-		m->m_pkthdr.rcvif = NULL;	/*XXX*/
+		m->m_pkthdr.rcvif = NULL;	/* XXX */
 		/* If ipfw says divert, we have to just drop packet */
 		if ((*ip6_fw_chk_ptr)(&ip6, ifp, &port, &m)) {
 			m_freem(m);
@@ -1800,7 +1800,7 @@ do { \
 	else \
 		inp->inp_flags &= ~(bit); \
 } while (0)
-#else /*HAVE_NRL_INPCB*/
+#else /* HAVE_NRL_INPCB */
 #define OPTSET(bit) \
 do { \
 	if (optval) \
@@ -1816,7 +1816,7 @@ do { \
 	else \
 		in6p->in6p_flags &= ~(bit); \
 } while (0)
-#endif /*HAVE_NRL_INPCB*/
+#endif /* HAVE_NRL_INPCB */
 #ifdef HAVE_NRL_INPCB
 #define OPTBIT(bit) (inp->inp_flags & (bit) ? 1 : 0)
 #else
@@ -2265,7 +2265,7 @@ do { \
 					inp->inp_secrequire = get_sa_require(inp);
 #endif
 				break;
-#endif /*OpenBSD*/
+#endif /* OpenBSD */
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 			case IPV6_IPSEC_POLICY:
@@ -2661,7 +2661,7 @@ do { \
 				*mtod(m, int *) = optval;
 #endif
 				break;
-#endif /*OpenBSD*/
+#endif /* OpenBSD */
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 			case IPV6_IPSEC_POLICY:
@@ -2690,7 +2690,7 @@ do { \
 #endif
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				if (error == 0)
-					error = soopt_mcopyout(sopt, m); /*XXX*/
+					error = soopt_mcopyout(sopt, m); /* XXX */
 				if (error == 0 && m)
 					m_freem(m);
 #endif
@@ -3559,7 +3559,7 @@ ip6_getmoptions(optname, im6o, mp)
 	u_int *hlim, *loop, *ifindex;
 
 #ifdef __FreeBSD__
-	*mp = m_get(M_WAIT, MT_HEADER);		/*XXX*/
+	*mp = m_get(M_WAIT, MT_HEADER);		/* XXX */
 #else
 	*mp = m_get(M_WAIT, MT_SOOPTS);
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.50 2000/11/02 12:27:38 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.51 2001/07/26 06:53:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -643,8 +643,8 @@ esp_cbc_decrypt(m, off, sav, algo, ivlen)
 {
 	struct mbuf *s;
 	struct mbuf *d, *d0, *dp;
-	int soff, doff;	/*offset from the head of chain, to head of this mbuf */
-	int sn, dn;	/*offset from the head of the mbuf, to meat */
+	int soff, doff;	/* offset from the head of chain, to head of this mbuf  */
+	int sn, dn;	/* offset from the head of the mbuf, to meat  */
 	size_t ivoff, bodyoff;
 	u_int8_t iv[MAXIVLEN], *ivp;
 	u_int8_t sbuf[MAXIVLEN], *sp;
@@ -847,8 +847,8 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 {
 	struct mbuf *s;
 	struct mbuf *d, *d0, *dp;
-	int soff, doff;	/*offset from the head of chain, to head of this mbuf */
-	int sn, dn;	/*offset from the head of the mbuf, to meat */
+	int soff, doff;	/* offset from the head of chain, to head of this mbuf  */
+	int sn, dn;	/* offset from the head of the mbuf, to meat  */
 	size_t ivoff, bodyoff;
 	u_int8_t iv[MAXIVLEN], *ivp;
 	u_int8_t sbuf[MAXIVLEN], *sp;
@@ -1138,7 +1138,7 @@ esp_auth(m0, skip, length, sav, sum)
 		}
 	}
 	(*algo->result)(&s, sumbuf);
-	bcopy(sumbuf, sum, siz);	/*XXX*/
+	bcopy(sumbuf, sum, siz);	/* XXX */
 	
 	return 0;
 }

@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.34 2001/07/25 09:24:25 suz Exp $	*/
+/*	$KAME: udp6_output.c,v 1.35 2001/07/26 06:53:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -112,7 +112,7 @@
 #else
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#endif /*IPSEC*/
+#endif /* IPSEC */
 #endif
 
 #include <net/net_osdep.h>
@@ -426,7 +426,7 @@ udp6_output(in6p, m, addr6, control)
 			error = ENOBUFS;
 			goto release;
 		}
-#endif /*IPSEC*/
+#endif /* IPSEC */
 		error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route,
 		    flags, in6p->in6p_moptions, NULL);
 		break;
@@ -466,7 +466,7 @@ udp6_output(in6p, m, addr6, control)
 		udpstat.udps_opackets++;
 #ifdef IPSEC
 		(void)ipsec_setsocket(m, NULL);	/* XXX */
-#endif /*IPSEC*/
+#endif /* IPSEC */
 #ifdef __NetBSD__
 		error = ip_output(m, NULL, &in6p->in6p_route, 0 /* XXX */);
 #elif defined(__bsdi__) && _BSDI_VERSION >= 199802

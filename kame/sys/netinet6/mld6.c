@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.28 2001/07/25 05:18:02 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.29 2001/07/26 06:53:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -320,7 +320,7 @@ mld6_input(m, off)
 					in6m->in6m_timer = 0; /* reset timer */
 					in6m->in6m_state = MLD6_IREPORTEDLAST;
 				}
-				else if (in6m->in6m_timer == 0 || /*idle state*/
+				else if (in6m->in6m_timer == 0 || /* idle */
 					in6m->in6m_timer > timer) {
 					in6m->in6m_timer =
 						MLD6_RANDOM_DELAY(timer);

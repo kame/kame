@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.h,v 1.6 2001/07/25 00:55:49 itojun Exp $	*/
+/*	$KAME: in6_gif.h,v 1.7 2001/07/26 06:53:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,4 +41,4 @@ int gif_encapcheck6 __P((const struct mbuf *, int, int, void *));
 int in6_gif_attach __P((struct gif_softc *));
 int in6_gif_detach __P((struct gif_softc *));
 
-#endif /*_NETINET6_IN6_GIF_H_*/
+#endif /* _NETINET6_IN6_GIF_H_ */

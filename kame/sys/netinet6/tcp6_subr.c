@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.34 2001/04/02 12:44:42 itojun Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.35 2001/07/26 06:53:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -79,7 +79,7 @@
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 #include "opt_inet.h"
-#ifdef __NetBSD__	/*XXX*/
+#ifdef __NetBSD__	/* XXX */
 #include "opt_ipsec.h"
 #endif
 #endif
@@ -118,7 +118,7 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#endif /*IPSEC*/
+#endif /* IPSEC */
 
 /* patchable/settable parameters for tcp6 */
 #if 0
@@ -128,7 +128,7 @@ extern	int tcp6_do_rfc1323;
 #endif
 
 #ifndef __bsdi__
-extern int ip_next_mtu __P((int, int));	/*XXX netinet/ip_icmp.c */
+extern int ip_next_mtu __P((int, int));	/* XXX netinet/ip_icmp.c  */
 #endif
 
 extern struct in6pcb *tcp6_last_in6pcb;
@@ -313,7 +313,7 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 #ifdef IPSEC
 	m->m_pkthdr.rcvif = t6p ? (struct ifnet *)t6p->t_in6pcb->in6p_socket
 				: NULL;
-#endif /*IPSEC*/
+#endif /* IPSEC */
 	ip6oflags = 0;
 	if (t6p && (t6p->t_in6pcb->in6p_flags & IN6P_MINMTU))
 		ip6oflags |= IPV6_MINMTU;
@@ -815,4 +815,4 @@ ipsec6_hdrsiz_tcp(t6p)
 	m_free(m);
 	return hdrsiz;
 }
-#endif /*IPSEC*/
+#endif /* IPSEC */

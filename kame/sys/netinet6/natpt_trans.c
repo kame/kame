@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.41 2001/07/19 05:22:12 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.42 2001/07/26 06:53:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -328,7 +328,7 @@ fakeTimxceed(struct _cv *cv4from, struct mbuf *m4)
 	innerip4to->ip_sum = htons(cksum);
 
 	Dum.p = ats->remote._sport;
-	Dum.p = ats->local._sport;	/*XXX BUG? */
+	Dum.p = ats->local._sport;	/* XXX BUG?  */
 	cksum = adjustChecksum(ntohs(icmp4to->icmp_cksum),
 			       (u_char *)&Dum, sizeof(Dum),
 			       (u_char *)&Dee, sizeof(Dee));
@@ -1158,7 +1158,7 @@ translatingTCPUDPv4To6(struct _cv *cv4, struct pAddr *pad, struct _cv *cv6)
     struct ip6_hdr	*ip6;
     struct tcp6hdr	*tcp6;
 
-    if (cv4->m->m_flags & M_EXT) /*XXX false assumption on m_ext.ext_siz*/
+    if (cv4->m->m_flags & M_EXT) /* XXX false assumption on m_ext.ext_siz */
     {
 	if (cv4->plen + sizeof(struct ip6_hdr) > MHLEN)
 	{

@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.87 2001/07/25 16:51:56 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.88 2001/07/26 06:53:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,7 +64,7 @@
  *	@(#)raw_ip.c	8.2 (Berkeley) 1/4/94
  */
 
-#ifdef __NetBSD__	/*XXX*/
+#ifdef __NetBSD__	/* XXX */
 #include "opt_ipsec.h"
 #endif
 
@@ -110,7 +110,7 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#endif /*IPSEC*/
+#endif /* IPSEC */
 
 #include <machine/stdarg.h>
 
@@ -208,7 +208,7 @@ rip6_input(mp, offp, proto)
 	bzero(&rip6src, sizeof(rip6src));
 	rip6src.sin6_len = sizeof(struct sockaddr_in6);
 	rip6src.sin6_family = AF_INET6;
-#if 0 /*XXX inbound flowlabel */
+#if 0 /* XXX inbound flowlabel  */
 	rip6src.sin6_flowinfo = ip6->ip6_flow & IPV6_FLOWINFO_MASK;
 #endif
 	/* KAME hack: recover scopeid */
@@ -255,7 +255,7 @@ rip6_input(mp, offp, proto)
 				ipsec6stat.in_polvio++;
 				/* do not inject data into pcb */
 			} else
-#endif /*IPSEC*/
+#endif /* IPSEC */
 			if ((n = m_copy(m, 0, (int)M_COPYALL)) != NULL) {
 				if (last->in6p_flags & IN6P_CONTROLOPTS)
 					ip6_savecontrol(last, ip6, n, &opts,
@@ -286,7 +286,7 @@ rip6_input(mp, offp, proto)
 		ip6stat.ip6s_delivered--;
 		/* do not inject data into pcb */
 	} else
-#endif /*IPSEC*/
+#endif /* IPSEC */
 	if (last) {
 		if (last->in6p_flags & IN6P_CONTROLOPTS)
 			ip6_savecontrol(last, ip6, m, &opts, NULL);
@@ -593,7 +593,7 @@ rip6_output(m, va_alist)
 		error = ENOBUFS;
 		goto bad;
 	}
-#endif /*IPSEC*/
+#endif /* IPSEC */
 
 	flags = 0;
 	if (in6p->in6p_flags & IN6P_MINMTU)
@@ -623,9 +623,9 @@ rip6_output(m, va_alist)
 	return(error);
 }
 
-/*
+/* 
  * Raw IPv6 socket option processing.
- */
+  */
 int
 rip6_ctloutput(op, so, level, optname, mp)
 	int op;

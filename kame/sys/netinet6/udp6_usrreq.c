@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.92 2001/07/25 16:51:56 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.93 2001/07/26 06:53:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,7 +64,7 @@
  *	@(#)udp_var.h	8.1 (Berkeley) 6/10/93
  */
 
-#ifdef __NetBSD__	/*XXX*/
+#ifdef __NetBSD__	/* XXX */
 #include "opt_ipsec.h"
 #endif
 
@@ -103,7 +103,7 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
-#endif /*IPSEC*/
+#endif /* IPSEC */
 
 #include "faith.h"
 #if defined(NFAITH) && NFAITH > 0
@@ -266,7 +266,7 @@ udp6_input(mp, offp, proto)
 		udp_in6.sin6_len = sizeof(struct sockaddr_in6);
 		udp_in6.sin6_family = AF_INET6;
 		udp_in6.sin6_port = uh->uh_sport;
-#if 0 /*XXX inbound flowinfo */
+#if 0 /* XXX inbound flowinfo  */
 		udp_in6.sin6_flowinfo = ip6->ip6_flow & IPV6_FLOWINFO_MASK;
 #endif
 		/* KAME hack: recover scopeid */
@@ -313,7 +313,7 @@ udp6_input(mp, offp, proto)
 					ipsec6stat.in_polvio++;
 					/* do not inject data into pcb */
 				} else
-#endif /*IPSEC*/
+#endif /* IPSEC */
 				if ((n = m_copy(m, 0, M_COPYALL)) != NULL) {
 					/*
 					 * KAME NOTE: do not
@@ -376,7 +376,7 @@ udp6_input(mp, offp, proto)
 			ipsec6stat.in_polvio++;
 			goto bad;
 		}
-#endif /*IPSEC*/
+#endif /* IPSEC */
 		if (last->in6p_flags & IN6P_CONTROLOPTS
 #ifdef SO_TIMESTAMP
 		 || last->in6p_socket->so_options & SO_TIMESTAMP
@@ -439,7 +439,7 @@ udp6_input(mp, offp, proto)
 		ipsec6stat.in_polvio++;
 		goto bad;
 	}
-#endif /*IPSEC*/
+#endif /* IPSEC */
 
 	/*
 	 * Construct sockaddr format source address.
@@ -846,7 +846,7 @@ udp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		    oldp, oldlenp, newp, newlen));
 	}
 }
-#endif /*__bsdi__*/
+#endif /* __bsdi__ */
 
 #ifdef __NetBSD__
 #include <vm/vm.h>

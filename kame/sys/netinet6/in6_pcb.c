@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.103 2001/07/25 16:48:02 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.104 2001/07/25 16:51:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,7 +64,7 @@
  *	@(#)in_pcb.c	8.2 (Berkeley) 1/4/94
  */
 
-#ifdef __NetBSD__	/*XXX*/
+#ifdef __NetBSD__	/* XXX */
 #include "opt_ipsec.h"
 #endif
 
@@ -145,7 +145,7 @@ in6_pcballoc(so, head)
 		FREE(in6p, M_PCB);
 		return error;
 	}
-#endif /*IPSEC*/
+#endif /* IPSEC */
 	in6p->in6p_next = head->in6p_next;
 	head->in6p_next = in6p;
 	in6p->in6p_prev = head;
@@ -175,7 +175,7 @@ in6_pcbbind(in6p, nam)
 	struct in6pcb *head = in6p->in6p_head;
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)NULL;
 #ifndef __NetBSD__
-	struct proc *p = curproc;	/*XXX*/
+	struct proc *p = curproc;	/* XXX */
 #endif
 	u_int16_t lport = 0;
 	int wild = 0, reuseport = (so->so_options & SO_REUSEPORT);
@@ -314,7 +314,7 @@ in6_pcbbind(in6p, nam)
 		in6p->in6p_lport = lport;
 
 #if 0
-	in6p->in6p_flowinfo = 0;	/*XXX*/
+	in6p->in6p_flowinfo = 0;	/* XXX */
 #endif
 	return(0);
 }
