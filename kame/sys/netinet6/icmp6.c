@@ -490,17 +490,21 @@ icmp6_input(mp, offp, proto)
 				RTFREE(rt);
 			rt = icmp6_mtudisc_clone((struct sockaddr *)&sin6);
 		}
-#endif
+#else
 #ifdef __FreeBSD__
 		rt = rtalloc1((struct sockaddr *)&sin6, 0,
 			RTF_CLONING | RTF_PRCLONING);
-#endif /*__FreeBSD__*/
+#else
 #ifdef __bsdi__
 		bcopy(&sin6, &ro6.ro_dst, sizeof(struct sockaddr_in6));
 		ro6.ro_rt = 0;
 		rtcalloc((struct route *)&ro6);
 		rt = ro6.ro_rt;
-#endif /*__bsdi__*/
+#else
+#error no case for this particular operating system
+#endif
+#endif
+#endif
 
 		if (rt && (rt->rt_flags & RTF_HOST)
 		    && !(rt->rt_rmx.rmx_locks & RTV_MTU)) {

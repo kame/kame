@@ -569,9 +569,9 @@ skip_ipsec2:;
 		 * ifp must point it.
 		 */
 		if (ro->ro_rt == 0) {
-#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
+#ifndef __bsdi__
 			/*
-			 * NetBSD/OpenBSD always clones routes, if parent is
+			 * non-bsdi always clone routes, if parent is
 			 * PRF_CLONING.
 			 */
 			rtalloc((struct route *)ro);
