@@ -1,4 +1,4 @@
-/*	$KAME: misc.h,v 1.9 2000/12/15 13:43:56 sakane Exp $	*/
+/*	$KAME: misc.h,v 1.10 2000/12/17 23:03:48 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,6 @@
  */
 
 #define BIT2STR(b) bit2str(b, sizeof(b)<<3)
-#define PVDUMP(var) hexdump((var)->v, (var)->l)
 
 #ifdef HAVE_FUNCTION_MACRO
 #define LOCATION        debug_location(__FILE__, __LINE__, __FUNCTION__)
