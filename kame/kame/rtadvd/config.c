@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.19 2000/11/08 06:00:04 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.20 2000/11/08 06:32:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -815,7 +815,6 @@ make_packet(struct rainfo *rainfo)
 	     pfx != &rainfo->prefix; pfx = pfx->next) {
 		u_int32_t vltime, pltime;
 		struct timeval now;
-		long fst;
 
 		ndopt_pi = (struct nd_opt_prefix_info *)buf;
 		ndopt_pi->nd_opt_pi_type = ND_OPT_PREFIX_INFORMATION;
