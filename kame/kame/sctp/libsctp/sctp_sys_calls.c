@@ -1,4 +1,4 @@
-/*	$Header: /usr/home/sumikawa/kame/kame/kame/kame/sctp/libsctp/sctp_sys_calls.c,v 1.7 2003/11/25 06:54:38 ono Exp $ */
+/*	$Header: /usr/home/sumikawa/kame/kame/kame/kame/sctp/libsctp/sctp_sys_calls.c,v 1.8 2004/06/14 05:33:30 itojun Exp $ */
 
 /*
  * Copyright (C) 2002 Cisco Systems Inc,
@@ -58,7 +58,7 @@ sctp_connectx(int fd, struct sockaddr *addrs, int addrcnt)
 			return (-1);
 		}
 		len += at->sa_len;
-		at = (struct sockaddr *)((caddr_t)at + at->sa_len);
+		at = (struct sockaddr *)((u_int8_t *)at + at->sa_len);
 		cnt++;
 	}
 	/* do we have any? */
