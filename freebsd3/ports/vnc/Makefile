@@ -3,7 +3,7 @@
 # Date created:		24 February 1998
 # Whom:			itojun@itojun.org
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:10:57 itojun Exp $
+# $Id: Makefile,v 1.2 2000/06/23 16:48:49 sumikawa Exp $
 #
 
 DISTNAME=       	vnc-3.3.2r3_unixsrc
@@ -14,7 +14,7 @@ DISTFILES=		vnc-3.3.2r3_unixsrc.tgz \
 			vnc-3.3.2_doc.tgz
 
 PATCH_SITES=		ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=		vnc-3.3.2r3-v6-19990105.diff.gz
+PATCHFILES=		vnc-3.3.2r3-v6-20000518.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	 	itojun@itojun.org
