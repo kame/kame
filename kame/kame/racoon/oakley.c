@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.68 2000/10/18 09:37:23 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.69 2000/10/23 12:09:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1451,7 +1451,7 @@ oakley_check_certid(iph1)
 	case IPSECDOI_ID_IPV6_ADDR:
 	{
 		/*
-		 * converting to binary from string becuase openssl return
+		 * converting to binary from string because openssl return
 		 * a string even if object is a binary.
 		 * XXX fix it !  access by ASN.1 directly without.
 		 */
