@@ -1,38 +1,40 @@
-$Id: TODO,v 1.4 2000/01/12 00:33:50 itojun Exp $
+$Id: TODO,v 1.5 2000/01/14 19:49:21 sakane Exp $
 
 Sorry that `racoon' is not stable yet.  But she can exchange the key
 in limited environment.  Try to run with racoon.conf in the case
 which IPsec-SA required.  Please tell me, sakane@ydc.co.jp, bug report
 except following items.  I do modify continuously until she will be stable.
 
+New feature
+o Base mode
+o Commit bit during phase 2.
+o UserFQDN/FQDN type of ID payload on phase 1 for pre-shared key.
+o acceptable IP address check.
+o acceptable SAs check.
+o system logging facility.
+o SA bundle.
+
 TODO list
 
 UGENT
-o The documents for users convenience are to be written.
+o The documents for users convenience.
 
 MUST
-o IKE commit bit
-o Informational Exchange processing properly.
-o Sending and to receive and process Delete payload of Informational Exchange.
 o authentication methods besides pre-shared-key. e.g. RSA, PGP.
 o Certificate authentication and certificate request payloads
-o ID payload should be checked in phase 1.
-o In both phase, check SAs proposed and select a SA to use.
-  In Currnet version, first SA in proposal is applied.
-o Selectors (filters) to the IPaddress, IP Subnet, and port
-o To be supported bytes lifetimes for ISAKMP-SA.
+o To consider the use with certificate infrastructure.  PXIX ???
 o Support scoped (link-local and site-local) IPv6 addresses.
   It needs pfkey modification for scope IDs, and advanced API (RFC2292)
   related mods in racoon itself.
-o Support multiple proposals with same proposal ID (for AND conditions like
-  "esp AND ah").  This needs updates to pfkey.
+o kmstat is to be useful.
 
 SHOULD
+o To be supported bytes lifetimes for ISAKMP-SA.
+o Sending and to receive and process Delete payload of Informational Exchange.
+o Informational Exchange processing properly.
 o fix flag for logging
 o more acceptable check.
-o To consider the use with certificate infrastructure.  PXIX ???
 o New group mode should be considered.
-o kmstat is to be useful.
 o Dynamically retry to exchange and resend the packet per nodes.
 o Remote maintenance with secure connection.
 o To make the list of supported algorithm by sadb_supported payload
@@ -75,7 +77,6 @@ o don't keep to hold keymat values, do it ?
 o local address's field in isakmpsa handler must be kicked out to rmconf.
 
 MAY
-o Other exchange.  i.e. for the configration of KAME gif tunnel.
 o Effective code.
 o more fix strnames.c.
 
