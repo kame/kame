@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.294 2003/07/03 05:01:25 itojun Exp $	*/
+/*	$KAME: key.c,v 1.295 2003/07/07 11:23:44 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -522,7 +522,7 @@ static struct mbuf *key_alloc_mbuf __P((int));
 struct callout key_timehandler_ch;
 #endif
 
-#if defined(MIP6) && defined(MIP6_HAIPSEC) && (defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE))
+#if defined(MIP6) && !defined(MIP6_NOHAIPSEC) && (defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE))
 static struct secpolicy *key_mip6_find_sp(int,
     const struct sockaddr_in6 *, const struct sockaddr_in6 *);
 #endif
@@ -7916,7 +7916,7 @@ key_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 }
 #endif /*__NetBSD__*/
 
-#if defined(MIP6) && defined(MIP6_HAIPSEC) && (defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE))
+#if defined(MIP6) && !defined(MIP6_NOHAIPSEC) && (defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE))
 int
 key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 	struct sockaddr_in6 *haddr;
@@ -8172,4 +8172,4 @@ key_mip6_find_sp(dir, src, dst)
 	}
 	return (sp);
 }
-#endif /* MIP6 && MIP6_HAIPSEC && (MIP6_HOME_AGENT || MIP6_MOBILE_NODE) */
+#endif /* MIP6 && !MIP6_NOHAIPSEC && (MIP6_HOME_AGENT || MIP6_MOBILE_NODE) */

@@ -1,4 +1,4 @@
-/*	$KAME: key.h,v 1.30 2003/07/01 06:54:37 itojun Exp $	*/
+/*	$KAME: key.h,v 1.31 2003/07/07 11:23:44 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,7 +75,7 @@ extern void key_sa_recordxfer __P((struct secasvar *, struct mbuf *));
 extern void key_sa_routechange __P((struct sockaddr *));
 extern void key_sa_stir_iv __P((struct secasvar *));
 
-#if defined(MIP6) && defined(MIP6_HAIPSEC)
+#if defined(MIP6) && !defined(MIP6_NOHAIPSEC)
 int key_mip6_update_mobile_node_ipsecdb(struct sockaddr_in6 *,
     struct sockaddr_in6 *, struct sockaddr_in6 *, struct sockaddr_in6 *);
 int key_mip6_update_home_agent_ipsecdb(struct sockaddr_in6 *,

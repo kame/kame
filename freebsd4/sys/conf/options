@@ -289,7 +289,7 @@ MIP6_HOME_AGENT		opt_mip6.h
 MIP6_DEBUG		opt_mip6.h
 MIP6_STATIC_HADDR	opt_mip6.h
 MIP6_CALLOUTTEST	opt_mip6.h
-MIP6_HAIPSEC		opt_mip6.h
+MIP6_NOHAIPSEC		opt_mip6.h
 NATPT			opt_natpt.h
 NATPT_NAT		opt_natpt.h
 NEW_STRUCT_ROUTE	opt_global.h

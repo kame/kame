@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.10 2003/07/01 08:51:56 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.11 2003/07/07 11:23:44 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -211,12 +211,12 @@ static int mip6_ip6mc_create(struct ip6_mobility **, struct sockaddr_in6 *,
     struct sockaddr_in6 *, u_int8_t *);
 
 /* core functions for mobile node and home agent. */
-#ifdef MIP6_HAIPSEC
+#if !defined(MIP6_NOHAIPSEC)
 #if defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE)
 static int mip6_update_ipsecdb(struct sockaddr_in6 *,
     struct sockaddr_in6 *, struct sockaddr_in6 *, struct sockaddr_in6 *);
 #endif /* MIP6_HOME_AGENT || MIP6_MOBILE_NODE */
-#endif /* MIP6_HAIPSEC */
+#endif /* !MIP6_NOHAIPSEC */
 
 void
 mip6_init()
@@ -2559,19 +2559,19 @@ mip6_tunnel_control(action, entry, func, ep)
 	int (*func)(const struct mbuf *, int, int, void *);
 	const struct encaptab **ep;
 {
-#ifdef MIP6_HAIPSEC
+#if !defined(MIP6_NOHAIPSEC)
 #ifdef MIP6_MOBILE_NODE
 	struct mip6_bu *mbu;
 #endif
 #ifdef MIP6_HOME_AGENT
 	struct mip6_bc *mbc;
 #endif
-#endif /* MIP6_HAIPSEC */
+#endif /* !MIP6_NOHAIPSEC */
 	if ((entry == NULL) && (ep == NULL)) {
 		return (EINVAL);
 	}
 
-#ifdef MIP6_HAIPSEC
+#if !defined(MIP6_NOHAIPSEC)
 	/* XXX */
 #ifdef MIP6_MOBILE_NODE
 	if (func == mip6_bu_encapcheck) {
@@ -2601,7 +2601,7 @@ mip6_tunnel_control(action, entry, func, ep)
 		}
 	}
 #endif
-#endif /* MIP6_HAIPSEC */
+#endif /* !MIP6_NOHAIPSEC */
 
 	/* before doing anything, remove an existing encap entry. */
 	switch (action) {
@@ -2634,7 +2634,7 @@ mip6_tunnel_control(action, entry, func, ep)
 	return (0);
 }
 
-#ifdef MIP6_HAIPSEC
+#if !defined(MIP6_NOHAIPSEC)
 #ifdef IPSEC
 #ifndef __OpenBSD__
 static int
@@ -2669,6 +2669,6 @@ mip6_update_ipsecdb(haddr, ocoa, ncoa, haaddr)
 /* __OpenBSD__ part.  not yet. */
 #endif
 #endif /* IPSEC */
-#endif /* MIP6_HAIPSEC */
+#endif /* !MIP6_NOHAIPSEC */
 
 #endif /* MIP6_HOME_AGENT || MIP6_MOBILE_NODE */
