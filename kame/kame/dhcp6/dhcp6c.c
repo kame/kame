@@ -65,7 +65,7 @@ struct servtab {
 };
 
 int debug = 0;
-#define dprintf(x)	{ if (debug) fprintf x; }
+#define dprintf(x)	do { if (debug) fprintf x; } while (0)
 char *device = NULL;
 
 int insock;	/* inbound udp port */

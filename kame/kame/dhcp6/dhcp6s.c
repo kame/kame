@@ -64,7 +64,7 @@ struct servtab {
 };
 
 int debug = 0;
-#define dprintf(x)	{ if (debug) fprintf x; }
+#define dprintf(x)	do { if (debug) fprintf x; } while (0)
 char *device = NULL;
 #if 0
 char *dnsserv = "3ffe:501:4819::42";

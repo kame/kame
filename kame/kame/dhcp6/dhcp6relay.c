@@ -53,7 +53,7 @@ static int icmp6sock;		/* socket to receive ICMPv6 errors */
 static int maxfd;		/* maxi file descriptor for select(2) */
 
 static int debug = 0;
-#define dprintf(x)	{ if (debug) fprintf x; }
+#define dprintf(x)	do { if (debug) fprintf x; } while (0)
 
 char *device = NULL;		/* must be global */
 
