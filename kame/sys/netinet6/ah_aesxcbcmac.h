@@ -1,4 +1,4 @@
-/*	$KAME: ah_aesxcbcmac.h,v 1.2 2003/07/20 00:29:37 itojun Exp $	*/
+/*	$KAME: ah_aesxcbcmac.h,v 1.3 2003/07/20 18:01:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998 and 2003 WIDE Project.
@@ -34,5 +34,5 @@ extern int ah_aes_xcbc_mac_init __P((struct ah_algorithm_state *,
 extern void ah_aes_xcbc_mac_loop __P((struct ah_algorithm_state *, u_int8_t *,
 	size_t));
 extern void ah_aes_xcbc_mac_result __P((struct ah_algorithm_state *,
-	u_int8_t *));
+	u_int8_t *, size_t));
 

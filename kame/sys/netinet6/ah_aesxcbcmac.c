@@ -1,4 +1,4 @@
-/*	$KAME: ah_aesxcbcmac.c,v 1.4 2003/07/20 03:00:15 itojun Exp $	*/
+/*	$KAME: ah_aesxcbcmac.c,v 1.5 2003/07/20 18:01:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998 and 2003 WIDE Project.
@@ -157,9 +157,10 @@ ah_aes_xcbc_mac_loop(state, addr, len)
 }
 
 void
-ah_aes_xcbc_mac_result(state, addr)
+ah_aes_xcbc_mac_result(state, addr, l)
 	struct ah_algorithm_state *state;
 	u_int8_t *addr;
+	size_t l;
 {
 	u_char digest[AES_BLOCKSIZE];
 	aesxcbc_ctx *ctx;
@@ -183,7 +184,7 @@ ah_aes_xcbc_mac_result(state, addr)
 		rijndaelEncrypt(ctx->r_k1s, ctx->r_nr, ctx->buf, digest);
 	}
 
-	bcopy(&digest[0], (void *)addr, HMACSIZE);
+	bcopy(digest, addr, sizeof(digest) > l ? l : sizeof(digest));
 
 	free(state->foo, M_TEMP);
 }

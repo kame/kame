@@ -1,4 +1,4 @@
-/*	$KAME: ah.h,v 1.18 2003/07/19 10:42:36 itojun Exp $	*/
+/*	$KAME: ah.h,v 1.19 2003/07/20 18:01:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,12 +75,10 @@ struct ah_algorithm {
 	const char *name;
 	int (*init) __P((struct ah_algorithm_state *, struct secasvar *));
 	void (*update) __P((struct ah_algorithm_state *, u_int8_t *, size_t));
-	void (*result) __P((struct ah_algorithm_state *, u_int8_t *));
+	void (*result) __P((struct ah_algorithm_state *, u_int8_t *, size_t));
 };
 
 #define	AH_MAXSUMSIZE	16
-
-#define	HMACSIZE	16
 
 extern const struct ah_algorithm *ah_algorithm_lookup __P((int));
 

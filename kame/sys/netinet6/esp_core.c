@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.61 2003/07/19 10:42:36 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.62 2003/07/20 18:01:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1153,7 +1153,7 @@ esp_auth(m0, skip, length, sav, sum)
 			break;
 		}
 	}
-	(*algo->result)(&s, sumbuf);
+	(*algo->result)(&s, sumbuf, sizeof(sumbuf));
 	bcopy(sumbuf, sum, siz);	/* XXX */
 
 	return 0;
