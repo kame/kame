@@ -634,7 +634,7 @@ run_service(ctrl, sep)
 {
 	struct passwd *pwd;
 	struct group *grp = NULL;	/* XXX gcc */
-	char buf[7];
+	char buf[NI_MAXSERV];
 #ifdef LIBWRAP
 	struct request_info req;
 	int denied;
@@ -1796,13 +1796,15 @@ inetd_setproctitle(a, s)
 	char *cp;
 	struct sockaddr_storage ss;
 	char buf[80];
-	char hbuf[80];
+	char hbuf[NI_MAXHOST];
 
 	cp = Argv[0];
 	size = sizeof(ss);
 	if (getpeername(s, (struct sockaddr *)&ss, &size) == 0) {
-		getnameinfo((struct sockaddr *)&ss, ss.ss_len,
-			hbuf, sizeof(hbuf), NULL, 0, NI_NUMERICHOST);
+		if (getnameinfo((struct sockaddr *)&ss, ss.ss_len,
+				hbuf, sizeof(hbuf), NULL, 0,
+				NI_NUMERICHOST) != 0)
+			strcpy(hbuf, "invalid");
 		(void)snprintf(buf, sizeof buf, "-%s [%s]", a, hbuf);
 	} else
 		(void)snprintf(buf, sizeof buf, "-%s", a);
@@ -2276,7 +2278,8 @@ dolog(sep, ctrl)
 		return;
 	}
 
-	getnameinfo(sa, sa->sa_len, buf, sizeof(buf), NULL, 0, 0);
+	if (getnameinfo(sa, sa->sa_len, buf, sizeof(buf), NULL, 0, 0) != 0)
+		strcpy(buf, "invalid");
 	host = buf;
 
 	switch (sep->se_log & ~MULOG_RFC931) {
