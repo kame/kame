@@ -1,6 +1,9 @@
+2000-05-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+
+
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.904 2000/05/19 02:42:25 itojun Exp $
+$Id: CHANGELOG,v 1.905 2000/05/19 07:32:32 jinmei Exp $
 
 <200005>
 Fri May 19 11:41:05 JST 2000  itojun@iijlab.net
@@ -22,10 +25,11 @@ Fri May 19 00:30:04 JST 2000 itojun@iijlab.net
 	get the default scope zone for a specified address.
 
 2000-05-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* {bsdi4, openbsd}/sys/netinet6/raw_ipv6.c: 
-	* kame/sys/netinet6/udp6_output.c (udp6_output): 
-	* {bsdi4, openbsd}/sys/netinet6/in6_pcb.c (in6_pcbconnect,
-	  in6_pcbbind):
+	* kame/sys/netinet6/udp6_output.c (udp6_output):
+	* kame/sys/netinet6/raw_ip6.c (rip6_usrreq):
+	* {bsdi4, openbsd}/sys/netinet6/raw_ipv6.c:
+	* {freebsd[34]}/sys/netinet6/raw_ip6.c:
+	* {bsdi4, freebsd[34], openbsd}/sys/netinet6/in6_pcb.c:
 	filled default scope zone in sin6_scope_id if unspecified.
         Currently, these are enabled only with the ENABLE_DEFAULT_SCOPE
 	kernel compilation option.
