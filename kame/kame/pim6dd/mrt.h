@@ -33,7 +33,7 @@
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
  *
- *  $Id: mrt.h,v 1.1 1999/08/08 23:30:52 itojun Exp $
+ *  $Id: mrt.h,v 1.2 1999/08/24 10:04:56 jinmei Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.
@@ -169,6 +169,7 @@ struct mrtentry {
 
     if_set		oifs;           /* The current result oifs          */
     if_set		pruned_oifs;    /* The pruned oifs (Prune received) */
+    if_set		asserted_oifs;	/* The asserted oifs (Lost Assert)  */
     if_set		filter_oifs;	/* The filtered oifs */
     if_set		leaves;		/* Has directly connected members   */
     struct pim_nbr_entry *upstream;	/* upstream router, needed because

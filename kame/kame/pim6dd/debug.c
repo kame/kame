@@ -34,7 +34,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: debug.c,v 1.1 1999/08/08 23:30:51 itojun Exp $
+ *  $Id: debug.c,v 1.2 1999/08/24 10:04:55 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -393,6 +393,7 @@ dump_pim_mrt(fp)
     u_int number_of_groups = 0;
     char oifs[(sizeof(if_set)<<3)+1];
     char pruned_oifs[(sizeof(if_set)<<3)+1];
+    char asserted_oifs[(sizeof(if_set)<<3)+1];
     char leaves_oifs[(sizeof(if_set)<<3)+1];
     char filter_oifs[(sizeof(if_set)<<3)+1];
     char incoming_iif[(sizeof(if_set)<<3)+1];
@@ -415,6 +416,8 @@ dump_pim_mrt(fp)
 		    IF_ISSET(vifi, &r->oifs)          ? 'o' : '.';
 		pruned_oifs[vifi] =
 		    IF_ISSET(vifi, &r->pruned_oifs)   ? 'p' : '.';
+		asserted_oifs[vifi] =
+		    IF_ISSET(vifi, &r->pruned_oifs)   ? 'a' : '.';
 		filter_oifs[vifi] =
 		    IF_ISSET(vifi, &r->filter_oifs)   ? 'f' : '.';
 		leaves_oifs[vifi] =
@@ -443,6 +446,7 @@ dump_pim_mrt(fp)
 	    fprintf(fp, "\n");
 	    
 	    fprintf(fp, "Pruned   oifs: %-20s\n", pruned_oifs);
+	    fprintf(fp, "Asserted oifs: %-20s\n", pruned_oifs);
 	    fprintf(fp, "Filtered oifs: %-20s\n", filter_oifs);
 	    fprintf(fp, "Leaves   oifs: %-20s\n", leaves_oifs);
 	    fprintf(fp, "Outgoing oifs: %-20s\n", oifs);
@@ -463,4 +467,3 @@ dump_pim_mrt(fp)
 
     fprintf(fp, "Number of Groups: %u\n", number_of_groups);
 }
-

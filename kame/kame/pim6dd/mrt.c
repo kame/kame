@@ -33,7 +33,7 @@
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
  *
- *  $Id: mrt.c,v 1.1 1999/08/08 23:30:52 itojun Exp $
+ *  $Id: mrt.c,v 1.2 1999/08/24 10:04:56 jinmei Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.
@@ -612,6 +612,7 @@ alloc_mrtentry(srcentry_ptr, grpentry_ptr)
     IF_ZERO(&mrtentry_ptr->pruned_oifs);
     IF_ZERO(&mrtentry_ptr->oifs);
     IF_ZERO(&mrtentry_ptr->filter_oifs);
+    IF_ZERO(&mrtentry_ptr->asserted_oifs);
     mrtentry_ptr->upstream = (pim_nbr_entry_t *)NULL;
     mrtentry_ptr->metric = 0;
     mrtentry_ptr->preference = 0;

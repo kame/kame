@@ -33,7 +33,7 @@
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
  *
- *  $Id: timer.c,v 1.1 1999/08/08 23:30:54 itojun Exp $
+ *  $Id: timer.c,v 1.2 1999/08/24 10:04:57 jinmei Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.
@@ -305,7 +305,8 @@ age_routes()
 			    change_interfaces(mrtentry_ptr,
 					      mrtentry_ptr->incoming,
 					      &mrtentry_ptr->pruned_oifs,
-					      &mrtentry_ptr->leaves);
+					      &mrtentry_ptr->leaves,
+					      &mrtentry_ptr->asserted_oifs);
 		    if(state_change == -1)
 			    trigger_prune_alert(mrtentry_ptr);
 	    }
