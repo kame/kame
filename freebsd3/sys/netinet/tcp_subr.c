@@ -301,13 +301,8 @@ tcp_respond(tp, iph, th, m, ack, seq, flags, isipv6)
 	if (tp) {
 		if (!(flags & TH_RST)) {
 			win = sbspace(&tp->t_inpcb->inp_socket->so_rcv);
-#if  (__FreeBSD_version >= 300000)
 			if (win > (long)TCP_MAXWIN << tp->rcv_scale)
 				win = (long)TCP_MAXWIN << tp->rcv_scale;
-#else
-			if (win > (long)TCP6_MAXWIN << tp->rcv_scale)
-				win = (long)TCP6_MAXWIN << tp->rcv_scale;
-#endif
 		}
 #ifdef INET6
 		if (isipv6)
