@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.4 2001/09/20 06:07:17 itojun Exp $	*/
+/*	$KAME: if_hif.c,v 1.5 2001/09/20 09:59:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -608,7 +608,7 @@ hif_coa_get_ifaddr(hcoa)
 	for (ia = hcoa->hcoa_ifp->if_addrlist.tqh_first;
 	     ia;
 	     ia = ia->ifa_list.tqe_next)
-#elif defined(__FreeBSD_) && __FreeBSD__ >= 3
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
 	for (ia = hcoa->hcoa_ifp->if_addrhead.tqh_first;
 	     ia;
 	     ia = ia->ifa_link.tqe_next)
