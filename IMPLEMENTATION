@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.282 2001/11/16 06:11:03 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.283 2001/11/21 07:58:28 sakane Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -2068,7 +2068,7 @@ specified as the tunnel endpoints, automatically.
 
 	# setkey -c <<EOF
 	spdadd A B any -P out ipsec esp/tunnel/C-D/use;
-	spdadd A B any -P in ipsec esp/tunnel/D-C/use;
+	spdadd B A any -P in ipsec esp/tunnel/D-C/use;
 	^D
 
 Additionally, if you would like to control the source address selection for
