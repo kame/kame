@@ -1,4 +1,4 @@
-/*	$KAME: handler.c,v 1.35 2000/09/13 04:50:25 itojun Exp $	*/
+/*	$KAME: handler.c,v 1.36 2000/09/19 06:49:29 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.35 2000/09/13 04:50:25 itojun Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.36 2000/09/19 06:49:29 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -249,9 +249,13 @@ delph1(iph1)
 	VPTRINIT(iph1->sig);
 	VPTRINIT(iph1->sig_p);
 	oakley_delcert(iph1->cert);
+	iph1->cert = NULL;
 	oakley_delcert(iph1->cert_p);
+	iph1->cert_p = NULL;
 	oakley_delcert(iph1->crl_p);
+	iph1->crl_p = NULL;
 	oakley_delcert(iph1->cr_p);
+	iph1->cr_p = NULL;
 	VPTRINIT(iph1->id);
 	VPTRINIT(iph1->id_p);
 

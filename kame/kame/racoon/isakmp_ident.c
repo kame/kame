@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_ident.c,v 1.40 2000/09/13 05:58:34 sakane Exp $	*/
+/*	$KAME: isakmp_ident.c,v 1.41 2000/09/19 06:49:30 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.40 2000/09/13 05:58:34 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.41 2000/09/19 06:49:30 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -393,6 +393,7 @@ end:
 		VPTRINIT(iph1->nonce_p);
 		VPTRINIT(iph1->id_p);
 		oakley_delcert(iph1->cr_p);
+		iph1->cr_p = NULL;
 	}
 
 	return error;
@@ -597,7 +598,9 @@ end:
 	if (error) {
 		VPTRINIT(iph1->id_p);
 		oakley_delcert(iph1->cert_p);
+		iph1->cert_p = NULL;
 		oakley_delcert(iph1->crl_p);
+		iph1->crl_p = NULL;
 		VPTRINIT(iph1->sig_p);
 	}
 
@@ -1123,9 +1126,12 @@ end:
 	if (error) {
 		VPTRINIT(iph1->id_p);
 		oakley_delcert(iph1->cert_p);
+		iph1->cert_p = NULL;
 		oakley_delcert(iph1->crl_p);
+		iph1->crl_p = NULL;
 		VPTRINIT(iph1->sig_p);
 		oakley_delcert(iph1->cr_p);
+		iph1->cr_p = NULL;
 	}
 
 	return error;

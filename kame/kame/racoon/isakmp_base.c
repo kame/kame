@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_base.c,v 1.32 2000/09/13 05:58:34 sakane Exp $	*/
+/*	$KAME: isakmp_base.c,v 1.33 2000/09/19 06:49:30 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.32 2000/09/13 05:58:34 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.33 2000/09/19 06:49:30 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -550,7 +550,9 @@ end:
 	if (error) {
 		VPTRINIT(iph1->dhpub_p);
 		oakley_delcert(iph1->cert_p);
+		iph1->cert_p = NULL;
 		oakley_delcert(iph1->crl_p);
+		iph1->crl_p = NULL;
 		VPTRINIT(iph1->sig_p);
 	}
 
@@ -866,7 +868,9 @@ end:
 	if (error) {
 		VPTRINIT(iph1->dhpub_p);
 		oakley_delcert(iph1->cert_p);
+		iph1->cert_p = NULL;
 		oakley_delcert(iph1->crl_p);
+		iph1->crl_p = NULL;
 		VPTRINIT(iph1->sig_p);
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.54 2000/09/13 05:58:34 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.55 2000/09/19 06:49:30 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.54 2000/09/13 05:58:34 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.55 2000/09/19 06:49:30 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1311,6 +1311,7 @@ get_cert_fromlocal(iph1, my)
 		plog(logp, LOCATION, NULL,
 			"ERROR: failed to get cert buffer\n");
 		oakley_delcert(*certpl);
+		*certpl = NULL;
 		goto end;
 	}
 	memcpy((*certpl)->pl->v + 1, cert->v, cert->l);
@@ -1564,6 +1565,7 @@ oakley_savecert(iph1, gen)
 	default:
 		/* XXX */
 		oakley_delcert((*c));
+		*c = NULL;
 		return NULL;
 	}
 
@@ -1637,6 +1639,7 @@ save_certbuf(gen)
 		plog(logp, LOCATION, NULL,
 			"Failed to copy CERT from packet.\n");
 		oakley_delcert(new);
+		new = NULL;
 		return NULL;
 	}
 	memcpy(new->pl->v, gen + 1, new->pl->l);
