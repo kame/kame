@@ -295,7 +295,7 @@ udp6_input(mp, offp, proto)
 								ip6, n);
 					}
 
-					m_adj(m, off + sizeof(struct udphdr));
+					m_adj(n, off + sizeof(struct udphdr));
 					if (sbappendaddr(&last->in6p_socket->so_rcv,
 							(struct sockaddr *)&udp_in6,
 							n, opts) == 0) {
