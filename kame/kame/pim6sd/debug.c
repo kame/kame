@@ -1,4 +1,4 @@
-/*	$KAME: debug.c,v 1.54 2002/12/24 04:43:11 suz Exp $	*/
+/*	$KAME: debug.c,v 1.55 2002/12/24 06:37:10 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -973,7 +973,6 @@ dump_pim_mrt(fp)
 }
 
 
-/* TODO: modify the output for better redability */
 /*
  * Dumps the local Cand-RP-set
  */
@@ -984,58 +983,43 @@ dump_rp_set(fp)
     cand_rp_t      *rp;
     rp_grp_entry_t *rp_grp_entry;
     grp_mask_t     *grp_mask;
-    int print_upstream;
 
     fprintf(fp, "---------------------------RP-Set----------------------------\n");
     fprintf(fp, "Current BSR address: %s Prio: %d Timeout: %d\n",
 	    sa6_fmt(&curr_bsr_address), curr_bsr_priority,
 	    pim_bootstrap_timer);
-    fprintf(fp, "%-40s %-3s Group prefix     Prio Hold Age\n",
-	    "RP-address/Upstream", "IN");
+    fprintf(fp, "%-45s Prio Hold Age\n", "RP-address(Upstream)/Group prefix");
 
     for (rp = cand_rp_list; rp != (cand_rp_t *) NULL; rp = rp->next)
     {
-	char *upstream_str;
+	if (rp->rpentry->upstream != NULL) {
+		fprintf(fp, "%s(%s%%%s)\n",
+			sa6_fmt(&rp->rpentry->address),
+			sa6_fmt(&rp->rpentry->upstream->address),
+			uvifs[rp->rpentry->incoming].uv_name);
+	} else {
+		fprintf(fp, "%s(none)\n", sa6_fmt(&rp->rpentry->address));
+	}
 
-	print_upstream = 0;
+	if ((rp_grp_entry = rp->rp_grp_next) == NULL)
+		continue;
 
-	fprintf(fp, "%-40s %-3d ",
-		sa6_fmt(&rp->rpentry->address),
-		rp->rpentry->incoming);
-	if ((rp_grp_entry = rp->rp_grp_next) != (rp_grp_entry_t *) NULL)
-	{
+	grp_mask = rp_grp_entry->group;
+	fprintf(fp, "%4s %-40s %-4u %-4u %-3u\n", "",
+		net6name(&grp_mask->group_addr.sin6_addr,
+			 &grp_mask->group_mask),
+		rp_grp_entry->priority, rp_grp_entry->advholdtime,
+		rp_grp_entry->holdtime);
+
+	for (rp_grp_entry = rp_grp_entry->rp_grp_next;
+	     rp_grp_entry != (rp_grp_entry_t *) NULL;
+	     rp_grp_entry = rp_grp_entry->rp_grp_next) {
 	    grp_mask = rp_grp_entry->group;
-	    fprintf(fp, "%-16.16s %-4u %-4u %-3u\n",
+	    /* XXX: hardcoding */
+	    fprintf(fp, "%4s %-40s %-4u %-4u %-3u\n", "",
 		    net6name(&grp_mask->group_addr.sin6_addr,
-			     &grp_mask->group_mask),
-		    rp_grp_entry->priority, rp_grp_entry->advholdtime,
-		    rp_grp_entry->holdtime);
-
-	    if (rp->rpentry->upstream != NULL)
-		upstream_str = sa6_fmt(&rp->rpentry->upstream->address);
-	    else
-		upstream_str = "(none)";
-
-	    for (rp_grp_entry = rp_grp_entry->rp_grp_next;
-		 rp_grp_entry != (rp_grp_entry_t *) NULL;
-		 rp_grp_entry = rp_grp_entry->rp_grp_next)
-	    {
-		grp_mask = rp_grp_entry->group;
-		/* XXX: hardcoding */
-		if (print_upstream == 0) {
-		    fprintf(fp, "  %-38s", upstream_str);
-		    print_upstream = 1;
-		}
-		else
-		    fprintf(fp, "  %38s", "");
-		fprintf(fp, "%4s %-16.16s %-4u %-4u %-3u\n", "",
-			net6name(&grp_mask->group_addr.sin6_addr,
-				 &grp_mask->group_mask),
-			rp_grp_entry->priority,
-			rp_grp_entry->advholdtime, rp_grp_entry->holdtime);
-	    }
-	    if (print_upstream == 0)
-		fprintf(fp, "  %-38s\n", upstream_str);
+			     &grp_mask->group_mask), rp_grp_entry->priority,
+			    rp_grp_entry->advholdtime, rp_grp_entry->holdtime);
 	}
     }
     return (TRUE);
