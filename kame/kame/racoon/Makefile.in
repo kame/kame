@@ -1,4 +1,4 @@
-# YIPS $Id: Makefile.in,v 1.8 2000/01/09 01:31:19 itojun Exp $
+# YIPS $Id: Makefile.in,v 1.9 2000/01/09 03:17:38 itojun Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -28,7 +28,6 @@ OBJS=	main.o session.o isakmp.o handler.o \
 	cfparse.o cftoken.o strnames.o \
 	vmbuf.o plog.o logger.o schedule.o str2val.o misc.o sockmisc.o \
 	@LIBOBJS@
-#OBJS+=	signing.o
 
 all: $(PROG)
 
