@@ -21,6 +21,7 @@ INCS+=	rpc/auth.h rpc/auth_unix.h rpc/clnt.h rpc/pmap_clnt.h rpc/pmap_prot.h \
 	rpc/pmap_rmt.h rpc/rpc.h rpc/rpc_msg.h rpc/svc.h rpc/svc_auth.h \
 	rpc/types.h rpc/xdr.h
 INCS+=	rpcsvc/yp_prot.h rpcsvc/ypclnt.h
+INCS+=	ifaddrs.h
 INCSDIR=/usr/include
 
 MKOBJ=	no
