@@ -1,4 +1,4 @@
-/*	$KAME: debug.c,v 1.59 2003/09/02 09:48:45 suz Exp $	*/
+/*	$KAME: debug.c,v 1.60 2004/06/09 15:21:51 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -601,24 +601,27 @@ dump_mldgroups(fp)
 	struct listaddr *grp, *src;
 
 	fprintf(fp, "Reported MLD Group\n");
-	fprintf(fp, " %-3s %6s %-40s\n", "Mif", "PhyIF", "Group/Source");
+	fprintf(fp, " %-3s %6s %s\n", "Mif", "PhyIF",
+		"Group(Timer,MLD-version,Filter-mode)/Source(Timer)");
 
 	for (vifi = 0, v = uvifs; vifi < numvifs; ++vifi, ++v) {
 		for (grp = v->uv_groups; grp; grp = grp->al_next) {
-			fprintf(fp, " %-3u %6s %-40s\n", vifi,
-				(v->uv_flags & MIFF_REGISTER) ? 
-				    "regist" : v->uv_name,
-				sa6_fmt(&grp->al_addr));
+			fprintf(fp, " %-3u %6s %s (%lu %s %s)\n", vifi,
+			    (v->uv_flags & MIFF_REGISTER) ? "regist" : v->uv_name,
+			    sa6_fmt(&grp->al_addr), (u_long) grp->al_timer,
+			    grp->comp_mode == MLDv2 ? "v2" : "v1",
+			    grp->filter_mode == MODE_IS_INCLUDE ? "IN" : "EX");
 
 			src = grp->sources;
 			if (src == NULL) {
-				fprintf(fp, " %-3s %6s   %-40s\n", "", "",
+				fprintf(fp, " %-3s %6s   %s (-)\n", "", "",
 					"(any source)");
 				continue;
 			}
 			for ( ; src; src = src->al_next) {
-				fprintf(fp, " %-3s %6s   %-40s\n", "", "",
-					sa6_fmt(&src->al_addr));
+				fprintf(fp, " %-3s %6s   %s (%lu)\n", "", "",
+					sa6_fmt(&src->al_addr),
+					(u_long) src->al_timer);
 			}
 		}
 	}
