@@ -204,6 +204,7 @@ pppattach(dummy)
     for (sc = ppp_softc; i < NPPP; sc++) {
 	sc->sc_if.if_name = "ppp";
 	sc->sc_if.if_unit = i++;
+	sc->sc_if.if_softc = sc;
 	sc->sc_if.if_mtu = PPP_MTU;
 	sc->sc_if.if_flags = IFF_POINTOPOINT | IFF_MULTICAST;
 	sc->sc_if.if_type = IFT_PPP;
