@@ -1,9 +1,9 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2143 2002/04/30 14:53:05 jinmei Exp $
+$KAME: CHANGELOG,v 1.2144 2002/04/30 15:05:30 jinmei Exp $
 
 <200204>
 2002-04-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* kame/kame/dhcp6: added the ability to send solicit messages with
+	* kame/kame/dhcp6: added an ability to send solicit messages with
 	a rapid commit option.  A configuration file for dhcp6c was
 	introduced to include the option.
 
