@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2644 2004/07/14 16:44:47 suz Exp $
+$KAME: CHANGELOG,v 1.2645 2004/07/16 09:29:23 suz Exp $
 
 <200407>
+2004-07-16  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/kame/kame/pim6sd/mld6v2_proto.c: fixed a wrong S-flag handling.
+	* kame/sys/netinet6/icmp6.c: uses TCP-hostcache framework for pMTU
+	  discovery in freebsd5, so that pMTU discovery on TCP works fine.
+
 2004-07-14  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/netinet6/in6.c: fixed a freebsd5 kernel crash by "ndp -P"
 	command.
