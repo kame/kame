@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.18 2000/04/19 14:45:46 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.19 2000/04/21 10:43:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -252,9 +252,9 @@ ip6_mrouter_set(so, sopt)
 	if (so != ip6_mrouter && sopt->sopt_name != MRT6_INIT)
 		return (EACCES);
 
-	if (error = soopt_getm(sopt, &m)) /* XXX */
+	if ((error = soopt_getm(sopt, &m)) != 0) /* XXX */
 		return (error);
-	if (error = soopt_mcopyin(sopt, m)) /* XXX */
+	if ((error = soopt_mcopyin(sopt, m)) != 0) /* XXX */
 		return (error);
 
 	switch (sopt->sopt_name) {
