@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.978 2000/06/06 08:25:50 jinmei Exp $
+$Id: CHANGELOG,v 1.979 2000/06/06 08:27:58 jinmei Exp $
 
 <200006>
 2000-06-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -11,7 +11,7 @@ $Id: CHANGELOG,v 1.978 2000/06/06 08:25:50 jinmei Exp $
 2000-06-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi3/sbin/sysctl/sysctl.c:
 	* {netbsd, openbsd}/usr.sbin/sysctl/sysctl.c:
-	synch with the change below. (Fortunately, there is no binary
+	synch with the change below. (Fortunately, there are no binary
 	compatibility issues).
 
 2000-06-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
