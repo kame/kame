@@ -1,4 +1,4 @@
-/*	$KAME: if_sec.c,v 1.3 2001/07/25 09:23:56 itojun Exp $	*/
+/*	$KAME: if_sec.c,v 1.4 2001/07/26 01:58:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -154,7 +154,7 @@ sec_create(unit)
 	sc->gif_if.if_flags  = IFF_POINTOPOINT | IFF_MULTICAST;
 	/* turn off ingress filter */
 	sc->gif_if.if_flags  |= IFF_LINK2;
-	sc->gif_if.if_ioctl  = gif_ioctl;
+	sc->gif_if.if_ioctl  = sec_ioctl;
 #ifdef __OpenBSD__
 	sc->gif_if.if_start  = gif_start;
 #endif
@@ -209,6 +209,36 @@ sec_destroy(ifp)
 	}
 
 	return ENOENT;
+}
+
+int
+sec_ioctl(ifp, cmd, data)
+	struct ifnet *ifp;
+#if defined(__FreeBSD__) && __FreeBSD__ < 3
+	int cmd;
+#else
+	u_long cmd;
+#endif
+	caddr_t data;
+{
+
+	/* forbid physical address changes */
+	switch (cmd) {
+#ifdef INET
+	case SIOCSIFPHYADDR:
+#endif
+#ifdef INET6
+	case SIOCSIFPHYADDR_IN6:
+#endif /* INET6 */
+	case SIOCSLIFPHYADDR:
+#ifdef SIOCDIFPHYADDR
+	case SIOCDIFPHYADDR:
+#endif
+		return EOPNOTSUPP;
+
+	default:
+		return gif_ioctl(ifp, cmd, data);
+	}
 }
 
 #if 0
