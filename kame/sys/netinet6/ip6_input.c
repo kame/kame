@@ -1199,14 +1199,14 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 			}
 
 #ifndef PULLDOWN_TEST
-			if (off + sizeof(*ip6e) > m_len)
+			if (off + sizeof(*ip6e) > m->m_len)
 				goto loopend;
 			ip6e = (struct ip6_ext *)(mtod(m, caddr_t) + off);
 			if (nxt == IPPROTO_AH)
 				elen = (ip6e->ip6e_len + 2) << 2;
 			else
 				elen = (ip6e->ip6e_len + 1) << 3;
-			if (off + elen > m_len)
+			if (off + elen > m->m_len)
 				goto loopend;
 #else
 			ext = ip6_pullexthdr(m, off, nxt);
