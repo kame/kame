@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1240 2000/08/29 07:34:05 jinmei Exp $
+$KAME: CHANGELOG,v 1.1241 2000/08/30 06:02:59 itojun Exp $
 
 <200008>
+Wed Aug 30 15:02:27 JST 2000  itojun@iijlab.net
+	* kame/ping6/ping6.c, sys/netinet6/in6_ifattach.c:
+	  downcase hostname/DNS name, before computing NI group address.
+	  From: yoshfuji
+
 2000-08-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (prelist_update): reverted the
 	original two-hour rule for updating address lifetime in RFC 2462.
