@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/04/24 01:17:47 $
+			$Date: 2000/04/26 14:28:10 $
 
 1. IPv6
 
@@ -78,6 +78,9 @@ RFC2553: Basic Socket Interface Extensions for IPv6
 	- supported on KAME/BSDI4,
 	- not supported on KAME/FreeBSD228, KAME/OpenBSD and KAME/BSDI3.
       see 1.12 in this document for details.
+RFC2671: Extension Mechanisms for DNS (EDNS0)
+    * see USAGE for how to use it.
+    * not supported on kame/freebsd4 and kame/bsdi4.
 RFC2675: IPv6 Jumbograms
     * See 1.7 in this document for details.
 RFC2710: Multicast Listener Discovery for IPv6
