@@ -2,11 +2,11 @@
 # Date created:         Wed Jan 26 03:37:49 JST 2000
 # Whom:                 sumikawa
 #
-# $KAME: Makefile,v 1.20 2000/10/03 16:26:40 sumikawa Exp $
+# $KAME: Makefile,v 1.21 2000/10/15 09:53:47 sumikawa Exp $
 #
 
 PORTNAME=	tcpdump
-SNAPVERSION=	2000.10.02
+SNAPVERSION=	2000.10.09
 PORTVERSION=	${SNAPVERSION:S/.//g}
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
