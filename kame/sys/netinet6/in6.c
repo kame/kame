@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.78 2000/04/26 06:00:18 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.79 2000/04/27 16:43:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -815,7 +815,7 @@ in6_control(so, cmd, data, ifp)
 					    "from list\n");
 				}
 			}
-			IFAFREE(&ia->ia_ifa);
+			IFAFREE(&oia->ia_ifa);
 		}
 #endif
 		return error;
