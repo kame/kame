@@ -1,4 +1,4 @@
-/*      $KAME: binding.c,v 1.8 2005/03/07 23:18:27 keiichi Exp $	*/
+/*      $KAME: binding.c,v 1.9 2005/03/07 23:22:59 keiichi Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -76,7 +76,7 @@ static char reg_fsm_desc[] = {
   "BOUND",
   "DHAAD"
 };
-static rr_fsm_desc[] = {
+static char rr_fsm_desc[] = {
   "START",
   "WAITHC",
   "WAITH",
