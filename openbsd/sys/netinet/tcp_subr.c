@@ -688,11 +688,21 @@ tcp_notify(inp, error)
 	 * and receives a second error, give up now.  This is better
 	 * than waiting a long time to establish a connection that
 	 * can never complete.
+	 *
+	 * Further optimization:
+	 *  TCP SHOULD abort a connection in the SYN-SENT or the SYN-RECEIVED
+	 *  state if it receives an ICMP "Destination Unreachable" message that
+	 *  indicates a soft error about that connection.
+	 * [draft-gont-tcpm-tcp-soft-errors-01.txt, Section 4]
 	 */
 	if (tp->t_state == TCPS_ESTABLISHED &&
 	     (error == EHOSTUNREACH || error == ENETUNREACH ||
 	      error == EHOSTDOWN)) {
 		return;
+	} else if ((tp->t_state == TCPS_SYN_SENT ||
+	    tp->t_state == TCPS_SYN_RECEIVED) &&
+	    (error == EHOSTUNREACH || error == EHOSTDOWN)) {
+		so->so_error = error;
 	} else if (TCPS_HAVEESTABLISHED(tp->t_state) == 0 &&
 	    tp->t_rxtshift > 3 && tp->t_softerror)
 		so->so_error = error;
