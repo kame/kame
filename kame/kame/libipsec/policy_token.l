@@ -44,7 +44,11 @@
 #include <unistd.h>
 #include <errno.h>
 
+#ifndef __NetBSD__
 #include "y.tab.h"
+#else
+#include "policy_parse.h"
+#endif
 #define yylval __libyylval	/* XXX */
 
 int yylex __P((void));
