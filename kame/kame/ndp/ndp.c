@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.52 2001/02/05 01:52:49 jinmei Exp $	*/
+/*	$KAME: ndp.c,v 1.53 2001/02/08 06:54:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -132,7 +132,7 @@ static int tflag;
 static int32_t thiszone;	/* time difference with gmt */
 static int s = -1;
 static int repeat = 0;
-static int lflag = 0;
+static int lflag = 1;
 
 char ntop_buf[INET6_ADDRSTRLEN];	/* inet_ntop() */
 char host_buf[NI_MAXHOST];		/* getnameinfo() */
