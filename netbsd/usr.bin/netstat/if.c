@@ -61,6 +61,7 @@ __RCSID("$NetBSD: if.c,v 1.31 1999/03/14 22:28:05 mycroft Exp $");
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
+#include <netdb.h>
 
 #include "netstat.h"
 
@@ -72,7 +73,6 @@ static void catchalarm __P((int));
 
 #ifdef INET6
 char *netname6 __P((struct sockaddr_in6 *, struct in6_addr *));
-static char ntop_buf[INET6_ADDRSTRLEN];		/* for inet_ntop() */
 #endif
 
 /*
@@ -100,6 +100,9 @@ intpr(interval, ifnetaddr, pfunc)
 	struct sockaddr *sa;
 	struct ifnet_head ifhead;	/* TAILQ_HEAD */
 	char name[IFNAMSIZ];
+#ifdef INET6
+	char hbuf[NI_MAXHOST];		/* for getnameinfo() */
+#endif
 
 	if (ifnetaddr == 0) {
 		printf("ifnet: symbol not defined\n");
@@ -224,13 +227,25 @@ intpr(interval, ifnetaddr, pfunc)
 #ifdef INET6
 			case AF_INET6:
 				sin6 = (struct sockaddr_in6 *)sa;
-				printf("%-13.13s ",
-				       netname6(&ifaddr.in6.ia_addr,
-						&ifaddr.in6.ia_prefixmask.sin6_addr));
-				printf("%-17.17s ",
-				    (char *)inet_ntop(AF_INET6,
-					&sin6->sin6_addr,
-					ntop_buf, sizeof(ntop_buf)));
+				cp = netname6(&ifaddr.in6.ia_addr,
+					&ifaddr.in6.ia_prefixmask.sin6_addr);
+				if (vflag)
+					n = strlen(cp) < 13 ? 13 : strlen(cp);
+				else
+					n = 13;
+				printf("%-*.*s ", n, n, cp);
+				if (getnameinfo((struct sockaddr *)sin6,
+						sin6->sin6_len,
+						hbuf, sizeof(hbuf), NULL, 0,
+						NI_NUMERICHOST | NI_WITHSCOPEID)) {
+					cp = "?";
+				} else
+					cp = hbuf;
+				if (vflag)
+					n = strlen(cp) < 17 ? 17 : strlen(cp);
+				else
+					n = 17;
+				printf("%-*.*s ", n, n, cp);
 				break;
 #endif /*INET6*/
 #ifndef SMALL

@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.6 1999/10/05 10:14:16 jinmei Exp $");
+__RCSID("$Id: inet6.c,v 1.7 1999/10/27 11:58:34 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -110,8 +110,6 @@ struct	socket sockb;
 char	*inet6name __P((struct in6_addr *));
 void	inet6print __P((struct in6_addr *, int, char *));
 
-static char ntop_buf[INET6_ADDRSTRLEN];
-
 /*
  * Print a summary of connections related to an Internet
  * protocol.  For TCP, also give state of connection.
@@ -173,9 +171,9 @@ ip6protopr(off, name)
 		}
 		if (Aflag) {
 			if (istcp)
-				printf("%8p ", in6pcb.in6p_ppcb);
+				printf("%8lx ", (u_long)in6pcb.in6p_ppcb);
 			else
-				printf("%8p ", next);
+				printf("%8lx ", (u_long)next);
 		}
 		printf("%-5.5s %6ld %6ld ", name, sockb.so_rcv.sb_cc,
 			sockb.so_snd.sb_cc);
@@ -1125,19 +1123,22 @@ inet6print(in6, port, proto)
 	char *proto;
 {
 #define GETSERVBYPORT6(port, proto, ret)\
-{\
+do {\
 	if (strcmp((proto), "tcp6") == 0)\
 		(ret) = getservbyport((int)(port), "tcp");\
 	else if (strcmp((proto), "udp6") == 0)\
 		(ret) = getservbyport((int)(port), "udp");\
 	else\
 		(ret) = getservbyport((int)(port), (proto));\
-};
+} while (0)
 	struct servent *sp = 0;
 	char line[80], *cp;
 	int width;
 
-	sprintf(line, "%.*s.", (Aflag && !nflag) ? 12 : 16, inet6name(in6));
+	width = Aflag ? 12 : 16;
+	if (vflag && width < strlen(inet6name(in6)))
+		width = strlen(inet6name(in6));
+	sprintf(line, "%.*s.", width, inet6name(in6));
 	cp = index(line, '\0');
 	if (!nflag && port)
 		GETSERVBYPORT6(port, proto, sp);
@@ -1146,6 +1147,8 @@ inet6print(in6, port, proto)
 	else
 		sprintf(cp, "%d", ntohs((u_short)port));
 	width = Aflag ? 18 : 22;
+	if (vflag && width < strlen(line))
+		width = strlen(line);
 	printf(" %-*.*s", width, width, line);
 }
 
@@ -1164,6 +1167,8 @@ inet6name(in6p)
 	struct hostent *hp;
 	static char domain[MAXHOSTNAMELEN + 1];
 	static int first = 1;
+	char hbuf[NI_MAXHOST];
+	struct sockaddr_in6 sin6;
 
 	if (first && !nflag) {
 		first = 0;
@@ -1187,10 +1192,24 @@ inet6name(in6p)
 		strcpy(line, "*");
 	else if (cp)
 		strcpy(line, cp);
-	else 
-		sprintf(line, "%s",
-			inet_ntop(AF_INET6, (void *)in6p, ntop_buf,
-				sizeof(ntop_buf)));
+	else  {
+		memset(&sin6, 0, sizeof(sin6));
+		sin6.sin6_len = sizeof(sin6);
+		sin6.sin6_family = AF_INET6;
+		sin6.sin6_addr = *in6p;
+		if (IN6_IS_ADDR_LINKLOCAL(in6p)) {
+			sin6.sin6_scope_id =
+				ntohs(*(u_int16_t *)&in6p->s6_addr[2]);
+			sin6.sin6_addr.s6_addr[2] = 0;
+			sin6.sin6_addr.s6_addr[3] = 0;
+		}
+		if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
+				hbuf, sizeof(hbuf), NULL, 0,
+				NI_NUMERICHOST | NI_WITHSCOPEID)) {
+			strcpy(hbuf, "?");
+		}
+		sprintf(line, "%s", hbuf);
+	}
 	return (line);
 }
 
