@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.48 2001/01/22 11:45:18 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.49 2001/01/22 11:53:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.48 2001/01/22 11:45:18 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.49 2001/01/22 11:53:44 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -214,6 +214,7 @@ void sighandler __P((int));
 void ripalarm __P((int));
 void riprecv __P((void));
 void ripsend __P((struct ifc *, struct sockaddr_in6 *, int));
+int out_filter __P((struct riprt *, struct ifc *));
 void init __P((void));
 void sockopt __P((struct ifc *));
 void ifconfig __P((void));
@@ -719,9 +720,7 @@ ripsend(ifcp, sin, flag)
 {
 	struct	riprt *rrt;
 	struct	in6_addr *nh;	/* next hop */
-	struct	in6_addr ia;
-	struct	iff *iffp;
-	int	maxrte, ok;
+	int	maxrte;
 
 	if (ifcp == NULL) {
 		/*
@@ -752,8 +751,12 @@ ripsend(ifcp, sin, flag)
 	if ((flag & RRTF_SENDANYWAY) == 0 &&
 	    (qflag || (ifcp->ifc_flags & IFF_LOOPBACK)))
 		return;
+
+	/* -N: no use */
 	if (iff_find(ifcp, 'N') != NULL)
 		return;
+
+	/* -T: generate default route only */
 	if (iff_find(ifcp, 'T') != NULL) {
 		struct netinfo6 rrt_info;
 		memset(&rrt_info, 0, sizeof(struct netinfo6));
@@ -767,73 +770,20 @@ ripsend(ifcp, sin, flag)
 		ripflush(ifcp, sin);
 		return;
 	}
+
 	maxrte = (ifcp->ifc_mtu - sizeof(struct ip6_hdr) - 
 			sizeof(struct udphdr) - 
 			sizeof(struct rip6) + sizeof(struct netinfo6)) /
 			sizeof(struct netinfo6);
+
 	nrt = 0; np = ripbuf->rip6_nets; nh = NULL;
 	for (rrt = riprt; rrt; rrt = rrt->rrt_next) {
 		if (rrt->rrt_rflags & RRTF_NOADVERTISE)
 			continue;
+
 		/* Need to check filter here */
-
-		/*
-		 * -A: filter out less specific routes, if we have aggregated
-		 * route configured.
-		 */ 
-		for (iffp = ifcp->ifc_filter; iffp; iffp = iffp->iff_next) {
-			if (iffp->iff_type != 'A')
-				continue;
-			if (rrt->rrt_info.rip6_plen <= iffp->iff_plen)
-				continue;
-			ia = rrt->rrt_info.rip6_dest; 
-			applyplen(&ia, iffp->iff_plen);
-			if (IN6_ARE_ADDR_EQUAL(&ia, &iffp->iff_addr))
-				goto noadvert;
-		}
-
-		/*
-		 * if it is an aggregated route, advertise it only to the
-		 * interfaces specified on -A.
-		 */
-		if ((rrt->rrt_rflags & RRTF_AGGREGATE) != 0) {
-			ok = 0;
-			for (iffp = ifcp->ifc_filter; iffp;
-			     iffp = iffp->iff_next) {
-				if (iffp->iff_type != 'A')
-					continue;
-				if (rrt->rrt_info.rip6_plen == iffp->iff_plen &&
-				    IN6_ARE_ADDR_EQUAL(&rrt->rrt_info.rip6_dest,
-				    &iffp->iff_addr)) {
-					ok = 1;
-					break;
-				}
-			}
-			if (!ok)
-				goto noadvert;
-		}
-
-		/*
-		 * -O: advertise only if prefix matches the configured prefix.
-		 */
-		if (iff_find(ifcp, 'O')) {
-			ok = 0;
-			for (iffp = ifcp->ifc_filter; iffp;
-			     iffp = iffp->iff_next) {
-				if (iffp->iff_type != 'O')
-					continue;
-				if (rrt->rrt_info.rip6_plen < iffp->iff_plen)
-					continue;
-				ia = rrt->rrt_info.rip6_dest; 
-				applyplen(&ia, iffp->iff_plen);
-				if (IN6_ARE_ADDR_EQUAL(&ia, &iffp->iff_addr)) {
-					ok = 1;
-					break;
-				}
-			}
-			if (!ok)
-				goto noadvert;
-		}
+		if (out_filter(rrt, ifcp) == 0)
+			continue;
 
 		/* Check split horizon and other conditions */
 		if (tobeadv(rrt, ifcp) == 0)
@@ -879,11 +829,81 @@ ripsend(ifcp, sin, flag)
 			ripflush(ifcp, sin);
 			nh = NULL;
 		}
-
-noadvert:;
 	}
 	if (nrt)	/* Send last packet */
 		ripflush(ifcp, sin);
+}
+
+/*
+ * outbound filter logic, per-route/inteface.
+ */
+int
+out_filter(rrt, ifcp)
+	struct riprt *rrt;
+	struct ifc *ifcp;
+{
+	struct iff *iffp;
+	struct in6_addr ia;
+	int ok;
+
+	/*
+	 * -A: filter out less specific routes, if we have aggregated
+	 * route configured.
+	 */ 
+	for (iffp = ifcp->ifc_filter; iffp; iffp = iffp->iff_next) {
+		if (iffp->iff_type != 'A')
+			continue;
+		if (rrt->rrt_info.rip6_plen <= iffp->iff_plen)
+			continue;
+		ia = rrt->rrt_info.rip6_dest; 
+		applyplen(&ia, iffp->iff_plen);
+		if (IN6_ARE_ADDR_EQUAL(&ia, &iffp->iff_addr))
+			return 0;
+	}
+
+	/*
+	 * if it is an aggregated route, advertise it only to the
+	 * interfaces specified on -A.
+	 */
+	if ((rrt->rrt_rflags & RRTF_AGGREGATE) != 0) {
+		ok = 0;
+		for (iffp = ifcp->ifc_filter; iffp; iffp = iffp->iff_next) {
+			if (iffp->iff_type != 'A')
+				continue;
+			if (rrt->rrt_info.rip6_plen == iffp->iff_plen &&
+			    IN6_ARE_ADDR_EQUAL(&rrt->rrt_info.rip6_dest,
+			    &iffp->iff_addr)) {
+				ok = 1;
+				break;
+			}
+		}
+		if (!ok)
+			return 0;
+	}
+
+	/*
+	 * -O: advertise only if prefix matches the configured prefix.
+	 */
+	if (iff_find(ifcp, 'O')) {
+		ok = 0;
+		for (iffp = ifcp->ifc_filter; iffp; iffp = iffp->iff_next) {
+			if (iffp->iff_type != 'O')
+				continue;
+			if (rrt->rrt_info.rip6_plen < iffp->iff_plen)
+				continue;
+			ia = rrt->rrt_info.rip6_dest; 
+			applyplen(&ia, iffp->iff_plen);
+			if (IN6_ARE_ADDR_EQUAL(&ia, &iffp->iff_addr)) {
+				ok = 1;
+				break;
+			}
+		}
+		if (!ok)
+			return 0;
+	}
+
+	/* the prefix should be advertised */
+	return 1;
 }
 
 /*
@@ -1069,8 +1089,11 @@ riprecv()
 		trace(1, "Invalid command %d\n", rp->rip6_cmd);
 		return; 
 	}
+
+	/* -N: no use */
 	if (iff_find(ifcp, 'N') != NULL)
 		return;
+
 	tracet(1, "Recv(%s): from %s.%d info(%d)\n",
 		ifcp->ifc_name, inet6_n2p(&nh), ntohs(fsock.sin6_port), nn);
 
@@ -2889,7 +2912,7 @@ ifdump0(dump, ifcp)
 			case 'A':
 				ft = "Aggregate"; addr++; break;
 			case 'N':
-				ft = "No-advertise"; break;
+				ft = "No-use"; break;
 			case 'O':
 				ft = "Advertise-only"; addr++; break;
 			case 'T':
