@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2594 2004/04/18 15:16:58 suz Exp $
+$KAME: CHANGELOG,v 1.2595 2004/04/20 08:05:30 suz Exp $
 
 <200404>
+2004-04-20  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/sys/netinet6/mldv2.c: fixed a MLDv2-enabled freebsd[45] kernel 
+	crash due to an improper termincation of layer2 multicast listening.
+	(ToDo: same fix is necesary for freebsd[45]/sys/netinet/in.c)
+
 2004-04-18  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/kame/pim6sd/{vif.c, mld6.[ch]}, kame/sys/netinet6/in6.h:
 	All MLDv2-capable routers multicast address has been officially assigned

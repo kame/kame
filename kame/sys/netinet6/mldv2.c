@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.15 2004/04/03 03:00:04 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.16 2004/04/20 08:05:31 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3126,35 +3126,36 @@ in6_delmulti2(in6m, error, numsrc, src, mode, final)
 			mld_stop_listening(in6m);
 		}
 	}
-	if (ifma->ifma_refcount == 1) {
-		/*
-		 * We cannot use timer for robstness times report
-		 * transmission when ifma->ifma_refcount becomes 0, since in6m
-		 * itself will be removed here. So, in this case, report
-		 * retransmission will be done quickly.XXX my spec.
-		 */
-		while (in6m->in6m_source->i6ms_robvar > 0) {
-			m = NULL;
-			buflen = 0;
-			mld_send_state_change_report
-				(&m, &buflen, in6m, type, 0);
-			if (m != NULL)
-				mld_sendbuf(m, in6m->in6m_ifp);
-		}
-		/*
-		 * Unlink from list.
-		 */
-		in6_free_all_msf_source_list(in6m);
-		ifma->ifma_protospec = 0;
-		LIST_REMOVE(in6m, in6m_entry);
-		free(in6m, M_IPMADDR);
-	}
 	/*
 	 * If this is a final leave request by the socket, decrease refcount.
 	 */
-	if (final)
+	if (final) {
+		if (ifma->ifma_refcount == 1) {
+			/*
+			 * We cannot use timer for robstness times report
+			 * transmission when ifma->ifma_refcount becomes 0,
+			 * since in6m itself will be removed here. So, in 
+			 * this case, report retransmission will be done 
+			 * quickly.XXX my spec.
+			 */
+			while (in6m->in6m_source->i6ms_robvar > 0) {
+				m = NULL;
+				buflen = 0;
+				mld_send_state_change_report
+					(&m, &buflen, in6m, type, 0);
+				if (m != NULL)
+					mld_sendbuf(m, in6m->in6m_ifp);
+			}
+			/*
+			 * Unlink from list.
+			 */
+			in6_free_all_msf_source_list(in6m);
+			ifma->ifma_protospec = 0;
+			LIST_REMOVE(in6m, in6m_entry);
+			free(in6m, M_IPMADDR);
+		}
 		if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
-
+	}
 	*error = 0;
 	if (newhead != NULL)
 		FREE(newhead, M_MSFILTER);
@@ -3227,25 +3228,12 @@ in6_modmulti2(ap, ifp, error, numsrc, src, mode,
 				 */
 			}
 			if (mode == MCAST_INCLUDE) {
-				if (--in6m->in6m_refcount == 0) {
-					/*
-					 * Unlink from list.
-					 */
+				if (ifma->ifma_refcount == 1) {
+					ifma->ifma_protospec = 0;
 					LIST_REMOVE(in6m, in6m_entry);
-					/*
-					 * Notify the network driver to update
-					 * its multicast reception filter.
-					 */
-					ifr.ifr_addr.sin6_family = AF_INET6;
-					ifr.ifr_addr.sin6_len =
-					    sizeof(struct sockaddr_in6);
-					bcopy(&in6m->in6m_addr,
-					    &ifr.ifr_addr.sin6_addr,
-					    sizeof(ifr.ifr_addr.sin6_addr));
-					(*in6m->in6m_ifp->if_ioctl)(in6m->in6m_ifp,
-					    SIOCDELMULTI, (caddr_t)&ifr);
 					free(in6m, M_IPMADDR);
 				}
+				if_delmulti(ifma->ifma_ifp, ifma->ifma_addr);
 				splx(s);
 				return NULL; /* not an error! */
 			} else if (mode == MCAST_EXCLUDE) {
