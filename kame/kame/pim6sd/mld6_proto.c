@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.41 2004/06/14 04:33:45 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.42 2004/06/15 09:51:58 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -167,6 +167,7 @@ accept_listener_query(src, dst, group, tmo)
 {
 	register int mifi;
 	register struct uvif *v;
+	register struct listaddr *g;
 	struct sockaddr_in6 group_sa = {sizeof(group_sa), AF_INET6};
 
 	/* Ignore my own listener query */
@@ -237,45 +238,46 @@ accept_listener_query(src, dst, group, tmo)
 	 * to [Last Member Query Count] * the [Max Response Time] in the
 	 * packet.
 	 */
-	if (!IN6_IS_ADDR_UNSPECIFIED(group)) {
-		register struct listaddr *g;
-
-		IF_DEBUG(DEBUG_MLD)
-			log_msg(LOG_DEBUG, 0,
-			    "%s for %s from %s on mif %d, timer %d",
-			    "Group-specific membership query",
-			    inet6_fmt(group), sa6_fmt(src), mifi, tmo);
-
-		group_sa.sin6_addr = *group;
-		group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
-		for (g = v->uv_groups; g != NULL; g = g->al_next) {
-			if (inet6_equal(&group_sa, &g->al_addr) &&
-			    g->al_query == 0) {
-				/*
-				 * setup a timeout to remove the group
-				 * membership.
-				 */
-				if (g->al_timerid)
-					g->al_timerid =
-						DeleteTimer(g->al_timerid);
-				g->al_timer = MLD6_LAST_LISTENER_QUERY_COUNT *
-					tmo / MLD6_TIMER_SCALE;
-				/*
-				 * use al_query to record our presence in
-				 * last-member state.
-				 */
-				g->al_query = -1;
-				g->al_timerid = SetTimer(mifi, g);
-				IF_DEBUG(DEBUG_MLD)
-					log_msg(LOG_DEBUG, 0,
-					    "timer for grp %s on mif %d "
-					    "set to %ld",
-					    inet6_fmt(group),
-					    mifi, g->al_timer);
-				break;
-			}
-		}
+	if (IN6_IS_ADDR_UNSPECIFIED(group)) {
+		log_msg(LOG_DEBUG, 0,
+			"nothing to do with general-query on router-side, "
+			"except for querier-election");
+		return;
 	}
+
+	IF_DEBUG(DEBUG_MLD)
+		log_msg(LOG_DEBUG, 0,
+		    "%s for %s from %s on mif %d, timer %d",
+		    "Group-specific membership query",
+		    inet6_fmt(group), sa6_fmt(src), mifi, tmo);
+
+	group_sa.sin6_addr = *group;
+	group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
+	g = check_multicast_listener(v, &group_sa);
+	if (g == NULL) {
+		log_msg(LOG_DEBUG, 0, "listener not found for %s on mif %d",
+		    inet6_fmt(group), mifi);
+		return;
+	}
+	if (g->al_query == 0) {
+		log_msg(LOG_DEBUG, 0,
+		    "no query found for %s on mif %d", inet6_fmt(group), mifi);
+		return;
+	}
+
+	/* setup a timeout to remove the group membership */
+	if (g->al_timerid)
+		g->al_timerid = DeleteTimer(g->al_timerid);
+	g->al_timer = MLD6_LAST_LISTENER_QUERY_COUNT * tmo / MLD6_TIMER_SCALE;
+
+	/* use al_query to record our presence in last-member state */
+	g->al_query = -1;
+	g->al_timerid = SetTimer(mifi, g);
+	IF_DEBUG(DEBUG_MLD)
+		log_msg(LOG_DEBUG, 0,
+		    "timer for grp %s on mif %d set to %ld",
+		    inet6_fmt(group), mifi, g->al_timer);
+		break;
 }
 
 /*
@@ -704,17 +706,17 @@ SetQueryTimer(g, mifi, to_expire, q_time)
  * Checks for MLD listener: returns TRUE if there is a receiver for the group
  * on the given uvif, or returns FALSE otherwise.
  */
-int
+struct listaddr *
 check_multicast_listener(v, group)
 	struct uvif *v;
 	struct sockaddr_in6 *group;
 {
-	register struct listaddr *g;
+	struct listaddr *g;
 
 	/* Look for the group in our listener list. */
 	for (g = v->uv_groups; g != NULL; g = g->al_next) {
 		if (inet6_equal(group, &g->al_addr))
-			return TRUE;
+			break;
 	}
-	return FALSE;
+	return g;
 }
