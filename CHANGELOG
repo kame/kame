@@ -1,0 +1,12 @@
+			CHANGELOG for KAME kit
+
+$Id: CHANGELOG,v 1.1 1999/08/07 01:01:56 itojun Exp $
+
+<199908>
+Fri Aug  6 JST 1999  itojun@iijlab.net
+	* sys/netinet6/{tcp6,udp6}* (platforms with TCP6):
+	  respect SO_TIMESTAMP.
+	* sys/netinet6/ip6_fw.[ch]: IPv6 packet filter ported from
+	  KAME/FreeBSD228 to all platforms.
+
+(past changelog must be merged here)
