@@ -143,29 +143,24 @@ rip6_input(mp, offp, proto)
 	register struct inpcb *in6p;
 	struct inpcb *last = 0;
 	struct ip6_recvpktopts opts;
-	struct sockaddr_in6 *src, *dst, src_storage, dst_storage, fromsa;
+	struct sockaddr_in6 src, dst, fromsa;
 
 	rip6stat.rip6s_ipackets++;
 
 	/*
 	 * extract full sockaddr structures for the src/dst addresses,
-	 * and make local copies of them.  The copies are necessary
-	 * because the memory that stores src and dst may be freed during
-	 * the process below.
+	 * and make local copies of them.
 	 */
 	if (ip6_getpktaddrs(m, &src, &dst)) {
 		m_freem(m);
 		return (IPPROTO_DONE);
 	}
-	src_storage = *src;
-	dst_storage = *dst;
-	src = &src_storage;
-	dst = &dst_storage;
+
 	/*
 	 * XXX: the address may have embedded scope zone ID, which should be
 	 * hidden from applications.
 	 */
-	fromsa = *src;
+	fromsa = src;
 #ifndef SCOPEDROUTING
 	in6_clearscope(&fromsa.sin6_addr);
 #endif
@@ -185,10 +180,10 @@ rip6_input(mp, offp, proto)
 		    in6p->in6p_ip6_nxt != proto)
 			continue;
 		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa) &&
-		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst))
+		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, &dst))
 			continue;
 		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa) &&
-		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, src))
+		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, &src))
 			continue;
 		if (in6p->in6p_cksum != -1) {
 			rip6stat.rip6s_isum++;
@@ -242,7 +237,7 @@ rip6_input(mp, offp, proto)
 			 * contains the packet addresses, while we
 			 * still need them for IPsec.
 			 */
-			if (!ip6_setpktaddrs(m, src, dst)) {
+			if (!ip6_setpktaddrs(m, &src, &dst)) {
 				m_freem(m);
 				ip6stat.ip6s_delivered--;
 				return(IPPROTO_DONE); /* XXX */

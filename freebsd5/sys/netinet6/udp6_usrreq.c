@@ -137,7 +137,7 @@ udp6_input(mp, offp, proto)
 	struct ip6_recvpktopts opts;
 	int off = *offp;
 	int plen, ulen;
-	struct sockaddr_in6 *src, *dst, src_storage, dst_storage, fromsa;
+	struct sockaddr_in6 src, dst, fromsa;
 #ifdef MLDV2
 	struct sock_msf *msf;
 	struct ip6_moptions *im6o;
@@ -168,24 +168,18 @@ udp6_input(mp, offp, proto)
 
 	/*
 	 * extract full sockaddr structures for the src/dst addresses,
-	 * and make local copies of them.  The copies are necessary
-	 * because the memory that stores src and dst may be freed during
-	 * the process below.
+	 * and make local copies of them.
 	 */
 	if (ip6_getpktaddrs(m, &src, &dst)) {
 		m_freem(m);
 		goto bad;
 	}
-	src_storage = *src;
-	dst_storage = *dst;
-	src = &src_storage;
-	dst = &dst_storage;
 
 	/*
 	 * XXX: the address may have embedded scope zone ID, which should be
 	 * hidden from applications.
 	 */
-	fromsa = *src;
+	fromsa = src;
 #ifndef SCOPEDROUTING
 	in6_clearscope(&fromsa.sin6_addr);
 #endif
@@ -259,12 +253,12 @@ udp6_input(mp, offp, proto)
 			if (in6p->in6p_lport != uh->uh_dport)
 				continue;
 			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)) {
-				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst))
+				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, &dst))
 					continue;
 			}
 			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
 				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa,
-							src) ||
+							&src) ||
 				    in6p->in6p_fport != uh->uh_sport) {
 					continue;
 				}
@@ -309,7 +303,7 @@ udp6_input(mp, offp, proto)
 			 * contains the packet addresses, while we \
 			 * still need them for IPsec. \
 			 */ \
-			if (!ip6_setpktaddrs(m, src, dst)) \
+			if (!ip6_setpktaddrs(m, &src, &dst)) \
 				goto bad; /* XXX */ \
 		} \
 		last = in6p; \
@@ -345,7 +339,7 @@ udp6_input(mp, offp, proto)
 			 * contains the packet addresses, while we \
 			 * still need them for IPsec. \
 			 */ \
-			if (!ip6_setpktaddrs(m, src, dst)) \
+			if (!ip6_setpktaddrs(m, &src, &dst)) \
 				goto bad; /* XXX */ \
 		} \
 		last = inp; \
@@ -363,7 +357,8 @@ udp6_input(mp, offp, proto)
 			     imm != NULL;
 			     imm = LIST_NEXT(imm, i6mm_chain)) {
 
-				if (SS_CMP(&imm->i6mm_maddr->in6m_sa, !=, dst))
+				if (SS_CMP(&imm->i6mm_maddr->in6m_sa,
+				    !=, &dst))
 					continue;
 
 				msf = imm->i6mm_msf;
@@ -483,7 +478,7 @@ udp6_input(mp, offp, proto)
 				 * contains the packet addresses, while we
 				 * still need them for IPsec.
 				 */
-				if (!ip6_setpktaddrs(m, src, dst))
+				if (!ip6_setpktaddrs(m, &src, &dst))
 					goto bad; /* XXX */
 			}
 #endif /* !MLDV2 */
@@ -548,8 +543,8 @@ udp6_input(mp, offp, proto)
 	/*
 	 * Locate pcb for datagram.
 	 */
-	in6p = in6_pcblookup_hash(&udbinfo, src, uh->uh_sport,
-				  dst, uh->uh_dport, 1,
+	in6p = in6_pcblookup_hash(&udbinfo, &src, uh->uh_sport,
+				  &dst, uh->uh_dport, 1,
 				  m->m_pkthdr.rcvif);
 	if (in6p == 0) {
 		if (log_in_vain) {
