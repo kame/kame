@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.108 2003/01/23 06:13:33 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.109 2003/01/23 07:43:59 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -585,6 +585,14 @@ client6_timo(arg)
 		break;
 	case DHCP6S_SOLICIT:
 		if (ifp->servers) {
+			/*
+			 * Send a Request to the best server.
+			 * Note that when we set Rapid-commit in Solicit,
+			 * but a direct Reply has been delayed (very much),
+			 * the transition to DHCP6S_REQUEST (and the change of
+			 * transaction ID) will invalidate the reply even if it
+			 * ever arrives.
+			 */
 			ifp->current_server = select_server(ifp);
 			if (ifp->current_server == NULL) {
 				/* this should not happen! */
