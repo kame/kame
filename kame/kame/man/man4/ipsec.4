@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"	$Id: ipsec.4,v 1.3 2000/01/19 06:16:53 itojun Exp $
+.\"	$Id: ipsec.4,v 1.4 2000/01/19 06:56:51 itojun Exp $
 .\"
 .Dd January 29, 1999
 .Dt IPSEC 4
@@ -209,13 +209,19 @@ routines from looking into IP payload.
 .Xr racoon 8
 .Pp
 .Rs
-.%T RFC2367
+.%A Daniel L. McDonald
+.%A Craig Metz
+.%A Bao G. Phan
+.%T "PF_KEY Key Management API, Version 2"
+.%R RFC
+.%N 2367
 .Re
 .Rs
 .%A "D. L. McDonald"
 .%T "A Simple IP Security API Extension to BSD Sockets"
+.%R internet draft
 .%N "draft-mcdonald-simple-ipsec-api-03.txt"
-.%O "internet draft"
+.%O work in progress material
 .Re
 .Sh CAVEAT
 The IPsec support is subject to change as the IPsec protocols develop.
