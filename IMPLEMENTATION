@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.197 2001/02/28 14:33:51 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.198 2001/03/12 11:33:44 itojun Exp $
 
 1. IPv6
 
@@ -1654,6 +1654,9 @@ Currently supported algorithms are:
 	keyed SHA1 with 96bit crypto checksum (no document)
 	HMAC MD5 with 96bit crypto checksum (rfc2403.txt
 	HMAC SHA1 with 96bit crypto checksum (rfc2404.txt)
+	HMAC SHA2-256 with 96bit crypto checksum (no document)
+	HMAC SHA2-384 with 96bit crypto checksum (no document)
+	HMAC SHA2-512 with 96bit crypto checksum (no document)
     new IPsec ESP
 	null encryption (rfc2410.txt)
 	DES-CBC with derived IV
