@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.161 2004/12/27 05:41:19 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.162 2004/12/27 08:17:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -191,7 +191,9 @@ rip6_input(mp, offp, proto)
 {
 	struct mbuf *m = *mp, *opts = NULL;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
+#ifdef __NetBSD__
 	struct inpcb_hdr *inph;
+#endif
 	struct in6pcb *in6p;
 	struct in6pcb *last = NULL;
 	struct sockaddr_in6 rip6src;
