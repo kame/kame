@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.81 2002/01/10 13:46:23 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.82 2002/01/20 11:36:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -269,10 +269,12 @@ struct ip6aux {
 #define IP6A_ROUTEOPTIMIZED 0x10	/* route optimized packet */
 
 	/* ip6.ip6_src */
-	struct in6_addr ip6a_careof;	/* care-of address of the peer */
+	struct sockaddr_in6 ip6a_src;	/* source address in the IPv6 header */
+#define ip6a_careof ip6a_src.sin6_addr	/* care-of address of the peer */
 	struct in6_addr ip6a_home;	/* home address of the peer */
 
-	/* ip6.ip6_dst */
+	/* ip6.ip6_dst: we can perhaps obsolete ip6a_dstia6 in the future */
+	struct sockaddr_in6 ip6a_dst;	/* dst address in the IPv6 header */
 	struct in6_ifaddr *ip6a_dstia6;	/* my ifaddr that matches ip6_dst */
 
 	/* rtalert */
@@ -370,6 +372,8 @@ int	ip6_lasthdr __P((struct mbuf *, int, int, int *));
 struct mbuf *ip6_addaux __P((struct mbuf *));
 struct mbuf *ip6_findaux __P((struct mbuf *));
 void	ip6_delaux __P((struct mbuf *));
+struct mbuf *ip6_setpktaddrs __P((struct mbuf *, struct sockaddr_in6 *,
+				  struct sockaddr_in6 *));
 
 int	ip6_mforward __P((struct ip6_hdr *, struct ifnet *, struct mbuf *));
 int	ip6_process_hopopts __P((struct mbuf *, u_int8_t *, int, u_int32_t *,

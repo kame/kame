@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.88 2002/01/08 02:40:57 k-sugyou Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.89 2002/01/20 11:36:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -172,15 +172,29 @@ ip6_forward(m, srcrt)
 	struct sockaddr_in6 *dst;
 	struct rtentry *rt;
 	int error, type = 0, code = 0;
-	struct mbuf *mcopy = NULL;
+	struct mbuf *mcopy = NULL, *mx;
 	struct ifnet *origifp;	/* maybe unnecessary */
-	int64_t srczone, dstzone;
+	struct sockaddr_in6 *sa6_src, *sa6_dst;
+	int64_t dstzone;
 #ifdef IPSEC
 	struct secpolicy *sp = NULL;
 #endif
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
+
+	/* get source and destination addresses with full scope information. */
+	if ((mx = ip6_findaux(m)) == NULL) {
+		/*
+		 * we dare to log the fact here because this should be an
+		 * internal bug.
+		 */
+		log(LOG_ERR, "ip6_forward: can't find IPv6 aux\n");
+		m_freem(m);
+		return;
+	}
+	sa6_src = &mtod(mx, struct ip6aux *)->ip6a_src;
+	sa6_dst = &mtod(mx, struct ip6aux *)->ip6a_dst;
 
 #ifdef IPSEC
 	/*
@@ -240,6 +254,15 @@ ip6_forward(m, srcrt)
 	 * processing may modify the mbuf.
 	 */
 	mcopy = m_copy(m, 0, imin(m->m_pkthdr.len, ICMPV6_PLD_MAXLEN));
+	/*
+	 * XXX: m_copy moves m_aux to mcopy, but we need the data for both the
+	 * original and the copy.
+	 */
+	if (ip6_setpktaddrs(m, sa6_src, sa6_dst) == NULL) {
+		m_freem(m);
+		m_freem(mcopy);
+		return;
+	}
 
 #ifdef IPSEC
 	/* get a security policy for this packet */
@@ -409,7 +432,12 @@ ip6_forward(m, srcrt)
 		    (ip6_forward_rt.ro_rt->rt_flags & RTF_UP) == 0
 #ifdef MEASURE_PERFORMANCE
 		    || (ip6_ours_check_algorithm != OURS_CHECK_ALG_RTABLE &&
-			!IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &dst->sin6_addr))
+#ifdef SCOPEDROUTING
+			!SA6_ARE_ADDR_EQUAL(sa6_dst, dst)
+#else
+			!IN6_ARE_ADDR_EQUAL(&sa6_dst->sin6_addr,
+					    &dst->sin6_addr)
+#endif
 #endif
 			) {
 			if (ip6_forward_rt.ro_rt) {
@@ -418,10 +446,10 @@ ip6_forward(m, srcrt)
 			}
 #ifdef MEASURE_PERFORMANCE
 			ip6_forward_cache_miss++;
-			bzero(dst, sizeof(*dst));
-			dst->sin6_family = AF_INET6;
-			dst->sin6_len = sizeof(*dst);
-			dst->sin6_addr = ip6->ip6_dst;
+			*dst = *sa6_dst;
+#ifndef SCOPEDROUTING
+			dst->sin6_scope_id = 0;	/* XXX */
+#endif
 #endif
 			/* this probably fails but give it a try again */
 #ifdef __FreeBSD__
@@ -451,16 +479,20 @@ ip6_forward(m, srcrt)
 			return;
 		}
 	} else if ((rt = ip6_forward_rt.ro_rt) == 0 ||
-		 !IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &dst->sin6_addr)) {
+#ifdef SCOPEDROUTING
+		   !SA6_ARE_ADDR_EQUAL(sa6_dst, dst)
+#else
+		   !IN6_ARE_ADDR_EQUAL(&sa6_dst->sin6_addr, &dst->sin6_addr)
+#endif
+		) {
 		if (ip6_forward_rt.ro_rt) {
 			RTFREE(ip6_forward_rt.ro_rt);
 			ip6_forward_rt.ro_rt = 0;
 		}
-		bzero(dst, sizeof(*dst));
-		dst->sin6_len = sizeof(struct sockaddr_in6);
-		dst->sin6_family = AF_INET6;
-		dst->sin6_addr = ip6->ip6_dst;
-
+		*dst = *sa6_dst;
+#ifndef SCOPEDROUTING
+		dst->sin6_scope_id = 0;	/* XXX */
+#endif
 #ifdef __FreeBSD__
   		rtalloc_ign((struct route *)&ip6_forward_rt, RTF_PRCLONING);
 #else
@@ -484,17 +516,18 @@ ip6_forward(m, srcrt)
 	 * for the reason that the destination is beyond the scope of the
 	 * source address, discard the packet and return an icmp6 destination
 	 * unreachable error with Code 2 (beyond scope of source address).
-	 * [draft-ietf-ipngwg-icmp-v3-00.txt, Section 3.1]
+	 * [draft-ietf-ipngwg-icmp-v3-02.txt, Section 3.1]
 	 */
-	if ((srczone = in6_addr2zoneid(m->m_pkthdr.rcvif, &ip6->ip6_src)) < 0
-	    || (dstzone = in6_addr2zoneid(rt->rt_ifp, &ip6->ip6_src)) < 0) {
-		/* XXX: will this really happen?  should return an icmp error? */
+	if ((dstzone = in6_addr2zoneid(rt->rt_ifp, &ip6->ip6_src)) < 0) {
+		/*
+		 * XXX: will this really happen? should return an icmp error?
+		 */
 		ip6stat.ip6s_cantforward++;
 		ip6stat.ip6s_badscope++;
 		m_freem(m);
 		return;
 	}
-	if (srczone != dstzone) {
+	if (sa6_src->sin6_scope_id != (u_int32_t)dstzone) {
 		ip6stat.ip6s_cantforward++;
 		ip6stat.ip6s_badscope++;
 		in6_ifstat_inc(rt->rt_ifp, ifs6_in_discard);
@@ -572,7 +605,7 @@ ip6_forward(m, srcrt)
 	if (rt->rt_ifp == m->m_pkthdr.rcvif && !srcrt &&
 	    (rt->rt_flags & (RTF_DYNAMIC|RTF_MODIFIED)) == 0) {
 		if ((rt->rt_ifp->if_flags & IFF_POINTOPOINT) &&
-		    nd6_is_addr_neighbor((struct sockaddr_in6 *)&ip6_forward_rt.ro_dst, rt->rt_ifp)) {
+		    nd6_is_addr_neighbor(sa6_dst, rt->rt_ifp)) {
 			/*
 			 * If the incoming interface is equal to the outgoing
 			 * one, the link attached to the interface is

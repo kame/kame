@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.255 2002/01/17 15:01:03 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.256 2002/01/20 11:36:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -249,7 +249,6 @@ struct ip6stat ip6stat;
 
 static void ip6_init2 __P((void *));
 static struct mbuf *ip6_setdstifaddr __P((struct mbuf *, struct in6_ifaddr *));
-
 static int ip6_hopopts_input __P((u_int32_t *, u_int32_t *, struct mbuf **, int *));
 #ifdef PULLDOWN_TEST
 static struct mbuf *ip6_pullexthdr __P((struct mbuf *, size_t, int));
@@ -765,22 +764,39 @@ ip6_input(m)
 	sa6_src.sin6_len = sa6_dst.sin6_len = sizeof(struct sockaddr_in6);
 	sa6_src.sin6_addr = ip6->ip6_src;
 	sa6_src.sin6_scope_id = srczone; /* srczone should be in 32bit here */
+	if (in6_embedscope(&sa6_src.sin6_addr, &sa6_src)) {
+		/* XXX: should not happen */
+		ip6stat.ip6s_badscope++;
+		goto bad;
+	}
 	sa6_dst.sin6_addr = ip6->ip6_dst;
 	sa6_dst.sin6_scope_id = dstzone; /* dstzone should be in 32bit here */
+	if (in6_embedscope(&sa6_dst.sin6_addr, &sa6_dst)) { /* XXX */
+		ip6stat.ip6s_badscope++;
+		goto bad;
+	}
+
+	/* attach the addresses to the packet for later use */
+	if (!ip6_setpktaddrs(m, &sa6_src, &sa6_dst))
+		goto bad;
 
 	/*
 	 * Embed interface ID as the zone ID for interface-local and
 	 * link-local addresses.
 	 * XXX: KAME assumes one-to-one mapping between interfaces and
 	 * links.
+	 * XXX: we should eventually avoid modifying the IPv6 header fields
+	 *      and use sa6_src and sa6_dst only.
 	 */
-	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
+	if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src)) {
 		ip6->ip6_src.s6_addr16[1]
 			= htons(m->m_pkthdr.rcvif->if_index);
+	}
 	if (IN6_IS_ADDR_MC_INTFACELOCAL(&ip6->ip6_dst) ||
-	    IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
+	    IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst)) {
 		ip6->ip6_dst.s6_addr16[1]
 			= htons(m->m_pkthdr.rcvif->if_index);
+	}
 
 #if 0 /* this case seems to be unnecessary. (jinmei, 20010401) */
 	/*
@@ -910,9 +926,6 @@ ip6_input(m)
 		ip6stat.ip6s_forward_cachehit++;
 	else {
 		struct sockaddr_in6 *dst6;
-#ifdef SCOPEDROUTING
-		int64_t dstzone;
-#endif
 
 		if (ip6_forward_rt.ro_rt) {
 			/* route is down or destination is different */
@@ -923,17 +936,9 @@ ip6_input(m)
 
 		bzero(&ip6_forward_rt.ro_dst, sizeof(struct sockaddr_in6));
 		dst6 = (struct sockaddr_in6 *)&ip6_forward_rt.ro_dst;
-		dst6->sin6_len = sizeof(struct sockaddr_in6);
-		dst6->sin6_family = AF_INET6;
-		dst6->sin6_addr = ip6->ip6_dst;
-#ifdef SCOPEDROUTING
-		if ((dstzone = in6_addr2zoneid(m->m_pkthdr.rcvif,
-					       &ip6->ip6_dst)) < 0) {
-			ip6stat.ip6s_badscope++;
-			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_addrerr);
-			goto bad;
-		}
-		ip6_forward_rt.ro_dst.sin6_scope_id = dstzone;
+		*dst6 = sa6_dst;
+#ifndef SCOPEDROUTING
+		dst6->sin6_scope_id = 0; /* XXX */
 #endif
 
 #ifdef __FreeBSD__
@@ -1341,6 +1346,22 @@ ip6_setdstifaddr(m, ia6)
 	if (n)
 		mtod(n, struct ip6aux *)->ip6a_dstia6 = ia6;
 	return n;	/* NULL if failed to set */
+}
+
+struct mbuf *
+ip6_setpktaddrs(m, src, dst)
+	struct mbuf *m;
+	struct sockaddr_in6 *src, *dst;
+{
+	struct mbuf *n;
+
+	n = ip6_addaux(m);
+	if (n) {
+		mtod(n, struct ip6aux *)->ip6a_src = *src;
+		mtod(n, struct ip6aux *)->ip6a_dst = *dst;
+	}
+
+	return(n);
 }
 
 struct in6_ifaddr *
