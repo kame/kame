@@ -1184,6 +1184,7 @@ setia6deprecated(vname, deprecated)
 	const char *vname;
 	int deprecated;
 {
+
 	if (deprecated)
 		setia6lifetime("pltime", "0");
 }
