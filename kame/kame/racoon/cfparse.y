@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.114 2003/02/03 08:27:50 itojun Exp $	*/
+/*	$KAME: cfparse.y,v 1.115 2003/05/08 07:57:43 itojun Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -219,7 +219,7 @@ special_statement
 
 	/* include */
 include_statement
-	:	INCLUDE QUOTEDSTRING
+	:	INCLUDE QUOTEDSTRING EOS
 		{
 			char path[MAXPATHLEN];
 
@@ -229,7 +229,6 @@ include_statement
 			if (yycf_switch_buffer(path) != 0)
 				return -1;
 		}
-		EOS
 	;
 
 	/* self infomation */
