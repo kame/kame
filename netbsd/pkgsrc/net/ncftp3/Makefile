@@ -1,57 +1,38 @@
-# New ports collection makefile for:    ncftp3
-# Version required:     3.0
-# Date created:         4 Nov 1994
-# Whom:                 ache
-#
-# $Id: Makefile,v 1.4 1999/10/21 03:45:23 sumikawa Exp $
+# $NetBSD$
 #
 
-DISTNAME=	ncftp-3.0beta21-src
-PKGNAME=	ncftp-3.0b21
+DISTNAME=	ncftp-3.0.0-src
+PKGNAME=	ncftp-3.0.0
 CATEGORIES=	net
-MASTER_SITES=	ftp://ftp.ncftp.com/ncftp/3.0BETA/
+MASTER_SITES=	ftp://ftp.ncftp.com/ncftp/
 
-PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
-		ftp://ftp.v6.kame.net/pub/kame/misc/
-PATCHFILES=	ncftp-30b21-19991021.diff.gz
-PATCH_DIST_STRIP=	-p
+PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
+PATCHFILES=	ncftp-300-v6-20000327.diff.gz
+PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	sumikawa@kame.net
 
 WRKSRC=		${WRKDIR}/${DISTNAME:S/-src//}
 GNU_CONFIGURE=	yes
-CONFIGURE_ARGS=	--with-ncurses
+CONFIGURE_ARGS+=--with-ncurses
 MAN1=		ncftp3.1 ncftpbatch.1 ncftpget.1 ncftpls.1 ncftpput.1
 MAN3=		Strn.3
 NO_LATEST_LINK=	yes
 
-#.if ${PORTOBJFORMAT} == "elf"
-#LIBNCFTP= libncftp.so.2
-#LIBSTRN=libStrn.so.1
-#.else
-#LIBNCFTP= libncftp.so.2.0
-#LIBSTRN=libStrn.so.1.0
-#.endif
+CONFIGURE_ARGS+=--enable-ipv6
+CONFIGURE_ARGS+=--with-ipv6-libraries=/usr/local/v6/lib
+CONFIGURE_ARGS+=--with-ipv6-libname=inet6
 
 post-patch:
 	@${MV} ${WRKSRC}/ncftp/pref.h ${WRKSRC}/ncftp/pref.h.in
 	@${SED} -e 's:/etc/ncftp.firewall:${PREFIX}/etc/ncftp.firewall:' \
 		${WRKSRC}/ncftp/pref.h.in > ${WRKSRC}/ncftp/pref.h
 
-#pre-build:
-#	cd ${WRKSRC}/Strn ; make so
-#	cd ${WRKSRC}/libncftp ; make so
-
 do-install:
 	@$(INSTALL_PROGRAM) $(WRKSRC)/bin/ncftp $(PREFIX)/bin/ncftp3
 	@cd ${WRKSRC}/bin ; $(INSTALL_PROGRAM) \
 		ncftpbatch ncftpget ncftpls ncftpput ncftpbookmarks \
 		$(PREFIX)/bin
-#	@$(INSTALL_DATA) $(WRKSRC)/Strn/libStrn.so.1 $(PREFIX)/lib/$(LIBSTRN)
-#	@cd $(PREFIX)/lib && ${LN} -sf $(LIBSTRN) libStrn.so
-#	@$(INSTALL_DATA) $(WRKSRC)/libncftp/libncftp.so.2 $(PREFIX)/lib/$(LIBNCFTP)
-#	@cd $(PREFIX)/lib && ${LN} -sf $(LIBNCFTP) libncftp.so
-#	@${SETENV} OBJFORMAT=${PORTOBJFORMAT} ${LDCONFIG} -m ${PREFIX}/lib
 	@$(INSTALL_MAN) $(WRKSRC)/doc/man/ncftp.1 $(PREFIX)/man/man1/ncftp3.1
 	@cd ${WRKSRC}/doc/man ; $(INSTALL_MAN) \
 		ncftpbatch.1 ncftpget.1 ncftpls.1 ncftpput.1 \
