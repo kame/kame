@@ -2616,8 +2616,12 @@ in_getmopt_ifargs(sopt, ifp, ia_grp, index)
 			*ifp = ifindex2ifnet[index];
 #endif
 
-		if (*ifp == NULL || ((*ifp)->if_flags & IFF_MULTICAST) == 0)
+		if (*ifp == NULL || ((*ifp)->if_flags & IFF_MULTICAST) == 0) {
+#ifdef IGMPV3_DEBUG
+			printf("invalid interface (#%d) specified", index);
+#endif
 			error = EINVAL;
+		}
 
 		break;
 
@@ -2760,12 +2764,18 @@ ip_getmopt_sgaddr(sopt, ifp, ss_grp, ss_src)
 
 		if (!IN_MULTICAST(sin_grp->sin_addr.s_addr) ||
 				IN_LOCAL_GROUP(sin_grp->sin_addr.s_addr)) {
+#ifdef IGMPV3_DEBUG
+			printf("invalid group %s specified\n", inet_ntoa(sin_grp->sin_addr));
+#endif
 			error = EINVAL;
 			break;
 		}
 		if (IN_MULTICAST(sin_src->sin_addr.s_addr) ||
 			    IN_BADCLASS(sin_src->sin_addr.s_addr) ||
 			    (sin_src->sin_addr.s_addr & IN_CLASSA_NET) == 0) {
+#ifdef IGMPV3_DEBUG
+			printf("invalid source %s specified\n", inet_ntoa(sin_src->sin_addr));
+#endif
 			error = EINVAL;
 			break;
 		}
