@@ -146,6 +146,9 @@ main(argc, argv)
 	char *addr, *port;
 	struct addrinfo hints, *res;
 	int error;
+	struct ip_mreq mreq4;
+	struct ipv6_mreq mreq6;
+	const u_int on = 1;
 
 	pname = argv[0];
 	gethostname(myhostname, sizeof(myhostname));
@@ -219,18 +222,27 @@ main(argc, argv)
 		int ifindex;
 
 		ifindex = if_nametoindex(ifname);
-		if (ifindex == 0)
-			err(1, "if_nametoindex");
-		error = setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_IF,
-				&ifindex, sizeof(ifindex));
-		if (error < 0)
+		if (ifindex == 0) {
+			err(1, "if_nametoindex(%s)", ifname);
+			/*NOTREACHED*/
+		}
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_IF,
+				&ifindex, sizeof(ifindex)) < 0) {
 			err(1, "setsockopt(IPV6_MULTICAST_IF)");
+			/*NOTREACHED*/
+		}
 	}
 	if (hlim != 0) {
-		error = setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
-				&hlim, sizeof(hlim));
-		if (error < 0)
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
+				&hlim, sizeof(hlim)) < 0) {
 			err(1, "setsockopt(IPV6_MULTICAST_HOPS)");
+			/*NOTREACHED*/
+		}
+	}
+	if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP,
+			&on, sizeof(on)) < 0) {
+		err(1, "setsockopt(IPV6_MULTICAST_LOOP)");
+		/*NOTREACHED*/
 	}
 	memcpy(&session->s_mcast, res->ai_addr, res->ai_addrlen);
 	session->s_mfd = s;
@@ -255,24 +267,49 @@ main(argc, argv)
 		err(1, "bind");
 	switch (res->ai_family) {
 	case AF_INET6:
-		if (IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6 *)res->ai_addr)->sin6_addr)) {
-			struct ipv6_mreq mreq6;
+		if (!IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6 *)res->ai_addr)->sin6_addr))
+			break;
+		memset(&mreq6, 0, sizeof(mreq6));
+		if (ifname) {
+			mreq6.ipv6mr_interface = if_nametoindex(ifname);
+			if (mreq6.ipv6mr_interface == 0)
+				err(1, "if_nametoindex(%s)", ifname);
+		}
+		memcpy(&mreq6.ipv6mr_multiaddr,
+			&((struct sockaddr_in6 *)res->ai_addr)->sin6_addr,
+			sizeof(mreq6.ipv6mr_multiaddr));
 
-			memset(&mreq6, 0, sizeof(mreq6));
-			if (ifname) {
-				mreq6.ipv6mr_interface = if_nametoindex(ifname);
-				if (mreq6.ipv6mr_interface == 0)
-					err(1, "if_nametoindex(%s)", ifname);
-			}
-
-			memcpy(&mreq6.ipv6mr_multiaddr,
-				&((struct sockaddr_in6 *)res->ai_addr)->sin6_addr,
-				sizeof(mreq6.ipv6mr_multiaddr));
-
-			if (setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP,
-					&mreq6, sizeof(mreq6))) {
-				err(1, "setsockopt(IPV6_JOIN_GROUP)");
-			}
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP,
+				&mreq6, sizeof(mreq6))) {
+			err(1, "setsockopt(IPV6_JOIN_GROUP)");
+		}
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP,
+				&on, sizeof(on)) < 0) {
+			err(1, "setsockopt(IPV6_MULTICAST_LOOP)");
+			/*NOTREACHED*/
+		}
+		break;
+	case AF_INET:
+		if (!IN_MULTICAST(&((struct sockaddr_in *)res->ai_addr)->sin_addr.s_addr))
+			break;
+		memset(&mreq4, 0, sizeof(mreq4));
+		memcpy(&mreq4.imr_multiaddr,
+			&((struct sockaddr_in *)res->ai_addr)->sin_addr,
+			sizeof(mreq4.imr_multiaddr));
+#if 0
+		if (!ifname) {
+			errx(1, "interface not specified");
+			/*NOTREACHED*/
+		}
+		if (ioctl(s, mreq4.imr_interface, ifname) < 0) {
+			err(1, "ioctl");
+			/*NOTREACHED*/
+		}
+#endif
+		if (setsockopt(s, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+				&mreq4, sizeof(mreq4))) {
+			err(1, "setsockopt(IP_ADD_MEMBERSHIP)");
+			/*NOTREACHED*/
 		}
 		break;
 	default:
@@ -311,6 +348,10 @@ main(argc, argv)
 		case AF_INET6:
 			level = IPPROTO_IPV6;
 			optname = IPV6_IPSEC_POLICY;
+			break;
+		case AF_INET:
+			level = IPPROTO_IP;
+			optname = IP_IPSEC_POLICY;
 			break;
 		default:
 			level = optname = 0;
@@ -548,12 +589,15 @@ cmd_who(buf, sa)
 		strcpy(abuf, "unknown");
 
 	memcpy(&ss, sa, sa->sa_len);
-	switch (ss.ss_family) {
+	switch (sa->sa_family) {
 	case AF_INET6:
 		((struct sockaddr_in6 *)&ss)->sin6_port = ntohs(atoi(session->s_uport));
 		break;
+	case AF_INET:
+		((struct sockaddr_in *)&ss)->sin_port = ntohs(atoi(session->s_uport));
+		break;
 	default:
-		wstat_print(">> unsupported af %d\n", ss.ss_family);
+		wstat_print(">> unsupported af %d\n", sa->sa_family);
 		return 0;
 	}
 
@@ -573,6 +617,9 @@ cmd_secret(buf, sa)
 	int error;
 	char myaddr[BUFSIZ];
 	struct sockaddr *src;
+#ifdef __KAME__
+	struct sockaddr_in6 *sin6;
+#endif
 
 	p = buf;
 	while (*p && !isspace(*p))
@@ -598,8 +645,6 @@ cmd_secret(buf, sa)
 #ifdef __KAME__	/*should use advapi*/
 	switch (res->ai_family) {
 	case AF_INET6:
-	    {
-		struct sockaddr_in6 *sin6;
 		sin6 = (struct sockaddr_in6 *)res->ai_addr;
 		if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
 			int ifindex;
@@ -620,7 +665,6 @@ cmd_secret(buf, sa)
 				htons(ifindex);
 		}
 		break;
-	    }
 	}
 #endif
 
@@ -779,7 +823,7 @@ set_info(ss)
 	int error;
 
 	error = getnameinfo((struct sockaddr *)&ss->s_mcast,
-				ss->s_mcast.__ss_len,
+				((struct sockaddr *)&ss->s_mcast)->sa_len,
 				host, sizeof(host),
 				serv, sizeof(serv), NI_NUMERICSERV);
 	if (error) {
