@@ -1,13 +1,13 @@
 # New ports collection makefile for:	ucd-snmp-v6
-# Version required:			3.6.2 + IPv6 19990819
+# Version required:			3.6.2 + IPv6 19990904
 # Date created:				26 June 1996
 # Whom:					itojun@iijlab.net
 #
-# $Id: Makefile,v 1.2 1999/08/18 15:17:56 itojun Exp $
+# $Id: Makefile,v 1.3 1999/09/04 09:45:25 itojun Exp $
 #
 
 DISTNAME=	ucd-snmp-3.6.2
-PKGNAME=	ucd-snmp-v6-3.6.2.19990819
+PKGNAME=	ucd-snmp-v6-3.6.2.19990904
 CATEGORIES=	net
 MASTER_SITES= 	ftp://ucd-snmp.ucdavis.edu/ \
 		ftp://sunsite.cnlab-switch.ch/mirror/ucd-snmp/ \
@@ -15,7 +15,7 @@ MASTER_SITES= 	ftp://ucd-snmp.ucdavis.edu/ \
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
 		ftp://ftp.v6.kame.net/pub/kame/misc/
-PATCHFILES=	ucd-snmp-3.6.2-v6-19990819.diff.gz
+PATCHFILES=	ucd-snmp-3.6.2-v6-19990904.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@iijlab.net
