@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.43 2000/01/27 06:03:25 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.44 2000/01/27 06:45:39 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1882,8 +1882,9 @@ check_attr_isakmp(trns)
 
 		YIPSDEBUG(DEBUG_DSA,
 			plog(logp, LOCATION, NULL,
-				"type=%d, flag=0x%04x, lorv=0x%04x\n",
-				type, flag, lorv));
+				"type=%s, flag=0x%04x, lorv=%s\n",
+				s_oakley_attr(type), flag,
+				s_oakley_attr_v(type, lorv)));
 
 		/*
 		 * some of the attributes must be encoded in TV.
@@ -2105,8 +2106,9 @@ check_attr_ipsec(proto_id, trns)
 
 		YIPSDEBUG(DEBUG_DSA,
 			plog(logp, LOCATION, NULL,
-				"type=%d, flag=0x%04x, lorv=0x%04x\n",
-				type, flag, lorv));
+				"type=%s, flag=0x%04x, lorv=%s\n",
+				s_ipsecdoi_attr(type), flag,
+				s_ipsecdoi_attr_v(type, lorv)));
 
 		if (type < sizeof(attrseen)/sizeof(attrseen[0]))
 			attrseen[type]++;
