@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.28 2000/11/18 11:08:15 jinmei Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.29 2000/11/30 16:00:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -558,9 +558,9 @@ tcp6_ctlinput(cmd, sa, d)
 	struct tcp6hdr th;
 	void (*notify) __P((struct in6pcb *, int)) = tcp6_notify;
 	int nmatch;
-	struct sockaddr_in6 sa6;
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
+	struct sockaddr_in6 *sa6_src = NULL;
 	int off;
 	struct tcp_portonly {
 		u_int16_t th_sport;
@@ -584,15 +584,13 @@ tcp6_ctlinput(cmd, sa, d)
 		m = ip6cp->ip6c_m;
 		ip6 = ip6cp->ip6c_ip6;
 		off = ip6cp->ip6c_off;
+		sa6_src = ip6cp->ip6c_src;
 	} else {
 		m = NULL;
 		ip6 = NULL;
+		sa6_src = &sa6_any;
 	}
 
-	/* translate addresses into internal form */
-	sa6 = *(struct sockaddr_in6 *)sa;
-	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr) && m && m->m_pkthdr.rcvif)
-		sa6.sin6_addr.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 	if (ip6) {
 		/*
 		 * XXX: We assume that when IPV6 is non NULL,
@@ -602,6 +600,8 @@ tcp6_ctlinput(cmd, sa, d)
 
 		/* translate addresses into internal form */
 		ip6_tmp = *ip6;
+		ip6_tmp = ((struct sockaddr_in6 *)sa)->sin6_addr;
+		/* XXX: to be more generic... */
 		if (IN6_IS_ADDR_LINKLOCAL(&ip6_tmp.ip6_src))
 			ip6_tmp.ip6_src.s6_addr16[1] =
 				htons(m->m_pkthdr.rcvif->if_index);
@@ -616,8 +616,7 @@ tcp6_ctlinput(cmd, sa, d)
 		bzero(&th, sizeof(th));
 		m_copydata(m, off, sizeof(*thp), (caddr_t)&th);
 
-		nmatch = in6_pcbnotify(&tcb6, (struct sockaddr *)&sa6,
-				       th.th_dport, &ip6_tmp.ip6_src,
+		nmatch = in6_pcbnotify(&tcb6, sa, th.th_dport, sa6_src,
 				       th.th_sport, cmd, NULL, notify);
 		if (nmatch == 0 && syn_cache_count6 &&
 		    (inet6ctlerrmap[cmd] == EHOSTUNREACH ||
@@ -625,8 +624,8 @@ tcp6_ctlinput(cmd, sa, d)
 		     inet6ctlerrmap[cmd] == EHOSTDOWN))
 			syn_cache_unreach6(&ip6_tmp, thp);
 	} else {
-		(void) in6_pcbnotify(&tcb6, (struct sockaddr *)&sa6, 0,
-				     &zeroin6_addr, 0, cmd, NULL, notify);
+		(void) in6_pcbnotify(&tcb6, sa, 0, sa6_src, 0, cmd, NULL,
+				     notify);
 	}
 }
 

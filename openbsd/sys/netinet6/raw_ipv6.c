@@ -329,11 +329,11 @@ rip6_ctlinput(cmd, sa, d)
 	struct sockaddr *sa;
 	void *d;
 {
-	struct sockaddr_in6 sa6;
 	register struct ip6_hdr *ip6;
 	struct mbuf *m;
 	int off;
 	void *cmdarg;
+	struct sockaddr_in6 *sa6_src = NULL;
 	void (*notify) __P((struct inpcb *, int)) = in_rtchange;
 
 	if (sa->sa_family != AF_INET6 ||
@@ -356,63 +356,17 @@ rip6_ctlinput(cmd, sa, d)
 		ip6 = ip6cp->ip6c_ip6;
 		off = ip6cp->ip6c_off;
 		cmdarg = ip6cp->ip6c_cmdarg;
-
-		bzero(&sa6, sizeof(sa6));
-		sa6.sin6_family = AF_INET6;
-		sa6.sin6_len = sizeof(sa6);
-		sa6.sin6_addr = *ip6cp->ip6c_finaldst;
-		sa6.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
-						     ip6cp->ip6c_finaldst);
-#ifndef SCOPEDROUTING
-		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
-			/* should be impossbile */
-			printf("rip6_ctlinput: in6_embedscope failed\n");
-			return;
-		}
-#endif
+		sa6_src = ip6cp->ip6c_src;
 	} else {
 		m = NULL;
 		ip6 = NULL;
 		cmdarg = NULL;
-
-		/* XXX: translate addresses into internal form */
-		sa6 = *(struct sockaddr_in6 *)sa;
-#ifndef SCOPEDROUTING
-		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
-			/* should be impossbile */
-			printf("rip6_ctlinput: in6_embedscope failed\n");
-			return;
-		}
-#endif
+		sa6_src = &sa6_any;
 	}
 
-	if (ip6) {
-		/*
-		 * XXX: We assume that when IPV6 is non NULL,
-		 * M and OFF are valid.
-		 */
-		struct sockaddr_in6 sa6_src;
-
-		bzero(&sa6, sizeof(sa6_src));
-		sa6_src.sin6_family = AF_INET6;
-		sa6_src.sin6_len = sizeof(sa6_src);
-		sa6_src.sin6_addr = ip6->ip6_src;
-		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
-							 &ip6->ip6_src);
-#ifndef SCOPEDROUTING
-		if (in6_embedscope(&sa6_src.sin6_addr, &sa6, NULL, NULL)) {
-			/* should be impossbile */
-			printf("rip6_ctlinput: in6_embedscope failed\n");
-			return;
-		}
-#endif
-		(void) in6_pcbnotify(&rawin6pcbtable, (struct sockaddr *)&sa6,
-				     0, &sa6_src.sin6_addr, 0, cmd, cmdarg,
-				     notify);
-	} else {
-		(void) in6_pcbnotify(&rawin6pcbtable, (struct sockaddr *)&sa6,
-				     0, &zeroin6_addr, 0, cmd, cmdarg, notify);
-	}
+	(void) in6_pcbnotify(&rawin6pcbtable, sa, 0,
+			     (struct sockaddr *)sa6_src,, 0, cmd,
+			     cmdarg, notify);
 }
 
 /*

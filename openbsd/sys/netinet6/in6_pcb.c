@@ -532,24 +532,26 @@ in6_pcbconnect(inp, nam)
  * Must be called at splnet.
  */
 int
-in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, cmdarg, notify)
+in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 	struct inpcbtable *head;
-	struct sockaddr *dst;
+	struct sockaddr *dst, *src;
 	uint fport_arg;
-	struct in6_addr *la;
 	uint lport_arg;
 	int cmd;
 	void *cmdarg;
 	void (*notify) __P((struct inpcb *, int));
 {
 	register struct inpcb *inp, *ninp;
-	struct in6_addr *faddr,laddr = *la;
+	struct in6_addr *faddr,laddr;
 	u_short fport = fport_arg, lport = lport_arg;
 	int errno, nmatch = 0;
+	u_int32_t flowinfo;
 
 	if ((unsigned)cmd > PRC_NCMDS || dst->sa_family != AF_INET6)
 		return 1;
 	faddr = &(((struct sockaddr_in6 *)dst)->sin6_addr);
+	laddr = ((struct sockaddr_in6 *)src)->sin6_addr;
+	flowinfo = ((struct sockaddr_in6 *)src)->sin6_flowinfo;
 	if (IN6_IS_ADDR_UNSPECIFIED(faddr))
 		return 1;
 	if (IN6_IS_ADDR_V4MAPPED(faddr))
@@ -600,15 +602,29 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, cmdarg, notify)
 			    (u_int32_t *)cmdarg);
 		}
 
-		if (!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, faddr) ||
-		    !inp->inp_socket ||
-		    (lport && inp->inp_lport != lport) ||
-		    (!IN6_IS_ADDR_UNSPECIFIED(&laddr) && !IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6, &laddr)) ||
-		    (fport && inp->inp_fport != fport)) {
+		/*
+		 * Detect if we should notify the error. If no source and
+		 * destination ports are specifed, but non-zero flowinfo and
+		 * local address match, notify the error. This is the case
+		 * when the error is delivered with an encrypted error buffer
+		 * by ESP. Otherwise, just compare addresses and ports
+		 * as usual.
+		 */
+		if (lport == 0 && fport == 0 && flowinfo &&
+		    inp->inp_socket != NULL &&
+		    flowinfo == (inp->inp_flowinfo & IPV6_FLOWLABEL_MASK) &&
+		    IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6, &laddr))
+			goto do_notify;
+		else if (!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, faddr) ||
+			 inp->inp_socket == 0 ||
+			 (lport && inp->inp_lport != lport) ||
+			 (!IN6_IS_ADDR_UNSPECIFIED(&laddr) &&
+			  !IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6, &laddr)) ||
+			 (fport && inp->inp_fport != fport)) {
 			continue;
 		}
+	  do_notify:
 		nmatch++;
-
 		if (notify)
 			(*notify)(inp, errno);
 	}

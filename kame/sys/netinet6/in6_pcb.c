@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.72 2000/11/29 05:16:37 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.73 2000/11/29 16:45:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -539,24 +539,26 @@ in6_setpeeraddr(in6p, nam)
  * Must be called at splsoftnet.
  */
 int
-in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, cmdarg, notify)
+in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 	struct in6pcb *head;
-	struct sockaddr *dst;
+	struct sockaddr *dst, *src;
 	u_int fport_arg, lport_arg;
-	struct in6_addr *laddr6;
 	int cmd;
 	void *cmdarg;
 	void (*notify) __P((struct in6pcb *, int));
 {
 	struct in6pcb *in6p, *nin6p;
-	struct in6_addr faddr6;
+	struct in6_addr faddr6, laddr6;
 	u_int16_t fport = fport_arg, lport = lport_arg;
 	int errno;
 	int nmatch = 0;
+	u_int32_t flowinfo;
 
 	if ((unsigned)cmd > PRC_NCMDS || dst->sa_family != AF_INET6)
 		return 0;
 	faddr6 = ((struct sockaddr_in6 *)dst)->sin6_addr;
+	laddr6 = ((struct sockaddr_in6 *)src)->sin6_addr;
+	flowinfo = ((struct sockaddr_in6 *)src)->sin6_flowinfo;
 	if (IN6_IS_ADDR_UNSPECIFIED(&faddr6))
 		return 0;
 
@@ -576,9 +578,6 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, cmdarg, notify)
 		if (cmd != PRC_HOSTDEAD)
 			notify = in6_rtchange;
 	}
-
-	if (notify == NULL)
-		return 0;
 
 	errno = inet6ctlerrmap[cmd];
 	for (in6p = head->in6p_next; in6p != head; in6p = nin6p) {
@@ -602,7 +601,20 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, cmdarg, notify)
 					(u_int32_t *)cmdarg);
 		}
 
-		if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &faddr6) ||
+		/*
+		 * Detect if we should notify the error. If no source and
+		 * destination ports are specifed, but non-zero flowinfo and
+		 * local address match, notify the error. This is the case
+		 * when the error is delivered with an encrypted error buffer
+		 * by ESP. Otherwise, just compare addresses and ports
+		 * as usual.
+		 */
+		if (lport == 0 && fport == 0 && flowinfo &&
+		    in6p->in6p_socket != NULL &&
+		    flowinfo == (in6p->in6p_flowinfo & IPV6_FLOWLABEL_MASK) &&
+		    IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &laddr6))
+			goto do_notify;
+		else if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &faddr6) ||
 		    in6p->in6p_socket == 0 ||
 		    (lport && in6p->in6p_lport != lport) ||
 		    (!IN6_IS_ADDR_UNSPECIFIED(laddr6) &&
@@ -610,7 +622,9 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, cmdarg, notify)
 		    (fport && in6p->in6p_fport != fport))
 			continue;
 
-		(*notify)(in6p, errno);
+	  do_notify:
+		if (notify)
+			(*notify)(in6p, errno);
 		nmatch++;
 	}
 	return nmatch;

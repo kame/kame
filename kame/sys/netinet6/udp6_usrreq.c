@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.77 2000/11/30 05:08:35 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.78 2000/11/30 16:00:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -499,12 +499,13 @@ udp6_ctlinput(cmd, sa, d)
 	void *d;
 {
 	struct udphdr uh;
-	struct sockaddr_in6 sa6;
 	register struct ip6_hdr *ip6;
+	struct sockaddr_in6 *sa = (struct sockaddr_in6 *)sa;
 	struct mbuf *m;
 	int off;
 	void *cmdarg;
 	struct ip6ctlparam *ip6cp = NULL;
+	struct sockaddr_in6 *sa6_src = NULL;
 	void (*notify) __P((struct in6pcb *, int)) = udp6_notify;
 	struct udp_portonly {
 		u_int16_t uh_sport;
@@ -535,37 +536,12 @@ udp6_ctlinput(cmd, sa, d)
 		ip6 = ip6cp->ip6c_ip6;
 		off = ip6cp->ip6c_off;
 		cmdarg = ip6cp->ip6c_cmdarg;
+		sa6_src = ip6cp->ip6c_src;
 	} else {
 		m = NULL;
 		ip6 = NULL;
 		cmdarg = NULL;
-	}
-
-	if (ip6cp && ip6cp->ip6c_finaldst) {
-		bzero(&sa6, sizeof(sa6));
-		sa6.sin6_family = AF_INET6;
-		sa6.sin6_len = sizeof(sa6);
-		sa6.sin6_addr = *ip6cp->ip6c_finaldst;
-		/* XXX: assuming M is valid in this case */
-		sa6.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
-						     ip6cp->ip6c_finaldst);
-#ifndef SCOPEDROUTING
-		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
-			/* should be impossbile */
-			printf("udp6_ctlinput: in6_embedscope failed\n");
-			return;
-		}
-#endif
-	} else {
-		/* XXX: translate addresses into internal form */
-		sa6 = *(struct sockaddr_in6 *)sa;
-#ifndef SCOPEDROUTING
-		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
-			/* should be impossbile */
-			printf("udp6_ctlinput: in6_embedscope failed\n");
-			return;
-		}
-#endif
+		sa6_src = &sa6_any;
 	}
 
 	if (ip6) {
@@ -573,7 +549,6 @@ udp6_ctlinput(cmd, sa, d)
 		 * XXX: We assume that when IPV6 is non NULL,
 		 * M and OFF are valid.
 		 */
-		struct sockaddr_in6 sa6_src;
 
 		/* check if we can safely examine src and dst ports */
 		if (m->m_pkthdr.len < off + sizeof(*uhp))
@@ -581,20 +556,6 @@ udp6_ctlinput(cmd, sa, d)
 
 		bzero(&uh, sizeof(uh));
 		m_copydata(m, off, sizeof(*uhp), (caddr_t)&uh);
-
-		bzero(&sa6, sizeof(sa6_src));
-		sa6_src.sin6_family = AF_INET6;
-		sa6_src.sin6_len = sizeof(sa6_src);
-		sa6_src.sin6_addr = ip6->ip6_src;
-		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
-							 &ip6->ip6_src);
-#ifndef SCOPEDROUTING
-		if (in6_embedscope(&sa6_src.sin6_addr, &sa6_src, NULL, NULL)) {
-			/* should be impossbile */
-			printf("udp6_ctlinput: in6_embedscope failed\n");
-			return;
-		}
-#endif
 
 #ifdef __NetBSD__
 		if (cmd == PRC_MSGSIZE) {
@@ -607,8 +568,8 @@ udp6_ctlinput(cmd, sa, d)
 			 * corresponding to the address in the ICMPv6 message
 			 * payload.
 			 */
-			if (in6_pcblookup_connect(&udb6, &sa6.sin6_addr,
-			    uh.uh_dport, &sa6_src.sin6_addr, uh.uh_sport, 0))
+			if (in6_pcblookup_connect(&udb6, sa6->sin6_addr,
+			    uh.uh_dport, &sa6_src->sin6_addr, uh.uh_sport, 0))
 				updatemtu = 1;
 #if 0
 			/*
@@ -618,8 +579,8 @@ udp6_ctlinput(cmd, sa, d)
 			 * We should at least check if the local address (= s)
 			 * is really ours.
 			 */
-			else if (in6_pcblookup_bind(&udb6, &sa6.sin6_addr,
-			    uh.uh_dport, 0))
+			else if (in6_pcblookup_bind(&udb6, &sa6->sin6_addr,
+						    uh.uh_dport, 0))
 				updatemtu = 1;
 #endif
 
@@ -643,12 +604,11 @@ udp6_ctlinput(cmd, sa, d)
 		}
 #endif
 
-		(void) in6_pcbnotify(&udb6, (struct sockaddr *)&sa6,
-				     uh.uh_dport, &sa6_src.sin6_addr,
+		(void) in6_pcbnotify(&udb6, sa, uh.uh_dport, sa6_src,
 				     uh.uh_sport, cmd, cmdarg, notify);
 	} else {
-		(void) in6_pcbnotify(&udb6, (struct sockaddr *)&sa6, 0,
-				     &zeroin6_addr, 0, cmd, cmdarg, notify);
+		(void) in6_pcbnotify(&udb6, sa, 0, sa6_src, 0, cmd,
+				     cmdarg, notify);
 	}
 }
 
