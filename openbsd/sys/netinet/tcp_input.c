@@ -335,14 +335,6 @@ tcp6_input(mp, offp, proto)
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	struct in6_ifaddr *ia6;
 
-#if defined(NFAITH) && 0 < NFAITH
-	if (faithprefix(&ip6->ip6_dst)) {
-		/* XXX send icmp6 host/port unreach? */
-		m_freem(m);
-		return IPPROTO_DONE;
-	}
-#endif
-
 	/*
 	 * draft-itojun-ipv6-tcp-to-anycast
 	 */
@@ -629,13 +621,22 @@ findpcb:
 		break;
 	}
 	if (inp == 0) {
+#ifdef INET6
+		int flags;
+#endif
+
 		++tcpstat.tcps_pcbhashmiss;
 		switch (af) {
-#ifdef INET6
 		case AF_INET6:
+#ifdef INET6
+			flags = INPLOOKUP_WILDCARD | INPLOOKUP_IPV6;
+#if defined(NFAITH) && NFAITH > 0
+			if (faithprefix(&ipv6->ip6_dst))
+				flags |= INPLOOKUP_FAITH;
+#endif
 			inp = in_pcblookup(&tcbtable, &ipv6->ip6_src,
 			    th->th_sport, &ipv6->ip6_dst, th->th_dport,
-			    INPLOOKUP_WILDCARD | INPLOOKUP_IPV6);
+			    flags);
 			break;
 #endif /* INET6 */
 		case AF_INET:

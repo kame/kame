@@ -211,6 +211,7 @@ struct inpcbtable {
 #define	INPLOOKUP_WILDCARD	1
 #define	INPLOOKUP_SETLOCAL	2
 #define	INPLOOKUP_IPV6		4
+#define	INPLOOKUP_FAITH		8
 
 #define	sotoinpcb(so)	((struct inpcb *)(so)->so_pcb)
 

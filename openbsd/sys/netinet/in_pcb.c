@@ -649,7 +649,6 @@ in_pcbnotify(table, dst, fport_arg, laddr, lport_arg, errno, notify)
 	/*
 	 * See in6_pcbnotify() for IPv6 codepath.  By the time this
 	 * gets called, the addresses passed are either definitely IPv4 or
-	 * IPv6; *_pcbnotify() never gets called with v4-mapped v6 addresses.
 	 */
 #endif /* INET6 */
 
@@ -696,7 +695,6 @@ in_pcbnotifyall(table, dst, errno, notify)
 	/*
 	 * See in6_pcbnotify() for IPv6 codepath.  By the time this
 	 * gets called, the addresses passed are either definitely IPv4 or
-	 * IPv6; *_pcbnotify() never gets called with v4-mapped v6 addresses.
 	 */
 #endif /* INET6 */
 
@@ -802,17 +800,10 @@ in_pcblookup(table, faddrp, fport_arg, laddrp, lport_arg, flags)
 			struct in6_addr *laddr6 = (struct in6_addr *)laddrp;
 			struct in6_addr *faddr6 = (struct in6_addr *)faddrp;
 
-			/* 
-			 * Always skip AF_INET sockets when looking
-			 * for AF_INET6 addresses.  The only problem
-			 * with this comes if the PF_INET6 addresses
-			 * are v4-mapped addresses.  From what I've
-			 * been able to see, none of the callers cause
-			 * such a situation to occur.  If such a
-			 * situation DID occur, then it is possible to
-			 * miss a matching PCB.
-			 */
 			if (!(inp->inp_flags & INP_IPV6))
+				continue;
+			if ((flags & INPLOOKUP_FAITH) != 0 &&
+			    (inp->inp_flags & IN6P_FAITH) == 0)
 				continue;
 
 			if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6)) {
