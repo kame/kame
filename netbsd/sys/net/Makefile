@@ -10,6 +10,6 @@ INCS=	bpf.h bpfdesc.h ethertypes.h if.h if_arc.h if_arp.h \
 	if_stripvar.h if_token.h if_tun.h if_types.h netisr.h \
 	pfil.h pfkeyv2.h ppp-comp.h ppp_defs.h radix.h \
 	raw_cb.h route.h slcompress.h slip.h zlib.h
-#INCS+=	radix_art.h
+INCS+=	radix_art.h
 
 .include <bsd.kinc.mk>
