@@ -8,8 +8,8 @@ AC_PROG_CC
 AC_PROG_CPP
 
 dnl Checks for libraries.
-AC_CHECK_LIB(c, kvm_open, [], [AC_CHECK_LIB(kvm, kvm_open)])
-AC_CHECK_LIB(mld, nlist)
+dnl AC_CHECK_LIB(c, kvm_open, [], [AC_CHECK_LIB(kvm, kvm_open)])
+dnl AC_CHECK_LIB(mld, nlist)
 
 dnl pcap library
 dnl CFLAGS="-I. $CFLAGS"
