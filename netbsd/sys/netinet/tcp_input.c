@@ -2802,43 +2802,22 @@ syn_cache_get(src, dst, th, hlen, tlen, so, m)
 #endif
 
 #ifdef IPSEC
-    {
 	/*
 	 * we make a copy of policy, instead of sharing the policy,
 	 * for better behavior in terms of SA lookup and dead SA removal.
 	 */
-	struct secpolicy *sp;
 	if (inp) {
-		sp = ipsec_copy_policy(sotoinpcb(oso)->inp_sp_in);
-		if (sp) {
-			key_freesp(inp->inp_sp_in);
-			inp->inp_sp_in = sp;
-		} else
-			printf("tcp_input: could not copy policy\n");
-		sp = ipsec_copy_policy(sotoinpcb(oso)->inp_sp_out);
-		if (sp) {
-			key_freesp(inp->inp_sp_out);
-			inp->inp_sp_out = sp;
-		} else
+		/* copy old policy into new socket's */
+		if (ipsec_copy_policy(sotoinpcb(oso)->inp_sp, inp->inp_sp))
 			printf("tcp_input: could not copy policy\n");
 	}
 #ifdef INET6
 	else if (in6p) {
-		sp = ipsec_copy_policy(sotoin6pcb(oso)->in6p_sp_in);
-		if (sp) {
-			key_freesp(in6p->in6p_sp_in);
-			in6p->in6p_sp_in = sp;
-		} else
-			printf("tcp_input: could not copy policy\n");
-		sp = ipsec_copy_policy(sotoin6pcb(oso)->in6p_sp_out);
-		if (sp) {
-			key_freesp(in6p->in6p_sp_out);
-			in6p->in6p_sp_out = sp;
-		} else
+		/* copy old policy into new socket's */
+		if (ipsec_copy_policy(sotoin6pcb(oso)->in6p_sp, in6p->in6p_sp))
 			printf("tcp_input: could not copy policy\n");
 	}
 #endif
-    }
 #endif
 
 	/*

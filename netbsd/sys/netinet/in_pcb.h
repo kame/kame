@@ -95,12 +95,7 @@ struct inpcb {
 	int	  inp_errormtu;		/* MTU of last xmit status = EMSGSIZE */
 	struct	  inpcbtable *inp_table;
 #if 1 /*IPSEC*/
-	struct secpolicy *inp_sp_in;
-	struct secpolicy *inp_sp_out;
-					/*
-					 * security policy. It may not be
-					 * used according to policy selection.
-					 */
+	struct inpcbpolicy *inp_sp;     /* security policy. */
 #endif
 };
 #define	inp_faddr	inp_ip.ip_dst

@@ -1290,11 +1290,8 @@ udp_usrreq(so, req, m, nam, control, p)
 		inp = sotoinpcb(so);
 		inp->inp_ip.ip_ttl = ip_defttl;
 #ifdef IPSEC
-		if ((error = ipsec_init_policy(&inp->inp_sp_in)) != 0) {
-			in_pcbdetach(inp);
-			break;
-		}
-		if ((error = ipsec_init_policy(&inp->inp_sp_out)) != 0) {
+		error = ipsec_init_policy(so, &inp->inp_sp);
+		if (error != 0) {
 			in_pcbdetach(inp);
 			break;
 		}
