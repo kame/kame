@@ -33,7 +33,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/ifaddrlist.c,v 1.1 1999/08/08 23:32:25 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/ifaddrlist.c,v 1.2 1999/11/09 21:09:48 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -77,7 +77,22 @@ struct rtentry;
 #define ISLOOPBACK(p) (strcmp((p)->ifr_name, "lo0") == 0)
 #endif
 
-#define MAX_IPADDR 32
+static unsigned int if_maxindex __P((void));
+
+static unsigned int
+if_maxindex()
+{
+	struct if_nameindex *p, *p0;
+	unsigned int max = 0;
+
+	p0 = if_nameindex();
+	for (p = p0; p && p->if_index && p->if_name; p++) {
+		if (max < p->if_index)
+			max = p->if_index;
+	}
+	if_freenameindex(p0);
+	return max;
+}
 
 /*
  * Return the interface list
@@ -93,22 +108,42 @@ ifaddrlist(register struct ifaddrlist **ipaddrp, register char *errbuf)
 	register struct sockaddr_in *sin;
 	register struct ifaddrlist *al;
 	struct ifconf ifc;
-	struct ifreq ibuf[MAX_IPADDR], ifr;
+	struct ifreq *ibuf, ifr;
 	char device[sizeof(ifr.ifr_name) + 1];
-	static struct ifaddrlist ifaddrlist[MAX_IPADDR];
+	struct ifaddrlist *ifaddrlist;
+	unsigned int maxif;
+
+#if 1
+	maxif = if_maxindex() * 3; /* 3 is a magic number... */
+#else
+	maxif = 64;
+#endif
+	ifaddrlist = (struct ifaddrlist *)malloc(maxif *
+		sizeof(struct ifaddrlist));
+	if (ifaddrlist == NULL)
+		return -1;
+	ibuf = (struct ifreq *)malloc(maxif * sizeof(struct ifreq));
+	if (ibuf == NULL) {
+		free(ifaddrlist);
+		return -1;
+	}
 
 	fd = socket(AF_INET, SOCK_DGRAM, 0);
 	if (fd < 0) {
 		(void)sprintf(errbuf, "socket: %s", strerror(errno));
+		free(ifaddrlist);
+		free(ibuf);
 		return (-1);
 	}
-	ifc.ifc_len = sizeof(ibuf);
+	ifc.ifc_len = maxif * sizeof(struct ifreq);
 	ifc.ifc_buf = (caddr_t)ibuf;
 
 	if (ioctl(fd, SIOCGIFCONF, (char *)&ifc) < 0 ||
 	    ifc.ifc_len < sizeof(struct ifreq)) {
 		(void)sprintf(errbuf, "SIOCGIFCONF: %s", strerror(errno));
 		(void)close(fd);
+		free(ifaddrlist);
+		free(ibuf);
 		return (-1);
 	}
 	ifrp = ibuf;
@@ -143,6 +178,8 @@ ifaddrlist(register struct ifaddrlist **ipaddrp, register char *errbuf)
 			    (int)sizeof(ifr.ifr_name), ifr.ifr_name,
 			    strerror(errno));
 			(void)close(fd);
+			free(ifaddrlist);
+			free(ibuf);
 			return (-1);
 		}
 
@@ -156,6 +193,8 @@ ifaddrlist(register struct ifaddrlist **ipaddrp, register char *errbuf)
 			(void)sprintf(errbuf, "SIOCGIFADDR: %s: %s",
 			    device, strerror(errno));
 			(void)close(fd);
+			free(ifaddrlist);
+			free(ibuf);
 			return (-1);
 		}
 
@@ -168,5 +207,7 @@ ifaddrlist(register struct ifaddrlist **ipaddrp, register char *errbuf)
 	(void)close(fd);
 
 	*ipaddrp = ifaddrlist;
+	free(ifaddrlist);
+	free(ibuf);
 	return (nipaddr);
 }
