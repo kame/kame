@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.49 2001/09/11 11:25:10 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.50 2001/09/12 10:58:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -97,11 +97,10 @@ struct callout mip6_pfx_ch;
 #endif
 int mip6_pfx_timer_running = 0;
 
-static int mip6_determine_location_withndpr
-    __P((struct hif_softc *,
-	 struct in6_addr *,
-	 struct nd_prefix *,
-	 struct nd_defrouter *));
+static int mip6_determine_location_withndpr __P((struct hif_softc *,
+						 struct in6_addr *,
+						 struct nd_prefix *,
+						 struct nd_defrouter *));
 static int mip6_haddr_config __P((struct hif_softc *, struct ifnet *));
 static int mip6_process_movement __P((struct hif_softc *, int));
 static int mip6_select_coa __P((struct ifnet *));
@@ -225,10 +224,10 @@ mip6_process_defrouter_change(dr)
  */
 int
 mip6_process_nd_prefix(saddr, ndpr, dr, m)
-     struct in6_addr *saddr;
-     struct nd_prefix *ndpr;
-     struct nd_defrouter *dr;
-     struct mbuf *m;
+	struct in6_addr *saddr;
+	struct nd_prefix *ndpr;
+	struct nd_defrouter *dr;
+	struct mbuf *m;
 {
 	struct hif_softc *sc;
 	int coa_changed;
@@ -299,10 +298,10 @@ mip6_process_nd_prefix(saddr, ndpr, dr, m)
  */
 static int
 mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
-     struct hif_softc *sc;
-     struct in6_addr *rtaddr;
-     struct nd_prefix *ndpr;
-     struct nd_defrouter *dr;
+	struct hif_softc *sc;
+	struct in6_addr *rtaddr;
+	struct nd_prefix *ndpr;
+	struct nd_defrouter *dr;
 {
 	struct hif_subnet *hs, *hsbypfx, *hsbyha;
 	struct mip6_subnet *ms;
@@ -567,8 +566,8 @@ mip6_determine_location_withndpr(sc, rtaddr, ndpr, dr)
  */
 static int
 mip6_haddr_config(sc, ifp)
-     struct hif_softc *sc;
-     struct ifnet *ifp;
+	struct hif_softc *sc;
+	struct ifnet *ifp;
 {
 	switch(sc->hif_location) {
 	case HIF_LOCATION_HOME:
@@ -616,8 +615,8 @@ mip6_haddr_config(sc, ifp)
 
 static int
 mip6_process_movement(sc, coa_changed)
-     struct hif_softc *sc;
-     int coa_changed;
+	struct hif_softc *sc;
+	int coa_changed;
 {
 	/* configure coa and do home (un)regstration if needed */
 	switch(sc->hif_location_prev) {
@@ -692,7 +691,7 @@ mip6_process_movement(sc, coa_changed)
  */
 static int
 mip6_select_coa(preferedifp)
-     struct ifnet *preferedifp;
+	struct ifnet *preferedifp;
 {
 	struct hif_coa *hcoa;
 	struct in6_ifaddr *ia6;
@@ -737,7 +736,7 @@ mip6_select_coa(preferedifp)
 
 static int
 mip6_remove_addrs(ifp)
-     struct ifnet *ifp;
+	struct ifnet *ifp;
 {
 	struct ifaddr *ia, *ia_next;
 	struct in6_ifaddr *ia6;
@@ -773,8 +772,8 @@ mip6_remove_addrs(ifp)
  */
 static int
 mip6_attach_haddrs(sc, ifp)
-     struct hif_softc *sc;
-     struct ifnet *ifp;
+	struct hif_softc *sc;
+	struct ifnet *ifp;
 {
 	int error = 0;
 
@@ -804,8 +803,8 @@ mip6_attach_haddrs(sc, ifp)
  */
 static int
 mip6_remove_haddrs(sc, ifp)
-     struct hif_softc *sc;
-     struct ifnet *ifp;
+	struct hif_softc *sc;
+	struct ifnet *ifp;
 {
 	struct ifaddr *ia, *ia_next;
 	struct in6_ifaddr *ia6;
@@ -858,8 +857,8 @@ mip6_remove_haddrs(sc, ifp)
  */
 static int
 mip6_detach_haddrs(sc, ifp)
-     struct hif_softc *sc;
-     struct ifnet *ifp;
+	struct hif_softc *sc;
+	struct ifnet *ifp;
 {
 	struct ifnet *hif_ifp = (struct ifnet *)sc;
 	struct ifaddr *ia, *ia_next;
@@ -894,8 +893,8 @@ mip6_detach_haddrs(sc, ifp)
  */
 static int
 mip6_add_haddrs(sc, ifp)
-     struct hif_softc *sc;
-     struct ifnet *ifp;
+	struct hif_softc *sc;
+	struct ifnet *ifp;
 {
 	struct hif_subnet *hs;
 	struct mip6_subnet *ms;
@@ -983,8 +982,8 @@ mip6_add_haddrs(sc, ifp)
  */
 static int
 mip6_remove_addr(ifp, ia6)
-     struct ifnet *ifp;
-     struct in6_ifaddr *ia6;
+	struct ifnet *ifp;
+	struct in6_ifaddr *ia6;
 {
 	struct in6_aliasreq ifra;
 	int error = 0;
@@ -1010,8 +1009,8 @@ mip6_remove_addr(ifp, ia6)
 
 int
 mip6_ioctl(cmd, data)
-     u_long cmd;
-     caddr_t data;
+	u_long cmd;
+	caddr_t data;
 {
 	struct mip6_req *mr = (struct mip6_req *)data;
 
@@ -1069,14 +1068,14 @@ mip6_ioctl(cmd, data)
  */
 struct mbuf *
 mip6_create_ip6hdr(ip6_src, ip6_dst, next, plen)
-struct in6_addr *ip6_src;  /* Source address for packet */
-struct in6_addr *ip6_dst;  /* Destination address for packet */
-u_int8_t         next;     /* Next header following the IPv6 header */
-u_int32_t        plen;     /* Payload length (zero if no payload */
+	struct in6_addr *ip6_src; /* Source address for packet */
+	struct in6_addr *ip6_dst; /* Destination address for packet */
+	u_int8_t next;            /* Next header following the IPv6 header */
+	u_int32_t plen;           /* Payload length (zero if no payload */
 {
-	struct ip6_hdr  *ip6;    /* IPv6 header */
-	struct mbuf     *mo;     /* Ptr to mbuf allocated for output data */
-	u_int32_t        maxlen;
+	struct ip6_hdr *ip6; /* IPv6 header */
+	struct mbuf *mo;     /* Ptr to mbuf allocated for output data */
+	u_int32_t maxlen;
 
 	/* Allocate memory for the IPv6 header and fill it with data */
 	ip6 = (struct ip6_hdr *)malloc(sizeof(struct ip6_hdr),
@@ -1119,11 +1118,11 @@ u_int32_t        plen;     /* Payload length (zero if no payload */
 
 int
 mip6_exthdr_create(m, opt, pktopt_rthdr, pktopt_haddr, pktopt_binding)
-     struct mbuf *m;
-     struct ip6_pktopts *opt;
-     struct ip6_rthdr **pktopt_rthdr;
-     struct ip6_dest **pktopt_haddr;
-     struct ip6_dest **pktopt_binding;
+	struct mbuf *m;
+	struct ip6_pktopts *opt;
+	struct ip6_rthdr **pktopt_rthdr;
+	struct ip6_dest **pktopt_haddr;
+	struct ip6_dest **pktopt_binding;
 {
 	struct ip6_hdr *ip6;
 	struct in6_addr *src;
@@ -1222,8 +1221,8 @@ mip6_exthdr_create(m, opt, pktopt_rthdr, pktopt_haddr, pktopt_binding)
 
 int
 mip6_rthdr_create(pktopt_rthdr, coa)
-     struct ip6_rthdr **pktopt_rthdr;
-     struct in6_addr *coa;
+	struct ip6_rthdr **pktopt_rthdr;
+	struct in6_addr *coa;
 {
 	struct ip6_rthdr0 *rthdr0;
 	size_t len;
@@ -1249,8 +1248,8 @@ mip6_rthdr_create(pktopt_rthdr, coa)
 
 static int
 mip6_rthdr_create_withdst(pktopt_rthdr, dst)
-     struct ip6_rthdr **pktopt_rthdr;
-     struct in6_addr *dst;
+	struct ip6_rthdr **pktopt_rthdr;
+	struct in6_addr *dst;
 {
 	struct mip6_bc *mbc;
 
@@ -1269,11 +1268,11 @@ mip6_rthdr_create_withdst(pktopt_rthdr, dst)
 
 static int
 mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
-     struct ip6_dest **pktopt_mip6dest2;
-     struct in6_addr *src;
-     struct in6_addr *dst;
-     struct ip6_pktopts *opts;
-     struct hif_softc *sc;
+	struct ip6_dest **pktopt_mip6dest2;
+	struct in6_addr *src;
+	struct in6_addr *dst;
+	struct ip6_pktopts *opts;
+	struct hif_softc *sc;
 {
 	struct ip6_opt_binding_update bu_opt;
 	struct mip6_buffer *optbuf;
@@ -1382,10 +1381,10 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 
 static int
 mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
-     struct ip6_dest **pktopt_haddr;
-     struct in6_addr *src;
-     struct in6_addr *dst;
-     struct hif_softc *sc;
+	struct ip6_dest **pktopt_haddr;
+	struct in6_addr *src;
+	struct in6_addr *dst;
+	struct hif_softc *sc;
 {
 	struct ip6_opt_home_address haddr_opt;
 	struct mip6_buffer *optbuf;
@@ -1427,9 +1426,9 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 
 int
 mip6_destopt_discard(pktopt_rthdr, pktopt_haddr, pktopt_mip6dest2)
-     struct ip6_rthdr *pktopt_rthdr;
-     struct ip6_dest *pktopt_haddr;
-     struct ip6_dest *pktopt_mip6dest2;
+	struct ip6_rthdr *pktopt_rthdr;
+	struct ip6_dest *pktopt_haddr;
+	struct ip6_dest *pktopt_mip6dest2;
 {
 	if (pktopt_rthdr)
 		free(pktopt_rthdr, M_TEMP);
@@ -1445,11 +1444,11 @@ mip6_destopt_discard(pktopt_rthdr, pktopt_haddr, pktopt_mip6dest2)
 
 int
 mip6_ba_destopt_create(pktopt_badest2, status, seqno, lifetime, refresh)
-     struct ip6_dest **pktopt_badest2;
-     u_int8_t status;
-     u_int8_t seqno;
-     u_int32_t lifetime;
-     u_int32_t refresh;
+	struct ip6_dest **pktopt_badest2;
+	u_int8_t status;
+	u_int8_t seqno;
+	u_int32_t lifetime;
+	u_int32_t refresh;
 {
 	struct ip6_opt_binding_ack ba_opt;
 	struct mip6_buffer *optbuf;
@@ -1496,7 +1495,7 @@ mip6_ba_destopt_create(pktopt_badest2, status, seqno, lifetime, refresh)
  */
 void
 mip6_find_offset(buf)
-struct mip6_buffer *buf;  /* Destination header with options */
+	struct mip6_buffer *buf;  /* Destination header with options */
 {
 	int       ii;
 	u_int8_t  new_off;
@@ -1530,7 +1529,7 @@ struct mip6_buffer *buf;  /* Destination header with options */
  */
 void
 mip6_align_destopt(buf)
-struct mip6_buffer *buf;     /* IPv6 destination header to align */
+	struct mip6_buffer *buf;     /* IPv6 destination header to align */
 {
 	struct ip6_ext  *ext_hdr;
 	int              rest;     /* Rest of modulo division */
@@ -1572,8 +1571,8 @@ struct mip6_buffer *buf;     /* IPv6 destination header to align */
  */
 caddr_t
 mip6_add_opt2dh(opt, dh)
-     caddr_t opt;   /* BU, BR, BA or Home Address option */
-     struct mip6_buffer *dh;    /* Buffer containing the IPv6 DH  */
+	caddr_t opt;            /* BU, BR, BA or Home Address option */
+	struct mip6_buffer *dh; /* Buffer containing the IPv6 DH  */
 {
 	struct ip6_opt_binding_update  *bu;
 	struct ip6_opt_binding_ack     *ba;
@@ -1742,7 +1741,7 @@ mip6_add_opt2dh(opt, dh)
  */
 int
 mip6_addr_exchange(m, dstm)
-	struct mbuf *m; /* includes IPv6 header */
+	struct mbuf *m;    /* includes IPv6 header */
 	struct mbuf *dstm; /* includes homeaddress destopt */
 {
 	struct ip6_opt_home_address *ha_opt;
@@ -1811,10 +1810,10 @@ mip6_addr_exchange(m, dstm)
 
 int
 mip6_process_destopt(m, dstopts, opt, dstoptlen)
-     struct mbuf *m;
-     struct ip6_dest *dstopts;
-     u_int8_t *opt;
-     int dstoptlen;
+	struct mbuf *m;
+	struct ip6_dest *dstopts;
+	u_int8_t *opt;
+	int dstoptlen;
 {
 	int error = 0;
 
@@ -1908,9 +1907,9 @@ mip6_process_destopt(m, dstopts, opt, dstoptlen)
 
 u_int8_t *
 mip6_destopt_find_subopt(subopt, suboptlen, subopttype)
-     u_int8_t *subopt; /* Ptr to first sub-option in current option */
-     u_int8_t suboptlen;   /* Remaining option length */
-     u_int8_t subopttype;
+	u_int8_t *subopt;    /* Ptr to first sub-option in current option */
+	u_int8_t suboptlen;  /* Remaining option length */
+	u_int8_t subopttype;
 {
 	u_int8_t *match = NULL;
 
@@ -1936,7 +1935,7 @@ mip6_destopt_find_subopt(subopt, suboptlen, subopttype)
 
 int64_t
 mip6_coa_get_lifetime(coa)
-     struct in6_addr *coa;
+	struct in6_addr *coa;
 {
 	struct in6_ifaddr *ia;
 	int64_t lifetime;
@@ -1960,10 +1959,10 @@ mip6_coa_get_lifetime(coa)
 
 void
 mip6_create_addr(addr, ifid, prefix, prefixlen)
-     struct in6_addr *addr;
-     struct in6_addr *ifid;
-     struct in6_addr *prefix;
-     u_int8_t prefixlen;
+	struct in6_addr *addr;
+	struct in6_addr *ifid;
+	struct in6_addr *prefix;
+	u_int8_t prefixlen;
 {
 	int i, bytelen, bitlen;
 	u_int8_t mask;

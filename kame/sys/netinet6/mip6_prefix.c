@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.6 2001/09/05 02:33:08 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.7 2001/09/12 10:58:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -93,9 +93,9 @@ mip6_prefix_init(void)
 
 struct mip6_prefix *
 mip6_prefix_create(prefix, prefixlen, lifetime)
-     struct in6_addr *prefix;
-     u_int8_t prefixlen;
-     u_int32_t lifetime;
+	struct in6_addr *prefix;
+	u_int8_t prefixlen;
+	u_int32_t lifetime;
 {
 	struct mip6_prefix *mpfx;
 
@@ -118,8 +118,8 @@ mip6_prefix_create(prefix, prefixlen, lifetime)
 }
 
 int mip6_prefix_haddr_assign(mpfx, sc)
-     struct mip6_prefix *mpfx;
-     struct hif_softc *sc;
+	struct mip6_prefix *mpfx;
+	struct hif_softc *sc;
 {
 	struct in6_addr ifid;
 	int error = 0;
@@ -142,8 +142,8 @@ int mip6_prefix_haddr_assign(mpfx, sc)
 
 int
 mip6_prefix_list_insert(mpfx_list, mpfx)
-     struct mip6_prefix_list *mpfx_list;
-     struct mip6_prefix *mpfx;
+	struct mip6_prefix_list *mpfx_list;
+	struct mip6_prefix *mpfx;
 {
 	if ((mpfx_list == NULL) || (mpfx == NULL)) {
 		return (EINVAL);
@@ -164,8 +164,8 @@ mip6_prefix_list_insert(mpfx_list, mpfx)
 
 int
 mip6_prefix_list_remove(mpfx_list, mpfx)
-     struct mip6_prefix_list *mpfx_list;
-     struct mip6_prefix *mpfx;
+	struct mip6_prefix_list *mpfx_list;
+	struct mip6_prefix *mpfx;
 {
 	struct mip6_subnet *ms;
 	struct mip6_subnet_prefix *mspfx;
@@ -204,7 +204,7 @@ mip6_prefix_list_remove(mpfx_list, mpfx)
 
 struct mip6_prefix *
 mip6_prefix_list_find(tmpmpfx)
-     struct mip6_prefix *tmpmpfx;
+	struct mip6_prefix *tmpmpfx;
 {
 	struct mip6_prefix *mpfx;
 

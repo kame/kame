@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.5 2001/08/14 12:59:39 keiichi Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.6 2001/09/12 10:58:23 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -98,7 +98,7 @@ mip6_subnet_create(void)
 
 int
 mip6_subnet_delete(ms)
-     struct mip6_subnet *ms;
+	struct mip6_subnet *ms;
 {
 	struct hif_softc *sc;
 	struct hif_subnet *hs;
@@ -164,8 +164,8 @@ mip6_subnet_delete(ms)
 
 int
 mip6_subnet_list_insert(ms_list, ms)
-     struct mip6_subnet_list *ms_list;
-     struct mip6_subnet *ms;
+	struct mip6_subnet_list *ms_list;
+	struct mip6_subnet *ms;
 {
 	if ((ms_list == NULL) || (ms == NULL)) {
 		return (EINVAL);
@@ -178,8 +178,8 @@ mip6_subnet_list_insert(ms_list, ms)
 
 int
 mip6_subnet_list_remove(ms_list, ms)
-     struct mip6_subnet_list *ms_list;
-     struct mip6_subnet *ms;
+	struct mip6_subnet_list *ms_list;
+	struct mip6_subnet *ms;
 {
 	int error = 0;
 
@@ -195,9 +195,9 @@ mip6_subnet_list_remove(ms_list, ms)
 
 struct mip6_subnet *
 mip6_subnet_list_find_withprefix(ms_list, prefix, prefixlen)
-     struct mip6_subnet_list *ms_list;
-     struct in6_addr *prefix;
-     u_int8_t prefixlen;
+	struct mip6_subnet_list *ms_list;
+	struct in6_addr *prefix;
+	u_int8_t prefixlen;
 {
 	struct mip6_subnet *ms;
 	struct mip6_subnet_prefix *mspfx;
@@ -224,8 +224,8 @@ mip6_subnet_list_find_withprefix(ms_list, prefix, prefixlen)
 
 struct mip6_subnet *
 mip6_subnet_list_find_withhaaddr(ms_list, haaddr)
-     struct mip6_subnet_list *ms_list;
-     struct in6_addr *haaddr;
+	struct mip6_subnet_list *ms_list;
+	struct in6_addr *haaddr;
 {
 	struct mip6_subnet *ms;
 	struct mip6_subnet_ha *msha;
@@ -249,7 +249,7 @@ mip6_subnet_list_find_withhaaddr(ms_list, haaddr)
 
 struct mip6_subnet_prefix *
 mip6_subnet_prefix_create(mpfx)
-     struct mip6_prefix *mpfx;
+	struct mip6_prefix *mpfx;
 {
 	struct mip6_subnet_prefix *mspfx;
 
@@ -269,8 +269,8 @@ mip6_subnet_prefix_create(mpfx)
 
 int
 mip6_subnet_prefix_list_insert(mspfx_list, mspfx)
-     struct mip6_subnet_prefix_list *mspfx_list;
-     struct mip6_subnet_prefix *mspfx;
+	struct mip6_subnet_prefix_list *mspfx_list;
+	struct mip6_subnet_prefix *mspfx;
 {
 	if ((mspfx_list == NULL) || (mspfx == NULL)) {
 		return (EINVAL);
@@ -283,8 +283,8 @@ mip6_subnet_prefix_list_insert(mspfx_list, mspfx)
 
 int
 mip6_subnet_prefix_list_remove(mspfx_list, mspfx)
-     struct mip6_subnet_prefix_list *mspfx_list;
-     struct mip6_subnet_prefix *mspfx;
+	struct mip6_subnet_prefix_list *mspfx_list;
+	struct mip6_subnet_prefix *mspfx;
 {
 	int error = 0;
 
@@ -305,8 +305,8 @@ mip6_subnet_prefix_list_remove(mspfx_list, mspfx)
 
 struct mip6_subnet_prefix *
 mip6_subnet_prefix_list_find_withmpfx(mspfx_list, mpfx)
-     struct mip6_subnet_prefix_list *mspfx_list;
-     struct mip6_prefix *mpfx;
+	struct mip6_subnet_prefix_list *mspfx_list;
+	struct mip6_prefix *mpfx;
 {
 	struct mip6_subnet_prefix *mspfx;
 
@@ -328,9 +328,9 @@ mip6_subnet_prefix_list_find_withmpfx(mspfx_list, mpfx)
 
 struct mip6_subnet_prefix *
 mip6_subnet_prefix_list_find_withprefix(mspfx_list, prefix, prefixlen)
-     struct mip6_subnet_prefix_list *mspfx_list;
-     struct in6_addr *prefix;
-     u_int8_t prefixlen;
+	struct mip6_subnet_prefix_list *mspfx_list;
+	struct in6_addr *prefix;
+	u_int8_t prefixlen;
 {
 	struct mip6_subnet_prefix *mspfx;
 	struct mip6_prefix *mpfx;
@@ -364,7 +364,7 @@ mip6_subnet_prefix_list_find_withprefix(mspfx_list, prefix, prefixlen)
 
 struct mip6_subnet_ha *
 mip6_subnet_ha_create(mha)
-     struct mip6_ha *mha;
+	struct mip6_ha *mha;
 {
 	struct mip6_subnet_ha *msha;
 
@@ -384,8 +384,8 @@ mip6_subnet_ha_create(mha)
 
 int
 mip6_subnet_ha_list_insert(msha_list, msha)
-     struct mip6_subnet_ha_list *msha_list;
-     struct mip6_subnet_ha *msha;
+	struct mip6_subnet_ha_list *msha_list;
+	struct mip6_subnet_ha *msha;
 {
 	if ((msha_list == NULL) || (msha == NULL)) {
 		return (EINVAL);
@@ -402,7 +402,7 @@ mip6_subnet_ha_list_insert(msha_list, msha)
  */
 struct mip6_subnet_ha *
 mip6_subnet_ha_list_find_preferable(msha_list)
-     struct mip6_subnet_ha_list *msha_list;
+	struct mip6_subnet_ha_list *msha_list;
 {
 	struct mip6_subnet_ha *msha;
 	struct mip6_ha *mha;
@@ -426,8 +426,8 @@ mip6_subnet_ha_list_find_preferable(msha_list)
 
 struct mip6_subnet_ha *
 mip6_subnet_ha_list_find_withmha(msha_list, mha)
-     struct mip6_subnet_ha_list *msha_list;
-     struct mip6_ha *mha;
+	struct mip6_subnet_ha_list *msha_list;
+	struct mip6_ha *mha;
 {
 	struct mip6_subnet_ha *msha;
 
@@ -449,8 +449,8 @@ mip6_subnet_ha_list_find_withmha(msha_list, mha)
 
 struct mip6_subnet_ha *
 mip6_subnet_ha_list_find_withhaaddr(msha_list, haaddr)
-     struct mip6_subnet_ha_list *msha_list;
-     struct in6_addr *haaddr;
+	struct mip6_subnet_ha_list *msha_list;
+	struct in6_addr *haaddr;
 {
 	struct mip6_subnet_ha *msha;
 	struct mip6_ha *mha;

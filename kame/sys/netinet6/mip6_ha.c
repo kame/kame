@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.23 2001/09/05 02:33:08 keiichi Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.24 2001/09/12 10:58:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -91,11 +91,11 @@ mip6_ha_init()
 
 struct mip6_ha *
 mip6_ha_create(lladdr, gaddr, flags, pref, lifetime)
-     struct in6_addr *lladdr;
-     struct in6_addr *gaddr;
-     u_int8_t flags;
-     int16_t pref;
-     int32_t lifetime;
+	struct in6_addr *lladdr;
+	struct in6_addr *gaddr;
+	u_int8_t flags;
+	int16_t pref;
+	int32_t lifetime;
 {
 	struct mip6_ha *mha = NULL;
 
@@ -120,7 +120,7 @@ mip6_ha_create(lladdr, gaddr, flags, pref, lifetime)
 
 void
 mip6_ha_print(mha)
-     struct mip6_ha *mha;
+	struct mip6_ha *mha;
 {
 	if (mip6_config.mcfg_debug) {
 		printf("lladdr   %s\n", ip6_sprintf(&mha->mha_lladdr));
@@ -133,8 +133,8 @@ mip6_ha_print(mha)
 
 int
 mip6_ha_list_insert(mha_list, mha)
-     struct mip6_ha_list *mha_list;
-     struct mip6_ha *mha;
+	struct mip6_ha_list *mha_list;
+	struct mip6_ha *mha;
 {
 	if ((mha_list == NULL) || (mha == NULL)) {
 		return (EINVAL);
@@ -154,8 +154,8 @@ mip6_ha_list_insert(mha_list, mha)
 
 int
 mip6_ha_list_remove(mha_list, mha)
-     struct mip6_ha_list *mha_list;
-     struct mip6_ha *mha;
+	struct mip6_ha_list *mha_list;
+	struct mip6_ha *mha;
 {
 	struct mip6_subnet *ms;
 	struct mip6_subnet_ha *msha;
@@ -193,9 +193,9 @@ mip6_ha_list_remove(mha_list, mha)
 
 int
 mip6_ha_list_update_hainfo(mha_list, dr, hai)
-     struct mip6_ha_list *mha_list;
-     struct nd_defrouter *dr;
-     struct nd_opt_homeagent_info *hai;
+	struct mip6_ha_list *mha_list;
+	struct nd_defrouter *dr;
+	struct nd_opt_homeagent_info *hai;
 {
 	int16_t pref = 0;
 	u_int16_t lifetime = dr->rtlifetime;
@@ -237,9 +237,9 @@ mip6_ha_list_update_hainfo(mha_list, dr, hai)
 
 int
 mip6_ha_list_update_withndpr(mha_list, addr, ndpr)
-     struct mip6_ha_list *mha_list;
-     struct in6_addr *addr;
-     struct nd_prefix *ndpr;
+	struct mip6_ha_list *mha_list;
+	struct in6_addr *addr;
+	struct nd_prefix *ndpr;
 {
 	struct mip6_ha *mha;
 
@@ -254,8 +254,8 @@ mip6_ha_list_update_withndpr(mha_list, addr, ndpr)
 
 struct mip6_ha *
 mip6_ha_list_find_withaddr(mha_list, addr)
-     struct mip6_ha_list *mha_list;
-     struct in6_addr *addr;
+	struct mip6_ha_list *mha_list;
+	struct in6_addr *addr;
 {
 	struct mip6_ha *mha, *match = NULL;
 
@@ -278,7 +278,7 @@ mip6_ha_list_find_withaddr(mha_list, addr)
 
 static void
 mip6_ha_timeout(dummy)
-     void *dummy;
+	void *dummy;
 {
 	struct mip6_ha *mha, *mha_next;
 	struct hif_softc *sc;

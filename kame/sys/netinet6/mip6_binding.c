@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.10 2001/09/11 11:25:10 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.11 2001/09/12 10:58:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -141,8 +141,8 @@ mip6_bu_init()
  */
 struct mip6_bu *
 mip6_bu_list_find_withpaddr(bu_list, paddr)
-     struct mip6_bu_list *bu_list;
-     struct in6_addr *paddr;
+	struct mip6_bu_list *bu_list;
+	struct in6_addr *paddr;
 {
 	struct mip6_bu *mbu;
 
@@ -171,11 +171,11 @@ mip6_bu_list_find_withhaddr(bu_list, haddr)
 
 struct mip6_bu *
 mip6_bu_create(paddr, mpfx, coa, flags, sc)
-     struct in6_addr *paddr;
-     struct mip6_prefix *mpfx;
-     struct in6_addr *coa;
-     u_int16_t flags;
-     struct hif_softc *sc;
+	struct in6_addr *paddr;
+	struct mip6_prefix *mpfx;
+	struct in6_addr *coa;
+	u_int16_t flags;
+	struct hif_softc *sc;
 {
 	struct mip6_bu *mbu;
 	u_int32_t coa_lifetime;
@@ -225,7 +225,7 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
  */
 int
 mip6_home_registration(sc)
-     struct hif_softc *sc;
+	struct hif_softc *sc;
 {
 	struct hif_subnet *hs;
 	struct mip6_subnet *ms;
@@ -357,7 +357,7 @@ mip6_home_registration(sc)
 
 static int
 mip6_bu_list_notify_binding_change(sc)
-     struct hif_softc *sc;
+	struct hif_softc *sc;
 {
 	struct mip6_prefix *mpfx;
 	struct mip6_bu *mbu, *mbu_next;
@@ -455,7 +455,7 @@ mip6_bu_stoptimer()
 
 static void
 mip6_bu_timeout(arg)
-     void *arg;
+	void *arg;
 {
 	int s;
 	struct hif_softc *sc;
@@ -558,7 +558,7 @@ mip6_bu_timeout(arg)
  */
 static int
 mip6_bu_send_bu(mbu)
-     struct mip6_bu *mbu;
+	struct mip6_bu *mbu;
 {
 	struct mbuf *m;
 	int error = 0;
@@ -583,8 +583,8 @@ mip6_bu_send_bu(mbu)
 
 int
 mip6_bu_list_insert(bu_list, mbu)
-     struct mip6_bu_list *bu_list;
-     struct mip6_bu *mbu;
+	struct mip6_bu_list *bu_list;
+	struct mip6_bu *mbu;
 {
 	LIST_INSERT_HEAD(bu_list, mbu, mbu_entry);
 
@@ -595,8 +595,8 @@ mip6_bu_list_insert(bu_list, mbu)
 
 static int
 mip6_bu_list_remove(mbu_list, mbu)
-     struct mip6_bu_list *mbu_list;
-     struct mip6_bu *mbu;
+	struct mip6_bu_list *mbu_list;
+	struct mip6_bu *mbu;
 {
 	struct hif_softc *sc;
 	int empty = 1;
@@ -630,7 +630,7 @@ mip6_bu_list_remove(mbu_list, mbu)
 
 static int
 mip6_bu_list_remove_all(mbu_list)
-     struct mip6_bu_list *mbu_list;
+	struct mip6_bu_list *mbu_list;
 {
 	struct mip6_bu *mbu, *mbu_next;
 	int error = 0;
@@ -662,8 +662,8 @@ mip6_bu_list_remove_all(mbu_list)
  */
 int
 mip6_validate_bu(m, opt)
-     struct mbuf *m;
-     u_int8_t *opt;
+	struct mbuf *m;
+	u_int8_t *opt;
 {
 	struct ip6_hdr *ip6;
 	struct mbuf *n;
@@ -758,8 +758,8 @@ mip6_validate_bu(m, opt)
  */
 int
 mip6_process_bu(m, opt)
-     struct mbuf *m;
-     u_int8_t *opt;
+	struct mbuf *m;
+	u_int8_t *opt;
 {
 	struct ip6_hdr *ip6;
 	struct mbuf *n;
@@ -910,12 +910,12 @@ mip6_process_bu(m, opt)
 
 int
 mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
-     struct in6_addr *haddr0;
-     struct in6_addr *coa;
-     struct ip6_opt_binding_update *bu_opt;
-     u_int8_t seqno;
-     u_int32_t lifetime;
-     struct in6_addr *haaddr;
+	struct in6_addr *haddr0;
+	struct in6_addr *coa;
+	struct ip6_opt_binding_update *bu_opt;
+	u_int8_t seqno;
+	u_int32_t lifetime;
+	struct in6_addr *haaddr;
 {
 	u_int8_t prefixlen;
 	struct mip6_bc *mbc, *mbc_next;
@@ -1020,9 +1020,9 @@ mip6_process_hurbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 
 int
 mip6_are_ifid_equal(addr1, addr2, prefixlen)
-     struct in6_addr *addr1;
-     struct in6_addr *addr2;
-     u_int8_t prefixlen;
+	struct in6_addr *addr1;
+	struct in6_addr *addr2;
+	u_int8_t prefixlen;
 {
 	int bytelen, bitlen;
 	u_int8_t mask;
@@ -1056,12 +1056,12 @@ mip6_are_ifid_equal(addr1, addr2, prefixlen)
 
 int
 mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
-     struct in6_addr *haddr0;
-     struct in6_addr *coa;
-     struct ip6_opt_binding_update *bu_opt;
-     u_int8_t seqno;
-     u_int32_t lifetime;
-     struct in6_addr *haaddr;
+	struct in6_addr *haddr0;
+	struct in6_addr *coa;
+	struct ip6_opt_binding_update *bu_opt;
+	u_int8_t seqno;
+	u_int32_t lifetime;
+	struct in6_addr *haaddr;
 {
 	struct nd_prefix *pr;
 	struct in6_addr haddr;
@@ -1228,13 +1228,13 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 
 int
 mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
-     struct in6_addr *src;
-     struct in6_addr *dst;
-     struct in6_addr *dstcoa;
-     u_int8_t status;
-     u_int8_t seqno;
-     u_int32_t lifetime;
-     u_int32_t refresh;
+	struct in6_addr *src;
+	struct in6_addr *dst;
+	struct in6_addr *dstcoa;
+	u_int8_t status;
+	u_int8_t seqno;
+	u_int32_t lifetime;
+	u_int32_t refresh;
 {
 	struct mbuf *m;
 	struct ip6_pktopts opt;
@@ -1275,9 +1275,9 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 
 int
 mip6_bc_proxy_control(target, local, cmd)
-     struct in6_addr *target;
-     struct in6_addr *local;
-     int cmd;
+	struct in6_addr *target;
+	struct in6_addr *local;
+	int cmd;
 {
 	struct sockaddr_in6 mask; /* = {sizeof(mask), AF_INET6 } */
 	struct sockaddr_in6 sa6;
@@ -1426,7 +1426,7 @@ mip6_bc_proxy_control(target, local, cmd)
  */
 int
 mip6_ifa_need_dad(ia)
-     struct in6_ifaddr *ia;
+	struct in6_ifaddr *ia;
 {
 	struct hif_softc *sc = NULL;
 	struct mip6_bu *mbu = NULL;
@@ -1449,7 +1449,7 @@ if(mbu)	mip6_bu_print(mbu);
 #ifdef MIP6_DEBUG
 void
 mip6_bu_print(mbu)
-     struct mip6_bu *mbu;
+	struct mip6_bu *mbu;
 {
 	printf("paddr      %s\n", ip6_sprintf(&mbu->mbu_paddr));
 	printf("haddr      %s\n", ip6_sprintf(&mbu->mbu_haddr));
@@ -1480,8 +1480,8 @@ mip6_bu_print(mbu)
  */
 int
 mip6_validate_ba(m, opt)
-     struct mbuf *m;
-     u_int8_t *opt;
+	struct mbuf *m;
+	u_int8_t *opt;
 {
 	struct ip6_hdr *ip6;
 	struct ip6_opt_binding_ack *ba_opt;
@@ -1554,8 +1554,8 @@ mip6_validate_ba(m, opt)
  */
 int
 mip6_process_ba(m, opt)
-     struct mbuf *m;
-     u_int8_t *opt;
+	struct mbuf *m;
+	u_int8_t *opt;
 {
 	struct ip6_hdr *ip6;
 	struct hif_softc *sc;
@@ -1691,8 +1691,8 @@ mip6_process_ba(m, opt)
  */
 int
 mip6_validate_br(m, opt)
-     struct mbuf *m;
-     u_int8_t *opt;
+	struct mbuf *m;
+	u_int8_t *opt;
 {
 	/* XXX */
 	return (0);
@@ -1700,8 +1700,8 @@ mip6_validate_br(m, opt)
 
 int
 mip6_process_br(m, opt)
-     struct mbuf *m;
-     u_int8_t *opt;
+	struct mbuf *m;
+	u_int8_t *opt;
 {
 	struct ip6_hdr *ip6;
 	struct ip6_opt_binding_request *br_opt;
@@ -1759,13 +1759,13 @@ mip6_bc_init()
 
 static struct mip6_bc *
 mip6_bc_create(phaddr, pcoa, addr, flags, prefixlen, seqno, lifetime)
-     struct in6_addr *phaddr;
-     struct in6_addr *pcoa;
-     struct in6_addr *addr;
-     u_int8_t flags;
-     u_int8_t prefixlen;
-     u_int8_t seqno;
-     u_int32_t lifetime;
+	struct in6_addr *phaddr;
+	struct in6_addr *pcoa;
+	struct in6_addr *addr;
+	u_int8_t flags;
+	u_int8_t prefixlen;
+	u_int8_t seqno;
+	u_int32_t lifetime;
 {
 	struct mip6_bc *mbc;
 
@@ -1794,8 +1794,8 @@ mip6_bc_create(phaddr, pcoa, addr, flags, prefixlen, seqno, lifetime)
 
 static int
 mip6_bc_list_insert(mbc_list, mbc)
-     struct mip6_bc_list *mbc_list;
-     struct mip6_bc *mbc;
+	struct mip6_bc_list *mbc_list;
+	struct mip6_bc *mbc;
 {
 	LIST_INSERT_HEAD(mbc_list, mbc, mbc_entry);
 
@@ -1811,8 +1811,8 @@ mip6_bc_list_insert(mbc_list, mbc)
 
 int
 mip6_bc_list_remove(mbc_list, mbc)
-     struct mip6_bc_list *mbc_list;
-     struct mip6_bc *mbc;
+	struct mip6_bc_list *mbc_list;
+	struct mip6_bc *mbc;
 {
 	LIST_REMOVE(mbc, mbc_entry);
 	FREE(mbc, M_TEMP);
@@ -1829,8 +1829,8 @@ mip6_bc_list_remove(mbc_list, mbc)
 
 struct mip6_bc *
 mip6_bc_list_find_withphaddr(mbc_list, haddr)
-     struct mip6_bc_list *mbc_list;
-     struct in6_addr *haddr;
+	struct mip6_bc_list *mbc_list;
+	struct in6_addr *haddr;
 {
 	struct mip6_bc *mbc;
 
@@ -1845,8 +1845,8 @@ mip6_bc_list_find_withphaddr(mbc_list, haddr)
 
 struct mip6_bc *
 mip6_bc_list_find_withcoa(mbc_list, pcoa)
-     struct mip6_bc_list *mbc_list;
-     struct in6_addr *pcoa;
+	struct mip6_bc_list *mbc_list;
+	struct in6_addr *pcoa;
 {
 	struct mip6_bc *mbc;
 
@@ -1861,7 +1861,7 @@ mip6_bc_list_find_withcoa(mbc_list, pcoa)
 
 static void
 mip6_bc_timeout(dummy)
-     void *dummy;
+	void *dummy;
 {
 	int s;
 	struct mip6_bc *mbc, *mbc_next;
@@ -1926,10 +1926,10 @@ static void mip6_bc_starttimer(void)
  */
 static int
 mip6_tunnel_control(action, entry, func, ep)
-     int action;
-     void *entry;
-     int (*func) __P((const struct mbuf *, int, int, void *));
-     const struct encaptab **ep;
+	int action;
+	void *entry;
+	int (*func) __P((const struct mbuf *, int, int, void *));
+	const struct encaptab **ep;
 {
 	if ((entry == NULL) || (ep == NULL)) {
 		return (EINVAL);
@@ -1957,10 +1957,10 @@ mip6_tunnel_control(action, entry, func, ep)
 
 static int
 mip6_bu_encapcheck(m, off, proto, arg)
-     const struct mbuf *m;
-     int off;
-     int proto;
-     void *arg;
+	const struct mbuf *m;
+	int off;
+	int proto;
+	void *arg;
 {
 	struct ip6_hdr *ip6;
 	struct mip6_bu *mbu = (struct mip6_bu *)arg;
@@ -2054,10 +2054,10 @@ mip6_bu_encapcheck(m, off, proto, arg)
 
 static int
 mip6_bc_encapcheck(m, off, proto, arg)
-     const struct mbuf *m;
-     int off;
-     int proto;
-     void *arg;
+	const struct mbuf *m;
+	int off;
+	int proto;
+	void *arg;
 {
 	struct ip6_hdr *ip6;
 	struct mip6_bc *mbc = (struct mip6_bc *)arg;
@@ -2094,8 +2094,8 @@ mip6_bc_encapcheck(m, off, proto, arg)
  */
 int
 mip6_tunnel_input(mp, offp, proto)
-     struct mbuf **mp;
-     int *offp, proto;
+	struct mbuf **mp;
+	int *offp, proto;
 {
 	struct mbuf *m = *mp;
 	struct ip6_hdr *ip6;
@@ -2157,8 +2157,8 @@ mip6_tunnel_input(mp, offp, proto)
  */
 int
 mip6_tunnel_output(mp, mbc)
-     struct mbuf **mp;
-     struct mip6_bc *mbc;
+	struct mbuf **mp;
+	struct mip6_bc *mbc;
 {
 	struct sockaddr_in6 dst;
 	const struct encaptab *ep = mbc->mbc_encap;
@@ -2263,7 +2263,7 @@ mip6_tunnel_output(mp, mbc)
  */
 int
 mip6_route_optimize(m)
-     struct mbuf *m;
+	struct mbuf *m;
 {
 	struct ip6_hdr *ip6;
 	struct mip6_prefix *mpfx;
