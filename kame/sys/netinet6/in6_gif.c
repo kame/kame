@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.96 2002/02/20 14:34:00 jinmei Exp $	*/
+/*	$KAME: in6_gif.c,v 1.97 2002/05/30 04:12:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -131,7 +131,6 @@ in6_gif_output(ifp, family, m)
 	int error;
 	int hlen, poff;
 	struct mbuf *mp;
-	long time_second;
 
 	if (sin6_src == NULL || sin6_dst == NULL ||
 	    sin6_src->sin6_family != AF_INET6 ||
@@ -219,8 +218,7 @@ in6_gif_output(ifp, family, m)
 	 * are made in in6_selectsrc() called from ip6_output().
 	 */
 	if (sc->gif_ro6.ro_rt && (dst->sin6_family != sin6_dst->sin6_family ||
-				  sc->rtcache_expire == 0 ||
-				  time_second >= sc->rtcache_expire)) {
+	    sc->rtcache_expire == 0 || mono_time.tv_sec >= sc->rtcache_expire)) {
 		RTFREE(sc->gif_ro6.ro_rt);
 		sc->gif_ro6.ro_rt = NULL;
 	}
@@ -240,8 +238,8 @@ in6_gif_output(ifp, family, m)
 	error = ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL);
 #endif
 
-	if (sc->gif_ro6.ro_rt && time_second >= sc->rtcache_expire)
-		sc->rtcache_expire = time_second + in6_gif_rtcachettl;
+	if (sc->gif_ro6.ro_rt && mono_time.tv_sec >= sc->rtcache_expire)
+		sc->rtcache_expire = mono_time.tv_sec + in6_gif_rtcachettl;
 
 	return(error);
 #else	/* !__OpenBSD__ */
@@ -252,8 +250,8 @@ in6_gif_output(ifp, family, m)
 	struct ip6_hdr *ip6;
 	int proto, error;
 	u_int8_t itos, otos;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	struct timeval mono_time;
 #endif
 
 	if (sin6_src == NULL || sin6_dst == NULL ||
@@ -337,16 +335,15 @@ in6_gif_output(ifp, family, m)
 	ip6->ip6_flow &= ~ntohl(0xff00000);
 	ip6->ip6_flow |= htonl((u_int32_t)otos << 20);
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	time_second = time.tv_sec;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	microtime(&mono_time);
 #endif
 	/*
 	 * compare address family just for safety.  other validity checks
 	 * are made in in6_selectsrc() called from ip6_output().
 	 */
 	if (sc->gif_ro6.ro_rt && (dst->sin6_family != sin6_dst->sin6_family ||
-				  sc->rtcache_expire == 0 ||
-				  time_second >= sc->rtcache_expire)) {
+	    sc->rtcache_expire == 0 || mono_time.tv_sec >= sc->rtcache_expire)) {
 		/*
 		 * If the cached route is not valid or has expired,
 		 * clear the stale cache and let ip6_output make a new cached
@@ -375,8 +372,8 @@ in6_gif_output(ifp, family, m)
 	 * if a (new) cached route has been created in ip6_output(), extend
 	 * the expiration time.
 	 */
-	if (sc->gif_ro6.ro_rt && time_second >= sc->rtcache_expire)
-		sc->rtcache_expire = time_second + in6_gif_rtcachettl;
+	if (sc->gif_ro6.ro_rt && mono_time.tv_sec >= sc->rtcache_expire)
+		sc->rtcache_expire = mono_time.tv_sec + in6_gif_rtcachettl;
 
 	return(error);
 #endif	/* __OpenBSD__ */
