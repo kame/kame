@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.184 2001/01/23 15:23:35 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.185 2001/02/06 03:35:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1544,10 +1544,10 @@ ni6_input(m, off)
 	M_COPY_PKTHDR(n, m); /* just for recvif */
 	if (replylen > MHLEN) {
 		if (replylen > MCLBYTES) {
-			 /*
-			  * XXX: should we try to allocate more? But MCLBYTES
-			  * is probably much larger than IPV6_MMTU...
-			  */
+			/*
+			 * XXX: should we try to allocate more? But MCLBYTES
+			 * is probably much larger than IPV6_MMTU...
+			 */
 			goto bad;
 		}
 		MCLGET(n, M_DONTWAIT);
@@ -1858,18 +1858,15 @@ ni6_addrs(ni6, m, ifpp, subj)
 			/* What do we have to do about ::1? */
 			switch(in6_addrscope(&ifa6->ia_addr.sin6_addr)) {
 			case IPV6_ADDR_SCOPE_LINKLOCAL:
-				if ((niflags & NI_NODEADDR_FLAG_LINKLOCAL)
-				    == 0)
+				if ((niflags & NI_NODEADDR_FLAG_LINKLOCAL) == 0)
 					continue;
 				break;
 			case IPV6_ADDR_SCOPE_SITELOCAL:
-				if ((niflags & NI_NODEADDR_FLAG_SITELOCAL)
-				    == 0)
+				if ((niflags & NI_NODEADDR_FLAG_SITELOCAL) == 0)
 					continue;
 				break;
 			case IPV6_ADDR_SCOPE_GLOBAL:
-				if ((niflags & NI_NODEADDR_FLAG_GLOBAL)
-				    == 0)
+				if ((niflags & NI_NODEADDR_FLAG_GLOBAL) == 0)
 					continue;
 				break;
 			default:
@@ -1961,18 +1958,15 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 			/* What do we have to do about ::1? */
 			switch(in6_addrscope(&ifa6->ia_addr.sin6_addr)) {
 			case IPV6_ADDR_SCOPE_LINKLOCAL:
-				if ((niflags & NI_NODEADDR_FLAG_LINKLOCAL)
-				    == 0)
+				if ((niflags & NI_NODEADDR_FLAG_LINKLOCAL) == 0)
 					continue;
 				break;
 			case IPV6_ADDR_SCOPE_SITELOCAL:
-				if ((niflags & NI_NODEADDR_FLAG_SITELOCAL)
-				    == 0)
+				if ((niflags & NI_NODEADDR_FLAG_SITELOCAL) == 0)
 					continue;
 				break;
 			case IPV6_ADDR_SCOPE_GLOBAL:
-				if ((niflags & NI_NODEADDR_FLAG_GLOBAL)
-				    == 0)
+				if ((niflags & NI_NODEADDR_FLAG_GLOBAL) == 0)
 					continue;
 				break;
 			default:
