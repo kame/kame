@@ -255,8 +255,12 @@ main_listen_accept()
      */
     if (bgpyes &&
 	FD_ISSET(bgpsock, &currentmask)) {
-      /* purge ancillary data on the listening socket */
-      if (read(bgpsock, NULL, 0) < 0)
+      int alen;
+
+      /* purge ancillary data (if any) on the listening socket */
+      if (ioctl(bgpsock, FIONREAD, &alen) <0)/* XXX is there a smarter way? */
+	fatal("<main_listen_accept>: ioctl(FIONREAD)");
+      if (alen > 0 && read(bgpsock, NULL, 0) < 0)
 	fatal("<main_listen_accept>: read on the listening socket");
 
       /*
