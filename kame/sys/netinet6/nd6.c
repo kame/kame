@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.100 2001/02/03 19:19:52 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.101 2001/02/03 19:35:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -746,12 +746,13 @@ regen_tmpaddr(ia6)
 
 		/*
 		 * Now we are looking at an autoconf address with the same
-		 * prefix as ours.  If the address is temporary and is
-		 * still preferred (such cases would be rare, though), do not
-		 * create another one.
+		 * prefix as ours.  If the address is temporary and is still
+		 * still preferred, do not create another one.  It would be
+		 * rare, but could happen, for example, when we resume a
+		 * laptop PC from a long period.
 		 */
 		if ((it6->ia6_flags & IN6_IFF_TEMPORARY) != 0) {
-			if (ia6->ia6_lifetime.ia6t_preferred == 0 &&
+			if (ia6->ia6_lifetime.ia6t_preferred == 0 ||
 			    ia6->ia6_lifetime.ia6t_preferred > time_second) {
 				public_ifa6 = NULL;
 				break;
