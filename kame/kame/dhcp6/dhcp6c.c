@@ -549,7 +549,7 @@ client6_recvadvert(s, serv)
 	 */
 	memcpy(&solid, &dh6a->dh6adv_rsv_id, sizeof(solid));
 	if ((ntohs(solid) & DH6SOL_SOLICIT_ID_MASK) != current_solicit_id) {
-		dprintf((stderr, "client6_recvadvert: solicit ID mismatch"));
+		dprintf((stderr, "client6_recvadvert: solicit ID mismatch\n"));
 		return(-1);
 	}
 
@@ -559,7 +559,8 @@ client6_recvadvert(s, serv)
 	 * sent the Solicit message.
 	 */
 	if (!IN6_ARE_ADDR_EQUAL(&dh6a->dh6adv_cliaddr, &current_cliaddr)) {
-		dprintf((stderr, "client6_recvadvert: client address mismatch"));
+		dprintf((stderr,
+			 "client6_recvadvert: client address mismatch\n"));
 		return(-1);
 	}
 
@@ -714,7 +715,7 @@ client6_recvreply(s, serv)
 	 * used in our Request (or Release) message.
 	 */
 	if (serv->st_xid != ntohs(dh6r->dh6rep_xid)) {
-		dprintf((stderr, "client6_recvreply: XID mismatch"));
+		dprintf((stderr, "client6_recvreply: XID mismatch\n"));
 		return(-1);
 	}
 
@@ -725,7 +726,7 @@ client6_recvreply(s, serv)
 	 */
 	if (!IN6_ARE_ADDR_EQUAL(&dh6r->dh6rep_cliaddr, &serv->st_llcli)) {
 		dprintf((stderr,
-			 "client6_recvreply: client address mismatch"));
+			 "client6_recvreply: client address mismatch\n"));
 		return(-1);
 	}
 
@@ -741,7 +742,7 @@ client6_recvreply(s, serv)
 	 */
 	if ((dh6r->dh6rep_flagandstat & DH6REP_STATMASK) != 0) {
 		dprintf((stderr,
-			 "client6_recvreply: status indicates an error (%d)",
+			 "client6_recvreply: status indicates an error (%d)\n",
 			 dh6r->dh6rep_flagandstat & DH6REP_STATMASK));
 		return(-1);
 	}

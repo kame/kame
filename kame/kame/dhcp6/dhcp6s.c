@@ -456,7 +456,7 @@ server6_react_solicit(buf, siz, rcvpi)
 
 	if (if_indextoname(rcvpi->ipi6_ifindex, ifnam) == NULL) {
 		/* it should be impossible, so we might have to assert here */
-		dprintf((stderr, "if_nametoindex failed for ID %d",
+		dprintf((stderr, "if_nametoindex failed for ID %d\n",
 			 rcvpi->ipi6_ifindex));
 		return(-1);
 	}
@@ -489,7 +489,7 @@ server6_react_solicit(buf, siz, rcvpi)
 		if (IN6_IS_ADDR_LINKLOCAL(&dh6s->dh6sol_relayaddr) ||
 		    IN6_IS_ADDR_LOOPBACK(&dh6s->dh6sol_relayaddr)) {
 			dprintf((stderr,
-				 "react_solicit: bad relay address %s",
+				 "react_solicit: bad relay address %s\n",
 				 in6addr2str(&dh6s->dh6sol_relayaddr, 0)));
 			return(-1);
 		}
@@ -501,7 +501,7 @@ server6_react_solicit(buf, siz, rcvpi)
 		if (in6_scope(&dh6s->dh6sol_relayaddr) >
 		    in6_scope(&rcvpi->ipi6_addr)) {
 			dprintf((stderr,
-				 "react_solicit: bad relay address %s with dst %s",
+				 "react_solicit: bad relay address %s with dst %s\n",
 				 in6addr2str(&dh6s->dh6sol_relayaddr, 0),
 				 in6addr2str(&rcvpi->ipi6_addr, 0)));
 			return(-1);
@@ -522,7 +522,7 @@ server6_react_solicit(buf, siz, rcvpi)
 				    != 0) {
 					dprintf((stderr,
 						 "react_solicit: can't find "
-						 "server address for relay %s",
+						 "server address for relay %s\n",
 						 in6addr2str(&dh6a->dh6adv_relayaddr,
 							     0)));
 					return(-1);
@@ -533,7 +533,7 @@ server6_react_solicit(buf, siz, rcvpi)
 		if (getifaddr(&servaddr, ifnam, &link_local_prefix,
 			      LINK_LOCAL_PLEN, 0, IN6_IFF_INVALID) != 0) {
 			dprintf((stderr,
-				 "react_solicit: can't find link-local on %s",
+				 "react_solicit: can't find link-local on %s\n",
 				 ifnam));
 			/*
 			 * This situation should fairely serious.
@@ -549,7 +549,7 @@ server6_react_solicit(buf, siz, rcvpi)
 #endif
 	if ((dh6s->dh6sol_flags & DH6SOL_PREFIX) != 0) {
 		dprintf((stderr,
-			 "react_solicit: P bit is set, but not implemented"));
+			 "react_solicit: P bit is set, but not implemented\n"));
 		/* proceed anyway */
 	}
 
@@ -636,7 +636,7 @@ server6_react_request(buf, siz, rcvpi)
 
 	if (if_indextoname(rcvpi->ipi6_ifindex, ifnam) == NULL) {
 		/* it should be impossible, so we might have to assert here */
-		dprintf((stderr, "if_nametoindex failed for ID %d",
+		dprintf((stderr, "if_nametoindex failed for ID %d\n",
 			 rcvpi->ipi6_ifindex));
 		return(-1);
 	}
@@ -681,7 +681,7 @@ server6_react_request(buf, siz, rcvpi)
 		if (IN6_IS_ADDR_LINKLOCAL(&dh6r->dh6req_relayaddr) ||
 		    IN6_IS_ADDR_LOOPBACK(&dh6r->dh6req_relayaddr)) {
 			dprintf((stderr,
-				 "react_request: bad relay address %s",
+				 "react_request: bad relay address %s\n",
 				 in6addr2str(&dh6r->dh6req_relayaddr, 0)));
 			return(-1);
 		}
@@ -694,7 +694,7 @@ server6_react_request(buf, siz, rcvpi)
 		if (in6_scope(&dh6r->dh6req_relayaddr) >
 		    in6_scope(&rcvpi->ipi6_addr)) {
 			dprintf((stderr,
-				 "react_request: bad relay address %s with dst %s",
+				 "react_request: bad relay address %s with dst %s\n",
 				 in6addr2str(&dh6r->dh6req_relayaddr, 0),
 				 in6addr2str(&rcvpi->ipi6_addr, 0)));
 			return(-1);
@@ -705,7 +705,7 @@ server6_react_request(buf, siz, rcvpi)
 			      GLOBAL_PLEN, 0, IN6_IFF_INVALID) != 0) {
 			if (!IN6_IS_ADDR_SITELOCAL(&dh6r->dh6req_relayaddr)) {
 				dprintf((stderr,
-					 "react_request: relay has a too large scope: %s",
+					 "react_request: relay has a too large scope: %s\n",
 					 in6addr2str(&dh6r->dh6req_relayaddr, 0)));
 				return(-1);
 			}
@@ -713,7 +713,7 @@ server6_react_request(buf, siz, rcvpi)
 			if (getifaddr(&myaddr, ifnam, &site_local_prefix,
 				      SITE_LOCAL_PLEN, 0, IN6_IFF_INVALID) != 0) {
 				dprintf((stderr,
-					 "react_request: relay has a too large scope: %s",
+					 "react_request: relay has a too large scope: %s\n",
 					 in6addr2str(&dh6r->dh6req_relayaddr, 0)));
 				return(-1);
 			}
@@ -726,7 +726,7 @@ server6_react_request(buf, siz, rcvpi)
 	 * that do not appear in the ``extensions'' field.
 	 */
 	if ((dh6r->dh6req_flags & DH6REQ_CLOSE) != 0) {
-		dprintf((stderr, "react_request: C bit is set, but ignore it"));
+		dprintf((stderr, "react_request: C bit is set, but ignore it\n"));
 		/* proceed anyway */
 	}
 
@@ -737,7 +737,7 @@ server6_react_request(buf, siz, rcvpi)
 	 */
 	if ((dh6r->dh6req_flags & DH6REQ_REBOOT) != 0) {
 		dprintf((stderr,
-			 "react_request: C bit is set, but we have no cache"));
+			 "react_request: C bit is set, but we have no cache\n"));
 	}
 
 	/*
