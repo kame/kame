@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.101 2001/06/01 10:12:55 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.102 2001/07/09 13:46:48 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -1514,7 +1514,7 @@ expand_isakmpspec(prop_no, trns_no, types,
 		return -1;
 	}
 	new->prop_no = prop_no;
-	new->trns_no = trns_no;
+	new->trns_no = trns_no++;
 	new->lifetime = lifetime;
 	new->lifebyte = lifebyte;
 	new->enctype = types[algclass_isakmp_enc];
