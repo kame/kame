@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.279 2001/10/04 06:46:54 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.280 2001/10/05 08:07:53 karino Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -2129,7 +2129,7 @@ mobile-ip6 patch is available from the location shown bellow.
 
 Other implementations are also available.
 
-	NEC: http://www.6bone.nec.co.jp/mipv6/internal-dist/ (-13 draft)
+	NEC: http://www.6bone.nec.co.jp/mipv6/ (-13 draft)
 	SFC: http://neo.sfc.wide.ad.jp/~mip6/ (-13 draft)
 
 7. Routing table extensions
