@@ -551,7 +551,6 @@ in6_control(so, cmd, data, ifp)
 	 * Find address for this interface, if it exists.
 	 */
 	{
-
 		struct sockaddr_in6 *sa6 =
 			(struct sockaddr_in6 *)&ifra->ifra_addr;
 
@@ -561,10 +560,10 @@ in6_control(so, cmd, data, ifp)
 				sa6->sin6_addr.s6_addr16[1] =
 					htons(ifp->if_index);
 			}
-			else
-				if (sa6->sin6_addr.s6_addr16[1] !=
-				    htons(ifp->if_index))
-					return(EINVAL);	/* ifid is contradict */
+			else if (sa6->sin6_addr.s6_addr16[1] !=
+				    htons(ifp->if_index)) {
+				return(EINVAL);	/* ifid is contradict */
+			}
 			if (sa6->sin6_scope_id) {
 				if (sa6->sin6_scope_id !=
 				    (u_int32_t)ifp->if_index)
@@ -728,12 +727,11 @@ in6_control(so, cmd, data, ifp)
 				ia->ia_dstaddr.sin6_addr.s6_addr16[1]
 					= htons(ifp->if_index);
 			}
-			else
-				if (ia->ia_dstaddr.sin6_addr.s6_addr16[1] !=
+			else if (ia->ia_dstaddr.sin6_addr.s6_addr16[1] !=
 				    htons(ifp->if_index)) {
-					ia->ia_dstaddr = oldaddr;
-					return(EINVAL);	/* ifid is contradict */
-				}
+				ia->ia_dstaddr = oldaddr;
+				return(EINVAL);	/* ifid is contradict */
+			}
 		}
 
 		if (ifp->if_ioctl && (error = (ifp->if_ioctl)
@@ -813,6 +811,7 @@ in6_control(so, cmd, data, ifp)
 		if ((ifp->if_flags & IFF_POINTOPOINT) &&
 		    (ifra->ifra_dstaddr.sin6_family == AF_INET6)) {
 			in6_ifscrub(ifp, ia);
+			oldaddr = ia->ia_dstaddr;
 			ia->ia_dstaddr = ifra->ifra_dstaddr;
 			/* link-local index check: should be a separate function? */
 			if (IN6_IS_ADDR_LINKLOCAL(&ia->ia_dstaddr.sin6_addr)) {
@@ -823,13 +822,11 @@ in6_control(so, cmd, data, ifp)
 					 */
 					ia->ia_dstaddr.sin6_addr.s6_addr16[1]
 						= htons(ifp->if_index);
-				}
-				else
-					if (ia->ia_dstaddr.sin6_addr.s6_addr16[1] !=
+				} else if (ia->ia_dstaddr.sin6_addr.s6_addr16[1] !=
 					    htons(ifp->if_index)) {
-						ia->ia_dstaddr = oldaddr;
-						return(EINVAL);	/* ifid is contradict */
-					}
+					ia->ia_dstaddr = oldaddr;
+					return(EINVAL);	/* ifid is contradict */
+				}
 			}
 			prefixIsNew = 1; /* We lie; but effect's the same */
 		}
