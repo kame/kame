@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2171 2002/05/30 04:38:02 jinmei Exp $
+$KAME: CHANGELOG,v 1.2172 2002/05/30 04:57:28 jinmei Exp $
 
 <200205>
+2002-05-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_setmtu0): separated from
+	nd6_setmtu() to handle two different cases; interface (and its MTU)
+	initialization and changing the MTU of an interface.
+	This change also fixed a bug that could destroy kernel stack
+	(when changing the interface MTU by hand) introduced yesterday.
+
 2002-05-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: [dhcp6c] added an ability to specify the SLA
 	length in the configuration file.
