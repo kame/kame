@@ -1,4 +1,4 @@
-/*	$KAME: schedule.c,v 1.17 2001/10/08 23:42:35 sakane Exp $	*/
+/*	$KAME: schedule.c,v 1.18 2001/10/08 23:58:22 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -39,6 +39,8 @@
 #include <string.h>
 #include <errno.h>
 
+#include "misc.h"
+#include "plog.h"
 #include "schedule.h"
 #include "var.h"
 #include "gcmalloc.h"
@@ -195,6 +197,7 @@ sched_kill(sc)
 	return;
 }
 
+/* XXX this function is probably unnecessary. */
 void
 sched_scrub_param(param)
 	void *param;
@@ -202,8 +205,13 @@ sched_scrub_param(param)
 	struct sched *sc;
 
 	TAILQ_FOREACH(sc, &sctree, chain) {
-		if (sc->param == param)
+		if (sc->param == param) {
+			if (!sc->dead) {
+				plog(LLV_ERROR, LOCATION, NULL,
+					"insanity schedule found.\n");
+			}
 			sched_kill(sc);
+		}
 	}
 }
 
