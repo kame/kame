@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.27 2002/02/05 03:05:21 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.28 2002/02/05 03:10:24 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -66,7 +66,7 @@ struct cmsghdr *cmsgp = NULL;
 static int calc_opthlen __P((int));
 static void setopthdr __P((int, int, char *));
 static void usage __P((void));
-static int Pflag, mflag;
+static int Pflag, mflag, cflag;
 
 #ifndef IPV6_MINMTU
 #define IPV6_MINMTU 1280
@@ -107,8 +107,11 @@ main(argc, argv)
 		} \
 	} while (0)
 
-	while ((ch = getopt(argc, argv, "D:d:f:h:l:M:mn:Pp:s:t:v")) != -1)
+	while ((ch = getopt(argc, argv, "cD:d:f:h:l:M:mn:Pp:s:t:v")) != -1)
 		switch(ch) {
+		case 'c':
+			cflag++;
+			break;
 		case 'D':
 			STICKYCHECK;
 			if (sticky)
@@ -316,6 +319,12 @@ main(argc, argv)
 	    < 0)
 		err(1, "socket");
 
+	if (cflag && !isconnected) {
+		if (connect(s, res->ai_addr, res->ai_addrlen))
+			err(1, "connect");
+		isconnected++;
+	}
+
 	if (verbose) {
 		printf("default values of socket options: \n");
 		dump_localopt(s, socktype, proto);
@@ -475,9 +484,11 @@ main(argc, argv)
 		struct ip6_mtuinfo mtuinfo;
 		int optlen = sizeof(mtuinfo);
 
-		if (connect(s, res->ai_addr, res->ai_addrlen))
-			errx(1, "connect");
-		isconnected++;
+		if (!isconnected) {
+			if (connect(s, res->ai_addr, res->ai_addrlen))
+				errx(1, "connect");
+			isconnected++;
+		}
 		if (getsockopt(s, IPPROTO_IPV6, IPV6_PATHMTU, &mtuinfo,
 			       &optlen)) {
 			errx(1, "getsockopt(IPV6_PATHMTU)");
@@ -615,7 +626,8 @@ static void
 usage()
 {
 	fprintf(stderr,
-		"usage: sender [-d dstoptlen] [-d sticky sticky_dstoptlen]\n"
+		"usage: sender [-c] (connect socket)\n"
+		"              [-d dstoptlen] [-d sticky sticky_dstoptlen]\n"
 		"              [-D rhdstoptlen] [-D sticky sticky_rhdstoptlen]\n"
 		"              [-f [01]] [-f sticky [01]] (dontfrag flag)\n"
 		"              [-h hbhoptlen] [-h sticky sticky_hbhoptlen]\n"
