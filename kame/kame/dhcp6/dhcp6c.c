@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.158 2005/03/30 06:30:54 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.159 2005/03/30 06:33:11 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2141,7 +2141,8 @@ set_auth(ev, optinfo)
 		}
 
 		if (authparam->key == NULL) {
-			dprintf(LOG_INFO, FNAME, "no authentication for %s",
+			dprintf(LOG_INFO, FNAME,
+			    "no authentication key for %s",
 			    dhcp6_event_statestr(ev));
 			return (-1);
 		}
