@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.28 2000/07/04 11:42:07 jinmei Exp $	*/
+/*	$KAME: mip6.c,v 1.29 2000/07/04 11:48:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -1557,17 +1557,9 @@ mip6_add_ifaddr(struct in6_addr *addr,
 {
 	struct in6_aliasreq    *ifra, dummy;
 	struct sockaddr_in6    *sa6;
-	struct sockaddr_in6     oldaddr;
-	struct in6_ifaddr      *ia, *oia;
-	struct in6_addrlifetime *lt;
-	int	error = 0, hostIsNew, prefixIsNew;
+	struct in6_ifaddr      *ia;
+	int	error = 0;
 	int	s;
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	struct ifaddr *ifa;
-#endif
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	time_t time_second = (time_t)time.tv_sec;
-#endif
 
 	bzero(&dummy, sizeof(dummy));
 	ifra = &dummy;
@@ -1594,11 +1586,7 @@ mip6_add_ifaddr(struct in6_addr *addr,
 	if (ifp == 0)
 		return EOPNOTSUPP;
 
-	s = splnet();
-
-	/*
-	 * Code recycled from in6_control().
-	 */
+	s = splnet();		/* necessary? */
 
 	/*
 	 * Find address for this interface, if it exists.
@@ -1625,184 +1613,11 @@ mip6_add_ifaddr(struct in6_addr *addr,
 	}
  	ia = in6ifa_ifpwithaddr(ifp, &sa6->sin6_addr);
 
-	if (ia == 0) {
-		ia = (struct in6_ifaddr *)
-			malloc(sizeof(*ia), M_IFADDR, M_WAITOK);
-		if (ia == NULL) {
-			splx(s);
-			return (ENOBUFS);
-		}
-		bzero((caddr_t)ia, sizeof(*ia));
-		ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
-		ia->ia_ifa.ifa_dstaddr
-			= (struct sockaddr *)&ia->ia_dstaddr;
-		ia->ia_ifa.ifa_netmask
-			= (struct sockaddr *)&ia->ia_prefixmask;
-
-		ia->ia_ifp = ifp;
-		if ((oia = in6_ifaddr) != NULL) {
-			for ( ; oia->ia_next; oia = oia->ia_next)
-				continue;
-			oia->ia_next = ia;
-		} else
-			in6_ifaddr = ia;
-		/* gain a refcnt for the link from in6_ifaddr */
-		ia->ia_ifa.ifa_refcnt++;
-
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		if ((ifa = ifp->if_addrlist) != NULL) {
-			for ( ; ifa->ifa_next; ifa = ifa->ifa_next)
-				continue;
-			ifa->ifa_next = &ia->ia_ifa;
-		} else
-			ifp->if_addrlist = &ia->ia_ifa;
-#else
-		TAILQ_INSERT_TAIL(&ifp->if_addrlist, &ia->ia_ifa,
-				  ifa_list);
-#endif
-		/* gain another refcnt for the link from if_addrlist */
-		ia->ia_ifa.ifa_refcnt++;
-	}
-
-	/* sanity for overflow - beware unsigned */
-	lt = &ifra->ifra_lifetime;
-	if (lt->ia6t_vltime != ND6_INFINITE_LIFETIME
-	    && lt->ia6t_vltime + time_second < time_second) {
-		splx(s);
-		return EINVAL;
-	}
-	if (lt->ia6t_pltime != ND6_INFINITE_LIFETIME
-	    && lt->ia6t_pltime + time_second < time_second) {
-		splx(s);
-		return EINVAL;
-	}
-	prefixIsNew = 0;
-	hostIsNew = 1;
-
-	if (ifra->ifra_addr.sin6_len == 0) {
-		ifra->ifra_addr = ia->ia_addr;
-		hostIsNew = 0;
-	} else if (IN6_ARE_ADDR_EQUAL(&ifra->ifra_addr.sin6_addr,
-				      &ia->ia_addr.sin6_addr))
-		hostIsNew = 0;
-
-	if (ifra->ifra_prefixmask.sin6_len) {
-		in6_ifscrub(ifp, ia, 0); /* XXX */
-		ia->ia_prefixmask = ifra->ifra_prefixmask;
-		prefixIsNew = 1;
-	}
-	if ((ifp->if_flags & IFF_POINTOPOINT) &&
-	    (ifra->ifra_dstaddr.sin6_family == AF_INET6)) {
-		in6_ifscrub(ifp, ia, 0); /* XXX */
-		oldaddr = ia->ia_dstaddr;
-		ia->ia_dstaddr = ifra->ifra_dstaddr;
-		/* link-local index check: should be a separate function? */
-		if (IN6_IS_ADDR_LINKLOCAL(&ia->ia_dstaddr.sin6_addr)) {
-			if (ia->ia_dstaddr.sin6_addr.s6_addr16[1] == 0) {
-				/*
-				 * interface ID is not embedded by
-				 * the user
-				 */
-				ia->ia_dstaddr.sin6_addr.s6_addr16[1]
-					= htons(ifp->if_index);
-			} else if (ia->ia_dstaddr.sin6_addr.s6_addr16[1] !=
-				   htons(ifp->if_index)) {
-				ia->ia_dstaddr = oldaddr;
-				splx(s);
-				return(EINVAL);	/* ifid is contradict */
-			}
-		}
-		prefixIsNew = 1; /* We lie; but effect's the same */
-	}
-	if (ifra->ifra_addr.sin6_family == AF_INET6) {
-		error = in6_ifinit(ifp, ia, &ifra->ifra_addr,
-				   hostIsNew, prefixIsNew);
-		/* XXX: can we proceed even upon an error? */
-	}
-	if (ifra->ifra_addr.sin6_family == AF_INET6
-	    && hostIsNew && (ifp->if_flags & IFF_MULTICAST)) {
-		int error_local = 0;
-
-		/*
-		 * join solicited multicast addr for new host id
-		 */
-		struct in6_addr llsol;
-		bzero(&llsol, sizeof(struct in6_addr));
-		llsol.s6_addr16[0] = htons(0xff02);
-		llsol.s6_addr16[1] = htons(ifp->if_index);
-		llsol.s6_addr32[1] = 0;
-		llsol.s6_addr32[2] = htonl(1);
-		llsol.s6_addr32[3] =
-			ifra->ifra_addr.sin6_addr.s6_addr32[3];
-		llsol.s6_addr8[12] = 0xff;
-		(void)in6_addmulti(&llsol, ifp, &error_local);
-		if (error == 0)
-			error = error_local;
-	}
-
-	ia->ia6_flags = ifra->ifra_flags;
-	ia->ia6_flags &= ~IN6_IFF_DUPLICATED;	/*safety*/
-	ia->ia6_flags &= ~IN6_IFF_NODAD;	/* Mobile IPv6 */
-
-	ia->ia6_lifetime = ifra->ifra_lifetime;
-	/* for sanity */
-	if (ia->ia6_lifetime.ia6t_vltime != ND6_INFINITE_LIFETIME) {
-		ia->ia6_lifetime.ia6t_expire =
-			time_second + ia->ia6_lifetime.ia6t_vltime;
-	} else
-		ia->ia6_lifetime.ia6t_expire = 0;
-	if (ia->ia6_lifetime.ia6t_pltime != ND6_INFINITE_LIFETIME) {
-		ia->ia6_lifetime.ia6t_preferred =
-			time_second + ia->ia6_lifetime.ia6t_pltime;
-	} else
-		ia->ia6_lifetime.ia6t_preferred = 0;
-
-	/*
-	 * Perform DAD, if needed.
-	 * XXX It may be of use, if we can administratively
-	 * disable DAD.
-	 */
-	switch (ifp->if_type) {
-	case IFT_ARCNET:
-	case IFT_ETHER:
-	case IFT_FDDI:
-#if 0
-	case IFT_ATM:
-	case IFT_SLIP:
-	case IFT_PPP:
-#endif
-		/* Mobile IPv6 modification */
-		if ((ifra->ifra_flags & IN6_IFF_NODAD) == 0) {
-			ia->ia6_flags |= IN6_IFF_TENTATIVE;
-			nd6_dad_start((struct ifaddr *)ia, NULL);
-		}
-		break;
-	case IFT_DUMMY:
-	case IFT_FAITH:
-	case IFT_GIF:
-	case IFT_LOOP:
-	default:
-		break;
-	}
-
-	if (hostIsNew) {
-		int iilen;
-		int error_local = 0;
-
-		iilen = (sizeof(ia->ia_prefixmask.sin6_addr) << 3) -
-			in6_mask2len(&ia->ia_prefixmask.sin6_addr);
-		error_local = in6_prefix_add_ifid(iilen, ia);
-		if (error == 0)
-			error = error_local;
-	}
-
-    splx(s);
-    return error;
-
-
+	error = in6_update_ifa(ifp, ifra, ia);
+	
+	splx(s);
+	return error;
 }
-
-
 
 /*
  ******************************************************************************
