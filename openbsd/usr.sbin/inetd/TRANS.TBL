@@ -1,6 +1,0 @@
-D CVS                               	CVS
-F INETD.8                           	inetd.8
-F INETD.C                           	inetd.c
-F MAKEFILE                          	Makefile
-L OBJ                               	obj	/usr/obj/usr.sbin/inetd
-F PATHNAME.H                        	pathnames.h
