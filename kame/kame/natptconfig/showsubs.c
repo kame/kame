@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.23 2002/06/12 03:51:11 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.24 2002/06/19 06:23:48 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -461,20 +461,30 @@ appendPAddrXL6(struct logmsg *lmsg, struct pAddr *pad, int type, int inv)
 			appendpAddrXL6short(lmsg, &pad->in6src, pad->port[0]);
 			break;
 
-		default:
+		case XLATE_REGULAR:
 			appendpAddrXL6short(lmsg, &pad->in6src, pad->port[0]);
 			appendpAddrXL6short(lmsg, &pad->in6dst, pad->port[1]);
+			break;
+
+		default:
+			appendpAddrXL6long(lmsg, &pad->in6src, pad->port[0]);
+			appendpAddrXL6long(lmsg, &pad->in6dst, pad->port[1]);
 			break;
 		}
 	} else {
 		switch (type) {
 		case XLATE_SHORT:
-			appendpAddrXL6long(lmsg, &pad->in6dst, pad->port[1]);
+			appendpAddrXL6short(lmsg, &pad->in6dst, pad->port[1]);
+			break;
+
+		case XLATE_REGULAR:
+			appendpAddrXL6short(lmsg, &pad->in6dst, pad->port[1]);
+			appendpAddrXL6short(lmsg, &pad->in6src, pad->port[0]);
 			break;
 
 		default:
-			appendpAddrXL6short(lmsg, &pad->in6dst, pad->port[1]);
-			appendpAddrXL6short(lmsg, &pad->in6src, pad->port[0]);
+			appendpAddrXL6long(lmsg, &pad->in6dst, pad->port[1]);
+			appendpAddrXL6long(lmsg, &pad->in6src, pad->port[0]);
 			break;
 		}
 	}
@@ -489,7 +499,7 @@ appendpAddrXL6long(struct logmsg *lmsg, struct in6_addr *addr, u_short port)
 
 	inet_ntop(AF_INET6, addr, Bow, sizeof(Bow));
 	snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(port));
-	concat(lmsg, "%-45s", Wow);
+	concat(lmsg, "%-46s", Wow);
 }
 
 
