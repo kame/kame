@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.132 2004/09/30 09:42:53 suz Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.133 2004/09/30 10:05:18 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -709,14 +709,10 @@ ip6_mrouter_done()
 	/*
 	 * Reset register interface
 	 */
-	if (inet6domain.dom_ifdetach) {
-		ifp = &multicast_register_if;
-		if (ifp->if_afdata[AF_INET6])
-			inet6domain.dom_ifdetach(ifp, ifp->if_afdata[AF_INET6]);
-		ifp->if_afdata[AF_INET6] = NULL;
+	if (reg_mif_num != (mifi_t)-1) {
+		if_detach(&multicast_register_if);
+		reg_mif_num = (mifi_t)-1;
 	}
-	reg_mif_num = -1;
-
 	ip6_mrouter = NULL;
 	ip6_mrouter_ver = 0;
 
@@ -824,10 +820,7 @@ add_m6if(mifcp)
 			ifp->if_flags |= IFF_LOOPBACK;
 			ifp->if_index = mifcp->mif6c_mifi;
 			reg_mif_num = mifcp->mif6c_mifi;
-			if (inet6domain.dom_ifattach) {
-				ifp->if_afdata[AF_INET6]
-				    = inet6domain.dom_ifattach(ifp);
-			}
+			if_attach(ifp);
 		}
 
 	} /* if REGISTER */
@@ -914,14 +907,6 @@ del_m6if(mifip)
 	s = splnet();
 #endif
 
-	if ((mifp->m6_flags & MIFF_REGISTER) && reg_mif_num != (mifi_t) -1) {
-		reg_mif_num = -1;
-		if (inet6domain.dom_ifdetach) {
-			ifp = &multicast_register_if;
-			inet6domain.dom_ifdetach(ifp, ifp->if_afdata[AF_INET6]);
-			ifp->if_afdata[AF_INET6] = NULL;
-		}
-	}
 	if (!(mifp->m6_flags & MIFF_REGISTER)) {
 		/*
 		 * XXX: what if there is yet IPv4 multicast daemon
@@ -936,6 +921,11 @@ del_m6if(mifip)
 		ifr.ifr_addr.sin6_addr = in6addr_any;
 		(*ifp->if_ioctl)(ifp, SIOCDELMULTI, (caddr_t)&ifr);
 #endif
+	} else {
+		if (reg_mif_num != (mifi_t)-1) {
+			if_detach(&multicast_register_if);
+			reg_mif_num = (mifi_t)-1;
+		}
 	}
 
 #ifdef notyet
