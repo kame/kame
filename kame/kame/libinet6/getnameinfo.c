@@ -238,6 +238,13 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 			{
 				char scopebuf[MAXHOSTNAMELEN], *s;
 				int scopelen;
+				/*
+				 * the following constraint is imposed by
+				 * if_indextoname(), called in ip6_sa2str().
+				 */
+#if MAXHOSTNAMELEN < IF_NAMESIZE
+# error assumption failed (scopelen)
+#endif
 
 				if ((s = ip6_sa2str((struct sockaddr_in6 *)sa,
 					scopebuf, sizeof(scopebuf), 0)) == NULL)
