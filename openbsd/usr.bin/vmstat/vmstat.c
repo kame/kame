@@ -1,5 +1,5 @@
 /*	$NetBSD: vmstat.c,v 1.29.4.1 1996/06/05 00:21:05 cgd Exp $	*/
-/*	$OpenBSD: vmstat.c,v 1.26 1999/03/15 15:38:48 deraadt Exp $	*/
+/*	$OpenBSD: vmstat.c,v 1.34 1999/09/02 01:23:30 deraadt Exp $	*/
 
 /*
  * Copyright (c) 1980, 1986, 1991, 1993
@@ -76,11 +76,20 @@ static char rcsid[] = "$NetBSD: vmstat.c,v 1.29.4.1 1996/06/05 00:21:05 cgd Exp 
 #include <limits.h>
 #include "dkstats.h"
 
+#ifdef UVM
+#include <uvm/uvm_extern.h>
+#endif
+
 struct nlist namelist[] = {
 #define	X_CPTIME	0
 	{ "_cp_time" },
+#if defined(UVM)
+#define X_UVMEXP	1
+	{ "_uvmexp" },
+#else
 #define X_SUM		1
 	{ "_cnt" },
+#endif
 #define	X_BOOTTIME	2
 	{ "_boottime" },
 #define X_HZ		3
@@ -118,19 +127,11 @@ struct nlist namelist[] = {
 #else
 #define X_END		14
 #endif
-#ifdef tahoe
-#define	X_VBDINIT	(X_END)
-	{ "_vbdinit" },
-#define	X_CKEYSTATS	(X_END+1)
-	{ "_ckeystats" },
-#define	X_DKEYSTATS	(X_END+2)
-	{ "_dkeystats" },
-#endif
-#if defined(pc532)
+#if defined(__pc532__)
 #define	X_IVT		(X_END)
 	{ "_ivt" },
 #endif
-#if defined(i386)
+#if defined(__i386__)
 #define	X_INTRHAND	(X_END)
 	{ "_intrhand" },
 #define	X_INTRSTRAY	(X_END+1)
@@ -144,7 +145,11 @@ extern struct _disk	cur;
 extern char	**dr_name;
 extern int	*dk_select, dk_ndrive;
 
+#ifdef UVM
+struct	uvmexp uvmexp, ouvmexp;
+#else
 struct	vmmeter sum, osum;
+#endif
 int		ndrives;
 
 int	winlines = 20;
@@ -391,7 +396,11 @@ dovmstat(interval, reps)
 			printhdr();
 		/* Read new disk statistics */
 		dkreadstats();
+#ifdef UVM
+		kread(X_UVMEXP, &uvmexp, sizeof(uvmexp));
+#else
 		kread(X_SUM, &sum, sizeof(sum));
+#endif
 		size = sizeof(total);
 		mib[0] = CTL_VM;
 		mib[1] = VM_METER;
@@ -401,10 +410,27 @@ dovmstat(interval, reps)
 		}
 		(void)printf("%2u%2u%2u",
 		    total.t_rq - 1, total.t_dw + total.t_pw, total.t_sw);
-#define pgtok(a) ((a) * ((int)sum.v_page_size >> 10))
 #define	rate(x)	(((x) + halfuptime) / uptime)	/* round */
+#ifdef UVM
+#define pgtok(a) ((a) * ((int)uvmexp.pagesize >> 10))
+#else
+#define pgtok(a) ((a) * ((int)sum.v_page_size >> 10))
+#endif
 		(void)printf("%6u%6u ",
 		    pgtok(total.t_avm), pgtok(total.t_free));
+#ifdef UVM
+		(void)printf("%4u ", rate(uvmexp.faults - ouvmexp.faults));
+		(void)printf("%3u ", rate(uvmexp.pdreact - ouvmexp.pdreact));
+		(void)printf("%3u ", rate(uvmexp.pageins - ouvmexp.pageins));
+		(void)printf("%3u %3u ",
+		    rate(uvmexp.pdpageouts - ouvmexp.pdpageouts), 0);
+		(void)printf("%3u ", rate(uvmexp.pdscans - ouvmexp.pdscans));
+		dkstats();
+		(void)printf("%4u %4u %3u ",
+		    rate(uvmexp.intrs - ouvmexp.intrs),
+		    rate(uvmexp.syscalls - ouvmexp.syscalls),
+		    rate(uvmexp.swtch - ouvmexp.swtch));
+#else
 		(void)printf("%4u ", rate(sum.v_faults - osum.v_faults));
 		(void)printf("%3u ",
 		    rate(sum.v_reactivated - osum.v_reactivated));
@@ -417,12 +443,17 @@ dovmstat(interval, reps)
 		    rate(sum.v_intr - osum.v_intr),
 		    rate(sum.v_syscall - osum.v_syscall),
 		    rate(sum.v_swtch - osum.v_swtch));
+#endif
 		cpustats();
 		(void)printf("\n");
 		(void)fflush(stdout);
 		if (reps >= 0 && --reps <= 0)
 			break;
+#ifdef UVM
+		ouvmexp = uvmexp;
+#else
 		osum = sum;
+#endif
 		uptime = interval;
 		/*
 		 * We round upward to avoid losing low-frequency events
@@ -473,6 +504,17 @@ dotimes()
 
 	pgintime = 0;
 	rectime = 0;
+#ifdef UVM
+	kread(X_UVMEXP, &uvmexp, sizeof(uvmexp));
+	(void)printf("%u reactivates, %u total time (usec)\n",
+	    uvmexp.pdreact, rectime);
+	(void)printf("average: %u usec / reclaim\n", rectime / uvmexp.pdreact);
+	(void)printf("\n");
+	(void)printf("%u page ins, %u total time (msec)\n",
+	    uvmexp.pageins, pgintime / 10);
+	(void)printf("average: %8.1f msec / page in\n",
+	    pgintime / (uvmexp.pageins * 10.0));
+#else
 	kread(X_SUM, &sum, sizeof(sum));
 	(void)printf("%u reactivates, %u total time (usec)\n",
 	    sum.v_reactivated, rectime);
@@ -482,6 +524,7 @@ dotimes()
 	    sum.v_pageins, pgintime / 10);
 	(void)printf("average: %8.1f msec / page in\n",
 	    pgintime / (sum.v_pageins * 10.0));
+#endif
 }
 
 int
@@ -498,19 +541,58 @@ pct(top, bot)
 
 #define	PCT(top, bot) pct((long)(top), (long)(bot))
 
-#if defined(tahoe)
-#include <machine/cpu.h>
-#endif
-
 void
 dosum()
 {
 	struct nchstats nchstats;
 	long nchtotal;
-#if defined(tahoe)
-	struct keystats keystats;
-#endif
 
+#ifdef UVM
+	kread(X_UVMEXP, &uvmexp, sizeof(uvmexp));
+	/* vm_page constants */
+	(void)printf("%9u bytes per page\n", uvmexp.pagesize);
+
+	/* vm_page counters */
+	(void)printf("%9u pages managed\n", uvmexp.npages);
+	(void)printf("%9u pages free\n", uvmexp.free);
+	(void)printf("%9u pages active\n", uvmexp.active);
+	(void)printf("%9u pages inactive\n", uvmexp.inactive);
+	(void)printf("%9u pages being paged out\n", uvmexp.paging);
+	(void)printf("%9u pages wired\n", uvmexp.wired);
+	(void)printf("%9u pages reserved for pagedaemon\n",
+		     uvmexp.reserve_pagedaemon);
+	(void)printf("%9u pages reserved for kernel\n",
+		     uvmexp.reserve_kernel);
+
+	/* swap */
+	(void)printf("%9u swap pages\n", uvmexp.swpages);
+	(void)printf("%9u swap pages in use\n", uvmexp.swpginuse);
+	(void)printf("%9u total anon's in system\n", uvmexp.nanon);
+	(void)printf("%9u free anon's\n", uvmexp.nfreeanon);
+
+	/* stat counters */
+	(void)printf("%9u page faults\n", uvmexp.faults);
+	(void)printf("%9u traps\n", uvmexp.traps);
+	(void)printf("%9u interrupts\n", uvmexp.intrs);
+	(void)printf("%9u cpu context switches\n", uvmexp.swtch);
+	(void)printf("%9u software interrupts\n", uvmexp.softs);
+	(void)printf("%9u syscalls\n", uvmexp.syscalls);
+	(void)printf("%9u pagein operations\n", uvmexp.pageins);
+	(void)printf("%9u swap ins\n", uvmexp.swapins);
+	(void)printf("%9u swap outs\n", uvmexp.swapouts);
+	(void)printf("%9u forks\n", uvmexp.forks);
+	(void)printf("%9u forks where vmspace is shared\n",
+		     uvmexp.forks_sharevm);
+
+	/* daemon counters */
+	(void)printf("%9u number of times the pagedamoen woke up\n",
+		     uvmexp.pdwoke);
+	(void)printf("%9u revolutions of the clock hand\n", uvmexp.pdrevs);
+	(void)printf("%9u pages freed by pagedaemon\n", uvmexp.pdfreed);
+	(void)printf("%9u pages scanned by pagedaemon\n", uvmexp.pdscans);
+	(void)printf("%9u pages reactivated by pagedaemon\n", uvmexp.pdreact);
+	(void)printf("%9u busy pages found by pagedaemon\n", uvmexp.pdbusy);
+#else
 	kread(X_SUM, &sum, sizeof(sum));
 	(void)printf("%9u cpu context switches\n", sum.v_swtch);
 	(void)printf("%9u device interrupts\n", sum.v_intr);
@@ -543,6 +625,8 @@ dosum()
 	(void)printf("%9u pages active\n", sum.v_active_count);
 	(void)printf("%9u pages inactive\n", sum.v_inactive_count);
 	(void)printf("%9u bytes per page\n", sum.v_page_size);
+#endif
+
 	kread(X_NCHSTATS, &nchstats, sizeof(nchstats));
 	nchtotal = nchstats.ncs_goodhits + nchstats.ncs_neghits +
 	    nchstats.ncs_badhits + nchstats.ncs_falsehits +
@@ -557,22 +641,6 @@ dosum()
 	    PCT(nchstats.ncs_badhits, nchtotal),
 	    PCT(nchstats.ncs_falsehits, nchtotal),
 	    PCT(nchstats.ncs_long, nchtotal));
-#if defined(tahoe)
-	kread(X_CKEYSTATS, &keystats, sizeof(keystats));
-	(void)printf("%9d %s (free %d%% norefs %d%% taken %d%% shared %d%%)\n",
-	    keystats.ks_allocs, "code cache keys allocated",
-	    PCT(keystats.ks_allocfree, keystats.ks_allocs),
-	    PCT(keystats.ks_norefs, keystats.ks_allocs),
-	    PCT(keystats.ks_taken, keystats.ks_allocs),
-	    PCT(keystats.ks_shared, keystats.ks_allocs));
-	kread(X_DKEYSTATS, &keystats, sizeof(keystats));
-	(void)printf("%9d %s (free %d%% norefs %d%% taken %d%% shared %d%%)\n",
-	    keystats.ks_allocs, "data cache keys allocated",
-	    PCT(keystats.ks_allocfree, keystats.ks_allocs),
-	    PCT(keystats.ks_norefs, keystats.ks_allocs),
-	    PCT(keystats.ks_taken, keystats.ks_allocs),
-	    PCT(keystats.ks_shared, keystats.ks_allocs));
-#endif
 }
 
 void
@@ -629,7 +697,7 @@ cpustats()
 	(void)printf("%2.0f", cur.cp_time[CP_IDLE] * pct);
 }
 
-#if defined(pc532)
+#if defined(__pc532__)
 /* To get struct iv ...*/
 #define _KERNEL
 #include <machine/psl.h>
@@ -648,7 +716,7 @@ dointr()
 
 	for (i = 0; i < 2; i++) {
 		(void)printf("%sware interrupts:\n", i ? "\nsoft" : "hard");
-		(void)printf("interrupt       total     rate\n");
+		(void)printf("interrupt         total     rate\n");
 		inttotal = 0;
 		for (j = 0; j < 16; j++, ivp++) {
 			if (ivp->iv_vec && ivp->iv_use && ivp->iv_cnt) {
@@ -657,16 +725,16 @@ dointr()
 					    kvm_geterr(kd));
 					exit(1);
 				}
-				(void)printf("%-12s %8ld %8ld\n", iname,
+				(void)printf("%-12s %10ld %8ld\n", iname,
 				    ivp->iv_cnt, ivp->iv_cnt / uptime);
 				inttotal += ivp->iv_cnt;
 			}
 		}
-		(void)printf("Total        %8ld %8ld\n",
+		(void)printf("Total        %10ld %8ld\n",
 		    inttotal, inttotal / uptime);
 	}
 }
-#elif defined(i386)
+#elif defined(__i386__)
 /* To get struct intrhand */
 #define _KERNEL
 #include <machine/psl.h>
@@ -678,7 +746,7 @@ dointr()
 	long inttotal;
 	time_t uptime;
 	int intrstray[16];
-	char iname[17];
+	char iname[17], fname[31];
 	int i;
 
 	iname[16] = '\0';
@@ -686,7 +754,7 @@ dointr()
 	kread(X_INTRHAND, intrhand, sizeof(intrhand));
 	kread(X_INTRSTRAY, intrstray, sizeof(intrstray));
 
-	(void)printf("interrupt           total     rate\n");
+	(void)printf("interrupt             total     rate\n");
 	inttotal = 0;
 	for (i = 0; i < 16; i++) {
 		ihp = intrhand[i];
@@ -695,18 +763,20 @@ dointr()
 				errx(1, "vmstat: ih: %s", kvm_geterr(kd));
 			if (kvm_read(kd, (u_long)ih.ih_what, iname, 16) != 16)
 				errx(1, "vmstat: ih_what: %s", kvm_geterr(kd));
-			printf("%-16.16s %8ld %8ld\n", iname, ih.ih_count, ih.ih_count / uptime);
+			snprintf(fname, sizeof fname, "irq%d/%s", i, iname);
+			printf("%-16.16s %10ld %8ld\n", fname, ih.ih_count,
+			    ih.ih_count / uptime);
 			inttotal += ih.ih_count;
 			ihp = ih.ih_next;
 		}
 	}
 	for (i = 0; i < 16; i++)
 		if (intrstray[i]) {
-			printf("Stray irq %-2d     %8d %8d\n",
+			printf("Stray irq %-2d     %10d %8d\n",
 			       i, intrstray[i], intrstray[i] / uptime);
 			inttotal += intrstray[i];
 		}
-	printf("Total            %8ld %8ld\n", inttotal, inttotal / uptime);
+	printf("Total            %10ld %8ld\n", inttotal, inttotal / uptime);
 }
 #else
 void
@@ -732,12 +802,12 @@ dointr()
 	}
 	kread(X_INTRCNT, intrcnt, (size_t)nintr);
 	kread(X_INTRNAMES, intrname, (size_t)inamlen);
-	(void)printf("interrupt         total     rate\n");
+	(void)printf("interrupt             total     rate\n");
 	inttotal = 0;
 	nintr /= sizeof(long);
 	while (--nintr >= 0) {
 		if (*intrcnt)
-			(void)printf("%-14s %8ld %8ld\n", intrname,
+			(void)printf("%-14s %12ld %8ld\n", intrname,
 			    *intrcnt, *intrcnt / uptime);
 		intrname += strlen(intrname) + 1;
 		inttotal += *intrcnt++;
@@ -747,25 +817,25 @@ dointr()
 	while (evptr) {
 		if (kvm_read(kd, (long)evptr, (void *)&evcnt,
 		    sizeof evcnt) != sizeof evcnt) {
-			(void)fprintf(stderr, "vmstat: event chain trashed\n",
+			(void)fprintf(stderr, "vmstat: event chain trashed: %s\n",
 			    kvm_geterr(kd));
 			exit(1);
 		}
 		if (strcmp(evcnt.ev_name, "intr") == 0) {
 			if (kvm_read(kd, (long)evcnt.ev_dev, (void *)&dev,
 			    sizeof dev) != sizeof dev) {
-				(void)fprintf(stderr, "vmstat: event chain trashed\n",
+				(void)fprintf(stderr, "vmstat: event chain trashed: %s\n",
 				    kvm_geterr(kd));
 				exit(1);
 			}
 			if (evcnt.ev_count)
-				(void)printf("%-14s %8ld %8ld\n", dev.dv_xname,
-				    evcnt.ev_count, evcnt.ev_count / uptime);
+				(void)printf("%-14s %12d %8ld\n", dev.dv_xname,
+				    evcnt.ev_count, (long)(evcnt.ev_count / uptime));
 			inttotal += evcnt.ev_count++;
 		}
 		evptr = evcnt.ev_list.tqe_next;
 	}
-	(void)printf("Total          %8ld %8ld\n", inttotal, inttotal / uptime);
+	(void)printf("Total          %12ld %8ld\n", inttotal, inttotal / uptime);
 }
 #endif
 

@@ -1,4 +1,4 @@
-.\" 	$OpenBSD: ftp.1,v 1.24 1999/02/09 17:43:04 deraadt Exp $
+.\" 	$OpenBSD: ftp.1,v 1.27 1999/07/04 11:53:54 aaron Exp $
 .\" 	$NetBSD: ftp.1,v 1.22 1997/08/18 10:20:22 lukem Exp $
 .\"
 .\" Copyright (c) 1985, 1989, 1990, 1993
@@ -36,7 +36,7 @@
 .\"
 .Dd August 18, 1997
 .Dt FTP 1
-.Os BSD 4.2
+.Os
 .Sh NAME
 .Nm ftp
 .Nd
@@ -56,7 +56,7 @@ http://\fIhost\fR[:\fIport\fR]/\fIfile\fR
 .Nm ftp
 \fIhost\fR:[/\fIpath\fR/]\fIfile\fR[/]
 .Sh DESCRIPTION
-.Nm ftp
+.Nm
 is the user interface to the
 .Tn ARPANET
 standard File Transfer Protocol.
@@ -348,11 +348,11 @@ The current settings for
 and
 .Ic structure
 are used while transferring the file.
-.It Ic gate Op Ar host Op Ar port 
+.It Ic gate Op Ar host Op Ar port
 Toggle gate-ftp mode.
 This will not be permitted if the gate-ftp server hasn't been set
 (either explicitly by the user, or from the
-.Ev FTPSERVER 
+.Ev FTPSERVER
 environment variable).
 If
 .Ar host
@@ -679,9 +679,12 @@ server (see below).
 Retrieve
 .Ic file
 and display with the program defined in
-.Ev PAGER 
-(which defaults to
-.Xr more 1 ).
+.Ev PAGER
+(defaulting to
+.Xr more 1
+if
+.Ev PAGER
+is null or not defined).
 .It Ic passive
 Toggle passive mode.  If passive mode is turned on
 (default is on), the ftp client will
@@ -1047,7 +1050,7 @@ on the command line.
 .Pp
 The following formats are valid syntax for an auto-fetch element:
 .Bl -tag -width "ftp://[user:password@]host[:port]/file"
-.It host:/file 
+.It host:/file
 .Dq Classic
 ftp format
 .It ftp://[user:password@]host[:port]/file
@@ -1086,7 +1089,7 @@ connection creation and deletion.
 .Pp
 If
 .Ic file
-contains a glob character and globbing is enabled, 
+contains a glob character and globbing is enabled,
 (see
 .Ic glob ) ,
 then the equivalent of
@@ -1325,7 +1328,7 @@ auto-login process.
 .El
 .Sh COMMAND LINE EDITING
 .Nm
-supports interactive command line editing, via the 
+supports interactive command line editing, via the
 .Xr editline 3
 library.
 It is enabled with the
@@ -1377,7 +1380,7 @@ Port to use when connecting to gate-ftp server when
 is enabled.
 Default is port returned by a
 .Fn getservbyname
-lookup of 
+lookup of
 .Dq ftpgate/tcp .
 .It Ev HOME
 For default location of a

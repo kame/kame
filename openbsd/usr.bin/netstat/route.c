@@ -1,4 +1,4 @@
-/*	$OpenBSD: route.c,v 1.27 1999/03/15 15:59:08 deraadt Exp $	*/
+/*	$OpenBSD: route.c,v 1.29 1999/09/22 05:10:04 deraadt Exp $	*/
 /*	$NetBSD: route.c,v 1.15 1996/05/07 02:55:06 thorpej Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)route.c	8.3 (Berkeley) 3/9/94";
 #else
-static char *rcsid = "$OpenBSD: route.c,v 1.27 1999/03/15 15:59:08 deraadt Exp $";
+static char *rcsid = "$OpenBSD: route.c,v 1.29 1999/09/22 05:10:04 deraadt Exp $";
 #endif
 #endif /* not lint */
 
@@ -81,6 +81,11 @@ static char *rcsid = "$OpenBSD: route.c,v 1.27 1999/03/15 15:59:08 deraadt Exp $
 
 #define kget(p, d) (kread((u_long)(p), (char *)&(d), sizeof (d)))
 
+/* alignment constraint for routing socket */
+#define ROUNDUP(a) \
+	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
+#define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
+
 /*
  * Definitions for showing gateway flags.
  */
@@ -108,6 +113,7 @@ struct bits {
 static union {
 	struct		sockaddr u_sa;
 	u_int32_t	u_data[64];
+	int		u_dummy;	/* force word-alignment */
 } pt_u;
 
 int	do_rtent = 0;
@@ -238,8 +244,8 @@ pr_encaphdr()
 {
 	if (Aflag)
 		printf("%-*s ", PLEN, "Address");
-	printf("%-31s %-5s %-31s %-5s %-5s %-26s\n",
-	    "Source address/netmask", "Port", "Destination address/netmask", 
+	printf("%-18s %-5s %-18s %-5s %-5s %-22s\n",
+	    "Source", "Port", "Destination", 
 	    "Port", "Proto", "SA(Address/SPI/Proto)");
 }
 
@@ -389,9 +395,7 @@ np_rtentry(rtm)
 		p_sockaddr(sa, 0, 0, 36);
 	else {
 		p_sockaddr(sa, 0, rtm->rtm_flags, 16);
-		if (sa->sa_len == 0)
-			sa->sa_len = sizeof(in_addr_t);
-		sa = (struct sockaddr *)(sa->sa_len + (char *)sa);
+		sa = (struct sockaddr *)(ROUNDUP(sa->sa_len) + (char *)sa);
 		p_sockaddr(sa, 0, 0, 18);
 	}
 	p_flags(rtm->rtm_flags & interesting, "%-6.6s ");
@@ -809,30 +813,19 @@ encap_print(rt)
 	register struct rtentry *rt;
 {
 	struct sockaddr_encap sen1, sen2, sen3;
-	u_char buffer[32];
-	int i;
 
 	bcopy(kgetsa(rt_key(rt)), &sen1, sizeof(sen1));
 	bcopy(kgetsa(rt_mask(rt)), &sen2, sizeof(sen2));
 	bcopy(kgetsa(rt->rt_gateway), &sen3, sizeof(sen3));
 
-	bzero(buffer, 32);
-	strncpy(buffer, inet_ntoa(sen1.sen_ip_src), 15);
-	i = strlen(buffer);
-	strncpy(buffer + i, "/", 1);
-	i++;
-	strncpy(buffer + i, inet_ntoa(sen2.sen_ip_src), 15);
-
-	printf("%-31s %-5u ", buffer, sen1.sen_sport);
-
-	bzero(buffer, 32);
-	strncpy(buffer, inet_ntoa(sen1.sen_ip_dst), 15);
-	i = strlen(buffer);
-	strncpy(buffer + i, "/", 1);
-	i++;
-	strncpy(buffer + i, inet_ntoa(sen2.sen_ip_dst), 15);
-
-	printf("%-31s %-5u %-5u ", buffer, sen1.sen_dport, sen1.sen_proto);
+	printf("%-18s %-5u ", netname(sen1.sen_ip_src.s_addr, 
+				      sen2.sen_ip_src.s_addr),
+	       sen1.sen_sport);
+	
+	printf("%-18s %-5u %-5u ", netname(sen1.sen_ip_dst.s_addr, 
+					   sen2.sen_ip_dst.s_addr),
+	       sen1.sen_dport, sen1.sen_proto);
+	
 	printf("%s/%08x/%-lu\n", inet_ntoa(sen3.sen_ipsp_dst),
 	       ntohl(sen3.sen_ipsp_spi), sen3.sen_ipsp_sproto);
 }
