@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.39 2001/09/19 05:41:15 jinmei Exp $	*/
+/*	$KAME: rtsold.c,v 1.40 2001/09/19 05:42:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -220,7 +220,7 @@ main(argc, argv)
 	}
 	if (aflag)
 		argv = autoifprobe();
-	while (*argv) {
+	while (argv && *argv) {
 		if (ifconfig(*argv)) {
 			errx(1, "failed to initialize %s", *argv);
 			/*NOTREACHED*/
