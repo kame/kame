@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.62 2002/05/21 23:26:09 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.63 2002/05/21 23:33:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -154,8 +154,6 @@ static void free_ndopts __P((union nd_opts *));
 static void ra_output __P((struct rainfo *));
 static void rtmsg_input __P((void));
 static void rtadvd_set_dump_file __P((void));
-
-struct prefix *find_prefix __P((struct rainfo *, struct in6_addr *, int));
 
 int
 main(argc, argv)
