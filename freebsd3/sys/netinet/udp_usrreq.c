@@ -122,7 +122,7 @@ int log_in_vain;
 SYSCTL_INT(_net_inet_udp, OID_AUTO, log_in_vain, CTLFLAG_RW, 
 	&log_in_vain, 0, "");
 
-static struct	inpcbhead udb;		/* from udp_var.h */
+struct	inpcbhead udb;		/* from udp_var.h */
 #define	udb6	udb  /* for KAME src sync over BSD*'s */
 struct inpcbinfo udbinfo;
 
@@ -631,7 +631,7 @@ udp_getcred SYSCTL_HANDLER_ARGS
 		return (error);
 	s = splnet();
 	inp = in_pcblookup_hash(&udbinfo, addrs[1].sin_addr, addrs[1].sin_port,
-				addrs[0].sin_addr, addrs[0].sin_port, 1);
+				addrs[0].sin_addr, addrs[0].sin_port, 1, NULL);
 	if (!inp || !inp->inp_socket || !inp->inp_socket->so_cred) {
 		error = ENOENT;
 		goto out;

@@ -832,7 +832,7 @@ tcp_getcred SYSCTL_HANDLER_ARGS
 		return (error);
 	s = splnet();
 	inp = in_pcblookup_hash(&tcbinfo, addrs[1].sin_addr, addrs[1].sin_port,
-				addrs[0].sin_addr, addrs[0].sin_port, 0);
+				addrs[0].sin_addr, addrs[0].sin_port, 0, NULL);
 	if (!inp || !inp->inp_socket || !inp->inp_socket->so_cred) {
 		error = ENOENT;
 		goto out;
