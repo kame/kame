@@ -1,6 +1,6 @@
-# $FreeBSD: src/etc/mtree/BSD.usr.dist,v 1.188.2.14 2001/03/05 12:08:49 ru Exp $
+# $FreeBSD: src/etc/mtree/BSD.usr.dist,v 1.188.2.18 2001/08/10 22:43:54 obrien Exp $
 #
-# Please see the file README before making changes to this file.
+# Please see the file src/etc/mtree/README before making changes to this file.
 #
 
 /set type=dir uname=root gname=wheel mode=0755
@@ -315,7 +315,15 @@
             ..
             ibcs2
             ..
+            ipfw
+            ..
             isdn
+                contrib
+                ..
+                i4brunppp
+                ..
+                v21
+                ..
             ..
             kld
                 cdev
@@ -879,11 +887,7 @@
         tabset
         ..
         tmac
-            locale
-            ..
             mdoc
-                locale
-                ..
             ..
             mm
             ..

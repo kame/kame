@@ -1,6 +1,6 @@
-# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.32.2.4 2000/11/05 12:30:01 brian Exp $
+# $FreeBSD: src/etc/mtree/BSD.include.dist,v 1.32.2.6 2001/08/01 20:37:03 obrien Exp $
 #
-# Please see the file README before making changes to this file.
+# Please see the file src/etc/mtree/README before making changes to this file.
 #
 
 /set type=dir uname=root gname=wheel mode=0755
@@ -15,6 +15,10 @@
         ppbus
         ..
         usb
+        ..
+    ..
+    fs
+        smbfs
         ..
     ..
     g++
@@ -52,6 +56,8 @@
     netncp
     ..
     netns
+    ..
+    netsmb
     ..
     nfs
     ..

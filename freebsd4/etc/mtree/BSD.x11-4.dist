@@ -1,6 +1,6 @@
-# $FreeBSD: src/etc/mtree/BSD.x11-4.dist,v 1.13.2.3 2001/03/24 02:15:31 sf Exp $
+# $FreeBSD: src/etc/mtree/BSD.x11-4.dist,v 1.13.2.5 2001/08/01 20:37:03 obrien Exp $
 #
-# Please see the file README before making changes to this file.
+# Please see the file src/etc/mtree/README before making changes to this file.
 #
 
 /set type=dir uname=root gname=wheel mode=0755
@@ -192,6 +192,8 @@
                 ..
                 tbl_data
                 ..
+                th_TH
+                ..
                 th_TH.TACTIS
                 ..
                 tscii-0
@@ -201,6 +203,10 @@
                 vi_VN.viscii
                 ..
                 zh
+                ..
+                zh_CN.gbk
+                ..
+                zh_HK.big5hkscs
                 ..
                 zh_TW
                 ..
