@@ -140,6 +140,8 @@ cksum6(int linkhdrlen, int size)
 			pim = (struct pim *)(packet + off);
 			nxt = IPPROTO_PIM;
 			cksum = &(pim->pim_cksum);
+			if (pim->pim_type == PIM_REGISTER)
+				len = PIM_MINLEN;
 			goto calc;
 		default:
 			return;

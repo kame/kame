@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1960 2001/11/02 05:47:00 jinmei Exp $
+$KAME: CHANGELOG,v 1.1961 2001/11/04 06:32:24 suz Exp $
 
 <200111>
+Sun Nov  4 15:29:28 JST 2001 suz@sdl.hitachi.co.jp
+	* kame/kame/v6test/cksum.c: calculates PIM checksum without 
+	encapsulated packet if it is a Register message.
+	
 2001-11-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/netinet/in.c (in_control): fixed a bug that the kernel
 	can panic in process of the SIOCSIFADDR ioctl unless the
