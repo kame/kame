@@ -377,8 +377,7 @@ timer_stmt
 
 	/* algorithm */
 algorithm_statement
-	:	ALGORITHM_DEFAULT BOC algorithm_stmts EOC
-	|	ALGORITHM_LEVEL
+	:	ALGORITHM_LEVEL
 		{
 			yywarn("algorithm_strength directive are obsoleted.");
 		} BOC algorithm_stmts EOC
