@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.89 2000/05/15 06:34:07 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.90 2000/05/15 06:48:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1330,7 +1330,7 @@ ni6_nametodns(name, namelen, old)
 	struct mbuf *m;
 	char *cp, *ep;
 	const char *p, *q;
-	int i, len;
+	int i, len, nterm;
 	struct ni_reply_fqdn *fqdn;
 
 	if (old)
@@ -1353,10 +1353,25 @@ ni6_nametodns(name, namelen, old)
 		m->m_len = len;
 		*mtod(m, char *) = namelen;
 		bcopy(name, mtod(m, char *) + 1, namelen);
+		return m;
 	} else {
 		m->m_len = 0;
 		cp = mtod(m, char *);
 		ep = mtod(m, char *) + M_TRAILINGSPACE(m);
+
+		/*
+		 * guess if it looks like shortened hostname, or FQDN.
+		 * shortened hostname needs two trailing "\0".
+		 */
+		i = 0;
+		for (p = name; p < name + namelen; p++) {
+			if (*p && *p == '.')
+				i++;
+		}
+		if (i < 2)
+			nterm = 2;
+		else
+			nterm = 1;
 
 		p = name;
 		while (cp < ep && p < name + namelen) {
@@ -1376,13 +1391,17 @@ ni6_nametodns(name, namelen, old)
 			if (p < name + namelen && *p == '.')
 				p++;
 		}
-		/* "\0" as termination */
-		if (cp + 1 >= ep)
+		/* termination */
+		if (cp + nterm >= ep)
 			goto fail;
-		*cp++ = '\0';
+		while (nterm-- > 0)
+			*cp++ = '\0';
 		m->m_len = cp - mtod(m, char *);
+		return m;
 	}
-	return m;
+
+	panic("should not reach here");
+	/*NOTREACHED*/
 
  fail:
 	if (m)
