@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.53 2001/12/25 01:22:38 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.54 2001/12/27 05:12:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -125,16 +125,7 @@
 
 #ifdef HAVE_NRL_INPCB
 #define in6pcb		inpcb
-#define in6p_outputopts	inp_outputopts6
-#define in6p_socket	inp_socket
-#define in6p_faddr	inp_faddr6
-#define in6p_laddr	inp_laddr6
-#define in6p_fport	inp_fport
-#define in6p_lport	inp_lport
-#define in6p_flags	inp_flags
-#define in6p_moptions	inp_moptions6
-#define in6p_route	inp_route6
-#define in6p_flowinfo	inp_flowinfo
+
 #define udp6stat	udpstat
 #define udp6s_opackets	udps_opackets
 #endif
