@@ -161,7 +161,7 @@ main(argc, argv)
   if (confcheck == 0)
     krt_init();
 
-#ifdef USE_LEX_YACC
+#ifndef WITHOUT_LEX_YACC
   if (cfparse(1, conf ? conf : CONFFILENAME))
     exit(1);
   if (confcheck)

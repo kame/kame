@@ -28,11 +28,13 @@ PROG = bgpd
 SRCS = main.c if.c rt_table.c task.c parse.c in6.c router.c \
 	bgp.c bgp_input.c bgp_output.c bgp_util.c aspath.c \
 	ripng.c ospf.c dump.c
+GENSRCS = cftoken.c cfparse.c
 HDRS = 	*.h
-OBJS = 	$(SRCS:%.c=%.o)
+OBJS = 	$(SRCS:%.c=%.o) $(GENSRCS:%.c=%.o)
+CLEANFILES = $(OBJS) $(PROG) $(GENSRC) lex.yy.c y.tab.c y.tab.h
 
-CFLAGS += -Wall @OPTFLAGS@ @DEFS@
-LIBS += @LDFLAGS@ -lcompat
+CFLAGS += -Wall -DHAVE_STDARG_H -DUSE_RFC2292BIS @OPTFLAGS@ @DEFS@
+LIBS += @LDFLAGS@ -ly -ll -lcompat
 
 CC=	@CC@
 LDCC=	@LDCC@
@@ -48,8 +50,16 @@ exec_prefix=	@exec_prefix@
 $(PROG):	$(OBJS)
 	$(LDCC) $(CFLAGS) -o $(PROG) $(OBJS) $(LDADD) $(LIBS)
 
+cfparse.c y.tab.h: cfparse.y
+	yacc -d cfparse.y
+	mv y.tab.c cfparse.c
+
+cftoken.c: cftoken.l y.tab.h
+	lex cftoken.l
+	mv lex.yy.c $@	
+
 clean::
-	/bin/rm -f $(OBJS) $(PROG)
+	/bin/rm -f $(CLEANFILES)
 
 distclean:: clean
 	/bin/rm -f Makefile config.cache config.status config.log
