@@ -2,12 +2,12 @@
 # Date created:         Wed Jan 26 03:37:49 JST 2000
 # Whom:                 sumikawa
 #
-# $KAME: Makefile,v 1.19 2000/07/28 22:57:03 sumikawa Exp $
+# $KAME: Makefile,v 1.20 2000/10/03 16:26:40 sumikawa Exp $
 #
 
 PORTNAME=	tcpdump
-SNAPVERSION=	2000_07_24
-PORTVERSION=	${SNAPVERSION:S/_//g}
+SNAPVERSION=	2000.10.02
+PORTVERSION=	${SNAPVERSION:S/.//g}
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
 DISTNAME=	${PORTNAME}-${SNAPVERSION}
@@ -23,7 +23,5 @@ CONFIGURE_ARGS+=--enable-ipv6
 
 pre-configure:
 	(cd ${WRKSRC}; autoreconf)
-
-INSTALL_TARGET=	install install-man
 
 .include <bsd.port.mk>
