@@ -85,6 +85,7 @@ static char sccsid[] = "@(#)rcmd.c	8.3 (Berkeley) 3/26/94";
 #include <rpcsvc/yp_prot.h>
 #include <rpcsvc/ypclnt.h>
 #endif
+#include <arpa/nameser.h>
 
 extern int innetgr __P(( const char *, const char *, const char *, const char * ));
 
@@ -115,6 +116,7 @@ rcmd(ahost, rport, locuser, remuser, cmd, fd2p)
 	char c;
 	int refused;
 	char num[8];
+	static char canonnamebuf[MAXDNAME];	/* is it proper here? */
 
 	pid = getpid();
 
@@ -131,8 +133,11 @@ rcmd(ahost, rport, locuser, remuser, cmd, fd2p)
 		return (-1);
 	}
 
-	if (res->ai_canonname)
-		*ahost = res->ai_canonname;
+	if (res->ai_canonname
+	 && strlen(res->ai_canonname) + 1 < sizeof(canonnamebuf)) {
+		strncpy(canonnamebuf, res->ai_canonname, sizeof(canonnamebuf));
+		*ahost = canonnamebuf;
+	}
 	ai = res;
 	refused = 0;
 	oldmask = sigblock(sigmask(SIGURG));
