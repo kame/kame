@@ -1,4 +1,4 @@
-/*	$KAME: prefix.c,v 1.7 2000/11/24 05:11:06 itojun Exp $	*/
+/*	$KAME: prefix.c,v 1.8 2000/11/24 06:16:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -208,8 +208,7 @@ config_load1(line)
 
 	if (strlen(line) + 1 > sizeof(buf))
 		return NULL;
-	strncpy(buf, line, sizeof(buf) - 1);
-	buf[sizeof(buf) - 1] = '\0';
+	strlcpy(buf, line, sizeof(buf));
 
 	p = strchr(buf, '\n');
 	if (!p)
