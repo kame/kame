@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2063 2002/01/28 05:09:53 itojun Exp $
+$KAME: CHANGELOG,v 1.2064 2002/01/28 08:28:31 keiichi Exp $
 
 <200201>
+Mon Jan 28 17:19:19 JST 2002 keiichi@iij.ad.jp
+	* kame/sys/netnet6/{mip6.c,mip6_binding.c,mip6.h}
+	- fix a bug in the processing routine of the authentication data
+	  sub-option.
+	- change the default security policy for protecting bu/ba.
+	  if compiled for ID-15, IPsec = 0 and authdata = 1.
+	  if compiled for ID-13, IPsec = 1.
+
 Mon Jan 28 14:09:21 JST 2002  itojun@iijlab.net
 	* bsdi4: upgrade base version to BSD/OS 4.3.
 
