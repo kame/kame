@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.102 2001/11/13 03:09:47 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.103 2001/11/13 07:28:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -469,6 +469,7 @@ rip6_output(m, va_alist)
 	int priv = 0;
 	va_list ap;
 	int flags;
+	struct in6_addr *in6a;
 
 	va_start(ap, m);
 	so = va_arg(ap, struct socket *);
@@ -521,33 +522,30 @@ rip6_output(m, va_alist)
 	/*
 	 * Source address selection.
 	 */
-	{
-		struct in6_addr *in6a;
-
-		if ((in6a = in6_selectsrc(dstsock, in6p->in6p_outputopts,
-					  in6p->in6p_moptions,
-					  &in6p->in6p_route,
-					  &in6p->in6p_laddr, &oifp,
-					  &error)) == 0) {
-			if (error == 0)
-				error = EADDRNOTAVAIL;
-			goto bad;
-		}
-		ip6->ip6_src = *in6a;
-		if (oifp && dstsock->sin6_scope_id == 0 &&
-		    (error = scope6_setzoneid(oifp, dstsock)) != 0) { /* XXX */
-			goto bad;
-		}
-		if (oifp == NULL && in6p->in6p_route.ro_rt) {
-			/* what if oifp contradicts ? */
+	if ((in6a = in6_selectsrc(dstsock, in6p->in6p_outputopts,
+				  in6p->in6p_moptions,
+				  &in6p->in6p_route,
+				  &in6p->in6p_laddr, &oifp,
+				  &error)) == 0) {
+		if (error == 0)
+			error = EADDRNOTAVAIL;
+		goto bad;
+	}
+	ip6->ip6_src = *in6a;
+	if (oifp && dstsock->sin6_scope_id == 0 &&
+	    (error = scope6_setzoneid(oifp, dstsock)) != 0) { /* XXX */
+		goto bad;
+	}
+	if (oifp == NULL && in6p->in6p_route.ro_rt) {
+		/* what if oifp contradicts ? */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
-			oifp = ifnet_byindex(in6p->in6p_route.ro_rt->rt_ifp->if_index);
+		oifp = ifnet_byindex(in6p->in6p_route.ro_rt->rt_ifp->if_index);
 #else
-			oifp = ifindex2ifnet[in6p->in6p_route.ro_rt->rt_ifp->if_index];
+		oifp = ifindex2ifnet[in6p->in6p_route.ro_rt->rt_ifp->if_index];
 #endif
-		}
 	}
 
+	/* fill in the rest of the IPv6 fields */
 	ip6->ip6_dst = *dst;
 	ip6->ip6_flow = in6p->in6p_flowinfo & IPV6_FLOWINFO_MASK;
 	ip6->ip6_vfc  &= ~IPV6_VERSION_MASK;
