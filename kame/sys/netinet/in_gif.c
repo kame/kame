@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.40 2000/05/05 11:00:56 sumikawa Exp $	*/
+/*	$KAME: in_gif.c,v 1.41 2000/06/17 20:34:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -100,6 +100,10 @@ SYSCTL_INT(_net_inet_ip, IPCTL_GIF_TTL, gifttl, CTLFLAG_RW,
 	&ip_gif_ttl,	0, "");
 #endif
 
+#ifndef offsetof
+#define offsetof(s, e) ((int)&((s *)0)->e)
+#endif
+
 int
 in_gif_output(ifp, family, m, rt)
 	struct ifnet	*ifp;
@@ -107,6 +111,86 @@ in_gif_output(ifp, family, m, rt)
 	struct mbuf	*m;
 	struct rtentry *rt;
 {
+#ifdef __OpenBSD__
+	register struct gif_softc *sc = (struct gif_softc*)ifp;
+	struct sockaddr_in *sin_src = (struct sockaddr_in *)sc->gif_psrc;
+	struct sockaddr_in *sin_dst = (struct sockaddr_in *)sc->gif_pdst;
+	struct tdb tdb;
+	struct xformsw xfs;
+	int error;
+	int hlen, poff;
+	u_int16_t plen;
+	struct mbuf *mp;
+
+	if (sin_src == NULL || sin_dst == NULL ||
+	    sin_src->sin_family != AF_INET ||
+	    sin_dst->sin_family != AF_INET) {
+		m_freem(m);
+		return EAFNOSUPPORT;
+	}
+
+	/* multi-destination mode is not supported */
+	if (ifp->if_flags & IFF_LINK0) {
+		m_freem(m);
+		return ENETUNREACH;
+	}
+
+	/* setup dummy tdb.  it highly depends on ipipoutput() code. */
+	bzero(&tdb, sizeof(tdb));
+	bzero(&xfs, sizeof(xfs));
+	tdb.tdb_src.sin.sin_family = AF_INET;
+	tdb.tdb_src.sin.sin_len = sizeof(struct sockaddr_in);
+	tdb.tdb_src.sin.sin_addr = sin_src->sin_addr;
+	tdb.tdb_dst.sin.sin_family = AF_INET;
+	tdb.tdb_dst.sin.sin_len = sizeof(struct sockaddr_in);
+	tdb.tdb_dst.sin.sin_addr = sin_dst->sin_addr;
+	tdb.tdb_xform = &xfs;
+	xfs.xf_type = -1;	/* not XF_IP4 */
+
+	switch (family) {
+	case AF_INET:
+		if (m->m_len < sizeof(struct ip)) {
+			m = m_pullup(m, sizeof(struct ip));
+			if (m == NULL)
+				return ENOBUFS;
+		}
+		hlen = (mtod(m, struct ip *)->ip_hl) << 2;
+		poff = offsetof(struct ip, ip_p);
+		break;
+#ifdef INET6
+	case AF_INET6:
+		hlen = sizeof(struct ip6_hdr);
+		poff = offsetof(struct ip6_hdr, ip6_nxt);
+		break;
+#endif
+	default:
+#ifdef DEBUG
+	        printf("in_gif_output: warning: unknown family %d passed\n",
+			family);
+#endif
+		m_freem(m);
+		return EAFNOSUPPORT;
+	}
+
+	/* encapsulate into IPv4 packet */
+	mp = NULL;
+	error = ipip_output(m, &tdb, &mp, hlen, poff);
+	if (error)
+		return error;
+	else if (mp == NULL)
+		return EFAULT;
+
+	m = mp;
+
+	/* ip_output needs host-order length.  it should be nuked */
+	m_copydata(m, offsetof(struct ip, ip_len), sizeof(u_int16_t),
+		   (caddr_t) &plen);
+	NTOHS(plen);
+	m_copyback(m, offsetof(struct ip, ip_len), sizeof(u_int16_t),
+		   (caddr_t) &plen);
+
+	return ip_output(m, NULL, NULL, 0, NULL, NULL);
+#else
 	register struct gif_softc *sc = (struct gif_softc*)ifp;
 	struct sockaddr_in *dst = (struct sockaddr_in *)&sc->gif_ro.ro_dst;
 	struct sockaddr_in *sin_src = (struct sockaddr_in *)sc->gif_psrc;
@@ -239,12 +323,9 @@ in_gif_output(ifp, family, m, rt)
 #endif
 	}
 
-#ifndef __OpenBSD__
 	error = ip_output(m, NULL, &sc->gif_ro, 0, NULL);
-#else
-	error = ip_output(m, NULL, &sc->gif_ro, 0, NULL, NULL);
-#endif
 	return(error);
+#endif /*openbsd*/
 }
 
 void
@@ -259,9 +340,11 @@ in_gif_input(m, va_alist)
 	int off, proto;
 	struct ifnet *gifp = NULL;
 	struct ip *ip;
-	int af;
 	va_list ap;
+#ifndef __OpenBSD__
+	int af;
 	u_int8_t otos;
+#endif
 
 	va_start(ap, m);
 	off = va_arg(ap, int);
@@ -283,6 +366,11 @@ in_gif_input(m, va_alist)
 		return;
 	}
 
+#ifdef __OpenBSD__
+	m->m_pkthdr.rcvif = gifp;
+	ipip_input(m, off); /* We have a configured GIF */
+	return;
+#else
 	otos = ip->ip_tos;
 	m_adj(m, off);
 
@@ -329,6 +417,7 @@ in_gif_input(m, va_alist)
 		return;
 	}
 	gif_input(m, af, gifp);
+#endif /*openbsd*/
 	return;
 }
 

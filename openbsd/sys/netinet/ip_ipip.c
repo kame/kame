@@ -105,10 +105,15 @@ ip4_input6(struct mbuf **m, int *offp, int proto)
     /* If we do not accept IPv4 explicitly, drop.  */
     if (!ipip_allow && ((*m)->m_flags & (M_AUTH|M_CONF)) == 0)
     {
+#if 0
 	DPRINTF(("ip4_input6(): dropped due to policy\n"));
 	ipipstat.ipips_pdrops++;
 	m_freem(*m);
 	return IPPROTO_DONE;
+#else
+	/* last resort: inject to raw socket */
+	return rip6_input(m, offp, proto);
+#endif
     }
 
     ipip_input(*m, *offp);
@@ -125,19 +130,26 @@ ip4_input(struct mbuf *m, ...)
 {
     va_list ap;
     int iphlen;
+    int proto;
+
+    va_start(ap, m);
+    iphlen = va_arg(ap, int);
+    proto = va_arg(ap, int);
+    va_end(ap);
 
     /* If we do not accept IPv4 explicitly, drop.  */
     if (!ipip_allow && (m->m_flags & (M_AUTH|M_CONF)) == 0)
     {
+#if 0
 	DPRINTF(("ip4_input(): dropped due to policy\n"));
 	ipipstat.ipips_pdrops++;
 	m_freem(m);
+#else
+	/* last resort: inject to raw socket */
+	rip_input(m, iphlen, proto);
+#endif
 	return;
     }
-
-    va_start(ap, m);
-    iphlen = va_arg(ap, int);
-    va_end(ap);
 
     ipip_input(m, iphlen);
 }

@@ -199,33 +199,18 @@ struct protosw inetsw[] = {
   rip_usrreq,
   0,		0,		0,		0,		icmp_sysctl
 },
-#if NGIF > 0
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR,
-  in_gif_input,	rip_output, 	0,		rip_ctloutput,
+  encap4_input,	rip_output, 	0,		rip_ctloutput,
   rip_usrreq,
-  0,		0,		0,		0,		ipip_sysctl
+  encap_init,	0,		0,		0,		ipip_sysctl
 },
 #ifdef INET6
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
-  in_gif_input,	rip_output,	 0,		0,
+  encap4_input,	rip_output,	 0,		0,
   rip_usrreq,	/*XXX*/
   0,		0,		0,		0,
 },
 #endif /* INET6 */
-#else /* NGIF */
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IPIP,	PR_ATOMIC|PR_ADDR,
-  ip4_input,	rip_output,	0,		rip_ctloutput,
-  rip_usrreq,
-  0,		0,		0,		0,		ipip_sysctl
-},
-#ifdef INET6
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
-  ip4_input,	rip_output, 	0,		rip_ctloutput,
-  rip_usrreq,	/*XXX*/
-  0,		0,		0,		0,
-},
-#endif /* INET6 */
-#endif /*NGIF*/
 { SOCK_RAW,	&inetdomain,	IPPROTO_IGMP,	PR_ATOMIC|PR_ADDR,
   igmp_input,	rip_output,	0,		rip_ctloutput,
   rip_usrreq,

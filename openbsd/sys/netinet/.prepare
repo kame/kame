@@ -25,7 +25,3 @@ exclude altq_subr.c
 exclude altq_var.h
 exclude altq_wfq.c
 exclude altq_wfq.h
-conflict in_gif.c
-conflict in_gif.h
-conflict ip_ecn.c
-conflict ip_ecn.h

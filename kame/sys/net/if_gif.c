@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.26 2000/05/17 01:09:26 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.27 2000/06/17 20:34:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -347,6 +347,7 @@ gif_output(ifp, m, dst, rt)
 	return error;
 }
 
+#ifndef __OpenBSD__	/* ipip_input() does it instead */
 void
 gif_input(m, af, gifp)
 	struct mbuf *m;
@@ -434,6 +435,7 @@ gif_input(m, af, gifp)
 
 	return;
 }
+#endif /*!OpenBSD*/
 
 /* XXX how should we handle IPv6 scope on SIOC[GS]IFPHYADDR? */
 int
@@ -481,9 +483,9 @@ gif_ioctl(ifp, cmd, data)
 		break;
 
 #ifdef	SIOCSIFMTU /* xxx */
-#ifndef __OpenBSD__
 	case SIOCGIFMTU:
 		break;
+
 	case SIOCSIFMTU:
 		{
 #ifdef __bsdi__
@@ -499,7 +501,6 @@ gif_ioctl(ifp, cmd, data)
 			ifp->if_mtu = mtu;
 		}
 		break;
-#endif /* !OpenBSD */
 #endif /* SIOCSIFMTU */
 
 	case SIOCSIFPHYADDR:

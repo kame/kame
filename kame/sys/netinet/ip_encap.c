@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.35 2000/05/05 11:00:57 sumikawa Exp $	*/
+/*	$KAME: ip_encap.c,v 1.36 2000/06/17 20:34:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -338,8 +338,13 @@ encap6_input(mp, offp, proto)
 		}
 	}
 
+#ifdef __OpenBSD__
+	/* last resort */
+	return ip4_input6(mp, offp, 0); /* XXX last argument ignored */
+#else
 	/* last resort: inject to raw socket */
 	return rip6_input(mp, offp, proto);
+#endif
 }
 #endif
 
