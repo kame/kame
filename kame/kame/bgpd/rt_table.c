@@ -298,7 +298,6 @@ set_nexthop(dst, ret_rte)
   struct ifinfo   *ife, *bestife = NULL;
   struct rt_entry *rte, *bestrte = NULL;
   struct ripif    *ripif;
-  struct ripif *bestif = NULL;
 
   extern byte           ripyes;
   extern struct ifinfo *ifentry;
@@ -358,7 +357,7 @@ set_nexthop(dst, ret_rte)
   }
 
   if (bestrte) {
-    ret_rte->rt_gwif = bestif->rip_ife;
+    ret_rte->rt_gwif = bestife;
     ret_rte->rt_gwsrc_type = bestrte->rt_proto.rtp_type;
     ret_rte->rt_gwsrc_entry = bestrte;
     switch(bestrte->rt_proto.rtp_type) {
