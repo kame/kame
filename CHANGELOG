@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2010 2001/12/14 16:47:35 sakane Exp $
+$KAME: CHANGELOG,v 1.2011 2001/12/18 02:26:58 jinmei Exp $
 
 <200112>
+2001-12-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet/icmp6.h: revised MLD-related definitions:
+	- used mld_xxx and MLD_xxx instead of mld6_xxx and MLD6_xxx
+	  according to the official defintions in rfc2292bis
+	- changed the first member of mld_hdr{} from mld_hdr to
+	  mld_icmp6_hdr to avoid name space conflict in C++
+
 Sat Dec 15 01:45:38 JST 2001 sakane@kame.net
 	* kame/racoon:
 	Suported the 6144-bit DH MODP group.  Fixed some memory leaks.
