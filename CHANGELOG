@@ -1,4 +1,11 @@
-$Id: CHANGELOG,v 1.501 2000/01/31 07:27:31 itojun Exp $
+$Id: CHANGELOG,v 1.502 2000/01/31 16:13:17 itojun Exp $
+
+<200002>
+Tue Feb  1 01:11:34 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/mail/solidpop3d: pop3 daemon from poland.
+	* kame/racoon: simplify the configure process.  allow it to be compiled
+	  on openssl-integrated platform (netbsd15), even without rsa headers/
+	  libraries (cert support will automatically be disabled).
 
 <200001>
 Mon Jan 31 16:25:42 JST 2000  itojun@iijlab.net
