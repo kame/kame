@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.8,v 1.29 2004/01/22 11:48:59 suz Exp $
+.\"	$KAME: dhcp6c.8,v 1.30 2004/03/24 05:44:12 suz Exp $
 .\"
 .\" Copyright (C) 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -128,6 +128,12 @@ which provides DNS name search path.
 A list of available NTP servers,
 each of which is an IPv6 numeric address and is separated by a white
 space character.
+.It Ic new_sip_name_servers
+A list of available SIP server addresses,
+each of which is an IPv6 numeric address and is separated by a white
+space character.
+.It Ic new_sip_name
+A list of SIP server domain names.
 .El
 .Pp
 Note that the daemon does not always provide all the parameters.

@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.13 2004/03/22 09:04:00 jinmei Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.14 2004/03/24 05:44:12 suz Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -78,6 +78,14 @@ means a domain name option.
 .Ic ntp-servers
 .Xc
 means an NTP server option.
+.It Xo
+.Ic sip-server-address
+.Xc
+means a SIP Server address option.
+.It Xo
+.Ic sip-server-domain-name
+.Xc
+means a SIP server domain name option.
 .It Ic ia-pd Ar ID
 means an IA_PD
 .Pq Identity Association for Prefix Delegation
@@ -158,6 +166,14 @@ requests a DNS search path.
 .Ic ntp-servers
 .Xc
 requests a list of NTP server addresses.
+.It Xo
+.Ic sip-server-address
+.Xc
+requests a list of SIP server addresses.
+.It Xo
+.Ic sip-server-domain-name
+.Xc
+requests a SIP server domain name.
 .It Xo
 .Ic lifetime
 .Xc

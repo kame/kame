@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6s.conf.5,v 1.8 2004/03/22 09:04:00 jinmei Exp $
+.\"	$KAME: dhcp6s.conf.5,v 1.9 2004/03/24 05:44:12 suz Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -94,6 +94,21 @@ Each
 .Ar ntp-address
 must be a numeric IPv6 address.
 Multiple server addresses can also be specified by a sequence of these
+statements.
+.It Xo
+.Ic sip-server-address Ar sip-server-address Op Ar sip-server-addresses... ;
+.Xc
+provides SIP server address(es).
+Each
+.Ar sip-server-address
+must be a numeric IPv6 address.
+Multiple server addresses can also be specified by a sequence of
+these statements.
+.It Xo
+.Ic sip-server-domain-name Ar \(dqsip-server-domain-name\(dq ;
+.Xc
+provides a domain name of a SIP server.
+Multiple names in the path can be specified by a sequence of these
 statements.
 .It Xo
 .Ic lifetime Ar interval ;
