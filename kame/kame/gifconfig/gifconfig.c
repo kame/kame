@@ -1,4 +1,4 @@
-/*	$KAME: gifconfig.c,v 1.14 2001/01/01 04:04:56 jinmei Exp $	*/
+/*	$KAME: gifconfig.c,v 1.15 2001/08/01 00:53:12 itojun Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -832,12 +832,36 @@ in6_getaddr(s, which)
 	int which;
 {
 	register struct sockaddr_in6 *sin = sin6tab[which];
+	struct addrinfo hints, *res;
+	int ecode;
 
-	sin->sin6_len = sizeof(*sin);
-	sin->sin6_family = AF_INET6;
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET6;
 
-        if (inet_pton(AF_INET6, s, &sin->sin6_addr) != 1)
+	if ((ecode = getaddrinfo(s, NULL, NULL, &res)) != 0)
+		errx(1, "error in parsing address string: %s",
+		    gai_strerror(ecode));
+
+	if (res->ai_addrlen != sizeof(*sin))
 		errx(1, "%s: bad value", s);
+
+	memcpy(sin, res->ai_addr, res->ai_addrlen);
+	freeaddrinfo(res);
+
+#ifdef __KAME__
+	/* embed scopeid */
+	if (sin->sin6_scope_id && 
+	    (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr) ||
+	     IN6_IS_ADDR_MC_LINKLOCAL(&sin->sin6_addr)
+#if 0
+	     ||
+	     IN6_IS_ADDR_MC_INTFACELOCAL(&sin->sin6_addr)
+#endif
+	     )) {
+		*(u_int16_t *)&sin->sin6_addr.s6_addr[2] =
+		    htons(sin->sin6_scope_id);
+	}
+#endif
 }
 
 void
