@@ -1,7 +1,7 @@
 /*
  * random.h -- A strong random number generator
  *
- * $FreeBSD: src/sys/i386/include/random.h,v 1.18 1999/12/29 04:33:06 peter Exp $
+ * $FreeBSD: src/sys/sys/random.h,v 1.19.2.1 2000/05/10 02:04:52 obrien Exp $
  *
  * Version 0.95, last modified 18-Oct-95
  * 
@@ -47,8 +47,8 @@
  * 
  */
 
-#ifndef	_MACHINE_RANDOM_H_
-#define	_MACHINE_RANDOM_H_
+#ifndef	_SYS_RANDOM_H_
+#define	_SYS_RANDOM_H_
 
 #include <sys/ioccom.h>
 
@@ -83,8 +83,9 @@ u_int read_random_unlimited(void *buf, u_int size);
 #ifdef notused
 u_int write_random(const char *buf, u_int nbytes);
 #endif
+struct proc;
 int random_poll(dev_t dev, int events, struct proc *p);
 
 #endif /* _KERNEL */
 
-#endif /* !_MACHINE_RANDOM_H_ */
+#endif /* !_SYS_RANDOM_H_ */
