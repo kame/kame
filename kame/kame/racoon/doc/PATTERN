@@ -1,0 +1,140 @@
+IPsec transport mode
+
+	HOST-A ================ HOST-B
+	(A)                     (B)
+
+	IKE negotiation: A <--> B
+	ID payloads: anything,anything
+	SA addresses: A <--> B
+	outgoing packet: IP(A->B)
+
+	HOST-A's policy:
+		spdadd A B any -P out ipsec ah/transport//require;
+		spdadd B A any -P in ipsec ah/transport//require;
+
+	HOST-B's policy:
+		spdadd B A any -P out ipsec ah/transport//require;
+		spdadd A B any -P in ipsec ah/transport//require;
+
+	both racoon.conf:
+		no particular
+
+IPsec tunnel mode
+
+	HOST-A --- Gateway-A =========== Gateway-B --- HOST-B
+	(A)        (GA)                  (GB)          (B)
+
+	IKE negotiation: GA <--> GB
+	ID payloads: A,B
+	SA addresses: GA <--> GB
+	outgoing packet: IP(GA->GB)
+
+	Gateway-A's policy:
+		spdadd A B any -P out ipsec esp/tunnel/GA-GB/require;
+		spdadd B A any -P in ipsec esp/tunnel/GB-GA/require;
+
+	Gateway-B's policy:
+		spdadd B A any -P out ipsec esp/tunnel/GB-GA/require;
+		spdadd A B any -P in ipsec esp/tunnel/GA-GB/require;
+
+	both racoon.conf:
+		no particular
+
+MIP6
+
+	MN ================ CN
+	(HA/COA)           (CNA)
+
+	IKE negotiation: COA <--> CNA
+		* MN always initiate IKE session probably.
+	ID payloads: HA,CNA
+	SA addresses: HA <--> CNA
+	outgoing packet: IP(COA->CNA) | HAoption(HA)
+
+	MN's policy:
+		spdadd HA CNA any -P out ipsec ah/transport//require;
+		spdadd CNA HA any -P in ipsec ah/transport//require;
+
+	MN's racoon.conf:
+		remote CNA { support_mip6 on; }
+
+	CN's policy:
+		spdadd CNA HA any -P out ipsec ah/transport//require;
+		spdadd HA CNA any -P in ipsec ah/transport//require;
+
+	CN's racoon.conf:
+		support_mip6 on;
+		(generate_policy on;)
+
+Accept anonymous client on IPsec transport mode
+
+	HOST-A =========== Server
+	(A)                (S)
+
+	IKE negotiation: A <-> S
+	ID payloads: anything,anything
+	SA addresses: A <--> S
+
+	HOST-A's policy:
+		spdadd A S any -P out ipsec esp/transport//require;
+		spdadd S A any -P in ipsec esp/transport//require;
+
+	A's racoon.conf:
+		no particular
+
+	Server's policy:
+		spdadd S A any -P out ipsec esp/transport//require;
+		spdadd A S any -P in ipsec esp/transport//require;
+		* SP will be installed by racoon.
+
+	Server's racoon.conf:
+		generate_policy on;
+
+Accept anonymous client on IPsec tunnel mode
+
+	HOST-A =========== Gateway --- HOST-B
+	(A)                (G)         (B)
+
+	IKE negotiation: A <-> G
+	ID payloads: anything,B
+	SA addresses: A <--> G
+
+	HOST-A's policy:
+		spdadd A B any -P out ipsec esp/tunnel/A-G/require;
+		spdadd B A any -P in ipsec esp/tunnel/G-A/require;
+
+	A's racoon.conf:
+		no particular
+
+	Gateway's policy:
+		spdadd B A any -P out ipsec esp/tunnel/G-A/require;
+		spdadd A B any -P in ipsec esp/tunnel/A-G/require;
+		* SP will be installed by racoon.
+
+	Gateway's racoon.conf:
+		generate_policy on;
+
+Bridge mode
+
+	HOST-A =========== Bridge --- HOST-C
+	(A)                           (C)
+
+	IKE negotiation: A <--> C
+	ID payloads: A,C
+	SA addresses: A <--> C
+	outgoing packet: IP(A->C) | IPsec
+
+	HOST-A's policy:
+		spdadd A C any -P out ipsec esp/transport//require;
+		spdadd C A any -P in ipsec esp/transport//require;
+
+	HOST-A's racoon.conf:
+		TBD
+
+	Bridge's policy:
+		spdadd C A any -P out ipsec esp/transport//require;
+		spdadd A C any -P in ipsec esp/transport//require;
+
+	Bridge's racoon.conf:
+		TBD
+
