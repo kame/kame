@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2438 2003/07/19 10:44:54 itojun Exp $
+$KAME: CHANGELOG,v 1.2439 2003/07/20 11:30:44 jinmei Exp $
 
 <200307>
+2003-07-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/config.c (configure_duid): fixed a bug of
+	allocating short memory.  Upgrading is required if you configure
+	dhcp6s with the duid statement.
+
 Sat Jul 19 18:12:01 JST 2003  itojun@iijlab.net
 	* sys/netinet6/esp_aesctr.c: support draft-ietf-ipsec-ciph-aes-ctr-03
 	  as there's no official DOI assignment yet, we use private DOI number.
