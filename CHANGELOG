@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1094 2000/07/04 10:05:52 jinmei Exp $
+$Id: CHANGELOG,v 1.1095 2000/07/04 11:50:27 jinmei Exp $
 
 <200006>
+2000-07-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/mip6.c (mip6_add_ifaddr): use in6_update_ifa()
+	to assign an address instead of coping code from in6.c
+
+2000-07-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_update_ifa): newly added to update
+	parameters of an IPv6 interface address.
+	Basically, this function does nothing new, but made in6_control()
+	simple.
+
 2000-07-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_control): completely obsoleted
 	SIOCSIFADDR_IN6, SIOCSIFDSTADDR_IN6, and SIOCSIFNETMASK_IN6.
