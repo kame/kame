@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.78 2001/10/01 10:57:51 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.79 2001/10/01 11:06:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -423,11 +423,9 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		}
 	}
 		/*
-		 * If Source(DA) is just a home address and Source(DB)
-		 * is just a care- of address, then sort DA before
-		 * DB. Similarly, if Source(DA) is just a care-of
-		 * address and Source(DB) is just a home address, then
-		 * sort DB before DA.
+		 * If SA is just a home address and SB is just a care-of
+		 * address, then prefer SA. Similarly, if SB is just a home
+		 * address and SA is just a care-of address, then prefer SB. 
 		 */
 		if ((ia_best->ia6_flags & IN6_IFF_HOME) != 0 &&
 		    (ia->ia6_flags & IN6_IFF_HOME) == 0) {
