@@ -1,4 +1,4 @@
-/*	$KAME: backupsa.c,v 1.8 2001/02/26 04:18:34 itojun Exp $	*/
+/*	$KAME: backupsa.c,v 1.9 2001/03/26 11:37:25 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -349,6 +349,10 @@ int
 backupsa_clean()
 {
 	FILE *fp;
+
+	/* simply return if the file is not defined. */
+	if (!lcconf->pathinfo[LC_PATHTYPE_BACKUPSA])
+		return;
 
 	fp = fopen(lcconf->pathinfo[LC_PATHTYPE_BACKUPSA], "w+");
 	if (fp == NULL) {
