@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.31 2001/01/19 05:29:12 itojun Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.32 2001/01/19 05:32:05 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -316,10 +316,8 @@ YOU DO NOT NEED TO HAVE IT AT ALL.
 default:\\
 	:chlim#64:raflags#0:rltime#1800:rtime#0:retrans#0:\\
 	:pinfoflags#192:vltime#2592000:pltime#604800:mtu#0:
-ether:\\
-	:mtu#1500:tc=default:
 ef0:\\
-	:addrs#1:addr="3ffe:501:ffff:1000::":prefixlen#64:tc=ether:
+	:addrs#1:addr="3ffe:501:ffff:1000::":prefixlen#64:tc=default:
 .Ed
 .Sh SEE ALSO
 .Xr termcap 5 ,
