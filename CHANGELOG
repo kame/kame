@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2121 2002/04/10 12:50:51 jinmei Exp $
+$KAME: CHANGELOG,v 1.2122 2002/04/12 05:38:06 jinmei Exp $
 
 <200204>
+2002-04-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/: use nd_ifinfo.linkmtu instead of
+	ifp->if_mtu to handle link MTU issues wrt IPv6, whenever possible.
+	Some OS dependent code for freebsd4 and bsdi4 was also modified in
+	this manner.  Some for netbsd and openbsd was untouched.
+
 2002-04-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/netinet/if_ether.c (arp_rtdrain):
 	* kame/sys/netinet6/nd6.c (nd6_rtdrain):
