@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.c,v 1.10 2002/04/03 05:38:50 kjc Exp $	*/
+/*	$KAME: altq_cbq.c,v 1.11 2002/10/04 14:24:09 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -678,7 +678,7 @@ cbq_ifdetach(ifacep)
 	else {
 		cbq_state_t *cp;
 
-		for (cp = cbq_list; cp != NULL; cp = cbqp->cbq_next)
+		for (cp = cbq_list; cp != NULL; cp = cp->cbq_next)
 			if (cp->cbq_next == cbqp) {
 				cp->cbq_next = cbqp->cbq_next;
 				break;
