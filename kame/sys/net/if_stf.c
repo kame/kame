@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.114 2004/05/26 09:54:47 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.115 2004/05/31 01:39:28 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -179,7 +179,7 @@ extern struct domain inetdomain;
 struct protosw in_stf_protosw =
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
   in_stf_input,
-#if defined(__FreeBSD__) && __FreeBSD_version >= 050201
+#if defined(__FreeBSD__) && __FreeBSD_version >= 502010
  (pr_output_t *)rip_output,
 #else
   rip_output,
