@@ -332,9 +332,6 @@ awi_attach(sc)
 	if_attach(ifp);
 #ifdef __OpenBSD__
 	ether_ifattach(ifp);
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
-#endif
 #elif defined(__FreeBSD__)
 	ether_ifattach(ifp);
 #if NBPFILTER > 0
@@ -342,8 +339,6 @@ awi_attach(sc)
 #endif
 #elif defined(__NetBSD__)
 	ether_ifattach(ifp, sc->sc_mib_addr.aMAC_Address);
-#if NBPFILTER > 0
-	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
 #endif
 #endif
 

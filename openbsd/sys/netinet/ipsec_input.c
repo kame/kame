@@ -1,11 +1,11 @@
-/*	$OpenBSD: ipsec_input.c,v 1.32 2000/09/19 03:20:59 angelos Exp $	*/
+/*	$OpenBSD: ipsec_input.c,v 1.36 2001/04/06 04:42:08 csapuntz Exp $	*/
 
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
- * Angelos D. Keromytis (kermit@csd.uch.gr) and 
+ * Angelos D. Keromytis (kermit@csd.uch.gr) and
  * Niels Provos (provos@physnet.uni-hamburg.de).
  *
- * This code was written by John Ioannidis for BSD/OS in Athens, Greece, 
+ * This code was written by John Ioannidis for BSD/OS in Athens, Greece,
  * in November 1995.
  *
  * Ported to OpenBSD and NetBSD, with additional transforms, in December 1996,
@@ -18,11 +18,11 @@
  *
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 by John Ioannidis,
  * Angelos D. Keromytis and Niels Provos.
- *	
+ *
  * Permission to use, copy, and modify this software without fee
  * is hereby granted, provided that this entire notice is included in
  * all copies of any software which is or includes a copy or
- * modification of this software. 
+ * modification of this software.
  * You may use this code under the GNU public license if you so wish. Please
  * contribute changes back to the authors under this freer than GPL license
  * so that we may further the use of strong encryption without limitations to
@@ -77,18 +77,12 @@
 
 #include "bpfilter.h"
 
-#define PI_MAGIC 0xdeadbeef /* XXX horror! */
-
 int ipsec_common_input(struct mbuf *, int, int, int, int);
 
 #ifdef ENCDEBUG
 #define DPRINTF(x)	if (encdebug) printf x
 #else
 #define DPRINTF(x)
-#endif
-
-#ifndef offsetof
-#define offsetof(s, e) ((int)&((s *)0)->e)
 #endif
 
 /* sysctl variables */
@@ -193,7 +187,7 @@ ipsec_common_input(struct mbuf *m, int skip, int protoff, int af, int sproto)
 	IPSEC_ISTAT(espstat.esps_notdb, ahstat.ahs_notdb);
 	return ENOENT;
     }
-	
+
     if (tdbp->tdb_flags & TDBF_INVALID)
     {
 	splx(s);
@@ -218,17 +212,17 @@ ipsec_common_input(struct mbuf *m, int skip, int protoff, int af, int sproto)
 	 * XXX The fragment conflicts with scoped nature of IPv6, so do it for
 	 * only for IPv4 for now.
 	 */
-	if (tdbp->tdb_interface)
-	  m->m_pkthdr.rcvif = (struct ifnet *) tdbp->tdb_interface;
-	else
-	  m->m_pkthdr.rcvif = &encif[0].sc_if;
+	m->m_pkthdr.rcvif = &encif[0].sc_if;
     }
 
     /* Register first use, setup expiration timer */
     if (tdbp->tdb_first_use == 0)
     {
 	tdbp->tdb_first_use = time.tv_sec;
-	tdb_expiration(tdbp, TDBEXP_TIMEOUT);
+	if (tdbp->tdb_flags & TDBF_FIRSTUSE)
+	    timeout_add(&tdbp->tdb_first_tmo, hz * tdbp->tdb_exp_first_use);
+	if (tdbp->tdb_flags & TDBF_SOFT_FIRSTUSE)
+	    timeout_add(&tdbp->tdb_sfirst_tmo, hz * tdbp->tdb_soft_first_use);
     }
 
     /*
@@ -283,7 +277,7 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff)
     /* Fix IPv4 header */
     if (tdbp->tdb_dst.sa.sa_family == AF_INET)
     {
-        if ((m = m_pullup(m, skip)) == 0)
+        if ((m->m_len < skip) && ((m = m_pullup(m, skip)) == 0))
         {
 	    DPRINTF(("ipsec_common_input_cb(): processing failed for SA %s/%08x\n", ipsp_address(tdbp->tdb_dst), ntohl(tdbp->tdb_spi)));
             IPSEC_ISTAT(espstat.esps_hdrops, ahstat.ahs_hdrops);
@@ -348,7 +342,7 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff)
 	}
 #endif /* INET6 */
 
-	/* 
+	/*
 	 * Check that the source address is an expected one, if we know what
 	 * it's supposed to be. This avoids source address spoofing.
 	 */
@@ -370,7 +364,8 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff)
     /* Fix IPv6 header */
     if (af == INET6)
     {
-        if ((m = m_pullup(m, sizeof(struct ip6_hdr))) == 0)
+        if ((m->m_len < sizeof(struct ip6_hdr)) &&
+            ((m = m_pullup(m, sizeof(struct ip6_hdr))) == 0))
         {
 	    DPRINTF(("ipsec_common_input_cb(): processing failed for SA %s/%08x\n", ipsp_address(tdbp->tdb_dst), ntohl(tdbp->tdb_spi)));
             IPSEC_ISTAT(espstat.esps_hdrops, ahstat.ahs_hdrops);
@@ -432,7 +427,7 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff)
 	    }
 	}
 
-	/* 
+	/*
 	 * Check that the source address is an expected one, if we know what
 	 * it's supposed to be. This avoids source address spoofing.
 	 */
@@ -455,7 +450,8 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff)
      * Record what we've done to the packet (under what SA it was
      * processed).
      */
-    if (m->m_pkthdr.tdbi && m->m_pkthdr.tdbi != (void *) PI_MAGIC)
+    /* XXX We need a better packets-attributes framework */
+    if (m->m_pkthdr.tdbi)
       free(m->m_pkthdr.tdbi, M_TEMP);
 
     MALLOC(m->m_pkthdr.tdbi, void *, sizeof(struct tdb_ident), M_TEMP,
@@ -486,11 +482,8 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff)
       m->m_flags |= M_AUTH;
 
 #if NBPFILTER > 0
-    if (tdbp->tdb_interface)
-	bpfif = (struct ifnet *) tdbp->tdb_interface;
-    else
-	bpfif = &encif[0].sc_if;
-    if (bpfif->if_bpf) 
+    bpfif = &encif[0].sc_if;
+    if (bpfif->if_bpf)
     {
         /*
          * We need to prepend the address family as
@@ -509,7 +502,7 @@ ipsec_common_input_cb(struct mbuf *m, struct tdb *tdbp, int skip, int protoff)
         m1.m_next = m;
         m1.m_len = ENC_HDRLEN;
         m1.m_data = (char *) &hdr;
-        
+
         bpf_mtap(bpfif->if_bpf, &m1);
     }
 #endif
@@ -619,26 +612,28 @@ int
 ah4_input_cb(struct mbuf *m, ...)
 {
     struct ifqueue *ifq = &ipintrq;
+    int s = splimp();
 
     /*
-     * Interface pointer is already in first mbuf; chop off the 
+     * Interface pointer is already in first mbuf; chop off the
      * `outer' header and reschedule.
      */
 
     if (IF_QFULL(ifq))
     {
 	IF_DROP(ifq);
-	if (m->m_pkthdr.tdbi && m->m_pkthdr.tdbi != (void *) PI_MAGIC)
-	  free(m->m_pkthdr.tdbi, M_TEMP);
-	m_freem(m);
 	ahstat.ahs_qfull++;
+	splx(s);
 
+	m_freem(m);
 	DPRINTF(("ah4_input_cb(): dropped packet because of full IP queue\n"));
 	return ENOBUFS;
     }
 
     IF_ENQUEUE(ifq, m);
     schednetisr(NETISR_IP);
+    splx(s);
+
     return 0;
 }
 
@@ -662,25 +657,27 @@ int
 esp4_input_cb(struct mbuf *m, ...)
 {
     struct ifqueue *ifq = &ipintrq;
+    int s = splimp();
 
     /*
-     * Interface pointer is already in first mbuf; chop off the 
+     * Interface pointer is already in first mbuf; chop off the
      * `outer' header and reschedule.
      */
     if (IF_QFULL(ifq))
     {
 	IF_DROP(ifq);
-	if (m->m_pkthdr.tdbi && m->m_pkthdr.tdbi != (void *) PI_MAGIC)
-	  free(m->m_pkthdr.tdbi, M_TEMP);
-	m_freem(m);
 	espstat.esps_qfull++;
+	splx(s);
 
+	m_freem(m);
 	DPRINTF(("esp4_input_cb(): dropped packet because of full IP queue\n"));
 	return ENOBUFS;
     }
 
     IF_ENQUEUE(ifq, m);
     schednetisr(NETISR_IP);
+    splx(s);
+
     return 0;
 }
 #endif /* INET */
@@ -777,8 +774,6 @@ ah6_input_cb(struct mbuf *m, int off, int protoff)
     return 0;
 
 bad:
-    if (m->m_pkthdr.tdbi && m->m_pkthdr.tdbi != (void *) PI_MAGIC)
-      free(m->m_pkthdr.tdbi, M_TEMP);
     m_freem(m);
     return EINVAL;
 }

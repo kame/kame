@@ -58,7 +58,7 @@ case ${osname} in
 		altqchr=62
 		;;
 	OpenBSD*i386)
-		altqchr=67
+		altqchr=70
 		;;
 	OpenBSD*alpha)
 		altqchr=52

@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.48 2001/06/03 21:27:29 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.49 2001/06/04 12:03:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -98,6 +98,9 @@
 #else
 #include "bpfilter.h"
 #endif
+#ifdef __OpenBSD__
+#include "bridge.h"
+#endif
 
 #include <net/net_osdep.h>
 
@@ -123,8 +126,13 @@ static int gif_eon_decap(struct ifnet *, struct mbuf **);
 /*
  * gif global variable definitions
  */
+#ifdef __OpenBSD__
+int ngif;			/* number of interfaces */
+struct gif_softc *gif = 0;
+#else
 static int ngif;		/* number of interfaces */
 static struct gif_softc *gif = 0;
+#endif
 
 #ifndef MAX_GIF_NEST
 /*
@@ -150,7 +158,7 @@ gifattach(dummy)
 	struct gif_softc *sc;
 	int i;
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	ngif = dummy;
 #else
 	ngif = NGIF;
@@ -192,6 +200,9 @@ gifattach(dummy)
 		/* turn off ingress filter */
 		sc->gif_if.if_flags  |= IFF_LINK2;
 		sc->gif_if.if_ioctl  = gif_ioctl;
+#ifdef __OpenBSD__
+		sc->gif_if.if_start  = gif_start;
+#endif
 		sc->gif_if.if_output = gif_output;
 		sc->gif_if.if_type   = IFT_GIF;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
@@ -210,6 +221,47 @@ gifattach(dummy)
 
 #ifdef __FreeBSD__
 PSEUDO_SET(gifattach, if_gif);
+#endif
+
+#ifdef __OpenBSD__
+void
+gif_start(ifp)
+        struct ifnet *ifp;
+{
+#if NBRIDGE > 0
+        struct sockaddr dst;
+#endif /* NBRIDGE */
+
+        struct mbuf *m;
+	int s;
+
+#if NBRIDGE > 0
+	bzero(&dst, sizeof(dst));
+
+	/*
+	 * XXX The assumption here is that only the ethernet bridge
+	 * uses the start routine of this interface, and it's thus
+	 * safe to do this.
+	 */
+	dst.sa_family = AF_LINK;
+#endif /* NBRIDGE */
+
+	for (;;) {
+	        s = splimp();
+		IF_DEQUEUE(&ifp->if_snd, m);
+		splx(s);
+
+		if (m == NULL) return;
+
+#if NBRIDGE > 0
+		/* Sanity check -- interface should be member of a bridge */
+		if (ifp->if_bridge == NULL) m_freem(m);
+		else gif_output(ifp, m, &dst, NULL);
+#else
+		m_freem(m);
+#endif /* NBRIDGE */
+	}
+}
 #endif
 
 static int

@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_input.c,v 1.60 2000/10/13 02:01:10 itojun Exp $	*/
+/*	$OpenBSD: ip_input.c,v 1.66 2001/03/28 20:03:03 angelos Exp $	*/
 /*	$NetBSD: ip_input.c,v 1.30 1996/03/16 23:53:58 christos Exp $	*/
 
 /*
@@ -81,10 +81,8 @@
 #define	IPSENDREDIRECTS	1
 #endif
 
-#define PI_MAGIC 0xdeadbeef  /* XXX the horror! */
-
 #ifndef IPMTUDISC
-#define IPMTUDISC	0
+#define IPMTUDISC	1
 #endif
 #ifndef IPMTUDISCTIMEOUT
 #define IPMTUDISCTIMEOUT (10 * 60)	/* as per RFC 1191 */
@@ -314,19 +312,8 @@ ipv4_input(struct mbuf *m, ...)
 	extra = va_arg(ap, int);
 	va_end(ap);
 
-#ifdef IPSEC
-	tdbi = (struct tdb_ident *) m->m_pkthdr.tdbi;
-	if (tdbi == (void *) PI_MAGIC)
-	        tdbi = NULL;
-#endif /* IPSEC */
-
 	if (extra) {
 		struct mbuf *newpacket;
-
-#ifdef IPSEC
-		if (tdbi)
-		        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 
 		if (!(newpacket = m_split(m, extra, M_NOWAIT))) {
 			m_freem(m);
@@ -349,10 +336,6 @@ ipv4_input(struct mbuf *m, ...)
 	if (m->m_len < sizeof (struct ip) &&
 	    (m = m_pullup(m, sizeof (struct ip))) == 0) {
 		ipstat.ips_toosmall++;
-#ifdef IPSEC
-		if (tdbi)
-		        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 		return;
 	}
 	ip = mtod(m, struct ip *);
@@ -368,10 +351,6 @@ ipv4_input(struct mbuf *m, ...)
 	if (hlen > m->m_len) {
 		if ((m = m_pullup(m, hlen)) == 0) {
 			ipstat.ips_badhlen++;
-#ifdef IPSEC
-			if (tdbi)
-			        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 			return;
 		}
 		ip = mtod(m, struct ip *);
@@ -434,10 +413,9 @@ ipv4_input(struct mbuf *m, ...)
 	{
 		struct mbuf *m0 = m;
 		if (fr_checkp && (*fr_checkp)(ip, hlen, m->m_pkthdr.rcvif, 0, &m0)) {
-#ifdef IPSEC
-			if (tdbi)
-			        free(tdbi, M_TEMP);
-#endif /* IPSEC */
+			return;
+		}
+		if (m0 == 0) {  /* in case of 'fastroute' */
 			return;
 		}
 		ip = mtod(m = m0, struct ip *);
@@ -452,10 +430,6 @@ ipv4_input(struct mbuf *m, ...)
 	 */
 	ip_nhops = 0;		/* for source routed packets */
 	if (hlen > sizeof (struct ip) && ip_dooptions(m)) {
-#ifdef IPSEC
-	        if (tdbi)
-		        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 	        return;
 	}
 
@@ -474,10 +448,6 @@ ipv4_input(struct mbuf *m, ...)
 		if (m->m_flags & M_EXT) {
 			if ((m = m_pullup(m, hlen)) == 0) {
 				ipstat.ips_toosmall++;
-#ifdef IPSEC
-				if (tdbi)
-				        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 				return;
 			}
 			ip = mtod(m, struct ip *);
@@ -499,10 +469,6 @@ ipv4_input(struct mbuf *m, ...)
 			ip->ip_id = htons(ip->ip_id);
 			if (ip_mforward(m, m->m_pkthdr.rcvif) != 0) {
 				ipstat.ips_cantforward++;
-#ifdef IPSEC
-				if (tdbi)
-				        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 				m_freem(m);
 				return;
 			}
@@ -526,10 +492,6 @@ ipv4_input(struct mbuf *m, ...)
 		if (inm == NULL) {
 			ipstat.ips_cantforward++;
 			m_freem(m);
-#ifdef IPSEC
-			if (tdbi)
-			        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 			return;
 		}
 		goto ours;
@@ -543,15 +505,12 @@ ipv4_input(struct mbuf *m, ...)
 	 */
 	if (ipforwarding == 0) {
 		ipstat.ips_cantforward++;
-#ifdef IPSEC
-		if (tdbi)
-		        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 		m_freem(m);
 	} else {
 #ifdef IPSEC
 	        /* IPsec policy check for forwarded packets */
                 s = splnet();
+		tdbi = (struct tdb_ident *) m->m_pkthdr.tdbi;
                 if (tdbi == NULL)
                   tdb = NULL;
                 else
@@ -566,11 +525,6 @@ ipv4_input(struct mbuf *m, ...)
 			ipstat.ips_cantforward++;
 			m_freem(m);
 			return;
-		}
-
-		if (tdbi) {
-		        free(tdbi, M_TEMP);
-			m->m_pkthdr.tdbi = NULL;
 		}
 
 		/* Fall through, forward packet */
@@ -592,10 +546,6 @@ ours:
 		if (m->m_flags & M_EXT) {		/* XXX */
 			if ((m = m_pullup(m, hlen)) == 0) {
 				ipstat.ips_toosmall++;
-#ifdef IPSEC
-				if (tdbi) 
-				        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 				return;
 			}
 			ip = mtod(m, struct ip *);
@@ -662,10 +612,6 @@ found:
 			ip = ip_reass(ipqe, fp);
 			if (ip == 0) {
 				ipq_unlock();
-#ifdef IPSEC
-				if (tdbi) 
-				        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 				return;
 			}
 			ipstat.ips_reassembled++;
@@ -698,7 +644,7 @@ found:
 	 * to deal with that).
 	 */
 	if ((ip->ip_p == IPPROTO_IPIP) || (ip->ip_p == IPPROTO_IPV6))
-	  goto skipipsec2;
+	  goto skipipsec;
 
 	/*
 	 * If the protected packet is TCP or UDP, we'll do the
@@ -706,10 +652,11 @@ found:
 	 * check for bypass sockets.
 	 */
 	if ((ip->ip_p == IPPROTO_TCP) || (ip->ip_p == IPPROTO_UDP))
-	  goto skipipsec2;
+	  goto skipipsec;
 
 	/* IPsec policy check for local-delivery packets */
         s = splnet();
+	tdbi = (struct tdb_ident *) m->m_pkthdr.tdbi;
         if (tdbi == NULL)
                 tdb = NULL;
         else
@@ -722,19 +669,11 @@ found:
 	/* Error or otherwise drop-packet indication */
 	if (error) {
 	        ipstat.ips_cantforward++;
-                if (tdbi)
-                        free(tdbi, M_TEMP);
 		m_freem(m);
 		return;
 	}
 
  skipipsec:
-	if (tdbi) {
-	        free(tdbi, M_TEMP);
-		m->m_pkthdr.tdbi = NULL;
-	}
-
- skipipsec2:
 	/* Otherwise, just fall through and deliver the packet */
 #endif /* IPSEC */
 
@@ -745,10 +684,6 @@ found:
 	(*inetsw[ip_protox[ip->ip_p]].pr_input)(m, hlen, NULL, 0);
 	return;
 bad:
-#ifdef IPSEC
-	if (tdbi)
-	        free(tdbi, M_TEMP);
-#endif /* IPSEC */
 	m_freem(m);
 }
 
@@ -1318,13 +1253,15 @@ ip_weadvertise(addr)
 	sin.sin_other = SIN_PROXY;
 	rt = rtalloc1(sintosa(&sin), 0);
 	if (rt == 0)
-	  return 0;
+		return 0;
 	
 	RTFREE(rt);
 	
 	if ((rt->rt_flags & RTF_GATEWAY) || (rt->rt_flags & RTF_LLINFO) == 0 ||
-	    rt->rt_gateway->sa_family != AF_LINK)
-	  return 0;
+	    rt->rt_gateway->sa_family != AF_LINK) {
+		RTFREE(rt);
+		return 0;
+	}
 
 	for (ifp = ifnet.tqh_first; ifp != 0; ifp = ifp->if_list.tqe_next)
 		for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;
@@ -1334,10 +1271,13 @@ ip_weadvertise(addr)
 
 			if (!bcmp(LLADDR((struct sockaddr_dl *)ifa->ifa_addr), 
 			    LLADDR((struct sockaddr_dl *)rt->rt_gateway),
-			    ETHER_ADDR_LEN))
+			    ETHER_ADDR_LEN)) {
+				RTFREE(rt);
 				return 1;
+			}
 		}
 
+	RTFREE(rt);
 	return 0;
 }
 

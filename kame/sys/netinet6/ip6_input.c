@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.195 2001/06/04 08:58:35 keiichi Exp $	*/
+/*	$KAME: ip6_input.c,v 1.196 2001/06/04 12:03:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -144,7 +144,7 @@
 #include <netinet6/ip6protosw.h>
 
 /* we need it for NLOOP. */
-#ifndef __bsdi__
+#if !defined(__bsdi__) && !defined(__OpenBSD__)
 #include "loop.h"
 #endif
 #include "faith.h"
@@ -172,7 +172,7 @@ struct in6_ifaddr *in6_ifaddr;
 struct ifqueue ip6intrq;
 #endif
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__)
 extern struct ifnet loif[NLOOP];
 #endif
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -349,6 +349,8 @@ ip6_init2(dummy)
 	 */
 #ifdef __bsdi__
 	in6_ifattach(loifp, NULL);
+#elif defined(__OpenBSD__)
+	in6_ifattach(lo0ifp, NULL);
 #else
 	in6_ifattach(&loif[0], NULL);
 #endif
@@ -492,6 +494,8 @@ ip6_input(m)
 			if (m->m_flags & M_LOOP) {
 #ifdef __bsdi__
 				ip6stat.ip6s_m2m[loifp->if_index]++;	/*XXX*/
+#elif defined(__OpenBSD__)
+				ip6stat.ip6s_m2m[lo0ifp->if_index]++;	/*XXX*/
 #else
 				ip6stat.ip6s_m2m[loif[0].if_index]++;	/*XXX*/
 #endif

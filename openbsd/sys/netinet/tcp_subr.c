@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_subr.c,v 1.35 2000/10/13 17:58:36 itojun Exp $	*/
+/*	$OpenBSD: tcp_subr.c,v 1.41 2001/04/06 04:42:09 csapuntz Exp $	*/
 /*	$NetBSD: tcp_subr.c,v 1.22 1996/02/13 23:44:00 christos Exp $	*/
 
 /*
@@ -57,6 +57,8 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <sys/socketvar.h>
 #include <sys/protosw.h>
 #include <sys/errno.h>
+#include <sys/time.h>
+#include <sys/kernel.h>
 
 #include <net/route.h>
 #include <net/if.h>
@@ -86,10 +88,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #ifdef TCP_SIGNATURE
 #include <sys/md5k.h>
 #endif /* TCP_SIGNATURE */
-
-#ifndef offsetof
-#define offsetof(type, member)	((size_t)(&((type *)0)->member))
-#endif
 
 /* patchable/settable parameters for tcp */
 int	tcp_mssdflt = TCP_MSS;
@@ -142,10 +140,9 @@ tcp_init()
 {
 #ifdef TCP_COMPAT_42
 	tcp_iss = 1;		/* wrong */
-#else /* TCP_COMPAT_42 */
-	tcp_iss = arc4random() + 1;
-#endif /* !TCP_COMPAT_42 */
+#endif /* TCP_COMPAT_42 */
 	in_pcbinit(&tcbtable, tcbhashsize);
+	tcp_now = arc4random() / 2;
 
 #ifdef INET6
 	/*
@@ -157,11 +154,9 @@ tcp_init()
 	if ((max_linkhdr + sizeof(struct ip6_hdr) + sizeof(struct tcphdr)) >
 	    MHLEN)
 		panic("tcp_init");
-#endif /* INET6 */
 
-#if defined(INET6) && !defined(TCP6)
 	icmp6_mtudisc_callback_register(tcp6_mtudisc_callback);
-#endif
+#endif /* INET6 */
 }
 
 /*
@@ -734,7 +729,7 @@ tcp_notify(inp, error)
 	sowwakeup(so);
 }
 
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 void
 tcp6_ctlinput(cmd, sa, d)
 	int cmd;
@@ -910,7 +905,7 @@ tcp_quench(inp, errno)
 		tp->snd_cwnd = tp->t_maxseg;
 }
 
-#if defined(INET6) && !defined(TCP6)
+#ifdef INET6
 /*
  * Path MTU Discovery handlers.
  */
@@ -927,7 +922,7 @@ tcp6_mtudisc_callback(faddr)
 	(void) in6_pcbnotify(&tcbtable, (struct sockaddr *)&sin6, 0,
 	    (struct sockaddr *)&sa6_any, 0, PRC_MSGSIZE, NULL, tcp_mtudisc);
 }
-#endif /* INET6 && !TCP6 */
+#endif /* INET6 */
 
 /*
  * On receipt of path MTU corrections, flush old route and replace it
@@ -1076,3 +1071,54 @@ tcp_signature_apply(fstate, data, len)
 	return 0;
 }
 #endif /* TCP_SIGNATURE */
+
+#define TCP_RNDISS_ROUNDS	16
+#define TCP_RNDISS_OUT	7200
+#define TCP_RNDISS_MAX	30000
+
+u_int8_t tcp_rndiss_sbox[128];
+u_int16_t tcp_rndiss_msb;
+u_int16_t tcp_rndiss_cnt;
+long tcp_rndiss_reseed;
+
+u_int16_t
+tcp_rndiss_encrypt(val)
+	u_int16_t val;
+{
+	u_int16_t sum = 0, i;
+  
+	for (i = 0; i < TCP_RNDISS_ROUNDS; i++) {
+		sum += 0x79b9;
+		val ^= ((u_int16_t)tcp_rndiss_sbox[(val^sum) & 0x7f]) << 7;
+		val = ((val & 0xff) << 7) | (val >> 8);
+	}
+
+	return val;
+}
+
+void
+tcp_rndiss_init()
+{
+	get_random_bytes(tcp_rndiss_sbox, sizeof(tcp_rndiss_sbox));
+
+	tcp_rndiss_reseed = time.tv_sec + TCP_RNDISS_OUT;
+	tcp_rndiss_msb = tcp_rndiss_msb == 0x8000 ? 0 : 0x8000; 
+	tcp_rndiss_cnt = 0;
+}
+
+tcp_seq
+tcp_rndiss_next()
+{
+	u_int16_t tmp;
+
+        if (tcp_rndiss_cnt >= TCP_RNDISS_MAX ||
+	    time.tv_sec > tcp_rndiss_reseed)
+                tcp_rndiss_init();
+	
+	get_random_bytes(&tmp, sizeof(tmp));
+
+	/* (tmp & 0x7fff) ensures a 32768 byte gap between ISS */
+	return ((tcp_rndiss_encrypt(tcp_rndiss_cnt++) | tcp_rndiss_msb) <<16) |
+		(tmp & 0x7fff);
+}
+

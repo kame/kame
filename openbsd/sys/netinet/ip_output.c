@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_output.c,v 1.83 2000/10/25 22:40:40 aaron Exp $	*/
+/*	$OpenBSD: ip_output.c,v 1.89 2001/04/14 00:30:59 angelos Exp $	*/
 /*	$NetBSD: ip_output.c,v 1.28 1996/02/13 23:43:07 christos Exp $	*/
 
 /*
@@ -78,10 +78,6 @@
 #define DPRINTF(x)    do { if (encdebug) printf x ; } while (0)
 #else
 #define DPRINTF(x)
-#endif
-
-#ifndef offsetof
-#define offsetof(s, e) ((int)&((s *)0)->e)
 #endif
 
 extern u_int8_t get_sa_require  __P((struct inpcb *));
@@ -181,13 +177,15 @@ ip_output(m0, va_alist)
 	 * If the higher-level protocol has cached the SA to use, we
 	 * can avoid the routing lookup if the source address is zero.
 	 */
-	if (inp != NULL && inp->inp_tdb != NULL &&
-	    ip->ip_src.s_addr == INADDR_ANY &&
-	    tdb->tdb_src.sa.sa_family == AF_INET &&
-	    tdb->tdb_src.sin.sin_addr.s_addr != INADDR_ANY) {
-	        ip->ip_src.s_addr = tdb->tdb_src.sin.sin_addr.s_addr;
-		splx(s);
-		goto skip_routing;
+	if (inp != NULL && inp->inp_tdb_out != NULL &&
+	    ip->ip_src.s_addr == INADDR_ANY) {
+		tdb = inp->inp_tdb_out;
+		if (tdb->tdb_src.sa.sa_family == AF_INET &&
+		    tdb->tdb_src.sin.sin_addr.s_addr != INADDR_ANY) {
+			ip->ip_src.s_addr = tdb->tdb_src.sin.sin_addr.s_addr;
+			splx(s);
+			goto skip_routing;
+		}
 	}
 
 	splx(s);
@@ -280,11 +278,11 @@ ip_output(m0, va_alist)
 	 * Check if there was an outgoing SA bound to the flow
 	 * from a transport protocol.
 	 */
-	if (inp && inp->inp_tdb &&
-	    inp->inp_tdb->tdb_dst.sa.sa_family == AF_INET &&
-	    !bcmp(&inp->inp_tdb->tdb_dst.sin.sin_addr,
+	if (inp && inp->inp_tdb_out &&
+	    inp->inp_tdb_out->tdb_dst.sa.sa_family == AF_INET &&
+	    !bcmp(&inp->inp_tdb_out->tdb_dst.sin.sin_addr,
 		  &ip->ip_dst, sizeof(ip->ip_dst)))
-	        tdb = inp->inp_tdb;
+	        tdb = inp->inp_tdb_out;
 	else
 	        tdb = ipsp_spd_lookup(m, AF_INET, hlen, &error,
 				      IPSP_DIRECTION_OUT, NULL, inp);
@@ -313,11 +311,6 @@ ip_output(m0, va_alist)
 			goto done;
 		}
 	} else {
-	        /* We need to do IPsec */
-	        bcopy(&tdb->tdb_dst, &sdst, sizeof(sdst));
-		sspi = tdb->tdb_spi;
-		sproto = tdb->tdb_sproto;
-
 		/*
 		 * If the socket has set the bypass flags and SA
 		 * destination matches the IP destination, skip
@@ -330,10 +323,16 @@ ip_output(m0, va_alist)
 		    (inp->inp_seclevel[SL_ESP_NETWORK] == IPSEC_LEVEL_BYPASS)
 		    && (sdst.sa.sa_family == AF_INET) &&
 		    (sdst.sin.sin_addr.s_addr == ip->ip_dst.s_addr)) {
-		        splx(s);
+			splx(s);
 			sproto = 0; /* mark as no-IPsec-needed */
 			goto done_spd;
 		}
+
+	        /* We need to do IPsec */
+	        bcopy(&tdb->tdb_dst, &sdst, sizeof(sdst));
+		sspi = tdb->tdb_spi;
+		sproto = tdb->tdb_sproto;
+		splx(s);
 
 		/* If it's not a multicast packet, try to fast-path */
 		if (!IN_MULTICAST(ip->ip_dst.s_addr)) {
@@ -548,29 +547,36 @@ sendit:
 		if (fr_checkp) {
 		    /*
 		     * Ok, it's time for a simple round-trip to the IPF/NAT
-		     * code with the enc# interface
+		     * code with the enc0 interface
 		     */
 		    struct mbuf *m0 = m;
-		    void *ifp = tdb->tdb_interface ?
-				(void *)tdb->tdb_interface :
-				      (void *)&encif[0].sc_if;
+		    void *ifp = (void *)&encif[0].sc_if;
 		    if ((*fr_checkp)(ip, hlen, ifp, 1, &m0)) {
 			error = EHOSTUNREACH;
 			splx(s);
 			goto done;
-		    } else {
-			ip = mtod(m = m0, struct ip *);
-			hlen = ip->ip_hl << 2;
 		    }
+		    if (m0 == 0) { /* in case of 'fastroute' */
+			error = 0;
+			splx(s);
+			goto done;
+		    }
+		    ip = mtod(m = m0, struct ip *);
+		    hlen = ip->ip_hl << 2;
   	        }
 #endif /* IPFILTER */
 		
 		tdb = gettdb(sspi, &sdst, sproto);
 		if (tdb == NULL) {
 			error = EHOSTUNREACH;
+			splx(s);
 			m_freem(m);
 			goto done;
 		}
+
+		/* Latch to PCB */
+		if (inp)
+		        tdb_add_inp(tdb, inp, 0);
 
 		/* Massage the IP header for use by the IPsec code */
 		ip->ip_len = htons((u_short) ip->ip_len);
@@ -583,7 +589,8 @@ sendit:
 		m->m_flags &= ~(M_MCAST | M_BCAST);
 
 		/* Callee frees mbuf */
-		error = ipsp_process_packet(m, tdb, AF_INET, 0);
+		/* XXX Last argument should be used */
+		error = ipsp_process_packet(m, tdb, AF_INET, 0, NULL);
 		splx(s);
 		return error;  /* Nothing more to be done */
 	}
@@ -598,8 +605,12 @@ sendit:
 		if (fr_checkp && (*fr_checkp)(ip, hlen, ifp, 1, &m0)) {
 			error = EHOSTUNREACH;
 			goto done;
-		} else
-			ip = mtod(m = m0, struct ip *);
+		}
+		if (m0 == 0) { /* in case of 'fastroute' */
+			error = 0;
+			goto done;
+		}
+		ip = mtod(m = m0, struct ip *);
 	}
 #endif
 	/*

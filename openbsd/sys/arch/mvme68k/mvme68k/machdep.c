@@ -1,4 +1,4 @@
-/*	$OpenBSD: machdep.c,v 1.33 2000/03/23 09:59:55 art Exp $ */
+/*	$OpenBSD: machdep.c,v 1.36 2001/04/17 04:30:46 aaron Exp $ */
 
 /*
  * Copyright (c) 1995 Theo de Raadt
@@ -173,6 +173,7 @@ static struct consdev bootcons = {
 	bootcngetc, 
 	bootcnputc,
 	bootcnpollc, 
+	NULL,
 	makedev(14,0), 
 	1};
 

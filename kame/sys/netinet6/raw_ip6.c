@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.78 2001/05/27 13:28:35 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.79 2001/06/04 12:03:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -567,7 +567,9 @@ rip6_output(m, va_alist)
 		int off;
 		u_int16_t sum;
 
+#ifndef offsetof
 #define	offsetof(type, member)	((size_t)(&((type *)0)->member)) /* XXX */
+#endif
 
 		/* compute checksum */
 		if (so->so_proto->pr_protocol == IPPROTO_ICMPV6)

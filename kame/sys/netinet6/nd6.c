@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.148 2001/06/04 09:02:35 keiichi Exp $	*/
+/*	$KAME: nd6.c,v 1.149 2001/06/04 12:03:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,10 +101,10 @@
 #include <netinet6/in6_prefix.h>
 #include <netinet/icmp6.h>
 
-#ifndef __bsdi__
+#if !defined(__bsdi__) && !defined(__OpenBSD__)
 #include "loop.h"
 #endif
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__)
 extern struct ifnet loif[NLOOP];
 #endif
 
@@ -1370,7 +1370,9 @@ nd6_rtrequest(req, rt, sa)
 				extern struct ifnet loif;
 				rt->rt_ifp = &loif;	/*XXX*/
 #endif
-#else /* non-bsdi */
+#elif defined(__OpenBSD__)
+				rt->rt_ifp = lo0ifp;	/*XXX*/
+#else
 				rt->rt_ifp = &loif[0];	/*XXX*/
 #endif
 				/*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: in6_pcb.c,v 1.20 2000/10/11 09:14:14 itojun Exp $	*/
+/*	$OpenBSD: in6_pcb.c,v 1.25 2001/02/16 16:00:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.

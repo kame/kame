@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_icmp.c,v 1.30 2000/10/17 22:33:51 provos Exp $	*/
+/*	$OpenBSD: ip_icmp.c,v 1.33 2001/03/28 20:03:03 angelos Exp $	*/
 /*	$NetBSD: ip_icmp.c,v 1.19 1996/02/13 23:42:22 christos Exp $	*/
 
 /*
@@ -367,6 +367,13 @@ icmp_input(m, va_alist)
 		code = PRC_QUENCH;
 	deliver:
 		/*
+		 * Free packet atttributes. XXX
+		 */
+		if ((m->m_flags & M_PKTHDR) && (m->m_pkthdr.tdbi)) {
+		    free(m->m_pkthdr.tdbi, M_TEMP);
+		    m->m_pkthdr.tdbi = NULL;
+		}
+		/*
 		 * Problem with datagram; advise higher level routines.
 		 */
 		if (icmplen < ICMP_ADVLENMIN || icmplen < ICMP_ADVLEN(icp) ||
@@ -466,6 +473,13 @@ icmp_input(m, va_alist)
 				ip->ip_src = ia->ia_dstaddr.sin_addr;
 		}
 reflect:
+		/*
+		 * Free packet atttributes. XXX
+		 */
+		if ((m->m_flags & M_PKTHDR) && (m->m_pkthdr.tdbi)) {
+		    free(m->m_pkthdr.tdbi, M_TEMP);
+		    m->m_pkthdr.tdbi = NULL;
+		}
 		ip->ip_len += hlen;	/* since ip_input deducts this */
 		icmpstat.icps_reflect++;
 		icmpstat.icps_outhist[icp->icmp_type]++;
@@ -473,6 +487,13 @@ reflect:
 		return;
 
 	case ICMP_REDIRECT:
+		/*
+		 * Free packet atttributes. XXX
+		 */
+		if ((m->m_flags & M_PKTHDR) && (m->m_pkthdr.tdbi)) {
+		    free(m->m_pkthdr.tdbi, M_TEMP);
+		    m->m_pkthdr.tdbi = NULL;
+		}
 		if (code > 3)
 			goto badcode;
 		if (icmplen < ICMP_ADVLENMIN || icmplen < ICMP_ADVLEN(icp) ||
@@ -567,8 +588,7 @@ icmp_reflect(m)
 					      m->m_pkthdr.rcvif));
 	/*
 	 * The following happens if the packet was not addressed to us,
-	 * and was received on an interface with no IP address (like an
-	 * enc interface).
+	 * and was received on an interface with no IP address.
 	 */
 	if (ia == (struct in_ifaddr *)0) {
 	        struct sockaddr_in *dst;
@@ -747,23 +767,15 @@ icmp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	/* NOTREACHED */
 }
 
-void
-icmp_mtudisc(icp)
-	struct icmp *icp;
+struct rtentry *
+icmp_mtudisc_clone(struct sockaddr *dst)
 {
 	struct rtentry *rt;
-	struct sockaddr *dst = sintosa(&icmpsrc);
-	u_long mtu = ntohs(icp->icmp_nextmtu);  /* Why a long?  IPv6 */
-	int    error;
-	
-	/* Table of common MTUs: */
+	int error;
 
-	static u_short mtu_table[] = {65535, 65280, 32000, 17914, 9180, 8166, 
-				      4352, 2002, 1492, 1006, 508, 296, 68, 0};
-    
 	rt = rtalloc1(dst, 1);
 	if (rt == 0)
-		return;
+		return (NULL);
     
 	/* If we didn't get a host route, allocate one */
     
@@ -776,8 +788,7 @@ icmp_mtudisc(icp)
 		    RTF_GATEWAY | RTF_HOST | RTF_DYNAMIC, &nrt);
 		if (error) {
 			rtfree(rt);
-			rtfree(nrt);
-			return;
+			return (NULL);
 		}
 		nrt->rt_rmx = rt->rt_rmx;
 		rtfree(rt);
@@ -786,8 +797,28 @@ icmp_mtudisc(icp)
 	error = rt_timer_add(rt, icmp_mtudisc_timeout, ip_mtudisc_timeout_q);
 	if (error) {
 		rtfree(rt);
-		return;
+		return (NULL);
 	}
+
+	return (rt);
+}
+
+void
+icmp_mtudisc(icp)
+	struct icmp *icp;
+{
+	struct rtentry *rt;
+	struct sockaddr *dst = sintosa(&icmpsrc);
+	u_long mtu = ntohs(icp->icmp_nextmtu);  /* Why a long?  IPv6 */
+	
+	/* Table of common MTUs: */
+
+	static u_short mtu_table[] = {65535, 65280, 32000, 17914, 9180, 8166, 
+				      4352, 2002, 1492, 1006, 508, 296, 68, 0};
+
+	rt = icmp_mtudisc_clone(dst);
+	if (rt == 0)
+		return;
 
 	if (mtu == 0) {
 		int i = 0;
@@ -831,8 +862,7 @@ icmp_mtudisc(icp)
 			rt->rt_rmx.rmx_mtu = mtu;
 	}
 
-	if (rt)
-		rtfree(rt);
+	rtfree(rt);
 }
 
 void

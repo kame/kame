@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_x25subr.c,v 1.4 1999/12/08 06:50:18 itojun Exp $	*/
+/*	$OpenBSD: if_x25subr.c,v 1.5 2001/01/19 06:37:37 itojun Exp $	*/
 /*	$NetBSD: if_x25subr.c,v 1.13 1996/05/09 22:29:25 scottr Exp $	*/
 
 /*

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.38 2001/06/04 08:57:09 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.39 2001/06/04 12:03:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -107,10 +107,10 @@
 
 #include <net/net_osdep.h>
 
-#ifndef __bsdi__
+#if !defined(__bsdi__) && !defined(__OpenBSD__)
 #include "loop.h"
 #endif
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__)
 extern struct ifnet loif[NLOOP];
 #endif
 
@@ -223,6 +223,8 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		if (ifp == NULL && IN6_IS_ADDR_MC_NODELOCAL(dst)) {
 #ifdef __bsdi__
 			ifp = loifp;
+#elif defined(__OpenBSD__)
+			ifp = lo0ifp;
 #else
 			ifp = &loif[0];
 #endif

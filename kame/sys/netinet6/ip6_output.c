@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.181 2001/06/04 09:00:31 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.182 2001/06/04 12:03:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -136,7 +136,7 @@ extern int ipsec_esp_network_default_level;
 #endif
 #endif /* IPSEC */
 
-#ifndef __bsdi__
+#if !defined(__bsdi__) && !defined(__OpenBSD__)
 #include "loop.h"
 #endif
 
@@ -181,7 +181,7 @@ extern struct ifnet loif;
 extern struct ifnet *loifp;
 #endif
 #endif
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__)
 extern struct ifnet loif[NLOOP];
 #endif
 
@@ -323,11 +323,11 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	 * from a transport protocol.
 	 */
 	ip6 = mtod(m, struct ip6_hdr *);
-	if (inp && inp->inp_tdb &&
-	    inp->inp_tdb->tdb_dst.sa.sa_family == AF_INET6 &&
-	    IN6_ARE_ADDR_EQUAL(&inp->inp_tdb->tdb_dst.sin6.sin6_addr,
+	if (inp && inp->inp_tdb_out &&
+	    inp->inp_tdb_out->tdb_dst.sa.sa_family == AF_INET6 &&
+	    IN6_ARE_ADDR_EQUAL(&inp->inp_tdb_out->tdb_dst.sin6.sin6_addr,
 		  &ip6->ip6_dst)) {
-	        tdb = inp->inp_tdb;
+	        tdb = inp->inp_tdb_out;
 	} else {
 	        tdb = ipsp_spd_lookup(m, AF_INET6, sizeof(struct ip6_hdr),
 	            &error, IPSP_DIRECTION_OUT, NULL, NULL);
@@ -713,10 +713,14 @@ skip_ipsec2:;
 			goto done;
 		}
 
+		/* Latch to PCB */
+		if (inp)
+			tdb_add_inp(tdb, inp, 0);
+
 		m->m_flags &= ~(M_BCAST | M_MCAST);	/* just in case */
 
 		/* Callee frees mbuf */
-		error = ipsp_process_packet(m, tdb, AF_INET6, 0);
+		error = ipsp_process_packet(m, tdb, AF_INET6, 0, NULL);
 		splx(s);
 
 		return error;  /* Nothing more to be done */
@@ -883,6 +887,8 @@ skip_ipsec2:;
 			} else {
 #ifdef __bsdi__
 				ifp = loifp;
+#elif defined(__OpenBSD__)
+				ifp = lo0ifp;
 #else
 				ifp = &loif[0];
 #endif
@@ -2153,7 +2159,7 @@ do { \
 					if (tdb == NULL)
 						error = ESRCH;
 					else
-						tdb_add_inp(tdb, inp);
+						tdb_add_inp(tdb, inp, 0);
 				}
 				splx(s);
 #endif
@@ -2550,12 +2556,12 @@ do { \
 				error = EINVAL;
 #else
 				s = spltdb();
-				if (inp->inp_tdb == NULL) {
+				if (inp->inp_tdb_out == NULL) {
 					error = ENOENT;
 				} else {
-					tdbi.spi = inp->inp_tdb->tdb_spi;
-					tdbi.dst = inp->inp_tdb->tdb_dst;
-					tdbi.proto = inp->inp_tdb->tdb_sproto;
+					tdbi.spi = inp->inp_tdb_out->tdb_spi;
+					tdbi.dst = inp->inp_tdb_out->tdb_dst;
+					tdbi.proto = inp->inp_tdb_out->tdb_sproto;
 					*mp = m = m_get(M_WAIT, MT_SOOPTS);
 					m->m_len = sizeof(tdbi);
 					bcopy((caddr_t)&tdbi, mtod(m, caddr_t),
@@ -3342,6 +3348,8 @@ ip6_setmoptions(optname, im6op, m)
 			if (IN6_IS_ADDR_MC_NODELOCAL(&mreq->ipv6mr_multiaddr)) {
 #ifdef __bsdi__
 				ifp = loifp;
+#elif defined(__OpenBSD__)
+				ifp = lo0ifp;
 #else
 				ifp = &loif[0];
 #endif

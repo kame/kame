@@ -1,4 +1,4 @@
-/*	$OpenBSD: eonvar.h,v 1.2 1996/03/04 10:35:13 mickey Exp $	*/
+/*	$OpenBSD: eonvar.h,v 1.3 2001/01/19 06:37:38 itojun Exp $	*/
 /*	$NetBSD: eonvar.h,v 1.6 1996/02/13 22:09:18 christos Exp $	*/
 
 /*-

@@ -1,4 +1,4 @@
-/*	$OpenBSD: rtsock.c,v 1.11 2000/03/12 01:27:11 itojun Exp $	*/
+/*	$OpenBSD: rtsock.c,v 1.13 2001/01/19 06:37:37 itojun Exp $	*/
 /*	$NetBSD: rtsock.c,v 1.18 1996/03/29 00:32:10 cgd Exp $	*/
 
 /*
@@ -250,6 +250,14 @@ route_output(m, va_alist)
 		senderr(EACCES);
 	switch (rtm->rtm_type) {
 
+	case RTM_DELETE:
+		error = rtrequest1(rtm->rtm_type, &info, &saved_nrt);
+		if (error == 0) {
+			(rt = saved_nrt)->rt_refcnt++;
+			goto report;
+		}
+		break;
+
 	case RTM_ADD:
 		if (gate == 0)
 			senderr(EINVAL);
@@ -260,16 +268,7 @@ route_output(m, va_alist)
 			saved_nrt->rt_refcnt--;
 			saved_nrt->rt_genmask = genmask;
 		}
-		break;
-
-	case RTM_DELETE:
-		error = rtrequest1(rtm->rtm_type, &info, &saved_nrt);
-		if (error == 0) {
-			(rt = saved_nrt)->rt_refcnt++;
-			goto report;
-		}
-		break;
-
+		/* FALLTHROUGH */
 	case RTM_GET:
 	case RTM_CHANGE:
 	case RTM_LOCK:
@@ -332,9 +331,6 @@ route_output(m, va_alist)
 				senderr(error);
 			if (gate && rt_setgate(rt, rt_key(rt), gate))
 				senderr(EDQUOT);
-			/* new gateway could require new ifaddr, ifp;
-			   flags may also be different; ifp may be specified
-			   by ll sockaddr when protocol address is ambiguous */
 			if (ifpaddr && (ifa = ifa_ifwithnet(ifpaddr)) &&
 			    (ifp = ifa->ifa_ifp) && (ifaaddr || gate))
 				ifa = ifaof_ifpforaddr(ifaaddr ? ifaaddr : gate,
@@ -364,6 +360,7 @@ route_output(m, va_alist)
 			/*
 			 * Fall into
 			 */
+		case RTM_ADD:
 		case RTM_LOCK:
 			rt->rt_rmx.rmx_locks &= ~(rtm->rtm_inits);
 			rt->rt_rmx.rmx_locks |=

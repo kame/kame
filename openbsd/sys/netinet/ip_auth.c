@@ -1,14 +1,14 @@
-/*	$OpenBSD: ip_auth.c,v 1.14 2000/05/24 21:59:10 kjell Exp $	*/
+/*	$OpenBSD: ip_auth.c,v 1.17 2001/01/30 04:23:55 kjell Exp $	*/
 
 /*
- * Copyright (C) 1998 by Darren Reed & Guido van Rooij.
+ * Copyright (C) 1998-2000 by Darren Reed & Guido van Rooij.
  *
  * Redistribution and use in source and binary forms are permitted
  * provided that this notice is preserved and due credit is given
  * to the original author and the contributors.
  */
 #if !defined(lint)
-static const char rcsid[] = "@(#)$IPFilter: ip_auth.c,v 2.1.2.4 2000/05/22 06:57:45 darrenr Exp $";
+static const char rcsid[] = "@(#)$IPFilter: ip_auth.c,v 2.11.2.5 2001/01/10 06:18:35 darrenr Exp $";
 #endif
 
 #include <sys/errno.h>
@@ -32,7 +32,7 @@ static const char rcsid[] = "@(#)$IPFilter: ip_auth.c,v 2.1.2.4 2000/05/22 06:57
 # include <sys/protosw.h>
 #endif
 #include <sys/socket.h>
-#if defined(_KERNEL) && !defined(linux)
+#if (defined(_KERNEL) || defined(KERNEL)) && !defined(linux)
 # include <sys/systm.h>
 #endif
 #if !defined(__SVR4) && !defined(__svr4__)
@@ -48,7 +48,7 @@ static const char rcsid[] = "@(#)$IPFilter: ip_auth.c,v 2.1.2.4 2000/05/22 06:57
 # include <sys/stream.h>
 # include <sys/kmem.h>
 #endif
-#if _BSDI_VERSION >= 199802
+#if (_BSDI_VERSION >= 199802) || (__FreeBSD_version >= 400000)
 # include <sys/queue.h>
 #endif
 #if defined(__NetBSD__) || defined(__OpenBSD__) || defined(bsdi)
@@ -130,11 +130,12 @@ static struct wait_queue *ipfauthwait = NULL;
 int	fr_authsize = FR_NUMAUTH;
 int	fr_authused = 0;
 int	fr_defaultauthage = 600;
+int	fr_auth_lock = 0;
 fr_authstat_t	fr_authstats;
-frauth_t fr_auth[FR_NUMAUTH];
+static frauth_t fr_auth[FR_NUMAUTH];
 mb_t	*fr_authpkts[FR_NUMAUTH];
-int	fr_authstart = 0, fr_authend = 0, fr_authnext = 0;
-frauthent_t	*fae_list = NULL;
+static int	fr_authstart = 0, fr_authend = 0, fr_authnext = 0;
+static frauthent_t	*fae_list = NULL;
 frentry_t	*ipauth = NULL;
 
 
@@ -150,6 +151,9 @@ fr_info_t *fin;
 	u_short id = ip->ip_id;
 	u_32_t pass;
 	int i;
+
+	if (fr_auth_lock)
+		return 0;
 
 	READ_ENTER(&ipf_auth);
 	for (i = fr_authstart; i != fr_authend; ) {
@@ -213,6 +217,9 @@ ip_t *ip;
 #endif
 	int i;
 
+	if (fr_auth_lock)
+		return 0;
+
 	WRITE_ENTER(&ipf_auth);
 	if (fr_authstart > fr_authend) {
 		fr_authstats.fas_nospace++;
@@ -242,14 +249,15 @@ ip_t *ip;
 	 * them.
 	 */
 # if SOLARIS && defined(_KERNEL)
-	if (ip == (ip_t *)m->b_rptr)
+	if ((ip == (ip_t *)m->b_rptr) && (ip->ip_v == 4))
 # endif
 	{
 		register u_short bo;
 
 		bo = ip->ip_len;
 		ip->ip_len = htons(bo);
-# if !SOLARIS	/* 4.4BSD converts this ip_input.c, but I don't in solaris.c */
+# if !SOLARIS && !defined(__NetBSD__)
+		/* 4.4BSD converts this ip_input.c, but I don't in solaris.c */
 		bo = ip->ip_id;
 		ip->ip_id = htons(bo);
 # endif
@@ -276,7 +284,7 @@ ip_t *ip;
 
 int fr_auth_ioctl(data, cmd, fr, frptr)
 caddr_t data;
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__) || (FreeBSD_version >= 300003)
 u_long cmd;
 #else
 int cmd;
@@ -284,11 +292,8 @@ int cmd;
 frentry_t *fr, **frptr;
 {
 	mb_t *m;
-#if defined(_KERNEL)
-# if !SOLARIS
+#if defined(_KERNEL) && !SOLARIS
 	struct ifqueue *ifq;
-	int s;
-# endif
 #endif
 	frauth_t auth, *au = &auth;
 	frauthent_t *fae, **faep;
@@ -296,12 +301,17 @@ frentry_t *fr, **frptr;
 
 	switch (cmd)
 	{
+	case SIOCSTLCK :
+		error = fr_lock(data, &fr_auth_lock);
+		break;
 	case SIOCINIFR :
 	case SIOCRMIFR :
 	case SIOCADIFR :
 		error = EINVAL;
 		break;
 	case SIOCINAFR :
+		error = EINVAL;
+		break;
 	case SIOCRMAFR :
 	case SIOCADAFR :
 		for (faep = &fae_list; (fae = *faep); )
@@ -322,8 +332,8 @@ frentry_t *fr, **frptr;
 		} else {
 			KMALLOC(fae, frauthent_t *);
 			if (fae != NULL) {
-				IRCOPY((char *)data, (char *)&fae->fae_fr,
-				       sizeof(fae->fae_fr));
+				bcopy((char *)fr, (char *)&fae->fae_fr,
+				      sizeof(*fr));
 				WRITE_ENTER(&ipf_auth);
 				fae->fae_age = fr_defaultauthage;
 				fae->fae_fr.fr_hits = 0;
@@ -341,15 +351,18 @@ frentry_t *fr, **frptr;
 		READ_ENTER(&ipf_auth);
 		fr_authstats.fas_faelist = fae_list;
 		RWLOCK_EXIT(&ipf_auth);
-		IWCOPY((char *)&fr_authstats, data, sizeof(fr_authstats));
+		error = IWCOPYPTR((char *)&fr_authstats, data,
+				   sizeof(fr_authstats));
 		break;
 	case SIOCAUTHW:
 fr_authioctlloop:
 		READ_ENTER(&ipf_auth);
 		if ((fr_authnext != fr_authend) && fr_authpkts[fr_authnext]) {
-			IWCOPY((char *)&fr_auth[fr_authnext], data,
-			       sizeof(fr_info_t));
+			error = IWCOPYPTR((char *)&fr_auth[fr_authnext], data,
+					  sizeof(frauth_t));
 			RWLOCK_EXIT(&ipf_auth);
+			if (error)
+				break;
 			WRITE_ENTER(&ipf_auth);
 			fr_authnext++;
 			if (fr_authnext == FR_NUMAUTH)
@@ -380,7 +393,9 @@ fr_authioctlloop:
 			goto fr_authioctlloop;
 		break;
 	case SIOCAUTHR:
-		IRCOPY(data, (caddr_t)&auth, sizeof(auth));
+		error = IRCOPYPTR(data, (caddr_t)&auth, sizeof(auth));
+		if (error)
+			return error;
 		WRITE_ENTER(&ipf_auth);
 		i = au->fra_index;
 		if ((i < 0) || (i > FR_NUMAUTH) ||
@@ -394,7 +409,6 @@ fr_authioctlloop:
 		fr_authpkts[i] = NULL;
 #ifdef	_KERNEL
 		RWLOCK_EXIT(&ipf_auth);
-		SPL_NET(s);
 # ifndef linux
 		if (m && au->fra_info.fin_out) {
 #  if SOLARIS
@@ -460,7 +474,6 @@ fr_authioctlloop:
 			}
 		}
 # endif
-		SPL_X(s);
 #endif /* _KERNEL */
 		break;
 	default :
@@ -513,6 +526,9 @@ void fr_authexpire()
 #if !SOLARIS
 	int s;
 #endif
+
+	if (fr_auth_lock)
+		return;
 
 	SPL_NET(s);
 	WRITE_ENTER(&ipf_auth);

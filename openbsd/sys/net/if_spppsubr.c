@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_spppsubr.c,v 1.5 2000/04/26 18:39:38 chris Exp $	*/
+/*	$OpenBSD: if_spppsubr.c,v 1.8 2001/03/25 02:56:18 csapuntz Exp $	*/
 /*
  * Synchronous PPP/Cisco link level subroutines.
  * Keepalive protocol implemented in both Cisco and PPP modes.
@@ -49,6 +49,7 @@
 #include <sys/mbuf.h>
 
 #if defined (__OpenBSD__)
+#include <sys/timeout.h>
 #include <sys/md5k.h>
 #else
 #include <sys/md5.h>
@@ -103,6 +104,9 @@
 #if defined (__FreeBSD__)
 # define UNTIMEOUT(fun, arg, handle)	\
 	untimeout(fun, arg, handle)
+#elif defined(__OpenBSD__)
+# define UNTIMEOUT(fun, arg, handle)	\
+	timeout_del(&(handle))
 #else
 # define UNTIMEOUT(fun, arg, handle)	\
 	untimeout(fun, arg)
@@ -256,6 +260,9 @@ struct cp {
 };
 
 static struct sppp *spppq;
+#if defined (__OpenBSD__)
+static struct timeout keepalive_ch;
+#endif
 #if defined (__FreeBSD__)
 static struct callout_handle keepalive_ch;
 #endif
@@ -832,9 +839,11 @@ sppp_attach(struct ifnet *ifp)
 	/* Initialize keepalive handler. */
 	if (! spppq)
 #if defined (__FreeBSD__)
-		keepalive_ch =
+		keepalive_ch = timeout(sppp_keepalive, 0, hz * 10);
+#elif defined(__OpenBSD__)
+		timeout_set(&keepalive_ch, sppp_keepalive, NULL);
+		timeout_add(&keepalive_ch, hz * 10);
 #endif
-		timeout(sppp_keepalive, 0, hz * 10);
 
 	/* Insert new entry into the keepalive list. */
 	sp->pp_next = spppq;
@@ -1009,15 +1018,19 @@ sppp_ioctl(struct ifnet *ifp, u_long cmd, void *data)
 
 #ifdef SIOCSIFMTU
 	case SIOCSIFMTU:
-		if (ifr->ifr_mtu < 128 || ifr->ifr_mtu > sp->lcp.their_mru)
+		if (ifr->ifr_mtu < 128 || ifr->ifr_mtu > sp->lcp.their_mru) {
+			splx(s);
 			return (EINVAL);
+		}
 		ifp->if_mtu = ifr->ifr_mtu;
 		break;
 #endif
 #ifdef SLIOCSETMTU
 	case SLIOCSETMTU:
-		if (*(short*)data < 128 || *(short*)data > sp->lcp.their_mru)
+		if (*(short*)data < 128 || *(short*)data > sp->lcp.their_mru) {
+			splx(s);
 			return (EINVAL);
+		}
 		ifp->if_mtu = *(short*)data;
 		break;
 #endif
@@ -1181,11 +1194,13 @@ sppp_cisco_send(struct sppp *sp, int type, long par1, long par2)
 		IF_DROP (&sp->pp_fastq);
 		IF_DROP (&ifp->if_snd);
 		m_freem (m);
+		m = NULL;
 	} else
 		IF_ENQUEUE (&sp->pp_cpq, m);
 	if (! (ifp->if_flags & IFF_OACTIVE))
 		(*ifp->if_start) (ifp);
-	ifp->if_obytes += m->m_pkthdr.len + 3;
+	if (m != NULL)
+		ifp->if_obytes += m->m_pkthdr.len + 3;
 }
 
 /*
@@ -1239,11 +1254,13 @@ sppp_cp_send(struct sppp *sp, u_short proto, u_char type,
 		IF_DROP (&ifp->if_snd);
 		m_freem (m);
 		++ifp->if_oerrors;
+		m = NULL;
 	} else
 		IF_ENQUEUE (&sp->pp_cpq, m);
 	if (! (ifp->if_flags & IFF_OACTIVE))
 		(*ifp->if_start) (ifp);
-	ifp->if_obytes += m->m_pkthdr.len + 3;
+	if (m != NULL)
+		ifp->if_obytes += m->m_pkthdr.len + 3;
 }
 
 /*
@@ -1742,8 +1759,11 @@ sppp_increasing_timeout (const struct cp *cp, struct sppp *sp)
 		timo = 1;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	sp->ch[cp->protoidx] = 
+	    timeout(cp->TO, (void *)sp, timo * sp->lcp.timeout);
+#elif defined(__OpenBSD__)
+	timeout_set(&sp->ch[cp->protoidx], cp->TO, (void *)sp);
+	timeout_add(&sp->ch[cp->protoidx], timo * sp->lcp.timeout);
 #endif
-	timeout(cp->TO, (void *)sp, timo * sp->lcp.timeout);
 }
 
 HIDE void
@@ -3309,9 +3329,11 @@ sppp_chap_tlu(struct sppp *sp)
 		i = 300 + ((unsigned)(random() & 0xff00) >> 7);
 
 #if defined (__FreeBSD__)
-		sp->ch[IDX_CHAP] =
+		sp->ch[IDX_CHAP] = timeout(chap.TO, (void *)sp, i * hz);
+#elif defined(__OpenBSD__)
+		timeout_set(&sp->ch[IDX_CHAP], chap.TO, (void *)sp);
+		timeout_add(&sp->ch[IDX_CHAP], i * hz);
 #endif
-		timeout(chap.TO, (void *)sp, i * hz);
 	}
 
 	if (debug) {
@@ -3578,8 +3600,11 @@ sppp_pap_open(struct sppp *sp)
 		pap.scr(sp);
 #if defined (__FreeBSD__)
 		sp->pap_my_to_ch =
+		    timeout(sppp_pap_my_TO, (void *)sp, sp->lcp.timeout);
+#elif defined (__OpenBSD__)
+		timeout_set(&sp->pap_my_to_ch, sppp_pap_my_TO, (void *)sp);
+		timeout_add(&sp->pap_my_to_ch, sp->lcp.timeout);
 #endif
-		timeout(sppp_pap_my_TO, (void *)sp, sp->lcp.timeout);
 	}
 }
 
@@ -3780,11 +3805,13 @@ sppp_auth_send(const struct cp *cp, struct sppp *sp, u_char type, u_char id,
 		IF_DROP (&ifp->if_snd);
 		m_freem (m);
 		++ifp->if_oerrors;
+		m = NULL;
 	} else
 		IF_ENQUEUE (&sp->pp_cpq, m);
 	if (! (ifp->if_flags & IFF_OACTIVE))
 		(*ifp->if_start) (ifp);
-	ifp->if_obytes += m->m_pkthdr.len + 3;
+	if (m != NULL)
+		ifp->if_obytes += m->m_pkthdr.len + 3;
 }
 
 /*
@@ -3853,9 +3880,11 @@ sppp_keepalive(void *dummy)
 	}
 	splx(s);
 #if defined (__FreeBSD__)
-	keepalive_ch =
+	keepalive_ch = timeout(sppp_keepalive, 0, hz * 10);
 #endif
-	timeout(sppp_keepalive, 0, hz * 10);
+#if defined (__OpenBSD__)
+	timeout_add(&keepalive_ch, hz * 10);
+#endif
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ethersubr.c,v 1.39 2000/10/18 16:16:33 jason Exp $	*/
+/*	$OpenBSD: if_ethersubr.c,v 1.44 2001/03/23 02:15:23 jason Exp $	*/
 /*	$NetBSD: if_ethersubr.c,v 1.19 1996/05/07 02:40:30 thorpej Exp $	*/
 
 /*
@@ -77,6 +77,8 @@ You should have received a copy of the license with this software. If you
 didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 */
 
+#include "bpfilter.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -87,6 +89,7 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <sys/ioctl.h>
 #include <sys/errno.h>
 #include <sys/syslog.h>
+#include <sys/timeout.h>
 
 #include <machine/cpu.h>
 
@@ -102,6 +105,10 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/in_var.h>
 #endif
 #include <netinet/if_ether.h>
+
+#if NBPFILTER > 0
+#include <net/bpf.h>
+#endif
 
 #include "bridge.h"
 #if NBRIDGE > 0
@@ -582,6 +589,8 @@ ether_input(ifp, eh, m)
 	if (m->m_flags & (M_BCAST|M_MCAST))
 		ifp->if_imcasts++;
 
+	etype = ntohs(eh->ether_type);
+
 #if NBRIDGE > 0
 	/*
 	 * Tap the packet off here for a bridge, if configured and
@@ -590,14 +599,26 @@ ether_input(ifp, eh, m)
 	 * gets processed as normal.
 	 */
 	if (ifp->if_bridge) {
-		m = bridge_input(ifp, eh, m);
-		if (m == NULL)
-			return;
-		/* The bridge has determined it's for us. */
-		ifp = m->m_pkthdr.rcvif;
-		goto decapsulate;
+		if (m->m_flags & M_PROTO1)
+			m->m_flags &= ~M_PROTO1;
+		else {
+			m = bridge_input(ifp, eh, m);
+			if (m == NULL)
+				return;
+			/* The bridge has determined it's for us. */
+			ifp = m->m_pkthdr.rcvif;
+		}
 	}
 #endif
+
+#if NVLAN > 0
+	if (etype == ETHERTYPE_8021Q) {
+		if (vlan_input(eh, m) < 0)
+			ifp->if_data.ifi_noproto++;
+		return;
+       }
+#endif /* NVLAN > 0 */
+
 	/*
 	 * If packet is unicast and we're in promiscuous mode, make sure it
 	 * is for us.  Drop otherwise.
@@ -612,16 +633,6 @@ ether_input(ifp, eh, m)
 	}
 
 decapsulate:
-
-	etype = ntohs(eh->ether_type);
-
-#if NVLAN > 0
-	if (etype == vlan_proto) {
-		if (vlan_input(eh, m) < 0)
-			ifp->if_data.ifi_noproto++;
-		return;
-       }
-#endif /* NVLAN > 0 */
 
 	switch (etype) {
 #ifdef INET
@@ -888,6 +899,9 @@ ether_ifattach(ifp)
 			break;
 		}
 	LIST_INIT(&((struct arpcom *)ifp)->ac_multiaddrs);
+#if NBPFILTER > 0
+	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
+#endif
 }
 
 void

@@ -1,4 +1,4 @@
-/*	$OpenBSD: uipc_syscalls.c,v 1.32 2000/10/12 09:58:05 itojun Exp $	*/
+/*	$OpenBSD: uipc_syscalls.c,v 1.36 2001/02/19 18:21:30 art Exp $	*/
 /*	$NetBSD: uipc_syscalls.c,v 1.19 1996/02/09 19:00:48 christos Exp $	*/
 
 /*
@@ -43,6 +43,7 @@
 #include <sys/file.h>
 #include <sys/buf.h>
 #include <sys/malloc.h>
+#include <sys/event.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
@@ -195,11 +196,16 @@ sys_accept(p, v, retval)
 		return (error);
 	}
 	*retval = tmpfd;
+
+	/* connection has been removed from the listen queue */
+	KNOTE(&so->so_rcv.sb_sel.si_note, 0);
+
 	{ struct socket *aso = so->so_q;
 	  if (soqremque(aso, 1) == 0)
 		panic("accept");
 	  so = aso;
 	}
+
 	fp->f_type = DTYPE_SOCKET;
 	fp->f_flag = FREAD|FWRITE;
 	fp->f_ops = &socketops;
@@ -396,7 +402,7 @@ sys_sendmsg(p, v, retval)
 	if (msg.msg_iovlen <= 0 || msg.msg_iovlen > IOV_MAX)
 		return (EMSGSIZE);
 	if (msg.msg_iovlen > UIO_SMALLIOV)
-		iov = malloc( sizeof(struct iovec) * msg.msg_iovlen,
+		iov = malloc(sizeof(struct iovec) * msg.msg_iovlen,
 		    M_IOV, M_WAITOK);
 	else
 		iov = aiov;
@@ -510,8 +516,7 @@ sendit(p, s, mp, flags, retsize)
 #ifdef KTRACE
 	if (ktriov != NULL) {
 		if (error == 0)
-			ktrgenio(p->p_tracep, s, UIO_WRITE,
-				ktriov, *retsize, error);
+			ktrgenio(p, s, UIO_WRITE, ktriov, *retsize, error);
 		free(ktriov, M_TEMP);
 	}
 #endif
@@ -661,7 +666,7 @@ recvit(p, s, mp, namelenp, retsize)
 #ifdef KTRACE
 	if (ktriov != NULL) {
 		if (error == 0)
-			ktrgenio(p->p_tracep, s, UIO_READ,
+			ktrgenio(p, s, UIO_READ,
 				ktriov, len - auio.uio_resid, error);
 		free(ktriov, M_TEMP);
 	}

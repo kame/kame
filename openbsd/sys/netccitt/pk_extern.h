@@ -1,4 +1,4 @@
-/*	$OpenBSD: pk_extern.h,v 1.2 1996/04/19 16:10:07 niklas Exp $	*/
+/*	$OpenBSD: pk_extern.h,v 1.3 2001/01/19 06:37:37 itojun Exp $	*/
 /*	$NetBSD: pk_extern.h,v 1.1 1996/02/13 22:05:17 christos Exp $	*/
 
 /*

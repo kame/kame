@@ -1,4 +1,4 @@
-/*	$OpenBSD: route.h,v 1.8 2000/05/17 00:21:12 deraadt Exp $	*/
+/*	$OpenBSD: route.h,v 1.11 2001/01/19 06:37:36 itojun Exp $	*/
 /*	$NetBSD: route.h,v 1.9 1996/02/13 22:00:49 christos Exp $	*/
 
 /*
@@ -341,9 +341,4 @@ int	 rtrequest __P((int, struct sockaddr *,
 			struct sockaddr *, struct sockaddr *, int,
 			struct rtentry **));
 int	 rtrequest1 __P((int, struct rt_addrinfo *, struct rtentry **));
-void	 ipv4_tunnelsetup __P((struct rtentry *));
-
-#ifdef MIP6
-void	 rt_mip6msg __P((int, struct ifnet *, struct rtentry *));
-#endif
 #endif /* _KERNEL */
