@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.99 2001/02/22 02:22:18 itojun Exp $
+$KAME: COVERAGE,v 1.100 2001/02/23 00:21:56 itojun Exp $
 
 
 x: supported/integrated
@@ -81,7 +81,7 @@ IPv6 IPsec	KAME	KAME	openbsd	KAME	KAME	openbsd	KAME	KAME
 	hardware acceleration is available.  tunnel mode may need more work.
 
 IPsec ESP, rc5-cbc
-		-	-	(*1)	x	-	(*1)	x	x
+		-	-	(*1)	x	-	(*1)	x	-
     (*1) not based on kame
 
 IPsec ESP, blowfish/des on LP64
@@ -119,7 +119,6 @@ ip6_mforward rejects packets with unspecified IPv6 source
 advanced API	2292bis	2292	2292	2292	2292	2292	2292	2292bis
 		(*1)
     (*1) 2292 API is supplied for binary backward compatibility
-    (*2) based on 2292bis code
 
 getifaddrs	x	x	x	x	x	x	x	x
 
@@ -145,8 +144,7 @@ pfctlinput2	(*1)	x	-	-	-	-	-	-
     (*1) in ip6_input.c
 
 icmp6 beyondscope
-		x	x	x	x	x	x	x	-
-    (*1) supports it, but has bug in link-local address check.
+		x	x	x	x	x	x	x	x
 
 ping6 with short -s
 		x	x	x	-	-	-	-	?
@@ -165,7 +163,7 @@ getaddrinfo obeys configured resolv order
 		(+)	x	x	x	x	x	x	-
 
 getaddrinfo supports AI_ADDRCONFIG (2553bis)
-		-	-	-	(*1)	-	-	(*1)	-
+		-	-	-	x	-	-	(*1)	-
     (*1) enabled by default, cannot turn it off
 
 getaddrinfo returns official hostname in hosts(5) (leftmost) in ai_canonname
@@ -176,12 +174,12 @@ getnameinfo uses addr%numeric for scopeid > maxifindex
 		x	x	x	x	x	x	x	x
 
 getnameinfo, 2nd arg type is socklen_t
-		x	x	x	-	x	x	-	-
+		x	x	x	x	x	x	-	-
 
 getnameinfo uses EAI_xx as return value (2553bis)
 		x	x	x	x	x	x	x	-
 
-ALTQ		(+)	-	-	-	-	-	-	-
+ALTQ		(+)	x	-	-	-	-	-	-
 
 NAT/PT		(+)	-	-	-	-	-	-	-
 
@@ -217,7 +215,7 @@ ipsec esp, blowfish-cbc codebase (before/after aug28, 2000)
 
 ipsec esp, rijndael support
 		(*1)	x	-	-	x	-	-	-
-    (*1) experimental, based on draft-ietf-ipsec-ciph-aes-cbc-00.txt
+    (*1) except openbsd
 
 ipsec esp, twofish support
 		(*1)	-	-	-	-	-	-	-
