@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.74 2001/03/24 07:44:59 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.75 2001/04/29 03:14:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -654,7 +654,10 @@ rip6_ctloutput(op, so, level, optname, mp)
 				 */
 				off = offsetof(struct icmp6_hdr, icmp6_cksum);
 				if (op == PRCO_SETOPT) {
+					if (!m || m->m_len != sizeof(int))
+						return EINVAL;
 					optval = *mtod(m, int *);
+					(void)m_free(m);
 					if (optval != off)
 						return EINVAL;
 				} else if (op == PRCO_GETOPT) {
@@ -665,7 +668,10 @@ rip6_ctloutput(op, so, level, optname, mp)
 					error = EINVAL;
 			} else {
 				if (op == PRCO_SETOPT) {
+					if (!m || m->m_len != sizeof(int))
+						return EINVAL;
 					optval = *mtod(m, int *);
+					(void)m_free(m);
 					in6p->in6p_cksum = optval;
 				} else if (op == PRCO_GETOPT) {
 					optval = in6p->in6p_cksum;
