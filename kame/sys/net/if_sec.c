@@ -1,4 +1,4 @@
-/*	$KAME: if_sec.c,v 1.6 2001/07/26 02:11:15 itojun Exp $	*/
+/*	$KAME: if_sec.c,v 1.7 2001/07/26 02:20:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -122,17 +122,16 @@ sec_create(unit)
 {
 	struct sec_softc *sc;
 	struct ifchain *ifcp;
-	int i;
 
 	/* monotonically-increasing unit number */
-	if (i == 0) {
+	if (unit == 0) {
 		if (0 > sec_maxunit)
-			i = 0;
+			unit = 0;
 		else
-			i = sec_maxunit + 1;
+			unit = sec_maxunit + 1;
 	}
-	if (i > sec_maxunit)
-		sec_maxunit = i;
+	if (unit > sec_maxunit)
+		sec_maxunit = unit;
 
 	sc = malloc(sizeof(*sc), M_DEVBUF, M_WAIT);
 	bzero(sc, sizeof(*sc));
@@ -140,10 +139,10 @@ sec_create(unit)
 	bzero(ifcp, sizeof(*ifcp));
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-	sprintf(sc->sc_gif.gif_if.if_xname, "sec%d", i);
+	sprintf(sc->sc_gif.gif_if.if_xname, "sec%d", unit);
 #else
 	sc->sc_gif.gif_if.if_name = "sec";
-	sc->sc_gif.gif_if.if_unit = i;
+	sc->sc_gif.gif_if.if_unit = unit;
 #endif
 
 	gifattach0(&sc->sc_gif);
