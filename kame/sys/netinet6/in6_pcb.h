@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.h,v 1.36 2000/10/31 04:02:53 itojun Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.37 2000/11/01 07:42:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -136,10 +136,12 @@ struct	in6pcb {
 #define IN6P_BINDV6ONLY		0x10000000 /* do not grab IPv4 traffic */
 #define IN6P_MINMTU		0x20000000 /* use minimum MTU */
 #define IN6P_RFC2292		0x40000000 /* used RFC2292 API on the socket */
+#define IN6P_MTU		0x80000000 /* receive path MTU */
 
 #define IN6P_CONTROLOPTS	(IN6P_PKTINFO|IN6P_HOPLIMIT|IN6P_HOPOPTS|\
 				 IN6P_DSTOPTS|IN6P_RTHDR|IN6P_RTHDRDSTOPTS|\
-				 IN6P_TCLASS|IN6P_AUTOFLOWLABEL|IN6P_RFC2292)
+				 IN6P_TCLASS|IN6P_AUTOFLOWLABEL|IN6P_RFC2292|\
+				 IN6P_MTU)
 
 #define IN6PLOOKUP_WILDCARD	1
 #define IN6PLOOKUP_SETLOCAL	2
