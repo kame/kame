@@ -118,6 +118,10 @@
 #include <netinet6/ip6_fw.h>
 #endif
 
+#ifdef ALTQ
+#include <netinet/altq_cdnr.h>
+#endif
+
 #include <netinet6/ip6protosw.h>
 
 /* we need it for NLOOP. */
@@ -360,6 +364,13 @@ ip6_input(m)
 		}
 		if (!m)
 			return;
+	}
+#endif
+
+#ifdef ALTQ
+	if (altq_input != NULL && (*altq_input)(m, AF_INET6) == 0) {
+		/* packet is dropped by traffic conditioner */
+		return;
 	}
 #endif
 
