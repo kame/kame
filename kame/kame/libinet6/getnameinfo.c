@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.70 2004/05/16 06:12:01 jinmei Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.71 2004/09/20 23:58:53 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -92,7 +92,7 @@ static const struct afd {
 	{PF_INET, sizeof(struct in_addr), sizeof(struct sockaddr_in),
 	 offsetof(struct sockaddr_in, sin_addr),
 	 offsetof(struct sockaddr_in, sin_port)},
-	{0, 0, 0, 0},
+	{0, 0, 0, 0, 0},
 };
 
 #ifdef INET6
