@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2312 2003/01/20 13:51:47 jinmei Exp $
+$KAME: CHANGELOG,v 1.2313 2003/01/21 08:04:04 itojun Exp $
 
 <200301>
+Tue Jan 21 17:02:57 JST 2003  itojun@iijlab.net
+	* sys/mbuf.h: switch from m_aux framework to m_tag framework (from
+	  openbsd) for tagging extra information to mbuf chain.
+	  TODO: bsdi3
+
 2003-01-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ndp/ndp.c (ifinfo): printed the max MTU for ndp -i IFNAME.
 
