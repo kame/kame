@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.37 2001/06/27 17:32:21 sakane Exp $	*/
+/*	$KAME: parse.y,v 1.38 2001/06/27 17:58:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -98,7 +98,7 @@ extern void yyerror __P((const char *));
 }
 
 %token EOT
-%token ADD GET DELETE FLUSH DUMP
+%token ADD GET DELETE DELETEALL FLUSH DUMP
 %token ADDRESS PREFIX PORT PORTANY
 %token UP_PROTO PR_ESP PR_AH PR_IPCOMP
 %token F_PROTOCOL F_AUTH F_ENC F_REPLAY F_COMP F_RAWCPI
