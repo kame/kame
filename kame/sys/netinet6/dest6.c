@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.28 2001/06/04 08:52:43 keiichi Exp $	*/
+/*	$KAME: dest6.c,v 1.29 2001/07/28 00:58:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -192,6 +192,7 @@ dest6_input(mp, offp, proto)
 		/* XXX should we do this at all?  do it now or later? */
 		/* XXX interaction with 2292bis IPV6_RECVDSTOPT */
 		/* XXX interaction with ipsec - should be okay */
+		/* XXX icmp6 responses is modified - which is bad */
 		bcopy(&ip6a->ip6a_careof, haopt->ip6oh_addr,
 		    sizeof(haopt->ip6oh_addr));
 		bcopy(&ip6a->ip6a_home, &ip6->ip6_src,
