@@ -1,4 +1,4 @@
-$Id: question,v 1.12 2000/02/24 11:38:29 sakane Exp $
+$Id: question,v 1.13 2000/08/09 19:39:59 sakane Exp $
 
 HOW DO I DO ?
 Q. ID payload handling in phase 2 besides IPSECDOI_ID_IP*.
@@ -30,6 +30,14 @@ Q. What is the perpose of exchange of DH attribute on quick mode ?
 Q. Should I do acceptable check of phase 2 pfs group ?.
    If initiator requests PFS, should we accept without acceptable check.
 	-> well-known issue
+
+Q. RESPONDER-LIFETIME is only one payload in a IKE message even in the case
+   of SA bundle case is ?
+A. At the moment, racoon sends this notify payload(s) against each protocol.
+
+Q. Which is SPI to be used initiator's or responder's when sending
+   RESPONDER-LIFETIME ?
+A. At the moment, racoon sends responder's one.
 
 Q. Is it typo that a body of nonce payload during base mode exchange.
             HDR, SA, Idii, Ni_b     =>
