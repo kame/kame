@@ -36,6 +36,8 @@ name="network_ipv6_mobile"
 rcvar=`set_rcvar ipv6_mobile`
 start_cmd="network_ipv6_mobile_start"
 
+${ipv6_mobile_enable:=NO}
+
 network_ipv6_mobile_start()
 {
 	echo 'Doing Mobile IPv6 network setup:'
