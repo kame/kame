@@ -1,6 +1,6 @@
 Installation procedure - FreeBSD 2.2.8
 KAME project
-$Id: INSTALL,v 1.6 1999/09/01 15:57:37 itojun Exp $
+$Id: INSTALL,v 1.7 1999/09/16 05:55:17 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -83,8 +83,26 @@ E-1. Most of configuration files are placed in /usr/local/v6/etc.
 	fi
 
 E-2. If you would like to use IPv6-ready inetd, you will need to stop using
-     /usr/sbin/inetd and switch to /usr/local/v6/sbin/inetd.  Configuration
-     file is placed in /etc/inetd.conf, but with enhanced syntax
+     /usr/sbin/inetd and switch to /usr/local/v6/sbin/inetd.
+     To do this, please replace the following section of /etc/rc:
+
+>if [ "X${inetd_enable}" != X"NO" ]; then
+>	echo -n ' inetd'
+>	inetd ${inetd_flags}
+>fi
+
+     with this:
+
+>if [ "X${inetd_enable}" != X"NO" ]; then
+>	echo -n ' inetd'
+>	if [ -x /usr/local/v6/sbin/inetd ]; then
+>		/usr/local/v6/sbin/inetd ${inetd_flags}
+>	else
+>		inetd ${inetd_flags}
+>	fi
+>fi
+
+     Configuration file is placed in /etc/inetd.conf, but with enhanced syntax
      (it is backward compatible so do not be afraid).  Consult manpages
      for details.
 
