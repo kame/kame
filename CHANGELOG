@@ -1,6 +1,15 @@
-$Id: CHANGELOG,v 1.496 2000/01/28 06:39:06 itojun Exp $
+$Id: CHANGELOG,v 1.497 2000/01/29 07:23:01 itojun Exp $
 
 <200001>
+Sat Jan 29 16:20:31 JST 2000  itojun@iijlab.net
+	* kame/sys/netinet6/ipsec.c (and other ipsec items):
+	  cleanup include file dependencies and namespace polution, like
+	  prototypes and #define KERNEL.
+	* kame/sys/netinet6/ip6_input.c: fix ip6_savecontrol() to be friendly
+	  with m_pulldown() environment.  now it does not modify mbuf chain
+	  at all so calling ip6_savecontrol() will not invalidate pointers
+	  into mbuf chain (like "uh" in udp6_input).
+
 Fri Jan 28 15:37:46 JST 2000  itojun@iijlab.net
 	* kame/sys/netinet6/ipsec.c, kame/sys/netkey/key.c,
 	  */sys/netinet{,6}/ip{,6}_input.c: pass policy message buffer length
