@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.48 2002/04/11 09:36:28 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.49 2002/04/15 06:35:30 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -69,6 +69,7 @@ int		natpt_initialized;
 u_int		natpt_debug;
 u_int		natpt_dump;
 struct in6_addr	natpt_prefix;
+u_int		natpt_forceFragment4;
 u_int		natpt_uselog;
 u_int		natpt_usesyslog;
 
@@ -499,6 +500,11 @@ natpt_config4(struct mbuf *m, struct pcv *cv4)
 		cv4->flags |= NEED_FRAGMENT;
 	if ((ip->ip_off & IP_DF) != 0)
 		cv4->flags |= SET_DF;
+
+	if ((cv4->flags & (SET_DF | NEED_FRAGMENT))
+	    && (natpt_forceFragment4 != 0)) {
+		cv4->flags &= ~SET_DF;
+	}
 
 	return (ip->ip_p);
 }

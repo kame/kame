@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.44 2002/04/11 09:36:28 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.45 2002/04/15 06:35:30 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -78,7 +78,8 @@
 #define	NATPTCTL_DEBUG		(NATPTCTL_ENABLE+1)
 #define	NATPTCTL_DUMP		(NATPTCTL_DEBUG+1)
 #define	NATPTCTL_PREFIX		(NATPTCTL_DUMP+1)
-#define	NATPTCTL_USELOG		(NATPTCTL_PREFIX+1)
+#define	NATPTCTL_FORCEFRAGMENT4	(NATPTCTL_PREFIX+1)
+#define	NATPTCTL_USELOG		(NATPTCTL_FORCEFRAGMENT4+1)
 #define	NATPTCTL_USESYSLOG	(NATPTCTL_USELOG+1)
 
 #define	NATPTCTL_MAXTTYANY	(NATPTCTL_USESYSLOG+1)
@@ -96,6 +97,7 @@
 	{ "debug",	NATPTCTL_INT,	NATPTCTL_DEFAULT },	\
 	{ "dump",	NATPTCTL_INT,	NATPTCTL_DEFAULT },	\
 	{ "prefix",	NATPTCTL_IN6ADDR,	NATPTCTL_DEFAULT },	\
+	{ "forcefragment4",	NATPTCTL_INT,	NATPTCTL_DEFAULT },	\
 	{ "uselog",	NATPTCTL_INT,	NATPTCTL_DEFAULT },	\
 	{ "usesyslog",	NATPTCTL_INT,	NATPTCTL_DEFAULT },	\
 								\
@@ -114,6 +116,7 @@
 	(caddr_t)&natpt_debug,		\
 	(caddr_t)&natpt_dump,		\
 	(caddr_t)&natpt_prefix,		\
+	(caddr_t)&natpt_forceFragment4,	\
 	(caddr_t)&natpt_uselog,		\
 	(caddr_t)&natpt_usesyslog,	\
 }
