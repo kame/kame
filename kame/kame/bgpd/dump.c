@@ -298,7 +298,13 @@ dump_bgp_exportlist(FILE *fp, struct rt_entry *rte, char *indent)
 						  inetaddrstr,
 						  INET_ADDRSTRLEN));
 			}
+
+			if ((rtp = rtp->rtp_next) == obnp->rp_adj_ribs_out)
+				break;
 		}
+
+		if ((obnp = obnp->rp_next) == bgb)
+			break;
 	}
 	if (first == 1)
 		fprintf(fp, "%s  Not exported\n", indent);
