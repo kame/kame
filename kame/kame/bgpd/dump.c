@@ -529,7 +529,7 @@ show_bgp_route_entry(fp, bre)
 	char *indent = " ";
 
 	dump_bgp_rtentry(fp, bre->rte, indent);
-	fprintf(fp, "%sPeerInfo: Addr: %s, ", indent, bgp_peerstr(bnp));
+	fprintf(fp, "%sPeerInfo: Addr: %s,\n", indent, bgp_peerstr(bnp));
 	
 	fprintf(fp, "%s          ID: %s, Type: %s\n", indent,
 		inet_ntop(AF_INET, &bnp->rp_id, inetaddrstr, INET_ADDRSTRLEN),
