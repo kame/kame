@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.49 2002/05/26 01:06:22 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.50 2002/05/26 13:12:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -786,7 +786,7 @@ main(argc, argv)
 		int len;
 
 		len = sizeof(Src);
-		if (getsockname(sndsock, (struct sockaddr *)&Src, &i) < 0) {
+		if (getsockname(sndsock, (struct sockaddr *)&Src, &len) < 0) {
 			perror("getsockname");
 			exit(1);
 		}
