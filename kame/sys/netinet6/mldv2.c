@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.6 2004/03/10 09:13:26 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.7 2004/03/10 09:14:51 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1752,7 +1752,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 		if (in6mm_src->i6ms_toex != NULL) {
 			/* For TO_EX list, it MUST be deleted after 
 			 * retransmission is done. This is because 
-			 * mld_fasttimo() doesn't know if the pending TO_EX 
+			 * mld_fasttimeo() doesn't know if the pending TO_EX 
 			 * report exists or not. */
 			 in6_free_msf_source_list(in6mm_src->i6ms_toex->head);
 			 FREE(in6mm_src->i6ms_toex->head, M_MSFILTER);
@@ -1806,7 +1806,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 		if (in6mm_src->i6ms_toin != NULL) {
 			/* For TO_IN list, it MUST be deleted
 			 * after retransmission is done. This is
-			 * because mld_fasttimo() doesn't know 
+			 * because mld_fasttimeo() doesn't know 
 			 * if the pending TO_IN report exists 
 			 * or not. */
 			in6_free_msf_source_list(in6mm_src->i6ms_toin->head);
