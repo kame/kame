@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.238 2001/09/26 05:51:11 keiichi Exp $	*/
+/*	$KAME: in6.c,v 1.239 2001/09/26 12:05:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -804,7 +804,7 @@ in6_control(so, cmd, data, ifp)
 				ifra->ifra_prefixmask.sin6_addr.s6_addr32[i];
 		}
 		/*
-		 * XXX: since we don't have enough APIs, we just set inifinity
+		 * XXX: since we don't have enough APIs, we just set infinity
 		 * to lifetimes.  They can be overridden by later advertised
 		 * RAs (when accept_rtadv is non 0), but we'd rather intend
 		 * such a behavior.
