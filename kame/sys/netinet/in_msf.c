@@ -3305,7 +3305,7 @@ in_getmopt_source_list(msf, numsrc, oss, mode)
 			return EOPNOTSUPP; /* panic ? */
 		*numsrc = msf->msf_blknumsrc;
 		*mode = MCAST_EXCLUDE;
-	} else if (msf->msf_grpjoin == 1) {
+	} else if (msf->msf_grpjoin >= 1) {
 		*numsrc = 0;
 		*mode = MCAST_EXCLUDE;
 	} else
