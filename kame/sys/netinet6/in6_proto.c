@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.108 2001/10/19 09:47:47 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.109 2001/11/10 09:40:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -759,6 +759,8 @@ SYSCTL_STRUCT(_net_inet6_ip6, IPV6CTL_RIP6STATS, rip6stats, CTLFLAG_RD,
 	&rip6stat, rip6stat, "");
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_PREFER_TEMPADDR,
 	prefer_tempaddr, CTLFLAG_RW, &ip6_prefer_tempaddr,	0, "");
+SYSCTL_INT(_net_inet6_ip6, IPV6CTL_USE_DEFAULTZONE,
+	use_defaultzone, CTLFLAG_RW, &ip6_use_defzone,		0,"");
 
 /* net.inet6.icmp6 */
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_REDIRACCEPT,
