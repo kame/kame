@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1717 2001/06/13 04:33:39 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1718 2001/06/13 08:32:18 sumikawa Exp $
 
 <200106>
+Wed Jun 13 17:29:56 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* kame/sys/net/if_gif.c: BSD/OS and FreeBSD do not update
+	  if_lastchange when processing packets for SNMP requirements.
+
 2001-06-13  Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* sys/i386/conf/GENERIC.KAME
 	- Add NATPT-NAT and add some notes.
