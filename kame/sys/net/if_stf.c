@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.52 2001/02/16 02:59:57 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.53 2001/02/16 03:00:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -64,7 +64,7 @@
  * Even if we assign link-locals to interface, we cannot really
  * use link-local unicast/multicast on top of 6to4 cloud (since there's no
  * encapsulation defined for link-local address), and the above analysis does
- * not change.  RFC3056 does not enfoce the assignment of link-local address
+ * not change.  RFC3056 does not mandate the assignment of link-local address
  * either.
  *
  * 6to4 interface has security issues.  Refer to
