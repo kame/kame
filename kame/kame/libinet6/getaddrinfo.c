@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.204 2004/12/03 12:54:43 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.205 2004/12/07 12:52:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -537,6 +537,7 @@ getaddrinfo(hostname, servname, hints, res)
 		}
 	}
 
+	memset(&ac, 0, sizeof(ac));
 	if ((error = init(&ac, pai->ai_flags)) != 0)
 		goto bad;
 
