@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.89 2000/12/04 06:20:45 itojun Exp $
+$KAME: COVERAGE,v 1.90 2001/01/12 10:41:58 itojun Exp $
 
 
 x: supported/integrated
@@ -62,196 +62,198 @@ CMSG_ALIGN	sysctl	ALIGN	ALIGN	ALIGN	ALIGN	ALIGN	ALIGN
 		KAME	merged *-current	merged
 		*BSD	net	open	free	net15	open28	free41	bsdi42
 		--	--	--	--	--	--	--	---
-KAME IPv6 as of	latest	early	early	early	early	early	early
+KAME IPv6 as of	latest	early	early	early	early	early	early	apr00
 			jun00	jun00	jul00	jun00	jun00	jun00
 
 KAME IPsec as of
-		latest	12jun00	-	early	12jun00	-	early
+		latest	12jun00	-	early	12jun00	-	early	apr00
 					jul00			jul00
 
-IPv4 IPsec	KAME	KAME	openbsd	KAME	KAME	openbsd	KAME
+IPv4 IPsec	KAME	KAME	openbsd	KAME	KAME	openbsd	KAME	KAME
 
-IPv6 IPsec	KAME	KAME	openbsd	KAME	KAME	openbsd	KAME
+IPv6 IPsec	KAME	KAME	openbsd	KAME	KAME	openbsd	KAME	KAME
 				(*1)			(*1)
     (*1) no extension header support yet (fragment header is supported),
 	hardware acceleration is available.  tunnel mode may need more work.
 
 IPsec ESP, rc5-cbc
-		-	-	(*1)	x	-	(*1)	x
+		-	-	(*1)	x	-	(*1)	x	x
     (*1) not based on kame
 
 IPsec ESP, blowfish/des on LP64
-		x	x	(*1)	-	x	(*1)	-
+		x	x	(*1)	-	x	(*1)	-	?
     (*1) not based on kame
 
 IPsec ESP, des on big endian
-		x	x	(*1)	-	x	(*1)	-
+		x	x	(*1)	-	x	(*1)	-	?
     (*1) not based on kame
 
 IPsec ESP, crypto backend uses block cipher (esp_cbc_encrypt)
-		x	x	(*1)	-	x	(*1)	-
+		x	x	(*1)	-	x	(*1)	-	-
     (*1) not based on kame
 
 RFC2367 conformance: sadb_msg
-		x	x	(*1)	x	x	(*1)	x
+		x	x	(*1)	x	x	(*1)	x	-
     (*1) not based on kame
 
 RFC2367 conformance: SADB_[EAC]ALG
-		x	x	(*2)	(*1)	x	(*2)	(*1)
+		x	x	(*2)	(*1)	x	(*2)	(*1)	-
     (*1) old KAME declaration, violates RFC2367 namespace and numbers
     (*2) not based on kame
 
 TCP/UDP		see IMPLEMENTATION for details
 
 TCP6 drops packets with unspecified IPv6 source
-		x	x	x	-	x	x	-
+		x	x	x	-	x	x	-	-
 
 ip6_forward rejects packets with unspecified IPv6 source
-		x	x	x	-	x	x	-
+		x	x	x	-	x	x	-	-
 
 ip6_mforward rejects packets with unspecified IPv6 source
-		x	x	x	-	x	x	-
+		x	x	x	-	x	x	-	-
 
-advanced API	2292bis	2292	2292	2292	2292	2292	2292
+advanced API	2292bis	2292	2292	2292	2292	2292	2292	2292bis
 		(*1)
     (*1) 2292 API is supplied for binary backward compatibility
+    (*2) based on 2292bis code
 
-getifaddrs	x	x	x	x	x	x	x
+getifaddrs	x	x	x	x	x	x	x	x
 
-icmp6 nodeinfo	07	07	07	05	06	06	05
+icmp6 nodeinfo	07	07	07	05	06	06	05	?
 					(*1/2)	(*1/2)	(*1/2)	(*1/2)
     (all) spec conformance is still low.  "05-" means 05/03 chimera.
     (*1) does not join NI group address
     (*2) node addresses reply does not have TTL attached
 
-nd6_proxyall	-	-	-	-	-	-	-
+nd6_proxyall	-	-	-	-	-	-	-	-
 
-ndp -s proxy	x	x	x	x	x	x	x
+ndp -s proxy	x	x	x	x	x	x	x	x
 
-ndp -I		x	x	x	x	x	x	x
+ndp -I		x	x	x	x	x	x	x	x
 
-NUD on p2p	x	x	x	x	x	x	x
+NUD on p2p	x	x	x	x	x	x	x	?
   (ndp -i)
 
 NUD on p2p only if real neighbor
-		x	x	x	x	x	x	x
+		x	x	x	x	x	x	x	?
 
 icmp6 beyondscope
-		x	x	x	x	x	x	x
+		x	x	x	x	x	x	x	-
     (*1) supports it, but has bug in link-local address check.
 
 ping6 with short -s
-		x	x	x	-	-	-	-
+		x	x	x	-	-	-	-	?
 
-CMSG_ALIGN	ALIGN	sysctl	ALIGN	ALIGN	sysctl	ALIGN	ALIGN
-		(*1)		(*1)	(*2)		(*1)	(*2)
+CMSG_ALIGN	ALIGN	sysctl	ALIGN	ALIGN	sysctl	ALIGN	ALIGN	ALIGN
+		(*1)		(*1)	(*2)		(*1)	(*2)	(*2)
     (*1) has namespace pollution bug, KAME PR 230.
     (*2) requires separate inclusion of machine/param.h.
     (all) backward binary compatibility for old code that uses old CMSG_xx
 	  is not provided (yet).
 
 CMSG passing in unix domain socket obeys CMSG_xx
-		(+)	x	-	x	x	-	x
+		(+)	x	-	x	x	-	x	?
 
 getaddrinfo obeys configured resolv order
-		(+)	x	x	x	x	x	x
+		(+)	x	x	x	x	x	x	-
 
 getaddrinfo supports AI_ADDRCONFIG (2553bis)
-		-	-	-	(*1)	-	-	(*1)
+		-	-	-	(*1)	-	-	(*1)	-
     (*1) enabled by default, cannot turn it off
 
 getaddrinfo returns official hostname in hosts(5) (leftmost) in ai_canonname
-		(*1)	x	x	x	x	x	x
+		(*1)	x	x	x	x	x	x	?
     (*1) netbsd, openbsd, freebsd4 are "x", others are "-"
 
 getnameinfo uses addr%numeric for scopeid > maxifindex
-		x	x	x	x	x	x	x
+		x	x	x	x	x	x	x	x
 
 getnameinfo, 2nd arg type is socklen_t
-		x	x	x	-	x	x	-
+		x	x	x	-	x	x	-	-
 
 getnameinfo uses EAI_xx as return value (2553bis)
-		x	x	x	x	x	x	x
+		x	x	x	x	x	x	x	-
 
-ALTQ		(+)	-	-	-	-	-	-
+ALTQ		(+)	-	-	-	-	-	-	-
 
-NAT/PT		(+)	-	-	-	-	-	-
+NAT/PT		(+)	-	-	-	-	-	-	-
 
-mobile-ip6	(+)	-	-	-	-	-	-
+mobile-ip6	(+)	-	-	-	-	-	-	x
 
-IPv6 RPC	-	x	-	-	x	-	-
+IPv6 RPC	-	x	-	-	x	-	-	-
 
-IPv6 NFS	-	x	-	-	x	-	-
+IPv6 NFS	-	x	-	-	x	-	-	-
 
 NIS ipnodes map support for hostname lookup
-		-	x	-	-	-	-	-
+		-	x	-	-	-	-	-	-
 
 resolver support for IPv6 transport
-		(+)	(*1)	(*1)	x	(*1)	(*1)	x
+		(+)	(*1)	(*1)	x	(*1)	(*1)	x	-
     (*1) libc resolver can handle IPv6 transport (IPv6 address in
 	/etc/resolv.conf), but not with userland tools like nslookup or dig.
 
 scoped addr in /etc/hosts (getaddrinfo)
-		(+)	x	x	x	x	x	x
+		(+)	x	x	x	x	x	x	-
 
 scoped addr in /etc/resolv.conf "nameserver" line
-		(+)	x	x	x	x	x	x
+		(+)	x	x	x	x	x	x	-
 
 ipsec socket passing to ip{6,}_output
-		aux	aux	-	aux	aux	-	aux
+		aux	aux	-	aux	aux	-	aux	aux
 
 ipsec esp, encryption logic
-		new	new	-	old	old	-	old
+		new	new	-	old	old	-	old	old
     new: unified cbc logic, old: per-algorithm cbc logic
 
 ipsec esp, blowfish-cbc codebase (before/after aug28, 2000)
-		new	new	-	old	old	-	old
+		new	new	-	old	old	-	old	old
 
 ipsec esp, rijndael support
-		(*1)	x	-	-	x	-	-
+		(*1)	x	-	-	x	-	-	-
     (*1) experimental, based on draft-ietf-ipsec-ciph-aes-cbc-00.txt
 
 ipsec esp, twofish support
-		(*1)	-	-	-	-	-	-
+		(*1)	-	-	-	-	-	-	-
     (*1) experimental, based on draft-ietf-ipsec-ciph-aes-cbc-00.txt
 
 router renumbering declaration does not use bitfield (sys/netinet/icmp6.h)
-		x	x	x	x	x	x	x
+		x	x	x	x	x	x	x	-
 
 source address selection
-		latest	may00	may00	may00	may00	may00	may00
+		latest	may00	may00	may00	may00	may00	may00	apr00?
 
 IPv6 PMTUD DoS prevention
-		(+)	(*1)	-	-	(*1)	-	-
+		(+)	(*1)	-	-	(*1)	-	-	-
     (*1) validates ICMPv6 too big by using TCP/connected UDP/ESP/AH connection
 	 table.  PMTUD does not work for other random protocols like ping6.
 
-6to4 intface	x	x	-	x	x	-	x
+6to4 intface	x	x	-	x	x	-	x	x
 
-basic userland	x	x	x	x	x	x	x
+basic userland	x	x	x	x	x	x	x	x
 
-route6d		x	x	x	x	x	x	x
-hroute6d	x	-	-	-	-	-	-
-bgpd		x	-	-	-	-	-	-
-pim6dd		x	x	-	x	x	-	x
-pim6sd		x	x	-	x	x	-	x
+route6d		x	x	x	x	x	x	x	x
+hroute6d	x	-	-	-	-	-	-	x
+bgpd		x	-	-	-	-	-	-	x
+pim6dd		x	x	-	x	x	-	x	x
+pim6sd		x	x	-	x	x	-	x	x
 
-rtsol/rtsold	x	x	x	x	x	x	x
-rtadvd		x	x	x	x	x	x	x
-rrenumd		x	-	-	x	-	-	x
+rtsol/rtsold	x	x	x	x	x	x	x	x
+rtadvd		x	x	x	x	x	x	x	x
+rrenumd		x	-	-	x	-	-	x	x
 
-faithd		x	x	x	x	x	x	x
+faithd		x	x	x	x	x	x	x	x
 		(*1)	(*1)
     (*1) inetd support
 
-syslogd		x	x	-	-	x	-	-
-lpr/lpd		x	x	-	-	x	-	-
+syslogd		x	x	-	-	x	-	-	?
+lpr/lpd		x	x	-	-	x	-	-	?
 
 default sendmail is IPv6 ready
-		(+)	x	x	-	x	x	-
+		(+)	x	x	-	x	x	-	-
 
 default sendmail.cf is IPv6 ready
-		(+)	x	x	-	x	x	-
+		(+)	x	x	-	x	x	-	-
 
-racoon		latest	pkgsrc	-	ports
-			001111a		000718a
+racoon		x	x	-	-	-	-	-	x
+racoon version	latest	001229	-	ports	pkgsrc	-	-	?
+					000718a
