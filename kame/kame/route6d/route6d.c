@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.53 2001/01/22 12:14:44 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.54 2001/01/22 13:24:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.53 2001/01/22 12:14:44 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.54 2001/01/22 13:24:35 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -2310,12 +2310,12 @@ getifmtu(ifindex)
 	}
 	ifm = (struct if_msghdr *)buf;
 	mtu = ifm->ifm_data.ifi_mtu;
-#ifdef	__FREEBSD__
+#ifdef __FreeBSD__
 	if (ifindex != ifm->ifm_index) {
 		fatal("ifindex does not match with ifm_index");
 		/*NOTREACHED*/
 	}
-#endif	/* __FREEBSD__ */
+#endif
 	free(buf);
 	return mtu;
 }
@@ -2343,6 +2343,24 @@ do { \
 	RTTYPE("NEWADDR", RTM_NEWADDR);
 	RTTYPE("DELADDR", RTM_DELADDR);
 	RTTYPE("IFINFO", RTM_IFINFO);
+#ifdef RTM_OLDADD
+	RTTYPE("OLDADD", RTM_OLDADD);
+#endif
+#ifdef RTM_OLDDEL
+	RTTYPE("OLDDEL", RTM_OLDDEL);
+#endif
+#ifdef RTM_OIFINFO
+	RTTYPE("OIFINFO", RTM_OIFINFO);
+#endif
+#ifdef RTM_IFANNOUNCE
+	RTTYPE("IFANNOUNCE", RTM_IFANNOUNCE);
+#endif
+#ifdef RTM_NEWMADDR
+	RTTYPE("NEWMADDR", RTM_NEWMADDR);
+#endif
+#ifdef RTM_DELMADDR
+	RTTYPE("DELMADDR", RTM_DELMADDR);
+#endif
 #undef RTTYPE
 	return NULL;
 }
