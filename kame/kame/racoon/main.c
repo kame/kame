@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.26 2001/02/01 17:00:37 itojun Exp $	*/
+/*	$KAME: main.c,v 1.27 2001/02/04 20:11:37 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,6 +77,7 @@ static void parse __P((int, char **));
 static void restore_params __P((void));
 static void save_params __P((void));
 static void saverestore_params __P((int));
+static void cleanup_pidfile __P((void));
 
 void
 Usage()
@@ -199,11 +200,23 @@ main(ac, av)
 			plog(LLV_ERROR, LOCATION, NULL,
 				"cannot open %s", pid_file);
 		}
+		if (atexit(cleanup_pidfile) < 0) {
+			plog(LLV_ERROR, LOCATION, NULL,
+				"cannot register pidfile cleanup");
+		}
 	}
 
 	session();
 
 	exit(0);
+}
+
+static void
+cleanup_pidfile()
+{
+	char *pid_file = _PATH_VARRUN "racoon.pid";
+
+	(void) unlink(pid_file);
 }
 
 static void
