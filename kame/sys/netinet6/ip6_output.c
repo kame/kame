@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.320 2002/07/31 06:31:50 k-sugyou Exp $	*/
+/*	$KAME: ip6_output.c,v 1.321 2002/07/31 10:21:48 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -304,8 +304,6 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	struct tdb *tdb;
 	int s;
 
-	bzero(&finaldst_sa, sizeof(finaldst_sa));
-
 	inp = NULL;     /* XXX */
 	if (inp && (inp->inp_flags & INP_IPV6) == 0)
 		panic("ip6_output: IPv4 pcb is passed");
@@ -320,6 +318,8 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	ip6 = mtod(m, struct ip6_hdr *);
 #endif
 #endif /* IPSEC */
+
+	bzero(&finaldst_sa, sizeof(finaldst_sa));
 
 #define MAKE_EXTHDR(hp, mp)						\
     do {								\
