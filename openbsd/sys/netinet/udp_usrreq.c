@@ -288,7 +288,7 @@ udp_input(m, va_alist)
 		/*
 		 * In IPv6, the UDP checksum is ALWAYS used.
 		 */
-		if ((uh->uh_sum = in6_cksum(m, IPPROTO_UDP, len, iphlen))) {
+		if ((uh->uh_sum = in6_cksum(m, IPPROTO_UDP, iphlen, len))) {
 			udpstat.udps_badsum++;
 			goto bad;
 		}
@@ -875,8 +875,8 @@ udp_output(m, va_alist)
 		/* 
 		 * Always calculate udp checksum for IPv6 datagrams
 		 */
-		if (!(uh->uh_sum = in6_cksum(m, IPPROTO_UDP, len +
-		    sizeof(struct udphdr), payload))) 
+		if (!(uh->uh_sum = in6_cksum(m, IPPROTO_UDP,
+		    payload, len + sizeof(struct udphdr))))
 			uh->uh_sum = 0xffff;
 
 		error = ip6_output(m, NULL, &inp->inp_route6, 
