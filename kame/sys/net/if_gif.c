@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.18 2000/04/14 08:36:02 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.19 2000/04/19 04:11:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -570,6 +570,7 @@ gif_ioctl(ifp, cmd, data)
 		error = 0;
 		break;
 
+#ifdef SIOCDIFPHYADDR
 	case SIOCDIFPHYADDR:
 		if (sc->gif_psrc) {
 			free((caddr_t)sc->gif_psrc, M_IFADDR);
@@ -581,6 +582,7 @@ gif_ioctl(ifp, cmd, data)
 		}
 		/* change the IFF_UP flag as well? */
 		break;
+#endif
 			
 	case SIOCGIFPSRCADDR:
 #ifdef INET6
