@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.14 2002/11/11 03:53:58 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.15 2003/03/25 09:57:07 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -2104,9 +2104,11 @@ in6_merge_msf_source_addr(iasl, src, req)
 		newias->i6as_refcount = 1;
 		return (newias->i6as_refcount);
 	}
-	if (ias == NULL)
-		return 0;
 
+	/*
+	 * creates a new source address in the specified source filter,
+	 * as there's no source address at all.
+	 */
 	if (req != IMS_ADD_SOURCE) {
 #ifdef MLDV2_DEBUG
 		printf("in6_merge_msf_source_addr: source address cannot be deleted? (really occurs?)\n");
