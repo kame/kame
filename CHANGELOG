@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1386 2000/11/11 07:06:09 jinmei Exp $
+$KAME: CHANGELOG,v 1.1387 2000/11/12 06:43:09 itojun Exp $
 
 <200011>
+Sun Nov 12 15:40:29 JST 2000  itojun@iijlab.net
+	* bsdi4/libexec/ftpd/ftpd.c: update LPSV/EPSV result code to conform
+	  RFC2428.
+
 2000-11-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd: introduced some improvements and new features
 	mainly for auto router renumbering (RR):
