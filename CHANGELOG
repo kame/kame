@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.871 2000/05/14 12:39:18 jinmei Exp $
+$Id: CHANGELOG,v 1.872 2000/05/14 14:35:21 itojun Exp $
 
 <200005>
+Sun May 14 JST 2000  itojun@iijlab.net
+	* sys/netkey: completely rewrite message management, to avoid possible
+	  buffer overrun with corrupted pfkey data stream.  since only root
+	  processes are able to connect to pfkey socket, we don't consider
+	  this as vulnerability (if a bad guy can inject corrupted data stream
+	  to pfkey, he has root privilege and he can do many other things
+	  as well).  rewrite still in progress.
+	  if you see any breakage with IPsec related operations, please report.
+	* sys/netkey: attach better proposal/combination payload to acquire
+	  message from the kernel.
+
 2000-05-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/usr.sbin/netstat: printed per-interface IPv6 statistics.
 	Please try
@@ -16,6 +27,16 @@ $Id: CHANGELOG,v 1.871 2000/05/14 12:39:18 jinmei Exp $
         - count statistics for outgoing ICMPv6 packets
         - be more friendly with nervous compilers
         - code cleanup
+
+Sat May 13 JST 2000  itojun@iijlab.net
+	* */usr.bin/telnet/commands.c: improve error message on invalid
+	  port name.  gai_strerror() does not give enough detail.
+	* netbsd/usr.sbin/inetd/inetd.c: improve error message on address
+	  family mismatch.
+	* sys/netinet6/icmp6.c: improve icmp6 node information support.
+	  we have not been conformant to the latest specification (05).
+	  the current code was mixture of 05 draft and 03 draft.
+	  need more fixes (see comment in code for detail).
 
 2000-05-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/gifconfig/gifconfig.c (in6_status): use getnameinfo
@@ -44,9 +65,14 @@ Thu May 11 19:28:22 JST 2000 sakane@ydc.co.jp
 
 	They are reported from <Francis.Dupont@enst-bretagne.fr>.
 
+Wed May 10 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ip6_input.c: drop packet with jumbo payload option,
+	  if ip6_plen != 0.  it is to improve conformance to RFC2675.
+
 Wed May 10 14:07:22 JST 2000  itojun@iijlab.net
 	* sys/netinet/* (all platforms): correct more boundary checking issues
-	  in ip options processing.
+	  in ip options processing.  This was 4.4BSD issue, and all *BSD
+	  platforms are not very careful in parsing ip options.
 	  
 Wed May 10 02:07:33 JST 2000  itojun@iijlab.net
 	* sbin/ping6: correct outbound NI query packet with -aw.
