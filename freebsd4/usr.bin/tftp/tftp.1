@@ -30,7 +30,7 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     @(#)tftp.1	8.2 (Berkeley) 4/18/94
-.\" $FreeBSD: src/usr.bin/tftp/tftp.1,v 1.4 1999/08/28 01:06:24 peter Exp $
+.\" $FreeBSD: src/usr.bin/tftp/tftp.1,v 1.4.2.2 2001/03/04 09:12:14 kris Exp $
 .\"
 .Dd April 18, 1994
 .Dt TFTP 1
@@ -60,7 +60,7 @@ command below).
 Once
 .Nm
 is running, it issues the prompt
-.Nm tftp>
+.Dq Li tftp>
 and recognizes the following commands:
 .Pp
 .Bl -tag -width verbose -compact
@@ -145,7 +145,7 @@ to disambiguate the colon.
 .Pp
 .It Cm quit
 Exit
-.Nm tftp .
+.Nm .
 An end of file also exits.
 .Pp
 .It Cm rexmt Ar retransmission-timeout
@@ -172,6 +172,9 @@ protocol, the remote site will probably have some
 sort of file-access restrictions in place.  The
 exact methods are specific to each site and therefore
 difficult to document here.
+.Pp
+Files larger than 33488896 octets (65535 blocks) cannot be transferred
+without client and server supporting blocksize negotiation (RFC1783).
 .Sh HISTORY
 The
 .Nm

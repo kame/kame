@@ -36,7 +36,7 @@
 static char sccsid[] = "From: @(#)route.c	8.6 (Berkeley) 4/28/95";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/route.c,v 1.41.2.4 2000/09/18 11:18:14 ru Exp $";
+  "$FreeBSD: src/usr.bin/netstat/route.c,v 1.41.2.5 2001/03/22 13:48:44 des Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -62,6 +62,7 @@ static const char rcsid[] =
 #include <sys/sysctl.h>
 
 #include <arpa/inet.h>
+#include <libutil.h>
 #include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -587,9 +588,9 @@ p_rtentry(rt)
 	sa_u addr, mask;
 
 	/*
-	 * Don't print protocol-cloned routes unless -a.
+	 * Don't print cloned routes unless -a.
 	 */
-	if (rt->rt_parent && !aflag)
+	if (rt->rt_flags & RTF_WASCLONED && !aflag)
 		return;
 
 	bzero(&addr, sizeof(addr));
@@ -644,7 +645,7 @@ routename(in)
 	u_long in;
 {
 	register char *cp;
-	static char line[MAXHOSTNAMELEN + 1];
+	static char line[MAXHOSTNAMELEN];
 	struct hostent *hp;
 
 	cp = 0;
@@ -653,7 +654,7 @@ routename(in)
 			AF_INET);
 		if (hp) {
 			cp = hp->h_name;
-			trimdomain(cp);
+			trimdomain(cp, strlen(cp));
 		}
 	}
 	if (cp) {
@@ -722,7 +723,7 @@ netname(in, mask)
 	u_long in, mask;
 {
 	char *cp = 0;
-	static char line[MAXHOSTNAMELEN + 1];
+	static char line[MAXHOSTNAMELEN];
 	struct netent *np = 0;
 	u_long net, omask, dmask;
 	register u_long i;
@@ -736,7 +737,7 @@ netname(in, mask)
 			np = getnetbyaddr(net, AF_INET);
 		if (np) {
 			cp = np->n_name;
-			trimdomain(cp);
+			trimdomain(cp, strlen(cp));
 		}
 	}
 	if (cp)
@@ -760,7 +761,7 @@ netname6(sa6, mask)
 	struct sockaddr_in6 *sa6;
 	struct in6_addr *mask;
 {
-	static char line[MAXHOSTNAMELEN + 1];
+	static char line[MAXHOSTNAMELEN];
 	u_char *p = (u_char *)mask;
 	u_char *lim;
 	int masklen, illegal = 0, flag = NI_WITHSCOPEID;
@@ -823,7 +824,7 @@ char *
 routename6(sa6)
 	struct sockaddr_in6 *sa6;
 {
-	static char line[MAXHOSTNAMELEN + 1];
+	static char line[MAXHOSTNAMELEN];
 	int flag = NI_WITHSCOPEID;
 	/* use local variable for safety */
 	struct sockaddr_in6 sa6_local = {AF_INET6, sizeof(sa6_local),};

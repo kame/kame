@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)tftp.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/tftp/tftp.c,v 1.5 1999/08/28 01:06:24 peter Exp $";
+  "$FreeBSD: src/usr.bin/tftp/tftp.c,v 1.5.2.1 2001/03/04 09:12:14 kris Exp $";
 #endif /* not lint */
 
 /* Many bug fixes are from Jim Guyton <guyton@rand-unix> */
@@ -98,7 +98,7 @@ xmitfile(fd, name, mode)
 	register struct tftphdr *ap;	   /* data and ack packets */
 	struct tftphdr *r_init(), *dp;
 	register int n;
-	volatile unsigned int block;
+	volatile unsigned short block;
 	volatile int size, convert;
 	volatile unsigned long amount;
 	struct sockaddr_storage from;
@@ -215,7 +215,7 @@ recvfile(fd, name, mode)
 	register struct tftphdr *ap;
 	struct tftphdr *dp, *w_init();
 	register int n;
-	volatile unsigned int block;
+	volatile unsigned short block;
 	volatile int size, firsttrip;
 	volatile unsigned long amount;
 	struct sockaddr_storage from;

@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.bin/netstat/inet6.c,v 1.3.2.2 2000/08/07 16:45:42 ume Exp $
+ * $FreeBSD: src/usr.bin/netstat/inet6.c,v 1.3.2.4 2001/03/22 13:48:42 des Exp $
  */
 
 #ifndef lint
@@ -348,7 +348,8 @@ ip6_stats(off, name)
 	if (off == 0)
 		return;
 
-	kread(off, (char *)&ip6stat, sizeof (ip6stat));
+	if (kread(off, (char *)&ip6stat, sizeof (ip6stat)))
+		return;
 	printf("%s:\n", name);
 
 #define	p(f, m) if (ip6stat.f || sflag <= 1) \
@@ -1022,7 +1023,7 @@ inet6name(in6p)
 	register char *cp;
 	static char line[50];
 	struct hostent *hp;
-	static char domain[MAXHOSTNAMELEN + 1];
+	static char domain[MAXHOSTNAMELEN];
 	static int first = 1;
 
 	if (first && !nflag) {
