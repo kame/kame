@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.16 2002/04/19 07:36:46 jinmei Exp $ */
+/*	$KAME: common.c,v 1.17 2002/07/30 04:42:42 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -324,6 +324,16 @@ dump_localopt(s, socktype, proto)
 			warnx("ICMP6_FILTER: invalid option length: %d",
 			      optlen);
 	}
+#endif
+
+#ifdef IPV6_PREFER_TEMPADDR
+	optlen = sizeof(optbuf);
+	if (getsockopt(s, IPPROTO_IPV6, IPV6_PREFER_TEMPADDR, optbuf, &optlen))
+		warn("getsockopt(IPV6_PREFER_TEMPADDR)");
+	else if (optlen == sizeof(int))
+		printf("IPV6_PREFER_TEMPADDR: %d\n", *(int *)optbuf);
+	else
+		warnx("IPV6_PREFER_TEMPADDR: invalid option length: %d", optlen);
 #endif
 }
 

@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.29 2002/04/19 07:36:46 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.30 2002/07/30 04:42:42 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -82,6 +82,8 @@ main(argc, argv)
 	char *portstr = DEFAULTPORT;
 	char *finaldst;
 	char *nexthop = NULL, *stickynexthop = NULL;
+	char *tempaddrp = NULL, *stickytempaddrp = NULL;
+	int tempaddr;
 	struct iovec msgiov;
 	char *e, *databuf, *stickybuf;
 	int stickylen;
@@ -108,7 +110,7 @@ main(argc, argv)
 		} \
 	} while (0)
 
-	while ((ch = getopt(argc, argv, "cD:d:f:h:l:M:mn:Pp:s:t:v")) != -1)
+	while ((ch = getopt(argc, argv, "cD:d:f:h:l:M:mn:Pp:s:t:T:v")) != -1)
 		switch(ch) {
 		case 'c':
 			cflag++;
@@ -191,6 +193,13 @@ main(argc, argv)
 			else
 				tclassp = optarg;
 			break;
+		case 'T':
+			STICKYCHECK;
+			if (sticky)
+				stickytempaddrp = optarg;
+			else
+				tempaddrp = optarg;
+			break;
 		case 'v':
 			verbose++;
 			break;
@@ -224,6 +233,8 @@ main(argc, argv)
 	if (Mflag)
 		ip6optlen += CMSG_SPACE(sizeof(int));
 	if (tclassp)
+		ip6optlen += CMSG_SPACE(sizeof(int));
+	if (tempaddrp)
 		ip6optlen += CMSG_SPACE(sizeof(int));
 #ifdef IPV6_NEXTHOP
 	if (nexthop != NULL) {
@@ -488,6 +499,26 @@ main(argc, argv)
 	}
 #endif
 
+#ifdef IPV6_PREFER_TEMPADDR
+	if (tempaddrp != NULL) {
+		tempaddr = atoi(tempaddrp);
+		cmsgp->cmsg_len = CMSG_LEN(sizeof(int));
+		cmsgp->cmsg_level = IPPROTO_IPV6;
+		cmsgp->cmsg_type = IPV6_PREFER_TEMPADDR;
+
+		/* I believe there should be no alignment problem here */
+		*(int *)CMSG_DATA(cmsgp) = tempaddr;
+		cmsgp = CMSG_NXTHDR(&msg, cmsgp);
+	}
+	if (stickytempaddrp != NULL) {
+		tempaddr = atoi(stickytempaddrp);
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_PREFER_TEMPADDR,
+		    &tempaddr, sizeof(tempaddr))) {
+			warn("setsockopt(IPV6_PREFER_TEMPADDR, %d)", tempaddr);
+		}
+	}
+#endif
+
 #ifdef IPV6_PATHMTU
 	if (Pflag) {
 		struct ip6_mtuinfo mtuinfo;
@@ -648,6 +679,7 @@ usage()
 		"              [-p portnum|\'echo\']\n"
 		"              [-s packetsize]\n"
 		"              [-t tclass] [-t sticky sticky_tclass]\n"
+		"              [-T tempaddr] [-T sticky sticky_tempaddr]\n"
 		"              [-v] (verbose output)\n"
 		"              IPv6addrs...\n");
 	exit(1);
