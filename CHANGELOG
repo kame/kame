@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1972 2001/11/07 15:37:02 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1973 2001/11/07 16:08:24 sakane Exp $
 
 <200111>
 2001-11-08 Shin'ichi Fujisawa	<fujisawa@kame.net>
@@ -23,6 +23,11 @@ Wed Nov  7 12:30:49 JST 2001 keiichi@iij.ad.jp
           to distinguish one bc on the home link from the other bcs
           which has a same interface identifier on the other link.
           (need to recompile mip6control)
+
+Wed Nov  7 10:48:51 JST 2001 sakane@kame.net
+	* kame/kame/racoon:
+	racoon will compare between the list of "sainfo" and the initiator's
+	proposal even when "generate_policy" is defined.
 
 2001-11-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_purge): corrected purging the
