@@ -92,7 +92,7 @@
 #define	MLEN		(MSIZE - sizeof(struct m_hdr))	/* normal data len */
 #define	MHLEN		(MLEN - sizeof(struct pkthdr))	/* data len w/pkthdr */
 
-#if 0
+#if 1
 #define	MINCLSIZE	(MHLEN+MLEN+1)	/* smallest amount to put in cluster */
 #else
 #define	MINCLSIZE	(MHLEN+1)	/* smallest amount to put in cluster */
