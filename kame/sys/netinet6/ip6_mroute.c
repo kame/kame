@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.21 2000/05/05 11:01:01 sumikawa Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.22 2000/05/19 02:29:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -184,7 +184,7 @@ static int pim6;
  * Quality of service parameter to be added in the future!!!
  */
 
-#define MF6CFIND(o, g, rt) { \
+#define MF6CFIND(o, g, rt) do { \
 	register struct mf6c *_rt = mf6ctable[MF6CHASH(o,g)]; \
 	rt = NULL; \
 	mrt6stat.mrt6s_mfc_lookups++; \
@@ -200,13 +200,13 @@ static int pim6;
 	if (rt == NULL) { \
 		mrt6stat.mrt6s_mfc_misses++; \
 	} \
-}
+} while (0)
 
 /*
  * Macros to compute elapsed time efficiently
  * Borrowed from Van Jacobson's scheduling code
  */
-#define TV_DELTA(a, b, delta) { \
+#define TV_DELTA(a, b, delta) do { \
 	    register int xxs; \
 		\
 	    delta = (a).tv_usec - (b).tv_usec; \
@@ -222,7 +222,7 @@ static int pim6;
 			  delta += (1000000 * xxs); \
 	       } \
 	    } \
-}
+} while (0)
 
 #define TV_LT(a, b) (((a).tv_usec < (b).tv_usec && \
 	      (a).tv_sec <= (b).tv_sec) || (a).tv_sec < (b).tv_sec)
@@ -1346,12 +1346,12 @@ ip6_mdq(m, ifp, rt)
  * seperate.
  */
 
-#define MC6_SEND(ip6,mifp,m) {                             	\
+#define MC6_SEND(ip6, mifp, m) do {                             \
 		if ((mifp)->m6_flags & MIFF_REGISTER) 		\
 		    register_send((ip6), (mifp), (m));	 	\
                 else                                     	\
                     phyint_send((ip6), (mifp), (m));      	\
-}
+} while (0)
 
 	/*
 	 * Don't forward if it didn't arrive from the parent mif
@@ -1374,55 +1374,53 @@ ip6_mdq(m, ifp, rt)
 		 * packets on this interface, send a message to the
 		 * routing daemon.
 		 */
-		if(mifi < nummifs) /* have to make sure this is a valid mif */
-			if(mif6table[mifi].m6_ifp)
+		/* have to make sure this is a valid mif */
+		if (mifi < nummifs && mif6table[mifi].m6_ifp)
+			if (pim6 && (m->m_flags & M_LOOP) == 0) {
+				/*
+				 * Check the M_LOOP flag to avoid an
+				 * unnecessary PIM assert.
+				 * XXX: M_LOOP is an ad-hoc hack...
+				 */
+				static struct sockaddr_in6 sin6 =
+				{ sizeof(sin6), AF_INET6 };
 
-				if (pim6 && (m->m_flags & M_LOOP) == 0) {
-					/*
-					 * Check the M_LOOP flag to avoid an
-					 * unnecessary PIM assert.
-					 * XXX: M_LOOP is an ad-hoc hack...
-					 */
-					static struct sockaddr_in6 sin6 =
-					{ sizeof(sin6), AF_INET6 };
+				register struct mbuf *mm;
+				struct mrt6msg *im;
 
-					register struct mbuf *mm;
-					struct mrt6msg *im;
+				mm = m_copy(m, 0, sizeof(struct ip6_hdr));
+				if (mm &&
+				    (M_HASCL(mm) ||
+				     mm->m_len < sizeof(struct ip6_hdr)))
+					mm = m_pullup(mm, sizeof(struct ip6_hdr));
+				if (mm == NULL)
+					return ENOBUFS;
+	
+				im = mtod(mm, struct mrt6msg *);
+				im->im6_msgtype	= MRT6MSG_WRONGMIF;
+				im->im6_mbz	= 0;
 
-					mm = m_copy(m, 0,
-						    sizeof(struct ip6_hdr));
-					if (mm &&
-					    (M_HASCL(mm) ||
-					     mm->m_len < sizeof(struct ip6_hdr)))
-						mm = m_pullup(mm, sizeof(struct ip6_hdr));
-					if (mm == NULL)
-						return ENOBUFS;
-		
-					im = mtod(mm, struct mrt6msg *);
-					im->im6_msgtype	= MRT6MSG_WRONGMIF;
-					im->im6_mbz	= 0;
+				for (mifp = mif6table, iif = 0;
+				     iif < nummifs && mifp &&
+					     mifp->m6_ifp != ifp;
+				     mifp++, iif++)
+					;
 
-					for (mifp = mif6table, iif = 0;
-					     iif < nummifs && mifp &&
-						     mifp->m6_ifp != ifp;
-					     mifp++, iif++);
+				im->im6_mif	= iif;
 
-					im->im6_mif	= iif;
+				sin6.sin6_addr = im->im6_src;
 
-					sin6.sin6_addr = im->im6_src;
+				mrt6stat.mrt6s_upcalls++;
 
-					mrt6stat.mrt6s_upcalls++;
-
-					if (socket_send(ip6_mrouter, mm,
-							&sin6) < 0) {
+				if (socket_send(ip6_mrouter, mm, &sin6) < 0) {
 #ifdef MRT6DEBUG
-						if (mrt6debug)
-							log(LOG_WARNING, "mdq, ip6_mrouter socket queue full\n");
+					if (mrt6debug)
+						log(LOG_WARNING, "mdq, ip6_mrouter socket queue full\n");
 #endif
-						++mrt6stat.mrt6s_upq_sockfull;
-						return ENOBUFS;
-					}	/* if socket Q full */
-				}		/* if PIM */
+					++mrt6stat.mrt6s_upq_sockfull;
+					return ENOBUFS;
+				}	/* if socket Q full */
+			}		/* if PIM */
 		return 0;
 	}			/* if wrong iif */
 
