@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.88 2003/02/07 09:34:37 jinmei Exp $	*/
+/*	$KAME: ip_encap.c,v 1.89 2003/12/22 02:43:41 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -187,6 +187,10 @@ LIST_HEAD(, encaptab) encaptab = LIST_HEAD_INITIALIZER(&encaptab);
 #ifdef USE_RADIX
 extern int max_keylen;	/* radix.c */
 struct radix_node_head *encap_head[2];	/* 0 for AF_INET, 1 for AF_INET6 */
+#endif
+
+#ifdef __FreeBSD__
+void	(*ipip_input)(struct mbuf *, int); /* hook for mrouting */
 #endif
 
 void

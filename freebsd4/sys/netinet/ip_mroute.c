@@ -1704,12 +1704,13 @@ encap_send(struct ip *ip, struct vif *vifp, struct mbuf *m)
  * This is similar to mroute_encapcheck() + mroute_encap_input() in -current.
  */
 static int
-X_ipip_input(struct mbuf *m, int off, int proto)
+X_ipip_input(struct mbuf *m, int off)
 {
     struct ip *ip = mtod(m, struct ip *);
     int hlen = ip->ip_hl << 2;
     int s;
     struct ifqueue *ifq;
+    int proto = ip->ip_p;
 
     if (!have_encap_tunnel) {
 	    rip_input(m, off);

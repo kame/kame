@@ -252,6 +252,7 @@ int	ip_rsvp_done(void);
 extern int	(*ip_rsvp_vif)(struct socket *, struct sockopt *);
 extern void	(*ip_rsvp_force_done)(struct socket *);
 extern void	(*rsvp_input_p)(struct mbuf *m, int off);
+extern void	(*ipip_input_p)(struct mbuf *m, int off);
 
 #ifdef IPDIVERT
 void	div_init(void);
