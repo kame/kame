@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.12 2000/03/25 07:23:34 sumikawa Exp $	*/
+/*	$KAME: net_osdep.h,v 1.13 2000/04/26 06:30:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -114,6 +114,17 @@
  *
  *	odd thing is that many of them refers loif as ifnet *loif,
  *	not loif[NLOOP], from outside of if_loop.c.
+ *
+ * - number of bpf pseudo devices
+ *	others: bpfilter.h, NBPFILTER
+ *	FreeBSD4: bpf.h, NBPF
+ *	solution:
+ *		#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+ *		#include "bpf.h"
+ *		#define NBPFILTER	NBPF
+ *		#else
+ *		#include "bpfilter.h"
+ *		#endif
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
