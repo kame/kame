@@ -1,5 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2508 2003/11/25 07:05:12 ono Exp $
+$KAME: CHANGELOG,v 1.2509 2003/12/07 16:03:04 suz Exp $
+
+<200312>
+2003-12-7   SUZUKI Shinsuke <suz@crl.hitachi.co.jp>
+	* freebsd5/sys/netinet6/in6_pcb.c
+	* freebsd5/sys/netinet/tcp_subr.c
+	fixed a kernel panic and error message on freebsd5-kame
+	in TCP TIME_WAIT state.
+
+	Reported by: KOZUKA Masahiro <ma-kun@kozuka.jp>
 
 <200311>
 2003-11-25  Hideki ONO  <ono@soft.net.fujitsu.co.jp>
