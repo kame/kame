@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.8 2000/07/02 13:58:29 itojun Exp $	*/
+/*	$KAME: ip6.h,v 1.9 2000/07/02 21:01:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -321,30 +321,36 @@ struct ip6_frag {
  * supposed to never be matched but is prepared just in case.
  */
 
+#ifdef INET6
+#define IP6_EXTHDR_STAT(x)	x
+#else
+#define IP6_EXTHDR_STAT(x)
+#endif
+
 #define IP6_EXTHDR_CHECK(m, off, hlen, ret)				\
 do {									\
     if ((m)->m_next != NULL) {						\
 	if (((m)->m_flags & M_LOOP) &&					\
 	    ((m)->m_len < (off) + (hlen)) &&				\
 	    (((m) = m_pullup((m), (off) + (hlen))) == NULL)) {		\
-		ip6stat.ip6s_exthdrtoolong++;				\
+		IP6_EXTHDR_STAT(ip6stat.ip6s_exthdrtoolong++;		\
 		return ret;						\
 	} else if ((m)->m_flags & M_EXT) {				\
 		if ((m)->m_len < (off) + (hlen)) {			\
-			ip6stat.ip6s_exthdrtoolong++;			\
+			IP6_EXTHDR_STAT(ip6stat.ip6s_exthdrtoolong++);	\
 			m_freem(m);					\
 			return ret;					\
 		}							\
 	} else {							\
 		if ((m)->m_len < (off) + (hlen)) {			\
-			ip6stat.ip6s_exthdrtoolong++;			\
+			IP6_EXTHDR_STAT(ip6stat.ip6s_exthdrtoolong++);	\
 			m_freem(m);					\
 			return ret;					\
 		}							\
 	}								\
     } else {								\
 	if ((m)->m_len < (off) + (hlen)) {				\
-		ip6stat.ip6s_tooshort++;				\
+		IP6_EXTHDR_STAT(ip6stat.ip6s_tooshort++);		\
 		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_truncated);	\
 		m_freem(m);						\
 		return ret;						\
@@ -366,7 +372,7 @@ do {									\
 do {									\
 	struct mbuf *t;							\
 	int tmp;							\
-	ip6stat.ip6s_exthdrget++;					\
+	IP6_EXTHDR_STAT(ip6stat.ip6s_exthdrget++);			\
 	if ((m)->m_len >= (off) + (len))				\
 		(val) = (typ)(mtod((m), caddr_t) + (off));		\
 	else {								\
@@ -385,7 +391,7 @@ do {									\
 #define IP6_EXTHDR_GET0(val, typ, m, off, len) \
 do {									\
 	struct mbuf *t;							\
-	ip6stat.ip6s_exthdrget0++;					\
+	IP6_EXTHDR_STAT(ip6stat.ip6s_exthdrget0++);			\
 	if ((off) == 0)							\
 		(val) = (typ)mtod(m, caddr_t);				\
 	else {								\
