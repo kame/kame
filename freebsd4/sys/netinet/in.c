@@ -401,6 +401,14 @@ in_control(so, cmd, data, ifp, p)
 
 	case SIOCDIFADDR:
 		in_ifscrub(ifp, ia);
+		/*
+		 * XXX horrible hack to detect that we are being called
+		 * from if_detach()
+		 */
+		if (!ifnet_addrs[ifp->if_index - 1]) {
+			in_pcbpurgeif0(LIST_FIRST(ripcbinfo.listhead), ifp);
+			in_pcbpurgeif0(LIST_FIRST(udbinfo.listhead), ifp);
+		}
 
 		/*
 		 * Protect from ipintr() traversing address list
