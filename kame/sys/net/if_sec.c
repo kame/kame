@@ -1,4 +1,4 @@
-/*	$KAME: if_sec.c,v 1.5 2001/07/26 02:09:21 itojun Exp $	*/
+/*	$KAME: if_sec.c,v 1.6 2001/07/26 02:11:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -162,6 +162,7 @@ int
 sec_destroy(ifp)
 	struct ifnet *ifp;
 {
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	struct ifchain *ifcp, *next;
 	struct sec_softc *sc;
 
@@ -172,19 +173,20 @@ sec_destroy(ifp)
 		if (ifp == ifcp->ifp) {
 			gif_delete_tunnel(ifp);
 			LIST_REMOVE(ifcp, chain);
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #if NBPFILTER > 0
 			bpfdetach(ifp);
 #endif
 			if_detach(ifp);
 			free(sc, M_DEVBUF);
-#endif
 
 			return 0;
 		}
 	}
 
 	return ENOENT;
+#else
+	return EOPNOTUSPP;
+#endif
 }
 
 int
