@@ -1,4 +1,4 @@
-/* $KAME: in6_msf.h,v 1.4 2003/05/09 08:40:55 suz Exp $	*/
+/* $KAME: in6_msf.h,v 1.5 2004/02/02 13:11:39 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -90,13 +90,12 @@ struct in6_multi_source {
 	struct	in6_addr_slist *i6ms_rec; /* recorded source address list  */
 	struct	in6_addr_slist *i6ms_in; /* include source address list    */
 	struct	in6_addr_slist *i6ms_ex; /* exclude source address list    */
-	u_int	i6ms_excnt;		 /* max source count of EX list	    */
 	struct	in6_addr_slist *i6ms_alw;  /* pending ALLOW source address */
 	struct	in6_addr_slist *i6ms_blk;  /* pending BLOCK source address */
 	struct	in6_addr_slist *i6ms_toin; /* pending TO_IN source address */
 	struct	in6_addr_slist *i6ms_toex; /* pending TO_EX source address */
 	u_int	i6ms_timer;		 /* state-change report timer	    */
-	u_int	i6ms_robvar;		 /* robusutness var. of grp record  */
+	u_int	i6ms_robvar;		 /* robustness var. of grp record  */
 };
 
 #ifdef _KERNEL

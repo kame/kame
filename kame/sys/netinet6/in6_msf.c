@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.19 2003/12/08 10:05:53 itojun Exp $	*/
+/*	$KAME: in6_msf.c,v 1.20 2004/02/02 13:11:39 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -198,7 +198,6 @@ in6_addmultisrc(in6m, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 			return error;
 		}
 		in6m->in6m_source->i6ms_mode = MCAST_INCLUDE;
-		in6m->in6m_source->i6ms_excnt = 0;
 		in6m->in6m_source->i6ms_grpjoin = 0;
 		in6m->in6m_source->i6ms_timer = 0;
 		in6m->in6m_source->i6ms_robvar = 0;
@@ -288,15 +287,11 @@ in6_addmultisrc(in6m, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 
 after_source_list_addition:
 	/*
-	 * When mode is EXCLUDE, add group join count if (*,G) join was
-	 * requested, or generate an EXCLUDE source list reaching max count.
+	 * When mode is EXCLUDE, and it's an initial request,
+	 * add group join count, regardless of the number of sources.
 	 */
-	if (mode == MCAST_EXCLUDE) {
-		if (init) /* only when socket made initial request. */
-			++in6m->in6m_source->i6ms_excnt;
-		if (numsrc == 0)
-			/* Received (*,G) join request. */
-			++in6m->in6m_source->i6ms_grpjoin;
+	if (mode == MCAST_EXCLUDE && init) {
+		++in6m->in6m_source->i6ms_grpjoin;
 	}
 
 	if (numsrc != 0)
@@ -306,8 +301,8 @@ after_source_list_addition:
 	error = in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc);
 	if (error != 0) {
 		mldlog((LOG_DEBUG, "in6_addmultisrc: in6_get_new_msf_state returns %d\n", error));
-		if ((mode == MCAST_EXCLUDE) && init)
-			--in6m->in6m_source->i6ms_excnt;
+		if (mode == MCAST_EXCLUDE && init)
+			--in6m->in6m_source->i6ms_grpjoin;
 		if (numsrc != 0) {
 			/* numsrc must be returned back before undo */
 			*fnumsrc -= j;
@@ -386,19 +381,15 @@ in6_delmultisrc(in6m, numsrc, ss, mode, final, newhead, newmode, newnumsrc)
 after_source_list_deletion:
 	/*
 	 * Each source which was removed from EXCLUDE source list is also
-	 * removed from an EXCLUDE source list reaching max count if there
+	 * removed from an EXCLUDE source list reaching max count, if there
 	 * is no (*,G) join state.
 	 */
 	if (mode == MCAST_EXCLUDE) {
-		if (numsrc == 0) {
-			/* Received (*,G) leave request. */
+		if (final) { /* socket made request leave from group. */
 			if (in6m->in6m_source->i6ms_grpjoin <= 0)
 				return EADDRNOTAVAIL;
-
 			--in6m->in6m_source->i6ms_grpjoin;
 		}
-		if (final) /* only when socket made request leave from group. */
-			--in6m->in6m_source->i6ms_excnt;
 	}
 
 	if (numsrc != 0) {
@@ -408,8 +399,8 @@ after_source_list_deletion:
 	error = in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc);
 	if (error != 0) {
 		mldlog((LOG_DEBUG, "in6_delmultisrc: in6_get_new_msf_state returns %d\n", error));
-		if ((mode == MCAST_EXCLUDE) && final)
-			++in6m->in6m_source->i6ms_excnt;
+		if (mode == MCAST_EXCLUDE && final)
+			++in6m->in6m_source->i6ms_grpjoin;
 		if (numsrc != 0) {
 			/* numsrc must be returned back before undo */
 			*fnumsrc += j;
@@ -484,7 +475,6 @@ in6_modmultisrc(in6m, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 			return error;
 		}
 		in6m->in6m_source->i6ms_mode = MCAST_INCLUDE;
-		in6m->in6m_source->i6ms_excnt = 0;
 		in6m->in6m_source->i6ms_grpjoin = 0;
 		in6m->in6m_source->i6ms_timer = 0;
 		in6m->in6m_source->i6ms_robvar = 0;
@@ -514,17 +504,9 @@ in6_modmultisrc(in6m, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 	}
 	i = 0; /* reset */
 
-	/*
-	 * Change grpjoin count for (*,G) operation or add new filtered
-	 * sources for (S,G) operation.
-	 */
-	if (numsrc == 0) {
-		if (mode == MCAST_INCLUDE) /* (*,G) leave */
-			--in6m->in6m_source->i6ms_grpjoin;
-		else /* (*,G) join */
-			++in6m->in6m_source->i6ms_grpjoin;
+	/* no need to change source list if there is no source */
+	if (numsrc == 0)
 		goto after_source_list_modification;
-	}
 
 	if (IN6M_SOURCE_LIST(mode) == NULL ||
 	    LIST_EMPTY(IN6M_SOURCE_LIST(mode)->head)) {
@@ -596,19 +578,15 @@ in6_modmultisrc(in6m, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 
 after_source_list_modification:
 	/*
-	 * If new request is Filter-Mode-Change request to MCAST_INCLUDE,
-	 * decrease i6ms_excnt.
-	 * If new request is Filter-Mode-Change request to MCAST_EXCLUDE,
-	 * increase i6ms_excnt.
-	 * If new request is EX{NULL} -> EX{non NULL} or
-	 * EX{NULL} -> IN{non NULL}, decrease i6ms_grpjoin.
+	 * If new request is EX{anything} -> IN{anything}
+	 * decrease i6ms_grpjoin.
+	 * If new request is IN{non NULL} -> EX{anything}
+	 * increase i6ms_grpjoin.
 	 */
 	if (old_mode != mode && mode == MCAST_INCLUDE)
-		--in6m->in6m_source->i6ms_excnt;
-	else if (old_mode != mode && mode == MCAST_EXCLUDE)
-		++in6m->in6m_source->i6ms_excnt;
-	if (numsrc != 0 && grpjoin)
 		--in6m->in6m_source->i6ms_grpjoin;
+	else if (old_mode != mode && mode == MCAST_EXCLUDE)
+		++in6m->in6m_source->i6ms_grpjoin;
 
 	/* New numsrc must be set before in6_get_new_msf_state() is called. */
 	if (old_num != 0)
@@ -620,11 +598,15 @@ after_source_list_modification:
 	if (error != 0) {
 		mldlog((LOG_DEBUG, "in6_modmultisrc: in6_get_new_msf_state error %d\n", error));
 		if (old_mode != mode && mode == MCAST_INCLUDE)
-			++in6m->in6m_source->i6ms_excnt;
-		else if (old_mode != mode && mode == MCAST_EXCLUDE)
-			--in6m->in6m_source->i6ms_excnt;
-		if (numsrc != 0 && grpjoin)
 			++in6m->in6m_source->i6ms_grpjoin;
+		else if (old_mode != mode && mode == MCAST_EXCLUDE)
+			--in6m->in6m_source->i6ms_grpjoin;
+
+		if (grpjoin && mode == MCAST_INCLUDE)
+			++in6m->in6m_source->i6ms_grpjoin;
+		else if (!grpjoin && mode == MCAST_EXCLUDE)
+			--in6m->in6m_source->i6ms_grpjoin;
+
 		if (old_num != 0) {
 			/* numsrc must be returned back before undo */
 			*ofnumsrc += j;
@@ -709,8 +691,6 @@ in6_undomultisrc(in6m, numsrc, ss, mode, req)
 		FREE(IN6M_SOURCE_LIST(mode)->head, M_MSFILTER);
 		FREE(IN6M_SOURCE_LIST(mode), M_MSFILTER);
 		IN6M_SOURCE_LIST(mode) = NULL;
-		if (mode == MCAST_EXCLUDE)
-			in6mm_src->i6ms_excnt = 0; /* this must be unneeded.. */
 	}
 }
 
@@ -733,7 +713,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 	int error = 0;
 
 	/* Case 1: Some socket requested (*,G) join. */
-	if (in6mm_src->i6ms_grpjoin != 0) {
+	if ((in6mm_src->i6ms_grpjoin != 0) && IN6M_LIST_EMPTY(ex)) {
 		/* IN{NULL} -> EX{NULL} */
 		if (LIST_EMPTY(in6mm_src->i6ms_cur->head)) {
 			if (in6mm_src->i6ms_mode == MCAST_INCLUDE) {
@@ -859,7 +839,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 		if (LIST_EMPTY(in6mm_src->i6ms_cur->head)) {
 			error = in6_copy_msf_source_list(in6mm_src->i6ms_ex,
 							 in6mm_src->i6ms_cur,
-							 in6mm_src->i6ms_excnt);
+							 in6mm_src->i6ms_grpjoin);
 			if (error != 0)
 				return error;
 
@@ -875,7 +855,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 				cmd = BLOCK_OLD_SOURCES;
 			}
 			LIST_FOREACH(ex_ias, in6mm_src->i6ms_ex->head, i6as_list) {
-				if (ex_ias->i6as_refcount != in6mm_src->i6ms_excnt)
+				if (ex_ias->i6as_refcount != in6mm_src->i6ms_grpjoin)
 					continue; /* skip */
 				error = in6_merge_pending_report(in6m, ex_ias,
 								 cmd);
@@ -899,7 +879,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 			mldlog((LOG_DEBUG, "case 3.3:EX{non-NULL}->EX{non-NULL}\n"));
 			filter = REPORT_FILTER2;
 			error = in6_merge_msf_head(in6m, in6mm_src->i6ms_ex,
-						   in6mm_src->i6ms_excnt, filter);
+						   in6mm_src->i6ms_grpjoin, filter);
 			if (error != 0)
 				return error;
 
@@ -924,14 +904,14 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 		in6mm_src->i6ms_cur->numsrc = 0;
 		error = in6_copy_msf_source_list(in6mm_src->i6ms_ex,
 						 in6mm_src->i6ms_cur,
-						 in6mm_src->i6ms_excnt);
+						 in6mm_src->i6ms_grpjoin);
 		if (error != 0)
 			return error;
 
 		i = in6mm_src->i6ms_cur->numsrc;
 		in6_clear_all_pending_report(in6m);
 		LIST_FOREACH(ex_ias, in6mm_src->i6ms_ex->head, i6as_list) {
-			if (ex_ias->i6as_refcount != in6mm_src->i6ms_excnt)
+			if (ex_ias->i6as_refcount != in6mm_src->i6ms_grpjoin)
 				continue; /* skip */
 			error = in6_merge_pending_report(in6m, ex_ias,
 							 CHANGE_TO_EXCLUDE_MODE);
@@ -1065,7 +1045,7 @@ in6_get_new_msf_state(in6m, newhead, newmode, newnumsrc)
 	*newnumsrc = 0;
 
 	LIST_FOREACH(ex_ias, &exhead, i6as_list) {
-		if (ex_ias->i6as_refcount != in6mm_src->i6ms_excnt)
+		if (ex_ias->i6as_refcount != in6mm_src->i6ms_grpjoin)
 			continue;
 
 		LIST_FOREACH(in_ias, &inhead, i6as_list) {
@@ -2159,9 +2139,11 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	}
 	if (imm != NULL) {
 		msf = imm->i6mm_msf;
-		if ((grpf->gf_fmode == MCAST_EXCLUDE) &&
-		    (grpf->gf_numsrc == 0) &&
-		    (msf && msf->msf_grpjoin != 0)) {
+		if (grpf->gf_fmode == MCAST_EXCLUDE &&
+		    grpf->gf_numsrc == 0 &&
+		    msf != NULL &&
+		    msf->msf_grpjoin != 0 &&
+		    msf->msf_blknumsrc == 0) {
 			splx(s);
 			return EADDRINUSE;
 		}
@@ -2308,7 +2290,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	old_ss = NULL;
 	old_mode = MCAST_INCLUDE;
 	msf = imm->i6mm_msf;
-	if (msf->msf_grpjoin != 0)
+	if (msf->msf_grpjoin != 0 && msf->msf_blknumsrc == 0)
 		old_mode = MCAST_EXCLUDE;
 	else if (msf->msf_numsrc != 0) {
 		MALLOC(old_ss, struct sockaddr_storage *,
@@ -2366,7 +2348,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	final = 0;
 	if ((grpf->gf_fmode == MCAST_INCLUDE) && (grpf->gf_numsrc == 0)) {
 		final = 1;
-		if (msf->msf_grpjoin != 0) {
+		if (msf->msf_grpjoin != 0 && msf->msf_blknumsrc == 0) {
 			in6_delmulti(imm->i6mm_maddr, &error, 0, NULL,
 				     MCAST_EXCLUDE, final);
 			if (error != 0) {
@@ -2492,10 +2474,15 @@ sock6_setmopt_srcfilter(sop, grpfp)
 		}
 	}
 
+	if (grpf->gf_fmode == MCAST_INCLUDE) {
+		msf->msf_grpjoin = 0;
+	} else { /* grpf->gf_fmode == MCAST_EXCLUDE)*/
+		msf->msf_grpjoin = 1;
+	}
+		
+
 	if (grpf->gf_numsrc == 0) {
 		in6_freemopt_source_list(msf, msf->msf_head, msf->msf_blkhead);
-		if (grpf->gf_fmode == MCAST_EXCLUDE)
-			msf->msf_grpjoin = 1;
 		/*
 		 * Remove the gap in the membership array if there is no
 		 * msf member.
@@ -2505,8 +2492,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 			LIST_REMOVE(imm, i6mm_chain);
 			FREE(imm, M_IPMADDR);
 		}
-	} else if (msf->msf_grpjoin)
-		msf->msf_grpjoin = 0;
+	}
 
 	if (old_ss != NULL)
 		FREE(old_ss, M_IPMOPTS);
@@ -2602,7 +2588,7 @@ sock6_getmopt_srcfilter(sop, grpfp)
 
 	msf = imm->i6mm_msf;
 
-	if (msf->msf_grpjoin != 0) {
+	if (msf->msf_grpjoin != 0 && msf->msf_blknumsrc == 0) {
 		/* (*,G) join */
 		grpf->gf_numsrc = 0;
 		grpf->gf_fmode = MCAST_EXCLUDE;
