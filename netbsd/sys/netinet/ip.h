@@ -79,11 +79,6 @@ struct ip {
 #define	IPTOS_THROUGHPUT	0x08
 #define	IPTOS_RELIABILITY	0x04
 /*	IPTOS_LOWCOST		0x02 XXX */
-#if 1
-/* ECN bits proposed by Sally Floyd */
-#define IPTOS_CE		0x01	/* congestion experienced */
-#define IPTOS_ECT		0x02	/* ECN-capable transport */
-#endif
 
 /*
  * Definitions for IP precedence (also in ip_tos) (hopefully unused)
@@ -96,6 +91,16 @@ struct ip {
 #define	IPTOS_PREC_IMMEDIATE		0x40
 #define	IPTOS_PREC_PRIORITY		0x20
 #define	IPTOS_PREC_ROUTINE		0x00
+
+/*
+ * ECN (Explicit Congestion Notification) codepoints in RFC3168
+ * mapped to the lower 2 bits of the TOS field.
+ */
+#define	IPTOS_ECN_NOTECT	0x00	/* not-ECT */
+#define	IPTOS_ECN_ECT1		0x01	/* ECN-capable transport (1) */
+#define	IPTOS_ECN_ECT0		0x02	/* ECN-capable transport (0) */
+#define	IPTOS_ECN_CE		0x03	/* congestion experienced */
+#define	IPTOS_ECN_MASK		0x03	/* ECN field mask */
 
 /*
  * Definitions for options.
