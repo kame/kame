@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.68 2002/07/17 23:49:16 sakane Exp $	*/
+/*	$KAME: esp_input.c,v 1.69 2002/08/21 23:11:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -244,6 +244,10 @@ esp4_input(m, va_alist)
 	if (!sumalgo)
 		goto noreplaycheck;
 	siz = (((*sumalgo->sumsiz)(sav) + 3) & ~(4 - 1));
+	if (m->m_pkthdr.len < off + ESPMAXLEN + siz) {
+		ipsecstat.in_inval++;
+		goto bad;
+	}
 	if (AH_MAXSUMSIZE < siz) {
 		ipseclog((LOG_DEBUG,
 		    "internal error: AH_MAXSUMSIZE must be larger than %lu\n",
@@ -671,6 +675,10 @@ esp6_input(mp, offp, proto)
 	if (!sumalgo)
 		goto noreplaycheck;
 	siz = (((*sumalgo->sumsiz)(sav) + 3) & ~(4 - 1));
+	if (m->m_pkthdr.len < off + ESPMAXLEN + siz) {
+		ipsecstat.in_inval++;
+		goto bad;
+	}
 	if (AH_MAXSUMSIZE < siz) {
 		ipseclog((LOG_DEBUG,
 		    "internal error: AH_MAXSUMSIZE must be larger than %lu\n",
