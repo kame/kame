@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2609 2004/05/20 09:39:52 suz Exp $
+$KAME: CHANGELOG,v 1.2610 2004/05/23 16:13:32 suz Exp $
 
 <200405>
+2004-05-23  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
+	* kame/kame/pim6sd/mld6v2_proto.c: don't send MLDv1 Query even 
+	  in MLDv1-compat mode to prevent MLDv2 hosts from unnecessarily 
+	  shifting to MLDv1-compatible mode (see draft-vida-mld-v2-08.txt 
+	  section 8.3.2 p.47)
+	* kame/kame/pim6sd/mld6v2_proto.c: don't send MLDv2 General Query 
+	  when it is not a querier.
+
 2004-05-20  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
 	* freebsd5: sync with FreeBSD 5.2.1-RELEASE.
 	  ToDo: 
