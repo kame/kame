@@ -1,0 +1,9 @@
+Platforms and base versions
+KAME project
+$Id: VERSION,v 1.1 1999/08/07 02:30:14 itojun Exp $
+
+
+platform	base version		webpage
+---		---			---
+netbsd		NetBSD 1.4		http://www.netbsd.org/
+freebsd2	FreeBSD 2.2.8-RELEASE	http://www.freebsd.org/

@@ -1,0 +1,26 @@
+Installation procedure - preparation of the tree
+KAME project
+$Id: INSTALL,v 1.1 1999/08/07 02:30:14 itojun Exp $
+
+
+KAME build tree shares part of the tree among operating system
+platforms.  "kame" directory is shared among "netbsd", "freebsd2",
+and other platforms.  You'll first need to make a complete tree from
+distributed tree.
+
+1. Identify your target operating system, by looking at document named
+   "VERSION".  Suppose the target is "netbsd".
+
+2. Be sure to have complete tree under your target directory ("netbsd").
+   In some cases you'll need to bring in vanilla distribution into
+   subdirectories and perform "patch" operation.  Consult target directory-
+   dependent document for details.
+
+3. Invoke the following:
+	% make TARGET=netbsd prepare
+   This will create necessary symbolic links for the build (from TARGET
+   tree to "kame" tree).
+   NOTE: You'll need perl interpreter for invoking this.
+
+4. Go down to the target operating system you have specified, and read
+   document named "INSTALL".  Good luck!
