@@ -568,19 +568,24 @@ p_rtentry(rt)
 	register struct rtentry *rt;
 {
 	static struct ifnet ifnet, *lastif;
-	struct sockaddr sock1, sock2;
-	struct sockaddr *sa = &sock1, *mask = &sock2;
+	struct sockaddr_storage sock1, sock2;
+	struct sockaddr *sa = (struct sockaddr *)&sock1;
+	struct sockaddr *mask = (struct sockaddr *)&sock2;
 	
 	bcopy(kgetsa(rt_key(rt)), sa, sizeof(struct sockaddr));
+	if (sa->sa_len > sizeof(struct sockaddr))
+		bcopy(kgetsa(rt_key(rt)), sa, sa->sa_len);
 
 	if (sa->sa_family == PF_KEY) {
 		encap_print(rt);
 		return;
 	}
 
-	if (rt_mask(rt))
+	if (rt_mask(rt)) {
 		bcopy(kgetsa(rt_mask(rt)), mask, sizeof(struct sockaddr));
-	else
+		if (sa->sa_len > sizeof(struct sockaddr))
+			bcopy(kgetsa(rt_mask(rt)), mask, sa->sa_len);
+	} else
 		mask = 0;
 	
 	p_sockaddr(sa, mask, rt->rt_flags, WID_DST);
