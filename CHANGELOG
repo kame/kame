@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1316 2000/10/03 22:31:51 itojun Exp $
+$KAME: CHANGELOG,v 1.1317 2000/10/03 22:34:28 itojun Exp $
 
 <200010>
 Wed Oct  4 07:30:10 JST 2000  itojun@iijlab.net
@@ -12,6 +12,10 @@ Wed Oct  4 07:30:10 JST 2000  itojun@iijlab.net
 
 Wed Oct  4 00:29:42 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/lftp: upgrade to 2.3.3.
+
+Tue Oct  3 JST 2000  itojun@iijlab.net
+	* libipsec/pfkey.c: tighten header chasing.  we should change some
+	  of the function signatures for better protection.
 
 2000-10-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/usr.sbin/netstat/main.c:
