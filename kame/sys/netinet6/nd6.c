@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.284 2002/06/09 16:16:00 keiichi Exp $	*/
+/*	$KAME: nd6.c,v 1.285 2002/06/13 07:54:31 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2082,7 +2082,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	}
 	sc = hif_list_find_withhaddr(src);
 	if (sc) {
-		return (sc->hif_if.if_output(sc, m, dst, rt));
+		return ((*sc->hif_if.if_output)((struct ifnet *)sc, m,  (struct sockaddr *)dst, rt));
 	}
 		
 #endif /* MIP6 */

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.1 2002/06/09 16:16:00 keiichi Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.2 2002/06/13 07:54:31 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -210,7 +210,7 @@ mip6_bu_fsm(mbu, event, data)
 				/* XXX */
 
 				/* XXX */ mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
-				error = mip6_bu_send_bu(mbu);
+				error = mip6_bu_send_cbu(mbu);
 				if (error) {
 					mip6log((LOG_ERR,
 					    "%s:%d: sending a binding upate "
@@ -285,7 +285,7 @@ mip6_bu_fsm(mbu, event, data)
 				/* XXX */
 
 				/* XXX */ mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
-				error = mip6_bu_send_bu(mbu);
+				error = mip6_bu_send_cbu(mbu);
 				if (error) {
 					mip6log((LOG_ERR,
 					    "%s:%d: sending a binding upate "

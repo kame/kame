@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.34 2002/06/09 16:16:00 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.35 2002/06/13 07:54:31 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -472,12 +472,28 @@ int mip6_home_registration		__P((struct hif_softc *));
 int mip6_validate_bu			__P((struct mbuf *, u_int8_t *));
 int mip6_process_bu			__P((struct mbuf *, u_int8_t *));
 
+int mip6_ip6mhi_input			__P((struct mbuf *,
+					     struct ip6m_home_test_init *,
+					     int));
+int mip6_ip6mci_input			__P((struct mbuf *,
+					     struct ip6m_careof_test_init *,
+					     int));
+int mip6_ip6mh_input			__P((struct mbuf *,
+					     struct ip6m_home_test *,
+					     int));
+int mip6_ip6mc_input			__P((struct mbuf *,
+					     struct ip6m_careof_test *,
+					     int));
 int mip6_ip6mu_input			__P((struct mbuf *,
 					     struct ip6m_binding_update *,
 					     int));
 int mip6_ip6ma_input			__P((struct mbuf *,
 					     struct ip6m_binding_ack *,
 					     int));
+int mip6_bu_fsm				__P((struct mip6_bu *, int, void *));
+int mip6_bu_send_hoti			__P((struct mip6_bu *));
+int mip6_bu_send_coti			__P((struct mip6_bu *));
+int mip6_bu_send_cbu			__P((struct mip6_bu *));
 
 /* binding ack management */
 int mip6_validate_ba			__P((struct mbuf *, u_int8_t *));

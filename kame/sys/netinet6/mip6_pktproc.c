@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.5 2002/06/09 16:16:00 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.6 2002/06/13 07:54:31 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -66,10 +66,23 @@
 extern struct mip6_bc_list mip6_bc_list;
 extern struct mip6_prefix_list mip6_prefix_list;
 
+static int mip6_ip6mh_create __P((struct ip6_mobility **,
+				  struct sockaddr_in6 *,
+				  struct sockaddr_in6 *,
+				  u_int32_t));
+static int mip6_ip6mc_create __P((struct ip6_mobility **,
+				  struct sockaddr_in6 *,
+				  struct sockaddr_in6 *,
+				  u_int32_t));
 static int mip6_ip6mu_process __P((struct mbuf *,
 				   struct ip6m_binding_update *, int));
 static int mip6_ip6ma_process __P((struct mbuf *,
 				   struct ip6m_binding_ack *, int));
+static int mip6_ip6mhi_create __P((struct ip6_mobility **,
+				   struct mip6_bu *));
+static int mip6_ip6mci_create __P((struct ip6_mobility **,
+				   struct mip6_bu *));
+
 static int mip6_cksum __P((struct sockaddr_in6 *,
 			   struct sockaddr_in6 *,
 			   u_int32_t, u_int8_t,	char *));
@@ -972,7 +985,7 @@ mip6_bu_send_coti(mbu)
 }
 
 int
-mip6_bu_send_bu(mbu)
+mip6_bu_send_cbu(mbu)
 	struct mip6_bu *mbu;
 {
 	struct sockaddr_in6 *busrc_sa;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.105 2002/06/09 16:16:00 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.106 2002/06/13 07:54:31 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2642,7 +2642,7 @@ mip6_route_optimize(m)
 		if (mbu->mbu_refexpire < time_second)
 			mbu->mbu_refexpire = 0x7fffffff;
 	}
-	mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_RO_DESIRED);
+	mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_RO_DESIRED, NULL);
 
 	return (0);
  bad:
