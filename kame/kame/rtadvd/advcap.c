@@ -1,4 +1,4 @@
-/*	$KAME: advcap.c,v 1.7 2002/05/29 09:36:07 itojun Exp $	*/
+/*	$KAME: advcap.c,v 1.8 2002/05/29 10:01:43 itojun Exp $	*/
 
 /*
  * Copyright (c) 1983 The Regents of the University of California.
@@ -196,7 +196,7 @@ tnchktc()
 
 	p = tbuf + strlen(tbuf) - 2;	/* before the last colon */
 	while (*--p != ':')
-		if (p<tbuf) {
+		if (p < tbuf) {
 			write(2, "Bad remcap entry\n", 18);
 			return (0);
 		}

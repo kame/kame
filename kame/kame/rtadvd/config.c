@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.59 2002/04/28 10:36:49 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.60 2002/05/29 10:01:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -722,7 +722,7 @@ makeentry(buf, len, id, string, add)
 {
 	char *ep = buf + len;
 
-	strcpy(buf, string);
+	strlcpy(buf, string, len);
 	if (add) {
 		char *cp;
 
