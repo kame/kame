@@ -13,6 +13,7 @@ SRCS=	main.c session.c isakmp.c handler.c random.c \
 	vmbuf.c plog.c logger.c schedule.c str2val.c misc.c sockmisc.c \
 	proposal.c sainfo.c vendorid.c safefile.c backupsa.c \
 	dnssec.c getcertsbyname.c
+SRCS+=	rijndael-alg-fst.c rijndael-api-fst.c
 
 MAN=	racoon.8 racoon.conf.5
 
@@ -45,6 +46,7 @@ CPPFLAGS+=-DHAVE_OPENSSL_OPENSSLV_H=1
 CPPFLAGS+=-DYY_NO_UNPUT
 CPPFLAGS+=-DHAVE_GETRRSETBYNAME
 CPPFLAGS+=-I${LIBPFKEYSRCDIR}
+CPPFLAGS+=-I${RACOONSRCDIR}/missing
 .if (${MKKERBEROS} != "no")
 CPPFLAGS+=-DHAVE_GSSAPI 
 .endif
@@ -55,5 +57,5 @@ CPPFLAGS+=-DHAVE_SIGNING_C=1 -DHAVE_OPENSSL_PEM_H=1 -DHAVE_OPENSSL_X509_H=1
 
 .include <bsd.prog.mk>
 
-.PATH:	${RACOONSRCDIR} ${TCPDUMPSRCDIR}
+.PATH:	${RACOONSRCDIR} ${TCPDUMPSRCDIR} ${RACOONSRCDIR}/missing/crypto/rijndael
 CLEANFILES+=	y.tab.h cfparse.c cftoken.c
