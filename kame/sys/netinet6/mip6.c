@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.176 2002/10/02 11:16:00 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.177 2002/10/17 12:49:34 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1599,6 +1599,12 @@ mip6_ioctl(cmd, data)
 		 */
 		bcopy(&mr->mip6r_ru.mip6r_ifnames, &mip6_preferred_ifnames,
 		    sizeof(mr->mip6r_ru.mip6r_ifnames));
+		if (mip6_process_movement()) {
+			mip6log((LOG_WARNING,
+			    "%s:%d: mip6_process_movement failed.\n",
+			    __FILE__, __LINE__));
+				/* ignore this error... */
+		}
 	}
 
 		break;
