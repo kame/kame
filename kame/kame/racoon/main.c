@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.42 2001/10/18 07:13:13 sakane Exp $	*/
+/*	$KAME: main.c,v 1.43 2001/11/16 04:34:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -148,6 +148,10 @@ main(ac, av)
 		errx(1, "could not set umask");
 		/* NOTREACHED*/
 	}
+
+#ifdef DEBUG_RECORD_MALLOCATION
+	DRM_init();
+#endif
 
 	initlcconf();
 	initrmconf();

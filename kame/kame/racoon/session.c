@@ -1,4 +1,4 @@
-/*	$KAME: session.c,v 1.26 2001/08/13 10:50:42 itojun Exp $	*/
+/*	$KAME: session.c,v 1.27 2001/11/16 04:34:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -249,6 +249,11 @@ signal_handler(sig)
 	    }
 		break;
 
+#ifdef DEBUG_RECORD_MALLOCATION
+	case SIGUSR2:
+		DRM_dump();
+		break;
+#endif
 	default:
 		/* XXX should be blocked any signal ? */
 		sigreq = sig;

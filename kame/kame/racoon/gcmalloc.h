@@ -1,4 +1,4 @@
-/*	$KAME: gcmalloc.h,v 1.3 2001/04/04 22:23:05 thorpej Exp $	*/
+/*	$KAME: gcmalloc.h,v 1.4 2001/11/16 04:34:57 sakane Exp $	*/
 
 /*
  * Copyright (C) 2000, 2001 WIDE Project.
@@ -94,6 +94,9 @@ free(void *ptr)
 #include <dmalloc.h>
 #endif /* DMALLOC */
 
+#ifdef DEBUG_RECORD_MALLOCATION
+#include <debugrm.h>
+#else
 #ifndef racoon_malloc
 #define	racoon_malloc(sz)	malloc((sz))
 #endif
@@ -106,5 +109,6 @@ free(void *ptr)
 #ifndef racoon_free
 #define	racoon_free(p)		free((p))
 #endif
+#endif /* DEBUG_RECORD_MALLOCATION */
 
 #endif /* _GCMALLOC_H_DEFINED */
