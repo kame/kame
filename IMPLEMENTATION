@@ -2,7 +2,14 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.217 2001/05/28 00:01:40 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.218 2001/05/28 00:05:21 itojun Exp $
+
+
+NOTE: The document tries to describe behaviors/implementation choices
+of the latest KAME/*BSD stack (like KAME/NetBSD 1.5).  The description
+here may not be applicable to KAME-integrated *BSD releases (like stock
+NetBSD 1.5.1), as we have certain amount of changes between them.  Still,
+some of the content can be useful for KAME-integrated *BSD releases.
 
 1. IPv6
 
