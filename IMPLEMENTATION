@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/02/12 19:29:51 $
+			$Date: 2000/02/14 08:47:23 $
 
 1. IPv6
 
@@ -1316,9 +1316,10 @@ others) may have modified their implementation, so use the following
 list just for reference purposes.
 	Altiga, Ashley-laurent (vpcom.com), Data Fellows (F-Secure),
 	BlueSteel, CISCO, Ericsson, ACC, Fitel, FreeS/WAN, HITACHI, IBM
-	AIX, IIJ, Intel, Microsoft WinNT, NIST (linux IPsec + plutoplus),
-	Netscreen, OpenBSD, Radguard, RedCreek, Routerware, SSH, Secure
-	Computing, Soliton, Toshiba, TIS/NAI Gauntret, VPNet, Yamaha RT100i
+	AIX, IIJ, Intel, Microsoft WinNT, NAI PGPnet,
+	NIST (linux IPsec + plutoplus), Netscreen, OpenBSD, Radguard,
+	RedCreek, Routerware, SSH, Secure Computing, Soliton, Toshiba,
+	TIS/NAI Gauntret, VPNet, Yamaha RT100i
 
 Here are (some of) platforms we have tested IPComp/IKE interoperability
 in the past, in no particular order.
