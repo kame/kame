@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.366 2004/03/21 14:55:06 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.367 2004/04/08 02:52:22 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -223,6 +223,8 @@ RFC3646: DNS Configuration options for Dynamic Host Configuration Protocol for
          IPv6 (DHCPv6)
 RFC3678: Socket Interface Extensions for Multicast Source Filters
     * works for kame/freebsd4, kame/netbsd, and kame/openbsd.
+RFC3736: Stateless Dynamic Host Configuration Protocol (DHCP) Service for IPv6
+    * KAME's dhcp6 implementation contains the "stateless" subset of DHCPv6.
 draft-ietf-ipngwg-icmp-name-lookups-09: IPv6 Name Lookups Through ICMP
 draft-ietf-mobileip-ipv6-24.txt: Mobility Support in IPv6
 draft-ietf-mobileip-mipv6-ha-ipsec-06.txt: 
