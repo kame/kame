@@ -279,7 +279,7 @@ struct ifaddr {
  * The prefix structure contains information about one prefix
  * of an interface.  They are maintained by the different address families,
  * are allocated and attached when an prefix or an address is set,
- * and are linked together so all prfefixes for an interface can be located.
+ * and are linked together so all prefixes for an interface can be located.
  */
 struct ifprefix {
 	struct	sockaddr *ifpr_prefix;	/* prefix of interface */
@@ -306,10 +306,12 @@ struct ifmultiaddr {
 
 #ifdef KERNEL
 #define	IFAFREE(ifa) \
-	if ((ifa)->ifa_refcnt <= 0) \
-		ifafree(ifa); \
-	else \
-		(ifa)->ifa_refcnt--;
+	do { \
+		if ((ifa)->ifa_refcnt <= 0) \
+			ifafree(ifa); \
+		else \
+			(ifa)->ifa_refcnt--; \
+	} while (0)
 
 extern	struct ifnethead ifnet;
 extern struct	ifnet	**ifindex2ifnet;
@@ -324,7 +326,7 @@ int	ether_output __P((struct ifnet *,
 	   struct mbuf *, struct sockaddr *, struct rtentry *));
 int	ether_ioctl __P((struct ifnet *, int, caddr_t));
 
-int	if_addmulti __P((struct ifnet *, struct sockaddr *, 
+int	if_addmulti __P((struct ifnet *, struct sockaddr *,
 			 struct ifmultiaddr **));
 int	if_allmulti __P((struct ifnet *, int));
 void	if_attach __P((struct ifnet *));
@@ -354,7 +356,7 @@ struct	ifaddr *ifa_ifwithroute __P((int, struct sockaddr *,
 struct	ifaddr *ifaof_ifpforaddr __P((struct sockaddr *, struct ifnet *));
 void	ifafree __P((struct ifaddr *));
 
-struct	ifmultiaddr *ifmaof_ifpforaddr __P((struct sockaddr *, 
+struct	ifmultiaddr *ifmaof_ifpforaddr __P((struct sockaddr *,
 					    struct ifnet *));
 int	if_simloop __P((struct ifnet *ifp, struct mbuf *m,
 		struct sockaddr *dst, int hlen));
