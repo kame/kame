@@ -1,9 +1,9 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2560 2004/03/10 13:51:10 jinmei Exp $
+$KAME: CHANGELOG,v 1.2561 2004/03/11 02:16:01 jinmei Exp $
 
 <200403>
 2004-03-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* kame/sys/netinet/icmp6.h (ICMP6_MEMBERSHIP_REDUCTION): defined
+	* kame/sys/netinet/icmp6.h (MLD_LISTENER_REDUCTION): defined
 	as an alias of MLD_LISTENER_DONE to be compliant to RFC3542.
 
 2004-03-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
