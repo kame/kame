@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1920 2001/10/18 08:18:02 keiichi Exp $
+$KAME: CHANGELOG,v 1.1921 2001/10/19 00:56:05 sakane Exp $
 
 <200110>
+Fri Oct 19 09:54:19 JST 2001 sakane@kame.net
+	* kame/sys/key.c:
+	the value of the prefixlen in the sadb_address structure is fixed.
+	when pfkey message relative to SA is sent, the prefixlen was incorrect.
+	reported by <archie@packetdesign.com>.
+
 Thu Oct 18 17:16:19 JST 2001 keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6*
 	- fix a bug that a HA sends wrong seq number when issuing a
