@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.20 2001/01/17 16:59:27 itojun Exp $	*/
+/*	$KAME: if_faith.c,v 1.21 2001/02/20 07:59:26 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -195,7 +195,7 @@ faithoutput(ifp, m, dst, rt)
 		 * try to free it or keep a pointer a to it).
 		 */
 		struct mbuf m0;
-		u_int af = dst->sa_family;
+		u_int32_t af = dst->sa_family;
 
 		m0.m_next = m;
 		m0.m_len = 4;

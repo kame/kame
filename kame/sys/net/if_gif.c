@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.40 2001/02/20 07:41:36 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.41 2001/02/20 07:59:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -307,7 +307,7 @@ gif_output(ifp, m, dst, rt)
 		 * try to free it or keep a pointer a to it).
 		 */
 		struct mbuf m0;
-		u_int af = dst->sa_family;
+		u_int32_t af = dst->sa_family;
 
 		m0.m_next = m;
 		m0.m_len = 4;
@@ -375,11 +375,11 @@ gif_input(m, af, gifp)
 		 * try to free it or keep a pointer a to it).
 		 */
 		struct mbuf m0;
-		u_int af1 = af;
+		u_int32_t af1 = af;
 		
 		m0.m_next = m;
 		m0.m_len = 4;
-		m0.m_data = (char *)&af;
+		m0.m_data = (char *)&af1;
 		
 #ifdef HAVE_OLD_BPF
 		bpf_mtap(gifp, &m0);
