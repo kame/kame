@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.34 2000/08/29 11:22:48 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.35 2000/08/30 02:29:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -65,6 +65,7 @@
 #include <netinet6/esp.h>
 #include <net/pfkeyv2.h>
 #include <netkey/keydb.h>
+#include <netkey/key.h>	/*M_SECA*/
 #include <crypto/des/des.h>
 #include <crypto/blowfish/blowfish.h>
 #include <crypto/cast128/cast128.h>
