@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_dump_policy.c,v 1.10 2000/05/07 05:28:24 itojun Exp $	*/
+/*	$KAME: ipsec_dump_policy.c,v 1.11 2000/05/07 05:29:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -74,7 +74,6 @@ ipsec_dump_policy(policy, delimiter)
 	struct sadb_x_ipsecrequest *xisr;
 	size_t off, buflen;
 	char *buf;
-	int error;
 	char isrbuf[1024];
 	char *newbuf;
 
@@ -179,7 +178,6 @@ ipsec_dump_ipsecrequest(buf, len, xisr, bound)
 {
 	const char *proto, *mode, *level;
 	char abuf[NI_MAXHOST * 2 + 2];
-	int error;
 
 	if (xisr->sadb_x_ipsecrequest_len > bound) {
 		__ipsec_errcode = EIPSEC_INVAL_PROTO;
