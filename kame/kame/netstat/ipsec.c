@@ -240,6 +240,8 @@ void
 ipsec_stats0(name)
 	char *name;
 {
+	printf("%s:\n", name);
+
 	skread(name, &ipsecstat_info);
 
 	print_ipsecstats();
