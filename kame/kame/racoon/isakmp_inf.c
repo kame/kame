@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.54 2000/09/20 21:52:14 sakane Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.55 2000/09/22 06:02:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.54 2000/09/20 21:52:14 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.55 2000/09/22 06:02:22 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -248,6 +248,7 @@ isakmp_info_send_d2(iph2)
 	vchar_t *payload = NULL;
 	int tlen;
 	int error = 0;
+	u_int8_t *spi;
 
 	if (iph2->status != PHASE2ST_ESTABLISHED)
 		return 0;
@@ -270,7 +271,7 @@ isakmp_info_send_d2(iph2)
 		 * decode any more if peer send encoded packet without aware of
 		 * deletion of SA.  Outbound SAs don't come under the situation.
 		 */
-		tlen = sizeof(*d) + sizeof(pr->spi);
+		tlen = sizeof(*d) + pr->spisize;
 		payload = vmalloc(tlen);
 		if (payload == NULL) {
 			plog(logp, LOCATION, NULL, 
@@ -283,14 +284,21 @@ isakmp_info_send_d2(iph2)
 		d->h.len = htons(tlen);
 		d->doi = htonl(IPSEC_DOI);
 		d->proto_id = pr->proto_id;
-		d->spi_size = sizeof(pr->spi);
+		d->spi_size = pr->spisize;
 		d->num_spi = htons(1);
-		memcpy(d + 1, &pr->spi, sizeof(pr->spi));
+		/*
+		 * XXX SPI bits are left-filled, for use with IPComp.
+		 * we should be switching to variable-length spi field...
+		 */
+		spi = (u_int8_t *)&pr->spi;
+		spi += sizeof(pr->spi);
+		spi -= pr->spisize;
+		memcpy(d + 1, spi, pr->spisize);
 
 		error = isakmp_info_send_common(iph1, payload,
 						ISAKMP_NPTYPE_D, 0);
 		vfree(payload);
-	}
+}
 
 	return error;
 }
@@ -892,10 +900,10 @@ purge_ipsec_spi(dst0, proto, spi, n)
 	size_t i;
 	caddr_t mhp[SADB_EXT_MAX + 1];
 
-	buf = pfkey_dump_sadb(proto);
+	buf = pfkey_dump_sadb(ipsecdoi2pfkey_proto(proto));
 	if (buf == NULL) {
 		YIPSDEBUG(DEBUG_MISC, plog(logp, LOCATION, NULL,
-			"pfkey_dump_sadb returned nothing.\n"));
+			"pfkey_dump_adb returned nothing.\n"));
 		return;
 	}
 
@@ -1093,6 +1101,10 @@ isakmp_info_recv_d(iph1, msg)
 	vchar_t *pbuf;
 	struct isakmp_parse_t *pa, *pap;
 	int protected = 0;
+	union {
+		u_int32_t spi32;
+		u_int16_t spi16[2];
+	} spi;
 
 	/* validate the type of next payload */
 	if (!(pbuf = isakmp_parse(msg)))
@@ -1179,7 +1191,26 @@ isakmp_info_recv_d(iph1, msg)
 				continue;
 			}
 			purge_ipsec_spi(iph1->remote, d->proto_id,
-					(u_int32_t *)(d + 1), num_spi);
+			    (u_int32_t *)(d + 1), num_spi);
+			break;
+
+		case IPSECDOI_PROTO_IPCOMP:
+			/* need to handle both 16bit/32bit SPI */
+			memset(&spi, 0, sizeof(spi));
+			if (d->spi_size == sizeof(spi.spi16[1])) {
+				memcpy(&spi.spi16[1], d + 1,
+				    sizeof(spi.spi16[1]));
+			} else if (d->spi_size == sizeof(spi.spi32))
+				memcpy(&spi.spi32, d + 1, sizeof(spi.spi32));
+			else {
+				plog(logp, LOCATION, iph1->remote,
+					"delete payload with strange spi "
+					"size %d(proto_id:%d)\n",
+					d->spi_size, d->proto_id);
+				continue;
+			}
+			purge_ipsec_spi(iph1->remote, d->proto_id,
+			    &spi.spi32, num_spi);
 			break;
 
 		default:
