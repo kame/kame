@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.156 2002/08/13 10:04:27 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.157 2002/08/14 05:51:48 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -149,7 +149,7 @@
 #define MIP6_CONFIG_BU_USE_SINGLE 0
 #endif /* !MIP6_CONFIG_BU_USE_SINGLE */
 
-#define NONCE_UPDATE_PERIOD	300	/* XXX */
+#define NONCE_UPDATE_PERIOD	(MIP6_COOKIE_MAX_LIFE / MIP6_NONCE_HISTORY)
 
 extern struct mip6_subnet_list mip6_subnet_list;
 extern struct mip6_prefix_list mip6_prefix_list;
