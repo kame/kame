@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.56 2000/05/05 06:54:33 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.57 2000/05/09 14:26:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -285,7 +285,7 @@ get_ifid(ifp0, altifp, in6)
 	if (altifp && get_hw_ifid(altifp, in6) == 0) {
 #ifdef ND6_DEBUG
 		printf("%s: got interface identifier from %s\n",
-		    if_name(ifp0), ifname(altifp));
+		    if_name(ifp0), if_name(altifp));
 #endif
 		goto success;
 	}
