@@ -1,4 +1,4 @@
-.\"	$KAME: getnameinfo.3,v 1.12 2000/06/22 20:19:07 itojun Exp $
+.\"	$KAME: getnameinfo.3,v 1.13 2000/06/22 20:25:50 itojun Exp $
 .\"
 .\" Copyright (c) 1983, 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -101,7 +101,7 @@ or
 .Fa servlen
 arguments.
 Otherwise, the caller must provide buffers large enough to hold the
-nodename and the  service name, including the terminating null characters.
+nodename and the service name, including the terminating null characters.
 .Pp
 Unfortunately most systems do not provide constants that specify the
 maximum size of either a fully-qualified domain name or a service name.
@@ -201,7 +201,7 @@ struct sockaddr *sa;	/* input */
 char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
 
 if (getnameinfo(sa, sa->sa_len, hbuf, sizeof(hbuf), sbuf,
-		sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV)) {
+    sizeof(sbuf), NI_NUMERICHOST | NI_NUMERICSERV)) {
 	errx(1, "could not get numeric hostname");
 	/*NOTREACHED*/
 }
@@ -214,7 +214,7 @@ struct sockaddr *sa;	/* input */
 char hbuf[NI_MAXHOST];
 
 if (getnameinfo(sa, sa->sa_len, hbuf, sizeof(hbuf), NULL, 0,
-		NI_NAMEREQD)) {
+    NI_NAMEREQD)) {
 	errx(1, "could not resolve hostname");
 	/*NOTREACHED*/
 }
