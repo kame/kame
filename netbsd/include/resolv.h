@@ -1,4 +1,4 @@
-/*	$NetBSD: resolv.h,v 1.19 2000/08/09 14:40:52 itojun Exp $	*/
+/*	$NetBSD: resolv.h,v 1.22 2003/08/07 09:44:11 agc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,11 +41,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -127,7 +123,7 @@
 #define	RES_MAXNDOTS		15	/* should reflect bit field size */
 
 struct __res_state {
-	int	retrans;	 	/* retransmition time interval */
+	int	retrans;	 	/* retransmission time interval */
 	int	retry;			/* number of times to retransmit */
 	u_long	options;		/* option flags - see below. */
 	int	nscount;		/* number of name servers */
@@ -211,19 +207,19 @@ struct __res_state_ext {
 typedef enum { res_goahead, res_nextns, res_modified, res_done, res_error }
 	res_sendhookact;
 
-typedef res_sendhookact (*res_send_qhook)__P((struct sockaddr_in * const *ns,
-					      const u_char **query,
-					      int *querylen,
-					      u_char *ans,
-					      int anssiz,
-					      int *resplen));
+typedef res_sendhookact (*res_send_qhook)__P((struct sockaddr_in * const *,
+					      const u_char **,
+					      int *,
+					      u_char *,
+					      int,
+					      int *));
 
-typedef res_sendhookact (*res_send_rhook)__P((const struct sockaddr_in *ns,
-					      const u_char *query,
-					      int querylen,
-					      u_char *ans,
-					      int anssiz,
-					      int *resplen));
+typedef res_sendhookact (*res_send_rhook)__P((const struct sockaddr_in *,
+					      const u_char *,
+					      int,
+					      u_char *,
+					      int,
+					      int *));
 
 struct res_sym {
 	int		number;		/* Identifying number, like T_MX */

@@ -1,4 +1,4 @@
-/*	$NetBSD: ls.h,v 1.11 2000/06/17 16:11:25 assar Exp $	*/
+/*	$NetBSD: ls.h,v 1.16 2003/12/26 06:19:19 grant Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -44,8 +40,12 @@ extern long blocksize;		/* block size units */
 
 extern int f_accesstime;	/* use time of last access */
 extern int f_flags;		/* show flags associated with a file */
+extern int f_grouponly;		/* long listing without owner */
+extern int f_humanize;		/* humanize size field */
 extern int f_inode;		/* print inode */
 extern int f_longform;		/* long listing format */
+extern int f_octal;		/* print octal escapes for nongraphic characters */
+extern int f_octal_escape;	/* like f_octal but use C escapes if possible */
 extern int f_sectime;		/* print the real time for all files */
 extern int f_size;		/* list size in short listing */
 extern int f_statustime;	/* use time of last mode change */
@@ -56,6 +56,7 @@ extern int f_nonprint;		/* show unprintables as ? */
 typedef struct {
 	FTSENT *list;
 	u_int64_t btotal;
+	u_int64_t stotal;
 	int entries;
 	int maxlen;
 	int s_block;

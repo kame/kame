@@ -1,4 +1,4 @@
-/*	$NetBSD: krb4encpwd.c,v 1.1 2000/06/22 06:47:46 thorpej Exp $	*/
+/*	$NetBSD: krb4encpwd.c,v 1.5 2003/08/07 16:44:55 agc Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "@(#)krb4encpwd.c	8.3 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: krb4encpwd.c,v 1.1 2000/06/22 06:47:46 thorpej Exp $");
+__RCSID("$NetBSD: krb4encpwd.c,v 1.5 2003/08/07 16:44:55 agc Exp $");
 #endif
 #endif /* not lint */
 
@@ -84,9 +80,7 @@ __RCSID("$NetBSD: krb4encpwd.c,v 1.1 2000/06/22 06:47:46 thorpej Exp $");
 
 #include <des.h>
 #include <krb.h>
-#ifdef	__STDC__
 #include <stdlib.h>
-#endif
 #ifdef	NO_STRING_H
 #include <strings.h>
 #else
@@ -271,7 +265,7 @@ krb4encpwd_is(ap, data, cnt)
 		  register int i;
 
 		  time(&now);
-		  sprintf(challenge, "%x", now);
+		  snprintf(challenge, sizeof(challenge), "%x", now);
 		  Data(ap, KRB4_ENCPWD_CHALLENGE, (void *)challenge, strlen(challenge));
 		}
 		break;
@@ -324,7 +318,7 @@ krb4encpwd_reply(ap, data, cnt)
 		local_des_read_pw_string(user_passwd, sizeof(user_passwd)-1, "Password: ", 0);
 		UserPassword = user_passwd;
 		Challenge = challenge;
-		strcpy(instance, RemoteHostName);
+		strlcpy(instance, RemoteHostName, sizeof(instance));
 		if ((cp = strchr(instance, '.')) != 0)  *cp = '\0';
 
 		if (r = krb_mk_encpwd_req(&krb_token, KRB_SERVICE_NAME, instance, realm, Challenge, UserNameRequested, user_passwd)) {
@@ -343,9 +337,10 @@ krb4encpwd_reply(ap, data, cnt)
 }
 
 	int
-krb4encpwd_status(ap, name, level)
+krb4encpwd_status(ap, name, l, level)
 	Authenticator *ap;
 	char *name;
+	size_t l;
 	int level;
 {
 
@@ -353,7 +348,7 @@ krb4encpwd_status(ap, name, level)
 		return(level);
 
 	if (UserNameRequested && passwdok(UserNameRequested, UserPassword)) {
-		strcpy(name, UserNameRequested);
+		strlcpy(name, UserNameRequested, l);
 		return(AUTH_VALID);
 	} else {
 		return(AUTH_USER);
@@ -405,12 +400,12 @@ krb4encpwd_printsub(data, cnt, buf, buflen)
 		goto common2;
 
 	default:
-		sprintf(lbuf, " %d (unknown)", data[3]);
+		snprintf(lbuf, sizeof(lbuf), " %d (unknown)", data[3]);
 		strncpy((char *)buf, lbuf, buflen);
 	common2:
 		BUMP(buf, buflen);
 		for (i = 4; i < cnt; i++) {
-			sprintf(lbuf, " %d", data[i]);
+			snprintf(lbuf, sizeof(lbuf), " %d", data[i]);
 			strncpy((char *)buf, lbuf, buflen);
 			BUMP(buf, buflen);
 		}

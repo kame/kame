@@ -1,4 +1,4 @@
-/*	$NetBSD: utmpx.h,v 1.6 2002/04/04 19:39:57 christos Exp $	 */
+/*	$NetBSD: utmpx.h,v 1.11 2003/08/26 16:48:32 wiz Exp $	 */
 
 /*-
  * Copyright (c) 2002 The NetBSD Foundation, Inc.
@@ -38,6 +38,8 @@
 #ifndef	_UTMPX_H_
 #define	_UTMPX_H_
 
+#include <sys/cdefs.h>
+#include <sys/featuretest.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 
@@ -51,7 +53,7 @@
 #define	_UTX_IDSIZE	4
 #define _UTX_HOSTSIZE	256
 
-#ifndef _XOPEN_SOURCE
+#if defined(_NETBSD_SOURCE)
 #define UTX_USERSIZE	_UTX_USERSIZE
 #define UTX_LINESIZE	_UTX_LINESIZE
 #define	UTX_IDSIZE	_UTX_IDSIZE
@@ -68,7 +70,7 @@
 #define USER_PROCESS	7
 #define DEAD_PROCESS	8
 
-#ifndef _XOPEN_SOURCE
+#if defined(_NETBSD_SOURCE)
 #define ACCOUNTING	9
 #define SIGNATURE	10
 #endif
@@ -100,9 +102,9 @@ struct utmpx {
 	uint32_t ut_pad[10];		/* reserved for future use */
 };
 
-#ifndef _XOPEN_SOURCE
+#if defined(_NETBSD_SOURCE)
 struct lastlogx {
-	struct timespec ll_time;	/* time entry was created */
+	struct timeval ll_tv;		/* time entry was created */
 	char ll_line[_UTX_LINESIZE];	/* tty name */
 	char ll_host[_UTX_HOSTSIZE];	/* host name */
 	struct sockaddr_storage ll_ss;	/* address where entry was made from */
@@ -111,24 +113,31 @@ struct lastlogx {
 
 __BEGIN_DECLS
 
-void setutxent(void);
-void endutxent(void);
-struct utmpx *getutxent(void);
-struct utmpx *getutxid(const struct utmpx *);
-struct utmpx *getutxline(const struct utmpx *);
-struct utmpx *pututxline(const struct utmpx *);
+void setutxent __P((void));
+void endutxent __P((void));
+struct utmpx *getutxent __P((void));
+struct utmpx *getutxid __P((const struct utmpx *));
+struct utmpx *getutxline __P((const struct utmpx *));
+struct utmpx *pututxline __P((const struct utmpx *));
 
-#ifndef _XOPEN_SOURCE
-void updwtmpx(const char *, const struct utmpx *);
-int lastlogxname(const char *);
-struct lastlogx *getlastlogxuid(uid_t);
-void updlastlogx(const char *, struct lastlogx *);
-void getutmp(const struct utmpx *, struct utmp *);
-void getutmpx(const struct utmp *, struct utmpx *);
+#if defined(_NETBSD_SOURCE)
+int updwtmpx __P((const char *, const struct utmpx *));
+int lastlogxname __P((const char *));
+#ifdef __LIBC12_SOURCE__
+struct lastlogx *getlastlogx __P((uid_t, struct lastlogx *));
+struct lastlogx *__getlastlogx13 __P((const char *, uid_t, struct lastlogx *));
+#else
+struct lastlogx *getlastlogx __P((const char *, uid_t, struct lastlogx *))
+	__RENAME(__getlastlogx13);
+#endif
+int updlastlogx __P((const char *, uid_t, struct lastlogx *));
+struct utmp;
+void getutmp __P((const struct utmpx *, struct utmp *));
+void getutmpx __P((const struct utmp *, struct utmpx *));
 
-int utmpxname(const char *);
+int utmpxname __P((const char *));
 
-#endif /* !_XOPEN_SOURCE */
+#endif /* _NETBSD_SOURCE */
 
 __END_DECLS
 

@@ -1,5 +1,9 @@
 #	from: @(#)Makefile	8.2 (Berkeley) 12/15/93
-#	$NetBSD: Makefile,v 1.15 2002/03/22 18:10:21 thorpej Exp $
+#	$NetBSD: Makefile,v 1.21 2003/12/11 09:46:27 dyoung Exp $
+
+NOPIC=		# defined
+NOPROFILE=	# defined
+NOLINT=		# defined
 
 .include <bsd.own.mk>
 
@@ -11,20 +15,22 @@ SRCS=	auth.c encrypt.c genget.c getent.c misc.c
 CPPFLAGS+= -DHAS_CGETENT
 CPPFLAGS+= -I${.CURDIR}
 
-# XXX See doc/HACKS gcc-3-libtelnet
-.if defined(HAVE_GCC3)
-COPTS+=	-O0
-.endif
-
 .if (${USE_KERBEROS} != "no")
-SRCS+=	enc_des.c kerberos.c
-SRCS+=	kerberos5.c
-
+SRCS+=	enc_des.c
 CPPFLAGS+= -DENCRYPTION -DAUTHENTICATION
-CPPFLAGS+= -DKRB4 -DDES_ENCRYPTION
-CPPFLAGS+= -DKRB5
-CPPFLAGS+= -I${DESTDIR}/usr/include/krb5
+CPPFLAGS+= -DDES_ENCRYPTION
+
+.if (${USE_KERBEROS4} != "no")
+SRCS+=	kerberos.c
+CPPFLAGS+= -DKRB4
 CPPFLAGS+= -I${DESTDIR}/usr/include/kerberosIV
 .endif
+
+SRCS+=	kerberos5.c
+CPPFLAGS+= -DKRB5
+CPPFLAGS+= -I${DESTDIR}/usr/include/krb5
+.endif
+
+libinstall::
 
 .include <bsd.lib.mk>

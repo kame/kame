@@ -1,4 +1,4 @@
-/*	$NetBSD: encrypt.c,v 1.8 2001/01/06 23:36:36 christos Exp $	*/
+/*	$NetBSD: encrypt.c,v 1.12 2003/08/07 16:44:54 agc Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -37,7 +33,7 @@
 #if 0
 static char sccsid[] = "@(#)encrypt.c	8.2 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: encrypt.c,v 1.8 2001/01/06 23:36:36 christos Exp $");
+__RCSID("$NetBSD: encrypt.c,v 1.12 2003/08/07 16:44:54 agc Exp $");
 #endif /* not lint */
 
 /*
@@ -69,9 +65,7 @@ __RCSID("$NetBSD: encrypt.c,v 1.8 2001/01/06 23:36:36 christos Exp $");
 #include "encrypt.h"
 #include "misc.h"
 
-#ifdef	__STDC__
 #include <stdlib.h>
-#endif
 #ifdef	NO_STRING_H
 #include <strings.h>
 #else
@@ -980,9 +974,9 @@ encrypt_gen_printsub(data, cnt, buf, buflen)
 	data += 2;
 	buf[buflen-1] = '\0';
 	buf[buflen-2] = '*';
-	buflen -= 2;;
+	buflen -= 2;
 	for (; cnt > 0; cnt--, data++) {
-		sprintf(tbuf, " %d", *data);
+		snprintf(tbuf, sizeof(tbuf), " %d", *data);
 		for (cp = tbuf; *cp && buflen > 0; --buflen)
 			*buf++ = *cp++;
 		if (buflen <= 0)

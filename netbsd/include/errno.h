@@ -1,4 +1,4 @@
-/*	$NetBSD: errno.h,v 1.4 2000/12/18 21:22:00 christos Exp $	*/
+/*	$NetBSD: errno.h,v 1.6 2003/08/07 09:44:10 agc Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1989, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -53,8 +49,7 @@ int *__errno __P((void));
 #define errno (*__errno())
 #endif
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
-    !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 extern __const int sys_nerr __RENAME(__sys_nerr14);
 extern __const char *__const *sys_errlist __RENAME(__sys_errlist14);
 #endif

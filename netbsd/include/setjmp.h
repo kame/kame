@@ -1,4 +1,4 @@
-/*	$NetBSD: setjmp.h,v 1.18 2000/03/07 21:12:37 jdolecek Exp $	*/
+/*	$NetBSD: setjmp.h,v 1.20 2003/08/07 09:44:11 agc Exp $	*/
 
 /*-
  * Copyright (c) 1990, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -52,7 +48,8 @@
 #else
 #endif
 
-#ifndef _ANSI_SOURCE
+#if defined(_POSIX_C_SOURCE) || defined(_XOPEN_SOURCE) || \
+    defined(_NETBSD_SOURCE)
 typedef long sigjmp_buf[_JBLEN + 1] _JB_ATTRIBUTES;
 #endif /* not ANSI */
 
@@ -71,20 +68,19 @@ void	__siglongjmp14 __P((sigjmp_buf, int));
 int	setjmp __P((jmp_buf)) __RENAME(__setjmp14);
 void	longjmp __P((jmp_buf, int)) __RENAME(__longjmp14);
 
-#ifndef _ANSI_SOURCE
+#if defined(_POSIX_C_SOURCE) || defined(_XOPEN_SOURCE) || \
+    defined(_NETBSD_SOURCE)
 int	sigsetjmp __P((sigjmp_buf, int)) __RENAME(__sigsetjmp14);
 void	siglongjmp __P((sigjmp_buf, int)) __RENAME(__siglongjmp14);
 #endif /* not ANSI */
 #endif /* __LIBC12_SOURCE__ */
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) || \
-    defined(_XOPEN_SOURCE)
+#if defined(_XOPEN_SOURCE) || defined(_NETBSD_SOURCE)
 int	_setjmp __P((jmp_buf));
 void	_longjmp __P((jmp_buf, int));
 #endif
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
-    !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 void	longjmperror __P((void));
 #endif
 __END_DECLS

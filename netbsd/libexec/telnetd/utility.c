@@ -1,4 +1,4 @@
-/*	$NetBSD: utility.c,v 1.18.2.1 2003/10/22 06:19:03 jmc Exp $	*/
+/*	$NetBSD: utility.c,v 1.24 2003/08/07 09:46:52 agc Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "@(#)utility.c	8.4 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: utility.c,v 1.18.2.1 2003/10/22 06:19:03 jmc Exp $");
+__RCSID("$NetBSD: utility.c,v 1.24 2003/08/07 09:46:52 agc Exp $");
 #endif
 #endif /* not lint */
 
@@ -64,7 +60,7 @@ extern int not42;
  * too full.
  */
 
-    void
+void
 ttloop()
 {
 
@@ -92,34 +88,30 @@ ttloop()
 /*
  * Check a descriptor to see if out of band data exists on it.
  */
-    int
+int
 stilloob(s)
     int	s;		/* socket number */
 {
-    static struct timeval timeout = { 0 };
-    fd_set	excepts;
+    struct pollfd set[1];
     int value;
 
-    if (s >= FD_SETSIZE)
-	fatal(pty, "fd too large");
-
+    set[0].fd = s;
+    set[0].events = POLLPRI;
     do {
-	FD_ZERO(&excepts);
-	FD_SET(s, &excepts);
-	value = select(s+1, (fd_set *)0, (fd_set *)0, &excepts, &timeout);
+	value = poll(set, 1, 0);
     } while ((value == -1) && (errno == EINTR));
 
     if (value < 0) {
-	fatalperror(pty, "select");
+	fatalperror(pty, "poll");
     }
-    if (FD_ISSET(s, &excepts)) {
+    if (set[0].revents & POLLPRI) {
 	return 1;
     } else {
 	return 0;
     }
 }
 
-	void
+void
 ptyflush()
 {
 	int n;
@@ -150,7 +142,7 @@ ptyflush()
  * if the current address is a TELNET IAC ("I Am a Command")
  * character.
  */
-    char *
+char *
 nextitem(current)
     char	*current;
 {
@@ -197,7 +189,7 @@ nextitem(current)
  * caller should be setting the urgent data pointer AFTER calling
  * us in any case.
  */
-    void
+void
 netclear()
 {
     register char *thisitem, *next;
@@ -250,7 +242,7 @@ netclear()
  *		Send as much data as possible to the network,
  *	handling requests for urgent data.
  */
-    void
+void
 netflush()
 {
     int n;
@@ -326,7 +318,7 @@ netflush()
  *    ptr - A pointer to a character string to write
  *    len - How many bytes to write
  */
-	void
+void
 writenet(ptr, len)
 	register unsigned char *ptr;
 	register int len;
@@ -346,9 +338,7 @@ writenet(ptr, len)
 /*
  * miscellaneous functions doing a variety of little jobs follow ...
  */
-
-
-	void
+void
 fatal(f, msg)
 	int f;
 	const char *msg;
@@ -371,7 +361,7 @@ fatal(f, msg)
 	exit(1);
 }
 
-	void
+void
 fatalperror(f, msg)
 	int f;
 	const char *msg;
@@ -384,7 +374,7 @@ fatalperror(f, msg)
 
 char editedhost[MAXHOSTNAMELEN];
 
-	void
+void
 edithost(pat, host)
 	register char *pat;
 	register char *host;
@@ -426,7 +416,7 @@ edithost(pat, host)
 
 static char *putlocation;
 
-	void
+void
 putstr(s)
 	register char *s;
 {
@@ -435,7 +425,7 @@ putstr(s)
 		putchr(*s++);
 }
 
-	void
+void
 putchr(cc)
 	int cc;
 {
@@ -449,7 +439,7 @@ putchr(cc)
 static char fmtstr[] = { "%l:%M\
 %p on %A, %d %B %Y" };
 
-	char *
+char *
 putf(cp, where)
 	register char *cp;
 	char *where;
@@ -471,12 +461,7 @@ putf(cp, where)
 		switch (*++cp) {
 
 		case 't':
-#ifdef	STREAMSPTY
-			/* names are like /dev/pts/2 -- we want pts/2 */
-			slash = strchr(line+1, '/');
-#else
 			slash = strrchr(line, '/');
-#endif
 			if (slash == (char *) 0)
 				putstr(line);
 			else
@@ -510,7 +495,7 @@ putf(cp, where)
 			break;
 
 		case 'v':
-			puts(utsinfo.version);
+			putstr(utsinfo.version);
                         break;
 		}
 		cp++;
@@ -523,7 +508,7 @@ putf(cp, where)
 /*
  * Print telnet options and commands in plain text, if possible.
  */
-	void
+void
 printoption(fmt, option)
 	register const char *fmt;
 	register int option;
@@ -537,7 +522,7 @@ printoption(fmt, option)
 	return;
 }
 
-    void
+void
 printsub(direction, pointer, length)
     char		direction;	/* '<' or '>' */
     unsigned char	*pointer;	/* where suboption data sits */
@@ -912,7 +897,7 @@ printsub(direction, pointer, length)
 	    }
 	    break;
 
-#if	defined(AUTHENTICATION)
+#ifdef AUTHENTICATION
 	case TELOPT_AUTHENTICATION:
 	    output_data("AUTHENTICATION");
 
@@ -1070,7 +1055,7 @@ printsub(direction, pointer, length)
 /*
  * Dump a data buffer in hex and ascii to the output data stream.
  */
-	void
+void
 printdata(tag, ptr, cnt)
 	register char *tag;
 	register char *ptr;

@@ -1,4 +1,4 @@
-/*	$NetBSD: stdlib.h,v 1.55 2001/03/28 11:12:19 kleink Exp $	*/
+/*	$NetBSD: stdlib.h,v 1.64 2003/08/07 09:44:11 agc Exp $	*/
 
 /*-
  * Copyright (c) 1990, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,8 +37,7 @@
 #include <sys/cdefs.h>
 #include <sys/featuretest.h>
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
-    !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 #include <sys/types.h>		/* for quad_t, etc. */
 #endif
 
@@ -69,8 +64,8 @@ typedef struct {
 } ldiv_t;
 
 #if !defined(_ANSI_SOURCE) && \
-    (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE) || \
-     defined(_ISOC99_SOURCE) || (__STDC_VERSION__ - 0) >= 199901L)
+    (defined(_ISOC99_SOURCE) || (__STDC_VERSION__ - 0) >= 199901L || \
+     defined(_NETBSD_SOURCE))
 typedef struct {
 	/* LONGLONG */
 	long long int quot;	/* quotient */
@@ -79,8 +74,7 @@ typedef struct {
 } lldiv_t;
 #endif
 
-#if !defined(_ANSI_SOURCE) && !defined(_ISOC99_SOURCE) && \
-    !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 typedef struct {
 	quad_t quot;		/* quotient */
 	quad_t rem;		/* remainder */
@@ -99,6 +93,7 @@ extern size_t __mb_cur_max;
 #define	MB_CUR_MAX	__mb_cur_max
 
 __BEGIN_DECLS
+__dead	 void _Exit __P((int)) __attribute__((__noreturn__));
 __dead	 void abort __P((void)) __attribute__((__noreturn__));
 __pure	 int abs __P((int));
 int	 atexit __P((void (*)(void)));
@@ -138,15 +133,15 @@ int	 wctomb __P((char *, wchar_t));
 int	 mbtowc __P((wchar_t * __restrict, const char * __restrict, size_t));
 size_t	 wcstombs __P((char * __restrict, const wchar_t * __restrict, size_t));
 
-#if !defined(_ANSI_SOURCE)
+#if defined(_POSIX_C_SOURCE) || defined(_XOPEN_SOURCE) || \
+    defined(_NETBSD_SOURCE)
 
 
 /*
  * IEEE Std 1003.1c-95, also adopted by X/Open CAE Spec Issue 5 Version 2
  */
-#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
-    (_POSIX_C_SOURCE - 0) >= 199506L || (_XOPEN_SOURCE - 0) >= 500 || \
-    defined(_REENTRANT)
+#if (_POSIX_C_SOURCE - 0) >= 199506L || (_XOPEN_SOURCE - 0) >= 500 || \
+    defined(_REENTRANT) || defined(_NETBSD_SOURCE)
 int	 rand_r __P((unsigned int *));
 #endif
 
@@ -154,8 +149,7 @@ int	 rand_r __P((unsigned int *));
 /*
  * X/Open Portability Guide >= Issue 4
  */
-#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
-    (_XOPEN_SOURCE - 0) >= 4
+#if (_XOPEN_SOURCE - 0) >= 4 || defined(_NETBSD_SOURCE)
 double	 drand48 __P((void));
 double	 erand48 __P((unsigned short[3]));
 long	 jrand48 __P((unsigned short[3]));
@@ -174,9 +168,8 @@ int	 putenv __P((const char *));
 /*
  * X/Open Portability Guide >= Issue 4 Version 2
  */
-#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
-    (defined(_XOPEN_SOURCE) && defined(_XOPEN_SOURCE_EXTENDED)) || \
-    (_XOPEN_SOURCE - 0) >= 500
+#if (defined(_XOPEN_SOURCE) && defined(_XOPEN_SOURCE_EXTENDED)) || \
+    (_XOPEN_SOURCE - 0) >= 500 || defined(_NETBSD_SOURCE)
 long	 a64l __P((const char *));
 char	*l64a __P((long));
 
@@ -203,8 +196,8 @@ void	*valloc __P((size_t));		/* obsoleted by malloc() */
 /*
  * ISO C99
  */
-#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
-    defined(_ISOC99_SOURCE) || (__STDC_VERSION__ - 0) >= 199901L
+#if defined(_ISOC99_SOURCE) || (__STDC_VERSION__ - 0) >= 199901L || \
+    defined(_NETBSD_SOURCE)
 /* LONGLONG */
 long long int	atoll __P((const char *));
 /* LONGLONG */
@@ -220,15 +213,32 @@ unsigned long long int
 #endif
 
 /*
+ * The Open Group Base Specifications, Issue 6; IEEE Std 1003.1-2001 (POSIX)
+ */
+#if (_POSIX_C_SOURCE - 0) >= 200112L || (_XOPEN_SOURCE - 0) >= 600 || \
+    defined(_NETBSD_SOURCE)
+int	 setenv __P((const char *, const char *, int));
+#ifdef __LIBC12_SOURCE__
+void	 unsetenv __P((const char *));
+int	 __unsetenv13 __P((const char *));
+#else
+int	 unsetenv __P((const char *))		__RENAME(__unsetenv13);
+#endif
+#endif
+
+/*
  * Implementation-defined extensions
  */
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 #if defined(alloca) && (alloca == __builtin_alloca) && (__GNUC__ < 2)
 void	*alloca __P((int));     /* built-in for gcc */ 
 #else 
 void	*alloca __P((size_t)); 
 #endif /* __GNUC__ */ 
 
+u_int32_t arc4random __P((void));
+void	 arc4random_stir __P((void));
+void	 arc4random_addrandom __P((u_char *, int));
 char	*getbsize __P((int *, long *));
 char	*cgetcap __P((char *, const char *, int));
 int	 cgetclose __P((void));
@@ -256,8 +266,6 @@ int	 radixsort __P((const unsigned char **, int, const unsigned char *,
 int	 sradixsort __P((const unsigned char **, int, const unsigned char *,
 	    unsigned));
 
-int	 setenv __P((const char *, const char *, int));
-void	 unsetenv __P((const char *));
 void	 setproctitle __P((const char *, ...))
 	    __attribute__((__format__(__printf__, 1, 2)));
 const char *getprogname __P((void)) __attribute__((__const__));
@@ -267,16 +275,20 @@ quad_t	 qabs __P((quad_t));
 quad_t	 strtoq __P((const char * __restrict, char ** __restrict, int));
 u_quad_t strtouq __P((const char * __restrict, char ** __restrict, int));
 
+	/* LONGLONG */
+long long strsuftoll(const char *, const char *, long long, long long);
+	/* LONGLONG */
+long long strsuftollx(const char *, const char *, long long, long long,
+	    		char *, size_t);
+
 int	 l64a_r __P((long, char *, int));
 
-size_t	shquote __P((const char *arg, char *buf, size_t bufsize));
-size_t	shquotev __P((int argc, char * const * argv, char *buf,
-	    size_t bufsize));
-#endif /* !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
-#endif /* !_ANSI_SOURCE */
+size_t	shquote __P((const char *, char *, size_t));
+size_t	shquotev __P((int, char * const *, char *, size_t));
+#endif /* _NETBSD_SOURCE */
+#endif /* _POSIX_C_SOURCE || _XOPEN_SOURCE || _NETBSD_SOURCE */
 
-#if !defined(_ANSI_SOURCE) && !defined(_ISOC99_SOURCE) && \
-    !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 qdiv_t	 qdiv __P((quad_t, quad_t));
 #endif
 __END_DECLS

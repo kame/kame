@@ -1,4 +1,4 @@
-/*	$NetBSD: clnt.h,v 1.16.2.1 2003/01/06 04:40:28 jmc Exp $	*/
+/*	$NetBSD: clnt.h,v 1.18 2003/01/28 22:19:24 wiz Exp $	*/
 
 /*
  * Sun RPC is a product of Sun Microsystems, Inc. and is provided for
@@ -79,7 +79,7 @@ enum clnt_stat {
 	 * rpc_call & clnt_create errors
 	 */
 	RPC_UNKNOWNHOST=13,		/* unknown host name */
-	RPC_UNKNOWNPROTO=17,		/* unkown protocol */
+	RPC_UNKNOWNPROTO=17,		/* unknown protocol */
 	RPC_UNKNOWNADDR = 19,		/* Remote address unknown */
 	RPC_NOBROADCAST = 21,		/* Broadcasting not supported */
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: routed.h,v 1.11 1998/02/10 00:38:19 perry Exp $	*/
+/*	$NetBSD: routed.h,v 1.13 2003/08/07 09:44:13 agc Exp $	*/
 
 /*-
  * Copyright (c) 1983, 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -102,7 +98,9 @@ struct netauth {
 		int8_t	md5_auth_len;	/* 16 */
 		u_int32_t md5_seqno;	/* sequence number */
 		u_int32_t rsvd[2];	/* must be 0 */
-#define	    RIP_AUTH_MD5_LEN RIP_AUTH_PW_LEN
+#define	    RIP_AUTH_MD5_KEY_LEN   RIP_AUTH_PW_LEN
+#define	    RIP_AUTH_MD5_HASH_XTRA (sizeof(struct netauth)-sizeof(struct a_md5))
+#define	    RIP_AUTH_MD5_HASH_LEN  (RIP_AUTH_MD5_KEY_LEN+RIP_AUTH_MD5_HASH_XTRA)
 	    } a_md5;
 	} au;
 };
@@ -137,7 +135,7 @@ struct rip {
 #define	RIPCMD_MAX		6
 
 #ifdef RIPCMDS
-char *ripcmds[RIPCMD_MAX] = {
+const char *ripcmds[RIPCMD_MAX] = {
 	"#0", "REQUEST", "RESPONSE", "TRACEON", "TRACEOFF"
 };
 #endif

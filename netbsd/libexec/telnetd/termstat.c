@@ -1,4 +1,4 @@
-/*	$NetBSD: termstat.c,v 1.11 2001/08/24 00:14:04 wiz Exp $	*/
+/*	$NetBSD: termstat.c,v 1.13 2003/08/07 09:46:52 agc Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,13 +34,13 @@
 #if 0
 static char sccsid[] = "@(#)termstat.c	8.2 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: termstat.c,v 1.11 2001/08/24 00:14:04 wiz Exp $");
+__RCSID("$NetBSD: termstat.c,v 1.13 2003/08/07 09:46:52 agc Exp $");
 #endif
 #endif /* not lint */
 
 #include "telnetd.h"
 
-#if defined(ENCRYPTION)
+#ifdef ENCRYPTION
 #include <libtelnet/encrypt.h>
 #endif
 
@@ -52,9 +48,7 @@ __RCSID("$NetBSD: termstat.c,v 1.11 2001/08/24 00:14:04 wiz Exp $");
  * local variables
  */
 int def_tspeed = -1, def_rspeed = -1;
-#ifdef	TIOCSWINSZ
 int def_row = 0, def_col = 0;
-#endif
 #ifdef	LINEMODE
 static int _terminit = 0;
 #endif	/* LINEMODE */
@@ -137,7 +131,7 @@ static int _terminit = 0;
  *	   then linemode is off, if server won't SGA, then linemode
  *	   is on.
  */
-	void
+void
 localstat()
 {
 	int need_will_echo = 0;
@@ -353,7 +347,7 @@ done:
  *
  * Check for changes to flow control
  */
-	void
+void
 flowstat()
 {
 	if (his_state_is_will(TELOPT_LFLOW)) {
@@ -383,7 +377,7 @@ flowstat()
  * at a time, and if using kludge linemode, then only linemode may be
  * affected.
  */
-	void
+void
 clientstat(code, parm1, parm2)
 	register int code, parm1, parm2;
 {
@@ -515,7 +509,6 @@ clientstat(code, parm1, parm2)
 #endif	/* LINEMODE */
 
 	case TELOPT_NAWS:
-#ifdef	TIOCSWINSZ
 	    {
 		struct winsize ws;
 
@@ -538,7 +531,6 @@ clientstat(code, parm1, parm2)
 		ws.ws_row = parm2;
 		(void) ioctl(pty, TIOCSWINSZ, (char *)&ws);
 	    }
-#endif	/* TIOCSWINSZ */
 
 		break;
 
@@ -587,7 +579,7 @@ clientstat(code, parm1, parm2)
  * function is called when the pty state has been processed for the first time.
  * It calls other functions that do things that were deferred in each module.
  */
-	void
+void
 defer_terminit()
 {
 
@@ -599,7 +591,6 @@ defer_terminit()
 		def_tspeed = def_rspeed = 0;
 	}
 
-#ifdef	TIOCSWINSZ
 	if (def_col || def_row) {
 		struct winsize ws;
 
@@ -608,7 +599,6 @@ defer_terminit()
 		ws.ws_row = def_row;
 		(void) ioctl(pty, TIOCSWINSZ, (char *)&ws);
 	}
-#endif
 
 	/*
 	 * The only other module that currently defers anything.
@@ -622,7 +612,7 @@ defer_terminit()
  *
  * Returns true if the pty state has been processed yet.
  */
-	int
+int
 terminit()
 {
 	return(_terminit);

@@ -1,4 +1,4 @@
-/*	$NetBSD: misc.c,v 1.10 2000/06/22 06:47:46 thorpej Exp $	*/
+/*	$NetBSD: misc.c,v 1.12 2003/08/07 16:44:56 agc Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "@(#)misc.c	8.1 (Berkeley) 6/4/93";
 #else
-__RCSID("$NetBSD: misc.c,v 1.10 2000/06/22 06:47:46 thorpej Exp $");
+__RCSID("$NetBSD: misc.c,v 1.12 2003/08/07 16:44:56 agc Exp $");
 #endif
 #endif /* not lint */
 
@@ -63,7 +59,7 @@ auth_encrypt_init(local, remote, name, server)
 {
 	RemoteHostName = remote;
 	LocalHostName = local;
-#if	defined(AUTHENTICATION)
+#ifdef AUTHENTICATION
 	auth_init(name, server);
 #endif
 #ifdef	ENCRYPTION

@@ -1,4 +1,4 @@
-/*	$NetBSD: stat_flags.c,v 1.13 2002/01/31 22:43:34 tv Exp $	*/
+/*	$NetBSD: stat_flags.c,v 1.18 2003/10/27 00:12:41 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -33,20 +29,20 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-#if defined(__RCSID) && !defined(lint)
-#if 0
-static char sccsid[] = "@(#)stat_flags.c	8.2 (Berkeley) 7/28/94";
-#else
-__RCSID("$NetBSD: stat_flags.c,v 1.13 2002/01/31 22:43:34 tv Exp $");
-#endif
-#endif /* not lint */
-
-#if HAVE_CONFIG_H
-#include "config.h"
+#if HAVE_NBTOOL_CONFIG_H
+#include "nbtool_config.h"
 #else
 #define HAVE_STRUCT_STAT_ST_FLAGS 1
 #endif
+
+#include <sys/cdefs.h>
+#if !defined(lint)
+#if 0
+static char sccsid[] = "@(#)stat_flags.c	8.2 (Berkeley) 7/28/94";
+#else
+__RCSID("$NetBSD: stat_flags.c,v 1.18 2003/10/27 00:12:41 lukem Exp $");
+#endif
+#endif /* not lint */
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -56,12 +52,12 @@ __RCSID("$NetBSD: stat_flags.c,v 1.13 2002/01/31 22:43:34 tv Exp $");
 
 #include "stat_flags.h"
 
-#define	SAPPEND(s) {							\
+#define	SAPPEND(s) do {							\
 	if (prefix != NULL)						\
-		(void)strcat(string, prefix);				\
-	(void)strcat(string, s);					\
+		(void)strlcat(string, prefix, sizeof(string));		\
+	(void)strlcat(string, s, sizeof(string));			\
 	prefix = ",";							\
-}
+} while (/* CONSTCOND */ 0)
 
 /*
  * flags_to_string --

@@ -1,4 +1,4 @@
-/*	$NetBSD: auth-proto.h,v 1.9 2001/01/06 23:36:07 christos Exp $	*/
+/*	$NetBSD: auth-proto.h,v 1.12 2003/08/07 16:44:53 agc Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -59,7 +55,7 @@
 #define _LIBTELNET_AUTH_PROTO_H_
 #include <sys/cdefs.h>
 
-#if	defined(AUTHENTICATION)
+#ifdef AUTHENTICATION
 Authenticator *findauthenticator __P((int, int));
 
 void auth_init __P((const char *, int));
@@ -81,7 +77,7 @@ int auth_status __P((char *));
 void auth_name __P((unsigned char *, int));
 int auth_sendname __P((unsigned char *, int));
 void auth_finished __P((Authenticator *, int));
-int auth_wait __P((char *));
+int auth_wait __P((char *, size_t));
 void auth_debug __P((int));
 void auth_printsub __P((unsigned char *, int, unsigned char *, int));
 
@@ -90,7 +86,7 @@ int kerberos4_init __P((Authenticator *, int));
 int kerberos4_send __P((Authenticator *));
 void kerberos4_is __P((Authenticator *, unsigned char *, int));
 void kerberos4_reply __P((Authenticator *, unsigned char *, int));
-int kerberos4_status __P((Authenticator *, char *, int));
+int kerberos4_status __P((Authenticator *, char *, size_t, int));
 void kerberos4_printsub __P((unsigned char *, int, unsigned char *, int));
 #endif
 
@@ -99,7 +95,7 @@ int kerberos5_init __P((Authenticator *, int));
 int kerberos5_send __P((Authenticator *));
 void kerberos5_is __P((Authenticator *, unsigned char *, int));
 void kerberos5_reply __P((Authenticator *, unsigned char *, int));
-int kerberos5_status __P((Authenticator *, char *, int));
+int kerberos5_status __P((Authenticator *, char *, size_t, int));
 void kerberos5_printsub __P((unsigned char *, int, unsigned char *, int));
 #endif
 #endif

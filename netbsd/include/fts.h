@@ -1,4 +1,4 @@
-/*	$NetBSD: fts.h,v 1.9 1998/11/06 19:44:52 christos Exp $	*/
+/*	$NetBSD: fts.h,v 1.11 2003/08/07 09:44:10 agc Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -45,8 +41,8 @@ typedef struct {
 	dev_t fts_dev;			/* starting device # */
 	char *fts_path;			/* path for this descent */
 	int fts_rfd;			/* fd for root */
-	int fts_pathlen;		/* sizeof(path) */
-	int fts_nitems;			/* elements in the sort array */
+	u_int fts_pathlen;		/* sizeof(path) */
+	u_int fts_nitems;		/* elements in the sort array */
 	int (*fts_compar)		/* compare function */
 	    __P((const struct _ftsent **, const struct _ftsent **));
 

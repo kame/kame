@@ -1,4 +1,4 @@
-/*	$NetBSD: kerberos.c,v 1.6 2001/11/30 04:48:14 lukem Exp $	*/
+/*	$NetBSD: kerberos.c,v 1.14 2003/10/21 01:10:47 fvdl Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "@(#)kerberos.c	8.3 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: kerberos.c,v 1.6 2001/11/30 04:48:14 lukem Exp $");
+__RCSID("$NetBSD: kerberos.c,v 1.14 2003/10/21 01:10:47 fvdl Exp $");
 #endif
 #endif /* not lint */
 
@@ -68,9 +64,7 @@ __RCSID("$NetBSD: kerberos.c,v 1.6 2001/11/30 04:48:14 lukem Exp $");
 #include <stdio.h>
 #include <des.h>	/* BSD wont include this in krb.h, so we do it here */
 #include <krb.h>
-#ifdef	__STDC__
 #include <stdlib.h>
-#endif
 #ifdef	NO_STRING_H
 #include <strings.h>
 #else
@@ -291,7 +285,7 @@ kerberos4_is(ap, data, cnt)
 		}
 		instance[0] = '*'; instance[1] = 0;
 		if ((r = krb_rd_req(&auth, KRB_SERVICE_NAME,
-				   instance, 0, &adat, "")) != NULL) {
+				   instance, 0, &adat, "")) != 0) {
 			if (auth_debug_mode)
 				printf("Kerberos failed him as %s\r\n", name);
 			Data(ap, KRB_REJECT, (void *)krb_err_txt[r], -1);
@@ -436,16 +430,17 @@ kerberos4_reply(ap, data, cnt)
 }
 
 	int
-kerberos4_status(ap, kname, level)
+kerberos4_status(ap, kname, l, level)
 	Authenticator *ap;
 	char *kname;
+	size_t l;
 	int level;
 {
 	if (level < AUTH_USER)
 		return(level);
 
 	if (UserNameRequested && !kuserok(&adat, UserNameRequested)) {
-		strcpy(kname, UserNameRequested);
+		strlcpy(kname, UserNameRequested, l);
 		return(AUTH_VALID);
 	} else
 		return(AUTH_USER);
@@ -496,12 +491,12 @@ kerberos4_printsub(data, cnt, buf, buflen)
 		goto common2;
 
 	default:
-		sprintf(lbuf, " %d (unknown)", data[3]);
+		snprintf(lbuf, sizeof(lbuf), " %d (unknown)", data[3]);
 		strncpy((char *)buf, lbuf, buflen);
 	common2:
 		BUMP(buf, buflen);
 		for (i = 4; i < cnt; i++) {
-			sprintf(lbuf, " %d", data[i]);
+			snprintf(lbuf, sizeof(lbuf), " %d", data[i]);
 			strncpy((char *)buf, lbuf, buflen);
 			BUMP(buf, buflen);
 		}
@@ -528,20 +523,12 @@ kerberos4_cksum(d, n)
 	 * Some compilers will spit out a warning message
 	 * about the loop not being entered at the top.
 	 */
-	switch (n&03)
-	while (n > 0) {
-	case 0:
-		ck ^= (int)*d++ << 24;
-		--n;
-	case 3:
-		ck ^= (int)*d++ << 16;
-		--n;
-	case 2:
-		ck ^= (int)*d++ << 8;
-		--n;
-	case 1:
-		ck ^= (int)*d++;
-		--n;
+	switch (n&03) {
+	case 0:	do {	ck ^= (int)*d++ << 24;	--n;
+	case 3:		ck ^= (int)*d++ << 16;	--n;
+	case 2:		ck ^= (int)*d++ << 8;	--n;
+	case 1:		ck ^= (int)*d++;	--n;
+		} while (n);
 	}
 	return(ck);
 }

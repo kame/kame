@@ -1,4 +1,4 @@
-/*	$NetBSD: grp.h,v 1.16 2002/01/27 07:00:43 lukem Exp $	*/
+/*	$NetBSD: grp.h,v 1.18 2003/08/07 09:44:10 agc Exp $	*/
 
 /*-
  * Copyright (c) 1989, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -47,7 +43,7 @@
 #include <sys/featuretest.h>
 #include <sys/types.h>
 
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 #define	_PATH_GROUP		"/etc/group"
 #endif
 
@@ -61,12 +57,12 @@ struct group {
 __BEGIN_DECLS
 struct group	*getgrgid __P((gid_t));
 struct group	*getgrnam __P((const char *));
-#if !defined(_POSIX_C_SOURCE) || defined(_XOPEN_SOURCE)
+#if defined(_XOPEN_SOURCE) || defined(_NETBSD_SOURCE)
 struct group	*getgrent __P((void));
 void		 setgrent __P((void));
 void		 endgrent __P((void));
 #endif
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 void		 setgrfile __P((const char *));
 int		 setgroupent __P((int));
 const char	*group_from_gid __P((gid_t, int));

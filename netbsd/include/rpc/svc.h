@@ -1,4 +1,4 @@
-/*	$NetBSD: svc.h,v 1.19.2.1 2003/01/06 04:39:59 jmc Exp $	*/
+/*	$NetBSD: svc.h,v 1.20 2002/11/08 00:10:44 fvdl Exp $	*/
 
 /*
  * Sun RPC is a product of Sun Microsystems, Inc. and is provided for

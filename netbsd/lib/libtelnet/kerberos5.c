@@ -1,4 +1,4 @@
-/*	$NetBSD: kerberos5.c,v 1.8 2001/09/17 12:34:43 assar Exp $	*/
+/*	$NetBSD: kerberos5.c,v 1.12 2003/08/07 16:44:55 agc Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -193,6 +189,8 @@ kerberos5_send(Authenticator *ap)
 	else
 		ap_opts = 0;
 
+	ap_opts |= AP_OPTS_USE_SUBKEY;
+    
 	ret = krb5_auth_con_init(telnet_context, &auth_context);
 	if (ret) {
 		if (auth_debug_mode) {
@@ -341,6 +339,28 @@ kerberos5_is(Authenticator * ap, unsigned char *data, int cnt)
 				printf("Kerberos V5: "
 				    "krb5_auth_con_getremotesubkey failed (%s)\r\n",
 				    krb5_get_err_text(telnet_context, ret));
+			return;
+		}
+		if (key_block == NULL) {
+			ret = krb5_auth_con_getkey(telnet_context,
+						   auth_context,
+						   &key_block);
+		}
+		if (ret) {
+			Data(ap, KRB_REJECT, "krb5_auth_con_getkey failed", -1);
+			auth_finished(ap, AUTH_REJECT);
+			if (auth_debug_mode)
+				printf("Kerberos V5: "
+				       "krb5_auth_con_getkey failed (%s)\r\n",
+				       krb5_get_err_text(telnet_context, ret));
+			return;
+		}
+		if (key_block == NULL) {
+			Data(ap, KRB_REJECT, "no subkey received", -1);
+			auth_finished(ap, AUTH_REJECT);
+			if (auth_debug_mode)
+				printf("Kerberos V5: "
+				       "krb5_auth_con_getremotesubkey returned NULL key\r\n");
 			return;
 		}
 		if ((ap->way & AUTH_HOW_MASK) == AUTH_HOW_MUTUAL) {
@@ -553,14 +573,14 @@ kerberos5_reply(Authenticator * ap, unsigned char *data, int cnt)
 }
 
 int
-kerberos5_status(Authenticator *ap, char *name, int level)
+kerberos5_status(Authenticator *ap, char *name, size_t l, int level)
 {
 	if (level < AUTH_USER)
 		return (level);
 
 	if (UserNameRequested &&
 	    krb5_kuserok(telnet_context, ticket->client, UserNameRequested)) {
-		strcpy(name, UserNameRequested);
+		strlcpy(name, UserNameRequested, l);
 		return (AUTH_VALID);
 	} else
 		return (AUTH_USER);

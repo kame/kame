@@ -1,4 +1,4 @@
-/*	$NetBSD: kvm.h,v 1.10 2000/06/26 06:38:02 kleink Exp $	*/
+/*	$NetBSD: kvm.h,v 1.12 2003/08/07 09:44:10 agc Exp $	*/
 
 /*-
  * Copyright (c) 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -71,6 +67,8 @@ char	**kvm_getenvv2 __P((kvm_t *, const struct kinfo_proc2 *, int));
 char	 *kvm_geterr __P((kvm_t *));
 int	  kvm_getloadavg __P((kvm_t *, double [], int));
 char	 *kvm_getfiles __P((kvm_t *, int, int, int *));
+struct kinfo_lwp *
+	  kvm_getlwps __P((kvm_t *, int, u_long, size_t, int *));
 struct kinfo_proc2 *
 	  kvm_getproc2 __P((kvm_t *, int, int, size_t, int *));
 struct kinfo_proc *

@@ -1,4 +1,4 @@
-/*	$NetBSD: spx.c,v 1.1 2000/06/22 06:47:46 thorpej Exp $ */
+/*	$NetBSD: spx.c,v 1.5 2003/08/07 16:44:56 agc Exp $ */
 
 /*-
  * Copyright (c) 1992, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -39,7 +35,7 @@
 #if 0
 static char sccsid[] = "@(#)spx.c	8.2 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: spx.c,v 1.1 2000/06/22 06:47:46 thorpej Exp $");
+__RCSID("$NetBSD: spx.c,v 1.5 2003/08/07 16:44:56 agc Exp $");
 #endif
 #endif /* not lint */
 
@@ -81,9 +77,7 @@ __RCSID("$NetBSD: spx.c,v 1.1 2000/06/22 06:47:46 thorpej Exp $");
 #include <arpa/telnet.h>
 #include <stdio.h>
 #include "gssapi_defs.h"
-#ifdef	__STDC__
 #include <stdlib.h>
-#endif
 #ifdef	NO_STRING_H
 #include <strings.h>
 #else
@@ -182,8 +176,9 @@ spx_init(ap, server)
 	if (server) {
 		str_data[3] = TELQUAL_REPLY;
 		gethostname(lhostname, sizeof(lhostname));
-		strcpy(targ_printable, "SERVICE:rcmd@");
-		strcat(targ_printable, lhostname);
+		strlcpy(targ_printable, "SERVICE:rcmd@",
+		    sizeof(targ_printable));
+		strlcat(targ_printable, lhostname, sizeof(targ_printable));
 		input_name_buffer.length = strlen(targ_printable);
 		input_name_buffer.value = targ_printable;
 		major_status = gss_import_name(&status,
@@ -225,8 +220,8 @@ spx_send(ap)
 	char *address;
 
 	printf("[ Trying SPX ... ]\n");
-	strcpy(targ_printable, "SERVICE:rcmd@");
-	strcat(targ_printable, RemoteHostName);
+	strlcpy(targ_printable, "SERVICE:rcmd@", sizeof(targ_printable));
+	strlcat(targ_printable, RemoteHostName, sizeof(targ_printable));
 
 	input_name_buffer.length = strlen(targ_printable);
 	input_name_buffer.value = targ_printable;
@@ -333,8 +328,9 @@ spx_is(ap, data, cnt)
 
 		gethostname(lhostname, sizeof(lhostname));
 
-		strcpy(targ_printable, "SERVICE:rcmd@");
-		strcat(targ_printable, lhostname);
+		strlcpy(targ_printable, "SERVICE:rcmd@",
+		    sizeof(targ_printable));
+		strlcat(targ_printable, lhostname, sizeof(targ_printable));
 
 		input_name_buffer.length = strlen(targ_printable);
 		input_name_buffer.value = targ_printable;
@@ -481,9 +477,10 @@ spx_reply(ap, data, cnt)
 }
 
 	int
-spx_status(ap, name, level)
+spx_status(ap, name, l, level)
 	Authenticator *ap;
 	char *name;
+	size_t l;
 	int level;
 {
 
@@ -504,8 +501,8 @@ spx_status(ap, name, level)
 	  return(AUTH_USER);   /*  not authenticated  */
 	}
 
-	strcpy(acl_file, pwd->pw_dir);
-	strcat(acl_file, "/.sphinx");
+	strlcpy(acl_file, pwd->pw_dir, sizeof(acl_file));
+	strlcat(acl_file, "/.sphinx", sizeof(acl_file));
 	acl_file_buffer.value = acl_file;
 	acl_file_buffer.length = strlen(acl_file);
 
@@ -521,7 +518,7 @@ spx_status(ap, name, level)
 					&acl_file_buffer);
 
 	if (major_status == GSS_S_COMPLETE) {
-	  strcpy(name, UserNameRequested);
+	  strlcpy(name, UserNameRequested, l);
 	  return(AUTH_VALID);
 	} else {
 	   return(AUTH_USER);
@@ -566,12 +563,12 @@ spx_printsub(data, cnt, buf, buflen)
 		goto common2;
 
 	default:
-		sprintf(lbuf, " %d (unknown)", data[3]);
+		snprintf(lbuf, sizeof(lbuf), " %d (unknown)", data[3]);
 		strncpy((char *)buf, lbuf, buflen);
 	common2:
 		BUMP(buf, buflen);
 		for (i = 4; i < cnt; i++) {
-			sprintf(lbuf, " %d", data[i]);
+			snprintf(lbuf, sizeof(lbuf), " %d", data[i]);
 			strncpy((char *)buf, lbuf, buflen);
 			BUMP(buf, buflen);
 		}

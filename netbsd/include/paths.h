@@ -1,4 +1,4 @@
-/*	$NetBSD: paths.h,v 1.19 2002/03/17 22:14:12 tshiozak Exp $	*/
+/*	$NetBSD: paths.h,v 1.25 2003/10/03 13:17:12 dsl Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -60,13 +56,18 @@
 #define	_PATH_BSHELL	"/bin/sh"
 #define	_PATH_CLOCKCTL	"/dev/clockctl"
 #define	_PATH_CONSOLE	"/dev/console"
+#define	_PATH_CONSTTY	"/dev/constty"
 #define	_PATH_CSHELL	"/bin/csh"
 #define	_PATH_DEFTAPE	"/dev/nrst0"
 #define	_PATH_DEVDB	"/var/run/dev.db"
 #define	_PATH_DEVNULL	"/dev/null"
 #define	_PATH_DRUM	"/dev/drum"
 #define	_PATH_I18NMODULE "/usr/lib/i18n"
+#define	_PATH_ICONV	"/usr/share/i18n/iconv"
+#define	_PATH_ESDB	"/usr/share/i18n/esdb"
+#define	_PATH_CSMAPPER	"/usr/share/i18n/csmapper"
 #define	_PATH_KMEM	"/dev/kmem"
+#define	_PATH_KSYMS	"/dev/ksyms"
 #define	_PATH_KVMDB	"/var/db/kvm.db"
 #define	_PATH_LOCALE	"/usr/share/locale"
 #define	_PATH_MAILDIR	"/var/mail"
@@ -75,13 +76,16 @@
 #define	_PATH_MIXER	"/dev/mixer"
 #define	_PATH_MIXER0	"/dev/mixer0"
 #define	_PATH_NOLOGIN	"/etc/nologin"
+#define	_PATH_RANDOM	"/dev/random"
 #define	_PATH_SENDMAIL	"/usr/sbin/sendmail"
 #define	_PATH_SHELLS	"/etc/shells"
 #define	_PATH_SKEYKEYS	"/etc/skeykeys"
 #define	_PATH_SOUND	"/dev/sound"
 #define	_PATH_SOUND0	"/dev/sound0"
+#define	_PATH_SYSMON	"/dev/sysmon"
 #define	_PATH_TTY	"/dev/tty"
 #define	_PATH_UNIX	"/netbsd"
+#define	_PATH_URANDOM	"/dev/urandom"
 #define	_PATH_VI	"/usr/bin/vi"
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: assert.h,v 1.12 2001/05/06 15:31:09 kleink Exp $	*/
+/*	$NetBSD: assert.h,v 1.15.2.2 2004/07/02 18:13:28 he Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -46,20 +42,17 @@
  */
 
 #include <sys/cdefs.h>
+#include <sys/featuretest.h>
 
 #undef assert
-#undef _assert
 
 #ifdef NDEBUG
-# ifndef lint
+# ifndef __lint__
 #  define assert(e)	(__static_cast(void,0))
-#  define _assert(e)	(__static_cast(void,0))
-# else /* !lint */
+# else /* !__lint__ */
 #  define assert(e)
-#  define _assert(e)
-# endif /* lint */
+# endif /* __lint__ */
 #else /* !NDEBUG */
-# define _assert(e)	assert(e)
 # if __STDC__
 #  define assert(e)							\
 	((e) ? __static_cast(void,0) : __assert13(__FILE__, __LINE__,	\
@@ -73,11 +66,11 @@
 
 #undef _DIAGASSERT
 #if !defined(_DIAGNOSTIC)
-# if !defined(lint)
+# if !defined(__lint__)
 #  define _DIAGASSERT(e) (__static_cast(void,0))
-# else /* !lint */
+# else /* !__lint__ */
 #  define _DIAGASSERT(e)
-# endif /* lint */
+# endif /* __lint__ */
 #else /* _DIAGNOSTIC */
 # if __STDC__
 #  define _DIAGASSERT(e)						\

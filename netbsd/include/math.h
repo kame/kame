@@ -1,4 +1,4 @@
-/*	$NetBSD: math.h,v 1.24 2002/02/19 13:08:12 simonb Exp $	*/
+/*	$NetBSD: math.h,v 1.34.2.2 2004/07/16 20:32:10 he Exp $	*/
 
 /*
  * ====================================================
@@ -31,30 +31,82 @@ union __double_u {
 	double __val;
 };
 
-#include <machine/math.h>		/* may use __float_u or __double_u */
+union __long_double_u {
+	unsigned char __dummy[sizeof(long double)];
+	long double __val;
+};
+
+#include <machine/math.h>		/* may use __float_u, __double_u,
+					   or __long_double_u */
+
+#ifdef __HAVE_LONG_DOUBLE
+#define	__fpmacro_unary_floating(__name, __arg0)			\
+	/* LINTED */							\
+	((sizeof (__arg0) == sizeof (float))				\
+	?	__ ## __name ## f (__arg0)				\
+	: (sizeof (__arg0) == sizeof (double))				\
+	?	__ ## __name ## d (__arg0)				\
+	:	__ ## __name ## l (__arg0))
+#else
+#define	__fpmacro_unary_floating(__name, __arg0)			\
+	/* LINTED */							\
+	((sizeof (__arg0) == sizeof (float))				\
+	?	__ ## __name ## f (__arg0)				\
+	:	__ ## __name ## d (__arg0))
+#endif /* __HAVE_LONG_DOUBLE */
 
 /*
  * ANSI/POSIX
  */
+/* 7.12#3 HUGE_VAL, HUGELF, HUGE_VALL */
 extern __const union __double_u __infinity;
 #define HUGE_VAL	__infinity.__val
 
 /*
  * ISO C99
  */
-#if defined(__HAVE_NANF) && \
-    (!defined(_ANSI_SOURCE) && \
-    (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE) || \
-     defined(_ISOC99_SOURCE) || (__STDC_VERSION__ - 0) >= 199901L))
+#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
+    !defined(_XOPEN_SOURCE) || \
+    ((__STDC_VERSION__ - 0) >= 199901L) || \
+    ((_POSIX_C_SOURCE - 0) >= 200112L) || \
+    ((_XOPEN_SOURCE  - 0) >= 600) || \
+    defined(_ISOC99_SOURCE) || defined(_NETBSD_SOURCE)
+/* 7.12#3 HUGE_VAL, HUGELF, HUGE_VALL */
+extern __const union __float_u __infinityf;
+#define	HUGE_VALF	__infinityf.__val
+
+extern __const union __long_double_u __infinityl;
+#define	HUGE_VALL	__infinityl.__val
+
+/* 7.12#4 INFINITY */
+#ifdef __INFINITY
+#define	INFINITY	__INFINITY	/* float constant which overflows */
+#else
+#define	INFINITY	HUGE_VALF	/* positive infinity */
+#endif /* __INFINITY */
+
+/* 7.12#5 NAN: a quiet NaN, if supported */
+#ifdef __HAVE_NANF
 extern __const union __float_u __nanf;
 #define	NAN		__nanf.__val
-#endif /* __HAVE_NANF && (!_ANSI_SOURCE && ....) */
+#endif /* __HAVE_NANF */
+
+/* 7.12#6 number classification macros */
+#define	FP_INFINITE	0x00
+#define	FP_NAN		0x01
+#define	FP_NORMAL	0x02
+#define	FP_SUBNORMAL	0x03
+#define	FP_ZERO		0x04
+/* NetBSD extensions */
+#define	_FP_LOMD	0x80		/* range for machine-specific classes */
+#define	_FP_HIMD	0xff
+
+#endif /* !_ANSI_SOURCE && ... */
 
 /*
  * XOPEN/SVID
  */
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) || \
-    defined(_XOPEN_SOURCE)
+#if defined(_XOPEN_SOURCE) || defined(_NETBSD_SOURCE)
 #define	M_E		2.7182818284590452354	/* e */
 #define	M_LOG2E		1.4426950408889634074	/* log 2e */
 #define	M_LOG10E	0.43429448190325182765	/* log 10e */
@@ -71,10 +123,9 @@ extern __const union __float_u __nanf;
 
 #define	MAXFLOAT	((float)3.40282346638528860e+38)
 extern int signgam;
-#endif /* !_ANSI_SOURCE && !_POSIX_C_SOURCE || _XOPEN_SOURCE */
+#endif /* _XOPEN_SOURCE || _NETBSD_SOURCE */
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
-    !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 enum fdversion {fdlibm_ieee = -1, fdlibm_svid, fdlibm_xopen, fdlibm_posix};
 
 #define _LIB_VERSION_TYPE enum fdversion
@@ -120,7 +171,7 @@ struct exception {
 #define	TLOSS		5
 #define	PLOSS		6
 
-#endif /* !_ANSI_SOURCE && !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
+#endif /* _NETBSD_SOURCE */
 
 __BEGIN_DECLS
 /*
@@ -153,13 +204,11 @@ double	fabs __P((double));
 double	floor __P((double));
 double	fmod __P((double, double));
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) || \
-    defined(_XOPEN_SOURCE)
+#if defined(_XOPEN_SOURCE) || defined(_NETBSD_SOURCE)
 double	erf __P((double));
 double	erfc __P((double));
 double	gamma __P((double));
 double	hypot __P((double, double));
-int	isnan __P((double));
 int	finite __P((double));
 double	j0 __P((double));
 double	j1 __P((double));
@@ -169,7 +218,7 @@ double	y0 __P((double));
 double	y1 __P((double));
 double	yn __P((int, double));
 
-#if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 500
+#if (_XOPEN_SOURCE - 0) >= 500 || defined(_NETBSD_SOURCE)
 double	acosh __P((double));
 double	asinh __P((double));
 double	atanh __P((double));
@@ -182,11 +231,56 @@ double	nextafter __P((double, double));
 double	remainder __P((double, double));
 double	rint __P((double));
 double	scalb __P((double, double));
-#endif /* !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 500 */
-#endif /* !_ANSI_SOURCE) && !_POSIX_C_SOURCE || _XOPEN_SOURCE */
+#endif /* (_XOPEN_SOURCE - 0) >= 500 || defined(_NETBSD_SOURCE)*/
+#endif /* _XOPEN_SOURCE || _NETBSD_SOURCE */
 
+/*
+ * ISO C99
+ */
 #if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
-    !defined(_XOPEN_SOURCE)
+    !defined(_XOPEN_SOURCE) || \
+    ((__STDC_VERSION__ - 0) >= 199901L) || \
+    ((_POSIX_C_SOURCE - 0) >= 200112L) || \
+    ((_XOPEN_SOURCE  - 0) >= 600) || \
+    defined(_ISOC99_SOURCE) || defined(_NETBSD_SOURCE)
+/* 7.12.3.1 int fpclassify(real-floating x) */
+#define	fpclassify(__x)	__fpmacro_unary_floating(fpclassify, __x)
+
+/* 7.12.3.2 int isfinite(real-floating x) */
+#define	isfinite(__x)	__fpmacro_unary_floating(isfinite, __x)
+
+/* 7.12.3.5 int isnormal(real-floating x) */
+#define	isnormal(__x)	(fpclassify(__x) == FP_NORMAL)
+
+/* 7.12.3.6 int signbit(real-floating x) */
+#define	signbit(__x)	__fpmacro_unary_floating(signbit, __x)
+
+double	round __P((double));
+float	roundf __P((float));
+
+#endif /* !_ANSI_SOURCE && ... */
+
+#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) || \
+    !defined(_XOPEN_SOURCE) || \
+    ((__STDC_VERSION__ - 0) >= 199901L) || \
+    ((_POSIX_C_SOURCE - 0) >= 200112L) || \
+    defined(_ISOC99_SOURCE) || defined(_NETBSD_SOURCE)
+/* 7.12.3.3 int isinf(real-floating x) */
+#ifdef __isinf
+#define	isinf(__x)	__isinf(__x)
+#else
+#define	isinf(__x)	__fpmacro_unary_floating(isinf, __x)
+#endif
+
+/* 7.12.3.4 int isnan(real-floating x) */
+#ifdef __isnan
+#define	isnan(__x)	__isnan(__x)
+#else
+#define	isnan(__x)	__fpmacro_unary_floating(isnan, __x)
+#endif
+#endif /* !_ANSI_SOURCE && ... */
+
+#if defined(_NETBSD_SOURCE)
 #ifndef __cplusplus
 int	matherr __P((struct exception *));
 #endif
@@ -210,22 +304,19 @@ double	cabs __P((/* struct complex { double r; double i; } */));
 #endif
 double	drem __P((double, double));
 
-#endif /* !_ANSI_SOURCE && !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
+#endif /* _NETBSD_SOURCE */
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
-    !defined(_XOPEN_SOURCE) || defined(_REENTRANT)
+#if defined(_NETBSD_SOURCE) || defined(_REENTRANT)
 /*
  * Reentrant version of gamma & lgamma; passes signgam back by reference
  * as the second argument; user must allocate space for signgam.
  */
 double	gamma_r __P((double, int *));
 double	lgamma_r __P((double, int *));
-#endif /* !... || _REENTRANT */
+#endif /* _NETBSD_SOURCE || _REENTRANT */
 
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
-    !defined(_XOPEN_SOURCE)
-int	isinf __P((double));
+#if defined(_NETBSD_SOURCE)
 
 /* float versions of ANSI/POSIX functions */
 float	acosf __P((float));
@@ -302,10 +393,9 @@ float	cabsf __P((/* struct complex { float r; float i; } */));
 float	dremf __P((float, float));
 float	expm1f __P((float));
 float	log1pf __P((float));
-#endif /* !_ANSI_SOURCE && !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
+#endif /* _NETBSD_SOURCE */
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
-    !defined(_XOPEN_SOURCE) || defined(_REENTRANT)
+#if defined(_NETBSD_SOURCE) || defined(_REENTRANT)
 /*
  * Float versions of reentrant version of gamma & lgamma; passes
  * signgam back by reference as the second argument; user must
@@ -315,6 +405,27 @@ float	gammaf_r __P((float, int *));
 float	lgammaf_r __P((float, int *));
 #endif /* !... || _REENTRANT */
 
+/*
+ * Library implementation
+ */
+int	__fpclassifyf __P((float));
+int	__fpclassifyd __P((double));
+int	__isfinitef __P((float));
+int	__isfinited __P((double));
+int	__isinff __P((float));
+int	__isinfd __P((double));
+int	__isnanf __P((float));
+int	__isnand __P((double));
+int	__signbitf __P((float));
+int	__signbitd __P((double));
+
+#ifdef __HAVE_LONG_DOUBLE
+int	__fpclassifyl __P((long double));
+int	__isfinitel __P((long double));
+int	__isinfl __P((long double));
+int	__isnanl __P((long double));
+int	__signbitl __P((long double));
+#endif
 __END_DECLS
 
 #endif /* _MATH_H_ */

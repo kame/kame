@@ -1,4 +1,4 @@
-/*	$NetBSD: ctype.h,v 1.21 2001/04/18 01:45:18 thorpej Exp $	*/
+/*	$NetBSD: ctype.h,v 1.25 2003/10/22 15:51:18 kleink Exp $	*/
 
 /*
  * Copyright (c) 1989 The Regents of the University of California.
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -43,9 +39,8 @@
 #ifndef _CTYPE_H_
 #define _CTYPE_H_
 
-#include <sys/featuretest.h>
-
 #include <sys/cdefs.h>
+#include <sys/featuretest.h>
 
 #define	_U	0x01
 #define	_L	0x02
@@ -76,16 +71,15 @@ int	isxdigit __P ((int));
 int	tolower __P ((int));
 int	toupper __P ((int));
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) || \
-    defined(_XOPEN_SOURCE)
+#if defined(_XOPEN_SOURCE) || defined(_NETBSD_SOURCE)
 int	isascii __P ((int));
 int	toascii __P ((int));
 int	_tolower __P ((int));
 int	_toupper __P ((int));
 #endif
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
-    !defined(_XOPEN_SOURCE)
+#if defined(_ISOC99_SOURCE) || (_POSIX_C_SOURCE - 0) > 200112L || \
+    (_XOPEN_SOURCE - 0) > 600 || defined(_NETBSD_SOURCE)
 int	isblank __P ((int));
 #endif
 __END_DECLS
@@ -104,16 +98,15 @@ __END_DECLS
 #define	tolower(c)	((int)((_tolower_tab_ + 1)[(int)(c)]))
 #define	toupper(c)	((int)((_toupper_tab_ + 1)[(int)(c)]))
 
-#if !defined(_ANSI_SOURCE) && !defined (_POSIX_C_SOURCE) || \
-    defined(_XOPEN_SOURCE)
+#if defined(_XOPEN_SOURCE) || defined(_NETBSD_SOURCE)
 #define	isascii(c)	((unsigned)(c) <= 0177)
 #define	toascii(c)	((c) & 0177)
 #define _tolower(c)	((c) - 'A' + 'a')
 #define _toupper(c)	((c) - 'a' + 'A')
 #endif
 
-#if !defined(_ANSI_SOURCE) && !defined(_POSIX_C_SOURCE) && \
-    !defined(_XOPEN_SOURCE)
+#if defined(_ISO_C99_SOURCE) || (_POSIX_C_SOURCE - 0) > 200112L || \
+    (_XOPEN_SOURCE - 0) > 600 || defined(_NETBSD_SOURCE)
 #if notyet
 /*
  * isblank() is implemented as C function, due to insufficient bitwidth in

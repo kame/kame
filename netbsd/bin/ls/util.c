@@ -1,4 +1,4 @@
-/*	$NetBSD: util.c,v 1.22 2001/12/20 20:17:29 soren Exp $	*/
+/*	$NetBSD: util.c,v 1.27 2003/09/22 02:43:20 jschauma Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993, 1994
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -41,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)util.c	8.5 (Berkeley) 4/28/95";
 #else
-__RCSID("$NetBSD: util.c,v 1.22 2001/12/20 20:17:29 soren Exp $");
+__RCSID("$NetBSD: util.c,v 1.27 2003/09/22 02:43:20 jschauma Exp $");
 #endif
 #endif /* not lint */
 
@@ -49,13 +45,44 @@ __RCSID("$NetBSD: util.c,v 1.22 2001/12/20 20:17:29 soren Exp $");
 #include <sys/stat.h>
 
 #include <ctype.h>
+#include <err.h>
 #include <fts.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <vis.h>
 
 #include "ls.h"
 #include "extern.h"
+
+int
+safe_print(const char *src)
+{
+	size_t len;
+	char *name;
+	int flags;
+
+	flags = VIS_NL | VIS_OCTAL;
+	if (f_octal_escape)
+		flags |= VIS_CSTYLE;
+
+	len = strlen(src);
+	if (len != 0 && SIZE_T_MAX/len <= 4) {
+		errx(EXIT_FAILURE, "%s: name too long", src);
+		/* NOTREACHED */
+	}
+
+	name = (char *)malloc(4*len+1);
+	if (name != NULL) {
+		len = strvis(name, src, flags);
+		printf("%s", name);
+		free(name);
+		return len;
+	} else
+		errx(EXIT_FAILURE, "out of memory!");
+		/* NOTREACHED */
+}
 
 int
 printescaped(const char *src)
@@ -74,8 +101,9 @@ printescaped(const char *src)
 void
 usage(void)
 {
-	(void)fprintf(stderr, 
-	    "usage: ls [-ACFLRSTWacdfgiklmnopqrstux1] [file ...]\n");
+
+	(void)fprintf(stderr,
+	    "usage: ls [-AaBbCcdFfgikLlmnopqRrSsTtuWwx1] [file ...]\n");
 	exit(EXIT_FAILURE);
 	/* NOTREACHED */
 }

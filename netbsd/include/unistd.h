@@ -1,4 +1,4 @@
-/*	$NetBSD: unistd.h,v 1.88 2001/07/29 22:18:45 wiz Exp $	*/
+/*	$NetBSD: unistd.h,v 1.95 2003/11/18 00:56:56 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1998, 1999 The NetBSD Foundation, Inc.
@@ -48,11 +48,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -151,8 +147,8 @@ ssize_t	 write __P((int, const void *, size_t));
 /*
  * IEEE Std 1003.2-92, adopted in X/Open Portability Guide Issue 4 and later
  */
-#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
-    (_POSIX_C_SOURCE - 0) >= 2 || (_XOPEN_SOURCE - 0) >= 4
+#if (_POSIX_C_SOURCE - 0) >= 2 || (_XOPEN_SOURCE - 0) >= 4 || \
+    defined(_NETBSD_SOURCE)
 int	 getopt __P((int, char * const [], const char *));
 
 extern	 char *optarg;			/* getopt(3) external variables */
@@ -161,6 +157,14 @@ extern	 int optind;
 extern	 int optopt;
 #endif
 
+/*
+ * The Open Group Base Specifications, Issue 6; IEEE Std 1003.1-2001 (POSIX)
+ */
+#if (_POSIX_C_SOURCE - 0) >= 200112L || (_XOPEN_SOURCE - 0) >= 600 || \
+    defined(_NETBSD_SOURCE)
+int	 setegid __P((gid_t));
+int	 seteuid __P((uid_t));
+#endif
 
 /*
  * The following three syscalls are also defined in <sys/types.h>
@@ -174,10 +178,9 @@ int	 truncate __P((const char *, off_t));
  * IEEE Std 1003.1b-93,
  * also found in X/Open Portability Guide >= Issue 4 Verion 2
  */
-#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
-    (_POSIX_C_SOURCE - 0) >= 199309L || \
+#if (_POSIX_C_SOURCE - 0) >= 199309L || \
     (defined(_XOPEN_SOURCE) && defined(_XOPEN_SOURCE_EXTENDED)) || \
-    (_XOPEN_SOURCE - 0) >= 500
+    (_XOPEN_SOURCE - 0) >= 500 || defined(_NETBSD_SOURCE)
 int	 ftruncate __P((int, off_t));
 #endif
 #endif /* __OFF_T_SYSCALLS_DECLARED */
@@ -186,8 +189,8 @@ int	 ftruncate __P((int, off_t));
 /*
  * IEEE Std 1003.1b-93, adopted in X/Open CAE Specification Issue 5 Version 2
  */
-#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
-    (_POSIX_C_SOURCE - 0) >= 199309L || (_XOPEN_SOURCE - 0) >= 500
+#if (_POSIX_C_SOURCE - 0) >= 199309L || (_XOPEN_SOURCE - 0) >= 500 || \
+    defined(_NETBSD_SOURCE)
 int	 fdatasync __P((int));
 int	 fsync __P((int));
 #endif
@@ -196,7 +199,7 @@ int	 fsync __P((int));
 /*
  * X/Open Portability Guide, all issues
  */
-#if !defined(_POSIX_C_SOURCE) || defined(_XOPEN_SOURCE)
+#if defined(_XOPEN_SOURCE) || defined(_NETBSD_SOURCE)
 int	 chroot __P((const char *));
 int	 nice __P((int));
 #endif
@@ -213,8 +216,7 @@ int	 rename __P((const char *, const char *)) __RENAME(__posix_rename);
 /*
  * X/Open Portability Guide >= Issue 4
  */
-#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
-    (_XOPEN_SOURCE - 0) >= 4
+#if (_XOPEN_SOURCE - 0) >= 4 || defined(_NETBSD_SOURCE)
 __aconst char *crypt __P((const char *, const char *));
 int	 encrypt __P((char *, int));
 char	*getpass __P((const char *));
@@ -225,9 +227,8 @@ pid_t	 getsid __P((pid_t));
 /*
  * X/Open Portability Guide >= Issue 4 Version 2
  */
-#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
-    (defined(_XOPEN_SOURCE) && defined(_XOPEN_SOURCE_EXTENDED)) || \
-    (_XOPEN_SOURCE - 0) >= 500
+#if (defined(_XOPEN_SOURCE) && defined(_XOPEN_SOURCE_EXTENDED)) || \
+    (_XOPEN_SOURCE - 0) >= 500 || defined(_NETBSD_SOURCE)
 #ifndef	intptr_t
 typedef	__intptr_t	intptr_t;
 #define	intptr_t	__intptr_t
@@ -260,7 +261,7 @@ int	 lockf __P((int, int, off_t));
 int	 readlink __P((const char *, char *, size_t));
 void	*sbrk __P((intptr_t));
 /* XXX prototype wrong! */
-int	 setpgrp __P((pid_t pid, pid_t pgrp));	/* obsoleted by setpgid() */
+int	 setpgrp __P((pid_t, pid_t));		/* obsoleted by setpgid() */
 int	 setregid __P((gid_t, gid_t));
 int	 setreuid __P((uid_t, uid_t));
 void	 swab __P((const void *, void *, size_t));
@@ -284,14 +285,13 @@ char	*getwd __P((char *));			/* obsoleted by getcwd() */
 struct timeval;				/* select(2) XXX */
 #endif
 int	 select __P((int, fd_set *, fd_set *, fd_set *, struct timeval *));
-#endif /* (!defined(_POSIX_SOURCE) && !defined(_XOPEN_SOURCE)) || ... */
+#endif /* _XOPEN_SOURCE_EXTENDED || _XOPEN_SOURCE >= 500 || _NETBSD_SOURCE */
 
 
 /*
  * X/Open CAE Specification Issue 5 Version 2
  */
-#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
-    (_XOPEN_SOURCE - 0) >= 500
+#if (_XOPEN_SOURCE - 0) >= 500 || defined(_NETBSD_SOURCE)
 ssize_t	 pread __P((int, void *, size_t, off_t));
 ssize_t	 pwrite __P((int, const void *, size_t, off_t));
 #endif
@@ -300,13 +300,14 @@ ssize_t	 pwrite __P((int, const void *, size_t, off_t));
 /*
  * Implementation-defined extensions
  */
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 int	 acct __P((const char *));
 int	 des_cipher __P((const char *, char *, long, int));
 int	 des_setkey __P((const char *));
 void	 endusershell __P((void));
 int	 exect __P((const char *, char * const *, char * const *));
 int	 fchroot __P((int));
+int	 fsync_range __P((int, int, off_t, off_t));
 int	 getdomainname __P((char *, size_t));
 int	 getgrouplist __P((const char *, gid_t, gid_t *, int *));
 mode_t	 getmode __P((const void *, mode_t));
@@ -329,8 +330,6 @@ int	 revoke __P((const char *));
 int	 rresvport __P((int *));
 int	 ruserok __P((const char *, int, const char *, const char *));
 int	 setdomainname __P((const char *, size_t));
-int	 setegid __P((gid_t));
-int	 seteuid __P((uid_t));
 int	 setgroups __P((int, const gid_t *));
 int	 sethostid __P((long));
 int	 sethostname __P((const char *, size_t));

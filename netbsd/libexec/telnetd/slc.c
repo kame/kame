@@ -1,4 +1,4 @@
-/*	$NetBSD: slc.c,v 1.10 2001/09/16 16:34:26 wiz Exp $	*/
+/*	$NetBSD: slc.c,v 1.13 2003/08/07 09:46:51 agc Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "@(#)slc.c	8.1 (Berkeley) 6/4/93";
 #else
-__RCSID("$NetBSD: slc.c,v 1.10 2001/09/16 16:34:26 wiz Exp $");
+__RCSID("$NetBSD: slc.c,v 1.13 2003/08/07 09:46:51 agc Exp $");
 #endif
 #endif /* not lint */
 
@@ -62,7 +58,7 @@ void process_slc __P((u_int, u_int, cc_t));
  *
  * Write out the current special characters to the client.
  */
-	void
+void
 send_slc()
 {
 	register int i;
@@ -86,7 +82,7 @@ send_slc()
  *
  * Set pty special characters to all the defaults.
  */
-	void
+void
 default_slc()
 {
 	register int i;
@@ -111,7 +107,7 @@ default_slc()
  *
  * Initialize the slc mapping table.
  */
-	void
+void
 get_slc_defaults()
 {
 	register int i;
@@ -133,7 +129,7 @@ get_slc_defaults()
  *
  * Add an slc triplet to the slc buffer.
  */
-	void
+void
 add_slc(func, flag, val)
 	register char func, flag;
 	register cc_t val;
@@ -158,7 +154,7 @@ add_slc(func, flag, val)
  * The parameter getit is non-zero if it is necessary to grab a copy
  * of the terminal control structures.
  */
-	void
+void
 start_slc(getit)
 	register int getit;
 {
@@ -177,7 +173,7 @@ start_slc(getit)
  *
  * Finish up the slc negotiation.  If something to send, then send it.
  */
-	int
+int
 end_slc(bufp)
 	register unsigned char **bufp;
 {
@@ -206,7 +202,9 @@ end_slc(bufp)
 			*bufp = &slcbuf[4];
 			return(slcptr - slcbuf - 4);
 		} else {
-			(void) sprintf((char *)slcptr, "%c%c", IAC, SE);
+			(void) snprintf((char *)slcptr,
+			    sizeof(slcbuf) - (slcptr - slcbuf), "%c%c",
+			    IAC, SE);
 			slcptr += 2;
 			len = slcptr - slcbuf;
 			writenet(slcbuf, len);
@@ -223,7 +221,7 @@ end_slc(bufp)
  *
  * Figure out what to do about the client's slc
  */
-	void
+void
 process_slc(func, flag, val)
 	u_int func, flag;
 	cc_t val;
@@ -289,7 +287,7 @@ process_slc(func, flag, val)
  * Process a request to change one of our special characters.
  * Compare client's request with what we are capable of supporting.
  */
-	void
+void
 change_slc(func, flag, val)
 	int func, flag;
 	cc_t val;
@@ -387,7 +385,7 @@ change_slc(func, flag, val)
 
 }  /* end of change_slc */
 
-#if	defined(USE_TERMIO) && (VEOF == VMIN)
+#if VEOF == VMIN
 cc_t oldeofc = '\004';
 #endif
 
@@ -399,13 +397,13 @@ cc_t oldeofc = '\004';
  * likely to have changed.  If a local change occurs, kick the support level
  * and flags up to the defaults.
  */
-	void
+void
 check_slc()
 {
 	register int i;
 
 	for (i = 1; i <= NSLC; i++) {
-#if	defined(USE_TERMIO) && (VEOF == VMIN)
+#if VEOF == VMIN
 		/*
 		 * In a perfect world this would be a neat little
 		 * function.  But in this world, we should not notify
@@ -419,7 +417,7 @@ check_slc()
 			else if (slctab[i].sptr)
 				oldeofc = *(slctab[i].sptr);
 		}
-#endif	/* defined(USE_TERMIO) && defined(SYSV_TERMIO) */
+#endif	/* VEOF == VMIN */
 		if (slctab[i].sptr &&
 				(*(slctab[i].sptr) != slctab[i].current.val)) {
 			slctab[i].current.val = *(slctab[i].sptr);
@@ -442,7 +440,7 @@ check_slc()
  *
  * ptr points to the beginning of the buffer, len is the length.
  */
-	void
+void
 do_opt_slc(ptr, len)
 	register unsigned char *ptr;
 	register int len;
@@ -483,7 +481,7 @@ do_opt_slc(ptr, len)
  *
  * Do slc stuff that was deferred.
  */
-	void
+void
 deferslc()
 {
 	if (def_slcbuf) {

@@ -1,4 +1,4 @@
-/*	$NetBSD: fnmatch.h,v 1.8 2001/10/27 15:41:18 kleink Exp $	*/
+/*	$NetBSD: fnmatch.h,v 1.11 2003/08/07 09:44:10 agc Exp $	*/
 
 /*-
  * Copyright (c) 1992, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -46,8 +42,9 @@
 #define	FNM_NOESCAPE	0x01	/* Disable backslash escaping. */
 #define	FNM_PATHNAME	0x02	/* Slash must be matched by slash. */
 #define	FNM_PERIOD	0x04	/* Period must be matched by period. */
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 #define	FNM_CASEFOLD	0x08	/* Pattern is matched case-insensitive */
+#define	FNM_LEADING_DIR	0x10	/* Ignore /<tail> after Imatch. */
 #endif
 
 #include <sys/cdefs.h>

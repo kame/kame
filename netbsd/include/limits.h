@@ -1,4 +1,4 @@
-/*	$NetBSD: limits.h,v 1.13 1999/09/27 16:24:39 kleink Exp $	*/
+/*	$NetBSD: limits.h,v 1.22 2003/08/07 09:44:10 agc Exp $	*/
 
 /*
  * Copyright (c) 1988, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,10 @@
 #ifndef _LIMITS_H_
 #define	_LIMITS_H_
 
-#if !defined(_ANSI_SOURCE)
+#include <sys/featuretest.h>
+
+#if defined(_POSIX_C_SOURCE) || defined(_XOPEN_SOURCE) || \
+    defined(_NETBSD_SOURCE)
 #define	_POSIX_ARG_MAX		4096
 #define	_POSIX_CHILD_MAX	6
 #define	_POSIX_LINK_MAX		8
@@ -46,28 +45,44 @@
 #define	_POSIX_MAX_CANON	255
 #define	_POSIX_MAX_INPUT	255
 #define	_POSIX_NAME_MAX		14
-#define	_POSIX_NGROUPS_MAX	0
-#define	_POSIX_OPEN_MAX		16
-#define	_POSIX_PATH_MAX		255
+#define	_POSIX_NGROUPS_MAX	8
+#define	_POSIX_OPEN_MAX		20
+#define	_POSIX_PATH_MAX		256
 #define	_POSIX_PIPE_BUF		512
+#define	_POSIX_RE_DUP_MAX	255
 #define	_POSIX_SSIZE_MAX	32767
 #define	_POSIX_STREAM_MAX	8
+#define	_POSIX_SYMLINK_MAX	256
+#define	_POSIX_THREAD_DESTRUCTOR_ITERATIONS	4
+#define	_POSIX_THREAD_KEYS_MAX	128
+#define	_POSIX_THREAD_THREADS_MAX		64
+#define	_POSIX_TIMER_MAX	32
+#define	_POSIX_TTY_NAME_MAX	9
 #define	_POSIX_TZNAME_MAX	3
 
 #define	_POSIX2_BC_BASE_MAX	99
 #define	_POSIX2_BC_DIM_MAX	2048
 #define	_POSIX2_BC_SCALE_MAX	99
 #define	_POSIX2_BC_STRING_MAX	1000
+#define	_POSIX2_CHARCLASS_NAME_MAX	14
 #define	_POSIX2_COLL_WEIGHTS_MAX	2
 #define	_POSIX2_EXPR_NEST_MAX	32
 #define	_POSIX2_LINE_MAX	2048
 #define	_POSIX2_RE_DUP_MAX	255
 
-#if !defined(_POSIX_C_SOURCE) || defined(_XOPEN_SOURCE)
+/*
+ * X/Open CAE Specifications,
+ * adopted in IEEE Std 1003.1-2001 XSI.
+ */
+#if (_POSIX_C_SOURCE - 0) >= 200112L || defined(_XOPEN_SOURCE) || \
+    defined(_NETBSD_SOURCE)
 #define	_XOPEN_IOV_MAX		16
+#define	_XOPEN_NAME_MAX		256
+#define	_XOPEN_PATH_MAX		1024
 
-#define PASS_MAX		128
+#define PASS_MAX		128		/* Legacy */
 
+#define CHARCLASS_NAME_MAX	14
 #define NL_ARGMAX		9
 #define NL_LANGMAX		14
 #define NL_MSGMAX		32767
@@ -75,10 +90,13 @@
 #define NL_SETMAX		255
 #define NL_TEXTMAX		2048
 
-#define TMP_MAX			308915776
-#endif /* !_POSIX_C_SOURCE || _XOPEN_SOURCE */
+/* Always ensure that this is consistent with <stdio.h> */
+#ifndef TMP_MAX
+#define TMP_MAX			308915776	/* Legacy */
+#endif
+#endif /* _POSIX_C_SOURCE >= 200112L || _XOPEN_SOURCE || _NETBSD_SOURCE */
 
-#endif /* !_ANSI_SOURCE */
+#endif /* _POSIX_C_SOURCE || _XOPEN_SOURCE || _NETBSD_SOURCE */
 
 #include <machine/limits.h>
 #include <sys/syslimits.h>

@@ -1,4 +1,4 @@
-/*	$NetBSD: wchar.h,v 1.12 2002/03/14 21:22:28 yamt Exp $	*/
+/*	$NetBSD: wchar.h,v 1.19 2003/07/08 05:39:23 itojun Exp $	*/
 
 /*-
  * Copyright (c)1999 Citrus Project,
@@ -66,6 +66,7 @@
 #define _WCHAR_H_
 
 #include <sys/cdefs.h>
+#include <sys/featuretest.h>
 #include <machine/ansi.h>
 #include <sys/null.h>
 
@@ -101,6 +102,7 @@ typedef	_BSD_SIZE_T_	size_t;
 #define putwchar(wc) putwc((wc), stdout)
 
 __BEGIN_DECLS
+wint_t	btowc __P((int));
 size_t	mbrlen __P((const char * __restrict, size_t, mbstate_t * __restrict));
 size_t	mbrtowc __P((wchar_t * __restrict, const char * __restrict, size_t,
 	    mbstate_t * __restrict));
@@ -111,6 +113,7 @@ size_t	wcrtomb __P((char * __restrict, wchar_t, mbstate_t * __restrict));
 wchar_t	*wcscat __P((wchar_t * __restrict, const wchar_t * __restrict));
 wchar_t	*wcschr __P((const wchar_t *, wchar_t));
 int	wcscmp __P((const wchar_t *, const wchar_t *));
+int	wcscoll __P((const wchar_t *, const wchar_t *));
 wchar_t	*wcscpy __P((wchar_t * __restrict, const wchar_t * __restrict));
 size_t	wcscspn __P((const wchar_t *, const wchar_t *));
 size_t	wcslen __P((const wchar_t *));
@@ -125,6 +128,10 @@ size_t	wcsrtombs __P((char * __restrict, const wchar_t ** __restrict, size_t,
 	    mbstate_t * __restrict));
 size_t	wcsspn __P((const wchar_t *, const wchar_t *));
 wchar_t	*wcsstr __P((const wchar_t *, const wchar_t *));
+wchar_t *wcstok __P((wchar_t * __restrict, const wchar_t * __restrict,
+		     wchar_t ** __restrict));
+size_t	wcsxfrm __P((wchar_t *, const wchar_t *, size_t));
+wchar_t	*wcswcs __P((const wchar_t *, const wchar_t *));
 wchar_t	*wmemchr __P((const wchar_t *, wchar_t, size_t));
 int	wmemcmp __P((const wchar_t *, const wchar_t *, size_t));
 wchar_t	*wmemcpy __P((wchar_t * __restrict, const wchar_t * __restrict,
@@ -135,18 +142,32 @@ wchar_t	*wmemset __P((wchar_t *, wchar_t, size_t));
 size_t	wcslcat __P((wchar_t *, const wchar_t *, size_t));
 size_t	wcslcpy __P((wchar_t *, const wchar_t *, size_t));
 int	wcswidth __P((const wchar_t *, size_t));
+int	wctob __P((wint_t));
 int	wcwidth __P((wchar_t));
 
-unsigned long int wcstoul __P((const wchar_t * __restrict, wchar_t ** __restrict,
-		int base));
-long int wcstol __P((const wchar_t * __restrict, wchar_t ** __restrict, int base));
+unsigned long int wcstoul __P((const wchar_t * __restrict,
+	wchar_t ** __restrict, int));
+long int wcstol __P((const wchar_t * __restrict,
+	wchar_t ** __restrict, int));
 double wcstod __P((const wchar_t * __restrict, wchar_t ** __restrict));
+
+#if defined(_ISOC99_SOURCE) || (__STDC_VERSION__ - 0) > 199901L || \
+    defined(_NETBSD_SOURCE)
+/* LONGLONG */
+long long int wcstoll __P((const wchar_t * __restrict,
+	wchar_t ** __restrict, int));
+/* LONGLONG */
+unsigned long long int wcstoull __P((const wchar_t * __restrict,
+	wchar_t ** __restrict, int));
+#endif
 
 wint_t ungetwc __P((wint_t, FILE *));
 wint_t fgetwc __P((FILE *));
+wchar_t *fgetws __P((wchar_t * __restrict, int, FILE * __restrict));
 wint_t getwc __P((FILE *));
 wint_t getwchar __P((void));
 wint_t fputwc __P((wchar_t, FILE *));
+int fputws __P((const wchar_t * __restrict, FILE * __restrict));
 wint_t putwc __P((wchar_t, FILE *));
 wint_t putwchar __P((wchar_t));
 

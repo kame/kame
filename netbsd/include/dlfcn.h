@@ -1,4 +1,4 @@
-/*	$NetBSD: dlfcn.h,v 1.13 2000/06/13 01:21:53 simonb Exp $	*/
+/*	$NetBSD: dlfcn.h,v 1.16 2003/07/01 15:02:01 skrll Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -39,16 +39,17 @@
 #ifndef _DLFCN_H_
 #define _DLFCN_H_
 
+#include <sys/featuretest.h>
 #include <sys/cdefs.h>
 
-#if !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 typedef struct _dl_info {
 	const char	*dli_fname;	/* File defining the symbol */
 	void		*dli_fbase;	/* Base address */
 	const char	*dli_sname;	/* Symbol name */
 	const void	*dli_saddr;	/* Symbol address */
 } Dl_info;
-#endif /* !defined(_XOPEN_SOURCE) */
+#endif /* defined(_NETBSD_SOURCE) */
 
 /*
  * User interface to the run-time linker.
@@ -57,7 +58,7 @@ __BEGIN_DECLS
 void	*dlopen __P((const char *, int));
 int	dlclose __P((void *));
 void	*dlsym __P((void *, const char *));
-#if !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 int	dladdr __P((const void *, Dl_info *));
 int	dlctl __P((void *, int, void *));
 #endif
@@ -69,14 +70,21 @@ __END_DECLS
 #define RTLD_NOW	2
 #define RTLD_GLOBAL	0x100		/* Allow global searches in object */
 #define RTLD_LOCAL	0x200
-#if !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 #define DL_LAZY		RTLD_LAZY	/* Compat */
 #endif
+
+/* 
+ * Special handle arguments for dlsym().
+ */   
+#define	RTLD_NEXT	((void *) -1)	/* Search subsequent objects. */
+#define	RTLD_DEFAULT	((void *) -2)	/* Use default search algorithm. */
+#define	RTLD_SELF	((void *) -3)	/* Search the caller itself. */
 
 /*
  * dlctl() commands
  */
-#if !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 #define DL_GETERRNO	1
 #define DL_GETSYMBOL	2
 #if 0
@@ -85,6 +93,6 @@ __END_DECLS
 #define DL_GETREFCNT	x
 #define DL_GETLOADADDR	x
 #endif /* 0 */
-#endif /* !defined(_XOPEN_SOURCE) */
+#endif /* defined(_NETBSD_SOURCE) */
 
 #endif /* !defined(_DLFCN_H_) */

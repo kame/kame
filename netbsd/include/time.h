@@ -1,4 +1,4 @@
-/*	$NetBSD: time.h,v 1.27 2001/03/31 18:29:20 kleink Exp $	*/
+/*	$NetBSD: time.h,v 1.33 2003/12/21 23:19:02 kleink Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -17,11 +17,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -46,7 +42,6 @@
 #include <sys/cdefs.h>
 #include <sys/featuretest.h>
 #include <machine/ansi.h>
-#include <machine/limits.h>	/* Include file containing CLK_TCK. */
 
 #include <sys/null.h>
 
@@ -103,16 +98,30 @@ size_t strftime __P((char * __restrict, size_t, const char * __restrict,
     const struct tm * __restrict));
 time_t time __P((time_t *));
 
-#if !defined(_ANSI_SOURCE)
-#define CLK_TCK		100
+#if defined(_POSIX_C_SOURCE) || defined(_XOPEN_SOURCE) || \
+    defined(_NETBSD_SOURCE)
+
+#ifdef __LIBC12_SOURCE__
+#define CLK_TCK 100
+#else
+
+/*
+ * CLK_TCK uses libc's internal __sysconf() to retrieve the machine's
+ * HZ. The value of _SC_CLK_TCK is 39 -- we hard code it so we do not
+ * need to include unistd.h
+ */
+long __sysconf __P((int));
+#define CLK_TCK		(__sysconf(39))
+
+#endif
+
 extern __aconst char *tzname[2];
 void tzset __P((void));
 
 /*
  * X/Open Portability Guide >= Issue 4
  */
-#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
-    (_XOPEN_SOURCE - 0) >= 4
+#if (_XOPEN_SOURCE - 0) >= 4 || defined(_NETBSD_SOURCE)
 extern int daylight;
 #ifndef __LIBC12_SOURCE__
 extern long int timezone __RENAME(__timezone13);
@@ -121,8 +130,8 @@ char *strptime __P((const char * __restrict, const char * __restrict,
     struct tm * __restrict));
 #endif
 
-#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
-    (_POSIX_C_SOURCE - 0) >= 199309L || (_XOPEN_SOURCE - 0) >= 500
+#if (_POSIX_C_SOURCE - 0) >= 199309L || (_XOPEN_SOURCE - 0) >= 500 || \
+    defined(_NETBSD_SOURCE)
 #include <sys/time.h>		/* XXX for struct timespec */
 struct sigevent;
 struct itimerspec;
@@ -130,35 +139,35 @@ int clock_getres __P((clockid_t, struct timespec *));
 int clock_gettime __P((clockid_t, struct timespec *));
 int clock_settime __P((clockid_t, const struct timespec *));
 int nanosleep __P((const struct timespec *, struct timespec *));
-int timer_create __P((clockid_t, struct sigevent *, timer_t *));
+int timer_create __P((clockid_t, struct sigevent * __restrict,
+    timer_t * __restrict));
 int timer_delete __P((timer_t));
 int timer_getoverrun __P((timer_t));
 int timer_gettime __P((timer_t, struct itimerspec *));
-int timer_settime __P((timer_t, int, const struct itimerspec *, 
-    struct itimerspec *));
-#endif /* (!_POSIX_C_SOURCE && !_XOPEN_SOURCE) || ... */
+int timer_settime __P((timer_t, int, const struct itimerspec * __restrict, 
+    struct itimerspec * __restrict));
+#endif /* _POSIX_C_SOURCE >= 199309 || _XOPEN_SOURCE >= 500 || ... */
 
-#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
-    (_POSIX_C_SOURCE - 0) >= 199506L || (_XOPEN_SOURCE - 0) >= 500 || \
-    defined(_REENTRANT)
+#if (_POSIX_C_SOURCE - 0) >= 199506L || (_XOPEN_SOURCE - 0) >= 500 || \
+    defined(_REENTRANT) || defined(_NETBSD_SOURCE)
 char *asctime_r __P((const struct tm * __restrict, char * __restrict));
 char *ctime_r __P((const time_t *, char *));
 struct tm *gmtime_r __P((const time_t * __restrict, struct tm * __restrict));
 struct tm *localtime_r __P((const time_t * __restrict, struct tm * __restrict));
 #endif
 
-#if !defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)
+#if defined(_NETBSD_SOURCE)
 time_t time2posix __P((time_t));
 time_t posix2time __P((time_t));
-time_t timegm __P((struct tm *const));
-time_t timeoff __P((struct tm *const, const long));
-time_t timelocal __P((struct tm *const));
+time_t timegm __P((struct tm *));
+time_t timeoff __P((struct tm *, long));
+time_t timelocal __P((struct tm *));
 #ifdef __LIBC12_SOURCE__
 char *timezone __P((int, int));
 #endif
 void tzsetwall __P((void));
-struct tm *offtime __P((const time_t *const, const long));
-#endif /* !_POSIX_C_SOURCE && !_XOPEN_SOURCE */
+struct tm *offtime __P((const time_t *, long));
+#endif /* _NETBSD_SOURCE */
 
 #endif /* !_ANSI_SOURCE */
 __END_DECLS

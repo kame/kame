@@ -1,4 +1,4 @@
-/*	$NetBSD: db.h,v 1.17 1999/09/26 10:22:01 scw Exp $	*/
+/*	$NetBSD: db.h,v 1.20 2003/08/07 09:44:09 agc Exp $	*/
 
 /*-
  * Copyright (c) 1990, 1993, 1994
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -46,20 +42,6 @@
 #define	RET_ERROR	-1		/* Return values. */
 #define	RET_SUCCESS	 0
 #define	RET_SPECIAL	 1
-
-#ifndef	__BIT_TYPES_DEFINED__
-#define	__BIT_TYPES_DEFINED__
-typedef	__signed char		   int8_t;
-typedef	unsigned char		 u_int8_t;
-typedef	short			  int16_t;
-typedef	unsigned short		u_int16_t;
-typedef	int			  int32_t;
-typedef	unsigned int		u_int32_t;
-#ifdef WE_DONT_NEED_QUADS
-typedef	long long		  int64_t;
-typedef	unsigned long long	u_int64_t;
-#endif
-#endif
 
 #define	MAX_PAGE_NUMBER	0xffffffff	/* >= # of pages in a file */
 typedef u_int32_t	pgno_t;
@@ -234,7 +216,7 @@ DB *dbopen __P((const char *, int, mode_t, DBTYPE, const void *));
 DB	*__bt_open __P((const char *, int, mode_t, const BTREEINFO *, int));
 DB	*__hash_open __P((const char *, int, mode_t, const HASHINFO *, int));
 DB	*__rec_open __P((const char *, int, mode_t, const RECNOINFO *, int));
-void	 __dbpanic __P((DB *dbp));
+void	 __dbpanic __P((DB *));
 #endif
 __END_DECLS
 #endif /* !_DB_H_ */

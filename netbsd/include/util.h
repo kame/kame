@@ -1,4 +1,4 @@
-/*	$NetBSD: util.h,v 1.21.2.1 2003/10/25 03:32:14 cyber Exp $	*/
+/*	$NetBSD: util.h,v 1.31 2003/08/07 09:44:11 agc Exp $	*/
 
 /*-
  * Copyright (c) 1995
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -34,7 +30,7 @@
  */
 
 #ifndef _UTIL_H_
-#define _UTIL_H_
+#define	_UTIL_H_
 
 #include <sys/cdefs.h>
 #include <sys/ttycom.h>
@@ -43,15 +39,18 @@
 #include <pwd.h>
 #include <termios.h>
 #include <utmp.h>
+#include <utmpx.h>
 
 #define	PIDLOCK_NONBLOCK	1
-#define PIDLOCK_USEHOSTNAME	2
+#define	PIDLOCK_USEHOSTNAME	2
 
-#define	FPARSELN_UNESCESC	0x01
-#define	FPARSELN_UNESCCONT	0x02
-#define	FPARSELN_UNESCCOMM	0x04
-#define	FPARSELN_UNESCREST	0x08
-#define	FPARSELN_UNESCALL	0x0f
+#define	HN_DECIMAL		0x01
+#define	HN_NOSPACE		0x02
+#define	HN_B			0x04
+#define	HN_DIVISOR_1000		0x08
+
+#define	HN_GETSCALE		0x10
+#define	HN_AUTOSCALE		0x20
 
 __BEGIN_DECLS
 struct disklabel;
@@ -62,18 +61,24 @@ struct utmp;
 struct winsize;
 
 pid_t		forkpty(int *, char *, struct termios *, struct winsize *);
-char	       *fparseln(FILE *, size_t *, size_t *, const char[3], int);
 const char     *getbootfile(void);
+off_t		getlabeloffset(void);
+int		getlabelsector(void);
 int		getmaxpartitions(void);
 int		getrawpartition(void);
+int		humanize_number(char *, size_t, int64_t, const char *, int,
+		    int);
 void		login(const struct utmp *);
+void		loginx(const struct utmpx *);
 int		login_tty(int);
 int		logout(const char *);
+int		logoutx(const char *, int, int);
 void		logwtmp(const char *, const char *, const char *);
+void		logwtmpx(const char *, const char *, const char *, int, int);
 int		opendisk(const char *, int, char *, size_t, int);
 int		openpty(int *, int *, char *, struct termios *,
-			struct winsize *);
-void		pidfile(const char *);
+		    struct winsize *);
+int		pidfile(const char *);
 int		pidlock(const char *, int, pid_t *, const char *);
 int		pw_abort(void);
 void		pw_copy(int, int, struct passwd *, struct passwd *);
@@ -87,6 +92,7 @@ int		pw_mkdb(const char *, int);
 void		pw_prompt(void);
 int		pw_setprefix(const char *);
 int		secure_path(const char *);
+int		snprintb(char *, size_t, const char *, uint64_t);
 int		ttyaction(const char *, const char *, const char *);
 int		ttylock(const char *, int, pid_t *);
 char	       *ttymsg(struct iovec *, int, const char *, int);

@@ -1,4 +1,4 @@
-/*	$NetBSD: ls.c,v 1.43 2000/07/29 03:46:15 lukem Exp $	*/
+/*	$NetBSD: ls.c,v 1.55 2003/12/26 10:51:25 simonb Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993, 1994
@@ -15,11 +15,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -46,7 +42,7 @@ __COPYRIGHT("@(#) Copyright (c) 1989, 1993, 1994\n\
 #if 0
 static char sccsid[] = "@(#)ls.c	8.7 (Berkeley) 8/5/94";
 #else
-__RCSID("$NetBSD: ls.c,v 1.43 2000/07/29 03:46:15 lukem Exp $");
+__RCSID("$NetBSD: ls.c,v 1.55 2003/12/26 10:51:25 simonb Exp $");
 #endif
 #endif /* not lint */
 
@@ -91,6 +87,8 @@ int f_accesstime;		/* use time of last access */
 int f_column;			/* columnated format */
 int f_columnacross;		/* columnated format, sorted across */
 int f_flags;			/* show flags associated with a file */
+int f_grouponly;		/* long listing without owner */
+int f_humanize;			/* humanize the size field */
 int f_inode;			/* print inode */
 int f_listdir;			/* list actual directory, not contents */
 int f_listdot;			/* list files beginning with . */
@@ -98,6 +96,8 @@ int f_longform;			/* long listing format */
 int f_nonprint;			/* show unprintables as ? */
 int f_nosort;			/* don't sort output */
 int f_numericonly;		/* don't convert uid/gid to name */
+int f_octal;			/* print octal escapes for nongraphic characters */
+int f_octal_escape;		/* like f_octal but use C escapes if possible */
 int f_recursive;		/* ls subdirectories also */
 int f_reversesort;		/* reverse whatever sort is used */
 int f_sectime;			/* print the real time for all files */
@@ -114,7 +114,7 @@ ls_main(int argc, char *argv[])
 {
 	static char dot[] = ".", *dotav[] = { dot, NULL };
 	struct winsize win;
-	int ch, fts_options, notused;
+	int ch, fts_options;
 	int kflag = 0;
 	const char *p;
 
@@ -136,7 +136,7 @@ ls_main(int argc, char *argv[])
 		f_listdot = 1;
 
 	fts_options = FTS_PHYSICAL;
-	while ((ch = getopt(argc, argv, "1ACFLRSTWacdfgiklmnopqrstux")) != -1) {
+	while ((ch = getopt(argc, argv, "1ABCFLRSTWabcdfghiklmnopqrstuwx")) != -1) {
 		switch (ch) {
 		/*
 		 * The -1, -C, -l, -m and -x options all override each other so
@@ -151,9 +151,17 @@ ls_main(int argc, char *argv[])
 			f_columnacross = f_longform = f_singlecol = f_stream =
 			    0;
 			break;
+		case 'g':
+			if (f_grouponly != -1)
+				f_grouponly = 1;
+			f_longform = 1;
+			f_column = f_columnacross = f_singlecol = f_stream = 0;
+			break;
 		case 'l':
 			f_longform = 1;
 			f_column = f_columnacross = f_singlecol = f_stream = 0;
+			/* Never let -g take precedence over -l. */
+			f_grouponly = -1;
 			break;
 		case 'm':
 			f_stream = 1;
@@ -189,6 +197,18 @@ ls_main(int argc, char *argv[])
 		case 'A':
 			f_listdot = 1;
 			break;
+		/* the -B option turns off the -b, -q and -w options. */
+		case 'B':
+			f_nonprint = 0;
+			f_octal = 1;
+			f_octal_escape = 0;
+			break;
+		/* the -b option turns off the -B, -q and -w options. */
+		case 'b':
+			f_nonprint = 0;
+			f_octal = 0;
+			f_octal_escape = 1;
+			break;
 		/* The -d option turns off the -R option. */
 		case 'd':
 			f_listdir = 1;
@@ -197,14 +217,19 @@ ls_main(int argc, char *argv[])
 		case 'f':
 			f_nosort = 1;
 			break;
-		case 'g':		/* Compatibility with 4.3BSD. */
-			break;
 		case 'i':
 			f_inode = 1;
 			break;
 		case 'k':
 			blocksize = 1024;
 			kflag = 1;
+			break;
+		/*
+		 * The -h option forces all sizes to be measured in bytes.
+		 * It also makes -l suppress -s.
+		 */
+		case 'h':
+			f_humanize = 1;
 			break;
 		case 'n':
 			f_numericonly = 1;
@@ -215,8 +240,11 @@ ls_main(int argc, char *argv[])
 		case 'p':
 			f_typedir = 1;
 			break;
+		/* the -q option turns off the -B, -b and -w options. */
 		case 'q':
 			f_nonprint = 1;
+			f_octal = 0;
+			f_octal_escape = 0;
 			break;
 		case 'r':
 			f_reversesort = 1;
@@ -236,6 +264,12 @@ ls_main(int argc, char *argv[])
 		case 'W':
 			f_whiteout = 1;
 			break;
+		/* the -w option turns off the -B, -b and -q options. */
+		case 'w':
+			f_nonprint = 0;
+			f_octal = 0;
+			f_octal_escape = 0;
+			break;
 		default:
 		case '?':
 			usage();
@@ -243,6 +277,12 @@ ls_main(int argc, char *argv[])
 	}
 	argc -= optind;
 	argv += optind;
+
+	/*
+	 * If both -g and -l options, let -l take precedence.
+	 */
+	if (f_grouponly == -1)
+		f_grouponly = 0;
 
 	/*
 	 * If not -F, -i, -l, -p, -S, -s or -t options, don't require stat
@@ -268,9 +308,9 @@ ls_main(int argc, char *argv[])
 #endif
 
 	/* If -l or -s, figure out block size. */
-	if (f_longform || f_size) {
+	if (f_inode || f_longform || f_size) {
 		if (!kflag)
-			(void)getbsize(&notused, &blocksize);
+			(void)getbsize(NULL, &blocksize);
 		blocksize /= 512;
 	}
 
@@ -410,7 +450,7 @@ display(FTSENT *p, FTSENT *list)
 	DISPLAY d;
 	FTSENT *cur;
 	NAMES *np;
-	u_int64_t btotal, maxblock, maxsize;
+	u_int64_t btotal, stotal, maxblock, maxsize;
 	int maxinode, maxnlink, maxmajor, maxminor;
 	int bcfile, entries, flen, glen, ulen, maxflags, maxgroup, maxlen;
 	int maxuser, needstats;
@@ -439,7 +479,7 @@ display(FTSENT *p, FTSENT *list)
 	maxinode = maxnlink = 0;
 	bcfile = 0;
 	maxuser = maxgroup = maxflags = maxlen = 0;
-	btotal = maxblock = maxsize = 0;
+	btotal = stotal = maxblock = maxsize = 0;
 	maxmajor = maxminor = 0;
 	for (cur = list, entries = 0; cur; cur = cur->fts_link) {
 		if (cur->fts_info == FTS_ERR || cur->fts_info == FTS_NS) {
@@ -488,6 +528,7 @@ display(FTSENT *p, FTSENT *list)
 			}
 
 			btotal += sp->st_blocks;
+			stotal += sp->st_size;
 			if (f_longform) {
 				if (f_numericonly ||
 				    (user = user_from_uid(sp->st_uid, 0)) ==
@@ -542,16 +583,27 @@ display(FTSENT *p, FTSENT *list)
 	d.maxlen = maxlen;
 	if (needstats) {
 		d.btotal = btotal;
-		(void)snprintf(buf, sizeof(buf), "%llu", (long long)maxblock);
-		d.s_block = strlen(buf);
+		d.stotal = stotal;
+		if (f_humanize) {
+			d.s_block = 4; /* min buf length for humanize_number */
+		} else {
+			(void)snprintf(buf, sizeof(buf), "%llu",
+			    (long long)howmany(maxblock, blocksize));
+			d.s_block = strlen(buf);
+		}
 		d.s_flags = maxflags;
 		d.s_group = maxgroup;
 		(void)snprintf(buf, sizeof(buf), "%u", maxinode);
 		d.s_inode = strlen(buf);
 		(void)snprintf(buf, sizeof(buf), "%u", maxnlink);
 		d.s_nlink = strlen(buf);
-		(void)snprintf(buf, sizeof(buf), "%llu", (long long)maxsize);
-		d.s_size = strlen(buf);
+		if (f_humanize) {
+			d.s_size = 4; /* min buf length for humanize_number */
+		} else {
+			(void)snprintf(buf, sizeof(buf), "%llu",
+			    (long long)maxsize);
+			d.s_size = strlen(buf);
+		}
 		d.s_user = maxuser;
 		if (bcfile) {
 			(void)snprintf(buf, sizeof(buf), "%u", maxmajor);
