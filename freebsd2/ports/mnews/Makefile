@@ -22,10 +22,12 @@ DOCS=		FAQ.doc board.doc gnspool.doc mnews.doc prerel.doc	\
 SAMPLES=	_mnews.smp jnames.fj jnames.jp jnames.smp jnames.tnn
 
 GNSPOOL?=	0
+VERSION=	1.22
 
 do-configure:
 .for f in Makefile site_dep.h
 	${SED} -e s+@PREFIX@+${PREFIX}+ -e s+@GNSPOOL@+${GNSPOOL}+ \
+		-e s+@VERSION@+${VERSION}+ \
 		${FILESDIR}/$f.in > ${WRKSRC}/$f
 .endfor
 

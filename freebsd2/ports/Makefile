@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.10 1999/12/07 13:55:52 sumikawa Exp $
+# $Id: Makefile,v 1.11 1999/12/27 07:30:07 itojun Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -21,6 +21,7 @@ SUBDIR+=	kaffe
 SUBDIR+=	libident6
 SUBDIR+=	lynx
 SUBDIR+=	mediator
+SUBDIR+=	mnews
 SUBDIR+=	mozilla
 SUBDIR+=	mpg123
 SUBDIR+=	mrt
