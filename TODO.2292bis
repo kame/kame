@@ -1,20 +1,23 @@
 TODO list for the new advanced API (aka rfc2292bis)
 KAME project
-$Id: TODO.2292bis,v 1.1 1999/12/16 05:15:38 jinmei Exp $
+$Id: TODO.2292bis,v 1.2 1999/12/21 12:38:07 jinmei Exp $
 
 new socket options or ancillary data types:
-- IPV6_RTHDRDSTOPTS
-- IPV6_RECVPKTINFO
-- IPV6_RECVHOPLIMIT
-- IPV6_RECVRTHDR
-- IPV6_RECVHOPOPTS
-- IPV6_RECVDSTOPTS
-- IPV6_RECVRTHDRDSTOPTS
+- IPV6_RTHDRDSTOPTS	done/19991221	jinmei	*
+- IPV6_RECVPKTINFO	done/19991217	jinmei
+- IPV6_RECVHOPLIMIT	done/19991217	jinmei
+- IPV6_RECVRTHDR	done/19991217	jinmei
+- IPV6_RECVHOPOPTS	done/19991217	jinmei
+- IPV6_RECVDSTOPTS	done/19991217	jinmei	*
+- IPV6_RECVRTHDRDSTOPTS	done/19991217	jinmei
 - IPV6_USE_MIN_MTU
 - IPV6_RECVPATHMTU
 - IPV6_REACHCONF
+(*) the current implementation returns each dst opt header in a single
+    ancillary object, but the specfication requires that all headers is
+    stored in a single object.
 
-existing options whose semantics are changed in 2292bis:
+existing options whose semantics is changed in 2292bis:
 - IPV6_PKTINFO
 - IPV6_HOPLIMIT
 - IPV6_RTHDR
@@ -39,17 +42,19 @@ new library functions:
 - rexec_af()
 
 affected applications:
-- bgpd
-- hroute6d
-- mld6query
-- pim6dd
-- pim6sd
-- ping6
-- racoon
-- route6d
-- rtadvd
-- rtsol[d]
-- traceroute6
-- telnet
+Application	Status		Date		Commiter
+------------------------------------------------
+- bgpd		recvcode	19991221	jinmei
+- hroute6d	recvcode	19991221	jinmei
+- mld6query	(sendonly)
+- pim6dd	recvcode	19991221	jinmei
+- pim6sd	recvcode	19991221	jinmei
+- ping6		recvcode	19991221	jinmei
+- racoon	recvcode	19991221	jinmei
+- route6d	recvcode	19991221	jinmei
+- rtadvd	recvcode	19991221	jinmei
+- rtsol[d]	recvcode	19991221	jinmei
+- traceroute6	recvcode	19991221	jinmei
+- telnet(rthdr)
 - ports/packages...
 - maybe more...
