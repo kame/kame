@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.127 2001/02/19 04:40:37 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.128 2001/02/19 04:42:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1548,6 +1548,9 @@ nd6_ioctl(cmd, data, ifp)
 
 	switch (cmd) {
 	case SIOCGDRLST_IN6:
+		/*
+		 * obsolete API, use sysctl under net.inet6.icmp6
+		 */
 		bzero(drl, sizeof(*drl));
 #ifdef __NetBSD__
 		s = splsoftnet();
@@ -1576,6 +1579,9 @@ nd6_ioctl(cmd, data, ifp)
 		splx(s);
 		break;
 	case SIOCGPRLST_IN6:
+		/*
+		 * obsolete API, use sysctl under net.inet6.icmp6
+		 */
 		/*
 		 * XXX meaning of fields, especialy "raflags", is very
 		 * differnet between RA prefix list and RR/static prefix list.
