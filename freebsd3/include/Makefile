@@ -21,6 +21,7 @@ FILES=	a.out.h ar.h assert.h bitstring.h ctype.h db.h dirent.h disktab.h \
 .if defined(WANT_CSRG_LIBM)
 FILES+=	math.h
 .endif
+FILES+=	ifaddrs.h
 
 ARPAFILES=	ftp.h inet.h nameser.h nameser_compat.h telnet.h tftp.h
 

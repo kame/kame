@@ -22,6 +22,7 @@ FILES=	a.out.h ar.h assert.h bitstring.h blf.h bm.h cast.h cpio.h ctype.h \
 	(${MACHINE_ARCH} != "powerpc")
 FILES+=	dlfcn.h link.h
 .endif
+FILES+=	ifaddrs.h
 
 MFILES=	float.h frame.h stdarg.h varargs.h
 LFILES=	errno.h fcntl.h syslog.h termios.h
