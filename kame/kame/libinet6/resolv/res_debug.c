@@ -77,7 +77,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_debug.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_debug.c,v 1.4 2000/03/27 09:40:06 itojun Exp $";
+static char rcsid[] = "$Id: res_debug.c,v 1.5 2000/04/26 03:13:11 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/param.h>
@@ -1068,6 +1068,14 @@ __p_option(option)
 	case RES_DNSRCH:	return "dnsrch";
 	case RES_INSECURE1:	return "insecure1";
 	case RES_INSECURE2:	return "insecure2";
+	case RES_NOALIASES:	return "noaliases";
+	case RES_USE_INET6:	return "inet6";
+#ifdef RES_NOTLDQUERY	/* freebsd[34] only */
+	case RES_NOTLDQUERY:	return "no-tld-query";
+#endif
+#ifdef RES_USE_EDNS0	/* KAME extension */
+	case RES_USE_EDNS0:	return "edns0";
+#endif
 	default:		sprintf(nbuf, "?0x%lx?", (u_long)option);
 				return (nbuf);
 	}
