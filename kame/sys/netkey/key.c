@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.245 2002/06/12 03:38:04 itojun Exp $	*/
+/*	$KAME: key.c,v 1.246 2002/06/12 03:42:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -429,6 +429,7 @@ static struct mbuf *key_setsadblifetime __P((u_int16_t, u_int32_t,
 static struct mbuf *key_setsadbxpolicy __P((u_int16_t, u_int8_t,
 	u_int32_t));
 static void *key_newbuf __P((const void *, u_int));
+static int key_ismyaddr __P((struct sockaddr *));
 #ifdef INET6
 static int key_ismyaddr6 __P((struct sockaddr_in6 *));
 #endif
@@ -3857,7 +3858,7 @@ key_newbuf(src, len)
  * OUT:	1: true, i.e. my address.
  *	0: false
  */
-int
+static int
 key_ismyaddr(sa)
 	struct sockaddr *sa;
 {
