@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_vr.c,v 1.26 1999/09/25 17:29:01 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_vr.c,v 1.26.2.3 2000/07/17 21:24:39 archie Exp $
  */
 
 /*
@@ -75,11 +75,6 @@
 
 #include <net/bpf.h>
 
-#include "opt_bdg.h"
-#ifdef BRIDGE
-#include <net/bridge.h>
-#endif /* BRIDGE */
-
 #include <vm/vm.h>              /* for vtophys */
 #include <vm/pmap.h>            /* for vtophys */
 #include <machine/clock.h>      /* for DELAY */
@@ -105,7 +100,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_vr.c,v 1.26 1999/09/25 17:29:01 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_vr.c,v 1.26.2.3 2000/07/17 21:24:39 archie Exp $";
 #endif
 
 /*
@@ -116,6 +111,8 @@ static struct vr_type vr_devs[] = {
 		"VIA VT3043 Rhine I 10/100BaseTX" },
 	{ VIA_VENDORID, VIA_DEVICEID_RHINE_II,
 		"VIA VT86C100A Rhine II 10/100BaseTX" },
+	{ VIA_VENDORID, VIA_DEVICEID_RHINE_II_2,
+		"VIA VT6102 Rhine II 10/100BaseTX" },
 	{ DELTA_VENDORID, DELTA_DEVICEID_RHINE_II,
 		"Delta Electronics Rhine II 10/100BaseTX" },
 	{ ADDTRON_VENDORID, ADDTRON_DEVICEID_RHINE_II,
@@ -802,12 +799,9 @@ static int vr_attach(dev)
 	callout_handle_init(&sc->vr_stat_ch);
 
 	/*
-	 * Call MI attach routines.
+	 * Call MI attach routine.
 	 */
-	if_attach(ifp);
-	ether_ifattach(ifp);
-
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
 fail:
 	splx(s);
@@ -827,7 +821,7 @@ static int vr_detach(dev)
 	ifp = &sc->arpcom.ac_if;
 
 	vr_stop(sc);
-	if_detach(ifp);
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 
 	bus_generic_detach(dev);
 	device_delete_child(dev, sc->vr_miibus);
@@ -1043,37 +1037,6 @@ static void vr_rxeof(sc)
 
 		ifp->if_ipackets++;
 		eh = mtod(m, struct ether_header *);
-
-		/*
-		 * Handle BPF listeners. Let the BPF user see the packet, but
-		 * don't pass it up to the ether_input() layer unless it's
-		 * a broadcast packet, multicast packet, matches our ethernet
-		 * address or the interface is in promiscuous mode.
-		 */
-		if (ifp->if_bpf) {
-			bpf_mtap(ifp, m);
-			if (ifp->if_flags & IFF_PROMISC &&
-				(bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-						ETHER_ADDR_LEN) &&
-					(eh->ether_dhost[0] & 1) == 0)) {
-				m_freem(m);
-				continue;
-			}
-		}
-
-#ifdef BRIDGE
-		if (do_bridge) {
-			struct ifnet		*bdg_ifp;
-			bdg_ifp = bridge_in(m);
-			if (bdg_ifp != BDG_LOCAL && bdg_ifp != BDG_DROP)
-				bdg_forward(&m, bdg_ifp);
-			if (((bdg_ifp != BDG_LOCAL) && (bdg_ifp != BDG_BCAST) &&
-			    (bdg_ifp != BDG_MCAST)) || bdg_ifp == BDG_DROP) {
-				m_freem(m);
-				continue;
-			}
-		}
-#endif /* BRIDGE */
 
 		/* Remove header from mbuf and pass it on. */
 		m_adj(m, sizeof(struct ether_header));

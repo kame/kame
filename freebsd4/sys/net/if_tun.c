@@ -13,7 +13,7 @@
  * UCL. This driver is based much more on read/write/poll mode of
  * operation though.
  *
- * $FreeBSD: src/sys/net/if_tun.c,v 1.74 2000/02/16 04:04:36 mdodd Exp $
+ * $FreeBSD: src/sys/net/if_tun.c,v 1.74.2.1 2000/07/19 15:14:34 brian Exp $
  */
 
 #include "opt_inet.h"
@@ -37,6 +37,7 @@
 #include <sys/malloc.h>
 
 #include <net/if.h>
+#include <net/if_types.h>
 #include <net/route.h>
 #include <net/intrq.h>
 
@@ -125,6 +126,7 @@ tuncreate(dev)
 	ifp->if_start = tunstart;
 #endif
 	ifp->if_flags = IFF_POINTOPOINT | IFF_MULTICAST;
+	ifp->if_type = IFT_PPP;
 	IFQ_SET_MAXLEN(&ifp->if_snd, ifqmaxlen);
 	IFQ_SET_READY(&ifp->if_snd);
 	ifp->if_softc = sc;

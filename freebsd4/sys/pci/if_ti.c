@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_ti.c,v 1.25 2000/01/18 00:26:29 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.5 2000/07/17 21:24:39 archie Exp $
  */
 
 /*
@@ -122,13 +122,23 @@
 #include <pci/ti_fw.h>
 #include <pci/ti_fw2.h>
 
-#ifdef M_HWCKSUM
-/*#define TI_CSUM_OFFLOAD*/
+/*
+ * Temporarily disable the checksum offload support for now.
+ * Tests with ftp.freesoftware.com show that after about 12 hours,
+ * the firmware will begin calculating completely bogus TX checksums
+ * and refuse to stop until the interface is reset. Unfortunately,
+ * there isn't enough time to fully debug this before the 4.1
+ * release, so this will need to stay off for now.
+ */
+#ifdef notdef
+#define TI_CSUM_FEATURES	(CSUM_IP | CSUM_TCP | CSUM_UDP | CSUM_IP_FRAGS)
+#else
+#define TI_CSUM_FEATURES	0
 #endif
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_ti.c,v 1.25 2000/01/18 00:26:29 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_ti.c,v 1.25.2.5 2000/07/17 21:24:39 archie Exp $";
 #endif
 
 /*
@@ -632,7 +642,8 @@ static int ti_alloc_jumbo_mem(sc)
 		entry = malloc(sizeof(struct ti_jpool_entry), 
 			       M_DEVBUF, M_NOWAIT);
 		if (entry == NULL) {
-			free(sc->ti_cdata.ti_jumbo_buf, M_DEVBUF);
+			contigfree(sc->ti_cdata.ti_jumbo_buf, TI_JMEM,
+			           M_DEVBUF);
 			sc->ti_cdata.ti_jumbo_buf = NULL;
 			printf("ti%d: no memory for jumbo "
 			    "buffer queue!\n", sc->ti_unit);
@@ -792,11 +803,9 @@ static int ti_newbuf_std(sc, i, m)
 	r = &sc->ti_rdata->ti_rx_std_ring[i];
 	TI_HOSTADDR(r->ti_addr) = vtophys(mtod(m_new, caddr_t));
 	r->ti_type = TI_BDTYPE_RECV_BD;
-#ifdef TI_CSUM_OFFLOAD
-	r->ti_flags = TI_BDFLAG_TCP_UDP_CKSUM|TI_BDFLAG_IP_CKSUM;
-#else
 	r->ti_flags = 0;
-#endif
+	if (sc->arpcom.ac_if.if_hwassist)
+		r->ti_flags |= TI_BDFLAG_TCP_UDP_CKSUM | TI_BDFLAG_IP_CKSUM;
 	r->ti_len = m_new->m_len;
 	r->ti_idx = i;
 
@@ -835,9 +844,8 @@ static int ti_newbuf_mini(sc, i, m)
 	TI_HOSTADDR(r->ti_addr) = vtophys(mtod(m_new, caddr_t));
 	r->ti_type = TI_BDTYPE_RECV_BD;
 	r->ti_flags = TI_BDFLAG_MINI_RING;
-#ifdef TI_CSUM_OFFLOAD
-	r->ti_flags |= TI_BDFLAG_TCP_UDP_CKSUM|TI_BDFLAG_IP_CKSUM;
-#endif
+	if (sc->arpcom.ac_if.if_hwassist)
+		r->ti_flags |= TI_BDFLAG_TCP_UDP_CKSUM | TI_BDFLAG_IP_CKSUM;
 	r->ti_len = m_new->m_len;
 	r->ti_idx = i;
 
@@ -896,9 +904,8 @@ static int ti_newbuf_jumbo(sc, i, m)
 	TI_HOSTADDR(r->ti_addr) = vtophys(mtod(m_new, caddr_t));
 	r->ti_type = TI_BDTYPE_RECV_JUMBO_BD;
 	r->ti_flags = TI_BDFLAG_JUMBO_RING;
-#ifdef TI_CSUM_OFFLOAD
-	r->ti_flags |= TI_BDFLAG_TCP_UDP_CKSUM|TI_BDFLAG_IP_CKSUM;
-#endif
+	if (sc->arpcom.ac_if.if_hwassist)
+		r->ti_flags |= TI_BDFLAG_TCP_UDP_CKSUM | TI_BDFLAG_IP_CKSUM;
 	r->ti_len = m_new->m_len;
 	r->ti_idx = i;
 
@@ -1206,6 +1213,8 @@ static int ti_chipinit(sc)
 	/* Initialize link to down state. */
 	sc->ti_linkstat = TI_EV_CODE_LINK_DOWN;
 
+	sc->arpcom.ac_if.if_hwassist = TI_CSUM_FEATURES;
+
 	/* Set endianness before we access any non-PCI registers. */
 #if BYTE_ORDER == BIG_ENDIAN
 	CSR_WRITE_4(sc, TI_MISC_HOST_CTL,
@@ -1316,11 +1325,10 @@ static int ti_chipinit(sc)
 	 * Only allow 1 DMA channel to be active at a time.
 	 * I don't think this is a good idea, but without it
 	 * the firmware racks up lots of nicDmaReadRingFull
-	 * errors.
+	 * errors.  This is not compatible with hardware checksums.
 	 */
-#ifndef TI_CSUM_OFFLOAD
-	TI_SETBIT(sc, TI_GCR_OPMODE, TI_OPMODE_1_DMA_ACTIVE);
-#endif
+	if (sc->arpcom.ac_if.if_hwassist == 0)
+		TI_SETBIT(sc, TI_GCR_OPMODE, TI_OPMODE_1_DMA_ACTIVE);
 
 	/* Recommended settings from Tigon manual. */
 	CSR_WRITE_4(sc, TI_GCR_DMA_WRITECFG, TI_DMA_STATE_THRESH_8W);
@@ -1399,9 +1407,9 @@ static int ti_gibinit(sc)
 	TI_HOSTADDR(rcb->ti_hostaddr) = vtophys(&sc->ti_rdata->ti_rx_std_ring);
 	rcb->ti_max_len = TI_FRAMELEN;
 	rcb->ti_flags = 0;
-#ifdef TI_CSUM_OFFLOAD
-	rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM|TI_RCB_FLAG_IP_CKSUM;
-#endif
+	if (sc->arpcom.ac_if.if_hwassist)
+		rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM |
+		     TI_RCB_FLAG_IP_CKSUM | TI_RCB_FLAG_NO_PHDR_CKSUM;
 #if NVLAN > 0
 	rcb->ti_flags |= TI_RCB_FLAG_VLAN_ASSIST;
 #endif
@@ -1412,9 +1420,9 @@ static int ti_gibinit(sc)
 	    vtophys(&sc->ti_rdata->ti_rx_jumbo_ring);
 	rcb->ti_max_len = TI_JUMBO_FRAMELEN;
 	rcb->ti_flags = 0;
-#ifdef TI_CSUM_OFFLOAD
-	rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM|TI_RCB_FLAG_IP_CKSUM;
-#endif
+	if (sc->arpcom.ac_if.if_hwassist)
+		rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM |
+		     TI_RCB_FLAG_IP_CKSUM | TI_RCB_FLAG_NO_PHDR_CKSUM;
 #if NVLAN > 0
 	rcb->ti_flags |= TI_RCB_FLAG_VLAN_ASSIST;
 #endif
@@ -1432,9 +1440,9 @@ static int ti_gibinit(sc)
 		rcb->ti_flags = TI_RCB_FLAG_RING_DISABLED;
 	else
 		rcb->ti_flags = 0;
-#ifdef TI_CSUM_OFFLOAD
-	rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM|TI_RCB_FLAG_IP_CKSUM;
-#endif
+	if (sc->arpcom.ac_if.if_hwassist)
+		rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM |
+		     TI_RCB_FLAG_IP_CKSUM | TI_RCB_FLAG_NO_PHDR_CKSUM;
 #if NVLAN > 0
 	rcb->ti_flags |= TI_RCB_FLAG_VLAN_ASSIST;
 #endif
@@ -1474,6 +1482,9 @@ static int ti_gibinit(sc)
 #if NVLAN > 0
 	rcb->ti_flags |= TI_RCB_FLAG_VLAN_ASSIST;
 #endif
+	if (sc->arpcom.ac_if.if_hwassist)
+		rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM |
+		     TI_RCB_FLAG_IP_CKSUM | TI_RCB_FLAG_NO_PHDR_CKSUM;
 	rcb->ti_max_len = TI_TX_RING_CNT;
 	if (sc->ti_hwrev == TI_HWREV_TIGON)
 		TI_HOSTADDR(rcb->ti_hostaddr) = TI_TX_RING_BASE;
@@ -1683,7 +1694,8 @@ static int ti_attach(dev)
 		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->ti_irq);
 		bus_release_resource(dev, SYS_RES_MEMORY,
 		    TI_PCI_LOMEM, sc->ti_res);
-		free(sc->ti_rdata, M_DEVBUF);
+		contigfree(sc->ti_rdata, sizeof(struct ti_ring_data),
+		    M_DEVBUF);
 		error = ENXIO;
 		goto fail;
 	}
@@ -1723,12 +1735,9 @@ static int ti_attach(dev)
 	ifmedia_set(&sc->ifmedia, IFM_ETHER|IFM_AUTO);
 
 	/*
-	 * Call MI attach routines.
+	 * Call MI attach routine.
 	 */
-	if_attach(ifp);
-	ether_ifattach(ifp);
-
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
 fail:
 	splx(s);
@@ -1748,15 +1757,15 @@ static int ti_detach(dev)
 	sc = device_get_softc(dev);
 	ifp = &sc->arpcom.ac_if;
 
-	if_detach(ifp);
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 	ti_stop(sc);
 
 	bus_teardown_intr(dev, sc->ti_irq, sc->ti_intrhand);
 	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->ti_irq);
 	bus_release_resource(dev, SYS_RES_MEMORY, TI_PCI_LOMEM, sc->ti_res);
 
-	free(sc->ti_cdata.ti_jumbo_buf, M_DEVBUF);
-	free(sc->ti_rdata, M_DEVBUF);
+	contigfree(sc->ti_cdata.ti_jumbo_buf, TI_JMEM, M_DEVBUF);
+	contigfree(sc->ti_rdata, sizeof(struct ti_ring_data), M_DEVBUF);
 	ifmedia_removeall(&sc->ifmedia);
 
 	splx(s);
@@ -1791,9 +1800,6 @@ static void ti_rxeof(sc)
 #if NVLAN > 0
 		u_int16_t		vlan_tag = 0;
 		int			have_tag = 0;
-#endif
-#ifdef TI_CSUM_OFFLOAD
-		struct ip		*ip;
 #endif
 
 		cur_rx =
@@ -1857,32 +1863,16 @@ static void ti_rxeof(sc)
 		eh = mtod(m, struct ether_header *);
 		m->m_pkthdr.rcvif = ifp;
 
-		/*
-	 	 * Handle BPF listeners. Let the BPF user see the packet, but
-	 	 * don't pass it up to the ether_input() layer unless it's
-	 	 * a broadcast packet, multicast packet, matches our ethernet
-	 	 * address or the interface is in promiscuous mode.
-	 	 */
-		if (ifp->if_bpf) {
-			bpf_mtap(ifp, m);
-			if (ifp->if_flags & IFF_PROMISC &&
-				(bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-		 			ETHER_ADDR_LEN) &&
-					(eh->ether_dhost[0] & 1) == 0)) {
-				m_freem(m);
-				continue;
-			}
-		}
-
 		/* Remove header from mbuf and pass it on. */
 		m_adj(m, sizeof(struct ether_header));
 
-#ifdef TI_CSUM_OFFLOAD
-		ip = mtod(m, struct ip *);
-		if (!(cur_rx->ti_tcp_udp_cksum ^ 0xFFFF) &&
-		    !(ip->ip_off & htons(IP_MF | IP_OFFMASK | IP_RF)))
-			m->m_flags |= M_HWCKSUM;
-#endif
+		if (ifp->if_hwassist) {
+			m->m_pkthdr.csum_flags |= CSUM_IP_CHECKED |
+			    CSUM_DATA_VALID;
+			if ((cur_rx->ti_ip_cksum ^ 0xffff) == 0)
+				m->m_pkthdr.csum_flags |= CSUM_IP_VALID;
+			m->m_pkthdr.csum_data = cur_rx->ti_tcp_udp_cksum;
+		}
 
 #if NVLAN > 0
 		/*
@@ -2026,6 +2016,7 @@ static int ti_encap(sc, m_head, txidx)
 	struct ti_tx_desc	*f = NULL;
 	struct mbuf		*m;
 	u_int32_t		frag, cur, cnt = 0;
+	u_int16_t		csum_flags = 0;
 #if NVLAN > 0
 	struct ifvlan		*ifv = NULL;
 
@@ -2038,6 +2029,16 @@ static int ti_encap(sc, m_head, txidx)
 	m = m_head;
 	cur = frag = *txidx;
 
+	if (m_head->m_pkthdr.csum_flags) {
+		if (m_head->m_pkthdr.csum_flags & CSUM_IP)
+			csum_flags |= TI_BDFLAG_IP_CKSUM;
+		if (m_head->m_pkthdr.csum_flags & (CSUM_TCP | CSUM_UDP))
+			csum_flags |= TI_BDFLAG_TCP_UDP_CKSUM;
+		if (m_head->m_flags & M_LASTFRAG)
+			csum_flags |= TI_BDFLAG_IP_FRAG_END;
+		else if (m_head->m_flags & M_FRAG)
+			csum_flags |= TI_BDFLAG_IP_FRAG;
+	}
 	/*
  	 * Start packing the mbufs in this chain into
 	 * the fragment pointers. Stop when we run out
@@ -2065,7 +2066,7 @@ static int ti_encap(sc, m_head, txidx)
 				break;
 			TI_HOSTADDR(f->ti_addr) = vtophys(mtod(m, vm_offset_t));
 			f->ti_len = m->m_len;
-			f->ti_flags = 0;
+			f->ti_flags = csum_flags;
 #if NVLAN > 0
 			if (ifv != NULL) {
 				f->ti_flags |= TI_BDFLAG_VLAN_TAG;
@@ -2125,6 +2126,24 @@ static void ti_start(ifp)
 		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
+
+		/*
+		 * XXX
+		 * safety overkill.  If this is a fragmented packet chain
+		 * with delayed TCP/UDP checksums, then only encapsulate
+		 * it if we have enough descriptors to handle the entire
+		 * chain at once.
+		 * (paranoia -- may not actually be needed)
+		 */
+		if (m_head->m_flags & M_FIRSTFRAG &&
+		    m_head->m_pkthdr.csum_flags & (CSUM_DELAY_DATA)) {
+			if ((TI_TX_RING_CNT - sc->ti_txcnt) <
+			    m_head->m_pkthdr.csum_data + 16) {
+				IF_PREPEND(&ifp->if_snd, m_head);
+				ifp->if_flags |= IFF_OACTIVE;
+				break;
+			}
+		}
 
 		/*
 		 * Pack the data into the transmit ring. If we

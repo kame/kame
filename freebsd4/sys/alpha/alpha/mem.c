@@ -38,7 +38,7 @@
  *
  *	from: Utah $Hdr: mem.c 1.13 89/10/08$
  *	from: @(#)mem.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/alpha/alpha/mem.c,v 1.19 1999/11/07 12:01:27 phk Exp $
+ * $FreeBSD: src/sys/alpha/alpha/mem.c,v 1.19.2.3 2000/05/14 00:29:44 obrien Exp $
  */
 
 /*
@@ -219,16 +219,10 @@ kmemphys:
 				if (pmap_extract(kernel_pmap, addr) == 0)
 					return EFAULT;
 			
-#if defined(UVM)
-			if (!uvm_kernacc((caddr_t)v, c,
-			    uio->uio_rw == UIO_READ ? B_READ : B_WRITE))
-				return (EFAULT);
-#else
 			if (!kernacc((caddr_t)v, c,
 			    uio->uio_rw == UIO_READ ? 
 			    VM_PROT_READ : VM_PROT_WRITE))
 				return (EFAULT);
-#endif
 			error = uiomove((caddr_t)v, c, uio);
 			continue;
 		}

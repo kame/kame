@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_loop.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_loop.c,v 1.47 2000/02/13 03:31:55 peter Exp $
+ * $FreeBSD: src/sys/net/if_loop.c,v 1.47.2.3 2000/07/15 07:14:29 kris Exp $
  */
 
 /*
@@ -194,7 +194,7 @@ contiguousfail:
 		return (EAFNOSUPPORT);
 	}
 #endif
-	return(if_simloop(ifp, m, dst, 0));
+	return(if_simloop(ifp, m, dst->sa_family, 0));
 }
 
 /*
@@ -209,29 +209,30 @@ contiguousfail:
  */
 
 int
-if_simloop(ifp, m, dst, hlen)
+if_simloop(ifp, m, af, hlen)
 	struct ifnet *ifp;
 	struct mbuf *m;
-	struct sockaddr *dst;
+	int af;
 	int hlen;
 {
 	int s, isr;
 	register struct ifqueue *ifq = 0;
 
-	if ((m->m_flags & M_PKTHDR) == 0)
-		panic("if_simloop: no HDR");
+	KASSERT((m->m_flags & M_PKTHDR) != 0, ("if_simloop: no HDR"));
 	m->m_pkthdr.rcvif = ifp;
+
 	/* BPF write needs to be handled specially */
-	if (dst->sa_family == AF_UNSPEC) {
-		dst->sa_family = *(mtod(m, int *));
+	if (af == AF_UNSPEC) {
+		KASSERT(m->m_len >= sizeof(int), ("if_simloop: m_len"));
+		af = *(mtod(m, int *));
 		m->m_len -= sizeof(int);
 		m->m_pkthdr.len -= sizeof(int);
 		m->m_data += sizeof(int);
 	}
 
+	/* Let BPF see incoming packet */
 	if (ifp->if_bpf) {
 		struct mbuf m0, *n = m;
-		u_int af = dst->sa_family;
 
 		if (ifp->if_bpf->bif_dlt == DLT_NULL) {
 			/*
@@ -251,17 +252,19 @@ if_simloop(ifp, m, dst, hlen)
 
 	/* Strip away media header */
 	if (hlen > 0) {
+		m_adj(m, hlen);
 #ifdef __alpha__
 		/* The alpha doesn't like unaligned data.
 		 * We move data down in the first mbuf */
-		if (hlen & 3) {
-			bcopy(m->m_data + hlen, m->m_data, m->m_len - hlen);
-			m->m_len -= hlen;
-			if (m->m_flags & M_PKTHDR)
-				m->m_pkthdr.len -= hlen;
-		} else
+		if (mtod(m, vm_offset_t) & 3) {
+			KASSERT(hlen >= 3, ("if_simloop: hlen too small"));
+			bcopy(m->m_data, 
+			    (char *)(mtod(m, vm_offset_t) 
+				- (mtod(m, vm_offset_t) & 3)),
+			    m->m_len);
+			mtod(m,vm_offset_t) -= (mtod(m, vm_offset_t) & 3);
+		}
 #endif
-		m_adj(m, hlen);
 	}
 
 #ifdef ALTQ
@@ -296,7 +299,8 @@ if_simloop(ifp, m, dst, hlen)
 	}
 #endif /* ALTQ */
 
-	switch (dst->sa_family) {
+	/* Deliver to upper layer protocol */
+	switch (af) {
 #ifdef INET
 	case AF_INET:
 		ifq = &ipintrq;
@@ -329,7 +333,7 @@ if_simloop(ifp, m, dst, hlen)
 		break;
 #endif NETATALK
 	default:
-		printf("if_simloop: can't handle af=%d\n", dst->sa_family);
+		printf("if_simloop: can't handle af=%d\n", af);
 		m_freem(m);
 		return (EAFNOSUPPORT);
 	}

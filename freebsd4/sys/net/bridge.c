@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/bridge.c,v 1.16 2000/02/08 14:53:55 luigi Exp $
+ * $FreeBSD: src/sys/net/bridge.c,v 1.16.2.3 2000/07/21 04:48:56 nsayer Exp $
  */
 
 /*
@@ -31,9 +31,8 @@
  * A bridging table holds the source MAC address/dest. interface for each
  * known node. The table is indexed using an hash of the source address.
  *
- * Input packets are tapped near the end of the input routine in each
- * driver (near the call to bpf_mtap, or before the call to ether_input)
- * and analysed calling bridge_in(). Depending on the result, the packet
+ * Input packets are tapped near the beginning of ether_input(), and
+ * analysed by calling bridge_in(). Depending on the result, the packet
  * can be forwarded to one or more output interfaces using bdg_forward(),
  * and/or sent to the upper layer (e.g. in case of multicast).
  *
@@ -122,6 +121,7 @@
 #define DEB(x)
 
 static void bdginit(void *);
+static void bdgtakeifaces(void);
 static void flush_table(void);
 static void bdg_promisc_on(void);
 static void parse_bdg_cfg(void);
@@ -170,7 +170,7 @@ static struct bdg_softc *ifp2sc = NULL ;
 #define	IFP_CHK(ifp, x) \
 	if (ifp2sc[ifp->if_index].magic != 0xDEADBEEF) { x ; }
 
-#define	SAMECLUSTER(ifp,src,eh) \
+#define	SAMECLUSTER(ifp,src) \
 	(src == NULL || CLUSTER(ifp) == CLUSTER(src) )
 
 /*
@@ -329,6 +329,16 @@ sysctl_bdg_cfg SYSCTL_HANDLER_ARGS
     return error ;
 }
 
+static int
+sysctl_refresh SYSCTL_HANDLER_ARGS
+{
+    if (req->newptr)
+	    bdgtakeifaces();
+    
+    return 0;
+}
+
+
 SYSCTL_DECL(_net_link_ether);
 SYSCTL_PROC(_net_link_ether, OID_AUTO, bridge_cfg, CTLTYPE_STRING|CTLFLAG_RW,
 	    &bridge_cfg, sizeof(bridge_cfg), &sysctl_bdg_cfg, "A",
@@ -347,6 +357,9 @@ SYSCTL_INT(_net_link_ether, OID_AUTO, bridge_ipfw_drop,
 int bdg_ipfw_colls;
 SYSCTL_INT(_net_link_ether, OID_AUTO, bridge_ipfw_collisions,
 	CTLFLAG_RW, &bdg_ipfw_colls,0,"");
+
+SYSCTL_PROC(_net_link_ether, OID_AUTO, bridge_refresh, CTLTYPE_INT|CTLFLAG_WR,
+	    NULL, 0, &sysctl_refresh, "I", "iface refresh");
 
 #if 1 /* diagnostic vars */
 int bdg_in_count = 0 , bdg_in_ticks = 0 , bdg_fw_count = 0, bdg_fw_ticks = 0 ;
@@ -427,11 +440,6 @@ int bdg_ports ;
 static void
 bdginit(void *dummy)
 {
-    int i ;
-    struct ifnet *ifp;
-    struct arpcom *ac ;
-    u_char *eth_addr ;
-    struct bdg_softc *bp;
 
     if (bdg_table == NULL)
 	bdg_table = (struct hash_table *)
@@ -444,8 +452,23 @@ bdginit(void *dummy)
     bzero(ifp2sc, BDG_MAX_PORTS * sizeof(struct bdg_softc) );
 
     bzero(&bdg_stats, sizeof(bdg_stats) );
+    bdgtakeifaces();
+    bdg_timeout(0);
+    do_bridge=0;
+}
+    
+void
+bdgtakeifaces(void)
+{
+    int i ;
+    struct ifnet *ifp;
+    struct arpcom *ac ;
+    u_char *eth_addr ;
+    struct bdg_softc *bp;
+
     bdg_ports = 0 ;
     eth_addr = bdg_addresses ;
+    *bridge_cfg = '\0';
 
     printf("BRIDGE 990810, have %d interfaces\n", if_index);
     for (i = 0 , ifp = ifnet.tqh_first ; i < if_index ;
@@ -474,17 +497,13 @@ bdginit(void *dummy)
 	    bdg_ports ++ ;
 	}
 
-    bdg_timeout(0);
-    do_bridge=0;
 }
 
 /*
  * bridge_in() is invoked to perform bridging decision on input packets.
+ *
  * On Input:
- *   m		packet to be bridged. The mbuf need not to hold the
- *		whole packet, only the first 14 bytes suffice. We
- *		assume them to be contiguous. No alignment assumptions
- *		because they are not a problem on i386 class machines.
+ *   eh		Ethernet header of the incoming packet.
  *
  * On Return: destination of packet, one of
  *   BDG_BCAST	broadcast
@@ -497,16 +516,12 @@ bdginit(void *dummy)
  * to fetch more of the packet, or simply drop it completely.
  */
 
-
 struct ifnet *
-bridge_in(struct mbuf *m)
+bridge_in(struct ifnet *ifp, struct ether_header *eh)
 {
     int index;
-    struct ifnet *ifp = m->m_pkthdr.rcvif,  *dst , *old ;
+    struct ifnet *dst , *old ;
     int dropit = MUTED(ifp) ;
-    struct ether_header *eh;
-
-    eh = mtod(m, struct ether_header *);
 
     /*
      * hash the source address
@@ -552,7 +567,7 @@ bridge_in(struct mbuf *m)
 	bcopy(eh->ether_shost, bdg_table[index].etheraddr, 6);
 	bdg_table[index].name = ifp ;
     }
-    dst = bridge_dst_lookup(m);
+    dst = bridge_dst_lookup(eh);
     /* Return values:
      *   BDG_BCAST, BDG_MCAST, BDG_LOCAL, BDG_UNKNOWN, BDG_DROP, ifp.
      * For muted interfaces, the first 3 are changed in BDG_LOCAL,
@@ -606,7 +621,7 @@ bridge_in(struct mbuf *m)
  *    *m0  -- pointer to the packet (NULL if still existent)
  */
 int
-bdg_forward (struct mbuf **m0, struct ifnet *dst)
+bdg_forward(struct mbuf **m0, struct ether_header *const eh, struct ifnet *dst)
 {
     struct ifnet *src = (*m0)->m_pkthdr.rcvif; /* could be NULL in output */
     struct ifnet *ifp, *last = NULL ;
@@ -614,8 +629,6 @@ bdg_forward (struct mbuf **m0, struct ifnet *dst)
     int canfree = 0 ; /* can free the buf at the end if set */
     int once = 0;      /* loop only once */
     struct mbuf *m ;
-
-    struct ether_header *eh = mtod(*m0, struct ether_header *); /* XXX */
 
     if (dst == BDG_DROP) { /* this should not happen */
 	printf("xx bdg_forward for BDG_DROP\n");
@@ -649,7 +662,6 @@ bdg_forward (struct mbuf **m0, struct ifnet *dst)
      * ethernet header.
      */
     if (ip_fw_chk_ptr) {
-	u_int16_t dummy = 0 ;
 	struct ip_fw_chain *rule = NULL ;
 	int off;
 	struct ip *ip ;
@@ -665,7 +677,6 @@ bdg_forward (struct mbuf **m0, struct ifnet *dst)
 	    (*m0) = m = m->m_next ;
 
 	    src = m->m_pkthdr.rcvif; /* could be NULL in output */
-	    eh = mtod(m, struct ether_header *); /* XXX */
 	    canfree = 1 ; /* for sure, a copy is not needed later. */
 	    goto forward; /* HACK! I should obey the fw_one_pass */
 	}
@@ -674,6 +685,8 @@ bdg_forward (struct mbuf **m0, struct ifnet *dst)
 	    goto forward ;
 	if (src == NULL)
 	    goto forward ; /* do not apply to packets from ether_output */
+	if (ntohs(eh->ether_type) != ETHERTYPE_IP)
+	    goto forward ; /* not an IP packet, ipfw is not appropriate */
 	/*
 	 * In this section, canfree=1 means m is the same as *m0.
 	 * canfree==0 means m is a copy. We need to make a copy here
@@ -687,7 +700,7 @@ bdg_forward (struct mbuf **m0, struct ifnet *dst)
 	     * Need to make a copy (and for good measure, make sure that
 	     * the header is contiguous). The original is still in *m0
 	     */
-	    int needed = min(MHLEN, 14+max_protohdr) ;
+	    int needed = min(MHLEN, max_protohdr) ;
 	    needed = min(needed, (*m0)->m_len ) ;
 
 	    m = m_copypacket( (*m0), M_DONTWAIT);
@@ -695,8 +708,7 @@ bdg_forward (struct mbuf **m0, struct ifnet *dst)
 	        printf("-- bdg: m_copypacket failed.\n") ;
 		return ENOBUFS ;
 	    }
-	    m = m_pullup(m, needed) ;
-	    if ( m == NULL ) {
+	    if (m->m_len < needed && (m = m_pullup(m, needed)) == NULL) {
 		printf("-- bdg: pullup failed.\n") ;
 		return ENOBUFS ;
 	    }
@@ -706,8 +718,7 @@ bdg_forward (struct mbuf **m0, struct ifnet *dst)
 	 * before calling the firewall, swap fields the same as IP does.
 	 * here we assume the pkt is an IP one and the header is contiguous
 	 */
-	eh = mtod(m, struct ether_header *);
-	ip = (struct ip *)(eh + 1 ) ;
+	ip = mtod(m, struct ip *);
 	NTOHS(ip->ip_len);
 	NTOHS(ip->ip_id);
 	NTOHS(ip->ip_off);
@@ -716,7 +727,7 @@ bdg_forward (struct mbuf **m0, struct ifnet *dst)
 	 * The third parameter to the firewall code is the dst.  interface.
 	 * Since we apply checks only on input pkts we use NULL.
 	 */
-	off = (*ip_fw_chk_ptr)(NULL, 0, NULL, &dummy, &m, &rule, NULL) ;
+	off = (*ip_fw_chk_ptr)(&ip, 0, NULL, NULL, &m, &rule, NULL);
 
 	if (m == NULL) { /* pkt discarded by firewall */
 	    /*
@@ -731,11 +742,9 @@ bdg_forward (struct mbuf **m0, struct ifnet *dst)
 
 	/*
 	 * If we get here, the firewall has passed the pkt, but the
-	 * mbuf pointer might have changed. Restore eh, ip, and the
-	 * fields NTOHS()'d. Then, if canfree==1, also restore *m0.
+	 * mbuf pointer might have changed. Restore the fields NTOHS()'d.
+	 * Then, if canfree==1, also restore *m0.
 	 */
-	eh = mtod(m, struct ether_header *);
-	ip = (struct ip *)(eh + 1 ) ;
 	HTONS(ip->ip_len);
 	HTONS(ip->ip_id);
 	HTONS(ip->ip_off);
@@ -781,11 +790,10 @@ forward:
      * but better than having packets corrupt!
      */
     if (canfree == 0 ) {
-	int needed = min(MHLEN, 14+max_protohdr) ;
+	int needed = min(MHLEN, max_protohdr) ;
 	needed = min(needed, (*m0)->m_len ) ;
 
-	*m0 = m_pullup( *m0, needed) ;
-	if ( *m0 == NULL ) {
+	if ((*m0)->m_len < needed && (*m0 = m_pullup(*m0, needed)) == NULL) {
 	    printf("-- bdg: pullup failed.\n") ;
 	    return ENOBUFS ;
 	}
@@ -808,7 +816,7 @@ forward:
 		return ENOBUFS ; /* the original is still there... */
 	    }
 	    /*
-	     * Last part of ether_output: queue pkt and start
+	     * Last part of ether_output: add header, queue pkt and start
 	     * output if interface not yet active.
 	     */
 #ifdef ALTQ
@@ -818,6 +826,10 @@ forward:
 #endif
 	    mflags = m->m_flags;
 	    len = m->m_pkthdr.len;
+	    M_PREPEND(m, ETHER_HDR_LEN, M_DONTWAIT);
+	    if (m == NULL)
+		    return ENOBUFS;
+	    bcopy(eh, mtod(m, struct ether_header *), ETHER_HDR_LEN);
 	    s = splimp();
 #ifdef ALTQ
 	    IFQ_ENQUEUE(&last->if_snd, m, &pktattr, error);
@@ -847,7 +859,7 @@ forward:
 #endif
 		(ifp->if_flags & (IFF_UP|IFF_RUNNING)) ==
 			 (IFF_UP|IFF_RUNNING) &&
-		SAMECLUSTER(ifp, src, eh) && !MUTED(ifp) )
+		SAMECLUSTER(ifp, src) && !MUTED(ifp) )
 	    last = ifp ;
 	ifp = ifp->if_link.tqe_next ;
 	if (ifp == NULL)

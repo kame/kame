@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.c	8.3 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/net/if.c,v 1.85 2000/02/28 19:30:25 guido Exp $
+ * $FreeBSD: src/sys/net/if.c,v 1.85.2.2 2000/07/18 09:29:50 itojun Exp $
  */
 
 #include "opt_compat.h"
@@ -1109,11 +1109,10 @@ ifconf(cmd, data)
 						sizeof (ifr));
 				ifrp++;
 			} else {
-				if (space < sa->sa_len - sizeof(*sa))
+				if (space < sizeof (ifr) + sa->sa_len -
+					    sizeof(*sa))
 					break;
 				space -= sa->sa_len - sizeof(*sa);
-				if (space < sizeof (ifr))
-					break;
 				error = copyout((caddr_t)&ifr, (caddr_t)ifrp,
 						sizeof (ifr.ifr_name));
 				if (error == 0)
@@ -1138,8 +1137,6 @@ ifconf(cmd, data)
 			ifrp++;
 		}
 	}
-	if (space < 0)
-		panic("ifconf: space < 0");
 	ifc->ifc_len -= space;
 	return (error);
 }

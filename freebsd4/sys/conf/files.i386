@@ -1,7 +1,7 @@
 # This file tells config what files go into building a kernel,
 # files marked standard are always included.
 #
-# $FreeBSD: src/sys/conf/files.i386,v 1.307 2000/02/21 02:10:01 gj Exp $
+# $FreeBSD: src/sys/conf/files.i386,v 1.307.2.5 2000/07/07 00:29:27 obrien Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -20,14 +20,14 @@ svr4_genassym.o			optional	compat_svr4		   \
 	clean		"svr4_genassym.o"
 #
 linux_assym.h			optional	compat_linux		   \
-	dependency 	"linux_genassym.o"				   \
-	compile-with	"genassym linux_genassym.o > ${.TARGET}"	   \
+	dependency 	"$S/kern/genassym.sh linux_genassym.o"		   \
+	compile-with	"sh $S/kern/genassym.sh linux_genassym.o > ${.TARGET}" \
 	no-obj no-implicit-rule before-depend				   \
 	clean		"linux_assym.h"
 #
 svr4_assym.h			optional	compat_svr4		   \
-	dependency 	"svr4_genassym.o"			   	   \
-	compile-with	"genassym svr4_genassym.o > ${.TARGET}"		   \
+	dependency 	"$S/kern/genassym.sh svr4_genassym.o"	   	   \
+	compile-with	"sh $S/kern/genassym.sh svr4_genassym.o > ${.TARGET}" \
 	no-obj no-implicit-rule before-depend				   \
 	clean		"svr4_assym.h"
 #
@@ -60,6 +60,8 @@ trlld.o				optional	oltr			\
 contrib/dev/oltr/trlldbm.c	optional	oltr
 contrib/dev/oltr/trlldhm.c	optional	oltr
 contrib/dev/oltr/trlldmac.c	optional	oltr
+dev/advansys/adv_isa.c		optional	adv isa
+dev/aic/aic_isa.c		optional	aic isa
 dev/ata/ata-all.c		optional	ata 
 dev/ata/ata-dma.c		optional	ata 
 dev/ata/ata-disk.c		optional	atadisk
@@ -147,7 +149,7 @@ i386/i386/i686_mem.c		standard
 i386/i386/identcpu.c		standard
 i386/i386/in_cksum.c		optional	inet
 i386/i386/initcpu.c		standard
-#i386/i386/k6_mem.c		standard
+i386/i386/k6_mem.c		standard
 # locore.s needs to be handled in Makefile to put it first.  Otherwise it's
 # now normal.
 # i386/i386/locore.s		standard

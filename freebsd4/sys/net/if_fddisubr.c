@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	from: if_ethersubr.c,v 1.5 1994/12/13 22:31:45 wollman Exp
- * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.41 2000/02/13 03:31:55 peter Exp $
+ * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.41.2.2 2000/06/25 02:23:39 bp Exp $
  */
 
 #include "opt_atalk.h"
@@ -342,11 +342,11 @@ fddi_output(ifp, m, dst, rt0)
 			struct mbuf *n = m_copy(m, 0, (int)M_COPYALL);
 
 			(void) if_simloop(ifp,
-				n, dst, sizeof(struct fddi_header));
+				n, dst->sa_family, sizeof(struct fddi_header));
 	     	} else if (bcmp(fh->fddi_dhost,
 		    fh->fddi_shost, sizeof(fh->fddi_shost)) == 0) {
 			(void) if_simloop(ifp,
-				m, dst, sizeof(struct fddi_header));
+				m, dst->sa_family, sizeof(struct fddi_header));
 			return(0);	/* XXX */
 		}
 	}
@@ -362,12 +362,12 @@ fddi_output(ifp, m, dst, rt0)
 		senderr(ENOBUFS);
 	}
 	ifp->if_obytes += m->m_pkthdr.len;
+	if (m->m_flags & M_MCAST)
+		ifp->if_omcasts++;
 	IF_ENQUEUE(&ifp->if_snd, m);
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);
-	if (m->m_flags & M_MCAST)
-		ifp->if_omcasts++;
 	return (error);
 
 bad:

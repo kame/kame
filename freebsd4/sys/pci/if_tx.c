@@ -1,5 +1,5 @@
 /*	$OpenBSD: if_tx.c,v 1.3 1998/10/10 04:30:09 jason Exp $	*/
-/* $FreeBSD: src/sys/pci/if_tx.c,v 1.34 1999/12/21 11:14:10 eivind Exp $ */
+/* $FreeBSD: src/sys/pci/if_tx.c,v 1.34.2.2 2000/07/17 21:24:39 archie Exp $ */
 
 /*-
  * Copyright (c) 1997 Semen Ustimenko (semen@iclub.nsu.ru)
@@ -66,7 +66,6 @@
 	}
 
 #include "bpf.h"
-#include "opt_bdg.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -133,10 +132,6 @@
 
 #include <pci/pcivar.h>
 #include <pci/if_txvar.h>
-
-#ifdef BRIDGE
-#include <net/bridge.h>
-#endif
 
 #endif
 
@@ -579,12 +574,7 @@ epic_freebsd_attach(
 			      SHUTDOWN_PRI_DEFAULT);
 
 	/*  Attach to if manager */
-	if_attach(ifp);
-	ether_ifattach(ifp);
-
-#if NBPF > 0
-	bpfattach(ifp,DLT_EN10MB, sizeof(struct ether_header));
-#endif
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
 	splx(s);
 
@@ -944,58 +934,13 @@ epic_rx_done __P((
 		m->m_pkthdr.rcvif = &(sc->sc_if);
 		m->m_pkthdr.len = m->m_len = len;
 
+#if !defined(__FreeBSD__)
 #if NBPF > 0
 		/* Give mbuf to BPF */
 		if( sc->sc_if.if_bpf ) 
-#if defined(__FreeBSD__)
-			bpf_mtap( &sc->sc_if, m );
-#else /* __OpenBSD__ */
 			bpf_mtap( sc->sc_if.if_bpf, m );
-#endif /* __FreeBSD__ */
 #endif /* NBPF */
-
-#ifdef BRIDGE
-		if (do_bridge) {
-			struct ifnet *bdg_ifp ;
-			bdg_ifp = bridge_in(m);
-			if (bdg_ifp == BDG_DROP) {
-				if (m)
-					m_free(m);
-				continue; /* and drop */
-			}
-			if (bdg_ifp != BDG_LOCAL)
-				bdg_forward(&m, bdg_ifp);
-			if (bdg_ifp != BDG_LOCAL && bdg_ifp != BDG_BCAST &&
-				bdg_ifp != BDG_MCAST) {
-				if (m)
-					m_free(m);
-				continue; /* and drop */
-			}
-			/* all others accepted locally */
-		}
-#endif
-
-#if NBPF > 0
-#ifdef BRIDGE
-		/*
-		 * This deserves explanation
-		 * If the bridge is _on_, then the following check
-		 * must not be done because occasionally the bridge
-		 * gets packets that are local but have the ethernet
-		 * address of one of the other interfaces.
-		 *
-		 * But if the bridge is off, then we have to drop
-		 * stuff that came in just via bpf.
-		 */
-		if (!do_bridge)
-#endif
-		/* Accept only our packets, broadcasts and multicasts */
-		if( (eh->ether_dhost[0] & 1) == 0 &&
-		    bcmp(eh->ether_dhost,sc->sc_macaddr,ETHER_ADDR_LEN)){
-			m_freem(m);
-			continue;
-		}
-#endif
+#endif /* !__FreeBSD__ */
 
 		/* Second mbuf holds packet ifself */
 		m->m_pkthdr.len = m->m_len = len - sizeof(struct ether_header);

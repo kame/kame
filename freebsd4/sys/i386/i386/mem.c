@@ -38,7 +38,7 @@
  *
  *	from: Utah $Hdr: mem.c 1.13 89/10/08$
  *	from: @(#)mem.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/i386/mem.c,v 1.79 1999/12/26 11:44:45 bde Exp $
+ * $FreeBSD: src/sys/i386/i386/mem.c,v 1.79.2.3 2000/07/24 21:51:05 obrien Exp $
  */
 
 /*
@@ -47,19 +47,19 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/buf.h>
 #include <sys/conf.h>
 #include <sys/fcntl.h>
-#include <sys/buf.h>
-#include <sys/kernel.h>
-#include <sys/uio.h>
 #include <sys/ioccom.h>
+#include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/memrange.h>
 #include <sys/proc.h>
+#include <sys/random.h>
 #include <sys/signalvar.h>
+#include <sys/uio.h>
 
 #include <machine/frame.h>
-#include <sys/random.h>
 #include <machine/psl.h>
 #include <machine/specialreg.h>
 #include <i386/isa/intr_machdep.h>

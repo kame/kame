@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/i386/i386/machdep.c,v 1.385 2000/02/28 19:48:51 bsd Exp $
+ * $FreeBSD: src/sys/i386/i386/machdep.c,v 1.385.2.4 2000/07/20 10:35:14 kris Exp $
  */
 
 #include "apm.h"
@@ -72,10 +72,6 @@
 #include <sys/sysctl.h>
 #include <sys/vmmeter.h>
 #include <sys/bus.h>
-
-#ifdef SYSVSHM
-#include <sys/shm.h>
-#endif
 
 #ifdef SYSVMSG
 #include <sys/msg.h>
@@ -269,7 +265,7 @@ cpu_startup(dummy)
 	/*
 	 * Good {morning,afternoon,evening,night}.
 	 */
-	printf(version);
+	printf("%s", version);
 	earlysetcpuclass();
 	startrtclock();
 	printcpuinfo();
@@ -329,9 +325,6 @@ again:
 
 	valloc(callout, struct callout, ncallout);
 	valloc(callwheel, struct callout_tailq, callwheelsize);
-#ifdef SYSVSHM
-	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
-#endif
 #ifdef SYSVSEM
 	valloc(sema, struct semid_ds, seminfo.semmni);
 	valloc(sem, struct sem, seminfo.semmns);
@@ -345,13 +338,35 @@ again:
 	valloc(msqids, struct msqid_ds, msginfo.msgmni);
 #endif
 
+	/*
+	 * The nominal buffer size (and minimum KVA allocation) is BKVASIZE.
+	 * For the first 64MB of ram nominally allocate sufficient buffers to
+	 * cover 1/4 of our ram.  Beyond the first 64MB allocate additional
+	 * buffers to cover 1/20 of our ram over 64MB.
+	 *
+	 * factor represents the 1/4 x ram conversion.
+	 */
 	if (nbuf == 0) {
+		int factor = 4 * BKVASIZE / PAGE_SIZE;
+
 		nbuf = 50;
 		if (physmem > 1024)
-			nbuf += min((physmem - 1024) / 8, 2048);
+			nbuf += min((physmem - 1024) / factor, 16384 / factor);
 		if (physmem > 16384)
-			nbuf += (physmem - 16384) / 20;
+			nbuf += (physmem - 16384) * 2 / (factor * 5);
 	}
+
+	/*
+	 * Do not allow the buffer_map to be more then 1/2 the size of the
+	 * kernel_map.
+	 */
+	if (nbuf > (kernel_map->max_offset - kernel_map->min_offset) / 
+	    (BKVASIZE * 2)) {
+		nbuf = (kernel_map->max_offset - kernel_map->min_offset) / 
+		    (BKVASIZE * 2);
+		printf("Warning: nbufs capped at %d\n", nbuf);
+	}
+
 	nswbuf = max(min(nbuf/4, 256), 16);
 
 	valloc(swbuf, struct buf, nswbuf);

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_input.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_input.c,v 1.130 2000/02/23 20:11:57 guido Exp $
+ * $FreeBSD: src/sys/netinet/ip_input.c,v 1.130.2.5 2000/07/15 07:14:30 kris Exp $
  */
 
 #define	_IP_VHL
@@ -83,11 +83,6 @@
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
-#ifdef IPSEC_DEBUG
-#include <netkey/key_debug.h>
-#else
-#define KEYDEBUG(lev,arg)
-#endif
 #endif
 
 #include "faith.h"
@@ -324,10 +319,14 @@ ip_input(struct mbuf *m)
 		}
 		ip = mtod(m, struct ip *);
 	}
-	if (hlen == sizeof(struct ip)) {
-		sum = in_cksum_hdr(ip);
+	if (m->m_pkthdr.csum_flags & CSUM_IP_CHECKED) {
+		sum = !(m->m_pkthdr.csum_flags & CSUM_IP_VALID);
 	} else {
-		sum = in_cksum(m, hlen);
+		if (hlen == sizeof(struct ip)) {
+			sum = in_cksum_hdr(ip);
+		} else {
+			sum = in_cksum(m, hlen);
+		}
 	}
 	if (sum) {
 		ipstat.ips_badsum++;
@@ -846,6 +845,9 @@ ip_reass(m, fp, where)
 	 * our data already.  If so, drop the data from the incoming
 	 * segment.  If it provides all of our data, drop us, otherwise
 	 * stick new segment in the proper place.
+	 *
+	 * If some of the data is dropped from the the preceding
+	 * segment, then it's checksum is invalidated.
 	 */
 	if (p) {
 		i = GETIP(p)->ip_off + GETIP(p)->ip_len - ip->ip_off;
@@ -853,6 +855,7 @@ ip_reass(m, fp, where)
 			if (i >= ip->ip_len)
 				goto dropfrag;
 			m_adj(m, i);
+			m->m_pkthdr.csum_flags = 0;
 			ip->ip_off += i;
 			ip->ip_len -= i;
 		}
@@ -875,6 +878,7 @@ ip_reass(m, fp, where)
 			GETIP(q)->ip_len -= i;
 			GETIP(q)->ip_off += i;
 			m_adj(q, i);
+			q->m_pkthdr.csum_flags = 0;
 			break;
 		}
 		nq = q->m_nextpkt;
@@ -932,6 +936,8 @@ inserted:
 		nq = q->m_nextpkt;
 		q->m_nextpkt = NULL;
 		m_cat(m, q);
+		m->m_pkthdr.csum_flags &= q->m_pkthdr.csum_flags;
+		m->m_pkthdr.csum_data += q->m_pkthdr.csum_data;
 	}
 
 #ifdef IPDIVERT
@@ -1124,7 +1130,7 @@ ip_dooptions(m)
 				break;
 			}
 			off--;			/* 0 origin */
-			if ((off + sizeof(struct in_addr)) > optlen) {
+			if (off > optlen - (int)sizeof(struct in_addr)) {
 				/*
 				 * End of source route.  Should be for us.
 				 */
@@ -1188,7 +1194,7 @@ nosourcerouting:
 
 		case IPOPT_RR:
 			if (optlen < IPOPT_OFFSET + sizeof(*cp)) {
-				code = &cp[IPOPT_OLEN] - (u_char *)ip;
+				code = &cp[IPOPT_OFFSET] - (u_char *)ip;
 				goto bad;
 			}
 			if ((off = cp[IPOPT_OFFSET]) < IPOPT_MINOFF) {
@@ -1199,7 +1205,7 @@ nosourcerouting:
 			 * If no space remains, ignore.
 			 */
 			off--;			/* 0 origin */
-			if ((off + sizeof(struct in_addr)) > optlen)
+			if (off > optlen - (int)sizeof(struct in_addr))
 				break;
 			(void)memcpy(&ipaddr.sin_addr, &ip->ip_dst,
 			    sizeof(ipaddr.sin_addr));
@@ -1229,7 +1235,8 @@ nosourcerouting:
 				code = (u_char *)&ipt->ipt_ptr - (u_char *)ip;
 				goto bad;
 			}
-			if (ipt->ipt_ptr > ipt->ipt_len - sizeof(int32_t)) {
+			if (ipt->ipt_ptr >
+			    ipt->ipt_len - (int)sizeof(int32_t)) {
 				if (++ipt->ipt_oflw == 0) {
 					code = (u_char *)&ipt->ipt_ptr -
 					    (u_char *)ip;
@@ -1679,6 +1686,10 @@ ip_forward(m, srcrt)
 		code = 0;
 		break;
 #endif
+
+	case EACCES:			/* ipfw denied packet */
+		m_freem(mcopy);
+		return;
 	}
 	icmp_error(mcopy, type, code, dest, destifp);
 }

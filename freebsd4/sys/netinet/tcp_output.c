@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_output.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.39 2000/02/09 00:34:40 shin Exp $
+ * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.39.2.4 2000/07/15 07:14:31 kris Exp $
  */
 
 #include "opt_inet6.h"
@@ -76,6 +76,8 @@
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #endif /*IPSEC*/
+
+#include <machine/in_cksum.h>
 
 #ifdef notyet
 extern struct mbuf *m_copypack();
@@ -642,6 +644,7 @@ send:
 	ip = mtod(m, struct ip *);
 	ipov = (struct ipovly *)ip;
 	th = (struct tcphdr *)(ip + 1);
+	/* this picks up the pseudo header (w/o the length) */
 	bcopy((caddr_t)tp->t_template->tt_ipgen, (caddr_t)ip,
 	      sizeof(struct ip));
 	bcopy((caddr_t)&tp->t_template->tt_t, (caddr_t)th,
@@ -719,15 +722,15 @@ send:
 	else
 #endif /* INET6 */
       {
+	m->m_pkthdr.csum_flags = CSUM_TCP;
+	m->m_pkthdr.csum_data = offsetof(struct tcphdr, th_sum);
 	if (len + optlen)
-		ipov->ih_len = htons((u_short)(sizeof (struct tcphdr) +
-		    optlen + len));
-	th->th_sum = in_cksum(m, (int)(hdrlen + len));
-#ifdef INET6
-	/* Re-initialization for later version check */
-	ip->ip_v = IPVERSION;
-	
-#endif /* INET6 */
+		th->th_sum = in_addword(th->th_sum, 
+		    htons((u_short)(optlen + len)));
+
+	/* IP version must be set here for ipv4/ipv6 checking later */
+	KASSERT(ip->ip_v == IPVERSION,
+	    ("%s: IP version incorrect: %d", __FUNCTION__, ip->ip_v));
       }
 
 	/*
@@ -772,12 +775,12 @@ send:
 		 */
 		if (!callout_active(tp->tt_rexmt) &&
 		    tp->snd_nxt != tp->snd_una) {
-			callout_reset(tp->tt_rexmt, tp->t_rxtcur,
-				      tcp_timer_rexmt, tp);
 			if (callout_active(tp->tt_persist)) {
 				callout_stop(tp->tt_persist);
 				tp->t_rxtshift = 0;
 			}
+			callout_reset(tp->tt_rexmt, tp->t_rxtcur,
+				      tcp_timer_rexmt, tp);
 		}
 	} else
 		if (SEQ_GT(tp->snd_nxt + len, tp->snd_max))
@@ -859,6 +862,10 @@ send:
 	if (error) {
 out:
 		if (error == ENOBUFS) {
+	                if (!callout_active(tp->tt_rexmt) &&
+                            !callout_active(tp->tt_persist))
+	                        callout_reset(tp->tt_rexmt, tp->t_rxtcur,
+                                      tcp_timer_rexmt, tp);
 			tcp_quench(tp->t_inpcb, 0);
 			return (0);
 		}

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_var.h,v 1.18 1999/12/29 04:38:36 peter Exp $
+ * $FreeBSD: src/sys/net/if_var.h,v 1.18.2.4 2000/07/17 21:24:34 archie Exp $
  */
 
 #ifndef	_NET_IF_VAR_H_
@@ -157,6 +157,7 @@ typedef void if_init_f_t __P((void *));
 #define	if_hdrlen	if_data.ifi_hdrlen
 #define	if_metric	if_data.ifi_metric
 #define	if_baudrate	if_data.ifi_baudrate
+#define	if_hwassist	if_data.ifi_hwassist
 #define	if_ipackets	if_data.ifi_ipackets
 #define	if_ierrors	if_data.ifi_ierrors
 #define	if_opackets	if_data.ifi_opackets
@@ -444,10 +445,13 @@ extern	struct ifnet loif[];
 extern	int if_index;
 extern	struct ifaddr **ifnet_addrs;
 
-void	ether_ifattach __P((struct ifnet *));
+void	ether_ifattach __P((struct ifnet *, int));
+void	ether_ifdetach __P((struct ifnet *, int));
 void	ether_input __P((struct ifnet *, struct ether_header *, struct mbuf *));
+void	ether_demux __P((struct ifnet *, struct ether_header *, struct mbuf *));
 int	ether_output __P((struct ifnet *,
 	   struct mbuf *, struct sockaddr *, struct rtentry *));
+int	ether_output_frame __P((struct ifnet *, struct mbuf *));
 int	ether_ioctl __P((struct ifnet *, int, caddr_t));
 
 int	if_addmulti __P((struct ifnet *, struct sockaddr *,
@@ -483,8 +487,7 @@ void	ifafree __P((struct ifaddr *));
 
 struct	ifmultiaddr *ifmaof_ifpforaddr __P((struct sockaddr *,
 					    struct ifnet *));
-int	if_simloop __P((struct ifnet *ifp, struct mbuf *m,
-		struct sockaddr *dst, int hlen));
+int	if_simloop __P((struct ifnet *ifp, struct mbuf *m, int af, int hlen));
 
 #endif /* _KERNEL */
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_input.c	8.12 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.107 2000/03/11 11:20:52 shin Exp $
+ * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.107.2.3 2000/07/15 07:14:31 kris Exp $
  */
 
 #include "opt_ipfw.h"		/* for ipfw_fwd		*/
@@ -92,6 +92,8 @@ struct tcphdr tcp_savetcp;
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
 #endif /*IPSEC*/
+
+#include <machine/in_cksum.h>
 
 MALLOC_DEFINE(M_TSEGQ, "tseg_qent", "TCP segment queue entry");
 
@@ -431,17 +433,27 @@ tcp_input(m, off0, proto)
 	}
 	ip = mtod(m, struct ip *);
 	ipov = (struct ipovly *)ip;
-
-	/*
-	 * Checksum extended TCP header and data.
-	 */
-	tlen = ip->ip_len;
-	len = sizeof (struct ip) + tlen;
-	bzero(ipov->ih_x1, sizeof(ipov->ih_x1));
-	ipov->ih_len = (u_short)tlen;
-	HTONS(ipov->ih_len);
 	th = (struct tcphdr *)((caddr_t)ip + off0);
-	th->th_sum = in_cksum(m, len);
+	tlen = ip->ip_len;
+
+	if (m->m_pkthdr.csum_flags & CSUM_DATA_VALID) {
+		if (m->m_pkthdr.csum_flags & CSUM_PSEUDO_HDR)
+                	th->th_sum = m->m_pkthdr.csum_data;
+		else
+	                th->th_sum = in_pseudo(ip->ip_src.s_addr,
+			    ip->ip_dst.s_addr, htonl(m->m_pkthdr.csum_data +
+			    ip->ip_len + IPPROTO_TCP));
+		th->th_sum ^= 0xffff;
+	} else {
+		/*
+		 * Checksum extended TCP header and data.
+		 */
+		len = sizeof (struct ip) + tlen;
+		bzero(ipov->ih_x1, sizeof(ipov->ih_x1));
+		ipov->ih_len = (u_short)tlen;
+		HTONS(ipov->ih_len);
+		th->th_sum = in_cksum(m, len);
+	}
 	if (th->th_sum) {
 		tcpstat.tcps_rcvbadsum++;
 		goto drop;
