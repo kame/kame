@@ -1,4 +1,4 @@
-/*	$KAME: pfkey_dump.c,v 1.32 2001/09/25 14:16:48 sakane Exp $	*/
+/*	$KAME: pfkey_dump.c,v 1.33 2001/09/25 14:29:47 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -129,22 +129,6 @@ static char *str_mode[] = {
 	"any",
 	"transport",
 	"tunnel",
-};
-
-static char *str_upper[] = {
-/*0*/	"ip", "icmp", "igmp", "ggp", "ip4",
-	"", "tcp", "", "egp", "",
-/*10*/	"", "", "", "", "",
-	"", "", "udp", "", "",
-/*20*/	"", "", "idp", "", "",
-	"", "", "", "", "tp",
-/*30*/	"", "", "", "", "",
-	"", "", "", "", "",
-/*40*/	"", "ip6", "", "rt6", "frag6",
-	"", "rsvp", "gre", "", "",
-/*50*/	"esp", "ah", "", "", "",
-	"", "", "", "icmp6", "none",
-/*60*/	"dst6",
 };
 
 static char *str_state[] = {
@@ -555,10 +539,27 @@ str_upperspec(ulp, p1, p2)
 	if (ulp == IPSEC_ULPROTO_ANY)
 		printf("any");
 	if (ulp == IPPROTO_ICMPV6) {
+		printf("icmp6");
 		if (!(p1 == IPSEC_PORT_ANY && p2 == IPSEC_PORT_ANY))
-			printf("icmp6 %d,%d", p1, p2);
-	} else
-		GETMSGSTR(str_upper, ulp);
+			printf(" %d,%d", p1, p2);
+	} else {
+		struct protoent *ent;
+
+		switch (ulp) {
+		case IPPROTO_IPV4:
+			printf("ip4");
+			break;
+		default:
+			ent = getprotobynumber(ulp);
+			if (ent)
+				printf("%s", ent->p_name);
+			else
+				printf("%d", ulp);
+
+			endprotoent();
+			break;
+		}
+	}
 }
 
 /*
