@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.48 2002/05/29 02:01:00 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.49 2002/05/29 10:05:03 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -987,8 +987,6 @@ natpt_removeTSlotEntry(struct tSlot *ats)
 /*
  *
  */
-
-extern caddr_t	natptctl_vars[NATPTCTL_NUM];
 
 void
 natpt_init_tslot()
