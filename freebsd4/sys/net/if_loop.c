@@ -56,6 +56,7 @@
 #include <net/netisr.h>
 #include <net/route.h>
 #include <net/bpf.h>
+#include <net/bpfdesc.h>
 
 #ifdef	INET
 #include <netinet/in.h>
