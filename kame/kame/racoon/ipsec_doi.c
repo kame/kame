@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.83 2000/06/19 07:44:58 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.84 2000/07/04 01:01:09 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2674,7 +2674,6 @@ ipsecdoi_setph2proposal(iph2)
 	vchar_t *q;
 	struct ipsecdoi_sa_b *sab;
 	struct isakmp_pl_p *prop;
-	size_t propoff;
 
 	proposal = iph2->proposal;
 
@@ -2691,7 +2690,6 @@ ipsecdoi_setph2proposal(iph2)
 	sab->sit = htonl(IPSECDOI_SIT_IDENTITY_ONLY);	/* XXX configurable ? */
 
 	prop = NULL;
-	propoff = -1;
 	for (a = proposal; a; a = a->next) {
 		for (b = a->head; b; b = b->next) {
 			q = setph2proposal0(iph2, a, b);
@@ -2707,12 +2705,8 @@ ipsecdoi_setph2proposal(iph2)
 				return -1;
 			}
 			memcpy(iph2->sa->v + iph2->sa->l - q->l, q->v, q->l);
-			if (propoff >= 0) {
-				prop = (struct isakmp_pl_p *)(iph2->sa->v +
-					propoff);
-				prop->h.np = ISAKMP_NPTYPE_P;
-			}
-			propoff = iph2->sa->l - q->l;
+			prop = (struct isakmp_pl_p *)(iph2->sa->v + iph2->sa->l - q->l);
+			prop->h.np = ISAKMP_NPTYPE_P;
 
 			vfree(q);
 		}
