@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.116 2001/06/27 15:54:39 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.117 2001/06/28 06:21:04 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -100,6 +100,7 @@ static int pk_recvdelete __P((caddr_t *));
 static int pk_recvacquire __P((caddr_t *));
 static int pk_recvexpire __P((caddr_t *));
 static int pk_recvflush __P((caddr_t *));
+static int getsadbpolicy __P((caddr_t *, int *, int, struct ph2handle *));
 static int pk_recvspdupdate __P((caddr_t *));
 static int pk_recvspdadd __P((caddr_t *));
 static int pk_recvspddelete __P((caddr_t *));
@@ -1742,46 +1743,27 @@ pk_recvflush(mhp)
 }
 
 static int
-pk_recvspdupdate(mhp)
-	caddr_t *mhp;
-{
-	/* sanity check */
-	if (mhp[0] == NULL) {
-		plog(LLV_ERROR, LOCATION, NULL,
-			"inappropriate sadb spdupdate message passed.\n");
-		return -1;
-	}
-
-	return 0;
-}
-
-/*
- * this function has to be used by responder side.
- */
-int
-pk_sendspdadd2(iph2)
+getsadbpolicy(policy0, policylen0, type, iph2)
+	caddr_t *policy0;
+	int *policylen0, type;
 	struct ph2handle *iph2;
 {
-	struct policyindex *spidx;
-	struct saproto *pr;
-	u_int64_t ltime, vtime;
+	struct policyindex *spidx = (struct policyindex *)iph2->spidx_gen;
 	struct sadb_x_policy *xpl;
 	struct sadb_x_ipsecrequest *xisr;
-	u_int satype, mode;
-	caddr_t policy = NULL, p;
+	struct saproto *pr;
+	caddr_t policy, p;
 	int policylen;
-
-	spidx = (struct policyindex *)iph2->spidx_gen;
-
-	ltime = iph2->approval->lifetime;
-	vtime = 0;
+	u_int satype, mode;
 
 	/* get policy buffer size */
 	policylen = sizeof(struct sadb_x_policy);
-	for (pr = iph2->approval->head; pr; pr = pr->next) {
-		policylen += PFKEY_ALIGN8(sizeof(*xisr)
-		                   + iph2->src->sa_len
-		                   + iph2->dst->sa_len);
+	if (type != SADB_X_SPDDELETE) {
+		for (pr = iph2->approval->head; pr; pr = pr->next) {
+			policylen += PFKEY_ALIGN8(sizeof(*xisr)
+					   + iph2->src->sa_len
+					   + iph2->dst->sa_len);
+		}
 	}
 
 	/* make policy structure */
@@ -1796,8 +1778,13 @@ pk_sendspdadd2(iph2)
 	xpl->sadb_x_policy_len = PFKEY_UNIT64(policylen);
 	xpl->sadb_x_policy_exttype = SADB_X_EXT_POLICY;
 	xpl->sadb_x_policy_type = IPSEC_POLICY_IPSEC;
-	xpl->sadb_x_policy_dir = spidx->dir;	/* always inbound */
+	xpl->sadb_x_policy_dir = spidx->dir;
 	xpl->sadb_x_policy_id = 0;
+
+	/* no need to append policy information any more if type is SPDDELETE */
+	if (type == SADB_X_SPDDELETE)
+		goto end;
+
 	xisr = (struct sadb_x_ipsecrequest *)(xpl + 1);
 
 	for (pr = iph2->approval->head; pr; pr = pr->next) {
@@ -1806,13 +1793,13 @@ pk_sendspdadd2(iph2)
 		if (satype == ~0) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"invalid proto_id %d\n", pr->proto_id);
-			goto end;
+			goto err;
 		}
 		mode = ipsecdoi2pfkey_mode(pr->encmode);
 		if (mode == ~0) {
 			plog(LLV_ERROR, LOCATION, NULL,
 				"invalid encmode %d\n", pr->encmode);
-			goto end;
+			goto err;
 		}
 
 		/* 
@@ -1834,6 +1821,95 @@ pk_sendspdadd2(iph2)
 		xisr->sadb_x_ipsecrequest_len = PFKEY_ALIGN8(sizeof(*xisr)
 		                                           + iph2->src->sa_len
 		                                           + iph2->dst->sa_len);
+	}
+
+end:
+	*policy0 = policy;
+	*policylen0 = policylen;
+
+	return 0;
+
+err:
+	if (policy)
+		racoon_free(policy);
+
+	return -1;
+}
+
+int
+pk_sendspdupdate2(iph2)
+	struct ph2handle *iph2;
+{
+	struct policyindex *spidx = (struct policyindex *)iph2->spidx_gen;
+	caddr_t policy = NULL;
+	int policylen = 0;
+	u_int64_t ltime, vtime;
+
+	ltime = iph2->approval->lifetime;
+	vtime = 0;
+
+	if (getsadbpolicy(&policy, &policylen, SADB_X_SPDUPDATE, iph2)) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"getting sadb policy failed.\n");
+		return -1;
+	}
+
+	if (pfkey_send_spdupdate2(
+			lcconf->sock_pfkey,
+			(struct sockaddr *)&spidx->src,
+			spidx->prefs,
+			(struct sockaddr *)&spidx->dst,
+			spidx->prefd,
+			spidx->ul_proto,
+			ltime, vtime,
+			policy, policylen, 0) < 0) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"libipsec failed send spdupdate2 (%s)\n",
+			ipsec_strerror());
+		goto end;
+	}
+	plog(LLV_DEBUG, LOCATION, NULL, "call pfkey_send_spdupdate2\n");
+
+end:
+	if (policy)
+		racoon_free(policy);
+
+	return 0;
+}
+
+static int
+pk_recvspdupdate(mhp)
+	caddr_t *mhp;
+{
+	/* sanity check */
+	if (mhp[0] == NULL) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"inappropriate sadb spdupdate message passed.\n");
+		return -1;
+	}
+
+	return 0;
+}
+
+/*
+ * this function has to be used by responder side.
+ */
+int
+pk_sendspdadd2(iph2)
+	struct ph2handle *iph2;
+{
+	struct policyindex *spidx = (struct policyindex *)iph2->spidx_gen;
+	caddr_t policy = NULL;
+	int policylen = 0;
+	u_int64_t ltime, vtime;
+
+	ltime = iph2->approval->lifetime;
+	vtime = 0;
+
+	if (getsadbpolicy(&policy, &policylen, SADB_X_SPDADD, iph2)) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"getting sadb policy failed.\n");
+		return -1;
 	}
 
 	if (pfkey_send_spdadd2(
@@ -1912,30 +1988,15 @@ int
 pk_sendspddelete(iph2)
 	struct ph2handle *iph2;
 {
-	struct policyindex *spidx;
-	struct sadb_x_policy *xpl;
+	struct policyindex *spidx = (struct policyindex *)iph2->spidx_gen;
 	caddr_t policy = NULL;
 	int policylen;
 
-	spidx = (struct policyindex *)iph2->spidx_gen;
-
-	/* get policy buffer size */
-	policylen = sizeof(struct sadb_x_policy);
-
-	/* make policy structure */
-	policy = racoon_malloc(policylen);
-	if (!policy) {
+	if (getsadbpolicy(&policy, &policylen, SADB_X_SPDDELETE, iph2)) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"buffer allocation failed.\n");
+			"getting sadb policy failed.\n");
 		return -1;
 	}
-
-	xpl = (struct sadb_x_policy *)policy;
-	xpl->sadb_x_policy_len = PFKEY_UNIT64(policylen);
-	xpl->sadb_x_policy_exttype = SADB_X_EXT_POLICY;
-	xpl->sadb_x_policy_type = IPSEC_POLICY_IPSEC;
-	xpl->sadb_x_policy_dir = spidx->dir;
-	xpl->sadb_x_policy_id = 0;
 
 	if (pfkey_send_spddelete(
 			lcconf->sock_pfkey,
