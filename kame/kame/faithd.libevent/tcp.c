@@ -124,17 +124,22 @@ tcp_doaccept(parent, event, arg)
 	conf = config_match((struct sockaddr *)&from,
 	    (struct sockaddr *)&relayto);
 	if (!conf || !conf->permit) {
-		char dst4[NI_MAXHOST], serv[NI_MAXSERV];
+		char src6[NI_MAXHOST], dst4[NI_MAXHOST];
+		char sserv[NI_MAXSERV], dserv[NI_MAXSERV];
 
+		getnameinfo((struct sockaddr *)&from, fromlen, src6,
+		    sizeof(src6), sserv, sizeof(sserv), NI_NUMERICHOST);
 		getnameinfo((struct sockaddr *)&relayto, relaytolen, dst4,
-		    sizeof(dst4), serv, sizeof(serv), NI_NUMERICHOST);
+		    sizeof(dst4), dserv, sizeof(dserv), NI_NUMERICHOST);
 		if (conf)
 			syslog(LOG_ERR,
-			    "translation to [%s]:%s not permitted for %s",
-			    dst4, serv, prefix_string(&conf->match));
+			    "translation from [%s]:%s to [%s]:%s not permitted for %s",
+			    src6, sserv, dst4, dserv,
+			    prefix_string(&conf->match));
 		else
 			syslog(LOG_ERR,
-			    "translation to [%s]:%s not permitted", dst4, serv);
+			    "translation from [%s]:%s to [%s]:%s not permitted",
+			    src6, sserv, dst4, dserv);
 		close(relay->r.s);
 		free(relay);
 		return;
