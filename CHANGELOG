@@ -1,11 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.243 1999/11/02 04:43:33 itojun Exp $
+$Id: CHANGELOG,v 1.244 1999/11/02 10:19:31 itojun Exp $
 
 <199911>
 Tue Nov  2 13:27:36 JST 1999  itojun@iijlab.net
-	* freebsd2/ports/sendmail.beta: add port directory for sendmail
-	  8.10.0beta6, to stress-test IPv6 part of it.
+	* freebsd2/ports/sendmail.beta, netbsd/pkgsrc/mail/sendmail.beta:
+	  add port directory for sendmail 8.10.0beta6, to stress-test IPv6
+	  part of it.
 
 Tue Nov  2 01:46:01 JST 1999  itojun@iijlab.net
 	* bsdi3/bin/ping6: move bsdi3/sbin/ping6 into bsdi3/bin/ping6, as
