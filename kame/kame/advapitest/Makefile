@@ -46,7 +46,7 @@ sender: sender.o common.o
 #	$(CC) $(CFLAGS) -o $@  receiver.o $(LDFLAGS) $(LIBS)
 
 accept: accept.o common.o
-	$(CC) $(CFLAGS) -o $@ sender.o common.o $(LDFLAGS) $(LIBS)
+	$(CC) $(CFLAGS) -o $@ accept.o common.o $(LDFLAGS) $(LIBS)
 
 connect: connect.o
 	$(CC) $(CFLAGS) -o $@ connect.o $(LDFLAGS) $(LIBS)
