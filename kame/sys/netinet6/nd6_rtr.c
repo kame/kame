@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.197 2002/03/29 05:25:11 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.198 2002/05/26 23:07:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -227,7 +227,7 @@ nd6_ra_input(m, off, icmp6len)
 	int off, icmp6len;
 {
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
-	struct nd_ifinfo *ndi = &nd_ifinfo[ifp->if_index];
+	struct nd_ifinfo *ndi = NDI(ifp);
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	struct nd_router_advert *nd_ra;
 	struct sockaddr_in6 *src_sa6;
@@ -246,7 +246,7 @@ nd6_ra_input(m, off, icmp6len)
 	 */
 	if (ip6_accept_rtadv == 0)
 		goto freeit;
-	if (!(nd_ifinfo[ifp->if_index].flags & ND6_IFF_ACCEPT_RTADV))
+	if (!(ndi->flags & ND6_IFF_ACCEPT_RTADV))
 		goto freeit;
 
 	if (ip6->ip6_hlim != 255) {

@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.117 2002/05/14 13:31:33 keiichi Exp $	*/
+/*	$KAME: in6_proto.c,v 1.118 2002/05/26 23:07:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -552,7 +552,8 @@ struct domain inet6domain =
 #endif
 #endif
       offsetof(struct sockaddr_in6, sin6_addr) << 3,
-      sizeof(struct sockaddr_in6) };
+      sizeof(struct sockaddr_in6),
+      in6_domifattach, in6_domifdetach, };
 
 #ifdef __FreeBSD__
 DOMAIN_SET(inet6);

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.272 2002/05/20 06:30:33 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.273 2002/05/26 23:07:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -700,26 +700,19 @@ in6_control(so, cmd, data, ifp)
 	case SIOCGIFSTAT_IN6:
 		if (ifp == NULL)
 			return EINVAL;
-		if (in6_ifstat == NULL || ifp->if_index >= in6_ifstatmax
-		 || in6_ifstat[ifp->if_index] == NULL) {
-			/* return EAFNOSUPPORT? */
-			bzero(&ifr->ifr_ifru.ifru_stat,
-				sizeof(ifr->ifr_ifru.ifru_stat));
-		} else
-			ifr->ifr_ifru.ifru_stat = *in6_ifstat[ifp->if_index];
+		bzero(&ifr->ifr_ifru.ifru_stat,
+		    sizeof(ifr->ifr_ifru.ifru_stat));
+		ifr->ifr_ifru.ifru_stat =
+		    *((struct in6_ifextra *)ifp->if_afdata[AF_INET6])->in6_ifstat;
 		break;
 
 	case SIOCGIFSTAT_ICMP6:
 		if (ifp == NULL)
 			return EINVAL;
-		if (icmp6_ifstat == NULL || ifp->if_index >= icmp6_ifstatmax ||
-		    icmp6_ifstat[ifp->if_index] == NULL) {
-			/* return EAFNOSUPPORT? */
-			bzero(&ifr->ifr_ifru.ifru_stat,
-				sizeof(ifr->ifr_ifru.ifru_icmp6stat));
-		} else
-			ifr->ifr_ifru.ifru_icmp6stat =
-				*icmp6_ifstat[ifp->if_index];
+		bzero(&ifr->ifr_ifru.ifru_stat,
+		    sizeof(ifr->ifr_ifru.ifru_icmp6stat));
+		ifr->ifr_ifru.ifru_icmp6stat =
+		    *((struct in6_ifextra *)ifp->if_afdata[AF_INET6])->icmp6_ifstat;
 		break;
 
 	case SIOCGIFALIFETIME_IN6:
@@ -2843,6 +2836,43 @@ in6_setmaxmtu()
 	}
 	if (maxmtu)	     /* update only when maxmtu is positive */
 		in6_maxmtu = maxmtu;
+}
+
+void *
+in6_domifattach(ifp)
+	struct ifnet *ifp;
+{
+	struct in6_ifextra *ext;
+
+	ext = (struct in6_ifextra *)malloc(sizeof(*ext), M_IFADDR, M_WAITOK);
+	bzero(ext, sizeof(*ext));
+
+	ext->in6_ifstat = (struct in6_ifstat *)malloc(sizeof(struct in6_ifstat),
+	    M_IFADDR, M_WAITOK);
+	bzero(ext->in6_ifstat, sizeof(*ext->in6_ifstat));
+
+	ext->icmp6_ifstat =
+	    (struct icmp6_ifstat *)malloc(sizeof(struct icmp6_ifstat), M_IFADDR,
+	    M_WAITOK);
+	bzero(ext->icmp6_ifstat, sizeof(*ext->icmp6_ifstat));
+
+	ext->nd_ifinfo = nd6_ifattach(ifp);
+	ext->scope6_id = scope6_ifattach(ifp);
+	return ext;
+}
+
+void
+in6_domifdetach(ifp, aux)
+	struct ifnet *ifp;
+	void *aux;
+{
+	struct in6_ifextra *ext = (struct in6_ifextra *)aux;
+
+	scope6_ifdetach(ext->scope6_id);
+	nd6_ifdetach(ext->nd_ifinfo);
+	free(ext->in6_ifstat, M_IFADDR);
+	free(ext->icmp6_ifstat, M_IFADDR);
+	free(ext, M_IFADDR);
 }
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.252 2002/05/03 03:11:49 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.253 2002/05/26 23:07:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -133,8 +133,6 @@ int nd6_debug = 0;
 static int nd6_inuse, nd6_allocated;
 
 struct llinfo_nd6 llinfo_nd6 = {&llinfo_nd6, &llinfo_nd6};
-static size_t nd_ifinfo_indexlim = 8;
-struct nd_ifinfo *nd_ifinfo = NULL;
 struct nd_drhead nd_defrouter;
 struct nd_prhead nd_prefix = { 0 };
 
@@ -203,39 +201,15 @@ nd6_init()
 #endif
 }
 
-void
+struct nd_ifinfo *
 nd6_ifattach(ifp)
 	struct ifnet *ifp;
 {
+	struct nd_ifinfo *nd;
 
-	/*
-	 * We have some arrays that should be indexed by if_index.
-	 * since if_index will grow dynamically, they should grow too.
-	 */
-	if (nd_ifinfo == NULL || if_index >= nd_ifinfo_indexlim) {
-		size_t n;
-		caddr_t q;
+	nd = (struct nd_ifinfo *)malloc(sizeof(*nd), M_IP6NDP, M_WAITOK);
 
-		while (if_index >= nd_ifinfo_indexlim)
-			nd_ifinfo_indexlim <<= 1;
-
-		/* grow nd_ifinfo */
-		n = nd_ifinfo_indexlim * sizeof(struct nd_ifinfo);
-		q = (caddr_t)malloc(n, M_IP6NDP, M_WAITOK);
-		bzero(q, n);
-		if (nd_ifinfo) {
-			bcopy((caddr_t)nd_ifinfo, q, n/2);
-			free((caddr_t)nd_ifinfo, M_IP6NDP);
-		}
-		nd_ifinfo = (struct nd_ifinfo *)q;
-	}
-
-#define ND nd_ifinfo[ifp->if_index]
-
-	/* Don't initialize if called twice. */
-	if (ND.initialized)
-		return;
-	ND.initialized = 1;
+	nd->initialized = 1;
 
 #ifdef DIAGNOSTIC
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
@@ -246,18 +220,27 @@ nd6_ifattach(ifp)
 		panic("nd6_ifattach: ifindex2ifnet is NULL");
 #endif
 #endif
-	ND.chlim = IPV6_DEFHLIM;
-	ND.basereachable = REACHABLE_TIME;
-	ND.reachable = ND_COMPUTE_RTIME(ND.basereachable);
-	ND.retrans = RETRANS_TIMER;
+	nd->chlim = IPV6_DEFHLIM;
+	nd->basereachable = REACHABLE_TIME;
+	nd->reachable = ND_COMPUTE_RTIME(nd->basereachable);
+	nd->retrans = RETRANS_TIMER;
 	/*
 	 * Note that the default value of ip6_accept_rtadv is 0, which means
 	 * we won't accept RAs by default even if we set ND6_IFF_ACCEPT_RTADV
 	 * here.
 	 */
-	ND.flags = (ND6_IFF_PERFORMNUD | ND6_IFF_ACCEPT_RTADV);
+	nd->flags = (ND6_IFF_PERFORMNUD | ND6_IFF_ACCEPT_RTADV);
 	nd6_setmtu(ifp);
-#undef ND
+
+	return nd;
+}
+
+void
+nd6_ifdetach(nd)
+	struct nd_ifinfo *nd;
+{
+
+	free(nd, M_IP6NDP);
 }
 
 void
@@ -267,7 +250,7 @@ nd6_setmtu(ifp)
 #ifndef MIN
 #define MIN(a,b) ((a) < (b) ? (a) : (b))
 #endif
-	struct nd_ifinfo *ndi = &nd_ifinfo[ifp->if_index];
+	struct nd_ifinfo *ndi = NDI(ifp);
 
 	switch (ifp->if_type) {
 	case IFT_ARCNET:	/* XXX MTU handling needs more work */
@@ -518,7 +501,7 @@ nd6_timer(ignored_arg)
 			ln = next;
 			continue;
 		}
-		ndi = &nd_ifinfo[ifp->if_index];
+		ndi = NDI(ifp);
 		dst = (struct sockaddr_in6 *)rt_key(rt);
 
 		if (ln->ln_expire > time_second) {
@@ -540,7 +523,7 @@ nd6_timer(ignored_arg)
 			if (ln->ln_asked < nd6_mmaxtries) {
 				ln->ln_asked++;
 				ln->ln_expire = time_second +
-					ND6_RETRANS_SEC(nd_ifinfo[ifp->if_index].retrans);
+					ND6_RETRANS_SEC(NDI(ifp)->retrans);
 				nd6_ns_output(ifp, NULL, dst, ln, 0);
 			} else {
 				struct mbuf *m = ln->ln_hold;
@@ -591,7 +574,7 @@ nd6_timer(ignored_arg)
 			if (ln->ln_asked < nd6_umaxtries) {
 				ln->ln_asked++;
 				ln->ln_expire = time_second +
-					ND6_RETRANS_SEC(nd_ifinfo[ifp->if_index].retrans);
+					ND6_RETRANS_SEC(NDI(ifp)->retrans);
 				nd6_ns_output(ifp, dst, dst, ln, 0);
 			} else {
 				next = nd6_free(rt, 0);
@@ -862,15 +845,6 @@ nd6_purge(ifp)
 		}
 		ln = nln;
 	}
-
-	/*
-	 * Reset the ND info so that the entry can be reinitialized for another
-	 * entry later.  It should be enough to zero-clear the "initialized"
-	 * member, but we clear the entire structure for safety.
-	 */
-	bzero(&nd_ifinfo[ifp->if_index], sizeof(struct nd_ifinfo));
-	/* the following is redundant, but make the intention clear */
-	nd_ifinfo[ifp->if_index].initialized = 0;
 }
 
 struct rtentry *
@@ -1219,8 +1193,7 @@ nd6_nud_hint(rt, dst6, force)
 
 	ln->ln_state = ND6_LLINFO_REACHABLE;
 	if (ln->ln_expire)
-		ln->ln_expire = time_second +
-			nd_ifinfo[rt->rt_ifp->if_index].reachable;
+		ln->ln_expire = time_second + NDI(rt->rt_ifp)->reachable;
 }
 
 void
@@ -1673,36 +1646,22 @@ nd6_ioctl(cmd, data, ifp)
 
 		break;
 	case OSIOCGIFINFO_IN6:
-		if (!nd_ifinfo || i >= nd_ifinfo_indexlim) {
-			error = EINVAL;
-			break;
-		}
 		/* XXX: old ndp(8) assumes a positive value for linkmtu. */
 		ndi->ndi.linkmtu = IN6_LINKMTU(ifp);
-		ndi->ndi.maxmtu = nd_ifinfo[ifp->if_index].maxmtu;
-		ndi->ndi.basereachable =
-		    nd_ifinfo[ifp->if_index].basereachable;
-		ndi->ndi.reachable = nd_ifinfo[ifp->if_index].reachable;
-		ndi->ndi.retrans = nd_ifinfo[ifp->if_index].retrans;
-		ndi->ndi.flags = nd_ifinfo[ifp->if_index].flags;
-		ndi->ndi.recalctm = nd_ifinfo[ifp->if_index].recalctm;
-		ndi->ndi.chlim = nd_ifinfo[ifp->if_index].chlim;
-		ndi->ndi.receivedra = nd_ifinfo[ifp->if_index].receivedra;
+		ndi->ndi.maxmtu = NDI(ifp)->maxmtu;
+		ndi->ndi.basereachable = NDI(ifp)->basereachable;
+		ndi->ndi.reachable = NDI(ifp)->reachable;
+		ndi->ndi.retrans = NDI(ifp)->retrans;
+		ndi->ndi.flags = NDI(ifp)->flags;
+		ndi->ndi.recalctm = NDI(ifp)->recalctm;
+		ndi->ndi.chlim = NDI(ifp)->chlim;
+		ndi->ndi.receivedra = NDI(ifp)->receivedra;
 		break;
 	case SIOCGIFINFO_IN6:
-		if (!nd_ifinfo || i >= nd_ifinfo_indexlim) {
-			error = EINVAL;
-			break;
-		}
-		ndi->ndi = nd_ifinfo[ifp->if_index];
+		ndi->ndi = *NDI(ifp);
 		break;
 	case SIOCSIFINFO_FLAGS:
-		/* XXX: almost all other fields of ndi->ndi is unused */
-		if (!nd_ifinfo || i >= nd_ifinfo_indexlim) {
-			error = EINVAL;
-			break;
-		}
-		nd_ifinfo[ifp->if_index].flags = ndi->ndi.flags;
+		NDI(ifp)->flags = ndi->ndi.flags;
 		break;
 	case SIOCSNDFLUSH_IN6:	/* XXX: the ioctl name is confusing... */
 		/* sync kernel routing table with the default router list */
@@ -2069,9 +2028,11 @@ nd6_slowtimo(ignored_arg)
 	timeout(nd6_slowtimo, (caddr_t)0, ND6_SLOWTIMER_INTERVAL * hz);
 #endif
 	for (i = 1; i < if_index + 1; i++) {
-		if (!nd_ifinfo || i >= nd_ifinfo_indexlim)
-			continue;
-		nd6if = &nd_ifinfo[i];
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+		nd6if = NDI(ifindex2ifnet(i));
+#else
+		nd6if = NDI(ifindex2ifnet[i]);
+#endif
 		if (nd6if->basereachable && /* already initialized */
 		    (nd6if->recalctm -= ND6_SLOWTIMER_INTERVAL) <= 0) {
 			/*
@@ -2211,7 +2172,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	}
 	if (!ln || !rt) {
 		if ((ifp->if_flags & IFF_POINTOPOINT) == 0 &&
-		    !(nd_ifinfo[ifp->if_index].flags & ND6_IFF_PERFORMNUD)) {
+		    !(NDI(ifp)->flags & ND6_IFF_PERFORMNUD)) {
 			log(LOG_DEBUG,
 			    "nd6_output: can't allocate llinfo for %s "
 			    "(ln=%p, rt=%p)\n",
@@ -2273,7 +2234,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	if (ln->ln_expire && ln->ln_asked == 0) {
 		ln->ln_asked++;
 		ln->ln_expire = time_second +
-			ND6_RETRANS_SEC(nd_ifinfo[ifp->if_index].retrans);
+			ND6_RETRANS_SEC(NDI(ifp)->retrans);
 		nd6_ns_output(ifp, NULL, dst, ln, 0);
 	}
 	return(0);

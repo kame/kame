@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.111 2002/05/14 13:31:33 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.112 2002/05/26 23:07:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -576,13 +576,13 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		 * Rule 9: prefer addresses on "preferred" interfaces.
 		 * This is a KAME specific rule.
 		 */
-#define NDI_BEST (nd_ifinfo[ia_best->ia_ifp->if_index])
-#define NDI_NEW  (nd_ifinfo[ia->ia_ifp->if_index])
-		if ((NDI_BEST.flags & ND6_IFF_PREFER_SOURCE) &&
-		    !(NDI_NEW.flags & ND6_IFF_PREFER_SOURCE))
+#define NDI_BEST NDI(ia_best->ia_ifp)
+#define NDI_NEW  NDI(ia->ia_ifp)
+		if ((NDI_BEST->flags & ND6_IFF_PREFER_SOURCE) &&
+		    !(NDI_NEW->flags & ND6_IFF_PREFER_SOURCE))
 			NEXT(9);
-		if (!(NDI_BEST.flags & ND6_IFF_PREFER_SOURCE) &&
-		    (NDI_NEW.flags & ND6_IFF_PREFER_SOURCE))
+		if (!(NDI_BEST->flags & ND6_IFF_PREFER_SOURCE) &&
+		    (NDI_NEW->flags & ND6_IFF_PREFER_SOURCE))
 			REPLACE(9);
 #undef NDI_BEST
 #undef NDI_NEW
@@ -946,7 +946,7 @@ in6_selecthlim(in6p, ifp)
 	if (in6p && in6p->in6p_hops >= 0)
 		return(in6p->in6p_hops);
 	else if (ifp)
-		return(nd_ifinfo[ifp->if_index].chlim);
+		return(NDI(ifp)->chlim);
 	else
 		return(ip6_defhlim);
 }

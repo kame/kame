@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.304 2002/05/24 09:03:49 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.305 2002/05/26 23:07:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2606,16 +2606,16 @@ icmp6_reflect(m, off)
 	ip6->ip6_vfc |= IPV6_VERSION;
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	if (outif)
-		ip6->ip6_hlim = nd_ifinfo[outif->if_index].chlim;
+		ip6->ip6_hlim = NDI(outif)->chlim;
 	else if (m->m_pkthdr.rcvif) {
 		/* XXX: This may not be the outgoing interface */
-		ip6->ip6_hlim = nd_ifinfo[m->m_pkthdr.rcvif->if_index].chlim;
+		ip6->ip6_hlim = NDI(m->m_pkthdr.rcvif)->chlim;
 	} else
 		ip6->ip6_hlim = ip6_defhlim;
 
 	icmp6->icmp6_cksum = 0;
 	icmp6->icmp6_cksum = in6_cksum(m, IPPROTO_ICMPV6,
-					sizeof(struct ip6_hdr), plen);
+	    sizeof(struct ip6_hdr), plen);
 
 	/*
 	 * XXX option handling

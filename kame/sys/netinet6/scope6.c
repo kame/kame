@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.31 2002/05/25 12:07:38 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.32 2002/05/26 23:07:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -50,40 +50,15 @@ int ip6_use_defzone = 1;
 int ip6_use_defzone = 0;
 #endif
 
-struct scope6_id {
-	/*
-	 * 16 is correspondent to 4bit multicast scope field.
-	 * i.e. from node-local to global with some reserved/unassigned types.
-	 */
-	u_int32_t s6id_list[16];
-};
-static size_t if_indexlim = 8;
-struct scope6_id *scope6_ids = NULL;
+static struct scope6_id sid_default;
+#define SID(ifp) \
+	(((struct in6_ifextra *)(ifp)->if_afdata[AF_INET6])->scope6_id)
 
-/*
- * Set default scope zone IDs for as many interfaces as possible.
- * This is important when an interface is somehow used for IPv6 before
- * activating (i.e. making it up) the interface.
- * XXX: we still need scope6_ifattach() for the case where an interface
- * can be attached or purged dynamically.
- */
 void
 scope6_init()
 {
-	struct ifnet *ifp;
-	int i;
 
-	for (i = 1; i <= if_index; i++) {
-#if defined(__FreeBSD__) && __FreeBSD__ >= 5
-		ifp = ifnet_byindex(i);
-#else
-		ifp = ifindex2ifnet[i];
-#endif
-		if (ifp == NULL) /* in some OSes this can happen */
-			continue;
-
-		scope6_ifattach(ifp);
-	}
+	bzero(&sid_default, sizeof(sid_default));
 }
 
 /*
@@ -91,7 +66,7 @@ scope6_init()
  * even if the interface has not become up.  We'll need a hook in net/if.c
  * for this.
  */
-void
+struct scope6_id *
 scope6_ifattach(ifp)
 	struct ifnet *ifp;
 {
@@ -100,52 +75,32 @@ scope6_ifattach(ifp)
 #else
 	int s = splnet();
 #endif
+	struct scope6_id *sid;
 
-	/*
-	 * We have some arrays that should be indexed by if_index.
-	 * since if_index will grow dynamically, they should grow too.
-	 */
-	if (scope6_ids == NULL || if_index >= if_indexlim) {
-		size_t n;
-		caddr_t q;
-
-		while (if_index >= if_indexlim)
-			if_indexlim <<= 1;
-
-		/* grow scope index array */
-		n = if_indexlim * sizeof(struct scope6_id);
-		/* XXX: need new malloc type? */
-		q = (caddr_t)malloc(n, M_IFADDR, M_WAITOK);
-		bzero(q, n);
-		if (scope6_ids) {
-			bcopy((caddr_t)scope6_ids, q, n/2);
-			free((caddr_t)scope6_ids, M_IFADDR);
-		}
-		scope6_ids = (struct scope6_id *)q;
-	}
-
-#define SID scope6_ids[ifp->if_index]
-
-	/* don't initialize if called twice */
-	if (SID.s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL]) {
-		splx(s);
-		return;
-	}
+	sid = (struct scope6_id *)malloc(sizeof(*sid), M_IFADDR, M_WAITOK);
 
 	/*
 	 * XXX: IPV6_ADDR_SCOPE_xxx macros are not standard.
 	 * Should we rather hardcode here?
 	 */
-	SID.s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL] = ifp->if_index;
-	SID.s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL] = ifp->if_index;
+	sid->s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL] = ifp->if_index;
+	sid->s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL] = ifp->if_index;
 #ifdef MULTI_SCOPE
 	/* by default, we don't care about scope boundary for these scopes. */
-	SID.s6id_list[IPV6_ADDR_SCOPE_SITELOCAL] = 1;
-	SID.s6id_list[IPV6_ADDR_SCOPE_ORGLOCAL] = 1;
+	sid->s6id_list[IPV6_ADDR_SCOPE_SITELOCAL] = 1;
+	sid->s6id_list[IPV6_ADDR_SCOPE_ORGLOCAL] = 1;
 #endif
-#undef SID
 
 	splx(s);
+	return sid;
+}
+
+void
+scope6_ifdetach(sid)
+	struct scope6_id *sid;
+{
+
+	free(sid, M_IFADDR);
 }
 
 int
@@ -155,8 +110,9 @@ scope6_set(ifp, idlist)
 {
 	int i, s;
 	int error = 0;
+	struct scope6_id *sid = SID(ifp);
 
-	if (scope6_ids == NULL)	/* paranoid? */
+	if (!sid)	/* paranoid? */
 		return(EINVAL);
 
 	/*
@@ -176,8 +132,7 @@ scope6_set(ifp, idlist)
 #endif
 
 	for (i = 0; i < 16; i++) {
-		if (idlist[i] &&
-		    idlist[i] != scope6_ids[ifp->if_index].s6id_list[i]) {
+		if (idlist[i] && idlist[i] != sid->s6id_list[i]) {
 			/*
 			 * An interface zone ID must be the corresponding
 			 * interface index by definition.
@@ -205,7 +160,7 @@ scope6_set(ifp, idlist)
 			 * but we simply set the new value in this initial
 			 * implementation.
 			 */
-			scope6_ids[ifp->if_index].s6id_list[i] = idlist[i];
+			sid->s6id_list[i] = idlist[i];
 		}
 	}
 	splx(s);
@@ -213,16 +168,18 @@ scope6_set(ifp, idlist)
 	return(error);
 }
 
+/* NO BOUND CHECK, BAD API */
 int
 scope6_get(ifp, idlist)
 	struct ifnet *ifp;
 	u_int32_t *idlist;
 {
-	if (scope6_ids == NULL)	/* paranoid? */
+	struct scope6_id *sid = SID(ifp);
+
+	if (sid == NULL)	/* paranoid? */
 		return(EINVAL);
 
-	bcopy(scope6_ids[ifp->if_index].s6id_list, idlist,
-	      sizeof(scope6_ids[ifp->if_index].s6id_list));
+	bcopy(sid->s6id_list, idlist, sizeof(sid->s6id_list));
 
 	return(0);
 }
@@ -304,14 +261,11 @@ in6_addr2zoneid(ifp, addr, ret_id)
 {
 	int scope;
 	u_int32_t zoneid = 0;
+	struct scope6_id *sid = SID(ifp);
 
 #ifdef DIAGNOSTIC
-	if (scope6_ids == NULL) { /* should not happen */
+	if (sid == NULL) { /* should not happen */
 		panic("in6_addr2zoneid: scope array is NULL");
-		/* NOTREACHED */
-	}
-	if (ifp->if_index >= if_indexlim) {
-		panic("in6_addr2zoneid: invalid interface");
 		/* NOTREACHED */
 	}
 	if (ret_id == NULL) {
@@ -335,22 +289,21 @@ in6_addr2zoneid(ifp, addr, ret_id)
 
 	scope = in6_addrscope(addr);
 
-#define SID scope6_ids[ifp->if_index]
 	switch (scope) {
 	case IPV6_ADDR_SCOPE_INTFACELOCAL: /* should be interface index */
-		zoneid = SID.s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL];
+		zoneid = sid->s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL];
 		break;
 
 	case IPV6_ADDR_SCOPE_LINKLOCAL:
-		zoneid = SID.s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL];
+		zoneid = sid->s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL];
 		break;
 
 	case IPV6_ADDR_SCOPE_SITELOCAL:
-		zoneid = SID.s6id_list[IPV6_ADDR_SCOPE_SITELOCAL];
+		zoneid = sid->s6id_list[IPV6_ADDR_SCOPE_SITELOCAL];
 		break;
 
 	case IPV6_ADDR_SCOPE_ORGLOCAL:
-		zoneid = SID.s6id_list[IPV6_ADDR_SCOPE_ORGLOCAL];
+		zoneid = sid->s6id_list[IPV6_ADDR_SCOPE_ORGLOCAL];
 		break;
 
 	default:
@@ -360,7 +313,6 @@ in6_addr2zoneid(ifp, addr, ret_id)
 
 	*ret_id = zoneid;
 	return(0);	
-#undef SID
 }
 
 void
@@ -374,26 +326,24 @@ scope6_setdefault(ifp)
 	 * "interface" and provide a user interface to set the default.
 	 */
 	if (ifp) {
-		scope6_ids[0].s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL] =
+		sid_default.s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL] =
 			ifp->if_index;
-		scope6_ids[0].s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL] =
+		sid_default.s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL] =
 			ifp->if_index;
 	}
 	else {
-		scope6_ids[0].s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL] = 0;
-		scope6_ids[0].s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL] = 0;
+		sid_default.s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL] = 0;
+		sid_default.s6id_list[IPV6_ADDR_SCOPE_LINKLOCAL] = 0;
 	}
 }
 
+/* NO BOUND CHECK, BAD API */
 int
 scope6_get_default(idlist)
 	u_int32_t *idlist;
 {
-	if (scope6_ids == NULL)	/* paranoid? */
-		return(EINVAL);
 
-	bcopy(scope6_ids[0].s6id_list, idlist,
-	      sizeof(scope6_ids[0].s6id_list));
+	bcopy(sid_default.s6id_list, idlist, sizeof(sid_default.s6id_list));
 
 	return(0);
 }
@@ -409,7 +359,7 @@ scope6_addr2default(addr)
 	if (IN6_IS_ADDR_LOOPBACK(addr))
 		return(0);
 
-	return(scope6_ids[0].s6id_list[in6_addrscope(addr)]);
+	return(sid_default.s6id_list[in6_addrscope(addr)]);
 }
 
 /*

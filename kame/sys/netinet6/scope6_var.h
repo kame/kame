@@ -1,4 +1,4 @@
-/*	$KAME: scope6_var.h,v 1.7 2002/05/25 12:07:38 jinmei Exp $	*/
+/*	$KAME: scope6_var.h,v 1.8 2002/05/26 23:07:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -33,8 +33,17 @@
 #define _NETINET6_SCOPE6_VAR_H_
 
 #ifdef _KERNEL
+struct scope6_id {
+	/*
+	 * 16 is correspondent to 4bit multicast scope field.
+	 * i.e. from node-local to global with some reserved/unassigned types.
+	 */
+	u_int32_t s6id_list[16];
+};
+
 void	scope6_init __P((void));
-void	scope6_ifattach __P((struct ifnet *));
+struct scope6_id *scope6_ifattach __P((struct ifnet *));
+void	scope6_ifdetach __P((struct scope6_id *));
 int	scope6_set __P((struct ifnet *, u_int32_t *));
 int	scope6_get __P((struct ifnet *, u_int32_t *));
 void	scope6_setdefault __P((struct ifnet *));

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.86 2002/05/26 06:22:58 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.87 2002/05/26 23:07:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -100,10 +100,13 @@ struct nd_ifinfo {
 #define ND6_IFF_ACCEPT_RTADV	0x2
 #define ND6_IFF_PREFER_SOURCE	0x4 /* XXX: not related to ND. */
 
+#ifdef _KERNEL
+#define NDI(ifp) \
+	(((struct in6_ifextra *)(ifp)->if_afdata[AF_INET6])->nd_ifinfo)
 #define IN6_LINKMTU(ifp) \
-	((nd_ifinfo[(ifp)->if_index].linkmtu && \
-	  nd_ifinfo[(ifp)->if_index].linkmtu < (ifp)->if_mtu) \
-		? nd_ifinfo[(ifp)->if_index].linkmtu : (ifp)->if_mtu)
+	((NDI(ifp)->linkmtu && NDI(ifp)->linkmtu < (ifp)->if_mtu) \
+		? NDI(ifp)->linkmtu : (ifp)->if_mtu)
+#endif
 
 struct in6_nbrinfo {
 	char ifname[IFNAMSIZ];	/* if name, e.g. "en0" */
@@ -329,7 +332,6 @@ extern int nd6_useloopback;
 extern int nd6_maxnudhint;
 extern int nd6_gctimer;
 extern struct llinfo_nd6 llinfo_nd6;
-extern struct nd_ifinfo *nd_ifinfo;
 extern struct nd_drhead nd_defrouter;
 extern struct nd_prhead nd_prefix;
 extern int nd6_debug;
@@ -386,7 +388,8 @@ union nd_opts {
 /* XXX: need nd6_var.h?? */
 /* nd6.c */
 void nd6_init __P((void));
-void nd6_ifattach __P((struct ifnet *));
+struct nd_ifinfo *nd6_ifattach __P((struct ifnet *));
+void nd6_ifdetach __P((struct nd_ifinfo *));
 int nd6_is_addr_neighbor __P((struct sockaddr_in6 *, struct ifnet *));
 void nd6_option_init __P((void *, int, union nd_opts *));
 struct nd_opt_hdr *nd6_option __P((union nd_opts *));

@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.77 2002/03/21 02:38:19 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.78 2002/05/26 23:07:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -87,6 +87,15 @@ struct in6_addrlifetime {
 	time_t ia6t_preferred;	/* preferred lifetime expiration time */
 	u_int32_t ia6t_vltime;	/* valid lifetime */
 	u_int32_t ia6t_pltime;	/* prefix lifetime */
+};
+
+struct nd_ifinfo;
+struct scope6_id;
+struct in6_ifextra {
+	struct in6_ifstat *in6_ifstat;
+	struct icmp6_ifstat *icmp6_ifstat;
+	struct nd_ifinfo *nd_ifinfo;
+	struct scope6_id *scope6_id;
 };
 
 struct	in6_ifaddr {
@@ -463,18 +472,10 @@ struct	in6_rrenumreq {
 #ifdef _KERNEL
 extern struct in6_ifaddr *in6_ifaddr;
 
-extern struct in6_ifstat **in6_ifstat;
-extern size_t in6_ifstatmax;
 extern struct icmp6stat icmp6stat;
-extern struct icmp6_ifstat **icmp6_ifstat;
-extern size_t icmp6_ifstatmax;
 #define in6_ifstat_inc(ifp, tag) \
 do {								\
-	if ((ifp) && (ifp)->if_index <= if_index		\
-	 && (ifp)->if_index < in6_ifstatmax			\
-	 && in6_ifstat && in6_ifstat[(ifp)->if_index]) {	\
-		in6_ifstat[(ifp)->if_index]->tag++;		\
-	}							\
+	((struct in6_ifextra *)((ifp)->if_afdata[AF_INET6]))->in6_ifstat->tag++; \
 } while (0)
 
 extern struct ifqueue ip6intrq;		/* IP6 packet input queue */
@@ -686,6 +687,8 @@ int	in6if_do_dad __P((struct ifnet *));
 void	in6_purgeif __P((struct ifnet *));
 void	in6_savemkludge __P((struct in6_ifaddr *));
 void	in6_setmaxmtu   __P((void));
+void	*in6_domifattach __P((struct ifnet *));
+void	in6_domifdetach __P((struct ifnet *, void *));
 void	in6_restoremkludge __P((struct in6_ifaddr *, struct ifnet *));
 void	in6_createmkludge __P((struct ifnet *));
 void	in6_purgemkludge __P((struct ifnet *));
