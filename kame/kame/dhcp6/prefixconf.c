@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.25 2003/08/01 01:20:06 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.26 2004/05/13 13:27:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -206,7 +206,7 @@ update_prefix(ia, pinfo, pifc, dhcpifp, ctlp, callback)
 			 * prefixes or subnets from the delegated prefix(es) to
 			 * the link through which it received the DHCP message
 			 * from the delegating router.
-			 * [dhcpv6-opt-prefix-delegation-01, Section 11.1]
+			 * [RFC3633 Section 12.1]
 			 */
 			if (strcmp(pif->ifname, dhcpifp->ifname) == 0) {
 				dprintf(LOG_INFO, FNAME,
