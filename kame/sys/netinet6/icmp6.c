@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.376 2004/02/17 11:40:25 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.377 2004/03/10 09:10:38 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -241,7 +241,7 @@ static void icmp6_mtudisc_timeout __P((struct rtentry *, struct rttimer *));
 void
 icmp6_init()
 {
-	mld6_init();
+	mld_init();
 #if defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	icmp6_mtudisc_timeout_q = rt_timer_queue_create(pmtu_expire);
 #endif
@@ -909,11 +909,11 @@ icmp6_input(mp, offp, proto)
 			icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_mldreport);
 		if ((n = m_copym(m, 0, M_COPYALL, M_DONTWAIT)) == NULL) {
 			/* give up local */
-			mld6_input(m, off);
+			mld_input(m, off);
 			m = NULL;
 			goto freeit;
 		}
-		mld6_input(n, off);
+		mld_input(n, off);
 		/* m stays. */
 		break;
 
@@ -2734,7 +2734,7 @@ void
 icmp6_fasttimo()
 {
 
-	mld6_fasttimeo();
+	mld_fasttimeo();
 }
 
 void
