@@ -146,9 +146,10 @@
 #define	IPPROTO_APES		99		/* any private encr. scheme */
 #define	IPPROTO_GMTP		100		/* GMTP*/
 #define	IPPROTO_IPCOMP		108		/* payload compression (IPComp) */
-/* 101-254: Partly Unassigned */
 #define	IPPROTO_PIM		103		/* Protocol Independent Mcast */
 #define	IPPROTO_PGM		113		/* PGM */
+#define IPPROTO_SCTP		132		/* SCTP (RFC2960) */
+/* 134-254: Partly Unassigned */
 /* 255: Reserved */
 /* BSD Private, local use, namespace incursion */
 #define	IPPROTO_DIVERT		254		/* divert pseudo-protocol */

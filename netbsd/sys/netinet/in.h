@@ -76,6 +76,7 @@
 #define	IPPROTO_ENCAP		98		/* encapsulation header */
 #define IPPROTO_PIM		103		/* Protocol indep. multicast */
 #define IPPROTO_IPCOMP		108		/* IP Payload Comp. Protocol */
+#define IPPROTO_SCTP		132		/* SCTP (RFC2960) */
 
 #define	IPPROTO_RAW		255		/* raw IP packet */
 #define	IPPROTO_MAX		256
