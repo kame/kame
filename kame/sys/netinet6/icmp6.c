@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.284 2002/02/08 15:26:09 sakane Exp $	*/
+/*	$KAME: icmp6.c,v 1.285 2002/02/09 05:17:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -579,14 +579,14 @@ icmp6_input(mp, offp, proto)
 		goto freeit;
 	}
 
+#if (defined(NFAITH) && 0 < NFAITH) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	if (
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
-		faithprefix_p != NULL && (*faithprefix_p)(&ip6->ip6_dst)
+	    faithprefix_p != NULL && (*faithprefix_p)(&ip6->ip6_dst)
 #else
-		faithprefix(&ip6->ip6_dst)
+	    faithprefix(&ip6->ip6_dst)
 #endif
-#if defined(NFAITH) && 0 < NFAITH
-	   ) {
+	    ) {
 		/*
 		 * Deliver very specific ICMP6 type only.
 		 * This is important to deilver TOOBIG.  Otherwise PMTUD
