@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.16 2001/01/23 06:51:07 itojun Exp $	*/
+/*	$KAME: dest6.c,v 1.17 2001/01/23 08:17:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,7 +80,7 @@ dest6_input(mp, offp, proto)
 #ifdef ITOJUNMIP6CN
 	struct mbuf *n;
 	struct ip6_opt_home_address *haopt = NULL;
-	struct ip6aux *ip6a;
+	struct ip6aux *ip6a = NULL;
 #endif
 	u_int8_t *opt;
 	struct ip6_hdr *ip6;
@@ -130,6 +130,12 @@ dest6_input(mp, offp, proto)
 				goto bad;
 			}
 
+#if 0
+			/* be picky about alignment */
+			if ((opt - dstopt) % 8 != 6)
+				goto bad;
+#endif
+
 			/* HA option must appear only once */
 			n = ip6_addaux(m);
 			if (!n) {
@@ -147,7 +153,7 @@ dest6_input(mp, offp, proto)
 
 			/*
 			 * don't complain even if it is larger,
-			 * we don't support suboptions at this moment
+			 * we don't support suboptions at this moment.
 			 */
 			if (optlen < sizeof(*haopt)) {
 				ip6stat.ip6s_toosmall++;
@@ -162,6 +168,12 @@ dest6_input(mp, offp, proto)
 			    sizeof(ip6a->ip6a_careof));
 			ip6a->ip6a_flags |= IP6A_HASEEN;
 			break;
+
+#if 0 /* just for testing */
+		case IP6OPT_BINDING_UPDATE:
+			optlen = *(opt + 1) + 2;
+			break;
+#endif
 #endif
 #ifdef MIP6
 		case IP6OPT_BINDING_UPDATE:
@@ -193,13 +205,13 @@ dest6_input(mp, offp, proto)
 
 #ifdef ITOJUNMIP6CN
 	/* if haopt is non-NULL, we are sure we have seen fresh HA option */
-	if (haopt && ip6a && ip6a->ip6a_flags &&
+	if (haopt && ip6a &&
 	    (ip6a->ip6a_flags & (IP6A_HASEEN | IP6A_SWAP)) == IP6A_HASEEN) {
 		/* XXX should we do this now or later? */
-		bcopy(&ip6a->ip6a_home, haopt->ip6oh_addr,
+		bcopy(&ip6a->ip6a_careof, haopt->ip6oh_addr,
 		    sizeof(haopt->ip6oh_addr));
-		bcopy(&ip6->ip6_src, &ip6a->ip6a_careof,
-		    sizeof(ip6a->ip6a_careof));
+		bcopy(&ip6a->ip6a_home, &ip6->ip6_src,
+		    sizeof(ip6->ip6_src));
 		ip6a->ip6a_flags |= IP6A_SWAP;
 	}
 #endif
