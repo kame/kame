@@ -1,4 +1,4 @@
-#	$NetBSD: Makefile,v 1.22 2000/01/08 23:12:36 itojun Exp $
+#	$NetBSD: Makefile,v 1.24 2002/03/28 09:58:10 jmc Exp $
 #	@(#)Makefile	8.1 (Berkeley) 6/6/93
 
 PROG=	systat

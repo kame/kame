@@ -1,4 +1,4 @@
-/*	$NetBSD: main.c,v 1.25.2.1 2000/09/01 16:37:09 ad Exp $	*/
+/*	$NetBSD: main.c,v 1.30 2001/12/06 12:40:51 blymn Exp $	*/
 
 /*-
  * Copyright (c) 1980, 1992, 1993
@@ -40,21 +40,20 @@ __COPYRIGHT("@(#) Copyright (c) 1980, 1992, 1993\n\
 #if 0
 static char sccsid[] = "@(#)main.c	8.1 (Berkeley) 6/6/93";
 #endif
-__RCSID("$NetBSD: main.c,v 1.25.2.1 2000/09/01 16:37:09 ad Exp $");
+__RCSID("$NetBSD: main.c,v 1.30 2001/12/06 12:40:51 blymn Exp $");
 #endif /* not lint */
 
 #include <sys/param.h>
 
+#include <ctype.h>
 #include <err.h>
 #include <limits.h>
-#include <nlist.h>
 #include <signal.h>
+#include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <stdlib.h>
-#include <ctype.h>
-#include <stdarg.h>
 
 #include "systat.h"
 #include "extern.h"
@@ -65,6 +64,8 @@ static struct nlist namelist[] = {
 	{ "_hz" },
 #define	X_STATHZ		1
 	{ "_stathz" },
+#define	X_MAXSLP		2
+	{ "_maxslp" },
 	{ "" }
 };
 static int     dellave;
@@ -77,12 +78,15 @@ double avenrun[3];
 int     col;
 int	naptime = 5;
 int     verbose = 1;                    /* to report kvm read errs */
-int     hz, stathz;
+int     hz, stathz, maxslp;
 char    c;
 char    *namp;
 char    hostname[MAXHOSTNAMELEN + 1];
 WINDOW  *wnd;
 int     CMDLINE;
+int     turns = 2;	/* stay how many refresh-turns in 'all' mode? */
+int     allflag;
+int     allcounter;
 
 static	WINDOW *wload;			/* one line window for load average */
 
@@ -100,7 +104,7 @@ main(int argc, char **argv)
 	egid = getegid();
 	(void)setegid(getgid());
 
-	while ((ch = getopt(argc, argv, "M:N:nw:")) != -1)
+	while ((ch = getopt(argc, argv, "M:N:nw:t:")) != -1)
 		switch(ch) {
 		case 'M':
 			memf = optarg;
@@ -114,6 +118,10 @@ main(int argc, char **argv)
 		case 'w':
 			if ((naptime = atoi(optarg)) <= 0)
 				errx(1, "interval <= 0.");
+			break;
+		case 't':
+			if ((turns = atoi(optarg)) <= 0)
+				errx(1, "turns <= 0.");
 			break;
 		case '?':
 		default:
@@ -140,9 +148,15 @@ main(int argc, char **argv)
 				modefound++;
 				break;
 			}
+
+			if(strstr("all",argv[0]) == "all"){
+				allcounter=0;
+				allflag=1;
+			}
 		}
 
-		if (!modefound)
+
+		if (!modefound && !allflag)
 			error("%s: Unknown command.", argv[0]);
 	}
 
@@ -205,6 +219,7 @@ main(int argc, char **argv)
 	hostname[sizeof(hostname) - 1] = '\0';
 	NREAD(X_HZ, &hz, sizeof hz);
 	NREAD(X_STATHZ, &stathz, sizeof stathz);
+	NREAD(X_MAXSLP, &maxslp, sizeof maxslp);
 	(*curmode->c_init)();
 	curmode->c_flags |= CF_INIT;
 	labels();
@@ -214,7 +229,7 @@ main(int argc, char **argv)
 	signal(SIGALRM, display);
 	display(0);
 	noecho();
-	crmode();
+	cbreak();
 	keyboard();
 	/*NOTREACHED*/
 }
@@ -223,7 +238,7 @@ static void
 usage(void)
 {
 	fprintf(stderr, "usage: systat [-n] [-M core] [-N system] [-w wait] "
-		"[display] [refresh-interval]\n");
+		"[-t turns]\n\t\t[display] [refresh-interval]\n");
 	exit(1);
 }
 
@@ -248,6 +263,7 @@ display(int signo)
 {
 	int j;
 	sigset_t set;
+	struct mode *p;
 
 	sigemptyset(&set);
 	sigaddset(&set, SIGALRM);
@@ -280,6 +296,19 @@ display(int signo)
 	wrefresh(wnd);
 	move(CMDLINE, col);
 	refresh();
+	
+	if (allflag && signo==SIGALRM) {
+		if (allcounter >= turns){
+			p = curmode;
+			p++;
+			if (p->c_name == NULL)
+				p = modes;
+			switch_mode(p);
+			allcounter=0;
+		} else
+			allcounter++;
+       }
+
 	sigprocmask(SIG_UNBLOCK, &set, NULL);
 	alarm(naptime);
 }
