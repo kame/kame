@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1732 2001/06/19 07:35:36 itojun Exp $
+$KAME: CHANGELOG,v 1.1733 2001/06/20 05:34:24 sumikawa Exp $
 
 <200106>
+Wed Jun 20 14:33:28 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* kame/sys/netinet6/{in6_var.h,in6.c,natpt_rule.c,nd6_rtr.c}:
+	  remove in6_len2mask(). this fucnction is duplicated with
+	  in6_prefixlen2mask().
+
 Tue Jun 19 16:33:40 JST 2001  itojun@iijlab.net
 	* bsdi4/sys/netinet/tcp_input.c: make faithd work on bsdi4.
 	  reported by jinmei
