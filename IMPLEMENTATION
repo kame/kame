@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.268 2001/08/28 12:16:03 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.269 2001/08/28 12:18:11 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -608,6 +608,10 @@ To summarize the sysctl knob:
 					out-of-scope)
 	1		1		invalid, or experimental
 					(out-of-scope of spec)
+
+The if_accept_rtadv flag is referred only when accept_rtadv is 1 (the
+latter two cases).  The flag does not have any effects when the sysctl
+variable is 0.
 
 See 1.2 in the document for relationship between DAD and autoconfiguration.
 
