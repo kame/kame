@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1723 2001/06/14 06:12:54 suz Exp $
+$KAME: CHANGELOG,v 1.1724 2001/06/14 08:06:36 itojun Exp $
 
 <200106>
+Thu Jun 14 17:05:06 JST 2001  itojun@iijlab.net
+	* netbsd/sys/net/if.[ch]: change meaning of ifnet.if_lastchange
+	  to meet with RFC1573 ifLastChange.  sync with netbsd-current.
+
 Thu Jun 14 13:42:55 JST 2001	suz@sdl.hitachi.co.jp
 	* bsdi3/usr.sbin/netstat/mroute6.c
 	+ fixed a bug that bsdi3's "netstat -gn" does not display multicast 
