@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.800 2000/04/21 11:14:04 itojun Exp $
+$Id: CHANGELOG,v 1.801 2000/04/21 14:37:21 jinmei Exp $
 
 <200004>
+2000-04-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd3/usr.bin/netstat/route.c (routename6): fill in the
+	sin6_socpe_id field of a local variable to support
+	<scope_addr>%<scope_id> extension.
+
 Fri Apr 21 20:13:09 JST 2000  itojun@iijlab.net
 	* openbsd/sys/netinet{,6}/in{,6}_pcb.c: on in{,6}_pcbnotify, make sure
 	  to touch pcbs that meets address family of incoming packet.
