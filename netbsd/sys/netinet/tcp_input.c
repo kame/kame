@@ -503,7 +503,7 @@ tcp6_input(mp, offp, proto)
 {
 	struct mbuf *m = *mp;
 
-#if defined(NFAITH) && 0 < NFAITH
+#if 0 /*defined(NFAITH) && 0 < NFAITH*/
 	if (m->m_pkthdr.rcvif) {
 		if (m->m_pkthdr.rcvif->if_type == IFT_FAITH) {
 			/* XXX send icmp6 host/port unreach? */
