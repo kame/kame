@@ -764,12 +764,12 @@ main(argc, argv)
 	if (getnameinfo((struct sockaddr *)&Dst, Dst.sin6_len, hbuf,
 			sizeof(hbuf), NULL, 0, NI_NUMERICHOST | niflag))
 		strcpy(hbuf, "(invalid)");
-	Fprintf(stderr, "IPv6 traceroute\n");
-	Fprintf(stderr, "  To: %s (%s)\n", hostname, hbuf);
+	Fprintf(stderr, "traceroute6");
+	Fprintf(stderr, " to %s (%s)", hostname, hbuf);
 	if (source)
-		Fprintf(stderr, "  From: %s\n", source);
+		Fprintf(stderr, " from %s", source);
 	Fprintf(stderr,
-		"  %d hops max, %d byte packets\n",
+		", %d hops max, %d byte packets\n",
 		max_hops, datalen);
 	(void) fflush(stderr);
 
