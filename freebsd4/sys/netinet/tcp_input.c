@@ -759,7 +759,7 @@ findpcb:
 				if ((ia6 = ip6_getdstifaddr(m)) &&
 				    (ia6->ia6_flags & IN6_IFF_DEPRECATED)) {
 					tp = NULL;
-					rstreason = BANDLIM_RST_OPENPORT; /* xxx */
+					rstreason = BANDLIM_RST_OPENPORT;
 					goto dropwithreset;
 				}
 			}
