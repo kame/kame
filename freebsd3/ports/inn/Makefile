@@ -3,10 +3,10 @@
 # Date created:		20 Oct 1994 (1.4), 18 Dec 1996 (1.5.1), 14 Feb 1999 (2.2)
 # Whom:			torstenb
 #
-# $Id: Makefile,v 1.3 1999/12/25 13:55:28 itojun Exp $
+# $Id: Makefile,v 1.4 1999/12/27 20:45:33 sumikawa Exp $
 #
 
-DISTNAME=	inn-2.2
+DISTNAME=	inn-2.2.2
 CATEGORIES=	news
 MASTER_SITES=	ftp://ftp.isc.org/isc/inn/
 
