@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.105 2003/04/09 09:28:19 suz Exp $	*/
+/*	$KAME: in6_gif.c,v 1.106 2003/09/05 23:09:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -324,7 +324,7 @@ in6_gif_output(ifp, family, m)
 	ip6->ip6_flow	= 0;
 	ip6->ip6_vfc	&= ~IPV6_VERSION_MASK;
 	ip6->ip6_vfc	|= IPV6_VERSION;
-	ip6->ip6_plen	= htons((u_short)m->m_pkthdr.len);
+	/* ip6->ip6_plen will be filled by ip6_output */
 	ip6->ip6_nxt	= proto;
 	ip6->ip6_hlim	= ip6_gif_hlim;
 	ip6->ip6_src	= sin6_src->sin6_addr;
