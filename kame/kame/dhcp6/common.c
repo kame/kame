@@ -51,6 +51,13 @@
 #include <err.h>
 #include <netdb.h>
 
+#ifdef HAVE_GETIFADDRS 
+# ifdef HAVE_IFADDRS_H
+#  define USE_GETIFADDRS
+#  include <ifaddrs.h>
+# endif
+#endif
+
 #include <dhcp6.h>
 #include <common.h>
 
@@ -78,6 +85,48 @@ getifaddr(addr, ifnam, prefix, plen)
 	struct in6_addr *prefix;
 	int plen;
 {
+#ifdef USE_GETIFADDRS
+	struct ifaddrs *ifap, *ifa;
+	struct sockaddr_in6 sin6;
+	int error;
+
+	if (getifaddrs(&ifap) != 0) {
+		err(1, "getifaddrs");
+		/*NOTREACHED*/
+	}
+
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (strcmp(ifnam, ifa->ifa_name) != 0)
+			continue;
+		if (ifa->ifa_addr->sa_family != AF_INET6)
+			continue;
+		if (ifa->ifa_addr->sa_len > sizeof(sin6))
+			continue;
+		memcpy(&sin6, &ifa->ifa_addr, ifa->ifa_addr->sa_len);
+		if (plen % 8 == 0) {
+			if (memcmp(&sin6.sin6_addr, prefix, plen / 8) != 0)
+				continue;
+		} else {
+			struct in6_addr a, m;
+			int i;
+			memcpy(&a, &sin6.sin6_addr, sizeof(sin6.sin6_addr));
+			memset(&m, 0, sizeof(m));
+			memset(&m, 0xff, plen / 8);
+			m.s6_addr[plen / 8] = (0xff00 >> (plen % 8)) & 0xff;
+			for (i = 0; i < sizeof(a); i++)
+				a.s6_addr[i] &= m.s6_addr[i];
+
+			if (memcmp(&a, prefix, plen / 8) != 0)
+				continue;
+		}
+		memcpy(addr, &sin6.sin6_addr, sizeof(sin6.sin6_addr));
+		error = 0;
+		break;
+	}
+
+	free(ifap);
+	return error;
+#else
 	int s;
 	unsigned int maxif;
 	struct ifreq *iflist;
@@ -121,6 +170,8 @@ getifaddr(addr, ifnam, prefix, plen)
 			continue;
 		if (ifr->ifr_addr.sa_family != AF_INET6)
 			continue;
+		if (ifr->ifr_addr.sa_len > sizeof(sin6))
+			continue;
 		memcpy(&sin6, &ifr->ifr_addr, ifr->ifr_addr.sa_len);
 		if (plen % 8 == 0) {
 			if (memcmp(&sin6.sin6_addr, prefix, plen / 8) != 0)
@@ -146,6 +197,7 @@ getifaddr(addr, ifnam, prefix, plen)
 	free(iflist);
 	close(s);
 	return error;
+#endif
 }
 
 int

@@ -66,11 +66,12 @@ esac
 
 AC_REPLACE_FUNCS(getaddrinfo)
 AC_REPLACE_FUNCS(getnameinfo)
+AC_REPLACE_FUNCS(getifaddrs)
 AC_CHECK_FUNCS(if_nametoindex)
 
 dnl Checks for header files.
 AC_HEADER_STDC
-AC_CHECK_HEADERS(fcntl.h sys/ioctl.h sys/time.h syslog.h unistd.h)
+AC_CHECK_HEADERS(fcntl.h sys/ioctl.h sys/time.h syslog.h unistd.h ifaddrs.h)
 AC_MSG_CHECKING(for socklen_t)
 AC_TRY_COMPILE([#include <sys/types.h>
 #include <sys/socket.h>],
