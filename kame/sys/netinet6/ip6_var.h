@@ -237,7 +237,7 @@ struct inpcb;
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 int	icmp6_ctloutput __P((struct socket *, struct sockopt *sopt));
-#elsif defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#elif defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 /* no icmp6_ctloutput */
 #else
 int	icmp6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
