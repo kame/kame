@@ -1,15 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1083 2000/07/03 02:51:54 itojun Exp $
+$Id: CHANGELOG,v 1.1084 2000/07/03 03:37:53 itojun Exp $
 
 <200006>
 Mon Jul  3 11:50:12 JST 2000  itojun@iijlab.net
 	* kame/sys/netinet/icmp6.h: avoid bitfields in router renumbering packet
 	  declaration.  XXX standards?
-
-Mon Jul  3 11:40:29 JST 2000  itojun@iijlab.net
-	* libinet6/name6.c: make sure to fill h_name on reverse query.
-	  From: Kris Kennaway <kris@FreeBSD.org>
 
 2000-07-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_input.c (ip6_input): immediately discarded
