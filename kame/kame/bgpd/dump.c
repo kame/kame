@@ -43,7 +43,7 @@
 extern struct ripif *ripifs;	/* defined in ripng.c */
 
 char *dumpfile;
-#define DUMPFILE "/var/log/bgpd.dump"
+#define DUMPFILE "/var/tmp/bgpd.dump"
 
 static char *aspath2str(struct aspath *);
 static char *cll2str(struct clstrlist *);
@@ -403,7 +403,7 @@ bgpd_dump_file()
 
 	if (dumpfile == NULL)
 		dumpfile = DUMPFILE;
-	if ((fp = fopen(dumpfile, "a+")) == NULL) {
+	if ((fp = fopen(dumpfile, "w")) == NULL) {
 		syslog(LOG_ERR, "<%s>: can't open dump file(%s): %s",
 			__FUNCTION__, dumpfile, strerror(errno));
 		return;
