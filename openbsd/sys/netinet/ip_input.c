@@ -1565,7 +1565,7 @@ ip_forward(m, srcrt)
 		 * a router should not generate ICMP_SOURCEQUENCH as
 		 * required in RFC1812 Requirements for IP Version 4 Routers.
 		 * source quench could be a big problem under DoS attacks,
-		 * or the underlying interface is rate-limited.
+		 * or if the underlying interface is rate-limited.
 		 */
 		if (mcopy)
 			m_freem(mcopy);
