@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.65 2002/05/22 07:59:18 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.66 2002/05/29 14:18:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -71,8 +71,8 @@ static u_char *rcvcmsgbuf;
 static size_t rcvcmsgbuflen;
 static u_char *sndcmsgbuf = NULL;
 static size_t sndcmsgbuflen;
-static int do_dump;
-static int do_die;
+volatile sig_atomic_t do_dump;
+volatile sig_atomic_t do_die;
 struct msghdr sndmhdr;
 struct iovec rcviov[2];
 struct iovec sndiov[2];
@@ -109,8 +109,10 @@ union nd_opts {
 		struct nd_opt_rd_hdr *rh;
 		struct nd_opt_mtu *mtu;
 		struct nd_optlist *list;
+#ifdef MIP6
 		struct nd_opt_advinterval *adv;
 		struct nd_opt_homeagent_info *hai;
+#endif
 	} nd_opt_each;
 };
 #define nd_opts_src_lladdr	nd_opt_each.src_lladdr
@@ -119,21 +121,27 @@ union nd_opts {
 #define nd_opts_rh		nd_opt_each.rh
 #define nd_opts_mtu		nd_opt_each.mtu
 #define nd_opts_list		nd_opt_each.list
+#ifdef MIP6
 #define nd_opts_adv		nd_opt_each.adv
 #define nd_opts_hai		nd_opt_each.hai
+#endif
 
 #define NDOPT_FLAG_SRCLINKADDR 0x1
 #define NDOPT_FLAG_TGTLINKADDR 0x2
 #define NDOPT_FLAG_PREFIXINFO 0x4
 #define NDOPT_FLAG_RDHDR 0x8
 #define NDOPT_FLAG_MTU 0x10
+#ifdef MIP6
 #define NDOPT_FLAG_ADV 0x20
 #define NDOPT_FLAG_HAI 0x40
+#endif
 
 u_int32_t ndopt_flags[] = {
 	0, NDOPT_FLAG_SRCLINKADDR, NDOPT_FLAG_TGTLINKADDR,
 	NDOPT_FLAG_PREFIXINFO, NDOPT_FLAG_RDHDR, NDOPT_FLAG_MTU,
+#ifdef MIP6
 	0, NDOPT_FLAG_ADV, NDOPT_FLAG_HAI
+#endif
 };
 
 int main __P((int, char *[]));
@@ -257,20 +265,20 @@ main(argc, argv)
 	sock_open();
 
 	/* record the current PID */
-#ifdef __NetBSD__
-	pidfile(NULL);
-#elif defined(__OpenBSD__)
+#if (defined(__NetBSD__) && __NetBSD_Version__ >= 106010000) || defined(__OpenBSD__)
 	if (pidfile(NULL) < 0) {
 		syslog(LOG_ERR,
-		    "<%s> failed to open a log file, run anyway.",
+		    "<%s> failed to open the pid log file, run anyway.",
 		    __FUNCTION__);
 	}
+#elif defined(__NetBSD__)
+	pidfile(NULL);
 #else
 	pid = getpid();
 	if ((pidfp = fopen(pidfilename, "w")) == NULL) {
 		syslog(LOG_ERR,
-		    "<%s> failed to open a log file(%s), run anyway.",
-		    __FUNCTION__, pidfilename);
+		    "<%s> failed to open the pid log file, run anyway.",
+		    __FUNCTION__);
 	} else {
 		fprintf(pidfp, "%d\n", pid);
 		fclose(pidfp);
