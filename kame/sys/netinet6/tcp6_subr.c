@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.40 2002/02/02 08:45:29 jinmei Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.41 2002/02/03 09:00:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -606,23 +606,6 @@ tcp6_ctlinput(cmd, sa, d)
 	}
 
 	if (ip6) {
-		/*
-		 * XXX: We assume that when IPV6 is non NULL,
-		 * M and OFF are valid.
-		 */
-		struct ip6_hdr ip6_tmp;
-
-		/* translate addresses into internal form */
-		ip6_tmp = *ip6;
-		ip6_tmp.ip6_dst = ((struct sockaddr_in6 *)sa)->sin6_addr;
-		/* XXX: to be more generic... */
-		if (IN6_IS_ADDR_LINKLOCAL(&ip6_tmp.ip6_src))
-			ip6_tmp.ip6_src.s6_addr16[1] =
-				htons(m->m_pkthdr.rcvif->if_index);
-		if (IN6_IS_ADDR_LINKLOCAL(&ip6_tmp.ip6_dst))
-			ip6_tmp.ip6_dst.s6_addr16[1] =
-				htons(m->m_pkthdr.rcvif->if_index);
-
 		if (m->m_pkthdr.len < off + sizeof(th))
 			return;
 
@@ -635,8 +618,8 @@ tcp6_ctlinput(cmd, sa, d)
 		    (inet6ctlerrmap[cmd] == EHOSTUNREACH ||
 		     inet6ctlerrmap[cmd] == ENETUNREACH ||
 		     inet6ctlerrmap[cmd] == EHOSTDOWN))
-			syn_cache_unreach6(&ip6_tmp, &th,
-					   (struct sockaddr_in6 *)sa, sa6_src);
+			syn_cache_unreach6(&th, (struct sockaddr_in6 *)sa,
+					   sa6_src);
 	} else {
 		(void) in6_pcbnotify(&tcb6, sa, 0, (struct sockaddr *)sa6_src,
 		    0, cmd, NULL, notify);

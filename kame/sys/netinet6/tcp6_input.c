@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.52 2002/02/02 08:44:34 jinmei Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.53 2002/02/03 09:00:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -655,8 +655,7 @@ findpcb:
 			 */
 			if ((thflags & (TH_RST|TH_ACK|TH_SYN)) != TH_SYN) {
 				if (thflags & TH_RST)
-					syn_cache_reset6(ip6, th, src_sa6,
-							 dst_sa6);
+					syn_cache_reset6(th, src_sa6, dst_sa6);
 				else if (thflags & TH_ACK) {
 					so = syn_cache_get6(so, m, off, len,
 							    src_sa6, dst_sa6);
@@ -2447,8 +2446,7 @@ syn_cache_timer6(interval)
  * Find an entry in the syn cache.
  */
 struct syn_cache6 *
-syn_cache_lookup6(ip6, th, prevp, headp, src, dst)
-	struct ip6_hdr *ip6;
+syn_cache_lookup6(th, prevp, headp, src, dst)
 	struct tcp6hdr *th;
 	struct syn_cache6 ***prevp;
 	struct syn_cache_head6 **headp;
@@ -2507,8 +2505,7 @@ syn_cache_get6(so, m, off, len, src, dst)
 	bzero(&opts, sizeof(opts));
 	ip6 = mtod(m, struct ip6_hdr *);
 	th = (struct tcp6hdr *)((caddr_t)ip6 + off);
-	if ((sc = syn_cache_lookup6(ip6, th, &sc_prev,
-				    &head, src, dst)) == NULL)
+	if ((sc = syn_cache_lookup6(th, &sc_prev, &head, src, dst)) == NULL)
 		return (NULL);
 
 	win = sbspace(&so->so_rcv);
@@ -2617,16 +2614,14 @@ done:
  */
 
 void
-syn_cache_reset6(ip6, th, src, dst)
-	struct ip6_hdr *ip6;
+syn_cache_reset6(th, src, dst)
 	struct tcp6hdr *th;
 	struct sockaddr_in6 *src, *dst;
 {
 	struct syn_cache6 *sc, **sc_prev;
 	struct syn_cache_head6 *head;
 
-	if ((sc = syn_cache_lookup6(ip6, th, &sc_prev,
-				    &head, src, dst)) == NULL)
+	if ((sc = syn_cache_lookup6(th, &sc_prev, &head, src, dst)) == NULL)
 		return;
 	if (SEQ_LT(th->th_seq, sc->sc_irs) ||
 	    SEQ_GT(th->th_seq, sc->sc_irs + 1))
@@ -2637,23 +2632,18 @@ syn_cache_reset6(ip6, th, src, dst)
 }
 
 void
-syn_cache_unreach6(ip6, th, src, dst)
-	struct ip6_hdr *ip6;
+syn_cache_unreach6(th, src, dst)
 	struct tcp6hdr *th;
 	struct sockaddr_in6 *src, *dst;
 {
 	struct syn_cache6 *sc, **sc_prev;
 	struct syn_cache_head6 *head;
-	struct ip6_hdr ip62;
 	struct tcp6hdr th2;
 
-	ip62.ip6_dst = ip6->ip6_src;
-	ip62.ip6_src = ip6->ip6_dst;	
 	th2.th_sport = th->th_dport;
 	th2.th_dport = th->th_sport;	
 
-	if ((sc = syn_cache_lookup6(&ip62, &th2, &sc_prev,
-				    &head, src, dst)) == NULL)
+	if ((sc = syn_cache_lookup6(&th2, &sc_prev, &head, src, dst)) == NULL)
 		return;
 	/* If the sequence number != sc_iss, then it's a bogus ICMP msg */
 	if (ntohl(th->th_seq) != sc->sc_iss)
@@ -2716,8 +2706,7 @@ syn_cache_add6(so, m, off, optp, optlen, oi)
 	/*
 	 * See if we already have an entry for this connection.
 	 */
-	if ((sc = syn_cache_lookup6(ip6, th, &sc_prev,
-				    &scp, src, dst)) != NULL) {
+	if ((sc = syn_cache_lookup6(th, &sc_prev, &scp, src, dst)) != NULL) {
 		tcp6stat.tcp6s_sc_dupesyn++;
 		if (syn_cache_respond6(sc, m, ip6, th, win,
 				       tb.ts_recent) == 0) {

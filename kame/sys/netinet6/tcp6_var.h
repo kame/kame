@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_var.h,v 1.9 2002/02/02 08:27:12 jinmei Exp $	*/
+/*	$KAME: tcp6_var.h,v 1.10 2002/02/03 09:00:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -447,8 +447,7 @@ void	 tcp6_xmit_timer __P((struct tcp6cb *, int));
 
 int	 syn_cache_add6 __P((struct socket *, struct mbuf *, int, u_char *,
 	    int, struct tcp6_opt_info *));
-void	 syn_cache_unreach6 __P((struct ip6_hdr *, struct tcp6hdr *,
-				 struct sockaddr_in6 *,
+void	 syn_cache_unreach6 __P((struct tcp6hdr *, struct sockaddr_in6 *,
 				 struct sockaddr_in6 *));
 struct socket *
 	 syn_cache_get6 __P((struct socket *so, struct mbuf *, int, int,
@@ -456,12 +455,11 @@ struct socket *
 void	 syn_cache_insert6 __P((struct syn_cache6 *, struct syn_cache6 ***,
 	    struct syn_cache_head6 **));
 struct syn_cache6 *
-	 syn_cache_lookup6 __P((struct ip6_hdr *, struct tcp6hdr *,
-				struct syn_cache6 ***,
+	 syn_cache_lookup6 __P((struct tcp6hdr *, struct syn_cache6 ***,
 				struct syn_cache_head6 **,
 				struct sockaddr_in6 *, struct sockaddr_in6 *));
-void	 syn_cache_reset6 __P((struct ip6_hdr *, struct tcp6hdr *,
-			       struct sockaddr_in6 *,  struct sockaddr_in6 *));
+void	 syn_cache_reset6 __P((struct tcp6hdr *, struct sockaddr_in6 *,
+			       struct sockaddr_in6 *));
 int	 syn_cache_respond6 __P((struct syn_cache6 *, struct mbuf *,
 				 struct ip6_hdr *, struct tcp6hdr *,
 				 long, u_long));
