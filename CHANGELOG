@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.723 2000/03/22 17:35:22 jinmei Exp $
+$Id: CHANGELOG,v 1.724 2000/03/22 17:36:55 itojun Exp $
 
 <200003>
+Thu Mar 23 02:36:12 JST 2000  itojun@iijlab.net
+	* kame/route6d: don't advertise reject/blackhole static routes.
+
 2000-03-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/netinet/udp_usrreq.c (udp6_output): was copied from
 	netinet6/udp6_usrreq.c to separate UDP output routine from that of
