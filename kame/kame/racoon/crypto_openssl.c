@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.86 2004/06/16 11:55:35 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.87 2004/08/24 05:37:36 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1610,6 +1610,7 @@ eay_hmacsha2_512_final(c)
 
 	HMAC_Final((HMAC_CTX *)c, res->v, &l);
 	res->l = l;
+	HMAC_cleanup((HMAC_CTX *)c);
 	(void)racoon_free(c);
 
 	if (SHA512_DIGEST_LENGTH != res->l) {
@@ -1666,6 +1667,7 @@ eay_hmacsha2_384_final(c)
 
 	HMAC_Final((HMAC_CTX *)c, res->v, &l);
 	res->l = l;
+	HMAC_cleanup((HMAC_CTX *)c);
 	(void)racoon_free(c);
 
 	if (SHA384_DIGEST_LENGTH != res->l) {
@@ -1722,6 +1724,7 @@ eay_hmacsha2_256_final(c)
 
 	HMAC_Final((HMAC_CTX *)c, res->v, &l);
 	res->l = l;
+	HMAC_cleanup((HMAC_CTX *)c);
 	(void)racoon_free(c);
 
 	if (SHA256_DIGEST_LENGTH != res->l) {
@@ -1779,6 +1782,7 @@ eay_hmacsha1_final(c)
 
 	HMAC_Final((HMAC_CTX *)c, res->v, &l);
 	res->l = l;
+	HMAC_cleanup((HMAC_CTX *)c);
 	(void)racoon_free(c);
 
 	if (SHA_DIGEST_LENGTH != res->l) {
@@ -1835,6 +1839,7 @@ eay_hmacmd5_final(c)
 
 	HMAC_Final((HMAC_CTX *)c, res->v, &l);
 	res->l = l;
+	HMAC_cleanup((HMAC_CTX *)c);
 	(void)racoon_free(c);
 
 	if (MD5_DIGEST_LENGTH != res->l) {
