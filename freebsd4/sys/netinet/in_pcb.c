@@ -840,11 +840,11 @@ in_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 				 */
 				return (inp);
 			}
-#ifdef INET6
-			if ((inp == NULL) && (inp_shared != NULL))
-				return (inp_shared);
-#endif
 		}
+#ifdef INET6
+		if ((inp == NULL) && (inp_shared != NULL))
+			return (inp_shared);
+#endif
 		/*
 		 * Not found.
 		 */
