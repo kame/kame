@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.319 2003/11/10 10:53:22 itojun Exp $	*/
+/*	$KAME: key.c,v 1.320 2003/11/11 19:06:06 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -6548,7 +6548,7 @@ key_acquire2(so, m, mhp)
 			return 0;
 		}
 
-		/* reset acq counter in order to deletion by timehander. */
+		/* reset acq counter in order to deletion by timehandler. */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 		acq->created = time_second;
 #else
