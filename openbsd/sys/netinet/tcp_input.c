@@ -57,6 +57,7 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/errno.h>
+#include <sys/domain.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -85,7 +86,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #ifndef INET
 #include <netinet/in.h>
 #endif
-#include <sys/domain.h>
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
