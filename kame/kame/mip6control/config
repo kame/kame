@@ -1,0 +1,11 @@
+#
+# a sample config file for mip6makeconfig.sh
+#
+# this file must be placed in /usr/local/v6/etc/mobileip6/xxxxx where
+# xxxxx is 5 digits.
+#
+nodename=keiichi.kame.net
+mobile_node=2001:200:0:0:201:11ff:fe54:4fde
+home_agent=2001:200:0:0:201:11ff:fe54:5ffc
+algorithm=blowfish-cbc
+secret="THIS_IS_MY_SECRET!!!"
