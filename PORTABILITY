@@ -1,6 +1,6 @@
 Portability guideline
 KAME project
-$Id: PORTABILITY,v 1.19 1999/11/06 15:28:00 itojun Exp $
+$Id: PORTABILITY,v 1.20 1999/12/01 01:44:40 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -180,5 +180,13 @@ across those possibilities.
 	#if defined(__bsdi__) && _BSDI_VERSION >= 199802
 		this is bsdi4.
 	#endif
+
+- RFC2553 defines sockaddr_storage to have __ss_{family,len} member.  During
+  the discusson for the draft on ipngwg, ss_len was proposed and final result
+  was not very clear.  Therefore, you can see both definition on operating
+  system platforms.  The most portable way of dealing with it is to:
+  (1) have -Dss_len=__ss_len to unify all occurences (including header file)
+  into __ss_len, or (2) never touch __ss_len.  cast to sockaddr * and use
+  sa_len.
 
 - For portability in networking code, look at kame/sys/net/net_osdep.h.
