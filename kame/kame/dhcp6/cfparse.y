@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.18 2003/01/22 07:24:15 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.19 2003/01/22 16:51:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -435,7 +435,15 @@ iaconf_list:
 	;
 
 iaconf:
-	prefix_interface { $$ = $1; }
+		prefix_interface { $$ = $1; }
+	|	PREFIX prefixparam EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, IACONF_PREFIX, $2, NULL);
+
+			$$ = l;
+		}
 	;
 
 prefix_interface:

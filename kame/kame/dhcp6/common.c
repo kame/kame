@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.75 2003/01/22 07:42:30 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.76 2003/01/22 16:51:39 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1524,6 +1524,8 @@ copyout_option(p, ep, optval)
 
 		if ((s = copyout_option(subp, ep, subov)) < 0)
 			return (-1);
+		if (p)
+			subp += s;
 		sublen += s;
 	}
 

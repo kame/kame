@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.21 2003/01/22 07:24:15 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.22 2003/01/22 16:51:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -140,6 +140,7 @@ struct iapd_conf {
 	struct ia_conf iapd_ia;
 
 	/* type dependent values follow */
+	struct dhcp6_list iapd_prefix_list;
 	struct pifc_list iapd_pif_list;
 };
 #define iapd_next iapd_ia.next
@@ -186,7 +187,7 @@ enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY, DECL_REQUEST, DECL_DUID,
       DHCPOPT_RAPID_COMMIT, DHCPOPT_PREFIX_DELEGATION, DHCPOPT_DNS,
       DHCPOPT_IA_PD,
       ADDRESS_LIST_ENT,
-      IACONF_PIF };
+      IACONF_PIF, IACONF_PREFIX };
 
 typedef enum {DHCP6_MODE_SERVER, DHCP6_MODE_CLIENT, DHCP6_MODE_RELAY }
 dhcp6_mode_t;

@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.24 2003/01/05 17:12:12 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.25 2003/01/22 16:51:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -82,7 +82,8 @@ extern char *configfilename;
 
 static int add_pd_pif __P((struct iapd_conf *, struct cf_list *));
 static int add_options __P((int, struct dhcp6_ifconf *, struct cf_list *));
-static int add_prefix __P((struct host_conf *, struct dhcp6_prefix *));
+static int add_prefix __P((struct dhcp6_list *, char *,
+    struct dhcp6_prefix *));
 static void clear_pd_pif __P((struct iapd_conf *));
 static void clear_ifconf __P((struct dhcp6_ifconf *));
 static void clear_iaconf __P((struct ia_conf *));
@@ -279,23 +280,37 @@ configure_ia(ialist, iatype)
 		/* IA-type specific initialization */
 		switch(iatype) {
 		case IATYPE_PD:
+			TAILQ_INIT(&((struct iapd_conf *)iac)->iapd_prefix_list);
 			TAILQ_INIT(&((struct iapd_conf *)iac)->iapd_pif_list);
 			break;
 		}
 
 		/* set up parameters for the IA */
 		for (cfl = iap->params; cfl; cfl = cfl->next) {
-			switch(cfl->type) {
-			case IACONF_PIF:
-				/* sanity check */
+			/* sanity check */
+			if ((cfl->type == IACONF_PIF ||
+			    cfl->type == IACONF_PREFIX) &&
+			    iatype != IATYPE_PD) {
 				if (iatype != IATYPE_PD) {
 					dprintf(LOG_ERR, "%s" "%s:%d "
 					    "internal error "
 					    "(IA type mismatch)",
 					    FNAME, configfilename, cfl->line);
 				}
+			}
+
+			switch(cfl->type) {
+			case IACONF_PIF:
 				if (add_pd_pif((struct iapd_conf *)iac, cfl))
 					goto bad;
+				break;
+			case IACONF_PREFIX:
+				if (add_prefix(&((struct iapd_conf *)iac)->iapd_prefix_list,
+				    "IAPD", cfl->ptr)) {
+					dprintf(LOG_NOTICE, "%s" "failed "
+						"to configure prefix", FNAME);
+					goto bad;
+				}
 				break;
 			default:
 				dprintf(LOG_ERR, "%s" "%s:%d "
@@ -441,7 +456,8 @@ configure_host(hostlist)
 					host->name, duidstr(&hconf->duid));
 				break;
 			case DECL_PREFIX:
-				if (add_prefix(hconf, cfl->ptr)) {
+				if (add_prefix(&hconf->prefix_list,
+				    hconf->name, cfl->ptr)) {
 					dprintf(LOG_ERR, "%s" "failed "
 						"to configure prefix for %s",
 						FNAME, host->name);
@@ -712,6 +728,8 @@ clear_pd_pif(iapdc)
 		free(pif->ifname);
 		free(pif);
 	}
+
+	dhcp6_clear_list(&iapdc->iapd_prefix_list);
 }
 
 static void
@@ -743,10 +761,7 @@ clear_hostconf(hlist)
 		host_next = host->next;
 
 		free(host->name);
-		while ((p = TAILQ_FIRST(&host->prefix_list)) != NULL) {
-			TAILQ_REMOVE(&host->prefix_list, p, link);
-			free(p);
-		}
+		dhcp6_clear_list(&host->prefix_list);
 		if (host->duid.duid_id)
 			free(host->duid.duid_id);
 		free(host);
@@ -763,6 +778,7 @@ add_options(opcode, ifc, cfl0)
 	struct cf_list *cfl;
 	int opttype;
 	struct dhcp6_ia ia;
+	struct iapd_conf *iapdc;
 
 	for (cfl = cfl0; cfl; cfl = cfl->next) {
 		if (opcode ==  DHCPOPTCODE_REQUEST) {
@@ -797,9 +813,10 @@ add_options(opcode, ifc, cfl0)
 		case DHCPOPT_IA_PD:
 			switch(opcode) {
 			case DHCPOPTCODE_SEND:
-				if (find_iaconf_fromhead(
+				iapdc = (struct iapd_conf *)find_iaconf_fromhead(
 				    (struct ia_conf *)iapd_conflist0,
-				    (u_int32_t)cfl->num) == NULL) {
+				    (u_int32_t)cfl->num);
+				if (iapdc == NULL) {
 					dprintf(LOG_ERR, "%s" "%s:%d "
 					    "IA_PD (%lu) is not defined",
 					    FNAME, configfilename, cfl->line,
@@ -819,7 +836,8 @@ add_options(opcode, ifc, cfl0)
 				 * configuration.
 				 */
 				if (dhcp6_add_listval(&ifc->iapd_list,
-				    DHCP6_LISTVAL_IAPD, &ia, NULL) == NULL) {
+				    DHCP6_LISTVAL_IAPD,
+				    &ia, &iapdc->iapd_prefix_list) == NULL) {
 					dprintf(LOG_ERR, "%s" "failed to "
 					    "configure an option", FNAME);
 					return (-1);
@@ -884,8 +902,9 @@ add_options(opcode, ifc, cfl0)
 }
 
 static int
-add_prefix(hconf, prefix0)
-	struct host_conf *hconf;
+add_prefix(head, name, prefix0)
+	struct dhcp6_list *head;
+	char *name;
 	struct dhcp6_prefix *prefix0;
 {
 	struct dhcp6_prefix oprefix;
@@ -902,10 +921,9 @@ add_prefix(hconf, prefix0)
 	prefix6_mask(&oprefix.addr, oprefix.plen);
 	if (!IN6_ARE_ADDR_EQUAL(&prefix0->addr, &oprefix.addr)) {
 		dprintf(LOG_WARNING, "%s" "prefix %s/%d for %s "
-			"has a trailing garbage.  It should be %s/%d",
-			FNAME, in6addr2str(&prefix0->addr, 0), prefix0->plen,
-			hconf->name,
-			in6addr2str(&oprefix.addr, 0), oprefix.plen);
+		    "has a trailing garbage.  It should be %s/%d",
+		    FNAME, in6addr2str(&prefix0->addr, 0), prefix0->plen,
+		    name, in6addr2str(&oprefix.addr, 0), oprefix.plen);
 		/* ignore the error */
 	}
 
@@ -919,12 +937,11 @@ add_prefix(hconf, prefix0)
 	}
 
 	/* prefix duplication check */
-	if (dhcp6_find_listval(&hconf->prefix_list, DHCP6_LISTVAL_PREFIX6,
+	if (dhcp6_find_listval(head, DHCP6_LISTVAL_PREFIX6,
 	    &oprefix, 0)) {
 		dprintf(LOG_NOTICE, "%s"
 		    "duplicated prefix: %s/%d for %s", FNAME,
-		    in6addr2str(&oprefix.addr, 0), oprefix.plen,
-		    hconf->name);
+		    in6addr2str(&oprefix.addr, 0), oprefix.plen, name);
 		return (-1);
 	}
 
@@ -939,7 +956,7 @@ add_prefix(hconf, prefix0)
 	}
 
 	/* insert the new prefix to the chain */
-	if (dhcp6_add_listval(&hconf->prefix_list, DHCP6_LISTVAL_PREFIX6,
+	if (dhcp6_add_listval(head, DHCP6_LISTVAL_PREFIX6,
 	    &oprefix, NULL) == NULL) {
 		return (-1);
 	}
