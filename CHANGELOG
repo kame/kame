@@ -1,5 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2664 2004/08/12 07:56:25 jinmei Exp $
+$KAME: CHANGELOG,v 1.2665 2004/09/04 09:31:29 jinmei Exp $
+
+<200409>
+2004-09-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: added the ability of dhcp6c to work on multiple
+	interfaces simultaneously.
 
 <200408>
 Thu Aug 12 12:54:25 JST 2004	keiichi@iij.ad.jp
