@@ -80,6 +80,7 @@ inet6_rthdr_init(bp, type)
     }
 }
 
+/* ARGSUSED */
 int
 inet6_rthdr_add(cmsg, addr, flags)
     struct cmsghdr *cmsg;
@@ -104,12 +105,15 @@ inet6_rthdr_add(cmsg, addr, flags)
 #endif 
 	     return(-1);
 	 }
+
+#ifdef COMPAT_RFC1883		/* XXX */
 	 if (flags == IPV6_RTHDR_STRICT) {
 	     int c, b;
 	     c = rt0->ip6r0_segleft / 8;
 	     b = rt0->ip6r0_segleft % 8;
 	     rt0->ip6r0_slmap[c] |= (1 << (7 - b));
 	 }
+#endif 
 	 rt0->ip6r0_segleft++;
 	 bcopy(addr, (caddr_t)rt0 + ((rt0->ip6r0_len + 1) << 3),
 	       sizeof(struct in6_addr));
@@ -128,6 +132,7 @@ inet6_rthdr_add(cmsg, addr, flags)
     return(0);
 }
 
+/* ARGSUSED */
 int
 inet6_rthdr_lasthop(cmsg, flags)
     struct cmsghdr *cmsg;
@@ -139,24 +144,28 @@ inet6_rthdr_lasthop(cmsg, flags)
      case IPV6_RTHDR_TYPE_0:
      {
 	 struct ip6_rthdr0 *rt0 = (struct ip6_rthdr0 *)rthdr;
+#ifdef COMPAT_RFC1883		/* XXX */
 	 if (flags != IPV6_RTHDR_LOOSE && flags != IPV6_RTHDR_STRICT) {
 #ifdef DEBUG
 	     fprintf(stderr, "inet6_rthdr_lasthop: unsupported flag(%d)\n", flags);
 #endif 
 	     return(-1);
 	 }
+#endif /* COMPAT_RFC1883 */
 	 if (rt0->ip6r0_segleft > 23) {
 #ifdef DEBUG
 	     fprintf(stderr, "inet6_rthdr_add: segment overflow\n");
 #endif 
 	     return(-1);
 	 }
+#ifdef COMPAT_RFC1883		/* XXX */
 	 if (flags == IPV6_RTHDR_STRICT) {
 	     int c, b;
 	     c = rt0->ip6r0_segleft / 8;
 	     b = rt0->ip6r0_segleft % 8;
 	     rt0->ip6r0_slmap[c] |= (1 << (7 - b));
 	 }
+#endif /* COMPAT_RFC1883 */
 	 break;
      }
      default:
@@ -241,7 +250,7 @@ inet6_rthdr_getaddr(cmsg, index)
 #endif 
 	    return NULL;
 	}
-	return &rt0->ip6r0_addr[index - 1];
+	return(((struct in6_addr *)(rt0 + 1)) + index - 1);
       }
 
     default:
@@ -280,10 +289,14 @@ inet6_rthdr_getflags(cmsg, index)
 #endif 
 	    return -1;
 	}
+#ifdef COMPAT_RFC1883		/* XXX */
 	if (rt0->ip6r0_slmap[index / 8] & (0x80 >> (index % 8)))
 	    return IPV6_RTHDR_STRICT;
 	else
 	    return IPV6_RTHDR_LOOSE;
+#else
+	return IPV6_RTHDR_LOOSE;
+#endif /* COMPAT_RFC1883 */
       }
 
     default:

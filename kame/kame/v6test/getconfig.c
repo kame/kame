@@ -371,6 +371,7 @@ make_rthdr(char *name)
 			hops = (rthdrlen - 8) / sizeof(struct ip6_hdr);
 		rthdr0 = (struct ip6_rthdr0 *)rthdr;
 		rthdr0->ip6r0_reserved = 0;
+#ifdef COMPAT_RFC1883
 		bzero(rthdr0->ip6r0_slmap, 3);
 		for (i = 0; i < hops; i++) {
 			int slflag = 1;
@@ -388,8 +389,8 @@ make_rthdr(char *name)
 				exit(1);
 			}
 			if (inet_pton(AF_INET6, addr,
-				      &rthdr0->ip6r0_addr[i]) != 1) {
-				perror("inet_pton");
+				      ((struct in6_addr *)rthdr0 + 1) + i) != 1) {
+				perror("inet_pton for %s", addr);
 				exit(1);
 			}
 			if (slflag && i < 24) {
@@ -398,6 +399,7 @@ make_rthdr(char *name)
 				rthdr0->ip6r0_slmap[c] |= (1 << (7 - b));
 			}
 		}
+#endif
 		if (rthdrlen == 0)
 			rthdrlen = sizeof(struct ip6_rthdr0) +
 				sizeof(struct in6_addr) * (hops - 1);

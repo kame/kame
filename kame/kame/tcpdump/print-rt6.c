@@ -56,8 +56,10 @@ rt6_print(register const u_char *bp, register const u_char *bp2)
 	register const struct ip6_rthdr0 *dp;
 	register const struct ip6_hdr *ip;
 	register const u_char *ep;
+#ifdef COMPAT_RFC1883		/* XXX */
 	u_long bitmap = 0x0800;
 	u_long slmap;
+#endif 
 	int i, len;
 
 #if 0
@@ -75,12 +77,17 @@ rt6_print(register const u_char *bp, register const u_char *bp2)
 	       ip6addr_string(&ip->ip6_src),
 	       ip6addr_string(&ip->ip6_dst));
 	
+#ifdef COMPAT_RFC1883		/* XXX */
 	TCHECK(dp->ip6r0_slmap[2]);
+#else
+	TCHECK(dp->ip6r0_reserved);
+#endif 
 	printf("srcrt (len=%d, ", dp->ip6r0_len);
 	printf("type=%d, ", dp->ip6r0_type);
 	printf("segleft=%d, ", dp->ip6r0_segleft);
 	if (dp->ip6r0_type != 0)
 		goto trunc;
+#ifdef COMPAT_RFC1883		/* XXX */
 	slmap = (dp->ip6r0_slmap[0] << 16)
 	      | (dp->ip6r0_slmap[1] <<  8)
 	      | (dp->ip6r0_slmap[2]);
@@ -92,6 +99,7 @@ rt6_print(register const u_char *bp, register const u_char *bp2)
 			printf("L");
 		bitmap >>= 1;
 	}
+#endif 
 	if (len % 2 == 1)
 		goto trunc;
 	len >>= 1;
