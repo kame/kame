@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.199 2004/11/28 08:22:15 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.200 2004/11/28 09:18:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4634,8 +4634,6 @@ res_queryN(name, target)
 			limitp = &limit;
 		}
 
-		rtt.tv_sec = 0;
-		rtt.tv_usec = 0;
 		n = res_send_timeout(buf, n, answer, anslen, limitp);
 		if (hp->ancount > 0) {
 			gettimeofday(&rtt, NULL);
