@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.85 2000/07/15 04:55:49 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.86 2000/07/15 12:41:25 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -650,7 +650,7 @@ quick_main(iph2, msg)
 		if (error == ISAKMP_INTERNAL_ERROR)
 			return 0;
 		isakmp_info_send_n2(iph2, error, NULL);
-			return -1;
+		return -1;
 	}
 
 	/* when using commit bit, status will be reached here. */
