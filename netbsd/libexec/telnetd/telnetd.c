@@ -184,7 +184,7 @@ char *progname;
 
 int main __P((int, char *[]));
 void usage __P((void));
-int getterminaltype __P((char *));
+int getterminaltype __P((char *, size_t));
 int getent __P((char *, char *));
 void doit __P((struct sockaddr *));
 void _gettermname __P((void));
@@ -676,8 +676,9 @@ static unsigned char ttytype_sbbuf[] = {
 };
 
     int
-getterminaltype(name)
+getterminaltype(name, len)
     char *name;
+    size_t len;
 {
     int retval = -1;
 
@@ -690,7 +691,7 @@ getterminaltype(name)
     while (his_will_wont_is_changing(TELOPT_AUTHENTICATION))
 	ttloop();
     if (his_state_is_will(TELOPT_AUTHENTICATION)) {
-	retval = auth_wait(name);
+	retval = auth_wait(name, len);
     }
 #endif
 
@@ -956,7 +957,7 @@ doit(who)
 	 * get terminal type.
 	 */
 	*user_name = 0;
-	level = getterminaltype(user_name);
+	level = getterminaltype(user_name, sizeof(user_name));
 	setenv("TERM", terminaltype ? terminaltype : "network", 1);
 
 	/*
