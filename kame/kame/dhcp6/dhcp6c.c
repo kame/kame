@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.74 2002/05/01 15:20:30 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.75 2002/05/08 07:18:09 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -627,6 +627,9 @@ client6_send(ifp, s)
 	    (ifp->send_flags & DHCIFF_RAPID_COMMIT)) {
 		optinfo.rapidcommit = 1;
 	}
+
+	/* option request options */
+	optinfo.requests = ifp->request_options;
 
 	/* set options in the message */
 	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),

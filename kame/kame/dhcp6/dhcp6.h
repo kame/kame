@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.19 2002/05/01 07:01:15 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.20 2002/05/08 07:18:09 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -77,6 +77,7 @@ struct dhcp6_optinfo {
 		int n;
 		char *list;
 	} dns;
+	struct dhcp6_optconf *requests;	/* options in option request */
 };
 
 /* DHCP6 base packet format */
@@ -99,11 +100,34 @@ struct dhcp6_duid_type1 {
 	/* link-layer address follows */
 } __attribute__ ((__packed__));
 
-/* options: TBD */
+/* options */
 #define DH6OPT_CLIENTID	1
 #define DH6OPT_SERVERID	2
-#define DH6OPT_DNS	11
+#define DH6OPT_IA 3
+#define DH6OPT_IA_TMP 4
+#define DH6OPT_IADDR 5
+#define DH6OPT_ORO 6
+#define DH6OPT_PREFERENCE 7
+#define DH6OPT_ELAPSED_TIME 8
+#define DH6OPT_CLIENT_MSG 9
+#define DH6OPT_SERVER_MSG 10
+#define DH6OPT_AUTH 11
+#define DH6OPT_UNICAST 12
+#define DH6OPT_STATUS_CODE 13
 #define DH6OPT_RAPID_COMMIT 14
+#define DH6OPT_USER_CLASS 15
+#define DH6OPT_VENDOR_CLASS 16
+#define DH6OPT_VENDOR_OPTS 17
+#define DH6OPT_INTERFACE_ID 18
+#define DH6OPT_RECONF_MSG 19
+/*
+ * The option type has not been assigned for the following options.
+ * We use type values from 256 temporarily. 
+ */
+#define DH6OPT_DNS 256
+#define DH6OPT_PREFIX_DELEGATION 257
+#define DH6OPT_PREFIX_INFORMATION 258
+#define DH6OPT_PREFIX_REQUEST 259
 
 struct dhcp6opt {
 	u_int16_t dh6opt_type;

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.6 2002/05/01 15:03:59 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.7 2002/05/08 07:18:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -56,9 +56,10 @@ static void cleanup_cflist __P((struct cf_list *));
 
 %token INTERFACE IFNAME
 %token PREFIX_INTERFACE SLA_ID
+%token REQUEST
 %token SEND
 %token ALLOW
-%token RAPID_COMMIT
+%token RAPID_COMMIT PREFIX_DELEGATION
 %token INFO_ONLY
 %token NUMBER SLASH EOS BCL ECL STRING
 
@@ -135,6 +136,14 @@ declaration:
 			l->list = $2;
 			$$ = l;
 		}
+	|	REQUEST dhcpoption EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, DECL_REQUEST);
+			l->list = $2;
+			$$ = l;
+		}
 	|	INFO_ONLY EOS
 		{
 			struct cf_list *l;
@@ -154,14 +163,22 @@ declaration:
 	;
 
 dhcpoption:
-	RAPID_COMMIT
-	{
-		struct cf_list *l;
+		RAPID_COMMIT
+		{
+			struct cf_list *l;
 
-		MAKE_CFLIST(l, DHCPOPT_RAPID_COMMIT);
-		/* no value */
-		$$ = l;
-	}
+			MAKE_CFLIST(l, DHCPOPT_RAPID_COMMIT);
+			/* no value */
+			$$ = l;
+		}
+	|	PREFIX_DELEGATION	
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, DHCPOPT_PREFIX_DELEGATION);
+			/* currently no value */
+			$$ = l;
+		}
 	;
 
 ifparams:

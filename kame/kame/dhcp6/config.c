@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.5 2002/05/08 06:12:50 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.6 2002/05/08 07:18:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -48,9 +48,9 @@ struct dhcp6_if *dhcp6_if;
 static struct dhcp6_ifconf *dhcp6_ifconflist;
 static struct prefix_ifconf *prefix_ifconflist0, *prefix_ifconflist;
 
-static int add_options __P((struct dhcp6_ifconf *, struct dhcp6_optconf **,
-			    u_long *, struct cf_list *));
+enum { DHCPOPTCODE_SEND, DHCPOPTCODE_REQUEST, DHCPOPTCODE_ALLOW };
 
+static int add_options __P((int, struct dhcp6_ifconf *, struct cf_list *));
 static void clear_ifconf __P((struct dhcp6_ifconf *));
 static void clear_prefixifconf __P((struct prefix_ifconf *));
 static void clear_options __P((struct dhcp6_optconf *));
@@ -128,17 +128,21 @@ configure_interface(iflist)
 
 		for (cfl = ifp->params; cfl; cfl = cfl->next) {
 			switch(cfl->type) {
+			case DECL_REQUEST:
+				if (add_options(DHCPOPTCODE_REQUEST,
+						ifc, cfl->list)) {
+					goto bad;
+				}
+				break;
 			case DECL_SEND:
-				if (add_options(ifc, &ifc->send_options,
-						&ifc->send_flags,
-						cfl->list)) {
+				if (add_options(DHCPOPTCODE_SEND,
+						ifc, cfl->list)) {
 					goto bad;
 				}
 				break;
 			case DECL_ALLOW:
-				if (add_options(ifc, &ifc->allow_options,
-						&ifc->allow_flags,
-						cfl->list)) {
+				if (add_options(DHCPOPTCODE_ALLOW,
+						ifc, cfl->list)) {
 					goto bad;
 				}
 				break;
@@ -290,6 +294,8 @@ configure_commit()
 			ifp->allow_flags = ifc->allow_flags;
 			clear_options(ifp->send_options);
 			ifp->send_options = ifc->send_options;
+			clear_options(ifp->request_options);
+			ifp->request_options = ifc->request_options;
 			ifc->send_options = NULL;
 		}
 	}
@@ -349,20 +355,51 @@ clear_options(opt0)
 }
 
 static int
-add_options(ifc, optp0, flagp, cfl0)
+add_options(opcode, ifc, cfl0)
+	int opcode;
 	struct dhcp6_ifconf *ifc;
-	struct dhcp6_optconf **optp0;
-	u_long *flagp;
 	struct cf_list *cfl0;
 {
 	struct dhcp6_optconf *opt, **optp;
 	struct cf_list *cfl;
 
-	optp = optp0;
 	for (cfl = cfl0; cfl; cfl = cfl->next) {
 		switch(cfl->type) {
 		case DHCPOPT_RAPID_COMMIT:
-			*flagp |= DHCIFF_RAPID_COMMIT;
+			switch(opcode) {
+			case DHCPOPTCODE_SEND:
+				ifc->send_flags |= DHCIFF_RAPID_COMMIT;
+				break;
+			case DHCPOPTCODE_ALLOW:
+				ifc->allow_flags |= DHCIFF_RAPID_COMMIT;
+				break;
+			default:
+				dprintf(LOG_ERR, "invalid operation (%d) "
+					"for option type (%d)",
+					opcode, cfl->type);
+				return(-1);
+			}
+			break;
+		case DHCPOPT_PREFIX_DELEGATION:
+			switch(opcode) {
+			case DHCPOPTCODE_REQUEST:
+				if ((opt = (struct dhcp6_optconf *)
+				     malloc(sizeof(*opt))) == NULL) {
+					dprintf(LOG_ERR, "add_options: "
+						"memory allocation failed");
+					return(-1);
+				}
+				memset(opt, 0, sizeof(*opt));
+				opt->type = DH6OPT_PREFIX_DELEGATION;
+				opt->next = ifc->request_options;
+				ifc->request_options = opt;
+				break;
+			default:
+				dprintf(LOG_ERR, "invalid operation (%d) "
+					"for option type (%d)",
+					opcode, cfl->type);
+				break;
+			}
 			break;
 		default:
 			dprintf(LOG_ERR, "unknown option type: %d", cfl->type);

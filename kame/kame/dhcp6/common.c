@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.38 2002/05/01 10:54:54 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.39 2002/05/08 07:18:08 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -73,6 +73,7 @@
 
 #include <dhcp6.h>
 #include <common.h>
+#include <config.h>
 
 int foreground;
 int debug_thresh;
@@ -257,6 +258,27 @@ random_between(x, y)
 	while ((y - x) * ratio < (y - x))
 		ratio = ratio / 2;
 	return x + ((y - x) * (ratio - 1) / random() & (ratio - 1));
+}
+
+int
+sa6_plen2mask(sa6, plen)
+	struct sockaddr_in6 *sa6;
+	int plen;
+{
+	u_char *cp;
+
+	if (plen < 0 || plen > 128)
+		return(-1);
+
+	memset(sa6, 0, sizeof(*sa6));
+	sa6->sin6_family = AF_INET6;
+	sa6->sin6_len = sizeof(*sa6);
+	
+	for (cp = (u_char *)&sa6->sin6_addr; plen > 7; plen -= 8)
+		*cp++ = 0xff;
+	*cp = 0xff << (8 - plen);
+
+	return(0);
 }
 
 char *
@@ -575,7 +597,7 @@ dhcp6_get_options(p, ep, optinfo)
 #define COPY_OPTION(t, l, v, p) do { \
 	if ((void *)(ep) - (void *)(p) < (l) + sizeof(struct dhcp6opt)) { \
 		dprintf(LOG_INFO, "option buffer short for %s", dhcpoptstr((t))); \
-		return(-1); \
+		goto fail; \
 	} \
 	(p)->dh6opt_type = htons((t)); \
 	(p)->dh6opt_len = htons((l)); \
@@ -593,6 +615,7 @@ dhcp6_set_options(bp, ep, optinfo)
 {
 	struct dhcp6opt *p = bp;
 	int len = 0;
+	char *tmpbuf = NULL;
 
 	if (optinfo->clientID.duid_len) {
 		COPY_OPTION(DH6OPT_CLIENTID, optinfo->clientID.duid_len,
@@ -613,7 +636,36 @@ dhcp6_set_options(bp, ep, optinfo)
 			    optinfo->dns.list, p);
 	}
 
+	if (optinfo->requests) {
+		int nopts, optlen;
+		struct dhcp6_optconf *opt;
+		u_int16_t *valp;
+
+		/* calculate the number of options */
+		tmpbuf = NULL;
+		for (nopts = 0, opt = optinfo->requests; opt;
+		     opt = opt->next, nopts++)
+			;
+		optlen = nopts * sizeof(u_int16_t);
+		if ((tmpbuf = malloc(optlen)) == NULL) {
+			dprintf(LOG_ERR,
+				"memory allocation failed for options");
+			goto fail;
+		}
+		for (opt = optinfo->requests, valp = (u_int16_t *)tmpbuf; opt;
+		     opt = opt->next, valp++) {
+			*valp = htons(opt->type);
+		}
+		COPY_OPTION(DH6OPT_ORO, optlen, tmpbuf, p);
+		free(tmpbuf);
+	}
+
 	return(len);
+
+  fail:
+	if (tmpbuf)
+		free(tmpbuf);
+	return(-1);
 }
 #undef COPY_OPTION
 
@@ -621,7 +673,7 @@ char *
 dhcpoptstr(type)
 	int type;
 {
-	static char genstr[sizeof("opt65535") + 1]; /* XXX thread unsafe */
+	static char genstr[sizeof("opt_65535") + 1]; /* XXX thread unsafe */
 
 	if (type > 65535)
 		return "INVALID option";
@@ -631,12 +683,14 @@ dhcpoptstr(type)
 		return "client ID";
 	case DH6OPT_SERVERID:
 		return "server ID";
-	case DH6OPT_DNS:
-		return "DNS";
+	case DH6OPT_ORO:
+		return "option request";
 	case DH6OPT_RAPID_COMMIT:
 		return "rapid commit";
+	case DH6OPT_DNS:
+		return "DNS";
 	default:
-		sprintf(genstr, "opt%d", type);
+		sprintf(genstr, "opt_%d", type);
 		return(genstr);
 	}
 }

@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.6 2002/05/02 12:07:57 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.7 2002/05/08 07:18:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -58,6 +58,7 @@ struct dhcp6_if {
 #define DHCIFF_RAPID_COMMIT 0x2
 
 	struct dhcp6_optconf *send_options;
+	struct dhcp6_optconf *request_options;
 };
 
 /* client status code */
@@ -72,6 +73,7 @@ struct dhcp6_ifconf {
 	u_long send_flags;
 	u_long allow_flags;
 
+	struct dhcp6_optconf *request_options;
 	struct dhcp6_optconf *send_options;
 	struct dhcp6_optconf *allow_options;
 };
@@ -84,8 +86,11 @@ struct prefix_ifconf {
 	int sla_len;
 	u_int32_t sla_id;  /* need more than 32bits? */
 	int ifid_len;
-	int ifid_type;
+	int ifid_type;		/* EUI-64 and manual (unused?) */
+	char ifid[16];		/* up to 128bits */
 };
+
+#define IFID_LEN_DEFAULT 64
 
 /* DHCP option information */
 struct dhcp6_optconf {
@@ -112,9 +117,9 @@ struct cf_list {
 	void *ptr;
 };
 
-enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY,
+enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY, DECL_REQUEST,
       IFPARAM_SLA_ID,
-      DHCPOPT_RAPID_COMMIT};
+      DHCPOPT_RAPID_COMMIT, DHCPOPT_PREFIX_DELEGATION};
 
 extern struct dhcp6_ifconf *dhcp6_iflist;
 

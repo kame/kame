@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.5 2002/05/01 14:46:06 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.6 2002/05/08 07:18:08 jinmei Exp $	*/
 
 %{
 /*
@@ -103,11 +103,15 @@ ecl		\}
 	return(IFNAME);
 }
 
+	/* request */
+<S_CNF>request { DECHO; return(REQUEST); }
+
 	/* send */
 <S_CNF>send { DECHO; return(SEND); }
 
 	/* DHCP options */
 <S_CNF>rapid-commit { DECHO; return(RAPID_COMMIT); }
+<S_CNF>prefix-delegation { DECHO; return(PREFIX_DELEGATION); }
 
 	/* generic options */
 <S_CNF>information-only { DECHO; return(INFO_ONLY); }
