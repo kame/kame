@@ -32,13 +32,8 @@ extern int debug;
 #define dprintf(x)	{ if (debug) fprintf x; }
 extern char *device;
 
-#if 0
-#define PCAP_TIMEOUT	100	/*ms*/
-
-/* client.c */
-void poll_register __P((void (*)()));
-void callback_register __P((int, pcap_t *, void (*)()));
-
-/* client4.c */
-void client4_init __P((void));
-#endif
+/* common.c */
+extern int getifaddr __P((struct in6_addr *, char *, struct in6_addr *, int));
+extern int transmit_sa __P((int, struct sockaddr *, int, char *, size_t));
+extern int transmit __P((int, char *, char *, int, char *, size_t));
+extern long random_between __P((long, long));

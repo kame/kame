@@ -1,5 +1,5 @@
 #
-# $Id: Makefile.in,v 1.1 1999/09/11 16:29:33 itojun Exp $
+# $Id: Makefile.in,v 1.2 1999/09/12 04:20:11 itojun Exp $
 #
 
 srcdir=	@srcdir@
@@ -16,8 +16,8 @@ exec_prefix=	@exec_prefix@
 bindir=	@bindir@
 mandir=	@mandir@
 
-CLIENTOBJS=	dhcp6c.o
-SERVOBJS=	dhcp6s.o
+CLIENTOBJS=	dhcp6c.o common.o
+SERVOBJS=	dhcp6s.o common.o
 
 all:	$(TARGET) 
 dhcp6c:	$(CLIENTOBJS) $(LIBOBJS)

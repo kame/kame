@@ -27,25 +27,28 @@
  * SUCH DAMAGE.
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <string.h>
-#include <err.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/errno.h>
 #include <sys/ioctl.h>
-#include <sys/queue.h>
-#include <netdb.h>
-#include <net/if_arp.h>
-#include <net/if.h>
+#if TIME_WITH_SYS_TIME
+# include <sys/time.h>
+# include <time.h>
+#else
+# if HAVE_SYS_TIME_H
+#  include <sys/time.h>
+# else
+#  include <time.h>
+# endif
+#endif
 #include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/ip.h>
-#include <netinet/udp.h>
-#include <netinet/if_ether.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <string.h>
+#include <err.h>
+#include <netdb.h>
 
 #include <dhcp6.h>
 #include <common.h>
@@ -88,7 +91,6 @@ static void mainloop __P((void));
 #if 0
 void callback_register __P((int, pcap_t *, void (*)()));
 #endif
-static int transmit __P((int, char *, char *, int, char *, size_t));
 static void client6_init __P((void));
 static void client6_mainloop __P((void));
 static void client6_findserv __P((void));
@@ -222,106 +224,6 @@ callback_register(fd, cap, func)
 }
 #endif
 
-static int
-getlifaddr(addr, ifnam)
-	struct in6_addr *addr;
-	char *ifnam;
-{
-	int s;
-	unsigned int maxif;
-	struct ifreq *iflist;
-	struct ifconf ifconf;
-	struct ifreq *ifr, *ifr_end;
-	struct sockaddr_in6 sin6;
-	int error;
-
-#if 0
-	maxif = if_maxindex() + 1;
-#else
-	maxif = 1;
-#endif
-	iflist = (struct ifreq *)malloc(maxif * BUFSIZ);	/* XXX */
-	if (!iflist) {
-		errx(1, "not enough core");
-		/*NOTREACHED*/
-	}
-
-	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) < 0) {
-		err(1, "socket(SOCK_DGRAM)");
-		/*NOTREACHED*/
-	}
-	memset(&ifconf, 0, sizeof(ifconf));
-	ifconf.ifc_req = iflist;
-	ifconf.ifc_len = maxif * BUFSIZ;	/* XXX */
-	if (ioctl(s, SIOCGIFCONF, &ifconf) < 0) {
-		err(1, "ioctl(SIOCGIFCONF)");
-		/*NOTREACHED*/
-	}
-	close(s);
-
-	/* Look for this interface in the list */
-	error = ENOENT;
-	ifr_end = (struct ifreq *) (ifconf.ifc_buf + ifconf.ifc_len);
-	for (ifr = ifconf.ifc_req;
-	     ifr < ifr_end;
-	     ifr = (struct ifreq *) ((char *) &ifr->ifr_addr
-				    + ifr->ifr_addr.sa_len)) {
-		if (strcmp(ifnam, ifr->ifr_name) != 0)
-			continue;
-		if (ifr->ifr_addr.sa_family != AF_INET6)
-			continue;
-		memcpy(&sin6, &ifr->ifr_addr, ifr->ifr_addr.sa_len);
-		if (!IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr))
-			continue;
-		memcpy(addr, &sin6.sin6_addr, sizeof(sin6.sin6_addr));
-		error = 0;
-		break;
-	}
-
-	free(iflist);
-	close(s);
-	return error;
-}
-
-static int
-transmit(s, addr, port, hlim, buf, len)
-	int s;
-	char *addr;
-	char *port;
-	int hlim;
-	char *buf;
-	size_t len;
-{
-	struct addrinfo hints, *res;
-	int error;
-
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = PF_INET6;
-	hints.ai_socktype = SOCK_DGRAM;
-	error = getaddrinfo(addr, port, &hints, &res);
-	if (error) {
-		errx(1, "getaddrinfo(%s): %s", addr, gai_strerror(error));
-		/*NOTREACHED*/
-	}
-	if (res->ai_next) {
-		errx(1, "getaddrinfo(%s): %s", addr,
-			"resolved to multiple addrs");
-		/*NOTREACHED*/
-	}
-
-	dprintf((stderr, "hoplimit=%d\n", hlim));
-	if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &hlim,
-			sizeof(hlim)) < 0) {
-		err(1, "setsockopt(IPV6_MULTICAST_HOPS)");
-		/*NOTREACHED*/
-	}
-
-	error = sendto(s, buf, len, 0, res->ai_addr, res->ai_addrlen);
-
-	freeaddrinfo(res);
-	return (error != len) ? -1 : 0;
-}
-
 /*------------------------------------------------------------*/
 
 void
@@ -447,9 +349,7 @@ client6_findserv()
 	/* send solicit, wait for advert */
 	timeo = 0;
 	sendtime = time(NULL);
-	delaytime = MIN_SOLICIT_DELAY;
-	delaytime += (MAX_SOLICIT_DELAY - MIN_SOLICIT_DELAY)
-		* (random() & 0xff) / 0xff;
+	delaytime = random_between(MIN_SOLICIT_DELAY, MAX_SOLICIT_DELAY);
 	waittime = 0;
 	while (1) {
 		t = time(NULL);
@@ -499,8 +399,8 @@ client6_findserv()
 				timeo++;
 				sendtime = time(NULL);
 				delaytime *= 2;
-				delaytime += (MAX_SOLICIT_DELAY - MIN_SOLICIT_DELAY)
-					* (random() & 0xff) / 0xff;
+				delaytime += random_between(MIN_SOLICIT_DELAY,
+					MAX_SOLICIT_DELAY);
 				waittime = ADV_CLIENT_WAIT;
 			}
 			break;
@@ -528,13 +428,15 @@ client6_sendsolicit(s)
 	struct dhcp6_solicit *dh6s;
 	size_t len;
 	const int firsttime = 1;
+	struct in6_addr target;
 
 	dh6s = (struct dhcp6_solicit *)buf;
 	len = sizeof(*dh6s);
 	memset(dh6s, 0, sizeof(*dh6s));
 	dh6s->dh6sol_msgtype = DH6_SOLICIT;
-	if (getlifaddr(&dh6s->dh6sol_cliaddr, device) != 0) {
-		errx(1, "getlifaddr failed");
+	inet_pton(AF_INET6, "fe80::", &target, sizeof(target));
+	if (getifaddr(&dh6s->dh6sol_cliaddr, device, &target, 10) != 0) {
+		errx(1, "getifaddr failed");
 		/*NOTREACHED*/
 	}
 #ifdef __KAME__
