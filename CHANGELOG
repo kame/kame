@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1564 2001/02/21 05:26:15 sakane Exp $
+$KAME: CHANGELOG,v 1.1565 2001/02/21 16:46:24 itojun Exp $
 
 <200102>
+Thu Feb 22 01:59:01 JST 2001  itojun@iijlab.net
+	* sys/netinet6/{dest6,nd6}.c: make variable length header parsing
+	  pickier.
+	* openbsd/include/netdb.h: change ai_addrlen from int to socklen_t,
+	  to conform to 2553bis-03.
+
 Wed Feb 21 14:25:55 JST 2001 sakane@ydc.co.jp
 	* racoon:
 	changed the proposal order of the protocol in the phase 2.
