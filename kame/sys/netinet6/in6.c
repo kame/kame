@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.176 2001/02/16 12:49:45 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.177 2001/02/16 15:14:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -586,7 +586,7 @@ in6_control(so, cmd, data, ifp)
 					htons(ifp->if_index);
 			} else if (sa6->sin6_addr.s6_addr16[1] !=
 				    htons(ifp->if_index)) {
-				return(EINVAL);	/* link ID is contradict */
+				return(EINVAL);	/* link ID contradicts */
 			}
 			if (sa6->sin6_scope_id) {
 				if (sa6->sin6_scope_id !=
