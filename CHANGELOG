@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1840 2001/08/14 06:16:42 suz Exp $
+$KAME: CHANGELOG,v 1.1841 2001/08/14 13:22:08 keiichi Exp $
 
 <200108>
+2001-08-14 Keiichi SHIMA <keiichi@iij.ad.jp>
+	* add a home agents list timeout routine.
+	* add some init functions.
+
 Tue Aug 14 15:01:57 JST 2001	suz@sdl.hitachi.co.jp
 	* kame/pim6sd: explicitly assigns NULL to pointers in newly-
 	malloced structures if there's no specific pointer to be assigned.
@@ -25,6 +29,12 @@ Mon Aug 13 22:03:28 JST 2001 sakane@kame.net
 	It also introduced additional data validation.  For example,
 	IPV6_USE_MIN_MTU is not allowed in the context of RFC2292 (i.e. by
 	the IPV6_PKTOPTIONS.)
+
+2001-08-09, Keiichi SHIMA <keiichi@iij.ad.jp>
+	* add a relay routine for an icmp against an encaplulated packet.
+	not tested.
+	* free mbuf in case error in the functions that has an mbuf pointer
+	in its	argument list.
 
 Thu Aug  9 09:37:44 BST 2001	suz@sdl.hitachi.co.jp
 	* kame/kame/pim6sd: s/vifi_t/mifi_t/ to sync with kernel implementation
@@ -57,6 +67,24 @@ Mon Aug  6 21:18:58 BST 2001	suz@sdl.hitachi.co.jp
 Sun Aug  5 14:00:04 JST 2001  itojun@iijlab.net
 	* sys/netinet6/ipsec.c: improve cached ipsec policy lookup on connected
 	  SOCK_STREAM PCBs.
+
+2001-08-03  Keiichi SHIMA <keiichi@iij.ad.jp>
+
+	add mobileip source code.
+
+	currently, many parts of spec are not implemented yet.  even
+	uncompilable under other than freebsd4 now.  also very
+	unstable.  of course, without MIP6 kernel option, there is no
+	problem. all mip6 related code is separated by ifdef MIP6.
+
+	this integration is just for KAME mip6 developper's
+	convinience.  the purpose of this early integration is to
+	decrease the maintenance cost to synchronize KAME main tree
+	and developping mip6 tree.  after this merge, mip6 code
+	modifications are reflected directly to KAME code.
+
+	i will make these codes compilable on the other OSes as soon
+	as possible.
 
 2001-08-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/advapitest/sender.c (main): added a new option '-n
