@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.20 2000/05/31 12:10:12 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.21 2000/05/31 12:12:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -335,7 +335,7 @@ hexdump(title, buf, len, from)
 	const char *d, *n;
 	int count;
 
-	dprintf("===\n%s\n", title);
+	printf("===\n%s\n", title);
 
 	if (getnameinfo(from, from->sa_len, hbuf, sizeof(hbuf),
 	    pbuf, sizeof(pbuf), niflags) != 0) {
@@ -343,26 +343,26 @@ hexdump(title, buf, len, from)
 		strncpy(pbuf, "?", sizeof(pbuf));
 	}
 
-	dprintf("host %s port %s myaddr %d\n", hbuf, pbuf, ismyaddr(from));
+	printf("host %s port %s myaddr %d\n", hbuf, pbuf, ismyaddr(from));
 	for (i = 0; i < len; i++) {
 		if (i % 16 == 0)
-			dprintf("%08x: ", i);
-		dprintf("%02x", buf[i] & 0xff);
+			printf("%08x: ", i);
+		printf("%02x", buf[i] & 0xff);
 		if (i % 16 == 15)
-			dprintf("\n");
+			printf("\n");
 	}
 	if (len % 16 != 0)
-		dprintf("\n");
+		printf("\n");
 
 	if (sizeof(*hp) > len) {
-		dprintf("packet too short, %d\n", len);
+		printf("packet too short, %d\n", len);
 		return -1;
 	}
 	hp = (HEADER *)buf;
-	dprintf("id: %04x qr: %u opcode: %u rcode: %u %u/%u/%u/%u/%u/%u/%u\n",
+	printf("id: %04x qr: %u opcode: %u rcode: %u %u/%u/%u/%u/%u/%u/%u\n",
 	    ntohs(hp->id), hp->qr, hp->opcode, hp->rcode,
 	    hp->qr, hp->aa, hp->tc, hp->rd, hp->ra, hp->ad, hp->cd);
-	dprintf("qd: %u an: %u ns: %u ar: %u\n",
+	printf("qd: %u an: %u ns: %u ar: %u\n",
 	    ntohs(hp->qdcount), ntohs(hp->ancount), ntohs(hp->nscount), 
 	    ntohs(hp->arcount));
 
@@ -372,7 +372,7 @@ hexdump(title, buf, len, from)
 		/* print questions section */
 		count = ntohs(hp->qdcount);
 		if (count)
-			dprintf("question section:\n");
+			printf("question section:\n");
 		while (count--) {
 			if (d - buf > len)
 				break;
@@ -381,8 +381,8 @@ hexdump(title, buf, len, from)
 				break;
 			if (d - buf + 4 > len)
 				break;
-			dprintf("%s", n);
-			dprintf(" qtype %u qclass %u\n",
+			printf("%s", n);
+			printf(" qtype %u qclass %u\n",
 			    ntohs(*(u_int16_t *)&d[0]),
 			    ntohs(*(u_int16_t *)&d[2]));
 			d += 4;
@@ -393,7 +393,7 @@ hexdump(title, buf, len, from)
 		/* print answers section */
 		count = ntohs(hp->ancount);
 		if (count)
-			dprintf("answers section:\n");
+			printf("answers section:\n");
 		while (count--) {
 			if (d - buf > len)
 				break;
@@ -404,17 +404,17 @@ hexdump(title, buf, len, from)
 				break;
 			if (d - buf + 10 + ntohs(*(u_int16_t *)&d[8]) > len)
 				break;
-			dprintf("%s", n);
-			dprintf(" qtype %u qclass %u",
+			printf("%s", n);
+			printf(" qtype %u qclass %u",
 			    ntohs(*(u_int16_t *)&d[0]),
 			    ntohs(*(u_int16_t *)&d[2]));
-			dprintf(" ttl %d rdlen %u ",
+			printf(" ttl %d rdlen %u ",
 			    (int32_t)ntohl(*(u_int32_t *)&d[4]),
 			    ntohs(*(u_int16_t *)&d[8]));
 			for (i = 0; i < ntohs(*(u_int16_t *)&d[8]); i++)
-				dprintf("%02x", d[10 + i] & 0xff);
+				printf("%02x", d[10 + i] & 0xff);
 			d += 10 + ntohs(*(u_int16_t *)&d[8]);
-			dprintf("\n");
+			printf("\n");
 
 			/* LINTED const cast */
 			free((char *)n);
@@ -583,7 +583,8 @@ getans(s, buf, len, from)
 		return -1;
 	hp = (HEADER *)buf;
 
-	hexdump("getans I", buf, len, from);
+	if (dflag)
+		hexdump("getans I", buf, len, from);
 
 	/* we handle successful replies only  XXX negative cache */
 	if (hp->qr != 1 || hp->rcode != NOERROR)
@@ -612,7 +613,8 @@ getans(s, buf, len, from)
 
 	hp->id = ohp->id;
 	hp->ra = 0;	/* recursion not supported */
-	hexdump("getans O", buf, len, (struct sockaddr *)&qc->from);
+	if (dflag)
+		hexdump("getans O", buf, len, (struct sockaddr *)&qc->from);
 	if (sendto(s, buf, len, 0, (struct sockaddr *)&qc->from,
 	    qc->from.ss_len) != len) {
 		delqcache(qc);
@@ -651,7 +653,8 @@ relay(buf, len, from)
 		return -1;
 	hp = (HEADER *)buf;
 
-	hexdump("relay I", buf, len, from);
+	if (dflag)
+		hexdump("relay I", buf, len, from);
 	if (hp->qr == 0 && hp->opcode == QUERY) {
 		/* query, no recurse - multicast it */
 		qc = newqcache(from, buf, len);
@@ -674,7 +677,8 @@ relay(buf, len, from)
 
 				sa = (struct sockaddr *)&ns->addr;
 
-				hexdump("relay O", buf, len, sa);
+				if (dflag)
+					hexdump("relay O", buf, len, sa);
 				if (sendto(sock[i], buf, len, 0, sa,
 				    sa->sa_len) == len) {
 					sent++;
@@ -714,7 +718,8 @@ serve(s, buf, len, from)
 	int l;
 	int count;
 
-	hexdump("serve I", buf, len, from);
+	if (dflag)
+		hexdump("serve I", buf, len, from);
 
 	/* we handle queries only */
 	if (sizeof(*hp) > len)
@@ -755,7 +760,8 @@ serve(s, buf, len, from)
 		p += l;
 		hp->ancount = htons(count);
 
-		hexdump("serve O", replybuf, p - replybuf, from);
+		if (dflag)
+			hexdump("serve O", replybuf, p - replybuf, from);
 
 		sendto(s, replybuf, p - replybuf, 0, from, from->sa_len);
 
@@ -803,7 +809,8 @@ serve(s, buf, len, from)
 		*(u_int16_t *)q = htons(p - q - sizeof(u_int16_t));
 		hp->ancount = htons(1);
 
-		hexdump("serve D", replybuf, p - replybuf, from);
+		if (dflag)
+			hexdump("serve D", replybuf, p - replybuf, from);
 
 		sendto(s, replybuf, p - replybuf, 0, from, from->sa_len);
 
