@@ -1,4 +1,4 @@
-/*	$KAME: if_indextoname.c,v 1.5 2000/11/07 22:25:45 jinmei Exp $	*/
+/*	$KAME: if_indextoname.c,v 1.6 2000/11/07 22:33:25 jinmei Exp $	*/
 
 /*-
  * Copyright (c) 1997, 2000
@@ -32,6 +32,7 @@
 #include <ifaddrs.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 /*
  * From RFC 2533:
@@ -58,9 +59,10 @@ char *
 if_indextoname(unsigned int ifindex, char *ifname)
 {
 	struct ifaddrs *ifaddrs, *ifa;
+	int error = 0;
 
 	if (getifaddrs(&ifaddrs) < 0)
-		return(NULL);
+		return(NULL);	/* getifaddrs properly set errno */
 
 	for (ifa = ifaddrs; ifa != NULL; ifa = ifa->ifa_next) {
 		if (ifa->ifa_addr &&
@@ -69,12 +71,15 @@ if_indextoname(unsigned int ifindex, char *ifname)
 			break;
 	}
 
-	if (ifa == NULL)
+	if (ifa == NULL) {
+		error = ENXIO;
 		ifname = NULL;
+	}
 	else
 		strncpy(ifname, ifa->ifa_name, IFNAMSIZ);
 
 	freeifaddrs(ifaddrs);
 
+	errno = error;
 	return(ifname);
 }
