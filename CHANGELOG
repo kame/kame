@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.223 1999/10/27 05:57:01 sakane Exp $
+$Id: CHANGELOG,v 1.224 1999/10/27 08:16:59 jinmei Exp $
 
 <199910>
+1999-10-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/rp.c (delete_grp_mask_entry): 
+	  fixed a bug of rearraging the group list.
+	  I believe the bug was derived from original pimd.
+
 Wed Oct 27 14:49:09 JST 1999 sakane@ydc.co.jp
 	* kame/sys/netkey/key.c:
 	We don't always try to allocate new SA.  It's no need if the state
