@@ -1051,7 +1051,6 @@ static void
 getdefif()
 {
 	struct in6_ndifreq ndifreq;
-	unsigned int ifindex;
 	char ifname[IFNAMSIZ+8];
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) 
@@ -1067,7 +1066,7 @@ getdefif()
 		printf("No default interface.\n");
 	else {
 		if ((if_indextoname(ndifreq.ifindex, ifname)) == NULL)
-			err(1, "failed to resolve ifname for index %d",
+			err(1, "failed to resolve ifname for index %lu",
 			    ndifreq.ifindex);
 		printf("ND default interface = %s\n", ifname);
 	}
