@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1003 2000/06/13 02:31:17 jinmei Exp $
+$Id: CHANGELOG,v 1.1004 2000/06/13 02:47:21 jinmei Exp $
 
 <200006>
+2000-06-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (in6_ifadd): made sure to gain a
+	reference counter to in6_ifaddr for the autoconfigured address
+	in bsdi and freebsd2 cases.
+	This fix would be important to those OSes, since the older code
+	woulde cause duplicated free when the lifetime for the address
+	expired.
+
 2000-06-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/common.c (getifaddr): corrected arguments to
 	in6_addrscopebyif().
