@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.8,v 1.7 2000/05/16 13:34:14 itojun Exp $
+.\"	$KAME: rtadvd.8,v 1.8 2000/05/22 22:12:11 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -39,7 +39,7 @@
 .Op Fl dDfmRs
 .Ar interface ...
 .Sh DESCRIPTION
-.Nm Rtadvd
+.Nm
 advertises router advertisement packet to the specified
 .Ar interfaces .
 .Pp
@@ -60,7 +60,7 @@ In particular,
 reads all the interface routes from the routing table and advertises
 them as on-link prefixes.
 .Pp
-.Nm Rtadvd
+.Nm
 also watches the routing table.
 By default, if an interface direct route is
 added/deleted on an advertising interface,
