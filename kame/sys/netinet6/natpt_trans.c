@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.33 2001/05/31 14:04:20 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.34 2001/06/09 12:11:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -572,6 +572,7 @@ translatingICMPv4To6(struct _cv *cv4, struct pAddr *pad)
 
       case ICMP_UNREACH:
 	tr_icmp4Unreach(cv4, &cv6, pad);
+	tr_icmp4MimicPayload(cv4, &cv6, pad);
 	break;
 
       case ICMP_ECHO:
@@ -580,6 +581,7 @@ translatingICMPv4To6(struct _cv *cv4, struct pAddr *pad)
 
       case ICMP_TIMXCEED:
 	tr_icmp4Timxceed(cv4, &cv6, pad);
+	tr_icmp4MimicPayload(cv4, &cv6, pad);
 	break;
 
       case ICMP_PARAMPROB:
@@ -705,8 +707,6 @@ tr_icmp4Unreach(struct _cv *cv4, struct _cv *cv6, struct pAddr *pad)
       default:
 	break;
     }
-
-    tr_icmp4MimicPayload(cv4, cv6, pad);
 }
 
 
@@ -752,8 +752,6 @@ tr_icmp4Timxceed(struct _cv *cv4, struct _cv *cv6, struct pAddr *pad)
     icmp6->icmp6_code = 0;
     icmp6->icmp6_id   = icmp4->icmp_id;
     icmp6->icmp6_seq  = icmp4->icmp_seq;
-
-    tr_icmp4MimicPayload(cv4, cv6, pad);
 }
 
 
@@ -775,9 +773,8 @@ tr_icmp4MimicPayload(struct _cv *cv4, struct _cv *cv6, struct pAddr *pad)
 {
     int			 dgramlen;
     int			 icmp6dlen, icmp6rest;
-    struct ip		*ip4 = cv6->_ip._ip4;
-    struct ip6_hdr	*ip6 = cv6->_ip._ip6;
-    struct ip6_hdr	*icmpip6;
+    struct ip		*icmpip4, *ip4 = cv4->_ip._ip4;
+    struct ip6_hdr	*icmpip6, *ip6 = cv6->_ip._ip6;
     caddr_t		 icmp4off, icmp4dgramoff;
     caddr_t		 icmp6off, icmp6dgramoff;
     caddr_t		 icmp4end = (caddr_t)ip4 + cv4->m->m_pkthdr.len;
@@ -792,6 +789,7 @@ tr_icmp4MimicPayload(struct _cv *cv4, struct _cv *cv6, struct pAddr *pad)
     icmp4dgramoff = icmp4off + sizeof(struct ip);
     icmp6dgramoff = icmp6off + sizeof(struct ip6_hdr);
 
+    icmpip4 = (struct ip *)icmp4off;
     icmpip6 = (struct ip6_hdr *)icmp6off;
     bzero(icmpip6, sizeof(struct ip6_hdr));
     bcopy(icmp4dgramoff, icmp6dgramoff, dgramlen);
@@ -799,9 +797,9 @@ tr_icmp4MimicPayload(struct _cv *cv4, struct _cv *cv6, struct pAddr *pad)
     icmpip6->ip6_flow = 0;
     icmpip6->ip6_vfc &= ~IPV6_VERSION_MASK;
     icmpip6->ip6_vfc |=	 IPV6_VERSION;
-    icmpip6->ip6_plen = 0;
-    icmpip6->ip6_nxt  = IPPROTO_UDP;
-    icmpip6->ip6_hlim = 0;
+    icmpip6->ip6_plen = htons(ntohs(icmpip4->ip_len) - sizeof(struct ip6_hdr));
+    icmpip6->ip6_nxt  = icmpip4->ip_p;
+    icmpip6->ip6_hlim = icmpip4->ip_ttl;
     icmpip6->ip6_src  = pad->in6dst;
     icmpip6->ip6_dst  = pad->in6src;
 
@@ -811,13 +809,26 @@ tr_icmp4MimicPayload(struct _cv *cv4, struct _cv *cv6, struct pAddr *pad)
       = cv6->m->m_len
       = sizeof(struct ip6_hdr) + htons(ip6->ip6_plen);
 
-    if (cv4->flags & NATPT_TRACEROUTE)
+    switch (((struct icmp *)icmp4dgramoff)->icmp_type)
     {
-	struct udphdr	*icmpudp6;
+      case ICMP_ECHO:		/* ping unreach	*/
+	{
+	    struct icmp6_hdr	*icmp6;
 
-	icmpudp6 = (struct udphdr *)((caddr_t)icmpip6 + sizeof(struct ip6_hdr));
-	icmpudp6->uh_sport = cv4->ats->local._dport;
-	icmpudp6->uh_dport = cv4->ats->local._sport;
+	    icmp6 = (struct icmp6_hdr *)((caddr_t)icmpip6 + sizeof(struct ip6_hdr));
+	    icmp6->icmp6_type = ICMP6_ECHO_REQUEST;
+	}
+	break;
+
+      case ICMP_TIMXCEED:	/* traceroute return */
+	{
+	    struct udphdr	*icmpudp6;
+
+	    icmpudp6 = (struct udphdr *)((caddr_t)icmpip6 + sizeof(struct ip6_hdr));
+	    icmpudp6->uh_sport = cv4->ats->local._dport;
+	    icmpudp6->uh_dport = cv4->ats->local._sport;
+	}
+	break;
     }
 }
 

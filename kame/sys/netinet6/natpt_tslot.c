@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.19 2001/06/07 13:22:03 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.20 2001/06/09 12:11:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -590,7 +590,6 @@ checkIncomingICMP(struct _cv *cv4)
 	    if (icmpudp4->uh_dport != ats->remote._dport)		continue;
 	}
 
-	cv4->flags |= NATPT_TRACEROUTE;
 	return (ats);
     }
 

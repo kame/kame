@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.16 2001/05/28 16:12:07 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.17 2001/06/09 12:11:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -160,7 +160,7 @@ struct _cv						/* 28[byte]	*/
 /*	#define	NATPT_OUTBOUND		(2)				*/
 
     u_char	 flags;
-#define		NATPT_TRACEROUTE	(0x01)
+#define		NATPT_TRACEROUTE	(0x01)	/* does not use now	*/
 #define		NATPT_NEEDFRAGMENT	(0x02)
 
     int		 poff;			/* payload offset		*/
