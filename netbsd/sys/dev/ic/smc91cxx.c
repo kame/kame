@@ -586,6 +586,7 @@ smc91cxx_start(ifp)
 	 * Peek at the next packet.
 	 */
 	IFQ_POLL(&ifp->if_snd, m);
+	if (m == NULL)
 		return;
 
 	/*
