@@ -1,5 +1,5 @@
 # default policy table based on RFC 3484.
-# usage: addrselect -c addrselect.conf.sample
+# usage: ip6addrctl -c path_to_this_file
 #
 #Format:
 #Prefix       Precedence Label
