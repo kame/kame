@@ -1,37 +1,48 @@
-# New ports collection makefile for:    ruby
-# Version required:     1.2.5
-# Date created:         04 September 1997
-# Whom:                 Eiji-usagi-MATSUmoto <usagi@ruby.club.or.jp>
-#
-# $Id: Makefile,v 1.1 1999/08/10 09:14:31 itojun Exp $
+# $NetBSD: Makefile,v 1.8 2000/01/15 18:46:29 jlam Exp $
 #
 
-DISTNAME=	ruby-1.2.5
+DISTNAME=	ruby-1.4.3
 CATEGORIES=	lang
-MASTER_SITES=	ftp://ftp.netlab.co.jp/pub/lang/ruby/${BRANCH_NAME}/ \
-		ftp://ftp.TokyoNet.AD.JP/pub/misc/ruby/${BRANCH_NAME}/ \
-		ftp://ftp.iij.ad.jp/pub/lang/ruby/${BRANCH_NAME}/ \
-		ftp://blade.nagaokaut.ac.jp/pub/lang/ruby/${BRANCH_NAME}/ \
-		ftp://ftp.krnet.ne.jp/pub/ruby/${BRANCH_NAME}/ \
-		ftp://mirror.nucba.ac.jp/mirror/ruby/${BRANCH_NAME}/
+MASTER_SITES=	ftp://ftp.TokyoNet.AD.JP/pub/misc/ruby/ \
+		ftp://ftp.iij.ad.jp/pub/lang/ruby/ \
+		ftp://ftp.netlab.co.jp/pub/lang/ruby/ \
+		ftp://blade.nagaokaut.ac.jp/pub/lang/ruby/ \
+		ftp://ftp.krnet.ne.jp/pub/ruby/ \
+		ftp://ftp.mirror.nucba.ac.jp/mirror/ruby/ \
+		http://mirror.nucba.ac.jp/mirror/ruby/
 
-PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
-		ftp://ftp.v6.kame.net/pub/kame/misc/
-PATCHFILES=	ruby-125-v6-19990509.diff.gz
-PATCH_DIST_STRIP=	-p1
+MAINTAINER=	sakamoto@netbsd.org
+HOMEPAGE=	http://www.ruby-lang.org/
 
-MAINTAINER=	itojun@kame.net
+BUILD_DEPENDS=	${LOCALBASE}/bin/bison:../../devel/bison
+#DEPENDS+=	gdbm-1.7.3:../../databases/gdbm
+#DEPENDS+=	ncurses>=4.2:../../devel/ncurses
+#DEPENDS+=	readline-4.0:../../devel/readline
 
 GNU_CONFIGURE=	yes
-#USE_AUTOCONF=	yes
-MAN1=		ruby.1
+CONFIGURE_ARGS+= --enable-shared --enable-ipv6
+MAKE_ENV+=	DLDFLAGS="-L${LOCALBASE}/lib -R${LOCALBASE}/lib -L${X11BASE}/lib -R${X11BASE}/lib"
 
-BRANCH_NAME=	1.2
+#PLIST_SUBST=	RUBY_VERSION=1.4
+PLIST_SRC+=	${WRKSRC}/PLIST
+LOWER_OPSYS?=	netbsd
+RUBY_VERSION=	1.4
+
+post-patch:
+	${RM} -f ${WRKSRC}/ext/tcltklib/MANIFEST
+	${RM} -f ${WRKSRC}/ext/tk/MANIFEST
+
+post-build:
+	${SED} -e 's/$${RUBY_VERSION}/${RUBY_VERSION}/' \
+		-e 's/$${MACHINE_ARCH}/${MACHINE_ARCH}/' \
+		-e 's/$${LOWER_OPSYS}/${LOWER_OPSYS}/' < ${PKGDIR}/PLIST \
+		> ${PLIST_SRC}
 
 post-install:
 	strip ${PREFIX}/bin/ruby
-
-test:
-	@(cd ${WRKSRC}; make test)
+	${MKDIR} ${PREFIX}/share/examples/ruby
+	${INSTALL_DATA} ${WRKSRC}/sample/* ${PREFIX}/share/examples/ruby
+	${MKDIR} ${PREFIX}/share/examples/ruby/misc
+	${INSTALL_DATA} ${WRKSRC}/misc/* ${PREFIX}/share/examples/ruby/misc
 
 .include "../../mk/bsd.pkg.mk"
