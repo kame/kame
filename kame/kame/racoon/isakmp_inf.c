@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.66 2001/03/05 23:09:12 thorpej Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.67 2001/03/08 22:07:44 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -948,13 +948,16 @@ info_recv_initialcontact(iph1)
 	caddr_t mhp[SADB_EXT_MAX + 1];
 	int proto_id, i;
 	struct ph2handle *iph2;
+#if 0
 	char *loc, *rem;
+#endif
 
 	if (f_local)
 		return;
 
-	loc = strdup(saddr2str(iph1->local));
-	rem = strdup(saddr2str(iph1->remote));
+#if 0
+	loc = strdup(saddrwop2str(iph1->local));
+	rem = strdup(saddrwop2str(iph1->remote));
 
 	/*
 	 * Purge all IPSEC-SAs for the peer.  We can do this
@@ -1002,6 +1005,7 @@ info_recv_initialcontact(iph1)
  the_hard_way:
 	free(loc);
 	free(rem);
+#endif
 
 	buf = pfkey_dump_sadb(SADB_SATYPE_UNSPEC);
 	if (buf == NULL) {
