@@ -261,7 +261,7 @@ union mcluster {
 		(m)->m_nextpkt = (struct mbuf *)NULL; \
 		(m)->m_data = (m)->m_pktdat; \
 		(m)->m_flags = M_PKTHDR; \
-		(m)->m_pkthdr.aux = (struct mbuf *)NULL; \
+		bzero(&(m)->m_pkthdr, sizeof((m)->m_pkthdr)); \
 		splx(_ms); \
 	} else { \
 		splx(_ms); \
