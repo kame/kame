@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.42 2000/06/20 16:11:09 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.43 2000/06/20 19:45:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -184,10 +184,10 @@ in_gif_output(ifp, family, m, rt)
 
 	/* ip_output needs host-order length.  it should be nuked */
 	m_copydata(m, offsetof(struct ip, ip_len), sizeof(u_int16_t),
-		   (caddr_t) &plen);
+	    (caddr_t) &plen);
 	NTOHS(plen);
 	m_copyback(m, offsetof(struct ip, ip_len), sizeof(u_int16_t),
-		   (caddr_t) &plen);
+	    (caddr_t) &plen);
 
 	return ip_output(m, NULL, NULL, 0, NULL, NULL);
 #else
