@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.26 2000/05/07 05:25:03 itojun Exp $	*/
+/*	$KAME: pfkey.c,v 1.27 2000/05/19 11:04:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -221,6 +221,7 @@ pfkey_send_getspi(so, satype, mode, src, dst, min, max, reqid, seq)
 	int len;
 	int need_spirange = 0;
 	caddr_t p;
+	int plen;
 
 	/* validity check */
 	if (src == NULL || dst == NULL) {
@@ -233,6 +234,17 @@ pfkey_send_getspi(so, satype, mode, src, dst, min, max, reqid, seq)
 	}
 	if (min > max || (min > 0 && min <= 255)) {
 		__ipsec_errcode = EIPSEC_INVAL_SPI;
+		return -1;
+	}
+	switch (src->sa_family) {
+	case AF_INET:
+		plen = sizeof(struct in_addr) << 3;
+		break;
+	case AF_INET6:
+		plen = sizeof(struct in6_addr) << 3;
+		break;
+	default:
+		__ipsec_errcode = EIPSEC_INVAL_FAMILY;
 		return -1;
 	}
 
@@ -257,18 +269,12 @@ pfkey_send_getspi(so, satype, mode, src, dst, min, max, reqid, seq)
 	                     len, satype, mode, reqid, seq, getpid());
 
 	/* set sadb_address for source */
-	p = pfkey_setsadbaddr(p,
-	                      SADB_EXT_ADDRESS_SRC,
-	                      src,
-	                      _INALENBYAF(src->sa_family) << 3,
-	                      IPSEC_ULPROTO_ANY);
+	p = pfkey_setsadbaddr(p, SADB_EXT_ADDRESS_SRC, src, plen,
+	    IPSEC_ULPROTO_ANY);
 
 	/* set sadb_address for destination */
-	p = pfkey_setsadbaddr(p,
-	                      SADB_EXT_ADDRESS_DST,
-	                      dst,
-	                      _INALENBYAF(dst->sa_family) << 3,
-	                      IPSEC_ULPROTO_ANY);
+	p = pfkey_setsadbaddr(p, SADB_EXT_ADDRESS_DST, dst, plen,
+	    IPSEC_ULPROTO_ANY);
 
 	/* proccessing spi range */
 	if (need_spirange) {
@@ -740,6 +746,7 @@ pfkey_send_x1(so, type, satype, mode, src, dst, spi, reqid, wsize,
 	struct sadb_msg *newmsg;
 	int len;
 	caddr_t p;
+	int plen;
 
 	/* validity check */
 	if (src == NULL || dst == NULL) {
@@ -748,6 +755,17 @@ pfkey_send_x1(so, type, satype, mode, src, dst, spi, reqid, wsize,
 	}
 	if (src->sa_family != dst->sa_family) {
 		__ipsec_errcode = EIPSEC_FAMILY_MISMATCH;
+		return -1;
+	}
+	switch (src->sa_family) {
+	case AF_INET:
+		plen = sizeof(struct in_addr) << 3;
+		break;
+	case AF_INET6:
+		plen = sizeof(struct in6_addr) << 3;
+		break;
+	default:
+		__ipsec_errcode = EIPSEC_INVAL_FAMILY;
 		return -1;
 	}
 
@@ -798,16 +816,10 @@ pfkey_send_x1(so, type, satype, mode, src, dst, spi, reqid, wsize,
 	p = pfkey_setsadbmsg((caddr_t)newmsg, type, len,
 	                     satype, mode, reqid, seq, getpid());
 	p = pfkey_setsadbsa(p, spi, wsize, a_type, e_type, flags);
-	p = pfkey_setsadbaddr(p,
-	                      SADB_EXT_ADDRESS_SRC,
-	                      src,
-	                      _INALENBYAF(src->sa_family) << 3,
-	                      IPSEC_ULPROTO_ANY);
-	p = pfkey_setsadbaddr(p,
-	                      SADB_EXT_ADDRESS_DST,
-	                      dst,
-	                      _INALENBYAF(dst->sa_family) << 3,
-	                      IPSEC_ULPROTO_ANY);
+	p = pfkey_setsadbaddr(p, SADB_EXT_ADDRESS_SRC, src, plen,
+	    IPSEC_ULPROTO_ANY);
+	p = pfkey_setsadbaddr(p, SADB_EXT_ADDRESS_DST, dst, plen,
+	    IPSEC_ULPROTO_ANY);
 
 	if (e_type != SADB_EALG_NONE)
 		p = pfkey_setsadbkey(p, SADB_EXT_KEY_ENCRYPT,
@@ -844,6 +856,7 @@ pfkey_send_x2(so, type, satype, mode, src, dst, spi)
 	struct sadb_msg *newmsg;
 	int len;
 	caddr_t p;
+	int plen;
 
 	/* validity check */
 	if (src == NULL || dst == NULL) {
@@ -852,6 +865,17 @@ pfkey_send_x2(so, type, satype, mode, src, dst, spi)
 	}
 	if (src->sa_family != dst->sa_family) {
 		__ipsec_errcode = EIPSEC_FAMILY_MISMATCH;
+		return -1;
+	}
+	switch (src->sa_family) {
+	case AF_INET:
+		plen = sizeof(struct in_addr) << 3;
+		break;
+	case AF_INET6:
+		plen = sizeof(struct in6_addr) << 3;
+		break;
+	default:
+		__ipsec_errcode = EIPSEC_INVAL_FAMILY;
 		return -1;
 	}
 
@@ -870,16 +894,10 @@ pfkey_send_x2(so, type, satype, mode, src, dst, spi)
 
 	p = pfkey_setsadbmsg((caddr_t)newmsg, type, len, satype, mode, 0, 0, getpid());
 	p = pfkey_setsadbsa(p, spi, 0, 0, 0, 0);
-	p = pfkey_setsadbaddr(p,
-	                      SADB_EXT_ADDRESS_SRC,
-	                      src,
-	                      _INALENBYAF(src->sa_family) << 3,
-	                      IPSEC_ULPROTO_ANY);
-	p = pfkey_setsadbaddr(p,
-	                      SADB_EXT_ADDRESS_DST,
-	                      dst,
-	                      _INALENBYAF(dst->sa_family) << 3,
-	                      IPSEC_ULPROTO_ANY);
+	p = pfkey_setsadbaddr(p, SADB_EXT_ADDRESS_SRC, src, plen,
+	    IPSEC_ULPROTO_ANY);
+	p = pfkey_setsadbaddr(p, SADB_EXT_ADDRESS_DST, dst, plen,
+	    IPSEC_ULPROTO_ANY);
 
 	/* send message */
 	len = pfkey_send(so, newmsg, len);
@@ -959,6 +977,7 @@ pfkey_send_x4(so, type, src, prefs, dst, prefd, proto, policy, policylen, seq)
 	struct sadb_msg *newmsg;
 	int len;
 	caddr_t p;
+	int plen;
 
 	/* validity check */
 	if (src == NULL || dst == NULL) {
@@ -969,8 +988,19 @@ pfkey_send_x4(so, type, src, prefs, dst, prefd, proto, policy, policylen, seq)
 		__ipsec_errcode = EIPSEC_FAMILY_MISMATCH;
 		return -1;
 	}
-	if (prefs > (_INALENBYAF(src->sa_family) << 3)
-	 || prefd > (_INALENBYAF(dst->sa_family) << 3)) {
+
+	switch (src->sa_family) {
+	case AF_INET:
+		plen = sizeof(struct in_addr) << 3;
+		break;
+	case AF_INET6:
+		plen = sizeof(struct in6_addr) << 3;
+		break;
+	default:
+		__ipsec_errcode = EIPSEC_INVAL_FAMILY;
+		return -1;
+	}
+	if (prefs > plen || prefd > plen) {
 		__ipsec_errcode = EIPSEC_INVAL_PREFIXLEN;
 		return -1;
 	}
@@ -978,9 +1008,9 @@ pfkey_send_x4(so, type, src, prefs, dst, prefd, proto, policy, policylen, seq)
 	/* create new sadb_msg to reply. */
 	len = sizeof(struct sadb_msg)
 		+ sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(_SALENBYAF(src->sa_family))
+		+ PFKEY_ALIGN8(src->sa_len)
 		+ sizeof(struct sadb_address)
-		+ PFKEY_ALIGN8(_SALENBYAF(src->sa_family))
+		+ PFKEY_ALIGN8(src->sa_len)
 		+ policylen;
 
 	if ((newmsg = CALLOC(len, struct sadb_msg *)) == NULL) {

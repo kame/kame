@@ -1,4 +1,4 @@
-/*	$KAME: pfkey_dump.c,v 1.15 2000/05/07 05:34:50 itojun Exp $	*/
+/*	$KAME: pfkey_dump.c,v 1.16 2000/05/19 11:04:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -406,8 +406,20 @@ str_prefport(family, pref, port)
 	static char buf[128];
 	char prefbuf[10];
 	char portbuf[10];
+	int plen;
 
-	if (pref == (_INALENBYAF(family) << 3))
+	switch (family) {
+	case AF_INET:
+		plen = sizeof(struct in_addr) << 3;
+		break;
+	case AF_INET6:
+		plen = sizeof(struct in6_addr) << 3;
+		break;
+	default:
+		return "?";
+	}
+
+	if (pref == plen)
 		prefbuf[0] = '\0';
 	else
 		snprintf(prefbuf, sizeof(prefbuf), "/%u", pref);
