@@ -1,4 +1,4 @@
-$Id: question,v 1.1 2000/01/09 21:45:53 sakane Exp $
+$Id: question,v 1.2 2000/01/09 23:38:24 sakane Exp $
 
 HOW DO I DO ?
 o ID payload handling in phase 2 besides IPSECDOI_ID_IP*.
@@ -32,3 +32,5 @@ o base mode
                   Ni ???
                            <= HDR, SA, Idir, Nr_b
                                              Nr ?
+o What's proto_id in notify message of responder 2nd message with commit bit
+  processing when multiple different SA applyed ?
