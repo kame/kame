@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.224 2002/02/04 02:25:05 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.225 2002/02/04 04:53:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1201,7 +1201,7 @@ nd6_free(rt, gc)
 void
 nd6_nud_hint(rt, dst6, force)
 	struct rtentry *rt;
-	struct in6_addr *dst6;
+	struct sockaddr_in6 *dst6;
 	int force;
 {
 	struct llinfo_nd6 *ln;
@@ -1216,7 +1216,7 @@ nd6_nud_hint(rt, dst6, force)
 	if (!rt) {
 		if (!dst6)
 			return;
-		if (!(rt = nd6_lookup(dst6, 0, NULL)))
+		if (!(rt = nd6_lookup(&dst6->sin6_addr, 0, NULL)))
 			return;
 	}
 
