@@ -1,4 +1,4 @@
-/*	$KAME: ip6_id.c,v 1.3 2003/09/06 02:49:26 itojun Exp $	*/
+/*	$KAME: ip6_id.c,v 1.4 2003/09/06 03:32:01 itojun Exp $	*/
 /*	$OpenBSD: ip_id.c,v 1.6 2002/03/15 18:19:52 millert Exp $	*/
 
 /*
@@ -66,7 +66,7 @@
  */
 
 /*
- * seed = random 15bit
+ * seed = random (bits - 1) bit
  * n = prime, g0 = generator to n,
  * j = random so that gcd(j,n-1) == 1
  * g = g0^j mod n will be a generator again.
