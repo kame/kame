@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.5 2003/10/18 08:23:35 itojun Exp $	*/
+/*	$KAME: dccp_var.h,v 1.6 2003/10/20 12:22:51 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -170,8 +170,8 @@ const char *dccpstates[] = {
 #define DCCP_SERVER	2
 #define DCCP_CLIENT	3
 
-#define SEQ_LT(a, b)	((int)(((a) << 8) - ((b) << 8)) < 0)
-#define SEQ_GT(a, b)	((int)(((a) << 8) - ((b) << 8)) > 0)
+#define DCCP_SEQ_LT(a, b)	((int)(((a) << 8) - ((b) << 8)) < 0)
+#define DCCP_SEQ_GT(a, b)	((int)(((a) << 8) - ((b) << 8)) > 0)
 
 /*
  * Names for DCCP sysctl objects

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.12 2003/10/20 10:09:19 ono Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.13 2003/10/20 12:22:51 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -543,7 +543,7 @@ dccp_input(struct mbuf *m, int off)
 	low_seqnr = (dp->gsn_rcv - (dp->loss_window / 3)) % 16777216;
 	high_seqnr = (dp->gsn_rcv + (dp->loss_window / 3 * 2)) % 16777216;
 
-	if (! (SEQ_GT(seqnr, low_seqnr) && SEQ_LT(seqnr, high_seqnr))) {
+	if (! (DCCP_SEQ_GT(seqnr, low_seqnr) && DCCP_SEQ_LT(seqnr, high_seqnr))) {
 		dccpstat.dccps_badseq++;
 		DCCP_DEBUG((LOG_INFO, "Recieved DCCP packet with bad sequence number = %u (low_seqnr = %u, high_seqnr = %u)\n", seqnr, low_seqnr, high_seqnr));
 		INP_UNLOCK(inp);
@@ -551,7 +551,7 @@ dccp_input(struct mbuf *m, int off)
 	}
 
 	/* dp->gsn_rcv should always be the highest received valid sequence number */
-	if (SEQ_GT(seqnr, dp->gsn_rcv))
+	if (DCCP_SEQ_GT(seqnr, dp->gsn_rcv))
 		dp->gsn_rcv = seqnr;
 
 	/* Just ignore DCCP-Move for now */
