@@ -28,3 +28,6 @@ option		ALTQ_PRIQ	#priority queue
 # mobile-ip6 options
 #option		MIP6
 #option		MIP6_DEBUG
+
+# ART routing table lookup algorithm
+#option		RADIX_ART
