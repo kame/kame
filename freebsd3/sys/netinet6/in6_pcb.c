@@ -824,7 +824,7 @@ in6_mapped_sockaddr(struct socket *so, struct sockaddr **nam)
 		return EINVAL;
 	if (inp->inp_vflag & INP_IPV4) {
 		error = in_setsockaddr(so, nam);
-		if (error == NULL)
+		if (error == 0)
 			in6_sin_2_v4mapsin6_in_sock(nam);
 	} else
 	error = in6_setsockaddr(so, nam);
@@ -842,7 +842,7 @@ in6_mapped_peeraddr(struct socket *so, struct sockaddr **nam)
 		return EINVAL;
 	if (inp->inp_vflag & INP_IPV4) {
 		error = in_setpeeraddr(so, nam);
-		if (error == NULL)
+		if (error == 0)
 			in6_sin_2_v4mapsin6_in_sock(nam);
 	} else
 		error = in6_setpeeraddr(so, nam);
@@ -911,7 +911,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 	for (inp = LIST_FIRST(head); inp != NULL; inp = ninp) {
 		ninp = LIST_NEXT(inp, inp_list);
 
-		if ((inp->inp_vflag & INP_IPV6) == NULL)
+		if ((inp->inp_vflag & INP_IPV6) == 0)
 			continue;
 
 		if (notify == in6_rtchange) {
@@ -969,7 +969,7 @@ in6_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 		head = &pcbinfo->hashbase[INP_PCBHASH(INADDR_ANY, lport, 0,
 						      pcbinfo->hashmask)];
 		LIST_FOREACH(inp, head, inp_hash) {
-			if ((inp->inp_vflag & INP_IPV6) == NULL)
+			if ((inp->inp_vflag & INP_IPV6) == 0)
 				continue;
 			if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr) &&
 			    IN6_ARE_ADDR_EQUAL(&inp->in6p_laddr, laddr) &&
@@ -1007,7 +1007,7 @@ in6_pcblookup_local(pcbinfo, laddr, lport_arg, wild_okay)
 			 */
 			LIST_FOREACH(inp, &phd->phd_pcblist, inp_portlist) {
 				wildcard = 0;
-				if ((inp->inp_vflag & INP_IPV6) == NULL)
+				if ((inp->inp_vflag & INP_IPV6) == 0)
 					continue;
 				if (!IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr))
 					wildcard++;
@@ -1110,7 +1110,7 @@ in6_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard, ifp)
 					      lport, fport,
 					      pcbinfo->hashmask)];
 	for (inp = head->lh_first; inp != NULL; inp = inp->inp_hash.le_next) {
-		if ((inp->inp_vflag & INP_IPV6) == NULL)
+		if ((inp->inp_vflag & INP_IPV6) == 0)
 			continue;
 		if (IN6_ARE_ADDR_EQUAL(&inp->in6p_faddr, faddr) &&
 		    IN6_ARE_ADDR_EQUAL(&inp->in6p_laddr, laddr) &&
@@ -1129,7 +1129,7 @@ in6_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard, ifp)
 						      pcbinfo->hashmask)];
 		for (inp = head->lh_first; inp != NULL;
 		     inp = inp->inp_hash.le_next) {
-			if ((inp->inp_vflag & INP_IPV6) == NULL)
+			if ((inp->inp_vflag & INP_IPV6) == 0)
 				continue;
 			if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_faddr) &&
 			    inp->inp_lport == lport) {
