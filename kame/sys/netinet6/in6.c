@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.161 2001/02/04 02:04:47 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.162 2001/02/04 02:06:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -933,7 +933,7 @@ in6_update_ifa(ifp, ifra, ia)
 	 * validate ifra_prefixmask.  don't check sin6_family, netmask
 	 * does not carry fields other than sin6_len.
 	 */
-	if (ifra->ifra_prefixmask.sin6_len > sizoef(struct sockaddr_in6))
+	if (ifra->ifra_prefixmask.sin6_len > sizeof(struct sockaddr_in6))
 		return(EINVAL);
 	/*
 	 * Because the IPv6 address architecture is classless, we require
