@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1417 2000/12/02 08:28:24 itojun Exp $
+$KAME: CHANGELOG,v 1.1418 2000/12/02 09:00:58 itojun Exp $
 
 <200012>
 Sat Dec  2 17:27:30 JST 2000  itojun@iijlab.net
@@ -11,11 +11,19 @@ Sat Dec  2 17:19:58 JST 2000  itojun@iijlab.net
 	* netbsd: catch up with netbsd 1.5.  ALTQ nor MIP6 do not compile.
 	  NATPT may not work.  pvcbridge does not work for now.
 
+	  NOTE: if you use anoncvs/cvsup to update from existing tree,
+	  make sure to invoke "make TARGET=netbsd clean" before update.
+	  symlink can make troubles with update.
+
 Fri Dec  1 21:02:25 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd4/ports/{ct,v6eval}: upgrade to 1.2.
 
 Fri Dec  1 19:35:18 JST 2000  itojun@iijlab.net
 	* openbsd: catch up with openbsd 2.8.  MIP6/NATPT may not work.
+
+	  NOTE: if you use anoncvs/cvsup to update from existing tree,
+	  make sure to invoke "make TARGET=openbsd clean" before update.
+	  symlink can make troubles with update.
 
 2000-12-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *BSD/sys/netinet6/in6_pcb.c (in6_pcbnotify):
