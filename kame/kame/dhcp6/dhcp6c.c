@@ -667,7 +667,7 @@ client6_recvreply(s, serv)
 	int s;
 	struct servtab *serv;
 {
-	char buf[BUFSIZ];
+	char rbuf[BUFSIZ], buf[BUFSIZ];
 	struct dhcp6_reply *dh6r;
 	ssize_t len;
 	struct sockaddr_storage from;
@@ -678,7 +678,7 @@ client6_recvreply(s, serv)
 	int i;
 
 	fromlen = sizeof(from);
-	if ((len = recvfrom(s, buf, sizeof(buf), 0,
+	if ((len = recvfrom(s, rbuf, sizeof(rbuf), 0,
 			(struct sockaddr *)&from, &fromlen)) < 0) {
 		err(1, "recvfrom(inbound)");
 		/*NOTREACHED*/
@@ -686,7 +686,7 @@ client6_recvreply(s, serv)
 
 	if (len < sizeof(*dh6r))
 		return -1;
-	dh6r = (struct dhcp6_reply *)buf;
+	dh6r = (struct dhcp6_reply *)rbuf;
 	if (dh6r->dh6rep_msgtype != DH6_REPLY)
 		return -1;
 	if (serv->st_xid != dh6r->dh6rep_xid)
@@ -698,7 +698,7 @@ client6_recvreply(s, serv)
 	cp = (char *)(dh6r + 1);
 	if ((dh6r->dh6rep_flagandstat & DH6REP_CLIPRESENT) != 0)
 		cp += sizeof(struct in6_addr);
-	ep = buf + len;
+	ep = rbuf + len;
 	while (cp < ep) {
 		code = ntohs(*(u_int16_t *)&cp[0]);
 		if (code != 65535)
@@ -754,7 +754,7 @@ client6_recvreply(s, serv)
 				printf("%02x", cp[4 + i] & 0xff);
 		}
 		printf("\n");
-		cp += len + 4;
+		cp += elen + 4;
 	}
 
 	return 0;
