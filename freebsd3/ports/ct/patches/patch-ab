@@ -1,0 +1,11 @@
+--- nd/Makefile.test.orig	Mon Feb 21 13:08:16 2000
++++ nd/Makefile.test	Mon Feb 21 13:08:22 2000
+@@ -4,7 +4,7 @@
+ # $Id: patch-ab,v 1.1 2000/03/02 12:07:47 sumikawa Exp $
+ #
+ 
+-PERL	= /usr/local/bin/perl
++PERL	= /usr/bin/perl
+ POD2HTML= $(PERL) -e 'use Pod::Html; pod2html("--noindex", @ARGV);'
+ 
+ IFILE=	INDEX.start INDEX.nd INDEX.rd INDEX.redirect

@@ -1,0 +1,11 @@
+--- spec/Makefile.test.orig	Mon Feb 21 13:16:56 2000
++++ spec/Makefile.test	Mon Feb 21 13:17:13 2000
+@@ -4,7 +4,7 @@
+ # $Id: patch-ae,v 1.1 2000/03/02 12:07:48 sumikawa Exp $
+ #
+ 
+-PERL	= /usr/local/bin/perl
++PERL	= /usr/bin/perl
+ POD2HTML= $(PERL) -e 'use Pod::Html; pod2html("--noindex", @ARGV);'
+ 
+ check:

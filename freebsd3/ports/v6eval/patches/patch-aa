@@ -1,0 +1,17 @@
+--- lib/Pz/MfAlgorithm.h-	Thu Mar  2 16:50:44 2000
++++ lib/Pz/MfAlgorithm.h	Thu Mar  2 16:51:06 2000
+@@ -45,10 +45,10 @@
+ #define	__MfAlgorithm_h__	1
+ #include "MvFunction.h"
+ #include <des.h>
+-#include <evp.h>
+-#include <blowfish.h>
+-#include <rc5.h>
+-#include <cast.h>
++#include <openssl/evp.h>
++#include <openssl/blowfish.h>
++#include <openssl/rc5.h>
++#include <openssl/cast.h>
+ 
+ class PFunction;
+ class PObjectList;
