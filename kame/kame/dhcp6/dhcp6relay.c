@@ -350,6 +350,11 @@ relay6_init()
 		/* NOTREACHED */
 	}
 	freeaddrinfo(res);
+	if (setsockopt(ssock, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &mhops,
+		       sizeof(mhops)) < 0) {
+		err(1, "setsockopt(ssock, IPV6_MULTICAST_HOPS(%d))", mhops);
+		/* NOTREACHED */
+	}
 
 	/*
 	 * Setup a socket to receive ICMPv6 errors.
