@@ -184,6 +184,7 @@ udp_input(m, off)
 	 * Get IP and UDP header together in first mbuf.
 	 */
 	ip = mtod(m, struct ip *);
+#ifndef PULLDOWN_TEST
 	if (m->m_len < iphlen + sizeof(struct udphdr)) {
 		if ((m = m_pullup(m, iphlen + sizeof(struct udphdr))) == 0) {
 			udpstat.udps_hdrops++;
@@ -192,6 +193,13 @@ udp_input(m, off)
 		ip = mtod(m, struct ip *);
 	}
 	uh = (struct udphdr *)((caddr_t)ip + iphlen);
+#else
+	IP6_EXTHDR_GET(uh, struct udphdr *, m, iphlen, sizeof(struct udphdr));
+	if (!uh) {
+		udpstat.udps_hdrops++;
+		return;
+	}
+#endif
 
 	/* destination port of 0 is illegal, based on RFC768. */
 	if (uh->uh_dport == 0)

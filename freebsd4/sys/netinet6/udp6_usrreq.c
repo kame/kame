@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.6 2001/07/29 19:32:40 ume Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.39 2001/09/26 06:12:59 keiichi Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.40 2001/10/11 02:28:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -158,8 +158,6 @@ udp6_input(mp, offp, proto)
 
 	bzero(&opts, sizeof(opts));
 
-	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
-
 	ip6 = mtod(m, struct ip6_hdr *);
 
 #if defined(NFAITH) && 0 < NFAITH
@@ -170,10 +168,19 @@ udp6_input(mp, offp, proto)
 	}
 #endif
 
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
+	ip6 = mtod(m, struct ip6_hdr *);
+	uh = (struct udphdr *)((caddr_t)ip6 + off);
+#else
+	IP6_EXTHDR_GET(uh, struct udphdr *, m, off, sizeof(*uh));
+	if (!uh)
+		return IPPROTO_DONE;
+#endif
+
 	udpstat.udps_ipackets++;
 
 	plen = ntohs(ip6->ip6_plen) - off + sizeof(*ip6);
-	uh = (struct udphdr *)((caddr_t)ip6 + off);
 	ulen = ntohs((u_short)uh->uh_ulen);
 
 	if (plen != ulen) {
