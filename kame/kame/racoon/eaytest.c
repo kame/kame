@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.33 2001/09/07 01:28:06 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.34 2001/09/07 01:33:26 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -52,7 +52,34 @@
 
 u_int32_t loglevel = 4;
 
-char *certs[] = {
+/* prototype */
+
+void certtest __P((int, char **));
+void ciphertest __P((int, char **));
+void hmactest __P((int, char **));
+void sha2test __P((int, char **));
+void sha1test __P((int, char **));
+void md5test __P((int, char **));
+void dhtest __P((int, char **));
+void bntest __P((int, char **));
+void Usage __P((void));
+
+/* test */
+
+#include <sys/stat.h>
+#include <unistd.h>
+void
+certtest(ac, av)
+	int ac;
+	char **av;
+{
+	vchar_t c;
+	char *str;
+	vchar_t *vstr;
+	int type;
+	int error;
+	int i;
+	static char *certs[] = {
 /* self signed */
 "-----BEGIN CERTIFICATE-----\n"
 "MIICpTCCAg4CAQAwDQYJKoZIhvcNAQEEBQAwgZoxCzAJBgNVBAYTAkpQMREwDwYD\n"
@@ -152,35 +179,7 @@ char *certs[] = {
 "Y8++0dC8NVvendIILcJBM5nbDq1TqIbb8K3SP80XhO5JLVJkoZiQftAMjo0peZPO\n"
 "EQ==\n"
 "-----END CERTIFICATE-----\n\n",
-};
-
-/* prototype */
-
-void certtest __P((int, char **));
-void ciphertest __P((int, char **));
-void hmactest __P((int, char **));
-void sha2test __P((int, char **));
-void sha1test __P((int, char **));
-void md5test __P((int, char **));
-void dhtest __P((int, char **));
-void bntest __P((int, char **));
-void Usage __P((void));
-
-/* test */
-
-#include <sys/stat.h>
-#include <unistd.h>
-void
-certtest(ac, av)
-	int ac;
-	char **av;
-{
-	vchar_t c;
-	char *str;
-	vchar_t *vstr;
-	int type;
-	int error;
-	int i;
+	};
 
 	printf("\n**Test for Certificate.**\n");
 
