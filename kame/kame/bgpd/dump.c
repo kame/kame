@@ -704,15 +704,15 @@ show_bgp_peer(FILE *fp, struct rpcb *bnp, char *indent)
 		ip6str(&bnp->rp_myaddr.sin6_addr, 0));
 	fprintf(fp, "%sTimers:", indent);
 	if (bnp->rp_connect_timer)
-		fprintf(fp, " connect=%d:%d",
+		fprintf(fp, " connect=%d:%02d",
 			(int)(bnp->rp_connect_timer->tsk_timeval.tv_sec/60),
 			(int)(bnp->rp_connect_timer->tsk_timeval.tv_sec%60));
 	if (bnp->rp_hold_timer)
-		fprintf(fp, " hold=%d:%d",
+		fprintf(fp, " hold=%d:%02d",
 			(int)(bnp->rp_hold_timer->tsk_timeval.tv_sec/60),
 			(int)(bnp->rp_hold_timer->tsk_timeval.tv_sec%60));
 	if (bnp->rp_keepalive_timer)
-		fprintf(fp, " keepalive=%d:%d",
+		fprintf(fp, " keepalive=%d:%02d",
 			(int)(bnp->rp_keepalive_timer->tsk_timeval.tv_sec/60),
 			(int)(bnp->rp_keepalive_timer->tsk_timeval.tv_sec%60));
 	fputc('\n', fp);
