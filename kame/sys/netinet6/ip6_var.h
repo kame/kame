@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.71 2001/09/21 08:46:49 keiichi Exp $	*/
+/*	$KAME: ip6_var.h,v 1.72 2001/11/10 09:13:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -337,6 +337,9 @@ extern int   ip6_lowportmax;		/* maximum reserved port */
 extern int	ip6_use_tempaddr; /* whether to use temporary addresses. */
 extern int	ip6_prefer_tempaddr; /* whether to prefer temporary addresses
 					in the source address selection */
+
+extern int	ip6_use_defzone; /* whether to use the default scope zone
+				    when unspecified */
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 struct in6pcb;

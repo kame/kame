@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.21 2001/10/18 05:53:43 itojun Exp $	*/
+/*	$KAME: scope6.c,v 1.22 2001/11/10 09:13:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -43,6 +43,8 @@
 
 #include <netinet6/in6_var.h>
 #include <netinet6/scope6_var.h>
+
+int ip6_use_defzone = 0;
 
 struct scope6_id {
 	/*
