@@ -1634,10 +1634,13 @@ icmp6_reflect(m, off)
 	/*
 	 * If the incoming packet was addressed directly to us(i.e. unicast),
 	 * use dst as the src for the reply.
+	 * The IN6_IFF_NOTREADY case would be VERY rare, but is possible when
+	 * (for example) when we encounter an error while forwarding procedure
+	 * destined to a duplicated address of ours.
 	 */
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next)
 		if (IN6_ARE_ADDR_EQUAL(&t, &ia->ia_addr.sin6_addr) &&
-		    (ia->ia6_flags & IN6_IFF_ANYCAST) == 0) {
+		    (ia->ia6_flags & (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY)) == 0) {
 			src = &t;
 			break;
 		}
