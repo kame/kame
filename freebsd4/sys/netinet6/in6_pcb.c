@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.7 2001/12/20 10:30:19 ru Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.1.1.4 2002/02/07 01:35:40 sakane Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.48 2002/02/07 12:46:12 sakane Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -519,13 +519,14 @@ in6_mapped_sockaddr(struct socket *so, struct sockaddr **nam)
 
 	if (inp == NULL)
 		return EINVAL;
-	if (inp->inp_vflag & INP_IPV4) {
+	if ((inp->inp_vflag & (INP_IPV4 | INP_IPV6)) == INP_IPV4) {
 		error = in_setsockaddr(so, nam);
 		if (error == 0)
 			in6_sin_2_v4mapsin6_in_sock(nam);
-	} else
-	/* scope issues will be handled in in6_setsockaddr(). */
-	error = in6_setsockaddr(so, nam);
+	} else {
+		/* scope issues will be handled in in6_setsockaddr(). */
+		error = in6_setsockaddr(so, nam);
+	}
 
 	return error;
 }
@@ -538,7 +539,7 @@ in6_mapped_peeraddr(struct socket *so, struct sockaddr **nam)
 
 	if (inp == NULL)
 		return EINVAL;
-	if (inp->inp_vflag & INP_IPV4) {
+	if ((inp->inp_vflag & (INP_IPV4 | INP_IPV6)) == INP_IPV4) {
 		error = in_setpeeraddr(so, nam);
 		if (error == 0)
 			in6_sin_2_v4mapsin6_in_sock(nam);
