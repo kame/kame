@@ -1,4 +1,4 @@
-/*	$KAME: session.c,v 1.14 2000/09/24 17:28:16 itojun Exp $	*/
+/*	$KAME: session.c,v 1.15 2000/10/03 23:40:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: session.c,v 1.14 2000/09/24 17:28:16 itojun Exp $ */
+/* YIPS @(#)$Id: session.c,v 1.15 2000/10/03 23:40:58 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -80,7 +80,7 @@
 #include "remoteconf.h"
 
 static void init_signal __P((void));
-static int set_signal __P((int sig, RETSIGTYPE (*func)()));
+static int set_signal __P((int sig, RETSIGTYPE (*func) __P((int))));
 static void check_sigreq __P((void));
 static void check_flushsa __P((void));
 static int close_sockets __P((void));
@@ -349,7 +349,7 @@ init_signal()
 static int
 set_signal(sig, func)
 	int sig;
-	RETSIGTYPE (*func)();
+	RETSIGTYPE (*func) __P((int));
 {
 	struct sigaction sa;
 

@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.13 2000/09/19 01:59:56 itojun Exp $	*/
+/*	$KAME: main.c,v 1.14 2000/10/03 23:41:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: main.c,v 1.13 2000/09/19 01:59:56 itojun Exp $ */
+/* YIPS @(#)$Id: main.c,v 1.14 2000/10/03 23:41:42 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -71,6 +71,7 @@ int vflag = 1;		/* for print-isakmp.c */
 static char version[] = "@(#)racoon 20000718 sakane@ydc.co.jp";
 static char *pname;
 
+int main __P((int, char **));
 static void Usage __P((void));
 static void parse __P((int, char **));
 
