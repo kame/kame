@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.98 2004/03/31 14:47:21 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.99 2004/05/13 13:28:13 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1669,7 +1669,8 @@ dhcp6_set_options(bp, ep, optinfo)
 
 		if ((tmpbuf = malloc(optlen)) == NULL) {
 			dprintf(LOG_ERR, FNAME,
-			    "memory allocation failed for SIP server domain options");
+			    "memory allocation failed for "
+			    "SIP server domain options");
 			goto fail;
 		}
 		cp = tmpbuf;
@@ -1682,12 +1683,14 @@ dhcp6_set_options(bp, ep, optinfo)
 			    name, sizeof (name));
 			if (nlen < 0) {
 				dprintf(LOG_ERR, FNAME,
-				    "failed to encode a SIP server domain name");
+				    "failed to encode a SIP server "
+				    "domain name");
 				goto fail;
 			}
 			if (ep - cp < nlen) {
 				dprintf(LOG_ERR, FNAME,
-				    "buffer length for SIP server domain name is too short");
+				    "buffer length for SIP server "
+				    "domain name is too short");
 				goto fail;
 			}
 			memcpy(cp, name, nlen);

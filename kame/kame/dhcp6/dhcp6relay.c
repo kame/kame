@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.49 2003/12/08 13:53:44 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.50 2004/05/13 13:28:13 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -560,8 +560,7 @@ relay6_recv(s, fromclient)
 		case DH6_DECLINE:
 		case DH6_INFORM_REQ:
 		case DH6_RELAY_FORW:
-			relay_to_server(dh6, len,
-			    (struct sockaddr_in6 *)&from,
+			relay_to_server(dh6, len, (struct sockaddr_in6 *)&from,
 			    ifname, htonl(pi->ipi6_ifindex));
 			break;
 		case DH6_RELAY_REPLY:
