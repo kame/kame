@@ -205,6 +205,7 @@ ip_output(struct mbuf *m0, struct mbuf *opt, struct route *ro,
 #endif /* FAST_IPSEC */
 	struct ip_fw_args args;
 	int src_was_INADDR_ANY = 0;	/* as the name says... */
+	int mtu = 0;
 
 	args.eh = NULL;
 	args.rule = NULL;
@@ -324,6 +325,7 @@ ip_output(struct mbuf *m0, struct mbuf *opt, struct route *ro,
 		ifp = ia->ia_ifp;
 		ip->ip_ttl = 1;
 		isbroadcast = in_broadcast(dst->sin_addr, ifp);
+		mtu = ifp->if_mtu;
 	} else if (IN_MULTICAST(ntohl(ip->ip_dst.s_addr)) &&
 	    imo != NULL && imo->imo_multicast_ifp != NULL) {
 		/*
@@ -333,6 +335,7 @@ ip_output(struct mbuf *m0, struct mbuf *opt, struct route *ro,
 		ifp = imo->imo_multicast_ifp;
 		IFP_TO_IA(ifp, ia);
 		isbroadcast = 0;	/* fool gcc */
+		mtu = ifp->if_mtu;
 	} else {
 		/*
 		 * If this is the case, we probably don't want to allocate
@@ -358,6 +361,8 @@ ip_output(struct mbuf *m0, struct mbuf *opt, struct route *ro,
 		}
 		ia = ifatoia(ro->ro_rt->rt_ifa);
 		ifp = ro->ro_rt->rt_ifp;
+		if ((mtu = ro->ro_rt->rt_rmx.rmx_mtu) == 0)
+			mtu = ifp->if_mtu;
 #ifdef RTUSE			/* for statistics */
 		RTUSE(ro->ro_rt);
 #else
@@ -658,10 +663,8 @@ sendit:
 		if (state.encap) {
 			ia = ifatoia(ro->ro_rt->rt_ifa);
 			ifp = ro->ro_rt->rt_ifp;
-#if 0
 			if ((mtu = ro->ro_rt->rt_rmx.rmx_mtu) == 0)
 				mtu = ifp->if_mtu;
-#endif
 		}
 	}
     }
@@ -1084,7 +1087,9 @@ pass:
 	 * If small enough for interface, or the interface will take
 	 * care of the fragmentation for us, can just send directly.
 	 */
-	if (ip->ip_len <= ifp->if_mtu || ifp->if_hwassist & CSUM_FRAGMENT) {
+	if (mtu == 0)
+		mtu = ifp->if_mtu;
+	if (ip->ip_len <= mtu || ifp->if_hwassist & CSUM_FRAGMENT) {
 		ip->ip_len = htons(ip->ip_len);
 		ip->ip_off = htons(ip->ip_off);
 		ip->ip_sum = 0;
