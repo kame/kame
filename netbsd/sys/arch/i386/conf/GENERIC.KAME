@@ -36,3 +36,6 @@ options 	ALTQ_CDNR	#diffserv traffic conditioner
 options 	ALTQ_PRIQ	#priority queue
 #options 	ALTQ_NOPCC	#don't use processor cycle counter
 #options 	ALTQ_DEBUG	#for debugging
+
+# ART routing table lookup algorithm
+#options 	RADIX_ART

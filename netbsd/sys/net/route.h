@@ -104,7 +104,7 @@ struct rt_metrics {
  */
 #ifndef RNF_NORMAL
 #include <net/radix.h>
-#if 0	/*RADIX_ART*/
+#if 1	/*RADIX_ART*/
 #include <net/radix_art.h>
 #endif
 #endif
