@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.13 1999/12/22 08:14:32 sakane Exp $ */
+/* KAME $Id: parse.y,v 1.14 1999/12/30 15:13:27 sakane Exp $ */
 
 %{
 #include <sys/types.h>
@@ -530,9 +530,8 @@ policy_spec
 		}
 	;
 
-policy_requests:
-		/*NOTHING*/
-	|	PL_REQUESTS { $$ = $1; }
+policy_requests
+	:	PL_REQUESTS { $$ = $1; }
 	;
 
 %%
