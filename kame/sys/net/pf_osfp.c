@@ -41,7 +41,16 @@
 # define DPFPRINTF(format, x...)		\
 	if (pf_status.debug >= PF_DEBUG_NOISY)	\
 		printf(format , ##x)
+#ifdef __FreeBSD__
+#define	pool_t			int
+#define	pool_get(pool, flags)	malloc(*(pool), M_PF, M_DONTWAIT)
+#define	pool_put(pool, item)	free(item, M_PF)
+#define	pool_init(pool, size, a, ao, f, m, p)	\
+	do { (*(pool)) = (size); } while (0)
+#define MAX(a, b)	(((a) > (b)) ? (a) : (b))
+#else
 typedef struct pool pool_t;
+#endif
 
 #else
 /* Userland equivalents so we can lend code to tcpdump et al. */
@@ -53,7 +62,8 @@ typedef struct pool pool_t;
 # define pool_t			int
 # define pool_get(pool, flags)	malloc(*(pool))
 # define pool_put(pool, item)	free(item)
-# define pool_init(pool, size, a, ao, f, m, p)	(*(pool)) = (size)
+# define pool_init(pool, size, a, ao, f, m, p)	\
+	do { (*(pool)) = (size); } while (0)
 
 # ifdef PFDEBUG
 #  include <stdarg.h>
