@@ -419,10 +419,7 @@ __END_DECLS
 #  define MSG_COMPAT	0x8000
 # endif
 
-#include <sys/cdefs.h>
-__BEGIN_DECLS
 void	pfctlinput __P((int, struct sockaddr *));
-__END_DECLS
 #endif /* !_KERNEL */
 
 #endif /* !_SYS_SOCKET_H_ */
