@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.586 2000/02/21 13:59:26 jinmei Exp $
+$Id: CHANGELOG,v 1.587 2000/02/21 16:02:45 itojun Exp $
 
 <200002>
+Tue Feb 22 00:59:54 JST 2000  itojun@iijlab.net
+	* sys/kern/uipc_mbuf{,2}.c, sys/sys/mbuf.h: allow mbuf attachment to
+	  m->m_pkthdr.aux.  this would be useful to pass around extra
+	  information across protocol handlers.  current consumers are
+	  sys/netinet/ip_encap.c (extra data passing - mainly for struct ifnet)
+	  and sys/netinet6/ipsec.c (socket policy passing).
+	  careful about mbuf memory leak if you try using it...
+
 2000-02-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/(several files): added initialization for IPsec. Now
 	the kernel can be built and run with the IPSEC option (though we
