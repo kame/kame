@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1522 2001/02/02 02:12:37 jinmei Exp $
+$KAME: CHANGELOG,v 1.1523 2001/02/02 02:13:02 jinmei Exp $
 
 <200102>
 2001-02-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -10,7 +10,7 @@ $KAME: CHANGELOG,v 1.1522 2001/02/02 02:12:37 jinmei Exp $
 	overflow for 32 bits integers.  With this change, you can specify
 	very large value (i.e. values larger than 0x80000000) for valid
 	and preferred lifetimes.
-	XXX: we assume long long is more than 32 bits in length.
+	XXX: we assume the type "long long" is more than 32 bits in length.
 
 2001-02-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* {bsdi4,freebsd4,netbsd,openbsd}/sbin/ifconfig/ifconfig.c:
