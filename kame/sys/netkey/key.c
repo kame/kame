@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.168 2000/10/06 04:20:23 itojun Exp $	*/
+/*	$KAME: key.c,v 1.169 2000/10/07 11:59:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2876,16 +2876,10 @@ key_setsaval(sav, m, mhp)
 		}
 
 		/* initialize */
-	    {
-		int i;
-		u_int8_t *p = (u_int8_t *)sav->iv;
-		for (i = 0; i < sav->ivlen; i++)
-			p[i] = key_random() & 0xff;
-	    }
-		break;
-#else
+		key_randomfill(sav->iv, sav->ivlen);
 		break;
 #endif
+		break;
 	case SADB_SATYPE_AH:
 	case SADB_X_SATYPE_IPCOMP:
 		break;
