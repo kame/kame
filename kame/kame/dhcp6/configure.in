@@ -242,17 +242,17 @@ else
 fi
 AC_SUBST(dhcpopt_ntp)
 
-AC_MSG_CHECKING(for DHCP Lifetime option)
-AC_ARG_WITH(opt-lifetime,
-[  --with-opt-lifetime=VALUE    specify DHCP option value for lifetime],
-    dhcpopt_lifetime="$withval", dhcpopt_lifetime=0)
-if test $dhcpopt_lifetime = 0 ; then
-	dhcpopt_lifetime=-1
+AC_MSG_CHECKING(for DHCP information refresh time option)
+AC_ARG_WITH(opt-refreshtime,
+[  --with-opt-refreshtime=VALUE    specify DHCP option value for refresh time],
+    dhcpopt_refreshtime="$withval", dhcpopt_refreshtime=0)
+if test $dhcpopt_refreshtime = 0 ; then
+	dhcpopt_refreshtime=-1
 	AC_MSG_RESULT(unspecified)
 else
-	AC_MSG_RESULT(using $dhcpopt_lifetime)
+	AC_MSG_RESULT(using $dhcpopt_refreshtime)
 fi
-AC_SUBST(dhcpopt_lifetime)
+AC_SUBST(dhcpopt_refreshtime)
 
 AC_CHECK_HEADERS(stdarg.h)
 

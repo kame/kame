@@ -25,7 +25,7 @@
 # SUCH DAMAGE.
 
 #
-# $Id: Makefile.in,v 1.39 2004/09/07 04:51:30 jinmei Exp $
+# $Id: Makefile.in,v 1.40 2004/11/28 10:48:38 jinmei Exp $
 #
 
 prefix=	@prefix@
@@ -58,7 +58,7 @@ CFLAGS+= @DHCPOPT_DNS@ @DH6OPT_DNSNAME@ \
 	-DCONF_DH6OPT_PREFIX_INFORMATION=@dhcpopt_pinfo@ \
 	-DCONF_DH6OPT_PREFIX_REQUEST=@dhcpopt_preq@ \
 	-DCONF_DH6OPT_NTP=@dhcpopt_ntp@ \
-	-DCONF_DH6OPT_LIFETIME=@dhcpopt_lifetime@
+	-DCONF_DH6OPT_REFRESHTIME=@dhcpopt_refreshtime@
 
 GENSRCS=cfparse.c cftoken.c
 CLIENTOBJS=	dhcp6c.o common.o config.o prefixconf.o dhcp6c_ia.o timer.o \

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.139 2004/09/07 09:09:13 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.140 2004/11/28 10:48:38 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1079,8 +1079,8 @@ set_statelessinfo(optinfo)
 	}
 
 	/* Lifetime */
-	if (optlifetime != -1)
-		optinfo->lifetime = (int64_t)optlifetime;
+	if (optrefreshtime != -1)
+		optinfo->refreshtime = (int64_t)optrefreshtime;
 
 	return (0);
 }

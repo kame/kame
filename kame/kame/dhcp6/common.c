@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.118 2004/09/07 09:20:28 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.119 2004/11/28 10:48:38 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -931,7 +931,7 @@ dhcp6_init_options(optinfo)
 
 	optinfo->pref = DH6OPT_PREF_UNDEF;
 	optinfo->elapsed_time = DH6OPT_ELAPSED_TIME_UNDEF;
-	optinfo->lifetime = DH6OPT_LIFETIME_UNDEF;
+	optinfo->refreshtime = DH6OPT_REFRESHTIME_UNDEF;
 
 	TAILQ_INIT(&optinfo->iapd_list);
 	TAILQ_INIT(&optinfo->reqopt_list);
@@ -1011,7 +1011,7 @@ dhcp6_copy_options(dst, src)
 	if (dhcp6_copy_list(&dst->prefix_list, &src->prefix_list))
 		goto fail;
 	dst->elapsed_time = src->elapsed_time;
-	dst->lifetime = src->lifetime;
+	dst->refreshtime = src->refreshtime;
 	dst->pref = src->pref;
 
 	if (src->relaymsg_msg != NULL) {
@@ -1471,19 +1471,22 @@ dhcp6_get_options(p, ep, optinfo)
 			if (get_delegated_prefixes(cp, cp + optlen, optinfo))
 				goto fail;
 			break;
-#ifdef USE_DH6OPT_LIFETIME
-		case DH6OPT_LIFETIME:
+#ifdef USE_DH6OPT_REFRESHTIME
+		case DH6OPT_REFRESHTIME:
 			if (optlen != 4)
 				goto malformed;
 			memcpy(&val32, cp, sizeof(val32));
 			val32 = ntohl(val32);
-			dprintf(LOG_DEBUG, "", "   lifetime: %lu", val32);
-			if (optinfo->lifetime != DH6OPT_LIFETIME_UNDEF) {
+			dprintf(LOG_DEBUG, "",
+			    "   information refresh time: %lu", val32);
+			if (optinfo->refreshtime != DH6OPT_REFRESHTIME_UNDEF) {
 				dprintf(LOG_INFO, FNAME,
-				    "duplicated lifetime option");
+				    "duplicated refresh time option");
 			} else
-				optinfo->lifetime = (int64_t)val32;
+				optinfo->refreshtime = (int64_t)val32;
 			break;
+#else
+			val32 = val32; /* XXX deceive compiler */
 #endif
 		default:
 			/* no option specific behavior */
@@ -2216,12 +2219,12 @@ dhcp6_set_options(optbp, optep, optinfo)
 		}
 	}
 
-#ifdef USE_DH6OPT_LIFETIME
-	if (optinfo->lifetime != DH6OPT_LIFETIME_UNDEF) {
-		u_int32_t p32 = (u_int32_t)optinfo->lifetime;
+#ifdef USE_DH6OPT_REFRESHTIME
+	if (optinfo->refreshtime != DH6OPT_REFRESHTIME_UNDEF) {
+		u_int32_t p32 = (u_int32_t)optinfo->refreshtime;
 
 		p32 = htonl(p32);
-		if (copy_option(DH6OPT_LIFETIME, sizeof(p32), &p32, &p,
+		if (copy_option(DH6OPT_REFRESHTIME, sizeof(p32), &p32, &p,
 		    optep, &len) != 0) {
 			goto fail;
 		}
@@ -2674,13 +2677,13 @@ get_rdvalue(rdm, rdvalue, rdsize)
 	/* nsec should be smaller than 2^32 */
 	l32 = (u_int32_t)nsec;
 #else
-
 	if (gettimeofday(&tv, NULL) != 0) {
 		dprintf(LOG_WARNING, FNAME, "gettimeofday failed: %s",
 		    strerror(errno));
 		return (-1);
 	}
 	u32 = (u_int32_t)tv.tv_sec;
+	u32 += JAN_1970;
 	l32 = (u_int32_t)tv.tv_usec;
 #endif /* HAVE_CLOCK_GETTIME */
 
@@ -2759,9 +2762,9 @@ dhcp6optstr(type)
 		return ("IA_PD");
 	case DH6OPT_IA_PD_PREFIX:
 		return ("IA_PD prefix");
-#ifdef USE_DH6OPT_LIFETIME
-	case DH6OPT_LIFETIME:
-		return ("Lifetime");
+#ifdef USE_DH6OPT_REFRESHTIME
+	case DH6OPT_REFRESHTIME:
+		return ("information refresh time");
 #endif
 	default:
 		snprintf(genstr, sizeof(genstr), "opt_%d", type);

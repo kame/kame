@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.146 2004/09/07 05:03:03 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.147 2004/11/28 10:48:38 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -134,7 +134,9 @@ static int construct_reqdata __P((struct dhcp6_if *, struct dhcp6_optinfo *,
     struct dhcp6_event *));
 static void destruct_iadata __P((struct dhcp6_eventdata *));
 static void tv_sub __P((struct timeval *, struct timeval *, struct timeval *));
-static struct dhcp6_timer *client6_expire_lifetime __P((void *));
+#ifdef USE_DH6OPT_REFRESHTIME
+static struct dhcp6_timer *client6_expire_refreshtime __P((void *));
+#endif
 static int process_auth __P((struct authparam *, struct dhcp6 *dh6, ssize_t,
     struct dhcp6_optinfo *));
 static int set_auth __P((struct dhcp6_event *, struct dhcp6_optinfo *));
@@ -822,19 +824,22 @@ client6_ifctl(ifname, command)
 	return (0);
 }
 
+#ifdef USE_DH6OPT_REFRESHTIME
 static struct dhcp6_timer *
-client6_expire_lifetime(arg)
+client6_expire_refreshtime(arg)
 	void *arg;
 {
 	struct dhcp6_if *ifp = arg;
 
-	dprintf(LOG_DEBUG, FNAME, "lifetime on %s expired", ifp->ifname);
+	dprintf(LOG_DEBUG, FNAME,
+	    "information refresh time on %s expired", ifp->ifname);
 
 	dhcp6_remove_timer(&ifp->timer);
 	client6_start(ifp);
 
 	return (NULL);
 }
+#endif
 
 struct dhcp6_timer *
 client6_timo(arg)
@@ -1817,25 +1822,26 @@ client6_recvreply(ifp, dh6, len, optinfo)
 		client6_script(ifp->scriptpath, state, optinfo);
 	}
 
-#ifdef USE_DH6OPT_LIFETIME
+#ifdef USE_DH6OPT_REFRESHTIME
 	/*
 	 * Set timer if an option lifetime is specified in a reply to
 	 * information-request.  We do not use the value in the stateful
 	 * configuration case (the spec is not clear in such a case).
 	 */
-	if (optinfo->lifetime != DH6OPT_LIFETIME_UNDEF) {
+	if (optinfo->refreshtime != DH6OPT_REFRESHTIME_UNDEF) {
 		if (state != DHCP6S_INFOREQ)
-			dprintf(LOG_DEBUG, FNAME, "ignore lifetime option");
+			dprintf(LOG_DEBUG, FNAME,
+			    "ignore information refresh time option");
 		else {
 			ifp->timer =
-			    dhcp6_add_timer(client6_expire_lifetime, ifp);
+			    dhcp6_add_timer(client6_expire_refreshtime, ifp);
 			if (ifp->timer == NULL) {
 				dprintf(LOG_WARNING, FNAME,
-				    "failed to add timer for option lifetime");
+				    "failed to add timer for refresh time");
 			} else {
 				struct timeval tv;
 
-				tv.tv_sec = (long)optinfo->lifetime;
+				tv.tv_sec = (long)optinfo->refreshtime;
 				tv.tv_usec = 0;
 
 				if (tv.tv_sec < 0) {
@@ -1844,8 +1850,8 @@ client6_recvreply(ifp, dh6, len, optinfo)
 					 * unsigned 32bit value.
 					 */
 					dprintf(LOG_WARNING, FNAME,
-					    "lifetime is too large: %lu",
-					    (u_int32_t)optinfo->lifetime);
+					    "refresh time is too large: %lu",
+					    (u_int32_t)optinfo->refreshtime);
 					tv.tv_sec = 0x7fffffff;	/* XXX */
 				}
 
@@ -1853,7 +1859,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 			}
 		}
 	}
-#endif /* USE_DH6OPT_LIFETIME */
+#endif /* USE_DH6OPT_REFRESHTIME */
 
 	/* update stateful configuration information */
 	if (state != DHCP6S_RELEASE) {

@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.36 2004/09/04 09:26:38 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.37 2004/11/28 10:48:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -237,7 +237,7 @@ enum { DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY, DECL_REQUEST, DECL_DUID,
        DHCPOPT_RAPID_COMMIT, DHCPOPT_AUTHINFO,
        DHCPOPT_DNS, DHCPOPT_DNSNAME,
        DHCPOPT_IA_PD, DHCPOPT_NTP,
-       DHCPOPT_LIFETIME,
+       DHCPOPT_REFRESHTIME,
        CFLISTENT_GENERIC,
        IACONF_PIF, IACONF_PREFIX,
        DHCPOPT_SIP, DHCPOPT_SIPNAME,
@@ -257,7 +257,7 @@ extern struct dhcp6_list sipnamelist;
 extern struct dhcp6_list dnslist;
 extern struct dhcp6_list dnsnamelist;
 extern struct dhcp6_list ntplist;
-extern long long optlifetime;
+extern long long optrefreshtime;
 
 extern struct dhcp6_if *ifinit __P((char *));
 extern int ifreset __P((struct dhcp6_if *));

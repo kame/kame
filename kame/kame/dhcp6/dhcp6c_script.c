@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_script.c,v 1.10 2004/05/13 14:01:13 jinmei Exp $	*/
+/*	$KAME: dhcp6c_script.c,v 1.11 2004/11/28 10:48:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -203,7 +203,7 @@ client6_script(scriptpath, state, optinfo)
 		}
 		memset(s, 0, elen);
 		snprintf(s, elen, "%s=", sipserver_str);
-		for (v = TAILQ_FIRST(&optinfo->dns_list); v;
+		for (v = TAILQ_FIRST(&optinfo->sip_list); v;
 		    v = TAILQ_NEXT(v, link)) {
 			char *addr;
 

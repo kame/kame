@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.32 2004/08/01 07:34:34 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.33 2004/11/28 10:48:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -86,7 +86,7 @@ static struct cf_namelist *iflist_head, *hostlist_head, *iapdlist_head;
 static struct cf_namelist *authinfolist_head, *keylist_head;
 struct cf_list *cf_dns_list, *cf_dns_name_list, *cf_ntp_list;
 struct cf_list *cf_sip_list, *cf_sip_name_list;
-long long cf_lifetime = -1;
+long long cf_refreshtime = -1;
 
 extern int yylex __P((void));
 static int add_namelist __P((struct cf_namelist *, struct cf_namelist **));
@@ -100,7 +100,7 @@ static void cleanup_cflist __P((struct cf_list *));
 %token ID_ASSOC IA_PD IAID
 %token REQUEST SEND ALLOW PREFERENCE
 %token HOST HOSTNAME DUID
-%token OPTION RAPID_COMMIT IA_PD DNS_SERVERS DNS_NAME NTP_SERVERS LIFETIME
+%token OPTION RAPID_COMMIT IA_PD DNS_SERVERS DNS_NAME NTP_SERVERS REFRESHTIME
 %token SIP_SERVERS SIP_NAME
 %token INFO_ONLY
 %token SCRIPT DELAYEDKEY
@@ -224,21 +224,21 @@ option_statement:
 				cf_sip_name_list->tail = l->tail;
 			}
 		}
-	|	OPTION LIFETIME NUMBER EOS
+	|	OPTION REFRESHTIME NUMBER EOS
 		{
-			if (cf_lifetime == -1) {
-				cf_lifetime = $3;
-				if (cf_lifetime < -1 ||
-				    cf_lifetime > 0xffffffff) {
+			if (cf_refreshtime == -1) {
+				cf_refreshtime = $3;
+				if (cf_refreshtime < -1 ||
+				    cf_refreshtime > 0xffffffff) {
 					/*
-					 * lifetime should not be negative
+					 * refresh time should not be negative
 					 * according to the lex definition,
 					 * but check it for safety.
 					 */
-					yyerror("lifetime is out of range");
+					yyerror("refresh time is out of range");
 				}
 			} else {
-				yywarn("multiple lifetimes (ignored)");
+				yywarn("multiple refresh times (ignored)");
 			}
 		}
 	;
@@ -507,11 +507,11 @@ dhcpoption:
 			/* currently no value */
 			$$ = l;
 		}
-	|	LIFETIME
+	|	REFRESHTIME
 		{
 			struct cf_list *l;
 
-			MAKE_CFLIST(l, DHCPOPT_LIFETIME, NULL, NULL);
+			MAKE_CFLIST(l, DHCPOPT_REFRESHTIME, NULL, NULL);
 			/* currently no value */
 			$$ = l;
 		}

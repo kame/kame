@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.23 2004/07/29 22:21:11 jinmei Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.24 2004/11/28 10:48:38 jinmei Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -192,9 +192,9 @@ requests a list of SIP server addresses.
 .Xc
 requests a SIP server domain name.
 .It Xo
-.Ic lifetime
+.Ic refreshtime
 .Xc
-means a lifetime option.
+means an information refresh time option.
 This is particularly useful when sent with information-request messages.
 As of this writing, the option type for this option is not officially
 assigned.

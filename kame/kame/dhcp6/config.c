@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.46 2004/07/28 22:33:59 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.47 2004/11/28 10:48:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -53,7 +53,7 @@ extern int errno;
 
 struct prefix_ifconf *prefix_ifconflist;
 struct dhcp6_list siplist, sipnamelist, dnslist, dnsnamelist, ntplist;
-long long optlifetime = -1;
+long long optrefreshtime = -1;
 
 static struct dhcp6_ifconf *dhcp6_ifconflist;
 struct ia_conflist ia_conflist0;
@@ -61,7 +61,7 @@ static struct host_conf *host_conflist0, *host_conflist;
 static struct keyinfo *key_list, *key_list0;
 static struct authinfo *auth_list, *auth_list0;
 static struct dhcp6_list siplist0, sipnamelist0, dnslist0, dnsnamelist0, ntplist0;
-static long long optlifetime0;
+static long long optrefreshtime0;
 
 enum { DHCPOPTCODE_SEND, DHCPOPTCODE_REQUEST, DHCPOPTCODE_ALLOW };
 
@@ -88,7 +88,7 @@ struct dhcp6_ifconf {
 
 extern struct cf_list *cf_dns_list, *cf_dns_name_list, *cf_ntp_list;
 extern struct cf_list *cf_sip_list, *cf_sip_name_list;
-extern long long cf_lifetime;
+extern long long cf_refreshtime;
 extern char *configfilename;
 
 static struct keyinfo *find_keybyname __P((struct keyinfo *, char *));
@@ -976,12 +976,12 @@ configure_global_option()
 	}
 
 	/* Lifetime for stateless options */
-	if (cf_lifetime >= 0) {
-#ifdef USE_DH6OPT_LIFETIME
-		optlifetime0 = cf_lifetime;
+	if (cf_refreshtime >= 0) {
+#ifdef USE_DH6OPT_REFRESHTIME
+		optrefreshtime0 = cf_refreshtime;
 #else
-		dprintf(LOG_ERR, FNAME,
-		    "the support for lifetime option is disabled");
+		dprintf(LOG_ERR, FNAME, "the support for "
+		    "information refresh time option is disabled");
 		goto bad;
 #endif
 	}
@@ -1134,7 +1134,7 @@ configure_cleanup()
 	TAILQ_INIT(&dnsnamelist0);
 	dhcp6_clear_list(&ntplist0);
 	TAILQ_INIT(&ntplist0);
-	optlifetime0 = -1;
+	optrefreshtime0 = -1;
 }
 
 void
@@ -1219,8 +1219,8 @@ configure_commit()
 	dhcp6_clear_list(&ntplist);
 	dhcp6_move_list(&ntplist, &ntplist0);
 
-	/* commit option lifetime */
-	optlifetime = optlifetime0;
+	/* commit information refresh time */
+	optrefreshtime = optrefreshtime0;
 }
 
 static void
@@ -1425,7 +1425,7 @@ add_options(opcode, ifc, cfl0)
 		case DHCPOPT_DNS:
 		case DHCPOPT_DNSNAME:
 		case DHCPOPT_NTP:
-		case DHCPOPT_LIFETIME:
+		case DHCPOPT_REFRESHTIME:
 			switch (cfl->type) {
 			case DHCPOPT_SIP:
 				opttype = DH6OPT_SIP_SERVER_A;
@@ -1447,12 +1447,13 @@ add_options(opcode, ifc, cfl0)
 				    "for NTP option is disabled");
 #endif
 				break;
-			case DHCPOPT_LIFETIME:
-#ifdef USE_DH6OPT_LIFETIME
-				opttype = DH6OPT_LIFETIME;
+			case DHCPOPT_REFRESHTIME:
+#ifdef USE_DH6OPT_REFRESHTIME
+				opttype = DH6OPT_REFRESHTIME;
 #else
 				dprintf(LOG_ERR, FNAME, "the support "
-				    "for lifetime option is disabled");
+				    "for information refresh time option "
+				    "is disabled");
 				return (-1);
 #endif
 				break;
