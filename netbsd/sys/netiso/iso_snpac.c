@@ -1,4 +1,4 @@
-/*	$NetBSD: iso_snpac.c,v 1.20 1998/08/25 04:43:46 thorpej Exp $	*/
+/*	$NetBSD: iso_snpac.c,v 1.23 2000/03/30 13:10:11 augustss Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -100,6 +100,8 @@ extern int      hz;
 
 LIST_HEAD(, llinfo_llc) llinfo_llc;
 
+struct callout snpac_age_ch;
+
 struct sockaddr_iso blank_siso = {sizeof(blank_siso), AF_ISO};
 static struct sockaddr_iso
 	dst = {sizeof(dst), AF_ISO},
@@ -164,20 +166,20 @@ union sockunion {
  * NOTES:		This does a lot of obscure magic;
  */
 void
-llc_rtrequest(req, rt, sa)
+llc_rtrequest(req, rt, info)
 	int             req;
-	register struct rtentry *rt;
-	struct sockaddr *sa;
+	struct rtentry *rt;
+	struct rt_addrinfo *info;
 {
-	register union sockunion *gate = (union sockunion *) rt->rt_gateway;
-	register struct llinfo_llc *lc = (struct llinfo_llc *) rt->rt_llinfo;
+	union sockunion *gate = (union sockunion *) rt->rt_gateway;
+	struct llinfo_llc *lc = (struct llinfo_llc *) rt->rt_llinfo;
 	struct ifnet   *ifp = rt->rt_ifp;
 	int             addrlen = ifp->if_addrlen;
 #define LLC_SIZE 3		/* XXXXXX do this right later */
 
 #ifdef ARGO_DEBUG
 	if (argo_debug[D_SNPA]) {
-		printf("llc_rtrequest(%d, %p, %p)\n", req, rt, sa);
+		printf("llc_rtrequest(%d, %p, %p)\n", req, rt, info);
 	}
 #endif
 	if (rt->rt_flags & RTF_GATEWAY)
@@ -256,26 +258,18 @@ iso_setmcasts(ifp, req)
 	static char    *addrlist[] =
 	{all_es_snpa, all_is_snpa, all_l1is_snpa, all_l2is_snpa, 0};
 	struct ifreq    ifr;
-	register caddr_t *cpp;
-	int             doreset = 0;
+	caddr_t *cpp;
 
 	bzero((caddr_t) & ifr, sizeof(ifr));
 	for (cpp = (caddr_t *) addrlist; *cpp; cpp++) {
 		bcopy(*cpp, (caddr_t) ifr.ifr_addr.sa_data, 6);
-		if (req == RTM_ADD) {
-			if (ether_addmulti(&ifr, (struct ethercom *)ifp) 
-			    == ENETRESET)
-				doreset++;
-			else if (ether_delmulti(&ifr, (struct ethercom *)ifp)
-			    == ENETRESET)
-				doreset++;
-		}
-	}
-	if (doreset) {
-		if (ifp->if_reset)
-			(*ifp->if_reset) (ifp);
-		else
-			printf("iso_setmcasts: %s needs reseting to receive iso mcasts\n",
+		if (req == RTM_ADD && (ifp->if_ioctl == 0 ||
+		    (*ifp->if_ioctl)(ifp, SIOCADDMULTI, (caddr_t)&ifr) != 0))
+			printf("iso_setmcasts: %s unable to add mcast\n",
+			    ifp->if_xname);
+		else if (req == RTM_DELETE && (ifp->if_ioctl == 0 ||
+		    (*ifp->if_ioctl)(ifp, SIOCDELMULTI, (caddr_t)&ifr) != 0))
+			printf("iso_setmcasts: %s unable to delete mcast\n",
 			    ifp->if_xname);
 	}
 }
@@ -335,7 +329,7 @@ iso_snparesolve(ifp, dest, snpa, snpa_len)
 	} else if (iso_systype != SNPA_IS && known_is != 0 &&
 		   (sc = (struct llinfo_llc *) known_is->rt_llinfo) &&
 		   (sc->lc_flags & SNPA_VALID)) {
-		register struct sockaddr_dl *sdl =
+		struct sockaddr_dl *sdl =
 		(struct sockaddr_dl *) (known_is->rt_gateway);
 		found_snpa = LLADDR(sdl);
 		addrlen = sdl->sdl_alen;
@@ -373,9 +367,9 @@ iso_snparesolve(ifp, dest, snpa, snpa_len)
  */
 void
 snpac_free(lc)
-	register struct llinfo_llc *lc;	/* entry to free */
+	struct llinfo_llc *lc;	/* entry to free */
 {
-	register struct rtentry *rt = lc->lc_rt;
+	struct rtentry *rt = lc->lc_rt;
 
 	if (known_is == rt)
 		known_is = 0;
@@ -409,10 +403,10 @@ snpac_add(ifp, nsap, snpa, type, ht, nsellength)
 	int             nsellength;	/* nsaps may differ only in trailing
 					 * bytes */
 {
-	register struct llinfo_llc *lc;
-	register struct rtentry *rt;
+	struct llinfo_llc *lc;
+	struct rtentry *rt;
 	struct rtentry *mrt = 0;
-	register struct iso_addr *r;	/* for zap_isoaddr macro */
+	struct iso_addr *r;	/* for zap_isoaddr macro */
 	int             snpalen = min(ifp->if_addrlen, MAX_SNPALEN);
 	int             new_entry = 0, index = ifp->if_index, iftype = ifp->if_type;
 
@@ -450,7 +444,7 @@ add:
 		rt = mrt;
 		rt->rt_refcnt--;
 	} else {
-		register struct sockaddr_dl *sdl = (struct sockaddr_dl *) rt->rt_gateway;
+		struct sockaddr_dl *sdl = (struct sockaddr_dl *) rt->rt_gateway;
 		rt->rt_refcnt--;
 		if ((rt->rt_flags & RTF_LLINFO) == 0)
 			goto add;
@@ -463,7 +457,7 @@ add:
 				goto add;
 			} else {
 				static struct iso_addr nsap2;
-				register char  *cp;
+				char  *cp;
 				nsap2 = *nsap;
 				cp = nsap2.isoa_genaddr + nsap->isoa_len - nsellength;
 				while (cp < (char *) (1 + &nsap2))
@@ -496,7 +490,7 @@ static void
 snpac_fixdstandmask(nsellength)
 	int nsellength;
 {
-	register char  *cp = msk.siso_data, *cplim;
+	char  *cp = msk.siso_data, *cplim;
 
 	cplim = cp + (dst.siso_nlen -= nsellength);
 	msk.siso_len = cplim - (char *) &msk;
@@ -527,7 +521,7 @@ snpac_ioctl(so, cmd, data, p)
 	caddr_t data;	/* data for the cmd */
 	struct proc *p;
 {
-	register struct systype_req *rq = (struct systype_req *) data;
+	struct systype_req *rq = (struct systype_req *) data;
 	int error;
 
 #ifdef ARGO_DEBUG
@@ -555,7 +549,7 @@ snpac_ioctl(so, cmd, data, p)
 		esis_holding_time = rq->sr_holdt;
 		esis_config_time = rq->sr_configt;
 		if (esis_esconfig_time != rq->sr_esconfigt) {
-			untimeout(esis_config, (caddr_t) 0);
+			callout_stop(&esis_config_ch);
 			esis_esconfig_time = rq->sr_esconfigt;
 			esis_config(NULL);
 		}
@@ -583,9 +577,9 @@ snpac_ioctl(so, cmd, data, p)
  */
 void
 snpac_logdefis(sc)
-	register struct rtentry *sc;
+	struct rtentry *sc;
 {
-	register struct rtentry *rt;
+	struct rtentry *rt;
 
 	if (known_is == sc || !(sc->rt_flags & RTF_HOST))
 		return;
@@ -631,10 +625,10 @@ void
 snpac_age(v)
 	void *v;
 {
-	register struct llinfo_llc *lc, *nlc;
-	register struct rtentry *rt;
+	struct llinfo_llc *lc, *nlc;
+	struct rtentry *rt;
 
-	timeout(snpac_age, (caddr_t) 0, SNPAC_AGE * hz);
+	callout_reset(&snpac_age_ch, SNPAC_AGE * hz, snpac_age, NULL);
 
 	for (lc = llinfo_llc.lh_first; lc != 0; lc = nlc) {
 		nlc = lc->lc_list.le_next;
@@ -686,7 +680,7 @@ void
 snpac_flushifp(ifp)
 	struct ifnet   *ifp;
 {
-	register struct llinfo_llc *lc;
+	struct llinfo_llc *lc;
 
 	for (lc = llinfo_llc.lh_first; lc != 0; lc = lc->lc_list.le_next) {
 		if (lc->lc_rt->rt_ifp == ifp && (lc->lc_flags & SNPA_VALID))
@@ -715,7 +709,7 @@ snpac_rtrequest(req, host, gateway, netmask, flags, ret_nrt)
 	short           flags;
 	struct rtentry **ret_nrt;
 {
-	register struct iso_addr *r;
+	struct iso_addr *r;
 
 #ifdef ARGO_DEBUG
 	if (argo_debug[D_SNPA]) {
@@ -767,7 +761,7 @@ snpac_addrt(ifp, host, gateway, netmask)
 	struct ifnet   *ifp;
 	struct iso_addr *host, *gateway, *netmask;
 {
-	register struct iso_addr *r;
+	struct iso_addr *r;
 
 	zap_isoaddr(dst, host);
 	zap_isoaddr(gte, gateway);

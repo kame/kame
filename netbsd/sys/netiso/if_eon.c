@@ -278,14 +278,15 @@ eoniphdr(hdr, loc, ro, class, zero)
  * RETURNS:			nothing
  */
 void
-eonrtrequest(cmd, rt, gate)
+eonrtrequest(cmd, rt, info)
 	int cmd;
 	struct rtentry *rt;
-	struct sockaddr *gate;
+	struct rt_addrinfo *info;
 {
 	unsigned long   zerodst = 0;
 	caddr_t         ipaddrloc = (caddr_t) & zerodst;
 	struct eon_llinfo *el = (struct eon_llinfo *) rt->rt_llinfo;
+	struct sockaddr *gate;
 
 	/*
 	 * Common Housekeeping
@@ -313,7 +314,7 @@ eonrtrequest(cmd, rt, gate)
 		el->el_rt = rt;
 		break;
 	}
-	if (gate || (gate = rt->rt_gateway))
+	if (info || (gate = info->rti_info[RTAX_GATEWAY]))	/*XXX*/
 		switch (gate->sa_family) {
 		case AF_LINK:
 #define SDL(x) ((struct sockaddr_dl *)x)
@@ -400,7 +401,7 @@ einval:
 		goto flush;
 	}
 	if ((el->el_flags & RTF_UP) == 0) {
-		eonrtrequest(RTM_CHANGE, rt, (struct sockaddr *) 0);
+		eonrtrequest(RTM_CHANGE, rt, (struct rt_addrinfo *) 0);
 		if ((el->el_flags & RTF_UP) == 0) {
 			error = EHOSTUNREACH;
 			goto flush;

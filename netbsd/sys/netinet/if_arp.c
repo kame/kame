@@ -357,10 +357,10 @@ arptimer(arg)
  * Parallel to llc_rtrequest.
  */
 void
-arp_rtrequest(req, rt, sa)
+arp_rtrequest(req, rt, info)
 	int req;
 	struct rtentry *rt;
-	struct sockaddr *sa;
+	struct rt_addrinfo *info;
 {
 	struct sockaddr *gate = rt->rt_gateway;
 	struct llinfo_arp *la = (struct llinfo_arp *)rt->rt_llinfo;

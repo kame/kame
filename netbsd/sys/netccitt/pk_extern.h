@@ -70,7 +70,7 @@ void pk_call_accepted __P((struct pklcd *, struct mbuf *));
 void pk_parse_facilities __P((octet *, struct sockaddr_x25 *));
 
 /* pk_llcsubr.c */
-void cons_rtrequest __P((int, struct rtentry *, struct sockaddr *));
+void cons_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 struct rtentry *npaidb_enter __P((struct sockaddr_dl *, struct sockaddr *,
 				  struct rtentry *, struct llc_linkcb *));
 struct rtentry *npaidb_enrich __P((short, caddr_t, struct sockaddr_dl *));

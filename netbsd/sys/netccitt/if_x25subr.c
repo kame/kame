@@ -442,10 +442,10 @@ x25_iftimeout(ifp)
  * or deletions of old ones.
  */
 void
-x25_rtrequest(cmd, rt, dst)
+x25_rtrequest(cmd, rt, info)
 	int cmd;
 	struct rtentry *rt;
-	struct sockaddr *dst;
+	struct rt_addrinfo *info;
 {
 	struct llinfo_x25 *lx = (struct llinfo_x25 *) rt->rt_llinfo;
 	struct pklcd *lcp;

@@ -726,10 +726,10 @@ ifaof_ifpforaddr(addr, ifp)
  * This should be moved to /sys/net/link.c eventually.
  */
 void
-link_rtrequest(cmd, rt, sa)
+link_rtrequest(cmd, rt, info)
 	int cmd;
 	struct rtentry *rt;
-	struct sockaddr *sa;
+	struct rt_addrinfo *info;
 {
 	struct ifaddr *ifa;
 	struct sockaddr *dst;
@@ -743,7 +743,7 @@ link_rtrequest(cmd, rt, sa)
 		rt->rt_ifa = ifa;
 		IFAREF(ifa);
 		if (ifa->ifa_rtrequest && ifa->ifa_rtrequest != link_rtrequest)
-			ifa->ifa_rtrequest(cmd, rt, sa);
+			ifa->ifa_rtrequest(cmd, rt, info);
 	}
 }
 

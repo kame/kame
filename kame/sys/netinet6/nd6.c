@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.84 2000/12/03 00:54:00 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.85 2001/01/17 15:36:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1113,7 +1113,7 @@ nd6_resolve(ifp, rt, m, dst, desten)
 #endif /* OLDIP6OUTPUT */
 
 void
-#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__)
 nd6_rtrequest(req, rt, info)
 	int	req;
 	struct rtentry *rt;
@@ -1354,7 +1354,7 @@ nd6_rtrequest(req, rt, sa)
 }
 
 void
-#if defined(__bsdi__) && _BSDI_VERSION >= 199802
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__)
 nd6_p2p_rtrequest(req, rt, info)
 	int	req;
 	struct rtentry *rt;

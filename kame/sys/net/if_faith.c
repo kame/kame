@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.18 2000/12/03 00:39:27 itojun Exp $	*/
+/*	$KAME: if_faith.c,v 1.19 2001/01/17 15:36:44 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -108,7 +108,11 @@ static int faithioctl __P((struct ifnet *, u_long, caddr_t));
 #endif
 int faithoutput __P((struct ifnet *, struct mbuf *, struct sockaddr *,
 	struct rtentry *));
+#ifdef __NetBSD__
+static void faithrtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
+#else
 static void faithrtrequest __P((int, struct rtentry *, struct sockaddr *));
+#endif
 
 #ifdef __FreeBSD__
 void faithattach __P((void *));
@@ -250,10 +254,17 @@ faithoutput(ifp, m, dst, rt)
 
 /* ARGSUSED */
 static void
+#ifdef __NetBSD__
+faithrtrequest(cmd, rt, info)
+	int cmd;
+	struct rtentry *rt;
+	struct rt_addrinfo *info;
+#else
 faithrtrequest(cmd, rt, sa)
 	int cmd;
 	struct rtentry *rt;
 	struct sockaddr *sa;
+#endif
 {
 	if (rt) {
 		rt->rt_rmx.rmx_mtu = rt->rt_ifp->if_mtu; /* for ISO */

@@ -1,4 +1,4 @@
-/*	$NetBSD: iso_var.h,v 1.11 1999/04/01 06:51:48 chopps Exp $	*/
+/*	$NetBSD: iso_var.h,v 1.14 2000/03/23 07:03:31 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1988, 1991, 1993
@@ -59,6 +59,9 @@ SOFTWARE.
 ******************************************************************/
 #ifndef _NETISO_ISO_VAR_H_
 #define _NETISO_ISO_VAR_H_
+
+#include <sys/callout.h>
+
 /*
  * ARGO Project, Computer Sciences Dept., University of Wisconsin - Madison
  */
@@ -134,6 +137,9 @@ struct ifqueue  clnlintrq;	/* clnl packet input queue */
 struct afhash;
 struct llinfo_llc;
 
+extern struct callout snpac_age_ch;
+extern struct callout esis_config_ch;
+
 /* iso.c */
 int iso_addrmatch1 __P((struct iso_addr *, struct iso_addr *));
 int iso_addrmatch __P((struct sockaddr_iso *, struct sockaddr_iso *));
@@ -143,6 +149,8 @@ int iso_hash __P((struct sockaddr_iso *, struct afhash *));
 int iso_netof __P((struct iso_addr *, caddr_t));
 int iso_control __P((struct socket *, u_long, caddr_t, struct ifnet *,
 		     struct proc *));
+void iso_purgeaddr __P((struct ifaddr *, struct ifnet *));
+void iso_purgeif __P((struct ifnet *));
 void iso_ifscrub __P((struct ifnet *, struct iso_ifaddr *));
 int iso_ifinit __P((struct ifnet *, struct iso_ifaddr *, struct sockaddr_iso *,
 		    int ));
@@ -160,7 +168,7 @@ int m_datalen __P((struct mbuf *));
 int m_compress __P((struct mbuf *, struct mbuf **));
 
 /* iso_snpac.c */
-void llc_rtrequest __P((int, struct rtentry *, struct sockaddr *));
+void llc_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 void iso_setmcasts __P((struct ifnet *, int));
 int iso_snparesolve __P((struct ifnet *, struct sockaddr_iso *,
 			 caddr_t, int *));

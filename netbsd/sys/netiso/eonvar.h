@@ -174,7 +174,7 @@ void eonprotoinit __P((void));
 void eonattach   __P((void));
 int eonioctl    __P((struct ifnet *, u_long, caddr_t));
 void eoniphdr    __P((struct eon_iphdr *, caddr_t, struct route *, int, int));
-void eonrtrequest __P((int, struct rtentry *, struct sockaddr *));
+void eonrtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 int eonoutput   __P((struct ifnet *, struct mbuf *, struct sockaddr *,
 		     struct rtentry *));
 void eoninput    __P((struct mbuf *, ...));

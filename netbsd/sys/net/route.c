@@ -528,7 +528,7 @@ rtrequest1(req, info, ret_nrt)
 		}
 		rt->rt_flags &= ~RTF_UP;
 		if ((ifa = rt->rt_ifa) && ifa->ifa_rtrequest)
-			ifa->ifa_rtrequest(RTM_DELETE, rt, SA(0));
+			ifa->ifa_rtrequest(RTM_DELETE, rt, info);
 		rttrash++;
 		if (ret_nrt)
 			*ret_nrt = rt;
@@ -591,7 +591,7 @@ rtrequest1(req, info, ret_nrt)
 			}
 		}
 		if (ifa->ifa_rtrequest)
-			ifa->ifa_rtrequest(req, rt, SA(ret_nrt ? *ret_nrt : 0));
+			ifa->ifa_rtrequest(req, rt, info);
 		if (ret_nrt) {
 			*ret_nrt = rt;
 			rt->rt_refcnt++;
@@ -733,14 +733,14 @@ rtinit(ifa, cmd, flags)
 			printf("rtinit: wrong ifa (%p) was (%p)\n", ifa,
 				rt->rt_ifa);
 			if (rt->rt_ifa->ifa_rtrequest)
-			    rt->rt_ifa->ifa_rtrequest(RTM_DELETE, rt, SA(0));
+				rt->rt_ifa->ifa_rtrequest(RTM_DELETE, rt, NULL);
 			IFAFREE(rt->rt_ifa);
 			rt->rt_ifa = ifa;
 			rt->rt_ifp = ifa->ifa_ifp;
 			rt->rt_rmx.rmx_mtu = ifa->ifa_ifp->if_mtu;	/*XXX*/
 			IFAREF(ifa);
 			if (ifa->ifa_rtrequest)
-			    ifa->ifa_rtrequest(RTM_ADD, rt, SA(0));
+				ifa->ifa_rtrequest(RTM_ADD, rt, NULL);
 		}
 		rt_newaddrmsg(cmd, ifa, error, nrt);
 	}

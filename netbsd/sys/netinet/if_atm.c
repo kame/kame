@@ -79,10 +79,10 @@
  */
 
 void
-atm_rtrequest(req, rt, sa)
+atm_rtrequest(req, rt, info)
 	int req;
 	struct rtentry *rt;
-	struct sockaddr *sa;
+	struct rt_addrinfo *info;
 {
 	struct sockaddr *gate = rt->rt_gateway;
 	struct atm_pseudoioctl api;
