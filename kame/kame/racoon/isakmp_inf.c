@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.73 2001/10/31 00:00:53 sakane Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.74 2001/11/06 02:02:58 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -820,7 +820,7 @@ purge_isakmp_spi(proto, spi, n)
 			continue;
 
 		plog(LLV_INFO, LOCATION, NULL,
-			"proto_id %s purging spi=%s.\n",
+			"purged ISAKMP-SA proto_id=%s spi=%s.\n",
 			s_ipsecdoi_proto(proto),
 			isakmp_pindex(&spi[i], 0));
 
@@ -922,7 +922,7 @@ purge_ipsec_spi(dst0, proto, spi, n)
 			}
 
 			plog(LLV_INFO, LOCATION, NULL,
-				"proto_id %s purging spi=%u.\n",
+				"purged IPsec-SA proto_id=%s spi=%u.\n",
 				s_ipsecdoi_proto(proto),
 				ntohl(spi[i]));
 		}
@@ -1236,8 +1236,7 @@ isakmp_info_recv_d(iph1, msg)
 			continue;
 		}
 
-		plog(LLV_INFO, LOCATION, NULL,
-			"packet properly proteted, purge SPIs.\n");
+		plog(LLV_DEBUG, LOCATION, NULL, "purged SAs.\n");
 	}
 
 	vfree(pbuf);
