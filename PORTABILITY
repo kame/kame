@@ -1,6 +1,6 @@
 Portability guideline
 KAME project
-$Id: PORTABILITY,v 1.2 1999/08/11 16:48:49 itojun Exp $
+$Id: PORTABILITY,v 1.3 1999/08/12 15:29:27 itojun Exp $
 
 
 Source code in "kame" directory will be shared among operating systems
@@ -68,5 +68,20 @@ across those possibilities.
 		/*something*/ \
 	} while (0)
   Without this wrapper nasty mistakes can happen.
+
+- BSDI3 make is a bit different from others:
+  (1) MAN[0-9] does not respect .PATH
+  (2) $> does not respect .PATH
+  You'll need to implement necessary tricks on your own.
+  The former one can be solved like below but is not a clean solution.
+	.PATH:	${SRCDIR}
+	_MAN5=	foo.5
+	MAN5=	${_MAN5:s/^/${SRCDIR}\//g}
+
+- BSDI3 /usr/bin/cc is gcc 1.42, and it does not support __FUNCTION__.
+  If you need to use __FUNCTION__, you need to set CC to "gcc", or "shlicc2"
+  explicitly.
+  __FUNCTION__ macro is not included in ANSI standard, so it is best to
+  avoid __FUNCTION__ for portability.
 
 - For portability in networking code, look at kame/sys/net/net_osdep.h.
