@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.10 2003/01/27 14:50:07 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.11 2003/02/06 07:06:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -71,6 +71,7 @@ struct ia {
 	struct iactl *ctl;
 };
 
+static void reestablish_ia __P((struct ia *));
 static void callback __P((struct ia *));
 static int release_ia __P((struct ia *));
 static void remove_ia __P((struct ia *));
@@ -153,7 +154,7 @@ update_ia(iatype, ialist, ifp, serverid)
 					    "renew/rebind for %s-%lu", FNAME,
 					    iastr(ia->conf->type),
 					    ia->conf->iaid);
-					remove_ia(ia);
+					reestablish_ia(ia);
 					goto nextia;
 				}
 				break;
@@ -220,6 +221,94 @@ update_ia(iatype, ialist, ifp, serverid)
 
 	  nextia:
 	}
+}
+
+static void
+reestablish_ia(ia)
+	struct ia *ia;
+{
+	struct dhcp6_ia iaparam;
+	struct dhcp6_event *ev;
+	struct dhcp6_eventdata *evd;
+
+	dprintf(LOG_DEBUG, "%s" "re-establishing IA: %s-%lu", FNAME,
+	    iastr(ia->conf->type), ia->conf->iaid);
+
+	if (ia->state != IAS_RENEW && ia->state != IAS_REBIND) {
+		dprintf(LOG_ERR, "%s" "internal error (invalid IA status)",
+		    FNAME);
+		exit(1);	/* XXX */
+	}
+
+	/* cancel the current event for the prefix. */
+	if (ia->evdata) {
+		TAILQ_REMOVE(&ia->evdata->event->data_list, ia->evdata, link);
+		if (ia->evdata->destructor)
+			ia->evdata->destructor(ia->evdata);
+		else
+			free(ia->evdata);
+		ia->evdata = NULL;
+	}
+
+	/* we don't need a timer for the IA (see comments in ia_timo()) */
+	dhcp6_remove_timer(&ia->timer);
+
+	if ((ev = dhcp6_create_event(ia->ifp, DHCP6S_REQUEST)) == NULL) {
+		dprintf(LOG_NOTICE, "%s" "failed to create a new event",
+		    FNAME);
+		goto fail;
+	}
+	TAILQ_INSERT_TAIL(&ia->ifp->event_list, ev, link);
+
+	if ((ev->timer = dhcp6_add_timer(client6_timo, ev)) == NULL) {
+		dprintf(LOG_NOTICE, "%s" "failed to create a new event "
+		    "timer", FNAME);
+		goto fail;
+	}
+
+	if ((evd = malloc(sizeof(*evd))) == NULL) {
+		dprintf(LOG_NOTICE, "%s" "failed to create a new event "
+		    "data", FNAME);
+		goto fail;
+	}
+	memset(evd, 0, sizeof(*evd));
+	evd->event = ev;
+	TAILQ_INSERT_TAIL(&ev->data_list, evd, link);
+
+	if (duidcpy(&ev->serverid, &ia->serverid)) {
+		dprintf(LOG_NOTICE, "%s" "failed to copy server ID",
+		    FNAME);
+		goto fail;
+	}
+
+	iaparam.iaid = ia->conf->iaid;
+	iaparam.t1 = ia->t1;
+	iaparam.t2 = ia->t2;
+
+	if (ia->ctl && ia->ctl->reestablish_data) {
+		if ((*ia->ctl->reestablish_data)(ia->ctl, &iaparam,
+		    &ia->evdata, evd)) {
+			dprintf(LOG_NOTICE, "%s" "failed to make "
+			    "reestablish data", FNAME);
+			goto fail;
+		}
+	}
+
+	ev->timeouts = 0;
+	dhcp6_set_timeoparam(ev);
+	dhcp6_reset_timer(ev);
+
+	ia->evdata = evd;
+
+	client6_send(ev);
+
+	return;
+
+  fail:
+	if (ev)
+		dhcp6_remove_event(ev);
+
+	return;
 }
 
 static void
@@ -302,12 +391,13 @@ release_ia(ia)
 	iaparam.t1 = ia->t1;
 	iaparam.t2 = ia->t2;
 
-	if (ia->ctl && ia->ctl->release_data)
+	if (ia->ctl && ia->ctl->release_data) {
 		if ((*ia->ctl->release_data)(ia->ctl, &iaparam, NULL, evd)) {
 			dprintf(LOG_NOTICE, "%s" "failed to make "
 			    "release data", FNAME);
 			goto fail;
 		}
+	}
 	TAILQ_INSERT_TAIL(&ev->data_list, evd, link);
 
 	ev->timeouts = 0;
@@ -444,22 +534,24 @@ ia_timo(arg)
 	iaparam.t2 = ia->t2;
 	switch(ia->state) {
 	case IAS_RENEW:
-		if (ia->ctl && ia->ctl->renew_data)
+		if (ia->ctl && ia->ctl->renew_data) {
 			if ((*ia->ctl->renew_data)(ia->ctl, &iaparam,
 			    &ia->evdata, evd)) {
 				dprintf(LOG_NOTICE, "%s" "failed to make "
 				    "renew data", FNAME);
 				goto fail;
 			}
+		}
 		break;
 	case IAS_REBIND:
-		if (ia->ctl && ia->ctl->rebind_data)
+		if (ia->ctl && ia->ctl->rebind_data) {
 			if ((*ia->ctl->rebind_data)(ia->ctl, &iaparam,
 			    &ia->evdata, evd)) {
 				dprintf(LOG_NOTICE, "%s" "failed to make "
 				    "rebind data", FNAME);
 				goto fail;
 			}
+		}
 		break;
 	}
 
