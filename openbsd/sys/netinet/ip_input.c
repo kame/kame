@@ -861,7 +861,7 @@ ip_dooptions(m)
 				goto bad;
 			}
 			optlen = cp[IPOPT_OLEN];
-			if (optlen <= 0 || optlen > cnt) {
+			if (optlen < IPOPT_OLEN + sizeof(*cp) || optlen > cnt) {
 				code = &cp[IPOPT_OLEN] - (u_char *)ip;
 				goto bad;
 			}
@@ -948,6 +948,10 @@ ip_dooptions(m)
 			break;
 
 		case IPOPT_RR:
+			if (optlen < IPOPT_OFFSET + sizeof(*cp)) {
+				code = &cp[IPOPT_OLEN] - (u_char *)ip;
+				goto bad;
+			}
 			if ((off = cp[IPOPT_OFFSET]) < IPOPT_MINOFF) {
 				code = &cp[IPOPT_OFFSET] - (u_char *)ip;
 				goto bad;
@@ -1018,6 +1022,9 @@ ip_dooptions(m)
 				break;
 
 			default:
+				/* XXX can't take &ipt->ipt_flg */
+				code = (u_char *)&ipt->ipt_ptr -
+				    (u_char *)ip + 1;
 				goto bad;
 			}
 			ntime = iptime();

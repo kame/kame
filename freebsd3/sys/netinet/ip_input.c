@@ -1173,7 +1173,7 @@ ip_dooptions(m)
 				goto bad;
 			}
 			optlen = cp[IPOPT_OLEN];
-			if (optlen <= 0 || optlen > cnt) {
+			if (optlen < IPOPT_OLEN + sizeof(*cp) || optlen > cnt) {
 				code = &cp[IPOPT_OLEN] - (u_char *)ip;
 				goto bad;
 			}
@@ -1194,6 +1194,10 @@ ip_dooptions(m)
 		 */
 		case IPOPT_LSRR:
 		case IPOPT_SSRR:
+			if (optlen < IPOPT_OFFSET + sizeof(*cp)) {
+				code = &cp[IPOPT_OLEN] - (u_char *)ip;
+				goto bad;
+			}
 			if ((off = cp[IPOPT_OFFSET]) < IPOPT_MINOFF) {
 				code = &cp[IPOPT_OFFSET] - (u_char *)ip;
 				goto bad;
@@ -1279,6 +1283,10 @@ nosourcerouting:
 			break;
 
 		case IPOPT_RR:
+			if (optlen < IPOPT_OFFSET + sizeof(*cp)) {
+				code = &cp[IPOPT_OLEN] - (u_char *)ip;
+				goto bad;
+			}
 			if ((off = cp[IPOPT_OFFSET]) < IPOPT_MINOFF) {
 				code = &cp[IPOPT_OFFSET] - (u_char *)ip;
 				goto bad;
@@ -1309,11 +1317,20 @@ nosourcerouting:
 		case IPOPT_TS:
 			code = cp - (u_char *)ip;
 			ipt = (struct ip_timestamp *)cp;
-			if (ipt->ipt_len < 5)
+			if (ipt->ipt_len < 4 || ipt->ipt_len > 40) {
+				code = (u_char *)&ipt->ipt_len - (u_char *)ip;
 				goto bad;
+			}
+			if (ipt->ipt_ptr < 5) {
+				code = (u_char *)&ipt->ipt_ptr - (u_char *)ip;
+				goto bad;
+			}
 			if (ipt->ipt_ptr > ipt->ipt_len - sizeof(int32_t)) {
-				if (++ipt->ipt_oflw == 0)
+				if (++ipt->ipt_oflw == 0) {
+					code = (u_char *)&ipt->ipt_ptr -
+					    (u_char *)ip;
 					goto bad;
+				}
 				break;
 			}
 			sin = (struct in_addr *)(cp + ipt->ipt_ptr - 1);
@@ -1324,8 +1341,11 @@ nosourcerouting:
 
 			case IPOPT_TS_TSANDADDR:
 				if (ipt->ipt_ptr - 1 + sizeof(n_time) +
-				    sizeof(struct in_addr) > ipt->ipt_len)
+				    sizeof(struct in_addr) > ipt->ipt_len) {
+					code = (u_char *)&ipt->ipt_ptr -
+					    (u_char *)ip;
 					goto bad;
+				}
 				ipaddr.sin_addr = dst;
 				ia = (INA)ifaof_ifpforaddr((SA)&ipaddr,
 							    m->m_pkthdr.rcvif);
@@ -1338,8 +1358,11 @@ nosourcerouting:
 
 			case IPOPT_TS_PRESPEC:
 				if (ipt->ipt_ptr - 1 + sizeof(n_time) +
-				    sizeof(struct in_addr) > ipt->ipt_len)
+				    sizeof(struct in_addr) > ipt->ipt_len) {
+					code = (u_char *)&ipt->ipt_ptr -
+					    (u_char *)ip;
 					goto bad;
+				}
 				(void)memcpy(&ipaddr.sin_addr, sin,
 				    sizeof(struct in_addr));
 				if (ifa_ifwithaddr((SA)&ipaddr) == 0)
@@ -1348,6 +1371,9 @@ nosourcerouting:
 				break;
 
 			default:
+				/* XXX can't take &ipt->ipt_flg */
+				code = (u_char *)&ipt->ipt_ptr -
+				    (u_char *)ip + 1;
 				goto bad;
 			}
 			ntime = iptime();

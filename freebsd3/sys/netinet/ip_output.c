@@ -1021,8 +1021,16 @@ ip_optcopy(ip, jp)
 			*dp++ = IPOPT_NOP;
 			optlen = 1;
 			continue;
-		} else
-			optlen = cp[IPOPT_OLEN];
+		}
+#ifdef DIAGNOSTIC
+		if (cnt < IPOPT_OLEN + sizoef(*cp))
+			panic("malformed IPv4 option passed to ip_optcopy");
+#endif
+		optlen = cp[IPOPT_OLEN];
+#ifdef DIAGNOSTIC
+		if (optlen < IPOPT_OLEN + sizoef(*cp) || optlen > cnt)
+			panic("malformed IPv4 option passed to ip_optcopy");
+#endif
 		/* bogus lengths should have been caught by ip_dooptions */
 		if (optlen > cnt)
 			optlen = cnt;
@@ -1361,8 +1369,10 @@ ip_pcbopts(optname, pcbopt, m)
 		if (opt == IPOPT_NOP)
 			optlen = 1;
 		else {
+			if (cnt < IPOPT_OLEN + sizeof(*cp))
+				goto bad;
 			optlen = cp[IPOPT_OLEN];
-			if (optlen <= IPOPT_OLEN || optlen > cnt)
+			if (optlen < IPOPT_OLEN  + sizeof(*cp) || optlen > cnt)
 				goto bad;
 		}
 		switch (opt) {
