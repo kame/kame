@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1446 2000/12/21 02:00:34 jinmei Exp $
+$KAME: CHANGELOG,v 1.1447 2000/12/22 09:00:34 jinmei Exp $
 
 <200012>
+2000-12-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd/config.c (getconfig): allowed hosts to
+	advertise RA only when router lifetime is set 0 on every
+	advertising interface. This restriction would avoid invalid RAs
+	advertised from a host by misconfiguration.
+
 2000-12-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.c (icmp6_input): all *BSD called
 	icmp6_rip6_input(). rip6_input(), which was used by bsdi4 and
