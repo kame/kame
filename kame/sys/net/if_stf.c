@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.77 2002/06/20 07:36:20 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.78 2002/07/23 06:53:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -670,6 +670,7 @@ stf_output(ifp, m, dst, rt)
 	m_copyback(m, offsetof(struct ip, ip_len), sizeof(u_int16_t),
 	    (caddr_t) &plen);
 
+	ifp->if_opackets++;
 	return ip_output(m, NULL, NULL, 0, NULL, NULL);
 #else
 	struct stf_softc *sc;
@@ -787,6 +788,7 @@ stf_output(ifp, m, dst, rt)
 		}
 	}
 
+	ifp->if_opackets++;
 	return ip_output(m, NULL, &sc->sc_ro, 0, NULL);
 #endif
 }
