@@ -1,4 +1,4 @@
-/*	$KAME: pdelegate.h,v 1.5 2001/09/06 05:31:47 itojun Exp $	*/
+/*	$KAME: pdelegate.h,v 1.6 2001/09/06 05:34:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -52,7 +52,11 @@
 #define ICMP6_PD_INITIAL_INTERVAL	5 /* seconds */
 #define ICMP6_PD_INITIAL_RETRY_MAX	3 /* times */
 
+#if 0
 #define ALLDELEGATORS		"ff02::20"	/*XXX local agreement*/
+#else
+#define ALLDELEGATORS		"ff02::2"	/*XXX local agreement w/yamaha*/
+#endif
 
 /* 5.1 Prefix Request */
 struct icmp6_prefix_request {
