@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.72 2001/03/14 13:25:20 itojun Exp $
+	$KAME: RELNOTES,v 1.73 2001/04/26 09:26:49 itojun Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -122,7 +122,7 @@ Many of old ones have been solved.
   kernel, or vice versa.  Be sure to use userland programs supplied with KAME
   (in /usr/local/v6) when you use KAME-patched kernel.  If you mix them up,
   you may experience strange behaviors.  For example, it causes serious trouble
-  if you use FreeBSD 4.2-RELEASE /sbin/ifconfig against KAME-patched kernel.
+  if you use FreeBSD 4.x-RELEASE /sbin/ifconfig against KAME-patched kernel.
 
 - The KAME build tree is designed to avoid overwrites of userland programs.
   It is intentional that we install KAME userland binaries into /usr/local/v6,
