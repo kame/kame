@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.42 2000/05/08 08:03:48 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.43 2000/05/22 15:33:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -563,23 +563,23 @@ struct in6_pktinfo {
 #define IPV6CTL_MAXID		25
 
 #ifdef IPV6CTL_MAPPED_ADDR
-#define IPV6CTL_NAMES_MAPPED_ADDR	"mapped_addr"
-#define IPV6CTL_TYPE_MAPPED_ADDR	CTLTYPE_INT
-#define IPV6CTL_VARS_MAPPED_ADDR	&ip6_mapped_addr_on
+#define __IPV6CTL_NAMES_MAPPED_ADDR	"mapped_addr"
+#define __IPV6CTL_TYPE_MAPPED_ADDR	CTLTYPE_INT
+#define __IPV6CTL_VARS_MAPPED_ADDR	&ip6_mapped_addr_on
 #else
-#define IPV6CTL_NAMES_MAPPED_ADDR	0
-#define IPV6CTL_TYPE_MAPPED_ADDR	0
-#define IPV6CTL_VARS_MAPPED_ADDR	0
+#define __IPV6CTL_NAMES_MAPPED_ADDR	0
+#define __IPV6CTL_TYPE_MAPPED_ADDR	0
+#define __IPV6CTL_VARS_MAPPED_ADDR	0
 #endif
 
 #ifdef IPV6CTL_BINDV6ONLY
-#define IPV6CTL_NAMES_BINDV6ONLY	"bindv6only"
-#define IPV6CTL_TYPE_BINDV6ONLY		CTLTYPE_INT
-#define IPV6CTL_VARS_BINDV6ONLY		&ip6_bindv6only
+#define __IPV6CTL_NAMES_BINDV6ONLY	"bindv6only"
+#define __IPV6CTL_TYPE_BINDV6ONLY		CTLTYPE_INT
+#define __IPV6CTL_VARS_BINDV6ONLY		&ip6_bindv6only
 #else
-#define IPV6CTL_NAMES_BINDV6ONLY	0
-#define IPV6CTL_TYPE_BINDV6ONLY	0
-#define IPV6CTL_VARS_BINDV6ONLY	0
+#define __IPV6CTL_NAMES_BINDV6ONLY	0
+#define __IPV6CTL_TYPE_BINDV6ONLY	0
+#define __IPV6CTL_VARS_BINDV6ONLY	0
 #endif
 
 #define IPV6CTL_NAMES { \
@@ -606,8 +606,8 @@ struct in6_pktinfo {
 	{ "kame_version", CTLTYPE_STRING }, \
 	{ "use_deprecated", CTLTYPE_INT }, \
 	{ "rr_prune", CTLTYPE_INT }, \
-	{ IPV6CTL_NAMES_MAPPED_ADDR, IPV6CTL_TYPE_MAPPED_ADDR }, \
-	{ IPV6CTL_NAMES_BINDV6ONLY, IPV6CTL_TYPE_BINDV6ONLY }, \
+	{ __IPV6CTL_NAMES_MAPPED_ADDR, __IPV6CTL_TYPE_MAPPED_ADDR }, \
+	{ __IPV6CTL_NAMES_BINDV6ONLY, __IPV6CTL_TYPE_BINDV6ONLY }, \
 }
 
 #ifdef __bsdi__
@@ -635,8 +635,8 @@ struct in6_pktinfo {
 	0, \
 	&ip6_use_deprecated, \
 	&ip6_rr_prune, \
-	IPV6CTL_VARS_MAPPED_ADDR, \
-	IPV6CTL_VARS_BINDV6ONLY, \
+	__IPV6CTL_VARS_MAPPED_ADDR, \
+	__IPV6CTL_VARS_BINDV6ONLY, \
 }
 #endif
 #endif /* !_XOPEN_SOURCE */
