@@ -1,4 +1,4 @@
-/*	$KAME: pim6.c,v 1.18 2001/08/09 08:46:57 suz Exp $	*/
+/*	$KAME: pim6.c,v 1.19 2001/08/30 11:21:38 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -281,7 +281,7 @@ accept_pim6(pimlen)
     int ifindex=0;
 
     /* sanity check */
-    if (pimlen < sizeof(pim)) {
+    if (pimlen < sizeof(*pim)) {
         log(LOG_WARNING, 0,
             "data field too short (%u bytes) for PIM header, from %s",
             pimlen, inet6_fmt(&src->sin6_addr));
