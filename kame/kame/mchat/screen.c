@@ -607,7 +607,8 @@ static void
 w_printinfo(wp)
 	struct window *wp;
 {
-	wstat_print("%s", wstat.wbuf);
+	if (use_curses)
+		wstat_print("%s", wstat.wbuf);
 }
 
 static void
