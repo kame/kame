@@ -182,8 +182,8 @@ struct icmp6_ifstat {
 	u_int64_t ifs6_in_redirect;
 	/* ipv6IfIcmpInGroupMembQueries, # of input MLD queries */
 	u_int64_t ifs6_in_mldquery;
-	/* ipv6IfIcmpInGroupMembResponses, # of input MLD responses */
-	u_int64_t ifs6_in_mldresponse;
+	/* ipv6IfIcmpInGroupMembResponses, # of input MLD reports */
+	u_int64_t ifs6_in_mldreport;
 	/* ipv6IfIcmpInGroupMembReductions, # of input MLD done */
 	u_int64_t ifs6_in_mlddone;
 
@@ -220,8 +220,8 @@ struct icmp6_ifstat {
 	u_int64_t ifs6_out_redirect;
 	/* ipv6IfIcmpOutGroupMembQueries, # of output MLD queries */
 	u_int64_t ifs6_out_mldquery;
-	/* ipv6IfIcmpOutGroupMembResponses, # of output MLD responses */
-	u_int64_t ifs6_out_mldresponse;
+	/* ipv6IfIcmpOutGroupMembResponses, # of output MLD reports */
+	u_int64_t ifs6_out_mldreport;
 	/* ipv6IfIcmpOutGroupMembReductions, # of output MLD done */
 	u_int64_t ifs6_out_mlddone;
 };

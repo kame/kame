@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.4 1999/08/23 11:05:41 jinmei Exp $");
+__RCSID("$Id: inet6.c,v 1.5 1999/08/23 12:36:37 jinmei Exp $");
 #endif
 #endif /* not lint */
 
@@ -1059,7 +1059,7 @@ icmp6_ifstats(ifname)
 	p(ifs6_in_neighboradvert, "\t%qu input neighbor advertisement%s\n");
 	p(ifs6_in_redirect, "\t%qu input redirect%s\n");
 	p(ifs6_in_mldquery, "\t%qu input MLD query%s\n");
-	p(ifs6_in_mldresponse, "\t%qu input MLD response%s\n");
+	p(ifs6_in_mldreport, "\t%qu input MLD report%s\n");
 	p(ifs6_in_mlddone, "\t%qu input MLD done%s\n");
 
 	p(ifs6_out_msg, "\t%qu total output message%s\n");
@@ -1077,7 +1077,7 @@ icmp6_ifstats(ifname)
 	p(ifs6_out_neighboradvert, "\t%qu output neighbor advertisement%s\n");
 	p(ifs6_out_redirect, "\t%qu output redirect%s\n");
 	p(ifs6_out_mldquery, "\t%qu output MLD query%s\n");
-	p(ifs6_out_mldresponse, "\t%qu output MLD response%s\n");
+	p(ifs6_out_mldreport, "\t%qu output MLD report%s\n");
 	p(ifs6_out_mlddone, "\t%qu output MLD done%s\n");
 
   end:
