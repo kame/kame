@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.284 2002/06/09 14:43:59 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.285 2002/06/14 03:50:39 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2102,8 +2102,10 @@ ip6_addaux(m)
 		}
 	} else {
 		n = m_aux_add(m, AF_INET6, -1);
-		n->m_len = sizeof(struct ip6aux);
-		bzero(mtod(n, caddr_t), n->m_len);
+		if (n) {
+			n->m_len = sizeof(struct ip6aux);
+			bzero(mtod(n, caddr_t), n->m_len);
+		}
 	}
 	return n;
 }
