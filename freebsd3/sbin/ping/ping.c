@@ -216,7 +216,8 @@ main(argc, argv)
 	struct sockaddr_in from;
 	char ctrl[sizeof(struct cmsghdr) + sizeof(struct timeval)];
 #ifdef IPSEC_POLICY_IPSEC
-	char *policy = NULL;
+	char *policy_in = NULL;
+	char *policy_out = NULL;
 #endif
 
 	/*
@@ -355,7 +356,12 @@ main(argc, argv)
 #ifdef IPSEC_POLICY_IPSEC
 		case 'P':
 			options |= F_POLICY;
-			policy = strdup(optarg);
+			if (!strncmp("in", optarg, 2))
+				policy_in = strdup(optarg);
+			else if (!strncmp("out", optarg, 3))
+				policy_out = strdup(optarg);
+			else
+				errx(1, "invalid security policy");
 			break;
 #else
 		case 'A':
@@ -434,15 +440,28 @@ main(argc, argv)
 	if (options & F_POLICY) {
 		int len;
 		char *buf;
-		if ((len = ipsec_get_policylen(policy)) < 0)
-			errx(EX_CONFIG, ipsec_strerror());
-		if ((buf = malloc(len)) == NULL)
-			err(EX_UNAVAILABLE, "malloc");
-		if ((len = ipsec_set_policy(buf, len, policy)) < 0)
-			errx(EX_CONFIG, ipsec_strerror());
-		if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY, buf, len) < 0)
-			err(EX_CONFIG, NULL);
-		free(buf);
+		if (policy_in) {
+			if ((len = ipsec_get_policylen(policy_in)) < 0)
+				errx(EX_CONFIG, ipsec_strerror());
+			if ((buf = malloc(len)) == NULL)
+				err(EX_UNAVAILABLE, "malloc");
+			if ((len = ipsec_set_policy(buf, len, policy_in)) < 0)
+				errx(EX_CONFIG, ipsec_strerror());
+			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_IN, buf, len) < 0)
+				err(EX_CONFIG, NULL);
+			free(buf);
+		}
+		if (policy_out) {
+			if ((len = ipsec_get_policylen(policy_out)) < 0)
+				errx(EX_CONFIG, ipsec_strerror());
+			if ((buf = malloc(len)) == NULL)
+				err(EX_UNAVAILABLE, "malloc");
+			if ((len = ipsec_set_policy(buf, len, policy_out)) < 0)
+				errx(EX_CONFIG, ipsec_strerror());
+			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_OUT, buf, len) < 0)
+				err(EX_CONFIG, NULL);
+			free(buf);
+		}
 	}
 #else
 	if (options & F_AUTHHDR) {
