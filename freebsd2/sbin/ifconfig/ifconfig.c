@@ -1319,7 +1319,6 @@ in6_getaddr(s, which)
 	struct sockaddr_in6 *sin6 = sin6tab[which];
 	struct addrinfo hints, *res;
 	int error;
-	char hbuf[200];
 
 	newaddr &= 1;
 
@@ -1352,7 +1351,7 @@ in6_getaddr(s, which)
 	if (which != MASK)
 		sin->sin6_family = AF_INET6;
 
-        if (inet_pton(AF_INET6, s, &sin->sin6_addr) <= 0)
+        if (inet_pton(AF_INET6, s, &sin->sin6_addr) != 1)
 		errx(1, "%s: bad value", s);
 #endif
 }
