@@ -1,4 +1,4 @@
-/*	$KAME: sender.c,v 1.21 2001/09/18 10:49:57 jinmei Exp $ */
+/*	$KAME: sender.c,v 1.22 2001/12/20 14:12:06 jinmei Exp $ */
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -64,7 +64,7 @@ struct cmsghdr *cmsgp = NULL;
 static int calc_opthlen __P((int));
 static void setopthdr __P((int, int));
 static void usage __P((void));
-static int mflag;
+static int mflag, fflag;
 
 #ifndef IPV6_MINMTU
 #define IPV6_MINMTU 1280
@@ -91,13 +91,16 @@ main(argc, argv)
 	int socktype = SOCK_DGRAM;
 	int proto = IPPROTO_UDP;
 
-	while ((ch = getopt(argc, argv, "d:D:h:l:Mmn:p:s:")) != -1)
+	while ((ch = getopt(argc, argv, "d:D:fh:l:Mmn:p:s:")) != -1)
 		switch(ch) {
 		case 'D':
 			dsthdr1len = atoi(optarg);
 			break;
 		case 'd':
 			dsthdr2len = atoi(optarg);
+			break;
+		case 'f':
+			fflag++;
 			break;
 		case 'h':
 			hbhlen = atoi(optarg);
@@ -284,6 +287,16 @@ main(argc, argv)
 	}
 #endif
 
+#ifdef IPV6_DONTFRAG
+	if (fflag) {
+		int on = 1;
+
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_DONTFRAG, &on,
+			       sizeof(on)) != 0)
+			err(1, "setsockopt(IPV6_DONTFRAG)");
+	}
+#endif
+
 #if 0
 	bzero(&local, sizeof(local));
 	local.sin6_family = AF_INET6;
@@ -386,8 +399,8 @@ setopthdr(optlen, hdrtype)
 static void
 usage()
 {
-	fprintf(stderr, "usage: sender [-d optlen] [-D optlen] [-h optlen] "
-		"[-l hoplimit] [-m] [-n nexthop] [-p port] [-s packetsize] "
-		"IPv6addrs...\n");
+	fprintf(stderr, "usage: sender [-d optlen] [-D optlen] [-f] "
+		"[-h optlen] [-l hoplimit] [-mM] [-n nexthop] [-p port] "
+		"[-s packetsize] IPv6addrs...\n");
 	exit(1);
 }
