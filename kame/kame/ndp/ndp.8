@@ -1,4 +1,4 @@
-.\"	$KAME: ndp.8,v 1.22 2002/05/29 09:13:09 itojun Exp $
+.\"	$KAME: ndp.8,v 1.23 2002/06/03 03:12:36 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -56,8 +56,9 @@
 .Nm ndp
 .Fl H
 .Nm ndp
-.Fl I
-.Op delete \(ba Ar interface
+.Fl I Ar interface
+.Nm ndp
+.Fl I Li delete
 .Nm ndp
 .Fl i
 .Ar interface
@@ -132,17 +133,17 @@ Parse the file specified by
 .It Fl H
 Harmonize consistency between the routing table and the default router
 list; install the top entry of the list into the kernel routing table.
-.It Fl I Op delete \(ba Ar interface
+.It Fl I Ar interface
 Shows or specifies the default interface used as the default route when
 there is no default router.
-If no argument is given to the option,
-the current default interface will be shown.
-If an
+If a valid
 .Ar interface
 is specified, the interface will be used as the default.
-If a special keyword
-.Ic delete
-is specified, the current default interface will be deleted from the kernel.
+If
+.Ar interface
+is not a valid interface name, the current setting will be presented.
+.It Fl I Li delete
+The current default interface will be deleted from the kernel.
 .It Fl i Ar interface Op Ar flags ...
 View ND information for the specified interface.
 If additional arguments

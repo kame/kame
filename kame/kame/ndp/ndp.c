@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.92 2002/06/03 03:09:11 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.93 2002/06/03 03:12:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -868,7 +868,8 @@ usage()
 	printf("       ndp -f[nt] filename\n");
 	printf("       ndp -i interface [flags...]\n");
 #ifdef SIOCSDEFIFACE_IN6
-	printf("       ndp -I [interface|delete]\n");
+	printf("       ndp -I interface\n");
+	printf("       ndp -I delete\n");
 #endif
 	printf("       ndp -p\n");
 	printf("       ndp -r\n");
