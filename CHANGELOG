@@ -1,13 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2428 2003/07/08 09:55:24 keiichi Exp $
+$KAME: CHANGELOG,v 1.2429 2003/07/08 09:59:24 keiichi Exp $
 
 <200307>
 Tue Jul  8 18:51:06 JST 2003	keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6_mncore.c
 	insert alternate careof address sub-option when creating a
-	binding update for the home registration.  strictly speaking,
-	this sub-option is not necessary if we protect the message by AH
-	for now, we always include this option though...
+	binding update for the home registration with ESP.
+	strictly speaking, this sub-option is not necessary when we
+	protect the message by AH (not ESP).  for now, we always
+	include this option, though...
 
 Tue Jul  8 17:11:20 JST 2003	keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6_cncore.c,mip6_hacore.c,mip6_var.h,
