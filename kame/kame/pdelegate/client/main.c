@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.5 2001/03/05 23:44:27 itojun Exp $	*/
+/*	$KAME: main.c,v 1.6 2001/03/27 02:41:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -164,7 +164,6 @@ mainloop(s)
 			if (n == 0) {
 				warnx("discovery retry");
 				if (retry-- > 0) {
-					warnx("foo");
 					send_discover(s);
 					state = 1;
 					settimeo(ICMP6_PD_QUERY_INTERVAL);
@@ -176,8 +175,8 @@ mainloop(s)
 			} else {
 				/* got discovery reply? */
 				servlen = sizeof(serv);
-				if (receive_discover(s, (struct sockaddr *)&serv,
-				    &servlen) < 0) {
+				if (receive_discover(s,
+				    (struct sockaddr *)&serv, &servlen) < 0) {
 					/* no, it is not - once again */
 					state = 1;
 					break;
@@ -185,7 +184,6 @@ mainloop(s)
 				p = (struct icmp6_prefix_delegation *)buf;
 
 				/* got discovery reply, send initreq */
-				warnx("bar");
 				send_initreq(s, (struct sockaddr *)&serv,
 				    servlen);
 				state = 2;
@@ -197,7 +195,6 @@ mainloop(s)
 			if (n == 0) {
 				warnx("initreq retry");
 				if (retry-- > 0) {
-					warnx("foo");
 					send_initreq(s,
 					    (struct sockaddr *)&serv, servlen);
 					state = 2;
