@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.260 2002/01/31 14:14:51 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.261 2002/02/04 05:58:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -778,6 +778,7 @@ ip6_input(m)
 	if (!ip6_setpktaddrs(m, &sa6_src, &sa6_dst))
 		goto bad;
 
+#if 0
 	/*
 	 * Embed interface ID as the zone ID for interface-local and
 	 * link-local addresses.
@@ -795,6 +796,7 @@ ip6_input(m)
 		ip6->ip6_dst.s6_addr16[1]
 			= htons(m->m_pkthdr.rcvif->if_index);
 	}
+#endif
 
 #if 0 /* this case seems to be unnecessary. (jinmei, 20010401) */
 	/*
@@ -824,7 +826,7 @@ ip6_input(m)
 	/*
 	 * Multicast check
 	 */
-	if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
+	if (IN6_IS_ADDR_MULTICAST(&sa6_dst.sin6_addr)) {
 	  	struct	in6_multi *in6m = 0;
 
 		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_mcast);
@@ -832,7 +834,7 @@ ip6_input(m)
 		 * See if we belong to the destination multicast group on the
 		 * arrival interface.
 		 */
-		IN6_LOOKUP_MULTI(ip6->ip6_dst, m->m_pkthdr.rcvif, in6m);
+		IN6_LOOKUP_MULTI(sa6_dst.sin6_addr, m->m_pkthdr.rcvif, in6m);
 		if (in6m)
 			ours = 1;
 		else if (!ip6_mrouter) {
