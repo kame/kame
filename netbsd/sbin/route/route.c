@@ -500,9 +500,6 @@ netname(sa)
 	u_int32_t i;
 	int subnetshift;
 	struct in_addr in;
-#ifdef INET6
-	static char ntop_buf[NI_MAXHOST];
-#endif
 
 	switch (sa->sa_family) {
 
@@ -946,6 +943,9 @@ inet_makenetandmask(net, sin)
 }
 
 #ifdef INET6
+/*
+ * XXX the function may need more improvement...
+ */
 static void
 inet6_makenetandmask(sin6)
 	struct sockaddr_in6 *sin6;
@@ -1061,7 +1061,8 @@ getaddr(which, s, hpp)
 			su->sin6.sin6_scope_id = 0;
 		}
 #endif
-		inet6_makenetandmask(&su->sin6);
+		if (which == RTA_DST)
+			inet6_makenetandmask(&su->sin6);
 		freeaddrinfo(res);
 		return 0;
 	    }
