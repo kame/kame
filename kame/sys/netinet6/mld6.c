@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.20 2000/07/12 12:58:04 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.21 2000/11/07 13:16:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -208,20 +208,6 @@ mld6_input(m, off)
 #endif
 	int timer;		/* timer value in the MLD query header */
 
-	/* source address validation */
-	if (!IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_src)) {
-		log(LOG_ERR,
-		    "mld6_input: src %s is not link-local\n",
-		    ip6_sprintf(&ip6->ip6_src));
-		/*
-		 * spec (RFC2710) does not explicitly
-		 * specify to discard the packet from a non link-local
-		 * source address. But we believe it's expected to do so.
-		 */
-		m_freem(m);
-		return;
-	}
-
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, sizeof(*mldh),);
 	mldh = (struct mld6_hdr *)(mtod(m, caddr_t) + off);
@@ -232,6 +218,23 @@ mld6_input(m, off)
 		return;
 	}
 #endif
+
+	/* source address validation */
+	ip6 = mtod(m, struct ip6_hdr *);/* in case mpullup */
+	if (!IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_src)) {
+		log(LOG_ERR,
+		    "mld6_input: src %s is not link-local (grp=%s)\n",
+		    ip6_sprintf(&ip6->ip6_src),
+		    ip6_sprintf(&mldh->mld6_addr));
+		/*
+		 * spec (RFC2710) does not explicitly
+		 * specify to discard the packet from a non link-local
+		 * source address. But we believe it's expected to do so.
+		 * XXX: do we have to allow :: as source?
+		 */
+		m_freem(m);
+		return;
+	}
 
 	/*
 	 * In the MLD6 specification, there are 3 states and a flag.
