@@ -26,84 +26,93 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.h,v 1.8 2000/04/05 04:54:41 sakane Exp $ */
+/* YIPS @(#)$Id: policy.h,v 1.9 2000/04/24 07:37:44 sakane Exp $ */
 
 #include <sys/queue.h>
 
 /* refs. ipsec.h */
+/*
+ * Security Policy Index
+ * NOTE: Encure to be same address family and upper layer protocol.
+ * NOTE: ul_proto, port number, uid, gid:
+ *	ANY: reserved for waldcard.
+ *	0 to (~0 - 1): is one of the number of each value.
+ */
 struct policyindex {
-	u_int8_t dir;                   /* see ipsec.h */
-	struct sockaddr_storage src;    /* IP src address for SP */
-	struct sockaddr_storage dst;    /* IP dst address for SP */
-	u_int8_t prefs;                 /* prefix length in bits for src */
-	u_int8_t prefd;                 /* prefix length in bits for dst */
-	u_int16_t ul_proto;             /* upper layer Protocol */
-	int action;			/* see ipsec.h */
-
-	struct ipsecpolicy *policy;	/* NULL if action is not IPsec. */
-	struct ph2handle *ph2;		/* backpointer to ipsecsahandler */
-
-	LIST_ENTRY(policyindex) chain;
+	u_int8_t dir;			/* direction of packet flow, see blow */
+	struct sockaddr_storage src;	/* IP src address for SP */
+	struct sockaddr_storage dst;	/* IP dst address for SP */
+	u_int8_t prefs;			/* prefix length in bits for src */
+	u_int8_t prefd;			/* prefix length in bits for dst */
+	u_int16_t ul_proto;		/* upper layer Protocol */
 };
 
-/* IPsec policy */
-struct ipsecpolicy {
-	int pfs_group;			/* only use when pfs is required. */
-	struct dhgroup *pfsgrp;		/* only use when pfs is required. */
+/* Security Policy Data Base */
+struct secpolicy {
+	TAILQ_ENTRY(secpolicy) chain;
 
-	struct ipsecsa *proposal;	/* proposal list */
-	struct policyindex *spidx;	/* backpointer to policyindex */
+	struct policyindex spidx;	/* selector */
+	u_int32_t id;			/* It's unique number on the system. */
+
+	u_int policy;		/* DISCARD, NONE or IPSEC, see keyv2.h */
+	struct ipsecrequest *req;
+				/* pointer to the ipsec request tree, */
+				/* if policy == IPSEC else this value == NULL.*/
 };
 
-/* IPsec SA specification */
-/* the most of values are defined by ipsec doi. */
-/* XXX should be held like struct prop_pair ?. */
-struct ipsecsa {
-	int prop_no;
-	int trns_no;
-	time_t lifetime;
-	int lifebyte;
-	int proto_id;
-	int ipsec_level;		/* see ipsec.h */
-	int encmode;
-	int reqid;
+/* Security Assocciation Index */
+/* NOTE: Ensure to be same address family */
+struct secasindex {
+	struct sockaddr_storage src;	/* srouce address for SA */
+	struct sockaddr_storage dst;	/* destination address for SA */
+	u_int16_t proto;		/* IPPROTO_ESP or IPPROTO_AH */
+	u_int8_t mode;			/* mode of protocol, see ipsec.h */
+	u_int32_t reqid;		/* reqid id who owned this SA */
+					/* see IPSEC_MANUAL_REQID_MAX. */
+};
 
-	int enctype;			/* encryption algorithm */
-	int encklen;
-	int authtype;			/* authentication algorithm */
-	int comptype;			/* compression algorithm */
+/* Request for IPsec */
+struct ipsecrequest {
+	struct ipsecrequest *next;
+				/* pointer to next structure */
+				/* If NULL, it means the end of chain. */
 
-	int pfs_group;			/* only perpose for acceptable check. */
-
-	size_t spisize;
-	u_int64_t spi;			/* spi from the peer XXX */
+	struct secasindex saidx;/* hint for search proper SA */
+				/* if __ss_len == 0 then no address specified.*/
+	u_int level;		/* IPsec level defined below. */
 
 #if 0
-	struct sockaddr *dst;		/* peers address of SA */
+	struct secasvar *sav;	/* place holder of SA for use */
 #endif
-
-	struct ipsecsa *bundles;	/* chain of sa boundle. */
-	struct ipsecsa *next;		/* next other proposal */
-	struct ipsecpolicy *ipsp;	/* backpointer to ipsecpolicy */
+	struct secpolicy *sp;	/* back pointer to SP */
 };
 
-extern struct policyindex *getspidx __P((struct policyindex *spidx));
-struct policyindex *getspidx_r __P((struct policyindex *spidx,
-	struct ph2handle *iph2));
-extern int cmpspidx __P((struct policyindex *a, struct policyindex *b));
-extern int cmpspidx_wild __P((struct policyindex *a, struct policyindex *b));
-extern struct policyindex *newspidx __P((void));
-extern void delspidx __P((struct policyindex *spidx));
-extern void insspidx __P((struct policyindex *spidx));
-extern void remspidx __P((struct policyindex *spidx));
-extern void flushspidx __P((void));
-extern void initspidx __P((void));
+#define KEY_SETSECSPIDX(_dir, s, d, ps, pd, ulp, idx)                        \
+do {                                                                         \
+	bzero((idx), sizeof(struct policyindex));                            \
+	(idx)->dir = (_dir);                                                 \
+	(idx)->prefs = (ps);                                                 \
+	(idx)->prefd = (pd);                                                 \
+	(idx)->ul_proto = (ulp);                                             \
+	memcpy(&(idx)->src, (s), ((struct sockaddr *)(s))->sa_len);          \
+	memcpy(&(idx)->dst, (d), ((struct sockaddr *)(d))->sa_len);          \
+} while (0)
 
-extern struct ipsecpolicy *newipsp __P((void));
+struct ph2handle;
+extern struct secpolicy *getsp __P((struct policyindex *));
+#if 1
+extern struct secpolicy *getsp_r __P((struct policyindex *));
+#else
+extern struct secpolicy *getsp_r __P((struct policyindex *, struct ph2handle *));
+#endif
+extern int cmpspidx __P((struct policyindex *, struct policyindex *));
+extern int cmpspidx_wild __P((struct policyindex *, struct policyindex *));
+extern struct secpolicy *newsp __P((void));
+extern void delsp __P((struct secpolicy *));
+extern void inssp __P((struct secpolicy *));
+extern void remsp __P((struct secpolicy *));
+extern void flushsp __P((void));
+extern void initsp __P((void));
+extern struct ipsecrequest *newipsecreq __P((void));
 
-extern struct ipsecsa *newipsa __P((void));
-extern void insipsa __P((struct ipsecsa *new, struct ipsecpolicy *ipsp));
-extern struct ipsecsa *dupipsecsa __P((const struct ipsecsa *s));
-extern void delipsecsa __P((struct ipsecsa *s));
-
-extern char *spidx2str __P((struct policyindex *spidx));
+extern char *spidx2str __P((struct policyindex *));

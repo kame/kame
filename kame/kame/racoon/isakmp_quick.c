@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.20 2000/04/18 12:20:11 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.21 2000/04/24 07:37:43 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -74,11 +74,17 @@
 #include "crypto_openssl.h"
 #include "pfkey.h"
 #include "policy.h"
+#include "algorithm.h"
+#include "sockmisc.h"
+#include "proposal.h"
+#include "sainfo.h"
 #include "admin.h"
 #include "strnames.h"
 
 /* quick mode */
 static vchar_t *quick_ir1sendmx __P((struct ph2handle *, vchar_t *));
+static int get_sainfo_r __P((struct ph2handle *iph2));
+static int get_proposal_r __P((struct ph2handle *));
 
 /* %%%
  * Quick Mode
@@ -106,13 +112,6 @@ quick_i1prep(iph2, msg)
 	iph2->ivm = oakley_newiv2(iph2->ph1, iph2->msgid);
 	if (iph2->ivm == NULL)
 		return NULL;
-
-	/* ipsecsa keys from proposal */
-	if (ipsecdoi_initsakeys(iph2) < 0) {
-		plog(logp, LOCATION, NULL,
-			"failed to get variable spece for phase2.\n");
-		goto end;
-	}
 
 	iph2->status = PHASE2ST_GETSPISENT;
 
@@ -165,7 +164,7 @@ quick_i1send(iph2, msg)
 	}
 
 	/* create SA payload for my proposal */
-	sa = ipsecdoi_setph2proposal(iph2, iph2->keys);
+	sa = ipsecdoi_setph2proposal(iph2);
 	if (sa == NULL)
 		goto end;
 
@@ -180,9 +179,16 @@ quick_i1send(iph2, msg)
 	 * acceptable.
 	 */
 	/* generate KE value if need */
-	pfsgroup = iph2->spidx->policy->pfs_group;
+	pfsgroup = iph2->proposal->pfs_group;
 	if (pfsgroup) {
-		if (oakley_dh_generate(iph2->spidx->policy->pfsgrp,
+		/* DH group settting if PFS is required. */
+		if (oakley_setdhgroup(iph2->sainfo->pfs_group,
+				&iph2->pfsgrp) < 0) {
+			plog(logp, LOCATION, NULL,
+				"failed to set DH value.\n");
+			goto end;
+		}
+		if (oakley_dh_generate(iph2->pfsgrp,
 				&iph2->dhpub, &iph2->dhpriv) < 0) {
 			goto end;
 		}
@@ -486,9 +492,6 @@ quick_i2recv(iph2, msg0)
 		/* XXX send information */
 		goto end;
 	}
-
-	if (ipsecdoi_fixsakeys(iph2) < 0)
-		goto end;
 
 	/* change status of isakmp status entry */
 	iph2->status = PHASE2ST_STATUS6;
@@ -1043,73 +1046,26 @@ quick_r1recv(iph2, msg0)
 		goto end;
 	}
 
-	/* create policy index to get policy */
-    {
-	struct policyindex spidxtmp;
+	/* get sainfo */
+	if (get_sainfo_r(iph2) < 0) {
+		plog(logp, LOCATION, NULL,
+			"failed to get sainfo.\n");
+		error = ISAKMP_INTERNAL_ERROR;
+		goto end;
+	}
 
-	memset(&spidxtmp, 0, sizeof(spidxtmp));
-	/*
-	 * If there are ID payloads, index is made from them.
-	 * If there are no ID payload, index made from Phase 1's ID
-	 * with mask these port number,
-	 */
-	/* make both src and dst address */
-	if (iph2->id_p != NULL && iph2->id != NULL) {
-		/* from ID payload */
-		error = ipsecdoi_id2sockaddr(iph2->id,
-				(struct sockaddr *)&spidxtmp.src,
-				&spidxtmp.prefs, &spidxtmp.ul_proto);
-		if (error != 0)
-			goto end;
-
-		error = ipsecdoi_id2sockaddr(iph2->id_p,
-				(struct sockaddr *)&spidxtmp.dst,
-				&spidxtmp.prefd, &spidxtmp.ul_proto);
-		if (error != 0)
-			goto end;
-	} else {
-		YIPSDEBUG(DEBUG_STAMP,
+	/* create responder's proposal */
+	if (iph2->proposal == NULL) {
+		if (get_proposal_r(iph2) < 0) {
 			plog(logp, LOCATION, NULL,
-				"get ipsec policy index from phase1 address "
-				"due to no ID payloads found.\n"));
-
-		/* from IKE-SA */
-		memcpy(&spidxtmp.src, iph2->ph1->remote, iph2->ph1->remote->sa_len);
-		_INPORTBYSA(&spidxtmp.src) = 0;
-		spidxtmp.prefs = _INALENBYAF(iph2->ph1->local->sa_family) << 3;
-
-		memcpy(&spidxtmp.dst, iph2->ph1->local, iph2->ph1->local->sa_len);
-		_INPORTBYSA(&spidxtmp.dst) = 0;
-		spidxtmp.prefd = _INALENBYAF(iph2->ph1->local->sa_family) << 3;
-
-		spidxtmp.ul_proto = IPSEC_ULPROTO_ANY;
+				"failed to get proposal for responder.\n");
+			error = ISAKMP_INTERNAL_ERROR;
+			goto end;
+		}
 	}
-	spidxtmp.action = IPSEC_POLICY_IPSEC;
-	spidxtmp.dir = IPSEC_DIR_OUTBOUND;	/* XXX */
-
-	/* search for proper policyindex */
-	iph2->spidx = getspidx(&spidxtmp);
-	if (iph2->spidx == NULL)
-		iph2->spidx = getspidx_r(&spidxtmp, iph2);
-	if (iph2->spidx == NULL) {
-		plog(logp, LOCATION, NULL,
-			"no policy found %s.\n", spidx2str(&spidxtmp));
-		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
-		goto end;
-	}
-	iph2->spidx->ph2 = iph2;
-
-	/* sanity check */
-	if (iph2->spidx->policy == NULL) {
-		plog(logp, LOCATION, NULL,
-			"no proposal found %s\n", spidx2str(iph2->spidx));
-		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
-		goto end;
-	}
-    }
 
 	/* If initiator requests PFS, we must check to ready to do that. */
-	if (iph2->dhpub_p != NULL && iph2->spidx->policy->pfs_group == 0) {
+	if (iph2->dhpub_p != NULL && iph2->proposal->pfs_group == 0) {
 		plog(logp, LOCATION, NULL,
 			"responder is not ready to do PFS.\n");
 		error = ISAKMP_NTYPE_NO_PROPOSAL_CHOSEN;
@@ -1200,7 +1156,14 @@ quick_r2send(iph2, msg)
 		goto end;
 	}
 
+#if 0
 	/* create SA payload for my proposal */
+	sa_ret = get_sabysaprop(iph2->approval, iph2->sa);
+	if (sa_ret == NULL)
+		goto end;
+#endif
+
+#if 0 /* XXX delete it !! */
     {
 	struct isakmp_pl_p *prop;
 	vchar_t *pbuf = NULL;
@@ -1217,29 +1180,29 @@ quick_r2send(iph2, msg)
 		if (pa->type != ISAKMP_NPTYPE_P) {
 			plog(logp, LOCATION, NULL,
 				"Invalid payload type=%u\n", pa->type);
-			return NULL;
+			goto end;
 		}
 
 		prop = (struct isakmp_pl_p *)pa->ptr;
 
 	    {
-		struct ipsecsakeys *k;
-		for (k = iph2->keys; k != NULL; k = k->next) {
-			if (prop->proto_id != k->proto_id)
+		struct saproto *x;
+		for (x = iph2->approval->head; x != NULL; x = x->next) {
+			if (prop->proto_id != x->proto_id)
 				continue;
 
-			if (prop->spi_size == sizeof(k->spi))
-				memcpy(prop + 1, &k->spi, sizeof(k->spi));
+			if (prop->spi_size == sizeof(x->keys->spi))
+				memcpy(prop + 1, &x->keys->spi, sizeof(x->keys->spi));
 			else if (prop->spi_size == 2 && prop->proto_id == IPSECDOI_PROTO_IPCOMP)
-				memcpy(prop + 1, (caddr_t)(&k->spi + 1) - 2, 2);
+				memcpy(prop + 1, (caddr_t)(&x->keys->spi + 1) - 2, 2);
 			else {
 				plog(logp, LOCATION, NULL,
 					"spi size mismatch: %d %d\n",
-					sizeof(k->spi), prop->spi_size);
+					sizeof(x->keys->spi), prop->spi_size);
 			}
 			break;
 		}
-		if (k == NULL) {
+		if (x == NULL) {
 			plog(logp, LOCATION, NULL,
 				"no prop found for %s\n",
 				s_ipsecdoi_proto(prop->proto_id));
@@ -1250,6 +1213,7 @@ quick_r2send(iph2, msg)
 	vfree(pbuf);
 	pbuf = NULL;
     }
+#endif
 
 	/* generate NONCE value */
 	iph2->nonce = eay_set_random(iph2->ph1->rmconf->nonce_size);
@@ -1257,17 +1221,24 @@ quick_r2send(iph2, msg)
 		goto end;
 
 	/* generate KE value if need */
-	pfsgroup = iph2->spidx->policy->pfs_group;
+	pfsgroup = iph2->approval->pfs_group;
 	if (iph2->dhpub_p != NULL && pfsgroup != 0) {
+		/* DH group settting if PFS is required. */
+		if (oakley_setdhgroup(iph2->sainfo->pfs_group,
+				&iph2->pfsgrp) < 0) {
+			plog(logp, LOCATION, NULL,
+				"failed to set DH value.\n");
+			goto end;
+		}
 		/* generate DH public value */
-		if (oakley_dh_generate(iph2->spidx->policy->pfsgrp,
+		if (oakley_dh_generate(iph2->pfsgrp,
 				&iph2->dhpub, &iph2->dhpriv) < 0) {
 			goto end;
 		}
 	}
 
 	/* create SA;NONCE payload, and KE and ID if need */
-	tlen = sizeof(*gen) + iph2->sa_ret->l
+	tlen = sizeof(*gen) + iph2->sa->l
 		+ sizeof(*gen) + iph2->nonce->l;
 	if (iph2->dhpub_p != NULL && pfsgroup != 0)
 		tlen += (sizeof(*gen) + iph2->dhpub->l);
@@ -1284,7 +1255,7 @@ quick_r2send(iph2, msg)
 	p = body->v;
 
 	/* make SA payload */ 
-	p = set_isakmp_payload(body->v, iph2->sa_ret, ISAKMP_NPTYPE_NONCE);
+	p = set_isakmp_payload(body->v, iph2->sa, ISAKMP_NPTYPE_NONCE);
 
 	/* add NONCE payload */
 	p = set_isakmp_payload(p, iph2->nonce,
@@ -1509,7 +1480,8 @@ quick_r3send(iph2, msg0)
 	/* XXX What can I do in the case of multiple different SA */
 	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "HASH(4) generate\n"));
 
-	tlen = sizeof(struct isakmp_pl_n) + sizeof(iph2->keys->spi);
+	/* XXX What should I do if there are multiple SAs ? */
+	tlen = sizeof(struct isakmp_pl_n) + iph2->approval->head->spisize;
 	notify = vmalloc(tlen);
 	if (notify == NULL) { 
 		plog(logp, LOCATION, NULL,
@@ -1520,10 +1492,10 @@ quick_r3send(iph2, msg0)
 	n->h.np = ISAKMP_NPTYPE_NONE;
 	n->h.len = htons(tlen);
 	n->doi = IPSEC_DOI;
-	n->proto_id = iph2->keys->proto_id;
-	n->spi_size = sizeof(iph2->keys->spi);
+	n->proto_id = iph2->approval->head->proto_id;
+	n->spi_size = sizeof(iph2->approval->head->spisize);
 	n->type = htons(ISAKMP_NTYPE_CONNECTED);
-	memcpy(n + 1, &iph2->keys->spi, sizeof(iph2->keys->spi));
+	memcpy(n + 1, &iph2->approval->head->spi, iph2->approval->head->spisize);
 
 	myhash = oakley_compute_hash1(iph2->ph1, iph2->msgid, notify);
 	if (myhash == NULL)
@@ -1717,3 +1689,247 @@ end:
 	return buf;
 }
 
+/*
+ * get remote's sainfo.
+ */
+static int
+get_sainfo_r(iph2)
+	struct ph2handle *iph2;
+{
+	char *name;
+	int namelen;
+
+	if (iph2->id_p == NULL) {
+		name = (char *)iph2->src;
+		namelen = iph2->src->sa_len;
+	} else {
+		struct ipsecdoi_id_b *id;
+		struct sockaddr_storage sa;
+
+		id = (struct ipsecdoi_id_b *)iph2->id_p->v;
+
+		switch (id->type) {
+		case IPSECDOI_ID_IPV4_ADDR:
+		case IPSECDOI_ID_IPV6_ADDR:
+
+			memset(&sa, 0, sizeof(sa));
+
+			sa.ss_family = id->type == IPSECDOI_ID_IPV4_ADDR
+					? AF_INET : AF_INET6;
+			sa.ss_len = id->type == IPSECDOI_ID_IPV4_ADDR
+					? 16 : 28;
+
+			/* sanity check */
+			if (iph2->id_p->l > _INALENBYAF(sa.ss_family)) {
+				plog(logp, LOCATION, NULL,
+					"invalid ID payload length:%d.\n",
+					iph2->id_p->l);
+				return -1;
+			}
+
+			memcpy(_INADDRBYSA(&sa), id + 1,
+				_INALENBYAF(sa.ss_family));
+
+			name = (char *)&sa;
+			namelen = sa.ss_len;
+			break;
+		case IPSECDOI_ID_FQDN:
+		case IPSECDOI_ID_USER_FQDN:
+			name = (char *)(id + 1);
+			namelen = iph2->id_p->l - sizeof(*id);
+			break;
+		default:
+			plog(logp, LOCATION, NULL,
+				"not supported id type %d\n", id->type);
+			return -1;
+		}
+	}
+
+	iph2->sainfo = getsainfo(name, namelen);
+	if (iph2->sainfo == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to get sainfo.\n");
+		return -1;
+	}
+
+	YIPSDEBUG(DEBUG_MISC,
+		plog(logp, LOCATION, NULL,
+			"get sa info: %p\n", iph2->sainfo));
+
+	return 0;
+}
+
+static int
+get_proposal_r(iph2)
+	struct ph2handle *iph2;
+{
+	struct policyindex spidx;
+	struct secpolicy *sp;
+	struct ipsecrequest *req;
+	struct saprop *newpp = NULL;
+
+	/* check */
+	if ((iph2->id_p != NULL && iph2->id == NULL)
+	 || (iph2->id_p == NULL && iph2->id != NULL)) {
+		plog(logp, LOCATION, NULL,
+			"Both ID wasn't found in payload.\n");
+		return -1;
+	}
+
+	memset(&spidx, 0, sizeof(spidx));
+
+#define _XIDT(d) ((struct ipsecdoi_id_b *)(d)->v)->type
+
+	if (iph2->id_p != NULL && iph2->id != NULL
+	 && (_XIDT(iph2->id) == IPSECDOI_ID_IPV4_ADDR
+	  || _XIDT(iph2->id) == IPSECDOI_ID_IPV6_ADDR
+	  || _XIDT(iph2->id) == IPSECDOI_ID_IPV4_ADDR_SUBNET
+	  || _XIDT(iph2->id) == IPSECDOI_ID_IPV6_ADDR_SUBNET)
+	 && (_XIDT(iph2->id_p) == IPSECDOI_ID_IPV4_ADDR
+	  || _XIDT(iph2->id_p) == IPSECDOI_ID_IPV6_ADDR
+	  || _XIDT(iph2->id_p) == IPSECDOI_ID_IPV4_ADDR_SUBNET
+	  || _XIDT(iph2->id_p) == IPSECDOI_ID_IPV6_ADDR_SUBNET)) {
+		/* from ID payload */
+		if (ipsecdoi_id2sockaddr(iph2->id,
+				(struct sockaddr *)&spidx.src,
+				&spidx.prefs, &spidx.ul_proto) != 0)
+			return -1;
+		YIPSDEBUG(DEBUG_MISC,
+			plog(logp, LOCATION, NULL,
+				"get src address from ID payload "
+				"%s prefixlen=%u ul_proto=%u\n",
+				saddr2str((struct sockaddr *)&spidx.src),
+				spidx.prefs, spidx.ul_proto));
+
+		if (ipsecdoi_id2sockaddr(iph2->id_p,
+				(struct sockaddr *)&spidx.dst,
+				&spidx.prefd, &spidx.ul_proto) != 0)
+			return -1;
+		YIPSDEBUG(DEBUG_MISC,
+			plog(logp, LOCATION, NULL,
+				"get dst address from ID payload "
+				"%s prefixlen=%u ul_proto=%u\n",
+				saddr2str((struct sockaddr *)&spidx.dst),
+				spidx.prefd, spidx.ul_proto));
+
+		spidx.dir = IPSEC_DIR_INBOUND;
+		spidx.prefs = _INALENBYAF(iph2->src->sa_family) << 3;
+		spidx.prefd = _INALENBYAF(iph2->dst->sa_family) << 3;
+		spidx.ul_proto = IPSEC_ULPROTO_ANY;
+	} else if (iph2->id_p == NULL && iph2->id == NULL) {
+		YIPSDEBUG(DEBUG_MISC,
+			plog(logp, LOCATION, NULL,
+				"get ipsec policy index from phase1 address "
+				"due to no ID payloads found.\n"));
+		KEY_SETSECSPIDX(IPSEC_DIR_INBOUND,
+				iph2->src,
+				iph2->dst,
+				_INALENBYAF(iph2->src->sa_family) << 3,
+				_INALENBYAF(iph2->dst->sa_family) << 3,
+				IPSEC_ULPROTO_ANY,
+				&spidx);
+	} else {
+		YIPSDEBUG(DEBUG_MISC,
+			plog(logp, LOCATION, NULL,
+				"ID is not address type:%d. "
+				"peer's address is used.\n"));
+		KEY_SETSECSPIDX(IPSEC_DIR_INBOUND,
+				iph2->src,
+				iph2->dst,
+				_INALENBYAF(iph2->src->sa_family) << 3,
+				_INALENBYAF(iph2->dst->sa_family) << 3,
+				IPSEC_ULPROTO_ANY,
+				&spidx);
+	}
+#undef _XIDT(d)
+
+	sp = getsp_r(&spidx);
+	if (sp == NULL) {
+		plog(logp, LOCATION, NULL,
+			"no policy found: %s\n", spidx2str(&spidx));
+		return -1;
+	}
+
+	YIPSDEBUG(DEBUG_SA,
+		plog(logp, LOCATION, NULL,
+			"suitable SP found:%s\n", spidx2str(&spidx)));
+
+	/* require IPsec ? */
+	if (sp->policy != IPSEC_POLICY_IPSEC) {
+		plog(logp, LOCATION, NULL,
+			"policy found, but no IPsec required: %s\n",
+			spidx2str(&spidx));
+		return -1;
+	}
+
+	/* allocate ipsec sa proposal */
+	newpp = newsaprop();
+	if (newpp == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to allocate saprop (%s).\n",
+			strerror(errno));
+		goto err;
+	}
+	newpp->prop_no = 1;
+	newpp->lifetime = iph2->sainfo->lifetime;
+	newpp->lifebyte = iph2->sainfo->lifebyte;
+	newpp->pfs_group = iph2->sainfo->pfs_group;
+
+	/* set new saprop */
+	inssaprop(&iph2->proposal, newpp);
+
+	for (req = sp->req; req; req = req->next) {
+		struct saproto *newpr;
+		struct sockaddr *psaddr = NULL;
+		struct sockaddr *pdaddr = NULL;
+
+		/* check if SA bundle ? */
+		if (req->saidx.src.ss_len && req->saidx.dst.ss_len) {
+
+			psaddr = (struct sockaddr *)&req->saidx.src;
+			pdaddr = (struct sockaddr *)&req->saidx.dst;
+
+			/* check end addresses of SA */
+			if (memcmp(iph2->src, psaddr, iph2->src->sa_len)
+			 || memcmp(iph2->dst, pdaddr, iph2->dst->sa_len)) {
+				/* end of SA bundle */
+				break;
+			}
+		}
+
+		/* allocate ipsec sa protocol */
+		newpr = newsaproto();
+		if (newpr == NULL) {
+			plog(logp, LOCATION, NULL,
+				"failed to allocate saproto (%s).\n",
+				strerror(errno));
+			goto err;
+		}
+
+		newpr->proto_id = ipproto2doi(req->saidx.proto);
+		newpr->spisize = 4;
+		newpr->encmode = pfkey2ipsecdoi_mode(req->saidx.mode);
+		newpr->reqid = req->saidx.reqid;
+
+		if (set_satrnsbysainfo(newpr, iph2->sainfo) < 0)
+			goto err;
+
+		/* set new saproto */
+		inssaproto(newpp, newpr);
+	}
+
+	YIPSDEBUG(DEBUG_DSA,
+		plog(logp, LOCATION, NULL,
+			"my single bundle:\n");
+			printsaprop0(newpp););
+
+	iph2->proposal = newpp;
+
+	return 0;
+
+err:
+	if (newpp)
+		flushsaprop(newpp);
+
+	return -1;
+}

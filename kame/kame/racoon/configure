@@ -3670,8 +3670,8 @@ done
 ac_given_srcdir=$srcdir
 ac_given_INSTALL="$INSTALL"
 
-trap 'rm -fr `echo "Makefile samples/basic.conf samples/policy.conf samples/psk.txt
-	samples/psk.txt samples/racoon.conf samples/remote.conf samples/sa.conf" | sed "s/:[^ ]*//g"` conftest*; exit 1' 1 2 15
+trap 'rm -fr `echo "Makefile samples/basic.conf samples/psk.txt
+	samples/psk.txt samples/racoon.conf samples/remote.conf" | sed "s/:[^ ]*//g"` conftest*; exit 1' 1 2 15
 EOF
 cat >> $CONFIG_STATUS <<EOF
 
@@ -3760,8 +3760,8 @@ EOF
 
 cat >> $CONFIG_STATUS <<EOF
 
-CONFIG_FILES=\${CONFIG_FILES-"Makefile samples/basic.conf samples/policy.conf samples/psk.txt
-	samples/psk.txt samples/racoon.conf samples/remote.conf samples/sa.conf"}
+CONFIG_FILES=\${CONFIG_FILES-"Makefile samples/basic.conf samples/psk.txt
+	samples/psk.txt samples/racoon.conf samples/remote.conf"}
 EOF
 cat >> $CONFIG_STATUS <<\EOF
 for ac_file in .. $CONFIG_FILES; do if test "x$ac_file" != x..; then

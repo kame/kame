@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.28 2000/04/21 06:59:00 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.29 2000/04/24 07:37:43 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -72,13 +72,18 @@
 #include "pfkey.h"
 #include "handler.h"
 #include "policy.h"
+#include "algorithm.h"
+#include "sainfo.h"
+#include "proposal.h"
 #include "admin.h"
 #include "strnames.h"
 
 /* prototype */
+#if 0
 static int pfkey_setspidxbymsg __P((caddr_t *mhp, struct policyindex *spidx));
 static int pfkey_spidxinfo __P((struct sadb_ident *id, struct sockaddr *saddr,
 	u_int8_t *pref, u_int16_t *ul_proto)); 
+#endif
 static int admin2pfkey_proto __P((u_int proto));
 static u_int ipsecdoi2pfkey_aalg __P((u_int hashtype));
 static u_int ipsecdoi2pfkey_ealg __P((u_int t_id));
@@ -125,6 +130,8 @@ NULL,	/* SADB_X_SPDSETIDX */
 NULL,	/* SADB_X_SPDEXPIRE */
 NULL,	/* SADB_X_SPDDELETE2 */
 };
+
+static int addnewsp __P((caddr_t *mhp));
 
 /*
  * PF_KEY packet handler
@@ -212,6 +219,7 @@ end:
 	return(error);
 }
 
+#if 0
 static int
 pfkey_setspidxbymsg(mhp, spidx)
 	caddr_t *mhp;
@@ -259,6 +267,7 @@ pfkey_spidxinfo(id, saddr, pref, ul_proto)
 
 	return 0;
 }
+#endif
 
 /*
  * dump SADB
@@ -391,6 +400,14 @@ pfkey_init()
 		return -1;
 	}
 
+	initsp();
+
+	if (pfkey_send_spddump(lcconf->sock_pfkey) < 0) {
+		plog(logp, LOCATION, NULL,
+			"libipsec failed regist ipcomp (%s)", ipsec_strerror());
+		pfkey_close(lcconf->sock_pfkey);
+		return -1;
+	}
 #if 0
 	if (pfkey_promisc_toggle(1) < 0) {
 		pfkey_close(lcconf->sock_pfkey);
@@ -663,12 +680,12 @@ keylen_ealg(t_id, encklen)
 	/*NOTREACHED*/
 }
 
-int pfkey_convertfromipsecdoi(proto_id, t_id, hashtype, comptype,
+int
+pfkey_convertfromipsecdoi(proto_id, t_id, hashtype,
 		e_type, e_keylen, a_type, a_keylen, flags)
 	u_int proto_id;
 	u_int t_id;
 	u_int hashtype;
-	u_int comptype;
 	u_int *e_type;
 	u_int *e_keylen;
 	u_int *a_type;
@@ -718,7 +735,7 @@ int pfkey_convertfromipsecdoi(proto_id, t_id, hashtype, comptype,
 		break;
 
 	case IPSECDOI_PROTO_IPCOMP:
-		if ((*e_type = ipsecdoi2pfkey_calg(comptype)) == ~0)
+		if ((*e_type = ipsecdoi2pfkey_calg(t_id)) == ~0)
 			goto bad;
 		*e_keylen = 0;
 
@@ -774,36 +791,39 @@ int
 pk_sendgetspi(iph2)
 	struct ph2handle *iph2;
 {
-	struct ipsecsakeys *k;
 	u_int satype, mode;
+	struct saprop *pp;
+	struct saproto *pr;
 
-	/*
-	 * XXX: not yet supported to send message for nested SA with
-	 * different destination address. we should do it.
-	 */
-	for (k = iph2->keys; k != NULL; k = k->next) {
+	pp = iph2->side == INITIATOR
+			? iph2->proposal
+			: iph2->approval;
+
+	for (pr = pp->head; pr != NULL; pr = pr->next) {
+
 		/* validity check */
-		satype = ipsecdoi2pfkey_proto(k->proto_id);
+		satype = ipsecdoi2pfkey_proto(pr->proto_id);
 		if (satype == ~0) {
 			plog(logp, LOCATION, NULL,
-				"invalid proto_id %d\n", k->proto_id);
+				"invalid proto_id %d\n", pr->proto_id);
 			return -1;
 		}
-		mode = ipsecdoi2pfkey_mode(k->encmode);
+		mode = ipsecdoi2pfkey_mode(pr->encmode);
 		if (mode == ~0) {
 			plog(logp, LOCATION, NULL,
-				"invalid encmode %d\n", k->encmode);
+				"invalid encmode %d\n", pr->encmode);
 			return -1;
 		}
 
 		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL, "call pfkey_send_getspi\n"););
+			plog(logp, LOCATION, NULL,
+				"call pfkey_send_getspi\n"););
 		if (pfkey_send_getspi(
 				lcconf->sock_pfkey,
 				satype,
 				mode,
-				k->dst,		/* src of SA */
-				iph2->src,	/* dst of SA */
+				iph2->dst,		/* src of SA */
+				iph2->src,		/* dst of SA */
 				0, 0, 0, iph2->seq) < 0) {
 			plog(logp, LOCATION, NULL,
 				"ipseclib failed send getspi (%s)\n",
@@ -813,9 +833,9 @@ pk_sendgetspi(iph2)
 		YIPSDEBUG(DEBUG_PFKEY,
 			plog(logp, LOCATION, NULL,
 				"send pfkey GETSPI for %s/%s/%s\n",
-				s_ipsecdoi_proto(k->proto_id),
-				s_ipsecdoi_encmode(k->encmode),
-				saddrwop2str(k->dst)));
+				s_ipsecdoi_proto(pr->proto_id),
+				s_ipsecdoi_encmode(pr->encmode),
+				saddrwop2str(iph2->dst)));
 	}
 
 	return 0;
@@ -832,9 +852,10 @@ pk_recvgetspi(mhp)
 	struct sadb_sa *sa;
 	struct ph2handle *iph2;
 	struct sockaddr *dst;
-	struct ipsecsakeys *k;
 	int proto_id;
 	int allspiok, notfound;
+	struct saprop *pp;
+	struct saproto *pr;
 
 	/* validity check */
 	if (mhp[SADB_EXT_SA] == NULL
@@ -867,25 +888,27 @@ pk_recvgetspi(mhp)
 	allspiok = 1;
 	notfound = 1;
 	proto_id = pfkey2ipsecdoi_proto(msg->sadb_msg_satype);
-	for (k = iph2->keys; k != NULL; k = k->next) {
-		if (k->proto_id == proto_id
-		 && cmpsaddrwop(k->dst, dst) == 0) {
-			k->spi = sa->sadb_sa_spi;
+	pp = iph2->side == INITIATOR ? iph2->proposal : iph2->approval;
+
+	for (pr = pp->head; pr != NULL; pr = pr->next) {
+		if (pr->proto_id == proto_id && pr->spi == 0) {
+			pr->spi = sa->sadb_sa_spi;
 			notfound = 0;
 			YIPSDEBUG(DEBUG_PFKEY,
 				plog(logp, LOCATION, NULL,
-					"get SPI %08x for %s\n",
+					"get SPI %08x for %s %s\n",
 					ntohl(sa->sadb_sa_spi),
-					saddrwop2str(k->dst)));
+					saddrwop2str(iph2->dst),
+					s_ipsecdoi_proto(pr->proto_id)));
 		}
-		if (k->spi == 0)
-			allspiok = 0;	/* not get spi */
+		if (pr->spi == 0)
+			allspiok = 0;	/* not get all spi */
 	}
 
 	if (notfound) {
 		plog(logp, LOCATION, NULL,
 			"get spi for unknown address %s\n",
-			saddrwop2str(dst));
+			saddrwop2str(iph2->dst));
 		return -1;
 	}
 
@@ -910,8 +933,7 @@ int
 pk_sendupdate(iph2)
 	struct ph2handle *iph2;
 {
-	struct ipsecsa *s;
-	struct ipsecsakeys *k;
+	struct saproto *pr;
 	int e_type, e_keylen, a_type, a_keylen, flags;
 	u_int satype, mode;
 
@@ -921,54 +943,34 @@ pk_sendupdate(iph2)
 			"no approvaled SAs found.\n");
 	}
 
-	for (s = iph2->approval; s != NULL; s = s->bundles) {
-		plog(logp, LOCATION, NULL, "s=%p\n", s);
-
-		/* search key */
-		for (k = iph2->keys; k != NULL; k = k->next) {
-			if (s->proto_id == k->proto_id
-			 && s->encmode == k->encmode
-			 && (cmpsaddrwop(iph2->dst, k->dst) == 0))
-				break;
-		}
-		if (k == NULL) {
-			plog(logp, LOCATION, NULL,
-				"why no key found for %s/%s/%s\n",
-				s_ipsecdoi_proto(s->proto_id),
-				s_ipsecdoi_encmode(s->encmode),
-				saddrwop2str(iph2->dst));
-			return -1;
-		}
+	for (pr = iph2->approval->head; pr != NULL; pr = pr->next) {
 		/* validity check */
-		satype = ipsecdoi2pfkey_proto(k->proto_id);
+		satype = ipsecdoi2pfkey_proto(pr->proto_id);
 		if (satype == ~0) {
 			plog(logp, LOCATION, NULL,
-				"invalid proto_id %d\n", k->proto_id);
+				"invalid proto_id %d\n", pr->proto_id);
 			return -1;
 		}
-		mode = ipsecdoi2pfkey_mode(k->encmode);
+		mode = ipsecdoi2pfkey_mode(pr->encmode);
 		if (mode == ~0) {
 			plog(logp, LOCATION, NULL,
-				"invalid encmode %d\n", k->encmode);
+				"invalid encmode %d\n", pr->encmode);
 			return -1;
 		}
 
 		/* set algorithm type and key length */
-		plog(logp, LOCATION, NULL, "%u %u %u\n",
-			s->proto_id, s->enctype, s->authtype, s->comptype);
-		e_keylen = iph2->approval->encklen;
+		e_keylen = pr->head->encklen;
 		if (pfkey_convertfromipsecdoi(
-				s->proto_id,
-				s->enctype,
-				s->authtype,
-				s->comptype,
+				pr->proto_id,
+				pr->head->trns_id,
+				pr->head->authtype,
 				&e_type, &e_keylen,
 				&a_type, &a_keylen, &flags) < 0)
 			return -1;
 
 		YIPSDEBUG(DEBUG_PFKEY,
 			plog(logp, LOCATION, NULL,
-				"call pfkey_send_update\n"););
+				"call pfkey_send_update\n"));
 
 		if (pfkey_send_update(
 				lcconf->sock_pfkey,
@@ -976,12 +978,13 @@ pk_sendupdate(iph2)
 				mode,
 				iph2->dst,
 				iph2->src,
-				k->spi,
+				pr->spi,
 				0,
 				4,	/* XXX static size of window */
-				k->keymat->v,
+				pr->keymat->v,
 				e_type, e_keylen, a_type, a_keylen, flags,
-				0, s->lifebyte * 1024, s->lifetime, 0,
+				0, iph2->approval->lifebyte * 1024,
+				iph2->approval->lifetime, 0,
 				iph2->seq) < 0) {
 			plog(logp, LOCATION, NULL,
 				"libipsec failed send update (%s)\n",
@@ -998,11 +1001,12 @@ pk_recvupdate(mhp)
 	caddr_t *mhp;
 {
 	struct sadb_msg *msg;
+	struct sadb_sa *sa;
 	struct sockaddr *src, *dst;
 	struct ph2handle *iph2;
-	struct ipsecsakeys *k;
 	u_int proto_id, encmode;
 	int incomplete = 0;
+	struct saproto *pr;
 
 	/* ignore this message becauase of local test mode. */
 	if (f_local)
@@ -1010,6 +1014,7 @@ pk_recvupdate(mhp)
 
 	/* sanity check */
 	if (mhp[0] == NULL
+	 || mhp[SADB_EXT_SA] == NULL
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
 		plog(logp, LOCATION, NULL,
@@ -1019,6 +1024,7 @@ pk_recvupdate(mhp)
 	msg = (struct sadb_msg *)mhp[0];
 	src = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]);
 	dst = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]);
+	sa = (struct sadb_sa *)mhp[SADB_EXT_SA];
 
 	iph2 = getph2byseq(msg->sadb_msg_seq);
 	if (iph2 == NULL) {
@@ -1037,7 +1043,7 @@ pk_recvupdate(mhp)
 	}
 
 	/* check to complete all keys ? */
-	for (k = iph2->keys; k != NULL; k = k->next) {
+	for (pr = iph2->approval->head; pr != NULL; pr = pr->next) {
 		proto_id = pfkey2ipsecdoi_proto(msg->sadb_msg_satype);
 		if (proto_id == ~0) {
 			plog(logp, LOCATION, NULL,
@@ -1051,22 +1057,20 @@ pk_recvupdate(mhp)
 			return -1;
 		}
 
-		if (k->proto_id == proto_id
-		 && cmpsaddrwop(k->dst, src) == 0) {
-			k->ok = 1;
+		if (pr->proto_id == proto_id
+		 && pr->spi == sa->sadb_sa_spi) {
+			pr->ok = 1;
 			YIPSDEBUG(DEBUG_MISC,
-				char *xsrc = strdup(saddrwop2str(k->src));
 				plog(logp, LOCATION, NULL,
 					"pfkey %s success %s/%s/%s->%s\n",
 					s_pfkey_type(msg->sadb_msg_type),
-					s_ipsecdoi_proto(k->proto_id),
-					s_ipsecdoi_encmode(k->encmode),
-					xsrc,
-					saddrwop2str(k->dst));
-				free(xsrc));
+					s_ipsecdoi_proto(pr->proto_id),
+					s_ipsecdoi_encmode(pr->encmode),
+					saddrwop2str(iph2->src));
+					saddrwop2str(iph2->dst));
 		}
 
-		if (k->ok == 0)
+		if (pr->ok == 0)
 			incomplete = 1;
 	}
 
@@ -1106,8 +1110,7 @@ int
 pk_sendadd(iph2)
 	struct ph2handle *iph2;
 {
-	struct ipsecsa *s;
-	struct ipsecsakeys *k;
+	struct saproto *pr;
 	int e_type, e_keylen, a_type, a_keylen, flags;
 	u_int satype, mode;
 
@@ -1117,65 +1120,48 @@ pk_sendadd(iph2)
 			"no approvaled SAs found.\n");
 	}
 
-	for (s = iph2->approval; s != NULL; s = s->bundles) {
-		/* search key */
-		for (k = iph2->keys; k != NULL; k = k->next) {
-			if (s->proto_id == k->proto_id
-			 && s->encmode == k->encmode)
-#if 0
-			 && (k->dst == NULL
-			  || cmpsaddrwop(s->dst, k->dst) == 0))
-#endif
-				break;
-		}
-		if (k == NULL) {
-			plog(logp, LOCATION, NULL,
-				"why no key found for %s/%s/%s\n",
-				s_ipsecdoi_proto(s->proto_id),
-				s_ipsecdoi_encmode(s->encmode),
-				saddrwop2str(iph2->dst));
-			return -1;
-		}
+	for (pr = iph2->approval->head; pr != NULL; pr = pr->next) {
 		/* validity check */
-		satype = ipsecdoi2pfkey_proto(k->proto_id);
+		satype = ipsecdoi2pfkey_proto(pr->proto_id);
 		if (satype == ~0) {
 			plog(logp, LOCATION, NULL,
-				"invalid proto_id %d\n", k->proto_id);
+				"invalid proto_id %d\n", pr->proto_id);
 			return -1;
 		}
-		mode = ipsecdoi2pfkey_mode(k->encmode);
+		mode = ipsecdoi2pfkey_mode(pr->encmode);
 		if (mode == ~0) {
 			plog(logp, LOCATION, NULL,
-				"invalid encmode %d\n", k->encmode);
+				"invalid encmode %d\n", pr->encmode);
 			return -1;
 		}
 
 		/* set algorithm type and key length */
-		e_keylen = iph2->approval->encklen;
+		e_keylen = pr->head->encklen;
 		if (pfkey_convertfromipsecdoi(
-				s->proto_id,
-				s->enctype,
-				s->authtype,
-				s->comptype,
+				pr->proto_id,
+				pr->head->trns_id,
+				pr->head->authtype,
 				&e_type, &e_keylen,
 				&a_type, &a_keylen, &flags) < 0)
 			return -1;
 
 		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL, "call pfkey_send_add(%u)\n",
-				k->spi_p););
+			plog(logp, LOCATION, NULL,
+				"call pfkey_send_add(%u)\n"));
+
 		if (pfkey_send_add(
 				lcconf->sock_pfkey,
 				satype,
 				mode,
 				iph2->src,
 				iph2->dst,
-				k->spi_p,
+				pr->spi_p,
 				0,
 				4,	/* XXX static size of window */
-				k->keymat_p->v,
+				pr->keymat_p->v,
 				e_type, e_keylen, a_type, a_keylen, flags,
-				0, s->lifebyte * 1024, s->lifetime, 0,
+				0, iph2->approval->lifebyte * 1024,
+				iph2->approval->lifetime, 0,
 				iph2->seq) < 0) {
 			plog(logp, LOCATION, NULL,
 				"libipsec failed send add (%s)\n", ipsec_strerror());
@@ -1297,7 +1283,7 @@ pk_recvacquire(mhp)
 	caddr_t *mhp;
 {
 	struct sadb_msg *msg;
-	struct policyindex spidxtmp, *spidx;
+	struct sadb_x_policy *xpl;
 	struct ph2handle *iph2;
 #ifdef YIPS_DEBUG
 	char h1[NI_MAXHOST], h2[NI_MAXHOST];
@@ -1318,70 +1304,33 @@ pk_recvacquire(mhp)
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
 	 || mhp[SADB_EXT_IDENTITY_SRC] == NULL
-	 || mhp[SADB_EXT_IDENTITY_DST] == NULL) {
+	 || mhp[SADB_EXT_IDENTITY_DST] == NULL
+	 || mhp[SADB_X_EXT_POLICY] == NULL) {
 		plog(logp, LOCATION, NULL,
 			"inappropriate sadb acquire message passed.\n");
 		return -1;
 	}
 	msg = (struct sadb_msg *)mhp[0];
+	xpl = (struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY];
 
-	/* set index of policyindex */
-	if (pfkey_setspidxbymsg(mhp, &spidxtmp) < 0) {
-		plog(logp, LOCATION, NULL,
-			"failed to get policy index.\n");
-		return -1;
+	/* ignore if type is not IPSEC_POLICY_IPSEC */
+	if (xpl->sadb_x_policy_type != IPSEC_POLICY_IPSEC) {
+		YIPSDEBUG(DEBUG_PFKEY,
+			plog(logp, LOCATION, NULL,
+				"ignore SPDGET message. type is not IPsec.\n"));
+		return 0;
 	}
 
-	/* search for proper policyindex */
-	spidx = getspidx(&spidxtmp);
-	if (spidx == NULL) {
-		/* make a dummy SA for getspidx_r */
-		struct ph2handle iph2_dummy;
-		memset(&iph2_dummy, 0, sizeof(iph2_dummy));
-		iph2_dummy.dst =
-			dupsaddr(PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]));
-		iph2_dummy.src =
-			dupsaddr(PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]));
-		spidx = getspidx_r(&spidxtmp, &iph2_dummy);
-		free(iph2_dummy.src);
-		free(iph2_dummy.dst);
-	}
-	if (spidx == NULL) {
-		plog(logp, LOCATION, NULL,
-			"no policy found %s.\n", spidx2str(&spidxtmp));
-		return -1;
-	}
-
-	/* validity check */
-	if (spidx->policy == NULL) {
-		plog(logp, LOCATION, NULL,
-			"no proposal found %s\n", spidx2str(spidx));
-		return -1;
-	}
-
-	/* search for phase2 handler */
-	iph2 = getph2byspidx(spidx);
+	/* check there is phase 2 handler ? */
+	iph2 = getph2byspid(xpl->sadb_x_policy_id);
 	if (iph2 != NULL) {
-		if (iph2->status != PHASE2ST_ESTABLISHED) {
-			/* block acquire message */
-			YIPSDEBUG(DEBUG_PFKEY,
-				plog(logp, LOCATION, NULL,
-					"ignore sadb acquire message "
-					"due to negotiating now.\n"));
-			return -1;
-		}
-
-		/*
-		 * I couldn't get expire message from kernel,
-		 * then I get the acquire message in the 1st.
-		 * Delete old pst in order to keeping process.
-		 */
-		unbindph12(iph2);
-		remph2(iph2);
-		delph2(iph2);
-		iph2 = NULL;
+		YIPSDEBUG(DEBUG_PFKEY,
+			plog(logp, LOCATION, NULL,
+				"ph2 found. ignore it.\n"));
+		return -1;
 	}
 
+	/* allocate a phase 2 handler at least. */
 	iph2 = newph2();
 	if (iph2 == NULL) {
 		plog(logp, LOCATION, NULL,
@@ -1389,17 +1338,11 @@ pk_recvacquire(mhp)
 			strerror(errno));
 		return -1;
 	}
-	iph2->spidx = spidx;
-	spidx->ph2 = iph2;
+	iph2->spid = xpl->sadb_x_policy_id;
 	iph2->seq = msg->sadb_msg_seq;
 	iph2->status = PHASE2ST_STATUS2;
-		
-	/* XXX Is this acquire request for most inside SA ?
-	 * To be considered about nested SAs with each destination
-	 * address are different.
-	 *       me +--- SA1 ---+ peer1
-	 *       me +--- SA2 --------------+ peer2
-	 */
+
+	/* set end addresses of SA */
 	iph2->dst = dupsaddr(PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]));
 	if (iph2->dst == NULL)
 		return -1;
@@ -1419,14 +1362,10 @@ pk_recvacquire(mhp)
 
 	insph2(iph2);
 
-	/* start isakmp initiation by using ident exchange */
-	if (isakmp_post_acquire(iph2) < 0) {
+	/* get a policy from kernel */
+	if (pfkey_send_spdget(lcconf->sock_pfkey, xpl->sadb_x_policy_id) < 0) {
 		plog(logp, LOCATION, NULL,
-			"failed to begin ipsec sa negotication.\n");
-		unbindph12(iph2);
-		remph2(iph2);
-		delph2(iph2);
-		iph2 = NULL;
+			"failed to get a policy.\n");
 		return -1;
 	}
 
@@ -1466,12 +1405,44 @@ static int
 pk_recvspdadd(mhp)
 	caddr_t *mhp;
 {
+	struct sadb_address *saddr, *daddr;
+	struct sadb_x_policy *xpl;
+	struct policyindex spidx;
+	struct secpolicy *sp;
+
 	/* sanity check */
-	if (mhp[0] == NULL) {
+	if (mhp[0] == NULL
+	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
+	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
+	 || mhp[SADB_X_EXT_POLICY] == NULL) {
 		plog(logp, LOCATION, NULL,
 			"inappropriate sadb acquire message passed.\n");
 		return -1;
 	}
+	saddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
+	daddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_DST];
+	xpl = (struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY];
+
+	KEY_SETSECSPIDX(xpl->sadb_x_policy_dir,
+			saddr + 1,
+			daddr + 1,
+			saddr->sadb_address_prefixlen,
+			daddr->sadb_address_prefixlen,
+			saddr->sadb_address_proto,
+			&spidx);
+
+	sp = getsp(&spidx);
+	if (sp != NULL) {
+		plog(logp, LOCATION, NULL,
+			"such policy already exists. "
+			"anyway replace it: %s\n",
+			spidx2str(&spidx));
+		remsp(sp);
+		delsp(sp);
+	}
+
+	if (addnewsp(mhp) < 0)
+		return -1;
 
 	return 0;
 }
@@ -1480,12 +1451,42 @@ static int
 pk_recvspddelete(mhp)
 	caddr_t *mhp;
 {
+	struct sadb_address *saddr, *daddr;
+	struct sadb_x_policy *xpl;
+	struct policyindex spidx;
+	struct secpolicy *sp;
+
 	/* sanity check */
-	if (mhp[0] == NULL) {
+	if (mhp[0] == NULL
+	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
+	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
+	 || mhp[SADB_X_EXT_POLICY] == NULL) {
 		plog(logp, LOCATION, NULL,
 			"inappropriate sadb acquire message passed.\n");
 		return -1;
 	}
+	saddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
+	daddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_DST];
+	xpl = (struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY];
+
+	KEY_SETSECSPIDX(xpl->sadb_x_policy_dir,
+			saddr + 1,
+			daddr + 1,
+			saddr->sadb_address_prefixlen,
+			daddr->sadb_address_prefixlen,
+			saddr->sadb_address_proto,
+			&spidx);
+
+	sp = getsp(&spidx);
+	if (sp == NULL) {
+		plog(logp, LOCATION, NULL,
+			"no policy found: %s\n",
+			spidx2str(&spidx));
+		return -1;
+	}
+
+	remsp(sp);
+	delsp(sp);
 
 	return 0;
 }
@@ -1494,6 +1495,204 @@ static int
 pk_recvspdget(mhp)
 	caddr_t *mhp;
 {
+#define MAXNESTEDSA	5	/* XXX */
+	struct sadb_msg *msg;
+	struct sadb_address *saddr, *daddr;
+	struct ph2handle *iph2[MAXNESTEDSA];
+	int n;	/* # of phase 2 handler */
+	struct sadb_x_policy *xpl;
+	struct sadb_x_ipsecrequest *xisr;
+	struct saprop *newpp = NULL;
+	int tlen;
+
+	/* ignore this message if local test mode. */
+	if (f_local)
+		return 0;
+
+	/* sanity check */
+	if (mhp[0] == NULL
+	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
+	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
+	 || mhp[SADB_X_EXT_POLICY] == NULL) {
+		plog(logp, LOCATION, NULL,
+			"inappropriate sadb acquire message passed.\n");
+		return -1;
+	}
+	msg = (struct sadb_msg *)mhp[0];
+	saddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
+	daddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_DST];
+	xpl = (struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY];
+
+	/* ignore if type is not IPSEC_POLICY_IPSEC */
+	if (xpl->sadb_x_policy_type != IPSEC_POLICY_IPSEC) {
+		YIPSDEBUG(DEBUG_PFKEY,
+			plog(logp, LOCATION, NULL,
+				"ignore SPDGET message. "
+				"type is not IPsec.\n"));
+		return 0;
+	}
+
+	memset(iph2, 0, MAXNESTEDSA);
+
+	n = 0;
+
+	/* get phase 2 handler. there must be one at least. */
+	iph2[n] = getph2byspid(xpl->sadb_x_policy_id);
+	if (iph2[n] == NULL) {
+		plog(logp, LOCATION, NULL,
+			"no ph2 found. it must be there at least.\n");
+		return -1;
+	}
+	if (iph2[n]->status != PHASE2ST_STATUS2) {
+		YIPSDEBUG(DEBUG_PFKEY,
+			plog(logp, LOCATION, NULL,
+				"ignore SPDGET message. "
+				"phase 2 status proceeded.\n"));
+		return 0;
+	}
+
+	/* get sa entitiy */
+	iph2[n]->sainfo = getsainfo((caddr_t)iph2[n]->dst, iph2[n]->dst->sa_len);
+	if (iph2[n]->sainfo == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to get sainfo.\n");
+		goto err;
+		/* XXX should use the algorithm list from register message */
+	}
+
+	/* allocate first proposal */
+	newpp = newsaprop();
+	if (newpp == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to allocate saprop (%s).\n",
+			strerror(errno));
+		goto err;
+	}
+	newpp->prop_no = 1;
+	newpp->lifetime = iph2[n]->sainfo->lifetime;
+	newpp->lifebyte = iph2[n]->sainfo->lifebyte;
+	newpp->pfs_group = iph2[n]->sainfo->pfs_group;
+
+	/* set new saprop */
+	inssaprop(&iph2[n]->proposal, newpp);
+
+	tlen = PFKEY_UNUNIT64(xpl->sadb_x_policy_len) - sizeof(*xpl);
+	xisr = (struct sadb_x_ipsecrequest *)(xpl + 1);
+
+	while (tlen > 0) {
+		struct saproto *newpr;
+		struct sockaddr *psaddr = NULL;
+		struct sockaddr *pdaddr = NULL;
+
+		/* sanity check */
+		if (tlen < sizeof(*xisr)) {
+			plog(logp, LOCATION, NULL,
+				"invalid sadb_x_ipsecrequest length (%d).\n",
+				tlen);
+			goto err;
+		}
+
+		/* get IP addresses if there */
+		if (xisr->sadb_x_ipsecrequest_len > sizeof(*xisr)) {
+			psaddr = (struct sockaddr *)(xisr + 1);
+			pdaddr = (struct sockaddr *)((caddr_t)psaddr
+						+ psaddr->sa_len);
+
+			/* check end addresses of SA */
+			if (memcmp(iph2[n]->src, psaddr, iph2[n]->src->sa_len)
+			 || memcmp(iph2[n]->dst, pdaddr, iph2[n]->dst->sa_len)) {
+				/*
+				 * XXX nested SAs with each destination
+				 * address are different.
+				 *       me +--- SA1 ---+ peer1
+				 *       me +--- SA2 --------------+ peer2
+				 */
+
+				/* check first ph2's proposal */
+				if (iph2[0]->proposal == NULL) {
+					plog(logp, LOCATION, NULL,
+						"SA addresses mismatch.\n");
+					goto err;
+				}
+
+				/* XXX new ph2 should be alloated. */
+				
+				plog(logp, LOCATION, NULL,
+					"not supported nested SA. Ignore.\n");
+				goto err;
+			}
+
+			/*
+			 * the src/dst addresses in phase 2 are same to
+			 * the addresses in ipsecrequest. also set sainfo.
+			 */
+		}
+
+		/* allocate ipsec sa protocol */
+		newpr = newsaproto();
+		if (newpr == NULL) {
+			plog(logp, LOCATION, NULL,
+				"failed to allocate saproto (%s).\n",
+				strerror(errno));
+			goto err;
+		}
+
+		newpr->proto_id = ipproto2doi(xisr->sadb_x_ipsecrequest_proto);
+		newpr->spisize = 4;
+		newpr->encmode = pfkey2ipsecdoi_mode(xisr->sadb_x_ipsecrequest_mode);
+		newpr->reqid = xisr->sadb_x_ipsecrequest_reqid;
+
+		if (set_satrnsbysainfo(newpr, iph2[n]->sainfo) < 0)
+			goto err;
+
+		/* set new saproto */
+		inssaproto(newpp, newpr);
+
+		/* initialization for the next. */
+		tlen -= xisr->sadb_x_ipsecrequest_len;
+
+		/* validity check */
+		if (tlen < 0) {
+			plog(logp, LOCATION, NULL,
+				"total length of policy mismatch.\n");
+			goto err;
+		}
+
+		xisr = (struct sadb_x_ipsecrequest *)((caddr_t)xisr
+				 + xisr->sadb_x_ipsecrequest_len);
+	}
+
+	/* start isakmp initiation by using ident exchange */
+	/* XXX should be looped if there are multiple phase 2 handler. */
+	if (isakmp_post_acquire(iph2[n]) < 0) {
+		plog(logp, LOCATION, NULL,
+			"failed to begin ipsec sa negotication.\n");
+		unbindph12(iph2[n]);
+		goto err;
+	}
+
+	return 0;
+
+err:
+	while (n >= 0) {
+		remph2(iph2[n]);
+		delph2(iph2[n]);
+		iph2[n] = NULL;
+		n--;
+	}
+	return -1;
+}
+
+static int
+pk_recvspddump(mhp)
+	caddr_t *mhp;
+{
+	struct sadb_msg *msg;
+	struct sadb_address *saddr, *daddr;
+	struct sadb_x_policy *xpl;
+	struct policyindex spidx;
+	struct secpolicy *sp;
+
 	/* sanity check */
 	if (mhp[0] == NULL) {
 		plog(logp, LOCATION, NULL,
@@ -1501,18 +1700,38 @@ pk_recvspdget(mhp)
 		return -1;
 	}
 
-	return 0;
-}
+	for (msg = (struct sadb_msg *)mhp[0];
+	     msg->sadb_msg_errno == 0;
+	     msg = (struct sadb_msg *)((caddr_t)msg + PFKEY_EXTLEN(msg))) {
 
-static int
-pk_recvspddump(mhp)
-	caddr_t *mhp;
-{
-	/* sanity check */
-	if (mhp[0] == NULL) {
-		plog(logp, LOCATION, NULL,
-			"inappropriate sadb acquire message passed.\n");
-		return -1;
+		saddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
+		daddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_DST];
+		xpl = (struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY];
+
+		KEY_SETSECSPIDX(xpl->sadb_x_policy_dir,
+				saddr + 1,
+				daddr + 1,
+				saddr->sadb_address_prefixlen,
+				daddr->sadb_address_prefixlen,
+				saddr->sadb_address_proto,
+				&spidx);
+
+		sp = getsp(&spidx);
+		if (sp != NULL) {
+			plog(logp, LOCATION, NULL,
+				"such policy already exists. "
+				"anyway replace it: %s\n",
+				spidx2str(&spidx));
+			remsp(sp);
+			delsp(sp);
+		}
+
+		if (addnewsp(mhp) < 0)
+			return -1;
+
+		/* last part ? */
+		if (msg->sadb_msg_seq == 0)
+			break;
 	}
 
 	return 0;
@@ -1528,6 +1747,8 @@ pk_recvspdflush(mhp)
 			"inappropriate sadb acquire message passed.\n");
 		return -1;
 	}
+
+	flushsp();
 
 	return 0;
 }
@@ -1584,3 +1805,171 @@ pk_getseq()
 {
 	return (u_int32_t)random();
 }
+
+static int
+addnewsp(mhp)
+	caddr_t *mhp;
+{
+	struct secpolicy *new;
+	struct sadb_address *saddr, *daddr;
+	struct sadb_x_policy *xpl;
+
+	/* sanity check */
+	if (mhp[SADB_EXT_ADDRESS_SRC] == NULL
+	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
+	 || mhp[SADB_X_EXT_POLICY] == NULL) {
+		plog(logp, LOCATION, NULL,
+			"inappropriate sadb acquire message passed.\n");
+		return -1;
+	}
+
+	saddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
+	daddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_DST];
+	xpl = (struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY];
+
+	new = newsp();
+	if (new == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to allocate buffer\n");
+		return -1;
+	}
+
+	new->spidx.dir = xpl->sadb_x_policy_dir;
+	new->policy = xpl->sadb_x_policy_type;
+
+	/* check policy */
+	switch (xpl->sadb_x_policy_type) {
+	case IPSEC_POLICY_DISCARD:
+	case IPSEC_POLICY_NONE:
+	case IPSEC_POLICY_ENTRUST:
+	case IPSEC_POLICY_BYPASS:
+		new->req = NULL;
+		break;
+
+	case IPSEC_POLICY_IPSEC:
+	    {
+		int tlen;
+		struct sadb_x_ipsecrequest *xisr;
+		struct ipsecrequest **p_isr = &new->req;
+
+		/* validity check */
+		if (PFKEY_EXTLEN(xpl) < sizeof(*xpl)) {
+			plog(logp, LOCATION, NULL,
+				"invalid msg length.\n");
+			return -1;
+		}
+
+		tlen = PFKEY_EXTLEN(xpl) - sizeof(*xpl);
+		xisr = (struct sadb_x_ipsecrequest *)(xpl + 1);
+
+		while (tlen > 0) {
+
+			/* length check */
+			if (xisr->sadb_x_ipsecrequest_len < sizeof(*xisr)) {
+				plog(logp, LOCATION, NULL,
+					"invalid msg length.\n");
+				return -1;
+			}
+
+			/* allocate request buffer */
+			*p_isr = newipsecreq();
+			if (*p_isr == NULL)
+				return -1;
+
+			/* set values */
+			(*p_isr)->next = NULL;
+
+			switch (xisr->sadb_x_ipsecrequest_proto) {
+			case IPPROTO_ESP:
+			case IPPROTO_AH:
+			case IPPROTO_IPCOMP:
+				break;
+			default:
+				plog(logp, LOCATION, NULL,
+					"invalid proto type: %u\n",
+					xisr->sadb_x_ipsecrequest_proto);
+				return -1;
+			}
+			(*p_isr)->saidx.proto = xisr->sadb_x_ipsecrequest_proto;
+
+			switch (xisr->sadb_x_ipsecrequest_mode) {
+			case IPSEC_MODE_TRANSPORT:
+			case IPSEC_MODE_TUNNEL:
+				break;
+			case IPSEC_MODE_ANY:
+			default:
+				plog(logp, LOCATION, NULL,
+					"invalid mode: %u\n",
+					xisr->sadb_x_ipsecrequest_mode);
+				return -1;
+			}
+			(*p_isr)->saidx.mode = xisr->sadb_x_ipsecrequest_mode;
+
+			switch (xisr->sadb_x_ipsecrequest_level) {
+			case IPSEC_LEVEL_DEFAULT:
+			case IPSEC_LEVEL_USE:
+			case IPSEC_LEVEL_REQUIRE:
+				break;
+			case IPSEC_LEVEL_UNIQUE:
+				(*p_isr)->saidx.reqid =
+					xisr->sadb_x_ipsecrequest_reqid;
+				break;
+
+			default:
+				plog(logp, LOCATION, NULL,
+					"invalid level: %u\n",
+					xisr->sadb_x_ipsecrequest_level);
+				return -1;
+			}
+			(*p_isr)->level = xisr->sadb_x_ipsecrequest_level;
+
+			/* set IP addresses if there */
+			if (xisr->sadb_x_ipsecrequest_len > sizeof(*xisr)) {
+				struct sockaddr *paddr;
+
+				paddr = (struct sockaddr *)(xisr + 1);
+				bcopy(paddr, &(*p_isr)->saidx.src,
+					paddr->sa_len);
+
+				paddr = (struct sockaddr *)((caddr_t)paddr
+							+ paddr->sa_len);
+				bcopy(paddr, &(*p_isr)->saidx.dst,
+					paddr->sa_len);
+			}
+
+			(*p_isr)->sp = new;
+
+			/* initialization for the next. */
+			p_isr = &(*p_isr)->next;
+			tlen -= xisr->sadb_x_ipsecrequest_len;
+
+			/* validity check */
+			if (tlen < 0) {
+				plog(logp, LOCATION, NULL,
+					"becoming tlen < 0\n");
+			}
+
+			xisr = (struct sadb_x_ipsecrequest *)((caddr_t)xisr
+			                 + xisr->sadb_x_ipsecrequest_len);
+		}
+	    }
+		break;
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid policy type.\n");
+		return -1;
+	}
+
+	KEY_SETSECSPIDX(xpl->sadb_x_policy_dir,
+			saddr + 1,
+			daddr + 1,
+			saddr->sadb_address_prefixlen,
+			daddr->sadb_address_prefixlen,
+			saddr->sadb_address_proto,
+			&new->spidx);
+
+	inssp(new);
+
+	return 0;
+}
+

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.11 2000/04/18 12:20:11 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.12 2000/04/24 07:37:43 sakane Exp $ */
 
 /* refered to RFC2407 */
 
@@ -146,13 +146,18 @@ struct ipsecdoi_pl_id {
 #define IPSECDOI_TYPE_PH2	1
 
 struct isakmpsa;
-struct ipsecsa;
-struct ipsecsakeys;
 struct ipsecdoi_pl_sa;
+struct saprop;
+struct saproto;
+struct satrns;
+struct prop_pair;
 
-extern int ipsecdoi_checkph1proposal __P((vchar_t *sa, struct ph1handle *iph1));
-extern int ipsecdoi_checkph2proposal __P((vchar_t *sa, struct ph2handle *iph2));
+extern int ipsecdoi_checkph1proposal __P((vchar_t *, struct ph1handle *));
+extern int ipsecdoi_checkph2proposal __P((vchar_t *, struct ph2handle *));
 
+extern void free_proppair __P((struct prop_pair **));
+extern struct prop_pair **get_proppair __P((vchar_t *, int mode));
+extern vchar_t *get_sabysaprop __P((struct saprop *, vchar_t *));
 extern int ipsecdoi_checkid1 __P((struct ph1handle *iph1));
 extern int ipsecdoi_setid1 __P((struct ph1handle *iph1));
 extern int ipsecdoi_setid2 __P((struct ph2handle *iph2));
@@ -160,13 +165,11 @@ extern int ipsecdoi_id2sockaddr __P((vchar_t *buf, struct sockaddr *saddr,
 	u_int8_t *prefixlen, u_int16_t *ul_proto));
 
 extern vchar_t *ipsecdoi_setph1proposal __P((struct isakmpsa *proposal));
-extern vchar_t *ipsecdoi_setph2proposal __P((struct ph2handle *iph2, struct ipsecsakeys *keys));
+extern vchar_t *ipsecdoi_setph2proposal __P((struct ph2handle *iph2));
 extern int ipsecdoi_get_defaultlifetime __P((void));
 extern int ipsecdoi_checkalgtypes __P((int proto_id, int enc, int auth, int comp));
 extern int ipproto2doi __P((int proto));
 
-extern int ipsecdoi_fixsakeys __P((struct ph2handle *iph2));
-extern int ipsecdoi_initsakeys __P((struct ph2handle *iph2));
-
-extern void ipsecdoi_printsa __P((const struct ipsecsa *));
-
+extern int ipsecdoi_t2satrns __P((struct isakmp_pl_t *,
+	struct saprop *, struct saproto *, struct satrns *));
+extern int ipsecdoi_authalg2trnsid __P((int alg));

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.15 2000/03/28 12:30:35 sakane Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.16 2000/04/24 07:37:44 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -55,17 +55,17 @@
 #include "handler.h"
 #include "oakley.h"
 
-static LIST_HEAD(_sptree, policyindex) sptree;
+static TAILQ_HEAD(_sptree, secpolicy) sptree;
 
 /* perform exact match against security policy table. */
-struct policyindex *
-getspidx(spidx)
+struct secpolicy *
+getsp(spidx)
 	struct policyindex *spidx;
 {
-	struct policyindex *p;
+	struct secpolicy *p;
 
-	LIST_FOREACH(p, &sptree, chain) {
-		if (!cmpspidx(spidx, p))
+	TAILQ_FOREACH(p, &sptree, chain) {
+		if (!cmpspidx(spidx, &p->spidx))
 			return p;
 	}
 
@@ -78,12 +78,27 @@ getspidx(spidx)
  * entry in policy.txt can be returned when we're negotiating transport
  * mode SA.  this is how the kernel works.
  */
-struct policyindex *
-getspidx_r(spidx, iph2)
+#if 1
+struct secpolicy *
+getsp_r(spidx)
+	struct policyindex *spidx;	/* from peer */
+{
+	struct secpolicy *p;
+
+	TAILQ_FOREACH(p, &sptree, chain) {
+		if (!cmpspidx_wild(&p->spidx, spidx))
+			return p;
+	}
+
+	return NULL;
+}
+#else
+struct secpolicy *
+getsp_r(spidx, iph2)
 	struct policyindex *spidx;	/* from peer */
 	struct ph2handle *iph2;
 {
-	struct policyindex *p;
+	struct secpolicy *p;
 
 	YIPSDEBUG(DEBUG_MISC,
 		plog(logp, LOCATION, NULL, "checking for transport mode\n"););
@@ -112,13 +127,14 @@ getspidx_r(spidx, iph2)
 	YIPSDEBUG(DEBUG_MISC,
 		plog(logp, LOCATION, NULL, "looks to be transport mode\n"););
 
-	LIST_FOREACH(p, &sptree, chain) {
-		if (!cmpspidx_wild(p, spidx))
+	TAILQ_FOREACH(p, &sptree, chain) {
+		if (!cmpspidx_wild(&p->spidx, spidx))
 			return p;
 	}
 
 	return NULL;
 }
+#endif
 
 /*
  * compare policyindex.
@@ -137,8 +153,7 @@ cmpspidx(a, b)
 	/* XXX don't check direction now, but it's to be checked carefully. */
 	if (a->prefs != b->prefs
 	 || a->prefd != b->prefd
-	 || a->ul_proto != b->ul_proto
-	 || a->action != b->action)
+	 || a->ul_proto != b->ul_proto)
 		return 1;
 
 	if (cmpsaddr((struct sockaddr *)&a->src, (struct sockaddr *)&b->src))
@@ -168,9 +183,7 @@ cmpspidx_wild(a, b)
 
 	if (!(a->dir == IPSEC_DIR_ANY || a->dir == b->dir))
 		return 1;
-	if (!(a->ul_proto == IPSEC_PROTO_ANY || a->ul_proto == b->ul_proto))
-		return 1;
-	if (a->action != b->action)
+	if (!(a->ul_proto == IPSEC_PROTO_ANY || b->ul_proto == IPSEC_PROTO_ANY || a->ul_proto == b->ul_proto))
 		return 1;
 
 	if (sizeof(sa1) < a->src.ss_len || sizeof(sa2) < b->src.ss_len) {
@@ -208,175 +221,80 @@ cmpspidx_wild(a, b)
 	return 0;
 }
 
-struct policyindex *
-newspidx()
+struct secpolicy *
+newsp()
 {
-	struct policyindex *new;
+	struct secpolicy *new;
 
-	new = CALLOC(sizeof(*new), struct policyindex *);
+	new = CALLOC(sizeof(*new), struct secpolicy *);
 	if (new == NULL) {
 		plog(logp, LOCATION, NULL,
 			"calloc (%s)", strerror(errno));
 		return NULL;
 	}
 
-	new->policy = NULL;
-
 	return new;
 }
 
 void
-delspidx(spidx)
-	struct policyindex *spidx;
+delsp(sp)
+	struct secpolicy *sp;
 {
-	if (spidx->policy) {
-		if (spidx->policy->pfsgrp)
-			oakley_dhgrp_free(spidx->policy->pfsgrp);
-		if (spidx->policy->proposal)
-			delipsecsa(spidx->policy->proposal);
+	struct ipsecrequest *req = NULL, *next;
+
+	for (req = sp->req; req; req = next) {
+		next = req->next;
+		free(req);
 	}
 	
-	free(spidx);
+	free(sp);
 }
 
 void
-insspidx(new)
-	struct policyindex *new;
+inssp(new)
+	struct secpolicy *new;
 {
-	LIST_INSERT_HEAD(&sptree, new, chain);
+	TAILQ_INSERT_TAIL(&sptree, new, chain);
 }
 
 void
-remspidx(spidx)
-	struct policyindex *spidx;
+remsp(sp)
+	struct secpolicy *sp;
 {
-	LIST_REMOVE(spidx, chain);
+	TAILQ_REMOVE(&sptree, sp, chain);
 }
 
 void
-flushspidx()
+flushsp()
 {
-	struct policyindex *p, *next;
+	struct secpolicy *p, *next;
 
-	for (p = LIST_FIRST(&sptree); p; p = next) {
-		next = LIST_NEXT(p, chain);
-		remspidx(p);
-		delspidx(p);
+	for (p = TAILQ_FIRST(&sptree); p; p = next) {
+		next = TAILQ_NEXT(p, chain);
+		remsp(p);
+		delsp(p);
 	}
 }
 
 void
-initspidx()
+initsp()
 {
-	LIST_INIT(&sptree);
+	TAILQ_INIT(&sptree);
 }
 
-struct ipsecpolicy *
-newipsp()
+struct ipsecrequest *
+newipsecreq()
 {
-	struct ipsecpolicy *new;
+	struct ipsecrequest *new;
 
-	new = CALLOC(sizeof(*new), struct ipsecpolicy *);
+	new = CALLOC(sizeof(*new), struct ipsecrequest *);
 	if (new == NULL) {
 		plog(logp, LOCATION, NULL,
 			"calloc (%s)", strerror(errno));
 		return NULL;
 	}
 
-	new->proposal = NULL;
-	new->spidx = NULL;
-
 	return new;
-}
-
-struct ipsecsa *
-newipsa()
-{
-	struct ipsecsa *new;
-
-	new = CALLOC(sizeof(*new), struct ipsecsa *);
-	if (new == NULL) {
-		plog(logp, LOCATION, NULL,
-			"calloc (%s)", strerror(errno));
-		return NULL;
-	}
-
-	new->bundles = NULL;
-	new->next = NULL;
-	new->ipsp = NULL;
-
-	return new;
-}
-
-void
-insipsa(new, ipsp)
-	struct ipsecsa *new;
-	struct ipsecpolicy *ipsp;
-{
-	struct ipsecsa *p;
-
-	new->ipsp = ipsp;
-
-	for (p = ipsp->proposal; p != NULL; p = p->next) {
-		/* bundled SA ? */
-		if (new->prop_no == p->prop_no && new->proto_id != p->proto_id) {
-			if (p->bundles == NULL) {
-				p->bundles = new;
-				return;
-			}
-			for (p = p->bundles; p->bundles != NULL; p = p->bundles)
-				;
-			p->bundles = new;
-			return;
-		}
-		if (p->next == NULL) {
-			/* new SA suite */
-			p->next = new;
-			return;
-		}
-	}
-
-	/* first sa */
-	ipsp->proposal = new;
-
-	return;
-}
-
-struct ipsecsa *
-dupipsecsa(s)
-	const struct ipsecsa *s;
-{
-	struct ipsecsa *d;
-
-	if (!s)
-		return NULL;
-	d = newipsa();
-	if (d == NULL)
-		return NULL;
-	memcpy(d, s, sizeof(*s));
-	if (s->bundles)
-		d->bundles = dupipsecsa(s->bundles);
-	if (s->next)
-		d->next = dupipsecsa(s->next);
-	return d;
-}
-
-void
-delipsecsa(s)
-	struct ipsecsa *s;
-{
-
-	if (!s)
-		return;
-	if (s->bundles)
-		delipsecsa(s->bundles);
-	if (s->next)
-		delipsecsa(s->next);
-#if 0
-	if (s->ipsp && s->ipsp->proposal == s)
-		s->ipsp->proposal = NULL;
-#endif
-	free(s);
 }
 
 char *
@@ -413,8 +331,8 @@ spidx2str(spidx)
 	p += i;
 	blen -= i;
 
-	snprintf(p, blen, "proto=%d dir=%d action=%d",
-		spidx->ul_proto, spidx->dir, spidx->action);
+	snprintf(p, blen, "proto=%d dir=%d",
+		spidx->ul_proto, spidx->dir);
 
 	return buf;
 }

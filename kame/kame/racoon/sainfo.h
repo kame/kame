@@ -26,31 +26,38 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.h,v 1.7 2000/04/24 07:37:44 sakane Exp $ */
+/* YIPS @(#)$Id: sainfo.h,v 1.1 2000/04/24 07:37:44 sakane Exp $ */
 
-struct ipsecsa;
+#include <sys/queue.h>
 
-extern int pfkey_handler __P((void));
-extern vchar_t *pfkey_dump_sadb __P((int satype));
-extern void pfkey_flush_sadb __P((u_int proto));
-extern int pfkey_init __P((void));
+/* SA info */
+struct sainfo {
+	int identtype;
+	vchar_t *name;			/* info name. e.g. IP address, FQDN.*/
 
-extern struct pfkey_st *pfkey_getpst
-	__P((caddr_t *mhp, int how_addrs, int how_spi));
+	time_t lifetime;
+	int lifebyte;
+	int pfs_group;			/* only use when pfs is required. */
+	int myidenttype;		/* local identifier type */
+	struct sainfoalg *algs[MAXALGCLASS];
 
-extern int pk_sendgetspi __P((struct ph2handle *sa));
-extern int pk_sendupdate __P((struct ph2handle *sa));
-extern int pk_sendadd __P((struct ph2handle *sa));
+	LIST_ENTRY(sainfo) chain;
+};
 
-extern void pfkey_timeover __P((struct ph2handle *iph2));
+/* algorithm type */
+struct sainfoalg {
+	int alg;
+	int encklen;			/* key length if encryption algorithm */
+	struct sainfoalg *next;
+};
 
-extern u_int pfkey2ipsecdoi_proto __P((u_int proto));
-extern u_int ipsecdoi2pfkey_proto __P((u_int proto));
-extern u_int pfkey2ipsecdoi_mode __P((u_int mode));
-extern u_int ipsecdoi2pfkey_mode __P((u_int mode));
-
-extern int pfkey_convertfromipsecdoi __P((
-	u_int proto_id, u_int t_id, u_int hashtype,
-	u_int *e_type, u_int *e_keylen, u_int *a_type, u_int *a_keylen,
-	u_int *flags));
-extern u_int32_t pk_getseq __P((void));
+extern struct sainfo *getsainfo __P((caddr_t, int));
+extern struct sainfo *newsainfo __P((void));
+extern void delsainfo __P((struct sainfo *));
+extern void inssainfo __P((struct sainfo *));
+extern void remsainfo __P((struct sainfo *));
+extern void flushsainfo __P((void));
+extern void initsainfo __P((void));
+extern struct sainfoalg *newsainfoalg __P((void));
+extern void inssainfoalg __P((struct sainfoalg **, struct sainfoalg *));
+extern const char * sainfo2str __P((const struct sainfo *si));

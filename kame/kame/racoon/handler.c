@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.18 2000/04/18 12:20:11 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.19 2000/04/24 07:37:43 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -45,7 +45,9 @@
 #include "debug.h"
 
 #include "schedule.h"
+#include "algorithm.h"
 #include "policy.h"
+#include "proposal.h"
 #include "isakmp_var.h"
 #include "isakmp.h"
 #include "oakley.h"
@@ -239,6 +241,7 @@ initph1tree()
 /*
  * search ph2handle with policyindex.
  */
+#if 0
 struct ph2handle *
 getph2byspidx(spidx)
 	struct policyindex *spidx;
@@ -258,8 +261,8 @@ getph2byspidx(spidx)
 
 	return NULL;
 }
+#endif
 
-#if 0
 /*
  * search ph2handle with policy id.
  */
@@ -280,7 +283,6 @@ getph2byspid(spid)
 
 	return NULL;
 }
-#endif
 
 /*
  * search ph2handle with sequence number.
@@ -317,23 +319,26 @@ getph2bymsgid(iph1, msgid)
 	return NULL;
 }
 
+/*
+ * call by pk_recvexpire().
+ */
 struct ph2handle *
 getph2bysaidx(src, dst, proto_id, spi)
 	struct sockaddr *src, *dst;
 	u_int proto_id;
 	u_int32_t spi;
 {
-	struct ph2handle *p;
-	struct ipsecsakeys *k;
+	struct ph2handle *iph2;
+	struct saproto *pr;
 
-	LIST_FOREACH(p, &ph2tree, chain) {
-		if (p->keys == NULL)
+	LIST_FOREACH(iph2, &ph2tree, chain) {
+		if (iph2->approval == NULL)
 			continue;
-		for (k = p->keys; k != NULL; k = k->next) {
-			if (proto_id == k->proto_id
-			 && (spi == k->spi || spi == k->spi_p)
-			 && cmpsaddrwop(k->dst, dst) == 0)
-				return p;
+		for (pr = iph2->approval->head; pr != NULL; pr = pr->next) {
+			if (proto_id != pr->proto_id)
+				break;
+			if (spi == pr->spi || spi == pr->spi_p)
+				return iph2;
 		}
 	}
 
@@ -363,6 +368,8 @@ void
 initph2(iph2)
 	struct ph2handle *iph2;
 {
+	/* NOTE: don't initialize src/dst */
+
 	if (iph2->id) {
 		vfree(iph2->id);
 		iph2->id = NULL;
@@ -391,16 +398,17 @@ initph2(iph2)
 		vfree(iph2->sa);
 		iph2->sa = NULL;
 	}
-	if (iph2->sa_ret) {
-		vfree(iph2->sa_ret);
-		iph2->sa_ret = NULL;
+
+	/* clear spi */
+	if (iph2->proposal) {
+		struct saproto *pr;
+		for (pr = iph2->proposal->head; pr != NULL; pr = pr->next)
+			pr->spi = 0;
 	}
-#if 0
 	if (iph2->approval) {
-		delipsecsa(iph2->approval);
+		flushsaprop(iph2->approval);
 		iph2->approval = NULL;
 	}
-#endif
 	if (iph2->sce)
 		SCHED_KILL(iph2->sce);
 	if (iph2->scr)
@@ -416,6 +424,17 @@ delph2(iph2)
 	struct ph2handle *iph2;
 {
 	initph2(iph2);
+
+	if (iph2->proposal) {
+		flushsaprop(iph2->proposal);
+		iph2->proposal = NULL;
+	}
+
+	if (iph2->approval) {
+		flushsaprop(iph2->approval);
+		iph2->approval = NULL;
+	}
+
 	/* XXX do more free parameters */
 
 	free(iph2);

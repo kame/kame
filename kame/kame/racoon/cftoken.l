@@ -94,7 +94,9 @@ hexstring	0x{hexdigit}+
 octetstring	{octet}({dot}{octet})+
 
 %s S_INI S_PTH S_INF S_LOG S_PAD S_LST S_RTRY
-%s S_ALGST S_ALGCL S_PLCY S_PLCYS S_PLCYP S_PLCYT
+%s S_ALGST S_ALGCL
+%s S_PLCY S_PLCYS S_PLCYP S_PLCYT
+%s S_SAINF S_SAINFS
 %s S_RMT S_RMTS S_RMTP
 %s S_SA
 
@@ -220,6 +222,24 @@ octetstring	{octet}({dot}{octet})+
 <S_PLCYT>encryption_algorithm { YYD; yylval.num = algclass_ipsec_enc; return(ALGORITHM_CLASS); }
 <S_PLCYT>authentication_algorithm { YYD; yylval.num = algclass_ipsec_auth; return(ALGORITHM_CLASS); }
 <S_PLCYT>compression_algorithm	{ YYD; yylval.num = algclass_ipsec_comp; return(ALGORITHM_CLASS); }
+
+	/* sainfo */
+<S_INI>sainfo		{ BEGIN S_SAINF; YYDB; return(SAINFO); }
+<S_SAINF>anonymous	{ YYD; return(ANONYMOUS); }
+<S_SAINF>{bcl}any{ecl}	{ YYD; return(PORTANY); }
+	/* sainfo spec */
+<S_SAINF>{bcl}		{ BEGIN S_SAINFS; return(BOC); }
+<S_SAINF>{semi}		{ BEGIN S_INI; return(EOS); }
+<S_SAINFS>{ecl}		{ BEGIN S_INI; return(EOC); }
+<S_SAINFS>pfs_group	{ YYD; return(PFS_GROUP); }
+<S_SAINFS>identifier	{ YYD; return(IDENTIFIER); }
+<S_SAINFS>lifetime	{ YYD; return(LIFETIME); }
+<S_SAINFS>time		{ YYD; yylval.num = CF_LIFETYPE_TIME; return(LIFETYPE); }
+<S_SAINFS>byte		{ YYD; yylval.num = CF_LIFETYPE_BYTE; return(LIFETYPE); }
+<S_SAINFS>encryption_algorithm { YYD; yylval.num = algclass_ipsec_enc; return(ALGORITHM_CLASS); }
+<S_SAINFS>authentication_algorithm { YYD; yylval.num = algclass_ipsec_auth; return(ALGORITHM_CLASS); }
+<S_SAINFS>compression_algorithm	{ YYD; yylval.num = algclass_ipsec_comp; return(ALGORITHM_CLASS); }
+<S_SAINFS>{comma}	{ YYD; /* XXX ignored, but to be handled. */ ; }
 
 	/* remote */
 <S_INI>remote		{ BEGIN S_RMT; YYDB; return(REMOTE); }

@@ -30,6 +30,7 @@
 #include "algorithm.h"
 #include "localconf.h"
 #include "policy.h"
+#include "sainfo.h"
 #include "oakley.h"
 #include "remoteconf.h"
 #include "grabmyaddr.h"
@@ -77,12 +78,16 @@ static int num2dhgroup[] = {
 static struct policyindex *cur_spidx;
 static struct remoteconf *cur_rmconf;
 static int tmpalgtype[MAXALGCLASS];
+static struct sainfo *cur_sainfo;
+static int cur_algclass;
 
 static struct proposalspec *prhead;	/* the head is always current. */
 
 static struct addrinfo *parse_addr __P((char *host, char *port, int flag));
+#if 0
 static struct policyindex * parse_spidx __P((caddr_t src, int prefs, int ports,
 		caddr_t dst, int prefd, int portd, int ul_proto, int dir));
+#endif
 static struct proposalspec *newprspec __P((void));
 static void cleanprhead __P((void));
 static void insprspec
@@ -91,15 +96,19 @@ static struct secprotospec *newspspec __P((void));
 static void insspspec
 	__P((struct secprotospec *spspec, struct proposalspec **head));
 
+#if 0
 static int set_ipsec_proposal
 	__P((struct policyindex *spidx, struct proposalspec *prspec));
+#endif
 static int set_isakmp_proposal
 	__P((struct remoteconf *rmconf, struct proposalspec *prspec));
 static u_int32_t set_algtypes __P((struct secprotospec *s, int class));
 static void clean_tmpalgtype __P((void));
+#if 0
 static int expand_ipsecspec __P((int prop_no, int trns_no, int *types,
 	int class, int last, struct proposalspec *p, struct secprotospec *s,
 	struct ipsecpolicy *ipsp));
+#endif
 static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 	int class, int last, time_t lifetime, int lifebyte, int encklen,
 	struct remoteconf *rmconf));
@@ -135,6 +144,8 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 %token POLICY DIRTYPE ACTION
 %token PLADDRTYPE PROPOSAL WHICHSIDE
 %token PROTOCOL SECLEVEL SECLEVELTYPE SECMODE SECMODETYPE
+	/* sa info */
+%token SAINFO
 	/* remote */
 %token REMOTE ANONYMOUS
 %token EXCHANGE_MODE EXCHANGETYPE DOI DOITYPE SITUATION SITUATIONTYPE
@@ -166,6 +177,7 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 %type <res> ike_addrinfo_port
 %type <spidx> policy_index
 %type <saddr> remote_index
+%type <val> sainfo_name
 
 %%
 
@@ -183,6 +195,7 @@ statement
 	|	timer_statement
 	|	algorithm_statement
 	|	policy_statement
+	|	sainfo_statement
 	|	remote_statement
 	|	staticsa_statement
 	;
@@ -395,7 +408,9 @@ algorithm_type
 
 	/* policy */
 policy_statement
-	:	POLICY policy_index {
+	:	POLICY policy_index
+		{
+			yywarn("policy directive are obsoleted.");
 			cur_spidx = $2;
 		}
 		policy_specswrap
@@ -403,13 +418,16 @@ policy_statement
 policy_specswrap
 	:	EOS
 		{
+			/*
 			if (cur_spidx->action == IPSEC_POLICY_IPSEC) {
 				yyerror("must define policy for IPsec");
 				return -1;
 			}
+			*/
 		}
 	|	BOC
 		{
+			/*
 			if (cur_spidx->action != IPSEC_POLICY_IPSEC) {
 				yyerror("must not define policy for no IPsec");
 				return -1;
@@ -421,13 +439,17 @@ policy_specswrap
 				return -1;
 			}
 			cur_spidx->policy->spidx = cur_spidx;
+			*/
 		}
 		policy_specs EOC
 		{
+			/*
 			if (set_ipsec_proposal(cur_spidx, prhead) != 0)
 				return -1;
+			*/
 
 			/* DH group settting if PFS is required. */
+			/*
 			if (cur_spidx->policy->pfs_group != 0
 			 && oakley_setdhgroup(cur_spidx->policy->pfs_group,
 					&cur_spidx->policy->pfsgrp) < 0) {
@@ -435,20 +457,25 @@ policy_specswrap
 				return -1;
 			}
 
+#if 0
 			ipsecdoi_printsa(cur_spidx->policy->proposal);
+#endif
 			insspidx(cur_spidx);
 
 			cleanprhead();
+			*/
 		}
 	;
 policy_index
 	:	ADDRSTRING prefix port
 		ADDRSTRING prefix port ul_proto DIRTYPE ACTION
 		{
+			/*
 			$$ = parse_spidx($1->v, $2, $3, $4->v, $5, $6, $7, $8);
 			$$->action = $9;
 			vfree($1);
 			vfree($4);
+			*/
 		}
 	;
 prefix
@@ -472,6 +499,7 @@ policy_specs
 policy_spec
 	:	PFS_GROUP dh_group_num EOS
 		{
+			/*
 			int doi;
 
 			doi = algtype2doi(algclass_isakmp_dh, $2);
@@ -480,9 +508,11 @@ policy_spec
 				return -1;
 			}
 			cur_spidx->policy->pfs_group = doi;
+			*/
 		}
 	|	PROPOSAL
 		{
+			/*
 			struct proposalspec *prspec;
 
 			prspec = newprspec();
@@ -490,6 +520,7 @@ policy_spec
 				return -1;
 			prspec->lifetime = ipsecdoi_get_defaultlifetime();
 			insprspec(prspec, &prhead);
+			*/
 		}
 		BOC ipsecproposal_specs EOC
 	;
@@ -637,6 +668,157 @@ secmode
 keylength
 	:	/* nothing */ { $$ = 0; }
 	|	NUMBER { $$ = $1; }
+	;
+
+	/* sainfo */
+sainfo_statement
+	:	SAINFO IDENTIFIERTYPE sainfo_name
+		{
+			cur_sainfo = newsainfo();
+			if (cur_sainfo == NULL) {
+				yyerror("failed to allocate sainfo");
+				return -1;
+			}
+			cur_sainfo->identtype = idtype2doi($2);
+			cur_sainfo->name = $3;
+		}
+		BOC sainfo_specs
+		{
+			/* default */
+			if (cur_sainfo->algs[algclass_ipsec_enc] == 0) {
+				yyerror("no encryption algorithm at %s",
+					sainfo2str(cur_sainfo));
+				return -1;
+			}
+			if (cur_sainfo->algs[algclass_ipsec_auth] == 0) {
+				yyerror("no authentication algorithm at %s",
+					sainfo2str(cur_sainfo));
+				return -1;
+			}
+			if (cur_sainfo->algs[algclass_ipsec_comp] == 0) {
+				yyerror("no compression algorithm at %s",
+					sainfo2str(cur_sainfo));
+				return -1;
+			}
+
+			inssainfo(cur_sainfo);
+		}
+		EOC
+	;
+sainfo_name
+	:	ANONYMOUS
+		{
+			$$ = NULL;
+		}
+	|	ADDRSTRING
+		{
+			struct addrinfo *res;
+
+			res = parse_addr($1->v, NULL, AI_NUMERICHOST);
+			vfree($1);
+			if (!res)
+				return -1;
+			$$ = vmalloc(res->ai_addrlen);
+			if ($$ == NULL) {
+				yyerror("vmalloc (%s)", strerror(errno));
+				freeaddrinfo(res);
+				return -1;
+			}
+			memcpy($$->v, res->ai_addr, $$->l);
+			freeaddrinfo(res);
+		}
+	|	QUOTEDSTRING
+		{
+			$1->l--;
+			$$ = $1;
+		}
+	;
+sainfo_specs
+	:	/* nothing */
+	|	sainfo_specs sainfo_spec
+	;
+sainfo_spec
+	:	PFS_GROUP dh_group_num EOS
+		{
+			int doi;
+
+			doi = algtype2doi(algclass_isakmp_dh, $2);
+			if (doi == -1) {
+				yyerror("must be DH group");
+				return -1;
+			}
+			cur_sainfo->pfs_group = doi;
+		}
+	|	LIFETIME LIFETYPE NUMBER UNITTYPE EOS
+		{
+			if ($2 == CF_LIFETYPE_TIME)
+				cur_sainfo->lifetime = $3 * $4;
+			else {
+				cur_sainfo->lifebyte = $3 * $4;
+				if (cur_sainfo->lifebyte < 1024) {
+					yyerror("byte size should be more "
+						"than 1024B.");
+					return -1;
+				}
+				cur_sainfo->lifebyte /= 1024;
+			}
+		}
+	|	ALGORITHM_CLASS {
+			cur_algclass = $1;
+		}
+		algorithm EOS
+	|	IDENTIFIER IDENTIFIERTYPE
+		{
+			cur_sainfo->myidenttype = idtype2doi($2);
+		}
+		EOS
+	;
+
+algorithms
+	:	algorithm
+	|	algorithm algorithms
+	;
+algorithm
+	:	ALGORITHMTYPE keylength
+		{
+			struct sainfoalg *alg;
+			int defklen;
+
+			alg = newsainfoalg();
+			if (alg == NULL) {
+				yyerror("sainfo's algorithm alocation "
+					"failed (%s)", strerror(errno));
+				return -1;
+			}
+
+			alg->alg = algtype2doi(cur_algclass, $1);
+			if (alg->alg == -1) {
+				yyerror("algorithm mismatched");
+				free(alg);
+				return -1;
+			}
+
+			defklen = default_keylen(cur_algclass, $1);
+			if (defklen == 0) {
+				if ($2) {
+					yyerror("keylen not allowed");
+					free(alg);
+					return -1;
+				}
+			} else {
+				if ($2 && check_keylen(cur_algclass, $1, $2) < 0) {
+					yyerror("invalid keylen %d", $2);
+					free(alg);
+					return -1;
+				}
+			}
+			if ($2)
+				alg->encklen = $2;
+			else
+				alg->encklen = defklen;
+
+			inssainfoalg(&cur_sainfo->algs[cur_algclass], alg);
+		}
 	;
 
 	/* remote */
@@ -904,6 +1086,7 @@ parse_addr(host, port, flag)
 	return res;
 }
 
+#if 0
 static struct policyindex *
 parse_spidx(src, prefs, ports, dst, prefd, portd, ul_proto, dir)
 	caddr_t src, dst;
@@ -954,6 +1137,7 @@ parse_spidx(src, prefs, ports, dst, prefd, portd, ul_proto, dir)
 
 	return spidx;
 }
+#endif
 
 static struct proposalspec *
 newprspec()
@@ -1029,6 +1213,7 @@ insspspec(spspec, head)
 	(*head)->spspec = spspec;
 }
 
+#if 0
 /* set final acceptable proposal */
 static int
 set_ipsec_proposal(spidx, prspec)
@@ -1216,6 +1401,7 @@ set_ipsec_proposal(spidx, prspec)
 
 	return 0;
 }
+#endif
 
 /* set final acceptable proposal */
 static int
@@ -1332,6 +1518,7 @@ clean_tmpalgtype()
 		tmpalgtype[i] = 0;	/* means algorithm undefined. */
 }
 
+#if 0
 static int
 expand_ipsecspec(prop_no, trns_no, types,
 		class, last, p, s, ipsp)
@@ -1389,7 +1576,9 @@ expand_ipsecspec(prop_no, trns_no, types,
 		new->authtype = tmpalgtype[algclass_ipsec_auth];
 		new->comptype = tmpalgtype[algclass_ipsec_comp];
 
+#if 0
 		insipsa(new, ipsp);
+#endif
 
 		return trns_no + 1;
 	}
@@ -1415,6 +1604,7 @@ expand_ipsecspec(prop_no, trns_no, types,
 
 	return trns_no;
 }
+#endif
 
 static int
 expand_isakmpspec(prop_no, trns_no, types,
@@ -1546,7 +1736,9 @@ cfreparse()
 	flushph2();
 	flushph1();
 	flushrmconf();
+#if 0
 	flushspidx();
+#endif
 	cleanprhead();
 	clean_tmpalgtype();
 	yycf_init_buffer();

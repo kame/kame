@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.55 2000/04/19 17:48:06 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.56 2000/04/24 07:37:43 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -791,6 +791,7 @@ isakmp_ph2begin_r(iph1, msg)
 		return -1;
 	}
 	_INPORTBYSA(iph2->dst) = 0;
+
 	iph2->src = dupsaddr(iph1->local);	/* XXX should be considered */
 	if (iph2->src == NULL) {
 		delph2(iph2);
@@ -1306,8 +1307,9 @@ isakmp_ph2expire(iph2)
 {
 	YIPSDEBUG(DEBUG_STAMP,
 		plog(logp, LOCATION, NULL,
-			"expire phase2 sa %s\n",
-			spidx2str(iph2->spidx)));
+			"expire phase2 sa %s->%s\n",
+			saddrwop2str(iph2->src),
+			saddrwop2str(iph2->dst)));
 	SCHED_INIT(iph2->sce);
 
 	iph2->status = PHASE2ST_EXPIRED;

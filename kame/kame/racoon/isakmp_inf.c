@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.27 2000/04/05 09:12:05 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.28 2000/04/24 07:37:43 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -77,6 +77,8 @@
 #include "crypto_openssl.h"
 #include "pfkey.h"
 #include "policy.h"
+#include "algorithm.h"
+#include "proposal.h"
 #include "admin.h"
 #include "strnames.h"
 
@@ -493,18 +495,17 @@ isakmp_info_send_n2(iph2, type, data)
 	int tlen;
 	int error = 0;
 	struct isakmp_pl_n *n;
-
-#if 0
-	return 0;
-#endif
+	struct saproto *pr;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
 	if (!iph2->approval)
 		return EINVAL;
 
+	pr = iph2->approval->head;
+
 	/* XXX must be get proper spi */
-	tlen = sizeof(*n) + sizeof(iph2->keys->spi);
+	tlen = sizeof(*n) + pr->spisize;
 	if (data)
 		tlen += data->l;
 	if ((payload = vmalloc(tlen)) == NULL) { 
@@ -516,13 +517,12 @@ isakmp_info_send_n2(iph2, type, data)
 	n->h.np = ISAKMP_NPTYPE_NONE;
 	n->h.len = htons(tlen);
 	n->doi = htonl(IPSEC_DOI);		/* IPSEC DOI (1) */
-	n->proto_id = iph2->approval->proto_id; /* IPSEC AH/ESP/whatever */
-	n->spi_size = sizeof(iph2->keys->spi);
+	n->proto_id = pr->proto_id;		/* IPSEC AH/ESP/whatever*/
+	n->spi_size = pr->spisize;
 	n->type = htons(type);
-	*(u_int32_t *)(n + 1) = (u_int32_t)htonl(iph2->keys->spi);
+	*(u_int32_t *)(n + 1) = (u_int32_t)htonl(pr->spi);
 	if (data) {
-		memcpy((caddr_t)(n + 1) + sizeof(iph2->keys->spi),
-			&iph2->keys->spi, sizeof(iph2->keys->spi));
+		memcpy((caddr_t)(n + 1) + pr->spisize, &pr->spi, pr->spisize);
 	}
 
 	iph2->flags |= ISAKMP_FLAG_E;	/* XXX Should we do FLAG_A ? */
@@ -568,6 +568,10 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	if (iph2 == NULL)
 		goto end;
 
+	iph2->dst = dupsaddr(iph1->remote);
+	_INPORTBYSA(iph2->dst) = 0;
+	iph2->src = dupsaddr(iph1->local);
+	_INPORTBYSA(iph2->src) = 0;
 	iph2->ph1 = iph1;
 	iph2->side = INITIATOR;
 	iph2->status = PHASE2ST_START;

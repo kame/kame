@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.28 2000/04/18 03:57:31 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.29 2000/04/24 07:37:43 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -63,6 +63,8 @@
 #include "handler.h"
 #include "ipsec_doi.h"
 #include "algorithm.h"
+#include "sainfo.h"
+#include "proposal.h"
 #include "crypto_openssl.h"
 #include "sockmisc.h"
 #include "strnames.h"
@@ -373,8 +375,8 @@ oakley_compute_keymat(iph2, side)
 	int error = -1;
 
 	/* compute sharing secret of DH when PFS */
-	if (iph2->spidx->policy->pfs_group && iph2->dhpub_p) {
-		if (oakley_dh_compute(iph2->spidx->policy->pfsgrp, iph2->dhpub,
+	if (iph2->approval->pfs_group && iph2->dhpub_p) {
+		if (oakley_dh_compute(iph2->pfsgrp, iph2->dhpub,
 				iph2->dhpriv, iph2->dhpub_p, &iph2->dhgxy) < 0)
 			goto end;
 	}
@@ -414,9 +416,9 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 	int error = -1;
 	int pfs = 0;
 	int dupkeymat;	/* generate K[1-dupkeymat] */
-	struct ipsecsakeys *k;
+	struct saproto *pr;
 
-	pfs = ((iph2->spidx->policy->pfs_group && iph2->dhgxy) ? 1 : 0);
+	pfs = ((iph2->approval->pfs_group && iph2->dhgxy) ? 1 : 0);
 	
 	len = pfs ? iph2->dhgxy->l : 0;
 	len += (1
@@ -430,7 +432,7 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 		goto end;
 	}
 
-	for (k = iph2->keys; k != NULL; k = k->next) {
+	for (pr = iph2->approval->head; pr != NULL; pr = pr->next) {
 		p = buf->v;
 
 		/* if PFS */
@@ -439,12 +441,12 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 			p += iph2->dhgxy->l;
 		}
 
-		p[0] = k->proto_id;
+		p[0] = pr->proto_id;
 		p += 1;
 
-		memcpy(p, (sa_dir == INBOUND_SA ? &k->spi : &k->spi_p),
-			sizeof(k->spi));
-		p += sizeof(k->spi);
+		memcpy(p, (sa_dir == INBOUND_SA ? &pr->spi : &pr->spi_p),
+			sizeof(pr->spi));
+		p += sizeof(pr->spi);
 
 		bp = (side == INITIATOR ? iph2->nonce : iph2->nonce_p);
 		memcpy(p, bp->v, bp->l);
@@ -465,7 +467,7 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 			goto end;
 
 		/* a guess: ESP: 128bit minimum, AH: 160 bit minimum */
-		dupkeymat = ((k->len ? k->len : 128) + 160) / 8 / res->l;
+		dupkeymat = ((pr->len ? pr->len : 128) + 160) / 8 / res->l;
 		dupkeymat += 2;	/* safety mergin */
 		if (dupkeymat < 3)
 			dupkeymat = 3;
@@ -535,23 +537,23 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 		YIPSDEBUG(DEBUG_DKEY, PVDUMP(res));
 
 		if (sa_dir == INBOUND_SA)
-			k->keymat = res;
+			pr->keymat = res;
 		else
-			k->keymat_p = res;
+			pr->keymat_p = res;
 	}
 
 	error = 0;
 
 end:
 	if (error) {
-		for (k = iph2->keys; k != NULL; k = k->next) {
-			if (k->keymat) {
-				vfree(k->keymat);
-				k->keymat = NULL;
+		for (pr = iph2->approval->head; pr != NULL; pr = pr->next) {
+			if (pr->keymat) {
+				vfree(pr->keymat);
+				pr->keymat = NULL;
 			}
-			if (k->keymat_p) {
+			if (pr->keymat_p) {
 				vfree(res);
-				k->keymat_p = NULL;
+				pr->keymat_p = NULL;
 			}
 		}
 	}

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.54 2000/04/18 12:20:11 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.55 2000/04/24 07:37:43 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -74,71 +74,18 @@
 #include "handler.h"
 #include "policy.h"
 #include "algorithm.h"
+#include "sainfo.h"
+#include "proposal.h"
 #include "strnames.h"
-
-/*
- * prop_pair: (proposal number, transform number)
- *
- *	(SA (P1 (T1 T2)) (P1' (T1' T2')) (P2 (T1" T2")))
- *
- *              p[1]      p[2]
- *      top     (P1,T1)   (P2",T1")
- *		 |  |tnext     |tnext
- *		 |  v          v
- *		 | (P1, T2)   (P2", T2")
- *		 v next
- *		(P1', T1')
- *		    |tnext
- *		    v
- *		   (P1', T2')
- *
- * when we convert it to ipsecsa in prop2ipsecsa(), it should become like:
- *	{next	<bundle (P1 T1), (P1', T1')>
- *		<bundle (P1 T1), (P1', T2')>
- *		<bundle (P1 T2), (P1', T1')>
- *		<bundle (P1 T2), (P1', T2')>}
- *	{next	(P2" T1")
- *		(P2" T2")}}
- * what a hard job.
- */
-struct prop_pair {
-	struct isakmp_pl_p *prop;
-	struct isakmp_pl_t *trns;
-	struct prop_pair *next;	/* next prop_pair with same proposal # */
-				/* (bundle case) */
-	struct prop_pair *tnext; /* next prop_pair in same proposal payload */
-				/* (multiple tranform case) */
-};
-#define MAXPROPPAIRLEN	256	/* It's enough because field size is 1 octet. */
 
 static vchar_t *get_ph1approval __P((struct ph1handle *iph1,
 	struct prop_pair **pair));
 static struct isakmpsa *get_ph1approvalx __P((struct prop_pair *p,
 	struct isakmpsa *proposal));
 static int t2isakmpsa __P((struct isakmp_pl_t *trns, struct isakmpsa *sa));
-static vchar_t *get_ph2approval __P((struct ph2handle *iph2,
-	struct prop_pair **pair));
-static struct ipsecsa *prop2ipsecsa_emit1 __P((struct prop_pair *p));
-static int prop2ipsecsa_emit __P((struct prop_pair **b, size_t max,
-	struct ipsecsa **result));
-static int prop2ipsecsa_recurse __P((struct prop_pair **b0,
-	struct prop_pair **b, size_t l, size_t max, struct ipsecsa **result));
-static struct ipsecsa *prop2ipsecsa __P((struct prop_pair *p));
-static struct ipsecsa *prop2ipsecsa __P((struct prop_pair *));
+static int get_ph2approval __P((struct ph2handle *, struct prop_pair **));
 static int get_ph2approvalx __P((struct ph2handle *, struct prop_pair *));
-#if 0
-static const struct ipsecsa *find_proposalmatch
-	__P((const struct ipsecsa *p1, const struct ipsecsa *p2));
-#endif
-static int cmpproposal_bundles __P((const struct ipsecsa *p1,
-	const struct ipsecsa *p2));
-static int cmpproposal __P((const struct ipsecsa *p1,
-	const struct ipsecsa *p2));
 
-static int t2ipsecsa __P((struct isakmp_pl_t *trns, struct ipsecsa *sa));
-
-static void free_proppair __P((struct prop_pair **));
-static struct prop_pair **get_proppair __P((vchar_t *sa, int mode));
 static int get_transform
 	__P((struct isakmp_pl_p *prop, struct prop_pair **pair, int *num_p));
 static vchar_t *get_sabyproppair __P((struct prop_pair *pair));
@@ -187,22 +134,8 @@ static int setph1attr __P((struct isakmpsa *props, caddr_t buf));
 #if 0
 static int getph2proplen __P((struct ipsecsa *proposal));
 #endif
-static caddr_t setph2attr __P((caddr_t buf, struct ipsecsa *sa, int *len));
 static vchar_t *sockaddr2id __P((struct sockaddr *saddr,
 	u_int prefixlen, u_int ul_proto));
-static int mksakeys __P((struct ipsecsa *b, struct ipsecsakeys **keys,
-	struct sockaddr *dst, struct sockaddr *src));
-
-#ifdef YIPS_DEBUG
-static void ipsecdoi_printsa_bundle __P((const struct ipsecsa *));
-#endif
-static void ipsecdoi_printsa_bundle0 __P((const struct ipsecsa *, int));
-static void ipsecdoi_printsa_1 __P((const struct ipsecsa *));
-
-#ifdef YIPS_DEBUG
-static void print_proppair0 __P((struct prop_pair *, int));
-static void print_proppair __P((struct prop_pair *));
-#endif
 
 /*%%%*/
 /*
@@ -652,6 +585,7 @@ err:
 	return error;
 }
 
+/*%%%*/
 /*
  * check phase 2 SA payload.
  * make new SA payload to be replyed not including general header.
@@ -666,7 +600,6 @@ ipsecdoi_checkph2proposal(sa, iph2)
 	vchar_t *sa;
 	struct ph2handle *iph2;
 {
-	vchar_t *newsa;		/* new SA payload approved. */
 	struct prop_pair **pair;
 
 	/* get proposal pair */
@@ -674,19 +607,11 @@ ipsecdoi_checkph2proposal(sa, iph2)
 	if (pair == NULL)
 		return -1;
 
-	/* check and get one SA for use */
-	newsa = get_ph2approval(iph2, pair);
-
-	free_proppair(pair);
-
-	if (newsa == NULL)
+	/* check and get one proposal for use */
+	if (get_ph2approval(iph2, pair) != 0) {
+		free_proppair(pair);
 		return -1;
-
-	/* update some of values in SA header */
-	((struct ipsecdoi_sa_b *)newsa->v)->doi = htonl(iph2->ph1->rmconf->doitype);
-	((struct ipsecdoi_sa_b *)newsa->v)->sit = htonl(iph2->ph1->rmconf->sittype);
-
-	iph2->sa_ret = newsa;
+	}
 
 	return 0;
 }
@@ -695,603 +620,86 @@ ipsecdoi_checkph2proposal(sa, iph2)
  * acceptable check for policy configuration.
  * return a new SA payload to be reply to peer.
  */
-static vchar_t *
+static int
 get_ph2approval(iph2, pair)
 	struct ph2handle *iph2;
 	struct prop_pair **pair;
 {
-	vchar_t *newsa;
-	struct prop_pair *s;
 	int prophlen;
 	int i;
 
-	/* sanity */
-	if (iph2->spidx == NULL) {
-		plog(logp, LOCATION, NULL, "no policy index found. why ?\n");
-		return NULL;
-	}
-
-#if 0
-	if (iph2->approval)
-		delipsecsa(iph2->approval);
-#endif
 	iph2->approval = NULL;
+
+	YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL,
+		"begin compare proposals.\n"));
 
 	for (i = 0; i < MAXPROPPAIRLEN; i++) {
 		if (pair[i] == NULL)
 			continue;
-		YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL, "pair[%d]: %p\n",
-			i, pair[i]);
+		YIPSDEBUG(DEBUG_SA,
+			plog(logp, LOCATION, NULL,
+				"pair[%d]: %p\n", i, pair[i]);
 			print_proppair(pair[i]););
 
-		s = pair[i];
 		prophlen = sizeof(struct isakmp_pl_p)
-				+ s->prop->spi_size;
+				+ pair[i]->prop->spi_size;
 		/* compare proposal and select one */
-		if (get_ph2approvalx(iph2, s) == 0)
-			goto found;
+		if (get_ph2approvalx(iph2, pair[i]) == 0)
+			return 0;
 	}
 
 	plog(logp, LOCATION, NULL, "no suitable policy found.\n");
 
-	return NULL;
-
-found:
-	newsa = get_sabyproppair(s);
-	if (newsa == NULL) {
-#if 0
-		if (iph2->approval)
-			delipsecsa(iph2->approval);
-#endif
-		iph2->approval = NULL;
-	}
-
-	return newsa;
+	return -1;
 }
 
-static struct ipsecsa *
-prop2ipsecsa_emit1(p)
-	struct prop_pair *p;
-{
-	struct ipsecsa *q;
-
-#if 0
-	YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL, "param: %p\n", p);
-		print_proppair(p););
-#endif
-	q = CALLOC(sizeof(struct ipsecsa), struct ipsecsa *);
-	if (q == NULL)
-		return NULL;
-
-	/* XXX structure of ipsecsa may be strange. should be fix ? */
-	q->proto_id = p->prop->proto_id;
-	if (q->proto_id == IPSECDOI_PROTO_IPSEC_ESP)
-		q->enctype = p->trns->t_id;
-	if (q->proto_id == IPSECDOI_PROTO_IPCOMP)
-		q->comptype = p->trns->t_id;
-
-	/* XXX this should belong to elsewhere */
-	if (sizeof(q->spi) >= p->prop->spi_size) {
-		q->spisize = p->prop->spi_size;
-		memcpy(&q->spi, p->prop + 1, p->prop->spi_size);
-	} else {
-		free(q);
-		return NULL;
-	}
-
-	if (t2ipsecsa(p->trns, q) < 0) {
-		free(q);
-		return NULL;
-	}
-
-#if 0
-	YIPSDEBUG(DEBUG_SA,
-		plog(logp, LOCATION, NULL, "result: %p\n", q);
-		ipsecdoi_printsa(q););
-#endif
-
-	return q;
-}
-
+/*
+ * compare my proposal and peers just one proposal.
+ * set a approval.
+ */
 static int
-prop2ipsecsa_emit(b, max, result)
-	struct prop_pair **b;
-	size_t max;
-	struct ipsecsa **result;
-{
-	size_t i;
-	struct ipsecsa top, *q;
-
-	memset(&top, 0, sizeof(top));
-	q = &top;
-	for (i = 0; i < max; i++) {
-#if 0
-		YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL, "param[%d]: %p\n", i, b[i]);
-			print_proppair(b[i]););
-#endif
-		q->bundles = prop2ipsecsa_emit1(b[i]);
-#if 0
-		YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL, "got %p from %p\n", q->bundles, b[i]););
-#endif
-		if (q->bundles == NULL) {
-			delipsecsa(top.next);
-			return -1;
-		}
-		q = q->bundles;
-	}
-	top.bundles->next = *result;
-	*result = top.bundles;
-
-#if 0
-	YIPSDEBUG(DEBUG_SA,
-		plog(logp, LOCATION, NULL, "%p\n", *result);
-		ipsecdoi_printsa_bundle(*result););
-#endif
-
-	return 0;
-}
-
-static int
-prop2ipsecsa_recurse(b0, b, l, max, result)
-	struct prop_pair **b0;
-	struct prop_pair **b;
-	size_t l;
-	size_t max;
-	struct ipsecsa **result;
-{
-	int ret = 0;
-	size_t i;
-
-	for (b[l] = b0[l]; b[l]; b[l] = b[l]->tnext) {
-		if (l + 1 < max) {
-			ret = prop2ipsecsa_recurse(b0, b, l + 1, max, result);
-			if (ret)
-				break;
-		} else {
-			for (i = 0; i < max; i++)
-				printf(" %ld=%p", (long)i, b[i]);
-			printf("\n");
-			ret = prop2ipsecsa_emit(b, max, result);
-#if 0
-			YIPSDEBUG(DEBUG_SA,
-				plog(logp, LOCATION, NULL, "%p\n", result);
-				ipsecdoi_printsa(*result););
-#endif
-			if (ret)
-				break;
-		}
-	}
-
-	return ret;
-}
-
-static struct ipsecsa *
-prop2ipsecsa(p)
-	struct prop_pair *p;
-{
-	struct prop_pair **b, **b0;
-	struct prop_pair *q;
-	size_t l, max;
-	struct ipsecsa top;
-
-	max = 0;
-	for (q = p; q; q = q->next)
-		max++;
-	b0 = CALLOC(sizeof(struct prop_pair *) * max, struct prop_pair **);
-	if (b0 == NULL)
-		return NULL;
-	b = CALLOC(sizeof(struct prop_pair *) * max, struct prop_pair **);
-	if (b == NULL)
-		return NULL;
-
-	/* b[n] contains pointer to bundle proposal */
-	l = 0;
-	for (q = p; q; q = q->next)
-		b0[l++] = q;
-
-	memset(&top, 0, sizeof(top));
-	if (prop2ipsecsa_recurse(b0, b, 0, max, &top.next)) {
-		delipsecsa(top.next);
-		return NULL;
-	}
-	return top.next;
-}
-
-/* compare my proposal and peers proposal. */
-static int
-get_ph2approvalx(iph2, p)
+get_ph2approvalx(iph2, pp)
 	struct ph2handle *iph2;
-	struct prop_pair *p;
+	struct prop_pair *pp;
 {
-	const struct ipsecsa *proposal = iph2->spidx->policy->proposal;
-	struct ipsecsa *sa;
-	struct ipsecsa *r;
+	struct saprop *pr0, *pr = NULL;
+	struct saprop *q1, *q2;
 
-	YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL, "begin.\n"));
-
-	YIPSDEBUG(DEBUG_SA,
-		plog(logp, LOCATION, NULL,
-	       		"prop#=%d prot-id=%s spi-size=%d #trns=%d "
-			"trns#=%d trns-id=%s\n",
-			p->prop->p_no, s_ipsecdoi_proto(p->prop->proto_id),
-			p->prop->spi_size, p->prop->num_t,
-			p->trns->t_no,
-			s_ipsecdoi_trns(p->prop->proto_id, p->trns->t_id)));
-
-	sa = prop2ipsecsa(p);
-	if (sa == NULL)
+	pr0 = aproppair2saprop(pp);
+	if (pr0 == NULL)
 		return -1;
 
-	YIPSDEBUG(DEBUG_DSA,
-		plog(logp, LOCATION, NULL, "peer's full proposal:\n");
-		ipsecdoi_printsa(sa););
-	YIPSDEBUG(DEBUG_DSA,
-		plog(logp, LOCATION, NULL, "my full proposal:\n");
-		ipsecdoi_printsa(proposal););
-
-    {
-	const struct ipsecsa *q1;
-	const struct ipsecsa *q2;
-
-	for (q1 = sa; q1; q1 = q1->next) {
-		for (q2 = proposal; q2; q2 = q2->next) {
+	for (q1 = pr0; q1; q1 = q1->next) {
+		for (q2 = iph2->proposal; q2; q2 = q2->next) {
 			YIPSDEBUG(DEBUG_DSA,
 				plog(logp, LOCATION, NULL,
 					"peer's single bundle:\n");
-				ipsecdoi_printsa_bundle(q1););
+				printsaprop0(q1););
 			YIPSDEBUG(DEBUG_DSA,
 				plog(logp, LOCATION, NULL,
 					"my single bundle:\n");
-				ipsecdoi_printsa_bundle(q2););
+				printsaprop0(q2););
 
-			if (cmpproposal_bundles(q1, q2) == 0)
+			pr = cmpsaprop_alloc(q1, q2);
+			if (pr != NULL)
 				goto found;
 
 			YIPSDEBUG(DEBUG_DSA,
 				plog(logp, LOCATION, NULL, "not matched\n"););
 		}
 	}
-	delipsecsa(sa);
+	/* no proposal matching */
+	flushsaprop(pr0);
 	return -1;
 
 found:
 	YIPSDEBUG(DEBUG_DSA, plog(logp, LOCATION, NULL, "matched\n"););
-	if (q1 == NULL) {
-		YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL,
-				"no acceptable proposal found.\n"));
-		return -1;
-	}
-
-	/* duplicate the result for future modification */
-	r = dupipsecsa(q1);
-	r->ipsp = NULL;
-	delipsecsa(r->next);
-	r->next = NULL;
-
-	delipsecsa(sa);
-	sa = NULL;
-    }
-
-	if (iph2->side == RESPONDER) {
-#if 0
-		if (iph2->approval)
-			delipsecsa(iph2->approval);
-#endif
-		iph2->approval = r;
-		/* ipsecsa keys from approval */
-		if (ipsecdoi_initsakeys(iph2) < 0) {
-			plog(logp, LOCATION, NULL,
-				"failed to get variable spece for phase2.\n");
-			delipsecsa(sa);
-			return -1;
-		}
-	}
-
-    {
-	/* set peer's spi from proposal payload */
-	struct ipsecsakeys *k;
-	struct ipsecsa *q1;
-
-	for (q1 = r; q1; q1 = q1->bundles) {
-		for (k = iph2->keys; k != NULL; k = k->next) {
-			if (q1->proto_id == k->proto_id
-			 && q1->encmode == k->encmode
-			 && (cmpsaddrwop(iph2->dst, k->dst) == 0))
-				break;
-		}
-		if (k == NULL) {
-			plog(logp, LOCATION, NULL,
-				"no SPI found for %s/%s\n",
-				s_ipsecdoi_proto(q1->proto_id),
-				saddrwop2str(iph2->dst));
-			delipsecsa(q1);
-			return -1;
-		}
-		/* special case for IPComp CPI - accept two-byte CPI */
-		if (q1->spisize == 2 && q1->proto_id == IPSECDOI_PROTO_IPCOMP) {
-			u_int16_t t[2];
-			memset(&t, 0, sizeof(t));
-			memcpy(&t[1], &q1->spi, q1->spisize);
-			memset(&q1->spi, 0, sizeof(q1->spi));
-			memcpy(&q1->spi, &t, sizeof(t));
-			q1->spisize = sizeof(t);
-		} else if (q1->spisize != sizeof(k->spi_p)) {
-			plog(logp, LOCATION, NULL,
-				"spi size mismatch, %d/%d\n",
-				q1->spisize, sizeof(k->spi_p));
-			delipsecsa(q1);
-			return -1;
-		}
-		memcpy(&k->spi_p, &q1->spi, q1->spisize);
-	}
-    }
-
-#if 0
-	if (iph2->approval)
-		delipsecsa(iph2->approval);
-#endif
-	iph2->approval = r;
+	iph2->approval = pr;
 
 	return 0;
 }
 
-#if 0
-/*
- * take a match against proposals (which is a linked list of bundles).
- * returns element from first argument only.
- */
-static const struct ipsecsa *
-find_proposalmatch(p1, p2)
-	const struct ipsecsa *p1;
-	const struct ipsecsa *p2;
-{
-	const struct ipsecsa *q1;
-	const struct ipsecsa *q2;
-
-	YIPSDEBUG(DEBUG_DSA,
-		plog(logp, LOCATION, NULL, "peer's single bundle:\n");
-		ipsecdoi_printsa_bundle(p1););
-	YIPSDEBUG(DEBUG_DSA,
-		plog(logp, LOCATION, NULL, "my single bundle:\n");
-		ipsecdoi_printsa_bundle(p2););
-
-	for (q1 = p1; q1; q1 = q1->next) {
-		for (q2 = p2; q2; q2 = q2->next) {
-			if (cmpproposal_bundles(q1, q2) == 0)
-				goto found;
-		}
-	}
-	YIPSDEBUG(DEBUG_DSA, plog(logp, LOCATION, NULL, "not matched\n"););
-	return NULL;
-
-found:
-	YIPSDEBUG(DEBUG_DSA, plog(logp, LOCATION, NULL, "matched\n"););
-	return q1;
-}
-#endif
-
-/*
- * take a complete match against bundles.  the order must match as well.
- * 0 if equal.
- */
-static int
-cmpproposal_bundles(p1, p2)
-	const struct ipsecsa *p1;
-	const struct ipsecsa *p2;
-{
-	const struct ipsecsa *q1;
-	const struct ipsecsa *q2;
-
-	q1 = p1;
-	q2 = p2;
-	while (q1 && q2) {
-		if (cmpproposal(q1, q2) != 0)
-			goto fail;
-		q1 = q1->bundles;
-		q2 = q2->bundles;
-	}
-
-	/* if the length of bundles is different, they don't match */
-	if (q1 || q2)
-		goto fail;
-
-	return 0;
-
-fail:
-	return 1;
-}
-
-/* take a single match betwee ipsecsa.  0 if equal. */
-static int
-cmpproposal(p1, p2)
-	const struct ipsecsa *p1;
-	const struct ipsecsa *p2;
-{
-	if (p1->proto_id != p2->proto_id)
-		goto fail;
-	if (p1->encmode != p2->encmode)
-		goto fail;
-#if 0
-	/* XXX to be considered */
-	if (p1->lifetime > p2->lifetime) ;
-	if (p1->lifebyte > p2->lifebyte) ;
-	if (p1->encklen >= p2->encklen) ;
-#endif
-
-	switch (p1->proto_id) {
-	case IPSECDOI_PROTO_IPSEC_ESP:
-		if (p1->enctype != p2->enctype || p1->authtype != p2->authtype)
-			goto fail;
-		break;
-	case IPSECDOI_PROTO_IPSEC_AH:
-		if (p1->authtype != p2->authtype)
-			goto fail;
-		break;
-	case IPSECDOI_PROTO_IPCOMP:
-		if (p1->comptype != p2->comptype)
-			goto fail;
-		break;
-	default:
-		plog(logp, LOCATION, NULL,
-			"invalid proto_id found %d\n", p1->proto_id);
-		goto fail;
-	}
-
-	return 0;
-fail:
-	return 1;
-}
-
-/*
- * get IPsec data attributes
- */
-static int
-t2ipsecsa(trns, sa)
-	struct isakmp_pl_t *trns;
-	struct ipsecsa *sa;
-{
-	struct isakmp_data *d, *prev;
-	int flag, type, lorv;
-	int error = -1;
-	int life_t;
-	int tlen;
-
-	tlen = ntohs(trns->h.len) - sizeof(*trns);
-	prev = (struct isakmp_data *)NULL;
-	d = (struct isakmp_data *)(trns + 1);
-
-	/* default */
-	sa->lifebyte = 0;
-	life_t = IPSECDOI_ATTR_SA_LD_TYPE_DEFAULT;
-	sa->lifetime = IPSECDOI_ATTR_SA_LD_SEC_DEFAULT;
-
-	while (tlen > 0) {
-
-		type = ntohs(d->type) & ~ISAKMP_GEN_MASK;
-		flag = ntohs(d->type) & ISAKMP_GEN_MASK;
-		lorv = d->lorv;
-
-		YIPSDEBUG(DEBUG_DSA,
-			plog(logp, LOCATION, NULL,
-				"type=%s, flag=0x%04x, lorv=%s\n",
-				s_ipsecdoi_attr(type), flag,
-				s_ipsecdoi_attr_v(type, ntohs(lorv))));
-
-		switch (type) {
-		case IPSECDOI_ATTR_SA_LD_TYPE:
-		{
-			int type = ntohs(lorv);
-			switch (type) {
-			case IPSECDOI_ATTR_SA_LD_TYPE_SEC:
-			case IPSECDOI_ATTR_SA_LD_TYPE_KB:
-				life_t = type;
-				break;
-			default:
-				plog(logp, LOCATION, NULL,
-				    "Warning of invalid life duration type.\n");
-				life_t = IPSECDOI_ATTR_SA_LD_TYPE_DEFAULT;
-				break;
-			}
-			break;
-		}
-		case IPSECDOI_ATTR_SA_LD:
-			if (life_t == NULL
-			 || prev == NULL
-			 || (ntohs(prev->type) & ~ISAKMP_GEN_MASK) !=
-					IPSECDOI_ATTR_SA_LD_TYPE) {
-				plog(logp, LOCATION, NULL,
-				    "life duration must follow ltype\n");
-				break;
-			}
-
-		    {
-			vchar_t *ld_buf = NULL;
-			u_int32_t t;
-			if (flag) {
-				/* i.e. ISAKMP_GEN_TV */
-				ld_buf = vmalloc(sizeof(d->lorv));
-				if (ld_buf == NULL) {
-					plog(logp, LOCATION, NULL,
-					    "vmalloc (%s)\n", strerror(errno));
-					goto end;
-				}
-				memcpy(ld_buf->v, &lorv, sizeof(d->lorv));
-			} else {
-				int len = ntohs(lorv);
-				/* i.e. ISAKMP_GEN_TLV */
-				ld_buf = vmalloc(len);
-				if (ld_buf == NULL) {
-					plog(logp, LOCATION, NULL,
-					    "vmalloc (%s)\n", strerror(errno));
-					goto end;
-				}
-				memcpy(ld_buf->v, d + 1, len);
-			}
-			switch (life_t) {
-			case IPSECDOI_ATTR_SA_LD_TYPE_SEC:
-				t = ipsecdoi_set_ld(life_t, ld_buf);
-				if (t == ~0)
-					sa->lifetime = IPSECDOI_ATTR_SA_LD_SEC_DEFAULT;
-				else
-					sa->lifetime = t;
-				break;
-			case IPSECDOI_ATTR_SA_LD_TYPE_KB:
-				t = ipsecdoi_set_ld(life_t, ld_buf);
-				if (t == ~0)
-					sa->lifebyte = 0;	/*XXX*/
-				else
-					sa->lifebyte = t;
-				break;
-			}
-			vfree(ld_buf);
-		    }
-			break;
-
-		case IPSECDOI_ATTR_GRP_DESC:
-			/*
-			 * RFC2407: 4.5 IPSEC Security Association Attributes
-			 *   Specifies the Oakley Group to be used in a PFS QM
-			 *   negotiation.  For a list of supported values, see
-			 *   Appendix A of [IKE].
-			 */
-			sa->pfs_group = (u_int8_t)ntohs(lorv);
-			break;
-
-		case IPSECDOI_ATTR_ENC_MODE:
-			sa->encmode = (u_int8_t)ntohs(lorv);
-			break;
-
-		case IPSECDOI_ATTR_AUTH:
-			sa->authtype = (u_int8_t)ntohs(lorv);
-			break;
-
-		case IPSECDOI_ATTR_KEY_LENGTH:
-			sa->encklen = ntohs(lorv);
-			break;
-
-		case IPSECDOI_ATTR_KEY_ROUNDS:
-		case IPSECDOI_ATTR_COMP_DICT_SIZE:
-		case IPSECDOI_ATTR_COMP_PRIVALG:
-		default:
-			break;
-		}
-
-		prev = d;
-		if (flag) {
-			tlen -= sizeof(*d);
-			d = (struct isakmp_data *)((char *)d + sizeof(*d));
-		} else {
-			tlen -= (sizeof(*d) + ntohs(lorv));
-			d = (struct isakmp_data *)((caddr_t)d + sizeof(*d) + ntohs(lorv));
-		}
-	}
-
-	error = 0;
-end:
-	return error;
-}
-
-static void
+void
 free_proppair(pair)
 	struct prop_pair **pair;
 {
@@ -1312,7 +720,7 @@ free_proppair(pair)
  * get proposal pairs from SA payload.
  * tiny check for proposal payload.
  */
-static struct prop_pair **
+struct prop_pair **
 get_proppair(sa, mode)
 	vchar_t *sa;
 	int mode;
@@ -1636,6 +1044,106 @@ get_sabyproppair(pair)
 		((struct isakmp_pl_t *)bp)->h.np = ISAKMP_NPTYPE_NONE;
 		((struct isakmp_pl_t *)bp)->h.len = htons(trnslen);
 		bp += trnslen;
+	}
+
+	return newsa;
+}
+
+/*
+ * make a new SA payload from prop_pair.
+ */
+vchar_t *
+get_sabysaprop(pp0, sa0)
+	struct saprop *pp0;
+	vchar_t *sa0;
+{
+	struct prop_pair **pair;
+	vchar_t *newsa;
+	int newtlen;
+	u_int8_t *np_p = NULL;
+	struct prop_pair *p = NULL;
+	struct saprop *pp;
+	struct saproto *pr;
+	struct satrns *tr;
+	int prophlen, trnslen;
+	caddr_t bp;
+
+	/* get proposal pair */
+	pair = get_proppair(sa0, IPSECDOI_TYPE_PH2);
+	if (pair == NULL)
+		return NULL;
+
+	newtlen = sizeof(struct ipsecdoi_sa_b);
+	for (pp = pp0; pp; pp = pp->next) {
+
+		if (pair[pp->prop_no] == NULL)
+			return NULL;
+
+		for (pr = pp->head; pr; pr = pr->next) {
+			newtlen += (sizeof(struct isakmp_pl_p)
+				+ pr->spisize);
+
+			for (tr = pr->head; tr; tr = tr->next) {
+				for (p = pair[pp->prop_no]; p; p = p->tnext) {
+					if (tr->trns_no == p->trns->t_no)
+						break;
+				}
+				if (p == NULL)
+					return NULL;
+
+				newtlen += ntohs(p->trns->h.len);
+			}
+		}
+	}
+
+	newsa = vmalloc(newtlen);
+	if (newsa == NULL) {
+		plog(logp, LOCATION, NULL,
+			"vmalloc (%s)\n", strerror(errno)); 
+		return NULL;
+	}
+	bp = newsa->v;
+
+	/* some of values of SA must be updated in the out of this function */
+	((struct isakmp_gen *)bp)->len = htons(newtlen);
+	bp += sizeof(struct ipsecdoi_sa_b);
+
+	/* create proposal payloads */
+	for (pp = pp0; pp; pp = pp->next) {
+
+		for (pr = pp->head; pr; pr = pr->next) {
+			prophlen = sizeof(struct isakmp_pl_p)
+					+ p->prop->spi_size;
+
+			for (tr = pr->head; tr; tr = tr->next) {
+				for (p = pair[pp->prop_no]; p; p = p->tnext) {
+					if (tr->trns_no == p->trns->t_no)
+						break;
+				}
+				if (p == NULL)
+					return NULL;
+
+				trnslen = ntohs(p->trns->h.len);
+
+				if (np_p)
+					*np_p = ISAKMP_NPTYPE_P;
+
+				/* create proposal */
+
+				memcpy(bp, p->prop, prophlen);
+				((struct isakmp_pl_p *)bp)->h.np = ISAKMP_NPTYPE_NONE;
+				((struct isakmp_pl_p *)bp)->h.len = htons(prophlen + trnslen);
+				((struct isakmp_pl_p *)bp)->num_t = 1;
+				np_p = &((struct isakmp_pl_p *)bp)->h.np;
+				bp += prophlen;
+
+				/* create transform */
+				memcpy(bp, p->trns, trnslen);
+				((struct isakmp_pl_t *)bp)->h.np = ISAKMP_NPTYPE_NONE;
+				((struct isakmp_pl_t *)bp)->h.len = htons(trnslen);
+				bp += trnslen;
+			}
+		}
 	}
 
 	return newsa;
@@ -2660,332 +2168,135 @@ setph1attr(sa, buf)
 	return attrlen;
 }
 
-#if 0
-/*
- * create phase2 proposal from policy configuration.
- * INCLUDING isakmp general header of SA payload.
- *
- * XXX the routine disagrees with other code in terms of interpretation of
- * "bundle" pointer.  we'll need to have more appropriate structure for
- * ipsecsa.
- */
-vchar_t *
-ipsecdoi_setph2proposal(iph2, keys)
-	struct ph2handle *iph2;
-	struct ipsecsakeys *keys;
-{
-	struct ipsecsa *proposal;
-	vchar_t *mysa;
-	struct ipsecdoi_pl_sa *sa;
-	struct isakmp_pl_p *prop;
-	struct isakmp_pl_t *trns;
-	struct ipsecsa *n, *b;
-	u_int tlen;	/* total sa length */
-	u_int8_t *np_p; /* pointer next prop type in previous header */
-	u_int8_t *np_t; /* pointer next trns type in previous header */
-	int proplen, trns_num, attrlen;
-	caddr_t p;
-
-	proposal = iph2->side == INITIATOR
-			? iph2->spidx->policy->proposal
-			: iph2->approval;
-
-	/* count total size of SA minus isakpm general header */
-	/* INCLUDING isakmp general header of SA payload. */
-	tlen = sizeof(struct ipsecdoi_pl_sa);
-	tlen += getph2proplen(proposal);
-
-	mysa = vmalloc(tlen);
-	if (mysa == NULL) {
-		plog(logp, LOCATION, NULL,
-			"failed to allocate my sa buffer (%s)\n",
-			strerror(errno)); 
-		return NULL;
-	}
-	p = mysa->v;
-
-	/* create SA payload */
-	sa = (struct ipsecdoi_pl_sa *)p;
-	sa->b.doi = htonl(IPSEC_DOI);
-	sa->b.sit = htonl(IPSECDOI_SIT_IDENTITY_ONLY);	/* XXX configurable ? */
-	p += sizeof(*sa);
-
-	np_p = NULL;
-
-	for (n = proposal; n != NULL; n = n->next) {
-
-		if (np_p)
-			*np_p = ISAKMP_NPTYPE_P;
-
-		/* create proposal */
-		prop = (struct isakmp_pl_p *)p;
-		prop->h.np = ISAKMP_NPTYPE_NONE;
-		prop->p_no = n->prop_no;
-		prop->proto_id = n->proto_id;
-	    {
-		struct ipsecsakeys *k;
-		for (k = keys; k != NULL; k = k->next) {
-			if (n->proto_id == k->proto_id
-			 && n->encmode == k->encmode
-			 && cmpsaddrwop(iph2->dst, k->dst) == 0)
-				break;
-		}
-		if (k == NULL) {
-			plog(logp, LOCATION, NULL,
-				"no SPI found for %s/%s\n",
-				s_ipsecdoi_proto(n->proto_id),
-				saddrwop2str(iph2->dst));
-			vfree(mysa);
-			return NULL;
-		}
-		prop->spi_size = sizeof(k->spi);
-		p += sizeof(*prop);
-		memcpy(p, &k->spi, sizeof(k->spi));
-		p += sizeof(k->spi);
-	    }
-
-		np_t = NULL;
-		trns_num = 0;
-		proplen = 0;
-
-		for (b = n; b != NULL; b = b->bundles) {
-			attrlen = 0;
-
-			if (np_t)
-				*np_t = ISAKMP_NPTYPE_T;
-
-			/* create transform */
-			trns = (struct isakmp_pl_t *)p;
-			trns->h.np  = ISAKMP_NPTYPE_NONE;
-			trns->t_no  = b->trns_no;
-			switch (b->proto_id) {
-			case IPSECDOI_PROTO_IPSEC_ESP:
-				trns->t_id  = b->enctype;
-				break;
-			case IPSECDOI_PROTO_IPSEC_AH:
-				switch (b->authtype) {
-				case IPSECDOI_ATTR_AUTH_HMAC_MD5:
-					trns->t_id = IPSECDOI_AH_MD5;
-					break;
-				case IPSECDOI_ATTR_AUTH_HMAC_SHA1:
-					trns->t_id = IPSECDOI_AH_SHA;
-					break;
-				case IPSECDOI_ATTR_AUTH_DES_MAC:
-					trns->t_id = IPSECDOI_AH_DES;
-					break;
-				case IPSECDOI_ATTR_AUTH_KPDK:
-					trns->t_id = 0;
-					break;
-				default:
-					plog(logp, LOCATION, NULL,
-						"invalid authtype %d\n",
-						b->authtype);
-					vfree(mysa);
-					return NULL;
-				}
-				break;
-			case IPSECDOI_PROTO_IPCOMP:
-				trns->t_id  = b->comptype;
-				break;
-			default:
-				plog(logp, LOCATION, NULL,
-					"invalid proto_id %d\n", b->proto_id);
-				vfree(mysa);
-				return NULL;
-			}
-			p += sizeof(*trns);
-			p = setph2attr(p, b, &attrlen);
-
-			trns->h.len = htons(sizeof(*trns) + attrlen);
-
-			/* count up transform length */
-			proplen += sizeof(*trns) + attrlen;
-			trns_num++;
-
-			/* save buffer to pre-next payload */
-			np_t = &trns->h.np;
-		}
-
-		/* update proposal length */
-		prop->h.len = htons(sizeof(*prop) + prop->spi_size + proplen);
-		prop->num_t = trns_num;
-
-		/* count up sa length */
-		sa->h.len += sizeof(*prop) + prop->spi_size + proplen;
-
-		/* save buffer to pre-next payload */
-		np_p = &prop->h.np;
-		np_t = NULL;
-	}
-
-	/* update sa length */
-	sa->h.len = htons(sizeof(*sa) + sa->h.len);
-
-	return mysa;
-}
-
-static int
-getph2proplen(proposal)
-	struct ipsecsa *proposal;
-{
-	struct ipsecsa *n, *b;
-	int len = 0;
-
-	for (n = proposal; n != NULL; n = n->next) {
-
-		len += sizeof(struct isakmp_pl_p) + sizeof(u_int32_t);
-						/* XXX spi size */
-
-		for (b = n; b != NULL; b = b->bundles) {
-			len += sizeof(struct isakmp_pl_t);
-
-			/* encryption mode always exists. */
-			len += sizeof(struct isakmp_data);
-
-			if (b->lifetime) {
-				len += sizeof(struct isakmp_data)
-					+ sizeof(struct isakmp_data);
-				if (b->lifetime > 0xffff)
-					len += sizeof(u_int32_t);
-			}
-			if (b->lifebyte) {
-				len += sizeof(struct isakmp_data)
-					+ sizeof(struct isakmp_data);
-				if (b->lifebyte > 0xffff)
-					len += sizeof(u_int32_t);
-			}
-			if (b->encklen)
-				len += sizeof(struct isakmp_data);
-			if (b->authtype)
-				len += sizeof(struct isakmp_data);
-		}
-	}
-
-	return len;
-}
-#else
 /*
  * XXX Assumes that there will be no ipsecsa struct with the same proto_id 
  * on "bundle" chain.  (i.e. single proposal payload will accompany single
  * transform payload only)
  */
 vchar_t *
-ipsecdoi_setph2proposal0(iph2, keys, b)
+ipsecdoi_setph2proposal0(iph2, pp, pr)
 	const struct ph2handle *iph2;
-	const struct ipsecsakeys *keys;
-	const struct ipsecsa *b;
+	const struct saprop *pp;
+	const struct saproto *pr;
 {
 	vchar_t *p;
-	const struct ipsecsakeys *k;
 	struct isakmp_pl_p *prop;
 	struct isakmp_pl_t *trns;
+	struct satrns *tr;
 	int len;
 	int attrlen;
 	size_t trnsoff;
+	caddr_t x0, x;
 
-	for (k = keys; k != NULL; k = k->next) {
-		if (b->proto_id == k->proto_id && b->encmode == k->encmode
-		 && cmpsaddrwop((struct sockaddr *)iph2->dst,
-				 (struct sockaddr *)k->dst) == 0)
-			break;
-	}
-	if (k == NULL) {
-		plog(logp, LOCATION, NULL,
-			"no SPI found for %s/%s\n",
-			s_ipsecdoi_proto(b->proto_id),
-			saddrwop2str((struct sockaddr *)iph2->dst));
-		return NULL;
-	}
-
-	p = vmalloc(sizeof(*prop) + sizeof(k->spi) + sizeof(*trns));
+	p = vmalloc(sizeof(*prop) + sizeof(pr->spi) + sizeof(*trns));
 	if (p == NULL)
 		return NULL;
 
 	/* create proposal */
 	prop = (struct isakmp_pl_p *)p->v;
 	prop->h.np = ISAKMP_NPTYPE_NONE;
-	prop->p_no = b->prop_no;
-	prop->proto_id = b->proto_id;
+	prop->p_no = pp->prop_no;
+	prop->proto_id = pr->proto_id;
 	prop->num_t = 1;
 
-	prop->spi_size = sizeof(k->spi);
-	memcpy(prop + 1, &k->spi, sizeof(k->spi));
+	prop->spi_size = sizeof(pr->spi);
+	memcpy(prop + 1, &pr->spi, sizeof(pr->spi));
 
 	/* create transform */
-	trnsoff = sizeof(*prop) + sizeof(k->spi);
-	trns = (struct isakmp_pl_t *)(p->v + trnsoff);
-	trns->h.np  = ISAKMP_NPTYPE_NONE;
-	trns->t_no  = b->trns_no;
-	switch (b->proto_id) {
-	case IPSECDOI_PROTO_IPSEC_ESP:
-		trns->t_id  = b->enctype;
-		break;
-	case IPSECDOI_PROTO_IPSEC_AH:
-		switch (b->authtype) {
-		case IPSECDOI_ATTR_AUTH_HMAC_MD5:
-			trns->t_id = IPSECDOI_AH_MD5;
-			break;
-		case IPSECDOI_ATTR_AUTH_HMAC_SHA1:
-			trns->t_id = IPSECDOI_AH_SHA;
-			break;
-		case IPSECDOI_ATTR_AUTH_DES_MAC:
-			trns->t_id = IPSECDOI_AH_DES;
-			break;
-		case IPSECDOI_ATTR_AUTH_KPDK:
-			trns->t_id = 0;
-			break;
-		default:
-			plog(logp, LOCATION, NULL,
-				"invalid authtype %d\n", b->authtype);
-			vfree(p);
-			return NULL;
+	for (tr = pr->head; tr; tr = tr->next) {
+	
+		trnsoff = sizeof(*prop) + sizeof(pr->spi);
+		trns = (struct isakmp_pl_t *)(p->v + trnsoff);
+		trns->h.np  = ISAKMP_NPTYPE_NONE;
+		trns->t_no  = tr->trns_no;
+		trns->t_id  = tr->trns_id;
+
+		len = sizeof(struct isakmp_data);
+		if (pp->lifetime) {
+			len += sizeof(struct isakmp_data) + sizeof(struct isakmp_data);
+			if (pp->lifetime > 0xffff)
+				len += sizeof(u_int32_t);
 		}
-		break;
-	case IPSECDOI_PROTO_IPCOMP:
-		trns->t_id  = b->comptype;
-		break;
-	default:
-		plog(logp, LOCATION, NULL,
-			"invalid proto_id %d\n", b->proto_id);
-		vfree(p);
-		return NULL;
+		if (pp->lifebyte) {
+			len += sizeof(struct isakmp_data) + sizeof(struct isakmp_data);
+			if (pp->lifebyte > 0xffff)
+				len += sizeof(u_int32_t);
+		}
+		if (tr->encklen)
+			len += sizeof(struct isakmp_data);
+		if (tr->authtype)
+			len += sizeof(struct isakmp_data);
+
+		switch (iph2->sainfo->pfs_group) {
+		case OAKLEY_ATTR_GRP_DESC_MODP768:
+		case OAKLEY_ATTR_GRP_DESC_MODP1024:
+		case OAKLEY_ATTR_GRP_DESC_MODP1536:
+			len += sizeof(struct isakmp_data);
+			break;
+		case 0:
+		default:
+			break;
+		}
+
+		p = vrealloc(p, p->l + len);
+		if (p == NULL)
+			return NULL;
+
+		/* set attributes */
+		x = x0 = p->v + p->l - len;
+
+		if (pp->lifetime) {
+			x = isakmp_set_attr_l(x, IPSECDOI_ATTR_SA_LD_TYPE,
+						IPSECDOI_ATTR_SA_LD_TYPE_SEC);
+			if (pp->lifetime > 0xffff) {
+				u_int32_t v = htonl((u_int32_t)pp->lifetime);
+				x = isakmp_set_attr_v(x, IPSECDOI_ATTR_SA_LD,
+							(caddr_t)&v, sizeof(v));
+			} else {
+				x = isakmp_set_attr_l(x, IPSECDOI_ATTR_SA_LD,
+							pp->lifetime);
+			}
+		}
+
+		if (pp->lifebyte) {
+			x = isakmp_set_attr_l(x, IPSECDOI_ATTR_SA_LD_TYPE,
+						IPSECDOI_ATTR_SA_LD_TYPE_KB);
+			if (pp->lifebyte > 0xffff) {
+				u_int32_t v = htonl((u_int32_t)pp->lifebyte);
+				x = isakmp_set_attr_v(x, IPSECDOI_ATTR_SA_LD,
+							(caddr_t)&v, sizeof(v));
+			} else {
+				x = isakmp_set_attr_l(x, IPSECDOI_ATTR_SA_LD,
+							pp->lifebyte);
+			}
+		}
+
+		x = isakmp_set_attr_l(x, IPSECDOI_ATTR_ENC_MODE, pr->encmode);
+
+		if ((pr->proto_id == IPSECDOI_PROTO_IPSEC_ESP && tr->authtype)
+		 || pr->proto_id == IPSECDOI_PROTO_IPSEC_AH)
+			x = isakmp_set_attr_l(x, IPSECDOI_ATTR_AUTH, tr->authtype);
+
+		if (tr->encklen)
+			x = isakmp_set_attr_l(x, IPSECDOI_ATTR_KEY_LENGTH, tr->encklen);
+
+		switch (iph2->sainfo->pfs_group) {
+		case OAKLEY_ATTR_GRP_DESC_MODP768:
+		case OAKLEY_ATTR_GRP_DESC_MODP1024:
+		case OAKLEY_ATTR_GRP_DESC_MODP1536:
+			x = isakmp_set_attr_l(x, IPSECDOI_ATTR_GRP_DESC,
+				iph2->sainfo->pfs_group);
+			break;
+		case 0:
+		default:
+			break;
+		}
+
+		attrlen = x - x0;
+
+		trns = (struct isakmp_pl_t *)(p->v + trnsoff);
+		trns->h.len = htons(sizeof(*trns) + attrlen);
 	}
-
-	len = sizeof(struct isakmp_data);
-	if (b->lifetime) {
-		len += sizeof(struct isakmp_data) + sizeof(struct isakmp_data);
-		if (b->lifetime > 0xffff)
-			len += sizeof(u_int32_t);
-	}
-	if (b->lifebyte) {
-		len += sizeof(struct isakmp_data) + sizeof(struct isakmp_data);
-		if (b->lifebyte > 0xffff)
-			len += sizeof(u_int32_t);
-	}
-	if (b->encklen)
-		len += sizeof(struct isakmp_data);
-	if (b->authtype)
-		len += sizeof(struct isakmp_data);
-
-	switch (b->ipsp->pfs_group) {
-	case OAKLEY_ATTR_GRP_DESC_MODP768:
-	case OAKLEY_ATTR_GRP_DESC_MODP1024:
-	case OAKLEY_ATTR_GRP_DESC_MODP1536:
-		len += sizeof(struct isakmp_data);
-		break;
-	case 0:
-	default:
-		break;
-	}
-
-	p = vrealloc(p, p->l + len);
-	if (p == NULL)
-		return NULL;
-
-	setph2attr(p->v + p->l - len, (struct ipsecsa *)b, &attrlen);
-
-	trns = (struct isakmp_pl_t *)(p->v + trnsoff);
-	trns->h.len = htons(sizeof(*trns) + attrlen);
 
 	prop = (struct isakmp_pl_p *)p->v;
 	prop->h.len = htons(p->l);
@@ -3002,19 +2313,18 @@ ipsecdoi_setph2proposal0(iph2, keys, b)
  * ipsecsa.
  */
 vchar_t *
-ipsecdoi_setph2proposal(iph2, keys)
+ipsecdoi_setph2proposal(iph2)
 	struct ph2handle *iph2;
-	struct ipsecsakeys *keys;
 {
-	struct ipsecsa *proposal;
+	struct saprop *proposal, *a;
+	struct saproto *b = NULL;
 	vchar_t *mysa, *q;
 	struct ipsecdoi_pl_sa *sa;
 	struct isakmp_pl_p *prop;
-	struct ipsecsa *n, *b;
 	size_t propoff;
 
 	proposal = iph2->side == INITIATOR
-			? iph2->spidx->policy->proposal
+			? iph2->proposal
 			: iph2->approval;
 
 	mysa = vmalloc(sizeof(*sa));
@@ -3032,9 +2342,9 @@ ipsecdoi_setph2proposal(iph2, keys)
 
 	prop = NULL;
 	propoff = -1;
-	for (n = proposal; n; n = n->next) {
-		for (b = n; b; b = b->bundles) {
-			q = ipsecdoi_setph2proposal0(iph2, keys, b);
+	for (a = proposal; a; a = a->next) {
+		for (b = a->head; b; b = b->next) {
+			q = ipsecdoi_setph2proposal0(iph2, a, b);
 			if (q == NULL) {
 				vfree(mysa);
 				return NULL;
@@ -3057,69 +2367,6 @@ ipsecdoi_setph2proposal(iph2, keys)
 	sa->h.len = htons(mysa->l);
 
 	return mysa;
-}
-#endif
-
-static caddr_t
-setph2attr(buf, sa, len)
-	caddr_t buf;
-	struct ipsecsa *sa;
-	int *len;
-{
-	caddr_t p = buf;
-
-	*len = 0;
-
-	if (sa->lifetime) {
-		p = isakmp_set_attr_l(p, IPSECDOI_ATTR_SA_LD_TYPE,
-					IPSECDOI_ATTR_SA_LD_TYPE_SEC);
-		if (sa->lifetime > 0xffff) {
-			u_int32_t v = htonl((u_int32_t)sa->lifetime);
-			p = isakmp_set_attr_v(p, IPSECDOI_ATTR_SA_LD,
-						(caddr_t)&v, sizeof(v));
-		} else {
-			p = isakmp_set_attr_l(p, IPSECDOI_ATTR_SA_LD,
-						sa->lifetime);
-		}
-	}
-
-	if (sa->lifebyte) {
-		p = isakmp_set_attr_l(p, IPSECDOI_ATTR_SA_LD_TYPE,
-					IPSECDOI_ATTR_SA_LD_TYPE_KB);
-		if (sa->lifebyte > 0xffff) {
-			u_int32_t v = htonl((u_int32_t)sa->lifebyte);
-			p = isakmp_set_attr_v(p, IPSECDOI_ATTR_SA_LD,
-						(caddr_t)&v, sizeof(v));
-		} else {
-			p = isakmp_set_attr_l(p, IPSECDOI_ATTR_SA_LD,
-						sa->lifebyte);
-		}
-	}
-
-	p = isakmp_set_attr_l(p, IPSECDOI_ATTR_ENC_MODE, sa->encmode);
-
-	if ((sa->proto_id == IPSECDOI_PROTO_IPSEC_ESP && sa->authtype)
-	 || sa->proto_id == IPSECDOI_PROTO_IPSEC_AH)
-		p = isakmp_set_attr_l(p, IPSECDOI_ATTR_AUTH, sa->authtype);
-
-	if (sa->encklen)
-		p = isakmp_set_attr_l(p, IPSECDOI_ATTR_KEY_LENGTH, sa->encklen);
-
-	switch (sa->ipsp->pfs_group) {
-	case OAKLEY_ATTR_GRP_DESC_MODP768:
-	case OAKLEY_ATTR_GRP_DESC_MODP1024:
-	case OAKLEY_ATTR_GRP_DESC_MODP1536:
-		p = isakmp_set_attr_l(p, IPSECDOI_ATTR_GRP_DESC,
-			sa->ipsp->pfs_group);
-		break;
-	case 0:
-	default:
-		break;
-	}
-
-	*len = p - buf;
-
-	return p;
 }
 
 int
@@ -3350,39 +2597,73 @@ err:
 }
 
 /*
- * create ID payload for phase 2, and set into iph2->id and id_p.
- * this function is for initiator.  responder will get to copy from payload.
+ * create ID payload for phase 2, and set into iph2->id and id_p.  There are
  * NOT INCLUDING isakmp general header.
+ * this function is for initiator.  responder will get to copy from payload.
+ * responder ID type is always address type.
  * see, RFC2407 4.6.2.1
  */
 int
 ipsecdoi_setid2(iph2)
 	struct ph2handle *iph2;
 {
-	struct policyindex *spidx = iph2->spidx;
+	int lctype;
+	vchar_t *ident = NULL;
 
-	/*
-	 * XXX only make ID of address type.  should be supported other type.
-	 * 	e.g. key_id.
-	 */
-	iph2->id = sockaddr2id((struct sockaddr *)&spidx->src,
-				spidx->prefs, spidx->ul_proto);
-	if (iph2->id == NULL) {
-		plog(logp, LOCATION, NULL,
-			"failed to get ID for %s\n",
-			saddr2str((struct sockaddr *)&spidx->src));
-		return -1;
+	/* local side */
+	lctype = doi2idtype(iph2->sainfo->myidenttype);
+
+	switch (iph2->sainfo->myidenttype) {
+	case IPSECDOI_ID_FQDN:
+		ident = lcconf->ident[lctype];
+		break;
+	case IPSECDOI_ID_USER_FQDN:
+		ident = lcconf->ident[lctype];
+		break;
+	case IPSECDOI_ID_KEY_ID:
+		ident = lcconf->ident[lctype];
+		break;
+	default:
+		ident = NULL;
 	}
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL, "use local ID type %s\n",
-			s_ipsecdoi_ident(((struct ipsecdoi_id_b *)iph2->id->v)->type)));
 
-	iph2->id_p = sockaddr2id((struct sockaddr *)&spidx->dst,
-				spidx->prefd, spidx->ul_proto);
+	if (ident == NULL) {
+		iph2->id = sockaddr2id(iph2->src,
+				_INALENBYAF(iph2->src->sa_family) << 3,
+				IPSEC_ULPROTO_ANY);
+		if (iph2->id == NULL) {
+			plog(logp, LOCATION, NULL,
+				"failed to get ID for %s\n", saddr2str(iph2->src));
+			return -1;
+		}
+		YIPSDEBUG(DEBUG_MISC,
+			plog(logp, LOCATION, NULL, "use local ID type %s\n",
+				s_ipsecdoi_ident(((struct ipsecdoi_id_b *)iph2->id->v)->type)));
+	} else {
+		struct ipsecdoi_id_b id_b;
+
+		id_b.type = iph2->sainfo->myidenttype;
+		id_b.proto_id = 0;
+		id_b.port = 0;
+
+		iph2->id = vmalloc(sizeof(id_b) + ident->l);
+		if (iph2->id == NULL) {
+			plog(logp, LOCATION, NULL,
+				"vmalloc (%s)\n", strerror(errno));
+			return -1;
+		}
+
+		memcpy(iph2->id->v, &id_b, sizeof(id_b));
+		memcpy(iph2->id->v + sizeof(id_b), ident->v, ident->l);
+	}
+
+	/* remote side */
+	iph2->id_p = sockaddr2id(iph2->dst,
+			_INALENBYAF(iph2->dst->sa_family) << 3,
+			IPSEC_ULPROTO_ANY);
 	if (iph2->id_p == NULL) {
 		plog(logp, LOCATION, NULL,
-			"failed to get ID for %s\n",
-			saddr2str((struct sockaddr *)&spidx->dst));
+			"failed to get ID for %s\n", saddr2str(iph2->dst));
 		vfree(iph2->id);
 		iph2->id = NULL;
 		return -1;
@@ -3578,16 +2859,10 @@ ipsecdoi_id2sockaddr(
 				? IPSEC_ULPROTO_ANY
 				: id_b->proto_id;	/* see sockaddr2id() */
 
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL,
-			"make saddr from ID payload "
-			"%s prefixlen=%u ul_proto=%u\n",
-			saddr2str(saddr),
-			*prefixlen, *ul_proto));
-
 	return 0;
 }
 
+#if 0
 /*
  * fix sa keys to be use.  this function is for initiator.
  */
@@ -3604,8 +2879,6 @@ ipsecdoi_fixsakeys(iph2)
 	iph2->keys = NULL;
 
 	for (b = iph2->approval; b != NULL; b = b->bundles) {
-		/* see ipsecdoi_initsakeys() */
-
 		if (mksakeys(b, &iph2->keys, iph2->dst, iph2->src) < 0) {
 			plog(logp, LOCATION, NULL,
 				"failed to create sa keys\n");
@@ -3683,7 +2956,7 @@ mksakeys(b, keys, dst, src)
 	for (v = *keys; v != NULL; v = v->next) {
 		if (v->proto_id == b->proto_id
 		 && v->encmode == b->encmode
-		 && (cmpsaddrwop(v->dst, b->ipsp->spidx->ph2->dst) == 0))
+		 && (cmpsaddrwop(v->dst, b->ph2->dst) == 0))
 			break;
 	}
 	/* this sa has already recorded */
@@ -3751,8 +3024,9 @@ ipsecdoi_printsa(s0)
 		printf("}");
 	printf("\n");
 }
+#endif
 
-#ifdef YIPS_DEBUG
+#ifdef 0
 static void
 ipsecdoi_printsa_bundle(s0)
 	const struct ipsecsa *s0;
@@ -3760,7 +3034,6 @@ ipsecdoi_printsa_bundle(s0)
 	ipsecdoi_printsa_bundle0(s0, 0);
 	printf("\n");
 }
-#endif
 
 static void
 ipsecdoi_printsa_bundle0(s0, level)
@@ -3807,27 +3080,219 @@ ipsecdoi_printsa_1(s)
 		s_ipsecdoi_attr_v(IPSECDOI_ATTR_AUTH, s->authtype),
 		s_ipsecdoi_trns(IPSECDOI_PROTO_IPCOMP, s->comptype));
 }
-
-#ifdef YIPS_DEBUG
-static void
-print_proppair0(p, level)
-	struct prop_pair *p;
-	int level;
-{
-	int i;
-	for (i = 0; i < level; i++)
-		printf("\t");
-	printf("%p: next=%p tnext=%p\n", p, p->next, p->tnext);
-	if (p->next)
-		print_proppair0(p->next, level + 1);
-	if (p->tnext)
-		print_proppair0(p->tnext, level + 1);
-}
-
-static void
-print_proppair(p)
-	struct prop_pair *p;
-{
-	print_proppair0(p, 1);
-}
 #endif
+
+/*
+ * set IPsec data attributes into a proposal.
+ * NOTE: MUST called per a transform.
+ */
+int
+ipsecdoi_t2satrns(t, pp, pr, tr)
+	struct isakmp_pl_t *t;
+	struct saprop *pp;
+	struct saproto *pr;
+	struct satrns *tr;
+{
+	struct isakmp_data *d, *prev;
+	int flag, type, lorv;
+	int error = -1;
+	int life_t;
+	vchar_t *ld_buf = NULL;
+	int tlen;
+
+	tr->trns_no = t->t_no;
+	tr->trns_id = t->t_id;
+
+	tlen = ntohs(t->h.len) - sizeof(*t);
+	prev = (struct isakmp_data *)NULL;
+	d = (struct isakmp_data *)(t + 1);
+
+	/* default */
+	life_t = IPSECDOI_ATTR_SA_LD_TYPE_DEFAULT;
+
+	while (tlen > 0) {
+
+		type = ntohs(d->type) & ~ISAKMP_GEN_MASK;
+		flag = ntohs(d->type) & ISAKMP_GEN_MASK;
+		lorv = d->lorv;
+
+		YIPSDEBUG(DEBUG_DSA,
+			plog(logp, LOCATION, NULL,
+				"type=%s, flag=0x%04x, lorv=%s\n",
+				s_ipsecdoi_attr(type), flag,
+				s_ipsecdoi_attr_v(type, ntohs(lorv))));
+
+		switch (type) {
+		case IPSECDOI_ATTR_SA_LD_TYPE:
+		{
+			int type = ntohs(lorv);
+			switch (type) {
+			case IPSECDOI_ATTR_SA_LD_TYPE_SEC:
+			case IPSECDOI_ATTR_SA_LD_TYPE_KB:
+				life_t = type;
+				break;
+			default:
+				plog(logp, LOCATION, NULL,
+				    "Warning of invalid life duration type.\n");
+				life_t = IPSECDOI_ATTR_SA_LD_TYPE_DEFAULT;
+				break;
+			}
+			break;
+		}
+		case IPSECDOI_ATTR_SA_LD:
+			if (life_t == NULL
+			 || prev == NULL
+			 || (ntohs(prev->type) & ~ISAKMP_GEN_MASK) !=
+					IPSECDOI_ATTR_SA_LD_TYPE) {
+				plog(logp, LOCATION, NULL,
+				    "life duration must follow ltype\n");
+				break;
+			}
+
+		    {
+			u_int32_t t;
+			if (flag) {
+				/* i.e. ISAKMP_GEN_TV */
+				ld_buf = vmalloc(sizeof(d->lorv));
+				if (ld_buf == NULL) {
+					plog(logp, LOCATION, NULL,
+					    "vmalloc (%s)\n", strerror(errno));
+					goto end;
+				}
+				memcpy(ld_buf->v, &lorv, sizeof(d->lorv));
+			} else {
+				int len = ntohs(lorv);
+				/* i.e. ISAKMP_GEN_TLV */
+				ld_buf = vmalloc(len);
+				if (ld_buf == NULL) {
+					plog(logp, LOCATION, NULL,
+					    "vmalloc (%s)\n", strerror(errno));
+					goto end;
+				}
+				memcpy(ld_buf->v, d + 1, len);
+			}
+			switch (life_t) {
+			case IPSECDOI_ATTR_SA_LD_TYPE_SEC:
+				t = ipsecdoi_set_ld(life_t, ld_buf);
+				if (t != ~0) {
+					/* lifetime must be equal in a proposal. */
+					if (pp->lifetime == 0)
+						pp->lifetime = t;
+					else if (pp->lifetime != t) {
+						plog(logp, LOCATION, NULL,
+							"lifetime mismatched "
+							"in a proposal.\n");
+						goto end;
+					}
+				} else if (pp->lifetime == 0)
+					pp->lifetime = IPSECDOI_ATTR_SA_LD_SEC_DEFAULT;
+				break;
+			case IPSECDOI_ATTR_SA_LD_TYPE_KB:
+				t = ipsecdoi_set_ld(life_t, ld_buf);
+				if (t == ~0) {
+					/* lifebyte must be equal in a proposal. */
+					if (pp->lifebyte == 0)
+						pp->lifebyte = t;
+					else if (pp->lifebyte != t) {
+						plog(logp, LOCATION, NULL,
+							"lifebyte mismatched "
+							"in a proposal.\n");
+						goto end;
+					}
+				} else if (pp->lifebyte == 0)
+					pp->lifebyte = 0;	/* XXX */
+				break;
+			}
+		    }
+			break;
+
+		case IPSECDOI_ATTR_GRP_DESC:
+			/*
+			 * RFC2407: 4.5 IPSEC Security Association Attributes
+			 *   Specifies the Oakley Group to be used in a PFS QM
+			 *   negotiation.  For a list of supported values, see
+			 *   Appendix A of [IKE].
+			 */
+			if (pp->pfs_group == 0)
+				pp->pfs_group = (u_int8_t)ntohs(lorv);
+			else if (pp->pfs_group != (u_int8_t)ntohs(lorv)) {
+				plog(logp, LOCATION, NULL,
+					"pfs_group mismatched "
+					"in a proposal.\n");
+				goto end;
+			}
+			break;
+
+		case IPSECDOI_ATTR_ENC_MODE:
+			if (pr->encmode != 0) {
+				plog(logp, LOCATION, NULL,
+					"multiple encmode exist "
+					"in a transform.\n");
+				goto end;
+			}
+			pr->encmode = (u_int8_t)ntohs(lorv);
+			break;
+
+		case IPSECDOI_ATTR_AUTH:
+			if (tr->authtype != 0) {
+				plog(logp, LOCATION, NULL,
+					"multiple authtype exist "
+					"in a transform.\n");
+				goto end;
+			}
+			tr->authtype = (u_int8_t)ntohs(lorv);
+			break;
+
+		case IPSECDOI_ATTR_KEY_LENGTH:
+			if (pr->proto_id != IPSECDOI_PROTO_IPSEC_ESP) {
+				plog(logp, LOCATION, NULL,
+					"key length defined but not ESP");
+				goto end;
+			}
+			tr->encklen = ntohs(lorv);
+			break;
+
+		case IPSECDOI_ATTR_KEY_ROUNDS:
+		case IPSECDOI_ATTR_COMP_DICT_SIZE:
+		case IPSECDOI_ATTR_COMP_PRIVALG:
+		default:
+			break;
+		}
+
+		prev = d;
+		if (flag) {
+			tlen -= sizeof(*d);
+			d = (struct isakmp_data *)((char *)d + sizeof(*d));
+		} else {
+			tlen -= (sizeof(*d) + ntohs(lorv));
+			d = (struct isakmp_data *)((caddr_t)d + sizeof(*d) + ntohs(lorv));
+		}
+	}
+
+	error = 0;
+end:
+	if (ld_buf)
+		vfree(ld_buf);
+
+	return error;
+}
+
+int
+ipsecdoi_authalg2trnsid(alg)
+	int alg;
+{
+	switch (alg) {
+        case IPSECDOI_ATTR_AUTH_HMAC_MD5:
+		return IPSECDOI_AH_MD5;
+        case IPSECDOI_ATTR_AUTH_HMAC_SHA1:
+		return IPSECDOI_AH_SHA;
+        case IPSECDOI_ATTR_AUTH_DES_MAC:
+		return IPSECDOI_AH_DES;
+	case IPSECDOI_ATTR_AUTH_KPDK:
+		return IPSECDOI_AH_MD5;	/* XXX */
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid authentication algorithm:%d\n", alg);
+	}
+	return -1;
+}

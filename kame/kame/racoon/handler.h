@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.15 2000/04/18 12:20:11 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.16 2000/04/24 07:37:43 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -202,9 +202,11 @@ struct ph2handle {
 	struct sockaddr *dst;		/* peer's address of SA. */
 
 	u_int32_t spid;			/* policy id by kernel */
+#if 0
 	struct policyindex *spidx;	/* pointer to policy */
 			/* initiator set when get acquire msg.
 			 * responder set after check 1st phase 2 msg. */
+#endif
 
 	int status;			/* ipsec sa status */
 	u_int8_t side;			/* INITIATOR or RESPONDER */
@@ -231,10 +233,11 @@ struct ph2handle {
 	u_int8_t flags;			/* Flags for phase 2 */
 	u_int32_t msgid;		/* msgid for phase 2 */
 
-	struct ipsecsa *approval;	/* SA(s) approved. */
-			/* point to one of the proposals in policyindex. */
-	struct ipsecsakeys *keys;
+	struct sainfo *sainfo;		/* parameter for phase 2 */
+	struct saprop *proposal;	/* SA(s) proposal. */
+	struct saprop *approval;	/* SA(s) approved. */
 
+	struct dhgroup *pfsgrp;		/* DH; prime number */
 	vchar_t *dhpriv;		/* DH; private value */
 	vchar_t *dhpub;			/* DH; public value */
 	vchar_t *dhpub_p;		/* DH; partner's public value */
@@ -245,10 +248,7 @@ struct ph2handle {
 	vchar_t *nonce_p;		/* partner's nonce value in phase 2 */
 	vchar_t *hash;			/* HASH2 minus general header */
 
-	vchar_t *sa;			/* whole SA payload to calculate HASH */
-					/* NOT INCLUDING general header. */
-
-	vchar_t *sa_ret;		/* SA payload to be reply */
+	vchar_t *sa;			/* SA payload to be reply */
 					/* NOT INCLUDING general header. */
 					/* Should be release after use. */
 
@@ -272,25 +272,6 @@ struct isakmp_ivm {
 	vchar_t *iv;
 	vchar_t *ive;
 	vchar_t *ivd;
-};
-
-/* holder for the variable of SA */
-struct ipsecsakeys {
-	int proto_id;
-	int encmode;
-	struct sockaddr *src;
-	struct sockaddr *dst;
-
-	u_int32_t spi;			/* SPI defined by me. i.e. --SA-> me */
-	u_int32_t spi_p;		/* SPI defined by peer. i.e. me -SA-> */
-	vchar_t *keymat;		/* KEYMAT */
-	vchar_t *keymat_p;		/* peer's KEYMAT */
-
-	int len;			/* length, in bits */
-
-	int ok;				/* if 1, success to set SA in kenrel */
-
-	struct ipsecsakeys *next;
 };
 
 /* for dumping */
@@ -323,6 +304,7 @@ extern void flushph1 __P((void));
 extern void initph1tree __P((void));
 
 extern struct ph2handle *getph2byspidx __P((struct policyindex *spidx));
+extern struct ph2handle *getph2byspid __P((u_int32_t spid));
 extern struct ph2handle *getph2byseq __P((u_int32_t seq));
 extern struct ph2handle *getph2bymsgid __P((struct ph1handle *iph1, u_int32_t msgid));
 extern struct ph2handle *getph2bysaidx __P((struct sockaddr *src, struct sockaddr *dst, u_int proto_id, u_int32_t spi));
