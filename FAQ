@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.43 2001/07/26 03:14:55 jinmei Exp $
+$KAME: FAQ,v 1.44 2001/07/26 03:48:22 jinmei Exp $
 
 
 GENERAL
@@ -191,7 +191,7 @@ s6_addr16[1] filled?
 	Note that this is only for internal kernel structures.
 	Any data coming out of socket file descriptor is not
 	affected.  KAME uses advanced API (rfc2292) for passing/getting
-	interface index from/to userland.
+	interface index from/to the user space.
 
 	Also note that this hack may go away in the near future,
 	by introduction of the sin6_ifindex field in sockaddr_in6
@@ -247,7 +247,7 @@ Q: How can I connect my host to the worldwide IPv6 network?
 Q: When I invoke ifconfig or netstat, garbled output is generated.
 	I suspect that you are invoking old (original) ifconfig or netstat.
 
-	Currently the KAME kit does not overwrite existing userland
+	Currently the KAME kit does not overwrite existing application
 	tools.  Instead, tools provided by KAME will be installed
 	into /usr/local/v6/bin and alike.  Therefore, to use
 	IPv6-enabled tools, you must invoke /usr/local/v6/sbin/ifconfig
@@ -327,7 +327,7 @@ Q: Some of my IPv6-ready programs show strange behavior after kernel update.
 	If you have installed your IPv6-ready programs before the
 	change, and the kernel is built from the KAME tree after
 	the change, your programs will not work properly.  Be sure
-	to update, or re-compile, userland tools too.
+	to update, or re-compile, application tools too.
 
 	We try to announce important changes to snap-users mailing
 	list.  Please subscribe to snap-users mailing list, if you
