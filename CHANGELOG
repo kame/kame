@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.799 2000/04/21 05:50:58 jinmei Exp $
+$Id: CHANGELOG,v 1.800 2000/04/21 11:14:04 itojun Exp $
 
 <200004>
+Fri Apr 21 20:13:09 JST 2000  itojun@iijlab.net
+	* openbsd/sys/netinet{,6}/in{,6}_pcb.c: on in{,6}_pcbnotify, make sure
+	  to touch pcbs that meets address family of incoming packet.
+
 2000-04-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/netinet/ip_output.c (in_mrejoin): skipped PF_INET6
 	entries. This is a fix of a serious bug and should be applied if
