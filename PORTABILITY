@@ -1,6 +1,6 @@
 Portability guideline
 KAME project
-$Id: PORTABILITY,v 1.3 1999/08/12 15:29:27 itojun Exp $
+$Id: PORTABILITY,v 1.4 1999/08/19 06:35:02 itojun Exp $
 
 
 Source code in "kame" directory will be shared among operating systems
@@ -83,5 +83,13 @@ across those possibilities.
   explicitly.
   __FUNCTION__ macro is not included in ANSI standard, so it is best to
   avoid __FUNCTION__ for portability.
+
+- sys/queue.h are very different in each of *BSDs.  Most of macros found in
+  FreeBSD3 are not available in other systems.  Simply avoid those, make sure
+  your code compile on non-FreeBSD3 systems.
+  Avoid xx_FOREACH(), which is only available in FreeBSD3.
+  Just use
+	for (x = xx_FIRST(); x; x = xx_NEXT(x))
+  and do not try to do #ifdef (FreeBSD3).  More #ifdef introduces more bugs.
 
 - For portability in networking code, look at kame/sys/net/net_osdep.h.
