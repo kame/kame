@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.94 2002/06/07 02:31:34 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.95 2002/06/08 11:31:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -449,8 +449,7 @@ int nd6_prelist_add __P((struct nd_prefix *, struct nd_defrouter *,
 int nd6_prefix_onlink __P((struct nd_prefix *));
 int nd6_prefix_offlink __P((struct nd_prefix *));
 void pfxlist_onlink_check __P((void));
-struct nd_defrouter *defrouter_lookup __P((struct sockaddr_in6 *,
-					   struct ifnet *));
+struct nd_defrouter *defrouter_lookup __P((struct sockaddr_in6 *, struct ifnet *));
 struct nd_prefix *nd6_prefix_lookup __P((struct nd_prefix *));
 int in6_init_prefix_ltimes __P((struct nd_prefix *ndpr));
 void rt6_flush __P((struct sockaddr_in6 *, struct ifnet *));
