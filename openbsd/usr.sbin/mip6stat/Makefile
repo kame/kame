@@ -1,10 +1,10 @@
 #
-# $Id: Makefile,v 1.2 2000/02/09 13:16:30 itojun Exp $
+# $Id: Makefile,v 1.3 2003/11/27 12:01:54 t-momose Exp $
 #
 SRCDIR=	${.CURDIR}/../../kame/mip6stat
 
 PROG=	mip6stat
-SRCS=	mip6stat.c bcache.c foraddr.c haddr.c halist.c config.c bulist.c
+SRCS=	mip6stat.c 
 
 CFLAGS+=-DINET6 -Wall
 
