@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1630 2001/04/01 09:34:28 jinmei Exp $
+$KAME: CHANGELOG,v 1.1631 2001/04/02 08:06:24 jinmei Exp $
 
 <200104>
+2001-04-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi3/sys/net/if.c (ifa_ifwithnet): disabled the check for
+	IFF_POINTOPOINT|IFF_LOOPBACK in ifa_ifwithnet().  The check for
+	IFF_POINTOPOINT was already disabled, but the check for
+	IFF_LOOPBACK should be disabled as well, in order to install
+	fe80::%lo0/64 correctly.
+
 2001-04-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_input.c (ip6_input): clarified goto-ours
 	logic:
