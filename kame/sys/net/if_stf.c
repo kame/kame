@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.112 2004/05/20 08:15:53 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.113 2004/05/26 07:51:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -214,16 +214,8 @@ static int stf_checkaddr6 __P((struct stf_softc *, struct in6_addr *,
 	struct ifnet *));
 static int stf_checkaddr46 __P((struct stf_softc *, struct in_addr *,
 	struct in6_addr *));
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 static void stf_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
-#else
-static void stf_rtrequest __P((int, struct rtentry *, struct sockaddr *));
-#endif
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
-static int stf_ioctl __P((struct ifnet *, int, caddr_t));
-#else
 static int stf_ioctl __P((struct ifnet *, u_long, caddr_t));
-#endif
 
 void
 stfattach(dummy)
@@ -382,14 +374,7 @@ stf_getsrcifa6(ifp)
 
 	sc = (struct stf_softc *)ifp;
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ia = ifp->if_addrlist; ia; ia = ia->ifa_next)
-#else
-	for (ia = ifp->if_addrlist.tqh_first;
-	     ia;
-	     ia = ia->ifa_list.tqe_next)
-#endif
-	{
+	for (ia = ifp->if_addrlist.tqh_first; ia; ia = ia->ifa_list.tqe_next) {
 		if (ia->ifa_addr == NULL)
 			continue;
 		if (ia->ifa_addr->sa_family != AF_INET6)
@@ -1023,17 +1008,10 @@ in_stf_input(m, va_alist)
 
 /* ARGSUSED */
 static void
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 stf_rtrequest(cmd, rt, info)
 	int cmd;
 	struct rtentry *rt;
 	struct rt_addrinfo *info;
-#else
-stf_rtrequest(cmd, rt, sa)
-	int cmd;
-	struct rtentry *rt;
-	struct sockaddr *sa;
-#endif
 {
 
 	if (rt)
@@ -1043,11 +1021,7 @@ stf_rtrequest(cmd, rt, sa)
 static int
 stf_ioctl(ifp, cmd, data)
 	struct ifnet *ifp;
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
-	int cmd;
-#else
 	u_long cmd;
-#endif
 	caddr_t data;
 {
 	struct ifaddr *ifa;

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.c,v 1.19 2004/02/24 21:52:26 itojun Exp $	*/
+/*	$KAME: sctp_asconf.c,v 1.20 2004/05/26 07:51:28 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -67,9 +67,9 @@
 #ifdef INET6
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
-#if defined(__FreeBSD__) || (__NetBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 #include <netinet6/in6_pcb.h>
-#elif defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#else
 #include <netinet/in_pcb.h>
 #endif
 #include <netinet/icmp6.h>

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.40 2004/04/09 10:31:44 jinmei Exp $	*/
+/*	$KAME: sctp_output.c,v 1.41 2004/05/26 07:51:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003, 2004 Cisco Systems Inc,
@@ -108,9 +108,9 @@
 #include <netinet6/scope6_var.h>
 #include <netinet6/nd6.h>
 
-#if defined(__FreeBSD__) || (__NetBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 #include <netinet6/in6_pcb.h>
-#elif defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#elif defined(__OpenBSD__)
 #include <netinet/in_pcb.h>
 #endif
 
@@ -120,7 +120,7 @@
 
 #include <net/net_osdep.h>
 
-#if defined(HAVE_NRL_INPCB) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(HAVE_NRL_INPCB) || defined(__FreeBSD__)
 #ifndef in6pcb
 #define in6pcb		inpcb
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.28 2004/02/24 21:52:27 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.29 2004/05/26 07:51:28 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -109,7 +109,7 @@
 
 #if defined(__FreeBSD__) || (__NetBSD__)
 #include <netinet6/in6_pcb.h>
-#elif defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#else
 #include <netinet/in_pcb.h>
 #endif
 

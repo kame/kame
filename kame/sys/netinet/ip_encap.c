@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.94 2004/05/21 08:35:48 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.95 2004/05/26 07:51:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -113,7 +113,7 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/ip6protosw.h>
 #include <netinet6/in6_var.h>
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
 #include <netinet/in_pcb.h>
 #else
 #include <netinet6/in6_pcb.h>
@@ -131,7 +131,7 @@
 
 #include <net/net_osdep.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 MALLOC_DEFINE(M_NETADDR, "Export Host", "Export host address structure");

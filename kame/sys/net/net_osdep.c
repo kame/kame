@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.c,v 1.13 2004/05/20 08:15:53 suz Exp $	*/
+/*	$KAME: net_osdep.c,v 1.14 2004/05/26 07:51:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,11 +64,7 @@ if_name(ifp)
 	ifbufround = (ifbufround + 1) % MAXNUMBUF;
 	cp = nam[ifbufround];
 
-#ifdef __bsdi__
-	sprintf(cp, "%s%d", ifp->if_name, ifp->if_unit);
-#else
 	snprintf(cp, IFNAMSIZ + 10, "%s%d", ifp->if_name, ifp->if_unit);
-#endif
 	return ((const char *)cp);
 #undef MAXNUMBUF
 }

@@ -1,4 +1,4 @@
-/*	$KAME: key.h,v 1.33 2003/09/08 07:23:04 itojun Exp $	*/
+/*	$KAME: key.h,v 1.34 2004/05/26 07:51:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -97,7 +97,7 @@ MALLOC_DECLARE(M_SECA);
 #endif /* MALLOC_DECLARE */
 #endif
 
-#if defined(__bsdi__) || defined(__NetBSD__)
+#ifdef __NetBSD__
 extern int key_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 #endif
 

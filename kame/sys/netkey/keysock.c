@@ -1,4 +1,4 @@
-/*	$KAME: keysock.c,v 1.34 2004/05/26 04:16:29 itojun Exp $	*/
+/*	$KAME: keysock.c,v 1.35 2004/05/26 07:51:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -197,43 +197,8 @@ key_usrreq(so, req, m, nam, control, p)
 		if (af == PF_KEY) /* XXX: AF_KEY */
 			key_cb.key_count++;
 		key_cb.any_count++;
-#ifndef __bsdi__
 		kp->kp_raw.rcb_laddr = &key_src;
 		kp->kp_raw.rcb_faddr = &key_dst;
-#else
-		/*
-		 * XXX rcb_faddr must be dynamically allocated, otherwise
-		 * raw_disconnect() will get angry.
-		 */
-	    {
-		struct mbuf *m, *n;
-		MGET(m, M_WAITOK, MT_DATA);
-		if (!m) {
-			error = ENOBUFS;
-			pfkeystat.in_nomem++;
-			free((caddr_t)kp, M_PCB);
-			so->so_pcb = (caddr_t) 0;
-			splx(s);
-			return (error);
-		}
-		MGET(n, M_WAITOK, MT_DATA);
-		if (!n) {
-			error = ENOBUFS;
-			m_freem(m);
-			pfkeystat.in_nomem++;
-			free((caddr_t)kp, M_PCB);
-			so->so_pcb = (caddr_t) 0;
-			splx(s);
-			return (error);
-		}
-		m->m_len = sizeof(key_src);
-		kp->kp_raw.rcb_laddr = mtod(m, struct sockaddr *);
-		bcopy(&key_src, kp->kp_raw.rcb_laddr, sizeof(key_src));
-		n->m_len = sizeof(key_dst);
-		kp->kp_raw.rcb_faddr = mtod(n, struct sockaddr *);
-		bcopy(&key_dst, kp->kp_raw.rcb_faddr, sizeof(key_dst));
-	    }
-#endif
 		soisconnected(so);
 		so->so_options |= SO_USELOOPBACK;
 	}
@@ -740,15 +705,15 @@ struct protosw keysw[] = {
   key_output,
 #endif
   raw_ctlinput,	0,
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if defined(__FreeBSD__)
   0,
 #else
   key_usrreq,
 #endif
   raw_init,	0,		0,		0,
-#if defined(__bsdi__) || defined(__NetBSD__)
+#ifdef __NetBSD__
   key_sysctl,
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+#elif defined(__FreeBSD__)
   &key_usrreqs
 #endif
 }

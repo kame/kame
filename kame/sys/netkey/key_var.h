@@ -1,4 +1,4 @@
-/*	$KAME: key_var.h,v 1.15 2003/09/24 20:52:23 itojun Exp $	*/
+/*	$KAME: key_var.h,v 1.16 2004/05/26 07:51:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,26 +74,6 @@
 	{ 0, 0 }, \
 	{ 0, 0 }, \
 }
-
-#ifdef __bsdi__
-#define KEYCTL_VARS { \
-	0, \
-	0, \
-	&key_spi_trycnt, \
-	&key_spi_minval, \
-	&key_spi_maxval, \
-	&key_int_random, \
-	&key_larval_lifetime, \
-	&key_blockacq_count, \
-	&key_blockacq_lifetime, \
-	&ipsec_esp_keymin, \
-	&ipsec_esp_auth, \
-	&ipsec_ah_keymin, \
-	&key_preferred_oldsa, \
-	0, \
-	0, \
-}
-#endif
 
 #ifdef _KERNEL
 #define _ARRAYLEN(p) (sizeof(p)/sizeof(p[0]))

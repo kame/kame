@@ -34,11 +34,13 @@
  * Developed by Hitoshi Asaeda, INRIA, February 2002.
  */
 
-#if !defined(__OpenBSD__) && !defined(__bsdi__)
-#include "opt_inet.h"
 #ifdef __FreeBSD__
+#include "opt_inet.h"
 #include "opt_inet6.h"
+#include "opt_mrouting.h"
 #endif
+#ifdef __NetBSD__
+#include "opt_inet.h"
 #include "opt_mrouting.h"
 #endif
 

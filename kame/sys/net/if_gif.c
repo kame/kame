@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.106 2004/05/20 08:15:53 suz Exp $	*/
+/*	$KAME: if_gif.c,v 1.107 2004/05/26 07:51:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -679,11 +679,7 @@ gif_ioctl(ifp, cmd, data)
 		break;
 
 	case SIOCSIFMTU:
-#ifdef __bsdi__
-		mtu = *(short *)ifr->ifr_data;
-#else
 		mtu = ifr->ifr_mtu;
-#endif
 		if (mtu < GIF_MTU_MIN || mtu > GIF_MTU_MAX)
 			return (EINVAL);
 		ifp->if_mtu = mtu;

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.h,v 1.15 2004/02/24 21:52:27 itojun Exp $	*/
+/*	$KAME: sctp_pcb.h,v 1.16 2004/05/26 07:51:28 itojun Exp $	*/
 
 #ifndef __sctp_pcb_h__
 #define __sctp_pcb_h__
@@ -53,13 +53,13 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/ip6protosw.h>
 #include <netinet6/in6_var.h>
-#if defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#ifdef __OpenBSD__
 #include <netinet/in_pcb.h>
 #else
 #include <netinet6/in6_pcb.h>
 #endif
 
-#if defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__OpenBSD__) || defined(__FreeBSD__)
 #ifndef in6pcb
 #define in6pcb		inpcb
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.329 2004/05/26 02:55:30 itojun Exp $	*/
+/*	$KAME: key.c,v 1.330 2004/05/26 07:51:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,9 +88,7 @@
 #include <netinet/in_pcb.h>
 #endif
 #ifdef INET6
-#if !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet6/in6_pcb.h>
-#endif
 #endif /* INET6 */
 
 #include <net/pfkeyv2.h>
@@ -4843,14 +4841,6 @@ key_timehandler(arg)
 static void
 key_srandom()
 {
-#ifdef __bsdi__
-	struct timeval tv;
-	extern long randseed; /* it's defined at i386/i386/random.s */
-
-	microtime(&tv);
-
-	randseed = tv.tv_usec;
-#endif
 
 	return;
 }
@@ -4883,7 +4873,7 @@ key_randomfill(p, l)
 	n = (size_t)read_random(p, (u_int)l);
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 4
 	n = (size_t)read_random_unlimited(p, (u_int)l);
-#elif !defined(__bsdi__)
+#else
 	*(u_int32_t *)p = arc4random();
 	n = sizeof(u_int32_t);
 #endif
@@ -8125,116 +8115,6 @@ key_alloc_mbuf(l)
 
 	return m;
 }
-
-#ifdef __bsdi__
-#include <sys/user.h>
-#include <sys/sysctl.h>
-
-int *key_sysvars[] = KEYCTL_VARS;
-
-int
-key_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
-	int *name;
-	u_int namelen;
-	void *oldp;
-	size_t *oldlenp;
-	void *newp;
-	size_t newlen;
-{
-	int error = 0;
-
-	if (name[0] >= KEYCTL_MAXID)
-		return (EOPNOTSUPP);
-	if ((name[0] == KEYCTL_DUMPSA && namelen == 2) || namelen == 1)
-		;
-	else
-		return (EOPNOTSUPP);
-	switch (name[0]) {
-	case KEYCTL_DEBUG_LEVEL:
-		return sysctl_int(oldp, oldlenp, newp, newlen,
-		    &key_debug_level);
-	case KEYCTL_DUMPSA:
-		if (newp)
-			return (EPERM);
-		if (oldlenp) {
-			struct mbuf *m, *n;
-			int err2 = 0;
-			char *p, *ep;
-			size_t l;
-
-			m = key_setdump(name[1], &error);
-			if (!m)
-				return (error);
-			if (!oldp)
-				*oldlenp = m->m_pkthdr.len;
-			else {
-				p = oldp;
-				if (*oldlenp < m->m_pkthdr.len) {
-					err2 = ENOMEM;
-					ep = p + *oldlenp;
-				} else {
-					*oldlenp = m->m_pkthdr.len;
-					ep = p + m->m_pkthdr.len;
-				}
-				for (n = m; n; n = n->m_next) {
-					l =  (ep - p < n->m_len) ?
-					    ep - p : n->m_len;
-					error = copyout(mtod(n, const void *),
-					    p, l);
-					p += l;
-					if (error)
-						break;
-				}
-				if (error == 0)
-					error = err2;
-			}
-			m_freem(m);
-		}
-		return (error);
-	case KEYCTL_DUMPSP:
-		if (newp)
-			return (EPERM);
-		if (oldlenp) {
-			struct mbuf *m, *n;
-			int err2 = 0;
-			char *p, *ep;
-			size_t l;
-
-			m = key_setspddump(&error);
-			if (!m)
-				return (error);
-			if (!oldp)
-				*oldlenp = m->m_pkthdr.len;
-			else {
-				p = oldp;
-				if (*oldlenp < m->m_pkthdr.len) {
-					err2 = ENOMEM;
-					ep = p + *oldlenp;
-				} else {
-					*oldlenp = m->m_pkthdr.len;
-					ep = p + m->m_pkthdr.len;
-				}
-				for (n = m; n; n = n->m_next) {
-					l =  (ep - p < n->m_len) ?
-					    ep - p : n->m_len;
-					error = copyout(mtod(n, const void *),
-					    p, l);
-					p += l;
-					if (error)
-						break;
-				}
-				if (error == 0)
-					error = err2;
-			}
-			m_freem(m);
-		}
-		return (error);
-	default:
-		return sysctl_int_arr(key_sysvars, name, namelen,
-			oldp, oldlenp, newp, newlen);
-	}
-}
-#endif /*__bsdi__*/
 
 #ifdef __NetBSD__
 #include <sys/sysctl.h>
