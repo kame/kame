@@ -1,11 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2241 2002/10/01 07:04:42 suz Exp $
+$KAME: CHANGELOG,v 1.2242 2002/10/02 06:37:39 suz Exp $
 
-<200209>
+<200210>
 Tue Oct  1 16:01:57 JST 2002	suz@crl.hitachi.co.jp
 	* kame/sys/netinet6/ip6_mroute.c: fixed kernel crash when stopping
 	  a multicast daemon.
 
+<200209>
 Thu Sep 26 16:11:08 JST 2002  itojun@iijlab.net
 	* netbsd: switch to 1.6.  note:
 	  - NATPT and IP6FW are dropped from support list
