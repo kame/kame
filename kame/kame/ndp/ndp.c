@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.69 2001/07/23 14:46:31 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.70 2001/07/24 02:35:07 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -643,7 +643,12 @@ again:;
 			    sizeof(host_buf), NULL, 0,
 			    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
 		if (cflag == 1) {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+			if (rtm->rtm_flags & RTF_WASCLONED)
+				delete(host_buf);
+#else
 			delete(host_buf);
+#endif
 			continue;
 		}
 		gettimeofday(&time, 0);
