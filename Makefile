@@ -95,5 +95,7 @@ autobuild:
 		(cd ${.CURDIR}/${TARGET}/sys/arch/${ARCH}/compile/${KERNCONF}; ${MAKE} depend; ${MAKE}); \
 		;; \
 	esac
+	@echo -n '${.TARGET} done at '
+	@date
 
 .include "Makefile.inc"
