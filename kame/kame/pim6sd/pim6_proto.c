@@ -3336,6 +3336,8 @@ compare_metrics(local_preference, local_metric, local_address,
 /************************************************************************
  *                        PIM_BOOTSTRAP
  ************************************************************************/
+#define PIM6_BOOTSTRAP_MINLEN (PIM_MINLEN + PIM6_ENCODE_UNI_ADDR_LEN)
+
 int
 receive_pim6_bootstrap(src, dst, pim_message, datalen)
     struct sockaddr_in6		*src,
@@ -3391,6 +3393,15 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	return (FALSE);
     }
 
+    /* sanity check for the minimum length */
+    if (datalen < PIM6_BOOTSTRAP_MINLEN) {
+	    log(LOG_NOTICE, 0,
+		"receive_pim6_bootstrap: Bootstrap message size(%u) is"
+		" too short from %s",
+		datalen, inet6_fmt(&src->sin6_addr));
+	    return(FALSE);
+    }
+
     v=&uvifs[mifi];	
     data_ptr = (u_int8 *) (pim_message + sizeof(struct pim));
 
@@ -3417,7 +3428,6 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
     new_bsr_address.sin6_len = sizeof(new_bsr_address);
     new_bsr_address.sin6_family = AF_INET6;
     new_bsr_address.sin6_scope_id = inet6_uvif2scopeid(&new_bsr_address, v);
-
 
     if (local_address(&new_bsr_address) != NO_VIF)
     {
@@ -3570,6 +3580,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
     }
 
     /* Forward the BSR Message first and then update the RP-set list */
+    /* XXX: should we do sanity checks befor forwarding?? */
     /* TODO: if the message was unicasted to me, resend? */
 
     for (mifi = 0; mifi < numvifs; mifi++)
@@ -3590,13 +3601,11 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
     max_data_ptr = (u_int8 *) pim_message + datalen;
  
     /*
-     * TODO: XXX: this 46 is HARDCODING!!! Do a bunch of definitions and make
+     * TODO: XXX: this 24 is HARDCODING!!! Do a bunch of definitions and make
      * it stylish!
-     * 46 = pim header (4 bytes ) + Frag (2) + Hash masklen (1) +
-     *      bsr priority (1) + Encoded Unicast-bsr adress (18) +
-     *      encoded group address(20)
+     * 24 = Encoded-Group Address(20) + RP-cound(1) + Frag-RP(1) + Reserved(2)
      */
-    min_datalen = 46;
+    min_datalen = 24;
 
     if ((new_bsr_fragment_tag != curr_bsr_fragment_tag) ||
 	(inet6_equal(&new_bsr_address, &curr_bsr_address)))
@@ -3610,7 +3619,6 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
     curr_bsr_fragment_tag = new_bsr_fragment_tag;
     MASKLEN_TO_MASK6(new_bsr_hash_masklen, curr_bsr_hash_mask);
     SET_TIMER(pim_bootstrap_timer, PIM_BOOTSTRAP_TIMEOUT);
-
 
     while (data_ptr + min_datalen <= max_data_ptr)
     {
@@ -3631,6 +3639,25 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
             /* Add all RPs */
 	    while (curr_frag_rp_count--)
 	    {
+		/*
+		 * Sanity for the data length; the data packet must contain
+		 * Encoded-Unicast-RP-Address(18) + RP-Holdtime(2) +
+		 * RP-Priority(1) + Reserved(1).
+		 */
+		if (data_ptr + PIM6_ENCODE_UNI_ADDR_LEN + sizeof(u_int32_t)
+		    > max_data_ptr) {
+		    log(LOG_NOTICE, 0,
+			"receive_pim6_bootstrap: Bootstrap from %s does not "
+			"have enough length to contatin RP information",
+			inet6_fmt(&src->sin6_addr));
+
+		    /*
+		     * Ignore the rest of the message.
+		     * XXX: should we discard the entire message?
+		     */
+		    goto garbage_collect;
+		}
+
 		GET_EUADDR6(&curr_rp_addr, data_ptr);
 		GET_HOSTSHORT(curr_rp_holdtime, data_ptr);
 		GET_BYTE(curr_rp_priority, data_ptr);
@@ -3774,6 +3801,8 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	}
     }
 
+    
+ garbage_collect:
     /*
      * Garbage collection. Check all group prefixes and if the fragment_tag
      * for a group_prefix is the same as curr_bsr_fragment_tag, then remove
@@ -3851,6 +3880,13 @@ send_pim6_bootstrap()
  *                        PIM_CAND_RP_ADV
  ************************************************************************/
 /*
+ * minimum length of a cand. RP adv. message;
+ * length of PIM header + prefix-cnt(1) + priority(1) + holdtime(2) +
+ *                        encoded unicast RP addr(18)
+  */
+#define PIM6_CAND_RP_ADV_MINLEN (PIM_MINLEN + PIM6_ENCODE_UNI_ADDR_LEN)
+
+/*
  * If I am the Bootstrap router, process the advertisement, otherwise ignore
  * it.
  */
@@ -3881,13 +3917,23 @@ receive_pim6_cand_rp_adv(src, dst, pim_message, datalen)
 	return (FALSE);
     }
 
+    /* sanity check for the minimum length */
+    if (datalen < PIM6_CAND_RP_ADV_MINLEN) {
+	    log(LOG_NOTICE, 0,
+		"receive_pim6_cand_rp_adv: cand_RP message size(%u) is"
+		" too short from %s",
+		datalen, inet6_fmt(&src->sin6_addr));
+	    return(FALSE);
+    }
+    datalen -= PIM6_CAND_RP_ADV_MINLEN;
+
     data_ptr = (u_int8 *) (pim_message + sizeof(struct pim));
     /* Parse the CAND_RP_ADV message */
-    /* TODO: XXX: check datalen whether it is at least the minimum */
     GET_BYTE(prefix_cnt, data_ptr);
     GET_BYTE(priority, data_ptr);
     GET_HOSTSHORT(holdtime, data_ptr);
     GET_EUADDR6(&cand_rp_addr, data_ptr);
+
     /*
      * The RP Address field is set to the globally reachable IPv6 address
      * [draft-ietf-pim-ipv6].
@@ -3903,7 +3949,6 @@ receive_pim6_cand_rp_adv(src, dst, pim_message, datalen)
     memset(&rpp_, 0, sizeof(rpp_));
     if (prefix_cnt == 0)
     {
-
 	/* The default ff:: and masklen of 8 */
 	MASKLEN_TO_MASK6(ALL_MCAST_GROUPS_LENGTH, grp_mask);
 	rpp_.sin6_addr = cand_rp_addr.unicast_addr;
@@ -3920,19 +3965,33 @@ receive_pim6_cand_rp_adv(src, dst, pim_message, datalen)
     }
     while (prefix_cnt--)
     {
-	GET_EGADDR6(&encod_grp_addr, data_ptr);
-	MASKLEN_TO_MASK6(encod_grp_addr.masklen, grp_mask);
-	group_.sin6_addr = encod_grp_addr.mcast_addr;
-	group_.sin6_scope_id = 0; /* XXX: what if for scoped multicast addr? */
-	rpp_.sin6_addr = cand_rp_addr.unicast_addr;
-	/* see above note on scope id */
+	    /*
+	     * Sanity check for the message length.
+	     * XXX: do we have to do the check at an earlier stage and
+	     *      discard the whole message (instead of adopting a part of it)
+	     *      if it's bogus?
+	     */
+	    if (datalen < PIM6_ENCODE_GRP_ADDR_LEN) {
+		    log(LOG_NOTICE, 0,
+			"receive_pim6_cand_rp_adv: cand_RP message from %s is"
+			" too short to contain enough groups",
+			inet6_fmt(&src->sin6_addr));
+		    return(FALSE);
+	    }
+	    datalen -= PIM6_ENCODE_GRP_ADDR_LEN;
+	    
+	    GET_EGADDR6(&encod_grp_addr, data_ptr);
+	    MASKLEN_TO_MASK6(encod_grp_addr.masklen, grp_mask);
+	    group_.sin6_addr = encod_grp_addr.mcast_addr;
+	    group_.sin6_scope_id = 0; /* XXX: what if for scoped multicast addr? */
+	    rpp_.sin6_addr = cand_rp_addr.unicast_addr;
+	    /* see above note on scope id */
 
-	add_rp_grp_entry(&cand_rp_list, &grp_mask_list,
-			 &rpp_, priority, holdtime,
-			 &group_, grp_mask,
-			 my_bsr_hash_mask,
-			 curr_bsr_fragment_tag);
-	/* TODO: Check for datalen */
+	    add_rp_grp_entry(&cand_rp_list, &grp_mask_list,
+			     &rpp_, priority, holdtime,
+			     &group_, grp_mask,
+			     my_bsr_hash_mask,
+			     curr_bsr_fragment_tag);
     }
 
     return (TRUE);
@@ -3985,7 +4044,6 @@ send_pim6_cand_rp_adv()
 			     &group_, grp_mask,
 			     my_bsr_hash_mask,
 			     curr_bsr_fragment_tag);
-	    /* TODO: Check for datalen */
 	}
 	return (TRUE);
     }

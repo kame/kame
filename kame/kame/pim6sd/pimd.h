@@ -169,6 +169,8 @@ typedef struct pim6_encod_uni_addr_ {
                       * memory. Must read it byte-by-byte!
                       */ 
 } pim6_encod_uni_addr_t;
+/* XXX: sizeof(pim6_encod_uni_addr_t) does not work due to misalignment */
+#define PIM6_ENCODE_UNI_ADDR_LEN 18
 
 /* Encoded-Group */
 typedef struct pim6_encod_grp_addr_ {
@@ -178,6 +180,8 @@ typedef struct pim6_encod_grp_addr_ {
     u_int8      masklen;
     struct in6_addr     mcast_addr;
 } pim6_encod_grp_addr_t;
+/* XXX: sizeof(pim6_encod_grp_addr_t) MAY NOT work due to an alignment problem */
+#define PIM6_ENCODE_GRP_ADDR_LEN 20
 
 /* Encoded-Source */
 typedef struct pim6_encod_src_addr_ {
@@ -187,6 +191,8 @@ typedef struct pim6_encod_src_addr_ {
     u_int8      masklen;
     struct in6_addr src_addr;
 } pim6_encod_src_addr_t;
+/* XXX: sizeof(pim6_encod_src_addr_t) MAY NOT work due to an alignment problem */
+#define PIM6_ENCODE_SRC_ADDR_LEN 20
 
 #define USADDR_RP_BIT 0x1
 #define USADDR_WC_BIT 0x2
