@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.73 2003/08/15 12:49:55 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.74 2003/08/20 09:24:42 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -872,6 +872,8 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 	int icmp6len;
 {
 	struct ip6_hdr *ip6;
+	struct m_tag *mtag;
+	struct ip6aux *ip6a;
 	struct sockaddr_in6 src_sa, dst_sa;
 	struct mobile_prefix_advert *mp_adv;
 	union nd_opts ndopts;
@@ -930,6 +932,12 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 	}
 
 	/* sanity check. */
+	if (hif->hif_location != HIF_LOCATION_FOREIGN) {
+		/* MPA is processed only we are foreign. */
+		error = EINVAL;
+		goto freeit;
+	}
+
 	mbu = mip6_bu_list_find_home_registration(&hif->hif_bu_list, &dst_sa);
 	if (mbu == NULL) {
 		error = EINVAL;
@@ -948,6 +956,19 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 	}
 
 	/* check type2 routing header. */
+	mtag = ip6_findaux(m);
+	if (mtag == NULL) {
+		/* this packet doesn't have a type 2 RTHDR. */
+		error = EINVAL;
+		goto freeit;
+	} else {
+		ip6a = (struct ip6aux *)(mtag + 1);
+		if ((ip6a->ip6a_flags & IP6A_ROUTEOPTIMIZED) == 0) {
+			/* this packet doesn't have a type 2 RTHDR. */
+			error = EINVAL;
+			goto freeit;
+		}
+	}
 
 	/* check id.  if it doesn't match, send mps. */
 
