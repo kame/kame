@@ -165,7 +165,7 @@ fi
 echo -n "Starting standard IPv6 daemons:"
 
 # inet46d configuration
-#	KAME/FreeBSD3.2: AF_INET{,6} dual stack support with wildcard
+#	KAME/FreeBSD3.x: AF_INET{,6} dual stack support with wildcard
 #		bind on AF_INET6 socket. Also with IPsec support
 if [ -x /usr/local/v6/sbin/inet46d ] && [ "X${inet6d_enable}" != X"NO" ]; then
 	echo -n ' inet46d';	/usr/local/v6/sbin/inet46d $inet6d_flags
