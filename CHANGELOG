@@ -1,21 +1,29 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.67 1999/08/25 16:38:44 jinmei Exp $
+$Id: CHANGELOG,v 1.68 1999/08/25 17:50:33 jinmei Exp $
 
 <199908>
+1999-08-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ah_core.c (ah6_calccksum): fixed a bug
+	of pointer adjustment to chase options. The bug might cause
+	kernel panic when trying to calculate ICV for a HbH or a Dst options
+	header including an immutable option.
+	Thanks to the TAHI project(http://www.tahi.org/) for finding the
+	bug.
+
 1999-08-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* sys/netinet6/in6_pcb.c (in6_selecthlim): added to select hop
 	limit for an outgoing packet in various situations. The algorithm
 	is as follows:
 	1. The hop limit field of the template header.
-	2. Hoplimit valued specified via ioctl.
+	2. Hoplimit value specified via ioctl.
 	3. (If the outgoing interface is detected) the current
 	   hop limit of the interface specified by router advertisement.
 	4. The system default hoplimit.
 	UDP6 and raw IP6 directory use this function. TCP6 uses this via
 	in6_pcbconnect.
 	This change fixes the problem that IPV6_UNICAST_HOPS did not work
-	for a UDP6 and raw IP6 socket.
+	for a UDP6 and a raw IP6 socket.
 	Thanks to Tetsuya Isaki <isaki@v6.ipc.hiroshima-u.ac.jp> for
 	finding the problem.
 
