@@ -1,4 +1,4 @@
-/*	$KAME: sctp_input.c,v 1.10 2003/03/10 05:58:12 itojun Exp $	*/
+/*	$KAME: sctp_input.c,v 1.11 2003/04/15 06:01:30 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_input.c,v 1.189 2002/04/04 18:37:12 randall Exp	*/
 
 /*
@@ -110,6 +110,8 @@
 #ifndef __OpenBSD__
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
+#else
+#undef IPSEC
 #endif
 #endif /*IPSEC*/
 

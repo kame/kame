@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.21 2003/04/10 11:54:38 jinmei Exp $	*/
+/*	$KAME: sctp_output.c,v 1.22 2003/04/15 06:01:30 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c, v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -127,6 +127,8 @@
 #ifndef __OpenBSD__
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
+#else
+#undef IPSEC
 #endif
 #endif /* IPSEC */
 

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.23 2003/03/10 05:58:13 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.24 2003/04/15 06:01:30 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
 
 /*
@@ -91,6 +91,8 @@
 #ifndef __OpenBSD__
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
+#else
+#undef IPSEC
 #endif
 #endif /*IPSEC*/
 

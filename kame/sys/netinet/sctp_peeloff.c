@@ -1,4 +1,4 @@
-/*	$KAME: sctp_peeloff.c,v 1.8 2002/10/09 18:01:21 itojun Exp $	*/
+/*	$KAME: sctp_peeloff.c,v 1.9 2003/04/15 06:01:30 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_peeloff.c,v 1.16 2002/04/04 19:12:45 randall Exp	*/
 
 /*
@@ -83,6 +83,8 @@
 #ifndef __OpenBSD__
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
+#else
+#undef IPSEC
 #endif
 #endif /*IPSEC*/
 

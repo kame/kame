@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.12 2003/03/10 05:58:13 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.13 2003/04/15 06:01:30 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_timer.c,v 1.60 2002/04/04 17:47:19 randall Exp	*/
 
 /*
@@ -100,6 +100,8 @@
 #ifndef __OpenBSD__
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
+#else
+#undef IPSEC
 #endif
 #endif /* IPSEC */
 

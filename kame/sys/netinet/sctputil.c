@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.15 2003/03/10 05:58:13 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.16 2003/04/15 06:01:30 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.c,v 1.153 2002/04/04 16:59:01 randall Exp	*/
 
 /*
@@ -116,6 +116,8 @@
 #ifndef __OpenBSD__
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
+#else
+#undef IPSEC
 #endif
 #endif /* IPSEC */
 

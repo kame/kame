@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.17 2003/03/10 05:58:12 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.18 2003/04/15 06:01:30 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.c,v 1.207 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -114,6 +114,8 @@
 #ifndef __OpenBSD__
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
+#else
+#undef IPSEC
 #endif
 #endif /* IPSEC */
 
