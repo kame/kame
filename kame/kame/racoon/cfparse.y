@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.109 2001/12/07 03:35:14 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.110 2001/12/14 03:45:58 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -707,7 +707,8 @@ remote_statement
 					}
 					yyerror("DH group must be equal "
 						"to each proposals's "
-						"when aggressive mode.\n");
+						"when aggressive mode is "
+						"used.\n");
 					return -1;
 				}
 				cur_rmconf->dh_group = b;
