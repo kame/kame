@@ -731,7 +731,9 @@ print_bgp_dump(FILE *fp)
 	/* show established peer first */
 	while(bnp) {
 		if (bnp->rp_state == BGPSTATE_ESTABLISHED)
-			show_bgp_peer(fp, bnp, "  ");
+			show_bgp_peer(fp, bnp, "  "); {
+			fputc('\n', fp);
+		}
 
 		if ((bnp = bnp->rp_next) == bgb)
 			break;
@@ -743,8 +745,10 @@ print_bgp_dump(FILE *fp)
 	bnp = bgb;
 	while(bnp) {
 		if (bnp->rp_state != BGPSTATE_ESTABLISHED &&
-		    find_epeer_by_rpcb(bnp) == NULL)
+		    find_epeer_by_rpcb(bnp) == NULL) {
 			show_bgp_peer(fp, bnp, "  ");
+			fputc('\n', fp);
+		}
 
 		if ((bnp = bnp->rp_next) == bgb)
 			break;
