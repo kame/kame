@@ -139,7 +139,7 @@ ifconfig()
   }
 
   close(s);
-  free(ifa);
+  free(ifap);
 }
 #else  /* !HAVE_GETIFADDRS */
 {
