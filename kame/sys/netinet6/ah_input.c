@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.56 2001/05/16 03:00:22 sakane Exp $	*/
+/*	$KAME: ah_input.c,v 1.57 2001/05/16 03:04:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -297,21 +297,19 @@ ah4_input(m, va_alist)
 	}
 	
     {
-#if 1
 	/*
 	 * some of IP header fields are flipped to the host endian.
 	 * convert them back to network endian.  VERY stupid.
 	 */
-#ifndef __NetBSD__
+#ifdef WITH_CONVERT_AND_STRIP_IP_LEN
 	ip->ip_len = htons(ip->ip_len + hlen);
-#if !(defined(__bsdi__) && _BSDI_VERSION >= 199802) /* i.e. !bsdi4 */
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
-	ip->ip_id = htons(ip->ip_id);
-#endif
-#endif
-#else
+#elif WITH_CONVERT_IP_LEN
 	ip->ip_len = htons(ip->ip_len);
 #endif
+#ifdef WITH_CONVERT_IP_ID
+	ip->ip_id = htons(ip->ip_id);
+#endif
+#ifdef WITH_CONVERT_IP_OFF
 	ip->ip_off = htons(ip->ip_off);
 #endif
 	if (ah4_calccksum(m, (caddr_t)cksum, siz1, algo, sav)) {
@@ -320,20 +318,18 @@ ah4_input(m, va_alist)
 		goto fail;
 	}
 	ipsecstat.in_ahhist[sav->alg_auth]++;
-#if 1
 	/*
 	 * flip them back.
 	 */
-#ifndef __NetBSD__
+#ifdef WITH_CONVERT_AND_STRIP_IP_LEN
 	ip->ip_len = ntohs(ip->ip_len) - hlen;
-#if !(defined(__bsdi__) && _BSDI_VERSION >= 199802) /* i.e. !bsdi4 */
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
-	ip->ip_id = ntohs(ip->ip_id);
-#endif
-#endif
-#else
+#elif WITH_CONVERT_IP_LEN
 	ip->ip_len = ntohs(ip->ip_len);
 #endif
+#ifdef WITH_CONVERT_IP_ID
+	ip->ip_id = ntohs(ip->ip_id);
+#endif
+#ifdef WITH_CONVERT_IP_OFF
 	ip->ip_off = ntohs(ip->ip_off);
 #endif
     }
