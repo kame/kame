@@ -1,6 +1,6 @@
 #! @PERL@
 
-#	$KAME: dynupdate.pl.in,v 1.4 2001/03/15 05:12:21 jinmei Exp $
+#	$KAME: dynupdate.pl.in,v 1.5 2001/03/15 05:13:02 jinmei Exp $
 
 # Copyright (C) 2001 WIDE Project.
 # All rights reserved.
@@ -68,6 +68,8 @@ while (<ADDRS>) {
 	next if !/^\tinet6/;
 	next if /\bdetached\b/;
 	next if /\bdeprecated\b/;
+	next if /\btentative\b/;
+	next if /\bduplicated\b/;
 	next if !/\binet6 [23][0-9a-f][0-9a-f][0-9a-f]:/;
 	s/^\tinet6 //;
 	push(@addrs, (split(/\s+/, $_))[0]);
