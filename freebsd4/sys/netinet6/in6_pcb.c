@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.2 2000/07/15 07:14:33 kris Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.29 2001/01/23 08:59:36 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.30 2001/05/11 18:33:04 itojun Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -195,7 +195,7 @@ in6_pcbbind(inp, nam, p)
 				    (so->so_cred->cr_uid !=
 				     t->inp_socket->so_cred->cr_uid))
 					return (EADDRINUSE);
-				if ((inp->inp_flags & IN6P_BINDV6ONLY) == 0 &&
+				if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0 &&
 				    IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
 					struct sockaddr_in sin;
 
@@ -217,7 +217,7 @@ in6_pcbbind(inp, nam, p)
 						lport, wild);
 			if (t && (reuseport & t->inp_socket->so_options) == 0)
 				return(EADDRINUSE);
-			if ((inp->inp_flags & IN6P_BINDV6ONLY) == 0 &&
+			if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0 &&
 			    IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
 				struct sockaddr_in sin;
 

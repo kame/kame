@@ -751,7 +751,7 @@ udp6_realinput(af, src, dst, m, off)
 #ifndef INET6_BINDV6ONLY
 			else {
 				if (IN6_IS_ADDR_V4MAPPED(dst6)
-				 && (in6p->in6p_flags & IN6P_BINDV6ONLY))
+				 && (in6p->in6p_flags & IN6P_IPV6_V6ONLY))
 					continue;
 			}
 #endif
@@ -763,7 +763,7 @@ udp6_realinput(af, src, dst, m, off)
 #ifndef INET6_BINDV6ONLY
 			else {
 				if (IN6_IS_ADDR_V4MAPPED(src6)
-				 && (in6p->in6p_flags & IN6P_BINDV6ONLY))
+				 && (in6p->in6p_flags & IN6P_IPV6_V6ONLY))
 					continue;
 			}
 #endif

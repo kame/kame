@@ -152,7 +152,7 @@ in_pcballoc(so, pcbinfo, p)
 	inp->inp_socket = so;
 #if defined(INET6)
 	if (INP_SOCKAF(so) == AF_INET6 && !ip6_mapped_addr_on)
- 		inp->inp_flags |= IN6P_BINDV6ONLY;
+ 		inp->inp_flags |= IN6P_IPV6_V6ONLY;
 #endif
 	LIST_INSERT_HEAD(pcbinfo->listhead, inp, inp_list);
 	pcbinfo->ipi_count++;

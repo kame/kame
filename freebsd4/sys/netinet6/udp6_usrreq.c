@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.4 2000/10/31 19:07:09 ume Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.26 2001/01/23 08:59:36 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.27 2001/05/21 05:45:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -575,7 +575,7 @@ udp6_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
-	if ((inp->inp_flags & IN6P_BINDV6ONLY) == 0) {
+	if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0) {
 		struct sockaddr_in6 *sin6_p;
 
 		sin6_p = (struct sockaddr_in6 *)nam;
@@ -611,7 +611,7 @@ udp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	if (inp == 0)
 		return EINVAL;
 
-	if ((inp->inp_flags & IN6P_BINDV6ONLY) == 0) {
+	if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0) {
 		struct sockaddr_in6 *sin6_p;
 
 		sin6_p = (struct sockaddr_in6 *)nam;
