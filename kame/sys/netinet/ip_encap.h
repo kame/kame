@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.h,v 1.8 2001/06/22 14:19:35 itojun Exp $	*/
+/*	$KAME: ip_encap.h,v 1.9 2001/07/24 16:16:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -34,14 +34,27 @@
 
 #ifdef _KERNEL
 
+#ifndef RNF_NORMAL
+#include <net/radix.h>
+#endif
+
+/* to lookup a pair of address using radix tree */
+struct sockaddr_pack {
+	u_int8_t sp_len;
+	u_int8_t sp_family;	/* not really used */
+	/* followed by variable-length data */
+};
+
 struct encaptab {
 	LIST_ENTRY(encaptab) chain;
 	int af;
 	int proto;			/* -1: don't care, I'll check myself */
-	struct sockaddr_storage src;	/* my addr */
-	struct sockaddr_storage srcmask;
-	struct sockaddr_storage dst;	/* remote addr */
-	struct sockaddr_storage dstmask;
+	struct sockaddr_pack *addrpack;
+	struct sockaddr_pack *maskpack;
+	struct sockaddr *src;	/* my addr */
+	struct sockaddr *srcmask;
+	struct sockaddr *dst;	/* remote addr */
+	struct sockaddr *dstmask;
 	int (*func) __P((const struct mbuf *, int, int, void *));
 	const struct protosw *psw;	/* only pr_input will be used */
 	void *arg;			/* passed via m->m_pkthdr.aux */

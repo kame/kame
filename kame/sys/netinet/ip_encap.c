@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.47 2001/07/24 13:38:45 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.48 2001/07/24 16:16:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -133,6 +133,8 @@ static struct encaptab *encap4_lookup __P((struct mbuf *, int, int));
 static struct encaptab *encap6_lookup __P((struct mbuf *, int, int));
 #endif
 static void encap_add __P((struct encaptab *));
+static ssize_t encap_afpairlen __P((int));
+static int encap_afcheck __P((int, const struct sockaddr *, const struct sockaddr *));
 static int mask_match __P((const struct encaptab *, const struct sockaddr *,
 		const struct sockaddr *));
 static void encap_fillarg __P((struct mbuf *, const struct encaptab *));
@@ -420,6 +422,62 @@ encap_add(ep)
 	LIST_INSERT_HEAD(&encaptab, ep, chain);
 }
 
+static ssize_t
+encap_afpairlen(af)
+	int af;
+{
+	switch (af) {
+	case AF_INET:
+		return sizeof(struct sockaddr_pack) +
+		    sizeof(struct sockaddr_in) * 2;
+#ifdef INET6
+	case AF_INET6:
+		return sizeof(struct sockaddr_pack) +
+		    sizeof(struct sockaddr_in6) * 2;
+#endif
+	default:
+		return -1;
+	}
+}
+
+static int
+encap_afcheck(af, sp, dp)
+	int af;
+	const struct sockaddr *sp;
+	const struct sockaddr *dp;
+{
+	if (sp && dp) {
+		if (sp->sa_len != dp->sa_len)
+			return EINVAL;
+		if (af != sp->sa_family || af != dp->sa_family)
+			return EINVAL;
+	} else if (!sp && !dp)
+		;
+	else
+		return EINVAL;
+
+	switch (af) {
+	case AF_INET:
+		if (sp && sp->sa_len != sizeof(struct sockaddr_in))
+			return EINVAL;
+		if (dp && dp->sa_len != sizeof(struct sockaddr_in))
+			return EINVAL;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		if (sp && sp->sa_len != sizeof(struct sockaddr_in6))
+			return EINVAL;
+		if (dp && dp->sa_len != sizeof(struct sockaddr_in6))
+			return EINVAL;
+		break;
+#endif
+	default:
+		return EAFNOSUPPORT;
+	}
+
+	return 0;
+}
+
 /*
  * sp (src ptr) is always my side, and dp (dst ptr) is always remote side.
  * length of mask (sm and dm) is assumed to be same as sp/dp.
@@ -437,6 +495,7 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 	struct encaptab *ep;
 	int error;
 	int s;
+	size_t l;
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
@@ -444,18 +503,9 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 	s = splnet();
 #endif
 	/* sanity check on args */
-	if (sp->sa_len > sizeof(ep->src) || dp->sa_len > sizeof(ep->dst)) {
-		error = EINVAL;
+	error = encap_afcheck(af, sp, dp);
+	if (error)
 		goto fail;
-	}
-	if (sp->sa_len != dp->sa_len) {
-		error = EINVAL;
-		goto fail;
-	}
-	if (af != sp->sa_family || af != dp->sa_family) {
-		error = EINVAL;
-		goto fail;
-	}
 
 	/* check if anyone have already attached with exactly same config */
 	for (ep = LIST_FIRST(&encaptab); ep; ep = LIST_NEXT(ep, chain)) {
@@ -463,16 +513,32 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 			continue;
 		if (ep->proto != proto)
 			continue;
-		if (ep->src.ss_len != sp->sa_len ||
-		    bcmp(&ep->src, sp, sp->sa_len) != 0 ||
-		    bcmp(&ep->srcmask, sm, sp->sa_len) != 0)
+		if (ep->func)
 			continue;
-		if (ep->dst.ss_len != dp->sa_len ||
-		    bcmp(&ep->dst, dp, dp->sa_len) != 0 ||
-		    bcmp(&ep->dstmask, dm, dp->sa_len) != 0)
+#ifdef DIAGNOSTIC
+		if (!ep->src || !ep->dst || !ep->srcmask || !ep->dstmask)
+			panic("null pointers in encaptab");
+#endif
+		if (ep->src->sa_len != sp->sa_len ||
+		    bcmp(ep->src, sp, sp->sa_len) != 0 ||
+		    bcmp(ep->srcmask, sm, sp->sa_len) != 0)
+			continue;
+		if (ep->dst->sa_len != dp->sa_len ||
+		    bcmp(ep->dst, dp, dp->sa_len) != 0 ||
+		    bcmp(ep->dstmask, dm, dp->sa_len) != 0)
 			continue;
 
 		error = EEXIST;
+		goto fail;
+	}
+
+	l = encap_afpairlen(af);
+#ifdef DIAGNOSTIC
+	if (l != sizeof(*ep->addrpack) + sp->sa_len + dp->sa_len)
+		panic("encap_afpairlen mismatch");
+#endif
+	if (l > 1 << (8 * sizeof(ep->addrpack->sp_len))) {
+		error = EINVAL;
 		goto fail;
 	}
 
@@ -485,10 +551,30 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 
 	ep->af = af;
 	ep->proto = proto;
-	bcopy(sp, &ep->src, sp->sa_len);
-	bcopy(sm, &ep->srcmask, sp->sa_len);
-	bcopy(dp, &ep->dst, dp->sa_len);
-	bcopy(dm, &ep->dstmask, dp->sa_len);
+	ep->addrpack = malloc(l, M_NETADDR, M_NOWAIT);
+	if (ep->addrpack == NULL) {
+		error = ENOBUFS;
+		goto gc;
+	}
+	ep->maskpack = malloc(l, M_NETADDR, M_NOWAIT);
+	if (ep->maskpack == NULL) {
+		error = ENOBUFS;
+		goto gc;
+	}
+	ep->addrpack->sp_len = l & 0xff;
+	ep->maskpack->sp_len = l & 0xff;
+	ep->src = (struct sockaddr *)((caddr_t)ep->addrpack +
+	    sizeof(*ep->addrpack));
+	ep->dst = (struct sockaddr *)((caddr_t)ep->src + ep->src->sa_len);
+	ep->srcmask = (struct sockaddr *)((caddr_t)ep->maskpack +
+	    sizeof(*ep->maskpack));
+	ep->dstmask = (struct sockaddr *)((caddr_t)ep->srcmask +
+	    ep->src->sa_len);
+
+	bcopy(sp, ep->src, sp->sa_len);
+	bcopy(sm, ep->srcmask, sp->sa_len);
+	bcopy(dp, ep->dst, dp->sa_len);
+	bcopy(dm, ep->dstmask, dp->sa_len);
 	ep->psw = psw;
 	ep->arg = arg;
 
@@ -498,6 +584,13 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 	splx(s);
 	return ep;
 
+gc:
+	if (ep->addrpack)
+		free(ep->addrpack, M_NETADDR);
+	if (ep->maskpack)
+		free(ep->maskpack, M_NETADDR);
+	if (ep)
+		free(ep, M_NETADDR);
 fail:
 	splx(s);
 	return NULL;
@@ -525,6 +618,10 @@ encap_attach_func(af, proto, func, psw, arg)
 		error = EINVAL;
 		goto fail;
 	}
+
+	error = encap_afcheck(af, NULL, NULL);
+	if (error)
+		goto fail;
 
 	ep = malloc(sizeof(*ep), M_NETADDR, M_NOWAIT);	/*XXX*/
 	if (ep == NULL) {
@@ -645,6 +742,10 @@ encap_detach(cookie)
 	for (p = LIST_FIRST(&encaptab); p; p = LIST_NEXT(p, chain)) {
 		if (p == ep) {
 			LIST_REMOVE(p, chain);
+			if (!ep->func) {
+				free(p->addrpack, M_NETADDR);
+				free(p->maskpack, M_NETADDR);
+			}
 			free(p, M_NETADDR);	/*XXX*/
 			return 0;
 		}
@@ -666,17 +767,21 @@ mask_match(ep, sp, dp)
 	u_int8_t *r;
 	int matchlen;
 
+#ifdef DIAGNOSTIC
+	if (ep->func)
+		panic("wrong encaptab passed to mask_match");
+#endif
 	if (sp->sa_len > sizeof(s) || dp->sa_len > sizeof(d))
 		return 0;
 	if (sp->sa_family != ep->af || dp->sa_family != ep->af)
 		return 0;
-	if (sp->sa_len != ep->src.ss_len || dp->sa_len != ep->dst.ss_len)
+	if (sp->sa_len != ep->src->sa_len || dp->sa_len != ep->dst->sa_len)
 		return 0;
 
 	matchlen = 0;
 
 	p = (const u_int8_t *)sp;
-	q = (const u_int8_t *)&ep->srcmask;
+	q = (const u_int8_t *)ep->srcmask;
 	r = (u_int8_t *)&s;
 	for (i = 0 ; i < sp->sa_len; i++) {
 		r[i] = p[i] & q[i];
@@ -685,7 +790,7 @@ mask_match(ep, sp, dp)
 	}
 
 	p = (const u_int8_t *)dp;
-	q = (const u_int8_t *)&ep->dstmask;
+	q = (const u_int8_t *)ep->dstmask;
 	r = (u_int8_t *)&d;
 	for (i = 0 ; i < dp->sa_len; i++) {
 		r[i] = p[i] & q[i];
@@ -699,8 +804,8 @@ mask_match(ep, sp, dp)
 	d.ss_len = dp->sa_len;
 	d.ss_family = dp->sa_family;
 
-	if (bcmp(&s, &ep->src, ep->src.ss_len) == 0 &&
-	    bcmp(&d, &ep->dst, ep->dst.ss_len) == 0) {
+	if (bcmp(&s, ep->src, ep->src->sa_len) == 0 &&
+	    bcmp(&d, ep->dst, ep->dst->sa_len) == 0) {
 		return matchlen;
 	} else
 		return 0;
