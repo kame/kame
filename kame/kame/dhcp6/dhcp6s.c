@@ -51,6 +51,7 @@
 #include <netdb.h>
 
 #include <dhcp6.h>
+#include <dhcp6opt.h>
 #include <common.h>
 
 struct servtab {
@@ -64,7 +65,13 @@ struct servtab {
 int debug = 0;
 #define dprintf(x)	{ if (debug) fprintf x; }
 char *device = NULL;
+#if 0
 char *dnsserv = "3ffe:501:4819::42";
+char *dnsdom = "kame.net."
+#else
+char *dnsserv = NULL;
+char *dnsdom = NULL;
+#endif
 
 int insock;	/* inbound udp port */
 int outsock;	/* outbound udp port */
@@ -90,7 +97,7 @@ main(argc, argv)
 	struct in6_addr a;
 
 	srandom(time(NULL) & getpid());
-	while ((ch = getopt(argc, argv, "dn:")) != EOF) {
+	while ((ch = getopt(argc, argv, "dn:N:")) != EOF) {
 		switch (ch) {
 		case 'd':
 			debug++;
@@ -101,6 +108,9 @@ main(argc, argv)
 				/*NOTREACHED*/
 			}
 			dnsserv = optarg;
+			break;
+		case 'N':
+			dnsdom = optarg;
 			break;
 		default:
 			usage();
@@ -126,7 +136,7 @@ main(argc, argv)
 static void
 usage()
 {
-	fprintf(stderr, "usage: dhcp6s [-d] [-n serv] intface\n");
+	fprintf(stderr, "usage: dhcp6s [-d] [-n dnsserv] [-N dnsdom] intface\n");
 	exit(0);
 }
 
@@ -487,7 +497,11 @@ server6_react_request(agent, buf, siz)
 	struct in6_addr *servaddr = NULL;
 	struct in6_addr myaddr, target;
 	int hlim;
+	struct dhcp6_opt *opt;
 	char *ext;
+	time_t t;
+	struct tm *tm;
+	struct dhcp6e extbuf;
 
 	dprintf((stderr, "react_request\n"));
 
@@ -568,15 +582,70 @@ server6_react_request(agent, buf, siz)
 #endif
 	dh6p->dh6rep_xid = dh6r->dh6req_xid;
 
-	/* DNS server */
+	/* attach extensions */
 	ext = (char *)(dh6p + 1);
-	*(u_int16_t *)&ext[0] = htons(6);
-	*(u_int16_t *)&ext[2] = htons(16);
-	inet_pton(AF_INET6, dnsserv, &ext[4], 16);
-	ext += 4 + 16;
-	len += 4 + 16;
 
-	/* domain name */
+	/* DNS server */
+	opt = dhcp6opttab_byname("Domain Name Server");
+	if (opt && dnsserv) {
+		extbuf.dh6e_type = htons(opt->code);
+		extbuf.dh6e_len = htons(sizeof(struct in6_addr));
+		memcpy(ext + sizeof(extbuf), &extbuf, sizeof(extbuf));
+		inet_pton(AF_INET6, dnsserv, ext + sizeof(extbuf),
+			sizeof(struct in6_addr));
+		ext += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
+		len += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
+	}
+
+	/* DNS domain */
+	opt = dhcp6opttab_byname("Domain Name");
+	if (opt && dnsdom) {
+		int len;
+
+		len = strlen(dnsdom);
+		extbuf.dh6e_type = htons(opt->code);
+		extbuf.dh6e_len = htons(len);	/*XXX alignment?*/
+		memcpy(ext + sizeof(extbuf), &extbuf, sizeof(extbuf));
+		memset(ext + sizeof(extbuf), 0, ntohs(extbuf.dh6e_len));
+		strncpy(ext + sizeof(extbuf), dnsdom, ntohs(extbuf.dh6e_len));
+		ext += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
+		len += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
+	}
+
+	/* timezone */
+	(void)time(&t);
+	tm = localtime(&t);
+	if (tm) {
+		opt = dhcp6opttab_byname("Time Offset");
+		if (opt) {
+			union {
+				u_int32_t ui;
+				int32_t i;
+			} tzoff;		/* ugly! */
+
+			tzoff.i = (int32_t)tm->tm_gmtoff;
+
+			extbuf.dh6e_type = htons(opt->code);
+			extbuf.dh6e_len = htons(sizeof(u_int32_t));
+			*(u_int32_t *)(ext + sizeof(extbuf)) = tzoff.ui;
+			ext += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
+			len += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
+		}
+
+		opt = dhcp6opttab_byname("IEEE 1003.1 POSIX Timezone");
+		if (opt) {
+			int len;
+
+			len = strlen(tm->tm_zone);
+			extbuf.dh6e_type = htons(opt->code);
+			extbuf.dh6e_len = htons(len);	/*XXX alignment?*/
+			memset(ext + sizeof(extbuf), 0, ntohs(extbuf.dh6e_len));
+			strncpy(ext + sizeof(extbuf), tm->tm_zone,
+				ntohs(extbuf.dh6e_len));
+			ext += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
+			len += sizeof(extbuf) + ntohs(extbuf.dh6e_len);
+		}
+	}
 
 	if (transmit_sa(outsock, (struct sockaddr *)&dst, hlim, sbuf, len) != 0) {
 		err(1, "transmit failed");

@@ -26,7 +26,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: dhcp6s.8,v 1.1 1999/09/12 11:45:14 itojun Exp $
+.\"     $Id: dhcp6s.8,v 1.2 1999/10/18 22:11:59 itojun Exp $
 .\"
 .Dd Sep 12, 1999
 .Dt DHCP6S 8
@@ -39,11 +39,34 @@
 .Nm
 .Op Fl d
 .Op Fl n Ar dnsserv
+.Op Fl N Ar dnsdom
 .Ar interface
 .\"
 .Sh DESCRIPTION
 .Nm
-replies to DHCPv6 client and replies as DHCPv6 server.
+replies to DHCPv6 client as DHCPv6 server.
+.Nm
+is able to give the following information to clients.
+.Bl -bullet -compact
+.It
+IPv6 address of DNS server
+.Pq Fl n Ar dnsserv
+.It
+DNS domain name
+.Pq Fl N Ar dnsdom
+.It
+Current timezone offset
+.It
+IEEE 1003.1 information for current timezone
+.El
+.Pp
+.Fl n
+specifies DNS server address to be passed to clients.
+.Ar dnsserv
+must be an IPv6 numeric address.
+.Fl N
+specifies the local DNS domain name, like
+.Dq Li kame.net. .
 .\"
 .Sh SEE ALSO
 .Xr dhcp6c 8

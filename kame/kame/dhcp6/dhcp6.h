@@ -152,6 +152,24 @@ union dhcp6 {
 };
 
 /* DHCP6 extension */
+struct dhcp6e {
+	u_int16_t dh6e_type;
+	u_int16_t dh6e_len;
+	/* value, variable length */
+};
+
+#define DH6EX_IP		1	/* IP address - see dhcp6e_ipaddr */
+#define	DH6EX_TZOFFSET		2	/* Time Offset */
+#define	DH6EX_TZINFO		3	/* IEEE 1003.1 POSIX Timezone */
+#define	DH6EX_DNSSERV		6	/* Domain Name Server */
+#define	DH6EX_DNSDOM		10	/* Domain Name */
+#define	DH6EX_DNSDOM		10	/* Domain Name */
+#define	DH6EX_SRVLOCAGENT	16	/* srvloc Directory Agent */
+#define	DH6EX_SRVLOCSCOPE	17	/* srvloc service scope */
+#define	DH6EX_NTPSERV		18	/* ntp server */
+#define	DH6EX_NISDOM		19	/* NIS domain */
+#define	DH6EX_NISSERV		20	/* NIS servers */
+
 struct dhcp6e_ipaddr {
 	u_int16_t dh6eip_type;
 	u_int16_t dh6eip_len;
