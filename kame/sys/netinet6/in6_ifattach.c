@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.89 2001/02/02 04:39:40 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.90 2001/02/02 06:46:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -79,6 +79,8 @@ unsigned long in6_maxmtu = 0;
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 static int get_hostid_ifid __P((struct ifnet *, struct in6_addr *));
+#endif
+#ifdef __NetBSD__
 struct callout in6_tmpaddrtimer_ch;
 #endif
 static int get_rand_ifid __P((struct ifnet *, struct in6_addr *));
