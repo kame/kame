@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet6/raw_ip6.c,v 1.7.2.1 2000/07/15 07:14:36 kris Exp $
+ * $FreeBSD: src/sys/netinet6/raw_ip6.c,v 1.7.2.2 2001/03/05 13:09:04 obrien Exp $
  */
 
 /*
@@ -65,8 +65,6 @@
  */
 
 #include "opt_ipsec.h"
-
-#include <stddef.h>
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -408,8 +406,6 @@ rip6_output(m, va_alist)
 		struct mbuf *n;
 		int off;
 		u_int16_t *p;
-
-#define	offsetof(type, member)	((size_t)(&((type *)0)->member)) /* XXX */
 
 		/* compute checksum */
 		if (so->so_proto->pr_protocol == IPPROTO_ICMPV6)
