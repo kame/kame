@@ -3348,7 +3348,7 @@ in_setmopt_source_addr(ss, msf, optname)
 			splx(s);
 			return ENOBUFS;
 		}
-		bcopy(&ss[0], &msfsrc->src, sizeof(ss[0]));
+		bcopy(&ss[0], &msfsrc->src, ss[0].ss_len);
 		msfsrc->refcount = 2;
 		LIST_INSERT_HEAD(msf->msf_head, msfsrc, list);
 		msf->msf_numsrc = 1;
@@ -3370,7 +3370,7 @@ in_setmopt_source_addr(ss, msf, optname)
 			splx(s);
 			return ENOBUFS;
 		}
-		bcopy(&ss[0], &msfsrc->src, sizeof(ss[0]));
+		bcopy(&ss[0], &msfsrc->src, ss[0].ss_len);
 		msfsrc->refcount = 2;
 		LIST_INSERT_HEAD(msf->msf_blkhead, msfsrc, list);
 		msf->msf_blknumsrc = 1;
@@ -3413,7 +3413,7 @@ merge_msf_list:
 			splx(s);
 			return ENOBUFS;
 		}
-		bcopy(&msfsrc->src, &newsrc->src, sizeof(newsrc->src));
+		bcopy(&msfsrc->src, &newsrc->src, msfsrc->src.ss_len);
 		newsrc->refcount = 2;
 		LIST_INSERT_BEFORE(msfsrc, newsrc, list);
 		break;
@@ -3429,7 +3429,7 @@ merge_msf_list:
 			splx(s);
 			return ENOBUFS;
 		}
-		bcopy(&msfsrc->src, &newsrc->src, sizeof(newsrc->src));
+		bcopy(&msfsrc->src, &newsrc->src, msfsrc->src.ss_len);
 		newsrc->refcount = 2;
 		LIST_INSERT_AFTER(lastp, newsrc, list);
 	}
