@@ -4,9 +4,10 @@ IPsec transport mode
 	(A)                     (B)
 
 	IKE negotiation: A <--> B
-	ID payloads: anything,anything
+	phase 1 ID payloads: <anything, anything>
 	SA addresses: A <--> B
 	outgoing packet: IP(A->B)
+	phase 2 ID payloads: none, or <A, B>
 
 	HOST-A's policy:
 		spdadd A B any -P out ipsec ah/transport//require;
@@ -17,7 +18,7 @@ IPsec transport mode
 		spdadd A B any -P in ipsec ah/transport//require;
 
 	both racoon.conf:
-		no particular
+		no particular twists
 
 IPsec tunnel mode
 
@@ -25,9 +26,11 @@ IPsec tunnel mode
 	(A)        (GA)                  (GB)          (B)
 
 	IKE negotiation: GA <--> GB
-	ID payloads: A,B
+	phase 2 ID payloads: <anything, anything>
+		IDs should reflect GA and GB's authenticity.
 	SA addresses: GA <--> GB
 	outgoing packet: IP(GA->GB)
+	phase 2 ID payloads: A, B
 
 	Gateway-A's policy:
 		spdadd A B any -P out ipsec esp/tunnel/GA-GB/require;
@@ -38,7 +41,7 @@ IPsec tunnel mode
 		spdadd A B any -P in ipsec esp/tunnel/GA-GB/require;
 
 	both racoon.conf:
-		no particular
+		no particular twists
 
 MIP6
 
@@ -47,9 +50,10 @@ MIP6
 
 	IKE negotiation: COA <--> CNA
 		* MN always initiate IKE session probably.
-	ID payloads: HA,CNA
+	phase 1 ID payloads: <anything, anything>
 	SA addresses: HA <--> CNA
 	outgoing packet: IP(COA->CNA) | HAoption(HA)
+	phase 2 ID payloads: <HA, CNA>
 
 	MN's policy:
 		spdadd HA CNA any -P out ipsec ah/transport//require;
@@ -72,69 +76,26 @@ Accept anonymous client on IPsec transport mode
 	(A)                (S)
 
 	IKE negotiation: A <-> S
-	ID payloads: anything,anything
+	phase 1 ID payloads: anything,anything
 	SA addresses: A <--> S
+	phase 2 ID payloads: none
+
+	S accepts network connections from network range net/pl (like
+	1.0.0.0/8).
 
 	HOST-A's policy:
 		spdadd A S any -P out ipsec esp/transport//require;
 		spdadd S A any -P in ipsec esp/transport//require;
 
 	A's racoon.conf:
-		no particular
+		no particular twists
 
 	Server's policy:
-		spdadd S A any -P out ipsec esp/transport//require;
-		spdadd A S any -P in ipsec esp/transport//require;
-		* SP will be installed by racoon.
+		spdadd S net/pl any -P out ipsec esp/transport//require;
+		spdadd net/pl S any -P in ipsec esp/transport//require;
 
 	Server's racoon.conf:
-		generate_policy on;
+		no particular twists
 
-Accept anonymous client on IPsec tunnel mode
-
-	HOST-A =========== Gateway --- HOST-B
-	(A)                (G)         (B)
-
-	IKE negotiation: A <-> G
-	ID payloads: anything,B
-	SA addresses: A <--> G
-
-	HOST-A's policy:
-		spdadd A B any -P out ipsec esp/tunnel/A-G/require;
-		spdadd B A any -P in ipsec esp/tunnel/G-A/require;
-
-	A's racoon.conf:
-		no particular
-
-	Gateway's policy:
-		spdadd B A any -P out ipsec esp/tunnel/G-A/require;
-		spdadd A B any -P in ipsec esp/tunnel/A-G/require;
-		* SP will be installed by racoon.
-
-	Gateway's racoon.conf:
-		generate_policy on;
-
-Bridge mode
-
-	HOST-A =========== Bridge --- HOST-C
-	(A)                           (C)
-
-	IKE negotiation: A <--> C
-	ID payloads: A,C
-	SA addresses: A <--> C
-	outgoing packet: IP(A->C) | IPsec
-
-	HOST-A's policy:
-		spdadd A C any -P out ipsec esp/transport//require;
-		spdadd C A any -P in ipsec esp/transport//require;
-
-	HOST-A's racoon.conf:
-		TBD
-
-	Bridge's policy:
-		spdadd C A any -P out ipsec esp/transport//require;
-		spdadd A C any -P in ipsec esp/transport//require;
-
-	Bridge's racoon.conf:
-		TBD
-
+	due to the absense of phase 2 ID, IPsec SA will be installed for
+	A <--> S, not for net/pl <--> S.
