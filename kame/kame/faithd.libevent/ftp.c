@@ -574,11 +574,27 @@ resin(s, event, arg)
 			    "229 Entering Extended Passive Mode (|||%u|)\r\n",
 			    ntohs(sin6.sin6_port));
 		} else {
+			u_int16_t port;
 			u_int8_t *ap, *pp;
 #define UC(x)	((x) & 0xff)
 
+			port = sin6.sin6_port;
+
+			/*
+			 * use control connection's endpoint address, as
+			 * data connection may not be bound to specific address
+			 * due to the kernel bug - see bind(2) calls above.
+			 */
+			salen = sizeof(sin6);
+			if (getsockname(relay->cli.s, (struct sockaddr *)&sin6,
+			    &salen) < 0) {
+				close(s);
+				snprintf(errmsg, sizeof(errmsg),
+				    "malloc: %s", strerror(errno));
+				goto epsvfail1;
+			}
+
 			ap = (u_int8_t *)&sin6.sin6_addr;
-			pp = (u_int8_t *)&sin6.sin6_port;
 
 			relay->ser.len = snprintf(relay->ser.buf,
 			    sizeof(relay->ser.buf),
