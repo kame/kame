@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.164 2000/11/30 11:13:35 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.165 2000/11/30 15:32:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1115,7 +1115,10 @@ icmp6_notify_error(m, off, icmp6len, code)
 		bzero(&icmp6dst, sizeof(icmp6dst));
 		icmp6dst.sin6_len = sizeof(struct sockaddr_in6);
 		icmp6dst.sin6_family = AF_INET6;
-		icmp6dst.sin6_addr = eip6->ip6_dst;
+		if (finaldst == NULL)
+			icmp6dst.sin6_addr = eip6->ip6_dst;
+		else
+			icmp6dst.sin6_addr = finaldst;
 		icmp6dst.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
 							  &icmp6dst.sin6_addr);
 #ifndef SCOPEDROUTING
