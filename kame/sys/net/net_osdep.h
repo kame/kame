@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.35 2001/02/06 01:33:03 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.36 2001/02/08 10:21:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -107,6 +107,8 @@
  *		timeout() is non-void, must keep returned value for untimeout()
  *	NetBSD 1.5
  *		timeout() is obsoleted, use callout_xx (sys/callout.h)
+ *	OpenBSD 2.8
+ *		timeout_{add,set,del} is encouraged (sys/timeout.h)
  * - sysctl
  *	NetBSD, OpenBSD
  *		foo_sysctl()
