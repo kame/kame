@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1027 2000/06/15 12:27:57 sakane Exp $
+$Id: CHANGELOG,v 1.1028 2000/06/15 13:42:40 itojun Exp $
 
 <200006>
+Thu Jun 15 22:41:16 JST 2000  itojun@iijlab.net
+	* kame/sys/netkey/key.c: correct compilation without IPSEC_ESP.
+	  From: Matthias Drochner <M.Drochner@fz-juelich.de>
+
 Thu Jun 15 21:22:35 JST 2000 sakane@ydc.co.jp
 	* kame/sys/netkey/key.c:
 	Fixed extension length of two key extension when dumping SA.
