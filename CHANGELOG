@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2341 2003/02/07 12:24:02 jinmei Exp $
+$KAME: CHANGELOG,v 1.2342 2003/02/08 19:35:27 kjc Exp $
 
 <200302>
+2003/02/09 03:33:58 JST kjc@csl.sony.co.jp
+	merge altq support into the freebsd5 tree.
+	the original code was made for 5.0-dp1 and it hasn't been fully
+	tested on 5.0 yet.
+
 2003-02-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6c: obsoleted 'prefix-delegation' as a
 	DHCPv6 option name.
