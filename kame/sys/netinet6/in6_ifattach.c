@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.113 2001/02/16 16:54:53 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.114 2001/02/23 09:05:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -116,7 +116,7 @@ static int in6_ifattach_loopback __P((struct ifnet *));
  * works only for certain architectures (like sparc).
  * also, using hostid itself may constitute a privacy threat, much worse
  * than MAC addresses (hostids are used for software licensing).
- * maybe we shold use MD5(hostid) instead.
+ * maybe we should use MD5(hostid) instead.
  */
 static int
 get_hostid_ifid(ifp, in6)
