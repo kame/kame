@@ -1160,7 +1160,6 @@ inetname(sa)
 {
 	register char *cp;
 	static char line[NI_MAXHOST];
-	struct hostent *hp;
 	static char domain[MAXHOSTNAMELEN + 1];
 	static int first = 1;
 
