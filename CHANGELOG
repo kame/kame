@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1555 2001/02/14 08:38:30 itojun Exp $
+$KAME: CHANGELOG,v 1.1556 2001/02/16 16:54:00 itojun Exp $
 
 <200102>
+Sat Feb 17 01:51:43 JST 2001  itojun@iijlab.net
+	* sys/netinet6/nd6.c: recover backward binary compatibility for
+	  SIOCGIFINFO_IN6.
+	* openbsd/sys/netinet/udp_usrreq.c: remove IPv6 cases from udp_output()
+	  to simplify it and make it easier to audit it (sync with openbsd-
+	  current).
+
 Wed Feb 14 17:37:34 JST 2001  itojun@iijlab.net
 	* sys/kern/uipc_mbuf2.c: make sure to return non-shared mbuf on
 	  calls to m_pulldown().
