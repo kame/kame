@@ -1,4 +1,4 @@
-/*	$OpenBSD: pmap_clnt.h,v 1.3 1998/08/29 18:57:14 deraadt Exp $	*/
+/*	$OpenBSD: pmap_clnt.h,v 1.5 2002/02/17 19:42:21 millert Exp $	*/
 /*	$NetBSD: pmap_clnt.h,v 1.5 1994/12/04 01:12:42 cgd Exp $	*/
 
 /*
@@ -67,21 +67,17 @@
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
-extern bool_t		pmap_set	__P((u_long, u_long, u_int, int));
-extern bool_t		pmap_unset	__P((u_long, u_long));
-extern struct pmaplist	*pmap_getmaps	__P((struct sockaddr_in *));
-extern enum clnt_stat	pmap_rmtcall	__P((struct sockaddr_in *,
-					     u_long, u_long, u_long,
-					     xdrproc_t, caddr_t,
-					     xdrproc_t, caddr_t,
-					     struct timeval, u_long *));
-extern enum clnt_stat	clnt_broadcast	__P((u_long, u_long, u_long,
-					     xdrproc_t, char *,
-					     xdrproc_t, char *,
-					     bool_t (*) __P((caddr_t,
-						struct sockaddr_in *))));
-extern u_short		pmap_getport	__P((struct sockaddr_in *,
-					     u_long, u_long, u_int));
+extern bool_t		pmap_set(u_long, u_long, u_int, int);
+extern bool_t		pmap_unset(u_long, u_long);
+extern struct pmaplist	*pmap_getmaps(struct sockaddr_in *);
+extern enum clnt_stat	pmap_rmtcall(struct sockaddr_in *, u_long, u_long,
+			    u_long, xdrproc_t, caddr_t, xdrproc_t, caddr_t,
+			    struct timeval, u_long *);
+extern enum clnt_stat	clnt_broadcast(u_long, u_long, u_long, xdrproc_t,
+			    char *, xdrproc_t, char *,
+			    bool_t (*)(caddr_t, struct sockaddr_in *));
+extern u_short		pmap_getport(struct sockaddr_in *, u_long, u_long,
+			    u_int);
 __END_DECLS
 
 #endif /* !_RPC_PMAPCLNT_H */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: assert.h,v 1.2 1997/09/21 10:45:25 niklas Exp $	*/
+/*	$OpenBSD: assert.h,v 1.4 2002/02/19 19:39:36 millert Exp $	*/
 /*	$NetBSD: assert.h,v 1.6 1994/10/26 00:55:44 cgd Exp $	*/
 
 /*-
@@ -54,15 +54,11 @@
 #define	_assert(e)	((void)0)
 #else
 #define	_assert(e)	assert(e)
-#ifdef __STDC__
 #define	assert(e)	((e) ? (void)0 : __assert(__FILE__, __LINE__, #e))
-#else	/* PCC */
-#define	assert(e)	((e) ? (void)0 : __assert(__FILE__, __LINE__, "e"))
-#endif
 #endif
 
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
-void __assert __P((const char *, int, const char *));
+void __assert(const char *, int, const char *);
 __END_DECLS
