@@ -1,11 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.761 2000/04/11 16:25:27 itojun Exp $
+$Id: CHANGELOG,v 1.762 2000/04/12 04:29:13 itojun Exp $
 
 <200003>
+Wed Apr 12 13:28:35 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/mbone/vat6: pkgsrc for vat6 (IPv6-ready vat).
+	  From: ichiro@ichiro.org
+
 Wed Apr 12 01:24:40 JST 2000  itojun@iijlab.net
 	* sys/netinet6/in6_ifattach.c: cleanup IPv6 interface initialization
-	  in in6_ifattach().  be more persistent about initialization.
+	  in in6_ifattach().  be more persistent about initialization,
+	  to cope with manually configured link-locals.
 
 2000-04-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/gifconfig/gifconfig.c: supported a new description
