@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.264 2001/08/19 07:35:38 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.265 2001/08/28 09:21:14 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1852,19 +1852,26 @@ Here are (some of) platforms we have tested IPsec/IKE interoperability
 in the past, no particular order.  Note that both ends (KAME and
 others) may have modified their implementation, so use the following
 list just for reference purposes.
-	ACC, allied-telesis, Altiga, Ashley-laurent (vpcom.com), BlueSteel,
-	CISCO IOS, Cryptek, Checkpoint FW-1, Data Fellows (F-Secure),
-	Ericsson, Fitel, FreeS/WAN, HiFn, HITACHI, IBM AIX, IIJ, Intel Canada,
-	Intel Packet Protect, MEW NetCocoon, MGCS, Microsoft WinNT/2000,
-	NAI PGPnet, NetLock, NIST (linux IPsec + plutoplus), NEC IX5000,
-	Netscreen, NxNetworks, OpenBSD isakmpd, Pivotal, Radguard, RapidStream,
-	RedCreek, Routerware, RSA, SSH (both IPv4/IPv6), Secure Computing,
-	Soliton, Sun Solaris8, TIS/NAI Gauntret, Toshiba, VPNet,
-	Yamaha RT series
+	ACC, Allied-telesis, Altiga, Ashley-laurent (vpcom.com),
+	BlueSteel, CISCO IOS, Checkpoint FW-1, Compaq Tru54 UNIX
+	X5.1B-BL4, Cryptek, Data Fellows (F-Secure), Ericsson,
+	F-Secure VPN+ 5.40, Fitec, Fitel, FreeS/WAN, HITACHI, HiFn,
+	IBM AIX 5.1, III, IIJ (fujie stack), Intel Canada, Intel
+	Packet Protect, MEW NetCocoon, MGCS, Microsoft WinNT/2000/XP,
+	NAI PGPnet, NEC IX5000, NIST (linux IPsec + plutoplus),
+	NetLock, Netoctave, Netopia, Netscreen, Nokia EPOC, Nortel
+	GatewayController/CallServer 2000 (not released yet),
+	NxNetworks, OpenBSD isakmpd on OpenBSD, Oullim information
+	technologies SECUREWORKS VPN gateway 3.0, Pivotal, RSA,
+	Radguard, RapidStream, RedCreek, Routerware, SSH, SecGo
+	CryptoIP v3, Secure Computing, Soliton, Sun Solaris 8,
+	TIS/NAI Gauntret, Toshiba, Trilogy AdmitOne 2.6, Trustworks
+	TrustedClient v3.2, USAGI linux, VPNet, Yamaha RT series,
+	ZyXEL
 
 Here are (some of) platforms we have tested IPComp/IKE interoperability
 in the past, in no particular order.
-	IRE, SSH (both IPv4/IPv6), NetLock
+	Compaq, IRE, SSH, NetLock, FreeS/WAN, F-Secure VPN+ 5.40
 
 VPNC (vpnc.org) provides IPsec conformance tests, using KAME and OpenBSD
 IPsec/IKE implementations.  Their test results are available at
