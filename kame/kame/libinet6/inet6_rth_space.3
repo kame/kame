@@ -1,4 +1,4 @@
-.\"	$KAME: inet6_rth_space.3,v 1.2 2000/05/17 14:13:15 itojun Exp $
+.\"	$KAME: inet6_rth_space.3,v 1.3 2000/05/17 14:30:15 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -97,8 +97,9 @@ header of the specified type containing the specified number of
 For an IPv6 Type 0 Routing header, the number
 of
 .Li segments
-must be between 0 and 127, inclusive.  The return value
-is just the space for the Routing header.  When the application uses
+must be between 0 and 127, inclusive.
+The return value is just the space for the Routing header.
+When the application uses
 ancillary data it must pass the returned length to
 .Fn CMSG_LEN
 to determine how much memory is needed for the ancillary data object
@@ -111,7 +112,8 @@ is not supported by this implementation or the number of segments is
 invalid for this type of Routing header.
 .Pp
 Note: This function returns the size but does not allocate the space
-required for the ancillary data.  This allows an application to
+required for the ancillary data.
+This allows an application to
 allocate a larger buffer, if other ancillary data objects are
 desired, since all the ancillary data objects must be specified to
 .Fn sendmsg
@@ -151,8 +153,8 @@ to the end of the Routing header being constructed.
 .Pp
 If successful, the segleft member of the Routing Header is updated to
 account for the new address in the Routing header and the return
-value of the function is 0.  Upon an error the return value of the
-function is -1.
+value of the function is 0.
+Upon an error the return value of the function is -1.
 .\"
 .Ss inet6_rth_reverse
 .Fn inet6_rth_reverse
@@ -162,8 +164,8 @@ pointed to by the first argument
 .Li in
 .Pc
 and writes a new Routing header that sends
-datagrams along the reverse of that route.  Both arguments are
-allowed to point to the same buffer
+datagrams along the reverse of that route.
+Both arguments are allowed to point to the same buffer
 .Po
 that is, the reversal can occur in place.
 .Pc
@@ -179,7 +181,8 @@ addresses
 contained in the Routing header described by
 .Li bp .
 On success the return value is
-zero or greater.  The return value of the function is -1 upon an error.
+zero or greater.
+The return value of the function is -1 upon an error.
 .\"
 .Ss inet6_rth_getaddr
 .Fn inet6_rth_getaddr
@@ -244,7 +247,8 @@ are documented in
 .Pq draft-ietf-ipngwg-rfc2292bis-01.txt .
 .\"
 .Sh BUGS
-Rfc2292bis is still under standardization procedure. The specification
+RFC2292bis is still under standardization procedure.
+The specification
 of the functions described in this manual can be changed in the future.
 .Pp
-The text was shamelessly copied from internet-drafts for rfc2292bis.
+The text was shamelessly copied from internet-drafts for RFC2292bis.

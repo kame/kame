@@ -1,4 +1,4 @@
-.\"	$KAME: inet6_opt_init.3,v 1.2 2000/05/17 14:13:15 itojun Exp $
+.\"	$KAME: inet6_opt_init.3,v 1.3 2000/05/17 14:30:15 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -62,7 +62,8 @@
 Building and parsing the Hop-by-Hop and Destination options is
 complicated for the reasons given earlier.
 The advanced API therefore defines a set
-of functions to help applications.  These functions assume the
+of functions to help applications.
+These functions assume the
 formatting rules specified in Appendix B in RFC2460 i.e. that the
 largest field is placed last in the option.
 The function prototypes for
@@ -133,8 +134,8 @@ inclusive, and is the length of the option data that follows.
 .Pp
 The
 .Li align
-parameter must have a value of 1, 2, 4, or 8.  The align
-value can not exceed the value of
+parameter must have a value of 1, 2, 4, or 8.
+The align value can not exceed the value of
 .Li len .
 .\"
 .Ss inet6_opt_finish
@@ -197,7 +198,8 @@ by a previous call to
 or
 .Fn inet6_opt_find .
 It specifies the position where to continue scanning the extension
-buffer.  The next option is returned by updating
+buffer.
+The next option is returned by updating
 .Li typep ,
 .Li lenp ,
 and
@@ -205,12 +207,13 @@ and
 This function returns the updated
 .Dq previous
 length
-computed by advancing past the option that was returned.  This
-returned
+computed by advancing past the option that was returned.
+This returned
 .Dq previous
 length can then be passed to subsequent calls to
-inet6_opt_next().  This function does not return any PAD1 or PADN
-options.  When there are no more options the return value is -1.
+.Fn inet6_opt_next .
+This function does not return any PAD1 or PADN options.
+When there are no more options the return value is -1.
 .\"
 .Ss inet6_opt_get_val
 .Fn inet6_opt_get_val
@@ -279,7 +282,8 @@ are documented in
 .Pq draft-ietf-ipngwg-rfc2292bis-01.txt .
 .\"
 .Sh BUGS
-Rfc2292bis is still under standardization procedure. The specification
+RFC2292bis is still under standardization procedure.
+The specification
 of the functions described in this manual can be changed in the future.
 .Pp
-The text was shamelessly copied from internet-drafts for rfc2292bis.
+The text was shamelessly copied from internet-drafts for RFC2292bis.
