@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.17 2005/03/03 01:20:56 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.18 2005/03/03 01:27:32 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2175,6 +2175,51 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 			return (0);
 		}
 	}
+
+#ifdef MIP_NEMO
+	if (ip6mhba->ip6mhba_status >= IP6_MH_BAS_ERRORBASE) {
+		struct nemo_mptable *mpt;
+
+                mpt = LIST_FIRST(&bul->bul_hoainfo->hinfo_mpt_head);
+		if (mpt == NULL) {
+			/* something wrong */
+			return (-1);
+		}
+
+		if (mpt->mpt_regmode == NEMO_IMPLICIT) {
+			switch (ip6mhba->ip6mhba_status) {
+			case IP6_MH_BAS_MR_NOT_PERMIT:
+				/* send it to another home agent */
+				break;
+			case IP6_MH_BAS_INVALID_PREFIX:
+			case IP6_MH_BAS_NOT_AUTHORIZED:
+				/* fatal error XXX */
+				break;
+			case IP6_MH_BAS_NO_PREFIX_INFO:
+				/* send it to another home agent, or may change mode */
+				break;
+			default:
+				break;
+			}
+		} else if (mpt->mpt_regmode == NEMO_EXPLICIT) {
+			case IP6_MH_BAS_MR_NOT_PERMIT:
+				/* send it to another home agent */
+				break;
+			case IP6_MH_BAS_INVALID_PREFIX:
+			case IP6_MH_BAS_NOT_AUTHORIZED:
+				/* send it to another home agent, or may change mode */
+				break;
+			case IP6_MH_BAS_NO_PREFIX_INFO:
+				/* fatal error XXX */
+				break;
+			default:
+				break;
+			}
+
+		}
+
+#endif /* MIP_NEMO */
+
 	/* check the status code */
 	if (ip6mhba->ip6mhba_status >= IP6_MH_BAS_ERRORBASE) {
 		syslog(LOG_NOTICE,
