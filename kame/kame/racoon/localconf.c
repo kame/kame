@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.14 2000/06/13 05:01:41 itojun Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.15 2000/06/19 09:21:25 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -232,6 +232,24 @@ getpsk(str, len)
 end:
 	fclose(fp);
 	return key;
+}
+
+/*
+ * get a file name of a type specified.
+ */
+void
+getpathname(path, len, type, name)
+	char *path;
+	int len, type;
+	const char *name;
+{
+	snprintf(path, len, "%s%s%s", 
+		name[0] == '/' ? "" : lcconf->pathinfo[type],
+		name[0] == '/' ? "" : "/",
+		name);
+
+	YIPSDEBUG(DEBUG_MISC,
+		plog(logp, LOCATION, NULL, "filename: %s\n", path));
 }
 
 static int lc_doi2idtype[] = {

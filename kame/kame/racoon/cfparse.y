@@ -223,10 +223,8 @@ include_statement
 		{
 			char path[MAXPATHLEN];
 
-			snprintf(path, sizeof(path), "%s%s%s", 
-				$2->v[0] == '/' ? "" : lcconf->pathinfo[LC_PATHTYPE_INCLUDE],
-				$2->v[0] == '/' ? "" : "/",
-				$2->v);
+			getpathname(path, sizeof(path),
+				LC_PATHTYPE_INCLUDE, $2->v);
 			vfree($2);
 			if (yycf_switch_buffer(path) != 0)
 				return -1;

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.38 2000/06/15 05:29:16 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.39 2000/06/19 09:21:25 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1135,12 +1135,9 @@ oakley_validate_auth(iph1)
 			switch (iph1->rmconf->certtype) {
 			case ISAKMP_CERT_X509SIGN:
 				/* make public file name */
-				snprintf(path, sizeof(path), "%s/%s",
-					lcconf->pathinfo[LC_PATHTYPE_CERT],
+				getpathname(path, sizeof(path),
+					LC_PATHTYPE_CERT,
 					iph1->rmconf->peerscertfile);
-				YIPSDEBUG(DEBUG_CERT,
-					plog(logp, LOCATION, NULL,
-						"filename: %s\n", path));
 				cert = eay_get_x509cert(path);
 				break;
 			default:
@@ -1262,11 +1259,9 @@ oakley_getmycert(iph1)
 		}
 
 		/* make public file name */
-		snprintf(path, sizeof(path), "%s/%s",
-			lcconf->pathinfo[LC_PATHTYPE_CERT],
+		getpathname(path, sizeof(path),
+			LC_PATHTYPE_CERT,
 			iph1->rmconf->mycertfile);
-		YIPSDEBUG(DEBUG_CERT,
-			plog(logp, LOCATION, NULL, "cert file: %s\n", path));
 		cert = eay_get_x509cert(path);
 		break;
 	default:
@@ -1319,11 +1314,9 @@ oakley_getsign(iph1)
 		}
 
 		/* make private file name */
-		snprintf(path, sizeof(path), "%s/%s",
-			lcconf->pathinfo[LC_PATHTYPE_CERT],
+		getpathname(path, sizeof(path),
+			LC_PATHTYPE_CERT,
 			iph1->rmconf->myprivfile);
-		YIPSDEBUG(DEBUG_CERT,
-			plog(logp, LOCATION, NULL, "filename: %s\n", path));
 		privkey = eay_get_pkcs1privkey(path);
 		if (privkey == NULL) {
 			plog(logp, LOCATION, NULL,
