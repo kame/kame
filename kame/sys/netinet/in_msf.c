@@ -45,6 +45,7 @@
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/systm.h>
+#include <sys/syslog.h>
 #include <sys/protosw.h>
 #ifdef __FreeBSD__
 #include <sys/sysctl.h>
@@ -229,9 +230,8 @@ in_addmultisrc(inm, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 	fnumsrc = &iasl->numsrc;
 	/* the number of sources is limited */
 	if (*fnumsrc >= igmpmaxsrcfilter) {
-#ifdef IGMPV3_DEBUG
-		printf("in_addmultisrc: number of source already reached max filter count.\n");
-#endif
+		igmplog((LOG_DEBUG, "in_addmultisrc: "
+			"number of source already reached max filter count"));
 		return EINVAL; /* XXX */
 	}
 
@@ -259,9 +259,8 @@ in_addmultisrc(inm, numsrc, ss, mode, init, newhead, newmode, newnumsrc)
 			 * This is implementation specific issue.
 			 */
 			++i; /* adjusted the number of srcs */
-#ifdef IGMPV3_DEBUG
-			printf("in_addmultisrc: number of source is over max filter count. Adjusted.\n");
-#endif
+			igmplog((LOG_DEBUG, "in_addmultisrc: number of source "
+				"is over max filter count. Adjusted."));
 			break;
 		}
 	}
@@ -285,9 +284,8 @@ after_source_list_addition:
 		*fnumsrc += j;
 	error = in_get_new_msf_state(inm, newhead, newmode, newnumsrc);
 	if (error != 0) {
-#ifdef IGMPV3_DEBUG
-		printf("in_addmultisrc: in_get_new_msf_state returns %d\n", error);
-#endif
+		igmplog((LOG_DEBUG, "in_addmultisrc: in_get_new_msf_state "
+			"returns %d\n", error));
 		if ((mode == MCAST_EXCLUDE) && init)
 			--inm->inm_source->ims_excnt;
 		if (numsrc != 0) {
@@ -384,9 +382,8 @@ after_source_list_deletion:
 		*fnumsrc -= j;
 	error = in_get_new_msf_state(inm, newhead, newmode, newnumsrc);
 	if (error != 0) {
-#ifdef IGMPV3_DEBUG
-		printf("in_delmultisrc: in_get_new_msf_state returns %d\n", error);
-#endif
+		igmplog((LOG_DEBUG, "in_delmultisrc: in_get_new_msf_state "
+			"returns %d\n", error));
 		if ((mode == MCAST_EXCLUDE) && final)
 			++inm->inm_source->ims_excnt;
 		if (numsrc != 0) {
@@ -545,9 +542,8 @@ in_modmultisrc(inm, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 	fnumsrc = &iasl->numsrc;
 	/* the number of sources is limited */
 	if (*fnumsrc >= igmpmaxsrcfilter) {
-#ifdef IGMPV3_DEBUG
-		printf("in_modmultisrc: number of source already reached max filter count.\n");
-#endif
+		igmplog((LOG_DEBUG, "in_modmultisrc: number of source "
+			"already reached max filter count.\n"));
 		return EINVAL; /* XXX */
 	}
 
@@ -578,9 +574,8 @@ in_modmultisrc(inm, numsrc, ss, mode, old_num, old_ss, old_mode, grpjoin,
 			 * This is implementation specific issue.
 			 */
 			++i; /* adjusted the number of sources */
-#ifdef IGMPV3_DEBUG
-			printf("in_modmultisrc: number of source is over max filter count. Adjusted.\n");
-#endif
+			igmplog((LOG_DEBUG, "in_modmultisrc: number of source "
+				"is over max filter count. Adjusted.\n"));
 			break;
 		}
 	}
@@ -609,9 +604,8 @@ after_source_list_modification:
 
 	error = in_get_new_msf_state(inm, newhead, newmode, newnumsrc);
 	if (error != 0) {
-#ifdef IGMPV3_DEBUG
-		printf("in_modmultisrc: in_get_new_msf_state error %d\n", error);
-#endif
+		igmplog((LOG_DEBUG, "in_modmultisrc: in_get_new_msf_state "
+			"error %d\n", error));
 		if (old_mode != mode && mode == MCAST_INCLUDE)
 			++inm->inm_source->ims_excnt;
 		else if (old_mode != mode && mode == MCAST_EXCLUDE)
@@ -736,15 +730,13 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 
 	/* Case 1: Some socket requested (*,G) join. */
 	if (inmm_src->ims_grpjoin != 0) {
-#ifdef IGMPV3_DEBUG
-		printf("case 1: Some socket requested (*,G) join.\n");
-#endif
+		igmplog((LOG_DEBUG, "case 1: Some socket requested (*,G) "
+			"join.\n"));
 		/* IN{NULL} -> EX{NULL} */
 		if (LIST_EMPTY(inmm_src->ims_cur->head)) {
 			if (inmm_src->ims_mode == MCAST_INCLUDE) {
-#ifdef IGMPV3_DEBUG
-				printf("case 1.1:IN{NULL}->EX{NULL}\n");
-#endif
+				igmplog((LOG_DEBUG,
+					"case 1.1:IN{NULL}->EX{NULL}\n"));
 				in_clear_all_pending_report(inm);
 
 				/*
@@ -761,9 +753,8 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 
 		/* IN{non NULL} -> EX{NULL} */
 		if (inmm_src->ims_mode == MCAST_INCLUDE) {
-#ifdef IGMPV3_DEBUG
-			printf("case 1.2:IN{non-NULL}->EX{NULL}\n");
-#endif
+			igmplog((LOG_DEBUG,
+				"case 1.2:IN{non-NULL}->EX{NULL}\n"));
 			in_clear_all_pending_report(inm);
 
 			/* To make TO_EX transmission */
@@ -775,9 +766,8 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 
 		/* EX{non NULL} -> EX{NULL} */
 		if (inmm_src->ims_ex != NULL) {
-#ifdef IGMPV3_DEBUG
-			printf("case 1.3:EX{non-NULL}->EX{NULL}\n");
-#endif
+			igmplog((LOG_DEBUG,
+				"case 1.3:EX{non-NULL}->EX{NULL}\n"));
 			filter = REPORT_FILTER2;
 			LIST_FOREACH(ex_ias, inmm_src->ims_ex->head,
 				     ias_list) {
@@ -806,15 +796,13 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 
 	/* Case 2: There is no member for this group. */
 	if (INM_LIST_EMPTY(in) && INM_LIST_EMPTY(ex)) {
-#ifdef IGMPV3_DEBUG
-		printf("case 2: there is no member of this group\n");
-#endif
+		igmplog((LOG_DEBUG,
+			"case 2: there is no member of this group\n"));
 		/* EX{NULL} -> IN{NULL} */
 		if (LIST_EMPTY(inmm_src->ims_cur->head)) {
 			if (inmm_src->ims_mode == MCAST_EXCLUDE) {
-#ifdef IGMPV3_DEBUG
-				printf("case 2.1: EX{NULL}->IN{NULL}\n");
-#endif
+				igmplog((LOG_DEBUG,
+					"case 2.1: EX{NULL}->IN{NULL}\n"));
 				in_clear_all_pending_report(inm);
 
 				/*
@@ -831,9 +819,8 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 
 		/* EX{non NULL} -> IN{NULL} */
 		if (inmm_src->ims_mode == MCAST_EXCLUDE) {
-#ifdef IGMPV3_DEBUG
-			printf("case 2.2: EX{non-NULL}->IN{NULL}\n");
-#endif
+			igmplog((LOG_DEBUG,
+				"case 2.2: EX{non-NULL}->IN{NULL}\n"));
 			filter = REPORT_FILTER4;
 			in_clear_all_pending_report(inm);
 
@@ -845,9 +832,7 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 		}
 
 		/* IN{non NULL} -> IN{NULL} */
-#ifdef IGMPV3_DEBUG
-		printf("case 2.3: IN{non-NULL}->IN{NULL}\n");
-#endif
+		igmplog((LOG_DEBUG, "case 2.3: IN{non-NULL}->IN{NULL}\n"));
 		filter = REPORT_FILTER1;
 		LIST_FOREACH(in_ias, inmm_src->ims_cur->head, ias_list) {
 			error = in_merge_pending_report(inm, in_ias,
@@ -874,9 +859,8 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 
 	/* Case 3: Source list of EXCLUDE filter is set for this group. */
 	if (INM_LIST_EMPTY(in)) {
-#ifdef IGMPV3_DEBUG
-		printf("case 3: Source list of EXCLUDE filter is set for this group\n");
-#endif
+		igmplog((LOG_DEBUG, "case 3: Source list of EXCLUDE filter "
+			"is set for this group\n"));
 		/* IN{NULL} -> EX{non NULL} or EX{NULL} -> EX{non NULL} */
 		if (LIST_EMPTY(inmm_src->ims_cur->head)) {
 			error = in_copy_msf_source_list(inmm_src->ims_ex,
@@ -887,16 +871,14 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 
 			i = inmm_src->ims_cur->numsrc;
 			if (inmm_src->ims_mode == MCAST_INCLUDE) {
-#ifdef IGMPV3_DEBUG
-				printf("case 3.1:IN{NULL}->EX{non-NULL}\n");
-#endif
+				igmplog((LOG_DEBUG,
+					"case 3.1:IN{NULL}->EX{non-NULL}\n"));
 				filter = REPORT_FILTER3;
 				cmd = CHANGE_TO_EXCLUDE_MODE;
 				in_clear_all_pending_report(inm);
 			} else {
-#ifdef IGMPV3_DEBUG
-				printf("case 3.2:EX{NULL}->EX{non-NULL}\n");
-#endif
+				igmplog((LOG_DEBUG,
+					"case 3.2:EX{NULL}->EX{non-NULL}\n"));
 				filter = REPORT_FILTER2;
 				cmd = BLOCK_OLD_SOURCES;
 			}
@@ -922,9 +904,8 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 
 		/* EX{non NULL} -> EX{non NULL} */
 		if (inmm_src->ims_mode == MCAST_EXCLUDE) {
-#ifdef IGMPV3_DEBUG
-			printf("case 3.3:EX{non-NULL}->EX{non-NULL}\n");
-#endif
+			igmplog((LOG_DEBUG,
+				"case 3.3:EX{non-NULL}->EX{non-NULL}\n"));
 			filter = REPORT_FILTER2;
 			error = in_merge_msf_head(inm, inmm_src->ims_ex,
 						  inmm_src->ims_excnt, filter);
@@ -946,9 +927,7 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 		}
 
 		/* IN{non NULL} -> EX{non NULL} */
-#ifdef IGMPV3_DEBUG
-		printf("case 3.4:IN{non-NULL}->EX{non-NULL}\n");
-#endif
+		igmplog((LOG_DEBUG, "case 3.4:IN{non-NULL}->EX{non-NULL}\n"));
 		filter = REPORT_FILTER3;
 		in_free_msf_source_list(inmm_src->ims_cur->head);
 		inmm_src->ims_cur->numsrc = 0;
@@ -985,9 +964,8 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 
 	/* Case 4: Source list of INCLUDE filter is set for this group. */
 	if (INM_LIST_EMPTY(ex)) {
-#ifdef IGMPV3_DEBUG
-		printf("case 4: Source list of INCLUDE filter is set for this group\n");
-#endif
+		igmplog((LOG_DEBUG, "case 4: Source list of INCLUDE filter "
+			"is set for this group\n"));
 		/* IN{NULL} -> IN{non NULL} or EX{NULL} -> IN{non NULL} */
 		if (LIST_EMPTY(inmm_src->ims_cur->head)) {
 			error = in_copy_msf_source_list(inmm_src->ims_in,
@@ -998,15 +976,13 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 
 			i = inmm_src->ims_cur->numsrc;
 			if (inm->inm_source->ims_mode == MCAST_INCLUDE) {
-#ifdef IGMPV3_DEBUG
-				printf("case 4.1:IN{NULL}->IN{non-NULL}\n");
-#endif
+				igmplog((LOG_DEBUG, "case 4.1:IN{NULL}->"
+					"IN{non-NULL}\n"));
 				filter = REPORT_FILTER1;
 				cmd = ALLOW_NEW_SOURCES;
 			} else {
-#ifdef IGMPV3_DEBUG
-				printf("case 4.2:EX{NULL}->IN{non-NULL}\n");
-#endif
+				igmplog((LOG_DEBUG, "case 4.2:EX{NULL}->"
+					"IN{non-NULL}\n"));
 				filter = REPORT_FILTER4;
 				cmd = CHANGE_TO_INCLUDE_MODE;
 				in_clear_all_pending_report(inm);
@@ -1033,9 +1009,8 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 
 		/* IN{non NULL} -> IN{non NULL} */
 		if (inmm_src->ims_mode == MCAST_INCLUDE) {
-#ifdef IGMPV3_DEBUG
-			printf("case 4.3:IN{non NULL}->IN{non-NULL}\n");
-#endif
+			igmplog((LOG_DEBUG, "case 4.3:IN{non NULL}->"
+				"IN{non-NULL}\n"));
 			filter = REPORT_FILTER1;
 			error = in_merge_msf_head(inm, inmm_src->ims_in,
 						  (u_int)0, filter);
@@ -1056,9 +1031,7 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 		}
 
 		/* EX{non NULL} -> IN{non NULL} (since EX list was left) */
-#ifdef IGMPV3_DEBUG
-		printf("case 4.4:EX{non NULL}->IN{non-NULL}\n");
-#endif
+		igmplog((LOG_DEBUG, "case 4.4:EX{non NULL}->IN{non-NULL}\n"));
 		filter = REPORT_FILTER4;
 		in_free_msf_source_list(inmm_src->ims_cur->head);
 		inmm_src->ims_cur->numsrc = 0;
@@ -1094,9 +1067,8 @@ in_get_new_msf_state(inm, newhead, newmode, newnumsrc)
 	}
 
 	/* Case 5: INCLUDE and EXCLUDE source lists coexist with this group. */
-#ifdef IGMPV3_DEBUG
-	printf("case 5: INCLUDE and EXCLUDE source lists coexist with this group.\n");
-#endif
+	igmplog((LOG_DEBUG, "case 5: INCLUDE and EXCLUDE source lists "
+		"coexist with this group.\n"));
 	LIST_FIRST(&inhead) = LIST_FIRST(inmm_src->ims_in->head);
 	LIST_FIRST(&exhead) = LIST_FIRST(inmm_src->ims_ex->head);
 	MALLOC(*newhead, struct ias_head *, sizeof(struct ias_head),
@@ -1260,9 +1232,9 @@ in_merge_msf_head(inm, iasl, refcount, filter)
 					/* XXX But do we really clear pending
 					 * report? */
 					in_clear_pending_report(inm, filter);
-#ifdef IGMPV3_DEBUG
-					printf("in_merge_msf_head: merge fail for FILTER%d\n", filter);
-#endif
+					igmplog((LOG_DEBUG,
+						"in_merge_msf_head: merge fail "
+						"for FILTER%d\n", filter));
 					return error;
 				}
 				curias->ias_refcount = 0;
@@ -1276,9 +1248,8 @@ in_merge_msf_head(inm, iasl, refcount, filter)
 			if (newias == NULL) {
 				in_undo_new_msf_curhead(inm, sin);
 				in_clear_pending_report(inm, filter); /* XXX */
-#ifdef IGMPV3_DEBUG
-				printf("in_merge_msf_head: malloc fail\n");
-#endif
+				igmplog((LOG_DEBUG, "in_merge_msf_head: "
+					"malloc fail\n"));
 				return ENOBUFS;
 			}
 			if (filter == REPORT_FILTER1)
@@ -1290,9 +1261,8 @@ in_merge_msf_head(inm, iasl, refcount, filter)
 			if (error != 0) {
 				in_undo_new_msf_curhead(inm, sin);
 				in_clear_pending_report(inm, filter); /* XXX */
-#ifdef IGMPV3_DEBUG
-				printf("in_merge_msf_head: merge fail for FILTER%d\n", filter);
-#endif
+				igmplog((LOG_DEBUG, "in_merge_msf_head: "
+					"merge fail for FILTER%d\n", filter));
 				return error;
 			}
 			bcopy(sin, &newias->ias_addr, sin->sin_len);
@@ -1311,9 +1281,8 @@ in_merge_msf_head(inm, iasl, refcount, filter)
 				in_undo_new_msf_curhead
 						(inm, &curias->ias_addr);
 				in_clear_pending_report(inm, filter); /* XXX */
-#ifdef IGMPV3_DEBUG
-				printf("in_merge_msf_head: merge fail for FILTER%d\n", filter);
-#endif
+				igmplog((LOG_DEBUG, "in_merge_msf_head: "
+					"merge fail for FILTER%d\n", filter));
 				return error;
 			}
 			curias->ias_refcount = 0;
@@ -1331,9 +1300,7 @@ in_merge_msf_head(inm, iasl, refcount, filter)
 		MALLOC(newias, struct in_addr_source *, sizeof(*newias),
 		       M_MSFILTER, M_NOWAIT);
 		if (newias == NULL) {
-#ifdef IGMPV3_DEBUG
-			printf("in_merge_msf_head: malloc fail\n");
-#endif
+			igmplog((LOG_DEBUG, "in_merge_msf_head: malloc fail\n"));
 			in_undo_new_msf_curhead(inm, &ias->ias_addr);
 			in_clear_pending_report(inm, filter); /* XXX */
 			return ENOBUFS;
@@ -1347,9 +1314,8 @@ in_merge_msf_head(inm, iasl, refcount, filter)
 		if (error != 0) {
 			in_undo_new_msf_curhead(inm, &ias->ias_addr);
 			in_clear_pending_report(inm, filter); /* XXX */
-#ifdef IGMPV3_DEBUG
-			printf("in_merge_msf_head: merge fail for FILTER%d\n", filter);
-#endif
+			igmplog((LOG_DEBUG, "in_merge_msf_head: merge fail "
+				"for FILTER%d\n", filter));
 			return error;
 		}
 		newias->ias_addr = ias->ias_addr;
@@ -1603,9 +1569,9 @@ giveup:
 			}
 		}
 	} else {
-#ifdef IGMPV3_DEBUG
-		printf("in_merge_msf_state: Pending source list merge failed. State-Change Report won't be sent.\n");
-#endif
+		igmplog((LOG_DEBUG, "in_merge_msf_state: Pending source "
+			"list merge failed. State-Change Report won't be "
+			"sent.\n"));
 		in_clear_pending_report(inm, filter);
 	}
 
@@ -1690,9 +1656,8 @@ in_merge_pending_report(inm, ias, type)
 			MALLOC(newias, struct in_addr_source *,
 				sizeof(*newias), M_MSFILTER, M_NOWAIT);
 			if (newias == NULL) {
-#ifdef IGMPV3_DEBUG
-				printf("in_merge_pending_report: ENOBUFS\n");
-#endif
+				igmplog((LOG_DEBUG,
+					"in_merge_pending_report: ENOBUFS\n"));
 				/*
 				 * We don't remove ims_alw created above,
 				 * since it may be needed to re-create later.
@@ -1710,9 +1675,8 @@ in_merge_pending_report(inm, ias, type)
 			MALLOC(newias, struct in_addr_source *,
 				sizeof(*newias), M_MSFILTER, M_NOWAIT);
 			if (newias == NULL) {
-#ifdef IGMPV3_DEBUG
-				printf("in_merge_pending_report: ENOBUFS\n");
-#endif
+				igmplog((LOG_DEBUG,
+					"in_merge_pending_report: ENOBUFS\n"));
 				return ENOBUFS;
 			}
 			bcopy(sin, &newias->ias_addr, sin->sin_len);
@@ -1723,9 +1687,7 @@ in_merge_pending_report(inm, ias, type)
 		} else if ((ref_count = in_merge_msf_source_addr
 					(inm->inm_source->ims_alw, sin,
 					 IMS_ADD_SOURCE)) < 0) {
-#ifdef IGMPV3_DEBUG
-			printf("in_merge_pending_report: ENOBUFS\n");
-#endif
+			igmplog((LOG_DEBUG, "in_merge_pending_report: ENOBUFS\n"));
 			return ENOBUFS;
 		} else if (ref_count == 1)
 			++inm->inm_source->ims_alw->numsrc;
@@ -1745,9 +1707,7 @@ in_merge_pending_report(inm, ias, type)
 			MALLOC(newias, struct in_addr_source *,
 				sizeof(*newias), M_MSFILTER, M_NOWAIT);
 			if (newias == NULL) {
-#ifdef IGMPV3_DEBUG
-				printf("in_merge_pending_report: ENOBUFS\n");
-#endif
+				igmplog((LOG_DEBUG, "in_merge_pending_report: ENOBUFS\n"));
 				return ENOBUFS;
 			}
 			bcopy(sin, &newias->ias_addr, sin->sin_len);
@@ -1759,9 +1719,7 @@ in_merge_pending_report(inm, ias, type)
 			MALLOC(newias, struct in_addr_source *,
 				sizeof(*newias), M_MSFILTER, M_NOWAIT);
 			if (newias == NULL) {
-#ifdef IGMPV3_DEBUG
-				printf("in_merge_pending_report: ENOBUFS\n");
-#endif
+				igmplog((LOG_DEBUG, "in_merge_pending_report: ENOBUFS\n"));
 				return ENOBUFS;
 			}
 			bcopy(sin, &newias->ias_addr, sin->sin_len);
@@ -1772,9 +1730,7 @@ in_merge_pending_report(inm, ias, type)
 		} else if ((ref_count = in_merge_msf_source_addr
 					(inm->inm_source->ims_blk, sin,
 					 IMS_ADD_SOURCE)) < 0) {
-#ifdef IGMPV3_DEBUG
-			printf("in_merge_pending_report: ENOBUFS\n");
-#endif
+			igmplog((LOG_DEBUG, "in_merge_pending_report: ENOBUFS\n"));
 			return ENOBUFS;
 		} else if (ref_count == 1)
 			++inm->inm_source->ims_blk->numsrc;
@@ -1791,9 +1747,7 @@ in_merge_pending_report(inm, ias, type)
 			MALLOC(newias, struct in_addr_source *,
 				sizeof(*newias), M_MSFILTER, M_NOWAIT);
 			if (newias == NULL) {
-#ifdef IGMPV3_DEBUG
-				printf("in_merge_pending_report: ENOBUFS\n");
-#endif
+				igmplog((LOG_DEBUG, "in_merge_pending_report: ENOBUFS\n"));
 				return ENOBUFS;
 			}
 			bcopy(sin, &newias->ias_addr, sin->sin_len);
@@ -1805,9 +1759,7 @@ in_merge_pending_report(inm, ias, type)
 			MALLOC(newias, struct in_addr_source *,
 				sizeof(*newias), M_MSFILTER, M_NOWAIT);
 			if (newias == NULL) {
-#ifdef IGMPV3_DEBUG
-				printf("in_merge_pending_report: ENOBUFS\n");
-#endif
+				igmplog((LOG_DEBUG, "in_merge_pending_report: ENOBUFS\n"));
 				return ENOBUFS;
 			}
 			bcopy(sin, &newias->ias_addr, sin->sin_len);
@@ -1818,9 +1770,7 @@ in_merge_pending_report(inm, ias, type)
 		} else if ((ref_count = in_merge_msf_source_addr
 					(inm->inm_source->ims_toin, sin,
 					 IMS_ADD_SOURCE)) < 0) {
-#ifdef IGMPV3_DEBUG
-			printf("in_merge_pending_report: ENOBUFS\n");
-#endif
+			igmplog((LOG_DEBUG, "in_merge_pending_report: ENOBUFS\n"));
 			return ENOBUFS;
 		} else if (ref_count == 1)
 			++inm->inm_source->ims_toin->numsrc;
@@ -1834,9 +1784,7 @@ in_merge_pending_report(inm, ias, type)
 			MALLOC(newias, struct in_addr_source *,
 				sizeof(*newias), M_MSFILTER, M_NOWAIT);
 			if (newias == NULL) {
-#ifdef IGMPV3_DEBUG
-				printf("in_merge_pending_report: ENOBUFS\n");
-#endif
+				igmplog((LOG_DEBUG, "in_merge_pending_report: ENOBUFS\n"));
 				return ENOBUFS;
 			}
 			bcopy(sin, &newias->ias_addr, sin->sin_len);
@@ -1848,9 +1796,7 @@ in_merge_pending_report(inm, ias, type)
 			MALLOC(newias, struct in_addr_source *,
 				sizeof(*newias), M_MSFILTER, M_NOWAIT);
 			if (newias == NULL) {
-#ifdef IGMPV3_DEBUG
-				printf("in_merge_pending_report: ENOBUFS\n");
-#endif
+				igmplog((LOG_DEBUG, "in_merge_pending_report: ENOBUFS\n"));
 				return ENOBUFS;
 			}
 			bcopy(sin, &newias->ias_addr, sin->sin_len);
@@ -1861,9 +1807,7 @@ in_merge_pending_report(inm, ias, type)
 		} else if ((ref_count = in_merge_msf_source_addr
 					(inm->inm_source->ims_toex, sin,
 					 IMS_ADD_SOURCE)) < 0) {
-#ifdef IGMPV3_DEBUG
-			printf("in_merge_pending_report: ENOBUFS\n");
-#endif
+			igmplog((LOG_DEBUG, "in_merge_pending_report: ENOBUFS\n"));
 			return ENOBUFS;
 		} else if (ref_count == 1)
 			++inm->inm_source->ims_toex->numsrc;
@@ -2057,9 +2001,7 @@ in_merge_msf_source_addr(iasl, src, req)
 				newias->ias_refcount = 1;
 				return (newias->ias_refcount);
 			} else {
-#ifdef IGMPV3_DEBUG
-				printf("in_merge_msf_source_addr: source address cannot be deleted?\n");
-#endif
+				igmplog((LOG_DEBUG, "in_merge_msf_source_addr: source address cannot be deleted?\n"));
 				return -1;
 			}
 		}
@@ -2083,9 +2025,7 @@ in_merge_msf_source_addr(iasl, src, req)
 				return (newias->ias_refcount);
 			}
 		} else {
-#ifdef IGMPV3_DEBUG
-			printf("in_merge_msf_source_addr: source address cannot be deleted?\n");
-#endif
+			igmplog((LOG_DEBUG, "in_merge_msf_source_addr: source address cannot be deleted?\n"));
 			return -1;
 		}
 	}
@@ -2128,18 +2068,15 @@ ip_setmopt_srcfilter(sop, imsfp)
 
 	if ((error = copyin((void *)*imsfp, (void *)&oimsf,
 			IP_MSFILTER_SIZE(0))) != 0) {
-#ifdef IGMPV3_DEBUG
-		printf("ip_setmopt_srcfilter: copyin error.\n");
-#endif
+		igmplog((LOG_DEBUG, "ip_setmopt_srcfilter: copyin error.\n"));
 		return error;
 	} else
 		imsf = &oimsf;
 
 	if ((imsf->imsf_numsrc >= igmpsomaxsrc) ||
 			 !IN_MULTICAST(imsf->imsf_multiaddr.s_addr)) {
-#ifdef IGMPV3_DEBUG
-		printf("ip_setmopt_srcfilter: the number of sources or group address is invalid\n");
-#endif
+		igmplog((LOG_DEBUG, "ip_setmopt_srcfilter: "
+			"the number of sources or group address is invalid\n"));
 		return EINVAL;
 	}
 	if ((imsf->imsf_numsrc != 0) &&
@@ -2181,9 +2118,7 @@ ip_setmopt_srcfilter(sop, imsfp)
 	 * add them.
 	 */
 	if ((ipcbp = (struct inpcb *)sop->so_pcb) == NULL) {
-#ifdef IGMPV3_DEBUG
-		printf("ip_setmopt_srcfilter: inpcb is NULL\n");
-#endif
+		igmplog((LOG_DEBUG, "ip_setmopt_srcfilter: inpcb is NULL\n"));
 		splx(s);
 		return EINVAL;
 	}
@@ -2396,9 +2331,10 @@ ip_setmopt_srcfilter(sop, imsfp)
 			in_delmulti(imop->imo_membership[i], old_num, old_ss,
 					old_mode, final, &error);
 			if (error != 0) {
-#ifdef IGMPV3_DEBUG
-				printf("in_setmopt_srcfilter: error %d. undo for IN{non NULL}/EX{non NULL} -> IN{NULL}\n", error);
-#endif
+				igmplog((LOG_DEBUG, "in_setmopt_srcfilter: "
+					"error %d. undo for "
+					"IN{non NULL}/EX{non NULL}->IN{NULL}\n",
+					error));
 				in_undomopt_source_list
 					(imop->imo_msf[i], imsf->imsf_fmode);
 				if (old_num != 0)
@@ -2422,9 +2358,9 @@ ip_setmopt_srcfilter(sop, imsfp)
 					0, NULL, MCAST_EXCLUDE, init, &error);
 		}
 		if (error != 0) {
-#ifdef IGMPV3_DEBUG
-			printf("in_setmopt_srcfilter: error %d. undo for IN{non NULL}/EX{non NULL} -> EX{NULL} or IN{NULL} -> EX{NULL}\n", error);
-#endif
+			igmplog((LOG_DEBUG, "in_setmopt_srcfilter: error %d. "
+				"undo for IN{non NULL}/EX{non NULL}->EX{NULL} "
+				"or IN{NULL}->EX{NULL}\n", error));
 			in_undomopt_source_list
 					(imop->imo_msf[i], imsf->imsf_fmode);
 			if (old_num != 0)
@@ -2438,18 +2374,17 @@ ip_setmopt_srcfilter(sop, imsfp)
 		/* Something -> IN{non NULL}/EX{non NULL} */
 		if (add_num == 0) { /* only delete some sources */
 			if (imop->imo_membership[i] == NULL) {
-#ifdef IGMPV3_DEBUG
-				printf("in_setmcast_srcfilter: NULL pointer?\n");
-#endif
+				igmplog((LOG_DEBUG, "in_setmcast_srcfilter: "
+					"NULL pointer?\n"));
 				splx(s);
 				return EOPNOTSUPP;
 			}
 			in_delmulti(imop->imo_membership[i], old_num, old_ss,
 					old_mode, final, &error);
 			if (error != 0) {
-#ifdef IGMPV3_DEBUG
-				printf("in_setmcast_srcfilter: in_delmulti retuned error=%d. undo.\n", error);
-#endif
+				igmplog((LOG_DEBUG, "in_setmcast_srcfilter: "
+					"in_delmulti retuned error=%d. undo.\n",
+					error));
 				in_undomopt_source_list
 					(imop->imo_msf[i], imsf->imsf_fmode);
 				FREE(old_ss, M_IPMOPTS);
@@ -2466,9 +2401,9 @@ ip_setmopt_srcfilter(sop, imsfp)
 					old_mode, init,
 					imop->imo_msf[i]->msf_grpjoin, &error);
 			if (error != 0) {
-#ifdef IGMPV3_DEBUG
-				printf("in_setmopt_srcfilter: in_modmulti returned error=%d. undo.\n", error);
-#endif
+				igmplog((LOG_DEBUG, "in_setmopt_srcfilter: "
+					"in_modmulti returned error=%d. undo.\n",
+					error));
 				in_undomopt_source_list
 					(imop->imo_msf[i], imsf->imsf_fmode);
 				if (old_num != 0)
@@ -2582,9 +2517,7 @@ ip_getmopt_srcfilter(sop, imsfp)
 
 	if ((error = copyin((void *)*imsfp, (void *)&oimsf,
 			IP_MSFILTER_SIZE(0))) != 0) {
-#ifdef IGMPV3_DEBUG
-		printf("ip_getmopt_srcfilter: copyin error.\n");
-#endif
+		igmplog((LOG_DEBUG, "ip_getmopt_srcfilter: copyin error.\n"));
 		return error;
 	} else
 		imsf = &oimsf;
@@ -2601,9 +2534,7 @@ ip_getmopt_srcfilter(sop, imsfp)
 	}
 
 	if ((ipcbp = (struct inpcb *)sop->so_pcb) == NULL) {
-#ifdef IGMPV3_DEBUG
-		printf("ip_getmopt_srcfilter: inpcb is NULL\n");
-#endif
+		igmplog((LOG_DEBUG, "ip_getmopt_srcfilter: inpcb is NULL\n"));
 		return EINVAL;
 	}
 	if ((imop = ipcbp->inp_moptions) == NULL)
@@ -2714,17 +2645,13 @@ sock_setmopt_srcfilter(sop, grpfp)
 
 	error = copyin((void *)*grpfp, (void *)&ogrpf, GROUP_FILTER_SIZE(0));
 	if (error != 0) {
-#ifdef IGMPV3_DEBUG
-		printf("sock_setmopt_srcfilter: copyin error.\n");
-#endif
+		igmplog((LOG_DEBUG, "sock_setmopt_srcfilter: copyin error.\n"));
 		return error;
 	}
 	grpf = &ogrpf;
 
 	if (grpf->gf_numsrc >= igmpsomaxsrc) {
-#ifdef IGMPV3_DEBUG
-		printf("sock_setmopt_srcfilter: the number of sources is reached to max count.\n");
-#endif
+		igmplog((LOG_DEBUG, "sock_setmopt_srcfilter: the number of sources is reached to max count.\n"));
 		return EINVAL;
 	}
 	if (grpf->gf_group.ss_family != AF_INET)
@@ -2976,9 +2903,10 @@ sock_setmopt_srcfilter(sop, grpfp)
 			in_delmulti(imop->imo_membership[i], old_num, old_ss,
 					old_mode, final, &error);
 			if (error != 0) {
-#ifdef IGMPV3_DEBUG
-				printf("sock_setmopt_srcfilter: error %d. undo for IN{non NULL}/EX{non NULL} -> IN{NULL}\n", error);
-#endif
+				igmplog((LOG_DEBUG, "sock_setmopt_srcfilter: "
+					"error %d. undo for "
+					"IN{non NULL}/EX{non NULL}->IN{NULL}\n",
+					error));
 				in_undomopt_source_list
 					(imop->imo_msf[i], grpf->gf_fmode);
 				if (old_num != 0)
@@ -3000,9 +2928,9 @@ sock_setmopt_srcfilter(sop, grpfp)
 					0, NULL, MCAST_EXCLUDE, init, &error);
 		}
 		if (error != 0) {
-#ifdef IGMPV3_DEBUG
-			printf("sock_setmopt_srcfilter: error %d. undo for IN{non NULL}/EX{non NULL} -> EX{NULL} or IN{NULL} -> EX{NULL}\n", error);
-#endif
+			igmplog((LOG_DEBUG, "sock_setmopt_srcfilter: error %d. "
+				"undo for IN{non NULL}/EX{non NULL}->EX{NULL} "
+				"or IN{NULL}->EX{NULL}\n", error));
 			in_undomopt_source_list
 					(imop->imo_msf[i], grpf->gf_fmode);
 			if (old_num != 0)
@@ -3022,9 +2950,9 @@ sock_setmopt_srcfilter(sop, grpfp)
 			in_delmulti(imop->imo_membership[i], old_num, old_ss,
 					old_mode, final, &error);
 			if (error != 0) {
-#ifdef IGMPV3_DEBUG
-				printf("sock_setmopt_srcfilter: in_delmulti retuned error=%d. undo.\n", error);
-#endif
+				igmplog((LOG_DEBUG, "sock_setmopt_srcfilter: "
+					"in_delmulti retuned error=%d. undo.\n",
+					error));
 				in_undomopt_source_list
 					(imop->imo_msf[i], grpf->gf_fmode);
 				FREE(old_ss, M_IPMOPTS);
@@ -3041,9 +2969,9 @@ sock_setmopt_srcfilter(sop, grpfp)
 					old_mode, init,
 					imop->imo_msf[i]->msf_grpjoin, &error);
 			if (error != 0) {
-#ifdef IGMPV3_DEBUG
-				printf("sock_setmopt_srcfilter: in_modmulti returned error=%d. undo.\n", error);
-#endif
+				igmplog((LOG_DEBUG, "sock_setmopt_srcfilter: "
+					"in_modmulti returned error=%d. undo.\n",
+					error));
 				in_undomopt_source_list
 					(imop->imo_msf[i], grpf->gf_fmode);
 				if (old_num != 0)
@@ -3158,9 +3086,7 @@ sock_getmopt_srcfilter(sop, grpfp)
 
 	if ((error = copyin((void *)*grpfp, (void *)&ogrpf,
 			GROUP_FILTER_SIZE(0))) != 0) {
-#ifdef IGMPV3_DEBUG
-		printf("sock_getmopt_srcfilter: copyin error.\n");
-#endif
+		igmplog((LOG_DEBUG, "sock_getmopt_srcfilter: copyin error.\n"));
 		return error;
 	} else
 		grpf = &ogrpf;
@@ -3669,9 +3595,7 @@ in_setmopt_source_list(msf, numsrc, ss, mode, add_num, old_num, old_ss)
 					j++;
 				} else {
 					in_undomopt_source_list(msf, mode);
-#if defined(IGMPV3_DEBUG) || defined(MLDV2_DEBUG)
-					printf("in_setmopt_source_list: cannot insert to old_ss. undo\n");
-#endif
+					igmplog((LOG_DEBUG, "in_setmopt_source_list: cannot insert to old_ss. undo\n"));
 					return EOPNOTSUPP;
 				}
 			}
