@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.186 2001/03/16 11:38:58 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.187 2001/03/21 19:15:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -576,8 +576,21 @@ ip6_input(m)
 	 * Note that filters must _never_ set this flag, as another filter
 	 * in the list may have previously cleared it.
 	 */
-	m0 = m;
-	pfh = pfil_hook_get(PFIL_IN, &inetsw[ip_protox[IPPROTO_IPV6]].pr_pfh);
+	/*
+	 * let ipfilter look at packet on the wire,
+	 * not the decapsulated packet.
+	 */
+#ifdef IPSEC
+	if (!ipsec_gethist(m, NULL))
+#else
+	if (1 /*CONSTCOND*/)
+#endif
+	{
+		m0 = m;
+		pfh = pfil_hook_get(PFIL_IN,
+		    &inetsw[ip_protox[IPPROTO_IPV6]].pr_pfh);
+	} else
+		pfh = NULL;
 	for (; pfh; pfh = pfh->pfil_link.tqe_next)
 		if (pfh->pfil_func) {
 			rv = pfh->pfil_func(ip6, sizeof(*ip6),
