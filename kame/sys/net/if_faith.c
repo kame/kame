@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.22 2001/07/07 06:07:30 sumikawa Exp $	*/
+/*	$KAME: if_faith.c,v 1.23 2001/12/17 13:55:29 sumikawa Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -154,6 +154,9 @@ faithattach(faith)
 		ifp->if_type = IFT_FAITH;
 		ifp->if_hdrlen = 0;
 		ifp->if_addrlen = 0;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+		ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+#endif
 		if_attach(ifp);
 #if NBPFILTER > 0
 #ifdef HAVE_OLD_BPF
