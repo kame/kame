@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1424 2000/12/04 11:28:06 itojun Exp $
+$KAME: CHANGELOG,v 1.1425 2000/12/04 14:10:59 itojun Exp $
 
 <200012>
+Mon Dec  4 23:09:51 JST 2000  itojun@iijlab.net
+	 * netbsd/pkgsrc: obsolete KAME pkgsrc tree, at least for now.
+	   we should consult NetBSD pkgsrc directory.  KAME pkgsrc uses
+	   1.4.2 pkgsrc build framework, which is too old for use with 1.5.
+
 Mon Dec  4 20:27:27 JST 2000  itojun@iijlab.net
 	* netbsd/sys/netinet/udp_usrreq.c: fix IPv4 multicast input path.
 	  NetBSD PR 11629.
