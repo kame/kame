@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.65 2003/01/06 22:02:48 sumikawa Exp $	*/
+/*	$KAME: traceroute6.c,v 1.66 2003/01/21 09:04:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -369,7 +369,7 @@ main(argc, argv)
 	char hbuf[NI_MAXHOST], src0[NI_MAXHOST];
 	char *ep;
 	int mib[4] = { CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_DEFHLIM };
-	size_t size = sizeof(max_hops);
+	size_t size;
 	u_long lport;
 	int minlen;
 
@@ -385,8 +385,9 @@ main(argc, argv)
 	seteuid(getuid());
 	setuid(getuid());
 
-	(void) sysctl(mib, sizeof(mib)/sizeof(mib[0]), &max_hops, &size,
-	    NULL, 0);
+	size = sizeof(i);
+	(void) sysctl(mib, sizeof(mib)/sizeof(mib[0]), &i, &size, NULL, 0);
+	max_hops = i;
 
 	/* set a minimum set of socket options */
 	on = 1;
@@ -690,8 +691,9 @@ main(argc, argv)
 		}
 	}
 #ifdef SO_SNDBUF
-	if (setsockopt(sndsock, SOL_SOCKET, SO_SNDBUF, (char *)&datalen,
-	    sizeof(datalen)) < 0) {
+	i = datalen;
+	if (setsockopt(sndsock, SOL_SOCKET, SO_SNDBUF, (char *)&i,
+	    sizeof(i)) < 0) {
 		perror("setsockopt(SO_SNDBUF)");
 		exit(6);
 	}
@@ -981,8 +983,9 @@ send_probe(seq, hops)
 {
 	int i;
 
+	i = hops;
 	if (setsockopt(sndsock, IPPROTO_IPV6, IPV6_UNICAST_HOPS,
-	    (char *)&hops, sizeof(hops)) < 0) {
+	    (char *)&i, sizeof(i)) < 0) {
 		perror("setsockopt IPV6_UNICAST_HOPS");
 	}
 
@@ -1009,7 +1012,7 @@ send_probe(seq, hops)
 		(void) gettimeofday(&op->tv, NULL);
 	}
 
-	i = sendto(sndsock, (char *)outpacket, datalen , 0,
+	i = sendto(sndsock, (char *)outpacket, datalen, 0,
 	    (struct sockaddr *)&Dst, Dst.sin6_len);
 	if (i < 0 || i != datalen)  {
 		if (i<0)
