@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.h,v 1.18 2003/12/05 01:35:18 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.h,v 1.19 2004/02/05 12:38:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -68,7 +68,7 @@ int mip6_mobile_node_start(void);
 void mip6_mobile_node_stop(void);
 
 /* movement processing. */
-int mip6_prelist_update(struct sockaddr_in6 *, union nd_opts *,
+int mip6_prelist_update(struct in6_addr *, union nd_opts *,
     struct nd_defrouter *, struct mbuf *);
 void mip6_probe_routers(void);
 void mip6_process_movement(void);
@@ -82,9 +82,9 @@ int mip6_route_optimize(struct mbuf *);
 int mip6_bu_list_remove(struct mip6_bu_list *, struct mip6_bu *);
 int mip6_bu_list_remove_all(struct mip6_bu_list *, int);
 struct mip6_bu *mip6_bu_list_find_home_registration(struct mip6_bu_list *,
-    struct sockaddr_in6 *);
+    struct in6_addr *);
 struct mip6_bu *mip6_bu_list_find_withpaddr(struct mip6_bu_list *,
-    struct sockaddr_in6 *, struct sockaddr_in6 *);
+    struct in6_addr *, struct in6_addr *);
 int mip6_home_registration(struct hif_softc *);
 int mip6_home_registration2(struct mip6_bu *);
 int mip6_bu_encapcheck(const struct mbuf *, int, int, void *);
@@ -95,28 +95,27 @@ int mip6_bu_send_bu(struct mip6_bu *);
 int mip6_bu_send_cbu(struct mip6_bu *);
 
 /* home agent list processing. */
-struct mip6_ha *mip6_ha_create(struct sockaddr_in6 *, u_int8_t, u_int16_t,
+struct mip6_ha *mip6_ha_create(struct in6_addr *, u_int8_t, u_int16_t,
     int32_t);
 void mip6_ha_update_lifetime(struct mip6_ha *, u_int16_t);
 void mip6_ha_list_insert(struct mip6_ha_list *, struct mip6_ha *);
 void mip6_ha_list_reinsert(struct mip6_ha_list *, struct mip6_ha *);
 int mip6_ha_list_remove(struct mip6_ha_list*, struct mip6_ha *mha);
 struct mip6_ha *mip6_ha_list_find_withaddr(struct mip6_ha_list *,
-    struct sockaddr_in6 *);
+    struct in6_addr *);
 int mip6_ha_list_update_hainfo(struct mip6_ha_list *, struct nd_defrouter *,
     struct nd_opt_homeagent_info *);
 
 /* prefix list processing. */
-struct mip6_prefix *mip6_prefix_create(struct sockaddr_in6 *, u_int8_t,
-    u_int32_t, u_int32_t);
+struct mip6_prefix *mip6_prefix_create(struct in6_addr *, u_int8_t, u_int32_t,
+    u_int32_t);
 void mip6_prefix_update_lifetime(struct mip6_prefix *, u_int32_t, u_int32_t);
 int mip6_prefix_list_insert(struct mip6_prefix_list *, struct mip6_prefix *);
 int mip6_prefix_list_remove(struct mip6_prefix_list *,
     struct mip6_prefix *mpfx);
-struct mip6_prefix *mip6_prefix_list_find_withprefix(struct sockaddr_in6 *,
-    int);
+struct mip6_prefix *mip6_prefix_list_find_withprefix(struct in6_addr *, int);
 struct mip6_prefix *mip6_prefix_list_find_withhaddr(struct mip6_prefix_list *,
-    struct sockaddr_in6 *);
+    struct in6_addr *);
 int mip6_prefix_haddr_assign(struct mip6_prefix *, struct hif_softc *);
 void mip6_prefix_settimer(struct mip6_prefix *, long);
 
@@ -126,14 +125,14 @@ struct mip6_prefix_ha *mip6_prefix_ha_list_insert(struct mip6_prefix_ha_list *,
 void mip6_prefix_ha_list_remove(struct mip6_prefix_ha_list *,
     struct mip6_prefix_ha *);
 struct mip6_prefix_ha *mip6_prefix_ha_list_find_withaddr(
-    struct mip6_prefix_ha_list *, struct sockaddr_in6 *);
+    struct mip6_prefix_ha_list *, struct in6_addr *);
 struct mip6_prefix_ha *mip6_prefix_ha_list_find_withmha(
     struct mip6_prefix_ha_list *, struct mip6_ha *);
 
 /* IPv6 extention header processing. */
-int mip6_haddr_destopt_create(struct ip6_dest **, struct sockaddr_in6 *,
-    struct sockaddr_in6 *, struct hif_softc *);
-int mip6_mobile_node_exthdr_size(struct sockaddr_in6 *, struct sockaddr_in6 *);
+int mip6_haddr_destopt_create(struct ip6_dest **, struct in6_addr *,
+    struct in6_addr *, struct hif_softc *);
+int mip6_mobile_node_exthdr_size(struct in6_addr *, struct in6_addr *);
 int mip6_addr_exchange(struct mbuf *, struct mbuf *);
 
 /* Mobility Header processing. */
@@ -144,12 +143,12 @@ int mip6_ip6mr_input(struct mbuf *, struct ip6_mh_binding_request *, int);
 int mip6_ip6me_input(struct mbuf *, struct ip6_mh_binding_error *, int);
 int mip6_ip6mhi_create(struct ip6_mh **, struct mip6_bu *);
 int mip6_ip6mci_create(struct ip6_mh **, struct mip6_bu *);
-int mip6_ip6mu_create(struct ip6_mh **, struct sockaddr_in6 *,
-    struct sockaddr_in6 *, struct hif_softc *);
+int mip6_ip6mu_create(struct ip6_mh **, struct in6_addr *, struct in6_addr *,
+    struct hif_softc *);
 
 /* ICMPv6 processing. */
 int mip6_icmp6_dhaad_req_output(struct hif_softc *);
-int mip6_icmp6_mp_sol_output(struct sockaddr_in6 *, struct sockaddr_in6 *);
+int mip6_icmp6_mp_sol_output(struct in6_addr *, struct in6_addr *);
 
 #ifdef MIP6_DEBUG
 void mip6_bu_print(struct mip6_bu *);

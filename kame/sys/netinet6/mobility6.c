@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.30 2003/12/08 10:16:38 t-momose Exp $	*/
+/*	$KAME: mobility6.c,v 1.31 2004/02/05 12:38:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -97,8 +97,8 @@ static struct timeval ip6me_ppslim_last;
 static int ip6me_pps_count = 0;
 static int ip6me_ppslim = 60; /* XXX must be configurable. */
 
-static int mobility6_be_ratelimit(const struct sockaddr_in6 *,
-    const struct sockaddr_in6 *, const int);
+static int mobility6_be_ratelimit(const struct in6_addr *,
+    const struct in6_addr *, const int);
 static int mobility6_rip6_input(struct mbuf **, int);
 
 /*
@@ -243,12 +243,12 @@ mobility6_input(mp, offp, proto)
 		n = ip6_findaux(m);
 		if (n) {
 			struct ip6aux *ip6a;
-			struct sockaddr_in6 src_sa, home_sa;
+			struct in6_addr src, home;
 
 			ip6a = (struct ip6aux *) (n + 1);
-			src_sa = ip6a->ip6a_src;
+			src = ip6->ip6_src;
 			if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
-				home_sa = ip6a->ip6a_src;
+				home = ip6->ip6_src;
 				if ((ip6a->ip6a_flags & IP6A_SWAP) != 0) {
 					/*
 					 * HAO exists and swapped
@@ -256,13 +256,13 @@ mobility6_input(mp, offp, proto)
 					 * send a binding error to CoA
 					 * of the sending node.
 					 */
-					src_sa.sin6_addr = ip6a->ip6a_coa;
+					src = ip6a->ip6a_coa;
 				} else {
 					/*
 					 * HAO exists but not swapped
 					 * yet.
 					 */
-					home_sa.sin6_addr = ip6a->ip6a_coa;
+					home = ip6a->ip6a_coa;
 				}
 			} else {
 				/*
@@ -270,13 +270,10 @@ mobility6_input(mp, offp, proto)
 				 * field of the binding error message
 				 * must be an unspecified address.
 				 */
-				bzero(&home_sa, sizeof(home_sa));
-				home_sa.sin6_family = AF_INET6;
-				home_sa.sin6_len = sizeof(home_sa);
-				home_sa.sin6_addr = in6addr_any;
+				home = in6addr_any;
 			}
-			(void)mobility6_send_be(&ip6a->ip6a_dst, &src_sa,
-			    IP6_MH_BES_UNKNOWN_MH, &home_sa);
+			(void)mobility6_send_be(&ip6->ip6_dst, &src,
+			    IP6_MH_BES_UNKNOWN_MH, &home);
 		}
 		m_freem(m);
 		mip6stat.mip6s_unknowntype++;
@@ -299,10 +296,10 @@ mobility6_input(mp, offp, proto)
  */
 int
 mobility6_send_be(src, dst, status, home)
-	struct sockaddr_in6 *src;
-	struct sockaddr_in6 *dst;
+	struct in6_addr *src;
+	struct in6_addr *dst;
 	u_int8_t status;
-	struct sockaddr_in6 *home;
+	struct in6_addr *home;
 {
 	struct mbuf *m;
 	struct ip6_pktopts opt;
@@ -343,8 +340,8 @@ mobility6_send_be(src, dst, status, home)
 
 static int
 mobility6_be_ratelimit(dst, hoa, status)
-	const struct sockaddr_in6 *dst;	/* not used at this moment */
-	const struct sockaddr_in6 *hoa;	/* not used at this moment */
+	const struct in6_addr *dst;	/* not used at this moment */
+	const struct in6_addr *hoa;	/* not used at this moment */
 	const int status;		/* not used at this moment */
 {
 	int ret;
@@ -367,21 +364,14 @@ mobility6_rip6_input(mp, off)
 	int off;
 {
 	struct mbuf *m = *mp;
-	struct sockaddr_in6 src, dst;
-#ifndef PULLDOWN_TEST
-	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-#endif
+	struct ip6_hdr *ip6;
 	struct ip6_mh *mh;
 	struct sockaddr_in6 fromsa;
 	struct in6pcb *in6p;
 	struct in6pcb *last = NULL;
 	struct mbuf *opts = NULL;
 
-	if (ip6_getpktaddrs(m, &src, &dst)) {
-		/* delivery failed.  abort processing. */
-		return (IPPROTO_DONE);
-	}
-
+	ip6 = mtod(m, struct ip6_hdr *);
 #ifndef PULLDOWN_TEST
 	/* this is assumed to be safe. */
 	mh = (struct ip6_mh *)((caddr_t)ip6 + off);
@@ -397,10 +387,13 @@ mobility6_rip6_input(mp, off)
 	 * XXX: the address may have embedded scope zone ID, which should be
 	 * hidden from applications.
 	 */
-	fromsa = src;
-#ifndef SCOPEDROUTING
-	in6_clearscope(&fromsa.sin6_addr);
-#endif
+	bzero(&fromsa, sizeof(fromsa));
+	fromsa.sin6_family = AF_INET6;
+	fromsa.sin6_len = sizeof(struct sockaddr_in6);
+	if (in6_recoverscope(&fromsa, &ip6->ip6_src, m->m_pkthdr.rcvif) != 0) {
+		m_freem(m);
+		return (IPPROTO_DONE);
+	}
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	LIST_FOREACH(in6p, &ripcb, inp_list)
@@ -423,11 +416,11 @@ mobility6_rip6_input(mp, off)
 		if (in6p->in6p_ip6.ip6_nxt != IPPROTO_MH)
 #endif
 			continue;
-		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa) &&
-		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, &dst))
+		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr) &&
+		    !IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr, &ip6->ip6_dst))
 			continue;
-		if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa) &&
-		    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, &src))
+		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr) &&
+		    !IN6_ARE_ADDR_EQUAL(&in6p->in6p_faddr, &ip6->ip6_src))
 			continue;
 		if (last) {
 			struct	mbuf *n = NULL;

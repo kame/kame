@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.23 2004/01/19 04:45:59 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.24 2004/02/05 12:38:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -92,7 +92,7 @@ mip6_process_hrbu(bi)
 	struct ifnet *destifp = NULL;
 	struct nd_prefix *pr, *llpr = NULL;
 	struct ifnet *hifp = NULL;
-	struct sockaddr_in6 lladdr;
+	struct in6_addr lladdr;
 	struct mip6_bc *llmbc = NULL;
 	struct mip6_bc *mbc = NULL;
 	struct mip6_bc *prim_mbc = NULL;
@@ -117,8 +117,8 @@ mip6_process_hrbu(bi)
 	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
 		if (pr->ndpr_ifp != destifp)
 			continue;
-		if (in6_are_prefix_equal(&bi->mbc_phaddr.sin6_addr,
-			&pr->ndpr_prefix.sin6_addr, pr->ndpr_plen)) {
+		if (in6_are_prefix_equal(&bi->mbc_phaddr, &pr->ndpr_prefix,
+			pr->ndpr_plen)) {
 			hifp = pr->ndpr_ifp; /* home ifp. */
 			prlifetime = pr->ndpr_vltime;
 		}
@@ -141,7 +141,7 @@ mip6_process_hrbu(bi)
 				continue;
 			}
 			/* save link-local prefix. */
-			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr)) {
+			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix)) {
 				llpr = pr;
 				continue;
 			}
@@ -186,7 +186,7 @@ mip6_process_hrbu(bi)
 	 */
 	if ((bi->mbc_flags & IP6MU_LINK) != 0 && llpr != NULL) {
 		mip6_create_addr(&lladdr,
-		    (const struct sockaddr_in6 *)&bi->mbc_phaddr, llpr);
+		    (const struct in6_addr *)&bi->mbc_phaddr, llpr);
 		llmbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &lladdr);
 		if (llmbc == NULL) {
 			/*
@@ -341,8 +341,8 @@ mip6_process_hurbu(bi)
 	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
 		if (pr->ndpr_ifp != destifp)
 			continue;
-		if (in6_are_prefix_equal(&bi->mbc_phaddr.sin6_addr,
-			&pr->ndpr_prefix.sin6_addr, pr->ndpr_plen)) {
+		if (in6_are_prefix_equal(&bi->mbc_phaddr, &pr->ndpr_prefix,
+			pr->ndpr_plen)) {
 			hifp = pr->ndpr_ifp; /* home ifp. */
 		}
 	}
@@ -407,8 +407,8 @@ mip6_process_hurbu(bi)
 
 int
 mip6_bc_proxy_control(target, local, cmd)
-	struct sockaddr_in6 *target;
-	struct sockaddr_in6 *local;
+	struct in6_addr *target;
+	struct in6_addr *local;
 	int cmd;
 {
 	struct sockaddr_in6 mask; /* = {sizeof(mask), AF_INET6 } */
@@ -421,17 +421,20 @@ mip6_bc_proxy_control(target, local, cmd)
 
 	/* Create sa6 */
 	bzero(&sa6, sizeof(sa6));
-	sa6 = *local;
-#ifndef SCOPEDROUTING
-	sa6.sin6_scope_id = 0;
-#endif
+	sa6.sin6_len = sizeof(sa6);
+	sa6.sin6_family = AF_INET6;
+	/* XXX */ in6_recoverscope(&sa6, local, NULL);
+	/* XXX */ in6_embedscope(&sa6.sin6_addr, &sa6);
+
 	ifa = ifa_ifwithaddr((struct sockaddr *)&sa6);
 	if (ifa == NULL)
 		return (EINVAL);
 	ifp = ifa->ifa_ifp;
 
 	bzero(&taddr, sizeof(taddr));
-	taddr = *target;
+	taddr.sin6_len = sizeof(taddr);
+	taddr.sin6_family = AF_INET6;
+	taddr.sin6_addr = *target;
 	if (in6_addr2zoneid(ifp, &taddr.sin6_addr,
 			    &taddr.sin6_scope_id)) {
 		mip6log((LOG_ERR,
@@ -443,9 +446,8 @@ mip6_bc_proxy_control(target, local, cmd)
 	if (error != 0) {
 		return(error);
 	}
-#ifndef SCOPEDROUTING
+	/* clear sin6_scope_id before looking up a routing table. */
 	taddr.sin6_scope_id = 0;
-#endif
 
 	switch (cmd) {
 	case RTM_DELETE:
@@ -462,13 +464,13 @@ mip6_bc_proxy_control(target, local, cmd)
 			return 0; /* EHOSTUNREACH */
 		}
 		error = rtrequest(RTM_DELETE, rt_key(rt), (struct sockaddr *)0,
-				  rt_mask(rt), 0, (struct rtentry **)0);
+		    rt_mask(rt), 0, (struct rtentry **)0);
 		if (error) {
 			mip6log((LOG_ERR,
 				 "%s:%d: RTM_DELETE for %s returned "
 				 "error = %d\n",
 				 __FILE__, __LINE__,
-				 ip6_sprintf(&target->sin6_addr), error));
+				 ip6_sprintf(target), error));
 		}
 		rt = NULL;
 
@@ -488,21 +490,21 @@ mip6_bc_proxy_control(target, local, cmd)
 				mip6log((LOG_NOTICE,
 					 "%s:%d: RTM_ADD: we are already proxy for %s\n",
 					 __FILE__, __LINE__,
-					 ip6_sprintf(&target->sin6_addr)));
+					 ip6_sprintf(target)));
 				return (EEXIST);
 			}
 			if ((rt->rt_flags & RTF_LLINFO) != 0) {
 				/* nd cache exist */
 				rtrequest(RTM_DELETE, rt_key(rt),
-					  (struct sockaddr *)0,
-					  rt_mask(rt), 0, (struct rtentry **)0);
+				    (struct sockaddr *)0, rt_mask(rt), 0,
+				    (struct rtentry **)0);
 				rt = NULL;
 			} else {
 				/* XXX Path MTU entry? */
 				mip6log((LOG_ERR,
 					 "%s:%d: entry exist %s: rt_flags=0x%x\n",
 					 __FILE__, __LINE__,
-					 ip6_sprintf(&target->sin6_addr),
+					 ip6_sprintf(target),
 					 (int)rt->rt_flags));
 			}
 		}
@@ -520,10 +522,11 @@ mip6_bc_proxy_control(target, local, cmd)
 		for (ifa_dl = ifp->if_addrlist.tqh_first; ifa_dl;
 		     ifa_dl = ifa_dl->ifa_list.tqe_next)
 #endif
-			if (ifa_dl->ifa_addr->sa_family == AF_LINK) break;
+			if (ifa_dl->ifa_addr->sa_family == AF_LINK)
+				break;
 
 		if (!ifa_dl)
-			return EINVAL;
+			return (EINVAL);
 
 		sdl = (struct sockaddr_dl *)ifa_dl->ifa_addr;
 	}
@@ -553,7 +556,7 @@ mip6_bc_proxy_control(target, local, cmd)
 				 "%s:%d: RTM_ADD for %s returned "
 				 "error = %d\n",
 				 __FILE__, __LINE__,
-				 ip6_sprintf(&target->sin6_addr), error));
+				 ip6_sprintf(target), error));
 		}
 
 		{
@@ -565,7 +568,7 @@ mip6_bc_proxy_control(target, local, cmd)
 			daddr.sin6_len = sizeof(daddr);
 			daddr.sin6_addr = in6addr_linklocal_allnodes;
 			if (in6_addr2zoneid(ifp, &daddr.sin6_addr,
-					    &daddr.sin6_scope_id)) {
+				&daddr.sin6_scope_id)) {
 				/* XXX: should not happen */
 				mip6log((LOG_ERR,
 					 "%s:%d: in6_addr2zoneid failed\n",
@@ -574,13 +577,12 @@ mip6_bc_proxy_control(target, local, cmd)
 			}
 			if (error == 0) {
 				error = in6_embedscope(&daddr.sin6_addr,
-						       &daddr);
+				    &daddr);
 			}
 			if (error == 0) {
-				nd6_na_output(ifp, &daddr, &taddr,
-					      ND_NA_FLAG_OVERRIDE,
-					      1,
-					      (struct sockaddr *)sdl);
+				nd6_na_output(ifp, &daddr.sin6_addr,
+				    &taddr.sin6_addr, ND_NA_FLAG_OVERRIDE, 1,
+				    (struct sockaddr *)sdl);
 			}
 		}
 
@@ -614,19 +616,21 @@ struct mip6_bc *
 mip6_temp_deleted_proxy(m)
 	struct mbuf *m;
 {
-	struct m_tag *n;
+	struct ip6_hdr *ip6;
+	struct m_tag *mtag;
 	struct mip6_bc *mbc = NULL;
-	struct sockaddr_in6 src, dst;
 	struct ip6aux *ip6a;
 	
-	n = ip6_findaux(m);
-	if (!n)
-		return NULL;
+	ip6 = mtod(m, struct ip6_hdr *);
 
-	ip6a = (struct ip6aux *) (n + 1);
-	if ((ip6a->ip6a_flags & IP6A_TEMP_PROXYND_DEL) &&
-	     ip6_getpktaddrs(m, &src, &dst) == 0) {
-		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &dst);
+	mtag = ip6_findaux(m);
+	if (!mtag)
+		return (NULL);
+	ip6a = (struct ip6aux *) (mtag + 1);
+
+	if (ip6a->ip6a_flags & IP6A_TEMP_PROXYND_DEL) {
+		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
+		    &ip6->ip6_dst);
 		ip6a->ip6a_flags &= ~IP6A_TEMP_PROXYND_DEL;
 	}
 
@@ -642,22 +646,18 @@ mip6_bc_encapcheck(m, off, proto, arg)
 {
 	struct ip6_hdr *ip6;
 	struct mip6_bc *mbc = (struct mip6_bc *)arg;
-	struct sockaddr_in6 encap_src;
-	struct sockaddr_in6 *mnaddr;
+	struct in6_addr *mnaddr;
 
 	if (mbc == NULL) {
 		return (0);
 	}
 
 	ip6 = mtod(m, struct ip6_hdr*);
-	if (!ip6_findaux((struct mbuf *)m) ||
-	    ip6_getpktaddrs((struct mbuf *)m, &encap_src, NULL))
-		return (0);
 
 	mnaddr = &mbc->mbc_pcoa;
 
 	/* check mn addr */
-	if (!SA6_ARE_ADDR_EQUAL(&encap_src, mnaddr)) {
+	if (!IN6_ARE_ADDR_EQUAL(&ip6->ip6_src, mnaddr)) {
 		return (0);
 	}
 
@@ -686,7 +686,7 @@ mip6_dad_start(mbc)
 	ia->ia_addr.sin6_len = sizeof(ia->ia_addr);
 	ia->ia_ifp = mbc->mbc_ifp;
 	ia->ia6_flags |= IN6_IFF_TENTATIVE;
-	sa6_copy_addr(&mbc->mbc_phaddr, &ia->ia_addr);
+	ia->ia_addr.sin6_addr = mbc->mbc_phaddr;
 	if (in6_addr2zoneid(ia->ia_ifp, &ia->ia_addr.sin6_addr,
 			    &ia->ia_addr.sin6_scope_id)) {
 		FREE(ia, M_IFADDR);
@@ -773,8 +773,8 @@ mip6_dad_success(ifa)
 		mip6log((LOG_ERR,
 		    "%s:%d: sending BA(%d) to %s(%s) failed. send it later.\n",
 		    __FILE__, __LINE__, mbc->mbc_status,
-		    ip6_sprintf(&mbc->mbc_phaddr.sin6_addr),
-		    ip6_sprintf(&mbc->mbc_pcoa.sin6_addr)));
+		    ip6_sprintf(&mbc->mbc_phaddr),
+		    ip6_sprintf(&mbc->mbc_pcoa)));
 	}
 
 	return (0);
@@ -908,10 +908,10 @@ mip6_tunnel_output(mp, mbc)
 {
 	const struct encaptab *ep = mbc->mbc_encap;
 	struct mbuf *m = *mp;
-	struct sockaddr_in6 *encap_src = &mbc->mbc_addr;
-	struct sockaddr_in6 *encap_dst = &mbc->mbc_pcoa;
+	struct in6_addr *encap_src = &mbc->mbc_addr;
+	struct in6_addr *encap_dst = &mbc->mbc_pcoa;
 	struct ip6_hdr *ip6;
-	int len, error = 0;
+	int len;
 
 	if (ep->af != AF_INET6) {
 		mip6log((LOG_ERR,
@@ -922,7 +922,7 @@ mip6_tunnel_output(mp, mbc)
 
 	/* Recursion problems? */
 
-	if (SA6_IS_ADDR_UNSPECIFIED(encap_src)) {
+	if (IN6_IS_ADDR_UNSPECIFIED(encap_src)) {
 		mip6log((LOG_ERR,
 			 "%s:%d: the encap source address is unspecified\n",
 			 __FILE__, __LINE__));
@@ -963,21 +963,17 @@ mip6_tunnel_output(mp, mbc)
 #endif
 	ip6->ip6_nxt = IPPROTO_IPV6;
 	ip6->ip6_hlim = ip6_defhlim;
-	ip6->ip6_src = encap_src->sin6_addr;
+	ip6->ip6_src = *encap_src;
 
 	/* bidirectional configured tunnel mode */
-	if (!SA6_IS_ADDR_UNSPECIFIED(encap_dst))
-		ip6->ip6_dst = encap_dst->sin6_addr;
+	if (!IN6_IS_ADDR_UNSPECIFIED(encap_dst))
+		ip6->ip6_dst = *encap_dst;
 	else {
 		mip6log((LOG_ERR,
 			 "%s:%d: the encap dest address is unspecified\n",
 			 __FILE__, __LINE__));
 		m_freem(m);
 		return (ENETUNREACH);
-	}
-	if (ip6_setpktaddrs(m, encap_src, encap_dst) == NULL) {
-		m_freem(m);
-		return (error);
 	}
 
 	mip6stat.mip6s_orevtunnel++;
@@ -1011,7 +1007,8 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	struct mbuf *n;
 	struct ip6_hdr *ip6, *otip6, oip6, *nip6;
 	int otip6off, nxt;
-	struct sockaddr_in6 dst_sa, oip6src_sa, oip6dst_sa;
+	struct in6_addr dst;
+	struct sockaddr_in6 oip6src_sa, oip6dst_sa;
 	struct icmp6_hdr *icmp6, *nicmp6;
 	struct mip6_bc *mbc;
 	int error = 0;
@@ -1023,10 +1020,6 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		 */
 		return (0);
 	}
-
-	/* get packet addresses. */
-	if (ip6_getpktaddrs(m, NULL, &dst_sa))
-		return (EINVAL);
 
 	/* check if we have enough icmp payload size. */
 	if (icmp6len < sizeof(*otip6) + sizeof(oip6)) {
@@ -1054,6 +1047,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	 *     |icmp|ip(src=ha,dst=mncoa)|ip(src=cn,dst=mnhoa)|payload
 	 */
 	ip6 = mtod(m, struct ip6_hdr *);
+	dst = ip6->ip6_dst;
 	icmp6 = (struct icmp6_hdr *)((caddr_t)ip6 + off);
 	if (icmp6->icmp6_type >= 128) {
 		/*
@@ -1112,7 +1106,8 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	if (in6_embedscope(&oip6dst_sa.sin6_addr, &oip6dst_sa))
 		return (0); /* XXX */
 
-	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &oip6dst_sa);
+	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
+	    &oip6dst_sa.sin6_addr);
 	if (mbc == NULL) {
 		/* we are not a home agent of this mobile node ?? */
 		return (0);
@@ -1136,10 +1131,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		/* continue. */
 		return (0);
 	}
-	if (!ip6_setpktaddrs(n, &dst_sa, &oip6src_sa)) {
-		m_freem(n);
-		return (0);
-	}
+
 	/* fill the ip6_hdr. */
 	nip6 = mtod(n, struct ip6_hdr *);
 	nip6->ip6_flow = 0;
@@ -1148,10 +1140,8 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	nip6->ip6_plen = htons(n->m_pkthdr.len - sizeof(struct ip6_hdr));
 	nip6->ip6_nxt = IPPROTO_ICMPV6;
 	nip6->ip6_hlim = ip6_defhlim;
-	nip6->ip6_src = dst_sa.sin6_addr;
-	in6_clearscope(&nip6->ip6_src);
+	nip6->ip6_src = dst;
 	nip6->ip6_dst = oip6src_sa.sin6_addr;
-	in6_clearscope(&nip6->ip6_dst);
 
 	/* fill the icmp6_hdr. */
 	nicmp6 = (struct icmp6_hdr *)(nip6 + 1);

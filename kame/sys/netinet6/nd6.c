@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.339 2004/02/05 10:09:24 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.340 2004/02/05 12:38:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2185,7 +2185,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 #endif /* IPSEC */
 #if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	struct hif_softc *sc;
-	struct sockaddr_in6 src;
+	struct ip6_hdr *ip6;
 #endif /* MIP6 && MIP6_MOBILE_NODE */
 
 	bzero(&dstsock, sizeof(dstsock));
@@ -2194,7 +2194,8 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	dstsock.sin6_addr = *dst;
 
 #if defined(MIP6) && defined(MIP6_MOBILE_NODE)
-	sc = hif_list_find_withhaddr(&src);
+	ip6 = mtod(m0, struct ip6_hdr *);
+	sc = hif_list_find_withhaddr(&ip6->ip6_src);
 	if (sc && sc->hif_location == HIF_LOCATION_FOREIGN) {
 		return ((*sc->hif_if.if_output)((struct ifnet *)sc, m,
 		    (struct sockaddr *)&dstsock, rt));

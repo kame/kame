@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.243 2004/02/03 07:25:23 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.244 2004/02/05 12:38:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -433,8 +433,8 @@ nd6_ra_input(m, off, icmp6len)
 
 	/* update home agent list. */
 	if ((MIP6_IS_MN /* || MIP6_IS_HA */) && dr) {
-		if (mip6_ha_list_update_hainfo(&mip6_ha_list,
-					       dr, ndopts.nd_opts_hai)) {
+		if (mip6_ha_list_update_hainfo(&mip6_ha_list, dr,
+			ndopts.nd_opts_hai)) {
 			mip6log((LOG_ERR,
 				 "%s:%d: global HA list update failed\n",
 				 __FILE__, __LINE__));

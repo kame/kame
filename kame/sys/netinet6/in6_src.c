@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.136 2004/02/04 01:04:19 suz Exp $	*/
+/*	$KAME: in6_src.c,v 1.137 2004/02/05 12:38:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -305,7 +305,7 @@ in6_selectsrc(dst, opts, mopts, ro, laddr, ifpp, errorp)
 	     uh = LIST_NEXT(uh, unuse_entry)) {
 		if ((IN6_IS_ADDR_UNSPECIFIED(&uh->unuse_addr)
 			 || IN6_ARE_ADDR_EQUAL(dst, &uh->unuse_addr))
-		    && (!uh->unuse_port || (&dstsock->sin6_port == uh->unuse_port))) {
+		    && (!uh->unuse_port || (dstsock.sin6_port == uh->unuse_port))) {
 			usecoa = 1;
 			break;
 		}
@@ -413,7 +413,8 @@ in6_selectsrc(dst, opts, mopts, ro, laddr, ifpp, errorp)
 				for (sc = LIST_FIRST(&hif_softc_list); sc;
 				    sc = LIST_NEXT(sc, hif_entry)) {
 					mbu_ia_best = mip6_bu_list_find_home_registration(
-					    &sc->hif_bu_list, &ia_addr);
+					    &sc->hif_bu_list,
+					    &ia_addr.sin6_addr);
 					if (mbu_ia_best)
 						break;
 				}

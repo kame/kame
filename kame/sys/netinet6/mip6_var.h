@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.114 2004/01/21 00:00:36 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.115 2004/02/05 12:38:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -81,7 +81,8 @@ struct mip6_req {
 	u_int8_t mip6r_count;
 	union {
 		struct mip6_bc *mip6r_mbc;
-		struct sockaddr_in6 mip6r_sin6;
+		struct in6_addr mip6r_in6;
+		struct sockaddr_in6 mip6r_ssin6;
 		struct mip6_preferred_ifnames mip6r_ifnames;
 	} mip6r_ru;
 };
@@ -89,9 +90,9 @@ struct mip6_req {
 /* the binding cache entry. */
 struct mip6_bc {
 	LIST_ENTRY(mip6_bc)   mbc_entry;
-	struct sockaddr_in6   mbc_phaddr;    /* peer home address */
-	struct sockaddr_in6   mbc_pcoa;      /* peer coa */
-	struct sockaddr_in6   mbc_addr;      /* my addr (needed?) */
+	struct in6_addr       mbc_phaddr;    /* peer home address */
+	struct in6_addr       mbc_pcoa;      /* peer coa */
+	struct in6_addr       mbc_addr;      /* my addr (needed?) */
 	u_int8_t              mbc_status;    /* BA statue */
 	u_int8_t	      mbc_send_ba;   /* nonzero means BA should be sent */
 	u_int32_t             mbc_refresh;   /* Using for sending BA */
@@ -148,9 +149,9 @@ typedef u_int8_t mip6_careof_token_t[MIP6_CAREOF_TOKEN_SIZE];
 /* the binding update list entry. */
 struct mip6_bu {
 	LIST_ENTRY(mip6_bu) mbu_entry;
-	struct sockaddr_in6 mbu_paddr;      /* peer addr of this BU */
-	struct sockaddr_in6 mbu_haddr;      /* HoA */
-	struct sockaddr_in6 mbu_coa;        /* CoA */
+	struct in6_addr     mbu_paddr;      /* peer addr of this BU */
+	struct in6_addr     mbu_haddr;      /* HoA */
+	struct in6_addr     mbu_coa;        /* CoA */
 	u_int16_t           mbu_lifetime;   /* BU lifetime */
 	u_int16_t           mbu_refresh;    /* refresh frequency */
 	u_int16_t           mbu_seqno;      /* sequence number */
@@ -254,7 +255,7 @@ LIST_HEAD(mip6_unuse_hoa_list, mip6_unuse_hoa);
 
 struct mip6_ha {
 	TAILQ_ENTRY(mip6_ha) mha_entry;
-	struct sockaddr_in6  mha_addr ;    /* lladdr or global addr */
+	struct in6_addr      mha_addr ;    /* lladdr or global addr */
 	u_int8_t             mha_flags;    /* RA flags */
 	u_int16_t            mha_pref;     /* home agent preference */
 	u_int16_t            mha_lifetime; /* router lifetime */
@@ -277,13 +278,13 @@ struct mip6_prefix_ha {
 
 struct mip6_prefix {
 	LIST_ENTRY(mip6_prefix) mpfx_entry;
-	struct sockaddr_in6     mpfx_prefix;
+	struct in6_addr         mpfx_prefix;
 	u_int8_t                mpfx_prefixlen;
 	u_int32_t               mpfx_vltime;
 	time_t                  mpfx_vlexpire;
 	u_int32_t               mpfx_pltime;
 	time_t                  mpfx_plexpire;
-	struct sockaddr_in6     mpfx_haddr;
+	struct in6_addr         mpfx_haddr;
 	LIST_HEAD(mip6_prefix_ha_list, mip6_prefix_ha) mpfx_ha_list;
 	int                     mpfx_refcnt;
 

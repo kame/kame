@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.63 2004/01/19 07:12:43 keiichi Exp $	*/
+/*	$KAME: dest6.c,v 1.64 2004/02/05 12:38:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -90,7 +90,7 @@ dest6_input(mp, offp, proto)
 	u_int8_t *opt;
 #ifdef MIP6
 	struct m_tag *n;
-	struct sockaddr_in6 src_sa, dst_sa, home_sa;
+	struct in6_addr home;
 	struct ip6_opt_home_address *haopt = NULL;
 	struct ip6aux *ip6a = NULL;
 	struct ip6_hdr *ip6;
@@ -162,48 +162,39 @@ dest6_input(mp, offp, proto)
 
 			/* XXX check header ordering */
 
-			if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
-				/* must not happen. */
-				goto bad;
-			}
-			bzero(&home_sa, sizeof(home_sa));
-			home_sa.sin6_len = sizeof(home_sa);
-			home_sa.sin6_family = AF_INET6;
-			bcopy(haopt->ip6oh_addr, &home_sa.sin6_addr,
-			      sizeof(struct in6_addr));
-			if (scope6_check_id(&home_sa, ip6_use_defzone)
-			    != 0)
-				goto bad;
+			bcopy(haopt->ip6oh_addr, &home,
+			    sizeof(struct in6_addr));
+
 			/*
 			 * reject invalid home-addresses
 			 */
-			if (IN6_IS_ADDR_MULTICAST(&home_sa.sin6_addr) ||
-			    IN6_IS_ADDR_LINKLOCAL(&home_sa.sin6_addr) ||
-			    IN6_IS_ADDR_V4MAPPED(&home_sa.sin6_addr)  ||
-			    IN6_IS_ADDR_UNSPECIFIED(&home_sa.sin6_addr) ||
-			    IN6_IS_ADDR_LOOPBACK(&home_sa.sin6_addr)) {
+			if (IN6_IS_ADDR_MULTICAST(&home) ||
+			    IN6_IS_ADDR_LINKLOCAL(&home) ||
+			    IN6_IS_ADDR_V4MAPPED(&home)  ||
+			    IN6_IS_ADDR_UNSPECIFIED(&home) ||
+			    IN6_IS_ADDR_LOOPBACK(&home)) {
 				ip6stat.ip6s_badscope++;
-				(void)mobility6_send_be(&dst_sa, &src_sa,
-				    IP6_MH_BES_UNKNOWN_HAO, &home_sa);
+				(void)mobility6_send_be(&ip6->ip6_dst,
+				    &ip6->ip6_src, IP6_MH_BES_UNKNOWN_HAO,
+				    &home);
 				goto bad;
 			}
 
-			bcopy(&home_sa.sin6_addr, &ip6a->ip6a_coa,
-			    sizeof(ip6a->ip6a_coa));
+			bcopy(&home, &ip6a->ip6a_coa, sizeof(ip6a->ip6a_coa));
 			ip6a->ip6a_flags |= IP6A_HASEEN;
 
 			mip6stat.mip6s_hao++;
 
 			/* check whether this HAO is 'verified'. */
 			if ((mbc = mip6_bc_list_find_withphaddr(
-				&mip6_bc_list, &home_sa)) != NULL) {
+				&mip6_bc_list, &home)) != NULL) {
 				/*
 				 * we have a corresponding binding
 				 * cache entry for the home address
 				 * includes in this HAO.
 				 */
-				if (SA6_ARE_ADDR_EQUAL(&mbc->mbc_pcoa,
-				    &src_sa))
+				if (IN6_ARE_ADDR_EQUAL(&mbc->mbc_pcoa,
+				    &ip6->ip6_src))
 					verified = 1;
 			}
 			/*
@@ -260,8 +251,6 @@ dest6_swap_hao(ip6, ip6a, haopt)
 	/* XXX icmp6 responses is modified - which is bad */
 	bcopy(&ip6->ip6_src, &ip6a->ip6a_coa, sizeof(ip6a->ip6a_coa));
 	bcopy(haopt->ip6oh_addr, &ip6->ip6_src, sizeof(ip6->ip6_src));
-	bcopy(haopt->ip6oh_addr, &ip6a->ip6a_src.sin6_addr,
-	    sizeof(ip6a->ip6a_src.sin6_addr));
 	bcopy(&ip6a->ip6a_coa, haopt->ip6oh_addr, sizeof(haopt->ip6oh_addr));
 #if 0
 	/* XXX linklocal address is (currently) not supported */
@@ -313,7 +302,7 @@ dest6_mip6_hao(m, mhoff, nxt)
 	struct ip6aux *ip6a;
 	struct ip6_opt ip6o;
 	struct m_tag *n;
-	struct sockaddr_in6 home_sa;
+	struct in6_addr home;
 	struct ip6_opt_home_address haopt;
 	struct ip6_mh mh;
 	int newoff, off, proto, swap;
@@ -384,10 +373,9 @@ dest6_mip6_hao(m, mhoff, nxt)
 
 	/* reject */
 	mip6stat.mip6s_unverifiedhao++;
-	home_sa = ip6a->ip6a_src;
-	home_sa.sin6_addr = *(struct in6_addr *)haopt.ip6oh_addr;
-	mobility6_send_be(&ip6a->ip6a_dst, &ip6a->ip6a_src,
-	    IP6_MH_BES_UNKNOWN_HAO, &home_sa);
+	home = *(struct in6_addr *)haopt.ip6oh_addr;
+	mobility6_send_be(&ip6->ip6_dst, &ip6->ip6_src,
+	    IP6_MH_BES_UNKNOWN_HAO, &home);
 
 	return (-1);
 }

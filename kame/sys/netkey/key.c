@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.326 2004/02/03 22:58:15 suz Exp $	*/
+/*	$KAME: key.c,v 1.327 2004/02/05 12:38:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -8422,12 +8422,12 @@ key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 
 	/* update a SADB from a home agent to a mobile node. */
 	LIST_FOREACH(sa, &sahtree, chain) {
-		if (!SA6_ARE_ADDR_EQUAL(haaddr,
-			(struct sockaddr_in6 *)&sa->saidx.src))
+		if (!IN6_ARE_ADDR_EQUAL(&haaddr->sin6_addr,
+			&((struct sockaddr_in6 *)&sa->saidx.src)->sin6_addr))
 			continue;
 /* XXX don't check the old CoA.  instead, we use a uniqid.
-		if (!SA6_ARE_ADDR_EQUAL(ocoa,
-			(struct sockaddr_in6 *)&sa->saidx.dst))
+		if (!IN6_ARE_ADDR_EQUAL(&ocoa->sin6_addr,
+			&((struct sockaddr_in6 *)&sa->saidx.dst)->sin6_addr))
 			continue;
 */
 		if (sa->saidx.mode != IPSEC_MODE_TUNNEL)
@@ -8468,12 +8468,12 @@ key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 	/* update a SADB from a mobile node to a home agent. */
 	LIST_FOREACH(sa, &sahtree, chain) {
 /* XXX don't check the old CoA.  instead, we use uniqid.
-		if (!SA6_ARE_ADDR_EQUAL(ocoa,
-			(struct sockaddr_in6 *)&sa->saidx.src))
+		if (!IN6_ARE_ADDR_EQUAL(&ocoa->sin6_addr,
+			&((struct sockaddr_in6 *)&sa->saidx.src)->sin6_addr))
 			continue;
 */
-		if (!SA6_ARE_ADDR_EQUAL(haaddr,
-			(struct sockaddr_in6 *)&sa->saidx.dst))
+		if (!IN6_ARE_ADDR_EQUAL(&haaddr->sin6_addr,
+			&((struct sockaddr_in6 *)&sa->saidx.dst)->sin6_addr))
 			continue;
 		if (sa->saidx.mode != IPSEC_MODE_TUNNEL)
 			continue;
@@ -8524,12 +8524,12 @@ key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr)
 	/* update a SADB from a mobile node to a home agent. */
 	LIST_FOREACH(sa, &sahtree, chain) {
 /* XXX don't check the old CoA.  instead we use a uniqid.
-		if (!SA6_ARE_ADDR_EQUAL(ocoa,
-			(struct sockaddr_in6 *)&sa->saidx.src))
+		if (!IN6_ARE_ADDR_EQUAL(&ocoa->sin6_addr,
+		    &((struct sockaddr_in6 *)&sa->saidx.src)->sin6_addr))
 			continue;
 */
-		if (!SA6_ARE_ADDR_EQUAL(haaddr,
-			(struct sockaddr_in6 *)&sa->saidx.dst))
+		if (!IN6_ARE_ADDR_EQUAL(&haaddr->sin6_addr,
+			&((struct sockaddr_in6 *)&sa->saidx.dst)->sin6_addr))
 			continue;
 		if (sa->saidx.mode != IPSEC_MODE_TUNNEL)
 			continue;
@@ -8564,12 +8564,12 @@ key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr)
 
 	/* update a SADB from a home agent to a mobile node. */
 	LIST_FOREACH(sa, &sahtree, chain) {
-		if (!SA6_ARE_ADDR_EQUAL(haaddr,
-			(struct sockaddr_in6 *)&sa->saidx.src))
+		if (!IN6_ARE_ADDR_EQUAL(&haaddr->sin6_addr,
+			&((struct sockaddr_in6 *)&sa->saidx.src)->sin6_addr))
 			continue;
 /* XXX don't check the old CoA.  instead, we use a uniqid.
-		if (!SA6_ARE_ADDR_EQUAL(ocoa,
-			(struct sockaddr_in6 *)&sa->saidx.dst))
+		if (!IN6_ARE_ADDR_EQUAL(&ocoa->sin6_addr,
+			&((struct sockaddr_in6 *)&sa->saidx.dst)->sin6_addr))
 			continue;
 */
 		if (sa->saidx.mode != IPSEC_MODE_TUNNEL)
@@ -8628,11 +8628,11 @@ key_mip6_find_sp(dir, src, dst)
 #endif
 
 		/* check addresses. */
-		if (!SA6_ARE_ADDR_EQUAL(src,
-			(struct sockaddr_in6 *)&spidx->src))
+		if (!IN6_ARE_ADDR_EQUAL(&src->sin6_addr,
+			&((struct sockaddr_in6 *)&spidx->src)->sin6_addr))
 			continue;
-		if (!SA6_ARE_ADDR_EQUAL(dst,
-			(struct sockaddr_in6 *)&spidx->dst))
+		if (!IN6_ARE_ADDR_EQUAL(&dst->sin6_addr,
+			&((struct sockaddr_in6 *)&spidx->dst)->sin6_addr))
 			continue;
 
 		/* found. */

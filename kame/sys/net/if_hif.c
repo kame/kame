@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.66 2004/01/24 09:15:01 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.67 2004/02/05 12:38:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -449,7 +449,7 @@ hif_find_preferable_ha(hif)
 		if (!hif_prefix_list_find_withmha(&hif->hif_prefix_list_home,
 		    mha))
 			continue;
-		if (IN6_IS_ADDR_LINKLOCAL(&mha->mha_addr.sin6_addr))
+		if (IN6_IS_ADDR_LINKLOCAL(&mha->mha_addr))
 			continue;
 		/* return the entry we have found first. */
 		return (mha);
@@ -465,7 +465,7 @@ hif_find_preferable_ha(hif)
 struct mip6_ha *
 hif_find_next_preferable_ha(hif, haaddr)
 	struct hif_softc *hif;
-	struct sockaddr_in6 *haaddr;
+	struct in6_addr *haaddr;
 {
 	struct mip6_ha *curmha, *mha;
 
@@ -494,7 +494,7 @@ hif_find_next_preferable_ha(hif, haaddr)
  */
 struct hif_softc *
 hif_list_find_withhaddr(haddr)
-     struct sockaddr_in6 *haddr;
+     struct in6_addr *haddr;
 {
 	struct hif_softc *hif;
 	struct hif_prefix *hpfx;
@@ -505,7 +505,7 @@ hif_list_find_withhaddr(haddr)
 		for (hpfx = LIST_FIRST(&hif->hif_prefix_list_home); hpfx;
 		    hpfx = LIST_NEXT(hpfx, hpfx_entry)) {
 			mpfx = hpfx->hpfx_mpfx;
-			if (SA6_ARE_ADDR_EQUAL(&mpfx->mpfx_haddr, haddr))
+			if (IN6_ARE_ADDR_EQUAL(&mpfx->mpfx_haddr, haddr))
 				return (hif);
 		}
 	}
@@ -570,7 +570,7 @@ hif_prefix_list_update_withhaaddr(sc, data)
 	struct hif_ifreq *hifr = (struct hif_ifreq *)data;
 	struct mip6_ha *nmha = (struct mip6_ha *)data;
 	struct mip6_ha *mha;
-	struct sockaddr_in6 prefix;
+	struct in6_addr prefix;
 	struct mip6_prefix *mpfx;
 	struct hif_softc *hif;
 	int error = 0;
@@ -586,10 +586,10 @@ hif_prefix_list_update_withhaaddr(sc, data)
 		return (EINVAL);
 	}
 	nmha = &hifr->ifr_ifru.ifr_mha;
-	if (IN6_IS_ADDR_UNSPECIFIED(&nmha->mha_addr.sin6_addr)
-	    ||IN6_IS_ADDR_LOOPBACK(&nmha->mha_addr.sin6_addr)
-	    ||IN6_IS_ADDR_LINKLOCAL(&nmha->mha_addr.sin6_addr)
-	    || IN6_IS_ADDR_SITELOCAL(&nmha->mha_addr.sin6_addr))
+	if (IN6_IS_ADDR_UNSPECIFIED(&nmha->mha_addr)
+	    ||IN6_IS_ADDR_LOOPBACK(&nmha->mha_addr)
+	    ||IN6_IS_ADDR_LINKLOCAL(&nmha->mha_addr)
+	    || IN6_IS_ADDR_SITELOCAL(&nmha->mha_addr))
 		return (EINVAL);
 
 	mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &nmha->mha_addr);
@@ -613,12 +613,8 @@ hif_prefix_list_update_withhaaddr(sc, data)
 	mpfx = mip6_prefix_list_find_withprefix(&mha->mha_addr, 64 /* XXX */);
 	if (mpfx == NULL) {
 		bzero(&prefix, sizeof(prefix));
-		prefix.sin6_len = sizeof(prefix);
-		prefix.sin6_family = AF_INET6;
-		prefix.sin6_addr.s6_addr32[0]
-		    = mha->mha_addr.sin6_addr.s6_addr32[0];
-		prefix.sin6_addr.s6_addr32[1]
-		    = mha->mha_addr.sin6_addr.s6_addr32[1];
+		prefix.s6_addr32[0] = mha->mha_addr.s6_addr32[0];
+		prefix.s6_addr32[1] = mha->mha_addr.s6_addr32[1];
 		mpfx = mip6_prefix_create(&prefix, 64 /* XXX */, 
 		    65535 /* XXX */, 0);
 		if (mpfx == NULL)
@@ -683,7 +679,7 @@ hif_prefix_list_remove(hpfx_list, hpfx)
 struct hif_prefix *
 hif_prefix_list_find_withprefix(hif_prefix_list, prefix, prefixlen)
 	struct hif_prefix_list *hif_prefix_list;
-	struct sockaddr_in6 *prefix;
+	struct in6_addr *prefix;
 	int prefixlen;
 {
 	struct hif_prefix *hpfx;
@@ -692,8 +688,8 @@ hif_prefix_list_find_withprefix(hif_prefix_list, prefix, prefixlen)
 	for (hpfx = LIST_FIRST(hif_prefix_list); hpfx;
 	    hpfx = LIST_NEXT(hpfx, hpfx_entry)) {
 		mpfx = hpfx->hpfx_mpfx;
-		if (in6_are_prefix_equal(&prefix->sin6_addr,
-		    &mpfx->mpfx_prefix.sin6_addr, prefixlen)
+		if (in6_are_prefix_equal(prefix, &mpfx->mpfx_prefix,
+			prefixlen)
 		    && (prefixlen == mpfx->mpfx_prefixlen)) {
 			/* found. */
 			return (hpfx);
@@ -706,7 +702,7 @@ hif_prefix_list_find_withprefix(hif_prefix_list, prefix, prefixlen)
 struct hif_prefix *
 hif_prefix_list_find_withhaaddr(hif_prefix_list, haaddr)
 	struct hif_prefix_list *hif_prefix_list;
-	struct sockaddr_in6 *haaddr;
+	struct in6_addr *haaddr;
 {
 	struct hif_prefix *hpfx;
 	struct mip6_prefix *mpfx;
@@ -719,7 +715,7 @@ hif_prefix_list_find_withhaaddr(hif_prefix_list, haaddr)
 		for (mpfxha = LIST_FIRST(&mpfx->mpfx_ha_list); mpfxha;
 		    mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
 			mha = mpfxha->mpfxha_mha;
-			if (SA6_ARE_ADDR_EQUAL(&mha->mha_addr, haaddr))
+			if (IN6_ARE_ADDR_EQUAL(&mha->mha_addr, haaddr))
 				return (hpfx);
 		}
 	}
@@ -790,11 +786,8 @@ hif_site_prefix_list_update_withioctl(sc, data)
 
 	for (hsp = LIST_FIRST(&sc->hif_sp_list); hsp;
 	     hsp = LIST_NEXT(hsp, hsp_entry)) {
-		if (!in6_are_prefix_equal(&nhsp->hsp_prefix.sin6_addr,
-			&hsp->hsp_prefix.sin6_addr, nhsp->hsp_prefixlen))
-			continue;
-		if (nhsp->hsp_prefix.sin6_scope_id
-		    != hsp->hsp_prefix.sin6_scope_id)
+		if (!in6_are_prefix_equal(&nhsp->hsp_prefix, &hsp->hsp_prefix,
+			nhsp->hsp_prefixlen))
 			continue;
 		if (nhsp->hsp_prefixlen != hsp->hsp_prefixlen)
 			continue;
@@ -825,7 +818,6 @@ hif_output(ifp, m, dst, rt)
      struct sockaddr *dst;
      struct rtentry *rt;
 {
-	struct sockaddr_in6 src_sa, dst_sa;
 	struct mip6_bu *mbu;
 	struct hif_softc *hif = (struct hif_softc *)ifp;
 	struct ip6_hdr *ip6;
@@ -905,23 +897,19 @@ hif_output(ifp, m, dst, rt)
 	 * if ! link-local, prepend an outer ip header and send it.
 	 * if link-local, discard it.
 	 */
-	if (ip6_getpktaddrs(m, &src_sa, &dst_sa))
+	ip6 = mtod(m, struct ip6_hdr *);
+	if (IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_src)
+	    || IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst)
+	    || IN6_IS_ADDR_SITELOCAL(&ip6->ip6_src)
+	    || IN6_IS_ADDR_SITELOCAL(&ip6->ip6_dst))
 		goto done;
 
-	if (IN6_IS_ADDR_LINKLOCAL(&src_sa.sin6_addr)
-	    || IN6_IS_ADDR_LINKLOCAL(&dst_sa.sin6_addr)
-#ifdef MIP6_DISABLE_SITELOCAL
-	    || IN6_IS_ADDR_SITELOCAL(&src_sa.sin6_addr)
-	    || IN6_IS_ADDR_SITELOCAL(&dst_sa.sin6_addr)
-#endif
-		)
-		goto done;
-
-	mbu = mip6_bu_list_find_home_registration(&hif->hif_bu_list, &src_sa);
+	mbu = mip6_bu_list_find_home_registration(&hif->hif_bu_list,
+	    &ip6->ip6_src);
 	if (!mbu)
 		goto done;
 
-	if (IN6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr.sin6_addr))
+	if (IN6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr))
 		goto done;
 
 	M_PREPEND(m, sizeof(struct ip6_hdr), M_DONTWAIT);
@@ -937,12 +925,8 @@ hif_output(ifp, m, dst, rt)
 	ip6->ip6_plen = htons((u_short)m->m_pkthdr.len - sizeof(*ip6));
 	ip6->ip6_nxt = IPPROTO_IPV6;
 	ip6->ip6_hlim = ip6_defhlim;
-	ip6->ip6_src = mbu->mbu_coa.sin6_addr;
-	ip6->ip6_dst = mbu->mbu_paddr.sin6_addr;
-	if (!ip6_setpktaddrs(m, &mbu->mbu_coa, &mbu->mbu_paddr))
-		goto done;
-	in6_clearscope(&ip6->ip6_src);
-	in6_clearscope(&ip6->ip6_dst);
+	ip6->ip6_src = mbu->mbu_coa;
+	ip6->ip6_dst = mbu->mbu_paddr;
 	mip6stat.mip6s_orevtunnel++;
 #ifdef IPV6_MINMTU
 	/* XXX */

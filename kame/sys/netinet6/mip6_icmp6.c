@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.87 2004/01/24 09:15:01 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.88 2004/02/05 12:38:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -106,32 +106,22 @@
 u_int16_t mip6_dhaad_id = 0;
 u_int16_t mip6_mps_id = 0;
 
-static const struct sockaddr_in6 haanyaddr_ifid64 = {
-	sizeof(struct sockaddr_in6),	/* sin6_len */
-	AF_INET6,			/* sin6_family */
-	0,				/* sin6_port */
-	0,				/* sin6_flowinfo */
-	{{{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-	    0xfd, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe }}},
-	0				/* sin6_scope_id */
+static const struct in6_addr haanyaddr_ifid64 = {
+	{{ 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+	    0xfd, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe }}
 };
-static const struct sockaddr_in6 haanyaddr_ifidnn = {
-	sizeof(struct sockaddr_in6),	/* sin6_len */
-	AF_INET6,			/* sin6_family */
-	0,				/* sin6_port */
-	0,				/* sin6_flowinfo */
-	{{{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-	    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe }}},
-	0				/* sin6_scope_id */
+static const struct in6_addr haanyaddr_ifidnn = {
+	{{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
+	    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe }}
 };
 #endif /* MIP6_MOBILE_NODE */
 
-static void mip6_icmp6_find_addr(struct mbuf *, int, int,
-    struct sockaddr_in6 *,  struct sockaddr_in6 *);
+static void mip6_icmp6_find_addr(struct mbuf *, int, int, struct in6_addr *,
+    struct in6_addr *);
 #ifdef MIP6_MOBILE_NODE
 static int mip6_icmp6_dhaad_rep_input(struct mbuf *, int, int);
 static int mip6_dhaad_ha_list_insert(struct hif_softc *, struct mip6_ha *);
-static int mip6_icmp6_create_haanyaddr(struct sockaddr_in6 *,
+static int mip6_icmp6_create_haanyaddr(struct in6_addr *,
     struct mip6_prefix *);
 static int mip6_icmp6_mp_adv_input(struct mbuf *, int, int);
 #endif
@@ -145,7 +135,7 @@ mip6_icmp6_input(m, off, icmp6len)
 	struct ip6_hdr *ip6;
 	struct icmp6_hdr *icmp6;
 	struct mip6_bc *mbc;
-	struct sockaddr_in6 laddr, paddr;
+	struct in6_addr laddr, paddr;
 #ifdef MIP6_MOBILE_NODE
 	int error = 0;
 	caddr_t origip6;
@@ -171,10 +161,8 @@ mip6_icmp6_input(m, off, icmp6len)
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &paddr);
 		if (mbc && (mbc->mbc_flags & IP6MU_HOME) == 0) {
 			mip6log((LOG_INFO,
-				 "%s:%d: "
-				 "a mobile node (%s) moved.\n",
-				 __FILE__, __LINE__,
-				 ip6_sprintf(&paddr.sin6_addr)));
+			    "mip6_icmp6_input:%d: a mobile node (%s) moved.\n",
+			    __LINE__, ip6_sprintf(&paddr)));
 			mip6_bc_list_remove(&mip6_bc_list, mbc);
 		}
 		break;
@@ -236,9 +224,8 @@ mip6_icmp6_input(m, off, icmp6len)
 				mip6_icmp6_find_addr(m, off, icmp6len,
 						     &laddr, &paddr);
 				mip6log((LOG_NOTICE,
-					 "%s:%d: a node (%s) doesn't support a home address destopt.\n",
-					 __FILE__, __LINE__,
-					 ip6_sprintf(&paddr.sin6_addr)));
+				    "mip6_icmp6_input:%d: a node (%s) doesn't support a home address destopt.\n",
+				    __LINE__, ip6_sprintf(&paddr)));
 				/*
 				 * if the peer doesn't support HAO, we
 				 * must use bi-directional tunneling
@@ -266,10 +253,8 @@ mip6_icmp6_input(m, off, icmp6len)
 				mip6_icmp6_find_addr(m, off, icmp6len,
 						     &laddr, &paddr);
 				mip6log((LOG_NOTICE,
-					 "%s:%d: a node (%s) doesn't support "
-					 "Mobile IPv6.\n",
-					 __FILE__, __LINE__,
-					 ip6_sprintf(&paddr.sin6_addr)));
+				    "mip6_icmp6_input:%d: a node (%s) doesn't support Mobile IPv6.\n",
+				    __LINE__, ip6_sprintf(&paddr)));
 				for (sc = LIST_FIRST(&hif_softc_list); sc;
 				    sc = LIST_NEXT(sc, hif_entry)) {
 					mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &paddr, &laddr);
@@ -287,19 +272,18 @@ mip6_icmp6_input(m, off, icmp6len)
 }
 
 static void
-mip6_icmp6_find_addr(m, icmp6off, icmp6len, sin6local, sin6peer)
+mip6_icmp6_find_addr(m, icmp6off, icmp6len, local, peer)
 	struct mbuf *m;
 	int icmp6off;
 	int icmp6len; /* Total icmp6 payload length */
-	struct sockaddr_in6 *sin6local; /* Local home address */
-	struct sockaddr_in6 *sin6peer; /* Peer home address */
+	struct in6_addr *local; /* Local home address */
+	struct in6_addr *peer; /* Peer home address */
 {
 	caddr_t icmp6;
 	struct ip6_opt_home_address *haddr_opt; /* Home Address option */
 	struct ip6_hdr *ip6;                    /* IPv6 header */
 	struct ip6_ext *ehdr;                   /* Extension header */
-	struct in6_addr *la;                    /* Local home address */
-	struct in6_addr *pa;                    /* Peer home address */
+	struct sockaddr_in6 local_sa, peer_sa;
 	struct ip6_rthdr2 *rh;                  /* Routing header */
 	u_int8_t *eopt, nxt, optlen;
 	int off, elen, eoff;
@@ -311,8 +295,8 @@ mip6_icmp6_find_addr(m, icmp6off, icmp6len, sin6local, sin6peer)
 	nxt = ip6->ip6_nxt;
 	off += sizeof(struct ip6_hdr);
 
-	la = &ip6->ip6_src;
-	pa = &ip6->ip6_dst;
+	*local = ip6->ip6_src;
+	*peer = ip6->ip6_dst;
 
 	/* Search original IPv6 header extensions for Routing Header type 0
 	   and for home address option (if I'm a mobile node). */
@@ -334,8 +318,8 @@ mip6_icmp6_find_addr(m, icmp6off, icmp6len, sin6local, sin6peer)
 						break;
 
 					haddr_opt = (struct ip6_opt_home_address *)eopt;
-					la = (struct in6_addr *)
-						haddr_opt->ip6oh_addr;
+					bcopy((caddr_t)haddr_opt->ip6oh_addr,
+					    local, sizeof(struct in6_addr));
 					eoff += optlen;
 					eopt += optlen;
 					continue;
@@ -358,7 +342,8 @@ mip6_icmp6_find_addr(m, icmp6off, icmp6len, sin6local, sin6peer)
 			}
 
 			addr_off = 8 + (((rh->ip6r2_len / 2) - 1) << 3);
-			pa = (struct in6_addr *)(icmp6 + off + addr_off);
+			bcopy((caddr_t)(icmp6 + off + addr_off), peer,
+			    sizeof(struct in6_addr));
 
 			nxt = rh->ip6r2_nxt;
 			off += (rh->ip6r2_len + 1) << 3;
@@ -376,17 +361,21 @@ mip6_icmp6_find_addr(m, icmp6off, icmp6len, sin6local, sin6peer)
 		break;
 	}
 
-	sin6local->sin6_len = sizeof(*sin6local);
-	sin6local->sin6_family = AF_INET6;
-	sin6local->sin6_addr = *la;
-	in6_addr2zoneid(m->m_pkthdr.rcvif, &sin6local->sin6_addr,
-			&sin6local->sin6_scope_id); /* XXX */
+	local_sa.sin6_len = sizeof(local_sa);
+	local_sa.sin6_family = AF_INET6;
+	local_sa.sin6_addr = *local;
+	/* XXX */
+	in6_addr2zoneid(m->m_pkthdr.rcvif, &local_sa.sin6_addr,
+	    &local_sa.sin6_scope_id);
+	in6_embedscope(local, &local_sa);
 
-	sin6peer->sin6_len = sizeof(*sin6peer);
-	sin6peer->sin6_family = AF_INET6;
-	sin6peer->sin6_addr = *pa;
-	in6_addr2zoneid(m->m_pkthdr.rcvif, &sin6peer->sin6_addr,
-			&sin6peer->sin6_scope_id); /* XXX */
+	peer_sa.sin6_len = sizeof(peer_sa);
+	peer_sa.sin6_family = AF_INET6;
+	peer_sa.sin6_addr = *peer;
+	/* XXX */
+	in6_addr2zoneid(m->m_pkthdr.rcvif, &peer_sa.sin6_addr,
+	    &peer_sa.sin6_scope_id);
+	in6_embedscope(peer, &peer_sa);
 }
 
 #ifdef MIP6_MOBILE_NODE
@@ -397,12 +386,11 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	int icmp6len;
 {
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 sin6src;
 	struct mip6_dhaad_rep *hdrep;
 	u_int16_t hdrep_id;
 	struct mip6_ha *mha, *mha_prefered = NULL;
 	struct in6_addr *haaddrs, *haaddrptr;
-	struct sockaddr_in6 haaddr;
+	struct sockaddr_in6 haaddr_sa;
 	int i, hacount = 0;
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
@@ -415,10 +403,6 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 #endif /* __FreeBSD__ */
 
 	ip6 = mtod(m, struct ip6_hdr *);
-	if (ip6_getpktaddrs(m, &sin6src, NULL)) {
-		m_freem(m);
-		return (EINVAL);
-	}
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, icmp6len, EINVAL);
 	hdrep = (struct mip6_dhaad_rep *)((caddr_t)ip6 + off);
@@ -426,8 +410,8 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	IP6_EXTHDR_GET(hdrep, struct mip6_dhaad_rep *, m, off, icmp6len);
 	if (hdrep == NULL) {
 		mip6log((LOG_ERR,
-		    "%s:%d: failed to EXTHDR_GET.\n",
-		    __FILE__, __LINE__));
+		    "mip6_icmp6_dhaad_rep_input:%d: failed to EXTHDR_GET.\n",
+		    __LINE__));
 		return (EINVAL);
 	}
 #endif
@@ -444,8 +428,9 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 		/ sizeof(struct in6_addr);
 	if (hacount == 0) {
 		mip6log((LOG_ERR,
-		    "%s:%d: DHAAD reply includes no home agent.\n",
-		    __FILE__, __LINE__));
+		    "mip6_icmp6_dhaad_rep_input:%d: "
+		    "DHAAD reply includes no home agent.\n",
+		    __LINE__));
 		m_freem(m);
 		return (EINVAL);
 	}
@@ -471,20 +456,21 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	/* install addresses of a home agent specified in the message */
 	haaddrptr = haaddrs;
 	for (i = 0; i < hacount; i++) {
-		bzero(&haaddr, sizeof(haaddr));
-		haaddr.sin6_len = sizeof(haaddr);
-		haaddr.sin6_family = AF_INET6;
-		haaddr.sin6_addr = *haaddrptr++;
+		bzero(&haaddr_sa, sizeof(haaddr_sa));
+		haaddr_sa.sin6_len = sizeof(haaddr_sa);
+		haaddr_sa.sin6_family = AF_INET6;
+		haaddr_sa.sin6_addr = *haaddrptr++;
 		/*
 		 * XXX we cannot get a correct zone id by looking only
 		 * in6_addr structure.
 		 */
-		if (in6_addr2zoneid(m->m_pkthdr.rcvif, &haaddr.sin6_addr,
-		    &haaddr.sin6_scope_id))
+		if (in6_addr2zoneid(m->m_pkthdr.rcvif, &haaddr_sa.sin6_addr,
+		    &haaddr_sa.sin6_scope_id))
 			continue;
-		if (in6_embedscope(&haaddr.sin6_addr, &haaddr))
+		if (in6_embedscope(&haaddr_sa.sin6_addr, &haaddr_sa))
 			continue;
-		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &haaddr);
+		mha = mip6_ha_list_find_withaddr(&mip6_ha_list,
+		    &haaddr_sa.sin6_addr);
 		if (mha) {
 			/*
 			 * if this home agent already exists in the list,
@@ -506,8 +492,8 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 			 * to the internal home agent list
 			 * (mip6_ha_list).
 			 */
-			mha = mip6_ha_create(&haaddr, ND_RA_FLAG_HOME_AGENT,
-			    0, 0);
+			mha = mip6_ha_create(&haaddr_sa.sin6_addr,
+			    ND_RA_FLAG_HOME_AGENT, 0, 0);
 			if (mha == NULL) {
 				mip6log((LOG_ERR,
 				    "%s:%d: mip6_ha create failed\n",
@@ -537,7 +523,7 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	for (mbu = LIST_FIRST(&sc->hif_bu_list); mbu;
 	     mbu = LIST_NEXT(mbu, mbu_entry)) {
 		if ((mbu->mbu_flags & IP6MU_HOME)
-		    && SA6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr)) {
+		    && IN6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr)) {
 			/* home registration. */
 			mbu->mbu_paddr = mha_prefered->mha_addr;
 			if (!MIP6_IS_BU_BOUND_STATE(mbu)) {
@@ -547,9 +533,9 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 					    "sending a binding update "
 					    "from %s(%s) to %s failed.\n",
 					    __FILE__, __LINE__,
-					    ip6_sprintf(&mbu->mbu_haddr.sin6_addr),
-					    ip6_sprintf(&mbu->mbu_coa.sin6_addr),
-					    ip6_sprintf(&mbu->mbu_paddr.sin6_addr)));
+					    ip6_sprintf(&mbu->mbu_haddr),
+					    ip6_sprintf(&mbu->mbu_coa),
+					    ip6_sprintf(&mbu->mbu_paddr)));
 				}
 			}
 		}
@@ -578,8 +564,8 @@ int
 mip6_icmp6_dhaad_req_output(sc)
 	struct hif_softc *sc;
 {
-	struct sockaddr_in6 hif_coa;
-	struct sockaddr_in6 haanyaddr;
+	struct in6_addr hif_coa;
+	struct in6_addr haanyaddr;
 	struct mip6_prefix *mpfx;
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
@@ -608,14 +594,7 @@ mip6_icmp6_dhaad_req_output(sc)
 		    "no avaiable CoA.\n"));
 		return (0);
 	}
-	hif_coa = sc->hif_coa_ifa->ia_addr;
-	if (in6_addr2zoneid(sc->hif_coa_ifa->ia_ifp, &hif_coa.sin6_addr,
-	    &hif_coa.sin6_scope_id)) {
-		/* must not happen. */
-	}
-	if (in6_embedscope(&hif_coa.sin6_addr, &hif_coa)) {
-		/* must not happen. */
-	}
+	hif_coa = sc->hif_coa_ifa->ia_addr.sin6_addr;
 
 	/*
 	 * we must determine the home agent subnet anycast address.
@@ -662,10 +641,6 @@ mip6_icmp6_dhaad_req_output(sc)
 	hdreq->mip6_dhreq_cksum = in6_cksum(m, IPPROTO_ICMPV6, off, icmp6len);
 
 	/* send the DHAAD request packet to the home agent anycast address. */
-	if (!ip6_setpktaddrs(m, &hif_coa, &haanyaddr)) {
-		m_freem(m);
-		return (EINVAL);
-	}
 	error = ip6_output(m, NULL, NULL, 0, NULL, NULL
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 			   , NULL
@@ -695,7 +670,7 @@ mip6_icmp6_dhaad_req_output(sc)
 
 static int
 mip6_icmp6_create_haanyaddr(haanyaddr, mpfx)
-	struct sockaddr_in6 *haanyaddr;
+	struct in6_addr *haanyaddr;
 	struct mip6_prefix *mpfx;
 {
 	struct nd_prefix ndpr;
@@ -717,7 +692,7 @@ mip6_icmp6_create_haanyaddr(haanyaddr, mpfx)
 
 int
 mip6_icmp6_mp_sol_output(haddr, haaddr)
-	struct sockaddr_in6 *haddr, *haaddr;
+	struct in6_addr *haddr, *haaddr;
 {
 	struct hif_softc *sc;
 	struct mbuf *m;
@@ -740,7 +715,7 @@ mip6_icmp6_mp_sol_output(haddr, haaddr)
 		    "mip6_icmp6_mp_sol_output:%d: "
 		    "no corresponding hif interface with %s.\n",
 		    __LINE__,
-		    ip6_sprintf(&haddr->sin6_addr)));
+		    ip6_sprintf(haddr)));
 		return (0);
 	}
 
@@ -789,10 +764,8 @@ mip6_icmp6_mp_sol_output(haddr, haaddr)
 	/* ip6->ip6_plen will be set later */
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	ip6->ip6_hlim = ip6_defhlim;
-	ip6->ip6_src = haddr->sin6_addr;
-	in6_clearscope(&ip6->ip6_src);
-	ip6->ip6_dst = haaddr->sin6_addr;
-	in6_clearscope(&ip6->ip6_dst);
+	ip6->ip6_src = *haddr;
+	ip6->ip6_dst = *haaddr;
 	mp_sol = (struct mip6_prefix_solicit *)(ip6 + 1);
 	mp_sol->mip6_ps_type = MIP6_PREFIX_SOLICIT;
 	mp_sol->mip6_ps_code = 0;
@@ -805,10 +778,6 @@ mip6_icmp6_mp_sol_output(haddr, haaddr)
 	mp_sol->mip6_ps_cksum = in6_cksum(m, IPPROTO_ICMPV6, sizeof(*ip6),
 	    icmp6len);
 
-	if (!ip6_setpktaddrs(m, haddr, haaddr)) {
-		m_freem(m);
-		return (EINVAL);
-	}
 	error = ip6_output(m, 0, 0, 0, 0 ,NULL
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
 	    , NULL
@@ -835,7 +804,6 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 	struct ip6_hdr *ip6;
 	struct m_tag *mtag;
 	struct ip6aux *ip6a;
-	struct sockaddr_in6 src_sa, dst_sa;
 	struct mip6_prefix_advert *mp_adv;
 	union nd_opts ndopts;
 	struct nd_opt_hdr *ndopt;
@@ -863,10 +831,6 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 
 
 	ip6 = mtod(m, struct ip6_hdr *);
-	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
-		error = EINVAL;
-		goto freeit;
-	}
 #ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, icmp6len, EINVAL);
 	mp_adv = (struct mip6_prefix_advert *)((caddr_t)ip6 + off);
@@ -882,14 +846,14 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 #endif
 
 	/* find mip6_ha instance. */
-	mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &src_sa);
+	mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &ip6->ip6_src);
 	if (mha == NULL) {
 		error = EINVAL;
 		goto freeit;
 	}
 
 	/* find relevant hif interface. */
-	hif = hif_list_find_withhaddr(&dst_sa);
+	hif = hif_list_find_withhaddr(&ip6->ip6_dst);
 	if (hif == NULL) {
 		error = EINVAL;
 		goto freeit;
@@ -902,19 +866,20 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 		goto freeit;
 	}
 
-	mbu = mip6_bu_list_find_home_registration(&hif->hif_bu_list, &dst_sa);
+	mbu = mip6_bu_list_find_home_registration(&hif->hif_bu_list,
+	    &ip6->ip6_dst);
 	if (mbu == NULL) {
 		error = EINVAL;
 		goto freeit;
 	}
-	if (!SA6_ARE_ADDR_EQUAL(&mbu->mbu_paddr, &src_sa)) {
+	if (!IN6_ARE_ADDR_EQUAL(&mbu->mbu_paddr, &ip6->ip6_src)) {
 		mip6log((LOG_ERR,
 		    "%s:%d: the source address of a mobile prefix adv (%s)"
 		    "is not the home agent addrss of a binding update "
 		    "entry(%s)\n",
 		    __FILE__, __LINE__,
-		    ip6_sprintf(&mbu->mbu_paddr.sin6_addr),
-		    ip6_sprintf(&src_sa.sin6_addr)));
+		    ip6_sprintf(&mbu->mbu_paddr),
+		    ip6_sprintf(&ip6->ip6_src)));
 		error = EINVAL;
 		goto freeit;
 	}
@@ -1003,10 +968,10 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 		prefix_sa.sin6_len = sizeof(prefix_sa);
 		prefix_sa.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
 		/* XXX scope? */
-		mpfx = mip6_prefix_list_find_withprefix(&prefix_sa,
+		mpfx = mip6_prefix_list_find_withprefix(&prefix_sa.sin6_addr,
 		    ndopt_pi->nd_opt_pi_prefix_len);
 		if (mpfx == NULL) {
-			mpfx = mip6_prefix_create(&prefix_sa,
+			mpfx = mip6_prefix_create(&prefix_sa.sin6_addr,
 			    ndopt_pi->nd_opt_pi_prefix_len,
 			    ntohl(ndopt_pi->nd_opt_pi_valid_time),
 			    ntohl(ndopt_pi->nd_opt_pi_preferred_time));
@@ -1036,7 +1001,7 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 			    sizeof(ifra.ifra_name));
 			ifra.ifra_addr.sin6_len = sizeof(struct sockaddr_in6);
 			ifra.ifra_addr.sin6_family = AF_INET6;
-			ifra.ifra_addr.sin6_addr = mpfx->mpfx_haddr.sin6_addr;
+			ifra.ifra_addr.sin6_addr = mpfx->mpfx_haddr;
 			ifra.ifra_prefixmask.sin6_len
 			    = sizeof(struct sockaddr_in6);
 			ifra.ifra_prefixmask.sin6_family = AF_INET6;
@@ -1104,8 +1069,8 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 				if ((ifa6->ia6_flags & IN6_IFF_AUTOCONF) == 0)
 					continue;
 
-				if (!SA6_ARE_ADDR_EQUAL(&mpfx->mpfx_haddr,
-				    &ifa6->ia_addr))
+				if (!IN6_ARE_ADDR_EQUAL(&mpfx->mpfx_haddr,
+				    &ifa6->ia_addr.sin6_addr))
 					continue;
 
 				ifa6->ia6_lifetime.ia6t_vltime
@@ -1148,9 +1113,10 @@ mip6_icmp6_mp_adv_input(m, off, icmp6len)
 		prefix_sa.sin6_len = sizeof(prefix_sa);
 		prefix_sa.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
 		/* XXX scope. */
-		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &prefix_sa);
+		mha = mip6_ha_list_find_withaddr(&mip6_ha_list,
+		    &prefix_sa.sin6_addr);
 		if (mha == NULL) {
-			mha = mip6_ha_create(&prefix_sa,
+			mha = mip6_ha_create(&prefix_sa.sin6_addr,
 			    ND_RA_FLAG_HOME_AGENT, 0, 0);
 			mip6_ha_list_insert(&mip6_ha_list, mha);
 		} else {

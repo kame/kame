@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.133 2004/02/03 07:25:22 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.134 2004/02/05 12:38:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -414,20 +414,19 @@ ip6_forward(m, srcrt)
 		 */
 		struct mip6_bc *mbc;
 
-		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &sa6_dst);
+		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
+		    &ip6->ip6_dst);
 		if (mbc &&
 		    (mbc->mbc_flags & IP6MU_HOME) &&
 		    (mbc->mbc_encap != NULL)) {
-			if (IN6_IS_ADDR_LINKLOCAL(&mbc->mbc_phaddr.sin6_addr)
-#ifdef MIP6_DISABLE_SITELOCAL
-			    || IN6_IS_ADDR_SITELOCAL(&mbc->mbc_phaddr.sin6_addr)
-#endif
+			if (IN6_IS_ADDR_LINKLOCAL(&mbc->mbc_phaddr)
+			    || IN6_IS_ADDR_SITELOCAL(&mbc->mbc_phaddr)
 			    )
 			{
 				ip6stat.ip6s_cantforward++;
 				if (mcopy) {
 					icmp6_error(mcopy, ICMP6_DST_UNREACH,
-						    ICMP6_DST_UNREACH_ADDR, 0);
+					    ICMP6_DST_UNREACH_ADDR, 0);
 				}
 				m_freem(m);
 				return;
@@ -437,8 +436,8 @@ ip6_forward(m, srcrt)
 				u_long mtu = IPV6_MMTU;
 				/* XXX in6_ifstat_inc(rt->rt_ifp, ifs6_in_toobig); */
 				if (mcopy) {
-					icmp6_error(mcopy, ICMP6_PACKET_TOO_BIG,
-						    0, mtu);
+					icmp6_error(mcopy,
+					    ICMP6_PACKET_TOO_BIG, 0, mtu);
 				}
 				m_freem(m);
 				return;
@@ -459,7 +458,8 @@ ip6_forward(m, srcrt)
 				m_freem(mcopy);
 			return;
 		}
-		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &sa6_src);
+		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
+		    &ip6->ip6_src);
 		if (mbc &&
 		    (mbc->mbc_flags & IP6MU_HOME) &&
 		    (mbc->mbc_encap != NULL)) {

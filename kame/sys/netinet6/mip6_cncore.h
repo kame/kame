@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.h,v 1.12 2003/12/11 18:55:52 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.h,v 1.13 2004/02/05 12:38:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -66,25 +66,24 @@ void mip6_init(void);
 int mip6_ioctl(u_long, caddr_t);
 
 /* IPv6 extention header processing. */
-struct mbuf *mip6_create_ip6hdr(struct sockaddr_in6 *, struct sockaddr_in6 *,
+struct mbuf *mip6_create_ip6hdr(struct in6_addr *, struct in6_addr *,
     u_int8_t, u_int32_t);
 int mip6_exthdr_create(struct mbuf *, struct ip6_pktopts *,
     struct mip6_pktopts *);
-int mip6_rthdr_create(struct ip6_rthdr **, struct sockaddr_in6 *,
+int mip6_rthdr_create(struct ip6_rthdr **, struct in6_addr *,
     struct ip6_pktopts *);
-int mip6_exthdr_size(struct sockaddr_in6 *, struct sockaddr_in6 *);
+int mip6_exthdr_size(struct in6_addr *, struct in6_addr *);
 void mip6_destopt_discard(struct mip6_pktopts *);
 
 /* binding cache entry processing. */
 void mip6_bc_init(void);
-struct mip6_bc *mip6_bc_create(struct sockaddr_in6 *, struct sockaddr_in6 *,
-    struct sockaddr_in6 *, u_int8_t, u_int16_t, u_int32_t, struct ifnet *);
+struct mip6_bc *mip6_bc_create(struct in6_addr *, struct in6_addr *,
+    struct in6_addr *, u_int8_t, u_int16_t, u_int32_t, struct ifnet *);
 int mip6_bc_list_remove(struct mip6_bc_list *, struct mip6_bc *);
 struct mip6_bc *mip6_bc_list_find_withphaddr(struct mip6_bc_list *,
-    struct sockaddr_in6 *);
-int mip6_bc_send_ba(struct sockaddr_in6 *, struct sockaddr_in6 *,
-    struct sockaddr_in6 *, u_int8_t, u_int16_t, u_int32_t, u_int32_t,
-    struct mip6_mobility_options *);
+    struct in6_addr *);
+int mip6_bc_send_ba(struct in6_addr *, struct in6_addr *, struct in6_addr *,
+    u_int8_t, u_int16_t, u_int32_t, u_int32_t, struct mip6_mobility_options *);
 
 /* return routablity processing. */
 int mip6_get_nonce(u_int16_t, mip6_nonce_t *);
@@ -92,9 +91,9 @@ int mip6_get_nodekey(u_int16_t, mip6_nodekey_t *);
 int mip6_create_keygen_token(struct in6_addr *, mip6_nodekey_t *,
     mip6_nonce_t *, u_int8_t, void *);
 int mip6_is_valid_bu(struct ip6_hdr *, struct ip6_mh_binding_update *,
-    int, struct mip6_mobility_options *, struct sockaddr_in6 *,
-    struct sockaddr_in6 *, int, u_int8_t *);
-int mip6_calculate_kbm_from_index(struct sockaddr_in6 *, struct sockaddr_in6 *,
+    int, struct mip6_mobility_options *, struct in6_addr *, struct in6_addr *,
+    int, u_int8_t *);
+int mip6_calculate_kbm_from_index(struct in6_addr *, struct in6_addr *,
     u_int16_t, u_int16_t, int, u_int8_t *);
 void mip6_calculate_kbm(mip6_home_token_t *, mip6_careof_token_t *,
     u_int8_t *);
@@ -105,15 +104,15 @@ int mip6_calculate_authenticator(u_int8_t *, u_int8_t *, struct in6_addr *,
 int mip6_ip6mhi_input(struct mbuf *, struct ip6_mh_home_test_init *, int);
 int mip6_ip6mci_input(struct mbuf *, struct ip6_mh_careof_test_init *, int);
 int mip6_ip6mu_input(struct mbuf *, struct ip6_mh_binding_update *, int);
-int mip6_ip6ma_create(struct ip6_mh **, struct sockaddr_in6 *,
-    struct sockaddr_in6 *, struct sockaddr_in6 *, u_int8_t, u_int16_t,
-    u_int32_t, u_int32_t, struct mip6_mobility_options *);
-int mip6_ip6me_create(struct ip6_mh **, struct sockaddr_in6 *,
-    struct sockaddr_in6 *, u_int8_t, struct sockaddr_in6 *);
+int mip6_ip6ma_create(struct ip6_mh **, struct in6_addr *, struct in6_addr *,
+    struct in6_addr *, u_int8_t, u_int16_t, u_int32_t, u_int32_t,
+    struct mip6_mobility_options *);
+int mip6_ip6me_create(struct ip6_mh **, struct in6_addr *, struct in6_addr *,
+    u_int8_t, struct in6_addr *);
 int mip6_get_mobility_options(struct ip6_mh *, int, int,
     struct mip6_mobility_options *);
-int mip6_cksum(struct sockaddr_in6 *, struct sockaddr_in6 *, u_int32_t,
-    u_int8_t, char *);
+int mip6_cksum(struct in6_addr *, struct in6_addr *, u_int32_t, u_int8_t,
+    char *);
 
 /* ICMPv6 processing. */
 int mip6_icmp6_input(struct mbuf *, int, int);
@@ -125,7 +124,7 @@ u_int mip6_brr_time(struct mip6_bc *);
 /* core functions for mobile node and home agent. */
 #if defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE)
 struct nd_prefix;
-void mip6_create_addr(struct sockaddr_in6 *, const struct sockaddr_in6 *,
+void mip6_create_addr(struct in6_addr *, const struct in6_addr *,
     struct nd_prefix *);
 int mip6_tunnel_input(struct mbuf **, int *, int);
 int mip6_tunnel_control(int, void *,

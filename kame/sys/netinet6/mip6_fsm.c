@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.25 2003/12/05 01:35:17 keiichi Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.26 2004/02/05 12:38:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1496,7 +1496,7 @@ mip6_bu_pri_fsm_home_registration(mbu)
 		if (mha != NULL)
 			mbu->mbu_paddr = mha->mha_addr;
 		else
-			mbu->mbu_paddr = sa6_any;
+			mbu->mbu_paddr = in6addr_any;
 		mbu->mbu_retrans_count = 1;
 	}
 	mbu->mbu_retrans = mono_time.tv_sec + (1 << mbu->mbu_retrans_count);

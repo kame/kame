@@ -176,7 +176,7 @@ device		pcic0	at isa? irq 0 port 0x3e0 iomem 0xd0000
 device		pcic1	at isa? irq 0 port 0x3e2 iomem 0xd4000 disable
 
 # Serial (COM) ports
-device		sio0	at isa? port IO_COM1 flags 0x10 irq 4
+device		sio0	at isa? port IO_COM1 flags 0x80 irq 4
 device		sio1	at isa? port IO_COM2 irq 3
 device		sio2	at isa? disable port IO_COM3 irq 5
 device		sio3	at isa? disable port IO_COM4 irq 9

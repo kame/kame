@@ -1,4 +1,4 @@
-/*	$KAME: mpa.c,v 1.9 2004/01/20 04:18:20 t-momose Exp $	*/
+/*	$KAME: mpa.c,v 1.10 2004/02/05 12:38:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: mpa.c,v 1.9 2004/01/20 04:18:20 t-momose Exp $
+ * $Id: mpa.c,v 1.10 2004/02/05 12:38:09 keiichi Exp $
  */
 
 #include <sys/param.h>
@@ -361,14 +361,14 @@ reg_hoa_pick(coaddr, hoaddr)
             return (-1);
 	}
         mbc = &mip6_bc;
-        if (IN6_ARE_ADDR_EQUAL(&(mbc->mbc_pcoa.sin6_addr), coaddr))
+        if (IN6_ARE_ADDR_EQUAL(&(mbc->mbc_pcoa), coaddr))
             break;
     }
     
     if (!mbc)
         return -1;
 
-    bcopy(&(mbc->mbc_phaddr.sin6_addr), hoaddr, sizeof (struct in6_addr));
+    bcopy(&(mbc->mbc_phaddr), hoaddr, sizeof (struct in6_addr));
     
     return 0;
 }
@@ -399,7 +399,7 @@ reg_coa_pick(addr_list)
             for (addrp = LIST_FIRST(addr_list);
                  addrp;
                  addrp = LIST_NEXT(addrp, sockin6_entry)) {
-			if (IN6_ARE_ADDR_EQUAL(&(mbc->mbc_pcoa.sin6_addr), &(addrp->addr.sin6_addr))) {
+			if (IN6_ARE_ADDR_EQUAL(&(mbc->mbc_pcoa), &(addrp->addr.sin6_addr))) {
 				dup = -1;
 				break;
 			}
@@ -475,7 +475,7 @@ examine_mpaexp_bc()
 	if (mip6_bc.mbc_mpa_exp > time_second)
 	    continue;
 
-    	if ((haif = haif_findwithhomeaddr(&mip6_bc.mbc_phaddr.sin6_addr, &index)) == NULL)
+    	if ((haif = haif_findwithhomeaddr(&mip6_bc.mbc_phaddr, &index)) == NULL)
 	    continue;
 
 	hagent_addr = &((struct sockaddr_in6 *)(haif->haif_gavec[index].global->ifa_addr))->sin6_addr;

@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.47 2004/02/03 07:25:23 itojun Exp $	*/
+/*	$KAME: route6.c,v 1.48 2004/02/05 12:38:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -312,17 +312,13 @@ ip6_rthdr2(m, ip6, rh2)
 	struct ip6_rthdr2 *rh2;
 {
 	int rh2_has_hoa;
-	struct sockaddr_in6 dst_sa, next_sa;
+	struct sockaddr_in6 next_sa;
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
 	struct in6_addr *nextaddr, tmpaddr;
 	struct in6_ifaddr *ifa;
 
 	rh2_has_hoa = 0;
-
-	/* get ip src and dst addrs. */
-	if (ip6_getpktaddrs(m, NULL, &dst_sa))
-		goto bad;
 
 	/*
 	 * determine the scope zone of the next hop, based on the interface
@@ -368,8 +364,8 @@ ip6_rthdr2(m, ip6, rh2)
 				 * if segleft == 0, ip6_dst must be
 				 * one of our home addresses.
 				 */
-				if (!SA6_ARE_ADDR_EQUAL(&dst_sa,
-							&mbu->mbu_haddr))
+				if (!IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
+					&mbu->mbu_haddr))
 					continue;
 
 				mip6stat.mip6s_rthdr2++;
@@ -380,8 +376,8 @@ ip6_rthdr2(m, ip6, rh2)
 				 * ip6_dst, the route is optimized
 				 * already.
 				 */
-				if (!SA6_ARE_ADDR_EQUAL(&next_sa,
-							&mbu->mbu_coa)) {
+				if (!IN6_ARE_ADDR_EQUAL(&next_sa.sin6_addr,
+					&mbu->mbu_coa)) {
 					/* coa mismatch.  discard this. */
 					goto bad;
 				}
@@ -405,8 +401,8 @@ ip6_rthdr2(m, ip6, rh2)
 				 * intermediate node must be one of
 				 * our home addresses.
 				 */
-				if (!SA6_ARE_ADDR_EQUAL(&next_sa,
-							&mbu->mbu_haddr))
+				if (!IN6_ARE_ADDR_EQUAL(&next_sa.sin6_addr,
+					&mbu->mbu_haddr))
 					continue;
 				rh2_has_hoa++;
 			}
@@ -435,9 +431,6 @@ ip6_rthdr2(m, ip6, rh2)
 		ip6stat.ip6s_badoptions++;
 		goto bad;
 	}
-
-	if (!ip6_setpktaddrs(m, NULL, &next_sa))
-		goto bad;
 
 	/*
 	 * Swap the IPv6 destination address and nextaddr. Forward the packet.

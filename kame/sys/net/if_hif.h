@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.27 2004/01/24 09:15:01 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.28 2004/02/05 12:38:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -92,7 +92,7 @@ LIST_HEAD(hif_prefix_list, hif_prefix);
 
 struct hif_site_prefix {
 	LIST_ENTRY(hif_site_prefix) hsp_entry;
-	struct sockaddr_in6         hsp_prefix;
+	struct in6_addr             hsp_prefix;
 	u_int8_t                    hsp_prefixlen;
 };
 LIST_HEAD(hif_site_prefix_list, hif_site_prefix);
@@ -143,7 +143,7 @@ struct hif_ifreq {
 
 extern struct hif_softc_list hif_softc_list;
 
-struct hif_softc *hif_list_find_withhaddr __P((struct sockaddr_in6 *));
+struct hif_softc *hif_list_find_withhaddr(struct in6_addr *);
 
 int hif_ioctl(struct ifnet *, u_long, caddr_t);
 int hif_output(struct ifnet *, struct mbuf *, struct sockaddr *,
@@ -152,15 +152,15 @@ void hif_save_location(struct hif_softc *);
 void hif_restore_location(struct hif_softc *);
 struct mip6_ha *hif_find_preferable_ha(struct hif_softc *);
 struct mip6_ha *hif_find_next_preferable_ha(struct hif_softc *,
-    struct sockaddr_in6 *);
+    struct in6_addr *);
 
 struct hif_prefix *hif_prefix_list_insert_withmpfx(struct hif_prefix_list *,
     struct mip6_prefix *);
 void hif_prefix_list_remove(struct hif_prefix_list *, struct hif_prefix *);
 struct hif_prefix *hif_prefix_list_find_withprefix(struct hif_prefix_list *,
-    struct sockaddr_in6 *, int);
+    struct in6_addr *, int);
 struct hif_prefix *hif_prefix_list_find_withhaaddr(struct hif_prefix_list *,
-    struct sockaddr_in6 *);
+    struct in6_addr *);
 struct hif_prefix *hif_prefix_list_find_withmpfx(struct hif_prefix_list *,
     struct mip6_prefix *);
 

@@ -961,13 +961,13 @@ send:
 			goto out;
 		}
 #endif /*IPSEC*/
-		error = ip6_output(m,
-			    tp->t_inpcb->in6p_outputopts, NULL,
-			    (so->so_options & SO_DONTROUTE), NULL, NULL
+		error = ip6_output(m, tp->t_inpcb->in6p_outputopts,
+		    &tp->t_inpcb->in6p_route, (so->so_options & SO_DONTROUTE),
+		    NULL, NULL
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-			    , tp->t_inpcb
+		    , tp->t_inpcb
 #endif
-			    );
+		    );
 	} else
 #endif /* INET6 */
     {
@@ -1104,6 +1104,6 @@ mip6_hdrsiz_tcp(tp)
 	    || (inp->inp_vflag & INP_IPV6) == 0)
 		return (0);
 
-	return (mip6_exthdr_size(&inp->in6p_lsa, &inp->in6p_fsa));
+	return (mip6_exthdr_size(&inp->in6p_laddr, &inp->in6p_faddr));
 }
 #endif /* INET6 && MIP6 */

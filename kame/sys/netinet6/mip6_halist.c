@@ -1,4 +1,4 @@
-/*	$KAME: mip6_halist.c,v 1.10 2003/09/29 02:09:20 keiichi Exp $	*/
+/*	$KAME: mip6_halist.c,v 1.11 2004/02/05 12:38:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -92,7 +92,7 @@ mip6_halist_init()
 
 struct mip6_ha *
 mip6_ha_create(addr, flags, pref, lifetime)
-	struct sockaddr_in6 *addr;
+	struct in6_addr *addr;
 	u_int8_t flags;
 	u_int16_t pref;
 	int32_t lifetime;
@@ -106,21 +106,21 @@ mip6_ha_create(addr, flags, pref, lifetime)
 	microtime(&mono_time);
 #endif
 
-	if (IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr)
-	    || IN6_IS_ADDR_LOOPBACK(&addr->sin6_addr)
-	    || IN6_IS_ADDR_MULTICAST(&addr->sin6_addr)) {
+	if (IN6_IS_ADDR_UNSPECIFIED(addr)
+	    || IN6_IS_ADDR_LOOPBACK(addr)
+	    || IN6_IS_ADDR_MULTICAST(addr)) {
 		mip6log((LOG_ERR,
 		    "mip6_ha_create: an invalid home agent address(%s).",
-		    ip6_sprintf(&addr->sin6_addr)));
+		    ip6_sprintf(addr)));
 		return (NULL);
 	}
 
-	if (!IN6_IS_ADDR_LINKLOCAL(&addr->sin6_addr)
+	if (!IN6_IS_ADDR_LINKLOCAL(addr)
 	    && ((flags & ND_RA_FLAG_HOME_AGENT) == 0)) {
 		mip6log((LOG_ERR,
 		    "mip6_ha_create: non link-local address(%s) "
 		    "must have H bit in router flags.\n",
-		    ip6_sprintf(&addr->sin6_addr)));
+		    ip6_sprintf(addr)));
 		return (NULL);
 	}
 
@@ -143,7 +143,7 @@ mip6_ha_create(addr, flags, pref, lifetime)
 #elif defined(__OpenBSD__)
 	timeout_set(&mha->mha_timer_ch, mip6_ha_timer, mha);
 #endif
-	if (IN6_IS_ADDR_LINKLOCAL(&mha->mha_addr.sin6_addr)) {
+	if (IN6_IS_ADDR_LINKLOCAL(&mha->mha_addr)) {
 		mha->mha_lifetime = lifetime;
 	} else {
 		mha->mha_lifetime = 0; /* infinite. */
@@ -375,7 +375,7 @@ mip6_ha_list_update_hainfo(mha_list, dr, hai)
 
 	if ((mha_list == NULL) ||
 	    (dr == NULL) ||
-	    !IN6_IS_ADDR_LINKLOCAL(&dr->rtaddr.sin6_addr)) {
+	    !IN6_IS_ADDR_LINKLOCAL(&dr->rtaddr)) {
 		return (EINVAL);
 	}
 
@@ -409,13 +409,13 @@ mip6_ha_list_update_hainfo(mha_list, dr, hai)
 struct mip6_ha *
 mip6_ha_list_find_withaddr(mha_list, addr)
 	struct mip6_ha_list *mha_list;
-	struct sockaddr_in6 *addr;
+	struct in6_addr *addr;
 {
 	struct mip6_ha *mha;
 
 	for (mha = TAILQ_FIRST(mha_list); mha;
 	    mha = TAILQ_NEXT(mha, mha_entry)) {
-		if (SA6_ARE_ADDR_EQUAL(&mha->mha_addr, addr))
+		if (IN6_ARE_ADDR_EQUAL(&mha->mha_addr, addr))
 			return (mha);
 	}
 	/* not found. */

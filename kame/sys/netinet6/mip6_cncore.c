@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.59 2004/01/20 09:55:50 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.60 2004/02/05 12:38:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -194,16 +194,16 @@ static int mip6_brr_tryinterval = 10;	/* second */
 static int mip6_brr_mode = MIP6_BRR_SEND_EXPONENT;
 
 /* IPv6 extension header processing. */
-static int mip6_rthdr_create_withdst(struct ip6_rthdr **,
-    struct sockaddr_in6 *, struct ip6_pktopts *);
+static int mip6_rthdr_create_withdst(struct ip6_rthdr **, struct in6_addr *,
+    struct ip6_pktopts *);
 
 /* binding cache entry processing. */
 static int mip6_bc_delete(struct mip6_bc *);
 static int mip6_bc_list_insert(struct mip6_bc_list *, struct mip6_bc *);
-static int mip6_bc_register(struct sockaddr_in6 *, struct sockaddr_in6 *,
-    struct sockaddr_in6 *, u_int16_t, u_int16_t, u_int32_t);
-static int mip6_bc_update(struct mip6_bc *, struct sockaddr_in6 *,
-    struct sockaddr_in6 *, u_int16_t, u_int16_t, u_int32_t);
+static int mip6_bc_register(struct in6_addr *, struct in6_addr *,
+    struct in6_addr *, u_int16_t, u_int16_t, u_int32_t);
+static int mip6_bc_update(struct mip6_bc *, struct in6_addr *,
+    struct in6_addr *, u_int16_t, u_int16_t, u_int32_t);
 static int mip6_bc_send_brr(struct mip6_bc *);
 static int mip6_bc_need_brr(struct mip6_bc *);
 static void mip6_bc_timer(void *);
@@ -214,12 +214,12 @@ static void mip6_create_nodekey(mip6_nodekey_t *);
 static void mip6_update_nonce_nodekey(void *);
 
 /* Mobility Header processing. */
-static int mip6_ip6mh_create(struct ip6_mh **, struct sockaddr_in6 *,
-    struct sockaddr_in6 *, u_int8_t *);
-static int mip6_ip6mc_create(struct ip6_mh **, struct sockaddr_in6 *,
-    struct sockaddr_in6 *, u_int8_t *);
-static int mip6_ip6mr_create(struct ip6_mh **, struct sockaddr_in6 *,
-    struct sockaddr_in6 *);
+static int mip6_ip6mh_create(struct ip6_mh **, struct in6_addr *,
+    struct in6_addr *, u_int8_t *);
+static int mip6_ip6mc_create(struct ip6_mh **, struct in6_addr *,
+    struct in6_addr *, u_int8_t *);
+static int mip6_ip6mr_create(struct ip6_mh **, struct in6_addr *,
+    struct in6_addr *);
 
 /* core functions for mobile node and home agent. */
 #if !defined(MIP6_NOHAIPSEC)
@@ -361,7 +361,7 @@ mip6_ioctl(cmd, data)
 		break;
 
 	case SIOCDBC:
-		if (SA6_IS_ADDR_UNSPECIFIED(&mr->mip6r_ru.mip6r_sin6)) {
+		if (IN6_IS_ADDR_UNSPECIFIED(&mr->mip6r_ru.mip6r_in6)) {
 			struct mip6_bc *mbc;
 
 			/* remove all binding cache entries. */
@@ -373,7 +373,7 @@ mip6_ioctl(cmd, data)
 
 			/* remove a specified binding cache entry. */
 			mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, 
-			    &mr->mip6r_ru.mip6r_sin6);
+			    &mr->mip6r_ru.mip6r_in6);
 			if (mbc != NULL) {
 				(void)mip6_bc_list_remove(&mip6_bc_list, mbc);
 			}
@@ -389,9 +389,9 @@ mip6_ioctl(cmd, data)
 			     uh;
 			     uh = LIST_NEXT(uh, unuse_entry)) {
 				if (IN6_ARE_ADDR_EQUAL(&uh->unuse_addr,
-				    &mr->mip6r_ru.mip6r_sin6.sin6_addr) &&
+				    &mr->mip6r_ru.mip6r_ssin6.sin6_addr) &&
 				    uh->unuse_port
-				    == mr->mip6r_ru.mip6r_sin6.sin6_port) {
+				    == mr->mip6r_ru.mip6r_ssin6.sin6_port) {
 					splx(s);
 					return (EEXIST);
 				}
@@ -404,8 +404,8 @@ mip6_ioctl(cmd, data)
 				return (ENOBUFS);
 			}
 
-			uh->unuse_addr = mr->mip6r_ru.mip6r_sin6.sin6_addr;
-			uh->unuse_port = mr->mip6r_ru.mip6r_sin6.sin6_port;
+			uh->unuse_addr = mr->mip6r_ru.mip6r_ssin6.sin6_addr;
+			uh->unuse_port = mr->mip6r_ru.mip6r_ssin6.sin6_port;
 			LIST_INSERT_HEAD(&mip6_unuse_hoa, uh, unuse_entry);
 		}
 		break;
@@ -421,9 +421,9 @@ mip6_ioctl(cmd, data)
 			for (uh = LIST_FIRST(&mip6_unuse_hoa); uh; uh = nxt) {
 				nxt = LIST_NEXT(uh, unuse_entry);
 				if (IN6_ARE_ADDR_EQUAL(&uh->unuse_addr,
-				    &mr->mip6r_ru.mip6r_sin6.sin6_addr) &&
+				    &mr->mip6r_ru.mip6r_ssin6.sin6_addr) &&
 				    uh->unuse_port
-				    == mr->mip6r_ru.mip6r_sin6.sin6_port) {
+				    == mr->mip6r_ru.mip6r_ssin6.sin6_port) {
 					LIST_REMOVE(uh, unuse_entry);
 					FREE(uh, M_IP6OPT);
 					break;
@@ -469,11 +469,11 @@ mip6_ioctl(cmd, data)
  ******************************************************************************
  */
 struct mbuf *
-mip6_create_ip6hdr(src_sa, dst_sa, nh, plen)
-	struct sockaddr_in6 *src_sa; /* source sockaddr */
-	struct sockaddr_in6 *dst_sa; /* destination sockaddr */
-	u_int8_t nh; /* next header */
-	u_int32_t plen; /* payload length */
+mip6_create_ip6hdr(src, dst, nxt, plen)
+	struct in6_addr *src;
+	struct in6_addr *dst;
+	u_int8_t nxt;
+	u_int32_t plen;
 {
 	struct ip6_hdr *ip6; /* ipv6 header. */
 	struct mbuf *m; /* a pointer to the mbuf containing ipv6 header. */
@@ -502,17 +502,10 @@ mip6_create_ip6hdr(src_sa, dst_sa, nh, plen)
 	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
 	ip6->ip6_vfc |= IPV6_VERSION;
 	ip6->ip6_plen = htons((u_int16_t)plen);
-	ip6->ip6_nxt = nh;
+	ip6->ip6_nxt = nxt;
 	ip6->ip6_hlim = ip6_defhlim;
-	ip6->ip6_src = src_sa->sin6_addr;
-	in6_clearscope(&ip6->ip6_src);
-	ip6->ip6_dst = dst_sa->sin6_addr;
-	in6_clearscope(&ip6->ip6_dst);
-
-	if (!ip6_setpktaddrs(m, src_sa, dst_sa)) {
-		m_free(m);
-		return (NULL);
-	}
+	ip6->ip6_src = *src;
+	ip6->ip6_dst = *dst;
 
 	return (m);
 }
@@ -524,8 +517,6 @@ mip6_exthdr_create(m, opt, mip6opt)
 	struct mip6_pktopts *mip6opt;
 {
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 src;
-	struct sockaddr_in6 dst;
 	int s, error = 0;
 #ifdef MIP6_MOBILE_NODE
 	struct hif_softc *sc;
@@ -537,8 +528,6 @@ mip6_exthdr_create(m, opt, mip6opt)
 	mip6opt->mip6po_haddr = NULL;
 
 	ip6 = mtod(m, struct ip6_hdr *);
-	if (ip6_getpktaddrs(m, &src, &dst))
-		return (EINVAL);
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
@@ -570,7 +559,8 @@ mip6_exthdr_create(m, opt, mip6opt)
 	 * exists a valid binding cache entry for this destination
 	 * node.
 	 */
-	error = mip6_rthdr_create_withdst(&mip6opt->mip6po_rthdr2, &dst, opt);
+	error = mip6_rthdr_create_withdst(&mip6opt->mip6po_rthdr2,
+	    &ip6->ip6_dst, opt);
 	if (error) {
 		mip6log((LOG_ERR,
 		    "%s:%d: rthdr creation failed.\n",
@@ -589,7 +579,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 	 * find hif that has a home address that is the same
 	 * to the source address of this sending ip packet
 	 */
-	sc = hif_list_find_withhaddr(&src);
+	sc = hif_list_find_withhaddr(&ip6->ip6_src);
 	if (sc == NULL) {
 		/*
 		 * this source addrss is not one of our home addresses.
@@ -602,7 +592,8 @@ mip6_exthdr_create(m, opt, mip6opt)
 	 * check home registration status for this destination
 	 * address.
 	 */
-	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &dst, &src);
+	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &ip6->ip6_dst,
+	    &ip6->ip6_src);
 	if (mbu == NULL) {
 		/* no registration action has been started yet. */
 		goto skip_hao;
@@ -634,8 +625,8 @@ mip6_exthdr_create(m, opt, mip6opt)
 			goto skip_hao;
 	}
 	/* create a home address destination option. */
-	error = mip6_haddr_destopt_create(&mip6opt->mip6po_haddr, &src, &dst,
-	    sc);
+	error = mip6_haddr_destopt_create(&mip6opt->mip6po_haddr,
+	    &ip6->ip6_src, &ip6->ip6_dst, sc);
 	if (error) {
 		mip6log((LOG_ERR,
 		    "%s:%d: homeaddress insertion failed.\n",
@@ -654,7 +645,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 int
 mip6_rthdr_create(pktopt_rthdr, coa, opt)
 	struct ip6_rthdr **pktopt_rthdr;
-	struct sockaddr_in6 *coa;
+	struct in6_addr *coa;
 	struct ip6_pktopts *opt;
 {
 	struct ip6_rthdr2 *rthdr2;
@@ -679,8 +670,7 @@ mip6_rthdr_create(pktopt_rthdr, coa, opt)
 	rthdr2->ip6r2_type = 2;
 	rthdr2->ip6r2_segleft = 1;
 	rthdr2->ip6r2_reserved = 0;
-	bcopy((caddr_t)&coa->sin6_addr, (caddr_t)(rthdr2 + 1),
-	      sizeof(struct in6_addr));
+	bcopy((caddr_t)&coa, (caddr_t)(rthdr2 + 1), sizeof(struct in6_addr));
 	*pktopt_rthdr = (struct ip6_rthdr *)rthdr2;
 
 	mip6stat.mip6s_orthdr2++;
@@ -691,7 +681,7 @@ mip6_rthdr_create(pktopt_rthdr, coa, opt)
 static int
 mip6_rthdr_create_withdst(pktopt_rthdr, dst, opt)
 	struct ip6_rthdr **pktopt_rthdr;
-	struct sockaddr_in6 *dst;
+	struct in6_addr *dst;
 	struct ip6_pktopts *opt;
 {
 	struct mip6_bc *mbc;
@@ -713,8 +703,8 @@ mip6_rthdr_create_withdst(pktopt_rthdr, dst, opt)
 
 int
 mip6_exthdr_size(src, dst)
-	struct sockaddr_in6 *src;
-	struct sockaddr_in6 *dst;
+	struct in6_addr *src;
+	struct in6_addr *dst;
 {
 	int hdrsiz;
 	struct mip6_bc *mbc;
@@ -759,9 +749,9 @@ mip6_bc_init()
 
 struct mip6_bc *
 mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
-	struct sockaddr_in6 *phaddr;
-	struct sockaddr_in6 *pcoa;
-	struct sockaddr_in6 *addr;
+	struct in6_addr *phaddr;
+	struct in6_addr *pcoa;
+	struct in6_addr *addr;
 	u_int8_t flags;
 	u_int16_t seqno;
 	u_int32_t lifetime;
@@ -889,7 +879,7 @@ mip6_bc_list_insert(mbc_list, mbc)
 	struct mip6_bc_list *mbc_list;
 	struct mip6_bc *mbc;
 {
-	int id = MIP6_BC_HASH_ID(&mbc->mbc_phaddr.sin6_addr);
+	int id = MIP6_BC_HASH_ID(&mbc->mbc_phaddr);
 
 	if (mip6_bc_hash[id] != NULL) {
 		LIST_INSERT_BEFORE(mip6_bc_hash[id], mbc, mbc_entry);
@@ -915,11 +905,11 @@ mip6_bc_list_remove(mbc_list, mbc)
 		return (EINVAL);
 	}
 
-	id = MIP6_BC_HASH_ID(&mbc->mbc_phaddr.sin6_addr);
+	id = MIP6_BC_HASH_ID(&mbc->mbc_phaddr);
 	if (mip6_bc_hash[id] == mbc) {
 		struct mip6_bc *next = LIST_NEXT(mbc, mbc_entry);
 		if (next != NULL &&
-		    id == MIP6_BC_HASH_ID(&next->mbc_phaddr.sin6_addr)) {
+		    id == MIP6_BC_HASH_ID(&next->mbc_phaddr)) {
 			mip6_bc_hash[id] = next;
 		} else {
 			mip6_bc_hash[id] = NULL;
@@ -948,7 +938,7 @@ mip6_bc_list_remove(mbc_list, mbc)
 				    "%s:%d: can't delete a proxy ND entry "
 				    "for %s.\n",
 				    __FILE__, __LINE__,
-				    ip6_sprintf(&mbc->mbc_phaddr.sin6_addr)));
+				    ip6_sprintf(&mbc->mbc_phaddr)));
 			}
 			error = mip6_tunnel_control(MIP6_TUNNEL_DELETE,
 			    mbc, mip6_bc_encapcheck, &mbc->mbc_encap);
@@ -957,7 +947,7 @@ mip6_bc_list_remove(mbc_list, mbc)
 				    "%s:%d: tunnel control error (%d)"
 				    "for %s.\n",
 				    __FILE__, __LINE__, error,
-				    ip6_sprintf(&mbc->mbc_phaddr.sin6_addr)));
+				    ip6_sprintf(&mbc->mbc_phaddr)));
 			}
 		}
 	}
@@ -970,16 +960,16 @@ mip6_bc_list_remove(mbc_list, mbc)
 struct mip6_bc *
 mip6_bc_list_find_withphaddr(mbc_list, haddr)
 	struct mip6_bc_list *mbc_list;
-	struct sockaddr_in6 *haddr;
+	struct in6_addr *haddr;
 {
 	struct mip6_bc *mbc;
-	int id = MIP6_BC_HASH_ID(&haddr->sin6_addr);
+	int id = MIP6_BC_HASH_ID(haddr);
 
 	for (mbc = mip6_bc_hash[id]; mbc;
 	     mbc = LIST_NEXT(mbc, mbc_entry)) {
-		if (MIP6_BC_HASH_ID(&mbc->mbc_phaddr.sin6_addr) != id)
+		if (MIP6_BC_HASH_ID(&mbc->mbc_phaddr) != id)
 			return NULL;
-		if (SA6_ARE_ADDR_EQUAL(&mbc->mbc_phaddr, haddr))
+		if (IN6_ARE_ADDR_EQUAL(&mbc->mbc_phaddr, haddr))
 			break;
 	}
 
@@ -987,10 +977,10 @@ mip6_bc_list_find_withphaddr(mbc_list, haddr)
 }
 
 static int
-mip6_bc_register(hoa_sa, coa_sa, dst_sa, flags, seqno, lifetime)
-	struct sockaddr_in6 *hoa_sa;
-	struct sockaddr_in6 *coa_sa;
-	struct sockaddr_in6 *dst_sa;
+mip6_bc_register(hoa, coa, dst, flags, seqno, lifetime)
+	struct in6_addr *hoa;
+	struct in6_addr *coa;
+	struct in6_addr *dst;
 	u_int16_t flags;
 	u_int16_t seqno;
 	u_int32_t lifetime;
@@ -998,12 +988,13 @@ mip6_bc_register(hoa_sa, coa_sa, dst_sa, flags, seqno, lifetime)
 	struct mip6_bc *mbc;
 
 	/* create a binding cache entry. */
-	mbc = mip6_bc_create(hoa_sa, coa_sa, dst_sa,
-			     flags, seqno, lifetime, NULL);
+	mbc = mip6_bc_create(hoa, coa, dst, flags, seqno, lifetime,
+	    NULL);
 	if (mbc == NULL) {
 		mip6log((LOG_ERR,
-			 "%s:%d: mip6_bc memory allocation failed.\n",
-			 __FILE__, __LINE__));
+		    "mip6_bc_register:%d: "
+		    "mip6_bc memory allocation failed.\n",
+		    __LINE__));
 		return (ENOMEM);
 	}
 
@@ -1011,25 +1002,29 @@ mip6_bc_register(hoa_sa, coa_sa, dst_sa, flags, seqno, lifetime)
 }
 
 static int
-mip6_bc_update(mbc, coa_sa, dst_sa, flags, seqno, lifetime)
+mip6_bc_update(mbc, coa, dst, flags, seqno, lifetime)
 	struct mip6_bc *mbc;
-	struct sockaddr_in6 *coa_sa;
-	struct sockaddr_in6 *dst_sa;
+	struct in6_addr *coa;
+	struct in6_addr *dst;
 	u_int16_t flags;
 	u_int16_t seqno;
 	u_int32_t lifetime;
 {
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
+#ifdef __FreeBSD__
+	struct timeval mono_time;
+#endif /* __FreeBSD__ */
+
+#if __FreeBSD__
+	microtime(&mono_time);
 #endif
-	/* update a BC entry. */
-	mbc->mbc_pcoa = *coa_sa;
+	/* update a binding cache entry. */
+	mbc->mbc_pcoa = *coa;
 	mbc->mbc_flags = flags;
 	mbc->mbc_seqno = seqno;
 	mbc->mbc_lifetime = lifetime;
-	mbc->mbc_expire	= time_second + mbc->mbc_lifetime;
+	mbc->mbc_expire	= mono_time.tv_sec + mbc->mbc_lifetime;
 	/* sanity check for overflow */
-	if (mbc->mbc_expire < time_second)
+	if (mbc->mbc_expire < mono_time.tv_sec)
 		mbc->mbc_expire = 0x7fffffff;
 	mbc->mbc_state = MIP6_BC_FSM_STATE_BOUND;
 	mip6_bc_settimer(mbc, -1);
@@ -1040,9 +1035,9 @@ mip6_bc_update(mbc, coa_sa, dst_sa, flags, seqno, lifetime)
 
 int
 mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh, mopt)
-	struct sockaddr_in6 *src;
-	struct sockaddr_in6 *dst;
-	struct sockaddr_in6 *dstcoa;
+	struct in6_addr *src;
+	struct in6_addr *dst;
+	struct in6_addr *dstcoa;
 	u_int8_t status;
 	u_int16_t seqno;
 	u_int32_t lifetime;
@@ -1051,7 +1046,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh, mopt)
 {
 	struct mbuf *m;
 	struct ip6_pktopts opt;
-	struct m_tag *n;
+	struct m_tag *mtag;
 	struct ip6aux *ip6a;
 	struct ip6_rthdr *pktopt_rthdr;
 	int error = 0;
@@ -1080,7 +1075,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh, mopt)
 	 * when sending a binding ack, we use rthdr2 except when
 	 * we are on the home link.
 	 */
-	if (!SA6_ARE_ADDR_EQUAL(dst, dstcoa)) {
+	if (!IN6_ARE_ADDR_EQUAL(dst, dstcoa)) {
 		error = mip6_rthdr_create(&pktopt_rthdr, dstcoa, NULL);
 		if (error) {
 			mip6log((LOG_ERR,
@@ -1092,20 +1087,20 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh, mopt)
 		opt.ip6po_rthdr2 = pktopt_rthdr;
 	}
 
-	n = ip6_findaux(m);
-	if (n) {
-		ip6a = (struct ip6aux *)(n + 1);
+	mtag = ip6_findaux(m);
+	if (mtag) {
+		ip6a = (struct ip6aux *)(mtag + 1);
 		ip6a->ip6a_flags |= IP6A_NOTUSEBC;
 	}
 
 #ifdef MIP6_HOME_AGENT
 	/* delete proxy nd entry temprolly */
 	if ((status >= IP6_MH_BAS_ERRORBASE) &&
-	     SA6_ARE_ADDR_EQUAL(dst, dstcoa)) {
+	     IN6_ARE_ADDR_EQUAL(dst, dstcoa)) {
 		struct mip6_bc *mbc;
 
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, dst);
-		if (n && mbc && mbc->mbc_flags & IP6MU_HOME &&
+		if (mtag && mbc && mbc->mbc_flags & IP6MU_HOME &&
 		    (mip6_bc_proxy_control(&mbc->mbc_phaddr, &mbc->mbc_addr, RTM_DELETE) == 0)) {
 			ip6a->ip6a_flags |= IP6A_TEMP_PROXYND_DEL;
 		}
@@ -1194,7 +1189,7 @@ mip6_bc_need_brr(mbc)
 	struct mip6_bc *mbc;
 {
 	int found;
-	struct sockaddr_in6 *src, *dst;
+	struct in6_addr *src, *dst;
 #ifdef __FreeBSD__
 	struct inpcb *inp;
 #endif
@@ -1210,8 +1205,8 @@ mip6_bc_need_brr(mbc)
 	for (inp = LIST_FIRST(&tcb); inp; inp = LIST_NEXT(inp, inp_list)) {
 		if ((inp->inp_vflag & INP_IPV6) == 0)
 			continue;
-		if (SA6_ARE_ADDR_EQUAL(src, &inp->in6p_lsa)
-		    && SA6_ARE_ADDR_EQUAL(dst, &inp->in6p_fsa)) {
+		if (IN6_ARE_ADDR_EQUAL(src, &inp->in6p_laddr)
+		    && IN6_ARE_ADDR_EQUAL(dst, &inp->in6p_faddr)) {
 			found++;
 			break;
 		}
@@ -1219,8 +1214,8 @@ mip6_bc_need_brr(mbc)
 #endif
 #ifdef __NetBSD__
 	for (inp = &tcb6; inp != &tcb6; inp = inp->in6p_next) {
-		if (SA6_ARE_ADDR_EQUAL(src, &inp->in6p_lsa)
-		    && SA6_ARE_ADDR_EQUAL(dst, &inp->in6p_fsa)) {
+		if (IN6_ARE_ADDR_EQUAL(src, &inp->in6p_laddr)
+		    && IN6_ARE_ADDR_EQUAL(dst, &inp->in6p_faddr)) {
 			found++;
 			break;
 		}
@@ -1530,12 +1525,12 @@ mip6_create_keygen_token_cb(void *op)
  *	Check a Binding Update packet whether it is valid 
  */
 int
-mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa, cache_req, status)
+mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa, coa, cache_req, status)
 	struct ip6_hdr *ip6;
 	struct ip6_mh_binding_update *ip6mu;
 	int ip6mulen;
 	struct mip6_mobility_options *mopt;
-	struct sockaddr_in6 *hoa_sa, *coa_sa;
+	struct in6_addr *hoa, *coa;
 	int cache_req;	/* true if this request is cacheing */
 	u_int8_t *status;
 {
@@ -1548,20 +1543,22 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa, cache_req, status)
 	if ((mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA)) 
 	     != (MOPT_NONCE_IDX | MOPT_AUTHDATA)) {
 		mip6log((LOG_ERR,
-			 "%s:%d: Nonce or Authdata is missed. (%02x)\n",
-			 __FILE__, __LINE__, mopt->valid_options));
+		    "mip6_is_valid_bu:%d: "
+		    "Nonce or Authdata is missed. (%02x)\n",
+		    __LINE__, mopt->valid_options));
 		return (EINVAL);
 	}
-	if ((*status = mip6_calculate_kbm_from_index(hoa_sa, coa_sa, mopt->mopt_ho_nonce_idx, 
-			mopt->mopt_co_nonce_idx, !cache_req, key_bm))) {
+	if ((*status = mip6_calculate_kbm_from_index(hoa, coa,
+	    mopt->mopt_ho_nonce_idx, mopt->mopt_co_nonce_idx,
+	    !cache_req, key_bm))) {
 		return (EINVAL);
 	}
 
 	cksum_backup = ip6mu->ip6mhbu_cksum;
 	ip6mu->ip6mhbu_cksum = 0;
 	/* Calculate authenticator */
-	if (mip6_calculate_authenticator(key_bm, authdata,
-	    &coa_sa->sin6_addr, &ip6->ip6_dst, (caddr_t)ip6mu, ip6mulen, 
+	if (mip6_calculate_authenticator(key_bm, authdata, coa, &ip6->ip6_dst,
+	    (caddr_t)ip6mu, ip6mulen,
 	    (u_int8_t *)mopt->mopt_auth + sizeof(struct ip6_mh_opt_auth_data) - (u_int8_t *)ip6mu, 
 	    MOPT_AUTH_LEN(mopt) + 2)) {
 		return (EINVAL);
@@ -1573,9 +1570,9 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa, cache_req, status)
 }
 
 int
-mip6_calculate_kbm_from_index(hoa_sa, coa_sa, ho_nonce_idx, co_nonce_idx, ignore_co_nonce, key_bm)
-	struct sockaddr_in6 *hoa_sa;
-	struct sockaddr_in6 *coa_sa;
+mip6_calculate_kbm_from_index(hoa, coa, ho_nonce_idx, co_nonce_idx, ignore_co_nonce, key_bm)
+	struct in6_addr *hoa;
+	struct in6_addr *coa;
 	u_int16_t ho_nonce_idx;	/* Home Nonce Index */
 	u_int16_t co_nonce_idx;	/* Care-of Nonce Index */
 	int ignore_co_nonce;
@@ -1589,18 +1586,19 @@ mip6_calculate_kbm_from_index(hoa_sa, coa_sa, ho_nonce_idx, co_nonce_idx, ignore
 
 	if (mip6_get_nonce(ho_nonce_idx, &home_nonce) != 0) {
 		mip6log((LOG_ERR,
-			 "%s:%d: Home Nonce cannot be acquired.\n",
-			 __FILE__, __LINE__));
+		    "mip6_calculate_kbm_from_index:%d: "
+		    "Home Nonce cannot be acquired.\n",
+		    __LINE__));
 		stat =IP6_MH_BAS_HOME_NI_EXPIRED;
 	}
 	if (!ignore_co_nonce && 
 	    mip6_get_nonce(co_nonce_idx, &careof_nonce) != 0) {
 		mip6log((LOG_ERR,
-			 "%s:%d: Care-of Nonce cannot be acquired.\n",
-			 __FILE__, __LINE__));
+		    "mip6_calculate_kbm_from_index:%d: "
+		    "Care-of Nonce cannot be acquired.\n",
+		    __LINE__));
 		stat = (stat == IP6_MH_BAS_ACCEPTED) ? 
-			IP6_MH_BAS_COA_NI_EXPIRED :
-			IP6_MH_BAS_NI_EXPIRED;
+		    IP6_MH_BAS_COA_NI_EXPIRED : IP6_MH_BAS_NI_EXPIRED;
 	}
 	if (stat != IP6_MH_BAS_ACCEPTED)
 		return (stat);
@@ -1613,8 +1611,9 @@ mip6_calculate_kbm_from_index(hoa_sa, coa_sa, ho_nonce_idx, co_nonce_idx, ignore
 	    (!ignore_co_nonce && 
 		(mip6_get_nodekey(co_nonce_idx, &coa_nodekey) != 0))) {
 		mip6log((LOG_ERR,
-			 "%s:%d: home or care-of node key cannot be acquired.\n",
-			 __FILE__, __LINE__));
+		    "mip6_calculate_kbm_from_index:%d: "
+		    "home or care-of node key cannot be acquired.\n",
+		    __LINE__));
 		return (IP6_MH_BAS_NI_EXPIRED);
 	}
 #ifdef RR_DBG
@@ -1623,11 +1622,12 @@ mip6_hexdump("CN: Careof Nodekey: ", sizeof(coa_nodekey), &coa_nodekey);
 #endif
 
 	/* Calculate home keygen token */
-	if (mip6_create_keygen_token(&hoa_sa->sin6_addr,
-			   &home_nodekey, &home_nonce, 0, &home_token)) {
+	if (mip6_create_keygen_token(hoa, &home_nodekey, &home_nonce, 0,
+		&home_token)) {
 		mip6log((LOG_ERR,
-			 "%s:%d: Failed of creation of home keygen token\n",
-			 __FILE__, __LINE__));
+		    "mip6_calculate_kbm_from_index:%d: "
+		    "Failed of creation of home keygen token\n",
+		    __LINE__));
 		return (IP6_MH_BAS_UNSPECIFIED);
 	}
 #ifdef RR_DBG
@@ -1636,11 +1636,12 @@ mip6_hexdump("CN: Home keygen token: ", sizeof(home_token), (u_int8_t *)&home_to
 
 	if (!ignore_co_nonce) {
 		/* Calculate care-of keygen token */
-		if (mip6_create_keygen_token(&coa_sa->sin6_addr,
-			   &coa_nodekey, &careof_nonce, 1, &careof_token)) {
+		if (mip6_create_keygen_token(coa, &coa_nodekey, &careof_nonce,
+			1, &careof_token)) {
 			mip6log((LOG_ERR,
-			 	"%s:%d: Failed of creation of care-of keygen token\n",
-			 	__FILE__, __LINE__));
+			    "mip6_calculate_kbm_from_index:%d: "
+			    "Failed of creation of care-of keygen token\n",
+			    __LINE__));
 			return (IP6_MH_BAS_UNSPECIFIED);
 		}
 #ifdef RR_DBG
@@ -1649,8 +1650,8 @@ mip6_hexdump("CN: Care-of keygen token: ", sizeof(careof_token), (u_int8_t *)&ca
 	}
 
 	/* Calculate K_bm */
-	mip6_calculate_kbm(&home_token,
-			   ignore_co_nonce ? NULL : &careof_token, key_bm);
+	mip6_calculate_kbm(&home_token, ignore_co_nonce ? NULL : &careof_token,
+	    key_bm);
 #ifdef RR_DBG
 mip6_hexdump("CN: K_bm: ", sizeof(key_bm), key_bm);
 #endif
@@ -1828,67 +1829,61 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 	struct ip6_mh_home_test_init *ip6mhi;
 	int ip6mhilen;
 {
-	struct sockaddr_in6 src_sa, dst_sa;
+	struct ip6_hdr *ip6;
 	struct mbuf *m;
-	struct m_tag *n;
+	struct m_tag *mtag;
 	struct ip6aux *ip6a;
 	struct ip6_pktopts opt;
 	int error = 0;
 
 	mip6stat.mip6s_hoti++;
 
-	if (ip6_getpktaddrs(m0, &src_sa, &dst_sa)) {
-		/* must not happen. */
-		m_freem(m0);
-		return (EINVAL);
-	}
+	ip6 = mtod(m0, struct ip6_hdr *);
 
 	/* packet length check. */
 	if (ip6mhilen < sizeof(struct ip6_mh_home_test_init)) {
 		mip6log((LOG_NOTICE,
-			 "%s:%d: too short home test init (len = %d) "
-			 "from host %s.\n",
-			 __FILE__, __LINE__,
-			 ip6mhilen,
-			 ip6_sprintf(&src_sa.sin6_addr)));
+		    "mip6_ip6mhi_input:%d: "
+		    "too short home test init (len = %d) from host %s.\n",
+		    __LINE__, ip6mhilen, ip6_sprintf(&ip6->ip6_src)));
 		ip6stat.ip6s_toosmall++;
-		/* send ICMP parameter problem. */
+		/* send an ICMP parameter problem. */
 		icmp6_error(m0, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
-		    (caddr_t)&ip6mhi->ip6mhhti_len - (caddr_t)mtod(m0, struct ip6_hdr *));
+		    (caddr_t)&ip6mhi->ip6mhhti_len - (caddr_t)ip6);
 		return (EINVAL);
 	}
 
 	/* a home address destination option must not exist. */
-	n = ip6_findaux(m0);
-	if (n) {
-		ip6a = (struct ip6aux *) (n + 1);
+	mtag = ip6_findaux(m0);
+	if (mtag) {
+		ip6a = (struct ip6aux *) (mtag + 1);
 		if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
 			mip6log((LOG_NOTICE,
-			    "%s:%d: recieved a home test init with "
-			    " a home address destination option.\n",
-			    __FILE__, __LINE__));
+			    "mip6_ip6mhi_input:%d: "
+			    "recieved a home test init with "
+			    "a home address destination option.\n",
+			    __LINE__));
 			m_freem(m0);
 			/* stat? */
 			return (EINVAL);
 		}
 	}
 
-	ip6_initpktopts(&opt);
-
-	m = mip6_create_ip6hdr(&dst_sa, &src_sa, IPPROTO_NONE, 0);
+	m = mip6_create_ip6hdr(&ip6->ip6_dst, &ip6->ip6_src, IPPROTO_NONE, 0);
 	if (m == NULL) {
 		mip6log((LOG_ERR,
-		    "%s:%d: creating ip6hdr failed.\n",
-		    __FILE__, __LINE__));
+		    "mip6_ip6mhi_input:%d: creating ip6hdr failed.\n",
+		    __LINE__));
  		goto free_ip6pktopts;
 	}
 
-	error = mip6_ip6mh_create(&opt.ip6po_mh, &dst_sa, &src_sa,
+	ip6_initpktopts(&opt);
+	error = mip6_ip6mh_create(&opt.ip6po_mh, &ip6->ip6_dst, &ip6->ip6_src,
 	    ip6mhi->ip6mhhti_cookie8);
 	if (error) {
 		mip6log((LOG_ERR,
-		    "%s:%d: HoT creation error (%d)\n",
-		    __FILE__, __LINE__, error));
+		    "mip6_ip6mhi_input:%d: HoT creation error (%d)\n",
+		    __LINE__, error));
 		m_freem(m);
  		goto free_ip6pktopts;
 	}
@@ -1919,23 +1914,19 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 	struct ip6_mh_careof_test_init *ip6mci;
 	int ip6mcilen;
 {
-	struct sockaddr_in6 src_sa, dst_sa;
+	struct ip6_hdr *ip6;
 	struct mbuf *m;
-	struct m_tag *n;
+	struct m_tag *mtag;
 	struct ip6aux *ip6a;
 	struct ip6_pktopts opt;
 	int error = 0;
 
 	mip6stat.mip6s_coti++;
 
-	if (ip6_getpktaddrs(m0, &src_sa, &dst_sa)) {
-		/* must not happen. */
-		m_freem(m0);
-		return (EINVAL);
-	}
+	ip6 = mtod(m0, struct ip6_hdr *);
 
-	if (IN6_IS_ADDR_UNSPECIFIED(&src_sa.sin6_addr) ||
-	    IN6_IS_ADDR_LOOPBACK(&src_sa.sin6_addr)) {
+	if (IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src) ||
+	    IN6_IS_ADDR_LOOPBACK(&ip6->ip6_src)) {
 		m_freem(m0);
 		return (EINVAL);
 	}
@@ -1943,49 +1934,47 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 	/* packet length check. */
 	if (ip6mcilen < sizeof(struct ip6_mh_careof_test_init)) {
 		mip6log((LOG_NOTICE,
-			 "%s:%d: too short care-of test init (len = %d) "
-			 "from host %s.\n",
-			 __FILE__, __LINE__,
-			 ip6mcilen,
-			 ip6_sprintf(&src_sa.sin6_addr)));
+		    "mip6_ip6mci_input:%d: "
+		    "too short care-of test init (len = %d) from host %s.\n",
+		    __LINE__, ip6mcilen, ip6_sprintf(&ip6->ip6_src)));
 		ip6stat.ip6s_toosmall++;
 		/* send ICMP parameter problem. */
 		icmp6_error(m0, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
-		    (caddr_t)&ip6mci->ip6mhcti_len - (caddr_t)mtod(m0, struct ip6_hdr *));
+		    (caddr_t)&ip6mci->ip6mhcti_len - (caddr_t)ip6);
 		return (EINVAL);
 	}
 
 	/* a home address destination option must not exist. */
-	n = ip6_findaux(m0);
-	if (n) {
-		ip6a = (struct ip6aux *) (n + 1);
+	mtag = ip6_findaux(m0);
+	if (mtag) {
+		ip6a = (struct ip6aux *) (mtag + 1);
 		if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
 			mip6log((LOG_NOTICE,
-			    "%s:%d: recieved a care-of test init with "
-			    " a home address destination option.\n",
-			    __FILE__, __LINE__));
+			    "mip6_ip6mci_input:%d: "
+			    "recieved a care-of test init with "
+			    "a home address destination option.\n",
+			    __LINE__));
 			m_freem(m0);
 			/* stat? */
 			return (EINVAL);
 		}
 	}
 
-	ip6_initpktopts(&opt);
-
-	m = mip6_create_ip6hdr(&dst_sa, &src_sa, IPPROTO_NONE, 0);
+	m = mip6_create_ip6hdr(&ip6->ip6_dst, &ip6->ip6_src, IPPROTO_NONE, 0);
 	if (m == NULL) {
 		mip6log((LOG_ERR,
-		    "%s:%d: creating ip6hdr failed.\n",
-		    __FILE__, __LINE__));
+		    "mip6_ip6mci_input:%d: creating ip6hdr failed.\n",
+		    __LINE__));
  		goto free_ip6pktopts;
 	}
 
-	error = mip6_ip6mc_create(&opt.ip6po_mh, &dst_sa, &src_sa,
+	ip6_initpktopts(&opt);
+	error = mip6_ip6mc_create(&opt.ip6po_mh, &ip6->ip6_dst, &ip6->ip6_src,
 	    ip6mci->ip6mhcti_cookie8);
 	if (error) {
 		mip6log((LOG_ERR,
-		    "%s:%d: HoT creation error (%d)\n",
-		    __FILE__, __LINE__, error));
+		    "mip6_ip6mci_input:%d: HoT creation error (%d)\n",
+		    __LINE__, error));
 		m_freem(m);
  		goto free_ip6pktopts;
 	}
@@ -2012,7 +2001,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 
 #define IS_REQUEST_TO_CACHE(lifetime, hoa, coa)	\
 	(((lifetime) != 0) &&			\
-	 (!SA6_ARE_ADDR_EQUAL((hoa), (coa))))
+	 (!IN6_ARE_ADDR_EQUAL((hoa), (coa))))
 int
 mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	struct mbuf *m;
@@ -2020,8 +2009,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	int ip6mulen;
 {
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 src_sa, dst_sa;
-	struct m_tag *n;
+	struct m_tag *mtag;
 	struct ip6aux *ip6a = NULL;
 	u_int8_t isprotected = 0;
 	struct mip6_bc *mbc;
@@ -2055,21 +2043,14 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 #endif /* IPSEC */
 
 	ip6 = mtod(m, struct ip6_hdr *);
-	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
-		/* must not happen. */
-		m_freem(m);
-		return (EINVAL);
-	}
-	bi.mbc_addr = dst_sa;
+	bi.mbc_addr = ip6->ip6_dst;
 
 	/* packet length check. */
 	if (ip6mulen < sizeof(struct ip6_mh_binding_update)) {
 		mip6log((LOG_NOTICE,
-			 "%s:%d: too short binding update (len = %d) "
-			 "from host %s.\n",
-			 __FILE__, __LINE__,
-			 ip6mulen,
-			 ip6_sprintf(&src_sa.sin6_addr)));
+		    "mip6_ip6mu_input:%d: too short binding update (len = %d) "
+		    "from host %s.\n",
+		    __LINE__, ip6mulen, ip6_sprintf(&ip6->ip6_src)));
 		ip6stat.ip6s_toosmall++;
 		/* send ICMP parameter problem. */
 		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
@@ -2091,16 +2072,16 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	}
 #endif
 
-	bi.mbc_pcoa = src_sa;
-	n = ip6_findaux(m);
-	if (n == NULL) {
+	bi.mbc_pcoa = ip6->ip6_src;
+	mtag = ip6_findaux(m);
+	if (mtag == NULL) {
 		m_freem(m);
 		return (EINVAL);
 	}
-	ip6a = (struct ip6aux *) (n + 1);
+	ip6a = (struct ip6aux *) (mtag + 1);
 	if (((ip6a->ip6a_flags & IP6A_HASEEN) != 0) && 
 	    ((ip6a->ip6a_flags & IP6A_SWAP) != 0)) {
-		bi.mbc_pcoa.sin6_addr = ip6a->ip6a_coa;
+		bi.mbc_pcoa = ip6a->ip6a_coa;
 	}
 
 	if (!mip6ctl_use_ipsec && (bi.mbc_flags & IP6MU_HOME)) {
@@ -2124,11 +2105,10 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
  accept_binding_update:
 
 	/* get home address. */
-	bi.mbc_phaddr = src_sa;
+	bi.mbc_phaddr = ip6->ip6_src;
 
 	if ((error = mip6_get_mobility_options((struct ip6_mh *)ip6mu,
-					       sizeof(*ip6mu),
-					       ip6mulen, &mopt))) {
+		 sizeof(*ip6mu), ip6mulen, &mopt))) {
 		/* discard. */
 		m_freem(m);
 		mip6stat.mip6s_invalidopt++;
@@ -2136,13 +2116,13 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	}
 
 	if (mopt.valid_options & MOPT_ALTCOA)
-		bi.mbc_pcoa.sin6_addr = mopt.mopt_altcoa;
+		bi.mbc_pcoa = mopt.mopt_altcoa;
 
-	if (IN6_IS_ADDR_MULTICAST(&bi.mbc_pcoa.sin6_addr) ||
-	    IN6_IS_ADDR_UNSPECIFIED(&bi.mbc_pcoa.sin6_addr) ||
-	    IN6_IS_ADDR_V4MAPPED(&bi.mbc_pcoa.sin6_addr) ||
-	    IN6_IS_ADDR_V4COMPAT(&bi.mbc_pcoa.sin6_addr) ||
-	    IN6_IS_ADDR_LOOPBACK(&bi.mbc_pcoa.sin6_addr)) {
+	if (IN6_IS_ADDR_MULTICAST(&bi.mbc_pcoa) ||
+	    IN6_IS_ADDR_UNSPECIFIED(&bi.mbc_pcoa) ||
+	    IN6_IS_ADDR_V4MAPPED(&bi.mbc_pcoa) ||
+	    IN6_IS_ADDR_V4COMPAT(&bi.mbc_pcoa) ||
+	    IN6_IS_ADDR_LOOPBACK(&bi.mbc_pcoa)) {
 		/* discard. */
 		m_freem(m);
 		mip6stat.mip6s_invalidcoa++;
@@ -2181,14 +2161,12 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		return (EINVAL);
 	}
 	if (!bu_safe && 
-	    mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &mopt, 
-			     &bi.mbc_phaddr, &bi.mbc_pcoa,
-			     IS_REQUEST_TO_CACHE(bi.mbc_lifetime,
-				&bi.mbc_phaddr, &bi.mbc_pcoa), 
-			     &bi.mbc_status)) {
+	    mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &mopt, &bi.mbc_phaddr,
+		&bi.mbc_pcoa, IS_REQUEST_TO_CACHE(bi.mbc_lifetime,
+		    &bi.mbc_phaddr, &bi.mbc_pcoa), &bi.mbc_status)) {
 		mip6log((LOG_ERR,
-			 "%s:%d: RR authentication was failed.\n",
-			 __FILE__, __LINE__));
+		    "mip6_ip6mu_input:%d: RR authentication was failed.\n",
+		    __LINE__));
 		/* discard. */
 		m_freem(m);
 		mip6stat.mip6s_rrauthfail++;
@@ -2336,7 +2314,7 @@ send_ba:
 static int
 mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 	struct ip6_mh **pktopt_mobility;
-	struct sockaddr_in6 *src, *dst;
+	struct in6_addr *src, *dst;
 	u_int8_t *cookie;		/* home init cookie */
 {
 	struct ip6_mh_home_test *ip6mh;
@@ -2363,7 +2341,7 @@ mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 	ip6mh->ip6mhht_type = IP6_MH_TYPE_HOT;
 	ip6mh->ip6mhht_nonce_index = htons(nonce_index);
 	bcopy(cookie, ip6mh->ip6mhht_cookie8, sizeof(ip6mh->ip6mhht_cookie8));
-	if (mip6_create_keygen_token(&dst->sin6_addr, &home_nodekey,
+	if (mip6_create_keygen_token(dst, &home_nodekey,
 	    &home_nonce, 0, ip6mh->ip6mhht_token8)) {
 		mip6log((LOG_ERR,
 		 	"%s:%d: Failed of creation of home keygen token\n",
@@ -2383,7 +2361,7 @@ mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 static int
 mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	struct ip6_mh **pktopt_mobility;
-	struct sockaddr_in6 *src, *dst;
+	struct in6_addr *src, *dst;
 	u_int8_t *cookie;		/* careof init cookie */
 {
 	struct ip6_mh_careof_test *ip6mc;
@@ -2410,11 +2388,12 @@ mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	ip6mc->ip6mhct_type = IP6_MH_TYPE_COT;
 	ip6mc->ip6mhct_nonce_index = htons(nonce_index);
 	bcopy(cookie, ip6mc->ip6mhct_cookie8, sizeof(ip6mc->ip6mhct_cookie8));
-	if (mip6_create_keygen_token(&dst->sin6_addr, &careof_nodekey,
-	    &careof_nonce, 1, ip6mc->ip6mhct_token8)) {
+	if (mip6_create_keygen_token(dst, &careof_nodekey, &careof_nonce, 1,
+		ip6mc->ip6mhct_token8)) {
 		mip6log((LOG_ERR,
-		 	"%s:%d: Failed of creation of home keygen token\n",
-		 	__FILE__, __LINE__));
+		    "mip6_ip6mc_create:%d: "
+		    "Failed of creation of home keygen token\n",
+		    __LINE__));
 		 return (EINVAL);
 	}
 
@@ -2431,9 +2410,9 @@ int
 mip6_ip6ma_create(pktopt_mobility, src, dst, dstcoa, status, seqno, lifetime,
     refresh, mopt)
 	struct ip6_mh **pktopt_mobility;
-	struct sockaddr_in6 *src;
-	struct sockaddr_in6 *dst;
-	struct sockaddr_in6 *dstcoa;
+	struct in6_addr *src;
+	struct in6_addr *dst;
+	struct in6_addr *dstcoa;
 	u_int8_t status;
 	u_int16_t seqno;
 	u_int32_t lifetime;
@@ -2534,8 +2513,7 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, dstcoa, status, seqno, lifetime,
 		mopt_auth->ip6moad_type = IP6_MHOPT_BAUTH;
 		mopt_auth->ip6moad_len = IP6MOPT_AUTHDATA_SIZE - 2;
 		mip6_calculate_authenticator(key_bm, (caddr_t)(mopt_auth + 1),
-		    &dstcoa->sin6_addr, &src->sin6_addr, (caddr_t)ip6ma,
-		    ip6ma_size,
+		    dstcoa, src, (caddr_t)ip6ma, ip6ma_size,
 		    ba_size + refresh_size + sizeof(struct ip6_mh_opt_auth_data),
 		    IP6MOPT_AUTHDATA_SIZE - 2);
 	}
@@ -2564,8 +2542,8 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, dstcoa, status, seqno, lifetime,
 static int
 mip6_ip6mr_create(pktopt_mobility, src, dst)
 	struct ip6_mh **pktopt_mobility;
-	struct sockaddr_in6 *src;
-	struct sockaddr_in6 *dst;
+	struct in6_addr *src;
+	struct in6_addr *dst;
 {
 	struct ip6_mh_binding_request *ip6mr;
 	int ip6mr_size;
@@ -2596,10 +2574,10 @@ mip6_ip6mr_create(pktopt_mobility, src, dst)
 int
 mip6_ip6me_create(pktopt_mobility, src, dst, status, addr)
 	struct ip6_mh **pktopt_mobility;
-	struct sockaddr_in6 *src;
-	struct sockaddr_in6 *dst;
+	struct in6_addr *src;
+	struct in6_addr *dst;
 	u_int8_t status;
-	struct sockaddr_in6 *addr;
+	struct in6_addr *addr;
 {
 	struct ip6_mh_binding_error *ip6me;
 	int ip6me_size;
@@ -2618,7 +2596,7 @@ mip6_ip6me_create(pktopt_mobility, src, dst, status, addr)
 	ip6me->ip6mhbe_len = (ip6me_size >> 3) - 1;
 	ip6me->ip6mhbe_type = IP6_MH_TYPE_BERROR;
 	ip6me->ip6mhbe_status = status;
-	ip6me->ip6mhbe_homeaddr = addr->sin6_addr;
+	ip6me->ip6mhbe_homeaddr = *addr;
 	in6_clearscope(&ip6me->ip6mhbe_homeaddr);
 
 	/* calculate checksum. */
@@ -2699,9 +2677,9 @@ mip6_get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
 #define ADDCARRY(x)  (x > 65535 ? x -= 65535 : x)
 #define REDUCE do {l_util.l = sum; sum = l_util.s[0] + l_util.s[1]; ADDCARRY(sum);} while(0);
 int
-mip6_cksum(src_sa, dst_sa, plen, nh, mobility)
-	struct sockaddr_in6 *src_sa;
-	struct sockaddr_in6 *dst_sa;
+mip6_cksum(src, dst, plen, nh, mobility)
+	struct in6_addr *src;
+	struct in6_addr *dst;
 	u_int32_t plen;
 	u_int8_t nh;
 	char *mobility;
@@ -2724,9 +2702,9 @@ mip6_cksum(src_sa, dst_sa, plen, nh, mobility)
 	} l_util;
 
 	bzero(&uph, sizeof(uph));
-	uph.uph_un.uph_src = src_sa->sin6_addr;
+	uph.uph_un.uph_src = *src;
 	in6_clearscope(&uph.uph_un.uph_src);
-	uph.uph_un.uph_dst = dst_sa->sin6_addr;
+	uph.uph_un.uph_dst = *dst;
 	in6_clearscope(&uph.uph_un.uph_dst);
 	uph.uph_un.uph_plen = htonl(plen);
 	uph.uph_un.uph_nh = nh;
@@ -2761,56 +2739,57 @@ mip6_cksum(src_sa, dst_sa, plen, nh, mobility)
 #if defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE)
 void
 mip6_create_addr(addr, ifid, ndpr)
-	struct sockaddr_in6 *addr;
-	const struct sockaddr_in6 *ifid;
+	struct in6_addr *addr;
+	const struct in6_addr *ifid;
 	struct nd_prefix *ndpr;
 {
 	int i, bytelen, bitlen;
 	u_int8_t mask;
-	struct in6_addr *prefix = &ndpr->ndpr_prefix.sin6_addr;
+	struct in6_addr *prefix = &ndpr->ndpr_prefix;
 	u_int8_t prefixlen = ndpr->ndpr_plen;
+	struct sockaddr_in6 sin6;
 
 	bzero(addr, sizeof(*addr));
 
 	bytelen = prefixlen / 8;
 	bitlen = prefixlen % 8;
 	for (i = 0; i < bytelen; i++)
-		addr->sin6_addr.s6_addr8[i] = prefix->s6_addr8[i];
+		addr->s6_addr8[i] = prefix->s6_addr8[i];
 	if (bitlen) {
 		mask = 0;
 		for (i = 0; i < bitlen; i++)
 			mask |= (0x80 >> i);
-		addr->sin6_addr.s6_addr8[bytelen]
-			= (prefix->s6_addr8[bytelen] & mask)
-			| (ifid->sin6_addr.s6_addr8[bytelen] & ~mask);
+		addr->s6_addr8[bytelen] = (prefix->s6_addr8[bytelen] & mask)
+		    | (ifid->s6_addr8[bytelen] & ~mask);
 
 		for (i = bytelen + 1; i < 16; i++)
-			addr->sin6_addr.s6_addr8[i]
-				= ifid->sin6_addr.s6_addr8[i];
+			addr->s6_addr8[i] = ifid->s6_addr8[i];
 	} else {
 		for (i = bytelen; i < 16; i++)
-			addr->sin6_addr.s6_addr8[i]
-				= ifid->sin6_addr.s6_addr8[i];
+			addr->s6_addr8[i] = ifid->s6_addr8[i];
 	}
 
-	addr->sin6_len = sizeof(*addr);
-	addr->sin6_family = AF_INET6;
+	sin6.sin6_len = sizeof(sin6);
+	sin6.sin6_family = AF_INET6;
+	sin6.sin6_addr = *addr;
 	if (ndpr->ndpr_ifp) {
 		int error;
-		error = in6_addr2zoneid(ndpr->ndpr_ifp, &addr->sin6_addr,
-					&addr->sin6_scope_id);
+
+		error = in6_addr2zoneid(ndpr->ndpr_ifp, &sin6.sin6_addr,
+		    &sin6.sin6_scope_id);
 		if (error == 0)
-			error = in6_embedscope(&addr->sin6_addr, addr);
+			error = in6_embedscope(addr, &sin6);
 		if (error != 0)
 			mip6log((LOG_ERR,
-				 "%s:%d: can't set scope correctly\n",
-				 __FILE__, __LINE__));
+			    "mip6_create_addr:%d: can't set scope correctly\n",
+			    __LINE__));
 	} else {
 		/* no ifp is specified. */
-		if (scope6_check_id(addr, ip6_use_defzone))
+		if (scope6_check_id(&sin6, ip6_use_defzone))
 			mip6log((LOG_ERR,
-				 "%s:%d: can't set scope correctly\n",
-				 __FILE__, __LINE__));
+			    "mip6_create_addr:%d: can't set scope correctly\n",
+			    __LINE__));
+		*addr = sin6.sin6_addr;
 	}
 }
 
@@ -2897,9 +2876,11 @@ mip6_tunnel_control(action, entry, func, ep)
 #if !defined(MIP6_NOHAIPSEC)
 #ifdef MIP6_MOBILE_NODE
 	struct mip6_bu *mbu;
+	struct sockaddr_in6 haddr_sa, coa_sa, paddr_sa;
 #endif
 #ifdef MIP6_HOME_AGENT
 	struct mip6_bc *mbc;
+	struct sockaddr_in6 phaddr_sa, pcoa_sa, addr_sa;
 #endif
 #endif /* !MIP6_NOHAIPSEC */
 	if ((entry == NULL) && (ep == NULL)) {
@@ -2911,8 +2892,26 @@ mip6_tunnel_control(action, entry, func, ep)
 #ifdef MIP6_MOBILE_NODE
 	if (func == mip6_bu_encapcheck) {
 		mbu = (struct mip6_bu *)entry;
-		if (mip6_update_ipsecdb(&mbu->mbu_haddr, NULL, &mbu->mbu_coa,
-			&mbu->mbu_paddr)) {
+
+		bzero(&haddr_sa, sizeof(haddr_sa));
+		haddr_sa.sin6_len = sizeof(haddr_sa);
+		haddr_sa.sin6_family = AF_INET6;
+		haddr_sa.sin6_addr = mbu->mbu_haddr;
+		/* XXX scope_id? */
+
+		bzero(&coa_sa, sizeof(coa_sa));
+		coa_sa.sin6_len = sizeof(coa_sa);
+		coa_sa.sin6_family = AF_INET6;
+		coa_sa.sin6_addr = mbu->mbu_coa;
+		/* XXX scope_id? */
+
+		bzero(&paddr_sa, sizeof(paddr_sa));
+		paddr_sa.sin6_len = sizeof(paddr_sa);
+		paddr_sa.sin6_family = AF_INET6;
+		paddr_sa.sin6_addr = mbu->mbu_paddr;
+		/* XXX scope_id? */
+
+		if (mip6_update_ipsecdb(&haddr_sa, NULL, &coa_sa, &paddr_sa)) {
 			mip6log((LOG_ERR,
 			    "%s:%d: failed to update ipsec database.\n",
 			    __FILE__, __LINE__));
@@ -2920,13 +2919,32 @@ mip6_tunnel_control(action, entry, func, ep)
 			return (EINVAL);
 			
 		}
-	} else
+	}
 #endif
 #ifdef MIP6_HOME_AGENT
 	if (func == mip6_bc_encapcheck) {
 		mbc = (struct mip6_bc *)entry;
-		if (mip6_update_ipsecdb(&mbc->mbc_phaddr, NULL, &mbc->mbc_pcoa,
-			&mbc->mbc_addr)) {
+
+		bzero(&phaddr_sa, sizeof(phaddr_sa));
+		phaddr_sa.sin6_len = sizeof(phaddr_sa);
+		phaddr_sa.sin6_family = AF_INET6;
+		phaddr_sa.sin6_addr = mbc->mbc_phaddr;
+		/* XXX scope_id? */
+
+		bzero(&pcoa_sa, sizeof(pcoa_sa));
+		pcoa_sa.sin6_len = sizeof(pcoa_sa);
+		pcoa_sa.sin6_family = AF_INET6;
+		pcoa_sa.sin6_addr = mbc->mbc_pcoa;
+		/* XXX scope_id? */
+
+		bzero(&addr_sa, sizeof(addr_sa));
+		addr_sa.sin6_len = sizeof(paddr_sa);
+		addr_sa.sin6_family = AF_INET6;
+		addr_sa.sin6_addr = mbc->mbc_addr;
+		/* XXX scope_id? */
+
+		if (mip6_update_ipsecdb(&phaddr_sa, NULL, &pcoa_sa,
+			&addr_sa)) {
 			mip6log((LOG_ERR,
 			    "%s:%d: failed to update ipsec database.\n",
 			    __FILE__, __LINE__));
