@@ -1,3 +1,5 @@
+/*	$KAME: config.c,v 1.22 2000/12/04 06:45:29 itojun Exp $	*/
+
 /*
  *  Copyright (c) 1998 by the University of Southern California.
  *  All rights reserved.

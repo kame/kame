@@ -1,3 +1,5 @@
+/*	$KAME: cftoken.l,v 1.8 2000/12/04 06:45:29 itojun Exp $	*/
+
 %{
 /*
  * Copyright (C) 1999 WIDE Project.

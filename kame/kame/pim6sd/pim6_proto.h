@@ -1,3 +1,5 @@
+/*	$KAME: pim6_proto.h,v 1.5 2000/12/04 06:45:31 itojun Exp $	*/
+
 /*
  *  Copyright (c) 1998 by the University of Southern California.
  *  All rights reserved.

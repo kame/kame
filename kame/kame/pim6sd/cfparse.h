@@ -1,3 +1,5 @@
+/*	$KAME: cfparse.h,v 1.2 2000/12/04 06:45:28 itojun Exp $	*/
+
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.

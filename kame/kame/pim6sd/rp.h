@@ -1,3 +1,5 @@
+/*	$KAME: rp.h,v 1.5 2000/12/04 06:45:32 itojun Exp $	*/
+
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
  * All rights reserved.

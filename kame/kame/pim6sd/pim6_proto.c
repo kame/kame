@@ -1,3 +1,5 @@
+/*	$KAME: pim6_proto.c,v 1.37 2000/12/04 06:45:31 itojun Exp $	*/
+
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
  * All rights reserved.

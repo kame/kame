@@ -1,3 +1,5 @@
+/*	$KAME: mld6.c,v 1.29 2000/12/04 06:45:30 itojun Exp $	*/
+
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.

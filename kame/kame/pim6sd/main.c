@@ -1,3 +1,5 @@
+/*	$KAME: main.c,v 1.13 2000/12/04 06:45:30 itojun Exp $	*/
+
 /*
  *  Copyright (c) 1998 by the University of Southern California.
  *  All rights reserved.

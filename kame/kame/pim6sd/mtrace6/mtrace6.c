@@ -1,3 +1,5 @@
+/*	$KAME: mtrace6.c,v 1.16 2000/12/04 06:45:34 itojun Exp $	*/
+
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.

@@ -1,3 +1,5 @@
+/*	$KAME: inet6.h,v 1.6 2000/12/04 06:45:29 itojun Exp $	*/
+
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
  * All rights reserved.

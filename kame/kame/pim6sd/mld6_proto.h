@@ -1,3 +1,5 @@
+/*	$KAME: mld6_proto.h,v 1.4 2000/12/04 06:45:30 itojun Exp $	*/
+
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
  * All rights reserved.

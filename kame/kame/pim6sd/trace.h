@@ -1,4 +1,5 @@
-/*	$KAME: trace.h,v 1.3 2000/07/24 01:00:29 itojun Exp $	*/
+/*	$KAME: trace.h,v 1.4 2000/12/04 06:45:32 itojun Exp $	*/
+
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.

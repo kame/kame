@@ -1,4 +1,5 @@
-/*	$KAME: trace.c,v 1.11 2000/08/08 05:08:44 jinmei Exp $	*/
+/*	$KAME: trace.c,v 1.12 2000/12/04 06:45:32 itojun Exp $	*/
+
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
