@@ -255,14 +255,16 @@ mrt6_stats(mrpaddr, mstaddr)
 	pes(mrt6s_mfc_misses, " %10llu multicast forwarding cache miss%s\n");
 	p(mrt6s_upcalls, " %10llu upcall%s to mrouted\n");
 	p(mrt6s_upq_ovflw, " %10llu upcall llueue overflow%s\n");
-	p(mrt6s_upq_sockfull, " %10llu upcall%s dropped due to full socket buffer\n");
+	p(mrt6s_upq_sockfull,
+	    " %10llu upcall%s dropped due to full socket buffer\n");
 	p(mrt6s_cache_cleanups, " %10llu cache cleanup%s\n");
 	p(mrt6s_no_route, " %10llu datagram%s with no route for origin\n");
 	p(mrt6s_bad_tunnel, " %10llu datagram%s arrived with bad tunneling\n");
 	p(mrt6s_cant_tunnel, " %10llu datagram%s could not be tunneled\n");
 	p(mrt6s_wrong_if, " %10llu datagram%s arrived on wrong interface\n");
 	p(mrt6s_drop_sel, " %10llu datagram%s selectively dropped\n");
-	p(mrt6s_q_overflow, " %10llu datagram%s dropped due to llueue overflow\n");
+	p(mrt6s_q_overflow,
+	    " %10llu datagram%s dropped due to llueue overflow\n");
 	p(mrt6s_pkt2large, " %10llu datagram%s dropped for being too large\n");
 #undef p
 #undef pes
