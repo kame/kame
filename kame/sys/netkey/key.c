@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.185 2001/05/01 16:58:43 itojun Exp $	*/
+/*	$KAME: key.c,v 1.186 2001/05/24 07:19:10 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2844,7 +2844,7 @@ key_getsah(saidx)
 	LIST_FOREACH(sah, &sahtree, chain) {
 		if (sah->state == SADB_SASTATE_DEAD)
 			continue;
-		if (key_cmpsaidx_withoutmode(&sah->saidx, saidx))
+		if (key_cmpsaidx_withoutmode2(&sah->saidx, saidx))
 			return sah;
 	}
 
@@ -3996,7 +3996,50 @@ key_cmpsaidx_withmode(saidx0, saidx1)
 }
 
 /*
- * compare two secasindex structure without mode.
+ * compare two secasindex structure without mode, but think reqid.
+ * don't compare port.
+ * IN:
+ *	saidx0: source, it is often in SAD.
+ *	saidx1: object, it is often from user.
+ * OUT:
+ *	1 : equal
+ *	0 : not equal
+ */
+  static int
+key_cmpsaidx_withoutmode2(saidx0, saidx1)
+	struct secasindex *saidx0, *saidx1;
+{
+	/* sanity */
+	if (saidx0 == NULL && saidx1 == NULL)
+		return 1;
+
+	if (saidx0 == NULL || saidx1 == NULL)
+		return 0;
+
+	if (saidx0->proto != saidx1->proto)
+		return 0;
+
+	/*
+	 * If reqid of SPD is non-zero, unique SA is required.
+	 * The result must be of same reqid in this case.
+	 */
+	if (saidx1->reqid != 0 && saidx0->reqid != saidx1->reqid)
+		return 0;
+
+	if (key_sockaddrcmp((struct sockaddr *)&saidx0->src,
+	    (struct sockaddr *)&saidx1->src, 0) != 0) {
+		return 0;
+	}
+	if (key_sockaddrcmp((struct sockaddr *)&saidx0->dst,
+	    (struct sockaddr *)&saidx1->dst, 0) != 0) {
+		return 0;
+	}
+
+	return 1;
+}
+
+/*
+ * compare two secasindex structure without both mode and reqid.
  * don't compare port.
  * IN:
  *	saidx0: source, it is often in SAD.
