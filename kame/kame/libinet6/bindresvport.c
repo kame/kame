@@ -44,6 +44,10 @@ static char *rcsid = "$OpenBSD: bindresvport.c,v 1.11 1999/12/17 19:22:08 deraad
 #include <netinet/in.h>
 #include <errno.h>
 
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__)
+#include <rpc/rpc.h>
+#endif
+
 /*
  * Bind a socket to a privileged IP port
  */
