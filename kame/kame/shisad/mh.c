@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.6 2005/01/12 03:23:33 t-momose Exp $  */
+/*      $KAME: mh.c,v 1.7 2005/01/12 11:02:37 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -318,6 +318,11 @@ mh_input_common(fd)
 			syslog(LOG_INFO, "  coa:  %s\n", ip6_sprintf(&from.sin6_addr));
 	}
 
+	if (mh->ip6mh_type > IP6_MH_TYPE_MAX)
+		mip6stat.mip6s_unknowntype++;
+	else
+		mip6stat.mip6s_mobility[mh->ip6mh_type]++;
+	
 	if (mh_input(&from.sin6_addr, &dst, hoaopt ? &hoa : NULL,
 		     rthdr_on ? &rtaddr : NULL, mh, mhlen)) {
 		return (-1);
@@ -491,7 +496,6 @@ mh_input(src, dst, hoa, rtaddr, mh, mhlen)
 	/* Processing HOTI, COTI, BU, BE */
 	switch(mh->ip6mh_type) {
 	case IP6_MH_TYPE_HOTI:
-		mip6stat.mip6s_hoti++;
 #ifdef MIP_CN
 		/* section 9.4.1 Check Home Address Option */
 		if (hoa != NULL) 
@@ -508,7 +512,6 @@ mh_input(src, dst, hoa, rtaddr, mh, mhlen)
 #endif /* MIP_CN */
 		break;
 	case IP6_MH_TYPE_COTI:
-		mip6stat.mip6s_coti++;
 #ifdef MIP_CN
 		/* section 9.4.2 Check Home Address Option */
 		if (hoa != NULL) 
@@ -525,24 +528,17 @@ mh_input(src, dst, hoa, rtaddr, mh, mhlen)
 #endif /* MIP_CN */
 		break;
 	case IP6_MH_TYPE_BACK:
-		mip6stat.mip6s_ba++;
 	case IP6_MH_TYPE_COT:
-		mip6stat.mip6s_cot++;
 	case IP6_MH_TYPE_HOT:
-		mip6stat.mip6s_hot++;
 	case IP6_MH_TYPE_BRR:
-		mip6stat.mip6s_br++;
 		/* CN and HA just ignore */
 		break;
 	case IP6_MH_TYPE_BU:
-		mip6stat.mip6s_bu++;
 		return (receive_bu(src, dst, hoa, rtaddr, (struct ip6_mh_binding_update *)mh, mhlen));
 		break;
 	case IP6_MH_TYPE_BERROR:
-		mip6stat.mip6s_be++;
 		break;
 	default:
-		mip6stat.mip6s_unknowntype++;
 		send_be(src, dst, hoa, IP6_MH_BES_UNKNOWN_MH);
 		break;
 	}
@@ -932,8 +928,6 @@ send_brr(src, dst)
 						 (uint16_t *)&brr, sizeof(brr), IPPROTO_MH);
 
 	error = sendmessage((char *)&brr, sizeof(brr), 0, src, dst, NULL, NULL);
-	if (error == 0)
-		mip6stat.mip6s_obr++;
 	return (error);
 }
 
@@ -971,8 +965,6 @@ send_hoti(bul)
 
 	err = sendmessage((char *)&hoti, sizeof(hoti), 0,
 	    &bul->bul_hoainfo->hinfo_hoa, &bul->bul_peeraddr, NULL, NULL);
-	if (err == 0)
-		mip6stat.mip6s_ohoti++;
 
 	return (err);
 }
@@ -1010,8 +1002,6 @@ send_coti(bul)
 
 	err = sendmessage((char *)&coti, sizeof(coti),
 		0, &bul->bul_coa, &bul->bul_peeraddr, NULL, NULL);
-	if (err == 0)
-		mip6stat.mip6s_ocoti++;
 
 	return (err);
 }
@@ -1059,8 +1049,6 @@ send_hot(hoti, dst, src)
 			   sizeof(hot), IPPROTO_MH);
 
 	err = sendmessage((char *)&hot, sizeof(hot), 0, src, dst, NULL, NULL);
-	if (err == 0)
-		mip6stat.mip6s_ohot++;
 
 	return (err);
 }
@@ -1105,8 +1093,6 @@ send_cot(coti, dst, src)
 			   sizeof(cot), IPPROTO_MH);
 
 	err = sendmessage((char *)&cot, sizeof(cot), 0, src, dst, NULL, NULL);
-	if (err == 0)
-		mip6stat.mip6s_ocot++;
 
 	return (err);
 }
@@ -1364,7 +1350,6 @@ send_bu(bul)
 		    &bul->bul_coa, NULL);
 
 	if (error == 0) {
-		mip6stat.mip6s_obu++;
 		time(&bul->bul_bu_lastsent);
 	}
 	
@@ -1536,7 +1521,6 @@ send_ba(src, coa, acoa, hoa, recv_bu, kbm_p, status, seqno, lifetime, refresh, b
 		err = sendmessage(bufp, buflen, 0, src, hoa, NULL, coa);
 
 	if (err == 0) {
-		mip6stat.mip6s_oba++;
 		mip6stat.mip6s_oba_hist[status]++;
 	}
 	
@@ -1555,7 +1539,7 @@ send_be(dst, src, home, status)
 	int err = 0;
 
 	if (debug) {
-		syslog(LOG_INFO, "BA is sent");
+		syslog(LOG_INFO, "BE is sent");
 		syslog(LOG_INFO, "  from %s", ip6_sprintf(src));
 		syslog(LOG_INFO, "  to   %s", ip6_sprintf(dst));
 		syslog(LOG_INFO, "  for  %s",
@@ -1582,7 +1566,6 @@ send_be(dst, src, home, status)
 	err =  sendmessage((char *)&be, sizeof(be), 
 			   0, src, dst, NULL, NULL);
 	if (err == 0) {
-		mip6stat.mip6s_obe++;
 		mip6stat.mip6s_obe_hist[status]++;
 	}
 	
@@ -1763,6 +1746,8 @@ sendmessage(mhdata, mhdatalen, ifindex, src, dst, hoa, rtaddr)
 		syslog(LOG_ERR, "sendmsg error %s", strerror(errno));
 		fprintf(stderr, "%s -> %s\n",
 			ip6_sprintf(src), ip6_sprintf(dst));
+	} else {
+		mip6stat.mip6s_omobility[((struct ip6_mh *)mhdata)->ip6mh_type]++;
 	}
 
 	return (0);

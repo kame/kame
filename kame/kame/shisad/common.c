@@ -1,4 +1,4 @@
-/*      $KAME: common.c,v 1.3 2005/01/12 03:23:33 t-momose Exp $  */
+/*      $KAME: common.c,v 1.4 2005/01/12 11:02:37 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -1635,23 +1635,28 @@ command_show_stat(s)
 	int s;
 {
 	int i;
+	u_quad_t mip6s_mh;
 	char buff[2048];
 
-#define PS(msg, variable) {\
-         sprintf(buff, "     %qu " msg "\n", (&mip6stat)->variable);\
+#define PS(msg, value) do {\
+         sprintf(buff, "     %qu " msg "\n", value);\
          write(s, buff, strlen(buff));\
-	}
+	} while(/*CONSTCOND*/0)
 
 	sprintf(buff, "Input Statistic:\n");
 	write(s, buff, strlen(buff));
 
-	PS("Mobility Headers", mip6s_mobility);
-	PS("HoTI messages", mip6s_hoti);
-	PS("CoTI messages", mip6s_coti);
-	PS("HoT messages", mip6s_hot);
-	PS("CoT messages", mip6s_cot);
-	PS("BU messages", mip6s_bu);
-	PS("BA messages", mip6s_ba);
+	mip6s_mh = 0;
+	for (i = 0; i < sizeof(mip6stat.mip6s_mobility) / sizeof(u_quad_t); i++)
+		mip6s_mh += mip6stat.mip6s_mobility[i];
+	
+	PS("Mobility Headers", mip6s_mh);
+	PS("HoTI messages", mip6stat.mip6s_hoti);
+	PS("CoTI messages", mip6stat.mip6s_coti);
+	PS("HoT messages", mip6stat.mip6s_hot);
+	PS("CoT messages", mip6stat.mip6s_cot);
+	PS("BU messages", mip6stat.mip6s_bu);
+	PS("BA messages", mip6stat.mip6s_ba);
 	for (i =0; i < 256; i++) {
 		if ((&mip6stat)->mip6s_ba_hist[i] != 0) {
 			sprintf(buff, "\t\t%qu %s\n", (&mip6stat)->mip6s_ba_hist[i],
@@ -1659,8 +1664,8 @@ command_show_stat(s)
 			write(s, buff, strlen(buff));
 		}
 	}
-	PS("BR messages", mip6s_br);
-	PS("BE messages", mip6s_be);
+	PS("BR messages", mip6stat.mip6s_br);
+	PS("BE messages", mip6stat.mip6s_be);
 	for (i =0; i < 2; i++) { /* currently only 2 codes are available */
 		if ((&mip6stat)->mip6s_be_hist[i] != 0) {
 			sprintf(buff, "\t\t%qu %s\n", (&mip6stat)->mip6s_be_hist[i],
@@ -1668,36 +1673,39 @@ command_show_stat(s)
 			write(s, buff, strlen(buff));
 		}
 	}
-	PS("Home Address Option", mip6s_hao);
-	PS("unverified Home Address Option", mip6s_unverifiedhao);
-	PS("Routing Header type 2", mip6s_rthdr2);
-	PS("reverse tunneled input", mip6s_revtunnel);
-	PS("bad MH checksum", mip6s_checksum);
-	PS("bad payload protocol", mip6s_payloadproto);
-	PS("unknown MH type", mip6s_unknowntype);
-	PS("not my home address", mip6s_nohif);
-	PS("no related binding update entry", mip6s_nobue);
-	PS("home init cookie mismatch", mip6s_hinitcookie);
-	PS("careof init cookie mismatch", mip6s_cinitcookie);
-	PS("unprotected binding signaling packets", mip6s_unprotected);
-	PS("BUs discarded due to bad HAO", mip6s_haopolicy);
-	PS("RR authentication failed", mip6s_rrauthfail);
-	PS("seqno mismatch", mip6s_seqno);
-	PS("parameter problem for HAO", mip6s_paramprobhao);
-	PS("parameter problem for MH", mip6s_paramprobmh);
-	PS("Invalid Care-of address", mip6s_invalidcoa);
-	PS("Invalid mobility options", mip6s_invalidopt);
+	PS("Home Address Option", mip6stat.mip6s_hao);
+	PS("unverified Home Address Option", mip6stat.mip6s_unverifiedhao);
+	PS("Routing Header type 2", mip6stat.mip6s_rthdr2);
+	PS("reverse tunneled input", mip6stat.mip6s_revtunnel);
+	PS("bad MH checksum", mip6stat.mip6s_checksum);
+	PS("bad payload protocol", mip6stat.mip6s_payloadproto);
+	PS("unknown MH type", mip6stat.mip6s_unknowntype);
+	PS("not my home address", mip6stat.mip6s_nohif);
+	PS("no related binding update entry", mip6stat.mip6s_nobue);
+	PS("home init cookie mismatch", mip6stat.mip6s_hinitcookie);
+	PS("careof init cookie mismatch", mip6stat.mip6s_cinitcookie);
+	PS("unprotected binding signaling packets", mip6stat.mip6s_unprotected);
+	PS("BUs discarded due to bad HAO", mip6stat.mip6s_haopolicy);
+	PS("RR authentication failed", mip6stat.mip6s_rrauthfail);
+	PS("seqno mismatch", mip6stat.mip6s_seqno);
+	PS("parameter problem for HAO", mip6stat.mip6s_paramprobhao);
+	PS("parameter problem for MH", mip6stat.mip6s_paramprobmh);
+	PS("Invalid Care-of address", mip6stat.mip6s_invalidcoa);
+	PS("Invalid mobility options", mip6stat.mip6s_invalidopt);
 
 	sprintf(buff, "Output Statistic:\n");
 	write(s, buff, strlen(buff));
 
-	PS("Mobility Headers", mip6s_omobility);
-	PS("HoTI messages", mip6s_ohoti);
-	PS("CoTI messages", mip6s_ocoti);
-	PS("HoT messages", mip6s_ohot);
-	PS("CoT messages", mip6s_ocot);
-	PS("BU messages", mip6s_obu);
-	PS("BA messages", mip6s_oba);
+	mip6s_mh = 0;
+	for (i = 0; i < sizeof(mip6stat.mip6s_omobility) / sizeof(u_quad_t); i++)
+		mip6s_mh += mip6stat.mip6s_omobility[i];
+	PS("Mobility Headers", mip6s_mh);
+	PS("HoTI messages", mip6stat.mip6s_ohoti);
+	PS("CoTI messages", mip6stat.mip6s_ocoti);
+	PS("HoT messages", mip6stat.mip6s_ohot);
+	PS("CoT messages", mip6stat.mip6s_ocot);
+	PS("BU messages", mip6stat.mip6s_obu);
+	PS("BA messages", mip6stat.mip6s_oba);
 	for (i =0; i < 256; i++) {
 		if ((&mip6stat)->mip6s_oba_hist[i] != 0) {
 			sprintf(buff, "\t\t%qu %s\n", (&mip6stat)->mip6s_oba_hist[i],
@@ -1705,8 +1713,8 @@ command_show_stat(s)
 			write(s, buff, strlen(buff));
 		}
 	}
-	PS("BR messages", mip6s_obr);
-	PS("BE messages", mip6s_obe);
+	PS("BR messages", mip6stat.mip6s_obr);
+	PS("BE messages", mip6stat.mip6s_obe);
 	for (i =0; i < 2; i++) { /* currently only 2 codes are available */
 		if ((&mip6stat)->mip6s_obe_hist[i] != 0) {
 			printf("\t\t%qu %s\n", (&mip6stat)->mip6s_obe_hist[i],
@@ -1714,9 +1722,7 @@ command_show_stat(s)
 			write(s, buff, strlen(buff));
 		}
 	}
-	PS("Home Address Option", mip6s_ohao);
-	PS("Routing Header type 2", mip6s_orthdr2);
-	PS("reverse tunneled output", mip6s_orevtunnel);
-
-
+	PS("Home Address Option", mip6stat.mip6s_ohao);
+	PS("Routing Header type 2", mip6stat.mip6s_orthdr2);
+	PS("reverse tunneled output", mip6stat.mip6s_orevtunnel);
 }
