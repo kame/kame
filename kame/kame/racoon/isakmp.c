@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.170 2001/12/12 21:18:32 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.171 2001/12/12 22:35:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1150,7 +1150,7 @@ isakmp_parsewoh(np0, gen, len)
 			int off;
 
 			off = p - (struct isakmp_parse_t *)result->v;
-			result = vrealloc(result->l * 2);
+			result = vrealloc(result, result->l * 2);
 			if (result == NULL) {
 				plog(LLV_DEBUG, LOCATION, NULL,
 					"failed to realloc buffer.\n");
