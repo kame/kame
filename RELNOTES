@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/06 05:06:34 $
+		     $Date: 1999/10/06 07:07:24 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -23,9 +23,10 @@ and the next STABLE release,
   trouble with IPv6 commuincation (which heavily uses multicast).
   This is not a KAME problem (*BSD problem), but please be warned.
   Workaround: perform "ifconfig down", then "ifconfig up" after resume.
-- racoon daemon may not work correctly due to code synchronization problem
-  between userland and the kernel.  Because of STABLE cut-off date we do not
-  supply fixes for this.  If you would like to use racoon, please use more
+- racoon daemon does not work correctly due to code synchronization problem
+  between userland and the kernel (racoon daemon compiles fine but will not
+  be able to negotiate keys).  Because of STABLE cut-off date we were
+  unable to fix this.  If you would like to use racoon, please use more
   recent SNAP kit instead.
 
 PLATFORM DIFFERENCES
