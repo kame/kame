@@ -440,14 +440,14 @@ main(argc, argv)
 	    error = getaddrinfo(NULL, service, &hints, &res);
 
 	    if (error) {
-		errx(1, "tcp/%s: %s\n", service, gai_strerror(error));
-		usage();
+		fprintf(stderr, "tcp/%s: %s\n", service, gai_strerror(error));
+		exit(1);
 	    }
 
 	    s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	    if (s < 0) {
-		    perror("telnetd: socket");;
-		    exit(1);
+		perror("telnetd: socket");
+		exit(1);
 	    }
 	    (void) setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
 				(char *)&on, sizeof(on));
