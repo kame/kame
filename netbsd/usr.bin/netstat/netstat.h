@@ -81,6 +81,7 @@ void	ipsec_stats __P((u_long, char *));
 
 #ifdef INET6
 struct sockaddr_in6;
+struct in6_addr;
 void	ip6protopr __P((u_long, char *));
 void	tcp6_stats __P((u_long, char *));
 void	tcp6_dump __P((u_long));
