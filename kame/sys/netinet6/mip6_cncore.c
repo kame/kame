@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.9 2003/06/25 17:25:20 t-momose Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.10 2003/07/01 08:51:56 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -2165,8 +2165,13 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, dstcoa, status, seqno, lifetime, re
 		mopt->mopt_ho_nonce_idx, mopt->mopt_co_nonce_idx, 
 		!IS_REQUEST_TO_CACHE(lifetime, dst, dstcoa), key_bm) == 0) {
 		need_auth = 1;
-		/* Binding Auth Option no longer require any alignment. 
+		/* Since Binding Auth Option must be the last mobility option,
+		   an implicit alignment requirement is 8n + 2.
 		   (6.2.7) */
+		if (refresh_size)
+			refresh_size += MIP6_PADLEN(ba_size + refresh_size, 8, 2);
+		else
+			ba_size += MIP6_PADLEN(ba_size, 8, 2);
 		auth_size = AUTH_SIZE;
 	}
 	ip6ma_size = ba_size + refresh_size + auth_size;
