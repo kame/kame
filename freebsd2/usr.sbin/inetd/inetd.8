@@ -92,6 +92,15 @@ Specify the maximum number of times a service can be invoked
 in one minute; the default is 256.
 .It Fl a
 Specify a specific IP address to bind to.
+You can specify both IPv4 and IPv6 address by
+.Fl a ,
+like
+.Do
+.Fl a
+127.0.0.1
+.Fl a
+::1
+.Dc .
 .It Fl p
 Specify an alternate file in which to store the process ID.
 .El
