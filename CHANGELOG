@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.403 2000/01/04 23:53:38 itojun Exp $
+$Id: CHANGELOG,v 1.404 2000/01/05 04:28:24 itojun Exp $
 
 <200001>
+Wed Jan  5 13:27:43 JST 2000  itojun@iijlab.net
+	* kame/libinet6/getnameinfo.c: allow reverse lookup for v4 loopback
+	  network (127.0.0.0/8).
+	* kame/libinet6/rcmd.c: implement iruserok_sa().  iruserok_af() does
+	  not make sense as it is not scope-aware.
+	  nuke ruserok_af(), as ruserok() takes string hostname and is af
+	  independent already.  we don't really need ruserok_af().
+	  iruserok_af() is kept for backward compatibility.  we'll nuke it
+	  afterwards.
+
 Wed Jan  5 02:49:05 JST 2000  itojun@iijlab.net
 	* netbsd: add net.inet6.ip6.bindv6only sysctl.  this is a replacement
 	  of net.inet6.ip6.mapped_addr, which was bitwise opposite to
