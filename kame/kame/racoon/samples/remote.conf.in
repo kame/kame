@@ -1,4 +1,4 @@
-# $Id: remote.conf.in,v 1.5 2000/03/26 10:51:13 itojun Exp $
+# $KAME: remote.conf.in,v 1.6 2000/03/26 10:52:59 itojun Exp $
 
 # IKE SA configuration
 

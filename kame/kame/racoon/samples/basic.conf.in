@@ -1,4 +1,4 @@
-# $Id: basic.conf.in,v 1.11 2000/03/26 10:51:13 itojun Exp $
+# $KAME: basic.conf.in,v 1.12 2000/03/26 10:52:58 itojun Exp $
 
 # search this file for pre_shared_key with various ID key.
 path pre_shared_key "@sysconfdir_x@/racoon/psk.txt" ;

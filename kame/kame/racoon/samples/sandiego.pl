@@ -6,7 +6,7 @@ $hostname =~ s/\n$//;
 $userfqdn = `whoami`;
 $userfqdn =~ s/\n$//;
 $userfqdn .= '@' . $hostname;
-$rcsid = '$Id: sandiego.pl,v 1.10 2000/03/26 10:51:14 itojun Exp $';
+$rcsid = '$KAME: sandiego.pl,v 1.11 2000/03/26 10:52:59 itojun Exp $';
 
 print <<EOF;
 # automatically generated from $rcsid
