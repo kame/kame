@@ -1,4 +1,4 @@
-/*	$KAME: addrselect.c,v 1.2 2001/09/25 06:31:06 itojun Exp $	*/
+/*	$KAME: addrselect.c,v 1.3 2001/09/26 08:29:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -187,7 +187,8 @@ dump_policy()
 		} else		/* XXX */
 			printf("%s/%d", addrbuf, plen);
 #ifndef __FreeBSD__
-		printf(" %5d %5d %8llu\n", pol->preced, pol->label, pol->use);
+		printf(" %5d %5d %8llu\n", pol->preced, pol->label,
+		    (unsigned long long)pol->use);
 #else  /* XXX: see PORTABILITY */
 		printf(" %5d %5d %8qu\n", pol->preced, pol->label, pol->use);
 #endif
