@@ -534,7 +534,6 @@ else
 		signing=no])
 fi
 if test $signing = "yes"; then
-	LIBOBJS="$LIBOBJS signing.o"
 	AC_DEFINE(HAVE_SIGNING_C)
 fi
 if test "x$include_path_openssl" = "x"; then
