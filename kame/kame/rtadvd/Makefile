@@ -44,7 +44,7 @@ DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
 LDADD+=	-lcompat
 DPADD+=	${LIBCOMPAT}
 
-.if (${OPSYS} != "NetBSD")
+.if (${OPSYS} != "NetBSD") && (${OPSYS} != "OpenBSD")
 MAN5=	rtadvd.conf.5
 MAN8=	rtadvd.8
 .else

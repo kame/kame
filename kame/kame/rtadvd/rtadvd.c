@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.67 2002/05/31 13:30:37 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.68 2002/06/04 05:11:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -245,8 +245,10 @@ main(argc, argv)
 	/* timer initialization */
 	rtadvd_timer_init();
 
+#ifndef HAVE_ARC4RANDOM
 	/* random value initialization */
 	srandom((u_long)time(NULL));
+#endif
 
 	/* get iflist block from kernel */
 	init_iflist();
@@ -868,7 +870,11 @@ rs_input(int len, struct nd_router_solicit *rs,
 		 * delay and send the advertisement at the
 		 * already-scheduled time. RFC-2461 6.2.6
 		 */
+#ifdef HAVE_ARC4RANDOM
+		delay = arc4random() % MAX_RA_DELAY_TIME;
+#else
 		delay = random() % MAX_RA_DELAY_TIME;
+#endif
 		interval.tv_sec = 0;
 		interval.tv_usec = delay;
 		rest = rtadvd_timer_rest(ra->timer);
@@ -1639,7 +1645,11 @@ ra_timer_update(void *data, struct timeval *tm)
 	 * MaxRtrAdvInterval (RFC2461 6.2.4).
 	 */
 	interval = rai->mininterval; 
+#ifdef HAVE_ARC4RANDOM
+	interval += arc4random() % (rai->maxinterval - rai->mininterval);
+#else
 	interval += random() % (rai->maxinterval - rai->mininterval);
+#endif
 
 	/*
 	 * For the first few advertisements (up to
