@@ -34,7 +34,7 @@
  *
  */
 
-#ifdef __FreeBSDD__
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_altq.h"
@@ -58,7 +58,9 @@
 #else
 #include <sys/callout.h>
 #endif
+#ifndef __FreeBSD__
 #include <sys/pool.h>
+#endif
 #include <sys/malloc.h>
 
 #include <net/if.h>
@@ -81,6 +83,10 @@
 
 #ifdef ALTQ
 #include <altq/altq.h>
+#endif
+
+#ifdef __FreeBSD__
+#define splsoftnet()	splnet()
 #endif
 
 void			 pfattach(int);
@@ -114,6 +120,7 @@ pfattach(int num)
 {
 	u_int32_t *timeout = pf_default_rule.timeout;
 
+#ifndef __FreeBSD__
 	pool_init(&pf_tree_pl, sizeof(struct pf_tree_node), 0, 0, 0, "pftrpl",
 	    NULL);
 	pool_init(&pf_rule_pl, sizeof(struct pf_rule), 0, 0, 0, "pfrulepl",
@@ -130,6 +137,7 @@ pfattach(int num)
 
 	pool_sethardlimit(&pf_state_pl, pf_pool_limits[PF_LIMIT_STATES].limit,
 	    NULL, 0);
+#endif
 
 	RB_INIT(&tree_lan_ext);
 	RB_INIT(&tree_ext_gwy);
@@ -410,7 +418,11 @@ pf_empty_pool(struct pf_palist *poola)
 	while ((empty_pool_pa = TAILQ_FIRST(poola)) != NULL) {
 		pf_dynaddr_remove(&empty_pool_pa->addr.addr);
 		TAILQ_REMOVE(poola, empty_pool_pa, entries);
+#ifdef __FreeBSD__
+		free(empty_pool_pa, M_PF);
+#else
 		pool_put(&pf_pooladdr_pl, empty_pool_pa);
+#endif
 	}
 }
 
@@ -442,7 +454,11 @@ pf_rm_rule(struct pf_rulequeue *rulequeue, struct pf_rule *rule)
 		pf_tbladdr_remove(&rule->dst.addr);
 	}
 	pf_empty_pool(&rule->rpool.list);
+#ifdef __FreeBSD__
+	free(rule, M_PF);
+#else
 	pool_put(&pf_rule_pl, rule);
+#endif
 }
 
 u_int16_t
@@ -530,6 +546,11 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 	struct pf_pool		*pool = NULL;
 	int			 s;
 	int			 error = 0;
+#ifdef __FreeBSD__
+	struct timeval		time;
+
+	time.tv_sec = time_second;
+#endif
 
 	/* XXX keep in sync with switch() below */
 	if (securelevel > 1)
@@ -610,9 +631,15 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			pf_status.running = 1;
 			pf_status.states = states;
 			pf_status.since = time.tv_sec;
-			if (status_ifp != NULL)
+			if (status_ifp != NULL) {
+#ifdef __FreeBSD__
+				snprintf(pf_status.ifname, IFNAMSIZ, "%s%d",
+				    status_ifp->if_name, status_ifp->if_unit);
+#else
 				strlcpy(pf_status.ifname,
 				    status_ifp->if_xname, IFNAMSIZ);
+#endif
+			}
 			DPFPRINTF(PF_DEBUG_MISC, ("pf: started\n"));
 		}
 		break;
@@ -681,7 +708,11 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EBUSY;
 			break;
 		}
+#ifdef __FreeBSD__
+		rule = malloc(sizeof(struct pf_rule), M_PF, M_NOWAIT);
+#else
 		rule = pool_get(&pf_rule_pl, PR_NOWAIT);
+#endif
 		if (rule == NULL) {
 			error = ENOMEM;
 			break;
@@ -695,14 +726,22 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		rule->entries.tqe_prev = NULL;
 #ifndef INET
 		if (rule->af == AF_INET) {
+#ifdef __FreeBSD__
+			free(newrule, M_PF);
+#else
 			pool_put(&pf_rule_pl, rule);
+#endif
 			error = EAFNOSUPPORT;
 			break;
 		}
 #endif /* INET */
 #ifndef INET6
 		if (rule->af == AF_INET6) {
+#ifdef __FreeBSD__
+			free(newrule, M_PF);
+#else
 			pool_put(&pf_rule_pl, rule);
+#endif
 			error = EAFNOSUPPORT;
 			break;
 		}
@@ -716,7 +755,11 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		if (rule->ifname[0]) {
 			rule->ifp = ifunit(rule->ifname);
 			if (rule->ifp == NULL) {
+#ifdef __FreeBSD__
+				free(rule, M_PF);
+#else
 				pool_put(&pf_rule_pl, rule);
+#endif
 				error = EINVAL;
 				break;
 			}
@@ -924,7 +967,12 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		}
 
 		if (pcr->action != PF_CHANGE_REMOVE) {
+#ifdef __FreeBSD__
+			newrule = malloc(sizeof(struct pf_rule), M_PF,
+			    M_NOWAIT);
+#else
 			newrule = pool_get(&pf_rule_pl, PR_NOWAIT);
+#endif
 			if (newrule == NULL) {
 				error = ENOMEM;
 				break;
@@ -936,14 +984,22 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			newrule->entries.tqe_prev = NULL;
 #ifndef INET
 			if (newrule->af == AF_INET) {
+#ifdef __FreeBSD__
+				free(newrule, M_PF);
+#else
 				pool_put(&pf_rule_pl, newrule);
+#endif
 				error = EAFNOSUPPORT;
 				break;
 			}
 #endif /* INET */
 #ifndef INET6
 			if (newrule->af == AF_INET6) {
+#ifdef __FreeBSD__
+				free(newrule, M_PF);
+#else
 				pool_put(&pf_rule_pl, newrule);
+#endif
 				error = EAFNOSUPPORT;
 				break;
 			}
@@ -951,7 +1007,11 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			if (newrule->ifname[0]) {
 				newrule->ifp = ifunit(newrule->ifname);
 				if (newrule->ifp == NULL) {
+#ifdef __FreeBSD__
+					free(newrule, M_PF);
+#else
 					pool_put(&pf_rule_pl, newrule);
+#endif
 					error = EINVAL;
 					break;
 				}
@@ -1108,7 +1168,11 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EINVAL;
 			break;
 		}
+#ifdef __FreeBSD__
+		state = malloc(sizeof(struct pf_state), M_PF, M_NOWAIT);
+#else
 		state = pool_get(&pf_state_pl, PR_NOWAIT);
+#endif
 		if (state == NULL) {
 			error = ENOMEM;
 			break;
@@ -1123,7 +1187,11 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		state->packets[0] = state->packets[1] = 0;
 		state->bytes[0] = state->bytes[1] = 0;
 		if (pf_insert_state(state)) {
+#ifdef __FreeBSD__
+			free(state, M_PF);
+#else
 			pool_put(&pf_state_pl, state);
+#endif
 			error = ENOMEM;
 		}
 		splx(s);
@@ -1223,8 +1291,13 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 				error = EINVAL;
 			else {
 				status_ifp = ifp;
+#ifdef __FreeBSD__
+				snprintf(pf_status.ifname, IFNAMSIZ, "%s%d",
+				    status_ifp->if_name, status_ifp->if_unit);
+#else
 				strlcpy(pf_status.ifname, ifp->if_xname,
 				    IFNAMSIZ);
+#endif
 			}
 		break;
 	}
@@ -1246,9 +1319,15 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		pf_status.states = states;
 		pf_status.since = since;
 		pf_status.debug = debug;
-		if (status_ifp != NULL)
+		if (status_ifp != NULL) {
+#ifdef __FreeBSD__
+			snprintf(pf_status.ifname, IFNAMSIZ, "%s%d",
+			    status_ifp->if_name, status_ifp->if_unit);
+#else
 			strlcpy(pf_status.ifname,
 			    status_ifp->if_xname, IFNAMSIZ);
+#endif
+		}
 		break;
 	}
 
@@ -1356,7 +1435,7 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EBUSY;
 			goto fail;
 		}
-#else
+#elif defined(__NetBSD__)
 		(void)pool_sethardlimit(pf_pool_limits[pl->index].pp,
 		    pl->limit, NULL, 0);
 #endif
@@ -1463,7 +1542,11 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 				/* detach and destroy the discipline */
 				error = altq_remove(altq);
 			}
+#ifdef __FreeBSD__
+			free(altq, M_PF);
+#else
 			pool_put(&pf_altq_pl, altq);
+#endif
 		}
 		*ticket = ++ticket_altqs_inactive;
 		break;
@@ -1477,7 +1560,11 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EBUSY;
 			break;
 		}
+#ifdef __FreeBSD__
+		altq = malloc(sizeof(struct pf_altq), M_PF, M_NOWAIT);
+#else
 		altq = pool_get(&pf_altq_pl, PR_NOWAIT);
+#endif
 		if (altq == NULL) {
 			error = ENOMEM;
 			break;
@@ -1500,7 +1587,11 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 
 		error = altq_add(altq);
 		if (error) {
+#ifdef __FreeBSD__
+			free(altq, M_PF);
+#else
 			pool_put(&pf_altq_pl, altq);
+#endif
 			break;
 		}
 
@@ -1553,7 +1644,11 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 				if (err != 0 && error == 0)
 					error = err;
 			}
+#ifdef __FreeBSD__
+			free(altq, M_PF);
+#else
 			pool_put(&pf_altq_pl, altq);
+#endif
 		}
 		splx(s);
 
@@ -1675,7 +1770,11 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EINVAL;
 			break;
 		}
+#ifdef __FreeBSD__
+		pa = malloc(sizeof(struct pf_pooladdr), M_PF, M_NOWAIT);
+#else
 		pa = pool_get(&pf_pooladdr_pl, PR_NOWAIT);
+#endif
 		if (pa == NULL) {
 			error = ENOMEM;
 			break;
@@ -1684,14 +1783,22 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		if (pa->ifname[0]) {
 			pa->ifp = ifunit(pa->ifname);
 			if (pa->ifp == NULL) {
+#ifdef __FreeBSD__
+				free(pa, M_PF);
+#else
 				pool_put(&pf_pooladdr_pl, pa);
+#endif
 				error = EINVAL;
 				break;
 			}
 		}
 		if (pf_dynaddr_setup(&pa->addr.addr, pp->af)) {
 			pf_dynaddr_remove(&pa->addr.addr);
+#ifdef __FreeBSD__
+			free(pa, M_PF);
+#else
 			pool_put(&pf_pooladdr_pl, pa);
+#endif
 			error = EINVAL;
 			break;
 		}
@@ -1767,7 +1874,12 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			break;
 		}
 		if (pca->action != PF_CHANGE_REMOVE) {
+#ifdef __FreeBSD__
+			newpa = malloc(sizeof(struct pf_pooladdr), M_PF,
+			    M_NOWAIT);
+#else
 			newpa = pool_get(&pf_pooladdr_pl, PR_NOWAIT);
+#endif
 			if (newpa == NULL) {
 				error = ENOMEM;
 				break;
@@ -1775,14 +1887,22 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			bcopy(&pca->addr, newpa, sizeof(struct pf_pooladdr));
 #ifndef INET
 			if (pca->af == AF_INET) {
+#ifdef __FreeBSD__
+				free(newpa, M_PF);
+#else
 				pool_put(&pf_pooladdr_pl, newpa);
+#endif
 				error = EAFNOSUPPORT;
 				break;
 			}
 #endif /* INET */
 #ifndef INET6
 			if (pca->af == AF_INET6) {
+#ifdef __FreeBSD__
+				free(newpa, M_PF);
+#else
 				pool_put(&pf_pooladdr_pl, newpa);
+#endif
 				error = EAFNOSUPPORT;
 				break;
 			}
@@ -1790,7 +1910,11 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			if (newpa->ifname[0]) {
 				newpa->ifp = ifunit(newpa->ifname);
 				if (newpa->ifp == NULL) {
+#ifdef __FreeBSD__
+					free(newpa, M_PF);
+#else
 					pool_put(&pf_pooladdr_pl, newpa);
+#endif
 					error = EINVAL;
 					break;
 				}
@@ -1798,7 +1922,11 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 				newpa->ifp = NULL;
 			if (pf_dynaddr_setup(&newpa->addr.addr, pca->af)) {
 				pf_dynaddr_remove(&newpa->addr.addr);
+#ifdef __FreeBSD__
+				free(newpa, M_PF);
+#else
 				pool_put(&pf_pooladdr_pl, newpa);
+#endif
 				error = EINVAL;
 				break;
 			}
@@ -1828,7 +1956,11 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 		if (pca->action == PF_CHANGE_REMOVE) {
 			TAILQ_REMOVE(&pool->list, oldpa, entries);
 			pf_dynaddr_remove(&oldpa->addr.addr);
+#ifdef __FreeBSD__
+			free(oldpa, M_PF);
+#else
 			pool_put(&pf_pooladdr_pl, oldpa);
+#endif
 		} else {
 			if (oldpa == NULL)
 				TAILQ_INSERT_TAIL(&pool->list, newpa, entries);

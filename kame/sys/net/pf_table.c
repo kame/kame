@@ -35,6 +35,9 @@
 #include <sys/socket.h>
 #include <sys/mbuf.h>
 #include <sys/kernel.h>
+#ifdef __FreeBSD__
+#include <sys/malloc.h>
+#endif
 
 #include <net/if.h>
 #include <net/route.h>
@@ -43,6 +46,10 @@
 #include <netinet/ip_ipsp.h>
 #endif
 #include <net/pfvar.h>
+
+#ifdef __FreeBSD__
+#define splsoftnet()	splnet()
+#endif
 
 #define ACCEPT_FLAGS(oklist)			\
 	do {					\
@@ -104,8 +111,10 @@ struct pfr_walktree {
 
 #define senderr(e)	do { rv = (e); goto _bad; } while (0)
 
+#ifndef __FreeBSD__
 struct pool		 pfr_ktable_pl;
 struct pool		 pfr_kentry_pl;
+#endif
 struct sockaddr_in	 pfr_sin;
 struct sockaddr_in6	 pfr_sin6;
 
@@ -165,10 +174,12 @@ int			 pfr_ticket;
 void
 pfr_initialize(void)
 {
+#ifndef __FreeBSD__
 	pool_init(&pfr_ktable_pl, sizeof(struct pfr_ktable), 0, 0, 0,
 	    "pfrktable", NULL);
 	pool_init(&pfr_kentry_pl, sizeof(struct pfr_kentry), 0, 0, 0,
 	    "pfrkentry", NULL);
+#endif
 
 	pfr_sin.sin_len = sizeof(pfr_sin);
 	pfr_sin.sin_family = AF_INET;
@@ -219,7 +230,11 @@ pfr_add_addrs(struct pfr_table *tbl, struct pfr_addr *addr, int size,
 	struct pfr_kentry	*p, *q;
 	struct pfr_addr		 ad;
 	int			 i, rv, s, xadd = 0;
+#ifdef __FreeBSD__
+	long			 tzero = time_second;
+#else
 	long			 tzero = time.tv_sec;
+#endif
 
 	ACCEPT_FLAGS(PFR_FLAG_ATOMIC+PFR_FLAG_DUMMY+PFR_FLAG_FEEDBACK);
 	if (pfr_validate_table(tbl, 0))
@@ -359,7 +374,11 @@ pfr_set_addrs(struct pfr_table *tbl, struct pfr_addr *addr, int size,
 	struct pfr_kentry	*p, *q;
 	struct pfr_addr		 ad;
 	int			 i, rv, s, xadd = 0, xdel = 0, xchange = 0;
+#ifdef __FreeBSD__
+	long			 tzero = time_second;
+#else
 	long			 tzero = time.tv_sec;
+#endif
 
 	ACCEPT_FLAGS(PFR_FLAG_ATOMIC+PFR_FLAG_DUMMY+PFR_FLAG_FEEDBACK);
 	if (pfr_validate_table(tbl, 0))
@@ -546,7 +565,11 @@ pfr_get_astats(struct pfr_table *tbl, struct pfr_astats *addr, int *size,
 	struct pfr_walktree	 w;
 	struct pfr_kentryworkq	 workq;
 	int			 rv, s;
+#ifdef __FreeBSD__
+	long			 tzero = time_second;
+#else
 	long			 tzero = time.tv_sec;
+#endif
 
 	ACCEPT_FLAGS(PFR_FLAG_ATOMIC); /* XXX PFR_FLAG_CLSTATS disabled */
 	if (pfr_validate_table(tbl, 0))
@@ -739,7 +762,11 @@ pfr_create_kentry(struct pfr_addr *ad)
 {
 	struct pfr_kentry	*ke;
 
+#ifdef __FreeBSD__
+	ke = malloc(sizeof(struct pfr_kentry), M_PF, M_NOWAIT);
+#else
 	ke = pool_get(&pfr_kentry_pl, PR_NOWAIT);
+#endif
 	if (ke == NULL)
 		return (NULL);
 	bzero(ke, sizeof(*ke));
@@ -768,7 +795,11 @@ pfr_destroy_kentries(struct pfr_kentryworkq *workq)
 void
 pfr_destroy_kentry(struct pfr_kentry *ke)
 {
+#ifdef __FreeBSD__
+	free(ke, M_PF);
+#else
 	pool_put(&pfr_kentry_pl, ke);
+#endif
 }
 
 void
@@ -1032,7 +1063,11 @@ pfr_add_tables(struct pfr_table *tbl, int size, int *nadd, int flags)
 	struct pfr_ktableworkq	 addq, changeq;
 	struct pfr_ktable	*p, *q, *r, key;
 	int			 i, rv, s, xadd = 0;
+#ifdef __FreeBSD__
+	long			 tzero = time_second;
+#else
 	long			 tzero = time.tv_sec;
+#endif
 
 	ACCEPT_FLAGS(PFR_FLAG_ATOMIC+PFR_FLAG_DUMMY);
 	SLIST_INIT(&addq);
@@ -1183,7 +1218,11 @@ pfr_get_tstats(struct pfr_table *filter, struct pfr_tstats *tbl, int *size,
 	struct pfr_ktable	*p;
 	struct pfr_ktableworkq	 workq;
 	int			 s, n, nn;
+#ifdef __FreeBSD__
+	long			 tzero = time_second;
+#else
 	long			 tzero = time.tv_sec;
+#endif
 
 	ACCEPT_FLAGS(PFR_FLAG_ATOMIC|PFR_FLAG_ALLRSETS);
 					/* XXX PFR_FLAG_CLSTATS disabled */
@@ -1231,7 +1270,11 @@ pfr_clr_tstats(struct pfr_table *tbl, int size, int *nzero, int flags)
 	struct pfr_ktableworkq	 workq;
 	struct pfr_ktable	*p, key;
 	int			 i, s, xzero = 0;
+#ifdef __FreeBSD__
+	long			 tzero = time_second;
+#else
 	long			 tzero = time.tv_sec;
+#endif
 
 	ACCEPT_FLAGS(PFR_FLAG_ATOMIC+PFR_FLAG_DUMMY+PFR_FLAG_ADDRSTOO);
 	SLIST_INIT(&workq);
@@ -1439,7 +1482,11 @@ pfr_ina_commit(int ticket, int *nadd, int *nchange, int flags)
 	struct pfr_ktable	*p;
 	struct pfr_ktableworkq	 workq;
 	int			 s, xadd = 0, xchange = 0;
+#ifdef __FreeBSD__
+	long			 tzero = time_second;
+#else
 	long			 tzero = time.tv_sec;
+#endif
 
 	ACCEPT_FLAGS(PFR_FLAG_ATOMIC+PFR_FLAG_DUMMY);
 	if (ticket != pfr_ticket)
@@ -1679,7 +1726,11 @@ pfr_create_ktable(struct pfr_table *tbl, long tzero, int attachruleset)
 	struct pfr_ktable	*kt;
 	struct pf_ruleset	*rs;
 
+#ifdef __FreeBSD__
+	kt = malloc(sizeof(struct pfr_ktable), M_PF, M_NOWAIT);
+#else
 	kt = pool_get(&pfr_ktable_pl, PR_NOWAIT);
+#endif
 	if (kt == NULL)
 		return (NULL);
 	bzero(kt, sizeof(*kt));
@@ -1743,7 +1794,11 @@ pfr_destroy_ktable(struct pfr_ktable *kt, int flushaddr)
 			kt->pfrkt_rs->anchor->tables--;
 		pf_remove_if_empty_ruleset(kt->pfrkt_rs);
 	}
+#ifdef __FreeBSD__
+	free(kt, M_PF);
+#else
 	pool_put(&pfr_ktable_pl, kt);
+#endif
 }
 
 int
@@ -1853,7 +1908,11 @@ pfr_attach_table(struct pf_ruleset *rs, char *name)
 	}
 	kt = pfr_lookup_table(&tbl);
 	if (kt == NULL) {
+#ifdef __FreeBSD__
+		kt = pfr_create_ktable(&tbl, time_second, 1);
+#else
 		kt = pfr_create_ktable(&tbl, time.tv_sec, 1);
+#endif
 		if (kt == NULL)
 			return (NULL);
 		if (ac != NULL) {

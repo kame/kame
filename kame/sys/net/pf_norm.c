@@ -25,6 +25,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef __FreeBSD__
+#include "opt_inet.h"
+#include "opt_inet6.h"
+#endif
 #ifdef _KERNEL_OPT
 #include "opt_inet.h"
 #endif
@@ -39,12 +43,19 @@
 #include <sys/socket.h>
 #include <sys/kernel.h>
 #include <sys/time.h>
+#ifndef __FreeBSD__
 #include <sys/pool.h>
+#endif
+#ifdef __FreeBSD__
+#include <sys/malloc.h>
+#endif
 
 #ifdef __OpenBSD__
 #include <dev/rndvar.h>
-#else
+#elif defined(__NetBSD__)
 #include <sys/rnd.h>
+#elif defined(__FreeBSD__)
+#include <sys/random.h>
 #endif
 #include <net/if.h>
 #include <net/if_types.h>
@@ -67,6 +78,11 @@
 #endif /* INET6 */
 
 #include <net/pfvar.h>
+
+#ifdef __FreeBSD__
+#undef KASSERT
+#define KASSERT(x)
+#endif
 
 struct pf_frent {
 	LIST_ENTRY(pf_frent) fr_next;
@@ -132,13 +148,16 @@ int			 pf_normalize_tcpopt(struct pf_rule *, struct mbuf *,
 			    { printf("%s: ", __func__); printf x ;}
 
 /* Globals */
+#ifndef __FreeBSD__
 struct pool		 pf_frent_pl, pf_frag_pl, pf_cache_pl, pf_cent_pl;
 struct pool		 pf_state_scrub_pl;
+#endif
 int			 pf_nfrents, pf_ncache;
 
 void
 pf_normalize_init(void)
 {
+#ifndef __FreeBSD__
 	pool_init(&pf_frent_pl, sizeof(struct pf_frent), 0, 0, 0, "pffrent",
 	    NULL);
 	pool_init(&pf_frag_pl, sizeof(struct pf_fragment), 0, 0, 0, "pffrag",
@@ -154,6 +173,7 @@ pf_normalize_init(void)
 	pool_sethardlimit(&pf_frent_pl, PFFRAG_FRENT_HIWAT, NULL, 0);
 	pool_sethardlimit(&pf_cache_pl, PFFRAG_FRCACHE_HIWAT, NULL, 0);
 	pool_sethardlimit(&pf_cent_pl, PFFRAG_FRCENT_HIWAT, NULL, 0);
+#endif
 
 	TAILQ_INIT(&pf_fragqueue);
 	TAILQ_INIT(&pf_cachequeue);
@@ -183,8 +203,13 @@ void
 pf_purge_expired_fragments(void)
 {
 	struct pf_fragment	*frag;
+#ifdef __FreeBSD__
+	u_int32_t		 expire = time_second -
+				    pf_default_rule.timeout[PFTM_FRAG];
+#else
 	u_int32_t		 expire = time.tv_sec -
 				    pf_default_rule.timeout[PFTM_FRAG];
+#endif
 
 	while ((frag = TAILQ_LAST(&pf_fragqueue, pf_fragqueue)) != NULL) {
 		KASSERT(BUFFER_FRAGMENTS(frag));
@@ -254,7 +279,11 @@ pf_free_fragment(struct pf_fragment *frag)
 			LIST_REMOVE(frent, fr_next);
 
 			m_freem(frent->fr_m);
+#ifdef __FreeBSD__
+			free(frent, M_PF);
+#else
 			pool_put(&pf_frent_pl, frent);
+#endif
 			pf_nfrents--;
 		}
 	} else {
@@ -266,7 +295,11 @@ pf_free_fragment(struct pf_fragment *frag)
 			    LIST_FIRST(&frag->fr_cache)->fr_off >
 			    frcache->fr_end);
 
+#ifdef __FreeBSD__
+			free(frcache, M_PF);
+#else
 			pool_put(&pf_cent_pl, frcache);
+#endif
 			pf_ncache--;
 		}
 	}
@@ -294,7 +327,11 @@ pf_find_fragment(struct ip *ip, struct pf_frag_tree *tree)
 	frag = RB_FIND(pf_frag_tree, tree, &key);
 	if (frag != NULL) {
 		/* XXX Are we sure we want to update the timeout? */
+#ifdef __FreeBSD__
+		frag->fr_timeout = time_second;
+#else
 		frag->fr_timeout = time.tv_sec;
+#endif
 		if (BUFFER_FRAGMENTS(frag)) {
 			TAILQ_REMOVE(&pf_fragqueue, frag, frag_next);
 			TAILQ_INSERT_HEAD(&pf_fragqueue, frag, frag_next);
@@ -315,11 +352,19 @@ pf_remove_fragment(struct pf_fragment *frag)
 	if (BUFFER_FRAGMENTS(frag)) {
 		RB_REMOVE(pf_frag_tree, &pf_frag_tree, frag);
 		TAILQ_REMOVE(&pf_fragqueue, frag, frag_next);
+#ifdef __FreeBSD__
+		free(frag, M_PF);
+#else
 		pool_put(&pf_frag_pl, frag);
+#endif
 	} else {
 		RB_REMOVE(pf_frag_tree, &pf_cache_tree, frag);
 		TAILQ_REMOVE(&pf_cachequeue, frag, frag_next);
+#ifdef __FreeBSD__
+		free(frag, M_PF);
+#else
 		pool_put(&pf_cache_pl, frag);
+#endif
 	}
 }
 
@@ -343,10 +388,19 @@ pf_reassemble(struct mbuf **m0, struct pf_fragment *frag,
 
 	/* Create a new reassembly queue for this packet */
 	if (frag == NULL) {
+#ifdef __FreeBSD__
+		frag = malloc(sizeof(struct pf_fragment), M_PF, M_NOWAIT);
+#else
 		frag = pool_get(&pf_frag_pl, PR_NOWAIT);
+#endif
 		if (frag == NULL) {
 			pf_flush_fragments();
+#ifdef __FreeBSD__
+			frag = malloc(sizeof(struct pf_fragment), M_PF,
+			    M_NOWAIT);
+#else
 			frag = pool_get(&pf_frag_pl, PR_NOWAIT);
+#endif
 			if (frag == NULL)
 				goto drop_fragment;
 		}
@@ -357,7 +411,11 @@ pf_reassemble(struct mbuf **m0, struct pf_fragment *frag,
 		frag->fr_dst = frent->fr_ip->ip_dst;
 		frag->fr_p = frent->fr_ip->ip_p;
 		frag->fr_id = frent->fr_ip->ip_id;
+#ifdef __FreeBSD__
+		frag->fr_timeout = time_second;
+#else
 		frag->fr_timeout = time.tv_sec;
+#endif
 		LIST_INIT(&frag->fr_queue);
 
 		RB_INSERT(pf_frag_tree, &pf_frag_tree, frag);
@@ -410,7 +468,11 @@ pf_reassemble(struct mbuf **m0, struct pf_fragment *frag,
 		next = LIST_NEXT(frea, fr_next);
 		m_freem(frea->fr_m);
 		LIST_REMOVE(frea, fr_next);
+#ifdef __FreeBSD__
+		free(frea, M_PF);
+#else
 		pool_put(&pf_frent_pl, frea);
+#endif
 		pf_nfrents--;
 	}
 
@@ -465,13 +527,21 @@ pf_reassemble(struct mbuf **m0, struct pf_fragment *frag,
 	m2 = m->m_next;
 	m->m_next = NULL;
 	m_cat(m, m2);
+#ifdef __FreeBSD__
+	free(frent, M_PF);
+#else
 	pool_put(&pf_frent_pl, frent);
+#endif
 	pf_nfrents--;
 	for (frent = next; frent != NULL; frent = next) {
 		next = LIST_NEXT(frent, fr_next);
 
 		m2 = frent->fr_m;
+#ifdef __FreeBSD__
+		free(frent, M_PF);
+#else
 		pool_put(&pf_frent_pl, frent);
+#endif
 		pf_nfrents--;
 		m_cat(m, m2);
 	}
@@ -501,7 +571,11 @@ pf_reassemble(struct mbuf **m0, struct pf_fragment *frag,
 
  drop_fragment:
 	/* Oops - fail safe - drop packet */
+#ifdef __FreeBSD__
+	free(frent, M_PF);
+#else
 	pool_put(&pf_frent_pl, frent);
+#endif
 	pf_nfrents--;
 	m_freem(m);
 	return (NULL);
@@ -522,18 +596,35 @@ pf_fragcache(struct mbuf **m0, struct ip *h, struct pf_fragment *frag, int mff,
 
 	/* Create a new range queue for this packet */
 	if (frag == NULL) {
+#ifdef __FreeBSD__
+		frag = malloc(sizeof(struct pf_fragment), M_PF, M_NOWAIT);
+#else
 		frag = pool_get(&pf_cache_pl, PR_NOWAIT);
+#endif
 		if (frag == NULL) {
 			pf_flush_fragments();
+#ifdef __FreeBSD__
+			frag = malloc(sizeof(struct pf_fragment), M_PF,
+			    M_NOWAIT);
+#else
 			frag = pool_get(&pf_cache_pl, PR_NOWAIT);
+#endif
 			if (frag == NULL)
 				goto no_mem;
 		}
 
 		/* Get an entry for the queue */
+#ifdef __FreeBSD__
+		cur = malloc(sizeof(struct pf_frcache), M_PF, M_NOWAIT);
+#else
 		cur = pool_get(&pf_cent_pl, PR_NOWAIT);
+#endif
 		if (cur == NULL) {
+#ifdef __FreeBSD__
+			free(frag, M_PF);
+#else
 			pool_put(&pf_cache_pl, frag);
+#endif
 			goto no_mem;
 		}
 		pf_ncache++;
@@ -544,7 +635,11 @@ pf_fragcache(struct mbuf **m0, struct ip *h, struct pf_fragment *frag, int mff,
 		frag->fr_dst = h->ip_dst;
 		frag->fr_p = h->ip_p;
 		frag->fr_id = h->ip_id;
+#ifdef __FreeBSD__
+		frag->fr_timeout = time_second;
+#else
 		frag->fr_timeout = time.tv_sec;
+#endif
 
 		cur->fr_off = off;
 		cur->fr_end = max;
@@ -648,7 +743,11 @@ pf_fragcache(struct mbuf **m0, struct ip *h, struct pf_fragment *frag, int mff,
 			    h->ip_id, -precut, frp->fr_off, frp->fr_end, off,
 			    max));
 
+#ifdef __FreeBSD__
+			cur = malloc(sizeof(struct pf_frcache), M_PF, M_NOWAIT);
+#else
 			cur = pool_get(&pf_cent_pl, PR_NOWAIT);
+#endif
 			if (cur == NULL)
 				goto no_mem;
 			pf_ncache++;
@@ -701,7 +800,11 @@ pf_fragcache(struct mbuf **m0, struct ip *h, struct pf_fragment *frag, int mff,
 			    h->ip_id, -aftercut, off, max, fra->fr_off,
 			    fra->fr_end));
 
+#ifdef __FreeBSD__
+			cur = malloc(sizeof(struct pf_frcache), M_PF, M_NOWAIT);
+#else
 			cur = pool_get(&pf_cent_pl, PR_NOWAIT);
+#endif
 			if (cur == NULL)
 				goto no_mem;
 			pf_ncache++;
@@ -722,7 +825,11 @@ pf_fragcache(struct mbuf **m0, struct ip *h, struct pf_fragment *frag, int mff,
 				    max, fra->fr_off, fra->fr_end));
 				fra->fr_off = cur->fr_off;
 				LIST_REMOVE(cur, fr_next);
+#ifdef __FreeBSD__
+				free(cur, M_PF);
+#else
 				pool_put(&pf_cent_pl, cur);
+#endif
 				pf_ncache--;
 				cur = NULL;
 
@@ -735,7 +842,11 @@ pf_fragcache(struct mbuf **m0, struct ip *h, struct pf_fragment *frag, int mff,
 				    max, fra->fr_off, fra->fr_end));
 				fra->fr_off = frp->fr_off;
 				LIST_REMOVE(frp, fr_next);
+#ifdef __FreeBSD__
+				free(frp, M_PF);
+#else
 				pool_put(&pf_cent_pl, frp);
+#endif
 				pf_ncache--;
 				frp = NULL;
 
@@ -896,7 +1007,11 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct ifnet *ifp, u_short *reason)
 			goto bad;
 
 		/* Get an entry for the fragment queue */
+#ifdef __FreeBSD__
+		frent = malloc(sizeof(struct pf_frent), M_PF, M_NOWAIT);
+#else
 		frent = pool_get(&pf_frent_pl, PR_NOWAIT);
+#endif
 		if (frent == NULL) {
 			REASON_SET(reason, PFRES_MEMORY);
 			return (PF_DROP);
@@ -1129,7 +1244,11 @@ pf_normalize_tcp_init(struct mbuf *m, int off, struct pf_pdesc *pd,
 
 	KASSERT(src->scrub == NULL);
 
+#ifdef __FreeBSD__
+	src->scrub = malloc(sizeof(struct pf_state_scrub), M_PF, M_NOWAIT);
+#else
 	src->scrub = pool_get(&pf_state_scrub_pl, PR_NOWAIT);
+#endif
 	if (src->scrub == NULL)
 		return (1);
 	bzero(src->scrub, sizeof(*src->scrub));
@@ -1194,10 +1313,20 @@ pf_normalize_tcp_init(struct mbuf *m, int off, struct pf_pdesc *pd,
 void
 pf_normalize_tcp_cleanup(struct pf_state *state)
 {
-	if (state->src.scrub)
+	if (state->src.scrub) {
+#ifdef __FreeBSD__
+		free(state->src.scrub, M_PF);
+#else
 		pool_put(&pf_state_scrub_pl, state->src.scrub);
-	if (state->dst.scrub)
+#endif
+	}
+	if (state->dst.scrub) {
+#ifdef __FreeBSD__
+		free(state->dst.scrub, M_PF);
+#else
 		pool_put(&pf_state_scrub_pl, state->dst.scrub);
+#endif
+	}
 
 	/* Someday... flush the TCP segment reassembly descriptors. */
 }
