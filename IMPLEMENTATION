@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/08/16 12:07:11 $
+			$Date: 1999/08/20 12:57:12 $
 
 1. IPv6
 
@@ -711,15 +711,14 @@ Here is a list of FreeBSD 3.x-RELEASE drivers and its conditions:
 	fe	ok		ok		yes
 	fxp	ok		ok		yes
 	lnc	?		ok		-
-	cnw	ok		ok		-(**)
+	cnw	ok		ok		-(*)
 	ep	ok		ok		-
-	sn	?		?		-(**)
+	sn	?		?		-(*)
 	xl	?		ok		-
 	ed	?		ok		-
 
-(*)  With PAO3 patch applied. (http://www.jp.freebsd.org/PAO/).
-(**) These drivers are distributed with PAO as PAO3
-     (http://www.jp.freebsd.org/PAO/).
+(*) These drivers are distributed with PAO as PAO3
+    (http://www.jp.freebsd.org/PAO/).
 
 More drivers will just simply work on KAME FreeBSD 3.x-RELEASE but have not
 been checked yet.
