@@ -232,7 +232,6 @@ edinit(struct pccard_devinfo *devi)
 	/* validate unit number. */
 	if (devi->isahd.id_unit >= NEDTOT)
 		return(ENODEV);
-
 	/*
 	 * Probe the device. If a value is returned, the
 	 * device was found at the location.
