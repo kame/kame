@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.138 2003/06/30 11:01:18 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.139 2003/09/12 08:40:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -35,10 +35,12 @@
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
+#include <sys/sysctl.h>
 
 #include <net/route.h>
 #include <net/pfkeyv2.h>
 #include <netkey/key_debug.h>
+#include <netkey/key_var.h>
 
 #include <netinet/in.h>
 #ifdef IPV6_INRIA_VERSION
@@ -254,6 +256,38 @@ vchar_t *
 pfkey_dump_sadb(satype)
 	int satype;
 {
+#ifdef KEYCTL_DUMPSA
+	vchar_t *buf = NULL;
+	int mib[] = { CTL_NET, PF_KEY, KEYCTL_DUMPSA, 0 };
+	size_t len;
+
+	mib[3] = satype;
+	if (sysctl(mib, 4, NULL, &len, NULL, 0) < 0) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"libipsec failed sysctl: %s\n", strerror(errno));
+		goto fail;
+	}
+
+	buf = valloc(len);
+	if (buf == NULL) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"failed to reallocate buffer to dump.\n");
+		goto fail;
+	}
+
+	if (sysctl(mib, 4, buf->v, &len, NULL, 0) < 0) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"libipsec failed sysctl: %s\n", strerror(errno));
+		goto fail;
+	}
+
+	return buf;
+
+fail:
+	if (buf)
+		vfree(buf);
+	return (NULL);
+#else
 	int s = -1;
 	vchar_t *buf = NULL;
 	pid_t pid = getpid();
@@ -314,6 +348,7 @@ done:
 	if (s >= 0)
 		close(s);
 	return buf;
+#endif
 }
 
 /*
