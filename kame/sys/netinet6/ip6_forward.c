@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.64 2001/02/06 05:08:49 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.65 2001/02/06 05:25:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,7 +66,10 @@
 #include <netinet/icmp6.h>
 #include <netinet6/nd6.h>
 
-#ifdef __NetBSD__
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#include <netinet/in_pcb.h>
+#endif
+#if !((defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802))
 #include <netinet6/in6_pcb.h>
 #endif
 
