@@ -1,4 +1,4 @@
-.\"	$KAME: bindtest.1,v 1.14 2001/06/26 12:37:01 jinmei Exp $
+.\"	$KAME: bindtest.1,v 1.15 2001/06/26 12:43:47 jinmei Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -146,13 +146,28 @@ When the
 .Fl o Ar IPv4address
 option is specified, the address can be any valid IPv4 address in
 theory, but, for the testing purpose, the address is meaningful only
-when it is an IPv4 address assigned on testing node itself.
+when it is an IPv4 address assigned on the testing node itself.
 .Pp
 With
 .Fl s ,
 .Nm
 generates summarized output instead of verbose output.
 Here is a sample output, and the legends for summarized output.
+.Pp
+The
+.Fl l
+option is meaningful only when the corresponding socket is TCP.
+It specifies
+.Nm
+to issue
+.Xr listen 2
+after calling
+.Xr bind 2
+for both two sockets.
+Normally, the program calls the two calls for the first socket, and
+then calls them for the second one.
+This option exists because there exists an operating system that behaves
+differently for both cases.
 .Pp
 .Ds
 starting tests, socktype = SOCK_DGRAM
