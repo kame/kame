@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2446 2003/07/29 00:51:18 t-momose Exp $
+$KAME: CHANGELOG,v 1.2447 2003/07/29 08:13:56 keiichi Exp $
 
 <200307>
+Tue Jul 29 17:09:15 JST 2003	keiichi@iij.ad.jp
+	* kame/sys/netinet6/mip6_mncore.[hc]
+	select a CoA using the source address selection like algorithm.
+	suggested by Francis.Dupont@enst-bretagne.fr.
+
 2003-07-28  MOMOSE Tsuyoshi  <t-momose@netlab.nec.co.jp>
 	* sys/netinet6/{ip6_output.c, ip6_var.h, mip6_cncore.c,
 	mip6_hacore.[ch], nd6.c}:
