@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.120 2001/02/15 11:01:28 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.121 2001/02/15 11:10:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2328,13 +2328,13 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 		     dr = TAILQ_NEXT(dr, dr_entry)) {
 			if (oldp && d + 1 <= de) {
 				bzero(d, sizeof(*d));
-				d->rtaddr = dr->rtaddr;
-				if (IN6_IS_ADDR_LINKLOCAL(&d->rtaddr))
-					d->rtaddr.s6_addr16[1] = 0;
-				else
+				d->rtaddr.sin6_family = AF_INET6;
+				d->rtaddr.sin6_len = sizeof(d->rtaddr);
+				if (in6_recoverscope(&d->rtaddr, &dr->rtaddr,
+				    dr->ifp) != 0)
 					log(LOG_ERR,
-					    "default router list contains a "
-					    "non-linklocal address(%s)\n",
+					    "scope error in "
+					    "default router list (%s)\n",
 					    ip6_sprintf(&dr->rtaddr));
 				d->flags = dr->flags;
 				d->rtlifetime = dr->rtlifetime;

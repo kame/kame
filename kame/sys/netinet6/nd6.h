@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.48 2001/02/15 11:01:28 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.49 2001/02/15 11:10:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -114,7 +114,7 @@ struct	in6_drlist {
 };
 
 struct	in6_defrouter {
-	struct	in6_addr rtaddr;
+	struct	sockaddr_in6 rtaddr;
 	u_char	flags;
 	u_short	rtlifetime;
 	u_long	expire;

@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.58 2001/02/15 11:04:22 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.59 2001/02/15 11:10:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -989,15 +989,9 @@ rtrlist()
 
 	ep = (struct in6_defrouter *)(buf + l);
 	for (p = (struct in6_defrouter *)buf; p < ep; p++) {
-		struct sockaddr_in6 sin6;
-
-		bzero(&sin6, sizeof(sin6));
-		sin6.sin6_family = AF_INET6;
-		sin6.sin6_len = sizeof(sin6);
-		sin6.sin6_addr = p->rtaddr;
-		getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len, host_buf,
-			    sizeof(host_buf), NULL, 0,
-			    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
+		getnameinfo((struct sockaddr *)&p->rtaddr, p->rtaddr.sin6_len,
+		    host_buf, sizeof(host_buf), NULL, 0,
+		    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
 		
 		printf("%s if=%s", host_buf,
 		       if_indextoname(p->if_index, ifix_buf));
