@@ -1,16 +1,34 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1140 2000/07/19 16:54:21 sumikawa Exp $
+$Id: CHANGELOG,v 1.1141 2000/07/21 11:02:40 sakane Exp $
 
 <200006>
 Thu Jul 20 01:52:59 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/{libpcap,tcpdump}: use 7/17 weekly snap.
 	* freebsd3/ports/mtr: use latest IPv6 patch.
 
+Wed Jul 19 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	- when racoon is running local test mode, AND initial contact is
+	  received, don't delete phase 2 SA.
+	- more improve to delete phase 1 SA on receiving initial contact.
+
 Wed Jul 19 22:22:47 JST 2000  itojun@iiljab.net
 	* kame/rtsold/rtsol.c, kame/rtadvd/rtadvd.c: ip6_var.h requires
 	  sys/queue.h.
 	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 7/17 weekly snap.
+
+Tue Jul 18 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	- don't send notify message in processing of information exchange.
+	- fixed a possible memory leak when error occure.
+	- added some message about comparing each values in proposal.
+	- improved to delete phase1 SA when delete message is received OR
+	  initial contact is received.
+
+Mon Jul 17 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	- commented when id payload of subnet type with full bit masked.
 
 Mon Jul 17 18:45:11 JST 2000  itojun@iijlab.net
 	* sys/netkey/key.c: allow ESP with no authentication.  it was
@@ -18,6 +36,11 @@ Mon Jul 17 18:45:11 JST 2000  itojun@iijlab.net
 
 Mon Jul 17 03:31:47 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/ruby: upgrade to 1.4.5.
+
+Sun Jul 16 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	- commented when id payload of subnet type with full bit masked.
+	- racoon.conf are updated about padding option.
 
 Sun Jul 16 16:44:24 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_forward.c: enable IPSEC_IPV6FWD case by default.
@@ -45,9 +68,36 @@ Sun Jul 16 00:57:23 JST 2000  itojun@iijlab.net
 	  symbol name).  beware: the change breaks backward compatibility.
 	  setkey and racoon MUST be recompiled after updating include files.
 
+Sat Jul 15 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	- fixed the place of checking whether delete payload is protected
+	  when delete notification is received.
+	- When a IKE node receive a delete payload, the node always delete
+	  outbount SAs only.  So destination IP address have to check before
+	  SA will be deleted.
+	- Delete phase 1 handler when a delete notification has been received.
+	  Renamed purge_spi() to purge_ipsec_spi() accompanied with above
+	  chanege.
+	- commented about the reason why we don't send delete payload
+	  for outbound SAs.
+	- added a option to randomize values in a padding.  clarified to
+	  randomize length.
+	- fixed some of memory leak.
+
 Sat Jul 15 13:51:59 JST 2000  itojun@iijlab.net
 	* kame/route6d: if a routing entry exists for aggregate prefix (-A),
 	  do not overwrite it (exit with error).  it should be a safer behavir.
+
+Fri Jul 14 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	- enable to switch sending initial contact.
+	- try to send delete payload on phase 1 when phase 1 sa is deleted
+	- fixed to compare address family in two sockaddrs.
+	- fixed making a length of IPv6 ID payload.  it was used a length of
+	  struct in_addr.
+	- fixed a part of sending a notification on phase 2.
+	- fixed making a ID payload of type of IPv4 address.  There was
+	  unnecessary space in a address part.
 
 Thu Jul 13 22:27:18 JST 2000  itojun@iijlab.net
 	* openbsd/sys/netinet6/raw_ipv6.c: enable IPv6 multicast routing
