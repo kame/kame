@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.15 2000/08/31 06:09:27 sakane Exp $	*/
+/*	$KAME: setkey.c,v 1.16 2000/11/08 16:28:16 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -62,6 +62,8 @@ int postproc __P((struct sadb_msg *, int));
 const char *numstr __P((int));
 void shortdump_hdr __P((void));
 void shortdump __P((struct sadb_msg *));
+static void printdate __P((void));
+static int32_t gmt2local __P((time_t));
 
 #define MODE_SCRIPT	1
 #define MODE_CMDDUMP	2
@@ -78,10 +80,13 @@ int f_mode = 0;
 int f_cmddump = 0;
 int f_policy = 0;
 int f_hexdump = 0;
+int f_tflag = 0;
 char *pname;
 
 u_char m_buf[BUFSIZ];
 u_int m_len;
+
+static time_t thiszone;
 
 extern int lineno;
 
@@ -110,6 +115,8 @@ main(ac, av)
 	pname = *av;
 
 	if (ac == 1) Usage();
+
+	thiszone = gmt2local(0);
 
 	while ((c = getopt(ac, av, "acdf:hlvxDFP")) != EOF) {
 		switch (c) {
@@ -141,6 +148,7 @@ main(ac, av)
 			break;
 		case 'x':
 			f_mode = MODE_PROMISC;
+			f_tflag++;
 			break;
 		case 'P':
 			f_policy = 1;
@@ -274,6 +282,7 @@ promisc()
 			err(1, "recv");
 			/*NOTREACHED*/
 		}
+		printdate();
 		if (f_hexdump) {
 			int i;
 			for (i = 0; i < len; i++) {
@@ -574,4 +583,65 @@ shortdump(msg)
 		printf("?");
 
 	printf("\n");
+}
+
+/* From: tcpdump(1):gmt2local.c and util.c */
+/*
+ * Print the timestamp
+ */
+static void
+printdate()
+{
+	struct timeval tp;
+	int s;
+
+	if (gettimeofday(&tp, NULL) == -1) {
+		perror("gettimeofday");
+		return;
+	}
+
+	if (f_tflag == 1) {
+		/* Default */
+		s = (tp.tv_sec + thiszone ) % 86400;
+		(void)printf("%02d:%02d:%02d.%06u ",
+		    s / 3600, (s % 3600) / 60, s % 60, (u_int32_t)tp.tv_usec);
+	} else if (f_tflag > 1) {
+		/* Unix timeval style */
+		(void)printf("%u.%06u ",
+		    (u_int32_t)tp.tv_sec, (u_int32_t)tp.tv_usec);
+	}
+
+	printf("\n");
+}
+
+/*
+ * Returns the difference between gmt and local time in seconds.
+ * Use gmtime() and localtime() to keep things simple.
+ */
+int32_t
+gmt2local(time_t t)
+{
+	register int dt, dir;
+	register struct tm *gmt, *loc;
+	struct tm sgmt;
+
+	if (t == 0)
+		t = time(NULL);
+	gmt = &sgmt;
+	*gmt = *gmtime(&t);
+	loc = localtime(&t);
+	dt = (loc->tm_hour - gmt->tm_hour) * 60 * 60 +
+	    (loc->tm_min - gmt->tm_min) * 60;
+
+	/*
+	 * If the year or julian day is different, we span 00:00 GMT
+	 * and must add or subtract a day. Check the year first to
+	 * avoid problems when the julian day wraps.
+	 */
+	dir = loc->tm_year - gmt->tm_year;
+	if (dir == 0)
+		dir = loc->tm_yday - gmt->tm_yday;
+	dt += dir * 24 * 60 * 60;
+
+	return (dt);
 }
