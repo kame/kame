@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.54 2001/12/27 02:21:22 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.55 2001/12/28 06:18:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -740,8 +740,7 @@ mip6_bu_list_remove_all(mbu_list)
 }
 
 /*
- * validate incoming binding update.
- * draft-14 section 8.2
+ * validate incoming binding updates.
  */
 int
 mip6_validate_bu(m, opt)
@@ -770,37 +769,43 @@ mip6_validate_bu(m, opt)
 	 * check if the incoming binding update is protected by the
 	 * ipsec mechanism.
 	 */
-	if (!mip6_config.mcfg_use_ipsec &&
-	    !((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM))) {
+	if (mip6_config.mcfg_use_ipsec != 0) {
+		/*
+		 * we will take into consideration of using the ipsec
+		 * mechanism to protect binding updates.
+		 */
+		if ((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM)) {
+			/*
+			 * this packet is protected by the ipsec
+			 * mechanism.
+			 */
+			ipsec_protected = 1;
+		} else {
 #ifdef MIP6_DRAFT13
-		/*
-		 * draft-13 requires that the binding update must be
-		 * protected by the ipsec authentication mechanism.
-		 * if this packet is not protected, ignore this.
-		 */
-		mip6log((LOG_NOTICE,
-			 "%s:%d: an unprotected binding update from %s.\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&ip6->ip6_src)));
+			/*
+			 * draft-13 requires that the binding update
+			 * must be protected by the ipsec
+			 * authentication mechanism.  if this packet
+			 * is not protected, ignore this.
+			 */
+			mip6log((LOG_NOTICE,
+				 "%s:%d: an unprotected binding update "
+				 "from %s.\n",
+				 __FILE__, __LINE__,
+				 ip6_sprintf(&ip6->ip6_src)));
 
-		/* silently ignore. */
-		return (1);
-#else
-		/*
-		 * draft-15 and later introduces authentication data
-		 * sub-option to protect the binding update.  if this
-		 * binding update is not protected by the ipsec, we
-		 * will check the authentication data sub-option
-		 * later in this function.
-		 */
+			/* silently ignore. */
+			return (1);
 #endif /* MIP6_DRAFT13 */
-	} else {
-		/*
-		 * if the ipsec is available and once we have checked
-		 * this packet is protected by the ipsec, no further
-		 * authentication check is needed.
-		 */
-		ipsec_protected = 1;
+			/*
+			 * draft-15 and later introduces
+			 * authentication data sub-option to protect
+			 * the binding updates.  if this binding
+			 * update is not protected by the ipsec, we
+			 * will check the authentication data
+			 * sub-option later in this function.
+			 */
+		}
 	}
 #endif /* IPSEC && !__OpenBSD__ */
 
@@ -815,6 +820,7 @@ mip6_validate_bu(m, opt)
 			 "in the binding update from host %s.\n",
 			 __FILE__, __LINE__,
 			 ip6_sprintf(&ip6->ip6_src)));
+		/* silently ignore. */
 		return (1);
 	}
 
@@ -829,6 +835,7 @@ mip6_validate_bu(m, opt)
 			 "in the binding update from host %s.\n",
 			 __FILE__, __LINE__,
 			 ip6_sprintf(&ip6->ip6_src)));
+		/* silently ignore. */
 		return (1);
 	}
 
@@ -839,7 +846,7 @@ mip6_validate_bu(m, opt)
 	if (bu_opt->ip6ou_len < IP6OPT_BULEN) {
 		ip6stat.ip6s_badoptions++;
 		mip6log((LOG_NOTICE,
-			 "%s:%d: too short binding update (%d) "
+			 "%s:%d: too short binding update (len = %d) "
 			 "from host %s.\n",
 			 __FILE__, __LINE__,
 			 bu_opt->ip6ou_len,
@@ -848,7 +855,7 @@ mip6_validate_bu(m, opt)
 		return (1);
 	}
 
-	/* check sub-options. */
+	/* check sub-option(s). */
 	if (bu_opt->ip6ou_len > IP6OPT_BULEN) {
 		/* we have sub-option(s). */
 		int suboptlen = bu_opt->ip6ou_len - IP6OPT_BULEN;
@@ -895,14 +902,14 @@ mip6_validate_bu(m, opt)
 #ifndef MIP6_DRAFT13
 	/*
 	 * if the packet is protected by the ipsec, we believe it.
-	 * otherwise, check the authentication sub-option.
+	 * otherwise, check the authentication data sub-option.
 	 */
 	if (ipsec_protected == 0) {
 		if (authdata == NULL) {
 			/*
-			 * if the packet is not protected by ipsec and
-			 * do not have a authentication data either,
-			 * this packet is not reliable.
+			 * if the packet is not protected by the ipsec
+			 * and does not have a authentication data
+			 * either, this packet is not reliable.
 			 */
 			mip6log((LOG_ERR,
 				 "%s:%d: an unprotected binding update "
@@ -913,19 +920,19 @@ mip6_validate_bu(m, opt)
 			/* XXX */
 		} else {
 			/*
-			 * if the ipsec protection is not provided but
-			 * an authentication data exist, check the
-			 * authentication data.  if it seems good, we
-			 * think this packet is protected by some week
-			 * auth mechanism.
+			 * if the packet is not protected by the ipsec
+			 * but an authentication data sub-option
+			 * exists, check the authentication data.  if
+			 * it seems good, we think this packet is
+			 * protected by some week auth mechanisms.
 			 */
 			if (mip6_bu_authdata_verify(&ip6a->ip6a_home,
 						    &ip6->ip6_dst,
 						    &ip6a->ip6a_careof,
 						    bu_opt, authdata)) {
 				mip6log((LOG_ERR,
-					 "%s:%d: authenticate binding update "
-					 "failed from host %s\n",
+					 "%s:%d: invalid authenticataion data "
+					 "from host %s\n",
 					 __FILE__, __LINE__,
 					 ip6_sprintf(&ip6->ip6_src)));
 				/* discard. */
@@ -961,7 +968,7 @@ mip6_validate_bu(m, opt)
 			 mbc->mbc_seqno, ip6_sprintf(&ip6->ip6_src)));
 #ifndef MIP6_DRAFT13
 		/*
-		 * the seqno of this bingin update is smaller than the
+		 * the seqno of this binding update is smaller than the
 		 * corresponding binding cache.  we send TOO_SMALL
 		 * binding ack as an error.  in this case, we use the
 		 * coa of the incoming packet instead of the coa
@@ -976,10 +983,11 @@ mip6_validate_bu(m, opt)
 					0, 0);
 		if (error) {
 			mip6log((LOG_ERR,
-				 "%s:%d: can't send BA\n",
+				 "%s:%d: sending a binding ack failed.\n",
 				 __FILE__, __LINE__));
 		}
 #endif /* !MIP6_DRAFT13 */
+		/* silently ignore. */
 		return (1);
 	}
 
@@ -2056,8 +2064,7 @@ mip6_bu_print(mbu)
  */
 
 /*
- * Binding Ackowledgements validation.
- * draft-14 section 10.13
+ * validate the incoming binding ackowledgements.
  */
 int
 mip6_validate_ba(m, opt)
@@ -2082,26 +2089,47 @@ mip6_validate_ba(m, opt)
 	ip6 = mtod(m, struct ip6_hdr *);
 	ba_opt = (struct ip6_opt_binding_ack *)(opt);
 
-	/* Make sure that the BA is protected by an AH (see 4.4, 10.12). */
 #if defined(IPSEC) && !defined(__OpenBSD__)
-	if (!mip6_config.mcfg_use_ipsec &&
-	    !((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM))) {
-#ifdef MIP6_DRAFT13
-		mip6log((LOG_NOTICE,
-			 "%s:%d: an unprotected binding ack from %s.\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&ip6->ip6_src)));
-		/* silently ignore */
-		return (1);
-#else
+	/*
+	 * check if this incoming binding ack is protected by the
+	 * ipsec mechanism.
+	 */
+	if (mip6_config.mcfg_use_ipsec != 0) {
 		/*
-		 * if ipsec is available and we can validate this
-		 * packet using ipsec, it is enough to protect the
-		 * binding ack.
+		 * we will take into consideration of using the ipsec
+		 * mechanism to protect binding acks.
 		 */
-#endif /* MIP6_DRAFT13 */
-	} else {
-		ipsec_protected = 1;
+		if ((m->m_flags & M_AUTHIPHDR) && (m->m_flags & M_AUTHIPDGM)) {
+			/*
+			 * this packet is protected by the ipsec
+			 * mechanism.
+			 */
+			ipsec_protected = 1;
+		} else {
+#ifdef MIP6_DRAFT13
+			/*
+			 * draft-13 requires that the binding ack must
+			 * be protected by the ipsec authentication
+			 * mechanism.  if this packet is not
+			 * protected, ignore this.
+			 */
+			mip6log((LOG_NOTICE,
+				 "%s:%d: an unprotected binding ack "
+				 "from %s.\n",
+				 __FILE__, __LINE__,
+				 ip6_sprintf(&ip6->ip6_src)));
+			/* silently ignore */
+			return (1);
+#endif
+			/*
+			 * draft-15 and later introduces
+			 * authentication data sub-option to protect
+			 * the binding acks.  if this binding update
+			 * is not protected by the ipsec, we will
+			 * check the authentication data sub-option
+			 * later in this function.
+			 */
+		}
 	}
 #endif /* IPSEC && !__OpenBSD__ */
 
@@ -2138,7 +2166,7 @@ mip6_validate_ba(m, opt)
 	}
 
 
-	/* check sub-options. */
+	/* check sub-option(s). */
 	if (ba_opt->ip6oa_len > IP6OPT_BALEN) {
 		/* we have sub-option(s). */
 		int suboptlen = ba_opt->ip6oa_len - IP6OPT_BALEN;
@@ -2185,9 +2213,9 @@ mip6_validate_ba(m, opt)
 	if (ipsec_protected == 0) {
 		if (authdata == NULL) {
 			/*
-			 * if the packet is not protected by ipsec and
-			 * do not have a authentication data either,
-			 * this packet is not reliable.
+			 * if the packet is not protected by the ipsec
+			 * and do not have a authentication data
+			 * either, this packet is not reliable.
 			 */
 			mip6log((LOG_ERR,
 				 "%s:%d: an unprotected binding ack "
@@ -2198,11 +2226,11 @@ mip6_validate_ba(m, opt)
 			/* XXX */
 		} else {
 			/*
-			 * if the ipsec protection is not provided but
-			 * an authentication data exist, check the
-			 * authentication data.  if it seems good, we
-			 * think this packet is protected by some week
-			 * auth mechanism.
+			 * if the packet is not protected by the ipsec
+			 * but an authentication data sub-option
+			 * exists, check the authentication data.  if
+			 * it seems good, we think this packet is
+			 * protected by some week auth mechanisms.
 			 */
 			if (mip6_ba_authdata_verify(ip6_home,
 						    &ip6->ip6_dst,
@@ -2222,14 +2250,14 @@ mip6_validate_ba(m, opt)
 #endif /* IPSEC && !__OpenBSD__ */
 
 	/*
-	 * check if the seq number of the send BU == the seq number of
-	 * the received BA.
+	 * check if the sequence number of the binding update sent ==
+	 * the sequence number of the binding ack received.
 	 */
 	sc = hif_list_find_withhaddr(&ip6->ip6_dst);
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &ip6->ip6_src);
 	if (mbu == NULL) {
 		mip6log((LOG_NOTICE,
-			 "%s:%d: no matching BU entry found.\n",
+			 "%s:%d: no matching binding update entry found.\n",
 			 __FILE__, __LINE__));
 		/* silently ignore */
 		return (1);
@@ -2240,11 +2268,12 @@ mip6_validate_ba(m, opt)
 	seqno = ba_opt->ip6oa_seqno;
 	if (ba_opt->ip6oa_status == MIP6_BA_STATUS_SEQNO_TOO_SMALL) {
 		/*
-		 * our HA has a greater seq number in her binging
-		 * cache entriy of mine.  we should resent binding
-		 * update with greater than the seq number of the
-		 * already exists binding cache.  this binding ack is
-		 * valid though the seq number doesn't match.
+		 * our home agent has a greater sequence number in its
+		 * binging cache entriy of mine.  we should resent
+		 * binding update with greater than the sequence
+		 * number of the binding cache already exists in our
+		 * home agent.  this binding ack is valid though the
+		 * sequence number doesn't match.
 		 */
 		goto validate_ba_valid;
 	}
@@ -2259,14 +2288,14 @@ mip6_validate_ba(m, opt)
 			 seqno,
 			 mbu->mbu_seqno,
 			 ip6_sprintf(&ip6->ip6_src)));
-		/* silently ignore */
+		/* silently ignore. */
 		return (1);
 	}
 
 #ifndef MIP6_DRAFT13
  validate_ba_valid:
 #endif /* !MIP6_DRAFT13 */
-	/* we have a valid BA */
+	/* we have a valid binding ack. */
 	return (0);
 }
 

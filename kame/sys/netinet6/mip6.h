@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.41 2001/12/27 02:21:22 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.42 2001/12/28 06:18:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -292,8 +292,8 @@ struct mip6_bc *mip6_bc_list_find_withphaddr
 struct mip6_bc *mip6_bc_list_find_withpcoa
 					__P((struct mip6_bc_list *,
 					     struct in6_addr *));
-#ifndef MIP6_DRAFT13
 #if defined(IPSEC) && !defined(__OpenBSD__)
+#ifndef MIP6_DRAFT13
 struct secasvar;
 struct mip6_subopt_authdata *mip6_authdata_create
 					__P((struct secasvar *));
@@ -310,8 +310,8 @@ int mip6_ba_authdata_calc __P((struct secasvar *,
 			       struct ip6_opt_binding_ack *,
 			       struct mip6_subopt_authdata *,
 			       caddr_t));
-#endif /* IPSEC && !__OpenBSD__ */
 #endif /* !MIP6_DRAFT13 */
+#endif /* IPSEC && !__OpenBSD__ */
 
 int mip6_dad_success			__P((struct ifaddr *));
 int mip6_dad_duplicated			__P((struct ifaddr *));
