@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.50 2000/02/16 13:44:16 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.51 2000/03/13 10:28:35 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -959,7 +959,6 @@ isakmp_open()
 {
 	int tmp = 1;
 	struct myaddrs *p;
-	int error = 0;
 
 	for (p = lcconf->myaddrs; p; p = p->next) {
 		if (!p->addr)
@@ -1042,20 +1041,20 @@ isakmp_open()
 			goto err_and_next;
 		}
 
-		YIPSDEBUG(DEBUG_INFO,
-			plog(logp, LOCATION, p->addr,
-				"used as isakmp port (fd=%d).\n", p->sock));
+		plog(logp, LOCATION, p->addr,
+			"used as isakmp port (fd=%d).\n", p->sock);
 
 		continue;
 
 	err_and_next:
 		free(p->addr);
 		p->addr = NULL;
-		error = -1;
+		if (lcconf->strict_address)
+			return -1;
 		continue;
 	}
 
-	return error;
+	return 0;
 }
 
 void

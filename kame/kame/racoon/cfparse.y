@@ -126,7 +126,7 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 	/* padding */
 %token PADDING PAD_MAXLEN PAD_RANDOMIZE PAD_RESTRICT PAD_EXCLTAIL
 	/* listen */
-%token LISTEN X_ISAKMP X_ADMIN
+%token LISTEN X_ISAKMP X_ADMIN STRICT_ADDRESS
 	/* timer */
 %token RETRY RETRY_COUNTER RETRY_INTERVAL RETRY_PERSEND
 %token RETRY_PHASE1 RETRY_PHASE2
@@ -319,6 +319,7 @@ listen_stmt
 		{
 			lcconf->port_admin = $2;
 		}
+	|	STRICT_ADDRESS EOS { lcconf->strict_address = TRUE; }
 	;
 ike_addrinfo_port
 	:	ADDRSTRING ike_port

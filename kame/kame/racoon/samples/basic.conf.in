@@ -1,4 +1,4 @@
-# $Id: basic.conf.in,v 1.9 2000/03/02 03:27:59 itojun Exp $
+# $Id: basic.conf.in,v 1.10 2000/03/13 10:28:34 sakane Exp $
 
 # search this file for pre_shared_key with various ID key.
 path pre_shared_key "@sysconfdir_x@/racoon/psk.txt" ;
@@ -30,7 +30,8 @@ padding {
 listen {
 	#isakmp 127.0.0.1 [7000];
 	#isakmp 202.249.11.124 [500];
-	#admin [7002];	# administrative's port by kmpstat.
+	#admin [7002];		# administrative's port by kmpstat.
+	strict_address;		# required all addresses must be bound.
 }
 
 # Specification of default various timer.

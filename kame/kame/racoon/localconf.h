@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.h,v 1.4 2000/01/18 05:02:01 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.h,v 1.5 2000/03/13 10:28:35 sakane Exp $ */
 
 /* local configuration */
 
@@ -87,6 +87,7 @@ struct localconf {
 	int wait_ph2complete;
 
 	int secret_size;
+	int strict_address;		/* strictly check addresses. */
 
 	struct algorithm_strength **algstrength;
 		/*

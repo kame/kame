@@ -147,6 +147,7 @@ octetstring	{octet}({dot}{octet})+
 <S_LST>{bcl}		{ return(BOC); }
 <S_LST>isakmp		{ YYD; return(X_ISAKMP); }
 <S_LST>admin		{ YYD; return(X_ADMIN); }
+<S_LST>strict_address	{ YYD; return(STRICT_ADDRESS); }
 <S_LST>{ecl}		{ BEGIN S_INI; return(EOC); }
 
 	/* timer */

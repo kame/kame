@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.4 2000/01/12 20:57:27 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.5 2000/03/13 10:28:35 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -106,6 +106,7 @@ initlcconf()
 	lcconf->secret_size = LC_DEFAULT_SECRETSIZE;
 	lcconf->retry_checkph1 = LC_DEFAULT_RETRY_CHECKPH1;
 	lcconf->wait_ph2complete = LC_DEFAULT_WAIT_PH2COMPLETE;
+	lcconf->strict_address = FALSE;
 }
 
 vchar_t *
