@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.usr.dist,v 1.269 2002/11/15 18:44:09 ru Exp $
+# $FreeBSD: src/etc/mtree/BSD.usr.dist,v 1.273 2003/03/12 14:29:15 ru Exp $
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -139,8 +139,6 @@
                 07.lpd
                 ..
                 08.sendmailop
-                ..
-                10.named
                 ..
                 11.timedop
                 ..
@@ -341,6 +339,10 @@
             ..
             bg_BG.CP1251
             ..
+            ca_ES.ISO8859-1
+            ..
+            ca_ES.ISO8859-15
+            ..
             cs_CZ.ISO8859-2
             ..
             da_DK.ISO8859-1
@@ -538,8 +540,6 @@
                 i386
                 ..
             ..
-            catn
-            ..
             en.ISO8859-1    uname=root
                 cat1
                 ..
@@ -571,8 +571,6 @@
                     i386
                     ..
                 ..
-                catn
-                ..
             ..
             ja              uname=root
                 cat1
@@ -593,8 +591,6 @@
                 ..
                 cat9
                 ..
-                catn
-                ..
 /set uname=root
                 man1
                 ..
@@ -613,8 +609,6 @@
                 man8
                 ..
                 man9
-                ..
-                mann
                 ..
             ..
             man1
@@ -647,8 +641,6 @@
                 i386
                 ..
             ..
-            mann
-            ..
         ..
         me
         ..
@@ -668,6 +660,10 @@
             af_ZA.ISO8859-15
             ..
             bg_BG.CP1251
+            ..
+            ca_ES.ISO8859-1
+            ..
+            ca_ES.ISO8859-15
             ..
             cs_CZ.ISO8859-2
             ..
@@ -830,6 +826,26 @@
             zh_CN.eucCN
             ..
             zh_TW.Big5
+            ..
+        ..
+        openssl
+            man
+/set uname=man
+                cat1
+                ..
+                cat3
+                ..
+                en.ISO8859-1    uname=root
+                    cat1
+                    ..
+                    cat3
+                    ..
+                ..
+/set uname=root
+                man1
+                ..
+                man3
+                ..
             ..
         ..
         pcvt

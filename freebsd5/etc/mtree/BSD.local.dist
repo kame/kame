@@ -1,4 +1,4 @@
-# $FreeBSD: src/etc/mtree/BSD.local.dist,v 1.93 2002/10/29 16:48:03 tobez Exp $
+# $FreeBSD: src/etc/mtree/BSD.local.dist,v 1.95 2003/03/24 09:39:09 ru Exp $
 #
 # Please see the file src/etc/mtree/README before making changes to this file.
 #
@@ -198,6 +198,54 @@
         ..
         mann
         ..
+        ru.KOI8-R
+/set uname=man
+            cat1
+            ..
+            cat2
+            ..
+            cat3
+            ..
+            cat4
+            ..
+            cat5
+            ..
+            cat6
+            ..
+            cat7
+            ..
+            cat8
+            ..
+            cat9
+            ..
+            catl
+            ..
+            catn
+            ..
+/set uname=root
+            man1
+            ..
+            man2
+            ..
+            man3
+            ..
+            man4
+            ..
+            man5
+            ..
+            man6
+            ..
+            man7
+            ..
+            man8
+            ..
+            man9
+            ..
+            manl
+            ..
+            mann
+            ..
+        ..
     ..
     sbin
     ..
@@ -230,6 +278,10 @@
             af_ZA.ISO8859-15
             ..
             bg_BG.CP1251
+            ..
+            ca_ES.ISO8859-1
+            ..
+            ca_ES.ISO8859-15
             ..
             cs_CZ.ISO8859-2
             ..

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)netstat.h	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/usr.bin/netstat/netstat.h,v 1.33 2002/09/05 17:06:51 dwmalone Exp $
+ * $FreeBSD: src/usr.bin/netstat/netstat.h,v 1.34 2003/02/20 04:26:58 bmilekic Exp $
  */
 
 #include <sys/cdefs.h>
@@ -97,7 +97,7 @@ void	pfkey_stats (u_long, const char *, int);
 void	bdg_stats (u_long, const char *, int);
 
 void	mbpr (u_long, u_long, u_long, u_long, u_long, u_long,
-	      u_long, u_long, u_long);
+	      u_long, u_long, u_long, u_long, u_long);
 
 void	hostpr (u_long, u_long);
 void	impstats (u_long, u_long);

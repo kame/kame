@@ -44,7 +44,7 @@ static char sccsid[] = "@(#)main.c	8.1 (Berkeley) 6/6/93";
 #endif
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/usr.bin/tftp/main.c,v 1.18 2002/05/12 01:47:50 bsd Exp $");
+__FBSDID("$FreeBSD: src/usr.bin/tftp/main.c,v 1.19 2003/03/25 02:33:35 jon Exp $");
 
 /* Many bug fixes are from Jim Guyton <guyton@rand-unix> */
 
@@ -262,9 +262,9 @@ setpeer(argc, argv)
 		return;
 	}
 	if (argc == 3)
-		setpeer0(argv[1], NULL);
-	else
 		setpeer0(argv[1], argv[2]);
+	else
+		setpeer0(argv[1], NULL);
 }
 
 struct	modes {

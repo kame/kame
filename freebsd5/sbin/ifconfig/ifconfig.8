@@ -30,9 +30,9 @@
 .\" SUCH DAMAGE.
 .\"
 .\"     From: @(#)ifconfig.8	8.3 (Berkeley) 1/5/94
-.\" $FreeBSD: src/sbin/ifconfig/ifconfig.8,v 1.66 2002/11/25 16:01:28 ru Exp $
+.\" $FreeBSD: src/sbin/ifconfig/ifconfig.8,v 1.71 2003/05/14 16:22:16 ru Exp $
 .\"
-.Dd July 2, 2001
+.Dd April 28, 2003
 .Dt IFCONFIG 8
 .Os
 .Sh NAME
@@ -259,15 +259,12 @@ This action does not automatically disable routes using the interface.
 Fill interface index
 (lowermost 64bit of an IPv6 address)
 automatically.
-.\" .It Cm ipdst
-.\" This is used to specify an Internet host who is willing to receive
-.\" ip packets encapsulating NS packets bound for a remote network.
-.\" An apparent point to point link is constructed, and
-.\" the address specified will be taken as the NS address and network
-.\" of the destination.
-.\" IP encapsulation of
-.\" .Tn CLNP
-.\" packets is done differently.
+.It Cm ipdst
+This is used to specify an Internet host who is willing to receive
+IP packets encapsulating IPX packets bound for a remote network.
+An apparent point to point link is constructed, and
+the address specified will be taken as the IPX address and network
+of the destination.
 .It Cm maclabel Ar label
 If Mandatory Access Control support is enabled in the kernel,
 set the MAC label to
@@ -305,6 +302,29 @@ list of available options.
 .It Fl mediaopt Ar opts
 If the driver supports the media selection system, disable the
 specified media options on the interface.
+.It Cm mode Ar mode
+If the driver supports the media selection system, set the specified
+operating mode on the interface to
+.Ar mode .
+For IEEE 802.11 wireless interfaces that support multiple operating modes
+this directive is used to select between 802.11a
+.Pq Dq 11a ,
+802.11b
+.Pq Dq 11b ,
+and 802.11g
+.Pq Dq 11g
+operating modes.
+.It Cm rxcsum , txcsum
+If the driver supports user-configurable checksum offloading,
+enable receive (or transmit) checksum offloading on the interface.
+Some drivers may not be able to enable these flags independently
+of each other, so setting one may also set the other.
+The driver will offload as much checksum work as it can reliably
+support, the exact level of offloading varies between drivers.
+.It Fl rxcsum , Fl txcsum
+If the driver supports user-configurable checksum offloading,
+disable receive (or transmit) checksum offloading on the interface.
+These settings may not always be independent of each other.
 .It Cm tunnel Ar src_addr dest_addr
 (IP tunnel devices only.)
 Configure the physical source and destination address for IP tunnel

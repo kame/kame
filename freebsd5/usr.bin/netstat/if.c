@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)if.c	8.3 (Berkeley) 4/28/95";
 */
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/if.c,v 1.51 2002/09/05 17:06:51 dwmalone Exp $";
+  "$FreeBSD: src/usr.bin/netstat/if.c,v 1.53 2003/03/05 19:20:28 peter Exp $";
 #endif /* not lint */
 
 #include <sys/types.h>
@@ -55,14 +55,6 @@ static const char rcsid[] =
 #include <netinet/in_var.h>
 #include <netipx/ipx.h>
 #include <netipx/ipx_if.h>
-#ifdef NS
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-#endif
-#ifdef ISO
-#include <netiso/iso.h>
-#include <netiso/iso_var.h>
-#endif
 #include <arpa/inet.h>
 
 #include <signal.h>
@@ -163,12 +155,6 @@ intpr(int _interval, u_long ifnetaddr, void (*pfunc)(char *))
 		struct in6_ifaddr in6;
 #endif
 		struct ipx_ifaddr ipx;
-#ifdef NS
-		struct ns_ifaddr ns;
-#endif
-#ifdef ISO
-		struct iso_ifaddr iso;
-#endif
 	} ifaddr;
 	u_long ifaddraddr;
 	u_long ifaddrfound;
@@ -233,9 +219,10 @@ intpr(int _interval, u_long ifnetaddr, void (*pfunc)(char *))
 			if (kread(ifnetaddr, (char *)&ifnet, sizeof ifnet) ||
 			    kread((u_long)ifnet.if_name, tname, 16))
 				return;
-			tname[15] = '\0';
+			tname[sizeof(tname) - 1] = '\0';
 			ifnetaddr = (u_long)TAILQ_NEXT(&ifnet, if_link);
-			snprintf(name, 32, "%s%d", tname, ifnet.if_unit);
+			snprintf(name, sizeof(name), "%s%d", tname,
+			    ifnet.if_unit);
 			if (interface != 0 && (strcmp(name, interface) != 0))
 				continue;
 			cp = index(name, '\0');
@@ -346,23 +333,6 @@ intpr(int _interval, u_long ifnetaddr, void (*pfunc)(char *))
 				printf("atalk:%-12.12s ",atalk_print(sa,0x10) );
 				printf("%-11.11s  ",atalk_print(sa,0x0b) );
 				break;
-#ifdef NS
-			case AF_NS:
-				{
-				struct sockaddr_ns *sns =
-					(struct sockaddr_ns *)sa;
-				u_long net;
-				char netnum[10];
-
-				*(union ns_net *) &net = sns->sns_addr.x_net;
-				sprintf(netnum, "%lxH", ntohl(net));
-				upHex(netnum);
-				printf("ns:%-10s ", netnum);
-				printf("%-17s ",
-				    ns_phost((struct sockaddr *)sns));
-				}
-				break;
-#endif
 			case AF_LINK:
 				{
 				struct sockaddr_dl *sdl =
@@ -542,15 +512,15 @@ sidewaysintpr(unsigned interval1, u_long off)
 
 		if (kread(off, (char *)&ifnet, sizeof ifnet))
 			break;
-		if (kread((u_long)ifnet.if_name, tname, 16))
+		if (kread((u_long)ifnet.if_name, tname, sizeof(tname)))
 			break;
-		tname[15] = '\0';
-		snprintf(name, 16, "%s%d", tname, ifnet.if_unit);
+		tname[sizeof(tname) - 1] = '\0';
+		snprintf(name, sizeof(name), "%s%d", tname, ifnet.if_unit);
 		if (interface && strcmp(name, interface) == 0) {
 			interesting = ip;
 			interesting_off = off;
 		}
-		snprintf(ip->ift_name, 16, "(%s)", name);;
+		snprintf(ip->ift_name, sizeof(ip->ift_name), "(%s)", name);;
 		if ((ipn = malloc(sizeof(struct iftot))) == NULL) {
 			printf("malloc failed\n");
 			exit(1);
@@ -570,7 +540,6 @@ sidewaysintpr(unsigned interval1, u_long off)
 		exit(1);
 	}
 	memset(sum, 0, sizeof(struct iftot));
-
 
 	(void)signal(SIGALRM, catchalarm);
 	signalled = NO;

@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.85 2002/11/15 00:02:21 sam Exp $";
+  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.90 2003/04/28 16:37:38 sam Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -80,15 +80,6 @@ static const char rcsid[] =
 
 /* Appletalk */
 #include <netatalk/at.h>
-
-/* XNS */
-#ifdef NS
-#define	NSIP
-#include <netns/ns.h>
-#include <netns/ns_if.h>
-#endif
-
-/* OSI */
 
 #include <ctype.h>
 #include <err.h>
@@ -245,6 +236,7 @@ struct	cmd {
 	{ "-monitor",	-IFF_MONITOR,	setifflags },
 #ifdef USE_IF_MEDIA
 	{ "media",	NEXTARG,	setmedia },
+	{ "mode",	NEXTARG,	setmediamode },
 	{ "mediaopt",	NEXTARG,	setmediaopt },
 	{ "-mediaopt",	NEXTARG,	unsetmediaopt },
 #endif
@@ -317,10 +309,6 @@ af_status	in6_status;
 af_getaddr	in6_getaddr;
 af_getprefix	in6_getprefix;
 #endif /*INET6*/
-#ifdef NS
-af_status	xns_status;
-af_getaddr	xns_getaddr;
-#endif
 
 /* Known address families */
 const
@@ -349,10 +337,6 @@ struct	afswtch {
 #endif
 	{ "atalk", AF_APPLETALK, at_status, at_getaddr, NULL,
 	     SIOCDIFADDR, SIOCAIFADDR, C(addreq), C(addreq) },
-#ifdef NS
-	{ "ns", AF_NS, xns_status, xns_getaddr, NULL,
-	     SIOCDIFADDR, SIOCAIFADDR, C(ridreq), C(addreq) },
-#endif
 	{ "link", AF_LINK, link_status, link_getaddr, NULL,
 	     0, SIOCSIFLLADDR, NULL, C(ridreq) },
 	{ "ether", AF_LINK, link_status, link_getaddr, NULL,
@@ -708,18 +692,6 @@ ifconfig(int argc, char *const *argv, const struct afswtch *afp)
 #endif
 	if (ifr.ifr_addr.sa_family == AF_APPLETALK)
 		checkatrange((struct sockaddr_at *) &addreq.ifra_addr);
-#ifdef NS
-	if (setipdst && ifr.ifr_addr.sa_family == AF_NS) {
-		struct nsip_req rq;
-		int size = sizeof(rq);
-
-		rq.rq_ns = addreq.ifra_addr;
-		rq.rq_ip = addreq.ifra_dstaddr;
-
-		if (setsockopt(s, 0, SO_NSIP_ROUTE, &rq, size) < 0)
-			Perror("Encapsulation Routing");
-	}
-#endif
 	if (clearaddr) {
 		if (afp->af_ridreq == NULL || afp->af_difaddr == 0) {
 			warnx("interface %s cannot change %s addresses!",
@@ -1159,7 +1131,10 @@ status(const struct afswtch *afp, int addrcount, struct	sockaddr_dl *sdl,
 	if (ioctl(s, SIOCGIFSTATUS, &ifs) == 0) 
 		printf("%s", ifs.ascii);
 
-	if (!allfamilies && !p && afp->af_status != media_status &&
+	if (!allfamilies && !p &&
+#ifdef USE_IF_MEDIA
+	    afp->af_status != media_status &&
+#endif
 	    afp->af_status != link_status
 #ifdef USE_VLANS
 	    && afp->af_status != vlan_status
@@ -1469,43 +1444,21 @@ at_status(int s __unused, struct rt_addrinfo * info)
 	putchar('\n');
 }
 
-#ifdef NS
-void
-xns_status(int s __unused, struct rt_addrinfo * info)
-{
-	struct sockaddr_ns *sns, null_sns;
-
-	memset(&null_sns, 0, sizeof(null_sns));
-
-	sns = (struct sockaddr_ns *)info->rti_info[RTAX_IFA];
-	printf("\tns %s ", ns_ntoa(sns->sns_addr));
-
-	if (flags & IFF_POINTOPOINT) {
-		sns = (struct sockaddr_ns *)info->rti_info[RTAX_BRD];
-		if (!sns)
-			sns = &null_sns;
-		printf("--> %s ", ns_ntoa(sns->sns_addr));
-	}
-
-	putchar('\n');
-	close(s);
-}
-#endif
-
-
 void
 link_status(int s __unused, struct rt_addrinfo *info)
 {
-	int n;
 	struct sockaddr_dl *sdl = (struct sockaddr_dl *)info;
 
-	if ((n = sdl->sdl_alen) > 0) {
+	if (sdl->sdl_alen > 0) {
 		if (sdl->sdl_type == IFT_ETHER &&
 		    sdl->sdl_alen == ETHER_ADDR_LEN)
 			printf("\tether %s\n",
 			    ether_ntoa((struct ether_addr *)LLADDR(sdl)));
-		else
-			printf("\tlladdr %s\n", link_ntoa(sdl) + n + 1);
+		else {
+			int n = sdl->sdl_nlen > 0 ? sdl->sdl_nlen + 1 : 0;
+
+			printf("\tlladdr %s\n", link_ntoa(sdl) + n);
+		}
 	}
 }
 
@@ -1773,25 +1726,6 @@ printf("\tatalk %d.%d range %d-%d phase %d\n",
 	sat->sat_range.r_netrange = at_nr;
 }
 
-#ifdef NS
-#define SNS(x) ((struct sockaddr_ns *) &(x))
-struct sockaddr_ns *snstab[] = {
-SNS(ridreq.ifr_addr), SNS(addreq.ifra_addr),
-SNS(addreq.ifra_mask), SNS(addreq.ifra_broadaddr)};
-
-void
-xns_getaddr(const char *addr, int which)
-{
-	struct sockaddr_ns *sns = snstab[which];
-
-	sns->sns_family = AF_NS;
-	sns->sns_len = sizeof(*sns);
-	sns->sns_addr = ns_addr(addr);
-	if (which == MASK)
-		printf("Attempt to set XNS netmask will be ineffectual\n");
-}
-#endif
-
 #ifdef INET6
 int
 prefix(void *val, int size)
@@ -1880,7 +1814,7 @@ ifmaybeload(char *name)
 				cp = mstat.name;
 			}
 			/* already loaded? */
-			if (!strcmp(ifkind, cp))
+			if (!strncmp(name, cp, strlen(cp)))
 				return;
 		}
 	}
