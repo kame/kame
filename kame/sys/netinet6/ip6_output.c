@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.385 2003/07/01 04:05:07 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.386 2003/07/01 04:07:11 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2875,10 +2875,6 @@ do { \
 			case IPV6_2292HOPOPTS:
 			case IPV6_2292RTHDR:
 			case IPV6_2292DSTOPTS:
-				if (optname == IPV6_2292HOPOPTS ||
-				    optname == IPV6_2292DSTOPTS ||
-				    !privileged)
-					return (EPERM);
 				switch (optname) {
 				case IPV6_2292PKTINFO:
 					optval = OPTBIT(IN6P_PKTINFO);
@@ -2887,16 +2883,12 @@ do { \
 					optval = OPTBIT(IN6P_HOPLIMIT);
 					break;
 				case IPV6_2292HOPOPTS:
-					if (!privileged)
-						return (EPERM);
 					optval = OPTBIT(IN6P_HOPOPTS);
 					break;
 				case IPV6_2292RTHDR:
 					optval = OPTBIT(IN6P_RTHDR);
 					break;
 				case IPV6_2292DSTOPTS:
-					if (!privileged)
-						return (EPERM);
 					optval = OPTBIT(IN6P_DSTOPTS|IN6P_RTHDRDSTOPTS);
 					break;
 				}
