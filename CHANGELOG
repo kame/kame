@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2348 2003/02/18 04:29:29 suz Exp $
+$KAME: CHANGELOG,v 1.2349 2003/02/18 11:46:36 suz Exp $
 
 <200302>
+Tue Feb 18 20:43:42 JST 2003	suz@crl.hitachi.co.jp
+	* {freebsd4,netbsd,openbsd}/sys/netinet/udp_usrreq.c
+	  properly handles IPv4 UDP packet for IPv4 broadcast address
+	  (only for IGMPv3 kernel)
+
 Tue Feb 18 12:19:53 JST 2003	suz@crl.hitachi.co.jp
 	* {freebsd4,freebsd5,netbsd,openbsd}/sys/netinet/udp_usrreq.c
 	  {freebsd4,freebsd5,kame}/sys/netinet6/udp6_usrreq.c:
