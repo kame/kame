@@ -1,80 +1,113 @@
 				- v6test -
 
 v6testとは：
+
 	bpfを使って色んなIPv6のパケットを生成、送信するプログラムです。
 
 	termcapライクなエントリを書くことによって送出するパケットを好
 	き勝手に作れます(eg. 100個のdestination optionのついたパケット)
 
 動作確認システム：
-	以下のシステムで動作確認が行なわれています。
 
-	Hydrangea(BSD/OS, FreeBSD)
+	以下のシステムで動作確認されています。
+
+	KAME(BSD/OS, FreeBSD)
 	NR60
 	globe
 	cond
 
-	それ以外のプラットホームでも、RFC2292(advanced API)をちゃんと
-	サポートしてれば動きます。
+	それ以外のプラットホームでも、bpfさえあれば動くはずです。
+	IPv6 stackである必要もありません。
 
 インストール：
+
 	./configure
 	make
+	su
+	make install
 
-	いまのとこ、make installはありません。v6test.confファイルがカ
-	レントディレクトリにないと動かないからです。
+	以上の作業で、
+		実行ファイルが /usr/local/v6/bin/v6test として、
+		設定ファイルが /usr/local/lib/v6test/*.conf として
+	インストールされます。
 
 使い方：
-	v6test [-s src_address]  entry [entry entry ...]
+
+	v6test [-s src_address] entry [entry entry ...]
 	       [-d dst_address]
 	       [-i interface]
 	       [-f conffile]
 
 	例えば、
-	v6test ping
+		v6test -f /usr/local/v6/lib/v6test/ext.conf ping
 	とすると、ff02::1に対してicmp echoが出ます。
 
-	いまのところ、カレントディレクトリからv6test.confを読み込んで
-	きてエントリを検索します。ディレクトリ間違わないように注意してね。
+	-f オプションで設定ファイルを指定できます。省略すると、カレン
+	ト・ディレクトリからv6test.confを読み込んできてエントリを検索します。
 
-	-s, -dを使うことによって、設定ファイルをいじらなくても始点、終
+	-s、-dを使うことによって、設定ファイルをいじらなくても始点、終
 	点アドレスを変えることができます
 
-	-iオプションで送信インターフェイスを変更できます。デフォルトは
-	ep0です(Makefileで変更可)．
-
-	-fオプションでコンフィギュレーションファイルを指定できます。
-	デフォルトは ./v6test.conf です。
+	-i オプションで送信インターフェイスを変更できます。デフォルト
+	はep0です(Makefileで変更可)。
 	
-	entryは複数指定できます。時間待ちエントリもあるので、
-	Aのパケットを送信後、0.5秒まって、Bを送出とかもできます
+	entryは複数指定できます。時間待ちエントリ(interval)もあるので、
+	例えば、
+		v6test -f /usr/local/v6/lib/v6test/ext.conf \
+			ping wait500msrc ping
+	とすると、pingを送出後、0.5秒待って更にpingを送出します。
 
-	詳しくはconf読んで推理してください。申し訳ない。
+設定ファイルの書き方：
 
-CONF:
-	confファイルは以下の2種類があります。
-	conf-jpディレクトリの下に置いてます．
+	confファイルは以下の3種類があります。
+	/usr/local/v6/lib/v6testの下に置いてます。
 
 	1. ext.conf 
 		拡張ヘッダに関する嫌がらせ
 	2. ndp.conf
 		近隣探索に関するかゆいところ
+	3. synloop.conf
+		昔流行ったSYNパケットによるクラッキング
+
+
+	では、具体的にエントリの書き方を説明します。
+	ext.conf の illodrhbh エントリを見てください。
+
+	--------------------------------------------------
+	illodrhbh:\
+		:ip6:dstopt1:hbh-m:icmp6echo:
+	--------------------------------------------------
+
+	illodrhbh が v6test に渡す引数です。illodrhbhはip6、dstopt1、
+	hbh-m、icmp6echoという4つのブロックから構成されます。それぞれ
+	のブロックの先頭数文字が、どのヘッダを使用するかを表してます。
+		ip6: IPv6ヘッダ
+		dstopt: 終点オプション・ヘッダ
+		hbh: 中継点
+		icmp6echo: ICMPエコー
+	となってます。以上より、
+		v6test -f /usr/local/v6/lib/v6test/ext.conf illodrhbh
+	を実行すると、
+		IPv6ヘッダ + 終点オプション・ヘッダ +
+			 中継点ヘッダ + ICMP echoリクエスト
+	のパケットが送信されます。
+
+	後半の数文字は同じヘッダを表す別のエントリと区別するために存在
+	します。
 
 TODO：
+
 	o 詳しいドキュメント書き(日、英)
 	o 親切なconfファイル(期待される結果とか、refとか)
 	o 受信部もつくって、target addressを指定するだけで、山程のテスト
 	  を実行して、点数がでる。
 	o libpcapベースにして、nitなんかも使えるようにする
-	o -f foo.conf option
-		-> 19980519 done by jinmei
-	o さあて、どこにconfファイルをおこうかねえ。多少は検索する？
 	o IP(v4,v6)パケットのネスト(トンネリング)
 	o getconfig.c をきれいに書き直す(冗長な変数削除とか、バッファ溢
 	  れの考慮とか…)
 	o 大きなパケットをフラグメントに分割して送る機能
 
-COPYRIGHT:
+著作権表示：
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
