@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.36 2000/07/04 10:49:57 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.37 2000/07/19 12:47:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,6 +66,10 @@
 
 #ifndef _NETINET6_IN6_VAR_H_
 #define _NETINET6_IN6_VAR_H_
+
+#ifndef _XOPEN_SOURCE	/*?*/
+#include <sys/queue.h>
+#endif
 
 /*
  * Interface address, Internet version.  One of these structures

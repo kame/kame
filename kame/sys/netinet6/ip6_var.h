@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.35 2000/07/12 16:07:16 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.36 2000/07/19 12:47:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,6 +66,10 @@
 
 #ifndef _NETINET6_IP6_VAR_H_
 #define _NETINET6_IP6_VAR_H_
+
+#ifndef _XOPEN_SOURCE	/*?*/
+#include <sys/queue.h>
+#endif
 
 /*
  * IP6 reassembly queue structure.  Each fragment
