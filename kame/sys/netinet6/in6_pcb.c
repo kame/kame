@@ -288,7 +288,6 @@ in6_pcbbind(in6p, nam)
 
 /*
  * Find an empty port and set it to the specified PCB.
- * XXX IN6P_LOWPORT
  */
 int
 in6_pcbsetport(laddr, in6p)
@@ -300,6 +299,7 @@ in6_pcbsetport(laddr, in6p)
 	u_short last_port, lport = 0;
 	int wild = 0;
 	void *t;
+	u_short min, max;
 
 	/* XXX: this is redundant when called from in6_pcbbind */
 	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0 &&
@@ -307,11 +307,19 @@ in6_pcbsetport(laddr, in6p)
 	    (so->so_options & SO_ACCEPTCONN) == 0))
 		wild = IN6PLOOKUP_WILDCARD;
 
+	if (in6p->in6p_flags & IN6P_LOWPORT) {
+		min = IPV6PORT_RESERVEDMIN;
+		max = IPV6PORT_RESERVEDMAX;
+	} else {
+		min = IPV6PORT_ANONMIN;
+		max = IPV6PORT_ANONMAX;
+	}
+
 	/* value out of range */
-	if (head->in6p_lport < IPV6PORT_ANONMIN)
-		head->in6p_lport = IPV6PORT_ANONMIN;
-	else if (head->in6p_lport > IPV6PORT_ANONMAX)
-		head->in6p_lport = IPV6PORT_ANONMIN;
+	if (head->in6p_lport < min)
+		head->in6p_lport = min;
+	else if (head->in6p_lport > max)
+		head->in6p_lport = min;
 	last_port = head->in6p_lport;
 	goto startover;	/*to randomize*/
 	for (;;) {
@@ -331,8 +339,8 @@ in6_pcbsetport(laddr, in6p)
 		if (t == 0)
 			break;
 	  startover:
-		if (head->in6p_lport >= IPV6PORT_ANONMAX)
-			head->in6p_lport = IPV6PORT_ANONMIN;
+		if (head->in6p_lport >= max)
+			head->in6p_lport = min;
 		else
 			head->in6p_lport++;
 		if (head->in6p_lport == last_port)
