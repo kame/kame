@@ -293,6 +293,7 @@ accept1(p, uap, compat)
 	if (error) {
 		fdp->fd_ofiles[fd] = 0;
 		ffree(fp);
+		soclose(so);
 	}
 	splx(s);
 	return (error);
