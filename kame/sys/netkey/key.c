@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.84 2000/05/07 13:04:51 itojun Exp $	*/
+/*	$KAME: key.c,v 1.85 2000/05/07 14:38:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -376,7 +376,8 @@ static struct secasvar *key_getsavbyseq __P((struct secashead *, u_int32_t));
 static struct sadb_msg *key_add __P((caddr_t *));
 static int key_setident __P((struct secashead *, caddr_t *));
 static struct sadb_msg *key_getmsgbuf_x1 __P((caddr_t *));
-static struct sadb_msg *key_delete __P((caddr_t *));
+static int key_delete __P((struct socket *, struct mbuf *,
+	struct sadb_msghdr *));
 static struct sadb_msg *key_get __P((caddr_t *));
 static int key_acquire __P((struct secasindex *, struct secpolicy *));
 static struct secacq *key_newacq __P((struct secasindex *));
@@ -4234,13 +4235,11 @@ key_getspi(so, m, mhp)
 	int off, len;
 
 	/* create new sadb_msg to reply. */
-	len = sizeof(struct sadb_msg) + sizeof(struct sadb_sa)
-	    + mhp->extlen[SADB_EXT_ADDRESS_SRC]
-	    + mhp->extlen[SADB_EXT_ADDRESS_DST];
-#ifdef DIAGNOSTIC
+	len = sizeof(struct sadb_msg) + sizeof(struct sadb_sa) +
+	    mhp->extlen[SADB_EXT_ADDRESS_SRC] +
+	    mhp->extlen[SADB_EXT_ADDRESS_DST];
 	if (len > MCLBYTES)
-		panic("too big msglen in key_getspi");
-#endif
+		return key_senderror(so, m, ENOBUFS);
 
 	MGETHDR(n, M_DONTWAIT, MT_DATA);
 	if (len > MHLEN) {
@@ -4268,15 +4267,21 @@ key_getspi(so, m, mhp)
 
 	m_copydata(m, mhp->extoff[SADB_EXT_ADDRESS_SRC],
 	    mhp->extlen[SADB_EXT_ADDRESS_SRC], mtod(n, caddr_t) + off);
-	off += PFKEY_ALIGN8(mhp->extlen[SADB_EXT_ADDRESS_SRC]);
+	off += mhp->extlen[SADB_EXT_ADDRESS_SRC];
 
 	m_copydata(m, mhp->extoff[SADB_EXT_ADDRESS_DST],
 	    mhp->extlen[SADB_EXT_ADDRESS_DST], mtod(n, caddr_t) + off);
+	off += mhp->extlen[SADB_EXT_ADDRESS_DST];
+
+#ifdef DIAGNOSTIC
+	if (off != len)
+		panic("length inconsistency in key_getspi");
+#endif
 
 	newmsg = mtod(n, struct sadb_msg *);
 	newmsg->sadb_msg_seq = newsav->seq;
 	newmsg->sadb_msg_errno = 0;
-	newmsg->sadb_msg_len = PFKEY_UNIT64(len);
+	newmsg->sadb_msg_len = PFKEY_UNIT64(n->m_pkthdr.len);
 
 	m_freem(m);
 	return key_sendup_mbuf(so, n, KEY_SENDUP_ONE);
@@ -4860,11 +4865,12 @@ key_getmsgbuf_x1(mhp)
  * OUT:	NULL if fail.
  *	other if success, return pointer to the message to send.
  */
-static struct sadb_msg *
-key_delete(mhp)
-	caddr_t *mhp;
+static int
+key_delete(so, m, mhp)
+	struct socket *so;
+	struct mbuf *m;
+	struct sadb_msghdr *mhp;
 {
-	struct sadb_msg *msg0;
 	struct sadb_sa *sa0;
 	struct sadb_address *src0, *dst0;
 	struct secasindex saidx;
@@ -4873,42 +4879,38 @@ key_delete(mhp)
 	u_int16_t proto;
 
 	/* sanity check */
-	if (mhp == NULL || mhp[0] == NULL)
+	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
 		panic("key_delete: NULL pointer is passed.\n");
 
-	msg0 = (struct sadb_msg *)mhp[0];
-
 	/* map satype to proto */
-	if ((proto = key_satype2proto(msg0->sadb_msg_satype)) == 0) {
+	if ((proto = key_satype2proto(mhp->msg->sadb_msg_satype)) == 0) {
 #ifdef IPSEC_DEBUG
 		printf("key_delete: invalid satype is passed.\n");
 #endif
-		msg0->sadb_msg_errno = EINVAL;
-		return NULL;
+		return key_senderror(so, m, EINVAL);
 	}
 
-	if (mhp[SADB_EXT_SA] == NULL
-	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
-	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
+	if (mhp->ext[SADB_EXT_SA] == NULL ||
+	    mhp->ext[SADB_EXT_ADDRESS_SRC] == NULL ||
+	    mhp->ext[SADB_EXT_ADDRESS_DST] == NULL) {
 #ifdef IPSEC_DEBUG
 		printf("key_delete: invalid message is passed.\n");
 #endif
-		msg0->sadb_msg_errno = EINVAL;
-		return NULL;
+		return key_senderror(so, m, EINVAL);
 	}
-	sa0 = (struct sadb_sa *)mhp[SADB_EXT_SA];
-	src0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_SRC]);
-	dst0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_DST]);
+	sa0 = (struct sadb_sa *)mhp->ext[SADB_EXT_SA];
+	src0 = (struct sadb_address *)(mhp->ext[SADB_EXT_ADDRESS_SRC]);
+	dst0 = (struct sadb_address *)(mhp->ext[SADB_EXT_ADDRESS_DST]);
 
-	KEY_SETSECASIDX(proto, msg0, src0+1, dst0+1, &saidx);
+	/* XXX boundary check against sa_len */
+	KEY_SETSECASIDX(proto, mhp->msg, src0 + 1, dst0 + 1, &saidx);
 
 	/* get a SA header */
 	if ((sah = key_getsah(&saidx)) == NULL) {
 #ifdef IPSEC_DEBUG
 		printf("key_delete: no SA found.\n");
 #endif
-		msg0->sadb_msg_errno = ENOENT;
-		return NULL;
+		return key_senderror(so, m, ENOENT);
 	}
 
 	/* get a SA with SPI. */
@@ -4917,8 +4919,7 @@ key_delete(mhp)
 #ifdef IPSEC_DEBUG
 		printf("key_delete: no alive SA found.\n");
 #endif
-		msg0->sadb_msg_errno = ENOENT;
-		return NULL;
+		return key_senderror(so, m, ENOENT);
 	}
 
 	key_sa_chgstate(sav, SADB_SASTATE_DEAD);
@@ -4926,36 +4927,58 @@ key_delete(mhp)
 	sav = NULL;
 
     {
+	struct mbuf *n;
 	struct sadb_msg *newmsg;
-	u_int len;
-	caddr_t p;
+	int off, len;
 
 	/* create new sadb_msg to reply. */
-	len = sizeof(struct sadb_msg)
-	    + sizeof(struct sadb_sa)
-	    + PFKEY_EXTLEN(mhp[SADB_EXT_ADDRESS_SRC])
-	    + PFKEY_EXTLEN(mhp[SADB_EXT_ADDRESS_DST]);
+	len = sizeof(struct sadb_msg) + mhp->extlen[SADB_EXT_SA] +
+	    mhp->extlen[SADB_EXT_ADDRESS_SRC] +
+	    mhp->extlen[SADB_EXT_ADDRESS_DST];
+	if (len > MCLBYTES)
+		return key_senderror(so, m, ENOBUFS);
 
-	KMALLOC(newmsg, struct sadb_msg *, len);
-	if (newmsg == NULL) {
-#ifdef IPSEC_DEBUG
-		printf("key_delete: No more memory.\n");
-#endif
-		msg0->sadb_msg_errno = ENOBUFS;
-		return NULL;
+	MGETHDR(n, M_DONTWAIT, MT_DATA);
+	if (len > MHLEN) {
+		MCLGET(n, M_DONTWAIT);
+		if ((n->m_flags & M_EXT) == 0) {
+			m_freem(n);
+			n = NULL;
+		}
 	}
-	bzero((caddr_t)newmsg, len);
+	if (!n)
+		return key_senderror(so, m, ENOBUFS);
 
-	bcopy((caddr_t)mhp[0], (caddr_t)newmsg, sizeof(*msg0));
+	n->m_pkthdr.len = n->m_len = len;
+	n->m_next = NULL;
+	off = 0;
+
+	m_copydata(m, 0, sizeof(struct sadb_msg), mtod(n, caddr_t) + off);
+	off += PFKEY_ALIGN8(sizeof(struct sadb_msg));
+
+	m_copydata(m, mhp->extoff[SADB_EXT_SA],
+	    mhp->extlen[SADB_EXT_SA], mtod(n, caddr_t) + off);
+	off += mhp->extlen[SADB_EXT_SA];
+
+	m_copydata(m, mhp->extoff[SADB_EXT_ADDRESS_SRC],
+	    mhp->extlen[SADB_EXT_ADDRESS_SRC], mtod(n, caddr_t) + off);
+	off += mhp->extlen[SADB_EXT_ADDRESS_SRC];
+
+	m_copydata(m, mhp->extoff[SADB_EXT_ADDRESS_DST],
+	    mhp->extlen[SADB_EXT_ADDRESS_DST], mtod(n, caddr_t) + off);
+	off += mhp->extlen[SADB_EXT_ADDRESS_DST];
+
+#ifdef DIAGNOSTIC
+	if (off != len)
+		panic("length inconsistency in key_delete");
+#endif
+
+	newmsg = mtod(n, struct sadb_msg *);
 	newmsg->sadb_msg_errno = 0;
-	newmsg->sadb_msg_len = PFKEY_UNIT64(len);
-	p = (caddr_t)newmsg + sizeof(*msg0);
+	newmsg->sadb_msg_len = PFKEY_UNIT64(n->m_pkthdr.len);
 
-	p = key_setsadbext(p, mhp[SADB_EXT_SA]);
-	p = key_setsadbext(p, mhp[SADB_EXT_ADDRESS_SRC]);
-	p = key_setsadbext(p, mhp[SADB_EXT_ADDRESS_DST]);
-
-	return newmsg;
+	m_freem(m);
+	return key_sendup_mbuf(so, n, KEY_SENDUP_ALL);
     }
 }
 
@@ -6387,10 +6410,8 @@ key_parse(m, so)
 		target = KEY_SENDUP_ALL;
 		break;
 
-	case SADB_DELETE:
-		if ((newmsg = key_delete((caddr_t *)mh.ext)) == NULL)
-			goto sendback;
-		target = KEY_SENDUP_ALL;
+	case SADB_DELETE:	/*done*/
+		return key_delete(so, m, &mh);
 		break;
 
 	case SADB_GET:
