@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.283 2002/02/03 08:44:16 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.284 2002/02/03 08:48:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -262,6 +262,8 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	u_int32_t optlen = 0, plen = 0, unfragpartlen = 0;
 	struct ip6_exthdrs exthdrs;
 	struct in6_addr finaldst;
+	int clone = 0;
+	u_int32_t zone;
 #ifdef NEW_STRUCT_ROUTE
 	struct route *ro_pmtu = NULL;
 #else
@@ -995,93 +997,84 @@ skip_ipsec2:;
 			ip6->ip6_hlim = ip6_defmcasthlim;
 	}
 
-	{
-		/*
-		 * XXX: using a block just to define a local variables is not
-		 * a good style....
-		 */
-		int clone = 0;
-		u_int32_t zone;
-
 #if defined(__bsdi__) || defined(__FreeBSD__)
-		if (ro != &ip6route && !IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
-			clone = 1;
+	if (ro != &ip6route && !IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst))
+		clone = 1;
 #endif
 
-		if ((error = in6_selectroute(dst_sa, opt, im6o, ro,
-					     &ifp, &rt, clone)) != 0) {
-			switch (error) {
-			case EHOSTUNREACH:
-				ip6stat.ip6s_noroute++;
-				break;
-			case EADDRNOTAVAIL:
-			default:
-				break; /* XXX statistics? */
-			}
-			if (ifp != NULL)
-				in6_ifstat_inc(ifp, ifs6_out_discard);
-			goto bad;
+	if ((error = in6_selectroute(dst_sa, opt, im6o, ro,
+				     &ifp, &rt, clone)) != 0) {
+		switch (error) {
+		case EHOSTUNREACH:
+			ip6stat.ip6s_noroute++;
+			break;
+		case EADDRNOTAVAIL:
+		default:
+			break; /* XXX statistics? */
 		}
-		if (rt == NULL) {
-			/*
-			 * If in6_selectroute() does not return a route entry,
-			 * dst may not have been updated. 
-			 */
-			*dst = *dst_sa;	/* XXX */
-		}
-
-		/*
-		 * then rt (for unicast) and ifp must be non-NULL valid values.
-		 */
-		if ((flags & IPV6_FORWARDING) == 0) {
-			/* XXX: the FORWARDING flag can be set for mrouting. */
-			in6_ifstat_inc(ifp, ifs6_out_request);
-		}
-		if (rt != NULL) {
-			ia = (struct in6_ifaddr *)(rt->rt_ifa);
-			rt->rt_use++;
-		}
-
-		/*
-		 * The outgoing interface must be in the zone of source and
-		 * destination addresses.  We should use ia_ifp to support the
-		 * case of sending packets to an address of our own.
-		 */
-		if (ia != NULL && ia->ia_ifp)
-			origifp = ia->ia_ifp;
-		else
-			origifp = ifp;
-		if (in6_addr2zoneid(origifp, &src_sa->sin6_addr, &zone) ||
-		    zone != src_sa->sin6_scope_id) {
-#ifdef SCOPEDEBUG		/* will be removed shortly */
-			printf("ip6 output: bad source scope %s%%%d for %s%%%d on %s\n",
-			       ip6_sprintf(&src_sa->sin6_addr),
-			       src_sa->sin6_scope_id,
-			       ip6_sprintf(&dst_sa->sin6_addr),
-			       dst_sa->sin6_scope_id, if_name(origifp));
-#endif
-			goto badscope;
-		}
-		if (in6_addr2zoneid(origifp, &dst_sa->sin6_addr, &zone) ||
-		    zone != dst_sa->sin6_scope_id) {
-#ifdef SCOPEDEBUG		/* will be removed shortly */
-			printf("ip6 output: bad dst scope %s%%%d on %s\n",
-			       ip6_sprintf(&dst_sa->sin6_addr),
-			       dst_sa->sin6_scope_id, if_name(origifp));
-#endif
-			goto badscope;
-		}
-
-		/* scope check is done. */
-		goto routefound;
-
-	  badscope:
-		ip6stat.ip6s_badscope++;
-		in6_ifstat_inc(origifp, ifs6_out_discard);
-		if (error == 0)
-			error = EHOSTUNREACH; /* XXX */
+		if (ifp != NULL)
+			in6_ifstat_inc(ifp, ifs6_out_discard);
 		goto bad;
 	}
+	if (rt == NULL) {
+		/*
+		 * If in6_selectroute() does not return a route entry,
+		 * dst may not have been updated. 
+		 */
+		*dst = *dst_sa;	/* XXX */
+	}
+
+	/*
+	 * then rt (for unicast) and ifp must be non-NULL valid values.
+	 */
+	if ((flags & IPV6_FORWARDING) == 0) {
+		/* XXX: the FORWARDING flag can be set for mrouting. */
+		in6_ifstat_inc(ifp, ifs6_out_request);
+	}
+	if (rt != NULL) {
+		ia = (struct in6_ifaddr *)(rt->rt_ifa);
+		rt->rt_use++;
+	}
+
+	/*
+	 * The outgoing interface must be in the zone of source and
+	 * destination addresses.  We should use ia_ifp to support the
+	 * case of sending packets to an address of our own.
+	 */
+	if (ia != NULL && ia->ia_ifp)
+		origifp = ia->ia_ifp;
+	else
+		origifp = ifp;
+	if (in6_addr2zoneid(origifp, &src_sa->sin6_addr, &zone) ||
+	    zone != src_sa->sin6_scope_id) {
+#ifdef SCOPEDEBUG		/* will be removed shortly */
+		printf("ip6 output: bad source scope %s%%%d for %s%%%d on %s\n",
+		       ip6_sprintf(&src_sa->sin6_addr),
+		       src_sa->sin6_scope_id,
+		       ip6_sprintf(&dst_sa->sin6_addr),
+		       dst_sa->sin6_scope_id, if_name(origifp));
+#endif
+		goto badscope;
+	}
+	if (in6_addr2zoneid(origifp, &dst_sa->sin6_addr, &zone) ||
+	    zone != dst_sa->sin6_scope_id) {
+#ifdef SCOPEDEBUG		/* will be removed shortly */
+		printf("ip6 output: bad dst scope %s%%%d on %s\n",
+		       ip6_sprintf(&dst_sa->sin6_addr),
+		       dst_sa->sin6_scope_id, if_name(origifp));
+#endif
+		goto badscope;
+	}
+
+	/* scope check is done. */
+	goto routefound;
+
+  badscope:
+	ip6stat.ip6s_badscope++;
+	in6_ifstat_inc(origifp, ifs6_out_discard);
+	if (error == 0)
+		error = EHOSTUNREACH; /* XXX */
+	goto bad;
 
   routefound:
 	if (rt) {
