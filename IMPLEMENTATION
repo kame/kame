@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/11/26 15:39:27 $
+			$Date: 1999/12/03 14:50:38 $
 
 1. IPv6
 
@@ -14,7 +14,7 @@ below (NOTE: this is not a complete list - this is too hard to maintain...).
 For details please refer to specific chapter in the document, RFCs, manpages
 come with KAME, or comments in the source code.
 
-Conformance tests have been performed on the previous KAME STABLE kit
+Conformance tests have been performed on the KAME STABLE kit
 at TAHI project.  Results can be viewed at http://www.tahi.org/report/KAME/.
 We also attended Univ. of New Hampshire IOL tests (http://www.iol.unh.edu/)
 in the past, with our past snapshots.
@@ -129,14 +129,6 @@ cache handling in the following cases:
 For (1), we implemented workaround based on discussions on IETF ipngwg mailing
 list.  For more details, see the comments in the source code and email
 thread started from (IPng 7155), dated Feb 6 1999.
-
-IPv6 address autoconfiguration assumes that a host has only single network
-interface (more precisely, single non-loopback interface).  This is because
-the spec assumes that there's no routing table on IPv6 host (an IPv6 host
-has default router list and prefix list only).
-Because of this, if you accept RAs on a node with multiple network interfaces,
-the node will not behave as you might expect.  RFC2461 Appendix A talks
-little bit about this issue.
 
 IPv6 on-link determination rule (RFC2461) is quite different from assumptions
 in BSD network code.  At this moment, KAME does not implement on-link
