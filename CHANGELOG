@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.378 1999/12/27 12:37:49 sumikawa Exp $
+$Id: CHANGELOG,v 1.379 1999/12/27 18:19:58 sumikawa Exp $
 
 <199912>
+Mon Dec 27 22:03:26 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/{include, etc, lib, libexec, sbin, usr.bin, usr.sbin}:
+	sync with FreeBSD 3.4-RELEASE
+
 Mon Dec 27 21:34:51 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/ethereal: removed ethreal port. It's already
 	  standardly disutributed by ports-current.
@@ -10,7 +14,7 @@ Mon Dec 27 21:34:51 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	  with FreeBSD-3.4.
 
 Mon Dec 27 20:34:20 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
-	* freebsd3/sys: sync with FreeBSD 3.4-current. zp0 works
+	* freebsd3/sys: sync with FreeBSD 3.4-RELEASE. zp0 works
 	  correctly, and ep0/cnw0 also work with PAO. However, many
 	  applications are based on FreeBSD-3.3 yet.
 
