@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.h,v 1.10 2000/11/07 14:14:34 jinmei Exp $	*/
+/*	$KAME: rtadvd.h,v 1.11 2000/11/08 05:24:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -74,7 +74,11 @@ struct prefix {
 	struct prefix *prev;	/* previous link */
 
 	u_int32_t validlifetime; /* AdvValidLifetime */
+	u_int vltimedecr;	/* bool: decrement vltime in real time */
 	u_int32_t preflifetime;	/* AdvPreferredLifetime */
+	u_int pltimedecr;	/* bool: decrement pltime in real time */
+	long firstadv;		/* timestamp of the 1st advertisement;
+				   for real-time lifetime derecment only */
 	u_int onlinkflg;	/* bool: AdvOnLinkFlag */
 	u_int autoconfflg;	/* bool: AdvAutonomousFlag */
 #ifdef MIP6

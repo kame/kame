@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.17 2000/09/07 05:01:09 itojun Exp $	*/
+/*	$KAME: config.c,v 1.18 2000/11/08 05:24:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -303,6 +303,10 @@ getconfig(intface)
 			}
 			pfx->validlifetime = (u_int32_t)val;
 
+			makeentry(entbuf, i, "vltimedecr", added);
+			MAYHAVE(val, entbuf, 0); /* 0 = not decrement */
+			pfx->vltimedecr = val;
+
 			makeentry(entbuf, i, "pltime", added);
 			MAYHAVE(val, entbuf, DEF_ADVPREFERREDLIFETIME);
 			if (val < 0 || val > 0xffffffff) {
@@ -312,6 +316,10 @@ getconfig(intface)
 				exit(1);
 			}
 			pfx->preflifetime = (u_int32_t)val;
+
+			makeentry(entbuf, i, "pltimedecr", added);
+			MAYHAVE(val, entbuf, 0); /* 0 = not decrement */
+			pfx->pltimedecr = val;
 
 			makeentry(entbuf, i, "addr", added);
 			addr = (char *)agetstr(entbuf, &bp);
@@ -795,6 +803,10 @@ make_packet(struct rainfo *rainfo)
 	
 	for (pfx = rainfo->prefix.next;
 	     pfx != &rainfo->prefix; pfx = pfx->next) {
+		u_int32_t vltime, pltime;
+		struct timeval now;
+		long fst;
+
 		ndopt_pi = (struct nd_opt_prefix_info *)buf;
 		ndopt_pi->nd_opt_pi_type = ND_OPT_PREFIX_INFORMATION;
 		ndopt_pi->nd_opt_pi_len = 4;
@@ -811,9 +823,25 @@ make_packet(struct rainfo *rainfo)
 			ndopt_pi->nd_opt_pi_flags_reserved |=
 				ND_OPT_PI_FLAG_RTADDR;
 #endif
-		ndopt_pi->nd_opt_pi_valid_time = ntohl(pfx->validlifetime);
-		ndopt_pi->nd_opt_pi_preferred_time =
-			ntohl(pfx->preflifetime);
+		if (pfx->vltimedecr || pfx->pltimedecr) {
+			gettimeofday(&now, NULL);
+			if (pfx->firstadv == 0)
+				pfx->firstadv = now.tv_sec;
+			fst = pfx->firstadv;
+		}
+		vltime = (pfx->vltimedecr == 0) ? pfx->validlifetime :
+			now.tv_sec - fst;
+		pltime = (pfx->pltimedecr == 0) ? pfx->preflifetime :
+			now.tv_sec - fst;
+		if (vltime < pltime) {
+			/*
+			 * this can happen if vltime is decrement but pltime
+			 * is not.
+			 */
+			pltime = vltime;
+		}
+		ndopt_pi->nd_opt_pi_valid_time = ntohl(vltime);
+		ndopt_pi->nd_opt_pi_preferred_time = ntohl(pltime);
 		ndopt_pi->nd_opt_pi_reserved2 = 0;
 		ndopt_pi->nd_opt_pi_prefix = pfx->prefix;
 

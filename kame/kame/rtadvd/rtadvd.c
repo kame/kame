@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.38 2000/11/08 04:53:12 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.39 2000/11/08 05:24:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1389,6 +1389,8 @@ struct rainfo *rainfo;
 		       __FUNCTION__, rainfo->ifname);
 		return;
 	}
+
+	make_packet(rainfo);	/* XXX: inefficient */
 
 	sndmhdr.msg_name = (caddr_t)&sin6_allnodes;
 	sndmhdr.msg_iov[0].iov_base = (caddr_t)rainfo->ra_data;
