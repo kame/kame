@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.35 2001/11/14 07:18:58 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.36 2001/11/14 09:07:51 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -94,6 +94,11 @@ natpt_lookForRule6(struct pcv *cv6)
 		if (csl->Local.sa_family != AF_INET6)
 			continue;
 
+		if ((cv6->ip_p == IPPROTO_TCP)
+		    && (((cv6->pyld.tcp4->th_flags & TH_SYN) == 0)
+			|| ((cv6->pyld.tcp4->th_flags & TH_ACK) != 0)))
+			continue;
+
 		if (csl->proto != 0) {
 			switch (cv6->ip_p) {
 			case IPPROTO_ICMPV6:
@@ -139,6 +144,11 @@ natpt_lookForRule4(struct pcv *cv4)
 	     csl;
 	     csl = TAILQ_NEXT(csl, csl_list)) {
 		if (csl->Local.sa_family != AF_INET)
+			continue;
+
+		if ((cv4->ip_p == IPPROTO_TCP)
+		    && (((cv4->pyld.tcp4->th_flags & TH_SYN) == 0)
+			|| ((cv4->pyld.tcp4->th_flags & TH_ACK) != 0)))
 			continue;
 
 		if (csl->proto != 0) {
