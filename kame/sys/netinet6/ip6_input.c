@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.162 2001/02/05 08:21:58 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.163 2001/02/05 08:28:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1325,10 +1325,10 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 			if (ip6->ip6_plen) {
 				ip6stat.ip6s_badoptions++;
 				icmp6_error(m, ICMP6_PARAM_PROB,
-					   ICMP6_PARAMPROB_HEADER,
-					   sizeof(struct ip6_hdr) +
-					   sizeof(struct ip6_hbh) +
-					   opt - opthead);
+					    ICMP6_PARAMPROB_HEADER,
+					    sizeof(struct ip6_hdr) +
+					    sizeof(struct ip6_hbh) +
+					    opt - opthead);
 				return(-1);
 			}
 
@@ -1351,10 +1351,10 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 			if (*plenp != 0) {
 				ip6stat.ip6s_badoptions++;
 				icmp6_error(m, ICMP6_PARAM_PROB,
-					   ICMP6_PARAMPROB_HEADER,
-					   sizeof(struct ip6_hdr) +
-					   sizeof(struct ip6_hbh) +
-					   opt + 2 - opthead);
+					    ICMP6_PARAMPROB_HEADER,
+					    sizeof(struct ip6_hdr) +
+					    sizeof(struct ip6_hbh) +
+					    opt + 2 - opthead);
 				return(-1);
 			}
 #endif
@@ -1365,10 +1365,10 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 			if (jumboplen <= IPV6_MAXPACKET) {
 				ip6stat.ip6s_badoptions++;
 				icmp6_error(m, ICMP6_PARAM_PROB,
-					   ICMP6_PARAMPROB_HEADER,
-					   sizeof(struct ip6_hdr) +
-					   sizeof(struct ip6_hbh) +
-					   opt + 2 - opthead);
+					    ICMP6_PARAMPROB_HEADER,
+					    sizeof(struct ip6_hdr) +
+					    sizeof(struct ip6_hbh) +
+					    opt + 2 - opthead);
 				return(-1);
 			}
 			*plenp = jumboplen;
