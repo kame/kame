@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.137 2002/07/01 21:02:43 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.138 2002/07/01 21:57:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1758,7 +1758,7 @@ ip6_str2scopeid(scope, sin6, scopeid)
 trynumeric:
 	errno = 0;
 	lscopeid = strtoul(scope, &ep, 10);
-	*scopeid = lscopeid & 0xffffffff;
+	*scopeid = (u_int32_t)(lscopeid & 0xffffffffUL);
 	if (errno == 0 && ep && *ep == '\0' && *scopeid == lscopeid)
 		return 0;
 	else
