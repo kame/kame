@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.16 2000/02/16 05:51:27 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.17 2000/02/16 11:01:43 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -205,7 +205,7 @@ eay_get_x509sign(source, privkey, cert)
 	/* XXX: to be handled EVP_dss() */
 	/* XXX: Where can I get such parameters ?  From my cert ? */
 	/* XXX: How can I get a length of signed buffer */
-	EVP_SignInit(&md_ctx, EVP_md5());
+	EVP_SignInit(&md_ctx, EVP_sha1());
 	EVP_SignUpdate(&md_ctx, source->v, source->l);
 	siglen = sizeof(sigbuf);
 	error = EVP_SignFinal(&md_ctx, sigbuf, &siglen, evp);
@@ -254,7 +254,7 @@ eay_check_x509sign(source, sig, cert)
 
 	/* Verify the signature */
 	/* XXX: to be handled EVP_dss() */
-	EVP_VerifyInit(&md_ctx, EVP_md5());
+	EVP_VerifyInit(&md_ctx, EVP_sha1());
 	EVP_VerifyUpdate(&md_ctx, source->v, source->l);
 	error = EVP_VerifyFinal(&md_ctx, sig->v, sig->l, evp);
 
