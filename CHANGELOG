@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1176 2000/08/03 13:57:54 itojun Exp $
+$KAME: CHANGELOG,v 1.1177 2000/08/03 15:17:11 itojun Exp $
 
 <200007>
+Fri Aug  4 00:16:00 JST 2000  itojun@iijlab.net
+	* kame/ping6/ping6.c: support icmp6 node information
+	  "supported query types" query, by ping6 -t.
+
 Thu Aug  3 05:36:23 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	Improved to check a packet which is processed or not.  The way is
@@ -12,7 +16,7 @@ Thu Aug  3 05:36:23 JST 2000 sakane@ydc.co.jp
 Thu Aug  3 03:00:36 JST 2000 sakane@ydc.co.jp
 	* kame/sys/{netkey/{key.c,keydb.h},netinet6/ipsec.h}:
 	Improved lifetime handling.  It uses real time instead of tick.
-	XXX 2039 problem remains.
+	XXX year 2038 problem remains.
 
 Thu Aug  3 00:49:58 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
@@ -21,7 +25,6 @@ Thu Aug  3 00:49:58 JST 2000 sakane@ydc.co.jp
 
 Thu Aug  2 JST 2000  itojun@iijlab.net
 	* sys/netinet6/icmp6.c: implement icmp6 nodeinfo "supported qtypes".
-	  need testing.
 	* sys/netinet6: remove bogus DIAGNOSTIC cases for sizeof(ro.ro_dst).
 
 Tue Aug  1 23:53:36 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
