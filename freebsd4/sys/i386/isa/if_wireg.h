@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/if_wireg.h,v 1.8 2000/02/02 17:59:12 wpaul Exp $
+ * $FreeBSD: src/sys/i386/isa/if_wireg.h,v 1.8.2.2 2001/08/25 00:48:25 nsayer Exp $
  */
 
 struct wi_counters {
@@ -66,6 +66,14 @@ struct wi_counters {
 #define WI_RID_DEFLT_CRYPT_KEYS	0xFCB0
 #define WI_RID_TX_CRYPT_KEY	0xFCB1
 #define WI_RID_WEP_AVAIL	0xFD4F
+#define WI_RID_P2_TX_CRYPT_KEY	0xFC23
+#define WI_RID_P2_CRYPT_KEY0	0xFC24
+#define WI_RID_P2_CRYPT_KEY1	0xFC25
+#define WI_RID_P2_CRYPT_KEY2	0xFC26
+#define WI_RID_P2_CRYPT_KEY3	0xFC27
+#define WI_RID_P2_ENCRYPTION	0xFC28
+#define WI_RID_CUR_TX_RATE	0xFD44 /* current TX rate */
+
 struct wi_key {
 	u_int16_t		wi_keylen;
 	u_int8_t		wi_keydat[14];
@@ -82,10 +90,20 @@ struct wi_softc	{
 	struct ifmedia		ifmedia;
 	device_t		dev;
 	int			wi_unit;
+	struct resource *	local;
+	int					local_rid;
 	struct resource *	iobase;
+	int					iobase_rid;
 	struct resource *	irq;
+	int					irq_rid;
+	struct resource *	mem;
+	int					mem_rid;
+	bus_space_handle_t	wi_localhandle;
+	bus_space_tag_t		wi_localtag;
 	bus_space_handle_t	wi_bhandle;
 	bus_space_tag_t		wi_btag;
+	bus_space_handle_t	wi_bmemhandle;
+	bus_space_tag_t		wi_bmemtag;
 	void *			wi_intrhand;
 	int			wi_io_addr;    
 	int			wi_tx_data_id;
@@ -117,6 +135,8 @@ struct wi_softc	{
 	int			wi_nextitem;
 #endif
 	struct callout_handle	wi_stat_ch;
+	int			wi_prism2;
+	int			wi_prism2_ver;
 };
 
 #define WI_TIMEOUT	65536
@@ -127,6 +147,15 @@ struct wi_softc	{
 #define WI_PORT3	3
 #define WI_PORT4	4
 #define WI_PORT5	5
+
+#define WI_PCI_LOCALRES	0x14	/* The PLX chip's local registers */
+#define WI_PCI_MEMRES	0x18	/* The PCCard's attribute memory */
+#define WI_PCI_IORES	0x1C	/* The PCCard's I/O space */
+
+#define WI_LOCAL_INTCSR			0x4c
+#define WI_LOCAL_INTEN			0x40 /* poke this into INTCSR */
+#define WI_HFA384X_SWSUPPORT0_OFF	0x28
+#define WI_PRISM2STA_MAGIC		0x4A2D
 
 /* Default port: 0 (only 0 exists on stations) */
 #define WI_DEFAULT_PORT	(WI_PORT0 << 8)
@@ -171,6 +200,13 @@ struct wi_softc	{
 	bus_space_read_2(sc->wi_btag, sc->wi_bhandle, reg)
 #define CSR_READ_1(sc, reg)		\
 	bus_space_read_1(sc->wi_btag, sc->wi_bhandle, reg)
+
+#define CSM_WRITE_1(sc, off, val)	\
+	bus_space_write_1(sc->wi_bmemtag, sc->wi_bmemhandle, off, val)
+
+#define CSM_READ_1(sc, off)		\
+	bus_space_read_1(sc->wi_bmemtag, sc->wi_bmemhandle, off)
+
 
 /*
  * The WaveLAN/IEEE cards contain an 802.11 MAC controller which Lucent
@@ -337,6 +373,9 @@ struct wi_softc	{
 #define WI_AUX_OFFSET		0x3C
 #define WI_AUX_DATA		0x3E
 
+#define WI_COR_OFFSET	0x3e0
+#define WI_COR_VALUE	0x41
+
 /*
  * One form of communication with the Hermes is with what Lucent calls
  * LTV records, where LTV stands for Length, Type and Value. The length
@@ -400,6 +439,26 @@ struct wi_ltv_memsz {
 	u_int16_t		wi_type;
 	u_int16_t		wi_mem_ram;
 	u_int16_t		wi_mem_nvram;
+};
+
+/*
+ * NIC Identification (0xFD0B)
+ */
+#define WI_RID_CARDID		0xFD0B
+#define WI_RID_IDENT		0xFD20
+struct wi_ltv_ver {
+	u_int16_t		wi_len;
+	u_int16_t		wi_type;
+	u_int16_t		wi_ver[4];
+#define WI_NIC_EVB2	0x8000
+#define WI_NIC_HWB3763	0x8001
+#define WI_NIC_HWB3163	0x8002
+#define WI_NIC_HWB3163B	0x8003
+#define WI_NIC_EVB3	0x8004
+#define WI_NIC_HWB1153	0x8007
+#define WI_NIC_P2_SST	0x8008	/* Prism2 with SST flush */
+#define WI_NIC_PRISM2_5	0x800C
+#define WI_NIC_3874A	0x8013	/* Prism2.5 Mini-PCI */
 };
 
 /*
