@@ -33,7 +33,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/inet.c,v 1.3 2000/01/13 17:09:23 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/libpcap/inet.c,v 1.4 2000/02/23 11:25:28 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -60,6 +60,9 @@ struct rtentry;
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#ifdef HAVE_IFADDRS_H
+#include <ifaddrs.h>
+#endif
 
 #include "pcap-int.h"
 
@@ -85,6 +88,47 @@ char *
 pcap_lookupdev(errbuf)
 	register char *errbuf;
 {
+#ifdef HAVE_IFADDRS_H
+	struct ifaddrs *ifap, *ifa, *mp;
+	int n, minunit;
+	char *cp;
+	static char device[IF_NAMESIZE + 1];
+
+	if (getifaddrs(&ifap) != 0) {
+		(void)sprintf(errbuf, "getifaddrs: %s", pcap_strerror(errno));
+		return NULL;
+	}
+
+	mp = NULL;
+	minunit = 666;
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if ((ifa->ifa_flags & IFF_UP) == 0)
+			continue;
+#ifdef IFF_LOOPBACK
+		if ((ifa->ifa_flags & IFF_LOOPBACK) != 0)
+			continue;
+#else
+		if (strcmp(ifa->ifa_name, "lo0") == 0)
+			continue;
+#endif
+
+		for (cp = ifa->ifa_name; !isdigit(*cp); ++cp)
+			continue;
+		n = atoi(cp);
+		if (n < minunit) {
+			minunit = n;
+			mp = ifa;
+		}
+	}
+	if (mp == NULL) {
+		(void)strcpy(errbuf, "no suitable device found");
+		return (NULL);
+	}
+
+	(void)strncpy(device, mp->ifa_name, sizeof(device) - 1);
+	device[sizeof(device) - 1] = '\0';
+	return (device);
+#else
 	register int fd, minunit, n;
 	register char *cp;
 	register struct ifreq *ifrp, *ifend, *ifnext, *mp;
@@ -162,6 +206,7 @@ pcap_lookupdev(errbuf)
 	(void)strncpy(device, mp->ifr_name, sizeof(device) - 1);
 	device[sizeof(device) - 1] = '\0';
 	return (device);
+#endif
 }
 
 int
