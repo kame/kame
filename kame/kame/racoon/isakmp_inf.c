@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.42 2000/07/18 00:35:26 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.43 2000/07/18 06:03:16 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -806,14 +806,19 @@ purge_isakmp_spi(proto, spi, n)
 
 	for (i = 0; i < n; i++) {
 		iph1 = getph1byindex(&spi[i]);
-		if (iph1) {
+		if (!iph1 || iph1->status == PHASE1ST_EXPIRED)
+			continue;
+
+		YIPSDEBUG(DEBUG_SA,
 			plog(logp, LOCATION, NULL,
 				"proto_id %s purging spi:%s.\n",
 				s_ipsecdoi_proto(proto),
-				isakmp_pindex(&spi[i], 0));
-			remph1(iph1);
-			delph1(iph1);
-		}
+				isakmp_pindex(&spi[i], 0)));
+
+		if (iph1->sce)
+			SCHED_KILL(iph1->sce);
+		iph1->status = PHASE1ST_EXPIRED;
+		iph1->sce = sched_new(1, isakmp_ph1delete, iph1);
 	}
 }
 
@@ -932,8 +937,9 @@ info_recv_initialcontact(remote)
 	struct sadb_sa *sa;
 	struct sockaddr *src, *dst;
 	caddr_t mhp[SADB_EXT_MAX + 1];
-
-	/* XXX to be purge IKE-SA(s) */
+	int proto_id;
+	struct ph1handle *iph1;
+	struct ph2handle *iph2;
 
 	/* purge IPsec-SA(s) */
 	buf = pfkey_dump_sadb(SADB_SATYPE_UNSPEC);
@@ -977,13 +983,33 @@ info_recv_initialcontact(remote)
 			continue;
 		}
 
-		if (!cmpsaddrwop(remote, src) || !cmpsaddrwop(remote, dst)) {
-			YIPSDEBUG(DEBUG_DMISC,
-				plog(logp, LOCATION, NULL, "purging spi=%u.\n",
-						ntohl(sa->sadb_sa_spi)));
-			pfkey_send_delete(lcconf->sock_pfkey,
-				msg->sadb_msg_satype,
-				IPSEC_MODE_ANY, src, dst, sa->sadb_sa_spi);
+		/*
+		 * If the remote address matchs with src or dst of SA,
+		 * then delete the SA.
+		 */
+		if (cmpsaddrwop(remote, src) && cmpsaddrwop(remote, dst)) {
+			msg = next;
+			continue;
+		}
+
+		YIPSDEBUG(DEBUG_DMISC,
+			plog(logp, LOCATION, NULL, "purging spi=%u.\n",
+					ntohl(sa->sadb_sa_spi)));
+		pfkey_send_delete(lcconf->sock_pfkey,
+			msg->sadb_msg_satype,
+			IPSEC_MODE_ANY, src, dst, sa->sadb_sa_spi);
+
+		/*
+		 * delete a relative phase 2 handler.
+		 * continue to process if no relative phase 2 handler
+		 * exists.
+		 */
+		proto_id = pfkey2ipsecdoi_proto(msg->sadb_msg_satype);
+		iph2 = getph2bysaidx(src, dst, proto_id, sa->sadb_sa_spi);
+		if (iph2) {
+			unbindph12(iph2);
+			remph2(iph2);
+			delph2(iph2);
 		}
 
 		msg = next;
@@ -991,6 +1017,23 @@ info_recv_initialcontact(remote)
 
 	if (buf)
 		vfree(buf);
+
+	/* purge ISAKMP-SA(s) */
+	while ((iph1 = getph1byaddr(remote)) != NULL) {
+		if (!cmpsaddrwop(remote, iph1->remote))
+			continue;	/* XXX to be used campsaddr() */
+		if (iph1->status == PHASE1ST_EXPIRED)
+			continue;
+		YIPSDEBUG(DEBUG_SA,
+			plog(logp, LOCATION, NULL,
+				"proto_id ISAKMP purging spi:%s.\n",
+				isakmp_pindex(&iph1->index, 0)));
+
+		if (iph1->sce)
+			SCHED_KILL(iph1->sce);
+		iph1->status = PHASE1ST_EXPIRED;
+		iph1->sce = sched_new(1, isakmp_ph1delete, iph1);
+	}
 }
 
 /*
