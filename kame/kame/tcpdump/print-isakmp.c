@@ -30,7 +30,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/hydrangea-freebsd/kit/src/tcpdump/Attic/print-isakmp.c,v 1.1.2.18.2.12 1999/06/13 18:39:02 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.1.1.1 1999/08/08 23:32:06 itojun Exp $ (LBL)";
 #endif
 
 #include <string.h>
@@ -300,9 +300,9 @@ rawprint(caddr_t loc, size_t len)
 }
 
 struct attrmap {
-	u_char *type;
+	char *type;
 	int nvalue;
-	u_char *value[30];	/*XXX*/
+	char *value[30];	/*XXX*/
 };
 
 static u_char *
@@ -465,7 +465,7 @@ static char *ipcomp_p_map[] = {
 };
 
 struct attrmap ipsec_t_map[] = {
-	{ NULL,	0 },
+	{ NULL,	0, },
 	{ "lifetype", 3, { NULL, "sec", "kb", }, },
 	{ "life", 0, },
 	{ "group desc", 5,	{ NULL, "modp768", "modp1024", "EC2N 2^155",
@@ -706,7 +706,7 @@ isakmp_id_print(struct isakmp_gen *ext, u_char *ep, u_int32_t phase,
 		printf(" len=%d", len);
 		if (2 < vflag) {
 			printf(" ");
-			rawprint(data, len);
+			rawprint((caddr_t)data, len);
 		}
 	}
 	return (u_char *)ext + ntohs(ext->len);
@@ -874,7 +874,7 @@ isakmp_d_print(struct isakmp_gen *ext, u_char *ep, u_int32_t phase,
 	for (i = 0; i < ntohs(p->num_spi); i++) {
 		if (i != 0)
 			printf(",");
-		rawprint(q, p->spi_size);
+		rawprint((caddr_t)q, p->spi_size);
 		q += p->spi_size;
 	}
 	return q;
