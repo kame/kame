@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1696 2001/05/30 18:20:57 jinmei Exp $
+$KAME: CHANGELOG,v 1.1697 2001/05/30 18:23:30 itojun Exp $
 
 <200105>
 2001-05-31  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -10,6 +10,7 @@ $KAME: CHANGELOG,v 1.1696 2001/05/30 18:20:57 jinmei Exp $
 	returned addrinfo chain.
 	Without the change, getaddrinfo would leave the field NULL, which
 	would annoy some applications.
+	(the change follows 2553bis-03)
 
 2001-05-29  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_trans.c
