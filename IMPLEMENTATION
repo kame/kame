@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.267 2001/08/28 12:06:50 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.268 2001/08/28 12:16:03 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -565,12 +565,15 @@ The first step in stateless address configuration is Duplicated Address
 Detection (DAD).  See 1.2 for more detail on DAD.
 
 When a host hears Router Advertisement from the router, a host may
-autoconfigure itself by stateless address autoconfiguration.
-This behavior can be controlled by net.inet6.ip6.accept_rtadv
-(host autoconfigures itself if it is set to 1).
-By autoconfiguration, network address prefix for the receiving interface
-(usually global address prefix) is added.  The default route is also
-configured.
+autoconfigure itself by stateless address autoconfiguration.  This
+behavior can be controlled by the net.inet6.ip6.accept_rtadv sysctl
+variable and a per-interface flag managed in the kernel.  The latter,
+which we call "if_accept_rtadv" here, can be changed by the ndp(8)
+command (see the manpage for more details).  When the sysctl variable
+is set to 1, and the flag is set, the host autoconfigures itself.  By
+autoconfiguration, network address prefixes for the receiving
+interface (usually global address prefix) are added.  The default
+route is also configured.
 
 Routers periodically generate Router Advertisement packets.  To
 request an adjacent router to generate RA packet, a host can transmit
@@ -579,15 +582,17 @@ Router Solicitation.  To generate an RS packet at any time, use the
 generates Router Solicitation whenever necessary, and it works greatly
 for nomadic usage (notebooks/laptops).  If one wishes to ignore Router
 Advertisements, use sysctl to set net.inet6.ip6.accept_rtadv to 0.
+Additionally, ndp(8) command can be used to control the behavior
+per-interface basis.
 
 To generate Router Advertisement from a router, use the "rtadvd" daemon.
 
 Note that the IPv6 specification assumes the following items and that
 nonconforming cases are left unspecified:
 - Only hosts will listen to router advertisements
-- Hosts have single network interface (except loopback)
+- Hosts have a single network interface (except loopback)
 This is therefore unwise to enable net.inet6.ip6.accept_rtadv on routers,
-or multi-interface host.  A misconfigured node can behave strange
+or multi-interface hosts.  A misconfigured node can behave strange
 (KAME code allows nonconforming configuration, for those who would like
 to do some experiments).
 
