@@ -139,13 +139,13 @@ u_char inet6ctlerrmap[PRC_NCMDS] = {
  */
 int
 in6_pcbbind(inp, nam)
-	register struct inpcb *inp;
+	struct inpcb *inp;
 	struct mbuf *nam;
 {
-	register struct socket *so = inp->inp_socket;
+	struct socket *so = inp->inp_socket;
 
-	register struct inpcbtable *head = inp->inp_table;
-	register struct sockaddr_in6 *sin6;
+	struct inpcbtable *head = inp->inp_table;
+	struct sockaddr_in6 *sin6;
 	struct proc *p = curproc;		/* XXX */
 	u_short lport = 0;
 	int wild = INPLOOKUP_IPV6, reuseport = (so->so_options & SO_REUSEPORT);
@@ -433,7 +433,7 @@ portloop:
  */
 int
 in6_pcbconnect(inp, nam)
-	register struct inpcb *inp;
+	struct inpcb *inp;
 	struct mbuf *nam;
 {
 	struct in6_addr *in6a = NULL;
@@ -565,7 +565,7 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 	void *cmdarg;
 	void (*notify) __P((struct inpcb *, int));
 {
-	register struct inpcb *inp, *ninp;
+	struct inpcb *inp, *ninp;
 	u_short fport = fport_arg, lport = lport_arg;
 	struct sockaddr_in6 sa6_src, *sa6_dst;
 	int errno, nmatch = 0;
@@ -681,10 +681,10 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
  */
 int
 in6_setsockaddr(inp, nam)
-	register struct inpcb *inp;
+	struct inpcb *inp;
 	struct mbuf *nam;
 {
-	register struct sockaddr_in6 *sin6;
+	struct sockaddr_in6 *sin6;
 
 	nam->m_len = sizeof(struct sockaddr_in6);
 	sin6 = mtod(nam,struct sockaddr_in6 *);
@@ -706,10 +706,10 @@ in6_setsockaddr(inp, nam)
  */
 int
 in6_setpeeraddr(inp, nam)
-	register struct inpcb *inp;
+	struct inpcb *inp;
 	struct mbuf *nam;
 {
-	register struct sockaddr_in6 *sin6;
+	struct sockaddr_in6 *sin6;
 
 	nam->m_len = sizeof(struct sockaddr_in6);
 	sin6 = mtod(nam,struct sockaddr_in6 *);
