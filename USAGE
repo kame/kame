@@ -1,6 +1,6 @@
 	USAGE
 	KAME Project
-	$KAME: USAGE,v 1.34 2002/01/31 09:44:02 k-sugyou Exp $
+	$KAME: USAGE,v 1.35 2003/05/07 11:27:31 kjc Exp $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -527,7 +527,7 @@ How to install and use ALTQ:
 		
 	other platforms:
 		add "options ALTQ" to your kernel config file.
-		add optional queueing disciplines to use.
+		add optional queueing disciplines (e.g., ALTQ_CBQ) to use.
 
  - make altq devices
 	you need to create altq devices before using altq:
