@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.113 2002/05/10 06:46:32 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.114 2002/05/10 11:34:21 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1058,8 +1058,14 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 	icmpip6->ip6_plen = htons(ntohs(icmpip4->ip_len) - sizeof(struct ip));
 	icmpip6->ip6_nxt  = icmpip4->ip_p;
 	icmpip6->ip6_hlim = icmpip4->ip_ttl;
+
+#if	0
 	icmpip6->ip6_src  = pad->in6dst;
 	icmpip6->ip6_dst  = pad->in6src;
+#else
+	icmpip6->ip6_src  = pad->in6src;
+	icmpip6->ip6_dst  = pad->in6dst;
+#endif
 
 	switch (cv4->pyld.icmp4->icmp_type) {
 	case ICMP_ECHO:	/* ping unreach */
