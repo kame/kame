@@ -1,6 +1,6 @@
 include	"arch/pc532/conf/GENERIC"
 
-# most of INET6 and IPSEC items defined in GENERIC
+# INET6 and IPSEC items are defined in GENERIC
 
 # these options will become the default behavior soon.
 options 	NEW_STRUCT_ROUTE
