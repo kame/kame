@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: dtcps.8,v 1.1 1999/08/08 23:29:23 itojun Exp $
+.\"     $Id: dtcps.8,v 1.2 2000/05/27 13:55:40 itojun Exp $
 .\"
 .Dd Apr 28, 1999
 .Dt DTCPS 8
@@ -59,7 +59,7 @@ will use APOP password database file
 as password database.
 .Pp
 Clients requesting tunnel typed
-.Dq Dv tunnelonly
+.Dq Li tunnelonly
 will get simple IPv6-over-IPv4 tunnel.
 No global address will be assigned to the configured tunnel link.
 It is up to administrators to assign global IPv6 address to the client host,
@@ -73,13 +73,13 @@ If
 argument is specified,
 .Nm
 will accept tunnel request for
-.Dq Dv host
+.Dq Li host
 tunnel type.
 The tunnel type needs a pair of temporary global IPv6 address for the
 configured tunnel link, like
-.Dv 3ffe:ffff:ffff:ffff::5
+.Li 3ffe:ffff:ffff:ffff::5
 and
-.Dv 3ffe:ffff:ffff:ffff::6 .
+.Li 3ffe:ffff:ffff:ffff::6 .
 The address pair will be assigned from specified
 .Ar prefix .
 Prefixlen for the temporary global address will be 126,
@@ -113,13 +113,13 @@ command first appeared in WIDE/KAME IPv6 protocol stack kit.
 .\"
 .Sh BUGS
 KAME kernel has some trouble handling
-.Dv /126
+.Li /126
 addresses used in tunnel type
-.Dq Dv host .
+.Dq Li host .
 To avoid trouble, do not specify
 .Ar prefix
 on the argument, to disallow tunnel requests for tunnel type
-.Dq Dv host .
+.Dq Li host .
 This should be fixed soon.
 .Pp
 DTCP needs to keep TCP connection between server and client.

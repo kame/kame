@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: dtcpc.8,v 1.2 2000/05/27 13:37:22 jinmei Exp $
+.\"     $Id: dtcpc.8,v 1.3 2000/05/27 13:55:40 itojun Exp $
 .\"
 .Dd Apr 28, 1999
 .Dt DTCPC 8
@@ -69,14 +69,14 @@ to the DTCP server.
 The default value for
 .Ar tuntype
 is
-.Dq Dv tunnelonly .
+.Dq Li tunnelonly .
 For tunnel types, please refer to
 .Xr dtcps 8 .
 .Pp
 By default,
 .Nm
 will use
-.Dv gif0
+.Li gif0
 as tunnelling device.
 This can be altered by using
 .Fl i .
@@ -84,7 +84,7 @@ This can be altered by using
 .Fl r
 specifies how the default route is configured.
 If
-.Dq Dv static
+.Dq Li static
 is specified as
 .Ar routecommand ,
 .Nm
@@ -94,7 +94,7 @@ command to install the default route towards the corresponding
 tunnel interface.
 This is the default behavior.
 If 
-.Dq Dv solicit
+.Dq Li solicit
 is specified,
 .Nm
 will call the
@@ -127,10 +127,10 @@ command first appeared in WIDE/KAME IPv6 protocol stack kit.
 .\"
 .Sh BUGS
 KAME kernel has some trouble handling
-.Dv /126
+.Li /126
 addresses.
 To avoid trouble, please do not use
-.Dq Fl t Dv host
+.Dq Fl t Li host
 for the moment.
 This should be fixed soon.
 .Pp
