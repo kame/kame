@@ -1,13 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.165 1999/10/06 10:53:09 itojun Exp $
+$Id: CHANGELOG,v 1.166 1999/10/06 11:02:37 itojun Exp $
 
 <199910>
 Wed Oct  6 19:50:37 JST 1999	k-sugyou@kame.net
 	* freebsd[23]/ports/perl5: update to latest IPv6 patch.
 
 Wed Oct  6 19:42:56 JST 1999  itojun@iijlab.net
-	* netbsd/pkgsrc/net/totd, freebsd2/ports/totd:
+	* netbsd/pkgsrc/net/totd, freebsd[23]/ports/totd:
 	  totd, a DNS server for translation services like faithd(8).
 	  NetBSD PR: 8563
 	  From: Feico Dillema <dillema@acm.org>

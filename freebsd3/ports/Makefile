@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.3 1999/08/24 17:29:58 sumikawa Exp $
+# $Id: Makefile,v 1.4 1999/10/06 11:02:05 itojun Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -44,6 +44,7 @@ SUBDIR+=	ssh
 SUBDIR+=	tcp_wrapper
 SUBDIR+=	tcpd6
 SUBDIR+=	tcptrace
+SUBDIR+=	totd
 SUBDIR+=	ucd-snmp
 SUBDIR+=	v6eval
 SUBDIR+=	v6tun
