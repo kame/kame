@@ -3,6 +3,8 @@ SRCS=	faithd.c tcp.c ftp.c prefix.c
 
 MAN8=	faithd.8
 
+CFLAGS+=-Dsocklen_t=u_int
+
 LDADD+=	-lutil
 DPADD+=	${LIBUTIL}
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 \
