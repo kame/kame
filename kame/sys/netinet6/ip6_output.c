@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.463 2005/01/17 06:21:11 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.464 2005/01/20 03:33:10 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1546,19 +1546,6 @@ passout:
 			in6_ifstat_inc(ifp, ifs6_out_fragfail);
 			goto bad;
 		}
-
-#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
-		/*
-		 * Verify that we have any chance at all of being able to queue
-		 *      the packet or packet fragments
-		 */
-		if (qslots <= 0 || ((u_int)qslots * (mtu - hlen)
-		    < tlen  /* - hlen */)) {
-			error = ENOBUFS;
-			ip6stat.ip6s_odropped++;
-			goto bad;
-		}
-#endif
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 503000
 		/*
