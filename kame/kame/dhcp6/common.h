@@ -1,4 +1,4 @@
-/*	$KAME: common.h,v 1.28 2002/05/23 03:30:08 jinmei Exp $	*/
+/*	$KAME: common.h,v 1.29 2002/06/11 08:24:34 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -31,7 +31,13 @@
 #define IN6_IFF_INVALID (IN6_IFF_ANYCAST|IN6_IFF_TENTATIVE|\
 		IN6_IFF_DUPLICATED|IN6_IFF_DETACHED)
 
+#ifdef HAVE_ANSI_FUNC
+#define FNAME __func__ ": "
+#elif defined (HAVE_GCC_FUNCTION)
 #define FNAME __FUNCTION__ ": "
+#else
+#define FNAME ""
+#endif
 
 extern int foreground;
 extern int debug_thresh;
