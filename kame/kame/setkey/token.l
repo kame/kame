@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.22 2001/06/27 17:32:21 sakane Exp $	*/
+/*	$KAME: token.l,v 1.23 2001/08/16 09:16:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -220,7 +220,7 @@ any		{ PREPROC; return(ANY); }
 			return(DECSTRING);
 		}
 
-{ipaddress}	{
+({ipaddress}|{hostname})	{
 			PREPROC;
 
 			yylval.val.len = yyleng;

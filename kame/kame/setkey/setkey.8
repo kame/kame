@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.54 2001/08/16 06:36:37 itojun Exp $
+.\"	$KAME: setkey.8,v 1.55 2001/08/16 09:16:05 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -199,11 +199,11 @@ Meta-arguments are as follows:
 Source/destination of the secure communication is specified as
 IPv4/v6 address.
 .Nm
-does not consult hostname-to-address for arguments
-.Ar src
-and
-.Ar dst .
-They must be in numeric form.
+can resolve a FQDN into a numeric address.
+The FQDN must resolve into a single address.
+If there are multiple address registered for the FQDN,
+.Nm
+will raise error.
 .\"
 .Pp
 .It Ar protocol

@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.38 2001/06/27 17:58:57 sakane Exp $	*/
+/*	$KAME: parse.y,v 1.39 2001/08/16 09:16:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -79,7 +79,7 @@ extern int m_len;
 extern char cmdarg[8192];
 extern int f_debug;
 
-static struct addrinfo *parse_addr __P((char *, char *, int));
+static struct addrinfo *parse_addr __P((char *, char *));
 static int setvarbuf __P((int *, struct sadb_ext *, int, caddr_t, int));
 void parse_init __P((void));
 void free_buffer __P((void));
@@ -519,9 +519,10 @@ ipaddress
 		{
 			struct addrinfo *res;
 
-			res = parse_addr($1.buf, NULL, AI_NUMERICHOST);
+			res = parse_addr($1.buf, NULL);
 			if (res == NULL) {
 				free($1.buf);
+				/* yyerror already called by parse_addr */
 				return -1;
 			}
 			pp_addr = (struct sockaddr *)malloc(res->ai_addrlen);
@@ -873,10 +874,9 @@ setkeymsg()
 }
 
 static struct addrinfo *
-parse_addr(host, port, flag)
+parse_addr(host, port)
 	char *host;
 	char *port;
-	int flag;
 {
 	struct addrinfo hints, *res = NULL;
 	int error;
@@ -884,14 +884,16 @@ parse_addr(host, port, flag)
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_UNSPEC;
 	hints.ai_socktype = SOCK_DGRAM;
-	hints.ai_flags = flag;
+	hints.ai_flags = 0;
 	error = getaddrinfo(host, port, &hints, &res);
 	if (error != 0) {
 		yyerror(gai_strerror(error));
 		return NULL;
 	}
 	if (res->ai_next != NULL) {
-		yyerror(gai_strerror(error));
+		freeaddrinfo(res);
+		yyerror("resolved to multiple address");
+		res = NULL;
 	}
 	return res;
 }
