@@ -19,6 +19,12 @@ update: update-doc update-plat
 update-doc:
 	cvs update -d -P $(DOC)
 update-plat:
+	for i in kame $(TARGET); do \
+		if test -d $$i; then \
+			(cd $$i; cvs update -d -P); \
+		fi \
+	done
+update-all: update-doc
 	for i in $(PLAT); do \
 		if test -d $$i; then \
 			(cd $$i; cvs update -d -P); \
