@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.81 2001/01/06 06:40:30 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.82 2001/01/06 07:03:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -633,9 +633,8 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 		 *   Jinmei says that it implies bsdi/freebsd behavior, itojun
 		 *   is not really convinced.
 		 * - Having hiwat/lowat on # of cloned host route (redirect/
-		 *   pmtud) may be a good idea, but we have no idea what is a
-		 *   good default value, or what happens with starvation
-		 *   situation.
+		 *   pmtud) may be a good idea.  netbsd/openbsd has it.  see
+		 *   icmp6_mtudisc_update().
 		 */
 		if ((PRC_IS_REDIRECT(cmd) || cmd == PRC_HOSTDEAD) &&
 		    IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr) &&
