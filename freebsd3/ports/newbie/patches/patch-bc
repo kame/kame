@@ -1,0 +1,11 @@
+--- ne_io.c-	Tue Dec  7 18:28:44 1999
++++ ne_io.c	Tue Dec  7 18:29:24 1999
+@@ -1230,7 +1230,7 @@
+       dest6.sin6_len = sizeof(dest6);
+ #endif
+       dest6.sin6_family = AF_INET6;
+-      memcpy(&(dest6.sin6_addr.s6_addr32[3]), &(sin_p->sin_addr), 
++      memcpy(&(dest6.sin6_addr.__u6_addr.__u6_addr32[3]), &(sin_p->sin_addr), 
+ 	     sizeof(u_int32_t));
+       sa_p = (struct sockaddr*)&dest6;
+     }else if(dest_p->sa_family == AF_INET6){
