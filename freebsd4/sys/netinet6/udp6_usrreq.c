@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.7 2001/12/15 01:06:28 brooks Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.48 2002/02/07 12:46:13 sakane Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.49 2002/03/16 18:30:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -241,15 +241,15 @@ udp6_input(mp, offp, proto)
 			if (in6p->in6p_lport != uh->uh_dport)
 				continue;
 			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)) {
-				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa,
-							src))
+				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst))
 					continue;
 			}
 			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
 				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa,
-							dst) ||
-				   in6p->in6p_fport != uh->uh_sport)
+							src) ||
+				    in6p->in6p_fport != uh->uh_sport) {
 					continue;
+				}
 			}
 
 			if (last != NULL) {
