@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2079 2002/02/19 07:50:02 kjc Exp $
+$KAME: CHANGELOG,v 1.2080 2002/02/19 13:12:33 jinmei Exp $
 
 <200202>
+2002-02-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_input.c (ip6_init2): called nd6_ifattach()
+	for the loopback interface, in order to make sure to initialize
+	the nd_ifinfo structure for the interface.
+
 2002/02/19 16:05:42 JST	kjc@csl.sony.co.jp
 	* reduce differences from netbsd-current and openbsd-3.0:
 	 - use ALTQ_DECL() for altq only variables.
