@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.24 2000/12/13 15:52:58 camield Exp $	*/
+/*	$OpenBSD: main.c,v 1.27 2001/08/26 09:42:04 brian Exp $	*/
 /*	$NetBSD: main.c,v 1.9 1996/05/07 02:55:02 thorpej Exp $	*/
 
 /*
@@ -44,7 +44,7 @@ char copyright[] =
 #if 0
 static char sccsid[] = "from: @(#)main.c	8.4 (Berkeley) 3/1/94";
 #else
-static char *rcsid = "$OpenBSD: main.c,v 1.24 2000/12/13 15:52:58 camield Exp $";
+static char *rcsid = "$OpenBSD: main.c,v 1.27 2001/08/26 09:42:04 brian Exp $";
 #endif
 #endif /* not lint */
 
@@ -171,6 +171,12 @@ struct nlist nl[] = {
 	{ "_mf6ctable" },
 #define N_MIF6TABLE	50
 	{ "_mif6table" },
+#define N_MBPOOL	51
+	{ "_mbpool" },
+#define N_MCLPOOL	52
+	{ "_mclpool" },
+#define N_IPCOMPSTAT    53
+	{ "_ipcompstat" },
 	{ ""},
 };
 
@@ -200,6 +206,8 @@ struct protox {
 	  ipip_stats,	"ipencap" },
 	{ -1,		N_ETHERIPSTAT,	1,	0,
 	  etherip_stats,"etherip" },
+	{ -1,           N_IPCOMPSTAT,   1,      0,
+	  ipcomp_stats, "ipcomp" },
 	{ -1,		-1,		0,	0,
 	  0,		0 }
 };
@@ -289,7 +297,7 @@ main(argc, argv)
 
 	af = AF_UNSPEC;
 
-	while ((ch = getopt(argc, argv, "Aabdf:gI:ilM:mN:np:rstuvw:")) != -1)
+	while ((ch = getopt(argc, argv, "Aabdf:gI:ilM:mN:np:qrstuvw:")) != -1)
 		switch(ch) {
 		case 'A':
 			Aflag = 1;
@@ -363,6 +371,9 @@ main(argc, argv)
 			}
 			pflag = 1;
 			break;
+		case 'q':
+			qflag = 1;
+			break;
 		case 'r':
 			rflag = 1;
 			break;
@@ -433,7 +444,8 @@ main(argc, argv)
 		exit(1);
 	}
 	if (mflag) {
-		mbpr(nl[N_MBSTAT].n_value);
+		mbpr(nl[N_MBSTAT].n_value, nl[N_MBPOOL].n_value,
+		    nl[N_MCLPOOL].n_value);
 		exit(0);
 	}
 	if (pflag) {

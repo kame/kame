@@ -1,4 +1,4 @@
-/*	$OpenBSD: ifconfig.c,v 1.48 2001/05/07 13:53:26 markus Exp $	*/
+/*	$OpenBSD: ifconfig.c,v 1.52 2001/08/19 01:51:34 itojun Exp $	*/
 /*      $NetBSD: ifconfig.c,v 1.40 1997/10/01 02:19:43 enami Exp $      */
 
 /*
@@ -81,7 +81,7 @@ static char copyright[] =
 #if 0
 static char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #else
-static char rcsid[] = "$OpenBSD: ifconfig.c,v 1.48 2001/05/07 13:53:26 markus Exp $";
+static char rcsid[] = "$OpenBSD: ifconfig.c,v 1.52 2001/08/19 01:51:34 itojun Exp $";
 #endif
 #endif /* not lint */
 
@@ -195,6 +195,7 @@ void	unsetvlandev __P((char *, int));
 void	vlan_status ();
 void	fixnsel __P((struct sockaddr_iso *));
 int	main __P((int, char *[]));
+int	prefix __P((void *val, int));
 
 /*
  * Media stuff.  Whenever a media command is first performed, the
@@ -371,7 +372,7 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	register const struct afswtch *rafp;
+	register const struct afswtch *rafp = NULL;
 	int aflag = 0;
 	int ifaliases = 0;
 	int i;
@@ -1941,7 +1942,8 @@ in_getprefix(plen, which)
 	memset((void *)&sin->sin_addr, 0x00, sizeof(sin->sin_addr));
 	for (cp = (u_char *)&sin->sin_addr; len > 7; len -= 8)
 		*cp++ = 0xff;
-	*cp = 0xff << (8 - len);
+	if (len)
+		*cp = 0xff << (8 - len);
 }
 
 /*
@@ -2046,7 +2048,8 @@ in6_getprefix(plen, which)
 	memset((void *)&sin->sin6_addr, 0x00, sizeof(sin->sin6_addr));
 	for (cp = (u_char *)&sin->sin6_addr; len > 7; len -= 8)
 		*cp++ = 0xff;
-	*cp = 0xff << (8 - len);
+	if (len)
+		*cp = 0xff << (8 - len);
 }
 
 int
@@ -2369,6 +2372,7 @@ sec2str(total)
 	int first = 1;
 	char *p = result;
 	char *end = &result[sizeof(result)];
+	int n;
 
 	if (0) {	/*XXX*/
 		days = total / 3600 / 24;
@@ -2378,15 +2382,24 @@ sec2str(total)
 
 		if (days) {
 			first = 0;
-			p += snprintf(p, end - p, "%dd", days);
+			n = snprintf(p, end - p, "%dd", days);
+			if (n < 0 || n >= end - p)
+				return(result);
+			p += n;
 		}
 		if (!first || hours) {
 			first = 0;
-			p += snprintf(p, end - p, "%dh", hours);
+			n = snprintf(p, end - p, "%dh", hours);
+			if (n < 0 || n >= end - p)
+				return(result);
+			p += n;
 		}
 		if (!first || mins) {
 			first = 0;
-			p += snprintf(p, end - p, "%dm", mins);
+			n = snprintf(p, end - p, "%dm", mins);
+			if (n < 0 || n >= end - p)
+				return(result);
+			p += n;
 		}
 		snprintf(p, end - p, "%ds", secs);
 	} else

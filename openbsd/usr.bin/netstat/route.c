@@ -1,4 +1,4 @@
-/*	$OpenBSD: route.c,v 1.39 2000/12/11 17:33:07 provos Exp $	*/
+/*	$OpenBSD: route.c,v 1.42 2001/10/09 09:21:10 brian Exp $	*/
 /*	$NetBSD: route.c,v 1.15 1996/05/07 02:55:06 thorpej Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)route.c	8.3 (Berkeley) 3/9/94";
 #else
-static char *rcsid = "$OpenBSD: route.c,v 1.39 2000/12/11 17:33:07 provos Exp $";
+static char *rcsid = "$OpenBSD: route.c,v 1.42 2001/10/09 09:21:10 brian Exp $";
 #endif
 #endif /* not lint */
 
@@ -110,6 +110,7 @@ struct bits {
 	{ RTF_STATIC,	'S' },
 	{ RTF_PROTO1,	'1' },
 	{ RTF_PROTO2,	'2' },
+	{ RTF_PROTO3,	'3' },
 	{ 0 }
 };
 
@@ -440,7 +441,7 @@ p_sockaddr(sa, mask, flags, width)
 		register struct sockaddr_in *msin = (struct sockaddr_in *)mask;
 
 		cp = (sin->sin_addr.s_addr == 0) ? "default" :
-		      ((flags & RTF_HOST) ?
+		      ((flags & RTF_HOST) || mask == NULL ?
 			routename(sin->sin_addr.s_addr) :
 			netname(sin->sin_addr.s_addr, msin->sin_addr.s_addr));
 
@@ -505,10 +506,12 @@ p_sockaddr(sa, mask, flags, width)
 				n = snprintf(cp,
 				    workbuf + sizeof (workbuf) - cp,
 				    "%s%x", cplim, *lla);
+				cplim = ":";
+				if (n == -1)	/* What else to do ? */
+				  continue;
 				if (n >= workbuf + sizeof (workbuf) - cp)
 					n = workbuf + sizeof (workbuf) - cp - 1;
 				cp += n;
-				cplim = ":";
 			}
 			cp = workbuf;
 			break;
@@ -535,20 +538,23 @@ p_sockaddr(sa, mask, flags, width)
 		n = snprintf(cp, cplim - cp, "(%d)", sa->sa_family);
 		if (n >= cplim - cp)
 			n = cplim - cp - 1;
-		cp += n;
+		if (n > 0)
+			cp += n;
 		while (s < slim && cp < cplim) {
 			n = snprintf(cp, workbuf + sizeof (workbuf) - cp,
 			    " %02x", *s++);
 			if (n >= workbuf + sizeof (workbuf) - cp)
 				n = workbuf + sizeof (workbuf) - cp - 1;
-			cp += n;
+			if (n > 0)
+				cp += n;
 			if (s < slim) {
 				n = snprintf(cp,
 				    workbuf + sizeof (workbuf) - cp,
 				    "%02x", *s++);
 				if (n >= workbuf + sizeof (workbuf) - cp)
 					n = workbuf + sizeof (workbuf) - cp - 1;
-				cp += n;
+				if (n > 0)
+					cp += n;
 			}
 		}
 		cp = workbuf;

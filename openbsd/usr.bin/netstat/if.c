@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.23 2001/02/06 05:24:10 fgsch Exp $	*/
+/*	$OpenBSD: if.c,v 1.26 2001/09/04 23:35:59 millert Exp $	*/
 /*	$NetBSD: if.c,v 1.16.4.2 1996/06/07 21:46:46 thorpej Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)if.c	8.2 (Berkeley) 2/21/94";
 #else
-static char *rcsid = "$OpenBSD: if.c,v 1.23 2001/02/06 05:24:10 fgsch Exp $";
+static char *rcsid = "$OpenBSD: if.c,v 1.26 2001/09/04 23:35:59 millert Exp $";
 #endif
 #endif /* not lint */
 
@@ -95,11 +95,11 @@ intpr(interval, ifnetaddr)
 		struct ipx_ifaddr ipx;
 		struct iso_ifaddr iso;
 	} ifaddr;
+	u_long total;
 	u_long ifaddraddr;
 	struct sockaddr *sa;
 	struct ifnet_head ifhead;	/* TAILQ_HEAD */
 	char name[IFNAMSIZ];
-	int n;
 
 	if (ifnetaddr == 0) {
 		printf("ifnet: symbol not defined\n");
@@ -154,6 +154,22 @@ intpr(interval, ifnetaddr)
 			*cp = '\0';
 			ifaddraddr = (u_long)ifnet.if_addrlist.tqh_first;
 		}
+
+		if (qflag) {
+			total = ifnet.if_ibytes + ifnet.if_obytes +
+			    ifnet.if_ipackets + ifnet.if_ierrors +
+			    ifnet.if_opackets + ifnet.if_oerrors +
+			    ifnet.if_collisions;
+			if (tflag)
+				total += ifnet.if_timer;
+			if (dflag)
+				total += ifnet.if_snd.ifq_drops;
+			if (total == 0) {
+				ifaddraddr = 0;
+				continue;
+			}
+		}
+
 		printf("%-7.7s %-5ld ", name, ifnet.if_mtu);
 		if (ifaddraddr == 0) {
 			printf("%-11.11s ", "none");
@@ -360,7 +376,7 @@ struct	iftot {
 	int	ift_dr;			/* drops */
 } iftot[MAXIF];
 
-u_char	signalled;			/* set if alarm goes off "early" */
+volatile sig_atomic_t signalled;	/* set if alarm goes off "early" */
 
 /*
  * Print a running summary of interface statistics.
@@ -379,7 +395,7 @@ sidewaysintpr(interval, off)
 	register int line;
 	struct iftot *lastif, *sum, *interesting;
 	struct ifnet_head ifhead;	/* TAILQ_HEAD */
-	int oldmask;
+	sigset_t emptyset;
 
 	/*
 	 * Find the pointer to the first ifnet structure.  Replace
@@ -520,15 +536,15 @@ loop:
 	if (lastif - iftot > 0) {
 		if (bflag)
 			printf("  %10lu %8.8s %10lu %5.5s",
-			    sum->ift_ib -  total->ift_ib, " ",
-			    sum->ift_ob -  total->ift_ob, " ");
+			    (unsigned long)sum->ift_ib -  total->ift_ib, " ",
+			    (unsigned long)sum->ift_ob -  total->ift_ob, " ");
 		else
 			printf("  %8lu %5lu %8lu %5lu %5lu",
-			    sum->ift_ip - total->ift_ip,
-			    sum->ift_ie - total->ift_ie,
-			    sum->ift_op - total->ift_op,
-			    sum->ift_oe - total->ift_oe,
-			    sum->ift_co - total->ift_co);
+			    (unsigned long)sum->ift_ip - total->ift_ip,
+			    (unsigned long)sum->ift_ie - total->ift_ie,
+			    (unsigned long)sum->ift_op - total->ift_op,
+			    (unsigned long)sum->ift_oe - total->ift_oe,
+			    (unsigned long)sum->ift_co - total->ift_co);
 		if (dflag)
 			printf(" %5d", sum->ift_dr - total->ift_dr);
 	}
@@ -536,11 +552,9 @@ loop:
 	putchar('\n');
 	fflush(stdout);
 	line++;
-	oldmask = sigblock(sigmask(SIGALRM));
-	if (! signalled) {
-		sigpause(0);
-	}
-	sigsetmask(oldmask);
+	sigemptyset(&emptyset);
+	if (!signalled)
+		sigsuspend(&emptyset);
 	signalled = NO;
 	(void)alarm(interval);
 	if (line == 21)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: dkstats.c,v 1.9 2001/01/02 20:09:02 deraadt Exp $	*/
+/*	$OpenBSD: dkstats.c,v 1.14 2001/07/21 09:21:56 deraadt Exp $	*/
 /*	$NetBSD: dkstats.c,v 1.1 1996/05/10 23:19:27 thorpej Exp $	*/
 
 /*
@@ -33,9 +33,12 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/param.h>
 #include <sys/dkstat.h>
 #include <sys/time.h>
 #include <sys/disk.h>
+#include <sys/sysctl.h>
+#include <sys/tty.h>
 
 #include <err.h>
 #include <fcntl.h>
@@ -148,21 +151,69 @@ void
 dkreadstats()
 {
 	struct disk	cur_disk, *p;
-	int		i;
+	int		i, mib[3];
+	size_t		size;
+	struct diskstats *q;
 
-	p = dk_drivehead;
+	if (nlistf == NULL && memf == NULL) {
+		size = dk_ndrive * sizeof(struct diskstats);
+		mib[0] = CTL_HW;
+		mib[1] = HW_DISKSTATS;
+		q = malloc(size);
+		if (q == NULL)
+			err(1, NULL);
+		if (sysctl(mib, 2, q, &size, NULL, 0) < 0) {
+			warn("could not read hw.diskstats");
+			bzero(q, dk_ndrive * sizeof(struct diskstats));
+		}
 
-	for (i = 0; i < dk_ndrive; i++) {
-		deref_kptr(p, &cur_disk, sizeof(cur_disk));
-		cur.dk_xfer[i] = cur_disk.dk_xfer;
-		cur.dk_seek[i] = cur_disk.dk_seek;
-		cur.dk_bytes[i] = cur_disk.dk_bytes;
-		timerset(&(cur_disk.dk_time), &(cur.dk_time[i]));
-		p = cur_disk.dk_link.tqe_next;
+		for (i = 0; i < dk_ndrive; i++)	{
+			cur.dk_xfer[i] = q[i].ds_xfer;
+			cur.dk_seek[i] = q[i].ds_seek;
+			cur.dk_bytes[i] = q[i].ds_bytes;
+			timerset(&(q[i].ds_time), &(cur.dk_time[i]));
+		}
+		free(q);
+
+	 	size = sizeof(cur.cp_time);
+		mib[0] = CTL_KERN;
+		mib[1] = KERN_CPTIME;
+		if (sysctl(mib, 2, cur.cp_time, &size, NULL, 0) < 0) {
+			warn("could not read kern.cp_time");
+			bzero(cur.cp_time, sizeof(cur.cp_time));
+		}
+		size = sizeof(cur.tk_nin);
+		mib[0] = CTL_KERN;
+		mib[1] = KERN_TTY;
+		mib[2] = KERN_TTY_TKNIN;
+		if (sysctl(mib, 3, &cur.tk_nin, &size, NULL, 0) < 0) {
+			warn("could not read kern.tty.tk_nin");
+			cur.tk_nin = 0;
+		}
+		size = sizeof(cur.tk_nin);
+		mib[0] = CTL_KERN;
+		mib[1] = KERN_TTY;
+		mib[2] = KERN_TTY_TKNOUT;
+		if (sysctl(mib, 3, &cur.tk_nout, &size, NULL, 0) < 0) {
+			warn("could not read kern.tty.tk_nout");
+			cur.tk_nout = 0;
+		}
+	} else {
+		p = dk_drivehead;
+
+		for (i = 0; i < dk_ndrive; i++) {
+			deref_kptr(p, &cur_disk, sizeof(cur_disk));
+			cur.dk_xfer[i] = cur_disk.dk_xfer;
+			cur.dk_seek[i] = cur_disk.dk_seek;
+			cur.dk_bytes[i] = cur_disk.dk_bytes;
+			timerset(&(cur_disk.dk_time), &(cur.dk_time[i]));
+			p = cur_disk.dk_link.tqe_next;
+		}
+
+		deref_nl(X_CP_TIME, cur.cp_time, sizeof(cur.cp_time));
+		deref_nl(X_TK_NIN, &cur.tk_nin, sizeof(cur.tk_nin));
+		deref_nl(X_TK_NOUT, &cur.tk_nout, sizeof(cur.tk_nout));
 	}
-	deref_nl(X_CP_TIME, cur.cp_time, sizeof(cur.cp_time));
-	deref_nl(X_TK_NIN, &cur.tk_nin, sizeof(cur.tk_nin));
-	deref_nl(X_TK_NOUT, &cur.tk_nout, sizeof(cur.tk_nout));
 }
 
 /*
@@ -178,34 +229,58 @@ int	select;
         char		errbuf[_POSIX2_LINE_MAX];
 	static int	once = 0;
 	extern int	hz;
-	int		i;
+	int		i, mib[2];
+	size_t		size;
+	struct clockinfo clkinfo;
+	char		*disknames, *name, *bufpp;
 
 	if (once)
 		return(1);
 
-	/* Open the kernel. */
-        if ((kd = kvm_openfiles(nlistf, memf, NULL, O_RDONLY, errbuf)) == NULL)
-		errx(1, "kvm_openfiles: %s", errbuf);
+	if (nlistf != NULL || memf != NULL) {
+		/* Open the kernel. */
+		if ((kd = kvm_openfiles(nlistf, memf, NULL, O_RDONLY,
+		    errbuf)) == NULL)
+			errx(1, "kvm_openfiles: %s", errbuf);
 
-	/* Obtain the namelist symbols from the kernel. */
-	if (kvm_nlist(kd, namelist))
-		KVM_ERROR("kvm_nlist failed to read symbols.");
+		/* Obtain the namelist symbols from the kernel. */
+		if (kvm_nlist(kd, namelist))
+			KVM_ERROR("kvm_nlist failed to read symbols.");
 
-	/* Get the number of attached drives. */
-	deref_nl(X_DISK_COUNT, &dk_ndrive, sizeof(dk_ndrive));
+		/* Get the number of attached drives. */
+		deref_nl(X_DISK_COUNT, &dk_ndrive, sizeof(dk_ndrive));
 
-	if (dk_ndrive < 0)
-		errx(1, "invalid _disk_count %d.", dk_ndrive);
-	else {
+		if (dk_ndrive < 0)
+			errx(1, "invalid _disk_count %d.", dk_ndrive);
+
 		/* Get a pointer to the first disk. */
 		deref_nl(X_DISKLIST, &disk_head, sizeof(disk_head));
 		dk_drivehead = disk_head.tqh_first;
-	}
 
-	/* Get ticks per second. */
-	deref_nl(X_STATHZ, &hz, sizeof(hz));
-	if (!hz)
-		deref_nl(X_HZ, &hz, sizeof(hz));
+		/* Get ticks per second. */
+		deref_nl(X_STATHZ, &hz, sizeof(hz));
+		if (!hz)
+		  deref_nl(X_HZ, &hz, sizeof(hz));
+	} else {
+		/* Get the number of attached drives. */
+		mib[0] = CTL_HW;
+		mib[1] = HW_DISKCOUNT;
+		size = sizeof(dk_ndrive);
+		if (sysctl(mib, 2, &dk_ndrive, &size, NULL, 0) < 0 ) {
+			warn("could not read hw.diskcount");
+			dk_ndrive = 0;
+		}
+
+		/* Get ticks per second. */
+		mib[0] = CTL_KERN;
+		mib[1] = KERN_CLOCKRATE;
+		size = sizeof(clkinfo);
+		if (sysctl(mib, 2, &clkinfo, &size, NULL, 0) < 0) {
+			warn("could not read kern.clockrate");
+			hz = 0;
+		} else
+			hz = clkinfo.stathz;
+	}
 
 	/* allocate space for the statistics */
 	cur.dk_time = calloc(dk_ndrive, sizeof(struct timeval));
@@ -229,17 +304,36 @@ int	select;
 	dr_name = cur.dk_name;
 
 	/* Read the disk names and set intial selection. */
-	p = dk_drivehead;
-	for (i = 0; i < dk_ndrive; i++) {
-		char	buf[10];
-		deref_kptr(p, &cur_disk, sizeof(cur_disk));
-		deref_kptr(cur_disk.dk_name, buf, sizeof(buf));
-		cur.dk_name[i] = strdup(buf);
-		if (!cur.dk_name[i])
-			errx(1, "Memory allocation failure.");
-		cur.dk_select[i] = select;
+	if (nlistf == NULL && memf == NULL) {
+		mib[0] = CTL_HW;
+		mib[1] = HW_DISKNAMES;
+		size = 0;
+		if (sysctl(mib, 2, NULL, &size, NULL, 0) < 0)
+			err(1, "can't get hw.disknames");
+		disknames = malloc(size);
+		if (disknames == NULL)
+			err(1, NULL);
+		if (sysctl(mib, 2, disknames, &size, NULL, 0) < 0)
+			err(1, "can't get hw.disknames");
+		bufpp = disknames;
+		i = 0;
+		while ((name = strsep(&bufpp, ",")) != NULL) {
+		    cur.dk_name[i] = name;
+		    cur.dk_select[i++] = select;
+		}
+	} else {
+		p = dk_drivehead;
+		for (i = 0; i < dk_ndrive; i++) {
+			char	buf[10];
+			deref_kptr(p, &cur_disk, sizeof(cur_disk));
+			deref_kptr(cur_disk.dk_name, buf, sizeof(buf));
+			cur.dk_name[i] = strdup(buf);
+			if (!cur.dk_name[i])
+				errx(1, "Memory allocation failure.");
+			cur.dk_select[i] = select;
 
-		p = cur_disk.dk_link.tqe_next;
+			p = cur_disk.dk_link.tqe_next;
+		}
 	}
 
 	/* Never do this initalization again. */

@@ -1,4 +1,4 @@
-/*	$OpenBSD: inet.c,v 1.49 2001/03/03 01:00:20 itojun Exp $	*/
+/*	$OpenBSD: inet.c,v 1.53 2001/08/26 09:42:04 brian Exp $	*/
 /*	$NetBSD: inet.c,v 1.14 1995/10/03 21:42:37 thorpej Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-static char *rcsid = "$OpenBSD: inet.c,v 1.49 2001/03/03 01:00:20 itojun Exp $";
+static char *rcsid = "$OpenBSD: inet.c,v 1.53 2001/08/26 09:42:04 brian Exp $";
 #endif
 #endif /* not lint */
 
@@ -72,6 +72,7 @@ static char *rcsid = "$OpenBSD: inet.c,v 1.49 2001/03/03 01:00:20 itojun Exp $";
 #include <netinet/ip_ah.h>
 #include <netinet/ip_esp.h>
 #include <netinet/ip_ipip.h>
+#include <netinet/ip_ipcomp.h>
 #include <netinet/ip_ether.h>
 
 #include <arpa/inet.h>
@@ -272,6 +273,7 @@ tcp_stats(off, name)
 	p(tcps_sndprobe, "\t\t%u window probe packet%s\n");
 	p(tcps_sndwinup, "\t\t%u window update packet%s\n");
 	p(tcps_sndctrl, "\t\t%u control packet%s\n");
+	p(tcps_outhwcsum, "\t\t%u packet%s hardware-checksummed\n");
 	p(tcps_rcvtotal, "\t%u packet%s received\n");
 	p2(tcps_rcvackpack, tcps_rcvackbyte, "\t\t%u ack%s (for %qd byte%s)\n");
 	p(tcps_rcvdupack, "\t\t%u duplicate ack%s\n");
@@ -294,6 +296,7 @@ tcp_stats(off, name)
 	p(tcps_rcvbadoff, "\t\t%u discarded for bad header offset field%s\n");
 	p1(tcps_rcvshort, "\t\t%u discarded because packet too short\n");
 	p1(tcps_rcvnosec, "\t\t%u discarded for missing IPSec protection\n");
+	p(tcps_inhwcsum, "\t\t%u packet%s hardware-checksummed\n");
 	p(tcps_connattempt, "\t%u connection request%s\n");
 	p(tcps_accepts, "\t%u connection accept%s\n");
 	p(tcps_connects, "\t%u connection%s established (including accepts)\n");
@@ -343,6 +346,8 @@ udp_stats(off, name)
 	p1(udps_badlen, "\t%lu with bad data length field\n");
 	p1(udps_badsum, "\t%lu with bad checksum\n");
 	p1(udps_nosum, "\t%lu with no checksum\n");
+	p(udps_inhwcsum, "\t%lu input packet%s hardware-checksummed\n");
+	p(udps_outhwcsum, "\t%lu output packet%s hardware-checksummed\n");
 	p1(udps_noport, "\t%lu dropped due to no socket\n");
 	p(udps_noportbcast, "\t%lu broadcast/multicast datagram%s dropped due to no socket\n");
 	p1(udps_nosec, "\t%lu dropped due to missing IPSec protection\n");
@@ -411,6 +416,8 @@ ip_stats(off, name)
 	p(ips_toolong, "\t%lu packet%s with ip length > max ip packet size\n");
 	p(ips_nogif, "\t%lu tunneling packet%s that can't find gif\n");
 	p(ips_badaddr, "\t%lu datagram%s with bad address in header\n");
+	p(ips_inhwcsum, "\t%lu input datagram%s checksum-processed by hardware\n");
+	p(ips_outhwcsum, "\t%lu output datagram%s checksum-processed by hardware\n");
 #undef p
 #undef p1
 }
@@ -743,13 +750,13 @@ etherip_stats(off, name)
     printf(m, etheripstat.f, plural(etheripstat.f))
 
 
-        p(etherip_hdrops, "\t%u packet%s shorter than header shows\n");
-        p(etherip_qfull, "\t%u packet%s were dropped due to full output queue\n");
+	p(etherip_hdrops, "\t%u packet%s shorter than header shows\n");
+	p(etherip_qfull, "\t%u packet%s were dropped due to full output queue\n");
 	p(etherip_noifdrops, "\t%u packet%s were dropped because of no interface/bridge information\n");
-        p(etherip_pdrops, "\t%u packet%s dropped due to policy\n");
-        p(etherip_adrops, "\t%u packet%s dropped for other reasons\n");
-	p(etherip_ipackets, "\t%u input ethernet-in-IP packets\n");
-	p(etherip_opackets, "\t%u output ethernet-in-IP packets\n");
+	p(etherip_pdrops, "\t%u packet%s dropped due to policy\n");
+	p(etherip_adrops, "\t%u packet%s dropped for other reasons\n");
+	p(etherip_ipackets, "\t%u input ethernet-in-IP packet%s\n");
+	p(etherip_opackets, "\t%u output ethernet-in-IP packet%s\n");
 	p(etherip_ibytes, "\t%qu input byte%s\n");
 	p(etherip_obytes, "\t%qu output byte%s\n");
 #undef p
@@ -825,5 +832,43 @@ ipip_stats(off, name)
 	p(ipips_obytes, "\t%qu output byte%s\n");
 	p(ipips_family, "\t%u protocol family mismatches\n");
 	p(ipips_unspec, "\t%u attempts to use tunnel with unspecified endpoint(s)\n");
+#undef p
+}
+
+/*
+ * Dump IPCOMP statistics structure.
+ */
+void
+ipcomp_stats(off, name)
+	u_long off;
+	char *name;
+{
+	struct ipcompstat ipcompstat;
+
+	
+	if (off == 0)
+		return;
+	kread(off, (char *)&ipcompstat, sizeof (ipcompstat));
+	printf("%s:\n", name);
+
+#define p(f, m) if (ipcompstat.f || sflag <= 1) \
+    printf(m, ipcompstat.f, plural(ipcompstat.f))
+
+	p(ipcomps_input, "\t%u input IPCOMP packet%s\n");
+	p(ipcomps_output, "\t%u output IPCOMP packet%s\n");
+	p(ipcomps_nopf, "\t%u packet%s from unsupported protocol families\n");
+	p(ipcomps_hdrops, "\t%u packet%s shorter than header shows\n");
+	p(ipcomps_pdrops, "\t%u packet%s dropped due to policy\n");
+	p(ipcomps_notdb, "\t%u packet%s for which no TDB was found\n");
+	p(ipcomps_badkcr, "\t%u input packet%s that failed to be processed\n");
+	p(ipcomps_noxform, "\t%u packet%s for which no XFORM was set in TDB received\n");   
+	p(ipcomps_qfull, "\t%u packet%s were dropped due to full output queue\n");
+	p(ipcomps_wrap, "\t%u packet%s where counter wrapping was detected\n");
+	p(ipcomps_invalid, "\t%u packet%s attempted to use an invalid tdb\n");
+	p(ipcomps_toobig, "\t%u packet%s got larger than max IP packet size\n");
+	p(ipcomps_crypto, "\t%u packet%s that failed (de)compression processing\n");
+	p(ipcomps_ibytes, "\t%qu input byte%s\n");
+	p(ipcomps_obytes, "\t%qu output byte%s\n");
+
 #undef p
 }

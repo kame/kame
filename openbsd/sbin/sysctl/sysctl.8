@@ -1,4 +1,4 @@
-.\"	$OpenBSD: sysctl.8,v 1.61 2001/02/07 11:43:49 itojun Exp $
+.\"	$OpenBSD: sysctl.8,v 1.68 2001/08/18 03:32:16 art Exp $
 .\"	$NetBSD: sysctl.8,v 1.4 1995/09/30 07:12:49 thorpej Exp $
 .\"
 .\" Copyright (c) 1993
@@ -53,42 +53,39 @@
 .Fl aA
 .Sh DESCRIPTION
 The
-.Nm sysctl
+.Nm
 utility retrieves kernel state and allows processes with
 appropriate privilege to set kernel state.
 The state to be retrieved or set is described using a
 ``Management Information Base'' (``MIB'') style name,
 described as a dotted set of components.
-The
-.Fl a
-flag can be used to list all the currently available string or integer values.
-The
-.Fl A
-flag will list all the known MIB names including tables.
+
+The options are as follows:
+.Bl -tag -width xxx
+.It Fl a 
+list all the currently available string or integer values.
+.It Fl A
+list all the known MIB names including tables.
 Those with string or integer values will be printed as with the
 .Fl a
-flag; for the table values,
-the name of the utility to retrieve them is given.
-.Pp
-The
-.Fl n
-flag specifies that the printing of the field name should be
-suppressed and that only its value should be output.
-This flag is useful for setting shell variables.
-For example, to save the pagesize in variable psize, use:
+flag; for the table values, the name of the utility to retrieve them is given.
+.It Fl n
+suppress printing of the field name, only output the field value.
+Useful for setting shell variables.
+For example:
 .Bd -literal -offset indent -compact
 set psize=`sysctl -n hw.pagesize`
 .Ed
 .Pp
 If just a MIB style name is given,
 the corresponding value is retrieved.
-If a value is to be set, the
-.Fl w
-flag must be specified and the MIB name followed
-by an equal sign and the new value to be used.
+.It Fl w
+required to set a variable. The MIB name should be followed
+by an equal sign and the new value.
+.El
 .Pp
 The information available from
-.Nm sysctl
+.Nm
 consists of integers, strings, and tables.
 The tabular information can only be retrieved by special
 purpose programs such as
@@ -123,15 +120,11 @@ privilege can change the value.
 .It kern.ngroups	integer	no
 .It kern.job_control	integer	no
 .It kern.saved_ids	integer	no
-.It kern.link_max	integer	no
-.It kern.max_canon	integer	no
-.It kern.max_input	integer	no
-.It kern.name_max	integer	no
-.It kern.path_max	integer	no
-.It kern.pipe_buf	integer	no
-.It kern.chown_restricted	integer	no
-.It kern.no_trunc	integer	no
 .It kern.boottime	struct	no
+.It kern.ntptime	struct	no
+.It kern.cp_time	struct	no
+.It kern.nchstats	struct	no
+.It kern.forkstat	struct	no
 .It kern.somaxconn	integer	yes
 .It kern.sominconn	integer	yes
 .It kern.usermount	integer	yes
@@ -142,13 +135,27 @@ privilege can change the value.
 .It kern.sysvsem	integer	no
 .It kern.sysvshm	integer	no
 .It kern.arandom	u_int	no
+.It kern.msgbufsize	integer	no
+.It kern.nselcoll	integer	no
 .It kern.malloc.buckets	string	no
 .It kern.malloc.bucket.<sz>	string	no
+.It kern.malloc.kmemnames	string	no
+.It kern.malloc.kmemstat.<name>	string	no
+.It kern.tty.tk_nin	int64_t	no
+.It kern.tty.tk_nout	int64_t	no
+.It kern.tty.tk_rawcc	int64_t	no
+.It kern.tty.tk_cancc	int64_t	no
+.It kern.fscale	int	no
+.It kern.ccpu	u_int	no
+.It kern.nprocs	int	no
+.It kern.stackgap_random	int	yes
 .It vm.loadavg	struct	no
 .It vm.psstrings	struct	no
 .It vm.swapencrypt.enable	integer	yes
 .It vm.swapencrypt.keyscreated	integer	no
 .It vm.swapencrypt.keysdeleted	integer	no
+.It vm.uvmexp	struct	no
+.It vm.vmmeter	struct	no
 .It fs.posix.setuid	integer	yes
 .It net.inet.ip.forwarding	integer	yes
 .It net.inet.ip.redirect	integer	yes
@@ -173,6 +180,7 @@ privilege can change the value.
 .It net.inet.ip.ipsec-firstuse	integer	yes
 .It net.inet.ip.ipsec-enc-alg	string	yes
 .It net.inet.ip.ipsec-auth-alg	string	yes
+.It net.inet.ip.ipsec-comp-alg	string	yes
 .It net.inet.ip.ipsec-expire-acquire	integer	yes
 .It net.inet.ip.ipsec-invalid-life	integer	yes
 .It net.inet.ip.mtudisc	integer	yes
@@ -199,6 +207,7 @@ privilege can change the value.
 .It net.inet.udp.sendspace	integer	yes
 .It net.inet.esp.enable	integer	yes
 .It net.inet.ah.enable	integer	yes
+.It net.inet.ipcomp.enable integer yes
 .It net.inet.gre.allow	integer	yes
 .It net.inet.mobileip.allow	integer	yes
 .It net.inet6.ip6.forwarding	integer	yes
@@ -247,6 +256,9 @@ privilege can change the value.
 .It hw.physmem	integer	no
 .It hw.usermem	integer	no
 .It hw.pagesize	integer	no
+.It hw.diskstats	struct	no
+.It hw.disknames	string	no
+.It hw.diskcount	integer	no
 .It machdep.console_device	dev_t	no
 .It machdep.apmwarn	integer	yes (i386 only)
 .It machdep.apmhalt	integer	yes (i386 only)
@@ -289,7 +301,7 @@ privilege can change the value.
 .El
 .Pp
 The
-.Nm sysctl
+.Nm
 program can get or set debugging variables
 that have been identified for its display.
 This information can be obtained by using the command:
@@ -297,7 +309,7 @@ This information can be obtained by using the command:
 sysctl debug
 .Ed
 In addition,
-.Nm sysctl
+.Nm
 can extract information about the filesystems that have been compiled
 into the running system.
 This information can be obtained by using the command:
