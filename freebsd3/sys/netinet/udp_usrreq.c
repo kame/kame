@@ -88,6 +88,7 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
+#include <netinet/ip_var.h>
 #if defined(INET6) && defined(MAPPED_ADDR_ENABLED)
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
@@ -471,7 +472,7 @@ udp_append(last, ip, n, off)
 			savedflags = last->inp_flags;
 			last->inp_flags &= ~INP_UNMAPPABLEOPTS;
 			ip6_savecontrol(last, &udp_ip6.uip6_ip6, n,
-					&opts6, NULL);
+					&opts, NULL);
 			last->inp_flags = savedflags;
 		} else
 #endif
