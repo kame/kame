@@ -210,7 +210,7 @@ contiguousfail:
 int
 if_simloop(ifp, m, dst, hlen)
 	struct ifnet *ifp;
-	register struct mbuf *m;
+	struct mbuf *m;
 	struct sockaddr *dst;
 	int hlen;
 {
