@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.250 2004/04/09 07:11:45 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.251 2004/04/19 04:37:25 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -300,7 +300,7 @@ nd6_ra_input(m, off, icmp6len)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	time_second = time.tv_sec;
 #endif
-	Bzero(&dr0, sizeof(dr0));
+	bzero(&dr0, sizeof(dr0));
 	dr0.rtaddr = ip6->ip6_src;
 	dr0.flags  = nd_ra->nd_ra_flags_reserved;
 	if (rtpref(&dr0) == RTPREF_RESERVED) {
@@ -572,9 +572,9 @@ defrouter_addreq(new)
 	int s;
 	int error;
 
-	Bzero(&def, sizeof(def));
-	Bzero(&mask, sizeof(mask));
-	Bzero(&gate, sizeof(gate)); /* for safety */
+	bzero(&def, sizeof(def));
+	bzero(&mask, sizeof(mask));
+	bzero(&gate, sizeof(gate)); /* for safety */
 
 	def.sin6_len = mask.sin6_len = gate.sin6_len =
 	    sizeof(struct sockaddr_in6);
@@ -677,8 +677,8 @@ defrouter_delifreq()
 	if (!nd6_defif_installed)
 		return;
 
-	Bzero(&def, sizeof(def));
-	Bzero(&mask, sizeof(mask));
+	bzero(&def, sizeof(def));
+	bzero(&mask, sizeof(mask));
 
 	def.sin6_len = mask.sin6_len = sizeof(struct sockaddr_in6);
 	def.sin6_family = mask.sin6_family = AF_INET6;
@@ -778,9 +778,9 @@ defrouter_delreq(dr)
 		panic("dr == NULL in defrouter_delreq");
 #endif
 
-	Bzero(&def, sizeof(def));
-	Bzero(&mask, sizeof(mask));
-	Bzero(&gw, sizeof(gw));	/* for safety */
+	bzero(&def, sizeof(def));
+	bzero(&mask, sizeof(mask));
+	bzero(&gw, sizeof(gw));	/* for safety */
 
 	def.sin6_len = mask.sin6_len = gw.sin6_len =
 	    sizeof(struct sockaddr_in6);

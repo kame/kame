@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.355 2004/04/12 14:12:53 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.356 2004/04/19 04:37:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1461,7 +1461,7 @@ nd6_rtrequest(req, rt, sa)
 		}
 		nd6_inuse++;
 		nd6_allocated++;
-		Bzero(ln, sizeof(*ln));
+		bzero(ln, sizeof(*ln));
 		ln->ln_rt = rt;
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 		callout_init(&ln->ln_timer_ch, NULL);
