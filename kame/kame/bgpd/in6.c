@@ -124,7 +124,8 @@ in6_is_addr_onlink(dst, retifp)
       if (IN6_ARE_PRFX_EQUAL(dst,
 			     &rte->rt_ripinfo.rip6_dest,
 			     rte->rt_ripinfo.rip6_plen)  &&
-	  (rte->rt_flags & RTF_UP)) {
+	  (rte->rt_flags & RTF_UP) &&
+	  (rte->rt_flags & RTF_GATEWAY) == 0) { /* XXX */
 	      *retifp = ife;
 	      return 1;
       }
