@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.43 2002/07/26 12:48:26 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.44 2002/07/29 09:40:33 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -581,6 +581,7 @@ int mip6_get_mobility_options __P((struct ip6m_binding_update *,
 void mip6_create_cookie __P((struct in6_addr *,
 			     mip6_nodekey_t *, mip6_nonce_t *,
 			     void *));
+void mip6_calculate_kbu(mip6_home_cookie_t *, mip6_careof_cookie_t *, u_int8_t *);
 #endif /* MIP6_DRAFT17 */
 
 #endif /* _KERNEL */

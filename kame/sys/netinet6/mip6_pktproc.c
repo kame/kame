@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.32 2002/07/26 16:49:10 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.33 2002/07/29 09:40:33 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -69,15 +69,11 @@
 
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
-#ifdef __NetBSD__
-#include <sys/sha1.h>
-#define SHA1_RESULTLEN	20
-#else
-#include <crypto/sha1.h>
-#endif
 #include <crypto/hmac.h>
-
 #include <net/net_osdep.h>
+
+#define SHA1_RESULTLEN	20
+
 
 /* xn + y; x must be 2^m */
 #define PADLEN(cur_offset, x, y)	\
@@ -1390,7 +1386,6 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	struct mip6_bu *mbu, *hrmbu;
 	int need_rr = 0;
 	struct sockaddr_in6 *busrc_sa;
-	SHA1_CTX sha1_ctx;
 	HMAC_CTX hmac_ctx;
 	u_int8_t key_bu[SHA1_RESULTLEN]; /* Stated as 'Kbu' in the spec */
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -1553,12 +1548,7 @@ printf("MN: Home Cookie: %*D\n", sizeof(mbu->mbu_home_cookie), (caddr_t)&mbu->mb
 printf("MN: Care-of Cookie: %*D\n", sizeof(mbu->mbu_careof_cookie), (caddr_t)&mbu->mbu_careof_cookie, ":");
 #endif
 		/* Calculate K_bu */
-		SHA1Init(&sha1_ctx);
-		SHA1Update(&sha1_ctx, (caddr_t)&mbu->mbu_home_cookie,
-			   sizeof(mbu->mbu_home_cookie));
-		SHA1Update(&sha1_ctx, (caddr_t)&mbu->mbu_careof_cookie,
-			   sizeof(mbu->mbu_careof_cookie));
-		SHA1Final(key_bu, &sha1_ctx);
+		mip6_calculate_kbu(&mbu->mbu_home_cookie, &mbu->mbu_careof_cookie, key_bu);
 #if RR_DBG
 printf("MN: K_bu: %*D\n", sizeof(key_bu), key_bu, ":");
 #endif

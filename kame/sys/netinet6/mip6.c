@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.148 2002/07/26 11:51:45 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.149 2002/07/29 09:40:33 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2613,7 +2613,6 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa)
 	u_int8_t key_bu[SHA1_RESULTLEN]; /* Stated as 'Kbu' in the spec */
 	u_int8_t authdata[SHA1_RESULTLEN];
 	u_int16_t cksum_backup;
-	SHA1_CTX sha1_ctx;
 	HMAC_CTX hmac_ctx;
 	int restlen;
 
@@ -2667,10 +2666,7 @@ printf("CN: Care-of Cookie: %*D\n", sizeof(careof_cookie), (u_int8_t *)&careof_c
 #endif
 
 	/* Calculate K_bu */
-	SHA1Init(&sha1_ctx);
-	SHA1Update(&sha1_ctx, (caddr_t)&home_cookie, sizeof(home_cookie));
-	SHA1Update(&sha1_ctx, (caddr_t)&careof_cookie, sizeof(careof_cookie));
-	SHA1Final(key_bu, &sha1_ctx);
+	mip6_calculate_kbu(&home_cookie, &careof_cookie, key_bu);
 #ifdef RR_DBG
 printf("CN: K_bu: %*D\n", sizeof(key_bu), key_bu, ":");
 #endif
@@ -2792,5 +2788,19 @@ mip6_create_cookie(addr, nodekey, nonce, cookie)
 	hmac_loop(&hmac_ctx, (u_int8_t *)addr, sizeof(struct in6_addr));
 	hmac_loop(&hmac_ctx, (u_int8_t *)nonce, sizeof(mip6_nonce_t));
 	hmac_result(&hmac_ctx, (u_int8_t *)cookie);
+}
+
+void
+mip6_calculate_kbu(home_cookie, careof_cookie, key_bu)
+	mip6_home_cookie_t *home_cookie;
+	mip6_careof_cookie_t *careof_cookie;
+	u_int8_t *key_bu;	/* needs at least SHA1_RESULTLEN bytes */
+{
+	SHA1_CTX sha1_ctx;
+
+	SHA1Init(&sha1_ctx);
+	SHA1Update(&sha1_ctx, (caddr_t)home_cookie, sizeof(*home_cookie));
+	SHA1Update(&sha1_ctx, (caddr_t)careof_cookie, sizeof(*careof_cookie));
+	SHA1Final(key_bu, &sha1_ctx);
 }
 #endif /* MIP6_DRAFT17 */
