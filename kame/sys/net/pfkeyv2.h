@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.8 2000/03/09 13:15:00 sakane Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.9 2000/03/15 09:47:19 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: pfkeyv2.h,v 1.8 2000/03/09 13:15:00 sakane Exp $ */
+/* $Id: pfkeyv2.h,v 1.9 2000/03/15 09:47:19 sakane Exp $ */
 
 /*
  * This file has been derived rfc 2367,
@@ -281,7 +281,8 @@ struct sadb_x_ipsecrequest {
 #define SADB_SATYPE_RIPV2	7
 #define SADB_SATYPE_MIP		8
 #define SADB_X_SATYPE_IPCOMP	9
-#define SADB_SATYPE_MAX		9
+#define SADB_X_SATYPE_POLICY	10
+#define SADB_SATYPE_MAX		11
 
 #define SADB_SASTATE_LARVAL   0
 #define SADB_SASTATE_MATURE   1
