@@ -171,11 +171,6 @@ solisten(so, backlog)
 		splx(s);
 		return (error);
 	}
-	if (so->so_q.tqh_first == NULL)
-		so->so_options |= SO_ACCEPTCONN;
-	if (backlog < 0)
-		backlog = 0;
-	so->so_qlimit = min(backlog, somaxconn);
 	splx(s);
 	return (0);
 }
