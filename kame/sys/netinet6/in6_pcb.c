@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.78 2000/12/02 07:30:36 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.79 2000/12/03 00:53:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -603,6 +603,50 @@ in6_pcbnotify(head, dst, fport_arg, src, lport_arg, cmd, cmdarg, notify)
 					&sa6_dst->sin6_addr))) {
 			ip6_notify_pmtu(in6p, (struct sockaddr_in6 *)dst,
 					(u_int32_t *)cmdarg);
+		}
+
+		/*
+		 * Under the following condition, notify of redirects
+		 * to the pcb, without making address matches against inpcb.
+		 * - redirect notification is arrived.
+		 * - the inpcb is unconnected.
+		 * - the inpcb is caching !RTF_HOST routing entry.
+		 * - the ICMPv6 notification is from the gateway cached in the
+		 *   inpcb.  i.e. ICMPv6 notification is from nexthop gateway
+		 *   the inpcb used very recently.
+		 *
+		 * This is to improve interaction between netbsd/openbsd
+		 * redirect handling code, and inpcb route cache code.
+		 * without the clause, !RTF_HOST routing entry (which carries
+		 * gateway used by inpcb right before the ICMPv6 redirect)
+		 * will be cached forever in unconnected inpcb.
+		 *
+		 * There still is a question regarding to what is TRT:
+		 * - On bsdi/freebsd, RTF_HOST (cloned) routing entry will be
+		 *   generated on packet output.  inpcb will always cache
+		 *   RTF_HOST routing entry so there's no need for the clause
+		 *   (ICMPv6 redirect will update RTF_HOST routing entry,
+		 *   and inpcb is caching it already).
+		 *   However, bsdi/freebsd are vulnerable to local DoS attacks
+		 *   due to the cloned routing entries.
+		 * - Specwise, "destination cache" is mentioned in RFC2461.
+		 *   Jinmei says that it implies bsdi/freebsd behavior, itojun
+		 *   is not really convinced.
+		 * - Having hiwat/lowat on # of cloned host route (redirect/
+		 *   pmtud) may be a good idea, but we have no idea what is a
+		 *   good default value, or what happens with starvation
+		 *   situation.
+		 */
+		if ((PRC_IS_REDIRECT(cmd) || cmd == PRC_HOSTDEAD) &&
+		    IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr) &&
+		    in6p->in6p_route.ro_rt &&
+		    !(in6p->in6p_route.ro_rt->rt_flags & RTF_HOST)) {
+			struct sockaddr_in6 *dst6;
+
+			dst6 = (struct sockaddr_in6 *)&in6p->in6p_route.ro_dst;
+			if (IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr,
+			    &sa6_dst->sin6_addr))
+				goto do_notify;
 		}
 
 		/*
