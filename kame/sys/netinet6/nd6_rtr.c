@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.208 2002/06/08 23:27:37 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.209 2002/06/09 01:07:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1274,9 +1274,15 @@ prelist_update(new, dr, m)
 		 * Authenticity for NA consists authentication for
 		 * both IP header and IP datagrams, doesn't it ?
 		 */
-#if defined(M_AUTHIPHDR) && defined(M_AUTHIPDGM)
-		auth = (m->m_flags & M_AUTHIPHDR
-		     && m->m_flags & M_AUTHIPDGM) ? 1 : 0;
+#ifdef __OpenBSD__
+#ifdef M_AUTH_AH
+		auth = ((m->m_flags & M_AUTH_AH) && (m->m_flags & M_AUTH));
+#else
+		auth = 0;
+#endif
+#else
+		auth = ((m->m_flags & M_AUTHIPHDR) &&
+		    (m->m_flags & M_AUTHIPDGM));
 #endif
 	}
 
