@@ -1,4 +1,4 @@
-/*	$KAME: vif.h,v 1.18 2001/11/27 07:23:29 suz Exp $	*/
+/*	$KAME: vif.h,v 1.19 2002/05/29 12:02:11 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -235,6 +235,7 @@ struct uvif {
 struct phaddr {
 	struct phaddr 			*pa_next;
 	struct sockaddr_in6 	pa_addr;
+	struct sockaddr_in6 	pa_rmt_addr;	/* valid only in case of P2P I/F */
 	struct sockaddr_in6 	pa_prefix;
 	struct in6_addr 		pa_subnetmask;
 };
