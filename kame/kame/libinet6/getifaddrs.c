@@ -57,7 +57,7 @@
 #define	ALIGNBYTES	XXX
 #endif
 #ifndef	ALIGN
-#define	ALIGN(p)	(((u_int)(p) + ALIGNBYTES) &~ ALIGNBYTES)
+#define	ALIGN(p)	(((u_long)(p) + ALIGNBYTES) &~ ALIGNBYTES)
 #endif
 
 #if	_BSDI_VERSION >= 199701
