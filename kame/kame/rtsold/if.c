@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.19 2002/06/10 20:00:36 itojun Exp $	*/
+/*	$KAME: if.c,v 1.20 2003/01/08 05:28:07 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,6 +68,9 @@
 #include <limits.h>
 #ifdef HAVE_GETIFADDRS
 #include <ifaddrs.h>
+#endif
+#ifdef ISATAP
+#include <net/if_stf.h>
 #endif
 
 #include "rtsold.h"
@@ -457,4 +460,62 @@ get_rtaddrs(int addrs, struct sockaddr *sa, struct sockaddr **rti_info)
 		} else
 			rti_info[i] = NULL;
 	}
+}
+
+int
+is_isatap(struct ifinfo *ifinfo)
+{
+#ifndef ISATAP
+	return 0;
+#else
+	struct ifreq ifr;
+	int s;
+	static struct in_addr addr;
+
+	memset(&addr, 0, sizeof(addr));
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
+		warnmsg(LOG_ERR, __func__, "socket: %s", strerror(errno));
+		exit(1);
+	}
+
+	memset(&ifr, 0, sizeof(ifr));
+	memcpy(ifr.ifr_name, ifinfo->ifname, sizeof(ifr.ifr_name));
+	if (ioctl(s, SIOCGIFPHYS, (caddr_t)&ifr) < 0) {
+		warnmsg(LOG_DEBUG, __func__,
+			"ioctl:SIOCGIFPHYS: failed for %s", ifr.ifr_name);
+		close(s);
+		return 0;
+	}
+	close(s);
+	return (ifr.ifr_phys == STFM_ISATAP);
+#endif /* ISATAP */
+}
+
+size_t
+get_isatap_router(struct ifinfo *ifinfo, void **buf)
+{
+#ifndef ISATAP
+	return 0;
+#else
+	char *ptr, *lim;
+	size_t needed;
+	int mib[4] = {CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_ISATAPRTR};
+
+	/* get ISATAP router list */
+	if (!is_isatap(ifinfo))
+		return 0;
+	if (sysctl(mib, 4, NULL, &needed, NULL, 0) < 0)
+		return 0;
+	if (needed == 0)
+		return NULL;
+	if ((*buf = malloc(needed)) == NULL) {
+		warnmsg(LOG_ERR, __func__, "malloc failed");
+		exit(1);
+	}
+	if (sysctl(mib, 4, *buf, &needed, NULL, 0) < 0) {
+		warnmsg(LOG_ERR, __func__,  "sysctl failed");
+		exit(1);
+	}
+	return needed;
+#endif /* ISATAP */
 }

@@ -1,4 +1,4 @@
-/*	$KAME: if.h,v 1.7 2001/12/20 02:09:37 k-sugyou Exp $	*/
+/*	$KAME: if.h,v 1.8 2003/01/08 05:28:07 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -58,3 +58,6 @@ int ifmsg_type __P((char *));
 int rtmsg_len __P((char *));
 int ifmsg_len __P((char *));
 void init_iflist __P((void));
+
+int is_isatap __P((struct rainfo *));
+int is_isatap_router __P((struct rainfo *, struct in6_addr *));

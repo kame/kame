@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.22 2002/06/10 19:59:46 itojun Exp $	*/
+/*	$KAME: if.c,v 1.23 2003/01/08 05:28:07 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -65,6 +65,7 @@
 #include <syslog.h>
 #include "rtadvd.h"
 #include "if.h"
+#include <net/if_stf.h>
 
 #define ROUNDUP(a, size) \
 	(((a) & ((size)-1)) ? (1 + ((a) | ((size)-1))) : (a))
@@ -620,4 +621,86 @@ init_iflist()
 
 	/* make list of pointers to each if_msghdr */
 	parse_iflist(&iflist, ifblock, ifblock_size);
+}
+
+int
+is_isatap(struct rainfo *rai)
+{
+#ifndef ISATAP
+	return 0
+#else
+	struct ifreq ifr;
+	int s;
+	static struct in_addr addr;
+
+	memset(&addr, 0, sizeof(addr));
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
+		syslog(LOG_ERR, "<%s> socket: %s", __func__,
+		       strerror(errno));
+		exit(1);
+	}
+
+	memset(&ifr, 0, sizeof(ifr));
+	memcpy(ifr.ifr_name, rai->ifname, sizeof(ifr.ifr_name));
+	if (ioctl(s, SIOCGIFPHYS, (caddr_t)&ifr) < 0) {
+		syslog(LOG_DEBUG, "<%s> ioctl:SIOCGIFPHYS: failed for %s",
+		       __func__, ifr.ifr_name);
+		close(s);
+		return 0;
+	}
+	close(s);
+	return (ifr.ifr_phys == STFM_ISATAP);
+#endif /* ISATAP */
+}
+
+int
+is_isatap_router(struct rainfo *rai, struct in6_addr *src)
+{
+#ifndef ISATAP
+	return 0;
+#else
+	struct in_addr *addr, *src4;
+	char *buf, *ptr, *lim;
+	size_t needed;
+	int mib[3] = {CTL_NET, IPPROTO_IPV6, IPV6CTL_ISATAPRTR};
+
+	/* check if the given address is in ISATAP format */
+	if (ntohl(((struct in_addr *)(&src->s6_addr[8]))->s_addr) == 0x00005efe)
+		return 0;
+	src4 = (struct in_addr *)(&src->s6_addr[12]);
+
+	/* get ISATAP router list and compare them with src4 */
+	if (!is_isatap(rai))
+		return 0;
+	if (sysctl(mib, 3, NULL, &needed, NULL, 0) < 0)
+		return;
+	if (needed == 0)
+		return;
+	if ((buf = malloc(needed)) == NULL) {
+		syslog(LOG_ERR, "<%s> malloc failed", __func__);
+		exit(1);
+	}
+	if (sysctl(mib, 3, buf, &needed, NULL, 0) < 0) {
+		syslog(LOG_ERR, "<%s> sysctl failed", __func__);
+		exit(1);
+	}
+	
+	lim = buf + needed;
+	ptr = buf;
+	while (ptr < lim) {
+		struct sockaddr_in *addr = (struct sockaddr_in *) ptr;
+
+		if (addr->sin_family != AF_INET) {
+			syslog(LOG_INFO, "invalid addr family (%d)",
+			       addr->sin_family);
+			continue;
+		}
+		if (memcmp(&addr->sin_addr, &src4, sizeof(*src4)) == 0) {
+			return 1;
+		}
+		ptr += addr->sin_len;
+	}
+
+	return 0;
+#endif /* ISATAP */
 }

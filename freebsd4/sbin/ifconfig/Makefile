@@ -21,6 +21,9 @@ CFLAGS+=-DUSE_VLANS
 SRCS+=	ifieee80211.c
 CFLAGS+=-DUSE_IEEE80211
 
+#comment out to exclude ISATAP support
+CFLAGS+=-DUSE_ISATAP -g
+
 MAN=	ifconfig.8
 
 .if defined(RELEASE_CRUNCH)

@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.75 2002/09/24 13:58:41 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.76 2003/01/08 05:28:07 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1019,6 +1019,19 @@ ra_input(int len, struct nd_router_advert *ra,
 		       if_indextoname(pi->ipi6_ifindex, ifnamebuf));
 		goto done;
 	}
+	/* 
+	 * RA validity check according to draft-ietf-ngtrans-isatap-08.txt 5.2.2
+	 */
+	if (is_isatap(rai) && !is_isatap_router(rai, &from->sin6_addr)) {
+		syslog(LOG_INFO,
+		       "<%s> received RA from non-ISATAP router %s"
+		       " interface(%s)",
+		       __func__,
+		       inet_ntop(AF_INET6, &from->sin6_addr,
+				 ntopbuf, INET6_ADDRSTRLEN),
+		       if_indextoname(pi->ipi6_ifindex, ifnamebuf));
+		goto done;
+	}
 	rai->rainput++;		/* increment statistics */
 	
 	/* Cur Hop Limit value */
@@ -1627,6 +1640,9 @@ struct rainfo *rainfo;
 	       "<%s> send RA on %s, # of waitings = %d",
 	       __func__, rainfo->ifname, rainfo->waiting); 
 
+	if (is_isatap(rainfo))
+		goto unicast_adv;
+
 	i = sendmsg(sock, &sndmhdr, 0);
 
 	if (i < 0 || i != rainfo->ra_datalen)  {
@@ -1636,16 +1652,24 @@ struct rainfo *rainfo;
 			       strerror(errno));
 		}
 	}
+	/* update counter */
+	if (rainfo->initcounter < MAX_INITIAL_RTR_ADVERTISEMENTS)
+		rainfo->initcounter++;
+	rainfo->raoutput++;
 
+
+unicast_adv:
 	/*
-	 * unicast advertisements
-	 * XXX commented out.  reason: though spec does not forbit it, unicast
-	 * advert does not really help
+	 * unicast advertisements: used only in case of ISATAP interface.
+	 * reason: though spec does not forbit it, unicast advert 
+	 * does not really help in case of normal interfaces
 	 */
 	for (sol = rainfo->soliciter; sol; sol = nextsol) {
 		nextsol = sol->next;
 
-#if 0
+		if (!is_isatap(rainfo))
+			goto free_memory;
+
 		sndmhdr.msg_name = (caddr_t)&sol->addr;
 		i = sendmsg(sock, &sndmhdr, 0);
 		if (i < 0 || i != rainfo->ra_datalen)  {
@@ -1656,17 +1680,18 @@ struct rainfo *rainfo;
 				    strerror(errno));
 			}
 		}
-#endif
+		/* update counter */
+		/* XXX: in case of NMBA media, initcounter has no meaning ... */
+		if (rainfo->initcounter < MAX_INITIAL_RTR_ADVERTISEMENTS)
+			rainfo->initcounter++;
+		rainfo->raoutput++;
 
+
+	free_memory:
 		sol->next = NULL;
 		free(sol);
 	}
 	rainfo->soliciter = NULL;
-
-	/* update counter */
-	if (rainfo->initcounter < MAX_INITIAL_RTR_ADVERTISEMENTS)
-		rainfo->initcounter++;
-	rainfo->raoutput++;
 
 	/* update timestamp */
 	gettimeofday(&rainfo->lastsent, NULL);

@@ -1,4 +1,4 @@
-/*	$KAME: rtsol.c,v 1.17 2002/12/05 02:45:50 jinmei Exp $	*/
+/*	$KAME: rtsol.c,v 1.18 2003/01/08 05:28:07 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -177,9 +177,15 @@ sendpacket(struct ifinfo *ifinfo)
 	int hoplimit = 255;
 	int i;
 	struct sockaddr_in6 dst;
+	struct sockaddr_in *isatap = NULL, *ptr;
+	size_t isatapsiz = 0;
 
 	dst = sin6_allrouters;
 	dst.sin6_scope_id = ifinfo->linkid;
+	/* get ISATAP router list for later use */
+	if (is_isatap(ifinfo)) {
+		isatapsiz = get_isatap_router(ifinfo, &isatap);
+	}
 
 	sndmhdr.msg_name = (caddr_t)&dst;
 	sndmhdr.msg_iov[0].iov_base = (caddr_t)ifinfo->rs_data;
@@ -201,21 +207,37 @@ sendpacket(struct ifinfo *ifinfo)
 	cm->cmsg_len = CMSG_LEN(sizeof(int));
 	memcpy(CMSG_DATA(cm), &hoplimit, sizeof(int));
 
-	warnmsg(LOG_DEBUG, __func__,
-	    "send RS on %s, whose state is %d",
-	    ifinfo->ifname, ifinfo->state);
+	ptr = isatap;
+	do {
+		if (is_isatap(ifinfo)) {
+			if (isatapsiz == 0)
+				break;
 
-	i = sendmsg(rssock, &sndmhdr, 0);
-
-	if (i < 0 || i != ifinfo->rs_datalen) {
-		/*
-		 * ENETDOWN is not so serious, especially when using several
-		 * network cards on a mobile node. We ignore it.
-		 */
-		if (errno != ENETDOWN || dflag > 0)
-			warnmsg(LOG_ERR, __func__, "sendmsg on %s: %s",
-			    ifinfo->ifname, strerror(errno));
-	}
+			memset(&dst.sin6_addr, 0, sizeof(dst.sin6_addr));
+			dst.sin6_addr.s6_addr[0] = 0xfe;
+			dst.sin6_addr.s6_addr[1] = 0x80;
+			dst.sin6_addr.s6_addr[10] = 0x5e;
+			dst.sin6_addr.s6_addr[11] = 0xfe;
+			memcpy(&dst.sin6_addr.s6_addr[12], &ptr->sin_addr, 4);
+			isatapsiz -= ptr->sin_len;
+			ptr++;
+		}
+		warnmsg(LOG_DEBUG, __func__,
+		    "send RS on %s, whose state is %d",
+		    ifinfo->ifname, ifinfo->state);
+		i = sendmsg(rssock, &sndmhdr, 0);
+		if (i < 0 || i != ifinfo->rs_datalen) {
+			/*
+			 * ENETDOWN is not so serious, especially when using several
+			 * network cards on a mobile node. We ignore it.
+			 */
+			if (errno != ENETDOWN || dflag > 0)
+				warnmsg(LOG_ERR, __func__, "sendmsg on %s: %s",
+				    ifinfo->ifname, strerror(errno));
+		}
+	} while (isatapsiz > 0);
+	if (isatap)
+		free(isatap);
 
 	/* update counter */
 	ifinfo->probes++;
