@@ -93,6 +93,9 @@
 #include <netinet6/in6_pcb.h>
 #include <netinet6/nd6.h>
 #include <netinet6/ip6protosw.h>
+#ifdef ENABLE_DEFAULT_SCOPE
+#include <netinet6/scope6_var.h>
+#endif
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
@@ -608,6 +611,11 @@ rip6_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 
 	if (TAILQ_EMPTY(&ifnet) || addr->sin6_family != AF_INET6)
 		return EADDRNOTAVAIL;
+#ifdef ENABLE_DEFAULT_SCOPE
+	if (addr->sin6_scope_id == 0) {	/* not change if specified  */
+		addr->sin6_scope_id = scope6_addr2default(&addr->sin6_addr);
+	}
+#endif
 	if (!IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr) &&
 	    (ia = ifa_ifwithaddr((struct sockaddr *)addr)) == 0)
 		return EADDRNOTAVAIL;
@@ -635,7 +643,11 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		return EADDRNOTAVAIL;
 	if (addr->sin6_family != AF_INET6)
 		return EAFNOSUPPORT;
-
+#ifdef ENABLE_DEFAULT_SCOPE
+	if (addr->sin6_scope_id == 0) {	/* not change if specified  */
+		addr->sin6_scope_id = scope6_addr2default(&addr->sin6_addr);
+	}
+#endif
 	/* Source address selection. XXX: need pcblookup? */
 	in6a = in6_selectsrc(addr, inp->in6p_outputopts,
 			     inp->in6p_moptions, &inp->in6p_route,
@@ -682,6 +694,11 @@ rip6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 		}
 		dst = (struct sockaddr_in6 *)nam;
 	}
+#ifdef ENABLE_DEFAULT_SCOPE
+	if (dst->sin6_scope_id == 0) {	/* not change if specified  */
+		dst->sin6_scope_id = scope6_addr2default(&dst->sin6_addr);
+	}
+#endif
 	return rip6_output(m, so, dst, control);
 }
 
