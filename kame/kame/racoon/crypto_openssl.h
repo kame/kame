@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.h,v 1.23 2001/08/14 12:26:06 sakane Exp $	*/
+/*	$KAME: crypto_openssl.h,v 1.24 2001/09/11 13:25:00 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -51,6 +51,10 @@ extern vchar_t *eay_get_x509cert __P((char *));
 extern vchar_t *eay_get_x509sign __P((vchar_t *, vchar_t *, vchar_t *));
 extern int eay_check_x509sign __P((vchar_t *, vchar_t *, vchar_t *));
 extern int eay_check_pkcs7sign __P((vchar_t *, vchar_t *, vchar_t *));
+
+/* RSA */
+extern vchar_t *eay_rsa_sign __P((vchar_t *, vchar_t *));
+extern int eay_rsa_verify __P((vchar_t *, vchar_t *, vchar_t *));
 
 /* ASN.1 */
 extern vchar_t *eay_get_pkcs1privkey __P((char *));

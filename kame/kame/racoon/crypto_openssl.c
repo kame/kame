@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.68 2001/08/20 06:46:28 itojun Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.69 2001/09/11 13:25:00 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -930,6 +930,87 @@ end:
 	return pkey;
 }
 #endif
+
+vchar_t *
+eay_rsa_sign(src, privkey)
+	vchar_t *src, *privkey; 
+{
+	EVP_PKEY *evp;
+	u_char *bp = privkey->v;
+	vchar_t *sig = NULL;
+	int len;
+	int pad = RSA_PKCS1_PADDING;
+
+	/* XXX to be handled EVP_PKEY_DSA */
+	evp = d2i_PrivateKey(EVP_PKEY_RSA, NULL, &bp, privkey->l);
+	if (evp == NULL)
+		return NULL;
+
+	/* XXX: to be handled EVP_dss() */
+	/* XXX: Where can I get such parameters ?  From my cert ? */
+
+	len = RSA_size(evp->pkey.rsa);
+
+	sig = vmalloc(len);
+	if (sig == NULL)
+		return NULL;
+
+	len = RSA_private_encrypt(src->l, src->v, sig->v, evp->pkey.rsa, pad);
+	EVP_PKEY_free(evp);
+	if (len == 0 || len != sig->l) {
+		vfree(sig);
+		sig = NULL;
+	}
+
+	return sig;
+}
+
+int
+eay_rsa_verify(src, sig, pubkey)
+	vchar_t *src, *sig, *pubkey;
+{
+	EVP_PKEY *evp;
+	u_char *bp = pubkey->v;
+	vchar_t *xbuf = NULL;
+	int pad = RSA_PKCS1_PADDING;
+	int len = 0;
+	int error;
+
+	evp = d2i_PUBKEY(NULL, &bp, pubkey->l);
+	if (evp == NULL)
+#ifndef EAYDEBUG
+		return NULL;
+#endif
+
+	len = RSA_size(evp->pkey.rsa);
+
+	xbuf = vmalloc(len);
+	if (xbuf == NULL) {
+#ifndef EAYDEBUG
+		plog(LLV_ERROR, LOCATION, NULL, "%s\n", eay_strerror());
+#endif
+		EVP_PKEY_free(evp);
+		return -1;
+	}
+
+	len = RSA_public_decrypt(sig->l, sig->v, xbuf->v, evp->pkey.rsa, pad);
+#ifndef EAYDEBUG
+	if (len == 0 || len != src->l)
+		plog(LLV_ERROR, LOCATION, NULL, "%s\n", eay_strerror());
+#endif
+	EVP_PKEY_free(evp);
+	if (len == 0 || len != src->l) {
+		vfree(xbuf);
+		return -1;
+	}
+
+	error = memcmp(src->v, xbuf->v, src->l);
+	vfree(xbuf);
+	if (error != 0)
+		return -1;
+
+	return 0;
+}
 
 /*
  * get error string
