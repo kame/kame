@@ -39,6 +39,7 @@ DPADD+=	${.CURDIR}/../libinet6/libinet6.a \
 MAN8=	natptconfig.8
 .else
 MAN=	natptconfig.8
+YFLAGS+= -d
 .endif
 
 main.o:		main.c natptconfig.y.h
