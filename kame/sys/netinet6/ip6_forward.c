@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.118 2003/04/23 09:15:50 keiichi Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.119 2003/06/26 09:59:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,8 +41,10 @@
 #ifdef __NetBSD__
 #include "opt_ipsec.h"
 #endif
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 #include "pf.h"
+#else
+#define NPF 0
 #endif
 
 #include <sys/param.h>
@@ -78,10 +80,8 @@
 #include <netinet6/in6_pcb.h>
 #endif
 
-#ifdef __OpenBSD__
 #if NPF > 0
 #include <net/pfvar.h>
-#endif
 #endif
 
 #ifdef __OpenBSD__ /* KAME IPSEC */
@@ -764,11 +764,14 @@ ip6_forward(m, srcrt)
 	}
 #endif
 
-#if defined(__OpenBSD__) && NPF > 0
+#if NPF > 0
 	if (pf_test6(PF_OUT, rt->rt_ifp, &m) != PF_PASS) {
 		m_freem(m);
 		goto senderr;
 	}
+	if (m == NULL)
+		goto senderr;
+
 	ip6 = mtod(m, struct ip6_hdr *);
 #endif
 

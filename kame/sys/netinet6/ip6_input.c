@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.316 2003/06/26 07:34:23 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.317 2003/06/26 09:59:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,8 +78,10 @@
 #include "opt_inet.h"
 #include "opt_ipsec.h"
 #endif
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 #include "pf.h"
+#else
+#define NPF 0
 #endif
 
 #include <sys/param.h>
@@ -175,10 +177,8 @@
 #include <netinet6/in6_gif.h>
 #endif
 
-#ifdef __OpenBSD__
 #if NPF > 0
 #include <net/pfvar.h>
-#endif
 #endif
 
 #include <net/net_osdep.h>
@@ -544,7 +544,7 @@ ip6_input(m)
 		goto bad;
 	}
 
-#if defined(__OpenBSD__) && NPF > 0
+#if NPF > 0
 	/*
 	 * Packet filter
 	 */

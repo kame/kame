@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.377 2003/06/26 07:34:23 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.378 2003/06/26 09:59:45 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -108,8 +108,10 @@
 #include "opt_inet.h"
 #include "opt_ipsec.h"
 #endif
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) || defined(__NetBSD__)
 #include "pf.h"
+#else
+#define NPF 0
 #endif
 
 #include <sys/param.h>
@@ -160,10 +162,8 @@
 #include <netinet6/ip6protosw.h>
 #include <netinet6/scope6_var.h>
 
-#ifdef __OpenBSD__
 #if NPF > 0
 #include <net/pfvar.h>
-#endif
 #endif
 
 #ifdef IPSEC
@@ -1408,12 +1408,14 @@ skip_ipsec2:;
 	ip6 = mtod(m, struct ip6_hdr *);
 #endif /* PFIL_HOOKS */
 
-#if defined(__OpenBSD__) && NPF > 0
+#if NPF > 0
 	if (pf_test6(PF_OUT, ifp, &m) != PF_PASS) {
 		error = EHOSTUNREACH;
 		m_freem(m);
 		goto done;
 	}
+	if (m == NULL)
+		goto done;
 	ip6 = mtod(m, struct ip6_hdr *);
 #endif
 
