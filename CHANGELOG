@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1193 2000/08/13 02:10:39 itojun Exp $
+$KAME: CHANGELOG,v 1.1194 2000/08/13 19:08:30 sumikawa Exp $
 
 <200008> 
+Mon Aug 14 13:05:11 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* kame/freebsd3/ports/mozilla: upgrade to M17.
+
 Sun Aug 13 11:09:44 JST 2000  itojun@iijlab.net
 	* kame/rtsold/rtsold.c: add -a flag, to autoprobe interface.
 	  suggested by thorpej@netbsd.org
