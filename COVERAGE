@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.95 2001/01/23 17:48:09 itojun Exp $
+$KAME: COVERAGE,v 1.96 2001/01/25 15:14:30 itojun Exp $
 
 
 x: supported/integrated
@@ -55,6 +55,8 @@ CMSG_ALIGN	sysctl	ALIGN	ALIGN	ALIGN	ALIGN	ALIGN	ALIGN
     (all) backward binary compatibility for old code that uses old CMSG_xx
 	  is not provided (yet).
 
+ART routing table lookup algorithm
+		x	x	-	-	-	x	-
 
 
 
