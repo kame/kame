@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.238 2001/11/13 03:09:46 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.239 2001/11/17 09:44:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3790,46 +3790,15 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		}
 
 		/*
-		 * Check if the requested source address is indeed a unicast
-		 * address assigned to the node, and can be used as the
-		 * packet's source address.
+		 * We store the address anyway, and let in6_selectsrc()
+		 * validate the specified address.  This is because ipi6_addr
+		 * may not have enough information about its scope zone, and
+		 * we may need additional information (such as outgoing
+		 * interface or the scope zone of a destination address) to
+		 * disambiguate the scope.
+		 * XXX: the delay of the validation may confuse the
+		 * application when it is used as a sticky option.
 		 */
-#if 0				/* let in6_selectsrc() check this */
-		if (!IN6_IS_ADDR_UNSPECIFIED(&pktinfo->ipi6_addr)) {
-			struct in6_ifaddr *ia6;
-			struct sockaddr_in6 sin6;
-
-			bzero(&sin6, sizeof(sin6));
-			sin6.sin6_len = sizeof(sin6);
-			sin6.sin6_family = AF_INET6;
-			if (ifp) {
-				int64_t zone;
-
-				zone = in6_addr2zoneid(ifp,
-						       &pktinfo->ipi6_addr);
-				if (zone < 0) {
-					/* XXX: this should not happen */
-					return(EINVAL);
-				}
-				sin6.sin6_scope_id = zone;
-			}
-			sin6.sin6_addr = pktinfo->ipi6_addr;
-			/* XXX: the following may override the original data */
-			if (in6_embedscope(&sin6.sin6_addr, &sin6))
-				return(EINVAL);
-#ifndef SCOPEDROUTING
-			sin6.sin6_scope_id = 0; /* XXX */
-#endif
-			pktinfo->ipi6_addr = sin6.sin6_addr; /* XXX */
-			ia6 = (struct in6_ifaddr *)ifa_ifwithaddr(sin6tosa(&sin6));
-			if (ia6 == NULL ||
-			    (ia6->ia6_flags & (IN6_IFF_ANYCAST |
-					       IN6_IFF_NOTREADY)) != 0) {
-				return(EADDRNOTAVAIL);
-			}
-		}
-#endif /* 0 */
-
 		if (sticky) {
 			if (opt->ip6po_pktinfo == NULL) {
 				opt->ip6po_pktinfo = malloc(sizeof(*pktinfo),
