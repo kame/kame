@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.31 2004/01/26 03:30:44 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.32 2004/02/16 08:47:19 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -2340,11 +2340,8 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 	memcpy(&netp->ra._l_addr, newaddr, newaddr->sa_len);
 #if defined(__FreeBSD__)
 	if (newaddr->sa_family == AF_INET6)
-#ifdef SCTP_BASE_FREEBSD
-		netp->addr_is_local = in6_localaddr(&(((struct sockaddr_in6 *)newaddr)->sin6_addr));
-#else
-		netp->addr_is_local = in6_localaddr((struct sockaddr_in6 *)newaddr);
-#endif /* SCTP_BASE_FREEBSD */
+		netp->addr_is_local =
+		    in6_localaddr(&(((struct sockaddr_in6 *)newaddr)->sin6_addr));
 	else
 		netp->addr_is_local = in_localaddr(((struct sockaddr_in *)newaddr)->sin_addr);
 #else
