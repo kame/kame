@@ -1,11 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1460 2001/01/02 11:09:15 jinmei Exp $
+$KAME: CHANGELOG,v 1.1461 2001/01/02 11:20:08 jinmei Exp $
 
 <200101>
 2001-01-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* freebsd3/ports/bind8/: upgraded to bind.8.2.2-p7. This port
-	includes libbind.a that supports A6/DNAME6.
+	* freebsd3/lib/libinet6/Makefile: do not link resolver files when
+	USE_LIBBIND6 is YES, so that enhanced libbind could be tested.
+	* freebsd3/*/Makefile.inc: when USE_LIBBIND6 is YES, link libbind
+	(as well as libinet6).
 
 Tue Jan  2 17:15:44 JST 2001  itojun@iijlab.net
 	* sys/netinet6/in6.c: correct use of IFAREF/IFFREE on non-netsd
