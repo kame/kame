@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: algorithm.h,v 1.1 2000/01/09 01:31:21 itojun Exp $ */
+/* YIPS @(#)$Id: algorithm.h,v 1.2 2000/01/10 21:32:00 itojun Exp $ */
 
 /* algorithm strength */
 enum {
@@ -38,10 +38,8 @@ enum {
 
 struct algorithm_strength {
 	/*
-	 * algorithm type is mapped to least significant bit.
-	 * For example, #1 is mapped to 1st least significant bit.
-	 * #31 is mapped to 2nd most significant bit.
-	 * #0 is not encoded, that is, it means nothing.
+	 * algorithm type N is mapped to 1 << (N - 1).
+	 * N of 0 is not encoded, that is, it means nothing.
 	 */
 	u_int32_t algtype[MAXALGSTRENGTH];
 };
