@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.142 2000/09/15 07:40:18 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.143 2000/09/15 07:45:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2296,8 +2296,8 @@ icmp6_redirect_input(m, off)
 		}
 	} else {
 		log(LOG_ERR,
-			"ICMP6 redirect rejected; no route "
-			"with inet6 gateway found for redirect dst: %s\n",
+			"ICMP6 redirect rejected; "
+			"no route found for redirect dst: %s\n",
 			icmp6_redirect_diag(&src6, &reddst6, &redtgt6));
 		goto freeit;
 	}
