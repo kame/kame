@@ -1,7 +1,7 @@
-/*	$KAME: if_altq.h,v 1.10 2003/02/07 10:17:07 suz Exp $	*/
+/*	$KAME: if_altq.h,v 1.11 2003/07/10 12:07:50 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-2002
+ * Copyright (C) 1997-2003
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,16 +28,14 @@
 #ifndef _ALTQ_IF_ALTQ_H_
 #define	_ALTQ_IF_ALTQ_H_
 
-#ifdef KERNEL
-#ifndef _KERNEL
-#define	_KERNEL
-#endif
-#endif
-
 #if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 #include <sys/lock.h>		/* XXX */
 #include <sys/mutex.h>		/* XXX */
 #include <sys/event.h>		/* XXX */
+#endif
+
+#ifdef _KERNEL_OPT
+#include <altq/altqconf.h>
 #endif
 
 struct altq_pktattr; struct tb_regulator; struct top_cdnr;
@@ -96,6 +94,16 @@ struct altq_pktattr {
 	void	*pattr_class;		/* sched class set by classifier */
 	int	pattr_af;		/* address family */
 	caddr_t	pattr_hdr;		/* saved header position in mbuf */
+};
+
+/*
+ * mbuf tag to carry a queue id (and hints for ECN).
+ */
+struct altq_tag {
+	u_int32_t	qid;		/* queue id */
+	/* hints for ecn */
+	int		af;		/* address family */
+	void		*hdr;		/* saved header position in mbuf */
 };
 
 /*
@@ -168,7 +176,9 @@ extern int altq_enable(struct ifaltq *);
 extern int altq_disable(struct ifaltq *);
 extern struct mbuf *tbr_dequeue(struct ifaltq *, int);
 extern int (*altq_input)(struct mbuf *, int);
+#if 1 /* ALTQ3_CLFIER_COMPAT */
 void altq_etherclassify(struct ifaltq *, struct mbuf *, struct altq_pktattr *);
+#endif
 #endif /* _KERNEL */
 
 #endif /* _ALTQ_IF_ALTQ_H_ */

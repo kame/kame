@@ -1,6 +1,6 @@
-/*	$KAME: altq_priq.c,v 1.9 2003/06/27 09:43:00 kjc Exp $	*/
+/*	$KAME: altq_priq.c,v 1.10 2003/07/10 12:07:48 kjc Exp $	*/
 /*
- * Copyright (C) 2000-2002
+ * Copyright (C) 2000-2003
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -52,8 +52,9 @@
 #include <sys/queue.h>
 
 #include <net/if.h>
-#include <net/if_types.h>
+#include <netinet/in.h>
 
+#include <net/pfvar.h>
 #include <altq/altq.h>
 #include <altq/altq_conf.h>
 #include <altq/altq_priq.h>
@@ -61,12 +62,15 @@
 /*
  * function prototypes
  */
+#ifdef ALTQ3_COMPAT
 static struct priq_if *priq_attach(struct ifaltq *, u_int);
 static int priq_detach(struct priq_if *);
+#endif
 static int priq_clear_interface(struct priq_if *);
 static int priq_request(struct ifaltq *, int, void *);
 static void priq_purge(struct priq_if *);
-static struct priq_class *priq_class_create(struct priq_if *, int, int, int);
+static struct priq_class *priq_class_create(struct priq_if *, int, int, int,
+    int);
 static int priq_class_destroy(struct priq_class *);
 static int priq_enqueue(struct ifaltq *, struct mbuf *, struct altq_pktattr *);
 static struct mbuf *priq_dequeue(struct ifaltq *, int);
@@ -76,6 +80,7 @@ static struct mbuf *priq_getq(struct priq_class *);
 static struct mbuf *priq_pollq(struct priq_class *);
 static void priq_purgeq(struct priq_class *);
 
+#ifdef ALTQ3_COMPAT
 static int priqcmd_if_attach(struct priq_interface *);
 static int priqcmd_if_detach(struct priq_interface *);
 static int priqcmd_add_class(struct priq_add_class *);
@@ -84,59 +89,148 @@ static int priqcmd_modify_class(struct priq_modify_class *);
 static int priqcmd_add_filter(struct priq_add_filter *);
 static int priqcmd_delete_filter(struct priq_delete_filter *);
 static int priqcmd_class_stats(struct priq_class_stats *);
-static void get_class_stats(struct priq_classstats *, struct priq_class *);
-static struct priq_class *clh_to_clp(struct priq_if *, u_long);
-static u_long clp_to_clh(struct priq_class *);
+#endif /* ALTQ3_COMPAT */
 
+static void get_class_stats(struct priq_classstats *, struct priq_class *);
+static struct priq_class *clh_to_clp(struct priq_if *, u_int32_t);
+#if 0
+static u_long clp_to_clh(struct priq_class *);
+#endif
+
+#ifdef ALTQ3_COMPAT
 altqdev_decl(priq);
 
 /* pif_list keeps all priq_if's allocated. */
 static struct priq_if *pif_list = NULL;
+#endif /* ALTQ3_COMPAT */
 
-static struct priq_if *
-priq_attach(ifq, bandwidth)
-	struct ifaltq *ifq;
-	u_int bandwidth;
+int
+priq_pfattach(struct pf_altq *a)
 {
-	struct priq_if *pif;
+	struct ifnet *ifp;
+	int s, error;
 
-	MALLOC(pif, struct priq_if *, sizeof(struct priq_if),
-	       M_DEVBUF, M_WAITOK);
-	if (pif == NULL)
-		return (NULL);
-	bzero(pif, sizeof(struct priq_if));
-	pif->pif_bandwidth = bandwidth;
-	pif->pif_maxpri = -1;
-	pif->pif_ifq = ifq;
-
-	/* add this state to the priq list */
-	pif->pif_next = pif_list;
-	pif_list = pif;
-
-	return (pif);
+	if ((ifp = ifunit(a->ifname)) == NULL || a->altq_disc == NULL)
+		return (EINVAL);
+#ifdef __NetBSD__
+	s = splnet();
+#else
+	s = splimp();
+#endif
+	error = altq_attach(&ifp->if_snd, ALTQT_PRIQ, a->altq_disc,
+	    priq_enqueue, priq_dequeue, priq_request, NULL, NULL);
+	splx(s);
+	return (error);
 }
 
-static int
-priq_detach(pif)
-	struct priq_if *pif;
+int
+priq_add_altq(struct pf_altq *a)
 {
+	struct priq_if	*pif;
+	struct ifnet	*ifp;
+
+	if ((ifp = ifunit(a->ifname)) == NULL)
+		return (EINVAL);
+	if (!ALTQ_IS_READY(&ifp->if_snd))
+		return (ENODEV);
+
+	MALLOC(pif, struct priq_if *, sizeof(struct priq_if),
+	    M_DEVBUF, M_WAITOK);
+	if (pif == NULL)
+		return (ENOMEM);
+	bzero(pif, sizeof(struct priq_if));
+	pif->pif_bandwidth = a->ifbandwidth;
+	pif->pif_maxpri = -1;
+	pif->pif_ifq = &ifp->if_snd;
+
+	/* keep the state in pf_altq */
+	a->altq_disc = pif;
+
+	return (0);
+}
+
+int
+priq_remove_altq(struct pf_altq *a)
+{
+	struct priq_if *pif;
+
+	if ((pif = a->altq_disc) == NULL)
+		return (EINVAL);
+	a->altq_disc = NULL;
+
 	(void)priq_clear_interface(pif);
 
-	/* remove this interface from the pif list */
-	if (pif_list == pif)
-		pif_list = pif->pif_next;
-	else {
-		struct priq_if *p;
-
-		for (p = pif_list; p != NULL; p = p->pif_next)
-			if (p->pif_next == pif) {
-				p->pif_next = pif->pif_next;
-				break;
-			}
-		ASSERT(p != NULL);
-	}
-
 	FREE(pif, M_DEVBUF);
+	return (0);
+}
+
+int
+priq_add_queue(struct pf_altq *a)
+{
+	struct priq_if *pif;
+	struct priq_class *cl;
+
+	if ((pif = a->altq_disc) == NULL)
+		return (EINVAL);
+
+	/* check parameters */
+	if (a->priority >= PRIQ_MAXPRI)
+		return (EINVAL);
+	if (a->qid == 0)
+		return (EINVAL);
+	if (a->qid > PRIQ_MAXQID)
+		return (EINVAL);
+	if (clh_to_clp(pif, a->qid) != NULL)
+		return (EBUSY);
+
+	cl = priq_class_create(pif, a->priority, a->qlimit,
+	    a->pq_u.priq_opts.flags, a->qid);
+	if (cl == NULL)
+		return (ENOMEM);
+
+	return (0);
+}
+
+int
+priq_remove_queue(struct pf_altq *a)
+{
+	struct priq_if *pif;
+	struct priq_class *cl;
+
+	if ((pif = a->altq_disc) == NULL)
+		return (EINVAL);
+
+	if ((cl = clh_to_clp(pif, a->qid)) == NULL)
+		return (EINVAL);
+
+	return (priq_class_destroy(cl));
+}
+
+int
+priq_getqstats(struct pf_altq *a, void *ubuf, int *nbytes)
+{
+	struct priq_if *pif;
+	struct priq_class *cl;
+	struct priq_classstats stats;
+	int error = 0;
+
+	if ((pif = altq_lookup(a->ifname, ALTQT_PRIQ)) == NULL)
+		return (EBADF);
+
+	if ((cl = clh_to_clp(pif, a->qid)) == NULL)
+		return (EINVAL);
+
+	if (*nbytes < sizeof(stats))
+		return (EINVAL);
+
+	get_class_stats(&stats, cl);
+#if 0
+	stats.handle = a->qid;
+#endif
+
+	if ((error = copyout((caddr_t)&stats, ubuf, sizeof(stats))) != 0)
+		return (error);
+	*nbytes = sizeof(stats);
 	return (0);
 }
 
@@ -145,14 +239,15 @@ priq_detach(pif)
  * all the filters and classes.
  */
 static int
-priq_clear_interface(pif)
-	struct priq_if *pif;
+priq_clear_interface(struct priq_if *pif)
 {
 	struct priq_class	*cl;
 	int pri;
 
+#ifdef ALTQ3_CLFIER_COMPAT
 	/* free the filters for this interface */
 	acc_discard_filters(&pif->pif_classifier, NULL, 1);
+#endif
 
 	/* clear out the classes */
 	for (pri = 0; pri <= pif->pif_maxpri; pri++)
@@ -163,10 +258,7 @@ priq_clear_interface(pif)
 }
 
 static int
-priq_request(ifq, req, arg)
-	struct ifaltq *ifq;
-	int req;
-	void *arg;
+priq_request(struct ifaltq *ifq, int req, void *arg)
 {
 	struct priq_if	*pif = (struct priq_if *)ifq->altq_disc;
 
@@ -180,8 +272,7 @@ priq_request(ifq, req, arg)
 
 /* discard all the queued packets on the interface */
 static void
-priq_purge(pif)
-	struct priq_if *pif;
+priq_purge(struct priq_if *pif)
 {
 	struct priq_class *cl;
 	int pri;
@@ -195,9 +286,7 @@ priq_purge(pif)
 }
 
 static struct priq_class *
-priq_class_create(pif, pri, qlimit, flags)
-	struct priq_if *pif;
-	int pri, qlimit, flags;
+priq_class_create(struct priq_if *pif, int pri, int qlimit, int flags, int qid)
 {
 	struct priq_class *cl;
 	int s;
@@ -256,7 +345,7 @@ priq_class_create(pif, pri, qlimit, flags)
 	if (pri > pif->pif_maxpri)
 		pif->pif_maxpri = pri;
 	cl->cl_pif = pif;
-	cl->cl_handle = (u_long)cl;  /* XXX: just a pointer to this class */
+	cl->cl_handle = qid;
 
 #ifdef ALTQ_RED
 	if (flags & (PRCF_RED|PRCF_RIO)) {
@@ -283,8 +372,10 @@ priq_class_create(pif, pri, qlimit, flags)
 		} else
 #endif
 		if (flags & PRCF_RED) {
-			cl->cl_red = red_alloc(0, 0, 0, 0,
-					       red_flags, red_pkttime);
+			cl->cl_red = red_alloc(0, 0,
+			    qlimit(cl->cl_q) * 10/100,
+			    qlimit(cl->cl_q) * 30/100,
+			    red_flags, red_pkttime);
 			if (cl->cl_red != NULL)
 				qtype(cl->cl_q) = Q_RED;
 		}
@@ -311,8 +402,7 @@ priq_class_create(pif, pri, qlimit, flags)
 }
 
 static int
-priq_class_destroy(cl)
-	struct priq_class *cl;
+priq_class_destroy(struct priq_class *cl)
 {
 	struct priq_if *pif;
 	int s, pri;
@@ -323,8 +413,10 @@ priq_class_destroy(cl)
 	s = splimp();
 #endif
 
+#ifdef ALTQ3_CLFIER_COMPAT
 	/* delete filters referencing to this class */
 	acc_discard_filters(&cl->cl_pif->pif_classifier, cl, 0);
+#endif
 
 	if (!qempty(cl->cl_q))
 		priq_purgeq(cl);
@@ -362,20 +454,46 @@ priq_class_destroy(cl)
  * (*altq_enqueue) in struct ifaltq.
  */
 static int
-priq_enqueue(ifq, m, pktattr)
-	struct ifaltq *ifq;
-	struct mbuf *m;
-	struct altq_pktattr *pktattr;
+priq_enqueue(struct ifaltq *ifq, struct mbuf *m, struct altq_pktattr *pktattr)
 {
 	struct priq_if	*pif = (struct priq_if *)ifq->altq_disc;
 	struct priq_class *cl;
+	struct m_tag *t;
 	int len;
 
 	/* grab class set by classifier */
-	if (pktattr == NULL || (cl = pktattr->pattr_class) == NULL)
+	if ((m->m_flags & M_PKTHDR) == 0) {
+		/* should not happen */
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+		printf("altq: packet for %s does not have pkthdr\n",
+		    ifq->altq_ifp->if_xname);
+#else
+		printf("altq: packet for %s%d does not have pkthdr\n",
+		    ifq->altq_ifp->if_name, ifq->altq_ifp->if_unit);
+#endif
+		m_freem(m);
+		return (ENOBUFS);
+	}
+	cl = NULL;
+	if ((t = m_tag_find(m, PACKET_TAG_PF_QID, NULL)) != NULL)
+		cl = clh_to_clp(pif, ((struct altq_tag *)(t+1))->qid);
+#ifdef ALTQ3_COMPAT
+	else if ((ifq->altq_flags & ALTQF_CLASSIFY) && pktattr != NULL)
+		cl = pktattr->pattr_class;
+#endif
+	if (cl == NULL) {
 		cl = pif->pif_default;
-	cl->cl_pktattr = pktattr;  /* save proto hdr used by ECN */
-
+		if (cl == NULL) {
+			m_freem(m);
+			return (ENOBUFS);
+		}
+	}
+#ifdef ALTQ3_COMPAT
+	if (pktattr != NULL)
+		cl->cl_pktattr = pktattr;  /* save proto hdr used by ECN */
+	else
+#endif
+		cl->cl_pktattr = NULL;
 	len = m_pktlen(m);
 	if (priq_addq(cl, m) != 0) {
 		/* drop occurred.  mbuf was freed in priq_addq. */
@@ -398,9 +516,7 @@ priq_enqueue(ifq, m, pktattr)
  *	after ALTDQ_POLL.
  */
 static struct mbuf *
-priq_dequeue(ifq, op)
-	struct ifaltq	*ifq;
-	int		op;
+priq_dequeue(struct ifaltq *ifq, int op)
 {
 	struct priq_if	*pif = (struct priq_if *)ifq->altq_disc;
 	struct priq_class *cl;
@@ -431,9 +547,7 @@ priq_dequeue(ifq, op)
 }
 
 static int
-priq_addq(cl, m)
-	struct priq_class *cl;
-	struct mbuf *m;
+priq_addq(struct priq_class *cl, struct mbuf *m)
 {
 
 #ifdef ALTQ_RIO
@@ -459,8 +573,7 @@ priq_addq(cl, m)
 }
 
 static struct mbuf *
-priq_getq(cl)
-	struct priq_class *cl;
+priq_getq(struct priq_class *cl)
 {
 #ifdef ALTQ_RIO
 	if (q_is_rio(cl->cl_q))
@@ -481,8 +594,7 @@ priq_pollq(cl)
 }
 
 static void
-priq_purgeq(cl)
-	struct priq_class *cl;
+priq_purgeq(struct priq_class *cl)
 {
 	struct mbuf *m;
 
@@ -494,6 +606,95 @@ priq_purgeq(cl)
 		m_freem(m);
 	}
 	ASSERT(qlen(cl->cl_q) == 0);
+}
+
+static void
+get_class_stats(struct priq_classstats *sp, struct priq_class *cl)
+{
+	sp->class_handle = cl->cl_handle;
+	sp->qlength = qlen(cl->cl_q);
+	sp->qlimit = qlimit(cl->cl_q);
+	sp->period = cl->cl_period;
+	sp->xmitcnt = cl->cl_xmitcnt;
+	sp->dropcnt = cl->cl_dropcnt;
+
+	sp->qtype = qtype(cl->cl_q);
+#ifdef ALTQ_RED
+	if (q_is_red(cl->cl_q))
+		red_getstats(cl->cl_red, &sp->red[0]);
+#endif
+#ifdef ALTQ_RIO
+	if (q_is_rio(cl->cl_q))
+		rio_getstats((rio_t *)cl->cl_red, &sp->red[0]);
+#endif
+
+}
+
+/* convert a class handle to the corresponding class pointer */
+static struct priq_class *
+clh_to_clp(struct priq_if *pif, u_int32_t chandle)
+{
+	int idx;
+
+	if (chandle == 0)
+		return (NULL);
+
+	for (idx = pif->pif_maxpri; idx >= 0; idx--)
+		if (pif->pif_classes[idx] != NULL &&
+		    pif->pif_classes[idx]->cl_handle == chandle)
+			return (pif->pif_classes[idx]);
+
+	return (NULL);
+}
+
+
+#ifdef ALTQ3_COMPAT
+
+static struct priq_if *
+priq_attach(ifq, bandwidth)
+	struct ifaltq *ifq;
+	u_int bandwidth;
+{
+	struct priq_if *pif;
+
+	MALLOC(pif, struct priq_if *, sizeof(struct priq_if),
+	       M_DEVBUF, M_WAITOK);
+	if (pif == NULL)
+		return (NULL);
+	bzero(pif, sizeof(struct priq_if));
+	pif->pif_bandwidth = bandwidth;
+	pif->pif_maxpri = -1;
+	pif->pif_ifq = ifq;
+
+	/* add this state to the priq list */
+	pif->pif_next = pif_list;
+	pif_list = pif;
+
+	return (pif);
+}
+
+static int
+priq_detach(pif)
+	struct priq_if *pif;
+{
+	(void)priq_clear_interface(pif);
+
+	/* remove this interface from the pif list */
+	if (pif_list == pif)
+		pif_list = pif->pif_next;
+	else {
+		struct priq_if *p;
+
+		for (p = pif_list; p != NULL; p = p->pif_next)
+			if (p->pif_next == pif) {
+				p->pif_next = pif->pif_next;
+				break;
+			}
+		ASSERT(p != NULL);
+	}
+
+	FREE(pif, M_DEVBUF);
+	return (0);
 }
 
 /*
@@ -703,11 +904,13 @@ priqcmd_add_class(ap)
 		return (EINVAL);
 
 	if ((cl = priq_class_create(pif, ap->pri,
-				    ap->qlimit, ap->flags)) == NULL)
+	    ap->qlimit, ap->flags, ap->class_handle)) == NULL)
 		return (ENOMEM);
 
+#if 0
 	/* return a class handle to the user */
 	ap->class_handle = clp_to_clh(cl);
+#endif
 	return (0);
 }
 
@@ -756,7 +959,7 @@ priqcmd_modify_class(ap)
 
 	/* call priq_class_create to change class parameters */
 	if ((cl = priq_class_create(pif, ap->pri,
-				    ap->qlimit, ap->flags)) == NULL)
+	    ap->qlimit, ap->flags, ap->class_handle)) == NULL)
 		return (ENOMEM);
 	return 0;
 }
@@ -820,29 +1023,7 @@ priqcmd_class_stats(ap)
 	return (0);
 }
 
-static void get_class_stats(sp, cl)
-	struct priq_classstats *sp;
-	struct priq_class *cl;
-{
-	sp->class_handle = clp_to_clh(cl);
-
-	sp->qlength = qlen(cl->cl_q);
-	sp->period = cl->cl_period;
-	sp->xmitcnt = cl->cl_xmitcnt;
-	sp->dropcnt = cl->cl_dropcnt;
-
-	sp->qtype = qtype(cl->cl_q);
-#ifdef ALTQ_RED
-	if (q_is_red(cl->cl_q))
-		red_getstats(cl->cl_red, &sp->red[0]);
-#endif
-#ifdef ALTQ_RIO
-	if (q_is_rio(cl->cl_q))
-		rio_getstats((rio_t *)cl->cl_red, &sp->red[0]);
-#endif
-
-}
-
+#if 0
 /* convert a class handle to the corresponding class pointer */
 static struct priq_class *
 clh_to_clp(pif, chandle)
@@ -871,6 +1052,7 @@ clp_to_clh(cl)
 {
 	return (cl->cl_handle);
 }
+#endif
 
 #ifdef KLD_MODULE
 
@@ -883,4 +1065,5 @@ MODULE_DEPEND(altq_priq, altq_rio, 1, 1, 1);
 
 #endif /* KLD_MODULE */
 
+#endif /* ALTQ3_COMPAT */
 #endif /* ALTQ_PRIQ */

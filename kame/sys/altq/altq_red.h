@@ -1,7 +1,7 @@
-/*	$KAME: altq_red.h,v 1.7 2002/11/29 04:36:24 kjc Exp $	*/
+/*	$KAME: altq_red.h,v 1.8 2003/07/10 12:07:49 kjc Exp $	*/
 
 /*
- * Copyright (C) 1997-2002
+ * Copyright (C) 1997-2003
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,6 +31,7 @@
 
 #include <altq/altq_classq.h>
 
+#ifdef ALTQ3_COMPAT
 struct red_interface {
 	char	red_ifname[IFNAMSIZ];
 };
@@ -71,6 +72,7 @@ struct red_conf {
 	int red_pkttime;	/* average packet time in usec */
 	int red_flags;		/* see below */
 };
+#endif /* ALTQ3_COMPAT */
 
 /* red flags */
 #define	REDF_ECN4	0x01	/* use packet marking for IPv4 packets */
@@ -97,7 +99,7 @@ struct redstats {
 	u_int		marked_packets;
 };
 
-
+#ifdef ALTQ3_COMPAT
 /*
  * IOCTLs for RED
  */
@@ -108,46 +110,51 @@ struct redstats {
 #define	RED_CONFIG		_IOWR('Q', 6, struct red_conf)
 #define	RED_GETSTATS		_IOWR('Q', 12, struct red_stats)
 #define	RED_SETDEFAULTS		_IOW('Q', 30, struct redparams)
+#endif /* ALTQ3_COMPAT */
 
 #ifdef _KERNEL
 
+#ifdef ALTQ3_COMPAT
 struct flowvalve;
+#endif
 
 /* weight table structure for idle time calibration */
 struct wtab {
-	struct wtab *w_next;
-	int w_weight;
-	int w_param_max;
-	int w_refcount;
-	int32_t w_tab[32];
+	struct wtab	*w_next;
+	int		 w_weight;
+	int		 w_param_max;
+	int		 w_refcount;
+	int32_t		 w_tab[32];
 };
 
 typedef struct red {
-	int red_pkttime; 	/* average packet time in micro sec
-				   used for idle calibration */
-	int red_flags;		/* red flags */
+	int		red_pkttime;	/* average packet time in micro sec
+					   used for idle calibration */
+	int		red_flags;	/* red flags */
 
 	/* red parameters */
-	int red_weight;		/* weight for EWMA */
-	int red_inv_pmax;	/* inverse of max drop probability */
-	int red_thmin;		/* red min threshold */
-	int red_thmax;		/* red max threshold */
+	int		red_weight;	/* weight for EWMA */
+	int		red_inv_pmax;	/* inverse of max drop probability */
+	int		red_thmin;	/* red min threshold */
+	int		red_thmax;	/* red max threshold */
 
 	/* variables for internal use */
-	int red_wshift;		/* log(red_weight) */
-	int red_thmin_s;	/* th_min scaled by avgshift */
-	int red_thmax_s;	/* th_max scaled by avgshift */
-	int red_probd;		/* drop probability denominator */
+	int		red_wshift;	/* log(red_weight) */
+	int		red_thmin_s;	/* th_min scaled by avgshift */
+	int		red_thmax_s;	/* th_max scaled by avgshift */
+	int		red_probd;	/* drop probability denominator */
 
-	int red_avg;		/* queue length average scaled by avgshift */
-	int red_count; 	  	/* packet count since the last dropped/marked
-				   packet */
-	int red_idle;		/* queue was empty */
-	int red_old;		/* avg is above th_min */
-	struct wtab *red_wtab;	/* weight table */
-	struct timeval red_last;  /* timestamp when the queue becomes idle */
+	int		red_avg;	/* queue len avg scaled by avgshift */
+	int		red_count;	/* packet count since last dropped/
+					   marked packet */
+	int		red_idle;	/* queue was empty */
+	int		red_old;	/* avg is above th_min */
+	struct wtab	*red_wtab;	/* weight table */
+	struct timeval	 red_last;	/* time when the queue becomes idle */
 
+#ifdef ALTQ3_COMPAT
 	struct flowvalve *red_flowvalve;	/* flowvalve state */
+#endif
 
 	struct {
 		struct pktcntr	xmit_cnt;
@@ -158,6 +165,7 @@ typedef struct red {
 	} red_stats;
 } red_t;
 
+#ifdef ALTQ3_COMPAT
 typedef struct red_queue {
 	struct red_queue *rq_next;	/* next red_state in the list */
 	struct ifaltq *rq_ifq;		/* backpointer to ifaltq */
@@ -166,23 +174,24 @@ typedef struct red_queue {
 
 	red_t *rq_red;
 } red_queue_t;
+#endif /* ALTQ3_COMPAT */
 
 /* red drop types */
 #define	DTYPE_NODROP	0	/* no drop */
 #define	DTYPE_FORCED	1	/* a "forced" drop */
 #define	DTYPE_EARLY	2	/* an "unforced" (early) drop */
 
-extern red_t *red_alloc(int, int, int, int, int, int);
-extern void red_destroy(red_t *);
-extern void red_getstats(red_t *, struct redstats *);
-extern int red_addq(red_t *, class_queue_t *, struct mbuf *,
-		    struct altq_pktattr *);
-extern struct mbuf *red_getq(red_t *, class_queue_t *);
-extern int drop_early(int, int, int);
-extern int mark_ecn(struct mbuf *, struct altq_pktattr *, int);
-extern struct wtab *wtab_alloc(int);
-extern int wtab_destroy(struct wtab *);
-extern int32_t pow_w(struct wtab *, int);
+extern red_t		*red_alloc(int, int, int, int, int, int);
+extern void		 red_destroy(red_t *);
+extern void		 red_getstats(red_t *, struct redstats *);
+extern int		 red_addq(red_t *, class_queue_t *, struct mbuf *,
+			     struct altq_pktattr *);
+extern struct mbuf	*red_getq(red_t *, class_queue_t *);
+extern int		 drop_early(int, int, int);
+extern int		 mark_ecn(struct mbuf *, struct altq_pktattr *, int);
+extern struct wtab	*wtab_alloc(int);
+extern int		 wtab_destroy(struct wtab *);
+extern int32_t		 pow_w(struct wtab *, int);
 
 #endif /* _KERNEL */
 

@@ -1,7 +1,7 @@
-/*	$KAME: altq.h,v 1.9 2002/11/05 03:48:30 itojun Exp $	*/
+/*	$KAME: altq.h,v 1.10 2003/07/10 12:07:47 kjc Exp $	*/
 
 /*
- * Copyright (C) 1998-2002
+ * Copyright (C) 1998-2003
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,6 +28,16 @@
 #ifndef _ALTQ_ALTQ_H_
 #define	_ALTQ_ALTQ_H_
 
+#if 1
+/*
+ * allow altq-3 (altqd(8) and /dev/altq) to coexist with the new pf-based altq.
+ * altq3 is mainly for research experiments. pf-based altq is for daily use.
+ */
+#define ALTQ3_COMPAT		/* for compatibility with altq-3 */
+#define ALTQ3_CLFIER_COMPAT	/* for compatibility with altq-3 classifier */
+#endif
+
+#ifdef ALTQ3_COMPAT
 #include <sys/param.h>
 #include <sys/ioccom.h>
 #include <sys/queue.h>
@@ -36,6 +46,7 @@
 #ifndef IFNAMSIZ
 #define	IFNAMSIZ	16
 #endif
+#endif /* ALTQ3_COMPAT */
 
 /* altq discipline type */
 #define	ALTQT_NONE		0	/* reserved */
@@ -53,10 +64,12 @@
 #define	ALTQT_JOBS		12	/* JoBS */
 #define	ALTQT_MAX		13	/* should be max discipline type + 1 */
 
+#ifdef ALTQ3_COMPAT
 struct	altqreq {
 	char	ifname[IFNAMSIZ];	/* if name, e.g. "en0" */
 	u_long	arg;			/* request-specific argument */
 };
+#endif
 
 /* simple token backet meter profile */
 struct	tb_profile {
@@ -64,11 +77,13 @@ struct	tb_profile {
 	u_int	depth;	/* depth in bytes */
 };
 
+#ifdef ALTQ3_COMPAT
 struct	tbrreq {
 	char	ifname[IFNAMSIZ];	/* if name, e.g. "en0" */
 	struct	tb_profile tb_prof;	/* token bucket profile */
 };
 
+#ifdef ALTQ3_CLFIER_COMPAT
 /*
  * common network flow info structure
  */
@@ -139,6 +154,8 @@ struct flow_filter6 {
 	} ff_mask6;
 };
 #endif /* INET6 */
+#endif /* ALTQ3_CLFIER_COMPAT */
+#endif /* ALTQ3_COMPAT */
 
 /*
  * generic packet counter
@@ -151,6 +168,7 @@ struct pktcntr {
 #define	PKTCNTR_ADD(cntr, len)	\
 	do { (cntr)->packets++; (cntr)->bytes += len; } while (/*CONSTCOND*/ 0)
 
+#ifdef ALTQ3_COMPAT
 /*
  * altq related ioctls
  */
@@ -176,21 +194,7 @@ struct pktcntr {
 #endif /* 0 */
 #define	ALTQTBRSET	_IOW('q', 14, struct tbrreq)	/* set tb regulator */
 #define	ALTQTBRGET	_IOWR('q', 15, struct tbrreq)	/* get tb regulator */
-
-/* queue macros only in FreeBSD */
-#ifndef LIST_EMPTY
-#define	LIST_EMPTY(head) ((head)->lh_first == NULL)
-#endif
-#ifndef LIST_FOREACH
-#define	LIST_FOREACH(var, head, field)					\
-	for((var) = (head)->lh_first; (var); (var) = (var)->field.le_next)
-#endif
-
-#ifdef KERNEL
-#ifndef _KERNEL
-#define	_KERNEL
-#endif
-#endif
+#endif /* ALTQ3_COMPAT */
 
 #ifdef _KERNEL
 #include <altq/altq_var.h>

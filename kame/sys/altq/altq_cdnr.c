@@ -1,4 +1,4 @@
-/*	$KAME: altq_cdnr.c,v 1.12 2003/02/08 18:24:16 kjc Exp $	*/
+/*	$KAME: altq_cdnr.c,v 1.13 2003/07/10 12:07:47 kjc Exp $	*/
 
 /*
  * Copyright (C) 1999-2002
@@ -60,6 +60,7 @@
 #include <altq/altq_conf.h>
 #include <altq/altq_cdnr.h>
 
+#ifdef ALTQ3_COMPAT
 /*
  * diffserv traffic conditioning module
  */
@@ -1381,4 +1382,5 @@ ALTQ_MODULE(altq_cdnr, ALTQT_CDNR, &cdnr_sw);
 
 #endif /* KLD_MODULE */
 
+#endif /* ALTQ3_COMPAT */
 #endif /* ALTQ_CDNR */

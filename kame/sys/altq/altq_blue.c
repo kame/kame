@@ -1,4 +1,4 @@
-/*	$KAME: altq_blue.c,v 1.12 2003/02/08 18:24:16 kjc Exp $	*/
+/*	$KAME: altq_blue.c,v 1.13 2003/07/10 12:07:47 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -93,6 +93,7 @@
 #include <altq/altq_conf.h>
 #include <altq/altq_blue.h>
 
+#ifdef ALTQ3_COMPAT
 /*
  * Blue is proposed and implemented by Wu-chang Feng <wuchang@eecs.umich.edu>.
  * more information on Blue is available from
@@ -690,4 +691,5 @@ ALTQ_MODULE(altq_blue, ALTQT_BLUE, &blue_sw);
 
 #endif /* KLD_MODULE */
 
+#endif /* ALTQ3_COMPAT */
 #endif /* ALTQ_BLUE */

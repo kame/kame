@@ -1,4 +1,4 @@
-/*	$KAME: altq_wfq.c,v 1.11 2003/02/08 18:24:17 kjc Exp $	*/
+/*	$KAME: altq_wfq.c,v 1.12 2003/07/10 12:07:49 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -61,6 +61,7 @@
 #include <altq/altq_conf.h>
 #include <altq/altq_wfq.h>
 
+#ifdef ALTQ3_COMPAT
 /*
 #define	WFQ_DEBUG
 */
@@ -768,4 +769,5 @@ ALTQ_MODULE(altq_wfq, ALTQT_WFQ, &wfq_sw);
 
 #endif /* KLD_MODULE */
 
+#endif /* ALTQ3_COMPAT */
 #endif /* ALTQ_WFQ */

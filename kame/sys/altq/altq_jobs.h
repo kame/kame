@@ -1,4 +1,4 @@
-/*	$KAME: altq_jobs.h,v 1.5 2002/11/05 03:48:30 itojun Exp $	*/
+/*	$KAME: altq_jobs.h,v 1.6 2003/07/10 12:07:48 kjc Exp $	*/
 /*
  * Copyright (c) 2001, Rector and Visitors of the University of 
  * Virginia.
@@ -217,7 +217,9 @@ struct jobs_modify_class {
 struct jobs_add_filter {
 	struct	jobs_interface iface;
 	u_long	class_handle;
+#ifdef ALTQ3_CLFIER_COMPAT
 	struct	flow_filter filter;
+#endif
 	u_long	filter_handle;		/* return value */
 };
 
@@ -366,8 +368,9 @@ struct jobs_if {
 	struct	ifaltq	*jif_ifq;		/* backpointer to ifaltq */
 	struct	jobs_class *jif_default;	/* default class */
 	struct	jobs_class *jif_classes[JOBS_MAXPRI]; /* classes */
+#ifdef ALTQ3_CLFIER_COMPAT
 	struct	acc_classifier jif_classifier;	/* classifier */
-
+#endif
 	int	jif_maxpri;			/* max priority in use */
 
 	u_int	jif_bandwidth;			/* link bandwidth in bps */

@@ -1,4 +1,4 @@
-/*	$KAME: altq_jobs.c,v 1.6 2003/02/08 18:24:16 kjc Exp $	*/
+/*	$KAME: altq_jobs.c,v 1.7 2003/07/10 12:07:48 kjc Exp $	*/
 /*
  * Copyright (c) 2001, the Rector and Board of Visitors of the
  * University of Virginia.
@@ -89,6 +89,7 @@
 #include <altq/altq_conf.h>
 #include <altq/altq_jobs.h>
 
+#ifdef ALTQ3_COMPAT
 /*
  * function prototypes
  */
@@ -2265,4 +2266,5 @@ ALTQ_MODULE(altq_jobs, ALTQT_JOBS, &jobs_sw);
 
 #endif /* KLD_MODULE */
 
+#endif /* ALTQ3_COMPAT */
 #endif /* ALTQ_JOBS */

@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.c,v 1.19 2003/02/08 18:24:16 kjc Exp $	*/
+/*	$KAME: altq_conf.c,v 1.20 2003/07/10 12:07:48 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2003
@@ -52,6 +52,8 @@
 
 #include <altq/altq.h>
 #include <altq/altq_conf.h>
+
+#ifdef ALTQ3_COMPAT
 
 #ifdef ALTQ_CBQ
 altqdev_decl(cbq);
@@ -162,38 +164,19 @@ static struct altqsw altqsw[] = {				/* minor */
  */
 int	naltqsw = sizeof (altqsw) / sizeof (altqsw[0]);
 
-#ifndef __OpenBSD__
+#ifdef __FreeBSD__
 static	d_open_t	altqopen;
 static	d_close_t	altqclose;
 static	d_ioctl_t	altqioctl;
-#endif
-#ifdef __FreeBSD__
+
 static void altq_drvinit(void *);
 #else
-void	altqattach(int);
+cdev_decl(altq);
 #endif
 
 #if defined(__FreeBSD__)
 #define	CDEV_MAJOR 96		/* FreeBSD official number */
-#elif defined(__NetBSD__)
-#if defined(__i386__)
-#define	CDEV_MAJOR 75		/* NetBSD i386 (not official) */
-#elif defined(__alpha__)
-#define	CDEV_MAJOR 62		/* NetBSD alpha (not official) */
-#else
-#error arch not supported
-#endif
-#elif defined(__OpenBSD__)
-#if defined(__i386__)
-#define	CDEV_MAJOR 74		/* OpenBSD i386 (official) */
-#elif defined(__alpha__)
-#define	CDEV_MAJOR 53		/* OpenBSD alpha (official) */
-#else
-#error arch not supported
-#endif
-#endif
 
-#if defined(__FreeBSD__)
 #if (__FreeBSD_version < 400000)
 static struct cdevsw altq_cdevsw =
         { altqopen,	altqclose,	noread,	        nowrite,
@@ -210,11 +193,9 @@ static struct cdevsw altq_cdevsw =
 	  altqioctl,	seltrue,	nommap,		nostrategy,
 	  "altq",	CDEV_MAJOR,	nodump,		nopsize,  0 };
 #endif
-#elif defined(__NetBSD__)
-static struct cdevsw altq_cdevsw = cdev__oci_init(1,altq);
-#endif
+#endif /* __FreeBSD__ */
 
-#if !defined(__OpenBSD__)
+#if defined(__FreeBSD__)
 static
 #endif
 int
@@ -237,7 +218,7 @@ altqopen(dev, flag, fmt, p)
 	return ENXIO;
 }
 
-#if !defined(__OpenBSD__)
+#if defined(__FreeBSD__)
 static
 #endif
 int
@@ -260,7 +241,7 @@ altqclose(dev, flag, fmt, p)
 	return ENXIO;
 }
 
-#if !defined(__OpenBSD__)
+#if defined(__FreeBSD__)
 static
 #endif
 int
@@ -325,7 +306,7 @@ altqioctl(dev, cmd, addr, flag, p)
 	return ENXIO;
 }
 
-#if defined(__FreeBSD__) || defined(__NetBSD__)
+#if defined(__FreeBSD__)
 static int altq_devsw_installed = 0;
 #endif
 
@@ -391,20 +372,6 @@ altq_drvinit(unused)
 #endif /* FreeBSD 4.x or 5.x */
 
 SYSINIT(altqdev,SI_SUB_DRIVERS,SI_ORDER_MIDDLE+CDEV_MAJOR,altq_drvinit,NULL)
-
-#elif defined(__NetBSD__)
-
-void
-altqattach(int unused)
-{
-	if (!altq_devsw_installed) {
-		bcopy(&altq_cdevsw,
-		      &cdevsw[CDEV_MAJOR],
-		      sizeof(struct cdevsw));
-		altq_devsw_installed = 1;
-		printf("altq: major number is %d\n", CDEV_MAJOR);
-	}
-}
 
 #endif
 
@@ -502,3 +469,4 @@ altq_module_handler(mod, cmd, arg)
 }
 
 #endif  /* ALTQ_KLD */
+#endif /* ALTQ3_COMPAT */

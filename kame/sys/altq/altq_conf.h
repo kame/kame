@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.h,v 1.7 2002/04/03 05:38:50 kjc Exp $	*/
+/*	$KAME: altq_conf.h,v 1.8 2003/07/10 12:07:48 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2002
@@ -27,6 +27,7 @@
  */
 #ifndef _ALTQ_ALTQ_CONF_H_
 #define	_ALTQ_ALTQ_CONF_H_
+#ifdef ALTQ3_COMPAT
 
 #ifdef _KERNEL
 
@@ -104,4 +105,5 @@ int altq_module_handler(module_t, int, void *);
 #endif /* ALTQ_KLD */
 
 #endif /* _KERNEL */
+#endif /* ALTQ3_COMPAT */
 #endif /* _ALTQ_ALTQ_CONF_H_ */

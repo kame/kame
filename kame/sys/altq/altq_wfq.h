@@ -1,4 +1,4 @@
-/*	$KAME: altq_wfq.h,v 1.7 2002/11/29 04:36:24 kjc Exp $	*/
+/*	$KAME: altq_wfq.h,v 1.8 2003/07/10 12:07:49 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -44,7 +44,9 @@ struct wfq_interface{
 
 struct wfq_getqid{
 	struct wfq_interface 	iface;
+#ifdef ALTQ3_CLFIER_COMPAT
 	struct flowinfo 	flow;
+#endif
 	u_long			qid;
 };
 
@@ -115,7 +117,9 @@ typedef struct wfqstate {
 	int bytes;			/* total bytes in all the queues */
 	wfq *rrp;			/* round robin pointer */
 	wfq *queue;			/* pointer to queue list */
+#ifdef ALTQ3_CLFIER_COMPAT
 	u_long (*hash_func)(struct flowinfo *, int);
+#endif
 	u_int32_t fbmask;		/* filter bitmask */
 } wfq_state_t;
 

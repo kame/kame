@@ -1,4 +1,4 @@
-/*	$KAME: altq_cdnr.h,v 1.8 2002/11/29 04:36:23 kjc Exp $	*/
+/*	$KAME: altq_cdnr.h,v 1.9 2003/07/10 12:07:48 kjc Exp $	*/
 
 /*
  * Copyright (C) 1999-2002
@@ -165,8 +165,9 @@ struct cdnr_modify_tswtcm {
 struct cdnr_add_filter {
 	struct cdnr_interface	iface;
 	u_long			cdnr_handle;
+#ifdef ALTQ3_CLFIER_COMPAT
 	struct flow_filter	filter;
-
+#endif
 	u_long			filter_handle;	/* return value */
 };
 
@@ -265,8 +266,9 @@ struct top_cdnr {
 	struct ifaltq		*tc_ifq;
 
 	LIST_HEAD(, cdnr_block) tc_elements;
+#ifdef ALTQ3_CLFIER_COMPAT
 	struct acc_classifier	tc_classifier;
-
+#endif
 	struct pktcntr		tc_cnts[TCACODE_MAX+1];
 };
 

@@ -1,4 +1,4 @@
-/*	$KAME: altq_afmap.c,v 1.9 2002/11/29 04:36:22 kjc Exp $	*/
+/*	$KAME: altq_afmap.c,v 1.10 2003/07/10 12:07:47 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -63,6 +63,8 @@
 #include <altq/altq.h>
 #include <altq/altq_conf.h>
 #include <altq/altq_afmap.h>
+
+#ifdef ALTQ3_COMPAT
 
 LIST_HEAD(, afm_head) afhead_chain;
 
@@ -408,4 +410,5 @@ afmioctl(dev, cmd, addr, flag, p)
 	return error;
 }
 
+#endif /* ALTQ3_COMPAT */
 #endif /* ALTQ_AFMAP */

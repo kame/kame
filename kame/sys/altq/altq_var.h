@@ -1,7 +1,7 @@
-/*	$KAME: altq_var.h,v 1.14 2003/02/08 18:24:17 kjc Exp $	*/
+/*	$KAME: altq_var.h,v 1.15 2003/07/10 12:07:49 kjc Exp $	*/
 
 /*
- * Copyright (C) 1998-2002
+ * Copyright (C) 1998-2003
  *	Sony Computer Science Laboratories Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,6 +34,7 @@
 #include <sys/kernel.h>
 #include <sys/queue.h>
 
+#ifdef ALTQ3_CLFIER_COMPAT
 /*
  * filter structure for altq common classifier
  */
@@ -110,6 +111,7 @@ struct acc_classifier {
 
 #define	FIMB4_PORTS	(FIMB4_DPORT|FIMB4_SPORT|FIMB4_GPI)
 #define	FIMB6_PORTS	(FIMB6_DPORT|FIMB6_SPORT|FIMB6_GPI)
+#endif /* ALTQ3_CLFIER_COMPAT */
 
 /*
  * machine dependent clock
@@ -208,20 +210,57 @@ typedef void (timeout_t)(void *);
 
 #define	m_pktlen(m)		((m)->m_pkthdr.len)
 
-struct ifnet; struct mbuf; struct flowinfo;
+extern int pfaltq_running;
+
+struct ifnet; struct mbuf;
+struct pf_altq;
+#ifdef ALTQ3_CLFIER_COMPAT
+struct flowinfo;
+#endif
 
 void *altq_lookup(char *, int);
+#ifdef ALTQ3_CLFIER_COMPAT
 int altq_extractflow(struct mbuf *, int, struct flowinfo *, u_int32_t);
 int acc_add_filter(struct acc_classifier *, struct flow_filter *,
-		   void *, u_long *);
+    void *, u_long *);
 int acc_delete_filter(struct acc_classifier *, u_long);
 int acc_discard_filters(struct acc_classifier *, void *, int);
 void *acc_classify(void *, struct mbuf *, int);
+#endif
 u_int8_t read_dsfield(struct mbuf *, struct altq_pktattr *);
 void write_dsfield(struct mbuf *, struct altq_pktattr *, u_int8_t);
 void altq_assert(const char *, int, const char *);
 int tbr_set(struct ifaltq *, struct tb_profile *);
 int tbr_get(struct ifaltq *, struct tb_profile *);
+
+int	altq_pfattach(struct pf_altq *);
+int	altq_pfdetach(struct pf_altq *);
+int	altq_add(struct pf_altq *);
+int	altq_remove(struct pf_altq *);
+int	altq_add_queue(struct pf_altq *);
+int	altq_remove_queue(struct pf_altq *);
+int	altq_getqstats(struct pf_altq *, void *, int *);
+
+int	cbq_pfattach(struct pf_altq *);
+int	cbq_add_altq(struct pf_altq *);
+int	cbq_remove_altq(struct pf_altq *);
+int	cbq_add_queue(struct pf_altq *);
+int	cbq_remove_queue(struct pf_altq *);
+int	cbq_getqstats(struct pf_altq *, void *, int *);
+
+int	priq_pfattach(struct pf_altq *);
+int	priq_add_altq(struct pf_altq *);
+int	priq_remove_altq(struct pf_altq *);
+int	priq_add_queue(struct pf_altq *);
+int	priq_remove_queue(struct pf_altq *);
+int	priq_getqstats(struct pf_altq *, void *, int *);
+
+int	hfsc_pfattach(struct pf_altq *);
+int	hfsc_add_altq(struct pf_altq *);
+int	hfsc_remove_altq(struct pf_altq *);
+int	hfsc_add_queue(struct pf_altq *);
+int	hfsc_remove_queue(struct pf_altq *);
+int	hfsc_getqstats(struct pf_altq *, void *, int *);
 
 #endif /* _KERNEL */
 #endif /* _ALTQ_ALTQ_VAR_H_ */

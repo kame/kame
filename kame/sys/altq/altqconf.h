@@ -1,6 +1,14 @@
 /*	$OpenBSD: altqconf.h,v 1.1 2001/06/27 05:28:36 kjc Exp $	*/
 /*	$NetBSD: altqconf.h,v 1.2 2001/05/30 11:57:16 mrg Exp $	*/
 
+#if defined(_KERNEL_OPT) || defined(__OpenBSD__)
+
+#if defined(_KERNEL_OPT)
+#include "opt_altq_enabled.h"
+#endif
+
+#include <sys/conf.h>
+
 #ifdef ALTQ
 #define	NALTQ	1
 #else
@@ -18,3 +26,4 @@ cdev_decl(altq);
 #else
 #define	cdev_altq_init(x,y)	cdev__oci_init(x,y)
 #endif
+#endif /* defined(_KERNEL_OPT) || defined(__OpenBSD__) */
