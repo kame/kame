@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.15 2000/05/30 02:10:56 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.16 2000/05/31 15:45:18 sakane Exp $ */
 
 /* refered to RFC2407 */
 
@@ -92,6 +92,7 @@
 #define   IPSECDOI_ATTR_AUTH_HMAC_SHA1          2
 #define   IPSECDOI_ATTR_AUTH_DES_MAC            3
 #define   IPSECDOI_ATTR_AUTH_KPDK               4 /*RFC-1826(Key/Pad/Data/Key)*/
+#define   IPSECDOI_ATTR_AUTH_NONE               254	/* NOTE:internal use */
 	/*
 	 * When negotiating ESP without authentication, the Auth
 	 * Algorithm attribute MUST NOT be included in the proposal.
