@@ -134,9 +134,6 @@ static const char rcsid[] = "$OpenBSD: ifconfig.c,v 1.73 2003/03/16 05:20:27 mar
 #ifdef HAVE_IFADDRS_H
 #include <ifaddrs.h>
 #endif
-#ifdef USE_ISATAP
-#include <net/if_stf.h>
-#endif
 
 struct	ifreq		ifr, ridreq;
 struct	ifaliasreq	addreq;
@@ -188,11 +185,6 @@ void    setatrange(char *, int);
 void    setatphase(char *, int);
 void    settunnel(char *, char *);
 void    deletetunnel(void);
-#ifdef USE_ISATAP
-void	setisatapmode __P((const char *, int));;
-void	setisataprouter __P((const char *, int));;
-void	deleteisataprouter __P((const char *, int));;
-#endif
 #ifdef INET6
 void	setia6flags(char *, int);
 void	setia6deprecated(const char *, int);
@@ -210,9 +202,6 @@ void	setvlantag(char *, int);
 void	setvlandev(char *, int);
 void	unsetvlandev(char *, int);
 void	vlan_status ();
-#ifdef USE_ISATAP
-void	isatap_status();
-#endif
 void	fixnsel(struct sockaddr_iso *);
 int	main(int, char *[]);
 int	prefix(void *val, int);
@@ -304,11 +293,6 @@ const struct	cmd {
 	{ "giftunnel",  NEXTARG2,	0,		settunnel } ,
 	{ "tunnel",	NEXTARG2,	0,		settunnel } ,
 	{ "deletetunnel",  0,   	0,		deletetunnel } ,
-#ifdef USE_ISATAP
-	{ "isatapmode",	NEXTARG,	0,		setisatapmode },
-	{ "isataprtr",	NEXTARG,	0,		setisataprouter },
-	{ "deleteisataprtr", NEXTARG,	0,		deleteisataprouter },
-#endif
 	{ "link0",	IFF_LINK0,	0,		setifflags } ,
 	{ "-link0",	-IFF_LINK0,	0,		setifflags } ,
 	{ "link1",	IFF_LINK1,	0,		setifflags } ,
@@ -1729,9 +1713,6 @@ status(link, sdl)
 	vlan_status();
 #endif
 	ieee80211_status();
-#ifdef USE_ISATAP
-	isatap_status();
-#endif
 
 	(void) memset(&ifmr, 0, sizeof(ifmr));
 	(void) strlcpy(ifmr.ifm_name, name, sizeof(ifmr.ifm_name));
@@ -2840,121 +2821,3 @@ sec2str(total)
 	return(result);
 }
 #endif
-
-#ifdef USE_ISATAP
-void
-isatap_status()
-{
-	char *buf, *ptr, *lim;
-	size_t needed;
-	int mib[4] = {CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_ISATAPRTR};
-
-	/* just skip if it is not an ISATAP interface */
-	if (ioctl(s, SIOCGSTFMODE, (caddr_t) &ifr) < 0)
-		return;
-	if ((int) ifr.ifr_data != STFM_ISATAP) {
-		printf("\tisatapmode off\n");
-		return;
-	}
-	printf("\tisatapmode on\n");
-
-	if (sysctl(mib, 4, NULL, &needed, NULL, 0) < 0)
-		return;
-	if (needed == 0)
-		return;
-	if ((buf = malloc(needed)) == NULL)
-		errx(1, "malloc");
-	if (sysctl(mib, 4, buf, &needed, NULL, 0) < 0)
-		errx(1, "actual retrieval of ISATAP router list");
-	
-	lim = buf + needed;
-	ptr = buf;
-	while (ptr < lim) {
-		char rtraddr[NI_MAXHOST];
-		struct sockaddr *addr = (struct sockaddr *) ptr;
-
-		if (addr->sa_family != AF_INET) {
-			warnx("invalid addr family (%d)", addr->sa_family);
-			continue;
-		}
-		rtraddr[0] = '\0';
-		getnameinfo(addr, addr->sa_len,
-			    rtraddr, sizeof(rtraddr), 0, 0, NI_NUMERICHOST);
-		if (rtraddr[0])
-			printf("\tisataprtr %s\n", rtraddr);
-		ptr += addr->sa_len;
-	}
-}
-
-void
-setisatapmode(mode, param)
-	const char *mode;
-	int param;
-{
-	int isatapmode;
-	if (strcasecmp(mode, "on") == 0)
-		isatapmode = STFM_ISATAP;
-	else if (strcasecmp(mode, "off") == 0)
-		isatapmode = STFM_6TO4;
-	else
-		err(1, "syntax error");
-
-	memcpy(&ifr.ifr_data, &isatapmode, sizeof(isatapmode));
-	if (ioctl(s, SIOCSSTFMODE, (caddr_t) &ifr) < 0)
-		err(1, "SIOCSSTFMODE");
-}
-
-void
-setisataprouter(addr, param)
-	const char *addr;
-	int param;
-{
-	struct addrinfo hints, *rtrres;
-	struct ifreq ifreq;
-	int ecode;
-
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = afp->af_af;
-	if ((ecode = getaddrinfo(addr, NULL, NULL, &rtrres)) != 0)
-		errx(1, "error in parsing address string: %s",
-		    gai_strerror(ecode));
-
-	if (rtrres->ai_addr->sa_family != AF_INET)
-		errx(1, "ISATAP router must be an IPv4 address");
-
-	memset(&ifreq, 0, sizeof(ifreq));
-	strncpy(ifreq.ifr_name, name, IFNAMSIZ);
-	memcpy(&ifreq.ifr_addr, rtrres->ai_addr, rtrres->ai_addr->sa_len);
-
-	if (ioctl(s, SIOCSISATAPRTR, &ifreq) < 0)
-		warn("SIOCSISATAPRTR");
-	freeaddrinfo(rtrres);
-}
-
-void
-deleteisataprouter(addr, param)
-	const char *addr;
-	int param;
-{
-	struct addrinfo hints, *rtrres;
-	struct ifreq ifreq;
-	int ecode;
-
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = afp->af_af;
-	if ((ecode = getaddrinfo(addr, NULL, NULL, &rtrres)) != 0)
-		errx(1, "error in parsing address string: %s",
-		    gai_strerror(ecode));
-
-	if (rtrres->ai_addr->sa_family != AF_INET)
-		errx(1, "ISATAP router must be an IPv4 address");
-
-	memset(&ifreq, 0, sizeof(ifreq));
-	strncpy(ifreq.ifr_name, name, IFNAMSIZ);
-	memcpy(&ifreq.ifr_addr, rtrres->ai_addr, rtrres->ai_addr->sa_len);
-
-	if (ioctl(s, SIOCDISATAPRTR, &ifreq) < 0)
-		warn("SIOCDISATAPRTR");
-	freeaddrinfo(rtrres);
-}
-#endif /* USE_ISATAP */
