@@ -138,8 +138,8 @@ struct pool rttimer_pool;	/* pool for rttimer structures */
 struct callout rt_timer_ch; /* callout for rt_timer_timer() */
 
 /* XXX do these values make any sense? */
-static int rt_cache_hiwat = 4096;
-static int rt_cache_lowat = 1024;
+static int rt_cache_hiwat = -1;	/* temporarliy disabled */
+static int rt_cache_lowat = -1;	/* ditto */
 
 static int rt_cachetimeout = 3600;	/* should be configurable */
 static struct rttimer_queue *rt_cache_timeout_q = NULL;
