@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.9 1999/12/07 07:25:22 sumikawa Exp $
+# $Id: Makefile,v 1.10 1999/12/07 16:18:19 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -18,6 +18,8 @@ SUBDIR+=	icecast
 SUBDIR+=	ipv6socket_scrub
 SUBDIR+=	irc
 SUBDIR+=	inn
+SUBDIR+=	ja-w3m
+SUBDIR+=	ja-w3m-ssl
 SUBDIR+=	kaffe
 SUBDIR+=	libident6
 SUBDIR+=	lynx
@@ -56,6 +58,7 @@ SUBDIR+=	vat6
 SUBDIR+=	vic6
 SUBDIR+=	vnc
 SUBDIR+=	w3m
+SUBDIR+=	w3m-ssl
 SUBDIR+=	wbd
 SUBDIR+=	wget
 SUBDIR+=	wu-ftpd
