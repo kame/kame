@@ -1,4 +1,4 @@
-/*	$KAME: if_nametoindex.c,v 1.4 2000/04/24 10:08:41 itojun Exp $	*/
+/*	$KAME: if_nametoindex.c,v 1.5 2000/11/24 08:04:40 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1997, 2000
@@ -34,18 +34,22 @@
 #include <string.h>
 
 /*
- * From RFC 2133:
+ * From RFC 2553:
  *
- * 4.1.  Name-to-Index
+ * 4.1 Name-to-Index
+ *
  *
  *    The first function maps an interface name into its corresponding
  *    index.
  *
- *        #include <net/if.h>
+ *       #include <net/if.h>
  *
- *        unsigned int  if_nametoindex(const char *ifname);
+ *       unsigned int  if_nametoindex(const char *ifname);
  *
- *    If the specified interface does not exist, the return value is 0.
+ *    If the specified interface name does not exist, the return value is
+ *    0, and errno is set to ENXIO.  If there was a system error (such as
+ *    running out of memory), the return value is 0 and errno is set to the
+ *    proper value (e.g., ENOMEM).
  */
 
 unsigned int
@@ -69,5 +73,7 @@ if_nametoindex(const char *ifname)
 	}
 
 	freeifaddrs(ifaddrs);
+	if (!ni)
+		errno = ENXIO;
 	return(ni);
 }
