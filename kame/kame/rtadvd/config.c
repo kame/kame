@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.49 2001/06/11 03:09:54 itojun Exp $	*/
+/*	$KAME: config.c,v 1.50 2001/06/11 03:12:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -161,7 +161,7 @@ getconfig(intface)
 	MAYHAVE(val, "maxinterval", DEF_MAXRTRADVINTERVAL);
 	if (val < MIN_MAXINTERVAL || val > MAX_MAXINTERVAL) {
 		syslog(LOG_ERR,
-		       "<%s> maxinterval (%d) on %s is invalid "
+		       "<%s> maxinterval (%ld) on %s is invalid "
 		       "(must be between %e and %u)", __FUNCTION__, val,
 		       intface, MIN_MAXINTERVAL, MAX_MAXINTERVAL);
 		exit(1);
@@ -170,7 +170,7 @@ getconfig(intface)
 	MAYHAVE(val, "mininterval", tmp->maxinterval/3);
 	if (val < MIN_MININTERVAL || val > (tmp->maxinterval * 3) / 4) {
 		syslog(LOG_ERR,
-		       "<%s> mininterval (%d) on %s is invalid "
+		       "<%s> mininterval (%ld) on %s is invalid "
 		       "(must be between %e and %d)",
 		       __FUNCTION__, val, intface, MIN_MININTERVAL,
 		       (tmp->maxinterval * 3) / 4);
@@ -202,7 +202,7 @@ getconfig(intface)
 	MAYHAVE(val, "rltime", tmp->maxinterval * 3);
 	if (val && (val < tmp->maxinterval || val > MAXROUTERLIFETIME)) {
 		syslog(LOG_ERR,
-		       "<%s> router lifetime (%d) on %s is invalid "
+		       "<%s> router lifetime (%ld) on %s is invalid "
 		       "(must be 0 or between %d and %d)",
 		       __FUNCTION__, val, intface, tmp->maxinterval,
 		       tmp->maxinterval, MAXROUTERLIFETIME);
@@ -436,10 +436,10 @@ getconfig(intface)
 	}
 	else if (tmp->linkmtu < IPV6_MMTU || tmp->linkmtu > tmp->phymtu) {
 		syslog(LOG_ERR,
-		       "<%s> advertised link mtu (%ld) on %s is invalid (must "
+		       "<%s> advertised link mtu (%lu) on %s is invalid (must "
 		       "be between least MTU (%d) and physical link MTU (%d)",
-		       __FUNCTION__, tmp->linkmtu, intface, IPV6_MMTU,
-		       tmp->phymtu);
+		       __FUNCTION__, (unsigned long)tmp->linkmtu, intface,
+		       IPV6_MMTU, tmp->phymtu);
 		exit(1);
 	}
 
