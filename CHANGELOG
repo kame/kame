@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1845 2001/08/16 14:41:32 itojun Exp $
+$KAME: CHANGELOG,v 1.1846 2001/08/16 20:37:15 itojun Exp $
 
 <200108>
+Fri Aug 17 05:24:45 JST 2001  itojun@iijlab.net
+	* kame/setkey/parse.y: handle FQDN address in SPD/SAD configurations.
+	  when an FQDN resolves into multiple addresses, setkey(8) will
+	  install SPD/SAD entries for all possible combinations.
+	  inspired by Solaris IPsec stack.
+
 2001-08-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/usr.sbin/netstat/stats_inet6.h:
 	* {freebsd4,netbsd}/usr.bin/netstat/inet6.c (ip6_stats):
