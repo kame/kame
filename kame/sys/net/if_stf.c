@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.109 2003/05/01 08:03:46 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.110 2003/10/22 09:18:43 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -154,30 +154,21 @@
 #endif
 
 #if NSTF > 0
-#if NSTF > 2
-# error more than two stf interfaces not allowed
-#endif
+# if NSTF > 1
+# error more than one stf interface not allowed
+# endif
 
 #define IN6_IS_ADDR_6TO4(x)	(ntohs((x)->s6_addr16[0]) == 0x2002)
-#define IN6_IS_ADDR_ISATAP(x)	(ntohl((x)->s6_addr32[2]) == 0x00005efe)
-#define IN6_IS_ADDR_STF(x, y) \
-	((STF_IS_6TO4(x) && IN6_IS_ADDR_6TO4(y)) || \
-	 (STF_IS_ISATAP(x) && IN6_IS_ADDR_ISATAP(y)))
 
 /*
  * XXX: Return a pointer with 16-bit aligned.  Don't cast it to
  * struct in_addr *; use bcopy() instead.
  */
-#define GET_V4(x, y) (STF_IS_6TO4(x) ? \
-			 ((caddr_t)(&(y)->s6_addr16[1])) : \
-		      STF_IS_ISATAP(x) ? \
-			 ((caddr_t)(&(y)->s6_addr16[6])) : \
-		      NULL)
+#define GET_V4(x, y) ((caddr_t)(&(y)->s6_addr16[1]))
 
 
 LIST_HEAD(, stf_softc) stf_softc_list;
 static struct stf_softc *stf;
-TAILQ_HEAD(isatap_rtrlist, isatap_rtr) isatap_rtrlist;
 static int nstf;
 
 #if NGIF > 0
@@ -208,7 +199,6 @@ void stfattach __P((int));
 #endif
 static int stf_encapcheck __P((const struct mbuf *, int, int, void *));
 static struct in6_ifaddr *stf_getsrcifa6 __P((struct ifnet *));
-static int isatap_match_prefix __P((struct ifnet *, struct in6_addr *));
 static int stf_output __P((struct ifnet *, struct mbuf *, struct sockaddr *,
 	struct rtentry *));
 static int isrfc1918addr __P((struct in_addr *));
@@ -229,12 +219,6 @@ static int stf_ioctl __P((struct ifnet *, int, caddr_t));
 static int stf_ioctl __P((struct ifnet *, u_long, caddr_t));
 #endif
 
-#ifdef __FreeBSD__
-static int fill_isatap_rtrlist __P((struct sysctl_req *));
-#else
-int fill_isatap_rtrlist __P((void *, size_t *, size_t));
-#endif
-
 void
 stfattach(dummy)
 #ifdef __FreeBSD__
@@ -247,8 +231,6 @@ stfattach(dummy)
 	int i;
 	const struct encaptab *p;
 
-	if (nstf == 0)
-		TAILQ_INIT(&isatap_rtrlist);
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	nstf = dummy;
 #else
@@ -287,17 +269,6 @@ stfattach(dummy)
 #endif
 		/* turn off ingress filter */
 		sc->sc_if.if_flags  |= IFF_LINK2;
-
-		/* XXX: hardcoding */
-		if (i == 0) {
-			sc->sc_mode = STFM_6TO4; 
-			sc->sc_if.if_flags &= ~IFF_MULTICAST;
-			/* just for backward compatibility */
-		}
-		if (i == 1) {
-			sc->sc_mode = STFM_ISATAP;
-			sc->sc_if.if_flags |= IFF_MULTICAST;
-		}
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 		sc->sc_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
@@ -359,9 +330,8 @@ stf_encapcheck(m, off, proto, arg)
 
 	/*
 	 * check if IPv4 dst matches the IPv4 address derived from the
-	 * local 6to4/ISATAP address.
-	 * success on: dst = 10.1.1.1, ia6->ia_addr = 2002:0a01:0101:... (6to4)
-	 *     dst = 10.1.1.1, ia6->ia_addr = (prefix)::5efe:0a01:0101 (ISATAP)
+	 * local 6to4 address.
+	 * success on: dst = 10.1.1.1, ia6->ia_addr = 2002:0a01:0101:...
 	 */
 	if (bcmp(GET_V4(sc, &ia6->ia_addr.sin6_addr), &ip.ip_dst,
 	    sizeof(ip.ip_dst)) != 0)
@@ -373,27 +343,15 @@ stf_encapcheck(m, off, proto, arg)
 	 * success on: src = 10.1.1.1, ia6->ia_addr = 2002:0a00:.../24
 	 * fail on: src = 10.1.1.1, ia6->ia_addr = 2002:0b00:.../24
 	 */
-	if (STF_IS_6TO4(sc)) {
-		bzero(&a, sizeof(a));
-		bcopy(GET_V4(sc, &ia6->ia_addr.sin6_addr), &a, sizeof(a));
-		bcopy(GET_V4(sc, &ia6->ia_prefixmask.sin6_addr),
-		      &mask, sizeof(mask));
-		a.s_addr &= mask.s_addr;
-		b = ip.ip_src;
-		bcopy(GET_V4(sc, &ia6->ia_prefixmask.sin6_addr), &b, sizeof(b));
-		b.s_addr &= mask.s_addr;
-		if (a.s_addr != b.s_addr)
-			return 0;
-	}
-	/*
-	 * IPv4 src must be the ISATAP router IPv4 address,
-	 * if the IPv6 src does not belong to the ISATAP prefix
-	 * of this interface (draft-ietf-ngtrans-isatap-08.txt 4.5).
-	 * However it is checked later on.
-	 */
-	if (STF_IS_ISATAP(sc)) {
-		/* do nothing here */
-	}
+	bzero(&a, sizeof(a));
+	bcopy(GET_V4(sc, &ia6->ia_addr.sin6_addr), &a, sizeof(a));
+	bcopy(GET_V4(sc, &ia6->ia_prefixmask.sin6_addr), &mask, sizeof(mask));
+	a.s_addr &= mask.s_addr;
+	b = ip.ip_src;
+	bcopy(GET_V4(sc, &ia6->ia_prefixmask.sin6_addr), &b, sizeof(b));
+	b.s_addr &= mask.s_addr;
+	if (a.s_addr != b.s_addr)
+		return 0;
 
 	/* stf interface makes single side match only */
 	return 32;
@@ -425,12 +383,7 @@ stf_getsrcifa6(ifp)
 			continue;
 		sin6 = (struct sockaddr_in6 *)ia->ifa_addr;
 
-		/*
-		 * assumes the embeddd IPv4 address is unique per among
-		 * multiple ISATAP prefixed on an ISATAP interface
-		 * XXX: really okay?
-		 */
-		if (!IN6_IS_ADDR_STF(sc, &sin6->sin6_addr))
+		if (!IN6_IS_ADDR_6TO4(&sin6->sin6_addr))
 			continue;
 
 		bcopy(GET_V4(sc, &sin6->sin6_addr), &in, sizeof(in));
@@ -460,55 +413,6 @@ stf_getsrcifa6(ifp)
 	}
 
 	return NULL;
-}
-
-static int
-isatap_match_prefix(ifp, addr6)
-	struct ifnet *ifp;
-	struct in6_addr *addr6;
-{
-	struct ifaddr *ia;
-	struct in6_ifaddr *ia6;
-	struct sockaddr_in6 sa6, *sin6, *mask6;
-	struct stf_softc *sc;
-
-	sc = (struct stf_softc *)ifp;
-
-	bzero(&sa6, sizeof(sa6));
-	sa6.sin6_family = AF_INET6;
-	sa6.sin6_len = sizeof(sa6);
-	sa6.sin6_addr = *addr6;
-	if (in6_addr2zoneid(ifp, addr6, &sa6.sin6_scope_id)) {
-		return 0;
-	}
-	if (in6_embedscope(&sa6.sin6_addr, &sa6)) {
-		return 0;
-	}
-
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ia = ifp->if_addrlist; ia; ia = ia->ifa_next)
-#else
-	for (ia = ifp->if_addrlist.tqh_first;
-	     ia;
-	     ia = ia->ifa_list.tqe_next)
-#endif
-	{
-		if (ia->ifa_addr == NULL)
-			continue;
-		if (ia->ifa_addr->sa_family != AF_INET6)
-			continue;
-		ia6 = (struct in6_ifaddr *)ia;
-		sin6 = &ia6->ia_addr;
-		mask6 = &ia6->ia_prefixmask;
-		if (!IN6_IS_ADDR_STF(sc, &sin6->sin6_addr))
-			continue;
-
-		if (IN6_ARE_MASKED_ADDR_EQUAL(&sa6.sin6_addr, &sin6->sin6_addr,
-					      &mask6->sin6_addr))
-			return 1;
-	}
-
-	return 0;
 }
 
 #ifndef offsetof
@@ -572,21 +476,11 @@ stf_output(ifp, m, dst, rt)
 	 * ip6_dst has priority as it may be able to give us shorter IPv4 hops.
 	 */
 	ptr = NULL;
-	if (STF_IS_6TO4(sc)) {
-		if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst)) {
-			ptr = GET_V4(sc, &ip6->ip6_dst);
-		}
-		if (IN6_IS_ADDR_6TO4(&dst6->sin6_addr)) {
-			ptr = GET_V4(sc, &dst6->sin6_addr);
-		}
-	} else if (STF_IS_ISATAP(sc)) {
-		if (IN6_IS_ADDR_ISATAP(&ip6->ip6_dst) &&
-		    isatap_match_prefix(&sc->sc_if, &ip6->ip6_dst)) {
-			ptr = GET_V4(sc, &ip6->ip6_dst);
-		}
-		if (IN6_IS_ADDR_ISATAP(&dst6->sin6_addr)) {
-			ptr = GET_V4(sc, &dst6->sin6_addr);
-		}
+	if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst)) {
+		ptr = GET_V4(sc, &ip6->ip6_dst);
+	}
+	if (IN6_IS_ADDR_6TO4(&dst6->sin6_addr)) {
+		ptr = GET_V4(sc, &dst6->sin6_addr);
 	}
 	if (ptr == NULL) {
 		m_freem(m);
@@ -702,21 +596,11 @@ stf_output(ifp, m, dst, rt)
 	 * ip6_dst has priority as it may be able to give us shorter IPv4 hops.
 	 */
 	ptr = NULL;
-	if (STF_IS_6TO4(sc)) {
-		if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst)) {
-			ptr = GET_V4(sc, &ip6->ip6_dst);
-		}
-		if (IN6_IS_ADDR_6TO4(&dst6->sin6_addr)) {
-			ptr = GET_V4(sc, &dst6->sin6_addr);
-		}
-	} else if (STF_IS_ISATAP(sc)) {
-		if (IN6_IS_ADDR_ISATAP(&ip6->ip6_dst) &&
-		    isatap_match_prefix(&sc->sc_if, &ip6->ip6_dst)) {
-			ptr = GET_V4(sc, &ip6->ip6_dst);
-		}
-		if (IN6_IS_ADDR_ISATAP(&dst6->sin6_addr)) {
-			ptr = GET_V4(sc, &dst6->sin6_addr);
-		}
+	if (IN6_IS_ADDR_6TO4(&ip6->ip6_dst)) {
+		ptr = GET_V4(sc, &ip6->ip6_dst);
+	}
+	if (IN6_IS_ADDR_6TO4(&dst6->sin6_addr)) {
+		ptr = GET_V4(sc, &dst6->sin6_addr);
 	}
 	if (ptr == NULL) {
 		m_freem(m);
@@ -830,9 +714,6 @@ stf_checkaddr4(sc, in, inifp)
 	/*
 	 * reject packets with the following address:
 	 * 224.0.0.0/4 0.0.0.0/8 127.0.0.0/8 255.0.0.0/8
-	 * (the last three is not explicitly mentioned 
-	 *  in draft-ietf-ngtrans-isatap-08.txt, it 
-	 *  would have to be)
 	 */
 #if defined(__OpenBSD__) || defined(__NetBSD__)
 	if (IN_MULTICAST(in->s_addr))
@@ -849,16 +730,15 @@ stf_checkaddr4(sc, in, inifp)
 	 * reject packets with private address range in case of 6to4.
 	 * (requirement from RFC3056 section 2 1st paragraph)
 	 */
-	if (STF_IS_6TO4(sc) && isrfc1918addr(in))
+	if (isrfc1918addr(in))
 		return -1;
 
 	/*
 	 * reject packet with IPv4 link-local (169.254.0.0/16) in case of 6to4,
 	 * as suggested in draft-savola-v6ops-6to4-security-00.txt
 	 */
-	if (STF_IS_6TO4(sc) &&
-	    (((ntohl(in->s_addr) & 0xff000000) >> 24) == 169 &&
-	     ((ntohl(in->s_addr) & 0x00ff0000) >> 16) == 254))
+	if (((ntohl(in->s_addr) & 0xff000000) >> 24) == 169 &&
+	     ((ntohl(in->s_addr) & 0x00ff0000) >> 16) == 254)
 		return -1;
 
 	/*
@@ -920,11 +800,9 @@ stf_checkaddr6(sc, in6, inifp)
 {
 
 	/*
-	 * check 6to4/ISATAP addresses
+	 * check 6to4 addresses
 	 */
-	if ((STF_IS_6TO4(sc) && IN6_IS_ADDR_6TO4(in6)) ||
-	    (STF_IS_ISATAP(sc) && IN6_IS_ADDR_ISATAP(in6) &&
-	     isatap_match_prefix(&sc->sc_if, in6))) {
+	if (IN6_IS_ADDR_6TO4(in6)) {
 		struct in_addr in4;
 		bcopy(GET_V4(sc, in6), &in4, sizeof(in4));
 		return stf_checkaddr4(sc, &in4, inifp);
@@ -938,21 +816,6 @@ stf_checkaddr6(sc, in6, inifp)
 	 */
 	if (IN6_IS_ADDR_V4COMPAT(in6) || IN6_IS_ADDR_V4MAPPED(in6))
 		return -1;
-
-	/* the remaining checks are specific to 6to4 */
-	if (STF_IS_ISATAP(sc)) {
-		/*
-		 * if the destination IPv6 address is multicast, then it 
-		 * has to be ff02::2, otherwise discarded
-		 */
-		if (!IN6_IS_ADDR_MULTICAST(in6))
-			return 0;
-
-		if (IN6_ARE_ADDR_EQUAL(in6, &in6addr_linklocal_allrouters))
-			return 0;
-
-		return -1;
-	}
 
 	/*
 	 * reject link-local and site-local unicast
@@ -975,40 +838,10 @@ stf_checkaddr6(sc, in6, inifp)
 	return 0;
 }
 
-/* 
- * to see the combination of the outer IPv4 address and the inner 
- * IPv6 address are appropriate (draft-ietf-ngtrans-isatap-08.txt 4.5 Rule #2)
- * you must check the validity of each address by stf_checkaddr[46] in advance.
- */
 static int
-stf_checkaddr46(sc, in, in6)
-	struct stf_softc *sc;
-	struct in_addr *in;
-	struct in6_addr *in6;
+stf_checkaddr46(struct stf_softc *sc, struct in_addr *in, struct in6_addr *in6)
 {
-
-	struct isatap_rtr *rtr;
-
-	/* this test is dedicated for ISATAP */
-	if (!STF_IS_ISATAP(sc))
-		return 0;
-
-	/* 
-	 * if the source address is not ISATAP prefix, then
-	 * the outer IPv4 source address MUST be an ISATAP router's one
-	 */
-	if (isatap_match_prefix(&sc->sc_if, in6))
-		return 0;
-
-	TAILQ_FOREACH(rtr, &isatap_rtrlist, isr_entry) {
-		struct sockaddr_in *ptr;
-
-		ptr = (struct sockaddr_in *) &rtr->isr_addr;
-		if (in->s_addr == ptr->sin_addr.s_addr)
-			return 0;
-	}
-
-	return -1;
+	return 1;
 }
 
 void
@@ -1214,7 +1047,6 @@ stf_ioctl(ifp, cmd, data)
 	struct in_addr addr;
 	int error;
 	int s;
-	struct isatap_rtr *rtr;
 
 	error = 0;
 	ifr = (struct ifreq *)data;
@@ -1228,13 +1060,13 @@ stf_ioctl(ifp, cmd, data)
 			break;
 		}
 		sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
-		if (!IN6_IS_ADDR_STF(sc, &sin6->sin6_addr)) {
+		if (!IN6_IS_ADDR_6TO4(&sin6->sin6_addr)) {
 			error = EINVAL;
 			break;
 		}
 
 		bcopy(GET_V4(sc, &sin6->sin6_addr), &addr, sizeof(addr));
-		if (STF_IS_6TO4(sc) && isrfc1918addr(&addr)) {
+		if (isrfc1918addr(&addr)) {
 			error = EINVAL;
 			break;
 		}
@@ -1251,128 +1083,6 @@ stf_ioctl(ifp, cmd, data)
 			error = EAFNOSUPPORT;
 		break;
 
-	case SIOCGSTFMODE:
-		bcopy(&sc->sc_mode, &ifr->ifr_data, sizeof(sc->sc_mode));
-		break;
-		
-	case SIOCSSTFMODE:
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
-			break;
-#endif
-
-		/* multiple ISATAP/6to4 interface can cause confusion */
-		LIST_FOREACH(scp, &stf_softc_list, sc_list) {
-			if (bcmp(&sc->sc_mode, &ifr->ifr_data,
-				 sizeof(sc->sc_mode)) == 0) {
-				error = EEXIST;
-				return error;
-			}
-		}
-		switch (sc->sc_mode) {
-		case STFM_6TO4:
-		case STFM_ISATAP:
-			break;
-		default:
-			error = EINVAL;
-			return error;
-		}
-		bcopy(&ifr->ifr_data, &sc->sc_mode, sizeof(sc->sc_mode));
-		/* 
-		 * implementation following old ISATAP spec sends RS toward
-		 * ff02::2.  To receive this RS, ISATAP stf has to be multicast-
-		 * ready.
-		 */
-		if (STF_IS_ISATAP(sc))
-			sc->sc_if.if_flags |= IFF_MULTICAST;
-		else
-			sc->sc_if.if_flags &= ~IFF_MULTICAST;
-		break;
-
-	case SIOCSISATAPRTR:
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
-			break;
-#endif
-
-		if (!STF_IS_ISATAP(sc)) {
-			error = ENXIO;
-			break;
-		}
-		/* check the given ISATAP router address */
-		if (ifr->ifr_addr.sa_family != AF_INET) {
-			error = EAFNOSUPPORT;
-			break;
-		}
-		addr = ((struct sockaddr_in *) &ifr->ifr_addr)->sin_addr;
-		if (stf_checkaddr4(sc, &addr, NULL) < 0) {
-			error = EFAULT;
-			break;
-		}
-		TAILQ_FOREACH(rtr, &isatap_rtrlist, isr_entry) {
-			struct sockaddr_in *ptr;
-
-			ptr = (struct sockaddr_in *) &rtr->isr_addr;
-			if (addr.s_addr == ptr->sin_addr.s_addr) {
-				error = EEXIST;
-				return 0;
-			}
-		}
-
-		rtr = malloc(sizeof(*rtr), M_IFADDR, M_WAITOK);
-		bzero(rtr, sizeof(*rtr));
-		bcopy(&ifr->ifr_addr, &rtr->isr_addr, ifr->ifr_addr.sa_len);
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		s = splnet();
-#else
-		s = splimp();
-#endif
-		TAILQ_INSERT_TAIL(&isatap_rtrlist, rtr, isr_entry);
-		splx(s);
-		/* IPv6 default route will be installed by RA */
-		break;
-
-	case SIOCDISATAPRTR:
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
-			break;
-#endif
-
-		if (!STF_IS_ISATAP(sc)) {
-			error = ENXIO;
-			break;
-		}
-
-		/* check the given ISATAP router address */
-		if (ifr->ifr_addr.sa_family != AF_INET) {
-			error = EAFNOSUPPORT;
-			break;
-		}
-		addr = ((struct sockaddr_in *) &ifr->ifr_addr)->sin_addr;
-		if (stf_checkaddr4(sc, &addr, NULL) < 0) {
-			error = EFAULT;
-			break;
-		}
-		TAILQ_FOREACH(rtr, &isatap_rtrlist, isr_entry) {
-			struct sockaddr_in *ptr;
-
-			ptr = (struct sockaddr_in *) &rtr->isr_addr;
-			if (addr.s_addr != ptr->sin_addr.s_addr)
-				continue;
-
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-			s = splnet();
-#else
-			s = splimp();
-#endif
-			TAILQ_REMOVE(&isatap_rtrlist, rtr, isr_entry);
-			free(rtr, M_IFADDR);
-			splx(s);
-			return error;
-		}
-		error = EADDRNOTAVAIL;
-		break;
-
 	default:
 		error = EINVAL;
 		break;
@@ -1381,89 +1091,4 @@ stf_ioctl(ifp, cmd, data)
 	return error;
 }
 
-#ifdef __FreeBSD__
-#if __FreeBSD__ >= 4
-static int stf_sysctl_isatap_rtrlist(SYSCTL_HANDLER_ARGS);
-#else
-static int stf_sysctl_isatap_rtrlist SYSCTL_HANDLER_ARGS;
-#endif
-SYSCTL_DECL(_net_inet6_ip6);
-SYSCTL_NODE(_net_inet6_ip6, IPV6CTL_ISATAPRTR, isatap_rtrlist, CTLFLAG_RD,
-	    &stf_sysctl_isatap_rtrlist, "");
-
-#if __FreeBSD__ >= 4
-static int
-stf_sysctl_isatap_rtrlist(SYSCTL_HANDLER_ARGS)
-#else
-static int
-stf_sysctl_isatap_rtrlist SYSCTL_HANDLER_ARGS
-#endif
-{
-	if (req->newptr)
-		return EPERM;
-	return (fill_isatap_rtrlist(req));
-}
-#endif /* __FreeBSD__ */
-
-
-#ifndef __FreeBSD__
-int
-fill_isatap_rtrlist(oldp, oldlenp, ol)
-	void *oldp;
-	size_t *oldlenp, ol;
-#else
-static int
-fill_isatap_rtrlist(req)
-	struct sysctl_req *req;
-#endif
-{
-	int error = 0;
-	struct isatap_rtr *isr;
-	struct sockaddr_in *o = NULL, *oe = NULL;
-#ifdef __FreeBSD__
-	struct sockaddr_in dbuf;
-#else
-	size_t len = 0;
-#endif
-
-#ifndef __FreeBSD__
-	if (oldp) {
-		o = (struct sockaddr_in *) oldp;
-		oe = (struct sockaddr_in *) ((caddr_t)oldp + *oldlenp);
-	}
-#endif
-
-	TAILQ_FOREACH(isr, &isatap_rtrlist, isr_entry) {
-#ifdef __FreeBSD__
-		o = &dbuf;
-		oe = o + 1;
-#endif
-		if (
-#ifndef __FreeBSD__
-		    oldp &&
-#endif
-		    o + 1 <= oe) {
-			bzero(o, sizeof(*o));
-			bcopy(&isr->isr_addr, o, isr->isr_addr.sa_len);
-		}
-
-#ifndef __FreeBSD__
-		len += sizeof(*o);
-		if (o)
-			o++;
-#else
-		error = SYSCTL_OUT(req, o, sizeof(*o));
-		if (error)
-			break;
-#endif
-	}
-
-#ifndef __FreeBSD__
-	*oldlenp = len;
-	if (oldp && (len > ol))
-		error = ENOMEM;
-#endif
-
-	return error;
-}
 #endif /* NSTF > 0 */

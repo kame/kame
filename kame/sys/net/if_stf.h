@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.h,v 1.7 2003/01/08 08:47:23 suz Exp $	*/
+/*	$KAME: if_stf.h,v 1.8 2003/10/22 09:18:43 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -35,12 +35,8 @@
 #ifdef _KERNEL
 
 #include "stf.h"
-#if NSTF == 2
-#define ISATAP
-#endif
 
 struct stf_softc {
-	/* if_physical determines stf to work in 6to4 or ISATAP */
 	struct ifnet	sc_if;	   /* common area */
 	union {
 		struct route  __sc_ro4;
@@ -50,53 +46,17 @@ struct stf_softc {
 	} __sc_ro46;
 #define sc_ro	__sc_ro46.__sc_ro4
 	const struct encaptab *encap_cookie;
-	int sc_mode;	/* 6to4 or ISATAP */
 	LIST_ENTRY(stf_softc) sc_list; /* all stf's are linked */
 };
-
-struct isatap_rtr {
-	TAILQ_ENTRY(isatap_rtr) isr_entry;
-	struct sockaddr isr_addr;	/* IPv4 router address of ISATAP router */
-};
 #endif
 
-
-/* stf mode to identify tunnelling mode */
-#define STFM_6TO4   0
-#define STFM_ISATAP 1
-
-#ifndef SIOCSISATAPRTR
-#define SIOCSISATAPRTR SIOCSIFGENERIC
-#endif
-
-#ifndef SIOCGISATAPRTR
-#define SIOCGISATAPRTR SIOCGIFGENERIC
-#endif
-
-#ifndef SIOCDISATAPRTR
-#define SIOCDISATAPRTR SIOCDIFGENERIC
-#endif
 
 #ifdef _KERNEL
-#define STF_IS_6TO4(x) \
-	((((struct stf_softc *) (x))->sc_if.if_type == IFT_STF) && \
-	 (((struct stf_softc *) (x))->sc_mode == STFM_6TO4))
-#ifdef ISATAP
-#define STF_IS_ISATAP(x) \
-	((((struct stf_softc *) (x))->sc_if.if_type == IFT_STF) && \
-	 (((struct stf_softc *) (x))->sc_mode == STFM_ISATAP))
-#else
-#define STF_IS_ISATAP(x)  0	/* disable ISATAP */
-#endif
-
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 void in_stf_input __P((struct mbuf *, int));
 #else
 void in_stf_input __P((struct mbuf *, ...));
 #endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
 
-#ifndef __FreeBSD__
-extern int fill_isatap_rtrlist __P((void *, size_t *, size_t));
-#endif
 #endif /* _KERNEL */
 #endif /* _NET_IF_STF_H_ */

@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.184 2003/10/22 02:12:54 keiichi Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.185 2003/10/22 09:18:44 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -627,18 +627,9 @@ in6_ifattach_linklocal(ifp, altifp)
 		ifra.ifra_addr.sin6_addr.s6_addr32[2] = 0;
 		ifra.ifra_addr.sin6_addr.s6_addr32[3] = htonl(1);
 	} else if (ifp->if_type == IFT_STF) {
-		if (!STF_IS_ISATAP(ifp)) {
-			nd6log((LOG_ERR,
-			    "%s: 6to4 I/F cannot have linklocal address\n",
-			    if_name(ifp)));
-			return (-1);
-		}
-
-		/* ToDo: automatically fetches an IPv4 address for ISATAP */
-		nd6log((LOG_ERR,
-		    "%s: ISATAP I/F needs static linklocal addressing\n",
+		nd6log((LOG_ERR, "%s: 6to4 I/F cannot have linklocal address\n",
 		    if_name(ifp)));
-		return (0);
+		return (-1);
 	} else {
 		if (get_ifid(ifp, altifp, &ifra.ifra_addr.sin6_addr) != 0) {
 			nd6log((LOG_ERR,
@@ -930,8 +921,7 @@ in6_ifattach(ifp, altifp)
 		 * linklocals for 6to4 interface, but there's no use and
 		 * it is rather harmful to have one.
 		 */
-		if (STF_IS_6TO4(ifp))
-			return;
+		return;
 #endif
 	default:
 		break;
