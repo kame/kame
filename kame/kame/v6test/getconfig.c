@@ -532,7 +532,8 @@ make_icmp6echo(char *name, u_char type)
 
 	icmp6->icmp6_type = type;
 	MUSTHAVE(icmp6->icmp6_code, "icmp6_code", icmp6buf);
-	icmp6->icmp6_cksum = 0;	/* XXX */
+	MAYHAVE(val16, "icmp6_cksum", 0, icmp6buf);
+	icmp6->icmp6_cksum = htons(val16);
 	MUSTHAVE(icmp6->icmp6_id, "icmp6_id", icmp6buf);
 	HTONS(icmp6->icmp6_id);
 	MUSTHAVE(icmp6->icmp6_seq, "icmp6_seq", icmp6buf);
