@@ -1,4 +1,4 @@
-/*	$KAME: natpt_usrreq.c,v 1.22 2002/02/01 15:05:40 fujisawa Exp $	*/
+/*	$KAME: natpt_usrreq.c,v 1.23 2002/04/11 09:36:28 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -117,6 +117,8 @@ natpt_init()
 {
 	natpt_initialized = 1;
 	natpt_enable = 0;
+	natpt_uselog = 0;
+	natpt_usesyslog = 0;
 
 	natpt_init_rule();
 	natpt_init_tslot();

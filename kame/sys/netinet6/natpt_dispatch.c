@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.47 2002/03/28 07:30:03 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.48 2002/04/11 09:36:28 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -69,6 +69,8 @@ int		natpt_initialized;
 u_int		natpt_debug;
 u_int		natpt_dump;
 struct in6_addr	natpt_prefix;
+u_int		natpt_uselog;
+u_int		natpt_usesyslog;
 
 struct natptctl_names	 natptctl_names[NATPTCTL_NUM] = NATPTCTL_NAMES;
 caddr_t			 natptctl_vars[NATPTCTL_NUM]  = NATPTCTL_VARS;

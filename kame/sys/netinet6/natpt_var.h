@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.25 2002/02/22 15:02:05 sumikawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.26 2002/04/11 09:36:28 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -34,6 +34,8 @@ extern int		natpt_initialized;
 extern u_int		natpt_debug;
 extern u_int		natpt_dump;
 extern struct in6_addr	natpt_prefix;
+extern u_int		natpt_uselog;
+extern u_int		natpt_usesyslog;
 
 
 /*

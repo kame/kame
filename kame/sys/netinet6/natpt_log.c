@@ -1,4 +1,4 @@
-/*	$KAME: natpt_log.c,v 1.12 2001/09/02 19:06:25 fujisawa Exp $	*/
+/*	$KAME: natpt_log.c,v 1.13 2002/04/11 09:36:28 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -56,6 +56,9 @@
  *
  */
 
+#define	SZWOW		256
+#define	SZGETA		 16
+
 static struct sockaddr	natpt_dst = {2, PF_INET};
 static struct sockaddr	natpt_src = {2, PF_INET};
 
@@ -68,13 +71,22 @@ void
 natpt_logMsg(int priorities, char *format, ...)
 {
 	int		 rv;
-	u_char		 wow[256];
+	u_char		 wow[SZWOW+SZGETA];
 	va_list		 ap;
 
-	va_start(ap, format);
-	rv = vsnprintf(wow, sizeof(wow), format, ap);
-	natpt_log(LOG_MSG, priorities, (void *)wow, strlen(wow)+1);
-	va_end(ap);
+	if (natpt_usesyslog || natpt_uselog) {
+		va_start(ap, format);
+		rv = vsnprintf(wow, SZWOW, format, ap);
+		if (natpt_uselog) {
+			natpt_log(LOG_MSG, priorities, (void *)wow, strlen(wow)+1);
+		}
+		if (natpt_usesyslog) {
+			wow[rv] = '\n';
+			wow[rv+1] = '\0';
+			log(priorities, wow);
+		}
+		va_end(ap);
+	}
 }
 
 
