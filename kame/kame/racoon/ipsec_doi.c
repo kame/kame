@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.23 2000/01/12 16:21:58 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.24 2000/01/12 16:45:21 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -558,7 +558,7 @@ t2isakmpsa(trns, sa)
 					lorv);
 				goto err;
 			}
-			sa->encklen = (u_int8_t)lorv / 8;
+			sa->encklen = (u_int8_t)lorv;
 			keylen++;
 			break;
 
@@ -1197,6 +1197,9 @@ t2ipsecsa(trns, sa)
 			break;
 
 		case IPSECDOI_ATTR_KEY_LENGTH:
+			sa->encklen = lorv;
+			break;
+
 		case IPSECDOI_ATTR_KEY_ROUNDS:
 		case IPSECDOI_ATTR_COMP_DICT_SIZE:
 		case IPSECDOI_ATTR_COMP_PRIVALG:
@@ -2065,9 +2068,9 @@ check_attr_ipsec(proto_id, trns)
 		switch (type) {
 		case IPSECDOI_ATTR_ENC_MODE:
 			if (! flag) {
-				/* warning */
 				plog(logp, LOCATION, NULL,
 					"must be TV when ENC_MODE.\n");
+				return -1;
 			}
 
 			switch (lorv) {
@@ -2084,9 +2087,9 @@ check_attr_ipsec(proto_id, trns)
 
 		case IPSECDOI_ATTR_AUTH:
 			if (! flag) {
-				/* warning */
 				plog(logp, LOCATION, NULL,
 					"must be TV when AUTH.\n");
+				return -1;
 			}
 
 			switch (lorv) {
@@ -2122,9 +2125,9 @@ ahmismatch:
 
 		case IPSECDOI_ATTR_SA_LD_TYPE:
 			if (! flag) {
-				/* warning */
 				plog(logp, LOCATION, NULL,
 					"must be TV when LD_TYPE.\n");
+				return -1;
 			}
 
 			switch (lorv) {
@@ -2159,9 +2162,9 @@ ahmismatch:
 
 		case IPSECDOI_ATTR_GRP_DESC:
 			if (! flag) {
-				/* warning */
 				plog(logp, LOCATION, NULL,
 					"must be TV when GRP_DESC.\n");
+				return -1;
 			}
 
 			switch (lorv) {
@@ -2184,6 +2187,13 @@ ahmismatch:
 			break;
 
 		case IPSECDOI_ATTR_KEY_LENGTH:
+			if (! flag) {
+				plog(logp, LOCATION, NULL,
+					"must be TV when KEY_LENGTH.\n");
+				return -1;
+			}
+			break;
+
 		case IPSECDOI_ATTR_KEY_ROUNDS:
 		case IPSECDOI_ATTR_COMP_DICT_SIZE:
 		case IPSECDOI_ATTR_COMP_PRIVALG:
@@ -2247,9 +2257,9 @@ check_attr_ipcomp(trns)
 		switch (type) {
 		case IPSECDOI_ATTR_ENC_MODE:
 			if (! flag) {
-				/* warning */
 				plog(logp, LOCATION, NULL,
 					"must be TV when ENC_MODE.\n");
+				return -1;
 			}
 
 			switch (lorv) {
@@ -2266,9 +2276,9 @@ check_attr_ipcomp(trns)
 
 		case IPSECDOI_ATTR_SA_LD_TYPE:
 			if (! flag) {
-				/* warning */
 				plog(logp, LOCATION, NULL,
 					"must be TV when LD_TYPE.\n");
+				return -1;
 			}
 
 			switch (lorv) {
@@ -2303,9 +2313,9 @@ check_attr_ipcomp(trns)
 
 		case IPSECDOI_ATTR_GRP_DESC:
 			if (! flag) {
-				/* warning */
 				plog(logp, LOCATION, NULL,
 					"must be TV when GRP_DESC.\n");
+				return -1;
 			}
 
 			switch (lorv) {

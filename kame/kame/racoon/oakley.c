@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.2 2000/01/09 22:59:37 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.3 2000/01/12 16:45:21 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1422,11 +1422,13 @@ oakley_compute_enckey(iph1)
 		keylen = 16;
 		break;
 	case OAKLEY_ATTR_ENC_ALG_BLOWFISH:	/* can negotiate keylen */
-		keylen = iph1->approval->encklen ? iph1->approval->encklen : 56;
+		keylen = iph1->approval->encklen
+			? (iph1->approval->encklen + 7) / 8 : 56;
 		break;
 	case OAKLEY_ATTR_ENC_ALG_RC5:		/* can negotiate encklen */
 	case OAKLEY_ATTR_ENC_ALG_CAST:		/* can negotiate encklen */
-		keylen = iph1->approval->encklen ? iph1->approval->encklen : 16;
+		keylen = iph1->approval->encklen
+			? (iph1->approval->encklen + 7) / 8 : 16;
 		break;
 	case OAKLEY_ATTR_ENC_ALG_3DES:
 		keylen = 24;
