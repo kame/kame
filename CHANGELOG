@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1028 2000/06/15 13:42:40 itojun Exp $
+$Id: CHANGELOG,v 1.1029 2000/06/15 20:04:27 itojun Exp $
 
 <200006>
+Fri Jun 16 05:01:24 JST 2000  itojun@iijlab.net
+	* openbsd/sys: sync with OpenBSD 2.7
+	  limitation: if you configure gif interface, kernel does not compile.
+	  this is because OpenBSD integrates gif into OpenBSD IPsec tunnel
+	  code.  we will need to resolve it.
+	  TODO: userland cleanup.  tests.
+
 Thu Jun 15 22:41:16 JST 2000  itojun@iijlab.net
 	* kame/sys/netkey/key.c: correct compilation without IPSEC_ESP.
 	  From: Matthias Drochner <M.Drochner@fz-juelich.de>
