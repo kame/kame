@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.791 2000/04/18 12:46:04 jinmei Exp $
+$Id: CHANGELOG,v 1.792 2000/04/18 12:46:20 jinmei Exp $
 
 <200004>
 2000-04-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -10,7 +10,7 @@ $Id: CHANGELOG,v 1.791 2000/04/18 12:46:04 jinmei Exp $
 2000-04-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/scope6config/scope6config.c: added to configure and
 	view the scope zone identifiers of a particular interface.
-	XXX: should eventually merged into ifconfig or something.
+	XXX: should eventually be merged into ifconfig or something.
 
 2000-04-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/scope6.c: added to configure/mangement IPv6
