@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.11 2001/11/15 05:13:58 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.12 2002/01/31 16:08:17 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -75,6 +75,7 @@ void	 appendPAddr		__P((struct logmsg *, struct cSlot *, struct mAddr *));
 void	 appendPAddr4		__P((struct logmsg *, struct cSlot *, struct mAddr *));
 void	 appendPAddr6		__P((struct logmsg *, struct cSlot *, struct mAddr *));
 void	 appendPort		__P((struct logmsg *, struct mAddr *));
+void	 appendProto		__P((struct logmsg *, struct cSlot *));
 void	 makeTSlotLine		__P((char *, int, struct tSlot *,
 				     struct tcpstate *, int));
 void	 appendPAddrXL		__P((struct logmsg *, struct pAddr *, int, int));
@@ -107,26 +108,7 @@ makeCSlotLine(char *wow, int size, struct cSlot *csl)
 	concat(&lmsg, " to");
 	appendPAddr(&lmsg, csl, &csl->remote);
 
-	if (csl->proto) {
-		int	found = 0;
-
-		concat(&lmsg, " proto ");
-		if (csl->proto & NATPT_ICMP) {
-			concat(&lmsg, "icmp");
-			found++;
-		}
-		if (csl->proto & NATPT_TCP) {
-			if (found > 0)
-				concat(&lmsg, "/");
-			concat(&lmsg, "tcp");
-			found++;
-		}
-		if (csl->proto & NATPT_UDP) {
-			if (found > 0)
-				concat(&lmsg, "/");
-			concat(&lmsg, "udp");
-		}
-	}
+	appendProto(&lmsg, csl);
 
 	if (csl->map & NATPT_BIDIR) {
 		concat(&lmsg, " bidir");
@@ -222,6 +204,32 @@ appendPort(struct logmsg *lmsg, struct mAddr *mpad)
 
 	if (mpad->dport) {
 		concat(lmsg, " dport %d", ntohs(mpad->dport));
+	}
+}
+
+
+void
+appendProto(struct logmsg *lmsg, struct cSlot *csl)
+{
+	int	found = 0;
+
+	if (csl->proto) {
+		concat(lmsg, " proto ");
+		if (csl->proto & NATPT_ICMP) {
+			concat(lmsg, "icmp");
+			found++;
+		}
+		if (csl->proto & NATPT_TCP) {
+			if (found > 0)
+				concat(lmsg, "/");
+			concat(lmsg, "tcp");
+			found++;
+		}
+		if (csl->proto & NATPT_UDP) {
+			if (found > 0)
+				concat(lmsg, "/");
+			concat(lmsg, "udp");
+		}
 	}
 }
 
