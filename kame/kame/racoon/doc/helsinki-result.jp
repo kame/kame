@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.41 2001/08/16 18:22:17 sakane Exp $
+$KAME: helsinki-result.jp,v 1.42 2001/08/16 18:23:59 sakane Exp $
 
 
 generic
@@ -331,6 +331,8 @@ Fitec
 
 
 SSH
+	IPv6だけやった
+
 	ssh solaris version:
 	ssh側: IKEのパケットが出ない。
 	nd cacheの問題か？
