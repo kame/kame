@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.229 2005/01/26 07:45:26 t-momose Exp $	*/
+/*	$KAME: ipsec.c,v 1.230 2005/02/15 19:05:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -254,6 +254,14 @@ static void ipsec_delpcbpolicy __P((struct inpcbpolicy *));
 static int ipsec_deepcopy_pcbpolicy __P((struct inpcbpolicy *));
 #endif
 static struct secpolicy *ipsec_deepcopy_policy __P((struct secpolicy *));
+static struct secpolicy *getpolicybypcbsp __P((int, struct mbuf *, u_int,
+    struct inpcbpolicy *, int *));
+static int ipsec4_in_reject_pcb __P((struct mbuf *, struct inpcb *));
+#ifdef INET6
+static struct secpolicy *ipsec6_getpolicybypcb __P((struct mbuf *, u_int,
+    struct in6pcb *, int *));
+static int ipsec6_in_reject_pcb __P((struct mbuf *, struct in6pcb *));
+#endif
 static int ipsec_set_policy
 	__P((struct secpolicy **, int, caddr_t, size_t, int));
 static int ipsec_get_policy __P((struct secpolicy *, struct mbuf **));
@@ -455,55 +463,41 @@ ipsec_get_tag(m)
 }
 #endif
 
-/*
- * For OUTBOUND packet having a socket. Searching SPD for packet,
- * and return a pointer to SP.
- * OUT:	NULL:	no apropreate SP found, the following value is set to error.
- *		0	: bypass
- *		EACCES	: discard packet.
- *		ENOENT	: ipsec_acquire() in progress, maybe.
- *		others	: error occured.
- *	others:	a pointer to SP
- *
- * NOTE: IPv6 mapped adddress concern is implemented here.
- */
-struct secpolicy *
-ipsec4_getpolicybysock(m, dir, so, error)
+static struct secpolicy *
+getpolicybypcbsp(family, m, dir, pcbsp, error)
+	int family;
 	struct mbuf *m;
 	u_int dir;
-	struct socket *so;
+	struct inpcbpolicy *pcbsp;
 	int *error;
 {
-	struct inpcbpolicy *pcbsp = NULL;
 	struct secpolicy *currsp = NULL;	/* policy on socket */
 	struct secpolicy *kernsp = NULL;	/* policy on kernel */
 	struct secpolicyindex spidx;
+	struct ipsecstat *statp;
+	struct secpolicy *def_policy;
 #if NPF > 0
 	struct pf_tag *t;
 #endif
 	u_int16_t tag;
 
-	/* sanity check */
-	if (m == NULL || so == NULL || error == NULL)
-		panic("ipsec4_getpolicybysock: NULL pointer was passed.");
-
-	switch (so->so_proto->pr_domain->dom_family) {
-	case AF_INET:
-		pcbsp = sotoinpcb(so)->inp_sp;
-		break;
-#ifdef INET6
-	case AF_INET6:
-		pcbsp = sotoin6pcb(so)->in6p_sp;
-		break;
-#endif
-	default:
-		panic("ipsec4_getpolicybysock: unsupported address family");
-	}
-
 #ifdef DIAGNOSTIC
 	if (pcbsp == NULL)
-		panic("ipsec4_getpolicybysock: pcbsp is NULL.");
+		panic("getpolicybypcbsp: pcbsp is NULL.");
 #endif
+
+	switch (family) {
+	case AF_INET:
+		statp = &ipsecstat;
+		def_policy = ip4_def_policy;
+		break;
+	case AF_INET6:
+		statp = &ipsec6stat;
+		def_policy = ip6_def_policy;
+		break;
+	default:
+		panic("getpolicybypcbsp: unexpected family");
+	}
 
 #if NPF > 0
 	t = ipsec_get_tag(m);
@@ -513,13 +507,13 @@ ipsec4_getpolicybysock(m, dir, so, error)
 #endif
 
 	/* if we have a cached entry, and if it is still valid, use it. */
-	ipsecstat.spdcachelookup++;
+	statp->spdcachelookup++;
 	currsp = ipsec_checkpcbcache(m, pcbsp, dir);
 	if (currsp) {
 		*error = 0;
 		return currsp;
 	}
-	ipsecstat.spdcachemiss++;
+	statp->spdcachemiss++;
 
 	switch (dir) {
 	case IPSEC_DIR_INBOUND:
@@ -529,12 +523,12 @@ ipsec4_getpolicybysock(m, dir, so, error)
 		currsp = pcbsp->sp_out;
 		break;
 	default:
-		panic("ipsec4_getpolicybysock: illegal direction.");
+		panic("getpolicybypcbsp: illegal direction.");
 	}
 
 	/* sanity check */
 	if (currsp == NULL)
-		panic("ipsec4_getpolicybysock: currsp is NULL.");
+		panic("getpolicybypcbsp: currsp is NULL.");
 
 	/* when privileged socket */
 	if (pcbsp->priv) {
@@ -547,11 +541,11 @@ ipsec4_getpolicybysock(m, dir, so, error)
 
 		case IPSEC_POLICY_ENTRUST:
 			/* look for a policy in SPD */
-			if (ipsec_setspidx_mbuf(&spidx, AF_INET, m, 1) == 0 &&
+			if (ipsec_setspidx_mbuf(&spidx, family, m, 1) == 0 &&
 			    (kernsp = key_allocsp(tag, &spidx, dir)) != NULL) {
 				/* SP found */
 				KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
-					printf("DP ipsec4_getpolicybysock called "
+					printf("getpolicybypcbsp called "
 					       "to allocate SP:%p\n", kernsp));
 				*error = 0;
 				ipsec_fillpcbcache(pcbsp, m, kernsp, dir);
@@ -559,10 +553,10 @@ ipsec4_getpolicybysock(m, dir, so, error)
 			}
 
 			/* no SP found */
-			ip4_def_policy->refcnt++;
+			def_policy->refcnt++;
 			*error = 0;
-			ipsec_fillpcbcache(pcbsp, m, ip4_def_policy, dir);
-			return ip4_def_policy;
+			ipsec_fillpcbcache(pcbsp, m, def_policy, dir);
+			return (def_policy);
 
 		case IPSEC_POLICY_IPSEC:
 			currsp->refcnt++;
@@ -571,7 +565,7 @@ ipsec4_getpolicybysock(m, dir, so, error)
 			return currsp;
 
 		default:
-			ipseclog((LOG_ERR, "ipsec4_getpolicybysock: "
+			ipseclog((LOG_ERR, "getpolicybypcbsp: "
 			      "Invalid policy for PCB %d\n", currsp->policy));
 			*error = EINVAL;
 			return NULL;
@@ -581,11 +575,11 @@ ipsec4_getpolicybysock(m, dir, so, error)
 
 	/* when non-privileged socket */
 	/* look for a policy in SPD */
-	if (ipsec_setspidx_mbuf(&spidx, AF_INET, m, 1) == 0 &&
+	if (ipsec_setspidx_mbuf(&spidx, family, m, 1) == 0 &&
 	    (kernsp = key_allocsp(tag, &spidx, dir)) != NULL) {
 		/* SP found */
 		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
-			printf("DP ipsec4_getpolicybysock called "
+			printf("getpolicybypcbsp called "
 			       "to allocate SP:%p\n", kernsp));
 		*error = 0;
 		ipsec_fillpcbcache(pcbsp, m, kernsp, dir);
@@ -595,17 +589,17 @@ ipsec4_getpolicybysock(m, dir, so, error)
 	/* no SP found */
 	switch (currsp->policy) {
 	case IPSEC_POLICY_BYPASS:
-		ipseclog((LOG_ERR, "ipsec4_getpolicybysock: "
+		ipseclog((LOG_ERR, "getpolicybypcbsp: "
 		       "Illegal policy for non-privileged defined %d\n",
 			currsp->policy));
 		*error = EINVAL;
 		return NULL;
 
 	case IPSEC_POLICY_ENTRUST:
-		ip4_def_policy->refcnt++;
+		def_policy->refcnt++;
 		*error = 0;
-		ipsec_fillpcbcache(pcbsp, m, ip4_def_policy, dir);
-		return ip4_def_policy;
+		ipsec_fillpcbcache(pcbsp, m, def_policy, dir);
+		return (def_policy);
 
 	case IPSEC_POLICY_IPSEC:
 		currsp->refcnt++;
@@ -614,7 +608,7 @@ ipsec4_getpolicybysock(m, dir, so, error)
 		return currsp;
 
 	default:
-		ipseclog((LOG_ERR, "ipsec4_getpolicybysock: "
+		ipseclog((LOG_ERR, "getpolicybypcbsp: "
 		   "Invalid policy for PCB %d\n", currsp->policy));
 		*error = EINVAL;
 		return NULL;
@@ -635,17 +629,42 @@ ipsec4_getpolicybysock(m, dir, so, error)
  * NOTE: IPv6 mapped adddress concern is implemented here.
  */
 struct secpolicy *
+ipsec4_getpolicybysock(m, dir, so, error)
+	struct mbuf *m;
+	u_int dir;
+	struct socket *so;
+	int *error;
+{
+	struct inpcbpolicy *pcbsp;
+
+	/* sanity check */
+	if (m == NULL || so == NULL || error == NULL)
+		panic("ipsec4_getpolicybysock: NULL pointer was passed.");
+
+	switch (so->so_proto->pr_domain->dom_family) {
+	case AF_INET:
+		pcbsp = sotoinpcb(so)->inp_sp;
+		break;
+#ifdef INET6
+	case AF_INET6:
+		pcbsp = sotoin6pcb(so)->in6p_sp;
+		break;
+#endif
+	default:
+		panic("ipsec4_getpolicybysock: unsupported address family");
+	}
+
+	return (getpolicybypcbsp(AF_INET, m, dir, pcbsp, error));
+}
+
+struct secpolicy *
 ipsec4_getpolicybypcb(m, dir, inp, error)
 	struct mbuf *m;
 	u_int dir;
 	struct inpcb *inp;
 	int *error;
 {
-	struct inpcbpolicy *pcbsp = NULL;
-	struct secpolicy *currsp = NULL;	/* policy on socket */
-	struct secpolicy *kernsp = NULL;	/* policy on kernel */
-	struct secpolicyindex spidx;
-	u_int16_t tag;
+	struct inpcbpolicy *pcbsp;
 
 	/* sanity check */
 	if (m == NULL || inp == NULL || error == NULL)
@@ -658,116 +677,7 @@ ipsec4_getpolicybypcb(m, dir, inp, error)
 		panic("ipsec4_getpolicybypcb: pcbsp is NULL.");
 #endif
 
-	tag = 0;
-
-	/* if we have a cached entry, and if it is still valid, use it. */
-	ipsecstat.spdcachelookup++;
-	currsp = ipsec_checkpcbcache(m, pcbsp, dir);
-	if (currsp) {
-		*error = 0;
-		return currsp;
-	}
-	ipsecstat.spdcachemiss++;
-
-	switch (dir) {
-	case IPSEC_DIR_INBOUND:
-		currsp = pcbsp->sp_in;
-		break;
-	case IPSEC_DIR_OUTBOUND:
-		currsp = pcbsp->sp_out;
-		break;
-	default:
-		panic("ipsec4_getpolicybypcb: illegal direction.");
-	}
-
-	/* sanity check */
-	if (currsp == NULL)
-		panic("ipsec4_getpolicybypcb: currsp is NULL.");
-
-	/* when privileged socket */
-	if (pcbsp->priv) {
-		switch (currsp->policy) {
-		case IPSEC_POLICY_BYPASS:
-			currsp->refcnt++;
-			*error = 0;
-			ipsec_fillpcbcache(pcbsp, m, currsp, dir);
-			return currsp;
-
-		case IPSEC_POLICY_ENTRUST:
-			/* look for a policy in SPD */
-			if (ipsec_setspidx_mbuf(&spidx, AF_INET, m, 1) == 0 &&
-			    (kernsp = key_allocsp(tag, &spidx, dir)) != NULL) {
-				/* SP found */
-				KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
-					printf("DP ipsec4_getpolicybypcb called "
-					       "to allocate SP:%p\n", kernsp));
-				*error = 0;
-				ipsec_fillpcbcache(pcbsp, m, kernsp, dir);
-				return kernsp;
-			}
-
-			/* no SP found */
-			ip4_def_policy->refcnt++;
-			*error = 0;
-			ipsec_fillpcbcache(pcbsp, m, ip4_def_policy, dir);
-			return ip4_def_policy;
-
-		case IPSEC_POLICY_IPSEC:
-			currsp->refcnt++;
-			*error = 0;
-			ipsec_fillpcbcache(pcbsp, m, currsp, dir);
-			return currsp;
-
-		default:
-			ipseclog((LOG_ERR, "ipsec4_getpolicybypcb: "
-			      "Invalid policy for PCB %d\n", currsp->policy));
-			*error = EINVAL;
-			return NULL;
-		}
-		/* NOTREACHED */
-	}
-
-	/* when non-privileged socket */
-	/* look for a policy in SPD */
-	if (ipsec_setspidx_mbuf(&spidx, AF_INET, m, 1) == 0 &&
-	    (kernsp = key_allocsp(tag, &spidx, dir)) != NULL) {
-		/* SP found */
-		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
-			printf("DP ipsec4_getpolicybypcb called "
-			       "to allocate SP:%p\n", kernsp));
-		*error = 0;
-		ipsec_fillpcbcache(pcbsp, m, kernsp, dir);
-		return kernsp;
-	}
-
-	/* no SP found */
-	switch (currsp->policy) {
-	case IPSEC_POLICY_BYPASS:
-		ipseclog((LOG_ERR, "ipsec4_getpolicybypcb: "
-		       "Illegal policy for non-privileged defined %d\n",
-			currsp->policy));
-		*error = EINVAL;
-		return NULL;
-
-	case IPSEC_POLICY_ENTRUST:
-		ip4_def_policy->refcnt++;
-		*error = 0;
-		ipsec_fillpcbcache(pcbsp, m, ip4_def_policy, dir);
-		return ip4_def_policy;
-
-	case IPSEC_POLICY_IPSEC:
-		currsp->refcnt++;
-		*error = 0;
-		ipsec_fillpcbcache(pcbsp, m, currsp, dir);
-		return currsp;
-
-	default:
-		ipseclog((LOG_ERR, "ipsec4_getpolicybypcb: "
-		   "Invalid policy for PCB %d\n", currsp->policy));
-		*error = EINVAL;
-		return NULL;
-	}
-	/* NOTREACHED */
+	return (getpolicybypcbsp(AF_INET, m, dir, pcbsp, error));
 }
 
 /*
@@ -853,14 +763,7 @@ ipsec6_getpolicybysock(m, dir, so, error)
 	struct socket *so;
 	int *error;
 {
-	struct inpcbpolicy *pcbsp = NULL;
-	struct secpolicy *currsp = NULL;	/* policy on socket */
-	struct secpolicy *kernsp = NULL;	/* policy on kernel */
-	struct secpolicyindex spidx;
-#if NPF > 0
-	struct pf_tag *t;
-#endif
-	u_int16_t tag;
+	struct inpcbpolicy *pcbsp;
 
 	/* sanity check */
 	if (m == NULL || so == NULL || error == NULL)
@@ -878,122 +781,35 @@ ipsec6_getpolicybysock(m, dir, so, error)
 		panic("ipsec6_getpolicybysock: pcbsp is NULL.");
 #endif
 
-#if NPF > 0
-	t = ipsec_get_tag(m);
-	tag = t ? t->tag : 0;
-#else
-	tag = 0;
-#endif
+	return (getpolicybypcbsp(AF_INET6, m, dir, pcbsp, error));
+}
 
-	/* if we have a cached entry, and if it is still valid, use it. */
-	ipsec6stat.spdcachelookup++;
-	currsp = ipsec_checkpcbcache(m, pcbsp, dir);
-	if (currsp) {
-		*error = 0;
-		return currsp;
-	}
-	ipsec6stat.spdcachemiss++;
-
-	switch (dir) {
-	case IPSEC_DIR_INBOUND:
-		currsp = pcbsp->sp_in;
-		break;
-	case IPSEC_DIR_OUTBOUND:
-		currsp = pcbsp->sp_out;
-		break;
-	default:
-		panic("ipsec6_getpolicybysock: illegal direction.");
-	}
+static struct secpolicy *
+ipsec6_getpolicybypcb(m, dir, in6p, error)
+	struct mbuf *m;
+	u_int dir;
+	struct in6pcb *in6p;
+	int *error;
+{
+	struct inpcbpolicy *pcbsp;
 
 	/* sanity check */
-	if (currsp == NULL)
-		panic("ipsec6_getpolicybysock: currsp is NULL.");
+	if (m == NULL || in6p == NULL || error == NULL)
+		panic("ipsec6_getpolicybypcb: NULL pointer was passed.");
 
-	/* when privileged socket */
-	if (pcbsp->priv) {
-		switch (currsp->policy) {
-		case IPSEC_POLICY_BYPASS:
-			currsp->refcnt++;
-			*error = 0;
-			ipsec_fillpcbcache(pcbsp, m, currsp, dir);
-			return currsp;
+#ifdef DIAGNOSTIC
+	if (so->so_proto->pr_domain->dom_family != AF_INET6)
+		panic("ipsec6_getpolicybypcb: socket domain != inet6");
+#endif
 
-		case IPSEC_POLICY_ENTRUST:
-			/* look for a policy in SPD */
-			if (ipsec_setspidx_mbuf(&spidx, AF_INET6, m, 1) == 0 &&
-			    (kernsp = key_allocsp(tag, &spidx, dir)) != NULL) {
-				/* SP found */
-				KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
-					printf("DP ipsec6_getpolicybysock called "
-					       "to allocate SP:%p\n", kernsp));
-				*error = 0;
-				ipsec_fillpcbcache(pcbsp, m, kernsp, dir);
-				return kernsp;
-			}
+	pcbsp = in6p->in6p_sp;
 
-			/* no SP found */
-			ip6_def_policy->refcnt++;
-			*error = 0;
-			ipsec_fillpcbcache(pcbsp, m, ip6_def_policy, dir);
-			return ip6_def_policy;
+#ifdef DIAGNOSTIC
+	if (pcbsp == NULL)
+		panic("ipsec6_getpolicybypcb: pcbsp is NULL.");
+#endif
 
-		case IPSEC_POLICY_IPSEC:
-			currsp->refcnt++;
-			*error = 0;
-			ipsec_fillpcbcache(pcbsp, m, currsp, dir);
-			return currsp;
-
-		default:
-			ipseclog((LOG_ERR, "ipsec6_getpolicybysock: "
-			    "Invalid policy for PCB %d\n", currsp->policy));
-			*error = EINVAL;
-			return NULL;
-		}
-		/* NOTREACHED */
-	}
-
-	/* when non-privileged socket */
-	/* look for a policy in SPD */
-	if (ipsec_setspidx_mbuf(&spidx, AF_INET6, m, 1) == 0 &&
-	    (kernsp = key_allocsp(tag, &spidx, dir)) != NULL) {
-		/* SP found */
-		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
-			printf("DP ipsec6_getpolicybysock called "
-			       "to allocate SP:%p\n", kernsp));
-		*error = 0;
-		ipsec_fillpcbcache(pcbsp, m, kernsp, dir);
-		return kernsp;
-	}
-
-	/* no SP found */
-	switch (currsp->policy) {
-	case IPSEC_POLICY_BYPASS:
-		ipseclog((LOG_ERR, "ipsec6_getpolicybysock: "
-		    "Illegal policy for non-privileged defined %d\n",
-		    currsp->policy));
-		*error = EINVAL;
-		return NULL;
-
-	case IPSEC_POLICY_ENTRUST:
-		ip6_def_policy->refcnt++;
-		*error = 0;
-		ipsec_fillpcbcache(pcbsp, m, ip6_def_policy, dir);
-		return ip6_def_policy;
-
-	case IPSEC_POLICY_IPSEC:
-		currsp->refcnt++;
-		*error = 0;
-		ipsec_fillpcbcache(pcbsp, m, currsp, dir);
-		return currsp;
-
-	default:
-		ipseclog((LOG_ERR,
-		    "ipsec6_policybysock: Invalid policy for PCB %d\n",
-		    currsp->policy));
-		*error = EINVAL;
-		return NULL;
-	}
-	/* NOTREACHED */
+	return (getpolicybypcbsp(AF_INET6, m, dir, pcbsp, error));
 }
 
 /*
@@ -2125,17 +1941,49 @@ ipsec4_in_reject_so(m, so)
 	return result;
 }
 
+/*
+ * XXX: this function is almost a copy of in_reject_so, just for a portability
+ * reason.
+ */
+static int
+ipsec4_in_reject_pcb(m, inp)
+	struct mbuf *m;
+	struct inpcb *inp;
+{
+	struct secpolicy *sp = NULL;
+	int error;
+	int result;
+
+	/* sanity check */
+	if (m == NULL)
+		return 0;	/* XXX should be panic ? */
+
+	/* get SP for this packet. */
+	sp = ipsec4_getpolicybypcb(m, IPSEC_DIR_INBOUND, inp, &error);
+
+	/* XXX should be panic ? -> No, there may be error. */
+	if (sp == NULL)
+		return 0;
+
+	result = ipsec_in_reject(sp, m);
+	KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
+		printf("DP ipsec4_in_reject_so call free SP:%p\n", sp));
+	key_freesp(sp);
+
+	return result;
+}
+
 int
 ipsec4_in_reject(m, inp)
 	struct mbuf *m;
 	struct inpcb *inp;
 {
 	if (inp == NULL)
-		return ipsec4_in_reject_so(m, NULL);
-	if (inp->inp_socket)
-		return ipsec4_in_reject_so(m, inp->inp_socket);
+		return (ipsec4_in_reject_so(m, NULL));
+	else if (inp->inp_socket)
+		return (ipsec4_in_reject_so(m, inp->inp_socket));
 	else
-		panic("ipsec4_in_reject: invalid inpcb/socket");
+		return (ipsec4_in_reject_pcb(m, inp));
 }
 
 #ifdef INET6
@@ -2178,17 +2026,46 @@ ipsec6_in_reject_so(m, so)
 	return result;
 }
 
+/* XXX: just for portability */
+static int
+ipsec6_in_reject_pcb(m, in6p)
+	struct mbuf *m;
+	struct in6pcb *in6p;
+{
+	struct secpolicy *sp = NULL;
+	int error;
+	int result;
+
+	/* sanity check */
+	if (m == NULL)
+		return 0;	/* XXX should be panic ? */
+
+	/* get SP for this packet. */
+	sp = ipsec6_getpolicybypcb(m, IPSEC_DIR_INBOUND, in6p, &error);
+
+	if (sp == NULL)
+		return 0;	/* XXX should be panic ? */
+
+	result = ipsec_in_reject(sp, m);
+	KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
+		printf("DP ipsec6_in_reject_so call free SP:%p\n", sp));
+	key_freesp(sp);
+
+	return result;
+}
+
 int
 ipsec6_in_reject(m, in6p)
 	struct mbuf *m;
 	struct in6pcb *in6p;
 {
 	if (in6p == NULL)
-		return ipsec6_in_reject_so(m, NULL);
+		return (ipsec6_in_reject_so(m, NULL));
 	if (in6p->in6p_socket)
-		return ipsec6_in_reject_so(m, in6p->in6p_socket);
+		return (ipsec6_in_reject_so(m, in6p->in6p_socket));
 	else
-		panic("ipsec6_in_reject: invalid in6p/socket");
+		return (ipsec6_in_reject_pcb(m, in6p));
+		
 }
 #endif
 
