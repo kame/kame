@@ -32,7 +32,7 @@
  * Sun Jan  9 06:23:42 JST 2000
  *    Merged into new racoon with trivial modification.
  */
-/* $Id: signing.c,v 1.7 2000/02/08 12:52:07 itojun Exp $ */
+/* $Id: signing.c,v 1.8 2000/02/08 13:08:00 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -46,6 +46,11 @@
 #include <fcntl.h>
 
 /* get openssl/ssleay version number */
+#ifdef INCLUDE_PATH_OPENSSL
+#ifdef HAVE_OPENSSL_OPENSSLV_H
+#include <openssl/opensslv.h>
+#define SSLVER	OPENSSL_VERSION_NUMBER
+#else
 #ifdef HAVE_OPENSSLV_H
 #include <opensslv.h>
 #define SSLVER	OPENSSL_VERSION_NUMBER
@@ -53,6 +58,7 @@
 #ifdef HAVE_CVERSION_H
 #include <cversion.h>
 #define SSLVER	SSLEAY_VERSION_NUMBER
+#endif
 #endif
 #endif
 
