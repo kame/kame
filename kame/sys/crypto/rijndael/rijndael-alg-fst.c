@@ -4,8 +4,12 @@
  *          v2.0: Vincent Rijmen
  */
 
+/* XXX not thread safe due to rijndaelROUNDS */
+
 #include <sys/cdefs.h>
+#include <sys/types.h>
 #include <crypto/rijndael/rijndael-alg-fst.h>
+#include <crypto/rijndael/rijndael_local.h>
 
 #define SC	((BC - 4) >> 1)
 
@@ -32,15 +36,20 @@ static word8 shifts[3][4][2] = {
  }
 };
 
-word8 mul __P((word8, word8));
-void KeyAddition __P((word8[4][4], word8[4][4], word8));
-void ShiftRow __P((word8[4][4], word8, word8));
-void Substitution __P((word8[4][4], word8[256], word8));
-void MixColumn __P((word8[4][4], word8));
-void InvMixColumn __P((word8[4][4], word8));
+#if 0
+static word8 mul __P((word8, word8));
+#endif
+static void KeyAddition __P((word8[4][4], word8[4][4], word8));
+static void ShiftRow __P((word8[4][4], word8, word8));
+static void Substitution __P((word8[4][4], word8[256], word8));
+#if 0
+static void MixColumn __P((word8[4][4], word8));
+#endif
+static void InvMixColumn __P((word8[4][4], word8));
 
 
-word8 mul(word8 a, word8 b) {
+#if 0
+static word8 mul(word8 a, word8 b) {
    /* multiply two elements of GF(2^m)
     * needed for MixColumn and InvMixColumn
     */
@@ -49,8 +58,9 @@ word8 mul(word8 a, word8 b) {
 	else
 		return 0;
 }
+#endif
 
-void KeyAddition(word8 a[4][4], word8 rk[4][4], word8 BC) {
+static void KeyAddition(word8 a[4][4], word8 rk[4][4], word8 BC) {
 	/* Exor corresponding text input and round key input bytes
 	 */
 	int i, j;
@@ -60,7 +70,7 @@ void KeyAddition(word8 a[4][4], word8 rk[4][4], word8 BC) {
 			a[i][j] ^= rk[i][j];
 }
 
-void ShiftRow(word8 a[4][4], word8 d, word8 BC) {
+static void ShiftRow(word8 a[4][4], word8 d, word8 BC) {
 	/* Row 0 remains unchanged
 	 * The other three rows are shifted a variable amount
 	 */
@@ -75,7 +85,7 @@ void ShiftRow(word8 a[4][4], word8 d, word8 BC) {
 	}
 }
 
-void Substitution(word8 a[4][4], word8 box[256], word8 BC) {
+static void Substitution(word8 a[4][4], word8 box[256], word8 BC) {
 	/* Replace every byte of the input by the byte at that place
 	 * in the nonlinear S-box
 	 */
@@ -86,7 +96,8 @@ void Substitution(word8 a[4][4], word8 box[256], word8 BC) {
 			a[i][j] = box[a[i][j]] ;
 }
    
-void MixColumn(word8 a[4][4], word8 BC) {
+#if 0
+static void MixColumn(word8 a[4][4], word8 BC) {
         /* Mix the four bytes of every column in a linear way
 	 */
 	word8 b[4][4];
@@ -102,8 +113,9 @@ void MixColumn(word8 a[4][4], word8 BC) {
 		for(j = 0; j < BC; j++)
 			a[j][i] = b[j][i];
 }
+#endif
 
-void InvMixColumn(word8 a[4][4], word8 BC) {
+static void InvMixColumn(word8 a[4][4], word8 BC) {
         /* Mix the four bytes of every column in a linear way
 	 * This is the opposite operation of Mixcolumn
 	 */
@@ -125,14 +137,14 @@ int rijndaelKeySched (word8 k[MAXKC][4], int keyBits, word8 W[MAXROUNDS+1][4][4]
 	 */ 
 	int j, r, t, rconpointer = 0;
 	word8 tk[MAXKC][4];
-	int KC = ROUNDS - 6;
+	int KC = rijndaelROUNDS - 6;
 	
 	for(j = KC-1; j >= 0; j--)
 		*((word32*)tk[j]) = *((word32*)k[j]);
 	r = 0;
 	t = 0;
 	/* copy values into round key array */
-	for(j = 0; (j < KC) && (r < (ROUNDS+1)); ) {
+	for(j = 0; (j < KC) && (r < (rijndaelROUNDS+1)); ) {
 		for (; (j < KC) && (t < 4); j++, t++)
 			*((word32*)W[r][t]) = *((word32*)tk[j]);
 		if (t == 4) {
@@ -141,7 +153,7 @@ int rijndaelKeySched (word8 k[MAXKC][4], int keyBits, word8 W[MAXROUNDS+1][4][4]
 		}
 	}
 		
-	while (r < (ROUNDS+1)) { /* while not enough round key material calculated */
+	while (r < (rijndaelROUNDS+1)) { /* while not enough round key material calculated */
 		/* calculate new values */
 		tk[0][0] ^= S[tk[KC-1][1]];
 		tk[0][1] ^= S[tk[KC-1][2]];
@@ -163,7 +175,7 @@ int rijndaelKeySched (word8 k[MAXKC][4], int keyBits, word8 W[MAXROUNDS+1][4][4]
 				*((word32*)tk[j]) ^= *((word32*)tk[j-1]);
 		}
 		/* copy values into round key array */
-		for(j = 0; (j < KC) && (r < (ROUNDS+1)); ) {
+		for(j = 0; (j < KC) && (r < (rijndaelROUNDS+1)); ) {
 			for (; (j < KC) && (t < 4); j++, t++)
 				*((word32*)W[r][t]) = *((word32*)tk[j]);
 			if (t == 4) {
@@ -180,7 +192,7 @@ int rijndaelKeyEnctoDec (int keyBits, word8 W[MAXROUNDS+1][4][4])
 {
 	int r;
 
-	for (r = 1; r < ROUNDS; r++) {
+	for (r = 1; r < rijndaelROUNDS; r++) {
 		InvMixColumn(W[r], 4);
 	}
 	return 0;
@@ -213,7 +225,7 @@ int rijndaelEncrypt (word8 a[16], word8 b[16], word8 rk[MAXROUNDS+1][4][4])
            ^ *((word32*)T2[temp[0][1]])
            ^ *((word32*)T3[temp[1][2]]) 
            ^ *((word32*)T4[temp[2][3]]);
-   for(r = 1; r < ROUNDS-1; r++) {
+   for(r = 1; r < rijndaelROUNDS-1; r++) {
 		*((word32*)temp[0]) = *((word32*)b) ^ *((word32*)rk[r][0]);
 		*((word32*)temp[1]) = *((word32*)(b+4)) ^ *((word32*)rk[r][1]);
 		*((word32*)temp[2]) = *((word32*)(b+8)) ^ *((word32*)rk[r][2]);
@@ -236,10 +248,10 @@ int rijndaelEncrypt (word8 a[16], word8 b[16], word8 rk[MAXROUNDS+1][4][4])
            ^ *((word32*)T4[temp[2][3]]);
    }
    /* last round is special */   
-	*((word32*)temp[0]) = *((word32*)b) ^ *((word32*)rk[ROUNDS-1][0]);
-	*((word32*)temp[1]) = *((word32*)(b+4)) ^ *((word32*)rk[ROUNDS-1][1]);
-	*((word32*)temp[2]) = *((word32*)(b+8)) ^ *((word32*)rk[ROUNDS-1][2]);
-	*((word32*)temp[3]) = *((word32*)(b+12)) ^ *((word32*)rk[ROUNDS-1][3]);
+	*((word32*)temp[0]) = *((word32*)b) ^ *((word32*)rk[rijndaelROUNDS-1][0]);
+	*((word32*)temp[1]) = *((word32*)(b+4)) ^ *((word32*)rk[rijndaelROUNDS-1][1]);
+	*((word32*)temp[2]) = *((word32*)(b+8)) ^ *((word32*)rk[rijndaelROUNDS-1][2]);
+	*((word32*)temp[3]) = *((word32*)(b+12)) ^ *((word32*)rk[rijndaelROUNDS-1][3]);
    b[0] = T1[temp[0][0]][1];
    b[1] = T1[temp[1][1]][1];
    b[2] = T1[temp[2][2]][1]; 
@@ -256,10 +268,10 @@ int rijndaelEncrypt (word8 a[16], word8 b[16], word8 rk[MAXROUNDS+1][4][4])
    b[13] = T1[temp[0][1]][1];
    b[14] = T1[temp[1][2]][1]; 
    b[15] = T1[temp[2][3]][1];
-	*((word32*)b) ^= *((word32*)rk[ROUNDS][0]);
-	*((word32*)(b+4)) ^= *((word32*)rk[ROUNDS][1]);
-	*((word32*)(b+8)) ^= *((word32*)rk[ROUNDS][2]);
-	*((word32*)(b+12)) ^= *((word32*)rk[ROUNDS][3]);
+	*((word32*)b) ^= *((word32*)rk[rijndaelROUNDS][0]);
+	*((word32*)(b+4)) ^= *((word32*)rk[rijndaelROUNDS][1]);
+	*((word32*)(b+8)) ^= *((word32*)rk[rijndaelROUNDS][2]);
+	*((word32*)(b+12)) ^= *((word32*)rk[rijndaelROUNDS][3]);
 
 	return 0;
 }
@@ -275,14 +287,14 @@ int rijndaelEncryptRound (word8 a[4][4],
 
 
 	/* make number of rounds sane */
-	if (rounds > ROUNDS) rounds = ROUNDS;
+	if (rounds > rijndaelROUNDS) rounds = rijndaelROUNDS;
 
 	*((word32*)a[0]) = *((word32*)a[0]) ^ *((word32*)rk[0][0]);
 	*((word32*)a[1]) = *((word32*)a[1]) ^ *((word32*)rk[0][1]);
 	*((word32*)a[2]) = *((word32*)a[2]) ^ *((word32*)rk[0][2]);
 	*((word32*)a[3]) = *((word32*)a[3]) ^ *((word32*)rk[0][3]);
 
-	for(r = 1; (r <= rounds) && (r < ROUNDS); r++) {
+	for(r = 1; (r <= rounds) && (r < rijndaelROUNDS); r++) {
 		*((word32*)temp[0]) = *((word32*)T1[a[0][0]])
            ^ *((word32*)T2[a[1][1]])
            ^ *((word32*)T3[a[2][2]]) 
@@ -304,7 +316,7 @@ int rijndaelEncryptRound (word8 a[4][4],
 		*((word32*)a[2]) = *((word32*)temp[2]) ^ *((word32*)rk[r][2]);
 		*((word32*)a[3]) = *((word32*)temp[3]) ^ *((word32*)rk[r][3]);
    }
-	if (rounds == ROUNDS) {
+	if (rounds == rijndaelROUNDS) {
    	/* last round is special */   
    	temp[0][0] = T1[a[0][0]][1];
    	temp[0][1] = T1[a[1][1]][1];
@@ -322,10 +334,10 @@ int rijndaelEncryptRound (word8 a[4][4],
    	temp[3][1] = T1[a[0][1]][1];
    	temp[3][2] = T1[a[1][2]][1]; 
    	temp[3][3] = T1[a[2][3]][1];
-		*((word32*)a[0]) = *((word32*)temp[0]) ^ *((word32*)rk[ROUNDS][0]);
-		*((word32*)a[1]) = *((word32*)temp[1]) ^ *((word32*)rk[ROUNDS][1]);
-		*((word32*)a[2]) = *((word32*)temp[2]) ^ *((word32*)rk[ROUNDS][2]);
-		*((word32*)a[3]) = *((word32*)temp[3]) ^ *((word32*)rk[ROUNDS][3]);
+		*((word32*)a[0]) = *((word32*)temp[0]) ^ *((word32*)rk[rijndaelROUNDS][0]);
+		*((word32*)a[1]) = *((word32*)temp[1]) ^ *((word32*)rk[rijndaelROUNDS][1]);
+		*((word32*)a[2]) = *((word32*)temp[2]) ^ *((word32*)rk[rijndaelROUNDS][2]);
+		*((word32*)a[3]) = *((word32*)temp[3]) ^ *((word32*)rk[rijndaelROUNDS][3]);
 	}
 
 	return 0;
@@ -338,10 +350,10 @@ int rijndaelDecrypt (word8 a[16], word8 b[16], word8 rk[MAXROUNDS+1][4][4])
    word8 temp[4][4];
 	
 
-    *((word32*)temp[0]) = *((word32*)a) ^ *((word32*)rk[ROUNDS][0]);
-    *((word32*)temp[1]) = *((word32*)(a+4)) ^ *((word32*)rk[ROUNDS][1]);
-    *((word32*)temp[2]) = *((word32*)(a+8)) ^ *((word32*)rk[ROUNDS][2]);
-    *((word32*)temp[3]) = *((word32*)(a+12)) ^ *((word32*)rk[ROUNDS][3]);
+    *((word32*)temp[0]) = *((word32*)a) ^ *((word32*)rk[rijndaelROUNDS][0]);
+    *((word32*)temp[1]) = *((word32*)(a+4)) ^ *((word32*)rk[rijndaelROUNDS][1]);
+    *((word32*)temp[2]) = *((word32*)(a+8)) ^ *((word32*)rk[rijndaelROUNDS][2]);
+    *((word32*)temp[3]) = *((word32*)(a+12)) ^ *((word32*)rk[rijndaelROUNDS][3]);
     *((word32*)b) = *((word32*)T5[temp[0][0]])
            ^ *((word32*)T6[temp[3][1]])
            ^ *((word32*)T7[temp[2][2]]) 
@@ -358,7 +370,7 @@ int rijndaelDecrypt (word8 a[16], word8 b[16], word8 rk[MAXROUNDS+1][4][4])
            ^ *((word32*)T6[temp[2][1]])
            ^ *((word32*)T7[temp[1][2]]) 
            ^ *((word32*)T8[temp[0][3]]);
-   for(r = ROUNDS-1; r > 1; r--) {
+   for(r = rijndaelROUNDS-1; r > 1; r--) {
 		*((word32*)temp[0]) = *((word32*)b) ^ *((word32*)rk[r][0]);
 		*((word32*)temp[1]) = *((word32*)(b+4)) ^ *((word32*)rk[r][1]);
 		*((word32*)temp[2]) = *((word32*)(b+8)) ^ *((word32*)rk[r][2]);
@@ -423,19 +435,19 @@ int rijndaelDecryptRound (word8 a[4][4],
 	
 
 	/* make number of rounds sane */
-	if (rounds > ROUNDS) rounds = ROUNDS;
+	if (rounds > rijndaelROUNDS) rounds = rijndaelROUNDS;
 
         /* First the special round:
 	 *   without InvMixColumn
 	 *   with extra KeyAddition
 	 */
-	KeyAddition(a,rk[ROUNDS],4);
+	KeyAddition(a,rk[rijndaelROUNDS],4);
 	Substitution(a,Si,4);
 	ShiftRow(a,1,4);              
 	
-	/* ROUNDS-1 ordinary rounds
+	/* rijndaelROUNDS-1 ordinary rounds
 	 */
-	for(r = ROUNDS-1; r > rounds; r--) {
+	for(r = rijndaelROUNDS-1; r > rounds; r--) {
 		KeyAddition(a,rk[r],4);
 		InvMixColumn(a,4);      
 		Substitution(a,Si,4);

@@ -57,28 +57,17 @@
 #define	ROR(x,n) (((x) >> ((n) & 0x1F)) | ((x) << (32-((n) & 0x1F))))
 
 /* XXX the following decl should be expanded */
+#if 0
 #define BYTE	u_int8_t
 #define DWORD	u_int32_t
-
-#if BYTE_ORDER == LITTLE_ENDIAN
-#define LittleEndian		1
-#endif
-#if BYTE_ORDER == BIG_ENDIAN
-#define LittleEndian		0
 #endif
 
 /* XXX should use ALIGNBYTES, however, we cannot do that at runtime */
 #define ALIGN32		1
 
-/* Compile-time sanity checks: make sure that some platform was defined! */
-#ifndef LittleEndian
-#error Need to define LittleEndian for this platform! (in PLATFORM.H)
-#endif
-
 #ifndef ALIGN32
 #error Need to define ALIGN32 for this platform! (in PLATFORM.H)
 #endif
-
 
 /*  Build higher-level constructs based on endianness setting  */
 #if LittleEndian

@@ -71,7 +71,9 @@ void _DumpKey(CONST keyInstance *key)
 	DebugIO(";\n");
 	}
 #else
-CONST int debugCompile	=	0;
+#if 0
+static CONST int debugCompile	=	0;
+#endif
 #define DebugDump(x,s,R,XOR,doRot,showT,needBswap)
 #define	DebugDumpKey(key)
 #endif

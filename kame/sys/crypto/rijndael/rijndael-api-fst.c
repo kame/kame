@@ -4,12 +4,16 @@
  *          v2.0: Vincent Rijmen
  */
 
+/* XXX not thread safe due to rijndaelROUNDS */
+
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/types.h>
 #include <crypto/rijndael/rijndael-alg-fst.h>
 #include <crypto/rijndael/rijndael-api-fst.h>
+#include <crypto/rijndael/rijndael_local.h>
 
-int makeKey(keyInstance *key, BYTE direction, int keyLen, char *keyMaterial)
+int rijndael_makeKey(keyInstance *key, BYTE direction, int keyLen, char *keyMaterial)
 {
 	word8 k[MAXKC][4];
 	int i, j, t;
@@ -34,7 +38,7 @@ int makeKey(keyInstance *key, BYTE direction, int keyLen, char *keyMaterial)
 		strncpy(key->keyMaterial, keyMaterial, keyLen/4);
 	}
 
-	ROUNDS = keyLen/32 + 6;
+	rijndaelROUNDS = keyLen/32 + 6;
 
 	/* initialize key schedule: */
  	for(i = 0; i < key->keyLen/8; i++) {
@@ -59,7 +63,7 @@ int makeKey(keyInstance *key, BYTE direction, int keyLen, char *keyMaterial)
 	return TRUE;
 }
 
-int cipherInit(cipherInstance *cipher, BYTE mode, char *IV)
+int rijndael_cipherInit(cipherInstance *cipher, BYTE mode, char *IV)
 {
 	int i, j, t;
 	
@@ -92,7 +96,7 @@ int cipherInit(cipherInstance *cipher, BYTE mode, char *IV)
 }
 
 
-int blockEncrypt(cipherInstance *cipher,
+int rijndael_blockEncrypt(cipherInstance *cipher,
 	keyInstance *key, BYTE *input, int inputLen, BYTE *outBuffer)
 {
 	int i, k, numBlocks;
@@ -186,7 +190,7 @@ int blockEncrypt(cipherInstance *cipher,
 	return numBlocks*128;
 }
 
-int blockDecrypt(cipherInstance *cipher,
+int rijndael_blockDecrypt(cipherInstance *cipher,
 	keyInstance *key, BYTE *input, int inputLen, BYTE *outBuffer)
 {
 	int i, k, numBlocks;
@@ -305,7 +309,7 @@ int blockDecrypt(cipherInstance *cipher,
  *		TRUE - on success
  *		BAD_CIPHER_STATE - cipher in bad state (e.g., not initialized)
  */
-int cipherUpdateRounds(cipherInstance *cipher,
+int rijndael_cipherUpdateRounds(cipherInstance *cipher,
 	keyInstance *key, BYTE *input, int inputLen, BYTE *outBuffer, int rounds)
 {
 	int j;

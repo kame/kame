@@ -25,13 +25,26 @@
 #include	<sys/types.h>
 #include	<machine/endian.h>
 
+#if BYTE_ORDER == LITTLE_ENDIAN
+#define LittleEndian		1
+#endif
+#if BYTE_ORDER == BIG_ENDIAN
+#define LittleEndian		0
+#endif
+
+/* Compile-time sanity checks: make sure that some platform was defined! */
+#ifndef LittleEndian
+#error Need to define LittleEndian for this platform! (in PLATFORM.H)
+#endif
+
+#include	<crypto/twofish/twofish_local.h>
 #include	<crypto/twofish/twofish.h>
 #include	<crypto/twofish/table.h>
 
-int ParseHexDword __P((int, CONST char *, DWORD *, char *));
-DWORD RS_MDS_Encode __P((DWORD, DWORD));
-void BuildMDS __P((void));
-void ReverseRoundSubkeys __P((keyInstance *, BYTE));
+static int ParseHexDword __P((int, CONST char *, DWORD *, char *));
+static DWORD RS_MDS_Encode __P((DWORD, DWORD));
+static void BuildMDS __P((void));
+static void ReverseRoundSubkeys __P((keyInstance *, BYTE));
 
 #if   defined(min_key)  && !defined(MIN_KEY)
 #define	MIN_KEY		1			/* toupper() */
@@ -62,8 +75,8 @@ extern DWORD		cdecl TwofishAsmCodeSize(void);
 
 #define		CONST					/* help syntax from C++, NOP here */
 
-CONST		fullSbox MDStab;		/* not actually const.  Initialized ONE time */
-int			needToBuildMDS=1;		/* is MDStab initialized yet? */
+static CONST		fullSbox MDStab;		/* not actually const.  Initialized ONE time */
+static int			needToBuildMDS=1;		/* is MDStab initialized yet? */
 
 #define		BIG_TAB		0
 
@@ -147,8 +160,10 @@ static		fullSbox _sBox_;		/* permuted MDStab based on keys */
 #define	GetSboxKey	
 #endif
 
-CONST		char *moduleDescription	="Optimized C ";
-CONST		char *modeString		=MOD_STRING;
+#if 0
+static CONST		char *moduleDescription	="Optimized C ";
+static CONST		char *modeString		=MOD_STRING;
+#endif
 
 
 /* macro(s) for debugging help */
@@ -181,7 +196,7 @@ DWORD TwofishCodeStart(void) { return Here(0); }
 *		 run for a fixed number of queries and then say we're done.
 *
 -****************************************************************************/
-int TableOp(int op)
+int twofish_TableOp(int op)
 	{
 	static int queryCnt=0;
 
@@ -225,7 +240,7 @@ int TableOp(int op)
 *	happens automatically below. 
 *
 -****************************************************************************/
-int ParseHexDword(int bits,CONST char *srcTxt,DWORD *d,char *dstTxt)
+static int ParseHexDword(int bits,CONST char *srcTxt,DWORD *d,char *dstTxt)
 	{
 	int i;
 	char c;
@@ -362,7 +377,7 @@ DWORD f32(DWORD x,CONST DWORD *k32,int keyLen)
 *	without lookup tables.
 *
 -****************************************************************************/
-DWORD RS_MDS_Encode(DWORD k0,DWORD k1)
+static DWORD RS_MDS_Encode(DWORD k0,DWORD k1)
 	{
 	int i,j;
 	DWORD r;
@@ -393,7 +408,7 @@ DWORD RS_MDS_Encode(DWORD k0,DWORD k1)
 *	one time at initialization, after which the table is "CONST".
 *
 -****************************************************************************/
-void BuildMDS(void)
+static void BuildMDS(void)
 	{
 	int i;
 	DWORD d;
@@ -477,7 +492,7 @@ void BuildMDS(void)
 *	Note that key->numRounds must be even and >= 2 here.
 *
 -****************************************************************************/
-void ReverseRoundSubkeys(keyInstance *key,BYTE newDir)
+static void ReverseRoundSubkeys(keyInstance *key,BYTE newDir)
 	{
 	DWORD t0,t1;
 	register DWORD *r0=key->subKeys+ROUND_SUBKEYS;
@@ -526,9 +541,9 @@ void ReverseRoundSubkeys(keyInstance *key,BYTE newDir)
 		{ Xor32(dst,src,i  ); Xor32(dst,src,i+1); Xor32(dst,src,i+2); Xor32(dst,src,i+3); }	\
 	}
 #else						/* do it as a function call */
-void Xor256 __P((void *, void *, BYTE));
+static void Xor256 __P((void *, void *, BYTE));
 
-void Xor256(void *dst,void *src,BYTE b)
+static void Xor256(void *dst,void *src,BYTE b)
 	{
 	register DWORD	x=b*0x01010101u;	/* replicate byte to all four bytes */
 	register DWORD *d=(DWORD *)dst;
@@ -559,7 +574,7 @@ void Xor256(void *dst,void *src,BYTE b)
 *	be generated on-the-fly	using f32()
 *
 -****************************************************************************/
-int reKey(keyInstance *key)
+int twofish_reKey(keyInstance *key)
 	{
 	int		i,j,k64Cnt,keyLen;
 	int		subkeyCnt;
@@ -753,7 +768,7 @@ else
 * Notes:	This parses the key bits from keyMaterial.  Zeroes out unused key bits
 *
 -****************************************************************************/
-int makeKey(keyInstance *key, BYTE direction, int keyLen,CONST char *keyMaterial)
+int twofish_makeKey(keyInstance *key, BYTE direction, int keyLen,CONST char *keyMaterial)
 	{
 #if VALIDATE_PARMS				/* first, sanity check on parameters */
 	if (key == NULL)			
@@ -781,7 +796,7 @@ int makeKey(keyInstance *key, BYTE direction, int keyLen,CONST char *keyMaterial
 	if (ParseHexDword(keyLen,keyMaterial,key->key32,key->keyMaterial))
 		return BAD_KEY_MAT;	
 
-	return reKey(key);			/* generate round subkeys */
+	return twofish_reKey(key);			/* generate round subkeys */
 	}
 
 
@@ -800,7 +815,7 @@ int makeKey(keyInstance *key, BYTE direction, int keyLen,CONST char *keyMaterial
 *					else error code (e.g., BAD_CIPHER_MODE)
 *
 -****************************************************************************/
-int cipherInit(cipherInstance *cipher, BYTE mode,CONST char *IV)
+int twofish_cipherInit(cipherInstance *cipher, BYTE mode,CONST char *IV)
 	{
 	int i;
 #if VALIDATE_PARMS				/* first, sanity check on parameters */
@@ -850,7 +865,7 @@ int cipherInit(cipherInstance *cipher, BYTE mode,CONST char *IV)
 *		 sizes can be supported.
 *
 -****************************************************************************/
-int blockEncrypt(cipherInstance *cipher, keyInstance *key,CONST BYTE *input,
+int twofish_blockEncrypt(cipherInstance *cipher, keyInstance *key,CONST BYTE *input,
 				int inputLen, BYTE *outBuffer)
 	{
 	int   i,n;						/* loop counters */
@@ -887,7 +902,7 @@ int blockEncrypt(cipherInstance *cipher, keyInstance *key,CONST BYTE *input,
 		cipher->mode = MODE_ECB;	/* do encryption in ECB */
 		for (n=0;n<inputLen;n++)
 			{
-			blockEncrypt(cipher,key,cipher->IV,BLOCK_SIZE,(BYTE *)x);
+			twofish_blockEncrypt(cipher,key,cipher->IV,BLOCK_SIZE,(BYTE *)x);
 			bit0  = 0x80 >> (n & 7);/* which bit position in byte */
 			ctBit = (input[n/8] & bit0) ^ ((((BYTE *) x)[0] & 0x80) >> (n&7));
 			outBuffer[n/8] = (outBuffer[n/8] & ~ bit0) | ctBit;
@@ -1019,7 +1034,7 @@ int blockEncrypt(cipherInstance *cipher, keyInstance *key,CONST BYTE *input,
 *		 sizes can be supported.
 *
 -****************************************************************************/
-int blockDecrypt(cipherInstance *cipher, keyInstance *key,CONST BYTE *input,
+int twofish_blockDecrypt(cipherInstance *cipher, keyInstance *key,CONST BYTE *input,
 				int inputLen, BYTE *outBuffer)
 	{
 	int   i,n;						/* loop counters */
@@ -1056,7 +1071,7 @@ int blockDecrypt(cipherInstance *cipher, keyInstance *key,CONST BYTE *input,
 		cipher->mode = MODE_ECB;	/* do encryption in ECB */
 		for (n=0;n<inputLen;n++)
 			{
-			blockEncrypt(cipher,key,cipher->IV,BLOCK_SIZE,(BYTE *)x);
+			twofish_blockEncrypt(cipher,key,cipher->IV,BLOCK_SIZE,(BYTE *)x);
 			bit0  = 0x80 >> (n & 7);
 			ctBit = input[n/8] & bit0;
 			outBuffer[n/8] = (outBuffer[n/8] & ~ bit0) |

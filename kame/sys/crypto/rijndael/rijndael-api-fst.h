@@ -2,7 +2,6 @@
  * Optimised ANSI C code
  */
 
-
 #include <crypto/rijndael/rijndael-alg-fst.h>
 
 /*  Defines:
@@ -44,24 +43,22 @@
 parameters at the bottom of the structs as appropriate.
 */
 
-typedef    unsigned char    BYTE;
-
 /*  The structure for key information */
 typedef struct {
-      BYTE  direction;	/*  Key used for encrypting or decrypting? */
+      u_int8_t  direction;	/*  Key used for encrypting or decrypting? */
       int   keyLen;	/*  Length of the key  */
       char  keyMaterial[MAX_KEY_SIZE+1];  /*  Raw key data in ASCII,
                                     e.g., user input or KAT values */
       /*  The following parameters are algorithm dependent, replace or
       		add as necessary  */
       int   blockLen;   /* block length */
-      word8 keySched[MAXROUNDS+1][4][4];	/* key schedule		*/
+      u_int8_t keySched[RIJNDAEL_MAXROUNDS+1][4][4];	/* key schedule		*/
       } keyInstance;
 
 /*  The structure for cipher information */
 typedef struct {  /* changed order of the components */
-      BYTE  mode;            /* MODE_ECB, MODE_CBC, or MODE_CFB1 */
-      BYTE  IV[MAX_IV_SIZE]; /* A possible Initialization Vector for 
+      u_int8_t  mode;            /* MODE_ECB, MODE_CBC, or MODE_CFB1 */
+      u_int8_t  IV[MAX_IV_SIZE]; /* A possible Initialization Vector for 
       					ciphering */
       /*  Add any algorithm specific parameters needed here  */
       int   blockLen;    	/* Sample: Handles non-128 bit block sizes
@@ -75,14 +72,14 @@ typedef struct {  /* changed order of the components */
 			setup the round keys in a variable block length setting 
 	     cipherInit(): parameter blockLen added (for obvious reasons)		
  */
-int makeKey(keyInstance *key, BYTE direction, int keyLen, char *keyMaterial);
+int rijndael_makeKey(keyInstance *key, u_int8_t direction, int keyLen, char *keyMaterial);
 
-int cipherInit(cipherInstance *cipher, BYTE mode, char *IV);
+int rijndael_cipherInit(cipherInstance *cipher, u_int8_t mode, char *IV);
 
-int blockEncrypt(cipherInstance *cipher, keyInstance *key, BYTE *input, 
-			int inputLen, BYTE *outBuffer);
+int rijndael_blockEncrypt(cipherInstance *cipher, keyInstance *key, u_int8_t *input, 
+			int inputLen, u_int8_t *outBuffer);
 
-int blockDecrypt(cipherInstance *cipher, keyInstance *key, BYTE *input,
-			int inputLen, BYTE *outBuffer);
-int cipherUpdateRounds(cipherInstance *cipher, keyInstance *key, BYTE *input, 
-                        int inputLen, BYTE *outBuffer, int Rounds);
+int rijndael_blockDecrypt(cipherInstance *cipher, keyInstance *key, u_int8_t *input,
+			int inputLen, u_int8_t *outBuffer);
+int rijndael_cipherUpdateRounds(cipherInstance *cipher, keyInstance *key, u_int8_t *input, 
+                        int inputLen, u_int8_t *outBuffer, int Rounds);
