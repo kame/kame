@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.29 2000/07/19 12:17:17 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.30 2001/01/05 03:44:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -187,6 +187,10 @@ union inx_addr {
 #define	map_one		map_addr_un.mau_one
 #define	map_inaddr	map_addr_un.mau_inaddr
 };
+
+/* should be obsoleted */
+struct hostent *getnodebyname __P((const char *, int, int));
+struct hostent *getnodebyaddr __P((const void *, size_t, int));
 
 static struct hostent *_hpcopy(struct hostent *hp, int *errp);
 static struct hostent *_hpaddr(int af, const char *name, void *addr, int *errp);
