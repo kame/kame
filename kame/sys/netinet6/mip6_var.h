@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.66 2002/11/01 05:56:25 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.67 2002/11/01 06:02:06 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -578,7 +578,8 @@ struct mip6_bu *mip6_bu_list_find_home_registration
 					__P((struct mip6_bu_list *,
 					     struct sockaddr_in6 *));
 int mip6_bu_encapcheck __P((const struct mbuf *, int, int, void *));
-int mip6_home_registration		__P((struct hif_softc *));
+int mip6_home_registration(struct hif_softc *);
+int mip6_home_registration2(struct mip6_bu *);
 int mip6_validate_bu			__P((struct mbuf *, u_int8_t *));
 int mip6_process_bu			__P((struct mbuf *, u_int8_t *));
 
