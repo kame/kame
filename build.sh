@@ -1,7 +1,7 @@
 #! /bin/sh
 #
 # build script for KAME buildlab.  may not be useful for normal usage.
-# $KAME: build.sh,v 1.5 2001/02/05 00:58:21 itojun Exp $
+# $KAME: build.sh,v 1.6 2001/02/09 12:36:40 itojun Exp $
 #
 
 echo the script is only for KAME buildlab, it is not useful in general
@@ -11,6 +11,9 @@ PATH=/usr/pkg/bin:/usr/local/bin:/usr/X11R6/bin:/usr/bin:/bin:/usr/sbin:/sbin
 export PATH
 HOME=/home/buildlab
 export HOME
+
+hostname=`hostname`
+date=`date`
 
 x=`find /var/tmp -name autobuild\* -print`
 if test "x" != "x$x"; then
@@ -27,9 +30,7 @@ EOF
 fi
 
 cd ~buildlab/k/kame
-hostname=`hostname`
 hosttop=`echo $hostname | sed -e 's/\..*//'`
-date=`date`
 make TARGET=$hosttop AUTOBUILD_COOKIE=/var/tmp/done.$$ autobuild 2>&1 | tee /var/tmp/autobuild.$$ | mail -s "$hostname autobuild at $date" $hosttop@buildlab.kame.net
 if ! test -f /var/tmp/done.$$; then
 	mail -s "autobuild failure: $hostname around $date" buildlab@kame.net <<EOF
