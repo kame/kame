@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.111 2000/11/09 01:46:37 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.112 2000/11/11 00:00:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1768,7 +1768,7 @@ in6_addmulti(maddr6, ifp, errorp)
 		if (*errorp) {
 			LIST_REMOVE(in6m, in6m_entry);
 			free(in6m, M_IPMADDR);
-			ia->ia_ifa.ifa_refcnt--;
+			IFAFREE(&ia->ia_ifa);
 			splx(s);
 			return(NULL);
 		}
