@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.55 2003/08/09 17:06:39 suz Exp $	*/
+/*	$KAME: if_hif.c,v 1.56 2003/08/14 10:06:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -428,6 +428,10 @@ hif_ha_list_insert(hha_list, mha)
 	if ((hha_list == NULL) || (mha == NULL))
 		panic("hha_list nor mha must not be NULL");
 
+	hha = hif_ha_list_find_withmha(hha_list, mha);
+	if (hha != NULL)
+		return (hha);
+
 	MALLOC(hha, struct hif_ha *, sizeof(struct hif_ha), M_TEMP, M_NOWAIT);
 	if (hha == NULL) {
 		mip6log((LOG_ERR, "%s:%d: memory allocation failed.\n",
@@ -715,6 +719,7 @@ hif_ha_list_update_withmpfx(sc, data)
 	struct mip6_prefix *nmpfx, *mpfx;
 	int mpfx_is_new = 0;
 	struct mip6_ha *mha;
+	struct hif_softc *hif;
 	struct hif_ha *hha;
 	int error = 0;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -757,7 +762,15 @@ hif_ha_list_update_withmpfx(sc, data)
 			struct sockaddr_in6 any = sa6_any;
 			mha = mip6_ha_create(&any, NULL, 0, 0,
 			    MIP6_HA_DEFAULT_LIFETIME);
-			hif_ha_list_insert(&sc->hif_ha_list_home, mha);
+			mip6_ha_list_insert(&mip6_ha_list, mha);
+			for (hif = TAILQ_FIRST(&hif_softc_list); hif;
+			    hif = TAILQ_NEXT(hif, hif_entry)) {
+				if (hif == sc)
+					hif_ha_list_insert(&hif->hif_ha_list_home, mha);
+				else
+					hif_ha_list_insert(&hif->hif_ha_list_foreign, mha);
+
+			}
 		} else
 			mha = hha->hha_mha;
 		mip6_prefix_ha_list_insert(&mpfx->mpfx_ha_list, mha);

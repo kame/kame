@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.98 2003/08/08 11:59:11 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.99 2003/08/14 10:06:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -269,11 +269,20 @@ struct mip6_prefix {
 	u_int32_t               mpfx_pltime;
 	time_t                  mpfx_plexpire;
 	struct sockaddr_in6     mpfx_haddr;
-	u_int16_t		mpfx_mpsid;	/* Used for MPS */
-	u_int8_t		mpfx_sentmps;	/* 1: sent MPS to HA with above ID */
 	LIST_HEAD(mip6_prefix_ha_list, mip6_prefix_ha) mpfx_ha_list;
+
+	int                     mpfx_state;
+	u_long                  mpfx_expire;
+	long                    mpfx_ntick;
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	struct callout          mpfx_timer_ch;
+#elif defined(__OpenBSD__)
+	struct timeout          mpfx_timer_ch;
+#endif
 };
 LIST_HEAD(mip6_prefix_list, mip6_prefix);
+#define MIP6_PREFIX_STATE_PREFERRED 0
+#define MIP6_PREFIX_STATE_VALID     1
 
 /* packet options used by the mip6 packet output processing routine. */
 struct mip6_pktopts {

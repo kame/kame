@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.70 2003/07/28 11:04:32 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.71 2003/08/14 10:06:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -129,6 +129,7 @@ static int mip6_dhaad_ha_list_insert(struct hif_softc *, struct mip6_ha *);
 static int mip6_icmp6_create_haanyaddr(struct sockaddr_in6 *,
     struct mip6_prefix *);
 static int mip6_icmp6_create_linklocal(struct in6_addr *, struct in6_addr *);
+static int mip6_icmp6_mp_adv_input(struct mbuf *, int, int);
 #endif
 
 int
@@ -181,20 +182,24 @@ mip6_icmp6_input(m, off, icmp6len)
 		error = mip6_icmp6_dhaad_rep_input(m, off, icmp6len);
 		if (error) {
 			mip6log((LOG_ERR,
-				 "%s:%d: failed to process a DHAAD reply.\n",
-				 __FILE__, __LINE__));
+			    "%s:%d: failed to process a DHAAD reply.\n",
+			     __FILE__, __LINE__));
 			return (error);
 		}
 		break;
-#endif
 
 	case ICMP6_MOBILEPREFIX_ADVERT:
 		if (!MIP6_IS_MN)
 			break;
-		/* XXX: TODO */
+		error = mip6_icmp6_mp_adv_input(m, off, icmp6len);
+		if (error) {
+			mip6log((LOG_ERR,
+			    "%s:%d: failed to process a MPA.\n",
+			     __FILE__, __LINE__));
+			return (error);
+		}
 		break;
 
-#ifdef MIP6_MOBILE_NODE
 	case ICMP6_PARAM_PROB:
 		if (!MIP6_IS_MN)
 			break;
@@ -394,11 +399,19 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	struct dhaad_rep *hdrep;
 	u_int16_t hdrep_id;
 	struct mip6_ha *mha, *mha_prefered = NULL;
+	struct hif_ha *hha;
 	struct in6_addr *haaddrs, *haaddrptr;
-	struct sockaddr_in6 lladdr;
+	struct sockaddr_in6 lladdr, haaddr, anyaddr = sa6_any;
 	int i, hacount = 0;
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
+#ifdef __FreeBSD__
+	struct timeval mono_time;
+#endif /* __FreeBSD__ */
+
+#ifdef __FreeBSD__
+	microtime(&mono_time);
+#endif /* __FreeBSD__ */
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	if (ip6_getpktaddrs(m, &sin6src, NULL)) {
@@ -412,8 +425,8 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	IP6_EXTHDR_GET(hdrep, struct dhaad_rep *, m, off, icmp6len);
 	if (hdrep == NULL) {
 		mip6log((LOG_ERR,
-			 "%s:%d: failed to EXTHDR_GET.\n",
-			 __FILE__, __LINE__));
+		    "%s:%d: failed to EXTHDR_GET.\n",
+		    __FILE__, __LINE__));
 		return (EINVAL);
 	}
 #endif
@@ -424,6 +437,8 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 		m_freem(m);
 		return (EINVAL);
 	}
+
+	/* check the number of home agents listed in the message. */
 	hacount = (icmp6len - sizeof(struct dhaad_rep))
 		/ sizeof(struct in6_addr);
 	if (hacount == 0) {
@@ -437,8 +452,7 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	/* find hif that matches this receiving hadiscovid of DHAAD reply. */
 	hdrep_id = hdrep->dhaad_rep_id;
 	hdrep_id = ntohs(hdrep_id);
-	for (sc = TAILQ_FIRST(&hif_softc_list);
-	     sc;
+	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
 	     sc = TAILQ_NEXT(sc, hif_entry)) {
 		if (sc->hif_dhaad_id == hdrep_id)
 			break;
@@ -453,18 +467,23 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	/* reset rate limitation factor. */
 	sc->hif_dhaad_count = 0;
 
-	/* install HAs specified in the HA list */
+	/* install addresses of a home agent specified in the message */
 	haaddrptr = haaddrs;
 	for (i = 0; i < hacount; i++) {
-		struct sockaddr_in6 haaddr;
-
 		bzero(&haaddr, sizeof(haaddr));
 		haaddr.sin6_len = sizeof(haaddr);
 		haaddr.sin6_family = AF_INET6;
 		haaddr.sin6_addr = *haaddrptr;
+		/*
+		 * XXX we cannot get a correct zone id by looking only
+		 * in6_addr structure.
+		 */
 		in6_addr2zoneid(m->m_pkthdr.rcvif, &haaddr.sin6_addr,
-				&haaddr.sin6_scope_id); /* XXX */
+				&haaddr.sin6_scope_id);
+		in6_embedscope(&haaddr.sin6_addr, &haaddr);
 		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &haaddr);
+		hha = hif_ha_list_find_withaddr(&sc->hif_ha_list_home,
+		    &anyaddr);
 		if (mha) {
 			/*
 			 * if this home agent already exists in the list,
@@ -476,8 +495,43 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 			 * how to get the REAL lifetime of the home agent?
 			 */
 			mha->mha_lifetime = MIP6_HA_DEFAULT_LIFETIME;
+		} else if (hha) {
+			/*
+			 * there is a mip6_ha entry which has an
+			 * unspecified link-local address.  this is
+			 * the bootstrap mip6_ha entry for DHAAD
+			 * request.
+			 */
+			mha = hha->hha_mha;
+			/*
+			 * XXX: TODO
+			 *
+			 * DHAAD reply doesn't include home agents'
+			 * link-local addresses.  how we decide for
+			 * each home agent link-local address?  and
+			 * lifetime determination is a problem, as
+			 * noted above.
+			 */
+			bzero(&mha->mha_lladdr, sizeof(mha->mha_lladdr));
+			mha->mha_lladdr.sin6_len = sizeof(mha->mha_lladdr);
+			mha->mha_lladdr.sin6_family = AF_INET6;
+			mip6_icmp6_create_linklocal(&mha->mha_lladdr.sin6_addr,
+			    haaddrptr);
+			/*
+			 * XXX we cannot get a correct zone id of a
+			 * link-local address of a remote network.
+			 */
+			in6_addr2zoneid(m->m_pkthdr.rcvif,
+			    &mha->mha_lladdr.sin6_addr,
+			    &mha->mha_lladdr.sin6_scope_id);
+			in6_embedscope(&mha->mha_lladdr.sin6_addr,
+			    &mha->mha_lladdr);
+			mha->mha_gaddr = haaddr;
+			mha->mha_flags = ND_RA_FLAG_HOME_AGENT;
+			mha->mha_pref = 0;
+			mha->mha_lifetime = MIP6_HA_DEFAULT_LIFETIME;
+			mha->mha_expire = mono_time.tv_sec + mha->mha_lifetime;
 		} else {
-			struct sockaddr_in6 haaddr;
 			/*
 			 * create a new home agent entry and insert it
 			 * to the internal home agent list
@@ -489,30 +543,29 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 			 * DHAAD reply doesn't include home agents'
 			 * link-local addresses.  how we decide for
 			 * each home agent link-local address?  and
-			 * lifetime determination is a problem, also.
+			 * lifetime determination is a problem, as
+			 * noted above.
 			 */
 			bzero(&lladdr, sizeof(lladdr));
 			lladdr.sin6_len = sizeof(lladdr);
 			lladdr.sin6_family = AF_INET6;
 			mip6_icmp6_create_linklocal(&lladdr.sin6_addr,
 						    haaddrptr);
+			/*
+			 * XXX we cannot get a correct zone id of a
+			 * link-local address of a remote network.
+			 */
 			in6_addr2zoneid(m->m_pkthdr.rcvif, &lladdr.sin6_addr,
-					&lladdr.sin6_scope_id);
+			    &lladdr.sin6_scope_id);
 			in6_embedscope(&lladdr.sin6_addr, &lladdr);
-			bzero(&haaddr, sizeof(haaddr));
-			haaddr.sin6_len = sizeof(haaddr);
-			haaddr.sin6_family = AF_INET6;
-			haaddr.sin6_addr = *haaddrptr;
-			in6_addr2zoneid(m->m_pkthdr.rcvif, &haaddr.sin6_addr,
-					&haaddr.sin6_scope_id);
-			in6_embedscope(&haaddr.sin6_addr, &haaddr);
+
 			mha = mip6_ha_create(&lladdr, &haaddr,
-					     ND_RA_FLAG_HOME_AGENT,
-					     0, MIP6_HA_DEFAULT_LIFETIME);
+			    ND_RA_FLAG_HOME_AGENT, 0,
+			    MIP6_HA_DEFAULT_LIFETIME);
 			if (mha == NULL) {
 				mip6log((LOG_ERR,
-					 "%s:%d: mip6_ha create failed\n",
-					 __FILE__, __LINE__));
+				    "%s:%d: mip6_ha create failed\n",
+				    __FILE__, __LINE__));
 				m_freem(m);
 				return (ENOMEM);
 			}
@@ -523,9 +576,7 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 			/*
 			 * the home agent listed at the top of the
 			 * DHAAD reply packet is the most preferable
-			 * one.  of course, if the reply includes the
-			 * address which is the same to the ip6_src
-			 * address, it is the one.
+			 * one.
 			 */
 			mha_prefered = mha;
 		}
@@ -546,13 +597,13 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 			if (!MIP6_IS_BU_BOUND_STATE(mbu)) {
 				if (mip6_bu_send_bu(mbu)) {
 					mip6log((LOG_ERR,
-						 "%s:%d: "
-						 "sending a binding update "
-						 "from %s(%s) to %s failed.\n",
-						 __FILE__, __LINE__,
-						 ip6_sprintf(&mbu->mbu_haddr.sin6_addr),
-						 ip6_sprintf(&mbu->mbu_coa.sin6_addr),
-						 ip6_sprintf(&mbu->mbu_paddr.sin6_addr)));
+					    "%s:%d: "
+					    "sending a binding update "
+					    "from %s(%s) to %s failed.\n",
+					    __FILE__, __LINE__,
+					    ip6_sprintf(&mbu->mbu_haddr.sin6_addr),
+					    ip6_sprintf(&mbu->mbu_coa.sin6_addr),
+					    ip6_sprintf(&mbu->mbu_paddr.sin6_addr)));
 				}
 			}
 		}
@@ -562,13 +613,20 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 }
 
 static int
-mip6_dhaad_ha_list_insert(sc, mha)
-	struct hif_softc *sc;
+mip6_dhaad_ha_list_insert(homehif, mha)
+	struct hif_softc *homehif;
 	struct mip6_ha *mha;
 {
+	struct hif_softc *hif;
 	struct mip6_prefix *mpfx;
 
-	hif_ha_list_insert(&sc->hif_ha_list_home, mha);
+	for (hif = TAILQ_FIRST(&hif_softc_list); hif;
+	     hif = TAILQ_NEXT(hif, hif_entry)) {
+		if (hif == homehif)
+			hif_ha_list_insert(&hif->hif_ha_list_home, mha);
+		else
+			hif_ha_list_insert(&hif->hif_ha_list_foreign, mha);
+	}
 
 	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
 	    mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
@@ -726,9 +784,8 @@ mip6_icmp6_create_linklocal(lladdr, ifid)
 }
 
 int
-mip6_icmp6_mp_sol_output(mpfx, mha)
-	struct mip6_prefix *mpfx;
-	struct mip6_ha *mha;
+mip6_icmp6_mp_sol_output(haddr, haaddr)
+	struct sockaddr_in6 *haddr, *haaddr;
 {
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
@@ -744,8 +801,8 @@ mip6_icmp6_mp_sol_output(mpfx, mha)
 	maxlen += (sizeof(struct nd_opt_hdr) + 6 + 7) & ~7;
 	if (max_linkhdr + maxlen >= MCLBYTES) {
 		mip6log((LOG_ERR,
-			 "%s:%d: too large cluster reqeust.\n",
-			 __FILE__, __LINE__));
+		    "%s:%d: too large cluster reqeust.\n",
+		    __FILE__, __LINE__));
 		return (EINVAL);
 	}
 
@@ -774,34 +831,193 @@ mip6_icmp6_mp_sol_output(mpfx, mha)
 	/* ip6->ip6_plen will be set later */
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	ip6->ip6_hlim = ip6_defhlim;
-	ip6->ip6_src = mpfx->mpfx_haddr.sin6_addr;
-	ip6->ip6_dst = mha->mha_gaddr.sin6_addr;
+	ip6->ip6_src = haddr->sin6_addr;
+	in6_clearscope(&ip6->ip6_src);
+	ip6->ip6_dst = haaddr->sin6_addr;
+	in6_clearscope(&ip6->ip6_dst);
 	mp_sol = (struct mobile_prefix_solicit *)(ip6 + 1);
 	mp_sol->mp_sol_type = ICMP6_MOBILEPREFIX_SOLICIT;
 	mp_sol->mp_sol_code = 0;
+	mp_sol->mp_sol_id = 0; /* XXX */
 	mp_sol->mp_sol_reserved = 0;
 
 	/* calculate checksum. */
 	ip6->ip6_plen = htons((u_short)icmp6len);
 	mp_sol->mp_sol_cksum = 0;
-	mp_sol->mp_sol_cksum
-		= in6_cksum(m, IPPROTO_ICMPV6, sizeof(*ip6), icmp6len);
+	mp_sol->mp_sol_cksum = in6_cksum(m, IPPROTO_ICMPV6, sizeof(*ip6),
+	    icmp6len);
 
-	if (!ip6_setpktaddrs(m, &mpfx->mpfx_haddr, &mha->mha_gaddr)) {
+	if (!ip6_setpktaddrs(m, haddr, haaddr)) {
 		m_freem(m);
 		return (EINVAL);
 	}
 	error = ip6_output(m, 0, 0, 0, 0 ,NULL
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-			   , NULL
+	    , NULL
 #endif
-			  );
+	    );
 	if (error) {
 		mip6log((LOG_ERR,
-			 "%s:%d: mobile prefix sol send failed (code = %d)\n",
-			 __FILE__, __LINE__, error));
+		    "%s:%d: mobile prefix sol send failed (code = %d)\n",
+		    __FILE__, __LINE__, error));
 	}
 
+	return (error);
+}
+
+static int
+mip6_icmp6_mp_adv_input(m, off, icmp6len)
+	struct mbuf *m;
+	int off;
+	int icmp6len;
+{
+	struct ip6_hdr *ip6;
+	struct sockaddr_in6 src_sa;
+	struct mobile_prefix_advert *mp_adv;
+	union nd_opts ndopts;
+	struct nd_opt_hdr *ndopt;
+	struct nd_opt_prefix_info *ndopt_pi;
+	struct sockaddr_in6 prefix_sa;
+	struct mip6_prefix *mpfx;
+	struct mip6_ha *mha;
+#ifdef __FreeBSD__
+	struct timeval mono_time;
+#endif /* __FreeBSD__ */
+	int error = 0;
+
+#ifdef __FreeBSD__
+	microtime(&mono_time);
+#endif /* __FreeBSD__ */
+
+
+	/* XXX IPSec check. */
+
+
+	ip6 = mtod(m, struct ip6_hdr *);
+	if (ip6_getpktaddrs(m, &src_sa, NULL)) {
+		error = EINVAL;
+		goto freeit;
+	}
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, icmp6len, EINVAL);
+	mp_adv = (struct mobile_prefix_advert *)((caddr_t)ip6 + off);
+#else
+	IP6_EXTHDR_GET(mp_adv, struct mobile_prefix_advert*, m, off, icmp6len);
+	if (mp_adv == NULL) {
+		mip6log((LOG_ERR,
+		    "%s:%d: failed to EXTHDR_GET.\n",
+		    __FILE__, __LINE__));
+		error = EINVAL;
+		goto freeit;
+	}
+#endif
+
+	/* find mip6_ha instance. */
+	mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &src_sa);
+	if (mha == NULL) {
+		error = EINVAL;
+		goto freeit;
+	}
+
+	icmp6len -= sizeof(*mp_adv);
+	nd6_option_init(mp_adv + 1, icmp6len, &ndopts);
+	if (nd6_options(&ndopts) < 0) {
+		mip6log((LOG_INFO,
+		    "%s:%d: invalid ND option, ignored\n",
+		    __FILE__, __LINE__));
+		/* nd6_options have incremented stats */
+		error = EINVAL;
+		goto freeit;
+	}
+
+	for (ndopt = (struct nd_opt_hdr *)ndopts.nd_opts_pi;
+	     ndopt <= (struct nd_opt_hdr *)ndopts.nd_opts_pi_end;
+	     ndopt = (struct nd_opt_hdr *)((caddr_t)ndopt
+		 + (ndopt->nd_opt_len << 3))) {
+		if (ndopt->nd_opt_type != ND_OPT_PREFIX_INFORMATION)
+			continue;
+		ndopt_pi = (struct nd_opt_prefix_info *)ndopt;
+
+		/* sanity check of prefix information. */
+		if (ndopt_pi->nd_opt_pi_len != 4) {
+			mip6log((LOG_INFO,
+			    "%s:%d: invalid option "
+			    "len %d for prefix information option, "
+			    "ignored\n",
+			    __FILE__, __LINE__, ndopt_pi->nd_opt_pi_len));
+		}
+		if (128 < ndopt_pi->nd_opt_pi_prefix_len) {
+			mip6log((LOG_INFO,
+			    "%s:%d: invalid prefix "
+			    "len %d for prefix information option, "
+			    "ignored\n",
+			    __FILE__, __LINE__, ndopt_pi->nd_opt_pi_prefix_len));
+			continue;
+		}
+		if (IN6_IS_ADDR_MULTICAST(&ndopt_pi->nd_opt_pi_prefix)
+		    || IN6_IS_ADDR_LINKLOCAL(&ndopt_pi->nd_opt_pi_prefix)) {
+			mip6log((LOG_INFO,
+			    "%s:%d: invalid prefix "
+			    "%s, ignored\n",
+			    __FILE__, __LINE__,
+			    ip6_sprintf(&ndopt_pi->nd_opt_pi_prefix)));
+			continue;
+		}
+		/* aggregatable unicast address, rfc2374 */
+		if ((ndopt_pi->nd_opt_pi_prefix.s6_addr8[0] & 0xe0) == 0x20
+		    && ndopt_pi->nd_opt_pi_prefix_len != 64) {
+			mip6log((LOG_INFO,
+			    "%s:%d: invalid prefixlen "
+			    "%d for rfc2374 prefix %s, ignored\n",
+			    __FILE__, __LINE__,
+			    ndopt_pi->nd_opt_pi_prefix_len,
+			    ip6_sprintf(&ndopt_pi->nd_opt_pi_prefix)));
+			continue;
+		}
+
+		bzero(&prefix_sa, sizeof(prefix_sa));
+		prefix_sa.sin6_family = AF_INET6;
+		prefix_sa.sin6_len = sizeof(prefix_sa);
+		prefix_sa.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
+		/* XXX scope? */
+		mpfx = mip6_prefix_list_find_withprefix(&prefix_sa,
+		    ndopt_pi->nd_opt_pi_prefix_len);
+		if (mpfx != NULL) {
+			mpfx = mip6_prefix_create(&prefix_sa,
+			    ndopt_pi->nd_opt_pi_prefix_len,
+			    ntohl(ndopt_pi->nd_opt_pi_valid_time),
+			    ntohl(ndopt_pi->nd_opt_pi_preferred_time));
+			if (mpfx == NULL) {
+				error = EINVAL;
+				goto freeit;
+			}
+			mip6_prefix_ha_list_insert(&mpfx->mpfx_ha_list, mha);
+			mip6_prefix_list_insert(&mip6_prefix_list, mpfx);
+
+			/* XXX a new address configuration. */
+
+		} else {
+			mpfx->mpfx_vltime
+			    = ntohl(ndopt_pi->nd_opt_pi_valid_time);
+			mpfx->mpfx_pltime
+			    = ntohl(ndopt_pi->nd_opt_pi_preferred_time);
+			mpfx->mpfx_vlexpire
+			    = mono_time.tv_sec + mpfx->mpfx_vltime;
+			mpfx->mpfx_plexpire
+			    = mono_time.tv_sec + mpfx->mpfx_pltime;
+			mip6_prefix_settimer(mpfx, mpfx->mpfx_pltime * hz);
+			mpfx->mpfx_state = MIP6_PREFIX_STATE_PREFERRED;
+		}
+
+
+		if (ndopt_pi->nd_opt_pi_flags_reserved
+		    & ND_OPT_PI_FLAG_ROUTER) {
+			/* XXX multiple global address case. */
+		}
+	}
+
+ freeit:
+	m_freem(m);
 	return (error);
 }
 #endif /* MIP6_MOBILE_NODE */

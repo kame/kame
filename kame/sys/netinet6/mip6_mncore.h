@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.h,v 1.8 2003/07/31 09:56:39 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.h,v 1.9 2003/08/14 10:06:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -109,9 +109,12 @@ int mip6_prefix_list_insert(struct mip6_prefix_list *, struct mip6_prefix *);
 int mip6_prefix_list_remove(struct mip6_prefix_list *,
     struct mip6_prefix *mpfx);
 struct mip6_prefix *mip6_prefix_list_find(struct mip6_prefix *);
+struct mip6_prefix *mip6_prefix_list_find_withprefix(struct sockaddr_in6 *,
+    int);
 struct mip6_prefix *mip6_prefix_list_find_withhaddr(struct mip6_prefix_list *,
     struct sockaddr_in6 *);
 int mip6_prefix_haddr_assign(struct mip6_prefix *, struct hif_softc *);
+void mip6_prefix_settimer(struct mip6_prefix *, long);
 
 /* advertising router list management. */
 struct mip6_prefix_ha *mip6_prefix_ha_list_insert(struct mip6_prefix_ha_list *,
@@ -143,7 +146,7 @@ int mip6_ip6mu_create(struct ip6_mobility **, struct sockaddr_in6 *,
 /* ICMPv6 processing. */
 int mip6_icmp6_input(struct mbuf *, int, int);
 int mip6_icmp6_dhaad_req_output(struct hif_softc *);
-int mip6_icmp6_mp_sol_output(struct mip6_prefix *, struct mip6_ha *);
+int mip6_icmp6_mp_sol_output(struct sockaddr_in6 *, struct sockaddr_in6 *);
 
 #ifdef MIP6_DEBUG
 void mip6_bu_print(struct mip6_bu *);

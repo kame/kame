@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.22 2003/07/28 07:36:05 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.23 2003/08/14 10:06:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -54,6 +54,12 @@
 #include <sys/timeout.h>
 #endif
 
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 501000)
+#include <sys/limits.h>
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#include <machine/limits.h>
+#endif
+
 #include <net/if.h>
 #include <net/if_types.h>
 #include <net/route.h>
@@ -76,20 +82,11 @@
 
 struct mip6_prefix_list mip6_prefix_list;
 
-#ifdef __NetBSD__
-struct callout mip6_pfx_ch = CALLOUT_INITIALIZER;
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-struct callout mip6_pfx_ch;
-#endif
+static void mip6_prefix_timer(void *);
 
 void
 mip6_prefix_init(void)
 {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	callout_init(&mip6_pfx_ch, NULL);
-#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	callout_init(&mip6_pfx_ch);
-#endif
 	LIST_INIT(&mip6_prefix_list);
 }
 
@@ -122,6 +119,16 @@ mip6_prefix_create(prefix, prefixlen, vltime, pltime)
 	mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
 	/* XXX mpfx->mpfx_haddr; */
 	LIST_INIT(&mpfx->mpfx_ha_list);
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	callout_init(&mpfx->mpfx_timer_ch, NULL);
+#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	callout_init(&mpfx->mpfx_timer_ch);
+#elif defined(__OpenBSD__)
+	timeout_set(&mpfx->mpfx_timer_ch, mip6_prefix_timer, mpfx);
+#endif
+
+	/* set initial timeout. */
+	mip6_prefix_settimer(mpfx, mpfx->mpfx_pltime * hz);
 
 	return (mpfx);
 }
@@ -187,6 +194,7 @@ mip6_prefix_list_remove(mpfx_list, mpfx)
 	}
 
 	LIST_REMOVE(mpfx, mpfx_entry);
+	mip6_prefix_settimer(mpfx, -1);
 	FREE(mpfx, M_TEMP);
 
 	return (0);
@@ -208,6 +216,28 @@ mip6_prefix_list_find(tmpmpfx)
 					 &mpfx->mpfx_prefix.sin6_addr,
 					 tmpmpfx->mpfx_prefixlen)
 		    && (tmpmpfx->mpfx_prefixlen == mpfx->mpfx_prefixlen)) {
+			/* found. */
+			return (mpfx);
+		}
+	}
+
+	/* not found. */
+	return (NULL);
+}
+
+struct mip6_prefix *
+mip6_prefix_list_find_withprefix(prefix, prefixlen)
+	struct sockaddr_in6 *prefix;
+	int prefixlen;
+{
+	struct mip6_prefix *mpfx;
+
+	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
+	     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
+		if (in6_are_prefix_equal(&prefix->sin6_addr,
+					 &mpfx->mpfx_prefix.sin6_addr,
+					 prefixlen)
+		    && (prefixlen == mpfx->mpfx_prefixlen)) {
 			/* found. */
 			return (mpfx);
 		}
@@ -246,6 +276,10 @@ mip6_prefix_ha_list_insert(mpfxha_list, mha)
 
 	if ((mpfxha_list == NULL) || (mha == NULL))
 		return (NULL);
+
+	mpfxha = mip6_prefix_ha_list_find_withmha(mpfxha_list, mha);
+	if (mpfxha != NULL)
+		return (mpfxha);
 
 	MALLOC(mpfxha, struct mip6_prefix_ha *, sizeof(struct mip6_prefix_ha),
 	    M_TEMP, M_NOWAIT);
@@ -304,4 +338,133 @@ mip6_prefix_ha_list_find_withmha(mpfxha_list, mha)
 			return (mpfxha);
 	}
 	return (NULL);
+}
+
+void
+mip6_prefix_settimer(mpfx, tick)
+	struct mip6_prefix *mpfx;
+	long tick;
+{
+#ifdef __FreeBSD__
+	struct timeval mono_time;
+#endif
+	int s;
+
+#ifdef __FreeBSD__
+	microtime(&mono_time);
+#endif /* __FreeBSD__ */
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+
+	if (tick < 0) {
+		mpfx->mpfx_expire = 0;
+		mpfx->mpfx_ntick = 0;
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		callout_stop(&mpfx->mpfx_timer_ch);
+#elif defined(__OpenBSD__)
+		timeout_del(&mpfx->mpfx_timer_ch);
+#else
+		untimeout(mip6_prefix_timer, mpfx);
+#endif
+	} else {
+		mpfx->mpfx_expire = mono_time.tv_sec + tick / hz;
+		if (tick > INT_MAX) {
+			mpfx->mpfx_ntick = tick - INT_MAX;
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+			callout_reset(&mpfx->mpfx_timer_ch, INT_MAX,
+			    mip6_prefix_timer, mpfx);
+#elif defined(__OpenBSD__)
+			timeout_add(&mpfx->mpfx_timer_ch, INT_MAX);
+#else
+			timeout(nd6_llinfo_timer, ln, INT_MAX);
+#endif
+		} else {
+			mpfx->mpfx_ntick = 0;
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+			callout_reset(&mpfx->mpfx_timer_ch, tick,
+			    mip6_prefix_timer, mpfx);
+#elif defined(__OpenBSD__)
+			timeout_add(&mpfx->mpfx_timer_ch, tick);
+#else
+			timeout(mip6_prefix_timer, mpfx, tick);
+#endif
+		}
+	}
+
+	splx(s);
+}
+
+#define MIP6_MOBILE_PREFIX_SOL_INTERVAL 10 /* XXX */
+static void
+mip6_prefix_timer(arg)
+	void *arg;
+{
+	int s;
+	struct mip6_prefix *mpfx;
+	struct hif_softc *hif;
+	struct mip6_bu *mbu;
+#ifdef __FreeBSD__
+	struct timeval mono_time;
+#endif /* __FreeBSD__ */
+
+#ifdef __FreeBSD__
+	microtime(&mono_time);
+#endif /* __FreeBSD__ */
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+
+	mpfx = (struct mip6_prefix *)arg;
+
+	if (mpfx->mpfx_ntick > 0) {
+		if (mpfx->mpfx_ntick > INT_MAX) {
+			mpfx->mpfx_ntick -= INT_MAX;
+			mip6_prefix_settimer(mpfx, INT_MAX);
+		} else {
+			mpfx->mpfx_ntick = 0;
+			mip6_prefix_settimer(mpfx, mpfx->mpfx_ntick);
+		}
+		splx(s);
+		return;
+	}
+
+	switch (mpfx->mpfx_state) {
+	case MIP6_PREFIX_STATE_PREFERRED:
+		mip6_prefix_settimer(mpfx,
+		    MIP6_MOBILE_PREFIX_SOL_INTERVAL * hz);
+		mpfx->mpfx_state = MIP6_PREFIX_STATE_VALID;
+		break;
+
+	case MIP6_PREFIX_STATE_VALID:
+		if (mpfx->mpfx_vlexpire < mono_time.tv_sec) {
+			/* XXX remove entry. */
+			break;
+		}
+
+		for (hif = TAILQ_FIRST(&hif_softc_list); hif;
+		     hif = TAILQ_NEXT(hif, hif_entry)) {
+			if (!SA6_IS_ADDR_UNSPECIFIED(&mpfx->mpfx_haddr)) {
+				mbu = mip6_bu_list_find_home_registration(
+				    &hif->hif_bu_list, &mpfx->mpfx_haddr);
+				if (mbu != NULL) {
+					mip6_icmp6_mp_sol_output(
+					    &mbu->mbu_haddr, &mbu->mbu_paddr);
+					break;
+				}
+			}
+		}
+		mip6_prefix_settimer(mpfx,
+		    MIP6_MOBILE_PREFIX_SOL_INTERVAL * hz);
+		mpfx->mpfx_state = MIP6_PREFIX_STATE_VALID;
+		break;
+	}
+
+	splx(s);
 }

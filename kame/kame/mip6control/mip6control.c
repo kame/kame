@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.49 2003/08/04 05:25:37 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.50 2003/08/14 10:06:06 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,8 +78,8 @@ static void kread(u_long, void *, int);
 static int parse_address_port(char *, struct in6_addr *, uint16_t *);
 
 static const char *pfx_desc[] = {
-	"prefix\t\tplen\tvltime\tvlexp\tpltime\tplexp\thaddr\n",
-	"prefix\t\t\t\t\tplen\tvltime\tvlexp\tpltime\tplexp\thaddr\n"
+	"prefix\t\tplen\tvltime\tvlexp\tpltime\tplexp\texp\thaddr\n",
+	"prefix\t\t\t\t\tplen\tvltime\tvlexp\tpltime\tplexp\texp\thaddr\n"
 };
 static const char *bu_desc[] = {
 	"paddr\t\thaddr\t\tcoa\t\tlifetim\tltexp\trefresh\tretexp\tseqno\tflags\tpfsm\tsfsm\tstate\n",
@@ -446,12 +446,13 @@ main(argc, argv)
 			mpfx = &mip6_prefix;
 			printf(ipaddr_fmt[longdisp],
 			    ip6_sprintf(&mpfx->mpfx_prefix));
-			printf("%7u %7u %7ld %7u %7ld ",
+			printf("%7u %7u %7ld %7u %7ld %7ld",
 			    mpfx->mpfx_prefixlen,
 			    mpfx->mpfx_vltime,
 			    mpfx->mpfx_vlexpire - time.tv_sec,
 			    mpfx->mpfx_pltime,
-			    mpfx->mpfx_plexpire - time.tv_sec);
+			    mpfx->mpfx_plexpire - time.tv_sec,
+			    mpfx->mpfx_expire - time.tv_sec);
 			printf(ipaddr_fmt[longdisp],
 			    ip6_sprintf(&mpfx->mpfx_haddr));
 			printf("\n");

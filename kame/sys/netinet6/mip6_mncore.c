@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.21 2003/08/05 13:19:23 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.22 2003/08/14 10:06:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -393,6 +393,8 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 			mpfx->mpfx_pltime = tmpmpfx.mpfx_pltime;
 			mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
 			/* XXX mpfx->mpfx_haddr; */
+			mip6_prefix_settimer(mpfx, mpfx->mpfx_pltime * hz);
+			mpfx->mpfx_state = MIP6_PREFIX_STATE_PREFERRED;
 		} else {
 			/* this is a new prefix. */
 			mpfx = mip6_prefix_create(&tmpmpfx.mpfx_prefix,
