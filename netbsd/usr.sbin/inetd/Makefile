@@ -12,9 +12,6 @@ CPPFLAGS+=-DLIBWRAP
 LDADD+= -lwrap -lutil
 DPADD+= ${LIBWRAP} ${LIBUTIL}
 
-# This is necessary due to be friendly with past RFC2553 API changes...
-CPPFLAGS+=-Dss_family=__ss_family -Dss_len=__ss_len
-
 CPPFLAGS+=-DINET6
 CPPFLAGS+=-I${.CURDIR}/../../lib/libipsec
 LDADD+= -L${.CURDIR}/../../lib/libipsec -L${.CURDIR}/../../lib/libipsec/obj \
