@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.293 1999/11/25 06:21:16 itojun Exp $
+$Id: CHANGELOG,v 1.294 1999/11/25 09:09:18 sumikawa Exp $
 
 <199911>
+Thu Nov 25 18:08:36 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd[23]/ports/ipv6socket_scrub: a new pkgsrc directory for
+	  IPv6 socket scrubber (IPv6-readiness checking tool for source
+	  code tree).
+
 Thu Nov 25 10:26:39 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/devel/ipv6socket_scrub: a new pkgsrc directory for
 	  IPv6 socket scrubber (IPv6-readiness checking tool for source code
