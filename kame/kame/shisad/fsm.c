@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.2 2004/12/16 11:58:49 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.3 2004/12/16 12:12:28 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -841,7 +841,7 @@ bul_reg_fsm(bul, event, data)
 				     cnbul = LIST_NEXT(cnbul, bul_entry)) {
 					if ((cnbul->bul_flags & IP6_MH_BU_HOME) != 0)
 						continue;
-					if (cnbul->bul_hoainfo == bul->bul_hoainfo)
+					if (cnbul->bul_hoainfo != bul->bul_hoainfo)
 						continue;
 					bul_kick_fsm(cnbul,
 					    MIP6_BUL_FSM_EVENT_REGISTERED,
