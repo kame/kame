@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.279 2002/06/08 07:01:37 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.280 2002/06/08 07:32:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -489,7 +489,7 @@ ip6_input(m)
 	if (m->m_len < sizeof(struct ip6_hdr)) {
 		struct ifnet *inifp;
 		inifp = m->m_pkthdr.rcvif;
-		if ((m = m_pullup(m, sizeof(struct ip6_hdr))) == 0) {
+		if ((m = m_pullup(m, sizeof(struct ip6_hdr))) == NULL) {
 			ip6stat.ip6s_toosmall++;
 			in6_ifstat_inc(inifp, ifs6_in_hdrerr);
 			return;
