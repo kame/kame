@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.11 2001/06/25 02:25:45 itojun Exp $
+#	$KAME: Makefile,v 1.12 2001/07/11 09:16:28 suz Exp $
 #
 # Copyright (c) 1999 WIDE Project. All rights reserved.
 #
@@ -83,6 +83,7 @@ PROG=	pim6sd
 CFLAGS+=-DHAVE_STDARG_H
 LDADD+=-ly -ll
 SRCS=	mld6.c mld6_proto.c\
+	mld6v2.c mld6v2_proto.c\
 	inet6.c kern.c main.c config.c debug.c routesock.c vers.c callout.c\
 	route.c vif.c timer.c mrt.c pim6.c pim6_proto.c rp.c crc.c trace.c\
 	cfparse.y cftoken.l

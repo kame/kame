@@ -1,7 +1,19 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1764 2001/07/10 06:34:37 itojun Exp $
+$KAME: CHANGELOG,v 1.1765 2001/07/11 09:16:27 suz Exp $
 
 <200107>
+Wed Jul 11 17:55:33 JST 2001	suz@sdl.hitachi.co.jp
+	* kame/kame/pim6sd: added SSM (Source-Specific-Multicast) mode 
+	  for SSM prefix (ff20::/12 and ff30::/12).
+	  from Mickael Hoerdt <hoerdt@clarinet.u-strasbg.fr>.
+		+ supports MLDv2 as well as MLDv1 (cfparse.y, cftoken.l,
+		  mld6*.[ch], timer.c, vif.[ch])
+		+ uses SPT for multicast address in SSM range
+		  (inet6.[ch], mrt.c, pim6*.[ch], route.c)
+
+	* kame/kame/pim6sd/BUGS.V6
+	- write down ToDos suggested in the above patch.
+
 Tue Jul 10 15:34:09 JST 2001  itojun@iijlab.net
 	* netbsd: switch to NetBSD-1.5.1 from NetBSD-1.5.
 
