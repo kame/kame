@@ -141,9 +141,15 @@ in6_ifattach_getifid(ifp0)
 			case IFT_ETHER:
 			case IFT_FDDI:
 			case IFT_ATM:
-			/* what others? */
+				/* IEEE802/EUI64 cases - what others? */
 				addr = LLADDR(sdl);
 				addrlen = sdl->sdl_alen;
+				/*
+				 * to copy ifid from IEEE802/EUI64 interface,
+				 * u bit of the source needs to be 0.
+				 */
+				if ((addr[0] & 0x02) != 0)
+					break;
 				goto found;
 			default:
 				break;
