@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.355 1999/12/21 12:40:58 jinmei Exp $
+$Id: CHANGELOG,v 1.356 1999/12/21 12:53:01 sakane Exp $
 
 <199912>
+Tue Dec 21 00:44:22 PST 1999 sakane@ydc.co.jp
+	* kame/sys/netinet6/ipsec.c:
+	Limitedly dealing with upper layer protocol and port number
+	when forwarding packet with IPsec.  Support either TCP, UDP or ICMP.
+	If next header type is ESP then giving up to pursue header.
+
 1999-12-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/{bgpd, hroute6d, pim6[ds]d, ping6, racoon, route6d,
 	rtadvd, rtsol[d], traceroute6}: use IPV6_RECVxxx options (if
