@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.884 2000/05/17 01:11:14 itojun Exp $
+$Id: CHANGELOG,v 1.885 2000/05/17 03:00:45 suz Exp $
 
 <200005>
+2000-05-17  SUZUKI Shinsuke  <suz@sdl.hitachi.co.jp>
+	* {freebsd[23]/ports,netbsd/pkgsrc/net}/gated-ipv6
+	updated to May 11's snapshot
+
 Wed May 17 10:09:42 JST 2000  itojun@iijlab.net
 	* kame/sys/net/if_gif.c: with "options XBONEHACK", allow multiple
 	  gif tunnels to be configured with the same pair of outer addresses.
