@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.13 2001/06/07 13:22:03 fujisawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.14 2001/07/15 09:42:33 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -38,6 +38,7 @@ extern u_int		 natpt_dump;
 
 /*	natpt_dispatch.c	*/
 char		*ip4_sprintf			__P((struct in_addr *));
+caddr_t		 natpt_pyldaddr			__P((struct ip6_hdr *, caddr_t, int *));
 
 
 /*	natpt_log.c		*/

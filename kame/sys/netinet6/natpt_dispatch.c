@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.22 2001/06/21 07:47:34 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.23 2001/07/15 09:42:33 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -631,47 +631,16 @@ configCv6(int sess, struct mbuf *m, struct _cv *cv)
 caddr_t
 foundFinalPayload(struct mbuf *m, int *proto, int *offset)
 {
-    int			 nxt;
-    int			 off;
     struct ip6_hdr	*ip6;
-    struct ip6_ext	*ip6ext;
+    caddr_t		 ip6end;
+    caddr_t		 pyld;
 
     ip6 = mtod(m, struct ip6_hdr *);
-    nxt = ip6->ip6_nxt;
-    off = sizeof(struct ip6_hdr);
-    ip6ext = (struct ip6_ext *)((struct ip6_hdr *)(ip6 + 1));
-    while (nxt != IPPROTO_NONE && off + sizeof(*ip6ext) < m->m_len)
-    {
-	switch (nxt)
-	{
-	  case IPPROTO_HOPOPTS:
-	  case IPPROTO_ROUTING:
-#if 0
-	  case IPPROTO_FRAGMENT:
-#endif
-	  case IPPROTO_DSTOPTS:
-	    nxt = ip6ext->ip6e_nxt;
-	    off += (ip6ext->ip6e_len + 1) << 3;
-	    ip6ext = (struct ip6_ext *)(((caddr_t)ip6ext) + ((ip6ext->ip6e_len + 1) << 3));
-	    break;
-
-	  case IPPROTO_ICMPV6:
-	  case IPPROTO_TCP:
-	  case IPPROTO_UDP:
-	    *proto = nxt;
-	    *offset = off;
-	    return ((caddr_t)ip6ext);
-
-	  default:
-	    *proto = IPPROTO_IP;			/* goto mcastcheck	*/
-	    *offset = off;
-	    return (NULL);
-	}
-    }
-
-    *proto = IPPROTO_IP;				/* goto mcastcheck	*/
-    *offset = off;
-    return (NULL);
+    ip6end = (caddr_t)(ip6 + 1) + ntohs(ip6->ip6_plen);
+    if ((pyld = natpt_pyldaddr(ip6, ip6end, proto)) == NULL)
+	return (NULL);
+    *offset = pyld - (caddr_t)ip6;
+    return (pyld);
 }
 
 
@@ -806,6 +775,43 @@ ip4_sprintf(struct in_addr *addr)
 
     sprintf(ip4buf, "%d.%d.%d.%d%c", s[0], s[1], s[2], s[3], '\0');
     return (ip4buf);
+}
+
+
+caddr_t
+natpt_pyldaddr(struct ip6_hdr *ip6, caddr_t ip6end, int *proto)
+{
+    int			 nxt;
+    caddr_t		 ip6ext;
+
+    if (proto)
+	*proto = 0;
+    ip6ext = (caddr_t)((struct ip6_hdr *)(ip6 + 1));
+
+    nxt = ip6->ip6_nxt;
+    while ((nxt != IPPROTO_NONE) && (ip6ext < ip6end))
+    {
+	switch (nxt)
+	{
+	  case IPPROTO_HOPOPTS:
+	  case IPPROTO_ROUTING:
+	  case IPPROTO_DSTOPTS:
+	    ip6ext += ((((struct ip6_ext *)ip6ext)->ip6e_len + 1) << 3);
+	    break;
+
+	  case IPPROTO_ICMPV6:
+	  case IPPROTO_TCP:
+	  case IPPROTO_UDP:
+	    if (proto)
+		*proto = nxt;
+	    return (ip6ext);
+
+	  default:
+	    return (NULL);
+	}
+    }
+
+    return (NULL);
 }
 
 
