@@ -36,7 +36,7 @@ struct pfsync_softc {
 #ifdef __OpenBSD__
 	struct timeout	sc_tmo;
 #else
-	struct callout sc_tmo;
+	struct callout  sc_tmo;
 #endif
 	struct mbuf	*sc_mbuf;	/* current cummulative mbuf */
 	struct pf_state	*sc_ptr;	/* current ongoing state */
