@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.107 2004/07/09 14:13:59 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.108 2004/08/11 08:10:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -695,16 +695,6 @@ mld_allocbuf(mh, len, in6m, type)
 	if (*mh == NULL)
 		return NULL;
 	MGET(md, M_DONTWAIT, MT_DATA);
-
-	/* uses cluster in case of MLDv2 */
-	if (md && (len > MLD_MINLEN || type == MLDV2_LISTENER_REPORT)) {
-		/* XXX: assumes len is less than 2K Byte */
-		MCLGET(md, M_DONTWAIT);
-		if ((md->m_flags & M_EXT) == 0) {
-			m_free(md);
-			md = NULL;
-		}
-	}
 	if (md == NULL) {
 		m_free(*mh);
 		*mh = NULL;
@@ -742,8 +732,6 @@ mld_allocbuf(mh, len, in6m, type)
 #ifndef __FreeBSD__
 /*
  * Add an address to the list of IP6 multicast addresses for a given interface.
- * Add source addresses to the list also, if upstream router is MLDv2 capable
- * and the number of source is not 0.
  */
 struct	in6_multi *
 in6_addmulti(maddr6, ifp, errorp, delay)
@@ -917,8 +905,6 @@ in6_delmulti(in6m)
 
 /*
  * Add an address to the list of IP6 multicast addresses for a given interface.
- * Add source addresses to the list also, if upstream router is MLDv2 capable
- * and the number of source is not 0.
  */
 struct	in6_multi *
 in6_addmulti(maddr6, ifp, errorp, delay)
