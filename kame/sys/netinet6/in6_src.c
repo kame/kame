@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.57 2001/08/18 05:42:41 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.58 2001/08/18 05:46:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -351,6 +351,17 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 			else
 				NEXT(7);
 		}
+
+		/*
+		 * Rule 8: prefer addresses on alive interfaces.
+		 * This is a KAME specific rule.
+		 */
+		if ((ia_best->ia_ifp->if_flags & IFF_UP) &&
+		    !(ia->ia_ifp->if_flags & IFF_UP))
+			NEXT(8);
+		if (!(ia_best->ia_ifp->if_flags & IFF_UP) &&
+		    (ia->ia_ifp->if_flags & IFF_UP))
+			REPLACE(8);
 
 		/*
 		 * Rule 14: Use longest matching prefix.
