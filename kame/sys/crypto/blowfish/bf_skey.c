@@ -1,4 +1,4 @@
-/*	$KAME: bf_skey.c,v 1.8 2002/03/05 11:37:50 itojun Exp $	*/
+/*	$KAME: bf_skey.c,v 1.9 2004/12/22 08:27:48 itojun Exp $	*/
 /*	$NetBSD: bf_skey.c,v 1.2 2000/11/06 14:11:40 itojun Exp $	*/
 
 /* crypto/bf/bf_skey.c */
@@ -74,11 +74,11 @@ void
 BF_set_key(key, len, data)
 	BF_KEY *key;
 	int len;
-	unsigned char *data;
+	const unsigned char *data;
 {
 	int i;
 	BF_LONG *p, ri, in[2];
-	unsigned char *d, *end;
+	const unsigned char *d, *end;
 
 	memcpy((char *)key, (const char *)&bf_init, sizeof(BF_KEY));
 	p = key->P;
