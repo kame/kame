@@ -1,3 +1,4 @@
+$NetBSD$
 --- ipv6socket_scrub.c.orig	Fri Oct 15 18:51:40 1999
 +++ ipv6socket_scrub.c	Sun Nov 28 23:28:38 1999
 @@ -308,7 +308,7 @@

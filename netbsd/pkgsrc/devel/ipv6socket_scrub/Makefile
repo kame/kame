@@ -1,5 +1,5 @@
 # $NetBSD$
-# KAME $Id: Makefile,v 1.5 1999/11/28 14:32:53 itojun Exp $
+# KAME $Id: Makefile,v 1.6 1999/11/28 14:36:04 itojun Exp $
 #
 
 DISTNAME=		IPv6socket_scrub
@@ -17,6 +17,7 @@ WRKSRC=			${WRKDIR}/${DISTNAME}/src
 NO_CDROM=		"not redistributable"
 NO_PACKAGE=		"not redistributable"
 RESTRICTED=		"not redistributable, license agreement required"
+MIRROR_DISTFILES=	no
 
 do-fetch:
 	@if test \! -f ${DISTDIR}/${DISTNAME}${EXTRACT_SUFX}; then \
