@@ -807,6 +807,9 @@ out:	if (((m = m0)->m_flags & M_PKTHDR) && (m->m_pkthdr.len < totlen))
  *
  * XXX M_TRAILINGSPACE/M_LEADINGSPACE on shared cluster (sharedcluster)
  */
+#if 0
+#define PULLDOWN_DEBUG
+#endif
 struct mbuf *
 m_pulldown(m, off, len, offp)
 	struct mbuf *m;
@@ -825,6 +828,15 @@ m_pulldown(m, off, len, offp)
 		return NULL;	/* impossible */
 	}
 
+#ifdef PULLDOWN_DEBUG
+    {
+	struct mbuf *t;
+	printf("before:");
+	for (t = m; t; t = t->m_next)
+		printf(" %d", t->m_len);
+	printf("\n");
+    }
+#endif
 	n = m;
 	while (n != NULL && off > 0) {
 		if (n->m_len > off)
@@ -941,6 +953,15 @@ m_pulldown(m, off, len, offp)
 	off = 0;
 
 ok:
+#ifdef PULLDOWN_DEBUG
+    {
+	struct mbuf *t;
+	printf("after:");
+	for (t = m; t; t = t->m_next)
+		printf("%c%d", t == n ? '*' : ' ', t->m_len);
+	printf(" (off=%d)\n", off);
+    }
+#endif
 	if (offp)
 		*offp = off;
 	return n;

@@ -337,11 +337,31 @@ udp6_input(mp, offp, proto)
 
 	udp6stat.udp6s_ipackets++;
 
+#if 0
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
+#endif
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	plen = ntohs(ip6->ip6_plen) - off + sizeof(*ip6); /*XXX jumbogram*/
+#if 0
 	uh = (struct udphdr *)((caddr_t)ip6 + off);
+#else
+    {
+	struct mbuf *n;
+	int uoff;
+#if 0
+	n = m_pulldown(m, off, sizeof(struct udphdr), NULL);
+	uoff = 0;
+#else
+	n = m_pulldown(m, off, sizeof(struct udphdr), &uoff);
+#endif
+	if (n == NULL)
+		return IPPROTO_DONE;
+	if (n->m_len < uoff + sizeof(struct udphdr))
+		panic("m_pulldown malfunction");
+	uh = (struct udphdr *)(mtod(n, caddr_t) + uoff);
+    }
+#endif
 	ulen = ntohs((u_short)uh->uh_ulen);
 
 	if (plen != ulen) {
