@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.29 2004/02/18 15:10:51 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.30 2004/02/23 05:30:24 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -1388,7 +1388,7 @@ sctp6_peeraddr(struct socket *so,
 #endif
 		return ENOENT;
 	}
-	in6_recoverscope(&sin6, &sin6->sin6_addr, NULL);
+	in6_recoverscope(sin6, &sin6->sin6_addr, NULL);
 #ifdef __FreeBSD__
 	*nam = (struct sockaddr *)sin6;
 #endif
