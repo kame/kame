@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_ip.c	8.7 (Berkeley) 5/15/95
- * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.64 1999/12/22 19:13:23 shin Exp $
+ * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.64.2.1 2000/07/15 07:14:31 kris Exp $
  */
 
 #include "opt_inet6.h"
@@ -228,11 +228,10 @@ rip_output(m, so, dst)
 	}
 
 #ifdef IPSEC
-	m->m_pkthdr.rcvif = (struct ifnet *)so;	/*XXX*/
+	ipsec_setsocket(m, so);
 #endif /*IPSEC*/
 
-	return (ip_output(m, inp->inp_options, &inp->inp_route,
-			  flags | IP_SOCKINMRCVIF,
+	return (ip_output(m, inp->inp_options, &inp->inp_route, flags,
 			  inp->inp_moptions));
 }
 

@@ -1,8 +1,11 @@
 /*
  * extensions to ioctl_meteor.h for the bt848 cards
  *
- * $FreeBSD: src/sys/i386/include/ioctl_bt848.h,v 1.25 2000/01/24 14:00:34 roger Exp $
+ * $FreeBSD: src/sys/i386/include/ioctl_bt848.h,v 1.25.2.1 2000/04/18 12:53:36 roger Exp $
  */
+
+#ifndef  _MACHINE_IOCTL_BT848_H_
+#define  _MACHINE_IOCTL_BT848_H_
 
 /*
  * frequency sets
@@ -279,4 +282,7 @@ struct bktr_remote {
 # define BT848_IFORM_F_NTSCJ            (0x2)
 # define BT848_IFORM_F_NTSCM            (0x1)
 # define BT848_IFORM_F_AUTO             (0x0)
+
+
+#endif	/* _MACHINE_IOCTL_BT848_H_ */
 

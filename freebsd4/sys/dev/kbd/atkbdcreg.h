@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/kbd/atkbdcreg.h,v 1.4 1999/12/29 04:35:40 peter Exp $
+ * $FreeBSD: src/sys/dev/kbd/atkbdcreg.h,v 1.4.2.2 2000/03/31 12:51:57 yokota Exp $
  * from kbdio.h,v 1.8 1998/09/25 11:55:46 yokota Exp
  */
 
@@ -132,6 +132,9 @@
 #define PSM_MOUSE_ID		0
 #define PSM_BALLPOINT_ID	2
 #define PSM_INTELLI_ID		3
+#define PSM_EXPLORER_ID		4
+#define PSM_4DMOUSE_ID		6
+#define PSM_4DPLUS_ID		8
 
 #ifdef _KERNEL
 
@@ -181,8 +184,14 @@ typedef struct _kqueue {
 #endif
 } kqueue;
 
+struct resource;
+
 typedef struct atkbdc_softc {
-    int port;			/* base port address */
+    struct resource *port0;	/* data port */
+    struct resource *port1;	/* status port */
+    bus_space_tag_t iot;
+    bus_space_handle_t ioh0;
+    bus_space_handle_t ioh1;
     int command_byte;		/* current command byte value */
     int command_mask;		/* command byte mask bits for kbd/aux devices */
     int lock;			/* FIXME: XXX not quite a semaphore... */
@@ -191,9 +200,12 @@ typedef struct atkbdc_softc {
 } atkbdc_softc_t; 
 
 enum kbdc_device_ivar {
-	KBDC_IVAR_PORT,
 	KBDC_IVAR_IRQ,
 	KBDC_IVAR_FLAGS,
+	KBDC_IVAR_VENDORID,
+	KBDC_IVAR_SERIAL,
+	KBDC_IVAR_LOGICALID,
+	KBDC_IVAR_COMPATID, 
 };
 
 typedef caddr_t KBDC;
@@ -201,11 +213,12 @@ typedef caddr_t KBDC;
 /* function prototypes */
 
 atkbdc_softc_t *atkbdc_get_softc(int unit);
-int atkbdc_probe_unit(int unit, int port);
-int atkbdc_attach_unit(int unit, atkbdc_softc_t *sc, int port);
+int atkbdc_probe_unit(int unit, struct resource *port0, struct resource *port1);
+int atkbdc_attach_unit(int unit, atkbdc_softc_t *sc, struct resource *port0,
+		       struct resource *port1);
 int atkbdc_configure(void);
 
-KBDC kbdc_open(int port);
+KBDC atkbdc_open(int unit);
 int kbdc_lock(KBDC kbdc, int lock);
 int kbdc_data_ready(KBDC kbdc);
 

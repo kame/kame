@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/isa/mss.c,v 1.48 2000/03/05 15:51:09 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/isa/mss.c,v 1.48.2.3 2000/07/19 21:18:15 cg Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -33,11 +33,6 @@
 /* board-specific include files */
 #include <dev/sound/isa/mss.h>
 #include <dev/sound/chip.h>
-
-#include "gusc.h"
-#if notyet
-#include "midi.h"
-#endif /* notyet */
 
 #define MSS_BUFFSIZE (65536 - 256)
 #define	abs(x)	(((x) < 0) ? -(x) : (x))
@@ -49,6 +44,7 @@ struct mss_chinfo {
 	pcm_channel *channel;
 	snd_dbuf *buffer;
 	int dir;
+	u_int32_t fmt;
 };
 
 struct mss_info {
@@ -327,7 +323,6 @@ mss_alloc_resources(struct mss_info *mss, device_t dev)
     	return ok;
 }
 
-#if NGUSC > 0
 /*
  * XXX This might be better off in the gusc driver.
  */
@@ -353,12 +348,8 @@ gusmax_setup(struct mss_info *mss, device_t dev, struct resource *alt)
 	port_wr(alt, 0x0f, 0x00);
 
 	irqctl = irq_bits[isa_get_irq(parent)];
-#if notyet
-#if NMIDI > 0
 	/* Share the IRQ with the MIDI driver.  */
 	irqctl |= 0x40;
-#endif /* NMIDI > 0 */
-#endif /* notyet */
 	dmactl = dma_bits[isa_get_drq(parent)];
 	if (device_get_flags(parent) & DV_F_DUAL_DMA)
 		dmactl |= dma_bits[device_get_flags(parent) & DV_F_DRQ_MASK]
@@ -383,7 +374,6 @@ gusmax_setup(struct mss_info *mss, device_t dev, struct resource *alt)
 
 	splx(s);
 }
-#endif	/* NGUSC > 0 */
 
 static int
 mss_init(struct mss_info *mss, device_t dev)
@@ -429,10 +419,8 @@ mss_init(struct mss_info *mss, device_t dev)
 			break;
 		}
     		port_wr(alt, 0, 0xC); /* enable int and dma */
-#if NGUSC > 0
 		if (mss->bd_id == MD_GUSMAX)
 			gusmax_setup(mss, dev, alt);
-#endif
 		bus_release_resource(dev, SYS_RES_IOPORT, rid, alt);
 
     		/*
@@ -499,7 +487,7 @@ mss_probe(device_t dev)
     	int flags, irq, drq, result = ENXIO, setres = 0;
     	struct mss_info *mss;
 
-    	if (isa_get_vendorid(dev)) return ENXIO; /* not yet */
+    	if (isa_get_logicalid(dev)) return ENXIO; /* not yet */
 
     	mss = (struct mss_info *)malloc(sizeof *mss, M_DEVBUF, M_NOWAIT);
     	if (!mss) return ENXIO;
@@ -550,7 +538,11 @@ mss_probe(device_t dev)
 		     	rman_get_start(mss->io_base), tmpx));
 		goto no;
     	}
+#ifdef PC98
+    	if (irq > 12) {
+#else
     	if (irq > 11) {
+#endif
 		printf("MSS: Bad IRQ %d\n", irq);
 		goto no;
     	}
@@ -835,6 +827,10 @@ ymf_test(device_t dev, struct mss_info *mss)
 		if (!j) {
 	    		bus_release_resource(dev, SYS_RES_IOPORT,
 			 		     mss->conf_rid, mss->conf_base);
+#ifdef PC98
+			/* PC98 need this. I don't know reason why. */
+			bus_delete_resource(dev, SYS_RES_IOPORT, mss->conf_rid);
+#endif
 	    		mss->conf_base = 0;
 	    		continue;
 		}
@@ -856,16 +852,23 @@ mss_doattach(device_t dev, struct mss_info *mss)
     	mss_init(mss, dev);
     	if (flags & DV_F_TRUE_MSS) {
 		/* has IRQ/DMA registers, set IRQ and DMA addr */
+#ifdef PC98 /* CS423[12] in PC98 can use IRQ3,5,10,12 */
+		static char     interrupt_bits[13] =
+	        {-1, -1, -1, 0x08, -1, 0x10, -1, -1, -1, -1, 0x18, -1, 0x20};
+#else
 		static char     interrupt_bits[12] =
 	    	{-1, -1, -1, -1, -1, 0x28, -1, 0x08, -1, 0x10, 0x18, 0x20};
+#endif
 		static char     pdma_bits[4] =  {1, 2, -1, 3};
 		static char	valid_rdma[4] = {1, 0, -1, 0};
 		char		bits;
 
 		if (!mss->irq || (bits = interrupt_bits[rman_get_start(mss->irq)]) == -1)
 			goto no;
+#ifndef PC98 /* CS423[12] in PC98 don't support this. */
 		io_wr(mss, 0, bits | 0x40);	/* config port */
 		if ((io_rd(mss, 3) & 0x40) == 0) device_printf(dev, "IRQ Conflict?\n");
+#endif
 		/* Write IRQ+DMA setup */
 		if (pdma_bits[mss->pdma] == -1) goto no;
 		bits |= pdma_bits[mss->pdma];
@@ -955,7 +958,10 @@ static driver_t mss_driver = {
 	sizeof(snddev_info),
 };
 
-DRIVER_MODULE(mss, isa, mss_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_mss, isa, mss_driver, pcm_devclass, 0, 0);
+MODULE_DEPEND(snd_mss, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_VERSION(snd_mss, 1);
+
 
 /*
  * main irq handler for the CS423x. The OPTi931 code is
@@ -1278,6 +1284,7 @@ mss_format(struct mss_chinfo *ch, u_int32_t format)
         	{AFMT_U8, AFMT_MU_LAW, AFMT_S16_LE, AFMT_A_LAW,
 		-1, AFMT_IMA_ADPCM, AFMT_U16_BE, -1};
 
+	ch->fmt = format;
     	for (i = 0; i < 8; i++) if (arg == fmts[i]) break;
     	arg = i << 1;
     	if (format & AFMT_STEREO) arg |= 1;
@@ -1294,13 +1301,17 @@ mss_trigger(struct mss_chinfo *ch, int go)
 {
     	struct mss_info *mss = ch->parent;
     	u_char m;
-    	int retry, wr, cnt;
+    	int retry, wr, cnt, ss;
 
-    	wr = (ch->dir == PCMDIR_PLAY)? 1 : 0;
+	ss = 1;
+	ss <<= (ch->fmt & AFMT_STEREO)? 1 : 0;
+	ss <<= (ch->fmt & AFMT_16BIT)? 1 : 0;
+
+	wr = (ch->dir == PCMDIR_PLAY)? 1 : 0;
     	m = ad_read(mss, 9);
     	switch (go) {
     	case PCMTRIG_START:
-		cnt = (ch->buffer->dl / ch->buffer->sample_size) - 1;
+		cnt = (ch->buffer->dl / ss) - 1;
 
 		DEB(if (m & 4) printf("OUCH! reg 9 0x%02x\n", m););
 		m |= wr? I9_PEN : I9_CEN; /* enable DMA */
@@ -1371,12 +1382,12 @@ pnpmss_attach(device_t dev)
 	mss->irq_rid = 0;
 	mss->drq1_rid = 0;
 	mss->drq2_rid = 1;
+	mss->bd_id = MD_CS42XX;
 
 	switch (isa_get_logicalid(dev)) {
 	case 0x0000630e:			/* CSC0000 */
 	case 0x0001630e:			/* CSC0100 */
 	    mss->bd_flags |= BD_F_MSS_OFFSET;
-	    mss->bd_id = MD_CS42XX;
 	    break;
 
 	case 0x2100a865:			/* YHM0021 */
@@ -1404,7 +1415,6 @@ pnpmss_attach(device_t dev)
 
 	case 0x1022b839:			/* NMX2210 */
 	    mss->io_rid = 1;
-	    mss->bd_id = MD_CS42XX;
 	    break;
 
 #if 0
@@ -1417,10 +1427,13 @@ pnpmss_attach(device_t dev)
             mss->bd_id = MD_GUSPNP;
 	    break;
 #endif
+	case 0x01000000:			/* @@@0001 */
+	    mss->drq2_rid = -1;
+            break;
+
 	/* Unknown MSS default.  We could let the CSC0000 stuff match too */
         default:
 	    mss->bd_flags |= BD_F_MSS_OFFSET;
-	    mss->bd_id = MD_CS42XX;
 	    break;
 	}
     	return mss_doattach(dev, mss);
@@ -1440,7 +1453,10 @@ static driver_t pnpmss_driver = {
 	sizeof(snddev_info),
 };
 
-DRIVER_MODULE(pnpmss, isa, pnpmss_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_pnpmss, isa, pnpmss_driver, pcm_devclass, 0, 0);
+MODULE_DEPEND(snd_pnpmss, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_VERSION(snd_pnpmss, 1);
+
 
 /*
  * the opti931 seems to miss interrupts when working in full
@@ -1499,8 +1515,6 @@ opti931_intr(void *arg)
     	DEB(printf("xxx too many loops\n");)
 }
 
-#if NGUSC > 0
-
 static int
 guspcm_probe(device_t dev)
 {
@@ -1534,7 +1548,7 @@ guspcm_attach(device_t dev)
 	mss->drq1_rid = 1;
 	mss->drq2_rid = -1;
 
-	if (isa_get_vendorid(parent) == 0)
+	if (isa_get_logicalid(parent) == 0)
 		mss->bd_id = MD_GUSMAX;
 	else {
 		mss->bd_id = MD_GUSPNP;
@@ -1581,8 +1595,10 @@ static driver_t guspcm_driver = {
 	sizeof(snddev_info),
 };
 
-DRIVER_MODULE(guspcm, gusc, guspcm_driver, pcm_devclass, 0, 0);
-#endif	/* NGUSC > 0 */
+DRIVER_MODULE(snd_guspcm, gusc, guspcm_driver, pcm_devclass, 0, 0);
+MODULE_DEPEND(snd_guspcm, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_VERSION(snd_guspcm, 1);
+
 
 static int
 mssmix_init(snd_mixer *m)
@@ -1637,7 +1653,8 @@ ymmix_init(snd_mixer *m)
 	struct mss_info *mss = mix_getdevinfo(m);
 
 	mssmix_init(m);
-	mix_setdevs(m, mix_getdevs(m) | SOUND_MASK_VOLUME | SOUND_MASK_MIC);
+	mix_setdevs(m, mix_getdevs(m) | SOUND_MASK_VOLUME | SOUND_MASK_MIC
+				      | SOUND_MASK_BASS | SOUND_MASK_TREBLE);
 	/* Set master volume */
 	conf_wr(mss, OPL3SAx_VOLUMEL, 7);
 	conf_wr(mss, OPL3SAx_VOLUMER, 7);
@@ -1649,7 +1666,7 @@ static int
 ymmix_set(snd_mixer *m, unsigned dev, unsigned left, unsigned right)
 {
 	struct mss_info *mss = mix_getdevinfo(m);
-	int t;
+	int t, l, r;
 
 	switch (dev) {
 	case SOUND_MIXER_VOLUME:
@@ -1669,8 +1686,18 @@ ymmix_set(snd_mixer *m, unsigned dev, unsigned left, unsigned right)
 		break;
 
 	case SOUND_MIXER_BASS:
+		l = (left * 7) / 100;
+		r = (right * 7) / 100;
+		t = (r << 4) | l;
+		conf_wr(mss, OPL3SAx_BASS, t);
+		break;
+
 	case SOUND_MIXER_TREBLE:
-		/* Later maybe */
+		l = (left * 7) / 100;
+		r = (right * 7) / 100;
+		t = (r << 4) | l;
+		conf_wr(mss, OPL3SAx_TREBLE, t);
+		break;
 
 	default:
 		mss_mixer_set(mss, dev, left, right);
@@ -1740,7 +1767,9 @@ msschan_trigger(void *data, int go)
 {
 	struct mss_chinfo *ch = data;
 
-	if (go == PCMTRIG_EMLDMAWR) return 0;
+	if (go == PCMTRIG_EMLDMAWR || go == PCMTRIG_EMLDMARD)
+		return 0;
+
 	buf_isadma(ch->buffer, go);
 	mss_trigger(ch, go);
 	return 0;

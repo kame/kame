@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/syscons_isa.c,v 1.11 2000/01/29 15:08:56 peter Exp $
+ * $FreeBSD: src/sys/isa/syscons_isa.c,v 1.11.2.1 2000/04/03 13:03:43 yokota Exp $
  */
 
 #include "opt_syscons.h"
@@ -129,6 +129,7 @@ sc_softc_t
 	if (!(sc->flags & SC_INIT_DONE)) {
 		sc->keyboard = -1;
 		sc->adapter = -1;
+		sc->cursor_char = SC_CURSOR_CHAR;
 		sc->mouse_char = SC_MOUSE_CHAR;
 	}
 	return sc;

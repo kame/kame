@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/isa/isavar.h,v 1.3 1999/08/28 00:38:58 peter Exp $
+ * $FreeBSD: src/sys/alpha/isa/isavar.h,v 1.3.2.1 2000/06/07 01:45:03 jhb Exp $
  */
 
 /*
@@ -32,6 +32,8 @@
  */
 void isa_init_intr(void);
 struct resource *isa_alloc_intr(device_t bus, device_t child, int irq);
+struct resource *isa_alloc_intrs(device_t bus, device_t child, u_long start,
+				 u_long end);
 int isa_release_intr(device_t bus, device_t child, struct resource *r);
 int isa_setup_intr(device_t dev, device_t child,
 		   struct resource *irq, int flags,

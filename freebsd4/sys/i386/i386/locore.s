@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)locore.s	7.3 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/i386/locore.s,v 1.132 1999/12/04 13:09:26 kato Exp $
+ * $FreeBSD: src/sys/i386/i386/locore.s,v 1.132.2.2 2000/07/07 00:38:46 obrien Exp $
  *
  *		originally from: locore.s, by William F. Jolitz
  *
@@ -44,9 +44,7 @@
  */
 
 #include "opt_bootp.h"
-#include "opt_ddb.h"
 #include "opt_nfsroot.h"
-#include "opt_userconfig.h"
 
 #include <sys/syscall.h>
 #include <sys/reboot.h>
@@ -277,6 +275,9 @@ NON_GPROF_ENTRY(btext)
 	shrl	$17,%eax
 	movb	%al,R(_pc98_system_parameter)+1
 3:
+
+	movw	R(_pc98_system_parameter+0x86),%ax
+	movw	%ax,R(_cpu_id)
 #endif
 
 	call	identify_cpu
@@ -401,11 +402,11 @@ NON_GPROF_ENTRY(prepare_usermode)
 	movl	__udatasel,%ecx
 
 #if 0	/* ds/es/fs are in trap frame */
-	movl	%cx,%ds
-	movl	%cx,%es
-	movl	%cx,%fs
+	mov	%cx,%ds
+	mov	%cx,%es
+	mov	%cx,%fs
 #endif
-	movl	%cx,%gs				/* and ds to gs */
+	mov	%cx,%gs				/* and ds to gs */
 	ret					/* goto user! */
 
 
@@ -413,7 +414,7 @@ NON_GPROF_ENTRY(prepare_usermode)
  * Signal trampoline, copied to top of user stack
  */
 NON_GPROF_ENTRY(sigcode)
-	call	SIGF_HANDLER(%esp)		/* call signal handler */
+	call	*SIGF_HANDLER(%esp)		/* call signal handler */
 	lea	SIGF_UC(%esp),%eax		/* get ucontext_t */
 	pushl	%eax
 	testl	$PSL_VM,UC_EFLAGS(%eax)
@@ -427,7 +428,7 @@ NON_GPROF_ENTRY(sigcode)
 
 	ALIGN_TEXT
 _osigcode:
-	call	SIGF_HANDLER(%esp)		/* call signal handler */
+	call	*SIGF_HANDLER(%esp)		/* call signal handler */
 	lea	SIGF_SC(%esp),%eax		/* get sigcontext */
 	pushl	%eax
 	testl	$PSL_VM,SC_PS(%eax)
@@ -750,8 +751,7 @@ create_pagetables:
 /* Find end of kernel image (rounded up to a page boundary). */
 	movl	$R(_end),%esi
 
-/* include symbols if loaded and useful */
-#ifdef DDB
+/* Include symbols, if any. */
 	movl	R(_bootinfo+BI_ESYMTAB),%edi
 	testl	%edi,%edi
 	je	over_symalloc
@@ -760,7 +760,6 @@ create_pagetables:
 	addl	%edi,R(_bootinfo+BI_SYMTAB)
 	addl	%edi,R(_bootinfo+BI_ESYMTAB)
 over_symalloc:
-#endif
 
 /* If we are told where the end of the kernel space is, believe it. */
 	movl	R(_bootinfo+BI_KERNEND),%edi

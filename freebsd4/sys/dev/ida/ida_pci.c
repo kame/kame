@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/ida_pci.c,v 1.7 2000/03/08 16:16:31 jlemon Exp $
+ * $FreeBSD: src/sys/dev/ida/ida_pci.c,v 1.7.2.2 2000/05/23 19:30:35 jlemon Exp $
  */
 
 #include <sys/param.h>
@@ -53,7 +53,9 @@
 
 #define IDA_PCI_MEMADDR		(PCIR_MAPS + 4)		/* Mem I/O Address */
 
-#define IDA_DEVICEID_SMART	0xAE100E11
+#define IDA_DEVICEID_SMART		0xAE100E11
+#define IDA_DEVICEID_DEC_SMART		0x00461011
+#define IDA_DEVICEID_NCR_53C1510	0x00101000
 
 static int
 ida_v3_fifo_full(struct ida_softc *ida)
@@ -148,6 +150,12 @@ static struct ida_board board_id[] = {
 	{ 0x4040, "Compaq Integrated Array controller",	    &ida_v4_access },
 	{ 0x4050, "Compaq Smart Array 4200 controller",	    &ida_v4_access },
 	{ 0x4051, "Compaq Smart Array 4250ES controller",   &ida_v4_access },
+	{ 0x4058, "Compaq Smart Array 431 controller",      &ida_v4_access },
+
+	{ IDA_DEVICEID_DEC_SMART,
+		  "DEC/Compaq Smart Array 4200 controller", &ida_v4_access },
+	{ IDA_DEVICEID_NCR_53C1510,
+		  "NCR/Compaq Integrated Array controller", &ida_v4_access },
 
 	{ 0, "", 0 },
 };
@@ -187,14 +195,17 @@ ida_pci_match(u_int32_t id)
 static int
 ida_pci_probe(device_t dev)
 {
-	struct ida_board *board;
+	struct ida_board *board = NULL;
+	u_int32_t id = pci_get_devid(dev);
 
-	if (pci_get_devid(dev) == IDA_DEVICEID_SMART) {
+	if (id == IDA_DEVICEID_SMART)
 		board = ida_pci_match(pci_get_subdevice(dev));
-		if (board != NULL) {
-			device_set_desc(dev, board->desc);
-			return (0);
-		}
+	if (id == IDA_DEVICEID_DEC_SMART ||
+	    id == IDA_DEVICEID_NCR_53C1510)
+		board = ida_pci_match(id);
+	if (board != NULL) {
+		device_set_desc(dev, board->desc);
+		return (0);
 	}
 	return (ENXIO);
 }
@@ -221,6 +232,8 @@ ida_pci_attach(device_t dev)
 	ida->dev = dev;
 
 	board = ida_pci_match(pci_get_subdevice(dev));
+	if (board == NULL)
+		board = ida_pci_match(pci_get_devid(dev));
 	ida->cmd = *board->accessor;
 
 	ida->regs_res_type = SYS_RES_MEMORY;

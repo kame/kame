@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_subr.c	8.2 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_subr.c,v 1.73 2000/02/28 21:18:21 ps Exp $
+ * $FreeBSD: src/sys/netinet/tcp_subr.c,v 1.73.2.2 2000/07/15 07:14:31 kris Exp $
  */
 
 #include "opt_compat.h"
@@ -39,6 +39,7 @@
 #include "opt_ipsec.h"
 #include "opt_tcpdebug.h"
 
+#include <stddef.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/callout.h>
@@ -91,7 +92,12 @@
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
+#ifdef INET6
+#include <netinet6/ipsec6.h>
+#endif
 #endif /*IPSEC*/
+
+#include <machine/in_cksum.h>
 
 int 	tcp_mssdflt = TCP_MSS;
 SYSCTL_INT(_net_inet_tcp, TCPCTL_MSSDFLT, mssdflt, CTLFLAG_RW, 
@@ -242,17 +248,19 @@ tcp_template(tp)
 		ip6->ip6_plen = sizeof(struct tcphdr);
 		ip6->ip6_src = inp->in6p_laddr;
 		ip6->ip6_dst = inp->in6p_faddr;
+		n->tt_t.th_sum = 0;
 	} else
 #endif
       {
-	register struct ipovly *ipov;
+	struct ip *ip = (struct ip *)n->tt_ipgen;
 
-	ipov = (struct ipovly *)n->tt_ipgen;
-	bzero(ipov->ih_x1, sizeof(ipov->ih_x1));
-	ipov->ih_pr = IPPROTO_TCP;
-	ipov->ih_len = htons(sizeof (struct tcpiphdr) - sizeof (struct ip));
-	ipov->ih_src = inp->inp_laddr;
-	ipov->ih_dst = inp->inp_faddr;
+	bzero(ip, sizeof(struct ip));		/* XXX overkill? */
+	ip->ip_vhl = IP_VHL_BORING;
+	ip->ip_p = IPPROTO_TCP;
+	ip->ip_src = inp->inp_laddr;
+	ip->ip_dst = inp->inp_faddr;
+	n->tt_t.th_sum = in_pseudo(ip->ip_src.s_addr, ip->ip_dst.s_addr,
+	    htons(sizeof(struct tcphdr) + IPPROTO_TCP));
       }
 	n->tt_t.th_sport = inp->inp_lport;
 	n->tt_t.th_dport = inp->inp_fport;
@@ -262,7 +270,6 @@ tcp_template(tp)
 	n->tt_t.th_off = 5;
 	n->tt_t.th_flags = 0;
 	n->tt_t.th_win = 0;
-	n->tt_t.th_sum = 0;
 	n->tt_t.th_urp = 0;
 	return (n);
 }
@@ -296,7 +303,6 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 	struct route *ro = 0;
 	struct route sro;
 	struct ip *ip;
-	struct ipovly *ipov;
 	struct tcphdr *nth;
 #ifdef INET6
 	struct route_in6 *ro6 = 0;
@@ -311,7 +317,6 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 	ip6 = ipgen;
 #endif /* INET6 */
 	ip = ipgen;
-	ipov = ipgen;
 
 	if (tp) {
 		if (!(flags & TH_RST)) {
@@ -358,7 +363,6 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 	      {
 		bcopy((caddr_t)ip, mtod(m, caddr_t), sizeof(struct ip));
 		ip = mtod(m, struct ip *);
-		ipov = mtod(m, struct ipovly *);
 		nth = (struct tcphdr *)(ip + 1);
 	      }
 		bcopy((caddr_t)th, (caddr_t)nth, sizeof(struct tcphdr));
@@ -400,8 +404,9 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 	} else
 #endif
       {
-	ipov->ih_len = htons((u_short)(sizeof (struct tcphdr) + tlen));
 	tlen += sizeof (struct tcpiphdr);
+	ip->ip_len = tlen;
+	ip->ip_ttl = ip_defttl;
       }
 	m->m_len = tlen;
 	m->m_pkthdr.len = tlen;
@@ -416,9 +421,9 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 	else
 		nth->th_win = htons((u_short)win);
 	nth->th_urp = 0;
-	nth->th_sum = 0;
 #ifdef INET6
 	if (isipv6) {
+		nth->th_sum = 0;
 		nth->th_sum = in6_cksum(m, IPPROTO_TCP,
 					sizeof(struct ip6_hdr),
 					tlen - sizeof(struct ip6_hdr));
@@ -429,28 +434,17 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 	} else
 #endif /* INET6 */
       {
-	bzero(ipov->ih_x1, sizeof(ipov->ih_x1));
-	nth->th_sum = in_cksum(m, tlen);
-#ifdef INET6
-	/* Re-initialization for later version check */
-	ip->ip_vhl = IP_MAKE_VHL(IPVERSION, 0);
-#endif /* INET6 */
-	ip->ip_len = tlen;
-	ip->ip_ttl = ip_defttl;
+        nth->th_sum = in_pseudo(ip->ip_src.s_addr, ip->ip_dst.s_addr,
+	    htons((u_short)(tlen - sizeof(struct ip) + ip->ip_p)));
+        m->m_pkthdr.csum_flags = CSUM_TCP;
+        m->m_pkthdr.csum_data = offsetof(struct tcphdr, th_sum);
       }
 #ifdef TCPDEBUG
 	if (tp == NULL || (tp->t_inpcb->inp_socket->so_options & SO_DEBUG))
 		tcp_trace(TA_OUTPUT, 0, tp, mtod(m, void *), th, 0);
 #endif
 #ifdef IPSEC
-	if (tp != NULL) {
-		m->m_pkthdr.rcvif = (struct ifnet *)tp->t_inpcb->inp_socket;
-		ipflags |=
-#ifdef INET6
-			isipv6 ? IPV6_SOCKINMRCVIF :
-#endif
-			IP_SOCKINMRCVIF;
-	}
+	ipsec_setsocket(m, tp ? tp->t_inpcb->inp_socket : NULL);
 #endif
 #ifdef INET6
 	if (isipv6) {

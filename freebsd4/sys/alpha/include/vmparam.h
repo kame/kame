@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/vmparam.h,v 1.5 1999/08/28 00:38:53 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/include/vmparam.h,v 1.5.2.1 2000/04/02 08:46:31 peter Exp $ */
 /* From: NetBSD: vmparam.h,v 1.6 1997/09/23 23:23:23 mjacob Exp */
 #ifndef	_ALPHA_VMPARAM_H
 #define	_ALPHA_VMPARAM_H
@@ -92,14 +92,6 @@
  */
 #ifndef USRIOSIZE
 #define USRIOSIZE	64
-#endif
-
-/*
- * PTEs for system V style shared memory.
- * This is basically slop for kmempt which we actually allocate (malloc) from.
- */
-#ifndef SHMMAXPGS
-#define SHMMAXPGS	1024		/* 8mb */
 #endif
 
 /*

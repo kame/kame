@@ -22,7 +22,7 @@
 \ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 \ SUCH DAMAGE.
 \
-\ $FreeBSD: src/sys/boot/forth/support.4th,v 1.3 1999/11/24 17:56:40 dcs Exp $
+\ $FreeBSD: src/sys/boot/forth/support.4th,v 1.3.2.1 2000/07/07 00:15:53 obrien Exp $
 
 \ Loader.rc support functions:
 \
@@ -64,6 +64,7 @@
 \
 \ strdup ( addr len -- addr' len)			similar to strdup(3)
 \ strcat ( addr len addr' len' -- addr len+len' )	similar to strcat(3)
+\ strlen ( addr -- len )				similar to strlen(3)
 \ s' ( | string' -- addr len | )			similar to s"
 \ rudimentary structure support
 
@@ -131,6 +132,14 @@ create last_module_option sizeof module.next allot
   addr len len' +
 ;
 
+: strlen ( addr -- len )
+  0 >r
+  begin
+    dup c@ while
+    1+ r> 1+ >r repeat
+  drop r>
+;
+
 : s' 
   [char] ' parse
   state @ if
@@ -138,9 +147,8 @@ create last_module_option sizeof module.next allot
   then
 ; immediate
 
-\ How come ficl doesn't have again?
-
-: again false postpone literal postpone until ; immediate
+: 2>r postpone >r postpone >r ; immediate
+: 2r> postpone r> postpone r> ; immediate
 
 \ Private definitions
 

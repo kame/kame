@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_iso88025subr.c,v 1.7 1999/12/19 01:55:29 green Exp $
+ * $FreeBSD: src/sys/net/if_iso88025subr.c,v 1.7.2.2 2000/06/25 02:23:39 bp Exp $
  *
  */
 
@@ -295,11 +295,13 @@ iso88025_output(ifp, m, dst, rt0)
                 if ((m->m_flags & M_BCAST) || (loop_copy > 0)) { 
                         struct mbuf *n = m_copy(m, 0, (int)M_COPYALL);
                         /*printf("iso88025_output: if_simloop broadcast.\n");*/
-                        (void) if_simloop(ifp, n, dst, ISO88025_HDR_LEN);
+                        (void) if_simloop(ifp,
+			    n, dst->sa_family, ISO88025_HDR_LEN);
                 } else if (bcmp(th->iso88025_dhost,
                     th->iso88025_shost, ETHER_ADDR_LEN) == 0) {
                         /*printf("iso88025_output: if_simloop to ourselves.\n");*/
-                        (void) if_simloop(ifp, m, dst, ISO88025_HDR_LEN);
+                        (void) if_simloop(ifp,
+			    m, dst->sa_family, ISO88025_HDR_LEN);
                         return(0);      /* XXX */
                 }       
         }      
@@ -315,14 +317,14 @@ iso88025_output(ifp, m, dst, rt0)
 		splx(s);
 		senderr(ENOBUFS);
 	}
+	if (m->m_flags & M_MCAST)
+		ifp->if_omcasts++;
 	IF_ENQUEUE(&ifp->if_snd, m);
         /*printf("iso88025_output: packet queued.\n");*/
         if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);
 	ifp->if_obytes += len + ISO88025_HDR_LEN + 8;
-	if (m->m_flags & M_MCAST)
-		ifp->if_omcasts++;
 	return (error);
 
 bad:

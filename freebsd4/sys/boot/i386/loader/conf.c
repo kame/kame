@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/loader/conf.c,v 1.11 1999/08/28 00:40:18 peter Exp $
+ * $FreeBSD: src/sys/boot/i386/loader/conf.c,v 1.11.2.2 2000/05/04 13:51:31 ps Exp $
  */
 
 #include <stand.h>
@@ -41,17 +41,30 @@
  * XXX as libi386 and biosboot merge, some of these can become linker sets.
  */
 
+#if defined(LOADER_NFS_SUPPORT) && defined(LOADER_TFTP_SUPPORT)
+#error "Cannot have both tftp and nfs support yet."
+#endif
+
 /* Exported for libstand */
 struct devsw *devsw[] = {
     &biosdisk,
-    /* XXX network devices? */
+#if defined(LOADER_NFS_SUPPORT) || defined(LOADER_TFTP_SUPPORT)
+    &pxedisk,
+#endif
     NULL
 };
 
 struct fs_ops *file_system[] = {
     &ufs_fsops,
+    &ext2fs_fsops,
     &dosfs_fsops,
     &zipfs_fsops,
+#ifdef LOADER_NFS_SUPPORT 
+    &nfs_fsops,
+#endif
+#ifdef LOADER_TFTP_SUPPORT
+    &tftp_fsops,
+#endif
     NULL
 };
 

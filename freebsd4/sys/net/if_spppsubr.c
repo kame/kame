@@ -17,7 +17,7 @@
  *
  * From: Version 2.4, Thu Apr 30 17:17:21 MSD 1997
  *
- * $FreeBSD: src/sys/net/if_spppsubr.c,v 1.59 2000/02/13 03:31:55 peter Exp $
+ * $FreeBSD: src/sys/net/if_spppsubr.c,v 1.59.2.2 2000/05/11 16:36:33 obrien Exp $
  */
 
 #include <sys/param.h>
@@ -42,7 +42,7 @@
 #include <sys/socket.h>
 #include <sys/syslog.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-#include <machine/random.h>
+#include <sys/random.h>
 #endif
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -58,9 +58,6 @@
 #include <net/if_types.h>
 #include <net/route.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-#include <machine/random.h>
-#endif
 #if defined (__NetBSD__) || defined (__OpenBSD__)
 #include <machine/cpu.h> /* XXX for softnet */
 #endif

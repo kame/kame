@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/if_lnc.h,v 1.14 1999/09/25 12:05:54 phk Exp $
+ * $FreeBSD: src/sys/i386/isa/if_lnc.h,v 1.14.2.1 2000/06/18 08:03:51 gj Exp $
  */
 
 #include <i386/isa/ic/Am7990.h>
@@ -117,6 +117,7 @@
 #define Am79C970A 0x2621
 #define Am79C971  0x2623
 #define Am79C972  0x2624
+#define Am79C973  0x2625
 #define Am79C978  0x2626
 
 /* Board types */

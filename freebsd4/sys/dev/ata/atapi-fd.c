@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-fd.c,v 1.44.2.1 2000/03/14 20:25:12 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-fd.c,v 1.44.2.2 2000/04/01 14:11:42 sos Exp $
  */
 
 #include <sys/param.h>
@@ -354,13 +354,13 @@ afd_start(struct atapi_softc *atp)
     ccb[8] = count;
 
     atapi_queue_cmd(fdp->atp, ccb, data_ptr, count * fdp->cap.sector_size,
-		    bp->b_flags&B_READ ? ATPR_F_READ : 0, 30, afd_done, bp);
+		    bp->b_flags & B_READ ? ATPR_F_READ : 0, 30, afd_done, bp);
 }
 
 static int32_t 
 afd_partial_done(struct atapi_request *request)
 {
-    struct buf *bp = request->bp;
+    struct buf *bp = request->driver;
 
     if (request->error) {
 	bp->b_error = request->error;
@@ -373,7 +373,7 @@ afd_partial_done(struct atapi_request *request)
 static int32_t 
 afd_done(struct atapi_request *request)
 {
-    struct buf *bp = request->bp;
+    struct buf *bp = request->driver;
     struct afd_softc *fdp = request->device->driver;
 
     if (request->error || (bp->b_flags & B_ERROR)) {

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/commands.c,v 1.13 1999/12/28 07:19:22 msmith Exp $
+ * $FreeBSD: src/sys/boot/common/commands.c,v 1.13.2.2 2000/07/20 10:35:14 kris Exp $
  */
 
 #include <stand.h>
@@ -246,7 +246,8 @@ command_show(int argc, char *argv[])
 		pager_output("=");
 		pager_output(cp);
 	    }
-	    pager_output("\n");
+	    if (pager_output("\n"))
+		break;
 	}
 	pager_close();
     } else {
@@ -325,7 +326,7 @@ command_echo(int argc, char *argv[])
 
     s = unargv(argc, argv);
     if (s != NULL) {
-	printf(s);
+	printf("%s", s);
 	free(s);
     }
     if (!nl)
@@ -377,7 +378,7 @@ command_read(int argc, char *argv[])
     name = (argc > 0) ? argv[0]: NULL;
 	
     if (prompt != NULL)
-	printf(prompt);
+	printf("%s", prompt);
     if (timeout >= 0) {
 	when = time(NULL) + timeout;
 	while (!ischar())

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/libi386/bootinfo.c,v 1.23 1999/12/29 09:54:29 msmith Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/bootinfo.c,v 1.23.2.1 2000/04/15 03:09:44 ps Exp $
  */
 
 #include <stand.h>
@@ -271,7 +271,10 @@ bi_load(char *args, int *howtop, int *bootdevp, vm_offset_t *bip)
 	    break;
 	printf("root device %s invalid\n", i386_fmtdev(rootdev));
 	return(EINVAL);
-
+	
+    case DEVT_NET:
+	    break;
+	    
     default:
 	printf("WARNING - don't know how to boot from device type %d\n", rootdev->d_type);
     }

@@ -23,11 +23,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/dec_st6600.c,v 1.5 1999/12/14 17:50:00 gallatin Exp $
+ * $FreeBSD: src/sys/alpha/alpha/dec_st6600.c,v 1.5.2.2 2000/07/20 06:12:13 obrien Exp $
  */
 
 #include "opt_ddb.h"
 #include <sys/param.h>
+#include <sys/reboot.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/module.h>
@@ -47,8 +48,8 @@
 #include "sio.h"
 #include "sc.h"
 
-#ifndef CONSPEED
-#define CONSPEED TTYDEF_SPEED
+#ifndef	CONSPEED
+#define	CONSPEED TTYDEF_SPEED
 #endif
 static int comcnrate = CONSPEED;
 
@@ -95,7 +96,7 @@ st6600_cons_init()
 	ctb = (struct ctb *)(((caddr_t)hwrpb) + hwrpb->rpb_ctb_off);
 
 	switch (ctb->ctb_term_type) {
-	case 2: 
+	case 2:
 		/* serial console ... */
 		/* XXX */
 		{
@@ -109,6 +110,7 @@ st6600_cons_init()
 			if (siocnattach(0x3f8, comcnrate))
 				panic("can't init serial console");
 
+			boothowto |= RB_SERIAL;
 			break;
 		}
 
@@ -134,20 +136,20 @@ st6600_cons_init()
 static void
 st6600_intr_init()
 {
-
 	int i;
+
 	for(i = ST6600_PCI_IRQ_BEGIN; i <= ST6600_PCI_MAX_IRQ; i++)
 		platform.pci_intr_disable(i);
 	/* From Linux... */
 
 	platform.pci_intr_enable(55);	
 	platform.pci_intr_enable(2);	
-
 }
 
 static void
 st6600_intr_map(void *arg)
 {
+
 	return;
 }
 

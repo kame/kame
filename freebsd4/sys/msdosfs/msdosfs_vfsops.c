@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/msdosfs/msdosfs_vfsops.c,v 1.60 2000/01/27 14:43:07 nyan Exp $ */
+/* $FreeBSD: src/sys/msdosfs/msdosfs_vfsops.c,v 1.60.2.2 2000/07/08 14:34:27 bp Exp $ */
 /*	$NetBSD: msdosfs_vfsops.c,v 1.51 1997/11/17 15:36:58 ws Exp $	*/
 
 /*-
@@ -68,6 +68,8 @@
 #include <msdosfs/denode.h>
 #include <msdosfs/msdosfsmount.h>
 #include <msdosfs/fat.h>
+
+#define MSDOSFS_DFLTBSIZE       4096
 
 #if 1 /*def PC98*/
 /*
@@ -627,7 +629,7 @@ mountmsdosfs(devvp, mp, p, argp)
 	if (FAT12(pmp))
 		pmp->pm_fatblocksize = 3 * pmp->pm_BytesPerSec;
 	else
-		pmp->pm_fatblocksize = DFLTBSIZE;
+		pmp->pm_fatblocksize = MSDOSFS_DFLTBSIZE;
 
 	pmp->pm_fatblocksec = pmp->pm_fatblocksize / DEV_BSIZE;
 	pmp->pm_bnshift = ffs(DEV_BSIZE) - 1;
@@ -979,7 +981,7 @@ static struct vfsops msdosfs_vfsops = {
 	msdosfs_checkexp,
 	msdosfs_vptofh,
 	msdosfs_init,
-	vfs_stduninit,
+	msdosfs_uninit,
 	vfs_stdextattrctl,
 };
 

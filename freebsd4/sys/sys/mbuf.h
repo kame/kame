@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mbuf.h	8.5 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/mbuf.h,v 1.44 2000/01/19 01:26:06 msmith Exp $
+ * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.5 2000/07/15 07:14:43 kris Exp $
  */
 
 #ifndef _SYS_MBUF_H_
@@ -80,6 +80,10 @@ struct pkthdr {
 	int	len;			/* total packet length */
 	/* variables for ip and tcp reassembly */
 	caddr_t	header;			/* pointer to packet header */
+	/* variables for hardware checksum */
+	int	csum_flags;		/* flags regarding checksum */
+	int	csum_data;		/* data field used by csum routines */
+	struct	mbuf *aux;		/* extra data buffer; ipsec/others */
 };
 
 /* description of external storage mapped into mbuf, valid if M_EXT set */
@@ -131,10 +135,27 @@ struct mbuf {
 #define	M_BCAST		0x0100	/* send/received as link-level broadcast */
 #define	M_MCAST		0x0200	/* send/received as link-level multicast */
 #define	M_FRAG		0x0400	/* packet is a fragment of a larger packet */
+#define	M_FIRSTFRAG	0x0800	/* packet is first fragment */
+#define	M_LASTFRAG	0x1000	/* packet is last fragment */
 
 /* flags copied when copying m_pkthdr */
 #define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_PROTO1|M_PROTO1|M_PROTO2|M_PROTO3 | \
 			    M_PROTO4|M_PROTO5|M_BCAST|M_MCAST|M_FRAG)
+
+/* flags indicating hw checksum support and sw checksum requirements */
+#define CSUM_IP			0x0001		/* will csum IP */
+#define CSUM_TCP		0x0002		/* will csum TCP */
+#define CSUM_UDP		0x0004		/* will csum UDP */
+#define CSUM_IP_FRAGS		0x0008		/* will csum IP fragments */
+#define CSUM_FRAGMENT		0x0010		/* will do IP fragmentation */
+
+#define CSUM_IP_CHECKED		0x0100		/* did csum IP */
+#define CSUM_IP_VALID		0x0200		/*   ... the csum is valid */
+#define CSUM_DATA_VALID		0x0400		/* csum_data field is valid */
+#define CSUM_PSEUDO_HDR		0x0800		/* csum_data has pseudo hdr */
+
+#define CSUM_DELAY_DATA		(CSUM_TCP | CSUM_UDP)
+#define CSUM_DELAY_IP		(CSUM_IP)	/* XXX add ipv6 here too? */
 
 /* mbuf types */
 #define	MT_FREE		0	/* should be on free list */
@@ -251,8 +272,6 @@ union mcluster {
  *	MGETHDR(struct mbuf *m, int how, int type)
  * allocates an mbuf and initializes it to contain a packet header
  * and internal data.
- *
- * Warning: MGETHDR() does *not* initialize m->m_pkthdr.rcvif.
  */
 #define	MGET(m, how, type) do {						\
 	struct mbuf *_mm;						\
@@ -302,6 +321,9 @@ union mcluster {
 		_mm->m_nextpkt = NULL;					\
 		_mm->m_data = _mm->m_pktdat;				\
 		_mm->m_flags = M_PKTHDR;				\
+		_mm->m_pkthdr.rcvif = NULL;				\
+		_mm->m_pkthdr.csum_flags = 0;				\
+		_mm->m_pkthdr.aux = (struct mbuf *)NULL;		\
 		(m) = _mm;						\
 		splx(_ms);						\
 	} else {							\
@@ -361,6 +383,7 @@ union mcluster {
 #define	MCLFREE1(p) do {						\
 	union mcluster *_mp = (union mcluster *)(p);			\
 									\
+	KASSERT(mclrefcnt[mtocl(_mp)] > 0, ("freeing free cluster"));	\
 	if (--mclrefcnt[mtocl(_mp)] == 0) {				\
 		_mp->mcl_next = mclfree;				\
 		mclfree = _mp;						\
@@ -395,6 +418,7 @@ union mcluster {
 #define	MFREE(m, n) MBUFLOCK(						\
 	struct mbuf *_mm = (m);						\
 									\
+	KASSERT(_mm->m_type != MT_FREE, ("freeing free mbuf"));		\
 	mbstat.m_mtypes[_mm->m_type]--;					\
 	if (_mm->m_flags & M_EXT)					\
 		MEXTFREE1(m);						\
@@ -409,6 +433,7 @@ union mcluster {
 /*
  * Copy mbuf pkthdr from "from" to "to".
  * from must have M_PKTHDR set, and to must be empty.
+ * aux pointer will be moved to `to'.
  */
 #define	M_COPY_PKTHDR(to, from) do {					\
 	struct mbuf *_mfrom = (from);					\
@@ -417,6 +442,7 @@ union mcluster {
 	_mto->m_data = _mto->m_pktdat;					\
 	_mto->m_flags = _mfrom->m_flags & M_COPYFLAGS;			\
 	_mto->m_pkthdr = _mfrom->m_pkthdr;				\
+	_mfrom->m_pkthdr.aux = (struct mbuf *)NULL;			\
 } while (0)
 
 /*
@@ -466,17 +492,12 @@ union mcluster {
 	int _mplen = (plen);						\
 	int __mhow = (how);						\
 									\
-	if (_mm == NULL) {						\
-		MGET(_mm, __mhow, MT_DATA);				\
-		if (_mm == NULL)					\
-			break;						\
-	}								\
 	if (M_LEADINGSPACE(_mm) >= _mplen) {				\
 		_mm->m_data -= _mplen;					\
 		_mm->m_len += _mplen;					\
 	} else								\
 		_mm = m_prepend(_mm, _mplen, __mhow);			\
-	if (_mm->m_flags & M_PKTHDR)					\
+	if (_mm != NULL && _mm->m_flags & M_PKTHDR)			\
 		_mm->m_pkthdr.len += _mplen;				\
 	*_mmp = _mm;							\
 } while (0)
@@ -498,6 +519,14 @@ union mcluster {
 
 /* compatibility with 4.3 */
 #define	m_copy(m, o, l)	m_copym((m), (o), (l), M_DONTWAIT)
+
+/*
+ * pkthdr.aux type tags.
+ */
+struct mauxtag {
+	int	af;
+	int	type;
+};
 
 #ifdef _KERNEL
 extern	u_int		 m_clalloc_wid;	/* mbuf cluster wait count */
@@ -535,11 +564,15 @@ struct	mbuf *m_gethdr __P((int, int));
 int	m_mballoc __P((int, int));
 struct	mbuf *m_mballoc_wait __P((int, int));
 struct	mbuf *m_prepend __P((struct mbuf *,int,int));
+struct	mbuf *m_pulldown __P((struct mbuf *, int, int, int *));
 void	m_print __P((const struct mbuf *m));
 struct	mbuf *m_pullup __P((struct mbuf *, int));
 struct	mbuf *m_retry __P((int, int));
 struct	mbuf *m_retryhdr __P((int, int));
 struct	mbuf *m_split __P((struct mbuf *,int,int));
+struct	mbuf *m_aux_add __P((struct mbuf *, int, int));
+struct	mbuf *m_aux_find __P((struct mbuf *, int, int));
+void	m_aux_delete __P((struct mbuf *, struct mbuf *));
 #endif /* _KERNEL */
 
 #endif /* !_SYS_MBUF_H_ */

@@ -23,12 +23,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/bktr/bktr_i2c.h,v 1.2 1999/08/28 00:50:44 peter Exp $
+ * $FreeBSD: src/sys/dev/bktr/bktr_i2c.h,v 1.2.4.1 2000/04/18 12:50:32 roger Exp $
  *
  */
 #ifndef _BT848_I2C_H
 #define _BT848_I2C_H
 
-extern int bt848_i2c_attach(int, bt848_ptr_t, struct bktr_i2c_softc *);
+extern int bt848_i2c_attach(int, struct bktr_softc *bktr, struct bktr_i2c_softc *);
 
 #endif

@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/csapcm.c,v 1.8 2000/01/23 07:04:02 tanimura Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/csapcm.c,v 1.8.2.2 2000/07/19 21:18:45 cg Exp $
  */
 
 #include <sys/soundcard.h>
@@ -388,7 +388,9 @@ csachan_trigger(void *data, int go)
 	struct csa_chinfo *ch = data;
 	struct csa_info *csa = ch->parent;
 
-	if (go == PCMTRIG_EMLDMAWR) return 0;
+	if (go == PCMTRIG_EMLDMAWR || go == PCMTRIG_EMLDMARD)
+		return 0;
+
 	if (ch->dir == PCMDIR_PLAY) {
 		if (go == PCMTRIG_START)
 			csa_startplaydma(csa);
@@ -807,10 +809,11 @@ pcmcsa_attach(device_t dev)
 		csa_releaseres(csa, dev);
 		return (ENXIO);
 	}
-	codec = ac97_create(dev, csa, csa_rdcd, csa_wrcd);
+	codec = ac97_create(dev, csa, NULL, csa_rdcd, csa_wrcd);
 	if (codec == NULL)
 		return (ENXIO);
-	mixer_init(devinfo, &ac97_mixer, codec);
+	if (mixer_init(devinfo, &ac97_mixer, codec) == -1)
+		return (ENXIO);
 
 	snprintf(status, SND_STATUSLEN, "at irq %ld", rman_get_start(resp->irq));
 
@@ -871,4 +874,7 @@ static driver_t pcmcsa_driver = {
 
 static devclass_t pcm_devclass;
 
-DRIVER_MODULE(pcmcsa, csa, pcmcsa_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_csapcm, csa, pcmcsa_driver, pcm_devclass, 0, 0);
+MODULE_DEPEND(snd_csapcm, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_DEPEND(snd_csapcm, snd_csa, 1, 1, 1);
+MODULE_VERSION(snd_csapcm, 1);

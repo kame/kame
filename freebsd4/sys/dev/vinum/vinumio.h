@@ -33,8 +33,8 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumio.h,v 1.17 1999/10/12 04:35:01 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumio.h,v 1.18 2000/02/29 06:11:45 grog Exp $
+ * $Id: vinumio.h,v 1.19 2000/04/26 04:17:33 grog Exp grog $
+ * $FreeBSD: src/sys/dev/vinum/vinumio.h,v 1.18.2.1 2000/05/11 08:49:22 grog Exp $
  */
 
 #define L 'F'						    /* ID letter of our ioctls */
@@ -81,9 +81,10 @@ struct vinum_ioctl_msg {
     int index;
     enum objecttype type;
     enum objectstate state;				    /* state to set (VINUM_SETSTATE) */
+    enum parityop op;					    /* for parity ops */
     int force;						    /* do it even if it doesn't make sense */
     int recurse;					    /* recurse (VINUM_REMOVE) */
-    int verify;						    /* verify (initsd) */
+    int verify;						    /* verify (initsd, rebuildparity) */
     int otherobject;					    /* superordinate object (attach),
 							    * replacement object (replace) */
     int rename;						    /* rename object (attach) */
@@ -153,6 +154,5 @@ struct vinum_rename_msg {
 #define VINUM_FINDDAEMON	_IOC(0, L, 93, 0)	    /* check for presence of Vinum daemon */
 #define VINUM_SETDAEMON		_IOW(L, 94, int)	    /* set daemon flags */
 #define VINUM_GETDAEMON		_IOR(L, 95, int)	    /* get daemon flags */
-#define VINUM_CHECKPARITY	_IOWR(L, 96, struct _ioctl_reply) /* check RAID-4/5 parity */
-#define VINUM_REBUILDPARITY	_IOWR(L, 97, struct _ioctl_reply) /* rebuild RAID-4/5 parity */
+#define VINUM_PARITYOP   	_IOWR(L, 96, struct _ioctl_reply) /* check/rebuild RAID-4/5 parity */
 #define VINUM_MOVE		_IOWR(L, 98, struct _ioctl_reply) /* move an object */

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)sys_machdep.c	5.5 (Berkeley) 1/19/91
- * $FreeBSD: src/sys/i386/i386/sys_machdep.c,v 1.47 1999/12/06 05:12:26 luoqi Exp $
+ * $FreeBSD: src/sys/i386/i386/sys_machdep.c,v 1.47.2.1 2000/05/16 06:58:07 dillon Exp $
  *
  */
 
@@ -53,6 +53,7 @@
 #include <sys/user.h>
 
 #include <machine/cpu.h>
+#include <machine/ipl.h>
 #include <machine/pcb_ext.h>	/* pcb.h included by sys/user.h */
 #include <machine/sysarch.h>
 #ifdef SMP

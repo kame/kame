@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sf.c,v 1.18 1999/12/05 20:02:44 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_sf.c,v 1.18.2.3 2000/07/17 21:24:39 archie Exp $
  */
 
 /*
@@ -120,7 +120,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_sf.c,v 1.18 1999/12/05 20:02:44 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_sf.c,v 1.18.2.3 2000/07/17 21:24:39 archie Exp $";
 #endif
 
 static struct sf_type sf_devs[] = {
@@ -827,12 +827,9 @@ static int sf_attach(dev)
 	ifp->if_snd.ifq_maxlen = SF_TX_DLIST_CNT - 1;
 
 	/*
-	 * Call MI attach routines.
+	 * Call MI attach routine.
 	 */
-	if_attach(ifp);
-	ether_ifattach(ifp);
-
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
 fail:
 	splx(s);
@@ -851,7 +848,7 @@ static int sf_detach(dev)
 	sc = device_get_softc(dev);
 	ifp = &sc->arpcom.ac_if;
 
-	if_detach(ifp);
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 	sf_stop(sc);
 
 	bus_generic_detach(dev);
@@ -1017,20 +1014,9 @@ static void sf_rxeof(sc)
 		eh = mtod(m, struct ether_header *);
 		ifp->if_ipackets++;
 
-		if (ifp->if_bpf) {
-			bpf_mtap(ifp, m);
-			if (ifp->if_flags & IFF_PROMISC &&
-			    (bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-			    ETHER_ADDR_LEN) && !(eh->ether_dhost[0] & 1))) {
-				m_freem(m);
-				continue;
-			}
-		}
-
 		/* Remove header from mbuf and pass it on. */
 		m_adj(m, sizeof(struct ether_header));
 		ether_input(ifp, eh, m);
-
 	}
 
 	csr_write_4(sc, SF_CQ_CONSIDX,
@@ -1194,6 +1180,11 @@ static void sf_init(xsc)
 	} else {
 		SF_CLRBIT(sc, SF_RXFILT, SF_RXFILT_BROAD);
 	}
+
+	/*
+	 * Load the multicast filter.
+	 */
+	sf_setmulti(sc);
 
 	/* Init the completion queue indexes */
 	csr_write_4(sc, SF_CQ_CONSIDX, 0);

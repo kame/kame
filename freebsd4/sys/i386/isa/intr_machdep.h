@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/intr_machdep.h,v 1.19 1999/12/29 04:33:14 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/intr_machdep.h,v 1.19.2.1 2000/04/29 10:15:56 peter Exp $
  */
 
 #ifndef _I386_ISA_INTR_MACHDEP_H_
@@ -201,6 +201,11 @@ intrmask_t splq __P((intrmask_t mask));
 
 #define	INTR_FAST		0x00000001 /* fast interrupt handler */
 #define INTR_EXCL		0x00010000 /* excl. intr, default is shared */
+
+/*
+ * WARNING: These are internal functions and not to be used by device drivers!
+ * They are subject to change without notice. 
+ */
 struct intrec *inthand_add(const char *name, int irq, inthand2_t handler,
 			   void *arg, intrmask_t *maskptr, int flags);
 

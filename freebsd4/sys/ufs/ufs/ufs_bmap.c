@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_bmap.c	8.7 (Berkeley) 3/21/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_bmap.c,v 1.34 1999/09/29 20:05:33 phk Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_bmap.c,v 1.34.2.1 2000/03/17 10:12:14 ps Exp $
  */
 
 #include <sys/param.h>
@@ -214,7 +214,7 @@ ufs_bmaparray(vp, bn, bnp, ap, nump, runp, runb)
 			    ++bn, ++*runp);
 			bn = xap->in_off;
 			if (runb && bn) {
-				for(--bn; bn > 0 && *runb < maxrun &&
+				for(--bn; bn >= 0 && *runb < maxrun &&
 			    		is_sequential(ump, ((daddr_t *)bp->b_data)[bn],
 					    ((daddr_t *)bp->b_data)[bn+1]);
 			    		--bn, ++*runb);

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/include/md_var.h,v 1.9 2000/02/18 20:57:25 sos Exp $
+ * $FreeBSD: src/sys/alpha/include/md_var.h,v 1.9.2.2 2000/07/04 01:50:44 mjacob Exp $
  */
 
 #ifndef _MACHINE_MD_VAR_H_
@@ -37,6 +37,7 @@ extern	char	sigcode[];
 extern	char	esigcode[];
 extern	int	szsigcode;
 extern	int	Maxmem;
+extern	int	busdma_swi_pending;
 extern	void	(*netisrs[32]) __P((void));
 
 struct fpreg;
@@ -63,6 +64,12 @@ int	alpha_platform_setup_ide_intr(struct resource *res,
 				      driver_intr_t *fn, void *arg,
 				      void **cookiep);
 int	alpha_platform_teardown_ide_intr(struct resource *res, void *cookie);
+int	alpha_platform_pci_setup_intr(device_t dev, device_t child,
+				      struct resource *irq,  int flags,
+				      driver_intr_t *intr, void *arg,
+				      void **cookiep);
+int	alpha_platform_pci_teardown_intr(device_t dev, device_t child,
+					 struct resource *irq, void *cookie);
 #endif
 void	alpha_platform_assign_pciintr(struct pcicfg *cfg);
 

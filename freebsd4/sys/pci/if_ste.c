@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_ste.c,v 1.14 1999/12/07 20:14:42 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_ste.c,v 1.14.2.2 2000/07/17 21:24:39 archie Exp $
  */
 
 #include <sys/param.h>
@@ -47,11 +47,6 @@
 #include <net/if_media.h>
 
 #include <net/bpf.h>
-
-#include "opt_bdg.h"
-#ifdef BRIDGE
-#include <net/bridge.h>
-#endif
 
 #include <vm/vm.h>              /* for vtophys */
 #include <vm/pmap.h>            /* for vtophys */
@@ -78,7 +73,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_ste.c,v 1.14 1999/12/07 20:14:42 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_ste.c,v 1.14.2.2 2000/07/17 21:24:39 archie Exp $";
 #endif
 
 /*
@@ -728,38 +723,6 @@ again:
 		m->m_pkthdr.rcvif = ifp;
 		m->m_pkthdr.len = m->m_len = total_len;
 
-		/* Handle BPF listeners. Let the BPF user see the packet. */
-		if (ifp->if_bpf)
-			bpf_mtap(ifp, m);
-
-#ifdef BRIDGE
-		if (do_bridge) {
-			struct ifnet *bdg_ifp ;
-			bdg_ifp = bridge_in(m);
-			if (bdg_ifp != BDG_LOCAL && bdg_ifp != BDG_DROP)
-				bdg_forward(&m, bdg_ifp);
-			if (((bdg_ifp != BDG_LOCAL) && (bdg_ifp != BDG_BCAST) &&
-			    (bdg_ifp != BDG_MCAST)) || bdg_ifp == BDG_DROP) {
-				m_freem(m);
-				continue;
-			}
-		}
-#endif
-
-		/*
-		 * Don't pass packet up to the ether_input() layer unless it's
-		 * a broadcast packet, multicast packet, matches our ethernet
-		 * address or the interface is in promiscuous mode.
-		 */
-		if (ifp->if_bpf) {
-			if (ifp->if_flags & IFF_PROMISC &&
-			    (bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-			    ETHER_ADDR_LEN) && (eh->ether_dhost[0] & 1) == 0)){
-				m_freem(m);
-				continue;
-			}
-		}
-
 		/* Remove header from mbuf and pass it on. */
 		m_adj(m, sizeof(struct ether_header));
 		ether_input(ifp, eh, m);
@@ -1103,13 +1066,9 @@ static int ste_attach(dev)
 	ifp->if_snd.ifq_maxlen = STE_TX_LIST_CNT - 1;
 
 	/*
-	 * Call MI attach routines.
+	 * Call MI attach routine.
 	 */
-
-	if_attach(ifp);
-	ether_ifattach(ifp);
-
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
 fail:
 	splx(s);
@@ -1129,7 +1088,7 @@ static int ste_detach(dev)
 	ifp = &sc->arpcom.ac_if;
 
 	ste_stop(sc);
-	if_detach(ifp);
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 
 	bus_generic_detach(dev);
 	device_delete_child(dev, sc->ste_miibus);

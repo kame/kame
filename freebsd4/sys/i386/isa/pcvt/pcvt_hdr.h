@@ -41,7 +41,7 @@
  *
  *	Last Edit-Date: [Mon Dec 27 14:06:31 1999]
  *
- * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_hdr.h,v 1.36 1999/12/30 16:17:09 hm Exp $
+ * $FreeBSD: src/sys/i386/isa/pcvt/pcvt_hdr.h,v 1.36.2.2 2000/05/11 16:33:23 obrien Exp $
  *
  *---------------------------------------------------------------------------*/
 
@@ -68,7 +68,7 @@
 #include <sys/malloc.h>
 #include <sys/time.h>
 #if PCVT_FREEBSD > 210
-#include <machine/random.h>
+#include <sys/random.h>
 #endif	/* PCVT_FREEBSD > 210 */
 #else /* ! PCVT_FREEBSD >= 200 */
 
@@ -89,6 +89,8 @@
 #endif /* PCVT_FREEBSD >= 200 */
 
 #include <i386/isa/pcvt/pcvt_conf.h>
+
+#include <machine/bus.h>
 
 #include <dev/kbd/kbdreg.h>
 #include <dev/kbd/atkbdcreg.h>

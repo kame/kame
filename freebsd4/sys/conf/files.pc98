@@ -3,7 +3,7 @@
 #
 # modified for PC-9801
 #
-# $FreeBSD: src/sys/conf/files.pc98,v 1.140 2000/03/01 08:50:05 kato Exp $
+# $FreeBSD: src/sys/conf/files.pc98,v 1.140.2.6 2000/07/07 00:29:28 obrien Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -22,14 +22,14 @@ svr4_genassym.o			optional	compat_svr4		   \
 	clean		"svr4_genassym.o"
 #
 linux_assym.h			optional	compat_linux		   \
-	dependency 	"linux_genassym.o"				   \
-	compile-with	"genassym linux_genassym.o > ${.TARGET}"	   \
+	dependency 	"$S/kern/genassym.sh linux_genassym.o"		   \
+	compile-with	"sh $S/kern/genassym.sh linux_genassym.o > ${.TARGET}" \
 	no-obj no-implicit-rule before-depend				   \
 	clean		"linux_assym.h"
 #
 svr4_assym.h			optional	compat_svr4		   \
-	dependency 	"svr4_genassym.o"			   	   \
-	compile-with	"genassym svr4_genassym.o > ${.TARGET}"		   \
+	dependency 	"$S/kern/genassym.sh svr4_genassym.o"	   	   \
+	compile-with	"sh $S/kern/genassym.sh svr4_genassym.o > ${.TARGET}" \
 	no-obj no-implicit-rule before-depend				   \
 	clean		"svr4_assym.h"
 #
@@ -57,6 +57,8 @@ trlld.o				optional	oltr			\
 contrib/dev/oltr/trlldbm.c	optional	oltr
 contrib/dev/oltr/trlldhm.c	optional	oltr
 contrib/dev/oltr/trlldmac.c	optional	oltr
+#dev/advansys/adv_isa.c		optional	adv isa
+dev/aic/aic_cbus.c		optional	aic isa
 dev/ata/ata-all.c		optional	ata 
 dev/ata/ata-dma.c		optional	ata 
 dev/ata/ata-disk.c		optional	atadisk
@@ -126,7 +128,7 @@ i386/i386/i686_mem.c		standard
 i386/i386/identcpu.c		standard
 i386/i386/in_cksum.c		optional	inet
 i386/i386/initcpu.c		standard
-#i386/i386/k6_mem.c		standard
+i386/i386/k6_mem.c		standard
 # locore.s needs to be handled in Makefile to put it first.  Otherwise it's
 # now normal.
 # i386/i386/locore.s		standard
@@ -228,7 +230,6 @@ i386/isa/pcvt/pcvt_sup.c	optional	vt
 i386/isa/pcvt/pcvt_vtf.c	optional	vt
 pc98/pc98/ppc.c			optional	ppc
 i386/isa/prof_machdep.c		optional	profiling-routine
-i386/isa/random_machdep.c	standard
 i386/isa/rc.c			optional	rc
 i386/isa/rp.c			optional	rp
 i386/isa/scd.c			optional	scd
@@ -304,7 +305,7 @@ pc98/pc98/syscons.c		optional	sc
 pc98/pc98/syscons_pc98.c	optional	sc
 dev/syscons/schistory.c		optional	sc
 dev/syscons/scmouse.c		optional	sc
-pc98/pc98/scgdcrndr.c		optional	sc
+pc98/pc98/scgdcrndr.c		optional	sc gdc
 dev/syscons/scterm.c		optional	sc
 dev/syscons/scterm-dumb.c	optional	sc
 pc98/pc98/scterm-sck.c		optional	sc
@@ -314,9 +315,9 @@ dev/syscons/sysmouse.c		optional	sc
 i386/isa/tw.c			optional	tw
 pc98/pc98/wd.c			optional	wdc
 pc98/pc98/wd.c			optional	wd
-i386/isa/wd_cd.c		optional	wcd
-i386/isa/wfd.c			optional	wfd
-i386/isa/wst.c			optional	wst
+i386/isa/wd_cd.c		optional	wcd wdc
+i386/isa/wfd.c			optional	wfd wdc
+i386/isa/wst.c			optional	wst wdc
 i386/isa/wt.c			optional	wt
 i386/linux/imgact_linux.c	optional	compat_linux
 i386/linux/linux_dummy.c	optional	compat_linux

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_ccb.h,v 1.15 2000/01/25 21:24:52 mjacob Exp $
+ * $FreeBSD: src/sys/cam/cam_ccb.h,v 1.15.2.1 2000/03/17 22:38:29 peter Exp $
  */
 
 #ifndef _CAM_CAM_CCB_H
@@ -83,7 +83,7 @@ typedef enum {
 	CAM_ENG_SGLIST		= 0x00800000,/* SG list is for the HBA engine */
 
 /* Phase cognizant mode flags */
-	CAM_DIS_AUTOSRP		= 0x01000000,/* Diable autosave/restore ptrs  */
+	CAM_DIS_AUTOSRP		= 0x01000000,/* Disable autosave/restore ptrs */
 	CAM_DIS_AUTODISC	= 0x02000000,/* Disable auto disconnect	      */
 	CAM_TGT_CCB_AVAIL	= 0x04000000,/* Target CCB available	      */
 	CAM_TGT_PHASE_MODE	= 0x08000000,/* The SIM runs in phase mode    */

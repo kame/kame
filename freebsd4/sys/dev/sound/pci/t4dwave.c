@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THEPOSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/t4dwave.c,v 1.9 2000/01/29 18:48:29 peter Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/t4dwave.c,v 1.9.2.2 2000/07/19 21:18:45 cg Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -52,7 +52,7 @@ struct tr_chinfo {
 	u_int32_t eso, delta;
 	u_int32_t rvol, cvol;
 	u_int32_t gvsel, pan, vol, ctrl;
-	int index;
+	int index, ss;
 	snd_dbuf *buffer;
 	pcm_channel *channel;
 	struct tr_info *parent;
@@ -438,9 +438,12 @@ trchan_setformat(void *data, u_int32_t format)
 	struct tr_info *tr = ch->parent;
 	u_int32_t bits = tr_fmttobits(format);
 
+	ch->ss = 1;
+	ch->ss <<= (format & AFMT_STEREO)? 1 : 0;
+	ch->ss <<= (format & AFMT_16BIT)? 1 : 0;
 	if (ch->index >= 0) {
 		tr_rdch(tr, ch->index, ch);
-		ch->eso = (ch->buffer->bufsize / ch->buffer->sample_size) - 1;
+		ch->eso = (ch->buffer->bufsize / ch->ss) - 1;
 		ch->ctrl = bits | 0x01;
    		tr_wrch(tr, ch->index, ch);
 	} else {
@@ -487,10 +490,17 @@ trchan_trigger(void *data, int go)
 {
 	struct tr_chinfo *ch = data;
 	struct tr_info *tr = ch->parent;
-	if (go == PCMTRIG_EMLDMAWR) return 0;
+
+	if (go == PCMTRIG_EMLDMAWR || go == PCMTRIG_EMLDMARD)
+		return 0;
+
 	if (ch->index >= 0) {
-		if (go == PCMTRIG_START) tr_startch(tr, ch->index);
-		else tr_stopch(tr, ch->index);
+		if (go == PCMTRIG_START) {
+			tr_rdch(tr, ch->index, ch);
+			ch->cso = 0;
+   			tr_wrch(tr, ch->index, ch);
+			tr_startch(tr, ch->index);
+		} else tr_stopch(tr, ch->index);
 	} else {
 		u_int32_t i = tr_rd(tr, TR_REG_SBCTRL, 1) & ~7;
 		tr_wr(tr, TR_REG_SBCTRL, i | (go == PCMTRIG_START)? 1 : 0, 1);
@@ -503,9 +513,10 @@ trchan_getptr(void *data)
 {
 	struct tr_chinfo *ch = data;
 	struct tr_info *tr = ch->parent;
+
 	if (ch->index >= 0) {
 		tr_rdch(tr, ch->index, ch);
-		return ch->cso * ch->buffer->sample_size;
+		return ch->cso * ch->ss;
 	} else return tr_rd(tr, TR_REG_DMAR0, 4) - vtophys(ch->buffer->buf);
 }
 
@@ -628,9 +639,9 @@ tr_pci_attach(device_t dev)
 		goto bad;
 	}
 
-	codec = ac97_create(dev, tr, tr_rdcd, tr_wrcd);
+	codec = ac97_create(dev, tr, NULL, tr_rdcd, tr_wrcd);
 	if (codec == NULL) goto bad;
-	mixer_init(d, &ac97_mixer, codec);
+	if (mixer_init(d, &ac97_mixer, codec) == -1) goto bad;
 
 	tr->irqid = 0;
 	tr->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &tr->irqid,
@@ -687,4 +698,6 @@ static driver_t tr_driver = {
 
 static devclass_t pcm_devclass;
 
-DRIVER_MODULE(tr, pci, tr_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_t4dwave, pci, tr_driver, pcm_devclass, 0, 0);
+MODULE_DEPEND(snd_t4dwave, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_VERSION(snd_t4dwave, 1);

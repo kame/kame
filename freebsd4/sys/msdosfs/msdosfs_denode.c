@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/msdosfs/msdosfs_denode.c,v 1.47 2000/01/27 14:43:06 nyan Exp $ */
+/* $FreeBSD: src/sys/msdosfs/msdosfs_denode.c,v 1.47.2.1 2000/07/08 14:34:27 bp Exp $ */
 /*	$NetBSD: msdosfs_denode.c,v 1.28 1998/02/10 14:10:00 mrg Exp $	*/
 
 /*-
@@ -106,6 +106,16 @@ msdosfs_init(vfsp)
 {
 	dehashtbl = hashinit(desiredvnodes/2, M_MSDOSFSMNT, &dehash);
 	simple_lock_init(&dehash_slock);
+	return (0);
+}
+
+int 
+msdosfs_uninit(vfsp)
+	struct vfsconf *vfsp;
+{
+
+	if (dehashtbl)
+		free(dehashtbl, M_MSDOSFSMNT);
 	return (0);
 }
 

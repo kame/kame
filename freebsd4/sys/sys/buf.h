@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)buf.h	8.9 (Berkeley) 3/30/95
- * $FreeBSD: src/sys/sys/buf.h,v 1.88 2000/01/10 00:24:22 mckusick Exp $
+ * $FreeBSD: src/sys/sys/buf.h,v 1.88.2.1 2000/04/26 20:36:33 dillon Exp $
  */
 
 #ifndef _SYS_BUF_H_
@@ -491,7 +491,7 @@ void	cluster_callback __P((struct buf *));
 int	cluster_read __P((struct vnode *, u_quad_t, daddr_t, long,
 	    struct ucred *, long, int, struct buf **));
 int	cluster_wbuild __P((struct vnode *, long, daddr_t, int));
-void	cluster_write __P((struct buf *, u_quad_t));
+void	cluster_write __P((struct buf *, u_quad_t, int));
 int	physio __P((dev_t dev, struct uio *uio, int ioflag));
 #define physread physio
 #define physwrite physio

@@ -23,8 +23,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/mlfk_ipl.c,v 1.4 2000/02/09 20:56:36 guido Exp $
+ * $FreeBSD: src/sys/netinet/mlfk_ipl.c,v 1.4.2.1 2000/07/19 23:27:56 darrenr Exp $
  */
+
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -108,6 +109,7 @@ ipfilter_modevent(module_t mod, int type, void *unused)
 
 	switch (type) {
 	case MOD_LOAD :
+
 		error = iplattach();
 		if (error)
 			break;
@@ -162,7 +164,6 @@ ipfilter_modevent(module_t mod, int type, void *unused)
 		destroy_dev(ipf_devs[IPL_LOGNAT]);
 		destroy_dev(ipf_devs[IPL_LOGSTATE]);
 		destroy_dev(ipf_devs[IPL_LOGAUTH]);
-		cdevsw_remove(&ipl_cdevsw);
 		error = ipldetach();
 		break;
 	default:
@@ -173,7 +174,7 @@ ipfilter_modevent(module_t mod, int type, void *unused)
 }
 
 static moduledata_t ipfiltermod = {
-	"ipfilter",
+	IPL_VERSION,
 	ipfilter_modevent,
         0
 };

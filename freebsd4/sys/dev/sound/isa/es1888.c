@@ -23,12 +23,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/sound/isa/es1888.c,v 1.5 1999/12/06 18:26:30 peter Exp $
+ *	$FreeBSD: src/sys/dev/sound/isa/es1888.c,v 1.5.2.2 2000/07/19 21:18:15 cg Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
 #include <dev/sound/isa/sb.h>
 
+#ifdef __alpha__
 static int
 es1888_dspready(u_int32_t port)
 {
@@ -81,7 +82,7 @@ es1888_configuration_mode(void)
 {
 	/*
 	 * Emit the Read-Sequence-Key to enter configuration
-	 * mode. Note this only works after a reset (or after bit 2 of 
+	 * mode. Note this only works after a reset (or after bit 2 of
 	 * mixer register 0x40 is set).
 	 *
 	 * 3 reads from 0x229 in a row guarantees reset of key
@@ -106,6 +107,7 @@ es1888_set_port(u_int32_t port)
 	es1888_configuration_mode();
 	inb(port);
 }
+#endif
 
 static void
 es1888_identify(driver_t *driver, device_t parent)
@@ -168,4 +170,8 @@ static driver_t es1888_driver = {
 
 static devclass_t pcm_devclass;
 
-DRIVER_MODULE(es1888, isa, es1888_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_es1888, isa, es1888_driver, pcm_devclass, 0, 0);
+MODULE_DEPEND(snd_es1888, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_VERSION(snd_es1888, 1);
+
+

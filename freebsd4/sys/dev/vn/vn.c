@@ -38,7 +38,7 @@
  * from: Utah Hdr: vn.c 1.13 94/04/02
  *
  *	from: @(#)vn.c	8.6 (Berkeley) 4/1/94
- * $FreeBSD: src/sys/dev/vn/vn.c,v 1.105 1999/12/28 07:32:34 peter Exp $
+ * $FreeBSD: src/sys/dev/vn/vn.c,v 1.105.2.1 2000/05/15 16:50:33 dillon Exp $
  */
 
 /*
@@ -281,8 +281,6 @@ vnstrategy(struct buf *bp)
 	struct vn_softc *vn;
 	int error;
 	int isvplocked = 0;
-	struct uio auio;
-	struct iovec aiov;
 
 	unit = dkunit(bp->b_dev);
 	vn = bp->b_dev->si_drv1;
@@ -362,6 +360,11 @@ vnstrategy(struct buf *bp)
 		 * B_INVAL because (for a write anyway), the buffer is 
 		 * still valid.
 		 */
+		struct uio auio;
+		struct iovec aiov;
+
+		bzero(&auio, sizeof(auio));
+
 		aiov.iov_base = bp->b_data;
 		aiov.iov_len = bp->b_bcount;
 		auio.uio_iov = &aiov;
@@ -672,8 +675,6 @@ vniocattach_swap(vn, vio, dev, flag, p)
 int
 vnsetcred(struct vn_softc *vn, struct ucred *cred)
 {
-	struct uio auio;
-	struct iovec aiov;
 	char *tmpbuf;
 	int error = 0;
 
@@ -690,7 +691,11 @@ vnsetcred(struct vn_softc *vn, struct ucred *cred)
 	 */
 
 	if (vn->sc_vp) {
+		struct uio auio;
+		struct iovec aiov;
+
 		tmpbuf = malloc(vn->sc_secsize, M_TEMP, M_WAITOK);
+		bzero(&auio, sizeof(auio));
 
 		aiov.iov_base = tmpbuf;
 		aiov.iov_len = vn->sc_secsize;

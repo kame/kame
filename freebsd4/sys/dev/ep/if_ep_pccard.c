@@ -27,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ep/if_ep_pccard.c,v 1.12 2000/01/15 05:21:43 mdodd Exp $
+ * $FreeBSD: src/sys/dev/ep/if_ep_pccard.c,v 1.12.2.1 2000/07/17 21:24:26 archie Exp $
  */
 
 /*
@@ -48,6 +48,7 @@
 #include <machine/resource.h>
 #include <sys/rman.h>
  
+#include <net/ethernet.h>
 #include <net/if.h> 
 #include <net/if_arp.h>
 #include <net/if_media.h>
@@ -227,7 +228,7 @@ ep_pccard_detach(device_t dev)
 		return (0);
 	}
 	sc->arpcom.ac_if.if_flags &= ~IFF_RUNNING; 
-	if_detach(&sc->arpcom.ac_if);
+	ether_ifdetach(&sc->arpcom.ac_if, ETHER_BPF_SUPPORTED);
 	sc->gone = 1;
 	bus_teardown_intr(dev, sc->irq, sc->ep_intrhand);
 	ep_free(dev);

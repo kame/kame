@@ -45,8 +45,8 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumconfig.c,v 1.28 1999/12/29 07:39:16 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumconfig.c,v 1.32 2000/02/29 06:08:33 grog Exp $
+ * $Id: vinumconfig.c,v 1.30 2000/05/01 09:45:50 grog Exp grog $
+ * $FreeBSD: src/sys/dev/vinum/vinumconfig.c,v 1.32.2.2 2000/06/08 02:00:23 grog Exp $
  */
 
 #define STATIC static
@@ -285,11 +285,12 @@ give_sd_to_plex(int plexno, int sdno)
     }
 
     /*
-     * The plex doesn't have any subdisk with a larger
-     * offset.  Insert it
+     * The plex doesn't have any subdisk with a
+     * larger offset.  Insert it here.
      */
     plex->sdnos[i] = sdno;
     sd->plexsdno = i;					    /* note where we are in the subdisk */
+    sd->plexno = plex->plexno;				    /* and who we belong to */
     return i;
 }
 
@@ -2042,7 +2043,7 @@ finish_config(int update)
     vinum_conf.flags &= ~VF_CONFIGURING;		    /* and now other people can take a turn */
     if ((vinum_conf.flags & VF_WILL_CONFIGURE) != 0) {
 	vinum_conf.flags &= ~VF_WILL_CONFIGURE;
-	wakeup(&vinum_conf);
+	wakeup_one(&vinum_conf);
     }
 }
 /* Local Variables: */

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_card.h,v 1.2 1999/09/27 08:04:55 roger Exp $ */
+/* $FreeBSD: src/sys/dev/bktr/bktr_card.h,v 1.2.4.1 2000/04/18 12:50:30 roger Exp $ */
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -75,7 +75,8 @@
 #define CARD_VIDEO_HIGHWAY_XTREME	13
 #define CARD_ASKEY_DYNALINK_MAGIC_TVIEW	14
 #define CARD_LEADTEK		15
-#define Bt848_MAX_CARD		16
+#define CARD_TERRATVPLUS	16
+#define Bt848_MAX_CARD		17
 
 
 int	signCard( bktr_ptr_t bktr, int offset, int count, u_char* sig );

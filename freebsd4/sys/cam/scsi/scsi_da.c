@@ -25,15 +25,21 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.42 2000/01/17 06:27:37 mjacob Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.42.2.2 2000/07/01 23:35:48 ken Exp $
  */
 
+#ifdef _KERNEL
 #include "opt_hw_wdog.h"
+#endif /* _KERNEL */
 
 #include <sys/param.h>
+
+#ifdef _KERNEL
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/buf.h>
+#endif /* _KERNEL */
+
 #include <sys/devicestat.h>
 #include <sys/conf.h>
 #include <sys/disk.h>
@@ -46,6 +52,11 @@
 #include <vm/vm.h>
 #include <vm/pmap.h>
 
+#ifndef _KERNEL
+#include <stdio.h>
+#include <string.h>
+#endif /* _KERNEL */
+
 #include <cam/cam.h>
 #include <cam/cam_ccb.h>
 #include <cam/cam_extend.h>
@@ -54,6 +65,11 @@
 
 #include <cam/scsi/scsi_message.h>
 
+#ifndef _KERNEL 
+#include <cam/scsi/scsi_da.h>
+#endif /* !_KERNEL */
+
+#ifdef _KERNEL
 typedef enum {
 	DA_STATE_PROBE,
 	DA_STATE_NORMAL
@@ -172,6 +188,16 @@ static struct da_quirk_entry da_quirk_table[] =
 		 */
 		{T_DIRECT, SIP_MEDIA_FIXED, "QUANTUM", "VIKING 2*", "*"},
 		/*quirks*/ DA_Q_NO_6_BYTE
+	},
+	{
+		/*
+		 * This USB floppy drive uses the UFI command set. This
+		 * command set is a derivative of the ATAPI command set and
+		 * does not support READ_6 commands only READ_10. It also does
+		 * not support sync cache (0x35).
+		 */
+		{T_DIRECT, SIP_MEDIA_REMOVABLE, "Y-E DATA", "USB-FDU", "*"},
+		/*quirks*/ DA_Q_NO_6_BYTE|DA_Q_NO_SYNC_CACHE
 	}
 };
 
@@ -1540,3 +1566,38 @@ dashutdown(void * arg, int howto)
 
 	}
 }
+
+#else /* !_KERNEL */
+
+/*
+ * XXX This is only left out of the kernel build to silence warnings.  If,
+ * for some reason this function is used in the kernel, the ifdefs should
+ * be moved so it is included both in the kernel and userland.
+ */
+void
+scsi_format_unit(struct ccb_scsiio *csio, u_int32_t retries,
+		 void (*cbfcnp)(struct cam_periph *, union ccb *),
+		 u_int8_t tag_action, u_int8_t byte2, u_int16_t ileave,
+		 u_int8_t *data_ptr, u_int32_t dxfer_len, u_int8_t sense_len,
+		 u_int32_t timeout)
+{
+	struct scsi_format_unit *scsi_cmd;
+
+	scsi_cmd = (struct scsi_format_unit *)&csio->cdb_io.cdb_bytes;
+	scsi_cmd->opcode = FORMAT_UNIT;
+	scsi_cmd->byte2 = byte2;
+	scsi_ulto2b(ileave, scsi_cmd->interleave);
+
+	cam_fill_csio(csio,
+		      retries,
+		      cbfcnp,
+		      /*flags*/ (dxfer_len > 0) ? CAM_DIR_OUT : CAM_DIR_NONE,
+		      tag_action,
+		      data_ptr,
+		      dxfer_len,
+		      sense_len,
+		      sizeof(*scsi_cmd),
+		      timeout);
+}
+
+#endif /* _KERNEL */

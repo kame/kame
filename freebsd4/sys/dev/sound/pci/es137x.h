@@ -18,7 +18,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- * $FreeBSD: src/sys/dev/sound/pci/es137x.h,v 1.3 1999/12/19 17:51:32 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/es137x.h,v 1.3.2.2 2000/07/19 21:18:45 cg Exp $
  */
 
 #ifndef _ES1370_REG_H
@@ -179,6 +179,5 @@
 #define ES_SMPREG_VOL_ADC	0x6c
 #define ES_SMPREG_VOL_DAC1	0x7c
 #define ES_SMPREG_VOL_DAC2	0x7e
-#define ES_BUFFSIZE 0x10000		/* We're PCI! Use a large buffer */
 
 #endif

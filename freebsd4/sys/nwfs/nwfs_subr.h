@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/nwfs/nwfs_subr.h,v 1.2 2000/01/14 19:54:42 bde Exp $
+ * $FreeBSD: src/sys/nwfs/nwfs_subr.h,v 1.2.2.1 2000/04/17 08:34:20 bp Exp $
  */
 #ifndef _NWFS_SUBR_H_
 #define _NWFS_SUBR_H_
@@ -89,8 +89,8 @@ int  ncp_get_volume_info_with_number(struct ncp_conn *conn,
 		int n, struct ncp_volume_info *target,
 		struct proc *p,struct ucred *cred);
 
-void ncp_unix2dostime __P((struct timespec *tsp, u_int16_t *ddp, 
-	     u_int16_t *dtp, u_int8_t *dhp));
-void ncp_dos2unixtime __P((u_int dd, u_int dt, u_int dh, struct timespec *tsp));
+void ncp_unix2dostime (struct timespec *tsp, int tz, u_int16_t *ddp, 
+	     u_int16_t *dtp, u_int8_t *dhp);
+void ncp_dos2unixtime (u_int dd, u_int dt, u_int dh, int tz, struct timespec *tsp);
 
 #endif /* !_NWFS_SUBR_H_ */

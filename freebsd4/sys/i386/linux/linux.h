@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux.h,v 1.41 1999/12/04 11:10:20 marcel Exp $
+ * $FreeBSD: src/sys/i386/linux/linux.h,v 1.41.2.1 2000/05/09 17:41:24 dillon Exp $
  */
 
 #ifndef _I386_LINUX_LINUX_H_
@@ -224,6 +224,8 @@ struct linux_sigframe {
 
 extern int bsd_to_linux_signal[];
 extern int linux_to_bsd_signal[];
+extern struct sysentvec linux_sysvec;
+extern struct sysentvec elf_linux_sysvec;
 
 /*
  * Pluggable ioctl handlers

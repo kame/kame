@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_os.h,v 1.1 1999/09/26 22:06:20 roger Exp $ */
+/* $FreeBSD: src/sys/dev/bktr/bktr_os.h,v 1.1.4.1 2000/04/18 12:50:33 roger Exp $ */
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -55,4 +55,18 @@ vm_offset_t     get_bktr_mem( int unit, unsigned size );
 vm_offset_t     get_bktr_mem(bktr_ptr_t, bus_dmamap_t *, unsigned size);
 void            free_bktr_mem(bktr_ptr_t, bus_dmamap_t, vm_offset_t);
 #endif 
+
+/************************************/
+/* *** Interrupt Enable/Disable *** */
+/************************************/
+#if defined(__FreeBSD__)
+#define DECLARE_INTR_MASK(s)	intrmask_t s
+#define DISABLE_INTR(s)		s=spltty()
+#define ENABLE_INTR(s)		splx(s)
+#else
+#define DECLARE_INTR_MASK(s)	/* no need to declare 's' */
+#define DISABLE_INTR(s)		disable_intr()
+#define ENABLE_INTR(s)		enable_intr()
+#endif
+
 

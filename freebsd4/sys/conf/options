@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options,v 1.191 2000/02/23 20:10:53 guido Exp $
+# $FreeBSD: src/sys/conf/options,v 1.191.2.11 2000/07/20 00:45:06 kris Exp $
 #
 #        On the handling of kernel options
 #
@@ -54,7 +54,7 @@ GDB_REMOTE_CHAT	opt_ddb.h
 DEVFS
 HW_WDOG
 KTRACE
-MD5
+MD_NSECT	opt_md.h
 MD_ROOT		opt_md.h
 MD_ROOT_SIZE	opt_md.h
 MFS_ROOT	opt_mfs.h
@@ -68,6 +68,12 @@ SUIDDIR		opt_suiddir.h
 SYSVMSG		opt_sysvipc.h
 SYSVSEM		opt_sysvipc.h
 SYSVSHM		opt_sysvipc.h
+SHMALL		opt_sysvipc.h
+SHMMAX		opt_sysvipc.h
+SHMMAXPGS	opt_sysvipc.h
+SHMMIN		opt_sysvipc.h
+SHMMNI		opt_sysvipc.h
+SHMSEG		opt_sysvipc.h
 UCONSOLE
 ICMP_BANDLIM
 VFS_AIO
@@ -143,12 +149,6 @@ SEMMNU		opt_param.h
 SEMMSL		opt_param.h
 SEMOPM		opt_param.h
 SEMUME		opt_param.h
-SHMALL		opt_param.h
-SHMMAX		opt_param.h
-SHMMAXPGS	opt_param.h
-SHMMIN		opt_param.h
-SHMMNI		opt_param.h
-SHMSEG		opt_param.h
 
 # Generic SCSI options.
 CAM_MAX_HIGHPOWER	opt_cam.h
@@ -198,22 +198,6 @@ SCSI_NCR_MAX_WIDE	opt_ncr.h
 SCSI_NCR_MYADDR		opt_ncr.h
 
 # Options used only in pci/isp_pci.c
-SCSI_ISP_NO_FWLOAD_MASK	opt_isp.h
-SCSI_ISP_NO_NVRAM_MASK	opt_isp.h
-SCSI_ISP_PREFER_MEM_MAP	opt_isp.h
-SCSI_ISP_FABRIC		opt_isp.h
-SCSI_ISP_SCCLUN		opt_isp.h
-SCSI_ISP_FCDUPLEX	opt_isp.h
-SCSI_ISP_WWN		opt_isp.h
-ISP_DISABLE_1020_SUPPORT	opt_isp.h
-ISP_DISABLE_1080_SUPPORT	opt_isp.h
-ISP_DISABLE_2100_SUPPORT	opt_isp.h
-ISP_DISABLE_2200_SUPPORT	opt_isp.h
-ISP_COMPILE_FW			opt_isp.h
-ISP_COMPILE_1020_FW		opt_isp.h
-ISP_COMPILE_1080_FW		opt_isp.h
-ISP_COMPILE_2100_FW		opt_isp.h
-ISP_COMPILE_2200_FW		opt_isp.h
 ISP_TARGET_MODE		opt_isp.h
 
 # Options used in the 'ata' ATA/ATAPI driver
@@ -241,11 +225,11 @@ INET6			opt_inet6.h
 IPSEC			opt_ipsec.h
 IPSEC_ESP		opt_ipsec.h
 IPSEC_DEBUG		opt_ipsec.h
-IPSEC_IPV6FWD		opt_ipsec.h
 IPDIVERT
 DUMMYNET		opt_ipdn.h
 IPFILTER		opt_ipfilter.h
 IPFILTER_LOG		opt_ipfilter.h
+IPFILTER_DEFAULT_BLOCK	opt_ipfilter.h
 IPFIREWALL		opt_ipfw.h
 IPFIREWALL_VERBOSE	opt_ipfw.h
 IPFIREWALL_VERBOSE_LIMIT	opt_ipfw.h
@@ -269,6 +253,7 @@ TCP_COMPAT_42		opt_compat.h
 TCPDEBUG
 TCP_DROP_SYNFIN		opt_tcp_input.h
 TCP_RESTRICT_RST	opt_tcp_input.h
+XBONEHACK
 
 # Netgraph(4). Use option NETGRAPH to enable the base netgraph code.
 # Each netgraph node type can be either be compiled into the kernel
@@ -279,11 +264,15 @@ NETGRAPH_ASYNC		opt_netgraph.h
 NETGRAPH_BPF		opt_netgraph.h
 NETGRAPH_CISCO		opt_netgraph.h
 NETGRAPH_ECHO		opt_netgraph.h
+NETGRAPH_ETHER		opt_netgraph.h
 NETGRAPH_FRAME_RELAY	opt_netgraph.h
 NETGRAPH_HOLE		opt_netgraph.h
 NETGRAPH_IFACE		opt_netgraph.h
 NETGRAPH_KSOCKET	opt_netgraph.h
 NETGRAPH_LMI		opt_netgraph.h
+# MPPC compression requires proprietary files (not included)
+NETGRAPH_MPPC_COMPRESSION	opt_netgraph.h
+NETGRAPH_MPPC_ENCRYPTION	opt_netgraph.h
 NETGRAPH_PPP		opt_netgraph.h
 NETGRAPH_PPPOE		opt_netgraph.h
 NETGRAPH_PPTPGRE	opt_netgraph.h
@@ -412,6 +401,7 @@ METEOR_DEALLOC_ABOVE	opt_meteor.h
 COM_ESP			opt_sio.h
 COM_MULTIPORT		opt_sio.h
 BREAK_TO_DEBUGGER	opt_comconsole.h
+ALT_BREAK_TO_DEBUGGER	opt_comconsole.h
 
 # Include tweaks for running under the SimOS machine simulator.
 SIMOS			opt_simos.h
@@ -436,6 +426,7 @@ UMS_DEBUG		opt_usb.h
 VINUMDEBUG		opt_vinum.h
 
 # Embedded system options
+UKBD_DFLT_KEYMAP	opt_ukbd.h
 INIT_PATH		opt_init_path.h
 
 ROOTDEVNAME		opt_rootdevname.h

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sis.c,v 1.13 1999/09/25 17:29:01 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.2 2000/07/17 21:24:39 archie Exp $
  */
 
 /*
@@ -95,7 +95,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_sis.c,v 1.13 1999/09/25 17:29:01 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_sis.c,v 1.13.4.2 2000/07/17 21:24:39 archie Exp $";
 #endif
 
 /*
@@ -695,13 +695,10 @@ static int sis_attach(dev)
 	}
 
 	/*
-	 * Call MI attach routines.
+	 * Call MI attach routine.
 	 */
-	if_attach(ifp);
-	ether_ifattach(ifp);
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 	callout_handle_init(&sc->sis_stat_ch);
-
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
 
 fail:
 	splx(s);
@@ -722,7 +719,7 @@ static int sis_detach(dev)
 
 	sis_reset(sc);
 	sis_stop(sc);
-	if_detach(ifp);
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 
 	bus_generic_detach(dev);
 	device_delete_child(dev, sc->sis_miibus);
@@ -905,22 +902,6 @@ static void sis_rxeof(sc)
 
 		ifp->if_ipackets++;
 		eh = mtod(m, struct ether_header *);
-
-		/*
-		 * Handle BPF listeners. Let the BPF user see the packet, but
-		 * don't pass it up to the ether_input() layer unless it's
-		 * a broadcast packet, multicast packet, matches our ethernet
-		 * address or the interface is in promiscuous mode.
-		 */
-		if (ifp->if_bpf) {
-			bpf_mtap(ifp, m);
-			if (ifp->if_flags & IFF_PROMISC &&
-			    (bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-			    ETHER_ADDR_LEN) && !(eh->ether_dhost[0] & 1))) {
-				m_freem(m);
-				continue;
-			}
-		}
 
 		/* Remove header from mbuf and pass it on. */
 		m_adj(m, sizeof(struct ether_header));

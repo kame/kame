@@ -64,7 +64,7 @@
  *
  *	@(#)swap_pager.c	8.9 (Berkeley) 3/21/94
  *
- * $FreeBSD: src/sys/vm/swap_pager.c,v 1.130 1999/12/28 07:30:54 peter Exp $
+ * $FreeBSD: src/sys/vm/swap_pager.c,v 1.130.2.2 2000/03/27 21:34:43 dillon Exp $
  */
 
 #include <sys/param.h>
@@ -702,8 +702,6 @@ swap_pager_copy(srcobject, dstobject, offset, destroysource)
  *	distance.  We do not try to restrict it to the swap device stripe
  *	(that is handled in getpages/putpages).  It probably isn't worth
  *	doing here.
- *
- *	This routine must be called at splvm().
  */
 
 boolean_t
@@ -714,14 +712,17 @@ swap_pager_haspage(object, pindex, before, after)
 	int *after;
 {
 	daddr_t blk0;
+	int s;
 
 	/*
 	 * do we have good backing store at the requested index ?
 	 */
 
+	s = splvm();
 	blk0 = swp_pager_meta_ctl(object, pindex, 0);
 
 	if (blk0 == SWAPBLK_NONE) {
+		splx(s);
 		if (before)
 			*before = 0;
 		if (after)
@@ -764,7 +765,7 @@ swap_pager_haspage(object, pindex, before, after)
 		}
 		*after = (i - 1);
 	}
-
+	splx(s);
 	return (TRUE);
 }
 
@@ -1006,14 +1007,12 @@ swap_pager_getpages(object, m, count, reqpage)
 
 	mreq = m[reqpage];
 
-#if !defined(MAX_PERF)
 	if (mreq->object != object) {
 		panic("swap_pager_getpages: object mismatch %p/%p", 
 		    object, 
 		    mreq->object
 		);
 	}
-#endif
 	/*
 	 * Calculate range to retrieve.  The pages have already been assigned
 	 * their swapblks.  We require a *contiguous* range that falls entirely
@@ -1214,14 +1213,12 @@ swap_pager_putpages(object, m, count, sync, rtvals)
 	int i;
 	int n = 0;
 
-#if !defined(MAX_PERF)
 	if (count && m[0]->object != object) {
 		panic("swap_pager_getpages: object mismatch %p/%p", 
 		    object, 
 		    m[0]->object
 		);
 	}
-#endif
 	/*
 	 * Step 1
 	 *
@@ -1870,25 +1867,19 @@ swp_pager_meta_free_all(vm_object_t object)
 			for (i = 0; i < SWAP_META_PAGES; ++i) {
 				daddr_t v = swap->swb_pages[i];
 				if (v != SWAPBLK_NONE) {
-#if !defined(MAX_PERF)
 					--swap->swb_count;
-#endif
 					swp_pager_freeswapspace(v, 1);
 				}
 			}
-#if !defined(MAX_PERF)
 			if (swap->swb_count != 0)
 				panic("swap_pager_meta_free_all: swb_count != 0");
-#endif
 			*pswap = swap->swb_hnext;
 			zfree(swap_zone, swap);
 			--object->un_pager.swp.swp_bcount;
 		}
 		index += SWAP_META_PAGES;
-#if !defined(MAX_PERF)
 		if (index > 0x20000000)
 			panic("swp_pager_meta_free_all: failed to locate all swap meta blocks");
-#endif
 	}
 }
 

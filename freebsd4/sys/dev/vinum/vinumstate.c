@@ -37,8 +37,8 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumstate.c,v 2.15 2000/01/04 04:39:25 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumstate.c,v 1.28 2000/02/29 06:16:06 grog Exp $
+ * $Id: vinumstate.c,v 2.18 2000/05/10 07:30:50 grog Exp grog $
+ * $FreeBSD: src/sys/dev/vinum/vinumstate.c,v 1.28.2.2 2000/06/08 02:00:23 grog Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -643,7 +643,7 @@ checksdstate(struct sd *sd, struct request *rq, daddr_t diskaddr, daddr_t disken
 	 * - if it's RAID-4 or RAID-5, we can do it as
 	 *   long as only one subdisk is down
 	 */
-	if (plex->state == plex_striped)		    /* plex is striped, */
+	if (plex->organization == plex_striped)		    /* plex is striped, */
 	    return REQUEST_DOWN;
 
 	else if (isparity(plex)) {			    /* RAID-4 or RAID-5 plex */
@@ -870,11 +870,11 @@ start_object(struct vinum_ioctl_msg *data)
 	    strcpy(ioctl_reply->msg, "Drive is down");
 	    return;
 	}
+	if (data->blocksize)
+	    SD[objindex].revive_blocksize = data->blocksize;
 	if ((SD[objindex].state == sd_reviving)		    /* reviving, */
 	||(SD[objindex].state == sd_stale)) {		    /* or stale, will revive */
 	    SD[objindex].state = sd_reviving;		    /* make sure we're reviving */
-	    if (data->blocksize)
-		SD[objindex].revive_blocksize = data->blocksize;
 	    ioctl_reply->error = revive_block(objindex);    /* revive another block */
 	    ioctl_reply->msg[0] = '\0';			    /* no comment */
 	    return;

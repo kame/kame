@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@whistle.com>
  *
- * $FreeBSD: src/sys/netgraph/ng_cisco.h,v 1.2 1999/11/30 02:45:18 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_cisco.h,v 1.2.2.1 2000/05/24 21:36:40 archie Exp $
  * $Whistle: ng_cisco.h,v 1.6 1999/01/25 01:21:48 archie Exp $
  */
 
@@ -50,6 +50,7 @@
 /* Hook names */
 #define NG_CISCO_HOOK_DOWNSTREAM	"downstream"
 #define NG_CISCO_HOOK_INET		"inet"
+#define NG_CISCO_HOOK_INET6		"inet6"
 #define NG_CISCO_HOOK_APPLETALK		"atalk"
 #define NG_CISCO_HOOK_IPX		"ipx"
 #define NG_CISCO_HOOK_DEBUG		"debug"

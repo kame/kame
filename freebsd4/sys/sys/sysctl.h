@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sysctl.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/sysctl.h,v 1.81 2000/02/10 18:51:58 rwatson Exp $
+ * $FreeBSD: src/sys/sys/sysctl.h,v 1.81.2.1 2000/07/19 06:24:02 kbyanc Exp $
  */
 
 #ifndef _SYS_SYSCTL_H_
@@ -173,10 +173,20 @@ void sysctl_unregister_oid(struct sysctl_oid *oidp);
 	SYSCTL_OID(parent, nbr, name, CTLTYPE_INT|access, \
 		ptr, val, sysctl_handle_int, "I", descr)
 
-/* Oid for a long.  The pointer must be non NULL. */
-#define SYSCTL_LONG(parent, nbr, name, access, ptr, descr) \
+/* Oid for an unsigned int.  If ptr is NULL, val is returned. */
+#define SYSCTL_UINT(parent, nbr, name, access, ptr, val, descr) \
 	SYSCTL_OID(parent, nbr, name, CTLTYPE_INT|access, \
-		ptr, 0, sysctl_handle_long, "L", descr)
+		ptr, val, sysctl_handle_int, "IU", descr)
+
+/* Oid for a long.  If ptr is NULL, val is returned. */
+#define SYSCTL_LONG(parent, nbr, name, access, ptr, val, descr) \
+	SYSCTL_OID(parent, nbr, name, CTLTYPE_INT|access, \
+		ptr, val, sysctl_handle_long, "L", descr)
+
+/* Oid for an unsigned long.  If ptr is NULL, val is returned. */
+#define SYSCTL_ULONG(parent, nbr, name, access, ptr, val, descr) \
+        SYSCTL_OID(parent, nbr, name, CTLTYPE_INT|access, \
+                ptr, val, sysctl_handle_long, "LU", descr)
 
 /* Oid for an opaque object.  Specified by a pointer and a length. */
 #define SYSCTL_OPAQUE(parent, nbr, name, access, ptr, len, fmt, descr) \

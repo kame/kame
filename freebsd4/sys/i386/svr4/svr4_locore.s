@@ -3,10 +3,10 @@
 
 #include <svr4/svr4_syscall.h>		/* system call numbers */
 
-/* $FreeBSD: src/sys/i386/svr4/svr4_locore.s,v 1.10 2000/01/15 15:23:14 newton Exp $ */
+/* $FreeBSD: src/sys/i386/svr4/svr4_locore.s,v 1.10.2.1 2000/07/07 00:38:51 obrien Exp $ */
 	
 NON_GPROF_ENTRY(svr4_sigcode)
-	call	SVR4_SIGF_HANDLER(%esp)
+	call	*SVR4_SIGF_HANDLER(%esp)
 	leal	SVR4_SIGF_UC(%esp),%eax	# ucp (the call may have clobbered the
 					# copy at SIGF_UCP(%esp))
 #ifdef VM86

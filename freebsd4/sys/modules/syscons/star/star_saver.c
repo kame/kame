@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/modules/syscons/star/star_saver.c,v 1.23 2000/01/15 15:25:43 yokota Exp $
+ * $FreeBSD: src/sys/modules/syscons/star/star_saver.c,v 1.23.2.1 2000/05/09 13:42:17 nyan Exp $
  */
 
 #include <sys/param.h>
@@ -40,6 +40,10 @@
 #include <dev/fb/fbreg.h>
 #include <dev/fb/splashreg.h>
 #include <dev/syscons/syscons.h>
+
+#ifdef PC98
+#include <pc98/pc98/pc98_machdep.h>
+#endif
 
 #define NUM_STARS	50
 

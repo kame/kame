@@ -36,7 +36,7 @@
  *
  *	@(#)fbio.h	8.2 (Berkeley) 10/30/93
  *
- * $FreeBSD: src/sys/sys/fbio.h,v 1.9 1999/12/29 04:24:40 peter Exp $
+ * $FreeBSD: src/sys/sys/fbio.h,v 1.9.2.1 2000/05/05 09:16:16 nyan Exp $
  */
 
 #ifndef _SYS_FBIO_H_
@@ -380,8 +380,11 @@ typedef struct video_adapter_info video_adapter_info_t;
 #define M_ENH_B80x43	0x70	/* ega black & white 80x43 */
 #define M_ENH_C80x43	0x71	/* ega color 80x43 */
 
-#define M_PC98_80x25	98	/* PC98 80x25 */
-#define M_PC98_80x30	99	/* PC98 80x30 */
+#define M_PC98_80x25		98	/* PC98 text 80x25 */
+#define M_PC98_80x30		99	/* PC98 text 80x30 */
+#define M_PC98_EGC640x400	100	/* PC98 graphic 640x400 16 colors */
+#define M_PC98_PEGC640x400	101	/* PC98 graphic 640x400 256 colors */
+#define M_PC98_PEGC640x480	102	/* PC98 graphic 640x480 256 colors */
 
 #define M_HGC_P0	0xe0	/* hercules graphics - page 0 @ B0000 */
 #define M_HGC_P1	0xe1	/* hercules graphics - page 1 @ B8000 */

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/globaldata.h,v 1.11 1999/08/28 00:44:12 peter Exp $
+ * $FreeBSD: src/sys/i386/include/globaldata.h,v 1.11.2.1 2000/05/16 06:58:10 dillon Exp $
  */
 
 /*
@@ -66,6 +66,7 @@ struct globaldata {
 	caddr_t		gd_prv_CADDR3;
 	unsigned	*gd_prv_PADDR1;
 #endif
+	u_int		gd_astpending;
 };
 
 #ifdef SMP

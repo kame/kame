@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)isa.c	7.2 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/isa/intr_machdep.c,v 1.29 1999/12/26 16:21:19 bde Exp $
+ * $FreeBSD: src/sys/i386/isa/intr_machdep.c,v 1.29.2.1 2000/04/29 10:15:55 peter Exp $
  */
 /*
  * This file contains an aggregated module marked:
@@ -533,7 +533,7 @@ icu_unset(intr, handler)
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/intr_machdep.c,v 1.29 1999/12/26 16:21:19 bde Exp $
+ * $FreeBSD: src/sys/i386/isa/intr_machdep.c,v 1.29.2.1 2000/04/29 10:15:55 peter Exp $
  *
  */
 
@@ -723,6 +723,9 @@ add_intrdesc(intrec *idesc)
  * Add the interrupt handler descriptor data structure created by an
  * earlier call of create_intr() to the linked list for its irq and
  * adjust the interrupt masks if necessary.
+ *
+ * WARNING: This is an internal function and not to be used by device
+ * drivers.  It is subject to change without notice.
  */
 
 intrec *

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/boot0/Makefile,v 1.8 1999/08/28 00:39:59 peter Exp $
+# $FreeBSD: src/sys/boot/i386/boot0/Makefile,v 1.8.2.2 2000/07/17 21:27:26 jhb Exp $
 
 PROG=		boot0
 NOMAN=
@@ -8,7 +8,8 @@ BINMODE=	444
 
 M4?=	m4
 
-B0FLAGS=0xf
+# update, packet mode, and all slices enabled by default
+B0FLAGS=0x8f
 B0TICKS=0xb6
 
 ORG=	0x600
@@ -22,9 +23,9 @@ boot0: boot0.o
 	objcopy -S -O binary boot0.out ${.TARGET}
 .endif
 
-boot0.o: boot0.m4 boot0.s
-	(cd ${.CURDIR}; ${M4} -DFLAGS=${B0FLAGS} -DTICKS=${B0TICKS} \
-		boot0.m4 boot0.s) | ${AS} ${AFLAGS} -o ${.TARGET}
+boot0.o: boot0.s
+	${AS} ${AFLAGS} --defsym FLAGS=${B0FLAGS} --defsym TICKS=${B0TICKS} \
+		${.IMPSRC} -o ${.TARGET}
 
 CLEANFILES+= boot0.out boot0.o
 

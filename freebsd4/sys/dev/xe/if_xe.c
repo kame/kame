@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  *
  *	$Id: if_xe.c,v 1.20 1999/06/13 19:17:40 scott Exp $
- * $FreeBSD: src/sys/dev/xe/if_xe.c,v 1.13 2000/01/23 18:21:20 peter Exp $
+ * $FreeBSD: src/sys/dev/xe/if_xe.c,v 1.13.2.5 2000/07/21 22:38:24 imp Exp $
  */
 
 /*
@@ -33,11 +33,7 @@
  * I've pushed this fairly far, but there are some things that need to be
  * done here.  I'm documenting them here in case I get destracted. -- imp
  *
- * xe_memwrite -- maybe better handled pccard layer?
  * xe_cem56fix -- need to figure out how to map the extra stuff.
- * xe_activate -- need to write it, and add some stuff to it.  Look at if_sn
- *                for guidance.  resources/interrupts.
- * xe_deactivate -- turn off resources/interrupts.
  */
 
 /*
@@ -112,22 +108,16 @@
  */
 
 
-#ifndef XE_DEBUG
-#define XE_DEBUG 1	/* Increase for more voluminous output! */
-#endif
-
 #include <sys/param.h>
 #include <sys/cdefs.h>
 #include <sys/errno.h>
 #include <sys/kernel.h>
-#include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/systm.h>
 #include <sys/uio.h>
-#include <sys/conf.h>
 
 #include <sys/module.h>
 #include <sys/bus.h>
@@ -143,6 +133,9 @@
 #include <net/if_media.h>
 #include <net/if_mib.h>
 #include <net/bpf.h>
+
+#include <dev/pccard/pccardvar.h>
+#include "card_if.h"
 
 #include <dev/xe/if_xereg.h>
 #include <dev/xe/if_xevar.h>
@@ -209,8 +202,10 @@ static u_int16_t xe_phy_readreg		(struct xe_softc *scp, u_int16_t reg);
 static void      xe_phy_writereg	(struct xe_softc *scp, u_int16_t reg, u_int16_t data);
 
 /*
- * Debug functions
+ * Debug functions -- uncomment for VERY verbose dignostic information.
+ * Set to 1 for less verbose information
  */
+/* #define XE_DEBUG 2 */
 #ifdef XE_DEBUG
 #define XE_REG_DUMP(scp)		xe_reg_dump((scp))
 #define XE_MII_DUMP(scp)		xe_mii_dump((scp))
@@ -222,91 +217,63 @@ static void      xe_mii_dump		(struct xe_softc *scp);
 #endif
 
 /*
- * Two routines to read from/write to the attribute memory
- * the write portion is used only for fixing up the RealPort cards,
- * the reader portion was needed for debugging info, and duplicated some
- * code in xe_card_init(), so it appears here instead with suitable
- * modifications to xe_card_init()
- * -aDe Lovett
+ * Fixing for RealPort cards - they need a little furtling to get the
+ * ethernet working
  */
 static int
-xe_memwrite(device_t dev, off_t offset, u_char byte)
+xe_cem56fix(device_t dev)
 {
-	/* XXX */
-  return (-1);
-}
+  struct xe_softc *sc = (struct xe_softc *) device_get_softc(dev);
+  bus_space_tag_t bst;
+  bus_space_handle_t bsh;
+  struct resource *r;
+  int rid;
+  int ioport;
 
-/*
- * Hacking for RealPort cards
- */
-static int
-xe_cem56fix(struct xe_softc *scp)
-{
-#if XXX		/* Need to revisit */
-  int ioport, fail;
-
-  /* allocate a new I/O slot for the ethernet */
-  /* XXX: ctrl->mapio() always appears to return 0 (success), so
-   *      this may cause problems if another device is listening
-   *	  on 0x300 already.  In this case, you should choose a
-   *      known free I/O port address in the kernel config line
-   *      for the driver.  It will be picked up here and used
-   *      instead of the autodetected value.
-   */
-  slt->io[1].window = 1;
-  slt->io[1].flags = IODF_WS|IODF_16BIT|IODF_ZEROWS|IODF_ACTIVE;
-  slt->io[1].size = 0x10;
-
-#ifdef	XE_IOBASE
-
-  device_printf(scp->dev, "user requested ioport 0x%x\n", XE_IOBASE );
-  ioport = XE_IOBASE;
-  slt->io[1].start = ioport;
-  fail = ctrl->mapio(slt, 1);
-
-#else
-
-  for (ioport = 0x300; ioport < 0x400; ioport += 0x10) {
-    slt->io[1].start = ioport;
-    if ((fail = ctrl->mapio( slt, 1 )) == 0)
-      break;
-  }
-
+#ifdef XE_DEBUG
+  device_printf(dev, "Hacking your Realport, master\n");
+#endif
+ 
+#if XE_DEBUG > 1
+  device_printf(dev, "Realport port 0x%0lx, size 0x%0lx\n",
+      bus_get_resource_start(dev, SYS_RES_IOPORT, sc->port_rid),
+      bus_get_resource_count(dev, SYS_RES_IOPORT, sc->port_rid));
 #endif
 
-  /* did we find one? */
-  if (fail) {
-    device_printf(scp->dev, "xe_cem56fix: no free address space\n");
+  rid = 0;
+  r = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid, 0, ~0, 4 << 10, RF_ACTIVE);
+  if (!r) {
+#if XE_DEBUG > 0
+    device_printf(dev, "Can't map in attribute memory\n");
+#endif
     return -1;
   }
 
+  bsh = rman_get_bushandle(r);
+  bst = rman_get_bustag(r);
 
-  /* munge the id_iobase entry for use by the rest of the driver */
-#if XE_DEBUG > 1
-  device_printf(scp->dev, "using 0x%x for RealPort ethernet\n", ioport);
-#endif
-#if 0
-  scp->dev->id_iobase = ioport;
-#endif
+  CARD_SET_RES_FLAGS(device_get_parent(dev), dev, SYS_RES_MEMORY, rid,
+      PCCARD_A_MEM_ATTR);
 
-  /* magic to set up the ethernet */
-  xe_memwrite( scp->dev, DINGO_ECOR, DINGO_ECOR_IRQ_LEVEL|
-               DINGO_ECOR_INT_ENABLE|DINGO_ECOR_IOB_ENABLE|
-               DINGO_ECOR_ETH_ENABLE );
-  xe_memwrite( scp->dev, DINGO_EBAR0, ioport & 0xff );
-  xe_memwrite( scp->dev, DINGO_EBAR1, (ioport >> 8) & 0xff );
+  bus_space_write_1(bst, bsh, DINGO_ECOR, DINGO_ECOR_IRQ_LEVEL |
+					  DINGO_ECOR_INT_ENABLE |
+					  DINGO_ECOR_IOB_ENABLE |
+               				  DINGO_ECOR_ETH_ENABLE);
+  ioport = bus_get_resource_start(dev, SYS_RES_IOPORT, sc->port_rid);
+  bus_space_write_1(bst, bsh, DINGO_EBAR0, ioport & 0xff);
+  bus_space_write_1(bst, bsh, DINGO_EBAR1, (ioport >> 8) & 0xff);
 
-  xe_memwrite( scp->dev, DINGO_DCOR0, DINGO_DCOR0_SF_INT );
-  xe_memwrite( scp->dev, DINGO_DCOR1, DINGO_DCOR1_INT_LEVEL|DINGO_DCOR1_EEDIO );
-  xe_memwrite( scp->dev, DINGO_DCOR2, 0x00 );
-  xe_memwrite( scp->dev, DINGO_DCOR3, 0x00 );
-  xe_memwrite( scp->dev, DINGO_DCOR4, 0x00 );
+  bus_space_write_1(bst, bsh, DINGO_DCOR0, DINGO_DCOR0_SF_INT);
+  bus_space_write_1(bst, bsh, DINGO_DCOR1, DINGO_DCOR1_INT_LEVEL |
+  					   DINGO_DCOR1_EEDIO);
+  bus_space_write_1(bst, bsh, DINGO_DCOR2, 0x00);
+  bus_space_write_1(bst, bsh, DINGO_DCOR3, 0x00);
+  bus_space_write_1(bst, bsh, DINGO_DCOR4, 0x00);
+
+  bus_release_resource(dev, SYS_RES_MEMORY, rid, r);
 
   /* success! */
   return 0;
-#else
-  return -1;
-#endif /* XXX */
 }
 	
 /*
@@ -319,7 +286,9 @@ static int
 xe_probe(device_t dev)
 {
   struct xe_softc *scp = (struct xe_softc *) device_get_softc(dev);
-  u_char *buf;
+  bus_space_tag_t bst;
+  bus_space_handle_t bsh;
+  int buf;
   u_char ver_str[CISTPL_BUFSIZE>>1];
   off_t offs;
   int success, rc, i;
@@ -333,7 +302,7 @@ xe_probe(device_t dev)
 #endif
 
   /* Map in the CIS */
-  /* XXX This CANNOT work as it needs RF_PCCARD_ATTR support */
+  rid = 0;
   r = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid, 0, ~0, 4 << 10, RF_ACTIVE);
   if (!r) {
 #ifdef XE_DEBUG
@@ -341,7 +310,12 @@ xe_probe(device_t dev)
 #endif
     return ENOMEM;
   }
-  buf = (u_char *) rman_get_start(r);
+  bsh = rman_get_bushandle(r);
+  bst = rman_get_bustag(r);
+  buf = 0;
+
+  CARD_SET_RES_FLAGS(device_get_parent(dev), dev, SYS_RES_MEMORY, rid,
+      PCCARD_A_MEM_ATTR);
 
   /* Grep through CIS looking for relevant tuples */
   offs = 0;
@@ -505,7 +479,7 @@ xe_detach(device_t dev) {
   struct xe_softc *sc = device_get_softc(dev);
 
   sc->arpcom.ac_if.if_flags &= ~IFF_RUNNING; 
-  if_detach(&sc->arpcom.ac_if);
+  ether_ifdetach(&sc->arpcom.ac_if, ETHER_BPF_SUPPORTED);
   xe_deactivate(dev);
   return 0;
 }
@@ -516,12 +490,14 @@ xe_detach(device_t dev) {
 static int
 xe_attach (device_t dev) {
   struct xe_softc *scp = device_get_softc(dev);
+  int err;
 
 #ifdef XE_DEBUG
   device_printf(dev, "attach\n");
 #endif
 
-  xe_activate(dev);
+  if ((err = xe_activate(dev)) != 0)
+    return (err);
 
   /* Fill in some private data */
   scp->ifp = &scp->arpcom.ac_if;
@@ -529,7 +505,7 @@ xe_attach (device_t dev) {
   scp->autoneg_status = 0;
 
   /* Hack RealPorts into submission */
-  if (scp->dingo && xe_cem56fix(scp) < 0) {
+  if (scp->dingo && xe_cem56fix(dev) < 0) {
     device_printf(dev, "Unable to fix your RealPort\n");
     xe_deactivate(dev);
     return ENODEV;
@@ -602,17 +578,10 @@ xe_attach (device_t dev) {
   device_printf(dev, "Ethernet address %6D\n", scp->arpcom.ac_enaddr, ":");
 
   /* Attach the interface */
-  if_attach(scp->ifp);
-  ether_ifattach(scp->ifp);
-
-  /* BPF is in the kernel, call the attach for it */
-#if XE_DEBUG > 1
-  device_printf(dev, "BPF listener attached\n");
-#endif
-  bpfattach(scp->ifp, DLT_EN10MB, sizeof(struct ether_header));
+  ether_ifattach(scp->ifp, ETHER_BPF_SUPPORTED);
 
   /* Done */
-  return 1;
+  return 0;
 }
 
 
@@ -1047,29 +1016,7 @@ xe_intr(void *xscp)
 	    bus_space_read_multi_2(scp->bst, scp->bsh, XE_EDP, 
 	     (u_int16_t *) ehp, len >> 1);
 
-	  /*
-	   * Check if there's a BPF listener on this interface. If so, hand
-	   * off the raw packet to bpf.
-	   */
-	  if (ifp->if_bpf) {
-#if XE_DEBUG > 1
-	    device_printf(scp->dev, "passing input packet to BPF\n");
-#endif
-	    bpf_mtap(ifp, mbp);
-
-	    /*	
-	     * Note that the interface cannot be in promiscuous mode if there
-	     * are no BPF listeners.  And if we are in promiscuous mode, we
-	     * have to check if this packet is really ours.
-	     */
-	    if ((ifp->if_flags & IFF_PROMISC) &&
-		bcmp(ehp->ether_dhost, scp->arpcom.ac_enaddr, sizeof(ehp->ether_dhost)) != 0 &&
-		(rsr & XE_RSR_PHYS_PACKET)) {
-	      m_freem(mbp);
-	      mbp = NULL;
-	    }
-	  }
-
+	  /* Deliver packet to upper layers */
 	  if (mbp != NULL) {
 	    mbp->m_pkthdr.len = mbp->m_len = len - ETHER_HDR_LEN;
 	    mbp->m_data += ETHER_HDR_LEN;	/* Strip off Ethernet header */
@@ -1398,7 +1345,7 @@ static void xe_setmedia(void *xscp) {
    case IFM_10_T:	/* Force 10baseT */
     xe_soft_reset(scp);
 #if XE_DEBUG > 1
-    device_printf(csp->dev, "Selecting 10baseT\n");
+    device_printf(scp->dev, "Selecting 10baseT\n");
 #endif
     if (scp->phy_ok) {
       xe_phy_writereg(scp, PHY_BMCR, 0x0000);
@@ -2207,11 +2154,39 @@ int
 xe_activate(device_t dev)
 {
 	struct xe_softc *sc = device_get_softc(dev);
-	int err;
+	int start, err;
 
-	sc->port_rid = 0;
-	sc->port_res = bus_alloc_resource(dev, SYS_RES_IOPORT, &sc->port_rid,
-	    0, ~0, 16, RF_ACTIVE);
+	if (!sc->dingo) {
+		sc->port_rid = 0;	/* 0 is managed by pccard */
+		sc->port_res = bus_alloc_resource(dev, SYS_RES_IOPORT,
+		    &sc->port_rid, 0, ~0, 16, RF_ACTIVE);
+	} else {
+		/*
+		 * Find a 16 byte aligned ioport for the card.
+		 */
+#if XE_DEBUG > 0
+		device_printf(dev, "Finding an aligned port for RealPort\n");
+#endif /* XE_DEBUG */
+		sc->port_rid = 1;	/* 0 is managed by pccard */
+		start = 0x100;
+		do {
+			sc->port_res = bus_alloc_resource(dev,
+			    SYS_RES_IOPORT, &sc->port_rid, start, 0x3ff, 16,
+			    RF_ACTIVE);
+			if (sc->port_res == 0)
+				break;		/* we failed */
+			if ((rman_get_start(sc->port_res) & 0xf) == 0)
+				break;		/* good */
+			bus_release_resource(dev, SYS_RES_IOPORT, sc->port_rid, 
+			    sc->port_res);
+			start = (rman_get_start(sc->port_res) + 15) & ~0xf;
+		} while (1);
+#if XE_DEBUG > 2
+		device_printf(dev, "port 0x%0lx, size 0x%0lx\n",
+		    bus_get_resource_start(dev, SYS_RES_IOPORT, sc->port_rid),
+		    bus_get_resource_count(dev, SYS_RES_IOPORT, sc->port_rid));
+#endif /* XE_DEBUG */
+	}
 	if (!sc->port_res) {
 #if XE_DEBUG > 0
 		device_printf(dev, "Cannot allocate ioport\n");
@@ -2234,7 +2209,7 @@ xe_activate(device_t dev)
 		xe_deactivate(dev);
 		return err;
 	}
-	
+
 	sc->bst = rman_get_bustag(sc->port_res);
 	sc->bsh = rman_get_bushandle(sc->port_res);
 	return (0);

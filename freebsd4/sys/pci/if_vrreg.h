@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_vrreg.h,v 1.7 1999/09/19 22:03:30 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_vrreg.h,v 1.7.2.1 2000/07/05 21:43:59 wpaul Exp $
  */
 
 /*
@@ -445,6 +445,7 @@ struct vr_softc {
  */
 #define	VIA_DEVICEID_RHINE		0x3043
 #define VIA_DEVICEID_RHINE_II		0x6100
+#define VIA_DEVICEID_RHINE_II_2		0x3065
 
 /*
  * Delta Electronics device ID.

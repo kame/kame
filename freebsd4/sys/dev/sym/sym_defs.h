@@ -5,10 +5,9 @@
  *  Copyright (C) 1999-2000  Gerard Roudier <groudier@club-internet.fr>
  *
  *  This driver also supports the following Symbios/LSI PCI-SCSI chips:
- *	53C810A, 53C825A, 53C860, 53C875, 53C876, 53C885, 53C895.
+ *	53C810A, 53C825A, 53C860, 53C875, 53C876, 53C885, 53C895,
+ *	53C810,  53C815,  53C825 and the 53C1510D is 53C8XX mode.
  *
- *  but does not support earlier chips as the following ones:
- *	53C810, 53C815, 53C825.
  *  
  *  This driver for FreeBSD-CAM is derived from the Linux sym53c8xx driver.
  *  Copyright (C) 1998-1999  Gerard Roudier
@@ -56,7 +55,7 @@
  * SUCH DAMAGE.
  */
 
-/* $FreeBSD: src/sys/dev/sym/sym_defs.h,v 1.4 2000/01/08 19:58:17 groudier Exp $ */
+/* $FreeBSD: src/sys/dev/sym/sym_defs.h,v 1.4.2.2 2000/06/14 16:14:46 groudier Exp $ */
 
 #ifndef SYM_DEFS_H
 #define SYM_DEFS_H
@@ -500,13 +499,16 @@ struct sym_reg {
 /*b4*/	u32	nc_dbms;	/* Dynamic Block Move Selector      */
 /*b8*/	u32	nc_dnad64;	/* DMA Next Address 64              */
 /*bc*/	u16	nc_scntl4;	/* C1010 only                       */
-	#define   U3EN   0x80	/* Enable Ultra 3                   */
-	#define   AIPEN	 0x40   /* Allow check upper byte lanes     */
+	#define   U3EN    0x80	/* Enable Ultra 3                   */
+	#define   AIPCKEN 0x40  /* AIP checking enable              */
+				/* Also enable AIP generation on C10-33*/
 	#define   XCLKH_DT 0x08 /* Extra clock of data hold on DT edge */
 	#define   XCLKH_ST 0x04 /* Extra clock of data hold on ST edge */
 	#define   XCLKS_DT 0x02 /* Extra clock of data set  on DT edge */
 	#define   XCLKS_ST 0x01 /* Extra clock of data set  on ST edge */
-/*be*/	u16	nc_aipcntl;	/* Epat Control 1 C1010 only        */
+/*be*/	u8	nc_aipcntl0;	/* AIP Control 0 C1010 only         */
+/*bf*/	u8	nc_aipcntl1;	/* AIP Control 1 C1010 only         */
+	#define DISAIP  0x08	/* Disable AIP generation C10-66 only  */
 /*c0*/	u32	nc_pmjad1;	/* Phase Mismatch Jump Address 1    */
 /*c4*/	u32	nc_pmjad2;	/* Phase Mismatch Jump Address 2    */
 /*c8*/	u8	nc_rbc;		/* Remaining Byte Count             */

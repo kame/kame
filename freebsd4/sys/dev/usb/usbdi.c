@@ -1,12 +1,12 @@
 /*	$NetBSD: usbdi.c,v 1.60 2000/01/19 00:23:58 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usbdi.c,v 1.34 2000/02/10 18:50:19 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usbdi.c,v 1.34.2.3 2000/07/02 11:44:00 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -41,12 +41,10 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-#include <sys/kernel.h>
 #include <sys/device.h>
 #elif defined(__FreeBSD__)
 #include <sys/module.h>
 #include <sys/bus.h>
-#include <sys/conf.h>
 #include "usb_if.h"
 #if defined(DIAGNOSTIC) && defined(__i386__)
 #include <machine/cpu.h>
@@ -78,14 +76,14 @@ extern int usbdebug;
 #define DPRINTFN(n,x)
 #endif
 
-static usbd_status usbd_ar_pipe  __P((usbd_pipe_handle pipe));
-static void usbd_do_request_async_cb 
+Static usbd_status usbd_ar_pipe  __P((usbd_pipe_handle pipe));
+Static void usbd_do_request_async_cb 
     __P((usbd_xfer_handle, usbd_private_handle, usbd_status));
-static void usbd_start_next __P((usbd_pipe_handle pipe));
-static usbd_status usbd_open_pipe_ival
+Static void usbd_start_next __P((usbd_pipe_handle pipe));
+Static usbd_status usbd_open_pipe_ival
     __P((usbd_interface_handle, u_int8_t, u_int8_t, usbd_pipe_handle *, int));
 
-static int usbd_nbuses = 0;
+Static int usbd_nbuses = 0;
 
 void
 usbd_init()
@@ -99,8 +97,8 @@ usbd_finish()
 	--usbd_nbuses;
 }
 
-static __inline int usbd_xfer_isread __P((usbd_xfer_handle xfer));
-static __inline int
+Static __inline int usbd_xfer_isread __P((usbd_xfer_handle xfer));
+Static __inline int
 usbd_xfer_isread(xfer)
 	usbd_xfer_handle xfer;
 {
@@ -741,7 +739,7 @@ usbd_get_interface(iface, aiface)
 /*** Internal routines ***/
 
 /* Dequeue all pipe operations, called at splusb(). */
-static usbd_status
+Static usbd_status
 usbd_ar_pipe(pipe)
 	usbd_pipe_handle pipe;
 {
@@ -845,8 +843,9 @@ usb_transfer_complete(xfer)
 
 	if (!repeat) {
 		/* XXX should we stop the queue on all errors? */
-		if (xfer->status == USBD_CANCELLED ||
-		    xfer->status == USBD_TIMEOUT)
+		if ((xfer->status == USBD_CANCELLED
+		     || xfer->status == USBD_TIMEOUT)
+		    && pipe->iface != NULL)		/* not control pipe */
 			pipe->running = 0;
 		else
 			usbd_start_next(pipe);
@@ -934,7 +933,7 @@ usbd_do_request_flags(dev, req, data, flags, actlen)
 #ifdef DIAGNOSTIC
 #if defined(__i386__) && defined(__FreeBSD__)
 	KASSERT(intr_nesting_level == 0,
-	       	("ohci_abort_req in interrupt context"));
+	       	("usbd_do_request: in interrupt context"));
 #endif
 	if (dev->bus->intr_context) {
 		printf("usbd_do_request: not in process context\n");

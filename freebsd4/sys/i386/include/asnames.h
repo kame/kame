@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/asnames.h,v 1.44 1999/12/04 10:53:39 marcel Exp $
+ * $FreeBSD: src/sys/i386/include/asnames.h,v 1.44.2.1 2000/05/16 06:58:10 dillon Exp $
  */
 
 #ifndef _MACHINE_ASNAMES_H_
@@ -155,7 +155,6 @@
 #define _arith_invalid			arith_invalid
 #define _arith_overflow			arith_overflow
 #define _arith_underflow		arith_underflow
-#define _astpending			astpending
 #define _bcopy				bcopy
 #define _bcopy_vector			bcopy_vector
 #define _bigJump			bigJump
@@ -307,7 +306,7 @@
 #define _swi_generic			swi_generic
 #define _swi_null			swi_null
 #define _swi_vm				swi_vm
-#define _syscall			syscall
+#define _syscall2			syscall2
 #define _szsigcode			szsigcode
 #define _ticks				ticks
 #define _time				time
@@ -321,7 +320,6 @@
 #define _vm86paddr			vm86paddr
 #define _vm86pcb			vm86pcb
 #define _vm_page_zero_idle		vm_page_zero_idle
-#define _want_resched			want_resched
 #define _wm_sqrt			wm_sqrt
 
 #endif /* __ELF__ */
@@ -339,6 +337,7 @@
 #define _cpu_lockid			FS(cpu_lockid)
 #define _curpcb				FS(curpcb)
 #define _curproc			FS(curproc)
+#define _astpending			FS(astpending)
 #define _currentldt			FS(currentldt)
 #define _inside_intr			FS(inside_intr)
 #define _npxproc			FS(npxproc)

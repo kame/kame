@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/bus_private.h,v 1.11 1999/09/07 08:42:49 dfr Exp $
+ * $FreeBSD: src/sys/sys/bus_private.h,v 1.11.2.1 2000/05/07 20:26:51 n_hibma Exp $
  */
 
 #ifndef _SYS_BUS_PRIVATE_H_
@@ -53,7 +53,6 @@ struct devclass {
     char		*name;
     device_t		*devices; /* array of devices indexed by unit */
     int			maxunit; /* size of devices array */
-    int			nextunit; /* next unused unit number */
 };
 
 /*
@@ -134,6 +133,7 @@ struct device {
 #define DF_WILDCARD	4	/* unit was originally wildcard */
 #define DF_DESCMALLOCED	8	/* description was malloced */
 #define DF_QUIET	16	/* don't print verbose attach message */
+#define DF_DONENOMATCH	32	/* don't execute DEVICE_NOMATCH again */
     u_char		order;	/* order from device_add_child_ordered() */
     u_char		pad;
 #ifdef DEVICE_SYSCTLS

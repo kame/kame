@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/tc/am7990.c,v 1.9 2000/02/13 03:31:50 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/tc/am7990.c,v 1.9.2.2 2000/07/17 21:24:24 archie Exp $ */
 /*	$NetBSD: am7990.c,v 1.43 1998/03/29 22:36:42 mycroft Exp $	*/
 
 /*-
@@ -221,10 +221,7 @@ am7990_config(sc)
 	printf("%s: address %s\n", device_get_nameunit(sc->sc_dev),
 	       ether_sprintf(sc->sc_enaddr));
 
-	if_attach(ifp);
-	ether_ifattach(ifp);
-
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
 	switch (sc->sc_memsize) {
 	case 8192:
@@ -556,28 +553,6 @@ am7990_read(sc, boff, len)
 
 	/* We assume that the header fit entirely in one mbuf. */
 	eh = mtod(m, struct ether_header *);
-
-	/*
-	 * Check if there's a BPF listener on this interface.
-	 * If so, hand off the raw packet to BPF.
-	 */
-	if (ifp->if_bpf) {
-		bpf_mtap(ifp, m);
-
-#ifndef LANCE_REVC_BUG
-		/*
-		 * Note that the interface cannot be in promiscuous mode if
-		 * there are no BPF listeners.  And if we are in promiscuous
-		 * mode, we have to check if this packet is really ours.
-		 */
-		if ((ifp->if_flags & IFF_PROMISC) != 0 &&
-		    (eh->ether_dhost[0] & 1) == 0 && /* !mcast and !bcast */
-		    ETHER_CMP(eh->ether_dhost, sc->sc_enaddr)) {
-			m_freem(m);
-			return;
-		}
-#endif
-	}
 
 #ifdef LANCE_REVC_BUG
 	/*

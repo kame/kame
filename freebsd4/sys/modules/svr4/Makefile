@@ -1,8 +1,10 @@
-# $FreeBSD: src/sys/modules/svr4/Makefile,v 1.13 2000/01/10 08:48:11 phantom Exp $
+# $FreeBSD: src/sys/modules/svr4/Makefile,v 1.13.2.1 2000/07/07 01:30:28 obrien Exp $
 
 MAINTAINER=	newton@FreeBSD.org
 
-.PATH:	${.CURDIR}/../../i386/svr4 ${.CURDIR}/../../svr4
+TARGET_ARCH?=	${MACHINE_ARCH}
+
+.PATH:	${.CURDIR}/../../${TARGET_ARCH}/svr4 ${.CURDIR}/../../svr4
 KMOD=	svr4
 SRCS=	svr4_sysent.c svr4_sysvec.c opt_compat.h opt_svr4.h opt_vmpage.h \
 	vnode_if.h imgact_svr4.c svr4_signal.c svr4_fcntl.c svr4_misc.c \
@@ -16,7 +18,10 @@ EXPORT_SYMS=_svr4_mod
 CLEANFILES= svr4_assym.h svr4_genassym.o
 
 svr4_assym.h:	svr4_genassym.o
-	genassym ${.ALLSRC} > ${.TARGET}
+.if exists(@)
+svr4_assym.h:	@/kern/genassym.sh
+.endif
+	sh @/kern/genassym.sh svr4_genassym.o > ${.TARGET}
 
 svr4_locore.o:	svr4_locore.s svr4_assym.h
 	${CC} -c -x assembler-with-cpp -DLOCORE ${CFLAGS} \

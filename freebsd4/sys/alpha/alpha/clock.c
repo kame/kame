@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/clock.c,v 1.13 2000/01/04 11:30:01 mjacob Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/clock.c,v 1.13.2.1 2000/07/03 20:04:17 mjacob Exp $ */
 /* $NetBSD: clock.c,v 1.20 1998/01/31 10:32:47 ross Exp $ */
 
 /*
@@ -495,12 +495,14 @@ sysbeep(int pitch, int period)
 			splx(x);
 			return (-1); /* XXX Should be EBUSY, but nobody cares anyway. */
 		}
-	pitch = TIMER_DIV(pitch);
+
+	if (pitch) pitch = TIMER_DIV(pitch);
+
 	outb(TIMER_CNTR2, pitch);
 	outb(TIMER_CNTR2, (pitch>>8));
 	if (!beeping) {
 		/* enable counter2 output to speaker */
-		outb(IO_PPI, inb(IO_PPI) | 3);
+		if (pitch) outb(IO_PPI, inb(IO_PPI) | 3);
 		beeping = period;
 		timeout(sysbeepstop, (void *)NULL, period);
 	}

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_wb.c,v 1.26 1999/09/25 17:29:02 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_wb.c,v 1.26.2.2 2000/07/17 21:24:40 archie Exp $
  */
 
 /*
@@ -102,10 +102,6 @@
 
 #include <net/bpf.h>
 
-#ifdef BRIDGE
-#include <net/bridge.h>
-#endif
-
 #include <vm/vm.h>              /* for vtophys */
 #include <vm/pmap.h>            /* for vtophys */
 #include <machine/clock.h>      /* for DELAY */
@@ -131,7 +127,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_wb.c,v 1.26 1999/09/25 17:29:02 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_wb.c,v 1.26.2.2 2000/07/17 21:24:40 archie Exp $";
 #endif
 
 /*
@@ -969,12 +965,9 @@ static int wb_attach(dev)
 	}
 
 	/*
-	 * Call MI attach routines.
+	 * Call MI attach routine.
 	 */
-	if_attach(ifp);
-	ether_ifattach(ifp);
-
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
 fail:
 	if (error)
@@ -997,7 +990,7 @@ static int wb_detach(dev)
 	ifp = &sc->arpcom.ac_if;
 
 	wb_stop(sc);
-	if_detach(ifp);
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 
 	/* Delete any miibus and phy devices attached to this interface */
 	bus_generic_detach(dev);
@@ -1201,43 +1194,10 @@ static void wb_rxeof(sc)
 		ifp->if_ipackets++;
 		eh = mtod(m, struct ether_header *);
 
-#ifdef BRIDGE
-		if (do_bridge) {
-			struct ifnet		*bdg_ifp;
-			bdg_ifp = bridge_in(m);
-			if (bdg_ifp != BDG_LOCAL && bdg_ifp != BDG_DROP)
-				bdg_forward(&m, bdg_ifp);
-			if (((bdg_ifp != BDG_LOCAL) && (bdg_ifp != BDG_BCAST) &&
-			    (bdg_ifp != BDG_MCAST)) || bdg_ifp == BDG_DROP) {
-				m_freem(m);
-				break;
-			}
-		}
-#endif
-
-		/*
-		 * Handle BPF listeners. Let the BPF user see the packet, but
-		 * don't pass it up to the ether_input() layer unless it's
-		 * a broadcast packet, multicast packet, matches our ethernet
-		 * address or the interface is in promiscuous mode.
-		 */
-		if (ifp->if_bpf) {
-			bpf_mtap(ifp, m);
-			if (ifp->if_flags & IFF_PROMISC &&
-				(bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-						ETHER_ADDR_LEN) &&
-					(eh->ether_dhost[0] & 1) == 0)) {
-				m_freem(m);
-				break;
-			}
-		}
-
 		/* Remove header from mbuf and pass it on. */
 		m_adj(m, sizeof(struct ether_header));
 		ether_input(ifp, eh, m);
 	}
-
-	return;
 }
 
 void wb_rxeoc(sc)

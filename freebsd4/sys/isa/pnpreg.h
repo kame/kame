@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/isa/pnpreg.h,v 1.3 1999/12/29 04:54:35 peter Exp $
+ *	$FreeBSD: src/sys/isa/pnpreg.h,v 1.3.2.1 2000/05/11 11:10:35 nyan Exp $
  *      from: pnp.h,v 1.7 1998/09/13 22:15:44 eivind Exp
  */
 
@@ -48,8 +48,7 @@
 #endif
 
 /* Static ports to access PnP state machine */
-#if defined(PC98) && defined(_KERNEL)
-/* pnp.h is included from pnpinfo.c. */
+#ifdef PC98
 #define _PNP_ADDRESS		0x259
 #define _PNP_WRITE_DATA		0xa59
 #else

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)systm.h	8.7 (Berkeley) 3/29/95
- * $FreeBSD: src/sys/sys/systm.h,v 1.111 2000/03/02 22:03:49 dufault Exp $
+ * $FreeBSD: src/sys/sys/systm.h,v 1.111.2.2 2000/07/18 21:12:40 dfr Exp $
  */
 
 #ifndef _SYS_SYSTM_H_
@@ -76,9 +76,14 @@ extern int bootverbose;		/* nonzero to print verbose messages */
 #ifdef	INVARIANTS		/* The option is always available */
 #define	KASSERT(exp,msg)	do { if (!(exp)) panic msg; } while (0)
 #define	SPLASSERT(level, msg)	__CONCAT(__CONCAT(spl,level),assert)(msg)
+#define	CONDSPLASSERT(cond, level, msg) do {				\
+	if (cond)							\
+		SPLASSERT(level, msg);					\
+} while (0)
 #else
 #define	KASSERT(exp,msg)
-#define SPLASSERT(level, msg)
+#define	SPLASSERT(level, msg)
+#define	CONDSPLASSERT(cond, level, msg)
 #endif
 
 /*
@@ -212,11 +217,13 @@ void		setsoftclock __P((void));
 void		setsoftnet __P((void));
 void		setsofttty __P((void));
 void		setsoftvm __P((void));
+void		setsofttq __P((void));
 void		schedsoftcamnet __P((void));
 void		schedsoftcambio __P((void));
 void		schedsoftnet __P((void));
 void		schedsofttty __P((void));
 void		schedsoftvm __P((void));
+void		schedsofttq __P((void));
 intrmask_t	softclockpending __P((void));
 void		spl0 __P((void));
 intrmask_t	splbio __P((void));
@@ -231,6 +238,7 @@ intrmask_t	splsoftcamnet __P((void));
 intrmask_t	splsoftclock __P((void));
 intrmask_t	splsofttty __P((void));
 intrmask_t	splsoftvm __P((void));
+intrmask_t	splsofttq __P((void));
 intrmask_t	splstatclock __P((void));
 intrmask_t	spltty __P((void));
 intrmask_t	splvm __P((void));
@@ -255,6 +263,7 @@ void	splsoftcamnetassert __P((const char *msg));
 void	splsoftclockassert __P((const char *msg));
 void	splsoftttyassert __P((const char *msg));
 void	splsoftvmassert __P((const char *msg));
+void	splsofttqassert __P((const char *msg));
 void	splstatclockassert __P((const char *msg));
 void	splttyassert __P((const char *msg));
 void	splvmassert __P((const char *msg));

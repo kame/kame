@@ -1,12 +1,12 @@
 /*	$NetBSD: ugen.c,v 1.27 1999/10/28 12:08:38 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ugen.c,v 1.38 2000/03/02 16:01:53 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ugen.c,v 1.38.2.3 2000/07/02 11:58:30 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -68,7 +68,7 @@
 #ifdef UGEN_DEBUG
 #define DPRINTF(x)	if (ugendebug) logprintf x
 #define DPRINTFN(n,x)	if (ugendebug>(n)) logprintf x
-int	ugendebug = 10;
+int	ugendebug = 0;
 #else
 #define DPRINTF(x)
 #define DPRINTFN(n,x)
@@ -117,7 +117,7 @@ d_poll_t  ugenpoll;
 
 #define UGEN_CDEV_MAJOR	114
 
-static struct cdevsw ugen_cdevsw = {
+Static struct cdevsw ugen_cdevsw = {
 	/* open */	ugenopen,
 	/* close */	ugenclose,
 	/* read */	ugenread,
@@ -135,18 +135,18 @@ static struct cdevsw ugen_cdevsw = {
 };
 #endif
 
-static void ugenintr __P((usbd_xfer_handle xfer, usbd_private_handle addr, 
+Static void ugenintr __P((usbd_xfer_handle xfer, usbd_private_handle addr, 
 			  usbd_status status));
 
-static int ugen_do_read __P((struct ugen_softc *, int, struct uio *, int));
-static int ugen_do_write __P((struct ugen_softc *, int, struct uio *, int));
-static int ugen_do_ioctl __P((struct ugen_softc *, int, u_long, 
+Static int ugen_do_read __P((struct ugen_softc *, int, struct uio *, int));
+Static int ugen_do_write __P((struct ugen_softc *, int, struct uio *, int));
+Static int ugen_do_ioctl __P((struct ugen_softc *, int, u_long, 
 			      caddr_t, int, struct proc *));
-static int ugen_set_config __P((struct ugen_softc *sc, int configno));
-static usb_config_descriptor_t *ugen_get_cdesc __P((struct ugen_softc *sc,
+Static int ugen_set_config __P((struct ugen_softc *sc, int configno));
+Static usb_config_descriptor_t *ugen_get_cdesc __P((struct ugen_softc *sc,
 						    int index, int *lenp));
-static usbd_status ugen_set_interface __P((struct ugen_softc *, int, int));
-static int ugen_get_alt_index __P((struct ugen_softc *sc, int ifaceidx));
+Static usbd_status ugen_set_interface __P((struct ugen_softc *, int, int));
+Static int ugen_get_alt_index __P((struct ugen_softc *sc, int ifaceidx));
 
 #define UGENUNIT(n) ((minor(n) >> 4) & 0xf)
 #define UGENENDPOINT(n) (minor(n) & 0xf)
@@ -167,6 +167,7 @@ USB_MATCH(ugen)
 USB_ATTACH(ugen)
 {
 	USB_ATTACH_START(ugen, sc, uaa);
+	usbd_device_handle udev;
 	char devinfo[1024];
 	usbd_status err;
 	int conf;
@@ -175,8 +176,19 @@ USB_ATTACH(ugen)
 	USB_ATTACH_SETUP;
 	printf("%s: %s\n", USBDEVNAME(sc->sc_dev), devinfo);
 
-	sc->sc_udev = uaa->device;
-	conf = 1;		/* XXX should not hard code 1 */
+	sc->sc_udev = udev = uaa->device;
+
+	/* First set configuration index 0, the default one for ugen. */
+	err = usbd_set_config_index(udev, 0, 0);
+	if (err) {
+		printf("%s: setting configuration index 0 failed\n", 
+		       USBDEVNAME(sc->sc_dev));
+		sc->sc_dying = 1;
+		USB_ATTACH_ERROR_RETURN;
+	}
+	conf = usbd_get_config_descriptor(udev)->bConfigurationValue;
+
+	/* Set up all the local state for this configuration. */
 	err = ugen_set_config(sc, conf);
 	if (err) {
 		printf("%s: setting configuration %d failed\n", 
@@ -188,7 +200,7 @@ USB_ATTACH(ugen)
 	USB_ATTACH_SUCCESS_RETURN;
 }
 
-static int
+Static int
 ugen_set_config(sc, configno)
 	struct ugen_softc *sc;
 	int configno;
@@ -311,6 +323,7 @@ ugenopen(dev, flag, mode, p)
 		sc->sc_is_open[USB_CONTROL_ENDPOINT] = 1;
 		return (0);
 	}
+
 	/* Make sure there are pipes for all directions. */
 	for (dir = OUT; dir <= IN; dir++) {
 		if (flag & (dir == OUT ? FWRITE : FREAD)) {
@@ -424,7 +437,7 @@ ugenclose(dev, flag, mode, p)
 	return (0);
 }
 
-static int
+Static int
 ugen_do_read(sc, endpt, uio, flag)
 	struct ugen_softc *sc;
 	int endpt;
@@ -550,7 +563,7 @@ ugenread(dev, uio, flag)
 	return (error);
 }
 
-static int
+Static int
 ugen_do_write(sc, endpt, uio, flag)
 	struct ugen_softc *sc;
 	int endpt;
@@ -734,7 +747,7 @@ USB_DETACH(ugen)
 	return (0);
 }
 
-static void
+Static void
 ugenintr(xfer, addr, status)
 	usbd_xfer_handle xfer;
 	usbd_private_handle addr;
@@ -754,7 +767,7 @@ ugenintr(xfer, addr, status)
 		return;
 	}
 
-	usbd_get_xfer_status(xfer, 0, 0, &count, 0);
+	usbd_get_xfer_status(xfer, NULL, NULL, &count, NULL);
 	ibuf = sce->ibuf;
 
 	DPRINTFN(5, ("ugenintr: xfer=%p status=%d count=%d\n", 
@@ -772,7 +785,7 @@ ugenintr(xfer, addr, status)
 	selwakeup(&sce->rsel);
 }
 
-static usbd_status
+Static usbd_status
 ugen_set_interface(sc, ifaceidx, altno)
 	struct ugen_softc *sc;
 	int ifaceidx, altno;
@@ -829,7 +842,7 @@ ugen_set_interface(sc, ifaceidx, altno)
 }
 
 /* Retrieve a complete descriptor for a certain device and index. */
-static usb_config_descriptor_t *
+Static usb_config_descriptor_t *
 ugen_get_cdesc(sc, index, lenp)
 	struct ugen_softc *sc;
 	int index;
@@ -865,7 +878,7 @@ ugen_get_cdesc(sc, index, lenp)
 	return (cdesc);
 }
 
-static int
+Static int
 ugen_get_alt_index(sc, ifaceidx)
 	struct ugen_softc *sc;
 	int ifaceidx;
@@ -879,7 +892,7 @@ ugen_get_alt_index(sc, ifaceidx)
 	return (usbd_get_interface_altindex(iface));
 }
 
-static int
+Static int
 ugen_do_ioctl(sc, endpt, cmd, addr, flag, p)
 	struct ugen_softc *sc;
 	int endpt;

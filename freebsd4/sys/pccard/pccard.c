@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pccard.c,v 1.106 2000/02/21 06:56:29 imp Exp $
+ * $FreeBSD: src/sys/pccard/pccard.c,v 1.106.2.1 2000/05/23 03:56:58 imp Exp $
  */
 
 #include "opt_pcic.h"
@@ -73,8 +73,8 @@ SYSCTL_NODE(_machdep, OID_AUTO, pccard, CTLFLAG_RW, 0, "pccard");
 
 static int pcic_resume_reset = 1;
 
-SYSCTL_INT(_machdep_pccard, OID_AUTO, pcic_resume_reset, CTLFLAG_RW, 
-	&pcic_resume_reset, 0, "");
+SYSCTL_INT(_machdep_pccard, OID_AUTO, pcic_resume_reset, CTLFLAG_RW,
+    &pcic_resume_reset, 0, "");
 
 #define	PCCARD_MEMSIZE	(4*1024)
 
@@ -132,10 +132,10 @@ power_off_slot(void *arg)
 	struct slot *slt = (struct slot *)arg;
 	int s;
 
-	/* 
+	/*
 	 * The following will generate an interrupt.  So, to hold off
 	 * the interrupt unitl after disable runs so that we can get rid
-	 * rid of the interrupt before it becomes unsafe to touch the 
+	 * rid of the interrupt before it becomes unsafe to touch the
 	 * device.
 	 */
 	s = splhigh();
@@ -251,12 +251,12 @@ allocate_driver(struct slot *slt, struct dev_desc *desc)
 		goto err;
 	if (irq)
 		err = bus_set_resource(child, SYS_RES_IRQ, 0, irq, 1);
-	if (err) 
+	if (err)
 		goto err;
 	if (desc->memsize) {
-		err = bus_set_resource(child, SYS_RES_MEMORY, 0, desc->mem, 
+		err = bus_set_resource(child, SYS_RES_MEMORY, 0, desc->mem,
 		    desc->memsize);
-		if (err) 
+		if (err)
 			goto err;
 	}
 	err = device_probe_and_attach(child);

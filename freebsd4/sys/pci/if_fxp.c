@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_fxp.c,v 1.77 1999/09/30 19:03:12 gallatin Exp $
+ * $FreeBSD: src/sys/pci/if_fxp.c,v 1.77.2.6 2000/07/19 14:36:36 gallatin Exp $
  */
 
 /*
@@ -105,13 +105,6 @@
 #define	vtophys(va)	alpha_XXX_dmamap((vm_offset_t)(va))
 #endif /* __alpha__ */
 
-
-#include "opt_bdg.h"
-#ifdef BRIDGE
-#include <net/if_types.h>
-#include <net/bridge.h>
-#endif
-
 /*
  * NOTE!  On the Alpha, we have an alignment constraint.  The
  * card DMAs the packet immediately following the RFA.  However,
@@ -132,11 +125,15 @@ static __inline void
 fxp_lwcopy(src, dst)
 	volatile u_int32_t *src, *dst;
 {
+#ifdef __i386__
+	*dst = *src;
+#else
 	volatile u_int16_t *a = (volatile u_int16_t *)src;
 	volatile u_int16_t *b = (volatile u_int16_t *)dst;
 
 	b[0] = a[0];
 	b[1] = a[1];
+#endif
 }
 
 /*
@@ -232,6 +229,7 @@ static void fxp_watchdog	__P((struct ifnet *));
 static int fxp_add_rfabuf	__P((struct fxp_softc *, struct mbuf *));
 static int fxp_mdi_read		__P((struct fxp_softc *, int, int));
 static void fxp_mdi_write	__P((struct fxp_softc *, int, int, int));
+static void fxp_autosize_eeprom __P((struct fxp_softc *));
 static void fxp_read_eeprom	__P((struct fxp_softc *, u_int16_t *,
 				     int, int));
 static int fxp_attach_common	__P((struct fxp_softc *, u_int8_t *));
@@ -497,15 +495,21 @@ fxp_ether_ioctl(ifp, cmd, data)
 static int
 fxp_probe(device_t dev)
 {
-	if ((pci_get_vendor(dev) == FXP_VENDORID_INTEL) &&
-	    (pci_get_device(dev) == FXP_DEVICEID_i82557)) {
-		device_set_desc(dev, "Intel EtherExpress Pro 10/100B Ethernet");
-		return 0;
-	}
-	if ((pci_get_vendor(dev) == FXP_VENDORID_INTEL) &&
-	    (pci_get_device(dev) == FXP_DEVICEID_i82559)) {
-		device_set_desc(dev, "Intel InBusiness 10/100 Ethernet");
-		return 0;
+	if (pci_get_vendor(dev) == FXP_VENDORID_INTEL) {
+		switch (pci_get_device(dev)) {
+
+		case FXP_DEVICEID_i82557:
+			device_set_desc(dev, "Intel Pro 10/100B/100+ Ethernet");
+			return 0;
+		case FXP_DEVICEID_i82559:
+			device_set_desc(dev, "Intel InBusiness 10/100 Ethernet");
+			return 0;
+		case FXP_DEVICEID_i82559ER:
+			device_set_desc(dev, "Intel Embedded 10/100 Ethernet");
+			return 0;
+		default:
+			break;
+		}
 	}
 
 	return ENXIO;
@@ -594,14 +598,12 @@ fxp_attach(device_t dev)
 	/*
 	 * Attach the interface.
 	 */
-	if_attach(ifp);
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 	/*
 	 * Let the system queue as many packets as we have available
 	 * TX descriptors.
 	 */
 	ifp->if_snd.ifq_maxlen = FXP_NTXCB - 1;
-	ether_ifattach(ifp);
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
 
 	splx(s);
 	return 0;
@@ -625,7 +627,7 @@ fxp_detach(device_t dev)
 	/*
 	 * Close down routes etc.
 	 */
-	if_detach(&sc->arpcom.ac_if);
+	ether_ifdetach(&sc->arpcom.ac_if, ETHER_BPF_SUPPORTED);
 
 	/*
 	 * Stop DMA and drop transmit queue.
@@ -748,6 +750,11 @@ fxp_attach_common(sc, enaddr)
 	}
 
 	/*
+	 * Find out how large of an SEEPROM we have.
+	 */
+	fxp_autosize_eeprom(sc);
+
+	/*
 	 * Get info about the primary PHY
 	 */
 	fxp_read_eeprom(sc, (u_int16_t *)&data, 6, 1);
@@ -802,6 +809,76 @@ fxp_attach_common(sc, enaddr)
 }
 
 /*
+ * From NetBSD:
+ *
+ * Figure out EEPROM size.
+ *
+ * 559's can have either 64-word or 256-word EEPROMs, the 558
+ * datasheet only talks about 64-word EEPROMs, and the 557 datasheet
+ * talks about the existance of 16 to 256 word EEPROMs.
+ *
+ * The only known sizes are 64 and 256, where the 256 version is used
+ * by CardBus cards to store CIS information.
+ *
+ * The address is shifted in msb-to-lsb, and after the last
+ * address-bit the EEPROM is supposed to output a `dummy zero' bit,
+ * after which follows the actual data. We try to detect this zero, by
+ * probing the data-out bit in the EEPROM control register just after
+ * having shifted in a bit. If the bit is zero, we assume we've
+ * shifted enough address bits. The data-out should be tri-state,
+ * before this, which should translate to a logical one.
+ *
+ * Other ways to do this would be to try to read a register with known
+ * contents with a varying number of address bits, but no such
+ * register seem to be available. The high bits of register 10 are 01
+ * on the 558 and 559, but apparently not on the 557.
+ * 
+ * The Linux driver computes a checksum on the EEPROM data, but the
+ * value of this checksum is not very well documented.
+ */
+static void
+fxp_autosize_eeprom(sc)
+	struct fxp_softc *sc;
+{
+	u_int16_t reg;
+	int x;
+
+	CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, FXP_EEPROM_EECS);
+	/*
+	 * Shift in read opcode.
+	 */
+	for (x = 3; x > 0; x--) {
+		if (FXP_EEPROM_OPC_READ & (1 << (x - 1))) {
+			reg = FXP_EEPROM_EECS | FXP_EEPROM_EEDI;
+		} else {
+			reg = FXP_EEPROM_EECS;
+		}
+		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, reg);
+		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL,
+		    reg | FXP_EEPROM_EESK);
+		DELAY(1);
+		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, reg);
+		DELAY(1);
+	}
+	/*
+	 * Shift in address.
+	 * Wait for the dummy zero following a correct address shift.
+	 */
+	for (x = 1; x <= 8; x++) {
+		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, FXP_EEPROM_EECS);
+		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL,
+			FXP_EEPROM_EECS | FXP_EEPROM_EESK);
+		DELAY(1);
+		if ((CSR_READ_2(sc, FXP_CSR_EEPROMCONTROL) & FXP_EEPROM_EEDO) == 0)
+			break;
+		CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, FXP_EEPROM_EECS);
+		DELAY(1);
+	}
+	CSR_WRITE_2(sc, FXP_CSR_EEPROMCONTROL, 0);
+	DELAY(1);
+	sc->eeprom_size = x;
+}
+/*
  * Read from the serial EEPROM. Basically, you manually shift in
  * the read opcode (one bit at a time) and then shift in the address,
  * and then you shift out the data (all of this one bit at a time).
@@ -839,7 +916,7 @@ fxp_read_eeprom(sc, data, offset, words)
 		/*
 		 * Shift in address.
 		 */
-		for (x = 6; x > 0; x--) {
+		for (x = sc->eeprom_size; x > 0; x--) {
 			if ((i + offset) & (1 << (x - 1))) {
 				reg = FXP_EEPROM_EECS | FXP_EEPROM_EEDI;
 			} else {
@@ -976,7 +1053,19 @@ tbdinit:
 		/*
 		 * Advance the end of list forward.
 		 */
+
+#ifdef __alpha__
+		/*
+		 * On platforms which can't access memory in 16-bit
+		 * granularities, we must prevent the card from DMA'ing
+		 * up the status while we update the command field.
+		 * This could cause us to overwrite the completion status.
+		 */
+		atomic_clear_short(&sc->cbl_last->cb_command,
+		    FXP_CB_COMMAND_S);
+#else
 		sc->cbl_last->cb_command &= ~FXP_CB_COMMAND_S;
+#endif /*__alpha__*/
 		sc->cbl_last = txp;
 
 		/*
@@ -1083,7 +1172,7 @@ rcvloop:
 				 */
 				if (fxp_add_rfabuf(sc, m) == 0) {
 					struct ether_header *eh;
-					u_int16_t total_len;
+					int total_len;
 
 					total_len = rfa->actual_size &
 					    (MCLBYTES - 1);
@@ -1093,53 +1182,13 @@ rcvloop:
 						goto rcvloop;
 					}
 					m->m_pkthdr.rcvif = ifp;
-					m->m_pkthdr.len = m->m_len =
-					    total_len ;
+					m->m_pkthdr.len = m->m_len = total_len;
 					eh = mtod(m, struct ether_header *);
-					if (ifp->if_bpf)
-						bpf_tap(FXP_BPFTAP_ARG(ifp),
-						    mtod(m, caddr_t),
-						    total_len); 
-#ifdef BRIDGE
-                                        if (do_bridge) {
-                                            struct ifnet *bdg_ifp ;
-                                            bdg_ifp = bridge_in(m);
-                                            if (bdg_ifp == BDG_DROP)
-                                                goto dropit ;
-                                            if (bdg_ifp != BDG_LOCAL)
-                                                bdg_forward(&m, bdg_ifp);
-                                            if (bdg_ifp != BDG_LOCAL &&
-                                                    bdg_ifp != BDG_BCAST &&
-                                                    bdg_ifp != BDG_MCAST)
-                                                goto dropit ;
-                                            goto getit ;
-                                        }
-#endif
-					/*
-					 * Only pass this packet up
-					 * if it is for us.
-					 */
-					if ((ifp->if_flags &
-					    IFF_PROMISC) &&
-					    (rfa->rfa_status &
-					    FXP_RFA_STATUS_IAMATCH) &&
-					    (eh->ether_dhost[0] & 1)
-					    == 0) {
-#ifdef BRIDGE
-dropit:
-#endif
-					    if (m)
-						m_freem(m);
-					    goto rcvloop;
-					}
-#ifdef BRIDGE
-getit:
-#endif
 					m->m_data +=
 					    sizeof(struct ether_header);
 					m->m_len -=
 					    sizeof(struct ether_header);
-					m->m_pkthdr.len = m->m_len ;
+					m->m_pkthdr.len = m->m_len;
 					ether_input(ifp, eh, m);
 				}
 				goto rcvloop;
@@ -1734,7 +1783,7 @@ fxp_add_rfabuf(sc, oldm)
 		sc->rfa_tailm->m_next = m;
 		v = vtophys(rfa);
 		fxp_lwcopy(&v, (volatile u_int32_t *) p_rfa->link_addr);
-		p_rfa->rfa_control &= ~FXP_RFA_CONTROL_EL;
+		p_rfa->rfa_control = 0;
 	} else {
 		sc->rfa_headm = m;
 	}

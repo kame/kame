@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/libi386/elf_freebsd.c,v 1.7 1999/08/28 00:40:15 peter Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/elf_freebsd.c,v 1.7.2.1 2000/07/06 00:34:03 ps Exp $
  */
 
 #include <sys/param.h>
@@ -84,6 +84,7 @@ elf_exec(struct loaded_module *mp)
     printf("Start @ 0x%lx ...\n", entry);
 #endif
 
+    dev_cleanup();
     __exec((void *)entry, boothowto, bootdev, 0, 0, 0, bootinfop);
 
     panic("exec returned");

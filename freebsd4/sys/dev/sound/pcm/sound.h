@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/sound.h,v 1.10 2000/01/29 18:44:01 peter Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/sound.h,v 1.10.2.3 2000/07/19 20:12:58 cg Exp $
  */
 
 /*
@@ -47,6 +47,15 @@
 
 #include <sys/kernel.h> /* for DATA_SET */
 
+#if __FreeBSD_version < 500000
+#define MODULE_VERSION(mod, ver)
+#define MODULE_DEPEND(mod, dep, min, pref, max)
+
+#define ISADMA_WRITE B_WRITE
+#define ISADMA_READ B_READ
+#define ISADMA_RAW B_RAW
+#endif
+
 #include <sys/module.h>
 #include <sys/conf.h>
 #include <sys/file.h>
@@ -55,11 +64,12 @@
 #include <sys/errno.h>
 #include <sys/malloc.h>
 #include <sys/bus.h>
+#if __FreeBSD_version > 500000
+#include <sys/bio.h>
+#endif
 #include <sys/buf.h>
 #include <machine/clock.h>	/* for DELAY */
 #include <machine/resource.h>
-#include <machine/bus_memio.h>
-#include <machine/bus_pio.h>
 #include <machine/bus.h>
 #include <sys/rman.h>
 #include <sys/mman.h>
@@ -85,6 +95,12 @@ struct isa_device { int dummy; };
 #include <dev/sound/pcm/channel.h>
 #include <dev/sound/pcm/mixer.h>
 #include <dev/sound/pcm/dsp.h>
+
+#define PCM_MODVER	1
+
+#define PCM_MINVER	1
+#define PCM_PREFVER	PCM_MODVER
+#define PCM_MAXVER	1
 
 #define	MAGIC(unit) (0xa4d10de0 + unit)
 
@@ -157,6 +173,7 @@ int pcm_register(device_t dev, void *devinfo, int numplay, int numrec);
 int pcm_setstatus(device_t dev, char *str);
 u_int32_t pcm_getflags(device_t dev);
 void pcm_setflags(device_t dev, u_int32_t val);
+void *pcm_getdevinfo(device_t dev);
 void pcm_setswap(device_t dev, pcm_swap_t *swap);
 
 #endif /* _KERNEL */

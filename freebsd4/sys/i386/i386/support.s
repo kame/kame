@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/support.s,v 1.67 2000/02/20 20:50:58 bsd Exp $
+ * $FreeBSD: src/sys/i386/i386/support.s,v 1.67.2.2 2000/07/07 00:38:46 obrien Exp $
  */
 
 #include "opt_smp.h"
@@ -169,7 +169,7 @@ jtab:
 	.text
 	SUPERALIGN_TEXT
 5:
-	jmp	jtab(,%ecx,4)
+	jmp	*jtab(,%ecx,4)
 
 	SUPERALIGN_TEXT
 do3:
@@ -303,7 +303,7 @@ fpureg_i586_bzero_loop:
 	ret
 
 i586_bz3:
-	fstpl	%st(0)
+	fstp	%st(0)
 	lmsw	%ax
 	movb	$0xfe,kernel_fpu_lock
 	ret
@@ -663,7 +663,9 @@ ENTRY(memcpy)
  * returns to *curpcb->onfault instead of the function.
  */
 
-/* copyout(from_kernel, to_user, len) */
+/*
+ * copyout(from_kernel, to_user, len)  - MP SAFE (if not I386_CPU)
+ */
 ENTRY(copyout)
 	MEXITCOUNT
 	jmp	*_copyout_vector
@@ -848,7 +850,9 @@ ENTRY(i586_copyout)
 	jmp	done_copyout
 #endif /* I586_CPU && NNPX > 0 */
 
-/* copyin(from_user, to_kernel, len) */
+/*
+ * copyin(from_user, to_kernel, len) - MP SAFE
+ */
 ENTRY(copyin)
 	MEXITCOUNT
 	jmp	*_copyin_vector
@@ -1129,7 +1133,9 @@ fastmove_tail_fault:
 #endif /* I586_CPU && NNPX > 0 */
 
 /*
- * fu{byte,sword,word} : fetch a byte (sword, word) from user memory
+ * fu{byte,sword,word} - MP SAFE
+ *
+ *	Fetch a byte (sword, word) from user memory
  */
 ENTRY(fuword)
 	movl	_curpcb,%ecx
@@ -1154,6 +1160,9 @@ ENTRY(fuswintr)
 	movl	$-1,%eax
 	ret
 
+/*
+ * fusword - MP SAFE
+ */
 ENTRY(fusword)
 	movl	_curpcb,%ecx
 	movl	$fusufault,PCB_ONFAULT(%ecx)
@@ -1166,6 +1175,9 @@ ENTRY(fusword)
 	movl	$0,PCB_ONFAULT(%ecx)
 	ret
 
+/*
+ * fubyte - MP SAFE
+ */
 ENTRY(fubyte)
 	movl	_curpcb,%ecx
 	movl	$fusufault,PCB_ONFAULT(%ecx)
@@ -1187,7 +1199,9 @@ fusufault:
 	ret
 
 /*
- * su{byte,sword,word}: write a byte (word, longword) to user memory
+ * su{byte,sword,word} - MP SAFE (if not I386_CPU)
+ *
+ *	Write a byte (word, longword) to user memory
  */
 ENTRY(suword)
 	movl	_curpcb,%ecx
@@ -1238,6 +1252,9 @@ ENTRY(suword)
 	movl	%eax,PCB_ONFAULT(%ecx)
 	ret
 
+/*
+ * susword - MP SAFE (if not I386_CPU)
+ */
 ENTRY(susword)
 	movl	_curpcb,%ecx
 	movl	$fusufault,PCB_ONFAULT(%ecx)
@@ -1287,6 +1304,9 @@ ENTRY(susword)
 	movl	%eax,PCB_ONFAULT(%ecx)
 	ret
 
+/*
+ * su[i]byte - MP SAFE (if not I386_CPU)
+ */
 ALTENTRY(suibyte)
 ENTRY(subyte)
 	movl	_curpcb,%ecx
@@ -1337,7 +1357,8 @@ ENTRY(subyte)
 	ret
 
 /*
- * copyinstr(from, to, maxlen, int *lencopied)
+ * copyinstr(from, to, maxlen, int *lencopied) - MP SAFE
+ *
  *	copy a string from from to to, stop when a 0 character is reached.
  *	return ENAMETOOLONG if string is longer than maxlen, and
  *	EFAULT on protection violations. If lencopied is non-zero,
@@ -1409,7 +1430,7 @@ cpystrflt_x:
 
 
 /*
- * copystr(from, to, maxlen, int *lencopied)
+ * copystr(from, to, maxlen, int *lencopied) - MP SAFE
  */
 ENTRY(copystr)
 	pushl	%esi
@@ -1492,14 +1513,14 @@ ENTRY(lgdt)
 1:
 	/* reload "stale" selectors */
 	movl	$KDSEL,%eax
-	movl	%ax,%ds
-	movl	%ax,%es
-	movl	%ax,%gs
-	movl	%ax,%ss
+	mov	%ax,%ds
+	mov	%ax,%es
+	mov	%ax,%gs
+	mov	%ax,%ss
 #ifdef SMP
 	movl	$KPSEL,%eax
 #endif
-	movl	%ax,%fs
+	mov	%ax,%fs
 
 	/* reload code selector by turning return into intersegmental return */
 	movl	(%esp),%eax

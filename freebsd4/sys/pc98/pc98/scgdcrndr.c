@@ -23,15 +23,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/scgdcrndr.c,v 1.5 2000/01/20 15:16:48 kato Exp $
+ * $FreeBSD: src/sys/pc98/pc98/scgdcrndr.c,v 1.5.2.1 2000/03/31 03:13:49 nyan Exp $
  */
 
-#include "sc.h"
-#include "gdc.h"
 #include "opt_syscons.h"
 #include "opt_gdc.h"
-
-#if NSC > 0 && NGDC > 0
 
 #include <sys/param.h>
 #include <sys/kernel.h>
@@ -199,5 +195,3 @@ gdc_grborder(scr_stat *scp, int color)
 }
 
 #endif /* SC_NO_MODE_CHANGE */
-
-#endif /* NSC > 0 && NGDC > 0 */

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/boot/alpha/libalpha/elf_freebsd.c,v 1.8 1999/08/28 00:39:27 peter Exp $ */
+/* $FreeBSD: src/sys/boot/alpha/libalpha/elf_freebsd.c,v 1.8.2.1 2000/07/06 00:34:02 ps Exp $ */
 /* $NetBSD: loadfile.c,v 1.10 1998/06/25 06:45:46 ross Exp $ */
 
 /*-
@@ -152,6 +152,7 @@ elf_exec(struct loaded_module *mp)
 
     printf("Entering %s at 0x%lx...\n", mp->m_name, hdr->e_entry);
     closeall();
+    dev_cleanup();
     alpha_pal_imb();
     (*(void (*)())hdr->e_entry)(ffp_save, ptbr_save,
 			       BOOTINFO_MAGIC, &bootinfo_v1, 1, 0);

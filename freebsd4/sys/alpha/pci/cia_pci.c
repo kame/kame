@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/pci/cia_pci.c,v 1.5 1999/12/03 08:40:53 mdodd Exp $
+ * $FreeBSD: src/sys/alpha/pci/cia_pci.c,v 1.5.2.1 2000/06/07 01:45:03 jhb Exp $
  */
 
 #include <sys/param.h>
@@ -32,6 +32,7 @@
 #include <sys/module.h>
 #include <sys/bus.h>
 #include <machine/bus.h>
+#include <machine/md_var.h>
 #include <sys/rman.h>
 #include <pci/pcivar.h>
 
@@ -69,8 +70,8 @@ static device_method_t cia_pcib_methods[] = {
 	DEVMETHOD(bus_release_resource,	bus_generic_release_resource),
 	DEVMETHOD(bus_activate_resource, bus_generic_activate_resource),
 	DEVMETHOD(bus_deactivate_resource, bus_generic_deactivate_resource),
-	DEVMETHOD(bus_setup_intr,	bus_generic_setup_intr),
-	DEVMETHOD(bus_teardown_intr,	bus_generic_teardown_intr),
+	DEVMETHOD(bus_setup_intr,	alpha_platform_pci_setup_intr),
+	DEVMETHOD(bus_teardown_intr,	alpha_platform_pci_teardown_intr),
 
 	{ 0, 0 }
 };

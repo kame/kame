@@ -33,8 +33,8 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinummemory.c,v 1.23 1999/12/27 04:04:19 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinummemory.c,v 1.22 2000/02/29 06:13:24 grog Exp $
+ * $Id: vinummemory.c,v 1.25 2000/05/04 01:57:48 grog Exp grog $
+ * $FreeBSD: src/sys/dev/vinum/vinummemory.c,v 1.22.2.1 2000/06/02 04:26:11 grog Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -110,7 +110,9 @@ expand_table(void **table, int oldsize, int newsize)
 {
     if (newsize > oldsize) {
 	int *temp;
+	int s;
 
+	s = splhigh();
 	temp = (int *) Malloc(newsize);			    /* allocate a new table */
 	CHECKALLOC(temp, "vinum: Can't expand table\n");
 	bzero((char *) temp, newsize);			    /* clean it all out */
@@ -119,6 +121,7 @@ expand_table(void **table, int oldsize, int newsize)
 	    Free(*table);
 	}
 	*table = temp;
+	splx(s);
     }
 }
 

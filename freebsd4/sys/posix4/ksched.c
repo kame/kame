@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/posix4/ksched.c,v 1.7 1999/12/27 10:22:09 bde Exp $
+ * $FreeBSD: src/sys/posix4/ksched.c,v 1.7.2.1 2000/05/16 06:58:13 dillon Exp $
  */
 
 /* ksched: Soft real time scheduling based on "rtprio".
@@ -41,6 +41,7 @@
 #include <sys/kernel.h>
 #include <sys/resource.h>
 #include <machine/cpu.h>	/* For need_resched */
+#include <machine/ipl.h>	/* For need_resched */
 
 #include <posix4/posix4.h>
 

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)wd.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/isa/wd.c,v 1.219 2000/01/30 07:58:14 bde Exp $
+ * $FreeBSD: src/sys/i386/isa/wd.c,v 1.219.2.1 2000/04/03 20:13:06 n_hibma Exp $
  */
 
 /* TODO:
@@ -674,7 +674,7 @@ wdstart(int ctrlr)
 	/* is there a drive for the controller to do a transfer with? */
 	bp = bufq_first(&wdtab[ctrlr].controller_queue);
 	if (bp == NULL) {
-		if (atapi_start && atapi_start (ctrlr_atapi))
+		if (atapi_strt && atapi_strt (ctrlr_atapi))
 			/* mark controller active in ATAPI mode */
 			wdtab[ctrlr].b_active = 3;
 		return;

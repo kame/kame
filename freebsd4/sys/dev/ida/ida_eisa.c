@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/ida_eisa.c,v 1.1 2000/03/08 16:16:31 jlemon Exp $
+ * $FreeBSD: src/sys/dev/ida/ida_eisa.c,v 1.1.2.1 2000/04/16 14:14:29 mdodd Exp $
  */
 
 #include <sys/param.h>
@@ -80,7 +80,7 @@ ida_v1_submit(struct ida_softc *ida, struct ida_qcb *qcb)
 	ida_outb(ida, R_EISA_SYSTEM_DOORBELL, EISA_CHANNEL_CLEAR);
 	ida_outl(ida, R_EISA_LIST_ADDR, qcb->hwqcb_busaddr);
 	ida_outw(ida, R_EISA_LIST_LEN, size);
-	ida_outb(ida, R_EISA_LOCAL_DOORBELL, EISA_CHANNEL_CLEAR);
+	ida_outb(ida, R_EISA_LOCAL_DOORBELL, EISA_CHANNEL_BUSY);
 }
 
 static bus_addr_t

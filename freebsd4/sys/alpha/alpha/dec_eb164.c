@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/dec_eb164.c,v 1.8 1999/10/05 21:19:34 n_hibma Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/dec_eb164.c,v 1.8.2.2 2000/07/20 06:12:12 obrien Exp $ */
 /* $NetBSD: dec_eb164.c,v 1.26 1998/04/17 02:45:19 mjacob Exp $ */
 
 /*
@@ -6,17 +6,17 @@
  * All rights reserved.
  *
  * Author: Chris G. Demetriou
- * 
+ *
  * Permission to use, copy, modify and distribute this software and
  * its documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
- * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" 
- * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND 
+ *
+ * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+ * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND
  * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
  *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
@@ -34,6 +34,7 @@
 #include "opt_ddb.h"
 
 #include <sys/param.h>
+#include <sys/reboot.h>
 #include <sys/systm.h>
 #include <sys/termios.h>
 
@@ -46,8 +47,8 @@
 #include "sio.h"
 #include "sc.h"
 
-#ifndef CONSPEED
-#define CONSPEED TTYDEF_SPEED
+#ifndef	CONSPEED
+#define	CONSPEED TTYDEF_SPEED
 #endif
 static int comcnrate = CONSPEED;
 
@@ -94,7 +95,7 @@ dec_eb164_cons_init()
 	ctb = (struct ctb *)(((caddr_t)hwrpb) + hwrpb->rpb_ctb_off);
 
 	switch (ctb->ctb_term_type) {
-	case 2: 
+	case 2:
 		/* serial console ... */
 		/* XXX */
 		{
@@ -105,14 +106,15 @@ dec_eb164_cons_init()
 			 */
 			DELAY(160000000 / comcnrate);
 
-                        /* 
-                         * force a comconsole on com1 if the SRM has a serial
-			 * console
-                         */
-                        comconsole = 0;
+			/*
+			 * Force a comconsole on com1 if the SRM has a serial
+			 * console.
+			 */
+			comconsole = 0;
 			if (siocnattach(0x3f8, comcnrate))
 				panic("can't init serial console");
 
+			boothowto |= RB_SERIAL;
 			break;
 		}
 
@@ -131,7 +133,7 @@ dec_eb164_cons_init()
 		printf("ctb->ctb_turboslot = 0x%lx\n", ctb->ctb_turboslot);
 
 		panic("consinit: unknown console type %d\n",
-		    (int) ctb->ctb_term_type);
+		    (int)ctb->ctb_term_type);
 	}
 }
 

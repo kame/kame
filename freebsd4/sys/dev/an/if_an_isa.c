@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.1 2000/01/14 20:40:56 wpaul Exp $
+ * $FreeBSD: src/sys/dev/an/if_an_isa.c,v 1.1.2.1 2000/07/17 21:24:25 archie Exp $
  */
 
 /*
@@ -132,7 +132,7 @@ an_detach_isa(device_t dev)
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
 
 	an_stop(sc);
-	if_detach(ifp);
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 	bus_teardown_intr(dev, sc->irq_res, sc->irq_handle);
 	an_release_resources(dev);
 

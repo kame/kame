@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_dc.c,v 1.9 2000/03/11 05:20:56 msmith Exp $
+ * $FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.5 2000/07/17 21:24:38 archie Exp $
  */
 
 /*
@@ -44,6 +44,7 @@
  * ADMtek AL981 (www.admtek.com.tw)
  * ADMtek AN985 (www.admtek.com.tw)
  * Davicom DM9100, DM9102, DM9102A (www.davicom8.com)
+ * Accton EN1217 (www.accton.com)
  *
  * Datasheets for the 21143 are available at developer.intel.com.
  * Datasheets for the clone parts can be found at their respective sites.
@@ -122,11 +123,6 @@
 
 #include <net/bpf.h>
 
-#include "opt_bdg.h"
-#ifdef BRIDGE 
-#include <net/bridge.h>
-#endif
-
 #include <vm/vm.h>              /* for vtophys */
 #include <vm/pmap.h>            /* for vtophys */
 #include <machine/clock.h>      /* for DELAY */
@@ -152,7 +148,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_dc.c,v 1.9 2000/03/11 05:20:56 msmith Exp $";
+  "$FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.5 2000/07/17 21:24:38 archie Exp $";
 #endif
 
 /*
@@ -186,6 +182,8 @@ static struct dc_type dc_devs[] = {
 	{ DC_VENDORID_MX, DC_DEVICEID_987x5,
 		"Macronix 98715/98715A 10/100BaseTX" },
 	{ DC_VENDORID_MX, DC_DEVICEID_987x5,
+		"Macronix 98715AEC-C 10/100BaseTX" },
+	{ DC_VENDORID_MX, DC_DEVICEID_987x5,
 		"Macronix 98725 10/100BaseTX" },
 	{ DC_VENDORID_LO, DC_DEVICEID_82C115,
 		"LC82C115 PNIC II 10/100BaseTX" },
@@ -193,6 +191,8 @@ static struct dc_type dc_devs[] = {
 		"82c168 PNIC 10/100BaseTX" },
 	{ DC_VENDORID_LO, DC_DEVICEID_82C168,
 		"82c169 PNIC 10/100BaseTX" },
+	{ DC_VENDORID_ACCTON, DC_DEVICEID_EN1217,
+		"Accton EN1217 10/100BaseTX" },
 	{ 0, 0, NULL }
 };
 
@@ -899,8 +899,9 @@ static void dc_miibus_mediainit(dev)
 }
 
 #define DC_POLY		0xEDB88320
-#define DC_BITS		9
-#define DC_BITS_PNIC_II	7
+#define DC_BITS_512	9
+#define DC_BITS_128	7
+#define DC_BITS_64	6
 
 static u_int32_t dc_crc_le(sc, addr)
 	struct dc_softc		*sc;
@@ -916,11 +917,18 @@ static u_int32_t dc_crc_le(sc, addr)
 			crc = (crc >> 1) ^ (((crc ^ data) & 1) ? DC_POLY : 0);
 	}
 
-	/* The hash table on the PNIC II is only 128 bits wide. */
-	if (DC_IS_PNICII(sc))
-		return (crc & ((1 << DC_BITS_PNIC_II) - 1));
+	/*
+	 * The hash table on the PNIC II and the MX98715AEC-C/D/E
+	 * chips is only 128 bits wide.
+	 */
+	if (sc->dc_flags & DC_128BIT_HASH)
+		return (crc & ((1 << DC_BITS_128) - 1));
 
-	return (crc & ((1 << DC_BITS) - 1));
+	/* The hash table on the MX98715BEC is only 64 bits wide. */
+	if (sc->dc_flags & DC_64BIT_HASH)
+		return (crc & ((1 << DC_BITS_64) - 1));
+
+	return (crc & ((1 << DC_BITS_512) - 1));
 }
 
 /*
@@ -1224,8 +1232,9 @@ static void dc_setcfg(sc, media)
 				DC_PN_GPIO_SETBIT(sc, DC_PN_GPIO_100TX_LOOP);
 				DC_SETBIT(sc, DC_PN_NWAY, DC_PN_NWAY_SPEEDSEL);
 			}
-			DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_PORTSEL|
-			    DC_NETCFG_PCS|DC_NETCFG_SCRAMBLER);
+			DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_PORTSEL);
+			DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_PCS);
+			DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_SCRAMBLER);
 		}
 	}
 
@@ -1248,8 +1257,8 @@ static void dc_setcfg(sc, media)
 				DC_CLRBIT(sc, DC_PN_NWAY, DC_PN_NWAY_SPEEDSEL);
 			}
 			DC_CLRBIT(sc, DC_NETCFG, DC_NETCFG_PORTSEL);
+			DC_CLRBIT(sc, DC_NETCFG, DC_NETCFG_PCS);
 			DC_CLRBIT(sc, DC_NETCFG, DC_NETCFG_SCRAMBLER);
-			DC_SETBIT(sc, DC_NETCFG, DC_NETCFG_PCS);
 		}
 	}
 
@@ -1342,6 +1351,9 @@ static struct dc_type *dc_devtype(dev)
 				t++;
 			if (t->dc_did == DC_DEVICEID_98713_CP &&
 			    rev >= DC_REVISION_98713A)
+				t++;
+			if (t->dc_did == DC_DEVICEID_987x5 &&
+			    rev >= DC_REVISION_98715AEC_C)
 				t++;
 			if (t->dc_did == DC_DEVICEID_987x5 &&
 			    rev >= DC_REVISION_98725)
@@ -1454,10 +1466,10 @@ static int dc_attach(dev)
 	/*
 	 * Map control/status registers.
 	 */
-	command = pci_read_config(dev, PCI_COMMAND_STATUS_REG, 4);
+	command = pci_read_config(dev, PCIR_COMMAND, 4);
 	command |= (PCIM_CMD_PORTEN|PCIM_CMD_MEMEN|PCIM_CMD_BUSMASTEREN);
-	pci_write_config(dev, PCI_COMMAND_STATUS_REG, command, 4);
-	command = pci_read_config(dev, PCI_COMMAND_STATUS_REG, 4);
+	pci_write_config(dev, PCIR_COMMAND, command, 4);
+	command = pci_read_config(dev, PCIR_COMMAND, 4);
 
 #ifdef DC_USEIOSPACE
 	if (!(command & PCIM_CMD_PORTEN)) {
@@ -1541,19 +1553,34 @@ static int dc_attach(dev)
 	case DC_DEVICEID_98713_CP:
 		if (revision < DC_REVISION_98713A) {
 			sc->dc_type = DC_TYPE_98713;
-			sc->dc_flags |= DC_REDUCED_MII_POLL;
 		}
-		if (revision >= DC_REVISION_98713A)
+		if (revision >= DC_REVISION_98713A) {
 			sc->dc_type = DC_TYPE_98713A;
+			sc->dc_flags |= DC_21143_NWAY;
+		}
+		sc->dc_flags |= DC_REDUCED_MII_POLL;
 		sc->dc_flags |= DC_TX_POLL|DC_TX_USE_TX_INTR;
 		break;
 	case DC_DEVICEID_987x5:
+	case DC_DEVICEID_EN1217:
+		/*
+		 * Macronix MX98715AEC-C/D/E parts have only a
+		 * 128-bit hash table. We need to deal with these
+		 * in the same manner as the PNIC II so that we
+		 * get the right number of bits out of the
+		 * CRC routine.
+		 */
+		if (revision >= DC_REVISION_98715AEC_C &&
+		    revision < DC_REVISION_98725)
+			sc->dc_flags |= DC_128BIT_HASH;
 		sc->dc_type = DC_TYPE_987x5;
 		sc->dc_flags |= DC_TX_POLL|DC_TX_USE_TX_INTR;
+		sc->dc_flags |= DC_REDUCED_MII_POLL|DC_21143_NWAY;
 		break;
 	case DC_DEVICEID_82C115:
 		sc->dc_type = DC_TYPE_PNICII;
-		sc->dc_flags |= DC_TX_POLL|DC_TX_USE_TX_INTR;
+		sc->dc_flags |= DC_TX_POLL|DC_TX_USE_TX_INTR|DC_128BIT_HASH;
+		sc->dc_flags |= DC_REDUCED_MII_POLL|DC_21143_NWAY;
 		break;
 	case DC_DEVICEID_82C168:
 		sc->dc_type = DC_TYPE_PNIC;
@@ -1611,8 +1638,10 @@ static int dc_attach(dev)
 		DELAY(10000);
 		if (media & DC_CWUC_MII_ABILITY)
 			sc->dc_pmode = DC_PMODE_MII;
-		if (media & DC_CWUC_SYM_ABILITY)
+		if (media & DC_CWUC_SYM_ABILITY) {
 			sc->dc_pmode = DC_PMODE_SYM;
+			sc->dc_flags |= DC_21143_NWAY;
+		}
 		/*
 		 * If none of the bits are set, then this NIC
 		 * isn't meant to support 'wake up LAN' mode.
@@ -1703,6 +1732,7 @@ static int dc_attach(dev)
 
 	if (error && DC_IS_INTEL(sc)) {
 		sc->dc_pmode = DC_PMODE_SYM;
+		sc->dc_flags |= DC_21143_NWAY;
 		mii_phy_probe(dev, &sc->dc_miibus,
 		    dc_ifmedia_upd, dc_ifmedia_sts);
 		error = 0;
@@ -1718,13 +1748,10 @@ static int dc_attach(dev)
 	}
 
 	/*
-	 * Call MI attach routines.
+	 * Call MI attach routine.
 	 */
-	if_attach(ifp);
-	ether_ifattach(ifp);
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 	callout_handle_init(&sc->dc_stat_ch);
-
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
 
 #ifdef __alpha__
         sc->dc_srm_media = 0;
@@ -1772,7 +1799,7 @@ static int dc_detach(dev)
 	ifp = &sc->arpcom.ac_if;
 
 	dc_stop(sc);
-	if_detach(ifp);
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 
 	bus_generic_detach(dev);
 	device_delete_child(dev, sc->dc_miibus);
@@ -2131,47 +2158,12 @@ static void dc_rxeof(sc)
 		ifp->if_ipackets++;
 		eh = mtod(m, struct ether_header *);
 
-		/* Handle BPF listeners. Let the BPF user see the packet */
-		if (ifp->if_bpf)
-			bpf_mtap(ifp, m);
-
-#ifdef BRIDGE
-		if (do_bridge) {
-			struct ifnet *bdg_ifp ;
-			bdg_ifp = bridge_in(m);
-			if (bdg_ifp != BDG_LOCAL && bdg_ifp != BDG_DROP)
-				bdg_forward(&m, bdg_ifp);
-			if (((bdg_ifp != BDG_LOCAL) && (bdg_ifp != BDG_BCAST) &&			    (bdg_ifp != BDG_MCAST)) || bdg_ifp == BDG_DROP) {
-				m_freem(m);
-				continue;
-			}
-		}
-
-	eh = mtod(m, struct ether_header *);
-#endif
-
-		/* Don't pass it up to the ether_input() layer unless it's
-		 * a broadcast packet, multicast packet, matches our ethernet
-		 * address or the interface is in promiscuous mode.
-		 */
-		if (ifp->if_bpf) {
-			if (ifp->if_flags & IFF_PROMISC &&
-				(bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-				    ETHER_ADDR_LEN) &&
-				    (eh->ether_dhost[0] & 1) == 0)) {
-				m_freem(m);
-				continue;
-			}
-		}
-
 		/* Remove header from mbuf and pass it on. */
 		m_adj(m, sizeof(struct ether_header));
 		ether_input(ifp, eh, m);
 	}
 
 	sc->dc_cdata.dc_rx_prod = i;
-
-	return;
 }
 
 /*
@@ -2281,16 +2273,27 @@ static void dc_tick(xsc)
 	mii = device_get_softc(sc->dc_miibus);
 
 	if (sc->dc_flags & DC_REDUCED_MII_POLL) {
-		r = CSR_READ_4(sc, DC_ISR);
-		if (DC_IS_INTEL(sc)) {
-			if (r & DC_ISR_LINKFAIL) 
+		if (sc->dc_flags & DC_21143_NWAY) {
+			r = CSR_READ_4(sc, DC_10BTSTAT);
+			if (IFM_SUBTYPE(mii->mii_media_active) ==
+			    IFM_100_TX && (r & DC_TSTAT_LS100)) {
 				sc->dc_link = 0;
+				mii_mediachg(mii);
+			}
+			if (IFM_SUBTYPE(mii->mii_media_active) ==
+			    IFM_10_T && (r & DC_TSTAT_LS10)) {
+				sc->dc_link = 0;
+				mii_mediachg(mii);
+			}
 			if (sc->dc_link == 0)
 				mii_tick(mii);
 		} else {
+			r = CSR_READ_4(sc, DC_ISR);
 			if ((r & DC_ISR_RX_STATE) == DC_RXSTATE_WAIT &&
-			    sc->dc_cdata.dc_tx_prod == 0)
+			    sc->dc_cdata.dc_tx_cnt == 0)
 				mii_tick(mii);
+				if (!(mii->mii_media_status & IFM_ACTIVE))
+					sc->dc_link = 0;
 		}
 	} else
 		mii_tick(mii);
@@ -2324,7 +2327,10 @@ static void dc_tick(xsc)
 		}
 	}
 
-	sc->dc_stat_ch = timeout(dc_tick, sc, hz);
+	if (sc->dc_flags & DC_21143_NWAY && !sc->dc_link)
+		sc->dc_stat_ch = timeout(dc_tick, sc, hz/10);
+	else
+		sc->dc_stat_ch = timeout(dc_tick, sc, hz);
 
 	splx(s);
 
@@ -2715,7 +2721,10 @@ static void dc_init(xsc)
 
 	(void)splx(s);
 
-	sc->dc_stat_ch = timeout(dc_tick, sc, hz);
+	if (sc->dc_flags & DC_21143_NWAY)
+		sc->dc_stat_ch = timeout(dc_tick, sc, hz/10);
+	else
+		sc->dc_stat_ch = timeout(dc_tick, sc, hz);
 
 #ifdef __alpha__
         if(sc->dc_srm_media) {

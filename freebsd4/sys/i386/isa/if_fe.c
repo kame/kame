@@ -21,7 +21,7 @@
  */
 
 /*
- * $FreeBSD: src/sys/i386/isa/if_fe.c,v 1.58 1999/10/25 17:04:17 wpaul Exp $
+ * $FreeBSD: src/sys/i386/isa/if_fe.c,v 1.58.2.3 2000/07/17 21:24:30 archie Exp $
  *
  * Device driver for Fujitsu MB86960A/MB86965A based Ethernet cards.
  * To be used with FreeBSD 3.x
@@ -66,7 +66,6 @@
  *      cons of multiple frame transmission.
  *  o   To test IPX codes.
  *  o   To test FreeBSD3.0-current.
- *  o   To test BRIDGE codes.
  */
 
 #include "fe.h"
@@ -91,10 +90,6 @@
 #include <netinet/if_ether.h>
 
 #include <net/bpf.h>
-
-#ifdef BRIDGE
-#include <net/bridge.h>
-#endif
 
 #include <machine/clock.h>
 
@@ -247,6 +242,7 @@ static int	fe_probe_ubn	( struct isa_device *, struct fe_softc * );
 #ifdef PC98
 static int	fe_probe_re1000	( struct isa_device *, struct fe_softc * );
 static int	fe_probe_cnet9ne( struct isa_device *, struct fe_softc * );
+static int	fe_probe_rex    ( struct isa_device *, struct fe_softc * );
 #endif
 #if NCARD > 0
 static int	fe_probe_mbh	( struct isa_device *, struct fe_softc * );
@@ -489,6 +485,7 @@ fe_probe (struct isa_device * dev)
 #ifdef PC98
 	if (!nports) nports = fe_probe_re1000(dev, sc);
 	if (!nports) nports = fe_probe_cnet9ne(dev, sc);
+	if (!nports) nports = fe_probe_rex(dev, sc);
 #endif
 	if (!nports) nports = fe_probe_ssi(dev, sc);
 	if (!nports) nports = fe_probe_jli(dev, sc);
@@ -1654,6 +1651,133 @@ fail_ubn:
 	return 0;
 }
 
+/*
+ * REX boards(non-JLI type) support routine.
+ */
+
+#define REX_EEPROM_SIZE	32
+#define REX_DAT	0x01
+
+static void
+fe_read_eeprom_rex (struct fe_softc *sc, u_char *data)
+{
+	int i;
+	u_char bit, val;
+	u_char save16;
+	u_short reg16 = sc->ioaddr[0x10];
+
+	save16 = inb(reg16);
+
+	/* Issue a start condition.  */
+	val = inb(reg16) & 0xf0;
+	outb(reg16, val);
+
+	(void)inb(reg16);
+	(void)inb(reg16);
+	(void)inb(reg16);
+	(void)inb(reg16);
+
+	/* Read bytes from EEPROM.  */
+	for (i = 0; i < REX_EEPROM_SIZE; i++) {
+		/* Read a byte and store it into the buffer.  */
+		val = 0x00;
+		for (bit = 0x01; bit != 0x00; bit <<= 1) {
+			if (inb(reg16) & REX_DAT) val |= bit;
+		}
+		*data++ = val;
+	}
+
+	outb(reg16, save16);
+	
+#if 1
+	/* Report what we got.  */
+	if (bootverbose) {
+		data -= REX_EEPROM_SIZE;
+		for (i = 0; i < REX_EEPROM_SIZE; i += 16) {
+			printf("fe%d: EEPROM(REX):%3x: %16D\n",
+			       sc->sc_unit, i, data + i, " ");
+		}
+	}
+#endif
+}
+
+static void
+fe_init_rex ( struct fe_softc * sc )
+{
+	/* Setup IRQ control register on the ASIC.  */
+	outb(sc->ioaddr[0x10], sc->priv_info);
+}
+
+/*
+ * Probe for RATOC REX-9880/81/82/83 series.
+ */
+static int
+fe_probe_rex (struct isa_device * dev, struct fe_softc * sc)
+{
+	int i;
+	u_char eeprom [REX_EEPROM_SIZE];
+
+	static struct fe_simple_probe_struct probe_table [] = {
+		{ FE_DLCR2, 0x58, 0x00 },
+		{ FE_DLCR4, 0x08, 0x00 },
+		{ 0 }
+	};
+
+	/* See if the specified I/O address is possible for REX-9880.  */
+	/* 6[46CE]D0 are allowed.  */ 
+	if ((sc->iobase & ~0xA00) != 0x64D0) return 0;
+
+	/* Setup an I/O address mapping table and some others.  */
+	fe_softc_defaults(sc);
+
+	/* Re-map ioaddr for REX-9880.  */
+	for (i = 16; i < MAXREGISTERS; i++)
+		sc->ioaddr[i] = sc->iobase + 0x100 - 16 + i;
+
+	/* See if the card is on its address.  */
+	if (!fe_simple_probe(sc, probe_table)) return 0;
+
+	/* We now have to read the config EEPROM.  We should be very
+           careful, since doing so destroys a register.  (Remember, we
+           are not yet sure we have a REX-9880 board here.)  */
+	fe_read_eeprom_rex(sc, eeprom);
+	for (i = 0; i < ETHER_ADDR_LEN; i++)
+		sc->sc_enaddr[i] = eeprom[7 - i];
+
+	/* Make sure it is RATOC's.  */
+	if (!valid_Ether_p(sc->sc_enaddr, 0x00C0D0)) return 0;
+
+	/* Setup the board type.  */
+	sc->typestr = "REX-9880/9883";
+
+	/* This looks like a REX-9880 board.  It requires an
+	   explicit IRQ setting in config.  Make sure we have one,
+	   determining an appropriate value for the IRQ control
+	   register.  */
+	switch (dev->id_irq) {
+	  case IRQ3:  sc->priv_info = 0x10; break;
+	  case IRQ5:  sc->priv_info = 0x20; break;
+	  case IRQ6:  sc->priv_info = 0x40; break;
+	  case IRQ12: sc->priv_info = 0x80; break;
+	  default:
+		fe_irq_failure(sc->typestr,
+				sc->sc_unit, dev->id_irq, "3/5/6/12");
+		return 0;
+	}
+
+	/* Setup hooks.  We need a special initialization procedure.  */
+	sc->init = fe_init_rex;
+
+	/* REX-9880 has 64KB SRAM.  */
+	sc->proto_dlcr6 = FE_D6_BUFSIZ_64KB | FE_D6_TXBSIZ_2x4KB
+			| FE_D6_BBW_WORD | FE_D6_SBW_WORD | FE_D6_SRAM;
+#if 1
+	sc->proto_dlcr7 |= FE_D7_EOPPOL;	/* XXX */
+#endif
+	/* The I/O address range is fragmented in the REX-9880.
+	   This is the number of regs at iobase.  */
+	return 16;
+}
 #else	/* !PC98 */
 /*
  * Probe and initialization for Fujitsu FMV-180 series boards
@@ -2717,14 +2841,13 @@ fe_attach ( struct isa_device * dev )
 	/* Attach and stop the interface. */
 #if NCARD > 0
 	if (already_ifattach[dev->id_unit] != 1) {
-		if_attach(&sc->sc_if);
+		ether_ifattach(&sc->sc_if, ETHER_BPF_SUPPORTED);
 		already_ifattach[dev->id_unit] = 1;
 	}
 #else
-	if_attach(&sc->sc_if);
+	ether_ifattach(&sc->sc_if, ETHER_BPF_SUPPORTED);
 #endif
 	fe_stop(sc);
- 	ether_ifattach(&sc->sc_if);
   
   	/* Print additional info when attached.  */
  	printf("fe%d: address %6D, type %s%s\n", sc->sc_unit,
@@ -2773,8 +2896,6 @@ fe_attach ( struct isa_device * dev )
 		       sc->sc_unit);
 	}
 
-	/* If BPF is in the kernel, call the attach for it.  */
- 	bpfattach(&sc->sc_if, DLT_EN10MB, sizeof(struct ether_header));
 	return 1;
 }
 
@@ -3690,7 +3811,7 @@ fe_ioctl ( struct ifnet * ifp, u_long command, caddr_t data )
 
 /*
  * Retrieve packet from receive buffer and send to the next level up via
- * ether_input(). If there is a BPF listener, give a copy to BPF, too.
+ * ether_input().
  * Returns 0 if success, -1 if error (i.e., mbuf allocation failure).
  */
 static int
@@ -3768,61 +3889,6 @@ fe_get_packet ( struct fe_softc * sc, u_short len )
 		insw( sc->ioaddr[ FE_BMPR8 ], eh, ( len + 1 ) >> 1 );
 	}
 
-#define ETHER_ADDR_IS_MULTICAST(A) (*(char *)(A) & 1)
-
-	/*
-	 * Check if there's a BPF listener on this interface.
-	 * If it is, hand off the raw packet to bpf.
-	 */
-	if ( sc->sc_if.if_bpf ) {
-		bpf_mtap( &sc->sc_if, m );
-	}
-
-#ifdef BRIDGE
-	if (do_bridge) {
-		struct ifnet *ifp;
-
-		ifp = bridge_in(m);
-		if (ifp == BDG_DROP) {
-			m_freem(m);
-			return 0;
-		}
-		if (ifp != BDG_LOCAL)
-			bdg_forward(&m, ifp); /* not local, need forwarding */
-		if (ifp == BDG_LOCAL || ifp == BDG_BCAST || ifp == BDG_MCAST)
-			goto getit;
-		/* not local and not multicast, just drop it */
-		if (m)
-			m_freem(m);
-		return 0;
-	}
-#endif
-
-	/*
-	 * Make sure this packet is (or may be) directed to us.
-	 * That is, the packet is either unicasted to our address,
-	 * or broad/multi-casted.  If any other packets are
-	 * received, it is an indication of an error -- probably
-	 * 86960 is in a wrong operation mode.
-	 * Promiscuous mode is an exception.  Under the mode, all
-	 * packets on the media must be received.  (We must have
-	 * programmed the 86960 so.)
-	 */
-
-	if ( ( sc->sc_if.if_flags & IFF_PROMISC )
-	  && !ETHER_ADDR_IS_MULTICAST( eh->ether_dhost )
-	  && bcmp( eh->ether_dhost, sc->sc_enaddr, ETHER_ADDR_LEN ) != 0 ) {
-		/*
-		 * The packet was not for us.  This is normal since
-		 * we are now in promiscuous mode.  Just drop the packet.
-		 */
-		m_freem( m );
-		return 0;
-	}
-
-#ifdef BRIDGE
-getit:
-#endif
 	/* Strip off the Ethernet header.  */
 	m->m_pkthdr.len -= sizeof ( struct ether_header );
 	m->m_len -= sizeof ( struct ether_header );

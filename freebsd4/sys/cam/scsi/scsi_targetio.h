@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_targetio.h,v 1.5 1999/12/29 04:34:30 peter Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_targetio.h,v 1.5.2.2 2000/07/14 20:17:18 mjacob Exp $
  */
 
 #ifndef _CAM_SCSI_SCSI_TARGETIO_H_
@@ -34,7 +34,6 @@
 #include <sys/types.h>
 #endif
 #include <sys/ioccom.h>
-
 #include <cam/cam.h>
 #include <cam/cam_ccb.h>
 
@@ -122,4 +121,9 @@ struct ioc_alloc_unit {
  */
 #define TARGCTLIOALLOCUNIT	_IOWR('C', 7, struct ioc_alloc_unit)
 #define TARGCTLIOFREEUNIT	_IOW('C', 8, struct ioc_alloc_unit)
+
+/*
+ * Set/clear debugging for this target mode instance
+ */
+#define	TARGIODEBUG		_IOW('C', 9, int)
 #endif /* _CAM_SCSI_SCSI_TARGETIO_H_ */

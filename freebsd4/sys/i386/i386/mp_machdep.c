@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.115 2000/01/13 09:08:59 mdodd Exp $
+ * $FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.115.2.2 2000/05/31 21:42:19 msmith Exp $
  */
 
 #include "opt_smp.h"
@@ -572,6 +572,7 @@ mp_enable(u_int boot_addr)
 	for (apic = 0; apic < mp_napics; ++apic) {
 		ux = io_apic_read(apic, IOAPIC_VER);
 		io_apic_versions[apic] = ux;
+		io_apic_set_id(apic, IO_TO_ID(apic));
 	}
 
 	/* program each IO APIC in the system */
@@ -1661,13 +1662,7 @@ default_mp_table(int type)
 #else
 	if ((io_apic_id == 0) || (io_apic_id == 1) || (io_apic_id == 15)) {
 #endif	/* REALLY_ANAL_IOAPICID_VALUE */
-		ux = io_apic_read(0, IOAPIC_ID);	/* get current contents */
-		ux &= ~APIC_ID_MASK;	/* clear the ID field */
-		ux |= 0x02000000;	/* set it to '2' */
-		io_apic_write(0, IOAPIC_ID, ux);	/* write new value */
-		ux = io_apic_read(0, IOAPIC_ID);	/* re-read && test */
-		if ((ux & APIC_ID_MASK) != 0x02000000)
-			panic("can't control IO APIC ID, reg: 0x%08x", ux);
+		io_apic_set_id(0, 2);
 		io_apic_id = 2;
 	}
 	IO_TO_ID(0) = io_apic_id;
@@ -1770,8 +1765,10 @@ init_locks(void)
 	 */
 	mp_lock = 0x00000001;
 
+#if 0
 	/* ISR uses its own "giant lock" */
 	isr_lock = FREE_LOCK;
+#endif
 
 #if defined(APIC_INTR_DIAGNOSTIC) && defined(APIC_INTR_DIAGNOSTIC_IRQ)
 	s_lock_init((struct simplelock*)&apic_itrace_debuglock);

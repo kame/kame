@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/consio.h,v 1.5 2000/01/15 15:25:08 yokota Exp $
+ * $FreeBSD: src/sys/sys/consio.h,v 1.5.2.1 2000/05/05 09:16:15 nyan Exp $
  */
 
 #ifndef	_SYS_CONSIO_H_
@@ -345,8 +345,11 @@ typedef struct vt_mode vtmode_t;
 #define SW_VGA_CG640	_IO('S', M_VGA_CG640)
 #define SW_VGA_MODEX	_IO('S', M_VGA_MODEX)
 
-#define SW_PC98_80x25	_IO('S', M_PC98_80x25)
-#define SW_PC98_80x30	_IO('S', M_PC98_80x30)
+#define SW_PC98_80x25		_IO('S', M_PC98_80x25)
+#define SW_PC98_80x30		_IO('S', M_PC98_80x30)
+#define SW_PC98_EGC640x400	_IO('S', M_PC98_EGC640x400)
+#define SW_PC98_PEGC640x400	_IO('S', M_PC98_PEGC640x400)
+#define SW_PC98_PEGC640x480	_IO('S', M_PC98_PEGC640x480)
 
 #define SW_VGA_C90x25	_IO('S', M_VGA_C90x25)
 #define SW_VGA_M90x25	_IO('S', M_VGA_M90x25)

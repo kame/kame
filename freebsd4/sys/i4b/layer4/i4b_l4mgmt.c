@@ -29,7 +29,7 @@
  *
  *	$Id: i4b_l4mgmt.c,v 1.26 1999/12/13 21:25:28 hm Exp $ 
  *
- * $FreeBSD: src/sys/i4b/layer4/i4b_l4mgmt.c,v 1.6 1999/12/14 20:48:35 hm Exp $
+ * $FreeBSD: src/sys/i4b/layer4/i4b_l4mgmt.c,v 1.6.2.1 2000/05/10 02:04:48 obrien Exp $
  *
  *      last edit-date: [Mon Dec 13 22:06:32 1999]
  *
@@ -43,6 +43,7 @@
 
 #if defined(__FreeBSD__)
 #include <sys/ioccom.h>
+#include <sys/random.h>
 #else
 #include <sys/ioctl.h>
 #endif
@@ -52,10 +53,6 @@
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <net/if.h>
-
-#ifdef __FreeBSD__
-#include <machine/random.h>
-#endif
 
 #ifdef __FreeBSD__
 #include <machine/i4b_debug.h>

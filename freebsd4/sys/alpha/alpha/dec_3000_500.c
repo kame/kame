@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/dec_3000_500.c,v 1.2 1999/10/05 21:19:33 n_hibma Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/dec_3000_500.c,v 1.2.2.2 2000/07/20 06:12:12 obrien Exp $ */
 /*
  * Copyright (c) 1997 by Matthew Jacob
  * NASA AMES Research Center.
@@ -49,14 +49,14 @@ static const char dec_3000_500_sp[] = "DEC 3000/400 (\"Sandpiper\")";
 static const char dec_3000_500_sf[] = "DEC 3000/500 (\"Flamingo\")";
 
 const struct alpha_variation_table dec_3000_500_variations[] = {
-        { SV_ST_SANDPIPER, dec_3000_500_sp },
-        { SV_ST_FLAMINGO, dec_3000_500_sf },
-        { SV_ST_HOTPINK, "DEC 3000/500X (\"Hot Pink\")" },
-        { SV_ST_FLAMINGOPLUS, "DEC 3000/800 (\"Flamingo+\")" },
-        { SV_ST_SANDPLUS, "DEC 3000/600 (\"Sandpiper+\")" },
-        { SV_ST_SANDPIPER45, "DEC 3000/700 (\"Sandpiper45\")" },
-        { SV_ST_FLAMINGO45, "DEC 3000/900 (\"Flamingo45\")" },
-        { 0, NULL },
+	{ SV_ST_SANDPIPER, dec_3000_500_sp },
+	{ SV_ST_FLAMINGO, dec_3000_500_sf },
+	{ SV_ST_HOTPINK, "DEC 3000/500X (\"Hot Pink\")" },
+	{ SV_ST_FLAMINGOPLUS, "DEC 3000/800 (\"Flamingo+\")" },
+	{ SV_ST_SANDPLUS, "DEC 3000/600 (\"Sandpiper+\")" },
+	{ SV_ST_SANDPIPER45, "DEC 3000/700 (\"Sandpiper45\")" },
+	{ SV_ST_FLAMINGO45, "DEC 3000/900 (\"Flamingo45\")" },
+	{ 0, NULL },
 };
 
 void
@@ -66,26 +66,26 @@ dec_3000_500_init(int cputype)
 
 	platform.family = "DEC 3000/500 (\"Flamingo\")";
 
-        if ((platform.model = alpha_dsr_sysname()) == NULL) {
-                variation = hwrpb->rpb_variation & SV_ST_MASK;
-                if (variation == SV_ST_ULTRA) {
-                        /* These are really the same. */
-                        variation = SV_ST_FLAMINGOPLUS;
-                }
-                if ((platform.model = alpha_variation_name(variation,
-                    dec_3000_500_variations)) == NULL) {
-                        /*
-                         * This is how things used to be done.
-                         */
-                        if (variation == SV_ST_RESERVED) {
-                                if (hwrpb->rpb_variation & SV_GRAPHICS)
-                                        platform.model = dec_3000_500_sf;
-                                else
-                                        platform.model = dec_3000_500_sp;
-                        } else
-                                platform.model = alpha_unknown_sysname();
-                }
-        }
+	if ((platform.model = alpha_dsr_sysname()) == NULL) {
+		variation = hwrpb->rpb_variation & SV_ST_MASK;
+		if (variation == SV_ST_ULTRA) {
+			/* These are really the same. */
+			variation = SV_ST_FLAMINGOPLUS;
+		}
+		if ((platform.model = alpha_variation_name(variation,
+		    dec_3000_500_variations)) == NULL) {
+			/*
+			 * This is how things used to be done.
+			 */
+			if (variation == SV_ST_RESERVED) {
+				if (hwrpb->rpb_variation & SV_GRAPHICS)
+					platform.model = dec_3000_500_sf;
+				else
+					platform.model = dec_3000_500_sp;
+			} else
+				platform.model = alpha_unknown_sysname();
+		}
+	}
 
 	platform.iobus = "tcasic";
 	platform.cons_init = dec_3000_500_cons_init;
@@ -98,5 +98,6 @@ dec_3000_500_init(int cputype)
 static void
 dec_3000_500_cons_init(void)
 {
+
 	return;
 }

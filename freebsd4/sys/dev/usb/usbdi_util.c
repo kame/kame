@@ -1,12 +1,12 @@
 /*	$NetBSD: usbdi_util.c,v 1.24 1999/11/17 23:00:50 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usbdi_util.c,v 1.15 1999/11/28 21:01:06 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usbdi_util.c,v 1.15.2.2 2000/07/02 11:44:00 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -480,9 +480,9 @@ usbd_get_config(dev, conf)
 	return (usbd_do_request(dev, &req, conf));
 }
 
-static void usbd_bulk_transfer_cb __P((usbd_xfer_handle xfer, 
+Static void usbd_bulk_transfer_cb __P((usbd_xfer_handle xfer, 
 		usbd_private_handle priv, usbd_status status));
-static void
+Static void
 usbd_bulk_transfer_cb(xfer, priv, status)
 	usbd_xfer_handle xfer;
 	usbd_private_handle priv;

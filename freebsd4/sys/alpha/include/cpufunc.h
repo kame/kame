@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/include/cpufunc.h,v 1.6 1999/12/29 04:27:56 peter Exp $
+ * $FreeBSD: src/sys/alpha/include/cpufunc.h,v 1.6.2.1 2000/07/04 01:50:24 mjacob Exp $
  */
 
 #ifndef _MACHINE_CPUFUNC_H_
@@ -61,6 +61,13 @@ breakpoint(void)
 /*
  * Bulk i/o (for IDE driver).
  */
+static __inline void insb(u_int32_t port, void *buffer, size_t count)
+{
+        u_int8_t *p = (u_int8_t *) buffer;
+        while (count--)
+                *p++ = inb(port);
+}
+
 static __inline void insw(u_int32_t port, void *buffer, size_t count)
 {
 	u_int16_t *p = (u_int16_t *) buffer;
@@ -73,6 +80,13 @@ static __inline void insl(u_int32_t port, void *buffer, size_t count)
 	u_int32_t *p = (u_int32_t *) buffer;
 	while (count--)
 		*p++ = inl(port);
+}
+
+static __inline void outsb(u_int32_t port, const void *buffer, size_t count)
+{
+        const u_int8_t *p = (const u_int8_t *) buffer;
+        while (count--)
+                outb(port, *p++);
 }
 
 static __inline void outsw(u_int32_t port, const void *buffer, size_t count)

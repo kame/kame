@@ -12,7 +12,7 @@
  * all derivative works or modified versions.
  *
  * Version 1.9, Thu Oct 12 15:53:50 MSK 1995
- * $FreeBSD: src/sys/i386/isa/atapi.h,v 1.19 2000/01/24 17:15:59 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/atapi.h,v 1.19.2.1 2000/04/03 20:13:06 n_hibma Exp $
  */
 
 #define atapi_attach wdc_atapi_attach
@@ -273,7 +273,7 @@ extern int atapi_ndrv;                  /* the number of potential drives */
 extern struct atapi *atapi_tab;         /* the table of atapi controllers */
 
 int atapi_attach (int ctlr, int unit, int port);
-int atapi_start (int ctrlr);
+int atapi_strt (int ctrlr);
 int atapi_intr (int ctrlr);
 void atapi_debug (struct atapi *ata, int on);
 struct atapires atapi_request_wait (struct atapi *ata, int unit,

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ppbus/ppbconf.h,v 1.17 2000/01/14 00:17:56 nsouch Exp $
+ * $FreeBSD: src/sys/dev/ppbus/ppbconf.h,v 1.17.2.1 2000/05/24 00:20:57 n_hibma Exp $
  *
  */
 #ifndef __PPBCONF_H
@@ -250,6 +250,7 @@ struct ppb_data {
 	void *ppb_owner;	/* device which owns the bus */
 };
 
+#ifdef _KERNEL
 extern int ppb_attach_device(device_t);
 extern int ppb_request_bus(device_t, device_t, int);
 extern int ppb_release_bus(device_t, device_t);
@@ -263,6 +264,7 @@ extern int ppb_get_epp_protocol(device_t);
 extern int ppb_set_mode(device_t, int);		/* returns old mode */
 extern int ppb_get_mode(device_t);		/* returns current mode */
 extern int ppb_write(device_t, char *, int, int);
+#endif /* _KERNEL */
 
 /*
  * These are defined as macros for speedup.

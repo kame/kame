@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ktrace.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/ktrace.h,v 1.19 1999/12/29 04:24:43 peter Exp $
+ * $FreeBSD: src/sys/sys/ktrace.h,v 1.19.2.2 2000/07/15 06:32:25 green Exp $
  */
 
 #ifndef _SYS_KTRACE_H_
@@ -62,7 +62,7 @@ struct ktr_header {
 };
 
 /*
- * Test for kernel trace point
+ * Test for kernel trace point (MP SAFE)
  */
 #define KTRPOINT(p, type)	\
 	(((p)->p_traceflag & ((1<<(type))|KTRFAC_ACTIVE)) == (1<<(type)))
@@ -160,7 +160,7 @@ struct ktr_csw {
 void	ktrnamei __P((struct vnode *,char *));
 void	ktrcsw __P((struct vnode *,int,int));
 void	ktrpsig __P((struct vnode *, int, sig_t, sigset_t *, int));
-void	ktrgenio __P((struct vnode *,int, enum uio_rw,struct iovec *,int,int));
+void	ktrgenio __P((struct vnode *, int, enum uio_rw, struct uio *, int));
 void	ktrsyscall __P((struct vnode *, int, int narg, register_t args[]));
 void	ktrsysret __P((struct vnode *, int, int, register_t));
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/globals.h,v 1.5 1999/12/29 04:33:01 peter Exp $
+ * $FreeBSD: src/sys/i386/include/globals.h,v 1.5.2.1 2000/05/16 06:58:10 dillon Exp $
  */
 
 #ifndef	_MACHINE_GLOBALS_H_
@@ -90,6 +90,7 @@
 
 #define	common_tssd	GLOBAL_LVALUE(common_tssd, struct segment_descriptor)
 #define	tss_gdt		GLOBAL_LVALUE(tss_gdt, struct segment_descriptor *)
+#define	astpending	GLOBAL_LVALUE(astpending, u_int)
 
 #ifdef USER_LDT
 #define	currentldt	GLOBAL_LVALUE(currentldt, int)
@@ -111,6 +112,7 @@
 #endif	/*UP kernel*/
 
 GLOBAL_FUNC(curproc)
+GLOBAL_FUNC(astpending)
 GLOBAL_FUNC(curpcb)
 GLOBAL_FUNC(npxproc)
 GLOBAL_FUNC(common_tss)

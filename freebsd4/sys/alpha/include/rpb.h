@@ -1,5 +1,5 @@
 /* $NetBSD: rpb.h,v 1.20 1998/04/15 00:47:33 mjacob Exp $ */
-/* $FreeBSD: src/sys/alpha/include/rpb.h,v 1.6 1999/11/22 15:14:56 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/include/rpb.h,v 1.6.2.1 2000/07/04 01:51:04 mjacob Exp $ */
 
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -78,6 +78,13 @@ struct rpb {
 #define	ST_DEC_EV56_PBP		32		/* "Takara" (?) */
 #define	ST_DEC_ALPHAVME_320	33		/* "Yukon" (VME?) */
 #define	ST_DEC_6600		34		/* "Monet/Goldrush" */
+
+/*
+ * System types for Alpha Processor Inc. machines
+ */
+
+#define API_ST_BASE		200
+#define ST_API_UP1000		201		/* "Nautilus" */
 
 	u_int64_t	rpb_type;		/*  50: */
 

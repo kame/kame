@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2 2000/01/15 18:04:28 wpaul Exp $
+ * $FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.1 2000/07/17 21:24:25 archie Exp $
  */
 
 /*
@@ -82,7 +82,7 @@
 
 #ifndef lint
 static const char rcsid[] =
- "$FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2 2000/01/15 18:04:28 wpaul Exp $";
+ "$FreeBSD: src/sys/dev/an/if_an_pci.c,v 1.2.2.1 2000/07/17 21:24:25 archie Exp $";
 #endif
 
 #include <dev/an/if_aironet_ieee.h>
@@ -199,7 +199,7 @@ an_detach_pci(device_t dev)
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
 
 	an_stop(sc);
-	if_detach(ifp);
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 	bus_teardown_intr(dev, sc->irq_res, sc->irq_handle);
 	an_release_resources(dev);
 

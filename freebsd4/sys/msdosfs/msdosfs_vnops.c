@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/msdosfs/msdosfs_vnops.c,v 1.95 2000/01/08 10:45:54 bp Exp $ */
+/* $FreeBSD: src/sys/msdosfs/msdosfs_vnops.c,v 1.95.2.1 2000/07/18 13:19:13 dwmalone Exp $ */
 /*	$NetBSD: msdosfs_vnops.c,v 1.68 1998/02/10 14:10:04 mrg Exp $	*/
 
 /*-
@@ -1098,7 +1098,6 @@ abortit:
 	VOP_UNLOCK(fvp, 0, p);
 	if (VTODE(fdvp)->de_StartCluster != VTODE(tdvp)->de_StartCluster)
 		newparent = 1;
-	vrele(fdvp);
 	if (doingdirectory && newparent) {
 		if (error)	/* write access check above */
 			goto bad;
@@ -1166,7 +1165,8 @@ abortit:
 		panic("msdosfs_rename: lost from startdir");
 	if (!newparent)
 		VOP_UNLOCK(tdvp, 0, p);
-	(void) relookup(fdvp, &fvp, fcnp);
+	if (relookup(fdvp, &fvp, fcnp) == 0)
+		vrele(fdvp);
 	if (fvp == NULL) {
 		/*
 		 * From name has disappeared.

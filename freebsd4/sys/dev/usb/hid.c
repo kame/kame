@@ -1,12 +1,12 @@
-/*	$NetBSD: hid.c,v 1.9 1999/10/13 08:10:55 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/hid.c,v 1.11 1999/11/17 22:33:39 n_hibma Exp $ */
+/*	$NetBSD: hid.c,v 1.15 2000/04/27 15:26:46 augustss Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/hid.c,v 1.11.2.3 2000/07/02 11:27:27 n_hibma Exp $ */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -59,7 +59,7 @@ extern int usbdebug;
 #define DPRINTFN(n,x)
 #endif
 
-static void hid_clear_local __P((struct hid_item *));
+Static void hid_clear_local __P((struct hid_item *));
 
 #define MAXUSAGE 100
 struct hid_data {
@@ -75,7 +75,7 @@ struct hid_data {
 	int kindset;
 };
 
-static void
+Static void
 hid_clear_local(c)
 	struct hid_item *c;
 {
@@ -125,7 +125,8 @@ hid_get_item(s, h)
 	struct hid_item *h;
 {
 	struct hid_item *c = &s->cur;
-	int bTag, bType, bSize;
+	unsigned int bTag, bType, bSize;
+	u_int32_t oldpos;
 	u_char *data;
 	int32_t dval;
 	u_char *p;
@@ -299,7 +300,9 @@ hid_get_item(s, h)
 				break;
 			case 11: /* Pop */
 				hi = c->next;
+				oldpos = c->loc.pos;
 				s->cur = *hi;
+				c->loc.pos = oldpos;
 				free(hi, M_TEMP);
 				break;
 			default:

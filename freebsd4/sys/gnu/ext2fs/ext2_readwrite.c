@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_readwrite.c	8.7 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/gnu/ext2fs/ext2_readwrite.c,v 1.18 1999/09/20 23:27:56 dillon Exp $
+ * $FreeBSD: src/sys/gnu/ext2fs/ext2_readwrite.c,v 1.18.2.1 2000/04/26 20:36:30 dillon Exp $
  */
 
 #define	BLKSIZE(a, b, c)	blksize(a, b, c)
@@ -175,9 +175,11 @@ WRITE(ap)
 	struct proc *p;
 	daddr_t lbn;
 	off_t osize;
+	int seqcount;
 	int blkoffset, error, flags, ioflag, resid, size, xfersize;
 
 	ioflag = ap->a_ioflag;
+	seqcount = ap->a_ioflag >> 16;
 	uio = ap->a_uio;
 	vp = ap->a_vp;
 	ip = VTOI(vp);
@@ -265,7 +267,7 @@ WRITE(ap)
 		} else if (xfersize + blkoffset == fs->s_frag_size) {
 			if ((vp->v_mount->mnt_flag & MNT_NOCLUSTERW) == 0) {
 				bp->b_flags |= B_CLUSTEROK;
-				cluster_write(bp, ip->i_size);
+				cluster_write(bp, ip->i_size, seqcount);
 			} else {
 				bawrite(bp);
 			}

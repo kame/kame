@@ -1,9 +1,7 @@
-# $FreeBSD: src/sys/boot/i386/loader/Makefile,v 1.41 2000/02/04 20:57:09 luigi Exp $
+# $FreeBSD: src/sys/boot/i386/loader/Makefile,v 1.41.2.3 2000/07/06 23:27:27 obrien Exp $
 
 BASE=		loader
-PROG=		${BASE} cdboot
-MAN5=		../../forth/loader.conf.5
-MAN8=		loader.8 ../../forth/loader.4th.8
+PROG=		${BASE}
 #NOMAN=
 STRIP=
 NEWVERSWHAT=	"bootstrap loader" i386
@@ -11,6 +9,10 @@ BINDIR?=	/boot
 
 # architecture-specific loader code
 SRCS=		main.c conf.c
+
+# Enable PXE TFTP or NFS support, not both.
+CFLAGS+=	-DLOADER_NFS_SUPPORT
+#CFLAGS+=	-DLOADER_TFTP_SUPPORT
 
 # Enable PnP and ISA-PnP code.
 HAVE_PNP=	yes
@@ -44,15 +46,8 @@ CFLAGS+=	-I${.CURDIR}/..
 
 # where to get libstand from
 LIBSTAND=	-lstand
-#LIBSTAND=	${.CURDIR}/../../../lib/libstand/libstand.a
-#CFLAGS+=	-I${.CURDIR}/../../../lib/libstand/
-
-# where to get cdldr from
-.if exists(${.OBJDIR}/../cdldr)
-CDLDR=		${.OBJDIR}/../cdldr/cdldr
-.else
-CDLDR=		${.CURDIR}/../cdldr/cdldr
-.endif
+#LIBSTAND=	${.CURDIR}/../../../../lib/libstand/libstand.a
+CFLAGS+=	-I${.CURDIR}/../../../../lib/libstand/
 
 # BTX components
 .if exists(${.OBJDIR}/../btx)
@@ -79,14 +74,9 @@ vers.o:	${.CURDIR}/../../common/newvers.sh ${.CURDIR}/version
 	sh ${.CURDIR}/../../common/newvers.sh ${.CURDIR}/version ${NEWVERSWHAT}
 	${CC} -c vers.c
 
-cdboot: ${BASE} ${CDLDR}
-	cat ${CDLDR} ${BASE} > ${.TARGET}.tmp
-	dd if=${.TARGET}.tmp of=${.TARGET} obs=2k conv=osync
-	rm ${.TARGET}.tmp
-
 ${BASE}: ${BASE}.bin ${BTXLDR} ${BTXKERN} ${BTXCRT} ${BASE}.help
-	btxld -v -f aout -e 0x100000 -o ${.TARGET} -l ${BTXLDR} -b ${BTXKERN} \
-		${BASE}.bin
+	btxld -v -f aout -e ${LOADER_ADDRESS} -o ${.TARGET} -l ${BTXLDR} \
+		-b ${BTXKERN} ${BASE}.bin
 #	/usr/bin/kzip ${.TARGET}
 #	mv ${.TARGET}.kz ${.TARGET}
 
@@ -119,12 +109,14 @@ beforeinstall:
 	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 \
 		${.CURDIR}/../../forth/loader.conf ${DESTDIR}/boot/defaults
 
+.include <${.CURDIR}/../Makefile.inc>
+
 # Cannot use ${OBJS} above this line
 .include <bsd.prog.mk>
 
 ${BASE}.sym: ${OBJS} ${LIBI386} ${LIBSTAND} ${LIBFICL} vers.o
 	${CC} ${LDFLAGS} -o ${.TARGET} ${BTXCRT} ${OBJS} vers.o \
-		${LIBFICL} ${LIBSTAND} ${LIBI386} ${LIBSTAND}
+		${LIBFICL} ${LIBI386} ${LIBSTAND}
 
 # If it's not there, don't consider it a target
 .if exists(${.CURDIR}/../../../i386/include)
@@ -136,5 +128,3 @@ machine:
 .endif
 
 CLEANFILES+=	machine
-
-

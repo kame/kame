@@ -41,8 +41,8 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumioctl.c,v 1.11 1999/10/13 02:19:25 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumioctl.c,v 1.25 2000/02/29 06:12:34 grog Exp $
+ * $Id: vinumioctl.c,v 1.12 2000/02/29 02:20:31 grog Exp grog $
+ * $FreeBSD: src/sys/dev/vinum/vinumioctl.c,v 1.25.2.2 2000/06/08 02:00:23 grog Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -302,12 +302,8 @@ vinumioctl(dev_t dev,
 	    *(int *) data = daemon_options;
 	    return 0;
 
-	case VINUM_CHECKPARITY:				    /* check RAID-4/5 parity */
-	    parityops((struct vinum_ioctl_msg *) data, checkparity);
-	    return 0;
-
-	case VINUM_REBUILDPARITY:			    /* rebuild RAID-4/5 parity */
-	    parityops((struct vinum_ioctl_msg *) data, rebuildparity);
+	case VINUM_PARITYOP:				    /* check/rebuild RAID-4/5 parity */
+	    parityops((struct vinum_ioctl_msg *) data);
 	    return 0;
 
 	    /* move an object */
@@ -607,7 +603,6 @@ attachobject(struct vinum_ioctl_msg *msg)
 	    give_sd_to_plex(plex->plexno, sd->sdno);	    /* and give it to the plex */
 	    update_sd_config(sd->sdno, 0);
 	    save_config();
-	    reply->error = 0;
 	}
 	if (sd->state == sd_reviving)
 	    reply->error = EAGAIN;			    /* need to revive it */

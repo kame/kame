@@ -65,7 +65,7 @@
  * W. Metzenthen   June 1994.
  *
  *
- * $FreeBSD: src/sys/gnu/i386/fpemul/reg_round.s,v 1.9 1999/08/28 00:42:57 peter Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/reg_round.s,v 1.9.2.1 2000/07/07 00:38:42 obrien Exp $
  *
  */
 
@@ -385,7 +385,7 @@ LRound_nearest_64:
 	jne	LDo_64_round_up
 
 	/* Now test for round-to-even */
-	testb	$1,%ebx
+	testb	$1,%bl
 	jz	LCheck_truncate_64
 
 LDo_64_round_up:

@@ -1,5 +1,5 @@
 #
-# Copyright (c) 1992-1998 Nick Hibma <hibma@skylink.it>
+# Copyright (c) 1992-1998 Nick Hibma <n_hibma@freebsd.org>
 # All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -25,11 +25,13 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 # THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/dev/usb/usb_if.m,v 1.7 1999/07/25 18:54:21 n_hibma Exp $
+# $FreeBSD: src/sys/dev/usb/usb_if.m,v 1.7.2.2 2000/05/07 14:58:03 n_hibma Exp $
 #
 
 # USB interface description
 #
+
+#include <sys/bus.h>
 
 INTERFACE usb;
 

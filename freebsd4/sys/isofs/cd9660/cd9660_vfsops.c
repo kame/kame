@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)cd9660_vfsops.c	8.18 (Berkeley) 5/22/95
- * $FreeBSD: src/sys/isofs/cd9660/cd9660_vfsops.c,v 1.74 2000/01/10 12:24:36 phk Exp $
+ * $FreeBSD: src/sys/isofs/cd9660/cd9660_vfsops.c,v 1.74.2.1 2000/07/08 14:35:56 bp Exp $
  */
 
 #include <sys/param.h>
@@ -88,7 +88,7 @@ static struct vfsops cd9660_vfsops = {
 	cd9660_checkexp,
 	cd9660_vptofh,
 	cd9660_init,
-	vfs_stduninit,
+	cd9660_uninit,
 	vfs_stdextattrctl,
 };
 VFS_SET(cd9660_vfsops, cd9660, VFCF_READONLY);

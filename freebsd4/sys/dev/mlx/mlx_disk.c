@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mlx/mlx_disk.c,v 1.8 1999/12/22 01:21:27 msmith Exp $
+ * $FreeBSD: src/sys/dev/mlx/mlx_disk.c,v 1.8.2.3 2000/04/26 01:43:21 billf Exp $
  */
 
 /*
@@ -33,7 +33,6 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/malloc.h>
 #include <sys/kernel.h>
 
 #include <sys/buf.h>
@@ -49,12 +48,6 @@
 #include <dev/mlx/mlxio.h>
 #include <dev/mlx/mlxvar.h>
 #include <dev/mlx/mlxreg.h>
-
-#if 0
-#define debug(fmt, args...)	printf("%s: " fmt "\n", __FUNCTION__ , ##args)
-#else
-#define debug(fmt, args...)
-#endif
 
 /* prototypes */
 static int mlxd_probe(device_t dev);
@@ -86,9 +79,9 @@ static struct cdevsw mlxd_cdevsw = {
 		/* bmaj */	MLXD_BDEV_MAJOR
 };
 
-static devclass_t	mlxd_devclass;
-static struct cdevsw	mlxddisk_cdevsw;
+devclass_t		mlxd_devclass;
 static int		disks_registered = 0;
+static struct cdevsw	mlxddisk_cdevsw;
 
 static device_method_t mlxd_methods[] = {
     DEVMETHOD(device_probe,	mlxd_probe),
@@ -111,7 +104,7 @@ mlxd_open(dev_t dev, int flags, int fmt, struct proc *p)
     struct mlxd_softc	*sc = (struct mlxd_softc *)dev->si_drv1;
     struct disklabel	*label;
 
-    debug("called");
+    debug_called(1);
 	
     if (sc == NULL)
 	return (ENXIO);
@@ -139,7 +132,7 @@ mlxd_close(dev_t dev, int flags, int fmt, struct proc *p)
 {
     struct mlxd_softc	*sc = (struct mlxd_softc *)dev->si_drv1;
 
-    debug("called");
+    debug_called(1);
 	
     if (sc == NULL)
 	return (ENXIO);
@@ -153,13 +146,13 @@ mlxd_ioctl(dev_t dev, u_long cmd, caddr_t addr, int32_t flag, struct proc *p)
     struct mlxd_softc	*sc = (struct mlxd_softc *)dev->si_drv1;
     int error;
 
-    debug("called");
+    debug_called(1);
 	
     if (sc == NULL)
 	return (ENXIO);
 
     if ((error = mlx_submit_ioctl(sc->mlxd_controller, sc->mlxd_drive, cmd, addr, flag, p)) != ENOIOCTL) {
-	debug("mlx_submit_ioctl returned %d\n", error);
+	debug(0, "mlx_submit_ioctl returned %d\n", error);
 	return(error);
     }
     return (ENOTTY);
@@ -176,7 +169,7 @@ mlxd_strategy(struct buf *bp)
 {
     struct mlxd_softc	*sc = (struct mlxd_softc *)bp->b_dev->si_drv1;
 
-    debug("called");
+    debug_called(1);
 
     /* bogus disk? */
     if (sc == NULL) {
@@ -216,7 +209,7 @@ mlxd_intr(void *data)
     struct buf *bp = (struct buf *)data;
     struct mlxd_softc	*sc = (struct mlxd_softc *)bp->b_dev->si_drv1;
 
-    debug("called");
+    debug_called(1);
 	
     if (bp->b_flags & B_ERROR)
 	bp->b_error = EIO;
@@ -231,7 +224,7 @@ static int
 mlxd_probe(device_t dev)
 {
 
-    debug("called");
+    debug_called(1);
 	
     device_set_desc(dev, "Mylex System Drive");
     return (0);
@@ -245,7 +238,7 @@ mlxd_attach(device_t dev)
     char		*state;
     dev_t		dsk;
     
-    debug("called");
+    debug_called(1);
 
     parent = device_get_parent(dev);
     sc->mlxd_controller = (struct mlx_softc *)device_get_softc(parent);
@@ -291,7 +284,7 @@ mlxd_detach(device_t dev)
 {
     struct mlxd_softc *sc = (struct mlxd_softc *)device_get_softc(dev);
 
-    debug("called");
+    debug_called(1);
 
     devstat_remove_entry(&sc->mlxd_stats);
 

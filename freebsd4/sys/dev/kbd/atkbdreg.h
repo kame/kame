@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/kbd/atkbdreg.h,v 1.5 1999/12/29 04:35:40 peter Exp $
+ * $FreeBSD: src/sys/dev/kbd/atkbdreg.h,v 1.5.2.1 2000/03/31 12:51:57 yokota Exp $
  */
 
 #ifndef _DEV_KBD_ATKBDREG_H_
@@ -38,9 +38,9 @@
 
 #ifdef _KERNEL
 
-int		atkbd_probe_unit(int unit, int port, int irq, int flags);
+int		atkbd_probe_unit(int unit, int ctlr, int irq, int flags);
 int		atkbd_attach_unit(int unit, keyboard_t **kbd,
-				 int port, int irq, int flags);
+				 int ctlr, int irq, int flags);
 
 #endif
 

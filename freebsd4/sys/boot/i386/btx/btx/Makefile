@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/i386/btx/btx/Makefile,v 1.7 1999/10/12 21:33:48 jhb Exp $
+# $FreeBSD: src/sys/boot/i386/btx/btx/Makefile,v 1.7.2.1 2000/07/06 23:04:28 obrien Exp $
 
 M4?=	m4
 
@@ -19,8 +19,8 @@ btx: btx.o
 	objcopy -S -O binary btx.out ${.TARGET}
 .endif
 
-btx.o: btx.m4 btx.s
-	(cd ${.CURDIR}; ${M4} ${M4FLAGS} btx.m4 btx.s) | \
+btx.o: btx.s
+	(cd ${.CURDIR}; ${M4} ${M4FLAGS} btx.s) | \
 	   ${AS} ${AFLAGS} -o ${.TARGET}
 
 CLEANFILES+= btx btx.out btx.o

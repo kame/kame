@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/bktr/bktr_core.h,v 1.2 1999/10/28 13:58:16 roger Exp $ */
+/* $FreeBSD: src/sys/dev/bktr/bktr_core.h,v 1.2.2.1 2000/04/18 12:50:32 roger Exp $ */
 
 /*
  * This is part of the Driver for Video Capture Cards (Frame grabbers)
@@ -79,13 +79,13 @@ int	video_open( bktr_ptr_t bktr );
 int	video_close( bktr_ptr_t bktr );
 int	video_read( bktr_ptr_t bktr, int unit, dev_t dev, struct uio *uio );
 int	video_ioctl( bktr_ptr_t bktr, int unit,
-			int cmd, caddr_t arg, struct proc* pr );
+			ioctl_cmd_t cmd, caddr_t arg, struct proc* pr );
 
 
 int	tuner_open( bktr_ptr_t bktr );
 int	tuner_close( bktr_ptr_t bktr );
 int	tuner_ioctl( bktr_ptr_t bktr, int unit,
-			int cmd, caddr_t arg, struct proc* pr );
+			ioctl_cmd_t cmd, caddr_t arg, struct proc* pr );
 
 int	vbi_open( bktr_ptr_t bktr );
 int	vbi_close( bktr_ptr_t bktr );

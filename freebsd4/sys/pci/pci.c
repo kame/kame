@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/pci.c,v 1.141 2000/02/22 21:44:39 billf Exp $
+ * $FreeBSD: src/sys/pci/pci.c,v 1.141.2.2 2000/07/04 01:35:10 mjacob Exp $
  *
  */
 
@@ -55,6 +55,10 @@
 #include <pci/pcireg.h>
 #include <pci/pcivar.h>
 #include <sys/pciio.h>
+
+#ifdef __alpha__
+#include <machine/rpb.h>
+#endif
 
 #ifdef APIC_IO
 #include <machine/smp.h>
@@ -1034,17 +1038,45 @@ pci_add_map(device_t dev, pcicfgregs* cfg, int reg)
 	 *  can deal with multiple hoses 
 	 */
 
-	if(cfg->hose){
-		if (base & 0x80000000) {
-			printf("base   addr = 0x%lx\n", base);
-			printf("hacked addr = 0x%lx\n",
-			       base | ((u_int64_t)cfg->hose << 31));
-					
-			panic("hose encoding hack would clobber base addr");
+	if (cfg->hose) {
+		u_int32_t mask, shift, maxh;
+
+		switch (hwrpb->rpb_type) {
+		case ST_DEC_4100:
+			mask = 0xc0000000;
+			shift = 30;
+			maxh = 4;	/* not a hose. MCPCIA instance # */
+			break;
+		case ST_DEC_21000:
+			mask = 0xf8000000;
+			shift = 27;
+			maxh = 32;
+			break;
+		case ST_DEC_6600:
+			mask = 0x80000000;
+			shift = 31;
+			maxh = 2;
+			break;
+		default:
+			mask = 0;
+			shift = 0;
+			maxh = 0;
+			break;
 		}
-		if (cfg->hose > 1)
-			panic("only one hose supported!");
-		base |= ((u_int64_t)cfg->hose << 31);
+		if (base & mask) {
+			printf("base   addr = 0x%llx\n", (long long) base);
+			printf("mask   addr = 0x%lx\n", (long) mask);
+			printf("hacked addr = 0x%llx\n", (long long)
+			       (base | ((u_int64_t)cfg->hose << shift)));
+			panic("hose encoding hack would clobber base addr");
+			/* NOTREACHED */
+		}
+		if (cfg->hose >= maxh) {
+			panic("Hose %d - can only encode %d hose(s)",
+			    cfg->hose, maxh);
+			/* NOTREACHED */
+		}
+		base |= ((u_int64_t)cfg->hose << shift);
 	}
 #endif
 	if (type == SYS_RES_IOPORT && !pci_porten(cfg))

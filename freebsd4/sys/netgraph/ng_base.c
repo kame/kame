@@ -37,7 +37,7 @@
  * Authors: Julian Elischer <julian@whistle.com>
  *          Archie Cobbs <archie@whistle.com>
  *
- * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.11 1999/12/07 05:50:47 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_base.c,v 1.11.2.4 2000/07/21 20:45:58 archie Exp $
  * $Whistle: ng_base.c,v 1.39 1999/01/28 23:54:53 julian Exp $
  */
 
@@ -348,7 +348,7 @@ ng_make_node_common(struct ng_type *type, node_p *nodepp)
 	}
 
 	/* Make a node and try attach it to the type */
-	MALLOC(node, node_p, sizeof(*node), M_NETGRAPH, M_WAITOK);
+	MALLOC(node, node_p, sizeof(*node), M_NETGRAPH, M_NOWAIT);
 	if (node == NULL) {
 		TRAP_ERROR;
 		return (ENOMEM);
@@ -550,7 +550,7 @@ ng_name_node(node_p node, const char *name)
 	}
 
 	/* Allocate space and copy it */
-	MALLOC(node->name, char *, strlen(name) + 1, M_NETGRAPH, M_WAITOK);
+	MALLOC(node->name, char *, strlen(name) + 1, M_NETGRAPH, M_NOWAIT);
 	if (node->name == NULL) {
 		TRAP_ERROR;
 		return (ENOMEM);
@@ -667,7 +667,7 @@ ng_add_hook(node_p node, const char *name, hook_p *hookp)
 	}
 
 	/* Allocate the hook and link it up */
-	MALLOC(hook, hook_p, sizeof(*hook), M_NETGRAPH, M_WAITOK);
+	MALLOC(hook, hook_p, sizeof(*hook), M_NETGRAPH, M_NOWAIT);
 	if (hook == NULL) {
 		TRAP_ERROR;
 		return (ENOMEM);
@@ -691,7 +691,7 @@ ng_add_hook(node_p node, const char *name, hook_p *hookp)
 	node->numhooks++;
 
 	/* Set hook name */
-	MALLOC(hook->name, char *, strlen(name) + 1, M_NETGRAPH, M_WAITOK);
+	MALLOC(hook->name, char *, strlen(name) + 1, M_NETGRAPH, M_NOWAIT);
 	if (hook->name == NULL) {
 		error = ENOMEM;
 		LIST_REMOVE(hook, hooks);
@@ -1099,7 +1099,7 @@ ng_path2node(node_p here, const char *address, node_p *destp, char **rtnp)
 
 	/* Now compute return address, i.e., the path to the sender */
 	if (rtnp != NULL) {
-		MALLOC(*rtnp, char *, NG_NODELEN + 2, M_NETGRAPH, M_WAITOK);
+		MALLOC(*rtnp, char *, NG_NODELEN + 2, M_NETGRAPH, M_NOWAIT);
 		if (*rtnp == NULL) {
 			TRAP_ERROR;
 			return (ENOMEM);
@@ -1432,7 +1432,7 @@ ng_generic_msg(node_p here, struct ng_mesg *msg, const char *retaddr,
 				    __FUNCTION__, "types");
 				break;
 			}
-			strncpy(tp->typename, type->name, NG_TYPELEN);
+			strncpy(tp->type_name, type->name, NG_TYPELEN);
 			tp->numnodes = type->refs;
 			tl->numtypes++;
 		}
@@ -1519,7 +1519,7 @@ ng_generic_msg(node_p here, struct ng_mesg *msg, const char *retaddr,
 		const struct ng_cmdlist *c;
 		const struct ng_parse_type *argstype;
 		struct ng_mesg *rp, *ascii, *binary;
-		int off;
+		int off = 0;
 
 		/* Data area must contain at least a struct ng_mesg + '\0' */
 		ascii = (struct ng_mesg *)msg->data;
@@ -1658,6 +1658,26 @@ ng_send_dataq(hook_p hook, struct mbuf *m, meta_p meta)
 		NG_FREE_DATA(m, meta);
 	}
 	return (error);
+}
+
+/*
+ * Copy a 'meta'.
+ *
+ * Returns new meta, or NULL if original meta is NULL or ENOMEM.
+ */
+meta_p
+ng_copy_meta(meta_p meta)
+{
+	meta_p meta2;
+
+	if (meta == NULL)
+		return (NULL);
+	MALLOC(meta2, meta_p, meta->used_len, M_NETGRAPH, M_NOWAIT);
+	if (meta2 == NULL)
+		return (NULL);
+	meta2->allocated_len = meta->used_len;
+	bcopy(meta, meta2, meta->used_len);
+	return (meta2);
 }
 
 /************************************************************************
@@ -1876,7 +1896,7 @@ ng_queue_data(hook_p hook, struct mbuf *m, meta_p meta)
  * put the msg onto a queue to be picked up by another PPL (probably splnet)
  */
 int
-ng_queue_msg(node_p here, struct ng_mesg * msg, int len, const char *address)
+ng_queue_msg(node_p here, struct ng_mesg *msg, const char *address)
 {
 	register struct ng_queue_entry *q;
 	int     s;

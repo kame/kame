@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)param.h	5.8 (Berkeley) 6/28/91
- * $FreeBSD: src/sys/i386/include/param.h,v 1.54 1999/12/11 10:54:06 peter Exp $
+ * $FreeBSD: src/sys/i386/include/param.h,v 1.54.2.1 2000/05/05 13:37:01 jlemon Exp $
  */
 
 #ifndef _MACHINE_PARAM_H_
@@ -108,7 +108,7 @@
  * of the hardware page size.
  */
 #ifndef	MSIZE
-#define MSIZE		128		/* size of an mbuf */
+#define MSIZE		256		/* size of an mbuf */
 #endif	/* MSIZE */
 
 #ifndef	MCLSHIFT

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/scvidctl.c,v 1.19 2000/01/29 15:08:48 peter Exp $
+ * $FreeBSD: src/sys/dev/syscons/scvidctl.c,v 1.19.2.2 2000/05/05 09:16:08 nyan Exp $
  */
 
 #include "opt_syscons.h"
@@ -191,8 +191,8 @@ sc_set_text_mode(scr_stat *scp, struct tty *tp, int mode, int xsize, int ysize,
      * This is a kludge to fend off scrn_update() while we
      * muck around with scp. XXX
      */
-    scp->status |= UNKNOWN_MODE;
-    scp->status &= ~(GRAPHICS_MODE | PIXEL_MODE);
+    scp->status |= UNKNOWN_MODE | MOUSE_HIDDEN;
+    scp->status &= ~(GRAPHICS_MODE | PIXEL_MODE | MOUSE_VISIBLE);
     scp->mode = mode;
     scp->xsize = xsize;
     scp->ysize = ysize;
@@ -258,8 +258,8 @@ sc_set_graphics_mode(scr_stat *scp, struct tty *tp, int mode)
     }
 
     /* set up scp */
-    scp->status |= (UNKNOWN_MODE | GRAPHICS_MODE);
-    scp->status &= ~PIXEL_MODE;
+    scp->status |= (UNKNOWN_MODE | GRAPHICS_MODE | MOUSE_HIDDEN);
+    scp->status &= ~(PIXEL_MODE | MOUSE_VISIBLE);
     scp->mode = mode;
     /*
      * Don't change xsize and ysize; preserve the previous vty
@@ -388,8 +388,8 @@ sc_set_pixel_mode(scr_stat *scp, struct tty *tp, int xsize, int ysize,
 	sc_hist_save(scp);
 #endif
     prev_ysize = scp->ysize;
-    scp->status |= (UNKNOWN_MODE | PIXEL_MODE);
-    scp->status &= ~GRAPHICS_MODE;
+    scp->status |= (UNKNOWN_MODE | PIXEL_MODE | MOUSE_HIDDEN);
+    scp->status &= ~(GRAPHICS_MODE | MOUSE_VISIBLE);
     scp->xsize = xsize;
     scp->ysize = ysize;
     scp->xoff = (scp->xpixel/8 - xsize)/2;
@@ -619,6 +619,11 @@ sc_vid_ioctl(struct tty *tp, u_long cmd, caddr_t data, int flag, struct proc *p)
     case SW_CG640x350: case SW_ENH_CG640:
     case SW_BG640x480: case SW_CG640x480: case SW_VGA_CG320:
     case SW_VGA_MODEX:
+#ifdef PC98
+    /* PC98 GRAPHICS MODES */
+    case SW_PC98_EGC640x400:	case SW_PC98_PEGC640x400:
+    case SW_PC98_PEGC640x480:
+#endif
 	if (!(adp->va_flags & V_ADP_MODECHANGE))
 	    return ENODEV;
 	return sc_set_graphics_mode(scp, tp, cmd & 0xff);
@@ -676,7 +681,7 @@ sc_vid_ioctl(struct tty *tp, u_long cmd, caddr_t data, int flag, struct proc *p)
 		return error;
 	    }
 #ifndef PC98
-	    scp->status |= UNKNOWN_MODE;
+	    scp->status |= UNKNOWN_MODE | MOUSE_HIDDEN;
 	    splx(s);
 	    /* no restore fonts & palette */
 	    if (scp == scp->sc->cur_scp)
@@ -705,7 +710,7 @@ sc_vid_ioctl(struct tty *tp, u_long cmd, caddr_t data, int flag, struct proc *p)
 		splx(s);
 		return error;
 	    }
-	    scp->status |= (UNKNOWN_MODE | PIXEL_MODE);
+	    scp->status |= (UNKNOWN_MODE | PIXEL_MODE | MOUSE_HIDDEN);
 	    splx(s);
 	    if (scp == scp->sc->cur_scp) {
 		set_mode(scp);
@@ -724,7 +729,7 @@ sc_vid_ioctl(struct tty *tp, u_long cmd, caddr_t data, int flag, struct proc *p)
 		splx(s);
 		return error;
 	    }
-	    scp->status |= UNKNOWN_MODE;
+	    scp->status |= UNKNOWN_MODE | MOUSE_HIDDEN;
 	    splx(s);
 #ifdef PC98
 	    if (scp == scp->sc->cur_scp)

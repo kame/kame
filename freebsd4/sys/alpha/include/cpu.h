@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/cpu.h,v 1.13 2000/03/02 16:19:48 dufault Exp $ */
+/* $FreeBSD: src/sys/alpha/include/cpu.h,v 1.13.2.1 2000/05/24 14:20:58 gallatin Exp $ */
 /* From: NetBSD: cpu.h,v 1.18 1997/09/23 23:17:49 mjacob Exp */
 
 /*
@@ -92,9 +92,8 @@ struct clockframe {
 #define	aston()		(astpending = 1)
 
 #ifdef _KERNEL
-u_int32_t astpending;		/* need to trap before returning to user mode */
-u_int32_t intr_nesting_level;	/* bookeeping only; counts software intr */
-u_int32_t want_resched;		/* resched() was called */
+extern u_int32_t intr_nesting_level;	/* bookeeping only; counts software intr */
+extern u_int32_t want_resched;		/* resched() was called */
 #endif
 
 

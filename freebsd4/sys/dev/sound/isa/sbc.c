@@ -23,14 +23,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/isa/sbc.c,v 1.19 2000/03/09 02:13:21 tanimura Exp $
+ * $FreeBSD: src/sys/dev/sound/isa/sbc.c,v 1.19.2.3 2000/07/19 21:18:15 cg Exp $
  */
-
-#include "isa.h"
 
 #include <dev/sound/chip.h>
 #include <dev/sound/pcm/sound.h>
-#include  <dev/sound/isa/sb.h>
+#include <dev/sound/isa/sb.h>
 
 #define IO_MAX	3
 #define IRQ_MAX	1
@@ -85,6 +83,20 @@ static int release_resource(struct sbc_softc *scp);
 static devclass_t sbc_devclass;
 
 static int io_range[3] = {0x10, 0x2, 0x4};
+
+#ifdef PC98 /* I/O address table for PC98 */
+static bus_addr_t pcm_iat[] = {
+	0x000, 0x100, 0x200, 0x300, 0x400, 0x500, 0x600, 0x700,
+	0x800, 0x900, 0xa00, 0xb00, 0xc00, 0xd00, 0xe00, 0xf00
+};
+static bus_addr_t midi_iat[] = {
+	0x000, 0x100
+};
+static bus_addr_t opl_iat[] = {
+	0x000, 0x100, 0x200, 0x300
+};
+static bus_addr_t *sb_iat[] = { pcm_iat, midi_iat, opl_iat };
+#endif
 
 static int sb_rd(struct resource *io, int reg);
 static void sb_wr(struct resource *io, int reg, u_int8_t val);
@@ -202,13 +214,15 @@ static struct isa_pnp_id sbc_ids[] = {
 	{0x44008c0e, "Creative SB AWE64 Gold"},		/* CTL0044 */
 	{0x45008c0e, "Creative SB AWE64"},		/* CTL0045 */
 
-	{0x01000000, "Avance Logic ALS100+"},		/* @@@0001 */
+	{0x01000000, "Avance Logic ALS100+"},		/* @@@0001 - ViBRA16X clone */
 	{0x01100000, "Avance Asound 110"},		/* @@@1001 */
-	{0x01200000, "Avance Logic ALS120"},		/* @@@2001 */
+	{0x01200000, "Avance Logic ALS120"},		/* @@@2001 - ViBRA16X clone */
 
 	{0x02017316, "ESS ES1688"},			/* ESS1688 */
 	{0x68187316, "ESS ES1868"},			/* ESS1868 */
+	{0x03007316, "ESS ES1869"},			/* ESS1869 */
 	{0x69187316, "ESS ES1869"},			/* ESS1869 */
+	{0xabb0110e, "ESS ES1869 (Compaq OEM)"},	/* CPQb0ab */
 	{0xacb0110e, "ESS ES1869 (Compaq OEM)"},	/* CPQb0ac */
 	{0x78187316, "ESS ES1878"},			/* ESS1878 */
 	{0x79187316, "ESS ES1879"},			/* ESS1879 */
@@ -234,9 +248,17 @@ sbc_probe(device_t dev)
 		int rid = 0, ver;
 	    	struct resource *io;
 
+#ifdef PC98
+		io = isa_alloc_resourcev(dev, SYS_RES_IOPORT, &rid,
+					 pcm_iat, 16, RF_ACTIVE);
+#else
 		io = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
 		  		    	0, ~0, 16, RF_ACTIVE);
+#endif
 		if (!io) goto bad;
+#ifdef PC98
+		isa_load_resourcev(io, pcm_iat, 16);
+#endif
     		if (sb_reset_dsp(io)) goto bad2;
 		ver = sb_identify_board(io);
 		if (ver == 0) goto bad2;
@@ -292,6 +314,7 @@ sbc_attach(device_t dev)
 	scp->bd_ver = sb_identify_board(scp->io[0]) & 0x00000fff;
 	if (scp->bd_ver == 0) goto bad;
 	f = 0;
+	if (logical_id == 0x01200000 && scp->bd_ver < 0x0400) scp->bd_ver = 0x0499;
 	switch ((scp->bd_ver & 0x0f00) >> 8) {
     	case 1: /* old sound blaster has nothing... */
 		break;
@@ -323,6 +346,20 @@ sbc_attach(device_t dev)
 		/* soft irq/dma configuration */
 		x = -1;
 		irq = rman_get_start(scp->irq[0]);
+#ifdef PC98
+		/* SB16 in PC98 use different IRQ table */
+		if	(irq == 3) x = 1;
+		else if (irq == 5) x = 8;
+		else if (irq == 10) x = 2;
+		else if (irq == 12) x = 4;
+		if (x == -1) {
+			err = "bad irq (3/5/10/12 valid)";
+			goto bad;
+		}
+		else sb_setmixer(scp->io[0], IRQ_NR, x);
+		/* SB16 in PC98 use different dma setting */
+		sb_setmixer(scp->io[0], DMA_NR, dh == 0 ? 1 : 2);
+#else
 		if      (irq == 5) x = 2;
 		else if (irq == 7) x = 4;
 		else if (irq == 9) x = 1;
@@ -333,6 +370,7 @@ sbc_attach(device_t dev)
 		}
 		else sb_setmixer(scp->io[0], IRQ_NR, x);
 		sb_setmixer(scp->io[0], DMA_NR, (1 << dh) | (1 << dl));
+#endif
 		device_printf(dev, "setting card to irq %d, drq %d", irq, dl);
 		if (dl != dh) printf(", %d", dh);
 		printf("\n");
@@ -341,6 +379,8 @@ sbc_attach(device_t dev)
 
 	switch (logical_id) {
     	case 0x43008c0e:	/* CTL0043 */
+	case 0x01200000:
+	case 0x01000000:
 		f |= BD_F_SB16X;
 		break;
 	}
@@ -360,7 +400,6 @@ sbc_attach(device_t dev)
 	child = device_add_child(dev, "pcm", -1);
 	device_set_ivars(child, func);
 
-#if notyet
 	/* Midi Interface */
 	func = malloc(sizeof(struct sndcard_func), M_DEVBUF, M_NOWAIT);
 	if (func == NULL) goto bad;
@@ -376,7 +415,6 @@ sbc_attach(device_t dev)
 	func->func = SCF_SYNTH;
 	child = device_add_child(dev, "midi", -1);
 	device_set_ivars(child, func);
-#endif /* notyet */
 
 	/* probe/attach kids */
 	bus_generic_attach(dev);
@@ -460,13 +498,22 @@ sbc_alloc_resource(device_t bus, device_t child, int type, int *rid,
 	struct sbc_softc *scp;
 	int *alloced, rid_max, alloced_max;
 	struct resource **res;
+#ifdef PC98
+	int i;
+#endif
 
 	scp = device_get_softc(bus);
 	switch (type) {
 	case SYS_RES_IOPORT:
 		alloced = scp->io_alloced;
 		res = scp->io;
+#ifdef PC98
+		rid_max = 0;
+		for (i = 0; i < IO_MAX; i++)
+			rid_max += io_range[i];
+#else
 		rid_max = IO_MAX - 1;
+#endif
 		alloced_max = 1;
 		break;
 	case SYS_RES_DRQ:
@@ -567,9 +614,23 @@ alloc_resource(struct sbc_softc *scp)
 
 	for (i = 0 ; i < IO_MAX ; i++) {
 		if (scp->io[i] == NULL) {
+#ifdef PC98
+			scp->io_rid[i] = i > 0 ?
+				scp->io_rid[i - 1] + io_range[i - 1] : 0;
+			scp->io[i] = isa_alloc_resourcev(scp->dev,
+							 SYS_RES_IOPORT,
+							 &scp->io_rid[i],
+							 sb_iat[i],
+							 io_range[i],
+							 RF_ACTIVE);
+			if (scp->io[i] != NULL)
+				isa_load_resourcev(scp->io[i], sb_iat[i],
+						   io_range[i]);
+#else
 			scp->io_rid[i] = i;
 			scp->io[i] = bus_alloc_resource(scp->dev, SYS_RES_IOPORT, &scp->io_rid[i],
 							0, ~0, io_range[i], RF_ACTIVE);
+#endif
 			if (i == 0 && scp->io[i] == NULL)
 				return (1);
 			scp->io_alloced[i] = 0;
@@ -654,4 +715,8 @@ static driver_t sbc_driver = {
 };
 
 /* sbc can be attached to an isa bus. */
-DRIVER_MODULE(sbc, isa, sbc_driver, sbc_devclass, 0, 0);
+DRIVER_MODULE(snd_sbc, isa, sbc_driver, sbc_devclass, 0, 0);
+MODULE_DEPEND(snd_sbc, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_VERSION(snd_sbc, 1);
+
+

@@ -33,7 +33,7 @@
  *
  *	@(#)ipx_input.c
  *
- * $FreeBSD: src/sys/netipx/ipx_input.c,v 1.22 2000/02/13 03:32:02 peter Exp $
+ * $FreeBSD: src/sys/netipx/ipx_input.c,v 1.22.2.1 2000/05/10 02:04:52 obrien Exp $
  */
 
 #include <sys/param.h>
@@ -42,6 +42,7 @@
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/kernel.h>
+#include <sys/random.h>
 #include <sys/sysctl.h>
 
 #include <net/if.h>
@@ -54,8 +55,6 @@
 #include <netipx/ipx_if.h>
 #include <netipx/ipx_pcb.h>
 #include <netipx/ipx_var.h>
-
-#include <machine/random.h>
 
 int	ipxcksum = 0;
 SYSCTL_INT(_net_ipx_ipx, OID_AUTO, checksum, CTLFLAG_RW,

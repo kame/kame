@@ -29,7 +29,7 @@
  *
  *	$Id: i4b_tei.c,v 1.17 1999/12/13 21:25:27 hm Exp $ 
  *
- * $FreeBSD: src/sys/i4b/layer2/i4b_tei.c,v 1.6 1999/12/14 20:48:29 hm Exp $
+ * $FreeBSD: src/sys/i4b/layer2/i4b_tei.c,v 1.6.2.1 2000/05/10 02:04:48 obrien Exp $
  *
  *      last edit-date: [Mon Dec 13 22:04:24 1999]
  *
@@ -46,6 +46,7 @@
 
 #if defined(__FreeBSD__)
 #include <sys/ioccom.h>
+#include <sys/random.h>
 #else
 #include <sys/ioctl.h>
 #endif
@@ -63,10 +64,6 @@
 #else
 #include <i4b/i4b_debug.h>
 #include <i4b/i4b_ioctl.h>
-#endif
-
-#if defined(__FreeBSD__)
-#include <machine/random.h>
 #endif
 
 #include <i4b/include/i4b_global.h>

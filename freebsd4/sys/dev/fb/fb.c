@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fb/fb.c,v 1.11 1999/12/07 11:23:58 yokota Exp $
+ * $FreeBSD: src/sys/dev/fb/fb.c,v 1.11.2.1 2000/05/21 01:19:38 gallatin Exp $
  */
 
 #include "fb.h"
@@ -719,7 +719,11 @@ fb_commonioctl(video_adapter_t *adp, u_long cmd, caddr_t arg)
 		((video_adapter_info_t *)arg)->va_mem_base = adp->va_mem_base;
 		((video_adapter_info_t *)arg)->va_mem_size = adp->va_mem_size;
 		((video_adapter_info_t *)arg)->va_window
+#ifdef __i386__
 			= vtophys(adp->va_window);
+#else
+			= adp->va_window;
+#endif
 		((video_adapter_info_t *)arg)->va_window_size
 			= adp->va_window_size;
 		((video_adapter_info_t *)arg)->va_window_gran
@@ -727,7 +731,11 @@ fb_commonioctl(video_adapter_t *adp, u_long cmd, caddr_t arg)
 		((video_adapter_info_t *)arg)->va_window_orig
 			= adp->va_window_orig;
 		((video_adapter_info_t *)arg)->va_unused0
+#ifdef __i386__
 			= (adp->va_buffer) ? vtophys(adp->va_buffer) : 0;
+#else
+			= adp->va_buffer;
+#endif
 		((video_adapter_info_t *)arg)->va_buffer_size
 			= adp->va_buffer_size;
 		((video_adapter_info_t *)arg)->va_mode = adp->va_mode;

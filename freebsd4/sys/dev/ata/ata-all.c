@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-all.c,v 1.50.2.2 2000/03/18 22:26:28 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-all.c,v 1.50.2.4 2000/06/11 17:02:46 sos Exp $
  */
 
 #include "ata.h"
@@ -211,8 +211,8 @@ struct ata_pci_softc {
     int32_t irqcnt;
 };
 
-static int32_t
-ata_find_dev(device_t dev, int32_t type)
+int32_t
+ata_find_dev(device_t dev, int32_t type, int32_t revid)
 {
     device_t *children, child;
     int nchildren, i;
@@ -226,7 +226,8 @@ ata_find_dev(device_t dev, int32_t type)
 	/* check that it's on the same silicon and the device we want */
 	if (pci_get_slot(dev) == pci_get_slot(child) &&
 	    pci_get_vendor(child) == (type & 0xffff) &&
-	    pci_get_device(child) == ((type & 0xffff0000) >> 16)) {
+	    pci_get_device(child) == ((type & 0xffff0000) >> 16) &&
+	    pci_get_revid(child) >= revid) {
 	    free(children, M_TEMP);
 	    return 1;
 	}
@@ -263,11 +264,13 @@ ata_pci_match(device_t dev)
 	return "AcerLabs Aladdin ATA33 controller";
 
     case 0x05711106: 
-	if (ata_find_dev(dev, 0x05861106))
+	if (ata_find_dev(dev, 0x05861106, 0))
 	    return "VIA 82C586 ATA33 controller";
-	if (ata_find_dev(dev, 0x05961106))
+	if (ata_find_dev(dev, 0x05961106, 0x12))
+	    return "VIA 82C596B ATA66 controller";
+	if (ata_find_dev(dev, 0x05961106, 0))
 	    return "VIA 82C596 ATA33 controller";
-	if (ata_find_dev(dev, 0x06861106))
+	if (ata_find_dev(dev, 0x06861106, 0))
 	    return "VIA 82C686 ATA66 controller";
 	return "VIA Apollo ATA controller";
 
@@ -309,7 +312,7 @@ ata_pci_match(device_t dev)
     default:
 	if (pci_get_class(dev) == PCIC_STORAGE &&
 	    (pci_get_subclass(dev) == PCIS_STORAGE_IDE))
-	    return "Unknown PCI ATA controller (generic mode)";
+	    return "Generic PCI ATA controller";
     }
     return NULL;
 }
@@ -428,8 +431,9 @@ ata_pci_attach(device_t dev)
 	pci_write_config(dev, 0x60, DEV_BSIZE, 2);
 	pci_write_config(dev, 0x68, DEV_BSIZE, 2);
 	
-	/* prepare for ATA-66 on the 82C686 */
-	if (ata_find_dev(dev, 0x06861106)) {
+	/* prepare for ATA-66 on the 82C686 and rev 0x12 and newer 82C596's */
+	if (ata_find_dev(dev, 0x06861106, 0) || 
+	    ata_find_dev(dev, 0x05961106, 0x12)) {
 	    pci_write_config(dev, 0x50, 
 			     pci_read_config(dev, 0x50, 4) | 0x070f070f, 4);   
 	}
@@ -697,11 +701,11 @@ ata_pcisub_probe(device_t dev)
     scp->unit = (uintptr_t) device_get_ivars(dev);
 
     /* set the chiptype to the hostchip ID, makes life easier */
-    if (ata_find_dev(device_get_parent(dev), 0x05861106))
+    if (ata_find_dev(device_get_parent(dev), 0x05861106, 0))
 	scp->chiptype = 0x05861106;
-    else if (ata_find_dev(device_get_parent(dev), 0x05961106))
+    else if (ata_find_dev(device_get_parent(dev), 0x05961106, 0))
 	scp->chiptype = 0x05961106;
-    else if (ata_find_dev(device_get_parent(dev), 0x06861106))
+    else if (ata_find_dev(device_get_parent(dev), 0x06861106, 0))
 	scp->chiptype = 0x06861106;
     else
 	scp->chiptype = pci_get_devid(device_get_parent(dev));
@@ -1101,7 +1105,7 @@ ata_intr(void *data)
 #endif
     default:
 	if (scp->flags & ATA_DMA_ACTIVE) {
-	    if (!(dmastat = ata_dmastatus(scp)) & ATA_BMSTAT_INTERRUPT)
+	    if (!((dmastat = ata_dmastatus(scp)) & ATA_BMSTAT_INTERRUPT))
 		return;
 	    else
 		outb(scp->bmaddr+ATA_BMSTAT_PORT, dmastat|ATA_BMSTAT_INTERRUPT);
@@ -1509,9 +1513,9 @@ ata_umode(struct ata_params *ap)
 {
     if (ap->atavalid & ATA_FLAG_88) {
 	if (ap->udmamodes & 0x10)
-	    return (ap->cblid ? 4 : 2);
+	    return 4;
 	if (ap->udmamodes & 0x08)
-	    return (ap->cblid ? 3 : 2);
+	    return 3;
 	if (ap->udmamodes & 0x04)
 	    return 2;
 	if (ap->udmamodes & 0x02)

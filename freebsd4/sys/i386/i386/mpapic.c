@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/mpapic.c,v 1.37 1999/12/15 19:17:08 tegge Exp $
+ * $FreeBSD: src/sys/i386/i386/mpapic.c,v 1.37.2.1 2000/05/31 21:42:19 msmith Exp $
  */
 
 #include "opt_smp.h"
@@ -142,6 +142,24 @@ static void polarity __P((int apic, int pin, u_int32_t * flags, int level));
 	  IOART_INTAHI |	\
 	  IOART_DESTPHY |	\
 	  IOART_DELLOPRI))
+
+void
+io_apic_set_id(int apic, int id)
+{
+	u_int32_t ux;
+	
+	ux = io_apic_read(apic, IOAPIC_ID);	/* get current contents */
+	if (((ux & APIC_ID_MASK) >> 24) != id) {
+		ux &= ~APIC_ID_MASK;	/* clear the ID field */
+		ux |= (id << 24);
+		io_apic_write(apic, IOAPIC_ID, ux);	/* write new value */
+		ux = io_apic_read(apic, IOAPIC_ID);	/* re-read && test */
+		if (((ux & APIC_ID_MASK) >> 24) != id)
+			panic("can't control IO APIC #%d ID, reg: 0x%08x",
+			      apic, ux);
+	}
+}
+
 
 /*
  * Setup the IO APIC.

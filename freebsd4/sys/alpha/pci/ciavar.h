@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/pci/ciavar.h,v 1.2 1999/08/28 00:39:01 peter Exp $
+ * $FreeBSD: src/sys/alpha/pci/ciavar.h,v 1.2.2.1 2000/07/04 01:57:05 mjacob Exp $
  */
 
 extern void cia_init(void);

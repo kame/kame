@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/linux/Makefile,v 1.34 2000/01/09 10:04:53 bde Exp $
+# $FreeBSD: src/sys/modules/linux/Makefile,v 1.34.2.1 2000/07/07 01:29:00 obrien Exp $
 
 .PATH:	${.CURDIR}/../../${MACHINE_ARCH}/linux
 
@@ -17,7 +17,10 @@ EXPORT_SYMS=_linux_mod
 CLEANFILES= linux_assym.h linux_genassym.o
 
 linux_assym.h:	linux_genassym.o
-	genassym ${.ALLSRC} > ${.TARGET}
+.if exists(@)
+linux_assym.h:	@/kern/genassym.sh
+.endif
+	sh @/kern/genassym.sh linux_genassym.o > ${.TARGET}
 
 linux_locore.o:	linux_locore.s linux_assym.h
 	${CC} -c -x assembler-with-cpp -DLOCORE ${CFLAGS} \

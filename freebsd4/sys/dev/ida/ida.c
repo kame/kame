@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/ida.c,v 1.7 2000/03/08 16:16:30 jlemon Exp $
+ * $FreeBSD: src/sys/dev/ida/ida.c,v 1.7.2.1 2000/05/03 23:54:08 jlemon Exp $
  */
 
 /*
@@ -398,7 +398,7 @@ ida_construct_qcb(struct ida_softc *ida)
 	 * XXX
 	 */
 	{
-		struct id_softc *drv = (struct id_softc *)bp->b_driver1;
+		struct idad_softc *drv = (struct idad_softc *)bp->b_driver1;
 		hwqcb->hdr.drive = drv->unit;
 	}
 
@@ -520,7 +520,7 @@ ida_done(struct ida_softc *ida, struct ida_qcb *qcb)
 	} else {
 		if (error)
 			qcb->buf->b_flags |= B_ERROR;
-		id_intr(qcb->buf);
+		idad_intr(qcb->buf);
 	}
 
 	qcb->state = QCB_FREE;

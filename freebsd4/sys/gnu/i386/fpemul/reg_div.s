@@ -60,7 +60,7 @@
  * W. Metzenthen   June 1994.
  *
  * 
- * $FreeBSD: src/sys/gnu/i386/fpemul/reg_div.s,v 1.9 1999/08/28 00:42:56 peter Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/reg_div.s,v 1.9.2.1 2000/07/07 00:38:42 obrien Exp $
  *
  */
 
@@ -233,8 +233,8 @@ L_arg2_not_inf:
 #endif DENORM_OPERAND
 
 L_copy_arg1:
-	movb	TAG(%esi),%ax
-	movb	%ax,TAG(%edi)
+	movb	TAG(%esi),%al
+	movb	%al,TAG(%edi)
 	movl	EXP(%esi),%eax
 	movl	%eax,EXP(%edi)
 	movl	SIGL(%esi),%eax

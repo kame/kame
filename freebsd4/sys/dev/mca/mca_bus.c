@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mca/mca_bus.c,v 1.7 2000/01/13 09:01:46 mdodd Exp $
+ * $FreeBSD: src/sys/dev/mca/mca_bus.c,v 1.7.2.1 2000/03/17 23:55:48 peter Exp $
  */
 
 /*
@@ -485,6 +485,10 @@ mca_alloc_resource (device_t dev, device_t child, int type, int *rid,
 			resource_list_add(&(m_dev->rl), type, *rid,
 					  start, end, count);
 		}
+	}
+
+	if (type == SYS_RES_IRQ) {
+		flags |= RF_SHAREABLE;
 	}
 
 	return (resource_list_alloc(&(m_dev->rl), dev, child, type, rid,

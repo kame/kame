@@ -25,23 +25,19 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/assym.h,v 1.3 2000/01/03 16:49:36 marcel Exp $
+ * $FreeBSD: src/sys/sys/assym.h,v 1.3.2.1 2000/07/07 01:31:16 obrien Exp $
  */
 
 #ifndef _SYS_ASSYM_H_
 #define	_SYS_ASSYM_H_
 
-#ifndef offsetof
-#define	offsetof(t, m)		(&((t *)0)->m)
-#endif
+#define	ASSYM_ABS(value)	((value) < 0 ? -((value) + 1) + 1ULL : (value))
 
-#ifndef __assym
-#define	__assym(sym, v)		unsigned long sym = (unsigned long)v
-#endif
-
-#define	ASSYM(sym, v)		__assym(assym_##sym, v)
-
-#define	ASSYM_SELF(sym)		ASSYM(sym, sym)
-#define ASSYM_OFFSET(sym, s, m)	ASSYM(sym, offsetof(s, m))
+#define	ASSYM(name, value)					\
+char name ## sign[(value) < 0 ? 1 : 0];				\
+char name ## w0[ASSYM_ABS(value) & 0xFFFFU];			\
+char name ## w1[(ASSYM_ABS(value) & 0xFFFF0000UL) >> 16];	\
+char name ## w2[(ASSYM_ABS(value) & 0xFFFF00000000ULL) >> 32];	\
+char name ## w3[(ASSYM_ABS(value) & 0xFFFF000000000000ULL) >> 48]
 
 #endif /* !_SYS_ASSYM_H_ */

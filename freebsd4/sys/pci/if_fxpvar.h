@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_fxpvar.h,v 1.9 1999/09/30 19:03:12 gallatin Exp $
+ * $FreeBSD: src/sys/pci/if_fxpvar.h,v 1.9.2.1 2000/03/29 02:02:39 dg Exp $
  */
 
 /*
@@ -67,6 +67,7 @@ struct fxp_softc {
 	int phy_primary_addr;		/* address of primary PHY */
 	int phy_primary_device;		/* device type of primary PHY */
 	int phy_10Mbps_only;		/* PHY is 10Mbps-only device */
+	int eeprom_size;		/* size of serial EEPROM */
 };
 
 /* Macros to ease CSR access. */

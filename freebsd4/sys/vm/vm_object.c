@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_object.c,v 1.171 1999/12/12 03:19:29 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_object.c,v 1.171.2.2 2000/07/13 08:30:31 alc Exp $
  */
 
 /*
@@ -249,9 +249,7 @@ vm_object_reference(object)
 	object->ref_count++;
 	if (object->type == OBJT_VNODE) {
 		while (vget((struct vnode *) object->handle, LK_RETRY|LK_NOOBJ, curproc)) {
-#if !defined(MAX_PERF)
 			printf("vm_object_reference: delay in getting object\n");
-#endif
 		}
 	}
 }
@@ -440,10 +438,8 @@ vm_object_terminate(object)
 	 */
 	s = splvm();
 	while ((p = TAILQ_FIRST(&object->memq)) != NULL) {
-#if !defined(MAX_PERF)
 		if (p->busy || (p->flags & PG_BUSY))
 			panic("vm_object_terminate: freeing busy page %p\n", p);
-#endif
 		if (p->wire_count == 0) {
 			vm_page_busy(p);
 			vm_page_free(p);
@@ -913,9 +909,6 @@ vm_object_shadow(object, offset, length)
 	    (source->type == OBJT_DEFAULT ||
 	     source->type == OBJT_SWAP))
 		return;
-
-	KASSERT((source->flags & OBJ_ONEMAPPING) == 0,
-		("vm_object_shadow: source object has OBJ_ONEMAPPING set.\n"));
 
 	/*
 	 * Allocate a new object with the given length

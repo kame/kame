@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_output.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.39 2000/02/09 00:34:40 shin Exp $
+ * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.39.2.4 2000/07/15 07:14:31 kris Exp $
  */
 
 #include "opt_inet6.h"
@@ -45,6 +45,7 @@
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
 #include <sys/mbuf.h>
+#include <sys/domain.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -54,15 +55,11 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-#ifdef INET6
-#include <netinet/ip6.h>
-#endif
 #include <netinet/in_pcb.h>
-#ifdef INET6
-#include <netinet6/in6_pcb.h>
-#endif
 #include <netinet/ip_var.h>
 #ifdef INET6
+#include <netinet6/in6_pcb.h>
+#include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #endif
 #include <netinet/tcp.h>
@@ -79,6 +76,8 @@
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #endif /*IPSEC*/
+
+#include <machine/in_cksum.h>
 
 #ifdef notyet
 extern struct mbuf *m_copypack();
@@ -645,6 +644,7 @@ send:
 	ip = mtod(m, struct ip *);
 	ipov = (struct ipovly *)ip;
 	th = (struct tcphdr *)(ip + 1);
+	/* this picks up the pseudo header (w/o the length) */
 	bcopy((caddr_t)tp->t_template->tt_ipgen, (caddr_t)ip,
 	      sizeof(struct ip));
 	bcopy((caddr_t)&tp->t_template->tt_t, (caddr_t)th,
@@ -722,15 +722,15 @@ send:
 	else
 #endif /* INET6 */
       {
+	m->m_pkthdr.csum_flags = CSUM_TCP;
+	m->m_pkthdr.csum_data = offsetof(struct tcphdr, th_sum);
 	if (len + optlen)
-		ipov->ih_len = htons((u_short)(sizeof (struct tcphdr) +
-		    optlen + len));
-	th->th_sum = in_cksum(m, (int)(hdrlen + len));
-#ifdef INET6
-	/* Re-initialization for later version check */
-	ip->ip_v = IPVERSION;
-	
-#endif /* INET6 */
+		th->th_sum = in_addword(th->th_sum, 
+		    htons((u_short)(optlen + len)));
+
+	/* IP version must be set here for ipv4/ipv6 checking later */
+	KASSERT(ip->ip_v == IPVERSION,
+	    ("%s: IP version incorrect: %d", __FUNCTION__, ip->ip_v));
       }
 
 	/*
@@ -775,12 +775,12 @@ send:
 		 */
 		if (!callout_active(tp->tt_rexmt) &&
 		    tp->snd_nxt != tp->snd_una) {
-			callout_reset(tp->tt_rexmt, tp->t_rxtcur,
-				      tcp_timer_rexmt, tp);
 			if (callout_active(tp->tt_persist)) {
 				callout_stop(tp->tt_persist);
 				tp->t_rxtshift = 0;
 			}
+			callout_reset(tp->tt_rexmt, tp->t_rxtcur,
+				      tcp_timer_rexmt, tp);
 		}
 	} else
 		if (SEQ_GT(tp->snd_nxt + len, tp->snd_max))
@@ -806,31 +806,38 @@ send:
 	 */
 #ifdef INET6
 	if (isipv6) {
-		/* 
+		/*
 		 * we separately set hoplimit for every segment, since the
 		 * user might want to change the value via setsockopt.
 		 * Also, desired default hop limit might be changed via
-		 * Neighbor Discovery. 
-		 */ 
-		ip6->ip6_hlim = in6_selecthlim(tp->t_inpcb, 
-					       tp->t_inpcb->in6p_route.ro_rt ? 
-					       tp->t_inpcb->in6p_route.ro_rt->rt_ifp 
-					       : NULL); 
+		 * Neighbor Discovery.
+		 */
+		ip6->ip6_hlim = in6_selecthlim(tp->t_inpcb,
+					       tp->t_inpcb->in6p_route.ro_rt ?
+					       tp->t_inpcb->in6p_route.ro_rt->rt_ifp
+					       : NULL);
 
 		/* TODO: IPv6 IP6TOS_ECT bit on */
 #ifdef IPSEC
-		m->m_pkthdr.rcvif = (struct ifnet *)so;
+		ipsec_setsocket(m, so);
 #endif /*IPSEC*/
 		error = ip6_output(m,
 			    tp->t_inpcb->in6p_outputopts,
 			    &tp->t_inpcb->in6p_route,
-			    (so->so_options & SO_DONTROUTE)|IPV6_SOCKINMRCVIF,
-			    NULL, NULL);
+			    (so->so_options & SO_DONTROUTE), NULL, NULL);
 	} else
 #endif /* INET6 */
     {
 	struct rtentry *rt;
 	ip->ip_len = m->m_pkthdr.len;
+#ifdef INET6
+ 	if (INP_CHECK_SOCKAF(so, AF_INET6))
+ 		ip->ip_ttl = in6_selecthlim(tp->t_inpcb,
+ 					    tp->t_inpcb->in6p_route.ro_rt ?
+ 					    tp->t_inpcb->in6p_route.ro_rt->rt_ifp
+ 					    : NULL);
+ 	else
+#endif /* INET6 */
 	ip->ip_ttl = tp->t_inpcb->inp_ip_ttl;	/* XXX */
 	ip->ip_tos = tp->t_inpcb->inp_ip_tos;	/* XXX */
 	/*
@@ -846,12 +853,19 @@ send:
 	    && !(rt->rt_rmx.rmx_locks & RTV_MTU)) {
 		ip->ip_off |= IP_DF;
 	}
+#ifdef IPSEC
+ 	ipsec_setsocket(m, so);
+#endif /*IPSEC*/
 	error = ip_output(m, tp->t_inpcb->inp_options, &tp->t_inpcb->inp_route,
-	    (so->so_options & SO_DONTROUTE)|IP_SOCKINMRCVIF, 0);
+	    (so->so_options & SO_DONTROUTE), 0);
     }
 	if (error) {
 out:
 		if (error == ENOBUFS) {
+	                if (!callout_active(tp->tt_rexmt) &&
+                            !callout_active(tp->tt_persist))
+	                        callout_reset(tp->tt_rexmt, tp->t_rxtcur,
+                                      tcp_timer_rexmt, tp);
 			tcp_quench(tp->t_inpcb, 0);
 			return (0);
 		}

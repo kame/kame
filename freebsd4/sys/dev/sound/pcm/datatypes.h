@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/datatypes.h,v 1.8 1999/12/29 03:46:53 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/datatypes.h,v 1.8.2.2 2000/07/19 21:18:46 cg Exp $
  */
 
 typedef struct _snd_mixer snd_mixer;
@@ -60,18 +60,16 @@ struct _snd_mixer {
 struct _snd_dbuf {
         u_int8_t *buf;
         int bufsize;
-        volatile int rp, fp; /* pointers to the ready and free area */
         volatile int dl; /* transfer size */
+        volatile int rp, fp; /* pointers to the ready and free area */
 	volatile int rl, fl; /* lenght of ready and free areas. */
 	volatile u_int32_t int_count, prev_int_count;
+	volatile u_int32_t total, prev_total;
 	int chan, dir;       /* dma channel */
-	int sample_size; /* 1, 2, 4 */
-	struct selinfo sel;
-	u_long total;	/* total bytes processed */
-	u_long prev_total; /* copy of the above when GETxPTR called */
-	int first_poll;
-	bus_dmamap_t dmamap;
+	int fmt, blksz, blkcnt;
 	int underflow;
+	bus_dmamap_t dmamap;
+	struct selinfo sel;
 };
 
 typedef int (pcmfeed_init_t)(pcm_feeder *feeder);
@@ -118,18 +116,13 @@ struct _pcm_channel {
 	int volume;
 	u_int32_t speed;
 	u_int32_t flags;
-	u_int32_t format, hwfmt;
-	u_int32_t blocksize;
-	u_int32_t blocksize2nd;
-	u_int32_t fragments;
+	u_int32_t format;
+	u_int32_t blocks;
 
 	int direction;
-	snd_dbuf buffer;
-#define	SMEGBUFSZ 4
-	u_int8_t smegbuf[SMEGBUFSZ];
-	u_int32_t smegcnt;
+	snd_dbuf buffer, buffer2nd;
+	snddev_info *parent;
 	void *devinfo;
-	snd_dbuf buffer2nd;
 };
 
 typedef void (pcm_swap_t)(void *data, int dir);
@@ -137,12 +130,14 @@ typedef void (pcm_swap_t)(void *data, int dir);
 /* descriptor of audio device */
 struct _snddev_info {
 	pcm_channel *play, *rec, **aplay, **arec, fakechan;
+	int *ref;
 	unsigned playcount, reccount, chancount;
 	snd_mixer mixer;
 	u_long magic;
 	unsigned flags;
 	void *devinfo;
 	pcm_swap_t *swap;
+	device_t dev;
 	char status[SND_STATUSLEN];
 };
 

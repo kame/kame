@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/bootstrap.h,v 1.24 1999/08/28 00:39:45 peter Exp $
+ * $FreeBSD: src/sys/boot/common/bootstrap.h,v 1.24.2.2 2000/07/06 00:34:02 ps Exp $
  */
 
 #include <sys/types.h>
@@ -78,6 +78,7 @@ extern char	*strdupout(vm_offset_t str);
 
 /* bcache.c */
 extern int	bcache_init(int nblks, size_t bsize);
+extern void	bcache_flush();
 
 /*
  * Disk block cache
@@ -296,3 +297,5 @@ extern struct arch_switch archsw;
 
 /* This must be provided by the MD code, but should it be in the archsw? */
 extern void		delay(int delay);
+
+extern void		dev_cleanup(void);

@@ -1,12 +1,12 @@
 /*	$NetBSD: usb.h,v 1.38 1999/10/20 21:02:39 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb.h,v 1.17 1999/12/29 04:35:47 peter Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb.h,v 1.17.2.4 2000/07/02 12:14:44 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -64,6 +64,10 @@ MALLOC_DECLARE(M_USBHC);
 #endif /* _KERNEL */
 #endif /* __FreeBSD__ */
 
+/* these three defines are used by usbd to autoload the usb kld */
+#define USB_KLD		"usb"
+#define USB_OHCI	"ohci/usb"
+#define USB_UHCI	"uhci/usb"
 
 #define USB_MAX_DEVICES 128
 #define USB_START_ADDR 0
@@ -364,8 +368,8 @@ typedef struct {
 #define  USUBCLASS_SCSI		6
 #define  UPROTO_MASS_CBI_I	0
 #define  UPROTO_MASS_CBI	1
-#define  UPROTO_MASS_BULK	2
-#define  UPROTO_MASS_BULK_P	80	/* 'P' for the Iomega Zip drive */
+#define  UPROTO_MASS_BBB	2
+#define  UPROTO_MASS_BBB_P	80	/* 'P' for the Iomega Zip drive */
 #define UCLASS_HUB		9
 #define  USUBCLASS_HUB		0
 #define UCLASS_DATA		10
@@ -403,6 +407,7 @@ typedef struct {
 #define USB_RESUME_TIME		(20*5)  /* ms */
 #define USB_RESUME_WAIT		10  /* ms */
 #define USB_RESUME_RECOVERY	10  /* ms */
+#define USB_EXTRA_POWER_UP_TIME	0   /* ms */
 #else
 /* Allow for marginal (i.e. non-conforming) devices. */
 #define USB_PORT_RESET_DELAY	50  /* ms */
@@ -412,6 +417,7 @@ typedef struct {
 #define USB_RESUME_DELAY	(50*5)  /* ms */
 #define USB_RESUME_WAIT		50  /* ms */
 #define USB_RESUME_RECOVERY	50  /* ms */
+#define USB_EXTRA_POWER_UP_TIME	20  /* ms */
 #endif
 
 #define USB_MIN_POWER		100 /* mA */
@@ -534,6 +540,7 @@ struct usb_event {
 #define USB_GET_REPORT_DESC	_IOR ('U', 21, struct usb_ctl_report_desc)
 #define USB_SET_IMMED		_IOW ('U', 22, int)
 #define USB_GET_REPORT		_IOWR('U', 23, struct usb_ctl_report)
+#define USB_SET_REPORT		_IOW ('U', 24, struct usb_ctl_report)
 
 /* Generic USB device */
 #define USB_GET_CONFIG		_IOR ('U', 100, int)

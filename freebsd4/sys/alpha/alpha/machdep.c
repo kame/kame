@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.68 2000/02/29 08:48:08 dfr Exp $
+ * $FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.68.2.7 2000/07/20 10:35:13 kris Exp $
  */
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -112,6 +112,7 @@
 #include <sys/sysctl.h>
 #include <sys/uio.h>
 #include <sys/linker.h>
+#include <sys/random.h>
 #include <net/netisr.h>
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
@@ -139,10 +140,6 @@
 #include <sys/vnode.h>
 #include <miscfs/procfs/procfs.h>
 #include <machine/sigframe.h>
-
-#ifdef SYSVSHM
-#include <sys/shm.h>
-#endif
 
 #ifdef SYSVMSG
 #include <sys/msg.h>
@@ -272,7 +269,7 @@ cpu_startup(dummy)
 	/*
 	 * Good {morning,afternoon,evening,night}.
 	 */
-	printf(version);
+	printf("%s", version);
 	identifycpu();
 
 	/* startrtclock(); */
@@ -331,9 +328,6 @@ again:
 
 	valloc(callout, struct callout, ncallout);
 	valloc(callwheel, struct callout_tailq, callwheelsize);
-#ifdef SYSVSHM
-	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
-#endif
 #ifdef SYSVSEM
 	valloc(sema, struct semid_ds, seminfo.semmni);
 	valloc(sem, struct sem, seminfo.semmns);
@@ -347,10 +341,21 @@ again:
 	valloc(msqids, struct msqid_ds, msginfo.msgmni);
 #endif
 
+	/*
+	 * The nominal buffer size (and minimum KVA allocation) is BKVASIZE.
+	 * For the first 64MB of ram nominally allocate sufficient buffers to
+	 * cover 1/4 of our ram.  Beyond the first 64MB allocate additional
+	 * buffers to cover 1/20 of our ram over 64MB.
+	 */
+
 	if (nbuf == 0) {
-		nbuf = 30;
-		if( physmem > 1024)
-			nbuf += min((physmem - 1024) / 8, 2048);
+		int factor = 4 * BKVASIZE / PAGE_SIZE;
+
+		nbuf = 50;
+		if (physmem > 1024)
+			nbuf += min((physmem - 1024) / factor, 16384 / factor);
+		if (physmem > 16384)
+			nbuf += (physmem - 16384) * 2 / (factor * 5);
 	}
 	nswbuf = max(min(nbuf/4, 64), 16);
 
@@ -597,7 +602,7 @@ alpha_init(pfn, ptb, bim, bip, biv)
 	struct mddt_cluster *memc;
 	int i, mddtweird;
 	int cputype;
-	char* p;
+	char *p;
 
 	/* NO OUTPUT ALLOWED UNTIL FURTHER NOTICE */
 
@@ -740,11 +745,29 @@ alpha_init(pfn, ptb, bim, bip, biv)
 	 * Find out what hardware we're on, and do basic initialization.
 	 */
 	cputype = hwrpb->rpb_type;
-	if (cputype >= ncpuinit) {
-		platform_not_supported(cputype);
-		/* NOTREACHED */
+	if (cputype < 0) {
+		/*
+		 * At least some white-box (NT) systems have SRM which
+		 * reports a systype that's the negative of their
+		 * blue-box (UNIX/OVMS) counterpart.
+		 */
+		cputype = -cputype;
 	}
-	cpuinit[cputype].init(cputype);
+	
+	if (cputype >= API_ST_BASE) {
+		if (cputype >= napi_cpuinit + API_ST_BASE) {
+			platform_not_supported(cputype);
+			/* NOTREACHED */
+		}
+		cputype -= API_ST_BASE;
+		api_cpuinit[cputype].init(cputype);
+	} else {
+		if (cputype >= ncpuinit) {
+			platform_not_supported(cputype);
+			/* NOTREACHED */
+		}	
+		cpuinit[cputype].init(cputype);
+	}
 	snprintf(cpu_model, sizeof(cpu_model), "%s", platform.model);
 
 	/*
@@ -997,10 +1020,14 @@ alpha_init(pfn, ptb, bim, bip, biv)
 	    (struct trapframe *)proc0paddr->u_pcb.pcb_hw.apcb_ksp;
 
 	/*
+	 * Initialise entropy pool.
+	 */
+	rand_initialize();
+
+	/*
 	 * Look at arguments passed to us and compute boothowto.
 	 */
 
-	boothowto = 0;
 #ifdef KADB
 	boothowto |= RB_KDB;
 #endif
@@ -1066,6 +1093,16 @@ alpha_init(pfn, ptb, bim, bip, biv)
 		default:
 			printf("Unrecognized boot flag '%c'.\n", *p);
 			break;
+		}
+	}
+
+	/*
+	 * Catch case of boot_verbose set in environment.
+	 */
+	if ((p = getenv("boot_verbose")) != NULL) {
+		if (strcmp(p, "yes") == 0 || strcmp(p, "YES") == 0) {
+			boothowto |= RB_VERBOSE;
+			bootverbose = 1;
 		}
 	}
 
@@ -1140,17 +1177,46 @@ bzero(void *buf, size_t len)
 	}
 }
 
-/*
- * Wait "n" microseconds.
- */
 void
 DELAY(int n)
 {
-#ifndef SIMOS
-	long N = cycles_per_usec * (n);
+#ifndef	SIMOS
+	unsigned long pcc0, pcc1, curcycle, cycles;
+        int usec;
 
-	while (N > 0)				/* XXX */
-		N -= 3;				/* XXX */
+	if (n == 0)
+		return;
+
+        pcc0 = alpha_rpcc() & 0xffffffffUL;
+	cycles = 0;
+	usec = 0;
+
+        while (usec <= n) {
+		/*
+		 * Get the next CPU cycle count. The assumption here
+		 * is that we can't have wrapped twice past 32 bits worth
+		 * of CPU cycles since we last checked.
+		 */
+		pcc1 = alpha_rpcc() & 0xffffffffUL;
+		if (pcc1 < pcc0) {
+			curcycle = (pcc1 + 0x100000000UL) - pcc0;
+		} else {
+			curcycle = pcc1 - pcc0;
+		}
+
+		/*
+		 * We now have the number of processor cycles since we
+		 * last checked. Add the current cycle count to the
+		 * running total. If it's over cycles_per_usec, increment
+		 * the usec counter.
+		 */
+		cycles += curcycle;
+		while (cycles > cycles_per_usec) {
+			usec++;
+			cycles -= cycles_per_usec;
+		}
+		pcc0 = pcc1;
+        }
 #endif
 }
 
@@ -2110,14 +2176,4 @@ alpha_fpstate_switch(struct proc *p)
 	}
 
 	p->p_md.md_flags |= MDP_FPUSED;
-}
-
-/*
- * dummy version of read_random() until the random driver is ported.
- */
-int read_random __P((void));
-int
-read_random(void)
-{
-	return (0);
 }

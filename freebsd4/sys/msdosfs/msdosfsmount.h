@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/msdosfs/msdosfsmount.h,v 1.20 2000/01/27 14:43:07 nyan Exp $ */
+/* $FreeBSD: src/sys/msdosfs/msdosfsmount.h,v 1.20.2.1 2000/07/08 14:34:27 bp Exp $ */
 /*	$NetBSD: msdosfsmount.h,v 1.17 1997/11/17 15:37:07 ws Exp $	*/
 
 /*-
@@ -198,6 +198,7 @@ struct msdosfsmount {
 	(1024 << ((pmp)->pm_BlkPerSec >> 2))
 
 int msdosfs_init __P((struct vfsconf *vfsp));
+int msdosfs_uninit __P((struct vfsconf *vfsp));
 int msdosfs_mountroot __P((void));
 
 #endif /* _KERNEL */

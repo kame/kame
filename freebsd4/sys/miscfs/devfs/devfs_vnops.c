@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  * 
- * $FreeBSD: src/sys/miscfs/devfs/devfs_vnops.c,v 1.90 2000/01/10 12:04:17 phk Exp $
+ * $FreeBSD: src/sys/miscfs/devfs/devfs_vnops.c,v 1.90.2.1 2000/03/17 10:47:32 ps Exp $
  */
 
 #include <sys/param.h>
@@ -1933,7 +1933,6 @@ devfs_getpages(struct vop_getpages_args *ap)
 	}
 	if (!gotreqpage) {
 		m = ap->a_m[ap->a_reqpage];
-#ifndef MAX_PERF
 		printf("devfs_getpages: I/O read failure: (error code=%d)\n",
 								error);
 		printf("               size: %d, resid:"
@@ -1942,7 +1941,6 @@ devfs_getpages(struct vop_getpages_args *ap)
 		printf("               nread: %d, reqpage:"
 			" %d, pindex: %d, pcount: %d\n",
 				nread, ap->a_reqpage, m->pindex, pcount);
-#endif
 		/*
 		 * Free the buffer header back to the swap buffer pool.
 		 */

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_tireg.h,v 1.13 2000/02/10 00:37:47 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_tireg.h,v 1.13.2.2 2000/04/27 16:01:19 wpaul Exp $
  */
 
 /*
@@ -135,7 +135,7 @@
  */
 #define TI_FIRMWARE_MAJOR		0xc
 #define TI_FIRMWARE_MINOR		0x3
-#define TI_FIRMWARE_FIX			0x12
+#define TI_FIRMWARE_FIX			0x15
 
 /*
  * Miscelaneous Local Control register.

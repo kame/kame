@@ -1,5 +1,5 @@
 /*	$NetBSD: pcmcia_cis_quirks.c,v 1.5 1999/10/11 17:50:21 thorpej Exp $	*/
-/* $FreeBSD: src/sys/dev/pccard/pccard_cis_quirks.c,v 1.2 1999/11/28 05:49:27 imp Exp $ */
+/* $FreeBSD: src/sys/dev/pccard/pccard_cis_quirks.c,v 1.2.2.1 2000/05/23 03:57:00 imp Exp $ */
 
 #define	PCCARDDEBUG
 
@@ -47,7 +47,6 @@
 
 #include <dev/pccard/pccarddevs.h>
 #include <dev/pccard/pccardreg.h>
-#include <dev/pccard/pccardchip.h>
 #include <dev/pccard/pccardvar.h>
 
 /* There are cards out there whose CIS flat-out lies.  This file

@@ -23,13 +23,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/isa_compat.h,v 1.27 2000/02/28 07:52:22 bde Exp $
+ * $FreeBSD: src/sys/i386/isa/isa_compat.h,v 1.27.2.5 2000/05/22 13:09:50 nyan Exp $
  */
 
 #include "vt.h"
-#include "adv.h"
 #include "wdc.h"
-#include "mse.h"
 #include "ar.h"
 #include "cs.h"
 #include "cx.h"
@@ -40,7 +38,6 @@
 #include "rdp.h"
 #include "sr.h"
 #include "wl.h"
-#include "oltr.h"
 #include "pcm.h"
 #include "pas.h"
 #include "sb.h"
@@ -83,9 +80,7 @@ struct old_isa_driver {
 };
 
 extern struct isa_driver  vtdriver;
-extern struct isa_driver advdriver;
 extern struct isa_driver wdcdriver;
-extern struct isa_driver msedriver;
 extern struct isa_driver  ardriver;
 extern struct isa_driver  csdriver;
 extern struct isa_driver  cxdriver;
@@ -96,7 +91,6 @@ extern struct isa_driver lncdriver;
 extern struct isa_driver rdpdriver;
 extern struct isa_driver  srdriver;
 extern struct isa_driver  wldriver;
-extern struct isa_driver oltrdriver;
 extern struct isa_driver pasdriver;
 extern struct isa_driver  sbdriver;
 extern struct isa_driver sbxvidriver;
@@ -154,9 +148,6 @@ static struct old_isa_driver old_drivers[] = {
 #if NVT > 0
 	{ INTR_TYPE_TTY, &vtdriver },
 #endif
-#if NMSE > 0
-	{ INTR_TYPE_TTY, &msedriver },
-#endif
 #if NGP > 0
 	{ INTR_TYPE_TTY, &gpdriver },
 #endif
@@ -175,7 +166,7 @@ static struct old_isa_driver old_drivers[] = {
 #if NLABPC > 0
 	{ INTR_TYPE_TTY, &labpcdriver },
 #endif
-#if NRCD > 0
+#if NRC > 0
 	{ INTR_TYPE_TTY, &rcdriver },
 #endif
 #if NRP > 0
@@ -194,7 +185,7 @@ static struct old_isa_driver old_drivers[] = {
 	{ INTR_TYPE_TTY, &stlidriver },
 #endif
 #if NLORAN > 0
-	{ INTR_TYPE_TTY, &lorandriver },
+	{ INTR_TYPE_TTY | INTR_TYPE_FAST, &lorandriver },
 #endif
 
 /* BIO */
@@ -245,23 +236,8 @@ static struct old_isa_driver old_drivers[] = {
 	{ INTR_TYPE_NET, &tinadriver },
 #endif
 
-/* CAM */
-
-#if NADV > 0
-	{ INTR_TYPE_CAM, &advdriver },
-#endif
-
-#ifdef PC98
-#if NBS > 0
-	{ INTR_TYPE_CAM, &bsdriver },
-#endif
-#endif
-
 /* MISC */
 
-#if NOLTR > 0
-	{ INTR_TYPE_MISC, &oltrdriver },
-#endif
 #if NPAS > 0
 	{ INTR_TYPE_MISC, &pasdriver },
 #endif

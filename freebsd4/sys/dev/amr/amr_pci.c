@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/amr/amr_pci.c,v 1.1 1999/10/07 02:23:11 msmith Exp $
+ *	$FreeBSD: src/sys/dev/amr/amr_pci.c,v 1.1.2.1 2000/04/11 00:12:46 msmith Exp $
  */
 
 #include <sys/param.h>
@@ -157,6 +157,13 @@ amr_pci_attach(device_t dev)
 	    device_printf(dev, "I/O window not available\n");
 	    return(ENXIO);
 	}
+    }
+
+    /* force the busmaster enable bit on */
+    if (!(command & PCIM_CMD_BUSMASTEREN)) {
+	device_printf(dev, "busmaster bit not set, enabling\n");
+	command |= PCIM_CMD_BUSMASTEREN;
+	pci_write_config(dev, PCIR_COMMAND, command, 2);
     }
 
     /*

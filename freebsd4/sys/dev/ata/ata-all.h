@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-all.h,v 1.26 2000/03/05 16:52:23 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-all.h,v 1.26.2.1 2000/06/11 17:02:46 sos Exp $
  */
 
 /* ATA register defines */
@@ -326,6 +326,9 @@ int8_t ata_pio2mode(int32_t);
 int ata_pmode(struct ata_params *);
 int ata_wmode(struct ata_params *);
 int ata_umode(struct ata_params *);
+#if NPCI > 0
+int32_t ata_find_dev(device_t, int32_t, int32_t);
+#endif
 
 void ata_dmainit(struct ata_softc *, int32_t, int32_t, int32_t, int32_t);
 int32_t ata_dmasetup(struct ata_softc *, int32_t, int8_t *, int32_t, int32_t);

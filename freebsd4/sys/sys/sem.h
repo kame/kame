@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/sys/sem.h,v 1.20 1999/12/29 04:24:46 peter Exp $ */
+/* $FreeBSD: src/sys/sys/sem.h,v 1.20.2.1 2000/05/01 11:15:58 peter Exp $ */
 /*	$NetBSD: sem.h,v 1.5 1994/06/29 06:45:15 cgd Exp $	*/
 
 /*
@@ -163,14 +163,6 @@ extern int	*semu;		/* undo structure pool */
  * Process sem_undo vectors at proc exit.
  */
 void	semexit __P((struct proc *p));
-
-/*
- * Parameters to the semconfig system call
- */
-typedef enum {
-	SEM_CONFIG_FREEZE,	/* Freeze the semaphore facility. */
-	SEM_CONFIG_THAW		/* Thaw the semaphore facility. */
-} semconfig_ctl_t;
 #endif /* _KERNEL */
 
 #ifndef _KERNEL

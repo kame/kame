@@ -11,7 +11,7 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- * $FreeBSD: src/sys/netinet/ip_fw.h,v 1.47 2000/02/10 14:17:39 luigi Exp $
+ * $FreeBSD: src/sys/netinet/ip_fw.h,v 1.47.2.1 2000/06/11 18:39:44 luigi Exp $
  */
 
 #ifndef _IP_FW_H
@@ -81,7 +81,7 @@ struct ip_fw {
 	 * match all ports)
 	 */
     u_char fw_nports;
-    void *pipe_ptr;                    /* Pipe ptr in case of dummynet pipe */
+    void *pipe_ptr;                    /* flow_set ptr for dummynet pipe */
     void *next_rule_ptr ;              /* next rule in case of match */
     uid_t fw_uid;			/* uid to match */
     gid_t fw_gid;			/* gid to match */
@@ -167,6 +167,7 @@ struct ipfw_dyn_rule {
 #define IP_FW_F_SKIPTO	0x00000006	/* This is a skipto rule		*/
 #define IP_FW_F_FWD	0x00000007	/* This is a "change forwarding address" rule */
 #define IP_FW_F_PIPE	0x00000008	/* This is a dummynet rule */
+#define IP_FW_F_QUEUE	0x00000009	/* This is a dummynet queue */
 
 #define IP_FW_F_IN	0x00000100	/* Check inbound packets		*/
 #define IP_FW_F_OUT	0x00000200	/* Check outbound packets		*/

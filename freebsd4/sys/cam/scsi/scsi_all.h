@@ -14,13 +14,12 @@
  *
  * Ported to run under 386BSD by Julian Elischer (julian@tfs.com) Sept 1992
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_all.h,v 1.14 2000/02/20 04:42:44 ken Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_all.h,v 1.14.2.2 2000/07/14 20:14:19 mjacob Exp $
  */
 
 /*
  * SCSI general  interface description
  */
-
 #ifndef	_SCSI_SCSI_ALL_H
 #define _SCSI_SCSI_ALL_H 1
 
@@ -73,6 +72,9 @@
 #if defined(CAM_MAX_CDBLEN) && (CAM_MAX_CDBLEN < SCSI_MAX_CDBLEN)
 #error "CAM_MAX_CDBLEN cannot be less than SCSI_MAX_CDBLEN"
 #endif
+
+/* 6byte CDBs special case 0 length to be 256 */
+#define SCSI_CDB6_LEN(len)	((len) == 0 ? 256 : len)
 
 /*
  * This type defines actions to be taken when a particular sense code is

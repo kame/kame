@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/libi386/aout_freebsd.c,v 1.12 1999/08/28 00:40:13 peter Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/aout_freebsd.c,v 1.12.2.1 2000/07/06 00:34:02 ps Exp $
  */
 
 #include <sys/param.h>
@@ -77,6 +77,7 @@ aout_exec(struct loaded_module *mp)
     bi->bi_symtab = ssym;	/* XXX this is only the primary kernel symtab */
     bi->bi_esymtab = esym;
 
+    dev_cleanup();
     __exec((void *)entry, boothowto, bootdev, 0, 0, 0, bootinfop);
 
     panic("exec returned");

@@ -1,12 +1,12 @@
 /*
- * Copyright (C) 1997-1998 by Darren Reed.
+ * Copyright (C) 1997-2000 by Darren Reed.
  *
  * Redistribution and use in source and binary forms are permitted
  * provided that this notice is preserved and due credit is given
  * to the original author and the contributors.
  *
- * $Id: ip_log.c,v 2.1.2.2 1999/09/21 11:55:44 darrenr Exp $
- * $FreeBSD: src/sys/netinet/ip_log.c,v 1.13 2000/02/10 21:29:10 guido Exp $
+ * $Id: ip_log.c,v 2.5.2.1 2000/07/19 13:11:47 darrenr Exp $
+ * $FreeBSD: src/sys/netinet/ip_log.c,v 1.13.2.2 2000/07/19 23:27:55 darrenr Exp $
  */
 #include <sys/param.h>
 #if defined(KERNEL) && !defined(_KERNEL)
@@ -16,16 +16,24 @@
 # include "opt_ipfilter_log.h"
 #endif
 #ifdef  __FreeBSD__
-# if defined(_KERNEL) && !defined(IPFILTER_LKM)
-#  if !defined(__FreeBSD_version)
+# if defined(IPFILTER_LKM) || defined(_KERNEL)
+#  if !defined(__FreeBSD_version) 
 #   include <sys/osreldate.h>
 #  endif
-#  if defined(__FreeBSD_version) && (__FreeBSD_version >= 300000)
-#   include "opt_ipfilter.h"
+#  if !defined(IPFILTER_LKM)
+#   if defined(__FreeBSD_version) && (__FreeBSD_version >= 300000)
+#    include "opt_ipfilter.h"
+#   endif
+#  endif
+# else
+#  ifdef KLD_MODULE
+#   include <sys/osreldate.h>
+#  else
+#   include <osreldate.h>
 #  endif
 # endif
 #endif
-#ifdef	IPFILTER_LOG
+#ifdef  IPFILTER_LOG
 # ifndef SOLARIS
 #  define SOLARIS (defined(sun) && (defined(__svr4__) || defined(__SVR4)))
 # endif
@@ -129,7 +137,7 @@ extern	kcondvar_t	iplwait;
 
 iplog_t	**iplh[IPL_LOGMAX+1], *iplt[IPL_LOGMAX+1], *ipll[IPL_LOGMAX+1];
 size_t	iplused[IPL_LOGMAX+1];
-fr_info_t	iplcrc[IPL_LOGMAX+1];
+static fr_info_t	iplcrc[IPL_LOGMAX+1];
 # ifdef	linux
 static struct wait_queue *iplwait[IPL_LOGMAX+1];
 # endif
@@ -172,6 +180,7 @@ mb_t *m;
 	size_t sizes[2];
 	void *ptrs[2];
 	int types[2];
+	u_char p;
 # if SOLARIS
 	ill_t *ifp = fin->fin_ifp;
 # else
@@ -182,15 +191,16 @@ mb_t *m;
 	 * calculate header size.
 	 */
 	hlen = fin->fin_hlen;
-	if ((ip->ip_off & IP_OFFMASK) == 0) {
-		if (ip->ip_p == IPPROTO_TCP)
+	if (fin->fin_off == 0) {
+		p = fin->fin_fi.fi_p;
+		if (p == IPPROTO_TCP)
 			hlen += MIN(sizeof(tcphdr_t), fin->fin_dlen);
-		else if (ip->ip_p == IPPROTO_UDP)
+		else if (p == IPPROTO_UDP)
 			hlen += MIN(sizeof(udphdr_t), fin->fin_dlen);
-		else if (ip->ip_p == IPPROTO_ICMP) {
-			struct	icmp	*icmp;
+		else if (p == IPPROTO_ICMP) {
+			struct icmp *icmp;
 
-			icmp = (struct icmp *)((char *)ip + hlen);
+			icmp = (struct icmp *)fin->fin_dp;
 	 
 			/*
 			 * For ICMP, if the packet is an error packet, also
@@ -235,7 +245,7 @@ mb_t *m;
 			if ((ipfl.fl_ifname[2] = ifp->if_name[2]))
 				ipfl.fl_ifname[3] = ifp->if_name[3];
 #  endif
-	mlen = (flags & FR_LOGBODY) ? MIN(ip->ip_len - hlen, 128) : 0;
+	mlen = (flags & FR_LOGBODY) ? MIN(fin->fin_plen - hlen, 128) : 0;
 # endif
 	ipfl.fl_plen = (u_char)mlen;
 	ipfl.fl_hlen = (u_char)hlen;

@@ -1,4 +1,4 @@
-#       $FreeBSD: src/sys/modules/umass/Makefile,v 1.7 1999/11/28 18:53:33 bde Exp $ 
+#       $FreeBSD: src/sys/modules/umass/Makefile,v 1.7.2.1 2000/04/01 19:33:33 n_hibma Exp $ 
 
 MAINTAINER	 = n_hibma@freebsd.org
 
@@ -8,8 +8,5 @@ SRCS		 = bus_if.h device_if.h \
 		   opt_usb.h opt_cam.h opt_scsi.h \
 		   umass.c
 NOMAN		 =
-
-opt_scsi.h:
-	echo '#define SCSI_DELAY 15000' > opt_scsi.h
 
 .include <bsd.kmod.mk>

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/alpha/common/Makefile.common,v 1.4 1999/12/27 09:20:33 peter Exp $
+# $FreeBSD: src/sys/boot/alpha/common/Makefile.common,v 1.4.2.3 2000/07/12 05:16:49 jhb Exp $
 #
 # Common Alpha loader build rules
 
@@ -13,7 +13,7 @@ SRCS+=		dev_net.c
 # Enable BootForth
 BOOT_FORTH=	yes
 CFLAGS+=	-I${.CURDIR}/../../ficl -I${.CURDIR}/../../ficl/alpha
-#CFLAGS+=	-DBOOT_FORTH
+CFLAGS+=	-DBOOT_FORTH
 .if exists(${.OBJDIR}/../../ficl/libficl.a)
 LIBFICL=	${.OBJDIR}/../../ficl/libficl.a
 .else
@@ -58,9 +58,12 @@ ${BASE}.sym: ${OBJS} ${LIBSTAND} ${LIBFICL} ${LIBALPHA} ${CRT} vers.o setdef0.o 
 ${BASE}.help: help.common help.alpha
 	cat ${.ALLSRC} | awk -f ${.CURDIR}/../../common/merge_help.awk > ${.TARGET}
 
-.ifdef INSTALL_HELP
 beforeinstall:
-.if exists(${.OBJDIR}/loader.help)
+.if exists(${DESTDIR}/boot/${BASE})
+	mv ${DESTDIR}/boot/${BASE} ${DESTDIR}/boot/${BASE}.old
+.endif
+.ifdef INSTALL_HELP
+.if exists(${.OBJDIR}/${BASE}.help)
 	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 \
 		${.OBJDIR}/${BASE}.help ${DESTDIR}/boot
 .else
@@ -68,6 +71,17 @@ beforeinstall:
 		${.CURDIR}/${BASE}.help ${DESTDIR}/boot
 .endif
 .endif
+.if !exists(${DESTDIR}/boot/loader.rc)
+	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 \
+		${.CURDIR}/../../forth/loader.rc ${DESTDIR}/boot
+.endif
+	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 \
+		${.CURDIR}/../../forth/loader.4th ${DESTDIR}/boot
+	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 \
+		${.CURDIR}/../../forth/support.4th ${DESTDIR}/boot
+	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 \
+		${.CURDIR}/../../forth/loader.conf ${DESTDIR}/boot/defaults
+
 
 start.o:	${.CURDIR}/../libalpha/start.S
 	${CC} -c ${CFLAGS} $<

@@ -24,7 +24,7 @@
  * SUCH DAMAGE.
  *
  *	$Id: if_xe.c,v 1.20 1999/06/13 19:17:40 scott Exp $
- * $FreeBSD: src/sys/dev/xe/if_xevar.h,v 1.1 2000/01/10 08:05:53 imp Exp $
+ * $FreeBSD: src/sys/dev/xe/if_xevar.h,v 1.1.2.1 2000/06/01 01:23:53 imp Exp $
  */
 #ifndef DEV_XE_IF_XEDEV_H
 #define DEV_XE_IF_XEDEV_H
@@ -78,8 +78,8 @@ struct xe_softc {
  * Horrid stuff for accessing CIS tuples
  */
 #define CISTPL_BUFSIZE		512
-#define CISTPL_TYPE(tpl)	tpl[0]
-#define CISTPL_LEN(tpl)		tpl[2]
-#define CISTPL_DATA(tpl,pos)	tpl[4 + ((pos)<<1)]
+#define CISTPL_TYPE(tpl)	bus_space_read_1(bst, bsh, tpl + 0)
+#define CISTPL_LEN(tpl)		bus_space_read_1(bst, bsh, tpl + 2)
+#define CISTPL_DATA(tpl,pos)	bus_space_read_1(bst, bsh, tpl+ 4 + ((pos)<<1))
 
 #endif /* DEV_XE_IF_XEVAR_H */

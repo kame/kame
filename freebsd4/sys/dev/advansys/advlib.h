@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/advansys/advlib.h,v 1.8 2000/01/14 03:33:38 gibbs Exp $
+ * $FreeBSD: src/sys/dev/advansys/advlib.h,v 1.8.2.1 2000/04/14 13:32:50 nyan Exp $
  */
 /*
  * Ported from:
@@ -492,8 +492,8 @@ struct adv_target_transinfo {
 	struct adv_transinfo user;
 };
 
-struct adv_softc
-{
+struct adv_softc {
+	device_t		dev;
 	bus_space_tag_t		 tag;
 	bus_space_handle_t	 bsh;
 	struct cam_sim		*sim;

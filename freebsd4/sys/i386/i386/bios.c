@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/bios.c,v 1.29 1999/12/26 16:21:17 bde Exp $
+ * $FreeBSD: src/sys/i386/i386/bios.c,v 1.29.2.2 2000/06/14 18:03:11 iwasaki Exp $
  */
 
 /*
@@ -251,7 +251,7 @@ set_bios_selectors(struct bios_segments *seg, int flags)
     union descriptor *p_gdt;
 
 #ifdef SMP
-    p_gdt = &gdt[cpuid];
+    p_gdt = &gdt[cpuid * NGDT];
 #else
     p_gdt = gdt;
 #endif
@@ -557,6 +557,22 @@ pnpbios_identify(driver_t *driver, device_t parent)
 	    printf("pnpbios: bogus system node data, aborting scan\n");
 	    break;
 	}
+	
+	/*
+	 * If we are in APIC_IO mode, we should ignore the ISA PIC if it
+	 * shows up.  Likewise, in !APIC_IO mode, we should ignore the
+	 * APIC (less important).
+	 * This is significant because the ISA PIC will claim IRQ 2 (which
+	 * it uses for chaining), while in APIC mode this is a valid IRQ
+	 * available for general use.
+	 */
+#ifdef APIC_IO
+	if (!strcmp(pnp_eisaformat(pd->devid), "PNP0000"))	/* ISA PIC */
+	    continue;
+#else
+	if (!strcmp(pnp_eisaformat(pd->devid), "PNP0003"))	/* APIC */
+	    continue;
+#endif	
 	
 	/* Add the device and parse its resources */
 	dev = BUS_ADD_CHILD(parent, ISA_ORDER_PNP, NULL, -1);

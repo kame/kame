@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)trap.h	5.4 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/i386/include/trap.h,v 1.10 1999/08/28 00:44:27 peter Exp $
+ * $FreeBSD: src/sys/i386/include/trap.h,v 1.10.2.1 2000/03/20 10:27:52 cracauer Exp $
  */
 
 #ifndef _MACHINE_TRAP_H_
@@ -77,8 +77,8 @@
 #define	    ILL_FPOP_FAULT	T_FPOPFLT	/* coprocessor operand fault */
 
 /* portable macros for SIGFPE/ARITHTRAP */
-#define FPE_INTDIV	1	/* integer divide by zero */
-#define FPE_INTOVF	2	/* integer overflow */
+#define FPE_INTOVF	1	/* integer overflow */
+#define FPE_INTDIV	2	/* integer divide by zero */
 #define FPE_FLTDIV	3	/* floating point divide by zero */
 #define FPE_FLTOVF	4	/* floating point overflow */
 #define FPE_FLTUND	5	/* floating point underflow */

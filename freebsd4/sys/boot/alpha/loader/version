@@ -1,7 +1,9 @@
-$FreeBSD: src/sys/boot/alpha/loader/version,v 1.2 1999/09/05 15:16:49 peter Exp $
+$FreeBSD: src/sys/boot/alpha/loader/version,v 1.2.2.1 2000/07/06 23:45:00 obrien Exp $
 
 NOTE ANY CHANGES YOU MAKE TO THE BOOTBLOCKS HERE.  The format of this
 file is important.  Make sure the current version number is on line 6.
 
+0.3:	Set/getenv&cia, copyin/out.
+0.2:	FICL added to Alpha.
 0.1:	Initial i386 version, germinated from the NetBSD i386
 	standalone, but enormously modified.

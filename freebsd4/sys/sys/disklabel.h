@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)disklabel.h	8.2 (Berkeley) 7/10/94
- * $FreeBSD: src/sys/sys/disklabel.h,v 1.49 1999/12/29 04:24:39 peter Exp $
+ * $FreeBSD: src/sys/sys/disklabel.h,v 1.49.2.2 2000/05/04 17:45:54 ps Exp $
  */
 
 #ifndef _SYS_DISKLABEL_H_
@@ -360,6 +360,9 @@ struct dos_partition {
 #define DOSPARTOFF	446
 #define NDOSPART	4
 #define	DOSPTYP_386BSD	0xa5	/* 386BSD partition type */
+#define	DOSPTYP_LINSWP	0x82	/* Linux swap partition */
+#define	DOSPTYP_LINUX	0x83	/* Linux partition */
+#define	DOSPTYP_EXT	5	/* DOS extended partition */
 
 struct dos_partition {
 	unsigned char	dp_flag;	/* bootstrap flags */

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vm_pager.h	8.4 (Berkeley) 1/12/94
- * $FreeBSD: src/sys/vm/vm_pager.h,v 1.24 1999/12/29 04:55:11 peter Exp $
+ * $FreeBSD: src/sys/vm/vm_pager.h,v 1.24.2.1 2000/03/27 21:34:45 dillon Exp $
  */
 
 /*
@@ -145,6 +145,17 @@ vm_pager_put_pages(
 	(*pagertab[object->type]->pgo_putpages)
 	    (object, m, count, flags, rtvals);
 }
+
+/*
+ *	vm_pager_haspage
+ *
+ *	Check to see if an object's pager has the requested page.  The
+ *	object's pager will also set before and after to give the caller
+ *	some idea of the number of pages before and after the requested
+ *	page can be I/O'd efficiently.
+ *
+ *	This routine does not have to be called at any particular spl.
+ */
 
 static __inline boolean_t
 vm_pager_has_page(

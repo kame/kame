@@ -1,6 +1,6 @@
 /*
  *	from: vector.s, 386BSD 0.1 unknown origin
- * $FreeBSD: src/sys/i386/isa/icu_vector.s,v 1.14 1999/08/28 00:44:42 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/icu_vector.s,v 1.14.2.2 2000/07/18 21:12:42 dfr Exp $
  */
 
 /*
@@ -54,8 +54,8 @@ IDTVEC(vec_name) ; \
 	pushl	%edx ; \
 	pushl	%ds ; \
 	MAYBE_PUSHL_ES ; \
-	movl	$KDSEL,%eax ; \
-	movl	%ax,%ds ; \
+	mov	$KDSEL,%ax ; \
+	mov	%ax,%ds ; \
 	MAYBE_MOVW_AX_ES ; \
 	FAKE_MCOUNT((4+ACTUALLY_PUSHED)*4(%esp)) ; \
 	pushl	_intr_unit + (irq_num) * 4 ; \
@@ -95,9 +95,9 @@ IDTVEC(vec_name) ; \
 	pushl	%ecx ;		/* ... actually %ds ... */ \
 	pushl	%es ; \
 	pushl	%fs ; \
-	movl	$KDSEL,%eax ; \
-	movl	%ax,%es ; \
-	movl	%ax,%fs ; \
+	mov	$KDSEL,%ax ; \
+	mov	%ax,%es ; \
+	mov	%ax,%fs ; \
 	movl	(3+8+0)*4(%esp),%ecx ;	/* ... %ecx from thin frame ... */ \
 	movl	%ecx,(3+6)*4(%esp) ;	/* ... to fat frame ... */ \
 	movl	(3+8+1)*4(%esp),%eax ;	/* ... cpl from thin frame */ \
@@ -116,10 +116,10 @@ IDTVEC(vec_name) ; \
 	pushl	%ds ;		/* save our data and extra segments ... */ \
 	pushl	%es ; \
 	pushl	%fs ; \
-	movl	$KDSEL,%eax ;	/* ... and reload with kernel's own ... */ \
-	movl	%ax,%ds ;	/* ... early for obsolete reasons */ \
-	movl	%ax,%es ; \
-	movl	%ax,%fs ; \
+	mov	$KDSEL,%ax ;	/* ... and reload with kernel's own ... */ \
+	mov	%ax,%ds ;	/* ... early for obsolete reasons */ \
+	mov	%ax,%es ; \
+	mov	%ax,%fs ; \
 	maybe_extra_ipending ; \
 	movb	_imen + IRQ_BYTE(irq_num),%al ; \
 	orb	$IRQ_BIT(irq_num),%al ; \
@@ -209,16 +209,12 @@ _ihandlers:			/* addresses of interrupt handlers */
 	.long	Xresume8, Xresume9, Xresume10, Xresume11
 	.long	Xresume12, Xresume13, Xresume14, Xresume15 
 	.long	_swi_null, swi_net, _swi_null, _swi_null
-	.long	_swi_vm, _swi_null, _swi_null, _swi_null
-	.long	_swi_null, _swi_null, _swi_null, _swi_null
-	.long	_swi_null, _swi_null, _softclock, _swi_null
+	.long	_swi_vm, _swi_null, _softclock
 
 imasks:				/* masks for interrupt handlers */
 	.space	NHWI*4		/* padding; HWI masks are elsewhere */
 
 	.long	SWI_TTY_MASK, SWI_NET_MASK, SWI_CAMNET_MASK, SWI_CAMBIO_MASK
-	.long	SWI_VM_MASK, 0, 0, 0
-	.long	0, 0, 0, 0
-	.long	0, 0, SWI_CLOCK_MASK, 0
+	.long	SWI_VM_MASK, SWI_TQ_MASK, SWI_CLOCK_MASK
 
 	.text

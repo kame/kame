@@ -37,8 +37,8 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumlock.c,v 1.11 1999/10/12 04:35:37 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumlock.c,v 1.18 2000/01/05 22:59:36 grog Exp $
+ * $Id: vinumlock.c,v 1.13 2000/05/02 23:25:02 grog Exp grog $
+ * $FreeBSD: src/sys/dev/vinum/vinumlock.c,v 1.18.2.1 2000/05/11 08:49:22 grog Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -248,14 +248,13 @@ lockrange(daddr_t stripe, struct buf *bp, struct plex *plex)
 		}
 #endif
 		plex->lockwaits++;			    /* waited one more time */
-		while (lock->stripe)			    /* wait for it to become free */
-		    tsleep((void *) lock->stripe, PRIBIO, "vrlock", 2 * hz);
-		break;					    /* out of the inner level loop */
+		tsleep((void *) lock->stripe, PRIBIO, "vrlock", 2 * hz);
+		lock = plex->lock;			    /* start again */
+		foundlocks = 0;
+		pos = NULL;
 	    }
-	} else {
-	    if (pos == NULL)				    /* still looking for somewhere? */
-		pos = lock;				    /* a place to put this one */
-	}
+	} else if (pos == NULL)				    /* still looking for somewhere? */
+	    pos = lock;					    /* a place to put this one */
     }
 
     /*

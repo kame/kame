@@ -1,12 +1,12 @@
 /*	$NetBSD: uhcivar.h,v 1.21 2000/01/18 20:11:01 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uhcivar.h,v 1.16 2000/01/20 22:24:34 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uhcivar.h,v 1.16.2.3 2000/07/02 12:42:40 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -130,6 +130,12 @@ typedef struct uhci_softc {
 	struct usbd_bus sc_bus;		/* base device */
 	bus_space_tag_t iot;
 	bus_space_handle_t ioh;
+#if defined(__FreeBSD__)
+	void *ih;
+
+	struct resource *io_res;
+	struct resource *irq_res;
+#endif
 
 	uhci_physaddr_t *sc_pframes;
 	usb_dma_t sc_dma;
@@ -164,8 +170,10 @@ typedef struct uhci_softc {
 	char sc_vendor[16];		/* vendor string for root hub */
 	int sc_id_vendor;		/* vendor ID for root hub */
 
+#if defined(__NetBSD__)
 	void *sc_powerhook;		/* cookie from power hook */
 	void *sc_shutdownhook;		/* cookie from shutdown hook */
+#endif
 
 	device_ptr_t sc_child;		/* /dev/usb device */
 } uhci_softc_t;

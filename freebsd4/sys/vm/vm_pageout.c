@@ -65,7 +65,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_pageout.c,v 1.151 1999/12/11 16:13:02 eivind Exp $
+ * $FreeBSD: src/sys/vm/vm_pageout.c,v 1.151.2.2 2000/05/29 17:45:03 dillon Exp $
  */
 
 /*
@@ -1151,6 +1151,7 @@ vm_pageout_page_stats()
 	int pcount,tpcount;		/* Number of pages to check */
 	static int fullintervalcount = 0;
 	int page_shortage;
+	int s0;
 
 	page_shortage = 
 	    (cnt.v_inactive_target + cnt.v_cache_max + cnt.v_free_min) -
@@ -1159,12 +1160,16 @@ vm_pageout_page_stats()
 	if (page_shortage <= 0)
 		return;
 
+	s0 = splvm();
+
 	pcount = cnt.v_active_count;
 	fullintervalcount += vm_pageout_stats_interval;
 	if (fullintervalcount < vm_pageout_full_stats_interval) {
 		tpcount = (vm_pageout_stats_max * cnt.v_active_count) / cnt.v_page_count;
 		if (pcount > tpcount)
 			pcount = tpcount;
+	} else {
+		fullintervalcount = 0;
 	}
 
 	m = TAILQ_FIRST(&vm_page_queues[PQ_ACTIVE].pl);
@@ -1227,6 +1232,7 @@ vm_pageout_page_stats()
 
 		m = next;
 	}
+	splx(s0);
 }
 
 static int

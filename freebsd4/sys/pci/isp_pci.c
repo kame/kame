@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/pci/isp_pci.c,v 1.45 2000/02/29 05:48:46 mjacob Exp $ */
+/* $FreeBSD: src/sys/pci/isp_pci.c,v 1.45.2.2 2000/07/18 06:41:46 mjacob Exp $ */
 /*
  * PCI specific probe and attach routines for Qlogic ISP SCSI adapters.
  * FreeBSD Version.
@@ -52,14 +52,11 @@
 #include <sys/malloc.h>
 
 #include <dev/isp/isp_freebsd.h>
-#include <dev/isp/asm_pci.h>
 
 static u_int16_t isp_pci_rd_reg __P((struct ispsoftc *, int));
 static void isp_pci_wr_reg __P((struct ispsoftc *, int, u_int16_t));
-#if !defined(ISP_DISABLE_1080_SUPPORT) || !defined(ISP_DISABLE_12160_SUPPORT)
 static u_int16_t isp_pci_rd_reg_1080 __P((struct ispsoftc *, int));
 static void isp_pci_wr_reg_1080 __P((struct ispsoftc *, int, u_int16_t));
-#endif
 static int isp_pci_mbxdma __P((struct ispsoftc *));
 static int isp_pci_dmasetup __P((struct ispsoftc *, ISP_SCSI_XFER_T *,
 	ispreq_t *, u_int16_t *, u_int16_t));
@@ -72,23 +69,7 @@ static void isp_pci_dumpregs __P((struct ispsoftc *));
 #ifndef	ISP_CODE_ORG
 #define	ISP_CODE_ORG		0x1000
 #endif
-#ifndef	ISP_1040_RISC_CODE
-#define	ISP_1040_RISC_CODE	NULL
-#endif
-#ifndef	ISP_1080_RISC_CODE
-#define	ISP_1080_RISC_CODE	NULL
-#endif
-#ifndef	ISP_12160_RISC_CODE
-#define	ISP_12160_RISC_CODE	NULL
-#endif
-#ifndef	ISP_2100_RISC_CODE
-#define	ISP_2100_RISC_CODE	NULL
-#endif
-#ifndef	ISP_2200_RISC_CODE
-#define	ISP_2200_RISC_CODE	NULL
-#endif
 
-#ifndef ISP_DISABLE_1020_SUPPORT
 static struct ispmdvec mdvec = {
 	isp_pci_rd_reg,
 	isp_pci_wr_reg,
@@ -98,16 +79,14 @@ static struct ispmdvec mdvec = {
 	NULL,
 	isp_pci_reset1,
 	isp_pci_dumpregs,
-	ISP_1040_RISC_CODE,
+	NULL,
 	0,
 	ISP_CODE_ORG,
 	0,
 	BIU_BURST_ENABLE|BIU_PCI_CONF1_FIFO_64,
 	0
 };
-#endif
 
-#ifndef ISP_DISABLE_1080_SUPPORT
 static struct ispmdvec mdvec_1080 = {
 	isp_pci_rd_reg_1080,
 	isp_pci_wr_reg_1080,
@@ -117,16 +96,14 @@ static struct ispmdvec mdvec_1080 = {
 	NULL,
 	isp_pci_reset1,
 	isp_pci_dumpregs,
-	ISP_1080_RISC_CODE,
+	NULL,
 	0,
 	ISP_CODE_ORG,
 	0,
 	BIU_BURST_ENABLE|BIU_PCI_CONF1_FIFO_64,
 	0
 };
-#endif
 
-#ifndef ISP_DISABLE_12160_SUPPORT
 static struct ispmdvec mdvec_12160 = {
 	isp_pci_rd_reg_1080,
 	isp_pci_wr_reg_1080,
@@ -136,16 +113,14 @@ static struct ispmdvec mdvec_12160 = {
 	NULL,
 	isp_pci_reset1,
 	isp_pci_dumpregs,
-	ISP_12160_RISC_CODE,
+	NULL,
 	0,
-	ISP_CODE_ORG,
+	NULL,
 	0,
 	BIU_BURST_ENABLE|BIU_PCI_CONF1_FIFO_64,
 	0
 };
-#endif
 
-#ifndef ISP_DISABLE_2100_SUPPORT
 static struct ispmdvec mdvec_2100 = {
 	isp_pci_rd_reg,
 	isp_pci_wr_reg,
@@ -155,16 +130,14 @@ static struct ispmdvec mdvec_2100 = {
 	NULL,
 	isp_pci_reset1,
 	isp_pci_dumpregs,
-	ISP_2100_RISC_CODE,
+	NULL,
 	0,
 	ISP_CODE_ORG,
 	0,
 	0,
 	0
 };
-#endif
 
-#ifndef	ISP_DISABLE_2200_SUPPORT
 static struct ispmdvec mdvec_2200 = {
 	isp_pci_rd_reg,
 	isp_pci_wr_reg,
@@ -174,18 +147,13 @@ static struct ispmdvec mdvec_2200 = {
 	NULL,
 	isp_pci_reset1,
 	isp_pci_dumpregs,
-	ISP_2200_RISC_CODE,
+	NULL,
 	0,
 	ISP_CODE_ORG,
 	0,
 	0,
 	0
 };
-#endif
-
-#ifndef	SCSI_ISP_PREFER_MEM_MAP
-#define	SCSI_ISP_PREFER_MEM_MAP	0
-#endif
 
 #ifndef	PCIM_CMD_INVEN
 #define	PCIM_CMD_INVEN			0x10
@@ -217,7 +185,7 @@ static struct ispmdvec mdvec_2200 = {
 #endif
 
 #ifndef	PCI_VENDOR_QLOGIC
-#define	PCI_VENDOR_QLOGIC	0x1077
+#define	PCI_VENDOR_QLOGIC		0x1077
 #endif
 
 #ifndef	PCI_PRODUCT_QLOGIC_ISP1020
@@ -248,7 +216,8 @@ static struct ispmdvec mdvec_2200 = {
 #define	PCI_PRODUCT_QLOGIC_ISP2200	0x2200
 #endif
 
-#define	PCI_QLOGIC_ISP	((PCI_PRODUCT_QLOGIC_ISP1020 << 16) | PCI_VENDOR_QLOGIC)
+#define	PCI_QLOGIC_ISP1020	\
+	((PCI_PRODUCT_QLOGIC_ISP1020 << 16) | PCI_VENDOR_QLOGIC)
 
 #define	PCI_QLOGIC_ISP1080	\
 	((PCI_PRODUCT_QLOGIC_ISP1080 << 16) | PCI_VENDOR_QLOGIC)
@@ -299,6 +268,7 @@ struct isp_pcisoftc {
 	bus_dmamap_t			cntrol_dmap;
 	bus_dmamap_t			*dmaps;
 };
+ispfwfunc *isp_get_firmware_p = NULL;
 
 static device_method_t isp_pci_methods[] = {
 	/* Device interface */
@@ -317,12 +287,9 @@ static int
 isp_pci_probe(device_t dev)
 {
         switch ((pci_get_device(dev) << 16) | (pci_get_vendor(dev))) {
-#ifndef	ISP_DISABLE_1020_SUPPORT
-	case PCI_QLOGIC_ISP:
+	case PCI_QLOGIC_ISP1020:
 		device_set_desc(dev, "Qlogic ISP 1020/1040 PCI SCSI Adapter");
 		break;
-#endif
-#ifndef	ISP_DISABLE_1080_SUPPORT
 	case PCI_QLOGIC_ISP1080:
 		device_set_desc(dev, "Qlogic ISP 1080 PCI SCSI Adapter");
 		break;
@@ -332,22 +299,15 @@ isp_pci_probe(device_t dev)
 	case PCI_QLOGIC_ISP1280:
 		device_set_desc(dev, "Qlogic ISP 1280 PCI SCSI Adapter");
 		break;
-#endif
-#ifndef	ISP_DISABLE_12160_SUPPORT
 	case PCI_QLOGIC_ISP12160:
 		device_set_desc(dev, "Qlogic ISP 12160 PCI SCSI Adapter");
 		break;
-#endif
-#ifndef	ISP_DISABLE_2100_SUPPORT
 	case PCI_QLOGIC_ISP2100:
 		device_set_desc(dev, "Qlogic ISP 2100 PCI FC-AL Adapter");
 		break;
-#endif
-#ifndef	ISP_DISABLE_2200_SUPPORT
 	case PCI_QLOGIC_ISP2200:
 		device_set_desc(dev, "Qlogic ISP 2200 PCI FC-AL Adapter");
 		break;
-#endif
 	default:
 		return (ENXIO);
 	}
@@ -357,24 +317,23 @@ isp_pci_probe(device_t dev)
 		    ISP_PLATFORM_VERSION_MAJOR, ISP_PLATFORM_VERSION_MINOR,
 		    ISP_CORE_VERSION_MAJOR, ISP_CORE_VERSION_MINOR);
 	}
+	/*
+	 * XXXX: Here is where we might load the f/w module
+	 * XXXX: (or increase a reference count to it).
+	 */
 	return (0);
 }
 
 static int
 isp_pci_attach(device_t dev)
 {
-#ifdef	SCSI_ISP_WWN
-	const char *name = SCSI_ISP_WWN;
-	char *vtp = NULL;
-#endif
 	struct resource *regs, *irq;
-	int unit, bitmap, rtp, rgd, iqd, m1, m2;
+	int unit, bitmap, rtp, rgd, iqd, m1, m2, s;
 	u_int32_t data, cmd, linesz, psize, basetype;
 	struct isp_pcisoftc *pcs;
 	struct ispsoftc *isp;
 	struct ispmdvec *mdvp;
 	bus_size_t lim;
-	ISP_LOCKVAL_DECL;
 
 	/*
 	 * Figure out if we're supposed to skip this one.
@@ -397,7 +356,7 @@ isp_pci_attach(device_t dev)
 	/*
 	 * Figure out which we should try first - memory mapping or i/o mapping?
 	 */
-#if	SCSI_ISP_PREFER_MEM_MAP == 1
+#ifdef	__alpha__
 	m1 = PCIM_CMD_MEMEN;
 	m2 = PCIM_CMD_PORTEN;
 #else
@@ -451,22 +410,16 @@ isp_pci_attach(device_t dev)
 	pcs->pci_poff[SXP_BLOCK >> _BLK_REG_SHFT] = PCI_SXP_REGS_OFF;
 	pcs->pci_poff[RISC_BLOCK >> _BLK_REG_SHFT] = PCI_RISC_REGS_OFF;
 	pcs->pci_poff[DMA_BLOCK >> _BLK_REG_SHFT] = DMA_REGS_OFF;
-	/*
- 	 * GCC!
-	 */
 	mdvp = &mdvec;
 	basetype = ISP_HA_SCSI_UNKNOWN;
 	psize = sizeof (sdparam);
 	lim = BUS_SPACE_MAXSIZE_32BIT;
-#ifndef	ISP_DISABLE_1020_SUPPORT
-	if (pci_get_devid(dev) == PCI_QLOGIC_ISP) {
+	if (pci_get_devid(dev) == PCI_QLOGIC_ISP1020) {
 		mdvp = &mdvec;
 		basetype = ISP_HA_SCSI_UNKNOWN;
 		psize = sizeof (sdparam);
 		lim = BUS_SPACE_MAXSIZE_24BIT;
 	}
-#endif
-#ifndef	ISP_DISABLE_1080_SUPPORT
 	if (pci_get_devid(dev) == PCI_QLOGIC_ISP1080) {
 		mdvp = &mdvec_1080;
 		basetype = ISP_HA_SCSI_1080;
@@ -488,8 +441,6 @@ isp_pci_attach(device_t dev)
 		pcs->pci_poff[DMA_BLOCK >> _BLK_REG_SHFT] =
 		    ISP1080_DMA_REGS_OFF;
 	}
-#endif
-#ifndef	ISP_DISABLE_12160_SUPPORT
 	if (pci_get_devid(dev) == PCI_QLOGIC_ISP12160) {
 		mdvp = &mdvec_12160;
 		basetype = ISP_HA_SCSI_12160;
@@ -497,8 +448,6 @@ isp_pci_attach(device_t dev)
 		pcs->pci_poff[DMA_BLOCK >> _BLK_REG_SHFT] =
 		    ISP1080_DMA_REGS_OFF;
 	}
-#endif
-#ifndef	ISP_DISABLE_2100_SUPPORT
 	if (pci_get_devid(dev) == PCI_QLOGIC_ISP2100) {
 		mdvp = &mdvec_2100;
 		basetype = ISP_HA_FC_2100;
@@ -515,8 +464,6 @@ isp_pci_attach(device_t dev)
 			linesz = 1;
 		}
 	}
-#endif
-#ifndef	ISP_DISABLE_2200_SUPPORT
 	if (pci_get_devid(dev) == PCI_QLOGIC_ISP2200) {
 		mdvp = &mdvec_2200;
 		basetype = ISP_HA_FC_2200;
@@ -524,7 +471,6 @@ isp_pci_attach(device_t dev)
 		pcs->pci_poff[MBOX_BLOCK >> _BLK_REG_SHFT] =
 		    PCI_MBOX_REGS2100_OFF;
 	}
-#endif
 	isp = &pcs->pci_isp;
 	isp->isp_param = malloc(psize, M_DEVBUF, M_NOWAIT);
 	if (isp->isp_param == NULL) {
@@ -538,7 +484,24 @@ isp_pci_attach(device_t dev)
 	(void) snprintf(isp->isp_name, sizeof (isp->isp_name), "isp%d", unit);
 	isp->isp_osinfo.unit = unit;
 
-	ISP_LOCK(isp);
+	/*
+	 * Try and find firmware for this device.
+	 */
+
+	if (isp_get_firmware_p) {
+		int device = (int) pci_get_device(dev);
+#ifdef	ISP_TARGET_MODE
+		(*isp_get_firmware_p)(0, 1, device, &mdvp->dv_ispfw);
+#else
+		(*isp_get_firmware_p)(0, 0, device, &mdvp->dv_ispfw);
+#endif
+	}
+
+	/*
+	 *
+	 */
+
+	s = splbio();
 	/*
 	 * Make sure that SERR, PERR, WRITE INVALIDATE and BUSMASTER
 	 * are set.
@@ -573,11 +536,12 @@ isp_pci_attach(device_t dev)
 	data = pci_read_config(dev, PCIR_ROMADDR, 4);
 	data &= ~1;
 	pci_write_config(dev, PCIR_ROMADDR, data, 4);
-	ISP_UNLOCK(isp);
+
 
 	if (bus_dma_tag_create(NULL, 1, 0, BUS_SPACE_MAXADDR_32BIT,
 	    BUS_SPACE_MAXADDR, NULL, NULL, lim + 1,
 	    255, lim, 0, &pcs->parent_dmat) != 0) {
+		splx(s);
 		printf("%s: could not create master dma tag\n", isp->isp_name);
 		free(isp->isp_param, M_DEVBUF);
 		free(pcs, M_DEVBUF);
@@ -592,10 +556,6 @@ isp_pci_attach(device_t dev)
 		goto bad;
 	}
 
-#ifdef	SCSI_ISP_NO_FWLOAD_MASK
-	if (SCSI_ISP_NO_FWLOAD_MASK && (SCSI_ISP_NO_FWLOAD_MASK & (1 << unit)))
-		isp->isp_confopts |= ISP_CFG_NORELOAD;
-#endif
 	if (getenv_int("isp_no_fwload", &bitmap)) {
 		if (bitmap & (1 << unit))
 			isp->isp_confopts |= ISP_CFG_NORELOAD;
@@ -604,13 +564,6 @@ isp_pci_attach(device_t dev)
 		if (bitmap & (1 << unit))
 			isp->isp_confopts &= ~ISP_CFG_NORELOAD;
 	}
-
-#ifdef	SCSI_ISP_NO_NVRAM_MASK
-	if (SCSI_ISP_NO_NVRAM_MASK && (SCSI_ISP_NO_NVRAM_MASK & (1 << unit))) {
-		printf("%s: ignoring NVRAM\n", isp->isp_name);
-		isp->isp_confopts |= ISP_CFG_NONVRAM;
-	}
-#endif
 	if (getenv_int("isp_no_nvram", &bitmap)) {
 		if (bitmap & (1 << unit))
 			isp->isp_confopts |= ISP_CFG_NONVRAM;
@@ -619,14 +572,6 @@ isp_pci_attach(device_t dev)
 		if (bitmap & (1 << unit))
 			isp->isp_confopts &= ~ISP_CFG_NONVRAM;
 	}
-
-#ifdef	SCSI_ISP_FCDUPLEX
-	if (IS_FC(isp)) {
-		if (SCSI_ISP_FCDUPLEX && (SCSI_ISP_FCDUPLEX & (1 << unit))) {
-			isp->isp_confopts |= ISP_CFG_FULL_DUPLEX;
-		}
-	}
-#endif
 	if (getenv_int("isp_fcduplex", &bitmap)) {
 		if (bitmap & (1 << unit))
 			isp->isp_confopts |= ISP_CFG_FULL_DUPLEX;
@@ -644,12 +589,6 @@ isp_pci_attach(device_t dev)
 	 * all FC instances. A Port WWN will be constructed from it
 	 * as appropriate.
 	 */
-#ifdef	SCSI_ISP_WWN
-	isp->isp_osinfo.default_wwn = strtoq(name, &vtp, 16);
-	if (vtp != name && *vtp == 0) {
-		isp->isp_confopts |= ISP_CFG_OWNWWN;
-	} else
-#endif
 	if (!getenv_quad("isp_wwn", (quad_t *) &isp->isp_osinfo.default_wwn)) {
 		int i;
 		u_int64_t seed = (u_int64_t) (intptr_t) isp;
@@ -675,17 +614,19 @@ isp_pci_attach(device_t dev)
 #ifdef	ISP_TARGET_MODE
 	(void) getenv_int("isp_tdebug", &isp_tdebug);
 #endif
-	ISP_LOCK(isp);
 	if (bus_setup_intr(dev, irq, INTR_TYPE_CAM, (void (*)(void *))isp_intr,
 	    isp, &pcs->ih)) {
-		ISP_UNLOCK(isp);
+		splx(s);
 		device_printf(dev, "could not setup interrupt\n");
 		goto bad;
 	}
 
+	/*
+	 * Make sure we're in reset state.
+	 */
 	isp_reset(isp);
 	if (isp->isp_state != ISP_RESETSTATE) {
-		ISP_UNLOCK(isp);
+		splx(s);
 		goto bad;
 	}
 	isp_init(isp);
@@ -693,7 +634,7 @@ isp_pci_attach(device_t dev)
 		/* If we're a Fibre Channel Card, we allow deferred attach */
 		if (IS_SCSI(isp)) {
 			isp_uninit(isp);
-			ISP_UNLOCK(isp);
+			splx(s);
 			goto bad;
 		}
 	}
@@ -702,11 +643,15 @@ isp_pci_attach(device_t dev)
 		/* If we're a Fibre Channel Card, we allow deferred attach */
 		if (IS_SCSI(isp)) {
 			isp_uninit(isp);
-			ISP_UNLOCK(isp);
+			splx(s);
 			goto bad;
 		}
 	}
-	ISP_UNLOCK(isp);
+	splx(s);
+	/*
+	 * XXXX: Here is where we might unload the f/w module
+	 * XXXX: (or decrease the reference count to it).
+	 */
 	return (0);
 
 bad:
@@ -726,6 +671,10 @@ bad:
 			free(pcs->pci_isp.isp_param, M_DEVBUF);
 		free(pcs, M_DEVBUF);
 	}
+	/*
+	 * XXXX: Here is where we might unload the f/w module
+	 * XXXX: (or decrease the reference count to it).
+	 */
 	return (ENXIO);
 }
 
@@ -778,7 +727,6 @@ isp_pci_wr_reg(isp, regoff, val)
 	}
 }
 
-#if !defined(ISP_DISABLE_1080_SUPPORT) || !defined(ISP_DISABLE_12160_SUPPORT)
 static u_int16_t
 isp_pci_rd_reg_1080(isp, regoff)
 	struct ispsoftc *isp;
@@ -847,8 +795,6 @@ isp_pci_wr_reg_1080(isp, regoff, val)
 		isp_pci_wr_reg(isp, BIU_CONF1, oc);
 	}
 }
-#endif
-
 
 static void isp_map_rquest __P((void *, bus_dma_segment_t *, int, int));
 static void isp_map_result __P((void *, bus_dma_segment_t *, int, int));
@@ -1043,65 +989,89 @@ typedef struct {
  * mapped and a pointer to a partially filled in already allocated request
  * queue entry. We finish the job.
  */
-static void dma2_tgt __P((void *, bus_dma_segment_t *, int, int));
-static void dma2_tgt_fc __P((void *, bus_dma_segment_t *, int, int));
+static void tdma_mk __P((void *, bus_dma_segment_t *, int, int));
+static void tdma_mkfc __P((void *, bus_dma_segment_t *, int, int));
 
 static void
-dma2_tgt(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
+tdma_mk(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 {
 	mush_t *mp;
 	struct ccb_scsiio *csio;
 	struct isp_pcisoftc *pci;
 	bus_dmamap_t *dp;
-	u_int8_t scsi_status, send_status;
+	u_int8_t scsi_status;
 	ct_entry_t *cto;
-	u_int32_t handle;
-	int nctios;
+	u_int32_t handle, totxfr, sflags;
+	int nctios, send_status;
+	int32_t resid;
 
 	mp = (mush_t *) arg;
 	if (error) {
 		mp->error = error;
 		return;
 	}
-
 	csio = mp->cmd_token;
 	cto = mp->rq;
 
 	cto->ct_xfrlen = 0;
-	cto->ct_resid = 0;
 	cto->ct_seg_count = 0;
-	bzero(cto->ct_dataseg, sizeof (cto->ct_dataseg));
+	cto->ct_header.rqs_entry_count = 1;
+	MEMZERO(cto->ct_dataseg, sizeof(cto->ct_dataseg));
+
 	if (nseg == 0) {
-	 	cto->ct_header.rqs_entry_count = 1;
-		ISP_TDQE(mp->isp, "dma2_tgt[no data]", *mp->iptrp, cto);
+		cto->ct_header.rqs_seqno = 1;
+		ISP_TDQE(mp->isp, "tdma_mk[no data]", *mp->iptrp, cto);
 		if (isp_tdebug) {
 			printf("%s:CTIO lun %d->iid%d flgs 0x%x sts 0x%x ssts "
-			    "0x%x res %u\n", mp->isp->isp_name,
+			    "0x%x res %d\n", mp->isp->isp_name,
 			    csio->ccb_h.target_lun, cto->ct_iid, cto->ct_flags,
 			    cto->ct_status, cto->ct_scsi_status, cto->ct_resid);
 		}
-		ISP_SWIZ_CTIO(isp, cto, cto);
+		ISP_SWIZ_CTIO(mp->isp, cto, cto);
 		return;
 	}
-
-	/*
-	 * Save handle, and potentially any SCSI status, which
-	 * we'll reinsert on the last CTIO we're going to send.
-	 */
-	handle = cto->ct_reserved;
-	cto->ct_reserved = 0;
-	scsi_status = cto->ct_scsi_status;
-	cto->ct_scsi_status = 0;
-	send_status = cto->ct_flags & CT_SENDSTATUS;
-	cto->ct_flags &= ~CT_SENDSTATUS;
 
 	nctios = nseg / ISP_RQDSEG;
 	if (nseg % ISP_RQDSEG) {
 		nctios++;
 	}
 
+	/*
+	 * Save handle, and potentially any SCSI status, which we'll reinsert
+	 * on the last CTIO we're going to send.
+	 */
+	handle = cto->ct_reserved;
+	cto->ct_reserved = 0;
+	cto->ct_header.rqs_seqno = 0;
+	send_status = (cto->ct_flags & CT_SENDSTATUS) != 0;
+
+	if (send_status) {
+		sflags = cto->ct_flags & (CT_SENDSTATUS | CT_CCINCR);
+		cto->ct_flags &= ~(CT_SENDSTATUS | CT_CCINCR);
+		/*
+		 * Preserve residual.
+		 */
+		resid = cto->ct_resid;
+
+		/*
+		 * Save actual SCSI status.
+		 */
+		scsi_status = cto->ct_scsi_status;
+
+		/*
+		 * We can't do a status at the same time as a data CTIO, so
+		 * we need to synthesize an extra CTIO at this level.
+		 */
+		nctios++;
+	} else {
+		sflags = scsi_status = resid = 0;
+	}
+
+	totxfr = cto->ct_resid = 0;
+	cto->ct_scsi_status = 0;
+
 	pci = (struct isp_pcisoftc *)mp->isp;
-	dp = &pci->dmaps[handle - 1];
+	dp = &pci->dmaps[isp_handle_index(handle)];
 	if ((csio->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_IN) {
 		bus_dmamap_sync(pci->parent_dmat, *dp, BUS_DMASYNC_PREREAD);
 	} else {
@@ -1110,65 +1080,104 @@ dma2_tgt(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 
 
 	while (nctios--) {
-		int seg, seglim;
+		int seglim;
 
 		seglim = nseg;
-		if (seglim > ISP_RQDSEG)
-			seglim = ISP_RQDSEG;
+		if (seglim) {
+			int seg;
 
-		for (seg = 0; seg < seglim; seg++) {
-			cto->ct_dataseg[seg].ds_base = dm_segs->ds_addr;
-			cto->ct_dataseg[seg].ds_count = dm_segs->ds_len;
-			cto->ct_xfrlen += dm_segs->ds_len;
-			dm_segs++;
-		}
+			if (seglim > ISP_RQDSEG)
+				seglim = ISP_RQDSEG;
 
-		cto->ct_seg_count = seg;
-		cto->ct_flags &= CT_DATAMASK;
-		if ((csio->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_IN) {
-			cto->ct_flags |= CT_DATA_IN;
+			for (seg = 0; seg < seglim; seg++, nseg--) {
+				/*
+				 * Unlike normal initiator commands, we don't
+				 * do any swizzling here.
+				 */
+				cto->ct_dataseg[seg].ds_count = dm_segs->ds_len;
+				cto->ct_dataseg[seg].ds_base = dm_segs->ds_addr;
+				cto->ct_xfrlen += dm_segs->ds_len;
+				totxfr += dm_segs->ds_len;
+				dm_segs++;
+			}
+			cto->ct_seg_count = seg;
 		} else {
-			cto->ct_flags |= CT_DATA_OUT;
+			/*
+			 * This case should only happen when we're sending an
+			 * extra CTIO with final status.
+			 */
+			if (send_status == 0) {
+				printf("%s: tdma_mk ran out of segments\n",
+				       mp->isp->isp_name);
+				mp->error = EINVAL;
+				return;
+			}
 		}
+
+		/*
+		 * At this point, the fields ct_lun, ct_iid, ct_tagval,
+		 * ct_tagtype, and ct_timeout have been carried over
+		 * unchanged from what our caller had set.
+		 * 
+		 * The dataseg fields and the seg_count fields we just got
+		 * through setting. The data direction we've preserved all
+		 * along and only clear it if we're now sending status.
+		 */
 
 		if (nctios == 0) {
 			/*
-			 * We're the last in a sequence of CTIOs, so mark this
-			 * CTIO and save the handle to the CCB such that when
-			 * this CTIO completes we can free dma resources and
-			 * do whatever else we need to do to finish the rest
-			 * of the command.
+			 * We're the last in a sequence of CTIOs, so mark
+			 * this CTIO and save the handle to the CCB such that
+			 * when this CTIO completes we can free dma resources
+			 * and do whatever else we need to do to finish the
+			 * rest of the command.
 			 */
-			cto->ct_header.rqs_seqno = 1;
 			cto->ct_reserved = handle;
-			cto->ct_scsi_status = scsi_status;
-			cto->ct_flags |= send_status;
-			ISP_TDQE(mp->isp, "last dma2_tgt", *mp->iptrp, cto);
-			if (isp_tdebug) {
-				printf("%s:CTIO lun %d->iid%d flgs 0x%x sts "
-				    "0x%x ssts 0x%x res %u\n",
-				    mp->isp->isp_name, csio->ccb_h.target_lun,
-				    cto->ct_iid, cto->ct_flags, cto->ct_status,
-				    cto->ct_scsi_status, cto->ct_resid);
+			cto->ct_header.rqs_seqno = 1;
+
+			if (send_status) {
+				cto->ct_scsi_status = scsi_status;
+				cto->ct_flags |= sflags | CT_NO_DATA;;
+				cto->ct_resid = resid;
 			}
-			ISP_SWIZ_CTIO(isp, cto, cto);
+			if (isp_tdebug && send_status) {
+				printf("%s:CTIO lun%d for ID%d ct_flags 0x%x "
+				    "scsi_status 0x%x res %d\n",
+				    mp->isp->isp_name, csio->ccb_h.target_lun,
+				    cto->ct_iid, cto->ct_flags,
+				    cto->ct_scsi_status, cto->ct_resid);
+			} else if (isp_tdebug) {
+				printf("%s:CTIO lun%d for ID%d ct_flags 0x%x\n",
+				    mp->isp->isp_name, csio->ccb_h.target_lun,
+				    cto->ct_iid, cto->ct_flags);
+			}
+			ISP_TDQE(mp->isp, "last tdma_mk", *mp->iptrp, cto);
+			ISP_SWIZ_CTIO(mp->isp, cto, cto);
 		} else {
-			ct_entry_t *octo = cto;
+			ct_entry_t     *octo = cto;
+
+			/*
+			 * Make sure handle fields are clean
+			 */
 			cto->ct_reserved = 0;
 			cto->ct_header.rqs_seqno = 0;
-			ISP_TDQE(mp->isp, "dma2_tgt", *mp->iptrp, cto);
+
 			if (isp_tdebug) {
-				printf("%s:CTIO lun %d->iid%d flgs 0x%x res"
-				    " %u\n", mp->isp->isp_name,
-				    csio->ccb_h.target_lun, cto->ct_iid,
-				    cto->ct_flags, cto->ct_resid);
+				printf("%s:CTIO lun%d for ID%d ct_flags 0x%x\n",
+				    mp->isp->isp_name, csio->ccb_h.target_lun,
+				    cto->ct_iid, cto->ct_flags);
 			}
+			ISP_TDQE(mp->isp, "tdma_mk", *mp->iptrp, cto);
+
+			/*
+			 * Get a new CTIO
+			 */
 			cto = (ct_entry_t *)
 			    ISP_QUEUE_ENTRY(mp->isp->isp_rquest, *mp->iptrp);
-			*mp->iptrp =
+			*mp->iptrp = 
 			    ISP_NXT_QENTRY(*mp->iptrp, RQUEST_QUEUE_LEN);
 			if (*mp->iptrp == mp->optr) {
-				printf("%s: Queue Overflow in dma2_tgt\n",
+				printf("%s: Queue Overflow in tdma_mk\n",
 				    mp->isp->isp_name);
 				mp->error = MUSHERR_NOQENTRIES;
 				return;
@@ -1179,12 +1188,11 @@ dma2_tgt(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 			cto->ct_header.rqs_entry_type = RQSTYPE_CTIO;
 			cto->ct_header.rqs_entry_count = 1;
 			cto->ct_header.rqs_flags = 0;
-			/* ct_header.rqs_seqno && ct_reserved filled in later */
 			cto->ct_lun = octo->ct_lun;
 			cto->ct_iid = octo->ct_iid;
 			cto->ct_reserved2 = octo->ct_reserved2;
 			cto->ct_tgt = octo->ct_tgt;
-			cto->ct_flags = octo->ct_flags & ~CT_DATAMASK;
+			cto->ct_flags = octo->ct_flags;
 			cto->ct_status = 0;
 			cto->ct_scsi_status = 0;
 			cto->ct_tag_val = octo->ct_tag_val;
@@ -1193,14 +1201,18 @@ dma2_tgt(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 			cto->ct_resid = 0;
 			cto->ct_timeout = octo->ct_timeout;
 			cto->ct_seg_count = 0;
-			bzero(cto->ct_dataseg, sizeof (cto->ct_dataseg));
-			ISP_SWIZ_CTIO(isp, octo, octo);
+			MEMZERO(cto->ct_dataseg, sizeof(cto->ct_dataseg));
+			/*
+			 * Now swizzle the old one for the consumption of the
+			 * chip.
+			 */
+			ISP_SWIZ_CTIO(mp->isp, octo, octo);
 		}
 	}
 }
 
 static void
-dma2_tgt_fc(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
+tdma_mkfc(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 {
 	mush_t *mp;
 	struct ccb_scsiio *csio;
@@ -1208,10 +1220,9 @@ dma2_tgt_fc(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 	bus_dmamap_t *dp;
 	ct2_entry_t *cto;
 	u_int16_t scsi_status, send_status, send_sense;
-	u_int32_t handle, totxfr;
+	u_int32_t handle, totxfr, datalen;
 	u_int8_t sense[QLTM_SENSELEN];
 	int nctios;
-	int32_t resid;
 
 	mp = (mush_t *) arg;
 	if (error) {
@@ -1230,6 +1241,7 @@ dma2_tgt_fc(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 			return;
 		}
 	 	cto->ct_header.rqs_entry_count = 1;
+		cto->ct_header.rqs_seqno = 1;
 		/* ct_reserved contains the handle set by caller */
 		/*
 		 * We preserve ct_lun, ct_iid, ct_rxid. We set the data
@@ -1237,13 +1249,17 @@ dma2_tgt_fc(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 		 * We preserve the ct_resid and the response area.
 		 */
 		cto->ct_flags |= CT2_NO_DATA;
+		if (cto->ct_resid > 0)
+			cto->ct_flags |= CT2_DATA_UNDER;
+		else if (cto->ct_resid < 0)
+			cto->ct_flags |= CT2_DATA_OVER;
 		cto->ct_seg_count = 0;
 		cto->ct_reloff = 0;
 		ISP_TDQE(mp->isp, "dma2_tgt_fc[no data]", *mp->iptrp, cto);
 		if (isp_tdebug) {
 			scsi_status = cto->rsp.m1.ct_scsi_status;
 			printf("%s:CTIO2 RX_ID 0x%x lun %d->iid%d flgs 0x%x "
-			    "sts 0x%x ssts 0x%x res %u\n", mp->isp->isp_name,
+			    "sts 0x%x ssts 0x%x res %d\n", mp->isp->isp_name,
 			    cto->ct_rxid, csio->ccb_h.target_lun, cto->ct_iid,
 			    cto->ct_flags, cto->ct_status,
 			    cto->rsp.m1.ct_scsi_status, cto->ct_resid);
@@ -1283,9 +1299,9 @@ dma2_tgt_fc(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 		cto->ct_flags &= ~CT2_SENDSTATUS;
 
 		/*
-		 * Preserve residual.
+		 * Preserve residual, which is actually the total count.
 		 */
-		resid = cto->ct_resid;
+		datalen = cto->ct_resid;
 
 		/*
 		 * Save actual SCSI status. We'll reinsert the
@@ -1307,7 +1323,7 @@ dma2_tgt_fc(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 			nctios++;
 		}
 	} else {
-		scsi_status = send_sense = resid = 0;
+		scsi_status = send_sense = datalen = 0;
 	}
 
 	totxfr = cto->ct_resid = 0;
@@ -1315,7 +1331,7 @@ dma2_tgt_fc(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 	bzero(&cto->rsp, sizeof (cto->rsp));
 
 	pci = (struct isp_pcisoftc *)mp->isp;
-	dp = &pci->dmaps[handle - 1];
+	dp = &pci->dmaps[isp_handle_index(handle)];
 	if ((csio->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_IN) {
 		bus_dmamap_sync(pci->parent_dmat, *dp, BUS_DMASYNC_PREREAD);
 	} else {
@@ -1398,12 +1414,20 @@ dma2_tgt_fc(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 					    scsi_status;
 					cto->ct_flags |= CT2_SENDSTATUS;
 				}
-				cto->ct_resid = resid - totxfr;
+				/*
+				 * Get 'real' residual and set flags based
+				 * on it.
+				 */
+				cto->ct_resid = datalen - totxfr;
+				if (cto->ct_resid > 0)
+					cto->ct_flags |= CT2_DATA_UNDER;
+				else if (cto->ct_resid < 0)
+					cto->ct_flags |= CT2_DATA_OVER;
 			}
 			ISP_TDQE(mp->isp, "last dma2_tgt_fc", *mp->iptrp, cto);
 			if (isp_tdebug) {
 				printf("%s:CTIO2 RX_ID 0x%x lun %d->iid%d flgs"
-				    "0x%x sts 0x%x ssts 0x%x res %u\n",
+				    "0x%x sts 0x%x ssts 0x%x res %d\n",
 				    mp->isp->isp_name, cto->ct_rxid,
 				    csio->ccb_h.target_lun, (int) cto->ct_iid,
 				    cto->ct_flags, cto->ct_status,
@@ -1496,7 +1520,7 @@ dma2(void *arg, bus_dma_segment_t *dm_segs, int nseg, int error)
 	csio = mp->cmd_token;
 	rq = mp->rq;
 	pci = (struct isp_pcisoftc *)mp->isp;
-	dp = &pci->dmaps[rq->req_handle - 1];
+	dp = &pci->dmaps[isp_handle_index(rq->req_handle)];
 
 	if ((csio->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_IN) {
 		bus_dmamap_sync(pci->parent_dmat, *dp, BUS_DMASYNC_PREREAD);
@@ -1620,11 +1644,12 @@ isp_pci_dmasetup(struct ispsoftc *isp, struct ccb_scsiio *csio, ispreq_t *rq,
 #ifdef	ISP_TARGET_MODE
 	if (csio->ccb_h.func_code == XPT_CONT_TARGET_IO) {
 		if (IS_FC(isp)) {
-			eptr = dma2_tgt_fc;
+			eptr = tdma_mkfc;
 		} else {
-			eptr = dma2_tgt;
+			eptr = tdma_mk;
 		}
-		if ((csio->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_NONE) {
+		if ((csio->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_NONE ||
+		    (csio->dxfer_len == 0)) {
 			rq->req_seg_count = 1;
 			mp = &mush;
 			mp->isp = isp;
@@ -1646,7 +1671,8 @@ isp_pci_dmasetup(struct ispsoftc *isp, struct ccb_scsiio *csio, ispreq_t *rq,
 	 * NB: that move no data. For commands that move data,
 	 * NB: swizzling would take place in those functions.
 	 */
-	if ((csio->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_NONE) {
+	if ((csio->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_NONE ||
+	    (csio->dxfer_len == 0)) {
 		rq->req_seg_count = 1;
 		return (CMD_QUEUED);
 	}
@@ -1666,7 +1692,7 @@ isp_pci_dmasetup(struct ispsoftc *isp, struct ccb_scsiio *csio, ispreq_t *rq,
 	if ((csio->ccb_h.flags & CAM_SCATTER_VALID) == 0) {
 		if ((csio->ccb_h.flags & CAM_DATA_PHYS) == 0) {
 			int error, s;
-			dp = &pci->dmaps[rq->req_handle - 1];
+			dp = &pci->dmaps[isp_handle_index(rq->req_handle)];
 			s = splsoftvm();
 			error = bus_dmamap_load(pci->parent_dmat, *dp,
 			    csio->data_ptr, csio->dxfer_len, eptr, mp, 0);
@@ -1741,9 +1767,7 @@ static void
 isp_pci_dmateardown(struct ispsoftc *isp, ISP_SCSI_XFER_T *xs, u_int32_t handle)
 {
 	struct isp_pcisoftc *pci = (struct isp_pcisoftc *)isp;
-	bus_dmamap_t *dp = &pci->dmaps[handle - 1];
-	KASSERT((handle > 0 && handle <= isp->isp_maxcmds),
-	    ("bad handle in isp_pci_dmateardonw"));
+	bus_dmamap_t *dp = &pci->dmaps[isp_handle_index(handle)];
 	if ((xs->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_IN) {
 		bus_dmamap_sync(pci->parent_dmat, *dp, BUS_DMASYNC_POSTREAD);
 	} else {
@@ -1758,6 +1782,8 @@ isp_pci_reset1(struct ispsoftc *isp)
 {
 	/* Make sure the BIOS is disabled */
 	isp_pci_wr_reg(isp, HCCR, PCI_HCCR_CMD_BIOS);
+	/* and enable interrupts */
+	ENABLE_INTS(isp);
 }
 
 static void

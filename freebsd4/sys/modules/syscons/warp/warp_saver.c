@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/modules/syscons/warp/warp_saver.c,v 1.7 1999/08/28 00:47:57 peter Exp $
+ * $FreeBSD: src/sys/modules/syscons/warp/warp_saver.c,v 1.7.2.1 2000/05/10 16:26:47 obrien Exp $
  */
 
 #include <sys/param.h>
@@ -35,8 +35,7 @@
 #include <sys/syslog.h>
 #include <sys/consio.h>
 #include <sys/fbio.h>
-
-#include <machine/random.h>
+#include <sys/random.h>
 
 #include <dev/fb/fbreg.h>
 #include <dev/fb/splashreg.h>

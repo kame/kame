@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-tape.c,v 1.36.2.2 2000/03/18 22:26:29 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-tape.c,v 1.36.2.3 2000/04/01 14:11:43 sos Exp $
  */
 
 #include <sys/param.h>
@@ -482,13 +482,13 @@ ast_start(struct atapi_softc *atp)
     devstat_start_transaction(&stp->stats);
 
     atapi_queue_cmd(stp->atp, ccb, bp->b_data, blkcount * stp->blksize, 
-		    bp->b_flags&B_READ ? ATPR_F_READ : 0, 60, ast_done, bp);
+		    bp->b_flags & B_READ ? ATPR_F_READ : 0, 60, ast_done, bp);
 }
 
 static int32_t 
 ast_done(struct atapi_request *request)
 {
-    struct buf *bp = request->bp;
+    struct buf *bp = request->driver;
     struct ast_softc *stp = request->device->driver;
 
     if (request->error) {

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ppbus/ppbconf.c,v 1.17 2000/01/23 14:41:04 peter Exp $
+ * $FreeBSD: src/sys/dev/ppbus/ppbconf.c,v 1.17.2.1 2000/05/24 00:20:57 n_hibma Exp $
  *
  */
 #include "opt_ppb_1284.h"
@@ -504,7 +504,7 @@ ppb_request_bus(device_t bus, device_t dev, int how)
 /*
  * ppb_release_bus()
  *
- * Release the device allocated with ppb_request_dev()
+ * Release the device allocated with ppb_request_bus()
  */
 int
 ppb_release_bus(device_t bus, device_t dev)

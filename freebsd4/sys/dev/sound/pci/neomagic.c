@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THEPOSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/neomagic.c,v 1.7 2000/01/29 18:48:29 peter Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/neomagic.c,v 1.7.2.3 2000/07/19 21:18:45 cg Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -234,6 +234,18 @@ nm_waitcd(struct sc_info *sc)
 }
 
 static u_int32_t
+nm_initcd(void *devinfo)
+{
+	struct sc_info *sc = (struct sc_info *)devinfo;
+
+	nm_wr(sc, 0x6c0, 0x01, 1);
+	nm_wr(sc, 0x6cc, 0x87, 1);
+	nm_wr(sc, 0x6cc, 0x80, 1);
+	nm_wr(sc, 0x6cc, 0x00, 1);
+	return 0;
+}
+
+static u_int32_t
 nm_rdcd(void *devinfo, int regno)
 {
 	struct sc_info *sc = (struct sc_info *)devinfo;
@@ -337,7 +349,7 @@ nmchan_init(void *devinfo, snd_dbuf *b, pcm_channel *c, int dir)
 	ch = (dir == PCMDIR_PLAY)? &sc->pch : &sc->rch;
 	ch->buffer = b;
 	ch->buffer->bufsize = NM_BUFFSIZE;
-	ch->buffer->buf = (u_int8_t *)(rman_get_bushandle(sc->buf) + chnbuf);
+	ch->buffer->buf = (u_int8_t *)rman_get_virtual(sc->buf) + chnbuf;
 	if (bootverbose)
 		device_printf(sc->dev, "%s buf %p\n", (dir == PCMDIR_PLAY)?
 			      "play" : "rec", ch->buffer->buf);
@@ -384,7 +396,8 @@ nmchan_trigger(void *data, int go)
 	struct sc_info *sc = ch->parent;
 	int ssz;
 
-	if (go == PCMTRIG_EMLDMAWR) return 0;
+	if (go == PCMTRIG_EMLDMAWR || go == PCMTRIG_EMLDMARD)
+		return 0;
 
 	ssz = (ch->fmt & AFMT_16BIT)? 2 : 1;
 	if (ch->fmt & AFMT_STEREO)
@@ -611,9 +624,9 @@ nm_pci_attach(device_t dev)
 		goto bad;
 	}
 
-	codec = ac97_create(dev, sc, nm_rdcd, nm_wrcd);
+	codec = ac97_create(dev, sc, nm_initcd, nm_rdcd, nm_wrcd);
 	if (codec == NULL) goto bad;
-	mixer_init(d, &ac97_mixer, codec);
+	if (mixer_init(d, &ac97_mixer, codec) == -1) goto bad;
 
 	sc->irqid = 0;
 	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irqid,
@@ -644,11 +657,33 @@ bad:
 	return ENXIO;
 }
 
+static int
+nm_pci_resume(device_t dev)
+{
+	snddev_info *d;
+	struct sc_info *sc;
+
+	d = device_get_softc(dev);
+	sc = pcm_getdevinfo(dev);
+
+	/* Reinit audio device */
+    	if (nm_init(sc) == -1) {
+		device_printf(dev, "unable to reinitialize the card\n");
+		return ENXIO;
+	}
+	/* Reinit mixer */
+    	if (mixer_reinit(d) == -1) {
+		device_printf(dev, "unable to reinitialize the mixer\n");
+		return ENXIO;
+	}
+	return 0;
+}
+
 static device_method_t nm_methods[] = {
 	/* Device interface */
 	DEVMETHOD(device_probe,		nm_pci_probe),
 	DEVMETHOD(device_attach,	nm_pci_attach),
-
+	DEVMETHOD(device_resume,	nm_pci_resume),
 	{ 0, 0 }
 };
 
@@ -660,4 +695,6 @@ static driver_t nm_driver = {
 
 static devclass_t pcm_devclass;
 
-DRIVER_MODULE(nm, pci, nm_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_neomagic, pci, nm_driver, pcm_devclass, 0, 0);
+MODULE_DEPEND(snd_neomagic, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_VERSION(snd_neomagic, 1);

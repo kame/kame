@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_ed.c,v 1.173 1999/12/10 07:22:52 imp Exp $
+ * $FreeBSD: src/sys/dev/ed/if_ed.c,v 1.173.2.7 2000/07/17 21:24:25 archie Exp $
  */
 
 /*
@@ -79,7 +79,7 @@ static void	ed_watchdog	__P((struct ifnet *));
 
 static void	ds_getmcaf	__P((struct ed_softc *, u_long *));
 
-static void	ed_get_packet	__P((struct ed_softc *, char *, /* u_short */ int, int));
+static void	ed_get_packet	__P((struct ed_softc *, char *, /* u_short */ int));
 
 static __inline void	ed_rint	__P((struct ed_softc *));
 static __inline void	ed_xmit	__P((struct ed_softc *));
@@ -101,8 +101,6 @@ static u_short	ed_pio_write_mbufs __P((struct ed_softc *, struct mbuf *,
 static void	ed_setrcr	__P((struct ed_softc *));
 
 static u_long	ds_crc		__P((u_char *ep));
-
-static u_short	ed_get_Linksys	__P((struct ed_softc *));
 
 /*
  * Interrupt conversion table for WD/SMC ASIC/83C584
@@ -895,12 +893,10 @@ ed_probe_3Com(dev)
  * seems to fail for my card.  A future optimization would add this back
  * conditionally.
  */
-static u_short
+int
 ed_get_Linksys(sc)
 	struct ed_softc *sc;
 {
-	u_char LinksysOUI1[] = {0x00, 0xe0, 0x98};
-	u_char LinksysOUI2[] = {0x00, 0x80, 0xc8};
 	u_char sum;
 	int i;
 
@@ -918,9 +914,11 @@ ed_get_Linksys(sc)
 	for (i = 0; i < ETHER_ADDR_LEN; i++) {
 		sc->arpcom.ac_enaddr[i] = inb(sc->asic_addr + 0x04 + i);
 	}
-	if (bcmp(sc->arpcom.ac_enaddr, LinksysOUI1, sizeof(LinksysOUI1)) &&
-	    bcmp(sc->arpcom.ac_enaddr, LinksysOUI2, sizeof(LinksysOUI2)))
-		return (0);
+
+	outb(sc->nic_addr + ED_P0_DCR, ED_DCR_WTS | ED_DCR_FT1 | ED_DCR_LS);
+	sc->isa16bit = 1;
+	sc->type = ED_TYPE_NE2000;
+	sc->type_str = "Linksys";
 	return (1);
 }
 
@@ -938,7 +936,6 @@ ed_probe_Novell_generic(dev, port_rid, flags)
 	u_char  romdata[16], tmp;
 	static char test_pattern[32] = "THIS is A memory TEST pattern";
 	char    test_buffer[32];
-	int	linksys = 0;
 	int	error;
 
 	error = ed_alloc_port(dev, port_rid, ED_NOVELL_IO_PORTS);
@@ -1014,17 +1011,8 @@ ed_probe_Novell_generic(dev, port_rid, flags)
 	ed_pio_readmem(sc, 8192, test_buffer, sizeof(test_pattern));
 
 	if (bcmp(test_pattern, test_buffer, sizeof(test_pattern)) == 0) {
-	/* could be either an NE1000 or a Linksys ethernet controller */
-		linksys = ed_get_Linksys(sc);
-		if (linksys) {
-			outb(sc->nic_addr + ED_P0_DCR, ED_DCR_WTS | ED_DCR_FT1 | ED_DCR_LS);
-			sc->isa16bit = 1;
-			sc->type = ED_TYPE_NE2000;
-			sc->type_str = "Linksys";
-		} else {
-			sc->type = ED_TYPE_NE1000;
-			sc->type_str = "NE1000";
-		}
+		sc->type = ED_TYPE_NE1000;
+		sc->type_str = "NE1000";
 	} else {
 
 		/* neither an NE1000 nor a Linksys - try NE2000 */
@@ -1143,11 +1131,9 @@ ed_probe_Novell_generic(dev, port_rid, flags)
 
 	sc->mem_ring = sc->mem_start + sc->txb_cnt * ED_PAGE_SIZE * ED_TXBUF_SIZE;
 
-	if (!linksys) {
-		ed_pio_readmem(sc, 0, romdata, 16);
-		for (n = 0; n < ETHER_ADDR_LEN; n++)
-			sc->arpcom.ac_enaddr[n] = romdata[n * (sc->isa16bit + 1)];
-	}
+	ed_pio_readmem(sc, 0, romdata, 16);
+	for (n = 0; n < ETHER_ADDR_LEN; n++)
+		sc->arpcom.ac_enaddr[n] = romdata[n * (sc->isa16bit + 1)];
 
 #ifdef GWETHER
 	if (sc->arpcom.ac_enaddr[2] == 0x86) {
@@ -1658,8 +1644,7 @@ ed_attach(sc, unit, flags)
 		/*
 		 * Attach the interface
 		 */
-		if_attach(ifp);
-		ether_ifattach(ifp);
+		ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 	}
 	/* device attach does transition from UNCONFIGURED to IDLE state */
 
@@ -1685,10 +1670,6 @@ ed_attach(sc, unit, flags)
 			 (sc->vendor == ED_VENDOR_HP)) &&
 		(ifp->if_flags & IFF_ALTPHYS)) ? " tranceiver disabled" : "");
 
-	/*
-	 * If BPF is in the kernel, call the attach for it
-	 */
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
 	return (0);
 }
 
@@ -2213,7 +2194,7 @@ ed_rint(sc)
 			 * Go get packet.
 			 */
 			ed_get_packet(sc, packet_ptr + sizeof(struct ed_ring),
-				      len - sizeof(struct ed_ring), packet_hdr.rsr & ED_RSR_PHY);
+				      len - sizeof(struct ed_ring));
 			ifp->if_ipackets++;
 		} else {
 			/*
@@ -2514,7 +2495,7 @@ ed_ioctl(ifp, command, data)
 	struct ed_softc *sc = ifp->if_softc;
 	int     s, error = 0;
 
-	if (sc->gone) {
+	if (sc == NULL || sc->gone) {
 		ifp->if_flags &= ~IFF_RUNNING;
 		return ENXIO;
 	}
@@ -2619,14 +2600,13 @@ ed_ring_copy(sc, src, dst, amount)
 
 /*
  * Retreive packet from shared memory and send to the next level up via
- *	ether_input(). If there is a BPF listener, give a copy to BPF, too.
+ * ether_input().
  */
 static void
-ed_get_packet(sc, buf, len, multicast)
+ed_get_packet(sc, buf, len)
 	struct ed_softc *sc;
 	char   *buf;
 	u_short len;
-	int     multicast;
 {
 	struct ether_header *eh;
 	struct mbuf *m;
@@ -2664,37 +2644,19 @@ ed_get_packet(sc, buf, len, multicast)
 
 #ifdef BRIDGE
 	/*
-	 * Get link layer header, invoke brige_in, then
-	 * depending on the outcome of the test fetch the rest of the
-	 * packet and either pass up or call bdg_forward.
+	 * Don't read in the entire packet if we know we're going to drop it
 	 */
 	if (do_bridge) {
-		struct ifnet *ifp ;
-		int need_more = 1 ; /* in case not bpf */
+		struct ifnet *bif;
 
-		if (sc->arpcom.ac_if.if_bpf) {
-			need_more = 0 ;
-			ed_ring_copy(sc, buf, (char *)eh, len);
-			bpf_mtap(&sc->arpcom.ac_if, m);
-		} else
-			ed_ring_copy(sc, buf, (char *)eh, 14);
-		ifp = bridge_in(m);
-		if (ifp == BDG_DROP) {
+		ed_ring_copy(sc, buf, (char *)eh, ETHER_HDR_LEN);
+		if ((bif = bridge_in(&sc->arpcom.ac_if, eh)) == BDG_DROP) {
 			m_freem(m);
-			return ;
+			return;
 		}
-		/* else fetch rest of pkt and continue */
-		if (need_more && len > 14)
-			ed_ring_copy(sc, buf+14, (char *)(eh+1), len - 14);
-		if (ifp != BDG_LOCAL )
-			bdg_forward(&m, ifp); /* not local, need forwarding */
-		if (ifp == BDG_LOCAL || ifp == BDG_BCAST || ifp == BDG_MCAST)
-			goto getit ;
-		/* not local and not multicast, just drop it */
-		if (m)
-			m_freem(m);
-		return ;
-	}
+		ed_ring_copy(sc, buf + ETHER_HDR_LEN,
+		    (char *)eh + ETHER_HDR_LEN, len - ETHER_HDR_LEN);
+	} else
 #endif
 	/*
 	 * Get packet, including link layer address, from interface.
@@ -2702,33 +2664,12 @@ ed_get_packet(sc, buf, len, multicast)
 	ed_ring_copy(sc, buf, (char *)eh, len);
 
 	/*
-	 * Check if there's a BPF listener on this interface. If so, hand off
-	 * the raw packet to bpf.
-	 */
-	if (sc->arpcom.ac_if.if_bpf)
-		bpf_mtap(&sc->arpcom.ac_if, m);
-	/*
-	 * If we are in promiscuous mode, we have to check whether
-	 * this packet is really for us.
-	 */
-	if ((sc->arpcom.ac_if.if_flags & IFF_PROMISC) &&
-		bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-		      sizeof(eh->ether_dhost)) != 0 && multicast == 0) {
-		m_freem(m);
-		return;
-	}
-
-#ifdef BRIDGE
-getit:
-#endif
-	/*
 	 * Remove link layer address.
 	 */
 	m->m_pkthdr.len = m->m_len = len - sizeof(struct ether_header);
 	m->m_data += sizeof(struct ether_header);
 
 	ether_input(&sc->arpcom.ac_if, eh, m);
-	return;
 }
 
 /*

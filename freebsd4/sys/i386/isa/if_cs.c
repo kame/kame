@@ -27,7 +27,7 @@
  */
 
 /*
- * $FreeBSD: src/sys/i386/isa/if_cs.c,v 1.14 1999/09/25 12:05:52 phk Exp $
+ * $FreeBSD: src/sys/i386/isa/if_cs.c,v 1.14.2.2 2000/07/17 21:24:30 archie Exp $
  *
  * Device driver for Crystal Semiconductor CS8920 based ethernet
  *   adapters. By Maxim Bolotin and Oleg Sharoiko, 27-April-1997
@@ -609,16 +609,14 @@ cs_attach(struct cs_softc *sc, int unit, int flags)
                 ifmedia_set(&sc->media, media);
 		cs_mediaset(sc, media);
 
-		if_attach(ifp);
 		cs_stop( sc );
-		ether_ifattach(ifp);
+		ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 	}
 
 	if (bootverbose)
 		printf(CS_NAME"%d: ethernet address %6D\n",
 		       ifp->if_unit, sc->arpcom.ac_enaddr, ":");
 
-	bpfattach(ifp, DLT_EN10MB, sizeof (struct ether_header));
 	return 1;
 }
 
@@ -772,9 +770,6 @@ cs_get_packet(struct cs_softc *sc)
 	insw(iobase + RX_FRAME_PORT, m->m_data, (length+1)>>1);
 
 	eh = mtod(m, struct ether_header *);
-
-	if (ifp->if_bpf)
-		bpf_mtap(ifp, m);
 
 #ifdef CS_DEBUG
 	for (i=0;i<length;i++)

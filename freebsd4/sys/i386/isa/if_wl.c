@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/i386/isa/if_wl.c,v 1.27 1999/09/25 12:05:54 phk Exp $ */
+/* $FreeBSD: src/sys/i386/isa/if_wl.c,v 1.27.2.2 2000/07/17 21:24:32 archie Exp $ */
 /* 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -505,10 +505,7 @@ wlattach(struct isa_device *id)
        ifp->if_done
        ifp->if_reset
        */
-    if_attach(ifp);
-    ether_ifattach(ifp);
-
-    bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
+    ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
     bcopy(&sc->wl_addr[0], sc->wl_ac.ac_enaddr, WAVELAN_ADDR_SIZE);
     printf("%s%d: address %6D, NWID 0x%02x%02x", ifp->if_name, ifp->if_unit,
@@ -1075,27 +1072,10 @@ wlread(int unit, u_short fd_p)
     m->m_pkthdr.len = clen;
 
     /*
-     * Check if there's a BPF listener on this interface. If so, hand off
-     * the raw packet to bpf.
-     */
-    if (ifp->if_bpf) {
-	/* bpf assumes header is in mbufs.  It isn't.  We can
-	 * fool it without allocating memory as follows.
-	 * Trick borrowed from if_ie.c
-	 */
-	struct mbuf m0;		
-	m0.m_len = sizeof eh;
-	m0.m_data = (caddr_t) &eh;
-	m0.m_next = m;
-
-	bpf_mtap(ifp, &m0);
-	
-    }
-    /*
      * If hw is in promiscuous mode (note that I said hardware, not if
      * IFF_PROMISC is set in ifnet flags), then if this is a unicast
-     * packet and the MAC dst is not us, drop it.  This check was formerly
-     * inside the bpf if, above, but IFF_MULTI causes hw promisc without
+     * packet and the MAC dst is not us, drop it.  This check in normally
+     * inside ether_input(), but IFF_MULTI causes hw promisc without
      * a bpf listener, so this is wrong.
      *		Greg Troxel <gdt@ir.bbn.com>, 1998-08-07
      */

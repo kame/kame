@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $FreeBSD: src/sys/i386/include/smp.h,v 1.50 2000/01/04 22:24:58 tegge Exp $
+ * $FreeBSD: src/sys/i386/include/smp.h,v 1.50.2.2 2000/05/31 21:42:22 msmith Exp $
  *
  */
 
@@ -165,6 +165,7 @@ void	imen_dump		__P((void));
 int	apic_ipi		__P((int, int, int));
 int	selected_apic_ipi	__P((u_int, int, int));
 int	io_apic_setup		__P((int));
+void	io_apic_set_id		__P((int, int));
 int	ext_int_setup		__P((int, int));
 
 #if defined(READY)
@@ -183,6 +184,23 @@ extern int			smp_started;
 extern volatile int		smp_idle_loops;
 
 #endif /* !LOCORE */
-#endif /* SMP || APIC_IO */
+#else	/* !SMP && !APIC_IO */
+
+/*
+ * Create dummy MP lock empties
+ */
+
+static __inline void
+get_mplock(void)
+{
+}
+
+static __inline void
+rel_mplock(void)
+{
+}
+
+#endif
+
 #endif /* _KERNEL */
 #endif /* _MACHINE_SMP_H_ */

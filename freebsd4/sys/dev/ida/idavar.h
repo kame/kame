@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ida/idavar.h,v 1.3 2000/03/08 16:16:31 jlemon Exp $
+ * $FreeBSD: src/sys/dev/ida/idavar.h,v 1.3.2.1 2000/05/03 23:54:09 jlemon Exp $
  */
 
 /*
@@ -164,7 +164,7 @@ struct ida_softc {
  */
 #define DRV_WRITEPROT		0x0001
 
-struct id_softc {
+struct idad_softc {
 	device_t	dev;
 	struct 		ida_softc *controller;
 	struct		disk disk;
@@ -195,6 +195,6 @@ extern int ida_command(struct ida_softc *ida, int command, void *data,
 extern void ida_submit_buf(struct ida_softc *ida, struct buf *bp);
 extern void ida_intr(void *data);
 
-extern void id_intr(struct buf *bp);
+extern void idad_intr(struct buf *bp);
 
 #endif /* _IDAVAR_H */

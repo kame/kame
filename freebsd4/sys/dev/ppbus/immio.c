@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ppbus/immio.c,v 1.10 2000/01/14 00:17:51 nsouch Exp $
+ * $FreeBSD: src/sys/dev/ppbus/immio.c,v 1.10.2.1 2000/05/24 00:20:57 n_hibma Exp $
  *
  */
 
@@ -39,14 +39,12 @@
 #include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/malloc.h>
-#include <sys/buf.h>
 
 #include <machine/clock.h>
 
 #endif	/* _KERNEL */
 
 #ifdef	_KERNEL
-#include <sys/kernel.h>
 #endif /* _KERNEL */
 
 #include "opt_vpo.h"

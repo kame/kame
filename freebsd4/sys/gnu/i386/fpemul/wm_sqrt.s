@@ -60,7 +60,7 @@
  * W. Metzenthen   June 1994.
  *
  *
- * $FreeBSD: src/sys/gnu/i386/fpemul/wm_sqrt.s,v 1.9 1999/08/28 00:43:00 peter Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/wm_sqrt.s,v 1.9.2.1 2000/07/07 00:38:42 obrien Exp $
  *
  */
 
@@ -314,7 +314,7 @@ sqrt_stage_3_no_error:
 	movl	%edx,%eax
 	divl	%esi
 
-	sarl	$1,%ecx		/ divide by 2*/
+	sarl	$1,%ecx		/* divide by 2*/
 	rcrl	$1,%eax
 
 	/* prepare to round the result*/

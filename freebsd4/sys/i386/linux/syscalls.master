@@ -1,4 +1,4 @@
- $FreeBSD: src/sys/i386/linux/syscalls.master,v 1.30 2000/01/29 12:43:29 peter Exp $
+ $FreeBSD: src/sys/i386/linux/syscalls.master,v 1.30.2.2 2000/07/19 21:11:10 marcel Exp $
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
 ; System call name/number master file (or rather, slave, from LINUX).
@@ -32,7 +32,7 @@
 ; #ifdef's, etc. may be included, and are copied to the output files.
 
 0	STD	LINUX	{ int linux_setup(void); }
-1	NOPROTO	LINUX	{ int exit(int rval); }
+1	NOPROTO	LINUX	{ void exit(int rval); } exit rexit_args void
 2	STD	LINUX	{ int linux_fork(void); }
 3	NOPROTO	LINUX	{ int read(int fd, char *buf, u_int nbyte); }
 4	NOPROTO	LINUX	{ int write(int fd, char *buf, u_int nbyte); }
@@ -113,7 +113,8 @@
 				linux_osigset_t oldmask, \
 				linux_osigset_t mask); }
 73	STD	LINUX	{ int linux_sigpending(linux_osigset_t *mask); }
-74	NOPROTO	LINUX	{ int osethostname(char *hostname, u_int len); }
+74	NOPROTO	LINUX	{ int osethostname(char *hostname, u_int len); } \
+			    osethostname sethostname_args int
 75	STD	LINUX	{ int linux_setrlimit(u_int resource, \
 				struct ogetrlimit *rlim); }
 76	STD	LINUX	{ int linux_getrlimit(u_int resource, \
@@ -265,8 +266,10 @@
 178	STD	LINUX	{ int linux_rt_sigqueueinfo(void); }
 179	STD	LINUX	{ int linux_rt_sigsuspend(linux_sigset_t *newset, \
 				size_t sigsetsize); }
-180	STD	LINUX	{ int linux_pread(void); }
-181	STD	LINUX	{ int linux_pwrite(void); }
+180	STD	LINUX	{ int linux_pread(int fd, char *buf, size_t nbyte, \
+				off_t offset); }
+181	STD	LINUX	{ int linux_pwrite(int fd, const char *buf, \
+				size_t nbyte, off_t offset); }
 182	STD	LINUX	{ int linux_chown(char *path, int uid, int gid); }
 183	STD	LINUX	{ int linux_getcwd(char *buf, unsigned long bufsize); }
 184	STD	LINUX	{ int linux_capget(void); }

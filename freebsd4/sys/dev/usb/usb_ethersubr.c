@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/usb/usb_ethersubr.c,v 1.4 2000/01/14 01:36:15 wpaul Exp $
+ * $FreeBSD: src/sys/dev/usb/usb_ethersubr.c,v 1.4.2.3 2000/05/24 01:47:50 archie Exp $
  */
 
 /*
@@ -54,7 +54,6 @@
 #include <sys/systm.h>
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
-#include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/socket.h>
 
@@ -70,15 +69,15 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/usb/usb_ethersubr.c,v 1.4 2000/01/14 01:36:15 wpaul Exp $";
+  "$FreeBSD: src/sys/dev/usb/usb_ethersubr.c,v 1.4.2.3 2000/05/24 01:47:50 archie Exp $";
 #endif
 
-static struct ifqueue usbq_rx;
-static struct ifqueue usbq_tx;
+Static struct ifqueue usbq_rx;
+Static struct ifqueue usbq_tx;
 
-static void usbintr		__P((void));
+Static void usbintr		__P((void));
 
-static void usbintr()
+Static void usbintr()
 {
 	struct ether_header	*eh;
 	struct mbuf		*m;
@@ -97,26 +96,8 @@ static void usbintr()
 		q = (struct usb_qdat *)m->m_pkthdr.rcvif;
 		ifp = q->ifp;
 		m->m_pkthdr.rcvif = ifp;
-		/*
-		 * Handle BPF listeners. Let the BPF user see the packet, but
-		 * don't pass it up to the ether_input() layer unless it's
-		 * a broadcast packet, multicast packet, matches our ethernet
-		 * address or the interface is in promiscuous mode.
-		 */
-		if (ifp->if_bpf) {
-			bpf_mtap(ifp, m);
-			if (ifp->if_flags & IFF_PROMISC &&
-			    (bcmp(eh->ether_dhost,
-			    ((struct arpcom *)ifp->if_softc)->ac_enaddr,
-			    ETHER_ADDR_LEN) && !(eh->ether_dhost[0] & 1))) {
-				m_freem(m);
-				goto done;
-                	}
-		}
-
 		m_adj(m, sizeof(struct ether_header));
 		ether_input(ifp, eh, m);
-done:
 
 		/* Re-arm the receiver */
 		(*q->if_rxstart)(ifp);

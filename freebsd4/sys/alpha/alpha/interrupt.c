@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/interrupt.c,v 1.15 1999/11/19 13:38:22 gallatin Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/interrupt.c,v 1.15.2.1 2000/05/24 14:20:57 gallatin Exp $ */
 /* $NetBSD: interrupt.c,v 1.23 1998/02/24 07:38:01 thorpej Exp $ */
 
 /*
@@ -57,6 +57,7 @@ struct evcnt clock_intr_evcnt;	/* event counter for clock intrs. */
 #endif
 
 volatile int mc_expected, mc_received;
+u_int32_t intr_nesting_level;
 
 static void 
 dummy_perf(unsigned long vector, struct trapframe *framep)  

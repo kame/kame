@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.pc98,v 1.103 2000/01/14 12:56:42 kato Exp $
+# $FreeBSD: src/sys/conf/options.pc98,v 1.103.2.3 2000/06/21 12:22:36 kato Exp $
 
 DISABLE_PSE
 IDE_DELAY
@@ -49,7 +49,9 @@ CPU_DISABLE_5X86_LSSER		opt_cpu.h
 CPU_FASTER_5X86_FPU		opt_cpu.h
 CPU_I486_ON_386			opt_cpu.h
 CPU_IORT			opt_cpu.h
+CPU_L2_LATENCY			opt_cpu.h
 CPU_LOOP_EN			opt_cpu.h
+CPU_PPRO2CELERON		opt_cpu.h
 CPU_RSTK_EN			opt_cpu.h
 CPU_SUSP_HLT			opt_cpu.h
 CPU_UPGRADE_HW_CACHE		opt_cpu.h
@@ -185,10 +187,6 @@ NDGBPORTS		opt_dgb.h
 # Temporary options for moving to pnpbios
 PNPBIOS			opt_pnp.h
 
-# -------------------------------
-# EOF
-# -------------------------------
-
 # bs driver options
 SCSI_BOUNCE_SIZE	opt_bs.h
 BS_TARG_SAFEMODE	opt_bs.h
@@ -201,3 +199,7 @@ PC98			opt_global.h
 EPSON_BOUNCEDMA		opt_pc98.h
 EPSON_MEMWIN		opt_pc98.h
 LINE30			opt_syscons.h
+
+# -------------------------------
+# EOF
+# -------------------------------

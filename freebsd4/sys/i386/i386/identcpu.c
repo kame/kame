@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	from: Id: machdep.c,v 1.193 1996/06/18 01:22:04 bde Exp
- * $FreeBSD: src/sys/i386/i386/identcpu.c,v 1.80 2000/01/29 07:49:02 kato Exp $
+ * $FreeBSD: src/sys/i386/i386/identcpu.c,v 1.80.2.1 2000/06/14 13:00:25 kato Exp $
  */
 
 #include "opt_cpu.h"
@@ -208,7 +208,7 @@ printcpuinfo(void)
 				case 0x70:
 				case 0x80:
 				        strcat(cpu_model,
-					"Pentium III/Pentium III Xeon");
+					"Pentium III/Pentium III Xeon/Celeron");
 					cpu = CPU_PIII;
 					break;
 				default:

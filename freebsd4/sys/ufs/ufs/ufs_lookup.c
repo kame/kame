@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_lookup.c	8.15 (Berkeley) 6/16/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_lookup.c,v 1.33 2000/03/09 18:54:59 dillon Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_lookup.c,v 1.33.2.1 2000/03/17 10:12:15 ps Exp $
  */
 
 #include <sys/param.h>
@@ -192,7 +192,7 @@ ufs_lookup(ap)
 	 */
 	bmask = VFSTOUFS(vdp->v_mount)->um_mountp->mnt_stat.f_iosize - 1;
 	if (nameiop != LOOKUP || dp->i_diroff == 0 ||
-	    dp->i_diroff > dp->i_size) {
+	    dp->i_diroff >= dp->i_size) {
 		entryoffsetinblock = 0;
 		dp->i_offset = 0;
 		numdirpasses = 1;
@@ -411,9 +411,9 @@ found:
 	 * Check that directory length properly reflects presence
 	 * of this entry.
 	 */
-	if (entryoffsetinblock + DIRSIZ(OFSFMT(vdp), ep) > dp->i_size) {
+	if (dp->i_offset + DIRSIZ(OFSFMT(vdp), ep) > dp->i_size) {
 		ufs_dirbad(dp, dp->i_offset, "i_size too small");
-		dp->i_size = entryoffsetinblock + DIRSIZ(OFSFMT(vdp), ep);
+		dp->i_size = dp->i_offset + DIRSIZ(OFSFMT(vdp), ep);
 		dp->i_flag |= IN_CHANGE | IN_UPDATE;
 	}
 	brelse(bp);

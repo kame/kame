@@ -1,5 +1,5 @@
 /*
- * $FreeBSD: src/sys/boot/alpha/libalpha/OSFpal.c,v 1.2 1999/08/28 00:39:25 peter Exp $
+ * $FreeBSD: src/sys/boot/alpha/libalpha/OSFpal.c,v 1.2.2.1 2000/07/07 00:20:49 obrien Exp $
  * From	$NetBSD: OSFpal.c,v 1.5 1998/06/24 01:33:19 ross Exp $ 
  */
 
@@ -66,6 +66,8 @@ OSFpal()
 		return;
 	}
 	switch_palcode();
+	bcopy(&p->pcs_palrevisions[PALvar_OSF1], &p->pcs_pal_rev,
+	      sizeof(p->pcs_pal_rev));
 	printf("Switch to OSF PAL code succeeded.\n");
 }
 

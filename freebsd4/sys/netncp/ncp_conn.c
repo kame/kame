@@ -28,7 +28,7 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- * $FreeBSD: src/sys/netncp/ncp_conn.c,v 1.3 1999/10/12 10:36:58 bp Exp $
+ * $FreeBSD: src/sys/netncp/ncp_conn.c,v 1.3.2.1 2000/04/17 08:25:36 bp Exp $
  *
  * Connection tables
  */
@@ -93,7 +93,8 @@ int
 ncp_conn_access(struct ncp_conn *conn, struct ucred *cred, mode_t mode) {
 	int error;
 
-	if (ncp_suser(cred) == 0 || cred->cr_uid == conn->nc_owner->cr_uid)
+	if (cred == NOCRED || ncp_suser(cred) == 0 ||
+	    cred->cr_uid == conn->nc_owner->cr_uid)
 		return 0;
 	mode >>= 3;
 	if (!groupmember(conn->nc_group, cred))

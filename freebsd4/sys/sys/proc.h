@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)proc.h	8.15 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/sys/proc.h,v 1.99 2000/01/28 20:40:18 green Exp $
+ * $FreeBSD: src/sys/sys/proc.h,v 1.99.2.2 2000/05/16 06:58:05 dillon Exp $
  */
 
 #ifndef _SYS_PROC_H_
@@ -52,6 +52,7 @@
 #include <sys/time.h>			/* For structs itimerval, timeval. */
 #endif
 #include <sys/ucred.h>
+#include <sys/event.h>			/* For struct klist */
 
 /*
  * One structure allocated per session.
@@ -205,6 +206,7 @@ struct	proc {
 	sigset_t p_oldsigmask;		/* saved mask from before sigpause */
 	int	p_sig;			/* for core dump/debugger XXX */
         u_long	p_code;	  	        /* for core dump/debugger XXX */
+	struct	klist p_klist;		/* knotes attached to this process */
 
 /* End area that is zeroed on creation. */
 #define	p_endzero	p_startcopy
@@ -338,9 +340,18 @@ MALLOC_DECLARE(M_PARGS);
 		FREE(s, M_SESSION);					\
 }
 
+/*
+ * STOPEVENT is MP SAFE.
+ */
 extern void stopevent(struct proc*, unsigned int, unsigned int);
-#define	STOPEVENT(p,e,v)	do { \
-	if ((p)->p_stops & (e)) stopevent(p,e,v); } while (0)
+#define	STOPEVENT(p,e,v)			\
+	do {					\
+		if ((p)->p_stops & (e)) {	\
+			get_mplock();		\
+			stopevent(p,e,v);	\
+			rel_mplock(); 		\
+		}				\
+	} while (0)
 
 /* hold process U-area in memory, normally for ptrace/procfs work */
 #define PHOLD(p) {							\
@@ -363,6 +374,7 @@ extern u_long pgrphash;
 
 #ifndef curproc
 extern struct proc *curproc;		/* Current running proc. */
+extern u_int astpending;		/* software interrupt pending */
 extern int switchticks;			/* `ticks' at last context switch. */
 extern struct timeval switchtime;	/* Uptime at last context switch */
 #endif

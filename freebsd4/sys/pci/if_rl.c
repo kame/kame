@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_rl.c,v 1.38 1999/12/28 06:04:29 billf Exp $
+ * $FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.4 2000/07/17 21:24:39 archie Exp $
  */
 
 /*
@@ -132,7 +132,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_rl.c,v 1.38 1999/12/28 06:04:29 billf Exp $";
+  "$FreeBSD: src/sys/pci/if_rl.c,v 1.38.2.4 2000/07/17 21:24:39 archie Exp $";
 #endif
 
 /*
@@ -911,7 +911,7 @@ static int rl_attach(dev)
 		goto fail;
 	}
 
-	sc->rl_cdata.rl_rx_buf = contigmalloc(RL_RXBUFLEN + 32, M_DEVBUF,
+	sc->rl_cdata.rl_rx_buf = contigmalloc(RL_RXBUFLEN + 1518, M_DEVBUF,
 		M_NOWAIT, 0, 0xffffffff, PAGE_SIZE, 0);
 
 	if (sc->rl_cdata.rl_rx_buf == NULL) {
@@ -954,12 +954,9 @@ static int rl_attach(dev)
 	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 
 	/*
-	 * Call MI attach routines.
+	 * Call MI attach routine.
 	 */
-	if_attach(ifp);
-	ether_ifattach(ifp);
-
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
 fail:
 	splx(s);
@@ -978,7 +975,7 @@ static int rl_detach(dev)
 	sc = device_get_softc(dev);
 	ifp = &sc->arpcom.ac_if;
 
-	if_detach(ifp);
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 	rl_stop(sc);
 
 	bus_generic_detach(dev);
@@ -1120,8 +1117,13 @@ static void rl_rxeof(sc)
 		wrap = (sc->rl_cdata.rl_rx_buf + RL_RXBUFLEN) - rxbufpos;
 
 		if (total_len > wrap) {
+			/*
+			 * Fool m_devget() into thinking we want to copy
+			 * the whole buffer so we don't end up fragmenting
+			 * the data.
+			 */
 			m = m_devget(rxbufpos - RL_ETHER_ALIGN,
-			   wrap + RL_ETHER_ALIGN, 0, ifp, NULL);
+			    total_len + RL_ETHER_ALIGN, 0, ifp, NULL);
 			if (m == NULL) {
 				ifp->if_ierrors++;
 				printf("rl%d: out of mbufs, tried to "
@@ -1130,12 +1132,6 @@ static void rl_rxeof(sc)
 				m_adj(m, RL_ETHER_ALIGN);
 				m_copyback(m, wrap, total_len - wrap,
 					sc->rl_cdata.rl_rx_buf);
-				m = m_pullup(m, sizeof(struct ether_header));
-				if (m == NULL) {
-					printf("rl%d: m_pullup failed",
-					    sc->rl_unit);
-					ifp->if_ierrors++;
-				}
 			}
 			cur_rx = (total_len - wrap + ETHER_CRC_LEN);
 		} else {
@@ -1161,23 +1157,6 @@ static void rl_rxeof(sc)
 
 		eh = mtod(m, struct ether_header *);
 		ifp->if_ipackets++;
-
-		/*
-		 * Handle BPF listeners. Let the BPF user see the packet, but
-		 * don't pass it up to the ether_input() layer unless it's
-		 * a broadcast packet, multicast packet, matches our ethernet
-		 * address or the interface is in promiscuous mode.
-		 */
-		if (ifp->if_bpf) {
-			bpf_mtap(ifp, m);
-			if (ifp->if_flags & IFF_PROMISC &&
-				(bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-						ETHER_ADDR_LEN) &&
-					(eh->ether_dhost[0] & 1) == 0)) {
-				m_freem(m);
-				continue;
-			}
-		}
 
 		/* Remove header from mbuf and pass it on. */
 		m_adj(m, sizeof(struct ether_header));
@@ -1385,7 +1364,11 @@ static void rl_start(ifp)
 		if (m_head == NULL)
 			break;
 
-		rl_encap(sc, m_head);
+		if (rl_encap(sc, m_head)) {
+			IF_PREPEND(&ifp->if_snd, m_head);
+			ifp->if_flags |= IFF_OACTIVE;
+			break;
+		}
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame

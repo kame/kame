@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/sctermvar.h,v 1.1 2000/01/15 15:25:37 yokota Exp $
+ * $FreeBSD: src/sys/dev/syscons/sctermvar.h,v 1.1.2.1 2000/05/29 18:38:33 ache Exp $
  */
 
 #ifndef _DEV_SYSCONS_SCTERMVAR_H_
@@ -269,9 +269,14 @@ sc_term_tab(scr_stat *scp, int n)
 	if (n < 1)
 		n = 1;
 	i = (scp->xpos & ~7) + 8*n;
-	if (i >= scp->xsize)
-		sc_move_cursor(scp, 0, scp->ypos + 1);
-	else
+	if (i >= scp->xsize) {
+		if (scp->ypos >= scp->ysize - 1) {
+			scp->xpos = 0;
+			scp->ypos++;
+			scp->cursor_pos = scp->ypos*scp->xsize;
+		} else
+			sc_move_cursor(scp, 0, scp->ypos + 1);
+	} else
 		sc_move_cursor(scp, i, scp->ypos);
 }
 

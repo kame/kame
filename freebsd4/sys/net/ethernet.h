@@ -1,7 +1,7 @@
 /*
  * Fundamental constants relating to ethernet.
  *
- * $FreeBSD: src/sys/net/ethernet.h,v 1.12 1999/12/29 04:38:32 peter Exp $
+ * $FreeBSD: src/sys/net/ethernet.h,v 1.12.2.5 2000/07/19 21:43:52 archie Exp $
  *
  */
 
@@ -80,19 +80,40 @@ struct	ether_addr {
 #define	ETHERMTU	(ETHER_MAX_LEN-ETHER_HDR_LEN-ETHER_CRC_LEN)
 #define	ETHERMIN	(ETHER_MIN_LEN-ETHER_HDR_LEN-ETHER_CRC_LEN)
 
-#ifndef _KERNEL
+#ifdef _KERNEL
+
+/*
+ * For device drivers to specify whether they support BPF or not
+ */
+#define ETHER_BPF_UNSUPPORTED	0
+#define ETHER_BPF_SUPPORTED	1
+
+struct ifnet;
+struct mbuf;
+
+extern	void (*ng_ether_input_p)(struct ifnet *ifp,
+		struct mbuf **mp, struct ether_header *eh);
+extern	void (*ng_ether_input_orphan_p)(struct ifnet *ifp,
+		struct mbuf *m, struct ether_header *eh);
+extern	int  (*ng_ether_output_p)(struct ifnet *ifp, struct mbuf **mp);
+extern	void (*ng_ether_attach_p)(struct ifnet *ifp);
+extern	void (*ng_ether_detach_p)(struct ifnet *ifp);
+
+#else /* _KERNEL */
+
 #include <sys/cdefs.h>
 
 /*
  * Ethernet address conversion/parsing routines.
  */
 __BEGIN_DECLS
-struct	ether_addr *ether_aton __P((char *));
-int	ether_hostton __P((char *, struct ether_addr *));
-int	ether_line __P((char *, struct ether_addr *, char *));
-char 	*ether_ntoa __P((struct ether_addr *));
-int	ether_ntohost __P((char *, struct ether_addr *));
+struct	ether_addr *ether_aton __P((const char *));
+int	ether_hostton __P((const char *, struct ether_addr *));
+int	ether_line __P((const char *, struct ether_addr *, char *));
+char 	*ether_ntoa __P((const struct ether_addr *));
+int	ether_ntohost __P((char *, const struct ether_addr *));
 __END_DECLS
-#endif
+
+#endif /* !_KERNEL */
 
 #endif /* !_NET_ETHERNET_H_ */

@@ -35,8 +35,8 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinum.c,v 1.28 1999/10/12 09:41:20 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinum.c,v 1.38 2000/02/29 06:07:39 grog Exp $
+ * $Id: vinum.c,v 1.32 2000/05/10 07:54:29 grog Exp grog $
+ * $FreeBSD: src/sys/dev/vinum/vinum.c,v 1.38.2.1 2000/06/08 02:00:23 grog Exp $
  */
 
 #define STATIC static					    /* nothing while we're testing XXX */
@@ -118,7 +118,6 @@ vinumattach(void *dummy)
     bzero(SD, sizeof(struct sd) * INITIAL_SUBDISKS);
     vinum_conf.subdisks_allocated = INITIAL_SUBDISKS;	    /* number of sd slots allocated */
     vinum_conf.subdisks_used = 0;			    /* and number in use */
-
 }
 
 /*

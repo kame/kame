@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/cam/scsi/scsi_ses.c,v 1.8 2000/02/29 05:45:50 mjacob Exp $ */
+/* $FreeBSD: src/sys/cam/scsi/scsi_ses.c,v 1.8.2.1 2000/06/18 04:22:37 mjacob Exp $ */
 /*
  * Copyright (c) 2000 Matthew Jacob
  * All rights reserved.
@@ -748,6 +748,9 @@ static enctyp
 ses_type(void *buf, int buflen)
 {
 	unsigned char *iqd = buf;
+
+	if (buflen == 0)
+		buflen = 256;	/* per SPC-2 */
 
 	if (buflen < 8+SEN_ID_LEN)
 		return (SES_NONE);

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/sound.c,v 1.17 2000/01/16 12:52:22 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/sound.c,v 1.17.2.2 2000/07/19 21:18:46 cg Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -32,6 +32,8 @@
 static int 	status_isopen = 0;
 static int 	status_init(char *buf, int size);
 static int 	status_read(struct uio *buf);
+
+MODULE_VERSION(snd_pcm, PCM_MODVER);
 
 static d_open_t sndopen;
 static d_close_t sndclose;
@@ -59,14 +61,15 @@ static struct cdevsw snd_cdevsw = {
 	/* bmaj */	-1
 };
 
-/* PROPOSAL:
+/*
+PROPOSAL:
 each unit needs:
 status, mixer, dsp, dspW, audio, sequencer, midi-in, seq2, sndproc = 9 devices
 dspW and audio are deprecated.
 dsp needs min 64 channels, will give it 256
 
-minor = (unit << 12) + (dev << 8) + channel
-currently minor = (channel << 8) + (unit << 4) + dev
+minor = (unit << 20) + (dev << 16) + channel
+currently minor = (channel << 16) + (unit << 4) + dev
 
 nomenclature:
 	/dev/pcmX/dsp.(0..255)
@@ -75,16 +78,13 @@ nomenclature:
 	/dev/pcmX/status
 	/dev/pcmX/mixer
 	[etc.]
-
-currently:
-minor = (channel << 8) + (unit << 4) + dev
 */
 
 #define PCMMINOR(x) (minor(x))
-#define PCMCHAN(x) ((PCMMINOR(x) & 0x0000ff00) >> 8)
+#define PCMCHAN(x) ((PCMMINOR(x) & 0x00ff0000) >> 16)
 #define PCMUNIT(x) ((PCMMINOR(x) & 0x000000f0) >> 4)
 #define PCMDEV(x)   (PCMMINOR(x) & 0x0000000f)
-#define PCMMKMINOR(u, d, c) ((((c) & 0xff) << 8) | (((u) & 0x0f) << 4) | ((d) & 0x0f))
+#define PCMMKMINOR(u, d, c) ((((c) & 0xff) << 16) | (((u) & 0x0f) << 4) | ((d) & 0x0f))
 
 static devclass_t pcm_devclass;
 
@@ -101,8 +101,14 @@ pcm_addchan(device_t dev, int dir, pcm_channel *templ, void *devinfo)
     	snddev_info *d = device_get_softc(dev);
 	pcm_channel *ch;
 
+	if (((dir == PCMDIR_PLAY)? d->play : d->rec) == NULL) {
+		device_printf(dev, "bad channel add (%s)\n",
+		              (dir == PCMDIR_PLAY)? "play" : "record");
+		return 1;
+	}
 	ch = (dir == PCMDIR_PLAY)? &d->play[d->playcount] : &d->rec[d->reccount];
 	*ch = *templ;
+	ch->parent = d;
 	if (chn_init(ch, devinfo, dir)) {
 		device_printf(dev, "chn_init() for %s:%d failed\n",
 		              (dir == PCMDIR_PLAY)? "play" : "record",
@@ -143,6 +149,13 @@ pcm_setflags(device_t dev, u_int32_t val)
 	d->flags = val;
 }
 
+void *
+pcm_getdevinfo(device_t dev)
+{
+    	snddev_info *d = device_get_softc(dev);
+	return d->devinfo;
+}
+
 void
 pcm_setswap(device_t dev, pcm_swap_t *swap)
 {
@@ -164,6 +177,7 @@ pcm_register(device_t dev, void *devinfo, int numplay, int numrec)
 	make_dev(&snd_cdevsw, PCMMKMINOR(unit, SND_DEV_CTL, 0),
 		 UID_ROOT, GID_WHEEL, 0666, "mixer%d", unit);
 
+	d->dev = dev;
 	d->devinfo = devinfo;
 	d->chancount = d->playcount = d->reccount = 0;
     	sz = (numplay + numrec) * sizeof(pcm_channel *);
@@ -176,6 +190,11 @@ pcm_register(device_t dev, void *devinfo, int numplay, int numrec)
     		d->arec = (pcm_channel **)malloc(sz, M_DEVBUF, M_NOWAIT);
     		if (!d->arec) goto no;
     		bzero(d->arec, sz);
+
+    		sz = (numplay + numrec) * sizeof(int);
+		d->ref = (int *)malloc(sz, M_DEVBUF, M_NOWAIT);
+    		if (!d->ref) goto no;
+    		bzero(d->ref, sz);
 	}
 
 	if (numplay > 0) {
@@ -183,14 +202,19 @@ pcm_register(device_t dev, void *devinfo, int numplay, int numrec)
 						M_DEVBUF, M_NOWAIT);
     		if (!d->play) goto no;
     		bzero(d->play, numplay * sizeof(pcm_channel));
-	}
+	} else
+		d->play = NULL;
 
 	if (numrec > 0) {
 	  	d->rec = (pcm_channel *)malloc(numrec * sizeof(pcm_channel),
 				       	M_DEVBUF, M_NOWAIT);
     		if (!d->rec) goto no;
     		bzero(d->rec, numrec * sizeof(pcm_channel));
-	}
+	} else
+		d->rec = NULL;
+
+	if (numplay == 0 || numrec == 0)
+		d->flags |= SD_F_SIMPLEX;
 
 	fkchan_setup(&d->fakechan);
 	chn_init(&d->fakechan, NULL, 0);

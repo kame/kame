@@ -1,12 +1,12 @@
 /*	$NetBSD: ulpt.c,v 1.29 1999/11/17 23:00:50 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ulpt.c,v 1.26 1999/11/28 21:01:05 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ulpt.c,v 1.26.2.4 2000/07/02 12:25:31 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,11 +48,10 @@
 #include <sys/systm.h>
 #include <sys/proc.h>
 #include <sys/kernel.h>
-#if defined(__NetBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 #include <sys/device.h>
 #include <sys/ioctl.h>
 #elif defined(__FreeBSD__)
-#include <sys/ioccom.h>
 #include <sys/module.h>
 #include <sys/bus.h>
 #endif
@@ -120,14 +119,14 @@ struct ulpt_softc {
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 cdev_decl(ulpt);
 #elif defined(__FreeBSD__)
-static d_open_t ulptopen;
-static d_close_t ulptclose;
-static d_write_t ulptwrite;
-static d_ioctl_t ulptioctl;
+Static d_open_t ulptopen;
+Static d_close_t ulptclose;
+Static d_write_t ulptwrite;
+Static d_ioctl_t ulptioctl;
 
 #define ULPT_CDEV_MAJOR 113
 
-static struct cdevsw ulpt_cdevsw = {
+Static struct cdevsw ulpt_cdevsw = {
 	/* open */	ulptopen,
 	/* close */	ulptclose,
 	/* read */	noread,
@@ -221,7 +220,7 @@ USB_ATTACH(ulpt)
 
 #if 0
 /*
- * This code is disabled because for some mysterious it causes
+ * This code is disabled because for some mysterious reason it causes
  * printing not to work.  But only sometimes, and mostly with
  * UHCI and less often with OHCI.  *sigh*
  */

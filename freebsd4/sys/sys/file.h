@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)file.h	8.3 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/file.h,v 1.22 1999/12/29 04:24:41 peter Exp $
+ * $FreeBSD: src/sys/sys/file.h,v 1.22.2.4 2000/05/16 16:27:32 dillon Exp $
  */
 
 #ifndef _SYS_FILE_H_
@@ -60,9 +60,10 @@ struct file {
 #define	DTYPE_SOCKET	2	/* communications endpoint */
 #define	DTYPE_PIPE	3	/* pipe */
 #define	DTYPE_FIFO	4	/* fifo (named pipe) */
+#define	DTYPE_KQUEUE	5	/* event queue */
 	short	f_type;		/* descriptor type */
-	short	f_count;	/* reference count */
-	short	f_msgcount;	/* references from message queue */
+	short	f_FILLER1;	/* (OLD) reference count */
+	short	f_FILLER2;	/* (OLD) references from message queue */
 	struct	ucred *f_cred;	/* credentials associated with descriptor */
 	struct	fileops {
 		int	(*fo_read)	__P((struct file *fp, struct uio *uio,
@@ -84,11 +85,13 @@ struct file {
 				 * count of sequential accesses -- cleared
 				 * by most seek operations.
 				 */
-	off_t	f_nextread;	/*
-				 * offset of next expected read
+	off_t	f_nextoff;	/*
+				 * offset of next expected read or write
 				 */
 	off_t	f_offset;
 	caddr_t	f_data;		/* vnode or socket */
+	int	f_count;	/* reference count */
+	int	f_msgcount;	/* reference count from message queue */
 };
 
 #ifdef MALLOC_DECLARE

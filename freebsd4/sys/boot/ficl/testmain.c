@@ -3,7 +3,7 @@
 ** 
 */
 
-/* $FreeBSD: src/sys/boot/ficl/testmain.c,v 1.5 1999/11/23 11:17:37 dcs Exp $ */
+/* $FreeBSD: src/sys/boot/ficl/testmain.c,v 1.5.2.1 2000/07/06 23:51:45 obrien Exp $ */
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -227,7 +227,7 @@ static void ficlBreak(FICL_VM *pVM)
 static void ficlClock(FICL_VM *pVM)
 {
     clock_t now = clock();
-    stackPushUNS(pVM->pStack, (UNS32)now);
+    stackPushUNS(pVM->pStack, (FICL_UNS)now);
     return;
 }
 

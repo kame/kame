@@ -38,7 +38,7 @@
  *      @(#)bpf.h	8.1 (Berkeley) 6/10/93
  *	@(#)bpf.h	1.34 (LBL)     6/16/96
  *
- * $FreeBSD: src/sys/net/bpf.h,v 1.21.2.1 2000/03/19 05:55:36 rwatson Exp $
+ * $FreeBSD: src/sys/net/bpf.h,v 1.21.2.2 2000/04/19 21:25:52 archie Exp $
  */
 
 #ifndef _NET_BPF_H_
@@ -232,6 +232,8 @@ int	 bpf_validate __P((const struct bpf_insn *, int));
 void	 bpf_tap __P((struct ifnet *, u_char *, u_int));
 void	 bpf_mtap __P((struct ifnet *, struct mbuf *));
 void	 bpfattach __P((struct ifnet *, u_int, u_int));
+void	 bpfdetach __P((struct ifnet *));
+
 void	 bpfilterattach __P((int));
 u_int	 bpf_filter __P((const struct bpf_insn *, u_char *, u_int, u_int));
 #endif

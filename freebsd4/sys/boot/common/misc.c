@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/misc.c,v 1.6 1999/08/28 00:39:50 peter Exp $
+ * $FreeBSD: src/sys/boot/common/misc.c,v 1.6.2.1 2000/07/06 00:34:02 ps Exp $
  */
 
 #include <string.h>
@@ -130,4 +130,15 @@ hexdump(caddr_t region, size_t len)
 	emit("|\n");
     }
     pager_close();
+}
+
+void
+dev_cleanup(void)
+{
+    int		i;
+
+    /* Call cleanup routines */
+    for (i = 0; devsw[i] != NULL; ++i)
+	if (devsw[i]->dv_cleanup != NULL)
+	    (devsw[i]->dv_cleanup)();
 }

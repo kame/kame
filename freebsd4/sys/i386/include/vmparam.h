@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)vmparam.h	5.9 (Berkeley) 5/12/91
- * $FreeBSD: src/sys/i386/include/vmparam.h,v 1.32 1999/08/28 00:44:28 peter Exp $
+ * $FreeBSD: src/sys/i386/include/vmparam.h,v 1.32.2.1 2000/04/02 08:47:01 peter Exp $
  */
 
 
@@ -70,13 +70,6 @@
 #endif
 
 #define USRTEXT		(1*PAGE_SIZE)		/* base of user text XXX bogus */
-
-/*
- * Size of the Shared Memory Pages page table.
- */
-#ifndef	SHMMAXPGS
-#define	SHMMAXPGS	1024		/* XXX until we have more kmap space */
-#endif
 
 /*
  * The time for a process to be blocked before being very swappable.

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vnode.h	8.7 (Berkeley) 2/4/94
- * $FreeBSD: src/sys/sys/vnode.h,v 1.111 2000/02/02 07:07:17 rwatson Exp $
+ * $FreeBSD: src/sys/sys/vnode.h,v 1.111.2.2 2000/06/20 18:26:59 des Exp $
  */
 
 #ifndef _SYS_VNODE_H_
@@ -201,7 +201,8 @@ struct vattr {
 #define VA_EXCLUSIVE	0x02		/* exclusive create request */
 
 /*
- * Flags for ioflag. (high 16 bits used to ask for read-ahead)
+ * Flags for ioflag. (high 16 bits used to ask for read-ahead and
+ * help with write clustering)
  */
 #define	IO_UNIT		0x01		/* do I/O as atomic unit */
 #define	IO_APPEND	0x02		/* append write to end */
@@ -549,6 +550,7 @@ int 	getnewvnode __P((enum vtagtype tag,
 int	lease_check __P((struct vop_lease_args *ap));
 int	spec_vnoperate __P((struct vop_generic_args *));
 int	speedup_syncer __P((void));
+int	textvp_fullpath __P((struct proc *p, char **retbuf, char **retfreebuf));
 void 	vattr_null __P((struct vattr *vap));
 int 	vcount __P((struct vnode *vp));
 void	vdrop __P((struct vnode *));

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/vm86bios.s,v 1.15 1999/08/28 00:43:53 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/vm86bios.s,v 1.15.2.1 2000/05/16 06:58:07 dillon Exp $
  */
 
 #include <machine/asmacros.h>		/* miscellaneous asm macros */
@@ -64,7 +64,7 @@ ENTRY(vm86_bioscall)
 
 #ifdef SMP	
 	pushl	%edx
-	ALIGN_LOCK			/* Get global lock */
+	MP_LOCK				/* Get global lock */
 	popl	%edx
 #endif
 
@@ -136,17 +136,12 @@ ENTRY(vm86_bioscall)
 	 * Return via _doreti
 	 */
 #ifdef SMP
-	ECPL_LOCK
-#ifdef CPL_AND_CML
-#error Not ready for CPL_AND_CML
-#endif
 	pushl	_cpl			/* cpl to restore */
-	ECPL_UNLOCK
 #else
 	pushl	_cpl			/* cpl to restore */
 #endif
 	subl	$4,%esp			/* dummy unit */
-	MPLOCKED incb _intr_nesting_level
+	incb	_intr_nesting_level
 	MEXITCOUNT
 	jmp	_doreti
 

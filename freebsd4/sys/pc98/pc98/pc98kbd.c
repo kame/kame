@@ -25,13 +25,11 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/pc98kbd.c,v 1.16 2000/01/13 11:47:42 kato Exp $
+ * $FreeBSD: src/sys/pc98/pc98/pc98kbd.c,v 1.16.2.1 2000/03/31 03:13:49 nyan Exp $
  */
 
 #include "pckbd.h"
 #include "opt_kbd.h"
-
-#if NPCKBD > 0
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -927,5 +925,3 @@ read_kbd_data_no_wait(KBDC p)
     }
     return -1;		/* no data */
 }
-
-#endif /* NPCKBD > 0 */

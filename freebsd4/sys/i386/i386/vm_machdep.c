@@ -38,7 +38,7 @@
  *
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
- * $FreeBSD: src/sys/i386/i386/vm_machdep.c,v 1.132 2000/02/20 20:50:59 bsd Exp $
+ * $FreeBSD: src/sys/i386/i386/vm_machdep.c,v 1.132.2.1 2000/05/16 06:58:07 dillon Exp $
  */
 
 #include "npx.h"
@@ -578,13 +578,7 @@ vm_page_zero_idle()
 			TAILQ_REMOVE(&vm_page_queues[m->queue].pl, m, pageq);
 			m->queue = PQ_NONE;
 			splx(s);
-#if 0
-			rel_mplock();
-#endif
 			pmap_zero_page(VM_PAGE_TO_PHYS(m));
-#if 0
-			get_mplock();
-#endif
 			(void)splvm();
 			vm_page_flag_set(m, PG_ZERO);
 			m->queue = PQ_FREE + m->pc;
@@ -606,6 +600,12 @@ vm_page_zero_idle()
 #ifdef SMP
 	}
 #endif
+	/*
+	 * We have to enable interrupts for a moment if the try_mplock fails
+	 * in order to potentially take an IPI.   XXX this should be in 
+	 * swtch.s
+	 */
+	__asm __volatile("sti; nop; cli" : : : "memory");
 	return (0);
 }
 

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/mlphy.c,v 1.2 1999/08/28 02:16:30 peter Exp $
+ * $FreeBSD: src/sys/dev/mii/mlphy.c,v 1.2.2.1 2000/04/14 15:33:14 wpaul Exp $
  */
 
 /*
@@ -113,7 +113,7 @@ static int mlphy_probe(dev)
 	/*
 	 * Micro Linear PHY reports oui == 0 model == 0
 	 */
-	if (MII_OUI(ma->mii_id1, ma->mii_id2) != 0 &&
+	if (MII_OUI(ma->mii_id1, ma->mii_id2) != 0 ||
 	    MII_MODEL(ma->mii_id2) != 0)
 		return (ENXIO);
 

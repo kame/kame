@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/isa/ppcreg.h,v 1.10 2000/01/14 00:18:06 nsouch Exp $
+ * $FreeBSD: src/sys/isa/ppcreg.h,v 1.10.2.2 2000/07/22 09:09:36 dfr Exp $
  *
  */
 #ifndef __PPCREG_H
@@ -43,6 +43,8 @@
 #define WINB_W83877AF	8
 #define WINB_UNKNOWN	9
 #define NS_PC87334	10
+#define SMC_37C935	11
+#define NS_PC87303	12
 
 /*
  * Parallel Port Chipset Type. SMC versus GENERIC (others)
@@ -204,6 +206,32 @@ struct ppc_data {
 #define SMC_EPPSPP	0x1		/* EPP and SPP */
 #define SMC_ECP		0x2 		/* ECP */
 #define SMC_ECPEPP	0x3		/* ECP and EPP */
+
+/*
+ * Register defines for the SMC FDC37C935 parts
+ */
+
+/* Configuration ports */
+#define SMC935_CFG	0x370
+#define SMC935_IND	0x370
+#define SMC935_DAT	0x371
+
+/* Registers */
+#define SMC935_LOGDEV	0x7
+#define SMC935_ID	0x20
+#define SMC935_PORTHI	0x60
+#define SMC935_PORTLO	0x61
+#define SMC935_PPMODE	0xf0
+
+/* Parallel port modes */
+#define SMC935_SPP	0x38 + 0
+#define SMC935_EPP19SPP	0x38 + 1
+#define SMC935_ECP	0x38 + 2
+#define SMC935_ECPEPP19	0x38 + 3
+#define SMC935_CENT	0x38 + 4
+#define SMC935_EPP17SPP	0x38 + 5
+#define SMC935_UNUSED	0x38 + 6
+#define SMC935_ECPEPP17	0x38 + 7
 
 /*
  * Register defines for the Winbond W83877F parts

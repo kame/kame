@@ -36,13 +36,9 @@
  *
  * Author: Julian Elischer <julian@whistle.com>
  *
- * $FreeBSD: src/sys/netgraph/ng_cisco.c,v 1.4 1999/12/07 05:50:47 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_cisco.c,v 1.4.2.2 2000/05/24 21:36:40 archie Exp $
  * $Whistle: ng_cisco.c,v 1.25 1999/11/01 09:24:51 julian Exp $
  */
-
-#include "opt_inet.h"
-#include "opt_atalk.h"
-#include "opt_ipx.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -112,6 +108,7 @@ struct cisco_priv {
 	struct protoent inet;		/* IP information */
 	struct in_addr localip;
 	struct in_addr localmask;
+	struct protoent inet6;		/* IPv6 information */
 	struct protoent atalk;		/* AppleTalk information */
 	struct protoent ipx;		/* IPX information */
 };
@@ -215,6 +212,7 @@ cisco_constructor(node_p *nodep)
 	/* Initialise the varous protocol hook holders */
 	sc->downstream.af = 0xffff;
 	sc->inet.af = AF_INET;
+	sc->inet6.af = AF_INET6;
 	sc->atalk.af = AF_APPLETALK;
 	sc->ipx.af = AF_IPX;
 	return (0);
@@ -375,12 +373,15 @@ cisco_rcvdata(hook_p hook, struct mbuf *m, meta_p meta)
 		goto out;
 	}
 	h = mtod(m, struct cisco_header *);
-	h->address = CISCO_MULTICAST;		/* broadcast address */
+	h->address = CISCO_UNICAST;
 	h->control = 0;
 
 	switch (pep->af) {
 	case AF_INET:		/* Internet Protocol */
 		h->protocol = htons(ETHERTYPE_IP);
+		break;
+	case AF_INET6:
+		h->protocol = htons(ETHERTYPE_IPV6);
 		break;
 	case AF_APPLETALK:	/* AppleTalk Protocol */
 		h->protocol = htons(ETHERTYPE_AT);
@@ -517,6 +518,9 @@ cisco_input(sc_p sc, struct mbuf *m, meta_p meta)
 			goto drop;
 		case ETHERTYPE_IP:
 			pep = &sc->inet;
+			break;
+		case ETHERTYPE_IPV6:
+			pep = &sc->inet6;
 			break;
 		case ETHERTYPE_AT:
 			pep = &sc->atalk;

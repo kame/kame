@@ -1,12 +1,12 @@
 /*	$NetBSD: usb.c,v 1.33 1999/11/22 21:57:09 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb.c,v 1.26 2000/01/20 22:24:35 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb.c,v 1.26.2.3 2000/07/02 12:23:14 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -147,10 +147,10 @@ struct cdevsw usb_cdevsw = {
 };
 #endif
 
-static usbd_status usb_discover __P((struct usb_softc *));
+Static usbd_status usb_discover __P((struct usb_softc *));
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-static void	usb_create_event_thread __P((void *));
-static void	usb_event_thread __P((void *));
+Static void	usb_create_event_thread __P((void *));
+Static void	usb_event_thread __P((void *));
 #endif
 
 #define USB_MAX_EVENTS 50
@@ -158,21 +158,21 @@ struct usb_event_q {
 	struct usb_event ue;
 	SIMPLEQ_ENTRY(usb_event_q) next;
 };
-static SIMPLEQ_HEAD(, usb_event_q) usb_events =
+Static SIMPLEQ_HEAD(, usb_event_q) usb_events =
 	SIMPLEQ_HEAD_INITIALIZER(usb_events);
-static int usb_nevents = 0;
-static struct selinfo usb_selevent;
-static struct proc *usb_async_proc;  /* process who wants USB SIGIO */
-static int usb_dev_open = 0;
+Static int usb_nevents = 0;
+Static struct selinfo usb_selevent;
+Static struct proc *usb_async_proc;  /* process who wants USB SIGIO */
+Static int usb_dev_open = 0;
 
-static int usb_get_next_event __P((struct usb_event *));
+Static int usb_get_next_event __P((struct usb_event *));
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 /* Flag to see if we are in the cold boot process. */
 extern int cold;
 #endif
 
-static const char *usbrev_str[] = USBREV_STR;
+Static const char *usbrev_str[] = USBREV_STR;
 
 USB_DECLARE_DRIVER_INIT(usb,
 			DEVMETHOD(device_suspend, bus_generic_suspend),
@@ -550,7 +550,7 @@ usbpoll(dev, events, p)
 		if ((events & mask) && usb_nevents > 0)
 			revents |= events & mask;
 		if (revents == 0 && (events & mask)) {
-			DPRINTF(("usb: sleeping on %p\n", &usb_selevent));
+			DPRINTFN(2,("usb: sleeping on %p\n", &usb_selevent));
 			selrecord(p, &usb_selevent);
 		}
 		splx(s);

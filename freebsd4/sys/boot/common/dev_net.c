@@ -1,5 +1,5 @@
 /*	
- * $FreeBSD: src/sys/boot/common/dev_net.c,v 1.6 1999/09/01 09:11:14 dfr Exp $
+ * $FreeBSD: src/sys/boot/common/dev_net.c,v 1.6.2.1 2000/07/07 00:00:26 obrien Exp $
  * From: $NetBSD: dev_net.c,v 1.12 1997/12/10 20:38:37 gwr Exp $
  */
 
@@ -139,6 +139,7 @@ net_open(struct open_file *f, ...)
 		return (error);
 	    }
 	}
+	netdev_opens++;
     }
     netdev_opens++;
     f->f_devdata = &netdev_sock;

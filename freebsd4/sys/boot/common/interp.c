@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/interp.c,v 1.22 1999/11/27 21:44:47 dcs Exp $
+ * $FreeBSD: src/sys/boot/common/interp.c,v 1.22.2.2 2000/07/20 10:35:14 kris Exp $
  */
 /*
  * Simple commandline interpreter, toplevel and misc.
@@ -122,6 +122,7 @@ interact(void)
 	prompt();
 	ngets(input, sizeof(input));
 #ifdef BOOT_FORTH
+	bf_vm->sourceID.i = 0;
 	bf_run(input);
 #else
 	if (!parse(&argc, &argv, input)) {
@@ -189,7 +190,7 @@ include(char *filename)
 #ifdef BOOT_FORTH
     int			res;
     char		*cp;
-    int			fd, line;
+    int			prevsrcid, fd, line;
 #else
     int			argc,res;
     char		**argv, *cp;
@@ -252,6 +253,9 @@ include(char *filename)
      */
 #ifndef BOOT_FORTH
     argv = NULL;
+#else
+    prevsrcid = bf_vm->sourceID.i;
+    bf_vm->sourceID.i = fd;
 #endif
     res = CMD_OK;
     for (sp = script; sp != NULL; sp = sp->next) {
@@ -293,6 +297,8 @@ include(char *filename)
 #ifndef BOOT_FORTH
     if (argv != NULL)
 	free(argv);
+#else
+    bf_vm->sourceID.i = prevsrcid;
 #endif
     while(script != NULL) {
 	se = script;
@@ -323,7 +329,7 @@ prompt(void)
 	    ev = getenv(p + 2);
 	    
 	    if (ev != NULL)
-		printf(ev);
+		printf("%s", ev);
 	    p = cp + 1;
 	    continue;
 	}

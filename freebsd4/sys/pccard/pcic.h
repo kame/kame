@@ -1,5 +1,4 @@
 /*
- * Prototypes for APIC compatible interrupt register and unregister.
  * PCMCIA Card Interface Controller
  *
  * Copyright (c) 1999 Roger Hardiman
@@ -28,7 +27,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pccard/pcic.h,v 1.5 1999/10/25 02:41:55 imp Exp $ 
+ * $FreeBSD: src/sys/pccard/pcic.h,v 1.5.2.1 2000/05/23 03:56:59 imp Exp $ 
 */
 
 #define PCIC_RF_IODF_WS		(0x01 << 16)

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/isa/isa.c,v 1.19 1999/10/12 21:35:41 dfr Exp $
+ * $FreeBSD: src/sys/alpha/isa/isa.c,v 1.19.2.2 2000/07/04 01:54:16 mjacob Exp $
  */
 
 #include <sys/param.h>
@@ -42,6 +42,7 @@
 #include <machine/intr.h>
 #include <machine/intrcnt.h>
 #include <machine/resource.h>
+#include <machine/cpuconf.h>
 
 static struct rman isa_irq_rman;
 static struct rman isa_drq_rman;
@@ -134,6 +135,13 @@ isa_alloc_intr(device_t bus, device_t child, int irq)
 {
 	return rman_reserve_resource(&isa_irq_rman, irq, irq, 1,
 				     0, child);
+}
+
+struct resource *
+isa_alloc_intrs(device_t bus, device_t child, u_long start, u_long end)
+{
+	return rman_reserve_resource(&isa_irq_rman, start, end,
+				     end - start + 1, 0, child);
 }
 
 int
@@ -291,7 +299,11 @@ isa_setup_intr(device_t dev, device_t child,
 {
 	struct isa_intr *ii;
 	int error;
-	
+
+	if (platform.isa_setup_intr)
+		return platform.isa_setup_intr(dev, child, irq, flags, 
+			intr, arg, cookiep);	
+
 	error = rman_activate_resource(irq);
 	if (error)
 		return error;
@@ -326,6 +338,11 @@ isa_teardown_intr(device_t dev, device_t child,
 		  struct resource *irq, void *cookie)
 {
 	struct isa_intr *ii = cookie;
+
+	if (platform.isa_teardown_intr) {
+		platform.isa_teardown_intr(dev, child, irq, cookie);	
+		return 0;
+	}
 
 	alpha_teardown_intr(ii->ih);
 	isa_intr_disable(irq->r_start);

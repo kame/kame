@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/an/if_an.c,v 1.2 2000/01/16 06:41:49 wpaul Exp $
+ * $FreeBSD: src/sys/dev/an/if_an.c,v 1.2.2.3 2000/07/17 21:24:24 archie Exp $
  */
 
 /*
@@ -96,6 +96,8 @@
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/proc.h>
+#include <sys/ucred.h>
 #include <sys/socket.h>
 #ifdef ANCACHE
 #include <sys/syslog.h>
@@ -131,7 +133,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/an/if_an.c,v 1.2 2000/01/16 06:41:49 wpaul Exp $";
+  "$FreeBSD: src/sys/dev/an/if_an.c,v 1.2.2.3 2000/07/17 21:24:24 archie Exp $";
 #endif
 
 /* These are global because we need them in sys/pci/if_an_p.c. */
@@ -368,12 +370,10 @@ int an_attach(sc, unit, flags)
 	bzero((char *)&sc->an_stats, sizeof(sc->an_stats));
 
 	/*
-	 * Call MI attach routines.
+	 * Call MI attach routine.
 	 */
-	if_attach(ifp);
-	ether_ifattach(ifp);
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 	callout_handle_init(&sc->an_stat_ch);
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
 
 	return(0);
 }
@@ -456,25 +456,12 @@ static void an_rxeof(sc)
 
 	ifp->if_ipackets++;
 
-	/* Handle BPF listeners. */
-	if (ifp->if_bpf) {
-		bpf_mtap(ifp, m);
-		if (ifp->if_flags & IFF_PROMISC &&
-		    (bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-		    ETHER_ADDR_LEN) && (eh->ether_dhost[0] & 1) == 0)) {
-			m_freem(m);
-			return;
-		}
-	}
-
 	/* Receive packet. */
 	m_adj(m, sizeof(struct ether_header));
 #ifdef ANCACHE
 	an_cache_store(sc, eh, m, rx_frame.an_rx_signal_strength);
 #endif
 	ether_input(ifp, eh, m);
-
-	return;
 }
 
 static void an_txeof(sc, status)
@@ -982,14 +969,17 @@ static int an_ioctl(ifp, command, data)
 	struct an_softc		*sc;
 	struct an_req		areq;
 	struct ifreq		*ifr;
+	struct proc		*p = curproc;
 
 	s = splimp();
 
 	sc = ifp->if_softc;
 	ifr = (struct ifreq *)data;
 
-	if (sc->an_gone)
-		return(ENODEV);
+	if (sc->an_gone) {
+		error = ENODEV;
+		goto out;
+	}
 
 	switch(command) {
 	case SIOCSIFADDR:
@@ -1048,6 +1038,8 @@ static int an_ioctl(ifp, command, data)
 		error = copyout(&areq, ifr->ifr_data, sizeof(areq));
 		break;
 	case SIOCSAIRONET:
+		if ((error = suser(p)))
+			goto out;
 		error = copyin(ifr->ifr_data, &areq, sizeof(areq));
 		if (error)
 			break;
@@ -1057,7 +1049,7 @@ static int an_ioctl(ifp, command, data)
 		error = EINVAL;
 		break;
 	}
-
+out:
 	splx(s);
 
 	return(error);

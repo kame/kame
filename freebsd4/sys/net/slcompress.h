@@ -34,14 +34,14 @@
  *
  *	Van Jacobson (van@helios.ee.lbl.gov), Dec 31, 1989:
  *	- Initial distribution.
- * $FreeBSD: src/sys/net/slcompress.h,v 1.14 1999/08/28 00:48:29 peter Exp $
+ * $FreeBSD: src/sys/net/slcompress.h,v 1.14.2.1 2000/05/05 13:37:06 jlemon Exp $
  */
 
 #ifndef _NET_SLCOMPRESS_H_
 #define _NET_SLCOMPRESS_H_
 
 #define MAX_STATES 16		/* must be > 2 and < 256 */
-#define MAX_HDR MLEN		/* XXX 4bsd-ism: should really be 128 */
+#define MAX_HDR 128
 
 /*
  * Compressed packet format:

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/aureal.c,v 1.8 2000/01/29 18:48:28 peter Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/aureal.c,v 1.8.2.2 2000/07/19 21:18:45 cg Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -350,7 +350,10 @@ auchan_trigger(void *data, int go)
 {
 	struct au_chinfo *ch = data;
 	struct au_info *au = ch->parent;
-	if (go == PCMTRIG_EMLDMAWR) return 0;
+
+	if (go == PCMTRIG_EMLDMAWR || go == PCMTRIG_EMLDMARD)
+		return 0;
+
 	if (ch->dir == PCMDIR_PLAY) {
 		au_setadb(au, 0x11, (go)? 1 : 0);
 		if (!go) {
@@ -633,9 +636,9 @@ au_pci_attach(device_t dev)
 		goto bad;
 	}
 
-	codec = ac97_create(dev, au, au_rdcd, au_wrcd);
+	codec = ac97_create(dev, au, NULL, au_rdcd, au_wrcd);
 	if (codec == NULL) goto bad;
-	mixer_init(d, &ac97_mixer, codec);
+	if (mixer_init(d, &ac97_mixer, codec) == -1) goto bad;
 
 	if (bus_dma_tag_create(/*parent*/NULL, /*alignment*/2, /*boundary*/0,
 		/*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
@@ -683,4 +686,6 @@ static driver_t au_driver = {
 
 static devclass_t pcm_devclass;
 
-DRIVER_MODULE(au, pci, au_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_aureal, pci, au_driver, pcm_devclass, 0, 0);
+MODULE_DEPEND(snd_aureal, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_VERSION(snd_aureal, 1);

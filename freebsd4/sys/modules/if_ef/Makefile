@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/if_ef/Makefile,v 1.2 2000/01/23 03:35:10 bp Exp $
+# $FreeBSD: src/sys/modules/if_ef/Makefile,v 1.2.2.1 2000/04/17 09:10:11 bp Exp $
 
 .PATH:  ${.CURDIR}/../../net
 
@@ -8,12 +8,10 @@ MAN4=	ef.4
 
 # If you need only limited number of frames comment out unneeded ones
 # this will reduce number of visible devices
-#ETHER_II=
+ETHER_II=
 ETHER_8023=
 ETHER_8022=
 ETHER_SNAP=
-
-NBPF?=	1
 
 CFLAGS+= ${PROTOS}
 

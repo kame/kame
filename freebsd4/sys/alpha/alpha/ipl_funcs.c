@@ -23,11 +23,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/ipl_funcs.c,v 1.15 2000/02/17 18:37:42 bde Exp $
+ * $FreeBSD: src/sys/alpha/alpha/ipl_funcs.c,v 1.15.2.3 2000/07/18 21:12:42 dfr Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
 #include <sys/interrupt.h>
 #include <machine/ipl.h>
 #include <machine/cpu.h>
@@ -156,6 +158,7 @@ GENSET(setsoftnet,	&ipending,	1 << SWI_NET)
 GENSET(setsoftcamnet,	&ipending,	1 << SWI_CAMNET)
 GENSET(setsoftcambio,	&ipending,	1 << SWI_CAMBIO)
 GENSET(setsoftvm,	&ipending,	1 << SWI_VM)
+GENSET(setsofttq,	&ipending,	1 << SWI_TQ)
 GENSET(setsoftclock,	&ipending,	1 << SWI_CLOCK)
 
 GENSET(schedsofttty,	&idelayed,	1 << SWI_TTY)
@@ -163,9 +166,42 @@ GENSET(schedsoftnet,	&idelayed,	1 << SWI_NET)
 GENSET(schedsoftcamnet,	&idelayed,	1 << SWI_CAMNET)
 GENSET(schedsoftcambio,	&idelayed,	1 << SWI_CAMBIO)
 GENSET(schedsoftvm,	&idelayed,	1 << SWI_VM)
+GENSET(schedsofttq,	&idelayed,	1 << SWI_TQ)
 GENSET(schedsoftclock,	&idelayed,	1 << SWI_CLOCK)
 
 #ifdef INVARIANT_SUPPORT
+
+#define SPLASSERT_IGNORE        0
+#define SPLASSERT_LOG           1
+#define SPLASSERT_PANIC         2
+
+static int splassertmode = SPLASSERT_LOG;
+SYSCTL_INT(_kern, OID_AUTO, splassertmode, CTLFLAG_RW,
+	&splassertmode, 0, "Set the mode of SPLASSERT");
+
+static void
+init_splassertmode(void *ignored)
+{
+	TUNABLE_INT_FETCH("kern.splassertmode", 0, splassertmode);
+}
+SYSINIT(param, SI_SUB_TUNABLES, SI_ORDER_ANY, init_splassertmode, NULL);
+
+static void
+splassertfail(char *str, const char *msg, char *name, int level)
+{
+	switch (splassertmode) {
+	case SPLASSERT_IGNORE:
+		break;
+	case SPLASSERT_LOG:
+		printf(str, msg, name, level);
+		printf("\n");
+		break;
+	case SPLASSERT_PANIC:
+		panic(str, msg, name, level);
+		break;
+	}
+}
+
 #define	GENSPLASSERT(name, pri)				\
 void							\
 name##assert(const char *msg)				\
@@ -173,8 +209,8 @@ name##assert(const char *msg)				\
 	u_int cpl;					\
 							\
 	cpl = getcpl();					\
-	if (cpl < ALPHA_PSL_IPL_##pri);			\
-		panic("%s: not %s, cpl == %#x",		\
+	if (cpl < ALPHA_PSL_IPL_##pri)			\
+		splassertfail("%s: not %s, cpl == %#x",	\
 		    msg, __XSTRING(name) + 3, cpl);	\
 }
 #else
@@ -193,6 +229,7 @@ GENSPLASSERT(splsoftcamnet, SOFT)	/* XXX no corresponding spl for alpha */
 GENSPLASSERT(splsoftclock, SOFT)
 GENSPLASSERT(splsofttty, SOFT)		/* XXX no corresponding spl for alpha */
 GENSPLASSERT(splsoftvm, SOFT)
+GENSPLASSERT(splsofttq, SOFT)
 GENSPLASSERT(splstatclock, CLOCK)
 GENSPLASSERT(spltty, IO)
 GENSPLASSERT(splvm, IO)

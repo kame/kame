@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_xpt.c,v 1.80 2000/01/25 18:25:22 mjacob Exp $
+ * $FreeBSD: src/sys/cam/cam_xpt.c,v 1.80.2.5 2000/07/17 00:44:25 mjacob Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -430,6 +430,18 @@ static struct xpt_quirk_entry xpt_quirk_table[] =
 	},
 	{
 		/*
+		 * These Hitachi drives don't like multi-lun probing.
+		 * The PR submitter has a DK319H, but says that the Linux
+		 * kernel has a similar work-around for the DK312 and DK314,
+		 * so all DK31* drives are quirked here.
+		 * PR:            misc/18793
+		 * Submitted by:  Paul Haddad <paul@pth.com>
+		 */
+		{ T_DIRECT, SIP_MEDIA_FIXED, "HITACHI", "DK31*", "*" },
+		CAM_QUIRK_NOLUNS, /*mintags*/2, /*maxtags*/255
+	},
+	{
+		/*
 		 * This old revision of the TDC3600 is also SCSI-1, and
 		 * hangs upon serial number probing.
 		 */
@@ -468,6 +480,11 @@ static struct xpt_quirk_entry xpt_quirk_table[] =
 		/* Submitted by: Matthew Dodd <winter@jurai.net> */
 		{ T_PROCESSOR, SIP_MEDIA_FIXED, "CABLETRN", "EA41*", "*" },
 		CAM_QUIRK_NOLUNS, /*mintags*/0, /*maxtags*/0
+	},
+	{
+		/* TeraSolutions special settings for TRC-22 RAID */
+		{ T_DIRECT, SIP_MEDIA_FIXED, "TERASOLU", "TRC-22", "*" },
+		  /*quirks*/0, /*mintags*/55, /*maxtags*/255
 	},
 	{
 		/* Default tagged queuing parameters for all devices */
@@ -528,7 +545,7 @@ static u_int xpt_max_ccbs;	/*
 				 */
 static u_int xpt_ccb_count;	/* Current count of allocated ccbs */
 
-static struct cam_periph *xpt_periph;
+struct cam_periph *xpt_periph;
 
 static periph_init_t xpt_periph_init;
 
@@ -1465,7 +1482,7 @@ xpt_announce_periph(struct cam_periph *periph, char *announce_string)
 			       mb, speed % 1000);
 		else
 			printf("%s%d: %dKB/s transfers", periph->periph_name,
-			       periph->unit_number, (speed % 1000) * 1000);
+			       periph->unit_number, speed);
 		if ((cts.valid & CCB_TRANS_SYNC_OFFSET_VALID) != 0
 		 && cts.sync_offset != 0) {
 			printf(" (%d.%03dMHz, offset %d", freq / 1000,
@@ -3656,14 +3673,18 @@ xpt_run_dev_sendq(struct cam_eb *bus)
 		
 		splx(s);
 
-		if ((device->inq_flags & SID_CmdQue) != 0)
-			work_ccb->ccb_h.flags |= CAM_TAG_ACTION_VALID;
-		else
-			/*
-			 * Clear this in case of a retried CCB that failed
-			 * due to a rejected tag.
-			 */
-			work_ccb->ccb_h.flags &= ~CAM_TAG_ACTION_VALID;
+		/* In Target mode, the peripheral driver knows best... */
+		if (work_ccb->ccb_h.func_code == XPT_SCSI_IO) {
+			if ((device->inq_flags & SID_CmdQue) != 0
+			 && work_ccb->csio.tag_action != CAM_TAG_ACTION_NONE)
+				work_ccb->ccb_h.flags |= CAM_TAG_ACTION_VALID;
+			else
+				/*
+				 * Clear this in case of a retried CCB that
+				 * failed due to a rejected tag.
+				 */
+				work_ccb->ccb_h.flags &= ~CAM_TAG_ACTION_VALID;
+		}
 
 		/*
 		 * Device queues can be shared among multiple sim instances

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/boot/pc98/libpc98/Makefile,v 1.3 1999/11/03 08:23:57 nyan Exp $
+# $FreeBSD: src/sys/boot/pc98/libpc98/Makefile,v 1.3.2.1 2000/05/05 08:59:03 nyan Exp $
 #
 LIB=			pc98
 NOPIC=
@@ -8,7 +8,7 @@ INTERNALSTATICLIB=	true
 
 SRCS=	aout_freebsd.c biosdisk.c biosmem.c biospnp.c biospci.c \
 	bootinfo.c comconsole.c devicename.c elf_freebsd.c gatea20.c \
-	i386_copy.c i386_module.c time.c vidconsole.c
+	i386_copy.c i386_module.c time.c vidconsole.c pxe.c pxetramp.s
 .PATH:	${.CURDIR}/../../i386/libi386
 
 CFLAGS+=	-DPC98
@@ -21,6 +21,9 @@ CFLAGS+=	-DCOMPORT=${BOOT_COMCONSOLE_PORT}
 
 BOOT_COMCONSOLE_SPEED?= 9600
 CFLAGS+=	-DCOMSPEED=${BOOT_COMCONSOLE_SPEED}
+
+# the location of libstand
+CFLAGS+=	-I${.CURDIR}/../../../../lib/libstand/
 
 # Make the disk code more talkative
 #CFLAGS+= -DDISK_DEBUG

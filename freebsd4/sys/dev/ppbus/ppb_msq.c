@@ -23,14 +23,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ppbus/ppb_msq.c,v 1.9 2000/01/25 22:23:48 dfr Exp $
+ * $FreeBSD: src/sys/dev/ppbus/ppb_msq.c,v 1.9.2.1 2000/05/24 00:20:57 n_hibma Exp $
  *
  */
 #include <machine/stdarg.h>
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
 #include <sys/bus.h>
 
 #include <dev/ppbus/ppbconf.h>

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/pci/pcibus.c,v 1.20 2000/02/18 20:57:26 sos Exp $
+ * $FreeBSD: src/sys/alpha/pci/pcibus.c,v 1.20.2.5 2000/07/20 00:11:27 jhb Exp $
  *
  */
 
@@ -45,6 +45,11 @@
 #include <alpha/pci/pcibus.h>
 #include <alpha/isa/isavar.h>
 
+#include "isa.h"
+
+#define	ISA_IRQ_OFFSET	0xe0
+#define	ISA_IRQ_LEN	0x10
+
 char chipset_type[10];
 int chipset_bwx = 0;
 long chipset_ports = 0;
@@ -57,13 +62,13 @@ SYSCTL_STRING(_hw_chipset, OID_AUTO, type, CTLFLAG_RD, chipset_type, 0,
 	      "PCI chipset type");
 SYSCTL_INT(_hw_chipset, OID_AUTO, bwx, CTLFLAG_RD, &chipset_bwx, 0,
 	   "PCI chipset supports BWX access");
-SYSCTL_LONG(_hw_chipset, OID_AUTO, ports, CTLFLAG_RD, &chipset_ports,
+SYSCTL_LONG(_hw_chipset, OID_AUTO, ports, CTLFLAG_RD, &chipset_ports, 0,
 	    "PCI chipset port address");
-SYSCTL_LONG(_hw_chipset, OID_AUTO, memory, CTLFLAG_RD, &chipset_memory,
+SYSCTL_LONG(_hw_chipset, OID_AUTO, memory, CTLFLAG_RD, &chipset_memory, 0,
 	    "PCI chipset memory address");
-SYSCTL_LONG(_hw_chipset, OID_AUTO, dense, CTLFLAG_RD, &chipset_dense,
+SYSCTL_LONG(_hw_chipset, OID_AUTO, dense, CTLFLAG_RD, &chipset_dense, 0,
 	    "PCI chipset dense memory address");
-SYSCTL_LONG(_hw_chipset, OID_AUTO, hae_mask, CTLFLAG_RD, &chipset_hae_mask,
+SYSCTL_LONG(_hw_chipset, OID_AUTO, hae_mask, CTLFLAG_RD, &chipset_hae_mask, 0,
 	    "PCI chipset mask for HAE register");
 
 #ifdef notyet
@@ -140,6 +145,7 @@ alpha_platform_assign_pciintr(pcicfgregs *cfg)
 		platform.pci_intr_map((void *)cfg);
 }
 
+#if	NISA > 0
 struct resource *
 alpha_platform_alloc_ide_intr(int chan)
 {
@@ -166,17 +172,79 @@ alpha_platform_teardown_ide_intr(struct resource *res, void *cookie)
 {
 	return isa_teardown_intr(0, 0, res, cookie);
 }
+#else
+struct resource *
+alpha_platform_alloc_ide_intr(int chan)
+{
+	return (NULL);
+}
+int
+alpha_platform_release_ide_intr(int chan, struct resource *res)
+{
+	return (ENXIO);
+}
+
+int
+alpha_platform_setup_ide_intr(struct resource *res,
+    driver_intr_t *fn, void *arg, void **cookiep)
+{
+	return (ENXIO);
+}
+
+int
+alpha_platform_teardown_ide_intr(struct resource *res, void *cookie)
+{
+	return (ENXIO);
+}
+#endif
 
 static struct rman irq_rman, port_rman, mem_rman;
 
-void pci_init_resources()
+int
+alpha_platform_pci_setup_intr(device_t dev, device_t child,
+			      struct resource *irq,  int flags,
+			      driver_intr_t *intr, void *arg,
+			      void **cookiep)
+{
+#if	NISA > 0
+	/*
+	 * XXX - If we aren't the resource manager for this IRQ, assume that
+	 * it is actually handled by the ISA PIC.
+	 */
+	if(irq->r_rm != &irq_rman)
+		return isa_setup_intr(dev, child, irq, flags, intr, arg,
+				      cookiep);
+	else
+#endif
+		return bus_generic_setup_intr(dev, child, irq, flags, intr,
+					      arg, cookiep);
+}
+
+int
+alpha_platform_pci_teardown_intr(device_t dev, device_t child,
+				 struct resource *irq, void *cookie)
+{
+#if	NISA > 0
+	/*
+	 * XXX - If we aren't the resource manager for this IRQ, assume that
+	 * it is actually handled by the ISA PIC.
+	 */
+	if(irq->r_rm != &irq_rman)
+		return isa_teardown_intr(dev, child, irq, cookie);
+	else
+#endif
+		return bus_generic_teardown_intr(dev, child, irq, cookie);
+}
+
+void 
+pci_init_resources(void)
 {
 	irq_rman.rm_start = 0;
-	irq_rman.rm_end = 64;
+	irq_rman.rm_end = 65536;
 	irq_rman.rm_type = RMAN_ARRAY;
-	irq_rman.rm_descr = "PCI Interrupt request lines";
+	irq_rman.rm_descr = "PCI Mapped Interrupts";
 	if (rman_init(&irq_rman)
-	    || rman_manage_region(&irq_rman, 0, 63))
+	    || rman_manage_region(&irq_rman, 0, 65536))
 		panic("pci_init_resources irq_rman");
 
 	port_rman.rm_start = 0;
@@ -209,7 +277,16 @@ pci_alloc_resource(device_t bus, device_t child, int type, int *rid,
 
 	switch (type) {
 	case SYS_RES_IRQ:
-		rm = &irq_rman;
+#if NISA > 0
+		if((start >= ISA_IRQ_OFFSET) &&
+		   (end < ISA_IRQ_OFFSET + ISA_IRQ_LEN)) {
+		  	return isa_alloc_intrs(bus, child,
+					       start - ISA_IRQ_OFFSET,
+					       end - ISA_IRQ_OFFSET);
+		}
+		else
+#endif
+			rm = &irq_rman;
 		break;
 
 	case SYS_RES_IOPORT:
@@ -233,9 +310,9 @@ pci_alloc_resource(device_t bus, device_t child, int type, int *rid,
 		rman_set_bustag(rv, ALPHA_BUS_SPACE_MEM);
 		rman_set_bushandle(rv, rv->r_start);
 		if (flags & PCI_RF_DENSE)
-			rman_set_virtual(rv, pci_cvt_to_dense(rv->r_start));
+			rman_set_virtual(rv, (void *) pci_cvt_to_dense(rv->r_start));
 		else if (flags & PCI_RF_BWX)
-			rman_set_virtual(rv, pci_cvt_to_bwx(rv->r_start));
+			rman_set_virtual(rv, (void *) pci_cvt_to_bwx(rv->r_start));
 		else
 			rman_set_virtual(rv, (void *) rv->r_start); /* maybe NULL? */
 		break;

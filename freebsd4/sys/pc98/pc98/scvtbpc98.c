@@ -23,13 +23,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/scvtbpc98.c,v 1.5 2000/01/04 04:46:50 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/scvtbpc98.c,v 1.5.2.1 2000/03/31 03:13:50 nyan Exp $
  */
 
-#include "sc.h"
 #include "opt_syscons.h"
-
-#if NSC > 0
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -405,5 +402,3 @@ sc_vtb_ins(sc_vtb_t *vtb, int at, int count, int c, int attr)
 		      (void *)sc_vtb_attr_pointer(vtb, at), count);
 	}
 }
-
-#endif /* NSC */

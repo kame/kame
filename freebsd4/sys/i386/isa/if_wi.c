@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/if_wi.c,v 1.18 2000/02/02 17:59:12 wpaul Exp $
+ * $FreeBSD: src/sys/i386/isa/if_wi.c,v 1.18.2.4 2000/07/17 21:24:32 archie Exp $
  */
 
 /*
@@ -74,6 +74,8 @@
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/proc.h>
+#include <sys/ucred.h>
 #include <sys/socket.h>
 #include <sys/module.h>
 #include <sys/bus.h>
@@ -107,7 +109,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/i386/isa/if_wi.c,v 1.18 2000/02/02 17:59:12 wpaul Exp $";
+  "$FreeBSD: src/sys/i386/isa/if_wi.c,v 1.18.2.4 2000/07/17 21:24:32 archie Exp $";
 #endif
 
 #ifdef foo
@@ -214,7 +216,7 @@ static int wi_pccard_detach(dev)
 	}
 
 	wi_stop(sc);
-	if_detach(ifp);
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 	bus_teardown_intr(dev, sc->irq, sc->wi_intrhand);
 	wi_free(dev);
 	sc->wi_gone = 1;
@@ -324,12 +326,10 @@ static int wi_pccard_attach(device_t dev)
 	wi_stop(sc);
 
 	/*
-	 * Call MI attach routines.
+	 * Call MI attach routine.
 	 */
-	if_attach(ifp);
-	ether_ifattach(ifp);
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 	callout_handle_init(&sc->wi_stat_ch);
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
 
 	return(0);
 }
@@ -389,8 +389,13 @@ static void wi_rxeof(sc)
 
 		bcopy((char *)&rx_frame.wi_addr1,
 		    (char *)&eh->ether_dhost, ETHER_ADDR_LEN);
-		bcopy((char *)&rx_frame.wi_addr2,
-		    (char *)&eh->ether_shost, ETHER_ADDR_LEN);
+		if (sc->wi_ptype == WI_PORTTYPE_ADHOC) {
+			bcopy((char *)&rx_frame.wi_addr2,
+			    (char *)&eh->ether_shost, ETHER_ADDR_LEN);
+		} else {
+			bcopy((char *)&rx_frame.wi_addr3,
+			    (char *)&eh->ether_shost, ETHER_ADDR_LEN);
+		}
 		bcopy((char *)&rx_frame.wi_type,
 		    (char *)&eh->ether_type, sizeof(u_int16_t));
 
@@ -424,25 +429,12 @@ static void wi_rxeof(sc)
 
 	ifp->if_ipackets++;
 
-	/* Handle BPF listeners. */
-	if (ifp->if_bpf) {
-		bpf_mtap(ifp, m);
-		if (ifp->if_flags & IFF_PROMISC &&
-		    (bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-		    ETHER_ADDR_LEN) && (eh->ether_dhost[0] & 1) == 0)) {
-			m_freem(m);
-			return;
-		}
-	}
-
 	/* Receive packet. */
 	m_adj(m, sizeof(struct ether_header));
 #ifdef WICACHE
 	wi_cache_store(sc, eh, m, rx_frame.wi_q_info);
 #endif  
 	ether_input(ifp, eh, m);
-
-	return;
 }
 
 static void wi_txeof(sc, status)
@@ -969,14 +961,17 @@ static int wi_ioctl(ifp, command, data)
 	struct wi_softc		*sc;
 	struct wi_req		wreq;
 	struct ifreq		*ifr;
+	struct proc		*p = curproc;
 
 	s = splimp();
 
 	sc = ifp->if_softc;
 	ifr = (struct ifreq *)data;
 
-	if (sc->wi_gone)
-		return(ENODEV);
+	if (sc->wi_gone) {
+		error = ENODEV;
+		goto out;
+	}
 
 	switch(command) {
 	case SIOCSIFADDR:
@@ -1045,6 +1040,8 @@ static int wi_ioctl(ifp, command, data)
 		error = copyout(&wreq, ifr->ifr_data, sizeof(wreq));
 		break;
 	case SIOCSWAVELAN:
+		if ((error = suser(p)))
+			goto out;
 		error = copyin(ifr->ifr_data, &wreq, sizeof(wreq));
 		if (error)
 			break;
@@ -1064,7 +1061,7 @@ static int wi_ioctl(ifp, command, data)
 		error = EINVAL;
 		break;
 	}
-
+out:
 	splx(s);
 
 	return(error);

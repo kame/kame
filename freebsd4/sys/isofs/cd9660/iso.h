@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)iso.h	8.6 (Berkeley) 5/10/95
- * $FreeBSD: src/sys/isofs/cd9660/iso.h,v 1.19 1999/12/29 04:54:37 peter Exp $
+ * $FreeBSD: src/sys/isofs/cd9660/iso.h,v 1.19.2.1 2000/07/08 14:35:56 bp Exp $
  */
 
 #define ISODCL(from, to) (to - from + 1)
@@ -258,6 +258,7 @@ struct iso_mnt {
 int cd9660_vget_internal __P((struct mount *, ino_t, struct vnode **, int,
 			      struct iso_directory_record *));
 int cd9660_init __P((struct vfsconf *));
+int cd9660_uninit __P((struct vfsconf *));
 #define cd9660_sysctl ((int (*) __P((int *, u_int, void *, size_t *, void *, \
                                     size_t, struct proc *)))eopnotsupp)
 

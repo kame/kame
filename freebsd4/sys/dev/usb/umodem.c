@@ -1,12 +1,12 @@
 /*	$NetBSD: umodem.c,v 1.5 1999/01/08 11:58:25 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/umodem.c,v 1.17 1999/11/18 12:45:09 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/umodem.c,v 1.17.2.3 2000/07/02 11:43:59 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,8 +48,6 @@
 #elif defined(__FreeBSD__)
 #include <sys/module.h>
 #include <sys/bus.h>
-#include <sys/ioccom.h>
-#include <sys/conf.h>
 #endif
 #include <sys/tty.h>
 #include <sys/file.h>
@@ -123,7 +121,7 @@ USB_ATTACH(umodem)
 }
 
 #if defined(__FreeBSD__)
-static int
+Static int
 umodem_detach(device_t self)
 {
 	DPRINTF(("%s: disconnected\n", USBDEVNAME(self)));

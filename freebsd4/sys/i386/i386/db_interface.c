@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/i386/i386/db_interface.c,v 1.48 2000/01/11 14:53:56 yokota Exp $
+ * $FreeBSD: src/sys/i386/i386/db_interface.c,v 1.48.2.1 2000/07/07 00:38:46 obrien Exp $
  */
 
 /*
@@ -59,7 +59,7 @@ static jmp_buf	db_global_jmpbuf;
 static int	db_global_jmpbuf_valid;
 
 #ifdef __GNUC__
-#define	rss() ({u_short ss; __asm __volatile("movl %%ss,%0" : "=r" (ss)); ss;})
+#define	rss() ({u_short ss; __asm __volatile("mov %%ss,%0" : "=r" (ss)); ss;})
 #endif
 
 /*

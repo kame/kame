@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/bioscall.s,v 1.6 1999/08/28 00:43:41 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/bioscall.s,v 1.6.2.1 2000/07/07 00:38:46 obrien Exp $
  */
 
 /*
@@ -65,7 +65,7 @@ ENTRY(bios32)
 	movl	16(%ebp),%esi
 	movl	20(%ebp),%edi
 	pushl	%ebp
-	lcall	_bioscall_vector
+	lcall	*_bioscall_vector
 	popl	%ebp
 	movl	%eax,0(%ebp)
 	movl	%ebx,4(%ebp)
@@ -130,7 +130,7 @@ ENTRY(bios16_call)
 	.globl	CNAME(bios16_jmp)
 CNAME(bios16_jmp):
 	data16
-	lcall	_bioscall_vector	/* 16-bit call */
+	lcall	*_bioscall_vector	/* 16-bit call */
 
 	jc	1f
 	pushl	$0			/* success */

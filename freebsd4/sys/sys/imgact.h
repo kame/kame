@@ -30,11 +30,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/imgact.h,v 1.22 1999/12/29 04:24:41 peter Exp $
+ * $FreeBSD: src/sys/sys/imgact.h,v 1.22.2.1 2000/05/09 17:41:24 dillon Exp $
  */
 
 #ifndef _SYS_IMGACT_H_
 #define	_SYS_IMGACT_H_
+
+#define MAXSHELLCMDLEN	64
 
 struct image_params {
 	struct proc *proc;	/* our process struct */
@@ -51,7 +53,7 @@ struct image_params {
 	unsigned long entry_addr; /* entry address of target executable */
 	char vmspace_destroyed;	/* flag - we've blown away original vm space */
 	char interpreted;	/* flag - this executable is interpreted */
-	char interpreter_name[64]; /* name of the interpreter */
+	char interpreter_name[MAXSHELLCMDLEN]; /* name of the interpreter */
 	void *auxargs;		/* ELF Auxinfo structure pointer */
 	struct vm_page *firstpage;	/* first page that we mapped */
 	char *fname;            /* pointer to filename of executable (user space) */
@@ -62,6 +64,7 @@ struct image_params {
 int	exec_check_permissions __P((struct image_params *));
 int	exec_extract_strings __P((struct image_params *));
 int	exec_new_vmspace __P((struct image_params *));
+int	exec_shell_imgact __P((struct image_params *));
 #endif
 
 #endif /* !_SYS_IMGACT_H_ */

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/modules/syscons/fire/fire_saver.c,v 1.6 1999/08/28 00:47:48 peter Exp $
+ * $FreeBSD: src/sys/modules/syscons/fire/fire_saver.c,v 1.6.2.1 2000/05/10 14:01:23 obrien Exp $
  */
 
 /*
@@ -40,8 +40,7 @@
 #include <sys/syslog.h>
 #include <sys/consio.h>
 #include <sys/fbio.h>
-
-#include <machine/random.h>
+#include <sys/random.h>
 
 #include <dev/fb/fbreg.h>
 #include <dev/fb/splashreg.h>

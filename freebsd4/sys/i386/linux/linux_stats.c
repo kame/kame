@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux_stats.c,v 1.20 2000/01/08 21:09:41 marcel Exp $
+ * $FreeBSD: src/sys/i386/linux/linux_stats.c,v 1.20.2.1 2000/07/07 01:16:52 obrien Exp $
  */
 
 #include <sys/param.h>
@@ -43,8 +43,6 @@
 #include <i386/linux/linux.h>
 #include <i386/linux/linux_proto.h>
 #include <i386/linux/linux_util.h>
-
-#include <vm/vm_zone.h>
 
 struct linux_newstat {
 	u_short	stat_dev;

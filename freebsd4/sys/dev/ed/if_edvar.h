@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_edvar.h,v 1.4 1999/12/10 07:22:53 imp Exp $
+ * $FreeBSD: src/sys/dev/ed/if_edvar.h,v 1.4.2.1 2000/07/01 05:51:38 ps Exp $
  */
 
 /*
@@ -100,6 +100,7 @@ int	ed_probe_3Com		__P((device_t));
 int	ed_probe_Novell		__P((device_t));
 int	ed_probe_Novell_generic	__P((device_t, int, int));
 int	ed_probe_HP_pclanp	__P((device_t));
+int	ed_get_Linksys		__P((struct ed_softc *));
 
 int	ed_attach		__P((struct ed_softc *, int, int));
 void	ed_stop			__P((struct ed_softc *));

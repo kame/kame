@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_tl.c,v 1.51 2000/01/15 20:14:49 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_tl.c,v 1.51.2.2 2000/07/17 21:24:39 archie Exp $
  */
 
 /*
@@ -224,7 +224,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_tl.c,v 1.51 2000/01/15 20:14:49 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_tl.c,v 1.51.2.2 2000/07/17 21:24:39 archie Exp $";
 #endif
 
 /*
@@ -1333,12 +1333,9 @@ static int tl_attach(dev)
 	}
 
 	/*
-	 * Call MI attach routines.
+	 * Call MI attach routine.
 	 */
-	if_attach(ifp);
-	ether_ifattach(ifp);
-
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
 fail:
 	splx(s);
@@ -1358,7 +1355,7 @@ static int tl_detach(dev)
 	ifp = &sc->arpcom.ac_if;
 
 	tl_stop(sc);
-	if_detach(ifp);
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 
 	bus_generic_detach(dev);
 	device_delete_child(dev, sc->tl_miibus);
@@ -1545,26 +1542,6 @@ static int tl_intvec_rxeof(xsc, type)
 		 					ETHER_ADDR_LEN)) {
 				m_freem(m);
 				continue;
-		}
-
-		/*
-	 	 * Handle BPF listeners. Let the BPF user see the packet, but
-	 	 * don't pass it up to the ether_input() layer unless it's
-	 	 * a broadcast packet, multicast packet, matches our ethernet
-	 	 * address or the interface is in promiscuous mode. If we don't
-	 	 * want the packet, just forget it. We leave the mbuf in place
-	 	 * since it can be used again later.
-	 	 */
-		if (ifp->if_bpf) {
-			m->m_pkthdr.len = m->m_len = total_len;
-			bpf_mtap(ifp, m);
-			if (ifp->if_flags & IFF_PROMISC &&
-				(bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-		 				ETHER_ADDR_LEN) &&
-					(eh->ether_dhost[0] & 1) == 0)) {
-				m_freem(m);
-				continue;
-			}
 		}
 
 		/* Remove header from mbuf and pass it on. */

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ether.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/if_ether.c,v 1.64 2000/03/11 00:24:29 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/if_ether.c,v 1.64.2.3 2000/04/11 07:08:35 wes Exp $
  */
 
 /*
@@ -430,9 +430,9 @@ arpresolve(ac, rt, m, dst, desten, rt0)
 static void
 arpintr()
 {
-	register struct mbuf *m, *m0;
+	register struct mbuf *m;
 	register struct arphdr *ar;
-	int s, ml;
+	int s;
 
 	while (arpintrq.ifq_head) {
 		s = splimp();
@@ -442,8 +442,8 @@ arpintr()
 			panic("arpintr");
 	
                 if (m->m_len < sizeof(struct arphdr) &&
-                    (m = m_pullup(m, sizeof(struct arphdr)) == NULL)) {
-			log(LOG_ERR, "arp: runt packet -- m_pullup failed.");
+                    ((m = m_pullup(m, sizeof(struct arphdr))) == NULL)) {
+			log(LOG_ERR, "arp: runt packet -- m_pullup failed\n");
 			continue;
 		}
 		ar = mtod(m, struct arphdr *);
@@ -451,22 +451,15 @@ arpintr()
 		if (ntohs(ar->ar_hrd) != ARPHRD_ETHER
 		    && ntohs(ar->ar_hrd) != ARPHRD_IEEE802) {
 			log(LOG_ERR,
-			    "arp: unknown hardware address format (%2D)",
+			    "arp: unknown hardware address format (0x%2D)\n",
 			    (unsigned char *)&ar->ar_hrd, "");
 			m_freem(m);
 			continue;
 		}
 
-		m0 = m;
-		ml = 0;
-		while (m0 != NULL) {	
-			ml += m0->m_len;	/* wanna implement m_size?? */
-			m0 = m0->m_next;	
-		}
-
-		if (ml < sizeof(struct arphdr) + 2 * ar->ar_hln
+		if (m->m_pkthdr.len < sizeof(struct arphdr) + 2 * ar->ar_hln
 		    + 2 * ar->ar_pln) {
-			log(LOG_ERR, "arp: runt packet.");
+			log(LOG_ERR, "arp: runt packet\n");
 			m_freem(m);
 			continue;
 		}

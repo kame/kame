@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/advansys/advlib.c,v 1.15 2000/01/14 03:33:37 gibbs Exp $
+ * $FreeBSD: src/sys/dev/advansys/advlib.c,v 1.15.2.1 2000/04/14 13:32:49 nyan Exp $
  */
 /*
  * Ported from:
@@ -50,6 +50,9 @@
 #include <machine/bus_pio.h>
 #include <machine/bus.h>
 #include <machine/clock.h>
+#include <machine/resource.h>
+#include <sys/bus.h> 
+#include <sys/rman.h> 
 
 #include <cam/cam.h>
 #include <cam/cam_ccb.h>

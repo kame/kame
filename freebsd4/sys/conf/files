@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/files,v 1.340 2000/03/08 16:17:06 jlemon Exp $
+# $FreeBSD: src/sys/conf/files,v 1.340.2.17 2000/07/20 05:17:56 ps Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -60,7 +60,6 @@ cam/scsi/scsi_sa.c	optional sa
 cam/scsi/scsi_cd.c	optional cd
 cam/scsi/scsi_ch.c	optional ch
 cam/scsi/scsi_pass.c	optional pass
-cam/scsi/scsi_scan.c	optional scan
 cam/scsi/scsi_ses.c	optional ses
 cam/scsi/scsi_target.c	optional targ
 cam/scsi/scsi_targ_bh.c	optional targbh
@@ -96,7 +95,6 @@ ddb/db_variables.c	optional ddb
 ddb/db_watch.c		optional ddb
 ddb/db_write_cmd.c	optional ddb
 dev/advansys/adv_eisa.c	optional adv eisa
-dev/advansys/adv_isa.c	optional adv isa
 dev/advansys/adv_pci.c	optional adv pci
 dev/advansys/advansys.c	optional adv
 dev/advansys/advlib.c	optional adv
@@ -117,7 +115,6 @@ dev/aha/aha_isa.c	optional aha isa
 dev/aha/aha_mca.c	optional aha mca
 dev/ahb/ahb.c		optional ahb eisa
 dev/aic/aic.c		optional aic
-dev/aic/aic_isa.c	optional aic isa
 dev/aic/aic_pccard.c	optional aic card
 dev/aic7xxx/ahc_eisa.c	optional ahc eisa	\
 	dependency	"aic7xxx_reg.h $S/dev/aic7xxx/ahc_eisa.c"
@@ -175,6 +172,7 @@ dev/ida/ida_pci.c	optional ida pci
 dev/isp/isp_freebsd.c	optional isp
 dev/isp/isp.c		optional isp
 dev/isp/isp_target.c	optional isp
+dev/ispfw/ispfw.c	optional ispfw
 dev/mca/mca_bus.c	optional mca
 dev/md/md.c		optional md
 dev/mii/mii.c		optional miibus
@@ -182,6 +180,7 @@ dev/mii/mii_physubr.c	optional miibus
 dev/mii/ukphy.c		optional miibus
 dev/mii/ukphy_subr.c	optional miibus
 dev/mii/amphy.c		optional miibus
+dev/mii/brgphy.c	optional miibus
 dev/mii/dcphy.c		optional miibus
 dev/mii/exphy.c		optional miibus
 dev/mii/mlphy.c		optional miibus
@@ -189,6 +188,7 @@ dev/mii/nsphy.c		optional miibus
 dev/mii/pnphy.c		optional miibus
 dev/mii/tlphy.c		optional miibus
 dev/mii/rlphy.c		optional miibus
+dev/mii/xmphy.c		optional miibus
 miibus_if.o		optional miibus					\
 	dependency	"miibus_if.c miibus_if.h"			\
 	compile-with	"${NORMAL_C}"					\
@@ -223,6 +223,48 @@ power_if.h		optional pccard					\
 	compile-with	"perl5 $S/kern/makedevops.pl -h $S/dev/pccard/power_if.m" \
 	no-obj no-implicit-rule before-depend				\
 	clean		"power_if.h"
+power_if.o		optional card					\
+	dependency	"power_if.c power_if.h"				\
+	compile-with	"${NORMAL_C}"					\
+	no-implicit-rule local
+power_if.c		optional card					\
+	dependency	"$S/kern/makedevops.pl $S/dev/pccard/power_if.m" \
+	compile-with	"perl5 $S/kern/makedevops.pl -c $S/dev/pccard/power_if.m" \
+	no-obj no-implicit-rule before-depend local			\
+	clean		"power_if.c"
+power_if.h		optional card					\
+	dependency	"$S/kern/makedevops.pl $S/dev/pccard/power_if.m" \
+	compile-with	"perl5 $S/kern/makedevops.pl -h $S/dev/pccard/power_if.m" \
+	no-obj no-implicit-rule before-depend				\
+	clean		"power_if.h"
+card_if.o		optional pccard					\
+	dependency	"card_if.c card_if.h"				\
+	compile-with	"${NORMAL_C}"					\
+	no-implicit-rule local
+card_if.c		optional pccard					\
+	dependency	"$S/kern/makedevops.pl $S/dev/pccard/card_if.m" \
+	compile-with	"perl5 $S/kern/makedevops.pl -c $S/dev/pccard/card_if.m" \
+	no-obj no-implicit-rule before-depend local			\
+	clean		"card_if.c"
+card_if.h		optional pccard					\
+	dependency	"$S/kern/makedevops.pl $S/dev/pccard/card_if.m" \
+	compile-with	"perl5 $S/kern/makedevops.pl -h $S/dev/pccard/card_if.m" \
+	no-obj no-implicit-rule before-depend				\
+	clean		"card_if.h"
+card_if.o		optional card					\
+	dependency	"card_if.c card_if.h"				\
+	compile-with	"${NORMAL_C}"					\
+	no-implicit-rule local
+card_if.c		optional card					\
+	dependency	"$S/kern/makedevops.pl $S/dev/pccard/card_if.m" \
+	compile-with	"perl5 $S/kern/makedevops.pl -c $S/dev/pccard/card_if.m" \
+	no-obj no-implicit-rule before-depend local			\
+	clean		"card_if.c"
+card_if.h		optional card					\
+	dependency	"$S/kern/makedevops.pl $S/dev/pccard/card_if.m" \
+	compile-with	"perl5 $S/kern/makedevops.pl -h $S/dev/pccard/card_if.m" \
+	no-obj no-implicit-rule before-depend				\
+	clean		"card_if.h"
 dev/pcic/i82365.c	optional pcic pccard
 dev/pcic/i82365_isa.c	optional pcic pccard
 dev/pdq/if_fea.c	optional fea eisa
@@ -235,12 +277,12 @@ ppbus_if.o		optional ppbus					\
 	dependency	"ppbus_if.c ppbus_if.h"				\
 	compile-with	"${NORMAL_C}"					\
 	no-implicit-rule local
-ppbus_if.c		optional ppbus					\ 
+ppbus_if.c		optional ppbus					\
 	dependency	"$S/kern/makedevops.pl $S/dev/ppbus/ppbus_if.m" \
 	compile-with	"perl5 $S/kern/makedevops.pl -c $S/dev/ppbus/ppbus_if.m" \
 	no-obj no-implicit-rule before-depend local			\
 	clean		"ppbus_if.c"
-ppbus_if.h		optional ppbus					\ 
+ppbus_if.h		optional ppbus					\
 	dependency	"$S/kern/makedevops.pl $S/dev/ppbus/ppbus_if.m" \
 	compile-with	"perl5 $S/kern/makedevops.pl -h $S/dev/ppbus/ppbus_if.m" \
 	no-obj no-implicit-rule before-depend				\
@@ -319,6 +361,8 @@ dev/iicbus/iiconf.c	optional iicbus
 dev/iicbus/iicbus.c	optional iicbus
 dev/iicbus/if_ic.c	optional ic
 dev/iicbus/iic.c	optional iic
+dev/twe/twe.c			optional twe
+dev/twe/twe_disk.c		optional twe
 dev/vinum/vinum.c		optional vinum
 dev/vinum/vinumconfig.c		optional vinum
 dev/vinum/vinumdaemon.c		optional vinum
@@ -409,6 +453,7 @@ kern/kern_clock.c	standard
 kern/kern_conf.c	standard
 kern/kern_descrip.c	standard
 kern/kern_environment.c	standard
+kern/kern_event.c	standard
 kern/kern_exec.c	standard
 kern/kern_exit.c	standard
 kern/kern_fork.c	standard
@@ -423,6 +468,7 @@ kern/kern_ntptime.c	standard
 kern/kern_physio.c	standard
 kern/kern_proc.c	standard
 kern/kern_prot.c	standard
+kern/kern_random.c	standard
 kern/kern_resource.c	standard
 kern/kern_shutdown.c	standard
 kern/kern_sig.c		standard
@@ -447,6 +493,7 @@ kern/subr_prf.c		standard
 kern/subr_prof.c	standard
 kern/subr_blist.c	standard
 kern/subr_scanf.c	standard
+kern/subr_taskqueue.c	standard
 kern/subr_xxx.c		standard
 kern/sys_generic.c	standard
 kern/sys_pipe.c		standard
@@ -467,6 +514,7 @@ kern/tty_subr.c		standard
 kern/tty_tty.c		standard
 kern/uipc_domain.c	standard
 kern/uipc_mbuf.c	standard
+kern/uipc_mbuf2.c	standard
 kern/uipc_proto.c	standard
 kern/uipc_socket.c	standard
 kern/uipc_socket2.c	standard
@@ -549,6 +597,7 @@ net/if_mib.c		standard
 net/if_ppp.c		optional ppp
 net/if_sl.c		optional sl
 net/if_spppsubr.c	optional sppp
+net/if_stf.c		optional stf
 net/if_tun.c		optional tun
 net/if_vlan.c		optional vlan
 net/net_osdep.c		standard
@@ -563,6 +612,7 @@ net/rtsock.c		standard
 net/slcompress.c	optional ppp
 net/slcompress.c	optional sl
 net/zlib.c		optional ppp_deflate
+net/zlib.c		optional ipsec
 netatalk/aarp.c		optional netatalk
 netatalk/at_control.c	optional netatalk
 netatalk/at_proto.c	optional netatalk
@@ -657,11 +707,21 @@ netgraph/ng_bpf.c	optional netgraph_bpf
 net/bpf_filter.c	optional netgraph_bpf
 netgraph/ng_cisco.c	optional netgraph_cisco
 netgraph/ng_echo.c	optional netgraph_echo
+netgraph/ng_ether.c	optional netgraph_ether
 netgraph/ng_frame_relay.c	optional netgraph_frame_relay
 netgraph/ng_hole.c	optional netgraph_hole
 netgraph/ng_iface.c	optional netgraph_iface
 netgraph/ng_ksocket.c	optional netgraph_ksocket
 netgraph/ng_lmi.c	optional netgraph_lmi
+netgraph/ng_mppc.c	optional netgraph_mppc_compression
+# The next two files (plus the header file net/mppc.h) are proprietary and
+# must be obtained elsewhere in order to enable NETGRAPH_MPPC_COMPRESSION
+net/mppcc.c		optional netgraph_mppc_compression
+net/mppcd.c		optional netgraph_mppc_compression
+netgraph/ng_mppc.c	optional netgraph_mppc_encryption
+crypto/rc4/rc4.c	optional netgraph_mppc_encryption
+crypto/sha1.c		optional netgraph_mppc_encryption
+netgraph/ng_parse.c	optional netgraph
 netgraph/ng_ppp.c	optional netgraph_ppp
 netgraph/ng_pppoe.c	optional netgraph_pppoe
 netgraph/ng_pptpgre.c	optional netgraph_pptpgre
@@ -683,6 +743,8 @@ netinet/in_proto.c	optional inet
 netinet/in_rmx.c	optional inet
 netinet/ip_ecn.c	optional inet
 netinet/ip_ecn.c	optional inet6
+netinet/ip_encap.c	optional inet
+netinet/ip_encap.c	optional inet6
 netinet/ip_divert.c	optional ipdivert
 netinet/ip_dummynet.c	optional dummynet
 netinet/ip_flow.c	optional inet
@@ -727,6 +789,10 @@ netinet6/in6_ifattach.c	optional inet6
 netinet6/ip6_input.c	optional inet6
 netinet6/ip6_mroute.c	optional inet6
 netinet6/ip6_output.c	optional inet6
+netinet6/in6_src.c	optional inet6
+netinet6/ipcomp_core.c	optional ipsec
+netinet6/ipcomp_input.c	optional ipsec
+netinet6/ipcomp_output.c	optional ipsec
 netinet6/in6_pcb.c	optional inet6
 netinet6/in6_prefix.c	optional inet6
 netinet6/in6_proto.c	optional inet6
@@ -737,6 +803,8 @@ netinet6/nd6_nbr.c	optional inet6
 netinet6/nd6_rtr.c	optional inet6
 netinet6/raw_ip6.c	optional inet6
 netinet6/route6.c	optional inet6
+netinet6/scope6.c	optional inet6
+netinet6/udp6_output.c	optional inet6
 netinet6/udp6_usrreq.c	optional inet6
 netipx/ipx.c		optional ipx
 netipx/ipx_cksum.c	optional ipx
@@ -750,6 +818,7 @@ netipx/ipx_usrreq.c	optional ipx
 netipx/spx_debug.c	optional ipx
 netipx/spx_usrreq.c	optional ipx
 netkey/key.c		optional ipsec
+netkey/keydb.c	optional ipsec
 netkey/key_debug.c	optional ipsec
 netkey/keysock.c	optional ipsec
 netnatm/natm.c		optional natm
@@ -796,6 +865,27 @@ pccard/pccard.c		optional card
 pccard/pccard_beep.c	optional card
 pccard/pccard_nbk.c	optional card
 pccard/pcic.c		optional pcic card
+pci/agp.c		optional agp
+pci/agp_intel.c		optional agp
+pci/agp_via.c		optional agp
+pci/agp_sis.c		optional agp
+pci/agp_ali.c		optional agp
+pci/agp_amd.c		optional agp
+pci/agp_i810.c		optional agp
+agp_if.o		optional agp					\
+	dependency	"agp_if.c agp_if.h"				\
+	compile-with	"${NORMAL_C}"					\
+	no-implicit-rule local
+agp_if.c		optional agp					\
+	dependency	"$S/kern/makedevops.pl $S/pci/agp_if.m"		\
+	compile-with	"perl5 $S/kern/makedevops.pl -c $S/pci/agp_if.m" \
+	no-obj no-implicit-rule before-depend local			\
+	clean		"agp_if.c"
+agp_if.h		optional agp					\
+	dependency	"$S/kern/makedevops.pl $S/pci/agp_if.m"		\
+	compile-with	"perl5 $S/kern/makedevops.pl -h $S/pci/agp_if.m" \
+	no-obj no-implicit-rule before-depend				\
+	clean		"agp_if.h"
 pci/amd.c		optional amd
 pci/pcic_p.c		optional pcic pci
 dev/bktr/bktr_core.c	optional bktr pci
@@ -959,26 +1049,29 @@ isa/pnp.c		optional isa
 isa/pnpparse.c		optional isa
 dev/sound/isa/ad1816.c	optional pcm isa
 dev/sound/isa/es1888.c	optional pcm isa
+dev/sound/isa/ess.c	optional pcm isa
 dev/sound/isa/gusc.c	optional gusc isa
 dev/sound/isa/gusc.c	optional pcm isa
 dev/sound/isa/mss.c	optional pcm isa
 dev/sound/isa/sb.c	optional pcm isa
 dev/sound/isa/sbc.c	optional pcm isa
 dev/sound/isa/sbc.c	optional sbc isa
-dev/sound/pcm/sound.c	optional pcm
-dev/sound/pcm/ac97.c	optional pcm
-dev/sound/pcm/dsp.c	optional pcm
-dev/sound/pcm/channel.c	optional pcm
-dev/sound/pcm/feeder.c	optional pcm
-dev/sound/pcm/fake.c	optional pcm
-dev/sound/pcm/mixer.c	optional pcm
+#dev/sound/pci/aureal.c	optional pcm pci
 dev/sound/pci/csa.c	optional csa pci
 dev/sound/pci/csa.c	optional pcm pci
 dev/sound/pci/csapcm.c	optional pcm pci
+dev/sound/pci/ds1.c	optional pcm pci
+dev/sound/pci/emu10k1.c	optional pcm pci
 dev/sound/pci/es137x.c	optional pcm pci
 dev/sound/pci/neomagic.c optional pcm pci
 dev/sound/pci/t4dwave.c	optional pcm pci
-#dev/sound/pci/aureal.c	optional pcm pci
+dev/sound/pcm/ac97.c	optional pcm
+dev/sound/pcm/channel.c	optional pcm
+dev/sound/pcm/dsp.c	optional pcm
+dev/sound/pcm/fake.c	optional pcm
+dev/sound/pcm/feeder.c	optional pcm
+dev/sound/pcm/mixer.c	optional pcm
+dev/sound/pcm/sound.c	optional pcm
 #
 # These files in libkern/ are those needed by all architectures.  Some
 # of the files in libkern/ are only needed on some architectures, e.g.,

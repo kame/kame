@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)filedesc.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/filedesc.h,v 1.19 2000/01/20 07:12:51 imp Exp $
+ * $FreeBSD: src/sys/sys/filedesc.h,v 1.19.2.1 2000/05/05 03:50:02 jlemon Exp $
  */
 
 #ifndef _SYS_FILEDESC_H_
@@ -56,6 +56,8 @@
 #define NDFILE		20
 #define NDEXTENT	50		/* 250 bytes in 256-byte alloc. */
 
+struct klist;
+
 struct filedesc {
 	struct	file **fd_ofiles;	/* file structures for open files */
 	char	*fd_ofileflags;		/* per-process open file flags */
@@ -67,6 +69,11 @@ struct filedesc {
 	u_short	fd_freefile;		/* approx. next free file */
 	u_short	fd_cmask;		/* mask for file creation */
 	u_short	fd_refcnt;		/* reference count */
+
+	int	fd_knlistsize;		/* size of knlist */
+	struct	klist *fd_knlist;	/* list of attached knotes */
+	u_long	fd_knhashmask;		/* size of knhash */
+	struct	klist *fd_knhash;	/* hash table for attached knotes */
 };
 
 /*

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/isa/ad1816.c,v 1.7 1999/12/29 03:46:48 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/isa/ad1816.c,v 1.7.2.2 2000/07/19 21:18:14 cg Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -403,7 +403,9 @@ ad1816chan_trigger(void *data, int go)
     	struct ad1816_info *ad1816 = ch->parent;
     	int wr, reg;
 
-	if (go == PCMTRIG_EMLDMAWR) return 0;
+	if (go == PCMTRIG_EMLDMAWR || go == PCMTRIG_EMLDMARD)
+		return 0;
+
 	buf_isadma(ch->buffer, go);
     	wr = (ch->dir == PCMDIR_PLAY);
     	reg = wr? AD1816_PLAY : AD1816_CAPT;
@@ -413,6 +415,7 @@ ad1816chan_trigger(void *data, int go)
 		if (!(io_rd(ad1816, reg) & AD1816_ENABLE)) {
 	    		int cnt = ((ch->buffer->dl) >> 2) - 1;
 	    		ad1816_write(ad1816, wr? 8 : 10, cnt); /* count */
+	    		ad1816_write(ad1816, wr? 9 : 11, 0); /* reset cur cnt */
 	    		ad1816_write(ad1816, 1, ad1816_read(ad1816, 1) |
 				     (wr? 0x8000 : 0x4000)); /* enable int */
 	    		/* enable playback */
@@ -616,4 +619,8 @@ static driver_t ad1816_driver = {
 	sizeof(snddev_info),
 };
 
-DRIVER_MODULE(ad1816, isa, ad1816_driver, pcm_devclass, 0, 0);
+DRIVER_MODULE(snd_ad1816, isa, ad1816_driver, pcm_devclass, 0, 0);
+MODULE_DEPEND(snd_ad1816, snd_pcm, PCM_MINVER, PCM_PREFVER, PCM_MAXVER);
+MODULE_VERSION(snd_ad1816, 1);
+
+

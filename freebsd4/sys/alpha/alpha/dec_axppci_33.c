@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/dec_axppci_33.c,v 1.6 1999/12/08 17:43:29 ken Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/dec_axppci_33.c,v 1.6.2.2 2000/07/20 06:12:12 obrien Exp $ */
 /* $NetBSD: dec_axppci_33.c,v 1.38 1998/07/07 08:49:12 ross Exp $ */
 
 /*
@@ -6,17 +6,17 @@
  * All rights reserved.
  *
  * Author: Chris G. Demetriou
- * 
+ *
  * Permission to use, copy, modify and distribute this software and
  * its documentation is hereby granted, provided that both the copyright
  * notice and this permission notice appear in all copies of the
  * software, derivative works or modified versions, and any portions
  * thereof, and that both notices appear in supporting documentation.
- * 
- * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS" 
- * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND 
+ *
+ * CARNEGIE MELLON ALLOWS FREE USE OF THIS SOFTWARE IN ITS "AS IS"
+ * CONDITION.  CARNEGIE MELLON DISCLAIMS ANY LIABILITY OF ANY KIND
  * FOR ANY DAMAGES WHATSOEVER RESULTING FROM THE USE OF THIS SOFTWARE.
- * 
+ *
  * Carnegie Mellon requests users of this software to return to
  *
  *  Software Distribution Coordinator  or  Software.Distribution@CS.CMU.EDU
@@ -34,6 +34,7 @@
 #include "opt_ddb.h"
 
 #include <sys/param.h>
+#include <sys/reboot.h>
 #include <sys/systm.h>
 #include <sys/termios.h>
 
@@ -46,8 +47,8 @@
 
 #include "sio.h"
 #include "sc.h"
-#ifndef CONSPEED
-#define CONSPEED TTYDEF_SPEED
+#ifndef	CONSPEED
+#define	CONSPEED TTYDEF_SPEED
 #endif
 static int comcnrate = CONSPEED;
 
@@ -64,15 +65,15 @@ const struct alpha_variation_table dec_axppci_33_variations[] = {
 	{ 0, NULL },
 };
 
-#define	NSIO_PORT  0x26e	/* Hardware enabled option: 0x398 */
-#define	NSIO_BASE  0
-#define	NSIO_INDEX NSIO_BASE
-#define	NSIO_DATA  1
-#define	NSIO_SIZE  2
-#define	NSIO_CFG0  0
-#define	NSIO_CFG1  1
-#define	NSIO_CFG2  2
-#define	NSIO_IDE_ENABLE 0x40
+#define	NSIO_PORT	0x26e	/* Hardware enabled option: 0x398 */
+#define	NSIO_BASE	0
+#define	NSIO_INDEX	NSIO_BASE
+#define	NSIO_DATA	1
+#define	NSIO_SIZE	2
+#define	NSIO_CFG0	0
+#define	NSIO_CFG1	1
+#define	NSIO_CFG2	2
+#define	NSIO_IDE_ENABLE	0x40
 
 void
 dec_axppci_33_init()
@@ -108,7 +109,8 @@ dec_axppci_33_init()
 	outb(NSIO_PORT + NSIO_DATA, cfg0val);
 }
 
-extern int comconsole; /* XXX for forcing comconsole when srm serial console is used */
+/* XXX for forcing comconsole when srm serial console is used */
+extern int comconsole;
 
 static void
 dec_axppci_33_cons_init()
@@ -123,7 +125,7 @@ dec_axppci_33_cons_init()
 	ctb = (struct ctb *)(((caddr_t)hwrpb) + hwrpb->rpb_ctb_off);
 
 	switch (ctb->ctb_term_type) {
-	case 2: 
+	case 2:
 		/* serial console ... */
 		/* XXX */
 		{
@@ -139,6 +141,8 @@ dec_axppci_33_cons_init()
 			comconsole = 0;
 			if (siocnattach(0x3f8, comcnrate))
 				panic("can't init serial console");
+
+			boothowto |= RB_SERIAL;
 			break;
 		}
 
@@ -160,23 +164,25 @@ dec_axppci_33_cons_init()
 	}
 }
 
-#define        SIO_PCIREG_PIRQ_RTCTRL        0x60    /* PIRQ0 Route Control */
+#define	SIO_PCIREG_PIRQ_RTCTRL	0x60	/* PIRQ0 Route Control */
 
 void
 dec_axppci_33_intr_map(void *arg)
 {
-	pcicfgregs *cfg = (pcicfgregs *)arg;
+	pcicfgregs *cfg;
 	int pirq;
 	u_int32_t pirqreg;
 	u_int8_t pirqline;
+
+	cfg = (pcicfgregs *)arg;
 
 #ifndef DIAGNOSTIC
 	pirq = 0;				/* XXX gcc -Wuninitialized */
 #endif
 
-        /*
-         * Slot->interrupt translation.  Taken from NetBSD 
-         */
+	/*
+	 * Slot->interrupt translation.  Taken from NetBSD.
+	 */
 
 	if (cfg->intpin == 0) {
 		/* No IRQ used. */
@@ -184,7 +190,7 @@ dec_axppci_33_intr_map(void *arg)
 	}
 	if (cfg->intpin > 4) {
 		printf("dec_axppci_33_intr_map: bad interrupt pin %d\n",
-		       cfg->intpin);
+		    cfg->intpin);
 		return;
 	}
 
@@ -254,9 +260,9 @@ dec_axppci_33_intr_map(void *arg)
 		break;
 
 	default:
-                printf("dec_axppci_33_intr_map: weird device number %d\n",
+		printf("dec_axppci_33_intr_map: weird device number %d\n",
 		    cfg->slot);
-                return;
+		return;
 	}
 
 	pirqreg = chipset.cfgreadl(0, 0, 7, 0, SIO_PCIREG_PIRQ_RTCTRL);

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/common/boot.c,v 1.15 1999/08/28 00:39:45 peter Exp $
+ * $FreeBSD: src/sys/boot/common/boot.c,v 1.15.2.3 2000/07/06 23:58:16 obrien Exp $
  */
 
 /*
@@ -53,6 +53,7 @@ command_boot(int argc, char *argv[])
     struct loaded_module	*km;
     char			*cp;
     int				try;
+    int				i;
     
     /*
      * See if the user has specified an explicit kernel to boot.
@@ -243,6 +244,8 @@ getbootfile(int try)
 
     while ((try > 0) && (spec != NULL)) {
 	spec = strchr(spec, ';');
+	if (spec)
+	    spec++;	/* skip over the leading ';' */
 	try--;
     }
     if (spec != NULL) {

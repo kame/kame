@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/nexus.c,v 1.26 2000/01/26 01:32:51 msmith Exp $
+ * $FreeBSD: src/sys/i386/i386/nexus.c,v 1.26.2.2 2000/04/23 09:59:11 nyan Exp $
  */
 
 /*
@@ -147,10 +147,17 @@ nexus_probe(device_t dev)
 		panic("nexus_probe irq_rman");
 #else
 	irq_rman.rm_end = 15;
+#ifdef PC98
+	if (rman_init(&irq_rman)
+	    || rman_manage_region(&irq_rman,
+				  irq_rman.rm_start, irq_rman.rm_end))
+		panic("nexus_probe irq_rman");
+#else
 	if (rman_init(&irq_rman)
 	    || rman_manage_region(&irq_rman, irq_rman.rm_start, 1)
 	    || rman_manage_region(&irq_rman, 3, irq_rman.rm_end))
 		panic("nexus_probe irq_rman");
+#endif /* PC98 */
 #endif
 
 	/*
@@ -159,12 +166,17 @@ nexus_probe(device_t dev)
 	 * multiple bridges.  (eg: laptops with docking stations)
 	 */
 	drq_rman.rm_start = 0;
+#ifdef PC98
+	drq_rman.rm_end = 3;
+#else
 	drq_rman.rm_end = 7;
+#endif
 	drq_rman.rm_type = RMAN_ARRAY;
 	drq_rman.rm_descr = "DMA request lines";
 	/* XXX drq 0 not available on some machines */
 	if (rman_init(&drq_rman)
-	    || rman_manage_region(&drq_rman, 0, 7))
+	    || rman_manage_region(&drq_rman,
+				  drq_rman.rm_start, drq_rman.rm_end))
 		panic("nexus_probe drq_rman");
 
 	/*
@@ -289,7 +301,17 @@ nexus_alloc_resource(device_t bus, device_t child, int type, int *rid,
 		rman_set_bustag(rv, I386_BUS_SPACE_MEM);
 	} else if (type == SYS_RES_IOPORT) {
 		rman_set_bustag(rv, I386_BUS_SPACE_IO);
+#ifdef PC98
+		/* PC-98: the type of bus_space_handle_t is the structure. */
+		rv->r_bushandle.bsh_base = rv->r_start;
+		rv->r_bushandle.bsh_iat = NULL;
+		rv->r_bushandle.bsh_iatsz = 0;
+		rv->r_bushandle.bsh_res = NULL;
+		rv->r_bushandle.bsh_ressz = 0;
+#else
+		/* IBM-PC: the type of bus_space_handle_t is u_int */
 		rman_set_bushandle(rv, rv->r_start);
+#endif
 	}
 
 	if (needactivate) {
@@ -329,7 +351,17 @@ nexus_activate_resource(device_t bus, device_t child, int type, int rid,
 			vaddr = (caddr_t) pmap_mapdev(paddr-poffs, psize+poffs) + poffs;
 		}
 		rman_set_virtual(r, vaddr);
+#ifdef PC98
+		/* PC-98: the type of bus_space_handle_t is the structure. */
+		r->r_bushandle.bsh_base = (bus_addr_t) vaddr;
+		r->r_bushandle.bsh_iat = NULL;
+		r->r_bushandle.bsh_iatsz = 0;
+		r->r_bushandle.bsh_res = NULL;
+		r->r_bushandle.bsh_ressz = 0;
+#else
+		/* IBM-PC: the type of bus_space_handle_t is u_int */
 		rman_set_bushandle(r, (bus_space_handle_t) vaddr);
+#endif
 	}
 	return (rman_activate_resource(r));
 }

@@ -1,12 +1,12 @@
-/*	$NetBSD: usb_quirks.h,v 1.9 1999/11/15 22:04:15 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb_quirks.h,v 1.11 1999/12/28 02:00:55 wpaul Exp $	*/
+/*	$NetBSD: usb_quirks.h,v 1.11 2000/04/27 15:26:50 augustss Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb_quirks.h,v 1.11.2.2 2000/07/02 12:21:34 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -48,8 +48,6 @@ struct usbd_quirks {
 #define UQ_BUS_POWERED	0x20	/* device is bus powered, despite claim */
 #define UQ_BAD_AUDIO	0x40	/* device claims audio class, but isn't */
 #define UQ_SPUR_BUT_UP	0x80	/* spurious mouse button up events */
-#define UQ_NO_TSLEEP	0x100	/* device needs to work at interrupt
-				 * context, must avoid tsleep! */
 };
 
 extern struct usbd_quirks usbd_no_quirk;

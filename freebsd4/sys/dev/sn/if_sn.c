@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *   $FreeBSD: src/sys/dev/sn/if_sn.c,v 1.7 2000/01/22 17:24:16 hosokawa Exp $
+ *   $FreeBSD: src/sys/dev/sn/if_sn.c,v 1.7.2.2 2000/07/17 21:24:27 archie Exp $
  */
 
 /*
@@ -224,8 +224,7 @@ sn_attach(device_t dev)
 	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
 	ifp->if_timer = 0;
 
-	if_attach(ifp);
-	ether_ifattach(ifp);
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
 	/*
 	 * Fill the hardware address into ifa_addr if we find an AF_LINK
@@ -244,8 +243,6 @@ sn_attach(device_t dev)
 		sdl->sdl_slen = 0;
 		bcopy(sc->arpcom.ac_enaddr, LLADDR(sdl), ETHER_ADDR_LEN);
 	}
-
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
 
 	return 0;
 }
@@ -1097,26 +1094,6 @@ read_another:
 		*data = inb(BASE + DATA_REG_B);
 	}
 	++sc->arpcom.ac_if.if_ipackets;
-
-	if (sc->arpcom.ac_if.if_bpf)
-	{
-		bpf_mtap(&sc->arpcom.ac_if, m);
-
-		/*
-		 * Note that the interface cannot be in promiscuous mode if
-		 * there are no BPF listeners.  And if we are in promiscuous
-		 * mode, we have to check if this packet is really ours.
-		 */
-		if ((sc->arpcom.ac_if.if_flags & IFF_PROMISC) &&
-		    (eh->ether_dhost[0] & 1) == 0 &&
-		    bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-			 sizeof(eh->ether_dhost)) != 0 &&
-		    bcmp(eh->ether_dhost, etherbroadcastaddr,
-			 sizeof(eh->ether_dhost)) != 0) {
-			m_freem(m);
-			goto out;
-		}
-	}
 
 	/*
 	 * Remove link layer addresses and whatnot.

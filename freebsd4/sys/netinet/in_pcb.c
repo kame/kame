@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.59 1999/12/22 19:13:19 shin Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.59.2.3 2000/07/15 07:14:30 kris Exp $
  */
 
 #include "opt_ipsec.h"
@@ -72,7 +72,6 @@
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
-#include <netkey/key_debug.h>
 #endif /* IPSEC */
 
 struct	in_addr zeroin_addr;
@@ -574,7 +573,7 @@ in_setsockaddr(so, nam)
 	if (!inp) {
 		splx(s);
 		free(sin, M_SONAME);
-		return EINVAL;
+		return ECONNRESET;
 	}
 	sin->sin_port = inp->inp_lport;
 	sin->sin_addr = inp->inp_laddr;
@@ -597,7 +596,7 @@ in_setpeeraddr(so, nam)
 	 * Do the malloc first in case it blocks.
 	 */
 	MALLOC(sin, struct sockaddr_in *, sizeof *sin, M_SONAME, M_WAITOK);
-	bzero((caddr_t)sin, sizeof (*sin));
+	bzero(sin, sizeof (*sin));
 	sin->sin_family = AF_INET;
 	sin->sin_len = sizeof(*sin);
 
@@ -606,7 +605,7 @@ in_setpeeraddr(so, nam)
 	if (!inp) {
 		splx(s);
 		free(sin, M_SONAME);
-		return EINVAL;
+		return ECONNRESET;
 	}
 	sin->sin_port = inp->inp_fport;
 	sin->sin_addr = inp->inp_faddr;

@@ -2,7 +2,7 @@
 # LINT -- config file for checking all the sources, tries to pull in
 #	as much of the source tree as it can.
 #
-# $FreeBSD: src/sys/i386/conf/LINT,v 1.749 2000/03/09 16:32:56 jlemon Exp $
+# $FreeBSD: src/sys/i386/conf/LINT,v 1.749.2.17 2000/07/20 19:07:02 imp Exp $
 #
 # NB: You probably don't want to try running a kernel built from this
 # file.  Instead, you should start from GENERIC, and add options from
@@ -83,6 +83,14 @@ options 	PQ_LARGECACHE		# color for 512k/16k cache
 #    strings -aout -n 3 /kernel | grep ^___ | sed -e 's/^___//' > MYKERNEL
 #
 options 	INCLUDE_CONFIG_FILE     # Include this file in kernel
+
+#
+# The root device and filesystem type can be compiled in;
+# this provides a fallback option if the root device cannot
+# be correctly guesst by the bootstrap code, or an override if
+# the RB_DFLTROOT flag (-r) is specified when booting the kernel.
+#
+options 	ROOTDEVNAME=\"ufs:da0s2e\"
 
 
 #####################################################################
@@ -173,9 +181,17 @@ cpu		I686_CPU		# aka Pentium Pro(tm)
 # I/O clock delay time on Cyrix 5x86 and 6x86 are 0 and 7,respectively
 # (no clock delay).
 #
+# CPU_L2_LATENCY specifed the L2 cache latency value.  This option is used
+# only when CPU_PPRO2CELERON is defined and Mendocino Celeron is detected.
+# The default value is 5.
+#
 # CPU_LOOP_EN prevents flushing the prefetch buffer if the destination
 # of a jump is already present in the prefetch buffer on Cyrix 5x86(NOTE
 # 1).
+#
+# CPU_PPRO2CELERON enables L2 cache of Mendocino Celeron CPUs.  This option
+# is useful when you use Socket 8 to Socket 370 converter, because most Pentium
+# Pro BIOSs do not enable L2 cache of Mendocino Celeron CPUs.
 #
 # CPU_RSTK_EN enables return stack on Cyrix 5x86 (NOTE 1).
 #
@@ -220,7 +236,9 @@ options 	CPU_DISABLE_5X86_LSSER
 options 	CPU_FASTER_5X86_FPU
 options 	CPU_I486_ON_386
 options 	CPU_IORT
+options 	CPU_L2_LATENCY=5
 options 	CPU_LOOP_EN
+options 	CPU_PPRO2CELERON
 options 	CPU_RSTK_EN
 options 	CPU_SUSP_HLT
 options 	CPU_WT_ALLOC
@@ -265,12 +283,6 @@ options 	USER_LDT		#allow user-level control of i386 ldt
 options 	SYSVSHM
 options 	SYSVSEM
 options 	SYSVMSG
-
-#
-# This option includes a MD5 routine in the kernel, this is used for
-# various authentication and privacy uses.
-#
-options 	MD5
 
 
 #####################################################################
@@ -353,8 +365,6 @@ options 	USERCONFIG		#boot -c editor
 options 	INTRO_USERCONFIG	#imply -c and show intro screen
 options 	VISUAL_USERCONFIG	#visual boot -c editor
 
-# XXX - neither does this
-options 	ROOTDEVNAME=\"da0s2e\"
 
 #####################################################################
 # NETWORKING OPTIONS
@@ -369,7 +379,6 @@ options 	INET			#Internet communications protocols
 options 	INET6			#IPv6 communications protocols
 options 	IPSEC			#IP security
 options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
-options 	IPSEC_IPV6FWD		#IP security tunnel for IPv6
 options 	IPSEC_DEBUG		#debug for IP security
 
 options 	IPX			#IPX/SPX communications protocols
@@ -400,6 +409,9 @@ options 	NETGRAPH_HOLE
 options 	NETGRAPH_IFACE
 options 	NETGRAPH_KSOCKET
 options 	NETGRAPH_LMI
+# MPPC compression requires proprietary files (not included)
+#options 	NETGRAPH_MPPC_COMPRESSION
+options 	NETGRAPH_MPPC_ENCRYPTION
 options 	NETGRAPH_PPP
 options 	NETGRAPH_PPPOE
 options 	NETGRAPH_PPTPGRE
@@ -436,6 +448,7 @@ device		mn	# Munich32x/Falc54 Nx64kbit/sec cards.
 #  IPv6 over IPv6 tunneling.
 #  The `faith' pseudo-device captures packets sent to it and diverts them
 #  to the IPv4/IPv6 translation daemon.
+#  The `stf' device implements 6to4 encapsulation.
 #  The `ef' pseudo-device provides support for multiple ethernet frame types
 #  specified via ETHER_* options. See ef(4) for details.
 #
@@ -468,6 +481,7 @@ options 	ETHER_SNAP		# enable Ethernet_802.2/SNAP frame
 # for IPv6
 pseudo-device	gif	4		#IPv6 and IPv4 tunneling
 pseudo-device	faith	1		#for IPv6 and IPv4 translation
+pseudo-device	stf	1		#6to4 IPv6 over IPv4 encapsulation
 
 #
 # Internet family options:
@@ -626,14 +640,8 @@ options 	NFS_ROOT		#NFS usable as root device
 options 	DEVFS			#devices filesystem
 
 # Soft updates is technique for improving file system speed and
-# making abrupt shutdown less risky.  It is not enabled by default due
-# to copyright restraints on the code that implement it.
-#
-# Read ../../ufs/ffs/README.softupdates to learn what you need to
-# do to enable this.  ../../contrib/softupdates/README gives
-# more details on how they actually work.
-#
-#options 	SOFTUPDATES
+# making abrupt shutdown less risky.
+options 	SOFTUPDATES
 
 # Make space in the kernel for a root filesystem on a md device.
 # Define to the number of kilobytes to reserve for the filesystem.
@@ -642,6 +650,9 @@ options 	MD_ROOT_SIZE=10
 # Make the md device a potential root device, either with preloaded
 # images of type mfs_root or md_root.
 options 	MD_ROOT
+
+# Specify double the default maximum size for malloc(9)-backed md devices.
+options 	MD_NSECT=40000
 
 # Allow this many swap-devices.
 options 	NSWAPDEV=20
@@ -1233,6 +1244,11 @@ options 	BREAK_TO_DEBUGGER	#a BREAK on a comconsole goes to
 					#DDB, if available.
 options 	CONSPEED=9600		#default speed for serial console (default 9600)
 
+# Solaris implements a new BREAK which is initiated by a character
+# sequence CR ~ ^b which is similar to a familiar pattern used on
+# Sun servers by the Remote Console.
+options 	ALT_BREAK_TO_DEBUGGER
+
 # Options for sio:
 options 	COM_ESP			#code for Hayes ESP
 options 	COM_MULTIPORT		#code for some cards with shared IRQs
@@ -1288,7 +1304,7 @@ device an
 options 	WLCACHE		# enables the signal-strength cache
 options 	WLDEBUG		# enables verbose debugging output
 device wl0 at isa? port 0x300
-device xe0 at isa?
+device xe
 
 device oltr0 at isa?
 
@@ -2014,7 +2030,7 @@ options 	AVM_A1
 #device		isic0	at isa? port 0x398 irq 10 flags 18
 #
 # ELSA PCC-16
-options 	"ELSA_PCC16"
+options 	ELSA_PCC16
 #device		isic0	at isa? port 0x360 irq 10 flags 20
 #
 # ISA bus PnP Cards:
@@ -2045,16 +2061,20 @@ options 	ELSA_QS1ISA
 #device		isic
 #
 # ITK ix1 Micro ( V.3, PnP version ) (not supported yet!)
-#options 	"ITKIX1"
+#options 	ITKIX1
 #device		isic
 #
 # AVM Fritz!Card PnP (not supported yet!)
-#options 	"AVM_PNP"
+#options 	AVM_PNP
 #device 	isic
 #
 # Siemens I-Surf 2.0
-options 	"SIEMENS_ISURF2"
+options 	SIEMENS_ISURF2
 #device		isic
+#
+# Asuscom ISDNlink 128K ISAC
+#options 	ASUSCOM_IPAC
+#device 	isic
 #
 # PCI bus Cards:
 # --------------
@@ -2064,7 +2084,7 @@ options 	ELSA_QS1PCI
 #device		isic
 #
 # AVM Fritz!Card PCI
-options 	"AVM_A1_PCI"
+options 	AVM_A1_PCI
 #device		isic
 #
 # PCMCIA Cards:
@@ -2115,7 +2135,8 @@ options 	IPR_VJ
 # enable logging of the first n IP packets to isdnd (n=32 here)
 #options	IPR_LOG=32
 #
-# network driver for sync PPP over ISDN
+# network driver for sync PPP over ISDN; requires an equivalent
+# number of sppp pseudo-devices to be configured
 pseudo-device	"i4bisppp"	4
 
 
@@ -2236,86 +2257,6 @@ options		COMPAT_SVR4	# build emulator statically
 options		DEBUG_SVR4	# enable verbose debugging
 pseudo-device	streams		# STREAMS network driver (required for svr4).
 
-# More undocumented options for linting.
-# Note that documenting these are not considered an affront.
-
-options 	AHC_DUMP_EEPROM
-options 	AHC_TMODE_ENABLE
-options 	BUS_DEBUG
-options 	CAM_DEBUG_DELAY
-options 	CLK_CALIBRATION_LOOP
-options 	CLK_USE_I8254_CALIBRATION
-options 	CLK_USE_TSC_CALIBRATION
-options 	CLUSTERDEBUG
-options 	COMPAT_LINUX
-options 	CPU_UPGRADE_HW_CACHE
-options 	DEBUG
-options 	DEBUG_LINUX
-options 	DEBUG_VFS_LOCKS
-#options 	DISABLE_PSE
-options 	ENABLE_ALART
-options 	ENABLE_VFS_IOOPT
-options 	FB_DEBUG
-options 	FB_INSTALL_CDEV
-options 	FE_8BIT_SUPPORT
-options 	I4B_SMP_WORKAROUND
-options 	I586_PMC_GUPROF=0x70000
-options 	IBCS2
-options 	KBDIO_DEBUG=2
-options 	KBD_MAXRETRY=4
-options 	KBD_MAXWAIT=6
-options 	KBD_RESETDELAY=201
-options 	KEY
-options 	LOCKF_DEBUG
-options 	LOUTB
-options 	MSGMNB=2049
-options 	MSGMNI=41
-options 	MSGSEG=2049
-options 	MSGSSZ=16
-options 	MSGTQL=41
-options 	NBUF=512
-options 	NETATALKDEBUG
-options 	NMBCLUSTERS=1024
-options 	NPX_DEBUG
-#options 	OLTR_NO_BULLSEYE_MAC
-#options 	OLTR_NO_HAWKEYE_MAC
-#options 	OLTR_NO_TMS_MAC
-options 	PANIC_REBOOT_WAIT_TIME=16
-options 	PNPBIOS
-options 	PSM_DEBUG=1
-options 	SCSI_NCR_DEBUG
-options 	SCSI_NCR_MAX_SYNC=10000
-options 	SCSI_NCR_MAX_WIDE=1
-options 	SCSI_NCR_MYADDR=7
-options 	SC_DEBUG_LEVEL
-options 	SC_RENDER_DEBUG
-options 	SEMMAP=31
-options 	SEMMNI=11
-options 	SEMMNS=61
-options 	SEMMNU=31
-options 	SEMMSL=61
-options 	SEMOPM=101
-options 	SEMUME=11
-options 	SHMALL=1025
-options 	SHMMAX="(SHMMAXPGS*PAGE_SIZE+1)"
-options 	SHMMAXPGS=1025
-options 	SHMMIN=2
-options 	SHMMNI=33
-options 	SHMSEG=9
-options 	SHOW_BUSYBUFS	# List buffers that prevent root unmount
-options 	SIMPLELOCK_DEBUG
-options 	SI_DEBUG
-options 	SLIP_IFF_OPTS
-options 	SPX_HACK
-options 	TIMER_FREQ="((14318182+6)/12)"
-options 	VFS_BIO_DEBUG
-options 	VM_KMEM_SIZE
-options 	VM_KMEM_SIZE_MAX
-options 	VM_KMEM_SIZE_SCALE
-
-# Undocumented options covering presently broken code
-#options 	ASUSCOM_IPAC
-
 # The 'dpt' driver provides support for DPT controllers (http://www.dpt.com/).
 # These have hardware RAID-{0,1,5} support, and do multi-initiator I/O.
 # The DPT controllers are commonly re-licensed under other brand-names -
@@ -2412,3 +2353,83 @@ makeoptions	UKBD_DFLT_KEYMAP=it.iso
 #
 # An embedded system might want to run something other than init.
 options 	INIT_PATH="/sbin/init:/stand/sysinstall"
+
+# Debug options
+options 	BUS_DEBUG       # enable newbus debugging
+options 	DEBUG_VFS_LOCKS # enable vfs lock debugging
+options 	NPX_DEBUG       # enable npx debugging (FPU/math emu)
+
+# More undocumented options for linting.
+# Note that documenting these are not considered an affront.
+
+options 	AHC_DUMP_EEPROM
+options 	AHC_TMODE_ENABLE
+options 	CAM_DEBUG_DELAY
+options 	CLK_CALIBRATION_LOOP
+options 	CLK_USE_I8254_CALIBRATION
+options 	CLK_USE_TSC_CALIBRATION
+options 	CLUSTERDEBUG
+options 	COMPAT_LINUX
+options 	CPU_UPGRADE_HW_CACHE
+options 	DEBUG
+options 	DEBUG_LINUX
+#options 	DISABLE_PSE
+options 	ENABLE_ALART
+options 	ENABLE_VFS_IOOPT
+options 	FB_DEBUG
+options 	FB_INSTALL_CDEV
+options 	FE_8BIT_SUPPORT
+options 	I4B_SMP_WORKAROUND
+options 	I586_PMC_GUPROF=0x70000
+options 	IBCS2
+options 	KBDIO_DEBUG=2
+options 	KBD_MAXRETRY=4
+options 	KBD_MAXWAIT=6
+options 	KBD_RESETDELAY=201
+options 	KEY
+options 	LOCKF_DEBUG
+options 	LOUTB
+options 	MSGMNB=2049
+options 	MSGMNI=41
+options 	MSGSEG=2049
+options 	MSGSSZ=16
+options 	MSGTQL=41
+options 	NBUF=512
+options 	NETATALKDEBUG
+options 	NMBCLUSTERS=1024
+#options 	OLTR_NO_BULLSEYE_MAC
+#options 	OLTR_NO_HAWKEYE_MAC
+#options 	OLTR_NO_TMS_MAC
+options 	PANIC_REBOOT_WAIT_TIME=16
+options 	PNPBIOS
+options 	PSM_DEBUG=1
+options 	SCSI_NCR_DEBUG
+options 	SCSI_NCR_MAX_SYNC=10000
+options 	SCSI_NCR_MAX_WIDE=1
+options 	SCSI_NCR_MYADDR=7
+options 	SC_DEBUG_LEVEL
+options 	SC_RENDER_DEBUG
+options 	SEMMAP=31
+options 	SEMMNI=11
+options 	SEMMNS=61
+options 	SEMMNU=31
+options 	SEMMSL=61
+options 	SEMOPM=101
+options 	SEMUME=11
+options 	SHMALL=1025
+options 	SHMMAX="(SHMMAXPGS*PAGE_SIZE+1)"
+options 	SHMMAXPGS=1025
+options 	SHMMIN=2
+options 	SHMMNI=33
+options 	SHMSEG=9
+options 	SHOW_BUSYBUFS	# List buffers that prevent root unmount
+options 	SIMPLELOCK_DEBUG
+options 	SI_DEBUG
+options 	SLIP_IFF_OPTS
+options 	SPX_HACK
+options 	TIMER_FREQ="((14318182+6)/12)"
+options 	VFS_BIO_DEBUG
+options 	VM_KMEM_SIZE
+options 	VM_KMEM_SIZE_MAX
+options 	VM_KMEM_SIZE_SCALE
+options		XBONEHACK

@@ -1,12 +1,12 @@
 /*	$NetBSD: ohcivar.h,v 1.18 2000/01/18 20:11:00 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ohcivar.h,v 1.15 2000/01/27 23:25:58 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ohcivar.h,v 1.15.2.3 2000/07/02 12:42:40 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
  * All rights reserved.
  *
  * This code is derived from software contributed to The NetBSD Foundation
- * by Lennart Augustsson (augustss@carlstedt.se) at
+ * by Lennart Augustsson (lennart@augustsson.net) at
  * Carlstedt Research & Technology.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -57,6 +57,7 @@ typedef struct ohci_soft_td {
 	u_int16_t flags;
 #define OHCI_CALL_DONE	0x0001
 #define OHCI_ADD_LEN	0x0002
+#define OHCI_TD_HANDLED	0x0004		/* signal process_done has seen it */
 } ohci_soft_td_t;
 #define OHCI_STD_SIZE ((sizeof (struct ohci_soft_td) + OHCI_TD_ALIGN - 1) / OHCI_TD_ALIGN * OHCI_TD_ALIGN)
 #define OHCI_STD_CHUNK 128
@@ -77,6 +78,13 @@ typedef struct ohci_softc {
 	struct usbd_bus sc_bus;		/* base device */
 	bus_space_tag_t iot;
 	bus_space_handle_t ioh;
+
+#if defined(__FreeBSD__)
+	void *ih;
+
+	struct resource *io_res;
+	struct resource *irq_res;
+#endif
 
 	usb_dma_t sc_hccadma;
 	struct ohci_hcca *sc_hcca;
@@ -106,8 +114,10 @@ typedef struct ohci_softc {
 	char sc_vendor[16];
 	int sc_id_vendor;
 
+#if defined(__NetBSD__)
 	void *sc_powerhook;
 	void *sc_shutdownhook;		/* cookie from shutdown hook */
+#endif
 
 	device_ptr_t sc_child;
 } ohci_softc_t;

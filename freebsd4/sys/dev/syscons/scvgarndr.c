@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/scvgarndr.c,v 1.5 2000/01/29 15:08:47 peter Exp $
+ * $FreeBSD: src/sys/dev/syscons/scvgarndr.c,v 1.5.2.2 2000/04/03 13:03:52 yokota Exp $
  */
 
 #include "opt_syscons.h"
@@ -208,6 +208,67 @@ vga_txtcursor_shape(scr_stat *scp, int base, int height, int blink)
 }
 
 static void
+draw_txtcharcursor(scr_stat *scp, int at, u_short c, u_short a, int flip)
+{
+	sc_softc_t *sc;
+
+	sc = scp->sc;
+	scp->cursor_saveunder_char = c;
+	scp->cursor_saveunder_attr = a;
+
+#ifndef SC_NO_FONT_LOADING
+	if (sc->flags & SC_CHAR_CURSOR) {
+		unsigned char *font;
+		int h;
+		int i;
+
+		if (scp->font_size < 14) {
+			font = sc->font_8;
+			h = 8;
+		} else if (scp->font_size >= 16) {
+			font = sc->font_16;
+			h = 16;
+		} else {
+			font = sc->font_14;
+			h = 14;
+		}
+		if (scp->cursor_base >= h)
+			return;
+		if (flip)
+			a = (a & 0x8800)
+				| ((a & 0x7000) >> 4) | ((a & 0x0700) << 4);
+		bcopy(font + c*h, font + sc->cursor_char*h, h);
+		font = font + sc->cursor_char*h;
+		for (i = imax(h - scp->cursor_base - scp->cursor_height, 0);
+			i < h - scp->cursor_base; ++i) {
+			font[i] ^= 0xff;
+		}
+		sc->font_loading_in_progress = TRUE;
+		/* XXX */
+		(*vidsw[sc->adapter]->load_font)(sc->adp, 0, h, font,
+						 sc->cursor_char, 1);
+		sc->font_loading_in_progress = FALSE;
+		sc_vtb_putc(&scp->scr, at, sc->cursor_char, a);
+	} else
+#endif /* SC_NO_FONT_LOADING */
+	{
+		if ((a & 0x7000) == 0x7000) {
+			a &= 0x8f00;
+			if ((a & 0x0700) == 0)
+				a |= 0x0700;
+		} else {
+			a |= 0x7000;
+			if ((a & 0x0700) == 0x0700)
+				a &= 0xf000;
+		}
+		if (flip)
+			a = (a & 0x8800)
+				| ((a & 0x7000) >> 4) | ((a & 0x0700) << 4);
+		sc_vtb_putc(&scp->scr, at, c, a);
+	}
+}
+
+static void
 vga_txtcursor(scr_stat *scp, int at, int blink, int on, int flip)
 {
 	video_adapter_t *adp;
@@ -234,25 +295,10 @@ vga_txtcursor(scr_stat *scp, int at, int blink, int on, int flip)
 		scp->status &= ~VR_CURSOR_BLINK;
 		if (on) {
 			scp->status |= VR_CURSOR_ON;
-			cursor_attr = sc_vtb_geta(&scp->vtb, at);
-			scp->cursor_saveunder_char = sc_vtb_getc(&scp->scr, at);
-			scp->cursor_saveunder_attr = cursor_attr;
-			if ((cursor_attr & 0x7000) == 0x7000) {
-				cursor_attr &= 0x8f00;
-				if ((cursor_attr & 0x0700) == 0)
-					cursor_attr |= 0x0700;
-			} else {
-				cursor_attr |= 0x7000;
-				if ((cursor_attr & 0x0700) == 0x0700)
-					cursor_attr &= 0xf000;
-			}
-			if (flip)
-				cursor_attr = (cursor_attr & 0x8800)
-					| ((cursor_attr & 0x7000) >> 4)
-					| ((cursor_attr & 0x0700) << 4);
-			sc_vtb_putc(&scp->scr, at,
-				    sc_vtb_getc(&scp->scr, at),
-				    cursor_attr);
+			draw_txtcharcursor(scp, at,
+					   sc_vtb_getc(&scp->scr, at),
+					   sc_vtb_geta(&scp->scr, at),
+					   flip);
 		} else {
 			cursor_attr = scp->cursor_saveunder_attr;
 			if (flip)
@@ -289,15 +335,15 @@ draw_txtmouse(scr_stat *scp, int x, int y)
 
 	/* prepare mousepointer char's bitmaps */
 	pos = (y/scp->font_size - scp->yoff)*scp->xsize + x/8 - scp->xoff;
-	bcopy(scp->font + sc_vtb_getc(&scp->vtb, pos)*scp->font_size,
+	bcopy(scp->font + sc_vtb_getc(&scp->scr, pos)*scp->font_size,
 	      &font_buf[0], scp->font_size);
-	bcopy(scp->font + sc_vtb_getc(&scp->vtb, pos + 1)*scp->font_size,
+	bcopy(scp->font + sc_vtb_getc(&scp->scr, pos + 1)*scp->font_size,
 	      &font_buf[32], scp->font_size);
 	bcopy(scp->font 
-		 + sc_vtb_getc(&scp->vtb, pos + scp->xsize)*scp->font_size,
+		 + sc_vtb_getc(&scp->scr, pos + scp->xsize)*scp->font_size,
 	      &font_buf[64], scp->font_size);
 	bcopy(scp->font
-		 + sc_vtb_getc(&scp->vtb, pos + scp->xsize + 1)*scp->font_size,
+		 + sc_vtb_getc(&scp->scr, pos + scp->xsize + 1)*scp->font_size,
 	      &font_buf[96], scp->font_size);
 	for (i = 0; i < scp->font_size; ++i) {
 		cursor[i] = font_buf[i]<<8 | font_buf[i+32];
@@ -409,6 +455,8 @@ vga_pxlborder(scr_stat *scp, int color)
 {
 	vm_offset_t p;
 	int line_width;
+	int x;
+	int y;
 	int i;
 
 	(*vidsw[scp->sc->adapter]->set_border)(scp->sc->adp, color);
@@ -420,23 +468,19 @@ vga_pxlborder(scr_stat *scp, int color)
 	outw(GDCIDX, (color << 8) | 0x00);	/* set/reset */
 	line_width = scp->sc->adp->va_line_width;
 	p = scp->sc->adp->va_window;
-	if (scp->yoff > 0) {
+	if (scp->yoff > 0)
 		bzero_io((void *)p, line_width*scp->yoff*scp->font_size);
-		bzero_io((void *)(p + line_width*(scp->yoff + scp->ysize)
-					  *scp->font_size),
-			 line_width*(scp->ypixel
-				     - (scp->yoff + scp->ysize)*scp->font_size));
-	}
-	if (scp->xoff > 0) {
-		for (i = 0; i < scp->ysize*scp->font_size; ++i) {
-			bzero_io((void *)(p + line_width
-					          *(scp->yoff*scp->font_size + i)),
-				 scp->xoff);
-			bzero_io((void *)(p + line_width
-						  *(scp->yoff*scp->font_size + i)
-				     + scp->xoff + scp->xsize), 
-				 scp->xpixel/8 - scp->xoff - scp->xsize);
-		}
+	y = (scp->yoff + scp->ysize)*scp->font_size;
+	if (scp->ypixel > y)
+		bzero_io((void *)(p + line_width*y), line_width*(scp->ypixel - y));
+	y = scp->yoff*scp->font_size;
+	x = scp->xpixel/8 - scp->xoff - scp->xsize;
+	for (i = 0; i < scp->ysize*scp->font_size; ++i) {
+		if (scp->xoff > 0)
+			bzero_io((void *)(p + line_width*(y + i)), scp->xoff);
+		if (x > 0)
+			bzero_io((void *)(p + line_width*(y + i)
+				     + scp->xoff + scp->xsize), x);
 	}
 	outw(GDCIDX, 0x0000);		/* set/reset */
 	outw(GDCIDX, 0x0001);		/* set/reset enable */
@@ -631,6 +675,8 @@ draw_pxlcursor(scr_stat *scp, int at, int on, int flip)
 	outw(GDCIDX, 0xff08);		/* bit mask */
 }
 
+static int pxlblinkrate = 0;
+
 static void 
 vga_pxlcursor(scr_stat *scp, int at, int blink, int on, int flip)
 {
@@ -638,8 +684,16 @@ vga_pxlcursor(scr_stat *scp, int at, int blink, int on, int flip)
 		return;
 
 	if (on) {
-		scp->status |= VR_CURSOR_ON;
-		draw_pxlcursor(scp, at, on, flip);
+		if (!blink) {
+			scp->status |= VR_CURSOR_ON;
+			draw_pxlcursor(scp, at, on, flip);
+		} else if (++pxlblinkrate & 4) {
+			pxlblinkrate = 0;
+			scp->status ^= VR_CURSOR_ON;
+			draw_pxlcursor(scp, at,
+				       scp->status & VR_CURSOR_ON,
+				       flip);
+		}
 	} else {
 		if (scp->status & VR_CURSOR_ON)
 			draw_pxlcursor(scp, at, on, flip);
@@ -654,13 +708,11 @@ vga_pxlcursor(scr_stat *scp, int at, int blink, int on, int flip)
 static void
 vga_pxlblink(scr_stat *scp, int at, int flip)
 {
-	static int blinkrate = 0;
-
 	if (!(scp->status & VR_CURSOR_BLINK))
 		return;
-	if (!(++blinkrate & 4))
+	if (!(++pxlblinkrate & 4))
 		return;
-	blinkrate = 0;
+	pxlblinkrate = 0;
 	scp->status ^= VR_CURSOR_ON;
 	draw_pxlcursor(scp, at, scp->status & VR_CURSOR_ON, flip);
 }
@@ -689,7 +741,7 @@ draw_pxlmouse(scr_stat *scp, int x, int y)
 	outw(GDCIDX, 0xff08);		/* bit mask */
 	outw(GDCIDX, 0x0803);		/* data rotate/function select (and) */
 	p = scp->sc->adp->va_window + line_width*y + x/8;
-	if (x < scp->xpixel - 16) {
+	if (x < scp->xpixel - 8) {
 		for (i = y, j = 0; i < ymax; ++i, ++j) {
 			m = ~(mouse_and_mask[j] >> xoff);
 #ifdef __i386__
@@ -715,7 +767,7 @@ draw_pxlmouse(scr_stat *scp, int x, int y)
 	}
 	outw(GDCIDX, 0x1003);		/* data rotate/function select (or) */
 	p = scp->sc->adp->va_window + line_width*y + x/8;
-	if (x < scp->xpixel - 16) {
+	if (x < scp->xpixel - 8) {
 		for (i = y, j = 0; i < ymax; ++i, ++j) {
 			m = mouse_or_mask[j] >> xoff;
 #ifdef __i386__

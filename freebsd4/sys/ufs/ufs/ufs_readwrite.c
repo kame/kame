@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_readwrite.c	8.11 (Berkeley) 5/8/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_readwrite.c,v 1.65 1999/09/20 23:27:58 dillon Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_readwrite.c,v 1.65.2.2 2000/05/05 03:50:07 jlemon Exp $
  */
 
 #define	BLKSIZE(a, b, c)	blksize(a, b, c)
@@ -47,7 +47,10 @@
 #include <vm/vm_pager.h>
 #include <vm/vm_map.h>
 #include <vm/vnode_pager.h>
-#include <sys/poll.h>
+#include <sys/event.h>
+
+#define VN_KNOTE(vp, b) \
+	KNOTE((struct klist *)&vp->v_pollinfo.vpi_selinfo.si_note, (b))
 
 /*
  * Vnode op for reading.
@@ -379,10 +382,12 @@ WRITE(ap)
 	struct proc *p;
 	ufs_daddr_t lbn;
 	off_t osize;
+	int seqcount;
 	int blkoffset, error, extended, flags, ioflag, resid, size, xfersize;
 	vm_object_t object;
 
 	extended = 0;
+	seqcount = ap->a_ioflag >> 16;
 	ioflag = ap->a_ioflag;
 	uio = ap->a_uio;
 	vp = ap->a_vp;
@@ -492,7 +497,7 @@ WRITE(ap)
 		} else if (xfersize + blkoffset == fs->fs_bsize) {
 			if ((vp->v_mount->mnt_flag & MNT_NOCLUSTERW) == 0) {
 				bp->b_flags |= B_CLUSTEROK;
-				cluster_write(bp, ip->i_size);
+				cluster_write(bp, ip->i_size, seqcount);
 			} else {
 				bawrite(bp);
 			}
@@ -511,6 +516,8 @@ WRITE(ap)
 	 */
 	if (resid > uio->uio_resid && ap->a_cred && ap->a_cred->cr_uid != 0)
 		ip->i_mode &= ~(ISUID | ISGID);
+	if (resid > uio->uio_resid)
+		VN_KNOTE(vp, NOTE_WRITE | (extended ? NOTE_EXTEND : 0));
 	if (error) {
 		if (ioflag & IO_UNIT) {
 			(void)UFS_TRUNCATE(vp, osize,
@@ -520,8 +527,6 @@ WRITE(ap)
 		}
 	} else if (resid > uio->uio_resid && (ioflag & IO_SYNC))
 		error = UFS_UPDATE(vp, 1);
-	if (!error)
-		VN_POLLEVENT(vp, POLLWRITE | (extended ? POLLEXTEND : 0));
 
 	if (object)
 		vm_object_vndeallocate(object);

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/pcaudio.c,v 1.32 2000/01/26 11:23:51 kato Exp $
+ * $FreeBSD: src/sys/pc98/pc98/pcaudio.c,v 1.32.2.1 2000/04/13 10:36:25 nyan Exp $
  */
 
 #include <sys/param.h>
@@ -41,7 +41,11 @@
 #include <machine/clock.h>
 #include <machine/pcaudioio.h>
 
+#ifdef PC98
+#include <pc98/pc98/pc98.h>
+#else
 #include <isa/isareg.h>
+#endif
 #include <isa/isavar.h>
 #include <i386/isa/timerreg.h>
 
@@ -309,11 +313,12 @@ pca_continue(void)
 	int x = splhigh();
 
 #ifdef PC98
-        pca_status.oldval = inb(IO_PPI) & ~0x08;
+	pca_status.oldval = inb(IO_PPI) & ~0x08;
+	acquire_timer1(TIMER_LSB|TIMER_ONESHOT);
 #else
-        pca_status.oldval = inb(IO_PPI) | 0x03;
-#endif
+	pca_status.oldval = inb(IO_PPI) | 0x03;
 	acquire_timer2(TIMER_LSB|TIMER_ONESHOT);
+#endif
 	acquire_timer0(INTERRUPT_RATE, pcaintr);
 	pca_status.timer_on = 1;
 	splx(x);
@@ -559,7 +564,7 @@ pcaintr(struct clockframe *frame)
 		disable_intr();
 #ifdef PC98
 		__asm__("outb %0,$0x35\n"
-			"andb $0x08,%0\n"
+			"orb $0x08,%0\n"
 			"outb %0,$0x35"
 #else
 		__asm__("outb %0,$0x61\n"

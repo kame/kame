@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/dec_kn8ae.c,v 1.5 1999/10/05 21:19:34 n_hibma Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/dec_kn8ae.c,v 1.5.2.3 2000/07/20 06:12:12 obrien Exp $ */
 /* $NetBSD: dec_kn8ae.c,v 1.15 1998/02/13 00:12:50 thorpej Exp $ */
 
 /*
@@ -36,6 +36,8 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/termios.h>
+#include <sys/cons.h>
+#include <sys/reboot.h>
 
 #include <machine/rpb.h>
 #include <machine/cpuconf.h>
@@ -71,8 +73,6 @@ dec_kn8ae_init(int cputype)
 }
 
 /*
- * dec_kn8ae_cons_init- not needed right now. XXX hack in SimOS console
- *
  * Info to retain:
  *
  *	The AXP 8X00 seems to encode the
@@ -82,7 +82,7 @@ dec_kn8ae_init(int cputype)
 static void
 dec_kn8ae_cons_init(void)
 {
-#ifdef SIMOS
-    zs_cnattach(TLSB_GBUS_BASE, GBUS_DUART0_OFFSET);
-#endif
+
+	boothowto |= RB_SERIAL;
+	zs_cnattach(TLSB_GBUS_BASE, GBUS_DUART0_OFFSET);
 }

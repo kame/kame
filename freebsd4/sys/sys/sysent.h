@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/sysent.h,v 1.27 1999/12/29 04:24:48 peter Exp $
+ * $FreeBSD: src/sys/sys/sysent.h,v 1.27.2.2 2000/05/16 06:58:05 dillon Exp $
  */
 
 #ifndef _SYS_SYSENT_H_
@@ -44,6 +44,10 @@ struct sysent {		/* system call table */
 	int	sy_narg;	/* number of arguments */
 	sy_call_t *sy_call;	/* implementing function */
 };
+
+#define SYF_ARGMASK	0x0000FFFF
+#define SYF_MPSAFE	0x00010000
+
 #define SCARG(p,k)	((p)->k)	/* get arg from args pointer */
   /* placeholder till we integrate rest of lite2 syscallargs changes XXX */
 
@@ -75,6 +79,7 @@ struct sysentvec {
 	int		(*sv_coredump) __P((struct proc *, struct vnode *,
 					    off_t));
 					/* function to dump core, or NULL */
+	int		(*sv_imgact_try) __P((struct image_params *));
 };
 
 #ifdef _KERNEL

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/include/types.h,v 1.11 1999/12/29 04:28:00 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/include/types.h,v 1.11.2.1 2000/05/24 14:18:30 gallatin Exp $ */
 /* From: NetBSD: types.h,v 1.8 1997/04/06 08:47:45 cgd Exp */
 
 /*-
@@ -67,7 +67,7 @@ typedef	unsigned long	uintfptr_t;
 /* Interrupt mask (spl, xxx_imask, etc) */
 typedef __uint32_t		intrmask_t;
 
-/* Interrupt handler function type - arg should be "void *" one day */
-typedef void			inthand2_t(int _unit);
+/* Interrupt handler function type */
+typedef void			inthand2_t(void *);
 
 #endif	/* _MACHTYPES_H_ */

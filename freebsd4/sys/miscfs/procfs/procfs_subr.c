@@ -36,14 +36,17 @@
  *
  *	@(#)procfs_subr.c	8.6 (Berkeley) 5/14/95
  *
- * $FreeBSD: src/sys/miscfs/procfs/procfs_subr.c,v 1.26 1999/08/28 00:46:56 peter Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_subr.c,v 1.26.2.1 2000/06/21 09:33:43 des Exp $
  */
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/sysctl.h>
 #include <sys/proc.h>
+#include <sys/mount.h>
 #include <sys/vnode.h>
 #include <sys/malloc.h>
+
 #include <miscfs/procfs/procfs.h>
 
 static struct pfsnode *pfshead;
@@ -159,6 +162,12 @@ loop:
 		break;
 
 	case Pfile:
+		pfs->pfs_mode = (VREAD|VEXEC) |
+				(VREAD|VEXEC) >> 3 |
+				(VREAD|VEXEC) >> 6;
+		vp->v_type = VLNK;
+		break;
+
 	case Pmem:
 		pfs->pfs_mode = (VREAD|VWRITE) |
 				(VREAD) >> 3;;

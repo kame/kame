@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.i386,v 1.132 2000/01/14 00:17:49 nsouch Exp $
+# $FreeBSD: src/sys/conf/options.i386,v 1.132.2.2 2000/06/21 12:22:36 kato Exp $
 
 DISABLE_PSE
 IDE_DELAY
@@ -49,7 +49,9 @@ CPU_DISABLE_5X86_LSSER		opt_cpu.h
 CPU_FASTER_5X86_FPU		opt_cpu.h
 CPU_I486_ON_386			opt_cpu.h
 CPU_IORT			opt_cpu.h
+CPU_L2_LATENCY			opt_cpu.h
 CPU_LOOP_EN			opt_cpu.h
+CPU_PPRO2CELERON		opt_cpu.h
 CPU_RSTK_EN			opt_cpu.h
 CPU_SUSP_HLT			opt_cpu.h
 CPU_UPGRADE_HW_CACHE		opt_cpu.h
@@ -101,7 +103,6 @@ PSM_DEBUG		opt_psm.h
 PCIC_RESUME_RESET	opt_pcic.h
 
 ATKBD_DFLT_KEYMAP	opt_atkbd.h
-UKBD_DFLT_KEYMAP	opt_ukbd.h
 
 KBD_DISABLE_KEYMAP_LOAD	opt_kbd.h
 KBD_INSTALL_CDEV	opt_kbd.h

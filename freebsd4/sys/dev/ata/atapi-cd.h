@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-cd.h,v 1.15 2000/02/29 22:00:53 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-cd.h,v 1.15.2.2 2000/06/11 17:02:46 sos Exp $
  */
 
 /* CDROM Table Of Contents */
@@ -323,8 +323,8 @@ struct acd_softc {
 	u_int32_t	blksize;		/* block size in bytes */
     } info;
     struct audiopage		au;		/* audio page info */
-    struct cappage		cap;		/* capabilities page info */
     struct audiopage		aumask;		/* audio page mask */
+    struct cappage		cap;		/* capabilities page info */
     struct {					/* subchannel info */
 	u_int8_t	void0;
 	u_int8_t	audio_status;
@@ -337,7 +337,9 @@ struct acd_softc {
 	u_int32_t	rellba;
     } subchan;
     struct changer		*changer_info;	/* changer info */
-    int32_t			slot;		/* this lun's slot number */
+    struct acd_softc		**driver;	/* softc's of changer slots */
+    int32_t			slot;		/* this instance slot number */
+    time_t			timestamp;	/* this instance timestamp */
     u_int32_t			block_size;	/* blocksize currently used */
     struct disklabel		disklabel;	/* fake disk label */
     struct devstat		*stats;		/* devstat entry */

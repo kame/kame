@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)socketvar.h	8.3 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/socketvar.h,v 1.46 2000/01/14 02:53:28 jasone Exp $
+ * $FreeBSD: src/sys/sys/socketvar.h,v 1.46.2.1 2000/05/05 03:50:03 jlemon Exp $
  */
 
 #ifndef _SYS_SOCKETVAR_H_
@@ -104,6 +104,7 @@ struct socket {
 #define	SB_UPCALL	0x20		/* someone wants an upcall */
 #define	SB_NOINTR	0x40		/* operations not interruptible */
 #define SB_AIO		0x80		/* AIO operations queued */
+#define SB_KNOTE	0x100		/* kernel note attached */
 
 	void	(*so_upcall) __P((struct socket *, void *, int));
 	void	*so_upcallarg;
@@ -172,7 +173,7 @@ struct	xsocket {
  * Do we need to notify the other side when I/O is possible?
  */
 #define	sb_notify(sb)	(((sb)->sb_flags & (SB_WAIT | SB_SEL | SB_ASYNC | \
-    SB_UPCALL | SB_AIO)) != 0)
+    SB_UPCALL | SB_AIO | SB_KNOTE)) != 0)
 
 /*
  * How much space is there in a socket buffer (so->so_snd or so->so_rcv)?

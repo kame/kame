@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/linux/linux_misc.c,v 1.77 2000/03/09 17:52:01 marcel Exp $
+ * $FreeBSD: src/sys/i386/linux/linux_misc.c,v 1.77.2.3 2000/07/20 05:31:56 marcel Exp $
  */
 
 #include "opt_compat.h"
@@ -54,7 +54,6 @@
 #include <vm/vm_kern.h>
 #include <vm/vm_map.h>
 #include <vm/vm_extern.h>
-#include <vm/vm_zone.h>
 
 #include <machine/frame.h>
 #include <machine/psl.h>
@@ -697,7 +696,7 @@ linux_mmap(struct proc *p, struct linux_mmap_args *args)
 			sizeof(linux_args))))
 	return error;
 #ifdef DEBUG
-    printf("Linux-emul(%ld): mmap(%p, %d, %d, %08x, %d, %d)\n",
+    printf("Linux-emul(%ld): mmap(%p, %d, %d, 0x%08x, %d, %d)",
 	(long)p->p_pid, (void *)linux_args.addr, linux_args.len,
 	linux_args.prot, linux_args.flags, linux_args.fd, linux_args.pos);
 #endif
@@ -757,9 +756,17 @@ linux_mmap(struct proc *p, struct linux_mmap_args *args)
     }
 
     bsd_args.prot = linux_args.prot | PROT_READ;	/* always required */
-    bsd_args.fd = linux_args.fd;
+    if (linux_args.flags & LINUX_MAP_ANON)
+	bsd_args.fd = -1;
+    else
+	bsd_args.fd = linux_args.fd;
     bsd_args.pos = linux_args.pos;
     bsd_args.pad = 0;
+#ifdef DEBUG
+    printf("-> (%p, %d, %d, 0x%08x, %d, %d)\n",
+	(void *)bsd_args.addr, bsd_args.len,
+	bsd_args.prot, bsd_args.flags, bsd_args.fd, (int)bsd_args.pos);
+#endif
     return mmap(p, &bsd_args);
 }
 

@@ -14,12 +14,14 @@
  *---------------------------------------------------------------------------
  *
  * Description: PowerMACH Works header file
+ * $FreeBSD: src/sys/contrib/dev/oltr/trlld.h,v 1.3.2.1 2000/03/19 00:32:34 lile Exp $
  *
  *---------------------------------------------------------------------------
  * $Log: trlld.h,v $
- * Revision 1.1.1.1  2000/03/25 06:28:33  sumikawa
- * FreeBSD 4.0-RELEASE.
+ * Revision 1.1.1.2  2000/08/05 03:24:24  sumikawa
+ * FreeBSD 4.1-RELEASE
  *
+ * 
  *    Rev 1.9   25 Jan 1999 09:56:28   EGS
  * Added 3150
  * 

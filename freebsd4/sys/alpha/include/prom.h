@@ -26,7 +26,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/alpha/include/prom.h,v 1.5 1999/12/29 04:27:59 peter Exp $
+ * $FreeBSD: src/sys/alpha/include/prom.h,v 1.5.2.1 2000/03/27 18:29:34 mjacob Exp $
  */
 
 #ifndef	ASSEMBLER
@@ -95,6 +95,7 @@ int	prom_getenv __P((int, char *, int));
 
 #ifndef ASSEMBLER
 #ifdef _KERNEL
+void	promcnattach __P((int));
 void	promcnputc __P((dev_t, int));
 int	promcngetc __P((dev_t));
 int	promcncheckc __P((dev_t));

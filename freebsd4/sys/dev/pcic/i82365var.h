@@ -1,5 +1,5 @@
 /*	$NetBSD: i82365var.h,v 1.8 1999/10/15 06:07:27 haya Exp $	*/
-/* $FreeBSD: src/sys/dev/pcic/i82365var.h,v 1.15 2000/01/10 06:17:27 imp Exp $ */
+/* $FreeBSD: src/sys/dev/pcic/i82365var.h,v 1.15.2.1 2000/05/23 03:57:02 imp Exp $ */
 
 /*
  * Copyright (c) 1997 Marc Horowitz.  All rights reserved.
@@ -31,7 +31,6 @@
  */
 
 #include <dev/pccard/pccardreg.h>
-#include <dev/pccard/pccardchip.h>
 
 #include <dev/pcic/i82365reg.h>
 
@@ -107,8 +106,6 @@ struct pcic_softc {
 	struct resource	*port_res;
 	int		port_rid;
 
-	/* this needs to be large enough to hold PCIC_MEM_PAGES bits */
-	int	subregionmask;
 #define PCIC_MAX_MEM_PAGES	(8 * sizeof(int))
 
 	/* used by memory window mapping functions */
@@ -191,3 +188,7 @@ int pcic_suspend(device_t dev);
 int pcic_resume(device_t dev);
 int pcic_enable_socket(device_t dev, device_t child);
 int pcic_disable_socket(device_t dev, device_t child);
+int pcic_set_res_flags(device_t dev, device_t child, int type, int rid, 
+    u_int32_t flags);
+int pcic_set_memory_offset(device_t dev, device_t child, int rid,
+    u_int32_t offset);

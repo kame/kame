@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.151 2000/03/01 08:53:59 kato Exp $
+ * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.151.2.6 2000/07/20 10:35:15 kris Exp $
  */
 
 #include "apm.h"
@@ -68,14 +68,11 @@
 #include <sys/callout.h>
 #include <sys/mbuf.h>
 #include <sys/msgbuf.h>
+#include <sys/random.h>
 #include <sys/sysent.h>
 #include <sys/sysctl.h>
 #include <sys/vmmeter.h>
 #include <sys/bus.h>
-
-#ifdef SYSVSHM
-#include <sys/shm.h>
-#endif
 
 #ifdef SYSVMSG
 #include <sys/msg.h>
@@ -130,7 +127,6 @@
 #include <isa/rtc.h>
 #endif
 #include <machine/vm86.h>
-#include <machine/random.h>
 #include <sys/ptrace.h>
 #include <machine/sigframe.h>
 
@@ -282,7 +278,7 @@ cpu_startup(dummy)
 	/*
 	 * Good {morning,afternoon,evening,night}.
 	 */
-	printf(version);
+	printf("%s", version);
 	earlysetcpuclass();
 	startrtclock();
 	printcpuinfo();
@@ -342,9 +338,6 @@ again:
 
 	valloc(callout, struct callout, ncallout);
 	valloc(callwheel, struct callout_tailq, callwheelsize);
-#ifdef SYSVSHM
-	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
-#endif
 #ifdef SYSVSEM
 	valloc(sema, struct semid_ds, seminfo.semmni);
 	valloc(sem, struct sem, seminfo.semmns);
@@ -358,13 +351,35 @@ again:
 	valloc(msqids, struct msqid_ds, msginfo.msgmni);
 #endif
 
+	/*
+	 * The nominal buffer size (and minimum KVA allocation) is BKVASIZE.
+	 * For the first 64MB of ram nominally allocate sufficient buffers to
+	 * cover 1/4 of our ram.  Beyond the first 64MB allocate additional
+	 * buffers to cover 1/20 of our ram over 64MB.
+	 *
+	 * factor represents the 1/4 x ram conversion.
+	 */
 	if (nbuf == 0) {
+		int factor = 4 * BKVASIZE / PAGE_SIZE;
+
 		nbuf = 50;
 		if (physmem > 1024)
-			nbuf += min((physmem - 1024) / 8, 2048);
+			nbuf += min((physmem - 1024) / factor, 16384 / factor);
 		if (physmem > 16384)
-			nbuf += (physmem - 16384) / 20;
+			nbuf += (physmem - 16384) * 2 / (factor * 5);
 	}
+
+	/*
+	 * Do not allow the buffer_map to be more then 1/2 the size of the
+	 * kernel_map.
+	 */
+	if (nbuf > (kernel_map->max_offset - kernel_map->min_offset) / 
+	    (BKVASIZE * 2)) {
+		nbuf = (kernel_map->max_offset - kernel_map->min_offset) / 
+		    (BKVASIZE * 2);
+		printf("Warning: nbufs capped at %d\n", nbuf);
+	}
+
 	nswbuf = max(min(nbuf/4, 256), 16);
 
 	valloc(swbuf, struct buf, nswbuf);
@@ -1400,21 +1415,22 @@ sdtossd(sd, ssd)
  * Total memory size may be set by the kernel environment variable
  * hw.physmem or the compile-time define MAXMEM.
  */
+#ifdef PC98
 static void
-getmemsize_pc98(int first)
+getmemsize(int first)
 {
 	u_int	biosbasemem, biosextmem;
 	u_int	pagesinbase, pagesinext;
 	int	pa_indx;
+	int	pg_n;
 	int	speculative_mprobe;
 #if	NNPX > 0
 	int	msize;
 #endif
+	unsigned	under16;
 	vm_offset_t	target_page;
 
-	pc98_getmemsize();
-	biosbasemem = 640;                      /* 640KB */
-	biosextmem = (Maxmem * PAGE_SIZE - 0x100000)/1024;   /* extent memory */
+	pc98_getmemsize(&biosbasemem, &biosextmem, &under16);
 
 #ifdef SMP
 	/* make hole for AP bootstrap code */
@@ -1422,9 +1438,11 @@ getmemsize_pc98(int first)
 #else
 	pagesinbase = biosbasemem * 1024 / PAGE_SIZE;
 #endif
-
 	pagesinext = biosextmem * 1024 / PAGE_SIZE;
 
+ 	Maxmem_under16M = under16 * 1024 / PAGE_SIZE;
+
+#ifndef MAXMEM
 	/*
 	 * Maxmem isn't the "maximum memory", it's one larger than the
 	 * highest page of the physical address space.  It should be
@@ -1440,18 +1458,10 @@ getmemsize_pc98(int first)
 	 * memory probe.
 	 */
 	if (Maxmem >= 0x4000)
-#ifdef PC98
-	{
-		Maxmem = 0x4000;	/* XXX */
 		speculative_mprobe = TRUE;
-	}
-#else
-		speculative_mprobe = TRUE;
-#endif
 	else
 		speculative_mprobe = FALSE;
-
-#ifdef MAXMEM
+#else
 	Maxmem = MAXMEM/4;
 	speculative_mprobe = FALSE;
 #endif
@@ -1491,36 +1501,111 @@ getmemsize_pc98(int first)
 		pa_indx++;
 	}
 
+	/* XXX - some of EPSON machines can't use PG_N */
+	pg_n = PG_N;
+	if (pc98_machine_type & M_EPSON_PC98) {
+		switch (epson_machine_id) {
+#ifdef WB_CACHE
+		default:
+#endif
+		case 0x34:		/* PC-486HX */
+		case 0x35:		/* PC-486HG */
+		case 0x3B:		/* PC-486HA */
+			pg_n = 0;
+			break;
+		}
+	}
+
+	speculative_mprobe = FALSE;
+#ifdef notdef	/* XXX - see below */
+	/*
+	 * Certain 'CPU accelerator' supports over 16MB memory on the machines
+	 * whose BIOS doesn't store true size.  
+	 * To support this, we don't trust BIOS values if Maxmem < 16MB (0x1000
+	 * pages) - which is the largest amount that the OLD PC-98 can report.
+	 *
+	 * OK: PC-9801NS/R(9.6M)
+	 * OK: PC-9801DA(5.6M)+EUD-H(32M)+Cyrix 5x86
+	 * OK: PC-9821Ap(14.6M)+EUA-T(8M)+Cyrix 5x86-100
+	 * NG: PC-9821Ap(14.6M)+EUA-T(8M)+AMD DX4-100 -> freeze
+	 */
+	if (Maxmem < 0x1000) {
+		int tmp, page_bad;
+
+		page_bad = FALSE;
+
+		/*
+		 * For Max14.6MB machines, the 0x10f0 page is same as 0x00f0,
+		 * which is BIOS ROM, by overlapping.
+		 * So, we check that page's ability of writing.
+		 */
+		target_page = ptoa(0x10f0);
+
+		/*
+		 * map page into kernel: valid, read/write, non-cacheable
+		 */
+		*(int *)CMAP1 = PG_V | PG_RW | pg_n | target_page;
+		invltlb();
+
+		tmp = *(int *)CADDR1;
+		/*
+		 * Test for alternating 1's and 0's
+		 */
+		*(volatile int *)CADDR1 = 0xaaaaaaaa;
+		if (*(volatile int *)CADDR1 != 0xaaaaaaaa)
+			page_bad = TRUE;
+		/*
+		 * Test for alternating 0's and 1's
+		 */
+		*(volatile int *)CADDR1 = 0x55555555;
+		if (*(volatile int *)CADDR1 != 0x55555555)
+			page_bad = TRUE;
+		/*
+		 * Test for all 1's
+		 */
+		*(volatile int *)CADDR1 = 0xffffffff;
+		if (*(volatile int *)CADDR1 != 0xffffffff)
+			page_bad = TRUE;
+		/*
+		 * Test for all 0's
+		 */
+		*(volatile int *)CADDR1 = 0x0;
+		if (*(volatile int *)CADDR1 != 0x0) {
+			/*
+			 * test of page failed
+			 */
+			page_bad = TRUE;
+		}
+		/*
+		 * Restore original value.
+		 */
+		*(int *)CADDR1 = tmp;
+
+		/*
+		 * Adjust Maxmem if valid/good page.
+		 */
+		if (page_bad == FALSE) {
+			/* '+ 2' is needed to make speculative_mprobe sure */
+			Maxmem = 0x1000 + 2;
+			speculative_mprobe = TRUE;
+		}
+	}
+#endif
+
 	for (target_page = avail_start; target_page < ptoa(Maxmem); target_page += PAGE_SIZE) {
 		int tmp, page_bad;
 
 		page_bad = FALSE;
+
 		/* skip system area */
-		if (target_page>=ptoa(Maxmem_under16M) &&
+		if (target_page >= ptoa(Maxmem_under16M) &&
 				target_page < ptoa(4096))
 			continue;
 
 		/*
 		 * map page into kernel: valid, read/write, non-cacheable
 		 */
-		if (pc98_machine_type & M_EPSON_PC98) {
-			switch (epson_machine_id) {
-			case 0x34:				/* PC-486HX */
-			case 0x35:				/* PC-486HG */
-			case 0x3B:				/* PC-486HA */
-				*(int *)CMAP1 = PG_V | PG_RW | target_page;
-				break;
-			default:
-#ifdef WB_CACHE
-				*(int *)CMAP1 = PG_V | PG_RW | target_page;
-#else
-				*(int *)CMAP1 = PG_V | PG_RW | PG_N | target_page;
-#endif
-				break;
-			}
-		} else {
-		*(int *)CMAP1 = PG_V | PG_RW | PG_N | target_page;
-		}
+		*(int *)CMAP1 = PG_V | PG_RW | pg_n | target_page;
 		invltlb();
 
 		tmp = *(int *)CADDR1;
@@ -1578,7 +1663,7 @@ getmemsize_pc98(int first)
 			if (phys_avail[pa_indx] == target_page) {
 				phys_avail[pa_indx] += PAGE_SIZE;
 				if (speculative_mprobe == TRUE &&
-				    phys_avail[pa_indx] >= (64*1024*1024))
+				    phys_avail[pa_indx] >= (16*1024*1024))
 					Maxmem++;
 			} else {
 				pa_indx++;
@@ -1617,8 +1702,7 @@ getmemsize_pc98(int first)
 
 	avail_end = phys_avail[pa_indx];
 }
-
-#ifndef PC98
+#else
 static void
 getmemsize(int first)
 {
@@ -1690,7 +1774,6 @@ getmemsize(int first)
 	pte = (pt_entry_t)vtopte(KERNBASE + (1 << PAGE_SHIFT));
 	*pte = (1 << PAGE_SHIFT) | PG_RW | PG_V;
 
-	extmem = (Maxmem * PAGE_SIZE - 0x100000)/1024;   /* extent memory */
 	/*
 	 * get memory map with INT 15:E820
 	 */
@@ -2181,11 +2264,8 @@ init386(first)
 	dblfault_tss.tss_ldt = GSEL(GLDT_SEL, SEL_KPL);
 
 	vm86_initialize();
-#ifdef PC98
-	getmemsize_pc98(first);
-#else
 	getmemsize(first);
-#endif
+
 	/* now running on new page tables, configured,and u/iom is accessible */
 
 	/* Map the message buffer. */

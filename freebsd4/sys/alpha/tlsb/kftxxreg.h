@@ -1,8 +1,8 @@
-/* $FreeBSD: src/sys/alpha/tlsb/kftxxreg.h,v 1.3 1999/08/28 00:39:16 peter Exp $ */
+/* $FreeBSD: src/sys/alpha/tlsb/kftxxreg.h,v 1.3.2.1 2000/03/27 18:32:50 mjacob Exp $ */
 /* $NetBSD: kftxxreg.h,v 1.4 1997/06/04 01:47:15 cgd Exp $ */
 
 /*
- * Copyright (c) 1997 by Matthew Jacob
+ * Copyright (c) 1997, 2000 by Matthew Jacob
  * NASA AMES Research Center.
  * All rights reserved.
  *
@@ -15,8 +15,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. The name of the author may not be used to endorse or promote products
- *    derived from this software without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
  * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
@@ -73,3 +71,7 @@
 #define	KFT_ICCNSE	0x2040
 #define	KFT_ICCWTR	0x2100
 #define	KFT_IDPMSR	0x2B80
+#define	KFT_IDPNSE0	0x2A40
+#define	KFT_IDPNSE1	0x2140
+#define	KFT_IDPNSE2	0x2240
+#define	KFT_IDPNSE3	0x2340

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)cdefs.h	8.8 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/cdefs.h,v 1.28 2000/01/30 07:54:05 jasone Exp $
+ * $FreeBSD: src/sys/sys/cdefs.h,v 1.28.2.1 2000/03/18 23:30:03 jasone Exp $
  */
 
 #ifndef	_SYS_CDEFS_H_
@@ -154,7 +154,7 @@
 
 #ifdef __GNUC__
 #define __strong_reference(sym,aliassym)	\
-	extern __typeof (sym) aliassym __attribute__ ((alias (#sym)));
+	extern __typeof (sym) aliassym __attribute__ ((__alias__ (#sym)));
 #ifdef __ELF__
 #ifdef __STDC__
 #define	__weak_reference(sym,alias)	\

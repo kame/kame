@@ -7,16 +7,13 @@
 **
 *******************************************************************/
 
-/* $FreeBSD: src/sys/boot/ficl/alpha/sysdep.c,v 1.7 1999/09/29 04:43:07 dcs Exp $ */
+/* $FreeBSD: src/sys/boot/ficl/alpha/sysdep.c,v 1.7.2.1 2000/07/06 23:51:46 obrien Exp $ */
 
 #ifdef TESTMAIN
 #include <stdio.h>
 #include <stdlib.h>
 #else
 #include <stand.h>
-#ifdef __i386__
-#include <machine/cpufunc.h>
-#endif
 #endif
 #include "ficl.h"
 
@@ -80,39 +77,6 @@ void  ficlFree   (void *p)
     free(p);
 }
 
-#ifndef TESTMAIN
-#ifdef __i386__
-/* 
- * outb ( port# c -- )
- * Store a byte to I/O port number port#
- */
-void
-ficlOutb(FICL_VM *pVM)
-{
-	u_char c;
-	u_int32_t port;
-
-	port=stackPopUNS(pVM->pStack);
-	c=(u_char)stackPopINT(pVM->pStack);
-	outb(port,c);
-}
-
-/*
- * inb ( port# -- c )
- * Fetch a byte from I/O port number port#
- */
-void
-ficlInb(FICL_VM *pVM)
-{
-	u_char c;
-	u_int32_t port;
-
-	port=stackPopUNS(pVM->pStack);
-	c=inb(port);
-	stackPushINT(pVM->pStack,c);
-}
-#endif
-#endif
 
 /*
 ** Stub function for dictionary access control - does nothing

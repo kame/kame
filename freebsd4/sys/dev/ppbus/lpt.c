@@ -48,7 +48,7 @@
  *	from: unknown origin, 386BSD 0.1
  *	From Id: lpt.c,v 1.55.2.1 1996/11/12 09:08:38 phk Exp
  *	From Id: nlpt.c,v 1.14 1999/02/08 13:55:43 des Exp
- * $FreeBSD: src/sys/dev/ppbus/lpt.c,v 1.15 2000/02/13 03:03:31 peter Exp $
+ * $FreeBSD: src/sys/dev/ppbus/lpt.c,v 1.15.2.3 2000/07/07 00:30:40 obrien Exp $
  */
 
 /*
@@ -68,23 +68,24 @@
 #include <sys/module.h>
 #include <sys/bus.h>
 #include <sys/conf.h>
-#include <sys/buf.h>
 #include <sys/kernel.h>
 #include <sys/uio.h>
 #include <sys/syslog.h>
+#include <sys/malloc.h>
 
 #include <machine/clock.h>
 #include <machine/bus.h>
 #include <machine/resource.h>
 #include <sys/rman.h>
 
-#include <machine/lpt.h>
-
+#include <dev/ppbus/lptio.h>
 #include <dev/ppbus/ppbconf.h>
 #include <dev/ppbus/ppb_1284.h>
 #include <dev/ppbus/lpt.h>
 #include "ppbus_if.h"
 #include <dev/ppbus/ppbio.h>
+
+MALLOC_DEFINE(M_LPT, "lpt", "LPT buffers");
 
 #ifndef LPT_DEBUG
 #define lprintf(args)
@@ -120,8 +121,8 @@ struct lpt_data {
 #define LP_PRIMEOPEN	0x20	/* prime on every open */
 #define LP_AUTOLF	0x40	/* tell printer to do an automatic lf */
 #define LP_BYPASS	0x80	/* bypass  printer ready checks */
-	struct	buf *sc_inbuf;
-	struct	buf *sc_statbuf;
+	void	*sc_inbuf;
+	void	*sc_statbuf;
 	short	sc_xfercnt ;
 	char	sc_primed;
 	char	*sc_cp ;
@@ -551,8 +552,8 @@ lptopen(dev_t dev, int flags, int fmt, struct proc *p)
 	ppb_wctr(ppbus, sc->sc_control);
 
 	sc->sc_state = OPEN;
-	sc->sc_inbuf = geteblk(BUFSIZE);
-	sc->sc_statbuf = geteblk(BUFSTATSIZE);
+	sc->sc_inbuf = malloc(BUFSIZE, M_LPT, M_WAITOK);
+	sc->sc_statbuf = malloc(BUFSTATSIZE, M_LPT, M_WAITOK);
 	sc->sc_xfercnt = 0;
 	splx(s);
 
@@ -605,8 +606,8 @@ lptclose(dev_t dev, int flags, int fmt, struct proc *p)
 				break;
 
 	ppb_wctr(ppbus, LPC_NINIT);
-	brelse(sc->sc_inbuf);
-	brelse(sc->sc_statbuf);
+	free(sc->sc_inbuf, M_LPT);
+	free(sc->sc_statbuf, M_LPT);
 
 end_close:
 	/* release the bus anyway
@@ -695,6 +696,11 @@ lptread(dev_t dev, struct uio *uio, int ioflag)
         device_t ppbus = device_get_parent(lptdev);
 	int error = 0, len;
 
+	if (sc->sc_flags & LP_BYPASS) {
+		/* we can't do reads in bypass mode */
+		return (EPERM);
+	}
+
 	if ((error = ppb_1284_negociate(ppbus, PPB_NIBBLE, 0)))
 		return (error);
 
@@ -702,7 +708,7 @@ lptread(dev_t dev, struct uio *uio, int ioflag)
 	len = 0;
 	while (uio->uio_resid) {
 		if ((error = ppb_1284_read(ppbus, PPB_NIBBLE,
-				sc->sc_statbuf->b_data, min(BUFSTATSIZE,
+				sc->sc_statbuf, min(BUFSTATSIZE,
 				uio->uio_resid), &len))) {
 			goto error;
 		}
@@ -710,7 +716,7 @@ lptread(dev_t dev, struct uio *uio, int ioflag)
 		if (!len)
 			goto error;		/* no more data */
 
-		if ((error = uiomove(sc->sc_statbuf->b_data, len, uio)))
+		if ((error = uiomove(sc->sc_statbuf, len, uio)))
 			goto error;
 	}
 
@@ -760,7 +766,7 @@ lptwrite(dev_t dev, struct uio *uio, int ioflag)
 
 	sc->sc_state &= ~INTERRUPTED;
 	while ((n = min(BUFSIZE, uio->uio_resid)) != 0) {
-		sc->sc_cp = sc->sc_inbuf->b_data ;
+		sc->sc_cp = sc->sc_inbuf;
 		uiomove(sc->sc_cp, n, uio);
 		sc->sc_xfercnt = n ;
 

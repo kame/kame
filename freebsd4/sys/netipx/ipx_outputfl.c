@@ -33,7 +33,7 @@
  *
  *	@(#)ipx_outputfl.c
  *
- * $FreeBSD: src/sys/netipx/ipx_outputfl.c,v 1.14 1999/08/28 18:21:53 jhay Exp $
+ * $FreeBSD: src/sys/netipx/ipx_outputfl.c,v 1.14.2.1 2000/05/01 01:10:24 bp Exp $
  */
 
 #include <sys/param.h>
@@ -245,10 +245,10 @@ ipx_output_type20(m)
 			ifp = ia->ia_ifa.ifa_ifp;
 			dst.sipx_addr.x_net = ia->ia_addr.sipx_addr.x_net;
 			ipx->ipx_dna.x_net = dst.sipx_addr.x_net;
-			m1 = m_copym(m, 0, M_COPYALL, M_DONTWAIT);
-
 			if(ipx->ipx_sum != 0xffff)
 				ipx->ipx_sum = ipx_cksum(m, ntohs(ipx->ipx_len));
+
+			m1 = m_copym(m, 0, M_COPYALL, M_DONTWAIT);
 			if(m1) {
 				error = (*ifp->if_output)(ifp, m1,
 					(struct sockaddr *)&dst, NULL);

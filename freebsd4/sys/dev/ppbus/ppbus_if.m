@@ -23,9 +23,10 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $FreeBSD: src/sys/dev/ppbus/ppbus_if.m,v 1.1 2000/01/14 00:17:57 nsouch Exp $
+# $FreeBSD: src/sys/dev/ppbus/ppbus_if.m,v 1.1.2.1 2000/05/24 00:20:57 n_hibma Exp $
 #
 
+#include <sys/bus.h>
 #include <dev/ppbus/ppbconf.h>
 
 INTERFACE ppbus;

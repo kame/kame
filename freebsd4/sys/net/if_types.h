@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_types.h	8.2 (Berkeley) 4/20/94
- * $FreeBSD: src/sys/net/if_types.h,v 1.8 1999/11/05 14:41:30 shin Exp $
+ * $FreeBSD: src/sys/net/if_types.h,v 1.8.2.1 2000/07/15 07:14:29 kris Exp $
  */
 
 #ifndef _NET_IF_TYPES_H_
@@ -99,5 +99,6 @@
 #define	IFT_PROPMUX	0x36		/* Proprietary Multiplexing */
 #define	IFT_GIF		0x37
 #define	IFT_FAITH	0x38
+#define	IFT_STF		0x39
 
 #endif

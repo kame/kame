@@ -1,6 +1,6 @@
 /**************************************************************************
 **
-** $FreeBSD: src/sys/pci/pcisupport.c,v 1.154 2000/03/12 21:55:15 cpiazza Exp $
+** $FreeBSD: src/sys/pci/pcisupport.c,v 1.154.2.1 2000/03/29 06:56:04 cpiazza Exp $
 **
 **  Device driver for DEC/INTEL PCI chipsets.
 **
@@ -1728,6 +1728,12 @@ const char* pci_vga_match(device_t dev)
 			chip = "GeForce DDR"; break;
 		case 0x0103:
 			chip = "Quadro"; break;
+		case 0x0150:
+		case 0x0151:
+		case 0x0152:
+			chip = "GeForce2 GTS"; break;
+		case 0x0153:
+			chip = "Quadro2"; break;
 		}
 		break;
 	case 0x12d2:

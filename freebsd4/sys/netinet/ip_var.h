@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_var.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/ip_var.h,v 1.50 1999/12/29 04:41:02 peter Exp $
+ * $FreeBSD: src/sys/netinet/ip_var.h,v 1.50.2.2 2000/07/15 07:14:31 kris Exp $
  */
 
 #ifndef _NETINET_IP_VAR_H_
@@ -131,9 +131,6 @@ struct	ipstat {
 #define	IP_RAWOUTPUT		0x2		/* raw ip header exists */
 #define	IP_ROUTETOIF		SO_DONTROUTE	/* bypass routing tables */
 #define	IP_ALLOWBROADCAST	SO_BROADCAST	/* can send broadcast packets */
-#define	IP_SOCKINMRCVIF		0x100		/* IPSEC hack;
-						 * socket pointer in sending
-						 * packet's m_pkthdr.rcvif */
 
 struct ip;
 struct inpcb;
@@ -188,6 +185,8 @@ extern u_int16_t ip_divert_cookie;
 #endif
 
 extern struct sockaddr_in *ip_fw_fwd_addr;
+
+void	in_delayed_cksum(struct mbuf *m);
 
 #endif /* _KERNEL */
 

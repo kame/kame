@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/pci/tsunami_pci.c,v 1.6 2000/01/20 16:49:18 gallatin Exp $
+ * $FreeBSD: src/sys/alpha/pci/tsunami_pci.c,v 1.6.2.1 2000/06/07 01:45:03 jhb Exp $
  */
 
 #include <sys/param.h>
@@ -33,6 +33,7 @@
 #include <sys/malloc.h>
 #include <sys/bus.h>
 #include <machine/bus.h>
+#include <machine/md_var.h>
 #include <sys/rman.h>
 #include <pci/pcivar.h>
 #include <alpha/pci/tsunamireg.h>
@@ -156,8 +157,8 @@ static device_method_t tsunami_pcib_methods[] = {
 	DEVMETHOD(bus_release_resource,	bus_generic_release_resource),
 	DEVMETHOD(bus_activate_resource, bus_generic_activate_resource),
 	DEVMETHOD(bus_deactivate_resource, bus_generic_deactivate_resource),
-	DEVMETHOD(bus_setup_intr,	bus_generic_setup_intr),
-	DEVMETHOD(bus_teardown_intr,	bus_generic_teardown_intr),
+	DEVMETHOD(bus_setup_intr,	alpha_platform_pci_setup_intr),
+	DEVMETHOD(bus_teardown_intr,	alpha_platform_pci_teardown_intr),
 
 	{ 0, 0 }
 };

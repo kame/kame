@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_ed_pccard.c,v 1.9 2000/01/21 03:08:45 hosokawa Exp $
+ * $FreeBSD: src/sys/dev/ed/if_ed_pccard.c,v 1.9.2.3 2000/07/17 21:24:25 archie Exp $
  */
 
 #include <sys/param.h>
@@ -91,11 +91,10 @@ ed_pccard_detach(device_t dev)
 	}
 	ed_stop(sc);
 	ifp->if_flags &= ~IFF_RUNNING;
-	if_detach(ifp);
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 	sc->gone = 1;
 	bus_teardown_intr(dev, sc->irq_res, sc->irq_handle);
 	ed_release_resources(dev);
-	device_printf(dev, "unload\n");
 	return (0);
 }
 
@@ -109,12 +108,12 @@ ed_pccard_probe(device_t dev)
 {
 	int     error;
 
-	error = ed_probe_WD80x3(dev);
+	error = ed_probe_Novell(dev);
 	if (error == 0)
 		goto end;
 	ed_release_resources(dev);
 
-	error = ed_probe_Novell(dev);
+	error = ed_probe_WD80x3(dev);
 	if (error == 0)
 		goto end;
 	ed_release_resources(dev);
@@ -151,11 +150,13 @@ ed_pccard_attach(device_t dev)
 		return (error);
 	}	      
 
-	pccard_get_ether(dev, ether_addr);
-	for (i = 0, sum = 0; i < ETHER_ADDR_LEN; i++)
-		sum |= ether_addr[i];
-	if (sum)
-		bcopy(ether_addr, sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
+	if (ed_get_Linksys(sc) == 0) {
+		pccard_get_ether(dev, ether_addr);
+		for (i = 0, sum = 0; i < ETHER_ADDR_LEN; i++)
+			sum |= ether_addr[i];
+		if (sum)
+			bcopy(ether_addr, sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
+	}
 
 	error = ed_attach(sc, device_get_unit(dev), flags);
 	return (error);

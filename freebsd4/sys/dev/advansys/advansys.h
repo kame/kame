@@ -30,16 +30,15 @@
  * SUCH DAMAGE.
  * All rights reserved.
  *
- * $FreeBSD: src/sys/dev/advansys/advansys.h,v 1.2 1999/08/28 00:41:16 peter Exp $
+ * $FreeBSD: src/sys/dev/advansys/advansys.h,v 1.2.2.1 2000/04/14 13:32:48 nyan Exp $
  */
 
 #ifndef _ADVANSYS_H_
 #define _ADVANSYS_H_
 
-#include "adv.h"
 #include <dev/advansys/advlib.h>
 
-struct adv_softc *	adv_alloc(int unit, bus_space_tag_t tag,
+struct adv_softc *	adv_alloc(device_t dev, bus_space_tag_t tag,
 				  bus_space_handle_t bsh);
 char *			adv_name(struct adv_softc *adv);
 void			adv_map(void *arg, bus_dma_segment_t *segs,
@@ -53,7 +52,4 @@ void			adv_done(struct adv_softc *adv, union ccb* ccb,
 				 u_int scsi_stat, u_int q_no);
 timeout_t		adv_timeout;
 
-extern struct adv_softc *advsoftcs[NADV];   /* XXX Config should handle this */
-
-extern u_long adv_unit;
 #endif /* _ADVANSYS_H_ */

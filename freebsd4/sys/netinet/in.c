@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in.c	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/in.c,v 1.44 2000/01/13 14:52:49 shin Exp $
+ * $FreeBSD: src/sys/netinet/in.c,v 1.44.2.1 2000/07/15 07:14:30 kris Exp $
  */
 
 #include <sys/param.h>
@@ -207,6 +207,7 @@ in_control(so, cmd, data, ifp, p)
         if (ifp && ifp->if_type == IFT_GIF) {
                 switch (cmd) {
                 case SIOCSIFPHYADDR:
+		case SIOCDIFPHYADDR:
 			if (p &&
 			    (error = suser(p)) != 0)
         			return(error);

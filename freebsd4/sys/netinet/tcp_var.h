@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_var.h	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.56 2000/01/09 19:17:28 shin Exp $
+ * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.56.2.1 2000/07/18 16:45:47 sheldonh Exp $
  */
 
 #ifndef _NETINET_TCP_VAR_H_
@@ -331,7 +331,7 @@ struct	xtcpcb {
 #define	TCPCTL_KEEPINTVL	7	/* interval to send keepalives */
 #define	TCPCTL_SENDSPACE	8	/* send buffer space */
 #define	TCPCTL_RECVSPACE	9	/* receive buffer space */
-#define	TCPCTL_KEEPINIT		10	/* receive buffer space */
+#define	TCPCTL_KEEPINIT		10	/* timeout for establishing syn */
 #define	TCPCTL_PCBLIST		11	/* list of all outstanding PCBs */
 #define	TCPCTL_DELACKTIME	12	/* time before sending delayed ACK */
 #define	TCPCTL_V6MSSDFLT	13	/* MSS default for IPv6 */

@@ -1,9 +1,7 @@
-# $FreeBSD: src/sys/boot/pc98/loader/Makefile,v 1.12 2000/02/05 02:21:31 kato Exp $
+# $FreeBSD: src/sys/boot/pc98/loader/Makefile,v 1.12.2.3 2000/07/06 23:35:17 obrien Exp $
 
 BASE=		loader
 PROG=		${BASE}
-MAN5=		../../forth/loader.conf.5
-MAN8=		../../i386/loader/loader.8 ../../forth/loader.4th.8
 #NOMAN=
 STRIP=
 NEWVERSWHAT=	"bootstrap loader" pc98
@@ -14,6 +12,10 @@ CFLAGS+=	-DPC98
 # architecture-specific loader code
 SRCS=		main.c conf.c
 .PATH:		${.CURDIR}/../../i386/loader
+
+# Enable PXE TFTP or NFS support, not both.
+CFLAGS+=	-DLOADER_NFS_SUPPORT
+#CFLAGS+=	-DLOADER_TFTP_SUPPORT
 
 # Enable PnP and ISA-PnP code.
 HAVE_PNP=	yes
@@ -47,8 +49,8 @@ CFLAGS+=	-I${.CURDIR}/..
 
 # where to get libstand from
 LIBSTAND=	-lstand
-#LIBSTAND=	${.CURDIR}/../../../lib/libstand/libstand.a
-#CFLAGS+=	-I${.CURDIR}/../../../lib/libstand/
+#LIBSTAND=	${.CURDIR}/../../../../lib/libstand/libstand.a
+CFLAGS+=	-I${.CURDIR}/../../../../lib/libstand/
 
 # BTX components
 .if exists(${.OBJDIR}/../btx)
@@ -76,8 +78,8 @@ vers.o:	${.CURDIR}/../../common/newvers.sh ${.CURDIR}/../../i386/loader/version
 	${CC} -c vers.c
 
 ${BASE}: ${BASE}.bin ${BTXLDR} ${BTXKERN} ${BTXCRT} ${BASE}.help
-	btxld -v -f aout -e 0x100000 -o ${.TARGET} -l ${BTXLDR} -b ${BTXKERN} \
-		${BASE}.bin
+	btxld -v -f aout -e ${LOADER_ADDRESS} -o ${.TARGET} -l ${BTXLDR} \
+		-b ${BTXKERN} ${BASE}.bin
 #	/usr/bin/kzip ${.TARGET}
 #	mv ${.TARGET}.kz ${.TARGET}
 
@@ -110,12 +112,14 @@ beforeinstall:
 	${INSTALL} -C -o ${BINOWN} -g ${BINGRP} -m 444 \
 		${.CURDIR}/../../forth/loader.conf ${DESTDIR}/boot/defaults
 
+.include <${.CURDIR}/../Makefile.inc>
+
 # Cannot use ${OBJS} above this line
 .include <bsd.prog.mk>
 
 ${BASE}.sym: ${OBJS} ${LIBPC98} ${LIBSTAND} ${LIBFICL} vers.o
 	${CC} ${LDFLAGS} -o ${.TARGET} ${BTXCRT} ${OBJS} vers.o \
-		${LIBFICL} ${LIBSTAND} ${LIBPC98} ${LIBSTAND}
+		${LIBFICL} ${LIBPC98} ${LIBSTAND}
 
 # If it's not there, don't consider it a target
 .if exists(${.CURDIR}/../../../i386/include)
@@ -127,5 +131,3 @@ machine:
 .endif
 
 CLEANFILES+=	machine
-
-

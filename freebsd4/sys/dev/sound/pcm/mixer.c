@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/mixer.c,v 1.4 1999/11/20 16:50:32 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/mixer.c,v 1.4.2.2 2000/07/19 21:18:46 cg Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -32,6 +32,7 @@ static u_int16_t snd_mixerdefaults[SOUND_MIXER_NRDEVICES] = {
 	[SOUND_MIXER_VOLUME]	= 75,
 	[SOUND_MIXER_BASS]	= 50,
 	[SOUND_MIXER_TREBLE]	= 50,
+	[SOUND_MIXER_SYNTH]	= 75,
 	[SOUND_MIXER_PCM]	= 75,
 	[SOUND_MIXER_SPEAKER]	= 75,
 	[SOUND_MIXER_LINE]	= 75,
@@ -62,6 +63,19 @@ mixer_init(snddev_info *d, snd_mixer *m, void *devinfo)
 }
 
 int
+mixer_reinit(snddev_info *d)
+{
+	int i;
+	if (d == NULL) return -1;
+	if (d->mixer.init != NULL && d->mixer.init(&d->mixer) == 0) {
+		for (i = 0; i < SOUND_MIXER_NRDEVICES; i++)
+			mixer_set(d, i, d->mixer.level[i]);
+		mixer_setrecsrc(d, d->mixer.recsrc);
+		return 0;
+	} else return -1;
+}
+
+int
 mixer_set(snddev_info *d, unsigned dev, unsigned lev)
 {
 	if (d == NULL || d->mixer.set == NULL) return -1;
@@ -69,7 +83,7 @@ mixer_set(snddev_info *d, unsigned dev, unsigned lev)
 		unsigned l = min((lev & 0x00ff), 100);
 		unsigned r = min(((lev & 0xff00) >> 8), 100);
 		int v = d->mixer.set(&d->mixer, dev, l, r);
-		if (v >= 0) d->mixer.level[dev] = v;
+		if (v >= 0) d->mixer.level[dev] = l | (r << 8);
 		return 0;
 	} else return -1;
 }

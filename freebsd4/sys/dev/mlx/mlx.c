@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/mlx/mlx.c,v 1.14 1999/12/25 01:45:22 msmith Exp $
+ *	$FreeBSD: src/sys/dev/mlx/mlx.c,v 1.14.2.2 2000/04/24 19:40:48 msmith Exp $
  */
 
 /*
@@ -40,6 +40,7 @@
 #include <sys/conf.h>
 #include <sys/devicestat.h>
 #include <sys/disk.h>
+#include <sys/stat.h>
 
 #include <machine/resource.h>
 #include <machine/bus.h>
@@ -49,12 +50,6 @@
 #include <dev/mlx/mlxio.h>
 #include <dev/mlx/mlxvar.h>
 #include <dev/mlx/mlxreg.h>
-
-#if 0
-#define debug(fmt, args...)	printf("%s: " fmt "\n", __FUNCTION__ , ##args)
-#else
-#define debug(fmt, args...)
-#endif
 
 #define MLX_CDEV_MAJOR	130
 
@@ -75,7 +70,6 @@ static struct cdevsw mlx_cdevsw = {
 		/* bmaj */	-1
 };
 
-static int	cdev_registered = 0;
 devclass_t	mlx_devclass;
 
 /*
@@ -84,14 +78,17 @@ devclass_t	mlx_devclass;
 static int			mlx_v3_tryqueue(struct mlx_softc *sc, struct mlx_command *mc);
 static int			mlx_v3_findcomplete(struct mlx_softc *sc, u_int8_t *slot, u_int16_t *status);
 static void			mlx_v3_intaction(struct mlx_softc *sc, int action);
+static int			mlx_v3_fw_handshake(struct mlx_softc *sc, int *error, int *param1, int *param2);
 
 static int			mlx_v4_tryqueue(struct mlx_softc *sc, struct mlx_command *mc);
 static int			mlx_v4_findcomplete(struct mlx_softc *sc, u_int8_t *slot, u_int16_t *status);
 static void			mlx_v4_intaction(struct mlx_softc *sc, int action);
+static int			mlx_v4_fw_handshake(struct mlx_softc *sc, int *error, int *param1, int *param2);
 
 static int			mlx_v5_tryqueue(struct mlx_softc *sc, struct mlx_command *mc);
 static int			mlx_v5_findcomplete(struct mlx_softc *sc, u_int8_t *slot, u_int16_t *status);
 static void			mlx_v5_intaction(struct mlx_softc *sc, int action);
+static int			mlx_v5_fw_handshake(struct mlx_softc *sc, int *error, int *param1, int *param2);
 
 /*
  * Status monitoring
@@ -114,6 +111,7 @@ static void			mlx_pause_done(struct mlx_command *mc);
 static void			*mlx_enquire(struct mlx_softc *sc, int command, size_t bufsize, 
 					     void (*complete)(struct mlx_command *mc));
 static int			mlx_flush(struct mlx_softc *sc);
+static int			mlx_check(struct mlx_softc *sc, int drive);
 static int			mlx_rebuild(struct mlx_softc *sc, int channel, int target);
 static int			mlx_wait_command(struct mlx_command *mc);
 static int			mlx_poll_command(struct mlx_command *mc);
@@ -143,7 +141,7 @@ static void			mlx_complete(struct mlx_softc *sc);
  */
 static char			*mlx_diagnose_command(struct mlx_command *mc);
 static void			mlx_describe_controller(struct mlx_softc *sc);
-
+static int			mlx_fw_message(struct mlx_softc *sc, int status, int param1, int param2);
 
 /*
  * Utility functions.
@@ -166,7 +164,7 @@ mlx_free(struct mlx_softc *sc)
 {
     struct mlx_command	*mc;
 
-    debug("called");
+    debug_called(1);
 
     /* cancel status timeout */
     untimeout(mlx_periodic, sc, sc->mlx_timeout);
@@ -205,6 +203,10 @@ mlx_free(struct mlx_softc *sc)
     /* free controller enquiry data */
     if (sc->mlx_enq2 != NULL)
 	free(sc->mlx_enq2, M_DEVBUF);
+
+    /* destroy control device */
+    if (sc->mlx_dev_t != (dev_t)NULL)
+	destroy_dev(sc->mlx_dev_t);
 }
 
 /********************************************************************************
@@ -215,7 +217,7 @@ mlx_dma_map_sg(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 {
     struct mlx_softc	*sc = (struct mlx_softc *)arg;
 
-    debug("called");
+    debug_called(1);
 
     /* save base of s/g table's address in bus space */
     sc->mlx_sgbusaddr = segs->ds_addr;
@@ -227,7 +229,7 @@ mlx_sglist_map(struct mlx_softc *sc)
     size_t	segsize;
     int		error;
 
-    debug("called");
+    debug_called(1);
 
     /* destroy any existing mappings */
     if (sc->mlx_sgtable)
@@ -239,7 +241,7 @@ mlx_sglist_map(struct mlx_softc *sc)
      * Create a single tag describing a region large enough to hold all of
      * the s/g lists we will need.
      */
-    segsize = sizeof(struct mlx_sgentry) * MLX_NSEG * sc->mlx_maxiop;
+    segsize = sizeof(struct mlx_sgentry) * sc->mlx_sg_nseg * sc->mlx_maxiop;
     error = bus_dma_tag_create(sc->mlx_parent_dmat, 	/* parent */
 			       1, 0, 			/* alignment, boundary */
 			       BUS_SPACE_MAXADDR,	/* lowaddr */
@@ -277,9 +279,10 @@ mlx_sglist_map(struct mlx_softc *sc)
 int
 mlx_attach(struct mlx_softc *sc)
 {
-    int			rid, error, fwminor;
+    struct mlx_enquiry_old	*meo;
+    int				rid, error, fwminor, hscode, hserror, hsparam1, hsparam2, hsmsg;
 
-    debug("called");
+    debug_called(1);
 
     /*
      * Initialise per-controller queues.
@@ -292,23 +295,30 @@ mlx_attach(struct mlx_softc *sc)
      * Select accessor methods based on controller interface type.
      */
     switch(sc->mlx_iftype) {
+    case MLX_IFTYPE_2:
     case MLX_IFTYPE_3:
 	sc->mlx_tryqueue	= mlx_v3_tryqueue;
 	sc->mlx_findcomplete	= mlx_v3_findcomplete;
 	sc->mlx_intaction	= mlx_v3_intaction;
+	sc->mlx_fw_handshake	= mlx_v3_fw_handshake;
+	sc->mlx_sg_nseg		= MLX_NSEG_OLD;
 	break;
     case MLX_IFTYPE_4:
 	sc->mlx_tryqueue	= mlx_v4_tryqueue;
 	sc->mlx_findcomplete	= mlx_v4_findcomplete;
 	sc->mlx_intaction	= mlx_v4_intaction;
+	sc->mlx_fw_handshake	= mlx_v4_fw_handshake;
+	sc->mlx_sg_nseg		= MLX_NSEG_NEW;
 	break;
     case MLX_IFTYPE_5:
 	sc->mlx_tryqueue	= mlx_v5_tryqueue;
 	sc->mlx_findcomplete	= mlx_v5_findcomplete;
 	sc->mlx_intaction	= mlx_v5_intaction;
+	sc->mlx_fw_handshake	= mlx_v5_fw_handshake;
+	sc->mlx_sg_nseg		= MLX_NSEG_NEW;
 	break;
     default:
-	device_printf(sc->mlx_dev, "attaching unsupported interface version %d\n", sc->mlx_iftype);
+	mlx_free(sc);
 	return(ENXIO);		/* should never happen */
     }
 
@@ -316,18 +326,44 @@ mlx_attach(struct mlx_softc *sc)
     sc->mlx_intaction(sc, MLX_INTACTION_DISABLE);
 
     /* 
+     * Wait for the controller to come ready, handshake with the firmware if required.
+     * This is typically only necessary on platforms where the controller BIOS does not
+     * run.
+     */
+    hsmsg = 0;
+    DELAY(1000);
+    while ((hscode = sc->mlx_fw_handshake(sc, &hserror, &hsparam1, &hsparam2)) != 0) {
+	/* report first time around... */
+	if (hsmsg == 0) {
+	    device_printf(sc->mlx_dev, "controller initialisation in progress...\n");
+	    hsmsg = 1;
+	}
+	/* did we get a real message? */
+	if (hscode == 2) {
+	    hscode = mlx_fw_message(sc, hserror, hsparam1, hsparam2);
+	    /* fatal initialisation error? */
+	    if (hscode != 0) {
+		mlx_free(sc);
+		return(ENXIO);
+	    }
+	}
+    }
+    if (hsmsg == 1)
+	device_printf(sc->mlx_dev, "initialisation complete.\n");
+
+    /* 
      * Allocate and connect our interrupt.
      */
     rid = 0;
     sc->mlx_irq = bus_alloc_resource(sc->mlx_dev, SYS_RES_IRQ, &rid, 0, ~0, 1, RF_SHAREABLE | RF_ACTIVE);
     if (sc->mlx_irq == NULL) {
-	device_printf(sc->mlx_dev, "couldn't allocate interrupt\n");
+	device_printf(sc->mlx_dev, "can't allocate interrupt\n");
 	mlx_free(sc);
 	return(ENXIO);
     }
     error = bus_setup_intr(sc->mlx_dev, sc->mlx_irq, INTR_TYPE_BIO,  mlx_intr, sc, &sc->mlx_intr);
     if (error) {
-	device_printf(sc->mlx_dev, "couldn't set up interrupt\n");
+	device_printf(sc->mlx_dev, "can't set up interrupt\n");
 	mlx_free(sc);
 	return(ENXIO);
     }
@@ -335,17 +371,18 @@ mlx_attach(struct mlx_softc *sc)
     /*
      * Create DMA tag for mapping buffers into controller-addressable space.
      */
-    error = bus_dma_tag_create(sc->mlx_parent_dmat, 	/* parent */
-			       1, 0, 			/* alignment, boundary */
-			       BUS_SPACE_MAXADDR,	/* lowaddr */
-			       BUS_SPACE_MAXADDR, 	/* highaddr */
-			       NULL, NULL, 		/* filter, filterarg */
-			       MAXBSIZE, MLX_NSEG,	/* maxsize, nsegments */
-			       BUS_SPACE_MAXSIZE_32BIT,	/* maxsegsize */
-			       0,			/* flags */
+    error = bus_dma_tag_create(sc->mlx_parent_dmat, 		/* parent */
+			       1, 0, 				/* alignment, boundary */
+			       BUS_SPACE_MAXADDR,		/* lowaddr */
+			       BUS_SPACE_MAXADDR, 		/* highaddr */
+			       NULL, NULL, 			/* filter, filterarg */
+			       MAXBSIZE, sc->mlx_sg_nseg,	/* maxsize, nsegments */
+			       BUS_SPACE_MAXSIZE_32BIT,		/* maxsegsize */
+			       0,				/* flags */
 			       &sc->mlx_buffer_dmat);
     if (error != 0) {
 	device_printf(sc->mlx_dev, "can't allocate buffer DMA tag\n");
+	mlx_free(sc);
 	return(ENOMEM);
     }
 
@@ -355,29 +392,44 @@ mlx_attach(struct mlx_softc *sc)
     sc->mlx_maxiop = 8;
     error = mlx_sglist_map(sc);
     if (error != 0) {
-	device_printf(sc->mlx_dev, "couldn't make initial s/g list mapping\n");
+	device_printf(sc->mlx_dev, "can't make initial s/g list mapping\n");
+	mlx_free(sc);
 	return(error);
     }
 
     /* send an ENQUIRY2 to the controller */
     if ((sc->mlx_enq2 = mlx_enquire(sc, MLX_CMD_ENQUIRY2, sizeof(struct mlx_enquiry2), NULL)) == NULL) {
 	device_printf(sc->mlx_dev, "ENQUIRY2 failed\n");
+	mlx_free(sc);
 	return(ENXIO);
     }
 
     /*
      * We don't (yet) know where the event log is up to.
      */
-    sc->mlx_lastevent = -1;
-
-    /* print a little information about the controller */
-    mlx_describe_controller(sc);
+    sc->mlx_currevent = -1;
 
     /*
      * Do quirk/feature related things.
      */
     fwminor = (sc->mlx_enq2->me_firmware_id >> 8) & 0xff;
     switch(sc->mlx_iftype) {
+    case MLX_IFTYPE_2:
+	/* These controllers don't report the firmware version in the ENQUIRY2 response */
+	if ((meo = mlx_enquire(sc, MLX_CMD_ENQUIRY_OLD, sizeof(struct mlx_enquiry_old), NULL)) == NULL) {
+	    device_printf(sc->mlx_dev, "ENQUIRY_OLD failed\n");
+	    mlx_free(sc);
+	    return(ENXIO);
+	}
+	sc->mlx_enq2->me_firmware_id = ('0' << 24) | (0 << 16) | (meo->me_fwminor << 8) | meo->me_fwmajor;
+	free(meo, M_DEVBUF);
+	
+	/* XXX require 2.42 or better (PCI) or 2.14 or better (EISA) */
+	if (meo->me_fwminor < 42) {
+	    device_printf(sc->mlx_dev, " *** WARNING *** This firmware revision is not recommended\n");
+	    device_printf(sc->mlx_dev, " *** WARNING *** Use revision 2.42 or later\n");
+	}
+	break;
     case MLX_IFTYPE_3:
 	/* XXX certify 3.52? */
 	if (fwminor < 51) {
@@ -399,7 +451,7 @@ mlx_attach(struct mlx_softc *sc)
 	}
 	break;
     default:
-	device_printf(sc->mlx_dev, "interface version corrupted to %d\n", sc->mlx_iftype);
+	mlx_free(sc);
 	return(ENXIO);		/* should never happen */
     }
 
@@ -410,26 +462,30 @@ mlx_attach(struct mlx_softc *sc)
     sc->mlx_maxiop = sc->mlx_enq2->me_max_commands;
     error = mlx_sglist_map(sc);
     if (error != 0) {
-	device_printf(sc->mlx_dev, "couldn't make initial s/g list mapping\n");
+	device_printf(sc->mlx_dev, "can't make permanent s/g list mapping\n");
+	mlx_free(sc);
 	return(error);
     }
 
     /*
-     * No rebuild or check is in progress.
+     * No user-requested background operation is in progress.
      */
-    sc->mlx_rebuild = -1;
-    sc->mlx_check = -1;
+    sc->mlx_background = 0;
+    sc->mlx_rebuildstat.rs_code = MLX_REBUILDSTAT_IDLE;
 
     /*
-     * Register the control device on first attach.
+     * Create the control device.
      */
-    if (cdev_registered++ == 0)
-	cdevsw_add(&mlx_cdevsw);
+    sc->mlx_dev_t = make_dev(&mlx_cdevsw, device_get_unit(sc->mlx_dev), UID_ROOT, GID_OPERATOR, 
+			     S_IRUSR | S_IWUSR, "mlx%d", device_get_unit(sc->mlx_dev));
 
     /*
      * Start the timeout routine.
      */
     sc->mlx_timeout = timeout(mlx_periodic, sc, hz);
+
+    /* print a little information about the controller */
+    mlx_describe_controller(sc);
 
     return(0);
 }
@@ -444,7 +500,7 @@ mlx_startup(struct mlx_softc *sc)
     struct mlx_sysdrive		*dr;
     int				i, error;
 
-    debug("called");
+    debug_called(1);
     
     /*
      * Scan all the system drives and attach children for those that
@@ -504,7 +560,7 @@ mlx_detach(device_t dev)
     struct mlxd_softc	*mlxd;
     int			i, s, error;
 
-    debug("called");
+    debug_called(1);
 
     error = EBUSY;
     s = splbio();
@@ -525,11 +581,6 @@ mlx_detach(device_t dev)
 
     mlx_free(sc);
 
-    /*
-     * Deregister the control device on last detach.
-     */
-    if (--cdev_registered == 0)
-	cdevsw_remove(&mlx_cdevsw);
     error = 0;
  out:
     splx(s);
@@ -552,7 +603,7 @@ mlx_shutdown(device_t dev)
     struct mlx_softc	*sc = device_get_softc(dev);
     int			i, s, error;
 
-    debug("called");
+    debug_called(1);
 
     s = splbio();
     error = 0;
@@ -591,7 +642,7 @@ mlx_suspend(device_t dev)
     struct mlx_softc	*sc = device_get_softc(dev);
     int			s;
 
-    debug("called");
+    debug_called(1);
 
     s = splbio();
     sc->mlx_state |= MLX_STATE_SUSPEND;
@@ -614,7 +665,7 @@ mlx_resume(device_t dev)
 {
     struct mlx_softc	*sc = device_get_softc(dev);
 
-    debug("called");
+    debug_called(1);
 
     sc->mlx_state &= ~MLX_STATE_SUSPEND;
     sc->mlx_intaction(sc, MLX_INTACTION_ENABLE);
@@ -631,7 +682,7 @@ mlx_intr(void *arg)
 {
     struct mlx_softc	*sc = (struct mlx_softc *)arg;
 
-    debug("called");
+    debug_called(1);
 
     /* collect finished commands, queue anything waiting */
     mlx_done(sc);
@@ -646,7 +697,7 @@ mlx_submit_buf(struct mlx_softc *sc, struct buf *bp)
 {
     int		s;
     
-    debug("called");
+    debug_called(1);
 
     s = splbio();
     bufq_insert_tail(&sc->mlx_bufq, bp);
@@ -688,13 +739,15 @@ mlx_close(dev_t dev, int flags, int fmt, struct proc *p)
 int
 mlx_ioctl(dev_t dev, u_long cmd, caddr_t addr, int32_t flag, struct proc *p)
 {
-    int			unit = minor(dev);
-    struct mlx_softc	*sc = devclass_get_softc(mlx_devclass, unit);
-    int			*arg = (int *)addr;
-    struct mlx_pause	*mp;
-    struct mlx_sysdrive	*dr;
-    struct mlxd_softc	*mlxd;
-    int			i, error;
+    int				unit = minor(dev);
+    struct mlx_softc		*sc = devclass_get_softc(mlx_devclass, unit);
+    struct mlx_rebuild_request	*rb = (struct mlx_rebuild_request *)addr;
+    struct mlx_rebuild_status	*rs = (struct mlx_rebuild_status *)addr;
+    int				*arg = (int *)addr;
+    struct mlx_pause		*mp;
+    struct mlx_sysdrive		*dr;
+    struct mlxd_softc		*mlxd;
+    int				i, error;
     
     switch(cmd) {
 	/*
@@ -709,7 +762,7 @@ mlx_ioctl(dev_t dev, u_long cmd, caddr_t addr, int32_t flag, struct proc *p)
 	    if (sc->mlx_sysdrive[i].ms_disk != 0) {
 		/* looking for the next one we come across? */
 		if (*arg == -1) {
-		    *arg = device_get_unit(sc->mlx_sysdrive[i].ms_disk);
+		    *arg = device_get_unit(sc->mlx_sysdrive[0].ms_disk);
 		    return(0);
 		}
 		/* we want the one after this one */
@@ -804,6 +857,63 @@ mlx_ioctl(dev_t dev, u_long cmd, caddr_t addr, int32_t flag, struct proc *p)
     case MLX_COMMAND:
 	return(mlx_user_command(sc, (struct mlx_usercommand *)addr));
 
+	/*
+	 * Start a rebuild on a given SCSI disk
+	 */
+    case MLX_REBUILDASYNC:
+	if (sc->mlx_background != 0) {
+	    rb->rr_status = 0x0106;
+	    return(EBUSY);
+	}
+	rb->rr_status = mlx_rebuild(sc, rb->rr_channel, rb->rr_target);
+	switch (rb->rr_status) {
+	case 0:
+	    error = 0;
+	    break;
+	case 0x10000:
+	    error = ENOMEM;		/* couldn't set up the command */
+	    break;
+	case 0x0002:	
+	    error = EBUSY;
+	    break;
+	case 0x0104:
+	    error = EIO;
+	    break;
+	case 0x0105:
+	    error = ERANGE;
+	    break;
+	case 0x0106:
+	    error = EBUSY;
+	    break;
+	default:
+	    error = EINVAL;
+	    break;
+	}
+	if (error == 0)
+	    sc->mlx_background = MLX_BACKGROUND_REBUILD;
+	return(error);
+	
+	/*
+	 * Get the status of the current rebuild or consistency check.
+	 */
+    case MLX_REBUILDSTAT:
+	*rs = sc->mlx_rebuildstat;
+	return(0);
+
+	/*
+	 * Return the per-controller system drive number matching the
+	 * disk device number in (arg), if it happens to belong to us.
+	 */
+    case MLX_GET_SYSDRIVE:
+	error = ENOENT;
+	mlxd = (struct mlxd_softc *)devclass_get_softc(mlxd_devclass, *arg);
+	if ((mlxd != NULL) && (mlxd->mlxd_drive >= sc->mlx_sysdrive) && 
+	    (mlxd->mlxd_drive < (sc->mlx_sysdrive + MLX_MAXDRIVES))) {
+	    error = 0;
+	    *arg = mlxd->mlxd_drive - sc->mlx_sysdrive;
+	}
+	return(error);
+	
     default:	
 	return(ENOTTY);
     }
@@ -816,10 +926,8 @@ int
 mlx_submit_ioctl(struct mlx_softc *sc, struct mlx_sysdrive *drive, u_long cmd, 
 		caddr_t addr, int32_t flag, struct proc *p)
 {
-    struct mlxd_rebuild		*mr = (struct mlxd_rebuild *)addr;
-    struct mlxd_rebuild_status	*mp = (struct mlxd_rebuild_status *)addr;
     int				*arg = (int *)addr;
-    int				error;
+    int				error, result;
 
     switch(cmd) {
 	/*
@@ -830,63 +938,38 @@ mlx_submit_ioctl(struct mlx_softc *sc, struct mlx_sysdrive *drive, u_long cmd,
 	return(0);
 	
 	/*
-	 * Start a background rebuild on this drive.
+	 * Start a background consistency check on this drive.
 	 */
-    case MLXD_REBUILDASYNC:
-	/* XXX lock? */
-	if (sc->mlx_rebuild >= 0)
+    case MLXD_CHECKASYNC:		/* start a background consistency check */
+	if (sc->mlx_background != 0) {
+	    *arg = 0x0106;
 	    return(EBUSY);
-	sc->mlx_rebuild = drive - &sc->mlx_sysdrive[0];
-	    
-	switch (mlx_rebuild(sc, mr->rb_channel, mr->rb_target)) {
+	}
+	result = mlx_check(sc, drive - &sc->mlx_sysdrive[0]);
+	switch (result) {
 	case 0:
-	    drive->ms_state = MLX_SYSD_REBUILD;
 	    error = 0;
 	    break;
 	case 0x10000:
 	    error = ENOMEM;		/* couldn't set up the command */
 	    break;
-	case 0x0002:
-	case 0x0106:
-	    error = EBUSY;
-	    break;
-	case 0x0004:
+	case 0x0002:	
 	    error = EIO;
 	    break;
 	case 0x0105:
 	    error = ERANGE;
 	    break;
+	case 0x0106:
+	    error = EBUSY;
+	    break;
 	default:
 	    error = EINVAL;
 	    break;
 	}
-	if (error != 0)
-	    sc->mlx_rebuild = -1;
+	if (error == 0)
+	    sc->mlx_background = MLX_BACKGROUND_CHECK;
+	*arg = result;
 	return(error);
-
-	/*
-	 * Start a background consistency check on this drive.
-	 */
-    case MLXD_CHECKASYNC:		/* start a background consistency check */
-	/* XXX implement */
-	break;
-
-	/*
-	 * Get the status of the current rebuild or consistency check.
-	 */
-    case MLXD_REBUILDSTAT:
-
-	if (sc->mlx_rebuild >= 0) {	/* may be a second or so out of date */
-	    mp->rs_drive = sc->mlx_rebuild;
-	    mp->rs_size = sc->mlx_sysdrive[sc->mlx_rebuild].ms_size;
-	    mp->rs_remaining = sc->mlx_rebuildstat;
-	    return(0);
-	} else if (sc->mlx_check >= 0) {
-	    /* XXX implement */
-	} else {
-	    /* XXX should return status of last completed operation? */
-	    return(EINVAL);
-	}
 
     }
     return(ENOIOCTL);
@@ -907,7 +990,7 @@ mlx_periodic(void *data)
 {
     struct mlx_softc *sc = (struct mlx_softc *)data;
 
-    debug("called");
+    debug_called(1);
 
     /*
      * Run a bus pause? 
@@ -946,7 +1029,8 @@ mlx_periodic(void *data)
 	 *
 	 * XXX Note that this may not actually launch a command in situations of high load.
 	 */
-	mlx_enquire(sc, MLX_CMD_ENQUIRY, sizeof(struct mlx_enquiry), mlx_periodic_enquiry);
+	mlx_enquire(sc, (sc->mlx_iftype == MLX_IFTYPE_2) ? MLX_CMD_ENQUIRY_OLD : MLX_CMD_ENQUIRY, 
+		    imax(sizeof(struct mlx_enquiry), sizeof(struct mlx_enquiry_old)), mlx_periodic_enquiry);
 
 	/*
 	 * Check system drive status.
@@ -958,12 +1042,11 @@ mlx_periodic(void *data)
 	mlx_enquire(sc, MLX_CMD_ENQSYSDRIVE, sizeof(struct mlx_enq_sys_drive) * MLX_MAXDRIVES, 
 			mlx_periodic_enquiry);
 		
-	/* 
-	 * Get drive rebuild/check status
-	 */
-	if (sc->mlx_rebuild >= 0)
-	    mlx_enquire(sc, MLX_CMD_REBUILDSTAT, sizeof(struct mlx_rebuild_stat), mlx_periodic_rebuild);
     }
+
+    /* get drive rebuild/check status */
+    /* XXX should check sc->mlx_background if this is only valid while in progress */
+    mlx_enquire(sc, MLX_CMD_REBUILDSTAT, sizeof(struct mlx_rebuild_stat), mlx_periodic_rebuild);
 
     /* deal with possibly-missed interrupts and timed-out commands */
     mlx_done(sc);
@@ -980,16 +1063,54 @@ mlx_periodic_enquiry(struct mlx_command *mc)
 {
     struct mlx_softc		*sc = mc->mc_sc;
 
-    debug("called");
+    debug_called(1);
 
     /* Command completed OK? */
     if (mc->mc_status != 0) {
-	device_printf(sc->mlx_dev, "periodic enquiry failed\n");
+	device_printf(sc->mlx_dev, "periodic enquiry failed - %s\n", mlx_diagnose_command(mc));
 	goto out;
     }
 
     /* respond to command */
     switch(mc->mc_mailbox[0]) {
+	/*
+	 * This is currently a bit fruitless, as we don't know how to extract the eventlog
+	 * pointer yet.
+	 */
+    case MLX_CMD_ENQUIRY_OLD:
+    {
+	struct mlx_enquiry		*me = (struct mlx_enquiry *)mc->mc_data;
+	struct mlx_enquiry_old		*meo = (struct mlx_enquiry_old *)mc->mc_data;
+	int				i;
+
+	/* convert data in-place to new format */
+	for (i = (sizeof(me->me_dead) / sizeof(me->me_dead[0])) - 1; i >= 0; i--) {
+	    me->me_dead[i].dd_chan = meo->me_dead[i].dd_chan;
+	    me->me_dead[i].dd_targ = meo->me_dead[i].dd_targ;
+	}
+	me->me_misc_flags        = 0;
+	me->me_rebuild_count     = meo->me_rebuild_count;
+	me->me_dead_count        = meo->me_dead_count;
+	me->me_critical_sd_count = meo->me_critical_sd_count;
+	me->me_event_log_seq_num = 0;
+	me->me_offline_sd_count  = meo->me_offline_sd_count;
+	me->me_max_commands      = meo->me_max_commands;
+	me->me_rebuild_flag      = meo->me_rebuild_flag;
+	me->me_fwmajor           = meo->me_fwmajor;
+	me->me_fwminor           = meo->me_fwminor;
+	me->me_status_flags      = meo->me_status_flags;
+	me->me_flash_age         = meo->me_flash_age;
+	for (i = (sizeof(me->me_drvsize) / sizeof(me->me_drvsize[0])) - 1; i >= 0; i--) {
+	    if (i > ((sizeof(meo->me_drvsize) / sizeof(meo->me_drvsize[0])) - 1)) {
+		me->me_drvsize[i] = 0;		/* drive beyond supported range */
+	    } else {
+		me->me_drvsize[i] = meo->me_drvsize[i];
+	    }
+	}
+	me->me_num_sys_drvs = meo->me_num_sys_drvs;
+    }
+    /* FALLTHROUGH */
+
 	/*
 	 * Generic controller status update.  We could do more with this than just
 	 * checking the event log.
@@ -998,15 +1119,17 @@ mlx_periodic_enquiry(struct mlx_command *mc)
     {
 	struct mlx_enquiry		*me = (struct mlx_enquiry *)mc->mc_data;
 	
-	if (sc->mlx_lastevent == -1) {
+	if (sc->mlx_currevent == -1) {
 	    /* initialise our view of the event log */
 	    sc->mlx_currevent = sc->mlx_lastevent = me->me_event_log_seq_num;
-	} else if (me->me_event_log_seq_num != sc->mlx_lastevent) {
+	} else if ((me->me_event_log_seq_num != sc->mlx_lastevent) && !(sc->mlx_flags & MLX_EVENTLOG_BUSY)) {
 	    /* record where current events are up to */
 	    sc->mlx_currevent = me->me_event_log_seq_num;
-	    device_printf(sc->mlx_dev, "event log pointer was %d, now %d\n", 
-			  sc->mlx_lastevent, sc->mlx_currevent);
+	    debug(1, "event log pointer was %d, now %d\n", sc->mlx_lastevent, sc->mlx_currevent);
 
+	    /* mark the event log as busy */
+	    atomic_set_int(&sc->mlx_flags, MLX_EVENTLOG_BUSY);
+	    
 	    /* drain new eventlog entries */
 	    mlx_periodic_eventlog_poll(sc);
 	}
@@ -1022,24 +1145,21 @@ mlx_periodic_enquiry(struct mlx_command *mc)
 	     (i < MLX_MAXDRIVES) && (mes[i].sd_size != 0xffffffff); 
 	     i++) {
 
-	    /* if disk is being rebuilt, we should not check it */
-	    if (dr->ms_state == MLX_SYSD_REBUILD) {
-		/* has state been changed by controller? */
-		if (dr->ms_state != mes[i].sd_state) {
-		    switch(mes[i].sd_state) {
-		    case MLX_SYSD_OFFLINE:
-			device_printf(dr->ms_disk, "drive offline\n");
-			break;
-		    case MLX_SYSD_ONLINE:
-			device_printf(dr->ms_disk, "drive online\n");
-			break;
-		    case MLX_SYSD_CRITICAL:
-			device_printf(dr->ms_disk, "drive critical\n");
-			break;
-		    }
-		    /* save new state */
-		    dr->ms_state = mes[i].sd_state;
+	    /* has state been changed by controller? */
+	    if (dr->ms_state != mes[i].sd_state) {
+		switch(mes[i].sd_state) {
+		case MLX_SYSD_OFFLINE:
+		    device_printf(dr->ms_disk, "drive offline\n");
+		    break;
+		case MLX_SYSD_ONLINE:
+		    device_printf(dr->ms_disk, "drive online\n");
+		    break;
+		case MLX_SYSD_CRITICAL:
+		    device_printf(dr->ms_disk, "drive critical\n");
+		    break;
 		}
+		/* save new state */
+		dr->ms_state = mes[i].sd_state;
 	    }
 	}
 	break;
@@ -1065,7 +1185,7 @@ mlx_periodic_eventlog_poll(struct mlx_softc *sc)
     void		*result = NULL;
     int			error;
 
-    debug("called");
+    debug_called(1);
 
     /* get ourselves a command buffer */
     error = 1;
@@ -1129,7 +1249,7 @@ mlx_periodic_eventlog_respond(struct mlx_command *mc)
     struct mlx_eventlog_entry	*el = (struct mlx_eventlog_entry *)mc->mc_data;
     char			*reason;
 
-    debug("called");
+    debug_called(1);
 
     sc->mlx_lastevent++;		/* next message... */
     if (mc->mc_status == 0) {
@@ -1175,6 +1295,8 @@ mlx_periodic_eventlog_respond(struct mlx_command *mc)
 	}
     } else {
 	device_printf(sc->mlx_dev, "error reading message log - %s\n", mlx_diagnose_command(mc));
+	/* give up on all the outstanding messages, as we may have come unsynched */
+	sc->mlx_lastevent = sc->mlx_currevent;
     }
 	
     /* dispose of command and data */
@@ -1182,34 +1304,51 @@ mlx_periodic_eventlog_respond(struct mlx_command *mc)
     mlx_releasecmd(mc);
 
     /* is there another message to obtain? */
-    if (sc->mlx_lastevent != sc->mlx_currevent)
+    if (sc->mlx_lastevent != sc->mlx_currevent) {
 	mlx_periodic_eventlog_poll(sc);
+    } else {
+	/* clear log-busy status */
+	atomic_clear_int(&sc->mlx_flags, MLX_EVENTLOG_BUSY);
+    }
 }
 
 /********************************************************************************
- * Handle the completion of a rebuild operation.
+ * Handle check/rebuild operations in progress.
  */
 static void
 mlx_periodic_rebuild(struct mlx_command *mc)
 {
     struct mlx_softc		*sc = mc->mc_sc;
-    struct mlx_rebuild_stat	*mr = (struct mlx_rebuild_stat *)mc->mc_private;
+    struct mlx_rebuild_status	*mr = (struct mlx_rebuild_status *)mc->mc_data;
 
     switch(mc->mc_status) {
-    case 0:				/* all OK, rebuild still running */
-	sc->mlx_rebuildstat = mr->rb_remaining;
+    case 0:				/* operation running, update stats */
+	sc->mlx_rebuildstat = *mr;
+
+	/* spontaneous rebuild/check? */
+	if (sc->mlx_background == 0) {
+	    sc->mlx_background = MLX_BACKGROUND_SPONTANEOUS;
+	    device_printf(sc->mlx_dev, "background check/rebuild operation started\n");
+	}
 	break;
 
-    case 0x0105:			/* rebuild/check finished */
-	if (sc->mlx_rebuild >= 0) {
-	    device_printf(sc->mlx_sysdrive[sc->mlx_rebuild].ms_disk, "rebuild completed\n");
-	    sc->mlx_rebuild = -1;
-	} else if (sc->mlx_check >= 0) {
-	    device_printf(sc->mlx_sysdrive[sc->mlx_check].ms_disk, "consistency check completed\n");
-	    sc->mlx_check = -1;
-	} else {
-	    device_printf(sc->mlx_dev, "consistency check completed\n");
+    case 0x0105:			/* nothing running, finalise stats and report */
+	switch(sc->mlx_background) {
+	case MLX_BACKGROUND_CHECK:
+	    device_printf(sc->mlx_dev, "consistency check completed\n");	/* XXX print drive? */
+	    break;
+	case MLX_BACKGROUND_REBUILD:
+	    device_printf(sc->mlx_dev, "drive rebuild completed\n");	/* XXX print channel/target? */
+	    break;
+	case MLX_BACKGROUND_SPONTANEOUS:
+	default:
+	    /* if we have previously been non-idle, report the transition */
+	    if (sc->mlx_rebuildstat.rs_code != MLX_REBUILDSTAT_IDLE) {
+		device_printf(sc->mlx_dev, "background check/rebuild operation completed\n");
+	    }
 	}
+	sc->mlx_background = 0;
+	sc->mlx_rebuildstat.rs_code = MLX_REBUILDSTAT_IDLE;
 	break;
     }
     free(mc->mc_data, M_DEVBUF);
@@ -1321,7 +1460,7 @@ mlx_enquire(struct mlx_softc *sc, int command, size_t bufsize, void (* complete)
     void		*result;
     int			error;
 
-    debug("called");
+    debug_called(1);
 
     /* get ourselves a command buffer */
     error = 1;
@@ -1387,7 +1526,7 @@ mlx_flush(struct mlx_softc *sc)
     struct mlx_command	*mc;
     int			error;
 
-    debug("called");
+    debug_called(1);
 
     /* get ourselves a command buffer */
     error = 1;
@@ -1418,7 +1557,50 @@ mlx_flush(struct mlx_softc *sc)
 }
 
 /********************************************************************************
- * Start a background rebuild on the nominated controller/channel/target.
+ * Start a background consistency check on (drive).
+ *
+ * May be called with interrupts enabled or disabled; will return as soon as the
+ * operation has started or been refused.
+ */
+static int
+mlx_check(struct mlx_softc *sc, int drive)
+{
+    struct mlx_command	*mc;
+    int			error;
+
+    debug_called(1);
+
+    /* get ourselves a command buffer */
+    error = 0x10000;
+    if ((mc = mlx_alloccmd(sc)) == NULL)
+	goto out;
+    /* get a command slot */
+    if (mlx_getslot(mc))
+	goto out;
+
+    /* build a checkasync command, set the "fix it" flag */
+    mlx_make_type2(mc, MLX_CMD_CHECKASYNC, 0, 0, 0, 0, 0, drive | 0x80, 0, 0);
+
+    /* start the command and wait for it to be returned */
+    if (mlx_wait_command(mc))
+	goto out;
+    
+    /* command completed OK? */
+    if (mc->mc_status != 0) {	
+	device_printf(sc->mlx_dev, "CHECK ASYNC failed - %s\n", mlx_diagnose_command(mc));
+    } else {
+	device_printf(sc->mlx_sysdrive[drive].ms_disk, "consistency check started");
+    }
+    error = mc->mc_status;
+
+ out:
+    if (mc != NULL)
+	mlx_releasecmd(mc);
+    return(error);
+}
+
+/********************************************************************************
+ * Start a background rebuild of the physical drive at (channel),(target).
  *
  * May be called with interrupts enabled or disabled; will return as soon as the
  * operation has started or been refused.
@@ -1429,7 +1611,7 @@ mlx_rebuild(struct mlx_softc *sc, int channel, int target)
     struct mlx_command	*mc;
     int			error;
 
-    debug("called");
+    debug_called(1);
 
     /* get ourselves a command buffer */
     error = 0x10000;
@@ -1439,18 +1621,18 @@ mlx_rebuild(struct mlx_softc *sc, int channel, int target)
     if (mlx_getslot(mc))
 	goto out;
 
-    /* build a rebuild command */
+    /* build a rebuildasync command, set the "fix it" flag */
     mlx_make_type2(mc, MLX_CMD_REBUILDASYNC, channel, target, 0, 0, 0, 0, 0, 0);
 
-    /* run the command in either polled or wait mode */
-    if ((sc->mlx_state & MLX_STATE_INTEN) ? mlx_wait_command(mc) : mlx_poll_command(mc))
+    /* start the command and wait for it to be returned */
+    if (mlx_wait_command(mc))
 	goto out;
     
     /* command completed OK? */
     if (mc->mc_status != 0) {	
 	device_printf(sc->mlx_dev, "REBUILD ASYNC failed - %s\n", mlx_diagnose_command(mc));
     } else {
-	device_printf(sc->mlx_sysdrive[sc->mlx_rebuild].ms_disk, "rebuild started");
+	device_printf(sc->mlx_dev, "drive rebuild started for %d:%d\n", channel, target);
     }
     error = mc->mc_status;
 
@@ -1471,7 +1653,7 @@ mlx_wait_command(struct mlx_command *mc)
     struct mlx_softc	*sc = mc->mc_sc;
     int			error, count;
 
-    debug("called");
+    debug_called(1);
 
     mc->mc_complete = NULL;
     mc->mc_private = mc;		/* wake us when you're done */
@@ -1485,7 +1667,7 @@ mlx_wait_command(struct mlx_command *mc)
     }
 
     if (mc->mc_status != 0) {
-	device_printf(sc->mlx_dev, "I/O error 0x%x\n", mc->mc_status);
+	device_printf(sc->mlx_dev, "command failed - %s\n", mlx_diagnose_command(mc));
 	return(EIO);
     }
     return(0);
@@ -1495,7 +1677,7 @@ mlx_wait_command(struct mlx_command *mc)
 /********************************************************************************
  * Start the command (mc) and busy-wait for it to complete.
  *
- * Should only be used when interrupts are not available. Returns 0 on 
+ * Should only be used when interrupts can't be relied upon. Returns 0 on 
  * success, nonzero on error.
  * Successfully completed commands are dequeued.
  */
@@ -1505,7 +1687,7 @@ mlx_poll_command(struct mlx_command *mc)
     struct mlx_softc	*sc = mc->mc_sc;
     int			error, count, s;
 
-    debug("called");
+    debug_called(1);
 
     mc->mc_complete = NULL;
     mc->mc_private = NULL;	/* we will poll for it */
@@ -1516,14 +1698,15 @@ mlx_poll_command(struct mlx_command *mc)
     do {
 	/* poll for completion */
 	mlx_done(mc->mc_sc);
-    } while ((mc->mc_status == MLX_STATUS_BUSY) && (count < 10000));
+	
+    } while ((mc->mc_status == MLX_STATUS_BUSY) && (count++ < 15000000));
     if (mc->mc_status != MLX_STATUS_BUSY) {
 	s = splbio();
 	TAILQ_REMOVE(&sc->mlx_work, mc, mc_link);
 	splx(s);
 	return(0);
     }
-    device_printf(sc->mlx_dev, "I/O error 0x%x\n", mc->mc_status);
+    device_printf(sc->mlx_dev, "command failed - %s\n", mlx_diagnose_command(mc));
     return(EIO);
 }
 
@@ -1532,7 +1715,7 @@ mlx_poll_command(struct mlx_command *mc)
  * controller.  Leave a couple of slots free for emergencies.
  *
  * Must be called at splbio or in an equivalent fashion that prevents 
- * reentry or activity on the bufq..
+ * reentry or activity on the bufq.
  */
 static void
 mlx_startio(struct mlx_softc *sc)
@@ -1576,10 +1759,10 @@ mlx_startio(struct mlx_softc *sc)
 	mc->mc_length = bp->b_bcount;
 	if (bp->b_flags & B_READ) {
 	    mc->mc_flags |= MLX_CMD_DATAIN;
-	    cmd = MLX_CMD_READOLDSG;
+	    cmd = MLX_CMD_READSG;
 	} else {
 	    mc->mc_flags |= MLX_CMD_DATAOUT;
-	    cmd = MLX_CMD_WRITEOLDSG;
+	    cmd = MLX_CMD_WRITESG;
 	}
 	
 	/* map the command so the controller can work with it */
@@ -1598,14 +1781,22 @@ mlx_startio(struct mlx_softc *sc)
 	 * Build the I/O command.  Note that the SG list type bits are set to zero,
 	 * denoting the format of SG list that we are using.
 	 */
-	mlx_make_type5(mc, cmd, 
-		       blkcount & 0xff, 				/* xfer length low byte */
-		       (driveno << 3) | ((blkcount >> 8) & 0x07),	/* target and length high 3 bits */
-		       bp->b_pblkno,					/* physical block number */
-		       mc->mc_sgphys,					/* location of SG list */
-		       mc->mc_nsgent & 0x3f);				/* size of SG list (top 2 bits clear) */
+	if (sc->mlx_iftype == MLX_IFTYPE_2) {
+	    mlx_make_type1(mc, (cmd == MLX_CMD_WRITESG) ? MLX_CMD_WRITESG_OLD : MLX_CMD_READSG_OLD,
+			   blkcount & 0xff, 				/* xfer length low byte */
+			   bp->b_pblkno,				/* physical block number */
+			   driveno,					/* target drive number */
+			   mc->mc_sgphys,				/* location of SG list */
+			   mc->mc_nsgent & 0x3f);			/* size of SG list (top 3 bits clear) */
+	} else {
+	    mlx_make_type5(mc, cmd, 
+			   blkcount & 0xff, 				/* xfer length low byte */
+			   (driveno << 3) | ((blkcount >> 8) & 0x07),	/* target and length high 3 bits */
+			   bp->b_pblkno,				/* physical block number */
+			   mc->mc_sgphys,				/* location of SG list */
+			   mc->mc_nsgent & 0x3f);			/* size of SG list (top 3 bits clear) */
+	}
 	
-
 	/* try to give command to controller */
 	if (mlx_start(mc) != 0) {
 	    /* fail the command */
@@ -1655,51 +1846,79 @@ mlx_completeio(struct mlx_command *mc)
 
 /********************************************************************************
  * Take a command from user-space and try to run it.
+ *
+ * XXX Note that this can't perform very much in the way of error checking, and
+ *     as such, applications _must_ be considered trustworthy.
+ * XXX Commands using S/G for data are not supported.
  */
 static int
 mlx_user_command(struct mlx_softc *sc, struct mlx_usercommand *mu)
 {
     struct mlx_command	*mc;
+    struct mlx_dcdb	*dcdb;
     void		*kbuf;
     int			error;
     
+    debug_called(0);
+    
     kbuf = NULL;
     mc = NULL;
+    dcdb = NULL;
     error = ENOMEM;
-    /* get a kernel buffer for the transfer */
-    if (mu->mu_datasize > 0) {
-	if ((kbuf = malloc(mu->mu_datasize, M_DEVBUF, M_WAITOK)) == NULL)
-	    goto out;
-	if ((mu->mu_bufptr < 0) || (mu->mu_bufptr > (sizeof(mu->mu_command) < sizeof(u_int32_t)))) {
-	    error = EINVAL;
-	    goto out;
-	}
-    }
-    /* get ourselves a command buffer */
+
+    /* get ourselves a command and copy in from user space */
     if ((mc = mlx_alloccmd(sc)) == NULL)
 	goto out;
-
-    /* copy the command and data */
     bcopy(mu->mu_command, mc->mc_mailbox, sizeof(mc->mc_mailbox));
-    if ((mu->mu_datasize > 0) && ((error = copyin(mu->mu_buf, kbuf, mu->mu_datasize))))
-	goto out;
+    debug(0, "got command buffer");
+
+    /* if we need a buffer for data transfer, allocate one and copy in its initial contents */
+    if (mu->mu_datasize > 0) {
+	if (((kbuf = malloc(mu->mu_datasize, M_DEVBUF, M_WAITOK)) == NULL) ||
+	    (error = copyin(mu->mu_buf, kbuf, mu->mu_datasize)))
+	    goto out;
+	debug(0, "got kernel buffer");
+    }
 
     /* get a command slot */
     if (mlx_getslot(mc))
 	goto out;
-
+    debug(0, "got a slot");
+    
     /* map the command so the controller can see it */
     mc->mc_data = kbuf;
     mc->mc_length = mu->mu_datasize;
     mlx_mapcmd(mc);
+    debug(0, "mapped");
 
-    /* if there's a data buffer, fix up the command */
-    if (mu->mu_datasize > 0) {
-	mc->mc_mailbox[mu->mu_bufptr    ] =  mc->mc_length        & 0xff;
-	mc->mc_mailbox[mu->mu_bufptr + 1] = (mc->mc_length >> 8)  & 0xff;
-	mc->mc_mailbox[mu->mu_bufptr + 2] = (mc->mc_length >> 16) & 0xff;
-	mc->mc_mailbox[mu->mu_bufptr + 3] = (mc->mc_length >> 24) & 0xff;
+    /* 
+     * If this is a passthrough SCSI command, the DCDB is packed at the 
+     * beginning of the data area.  Fix up the DCDB to point to the correct physical
+     * address and override any bufptr supplied by the caller since we know
+     * what it's meant to be.
+     */
+    if (mc->mc_mailbox[0] == MLX_CMD_DIRECT_CDB) {
+	dcdb = (struct mlx_dcdb *)kbuf;
+	dcdb->dcdb_physaddr = mc->mc_dataphys + sizeof(*dcdb);
+	mu->mu_bufptr = 8;
     }
+    
+    /* 
+     * If there's a data buffer, fix up the command's buffer pointer.
+     */
+    if (mu->mu_datasize > 0) {
+
+	/* range check the pointer to physical buffer address */
+	if ((mu->mu_bufptr < 0) || (mu->mu_bufptr > (sizeof(mu->mu_command) - sizeof(u_int32_t)))) {
+	    error = EINVAL;
+	    goto out;
+	}
+	mc->mc_mailbox[mu->mu_bufptr    ] =  mc->mc_dataphys        & 0xff;
+	mc->mc_mailbox[mu->mu_bufptr + 1] = (mc->mc_dataphys >> 8)  & 0xff;
+	mc->mc_mailbox[mu->mu_bufptr + 2] = (mc->mc_dataphys >> 16) & 0xff;
+	mc->mc_mailbox[mu->mu_bufptr + 3] = (mc->mc_dataphys >> 24) & 0xff;
+    }
+    debug(0, "command fixup");
 
     /* submit the command and wait */
     if ((error = mlx_wait_command(mc)) != 0)
@@ -1736,7 +1955,7 @@ mlx_getslot(struct mlx_command *mc)
     struct mlx_softc	*sc = mc->mc_sc;
     int			s, slot;
 
-    debug("called  mc %p  sc %p", mc, sc);
+    debug_called(1);
 
     /* enforce slot-usage limit */
     if (sc->mlx_busycmds >= ((mc->mc_flags & MLX_CMD_PRIORITY) ? 
@@ -1750,7 +1969,7 @@ mlx_getslot(struct mlx_command *mc)
      */
     s = splbio();
     for (slot = 0; slot < sc->mlx_maxiop; slot++) {
-	debug("try slot %d", slot);
+	debug(2, "try slot %d", slot);
 	if (sc->mlx_busycmd[slot] == NULL)
 	    break;
     }
@@ -1764,7 +1983,7 @@ mlx_getslot(struct mlx_command *mc)
     if (slot >= sc->mlx_maxiop)
 	return(EBUSY);
 
-    debug("got slot %d", slot);
+    debug(2, "got slot %d", slot);
     mc->mc_slot = slot;
     return(0);
 }
@@ -1780,14 +1999,14 @@ mlx_setup_dmamap(void *arg, bus_dma_segment_t *segs, int nsegments, int error)
     struct mlx_sgentry	*sg;
     int			i;
 
-    debug("called");
+    debug_called(1);
 
     /* get base address of s/g table */
-    sg = sc->mlx_sgtable + (mc->mc_slot * MLX_NSEG);
+    sg = sc->mlx_sgtable + (mc->mc_slot * sc->mlx_sg_nseg);
 
     /* save s/g table information in command */
     mc->mc_nsgent = nsegments;
-    mc->mc_sgphys = sc->mlx_sgbusaddr + (mc->mc_slot * MLX_NSEG * sizeof(struct mlx_sgentry));
+    mc->mc_sgphys = sc->mlx_sgbusaddr + (mc->mc_slot * sc->mlx_sg_nseg * sizeof(struct mlx_sgentry));
     mc->mc_dataphys = segs[0].ds_addr;
 
     /* populate s/g table */
@@ -1802,7 +2021,7 @@ mlx_mapcmd(struct mlx_command *mc)
 {
     struct mlx_softc	*sc = mc->mc_sc;
 
-    debug("called");
+    debug_called(1);
 
     /* if the command involves data at all */
     if (mc->mc_data != NULL) {
@@ -1822,7 +2041,7 @@ mlx_unmapcmd(struct mlx_command *mc)
 {
     struct mlx_softc	*sc = mc->mc_sc;
 
-    debug("called");
+    debug_called(1);
 
     /* if the command involved data at all */
     if (mc->mc_data != NULL) {
@@ -1847,7 +2066,7 @@ mlx_start(struct mlx_command *mc)
     struct mlx_softc	*sc = mc->mc_sc;
     int			i, s, done;
 
-    debug("called");
+    debug_called(1);
 
     /* save the slot number as ident so we can handle this command when complete */
     mc->mc_mailbox[0x1] = mc->mc_slot;
@@ -1899,7 +2118,7 @@ mlx_done(struct mlx_softc *sc)
     u_int8_t		slot;
     u_int16_t		status;
     
-    debug("called");
+    debug_called(2);
 
     result = 0;
 
@@ -1947,7 +2166,7 @@ mlx_complete(struct mlx_softc *sc)
     struct mlx_command	*mc, *nc;
     int			s, count;
     
-    debug("called");
+    debug_called(2);
 
     /* avoid reentrancy  XXX might want to signal and request a restart */
     if (mlx_lock_tas(sc, MLX_LOCK_COMPLETING))
@@ -2023,7 +2242,7 @@ mlx_alloccmd(struct mlx_softc *sc)
     int			error;
     int			s;
 
-    debug("called");
+    debug_called(1);
 
     s = splbio();
     if ((mc = TAILQ_FIRST(&sc->mlx_freecmds)) != NULL)
@@ -2057,7 +2276,7 @@ mlx_releasecmd(struct mlx_command *mc)
 {
     int		s;
     
-    debug("called");
+    debug_called(1);
 
     s = splbio();
     TAILQ_INSERT_HEAD(&mc->mc_sc->mlx_freecmds, mc, mc_link);
@@ -2072,8 +2291,7 @@ mlx_freecmd(struct mlx_command *mc)
 {
     struct mlx_softc	*sc = mc->mc_sc;
     
-    debug("called");
-
+    debug_called(1);
     bus_dmamap_destroy(sc->mlx_buffer_dmat, mc->mc_dmamap);
     free(mc, M_DEVBUF);
 }
@@ -2096,7 +2314,7 @@ mlx_v3_tryqueue(struct mlx_softc *sc, struct mlx_command *mc)
 {
     int		i;
     
-    debug("called");
+    debug_called(2);
 
     /* ready for our command? */
     if (!(MLX_V3_GET_IDBR(sc) & MLX_V3_IDB_FULL)) {
@@ -2121,7 +2339,7 @@ static int
 mlx_v3_findcomplete(struct mlx_softc *sc, u_int8_t *slot, u_int16_t *status)
 {
 
-    debug("called");
+    debug_called(2);
 
     /* status available? */
     if (MLX_V3_GET_ODBR(sc) & MLX_V3_ODB_SAVAIL) {
@@ -2144,7 +2362,7 @@ mlx_v3_findcomplete(struct mlx_softc *sc, u_int8_t *slot, u_int16_t *status)
 static void
 mlx_v3_intaction(struct mlx_softc *sc, int action)
 {
-    debug("called");
+    debug_called(1);
 
     switch(action) {
     case MLX_INTACTION_DISABLE:
@@ -2158,6 +2376,45 @@ mlx_v3_intaction(struct mlx_softc *sc, int action)
     }
 }
 
+/********************************************************************************
+ * Poll for firmware error codes during controller initialisation.
+ * Returns 0 if initialisation is complete, 1 if still in progress but no 
+ * error has been fetched, 2 if an error has been retrieved.
+ */
+static int 
+mlx_v3_fw_handshake(struct mlx_softc *sc, int *error, int *param1, int *param2)
+{
+    u_int8_t	fwerror;
+    static int	initted = 0;
+
+    debug_called(2);
+
+    /* first time around, clear any hardware completion status */
+    if (!initted) {
+	MLX_V3_PUT_IDBR(sc, MLX_V3_IDB_SACK);
+	DELAY(1000);
+	initted = 1;
+    }
+
+    /* init in progress? */
+    if (!(MLX_V3_GET_IDBR(sc) & MLX_V3_IDB_INIT_BUSY))
+	return(0);
+
+    /* test error value */
+    fwerror = MLX_V3_GET_FWERROR(sc);
+    if (!(fwerror & MLX_V3_FWERROR_PEND))
+	return(1);
+
+    /* mask status pending bit, fetch status */
+    *error = fwerror & ~MLX_V3_FWERROR_PEND;
+    *param1 = MLX_V3_GET_FWERROR_PARAM1(sc);
+    *param2 = MLX_V3_GET_FWERROR_PARAM2(sc);
+
+    /* acknowledge */
+    MLX_V3_PUT_FWERROR(sc, 0);
+
+    return(2);
+}
 
 /********************************************************************************
  ********************************************************************************
@@ -2176,7 +2433,7 @@ mlx_v4_tryqueue(struct mlx_softc *sc, struct mlx_command *mc)
 {
     int		i;
     
-    debug("called");
+    debug_called(2);
 
     /* ready for our command? */
     if (!(MLX_V4_GET_IDBR(sc) & MLX_V4_IDB_FULL)) {
@@ -2184,6 +2441,10 @@ mlx_v4_tryqueue(struct mlx_softc *sc, struct mlx_command *mc)
 	for (i = 0; i < 13; i++)
 	    MLX_V4_PUT_MAILBOX(sc, i, mc->mc_mailbox[i]);
 	
+	/* memory-mapped controller, so issue a write barrier to ensure the mailbox is filled */
+	bus_space_barrier(sc->mlx_btag, sc->mlx_bhandle, MLX_V4_MAILBOX, MLX_V4_MAILBOX_LENGTH,
+			  BUS_SPACE_BARRIER_WRITE);
+
 	/* post command */
 	MLX_V4_PUT_IDBR(sc, MLX_V4_IDB_HWMBOX_CMD);
 	return(1);
@@ -2201,7 +2462,7 @@ static int
 mlx_v4_findcomplete(struct mlx_softc *sc, u_int8_t *slot, u_int16_t *status)
 {
 
-    debug("called");
+    debug_called(2);
 
     /* status available? */
     if (MLX_V4_GET_ODBR(sc) & MLX_V4_ODB_HWSAVAIL) {
@@ -2224,7 +2485,7 @@ mlx_v4_findcomplete(struct mlx_softc *sc, u_int8_t *slot, u_int16_t *status)
 static void
 mlx_v4_intaction(struct mlx_softc *sc, int action)
 {
-    debug("called");
+    debug_called(1);
 
     switch(action) {
     case MLX_INTACTION_DISABLE:
@@ -2238,6 +2499,45 @@ mlx_v4_intaction(struct mlx_softc *sc, int action)
     }
 }
 
+/********************************************************************************
+ * Poll for firmware error codes during controller initialisation.
+ * Returns 0 if initialisation is complete, 1 if still in progress but no 
+ * error has been fetched, 2 if an error has been retrieved.
+ */
+static int 
+mlx_v4_fw_handshake(struct mlx_softc *sc, int *error, int *param1, int *param2)
+{
+    u_int8_t	fwerror;
+    static int	initted = 0;
+
+    debug_called(2);
+
+    /* first time around, clear any hardware completion status */
+    if (!initted) {
+	MLX_V4_PUT_IDBR(sc, MLX_V4_IDB_SACK);
+	DELAY(1000);
+	initted = 1;
+    }
+
+    /* init in progress? */
+    if (!(MLX_V4_GET_IDBR(sc) & MLX_V4_IDB_INIT_BUSY))
+	return(0);
+
+    /* test error value */
+    fwerror = MLX_V4_GET_FWERROR(sc);
+    if (!(fwerror & MLX_V4_FWERROR_PEND))
+	return(1);
+
+    /* mask status pending bit, fetch status */
+    *error = fwerror & ~MLX_V4_FWERROR_PEND;
+    *param1 = MLX_V4_GET_FWERROR_PARAM1(sc);
+    *param2 = MLX_V4_GET_FWERROR_PARAM2(sc);
+
+    /* acknowledge */
+    MLX_V4_PUT_FWERROR(sc, 0);
+
+    return(2);
+}
 
 /********************************************************************************
  ********************************************************************************
@@ -2255,15 +2555,15 @@ static int
 mlx_v5_tryqueue(struct mlx_softc *sc, struct mlx_command *mc)
 {
     int		i;
-    
-    debug("called");
+
+    debug_called(2);
 
     /* ready for our command? */
     if (MLX_V5_GET_IDBR(sc) & MLX_V5_IDB_EMPTY) {
 	/* copy mailbox data to window */
 	for (i = 0; i < 13; i++)
 	    MLX_V5_PUT_MAILBOX(sc, i, mc->mc_mailbox[i]);
-	
+
 	/* post command */
 	MLX_V5_PUT_IDBR(sc, MLX_V5_IDB_HWMBOX_CMD);
 	return(1);
@@ -2281,7 +2581,7 @@ static int
 mlx_v5_findcomplete(struct mlx_softc *sc, u_int8_t *slot, u_int16_t *status)
 {
 
-    debug("called");
+    debug_called(2);
 
     /* status available? */
     if (MLX_V5_GET_ODBR(sc) & MLX_V5_ODB_HWSAVAIL) {
@@ -2304,20 +2604,59 @@ mlx_v5_findcomplete(struct mlx_softc *sc, u_int8_t *slot, u_int16_t *status)
 static void
 mlx_v5_intaction(struct mlx_softc *sc, int action)
 {
-    debug("called");
+    debug_called(1);
 
     switch(action) {
     case MLX_INTACTION_DISABLE:
-	MLX_V5_PUT_IER(sc, MLX_V5_IER_DISINT);
+	MLX_V5_PUT_IER(sc, 0xff & MLX_V5_IER_DISINT);
 	sc->mlx_state &= ~MLX_STATE_INTEN;
 	break;
     case MLX_INTACTION_ENABLE:
-	MLX_V5_PUT_IER(sc, 0);
+	MLX_V5_PUT_IER(sc, 0xff & ~MLX_V5_IER_DISINT);
 	sc->mlx_state |= MLX_STATE_INTEN;
 	break;
     }
 }
 
+/********************************************************************************
+ * Poll for firmware error codes during controller initialisation.
+ * Returns 0 if initialisation is complete, 1 if still in progress but no 
+ * error has been fetched, 2 if an error has been retrieved.
+ */
+static int 
+mlx_v5_fw_handshake(struct mlx_softc *sc, int *error, int *param1, int *param2)
+{
+    u_int8_t	fwerror;
+    static int	initted = 0;
+
+    debug_called(2);
+
+    /* first time around, clear any hardware completion status */
+    if (!initted) {
+	MLX_V5_PUT_IDBR(sc, MLX_V5_IDB_SACK);
+	DELAY(1000);
+	initted = 1;
+    }
+
+    /* init in progress? */
+    if (MLX_V5_GET_IDBR(sc) & MLX_V5_IDB_INIT_DONE)
+	return(0);
+
+    /* test for error value */
+    fwerror = MLX_V5_GET_FWERROR(sc);
+    if (!(fwerror & MLX_V5_FWERROR_PEND))
+	return(1);
+
+    /* mask status pending bit, fetch status */
+    *error = fwerror & ~MLX_V5_FWERROR_PEND;
+    *param1 = MLX_V5_GET_FWERROR_PARAM1(sc);
+    *param2 = MLX_V5_GET_FWERROR_PARAM2(sc);
+
+    /* acknowledge */
+    MLX_V5_PUT_FWERROR(sc, 0xff);
+
+    return(2);
+}
 
 /********************************************************************************
  ********************************************************************************
@@ -2343,6 +2682,13 @@ static char *mlx_status_messages[] = {
     "invalid or non-redundant drive",		/* 11 */
     "channel is busy",				/* 12 */
     "channel is not stopped",			/* 13 */
+    "rebuild successfully terminated",		/* 14 */
+    "unsupported command",			/* 15 */
+    "check condition received",			/* 16 */
+    "device is busy",				/* 17 */
+    "selection or command timeout",		/* 18 */
+    "command terminated abnormally",		/* 19 */
+    ""
 };
 
 static struct
@@ -2351,18 +2697,25 @@ static struct
     u_int16_t	status;
     int		msg;
 } mlx_messages[] = {
-    {MLX_CMD_READOLDSG,		0x0001,	 1},
-    {MLX_CMD_READOLDSG,		0x0002,	 1},
-    {MLX_CMD_READOLDSG,		0x0105,	 3},
-    {MLX_CMD_READOLDSG,		0x010c,	 4},
-    {MLX_CMD_WRITEOLDSG,	0x0001,	 1},
-    {MLX_CMD_WRITEOLDSG,	0x0002,	 1},
-    {MLX_CMD_WRITEOLDSG,	0x0105,	 3},
+    {MLX_CMD_READSG,		0x0001,	 1},
+    {MLX_CMD_READSG,		0x0002,	 1},
+    {MLX_CMD_READSG,		0x0105,	 3},
+    {MLX_CMD_READSG,		0x010c,	 4},
+    {MLX_CMD_WRITESG,		0x0001,	 1},
+    {MLX_CMD_WRITESG,		0x0002,	 1},
+    {MLX_CMD_WRITESG,		0x0105,	 3},
+    {MLX_CMD_READSG_OLD,	0x0001,	 1},
+    {MLX_CMD_READSG_OLD,	0x0002,	 1},
+    {MLX_CMD_READSG_OLD,	0x0105,	 3},
+    {MLX_CMD_WRITESG_OLD,	0x0001,	 1},
+    {MLX_CMD_WRITESG_OLD,	0x0002,	 1},
+    {MLX_CMD_WRITESG_OLD,	0x0105,	 3},
     {MLX_CMD_LOGOP,		0x0105,	 5},
     {MLX_CMD_REBUILDASYNC,	0x0002,  6},
     {MLX_CMD_REBUILDASYNC,	0x0004,  7},
     {MLX_CMD_REBUILDASYNC,	0x0105,  8},
     {MLX_CMD_REBUILDASYNC,	0x0106,  9},
+    {MLX_CMD_REBUILDASYNC,	0x0107, 14},
     {MLX_CMD_CHECKASYNC,	0x0002, 10},
     {MLX_CMD_CHECKASYNC,	0x0105, 11},
     {MLX_CMD_CHECKASYNC,	0x0106,  9},
@@ -2370,6 +2723,13 @@ static struct
     {MLX_CMD_STOPCHANNEL,	0x0105,  8},
     {MLX_CMD_STARTCHANNEL,	0x0005, 13},
     {MLX_CMD_STARTCHANNEL,	0x0105,  8},
+    {MLX_CMD_DIRECT_CDB,	0x0002, 16},
+    {MLX_CMD_DIRECT_CDB,	0x0008, 17},
+    {MLX_CMD_DIRECT_CDB,	0x000e, 18},
+    {MLX_CMD_DIRECT_CDB,	0x000f, 19},
+    {MLX_CMD_DIRECT_CDB,	0x0105,  8},
+    
+    {0,				0x0104, 14},
     {-1, 0, 0}
 };
 
@@ -2381,7 +2741,7 @@ mlx_diagnose_command(struct mlx_command *mc)
     
     /* look up message in table */
     for (i = 0; mlx_messages[i].command != -1; i++)
-	if ((mc->mc_mailbox[0] == mlx_messages[i].command) &&
+	if (((mc->mc_mailbox[0] == mlx_messages[i].command) || (mlx_messages[i].command == 0)) &&
 	    (mc->mc_status == mlx_messages[i].status))
 	    return(mlx_status_messages[mlx_messages[i].msg]);
 	
@@ -2390,7 +2750,7 @@ mlx_diagnose_command(struct mlx_command *mc)
 }
 
 /*******************************************************************************
- * Return a string describing the controller (hwid)
+ * Print a string describing the controller (sc)
  */
 static struct 
 {
@@ -2427,7 +2787,7 @@ mlx_describe_controller(struct mlx_softc *sc)
 	sprintf(buf, " model 0x%x", sc->mlx_enq2->me_hardware_id & 0xff);
 	model = buf;
     }
-    device_printf(sc->mlx_dev, "DAC%s, %d channel%s, firmware %d.%02d-%c-%d, %dMB RAM\n",
+    device_printf(sc->mlx_dev, "DAC%s, %d channel%s, firmware %d.%02d-%c-%02d, %dMB RAM\n",
 		  model, 
 		  sc->mlx_enq2->me_actual_channels, 
 		  sc->mlx_enq2->me_actual_channels > 1 ? "s" : "",
@@ -2474,6 +2834,59 @@ mlx_describe_controller(struct mlx_softc *sc)
 		      "\20\4Background Init\3Read Ahead\2MORE\1Cluster\n");
 	
     }
+}
+
+/*******************************************************************************
+ * Emit a string describing the firmware handshake status code, and return a flag 
+ * indicating whether the code represents a fatal error.
+ *
+ * Error code interpretations are from the Linux driver, and don't directly match
+ * the messages printed by Mylex's BIOS.  This may change if documentation on the
+ * codes is forthcoming.
+ */
+static int
+mlx_fw_message(struct mlx_softc *sc, int error, int param1, int param2)
+{
+    switch(error) {
+    case 0x00:
+	device_printf(sc->mlx_dev, "physical drive %d:%d not responding\n", param2, param1);
+	break;
+    case 0x08:
+	/* we could be neater about this and give some indication when we receive more of them */
+	if (!(sc->mlx_flags & MLX_SPINUP_REPORTED)) {
+	    device_printf(sc->mlx_dev, "spinning up drives...\n");
+	    sc->mlx_flags |= MLX_SPINUP_REPORTED;
+	}
+	break;
+    case 0x30:
+	device_printf(sc->mlx_dev, "configuration checksum error\n");
+	break;
+    case 0x60:
+	device_printf(sc->mlx_dev, "mirror race recovery failed\n");
+	break;
+    case 0x70:
+	device_printf(sc->mlx_dev, "mirror race recovery in progress\n");
+	break;
+    case 0x90:
+	device_printf(sc->mlx_dev, "physical drive %d:%d COD mismatch\n", param2, param1);
+	break;
+    case 0xa0:
+	device_printf(sc->mlx_dev, "logical drive installation aborted\n");
+	break;
+    case 0xb0:
+	device_printf(sc->mlx_dev, "mirror race on a critical system drive\n");
+	break;
+    case 0xd0:
+	device_printf(sc->mlx_dev, "new controller configuration found\n");
+	break;
+    case 0xf0:
+	device_printf(sc->mlx_dev, "FATAL MEMORY PARITY ERROR\n");
+	return(1);
+    default:
+	device_printf(sc->mlx_dev, "unknown firmware initialisation error %02x:%02x:%02x\n", error, param1, param2);
+	break;
+    }
+    return(0);
 }
 
 /********************************************************************************
