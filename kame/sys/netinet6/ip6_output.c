@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.158 2001/02/06 09:05:05 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.159 2001/02/09 01:58:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3073,14 +3073,17 @@ ip6_clearpktopts(pktopt, needfree, optname)
 	}
 }
 
-#define PKTOPT_EXTHDRCPY(type) if (src->type) {\
+#define PKTOPT_EXTHDRCPY(type) \
+do {\
+	if (src->type) {\
 		int hlen =\
 			(((struct ip6_ext *)src->type)->ip6e_len + 1) << 3;\
 		dst->type = malloc(hlen, M_IP6OPT, canwait);\
 		if (dst->type == NULL && canwait == M_NOWAIT)\
 			goto bad;\
 		bcopy(src->type, dst->type, hlen);\
-	}
+	}\
+} while (0)
 
 struct ip6_pktopts *
 ip6_copypktopts(src, canwait)
