@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.42 2001/08/16 18:23:59 sakane Exp $
+$KAME: helsinki-result.jp,v 1.43 2001/08/16 18:28:14 itojun Exp $
 
 
 generic
@@ -206,6 +206,10 @@ Oullim information technologies SECUREWORKS VPN gateway 3.0
 
 	Thu Aug 16 22:01:57 JST 2001
 	もういちど。あとはID payloadの順序だけ。
+
+	Fri Aug 17 02:00 JST頃
+	再挑戦。成功。
+
 
 Trilogy AdmitOne 2.6
 	Tue Aug 14 21:58:01 JST 2001
@@ -420,7 +424,6 @@ draft-shacham-ippcp-rfc2393bis-08.txt
 	phase 1 3DES + SHA1, group 5, lifetime = 10min
 	phase 2 3DES + SHA1 + deflate, group 5, lifetime = 2min
 	再挑戦。修正確認。
-
 
 netopia
 	Wed Aug 15 19:00 JST頃
