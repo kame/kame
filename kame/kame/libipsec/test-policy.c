@@ -100,7 +100,7 @@ main(ac, av)
 			continue;
 		}
 
-		printf("\tsetlen:%d\n", PFKEY_EXTLEN(buf));
+		printf("\tsetlen:%d\n", ipsec_get_policylen(buf));
 
 		if (do_setsockopt) {
 			printf("\tPF_INET:\n");
@@ -140,7 +140,8 @@ test(policy, family)
 	if ((so = socket(family, SOCK_DGRAM, 0)) < 0)
 		err(1, "socket");
 
-	if (setsockopt(so, proto, optname, policy, PFKEY_EXTLEN(policy)) < 0) {
+	len = ipsec_get_policylen(policy);
+	if (setsockopt(so, proto, optname, policy, len) < 0) {
 		printf("error on setsockopt");
 		goto end;
 	}

@@ -43,7 +43,8 @@ CFLAGS+=-Wall
 .PATH:	${.CURDIR}/../../../sys/netkey
 .PATH:	${.CURDIR}/../../sys/netkey
 SRCS=	pfkey.c pfkey_dump.c
-SRCS+=	ipsec_dump_policy.c ipsec_strerror.c policy_parse.y policy_token.l
+SRCS+=	ipsec_strerror.c policy_parse.y policy_token.l
+SRCS+=	ipsec_dump_policy.c ipsec_get_policylen.c
 SRCS+=	key_debug.c
 LDADD+=	-ll -ly
 CLEANFILES+=	y.tab.c y.tab.h
