@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.60 2001/03/29 05:34:31 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.61 2001/03/29 05:59:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -258,7 +258,7 @@ struct ip6aux {
 	u_int32_t ip6a_flags;
 #define IP6A_SWAP	0x01		/* swapped home/care-of on packet */
 #define IP6A_HASEEN	0x02		/* HA was present */
-#define IP6A_BRUID	0x03		/* BR Unique Identifier was present */
+#define IP6A_BRUID	0x04		/* BR Unique Identifier was present */
 
 	/* ip6.ip6_src */
 	struct in6_addr ip6a_careof;	/* care-of address of the peer */
