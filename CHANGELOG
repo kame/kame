@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1372 2000/11/07 22:39:12 jinmei Exp $
+$KAME: CHANGELOG,v 1.1373 2000/11/08 16:29:48 sakane Exp $
 
 <200011>
+Thu Nov  9 01:30:20 JST 2000 sakane@ydc.co.jp
+	* setkey:
+	Print a timestamp on each dump line by using -x option.
+
 2000-11-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/if_indextoname.c (if_indextoname): made sure
 	to set ENXIO to errno if an appropriate interface is not found.
