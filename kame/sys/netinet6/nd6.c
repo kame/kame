@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.93 2001/01/28 09:44:54 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.94 2001/01/30 14:06:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -605,7 +605,7 @@ nd6_timer(ignored_arg)
 	/*
 	 * expire interface addresses.
 	 * in the past the loop was inside prefix expiry processing.
-	 * however, as we can specify address lifetime with ifconfig(8),
+	 * However, as we can specify address lifetime with ifconfig(8),
 	 * it makes more sense for us to check individual interface addresses
 	 * separately from prefix lists.
 	 */
@@ -615,12 +615,8 @@ nd6_timer(ignored_arg)
 		lt6 = &ia6->ia6_lifetime;
 		if (lt6->ia6t_preferred && lt6->ia6t_preferred < time_second)
 			ia6->ia6_flags |= IN6_IFF_DEPRECATED;
-		if (lt6->ia6t_expire && lt6->ia6t_expire < time_second) {
-			if (!IN6_IS_ADDR_UNSPECIFIED(&ia6->ia_addr.sin6_addr))
-				in6_ifdel(ia6->ia_ifp,
-				    &ia6->ia_addr.sin6_addr);
-			/* xxx ND_OPT_PI_FLAG_ONLINK processing */
-		}
+		if (lt6->ia6t_expire && lt6->ia6t_expire < time_second)
+			in6_purgeaddr(&ia6->ia_ifa);
 	}
 
 	/* expire prefix list */
@@ -635,15 +631,17 @@ nd6_timer(ignored_arg)
 		 * can use the old prefix information to validate the
 		 * next prefix information to come.  See prelist_update()
 		 * for actual validation.
+		 *
+		 * I don't think such an offset is necessary.
+		 * (jinmei@kame.net, 20010130).
 		 */
-		if (pr->ndpr_expire
-		 && pr->ndpr_expire + NDPR_KEEP_EXPIRED < time_second) {
+		if (pr->ndpr_expire && pr->ndpr_expire < time_second) {
 			struct nd_prefix *t;
 			t = pr->ndpr_next;
 
 			/*
 			 * address expiration and prefix expiration are
-			 * separate.  NEVER perform in6_ifdel here.
+			 * separate.  NEVER perform in6_purgeaddr here.
 			 */
 
 			prelist_remove(pr);
@@ -686,8 +684,14 @@ nd6_purge(ifp)
 	for (pr = nd_prefix.lh_first; pr; pr = npr) {
 		npr = pr->ndpr_next;
 		if (pr->ndpr_ifp == ifp) {
-			if (!IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr))
-				in6_ifdel(pr->ndpr_ifp, &pr->ndpr_addr);
+			/*
+			 * Previously, pr->ndpr_addr is removed as well,
+			 * but I strongly believe we don't have to do it.
+			 * nd6_purge() is only called from in6_ifdetach(),
+			 * which removes all the associated interface address
+			 * by itself.
+			 * (jinmei@kame.net 20010129)
+			 */
 			prelist_remove(pr);
 		}
 	}
@@ -1514,13 +1518,15 @@ nd6_ioctl(cmd, data, ifp)
 			struct nd_pfxrouter *pfr;
 			int j;
 
-			prl->prefix[i].prefix = pr->ndpr_prefix.sin6_addr;
+			prl->prefix[i].prefix = pr->ndpr_prefix;
 			prl->prefix[i].raflags = pr->ndpr_raf;
 			prl->prefix[i].prefixlen = pr->ndpr_plen;
 			prl->prefix[i].vltime = pr->ndpr_vltime;
 			prl->prefix[i].pltime = pr->ndpr_pltime;
 			prl->prefix[i].if_index = pr->ndpr_ifp->if_index;
 			prl->prefix[i].expire = pr->ndpr_expire;
+			prl->prefix[i].refcnt = pr->ndpr_refcnt;
+			prl->prefix[i].flags = pr->ndpr_stateflags;
 
 			pfr = pr->ndpr_advrtrs.lh_first;
 			j = 0;
@@ -1555,7 +1561,7 @@ nd6_ioctl(cmd, data, ifp)
 		     rpp = LIST_NEXT(rpp, rp_entry)) {
 			if (i >= PRLSTSIZ)
 				break;
-			prl->prefix[i].prefix = rpp->rp_prefix.sin6_addr;
+			prl->prefix[i].prefix = rpp->rp_prefix;
 			prl->prefix[i].raflags = rpp->rp_raf;
 			prl->prefix[i].prefixlen = rpp->rp_plen;
 			prl->prefix[i].vltime = rpp->rp_vltime;
@@ -1563,6 +1569,7 @@ nd6_ioctl(cmd, data, ifp)
 			prl->prefix[i].if_index = rpp->rp_ifp->if_index;
 			prl->prefix[i].expire = rpp->rp_expire;
 			prl->prefix[i].advrtrs = 0;
+			prl->prefix[i].refcnt = pr->ndpr_refcnt; /* XXX */
 			prl->prefix[i].origin = rpp->rp_origin;
 			i++;
 		}
@@ -1607,9 +1614,32 @@ nd6_ioctl(cmd, data, ifp)
 		s = splnet();
 #endif
 		for (pr = nd_prefix.lh_first; pr; pr = next) {
+			struct in6_ifaddr *ia, *ia_next;
+
 			next = pr->ndpr_next;
-			if (!IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr))
-				in6_ifdel(pr->ndpr_ifp, &pr->ndpr_addr);
+
+			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr))
+				continue; /* XXX */
+
+			/* do we really have to remove addresses as well? */
+			for (ia = in6_ifaddr; ia; ia = ia_next) {
+				struct in6_addr *in6_pfx;
+				int plen_ifa;
+
+				/* ia might be removed. keep the next ptr. */
+				ia_next = ia->ia_next;
+
+				if ((ia->ia6_flags & IN6_IFF_AUTOCONF) == 0)
+					continue;
+
+				in6_pfx = &ia->ia_prefixmask.sin6_addr;
+				plen_ifa = in6_mask2len(in6_pfx, NULL);
+				if (pr->ndpr_plen == plen_ifa &&
+				    in6_are_prefix_equal(in6_pfx,
+							 &pr->ndpr_prefix.sin6_addr,
+							 pr->ndpr_plen))
+					in6_purgeaddr(&ia->ia_ifa);
+			}
 			prelist_remove(pr);
 		}
 		splx(s);

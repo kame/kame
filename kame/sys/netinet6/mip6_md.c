@@ -1,4 +1,4 @@
-/*	$KAME: mip6_md.c,v 1.25 2001/01/28 09:44:53 itojun Exp $	*/
+/*	$KAME: mip6_md.c,v 1.26 2001/01/30 14:06:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -194,7 +194,7 @@ mip6_md_init()
 		 * If home prefix already exists in prefix list, use that
 		 * entry instead.
 		 */
-		if ( (existing_pr = prefix_lookup(pr)) ) {
+		if ( (existing_pr = nd6_prefix_lookup(pr)) ) {
 			free(pr, M_TEMP);
 			pr = existing_pr;
 		}
@@ -221,9 +221,13 @@ mip6_md_init()
 
 		/* New prefix, fix all initialization. */
 
-		pr->ndpr_statef_onlink = 0; /* Should be 0 since there
-					       are no adv rtrs for
-					       this pfx yet */
+		/*
+		 * Should be off-link since there are no adv rtrs for this
+		 * pfx yet.
+		 * I'm not sure if this correct (jinmei@kame.net 20010129).
+		 */
+		pr->ndpr_stateflags &= ~NDPRF_ONLINK;
+					       
 		LIST_INIT(&pr->ndpr_advrtrs);
 
 	  skip_initialization:
@@ -385,7 +389,7 @@ mip6_select_defrtr(prhint, drhint)
 
 	if (MIP6_EAGER_PREFIX && prhint && drhint) {
 		if (drhint != dr && 
-		    (prhint = prefix_lookup(prhint)) != pr &&
+		    (prhint = nd6_prefix_lookup(prhint)) != pr &&
 		    pfxrtr_lookup(prhint, drhint)) {
 			/*
 			 * Check if hints are ok as the new defualt router
@@ -1302,7 +1306,7 @@ mip6_delete_ifaddr(struct in6_addr *addr,
 		IFAREF(&ia->ia_ifa);
 	}
 
-	in6_purgeaddr(&ia->ia_ifa, ifp);
+	in6_purgeaddr(&ia->ia_ifa);
 
 	splx(s);
 	return(0);

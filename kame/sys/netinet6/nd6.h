@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.30 2001/01/28 10:10:39 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.31 2001/01/30 14:06:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -110,13 +110,15 @@ struct	in6_drlist {
 struct	in6_prlist {
 	char ifname[IFNAMSIZ];
 	struct {
-		struct	in6_addr prefix;
+		struct	sockaddr_in6 prefix;
 		struct prf_ra raflags;
 		u_char	prefixlen;
 		u_char	origin;
 		u_long	vltime;
 		u_long	pltime;
 		u_long	expire;
+		u_int32_t flags;
+		int refcnt;
 		u_short if_index;
 		u_short advrtrs; /* number of advertisement routers */
 		struct	in6_addr advrtr[DRLSTSIZ]; /* XXX: explicit limit */
@@ -133,6 +135,9 @@ struct	in6_ndifreq {
 	u_long ifindex;
 };
 
+/* Prefix status */
+#define NDPRF_ONLINK		0x1
+#define NDPRF_DETACHED		0x2
 
 /* protocol constants */
 #define MAX_RTR_SOLICITATION_DELAY	1	/*1sec*/
@@ -182,13 +187,11 @@ struct nd_prefix {
 	time_t ndpr_expire;	/* expiration time of the prefix */
 	time_t ndpr_preferred;	/* preferred time of the prefix */
 	struct prf_ra ndpr_flags;
+	u_int32_t ndpr_stateflags; /* actual state flags */
 	/* list of routers that advertise the prefix: */
 	LIST_HEAD(pr_rtrhead, nd_pfxrouter) ndpr_advrtrs;
 	u_char	ndpr_plen;
-	struct	ndpr_stateflags {
-		/* if this prefix can be regarded as on-link */
-		u_char onlink : 1;
-	} ndpr_stateflags;
+	int	ndpr_refcnt;	/* reference couter from addresses */
 };
 
 #define ndpr_next		ndpr_entry.le_next
@@ -196,9 +199,6 @@ struct nd_prefix {
 #define ndpr_raf		ndpr_flags
 #define ndpr_raf_onlink		ndpr_flags.onlink
 #define ndpr_raf_auto		ndpr_flags.autonomous
-
-#define ndpr_statef_onlink	ndpr_stateflags.onlink
-#define ndpr_statef_addmark	ndpr_stateflags.addmark
 
 /*
  * We keep expired prefix for certain amount of time, for validation purposes.
@@ -347,13 +347,16 @@ void defrtrlist_del __P((struct nd_defrouter *));
 void prelist_remove __P((struct nd_prefix *));
 int prelist_update __P((struct nd_prefix *, struct nd_defrouter *,
 	struct mbuf *));
+int nd6_prelist_add __P((struct nd_prefix *, struct nd_defrouter *,
+			 struct nd_prefix **));
+int nd6_prefix_onlink __P((struct nd_prefix *));
+int nd6_prefix_offlink __P((struct nd_prefix *));
 struct nd_pfxrouter *find_pfxlist_reachable_router __P((struct nd_prefix *)); /* XXXYYY */
 void pfxlist_onlink_check __P((void));
 void defrouter_addifreq __P((struct ifnet *));           /* XXXYYY */
 struct nd_defrouter *defrouter_lookup __P((struct in6_addr *,
 					   struct ifnet *));
-struct nd_prefix *prefix_lookup __P((struct nd_prefix *));  /* XXXYYY */
-int in6_ifdel __P((struct ifnet *, struct in6_addr *));
+struct nd_prefix *nd6_prefix_lookup __P((struct nd_prefix *));
 struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
                                         struct nd_defrouter *));  /* XXXYYY */
 int in6_init_prefix_ltimes __P((struct nd_prefix *ndpr));

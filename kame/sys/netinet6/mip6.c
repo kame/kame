@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.34 2001/01/23 17:43:04 itojun Exp $	*/
+/*	$KAME: mip6.c,v 1.35 2001/01/30 14:06:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -1623,6 +1623,11 @@ mip6_add_ifaddr(struct in6_addr *addr,
  	ia = in6ifa_ifpwithaddr(ifp, &sa6->sin6_addr);
 
 	error = in6_update_ifa(ifp, ifra, ia);
+
+	/*
+	 * XXX: should we make the corresponding prefix as well?
+	 * I'm not sure...(jinmei@kame.net 20010130)
+	 */
 	
 	splx(s);
 	return error;

@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.47 2001/01/23 15:44:06 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.48 2001/01/30 14:06:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -121,6 +121,10 @@ struct	in6_ifaddr {
 
 	struct in6_addrlifetime ia6_lifetime;
 	struct ifprefix *ia6_ifpr; /* back pointer to ifprefix */
+
+	struct nd_prefix *ia6_ndpr; /* back pointer to the ND prefix
+				     * (for autoconfigured addresses only)
+				     */
 
 #ifdef MEASURE_PERFORMANCE
 	struct in6hash ia6_hash;	/* hash for ia_addr */
@@ -443,7 +447,8 @@ struct	in6_rrenumreq {
 #define IN6_IFF_NODAD		0x20	/* don't perform DAD on this address
 					 * (used only at first SIOC* call)
 					 */
-#define IN6_IFF_NOPFX		0x40	/* skip kerne prefix management.
+#define IN6_IFF_AUTOCONF	0x40	/* autoconfigurable address. */
+#define IN6_IFF_NOPFX		0x80	/* skip kernel prefix management.
 					 * XXX: this should be temporary.
 					 */
 
@@ -660,12 +665,9 @@ do {						\
 
 #endif /* not FreeBSD3 */
 
-int	in6_ifinit __P((struct ifnet *, struct in6_ifaddr *,
-			struct sockaddr_in6 *, int, int));
 struct	in6_multi *in6_addmulti __P((struct in6_addr *, struct ifnet *,
 				     int *));
 void	in6_delmulti __P((struct in6_multi *));
-void	in6_ifscrub __P((struct ifnet *, struct in6_ifaddr *, int));
 extern int in6_ifindex2scopeid __P((int));
 extern int in6_mask2len __P((struct in6_addr *, u_char *));
 extern void in6_len2mask __P((struct in6_addr *, int));
@@ -677,7 +679,7 @@ int	in6_control __P((struct socket *, u_long, caddr_t, struct ifnet *));
 #endif
 int	in6_update_ifa __P((struct ifnet *, struct in6_aliasreq *,
 			    struct in6_ifaddr *));
-void	in6_purgeaddr __P((struct ifaddr *, struct ifnet *));
+void	in6_purgeaddr __P((struct ifaddr *));
 void	in6_purgeif __P((struct ifnet *));
 void	in6_savemkludge __P((struct in6_ifaddr *));
 void	in6_setmaxmtu   __P((void));

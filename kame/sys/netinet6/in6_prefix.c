@@ -1,4 +1,4 @@
-/*	$KAME: in6_prefix.c,v 1.42 2001/01/24 01:55:56 jinmei Exp $	*/
+/*	$KAME: in6_prefix.c,v 1.43 2001/01/30 14:06:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1137,7 +1137,7 @@ delete_each_prefix(struct rr_prefix *rpp, u_char origin)
 		}
 		rap->ra_addr->ia6_ifpr = NULL;
 
-		in6_purgeaddr(&rap->ra_addr->ia_ifa, rpp->rp_ifp);
+		in6_purgeaddr(&rap->ra_addr->ia_ifa);
 		IFAFREE(&rap->ra_addr->ia_ifa);
 		free(rap, M_RR_ADDR);
 	}

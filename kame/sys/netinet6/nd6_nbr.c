@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.52 2001/01/23 15:23:36 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.53 2001/01/30 14:06:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -692,7 +692,14 @@ nd6_na_input(m, off, icmp6len)
 			ln->ln_expire = time_second + nd6_gctimer;
 #endif
 		}
-		ln->ln_router = is_router;
+		if ((ln->ln_router = is_router) != 0) {
+			/*
+			 * This means a router's state has changed from
+			 * non-reachable to probably reachable, and might
+			 * affect the status of associated prefixes..
+			 */
+			pfxlist_onlink_check();
+		}
 	} else {
 		int llchange;
 

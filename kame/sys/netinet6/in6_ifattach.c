@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.85 2001/01/24 02:08:47 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.86 2001/01/30 14:06:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -412,7 +412,8 @@ in6_ifattach_linklocal(ifp, altifp)
 	struct ifnet *altifp;	/* secondary EUI64 source */
 {
 	struct in6_aliasreq ifra;
-	int error;
+	struct nd_prefix pr0;
+	int i, error;
 
 	/*
 	 * configure link-local address.
@@ -478,13 +479,55 @@ in6_ifattach_linklocal(ifp, altifp)
 	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0) {
 		/*
 		 * XXX: When the interface does not support IPv6, this call
-		 * would fail in the SIOCSIFADDR ioctl. Do we have to treat
-		 * EAFNOSUPPORT as a special case? Or suppress the log?
+		 * would fail in the SIOCSIFADDR ioctl.  I believe the
+		 * notification is rather confusing in this case, so just
+		 * supress it.  (jinmei@kame.net 20010130)
 		 */
-		log(LOG_ERR, "in6_ifattach_linklocal: failed to configure "
-		    "a link-local address on %s (errno=%d)\n",
-		    if_name(ifp), error);
+		if (error != EAFNOSUPPORT)
+			log(LOG_NOTICE, "in6_ifattach_linklocal: failed to "
+			    "configure a link-local address on %s "
+			    "(errno=%d)\n",
+			    if_name(ifp), error);
 		return(-1);
+	}
+
+	/*
+	 * Make the link-local prefix (fe80::/64%link) as on-link.
+	 * Since we'd like to manage prefixes separately from addresses,
+	 * we make an ND6 prefix structure for the link-local prefix,
+	 * and add it to the prefix list as a never-expire prefix.
+	 * XXX: this change might affect some existing code base...
+	 */
+	bzero(&pr0, sizeof(pr0));
+	pr0.ndpr_ifp = ifp;
+	/* this should be 64 at this moment. */
+	pr0.ndpr_plen = in6_mask2len(&ifra.ifra_prefixmask.sin6_addr, NULL);
+	pr0.ndpr_mask = ifra.ifra_prefixmask.sin6_addr;
+	pr0.ndpr_prefix = ifra.ifra_addr;
+	/* apply the mask for safety. (nd6_prelist_add will apply it again) */
+	for (i = 0; i < 4; i++) {
+		pr0.ndpr_prefix.sin6_addr.s6_addr32[i] &=
+			in6mask64.s6_addr32[i];
+	}
+	/*
+	 * Initialize parameters.  The link-local prefix must always be
+	 * on-link, and its lifetimes never expire.
+	 */
+	pr0.ndpr_raf_onlink = 1;
+	pr0.ndpr_raf_auto = 1;	/* probably meaningless */
+	pr0.ndpr_vltime = ND6_INFINITE_LIFETIME;
+	pr0.ndpr_pltime = ND6_INFINITE_LIFETIME;
+	/*
+	 * Since there is no other link-local addresses, nd6_prefix_lookup()
+	 * probably returns NULL.  However, we cannot expect the result.
+	 * For example, if we first remove the (only) existing link-local
+	 * address, and then reconfigure another one, the prefix is still
+	 * valid with referring to the old link-local address.
+	 */
+	if (nd6_prefix_lookup(&pr0) == NULL) {
+		/* add the prefix if there's one. */
+		if ((error = nd6_prelist_add(&pr0, NULL, NULL)) != 0)
+			return(error);
 	}
 
 	return 0;
@@ -497,9 +540,6 @@ in6_ifattach_loopback(ifp)
 	struct in6_aliasreq ifra;
 	int error;
 
-	/*
-	 * configure link-local address
-	 */
 	bzero(&ifra, sizeof(ifra));
 
 	/*
@@ -544,8 +584,8 @@ in6_ifattach_loopback(ifp)
 	 * in6_ifattach_linklocal().
 	 */
 	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0) {
-		log(LOG_ERR, "in6_ifattach_linklocal: failed to configure "
-		    "a link-local address on %s (errno=%d)\n",
+		log(LOG_ERR, "in6_ifattach_loopback: failed to configure "
+		    "the loopback address on %s (errno=%d)\n",
 		    if_name(ifp), error);
 		return(-1);
 	}
@@ -769,6 +809,18 @@ in6_ifattach(ifp, altifp)
 	}
 
 	/*
+	 * assign loopback address for loopback interface.
+	 * XXX multiple loopback interface case.
+	 */
+	if ((ifp->if_flags & IFF_LOOPBACK) != 0) {
+		in6 = in6addr_loopback;
+		if (in6ifa_ifpwithaddr(ifp, &in6) == NULL) {
+			if (in6_ifattach_loopback(ifp) != 0)
+				return;
+		}
+	}
+
+	/*
 	 * assign a link-local address, if there's none. 
 	 */
 	ia = in6ifa_ifpforlinklocal(ifp, 0);
@@ -793,18 +845,6 @@ in6_ifattach(ifp, altifp)
 		if ((ifp->if_flags & IFF_LOOPBACK) == 0) {
 			ia->ia6_flags &= ~IN6_IFF_NODAD;
 			ia->ia6_flags |= IN6_IFF_TENTATIVE;
-		}
-	}
-
-	/*
-	 * assign loopback address for loopback interface.
-	 * XXX multiple loopback interface case.
-	 */
-	in6 = in6addr_loopback;
-	if ((ifp->if_flags & IFF_LOOPBACK) != 0) {
-		if (in6ifa_ifpwithaddr(ifp, &in6) == NULL) {
-			if (in6_ifattach_loopback(ifp) != 0)
-				return;
 		}
 	}
 
@@ -964,7 +1004,7 @@ in6_ifdetach(ifp)
 #endif
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
-		in6_purgeaddr(ifa, ifp);
+		in6_purgeaddr(ifa);
 	}
 
 	/* undo everything done by in6_ifattach(), just in case */
@@ -1062,6 +1102,10 @@ in6_ifdetach(ifp)
 	/*
 	 * remove neighbor management table.  we call it twice just to make
 	 * sure we nuke everything.  maybe we need just one call.
+	 * XXX: since the first call did not release addresses, some prefixes
+	 * might remain.  We should cann nd6_purge() again to release the
+	 * prefixes after removing all addresses above.
+	 * (Or can we just delay calling nd6_purge until at this point?)
 	 */
 	nd6_purge(ifp);
 
