@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.h,v 1.8 2000/06/08 06:43:52 sakane Exp $ */
+/* YIPS @(#)$Id: remoteconf.h,v 1.9 2000/07/04 12:49:19 sakane Exp $ */
 
 /* remote configuration */
 
@@ -58,9 +58,10 @@ struct remoteconf {
 	struct dhgroup *dhgrp;		/* use it when only aggressive mode */
 					/* avobe two cann't be defined by user*/
 
-	int retry_counter;		/* copy from lcconf, will be updated. */
-	int retry_interval;		/* copy from lcconf, will be updated. */
-	int count_persend;		/* copy from lcconf, will be updated. */
+	int retry_counter;		/* times to retry. */
+	int retry_interval;		/* interval each retry. */
+	int count_persend;		/* the number of packets each retry. */
+				/* above 3 values are copied from localconf. */
 
 	struct isakmpsa *proposal;	/* proposal list */
 	LIST_ENTRY(remoteconf) chain;	/* next remote conf */

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.h,v 1.11 2000/06/19 09:21:25 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.h,v 1.12 2000/07/04 12:49:18 sakane Exp $ */
 
 /* local configuration */
 
@@ -83,9 +83,10 @@ struct localconf {
 	int pad_strict;
 	int pad_excltail;
 
-	int retry_counter;		/* initial value */
-	int retry_interval;		/* initial value */
-	int count_persend;		/* initial value */
+	int retry_counter;		/* times to retry. */
+	int retry_interval;		/* interval each retry. */
+	int count_persend;		/* the number of packets each retry. */
+				/* above 3 values are copied into a handler. */
 
 	int retry_checkph1;
 	int wait_ph2complete;
