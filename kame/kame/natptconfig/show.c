@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.32 2002/07/01 12:21:10 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.33 2002/12/09 09:57:22 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -76,6 +76,7 @@ void		 makeCSlotLine	__P((char *, int, struct cSlot *));
 void		 makeCUILine	__P((char *, int, struct cSlot *));
 void		 makeTSlotLine	__P((char *, int, struct tSlot *,
 				     struct tcpstate *, int));
+void		 showVariableSubsid __P((int, int));
 
 
 /*
@@ -315,12 +316,8 @@ showVariable(int ctlName)
 int
 showVariables(char *word)
 {
-	const char *fn = __FUNCTION__;
-
 	int			 type;
-	int			 idx, val;
-	char			 Bow[128];
-	char			 Wow[INET6_ADDRSTRLEN];
+	int			 idx;
 	struct natptctl_names	 ctlnames[] = NATPTCTL_NAMES;
 
 	type = 0;
@@ -337,50 +334,75 @@ showVariables(char *word)
 			type = NATPTCTL_TSLOT;
 		else if (strncasecmp(word, "caddr", strlen("caddr")) == 0)
 			type = NATPTCTL_CADDR;
-		else
-			return (1);
+		else {
+			char	*name;
+
+			for (idx = 0; ctlnames[idx].ctl_name; idx++) {
+				name = ctlnames[idx].ctl_name;
+				if (strncasecmp(word, name, strlen(name)) == 0) {
+					showVariableSubsid(idx, NATPTCTL_ALL);
+					return (0);
+				}
+			}
+		}
+		return (1);
+
 	}
 
 	for (idx = 0; ctlnames[idx].ctl_name; idx++) {
-		if (type == NATPTCTL_ALL)
-			;
-		else if (type == NATPTCTL_TSLOT) {
-			if ((ctlnames[idx].ctl_attr & NATPTCTL_TSLOT) == 0)
-				continue;
-		}
-		else if (type == NATPTCTL_CADDR) {
-			if ((ctlnames[idx].ctl_attr & NATPTCTL_CADDR) == 0)
-				continue;
-		}
-		else if ((ctlnames[idx].ctl_attr & NATPTCTL_DEFAULT) == 0)
-			continue;
-
-		if (getValue(idx, (caddr_t)&Bow) <= 0) {
-			err(errno, "%s(): getvalue failure", fn);
-		}
-
-		printf("%16s: ", ctlnames[idx].ctl_name);
-
-		switch (ctlnames[idx].ctl_type) {
-		case NATPTCTL_INT:
-			val = *(int *)&Bow;
-			printf("0x%08x (%d)", val, val);
-			break;
-
-		case NATPTCTL_IN6ADDR:
-			inet_ntop(AF_INET6, &Bow, Wow, sizeof(Wow));
-			printf("%s", Wow);
-			break;
-
-		case NATPTCTL_CADDR_T:
-			printf("%p", *(caddr_t *)&Bow);
-			break;
-		}
-
-		printf("\n");
+		showVariableSubsid(idx, type);
 	}
 
 	return (0);
+}
+
+
+void
+showVariableSubsid(int idx, int type)
+{
+	const char *fn = __FUNCTION__;
+
+	int			 val;
+	char			 Bow[128];
+	char			 Wow[INET6_ADDRSTRLEN];
+	struct natptctl_names	 ctlnames[] = NATPTCTL_NAMES;
+
+	if (type == NATPTCTL_ALL)
+		;
+	else if (type == NATPTCTL_TSLOT) {
+		if ((ctlnames[idx].ctl_attr & NATPTCTL_TSLOT) == 0)
+			return;
+	}
+	else if (type == NATPTCTL_CADDR) {
+		if ((ctlnames[idx].ctl_attr & NATPTCTL_CADDR) == 0)
+			return;
+	}
+	else if ((ctlnames[idx].ctl_attr & NATPTCTL_DEFAULT) == 0)
+		return;
+
+	if (getValue(idx, (caddr_t)&Bow) <= 0) {
+		err(errno, "%s(): getvalue failure", fn);
+	}
+
+	printf("%16s: ", ctlnames[idx].ctl_name);
+
+	switch (ctlnames[idx].ctl_type) {
+	case NATPTCTL_INT:
+		val = *(int *)&Bow;
+		printf("0x%08x (%d)", val, val);
+		break;
+
+	case NATPTCTL_IN6ADDR:
+		inet_ntop(AF_INET6, &Bow, Wow, sizeof(Wow));
+		printf("%s", Wow);
+		break;
+
+	case NATPTCTL_CADDR_T:
+		printf("%p", *(caddr_t *)&Bow);
+		break;
+	}
+
+	printf("\n");
 }
 
 
