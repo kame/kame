@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.10 2001/09/13 16:00:10 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.11 2001/09/20 06:26:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -119,7 +119,6 @@ mip6_icmp6_input(m, off, icmp6len)
 	struct mip6_bu *mbu;
 	struct mip6_bc *mbc;
 	struct in6_addr *laddr, *paddr;
-	int error = 0;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	icmp6 = (struct icmp6_hdr *)((caddr_t)ip6 + off);
@@ -211,9 +210,6 @@ mip6_icmp6_input(m, off, icmp6len)
 	}
 
 	return (0);
- bad:
-	m_freem(m);
-	return (error);
 }
 
 int
@@ -225,7 +221,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	struct mbuf *n;
 	struct ip6_hdr *ip6, otip6, oip6, *nip6;
 	struct icmp6_hdr *icmp6, *nicmp6;
-	int plen, nplen;
+	int plen;
 	struct mip6_bc *mbc;
 
 	if (!MIP6_IS_HA) {
@@ -282,7 +278,13 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		return (0);
 	}
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	n = m_dup(m, M_DONTWAIT);
+#elif defined(__NetBSD__)
+	n = m_dup(m, 0, M_COPYALL, M_DONTWAIT);
+#else
+#error no m_dup
+#endif
 	if (n == NULL) {
 		mip6log((LOG_ERR,
 			 "%s: mbuf allocation failed.\n",
@@ -440,7 +442,6 @@ mip6_icmp6_ha_discov_req_input(m, off, icmp6len)
 {
 	struct ifnet *rifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6, *ip6_rep;
-	struct icmp6_hdr *icmp6;
 	struct ha_discov_req *hdreq;
 	struct ha_discov_rep *hdrep;
 	int hdreplen;
@@ -536,7 +537,7 @@ mip6_icmp6_ha_discov_rep_input(m, off, icmp6len)
 	struct ip6_hdr *ip6;
 	struct ha_discov_rep *hdrep;
 	u_int16_t hdrep_id;
-	struct mip6_ha *mha, *mha_next, *mha_prefered = NULL;
+	struct mip6_ha *mha, *mha_prefered = NULL;
 	struct in6_addr *haaddrs, *haaddrptr, lladdr;
 	int i, hacount = 0, found = 0;
 	struct hif_softc *sc;
