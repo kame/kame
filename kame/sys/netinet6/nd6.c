@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.215 2001/10/26 16:50:11 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.216 2001/10/28 17:19:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1100,8 +1100,10 @@ nd6_is_addr_neighbor(addr, ifp)
 	 * XXX: we restrict the condition to hosts, because routers usually do
 	 * not have the "default router list".
 	 */
-	if (!ip6_forwarding && TAILQ_FIRST(&nd_defrouter) == NULL)
+	if (!ip6_forwarding && TAILQ_FIRST(&nd_defrouter) == NULL &&
+	    nd6_defifindex == ifp->if_index) {
 		return(1);
+	}
 
 	/*
 	 * Even if the address matches none of our addresses, it might be
