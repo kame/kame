@@ -67,7 +67,9 @@
 #if 0
 static char sccsid[] = "from: @(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
+#ifdef __NetBSD__
 __RCSID("$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $");
+#endif
 #endif
 #endif /* not lint */
 
@@ -86,6 +88,10 @@ __RCSID("$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $");
 #include <string.h>
 #include <unistd.h>
 #include "netstat.h"
+
+#ifdef __bsdi__
+#define plural(x)	PLURAL(x)
+#endif
 
 #ifdef IPSEC
 static const char *ipsec_ahnames[] = {
