@@ -298,7 +298,6 @@ tvfix(tv)
 static void
 server6_mainloop()
 {
-	int bigsock;
 	int ret;
 	fd_set r;
 	char abuf[BUFSIZ], sbuf[BUFSIZ];
