@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.69 2001/07/04 04:54:30 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.70 2001/07/04 04:59:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -104,7 +104,7 @@
 
 static int recv_dns __P((struct sockdb *));
 static int recv_dns0 __P((struct sockdb *, int));
-static int recv_icmp6 __P((struct sockdb *));
+static void recv_icmp6 __P((struct sockdb *));
 static int conf_mediator __P((struct sockdb *));
 static char *encode_name __P((char **, int, const char *));
 static char *decode_name __P((const char **, int));
@@ -307,7 +307,7 @@ recv_dns0(sd, vclen)
 /*
  * process inbound ICMPv6-formatted packet.
  */
-static int
+static void
 recv_icmp6(sd)
 	struct sockdb *sd;
 {
@@ -494,9 +494,6 @@ decode_edns0(hp, bufp, len)
 	int len;
 {
 	int edns0len;
-	char *str;
-	char *p;
-	const char *q;
 	const char *buf = *bufp;
 
 	if (ntohs(hp->arcount) != 1 || len != 11)
@@ -525,9 +522,6 @@ update_edns0(hp, buf, len, edns0len)
 	int len;
 	size_t edns0len;
 {
-	char *str;
-	char *p;
-	const char *q;
 	u_int16_t v;
 
 	if (ntohs(hp->arcount) != 1 || len != 11)
@@ -1494,19 +1488,16 @@ relay_icmp6(sd, buf, len, from)
 	int len;
 	struct sockaddr *from;
 {
-	const struct sockaddr *sa;
 	HEADER *hp;
 	struct qcache *qc;
 	struct nsdb *ns;
 	int sent;
 	const char *n = NULL;
 	const char *d;
-	enum sdtype servtype;	/* type of server we want to relay to */
 	size_t rbuflen = PACKETSZ;
 	int edns0len = -1;
 	struct icmp6_nodeinfo *ni6;
 	struct addrinfo hints, *res;
-	int error;
 	char icmp6buf[RECVBUFSIZ];
 	u_int16_t qtype, qclass;
 
@@ -1641,7 +1632,6 @@ serve(sd, buf, len, from)
 	int l;
 	int count;
 	int scoped, loopback;
-	const struct addrinfo *ai;
 	size_t rbuflen = PACKETSZ;
 
 	if (dflag)
