@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.191 2001/04/24 16:54:59 sumikawa Exp $	*/
+/*	$KAME: ip6_input.c,v 1.192 2001/05/21 13:46:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -863,10 +863,27 @@ ip6_input(m)
 	 * route to the loopback interface for the destination of the packet.
 	 * But we think it's even useful in some situations, e.g. when using
 	 * a special daemon which wants to intercept the packet.
+	 *
+	 * XXX: some OSes automatically make a cloned route for the destination
+	 * of an outgoing packet.  If the outgoing interface of the packet
+	 * is a loopback one, the kernel would consider the packet to be
+	 * accepted, even if we have no such address assinged on the interface.
+	 * We check the cloned flag of the route entry to reject such cases,
+	 * assuming that route entries for our own addresses are not made by
+	 * cloning (it should be true because in6_addloop explicitly installs
+	 * the host route).  However, we might have to do an explicit check
+	 * while it would be less efficient.  Or, should we rather install a
+	 * reject route for such a case?
 	 */
 	if (ip6_forward_rt.ro_rt &&
 	    (ip6_forward_rt.ro_rt->rt_flags &
 	     (RTF_HOST|RTF_GATEWAY)) == RTF_HOST &&
+#ifdef RTF_WASCLONED
+	    !(ip6_forward_rt.ro_rt->rt_flags & RTF_WASCLONED) &&
+#endif
+#ifdef RTF_CLONED
+	    !(ip6_forward_rt.ro_rt->rt_flags & RTF_CLONED) &&
+#endif
 #if 0
 	    /*
 	     * The check below is redundant since the comparison of
@@ -874,7 +891,7 @@ ip6_input(m)
 	     * already done through looking up the routing table.
 	     */
 	    IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
-			       &rt6_key(ip6_forward_rt.ro_rt)->sin6_addr) &&
+				&rt6_key(ip6_forward_rt.ro_rt)->sin6_addr)
 #endif
 	    ip6_forward_rt.ro_rt->rt_ifp->if_type == IFT_LOOP) {
 		struct in6_ifaddr *ia6 =
