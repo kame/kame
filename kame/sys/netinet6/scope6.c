@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.5 2000/04/20 02:31:25 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.6 2000/04/20 05:58:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -45,18 +45,18 @@
 
 struct scope6_id {
 	/*
-	 * 16 is correspondent to 4bit multicast scop field.
+	 * 16 is correspondent to 4bit multicast scope field.
 	 * i.e. from node-local to global with some reserved/unassigned types.
 	 */
 	u_int32_t s6id_list[16];
 };
+static size_t if_indexlim = 8;
 struct scope6_id *scope6_ids = NULL;
 
 void
 scope6_ifattach(ifp)
 	struct ifnet *ifp;
 {
-	static size_t if_indexlim = 8;
 	int s = splnet();
 
 	/*
@@ -235,6 +235,8 @@ in6_addr2scopeid(ifp, addr)
 	int scope = in6_addrscope(addr);
 
 	if (scope6_ids == NULL)	/* paranoid? */
+		return(0);	/* XXX */
+	if (ifp->if_index >= if_indexlim)
 		return(0);	/* XXX */
 
 #define SID scope6_ids[ifp->if_index]
