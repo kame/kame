@@ -198,7 +198,7 @@ dump_bgp_rtable(FILE *fp, struct rt_entry *base)
 					rte->rt_gwsrc_entry->rt_ripinfo.rip6_plen,
 					rte->rt_gwif->ifi_ifn->if_name);
 				fprintf(fp, "        ");
-				fprintf(fp, "             %s",
+				fprintf(fp, "             %s)",
 					ip6str(&rte->rt_gwsrc_entry->rt_gw,
 					       rte->rt_gwif->ifi_ifn->if_index));
 				break;
