@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.6 1998/09/11 18:49:30 wollman Exp $
+# $FreeBSD: src/usr.sbin/lpr/chkprintcap/Makefile,v 1.6.2.1 1999/08/29 15:43:03 peter Exp $
 
 PROG=	chkprintcap
 MAN8=	chkprintcap.8

@@ -1,5 +1,5 @@
 #	From: @(#)Makefile	8.1 (Berkeley) 6/8/93
-#	$Id: Makefile,v 1.3 1998/03/07 09:47:53 bde Exp $
+# $FreeBSD: src/usr.sbin/lpr/SMM.doc/Makefile,v 1.3.2.1 1999/08/29 15:43:02 peter Exp $
 
 BINDIR=	/usr/share/doc
 VOLUME=	smm/07.lpd

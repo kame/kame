@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)lpdchar.c	8.1 (Berkeley) 6/6/93";
 */
 static const char rcsid[] =
-	"$Id: lpdchar.c,v 1.4 1997/12/02 20:45:55 wollman Exp $";
+  "$FreeBSD: src/usr.sbin/lpr/runqueue/lpdchar.c,v 1.4.2.1 1999/08/29 15:43:35 peter Exp $";
 #endif /* not lint */
 
 /*

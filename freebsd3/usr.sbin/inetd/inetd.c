@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)from: inetd.c	8.4 (Berkeley) 4/13/94";
 #endif
 static const char rcsid[] =
-	"$Id: inetd.c,v 1.46.2.2 1999/05/12 07:02:02 des Exp $";
+  "$FreeBSD: src/usr.sbin/inetd/inetd.c,v 1.46.2.9 1999/08/29 15:42:34 peter Exp $";
 #endif /* not lint */
 
 /*
@@ -128,12 +128,11 @@ static const char rcsid[] =
 #include <stdlib.h>
 #include <string.h>
 #include <syslog.h>
+#include <tcpd.h>
 #include <unistd.h>
 #include <libutil.h>
 #include <sysexits.h>
 
-#ifdef LIBWRAP
-# include <tcpd.h>
 #ifndef LIBWRAP_ALLOW_FACILITY
 # define LIBWRAP_ALLOW_FACILITY LOG_AUTH
 #endif
@@ -146,9 +145,11 @@ static const char rcsid[] =
 #ifndef LIBWRAP_DENY_SEVERITY
 # define LIBWRAP_DENY_SEVERITY LOG_WARNING
 #endif
-int allow_severity = LIBWRAP_ALLOW_FACILITY|LIBWRAP_ALLOW_SEVERITY;
-int deny_severity = LIBWRAP_DENY_FACILITY|LIBWRAP_DENY_SEVERITY;
-#endif
+
+#define ISWRAP(sep)	\
+	   ( ((wrap_ex && !(sep)->se_bi) || (wrap_bi && (sep)->se_bi)) \
+	&& ( ((sep)->se_accept && (sep)->se_socktype == SOCK_STREAM) \
+	    || (sep)->se_socktype == SOCK_DGRAM))
 
 #ifdef LOGIN_CAP
 #include <login_cap.h>
@@ -178,15 +179,20 @@ int deny_severity = LIBWRAP_DENY_FACILITY|LIBWRAP_DENY_SEVERITY;
 
 #define	SIGBLOCK	(sigmask(SIGCHLD)|sigmask(SIGHUP)|sigmask(SIGALRM))
 
+int	allow_severity;
+int	deny_severity;
+int	wrap_ex = 0;
+int	wrap_bi = 0;
 int	debug = 0;
 int	log = 0;
-int	nsock, maxsock;
+int	nsock;
+int	maxsock;			/* highest-numbered descriptor */
 fd_set	allsock;
 int	options;
 int	timingout;
 int	toomany = TOOMANY;
-int	maxchild = MAXCPM;
-int	maxcpm = MAXCHILD;
+int	maxchild = MAXCHILD;
+int	maxcpm = MAXCPM;
 struct	servent *sp;
 struct	rpcent *rpc;
 struct	in_addr bind_address;
@@ -253,6 +259,7 @@ struct servtab *getconfigent __P((void));
 void		ident_stream __P((int, struct servtab *));
 void		machtime_dg __P((int, struct servtab *));
 void		machtime_stream __P((int, struct servtab *));
+int		matchservent __P((char *, char *, char *));
 char	       *newstr __P((char *));
 char	       *nextline __P((FILE *));
 void		print_service __P((char *, struct servtab *));
@@ -269,6 +276,7 @@ char	       *sskip __P((char **));
 char	       *skip __P((char **));
 struct servtab *tcpmux __P((int));
 int		cpmip __P((struct servtab *, int));
+void		inetd_setproctitle __P((char *, int));
 
 void		unregisterrpc __P((register struct servtab *sep));
 
@@ -276,32 +284,32 @@ struct biltin {
 	char	*bi_service;		/* internally provided service name */
 	int	bi_socktype;		/* type of socket supported */
 	short	bi_fork;		/* 1 if should fork before call */
-	int	bi_maxchild;		/* max number of children (default) */
+	int	bi_maxchild;		/* max number of children (-1=default) */
 	void	(*bi_fn)();		/* function which performs it */
 } biltins[] = {
 	/* Echo received data */
-	{ "echo",	SOCK_STREAM,	1, 0,	echo_stream },
-	{ "echo",	SOCK_DGRAM,	0, 0,	echo_dg },
+	{ "echo",	SOCK_STREAM,	1, -1,	echo_stream },
+	{ "echo",	SOCK_DGRAM,	0, 1,	echo_dg },
 
 	/* Internet /dev/null */
-	{ "discard",	SOCK_STREAM,	1, 0,	discard_stream },
-	{ "discard",	SOCK_DGRAM,	0, 0,	discard_dg },
+	{ "discard",	SOCK_STREAM,	1, -1,	discard_stream },
+	{ "discard",	SOCK_DGRAM,	0, 1,	discard_dg },
 
 	/* Return 32 bit time since 1970 */
-	{ "time",	SOCK_STREAM,	0, 0,	machtime_stream },
-	{ "time",	SOCK_DGRAM,	0, 0,	machtime_dg },
+	{ "time",	SOCK_STREAM,	0, -1,	machtime_stream },
+	{ "time",	SOCK_DGRAM,	0, 1,	machtime_dg },
 
 	/* Return human-readable time */
-	{ "daytime",	SOCK_STREAM,	0, 0,	daytime_stream },
-	{ "daytime",	SOCK_DGRAM,	0, 0,	daytime_dg },
+	{ "daytime",	SOCK_STREAM,	0, -1,	daytime_stream },
+	{ "daytime",	SOCK_DGRAM,	0, 1,	daytime_dg },
 
 	/* Familiar character generator */
-	{ "chargen",	SOCK_STREAM,	1, 0,	chargen_stream },
-	{ "chargen",	SOCK_DGRAM,	0, 0,	chargen_dg },
+	{ "chargen",	SOCK_STREAM,	1, -1,	chargen_stream },
+	{ "chargen",	SOCK_DGRAM,	0, 1,	chargen_dg },
 
-	{ "tcpmux",	SOCK_STREAM,	1, 0,	(void (*)())tcpmux },
+	{ "tcpmux",	SOCK_STREAM,	1, -1,	(void (*)())tcpmux },
 
-	{ "ident",	SOCK_STREAM,	1, 0,	ident_stream },
+	{ "auth",	SOCK_STREAM,	1, -1,	ident_stream },
 
 	{ NULL }
 };
@@ -340,20 +348,19 @@ main(argc, argv, envp)
 	struct servtab *sep;
 	struct passwd *pwd;
 	struct group *grp;
-	struct sigaction sa, sapipe;
+	struct sigaction sa, saalrm, sachld, sahup, sapipe;
 	int tmpint, ch, dofork;
 	pid_t pid;
 	char buf[50];
-	struct  sockaddr_in peer;
-	int i;
 #ifdef LOGIN_CAP
 	login_cap_t *lc = NULL;
 #endif
-#ifdef LIBWRAP
 	struct request_info req;
 	int denied;
 	char *service = NULL;
-#endif
+	char *pnm;
+	struct  sockaddr_in peer;
+	int i;
 
 
 #ifdef OLD_SETPROCTITLE
@@ -368,7 +375,7 @@ main(argc, argv, envp)
 	openlog("inetd", LOG_PID | LOG_NOWAIT, LOG_DAEMON);
 
 	bind_address.s_addr = htonl(INADDR_ANY);
-	while ((ch = getopt(argc, argv, "dlR:a:c:C:p:")) != -1)
+	while ((ch = getopt(argc, argv, "dlwWR:a:c:C:p:")) != -1)
 		switch(ch) {
 		case 'd':
 			debug = 1;
@@ -399,10 +406,16 @@ main(argc, argv, envp)
 		case 'p':
 			pid_file = optarg;
 			break;
+		case 'w':
+			wrap_ex++;
+			break;
+		case 'W':
+			wrap_bi++;
+			break;
 		case '?':
 		default:
 			syslog(LOG_ERR,
-				"usage: inetd [-dl] [-a address] [-R rate]"
+				"usage: inetd [-dlwW] [-a address] [-R rate]"
 				" [-c maximum] [-C rate]"
 				" [-p pidfile] [conf-file]");
 			exit(EX_USAGE);
@@ -441,12 +454,12 @@ main(argc, argv, envp)
 	sigaddset(&sa.sa_mask, SIGCHLD);
 	sigaddset(&sa.sa_mask, SIGHUP);
 	sa.sa_handler = flag_retry;
-	sigaction(SIGALRM, &sa, (struct sigaction *)0);
+	sigaction(SIGALRM, &sa, &saalrm);
 	config();
 	sa.sa_handler = flag_config;
-	sigaction(SIGHUP, &sa, (struct sigaction *)0);
+	sigaction(SIGHUP, &sa, &sahup);
 	sa.sa_handler = flag_reapchild;
-	sigaction(SIGCHLD, &sa, (struct sigaction *)0);
+	sigaction(SIGCHLD, &sa, &sachld);
 	sa.sa_handler = SIG_IGN;
 	sigaction(SIGPIPE, &sa, &sapipe);
 
@@ -468,6 +481,8 @@ main(argc, argv, envp)
 	nsock++;
 	if (signalpipe[0] > maxsock)
 	    maxsock = signalpipe[0];
+	if (signalpipe[1] > maxsock)
+	    maxsock = signalpipe[1];
 
 	for (;;) {
 	    int n, ctrl;
@@ -538,29 +553,31 @@ main(argc, argv, envp)
 				close(ctrl);
 				continue;
 			    }
-			    if (log) {
-				i = sizeof peer;
-				if (getpeername(ctrl, (struct sockaddr *)
-						&peer, &i)) {
-					syslog(LOG_WARNING,
-						"getpeername(for %s): %m",
-						sep->se_service);
-					close(ctrl);
-					continue;
-				}
-				syslog(LOG_INFO,"%s from %s",
-					sep->se_service,
-					inet_ntoa(peer.sin_addr));
-			    }
 		    } else
 			    ctrl = sep->se_fd;
+		    if (log && !ISWRAP(sep)) {
+			    pnm = "unknown";
+			    i = sizeof peer;
+			    if (getpeername(ctrl, (struct sockaddr *)
+					    &peer, &i)) {
+				    i = sizeof peer;
+				    if (recvfrom(ctrl, buf, sizeof(buf),
+					MSG_PEEK,
+					(struct sockaddr *)&peer, &i) >= 0)
+					    pnm = inet_ntoa(peer.sin_addr);
+			    }
+			    else
+				    pnm = inet_ntoa(peer.sin_addr);
+			    syslog(LOG_INFO,"%s from %s", sep->se_service, pnm);
+		    }
 		    (void) sigblock(SIGBLOCK);
 		    pid = 0;
-#ifdef LIBWRAP_INTERNAL
-		    dofork = 1;
-#else
-		    dofork = (sep->se_bi == 0 || sep->se_bi->bi_fork);
-#endif
+		    /*
+		     * Fork for all external services, builtins which need to
+		     * fork and anything we're wrapping (as wrapping might
+		     * block or use hosts_options(5) twist).
+		     */
+		    dofork = !sep->se_bi || sep->se_bi->bi_fork || ISWRAP(sep);
 		    if (dofork) {
 			    if (sep->se_count++ == 0)
 				(void)gettimeofday(&sep->se_time, (struct timezone *)NULL);
@@ -606,6 +623,10 @@ main(argc, argv, envp)
 				for (tmpint = maxsock; tmpint > 2; tmpint--)
 					if (tmpint != ctrl)
 						(void) close(tmpint);
+				sigaction(SIGALRM, &saalrm, (struct sigaction *)0);
+				sigaction(SIGCHLD, &sachld, (struct sigaction *)0);
+				sigaction(SIGHUP, &sahup, (struct sigaction *)0);
+				/* SIGPIPE reset before exec */
 			    }
 			    /*
 			     * Call tcpmux to find the real service to exec.
@@ -618,32 +639,23 @@ main(argc, argv, envp)
 					    _exit(0);
 				    }
 			    }
-#ifdef LIBWRAP
-#ifndef LIBWRAP_INTERNAL
-			    if (sep->se_bi == 0)
-#endif
-			    if (sep->se_accept
-				&& sep->se_socktype == SOCK_STREAM) {
-				request_init(&req,
-				    RQ_DAEMON, sep->se_server_name ?
-					sep->se_server_name : sep->se_service,
-					RQ_FILE, ctrl, NULL);
+			    if (ISWRAP(sep)) {
+				inetd_setproctitle("wrapping", ctrl);
+				service = sep->se_server_name ?
+				    sep->se_server_name : sep->se_service;
+				request_init(&req, RQ_DAEMON, service, RQ_FILE, ctrl, NULL);
 				fromhost(&req);
+				deny_severity = LIBWRAP_DENY_FACILITY|LIBWRAP_DENY_SEVERITY;
+				allow_severity = LIBWRAP_ALLOW_FACILITY|LIBWRAP_ALLOW_SEVERITY;
 				denied = !hosts_access(&req);
-				if (denied || log) {
-				    sp = getservbyport(sep->se_ctrladdr.sin_port, sep->se_proto);
-				    if (sp == NULL) {
-					(void)snprintf(buf, sizeof buf, "%d",
-					   ntohs(sep->se_ctrladdr.sin_port));
-					service = buf;
-				    } else
-					service = sp->s_name;
-				}
 				if (denied) {
 				    syslog(deny_severity,
 				        "refused connection from %.500s, service %s (%s)",
 				        eval_client(&req), service, sep->se_proto);
-				    goto reject;
+				    if (sep->se_socktype != SOCK_STREAM)
+					recv(ctrl, buf, sizeof (buf), 0);
+				    if (dofork)
+					_exit(0);
 				}
 				if (log) {
 				    syslog(allow_severity,
@@ -651,10 +663,8 @@ main(argc, argv, envp)
 					eval_client(&req), service, sep->se_proto);
 				}
 			    }
-#endif /* LIBWRAP */
 			    if (sep->se_bi) {
 				(*sep->se_bi->bi_fn)(ctrl, sep);
-				/* NOTREACHED */
 			    } else {
 				if (debug)
 					warnx("%d execl %s",
@@ -741,13 +751,11 @@ main(argc, argv, envp)
 				execv(sep->se_server, sep->se_argv);
 				syslog(LOG_ERR,
 				    "cannot execute %s: %m", sep->se_server);
-#ifdef LIBWRAP
-			    reject:
-#endif
 				if (sep->se_socktype != SOCK_STREAM)
 					recv(0, buf, sizeof (buf), 0);
-				_exit(EX_OSERR);
 			    }
+			    if (dofork)
+				_exit(0);
 		    }
 		    if (sep->se_accept && sep->se_socktype == SOCK_STREAM)
 			    close(ctrl);
@@ -764,7 +772,7 @@ void flag_signal(c)
 {
 	if (write(signalpipe[1], &c, 1) != 1) {
 		syslog(LOG_ERR, "write: %m");
-		exit(EX_OSERR);
+		_exit(EX_OSERR);
 	}
 }
 
@@ -911,6 +919,7 @@ void config()
 			SWAP(sep->se_class, new->se_class);
 #endif
 			SWAP(sep->se_server, new->se_server);
+			SWAP(sep->se_server_name, new->se_server_name);
 			for (i = 0; i < MAXARGV; i++)
 				SWAP(sep->se_argv[i], new->se_argv[i]);
 			sigsetmask(omask);
@@ -1127,6 +1136,25 @@ close_sep(sep)
 	sep->se_numchild = 0;	/* forget about any existing children */
 }
 
+int
+matchservent(name1, name2, proto)
+	char *name1, *name2, *proto;
+{
+	char **alias;
+	struct servent *se;
+
+	if (strcmp(name1, name2) == 0)
+		return(1);
+	if ((se = getservbyname(name1, proto)) != NULL) {
+		if (strcmp(name2, se->s_name) == 0)
+			return(1);
+		for (alias = se->s_aliases; *alias; alias++)
+			if (strcmp(name2, *alias) == 0)
+				return(1);
+	}
+	return(0);
+}
+
 struct servtab *
 enter(cp)
 	struct servtab *cp;
@@ -1337,8 +1365,8 @@ more:
 			CONFIG, sep->se_service);
 		goto more;
 	}
-	sep->se_maxchild = maxchild;
-	sep->se_maxcpm = maxcpm;
+	sep->se_maxchild = -1;
+	sep->se_maxcpm = -1;
 	if ((s = strchr(arg, '/')) != NULL) {
 		char *eptr;
 		u_long val;
@@ -1350,6 +1378,10 @@ more:
 				CONFIG, sep->se_service);
 			goto more;
 		}
+		if (debug)
+			if (!sep->se_accept && val != 1)
+				warnx("maxchild=%lu for wait service %s"
+				    " not recommended", val, sep->se_service);
 		sep->se_maxchild = val;
 		if (*eptr == '/')
 			sep->se_maxcpm = strtol(eptr + 1, &eptr, 10);
@@ -1398,7 +1430,8 @@ more:
 
 		for (bi = biltins; bi->bi_service; bi++)
 			if (bi->bi_socktype == sep->se_socktype &&
-			    strcmp(bi->bi_service, sep->se_service) == 0)
+			    matchservent(bi->bi_service, sep->se_service,
+			    sep->se_proto))
 				break;
 		if (bi->bi_service == 0) {
 			syslog(LOG_ERR, "internal service %s unknown",
@@ -1409,11 +1442,15 @@ more:
 		sep->se_bi = bi;
 	} else
 		sep->se_bi = NULL;
+	if (sep->se_maxcpm < 0)
+		sep->se_maxcpm = maxcpm;
 	if (sep->se_maxchild < 0) {	/* apply default max-children */
-		if (sep->se_bi)
+		if (sep->se_bi && sep->se_bi->bi_maxchild >= 0)
 			sep->se_maxchild = sep->se_bi->bi_maxchild;
+		else if (sep->se_accept) 
+			sep->se_maxchild = maxchild > 0 ? maxchild : 0;
 		else
-			sep->se_maxchild = sep->se_accept ? 0 : 1;
+			sep->se_maxchild = 1;
 	}
 	if (sep->se_maxchild) {
 		sep->se_pids = malloc(sep->se_maxchild * sizeof(*sep->se_pids));

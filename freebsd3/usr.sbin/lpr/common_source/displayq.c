@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)displayq.c	8.4 (Berkeley) 4/28/95";
 */
 static const char rcsid[] =
-	"$Id: displayq.c,v 1.14 1998/05/13 06:52:08 jb Exp $";
+  "$FreeBSD: src/usr.sbin/lpr/common_source/displayq.c,v 1.14.2.1 1999/08/29 15:43:08 peter Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>

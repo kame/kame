@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.4 1997/12/02 20:45:33 wollman Exp $
+# $FreeBSD: src/usr.sbin/lpr/lp/Makefile,v 1.4.2.1 1999/08/29 15:43:16 peter Exp $
 
 BINDIR = /usr/bin
 MAN1 = lp.1
