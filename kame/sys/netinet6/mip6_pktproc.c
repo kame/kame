@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.6 2002/06/13 07:54:31 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.7 2002/06/18 02:11:06 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -474,7 +474,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		 * might have changed after it had registered before.
 		 */
 		error = mip6_bc_send_ba(&mbc->mbc_addr, &mbc->mbc_phaddr,
-		    &coa_sa, MIP6_BA_STATUS_SEQNO_TOO_SMALL, mbc->mbc_seqno,
+		    &coa_sa, IP6MA_STATUS_SEQNO_TOO_SMALL, mbc->mbc_seqno,
 		    0, 0);
 		if (error) {
 			mip6log((LOG_ERR,
@@ -541,7 +541,7 @@ mip6_ip6mu_process(m, ip6mu, ip6mulen)
 			/* this is not a homeagent. */
 			/* XXX */
 			mip6_bc_send_ba(dst_sa, src_sa, coa_sa,
-					MIP6_BA_STATUS_NOT_SUPPORTED,
+					IP6MA_STATUS_NOT_SUPPORTED,
 					seqno, 0, 0);
 			return (0);
 		}

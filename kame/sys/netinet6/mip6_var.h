@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.35 2002/06/13 07:54:31 k-sugyou Exp $	*/
+/*	$KAME: mip6_var.h,v 1.36 2002/06/18 02:11:06 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -520,6 +520,7 @@ int mip6_bc_send_bm			__P((struct mbuf *,
 					     struct in6_addr *));
 int mip6_dad_success			__P((struct ifaddr *));
 int mip6_dad_duplicated			__P((struct ifaddr *));
+int mip6_dad_error			__P((struct ifaddr *, int));
 struct ifaddr *mip6_dad_find		__P((struct in6_addr *, struct ifnet *));
 
 #define mip6log(arg) do { if (mip6_config.mcfg_debug) log arg;} while (0)

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.112 2002/06/09 16:16:00 keiichi Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.113 2002/06/18 02:11:06 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1307,15 +1307,25 @@ nd6_dad_start(ifa, tick)
 		return;
 	}
 	if (!ip6_dad_count) {
+#ifdef MIP6
+		mip6_dad_success(ifa);
+#endif
 		ia->ia6_flags &= ~IN6_IFF_TENTATIVE;
 		return;
 	}
 	if (!ifa->ifa_ifp)
 		panic("nd6_dad_start: ifa->ifa_ifp == NULL");
-	if (!(ifa->ifa_ifp->if_flags & IFF_UP))
+	if (!(ifa->ifa_ifp->if_flags & IFF_UP)) {
+#ifdef MIP6
+		mip6_dad_error(ifa, IP6MA_STATUS_RESOURCES);
+#endif
 		return;
+	}
 	if (nd6_dad_find(ifa) != NULL) {
 		/* DAD already in progress */
+#ifdef MIP6
+		mip6_dad_error(ifa, IP6MA_STATUS_RESOURCES);
+#endif
 		return;
 	}
 
@@ -1325,6 +1335,9 @@ nd6_dad_start(ifa, tick)
 			"%s(%s)\n",
 			ip6_sprintf(&ia->ia_addr.sin6_addr),
 			ifa->ifa_ifp ? if_name(ifa->ifa_ifp) : "???");
+#ifdef MIP6
+		mip6_dad_error(ifa, IP6MA_STATUS_RESOURCES);
+#endif
 		return;
 	}
 	bzero(dp, sizeof(*dp));

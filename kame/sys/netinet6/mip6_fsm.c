@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.3 2002/06/17 08:43:07 k-sugyou Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.4 2002/06/18 02:11:06 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -328,14 +328,14 @@ mip6_bu_fsm(mbu, event, data)
 	case MIP6_BU_FSM_STATE_WAITA:
 		switch (event) {
 		case MIP6_BU_FSM_EVENT_BA_RECEIVED:
-			if (ip6ma->ip6ma_status < MIP6_BA_STATUS_ERRORBASE) {
+			if (ip6ma->ip6ma_status < IP6MA_STATUS_ERRORBASE) {
 				/* stop timers. */
 
 				/* XXX */
 
 				*mbu_fsm_state = MIP6_BU_FSM_STATE_BOUND;
 			} else if (ip6ma->ip6ma_status
-			    == MIP6_BA_STATUS_SEQNO_TOO_SMALL) {
+			    == IP6MA_STATUS_SEQNO_TOO_SMALL) {
 				/*
 				 * set seq#, send bu, restart retrans
 				 * and failure timers.
@@ -345,9 +345,9 @@ mip6_bu_fsm(mbu, event, data)
 
 				*mbu_fsm_state = MIP6_BU_FSM_STATE_WAITA;
 			} else if ((ip6ma->ip6ma_status
-			    == MIP6_BA_STATUS_HOME_NONCE_EXPIRED)
+			    == IP6MA_STATUS_HOME_NONCE_EXPIRED)
 			    || (ip6ma->ip6ma_status
-			    == MIP6_BA_STATUS_CAREOF_NONCE_EXPIRED)) {
+			    == IP6MA_STATUS_CAREOF_NONCE_EXPIRED)) {
 				/*
 				 * send HoTI, CoTI, restart
 				 * retransmission and failure timers.
@@ -392,14 +392,14 @@ mip6_bu_fsm(mbu, event, data)
 	case MIP6_BU_FSM_STATE_WAITD:
 		switch (event) {
 		case MIP6_BU_FSM_EVENT_BA_RECEIVED:
-			if (ip6ma->ip6ma_status < MIP6_BA_STATUS_ERRORBASE) {
+			if (ip6ma->ip6ma_status < IP6MA_STATUS_ERRORBASE) {
 				/* stop timers. */
 
 				/* XXX */
 
 				*mbu_fsm_state = MIP6_BU_FSM_STATE_IDLE;
 			} else if (ip6ma->ip6ma_status
-			    == MIP6_BA_STATUS_SEQNO_TOO_SMALL) {
+			    == IP6MA_STATUS_SEQNO_TOO_SMALL) {
 				/*
 				 * set seq#, send bu, restart retrans
 				 * and failure timers.
@@ -407,9 +407,9 @@ mip6_bu_fsm(mbu, event, data)
 
 				/* XXX */
 			} else if ((ip6ma->ip6ma_status
-			    == MIP6_BA_STATUS_HOME_NONCE_EXPIRED)
+			    == IP6MA_STATUS_HOME_NONCE_EXPIRED)
 			    || (ip6ma->ip6ma_status
-			    == MIP6_BA_STATUS_CAREOF_NONCE_EXPIRED)) {
+			    == IP6MA_STATUS_CAREOF_NONCE_EXPIRED)) {
 				/*
 				 * send HoTI, restart retrans and
 				 * failure timers.

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.106 2002/06/13 07:54:31 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.107 2002/06/18 02:11:06 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -890,7 +890,7 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 		 * binding ack with an error NOT_HOME_SUBNET.
 		 */
 		if (mip6_bc_send_ba(haaddr, haddr0, coa,
-				    MIP6_BA_STATUS_NOT_HOME_SUBNET,
+				    IP6MA_STATUS_NOT_HOME_SUBNET,
 				    seqno,
 				    0,
 				    0)) {
@@ -910,7 +910,7 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 		if (mbc == NULL) {
 			/* XXX NOT_HOME_AGENT */
 			mip6_bc_send_ba(haaddr, haddr0, coa,
-					MIP6_BA_STATUS_NOT_HOME_AGENT,
+					IP6MA_STATUS_NOT_HOME_AGENT,
 					seqno,
 					0,
 					0);
@@ -943,7 +943,7 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 				 "%s:%d: can't remove BC.\n",
 				 __FILE__, __LINE__));
 			mip6_bc_send_ba(haaddr, haddr0, coa,
-					MIP6_BA_STATUS_UNSPECIFIED,
+					IP6MA_STATUS_UNSPECIFIED,
 					seqno,
 					0,
 					0);
@@ -997,7 +997,7 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 					 "%s:%d: can't remove BC.\n",
 					 __FILE__, __LINE__));
 				mip6_bc_send_ba(haaddr, haddr0, coa,
-						MIP6_BA_STATUS_UNSPECIFIED,
+						IP6MA_STATUS_UNSPECIFIED,
 						seqno,
 						0,
 						0);
@@ -1006,7 +1006,7 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 		}
 		if (found == 0) {
 			mip6_bc_send_ba(haaddr, haddr0, coa,
-					MIP6_BA_STATUS_NOT_HOME_AGENT,
+					IP6MA_STATUS_NOT_HOME_AGENT,
 					seqno,
 					0,
 					0);
@@ -1016,7 +1016,7 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 
 	/* return BA */
 	if (mip6_bc_send_ba(haaddr, haddr0, coa,
-			    MIP6_BA_STATUS_ACCEPTED,
+			    IP6MA_STATUS_ACCEPTED,
 			    seqno,
 			    0,
 			    0)) {
@@ -1114,7 +1114,7 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 		 * binding ack with an error NOT_HOME_SUBNET.
 		 */
 		if (mip6_bc_send_ba(haaddr, haddr0, coa,
-				    MIP6_BA_STATUS_NOT_HOME_SUBNET,
+				    IP6MA_STATUS_NOT_HOME_SUBNET,
 				    seqno,
 				    0,
 				    0)) {
@@ -1285,7 +1285,7 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 			refresh = lifetime < MIP6_REFRESH_MINLIFETIME ?
 				  lifetime : MIP6_REFRESH_MINLIFETIME;
 		if (mip6_bc_send_ba(haaddr, haddr0, coa,
-				    MIP6_BA_STATUS_ACCEPTED,
+				    IP6MA_STATUS_ACCEPTED,
 				    seqno,
 				    lifetime,
 				    refresh)) {
@@ -1392,7 +1392,7 @@ mip6_dad_success(ifa)
 	/* return BA */
 	if (mip6_bc_send_ba(&prim->mbc_addr, &prim->mbc_phaddr,
 			    &prim->mbc_pcoa,
-			    MIP6_BA_STATUS_ACCEPTED,
+			    IP6MA_STATUS_ACCEPTED,
 			    prim->mbc_seqno,
 			    prim->mbc_lifetime,
 			    prim->mbc_lifetime / 2 /* XXX */)) {
@@ -1410,6 +1410,14 @@ mip6_dad_success(ifa)
 int
 mip6_dad_duplicated(ifa)
 	struct ifaddr *ifa;
+{
+	return mip6_dad_error(ifa, IP6MA_STATUS_DAD_FAILED);
+}
+
+int
+mip6_dad_error(ifa, err)
+	struct ifaddr *ifa;
+	int err;
 {
 	struct  mip6_bc *mbc, *mbc_next, *prim = NULL;
 
@@ -1444,7 +1452,7 @@ mip6_dad_duplicated(ifa)
 	/* return BA */
 	mip6_bc_send_ba(&prim->mbc_addr, &prim->mbc_phaddr,
 			&prim->mbc_pcoa,
-			MIP6_BA_STATUS_DAD_FAILED,
+			err,
 			prim->mbc_seqno,
 			0, 0);
 	mip6_bc_list_remove(&mip6_bc_list, prim);

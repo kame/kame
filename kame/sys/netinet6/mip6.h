@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.51 2002/06/09 16:16:00 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.52 2002/06/18 02:11:06 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -70,23 +70,6 @@ struct mip6_req {
 #define MIP6SUBOPT_ALTCOA   0x03
 #define MIP6SUBOPT_AUTHDATA 0x04
 
-/* binding ack status code. */
-#define MIP6_BA_STATUS_ACCEPTED              0
-#define MIP6_BA_STATUS_ERRORBASE             128
-#define MIP6_BA_STATUS_UNSPECIFIED           128
-#define MIP6_BA_STATUS_PROHIBIT              130
-#define MIP6_BA_STATUS_RESOURCES             131
-#define MIP6_BA_STATUS_NOT_SUPPORTED         132
-#define MIP6_BA_STATUS_NOT_HOME_SUBNET       133
-#define MIP6_BA_STATUS_NOT_HOME_AGENT        137
-#define MIP6_BA_STATUS_DAD_FAILED            138
-#define MIP6_BA_STATUS_NO_SA                 139
-#define MIP6_BA_STATUS_SEQNO_TOO_SMALL       141
-#define MIP6_BA_STATUS_RO_NOT_DESIRED        142
-#define MIP6_BA_STATUS_INVAL_AUTHENTICATOR   143
-#define MIP6_BA_STATUS_HOME_NONCE_EXPIRED    144
-#define MIP6_BA_STATUS_CAREOF_NONCE_EXPIRED  145
-
 /* Unique Identifier sub-option format. */
 struct mip6_subopt_uniqid {
 	u_int8_t type; /* 0x02 */
@@ -121,6 +104,10 @@ struct mip6_subopt_authdata {
 #define IP6MA_STATUS_DAD_FAILED            138
 #define IP6MA_STATUS_NO_SA                 139
 #define IP6MA_STATUS_SEQNO_TOO_SMALL       141
+#define IP6MA_STATUS_RO_NOT_DESIRED        142
+#define IP6MA_STATUS_INVAL_AUTHENTICATOR   143
+#define IP6MA_STATUS_HOME_NONCE_EXPIRED    144
+#define IP6MA_STATUS_CAREOF_NONCE_EXPIRED  145
 
 /* Binding Error status code. */
 #define IP6ME_STATUS_NO_BINDING		1
