@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.38 2000/11/07 16:27:59 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.39 2000/11/07 16:39:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.38 2000/11/07 16:27:59 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.39 2000/11/07 16:39:34 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -2134,10 +2134,22 @@ do { \
 	RTFLAG("m", RTF_MASK);
 #endif
 	RTFLAG("C", RTF_CLONING);
+#ifdef RTF_CLONED
+	RTFLAG("c", RTF_CLONED);
+#endif
+#ifdef RTF_PRCLONING
+	RTFLAG("c", RTF_PRCLONING);
+#endif
+#ifdef RTF_WASCLONED
+	RTFLAG("W", RTF_WASCLONED);
+#endif
 	RTFLAG("X", RTF_XRESOLVE);
 	RTFLAG("L", RTF_LLINFO);
 	RTFLAG("S", RTF_STATIC);
 	RTFLAG("B", RTF_BLACKHOLE);
+#ifdef RTF_PROTO3
+	RTFLAG("3", RTF_PROTO3);
+#endif
 	RTFLAG("2", RTF_PROTO2);
 	RTFLAG("1", RTF_PROTO1);
 #undef RTFLAG
