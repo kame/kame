@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.73 2001/02/03 16:23:18 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.74 2001/02/04 05:39:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -353,14 +353,30 @@ extern const struct in6_addr in6addr_linklocal_allrouters;
 #define IN6_IS_ADDR_ANY(a)	IN6_IS_ADDR_UNSPECIFIED(a)
 #endif
 
+#ifdef _KERNEL	/*nonstandard*/
 /*
  * KAME Scope
  */
-#ifdef _KERNEL	/*nonstandard*/
 #define IN6_IS_SCOPE_LINKLOCAL(a)	\
 	((IN6_IS_ADDR_LINKLOCAL(a)) ||	\
 	 (IN6_IS_ADDR_MC_LINKLOCAL(a)))
+
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#define IFA6_IS_DEPRECATED(a) \
+	((a)->ia6_lifetime.ia6t_preferred != 0 && \
+	 (a)->ia6_lifetime.ia6t_preferred < time_second)
+#define IFA6_IS_INVALID(a) \
+	((a)->ia6_lifetime.ia6t_expire != 0 && \
+	 (a)->ia6_lifetime.ia6t_expire < time_second)
+#else
+#define IFA6_IS_DEPRECATED(a) \
+	((a)->ia6_lifetime.ia6t_preferred != 0 && \
+	 (a)->ia6_lifetime.ia6t_preferred < time.tv_sec)
+#define IFA6_IS_INVALID(a) \
+	((a)->ia6_lifetime.ia6t_expire != 0 && \
+	 (a)->ia6_lifetime.ia6t_expire < time.tv_sec)
 #endif
+#endif /* _KERNEL */
 
 /*
  * IP6 route structure

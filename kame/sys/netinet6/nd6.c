@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.103 2001/02/04 04:19:33 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.104 2001/02/04 05:39:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -615,7 +615,7 @@ nd6_timer(ignored_arg)
 		nia6 = ia6->ia_next;
 		/* check address lifetime */
 		lt6 = &ia6->ia6_lifetime;
-		if (lt6->ia6t_expire && lt6->ia6t_expire < time_second) {
+		if (IFA6_IS_INVALID(ia6)) {
 			int regen = 0;
 
 			/*
@@ -638,8 +638,7 @@ nd6_timer(ignored_arg)
 
 			if (regen)
 				goto addrloop; /* XXX: see below */
-		} else if (lt6->ia6t_preferred &&
-			 lt6->ia6t_preferred < time_second) {
+		} else if (IFA6_IS_DEPRECATED(ia6)) {
 			int oldflags = ia6->ia6_flags;
 
 			ia6->ia6_flags |= IN6_IFF_DEPRECATED;
@@ -718,9 +717,6 @@ regen_tmpaddr(ia6)
 	struct ifaddr *ifa;
 	struct ifnet *ifp;
 	struct in6_ifaddr *public_ifa6 = NULL;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
 
 	ifp = ia6->ia_ifa.ifa_ifp;
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
@@ -753,8 +749,7 @@ regen_tmpaddr(ia6)
 		 * a long period.
 		 */
 		if ((it6->ia6_flags & IN6_IFF_TEMPORARY) != 0 &&
-		    (it6->ia6_lifetime.ia6t_preferred == 0 ||
-		     it6->ia6_lifetime.ia6t_preferred > time_second)) {
+		    !IFA6_IS_DEPRECATED(it6)) {
 			public_ifa6 = NULL;
 			break;
 		}
@@ -765,8 +760,7 @@ regen_tmpaddr(ia6)
 		 * loop here, because there may be a still-preferred temporary
 		 * address with the prefix.
 		 */
-		if (it6->ia6_lifetime.ia6t_preferred == 0 ||
-		    it6->ia6_lifetime.ia6t_preferred > time_second)
+		if (!IFA6_IS_DEPRECATED(it6))
 		    public_ifa6 = it6;
 	}
 
