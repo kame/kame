@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.h,v 1.7 2000/01/10 21:08:07 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.h,v 1.8 2000/01/11 04:53:02 sakane Exp $ */
 
 /* refer to RFC 2408 */
 
@@ -297,6 +297,10 @@ struct isakmp_pl_n {
 #define ISAKMP_NTYPE_AUTHENTICATION_FAILED          24
 #define ISAKMP_NTYPE_INVALID_SIGNATURE              25
 #define ISAKMP_NTYPE_ADDRESS_NOTIFICATION           26
+#define ISAKMP_NTYPE_NOTIFY_SA_LIFETIME             27
+#define ISAKMP_NTYPE_CERTIFICATE_UNAVAILABLE        28
+#define ISAKMP_NTYPE_UNSUPPORTED_EXCHANGE_TYPE      29
+#define ISAKMP_NTYPE_UNEQUAL_PAYLOAD_LENGTHS        30
 /* NOTIFY MESSAGES - STATUS TYPES */
 #define ISAKMP_NTYPE_CONNECTED                   16384
 /* using only to log */

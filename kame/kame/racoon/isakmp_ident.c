@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.7 2000/01/10 23:47:29 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.8 2000/01/11 04:53:02 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -850,6 +850,10 @@ ident_r2recv(iph1, msg)
 			plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n");
 			isakmp_check_vendorid(pa->ptr, iph1->remote);
+			break;
+		case ISAKMP_NPTYPE_CR:
+			plog(logp, LOCATION, iph1->remote,
+				"certificate request received.\n");
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
