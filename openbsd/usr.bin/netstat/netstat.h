@@ -1,4 +1,4 @@
-/*	$OpenBSD: netstat.h,v 1.16 2000/12/13 15:52:58 camield Exp $	*/
+/*	$OpenBSD: netstat.h,v 1.19 2001/08/26 09:42:04 brian Exp $	*/
 /*	$NetBSD: netstat.h,v 1.6 1996/05/07 02:55:05 thorpej Exp $	*/
 
 /*
@@ -51,6 +51,7 @@ int	lflag;		/* show routing table with use and ref */
 int	mflag;		/* show memory stats */
 int	nflag;		/* show addresses numerically */
 int	pflag;		/* show given protocol */
+int	qflag;		/* only display non-zero values for output */
 int	rflag;		/* show routing tables (or routing stats) */
 int	sflag;		/* show protocol statistics */
 int	tflag;		/* show i/f watchdog timers */
@@ -83,8 +84,9 @@ void	esp_stats __P((u_long, char *));
 void	ipip_stats __P((u_long, char *));
 void	etherip_stats __P((u_long, char *));
 void	protopr __P((u_long, char *));
+void	ipcomp_stats __P((u_long, char *));
 
-void	mbpr(u_long);
+void	mbpr(u_long, u_long, u_long);
 
 void	hostpr __P((u_long, u_long));
 void	impstats __P((u_long, u_long));

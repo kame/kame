@@ -1,4 +1,4 @@
-/*	$OpenBSD: netstat.c,v 1.13 2000/05/24 13:17:08 itojun Exp $	*/
+/*	$OpenBSD: netstat.c,v 1.16 2001/07/28 05:36:18 pvalchev Exp $	*/
 /*	$NetBSD: netstat.c,v 1.3 1995/06/18 23:53:07 cgd Exp $	*/
 
 /*-
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)netstat.c	8.1 (Berkeley) 6/6/93";
 #endif
-static char rcsid[] = "$OpenBSD: netstat.c,v 1.13 2000/05/24 13:17:08 itojun Exp $";
+static char rcsid[] = "$OpenBSD: netstat.c,v 1.16 2001/07/28 05:36:18 pvalchev Exp $";
 #endif /* not lint */
 
 /*
@@ -73,6 +73,7 @@ static char rcsid[] = "$OpenBSD: netstat.c,v 1.13 2000/05/24 13:17:08 itojun Exp
 #include <netdb.h>
 #include <stdlib.h>
 #include <string.h>
+#include <err.h>
 #include <nlist.h>
 #include <paths.h>
 #include "systat.h"
@@ -162,10 +163,12 @@ static struct nlist namelist[] = {
 int
 initnetstat()
 {
-	if (kvm_nlist(kd, namelist)) {
+	int ret;
+
+	if ((ret = kvm_nlist(kd, namelist)) == -1)
+		errx(1, "%s", kvm_geterr(kd));
+	else if (ret)
 		nlisterr(namelist);
-		return(0);
-	}
 	if (namelist[X_TCBTABLE].n_value == 0) {
 		error("No symbols in namelist");
 		return(0);
@@ -210,7 +213,7 @@ again:
 	while (next != head) {
 		KREAD(next, &inpcb, sizeof (inpcb));
 		if (inpcb.inp_queue.cqe_prev != prev) {
-printf("prev = %x, head = %x, next = %x, inpcb...prev = %x\n", prev, head, next, inpcb.inp_queue.cqe_prev);
+printf("prev = %p, head = %p, next = %p, inpcb...prev = %p\n", prev, head, next, inpcb.inp_queue.cqe_prev);
 			p = netcb.nif_forw;
 			for (; p != (struct netinfo *)&netcb; p = p->nif_forw)
 				p->nif_seen = 1;
@@ -545,11 +548,9 @@ inetname(in)
 		}
 	}
 	if (in.s_addr == INADDR_ANY) {
-		strncpy(line, "*", sizeof line-1);
-		line[sizeof line-1] = '\0';
+		strlcpy(line, "*", sizeof line);
 	} else if (cp) {
-		strncpy(line, cp, sizeof line-1);
-		line[sizeof line-1] = '\0';
+		strlcpy(line, cp, sizeof line);
 	} else {
 		in.s_addr = ntohl(in.s_addr);
 #define C(x)	((x) & 0xff)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: sysctl.c,v 1.60 2001/02/23 16:46:36 mickey Exp $	*/
+/*	$OpenBSD: sysctl.c,v 1.76 2001/08/02 11:09:39 art Exp $	*/
 /*	$NetBSD: sysctl.c,v 1.9 1995/09/30 07:12:50 thorpej Exp $	*/
 
 /*
@@ -44,7 +44,7 @@ static char copyright[] =
 #if 0
 static char sccsid[] = "@(#)sysctl.c	8.5 (Berkeley) 5/9/95";
 #else
-static char *rcsid = "$OpenBSD: sysctl.c,v 1.60 2001/02/23 16:46:36 mickey Exp $";
+static char *rcsid = "$OpenBSD: sysctl.c,v 1.76 2001/08/02 11:09:39 art Exp $";
 #endif
 #endif /* not lint */
 
@@ -56,6 +56,9 @@ static char *rcsid = "$OpenBSD: sysctl.c,v 1.60 2001/02/23 16:46:36 mickey Exp $
 #include <sys/socket.h>
 #include <sys/malloc.h>
 #include <sys/dkstat.h>
+#include <sys/uio.h>
+#include <sys/tty.h>
+#include <sys/namei.h>
 #include <vm/vm_param.h>
 #include <machine/cpu.h>
 #include <net/route.h>
@@ -77,6 +80,7 @@ static char *rcsid = "$OpenBSD: sysctl.c,v 1.60 2001/02/23 16:46:36 mickey Exp $
 #include <netinet/tcp_timer.h>
 #include <netinet/tcp_var.h>
 #include <netinet/ip_gre.h>
+#include <netinet/ip_ipcomp.h>
 
 #ifdef INET6
 #include <netinet/ip6.h>
@@ -85,9 +89,7 @@ static char *rcsid = "$OpenBSD: sysctl.c,v 1.60 2001/02/23 16:46:36 mickey Exp $
 #include <netinet6/pim6_var.h>
 #endif
 
-#ifdef UVM
 #include <uvm/uvm_swap_encrypt.h>
-#endif
 
 #include <ufs/ufs/quota.h>
 #include <ufs/ufs/inode.h>
@@ -124,6 +126,9 @@ struct ctlname hwname[] = CTL_HW_NAMES;
 struct ctlname username[] = CTL_USER_NAMES;
 struct ctlname debugname[CTL_DEBUG_MAXID];
 struct ctlname kernmallocname[] = CTL_KERN_MALLOC_NAMES;
+struct ctlname forkstatname[] = CTL_KERN_FORKSTAT_NAMES;
+struct ctlname nchstatsname[] = CTL_KERN_NCHSTATS_NAMES;
+struct ctlname ttyname[] = CTL_KERN_TTY_NAMES;
 struct ctlname *vfsname;
 #ifdef CTL_MACHDEP_NAMES
 struct ctlname machdepname[] = CTL_MACHDEP_NAMES;
@@ -172,6 +177,7 @@ int	Aflag, aflag, nflag, wflag;
 #define	UNSIGNED	0x00000200
 #define	KMEMBUCKETS	0x00000400
 #define	LONGARRAY	0x00000800
+#define KMEMSTATS	0x00001000
 
 /* prototypes */
 void debuginit __P((void));
@@ -190,6 +196,10 @@ static int sysctl_vfs __P((char *, char **, int[], int, int *));
 static int sysctl_vfsgen __P((char *, char **, int[], int, int *));
 int sysctl_bios __P((char *, char **, int *, int, int *));
 int sysctl_swpenc __P((char *, char **, int *, int, int *));
+int sysctl_forkstat __P((char *, char **, int *, int, int *));
+int sysctl_tty __P((char *, char **, int *, int, int *));
+int sysctl_nchstats __P((char *, char **, int *, int, int *));
+int sysctl_malloc __P((char *, char **, int *, int, int *));
 void vfsinit __P((void));
 
 int
@@ -230,13 +240,13 @@ main(argc, argv)
 		vfsinit();
 		for (lvl1 = 1; lvl1 < CTL_MAXID; lvl1++)
 			listall(topname[lvl1].ctl_name, &secondlevel[lvl1]);
-		exit(0);
+		return (0);
 	}
 	if (argc == 0)
 		usage();
 	for (; *argv != NULL; ++argv)
 		parse(*argv, 1);
-	exit(0);
+	return (0);
 }
 
 /*
@@ -247,18 +257,21 @@ listall(prefix, lp)
 	char *prefix;
 	struct list *lp;
 {
-	int lvl2;
 	char *cp, name[BUFSIZ];
+	int lvl2, len;
 
 	if (lp->list == NULL)
 		return;
-	(void)strlcpy(name, prefix, BUFSIZ);
-	cp = &name[strlen(name)];
+	if ((len = strlcpy(name, prefix, sizeof(name))) >= sizeof(name))
+		warn("%s: name too long", prefix);
+	cp = name + len++;
 	*cp++ = '.';
 	for (lvl2 = 0; lvl2 < lp->size; lvl2++) {
 		if (lp->list[lvl2].ctl_name == NULL)
 			continue;
-		(void)strcpy(cp, lp->list[lvl2].ctl_name);
+		if (strlcpy(cp, lp->list[lvl2].ctl_name,
+		    sizeof(name) - len) >= sizeof(name) - len)
+			warn("%s: name too long", lp->list[lvl2].ctl_name);
 		parse(name, Aflag);
 	}
 }
@@ -277,7 +290,7 @@ parse(string, flags)
 	size_t size, newsize = 0;
 	int lal = 0, special = 0;
 	void *newval = 0;
-	quad_t quadval;
+	int64_t quadval;
 	struct list *lp;
 	int mib[CTL_MAXNAME];
 	char *cp, *bufp, buf[BUFSIZ];
@@ -334,14 +347,33 @@ parse(string, flags)
 				(void)printf("%s = %s\n", string,
 				    state == GMON_PROF_OFF ? "off" : "running");
 			return;
+		case KERN_FORKSTAT:
+			sysctl_forkstat(string, &bufp, mib, flags, &type);
+			return;
+		case KERN_TTY:
+			len = sysctl_tty(string, &bufp, mib, flags, &type);
+			if (len < 0)
+				return;
+			newsize = 0;
+			break;
+		case KERN_NCHSTATS:
+			sysctl_nchstats(string, &bufp, mib, flags, &type);
+			return;
 		case KERN_MALLOCSTATS:
 			len = sysctl_malloc(string, &bufp, mib, flags, &type);
 			if (len < 0)
 				return;
 			if (mib[2] == KERN_MALLOC_BUCKET)
 				special |= KMEMBUCKETS;
+			if (mib[2] == KERN_MALLOC_KMEMSTATS)
+				special |= KMEMSTATS;
 			newsize = 0;
 			break;
+		case KERN_MSGBUF:
+			if (flags == 0)
+				return;
+			warnx("use dmesg to view %s", string);
+			return;
 		case KERN_VNODE:
 		case KERN_FILE:
 			if (flags == 0)
@@ -379,6 +411,17 @@ parse(string, flags)
 		break;
 
 	case CTL_HW:
+		switch (mib[1]) {
+		case HW_DISKSTATS:
+			/*
+			 * Only complain if someone asks explicitly for this,
+			 * otherwise "fail" silently.
+			 */
+			if (flags)
+				warnx("use vmstat to view %s information",
+				    string);
+			return;
+		}
 		break;
 
 	case CTL_VM:
@@ -407,16 +450,15 @@ parse(string, flags)
 				(void)printf("%s = ", string);
 			(void)printf("%p\n", _ps.val);
 			return;
-		}
-#ifdef UVM
-		else if (mib[1] == VM_SWAPENCRYPT) {
+		} else if (mib[1] == VM_SWAPENCRYPT) {
 			len = sysctl_swpenc(string, &bufp, mib, flags, &type);
 			if (len < 0)
 				return;
 
 			break;
+		} else if (mib[1] == VM_NKMEMPAGES) {
+			break;
 		}
-#endif
 		if (flags == 0)
 			return;
 		warnx("use vmstat or systat to view %s information", string);
@@ -567,7 +609,8 @@ parse(string, flags)
 			break;
 
 		case CTLTYPE_QUAD:
-			(void)sscanf(newval, "%qd", &quadval);
+			/* XXX - assumes sizeof(long long) == sizeof(quad_t) */
+			(void)sscanf(newval, "%lld", (long long *)&quadval);
 			newval = &quadval;
 			newsize = sizeof(quadval);
 			break;
@@ -599,7 +642,35 @@ parse(string, flags)
 		struct kmembuckets *kb = (struct kmembuckets *)buf;
 		if (!nflag)
 			(void)printf("%s = ", string);
-		(void)printf("calls = %qu, total_allocated = %qu, total_free = %qu, elements = %qu, high_watermark = %qu, could_free = %qu\n", kb->kb_calls, kb->kb_total, kb->kb_totalfree, kb->kb_elmpercl, kb->kb_highwat, kb->kb_couldfree);
+		printf("(");
+		printf("calls = %llu ", (long long)kb->kb_calls);
+		printf("total_allocated = %llu ", (long long)kb->kb_total);
+		printf("total_free = %lld ", (long long)kb->kb_totalfree);
+		printf("elements = %lld ", (long long)kb->kb_elmpercl);
+		printf("high watermark = %lld ", (long long)kb->kb_highwat);
+		printf("could_free = %lld", (long long)kb->kb_couldfree);
+		printf(")\n");
+		return;
+	}
+	if (special & KMEMSTATS) {
+		struct kmemstats *km = (struct kmemstats *)buf;
+		int j, first = 1;
+
+		if (!nflag)
+			(void)printf("%s = ", string);
+		(void)printf("(inuse = %ld, calls = %ld, memuse = %ldK, limblocks = %d, mapblocks = %d, maxused = %ldK, limit = %ldK, spare = %ld, sizes = (", km->ks_inuse, km->ks_calls, (km->ks_memuse + 1023) / 1024, km->ks_limblocks, km->ks_mapblocks, (km->ks_maxused + 1023) / 1024, (km->ks_limit + 1023) / 1024, km->ks_spare);
+		for (j = 1 << MINBUCKET; j < 1 << (MINBUCKET + 16); j <<= 1) {
+		 	if ((km->ks_size & j ) == 0)
+				continue;
+			if (first)
+				(void)printf("%d", j);
+			else
+				(void)printf(",%d", j);
+			first = 0;
+		}
+		if (first)
+			(void)printf("none");
+		(void)printf("))\n");
 		return;
 	}
 	if (special & CLOCK) {
@@ -651,8 +722,8 @@ parse(string, flags)
 			(void)printf("%s = ", string);
 		(void)printf("bootdev = 0x%x, "
 			     "cylinders = %u, heads = %u, sectors = %u\n",
-			     pdi->bsd_dev, pdi->bios_cylinders, pdi->bios_heads,
-			     pdi->bios_sectors);
+			     pdi->bsd_dev, pdi->bios_cylinders,
+			     pdi->bios_heads, pdi->bios_sectors);
 		return;
 	}
 	if (special & BIOSDEV) {
@@ -684,25 +755,29 @@ parse(string, flags)
 		if (!nflag)
 			(void)printf("%s = ", string);
 		(void)printf(
-		"%qu %qu %qu %qu %qu %qu %qu %qu %qu %qu %qu %qu %qu %qu %qu %qu",
-		    rndstats->rnd_total,
-		    rndstats->rnd_used, rndstats->rnd_reads,
-		    rndstats->arc4_reads, rndstats->arc4_nstirs,
-		    rndstats->arc4_stirs,
-		    rndstats->rnd_pad[0],
-		    rndstats->rnd_pad[1],
-		    rndstats->rnd_pad[2],
-		    rndstats->rnd_pad[3],
-		    rndstats->rnd_pad[4],
-		    rndstats->rnd_waits,
-		    rndstats->rnd_enqs, rndstats->rnd_deqs,
-		    rndstats->rnd_drops, rndstats->rnd_drople);
+		"%llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu %llu",
+		    (unsigned long long)rndstats->rnd_total,
+		    (unsigned long long)rndstats->rnd_used,
+		    (unsigned long long)rndstats->rnd_reads,
+		    (unsigned long long)rndstats->arc4_reads,
+		    (unsigned long long)rndstats->arc4_nstirs,
+		    (unsigned long long)rndstats->arc4_stirs,
+		    (unsigned long long)rndstats->rnd_pad[0],
+		    (unsigned long long)rndstats->rnd_pad[1],
+		    (unsigned long long)rndstats->rnd_pad[2],
+		    (unsigned long long)rndstats->rnd_pad[3],
+		    (unsigned long long)rndstats->rnd_pad[4],
+		    (unsigned long long)rndstats->rnd_waits,
+		    (unsigned long long)rndstats->rnd_enqs,
+		    (unsigned long long)rndstats->rnd_deqs,
+		    (unsigned long long)rndstats->rnd_drops,
+		    (unsigned long long)rndstats->rnd_drople);
 		for (i = 0; i < sizeof(rndstats->rnd_ed)/sizeof(rndstats->rnd_ed[0]); i++)
-			(void)printf(" %qu", rndstats->rnd_ed[i]);
+			(void)printf(" %llu", (unsigned long long)rndstats->rnd_ed[i]);
 		for (i = 0; i < sizeof(rndstats->rnd_sc)/sizeof(rndstats->rnd_sc[0]); i++)
-			(void)printf(" %qu", rndstats->rnd_sc[i]);
+			(void)printf(" %llu", (unsigned long long)rndstats->rnd_sc[i]);
 		for (i = 0; i < sizeof(rndstats->rnd_sb)/sizeof(rndstats->rnd_sb[0]); i++)
-			(void)printf(" %qu", rndstats->rnd_sb[i]);
+			(void)printf(" %llu", (unsigned long long)rndstats->rnd_sb[i]);
 		printf("\n");
 		return;
 	}
@@ -738,7 +813,7 @@ parse(string, flags)
 	if (special & LONGARRAY) {
 		long *la = (long *)buf;
 		if (!nflag)
-			printf("%s = ", string, lal);
+			printf("%s = ", string);
 		while (lal--)
 			printf("%ld%s", *la++, lal? ",":"");
 		putchar('\n');
@@ -772,14 +847,18 @@ parse(string, flags)
 
 	case CTLTYPE_QUAD:
 		if (newsize == 0) {
+			long long tmp = *(quad_t *)buf;
+
 			if (!nflag)
 				(void)printf("%s = ", string);
-			(void)printf("%qd\n", *(quad_t *)buf);
+			(void)printf("%lld\n", tmp);
 		} else {
+			long long tmp = *(quad_t *)buf;
+
 			if (!nflag)
-				(void)printf("%s: %qd -> ", string,
-				    *(quad_t *)buf);
-			(void)printf("%qd\n", *(quad_t *)newval);
+				(void)printf("%s: %lld -> ", string, tmp);
+			tmp = *(quad_t *)newval;
+			(void)printf("%qd\n", tmp);
 		}
 		return;
 
@@ -1099,7 +1178,6 @@ sysctl_bios(string, bufpp, mib, flags, typep)
 }
 #endif
 
-#ifdef UVM
 struct ctlname swpencname[] = CTL_SWPENC_NAMES;
 struct list swpenclist = { swpencname, SWPENC_MAXID };
 
@@ -1114,7 +1192,6 @@ sysctl_swpenc(string, bufpp, mib, flags, typep)
 	int flags;
 	int *typep;
 {
-	char *name;
 	int indx;
 
 	if (*bufpp == NULL) {
@@ -1127,7 +1204,6 @@ sysctl_swpenc(string, bufpp, mib, flags, typep)
 	*typep = swpenclist.list[indx].ctl_type;
 	return(3);
 }
-#endif
 
 struct ctlname inetname[] = CTL_IPPROTO_NAMES;
 struct ctlname ipname[] = IPCTL_NAMES;
@@ -1140,6 +1216,7 @@ struct ctlname ahname[] = AHCTL_NAMES;
 struct ctlname etheripname[] = ETHERIPCTL_NAMES;
 struct ctlname grename[] = GRECTL_NAMES;
 struct ctlname mobileipname[] = MOBILEIPCTL_NAMES;
+struct ctlname ipcompname[] = IPCOMPCTL_NAMES;
 struct list inetlist = { inetname, IPPROTO_MAXID };
 struct list inetvars[] = {
 	{ ipname, IPCTL_MAXID },	/* ip */
@@ -1240,9 +1317,176 @@ struct list inetvars[] = {
 	{ 0, 0 },
 	{ 0, 0 },
 	{ etheripname, ETHERIPCTL_MAXID },
+	{ 0, 0 },
+	{ 0, 0 },
+	{ 0, 0 },
+	{ 0, 0 },
+	{ 0, 0 },
+	{ 0, 0 },
+	{ 0, 0 },
+	{ 0, 0 },
+	{ 0, 0 },
+	{ 0, 0 },
+	{ ipcompname, IPCOMPCTL_MAXID },
 };
 
 struct list kernmalloclist = { kernmallocname, KERN_MALLOC_MAXID };
+struct list forkstatlist = { forkstatname, KERN_FORKSTAT_MAXID };
+struct list nchstatslist = { nchstatsname, KERN_NCHSTATS_MAXID };
+struct list ttylist = { ttyname, KERN_TTY_MAXID };
+
+/*
+ * handle vfs namei cache statistics
+ */
+int
+sysctl_nchstats(string, bufpp, mib, flags, typep)
+	char *string;
+	char **bufpp;
+	int mib[];
+	int flags;
+	int *typep;
+{
+	static struct nchstats nch;
+	int indx;
+	size_t size;
+	static int keepvalue = 0;
+
+	if (*bufpp == NULL) {
+		bzero(&nch, sizeof(struct nchstats));
+		listall(string, &nchstatslist);
+		return(-1);
+	}
+	if ((indx = findname(string, "third", bufpp, &nchstatslist)) == -1)
+		return(-1);
+	mib[2] = indx;
+	if (*bufpp != NULL) {
+		warnx("fourth level name in %s is invalid", string);
+		return(-1);
+	}
+	if (keepvalue == 0) {
+		size = sizeof(struct nchstats);
+		if (sysctl(mib, 2, &nch, &size, NULL, 0) < 0)
+			return(-1);
+		keepvalue = 1;
+	}
+	if (!nflag)
+		(void)printf("%s = ", string);
+	switch (indx) {
+	case KERN_NCHSTATS_GOODHITS:
+		(void)printf("%ld\n", nch.ncs_goodhits);
+		break;
+	case KERN_NCHSTATS_NEGHITS:
+		(void)printf("%ld\n", nch.ncs_neghits);
+		break;
+	case KERN_NCHSTATS_BADHITS:
+		(void)printf("%ld\n", nch.ncs_badhits);
+		break;
+	case KERN_NCHSTATS_FALSEHITS:
+		(void)printf("%ld\n", nch.ncs_falsehits);
+		break;
+	case KERN_NCHSTATS_MISS:
+		(void)printf("%ld\n", nch.ncs_miss);
+		break;
+	case KERN_NCHSTATS_LONG:
+		(void)printf("%ld\n", nch.ncs_long);
+		break;
+	case KERN_NCHSTATS_PASS2:
+		(void)printf("%ld\n", nch.ncs_pass2);
+		break;
+	case KERN_NCHSTATS_2PASSES:
+		(void)printf("%ld\n", nch.ncs_2passes);
+		break;
+	}
+	return(-1);
+}
+
+/*
+ * handle tty statistics
+ */
+int
+sysctl_tty(string, bufpp, mib, flags, typep)
+	char *string;
+	char **bufpp;
+	int mib[];
+	int flags;
+	int *typep;
+{
+	int indx;
+
+	if (*bufpp == NULL) {
+		listall(string, &ttylist);
+		return(-1);
+	}
+	if ((indx = findname(string, "third", bufpp, &ttylist)) == -1)
+		return(-1);
+	mib[2] = indx;
+	*typep = CTLTYPE_QUAD;
+	return(3);
+}
+
+/*
+ * handle fork statistics
+ */
+int
+sysctl_forkstat(string, bufpp, mib, flags, typep)
+	char *string;
+	char **bufpp;
+	int mib[];
+	int flags;
+	int *typep;
+{
+	static struct forkstat fks;
+	static int keepvalue = 0;
+	int indx;
+	size_t size;
+
+	if (*bufpp == NULL) {
+		bzero(&fks, sizeof(struct forkstat));
+		listall(string, &forkstatlist);
+		return(-1);
+	}
+	if ((indx = findname(string, "third", bufpp, &forkstatlist)) == -1)
+		return(-1);
+	if (*bufpp != NULL) {
+		warnx("fourth level name in %s is invalid", string);
+		return(-1);
+	}
+	if (keepvalue == 0) {
+		size = sizeof(struct forkstat);
+		if (sysctl(mib, 2, &fks, &size, NULL, 0) < 0)
+			return(-1);
+		keepvalue = 1;
+	}
+	if (!nflag)
+		(void)printf("%s = ", string);
+	switch (indx)	{
+	case KERN_FORKSTAT_FORK:
+		(void)printf("%d\n", fks.cntfork);
+		break;
+	case KERN_FORKSTAT_VFORK:
+		(void)printf("%d\n", fks.cntvfork);
+		break;
+	case KERN_FORKSTAT_RFORK:
+		(void)printf("%d\n", fks.cntrfork);
+		break;
+	case KERN_FORKSTAT_KTHREAD:
+		(void)printf("%d\n", fks.cntkthread);
+		break;
+	case KERN_FORKSTAT_SIZFORK:
+		(void)printf("%d\n", fks.sizfork);
+		break;
+	case KERN_FORKSTAT_SIZVFORK:
+		(void)printf("%d\n", fks.sizvfork);
+		break;
+	case KERN_FORKSTAT_SIZRFORK:
+		(void)printf("%d\n", fks.sizrfork);
+		break;
+	case KERN_FORKSTAT_SIZKTHREAD:
+		(void)printf("%d\n", fks.sizkthread);
+		break;
+	}
+	return(-1);
+}
 
 /*
  * handle malloc statistics
@@ -1255,16 +1499,17 @@ sysctl_malloc(string, bufpp, mib, flags, typep)
 	int flags;
 	int *typep;
 {
-	int indx, size, stor, i;
-	char *name, bufp[BUFSIZ], *buf;
+	int indx, stor, i;
+	char *name, bufp[BUFSIZ], *buf, *ptr;
 	struct list lp;
+	size_t size;
 
 	if (*bufpp == NULL) {
 		listall(string, &kernmalloclist);
 		return(-1);
 	}
 	if ((indx = findname(string, "third", bufpp, &kernmalloclist)) == -1)
-		return (-1);
+		return(-1);
 	mib[2] = indx;
 	if (mib[2] == KERN_MALLOC_BUCKET) {
 		if ((name = strsep(bufpp, ".")) == NULL) {
@@ -1283,8 +1528,8 @@ sysctl_malloc(string, bufpp, mib, flags, typep)
 				return(-1);
 			lp.size = stor + 2;
 			for (i = 1;
-			     (lp.list[i].ctl_name = strsep(&buf, ",")) != NULL;
-			     i++) {
+			    (lp.list[i].ctl_name = strsep(&buf, ",")) != NULL;
+			    i++) {
 				lp.list[i].ctl_type = CTLTYPE_STRUCT;
 			}
 			lp.list[i].ctl_name = buf;
@@ -1295,10 +1540,64 @@ sysctl_malloc(string, bufpp, mib, flags, typep)
 		}
 		mib[3] = atoi(name);
 		return(4);
-	} else {
+	} else if (mib[2] == KERN_MALLOC_BUCKETS) {
+		*typep = CTLTYPE_STRING;
+		return(3);
+	} else if (mib[2] == KERN_MALLOC_KMEMSTATS) {
+		size = BUFSIZ;
+		stor = mib[2];
+		mib[2] = KERN_MALLOC_KMEMNAMES;
+		buf = bufp;
+		if (sysctl(mib, 3, buf, &size, NULL, 0) < 0)
+			return(-1);
+		mib[2] = stor;
+		if ((name = strsep(bufpp, ".")) == NULL) {
+			for (stor = 0, i = 0; i < size; i++)
+				if (buf[i] == ',')
+					stor++;
+			lp.list = calloc(stor + 2, sizeof(struct ctlname));
+			if (lp.list == NULL)
+				return(-1);
+			lp.size = stor + 2;
+			for (i = 1; (lp.list[i].ctl_name = strsep(&buf, ",")) != NULL; i++) {
+				if (lp.list[i].ctl_name[0] == '\0') {
+					i--;
+					continue;
+				}
+				lp.list[i].ctl_type = CTLTYPE_STRUCT;
+			}
+			lp.list[i].ctl_name = buf;
+			lp.list[i].ctl_type = CTLTYPE_STRUCT;
+			listall(string, &lp);
+			free(lp.list);
+			return(-1);
+		}
+		ptr = strstr(buf, name);
+ tryagain:
+		if (ptr == NULL) {
+		       warnx("fourth level name %s in %s is invalid", name,
+			     string);
+		       return(-1);
+		}
+		if ((*(ptr + strlen(name)) != ',') &&
+		    (*(ptr + strlen(name)) != '\0')) {
+			ptr = strstr(ptr + 1, name); /* retry */
+			goto tryagain;
+		}
+		if ((ptr != buf) && (*(ptr - 1) != ',')) {
+			ptr = strstr(ptr + 1, name); /* retry */
+			goto tryagain;
+		}
+		for (i = 0, stor = 0; buf + i < ptr; i++)
+			if (buf[i] == ',')
+				stor++;
+		mib[3] = stor;
+		return(4);
+	} else if (mib[2] == KERN_MALLOC_KMEMNAMES) {
 		*typep = CTLTYPE_STRING;
 		return(3);
 	}
+	return(-1);
 }
 
 /*
