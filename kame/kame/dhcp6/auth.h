@@ -1,4 +1,4 @@
-/*	$KAME: auth.h,v 1.1 2004/06/10 07:28:12 jinmei Exp $	*/
+/*	$KAME: auth.h,v 1.2 2004/06/12 10:43:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -29,6 +29,21 @@
  * SUCH DAMAGE.
  */
 
+/* secret key information for delayed authentication */
+struct keyinfo {
+	struct keyinfo *next;
+
+	char *name;		/* key name */
+
+	char *realm;		/* DHCP realm */
+	size_t realmlen;	/* length of realm */
+	u_int32_t keyid;	/* key ID */
+	char *secret;		/* binary key */
+	size_t secretlen;	/* length of the key */
+	time_t expire;		/* expiration time (0 means forever) */
+};
+
+extern int dhcp6_validate_key __P((struct keyinfo *));
 extern int dhcp6_calc_mac __P((char *, size_t, int, int, size_t,
     struct keyinfo *));
 extern int dhcp6_verify_mac __P((char *, ssize_t, int, int, size_t,

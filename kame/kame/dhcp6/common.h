@@ -1,4 +1,4 @@
-/*	$KAME: common.h,v 1.38 2004/06/10 07:28:29 jinmei Exp $	*/
+/*	$KAME: common.h,v 1.39 2004/06/12 10:43:33 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -98,7 +98,6 @@ extern char *dhcp6msgstr __P((int));
 extern char *dhcp6_stcodestr __P((u_int16_t));
 extern char *duidstr __P((struct duid *));
 extern char *dhcp6_event_statestr __P((struct dhcp6_event *));
-extern int dhcp6_validate_key __P((struct keyinfo *));
 extern int get_rdvalue __P((int, void *, size_t));
 extern int duidcpy __P((struct duid *, struct duid *));
 extern int duidcmp __P((struct duid *, struct duid *));

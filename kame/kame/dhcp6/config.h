@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.31 2004/06/10 09:43:21 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.32 2004/06/12 10:43:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -211,20 +211,6 @@ struct authinfo {
 	int rdm;		/* random attack detection method */
 
 	/* keys specific to this info? */
-};
-
-/* secret key information for delayed authentication */
-struct keyinfo {
-	struct keyinfo *next;
-
-	char *name;		/* key name */
-
-	char *realm;		/* DHCP realm */
-	size_t realmlen;	/* length of realm */
-	u_int32_t keyid;	/* key ID */
-	char *secret;		/* binary key */
-	size_t secretlen;	/* length of the key */
-	time_t expire;		/* expiration time (0 means forever) */
 };
 
 /* structures and definitions used in the config file parser */

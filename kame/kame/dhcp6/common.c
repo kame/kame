@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.109 2004/06/10 12:56:56 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.110 2004/06/12 10:43:33 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2603,27 +2603,6 @@ get_rdvalue(rdm, rdvalue, rdsize)
 
 	memcpy(rdvalue, &u32, sizeof(u32));
 	memcpy((char *)rdvalue + sizeof(u32), &l32, sizeof(l32));
-
-	return (0);
-}
-
-int
-dhcp6_validate_key(key)
-	struct keyinfo *key;
-{
-	time_t now;
-
-	if (key->expire == 0)	/* never expire */
-		return (0);
-
-	if (time(&now) == -1) {
-		dprintf(LOG_ERR, FNAME, "cannot get current time: %s",
-		    strerror(errno));
-		return (-1);	/* treat it as expiration (XXX) */
-	}
-
-	if (now > key->expire)
-		return (-1);
 
 	return (0);
 }

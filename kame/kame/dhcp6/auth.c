@@ -1,4 +1,4 @@
-/*	$KAME: auth.c,v 1.1 2004/06/10 07:28:12 jinmei Exp $	*/
+/*	$KAME: auth.c,v 1.2 2004/06/12 10:43:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -64,6 +64,7 @@
 
 #include <syslog.h>
 #include <string.h>
+#include <errno.h>
 
 #include <dhcp6.h>
 #include <config.h>
@@ -100,6 +101,27 @@ static void md5_init __P((md5_t *));
 static void md5_invalidate __P((md5_t *));
 static void md5_final __P((md5_t *, unsigned char *));
 static void md5_update __P((md5_t *, const unsigned char *, unsigned int));
+
+int
+dhcp6_validate_key(key)
+	struct keyinfo *key;
+{
+	time_t now;
+
+	if (key->expire == 0)	/* never expire */
+		return (0);
+
+	if (time(&now) == -1) {
+		dprintf(LOG_ERR, FNAME, "cannot get current time: %s",
+		    strerror(errno));
+		return (-1);	/* treat it as expiration (XXX) */
+	}
+
+	if (now > key->expire)
+		return (-1);
+
+	return (0);
+}
 
 int
 dhcp6_calc_mac(buf, len, proto, alg, off, key)

@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.43 2004/06/10 09:43:21 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.44 2004/06/12 10:43:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -46,6 +46,7 @@
 #include <dhcp6.h>
 #include <config.h>
 #include <common.h>
+#include <auth.h>
 
 extern int errno;
 
