@@ -530,6 +530,9 @@ rt_msg1(type, rtinfo)
 	register struct sockaddr *sa;
 	int len, dlen;
 
+	m = m_gethdr(M_DONTWAIT, MT_DATA);
+	if (m == 0)
+		return (m);
 	switch (type) {
 
 	case RTM_DELADDR:
@@ -544,22 +547,23 @@ rt_msg1(type, rtinfo)
 	default:
 		len = sizeof(struct rt_msghdr);
 	}
-	if (len > MCLBYTES)
-		panic("rt_msg1");
-	m = m_gethdr(M_DONTWAIT, MT_DATA);
-	if (m && len > MHLEN) {
-		MCLGET(m, M_DONTWAIT);
-		if ((m->m_flags & M_EXT) == 0) {
-			m_free(m);
-			m = NULL;
+	if (len > MHLEN + MLEN)
+		panic("rt_msg1: message too long");
+	else if (len > MHLEN) {
+		m->m_next = m_get(M_DONTWAIT, MT_DATA);
+		if (m->m_next == NULL) {
+			m_freem(m);
+			return (NULL);
 		}
+		m->m_pkthdr.len = len;
+		m->m_len = MHLEN;
+		m->m_next->m_len = len - MHLEN;
+	} else {
+		m->m_pkthdr.len = m->m_len = len;
 	}
-	if (m == 0)
-		return (m);
-	m->m_pkthdr.len = m->m_len = len;
 	m->m_pkthdr.rcvif = 0;
+	m_copyback(m, 0, datalen, data);
 	rtm = mtod(m, struct rt_msghdr *);
-	bzero(rtm, len);
 	for (i = 0; i < RTAX_MAX; i++) {
 		if ((sa = rtinfo->rti_info[i]) == NULL)
 			continue;
@@ -567,10 +571,6 @@ rt_msg1(type, rtinfo)
 		dlen = ROUNDUP(sa->sa_len);
 		m_copyback(m, len, dlen, (caddr_t)sa);
 		len += dlen;
-	}
-	if (m->m_pkthdr.len != len) {
-		m_freem(m);
-		return (NULL);
 	}
 	rtm->rtm_msglen = len;
 	rtm->rtm_version = RTM_VERSION;
