@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.95 2003/10/21 07:18:03 itojun Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.96 2005/01/11 01:09:50 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1511,7 +1511,7 @@ quick_r3send(iph2, msg0)
 	n = (struct isakmp_pl_n *)notify->v;
 	n->h.np = ISAKMP_NPTYPE_NONE;
 	n->h.len = htons(tlen);
-	n->doi = IPSEC_DOI;
+	n->doi = htonl(IPSEC_DOI);
 	n->proto_id = iph2->approval->head->proto_id;
 	n->spi_size = sizeof(iph2->approval->head->spisize);
 	n->type = htons(ISAKMP_NTYPE_CONNECTED);
