@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.59 2000/09/19 03:58:51 itojun Exp $
+	$KAME: RELNOTES,v 1.60 2000/09/19 03:59:29 itojun Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -85,7 +85,7 @@ Many of old ones have been solved.
 
 - libinet6 resolver code does not support NIS lookup.
 
-- freebsd[34], bsdi4, netbsd: IPsec policy lookup does not work right,
-  if you use IPv4 mapped address.  
+- IPsec policy lookup does not work right, if you use policy filter based on
+  port number.
 
 							<end of RELNOTES>
