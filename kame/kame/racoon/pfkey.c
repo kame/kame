@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.134 2002/06/04 05:20:27 itojun Exp $	*/
+/*	$KAME: pfkey.c,v 1.135 2003/05/29 06:47:05 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1880,12 +1880,44 @@ static int
 pk_recvspdupdate(mhp)
 	caddr_t *mhp;
 {
+	struct sadb_address *saddr, *daddr;
+	struct sadb_x_policy *xpl;
+	struct policyindex spidx;
+	struct secpolicy *sp;
+
 	/* sanity check */
-	if (mhp[0] == NULL) {
+	if (mhp[0] == NULL
+	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
+	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
+	 || mhp[SADB_X_EXT_POLICY] == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"inappropriate sadb spdupdate message passed.\n");
 		return -1;
 	}
+	saddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
+	daddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_DST];
+	xpl = (struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY];
+
+	KEY_SETSECSPIDX(xpl->sadb_x_policy_dir,
+			saddr + 1,
+			daddr + 1,
+			saddr->sadb_address_prefixlen,
+			daddr->sadb_address_prefixlen,
+			saddr->sadb_address_proto,
+			&spidx);
+
+	sp = getsp(&spidx);
+	if (sp == NULL) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"such policy does not already exist: %s\n",
+			spidx2str(&spidx));
+	} else {
+		remsp(sp);
+		delsp(sp);
+	}
+
+	if (addnewsp(mhp) < 0)
+		return -1;
 
 	return 0;
 }
