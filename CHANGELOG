@@ -1,6 +1,19 @@
-$Id: CHANGELOG,v 1.494 2000/01/28 03:03:31 jinmei Exp $
+2000-01-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+
+	
+
+$Id: CHANGELOG,v 1.495 2000/01/28 05:43:18 jinmei Exp $
 
 <200001>
+2000-01-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/tcp6_usrreq.c (tcp6_usrreq):
+	* {bsdi4,netbsd,openbsd}/sys/netinet/tcp_usrreq.c (tcp_usrreq):
+	* freebsd3/sys/netinet/tcp_usrreq.c (tcp_usr_rcvd):
+	Do not call tcp[6]_output by the PRU_RCVD request unless the
+	associated socket is connected. This fix will prevent kernel panic
+	when a user receives an ancillary data object on a listening
+	socket.
+
 2000-01-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/advapitest: was added mainly for debugging. The tools
 	would also be useful as references for developing an "advanced"
