@@ -1,4 +1,4 @@
-/*	$OpenBSD: ipx.c,v 1.10 2002/02/16 21:27:50 millert Exp $	*/
+/*	$OpenBSD: ipx.c,v 1.12 2002/06/09 04:07:10 jsyn Exp $	*/
 
 /*
  * Copyright (c) 1996 Michael Shalayeff
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)ns.c	8.1 (Berkeley) 6/6/93";
 #else
-static char *rcsid = "$OpenBSD: ipx.c,v 1.10 2002/02/16 21:27:50 millert Exp $";
+static char *rcsid = "$OpenBSD: ipx.c,v 1.12 2002/06/09 04:07:10 jsyn Exp $";
 #endif
 #endif /* not lint */
 
@@ -222,7 +222,7 @@ spx_stats(off, name)
 	ANY(spxstat.spxs_rcvduppack, "duplicate-only packet", " received");
 	ANY(spxstat.spxs_rcvdupbyte, "duplicate-only byte", " received");
 	ANY(spxstat.spxs_rcvpartduppack, "packet", " with some duplicate data");
-	ANY(spxstat.spxs_rcvpartdupbyte, "dup. byte", " in part-dup. packet");
+	ANY(spxstat.spxs_rcvpartdupbyte, "duplicate byte", " in part-duplicate packet");
 	ANY(spxstat.spxs_rcvoopack, "out-of-order packet", " received");
 	ANY(spxstat.spxs_rcvoobyte, "out-of-order byte", " received");
 	ANY(spxstat.spxs_rcvpackafterwin, "packet", " with data after window");
@@ -236,7 +236,7 @@ spx_stats(off, name)
 	ANY(spxstat.spxs_rcvwinupd, "rcvd window update packet", "");
 }
 #undef ANY
-#define ANY(x,y,z)  ((x) ? printf("\t%ld %s%s%s\n",x,y,plural(x),z) : 0)
+#define ANY(x,y,z)	((x) ? printf("\t%ld %s%s%s\n",x,y,plural(x),z) : 0)
 
 /*
  * Dump IPX statistics structure.
@@ -301,7 +301,7 @@ ipxerr_stats(off, name)
 		" received incomplete");
 	ANY(ipx_errstat.ipx_es_badcode, "error packet",
 		" received of unknown type");
-	for(j = 0; j < IPX_ERR_MAX; j ++) {
+	for (j = 0; j < IPX_ERR_MAX; j ++) {
 		z = ipx_errstat.ipx_es_outhist[j];
 		if (z && histoprint) {
 			printf("Output Error Histogram:\n");
@@ -311,7 +311,7 @@ ipxerr_stats(off, name)
 
 	}
 	histoprint = 1;
-	for(j = 0; j < IPX_ERR_MAX; j ++) {
+	for (j = 0; j < IPX_ERR_MAX; j ++) {
 		z = ipx_errstat.ipx_es_inhist[j];
 		if (z && histoprint) {
 			printf("Input Error Histogram:\n");
@@ -329,13 +329,13 @@ ipx_erputil(z, c)
 	char codebuf[30];
 	char *name, *where;
 
-	for(j = 0;; j ++) {
+	for (j = 0;; j ++) {
 		if ((name = ipx_errnames[j].name) == 0)
 			break;
 		if (ipx_errnames[j].code == c)
 			break;
 	}
-	if (name == 0)  {
+	if (name == 0) {
 		if (c > 01000)
 			where = "in transit";
 		else
@@ -344,7 +344,7 @@ ipx_erputil(z, c)
 		    "Unknown IPX error code 0%o", c);
 		name = codebuf;
 	} else
-		where =  ipx_errnames[j].where;
+		where = ipx_errnames[j].where;
 	ANY(z, name, where);
 }
 #endif /* IPXERRORMSGS */

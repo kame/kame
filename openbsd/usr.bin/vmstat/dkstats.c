@@ -1,4 +1,4 @@
-/*	$OpenBSD: dkstats.c,v 1.15 2002/02/16 21:27:58 millert Exp $	*/
+/*	$OpenBSD: dkstats.c,v 1.21 2002/09/17 19:37:40 deraadt Exp $	*/
 /*	$NetBSD: dkstats.c,v 1.1 1996/05/10 23:19:27 thorpej Exp $	*/
 
 /*
@@ -51,40 +51,24 @@
 #include <unistd.h>
 #include "dkstats.h"
 
+#if !defined(NOKVM)
 static struct nlist namelist[] = {
-#define	X_TK_NIN	0
-	{ "_tk_nin" },		/* tty characters in */
-#define	X_TK_NOUT	1
-	{ "_tk_nout" },		/* tty characters out */
-#define	X_CP_TIME	2
-	{ "_cp_time" },		/* system timer ticks */
-#define	X_HZ		3
-	{ "_hz" },		/* ticks per second */
-#define	X_STATHZ	4
+#define	X_TK_NIN	0		/* sysctl */
+	{ "_tk_nin" },
+#define	X_TK_NOUT	1		/* sysctl */
+	{ "_tk_nout" },
+#define	X_CP_TIME	2		/* sysctl */
+	{ "_cp_time" },
+#define	X_HZ		3		/* sysctl */
+	{ "_hz" },
+#define	X_STATHZ	4		/* sysctl */
 	{ "_stathz" },
-#define X_DISK_COUNT	5
-	{ "_disk_count" },	/* number of disks */
-#define X_DISKLIST	6
-	{ "_disklist" },	/* TAILQ of disks */
+#define X_DISK_COUNT	5		/* sysctl */
+	{ "_disk_count" },
+#define X_DISKLIST	6		/* sysctl */
+	{ "_disklist" },
 	{ NULL },
 };
-
-/* Structures to hold the statistics. */
-struct _disk	cur, last;
-
-/* Kernel pointers: nlistf and memf defined in calling program. */
-static kvm_t	*kd = NULL;
-extern char	*nlistf;
-extern char	*memf;
-
-/* Pointer to list of disks. */
-static struct disk	*dk_drivehead = NULL;
-
-/* Backward compatibility references. */
-int	  	dk_ndrive = 0;
-int		*dk_select;
-char		**dr_name;
-
 #define	KVM_ERROR(_string) {						\
 	warnx("%s", (_string));						\
 	errx(1, "%s", kvm_geterr(kd));					\
@@ -95,12 +79,37 @@ char		**dr_name;
  * 'p' which is of size 's'.
  */
 #define deref_nl(v, p, s) deref_kptr((void *)namelist[(v)].n_value, (p), (s));
+static void deref_kptr(void *, void *, size_t);
+#endif /* !defined(NOKVM) */
+
+/* Structures to hold the statistics. */
+struct _disk	cur, last;
+
+/* Kernel pointers: nlistf and memf defined in calling program. */
+#if !defined(NOKVM)
+extern kvm_t	*kd;
+#endif
+extern char	*nlistf;
+extern char	*memf;
+
+#if !defined(NOKVM)
+/* Pointer to list of disks. */
+static struct disk	*dk_drivehead = NULL;
+#endif
+
+/* Backward compatibility references. */
+int	  	dk_ndrive = 0;
+int		*dk_select;
+char		**dr_name;
 
 /* Missing from <sys/time.h> */
-#define timerset(tvp, uvp) ((uvp)->tv_sec = (tvp)->tv_sec);		\
-			   ((uvp)->tv_usec = (tvp)->tv_usec)
+#define timerset(tvp, uvp) \
+	((uvp)->tv_sec = (tvp)->tv_sec);		\
+	((uvp)->tv_usec = (tvp)->tv_usec)
 
-static void deref_kptr(void *, void *, size_t);
+#define SWAP(fld)	tmp = cur.fld;				\
+			cur.fld -= last.fld;			\
+			last.fld = tmp
 
 /*
  * Take the delta between the present values and the last recorded
@@ -108,11 +117,8 @@ static void deref_kptr(void *, void *, size_t);
  * the delta values in the 'cur' structure.
  */
 void
-dkswap()
+dkswap(void)
 {
-#define SWAP(fld)		tmp = cur.fld;				\
-				cur.fld -= last.fld;			\
-				last.fld = tmp
 	u_int64_t tmp;
 	int	i;
 
@@ -148,9 +154,11 @@ dkswap()
  * Also collect statistics for tty i/o and cpu ticks.
  */
 void
-dkreadstats()
+dkreadstats(void)
 {
+#if !defined(NOKVM)
 	struct disk	cur_disk, *p;
+#endif
 	int		i, mib[3];
 	size_t		size;
 	struct diskstats *q;
@@ -199,6 +207,7 @@ dkreadstats()
 			cur.tk_nout = 0;
 		}
 	} else {
+#if !defined(NOKVM)
 		p = dk_drivehead;
 
 		for (i = 0; i < dk_ndrive; i++) {
@@ -209,10 +218,10 @@ dkreadstats()
 			timerset(&(cur_disk.dk_time), &(cur.dk_time[i]));
 			p = cur_disk.dk_link.tqe_next;
 		}
-
 		deref_nl(X_CP_TIME, cur.cp_time, sizeof(cur.cp_time));
 		deref_nl(X_TK_NIN, &cur.tk_nin, sizeof(cur.tk_nin));
 		deref_nl(X_TK_NOUT, &cur.tk_nout, sizeof(cur.tk_nout));
+#endif /* !defined(NOKVM) */
 	}
 }
 
@@ -221,12 +230,13 @@ dkreadstats()
  * track disk statistics.
  */
 int
-dkinit(select)
-int	select;
+dkinit(int select)
 {
+#if !defined(NOKVM)
 	struct disklist_head disk_head;
 	struct disk	cur_disk, *p;
         char		errbuf[_POSIX2_LINE_MAX];
+#endif
 	static int	once = 0;
 	extern int	hz;
 	int		i, mib[2];
@@ -238,10 +248,20 @@ int	select;
 		return(1);
 
 	if (nlistf != NULL || memf != NULL) {
+#if !defined(NOKVM)
+		if (memf != NULL) {
+			setegid(getgid());
+			setgid(getgid());
+		}
+
 		/* Open the kernel. */
-		if ((kd = kvm_openfiles(nlistf, memf, NULL, O_RDONLY,
+		if (kd == NULL &&
+		    (kd = kvm_openfiles(nlistf, memf, NULL, O_RDONLY,
 		    errbuf)) == NULL)
 			errx(1, "kvm_openfiles: %s", errbuf);
+
+		setegid(getgid());
+		setgid(getgid());
 
 		/* Obtain the namelist symbols from the kernel. */
 		if (kvm_nlist(kd, namelist))
@@ -261,6 +281,7 @@ int	select;
 		deref_nl(X_STATHZ, &hz, sizeof(hz));
 		if (!hz)
 		  deref_nl(X_HZ, &hz, sizeof(hz));
+#endif /* !defined(NOKVM) */
 	} else {
 		/* Get the number of attached drives. */
 		mib[0] = CTL_HW;
@@ -322,9 +343,11 @@ int	select;
 		    cur.dk_select[i++] = select;
 		}
 	} else {
+#if !defined(NOKVM)
 		p = dk_drivehead;
 		for (i = 0; i < dk_ndrive; i++) {
 			char	buf[10];
+
 			deref_kptr(p, &cur_disk, sizeof(cur_disk));
 			deref_kptr(cur_disk.dk_name, buf, sizeof(buf));
 			cur.dk_name[i] = strdup(buf);
@@ -334,6 +357,7 @@ int	select;
 
 			p = cur_disk.dk_link.tqe_next;
 		}
+#endif /* !defined(NOKVM) */
 	}
 
 	/* Never do this initalization again. */
@@ -341,15 +365,14 @@ int	select;
 	return(1);
 }
 
+#if !defined(NOKVM)
 /*
  * Dereference the kernel pointer `kptr' and fill in the local copy 
  * pointed to by `ptr'.  The storage space must be pre-allocated,
  * and the size of the copy passed in `len'.
  */
 static void
-deref_kptr(kptr, ptr, len)
-	void *kptr, *ptr;
-	size_t len;
+deref_kptr(void *kptr, void *ptr, size_t len)
 {
 	char buf[128];
 
@@ -360,3 +383,4 @@ deref_kptr(kptr, ptr, len)
 		KVM_ERROR(buf);
 	}
 }
+#endif /* !defined(NOKVM) */

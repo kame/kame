@@ -1,4 +1,4 @@
-.\"	$OpenBSD: ifconfig.8,v 1.55 2002/04/08 09:12:36 deraadt Exp $
+.\"	$OpenBSD: ifconfig.8,v 1.58 2002/06/14 09:14:24 itojun Exp $
 .\"	$NetBSD: ifconfig.8,v 1.11 1996/01/04 21:27:29 pk Exp $
 .\"     $FreeBSD: ifconfig.8,v 1.16 1998/02/01 07:03:29 steve Exp $
 .\"
@@ -399,10 +399,12 @@ using the specified
 .Ar key .
 The
 .Ar key
-can either be a string, a series of hexadecimal digits, or a set of keys
+can either be a string, a series of hexadecimal digits (preceded by
+.So 0x Sc Ns ),
+or a set of keys
 of the form
 .Ar n:k1,k2,k3,k4 ,
-where 
+where
 .Ar n
 specifies which of the keys will be used for transmitted packets,
 and the four keys,
@@ -469,6 +471,11 @@ Set the IPv6 tentative address bit.
 .It Fl tentative
 (inet6 only)
 Clear the IPv6 tentative address bit.
+.It eui64
+(inet6 only)
+Fill interface index
+.Pq lowermost 64bit of an IPv6 address
+automatically.
 .It Cm trailers
 Request the use of a
 .Dq trailer

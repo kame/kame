@@ -1,4 +1,4 @@
-/*	$OpenBSD: ping.c,v 1.50 2002/02/17 02:04:38 deraadt Exp $	*/
+/*	$OpenBSD: ping.c,v 1.57 2002/09/06 21:17:39 deraadt Exp $	*/
 /*	$NetBSD: ping.c,v 1.20 1995/08/11 22:37:58 cgd Exp $	*/
 
 /*
@@ -47,7 +47,7 @@ static char copyright[] =
 #if 0
 static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #else
-static char rcsid[] = "$OpenBSD: ping.c,v 1.50 2002/02/17 02:04:38 deraadt Exp $";
+static char rcsid[] = "$OpenBSD: ping.c,v 1.57 2002/09/06 21:17:39 deraadt Exp $";
 #endif
 #endif /* not lint */
 
@@ -121,7 +121,7 @@ int options;
 #define	F_SO_DONTROUTE	0x080
 #define	F_VERBOSE	0x100
 #define	F_SADDR		0x200
-#define	F_HDRINCL       0x400
+#define	F_HDRINCL	0x400
 #define	F_TTL		0x800
 
 /* multicast options */
@@ -166,37 +166,34 @@ quad_t tmax = 0;		/* maximum round trip time in millisec */
 quad_t tsum = 0;		/* sum of all times in millisec, for doing average */
 quad_t tsumsq = 0;		/* sum of all times squared, for std. dev. */
 
-#ifdef SIGINFO
-int reset_kerninfo;
-#endif
-
 int bufspace = IP_MAXPACKET;
 
 void fill(char *, char *);
-void catcher(), prtsig(), finish(), summary(int);
+void catcher(int signo);
+void prtsig(int signo);
+void finish(int signo);
+void summary(int, int);
 int in_cksum(u_short *, int);
-void pinger();
+void pinger(void);
 char *pr_addr(in_addr_t);
 int check_icmph(struct ip *);
 void pr_icmph(struct icmp *);
 void pr_pack(char *, int, struct sockaddr_in *);
 void pr_retip(struct ip *);
 quad_t qsqrt(quad_t);
-void usage();
+void usage(void);
 
 int
-main(argc, argv)
-	int argc;
-	char **argv;
+main(int argc, char *argv[])
 {
 	struct timeval timeout;
 	struct hostent *hp;
 	struct sockaddr_in *to;
-	struct protoent *proto;
 	struct in_addr saddr;
 	int i;
 	int ch, hold = 1, packlen, preload;
-	int maxsize, maxsizelen, fdmasks;
+	int maxsize, fdmasks;
+	socklen_t maxsizelen;
 	u_char *datap, *packet;
 	char *target, hnamebuf[MAXHOSTNAMELEN];
 	u_char ttl = MAXTTL, loop = 1, df = 0;
@@ -206,9 +203,7 @@ main(argc, argv)
 #endif
 	fd_set *fdmaskp;
 
-	if (!(proto = getprotobyname("icmp")))
-		errx(1, "unknown protocol icmp");
-	if ((s = socket(AF_INET, SOCK_RAW, proto->p_proto)) < 0)
+	if ((s = socket(AF_INET, SOCK_RAW, IPPROTO_ICMP)) < 0)
 		err(1, "socket");
 
 	/* revoke privs */
@@ -243,7 +238,7 @@ main(argc, argv)
 			if (inet_aton(optarg, &saddr) == 0) {
 				if ((hp = gethostbyname(optarg)) == NULL)
 					errx(1, "bad interface address: %s",
-					     optarg);
+					    optarg);
 				memcpy(&saddr, hp->h_addr, sizeof(saddr));
 			}
 			options |= F_SADDR;
@@ -256,7 +251,8 @@ main(argc, argv)
 
 			if (interval < 1)
 				if (getuid())
-					errx(1, "%s: only root may use interval < 1s", strerror(EPERM));
+					errx(1, "%s: only root may use interval < 1s",
+					    strerror(EPERM));
 
 			if (interval < 0.01)
 				interval = 0.01;
@@ -388,27 +384,27 @@ main(argc, argv)
 		    sizeof(hold));
 
 	if (options & F_TTL) {
-		if (IN_MULTICAST(ntohl(to->sin_addr.s_addr))) 
-		    moptions |= MULTICAST_TTL;
+		if (IN_MULTICAST(ntohl(to->sin_addr.s_addr)))
+			moptions |= MULTICAST_TTL;
 		else
-		    options |= F_HDRINCL;
+			options |= F_HDRINCL;
 	}
 
 	if (options & F_RROUTE && options & F_HDRINCL)
 		errx(1, "-R option and -D or -T, or -t to unicast destinations"
-		     " are incompatible");
+		    " are incompatible");
 
 	if (options & F_HDRINCL) {
-		struct ip *ip = (struct ip*)outpackhdr;
+		struct ip *ip = (struct ip *)outpackhdr;
 
 		setsockopt(s, IPPROTO_IP, IP_HDRINCL, &hold, sizeof(hold));
 		ip->ip_v = IPVERSION;
 		ip->ip_hl = sizeof(struct ip) >> 2;
 		ip->ip_tos = tos;
-		ip->ip_id = 0;  
+		ip->ip_id = 0;
 		ip->ip_off = htons(df?IP_DF:0);
 		ip->ip_ttl = ttl;
-		ip->ip_p = proto->p_proto;
+		ip->ip_p = IPPROTO_ICMP;
 		ip->ip_src.s_addr = INADDR_ANY;
 		ip->ip_dst = to->sin_addr;
 	}
@@ -433,18 +429,18 @@ main(argc, argv)
 
 	if ((moptions & MULTICAST_NOLOOP) &&
 	    setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP, &loop,
-		       sizeof(loop)) < 0)
+	    sizeof(loop)) < 0)
 		err(1, "setsockopt IP_MULTICAST_LOOP");
 	if ((moptions & MULTICAST_TTL) &&
 	    setsockopt(s, IPPROTO_IP, IP_MULTICAST_TTL, &ttl,
-		       sizeof(ttl)) < 0)
+	    sizeof(ttl)) < 0)
 		err(1, "setsockopt IP_MULTICAST_TTL");
 	if ((moptions & MULTICAST_IF) &&
 	    setsockopt(s, IPPROTO_IP, IP_MULTICAST_IF, &saddr,
-		       sizeof(saddr)) < 0)
+	    sizeof(saddr)) < 0)
 		err(1, "setsockopt IP_MULTICAST_IF");
 
-	/* 
+	/*
 	 * When trying to send large packets, you must increase the
 	 * size of both the send and receive buffers...
 	 */
@@ -487,7 +483,7 @@ main(argc, argv)
 		pinger();
 
 	if ((options & F_FLOOD) == 0)
-		catcher();		/* start things going */
+		catcher(0);		/* start things going */
 
 	fdmasks = howmany(s+1, NFDBITS) * sizeof(fd_mask);
 	if ((fdmaskp = (fd_set *)malloc(fdmasks)) == NULL)
@@ -495,9 +491,9 @@ main(argc, argv)
 
 	for (;;) {
 		struct sockaddr_in from;
-		int cc;
-		int fromlen;
 		sigset_t omask, nmask;
+		socklen_t fromlen;
+		int cc;
 
 		if (options & F_FLOOD) {
 			pinger();
@@ -526,7 +522,7 @@ main(argc, argv)
 			break;
 	}
 	free(fdmaskp);
-	finish();
+	finish(0);
 	/* NOTREACHED */
 	exit(0);	/* Make the compiler happy */
 }
@@ -542,10 +538,10 @@ main(argc, argv)
  * quality of the delay and loss statistics.
  */
 void
-catcher()
+catcher(int signo)
 {
-	int waittime;
 	int save_errno = errno;
+	int waittime;
 
 	pinger();
 	(void)signal(SIGALRM, catcher);
@@ -569,11 +565,11 @@ catcher()
  * XXX not race safe
  */
 void
-prtsig()
+prtsig(int signo)
 {
 	int save_errno = errno;
 
-	summary(0);
+	summary(0, 1);
 	errno = save_errno;
 }
 
@@ -586,12 +582,12 @@ prtsig()
  * byte-order, to compute the round-trip time.
  */
 void
-pinger()
+pinger(void)
 {
 	struct icmp *icp;
-	int cc;
-	int i;
-	char *packet = outpack;
+	char buf[8192];
+	int cc, i;
+	u_char *packet = outpack;
 
 	icp = (struct icmp *)outpack;
 	icp->icmp_type = ICMP_ECHO;
@@ -618,22 +614,23 @@ pinger()
 	icp->icmp_cksum = in_cksum((u_short *)icp, cc);
 
 	if (options & F_HDRINCL) {
-		struct ip *ip = (struct ip*)outpackhdr;
+		struct ip *ip = (struct ip *)outpackhdr;
 
-		packet = (char*)ip;
+		packet = (u_char *)ip;
 		cc += sizeof(struct ip);
 		ip->ip_len = htons(cc);
 		ip->ip_sum = in_cksum((u_short *)outpackhdr, cc);
 	}
 
 	i = sendto(s, (char *)packet, cc, 0, &whereto,
-		   sizeof(struct sockaddr));
+	    sizeof(struct sockaddr));
 
 	if (i < 0 || i != cc)  {
 		if (i < 0)
 			perror("ping: sendto");
-		(void)printf("ping: wrote %s %d chars, ret=%d\n",
+		snprintf(buf, sizeof buf, "ping: wrote %s %d chars, ret=%d\n",
 		    hostname, cc, i);
+		write(STDOUT_FILENO, buf, strlen(buf));
 	}
 	if (!(options & F_QUIET) && options & F_FLOOD)
 		(void)write(STDOUT_FILENO, &DOT, 1);
@@ -647,10 +644,7 @@ pinger()
  * program to be run without having intermingled output (or statistics!).
  */
 void
-pr_pack(buf, cc, from)
-	char *buf;
-	int cc;
-	struct sockaddr_in *from;
+pr_pack(char *buf, int cc, struct sockaddr_in *from)
 {
 	struct icmp *icp;
 	in_addr_t l;
@@ -672,7 +666,7 @@ pr_pack(buf, cc, from)
 	if (cc < hlen + ICMP_MINLEN) {
 		if (options & F_VERBOSE)
 			warnx("packet too short (%d bytes) from %s", cc,
-			  inet_ntoa(*(struct in_addr *)&from->sin_addr.s_addr));
+			    inet_ntoa(*(struct in_addr *)&from->sin_addr.s_addr));
 		return;
 	}
 
@@ -694,7 +688,7 @@ pr_pack(buf, cc, from)
 			memcpy(&tvi, pkttime, sizeof tvi);
 			tp.tv_sec = ntohl(tvi.tv_sec);
 			tp.tv_usec = ntohl(tvi.tv_usec);
-			
+
 			timersub(&tv, &tp, &tv);
 			triptime = (tv.tv_sec * 1000000) + tv.tv_usec;
 			tsum += triptime;
@@ -721,8 +715,8 @@ pr_pack(buf, cc, from)
 			(void)write(STDOUT_FILENO, &BSPACE, 1);
 		else {
 			(void)printf("%d bytes from %s: icmp_seq=%u", cc,
-			   inet_ntoa(*(struct in_addr *)&from->sin_addr.s_addr),
-			   ntohs(icp->icmp_seq));
+			    inet_ntoa(*(struct in_addr *)&from->sin_addr.s_addr),
+			    ntohs(icp->icmp_seq));
 			(void)printf(" ttl=%d", ip->ip_ttl);
 			if (timing)
 				(void)printf(" time=%d.%03d ms",
@@ -731,14 +725,15 @@ pr_pack(buf, cc, from)
 			if (dupflag)
 				(void)printf(" (DUP!)");
 			/* check the data */
-			cp = (u_char*)&icp->icmp_data[sizeof(struct tvi)];
+			cp = (u_char *)&icp->icmp_data[sizeof(struct tvi)];
 			dp = &outpack[8 + sizeof(struct tvi)];
 			for (i = 8 + sizeof(struct tvi); i < datalen;
 			    ++i, ++cp, ++dp) {
 				if (*cp != *dp) {
-	(void)printf("\nwrong data byte #%d should be 0x%x but was 0x%x",
-	    i, *dp, *cp);
-					cp = (u_char*)&icp->icmp_data[0];
+					(void)printf("\nwrong data byte #%d "
+					    "should be 0x%x but was 0x%x",
+					    i, *dp, *cp);
+					cp = (u_char *)&icp->icmp_data[0];
 					for (i = 8; i < datalen; ++i, ++cp) {
 						if ((i % 32) == 8)
 							(void)printf("\n\t");
@@ -753,7 +748,7 @@ pr_pack(buf, cc, from)
 		if (!(options & F_VERBOSE))
 			return;
 		ip2 = (struct ip *) (buf + hlen + sizeof (struct icmp));
-		hlen2 = ip2->ip_hl << 2; 
+		hlen2 = ip2->ip_hl << 2;
 		if (cc >= hlen2 + 8 && check_icmph((struct ip *)(icp +
 		    sizeof (struct icmp))) != 1)
 			return;
@@ -809,10 +804,10 @@ pr_pack(buf, cc, from)
 			i -= IPOPT_MINOFF;
 			if (i <= 0)
 				continue;
-			if (i == old_rrlen
-			    && cp == (u_char *)buf + sizeof(struct ip) + 2
-			    && !memcmp(cp, old_rr, i)
-			    && !(options & F_FLOOD)) {
+			if (i == old_rrlen &&
+			    cp == (u_char *)buf + sizeof(struct ip) + 2 &&
+			    !memcmp(cp, old_rr, i) &&
+			    !(options & F_FLOOD)) {
 				(void)printf("\t(same route)");
 				i = ((i + 3) / 4) * 4;
 				hlen -= i;
@@ -868,9 +863,7 @@ pr_pack(buf, cc, from)
  *	Checksum routine for Internet Protocol family headers (C Version)
  */
 int
-in_cksum(addr, len)
-	u_short *addr;
-	int len;
+in_cksum(u_short *addr, int len)
 {
 	int nleft = len;
 	u_short *w = addr;
@@ -901,39 +894,58 @@ in_cksum(addr, len)
 }
 
 void
-summary(header)
-	int header;
+summary(int header, int sig)
 {
-	(void)putchar('\r');
-	(void)fflush(stdout);
+	char buf[8192], buft[8192];
 
-	if (header)
-		(void)printf("--- %s ping statistics ---\n", hostname);
+	buf[0] = '\0';
 
-	(void)printf("%ld packets transmitted, ", ntransmitted);
-	(void)printf("%ld packets received, ", nreceived);
-	if (nrepeats)
-		(void)printf("%ld duplicates, ", nrepeats);
+	if (!sig) {
+		(void)putchar('\r');
+		(void)fflush(stdout);
+	} else
+		strlcat(buf, "\r", sizeof buf);
+
+	if (header) {
+		snprintf(buft, sizeof buft, "--- %s ping statistics ---\n",
+		    hostname);
+		strlcat(buf, buft, sizeof buf);
+	}
+
+	snprintf(buft, sizeof buft, "%ld packets transmitted, ", ntransmitted);
+	strlcat(buf, buft, sizeof buf);
+	snprintf(buft, sizeof buft, "%ld packets received, ", nreceived);
+	strlcat(buf, buft, sizeof buf);
+
+	if (nrepeats) {
+		snprintf(buft, sizeof buft, "%ld duplicates, ", nrepeats);
+		strlcat(buf, buft, sizeof buf);
+	}
 	if (ntransmitted) {
 		if (nreceived > ntransmitted)
-			(void)printf("-- somebody's printing up packets!");
+			snprintf(buft, sizeof buft,
+			    "-- somebody's duplicating packets!");
 		else
-			(void)printf("%d%% packet loss",
+			snprintf(buft, sizeof buft, "%d%% packet loss",
 			    (int) (((ntransmitted - nreceived) * 100) /
 			    ntransmitted));
+		strlcat(buf, buft, sizeof buf);
 	}
-	(void)putchar('\n');
+	strlcat(buf, "\n", sizeof buf);
 	if (nreceived && timing) {
 		quad_t num = nreceived + nrepeats;
 		quad_t avg = tsum / num;
 		quad_t dev = qsqrt(tsumsq / num - avg * avg);
-		(void)printf("round-trip min/avg/max/std-dev = "
+
+		snprintf(buft, sizeof buft, "round-trip min/avg/max/std-dev = "
 		    "%d.%03d/%d.%03d/%d.%03d/%d.%03d ms\n",
 		    (int)(tmin / 1000), (int)(tmin % 1000),
 		    (int)(avg  / 1000), (int)(avg  % 1000),
 		    (int)(tmax / 1000), (int)(tmax % 1000),
 		    (int)(dev  / 1000), (int)(dev  % 1000));
+		strlcat(buf, buft, sizeof buf);
 	}
+	write(STDOUT_FILENO, buf, strlen(buf));		/* XXX atomicio? */
 }
 
 quad_t
@@ -959,12 +971,15 @@ qsqrt(quad_t qdev)
  *	Print out statistics, and give up.
  */
 void
-finish()
+finish(int signo)
 {
 	(void)signal(SIGINT, SIG_IGN);
 
-	summary(1);
-	exit(nreceived ? 0 : 1);
+	summary(1, 0);
+	if (signo)
+		_exit(nreceived ? 0 : 1);
+	else
+		exit(nreceived ? 0 : 1);
 }
 
 #ifdef notdef
@@ -988,8 +1003,7 @@ static char *ttab[] = {
  *	Print a descriptive string about an ICMP header.
  */
 void
-pr_icmph(icp)
-	struct icmp *icp;
+pr_icmph(struct icmp *icp)
 {
 	switch(icp->icmp_type) {
 	case ICMP_ECHOREPLY:
@@ -1013,8 +1027,8 @@ pr_icmph(icp)
 		case ICMP_UNREACH_NEEDFRAG:
 			if (icp->icmp_nextmtu != 0)
 				(void)printf("frag needed and DF set (MTU %d)\n",
-					ntohs(icp->icmp_nextmtu));
-			else 
+				    ntohs(icp->icmp_nextmtu));
+			else
 				(void)printf("frag needed and DF set\n");
 			break;
 		case ICMP_UNREACH_SRCFAIL:
@@ -1132,8 +1146,8 @@ pr_icmph(icp)
 	case ICMP_PARAMPROB:
 		switch(icp->icmp_code) {
 		case ICMP_PARAMPROB_OPTABSENT:
-			(void)printf(
-			    "Parameter problem, required option absent: pointer = 0x%02x\n",
+			(void)printf("Parameter problem, required option "
+			    "absent: pointer = 0x%02x\n",
 			    ntohs(icp->icmp_hun.ih_pptr));
 			break;
 		default:
@@ -1184,8 +1198,7 @@ pr_icmph(icp)
  *	Print an IP header with options.
  */
 void
-pr_iph(ip)
-	struct ip *ip;
+pr_iph(struct ip *ip)
 {
 	int hlen;
 	u_char *cp;
@@ -1236,8 +1249,7 @@ pr_addr(a)
  *	Dump some info on a returned (via ICMP) IP packet.
  */
 void
-pr_retip(ip)
-	struct ip *ip;
+pr_retip(struct ip *ip)
 {
 	int hlen;
 	u_char *cp;
@@ -1251,12 +1263,11 @@ pr_retip(ip)
 		    (*cp * 256 + *(cp + 1)), (*(cp + 2) * 256 + *(cp + 3)));
 	else if (ip->ip_p == 17)
 		(void)printf("UDP: from port %u, to port %u (decimal)\n",
-			(*cp * 256 + *(cp + 1)), (*(cp + 2) * 256 + *(cp + 3)));
+		    (*cp * 256 + *(cp + 1)), (*(cp + 2) * 256 + *(cp + 3)));
 }
 
 void
-fill(bp, patp)
-	char *bp, *patp;
+fill(char *bp, char *patp)
 {
 	int ii, jj, kk;
 	int pat[16];
@@ -1285,14 +1296,13 @@ fill(bp, patp)
 	}
 }
 
-/* 
+/*
  * when we get types of ICMP message with parts of the orig. datagram
  * we want to try to assure ourselves that it is from this instance
  * of ping, and not say, a refused finger connection or something
  */
 int
-check_icmph(iph)
-	struct ip *iph;
+check_icmph(struct ip *iph)
 {
 	struct icmp *icmph;
 
@@ -1318,11 +1328,11 @@ check_icmph(iph)
 }
 
 void
-usage()
+usage(void)
 {
 	(void)fprintf(stderr,
 	    "usage: ping [-DdfLnqRrv] [-c count] [-I ifaddr] [-i wait]\n"
-	    "\t[-l preload] [-p pattern] [-s packetsize] [-t ttl]"
-	    " [-w maxwait] host\n");
+	    "\t[-l preload] [-p pattern] [-s packetsize] [-T tos] [-t ttl]\n"
+	    "\t[-w maxwait] host\n");
 	exit(1);
 }

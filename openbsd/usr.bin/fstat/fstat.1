@@ -1,4 +1,4 @@
-.\"	$OpenBSD: fstat.1,v 1.20 2001/11/09 00:56:24 miod Exp $
+.\"	$OpenBSD: fstat.1,v 1.23 2002/09/30 09:54:56 avsm Exp $
 .\"
 .\" Copyright (c) 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -243,6 +243,19 @@ the pipe and a state that is built of the letters
 W - The pipe blocks waiting for the reader to read data.
 R - The pipe blocks waiting for the writer to write data.
 E - The pipe is in EOF state.
+.Sh CRYPTO
+Each
+.Xr crypto 4
+device is printed with only the kernel address of the device private data.
+.Sh KQUEUE
+Each
+.Xr kqueue 2
+is printed with some information as to queue length.
+Since these things are normally serviced quickly, it is likely that
+nothing of real importance can be discerned.
+.Sh SYSTRACE
+Each systrace device is printed with only the kernel address of the
+device private data.
 .Sh SEE ALSO
 .Xr netstat 1 ,
 .Xr nfsstat 1 ,

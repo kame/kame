@@ -1,4 +1,4 @@
-/*	$OpenBSD: isofs.c,v 1.3 2001/12/01 18:59:59 deraadt Exp $	*/
+/*	$OpenBSD: isofs.c,v 1.5 2002/07/13 06:02:57 deraadt Exp $	*/
 
 /*-
  * Copyright (c) 1988, 1993
@@ -78,14 +78,13 @@
 extern pid_t Pid;
 
 int
-isofs_filestat(vp, fsp)
-	struct vnode *vp;
-	struct filestat *fsp;
+isofs_filestat(struct vnode *vp, struct filestat *fsp)
 {
 	struct iso_node inode;
 
 	if (!KVM_READ(VTOI(vp), &inode, sizeof (inode))) {
-		dprintf("can't read inode at %p for pid %d", VTOI(vp), Pid);
+		dprintf("can't read inode at %p for pid %ld",
+		    VTOI(vp), (long)Pid);
 		return 0;
 	}
 	fsp->fsid = inode.i_dev & 0xffff;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.30 2002/02/16 21:27:50 millert Exp $	*/
+/*	$OpenBSD: main.c,v 1.33 2002/08/04 16:52:07 deraadt Exp $	*/
 /*	$NetBSD: main.c,v 1.9 1996/05/07 02:55:02 thorpej Exp $	*/
 
 /*
@@ -44,7 +44,7 @@ char copyright[] =
 #if 0
 static char sccsid[] = "from: @(#)main.c	8.4 (Berkeley) 3/1/94";
 #else
-static char *rcsid = "$OpenBSD: main.c,v 1.30 2002/02/16 21:27:50 millert Exp $";
+static char *rcsid = "$OpenBSD: main.c,v 1.33 2002/08/04 16:52:07 deraadt Exp $";
 #endif
 #endif /* not lint */
 
@@ -177,6 +177,8 @@ struct nlist nl[] = {
 	{ "_mclpool" },
 #define N_IPCOMPSTAT	53
 	{ "_ipcompstat" },
+#define N_RIP6STAT	54
+	{ "_rip6stat" },
 	{ ""},
 };
 
@@ -224,6 +226,8 @@ struct protox ip6protox[] = {
 	  icmp6_stats,	"icmp6" },
 	{ -1,		N_PIM6STAT,	1,	0,
 	  pim6_stats,	"pim6" },
+	{ -1,		N_RIP6STAT,	1,	0,
+	  rip6_stats,	"rip6" },
 	{ -1,		-1,		0,	0,
 	  0,		0 }
 };
@@ -298,7 +302,7 @@ main(argc, argv)
 	af = AF_UNSPEC;
 
 	while ((ch = getopt(argc, argv, "Aabdf:gI:ilM:mN:np:qrstuvw:")) != -1)
-		switch(ch) {
+		switch (ch) {
 		case 'A':
 			Aflag = 1;
 			break;
@@ -400,6 +404,23 @@ main(argc, argv)
 	argv += optind;
 	argc -= optind;
 
+	/*
+	 * Discard setgid privileges if not the running kernel so that bad
+	 * guys can't print interesting stuff from kernel memory.
+	 */
+	if (nlistf != NULL || memf != NULL) {
+		setegid(getgid());
+		setgid(getgid());
+	}
+
+	if ((kvmd = kvm_openfiles(nlistf, memf, NULL, O_RDONLY,
+	    buf)) == NULL) {
+		fprintf(stderr, "%s: kvm_open: %s\n", __progname, buf);
+		exit(1);
+	}
+	setegid(getgid());
+	setgid(getgid());
+
 #define	BACKWARD_COMPATIBILITY
 #ifdef	BACKWARD_COMPATIBILITY
 	if (*argv) {
@@ -417,23 +438,6 @@ main(argc, argv)
 		}
 	}
 #endif
-
-	/*
-	 * Discard setgid privileges if not the running kernel so that bad
-	 * guys can't print interesting stuff from kernel memory.
-	 */
-	if (nlistf != NULL || memf != NULL) {
-		setegid(getgid());
-		setgid(getgid());
-	}
-
-	if ((kvmd = kvm_openfiles(nlistf, memf, NULL, O_RDONLY,
-	    buf)) == NULL) {
-		fprintf(stderr, "%s: kvm_open: %s\n", __progname, buf);
-		exit(1);
-	}
-	setegid(getgid());
-	setgid(getgid());
 
 	if (kvm_nlist(kvmd, nl) < 0 || nl[0].n_type == 0) {
 		if (nlistf)

@@ -1,4 +1,4 @@
-/*	$OpenBSD: atalk.c,v 1.7 2002/02/16 21:27:50 millert Exp $	*/
+/*	$OpenBSD: atalk.c,v 1.9 2002/07/25 03:58:56 deraadt Exp $	*/
 /*	$NetBSD: atalk.c,v 1.2 1997/05/22 17:21:26 christos Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from @(#)atalk.c	1.1 (Whistle) 6/6/96";
 #else
-static char rcsid[] = "$OpenBSD: atalk.c,v 1.7 2002/02/16 21:27:50 millert Exp $";
+static char rcsid[] = "$OpenBSD: atalk.c,v 1.9 2002/07/25 03:58:56 deraadt Exp $";
 #endif
 #endif /* not lint */
 
@@ -160,11 +160,11 @@ at_pr_range(sat)
 	if (sat->sat_range.r_netrange.nr_firstnet
 	    != sat->sat_range.r_netrange.nr_lastnet) {
 		(void) snprintf(mybuf, sizeof(mybuf), "%d-%d",
-			ntohs(sat->sat_range.r_netrange.nr_firstnet),
-			ntohs(sat->sat_range.r_netrange.nr_lastnet));
+		    ntohs(sat->sat_range.r_netrange.nr_firstnet),
+		    ntohs(sat->sat_range.r_netrange.nr_lastnet));
 	} else {
 		(void) snprintf(mybuf, sizeof(mybuf), "%d",
-			ntohs(sat->sat_range.r_netrange.nr_firstnet));
+		    ntohs(sat->sat_range.r_netrange.nr_firstnet));
 	}
 	return mybuf;
 }
@@ -200,8 +200,8 @@ atalk_print(sa, what)
 		break;
 	case 3:
 		(void) snprintf(mybuf, sizeof(mybuf), "%s.%s",
-			at_pr_net(sat, numeric),
-			at_pr_host(sat, numeric));
+		    at_pr_net(sat, numeric),
+		    at_pr_host(sat, numeric));
 		break;
 	case 0x10:
 		(void) snprintf(mybuf, sizeof(mybuf), "%s", at_pr_range(sat));
@@ -232,17 +232,16 @@ atalk_print2(sa, mask, what)
 
 	thesockaddr.sat_addr.s_net = sat1->sat_addr.s_net &
 	    sat2->sat_addr.s_net;
-	n = snprintf(buf, sizeof(buf), "%s", atalk_print(sa2, 1 | (what & 8)));
-	if (n >= sizeof(buf))
+	if ((n = snprintf(buf, sizeof(buf), "%s",
+	    atalk_print(sa2, 1 | (what & 8)))) >= sizeof(buf))
 		n = sizeof(buf) - 1;
-	else if (n == -1)
+	else if (n < 0)
 		n = 0;	/* What else can be done ? */
 	if (sat2->sat_addr.s_net != 0xFFFF) {
 		thesockaddr.sat_addr.s_net = sat1->sat_addr.s_net |
 		    ~sat2->sat_addr.s_net;
-		l = snprintf(buf + n, sizeof(buf) - n,
-		    "-%s", atalk_print(sa2, 1 | (what & 8)));
-		if (l >= sizeof(buf) - n)
+		if ((l = snprintf(buf + n, sizeof(buf) - n,
+		    "-%s", atalk_print(sa2, 1 | (what & 8)))) >= sizeof(buf) - n)
 			l = sizeof(buf) - n - 1;
 		if (l > 0)
 			n += l;
@@ -285,7 +284,7 @@ atalkprotopr(off, name)
 		}
 #endif
 		if (kread((u_long) ddpcb.ddp_socket,
-			  (char *) &sockb, sizeof(sockb)) < 0)
+		    (char *) &sockb, sizeof(sockb)) < 0)
 			return;
 		if (first) {
 			printf("Active ATALK connections");
@@ -296,9 +295,9 @@ atalkprotopr(off, name)
 				printf("%-8.8s ", "PCB");
 			printf(Aflag ?
 			    "%-5.5s %-6.6s %-6.6s  %-18.18s %-18.18s %s\n" :
-			     "%-5.5s %-6.6s %-6.6s  %-22.22s %-22.22s %s\n",
-			       "Proto", "Recv-Q", "Send-Q",
-			     "Local Address", "Foreign Address", "(state)");
+			    "%-5.5s %-6.6s %-6.6s  %-22.22s %-22.22s %s\n",
+			    "Proto", "Recv-Q", "Send-Q",
+			    "Local Address", "Foreign Address", "(state)");
 			first = 0;
 		}
 		if (Aflag)
@@ -306,19 +305,19 @@ atalkprotopr(off, name)
 		printf("%-5.5s %6ld %6ld ", name, sockb.so_rcv.sb_cc,
 		    sockb.so_snd.sb_cc);
 		printf(Aflag ? " %-18.18s" : " %-22.22s", atalk_print(
-			  (struct sockaddr *) & ddpcb.ddp_lsat, 7));
+		    (struct sockaddr *) & ddpcb.ddp_lsat, 7));
 		printf(Aflag ? " %-18.18s" : " %-22.22s", atalk_print(
-			  (struct sockaddr *) & ddpcb.ddp_fsat, 7));
+		    (struct sockaddr *) & ddpcb.ddp_fsat, 7));
 		putchar('\n');
 	}
 }
 
 #define p(f, m) if (ddpstat.f || sflag <= 1) \
-    printf(m, ddpstat.f, plural(ddpstat.f))
+	printf(m, ddpstat.f, plural(ddpstat.f))
 #define p2(f1, f2, m) if (ddpstat.f1 || ddpstat.f2 || sflag <= 1) \
-    printf(m, ddpstat.f1, plural(ddpstat.f1), ddpstat.f2, plural(ddpstat.f2))
+	printf(m, ddpstat.f1, plural(ddpstat.f1), ddpstat.f2, plural(ddpstat.f2))
 #define p3(f, m) if (ddpstat.f || sflag <= 1) \
-    printf(m, ddpstat.f, plurales(ddpstat.f))
+	printf(m, ddpstat.f, plurales(ddpstat.f))
 
 /*
  * Dump DDP statistics structure.

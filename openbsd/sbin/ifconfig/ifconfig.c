@@ -1,4 +1,4 @@
-/*	$OpenBSD: ifconfig.c,v 1.61 2002/04/10 18:52:27 millert Exp $	*/
+/*	$OpenBSD: ifconfig.c,v 1.69 2002/07/08 00:48:54 deraadt Exp $	*/
 /*	$NetBSD: ifconfig.c,v 1.40 1997/10/01 02:19:43 enami Exp $	*/
 
 /*
@@ -81,7 +81,7 @@ static const char copyright[] =
 #if 0
 static const char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #else
-static const char rcsid[] = "$OpenBSD: ifconfig.c,v 1.61 2002/04/10 18:52:27 millert Exp $";
+static const char rcsid[] = "$OpenBSD: ifconfig.c,v 1.69 2002/07/08 00:48:54 deraadt Exp $";
 #endif
 #endif /* not lint */
 
@@ -92,6 +92,7 @@ static const char rcsid[] = "$OpenBSD: ifconfig.c,v 1.61 2002/04/10 18:52:27 mil
 #include <net/if.h>
 #include <net/if_dl.h>
 #include <net/if_media.h>
+#include <net/if_types.h>
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #include <netinet6/nd6.h>
@@ -135,10 +136,11 @@ static const char rcsid[] = "$OpenBSD: ifconfig.c,v 1.61 2002/04/10 18:52:27 mil
 
 struct	ifreq		ifr, ridreq;
 struct	ifaliasreq	addreq;
+struct	in_aliasreq	in_addreq;
 #ifdef INET6
 struct	in6_ifreq	ifr6;
 struct	in6_ifreq	in6_ridreq;
-struct	in6_aliasreq	in6_addreq __attribute__((aligned(4)));
+struct	in6_aliasreq	in6_addreq;
 #endif
 struct	iso_ifreq	iso_ridreq;
 struct	iso_aliasreq	iso_addreq;
@@ -147,7 +149,8 @@ struct  netrange	at_nr;		/* AppleTalk net range */
 
 int	ipx_type = ETHERTYPE_II;
 char	name[IFNAMSIZ];
-int	flags, metric, mtu, setaddr, setipdst, doalias;
+int	flags, setaddr, setipdst, doalias;
+u_long	metric, mtu;
 int	clearaddr, s;
 int	newaddr = 0;
 int	nsellength = 1;
@@ -186,6 +189,7 @@ void	setia6flags(char *, int);
 void	setia6pltime(char *, int);
 void	setia6vltime(char *, int);
 void	setia6lifetime(char *, char *);
+void	setia6eui64(const char *, int);
 #endif
 void    checkatrange(struct sockaddr_at *);
 void	setmedia(char *, int);
@@ -263,6 +267,7 @@ const struct	cmd {
 	{ "-tentative",	-IN6_IFF_TENTATIVE,	0,	setia6flags },
 	{ "pltime",	NEXTARG,	0,		setia6pltime },
 	{ "vltime",	NEXTARG,	0,		setia6vltime },
+	{ "eui64",	0,		0,		setia6eui64 },
 #endif /*INET6*/
 #ifndef INET_ONLY
 	{ "range",	NEXTARG,	0,		setatrange },
@@ -303,7 +308,7 @@ int	getinfo(struct ifreq *);
 void	getsock(int);
 void	printif(struct ifreq *, int);
 void	printb(char *, unsigned short, char *);
-void	status(int);
+void	status(int, struct sockaddr_dl *);
 void	usage();
 const char *get_string(const char *, const char *, u_int8_t *, int *);
 void	print_string(const u_int8_t *, int);
@@ -357,7 +362,7 @@ const struct afswtch {
 } afs[] = {
 #define C(x) ((caddr_t) &x)
 	{ "inet", AF_INET, in_status, in_getaddr, in_getprefix,
-	     SIOCDIFADDR, SIOCAIFADDR, C(ridreq), C(addreq) },
+	     SIOCDIFADDR, SIOCAIFADDR, C(ridreq), C(in_addreq) },
 #ifdef INET6
 	{ "inet6", AF_INET6, in6_status, in6_getaddr, in6_getprefix,
 	     SIOCDIFADDR_IN6, SIOCAIFADDR_IN6, C(in6_ridreq), C(in6_addreq) },
@@ -629,7 +634,7 @@ printif(ifrm, ifaliases)
 			namep = ifa->ifa_name;
 			if (getinfo(ifrp) < 0)
 				continue;
-			status(1);
+			status(1, (struct sockaddr_dl *)ifa->ifa_addr);
 			count++;
 			noinet = 1;
 			continue;
@@ -707,7 +712,7 @@ printif(ifrm, ifaliases)
 			ifreq = ifr = *ifrp;
 			if (getinfo(&ifreq) < 0)
 				continue;
-			status(1);
+			status(1, NULL);
 			count++;
 			noinet = 1;
 			continue;
@@ -915,6 +920,7 @@ setia6flags(vname, value)
 	char *vname;
 	int value;
 {
+
 	if (value < 0) {
 		value = -value;
 		in6_addreq.ifra_flags &= ~value;
@@ -927,6 +933,7 @@ setia6pltime(val, d)
 	char *val;
 	int d;
 {
+
 	setia6lifetime("pltime", val);
 }
 
@@ -935,6 +942,7 @@ setia6vltime(val, d)
 	char *val;
 	int d;
 {
+
 	setia6lifetime("vltime", val);
 }
 
@@ -960,14 +968,53 @@ setia6lifetime(cmd, val)
 		in6_addreq.ifra_lifetime.ia6t_pltime = newval;
 	}
 }
+
+void
+setia6eui64(cmd, val)
+	const char *cmd;
+	int val;
+{
+	struct ifaddrs *ifap, *ifa;
+	const struct sockaddr_in6 *sin6 = NULL;
+	const struct in6_addr *lladdr = NULL;
+	struct in6_addr *in6;
+
+	if (afp->af_af != AF_INET6)
+		errx(1, "%s not allowed for the AF", cmd);
+ 	in6 = (struct in6_addr *)&in6_addreq.ifra_addr.sin6_addr;
+	if (memcmp(&in6addr_any.s6_addr[8], &in6->s6_addr[8], 8) != 0)
+		errx(1, "interface index is already filled");
+	if (getifaddrs(&ifap) != 0)
+		err(1, "getifaddrs");
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr->sa_family == AF_INET6 &&
+		    strcmp(ifa->ifa_name, name) == 0) {
+			sin6 = (const struct sockaddr_in6 *)ifa->ifa_addr;
+			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+				lladdr = &sin6->sin6_addr;
+				break;
+			}
+		}
+	}
+	if (!lladdr)
+		errx(1, "could not determine link local address"); 
+
+ 	memcpy(&in6->s6_addr[8], &lladdr->s6_addr[8], 8);
+
+	freeifaddrs(ifap);
+}
 #endif
 
 void
 setifmetric(val)
 	char *val;
 {
+	char *ep = NULL;
+
 	(void) strlcpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
-	ifr.ifr_metric = atoi(val);
+	ifr.ifr_metric = strtoul(val, &ep, 10);
+	if (!ep || *ep)
+		errx(1, "%s: invalid metric", val);
 	if (ioctl(s, SIOCSIFMETRIC, (caddr_t)&ifr) < 0)
 		warn("SIOCSIFMETRIC");
 }
@@ -977,8 +1024,12 @@ setifmtu(val, d)
 	char *val;
 	int d;
 {
+	char *ep = NULL;
+
 	(void) strlcpy(ifr.ifr_name, name, sizeof(ifr.ifr_name));
-	ifr.ifr_mtu = atoi(val);
+	ifr.ifr_mtu = strtoul(val, &ep, 10);
+	if (!ep || *ep)
+		errx(1, "%s: invalid mtu", val);
 	if (ioctl(s, SIOCSIFMTU, (caddr_t)&ifr) < 0)
 		warn("SIOCSIFMTU");
 }
@@ -1051,7 +1102,8 @@ print_string(buf, len)
 	hasspc = 0;
 	if (len < 2 || buf[0] != '0' || tolower(buf[1]) != 'x') {
 		for (; i < len; i++) {
-			if (!isprint(buf[i]))
+			/* Only print 7-bit ASCII keys */
+			if (buf[i] & 0x80 || !isprint(buf[i]))
 				break;
 			if (isspace(buf[i]))
 				hasspc++;
@@ -1221,7 +1273,7 @@ ieee80211_status()
 			nwkey.i_key[i].i_keylen = sizeof(keybuf[i]);
 		}
 		if (ioctl(s, SIOCG80211NWKEY, (caddr_t)&nwkey) == -1) {
-			puts("*****");
+			puts("<not displayed>");
 		} else {
 			nwkey_verbose = 0;
 			/* check to see non default key or multiple keys defined */
@@ -1622,8 +1674,9 @@ const struct ifmedia_status_description ifm_status_descriptions[] =
  * specified, show it and it only; otherwise, show them all.
  */
 void
-status(link)
+status(link, sdl)
 	int link;
+	struct sockaddr_dl *sdl;
 {
 	const struct afswtch *p = afp;
 	struct ifmediareq ifmr;
@@ -1632,10 +1685,13 @@ status(link)
 	printf("%s: ", name);
 	printb("flags", flags, IFFBITS);
 	if (metric)
-		printf(" metric %d", metric);
+		printf(" metric %lu", metric);
 	if (mtu)
-		printf(" mtu %d", mtu);
+		printf(" mtu %lu", mtu);
 	putchar('\n');
+	if (sdl != NULL && sdl->sdl_type == IFT_ETHER && sdl->sdl_alen)
+		(void)printf("\taddress: %s\n", ether_ntoa(
+		    (struct ether_addr *)LLADDR(sdl)));
 
 #ifndef	INET_ONLY
 	vlan_status();
@@ -1854,8 +1910,8 @@ in6_alias(creq)
 	in6_fillscopeid(sin6);
 	scopeid = sin6->sin6_scope_id;
 	if (getnameinfo((struct sockaddr *)sin6, sin6->sin6_len,
-			hbuf, sizeof(hbuf), NULL, 0, niflag) != 0)
-		strcpy(hbuf, "");
+	    hbuf, sizeof(hbuf), NULL, 0, niflag) != 0)
+		strlcpy(hbuf, "", sizeof hbuf);
 	printf("\tinet6 %s", hbuf);
 
 	if (flags & IFF_POINTOPOINT) {
@@ -1872,8 +1928,8 @@ in6_alias(creq)
 		sin6 = (struct sockaddr_in6 *)&ifr6.ifr_addr;
 		in6_fillscopeid(sin6);
 		if (getnameinfo((struct sockaddr *)sin6, sin6->sin6_len,
-				hbuf, sizeof(hbuf), NULL, 0, niflag) != 0)
-			strcpy(hbuf, "");
+		    hbuf, sizeof(hbuf), NULL, 0, niflag) != 0)
+			strlcpy(hbuf, "", sizeof hbuf);
 		printf(" -> %s", hbuf);
 	}
 
@@ -2178,8 +2234,8 @@ struct	in_addr inet_makeaddr();
 
 #define SIN(x) ((struct sockaddr_in *) &(x))
 struct sockaddr_in *sintab[] = {
-SIN(ridreq.ifr_addr), SIN(addreq.ifra_addr),
-SIN(addreq.ifra_mask), SIN(addreq.ifra_broadaddr)};
+SIN(ridreq.ifr_addr), SIN(in_addreq.ifra_addr),
+SIN(in_addreq.ifra_mask), SIN(in_addreq.ifra_broadaddr)};
 
 void
 in_getaddr(s, which)
@@ -2536,14 +2592,16 @@ usage()
 	fprintf(stderr, "usage: ifconfig [ -m ] [ -a ] [ -A ] [ interface ]\n"
 		"\t[ [af] [ address [ dest_addr ] ] [ up ] [ down ] "
 		"[ netmask mask ] ]\n"
-		"\t[media media_type] [mediaopt media_option]\n"
+		"\t[ media media_type ] [ mediaopt media_option ]\n"
 		"\t[ metric n ]\n"
 		"\t[ mtu n ]\n"
-		"\t[ nwid netword_id ]\n"
-		"\t[ tunnel srcaddress dstaddress ]\n"
-		"\t[ deletetunnel ]\n"
+		"\t[ nwid network_id ] [ nwkey network_key | -nwkey ]\n"
+		"\t[ powersave | -powersave ] [ powersavesleep duration ]\n"
+		"\t[ [af] tunnel srcaddress dstaddress ] [ deletetunnel ]\n"
 		"\t[ vlan n vlandev interface ]\n"
 		"\t[ arp | -arp ]\n"
+		"\t[ anycast | -anycast ] [ deprecated | -deprecated ]\n"
+		"\t[ tentative | -tentative ] [ pltime n ] [ vltime n ] [ eui64 ]\n"
 		"\t[ -802.2 | -802.3 | -802.2tr | -snap | -EtherII ]\n"
 		"\t[ link0 | -link0 ] [ link1 | -link1 ] [ link2 | -link2 ]\n"
 		"       ifconfig [-a | -A | -am | -Am] [ af ]\n"
