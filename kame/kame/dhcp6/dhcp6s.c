@@ -641,7 +641,6 @@ server6_react_solicit(buf, siz, rcvpi)
 
 /* 11.6.1. Receipt of Request messages */
 /* 11.6.3. Creation and sending of Reply messages */
-/* XXX insufficient boundary checks! */
 static int
 server6_react_request(buf, siz, rcvpi)
 	char *buf;
@@ -657,7 +656,7 @@ server6_react_request(buf, siz, rcvpi)
 	int error;
 	struct in6_addr myaddr, target;
 	struct dhcp6_opt *opt;
-	char *ext;
+	char *ext, *ep;
 	time_t t;
 	struct tm *tm;
 	struct dhcp6e extbuf;
@@ -794,7 +793,14 @@ server6_react_request(buf, siz, rcvpi)
 	memcpy(&dst, res->ai_addr, res->ai_addrlen);
 	freeaddrinfo(res);
 
+	if (sizeof(struct dhcp6_reply) + sizeof(struct in6_addr) > sizeof(sbuf)) {
+		dprintf(LOG_ERR, "buffer size assumption failed");
+		exit(1);
+		/* NOTREACHED */
+	}
+
 	dh6p = (struct dhcp6_reply *)sbuf;
+	ep = sbuf + sizeof(sbuf);
 	len = sizeof(*dh6p);
 	memset(dh6p, 0, sizeof(*dh6p));
 	ext = (char *)(dh6p + 1);
@@ -812,8 +818,7 @@ server6_react_request(buf, siz, rcvpi)
 		dst.sin6_addr = dh6r->dh6req_relayaddr;
 		dst.sin6_scope_id = in6_addrscopebyif(&dh6r->dh6req_relayaddr,
 						      ifnam);
-	}
-	else {
+	} else {
 		dst.sin6_addr = dh6r->dh6req_cliaddr;
 		dst.sin6_scope_id = in6_addrscopebyif(&dh6r->dh6req_cliaddr,
 						      ifnam);
@@ -828,6 +833,9 @@ server6_react_request(buf, siz, rcvpi)
 		struct dnslist *d;
 
 		for (d = TAILQ_FIRST(&dnslist); d; d = TAILQ_NEXT(d, link)) {
+			if (ext + sizeof(extbuf) + sizeof(struct in6_addr) > ep)
+				break;
+
 			extbuf.dh6e_type = htons(opt->code);
 			extbuf.dh6e_len = htons(sizeof(struct in6_addr));
 			memcpy(ext, &extbuf, sizeof(extbuf));
@@ -840,7 +848,7 @@ server6_react_request(buf, siz, rcvpi)
 
 	/* DNS domain */
 	opt = dhcp6opttab_byname("Domain Name");
-	if (opt && dnsdom) {
+	if (opt && dnsdom && ext + sizeof(extbuf) + strlen(dnsdom) <= ep) {
 		int dnsdom_len;
 
 		dnsdom_len = strlen(dnsdom);
@@ -858,7 +866,7 @@ server6_react_request(buf, siz, rcvpi)
 	tm = localtime(&t);
 	if (tm) {
 		opt = dhcp6opttab_byname("Time Offset");
-		if (opt) {
+		if (opt && ext + sizeof(extbuf) + sizeof(u_int32_t) <= ep) {
 			union {
 				u_int32_t ui;
 				int32_t i;
@@ -875,7 +883,7 @@ server6_react_request(buf, siz, rcvpi)
 		}
 
 		opt = dhcp6opttab_byname("IEEE 1003.1 POSIX Timezone");
-		if (opt) {
+		if (opt && ext + sizeof(extbuf) + strlen(tm->tm_zone) <= ep) {
 			int zone_len;
 
 			zone_len = strlen(tm->tm_zone);
