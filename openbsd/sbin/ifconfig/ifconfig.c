@@ -145,7 +145,7 @@ int     dflag, mflag, lflag, uflag;
 int     reset_if_flags;
 int	explicit_prefix = 0;
 #ifdef INET6
-int	Lflag;
+int	Lflag = 1;
 #endif
 #ifndef INET_ONLY
 char ntop_buf[INET6_ADDRSTRLEN];	/*inet_ntop()*/
@@ -1251,6 +1251,7 @@ in6_alias(creq)
 	struct in6_ifreq *creq;
 {
 	struct sockaddr_in6 *sin6;
+	struct	in6_ifreq ifr6;		/* shadows file static variable */
 
 	/* Get the non-alias address for this interface. */
 	getsock(AF_INET6);
