@@ -1,0 +1,29 @@
+--- configure.in.orig	Tue Nov  2 13:17:06 1999
++++ configure.in	Thu Dec 16 11:30:59 1999
+@@ -1048,6 +1048,7 @@
+ dnl Straightforward OS determination
+ case "$canonical" in
+   *-*-linux*    ) opsys=linux ;;
++  *-*-freebsd* ) opsys=freebsd ;;
+   *-*-netbsd*   ) opsys=netbsd ;;
+   *-*-openbsd*	) opsys=openbsd ;;
+   *-*-nextstep* ) opsys=nextstep ;;
+@@ -2437,6 +2438,9 @@
+     AC_DEFINE(HAVE_XMU)
+   fi
+ 
++  ac_inet6_LDFLAGS="$LDFLAGS" LDFLAGS="$LDFLAGS -L/usr/local/v6/lib"
++  AC_CHECK_LIB(inet6, getaddrinfo, , LDFLAGS="$ac_inet6_LDFLAGS")
++
+   dnl Autodetect -lXbsd
+   dnl #### Someone, please add a better function than main
+   AC_CHECK_LIB(Xbsd, main, XE_PREPEND(-lXbsd, libs_x))
+@@ -3546,7 +3550,7 @@
+ dnl Check for Berkeley DB.
+ if test "$with_database_berkdb" != "no"; then
+   AC_MSG_CHECKING(for Berkeley db.h)
+-  for path in "db/db.h" "db.h"; do
++  for path in "/usr/include/db.h" "db/db.h" "db.h"; do
+     AC_TRY_COMPILE([#ifdef HAVE_INTTYPES_H
+ #define __BIT_TYPES_DEFINED__
+ #include <inttypes.h>
