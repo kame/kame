@@ -1,4 +1,4 @@
-/*	$KAME: kmpstat.c,v 1.27 2001/06/01 10:12:55 sakane Exp $	*/
+/*	$KAME: kmpstat.c,v 1.28 2001/06/01 10:14:49 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -195,7 +195,7 @@ main(ac, av)
 			break;
 
 		case 'd':
-			loglevel = 0xffffffff;
+			loglevel++;
 			break;
 
 		default:
