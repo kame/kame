@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.173 2001/01/26 08:16:51 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.174 2001/01/26 08:19:58 jinmei Exp $
 
 1. IPv6
 
@@ -1758,10 +1758,13 @@ to make the distribute develoment smooth.
   harmful for some other type of vi users and Emacs users, the
   agreement in the KAME developers is to allow it.
 - add the following line to the head of every KAME-derived file:
-  /*	$KAME: IMPLEMENTATION,v 1.173 2001/01/26 08:16:51 jinmei Exp $	*/
-  (this is for C. For other language, you should use its own comment line.)
+  /*(dollar)KAME(dollar)*/
+  where "(dollar)" is the dollar character ($).
+  (this is for C. For other language, you should use its own comment
+  line.)
   Once commited to the CVS repository, this line would contain its
-  version number.  This would make it easy to report a bug.
+  version number (see, for example, at the top of this file).  This
+  would make it easy to report a bug.
 - when editting a third-party package, keep its own coding style as
   much as possible, even if the style does not follow the items above.
 
