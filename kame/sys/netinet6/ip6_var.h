@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.85 2002/01/31 14:14:52 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.86 2002/02/07 05:31:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -270,8 +270,8 @@ struct ip6aux {
 
 	/* ip6.ip6_src */
 	struct sockaddr_in6 ip6a_src;	/* source address in the IPv6 header */
-#define ip6a_careof ip6a_src.sin6_addr	/* care-of address of the peer */
-	struct in6_addr ip6a_home;	/* home address of the peer */
+#define ip6a_home ip6a_src.sin6_addr
+	struct in6_addr ip6a_coa;	/* care of address of the peer */
 
 	/* ip6.ip6_dst */
 	struct sockaddr_in6 ip6a_dst;	/* dst address in the IPv6 header */

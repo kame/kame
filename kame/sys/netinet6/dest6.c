@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.34 2002/01/08 02:40:55 k-sugyou Exp $	*/
+/*	$KAME: dest6.c,v 1.35 2002/02/07 05:31:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -162,10 +162,8 @@ dest6_input(mp, offp, proto)
 
 			/* XXX check header ordering */
 
-			bcopy(haopt->ip6oh_addr, &ip6a->ip6a_home, 
-			    sizeof(ip6a->ip6a_home));
-			bcopy(&ip6->ip6_src, &ip6a->ip6a_careof, 
-			    sizeof(ip6a->ip6a_careof));
+			bcopy(&ip6a->ip6a_src.sin6_addr, &ip6a->ip6a_coa, 
+			    sizeof(ip6a->ip6a_coa));
 			ip6a->ip6a_flags |= IP6A_HASEEN;
 
 			/*
@@ -216,10 +214,12 @@ dest6_input(mp, offp, proto)
 		/* XXX interaction with 2292bis IPV6_RECVDSTOPT */
 		/* XXX interaction with ipsec - should be okay */
 		/* XXX icmp6 responses is modified - which is bad */
-		bcopy(&ip6a->ip6a_careof, haopt->ip6oh_addr,
-		    sizeof(haopt->ip6oh_addr));
-		bcopy(&ip6a->ip6a_home, &ip6->ip6_src,
+		bcopy(haopt->ip6oh_addr, &ip6->ip6_src,
 		    sizeof(ip6->ip6_src));
+		bcopy(haopt->ip6oh_addr, &ip6a->ip6a_src.sin6_addr,
+		    sizeof(ip6a->ip6a_src.sin6_addr));
+		bcopy(&ip6a->ip6a_coa, haopt->ip6oh_addr,
+		    sizeof(haopt->ip6oh_addr));
 #if 0
 		/* XXX linklocal address is (currently) not supported */
 		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))

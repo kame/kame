@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.79 2002/02/01 05:38:17 jinmei Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.80 2002/02/07 05:31:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -977,7 +977,7 @@ mip6_validate_bu(m, opt)
 			 */
 			if (mip6_bu_authdata_verify(&ip6a->ip6a_home,
 						    &ip6->ip6_dst,
-						    &ip6a->ip6a_careof,
+						    &ip6a->ip6a_coa,
 						    bu_opt, authdata)) {
 				mip6log((LOG_ERR,
 					 "%s:%d: invalid authenticataion data "
@@ -1026,7 +1026,7 @@ mip6_validate_bu(m, opt)
 		 * might have changed after it had registered before.
 		 */
 		error = mip6_bc_send_ba(&mbc->mbc_addr,
-					&mbc->mbc_phaddr, &ip6a->ip6a_careof,
+					&mbc->mbc_phaddr, &ip6a->ip6a_coa,
 					MIP6_BA_STATUS_SEQNO_TOO_SMALL,
 					mbc->mbc_seqno,
 					0, 0);
@@ -1090,7 +1090,7 @@ mip6_process_bu(m, opt)
 					 suboptlen,
 					 MIP6SUBOPT_ALTCOA);
 	if (altcoa_subopt == NULL) {
-		pcoa = &ip6a->ip6a_careof;
+		pcoa = &ip6a->ip6a_coa;
 	} else {
 		pcoa = (struct in6_addr *)&altcoa_subopt->coa;
 	}
