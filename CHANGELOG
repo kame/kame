@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.616 2000/02/25 04:16:14 jinmei Exp $
+$Id: CHANGELOG,v 1.617 2000/02/25 09:05:17 jinmei Exp $
 
 <200002>
+2000-02-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/net/if.c (ifa_ifwithnet):
+	* bsdi4/sys/net/route.c (ifa_ifwithroute):
+	loosened restriction on p2p interfaces. It was too strict for
+	KAME's IPv6 support.
+
 2000-02-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* {(net|open)bsd, freebsd3}/sys/netinet/tcp_input.c:
 	* kame/sys/netinet6/tcp6_input.c:
