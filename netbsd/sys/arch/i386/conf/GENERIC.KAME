@@ -56,3 +56,9 @@ options 	RADIX_MPATH
 
 # Source-Specific Multicast (SSM)
 #options 	IGMPV3		# IPv4
+
+# Mobile IPv6
+#options 	MIP6_DEBUG
+#options 	MIP6
+#options 	MIP6_DRAFT18
+#pseudo-device	hif	1
