@@ -284,8 +284,9 @@ accept1(p, uap, compat)
 			error = copyout(sa, (caddr_t)uap->name, (u_int)namelen);
 		} else
 			namelen = 0;
-		error = copyout((caddr_t)&namelen,
-		    (caddr_t)uap->anamelen, sizeof (*uap->anamelen));
+		if (!error)
+			error = copyout((caddr_t)&namelen,
+			    (caddr_t)uap->anamelen, sizeof (*uap->anamelen));
 	}
 	if (sa)
 		FREE(sa, M_SONAME);
