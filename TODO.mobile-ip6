@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.20 2001/12/06 06:57:09 k-sugyou Exp $
+$KAME: TODO.mobile-ip6,v 1.21 2001/12/07 03:32:39 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -22,10 +22,12 @@ you can be a volunteer, I will appreciate you much.
 <<Status>>
 
 todo
+- merge nd_prefix/nd_defrouter structure and mip6_prefix/mip6_ha structure.
+- merge home address configuration and stateless auto-configuration.
 - think again about home/care-of address swap.  at least the current code in
   sys/netinet6/dest6.c is not friendly with (1) icmp6 error generator, (2)
   tunnels used for PIM, and maybe others.
-- define the behavior of the socket API for homeaddress.
+- define the behavior of the socket API for home addresses.
 - security mechanism.
 - mobile prefix advertisement.
 - complete dynamic home agent discovery. (implement user-land daemon?)
@@ -87,7 +89,7 @@ HA side
 
 The Ericsson's code integrated before has been removed. Tha last
 kame-snap that includes the MIP code is 20010604. You can also
-retreive a patch for the 20010611 snap from
+retrieve a patch for the 20010611 snap from
 ftp://ftp.kame.net/pub/kame/contrib/mip6/ericsson.
 
 Also, NEC provides mobile ipv6 (based on draft 13) patch freely
