@@ -1,4 +1,4 @@
-/*	$OpenBSD: cmds.c,v 1.29 1998/09/01 17:08:22 deraadt Exp $	*/
+/*	$OpenBSD: cmds.c,v 1.31 1999/06/29 14:33:23 aaron Exp $	*/
 /*	$NetBSD: cmds.c,v 1.27 1997/08/18 10:20:15 lukem Exp $	*/
 
 /*
@@ -67,7 +67,7 @@
 #if 0
 static char sccsid[] = "@(#)cmds.c	8.6 (Berkeley) 10/9/94";
 #else
-static char rcsid[] = "$OpenBSD: cmds.c,v 1.29 1998/09/01 17:08:22 deraadt Exp $";
+static char rcsid[] = "$OpenBSD: cmds.c,v 1.31 1999/06/29 14:33:23 aaron Exp $";
 #endif
 #endif /* not lint */
 
@@ -953,7 +953,7 @@ setglob(argc, argv)
 }
 
 /*
- * Toggle preserving modification times on retreived files.
+ * Toggle preserving modification times on retrieved files.
  */
 /*VARARGS*/
 void
@@ -2228,7 +2228,7 @@ page(argc, argv)
 		return;
 	}
 	p = getenv("PAGER");
-	if (p == NULL)
+	if (p == NULL || (*p == '\0'))
 		p = PAGER;
 	if ((pager = malloc(strlen(p) + 2)) == NULL)
 		errx(1, "Can't allocate memory for $PAGER");
