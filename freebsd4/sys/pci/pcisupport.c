@@ -692,10 +692,6 @@ pcib_match(device_t dev)
 		return ("Intel 82801AB (ICH0) Hub to PCI bridge");
 	case 0x244e8086:
 		return ("Intel 82801BA/BAM (ICH2) Hub to PCI bridge");
-	case 0x24488086:
-		return ("Intel 82801CA/CAM (ICH3) PCI to PCI bridge");
-	case 0x35768086:
-		return ("Intel 82830MP Host to AGP bridge");
 	
 	/* VLSI -- vendor 0x1004 */
 	case 0x01021004:
@@ -902,8 +898,6 @@ isab_match(device_t dev)
 		return ("Intel 82801AB (ICH0) PCI to LPC bridge");
 	case 0x24408086:
 		return ("Intel 82801BA/BAM (ICH2) PCI to LPC bridge");
-	case 0x248C8086:
-		return ("Intel 82801CA/CAM (ICH3) PCI to LPC bridge");
 	
 	/* VLSI -- vendor 0x1004 */
 	case 0x00061004:
@@ -1049,12 +1043,6 @@ pci_usb_match(device_t dev)
 		return ("Intel 82801BA/BAM (ICH2) USB controller USB-A");
 	case 0x24448086:
 		return ("Intel 82801BA/BAM (ICH2) USB controller USB-B");
-	case 0x24828086:
-		return ("Intel 82801CA/CAM (ICH3) USB controller USB-A");
-	case 0x24848086:
-		return ("Intel 82801CA/CAM (ICH3) USB controller USB-B");
-	case 0x24878086:
-		return ("Intel 82801CA/CAM (ICH3) USB controller USB-C");
 
 	/* VIA Technologies -- vendor 0x1106 (0x1107 on the Apollo Master) */
 	case 0x30381106:
@@ -1235,9 +1223,6 @@ chip_match(device_t dev)
 		return ("Intel 82801AA (ICH) AC'97 Audio Controller");
 	case 0x24258086:
 		return ("Intel 82801AB (ICH0) AC'97 Audio Controller");
-	case 0x24858086:
-		return ("Intel 82801CA (ICH3) AC'97 Audio Controller");
-		break;
 
 	/* Sony -- vendor 0x104d */
 	case 0x8009104d:
@@ -1541,8 +1526,6 @@ const char* pci_vga_match(device_t dev)
 			chip = "Mobility-1"; break;
 		case 0x4c52:
 			chip = "RageMobility-P/M"; break;
-		case 0x4c59:
-			chip = "RadeonMobility"; break;
 		case 0x475a:
 			chip = "Mach64-GZ"; break;
 		case 0x5245:

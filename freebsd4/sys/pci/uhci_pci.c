@@ -91,12 +91,6 @@ static const char *uhci_device_ich0 	= "Intel 82801AB (ICH0) USB controller";
 static const char *uhci_device_ich2_a	= "Intel 82801BA/BAM (ICH2) USB controller USB-A";
 #define PCI_UHCI_DEVICEID_ICH2_B	0x24448086
 static const char *uhci_device_ich2_b	= "Intel 82801BA/BAM (ICH2) USB controller USB-B";
-#define PCI_UHCI_DEVICEID_ICH3_A	0x24828086
-static const char *uhci_device_ich3_a	= "Intel 82801CA/CAM (ICH3) USB controller USB-A";
-#define PCI_UHCI_DEVICEID_ICH3_B	0x24848086
-static const char *uhci_device_ich3_b	= "Intel 82801CA/CAM (ICH3) USB controller USB-B";
-#define PCI_UHCI_DEVICEID_ICH3_C	0x24878086
-static const char *uhci_device_ich3_c	= "Intel 82801CA/CAM (ICH3) USB controller USB-C";
 #define PCI_UHCI_DEVICEID_440MX		0x719a8086
 static const char *uhci_device_440mx 	= "Intel 82443MX USB controller";
 #define PCI_UHCI_DEVICEID_VT83C572	0x30381106
@@ -155,12 +149,6 @@ uhci_pci_match(device_t self)
 		return (uhci_device_ich2_a);
 	} else if (device_id == PCI_UHCI_DEVICEID_ICH2_B) {
 		return (uhci_device_ich2_b);
-	} else if (device_id == PCI_UHCI_DEVICEID_ICH3_A) {
-		return (uhci_device_ich3_a);
-	} else if (device_id == PCI_UHCI_DEVICEID_ICH3_B) {
-		return (uhci_device_ich3_b);
-	} else if (device_id == PCI_UHCI_DEVICEID_ICH3_C) {
-		return (uhci_device_ich3_c);
 	} else if (device_id == PCI_UHCI_DEVICEID_440MX) {
 		return (uhci_device_440mx);
 	} else if (device_id == PCI_UHCI_DEVICEID_VT83C572) {
@@ -250,18 +238,6 @@ uhci_pci_attach(device_t self)
 		break;
 	case PCI_UHCI_DEVICEID_ICH2_B:
 		device_set_desc(sc->sc_bus.bdev, uhci_device_ich2_b);
-		sprintf(sc->sc_vendor, "Intel");
-		break;
-	case PCI_UHCI_DEVICEID_ICH3_A:
-		device_set_desc(sc->sc_bus.bdev, uhci_device_ich3_a);
-		sprintf(sc->sc_vendor, "Intel");
-		break;
-	case PCI_UHCI_DEVICEID_ICH3_B:
-		device_set_desc(sc->sc_bus.bdev, uhci_device_ich3_b);
-		sprintf(sc->sc_vendor, "Intel");
-		break;
-	case PCI_UHCI_DEVICEID_ICH3_C:
-		device_set_desc(sc->sc_bus.bdev, uhci_device_ich3_c);
 		sprintf(sc->sc_vendor, "Intel");
 		break;
 	case PCI_UHCI_DEVICEID_440MX:
