@@ -150,7 +150,9 @@ struct udp_ip6 {
 
 static void udp_append __P((struct inpcb *last, struct ip *ip,
 			    struct mbuf *n));
+#ifdef INET6
 static void ip_2_ip6_hdr __P((struct ip6_hdr *ip6, struct ip *ip));
+#endif
 
 static int udp_detach __P((struct socket *so));
 static int udp_output __P((struct inpcb *, struct mbuf *, struct sockaddr *,
@@ -418,6 +420,7 @@ bad:
 	return;
 }
 
+#ifdef INET6
 static void
 ip_2_ip6_hdr(ip6, ip)
 	struct ip6_hdr *ip6;
@@ -434,6 +437,7 @@ ip_2_ip6_hdr(ip6, ip)
 	ip6->ip6_src.s6_addr32[3] = ip->ip_src.s_addr;
 	ip6->ip6_dst.s6_addr32[3] = ip->ip_dst.s_addr;
 }
+#endif
 
 /*
  * subroutine of udp_input(), mainly for source code readability.
