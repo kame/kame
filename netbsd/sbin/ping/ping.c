@@ -1,4 +1,4 @@
-/*	$NetBSD: ping.c,v 1.55.4.2 2000/10/18 02:04:49 tv Exp $	*/
+/*	$NetBSD: ping.c,v 1.63 2001/12/20 20:10:38 soren Exp $	*/
 
 /*
  * Copyright (c) 1989, 1993
@@ -62,10 +62,11 @@
 
 #include <sys/cdefs.h>
 #ifndef lint
-__RCSID("$NetBSD: ping.c,v 1.55.4.2 2000/10/18 02:04:49 tv Exp $");
+__RCSID("$NetBSD: ping.c,v 1.63 2001/12/20 20:10:38 soren Exp $");
 #endif
 
 #include <stdio.h>
+#include <stddef.h>
 #include <errno.h>
 #include <sys/time.h>
 #include <sys/types.h>
@@ -108,7 +109,7 @@ __RCSID("$NetBSD: ping.c,v 1.55.4.2 2000/10/18 02:04:49 tv Exp $");
 #endif /*IPSEC*/
 
 #define FLOOD_INTVL	0.01		/* default flood output interval */
-#define	MAXPACKET	(65536-60-8)	/* max packet size */
+#define	MAXPACKET	(IP_MAXPACKET-60-8)	/* max packet size */
 
 #define F_VERBOSE	0x0001
 #define F_QUIET		0x0002		/* minimize all output */
@@ -165,12 +166,11 @@ struct sockaddr_in src_addr;		/* from where */
 struct sockaddr_in loc_addr;		/* 127.1 */
 int datalen = 64-PHDR_LEN;		/* How much data */
 
-#ifdef sgi
-static char *__progname;
-#else
-extern char *__progname;
+#ifndef __NetBSD__
+static char *progname;
+#define	getprogname()		(progname)
+#define	setprogname(name)	((void)(progname = (name)))
 #endif
-
 
 char hostname[MAXHOSTNAMELEN];
 
@@ -178,7 +178,7 @@ static struct {
 	struct ip	o_ip;
 	char		o_opt[MAX_IPOPTLEN];
 	union {
-		u_char	    u_buf[MAXPACKET];
+		u_char	    u_buf[MAXPACKET+offsetof(struct icmp, icmp_data)];
 		struct icmp u_icmp;
 	} o_u;
 } out_pack;
@@ -208,7 +208,7 @@ double maxwait = 0.0;
 int reset_kerninfo;
 #endif
 
-int bufspace = 60*1024;
+int bufspace = IP_MAXPACKET;
 
 struct timeval now, clear_cache, last_tx, next_tx, first_tx;
 struct timeval last_rx, first_rx;
@@ -261,9 +261,8 @@ main(int argc, char *argv[])
 #endif
   
 
-#ifdef sgi
-	__progname = argv[0];
-#endif
+	setprogname(argv[0]);
+
 #ifndef IPSEC
 #define IPSECOPT
 #else
@@ -620,7 +619,7 @@ main(int argc, char *argv[])
 	 */
 	while (0 > setsockopt(s, SOL_SOCKET, SO_RCVBUF,
 			      (char*)&bufspace, sizeof(bufspace))) {
-		if ((bufspace -= 4096) == 0)
+		if ((bufspace -= 4096) <= 0)
 			err(1, "Cannot set the receive buffer size");
 	}
 
@@ -678,7 +677,7 @@ doit(void)
 		d_last = 365*24*60*60;
 	}
 
-	nfdmask = howmany(s + 1, NFDBITS);
+	nfdmask = howmany(s + 1, NFDBITS) * sizeof(fd_mask);
 	if ((fdmaskp = malloc(nfdmask)) == NULL)
 		err(1, "malloc");
 	memset(fdmaskp, 0, nfdmask);
@@ -1197,11 +1196,11 @@ in_cksum(u_short *p,
  * compute the difference of two timevals in seconds
  */
 static double
-diffsec(struct timeval *now,
+diffsec(struct timeval *timenow,
 	struct timeval *then)
 {
-	return ((now->tv_sec - then->tv_sec)*1.0
-		+ (now->tv_usec - then->tv_usec)/1000000.0);
+	return ((timenow->tv_sec - then->tv_sec)*1.0
+		+ (timenow->tv_usec - then->tv_usec)/1000000.0);
 }
 
 
@@ -1291,7 +1290,7 @@ summary(int header)
  */
 /* ARGSUSED */
 static void
-prtsig(int s)
+prtsig(int dummy)
 {
 	summary(0);
 #ifdef SIGINFO
@@ -1306,13 +1305,13 @@ prtsig(int s)
  * On the first SIGINT, allow any outstanding packets to dribble in
  */
 static void
-prefinish(int s)
+prefinish(int dummy)
 {
 	if (lastrcvd			/* quit now if caught up */
 	    || nreceived == 0)		/* or if remote is dead */
 		finish(0);
 
-	(void)signal(s, finish);	/* do this only the 1st time */
+	(void)signal(dummy, finish);	/* do this only the 1st time */
 
 	if (npackets > ntransmitted)	/* let the normal limit work */
 		npackets = ntransmitted;
@@ -1324,7 +1323,7 @@ prefinish(int s)
  */
 /* ARGSUSED */
 static void
-finish(int s)
+finish(int dummy)
 {
 #if defined(SIGINFO) && defined(NOKERNINFO)
 	struct termios ts;
@@ -1823,10 +1822,10 @@ usage(void)
 #endif /*IPSEC*/
 
 	(void)fprintf(stderr, "Usage: \n"
-	    "%s [-dDfLnoPqQrRv] [-c count] [-g gateway] [-h host]"
+	    "%s [-adDfLnoPqQrRv] [-c count] [-g gateway] [-h host]"
 	    " [-i interval] [-I addr]\n"
 	    "     [-l preload] [-p pattern] [-s size] [-t tos] [-T ttl]"
 	    " [-w maxwait] " IPSECOPT "host\n",
-	    __progname);
+	    getprogname());
 	exit(1);
 }

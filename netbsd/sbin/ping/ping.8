@@ -1,4 +1,4 @@
-.\"	$NetBSD: ping.8,v 1.31 1999/07/02 04:53:24 itojun Exp $
+.\"	$NetBSD: ping.8,v 1.39 2002/04/06 15:49:30 bjh21 Exp $
 .\"
 .\" Copyright (c) 1985, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -33,9 +33,9 @@
 .\"
 .\"     @(#)ping.8	8.2 (Berkeley) 12/11/93
 .\"
-.Dd March 11, 1997
+.Dd July 2, 1999
 .Dt PING 8
-.Os BSD 4.3
+.Os
 .Sh NAME
 .Nm ping
 .Nd send
@@ -44,7 +44,7 @@ packets to network hosts
 .Sh SYNOPSIS
 .Nm ""
 .Bk -words
-.Op Fl adfnoqrvDPQRL
+.Op Fl adDfLnoPqQrRv
 .Ek
 .Bk -words
 .Op Fl c Ar count
@@ -127,10 +127,10 @@ For the format of specification string, please refer
 Please note that this option is same as
 .Fl P
 in KAME/FreeBSD and KAME/BSDI
-.Po
+(as
 .Fl P
-was already occupied in NetBSD
-.Pc .
+was already occupied in
+.Nx ) .
 .It Fl f
 Flood ping.
 Outputs packets as fast as they come back or one hundred times per second,
@@ -224,7 +224,7 @@ data bytes when combined
 with the 8 bytes of
 .Tn ICMP
 header data.
-The maximum allowed value is 65468 bytes.
+The maximum allowed value is 65467 bytes.
 .It Fl T Ar ttl
 Use the specified time-to-live.
 .It Fl t Ar tos
@@ -357,7 +357,7 @@ You can then examine this file for repeated patterns that you can test
 using the
 .Fl p
 option of
-.Nm .
+.Nm "" .
 .Sh TTL DETAILS
 The
 .Tn TTL
@@ -439,8 +439,42 @@ Others may use completely wild values.
 .Nm
 returns 0 on success (the host is alive),
 and non-zero if the arguments are incorrect or the host is not responding.
+.Sh SEE ALSO
+.Xr netstat 1 ,
+.Xr icmp 4 ,
+.Xr inet 4 ,
+.Xr ip 4 ,
+.Xr ifconfig 8 ,
+.Xr routed 8 ,
+.Xr spray 8 ,
+.Xr traceroute 8
+.Sh HISTORY
+The
+.Nm
+command appeared in
+.Bx 4.3 .
+IPsec support was added by WIDE/KAME project.
 .Sh BUGS
-Many Hosts and Gateways ignore the
+Flood pinging is not recommended in general, and flood pinging a broadcast
+or multicast address should only be done under very controlled conditions.
+.Pp
+The
+.Nm
+program has evolved differently under different operating systems,
+and in some cases the same flag performs a different function
+under different operating systems. The
+.Fl t
+flag conflicts with
+.Fx .
+The
+.Fl a , c , i , I ,
+.Fl l , p , P , s ,
+and
+.Fl t
+flags conflict with
+.Sy Solaris .
+.Pp
+Some hosts and gateways ignore the
 .Tn RECORD_ROUTE
 option.
 .Pp
@@ -449,18 +483,3 @@ The maximum IP header length is too small for options like
 to
 be completely useful.
 There's not much that that can be done about this, however.
-.Pp
-Flood pinging is not recommended in general, and flood pinging the
-broadcast address should only be done under very controlled conditions.
-.Sh SEE ALSO
-.Xr netstat 1 ,
-.Xr ifconfig 8 ,
-.Xr routed 8 ,
-.Xr traceroute 8 ,
-.Xr spray 8
-.Sh HISTORY
-The
-.Nm
-command appeared in
-.Bx 4.3 .
-IPsec support was added by WIDE/KAME project.
