@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.32 2001/01/22 02:26:00 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.33 2001/01/28 09:00:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -274,7 +274,8 @@ struct nd_opt_prefix_info {	/* prefix information */
 
 #define ND_OPT_PI_FLAG_ONLINK		0x80
 #define ND_OPT_PI_FLAG_AUTO		0x40
-#define ND_OPT_PI_FLAG_RTADDR		0x20
+#define ND_OPT_PI_FLAG_RTADDR		0x20	/*KAME local - backward compat*/
+#define ND_OPT_PI_FLAG_ROUTER		0x20	/*2292bis-02*/
 
 struct nd_opt_rd_hdr {		/* redirected header */
 	u_int8_t	nd_opt_rh_type;
