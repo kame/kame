@@ -776,9 +776,6 @@ grp_prefix_config()
 			    (u_int8)pl->attru.prefix.plen, 0,
 			    cand_rp_adv_message.insert_data_ptr);
 		(*cand_rp_adv_message.prefix_cnt_ptr)++;
-
-		/* for debug */
-		printf("group_prefix: added %s/%d\n", inet6_fmt(&pl->attru.prefix.paddr), pl->attru.prefix.plen);
 	}
 
 	return(0);
