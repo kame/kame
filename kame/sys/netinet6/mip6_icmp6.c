@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.49 2002/07/10 09:08:04 k-sugyou Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.50 2002/08/27 09:52:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -222,9 +222,10 @@ mip6_icmp6_input(m, off, icmp6len)
 			switch (*(u_int8_t *)(origip6 + pptr)) {
 			case IP6OPT_HOME_ADDRESS:
 				/*
-				 * all IPv6 nodes must support a home
-				 * address destination option.
+				 * a peer doesn't recognize HAO.
 				 */
+				mip6stat.mip6s_paramprobhao++;
+
 				IP6_EXTHDR_CHECK(m, off, icmp6len, EINVAL);
 				mip6_icmp6_find_addr(m, off, icmp6len,
 						     &laddr, &paddr);
@@ -233,9 +234,9 @@ mip6_icmp6_input(m, off, icmp6len)
 					 __FILE__, __LINE__,
 					 ip6_sprintf(&paddr.sin6_addr)));
 				/*
-				 * as i said above, all IPv6 nodes must
-				 * support a home address destination
-				 * option, but ...
+				 * if the peer doesn't support HAO, we
+				 * must use bi-directional tunneling
+				 * to contiue communication.
 				 */
 				for (sc = TAILQ_FIRST(&hif_softc_list);
 				     sc;
@@ -257,6 +258,7 @@ mip6_icmp6_input(m, off, icmp6len)
 				/*
 				 * the peer doesn't recognize mobility header.
 				 */
+				mip6stat.mip6s_paramprobmh++;
 
 				IP6_EXTHDR_CHECK(m, off, icmp6len, EINVAL);
 				mip6_icmp6_find_addr(m, off, icmp6len,

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.51 2002/08/27 06:18:56 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.52 2002/08/27 09:52:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -326,6 +326,8 @@ struct mip6stat {
 	u_quad_t mip6s_haopolicy;	/* BU is discarded due to bad HAO */
 	u_quad_t mip6s_rrauthfail;	/* RR authentication failed */
 	u_quad_t mip6s_seqno;		/* seqno mismatch */
+	u_quad_t mip6s_paramprobhao;	/* ICMP paramprob for HAO received */
+	u_quad_t mip6s_paramprobmh;	/* ICMP paramprob for MH received */
 };
 
 #ifdef _KERNEL

@@ -1,4 +1,4 @@
-/*	$KAME: mip6stat.c,v 1.12 2002/08/27 05:46:13 keiichi Exp $	*/
+/*	$KAME: mip6stat.c,v 1.13 2002/08/27 09:52:40 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -42,14 +42,21 @@
 #include <sys/socket.h>
 #include <sys/queue.h>
 
+#include <net/route.h>
+
 #include <netinet/in.h>
+#include <netinet6/ip6_var.h>
 #include <netinet6/mip6_var.h>
+
+#define KEIICHI
 
 static kvm_t *kvm;
 static char kvm_err[_POSIX2_LINE_MAX];
 struct nlist kvm_namelist[] = {
 	{ "_mip6stat" },
-#define N_MIP6STAT 0
+#define NL_MIP6STAT 0
+	{ "_ip6stat" },
+#define NL_IP6STAT 1
 	{""},
 };
 
@@ -572,15 +579,30 @@ static const char *binding_error_status_desc[] = {
 };
 
 static int showdetail (struct mip6stat *);
+static int tmpshow(struct ip6stat *, struct mip6stat *);
 
 struct mip6stat mip6stat;
+struct ip6stat ip6stat;
 
 int
 main(argc, argv)
 	int argc;
 	char **argv;
 {
-	
+	int ch;
+#ifdef KEIICHI
+	int keiichi = 0;
+#endif
+
+	while ((ch = getopt(argc, argv, "K")) != -1) {
+		switch(ch) {
+#ifdef KEIICHI
+		case 'K':
+			keiichi = 1;
+			break;
+		}
+#endif
+	}
 
 	kvm = kvm_openfiles(NULL, NULL, NULL, O_RDONLY, kvm_err);
 	if (kvm == NULL) {
@@ -592,12 +614,22 @@ main(argc, argv)
 		exit(1);
 	}
 
-	if (kvm_read(kvm, kvm_namelist[N_MIP6STAT].n_value,
+	if (kvm_read(kvm, kvm_namelist[NL_MIP6STAT].n_value,
 	    (void *)&mip6stat, sizeof(mip6stat)) < 0) {
 		fprintf(stderr, "mip6stat read error\n");
 		exit(1);
 	}
+	if (kvm_read(kvm, kvm_namelist[NL_IP6STAT].n_value,
+	    (void *)&ip6stat, sizeof(ip6stat)) < 0) {
+		fprintf(stderr, "ip6stat read error\n");
+		exit(1);
+	}
 
+#ifdef KEIICHI
+	if (keiichi == 1)
+		tmpshow(&ip6stat, &mip6stat);
+	else
+#endif
 	showdetail(&mip6stat);
 
 	exit(0);
@@ -647,6 +679,8 @@ showdetail(mip6stat)
 	PS("BUs discarded due to bad HAO", mip6s_haopolicy);
 	PS("RR authentication failed", mip6s_rrauthfail);
 	PS("seqno mismatch", mip6s_seqno);
+	PS("parameter problem for HAO", mip6s_paramprobhao);
+	PS("parameter problem for MH", mip6s_paramprobmh);
 
 	printf("Output:\n");
 	PS("Mobility Headers", mip6s_omobility);
@@ -675,3 +709,68 @@ showdetail(mip6stat)
 
 	return (0);
 }
+#undef PS
+
+#ifdef KEIICHI
+#define M(variable) printf(#variable ":%qu,", mip6stat->variable)
+int
+tmpshow(ip6stat, mip6stat)
+	struct ip6stat *ip6stat;
+	struct mip6stat *mip6stat;
+{
+	int i;
+
+	printf("ip6:%qu,", ip6stat->ip6s_total);
+	M(mip6s_mobility);
+	M(mip6s_hoti);
+	M(mip6s_coti);
+	M(mip6s_hot);
+	M(mip6s_cot);
+	M(mip6s_bu);
+	M(mip6s_ba);
+	for (i = 0; i < 256; i++) {
+		if (mip6stat->mip6s_ba_hist[i] != 0)
+			printf("mip6s_ba_hist_%03d:%qu,",
+			    i, mip6stat->mip6s_ba_hist[i]);
+	}
+	M(mip6s_br);
+	M(mip6s_be);
+	for (i = 0; i < 256; i++) {
+		if (mip6stat->mip6s_be_hist[i] != 0)
+			printf("mip6s_be_hist_%03d:%qu,",
+			    i, mip6stat->mip6s_be_hist[i]);
+	}
+	M(mip6s_hao);
+	M(mip6s_unverifiedhao);
+	M(mip6s_rthdr2);
+	M(mip6s_paramprobhao);
+	M(mip6s_paramprobmh);
+
+	printf("oip6:%qu,", ip6stat->ip6s_localout);
+	M(mip6s_omobility);
+	M(mip6s_ohoti);
+	M(mip6s_ocoti);
+	M(mip6s_ohot);
+	M(mip6s_ocot);
+	M(mip6s_obu);
+	M(mip6s_oba);
+	for (i = 0; i < 256; i++) {
+		if (mip6stat->mip6s_oba_hist[i] != 0)
+			printf("mip6s_oba_hist_%03d:%qu,",
+			    i, mip6stat->mip6s_oba_hist[i]);
+	}
+	M(mip6s_obr);
+	M(mip6s_obe);
+	for (i = 0; i < 256; i++) {
+		if (mip6stat->mip6s_obe_hist[i] != 0)
+			printf("mip6s_obe_hist_%03d:%qu,",
+			    i, mip6stat->mip6s_obe_hist[i]);
+	}
+	M(mip6s_ohao);
+	M(mip6s_orthdr2);
+
+	printf("ENDOFDATA\n");
+	return (0);
+}
+#undef M
+#endif
