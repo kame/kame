@@ -1,4 +1,4 @@
-/*	$KAME: keydb.c,v 1.79 2003/09/06 05:15:44 itojun Exp $	*/
+/*	$KAME: keydb.c,v 1.80 2003/09/06 20:58:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -71,6 +71,7 @@
 MALLOC_DEFINE(M_SECA, "key mgmt", "security associations, key management");
 #endif
 
+extern TAILQ_HEAD(_satailq, secasvar) satailq;
 extern TAILQ_HEAD(_sptailq, secpolicy) sptailq;
 
 static void keydb_delsecasvar __P((struct secasvar *));
@@ -180,17 +181,31 @@ keydb_delsecashead(p)
 struct secasvar *
 keydb_newsecasvar()
 {
-	struct secasvar *p;
-	u_int32_t said = 0;
+	struct secasvar *p, *q;
+	static u_int32_t said = 0;
 
 	p = (struct secasvar *)malloc(sizeof(*p), M_SECA, M_NOWAIT);
 	if (!p)
 		return p;
-	bzero(p, sizeof(*p));
-	p->id = ++said;
-	if (said + 1 == 0)
+
+again:
+	said++;
+	if (said == 0)
 		said++;
+	TAILQ_FOREACH(q, &satailq, tailq) {
+		if (q->id == said)
+			goto again;
+		if (q->id < said && said < TAILQ_NEXT(q, tailq)->id)
+			break;
+	}
+
+	bzero(p, sizeof(*p));
+	p->id = said;
 	p->refcnt = 1;
+	if (q)
+		TAILQ_INSERT_AFTER(&satailq, q, p, tailq);
+	else
+		TAILQ_INSERT_TAIL(&satailq, p, tailq);
 	return p;
 }
 
@@ -235,6 +250,7 @@ keydb_delsecasvar(p)
 	if (p->refcnt)
 		panic("keydb_delsecasvar called with refcnt != 0");
 
+	TAILQ_REMOVE(&satailq, p, tailq);
 	free(p, M_SECA);
 }
 

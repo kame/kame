@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.300 2003/09/06 05:15:43 itojun Exp $	*/
+/*	$KAME: key.c,v 1.301 2003/09/06 20:58:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -160,7 +160,8 @@ static int key_preferred_oldsa = 1;	/*preferred old sa rather than new sa.*/
 static u_int32_t acq_seq = 0;
 static int key_tick_init_random = 0;
 
-TAILQ_HEAD(_sptailq, secpolicy) sptailq;		/* SPD table + pcb */
+TAILQ_HEAD(_satailq, secasvar) satailq;		/* list of all SAD entry */
+TAILQ_HEAD(_sptailq, secpolicy) sptailq;	/* SPD table + pcb */
 static LIST_HEAD(_sptree, secpolicy) sptree[IPSEC_DIR_MAX];	/* SPD table */
 static LIST_HEAD(_sahtree, secashead) sahtree;			/* SAD */
 static LIST_HEAD(_regtree, secreg) regtree[SADB_SATYPE_MAX + 1];
