@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1720 2001/06/13 13:34:48 itojun Exp $
+$KAME: CHANGELOG,v 1.1721 2001/06/14 05:08:05 itojun Exp $
 
 <200106>
 Wed Jun 13 22:31:49 JST 2001  itojun@iijlab.net
@@ -29,7 +29,7 @@ Wed Jun 13 17:29:56 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	  sys/i386/conf/GENERIC.KAME and compile/link kernel.
 
 	    #options	NATPT
-	    #options	NATPT-NAT
+	    #options	NATPT_NAT
 
 2001-06-10 Keiichi SHIMA <keiichi@iij.ad.jp>
 	Remove MIP6 code from KAME source tree. MIP6 code is now
