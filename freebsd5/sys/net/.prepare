@@ -1,0 +1,11 @@
+exclude if_pfsync.c
+exclude if_pfsync.h
+exclude if_pflog.c
+exclude if_pflog.h
+exclude pf.c
+exclude pf_ioctl.c
+exclude pf_norm.c
+exclude pf_osfp.c
+exclude pf_table.c
+exclude pfkeyv2.h
+exclude pfvar.h
