@@ -1,4 +1,4 @@
-$Id: question,v 1.16 2000/09/20 20:26:55 sakane Exp $
+$Id: question,v 1.17 2000/09/20 20:29:47 itojun Exp $
 
 HOW DO I DO ?
 
@@ -425,3 +425,11 @@ Q: phase 1 ID payload
 	must include the ID into subject alt name.
 
 Q: how may policy issue are.  can we interoperate ?
+
+Q: rekey.
+	- common: IPsec layer always use oldest SA.  optionally, send a delete
+		payload for old SA when we got a new SA.
+	- freeswan: trust no informational exchange (including initial-contact).
+		assume everyone will be using the latest SA in IPsec layer.
+		assume that phase 2 responder will install new key when the
+		responder got 1st packet of phase 2 (not the 3rd packet).
