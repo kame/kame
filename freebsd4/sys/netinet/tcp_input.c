@@ -1490,7 +1490,7 @@ trimthenstep6:
 	 * for the "LAND" DoS attack.
 	 */
 	if (tp->t_state == TCPS_SYN_RECEIVED && SEQ_LT(th->th_seq, tp->irs)) {
-		rstreason = BANDLIM_UNLIMITED;
+		rstreason = BANDLIM_RST_OPENPORT;
 		goto dropwithreset;
 	}
 
