@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.37 2000/09/13 04:50:24 itojun Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.38 2000/09/19 16:19:50 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.37 2000/09/13 04:50:24 itojun Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.38 2000/09/19 16:19:50 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -433,10 +433,11 @@ eay_get_x509text(cert)
 	}
 
 	len = BIO_get_mem_data(bio, &bp);
-	text = malloc(len);
+	text = malloc(len + 1);
 	if (text == NULL)
 		goto end;
 	memcpy(text, bp, len);
+	text[len] = '\0';
 
 	error = 0;
 
