@@ -74,7 +74,7 @@ if [ X"${ip6router}" = X"YES" ]; then
 				# NetBSD *requires* inet6
 				laddr=`$ifconfig $i inet6 | grep 'inet6 fe80:' | head -1 | \
 					awk '{print $2}'`
-				hostid=`echo $laddr | sed -e 's/fe80:[0-9a-fA-F]*:://'`
+				hostid=`echo $laddr | sed -e 's/fe80:[0-9a-fA-F]+::/fe80::/' -e 's/fe80:://' -e 's/@.*//'`
 				address=$j\:$hostid
 
 				eval hostid_$i=$hostid
