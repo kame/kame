@@ -1,4 +1,4 @@
-.\"	$KAME: pim6sd.8,v 1.8 2000/09/25 15:21:06 itojun Exp $
+.\"	$KAME: pim6sd.8,v 1.9 2000/12/04 06:28:26 itojun Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -39,7 +39,7 @@
 .Op Fl d Op debug_level Op ,debug_level
 .Op Fl f
 .Sh DESCRIPTION
-.Nm Pim6sd
+.Nm
 is an IPv6 multicast routing daemon, which supports
 PIMv2(Protocol Independent Multicast Version 2) sparse mode
 for IPv6.
@@ -74,7 +74,7 @@ Do not become daemon, run in foreground. This option is for debugging
 use.
 .El
 .Pp
-.Nm Pim6sd 
+.Nm
 automatically configures itself to forward on all multicast-capable
 interfaces, i.e., interfaces that have the IFF_MULTICAST flag set (excluding
 the "loopback interface").
@@ -139,12 +139,12 @@ It is based on IPv4 PIM sparse-mode
 developed at University of Southern California,
 which has also been derived from
 .Nm mrouted .
-.Nm Mrouted
+.Nm mrouted
 is COPYRIGHT 1989 by The Board of Trustees of
 Leland Stanford Junior University.
 .\"
 .Sh BUGS
-.Nm Pim6sd
+.Nm
 does not contain any unicast routing engine, so a unicast routing
 daemon needs to run on the system. 
 .Pp

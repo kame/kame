@@ -1,4 +1,4 @@
-.\"	$KAME: bgpd.8,v 1.9 2000/11/27 05:04:09 jinmei Exp $
+.\"	$KAME: bgpd.8,v 1.10 2000/12/04 06:28:21 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -42,7 +42,7 @@
 .Op Fl f
 .\"
 .Sh DESCRIPTION
-.Nm Bgpd
+.Nm
 speaks IPv6 routing protocols,
 and maintains the IPv6 network routing table.
 Though the name is
@@ -122,5 +122,5 @@ by some other routing daemons/commands.
 There is code to handle OSPFv6 in the
 .Nm
 source directory, but OSPFv6 support is just in progress.
-.Nm Bgpd
+.Nm
 is not able to distribute nor get IPv6 routing information via OSPFv6.

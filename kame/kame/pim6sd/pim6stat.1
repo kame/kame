@@ -1,4 +1,4 @@
-.\"	$KAME: pim6stat.1,v 1.7 2000/08/21 06:16:49 jinmei Exp $
+.\"	$KAME: pim6stat.1,v 1.8 2000/12/04 06:28:26 itojun Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -40,7 +40,7 @@
 .Op Fl p Ar pidfile
 .Op Fl w Ar waitsec
 .Sh DESCRIPTION
-.Nm Pim6stat
+.Nm
 shows status or statistics of the PIM for IPv6 daemon currently running.
 When invoked, it sends a signal to let the daemon dump its internal
 status to a file, waits for dumping, and outputs the content of the file
@@ -85,6 +85,6 @@ The
 .Nm
 command first appeared in KAME IPv6 protocol stack kit.
 .Sh BUGS
-.Nm Pim6stat
+.Nm
 needs superuser privilege.
 .\"

@@ -1,4 +1,4 @@
-.\"	$KAME: natptconfig.8,v 1.8 2000/11/09 03:04:10 itojun Exp $
+.\"	$KAME: natptconfig.8,v 1.9 2000/12/04 06:28:24 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -49,11 +49,11 @@
 .Ar subcommand Op Ar args...
 .\"
 .Sh DESCRIPTION
-.Nm Natptconfig
+.Nm
 configures and control the IPv6-to-IPv4 translator implemented in the
 kernel.
 .Pp
-.Nm Natptconfig
+.Nm
 takes the following command line options.
 .Bl -tag -width Ds
 .It Fl d Ar debuglevel
@@ -212,7 +212,7 @@ quoted.
 .\"
 .Sh RUNNING NAT-PT
 The following steps are necessary before attempting to run
-.Nm NAT-PT:
+.Nm Ns :
 .Bl -enum
 .It
 Build a custom kernel with uncomment the following options:
@@ -358,11 +358,11 @@ you may need to configure the translator box for proxy ARP, or
 configure alias IP address by using
 .Xr ifconfig 8 .
 .Pp
-.Nm Natptconfig
+.Nm
 show subcommand read many information from kernel device
 (ie. /dev/kmem), so you must have read permission of this device.
 .\"
 .Sh HISTORY
-.Nm Natptconfig
-are implemented by Shin-ichi Fujisawa
+.Nm
+was implemented by Shin-ichi Fujisawa
 .Li <fujisawa@kame.net> .

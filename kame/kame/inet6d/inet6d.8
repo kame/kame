@@ -1,4 +1,4 @@
-.\"	$KAME: inet6d.8,v 1.3 2000/11/09 03:04:08 itojun Exp $
+.\"	$KAME: inet6d.8,v 1.4 2000/12/04 06:28:23 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -39,7 +39,7 @@
 .Op Fl R Ar rate
 .Op Ar config-file
 .Sh DESCRIPTION
-.Nm Inet6d
+.Nm
 is IPv6 variant of
 .Xr inetd 8 .
 .Bl -tag -width Ds
@@ -48,7 +48,7 @@ Enable debugging facility by setting
 .Dv SO_DEBUG
 socket option.
 .It Fl R Ar rate
-.Nm Inet6d
+.Nm
 implements prevention mechanism for denial-of-service attack.
 By default,
 .Nm
