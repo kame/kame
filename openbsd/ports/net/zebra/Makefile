@@ -16,7 +16,7 @@ MAINTAINER=	itojun@itojun.org
 HOMEPAGE=	http://www.zebra.org/
 
 GNU_CONFIGURE=	yes
-CONFIGURE_ARGS+=--sysconfdir=${PREFIX}/etc/zebra
+#CONFIGURE_ARGS+=--sysconfdir=${PREFIX}/etc/zebra
 #CONFIGURE_ARGS+=--disable-ospf6d
 
-.include "../../mk/bsd.pkg.mk"
+.include <bsd.port.mk>
