@@ -78,6 +78,8 @@ struct rt_entry {
 
 /* bgpd internal flags for a route entry */
 #define RTF_INSTALLED		0x01000000
+#define RTF_BGPDIFSTATIC        0x02000000
+#define RTF_BGPDGWSTATIC        0x04000000
 #define RTF_IGP_EGP_SYNC        0x10000000
 #define RTF_NH_NOT_LLADDR       0x20000000
 #define RTF_SENDANYWAY          0x40000000

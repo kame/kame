@@ -99,6 +99,17 @@ struct attr_list {
 	}attru;
 };
 
+struct yy_route_entry {
+	struct yy_route_entry *next;
+	struct in6_prefix prefix;
+	int gwtype;
+	int line;
+	union {
+		struct sockaddr_in6 gateway;
+		char ifname[IFNAMSIZ];
+	} reu;
+};
+
 struct yy_ripifinfo {
 	struct yy_ripifinfo *next;
 	char ifname[IFNAMSIZ];
@@ -142,20 +153,23 @@ struct yy_rtproto {
 	}rtpu;
 };
 
+enum {GW_IFACE, GW_ADDR};
 enum {RIPIFA_DEFAULT, RIPIFA_NORIPIN, RIPIFA_NORIPOUT, RIPIFA_METRICIN,
       RIPIFA_FILINDEF, RIPIFA_FILOUTDEF, RIPIFA_RESINDEF, RIPIFA_RESOUTDEF,
       RIPIFA_FILINPFX, RIPIFA_FILOUTPFX, RIPIFA_RESINPFX, RIPIFA_RESOUTPFX,
       RIPIFA_DESCR, BGPPA_IFNAME, BGPPA_NOSYNC, BGPPA_NEXTHOPSELF,
       BGPPA_LCLADDR, BGPPA_PREFERENCE, BGPPA_PREPEND, BGPPA_DESCR,
-      EXPA_PROTO, AGGA_PROTO, AGGA_EXPFX};
+      EXPA_PROTO, AGGA_PROTO, AGGA_EXPFX, STATICA_RTE};
 enum {ATTR_FLAG, ATTR_PREFIX, ATTR_STRING, ATTR_ADDR, ATTR_NUMBER,
       ATTR_DATA, ATTR_LIST};
 enum {BGPPEER_NORMAL, BGPPEER_CLIENT}; 
 enum {RTP_IFACE, RTP_BGP, RTP_RIP, RTP_IBGP}; 
 
 static struct in6_prefix in6pfx_temp; /* XXX */
+static struct yy_route_entry static_temp; /* XXX */
 static struct yy_bgppeerinfo bgppeer_temp; /* XXX file global */
 static struct yy_bgppeerinfo *yy_bgppeer_head;
+static struct yy_route_entry *yy_static_head;
 static int yy_debug, yy_asnum, yy_bgpsbsize, yy_holdtime, yy_rrflag,
 	yy_rip, yy_rip_sitelocal;
 static long yy_routerid, yy_clusterid; /* XXX sizoef(long)? */
@@ -197,6 +211,7 @@ extern int yylex __P((void));
 %token DUMPFILE
 %token AUTONOMOUSSYSTEM ROUTERID CLUSTERID HOLDTIME ROUTEREFLECTOR BGPSBSIZE
 %token INTERFACE IFNAME
+%token STATIC GATEWAY
 %token RIP DEFAULT ORIGINATE NORIPIN NORIPOUT SITELOCAL METRICIN
 %token FILTERIN FILTEROUT RESTRICTIN RESTRICTOUT
 %token BGP GROUP TYPE INTERNAL EXTERNAL PEER CLIENT PEERAS AS
@@ -222,6 +237,7 @@ statements:
 statement:
 		logging_statement
 	|	param_statement
+	|	static_statement
 	|	rip_statement
 	|	bgp_statement
 	|	export_statement
@@ -291,6 +307,40 @@ param_statement:
 		}
 	;
 
+/* Static Route */
+static_statement: STATIC BCL static_routes ECL EOS
+
+static_routes:
+		/* empty */
+	|	static_routes static_route
+	;
+
+static_route:
+		prefix GATEWAY STRING EOS
+		{
+			static_temp.prefix = *($1);
+			if (get_in6_addr($3.v, &static_temp.reu.gateway)) {
+				yywarn("bad IPv6 gateway address: %s",
+				       $3.v);
+				free($3.v);
+				return(-1);
+			}
+			free($3.v);
+			static_temp.gwtype = GW_ADDR;
+			if (add_static(&static_temp))
+				return(-1);
+		}
+	|	prefix INTERFACE IFNAME EOS
+		{
+			static_temp.prefix = *($1);
+			strncpy(static_temp.reu.ifname, $3.v,
+				sizeof(static_temp.reu.ifname));
+			free($3.v);
+			static_temp.gwtype = GW_IFACE;
+			if (add_static(&static_temp))
+				return(-1);
+		}
+	;
 
 /* RIP */
 rip_statement:
@@ -793,6 +843,38 @@ prefix:
 
 %%
 static int
+add_static(new_rte)
+	struct yy_route_entry *new_rte;
+{
+	struct yy_route_entry *rte;
+
+	/* canonize the address part */
+	mask_nclear(&new_rte->prefix.paddr.sin6_addr, new_rte->prefix.plen);
+
+	/* check if duplicated */
+	for (rte = yy_static_head; rte; rte = rte->next) {
+		if (sa6_equal(&rte->prefix.paddr, &new_rte->prefix.paddr) &&
+		    rte->prefix.plen == new_rte->prefix.plen) {
+			yywarn("static route doubly defined: %s/%d",
+			       ip6str2(&rte->prefix.paddr), rte->prefix.plen);
+			return(-1);
+		}
+	}
+
+	/* add a new route */
+	if ((rte = malloc(sizeof(*rte))) == NULL) {
+		warnx("can't allocate space for a static route");
+		return(-1);
+	}
+	*rte = *new_rte;
+	rte->next = yy_static_head;
+	rte->line = lineno;
+	yy_static_head = rte;
+
+	return(0);
+}
+
+static int
 add_aggregation(prefix, aggrinfo)
 	struct in6_prefix *prefix;
 	struct attr_list *aggrinfo;
@@ -1064,6 +1146,102 @@ param_config()
 		ipv4id.s_addr = clusterId = yy_clusterid;
 		cprint("set %s to the BGP cluster ID\n", inet_ntoa(ipv4id));
 	}
+}
+
+static int
+static_config()
+{
+	struct yy_route_entry *yrte;
+	struct rt_entry *rte = NULL;
+	struct ifinfo *ifp;
+	extern struct rt_entry static_rte_head;
+
+	cprint("Static Route config\n");
+
+	for (yrte = yy_static_head; yrte; yrte = yrte->next) {
+		cprint("  Destination: %s/%d",
+		       ip6str2(&yrte->prefix.paddr), yrte->prefix.plen);
+
+		if ((rte = malloc(sizeof(*rte))) == NULL) {
+			warnx("can't allocate space for a static route");
+			return(-1);
+		}
+		memset(rte, 0, sizeof(*rte));
+
+		/* XXX: scoped addr support */
+		rte->rt_ripinfo.rip6_dest = yrte->prefix.paddr.sin6_addr;
+		rte->rt_ripinfo.rip6_plen = yrte->prefix.plen;
+
+		switch(yrte->gwtype) {
+		case GW_IFACE:
+			cprint(" to Interface %s", yrte->reu.ifname);
+
+			if ((ifp = find_if_by_name(yrte->reu.ifname))
+			    == NULL) {
+				warnx("%s line %d: invalid interface name: %s",
+				      configfilename, yrte->line,
+				      yrte->reu.ifname);
+				goto bad;
+			}
+			rte->rt_proto.rtp_type = RTPROTO_IF;
+			rte->rt_proto.rtp_if = ifp;
+			/* use our own address as gateway */
+			if (!IN6_IS_ADDR_UNSPECIFIED(&ifp->ifi_laddr))
+				rte->rt_gw = ifp->ifi_laddr;
+			else
+				rte->rt_gw = ifp->ifi_gaddr;
+			rte->rt_flags |= RTF_BGPDIFSTATIC;
+			break;
+		case GW_ADDR:
+			cprint(" gateway: %s", ip6str2(&yrte->reu.gateway));
+
+			if (IN6_IS_ADDR_LINKLOCAL(&yrte->reu.gateway.sin6_addr)) {
+				/* XXX: link vs I/F issue... */
+				u_int linkid = yrte->reu.gateway.sin6_scope_id;
+
+				if (linkid == 0) {
+					warnx("%s line %d: "
+					      "link-local gateway without"
+					      "scope id: %s",
+					      configfilename, yrte->line,
+					      ip6str2(&yrte->reu.gateway));
+					goto bad;
+				}
+				if ((ifp = find_if_by_index(linkid)) == NULL) {
+					yywarn("%s line %d: "
+					       "invalid scope id",
+					       configfilename, yrte->line,
+					       ip6str2(&yrte->reu.gateway));
+					goto bad;
+				}
+			}
+			else if (in6_is_addr_onlink(&yrte->reu.gateway.sin6_addr,
+						    &ifp) == 0) {
+					warnx("bad gateway (off-link): %s",
+					      ip6str2(&yrte->reu.gateway));
+					return(-1);
+			}
+
+			rte->rt_proto.rtp_type = RTPROTO_IF;
+			rte->rt_proto.rtp_if = ifp;
+			rte->rt_gw = yrte->reu.gateway.sin6_addr;
+			rte->rt_flags |= RTF_BGPDGWSTATIC;
+			break;
+		default:
+			cprint(" unknown gateway type(%d)", yrte->gwtype);
+			goto bad;
+		}
+
+		cprint("\n");
+		insque(rte, &static_rte_head);
+	}
+
+	return(0);
+
+  bad:
+	if (rte)
+		free(rte);
+	return(-1);
 }
 
 static int
@@ -1805,6 +1983,19 @@ attr_cleanup(head)
 }
 
 static void
+staticconfig_cleanup(head)
+	struct yy_route_entry *head;
+{
+	struct yy_route_entry *rte, *nrte;
+
+	for (rte = head; rte; rte = nrte) {
+		nrte = rte->next;
+
+		free(rte);
+	}
+}
+
+static void
 ripconfig_cleanup(head)
 	struct yy_ripifinfo *head;
 {
@@ -1865,6 +2056,7 @@ config_cleanup()
 {
 	if (yy_dumpfile)
 		free(yy_dumpfile);
+	staticconfig_cleanup(yy_static_head);
 	ripconfig_cleanup(yy_ripifinfo_head);
 	bgpconfig_cleanup(yy_bgppeer_head);
 	exportconfig_cleanup(yy_exportinfo_head);
@@ -1880,6 +2072,8 @@ int
 cf_post_config()
 {
 	param_config();	 /* always success */
+	if (static_config())
+		return(-1);
 	if (rip_config())
 		return(-1);
 	if (bgp_config())
@@ -1901,6 +2095,7 @@ cf_init()
 	yy_rip = yy_rip_sitelocal = yy_bgp = -1;
 	yy_routerid = yy_clusterid = -1;
 	yy_dumpfile = NULL;
+	yy_static_head = NULL;
 	yy_ripifinfo_head = NULL;
 	yy_bgppeer_head = NULL;
 	yy_exportinfo_head = NULL;

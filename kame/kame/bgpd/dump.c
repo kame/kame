@@ -74,10 +74,21 @@ dump_if_rtable(FILE *fp, struct rt_entry *base)
 
 	while(rte) {
 		fprintf(fp, "    "); /* indentation */
-		fprintf(fp, "%s/%d(%d)\n",
+		fprintf(fp, "%s/%d(%d)",
 			ip6str(&rte->rt_ripinfo.rip6_dest, 0),
 			rte->rt_ripinfo.rip6_plen,
 			rte->rt_ripinfo.rip6_metric);
+
+		if (rte->rt_flags & (RTF_BGPDIFSTATIC | RTF_BGPDGWSTATIC))
+			fprintf(fp, " static");
+
+		if (rte->rt_flags & RTF_BGPDGWSTATIC) {
+			fprintf(fp, " gateway=%s",
+				ip6str(&rte->rt_gw,
+				       rte->rt_proto.rtp_if->ifi_ifn->if_index));
+		}
+
+		fputc('\n', fp);
 
 		if ((rte = rte->rt_next) == base)
 			break;

@@ -151,6 +151,7 @@ void             bgpdexit  __P((void));
  *   route
  */
 void             krt_init     __P((void));
+void		 install_static __P((void));
 void             krt_entry    __P((struct rt_msghdr *));
 int              addroute     __P((struct rt_entry *, const struct in6_addr *,
 				   struct ifinfo *));

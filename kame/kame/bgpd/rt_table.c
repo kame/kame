@@ -37,6 +37,8 @@
 #include "in6.h"
 #include "ripng.h"
 
+struct rt_entry static_rte_head = {&static_rte_head, &static_rte_head};
+
 /* alignment constraint for routing socket messages */
 #define ROUNDUP(a) \
 	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
@@ -558,7 +560,7 @@ delroute(rte, gw)
 	extern int rtsock;
 	extern pid_t pid;
 
-	if (rte == NULL || gw == NULL) {
+	if (rte == NULL) {
 	  syslog(LOG_ERR, "<%s>: invalid argument", __FUNCTION__);
 	  return -1;
 	}
@@ -585,10 +587,12 @@ delroute(rte, gw)
         sin->sin6_addr = rp->rip6_dest;
 	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
         /* Gateway */
-        sin->sin6_len = sizeof(struct sockaddr_in6);
-        sin->sin6_family = AF_INET6;
-        sin->sin6_addr = *gw;
-	sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
+	if (gw) {
+	  sin->sin6_len = sizeof(struct sockaddr_in6);
+	  sin->sin6_family = AF_INET6;
+	  sin->sin6_addr = *gw;
+	  sin = (struct sockaddr_in6 *)((char *)sin + ROUNDUP(sin->sin6_len));
+	}
         /* Netmask */
         sin->sin6_len = sizeof(struct sockaddr_in6);
         sin->sin6_family = AF_INET6;
@@ -605,7 +609,8 @@ delroute(rte, gw)
 		 __FUNCTION__,
 		 inet_ntop(AF_INET6, &rp->rip6_dest, in6txt, INET6_ADDRSTRLEN),
 		 rp->rip6_plen,
-		 inet_ntop(AF_INET6, gw,            gw6txt, INET6_ADDRSTRLEN),
+		 gw ? inet_ntop(AF_INET6, gw, gw6txt, INET6_ADDRSTRLEN) :
+		 "NULL",
  		 ntohs(rp->rip6_tag),
  		 rte->rt_flags & RTF_IGP_EGP_SYNC ? "(sync)":"");
 #endif
@@ -621,11 +626,10 @@ delroute(rte, gw)
 		 __FUNCTION__,
 		 inet_ntop(AF_INET6, &rp->rip6_dest, in6txt, INET6_ADDRSTRLEN),
 		 rp->rip6_plen,
-		 inet_ntop(AF_INET6, gw,             gw6txt, INET6_ADDRSTRLEN),
-		 strerror(errno));
+		 gw ? inet_ntop(AF_INET6, gw, gw6txt, INET6_ADDRSTRLEN) :
+		 "NULL", strerror(errno));
 	  return -1;
 	}
-
 }
 
 
@@ -1004,4 +1008,47 @@ aggr_advable(agg, rtp)
     return 1;
   else
     return 0;
+}
+
+void
+install_static()
+{
+	struct rt_entry *rte, *nrte;
+	struct ifinfo *ifp;
+
+	for (rte = static_rte_head.rt_next; rte != &static_rte_head;
+	     rte = nrte) {
+		nrte = rte->rt_next;
+
+		switch(rte->rt_proto.rtp_type) {
+		case RTPROTO_IF:
+			ifp = rte->rt_proto.rtp_if;
+			if (addroute(rte, &rte->rt_gw, ifp)) {
+				syslog(LOG_ERR,
+				       "<%s>: failed to install a static route"
+				       "(%s/%d, gw=%s)",
+				       __FUNCTION__,
+				       ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+				       rte->rt_ripinfo.rip6_plen,
+				       ip6str(&rte->rt_gw,
+					      ifp->ifi_ifn->if_index));
+				fatalx("failed to install a static route");
+			}
+			/* chain this rte to as an interface route */
+			remque(rte);
+			if (ifp->ifi_rte != NULL)
+				insque(rte, ifp->ifi_rte);
+			else {
+				rte->rt_next = rte->rt_prev = rte;
+				ifp->ifi_rte = rte;
+			}
+			break;
+		default:
+			syslog(LOG_ERR,
+			       "<%s>: unknown origin for static route(%d)",
+			       __FUNCTION__, rte->rt_proto.rtp_type);
+			fatalx("install_static: unknown origin for "
+			       "static route");
+		}
+	}
 }

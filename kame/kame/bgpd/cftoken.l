@@ -169,6 +169,10 @@ description { DP("begin description"); BEGIN S_DESCR; return(DESCR); }
 }
 
 	/* rip */
+<S_CNF>static { YYD_ECHO; return(STATIC); }
+<S_CNF>gateway { YYD_ECHO; return(GATEWAY); }
+
+	/* rip */
 <S_CNF>rip { YYD_ECHO; return(RIP); }
 <S_CNF>default { YYD_ECHO; return(DEFAULT); }
 <S_CNF>originate { YYD_ECHO; return(ORIGINATE); }

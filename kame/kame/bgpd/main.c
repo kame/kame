@@ -165,6 +165,7 @@ main(argc, argv)
     exit(0);
 
   /* initialization after parsing configuration */
+  install_static();
   if (ripyes) {
     rip_sockinit();
     rip_import_init();
@@ -526,6 +527,7 @@ bgpdexit()
 {
   struct rpcb         *bnp;
   struct ripif        *ripif;
+  struct ifinfo *ife;
 
   extern int           bgpsock;
   extern struct rpcb  *bgb;
@@ -544,7 +546,6 @@ bgpdexit()
     close(bgpsock);
   }
 
-
   if (ripyes) {
     ripif = ripifs;
     while(ripif) {
@@ -553,6 +554,24 @@ bgpdexit()
       if ((ripif = ripif->rip_next) == ripifs)
 	break;
     }
+  }
+
+  /* removed all static routes */
+  ife = ifentry;
+  while(ife) {
+	  struct rt_entry *irte;
+
+	  irte = ife->ifi_rte;
+	  while(irte) {
+		  if (irte->rt_flags & (RTF_BGPDIFSTATIC | RTF_BGPDGWSTATIC))
+			  (void)delroute(irte, NULL);
+
+		  if ((irte = irte->rt_next) == ife->ifi_rte)
+			  break;
+	  }
+
+	  if ((ife = ife->ifi_next) == ifentry)
+		  break;
   }
 
   terminate();
