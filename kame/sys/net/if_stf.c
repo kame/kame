@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.87 2002/10/07 05:33:49 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.88 2002/10/08 07:18:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -96,10 +96,6 @@
 #include <sys/kernel.h>
 #endif
 #include <sys/syslog.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-#include <machine/bus.h>
-#include <sys/rman.h>
-#endif
 #include <machine/cpu.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -168,17 +164,12 @@ struct stf_softc {
 	} __sc_ro46;
 #define sc_ro	__sc_ro46.__sc_ro4
 	const struct encaptab *encap_cookie;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-	struct resource *r_unit;	/* resource allocated for this unit */
-#endif
 	LIST_ENTRY(stf_softc) sc_list; /* all stf's are linked */
 };
 
 LIST_HEAD(, stf_softc) stf_softc_list;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 static struct stf_softc *stf;
 static int nstf;
-#endif
 
 #if NGIF > 0
 extern int ip_gif_ttl;	/*XXX*/
@@ -201,20 +192,7 @@ struct protosw in_stf_protosw =
 #endif
 };
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-#define STFNAME		"stf"
-#define STF_MAXUNIT	0
-static MALLOC_DEFINE(M_STF, STFNAME, "6to4 Tunnel Interface");
-
-static int stfmodevent __P((module_t, int, void *));
-int	stf_clone_create __P((struct if_clone *, int *));
-void	stf_clone_destroy __P((struct ifnet *));
-
-static struct rman stfunits[1];
-
-struct if_clone stf_cloner =
-    IF_CLONE_INITIALIZER(STFNAME, stf_clone_create, stf_clone_destroy);
-#elif defined(__FreeBSD__) && __FreeBSD__ < 4
+#ifdef __FreeBSD__
 void stfattach __P((void *));
 #else
 void stfattach __P((int));
@@ -239,138 +217,6 @@ static int stf_ioctl __P((struct ifnet *, int, caddr_t));
 static int stf_ioctl __P((struct ifnet *, u_long, caddr_t));
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-int
-stf_clone_create(ifc, unit)
-	struct if_clone *ifc;
-	int *unit;
-{
-	struct resource *r;
-	struct stf_softc *sc;
-
-	if (*unit > STF_MAXUNIT)
-		return (ENXIO);
-
-	if (*unit < 0) {
-		 r = rman_reserve_resource(stfunits, 0, STF_MAXUNIT, 1,
-		     RF_ALLOCATED | RF_ACTIVE, NULL);
-		 if (r == NULL)
-			return (ENOSPC);
-		 *unit = rman_get_start(r);
-	} else {
-		r = rman_reserve_resource(stfunits, *unit, *unit, 1,
-		    RF_ALLOCATED | RF_ACTIVE, NULL);
-		if (r == NULL)
-			 return (EEXIST);
-	}
-
-	sc = malloc(sizeof(struct stf_softc), M_STF, M_WAIT);
-	bzero(sc, sizeof(struct stf_softc));
-
-	sc->sc_if.if_name = STFNAME;
-	sc->sc_if.if_unit = *unit;
-	sc->r_unit = r;
-
-	sc->encap_cookie = encap_attach_func(AF_INET, IPPROTO_IPV6,
-	    stf_encapcheck, &in_stf_protosw, sc);
-	if (sc->encap_cookie == NULL) {
-		printf("%s: attach failed\n", if_name(&sc->sc_if));
-		free(sc, M_STF);
-		return (ENOMEM);
-	}
-
-	sc->sc_if.if_mtu    = IPV6_MMTU;
-	sc->sc_if.if_flags  = 0;
-	sc->sc_if.if_ioctl  = stf_ioctl;
-	sc->sc_if.if_output = stf_output;
-	sc->sc_if.if_type   = IFT_STF;
-	sc->sc_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
-#ifdef __NetBSD__
-	sc->sc_if.if_dlt = DLT_NULL;
-#endif
-	if_attach(&sc->sc_if);
-#ifdef __NetBSD__
-	if_alloc_sadl(&sc->sc_if);
-#endif
-#if NBPFILTER > 0
-#ifdef HAVE_NEW_BPFATTACH
-	bpfattach(&sc->sc_if, DLT_NULL, sizeof(u_int));
-#else
-	bpfattach(&sc->sc_if.if_bpf, &sc->sc_if, DLT_NULL, sizeof(u_int));
-#endif
-#endif
-	LIST_INSERT_HEAD(&stf_softc_list, sc, sc_list);
-	return (0);
-}
-
-void
-stf_clone_destroy(ifp)
-	struct ifnet *ifp;
-{
-	int err;
-	struct stf_softc *sc = (void *) ifp;
-
-	LIST_REMOVE(sc, sc_list);
-	err = encap_detach(sc->encap_cookie);
-	KASSERT(err == 0, ("Unexpected error detaching encap_cookie"));
-#if NBPFILTER > 0
-	bpfdetach(ifp);
-#endif
-	if_detach(ifp);
-
-	err = rman_release_resource(sc->r_unit);
-	KASSERT(err == 0, ("Unexpected error freeing resource"));
-
-	free(sc, M_STF);
-}
-
-static int
-stfmodevent(mod, type, data)
-	module_t mod;
-	int type;
-	void *data;
-{
-	int err;
-
-	switch (type) {
-	case MOD_LOAD:
-		stfunits->rm_type = RMAN_ARRAY;
-		stfunits->rm_descr = "configurable if_stf units";
-		err = rman_init(stfunits);
-		if (err != 0)
-			return (err);
-		err = rman_manage_region(stfunits, 0, STF_MAXUNIT);
-		if (err != 0) {
-			printf("%s: stfunits: rman_manage_region: Failed %d\n",
-			    STFNAME, err);
-			rman_fini(stfunits);
-			return (err);
-		}
-		LIST_INIT(&stf_softc_list);
-		if_clone_attach(&stf_cloner);
-
-		break;
-	case MOD_UNLOAD:
-		if_clone_detach(&stf_cloner);
-
-		while (!LIST_EMPTY(&stf_softc_list))
-			stf_clone_destroy(&LIST_FIRST(&stf_softc_list)->sc_if);
-
-		err = rman_fini(stfunits);
-		KASSERT(err == 0, ("Unexpected error freeing resource"));
-
-		break;
-	}
-
-	return (0);
-}
-
-static moduledata_t stf_mod = {
-	"if_stf",
-	stfmodevent,
-	0
-};
-#else
 void
 stfattach(dummy)
 #ifdef __FreeBSD__
@@ -433,14 +279,9 @@ stfattach(dummy)
 		LIST_INSERT_HEAD(&stf_softc_list, sc, sc_list);
 	}
 }
-#endif
 
 #ifdef __FreeBSD__
-#if __FreeBSD__ >= 4
-DECLARE_MODULE(if_stf, stf_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
-#else
 PSEUDO_SET(stfattach, if_stf);
-#endif
 #endif
 
 static int

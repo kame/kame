@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.h,v 1.30 2002/09/25 11:41:21 itojun Exp $	*/
+/*	$KAME: if_gif.h,v 1.31 2002/10/08 07:18:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,9 +64,6 @@ struct gif_softc {
 	} gifsc_gifscr;
 	const struct encaptab *encap_cookie4;
 	const struct encaptab *encap_cookie6;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-	struct resource *r_unit;	/* resource allocated for this unit */
-#endif
 	LIST_ENTRY(gif_softc) gif_list; /* all gif's are linked */
 
 	time_t rtcache_expire;	/* expiration time of the cached route */

@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.30 2002/10/07 05:33:30 itojun Exp $	*/
+/*	$KAME: if_faith.c,v 1.31 2002/10/08 07:18:09 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -75,12 +75,6 @@
 #if defined(__bsdi__) || defined(__NetBSD__)
 #include <machine/cpu.h>
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-#include <sys/types.h>
-#include <sys/malloc.h>
-#include <machine/bus.h>	/* XXX: Shouldn't really be required! */
-#include <sys/rman.h>
-#endif
 
 #include <net/if.h>
 #include <net/if_types.h>
@@ -114,17 +108,6 @@
 
 #include <net/net_osdep.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-#define FAITHNAME	"faith"
-#define FAITH_MAXUNIT	0x7fff	/* ifp->if_unit is only 15 bits */
-
-struct faith_softc {
-	struct ifnet sc_if;	/* must be first */
-	struct resource *r_unit;
-	LIST_ENTRY(faith_softc) sc_list;
-};
-#endif
-
 #if defined(__FreeBSD__) && __FreeBSD__ < 3
 static int faithioctl __P((struct ifnet *, int, caddr_t));
 #else
@@ -139,164 +122,15 @@ static void faithrtrequest __P((int, struct rtentry *, struct sockaddr *));
 #endif
 
 #if defined(__FreeBSD__)
-#if __FreeBSD__ >= 4
-static int faithprefix __P((struct in6_addr *));
-
-static int faithmodevent __P((module_t, int, void *));
-
-static MALLOC_DEFINE(M_FAITH, FAITHNAME, "Firewall Assisted Tunnel Interface");
-static struct rman faithunits[1];
-LIST_HEAD(, faith_softc) faith_softc_list;
-
-int   faith_clone_create __P((struct if_clone *, int *));
-void  faith_clone_destroy __P((struct ifnet *));
-
-struct if_clone faith_cloner =
-	IF_CLONE_INITIALIZER(FAITHNAME, faith_clone_create, faith_clone_destroy);
-#else
 void faithattach __P((void *));
 PSEUDO_SET(faithattach, if_faith);
-#endif
 #else
 void faithattach __P((int));
 #endif
 
-#if !defined(__FreeBSD__) || __FreeBSD__ < 4
 static struct ifnet faithif[NFAITH];
-#endif
 
 #define	FAITHMTU	1500
-
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-static int
-faithmodevent(mod, type, data)
-	module_t mod;
-	int type;
-	void *data;
-{
-	int i;
-	int err;
-
-	switch (type) {
-	case MOD_LOAD:
-		faithunits->rm_type = RMAN_ARRAY;
-		faithunits->rm_descr = "configurable if_faith units";
-		err = rman_init(faithunits);
-		if (err != 0)
-			return (err);
-		err = rman_manage_region(faithunits, 0, FAITH_MAXUNIT);
-		if (err != 0) {
-			printf("%s: faithunits: rman_manage_region: "
-			    "Failed %d\n", FAITHNAME, err);
-			rman_fini(faithunits);
-			return (err);
-		}
-		LIST_INIT(&faith_softc_list);
-		if_clone_attach(&faith_cloner);
-		for(i = 0; i < NFAITH; i ++) {
-			err = faith_clone_create(&faith_cloner, &i);
-			KASSERT(err == 0,
-			    ("Error creating initial faith interfaces"));
-		}
-
-#ifdef INET6
-		faithprefix_p = faithprefix;
-#endif
-
-		break;
-	case MOD_UNLOAD:
-#ifdef INET6
-		faithprefix_p = NULL;
-#endif
-
-		if_clone_detach(&faith_cloner);
-
-		while (!LIST_EMPTY(&faith_softc_list))
-			faith_clone_destroy(
-			    &LIST_FIRST(&faith_softc_list)->sc_if);
-
-		err = rman_fini(faithunits);
-		if (err != 0)
-			return (err);
-
-		break;
-	}
-	return 0;
-}
-
-static moduledata_t faith_mod = {
-	"if_faith",
-	faithmodevent,
-	0
-};
-
-DECLARE_MODULE(if_faith, faith_mod, SI_SUB_PSEUDO, SI_ORDER_ANY);
-MODULE_VERSION(if_faith, 1);
-
-int
-faith_clone_create(ifc, unit)
-	struct if_clone *ifc;
-	int *unit;
-{
-	struct resource *r;
-	struct faith_softc *sc;
-
-	if (*unit > FAITH_MAXUNIT)
-		return (ENXIO);
-
-	if (*unit < 0) {
-		r = rman_reserve_resource(faithunits, 0, FAITH_MAXUNIT, 1,
-		    RF_ALLOCATED | RF_ACTIVE, NULL);
-		if (r == NULL)
-			return (ENOSPC);
-		*unit = rman_get_start(r);
-	} else {
-		r = rman_reserve_resource(faithunits, *unit, *unit, 1,
-		    RF_ALLOCATED | RF_ACTIVE, NULL);
-		if (r == NULL)
-			return (ENOSPC);
-	}
-
-	sc = malloc(sizeof(struct faith_softc), M_FAITH, M_WAITOK);
-	bzero(sc, sizeof(struct faith_softc));
-
-	sc->sc_if.if_softc = sc;
-	sc->sc_if.if_name = FAITHNAME;
-	sc->sc_if.if_unit = *unit;
-	sc->r_unit = r;
-
-	sc->sc_if.if_mtu = FAITHMTU;
-	/* Change to BROADCAST experimentaly to announce its prefix. */
-	sc->sc_if.if_flags = /* IFF_LOOPBACK */ IFF_BROADCAST | IFF_MULTICAST;
-	sc->sc_if.if_ioctl = faithioctl;
-	sc->sc_if.if_output = faithoutput;
-	sc->sc_if.if_type = IFT_FAITH;
-	sc->sc_if.if_hdrlen = 0;
-	sc->sc_if.if_addrlen = 0;
-	sc->sc_if.if_snd.ifq_maxlen = ifqmaxlen;
-	if_attach(&sc->sc_if);
-	bpfattach(&sc->sc_if, DLT_NULL, sizeof(u_int));
-	LIST_INSERT_HEAD(&faith_softc_list, sc, sc_list);
-	return (0);
-}
-
-void
-faith_clone_destroy(ifp)
-	struct ifnet *ifp;
-{
-	int err;
-	struct faith_softc *sc = (void *) ifp;
-
-	LIST_REMOVE(sc, sc_list);
-	bpfdetach(ifp);
-	if_detach(ifp);
-
-	err = rman_release_resource(sc->r_unit);
-	KASSERT(err == 0, ("Unexpected error freeing resource"));
-
-	free(sc, M_FAITH);
-}
-#else	/*defined(__FreeBSD__) || __FreeBSD__ >= 4*/
 
 /* ARGSUSED */
 void
@@ -346,8 +180,6 @@ faithattach(faith)
 #endif
 	}
 }
-
-#endif	/*defined(__FreeBSD__) || __FreeBSD__ >= 4*/
 
 int
 faithoutput(ifp, m, dst, rt)
@@ -539,9 +371,6 @@ faithioctl(ifp, cmd, data)
  * XXX could be slow
  * XXX could be layer violation to call sys/net from sys/netinet6
  */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-static
-#endif
 int
 faithprefix(in6)
 	struct in6_addr *in6;
