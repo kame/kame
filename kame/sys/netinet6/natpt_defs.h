@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.36 2002/01/29 14:10:22 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.37 2002/01/31 13:43:09 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -246,9 +246,11 @@ struct mAddr					/* sizeof(): 60[byte]	*/
 
 /* Configuration slot entry						*/
 
-struct	cSlot					/* sizeof(): 140[byte]	*/
+struct	cSlot					/* sizeof(): 144[byte]	*/
 {
 	TAILQ_ENTRY(cSlot)	csl_list;
+
+	int		 rnum;		/* rule number			*/
 
 	u_char		 proto;
 #define	NATPT_ICMPV6		0x01

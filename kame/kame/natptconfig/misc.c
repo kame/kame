@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.23 2002/01/29 14:11:02 fujisawa Exp $	*/
+/*	$KAME: misc.c,v 1.24 2002/01/31 13:42:35 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -93,9 +93,11 @@ setRules(int type, struct ruletab *ruletab)
 
 	bzero(&mBox, sizeof(struct natpt_msgBox));
 	mBox.size = sizeof(struct cSlot);
-	f = (struct cSlot *)malloc(sizeof(struct cSlot));
-	bzero(f, sizeof(struct cSlot));
-	mBox.freight = (caddr_t)f;
+	mBox.freight = (caddr_t)malloc(sizeof(struct cSlot));
+	bzero(mBox.freight, sizeof(struct cSlot));
+
+	f = (struct cSlot *)mBox.freight;
+	f->rnum = ruletab->rnum;
 
 	switch (type) {
 	case NATPT_MAP64:

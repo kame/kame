@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.20 2002/01/18 06:26:54 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.21 2002/01/31 13:42:36 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -119,7 +119,6 @@ showRules(int all)
 {
 	const char *fn = __FUNCTION__;
 
-	int			 num = 0;
 	struct cSlot		 csl;
 	TAILQ_HEAD(,cSlot)	 csl_head;
 	char			 Wow[BUFSIZ];
@@ -137,11 +136,10 @@ showRules(int all)
 	readKvm(&csl, sizeof(struct cSlot), TAILQ_FIRST(&csl_head));
 	while (TRUE) {
 		makeCSlotLine(Wow, sizeof(Wow), &csl);
-		printf("%3d: %s\n", num, Wow);
+		printf("%5d: %s\n", csl.rnum, Wow);
 		if (TAILQ_NEXT(&csl, csl_list) == NULL)
 			break;
 		readKvm(&csl, sizeof(struct cSlot), TAILQ_NEXT(&csl, csl_list));
-		num++;
 	}
 }
 

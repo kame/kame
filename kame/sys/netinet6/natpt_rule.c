@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.39 2002/01/29 14:10:22 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.40 2002/01/31 13:43:09 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -335,7 +335,26 @@ natpt_setRules(caddr_t addr)
 	natpt_log(LOG_CSLOT, LOG_DEBUG, (void *)cst, sizeof(struct cSlot));
 
 	s = splnet();
-	TAILQ_INSERT_TAIL(&csl_head, cst, csl_list);
+	if (cst->rnum == 0) {
+		TAILQ_INSERT_HEAD(&csl_head, cst, csl_list);
+	} else if (cst->rnum < 0) {
+		TAILQ_INSERT_TAIL(&csl_head, cst, csl_list);
+	} else {
+		struct cSlot	*csl;
+
+		for (csl = TAILQ_FIRST(&csl_head);
+		     csl;
+		     csl = TAILQ_NEXT(csl, csl_list)) {
+			if ((csl->rnum < 0)
+			    || (cst->rnum < csl->rnum))
+				break;
+		}
+		if (csl == NULL) {
+			TAILQ_INSERT_TAIL(&csl_head, cst, csl_list);
+		} else {
+			TAILQ_INSERT_BEFORE(csl, cst, csl_list);
+		}
+	}
 	splx(s);
 
 	return (0);

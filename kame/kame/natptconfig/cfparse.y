@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.19 2002/01/18 06:26:54 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.20 2002/01/31 13:42:35 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -332,7 +332,15 @@ rules
 
 map
 		: SMAP
-		    { bzero(&ruletab, sizeof(struct ruletab)); }
+		    {
+			bzero(&ruletab, sizeof(struct ruletab));
+			ruletab.rnum = -1;
+		    }
+		| SMAP SDECIMAL
+		    {
+			bzero(&ruletab, sizeof(struct ruletab));
+			ruletab.rnum = $2;
+		    }
 		;
 
 
