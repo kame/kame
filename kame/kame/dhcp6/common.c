@@ -91,7 +91,7 @@ getifaddr(addr, ifnam, prefix, plen)
 	int error;
 
 	if (getifaddrs(&ifap) != 0) {
-		err(1, "getifaddrs");
+		err(1, "getifaddr: getifaddrs");
 		/*NOTREACHED*/
 	}
 
@@ -201,6 +201,39 @@ getifaddr(addr, ifnam, prefix, plen)
 	close(s);
 	return error;
 #endif
+}
+
+/* XXX: this code assumes getifaddrs(3) */
+char *
+getdev(addr)
+	struct sockaddr_in6 *addr;
+{
+	struct ifaddrs *ifap, *ifa;
+	struct sockaddr_in6 *a6;
+	static char ret_ifname[IF_NAMESIZE];
+
+	if (getifaddrs(&ifap) != 0) {
+		err(1, "getdev: getifaddrs");
+		/* NOTREACHED */
+	}
+
+	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr->sa_family != AF_INET6)
+			continue;
+
+		a6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+		if (!IN6_ARE_ADDR_EQUAL(&a6->sin6_addr, &addr->sin6_addr) ||
+		    a6->sin6_scope_id != addr->sin6_scope_id)
+			continue;
+
+		break;
+	}
+
+	if (ifa)
+		strncpy(ret_ifname, ifa->ifa_name, sizeof(ret_ifname));
+	freeifaddrs(ifap);
+
+	return(ifa ? ret_ifname : NULL);
 }
 
 int
