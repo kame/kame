@@ -1,4 +1,4 @@
-$Id: question,v 1.5 2000/01/10 21:16:49 sakane Exp $
+$Id: question,v 1.6 2000/01/10 22:35:01 itojun Exp $
 
 HOW DO I DO ?
 Q. ID payload handling in phase 2 besides IPSECDOI_ID_IP*.
@@ -40,3 +40,37 @@ Q. how many time is the notify message sent ?
 A. don't resend notify message because peer can use Acknowledged
    Informational if peer requires the reply of the notify message.
 
+Q. What kind of policy configuration is desired?
+   policy.conf makes sense in certain situations only, such as:
+   - we are the initiator, and trying to enforce certain configuration.
+
+   If we would like to talk with strangers (like IPsec-ready webserver, or
+   "IPsec with everyone" configuration), or need to move from place to place
+   (like IPsec-ready nomadic node), we need an ability to write "wildcard
+   policy entry" which matches situations/packets/whatever, and then install
+   non-wildcard policy entry into the kernel.
+   For example:
+   - policy.conf says 0.0.0.0/0 -> 0.0.0.0/0, protocol "any", type "use",
+     for "encrypt everything" configuration.
+   - phase 2 ID payload will be exchanged for real address we have, and the
+     peer has (a.b.c.d/32).  This is not the same as "0.0.0.0/0" configured
+     onto policy entry.
+   - with the current code, policy.conf and phase 2 ID does not match, and
+     it will fail.
+
+   If we are acting as responder, we will be making policy entry from phase 2
+   IDs.  Is it always okay to accept phase 2 IDs as is, into our kernel policy?
+   We'll need to have filtering rule, or mapping rules from phase 2 IDs to
+   kernel policy.
+   For example:
+   - we have 10.1.1.0/24 -> 10.1.2.0/24, protocol "any" in policy.conf.
+   - what happens if we get, as responder, 10.1.1.0/25 -> 10.1.2.0/25,
+     protocol "any"?  should we accept it as is, or should we respect our
+     configuration?
+     if we respect our configuration, 10.1.1.128/25 -> 10.1.2.128/25 traffic
+     will be encrypted from our side, and end up being dropped by the peer.
+   - what happens if we get, as responder, 10.1.1.0/24 -> 10.1.2.0/24,
+     protocol "tcp"?  should we accept it as is, or should we respect our
+     configuration?
+     if we respect our configuration, non-tcp traffic will be dropped on
+     the peer.
