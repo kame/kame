@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.160 2001/10/11 01:39:09 itojun Exp $	*/
+/*	$KAME: isakmp.c,v 1.161 2001/11/16 04:07:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1482,7 +1482,7 @@ isakmp_ph1resend(iph1)
 	plog(LLV_DEBUG, LOCATION, NULL,
 		"resend phase1 packet %s\n",
 		isakmp_pindex(&iph1->index, iph1->msgid));
-	SCHED_INIT(iph1->scr);
+	SCHED_KILL(iph1->scr);
 
 	if (isakmp_send(iph1, iph1->sendbuf) < 0)
 		return;
@@ -1518,7 +1518,7 @@ isakmp_ph2resend(iph2)
 	plog(LLV_DEBUG, LOCATION, NULL,
 		"resend phase2 packet %s\n",
 		isakmp_pindex(&iph2->ph1->index, iph2->msgid));
-	SCHED_INIT(iph2->scr);
+	SCHED_KILL(iph2->scr);
 
 	if (isakmp_send(iph2->ph1, iph2->sendbuf) < 0)
 		return;
@@ -1562,7 +1562,7 @@ isakmp_ph1expire(iph1)
 	racoon_free(src);
 	racoon_free(dst);
 
-	SCHED_INIT(iph1->sce);
+	SCHED_KILL(iph1->sce);
 
 	iph1->status = PHASE1ST_EXPIRED;
 
@@ -1592,7 +1592,7 @@ isakmp_ph1delete(iph1)
 {
 	char *src, *dst;
 
-	SCHED_INIT(iph1->sce);
+	SCHED_KILL(iph1->sce);
 
 	if (LIST_FIRST(&iph1->ph2tree) != NULL) {
 		iph1->sce = sched_new(1, isakmp_ph1delete_stub, iph1);
@@ -1635,7 +1635,7 @@ isakmp_ph2expire(iph2)
 {
 	char *src, *dst;
 
-	SCHED_INIT(iph2->sce);
+	SCHED_KILL(iph2->sce);
 
 	src = strdup(saddrwop2str(iph2->src));
 	dst = strdup(saddrwop2str(iph2->dst));
@@ -1666,7 +1666,7 @@ isakmp_ph2delete(iph2)
 {
 	char *src, *dst;
 
-	SCHED_INIT(iph2->sce);
+	SCHED_KILL(iph2->sce);
 
 	src = strdup(saddrwop2str(iph2->src));
 	dst = strdup(saddrwop2str(iph2->dst));

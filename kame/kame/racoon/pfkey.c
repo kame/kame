@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.132 2001/10/19 05:31:22 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.133 2001/11/16 04:07:41 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -738,7 +738,7 @@ pfkey_timeover(iph2)
 	plog(LLV_ERROR, LOCATION, NULL,
 		"%s give up to get IPsec-SA due to time up to wait.\n",
 		saddrwop2str(iph2->dst));
-	SCHED_INIT(iph2->sce);
+	SCHED_KILL(iph2->sce);
 
 	/* If initiator side, send error to kernel by SADB_ACQUIRE. */
 	if (iph2->side == INITIATOR)
