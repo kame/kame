@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.128 2001/07/18 11:20:09 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.129 2001/07/21 02:35:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -86,7 +86,7 @@ static void pfxrtr_add __P((struct nd_prefix *, struct nd_defrouter *));
 static void pfxrtr_del __P((struct nd_pfxrouter *));
 static struct nd_pfxrouter *find_pfxlist_reachable_router
 	__P((struct nd_prefix *));
-static void defrouter_delreq __P((void));
+static void defrouter_delreq __P((struct nd_defrouter *));
 static void defrouter_addifreq __P((struct ifnet *));
 static void nd6_rtmsg __P((int, struct rtentry *));
 
@@ -644,20 +644,25 @@ defrtrlist_del(dr)
  * not be called from anywhere else.
  */
 static void
-defrouter_delreq()
+defrouter_delreq(dr)
+	struct nd_defrouter *dr;
 {
-	struct sockaddr_in6 def, mask;
+	struct sockaddr_in6 def, mask, gw;
 	struct rtentry *oldrt = NULL;
 
 	Bzero(&def, sizeof(def));
 	Bzero(&mask, sizeof(mask));
+	Bzero(&gw, sizeof(gw));
 
-	def.sin6_len = mask.sin6_len = sizeof(struct sockaddr_in6);
-	def.sin6_family = mask.sin6_family = AF_INET6;
+	def.sin6_len = mask.sin6_len = gw.sin6_len =
+	    sizeof(struct sockaddr_in6);
+	def.sin6_family = mask.sin6_family = gw.sin6_family = AF_INET6;
+	if (dr)
+		gw.sin6_addr = dr->rtaddr;
 
-	rtrequest(RTM_DELETE, (struct sockaddr *)&def, NULL,
-		  (struct sockaddr *)&mask,
-		  RTF_GATEWAY, &oldrt);
+	rtrequest(RTM_DELETE, (struct sockaddr *)&def,
+	    dr ? (struct sockaddr *)&gw : NULL,
+	    (struct sockaddr *)&mask, RTF_GATEWAY, &oldrt);
 	if (oldrt) {
 		nd6_rtmsg(RTM_DELETE, oldrt);
 		if (oldrt->rt_refcnt <= 0) {
@@ -738,7 +743,7 @@ defrouter_select()
 		 * the head entry will be used anyway.
 		 * XXX: do we have to check the current routing table entry?
 		 */
-		defrouter_delreq();
+		defrouter_delreq(NULL);
 		defrouter_addreq(dr);
 	}
 	else {
@@ -757,7 +762,7 @@ defrouter_select()
 			 * De-install the current default route
 			 * in advance.
 			 */
-			defrouter_delreq();
+			defrouter_delreq(NULL);
 			if (nd6_defifp) {
 				/*
 				 * Install a route to the default interface
