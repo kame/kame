@@ -1,8 +1,30 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1601 2001/03/13 05:00:48 jinmei Exp $
+$KAME: CHANGELOG,v 1.1602 2001/03/15 08:40:12 jinmei Exp $
 
 <200103>
+2001-03-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_ifinit): always set nd6_rtrequest
+	to ifa_rtrequest.
+	* kame/sys/netinet6/nd6_rtr.c (nd6_prefix_onlink): because of the
+	above change, the function does not set the ifa_rtrequest
+	function.
+	* kame/sys/netinet6/in6.c (in6_ifloop_request): set the address
+	itself as gateway, and set the RTF_LLINFO flag to the
+	corresponding host route, so that the route would have the flag,
+	and thus applications (e.g. routing daemons) that assume
+	traditional kernel behavior would be happy.  Older versions made
+	the route to the node's own address like this:
+	2001:200::3ca2:ffef:eff5:f9fd ::1  UH lo0
+	However, since some routing daemons try to install kernel internal
+	routes that do not have the RTF_LLINFO flag, this kind of entry
+	could cause an intentional host route propagated.  The new kernel,
+	instead, installs
+	2001:200::c049:d099:ab4b:b637 0:a0:12:34:ab:cd UHL lo0
+	just like far older versions of the kernel, which installed the
+	host route as a cloned route from the corresponding interface
+	direct route.
+
 2001-03-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd2/ports/wu-ftpd: upgraded to wu-ftpd 2.6.1.  Since there
 	are security holes in older versions, upgrade is recommended.
