@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.310 2002/07/25 03:08:54 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.311 2002/07/28 01:29:41 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -234,11 +234,9 @@ draft-ietf-dnsext-mdns-03.txt: Multicast DNS
     * kame/mdnsd has test implementation, which will not be built in
       default compilation.  The draft will experience a major change in the
       near future, so don't rely upon it.
-draft-ietf-ipngwg-default-addr-select-07.txt:
-	Default Address Selection for IPv6
-	the selection algorithm for both source and destination addresses
-	is implemented based on the draft, though some rules are still
-	omitted.
+draft-ietf-ipv6-default-addr-select-08.txt: Default Address Selection for IPv6
+    * the selection algorithm for both source and destination addresses
+      is implemented based on the draft, though some rules are still omitted.
 draft-ietf-ipngwg-icmp-v3-02.txt: ICMPv6 for IPv6 specification (revised)
     * See 1.9 in this document for details.
 draft-ietf-vrrp-ipv6-spec-02.txt: Virtual Router Redundancy Protocol for IPv6
