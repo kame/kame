@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.31 2000/08/24 00:24:39 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.32 2000/08/24 11:03:48 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -148,7 +148,6 @@ eay_check_x509cert(cert, CApath)
     {
 	BIO *bio;
 
-	printf("%s\n", cert->v);
 	bio = BIO_new(BIO_s_mem());
 	if (bio == NULL)
 		goto end;
@@ -279,13 +278,74 @@ return NULL;
 }
 
 /*
- * decode a X509 certificate and make a readable text.
+ * decode a X509 certificate and make a readable text terminated '\n'.
+ * return the buffer allocated, so must free it later.
  */
-vchar_t *
+char *
 eay_get_x509text(cert)
 	vchar_t *cert;
 {
-return NULL;
+	X509 *x509 = NULL;
+	BIO *bio = NULL;
+	char *text = NULL;
+	u_char *bp = NULL;
+	int len = 0;
+	int error = -1;
+
+#ifndef EAYDEBUG
+    {
+	u_char *bp;
+
+	bp = cert->v;
+
+	x509 = d2i_X509(NULL, &bp, cert->l);
+    }
+#else
+    {
+	bio = BIO_new(BIO_s_mem());
+	if (bio == NULL)
+		goto end;
+	error = BIO_write(bio, cert->v, cert->l);
+	x509 = PEM_read_bio_X509(bio, NULL, NULL, NULL);
+	BIO_free(bio);
+	bio = NULL;
+    }
+#endif
+	if (x509 == NULL)
+		goto end;
+
+	bio = BIO_new(BIO_s_mem());
+	if (bio == NULL)
+		goto end;
+
+	error = X509_print(bio, x509);
+	if (error != 1) {
+		error = -1;
+		goto end;
+	}
+
+	len = BIO_get_mem_data(bio, &bp);
+	text = malloc(len);
+	if (text == NULL)
+		goto end;
+	memcpy(text, bp, len);
+
+	error = 0;
+
+    end:
+	if (error) {
+#ifndef EAYDEBUG
+		plog(logp, LOCATION, NULL, "%s\n", eay_strerror());
+#else
+		printf("%s\n", eay_strerror());
+#endif
+	}
+	if (bio)
+		BIO_free(bio);
+	if (x509)
+		X509_free(x509);
+
+	return text;
 }
 
 /*
