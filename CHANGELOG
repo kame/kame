@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1858 2001/09/02 20:33:15 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1859 2001/09/03 16:35:53 sumikawa Exp $
 
 <200109>
+Tue Sep  4 01:32:49 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd4/usr.sbin/ppp: import IPv6 supporting PPP from
+	  FreeBSD-current.
+
 2001-09-03 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_*.[ch]:
 	* freebsd4/usr.sbin/{natptconfig,natptd,natptlog}:
