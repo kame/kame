@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.36 2002/02/19 03:40:39 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.37 2002/02/22 02:40:14 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1018,7 +1018,7 @@ mip6_icmp6_ha_discov_req_output(sc)
 	 * the format of draft-13 has a home address field for the
 	 * sending mobile node.
 	 */
-	hdreq->ha_dreq_home = mpfx->mpfx_haddr;
+	hdreq->ha_dreq_home = mpfx->mpfx_haddr.sin6_addr;
 #endif /* MIP6_DRAFT13 */
 
 	/* calculate checksum for this DHAAD request packet. */
