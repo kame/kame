@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.4 2000/10/31 19:07:09 ume Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.30 2001/07/25 04:56:19 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.31 2001/07/25 05:08:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -282,7 +282,7 @@ udp6_input(mp, offp, proto)
 					    || last->in6p_socket->so_options & SO_TIMESTAMP)
 						ip6_savecontrol(last, ip6, n,
 								&opts, NULL);
-								
+
 					m_adj(n, off + sizeof(struct udphdr));
 					if (sbappendaddr(&last->in6p_socket->so_rcv,
 							(struct sockaddr *)&udp_in6,
