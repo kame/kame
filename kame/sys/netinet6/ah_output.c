@@ -1,4 +1,4 @@
-/*	$KAME: ah_output.c,v 1.36 2002/10/10 06:19:58 itojun Exp $	*/
+/*	$KAME: ah_output.c,v 1.37 2003/08/22 21:25:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -415,7 +415,7 @@ ah6_output(m, nexthdrp, md, isr)
 	/* fix plen */
 	if (m->m_pkthdr.len - sizeof(struct ip6_hdr) > IPV6_MAXPACKET) {
 		ipseclog((LOG_ERR,
-		    "ip6_output: AH with IPv6 jumbogram is not supported\n"));
+		    "ah6_output: AH with IPv6 jumbogram is not supported\n"));
 		m_freem(m);
 		return EINVAL;
 	}
