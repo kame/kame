@@ -1,7 +1,7 @@
 /*	$OpenBSD: ip_ipip.c,v 1.22 2001/12/06 20:14:53 angelos Exp $ */
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
- * Angelos D. Keromytis (kermit@csd.uch.gr) and 
+ * Angelos D. Keromytis (kermit@csd.uch.gr) and
  * Niels Provos (provos@physnet.uni-hamburg.de).
  *
  * The original version of this code was written by John Ioannidis
@@ -22,7 +22,7 @@
  * Permission to use, copy, and modify this software with or without fee
  * is hereby granted, provided that this entire notice is included in
  * all copies of any software which is or includes a copy or
- * modification of this software. 
+ * modification of this software.
  * You may use this code under the GNU public license if you so wish. Please
  * contribute changes back to the authors under this freer than GPL license
  * so that we may further the use of strong encryption without limitations to
@@ -88,7 +88,7 @@ struct ipipstat ipipstat;
 int
 ip4_input6(struct mbuf **m, int *offp, int proto)
 {
-	/* If we do not accept IPv4 explicitly, drop.  */
+	/* If we do not accept IP-in-IP explicitly, drop.  */
 	if (!ipip_allow && ((*m)->m_flags & (M_AUTH|M_CONF)) == 0) {
 		DPRINTF(("ip4_input6(): dropped due to policy\n"));
 		ipipstat.ipips_pdrops++;
@@ -111,7 +111,7 @@ ip4_input(struct mbuf *m, ...)
 	va_list ap;
 	int iphlen;
 
-	/* If we do not accept IPv4 explicitly, drop.  */
+	/* If we do not accept IP-in-IP explicitly, drop.  */
 	if (!ipip_allow && (m->m_flags & (M_AUTH|M_CONF)) == 0) {
 		DPRINTF(("ip4_input(): dropped due to policy\n"));
 		ipipstat.ipips_pdrops++;
@@ -130,7 +130,7 @@ ip4_input(struct mbuf *m, ...)
 /*
  * ipip_input gets called when we receive an IP{46} encapsulated packet,
  * either because we got it at a real interface, or because AH or ESP
- * were being used in tunnel mode (in which case the rcvif element will 
+ * were being used in tunnel mode (in which case the rcvif element will
  * contain the address of the encX interface associated with the tunnel.
  */
 
@@ -163,13 +163,13 @@ ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
 		hlen = sizeof(struct ip);
 		break;
 #endif /* INET */
-
-#ifdef INET6   
+#ifdef INET6
         case 6:
 		hlen = sizeof(struct ip6_hdr);
 		break;
 #endif
         default:
+		ipipstat.ipips_family++;
 		m_freem(m);
 		return /* EAFNOSUPPORT */;
 	}
@@ -195,15 +195,20 @@ ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
 #endif /* MROUTING */
 
 	/* Keep outer ecn field. */
+	switch (v >> 4) {
 #ifdef INET
-	if ((v >> 4) == 4)
+	case 4:
 		otos = ipo->ip_tos;
+		break;
 #endif /* INET */
-
 #ifdef INET6
-	if ((v >> 4) == 6)
+	case 6:
 		otos = (ntohl(mtod(m, struct ip6_hdr *)->ip6_flow) >> 20) & 0xff;
+		break;
 #endif
+	default:
+		panic("ipip_input: should never reach here");
+	}
 
 	/* Remove outer IP header */
 	m_adj(m, iphlen);
@@ -229,6 +234,10 @@ ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
 		hlen = sizeof(struct ip6_hdr);
 		break;
 #endif
+	default:
+		ipipstat.ipips_family++;
+		m_freem(m);
+		return; /* EAFNOSUPPORT */
 	}
 
 	/*
@@ -248,7 +257,7 @@ ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
 	 * this is as good as any a position.
 	 */
 
-	/* Some sanity checks in the inner IPv4 header */
+	/* Some sanity checks in the inner IP header */
 	switch (v >> 4) {
 #ifdef INET
     	case 4:
@@ -260,7 +269,6 @@ ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
 		}
                 break;
 #endif /* INET */
-
 #ifdef INET6
     	case 6:
                 ip6 = (struct ip6_hdr *) ipo;
@@ -274,6 +282,8 @@ ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
 		ip6->ip6_flow |= htonl((u_int32_t) itos << 20);
                 break;
 #endif
+	default:
+		panic("ipip_input: should never reach here");
 	}
 
 	/* Check for local address spoofing. */
@@ -320,38 +330,41 @@ ipip_input(struct mbuf *m, int iphlen, struct ifnet *gifp)
 			}
 		}
 	}
-    
+
 	/* Statistics */
 	ipipstat.ipips_ibytes += m->m_pkthdr.len - iphlen;
 
 	/*
 	 * Interface pointer stays the same; if no IPsec processing has
-	 * been done (or will be done), this will point to a normal 
+	 * been done (or will be done), this will point to a normal
 	 * interface. Otherwise, it'll point to an enc interface, which
 	 * will allow a packet filter to distinguish between secure and
 	 * untrusted packets.
 	 */
 
+	switch (v >> 4) {
 #ifdef INET
-	if (ipo) {
+	case 4:
 		ifq = &ipintrq;
 		isr = NETISR_IP;
-	}
-#endif /* INET */
-
+		break;
+#endif
 #ifdef INET6
-	if (ip6) {
+	case 6:
 		ifq = &ip6intrq;
 		isr = NETISR_IPV6;
+		break;
+#endif
+	default:
+		panic("ipip_input: should never reach here");
 	}
-#endif /* INET6 */
 
 #if NBPFILTER > 0
 	if (gifp && gifp->if_bpf) {
 		struct mbuf m0;
 		u_int af;
 
-		if (ipo)
+		if (ifq == &ipintrq)
 			af = AF_INET;
 		else
 			af = AF_INET6;
