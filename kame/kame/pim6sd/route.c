@@ -1,4 +1,4 @@
-/*	$KAME: route.c,v 1.22 2002/09/17 10:01:14 suz Exp $	*/
+/*	$KAME: route.c,v 1.23 2002/12/09 09:01:53 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -454,9 +454,12 @@ calc_oifs(mrtentry_ptr, oifs_ptr)
 
     /*
      * oifs = (((copied_outgoing + my_join) - my_prune) + my_leaves) -
-     * my_asserted_oifs - incoming_interface, i.e. `leaves` have higher
-     * priority than `prunes`, but lower priority than `asserted`. The
-     * incoming interface is always deleted from the oifs
+     * my_asserted_oifs, i.e. `leaves` have higher priority than `prunes`,
+     * but lower priority than `asserted`.
+     * The incoming interface will be deleted in k_chg_mfc() when
+     * routing entries are installed into kernel. (see 
+     * draft-ietf-pim-sm-v2-new-05.txt section 4.2 and the definitions of
+     * *_olist() macros.
      */
 
     if (mrtentry_ptr == (mrtentry_t *) NULL)
@@ -502,7 +505,6 @@ bypass_oif_inheritance:
     IF_MERGE(&oifs, &mrtentry_ptr->leaves, &oifs);
     IF_CLR_MASK(&oifs, &mrtentry_ptr->asserted_oifs);
 
-    IF_CLR(mrtentry_ptr->incoming, &oifs);
     IF_COPY(&oifs, oifs_ptr);
 }
 

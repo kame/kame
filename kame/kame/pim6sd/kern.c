@@ -1,4 +1,4 @@
-/*	$KAME: kern.c,v 1.10 2002/06/26 10:24:47 jinmei Exp $	*/
+/*	$KAME: kern.c,v 1.11 2002/12/09 09:01:52 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -334,6 +334,11 @@ k_chg_mfc(socket, source, group, iif, oifs, rp_addr)
 	else
 	    IF_CLR(vifi, &mc.mf6cc_ifset);
     }
+    /*
+     * draft-ietf-pim-sm-v2-new-05.txt section 4.2 mentions iif is removed
+     * at the packet forwarding phase
+     */
+    IF_CLR(mc.mf6cc_parent, &mc.mf6cc_ifset);
 
 #ifdef PIM_REG_KERNEL_ENCAP
     mc.mf6cc_rp_addr.s_addr = rp_addr;
