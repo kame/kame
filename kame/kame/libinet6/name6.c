@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.32 2001/11/09 00:55:13 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.33 2001/11/09 09:36:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1683,6 +1683,10 @@ _icmp_fqdn_query(const struct in6_addr *addr, int ifindex)
 	hc->hc_ifindex = ifindex;
 	hc->hc_addr = *addr;
 	hc->hc_name = strdup(name);
+	if (!hc->hc_name) {
+		free(hc);
+		return NULL;
+	}
 	hc->hc_next = hc_head;
 	hc_head = hc;
 	return hc->hc_name;
