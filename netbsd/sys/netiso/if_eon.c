@@ -71,6 +71,7 @@ SOFTWARE.
  */
 
 #include "opt_eon.h"
+#include "opt_ipsec.h"
 
 #ifdef EON
 #define NEON 1
@@ -441,6 +442,9 @@ send:
 	}
 #endif
 
+#ifdef IPSEC
+	m->m_pkthdr.rcvif = NULL;
+#endif
 	error = ip_output(m, (struct mbuf *) 0, ro, 0, NULL);
 	m = 0;
 	if (error) {

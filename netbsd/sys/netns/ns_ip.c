@@ -40,6 +40,7 @@
  */
 
 #include "opt_ns.h"			/* options NSIP */
+#include "opt_ipsec.h"
 
 #ifdef NSIP
 #include <sys/param.h>
@@ -326,6 +327,9 @@ nsipoutput(ifp, m, dst, rt)
 	/*
 	 * Output final datagram.
 	 */
+#ifdef IPSEC
+	m->m_pkthdr.rcvif = NULL;
+#endif
 	error =  (ip_output(m, (struct mbuf *)0, ro, SO_BROADCAST, NULL));
 	if (error) {
 		ifn->ifen_ifnet.if_oerrors++;
