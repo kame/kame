@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.250 2002/04/24 02:30:31 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.251 2002/05/02 12:12:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -865,10 +865,12 @@ nd6_purge(ifp)
 
 	/*
 	 * Reset the ND info so that the entry can be reinitialized for another
-	 * entry later.  Note that the basereachable member is used as a flag
-	 * to determine whether the structure should be initialized.
+	 * entry later.  It should be enough to zero-clear the "initialized"
+	 * member, but we clear the entire structure for safety.
 	 */
 	bzero(&nd_ifinfo[ifp->if_index], sizeof(struct nd_ifinfo));
+	/* the following is redundant, but make the intention clear */
+	ND.initialized = 0;
 }
 
 struct rtentry *
