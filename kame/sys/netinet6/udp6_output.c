@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.27 2001/05/21 09:55:10 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.28 2001/05/21 11:33:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -233,6 +233,7 @@ udp6_output(in6p, m, addr6, control)
 		}
 
 		if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
+			/* how about ::ffff:0.0.0.0 case? */
 			error = EISCONN;
 			goto release;
 		}
