@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.29 2000/12/12 18:03:22 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.30 2001/01/02 12:10:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -161,6 +161,15 @@
  *
  * - (m->m_flags & M_EXT) != 0 does *not* mean that the max data length of
  *   the mbuf == MCLBYTES.
+ *
+ * - ifa_refcnt (struct ifaddr) management (IFAREF/IFAFREE).
+ *	NetBSD 1.5: always use IFAREF whenever reference gets added.
+ *		always use IFAFREE whenever reference gets freed.
+ *		IFAFREE frees ifaddr when ifa_refcnt reaches 0.
+ *	others: do not increase refcnt for ifp->if_addrlist and in_ifaddr.
+ *		use IFAFREE once when ifaddr is disconnected from
+ *		ifp->if_addrlist and in_ifaddr.  IFAFREE frees ifaddr when
+ *		ifa_refcnt goes negative.
  */
 
 #ifndef __NET_NET_OSDEP_H_DEFINED_
