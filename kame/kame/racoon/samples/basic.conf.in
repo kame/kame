@@ -1,4 +1,4 @@
-# $Id: basic.conf.in,v 1.7 2000/02/16 04:02:56 sakane Exp $
+# $Id: basic.conf.in,v 1.8 2000/02/22 02:41:44 itojun Exp $
 
 # search this file for pre_shared_key with various ID key.
 path pre_shared_key "@sysconfdir_x@/racoon/psk.txt" ;
@@ -66,8 +66,10 @@ algorithm_strength {
 	}
 	isakmp_encryption {
 		extra_high nothing ;
-		high rc5, blowfish ;
-		normal cast128, 3des, des ;
+#		high rc5, blowfish ;
+#		normal cast128, 3des, des ;
+		high blowfish ;
+		normal 3des ;
 	}
 	isakmp_hash {
 		extra_high nothing ;
@@ -91,8 +93,10 @@ algorithm_strength {
 	}
 	ipsec_ipcomp {
 		extra_high nothing ;
-		high deflate, lzs ;
-		normal oui, deflate, lzs ;
+#		high deflate, lzs ;
+#		normal oui, deflate, lzs ;
+		high deflate ;
+		normal deflate ;
 	}
 }
 
