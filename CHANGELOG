@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.849 2000/05/04 04:11:13 itojun Exp $
+$Id: CHANGELOG,v 1.850 2000/05/05 07:00:23 itojun Exp $
 
 <200005>
+Fri May  5 15:59:21 JST 2000  itojun@iijlab.net
+	* kame/sys/netinet6/in6_ifattach.c: stabilize in6_ifdetach() again.
+	  previous code touched uninitialized pointers.
+	* openbsd/sys/net/if.c: cope with pcmcia card removal.
+
 Thu May  4 13:10:16 JST 2000  itojun@iijlab.net
 	* openbsd/lib/libinet6/getaddrinfo.c: translate resolver error codes
 	  in h_errno into getaddrinfo error code.  without this, EAI_FAIL
