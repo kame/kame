@@ -31,7 +31,7 @@ CPPFLAGS+= -I${.CURDIR} -DHAVE_SELECT
 .endif
 LDADD+=	-lutil
 DPADD+=	${LIBUTIL}
-.if (${OPSYS} != "NetBSD")
+.if (${OPSYS} != "NetBSD") && (${OPSYS} != "OpenBSD")
 MAN8=	faithd.8
 .else
 MAN=	faithd.8
