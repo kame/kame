@@ -420,6 +420,17 @@ udp_input(struct mbuf *m, ...)
 	    in_broadcast(ip->ip_dst, m->m_pkthdr.rcvif)) {
 #endif /* INET6 */
 		struct socket *last;
+		struct sockaddr_in6 srcsa2, dstsa2; /* only with addr info */
+		
+		bzero(&srcsa2, sizeof(srcsa2));
+		bzero(&dstsa2, sizeof(dstsa2));
+		srcsa2.sin6_family = dstsa2.sin6_family = AF_INET6;
+		srcsa2.sin6_len = dstsa2.sin6_len = sizeof(struct sockaddr_in6);
+		srcsa2.sin6_addr = srcsa.sin6_addr;
+		dstsa2.sin6_addr = dstsa.sin6_addr;
+		srcsa2.sin6_scope_id = srcsa.sin6_scope_id;
+		dstsa2.sin6_scope_id = dstsa.sin6_scope_id;
+
 		/*
 		 * Deliver a multicast or broadcast datagram to *all* sockets
 		 * for which the local and remote addresses and ports match
@@ -652,7 +663,7 @@ scan_ipv6:
 			for (imm = LIST_FIRST(&im6o->im6o_memberships);
 			     imm != NULL;
 			     imm = LIST_NEXT(imm, i6mm_chain)) {
-				if (SS_CMP(&imm->i6mm_maddr->in6m_sa, !=, &dstsa))
+				if (SS_CMP(&imm->i6mm_maddr->in6m_sa, !=, &dstsa2))
 					continue;
 				
 				msf = imm->i6mm_msf;
@@ -673,10 +684,10 @@ scan_ipv6:
 					goto search_block_list6;
 				
 				LIST_FOREACH(msfsrc, msf->msf_head, list) {
-					if (SS_CMP(&msfsrc->src, <, &srcsa)) {
+					if (SS_CMP(&msfsrc->src, <, &srcsa2)) {
 						continue;
 					}
-					if (SS_CMP(&msfsrc->src, >, &srcsa)) {
+					if (SS_CMP(&msfsrc->src, >, &srcsa2)) {
 						/* terminate search, as there
 						 * will be no match */
 						break;
@@ -693,10 +704,10 @@ scan_ipv6:
 				LIST_FOREACH(msfsrc, msf->msf_blkhead, list) {
 					if (msfsrc->src.ss_family != AF_INET6)
 						continue;
-					if (SS_CMP(&msfsrc->src, <, &srcsa)) {
+					if (SS_CMP(&msfsrc->src, <, &srcsa2)) {
 						continue;
 					}
-					if (SS_CMP(&msfsrc->src, ==, &srcsa)) {
+					if (SS_CMP(&msfsrc->src, ==, &srcsa2)) {
 						/* blocks since the src matched
 						 * with block list */
 						break;

@@ -870,6 +870,17 @@ udp6_realinput(af, src, dst, m, off)
 	if (IN6_IS_ADDR_MULTICAST(&dst->sin6_addr) ||
 	    (af == AF_INET && IN_MULTICAST(dst4->s_addr))) {
 		struct in6pcb *last;
+		struct sockaddr_in6 src2, dst2; /* only with addr info */
+		
+		bzero(&src2, sizeof(src2));
+		bzero(&dst2, sizeof(dst2));
+		src2.sin6_family = dst2.sin6_family = AF_INET6;
+		src2.sin6_len = dst2.sin6_len = sizeof(struct sockaddr_in6);
+		src2.sin6_addr = src->sin6_addr;
+		dst2.sin6_addr = dst->sin6_addr;
+		src2.sin6_scope_id = src->sin6_scope_id;
+		dst2.sin6_scope_id = dst->sin6_scope_id;
+
 		/*
 		 * Deliver a multicast or broadcast datagram to *all* sockets
 		 * for which the local and remote addresses and ports match
@@ -927,12 +938,14 @@ udp6_realinput(af, src, dst, m, off)
 			
 			/*
 			 * Receive multicast data which fits MSF condition.
+			 * In MSF comparison, we use src2/dst2 to ignore
+			 * port number information.
 			 */
 			im6o = in6p->in6p_moptions;
 			for (imm = LIST_FIRST(&im6o->im6o_memberships);
 			     imm != NULL;
 			     imm = LIST_NEXT(imm, i6mm_chain)) {
-				if (SS_CMP(&imm->i6mm_maddr->in6m_sa, !=, dst))
+				if (SS_CMP(&imm->i6mm_maddr->in6m_sa, !=, dst2))
 					continue;
 				
 				if (imm->i6mm_msf == NULL) {
@@ -957,9 +970,9 @@ udp6_realinput(af, src, dst, m, off)
 					     list) {
 					if (msfsrc->src.ss_family != AF_INET6)
 						continue;
-					if (SS_CMP(&msfsrc->src, <, src))
+					if (SS_CMP(&msfsrc->src, <, src2))
 						continue;
-					if (SS_CMP(&msfsrc->src, >, src)) {
+					if (SS_CMP(&msfsrc->src, >, src2)) {
 						/* terminate search, as there
 						 * will be no match */
 						break;
@@ -978,9 +991,9 @@ udp6_realinput(af, src, dst, m, off)
 					     list) {
 					if (msfsrc->src.ss_family != AF_INET6)
 						continue;
-					if (SS_CMP(&msfsrc->src, <, src))
+					if (SS_CMP(&msfsrc->src, <, src2))
 						continue;
-					if (SS_CMP(&msfsrc->src, ==, src)) {
+					if (SS_CMP(&msfsrc->src, ==, src2)) {
 						/* blocks since the src matched
 						 * with block list */
 						break;

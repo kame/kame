@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.412 2004/01/19 04:58:40 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.413 2004/01/20 00:07:56 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -5051,6 +5051,8 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 	struct sockaddr_storage *ss_src;
 {
 	int error = 0;
+	struct sockaddr_in6 *sin6_grp;
+	struct sockaddr_in6 *sin6_src;
 
 	switch (optname) {
 	case MCAST_JOIN_GROUP:
@@ -5069,7 +5071,18 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 			break;
 		}
 
-		bcopy(&greq->gr_group, ss_grp, greq->gr_group.ss_len);
+		/*
+		 * bcopy(greq->gr_group, ss_grp) should not be used here,
+		 * since all the fields other than address has to be cleared,
+		 * which are just regarded as a garbage in IPv6 multicast 
+		 * group management.
+		 */
+		sin6_grp = SIN6(ss_grp);
+		sin6_grp->sin6_addr = SIN6(&greq->gr_group)->sin6_addr;
+		sin6_grp->sin6_len = sizeof(*sin6_grp);
+		sin6_grp->sin6_family = AF_INET6;
+		sin6_grp->sin6_scope_id = SIN6(&greq->gr_group)->sin6_scope_id;
+
 		if (!SS_IS_ADDR_MULTICAST(ss_grp)) {
 			error = EINVAL;
 			break;
@@ -5078,7 +5091,7 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		/*
 		 * Get a pointer to the ifnet structure.
 		 */
-		error = in6_getmopt_ifargs(optname, ifp, SIN6(&ss_grp), greq->gr_interface);
+		error = in6_getmopt_ifargs(optname, ifp, sin6_grp, greq->gr_interface);
 
 		break;
 	    }
@@ -5103,13 +5116,28 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 			break;
 		}
 
-		bcopy(&gsreq->gsr_source, ss_src, gsreq->gsr_source.ss_len);
-		bcopy(&gsreq->gsr_group, ss_grp,  gsreq->gsr_group.ss_len);
-		if (!SS_IS_ADDR_MULTICAST(ss_grp) ||
-		    SS_IS_LOCAL_GROUP(ss_grp)) {
+		/*
+		 * bcopy(gsreq->gsr_XXX, ss_XXX) should not be used here,
+		 * since I have to clear all the fields other than address,
+		 * which are just regarded as a garbage in IPv6 multicast 
+		 * group management.
+		 */
+		sin6_src = SIN6(ss_src);
+		sin6_src->sin6_addr = SIN6(&gsreq->gsr_source)->sin6_addr;
+		sin6_src->sin6_len = sizeof(*sin6_src);
+		sin6_src->sin6_family = AF_INET6;
+		sin6_src->sin6_scope_id =SIN6(&gsreq->gsr_source)->sin6_scope_id;
+		sin6_grp = SIN6(ss_grp);
+		sin6_grp->sin6_addr = SIN6(&gsreq->gsr_group)->sin6_addr;
+		sin6_grp->sin6_len = sizeof(*sin6_grp);
+		sin6_grp->sin6_family = AF_INET6;
+		sin6_grp->sin6_scope_id =SIN6(&gsreq->gsr_group)->sin6_scope_id;
+
+		if (!SS_IS_ADDR_MULTICAST(&ss_grp) ||
+		    SS_IS_LOCAL_GROUP(&ss_grp)) {
 #ifdef MLDV2_DEBUG
 			printf("invalid group %s specified\n",
-			       ip6_sprintf(&SIN6(ss_grp)->sin6_addr));
+			       ip6_sprintf(&sin6_grp->sin6_addr));
 #endif
 			error = EINVAL;
 			break;
@@ -5118,13 +5146,13 @@ ip6_getmopt_sgaddr(m, optname, ifp, ss_grp, ss_src)
 		    SS_IS_ADDR_UNSPECIFIED(ss_src)) {
 #ifdef MLDV2_DEBUG
 			printf("invalid source %s specified\n",
-			       ip6_sprintf(&SIN6(&ss_src)->sin6_addr));
+			       ip6_sprintf(&sin6_src->sin6_addr));
 #endif
 			error = EINVAL;
 			break;
 		}
 
-		error = in6_getmopt_ifargs(optname, ifp, SIN6(&ss_grp),
+		error = in6_getmopt_ifargs(optname, ifp, sin6_grp,
 					   gsreq->gsr_interface);
 
 		break;

@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.13 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.68 2003/12/22 05:14:28 suz Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.69 2004/01/20 00:07:56 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -235,6 +235,16 @@ udp6_input(mp, offp, proto)
 
 	if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
 		struct	inpcb *last;
+		struct	sockaddr_in6 fromsa2, tosa2; /* only with addr info */
+		
+		bzero(&fromsa2, sizeof(fromsa2));
+		bzero(&tosa2, sizeof(tosa2));
+		fromsa2.sin6_family = tosa2.sin6_family = AF_INET6;
+		fromsa2.sin6_len = tosa2.sin6_len = sizeof(struct sockaddr_in6);
+		fromsa2.sin6_addr = fromsa.sin6_addr;
+		tosa2.sin6_addr = tosa.sin6_addr;
+		fromsa2.sin6_scope_id = fromsa.sin6_scope_id;
+		tosa2.sin6_scope_id = tosa.sin6_scope_id;
 
 		/*
 		 * Deliver a multicast datagram to all sockets
@@ -360,6 +370,8 @@ udp6_input(mp, offp, proto)
 #endif /* IPSEC */
 			/*
 			 * Receive multicast data which fits MSF condition.
+			 * In MSF comparison, we use from/tosa2 to ignore
+			 * port number information.
 			 */
 			if ((im6o = in6p->in6p_moptions) == NULL)
 				continue;
@@ -368,7 +380,7 @@ udp6_input(mp, offp, proto)
 			     imm = LIST_NEXT(imm, i6mm_chain)) {
 
 				if (SS_CMP(&imm->i6mm_maddr->in6m_sa,
-				    !=, &tosa))
+				    !=, &tosa2))
 					continue;
 
 				msf = imm->i6mm_msf;
@@ -392,9 +404,9 @@ udp6_input(mp, offp, proto)
 				LIST_FOREACH(msfsrc, msf->msf_head, list) {
 					if (msfsrc->src.ss_family != AF_INET6)
 						continue;
-					if (SS_CMP(&msfsrc->src, <, &fromsa))
+					if (SS_CMP(&msfsrc->src, <, &fromsa2))
 						continue;
-					if (SS_CMP(&msfsrc->src, >, &fromsa)) {
+					if (SS_CMP(&msfsrc->src, >, &fromsa2)) {
 						/* terminate search, as there
 						 * will be no match */
 						break;
@@ -411,9 +423,9 @@ udp6_input(mp, offp, proto)
 				LIST_FOREACH(msfsrc, msf->msf_blkhead, list) {
 					if (msfsrc->src.ss_family != AF_INET6)
 						continue;
-					if (SS_CMP(&msfsrc->src, <, &fromsa))
+					if (SS_CMP(&msfsrc->src, <, &fromsa2))
 						continue;
-					if (SS_CMP(&msfsrc->src, >, &fromsa)) {
+					if (SS_CMP(&msfsrc->src, >, &fromsa2)) {
 						/* blocks since the src matched
 						 * with block list */
 						break;
