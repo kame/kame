@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.30 2002/09/01 05:58:03 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.31 2002/09/04 06:05:36 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1093,6 +1093,9 @@ contiguousfail:
 		mbu = mip6_bu_list_find_home_registration(&hif->hif_bu_list,
 							  src_sa);
 		if (!mbu)
+			goto done;
+
+		if (IN6_IS_ADDR_UNSPECIFIED(&mbu->mbu_paddr.sin6_addr))
 			goto done;
 
 		M_PREPEND(m, sizeof(struct ip6_hdr), M_DONTWAIT);
