@@ -1,4 +1,4 @@
-/*	$KAME: sctp_input.h,v 1.4 2003/11/25 06:40:53 ono Exp $	*/
+/*	$KAME: sctp_input.h,v 1.5 2004/08/17 04:06:17 itojun Exp $	*/
 
 #ifndef __sctp_input_h__
 #define __sctp_input_h__
@@ -32,10 +32,13 @@
  * SUCH DAMAGE.
  */
 
-#ifdef _KERNEL
-int sctp_common_input_processing(struct sctp_inpcb *, struct sctp_tcb *,
-	struct sctp_nets *, struct sctphdr *, struct sctp_chunkhdr *,
-	struct mbuf **, int, int, int, u_int8_t);
-void sctp_process_unrecog_param(struct sctp_tcb *, struct sctp_paramhdr *);
+#if defined(_KERNEL) || defined(KERNEL)
+int sctp_common_input_processing(struct mbuf **, int, int, int,
+    struct sctphdr *, struct sctp_chunkhdr *, struct sctp_inpcb *,
+    struct sctp_tcb *, struct sctp_nets *, u_int8_t);
+
+void sctp_handle_stream_reset(struct sctp_stream_reset_req *sr,
+     struct sctp_tcb *stcb);
+
 #endif
 #endif

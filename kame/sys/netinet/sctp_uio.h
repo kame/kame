@@ -1,10 +1,10 @@
-/*	$KAME: sctp_uio.h,v 1.9 2003/11/25 06:40:54 ono Exp $	*/
+/*	$KAME: sctp_uio.h,v 1.10 2004/08/17 04:06:20 itojun Exp $	*/
 
 #ifndef __sctp_uio_h__
 #define __sctp_uio_h__
 
 /*
- * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,6 +35,7 @@
  * SUCH DAMAGE.
  */
 #include <sys/types.h>
+#include <sys/socket.h>
 
 typedef caddr_t sctp_assoc_t;
 
@@ -48,6 +49,7 @@ struct sctp_event_subscribe {
 	u_int8_t sctp_shutdown_event;
 	u_int8_t sctp_partial_delivery_event;
 	u_int8_t sctp_adaption_layer_event;
+	u_int8_t sctp_stream_reset_events;
 };
 
 /* ancillary data types */
@@ -58,8 +60,8 @@ struct sctp_event_subscribe {
  * ancillary data structures
  */
 struct sctp_initmsg {
-	u_int16_t sinit_num_ostreams;
-	u_int16_t sinit_max_instreams;
+	u_int32_t sinit_num_ostreams;
+	u_int32_t sinit_max_instreams;
 	u_int16_t sinit_max_attempts;
 	u_int16_t sinit_max_init_timeo;
 };
@@ -99,10 +101,20 @@ struct sctp_pcbinfo {
 	u_int32_t mbuf_track;
 };
 
+struct sctp_sockstat {
+	sctp_assoc_t ss_assoc_id;
+	u_int32_t ss_total_sndbuf;
+	u_int32_t ss_total_mbuf_sndbuf;
+	u_int32_t ss_total_recv_buf;
+};
 
 /*
  * notification event structures
  */
+
+
+/* association change events */
+
 struct sctp_assoc_change {
 	u_int16_t sac_type;
 	u_int16_t sac_flags;
@@ -113,13 +125,8 @@ struct sctp_assoc_change {
 	u_int16_t sac_inbound_streams;
 	sctp_assoc_t sac_assoc_id;
 };
-struct sctp_sockstat {
-	sctp_assoc_t ss_assoc_id;
-	u_int32_t ss_total_sndbuf;
-	u_int32_t ss_total_mbuf_sndbuf;
-	u_int32_t ss_total_recv_buf;
-};
 /* sac_state values */
+
 #define SCTP_COMM_UP		0x0001
 #define SCTP_COMM_LOST		0x0002
 #define SCTP_RESTART		0x0003
@@ -127,6 +134,7 @@ struct sctp_sockstat {
 #define SCTP_CANT_STR_ASSOC	0x0005
 
 
+/* Address events */
 struct sctp_paddr_change {
 	u_int16_t spc_type;
 	u_int16_t spc_flags;
@@ -148,16 +156,31 @@ struct sctp_paddr_change {
  * CAUTION: these are user exposed SCTP addr reachability states
  *          must be compatible with SCTP_ADDR states in sctp_constants.h
  */
-#ifndef SCTP_ACTIVE
+#ifdef SCTP_ACTIVE
+#undef SCTP_ACTIVE
+#endif
 #define SCTP_ACTIVE		0x0001	/* SCTP_ADDR_REACHABLE */
-#endif
-#ifndef SCTP_INACTIVE
-#define SCTP_INACTIVE		0x0002	/* SCTP_ADDR_NOT_REACHABLE */
-#endif
-#ifdef SCTP_UNCONFIRMED
-#define SCTP_UNCONFIRMED	0x0200
-#endif
 
+#ifdef SCTP_INACTIVE
+#undef SCTP_INACTIVE
+#endif
+#define SCTP_INACTIVE		0x0002	/* SCTP_ADDR_NOT_REACHABLE */
+
+
+#ifdef SCTP_UNCONFIRMED
+#undef SCTP_UNCONFIRMED
+#endif
+#define SCTP_UNCONFIRMED	0x0200  /* SCTP_ADDR_UNCONFIRMED */
+
+#ifdef SCTP_NOHEARTBEAT
+#undef SCTP_NOHEARTBEAT
+#endif
+#define SCTP_NOHEARTBEAT        0x0040 /* SCTP_ADDR_NOHB */
+
+
+
+
+/* remote error events */
 struct sctp_remote_error {
 	u_int16_t sre_type;
 	u_int16_t sre_flags;
@@ -167,6 +190,7 @@ struct sctp_remote_error {
 	u_int8_t  sre_data[4];
 };
 
+/* data send failure event */
 struct sctp_send_failed {
 	u_int16_t ssf_type;
 	u_int16_t ssf_flags;
@@ -176,11 +200,12 @@ struct sctp_send_failed {
 	sctp_assoc_t ssf_assoc_id;
 	u_int8_t ssf_data[4];
 };
+
 /* flag that indicates state of data */
 #define SCTP_DATA_UNSENT	0x0001	/* inqueue never on wire */
 #define SCTP_DATA_SENT		0x0002	/* on wire at failure */
 
-
+/* shutdown event */
 struct sctp_shutdown_event {
 	u_int16_t	sse_type;
 	u_int16_t	sse_flags;
@@ -188,7 +213,7 @@ struct sctp_shutdown_event {
 	sctp_assoc_t	sse_assoc_id;
 };
 
-
+/* Adaption layer indication stuff */
 struct sctp_adaption_event {
 	u_int16_t	sai_type;
 	u_int16_t	sai_flags;
@@ -201,6 +226,7 @@ struct sctp_setadaption {
 	u_int32_t	ssb_adaption_ind;
 };
 
+/* pdapi indications */
 struct sctp_pdapi_event {
 	u_int16_t	pdapi_type;
 	u_int16_t	pdapi_flags;
@@ -209,8 +235,24 @@ struct sctp_pdapi_event {
 	sctp_assoc_t	pdapi_assoc_id;
 };
 
-/* pdapi indications */
+
 #define SCTP_PARTIAL_DELIVERY_ABORTED	0x0001
+
+/* stream reset stuff */
+
+struct sctp_stream_reset_event {
+	u_int16_t	strreset_type;
+	u_int16_t	strreset_flags;
+	u_int32_t	strreset_length;
+	sctp_assoc_t    strreset_assoc_id;
+	u_int16_t       strreset_list[0];
+};
+
+/* flags in strreset_flags filed */
+#define SCTP_STRRESET_INBOUND_STR  0x0001
+#define SCTP_STRRESET_OUTBOUND_STR 0x0002
+#define SCTP_STRRESET_ALL_STREAMS  0x0004
+#define SCTP_STRRESET_STREAM_LIST  0x0008
 
 
 /* notification types */
@@ -221,6 +263,9 @@ struct sctp_pdapi_event {
 #define SCTP_SHUTDOWN_EVENT		0x0005
 #define SCTP_ADAPTION_INDICATION	0x0006
 #define SCTP_PARTIAL_DELIVERY_EVENT	0x0007
+#define SCTP_STREAM_RESET_EVENT         0x0008
+
+
 
 struct sctp_tlv {
 	u_int16_t sn_type;
@@ -239,6 +284,7 @@ union sctp_notification {
 	struct sctp_shutdown_event sn_shutdown_event;
 	struct sctp_adaption_event sn_adaption_event;
 	struct sctp_pdapi_event sn_pdapi_event;
+	struct sctp_stream_reset_event sn_strreset_event;
 };
 
 /*
@@ -331,6 +377,33 @@ struct sctp_blk_args {
 	u_int16_t stream_qcnt;		/* chnk cnt */
 };
 
+/*
+ * Max we can reset in one setting, note this is dictated not by the 
+ * define but the size of a mbuf cluster so don't change this define
+ * and think you can specify more. You must do multiple resets if you
+ * want to reset more than SCTP_MAX_EXPLICIT_STR_RESET.
+ */
+#define SCTP_MAX_EXPLICT_STR_RESET   1000 
+
+#define SCTP_RESET_LOCAL_RECV  0x0001
+#define SCTP_RESET_LOCAL_SEND  0x0002
+#define SCTP_RESET_BOTH        0x0003
+
+struct sctp_stream_reset {
+	sctp_assoc_t strrst_assoc_id;
+	u_int16_t    strrst_flags;
+	u_int16_t    strrst_num_streams;	/* 0 == ALL */
+	u_int16_t    strrst_list[0];		/* list if strrst_num_streams is not 0*/
+};
+
+
+struct sctp_get_nonce_values {
+	sctp_assoc_t gn_assoc_id;
+	u_int32_t    gn_peers_tag;
+	u_int32_t    gn_local_tag;
+};
+
+/* Debugging logs */
 struct sctp_str_log{
 	u_int32_t n_tsn;
 	u_int32_t e_tsn;
@@ -376,7 +449,7 @@ struct sctp_cwnd_log_req{
 /*
  * API system calls
  */
-#ifndef _KERNEL
+#if !(defined(_KERNEL) || (defined(__APPLE__) && defined(KERNEL)))
 
 __BEGIN_DECLS
 int	sctp_peeloff	__P((int, sctp_assoc_t));
@@ -387,15 +460,18 @@ void	sctp_freepaddrs	__P((struct sockaddr *));
 int	sctp_getladdrs	__P((int, sctp_assoc_t, struct sockaddr **));
 void	sctp_freeladdrs	__P((struct sockaddr *));
 int     sctp_opt_info   __P((int, sctp_assoc_t, int, void *, size_t *));
-int     sctp_sendmsg    __P((int, void *, size_t, struct sockaddr *,
-	socklen_t, uint32_t, uint32_t, uint16_t, uint32_t, uint32_t));
+
+int     sctp_sendmsg    __P((int, const void *, size_t,
+	const struct sockaddr *,
+	socklen_t, u_int32_t, u_int32_t, u_int16_t, u_int32_t, u_int32_t));
+
+ssize_t sctp_send       __P((int sd, const void *msg, size_t len,
+	const struct sctp_sndrcvinfo *sinfo,int flags));
+
 ssize_t sctp_recvmsg	__P((int, void *, size_t, struct sockaddr *,
         socklen_t *, struct sctp_sndrcvinfo *, int *));
 
 __END_DECLS
 
-
-
 #endif /* !_KERNEL */
-
 #endif /* !__sctp_uio_h__ */

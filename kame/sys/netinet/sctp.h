@@ -1,4 +1,5 @@
-/*	$KAME: sctp.h,v 1.16 2004/02/24 21:52:26 itojun Exp $	*/
+/*	$KAME: sctp.h,v 1.17 2004/08/17 04:06:15 itojun Exp $	*/
+/* added comment for commit test */
 
 #ifndef _NETINET_SCTP_H_
 #define _NETINET_SCTP_H_
@@ -130,12 +131,25 @@ struct sctp_paramhdr {
 #define SCTP_MAXBURST			0x0000001c
 #define SCTP_GET_STAT_LOG		0x0000001d
 #define SCTP_CONNECT_X			0x0000001e	/* hidden opt for connectx */
-/* Test/debug get a route */
+#define SCTP_RESET_STREAMS		0x0000001f
+
+/* Things for the AUTH draft possibly */
+#define SCTP_PEER_PUBLIC_KEY            0x00000020  /* get the peers public key */
+#define SCTP_MY_PUBLIC_KEY              0x00000021  /* get/set my endpoints public key */
+#define SCTP_SET_AUTH_SECRET            0x00000022  /* get/set my shared secret */
+#define SCTP_SET_AUTH_CHUNKS            0x00000023  /* specify what chunks you want authenticated,
+						     * the system may have additional requirments 
+						     * as well. I.e. probably ASCONF/ASCONF-ACK no matter
+						     * if you want it or not.
+						     */
+/* Other debug items */
+#define SCTP_GET_NONCE_VALUES           0x00000024
+
 
 /* Debug things that need to be purged */
-#define SCTP_SET_INITIAL_DBG_SEQ	0x0000001f
-#define SCTP_RESET_PEGS                 0x00000020
-#define SCTP_CLR_STAT_LOG               0x00000021
+#define SCTP_SET_INITIAL_DBG_SEQ	0x00001f00
+#define SCTP_RESET_PEGS                 0x00002000
+#define SCTP_CLR_STAT_LOG               0x00002100
 
 /*
  * user state values
@@ -221,6 +235,7 @@ struct sctp_error_unrecognized_chunk {
 #define HAVE_SCTP_SAT_NETWORK_CAPABILITY1
 #define HAVE_SCTP_MULTIBUF              1
 #define HAVE_SCTP_NOCONNECT             0
+#define HAVE_SCTP_ECN_NONCE             1  /* ECN Nonce option */
 
 #include <netinet/sctp_uio.h>
 

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_peeloff.c,v 1.11 2004/05/26 10:08:01 itojun Exp $	*/
+/*	$KAME: sctp_peeloff.c,v 1.12 2004/08/17 04:06:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -28,18 +28,20 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#ifndef __OpenBSD__
+#if !(defined(__OpenBSD__) || defined(__APPLE__))
 #include "opt_ipsec.h"
 #endif
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__)
 #include "opt_inet6.h"
 #include "opt_inet.h"
 #endif
-#ifdef __NetBSD__
+#if defined(__NetBSD__)
 #include "opt_inet.h"
 #endif
 
-#ifndef __OpenBSD__
+#ifdef __APPLE__
+#include <sctp.h>
+#elif !defined(__OpenBSD__)
 #include "opt_sctp.h"
 #endif
 
@@ -97,13 +99,13 @@ sctp_can_peel_off(struct socket *head, caddr_t assoc_id)
 {
 #ifdef SCTP_TCP_MODEL_SUPPORT
 	struct sctp_inpcb *inp;
-	struct sctp_tcb *tcb;
+	struct sctp_tcb *stcb;
 	inp = (struct sctp_inpcb *)head->so_pcb;
 	if (inp == NULL) {
 		return (EFAULT);
 	}
-	tcb = sctp_findassociation_ep_asocid(inp, assoc_id);
-	if (tcb == NULL) {
+	stcb = sctp_findassociation_ep_asocid(inp, assoc_id);
+	if (stcb == NULL) {
 		return (ENOTCONN);
 	}
 	/* We are clear to peel this one off */
@@ -119,7 +121,7 @@ sctp_get_peeloff(struct socket *head, caddr_t assoc_id, int *error)
 #ifdef SCTP_TCP_MODEL_SUPPORT
 	struct socket *newso;
 	struct sctp_inpcb *inp, *n_inp;
-	struct sctp_tcb *tcb;
+	struct sctp_tcb *stcb;
 
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PEEL1) {
@@ -132,8 +134,8 @@ sctp_get_peeloff(struct socket *head, caddr_t assoc_id, int *error)
 		*error = EFAULT;
 		return (NULL);
 	}
-	tcb = sctp_findassociation_ep_asocid(inp, assoc_id);
-	if (tcb == NULL) {
+	stcb = sctp_findassociation_ep_asocid(inp, assoc_id);
+	if (stcb == NULL) {
 		*error = ENOTCONN;
 		return (NULL);
 	}
@@ -158,7 +160,7 @@ sctp_get_peeloff(struct socket *head, caddr_t assoc_id, int *error)
 	newso->so_state &= ~SS_NBIO;
 	newso->so_state |= SS_ISCONNECTED;
 	/* We remove it right away */
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 	TAILQ_REMOVE(&head->so_comp, newso, so_list);
 	head->so_qlen--;
 #else
@@ -173,15 +175,15 @@ sctp_get_peeloff(struct socket *head, caddr_t assoc_id, int *error)
 #endif /* __FreeBSD__ */
 	/*
 	 * Now we must move it from one hash table to another and get
-	 * the tcb in the right place.
+	 * the stcb in the right place.
 	 */
-	sctp_move_pcb_and_assoc(inp, n_inp, tcb);
+	sctp_move_pcb_and_assoc(inp, n_inp, stcb);
 	/* 
 	 * And now the final hack. We move data in the 
 	 * pending side i.e. head to the new socket
 	 * buffer. Let the GRUBBING begin :-0
 	 */
-	sctp_grub_through_socket_buffer(inp,head,newso,tcb);
+	sctp_grub_through_socket_buffer(inp, head, newso, stcb);
 	return (newso);
 #else
 	/* We don't support this without the TCP model */

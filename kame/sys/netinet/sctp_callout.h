@@ -1,4 +1,4 @@
-/*	$KAME: sctp_callout.h,v 1.6 2004/02/24 21:52:26 itojun Exp $	*/
+/*	$KAME: sctp_callout.h,v 1.7 2004/08/17 04:06:16 itojun Exp $	*/
 
 #ifndef __SCTP_CALLOUT__
 #define __SCTP_CALLOUT__
@@ -44,7 +44,6 @@ struct callout {
 #define SCTP_TICKS_PER_FASTTIMO 20		/* we get called about */
                                                 /* every 20ms */
 
-
 TAILQ_HEAD(calloutlist, callout);
 
 #define	CALLOUT_ACTIVE		0x0002 /* callout is currently active */
@@ -55,7 +54,7 @@ TAILQ_HEAD(calloutlist, callout);
 #define	callout_deactivate(c)	((c)->c_flags &= ~CALLOUT_ACTIVE)
 void	callout_init __P((struct callout *));
 #define	callout_pending(c)	((c)->c_flags & CALLOUT_PENDING)
+
 void	callout_reset __P((struct callout *, int, void (*)(void *), void *));
 int	callout_stop __P((struct callout *));
-
 #endif

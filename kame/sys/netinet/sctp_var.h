@@ -1,4 +1,4 @@
-/*	$KAME: sctp_var.h,v 1.20 2004/05/26 10:08:01 itojun Exp $	*/
+/*	$KAME: sctp_var.h,v 1.21 2004/08/17 04:06:21 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -41,56 +41,74 @@
 
 /* SCTP Kernel structures */
 
-
 /*
  * Names for SCTP sysctl objects
  */
 #define	SCTPCTL_MAXDGRAM	1	/* max datagram size */
 #define	SCTPCTL_RECVSPACE	2	/* default receive buffer space */
 #define SCTPCTL_AUTOASCONF      3       /* auto asconf enable/disable flag */
-#define SCTPCTL_MAXID		3
+#define SCTPCTL_ECN_ENABLE      4	/* Is ecn allowed */
+#define SCTPCTL_ECN_NONCE       5       /* Is ecn nonce allowed */
+#define SCTPCTL_STRICT_SACK     6	/* strictly require sack'd TSN's to be 
+					 * smaller than sndnxt.
+					 */
+#define SCTPCTL_NOCSUM_LO       7       /* Require that the Loopback NOT have
+					 * the crc32 checksum on packets routed over
+					 * it.
+					 */
+#define SCTPCTL_STRICT_INIT     8
+#define SCTPCTL_PEER_CHK_OH     9
+#define SCTPCTL_MAXBURST        10
+#define SCTPCTL_MAXCHUNKONQ     11
+#define SCTPCTL_MAXID		12
 
 #define SCTPCTL_NAMES { \
 	{ 0, 0 }, \
 	{ "maxdgram", CTLTYPE_INT }, \
 	{ "recvspace", CTLTYPE_INT }, \
 	{ "autoasconf", CTLTYPE_INT }, \
+	{ "ecn_enable", CTLTYPE_INT }, \
+	{ "ecn_nonce", CTLTYPE_INT }, \
+	{ "strict_sack", CTLTYPE_INT }, \
+	{ "looback_nocsum", CTLTYPE_INT }, \
+	{ "strict_init", CTLTYPE_INT }, \
+	{ "peer_chkoh", CTLTYPE_INT }, \
+	{ "maxburst", CTLTYPE_INT }, \
+	{ "maxchunks", CTLTYPE_INT }, \
 }
 
+#if defined(_KERNEL) || (defined(__APPLE__) && defined(KERNEL))
 
-#ifdef _KERNEL
-
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 SYSCTL_DECL(_net_inet_sctp);
 extern struct	pr_usrreqs sctp_usrreqs;
-
-#else /* to __FreeBSD__ */
-
-#ifdef __NetBSD__
+#elif defined(__NetBSD__)
 int sctp_usrreq __P((struct socket *, int, struct mbuf *, struct mbuf *,
 		      struct mbuf *, struct proc *));
-#else /* to __NetBSD__ */
+#else
 int sctp_usrreq __P((struct socket *, int, struct mbuf *, struct mbuf *,
 		      struct mbuf *));
-#endif /* __NetBSD__/else */
-
-#endif /* __FreeBSD__ */
-
+#endif
 
 #define	sctp_sbspace(sb) ((long) (((sb)->sb_hiwat > (sb)->sb_cc) ? ((sb)->sb_hiwat - (sb)->sb_cc) : 0))
 
+#define sctp_sbspace_sub(a,b) ((a > b) ? (a - b) : 0)
+
 extern int	sctp_sendspace;
 extern int	sctp_recvspace;
+extern int      sctp_ecn;
+extern int      sctp_ecn_nonce;
 
 struct sctp_nets;
 struct sctp_inpcb;
 struct sctp_tcb;
 struct sctphdr;
 
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__)
 void sctp_fasttim(void);
 #endif
-#ifdef __FreeBSD__
+
+#if defined(__FreeBSD__) || defined(__APPLE__)
 void	sctp_ctlinput __P((int, struct sockaddr *, void *));
 int	sctp_ctloutput __P((struct socket *, struct sockopt *));
 void	sctp_input __P((struct mbuf *, int));
@@ -98,19 +116,18 @@ void	sctp_input __P((struct mbuf *, int));
 void*	sctp_ctlinput __P((int, struct sockaddr *, void *));
 int	sctp_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 void	sctp_input __P((struct mbuf *, ... ));
-#endif /* __FreeBSD__ */
-
+#endif
+void	sctp_drain __P((void));
 void	sctp_init __P((void));
 int	sctp_shutdown __P((struct socket *));
-
 void	sctp_notify __P((struct sctp_inpcb *, int, struct sctphdr *,
 			 struct sockaddr *, struct sctp_tcb *,
 			 struct sctp_nets *));
-
 int sctp_usr_recvd __P((struct socket *, int));
 
-
+#if defined(INET6)
 void ip_2_ip6_hdr __P((struct ip6_hdr *, struct ip *));
+#endif
 
 int sctp_bindx(struct socket *, int, struct sockaddr_storage *,
 	int, int, struct proc *);
@@ -119,7 +136,7 @@ int sctp_bindx(struct socket *, int, struct sockaddr_storage *,
 int sctp_peeloff(struct socket *, struct socket *, int, caddr_t, int *);
 
 int sctp_ingetaddr(struct socket *,
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 		   struct sockaddr **
 #else
 		   struct mbuf *
@@ -127,7 +144,7 @@ int sctp_ingetaddr(struct socket *,
 );
 
 int sctp_peeraddr(struct socket *,
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 		  struct sockaddr **
 #else
 		  struct mbuf *
@@ -140,17 +157,39 @@ int sctp_listen(struct socket *, struct thread *);
 int sctp_listen(struct socket *, struct proc *);
 #endif
 
-int sctp_accept(struct socket *,
-#ifdef __FreeBSD__
-		struct sockaddr **
+#if defined(__FreeBSD__) || defined(__APPLE__)
+int sctp_accept(struct socket *, struct sockaddr **);
 #else
-		struct sockaddr *
+int sctp_accept(struct socket *, struct mbuf *);
 #endif
-);
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-int	 sctp_sysctl(int *, u_int, void *, size_t *, void *, size_t);
+int sctp_sysctl(int *, u_int, void *, size_t *, void *, size_t);
 #endif
+
+/*
+ * compatibility defines for OpenBSD, Apple
+ */
+
+/* map callout into timeout for OpenBSD */
+#ifdef __OpenBSD__
+#define callout_init(args)
+#define callout_reset(c, ticks, func, arg) \
+{ \
+	timeout_set(c, func, arg); \
+	timeout_add(c, ticks); \
+}
+#define callout_stop(c) timeout_del(c)
+#define callout_pending(c) timeout_pending(c)
+#define callout_active(c) timeout_initialized(c)
+#endif
+
+/* XXX: Temporary until I convert fix OpenBSD and move to newer defs */
+#if defined(__OpenBSD__)
+#define if_addrhead	if_addrlist
+#define if_link		if_list
+#define ifa_link	ifa_list
+#endif /* __OpenBSD__ */
 
 #endif /* _KERNEL */
 

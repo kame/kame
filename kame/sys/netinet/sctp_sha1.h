@@ -1,9 +1,9 @@
-/*	$KAME: sctp_sha1.h,v 1.4 2002/10/09 18:01:22 itojun Exp $	*/
+/*	$KAME: sctp_sha1.h,v 1.5 2004/08/17 04:06:19 itojun Exp $	*/
 
 #ifndef __SCTP_SLA1_h__
 #define __SCTP_SLA1_h__
 /*
- * Copyright (c) 2001, 2002 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2004 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -75,7 +75,7 @@ struct sha1_context {
 #define H3INIT 0x10325476
 #define H4INIT 0xc3d2e1f0
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || (defined(__APPLE__) && defined(KERNEL))
 
 void SHA1_Init(struct sha1_context *);
 void SHA1_Process(struct sha1_context *, unsigned char *, int);

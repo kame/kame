@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.h,v 1.17 2004/05/26 10:08:01 itojun Exp $	*/
+/*	$KAME: sctp_pcb.h,v 1.18 2004/08/17 04:06:19 itojun Exp $	*/
 
 #ifndef __sctp_pcb_h__
 #define __sctp_pcb_h__
@@ -35,13 +35,6 @@
  * SUCH DAMAGE.
  */
 
-#ifdef __OpenBSD__
-#include <netinet/sctp_callout.h>
-#else
-#include <sys/callout.h>
-#endif
-#include <netinet/sctp.h>
-#include <netinet/sctp_constants.h>
 /*
  * We must have V6 so the size of the proto can be calculated. Otherwise
  * we would not allocate enough for Net/Open BSD :-<
@@ -49,11 +42,13 @@
 #if defined(__FreeBSD__) && __FreeBSD_version > 500000
 #include <net/pfil.h>
 #endif
+#include <net/if.h>
+#include <net/if_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/ip6protosw.h>
 #include <netinet6/in6_var.h>
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__) 
 #include <netinet/in_pcb.h>
 #else
 #include <netinet6/in6_pcb.h>
@@ -65,6 +60,8 @@
 #endif
 #endif
 
+#include <netinet/sctp.h>
+#include <netinet/sctp_constants.h>
 
 LIST_HEAD(sctppcbhead, sctp_inpcb);
 LIST_HEAD(sctpasochead, sctp_tcb);
@@ -86,7 +83,7 @@ LIST_HEAD(sctpvtaghead, sctp_tagblock);
 #define SCTP_PCB_FLAGS_DO_ASCONF	0x00000020
 #define SCTP_PCB_FLAGS_AUTO_ASCONF	0x00000040
 /* socket options */
-#define SCTP_PCB_FLAGS_NODELAY		0x00000100 /* Does not do anything */
+#define SCTP_PCB_FLAGS_NODELAY		0x00000100
 #define SCTP_PCB_FLAGS_AUTOCLOSE	0x00000200
 #define SCTP_PCB_FLAGS_RECVDATAIOEVNT	0x00000400
 #define SCTP_PCB_FLAGS_RECVASSOCEVNT	0x00000800
@@ -96,24 +93,26 @@ LIST_HEAD(sctpvtaghead, sctp_tagblock);
 #define SCTP_PCB_FLAGS_RECVSHUTDOWNEVNT	0x00008000
 #define SCTP_PCB_FLAGS_ADAPTIONEVNT	0x00010000
 #define SCTP_PCB_FLAGS_PDAPIEVNT	0x00020000
-#define SCTP_PCB_FLAGS_NO_FRAGMENT	0x00040000
+#define SCTP_PCB_FLAGS_STREAM_RESETEVNT 0x00040000
+#define SCTP_PCB_FLAGS_NO_FRAGMENT	0x00080000
 /* TCP model support */
-#define SCTP_PCB_FLAGS_CONNECTED	0x00080000
-#define SCTP_PCB_FLAGS_IN_TCPPOOL	0x00100000
-#define SCTP_PCB_FLAGS_DONT_WAKE	0x00200000
-#define SCTP_PCB_FLAGS_WAKEOUTPUT	0x00400000
-#define SCTP_PCB_FLAGS_WAKEINPUT	0x00800000
-#define SCTP_PCB_FLAGS_BOUND_V6		0x01000000
-#define SCTP_PCB_FLAGS_NEEDS_MAPPED_V4	0x02000000
-#define SCTP_PCB_FLAGS_BLOCKING_IO	0x04000000
-#define SCTP_PCB_FLAGS_SOCKET_GONE	0x08000000
-#define SCTP_PCB_FLAGS_SOCKET_ALLGONE	0x10000000
+#define SCTP_PCB_FLAGS_CONNECTED	0x00100000
+#define SCTP_PCB_FLAGS_IN_TCPPOOL	0x00200000
+#define SCTP_PCB_FLAGS_DONT_WAKE	0x00400000
+#define SCTP_PCB_FLAGS_WAKEOUTPUT	0x00800000
+#define SCTP_PCB_FLAGS_WAKEINPUT	0x01000000
+#define SCTP_PCB_FLAGS_BOUND_V6		0x02000000
+#define SCTP_PCB_FLAGS_NEEDS_MAPPED_V4	0x04000000
+#define SCTP_PCB_FLAGS_BLOCKING_IO	0x08000000
+#define SCTP_PCB_FLAGS_SOCKET_GONE	0x10000000
+#define SCTP_PCB_FLAGS_SOCKET_ALLGONE	0x20000000
 
 /* flags to copy to new PCB */
 #define SCTP_PCB_COPY_FLAGS		0x0707ff64
 
-#define SCTP_PCBHASH_ALLADDR(port, mask) (port & mask)
+#define SCTP_IS_FLAG_SET(var, flag)	((var & flag) == flag))
 
+#define SCTP_PCBHASH_ALLADDR(port, mask) (port & mask)
 #define SCTP_PCBHASH_ASOC(tag, mask) (tag & mask)
 
 struct sctp_laddr {
@@ -122,8 +121,8 @@ struct sctp_laddr {
 };
 
 struct sctp_timewait {
-	u_int32_t tv_sec_at_expire;	/* the seconds from boot to expire */
-	u_int32_t v_tag;		/* the vtag that can not be reused */
+	uint32_t tv_sec_at_expire;	/* the seconds from boot to expire */
+	uint32_t v_tag;		/* the vtag that can not be reused */
 };
 
 struct sctp_tagblock {
@@ -155,12 +154,12 @@ struct sctp_epinfo {
 	struct sctppcbhead *sctp_tcpephash;
 	u_long hashtcpmark;
 #endif /* SCTP_TCP_MODEL_SUPPORT */
-	u_int32_t hashtblsize;
+	uint32_t hashtblsize;
 
 	struct sctppcbhead listhead;
 
 	/* ep zone info */
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 #if __FreeBSD_version >= 500000
 	struct uma_zone *ipi_zone_ep;
 	struct uma_zone *ipi_zone_asoc;
@@ -217,16 +216,16 @@ struct sctp_epinfo {
 	struct calloutlist callqueue;
 #endif /* _SCTP_NEEDS_CALLOUT_ */
 
-	u_int32_t mbuf_track;
+	uint32_t mbuf_track;
 
 	/* for port allocations */
-	u_short lastport;
-	u_short lastlow;
-	u_short lasthi;
+	uint16_t lastport;
+	uint16_t lastlow;
+	uint16_t lasthi;
 
 };
 
-extern u_int32_t sctp_pegs[SCTP_NUMBER_OF_PEGS];
+extern uint32_t sctp_pegs[SCTP_NUMBER_OF_PEGS];
 /*
  * Here we have all the relevant information for each SCTP entity created.
  * We will need to modify this as approprate. We also need to figure out
@@ -249,21 +248,21 @@ struct sctp_pcb {
 
 	/* various thresholds */
 	/* Max times I will init at a guy */
-	u_short max_init_times;
+	uint16_t max_init_times;
 
 	/* Max times I will send before we consider someone dead */
-	u_short max_send_times;
+	uint16_t max_send_times;
 
-	u_short def_net_failure;
+	uint16_t def_net_failure;
 
 	/* number of streams to pre-open on a association */
-	u_short pre_open_stream_count;
-	u_short max_open_streams_intome;
+	uint16_t pre_open_stream_count;
+	uint16_t max_open_streams_intome;
 
 	/* random number generator */
-	unsigned int random_counter;
-	unsigned char random_numbers[SCTP_SIGNATURE_ALOC_SIZE];
-	unsigned char random_store[SCTP_SIGNATURE_ALOC_SIZE];
+	uint32_t random_counter;
+	uint8_t random_numbers[SCTP_SIGNATURE_ALOC_SIZE];
+	uint8_t random_store[SCTP_SIGNATURE_ALOC_SIZE];
 
 	/*
 	 * This timer is kept running per endpoint.  When it fires it
@@ -273,10 +272,10 @@ struct sctp_pcb {
 	int def_cookie_life;
 	/* defaults to 0 */
 	int auto_close_time;
-	u_int32_t initial_sequence_debug;
-	u_int32_t adaption_layer_indicator;
+	uint32_t initial_sequence_debug;
+	uint32_t adaption_layer_indicator;
 	char store_at;
-	u_int8_t max_burst;
+	uint8_t max_burst;
 	char current_secret_number;
 	char last_secret_number;
 };
@@ -328,13 +327,13 @@ struct sctp_inpcb {
 	void *sctp_tcb_at_block;
 	int  error_on_block;
 	int32_t sctp_frag_point;
-	u_int32_t sctp_vtag_last;
-	struct mbuf *pkt,*pkt_last;
+	uint32_t sctp_vtag_last;
+	struct mbuf *pkt, *pkt_last, *sb_last_mpkt;
 	struct mbuf *control;
 #ifndef SCTP_VTAG_TIMEWAIT_PER_STACK
 	struct sctpvtaghead vtag_timewait[SCTP_NUMBER_IN_VTAG_BLOCK];
 #endif
-#ifndef __FreeBSD__
+#if !(defined(__FreeBSD__) || defined(__APPLE__))
 #ifndef INP_IPV6
 #define INP_IPV6	0x1
 #endif
@@ -366,8 +365,9 @@ struct sctp_socket_q_list {
 
 
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || (defined(__APPLE__) && defined(KERNEL))
 
+extern struct sctp_epinfo sctppcbinfo;
 extern int sctp_auto_asconf;
 
 int SCTP6_ARE_ADDR_EQUAL(struct in6_addr *a, struct in6_addr *b);
@@ -384,8 +384,9 @@ int sctp_inpcb_bind(struct socket *, struct sockaddr *, struct thread *);
 int sctp_inpcb_bind(struct socket *, struct sockaddr *, struct proc *);
 #endif
 
-struct sctp_tcb *sctp_findassociation_addr(struct mbuf *, int,
-	struct sctp_inpcb **, struct sctp_nets **, uint32_t vtag);
+struct sctp_tcb *sctp_findassociation_addr(struct mbuf *, int, int,
+    struct sctphdr *, struct sctp_chunkhdr *, struct sctp_inpcb **,
+    struct sctp_nets **);
 
 struct sctp_tcb *sctp_findassociation_addr_sa(struct sockaddr *,
 	struct sockaddr *, struct sctp_inpcb **, struct sctp_nets **, int);
@@ -407,6 +408,9 @@ struct sctp_tcb *sctp_findassociation_ep_addr(struct sctp_inpcb **,
 
 struct sctp_tcb *sctp_findassociation_ep_asocid(struct sctp_inpcb *, caddr_t);
 
+struct sctp_tcb *sctp_findassociation_ep_asconf(struct mbuf *, int, int,
+    struct sctphdr *, struct sctp_inpcb **, struct sctp_nets **);
+    
 int sctp_inpcb_alloc(struct socket *);
 
 
@@ -446,19 +450,24 @@ int sctp_del_local_addr_assoc(struct sctp_tcb *, struct ifaddr *);
 int sctp_del_local_addr_assoc_sa(struct sctp_tcb *, struct sockaddr *);
 
 int sctp_load_addresses_from_init(struct sctp_tcb *, struct mbuf *, int, int,
-	struct sockaddr *, int);
+    int, struct sctphdr *, struct sockaddr *);
 
-int sctp_set_primary_addr(struct sctp_tcb *, struct sockaddr *);
+int sctp_set_primary_addr(struct sctp_tcb *, struct sockaddr *, struct sctp_nets *);
 
-int sctp_is_vtag_good(struct sctp_inpcb *, u_int32_t, struct timeval *);
+int sctp_is_vtag_good(struct sctp_inpcb *, uint32_t, struct timeval *);
 
-void sctp_drain(void);
+/*void sctp_drain(void);*/
 
 int sctp_destination_is_reachable(struct sctp_tcb *, struct sockaddr *);
 
 int sctp_add_to_socket_q(struct sctp_inpcb *, struct sctp_tcb *);
 
 struct sctp_tcb *sctp_remove_from_socket_q(struct sctp_inpcb *);
+
+#if defined(__APPLE__)
+void	sctp_callout_alloc(struct sctp_timer *);
+void	sctp_callout_free(struct callout *);
+#endif
 
 #endif /* _KERNEL */
 #endif /* !__sctp_pcb_h__ */

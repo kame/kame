@@ -1,4 +1,4 @@
-/*	$KAME: sctp_header.h,v 1.12 2004/02/24 21:52:26 itojun Exp $	*/
+/*	$KAME: sctp_header.h,v 1.13 2004/08/17 04:06:16 itojun Exp $	*/
 
 #ifndef __sctp_header_h__
 #define __sctp_header_h__
@@ -35,6 +35,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/time.h>
 #include <netinet/sctp.h>
 #include <netinet/sctp_constants.h>
 
@@ -67,6 +68,11 @@ struct sctp_host_name_param {
 struct sctp_supported_addr_param {
 	struct sctp_paramhdr ph;	/* type=SCTP_SUPPORTED_ADDRTYPE */
 	u_int16_t addr_type[1];		/* array of supported address types */
+};
+
+/* ECN parameter */
+struct sctp_ecn_supported_param {
+	struct sctp_paramhdr ph;	/* type=SCTP_ECN_CAPABLE */
 };
 
 
@@ -108,6 +114,16 @@ struct sctp_asconf_addrv4_param {		/* an ASCONF address (v4) parameter */
 };
 
 
+/* ECN Nonce: draft-ladha-sctp-ecn-nonce */
+struct sctp_ecn_nonce_supported_param {
+	struct sctp_paramhdr ph;	/* type = 0x8001  len = 4 */
+};
+
+struct sctp_supported_chunk_types_param {
+	struct sctp_paramhdr ph;	/* type = 0x8002  len = x */
+	u_int8_t chunk_types[0];
+};
+
 /*
  * Structures for DATA chunks
  */
@@ -140,6 +156,7 @@ struct sctp_init {
 
 /* state cookie header */
 struct sctp_state_cookie {		/* this is our definition... */
+	u_int8_t  identification[16];	/* id of who we are */
 	u_int32_t cookie_life;		/* life I will award this cookie */
 	u_int32_t tie_tag_my_vtag;	/* my tag in old association */
 	u_int32_t tie_tag_peer_vtag;	/* peers tag in old association */
@@ -303,8 +320,6 @@ struct sctp_shutdown_complete_chunk {
 
 /* Oper error holding a stale cookie */
 struct sctp_stale_cookie_msg {
-	struct sctphdr sh;
-	struct sctp_chunkhdr ch;
 	struct sctp_paramhdr ph;	/* really an error cause */
 	u_int32_t time_usec;
 };
@@ -318,7 +333,6 @@ struct sctp_cookie_while_shutting_down {
 	struct sctphdr sh;
 	struct sctp_chunkhdr ch;
 	struct sctp_paramhdr ph;	/* really an error cause */
-
 };
 
 struct sctp_shutdown_complete_msg {
@@ -371,13 +385,54 @@ struct sctp_chunk_desc {
 };
 
 
-struct sctp_packet_drop {
+struct sctp_pktdrop_chunk {
 	struct sctp_chunkhdr ch;
 	u_int32_t bottle_bw;
 	u_int32_t current_onq;
 	u_int16_t trunc_len;
 	u_int16_t reserved;
 	u_int8_t data[0];
+};
+
+#define SCTP_RESET_YOUR  0x01   /* reset your streams and send response */
+#define SCTP_RESET_ALL   0x02   /* reset all of your streams */
+#define SCTP_RECIPRICAL  0x04   /* reset my streams too */
+
+struct sctp_stream_reset_request {
+	u_int8_t reset_flags;		   /* actual request */
+	u_int8_t reset_pad[3];
+	u_int32_t reset_req_seq;           /* monotonically increasing seq no */
+	u_int16_t list_of_streams[0];      /* if not all list of streams */
+};
+
+#define SCTP_RESET_PERFORMED        0x01   /* Peers sending str was reset */
+#define SCTP_RESET_DENIED           0x02   /* Asked for but refused       */
+
+struct sctp_stream_reset_response {
+	u_int8_t reset_flags;		   /* actual request */
+	u_int8_t reset_pad[3];
+	u_int32_t reset_req_seq_resp;   /* copied from reset_req reset_req_seq */
+	u_int32_t reset_at_tsn;		/* resetters next TSN to be assigned send wise */
+	u_int32_t cumulative_tsn;	/* resetters cum-ack point receive wise */
+	u_int16_t list_of_streams[0];   /* if not all list of streams */
+};
+
+/* convience structures, note that if you
+ * are making a request for specific streams 
+ * then the request will need to be an overlay
+ * structure.
+ */
+
+struct sctp_stream_reset_req {
+	struct sctp_chunkhdr ch;
+	struct sctp_paramhdr ph;
+	struct sctp_stream_reset_request sr_req;
+};
+
+struct sctp_stream_reset_resp {
+	struct sctp_chunkhdr ch;
+	struct sctp_paramhdr ph;
+	struct sctp_stream_reset_response sr_resp;
 };
 
 

@@ -1,7 +1,7 @@
-/*	$KAME: sctp6_var.h,v 1.6 2003/11/25 06:40:55 ono Exp $	*/
+/*	$KAME: sctp6_var.h,v 1.7 2004/08/17 04:06:22 itojun Exp $	*/
 
 /*
- * Copyright (c) 2001, 2002 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2004 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,9 +34,9 @@
 #ifndef _NETINET6_SCTP6_VAR_H_
 #define _NETINET6_SCTP6_VAR_H_
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || (defined(__APPLE__) && defined(KERNEL))
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || (__APPLE__)
 SYSCTL_DECL(_net_inet6_sctp6);
 extern struct pr_usrreqs sctp6_usrreqs;
 int	sctp6_ctloutput __P((struct socket *, struct sockopt *));
@@ -48,11 +48,14 @@ int	sctp6_usrreq __P((struct socket *, int, struct mbuf *, struct mbuf *,
 #else
 int	sctp6_usrreq __P((struct socket *, int, struct mbuf *, struct mbuf *,
 			   struct mbuf *));
-#endif /* __NetBSD */
-#endif /* __FreeBSD */
+#endif /* __NetBSD__ || __OpenBSD__ */
+#endif /* __FreeBSD__ */
 
+#if defined(__APPLE__)
+int	sctp6_input __P((struct mbuf **, int *));
+#else
 int	sctp6_input __P((struct mbuf **, int *, int));
-
+#endif
 int	sctp6_output __P((struct sctp_inpcb *, struct mbuf *, struct sockaddr *,
 	struct mbuf *, struct proc *));
 void	sctp6_ctlinput __P((int, struct sockaddr *, void *));

@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.h,v 1.13 2004/02/24 21:52:27 itojun Exp $	*/
+/*	$KAME: sctputil.h,v 1.14 2004/08/17 04:06:21 itojun Exp $	*/
 
 #ifndef __sctputil_h__
 #define __sctputil_h__
@@ -32,7 +32,112 @@
  * SUCH DAMAGE.
  */
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || (defined(__APPLE__) && defined(KERNEL))
+
+#ifdef SCTP_MBUF_DEBUG
+#define sctp_m_freem(m) do { \
+    printf("m_freem(%x) m->nxtpkt:%x at %d\n", \
+	   (u_int)m, m->m_next, __LINE__); \
+    m_freem(m); \
+} while (0);
+#else
+#define sctp_m_freem m_freem
+#endif
+
+#ifdef __APPLE__
+struct mbuf *sctp_m_copym(struct mbuf *m, int off, int len, int wait);
+#else
+#define sctp_m_copym	m_copym
+#endif /* __APPLE__ */
+
+/*
+ * Zone(pool) allocation routines: MUST be defined for each OS
+ * zone = zone/pool pointer
+ * name = string name of the zone/pool
+ * size = size of each zone/pool element
+ * number = number of elements in zone/pool
+ */
+#if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+#include <vm/uma.h>
+#else
+#include <vm/vm_zone.h>
+#endif
+#elif defined(__NetBSD__) || defined(__OpenBSD__)
+#include <sys/pool.h>
+#endif
+
+/* SCTP_ZONE_INIT: initialize the zone */
+#if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+#define UMA_ZFLAG_FULL	0x0020
+#define SCTP_ZONE_INIT(zone, name, size, number) { \
+	zone = uma_zcreate(name, size, NULL, NULL, NULL, NULL, UMA_ALIGN_PTR,
+		UMA_ZFLAG_FULL); \
+	uma_zone_set_max(zone, number); \
+}
+#else
+#define SCTP_ZONE_INIT(zone, name, size, number) \
+	zone = zinit(name, size, number, ZONE_INTERRUPT, 0);
+#endif
+#elif defined(__APPLE__)
+#define SCTP_ZONE_INIT(zone, name, size, number) \
+	zone = (void *)zinit(size, number * size, number, name);
+#elif defined(__OpenBSD__) || defined(__NetBSD__)
+#define SCTP_ZONE_INIT(zone, name, size, number) \
+	pool_init(&(zone), size, 0, 0, 0, name, NULL);
+#else
+	/* don't know this OS! */
+	force_comile_error;
+#endif
+
+/* SCTP_ZONE_GET: allocate element from the zone */
+#if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+#define SCTP_ZONE_GET(zone) \
+	uma_zalloc(zone, M_NOWAIT);
+#else
+#define SCTP_ZONE_GET(zone) \
+	zalloci(zone);
+#endif
+#elif defined(__APPLE__)
+#define SCTP_ZONE_GET(zone) \
+	zalloc(zone);
+#elif defined(__NetBSD__) || defined(__OpenBSD__)
+#define SCTP_ZONE_GET(zone) \
+	pool_get(&zone, PR_NOWAIT);
+#else
+	/* don't know this OS! */
+	force_comile_error;
+#endif
+
+/* SCTP_ZONE_FREE: free element from the zone */
+#if defined(__FreeBSD__)
+#if __FreeBSD_version >= 500000
+#define SCTP_ZONE_FREE(zone, element) \
+	uma_zfree(zone, element);
+#else
+#define SCTP_ZONE_FREE(zone, element) \
+	zfreei(zone, element);
+#endif
+#elif defined(__APPLE__)
+#define SCTP_ZONE_FREE(zone, element) \
+	zfree(zone, element);
+#elif defined(__NetBSD__) || defined(__OpenBSD__)
+#define SCTP_ZONE_FREE(zone, element) \
+	pool_put(&zone, element);
+#else
+	/* don't know this OS! */
+	force_comile_error;
+#endif
+
+#define sctp_get_associd(stcb) ((sctp_assoc_t)stcb)
+
+/*
+ * Function prototypes
+ */
+struct ifaddr *sctp_find_ifa_by_addr(struct sockaddr *sa);
+
 u_int32_t sctp_select_initial_TSN(struct sctp_pcb *);
 
 u_int32_t sctp_select_a_tag(struct sctp_inpcb *);
@@ -57,6 +162,8 @@ int find_next_best_mtu(int);
 u_int32_t sctp_calculate_rto(struct sctp_tcb *, struct sctp_association *,
 	struct sctp_nets *, struct timeval *);
 
+u_int32_t sctp_calculate_len(struct mbuf *);
+
 caddr_t sctp_m_getptr(struct mbuf *, int, int, u_int8_t *);
 
 struct sctp_paramhdr *sctp_get_next_param(struct mbuf *, int,
@@ -76,14 +183,14 @@ void sctp_abort_notification(struct sctp_tcb *, int);
 
 /* We abort responding to an IP packet for some reason */
 void sctp_abort_association(struct sctp_inpcb *, struct sctp_tcb *,
-	struct mbuf *, int, struct mbuf *);
+    struct mbuf *, int, struct sctphdr *, struct mbuf *);
 
 /* We choose to abort via user input */
 void sctp_abort_an_association(struct sctp_inpcb *, struct sctp_tcb *, int,
 	struct mbuf *);
 
-void sctp_handle_ootb(struct sctp_inpcb *, struct mbuf *, int, int, int,
-	struct mbuf *);
+void sctp_handle_ootb(struct mbuf *, int, int, struct sctphdr *,
+    struct sctp_inpcb *, struct mbuf *);
 
 int sctp_is_there_an_abort_here(struct mbuf *, int, int *);
 uint32_t sctp_is_same_scope(struct sockaddr_in6 *, struct sockaddr_in6 *);
@@ -92,9 +199,8 @@ struct sockaddr_in6 *sctp_recover_scope(struct sockaddr_in6 *,
 
 int sctp_cmpaddr(struct sockaddr *, struct sockaddr *);
 
-const char *sctp_ntop4(const u_char *, char *, size_t);
-const char *sctp_ntop6(const u_char *, char *, size_t);
 void sctp_print_address(struct sockaddr *);
+void sctp_print_address_pkt(struct ip *, struct sctphdr *);
 
 int sbappendaddr_nocheck __P((struct sockbuf *, struct sockaddr *,
 	struct mbuf *, struct mbuf *, u_int32_t, struct sctp_inpcb *));
@@ -103,21 +209,18 @@ int sbappendaddr_nocheck __P((struct sockbuf *, struct sockaddr *,
 int sctp_release_pr_sctp_chunk(struct sctp_tcb *, struct sctp_tmit_chunk *,
 	int, struct sctpchunk_listhead *);
 
-
 struct mbuf *sctp_generate_invmanparam(int);
 
 /*
- * this is an evil layer violation that I think
- * is a hack.. but I stand alone on the tsvwg
- * in this thought... everyone else considers
- * it part of the sockets layer (along with
- * all of the peeloff code :<
+ * this is an evil layer violation that I think is a hack.. but I stand
+ * alone on the tsvwg in this thought... everyone else considers it part
+ * of the sockets layer (along with all of the peeloff code :<)
  */
 u_int32_t sctp_get_last_vtag_from_sb(struct socket *);
 
 
-void sctp_grub_through_socket_buffer(struct sctp_inpcb *,
-	struct socket *, struct socket *, struct sctp_tcb *);
+void sctp_grub_through_socket_buffer(struct sctp_inpcb *, struct socket *,
+				     struct socket *, struct sctp_tcb *);
 
 void sctp_free_bufspace(struct sctp_tcb *, struct sctp_association *,
 	struct sctp_tmit_chunk *);
@@ -143,5 +246,33 @@ void sctp_audit_log(u_int8_t, u_int8_t);
 
 #endif
 
-#endif /* KERNEL */
+#ifdef SCTP_BASE_FREEBSD
+/* Note: these are in <sys/time.h>, but not in kernel space */
+#define	timerclear(tvp)		(tvp)->tv_sec = (tvp)->tv_usec = 0
+#define	timerisset(tvp)		((tvp)->tv_sec || (tvp)->tv_usec)
+#define	timercmp(tvp, uvp, cmp)						\
+	(((tvp)->tv_sec == (uvp)->tv_sec) ?				\
+	    ((tvp)->tv_usec cmp (uvp)->tv_usec) :			\
+	    ((tvp)->tv_sec cmp (uvp)->tv_sec))
+#define	timeradd(tvp, uvp, vvp)						\
+	do {								\
+		(vvp)->tv_sec = (tvp)->tv_sec + (uvp)->tv_sec;		\
+		(vvp)->tv_usec = (tvp)->tv_usec + (uvp)->tv_usec;	\
+		if ((vvp)->tv_usec >= 1000000) {			\
+			(vvp)->tv_sec++;				\
+			(vvp)->tv_usec -= 1000000;			\
+		}							\
+	} while (/* CONSTCOND */ 0)
+#define	timersub(tvp, uvp, vvp)						\
+	do {								\
+		(vvp)->tv_sec = (tvp)->tv_sec - (uvp)->tv_sec;		\
+		(vvp)->tv_usec = (tvp)->tv_usec - (uvp)->tv_usec;	\
+		if ((vvp)->tv_usec < 0) {				\
+			(vvp)->tv_sec--;				\
+			(vvp)->tv_usec += 1000000;			\
+		}							\
+	} while (/* CONSTCOND */ 0)
+#endif /* SCTP_BASE_FREEBSD */
+
+#endif /* _KERNEL */
 #endif

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_structs.h,v 1.11 2004/02/24 21:52:27 itojun Exp $	*/
+/*	$KAME: sctp_structs.h,v 1.12 2004/08/17 04:06:19 itojun Exp $	*/
 
 #ifndef __sctp_structs_h__
 #define __sctp_structs_h__
@@ -36,6 +36,14 @@
  */
 #include <sys/queue.h>
 
+#if defined(__APPLE__)
+#include <netinet/sctp_callout.h>
+#elif defined(__OpenBSD__)
+#include <sys/timeout.h>
+#else
+#include <sys/callout.h>
+#endif
+
 #ifdef IPSEC
 #ifndef __OpenBSD__
 #include <netinet6/ipsec.h>
@@ -46,13 +54,12 @@
 #include <netinet/sctp_header.h>
 #include <netinet/sctp_uio.h>
 
-/* Turn on HIGH SPEED SCTP per Sally Floyd's draft-02 */
-/*#define SCTP_HIGH_SPEED 1*/
-
-
-
 struct sctp_timer {
+#if defined(__OpenBSD__)
+	struct timeout timer;
+#else
 	struct callout timer;
+#endif
 	int type;
 	/*
 	 * Depending on the timer type these will be setup and cast with
@@ -112,7 +119,6 @@ struct sctp_nets {
 	struct timeval last_sent_time;
 	int ref_count;
 
-
 	/* Congestion stats per destination */
 	/*
 	 * flight size variables and such, sorry Vern, I could not avoid
@@ -120,6 +126,7 @@ struct sctp_nets {
 	 */
 	int flight_size;
 	int cwnd; /* actual cwnd */
+	int prev_cwnd; /* cwnd before any processing */
 	int partial_bytes_acked; /* in CA tracks when to increment a MTU */
 
 	/* tracking variables to avoid the aloc/free in sack processing */
@@ -134,11 +141,11 @@ struct sctp_nets {
 	u_int32_t heartbeat_random2;
 
 	/* if this guy is ok or not ... status */
-	unsigned short dest_state;
+	u_int16_t dest_state;
 	/* number of transmit failures to down this guy */
-	unsigned short failure_threshold;
+	u_int16_t failure_threshold;
 	/* error stats on destination */
-	unsigned short error_count;
+	u_int16_t error_count;
 
 	/* Flags that probably can be combined into dest_state */
 	u_int8_t rto_pending;		/* is segment marked for RTO update  ** if we split?*/
@@ -159,17 +166,20 @@ struct sctp_data_chunkrec {
 	u_int16_t stream_number; /* the stream number of this guy */
 	u_int32_t payloadtype;
 	u_int32_t context;	/* from send */
+
+       /* ECN Nonce: Nonce Value for this chunk */
+        u_int8_t ect_nonce;
+
 	/* part of the Highest sacked algorithm to be able to
 	 * stroke counts on ones that are FR'd.
 	 */
 	u_int32_t fast_retran_tsn;	/* sending_seq at the time of FR */
 	struct timeval timetodrop;	/* time we drop it from queue */
-	u_char  doing_fast_retransmit;	
-	u_char rcv_flags; /* flags pulled from data chunk on inbound
+	u_int8_t doing_fast_retransmit;	
+	u_int8_t rcv_flags; /* flags pulled from data chunk on inbound
 			   * for outbound holds sending flags.
 			   */
-	u_char ect_nonce;
-	u_char state_flags;
+	u_int8_t state_flags;
 };
 
 TAILQ_HEAD(sctpchunk_listhead, sctp_tmit_chunk);
@@ -181,11 +191,11 @@ struct sctp_tmit_chunk {
 		struct sctp_data_chunkrec data;
 		int chunk_id;
 	} rec;
-	int sent;		/* the send status */
-	int snd_count;		/* number of times I sent */
-	u_int32_t flags;	/* flags, such as FRAGMENT_OK */
-	int send_size;
-	int book_size;
+	int32_t   sent;		/* the send status */
+	int32_t   snd_count;			/* number of times I sent */
+	u_int32_t flags;		/* flags, such as FRAGMENT_OK */
+	int32_t   send_size;
+	int32_t   book_size;
 	struct sctp_association *asoc;	/* bp to asoc this belongs to */
 	struct timeval sent_rcv_time;	/* filled in if RTT being calculated */
 	struct mbuf *data;		/* pointer to mbuf chain of data */
@@ -203,8 +213,8 @@ TAILQ_HEAD(sctpwheelunrel_listhead, sctp_stream_in);
 struct sctp_stream_in {
 	struct sctpchunk_listhead inqueue;
 	TAILQ_ENTRY(sctp_stream_in) next_spoke;
-	u_short stream_no;
-	u_short last_sequence_delivered;	/* used for re-order */
+	uint16_t stream_no;
+	uint16_t last_sequence_delivered;	/* used for re-order */
 };
 
 /* This struct is used to track the traffic on outbound streams */
@@ -212,8 +222,8 @@ TAILQ_HEAD(sctpwheel_listhead, sctp_stream_out);
 struct sctp_stream_out {
 	struct sctpchunk_listhead outqueue;
 	TAILQ_ENTRY(sctp_stream_out) next_spoke; /* next link in wheel */
-	u_short stream_no;
-	u_short next_sequence_sent; /* next one I expect to send out */
+	uint16_t stream_no;
+	uint16_t next_sequence_sent; /* next one I expect to send out */
 };
 
 /* used to keep track of the addresses yet to try to add/delete */
@@ -247,18 +257,20 @@ struct sctp_association {
 	struct sctp_timer hb_timer;		/* hb timer */
 	struct sctp_timer dack_timer;		/* Delayed ack timer */
 	struct sctp_timer asconf_timer;		/* Asconf */
+	struct sctp_timer strreset_timer;	/* stream reset */
 	struct sctp_timer shut_guard_timer;	/* guard */
 	struct sctp_timer autoclose_timer;	/* automatic close timer */
 #ifdef SCTP_TCP_MODEL_SUPPORT
 	struct sctp_timer delayed_event_timer;	/* timer for delayed events */
 #endif /* SCTP_TCP_MODEL_SUPPORT */
+
 	/* list of local addresses when add/del in progress */
 	struct sctpladdr sctp_local_addr_list;
 	struct sctpnetlisthead nets;
-	/*
-	 * Control chunk queue
-	 */
+
+	/* Control chunk queue */
 	struct sctpchunk_listhead control_send_queue;
+
 	/* Once a TSN hits the wire it is moved to the sent_queue. We
 	 * maintain two counts here (don't know if any but retran_cnt
 	 * is needed). The idea is that the sent_queue_retran_cnt
@@ -288,8 +300,6 @@ struct sctp_association {
 	/* ASCONF save the last ASCONF-ACK so we can resend it if necessary */
 	struct mbuf *last_asconf_ack_sent;
 
-
-
 	/*
 	 * if Source Address Selection happening, this will rotate through
 	 * the link list.
@@ -311,11 +321,24 @@ struct sctp_association {
 	/* circular looking for output selection */
 	struct sctp_stream_out *last_out_stream;
 
+	/* wait to the point the cum-ack passes 
+	 * pending_reply->sr_resp.reset_at_tsn.
+	 */
+	struct sctp_stream_reset_resp *pending_reply;
+	struct sctpchunk_listhead pending_reply_queue;
+
 	u_int32_t cookie_preserve_req;
 	/* ASCONF next seq I am sending out, inits at init-tsn */
 	uint32_t asconf_seq_out;
 	/* ASCONF last received ASCONF from peer, starts at peer's TSN-1 */
 	uint32_t asconf_seq_in;
+
+	/* next seq I am sending in str reset messages */
+	uint32_t str_reset_seq_out;
+
+	/* next seq I am expecting in str reset messages */
+	uint32_t str_reset_seq_in;
+	u_int32_t str_reset_sending_seq;
 
 	/* various verification tag information */
 	u_int32_t my_vtag;	/*
@@ -357,7 +380,7 @@ struct sctp_association {
 	 */
 	u_int32_t t3timeout_highest_marked;
 
-	/* The Advanced Peer Ack Point, as required by the U-SCTP */
+	/* The Advanced Peer Ack Point, as required by the PR-SCTP */
 	/* (A1 in Section 4.2) */
 	u_int32_t advanced_peer_ack_point;
 
@@ -384,7 +407,6 @@ struct sctp_association {
 
 	u_int32_t tsn_last_delivered;
 
-
 	/*
 	 * window state information and smallest MTU that I use to bound
 	 * segmentation
@@ -394,13 +416,14 @@ struct sctp_association {
 	u_int32_t my_last_reported_rwnd;
 	u_int32_t my_rwnd_control_len;
 
-
 	u_int32_t total_output_queue_size;
 	u_int32_t total_output_mbuf_queue_size;
 
+	/* 32 bit nonce stuff */
+	u_int32_t nonce_resync_tsn;
+	u_int32_t nonce_wait_tsn;
 
 	int ctrl_queue_cnt; /* could be removed  REM */
-
 	/*
 	 * All outbound datagrams queue into this list from the
 	 * individual stream queue. Here they get assigned a TSN
@@ -427,12 +450,13 @@ struct sctp_association {
 	/* count of destinaton nets and list of destination nets */
 	int numnets;
 
-
 	/* Total error count on this association */
 	int overall_error_count;
 
 	int size_on_delivery_queue;
 	int cnt_on_delivery_queue;
+
+	int cnt_msg_on_sb;
 
 	/* All stream count of chunks for delivery */
 	int size_on_all_streams;
@@ -453,7 +477,6 @@ struct sctp_association {
 	/* the cookie life I award for any cookie, in seconds */
 	int cookie_life;
 
-
 	int numduptsns;
 	int dup_tsns[SCTP_MAX_DUP_TSNS];
 	int initial_init_rto_max;	/* initial RTO for INIT's */
@@ -465,7 +488,6 @@ struct sctp_association {
 	 * as flying rats).
 	 */
 	int stale_cookie_count;
-
 
 	/* For the partial delivery API, if up, invoked
 	 * this is what last TSN I delivered
@@ -479,14 +501,12 @@ struct sctp_association {
 	u_int16_t streamincnt;
 	u_int16_t streamoutcnt;
 
-
-
 	/* my maximum number of retrans of INIT and SEND */
 	/* copied from SCTP but should be individually setable */
 	u_int16_t max_init_times;
 	u_int16_t max_send_times;
-	u_int16_t def_net_failure;
 
+	u_int16_t def_net_failure;
 
 	/*
 	 * lock flag: 0 is ok to send, 1+ (duals as a retran count) is
@@ -503,9 +523,11 @@ struct sctp_association {
 	 */
 	u_int8_t first_ack_sent;
 
-	/* max burst after fast retransmit comletes */
+	/* max burst after fast retransmit completes */
 	u_int8_t max_burst;
+
 	u_int8_t sat_network;	/* RTT is in range of sat net or greater */
+	u_int8_t sat_network_lockout;/* lockout code */
 	u_int8_t burst_limit_applied;	/* Burst limit in effect at last send? */
 	/* flag goes on when we are doing a partial delivery api */
 	u_int8_t hb_random_values[4];
@@ -513,7 +535,14 @@ struct sctp_association {
 	u_int8_t fragment_flags;
 	u_int8_t hb_ect_randombit;
         u_int8_t hb_random_idx;
-	u_int8_t nonce_sum_in;
+
+	/* ECN Nonce stuff */
+	u_int8_t receiver_nonce_sum; /* nonce I sum and put in my sack */
+	u_int8_t ecn_nonce_allowed;  /* Tells us if ECN nonce is on */
+	u_int8_t nonce_sum_check;    /* On off switch used during re-sync */
+	u_int8_t nonce_wait_for_ecne;/* flag when we expect a ECN */
+	u_int8_t peer_supports_ecn_nonce; 
+
 	/*
 	 * This value, plus all other ack'd but above cum-ack is added
 	 * together to cross check against the bit that we have yet to
@@ -529,6 +558,15 @@ struct sctp_association {
 	uint8_t peer_supports_asconf_setprim; /* possibly removable REM */
 	/* pr-sctp support flag */
 	uint8_t peer_supports_prsctp;
+
+	/* stream resets are supported by the peer */
+	uint8_t peer_supports_strreset;
+
+	/*
+	 * packet drop's are supported by the peer, we don't really care
+	 * about this but we bookkeep it anyway.
+	 */
+	uint8_t peer_supports_pktdrop;
 
 	/* Do we allow V6/V4? */
 	u_int8_t ipv4_addr_legal;
@@ -547,13 +585,14 @@ struct sctp_association {
 	u_int8_t fast_retran_loss_recovery;
 	u_int8_t sat_t3_loss_recovery;
         u_int8_t dropped_special_cnt;
+	u_int8_t seen_a_sack_this_pkt;
+	u_int8_t stream_reset_outstanding;
 	/*
-	 * The mapping array is used to track out of order sequences
-	 * above last_acked_seq. 0 indicates packet missing 1 indicates
-	 * packet rec'd. We slide it up every time we raise last_acked_seq
-	 * and 0 trailing locactions out.  If I get a TSN above the
-	 * array mappingArraySz, I discard the datagram and let retransmit
-	 * happen.
+	 * The mapping array is used to track out of order sequences above
+	 * last_acked_seq. 0 indicates packet missing 1 indicates packet 
+	 * rec'd. We slide it up every time we raise last_acked_seq and 0
+	 * trailing locactions out.  If I get a TSN above the array
+	 * mappingArraySz, I discard the datagram and let retransmit happen.
 	 */
 };
 

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_constants.h,v 1.15 2004/05/26 10:08:00 itojun Exp $	*/
+/*	$KAME: sctp_constants.h,v 1.16 2004/08/17 04:06:16 itojun Exp $	*/
 
 #ifndef __sctp_constants_h__
 #define __sctp_constants_h__
@@ -34,7 +34,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
+#define SCTP_VERSION_STRING "KAME-BSD 1.1"
 /*#define SCTP_AUDITING_ENABLED 1 used for debug/auditing */
 #define SCTP_AUDIT_SIZE 256
 #define SCTP_STAT_LOG_SIZE 80000
@@ -69,31 +69,29 @@
 #define SCTP_FR_T3_MARKED           27
 #define SCTP_FR_T3_STOPPED          28
 #define SCTP_FR_MARKED              30
+
 /*
- * To turn on various logging, you must first
- * define SCTP_STAT_LOGGING. Then to get
- * something to log you define one of
- * the logging defines i.e.
+ * To turn on various logging, you must first define SCTP_STAT_LOGGING.
+ * Then to get something to log you define one of the logging defines i.e.
  *
  * SCTP_CWND_LOGGING
  * SCTP_BLK_LOGGING
  * SCTP_STR_LOGGING
  * SCTP_FR_LOGGING
  *
- * Any one or a combination of the logging
- * can be turned on.
+ * Any one or a combination of the logging can be turned on.
  */
-
 #define SCTP_LOG_EVENT_CWND  1
 #define SCTP_LOG_EVENT_BLOCK 2
 #define SCTP_LOG_EVENT_STRM  3
 #define SCTP_LOG_EVENT_FR    4
 #define SCTP_LOG_EVENT_MAP   5
+
 /* if you want to support the TCP model, uncomment the following define */
 #define SCTP_TCP_MODEL_SUPPORT	1
 
 /* number of associations by default for zone allocation */
-#define SCTP_MAX_NUM_OF_ASOC	20000
+#define SCTP_MAX_NUM_OF_ASOC	40000
 /* how many addresses per assoc remote and local */
 #define SCTP_SCALE_FOR_ADDR	2
 
@@ -200,6 +198,8 @@
 /* draft-ietf-stewart-pktdrpsctp */
 #define SCTP_PACKET_DROPPED	0x81
 
+/* draft-ietf-stewart-strreset-xxx */
+#define SCTP_STREAM_RESET       0x82
 
 /* ABORT and SHUTDOWN COMPLETE FLAG */
 #define SCTP_HAD_NO_TCB		0x01
@@ -219,33 +219,68 @@
 #define SCTP_DATA_NOT_FRAG	0x03
 #define SCTP_DATA_UNORDERED	0x04
 
-#define SCTP_CRC_ENABLE_BIT	0x01	/* lower bit of reserved */
+/* ECN Nonce: SACK Chunk Specific Flags */
+#define SCTP_SACK_NONCE_SUM     0x01
 
 /* align to 32-bit sizes */
-#define SCTP_SIZE32(x)	(((x+3) >> 2) << 2)
+#define SCTP_SIZE32(x)	((((x)+3) >> 2) << 2)
 
-#define IS_SCTP_CONTROL(a) (a->chunk_type != SCTP_DATA)
-#define IS_SCTP_DATA(a) (a->chunk_type == SCTP_DATA)
+#define IS_SCTP_CONTROL(a) ((a)->chunk_type != SCTP_DATA)
+#define IS_SCTP_DATA(a) ((a)->chunk_type == SCTP_DATA)
 
 /* SCTP parameter types */
-#define SCTP_HEARTBEAT_INFO	0x0001
-#define SCTP_IPV4_ADDRESS	0x0005
-#define SCTP_IPV6_ADDRESS	0x0006
-#define SCTP_STATE_COOKIE	0x0007
-#define SCTP_UNRECOG_PARAM	0x0008
-#define SCTP_COOKIE_PRESERVE	0x0009
-#define SCTP_HOSTNAME_ADDRESS	0x000b
-#define SCTP_SUPPORTED_ADDRTYPE	0x000c
-#define SCTP_ECN_CAPABLE	0x8000
+#define SCTP_HEARTBEAT_INFO	    0x0001
+#define SCTP_IPV4_ADDRESS	    0x0005
+#define SCTP_IPV6_ADDRESS	    0x0006
+#define SCTP_STATE_COOKIE	    0x0007
+#define SCTP_UNRECOG_PARAM	    0x0008
+#define SCTP_COOKIE_PRESERVE	    0x0009
+#define SCTP_HOSTNAME_ADDRESS	    0x000b
+#define SCTP_SUPPORTED_ADDRTYPE	    0x000c
+#define SCTP_ECN_CAPABLE	    0x8000
+/* draft-ietf-stewart-strreset-xxx */
+#define SCTP_STR_RESET_REQUEST      0x000d
+#define SCTP_STR_RESET_RESPONSE     0x000e
+
+/* ECN Nonce: draft-ladha-sctp-ecn-nonce */
+#define SCTP_ECN_NONCE_SUPPORTED    0x8001
+/* 
+ * draft-ietf-stewart-strreset-xxx 
+ *   param=0x8001  len=0xNNNN
+ *   Byte | Byte | Byte | Byte
+ *   Byte | Byte ...
+ *
+ *  Where each Byte is a chunk type
+ *  extension supported so for example
+ *  to support all chunks one would have (in hex):
+ *
+ *  80 01 00 09
+ *  C0 C1 80 81
+ *  82 00 00 00
+ *  
+ *  Has the parameter. 
+ *   C0 = PR-SCTP    (RFC3758)
+ *   C1, 80 = ASCONF (addip draft)
+ *   81 = Packet Drop 
+ *   82 = Stream Reset
+ */
+
 /* draft-ietf-tsvwg-prsctp */
-#define SCTP_PRSCTP_SUPPORTED	0xc000
+#define SCTP_SUPPORTED_CHUNK_EXT    0x8008
+
+/* number of extensions we support */
+#define SCTP_EXT_COUNT 5     	/* num of extensions we support chunk wise */
+#define SCTP_PAD_EXT_COUNT 3    /* num of pad bytes needed to get to 32 bit boundary */
+
+
+#define SCTP_PRSCTP_SUPPORTED	    0xc000
 /* draft-ietf-tsvwg-addip-sctp */
-#define SCTP_ADD_IP_ADDRESS	0xc001
-#define SCTP_DEL_IP_ADDRESS	0xc002
-#define SCTP_ERROR_CAUSE_IND	0xc003
-#define SCTP_SET_PRIM_ADDR	0xc004
-#define SCTP_SUCCESS_REPORT	0xc005
-#define SCTP_ULP_ADAPTION	0xc006
+#define SCTP_ADD_IP_ADDRESS	    0xc001
+#define SCTP_DEL_IP_ADDRESS	    0xc002
+#define SCTP_ERROR_CAUSE_IND	    0xc003
+#define SCTP_SET_PRIM_ADDR	    0xc004
+#define SCTP_SUCCESS_REPORT	    0xc005
+#define SCTP_ULP_ADAPTION	    0xc006
 
 /* Notification error codes */
 #define SCTP_NOTIFY_DATAGRAM_UNSENT	0x0001
@@ -282,7 +317,7 @@
 
 /* bits for TOS field */
 #define SCTP_ECT0_BIT		0x02
-#define SCTP_ECT1_BIT		0x02
+#define SCTP_ECT1_BIT		0x01
 #define SCTP_CE_BITS		0x03
 
 /* below turns off above */
@@ -317,6 +352,7 @@
 #define SCTP_STATE_CLOSED_SOCKET	0x0100
 #define SCTP_STATE_MASK			0x007f
 
+#define SCTP_GET_STATE(asoc)	((asoc)->state & SCTP_STATE_MASK)
 
 /* SCTP reachability state for each address */
 #define SCTP_ADDR_REACHABLE		0x001
@@ -382,6 +418,7 @@
 #define SCTP_TIMER_TYPE_SHUTDOWNGUARD	11
 #define SCTP_TIMER_TYPE_AUTOCLOSE	12
 #define SCTP_TIMER_TYPE_EVENTWAKE	13
+#define SCTP_TIMER_TYPE_STRRESET        14
 
 /*
  * Number of ticks before the soxwakeup() event that
@@ -598,7 +635,14 @@
 #define SCTP_NOTIFY_PARTIAL_DELVIERY_INDICATION 18
 #define SCTP_NOTIFY_ADAPTION_INDICATION         19
 #define SCTP_NOTIFY_INTERFACE_CONFIRMED 20
-#define SCTP_NOTIFY_MAX			20
+#define SCTP_NOTIFY_STR_RESET_RECV      21
+#define SCTP_NOTIFY_STR_RESET_SEND      22
+#define SCTP_NOTIFY_MAX			22
+
+
+
+
+
 /* clock variance is 10ms */
 #define SCTP_CLOCK_GRANULARITY	10
 
@@ -611,7 +655,7 @@
 #define IPPROTO_SCTP 132	/* the Official IANA number :-) */
 #endif /* !IPPROTO_SCTP */
 
-#define SCTP_MAX_DATA_BUNDLING		80
+#define SCTP_MAX_DATA_BUNDLING		256
 #define SCTP_MAX_CONTROL_BUNDLING	20
 
 /* modular comparison */
@@ -626,7 +670,7 @@
 #define SCTP_UNSET_TSN_PRESENT(arry, gap) (arry[(gap >> 3)] &= ((~(0x01 << ((gap & 0x07)))) & 0xff))
 
 /* pegs */
-#define SCTP_NUMBER_OF_PEGS 80
+#define SCTP_NUMBER_OF_PEGS 92
 /* peg index's */
 #define SCTP_PEG_SACKS_SEEN 0 /* XX */
 #define SCTP_PEG_SACKS_SENT 1 /* XX */
@@ -708,6 +752,18 @@
 #define SCTP_PDRP_NEDAT    77
 #define SCTP_PDRP_PDBRK    78
 #define SCTP_PREPENDS_FAST 79
+#define SCTP_PDRP_DNFND    80
+#define SCTP_PDRP_DIWNP    81
+#define SCTP_PDRP_DIZRW    82
+#define SCTP_PDRP_BADD     83
+#define SCTP_PDRP_MARK     84
+#define SCTP_ECNE_RCVD     85
+#define SCTP_CWR_PERFO     86
+#define SCTP_ECNE_SENT     87
+#define SCTP_MSGC_DROP     88
+#define SCTP_RESV1         89
+#define SCTP_RESV2         90
+#define SCTP_RESV3         91
 
 /*
  * This value defines the number of vtag block time wait entry's
@@ -760,17 +816,15 @@
      (((u_char *)&(a)->s_addr)[3] == 1))
 
 
-/* for FreeBSD, NetBSD, and OpenBSD */
-#ifdef _KERNEL
+#if defined(_KERNEL) || (defined(__APPLE__) && defined(KERNEL))
 
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 #define SCTP_GETTIME_TIMEVAL(x)	(microuptime(x))
 #define SCTP_GETTIME_TIMESPEC(x) (nanouptime(x))
 #else
 #define SCTP_GETTIME_TIMEVAL(x)	(microtime(x))
 #define SCTP_GETTIME_TIMESPEC(x) (nanotime(x))
 #endif /* __FreeBSD__ */
-
 
 #ifdef SCTP_TCP_MODEL_SUPPORT
 #define sctp_sowwakeup(inp, so) \

@@ -1,10 +1,10 @@
-/*	$KAME: sctp_peeloff.h,v 1.4 2003/11/25 06:40:53 ono Exp $	*/
+/*	$KAME: sctp_peeloff.h,v 1.5 2004/08/17 04:06:19 itojun Exp $	*/
 
 #ifndef __sctp_peeloff_h__
 #define __sctp_peeloff_h__
 
 /*
- * Copyright (C) 2002 Cisco Systems Inc,
+ * Copyright (C) 2002, 2004 Cisco Systems Inc,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -38,12 +38,18 @@
 #endif
 #include <sys/socket.h>
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || (defined(__APPLE__) && defined(KERNEL))
 
 int sctp_can_peel_off(struct socket *, caddr_t);
 
 struct socket *sctp_get_peeloff(struct socket *, caddr_t, int *);
 
+#ifdef __APPLE__
+struct sctp_peeloff_args {
+	int	sd;
+	caddr_t	name;
+};
+#endif
 
 #endif /* _KERNEL */
 

@@ -1,10 +1,10 @@
-/*	$KAME: sctp_asconf.h,v 1.6 2003/11/25 06:40:52 ono Exp $	*/
+/*	$KAME: sctp_asconf.h,v 1.7 2004/08/17 04:06:16 itojun Exp $	*/
 
 #ifndef _NETINET_SCTP_ASCONF_H_
 #define _NETINET_SCTP_ASCONF_H_
 
 /*
- * Copyright (c) 2001, 2002 Cisco Systems, Inc.
+ * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -33,7 +33,7 @@
  */
 #include <sys/malloc.h>
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || (defined(__APPLE__) && defined(KERNEL))
 
 extern void sctp_asconf_cleanup(struct sctp_tcb *, struct sctp_nets *);
 

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_crc32.c,v 1.10 2004/02/24 21:52:26 itojun Exp $	*/
+/*	$KAME: sctp_crc32.c,v 1.11 2004/08/17 04:06:16 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -31,7 +31,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#ifndef __OpenBSD__
+#ifdef __APPLE__
+#include <sctp.h>
+#elif !defined(__OpenBSD__)
 #include "opt_sctp.h"
 #endif
 #include <sys/param.h>

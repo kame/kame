@@ -1,10 +1,10 @@
-/*	$KAME: sctp_timer.h,v 1.4 2003/11/25 06:40:54 ono Exp $	*/
+/*	$KAME: sctp_timer.h,v 1.5 2004/08/17 04:06:20 itojun Exp $	*/
 
 #ifndef __sctp_timer_h__
 #define __sctp_timer_h__
 
 /*
- * Copyright (C) 2002 Cisco Systems Inc,
+ * Copyright (C) 2002, 2004 Cisco Systems Inc,
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,12 +32,12 @@
  * SUCH DAMAGE.
  */
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || (defined(__APPLE__) && defined(KERNEL))
 struct sctp_nets *sctp_find_alternate_net(struct sctp_tcb *,
 	struct sctp_nets *);
 
 int sctp_threshold_management(struct sctp_inpcb *, struct sctp_tcb *,
-	struct sctp_nets *, u_short);
+	struct sctp_nets *, uint16_t);
 
 void sctp_t3rxt_timer(struct sctp_inpcb *, struct sctp_tcb *,
 	struct sctp_nets *);
@@ -56,6 +56,8 @@ void sctp_pathmtu_timer(struct sctp_inpcb *, struct sctp_tcb *,
 
 void sctp_shutdownack_timer(struct sctp_inpcb *, struct sctp_tcb *,
 	struct sctp_nets *);
+void sctp_strreset_timer(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
+			 struct sctp_nets *net);
 
 void sctp_asconf_timer(struct sctp_inpcb *, struct sctp_tcb *,
 	struct sctp_nets *);
