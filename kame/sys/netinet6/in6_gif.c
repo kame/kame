@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.53 2001/07/24 13:06:40 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.54 2001/07/24 13:17:07 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -208,7 +208,7 @@ in6_gif_output(ifp, family, m, rt)
 	}
 	
 	return(ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL));
-#else
+#else	/*!__OpenBSD__*/
 	struct gif_softc *sc = (struct gif_softc*)ifp;
 	struct sockaddr_in6 *dst = (struct sockaddr_in6 *)&sc->gif_ro6.ro_dst;
 	struct sockaddr_in6 *sin6_src = (struct sockaddr_in6 *)sc->gif_psrc;
@@ -341,7 +341,7 @@ in6_gif_output(ifp, family, m, rt)
 #else
 	return(ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL));
 #endif
-#endif /*openbsd*/
+#endif	/*__OpenBSD__*/
 }
 
 int in6_gif_input(mp, offp, proto)
