@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.274 2002/06/04 12:29:43 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.275 2002/06/07 03:52:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -245,6 +245,7 @@ nd6_setmtu(ifp)
 	nd6_setmtu0(ifp, ND_IFINFO(ifp));
 }
 
+/* XXX todo: do not maintain copy of ifp->if_mtu in ndi->maxmtu */
 void
 nd6_setmtu0(ifp, ndi)
 	struct ifnet *ifp;
