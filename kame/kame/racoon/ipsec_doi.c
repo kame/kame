@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.155 2002/01/26 02:50:09 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.156 2002/04/15 08:13:00 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -315,9 +315,7 @@ get_ph1approvalx(p, proposal, sap)
 	struct prop_pair *p;
 	struct isakmpsa *proposal, *sap;
 {
-#ifdef YIPS_DEBUG
 	struct isakmp_pl_p *prop = p->prop;
-#endif
 	struct isakmp_pl_t *trns = p->trns;
 	struct isakmpsa sa, *s, *tsap;
 

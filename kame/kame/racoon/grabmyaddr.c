@@ -1,4 +1,4 @@
-/*	$KAME: grabmyaddr.c,v 1.29 2002/03/11 07:20:53 sakane Exp $	*/
+/*	$KAME: grabmyaddr.c,v 1.30 2002/04/15 08:13:00 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -144,9 +144,7 @@ grab_myaddrs()
 #endif
 #endif
 
-#if defined(YIPS_DEBUG)
 	char _addr1_[NI_MAXHOST];
-#endif
 
 	if (getifaddrs(&ifa0)) {
 		plog(LLV_ERROR, LOCATION, NULL,
@@ -232,9 +230,7 @@ grab_myaddrs()
 #endif
 #endif
 
-#if defined(YIPS_DEBUG)
 	char _addr1_[NI_MAXHOST];
-#endif
 
 	maxif = if_maxindex() + 1;
 	len = maxif * sizeof(struct sockaddr_storage) * 4; /* guess guess */
