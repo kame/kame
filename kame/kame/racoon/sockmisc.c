@@ -1,4 +1,4 @@
-/*	$KAME: sockmisc.c,v 1.23 2001/01/29 10:37:31 sakane Exp $	*/
+/*	$KAME: sockmisc.c,v 1.24 2001/03/22 22:36:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -97,6 +97,9 @@ cmpsaddrwop(addr1, addr2)
 		sa2 = (caddr_t)&((struct sockaddr_in6 *)addr2)->sin6_addr;
 		if (memcmp(sa1, sa2, sizeof(struct in6_addr)) != 0)
 			return 1;
+		if (((struct sockaddr_in6 *)addr1)->sin6_scope_id !=
+		    ((struct sockaddr_in6 *)addr2)->sin6_scope_id)
+			return 1;
 		break;
 #endif
 	default:
@@ -148,6 +151,9 @@ cmpsaddr(addr1, addr2)
 		if (!(port1 == 0 || port2 == 0 || port1 == port2))
 			return 1;
 		if (memcmp(sa1, sa2, sizeof(struct in6_addr)) != 0)
+			return 1;
+		if (((struct sockaddr_in6 *)sa1)->sin6_scope_id !=
+		    ((struct sockaddr_in6 *)sa2)->sin6_scope_id)
 			return 1;
 		break;
 #endif
