@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.46 2001/07/27 03:51:29 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.47 2001/07/27 07:27:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -333,6 +333,7 @@ struct ipsec_history {
 };
 
 extern int ipsec_debug;
+extern int ipsec_tunnel_device;
 
 #ifdef INET
 extern struct ipsecstat ipsecstat;

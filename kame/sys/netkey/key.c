@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.196 2001/07/27 04:14:12 itojun Exp $	*/
+/*	$KAME: key.c,v 1.197 2001/07/27 07:27:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1835,33 +1835,44 @@ key_spdadd(so, m, mhp)
 		}
 	}
 
-#if 0	/* XXX the fragment is ongoing work - itojun */
 	/*
 	 * based on newsp->req, create/configure tunnels.
+	 * TODO: reuse devices
+	 * TODO: conflicting devices
 	 */
-	for (req = newsp->req; req; req = req->next) {
-		struct ifnet *ifp;
+	if (ipsec_tunnel_device) {
+		for (req = newsp->req; req; req = req->next) {
+			struct ifnet *ifp;
 
-		if (req->saidx.mode != IPSEC_MODE_TUNNEL)
-			continue;
+			if (req->saidx.mode != IPSEC_MODE_TUNNEL)
+				continue;
 
-		ifp = sec_create(0);	/* I don't care about the unit number */
-		error = gif_set_tunnel(ifp, (struct sockaddr *)&req->saidx.src,
-		    (struct sockaddr *)&req->saidx.dst);
-		switch (error) {
-		case 0:
-			req->tunifp = ifp;
-			/* XXX reference count */
-			break;
-		case EEXIST:
-			/* XXX find another tunnel for the same outer pair */
-		default:
-			(void)sec_destroy(ifp);
-			keydb_delsecpolicy(newsp);
-			return key_senderror(so, m, EINVAL);
+			/* I don't care about the unit number */
+			ifp = sec_create(0);
+			if (!ifp) {
+				keydb_delsecpolicy(newsp);
+				return key_senderror(so, m, EINVAL);
+			}
+			error = gif_set_tunnel(ifp,
+			    (struct sockaddr *)&req->saidx.src,
+			    (struct sockaddr *)&req->saidx.dst);
+			switch (error) {
+			case 0:
+				req->tunifp = ifp;
+				/* XXX reference count and such */
+				break;
+			case EEXIST:
+				/*
+				 * XXX find another tunnel for the same outer
+				 * pair
+				 */
+			default:
+				(void)sec_destroy(ifp);
+				keydb_delsecpolicy(newsp);
+				return key_senderror(so, m, EINVAL);
+			}
 		}
 	}
-#endif
 
 	microtime(&tv);
 	newsp->created = tv.tv_sec;

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.109 2001/07/27 03:53:31 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.110 2001/07/27 07:27:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -115,6 +115,20 @@ int ipsec_debug = 1;
 #else
 int ipsec_debug = 0;
 #endif
+
+/* 1 if we decapsulate tunnels by sec* device */
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 2)
+#include "sec.h"
+#if defined(NSEC) && NSEC > 1
+#define USE_SEC_DEVICE	1
+#else
+#define USE_SEC_DEVICE	0
+#endif
+#else
+#define USE_SEC_DEVICE	0
+#endif
+
+int ipsec_tunnel_device = USE_SEC_DEVICE;
 
 #ifndef offsetof		/* XXX */
 #define	offsetof(type, member)	((size_t)(&((type *)0)->member))
