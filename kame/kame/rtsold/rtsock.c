@@ -1,4 +1,4 @@
-/*	$KAME: rtsock.c,v 1.6 2003/10/05 00:09:36 itojun Exp $	*/
+/*	$KAME: rtsock.c,v 1.7 2003/10/21 07:21:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -81,7 +81,7 @@ static struct {
 #if defined(__FreeBSD__)
 	{ RTM_IFINFO, 0, rtsock_ifprobe },
 #endif
-	{ 0, NULL },
+	{ 0, 0, NULL },
 };
 
 int
