@@ -376,6 +376,12 @@ set(argc, argv)
 		return 1;
 	}
 	sin->sin6_addr = ((struct sockaddr_in6 *)res->ai_addr)->sin6_addr;
+#ifdef __KAME__
+	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr)) {
+		*(u_int16_t *)&sin->sin6_addr.s6_addr[2] =
+			htons(((struct sockaddr_in6 *)res->ai_addr)->sin6_scope_id);
+	}
+#endif
 	ea = (u_char *)LLADDR(&sdl_m);
 	if (ndp_ether_aton(eaddr, ea) == 0)
 		sdl_m.sdl_alen = 6;
