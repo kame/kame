@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.117 2000/08/17 01:08:39 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.118 2000/08/19 02:01:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1375,7 +1375,8 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 
 		if (prevctl && prevctl->hlim) {
 			cm = mtod(prevctl->hlim, struct cmsghdr *);
-			oldhlim = (*(int *)CMSG_DATA(cm)) & 0xff;
+			bcopy(CMSG_DATA(cm), &oldhlim, sizeof(oldhlim));
+			oldhlim &= 0xff;
 		}
 
 		if (oldhlim < 0 || hlim != oldhlim) {

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.133 2000/08/18 14:20:30 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.134 2000/08/19 02:01:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1382,11 +1382,15 @@ ni6_input(m, off)
 		nni6->ni_flags = 0;
 		break;
 	case NI_QTYPE_SUPTYPES:
+	{
+		u_int32_t v;
 		nni6->ni_code = ICMP6_NI_SUCCESS;
 		nni6->ni_flags = htons(0x0000);	/* raw bitmap */
 		/* supports NOOP, SUPTYPES, FQDN, and NODEADDR */
-		*(u_int32_t *)(nni6 + 1) = htonl(0x0000000f);
+		v = (u_int32_t)htonl(0x0000000f);
+		bcopy(&v, nni6 + 1, sizeof(u_int32_t));
 		break;
+	}
 	case NI_QTYPE_FQDN:
 		nni6->ni_code = ICMP6_NI_SUCCESS;
 		fqdn = (struct ni_reply_fqdn *)(mtod(n, caddr_t) +
