@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.h,v 1.28 2001/10/23 12:41:29 jinmei Exp $	*/
+/*	$KAME: if_gif.h,v 1.29 2002/06/19 13:21:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -79,7 +79,7 @@ struct gif_softc {
 
 #define GIF_MTU		(1280)	/* Default MTU */
 #define	GIF_MTU_MIN	(1280)	/* Minimum MTU */
-#define	GIF_MTU_MAX	(8192)	/* Maximum MTU */
+#define	GIF_MTU_MAX	(32767)	/* Maximum MTU */
 
 extern int ngif;
 extern struct gif_softc *gif_softc;
