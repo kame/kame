@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.144 2001/09/12 16:52:38 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.145 2001/09/26 12:28:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -982,6 +982,9 @@ in6_ifattach(ifp, altifp)
 	/* initialize scope identifiers */
 	scope6_ifattach(ifp);
 
+	/* initialize NDP variables */
+	nd6_ifattach(ifp);
+
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	/* create a multicast kludge storage (if we have not had one) */
 	in6_createmkludge(ifp);
@@ -1059,9 +1062,6 @@ statinit:
 			malloc(sizeof(struct icmp6_ifstat), M_IFADDR, M_WAITOK);
 		bzero(icmp6_ifstat[ifp->if_index], sizeof(struct icmp6_ifstat));
 	}
-
-	/* initialize NDP variables */
-	nd6_ifattach(ifp);
 }
 
 /*
