@@ -107,6 +107,7 @@
 #endif
 #include <sys/cdefs.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 
 #define	_PATH_HEQUIV	"/etc/hosts.equiv"
 #define	_PATH_HOSTS	"/etc/hosts"

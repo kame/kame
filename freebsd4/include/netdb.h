@@ -63,6 +63,7 @@
 
 #include <sys/cdefs.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 
 #ifndef _PATH_HEQUIV
 # define	_PATH_HEQUIV	"/etc/hosts.equiv"
