@@ -133,6 +133,11 @@ main(argc, argv)
 			    res->ai_protocol);
 			if (s[smax] < 0)
 				continue;
+			if (setsockopt(s[smax], SOL_SOCKET, SO_REUSEADDR, &yes,
+			    sizeof(yes)) < 0) {
+				close(s[smax]);
+				continue;
+			}
 			if (setsockopt(s[smax], IPPROTO_IPV6, IPV6_FAITH, &yes,
 			    sizeof(yes)) < 0) {
 				close(s[smax]);
