@@ -1,4 +1,4 @@
-/*	$KAME: keysock.c,v 1.35 2004/05/26 07:51:29 itojun Exp $	*/
+/*	$NetBSD: keysock.c,v 1.31 2004/05/31 04:29:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -330,8 +330,10 @@ key_sendup0(rp, m, promisc, canwait)
 		}
 
 		if (canwait &&
-		    sbspace(&rp->rcb_socket->so_rcv) < m->m_pkthdr.len)
-			sbwait(&rp->rcb_socket->so_rcv);
+		    sbspace(&rp->rcb_socket->so_rcv) < m->m_pkthdr.len) {
+			error = EAGAIN;
+			continue;
+		}
 
 		if (!sbappendaddr(&rp->rcb_socket->so_rcv,
 		    (struct sockaddr *)&key_src, m, NULL)) {
@@ -340,7 +342,6 @@ key_sendup0(rp, m, promisc, canwait)
 			error = ENOBUFS;
 		} else
 			error = 0;
-		sorwakeup(rp->rcb_socket);
 	}
 	return error;
 }

@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.330 2004/05/26 07:51:29 itojun Exp $	*/
+/*	$NetBSD: key.c,v 1.121 2004/05/31 04:29:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2594,6 +2594,8 @@ key_spddump(so, m, mhp)
 	int cnt;
 	u_int dir;
 	struct mbuf *n;
+	struct keycb *kp;
+	int error = 0, needwait = 0;
 
 	/* sanity check */
 	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
@@ -2616,11 +2618,18 @@ key_spddump(so, m, mhp)
 			n = key_setdumpsp(sp, SADB_X_SPDDUMP, cnt,
 			    mhp->msg->sadb_msg_pid);
 
-			if (n)
-				key_sendup_mbuf(so, n,
+			if (n) {
+				error = key_sendup_mbuf(so, n,
 				    KEY_SENDUP_ONE | KEY_SENDUP_CANWAIT);
+				if (error == EAGAIN)
+					needwait = 1;
+			}
 		}
 	}
+
+	kp = (struct keycb *)sotorawcb(so);
+	while (needwait && kp->kp_queue)
+		sbwait(&so->so_rcv);
 
 	m_freem(m);
 	return 0;
@@ -7052,7 +7061,8 @@ key_dump(so, m, mhp)
 	u_int stateidx;
 	u_int8_t satype;
 	u_int8_t state;
-	int cnt;
+	int cnt, error = 0, needwait = 0;
+	struct keycb *kp;
 	struct mbuf *n;
 
 	/* sanity check */
@@ -7107,11 +7117,17 @@ key_dump(so, m, mhp)
 				if (!n)
 					return key_senderror(so, m, ENOBUFS);
 
-				key_sendup_mbuf(so, n,
+				error = key_sendup_mbuf(so, n,
 				    KEY_SENDUP_ONE | KEY_SENDUP_CANWAIT);
+				if (error == EAGAIN)
+					needwait = 1;
 			}
 		}
 	}
+
+	kp = (struct keycb *)sotorawcb(so);
+	while (needwait && kp->kp_queue)
+		sbwait(&so->so_rcv);
 
 	m_freem(m);
 	return 0;
