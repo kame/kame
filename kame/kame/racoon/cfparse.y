@@ -678,6 +678,8 @@ sainfo_statement
 		}
 		sainfo_name BOC sainfo_specs
 		{
+			struct sainfo *check;
+
 			/* default */
 			if (cur_sainfo->algs[algclass_ipsec_enc] == 0) {
 				yyerror("no encryption algorithm at %s",
@@ -695,6 +697,13 @@ sainfo_statement
 				return -1;
 			}
 
+			/* duplicate check */
+			check = getsainfo(cur_sainfo->idsrc, cur_sainfo->iddst);
+			if (check && (!check->idsrc && !cur_sainfo->idsrc)) {
+				yyerror("such sainfo duplicated: %s",
+					sainfo2str(cur_sainfo));
+				return -1;
+			}
 			inssainfo(cur_sainfo);
 		}
 		EOC
