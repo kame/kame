@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.249 2001/11/19 07:47:34 k-sugyou Exp $	*/
+/*	$KAME: in6.c,v 1.250 2001/12/01 08:51:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -187,7 +187,7 @@ struct multi6_kludge {
 #endif
 
 #ifdef MEASURE_PERFORMANCE
-static void in6h_delifa __P((const struct in6_ifaddr *));
+static void in6h_delifa __P((struct in6_ifaddr *));
 static void in6h_addhash __P((struct in6hash *));
 static void in6h_delhash __P((struct in6hash *));
 #endif
@@ -2948,7 +2948,7 @@ in6h_rebuild(newhashsiz)
 /* Remove hash entries for local address on an in6_ifaddr. */
 void
 in6h_delifa(ia)
-	const struct in6_ifaddr *ia;
+	struct in6_ifaddr *ia;
 {
 	if (IN6_IS_ADDR_UNSPECIFIED(&ia->ia6_hash.in6h_addr))
 		return;
