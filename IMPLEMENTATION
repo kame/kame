@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.167 2000/11/01 08:28:46 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.168 2000/12/11 05:08:27 itojun Exp $
 
 1. IPv6
 
@@ -1341,7 +1341,16 @@ Here is a list of FreeBSD 3.x-RELEASE drivers and its conditions:
 More drivers will just simply work on KAME FreeBSD 3.x-RELEASE but have not
 been checked yet.
 
-2.5 OpenBSD 2.x
+2.5 FreeBSD 4.x-RELEASE
+
+Here is a list of FreeBSD 4.x-RELEASE drivers and its conditions:
+
+	driver		multicast
+	---		---
+	(Ethernet)
+	lnc/vmware	ok
+
+2.6 OpenBSD 2.x
 
 Here is a list of OpenBSD 2.x drivers and its conditions:
 
@@ -1359,7 +1368,7 @@ Here is a list of OpenBSD 2.x drivers and its conditions:
 configuration.  This happens with certain revision of chipset on the card.
 Should be fixed by now by workaround in sys/net/if.c, but still not sure.
 
-2.6 BSD/OS 4.x
+2.7 BSD/OS 4.x
 
 The following lists BSD/OS 4.x device drivers and its conditions:
 
