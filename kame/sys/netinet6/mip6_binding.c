@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.125 2002/09/01 05:58:03 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.126 2002/09/02 06:08:58 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -280,6 +280,8 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 		mbu->mbu_refexpire = 0x7fffffff;
 	mbu->mbu_acktimeout = MIP6_BA_INITIAL_TIMEOUT;
 	mbu->mbu_ackexpire = time_second + mbu->mbu_acktimeout;
+	/* Sequence Number SHOULD start at a random value */
+	mbu->mbu_seqno = (u_int16_t)arc4random();
 	mbu->mbu_hif = sc;
 	/* *mbu->mbu_encap = NULL; */
 	cookie = arc4random();

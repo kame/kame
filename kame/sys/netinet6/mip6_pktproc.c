@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.45 2002/08/27 06:18:56 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.46 2002/09/02 06:08:58 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -605,13 +605,15 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		hoa_sa.sin6_addr = ip6a->ip6a_coa;
 	}
 
-	if ((error = mip6_get_mobility_options(ip6mu, ip6mulen, &mopt))) {
+	if ((error = mip6_get_mobility_options((struct ip6_mobility *)ip6mu,
+					       sizeof(*ip6mu),
+					       ip6mulen, &mopt))) {
 		m_freem(m);
 		return (error);
 	}
 	mip6log((LOG_INFO, "%s:%d: Mobility options: %b\n", 
 			 __FILE__, __LINE__, mopt.valid_options,
-		 "\20\4AUTH\3NONCE\2ALTCOA\1UID\n"));
+		 "\20\5REFRESH\4AUTH\3NONCE\2ALTCOA\1UID\n"));
 
 	if (mopt.valid_options & MOPT_ALTCOA)
 		coa_sa.sin6_addr = mopt.mopt_altcoa;
@@ -749,7 +751,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 					    IP6MA_STATUS_ACCEPTED, /* XXX */
 					    seqno,
 					    lifetime,
-					    lifetime)) {
+					    0)) {
 				mip6log((LOG_ERR,
 					 "%s:%d: sending BA to %s(%s) failed. "
 					 "send it later.\n",
@@ -774,11 +776,12 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
 	u_int16_t seqno;
-	u_int32_t lifetime;
+	u_int32_t lifetime, refresh;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
 	int error = 0;
+	struct mip6_mobility_options mopt;
 
 	mip6stat.mip6s_ba++;
 
@@ -813,6 +816,16 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		ip6stat.ip6s_toosmall++;
 		return (EINVAL);
 	}
+
+	if ((error = mip6_get_mobility_options((struct ip6_mobility *)ip6ma,
+					       sizeof(*ip6ma),
+					       ip6malen, &mopt))) {
+		m_freem(m);
+		return (error);
+	}
+	mip6log((LOG_INFO, "%s:%d: Mobility options: %b\n", 
+			 __FILE__, __LINE__, mopt.valid_options,
+		 "\20\5REFRESH\4AUTH\3NONCE\2ALTCOA\1UID\n"));
 
 	/* XXX autorization */
 
@@ -921,8 +934,16 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		if (mbu->mbu_expire < time_second)
 			mbu->mbu_expire = time_second;
 	}
-	/* XXX binding refresh advice option */
-	mbu->mbu_refresh = lifetime;		/* XXX */
+	/* binding refresh advice option */
+	if ((mbu->mbu_flags & IP6MU_HOME) &&
+	    (mopt.valid_options & MOPT_REFRESH)) {
+		refresh = mopt.mopt_refresh << 2;
+		if (refresh > lifetime || refresh == 0)
+			refresh = lifetime;
+	}
+	else
+		refresh = lifetime;
+	mbu->mbu_refresh = refresh;
 	mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
 	/* sanity check for overflow */
         if (mbu->mbu_refexpire < time_second)
@@ -1366,7 +1387,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	struct ip6m_binding_update *ip6mu;
 	struct ip6m_opt_nonce *mopt_nonce = NULL;
 	struct ip6m_opt_authdata *mopt_auth = NULL;
-	int ip6mu_size;
+	int ip6mu_size, pad;
 	int bu_size, nonce_size, auth_size;
 	struct mip6_bu *mbu, *hrmbu;
 	int need_rr = 0;
@@ -1467,13 +1488,6 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 
 	bzero(ip6mu, ip6mu_size);
 
-	if (bu_size - sizeof(struct ip6m_binding_update) >= 2) {
-		*((u_int8_t *)ip6mu + sizeof(struct ip6m_binding_update))
-			= IP6MOPT_PADN;
-		*((u_int8_t *)ip6mu + sizeof(struct ip6m_binding_update) + 1)
-			= bu_size - sizeof(struct ip6m_binding_update) - 2;
-	}
-
 	ip6mu->ip6mu_pproto = IPPROTO_NONE;
 	ip6mu->ip6mu_len = ip6mu_size >> 3;
 	ip6mu->ip6mu_type = IP6M_BINDING_UPDATE;
@@ -1520,6 +1534,29 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 		mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
 		ip6mu->ip6mu_lifetime =
 		    htons((u_int16_t)(mbu->mbu_lifetime >> 2));	/* units 4 secs */
+	}
+
+	if ((pad = bu_size - sizeof(struct ip6m_binding_update)) >= 2) {
+		u_char *p =
+			(u_int8_t *)ip6mu + sizeof(struct ip6m_binding_update);
+		*p = IP6MOPT_PADN;
+		*(p + 1) = pad - 2;
+	}
+	if (nonce_size) {
+		if ((pad = nonce_size - sizeof(struct ip6m_opt_nonce)) >= 2) {
+			u_char *p = (u_int8_t *)ip6mu + bu_size
+				+ sizeof(struct ip6m_opt_nonce);
+			*p = IP6MOPT_PADN;
+			*(p + 1) = pad - 2;
+		}
+	}
+	if (auth_size) {
+		if ((pad = auth_size - AUTH_SIZE) >= 2) {
+			u_char *p = (u_int8_t *)ip6mu + bu_size + nonce_size
+				+ AUTH_SIZE;
+			*p = IP6MOPT_PADN;
+			*(p + 1) = pad - 2;
+		}
 	}
 
 	if (need_rr) {
@@ -1607,20 +1644,35 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh)
 	u_int32_t refresh;
 {
 	struct ip6m_binding_ack *ip6ma;
+	struct ip6m_opt_refresh *mopt_refresh = NULL;
+	int need_refresh = 0;
 	int ip6ma_size, pad;
+	int ba_size, refresh_size;
 
 	*pktopt_mobility = NULL;
 
-	ip6ma_size = sizeof(struct ip6m_binding_ack);
-	pad = (ip6ma_size + 8) & 7;
-	ip6ma_size += pad;	/* XXX */
+	ba_size = sizeof(struct ip6m_binding_ack);
+	if (refresh > 3 && refresh < lifetime) {
+		need_refresh = 1;
+		ba_size += PADLEN(ba_size, 2, 0);
+		refresh_size = sizeof(struct ip6m_opt_refresh);
+		refresh_size += PADLEN(ba_size + refresh_size, 8, 0);
+	} else {
+		ba_size += PADLEN(ba_size, 8, 0);
+		refresh_size = 0;
+	}
+	ip6ma_size = ba_size + refresh_size;
 
 	MALLOC(ip6ma, struct ip6m_binding_ack *,
 	       ip6ma_size, M_IP6OPT, M_NOWAIT);
 	if (ip6ma == NULL)
 		return (ENOMEM);
+	if (need_refresh) {
+		mopt_refresh = (struct ip6m_opt_refresh *)((u_int8_t *)ip6ma + ba_size);
+	}
 
 	bzero(ip6ma, ip6ma_size);
+
 	ip6ma->ip6ma_pproto = IPPROTO_NONE;
 	ip6ma->ip6ma_len = ip6ma_size >> 3;
 	ip6ma->ip6ma_type = IP6M_BINDING_ACK;
@@ -1629,15 +1681,30 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh)
 	ip6ma->ip6ma_lifetime =
 		htons((u_int16_t)(lifetime >> 2));	/* units of 4 secs */
 
-	/* XXX binding refresh advice option */
+	/* padN */
+	if ((pad = ba_size - sizeof(struct ip6m_binding_ack)) >= 2) {
+		u_char *p = (u_int8_t *)ip6ma + sizeof(struct ip6m_binding_ack);
+		*p = IP6MOPT_PADN;
+		*(p + 1) = pad - 2;
+	}
+
+	/* binding refresh advice option */
+	if (need_refresh) {
+		mopt_refresh->ip6mor_type = IP6MOPT_REFRESH;
+		mopt_refresh->ip6mor_len = sizeof(struct ip6m_opt_refresh) - 2;
+		SET_NETVAL_S(&mopt_refresh->ip6mor_refresh, refresh >> 2);
+	}
 
 	/* XXX authorization data processing. */
 
-	/* XXX padN */
-	if (pad > 1) {
-		u_char *p = ((u_char *)ip6ma) + ip6ma_size - pad;
-		*p++ = IP6MOPT_PADN;
-		*p = pad - 2;
+	/* padN */
+	if (refresh_size) {
+		if ((pad = refresh_size - sizeof(struct ip6m_opt_refresh)) >= 2) {
+			u_char *p = (u_int8_t *)ip6ma + ba_size
+				+ sizeof(struct ip6m_opt_refresh);
+			*p = IP6MOPT_PADN;
+			*(p + 1) = pad - 2;
+		}
 	}
 
 	/* calculate checksum. */

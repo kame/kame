@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.53 2002/09/01 05:58:03 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.54 2002/09/02 06:08:58 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -625,7 +625,7 @@ int mip6_get_nodekey __P((int, mip6_nodekey_t *));
 int mip6_is_valid_bu (struct ip6_hdr *, struct ip6m_binding_update *,
 		      int, struct mip6_mobility_options *,
 		      struct sockaddr_in6 *, struct sockaddr_in6 *);
-int mip6_get_mobility_options __P((struct ip6m_binding_update *,
+int mip6_get_mobility_options __P((struct ip6_mobility *, int,
 				   int, struct mip6_mobility_options *));
 void mip6_create_cookie __P((struct in6_addr *,
 			     mip6_nodekey_t *, mip6_nonce_t *,

@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.161 2002/08/28 12:13:02 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.162 2002/09/02 06:08:58 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2765,16 +2765,16 @@ mip6_hexdump("CN: Auth Data: ", sizeof(authdata), authdata);
 }
 
 int
-mip6_get_mobility_options(ip6mu, ip6mulen, mopt)
-	struct ip6m_binding_update *ip6mu;
-	int ip6mulen;
+mip6_get_mobility_options(ip6mh, hlen, ip6mhlen, mopt)
+	struct ip6_mobility *ip6mh;
+	int hlen, ip6mhlen;
 	struct mip6_mobility_options *mopt;
 {
 	u_int8_t *mh, *mhend;
 	u_int16_t valid_option;
 
-	mh = (caddr_t)(ip6mu + 1);
-	mhend = (caddr_t)(ip6mu) + ip6mulen;
+	mh = (caddr_t)(ip6mh) + hlen;
+	mhend = (caddr_t)(ip6mh) + ip6mhlen;
 	mopt->valid_options = 0;
 
 #define check_mopt_len(mopt_len)	\
