@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.143 1999/09/29 07:31:40 jinmei Exp $
+$Id: CHANGELOG,v 1.144 1999/09/29 08:11:09 sumikawa Exp $
 
 <199909>
+Wed Sep 29 17:09:15 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* kame/kame/ndp/ndp.c: use getnameinfo() instead of inet_ntop().
+	  you should use -n option if you don't want to reverse lookup.
+
 1999-09-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/bgpd/if.c (get_32id): fixed a bug that 127.0.0.1 was
 	chosen as the BGP identifier if it was the only IPv4 address on
