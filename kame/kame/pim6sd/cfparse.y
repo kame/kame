@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.20 2002/04/03 04:12:55 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.21 2002/05/08 13:13:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -359,7 +359,7 @@ grppfx_statement:
 		int prefixok = 1;
 
 		if (inet_pton(AF_INET6, $2.v, &prefix.paddr) != 1) {
-			yywarn("invalid IPv6 address: %s (ignored)", $2);
+			yywarn("invalid IPv6 address: %s (ignored)", $2.v);
 			prefixok = 0;
 		}
 		free($2.v);	/* XXX: which was allocated dynamically */
