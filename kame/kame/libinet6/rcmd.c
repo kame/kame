@@ -91,7 +91,6 @@ extern int innetgr __P(( const char *, const char *, const char *, const char * 
 
 #define max(a, b)	((a > b) ? a : b)
 
-int __ivaliduser_af __P((FILE *, const void *, const char *, const char *, int, int));
 int __ivaliduser_sa __P((FILE *, const struct sockaddr *, int, const char *, const char *));
 #if 0
 static int __icheckhost __P((const void *, const char *, int, int));
@@ -128,6 +127,11 @@ rcmd_af(ahost, rport, locuser, remuser, cmd, fd2p, af)
 	int refused;
 	char num[8];
 	static char canonnamebuf[MAXDNAME];	/* is it proper here? */
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflags = NI_NUMERICHOST;
+#endif
 
 	pid = getpid();
 
@@ -139,8 +143,7 @@ rcmd_af(ahost, rport, locuser, remuser, cmd, fd2p, af)
 	(void)snprintf(num, sizeof(num), "%d", ntohs(rport));
 	error = getaddrinfo(*ahost, num, &hints, &res);
 	if (error) {
-		fprintf(stderr, "rcmd: getaddrinfo: %s\n",
-			gai_strerror(error));
+		fprintf(stderr, "rcmd: %s\n", gai_strerror(error));
 		return (-1);
 	}
 
@@ -178,18 +181,20 @@ rcmd_af(ahost, rport, locuser, remuser, cmd, fd2p, af)
 		if (ai->ai_next != NULL) {
 			int oerrno = errno;
 
-			getnameinfo(ai->ai_addr, ai->ai_addrlen,
+			if (getnameinfo(ai->ai_addr, ai->ai_addrlen,
 				    paddr, sizeof(paddr),
-				    NULL, 0,
-				    NI_NUMERICHOST);
+				    NULL, 0, niflags) != 0) {
+				strcpy(paddr, "?");
+			}
 			fprintf(stderr, "connect to address %s: ", paddr);
 			errno = oerrno;
 			perror(0);
 			ai = ai->ai_next;
-			getnameinfo(ai->ai_addr, ai->ai_addrlen,
+			if (getnameinfo(ai->ai_addr, ai->ai_addrlen,
 				    paddr, sizeof(paddr),
-				    NULL, 0,
-				    NI_NUMERICHOST);
+				    NULL, 0, niflags) != 0) {
+				strcpy(paddr, "?");
+			}
 			fprintf(stderr, "Trying %s...\n", paddr);
 			continue;
 		}
@@ -348,6 +353,8 @@ ruserok(rhost, superuser, ruser, luser)
  * gives us and look for a match.
  *
  * Returns 0 if ok, -1 if not ok.
+ *
+ * XXX obsolete API
  */
 int
 iruserok_af(raddr, superuser, ruser, luser, af)
@@ -356,79 +363,6 @@ iruserok_af(raddr, superuser, ruser, luser, af)
 	const char *ruser, *luser;
 	int af;
 {
-#if 0
-	register char *cp;
-	struct stat sbuf;
-	struct passwd *pwd;
-	FILE *hostf;
-	uid_t uid;
-	int first;
-	char pbuf[MAXPATHLEN];
-	int len = 0;
-
-	switch (af) {
-	case AF_INET:
-		len = sizeof(struct in_addr);
-		break;
-	case AF_INET6:
-		len = sizeof(struct in6_addr);
-		break;
-	}
-
-	first = 1;
-	hostf = superuser ? NULL : fopen(_PATH_HEQUIV, "r");
-again:
-	if (hostf) {
-		if (__ivaliduser_af(hostf, raddr, luser, ruser, af, len) == 0) {
-			(void)fclose(hostf);
-			return (0);
-		}
-		(void)fclose(hostf);
-	}
-	if (first == 1 && (__check_rhosts_file || superuser)) {
-		first = 0;
-		if ((pwd = getpwnam(luser)) == NULL)
-			return (-1);
-		(void)strcpy(pbuf, pwd->pw_dir);
-		(void)strcat(pbuf, "/.rhosts");
-
-		/*
-		 * Change effective uid while opening .rhosts.  If root and
-		 * reading an NFS mounted file system, can't read files that
-		 * are protected read/write owner only.
-		 */
-		uid = geteuid();
-		(void)seteuid(pwd->pw_uid);
-		hostf = fopen(pbuf, "r");
-		(void)seteuid(uid);
-
-		if (hostf == NULL)
-			return (-1);
-		/*
-		 * If not a regular file, or is owned by someone other than
-		 * user or root or if writeable by anyone but the owner, quit.
-		 */
-		cp = NULL;
-		if (lstat(pbuf, &sbuf) < 0)
-			cp = ".rhosts lstat failed";
-		else if (!S_ISREG(sbuf.st_mode))
-			cp = ".rhosts not regular file";
-		else if (fstat(fileno(hostf), &sbuf) < 0)
-			cp = ".rhosts fstat failed";
-		else if (sbuf.st_uid && sbuf.st_uid != pwd->pw_uid)
-			cp = "bad .rhosts owner";
-		else if (sbuf.st_mode & (S_IWGRP|S_IWOTH))
-			cp = ".rhosts writeable by other than owner";
-		/* If there were any problems, quit. */
-		if (cp) {
-			__rcmd_errstr = cp;
-			(void)fclose(hostf);
-			return (-1);
-		}
-		goto again;
-	}
-	return (-1);
-#else
 	struct sockaddr *sa = NULL;
 	struct sockaddr_in *sin = NULL;
 #ifdef INET6
@@ -459,7 +393,6 @@ again:
 
 	sa = (struct sockaddr *)&ss;
 	return iruserok_sa(sa, sa->sa_len, superuser, ruser, luser);
-#endif
 }
 
 /*
@@ -559,9 +492,6 @@ iruserok(raddr, superuser, ruser, luser)
 	int superuser;
 	const char *ruser, *luser;
 {
-#if 0
-	return iruserok_af(&raddr, superuser, ruser, luser, AF_INET);
-#else
 	struct sockaddr_in sin;
 
 	memset(&sin, 0, sizeof(sin));
@@ -570,11 +500,12 @@ iruserok(raddr, superuser, ruser, luser)
 	memcpy(&sin.sin_addr, &raddr, sizeof(sin.sin_addr));
 	return iruserok_sa((struct sockaddr *)&sin, sin.sin_len, superuser,
 		ruser, luser);
-#endif
 }
 
 /*
  * Returns 0 if ok, -1 if not ok.
+ *
+ * XXX obsolete API.
  */
 int
 __ivaliduser_af(hostf, raddr, luser, ruser, af, len)
@@ -583,123 +514,6 @@ __ivaliduser_af(hostf, raddr, luser, ruser, af, len)
 	const char *luser, *ruser;
 	int af, len;
 {
-#if 0
-	register char *user, *p;
-	int ch;
-	char buf[MAXHOSTNAMELEN + 128];		/* host + login */
-	char hname[MAXHOSTNAMELEN];
-	struct hostent *hp;
-	/* Presumed guilty until proven innocent. */
-	int userok = 0, hostok = 0;
-	int h_error;
-#ifdef YP
-	char *ypdomain;
-
-	if (yp_get_default_domain(&ypdomain))
-		ypdomain = NULL;
-#else
-#define	ypdomain NULL
-#endif
-	/* We need to get the damn hostname back for netgroup matching. */
-	hp = getipnodebyaddr((char *)raddr, len, af, &h_error);
-	if (hp == NULL)
-		return (-1);
-	strncpy(hname, hp->h_name, sizeof(hname));
-	hname[sizeof(hname) - 1] = '\0';
-	freehostent(hp);
-
-	while (fgets(buf, sizeof(buf), hostf)) {
-		p = buf;
-		/* Skip lines that are too long. */
-		if (strchr(p, '\n') == NULL) {
-			while ((ch = getc(hostf)) != '\n' && ch != EOF);
-			continue;
-		}
-		if (*p == '\n' || *p == '#') {
-			/* comment... */
-			continue;
-		}
-		while (*p != '\n' && *p != ' ' && *p != '\t' && *p != '\0') {
-			*p = isupper(*p) ? tolower(*p) : *p;
-			p++;
-		}
-		if (*p == ' ' || *p == '\t') {
-			*p++ = '\0';
-			while (*p == ' ' || *p == '\t')
-				p++;
-			user = p;
-			while (*p != '\n' && *p != ' ' &&
-			    *p != '\t' && *p != '\0')
-				p++;
-		} else
-			user = p;
-		*p = '\0';
-		/*
-		 * Do +/- and +@/-@ checking. This looks really nasty,
-		 * but it matches SunOS's behavior so far as I can tell.
-		 */
-		switch(buf[0]) {
-		case '+':
-			if (!buf[1]) {     /* '+' matches all hosts */
-				hostok = 1;
-				break;
-			}
-			if (buf[1] == '@')  /* match a host by netgroup */
-				hostok = innetgr((char *)&buf[2],
-					(char *)&hname, NULL, ypdomain);
-			else		/* match a host by addr */
-				hostok = __icheckhost(raddr,(char *)&buf[1],
-						      af, len);
-			break;
-		case '-':     /* reject '-' hosts and all their users */
-			if (buf[1] == '@') {
-				if (innetgr((char *)&buf[2],
-					      (char *)&hname, NULL, ypdomain))
-					return(-1);
-			} else {
-				if (__icheckhost(raddr,(char *)&buf[1],af,len))
-					return(-1);
-			}
-			break;
-		default:  /* if no '+' or '-', do a simple match */
-			hostok = __icheckhost(raddr, buf, af, len);
-			break;
-		}
-		switch(*user) {
-		case '+':
-			if (!*(user+1)) {      /* '+' matches all users */
-				userok = 1;
-				break;
-			}
-			if (*(user+1) == '@')  /* match a user by netgroup */
-				userok = innetgr(user+2, NULL, ruser, ypdomain);
-			else	   /* match a user by direct specification */
-				userok = !(strcmp(ruser, user+1));
-			break;
-		case '-': 		/* if we matched a hostname, */
-			if (hostok) {   /* check for user field rejections */
-				if (!*(user+1))
-					return(-1);
-				if (*(user+1) == '@') {
-					if (innetgr(user+2, NULL,
-							ruser, ypdomain))
-						return(-1);
-				} else {
-					if (!strcmp(ruser, user+1))
-						return(-1);
-				}
-			}
-			break;
-		default:	/* no rejections: try to match the user */
-			if (hostok)
-				userok = !(strcmp(ruser,*user ? user : luser));
-			break;
-		}
-		if (hostok && userok)
-			return(0);
-	}
-	return (-1);
-#else
 	struct sockaddr *sa = NULL;
 	struct sockaddr_in *sin = NULL;
 #ifdef INET6
@@ -734,7 +548,6 @@ __ivaliduser_af(hostf, raddr, luser, ruser, af, len)
 
 	sa = (struct sockaddr *)&ss;
 	return __ivaliduser_sa(hostf, sa, sa->sa_len, luser, ruser);
-#endif
 }
 
 /*
@@ -867,9 +680,6 @@ __ivaliduser(hostf, raddr, luser, ruser)
 	u_long raddr;
 	const char *luser, *ruser;
 {
-#if 0
-	return __ivaliduser_af(hostf, &raddr, luser, ruser, AF_INET, sizeof(raddr));
-#else
 	struct sockaddr_in sin;
 
 	memset(&sin, 0, sizeof(sin));
@@ -878,7 +688,6 @@ __ivaliduser(hostf, raddr, luser, ruser)
 	memcpy(&sin.sin_addr, &raddr, sizeof(sin.sin_addr));
 	return __ivaliduser_sa(hostf, (struct sockaddr *)&sin, sin.sin_len,
 		luser, ruser);
-#endif
 }
 
 #if 0
@@ -935,9 +744,13 @@ __icheckhost_sa(raddr, rlen, lhost)
 	struct addrinfo hints, *res0, *res;
 	int error;
 	char h1[NI_MAXHOST], h2[NI_MAXHOST];
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflags = NI_NUMERICHOST;
+#endif
 
-	if (getnameinfo(raddr, rlen, h1, sizeof(h1), NULL, 0,
-			NI_NUMERICHOST) != 0)
+	if (getnameinfo(raddr, rlen, h1, sizeof(h1), NULL, 0, niflags) != 0)
 		return (0);
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = raddr->sa_family;
@@ -952,7 +765,7 @@ __icheckhost_sa(raddr, rlen, lhost)
 		 || res->ai_addrlen != rlen)
 			continue;
 		if (getnameinfo(res->ai_addr, res->ai_addrlen, h2, sizeof(h2),
-				NULL, 0, NI_NUMERICHOST) != 0)
+				NULL, 0, niflags) != 0)
 			continue;
 		if (strcmp(h1, h2) == 0) {
 			match = 1;
