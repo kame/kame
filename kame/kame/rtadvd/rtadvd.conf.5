@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.26 2001/01/18 05:51:24 itojun Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.27 2001/01/18 05:56:45 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -286,8 +286,10 @@ by hand unless you need special non-default values.
 It can cause interoperability problem if you use an ill-configured
 parameter.
 .Pp
-To override some configuration parameter, you can specify the parameter alone.
-With the following configuration, we override router lifetime parameter for
+To override a configuration parameter, you can specify the parameter alone.
+With the following configuration,
+.Xr rtadvd 8
+overrides the router lifetime parameter for the
 .Li ne0
 interface.
 .Bd -literal -offset
@@ -295,10 +297,10 @@ ne0:\\
 	:rltime#0:
 .Ed
 .Pp
-The following example manually configures prefixes advertised from
+The following example manually configures prefixes advertised from the
 .Li ef0
 interface.
-The configuration must be used with
+The configuration must be used with the
 .Fl s
 option to
 .Xr rtadvd 8 .
@@ -307,7 +309,7 @@ ef0:\\
 	:addrs#1:addr="3ffe:501:4819:1000::":prefixlen#64:
 .Ed
 .Pp
-The following example presents default values in a explicit manner.
+The following example presents the default values in an explicit manner.
 The configuration is provided just for reference purposes;
 YOU DO NOT NEED TO HAVE IT AT ALL.
 .Bd -literal -offset
