@@ -1,4 +1,4 @@
-/*	$KAME: ip6opt.c,v 1.10 2001/12/25 04:07:39 jinmei Exp $	*/
+/*	$KAME: ip6opt.c,v 1.11 2001/12/25 04:17:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -608,7 +608,7 @@ inet6_opt_next(void *extbuf, size_t extlen, int prevlen, u_int8_t *typep,
 			if ((optlen = ip6optlen(optp, lim)) == 0)
 				goto optend;
 			*typep = *optp;
-			*lenp = optlen;
+			*lenp = optlen - 2;
 			*databufp = optp + 2;
 			return(optp + optlen - (u_int8_t *)extbuf);
 		}
@@ -665,7 +665,7 @@ inet6_opt_find(void *extbuf, size_t extlen, int prevlen, u_int8_t type,
 			goto optend;
 
 		if (*optp == type) { /* found */
-			*lenp = optlen;
+			*lenp = optlen - 2;
 			*databufp = optp + 2;
 			return(optp + optlen - (u_int8_t *)extbuf);
 		}
