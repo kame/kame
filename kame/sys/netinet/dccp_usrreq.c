@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.11 2003/10/20 08:36:19 ono Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.12 2003/10/20 10:09:19 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -1375,7 +1375,7 @@ again:
 	} else
 #endif
 	{
-	      	ip->ip_sum = in_pseudo(ip->ip_src.s_addr, ip->ip_dst.s_addr,
+	      	dh->dh_sum = in_pseudo(ip->ip_src.s_addr, ip->ip_dst.s_addr,
 		    htons((u_short)len + sizeof(struct dccphdr) + extrah_len + optlen + IPPROTO_DCCP)); 
 		dh->dh_sum = in_cksum_skip(m, hdrlen + cslen, 20);
 		m->m_pkthdr.csum_data = offsetof(struct dccphdr, dh_sum);
