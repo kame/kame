@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.82 1999/08/30 18:11:36 itojun Exp $
+$Id: CHANGELOG,v 1.83 1999/08/31 09:38:14 itojun Exp $
 
 <199908>
+Tue Aug 31 18:37:00 JST 1999  itojun@iijlab.net
+	* openbsd: made GENERIC.v6 at least compilable.
+	  GENERIC.v6 kernel boots okay, replies to ping6.
+	  transport layer (AF_INET6 raw/tcp/udp socket) needs more work.
+	  IPSEC support is completely broken (we have NRL/OpenBSD/KAME IPSEC
+	  code in the tree, I am not quite sure how to solve this).
+
 Tue Aug 31 03:07:16 JST 1999  itojun@iijlab.net
 	* netbsd: Upgrade base version to 1.4.1.  There's not too many
 	  changes between NetBSD 1.4 and 1.4.1, so it should be possible
