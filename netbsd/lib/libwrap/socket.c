@@ -135,25 +135,27 @@ void    sock_hostaddr(host)
 struct host_info *host;
 {
     struct sockaddr *sa = host->sin;
-    int salen;
+    int alen, af;
+    char *ap;
 
     if (!sa)
 	return;
     switch (sa->sa_family) {
     case AF_INET:
-	salen = sizeof(struct sockaddr_in);
+	ap = (char *)&((struct sockaddr_in *)sa)->sin_addr;
+	alen = sizeof(struct in_addr);
 	break;
 #ifdef INET6
     case AF_INET6:
-	salen = sizeof(struct sockaddr_in6);
+	ap = (char *)&((struct sockaddr_in6 *)sa)->sin6_addr;
+	alen = sizeof(struct in6_addr);
 	break;
 #endif
     default:
-	salen = sizeof(struct sockaddr);
-	break;
+	return;
     }
-    getnameinfo(sa, salen, host->addr, sizeof(host->addr), NULL, 0,
-	NI_NUMERICHOST);
+    host->addr[0] = '\0';
+    inet_ntop(af, ap, host->addr, sizeof(host->addr));
 }
 
 /* sock_hostname - map endpoint address to host name */
