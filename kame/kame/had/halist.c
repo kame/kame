@@ -1,4 +1,4 @@
-/*	$KAME: halist.c,v 1.9 2003/07/10 12:35:17 keiichi Exp $	*/
+/*	$KAME: halist.c,v 1.10 2004/08/19 11:28:24 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: halist.c,v 1.9 2003/07/10 12:35:17 keiichi Exp $
+ * $Id: halist.c,v 1.10 2004/08/19 11:28:24 sumikawa Exp $
  */
 
 /*
@@ -149,7 +149,8 @@ hal_update(ifindex, ha_addr, ha_lifetime, ha_pref)
     haif = haif_find(ifindex);
 
     if (!haif) {
-	syslog(LOG_ERR, __FUNCTION__ "cannt get home agent ifinfo for ifindex %d.\n", ifindex);
+	syslog(LOG_ERR, "%s: cannt get home agent ifinfo for ifindex %d.\n",
+	       __FUNCTION__, ifindex);
 	goto err;
     }
 
@@ -196,7 +197,7 @@ hal_update(ifindex, ha_addr, ha_lifetime, ha_pref)
 		DPRINT("<x:hal_update[created new entry]>");
 	    }
 	    else {
-		syslog(LOG_ERR, __FUNCTION__ "cannt allocate memory.\n");
+		syslog(LOG_ERR, "%s: cannt allocate memory.\n", __FUNCTION__);
 		goto err;
 	    }
 	}
@@ -325,7 +326,7 @@ hal_gaddr_add(halp, lastp, pi)
 	/* create global address list entry and enqueue */
 	galp = malloc(sizeof(struct hagent_gaddr));
 	if (galp == NULL) {
-	    syslog(LOG_ERR, __FUNCTION__ "cannt allocate memory.\n");
+	    syslog(LOG_ERR, "%s: cannt allocate memory.\n", __FUNCTION__);
 	    goto err;
 	}
 
@@ -761,7 +762,7 @@ hal_shuffle(haif)
     tablep = (struct hagent_entry **)malloc(sizeof (struct hagent_entry *) *
 					    DEFAULT_TABLE_SIZE);
     if (tablep == NULL) {
-	syslog(LOG_ERR, __FUNCTION__ "memory allocation failed.\n");
+	syslog(LOG_ERR, "%s: memory allocation failed.\n", __FUNCTION__);
 	return 0;
     }
     table_size = DEFAULT_TABLE_SIZE;
@@ -778,7 +779,7 @@ hal_shuffle(haif)
 		tableptmp = (struct hagent_entry **)malloc(sizeof (struct hagent_entry *) *
 							   table_size * 2);
 		if (tableptmp == NULL) {
-		    syslog(LOG_ERR, __FUNCTION__ "memory reallocation failed.\n");
+		    syslog(LOG_ERR, "%s: memory reallocation failed.\n", __FUNCTION__);
 		    free(tablep);
 		    return 0;
 		}
@@ -1111,7 +1112,7 @@ haif_getifaddrs()
     close(s);
 
     if (anycast_found == 0)
-	syslog(LOG_WARNING, __FUNCTION__ "anycast address not found");
+	syslog(LOG_WARNING, "%s: anycast address not found", __FUNCTION__);
 
     /* remove entries w/o anycast address and pack global address vector */ 
     for (i = 0; i < ifnum; ++i) {
@@ -1295,8 +1296,8 @@ haadisc_hup()
 
 	/* get interface addresses */
 	if (haif_getifaddrs() != 0) {
-		syslog(LOG_ERR, __FUNCTION__
-		       "get linklocal address of interfaces failed");
+		syslog(LOG_ERR,
+		       "get linklocal address of interfaces failed", __FUNCTION__);
 		exit(1);
 	}
 }

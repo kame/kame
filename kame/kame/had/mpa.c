@@ -1,4 +1,4 @@
-/*	$KAME: mpa.c,v 1.12 2004/02/13 02:52:08 keiichi Exp $	*/
+/*	$KAME: mpa.c,v 1.13 2004/08/19 11:28:24 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: mpa.c,v 1.12 2004/02/13 02:52:08 keiichi Exp $
+ * $Id: mpa.c,v 1.13 2004/08/19 11:28:24 sumikawa Exp $
  */
 
 #include <sys/param.h>
@@ -139,7 +139,7 @@ mpi_solicit_input(pi, sin6_hoa, mps)
     haif = haif_findwithunicast(&pi->ipi6_addr, &ifga_index);
 
     if (!haif) {
-        syslog(LOG_ERR, __FUNCTION__ "cannot get home agent ifinfo.\n");
+        syslog(LOG_ERR, __FUNCTION__, "cannot get home agent ifinfo.\n");
         goto err;
     }
 
@@ -151,6 +151,7 @@ mpi_solicit_input(pi, sin6_hoa, mps)
     src = ha_addr;
     mpi_advert_output(sin6_hoa, &src, haif, mps->mip6_ps_id);
 err:
+    ;
 }
 
 /* 
@@ -187,7 +188,7 @@ mpi_advert_output(dst_sa, src, haif, id)
     /* Pick home agent prefixes */
     /* -- search by dest. address instead of Home Address */
     if ((npi = pi_pick(src, prefix_info, haif, count)) < 0) {
-        syslog(LOG_ERR, __FUNCTION__ "cannot fild any home agent prefixes in home agent list.\n");
+        syslog(LOG_ERR, __FUNCTION__, "cannot fild any home agent prefixes in home agent list.\n");
         goto err;
     }
     
@@ -213,10 +214,11 @@ mpi_advert_output(dst_sa, src, haif, id)
     pi->ipi6_ifindex = 0; /* determined with a routing table */
 
     if ((len = sendmsg(sock, &sndmhdr, 0)) < 0) {
-        syslog(LOG_ERR, __FUNCTION__ "%s.\n", strerror(errno));
+        syslog(LOG_ERR, __FUNCTION__, "%s.\n", strerror(errno));
         goto err;
     }
 err:
+    ;
 }
 
 /*

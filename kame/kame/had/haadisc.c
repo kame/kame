@@ -1,4 +1,4 @@
-/*	$KAME: haadisc.c,v 1.17 2004/01/22 09:57:14 t-momose Exp $	*/
+/*	$KAME: haadisc.c,v 1.18 2004/08/19 11:28:24 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: haadisc.c,v 1.17 2004/01/22 09:57:14 t-momose Exp $
+ * $Id: haadisc.c,v 1.18 2004/08/19 11:28:24 sumikawa Exp $
  */
 
 /*
@@ -245,7 +245,7 @@ main(argc, argv)
 
 
     if ((haifinfo_tab = malloc(ifnum * sizeof (struct hagent_ifinfo))) == NULL) {
-	syslog(LOG_ERR, __FUNCTION__ "memory allocation failed.\n");
+	syslog(LOG_ERR, "%s: memory allocation failed.\n", __FUNCTION__);
 	exit(3);
     }
     bzero(haifinfo_tab, ifnum * sizeof (struct hagent_ifinfo));
@@ -258,8 +258,8 @@ main(argc, argv)
 
     /* get linklocal addresses of interfaces */
     if (haif_getifaddrs() != 0) {
-	syslog(LOG_ERR, __FUNCTION__
-	       "get linklocal address of interfaces failed");
+	syslog(LOG_ERR,
+	       "%s: get linklocal address of interfaces failed", __FUNCTION__);
 	exit(1);
     }
 
@@ -280,9 +280,8 @@ main(argc, argv)
 	daemon(1, 0);
 	pid = getpid();
 	if ((fp = fopen(pidfilename, "w")) == NULL)
-		syslog(LOG_ERR, __FUNCTION__
-		       "failed to open a log file(%s): %s",
-		       pidfilename, strerror(errno));
+		syslog(LOG_ERR, "%s: failed to open a log file(%s): %s",
+		       __FUNCTION__, pidfilename, strerror(errno));
 	else {
 		fprintf(fp, "%d\n", pid);
 		fclose(fp);
@@ -749,6 +748,7 @@ ra_input(len, ra, pinfo, from)
 #endif
     }
 done:
+    ;
 }
 
 /*
@@ -915,7 +915,7 @@ haad_request_input(len, haad_req, pi, src, type)
     haif = haif_findwithanycast(&pi->ipi6_addr, &ifga_index);
 
     if (! haif) {
-	syslog(LOG_ERR, __FUNCTION__ "cannt get home agent ifinfo.\n");
+	syslog(LOG_ERR, "%s: cannt get home agent ifinfo.\n", __FUNCTION__);
 	goto err;
     }
 
@@ -928,6 +928,7 @@ haad_request_input(len, haad_req, pi, src, type)
 #endif
 		      haif, type, ifga_index);
 err:
+    ;
 }
 
 /*
@@ -972,7 +973,8 @@ haad_reply_output(msgid, coaddr, reqaddr, haif, type, ifga_index)
 	     sizeof (struct mip6_dhaad_rep)) / sizeof (struct in6_addr);
     /* pick home agent global addresses for this home address */
      if ((nhaa = hal_pick(reqaddr, hagent_addr, &src, haif, count)) < 0) {
-	syslog(LOG_ERR, __FUNCTION__ "cannot fild any home agents in home agent list.\n");
+	syslog(LOG_ERR, "%s: cannot fild any home agents in home agent list.\n",
+	       __FUNCTION__);
 	goto err;
     }
     if (IN6_IS_ADDR_UNSPECIFIED(&src))
@@ -994,9 +996,10 @@ haad_reply_output(msgid, coaddr, reqaddr, haif, type, ifga_index)
     pi->ipi6_ifindex = 0; /* determined with routing table */
 
     if ((len = sendmsg(sock, &sndmhdr, 0)) < 0) {
-	syslog(LOG_ERR, __FUNCTION__ "%s.\n", strerror(errno));
+	syslog(LOG_ERR, "%s: %s.\n", __FUNCTION__,strerror(errno));
 	goto err;
     }
 err:
+    ;
 }
 
