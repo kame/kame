@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2014 2001/12/19 21:50:25 sakane Exp $
+$KAME: CHANGELOG,v 1.2015 2001/12/20 14:01:30 jinmei Exp $
 
 <200112>
+2001-12-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c: supported a new IPv6 socket
+	option IPV6_DONTFRAG as described in rfc2292bis-03.  This option
+	is used to disable IPv6-layer fragmentation.
+
 Thu Dec 20 06:48:57 JST 2001 sakane@kame.net
 	* kame/racoon:
 	fixed that the negotiation always failed when "verify_identifier"
