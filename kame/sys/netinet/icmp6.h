@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.26 2000/10/19 19:21:07 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.27 2000/11/08 06:55:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -403,12 +403,20 @@ struct icmp6_router_renum {	/* router renumbering header */
 	u_int16_t	rr_maxdelay;
 	u_int32_t	rr_reserved;
 };
-#define ICMP6_RR_FLAGS_SEGNUM		0x80
+#if 1
+#define ICMP6_RR_FLAGS_SEGNUM		0x80	/*?*/
 #define ICMP6_RR_FLAGS_TEST		0x40
 #define ICMP6_RR_FLAGS_REQRESULT	0x20
-#define ICMP6_RR_FLAGS_FORCEAPPLY	0x10
+#define ICMP6_RR_FLAGS_FORCEAPPLY	0x10	/*?*/
 #define ICMP6_RR_FLAGS_SPECSITE		0x08
 #define ICMP6_RR_FLAGS_PREVDONE		0x04
+#else /*RFC2894*/
+#define ICMP6_RR_FLAGS_TEST		0x80
+#define ICMP6_RR_FLAGS_REQRESULT	0x40
+#define ICMP6_RR_FLAGS_ALLIF		0x20
+#define ICMP6_RR_FLAGS_SPECSITE		0x10
+#define ICMP6_RR_FLAGS_PREVDONE		0x08
+#endif
 
 #define rr_type		rr_hdr.icmp6_type
 #define rr_code		rr_hdr.icmp6_code
