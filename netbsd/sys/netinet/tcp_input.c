@@ -893,23 +893,6 @@ findpcb:
 	else
 		tiwin = th->th_win;
 
-#ifdef INET6
-	/* save packet options if user wanted */
-	if (in6p && (in6p->in6p_flags & IN6P_CONTROLOPTS)) {
-		struct ip6_recvpktopts opts;
-
-		bzero(&opts, sizeof(opts));
-		ip6_savecontrol(in6p, ip6, m, &opts, &in6p->in6p_inputopts);
-		if (in6p->in6p_inputopts)
-			ip6_update_recvpcbopt(in6p->in6p_inputopts, &opts);
-		if (opts.head) {
-			if (sbappendcontrol(&in6p->in6p_socket->so_rcv,
-					    NULL, opts.head) == 0)
-				m_freem(opts.head);
-		}
-	}
-#endif
-
 	if (so->so_options & (SO_DEBUG|SO_ACCEPTCONN)) {
 		union syn_cache_sa src;
 		union syn_cache_sa dst;
@@ -1089,6 +1072,23 @@ findpcb:
 	}
 
 after_listen:
+#ifdef INET6
+	/* save packet options if user wanted */
+	if (in6p && (in6p->in6p_flags & IN6P_CONTROLOPTS)) {
+		struct ip6_recvpktopts opts;
+
+		bzero(&opts, sizeof(opts));
+		ip6_savecontrol(in6p, ip6, m, &opts, &in6p->in6p_inputopts);
+		if (in6p->in6p_inputopts)
+			ip6_update_recvpcbopt(in6p->in6p_inputopts, &opts);
+		if (opts.head) {
+			if (sbappendcontrol(&in6p->in6p_socket->so_rcv,
+					    NULL, opts.head) == 0)
+				m_freem(opts.head);
+		}
+	}
+#endif
+
 #ifdef DIAGNOSTIC
 	/*
 	 * Should not happen now that all embryonic connections
