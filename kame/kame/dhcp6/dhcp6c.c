@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.76 2002/05/08 08:14:56 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.77 2002/05/08 10:36:16 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -31,9 +31,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
-#ifdef __FreeBSD__
 #include <sys/queue.h>
-#endif
 #include <errno.h>
 #if TIME_WITH_SYS_TIME
 # include <sys/time.h>
@@ -94,7 +92,8 @@ static void client6_mainloop __P((void));
 static void client6_send __P((struct dhcp6_if *, int));
 static int client6_getreply __P((void));
 static int client6_recv __P((struct dhcp6_if *));
-static int client6_recvreply __P((struct dhcp6_if *, struct dhcp6 *, ssize_t));
+static int client6_recvreply __P((struct dhcp6_if *, struct dhcp6 *,
+				  ssize_t, struct dhcp6_optinfo *));
 static void client6_sleep __P((void));
 void client6_hup __P((int));
 static int sa2plen __P((struct sockaddr_in6 *));
@@ -665,6 +664,8 @@ client6_recv(ifp)
 	int s = insock;		/* XXX */
 	char rbuf[BUFSIZ];
 	struct sockaddr_storage from;
+	struct dhcp6opt *p, *ep;
+	struct dhcp6_optinfo optinfo;
 	socklen_t fromlen;
 	ssize_t len;
 	struct dhcp6 *dh6;
@@ -673,18 +674,28 @@ client6_recv(ifp)
 	if ((len = recvfrom(s, rbuf, sizeof(rbuf), 0,
 	    (struct sockaddr *)&from, &fromlen)) < 0) {
 		dprintf(LOG_ERR, "recvfrom(inbound): %s", strerror(errno));
-		return -1;
+		return(-1);
 	}
 
 	if (len < sizeof(*dh6)) {
 		dprintf(LOG_INFO, "client6_recv: short packet");
-		return -1;
+		return(-1);
 	}
 
 	dh6 = (struct dhcp6 *)rbuf;
 
 	dprintf(LOG_DEBUG, "receive %s from %s", dhcpmsgstr(dh6->dh6_msgtype),
 		addr2str((struct sockaddr *)&from));
+
+	/* get options */
+	dhcp6_init_options(&optinfo);
+	p = (struct dhcp6opt *)(dh6 + 1);
+	ep = (struct dhcp6opt *)((char *)dh6 + len);
+	if (dhcp6_get_options(p, ep, &optinfo) < 0) {
+		dprintf(LOG_INFO,
+			"client6_recvreply: failed to parse options");
+		return(-1);
+	}
 
 	switch(dh6->dh6_msgtype) {
 	case DH6_REPLY:
@@ -696,31 +707,33 @@ client6_recv(ifp)
 		if (ifp->state == DHCP6S_INFOREQ ||
 		    (ifp->state == DHCP6S_SOLICIT &&
 		     (ifp->send_flags & DHCIFF_RAPID_COMMIT))) {
-			return(client6_recvreply(ifp, dh6, len));
+			client6_recvreply(ifp, dh6, len, &optinfo);
 		} else {
 			dprintf(LOG_INFO, "client6_recv: unexpected reply");
-			return(-1);
+			goto fail;
 		}
 		break;
 	}
 
+	dhcp6_clear_options(&optinfo);
 	return(0);		/* we've done */
+
+  fail:
+	dhcp6_clear_options(&optinfo);
+	return(-1);		/* we've done */
 }
 
 /* 18.1.6. Receipt of Reply message */
 static int
-client6_recvreply(ifp, dh6, len)
+client6_recvreply(ifp, dh6, len, optinfo)
 	struct dhcp6_if *ifp;
 	struct dhcp6 *dh6;
 	ssize_t len;
+	struct dhcp6_optinfo *optinfo;
 {
 	char *cp;
 	char buf[BUFSIZ];
-	struct dhcp6opt *p, *ep, *np;
-	int i;
-	struct in6_addr in6;
 	struct duid reply_duid;
-	struct dhcp6_optinfo optinfo;
 
 	/*
 	 * The ``transaction-ID'' field value MUST match the value we
@@ -731,18 +744,8 @@ client6_recvreply(ifp, dh6, len)
 		return -1;
 	}
 
-	/* option processing */
-	dhcp6_init_options(&optinfo);
-	p = (struct dhcp6opt *)(dh6 + 1);
-	ep = (struct dhcp6opt *)((char *)dh6 + len);
-	if (dhcp6_get_options(p, ep, &optinfo) < 0) {
-		dprintf(LOG_INFO,
-			"client6_recvreply: failed to parse options");
-		return -1;
-	}
-
 	/* A Reply message must contain a Server ID option */
-	if (optinfo.serverID.duid_len == 0) {
+	if (optinfo->serverID.duid_len == 0) {
 		dprintf(LOG_INFO, "client6_recvreply: no server ID option");
 		return -1;
 	}
@@ -751,23 +754,26 @@ client6_recvreply(ifp, dh6, len)
 	 * DUID in the Client ID option (which must be contained for our
 	 * client implementation) must match ours.
 	 */
-	if (optinfo.clientID.duid_len == 0) {
+	if (optinfo->clientID.duid_len == 0) {
 		dprintf(LOG_INFO, "client6_recvreply: no client ID option");
 		return -1;
 	}
-	if (optinfo.clientID.duid_len != client_duid.duid_len ||
-	    memcmp(optinfo.clientID.duid_id, client_duid.duid_id,
+	if (optinfo->clientID.duid_len != client_duid.duid_len ||
+	    memcmp(optinfo->clientID.duid_id, client_duid.duid_id,
 		   client_duid.duid_len)) {
 		dprintf(LOG_INFO, "client6_recvreply: client DUID mismatch");
 		return -1;
 	}
 
-	if (optinfo.dns.n) {
-		for (i = 0, cp = optinfo.dns.list;
-		     i < optinfo.dns.n; i++, cp += sizeof(in6)) {
-			memcpy(&in6, cp, sizeof(in6));
+	if (!TAILQ_EMPTY(&optinfo->dnslist)) {
+		struct dnslist *d;
+		int i = 0;
+
+		for (d = TAILQ_FIRST(&optinfo->dnslist); d;
+		     d = TAILQ_NEXT(d, link), i++) {
 			dprintf(LOG_DEBUG, "nameserver[%d] %s", i,
-				inet_ntop(AF_INET6, &in6, buf, sizeof(buf)));
+				inet_ntop(AF_INET6, &d->addr,
+					  buf, sizeof(buf)));
 		}
 	}
 

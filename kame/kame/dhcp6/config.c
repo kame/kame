@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.6 2002/05/08 07:18:09 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.7 2002/05/08 10:36:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -30,8 +30,11 @@
  */
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/queue.h>
 
 #include <net/if_dl.h>
+
+#include <netinet/in.h>
 
 #include <syslog.h>
 #include <stdio.h>
@@ -360,7 +363,7 @@ add_options(opcode, ifc, cfl0)
 	struct dhcp6_ifconf *ifc;
 	struct cf_list *cfl0;
 {
-	struct dhcp6_optconf *opt, **optp;
+	struct dhcp6_optconf *opt;
 	struct cf_list *cfl;
 
 	for (cfl = cfl0; cfl; cfl = cfl->next) {

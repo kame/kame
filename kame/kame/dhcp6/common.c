@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.39 2002/05/08 07:18:08 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.40 2002/05/08 10:36:16 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -527,6 +527,31 @@ dhcp6_init_options(optinfo)
 	struct dhcp6_optinfo *optinfo;
 {
 	memset(optinfo, 0, sizeof(*optinfo));
+	TAILQ_INIT(&optinfo->dnslist);
+}
+
+void
+dhcp6_clear_options(optinfo)
+	struct dhcp6_optinfo *optinfo;
+{
+	struct dhcp6_optconf *ropt, *ropt_next;
+	struct dnslist *d, *dn;
+
+	for (ropt = optinfo->requests; ropt; ropt = ropt_next) {
+		ropt_next = ropt->next;
+
+		if (ropt->val)
+			free(ropt->val);
+		free(ropt);
+	}
+
+	for (d = TAILQ_FIRST(&optinfo->dnslist); d; d = dn) {
+		dn = TAILQ_NEXT(d, link);
+		TAILQ_REMOVE(&optinfo->dnslist, d, link);
+		free(d);
+	}
+
+	dhcp6_init_options(optinfo);
 }
 
 int
@@ -535,8 +560,9 @@ dhcp6_get_options(p, ep, optinfo)
 	struct dhcp6_optinfo *optinfo;
 {
 	struct dhcp6opt *np;
-	int opt, optlen;
-	char *cp;
+	int i, opt, optlen, reqopts;
+	char *cp, *val;
+	struct dhcp6_optconf *optconf;
 
 	for (; p + 1 <= ep; p = np) {
 		cp = (char *)(p + 1);
@@ -544,7 +570,7 @@ dhcp6_get_options(p, ep, optinfo)
 		opt = ntohs(p->dh6opt_type);
 		np = (struct dhcp6opt *)(cp + optlen);
 
-		dprintf(LOG_DEBUG, "DHCP option %s, len %d",
+		dprintf(LOG_DEBUG, "get DHCP option %s, len %d",
 			dhcpoptstr(opt), optlen);
 
 		/* option length field overrun */
@@ -566,6 +592,29 @@ dhcp6_get_options(p, ep, optinfo)
 			optinfo->serverID.duid_len = optlen;
 			optinfo->serverID.duid_id = cp;
 			break;
+		case DH6OPT_ORO:
+			if ((optlen % 2) != 0 || optlen == 0)
+				goto malformed;
+			reqopts = optlen / 2;
+			for (i = 0, val = cp; i < reqopts;
+			     i++, val += sizeof(u_int16_t)) {
+				optconf = (struct dhcp6_optconf *)
+					malloc(sizeof(*optconf));
+				if (optconf == NULL) {
+					dprintf(LOG_NOTICE,
+						"memory allocation failed "
+						"during parse options");
+					goto fail;
+				}
+				memset(optconf, 0, sizeof(*optconf));
+				memcpy(&optconf->type, val, sizeof(u_int16_t));
+				optconf->type = ntohs(optconf->type);
+				dprintf(LOG_DEBUG, "  requested option: %s",
+					dhcpoptstr(optconf->type));
+				optconf->next = optinfo->requests;
+				optinfo->requests = optconf;
+			}
+			break;
 		case DH6OPT_RAPID_COMMIT:
 			if (optlen != 0)
 				goto malformed;
@@ -574,8 +623,20 @@ dhcp6_get_options(p, ep, optinfo)
 		case DH6OPT_DNS:
 			if (optlen % sizeof(struct in6_addr) || optlen == 0)
 				goto malformed;
-			optinfo->dns.n = optlen / sizeof(struct in6_addr);
-			optinfo->dns.list = cp;
+			for (val = cp; val < cp + optlen;
+			     val += sizeof(struct in6_addr)) {
+				struct dnslist *dle;
+
+				if ((dle = malloc(sizeof *dle)) == NULL) {
+					dprintf(LOG_ERR, "memory allocation"
+						"failed during parse options");
+					goto fail;
+				}
+				memcpy(&dle->addr, val,
+				       sizeof(struct in6_addr));
+				TAILQ_INSERT_TAIL(&optinfo->dnslist,
+						  dle, link);
+			}
 			break;
 		default:
 			/* no option specific behavior */
@@ -591,6 +652,8 @@ dhcp6_get_options(p, ep, optinfo)
   malformed:
 	dprintf(LOG_INFO, "malformed DHCP option: type %d, len %d",
 		opt, optlen);
+  fail:
+	dhcp6_clear_options(optinfo);
 	return(-1);
 }
 
@@ -614,7 +677,7 @@ dhcp6_set_options(bp, ep, optinfo)
 	struct dhcp6_optinfo *optinfo;
 {
 	struct dhcp6opt *p = bp;
-	int len = 0;
+	int len = 0, optlen;
 	char *tmpbuf = NULL;
 
 	if (optinfo->clientID.duid_len) {
@@ -630,18 +693,36 @@ dhcp6_set_options(bp, ep, optinfo)
 	if (optinfo->rapidcommit)
 		COPY_OPTION(DH6OPT_RAPID_COMMIT, 0, NULL, p);
 
-	if (optinfo->dns.n) {
-		COPY_OPTION(DH6OPT_DNS,
-			    optinfo->dns.n * sizeof(struct in6_addr),
-			    optinfo->dns.list, p);
+	if (!TAILQ_EMPTY(&optinfo->dnslist)) {
+		struct in6_addr *in6;
+		struct dnslist *d;
+		int ns;
+
+		tmpbuf = NULL;
+		for (ns = 0, d = TAILQ_FIRST(&optinfo->dnslist); d;
+		     d = TAILQ_NEXT(d, link)) {
+			ns++;
+		}
+		optlen = ns * sizeof(struct in6_addr);
+		if ((tmpbuf = malloc(optlen)) == NULL) {
+			dprintf(LOG_ERR,
+				"memory allocation failed for DNS options");
+			goto fail;
+		}
+		in6 = (struct in6_addr *)tmpbuf;
+		for (d = TAILQ_FIRST(&optinfo->dnslist); d;
+		     d = TAILQ_NEXT(d, link), in6++) {
+			memcpy(in6, &d->addr, sizeof(*in6));
+		}
+		COPY_OPTION(DH6OPT_DNS, optlen, tmpbuf, p);
+		free(tmpbuf);
 	}
 
 	if (optinfo->requests) {
-		int nopts, optlen;
+		int nopts;
 		struct dhcp6_optconf *opt;
 		u_int16_t *valp;
 
-		/* calculate the number of options */
 		tmpbuf = NULL;
 		for (nopts = 0, opt = optinfo->requests; opt;
 		     opt = opt->next, nopts++)
@@ -689,6 +770,8 @@ dhcpoptstr(type)
 		return "rapid commit";
 	case DH6OPT_DNS:
 		return "DNS";
+	case DH6OPT_PREFIX_DELEGATION:
+		return "prefix delegation";
 	default:
 		sprintf(genstr, "opt_%d", type);
 		return(genstr);

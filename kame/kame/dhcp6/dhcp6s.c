@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.68 2002/05/08 07:38:22 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.69 2002/05/08 10:36:16 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -68,12 +68,6 @@
 #include <common.h>
 #include <config.h>
 
-struct dnslist {
-	TAILQ_ENTRY(dnslist) link;
-	struct in6_addr addr;
-};
-TAILQ_HEAD(, dnslist) dnslist;
-
 static int debug = 0;
 
 char *device = NULL;
@@ -87,6 +81,7 @@ static char rdatabuf[BUFSIZ];
 static int rmsgctllen;
 static char *rmsgctlbuf;
 static struct duid server_duid;
+static struct dnsq dnslist;
 
 #define LINK_LOCAL_PLEN 10
 #define SITE_LOCAL_PLEN 10
@@ -448,6 +443,8 @@ server6_react(ifp, siz, from, fromlen)
 			dhcpmsgstr(dh6->dh6_msgtype));
 		break;
 	}
+
+	dhcp6_clear_options(&optinfo);
 }
 
 static int
@@ -560,6 +557,8 @@ server6_send_reply(ifp, origmsg, optinfo, from, fromlen)
 		roptinfo.clientID = optinfo->clientID;
 
 	/* DNS server */
+	roptinfo.dnslist = dnslist;
+#ifdef deprecated
 	for (ns = 0, d = TAILQ_FIRST(&dnslist); d; d = TAILQ_NEXT(d, link))
 		ns++;
 	if (ns) {
@@ -576,6 +575,7 @@ server6_send_reply(ifp, origmsg, optinfo, from, fromlen)
 		}
 		roptinfo.dns.list = dnsbuf;
 	}
+#endif
 
 	/* set options in the reply message */
 	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),

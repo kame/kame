@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.20 2002/05/08 07:18:09 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.21 2002/05/08 10:36:16 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -69,15 +69,18 @@ struct duid {
 };
 
 /* option information */
+struct dnslist {
+	TAILQ_ENTRY(dnslist) link;
+	struct in6_addr addr;
+};
+TAILQ_HEAD(dnsq, dnslist);
+
 struct dhcp6_optinfo {
 	struct duid clientID;	/* DUID */
 	struct duid serverID;	/* DUID */
-	int rapidcommit;	/* bool */
-	struct {		/* list of DNS servers */
-		int n;
-		char *list;
-	} dns;
 	struct dhcp6_optconf *requests;	/* options in option request */
+	int rapidcommit;	/* bool */
+	struct dnsq dnslist;	/* DNS server list */
 };
 
 /* DHCP6 base packet format */
