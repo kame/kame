@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.h,v 1.15 2003/09/03 03:29:46 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.h,v 1.16 2003/10/21 03:03:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -144,7 +144,6 @@ int mip6_ip6mu_create(struct ip6_mobility **, struct sockaddr_in6 *,
     struct sockaddr_in6 *, struct hif_softc *);
 
 /* ICMPv6 processing. */
-int mip6_icmp6_input(struct mbuf *, int, int);
 int mip6_icmp6_dhaad_req_output(struct hif_softc *);
 int mip6_icmp6_mp_sol_output(struct sockaddr_in6 *, struct sockaddr_in6 *);
 

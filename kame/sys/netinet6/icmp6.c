@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.362 2003/10/20 13:33:39 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.363 2003/10/21 03:03:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -133,6 +133,7 @@
 #include <net/if_hif.h>
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
 #ifdef MIP6_HOME_AGENT
 #include <netinet6/mip6_hacore.h>
 #endif /* MIP6_HOME_AGENT */
@@ -627,12 +628,12 @@ icmp6_input(mp, offp, proto)
 	switch (icmp6->icmp6_type) {
 	case ICMP6_DST_UNREACH:
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_dstunreach);
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
+#if defined(MIP6)
 		if (mip6_icmp6_input(m, off, icmp6len)) {
 			m = NULL;
 			goto freeit;
 		}
-#endif /* MIP6 && MIP6_MOBILE_NODE */
+#endif /* MIP6 */
 		switch (code) {
 		case ICMP6_DST_UNREACH_NOROUTE:
 			code = PRC_UNREACH_NET;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.h,v 1.8 2003/10/16 08:12:54 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.h,v 1.9 2003/10/21 03:03:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -114,6 +114,9 @@ int mip6_get_mobility_options(struct ip6_mobility *, int, int,
     struct mip6_mobility_options *);
 int mip6_cksum(struct sockaddr_in6 *, struct sockaddr_in6 *, u_int32_t,
     u_int8_t, char *);
+
+/* ICMPv6 processing. */
+int mip6_icmp6_input(struct mbuf *, int, int);
 
 /* core functions for mobile node and home agent. */
 #if defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE)

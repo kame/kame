@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.82 2003/09/05 23:17:05 itojun Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.83 2003/10/21 03:03:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -98,8 +98,11 @@
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6_cncore.h>
+#ifdef MIP6_MOBILE_NODE
 #include <netinet6/mip6_mncore.h>
+#endif /* MIP6_MOBILE_NODE */
 
+#ifdef MIP6_MOBILE_NODE
 u_int16_t mip6_dhaad_id = 0;
 
 static const struct sockaddr_in6 haanyaddr_ifid64 = {
@@ -120,6 +123,7 @@ static const struct sockaddr_in6 haanyaddr_ifidnn = {
 	    0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xfe }}},
 	0				/* sin6_scope_id */
 };
+#endif /* MIP6_MOBILE_NODE */
 
 static void mip6_icmp6_find_addr(struct mbuf *, int, int,
     struct sockaddr_in6 *,  struct sockaddr_in6 *);
