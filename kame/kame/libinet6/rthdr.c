@@ -1,4 +1,4 @@
-/*	$KAME: rthdr.c,v 1.17 2003/06/06 06:36:42 itojun Exp $	*/
+/*	$KAME: rthdr.c,v 1.18 2003/06/06 06:56:59 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -82,7 +82,7 @@ inet6_rthdr_init(bp, type)
 #endif 
 
 		bzero(rthdr, sizeof(struct ip6_rthdr0));
-		    rthdr->ip6r_type = IPV6_RTHDR_TYPE_0;
+		rthdr->ip6r_type = IPV6_RTHDR_TYPE_0;
 		return (ch);
 	default:
 		return (NULL);
@@ -256,9 +256,8 @@ inet6_rthdr_getflags(cmsg, idx)
 		struct ip6_rthdr0 *rt0 = (struct ip6_rthdr0 *)rthdr;
 		int naddr;
 
-		if (rt0->ip6r0_len % 2 || 46 < rt0->ip6r0_len) {
+		if (rt0->ip6r0_len % 2 || 46 < rt0->ip6r0_len)
 			return (-1);
-		}
 		naddr = (rt0->ip6r0_len * 8) / sizeof(struct in6_addr);
 		if (idx < 0 || naddr < idx)
 			return (-1);
