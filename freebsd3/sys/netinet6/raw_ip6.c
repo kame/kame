@@ -314,6 +314,7 @@ rip6_output(m, va_alist)
 	int type = 0, code = 0;		/* for ICMPv6 output statistics only */
 	int priv = 0;
 	va_list ap;
+	int flags;
 
 	va_start(ap, m);
 	so = va_arg(ap, struct socket *);
@@ -471,8 +472,12 @@ rip6_output(m, va_alist)
 	}
 #endif /*IPSEC*/
 
-	error = ip6_output(m, optp, &in6p->in6p_route, 0, in6p->in6p_moptions,
-			   &oifp);
+	flags = 0;
+	if (in6p->in6p_flags & IN6P_MINMTU)
+		flags |= IPV6_MINMTU;
+	
+	error = ip6_output(m, optp, &in6p->in6p_route, flags,
+	    in6p->in6p_moptions, &oifp);
 	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
 		if (oifp)
 			icmp6_ifoutstat_inc(oifp, type, code);
