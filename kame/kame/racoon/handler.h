@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.17 2000/04/24 19:57:24 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.18 2000/05/30 01:02:34 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -148,10 +148,11 @@ struct ph1handle {
 					/* i.e. strut ipsecdoi_id_b*. */
 	struct isakmp_ivm *ivm;		/* IVs */
 
-	vchar_t *sa;			/* whole SA payload to calculate HASH */
+	vchar_t *sa;			/* whole SA payload to send/to be sent*/
+					/* to calculate HASH */
 					/* NOT INCLUDING general header. */
 
-	vchar_t *sa_ret;		/* SA payload to be reply */
+	vchar_t *sa_ret;		/* SA payload to reply/to be replyed */
 					/* NOT INCLUDING general header. */
 					/* NOTE: Should be release after use. */
 
