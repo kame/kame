@@ -1,6 +1,6 @@
-Installation procedure - FreeBSD 4.0
+Installation procedure - FreeBSD 4.x
 KAME project
-$Id: INSTALL,v 1.5 2000/11/22 10:51:22 itojun Exp $
+$Id: INSTALL,v 1.6 2000/11/22 10:57:07 itojun Exp $
 
 
 You'll need to follow the steps below.  They can be separated into two major
@@ -86,13 +86,14 @@ D-1. Reboot with the command you like.
 E. Configurations, in short
 ===========================
 E-0. You should configure IPv6 programs in this snapshot instead of the 
-     ones in original FreeBSD 4.0, because some of them do not work 
+     ones in original FreeBSD 4.x, because some of them do not work 
      on this snapshot. (We'll handle this problem in the near future)
 
-E-1. Most of configuration files for this snapshot are placed in 
-     /usr/local/v6/etc.
-     You may want to copy those foo.sample files into non-sample (foo),
-     edit as necessary.  
+E-1. Most of configuration files are shipped with normal OS distribution,
+     and are in located in /etc.  If you need special configuration file for
+     KAME-origin daemons, configuration files need to be placed in
+     /usr/local/v6/etc.  You may want to copy /usr/local/v6/etc/foo.sample into
+     /usr/local/v6/etc/foo, and edit as necessary.
 
 E-2. If you wish to use ALTQ, you may need to invoke /dev/MAKEDEV.altq.
 	# cd /dev
