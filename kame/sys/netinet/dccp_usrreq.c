@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.37 2004/12/16 11:12:14 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.38 2004/12/16 11:18:36 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -2296,14 +2296,13 @@ int
 #ifdef __FreeBSD__
 dccp_doconnect(struct socket *so, struct sockaddr *nam,
 #if __FreeBSD_version >= 500000
-    struct thread *td,
+	struct thread *td,
 #else
-    struct proc *td,
+	struct proc *td,
 #endif
-    int isipv6)
+	int isipv6)
 #else
-dccp_doconnect(struct socket *so, struct mbuf *m,
-    struct proc *td, int isipv6)
+dccp_doconnect(struct socket *so, struct mbuf *m, struct proc *td, int isipv6)
 #endif
 { 
 	struct inpcb *inp;
@@ -2553,11 +2552,11 @@ dccp_disconnect2(struct dccpcb *dp)
 int
 #ifdef __FreeBSD__
 dccp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
-    struct mbuf *control, 
+	struct mbuf *control, 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-    struct thread *td
+	struct thread *td
 #else
-    struct proc *td
+	struct proc *td
 #endif
 	)
 #else
@@ -3503,16 +3502,16 @@ struct pr_usrreqs dccp_usrreqs = {
 #ifdef __NetBSD__
 int
 dccp_usrreq(so, req, m, nam, control, p)
-     struct socket *so;
-     int req;
-     struct mbuf *m, *nam, *control;
-     struct proc *p;
+	struct socket *so;
+	int req;
+	struct mbuf *m, *nam, *control;
+	struct proc *p;
 #else /* OpenBSD */
 int
 dccp_usrreq(so, req, m, nam, control)
-     struct socket *so;
-     int req;
-     struct mbuf *m, *nam, *control;
+	struct socket *so;
+	int req;
+	struct mbuf *m, *nam, *control;
 #endif
 {
 	struct inpcb *inp;
