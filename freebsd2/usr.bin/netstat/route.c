@@ -437,7 +437,8 @@ p_sockaddr(sa, mask, flags, width)
 		 * sin6_scope_id field of SA should be set in the future.
 		 */
 		if (IN6_IS_ADDR_LINKLOCAL(in6) ||
-		    IN6_IS_ADDR_MC_LINKLOCAL(in6)) {
+		    IN6_IS_ADDR_MC_LINKLOCAL(in6) ||
+		    IN6_IS_ADDR_MC_NODELOCAL(in6)) {
 		    /* XXX: override is ok? */
 		    sa6->sin6_scope_id = (u_int32_t)ntohs(*(u_short *)&in6->s6_addr[2]);
 		    *(u_short *)&in6->s6_addr[2] = 0;
