@@ -422,7 +422,7 @@ udp6_input(mp, offp, proto)
 {
 	struct mbuf *m = *mp;
 	int off = *offp;
-	struct sockaddr_in6 src, dst;
+	struct sockaddr_in6 src, dst, fromsa, tosa;
 	struct ip6_hdr *ip6;
 	struct udphdr *uh;
 	u_int32_t plen, ulen;
@@ -498,7 +498,18 @@ udp6_input(mp, offp, proto)
 	src.sin6_port = uh->uh_sport;
 	dst.sin6_port = uh->uh_dport;
 
-	if (udp6_realinput(AF_INET6, &src, &dst, m, off) == 0) {
+	/*
+	 * XXX: the address may have embedded scope zone ID, which should be
+	 * hidden from applications.
+	 */
+	fromsa = src;
+	tosa = dst;
+#ifndef SCOPEDROUTING
+	in6_clearscope(&fromsa.sin6_addr);
+	in6_clearscope(&tosa.sin6_addr);
+#endif
+
+	if (udp6_realinput(AF_INET6, &fromsa, &tosa, m, off) == 0) {
 		if (m->m_flags & M_MCAST) {
 			udp6stat.udp6s_noportmcast++;
 			goto bad;
