@@ -754,9 +754,11 @@ send:
 	 */
 #ifdef INET6
 	if (tp->pf == PF_INET6) {
+	  m->m_pkthdr.len = sizeof(struct ip6_hdr) + sizeof(struct tcphdr)
+		  + optlen + len;
 	  th->th_sum = in6_cksum(m, IPPROTO_TCP,
-				 sizeof(struct tcphdr) + optlen + len,
-				 sizeof(struct ip6_hdr));
+				 sizeof(struct ip6_hdr),
+				 sizeof(struct tcphdr) + optlen + len);
 	} else
 #endif /* INET6 */
 	{

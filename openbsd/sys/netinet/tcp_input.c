@@ -579,7 +579,7 @@ tcp_input(m, va_alist)
 	  ti = NULL;
 	  ipv6 = mtod(m, struct ip6_hdr *);
 
-	  if (in6_cksum(m, IPPROTO_TCP, tlen, sizeof(struct ip6_hdr))) {
+	  if (in6_cksum(m, IPPROTO_TCP, sizeof(struct ip6_hdr), tlen)) {
 	    tcpstat.tcps_rcvbadsum++;
 	    goto drop;
 	  } /* endif in6_cksum */

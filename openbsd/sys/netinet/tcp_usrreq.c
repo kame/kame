@@ -265,6 +265,7 @@ tcp_usrreq(so, req, m, nam, control)
 			}
 		} else if (sin->sin_family == AF_INET)
 #endif /* INET6 */
+		{
 			if ((sin->sin_addr.s_addr == INADDR_ANY) ||
 			    IN_MULTICAST(sin->sin_addr.s_addr) ||
 			    in_broadcast(sin->sin_addr, NULL)) {
@@ -272,10 +273,11 @@ tcp_usrreq(so, req, m, nam, control)
 				break;
 			}
 
-		/* Trying to connect to some broadcast address */
-		if (in_broadcast(sin->sin_addr, NULL)) {
-			error = EINVAL;
-			break;
+			/* Trying to connect to some broadcast address */
+			if (in_broadcast(sin->sin_addr, NULL)) {
+				error = EINVAL;
+				break;
+			}
 		}
 
 		if (inp->inp_lport == 0) {
