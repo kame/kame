@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.65 2000/02/22 14:06:39 itojun Exp $	*/
+/*	$KAME: key.c,v 1.66 2000/03/04 09:23:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.65 2000/02/22 14:06:39 itojun Exp $ */
+/* KAME $Id: key.c,v 1.66 2000/03/04 09:23:01 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -480,6 +480,7 @@ key_checkrequest(isr, saidx)
 	/* get current level */
 	level = ipsec_get_reqlevel(isr);
 
+#if 1
 	/*
 	 * We do allocate new SA only if the state of SA in the holder is
 	 * SADB_SASTATE_DEAD.  The SA for outbound must be the oldest.
@@ -496,6 +497,26 @@ key_checkrequest(isr, saidx)
 			isr->sav = NULL;
 		}
 	}
+#else
+	/*
+	 * we free any SA stashed in the IPsec request because a different
+	 * SA may be involved each time this request is checked, either
+	 * because new SAs are being configured, or this request is
+	 * associated with an unconnected datagram socket, or this request
+	 * is associated with a system default policy.
+	 *
+	 * The operation may have negative impact to performance.  We may
+	 * want to check cached SA carefully, rather than picking new SA
+	 * every time.
+	 *
+	 * Also, not sure if the following code respects rekey consideration
+	 * (see above).
+	 */
+	if (isr->sav != NULL) {
+		key_freesav(isr->sav);
+		isr->sav = NULL;
+	}
+#endif
 
 	/* new SA allocation if no SA found. */
 	if (isr->sav == NULL)
