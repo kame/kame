@@ -32,7 +32,7 @@
  * Sun Jan  9 06:23:42 JST 2000
  *    Merged into new racoon with trivial modification.
  */
-/* $Id: signing.c,v 1.5 2000/02/07 10:51:22 sakane Exp $ */
+/* $Id: signing.c,v 1.6 2000/02/07 11:26:19 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -44,6 +44,17 @@
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
+
+/* get openssl/ssleay version number */
+#ifdef HAVE_OPENSSLV_H
+#include <opensslv.h>
+#define SSLVER	OPENSSL_VERSION_NUMBER
+#else
+#ifdef HAVE_CVERSION_H
+#include <cversion.h>
+#define SSLVER	SSLEAY_VERSION_NUMBER
+#endif
+#endif
 
 #include <rsa.h>
 #include <evp.h>
@@ -61,17 +72,6 @@
 #include "debug.h"
 #include "localconf.h"
 #include "signing.h"
-
-/* get openssl/ssleay version number */
-#ifdef HAVE_OPENSSLV_H
-#include <opensslv.h>
-#define SSLVER	OPENSSL_VERSION_NUMBER
-#else
-#ifdef HAVE_CVERSION_H
-#include <cversion.h>
-#define SSLVER	SSLEAY_VERSION_NUMBER
-#endif
-#endif
 
 /* Buffer used:	3072 bytes for data to be signed
  *		1024 bytes for signature buffer
