@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.45 2000/09/25 22:43:56 itojun Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.46 2001/01/26 01:32:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -70,7 +70,7 @@
 #define YES 1
 #define NO  0
 
-static struct afd {
+static const struct afd {
 	int a_af;
 	int a_addrlen;
 	int a_socklen;
@@ -120,7 +120,7 @@ getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 	size_t servlen;
 	int flags;
 {
-	struct afd *afd;
+	const struct afd *afd;
 	struct servent *sp;
 	struct hostent *hp;
 	u_short port;

@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.98 2001/01/24 12:49:16 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.99 2001/01/26 01:31:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -244,7 +244,7 @@ static int explore_fqdn __P((const struct addrinfo *, const char *,
 #endif
 
 #ifndef __OpenBSD__
-static char *ai_errlist[] = {
+static const char *ai_errlist[] = {
 	"Success",
 	"Address family for hostname not supported",	/* EAI_ADDRFAMILY */
 	"Temporary failure in name resolution",		/* EAI_AGAIN      */
@@ -311,7 +311,8 @@ gai_strerror(ecode)
 {
 	if (ecode < 0 || ecode > EAI_MAX)
 		ecode = EAI_MAX;
-	return ai_errlist[ecode];
+	/* LINTED const castaway */
+	return (char *)ai_errlist[ecode];
 }
 
 void
