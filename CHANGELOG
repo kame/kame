@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.651 2000/03/03 13:12:43 itojun Exp $
+$Id: CHANGELOG,v 1.652 2000/03/03 17:01:51 itojun Exp $
 
 <200003>
+Sat Mar  4 02:01:16 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/ethereal: upgrade to 0.8.4.
+
 Fri Mar  3 22:11:59 JST 2000  itojun@iijlab.net
 	* {netbsd,openbsd}/sys/netinet/ip_input.c: remove merge mistake,
 	  which affected TTL value for ressembled packet.  NetBSD PR 9412.
