@@ -487,17 +487,6 @@ rt_msg1(type, rtinfo, data, datalen)
 	struct sockaddr *sa;
 	int len, dlen;
 
-#ifdef DIAGNOSTIC
-	if (sizeof(struct ifa_msghdr) > MHLEN ||
-	    sizeof(struct if_msghdr) > MHLEN ||
-	    sizeof(struct if_announcemsghdr) > MHLEN ||
-	    sizeof(struct rt_msghdr) > MHLEN)
-		panic("rt_msg1: assumption failed");
-#ifdef COMPAT_14
-	if (sizeof(struct if_msghdr14) > MHLEN)
-		panic("rt_msg1: assumption failed");
-#endif
-#endif
 	m = m_gethdr(M_DONTWAIT, MT_DATA);
 	if (m == 0)
 		return (m);
