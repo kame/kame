@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.4 2002/05/20 05:50:04 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.5 2002/06/07 01:21:19 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -474,8 +474,8 @@ sctp6_ctlinput(cmd, pktdst, d)
 		struct sctp_nets *netp;
 		struct sockaddr_in6 final;
 
-		if (ip6cp->ip6c_m->m_pkthdr.len < (ip6cp->ip6c_off +
-						   sizeof(sh)))
+		if (ip6cp->ip6c_m == NULL ||
+		    ip6cp->ip6c_m->m_pkthdr.len < (ip6cp->ip6c_off + sizeof(sh)))
 			return;
 	  
 		bzero(&sh, sizeof(sh));
