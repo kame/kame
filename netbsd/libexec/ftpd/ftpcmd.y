@@ -328,8 +328,14 @@ cmd
 			/* some more sanity check */
 			p = result[0];
 			while (*p) {
-				if (!isdigit(*p))
-					goto parsefail;
+				if (!isdigit(*p)) {
+		protounsupp:
+					reply(522, "Unsupported protocol.");
+					if (tmp)
+						free(tmp);
+					usedefault = 1;
+					goto eprt_done;
+				}
 				p++;
 			}
 			p = result[2];
@@ -347,8 +353,12 @@ cmd
 			else
 				hints.ai_family = PF_UNSPEC;	/*XXX*/
 			hints.ai_socktype = SOCK_STREAM;
-			if (getaddrinfo(result[1], result[2], &hints, &res))
-				goto parsefail;
+			if (getaddrinfo(result[1], result[2], &hints, &res)) {
+				if (hints.ai_family == PF_UNSPEC)
+					goto protounsupp;
+				else
+					goto parsefail;
+			}
 			if (sizeof(data_dest) < res->ai_addrlen)
 				goto parsefail;
 			memcpy(&data_dest, res->ai_addr, res->ai_addrlen);
