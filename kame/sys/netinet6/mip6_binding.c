@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.71 2002/01/23 11:47:07 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.72 2002/01/24 07:32:58 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -262,8 +262,14 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 		mbu->mbu_lifetime = mpfx->mpfx_pltime;
 	}
 	mbu->mbu_expire = time_second + mbu->mbu_lifetime;
+	/* sanity check for overflow */
+	if (mbu->mbu_expire < time_second)
+		mbu->mbu_expire = 0x7fffffff;
 	mbu->mbu_refresh = mbu->mbu_lifetime;
 	mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
+	/* sanity check for overflow */
+	if (mbu->mbu_refexpire < time_second)
+		mbu->mbu_refexpire = 0x7fffffff;
 	mbu->mbu_acktimeout = MIP6_BA_INITIAL_TIMEOUT;
 	mbu->mbu_ackexpire = time_second + mbu->mbu_acktimeout;
 	mbu->mbu_flags = flags;
@@ -430,8 +436,14 @@ mip6_home_registration(sc)
 			mbu->mbu_lifetime = prefix_lifetime;
 		}
 		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
+		/* sanity check for overflow */
+		if (mbu->mbu_expire < time_second)
+			mbu->mbu_expire = 0x7fffffff;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
 		mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
+		/* sanity check for overflow */
+		if (mbu->mbu_refexpire < time_second)
+			mbu->mbu_refexpire = 0x7fffffff;
 		mbu->mbu_acktimeout = MIP6_BA_INITIAL_TIMEOUT;
 		mbu->mbu_ackexpire = time_second + mbu->mbu_acktimeout;
 		/* mbu->mbu_flags |= IP6_BUF_DAD ;*/
@@ -489,8 +501,14 @@ mip6_bu_list_notify_binding_change(sc)
 			mbu->mbu_lifetime = mpfx->mpfx_pltime;
 		}
 		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
+		/* sanity check for overflow */
+		if (mbu->mbu_expire < time_second)
+			mbu->mbu_expire = 0x7fffffff;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
 		mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
+		/* sanity check for overflow */
+		if (mbu->mbu_refexpire < time_second)
+			mbu->mbu_refexpire = 0x7fffffff;
 		mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
 		mip6_bu_send_bu(mbu);
 	}
@@ -604,6 +622,9 @@ mip6_bu_timeout(arg)
 				/* refresh binding */
 				mbu->mbu_refexpire
 					= time_second + mbu->mbu_refresh;
+				/* sanity check for overflow */
+				if (mbu->mbu_refexpire < time_second)
+					mbu->mbu_refexpire = 0x7fffffff;
 				if (mbu->mbu_flags & IP6_BUF_ACK) {
 					mbu->mbu_acktimeout
 						= MIP6_BA_INITIAL_TIMEOUT;
@@ -1149,6 +1170,9 @@ mip6_process_bu(m, opt)
 				mbc->mbc_lifetime = lifetime;
 				mbc->mbc_expire
 					= time_second + mbc->mbc_lifetime;
+				/* sanity check for overflow */
+				if (mbc->mbc_expire < time_second)
+					mbc->mbc_expire = 0x7fffffff;
 			}
 			
 			if (bu_opt->ip6ou_flags & IP6_BUF_ACK) {
@@ -1620,6 +1644,9 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 			mbc->mbc_seqno = seqno;
 			mbc->mbc_lifetime = lifetime;
 			mbc->mbc_expire = time_second + mbc->mbc_lifetime;
+			/* sanity check for overflow */
+			if (mbc->mbc_expire < time_second)
+				mbc->mbc_expire = 0x7fffffff;
 
 			/* modify encapsulation entry */
 			if (mip6_tunnel_control(MIP6_TUNNEL_CHANGE,
@@ -1698,6 +1725,9 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 				mbc->mbc_lifetime = lifetime;
 				mbc->mbc_expire
 					= time_second + mbc->mbc_lifetime;
+				/* sanity check for overflow */
+				if (mbc->mbc_expire < time_second)
+					mbc->mbc_expire = 0x7fffffff;
 
 				if (IN6_IS_ADDR_LINKLOCAL(&haddr))
 					continue;
@@ -2528,6 +2558,9 @@ success:
 	}
 	GET_NETVAL_L(ba_opt->ip6oa_refresh, mbu->mbu_refresh);
 	mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
+	/* sanity check for overflow */
+	if (mbu->mbu_refexpire < time_second)
+		mbu->mbu_refexpire = 0x7fffffff;
 	if (mbu->mbu_refresh > mbu->mbu_expire)
 		mbu->mbu_refresh = mbu->mbu_expire;
 
@@ -2949,6 +2982,9 @@ mip6_process_br(m, opt)
 		? haddr_remain : coa_remain;
 	mbu->mbu_lifetime = (u_int32_t)remain;
 	mbu->mbu_expire = time_second + mbu->mbu_lifetime;
+	/* sanity check for overflow */
+	if (mbu->mbu_expire < time_second)
+		mbu->mbu_expire = 0x7fffffff;
 	mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
 
 	/*
@@ -3021,6 +3057,9 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 	mbc->mbc_seqno = seqno;
 	mbc->mbc_lifetime = lifetime;
 	mbc->mbc_expire = time_second + mbc->mbc_lifetime;
+	/* sanity check for overflow */
+	if (mbc->mbc_expire < time_second)
+		mbc->mbc_expire = 0x7fffffff;
 	mbc->mbc_state = 0;
 	mbc->mbc_ifp = ifp;
 
@@ -3652,8 +3691,14 @@ mip6_route_optimize(m)
 			mbu->mbu_lifetime = mpfx->mpfx_pltime;
 		}
 		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
+		/* sanity check for overflow */
+		if (mbu->mbu_expire < time_second)
+			mbu->mbu_expire = 0x7fffffff;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
 		mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
+		/* sanity check for overflow */
+		if (mbu->mbu_refexpire < time_second)
+			mbu->mbu_refexpire = 0x7fffffff;
 		mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
 	}
 
