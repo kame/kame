@@ -101,4 +101,11 @@ autobuild:
 	touch ${AUTOBUILD_COOKIE}
 .endif
 
+copyright.c: COPYRIGHT
+	(echo '/*	$$KAME: Makefile,v 1.32 2001/01/28 15:47:15 itojun Exp $$	*/'; \
+	echo; \
+	echo '/*'; \
+	sed -e 's,^, * ,' -e 's, *$$,,' < ${.ALLSRC}; \
+	echo ' */') > ${.TARGET}
+
 .include "Makefile.inc"
