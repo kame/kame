@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.17 2001/08/28 04:08:31 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.18 2001/09/05 12:50:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -236,14 +236,12 @@ in6_addrscope(addr)
 	 * Regard loopback and unspecified addresses as global, since
 	 * they have no ambiguity.
 	 */
-#if 0
 	if (bcmp(&in6addr_loopback, addr, sizeof(addr) - 1) == 0) {
 		if (addr->s6_addr[15] == 1) /* loopback */
-			return IPV6_ADDR_SCOPE_INTFACELOCAL;
+			return IPV6_ADDR_SCOPE_LINKLOCAL;
 		if (addr->s6_addr[15] == 0) /* unspecified */
 			return IPV6_ADDR_SCOPE_GLOBAL; /* XXX: correct? */
 	}
-#endif
 
 	return IPV6_ADDR_SCOPE_GLOBAL;
 }
@@ -340,5 +338,12 @@ u_int32_t
 scope6_addr2default(addr)
 	struct in6_addr *addr;
 {
+	/*
+	 * special case: The loopback address should be considered as
+	 * link-local, but there's no ambiguity in the syntax. 
+	 */
+	if (IN6_IS_ADDR_LOOPBACK(addr))
+		return(0);
+
 	return(scope6_ids[0].s6id_list[in6_addrscope(addr)]);
 }
