@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.121 2000/08/19 01:35:42 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.122 2000/08/19 02:12:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1233,16 +1233,25 @@ ip6_insert_jumboopt(exthdrs, plen)
 		mopt = exthdrs->ip6e_hbh;
 		if (M_TRAILINGSPACE(mopt) < JUMBOOPTLEN) {
 			/*
-			 * XXX assumption: exthdrs->ip6e_hbh is not referenced
-			 * from places other than exthdrs.
+			 * XXX assumption:
+			 * - exthdrs->ip6e_hbh is not referenced from places
+			 *   other than exthdrs.
+			 * - exthdrs->ip6e_hbh is not an mbuf chain.
 			 */
 			int oldoptlen = mopt->m_len;
 			struct mbuf *n;
 
+			/*
+			 * XXX: give up if the whole (new) hbh header does
+			 * not fit even in an mbuf cluster.
+			 */
 			if (oldoptlen + JUMBOOPTLEN > MCLBYTES)
 				return(ENOBUFS);
-			if (mopt->m_next)
-				return(ENOBUFS);
+
+			/*
+			 * As a consequence, we must always prepare a cluster
+			 * at this point.
+			 */
 			MGET(n, M_DONTWAIT, MT_DATA);
 			if (n) {
 				MCLGET(n, M_DONTWAIT);
@@ -1254,7 +1263,8 @@ ip6_insert_jumboopt(exthdrs, plen)
 			if (!n)
 				return(ENOBUFS);
 			n->m_len = oldoptlen + JUMBOOPTLEN;
-			bcopy(mtod(mopt, caddr_t), mtod(n, caddr_t), oldoptlen);
+			bcopy(mtod(mopt, caddr_t), mtod(n, caddr_t),
+			      oldoptlen);
 			optbuf = mtod(n, caddr_t) + oldoptlen;
 			m_freem(mopt);
 			exthdrs->ip6e_hbh = n;
