@@ -3,6 +3,7 @@ SRCDIR=	${.CURDIR}/../../kame/natptconfig
 PROG=	natptconfig
 SRCS=	main.c cftoken.l cfparse.y misc.c show.c yylex.c showsubs.c
 
+MAN5=	natpt.conf.5
 MAN8=	natptconfig.8
 
 CFLAGS+= -g -I${.OBJDIR} -DYYDEBUG -Wall -DreadKMEM

@@ -1,4 +1,4 @@
-#	$KAME: Makefile,v 1.5 2001/09/02 19:32:27 fujisawa Exp $
+#	$KAME: Makefile,v 1.6 2001/09/30 21:15:05 fujisawa Exp $
 
 # Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 # All rights reserved.
@@ -50,9 +50,10 @@ CPPFLAGS+=-g
 .endif
 .if (${OPSYS} != "NetBSD")
 MAN1=
+MAN5=	natpt.conf.5
 MAN8=	natptconfig.8
 .else
-MAN=	natptconfig.8
+MAN=	natptconfig.8 natpt.conf.5
 .endif
 
 .if exists(/usr/local/v6/lib/libinet6.a)
