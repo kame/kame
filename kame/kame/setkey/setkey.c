@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.22 2001/08/16 10:39:11 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.23 2001/08/16 10:40:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -82,9 +82,6 @@ int f_policy = 0;
 int f_hexdump = 0;
 int f_tflag = 0;
 char *pname;
-
-u_char m_buf[BUFSIZ];
-u_int m_len;
 
 static time_t thiszone;
 
