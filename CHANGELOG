@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.77 1999/08/28 07:33:11 itojun Exp $
+$Id: CHANGELOG,v 1.78 1999/08/30 03:36:52 itojun Exp $
 
 <199908>
+Mon Aug 30 11:48:41 JST 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/net/zebra, freebsd[23]/ports/zebra: upgrade to 0.78a.
+
 Sat Aug 28 16:32:29 JST 1999  itojun@iijlab.net
 	* netbsd/usr.bin/whois: IPv6-ready whois client.
 
