@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1315 2000/10/03 15:31:42 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1316 2000/10/03 22:31:51 itojun Exp $
 
 <200010>
+Wed Oct  4 07:30:10 JST 2000  itojun@iijlab.net
+	* sys/net/pfkeyv2.h, racoon: move AES (rijndael) protocol # to the
+	  official one.  note that you now lost interoperability between old
+	  racoon and new racoon, when you negotiate rijndael.
+	  also note that AES final document is yet to become FIPS standard,
+	  so there's some uncertainity window, for like 3 months.
+
 Wed Oct  4 00:29:42 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/lftp: upgrade to 2.3.3.
 
