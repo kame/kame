@@ -177,7 +177,6 @@ hookup(host, port)
 		 * peername/sockname will be AF_INET if IPv4 mapped address
 		 * is used to embed IPv4 address, and will be AF_INET6 if
 		 * we use it as native.  What a mess!
-		 * IPv4 mapped address must die.
 		 */
 		ai_unmapped(res);
 #if 0	/*old behavior*/
