@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/08/13 12:50:31 $
+			$Date: 1999/08/16 12:07:11 $
 
 1. IPv6
 
@@ -190,6 +190,8 @@ kernel.  Router Solicitation (RS) output for endhosts, RS input
 for routers, and RA output for routers are implemented in the
 userland.
 
+1.4.1 Assignment of link-local, and special addresses
+
 When the kernel boots up, an IPv6 link-local address is assigned to each
 interface.  Also, direct route for the link-local address is added to
 routing table. Here is an output of netstat command:
@@ -205,6 +207,13 @@ and ff02:1::1, respectively).  In addition to a link-local address,
 the loopback address (::1) is assigned to the loopback interface.  It
 adds ::1/128 and ff01::/32 to routing table and joins ff01::1.
 
+1.4.2 Stateless address autoconfiguration on hosts
+
+In IPv6 specification, node can be separated into two categories:
+routers and hosts.  Routers forard packets addressed to others, hosts does
+not forward the packets.  net.inet6.ip6.forwarding defines whether this
+node is router or host (router if it is 1, host if it is 0).
+
 When a host hears Router Advertisement from the router, default route
 and network address prefix (usually global address prefix) are added.
 To generate a Router Solicitation packet at any time, use the "rtsol" command.
@@ -215,6 +224,13 @@ net.inet6.ip6.accept_rtadv to 0.
 
 To generate Router Advertisement from a router, use the "rtadvd" daemon.
 
+Note that, IPv6 specification assumes the following items, and nonconforming
+cases are left unspecified:
+- Only hosts will listen to router advertisements
+- Hosts have single network interface (except loopback)
+Therefore, this is unwise to enable net.inet6.ip6.accept_rtadv on routers,
+or multi-interface host.  A misconfigured node can behave strange.
+
 RFC2462 has validation rule against incoming RA prefix information option,
 in 5.5.3 (e).  This is to protect hosts from malicious (or misconfigured)
 routers that advertise very short prefix lifetime.
@@ -222,6 +238,8 @@ There was an update from Jim Bound to ipngwg mailing list (look
 for "(ipng 6712)" in the archive) and KAME implements Jim's update.
 
 See 1.2 in the document for relationship between DAD and autoconfiguration.
+
+1.4.3 DHCPv6
 
 DHCPv6 server/client is not implemented yet.  "Managed" and "Other" bits in
 RA have no special effect to stateful autoconfiguration procedure
