@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2174 2002/05/30 05:57:59 sakane Exp $
+$KAME: CHANGELOG,v 1.2175 2002/05/31 04:12:12 itojun Exp $
 
 <200205>
+Fri May 31 12:56:52 JST 2002  itojun@iijlab.net
+	* sys/netinet6/ip6_output.c: implement RFC2460 section 5, last
+	  paragraph (ICMPv6 too big with < 1280).
+
 Thu May 30 14:54:25 JST 2002 sakane@kame.net
 	* kame/sys/netkey/key.c:
 	- the memory leak was fixed when an error happened during
