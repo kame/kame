@@ -816,7 +816,7 @@ udp4_realinput(src, dst, m, off)
 bad:
 	return rcvcnt;
 }
-#endif /* IGMPV3 */
+#endif /* INET */
 
 #ifdef INET6
 static int
@@ -940,6 +940,7 @@ udp6_realinput(af, src, dst, m, off)
 bad:
 	return rcvcnt;
 }
+#endif /* INET6 */
 
 #ifdef INET
 /*
