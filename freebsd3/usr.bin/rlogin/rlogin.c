@@ -324,10 +324,11 @@ main(argc, argv)
 		if (doencrypt)
 			errx(1, "the -x flag requires Kerberos authentication");
 #endif /* CRYPT */
-		rem = rcmd(&host, sp->s_port, pw->pw_name, user, term, 0);
+		rem = rcmd_af(&host, sp->s_port, pw->pw_name, user, term, 0,
+		    PF_UNSPEC);
 	}
 #else
-	rem = rcmd(&host, sp->s_port, pw->pw_name, user, term, 0);
+	rem = rcmd_af(&host, sp->s_port, pw->pw_name, user, term, 0, PF_UNSPEC);
 #endif /* KERBEROS */
 
 	if (rem < 0)
