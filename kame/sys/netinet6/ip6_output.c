@@ -1303,8 +1303,8 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 #endif
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
-	rcvopts = &inp->in6p_inputopts;	/* XXX right? */
+#if defined(HAVE_NRL_INPCB)
+	rcvopts = &inp->in6p_inputopts;
 #else
 	rcvopts = &in6p->in6p_inputopts;
 #endif
