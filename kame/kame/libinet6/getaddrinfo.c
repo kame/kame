@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.210 2005/01/19 04:40:49 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.211 2005/01/19 07:21:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -282,7 +282,7 @@ struct ai_order {
 };
 
 /* types for OS dependent portion */
-#if 1
+#if 0
 struct res_target {
 	struct res_target *next;
 	const char *name;	/* domain name */
