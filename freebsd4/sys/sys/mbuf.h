@@ -577,14 +577,14 @@ union mcluster {
  * mbufs (or lookalikes) prepended to the actual mbuf chain.
  *
  *	m_type	= MT_TAG
- *	m_flags	= m_tag_id
+ *	m_flags	= _m_tag_id
  *	m_next	= next buffer in chain.
  *
  * BE VERY CAREFUL not to pass these blocks to the mbuf handling routines.
  *
  */
 
-#define	m_tag_id	m_hdr.mh_flags
+#define	_m_tag_id	m_hdr.mh_flags
 
 /* Packet tag types -- first ones are from NetBSD */
 

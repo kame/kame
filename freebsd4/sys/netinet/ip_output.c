@@ -197,10 +197,10 @@ ip_output(m0, opt, ro, flags, imo)
 
 	/* Grab info from MT_TAG mbufs prepended to the chain. */
 	for (; m0 && m0->m_type == MT_TAG; m0 = m0->m_next) {
-		switch(m0->m_tag_id) {
+		switch(m0->_m_tag_id) {
 		default:
 			printf("ip_output: unrecognised MT_TAG tag %d\n",
-			    m0->m_tag_id);
+			    m0->_m_tag_id);
 			break;
 
 		case PACKET_TAG_DUMMYNET:
