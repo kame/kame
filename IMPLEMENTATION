@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.207 2001/04/24 20:30:24 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.208 2001/04/25 02:28:08 jinmei Exp $
 
 1. IPv6
 
@@ -274,8 +274,9 @@ IPv6 uses scoped addresses.  It is therefore very important to
 specify the scope zone index (link index for a link-local address, or
 site index for a site-local address) with an IPv6 address.  Without a
 zone index, a scoped IPv6 address is ambiguous to the kernel, and
-the kernel will not be able to determine the outbound interface for a
-packet.  KAME code tries to address the issue in several ways.
+the kernel will not be able to determine the outbound link for a
+packet to the scoped address.  KAME code tries to address the issue in
+several ways.
 
 The entire architecture of scoped addresses is documented in
 draft-ietf-ipngwg-scoping-arch-xx.txt.  One non-trivial point of the
