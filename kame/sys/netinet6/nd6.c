@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.185 2001/08/03 12:52:33 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.186 2001/08/05 16:18:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2143,10 +2143,9 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	 * There is a neighbor cache entry, but no ethernet address
 	 * response yet.  Replace the held mbuf (if any) with this
 	 * latest one.
-	 *
-	 * 
-	 * XXX Does the code conform to rate-limiting rule?
-	 * (RFC 2461 7.2.2)
+	 * This code conforms to the rate-limiting rule described in Section
+	 * 7.2.2 of RFC 2461, because the timer is set correctly after sending
+	 * an NS below.
 	 */
 	if (ln->ln_state == ND6_LLINFO_NOSTATE)
 		ln->ln_state = ND6_LLINFO_INCOMPLETE;
