@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.43 2000/09/11 11:36:41 sumikawa Exp $	*/
+/*	$KAME: ip6_var.h,v 1.44 2000/10/31 04:36:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -148,6 +148,9 @@ struct	ip6_pktopts {
 
 	/* Destination options header (after a routing header) */
 	struct	ip6_dest *ip6po_dest2;
+
+	/* traffic class */
+	u_int8_t	ip6po_tclass;
 
 	int ip6po_flags;
 #define IP6PO_REACHCONF	0x01	/* upper-layer reachability confirmation */

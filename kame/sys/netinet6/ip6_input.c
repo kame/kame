@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.124 2000/10/23 03:44:25 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.125 2000/10/31 04:36:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1390,6 +1390,32 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 			*mp = sbcreatecontrol((caddr_t) &hlim, sizeof(int),
 			    IS2292(IPV6_2292HOPLIMIT, IPV6_HOPLIMIT),
 			    IPPROTO_IPV6);
+			if (*mp) {
+				ctl->hlim = *mp;
+				mp = &(*mp)->m_next;
+			}
+		}
+	}
+
+	/* draft-itojun-ipv6-tclass-api-01 */
+	if ((in6p->in6p_flags & IN6P_TCLASS) != 0) {
+		u_int32_t flowinfo;
+		int oflowinfo = -1;
+		u_int8_t v;
+
+		flowinfo = (u_int32_t)ntohl(ip6->ip6_flow & IPV6_FLOWINFO_MASK);
+		flowinfo >>= 20;
+
+		if (prevctl && prevctl->hlim) {
+			cm = mtod(prevctl->hlim, struct cmsghdr *);
+			bcopy(CMSG_DATA(cm), &v, sizeof(v));
+			oflowinfo = v & 0xff;
+		}
+
+		if (oflowinfo < 0 || flowinfo != oflowinfo) {
+			v = flowinfo & 0xff;
+			*mp = sbcreatecontrol((caddr_t) &v, sizeof(v),
+			    IPV6_TCLASS, IPPROTO_IPV6);
 			if (*mp) {
 				ctl->hlim = *mp;
 				mp = &(*mp)->m_next;

@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.165 2000/10/03 02:12:46 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.166 2000/10/31 04:37:52 itojun Exp $
 
 1. IPv6
 
@@ -134,6 +134,7 @@ draft-aboba-dnsext-mdns-00.txt: Multicast DNS
     * kame/mdnsd has test implementation, which will not be built in
       default compilation.  The draft will experience a major change in the
       near future, so don't rely upon it.
+draft-itojun-ipv6-tclass-api-01.txt: Socket API for IPv6 traffic class field
 
 1.2 Neighbor Discovery
 

@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1356 2000/10/29 11:51:00 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1357 2000/10/31 04:37:53 itojun Exp $
 
 <200010>
+Tue Oct 31 13:33:38 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ip6_{in,out}put.c: implement traffic class manipulation
+	  API, as documented in draft-itojun-ipv6-tclass-api-01.txt.
+	  experimental.
+
 2000-10-29  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* Fixed NATPT memory leak.  When TCP session is finished, memory
 	  which holds tcp information is not freed.
