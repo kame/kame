@@ -340,7 +340,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			if (!hdrsplit)
 				panic("assumption failed: hdr not split");
 			exthdrs.ip6e_dest2->m_next = m->m_next;
-			m->m_next = exthdrs.ip6e_dest2->m_next;
+			m->m_next = exthdrs.ip6e_dest2;
 			*mtod(exthdrs.ip6e_dest2, u_char *) = ip6->ip6_nxt;
 			ip6->ip6_nxt = IPPROTO_DSTOPTS;
 		}
