@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.17 2003/07/25 09:15:12 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.18 2003/07/28 05:38:35 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -586,27 +586,15 @@ mip6_exthdr_create(m, opt, mip6opt)
 	s = splnet();
 #endif
 
-	/* 
-	 * HoT messages must be delivered via a home agent even when
-	 * we have a valid binding cache entry for the mobile node who
-	 * have sent the corresponding HoTI message.
-	 */
 	/*
-	 * 6.1.6 Care-of Test (CoT) Message
-	 * The CoT message is always sent with the Destnation Address set to
-	 * the care-of address of the mobile node; it is sent directly to the
-	 * mobile node.
-	 *
-	 * when a mobile node is on its home link and send CoTI (this
-	 * situation happens if the mobile node want to remove the
-	 * binding cache entry created on the correspondent node), the
-	 * source address of CoTI and the home address are same.
-	 */
-	if ((opt != NULL) &&
-	    (opt->ip6po_mobility != NULL)) {
-		if (opt->ip6po_mobility->ip6m_type == IP6M_HOME_TEST ||
-		    opt->ip6po_mobility->ip6m_type == IP6M_CAREOF_TEST)
-			goto skip_rthdr2;
+	 * In section 6.1 of ID-24: "Mobility Header messages MUST NOT
+	 * be sent with a type 2 routing header, except as described
+	 * in Section 9.5.4 for Binding Acknowledgement".
+	*/
+	if ((opt != NULL)
+	    && (opt->ip6po_mobility != NULL)
+	    && (opt->ip6po_mobility->ip6m_type != IP6M_BINDING_ACK)) {
+		goto skip_rthdr2;
 	}
 
 	/*
@@ -634,7 +622,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 #ifdef MIP6_MOBILE_NODE
 	/* the following stuff is applied only for a mobile node. */
 	if (!MIP6_IS_MN) {
-		goto noneed;
+		goto skip_hao;
 	}
 
 	/*
@@ -647,44 +635,47 @@ mip6_exthdr_create(m, opt, mip6opt)
 		 * this source addrss is not one of our home addresses.
 		 * we don't need any special care about this packet.
 		 */
-		goto noneed;
+		goto skip_hao;
 	}
 
-	/* check registration status */
+	/*
+	 * check home registration status for this destination
+	 * address.
+	 */
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &dst, &src);
 	if (mbu == NULL) {
-		/* no registration action started yet. */
-		goto noneed;
+		/* no registration action has been started yet. */
+		goto skip_hao;
 	}
 
-	if (opt && opt->ip6po_mobility != NULL) {
+	if ((opt != NULL) && (opt->ip6po_mobility != NULL)) {
 		if (opt->ip6po_mobility->ip6m_type == IP6M_BINDING_UPDATE)
 			need_hao = 1;
 		if (opt->ip6po_mobility->ip6m_type == IP6M_HOME_TEST_INIT ||
 		    opt->ip6po_mobility->ip6m_type == IP6M_CAREOF_TEST_INIT)
-			goto noneed;
+			goto skip_hao;
 	}
 	if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
 		/* to my home agent. */
 		if (!need_hao &&
 		    (mbu->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_IDLE ||
 		     mbu->mbu_pri_fsm_state == MIP6_BU_PRI_FSM_STATE_WAITD))
-			goto noneed;
+			goto skip_hao;
 	} else {
 		/* to any of correspondent nodes. */
 		if (!need_hao && !MIP6_IS_BU_BOUND_STATE(mbu))
-			goto noneed;
+			goto skip_hao;
 	}
-	/* create haddr destopt. */
-	error = mip6_haddr_destopt_create(&mip6opt->mip6po_haddr,
-					  &src, &dst, sc);
+	/* create a home address destination option. */
+	error = mip6_haddr_destopt_create(&mip6opt->mip6po_haddr, &src, &dst,
+	    sc);
 	if (error) {
 		mip6log((LOG_ERR,
-			 "%s:%d: homeaddress insertion failed.\n",
-			 __FILE__, __LINE__));
+		    "%s:%d: homeaddress insertion failed.\n",
+		    __FILE__, __LINE__));
 		goto bad;
 	}
- noneed:
+ skip_hao:
 	error = 0; /* normal exit. */
 #endif /* MIP6_MOBILE_NODE */
 
