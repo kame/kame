@@ -489,52 +489,52 @@ main(argc, argv)
 	argv += optind;
 
 	if (debug) {
-	    int s, ns, foo, error;
-	    char *service = "telnet";
-	    struct addrinfo hints, *res;
+		int s, ns, foo, error;
+		char *service = "telnet";
+		struct addrinfo hints, *res;
 
-	    if (argc > 1) {
-		usage();
-		/* NOT REACHED */
-	    } else if (argc == 1)
-		service = *argv;
+		if (argc > 1) {
+			usage();
+			/* NOTREACHED */
+		} else if (argc == 1)
+			service = *argv;
 
-	    memset(&hints, 0, sizeof(hints));
-	    hints.ai_flags = AI_PASSIVE;
-	    hints.ai_family = family;
-	    hints.ai_socktype = SOCK_STREAM;
-	    hints.ai_protocol = 0;
-	    error = getaddrinfo(NULL, service, &hints, &res);
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_flags = AI_PASSIVE;
+		hints.ai_family = family;
+		hints.ai_socktype = SOCK_STREAM;
+		hints.ai_protocol = 0;
+		error = getaddrinfo(NULL, service, &hints, &res);
 
-	    if (error) {
-		errx(1, "tcp/%s: %s\n", service, gai_strerror(error));
-		usage();
-	    }
+		if (error) {
+			errx(1, "tcp/%s: %s\n", service, gai_strerror(error));
+			usage();
+		}
 
-	    s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-	    if (s < 0) {
-		perror("telnetd: socket");
-		exit(1);
-	    }
-	    (void) setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
-				(char *)&on, sizeof(on));
-	    if (bind(s, res->ai_addr, res->ai_addrlen) < 0) {
-		perror("bind");
-		exit(1);
-	    }
-	    if (listen(s, 1) < 0) {
-		perror("listen");
-		exit(1);
-	    }
-	    foo = res->ai_addrlen;
-	    ns = accept(s, res->ai_addr, &foo);
-	    if (ns < 0) {
-		perror("accept");
-		exit(1);
-	    }
-	    (void) dup2(ns, 0);
-	    (void) close(ns);
-	    (void) close(s);
+		s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		if (s < 0) {
+			perror("telnetd: socket");
+			exit(1);
+		}
+		(void) setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
+		    (char *)&on, sizeof(on));
+		if (bind(s, res->ai_addr, res->ai_addrlen) < 0) {
+			perror("bind");
+			exit(1);
+		}
+		if (listen(s, 1) < 0) {
+			perror("listen");
+			exit(1);
+		}
+		foo = res->ai_addrlen;
+		ns = accept(s, res->ai_addr, &foo);
+		if (ns < 0) {
+			perror("accept");
+			exit(1);
+		}
+		(void) dup2(ns, 0);
+		(void) close(ns);
+		(void) close(s);
 #ifdef convex
 	} else if (argc == 1) {
 		; /* VOID*/		/* Just ignore the host/port name */
