@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.402 2003/11/06 06:09:32 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.403 2003/11/06 08:03:27 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -477,7 +477,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		}
 	} else {
 		/*
-		 * this is the forwarding packet.  do not modify any
+		 * this is a forwarded packet.  do not modify any
 		 * extension headers.
 		 */
 	}

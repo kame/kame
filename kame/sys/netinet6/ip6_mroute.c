@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.107 2003/11/05 17:43:24 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.108 2003/11/06 08:03:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1773,7 +1773,7 @@ phyint_send(ip6, mifp, m, src, dst)
 	mb_copy->m_flags |= M_MCAST;
 
 	/*
-	 * If we sourced the packet, call ip6_output since we may devide
+	 * If we sourced the packet, call ip6_output since we may divide
 	 * the packet into fragments when the packet is too big for the
 	 * outgoing interface.
 	 * Otherwise, we can simply send the packet to the interface
