@@ -947,6 +947,7 @@ settunnel(src, dst)
 	int ecode;
 #ifdef INET6
 	struct in6_aliasreq in6_addreq; 
+	struct sockaddr_in6 *sin6;
 #endif
 
 	memset(&hints, 0, sizeof(hints));
@@ -985,6 +986,30 @@ settunnel(src, dst)
 		    srcres->ai_addr->sa_len);
 		memcpy(&in6_addreq.ifra_dstaddr, dstres->ai_addr,
 		    dstres->ai_addr->sa_len);
+		if (in6_addreq.ifra_addr.sin6_scope_id !=
+		    in6_addreq.ifra_dstaddr.sin6_scope_id) {
+			errx(1, "scope mismatch");
+			/* NOTREACHED */
+		}
+#ifdef __KAME__
+		/* embed scopeid */
+		sin6 = &in6_addreq.ifra_addr;
+		if (sin6->sin6_scope_id && 
+		    (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr) ||
+		     IN6_IS_ADDR_MC_LINKLOCAL(&sin6->sin6_addr) ||
+		     IN6_IS_ADDR_MC_INTFACELOCAL(&sin6->sin6_addr))) {
+			*(u_int16_t *)&sin6->sin6_addr.s6_addr[2] =
+			    htons(sin6->sin6_scope_id);
+		}
+		sin6 = &in6_addreq.ifra_dstaddr;
+		if (sin6->sin6_scope_id && 
+		    (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr) ||
+		     IN6_IS_ADDR_MC_LINKLOCAL(&sin6->sin6_addr) ||
+		     IN6_IS_ADDR_MC_INTFACELOCAL(&sin6->sin6_addr))) {
+			*(u_int16_t *)&sin6->sin6_addr.s6_addr[2] =
+			    htons(sin6->sin6_scope_id);
+		}
+#endif
 
 		if (ioctl(s, SIOCSIFPHYADDR_IN6, &in6_addreq) < 0)
 			warn("SIOCSIFPHYADDR_IN6");
@@ -992,7 +1017,8 @@ settunnel(src, dst)
 #endif /* INET6 */
 
 	default:
-		warn("address family not supported");
+		errx(1, "address family not supported");
+		/* NOTREACHED */
 	}
 
 	freeaddrinfo(srcres);
