@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.123 2000/06/10 14:19:48 sakane Exp $	*/
+/*	$KAME: key.c,v 1.124 2000/06/11 13:36:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -186,6 +186,7 @@ static const int minsize[] = {
 	sizeof(struct sadb_spirange),	/* SADB_EXT_SPIRANGE */
 	0,				/* SADB_X_EXT_KMPRIVATE */
 	sizeof(struct sadb_x_policy),	/* SADB_X_EXT_POLICY */
+	sizeof(struct sadb_x_sa2),	/* SADB_X_SA2 */
 };
 static const int maxsize[] = {
 	sizeof(struct sadb_msg),	/* SADB_EXT_RESERVED */
@@ -207,6 +208,7 @@ static const int maxsize[] = {
 	sizeof(struct sadb_spirange),	/* SADB_EXT_SPIRANGE */
 	0,				/* SADB_X_EXT_KMPRIVATE */
 	0,				/* SADB_X_EXT_POLICY */
+	sizeof(struct sadb_x_sa2),	/* SADB_X_SA2 */
 };
 
 #ifdef __FreeBSD__
@@ -6950,6 +6952,9 @@ key_validate_ext(ext, len)
 		return EINVAL;
 
 	/* if it does not match minimum/maximum length, bail */
+	if (ext->sadb_ext_type >= sizeof(minsize) / sizeof(minsize[0]) ||
+	    ext->sadb_ext_type >= sizeof(maxsize) / sizeof(maxsize[0]))
+		return EINVAL;
 	if (!minsize[ext->sadb_ext_type] || len < minsize[ext->sadb_ext_type])
 		return EINVAL;
 	if (maxsize[ext->sadb_ext_type] && len > maxsize[ext->sadb_ext_type])
