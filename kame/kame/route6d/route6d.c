@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.62 2001/04/06 04:01:41 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.63 2001/04/17 07:58:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.62 2001/04/06 04:01:41 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.63 2001/04/17 07:58:32 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -781,6 +781,7 @@ ripsend(ifcp, sin, flag)
 		rrt_info.rip6_dest = in6addr_any;
 		rrt_info.rip6_plen = 0;
 		rrt_info.rip6_metric = 1;
+		rrt_info.rip6_metric += ifcp->ifc_metric;
 		rrt_info.rip6_tag = htons(routetag & 0xffff);
 		np = ripbuf->rip6_nets;
 		*np = rrt_info;
