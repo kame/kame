@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.79 2001/02/06 03:48:06 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.80 2001/02/09 06:46:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -751,6 +751,8 @@ SYSCTL_OID(_net_inet6_ip6, IPV6CTL_TEMPVLTIME, tempvltime,
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_MAPPED_ADDR,
 	mapped_addr, CTLFLAG_RW,	&ip6_mapped_addr_on,	0, "");
 #endif
+SYSCTL_INT(_net_inet6_ip6, IPV6CTL_AUTO_LINKLOCAL,
+	auto_linklocal, CTLFLAG_RW, &ip6_auto_linklocal,	0, "");
 
 /* net.inet6.icmp6 */
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_REDIRACCEPT,
