@@ -31,10 +31,6 @@
  * SUCH DAMAGE.
  */
 
-#ifndef lint
-static char sccsid[] = "@(#)remcap.c	5.5 (Berkeley) 2/2/91";
-#endif /* not lint */
-
 /*
  * remcap - routines for dealing with the remote host data base
  *
