@@ -1,4 +1,4 @@
-/*	$KAME: ah_output.c,v 1.39 2004/02/19 17:56:28 itojun Exp $	*/
+/*	$KAME: ah_output.c,v 1.40 2004/05/25 01:16:03 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -33,7 +33,7 @@
  * RFC1826/2402 authentication header.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #endif
@@ -43,7 +43,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 #include <sys/malloc.h>
 #endif
 #include <sys/mbuf.h>
@@ -53,7 +53,7 @@
 #include <sys/socketvar.h>
 #include <sys/errno.h>
 #include <sys/time.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 #include <sys/kernel.h>
 #endif
 #include <sys/syslog.h>

@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.60 2004/03/10 03:28:18 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.61 2004/05/25 01:16:03 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -35,7 +35,7 @@
 
 /* TODO: have shared routines  for hmac-* algorithms */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
@@ -64,7 +64,7 @@
 #include <sys/socketvar.h>
 #include <sys/errno.h>
 #include <sys/time.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 #include <sys/kernel.h>
 #endif
 #include <sys/syslog.h>
