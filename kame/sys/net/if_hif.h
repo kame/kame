@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.10 2002/03/12 11:57:54 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.11 2002/03/15 05:14:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,7 +76,7 @@ t.
 #ifndef _NET_IF_HIF_H_
 #define _NET_IF_HIF_H_
 
-#define HIF_MTU 1500 /* XXX */
+#define HIF_MTU 1280 /* XXX */
 
 #define HIF_LOCATION_UNKNOWN 0x00
 #define HIF_LOCATION_HOME    0x01

@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.23 2002/03/14 06:45:19 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.24 2002/03/15 05:14:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1105,7 +1105,7 @@ contiguousfail:
 			goto done;
 		in6_clearscope(&ip6->ip6_src);
 		in6_clearscope(&ip6->ip6_dst);
-#if 1
+#ifdef IPV6_MINMTU
 		/* XXX */
 		return (ip6_output(m, 0, 0, IPV6_MINMTU, 0, &ifp));
 #else
