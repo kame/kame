@@ -21,7 +21,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-tcp.c,v 1.1.1.1 1999/08/08 23:32:09 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-tcp.c,v 1.2 1999/10/15 07:51:42 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -441,6 +441,16 @@ tcp_print(register const u_char *bp, register u_int length,
 		}
 		putchar('>');
 	}
+
+	if (length <= 0)
+		return;
+
+	/*
+	 * Decode payload if necessary.
+	 */
+	bp += (tp->th_off * 4);
+	if (sport == 179 || dport == 179)
+		bgp_print(bp, length);
 	return;
 bad:
 	fputs("[bad opt]", stdout);

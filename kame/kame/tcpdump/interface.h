@@ -18,7 +18,7 @@
  * WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED WARRANTIES OF
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * @(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/interface.h,v 1.2 1999/09/11 04:43:48 itojun Exp $ (LBL)
+ * @(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/interface.h,v 1.3 1999/09/21 20:29:35 itojun Exp $ (LBL)
  */
 
 #ifndef tcpdump_interface_h
@@ -177,6 +177,7 @@ extern void arp_print(const u_char *, u_int, u_int);
 extern void atalk_print(const u_char *, u_int);
 extern void atm_if_print(u_char *, const struct pcap_pkthdr *, const u_char *);
 extern void bootp_print(const u_char *, u_int, u_short, u_short);
+extern void bgp_print(const u_char *, int);
 extern void decnet_print(const u_char *, u_int, u_int);
 extern void default_print(const u_char *, u_int);
 extern void default_print_unaligned(const u_char *, u_int);
