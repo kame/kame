@@ -28,6 +28,18 @@ AC_ARG_ENABLE(pedant, [  --enable-pedant         pedantic compiler options],
 	[enable_pedant=no])
 AC_MSG_RESULT($enable_pedant)
 
+efence_dir=
+AC_MSG_CHECKING(if --with-efence option is specified)
+AC_ARG_WITH(efence, [  --with-efence=DIR       specify ElectricFence directory],
+	[efence_dir=$withval])
+AC_MSG_RESULT(${efence_dir-"default"})
+if test "$efence_dir" = "default"; then
+	AC_CHECK_LIB(efence, EF_Print)
+else
+	AC_CHECK_LIB(efence, EF_Print, [LIBS="$LIBS -L$efence_dir/lib -lefence"],
+			[], [-L$efence_dir/lib])
+fi
+
 AC_MSG_CHECKING(if you have KAME tcpdump in $srcdir/../tcpdump)
 if test -f "$srcdir/../tcpdump/print-isakmp.c"; then
 	LIBOBJS="$LIBOBJS print-isakmp.o"
