@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.78 2002/07/23 06:53:00 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.79 2002/07/23 08:11:37 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -819,6 +819,7 @@ stf_checkaddr4(sc, in, inifp)
 	/*
 	 * reject packets with private address range:
 	 * 10.0.0.0/8 172.16.0.0/12 192.168.0.0/16
+	 * (requirement from RFC3056 section 2 1st paragraph)
 	 */
 	if ((ntohl(in->s_addr) & 0xff000000) >> 24 == 10 ||
 	    (ntohl(in->s_addr) & 0xfff00000) >> 16 == 172 * 256 + 16 ||
