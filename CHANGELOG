@@ -1,8 +1,20 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1589 2001/03/05 18:22:16 thorpej Exp $
+$KAME: CHANGELOG,v 1.1590 2001/03/05 18:37:05 thorpej Exp $
 
 <200103>
+2001-03-05  Jason R. Thorpe  <thorpej@zembu.com>
+
+	* kame/racoon/handler.c: Implement deleteallph2(), which
+	deletes all Phase 2 handlers for a given src/dst/proto.
+	* kame/racoon/isakmp_inf.c: When processing INITIAL-CONTACT,
+	try to use the SADB_DELETE `delete all' extension and
+	deleteallph2() before doing it The Hard Way.  For both The
+	Easy Way and The Hard Way, make sure we only delete SAD entries
+	for SATYPEs that we manage.
+	* kame/racoon/pfkey.c: Use a table of SATYPEs that we manage,
+	and use that table to initialize our PF_KEY state.
+
 2001-03-05  Jason R. Thorpe  <thorpej@zembu.com>
 
 	* kame/libipsec/pfkey.c: Add pfkey_send_delete_all(), which

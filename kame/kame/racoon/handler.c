@@ -1,4 +1,4 @@
-/*	$KAME: handler.c,v 1.43 2001/02/06 16:28:16 thorpej Exp $	*/
+/*	$KAME: handler.c,v 1.44 2001/03/05 18:37:06 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -408,14 +408,16 @@ getph2bysaidx(src, dst, proto_id, spi)
 		if (iph2->proposal == NULL && iph2->approval == NULL)
 			continue;
 		if (iph2->approval != NULL) {
-			for (pr = iph2->approval->head; pr != NULL; pr = pr->next) {
+			for (pr = iph2->approval->head; pr != NULL;
+			     pr = pr->next) {
 				if (proto_id != pr->proto_id)
 					break;
 				if (spi == pr->spi || spi == pr->spi_p)
 					return iph2;
 			}
 		} else if (iph2->proposal != NULL) {
-			for (pr = iph2->proposal->head; pr != NULL; pr = pr->next) {
+			for (pr = iph2->proposal->head; pr != NULL;
+			     pr = pr->next) {
 				if (proto_id != pr->proto_id)
 					break;
 				if (spi == pr->spi)
@@ -574,6 +576,44 @@ flushph2()
 		unbindph12(p);
 		remph2(p);
 		delph2(p);
+	}
+}
+
+/*
+ * Delete all Phase 2 handlers for this src/dst/proto.  This
+ * is used during INITIAL-CONTACT processing (so no need to
+ * send a message to the peer).
+ */
+void
+deleteallph2(src, dst, proto_id)
+	struct sockaddr *src, *dst;
+	u_int proto_id;
+{
+	struct ph2handle *iph2, *next;
+	struct saproto *pr;
+
+	for (iph2 = LIST_FIRST(&ph2tree); iph2 != NULL; iph2 = next) {
+		next = LIST_NEXT(iph2, chain);
+		if (iph2->proposal == NULL && iph2->approval == NULL)
+			continue;
+		if (iph2->approval != NULL) {
+			for (pr = iph2->approval->head; pr != NULL;
+			     pr = pr->next) {
+				if (proto_id == pr->proto_id)
+					goto zap_it;
+			}
+		} else if (iph2->proposal != NULL) {
+			for (pr = iph2->proposal->head; pr != NULL;
+			     pr = pr->next) {
+				if (proto_id == pr->proto_id)
+					goto zap_it;
+			}
+		}
+		continue;
+ zap_it:
+		unbindph12(iph2);
+		remph2(iph2);
+		delph2(iph2);
 	}
 }
 
