@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1500 2001/01/23 08:52:43 jinmei Exp $
+$KAME: CHANGELOG,v 1.1501 2001/01/23 09:11:31 itojun Exp $
 
 <200101>
+Tue Jan 23 18:09:08 JST 2001  itojun@iijlab.net
+	* sys/netinet6/ip6_input.c: declare ip6aux structure, which is used
+	  to pass around information about the packet, across header processing
+	  routines.  we plan to put header chain parsing history into here.
+	* sys/netinet6/dest6.c: support home agent destination option.
+	  it is made mandatory by mobile-ip6 spec.
+	  XXX may have broke ericsson mobile-ip6
+
 2001-01-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/net/if_gif.c (gif_ioctl): set IFF_RUNNING upon sucess
 	of the SIOCSIFPHYADDR ioctl (and its variations).  This is
