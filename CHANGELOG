@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1910 2001/10/16 06:17:16 sakane Exp $
+$KAME: CHANGELOG,v 1.1911 2001/10/16 06:48:11 sakane Exp $
 
 <200110>
 Mon Oct 15 21:25:29 JST 2001 keiichi@iij.ad.jp
@@ -83,7 +83,7 @@ Tue Oct  9 08:43:04 JST 2001 sakane@kame.net
 
 Wed Sep 26 14:30:46 JST 2001 sakane@kame.net
 	* kame/kame/racoon:
-	new directive "verify_identifier has been added.  it can be strict
+	new directive "verify_identifier" has been added.  it can be strict
 	to check the identifier in the ID payload transmitted by the peer.
 	the default is off.
 
