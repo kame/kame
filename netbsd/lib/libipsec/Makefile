@@ -1,8 +1,10 @@
+SRCDIR=	${.CURDIR}/../../kame/libipsec
+
 LIB=	ipsec
 CFLAGS+=-g
 CPPFLAGS+=-DIPSEC_DEBUG -DIPSEC -DINET6
 
-.PATH:	${.CURDIR}/../../sys/netkey
+.PATH:	${SRCDIR} ${.CURDIR}/../../sys/netkey
 SRCS=	pfkey.c pfkey_dump.c
 SRCS+=	ipsec_policy.c ipsec_strerror.c key_debug.c
 
