@@ -1,0 +1,177 @@
+.\"	$KAME: dhcp6c.conf.5,v 1.1 2002/05/23 13:05:14 jinmei Exp $
+.\"
+.\" Copyright (C) 2002 WIDE Project.
+.\" All rights reserved.
+.\" 
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\" 
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd May 23, 2002
+.Dt DHCP6C.CONF 5
+.Os KAME
+.\"
+.Sh NAME
+.Nm dhcp6c.conf
+.Nd DHCPv6 client configuration file
+.\"
+.Sh SYNOPSIS
+.Pa /usr/local/v6/etc/dhcp6c.conf
+.\"
+.Sh DESCRIPTION
+The dhcp6c.conf file contains configuration information for
+.Nm dhcp6c .
+The configuration file consists of a sequence of statements terminated
+by a semi-colon (`;').
+Statements are composed of tokens separated by white space,
+which can be any combination of blanks,
+tabs and newlines.
+In some cases a set of statements is combined with a pair of brackets,
+which is regarded as a single token.
+Lines beginning with
+.Ql #
+are comments.
+.Sh Interface specification
+There are some statements that may or have to specify interface.
+Interfaces are specified in the form of "name unit", such as
+.Ar fxp0
+and
+.Ar gif1.
+.\"
+.Sh Interface statement
+An interface statement specifies configuration parameters on the
+interface.
+The generic format of an interface statement is as follows:
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic interface Ar interface
+{
+.Ar substatements
+};
+.Xc
+The followings are possible
+.Ar substatements
+in an interface statement.
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic send Ar send-options
+;
+.Xc
+This statement specifies DHCPv6 options to be sent to the server(s).
+Some options can only appear in particular messages according to the
+specification,
+in which case the appearance of the options is limited to be compliant
+with the specification.
+Currently only
+.Ar rapid-commit
+can be specified in a send statement, which specifies to include
+a rapid-commit option in solicit messages.
+.It Ic request Ar request-options ;
+This statement specifies DHCPv6 options to be included in an
+option-request option.
+Currently only
+.Ar prefix-delegation
+can be specified in a request statement, which requests the server to
+delegate IPv6 prefixes.
+.It Ic information-only ;
+This statement specifies
+.Nm dhcp6c
+to only exchange informational configuration parameters with servers.
+A list of DNS server addresses is an example of such parameters.
+This statement is useful when the client does not need stateful
+configuration parameters such as IPv6 addresses or prefixes.
+.El
+.El
+.\"
+.Sh Prefix interface statement
+A prefix interface statement specifies configuration parameters of
+prefixes on local interfaces that are derived from delegated prefixes.
+The generic format of an interface statement is as follows:
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic prefix-interface Ar interface
+{
+.Ar substatements
+};
+.Xc
+When an IPv6 prefix is delegated from a DHCPv6 server,
+.Nm dhcp6c
+will assign a prefix on the
+.Ar interface
+.Pq unless the interface received the DHCPv6 message containing the prefix
+with the delegated prefix and the parameters provided in
+.Ar substatements .
+Possible substatements are as follows.
+.Bl -tag -width Ds -compact
+.It Xo
+.Ic sla-id Ar ID
+;
+.Xc
+This statement specifies the identifier value of the site-level aggregator
+.Pq SLA
+on the interface.
+.Ar ID
+must be a decimal integer which fits in the length of SLA IDs
+.Pq which is 16 bits in the current implementation .
+For example,
+if
+.Ar ID
+is 1 and the client is delegated an IPv6 prefix 3ffe:ffff::/48,
+.Nm dhcp6c
+will combine the two values into a single IPv6 prefix,
+3ffe:ffff:0:1::/64,
+and will configure the prefix on the specified
+.Ar interface .
+.El
+.El
+.\"
+.Sh Examples
+The followings are a sample configuration to be delegated an IPv6
+prefix from an upstream service provider.
+With this configuration
+.Nm dhcp6c
+will send solicit messages containing a prefix delegation option in an
+option request option on an upstream PPP link,
+.Ar ppp0 .
+After receiving some prefixes from a server,
+.Nm dhcp6c
+will then configure derived IPv6 prefixes with the SLA ID 1 on a
+local ethernet interface,
+.Ar ne0 .
+.Bd -literal -offset
+interface ppp0 {
+        request prefix-delegation;
+};
+
+prefix-interface ne0 {
+        sla-id 1;
+};
+.Ed
+.Sh SEE ALSO
+.Xr dhcp6c 8
+.\"
+.Sh HISTORY
+The
+.Nm
+configuration file first appeared in the WIDE/KAME IPv6 protocol
+stack kit.
