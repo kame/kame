@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.28 2000/02/26 06:53:11 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.29 2000/02/26 08:20:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -70,10 +70,6 @@
 #include <net/net_osdep.h>
 
 #define SDL(s) ((struct sockaddr_dl *)s)
-
-#if 0
-extern	struct timeval time;
-#endif
 
 struct dadq;
 static struct dadq *nd6_dad_find __P((struct ifaddr *));
