@@ -2,7 +2,7 @@
 
 			KAME Project
 
-			$Date: 2000/06/14 15:50:16 $
+			$Date: 2000/07/03 02:43:19 $
 
 <<<Project Overview>>>
 
@@ -179,7 +179,8 @@ Markus Friedl, Ryota HIROSE, Shigeya Suzuki, Assar Westerlund,
 Bruce A. Mah, Masaaki Noro, Hugh Graham, Hubert Feyer, Eric Lemiere,
 Benoit Hilt, Noriaki Takamiya, Olivier TOGNI, Greg Troxel, Bill
 Fenner, Goeran Bengtson, Tomio Narita, Conny Larsson, Ryuji Somegawa,
-Akira Kato, Ronald van der Pol and Graham Wheeler (in no particular order).
+Akira Kato, Ronald van der Pol, Graham Wheeler and Kris Kennaway
+(in no particular order).
 
 We would also like to thank BSDI (http://www.bsdi.com/) for donating
 BSD/OS licenses for development.
