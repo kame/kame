@@ -434,12 +434,6 @@ server6_react_informreq(buf, siz, from, fromlen)
 	ext = (char *)(dh6p + 1);
 	dh6p->dh6_msgtypexid = dh6r->dh6_msgtypexid;
 	dh6p->dh6_msgtype = DH6_REPLY;
-	if (getifaddr(&dh6p->dh6_servaddr, device, &global_prefix, GLOBAL_PLEN,
-	    0, IN6_IFF_INVALID) != 0) {
-		dprintf(LOG_ERR, "could not get global address");
-		exit(1);
-		/* NOTREACHED */
-	}
 
 	/*
 	 * attach extensions.

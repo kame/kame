@@ -60,7 +60,6 @@ struct dhcp6 {
 		u_int8_t m;
 		u_int32_t x;
 	} dh6_msgtypexid;
-	struct in6_addr dh6_servaddr;
 	/* options follow */
 } __attribute__ ((__packed__));
 #define dh6_msgtype	dh6_msgtypexid.m
