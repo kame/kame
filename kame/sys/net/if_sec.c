@@ -1,4 +1,4 @@
-/*	$KAME: if_sec.c,v 1.1 2001/07/25 08:43:13 itojun Exp $	*/
+/*	$KAME: if_sec.c,v 1.2 2001/07/25 09:10:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -89,7 +89,7 @@
 #error depends on gif interface, add "pseudo-device gif"
 #endif
 
-#ifdef __freeBSD__
+#ifdef __FreeBSD__
 void secattach __P((void *));
 #else
 void secattach __P((int));
@@ -196,10 +196,10 @@ sec_destroy(ifp)
 		if (ifp == ifcp->ifp) {
 			gif_delete_tunnel(ifp);
 			LIST_REMOVE(ifcp, chain);
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #if NBPFILTER > 0
 			bpfdetach(ifp);
 #endif
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 			if_detach(ifp);
 			free(sc, M_DEVBUF);
 #endif
