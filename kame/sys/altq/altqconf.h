@@ -15,7 +15,9 @@
 #define	NALTQ	0
 #endif
 
+#if 0
 cdev_decl(altq);
+#endif
 
 #ifdef __OpenBSD__
 #define cdev_altq_init(c,n) { \
