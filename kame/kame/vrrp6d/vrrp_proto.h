@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_proto.h,v 1.5 2003/02/19 10:10:01 ono Exp $	*/
+/*	$KAME: vrrp_proto.h,v 1.6 2003/03/19 09:36:45 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -66,9 +66,14 @@
 #ifdef __FreeBSD__
 #include <net/ethernet.h>
 #else
+#ifdef __NetBSD__
 #include <net/if_ether.h>
 #endif
+#endif
 #include <netinet/in.h>
+#ifdef __OpenBSD__
+#include <netinet/if_ether.h>
+#endif
 #include "vrrp_define.h"
 
 /* RFC 2338 vrrp header */
