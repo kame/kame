@@ -841,38 +841,24 @@ prelist_update(new, dr, m)
 				lt6->ia6t_vltime = TWOHOUR;
 				update++;
 			}
-			if (TWOHOUR < new->ndpr_pltime
-			 || lt6->ia6t_pltime < new->ndpr_pltime) {
-				new->ndpr_apltime = new->ndpr_pltime;
-				lt6->ia6t_pltime = new->ndpr_pltime;
-				update++;
-			} else if (auth
-				&& lt6->ia6t_pltime <= TWOHOUR
-				&& new->ndpr_pltime <= lt6->ia6t_pltime) {
-				lt6->ia6t_pltime = new->ndpr_pltime;
-				update++;
-			} else {
-				lt6->ia6t_pltime = TWOHOUR;
-				update++;
-			}
 
+			/* 2 hour rule is not imposed for pref lifetime */
+			new->ndpr_apltime = new->ndpr_pltime;
+			lt6->ia6t_pltime = new->ndpr_pltime;
+			update++;
 #else	/* update from Jim Bound, (ipng 6712) */
 			if (TWOHOUR < new->ndpr_vltime
 			 || lt6->ia6t_vltime < new->ndpr_vltime) {
 				lt6->ia6t_vltime = new->ndpr_vltime;
 				update++;
 			} else if (auth) {
-				lt6->ia6t_pltime = new->ndpr_pltime;
+				lt6->ia6t_vltime = new->ndpr_vltime;
 				update++;
 			}
-			if (TWOHOUR < new->ndpr_pltime
-			 || lt6->ia6t_pltime < new->ndpr_pltime) {
-				lt6->ia6t_pltime = new->ndpr_pltime;
-				update++;
-			} else if (auth) {
-				lt6->ia6t_pltime = new->ndpr_pltime;
-				update++;
-			}
+
+			/* jim bound rule is not imposed for pref lifetime */
+			lt6->ia6t_pltime = new->ndpr_pltime;
+			update++;
 #endif
 			if (update)
 				in6_init_address_ltimes(new, lt6);
