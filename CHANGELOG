@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1805 2001/07/23 18:55:39 itojun Exp $
+$KAME: CHANGELOG,v 1.1806 2001/07/24 05:50:53 jinmei Exp $
 
 <200107>
+2001-07-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/raw_ip6.c (rip6_usrreq): supported the scoped
+	address format in bind(2) and connect(2) for raw socket.  The
+	former case is essential; bind(2) for a scoped address would not
+	success without this fix.
+
 Tue Jul 24 03:54:24 JST 2001  itojun@iijlab.net
 	* sys/netinet6/nd6.c: repair ndp -R.
 	* ndp: do not print uninitialized interface on ndp -i.
