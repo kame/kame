@@ -119,7 +119,6 @@ struct m_hdr {
 /* record/packet header in first mbuf of chain; valid if M_PKTHDR set */
 struct	pkthdr {
 	struct	ifnet *rcvif;		/* rcv interface */
-	void	*aux;			/* extra data buffer; ipsec/others */
 	int	len;			/* total packet length */
 };
 
@@ -251,7 +250,6 @@ struct mbuf {
 		(m)->m_nextpkt = (struct mbuf *)NULL; \
 		(m)->m_data = (m)->m_pktdat; \
 		(m)->m_flags = M_PKTHDR; \
-		(m)->m_pkthdr.aux = (void *)NULL; \
 	} else \
 		(m) = m_retryhdr((how), (type)); \
 } while (0)

@@ -114,7 +114,6 @@ struct	pkthdr {
 
 	/* variables for ip and tcp reassembly */
 	void	*header;		/* pointer to packet header */
-	void	*aux;			/* extra data buffer; ipsec/others */
 };
 
 /* description of external storage mapped into mbuf, valid if M_EXT set */
@@ -261,7 +260,6 @@ union mcluster {
 		(m)->m_nextpkt = (struct mbuf *)NULL; \
 		(m)->m_data = (m)->m_pktdat; \
 		(m)->m_flags = M_PKTHDR; \
-		(m)->m_pkthdr.aux = (void *)NULL; \
 		splx(_ms); \
 	} else { \
 		splx(_ms); \
