@@ -563,10 +563,9 @@ defrouter_select()
 #else
 	int s = splnet();
 #endif
-	struct nd_defrouter *dr_head, *dr, anydr;
+	struct nd_defrouter *dr, anydr;
 	struct rtentry *rt = NULL;
 	struct llinfo_nd6 *ln = NULL;
-	struct sockaddr_in6 sin6_def;
 
 	/*
 	 * Search for a (probably) reachable router from the list.
@@ -603,7 +602,9 @@ defrouter_select()
 		printf("Default router list becomes empty\n");
 	}
 
+#if 0
   done:
+#endif
 	splx(s);
 	return;
 }
