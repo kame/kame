@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.45 2001/08/31 09:59:51 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.46 2001/09/18 04:48:48 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -3406,7 +3406,7 @@ receive_pim6_assert(src, dst, pim_message, datalen)
 	    return (TRUE);	/* return whatever */
 
 	/* The upstream must be changed to the winner */
-	mrtentry_ptr->preference = assert_preference;
+	mrtentry_ptr->preference = assert_preference & ~PIM_ASSERT_RPT_BIT;
 	mrtentry_ptr->metric = assert_metric;
 	mrtentry_ptr->upstream = find_pim6_nbr(src);
 
