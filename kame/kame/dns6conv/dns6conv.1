@@ -1,0 +1,97 @@
+.\"	$KAME: dns6conv.1,v 1.1 2001/01/13 06:26:17 jinmei Exp $
+.\"
+.\" Copyright (C) 2001 WIDE Project.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd January 13, 2001
+.Dt DNS6CONV 1
+.Os KAME
+.\"
+.Sh NAME
+.Nm dns6conv
+.Nd converts an IPv6 textual address into a DNS RR
+.\"
+.Sh SYNOPSIS
+.Nm
+.Op Fl b Ar beginbit
+.Op Fl e Ar endbit
+.Op Fl f Ar formattype
+.Ar IPv6address
+.\"
+.Sh DESCRIPTION
+.Nm
+converts a specified textual IPv6 address into an appropriate DNS
+resource record format.
+It first separates a portion of the given address from
+.Ar beginbit
+bit to
+.Ar endbit ,
+with these bit values themselves exclusive
+.
+The default value of theses bits are 64 and 128,
+and can be specified by the
+.Fl b
+and
+.Fl e
+command line options, respectively.
+When specified, the values must be between 0 and 128, with 0 and 128
+inclusive.
+Also,
+.Ar beginbit
+must be smaller than
+.Ar endbit .
+.Pp
+Then the command prints the separated address in an appropriate format
+to use
+.Pq as a part of
+a DNS resource record.
+The
+.Fl f
+option is used to specify the type of the desired resource record.
+The following values can be specified with the option.
+.Bl -tag -width Ds -compact
+.It Ic a6
+specifies to print the separated address as an ordinary IPv6 textual
+format, which can be used as the address suffix part of an A6 resource
+record. This is the default format type of this command.
+.It Ic bit
+specifies to print the address as a hex string with the length of the
+significant bits separated by the slash character.
+The output can be used as a bitstring label to construct a reverse map
+database.
+.It Ic nibble
+specifies to print the address as nibble DNS labels.
+Currently not implemented.
+.El
+.Sh RETURN VALUES
+.Nm
+exits with 0 on success, and non-zero on errors.
+.\"
+.Sh HISTORY
+The
+.Nm
+command first appeared in the WIDE/KAME IPv6 protocol stack kit.
