@@ -186,7 +186,7 @@ struct	protoent {
 #define AI_CANONNAME	2	/* request for canonical name */
 #define AI_NUMERICHOST	4	/* don't ever try hostname reverse lookup */
 #define AI_NUMERICSERV	8	/* don't ever try service name lookup */
-/* valid flags for addrinfo */
+/* valid flags for addrinfo (not a standard def, apps should not use it) */
 #define AI_MASK \
     (AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST | AI_NUMERICSERV)
 
