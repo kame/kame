@@ -691,6 +691,7 @@ rtrequest1(req, info, ret_nrt)
 		if (rt == 0)
 			senderr(ENOBUFS);
 		Bzero(rt, sizeof(*rt));
+		rt->rt_createtime = time_second; /* for statistics */
 		rt->rt_flags = RTF_UP | flags;
 		LIST_INIT(&rt->rt_timer);
 		/*

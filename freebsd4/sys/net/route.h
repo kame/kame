@@ -128,6 +128,11 @@ struct rtentry {
 	struct	rtentry *rt_parent; 	/* cloning parent of this route */
 	void	*rt_filler2;		/* more filler */
 	LIST_HEAD(, rttimer) rt_timer;  /* queue of timeouts for misc funcs */
+
+	/* the following entries are for statistics*/
+	time_t rt_createtime;	/* timestamp at creation of this route */
+	time_t rt_lastreftime;	/* timestamp when the latest reference time */
+	u_long rt_usehist[12];	/* histogram of references for every 5 min */
 };
 
 /*
@@ -307,6 +312,17 @@ struct rttimer_queue {
 			rtfree(rt); \
 		else \
 			(rt)->rt_refcnt--; \
+	} while (0)
+
+#define	RTUSE(rt) \
+	do { \
+		int i; \
+		(rt)->rt_use++; \
+		(rt)->rt_lastreftime = time_second; \
+		i = ((rt)->rt_lastreftime - (rt)->rt_createtime) / 300; \
+		if (i > 11) \
+			i = 11; \
+		(rt)->rt_usehist[i]++; \
 	} while (0)
 
 extern struct route_cb route_cb;
