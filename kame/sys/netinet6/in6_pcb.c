@@ -300,6 +300,9 @@ in6_pcbsetport(laddr, in6p)
 	int wild = 0;
 	void *t;
 	u_short min, max;
+#ifdef __NetBSD__
+	struct proc *p = curproc;		/* XXX */
+#endif
 
 	/* XXX: this is redundant when called from in6_pcbbind */
 	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0 &&
@@ -308,6 +311,13 @@ in6_pcbsetport(laddr, in6p)
 		wild = IN6PLOOKUP_WILDCARD;
 
 	if (in6p->in6p_flags & IN6P_LOWPORT) {
+#ifdef __NetBSD__
+		if (p == 0 || (suser(p->p_ucred, &p->p_acflag) != 0))
+			return (EACCES);
+#else
+		if ((inp->inp_socket->so_state & SS_PRIV) == 0)
+			return (EACCES);
+#endif
 		min = IPV6PORT_RESERVEDMIN;
 		max = IPV6PORT_RESERVEDMAX;
 	} else {
