@@ -50,8 +50,8 @@ DPADD+=	/usr/local/ssl/lib/libcrypto.a
 .endif
 # for USA resident
 .if exists(/usr/local/lib/libRSAglue.a) && exists(/usr/local/lib/librsaref.a)
-LDADD+=	-L/usr/local/ssl/lib -lRSAglue -lrsaref
-DPADD+=	/usr/local/ssl/lib/libRSAglue.a /usr/local/ssl/lib/librsaref.a
+LDADD+=	-L/usr/local/lib -lRSAglue -lrsaref
+DPADD+=	/usr/local/lib/libRSAglue.a /usr/local/lib/librsaref.a
 .endif
 
 .PATH:	${SRCDIR} ${SRCDIR}/../tcpdump
