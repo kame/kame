@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/12/29 07:13:58 $
+			$Date: 2000/01/04 17:56:28 $
 
 1. IPv6
 
@@ -686,15 +686,12 @@ while KAME/FreeBSD3x uses merged inpcb structure.
 The platform can be configured to support IPv4 mapped address/special AF_INET6
 wildcard bind (disabled by default).  Kernel behavior can be summarized as
 follows:
-- default: No special support code for AF_INET6 wildcard socket will be
-  compiled in.  AF_INET6 sockets and AF_INET sockets are totally separate.
-  The behavior is similar to what described in 1.12.1.
-- add "MAPPED_ADDR_ENABLED=0" option to kernel config: special support code
-  will be compiled in, but is disabled by default.  It can be controlled by
-  sysctl (net.inet6.ip6.mapped_addr), or setsockopt(IPV6_BINDV6ONLY).
-- add "MAPPED_ADDR_ENABLED=1" option to kernel config: special support code
-  will be compiled in, but is enabled by default.  It can be controlled by
-  sysctl (net.inet6.ip6.mapped_addr), or setsockopt(IPV6_BINDV6ONLY).
+- default: special support code will be compiled in, but is disabled by
+  default.  It can be controlled by sysctl (net.inet6.ip6.bindv6only),
+  or setsockopt(IPV6_BINDV6ONLY).
+- add "INET6_BINDV6ONLY": No special support code for AF_INET6 wildcard socket
+  will be compiled in.  AF_INET6 sockets and AF_INET sockets are totally
+  separate.  The behavior is similar to what described in 1.12.1.
 
 sysctl setting will affect per-socket configuration at in6pcb creation time
 only.  In other words, per-socket configuration will be copied from sysctl

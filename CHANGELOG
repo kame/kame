@@ -1,8 +1,22 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.401 2000/01/04 17:38:45 jinmei Exp $
+$Id: CHANGELOG,v 1.402 2000/01/04 17:56:27 itojun Exp $
 
 <200001>
+Wed Jan  5 02:49:05 JST 2000  itojun@iijlab.net
+	* netbsd: add net.inet6.ip6.bindv6only sysctl.  this is a replacement
+	  of net.inet6.ip6.mapped_addr, which was bitwise opposite to
+	  IPV6_BINDV6ONLY.  by setting net.inet6.ip6.bindv6only to 1, AF_INET6
+	  socket will grab IPv6 traffic only.  by setting it to 0, AF_INET6
+	  socket will grab IPv4 traffic as well (as described in rfc1933).
+	  default value is 1 (i.e. AF_INET6 grabs IPv6 traffic only).
+
+	  "options INET6_BINDV6ONLY" will remove the code completely and
+	  hardcodes behavior to net.inet6.ip6.bindv6only=1 case.
+
+	  "options MAPPED_ADDR_ENABLED" and net.inet6.ip6.mapped_addr were
+	  obsoleted on netbsd (were introduced on Dec 21 1999).
+
 2000-01-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/{bgpd, pim6[ds]d, ping6, traceroute6}: were modified
 	to use rfc2292bis by default. Related Makefiles were also
