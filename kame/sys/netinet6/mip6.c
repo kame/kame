@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.174 2002/10/02 02:02:45 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.175 2002/10/02 06:23:56 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -55,6 +55,8 @@
 #ifdef __NetBSD__
 #define HAVE_SHA1
 #endif
+
+/*#define RR_DBG*/
 
 #include <sys/param.h>
 #include <sys/errno.h>
@@ -2693,8 +2695,6 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa)
 	u_int8_t key_bu[MIP6_KBU_LEN]; /* Stated as 'Kbu' in the spec */
 	u_int8_t authdata[SHA1_RESULTLEN];
 	u_int16_t cksum_backup;
-	HMAC_CTX hmac_ctx;
-	int restlen;
 #ifdef RR_DBG
 	extern void ipsec_hexdump __P((caddr_t, int));
 #define mip6_hexdump(m,l,a)			\
@@ -2763,37 +2763,13 @@ mip6_hexdump("CN: K_bu: ", sizeof(key_bu), key_bu);
 	cksum_backup = ip6mu->ip6mu_cksum;
 	ip6mu->ip6mu_cksum = 0;
 	/* Calculate authenticator */
-	hmac_init(&hmac_ctx, key_bu, sizeof(key_bu), HMAC_SHA1);
-	hmac_loop(&hmac_ctx, (u_int8_t *)&coa_sa->sin6_addr,
-		  sizeof(coa_sa->sin6_addr));
-#ifdef RR_DBG
-mip6_hexdump("CN: Auth: ", sizeof(coa_sa->sin6_addr), &coa_sa->sin6_addr);
-#endif
-	hmac_loop(&hmac_ctx, (u_int8_t *)&ip6->ip6_dst,
-		  sizeof(ip6->ip6_dst));
-#ifdef RR_DBG
-mip6_hexdump("CN: Auth: ", sizeof(ip6->ip6_dst), &ip6->ip6_dst);
-#endif
-	hmac_loop(&hmac_ctx, (u_int8_t *)ip6mu,
-		  (u_int8_t *)mopt->mopt_auth + sizeof(struct ip6m_opt_authdata ) - (u_int8_t *)ip6mu);
-#ifdef RR_DBG
-mip6_hexdump("CN: Auth: ", (u_int8_t *)mopt->mopt_auth + sizeof(struct ip6m_opt_authdata ) - (u_int8_t *)ip6mu, ip6mu);
-#endif
+	mip6_calculate_authenticator(key_bu, authdata,
+		&coa_sa->sin6_addr, &ip6->ip6_dst,
+		(caddr_t)ip6mu, ip6mulen, 
+		(u_int8_t *)mopt->mopt_auth + sizeof(struct ip6m_opt_authdata)
+			 - (u_int8_t *)ip6mu, 
+		MOPT_AUTH_LEN(mopt) + 2);
 
-	/* Must exclude authentication option */
-	restlen = ip6mulen - (((u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu) + MOPT_AUTH_LEN(mopt) + 2);
-	if (restlen > 0) {
-	    hmac_loop(&hmac_ctx,
-		      mopt->mopt_auth + MOPT_AUTH_LEN(mopt) + 2, restlen);
-#ifdef RR_DBG
-mip6_hexdump("CN: Auth: ", restlen, mopt->mopt_auth + MOPT_AUTH_LEN(mopt) + 2);
-#endif
-	}
-	bzero(authdata, sizeof(authdata));
-	hmac_result(&hmac_ctx, authdata);
-#ifdef RR_DBG
-mip6_hexdump("CN: Auth Data: ", sizeof(authdata), authdata);
-#endif
 	ip6mu->ip6mu_cksum = cksum_backup;
 
 	return (bcmp(mopt->mopt_auth + 2, authdata, MOPT_AUTH_LEN(mopt)));
@@ -2904,7 +2880,63 @@ mip6_calculate_kbu(home_cookie, careof_cookie, key_bu)
 	SHA1Update(&sha1_ctx, (caddr_t)home_cookie, sizeof(*home_cookie));
 	SHA1Update(&sha1_ctx, (caddr_t)careof_cookie, sizeof(*careof_cookie));
 	SHA1Final(result, &sha1_ctx);
-	/* First 96 bit */
+	/* First 128 bit */
 	bcopy(result, key_bu, MIP6_KBU_LEN);
+}
+
+/*
+ *   <------------------ datalen ------------------->
+ *                  <-- exclude_data_len ---> 
+ *   ---------------+-----------------------+--------
+ *   ^              <--                   -->
+ *   data     The area excluded from calculation Auth.
+ *   - - - - - - - ->
+ *     exclude_offset
+ */
+void
+mip6_calculate_authenticator(key_bu, result, addr1, addr2, data, datalen, exclude_offset, exclude_data_len)
+	u_int8_t *key_bu;		/* Key_bu */
+	u_int8_t *result;		/* */
+	struct in6_addr *addr1, *addr2;
+	caddr_t data;
+	size_t datalen;
+	int exclude_offset;
+	size_t exclude_data_len;
+{
+	HMAC_CTX hmac_ctx;
+	int restlen;
+	u_int8_t sha1_result[SHA1_RESULTLEN];
+
+	/* Calculate authenticator (5.5.6) */
+	/* MAC_Kbu(addr1, | addr2 | (BU|BA) ) */
+	hmac_init(&hmac_ctx, key_bu, MIP6_KBU_LEN, HMAC_SHA1);
+	hmac_loop(&hmac_ctx, (u_int8_t *)addr1, sizeof(*addr1));
+#ifdef RR_DBG
+mip6_hexdump("MN: Auth: ", sizeof(*addr1), addr1);
+#endif
+	hmac_loop(&hmac_ctx, (u_int8_t *)addr2, sizeof(*addr2));
+#ifdef RR_DBG
+mip6_hexdump("MN: Auth: ", sizeof(*addr2), addr2);
+#endif
+	hmac_loop(&hmac_ctx, (u_int8_t *)data, exclude_offset);
+#ifdef RR_DBG
+mip6_hexdump("MN: Auth: ", exclude_offset, data);
+#endif
+	/* Exclude authdata field in the mobility option to calculate authdata 
+	   But it should be included padding area */
+	restlen = datalen - (exclude_offset + exclude_data_len);
+	if (restlen > 0) {
+		hmac_loop(&hmac_ctx,
+			  data + exclude_offset + exclude_data_len,
+			  restlen);
+#ifdef RR_DBG
+mip6_hexdump("MN: Auth: ", restlen, data + exclude_offset + exclude_data_len);
+#endif
+	}
+	hmac_result(&hmac_ctx, sha1_result);
+	bcopy(sha1_result, result, MIP6_AUTHENTICATOR_LEN);
+#ifdef RR_DBG
+mip6_hexdump("MN: Authdata: ", MIP6_AUTHENTICATOR_LEN, result);
+#endif
 }
 #endif /* MIP6_DRAFT18 */

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.61 2002/09/30 10:21:39 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.62 2002/10/02 06:23:57 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -74,7 +74,7 @@
 
 #define SHA1_RESULTLEN	20
 
-
+/* Calculation pad length te be appended */
 /* xn + y; x must be 2^m */
 #define PADLEN(cur_offset, x, y)	\
 	((x + y) - ((cur_offset) % (x))) % (x)
@@ -632,7 +632,9 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	/* ip6_src and HAO has been already swapped at this point. */
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &bi.mbc_phaddr);
 	if (mbc == NULL) {
-		if (!bu_safe && mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &mopt, &bi.mbc_phaddr, &bi.mbc_pcoa)) {
+		if (!bu_safe && 
+		    mip6_is_valid_bu(ip6, ip6mu, ip6mulen, &mopt, 
+				     &bi.mbc_phaddr, &bi.mbc_pcoa)) {
 			mip6log((LOG_ERR,
 				 "%s:%d: RR authentication was failed.\n",
 				 __FILE__, __LINE__));
@@ -1428,9 +1430,13 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	int bu_size, nonce_size, auth_size;
 	struct mip6_bu *mbu, *hrmbu;
 	int need_rr = 0;
+#if 0
 	HMAC_CTX hmac_ctx;
+#endif
 	u_int8_t key_bu[MIP6_KBU_LEN]; /* Stated as 'Kbu' in the spec */
+#if 0
 	u_int8_t result[SHA1_RESULTLEN];
+#endif
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
@@ -1615,6 +1621,13 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 		mopt_auth->ip6moau_type = IP6MOPT_AUTHDATA;
 		mopt_auth->ip6moau_len = AUTH_SIZE - 2;
 
+		if (auth_size > AUTH_SIZE) {
+			*((u_int8_t *)ip6mu + bu_size + nonce_size + AUTH_SIZE)
+			    = IP6MOPT_PADN;
+			*((u_int8_t *)ip6mu + bu_size + nonce_size + AUTH_SIZE + 1)
+			    = auth_size - AUTH_SIZE - 2;
+		}
+
 #ifdef RR_DBG
 mip6_hexdump("MN: Home Cookie: ", sizeof(mbu->mbu_home_cookie), (caddr_t)&mbu->mbu_home_cookie);
 mip6_hexdump("MN: Care-of Cookie: ", sizeof(mbu->mbu_careof_cookie), (caddr_t)&mbu->mbu_careof_cookie);
@@ -1627,6 +1640,13 @@ mip6_hexdump("MN: K_bu: ", sizeof(key_bu), key_bu);
 
 		/* Calculate authenticator (5.5.6) */
 		/* MAC_Kbu(coa, | cn | BU) */
+		mip6_calculate_authenticator(key_bu, (u_int8_t *)(mopt_auth + 1), 
+			&mbu->mbu_coa.sin6_addr, &dst->sin6_addr, 
+			(caddr_t)ip6mu, bu_size + nonce_size + auth_size, 
+			bu_size + nonce_size + sizeof(struct ip6m_opt_authdata) ,
+			MIP6_AUTHENTICATOR_LEN);
+
+#if 0
 		hmac_init(&hmac_ctx, key_bu, sizeof(key_bu), HMAC_SHA1);
 		hmac_loop(&hmac_ctx, (u_int8_t *)&mbu->mbu_coa.sin6_addr,
 			  sizeof(mbu->mbu_coa.sin6_addr));
@@ -1660,6 +1680,7 @@ mip6_hexdump("MN: Auth: ", auth_size - AUTH_SIZE, (u_int8_t *)ip6mu + bu_size + 
 		bcopy(result, (u_int8_t *)(mopt_auth + 1), MIP6_AUTHENTICATOR_LEN);
 #ifdef RR_DBG
 mip6_hexdump("MN: Authdata: ", SHA1_RESULTLEN, (u_int8_t *)(mopt_auth + 1));
+#endif
 #endif
 	}
 

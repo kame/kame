@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.58 2002/09/26 14:03:19 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.59 2002/10/02 06:23:57 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -630,6 +630,9 @@ void mip6_create_cookie __P((struct in6_addr *,
 			     mip6_nodekey_t *, mip6_nonce_t *,
 			     void *));
 void mip6_calculate_kbu(mip6_home_cookie_t *, mip6_careof_cookie_t *, u_int8_t *);
+void mip6_calculate_authenticator(u_int8_t *, u_int8_t *, 
+	struct in6_addr *, struct in6_addr *,
+	caddr_t, size_t, int, size_t);
 #endif /* MIP6_DRAFT18 */
 
 #endif /* _KERNEL */
