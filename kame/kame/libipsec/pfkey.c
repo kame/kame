@@ -585,6 +585,11 @@ pfkey_send_spddelete(so, src, prefs, dst, prefd, proto, policy, policylen, seq)
 {
 	int len;
 
+	if (policylen != sizeof(struct sadb_x_policy)) {
+		ipsec_errcode = EIPSEC_INVAL_ARGUMENT;
+		return -1;
+	}
+
 	if ((len = pfkey_send_x4(so, SADB_X_SPDDELETE,
 				src, prefs, dst, prefd, proto,
 				policy, policylen, seq)) < 0)
