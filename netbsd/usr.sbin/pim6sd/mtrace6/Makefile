@@ -38,7 +38,6 @@ DPADD+=	-L${.OBJDIR}/../../../lib/libinet6/libinet6.a \
 
 .PATH:	${SRCDIR}
 
-#MAN= mtrace6.8
-NOMAN=	yes
+MAN= mtrace6.8
 
 .include <bsd.prog.mk>
