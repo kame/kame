@@ -55,7 +55,7 @@
 /*
  *      @(#)netdb.h	8.1 (Berkeley) 6/2/93
  *      From: Id: netdb.h,v 8.9 1996/11/19 08:39:29 vixie Exp $
- * $FreeBSD: src/include/netdb.h,v 1.14 2000/02/08 05:12:45 shin Exp $
+ * $FreeBSD: src/include/netdb.h,v 1.14.2.2 2001/02/26 07:34:09 ume Exp $
  */
 
 #ifndef _NETDB_H_
@@ -167,7 +167,7 @@ struct addrinfo {
 #define	AI_CANONNAME	0x00000002 /* fill ai_canonname */
 #define	AI_NUMERICHOST	0x00000004 /* prevent name resolution */
 /* valid flags for addrinfo */
-#define	AI_MASK \
+#define AI_MASK \
     (AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST | AI_ADDRCONFIG)
 
 #define	AI_ALL		0x00000100 /* IPv6 and IPv4-mapped (with AI_V4MAPPED) */
