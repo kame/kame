@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.170 2001/07/23 15:13:27 sumikawa Exp $	*/
+/*	$KAME: nd6.c,v 1.171 2001/07/23 15:55:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -533,7 +533,7 @@ nd6_timer(ignored_arg)
 			ln = next;
 			continue;
 		}
-		
+
 		/* sanity check */
 		if (!rt)
 			panic("rt=0 in nd6_timer(ln=%p)\n", ln);
