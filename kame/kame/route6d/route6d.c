@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.67 2001/06/02 06:32:54 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.68 2001/06/02 17:36:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.67 2001/06/02 06:32:54 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.68 2001/06/02 17:36:06 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -2002,10 +2002,7 @@ ifrt(ifcp, again)
 			rrt->rrt_rflags |= RRTF_CHANGED;
 			applyplen(&rrt->rrt_info.rip6_dest, ifa->ifa_plen);
 			memset(&rrt->rrt_gw, 0, sizeof(struct in6_addr));
-#if 0
-			/* XXX why gateway address == network adddress? */
 			rrt->rrt_gw = ifa->ifa_addr;
-#endif
 			np = &rrt->rrt_info;
 			search_rrt = rtsearch(np, &prev_rrt);
 			if (search_rrt != NULL) {
