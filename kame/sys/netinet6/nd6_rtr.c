@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.249 2004/04/09 06:54:29 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.250 2004/04/09 07:11:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1968,10 +1968,7 @@ nd6_prefix_offlink(pr)
 		return (EEXIST);
 	}
 
-	bzero(&sa6, sizeof(sa6));
-	sa6.sin6_family = AF_INET6;
-	sa6.sin6_len = sizeof(sa6);
-	bcopy(&pr->ndpr_prefix, &sa6.sin6_addr, sizeof(struct in6_addr));
+	sa6 = pr->ndpr_prefix;
 	bzero(&mask6, sizeof(mask6));
 	mask6.sin6_family = AF_INET6;
 	mask6.sin6_len = sizeof(sa6);
@@ -2110,8 +2107,7 @@ in6_ifadd(pr)
 	ifra.ifra_addr.sin6_family = AF_INET6;
 	ifra.ifra_addr.sin6_len = sizeof(struct sockaddr_in6);
 	/* prefix */
-	bcopy(&pr->ndpr_prefix, &ifra.ifra_addr.sin6_addr,
-	    sizeof(ifra.ifra_addr.sin6_addr));
+	ifra.ifra_addr.sin6_addr = pr->ndpr_prefix.sin6_addr;
 	ifra.ifra_addr.sin6_addr.s6_addr32[0] &= mask.s6_addr32[0];
 	ifra.ifra_addr.sin6_addr.s6_addr32[1] &= mask.s6_addr32[1];
 	ifra.ifra_addr.sin6_addr.s6_addr32[2] &= mask.s6_addr32[2];
