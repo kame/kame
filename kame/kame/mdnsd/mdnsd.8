@@ -1,4 +1,4 @@
-.\"	$KAME: mdnsd.8,v 1.43 2001/07/26 14:14:41 itojun Exp $
+.\"	$KAME: mdnsd.8,v 1.44 2001/07/31 04:36:09 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -61,9 +61,9 @@ serves as multicast DNS resolver.
 The program should be invoked on every node which speaks multicast DNS.
 .Pp
 .Nm
-will receive unicast DNS queries from local node,
+will receive unicast DNS queries
 and forward the queries toward link-local multicast DNS address on
-.Ar intface
+.Ar intface ,
 if the query is within
 .Dq local.arpa.
 domain.
