@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.97 2004/06/02 06:01:24 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.98 2004/08/16 04:53:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -195,6 +195,19 @@ void	(*ipip_input)(struct mbuf *, int); /* hook for mrouting */
 #endif
 
 void
+encap_setkeylen()
+{
+#ifdef USE_RADIX
+	if (sizeof(struct pack4) > max_keylen)
+		max_keylen = sizeof(struct pack4);
+#ifdef INET6
+	if (sizeof(struct pack6) > max_keylen)
+		max_keylen = sizeof(struct pack6);
+#endif
+#endif
+}
+
+void
 encap_init()
 {
 	static int initialized = 0;
@@ -219,12 +232,8 @@ encap_init()
 	 * max_keylen initialization should happen before the call to rn_init().
 	 */
 	rn_inithead((void **)&encap_head[0], sizeof(struct sockaddr_pack) << 3);
-	if (sizeof(struct pack4) > max_keylen)
-		max_keylen = sizeof(struct pack4);
 #ifdef INET6
 	rn_inithead((void **)&encap_head[1], sizeof(struct sockaddr_pack) << 3);
-	if (sizeof(struct pack6) > max_keylen)
-		max_keylen = sizeof(struct pack6);
 #endif
 #endif
 }

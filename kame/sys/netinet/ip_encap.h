@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.h,v 1.14 2004/05/26 10:08:00 itojun Exp $	*/
+/*	$KAME: ip_encap.h,v 1.15 2004/08/16 04:53:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -54,6 +54,7 @@ struct encaptab {
 	void *arg;			/* passed via PACKET_TAG_ENCAP */
 };
 
+void	encap_setkeylen __P((void));
 void	encap_init __P((void));
 #ifdef __FreeBSD__
 void	encap4_input __P((struct mbuf *, int));
