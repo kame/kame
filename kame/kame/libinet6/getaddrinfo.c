@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.196 2004/11/27 10:47:25 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.197 2004/11/27 12:55:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -307,7 +307,8 @@ static int get_portmatch __P((const struct addrinfo *, const char *));
 static int get_port __P((struct addrinfo *, const char *, int));
 static const struct afd *find_afd __P((int));
 static int addrconfig __P((int, struct addrconfig *));
-static void set_source __P((struct ai_order *, struct policyhead *));
+static void set_source __P((struct ai_order *, struct policyhead *,
+    struct addrconfig *));
 static int comp_dst __P((const void *, const void *));
 #ifdef INET6
 static int ip6_str2scopeid __P((char *, struct sockaddr_in6 *, u_int32_t *));
@@ -319,7 +320,7 @@ static int explore_fqdn __P((const struct addrinfo *, const char *,
 	const char *, struct addrinfo **, struct addrconfig *));
 
 static int init __P((struct addrconfig *, int));
-static int reorder __P((struct addrinfo *));
+static int reorder __P((struct addrinfo *, struct addrconfig *));
 static void get_addrselectpolicy __P((struct policyhead *));
 static void free_addrselectpolicy __P((struct policyhead *));
 static struct policyqueue *match_addrselectpolicy __P((struct sockaddr *,
@@ -704,7 +705,7 @@ globcopy:
 			 */
 			if (hints == NULL || !(hints->ai_flags & AI_PASSIVE)) {
 				if (!numeric)
-					(void)reorder(&sentinel);
+					(void)reorder(&sentinel, &ac);
 			}
 			*res = sentinel.ai_next;
 		} else
@@ -768,6 +769,16 @@ init(ac, flags)
 			if (s >= 0) {
 				strncpy(ifr6.ifr_name, ifap->ifa_name,
 				    sizeof(ifr6.ifr_name));
+				if (ifr6.ifr_name[sizeof(ifr6.ifr_name) - 1]
+				    != '\0') {
+					/*
+					 * XXX: overflow case.  Note that
+					 * automatic null-termination is wrong
+					 * here.
+					 */
+					close(s);
+					break;
+				}
 				memcpy(&ifr6.ifr_addr, ifap->ifa_addr,
 				    ifap->ifa_addr->sa_len);
 				if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) == 0) {
@@ -799,8 +810,9 @@ init(ac, flags)
 }
 
 static int
-reorder(sentinel)
+reorder(sentinel, ac)
 	struct addrinfo *sentinel;
+	struct addrconfig *ac;
 {
 	struct addrinfo *ai, **aip;
 	struct ai_order *aio;
@@ -832,7 +844,7 @@ reorder(sentinel)
 		aio[i].aio_dstpolicy = match_addrselectpolicy(ai->ai_addr,
 							      &policyhead);
 
-		set_source(&aio[i], &policyhead);
+		set_source(&aio[i], &policyhead, ac);
 	}
 
 	/* perform sorting. */
@@ -972,9 +984,10 @@ match_addrselectpolicy(addr, head)
 }
 
 static void
-set_source(aio, ph)
+set_source(aio, ph, ac)
 	struct ai_order *aio;
 	struct policyhead *ph;
+	struct addrconfig *ac;
 {
 	struct addrinfo ai = *aio->aio_ai;
 	struct sockaddr_storage ss;
@@ -1018,17 +1031,53 @@ set_source(aio, ph)
 	aio->aio_matchlen = matchlen(&aio->aio_srcsa, aio->aio_ai->ai_addr);
 #ifdef INET6
 	if (ai.ai_family == AF_INET6) {
+		struct ifaddrs *ifap;
+		struct sockaddr_in6 *sa6;
 		struct in6_ifreq ifr6;
 		u_int32_t flags6;
 
-		/* XXX: interface name should not be hardcoded */
-		memset(&ifr6, 0, sizeof(ifr6));
-		strncpy(ifr6.ifr_name, "lo0", sizeof(ifr6.ifr_name));
-		memcpy(&ifr6.ifr_addr, ai.ai_addr, ai.ai_addrlen);
-		if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) == 0) {
-			flags6 = ifr6.ifr_ifru.ifru_flags6;
-			if ((flags6 & IN6_IFF_DEPRECATED))
-				aio->aio_srcflag |= AIO_SRCFLAG_DEPRECATED;
+		/*
+		 * XXX: the loop can be expensive if we have a massive number
+		 * of addresses, in which case we may want to add an efficient
+		 * way to get access to the address list (e.g., using a hash). 
+		 */
+		for (ifap = ac->addrs; ifap != NULL; ifap = ifap->ifa_next) {
+			if (ifap->ifa_addr->sa_family != AF_INET6)
+				continue;
+			sa6 = (struct sockaddr_in6 *)ifap->ifa_addr;
+			if (IN6_ARE_ADDR_EQUAL(&sa6->sin6_addr,
+			    &((struct sockaddr_in6 *)&aio->aio_srcsa)->sin6_addr)) {
+				break;
+			}
+		}
+		if (ifap == NULL) {
+			/*
+			 * This is an unexpected case, but still can happen
+			 * if the node's configuration has been changed during
+			 * DNS name lookups, etc.  We ignore this case; after
+			 * all, the ordering of addrinfo is just an informative
+			 * optimization.
+			 */
+			;
+		} else {
+			memset(&ifr6, 0, sizeof(ifr6));
+			strncpy(ifr6.ifr_name, ifap->ifa_name,
+			    sizeof(ifr6.ifr_name));
+			memcpy(&ifr6.ifr_addr, &aio->aio_srcsa, srclen);
+			if (ifr6.ifr_name[sizeof(ifr6.ifr_name) - 1] == '\0') {
+				/*
+				 * make sure the name doesn't overflow.
+				 * Note that automatic null-termination is
+				 * wrong here.
+				 */
+				if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) == 0) {
+					flags6 = ifr6.ifr_ifru.ifru_flags6;
+					if ((flags6 & IN6_IFF_DEPRECATED)) {
+						aio->aio_srcflag |=
+						    AIO_SRCFLAG_DEPRECATED;
+					}
+				}
+			}
 		}
 	}
 #endif
