@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.109 2002/03/01 09:37:37 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.110 2002/03/15 07:46:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -206,9 +206,9 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 #ifdef MIP6
 	struct hif_softc *sc;
 	struct mip6_unuse_hoa *uh;
+	u_int8_t usecoa = 0;
 #ifdef MIP6_ALLOW_COA_FALLBACK
 	struct mip6_bu *mbu_dst;
-	u_int8_t coafallback = 0;
 #endif
 #endif
 
@@ -283,6 +283,30 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		return(NULL);
 
 #ifdef MIP6
+	/*
+	 * a caller can specify IP6PO_USECOA to not to use a home
+	 * address.  for example, the case that the neighbour
+	 * unreachability detection to the global address.
+	 */
+	if ((opts != NULL)
+	    && ((opts->ip6po_flags & IP6PO_USECOA) != 0)) {
+		usecoa = 1;
+	}
+	/*
+	 * a user can specify destination addresses or detination
+	 * ports for which he don't want to use a home address when
+	 * sending packets.
+	 */
+	for (uh = LIST_FIRST(&mip6_unuse_hoa);
+	     uh;
+	     uh = LIST_NEXT(uh, unuse_entry)) {
+		if ((IN6_IS_ADDR_UNSPECIFIED(&uh->unuse_addr)
+			 || IN6_ARE_ADDR_EQUAL(dst, &uh->unuse_addr))
+		    && (!uh->unuse_port || (dstsock->sin6_port == uh->unuse_port))) {
+			usecoa = 1;
+			break;
+		}
+  	}
 #ifdef MIP6_ALLOW_COA_FALLBACK
 	for (sc = TAILQ_FIRST(&hif_softc_list);
 	     sc;
@@ -291,18 +315,8 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 						      dstsock, NULL);
 		if ((mbu_dst != NULL) &&
 		    ((mbu_dst->mbu_state & MIP6_BU_STATE_MIP6NOTSUPP) != 0))
-			coafallback = 1;
+			usecoa = 1;
 	}
-	for (uh = LIST_FIRST(&mip6_unuse_hoa);
-	     uh;
-	     uh = LIST_NEXT(uh, unuse_entry)) {
-		if ((IN6_IS_ADDR_UNSPECIFIED(&uh->unuse_addr)
-			 || IN6_ARE_ADDR_EQUAL(dst, &uh->unuse_addr))
-		    && (!uh->unuse_port || (dstsock->sin6_port == uh->unuse_port))) {
-			coafallback = 1;
-			break;
-		}
-  	}
 #endif /* MIP6_ALLOW_COA_FALLBACK */
 #endif /* MIP6 */
 
@@ -382,14 +396,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		 * case above.
 		 */
 #ifdef MIP6
-		/*
-		 * a caller can specify IP6PO_USECOA to not to use a
-		 * home address.  for example, the case that the
-		 * neighbour unreachability detection to the global
-		 * address.
-		 */
-		if (!((opts != NULL) &&
-		      ((opts->ip6po_flags & IP6PO_USECOA) != 0))) {
+		{
 			struct mip6_bu *mbu_ia_best = NULL, *mbu_ia = NULL;
 			struct sockaddr_in6 ia_addr;
 
@@ -466,19 +473,20 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 			      == MIP6_BU_REG_STATE_NOTREG))) {
 				REPLACE(4);
 			}
-#ifdef MIP6_ALLOW_COA_FALLBACK
-			if (coafallback) {
+			if (usecoa != 0) {
 				/*
-				 * if the peer doesn't recognize a
-				 * home address destination option, we
-				 * will use a CoA as a source address
-				 * instead of a home address we have
-				 * registered before.  Though this
-				 * behavior breaks the mobility, this
-				 * is very useful in the current
-				 * transition period that many hosts
-				 * don't recognize a home address
-				 * destination option...
+				 * a sender don't want to use a home
+				 * address because:
+				 *
+				 * 1) we cannot use.  (ex. NS or NA to
+				 * global addresses.)
+				 *
+				 * 2) a user specified not to use.
+				 * (ex. mip6control -u)
+				 *
+				 * 3) MIP6_ALLOW_COA_FALLABCK is
+				 * defined and the peer doesn't
+				 * recognize HAO.
 				 */
 				if ((ia_best->ia6_flags & IN6_IFF_HOME) == 0 &&
 				    (ia->ia6_flags & IN6_IFF_HOME) != 0) {
@@ -490,9 +498,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 					/* XXX will break stat! */
 					REPLACE(0);
 				}
-			} else
-#endif
-			{
+			} else {
 				/*
 				 * If SA is just a home address and SB
 				 * is just a care-of address, then

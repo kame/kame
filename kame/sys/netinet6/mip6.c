@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.122 2002/03/13 17:00:46 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.123 2002/03/15 07:46:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -44,6 +44,10 @@
 #endif
 #ifdef __NetBSD__
 #include "opt_ipsec.h"
+#endif
+
+#if defined(MIP6_ALLOW_COA_FALLBACK) && defined(MIP6_BDT)
+#error "you cannot specify both MIP6_ALLOW_COA_FALLBACK and MIP6_BDT"
 #endif
 
 #include <sys/param.h>
