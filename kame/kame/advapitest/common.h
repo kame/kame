@@ -1,4 +1,4 @@
-/*	$KAME: common.h,v 1.1 2000/11/14 17:27:46 jinmei Exp $ */
+/*	$KAME: common.h,v 1.2 2001/09/18 11:00:54 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -28,6 +28,10 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#ifndef DEFAULTPORT
+#define DEFAULTPORT "33333"
+#endif
 
 void print_options __P((struct msghdr *));
 void print_opthdr __P((void *));
