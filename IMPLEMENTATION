@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.140 2000/07/30 15:29:22 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.141 2000/08/01 14:38:33 itojun Exp $
 
 1. IPv6
 
@@ -98,6 +98,9 @@ draft-ietf-dhc-dhcpv6-15.txt: DHCPv6
 draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
     * kame/dhcp6 has test implementation, which will not be compiled in
       default compilation.
+    * 15/12 drafts are not explicit about padding and string termination.
+      at IETF48, the author confirmed that there's no padding/termination
+      (and extensions can appear unaligned).  our code follows the comment.
 draft-itojun-ipv6-tcp-to-anycast-00.txt:
 	Disconnecting TCP connection toward IPv6 anycast address
 draft-ietf-ipngwg-scopedaddr-format-02.txt:
