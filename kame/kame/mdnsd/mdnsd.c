@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.47 2001/11/19 05:43:09 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.48 2001/11/19 05:53:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -383,6 +383,12 @@ getsock0(ai)
 		dprintf("socket: %s\n", strerror(errno));
 		return -1;
 	}
+#ifdef IPV6_V6ONLY
+	if (ai->ai_family == AF_INET6) {
+		(void)setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY,
+		    &yes, sizeof(yes));
+	}
+#endif
 	if (ai->ai_socktype == SOCK_STREAM || ai->ai_socktype == SOCK_DGRAM)
 		if (bind(s, ai->ai_addr, ai->ai_addrlen) < 0) {
 			dprintf("bind: %s\n", strerror(errno));
@@ -404,10 +410,6 @@ getsock0(ai)
 		    &yes, sizeof(yes));
 #ifdef IPV6_USE_MIN_MTU
 		(void)setsockopt(s, IPPROTO_IPV6, IPV6_USE_MIN_MTU,
-		    &yes, sizeof(yes));
-#endif
-#ifdef IPV6_V6ONLY
-		(void)setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY,
 		    &yes, sizeof(yes));
 #endif
 		break;
