@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.947 2000/05/28 15:08:44 itojun Exp $
+$Id: CHANGELOG,v 1.948 2000/05/28 15:45:23 itojun Exp $
 
 <200005>
+Mon May 29 00:43:15 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ip6_output.c (affects netbsd only):
+	  correct setsockopt(IPV6_BINDV6ONLY) behavior.
+
 Mon May 29 00:04:15 JST 2000  itojun@iijlab.net
 	* bsdi4/sys/netinet/in_pcb.c: remove NRL bind(2) ordering constraint.
 	  NRL code forbids wildcard IPv4 bind after wildcard IPv6 bind on
