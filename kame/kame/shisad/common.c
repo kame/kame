@@ -1,4 +1,4 @@
-/*      $KAME: common.c,v 1.9 2005/01/31 11:35:51 t-momose Exp $  */
+/*      $KAME: common.c,v 1.10 2005/02/05 09:15:02 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -275,6 +275,7 @@ mip6_flush_hal(hpfx_entry, exception_flag)
 			continue;
 
 		LIST_REMOVE(hal, hal_entry);
+		hal_stop_expire_timer(hal);
 		free(hal);
 	}
 
@@ -294,6 +295,7 @@ mip6_delete_hal(hpfx_entry, gladdr)
 		return;
 
 	LIST_REMOVE(hal, hal_entry);
+	hal_stop_expire_timer(hal);
 	free(hal);
 	hal = NULL;
 
@@ -369,6 +371,7 @@ mip6_delete_hpfxlist(home_prefix, home_prefixlen, hpfxhead)
 		haln = LIST_NEXT(hal, hal_entry);
 
 		LIST_REMOVE(hal, hal_entry);
+		hal_stop_expire_timer(hal);
 		free(hal);
 		hal = NULL;
 	}
