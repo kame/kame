@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.138 2001/07/21 09:40:57 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.139 2001/07/21 09:42:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -842,7 +842,9 @@ defrouter_select()
 
 	/*
 	 * If no default route was installed, we should probably install
-	 * interface route and assume that all destinations are on-link.
+	 * an interface route and assume that all destinations are on-link.
+	 *
+	 * Otherwise, make sure we don't have the last-resort interface route.
 	 */
  empty:
 	if (installcount == 0) {
