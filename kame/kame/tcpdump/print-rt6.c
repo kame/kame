@@ -81,8 +81,10 @@ rt6_print(register const u_char *bp, register const u_char *bp2)
 		dp0 = (struct ip6_rthdr0 *)dp;
 
 		TCHECK(dp0->ip6r0_reserved);
-		if (dp0->ip6r0_reserved || vflag)
-			printf("rsv=0x%0x, ", ntohl(dp0->ip6r0_reserved));
+		if (dp0->ip6r0_reserved || vflag) {
+			printf("rsv=0x%0x, ",
+				(u_int32_t)ntohl(dp0->ip6r0_reserved));
+		}
 
 		if (len % 2 == 1)
 			goto trunc;

@@ -21,7 +21,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-pim.c,v 1.3 1999/10/13 05:42:46 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-pim.c,v 1.4 1999/11/17 14:49:49 jinmei Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -533,8 +533,10 @@ pimv2_print(register const u_char *bp, register u_int len)
 			break;
 		if (ntohl(*(u_int32_t *)bp) & 0x80000000)
 			(void)printf(" RPT");
-		(void)printf(" pref=%u", ntohl(*(u_int32_t *)bp & 0x7fffffff));
-		(void)printf(" metric=%u", ntohl(*(u_int32_t *)(bp + 4)));
+		(void)printf(" pref=%u",
+			(u_int32_t)ntohl(*(u_int32_t *)bp & 0x7fffffff));
+		(void)printf(" metric=%u",
+			(u_int32_t)ntohl(*(u_int32_t *)(bp + 4)));
 		break;
 
 	 case 8:

@@ -71,7 +71,7 @@ frag6_print(register const u_char *bp, register const u_char *bp2)
 
 	if (vflag) {
 		printf("frag (0x%08x:%d|%ld)",
-		       ntohl(dp->ip6f_ident),
+		       (u_int32_t)ntohl(dp->ip6f_ident),
 		       ntohs(dp->ip6f_offlg & IP6F_OFF_MASK),
 		       sizeof(struct ip6_hdr) + ntohs(ip6->ip6_plen) -
 			       (long)(bp - bp2) - sizeof(struct ip6_frag));
