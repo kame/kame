@@ -745,7 +745,8 @@ in_pcblookup(table, faddrp, fport_arg, laddrp, lport_arg, flags)
 			if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6)) {
 				if (IN6_IS_ADDR_UNSPECIFIED(laddr6))
 					wildcard++;
-				else if (!IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6, laddr6))
+				else if (!IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6,
+				    laddr6))
 					continue;
 			} else {
 				if (!IN6_IS_ADDR_UNSPECIFIED(laddr6))
