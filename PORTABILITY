@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.30 2000/02/19 17:09:19 jinmei Exp $
+	$Id: PORTABILITY,v 1.31 2000/02/19 17:12:46 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -237,6 +237,9 @@ across those possibilities.
   (it will be interpreted as baa/obj/../foo/foo.h = baa/foo/foo.h)
 
   Solution: use -I${.CURDIR}/../foo.
+
+- OpenBSD does not allow duplicated inclusion of system header files.
+  (it does not have #ifndef _FOO_H_ wrapper)
 
 - Developers are advised to use pedantic compilation options (like -Wall
   -Werror).  To configure default make settings, /etc/make.conf (freebsd),
