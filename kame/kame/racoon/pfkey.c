@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.140 2003/11/09 15:45:53 itojun Exp $	*/
+/*	$KAME: pfkey.c,v 1.141 2003/11/11 16:50:13 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2272,6 +2272,12 @@ pk_recvspddump(mhp)
 	saddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
 	daddr = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_DST];
 	xpl = (struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY];
+
+	if (saddr == NULL || daddr == NULL || xpl == NULL) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"inappropriate sadb spddump message passed.\n");
+		return -1;
+	}
 
 	KEY_SETSECSPIDX(xpl->sadb_x_policy_dir,
 			saddr + 1,
