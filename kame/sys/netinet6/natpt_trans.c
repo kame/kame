@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.129 2002/06/27 04:48:59 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.130 2002/06/27 05:13:53 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1192,6 +1192,14 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 		struct ulc4	ulc4;
 		struct ulc6	ulc6;
 
+#ifdef _IP_VHL
+		hlen = IP_VHL_HL(icmpip4->ip_vhl) << 2;
+#else
+		hlen = icmpip4->ip_hl << 2;
+#endif
+		icmpulp4 = (caddr_t)icmpip4 + hlen;
+		icmpulp6 = (caddr_t)icmpip6 + sizeof(struct ip6_hdr);
+
 		bzero(&ulc4, sizeof(struct ulc4));
 		bzero(&ulc6, sizeof(struct ulc6));
 
@@ -1200,13 +1208,11 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 		ulc6.ulc_src = icmpip6->ip6_src;
 		ulc6.ulc_dst = icmpip6->ip6_dst;
 
-#ifdef _IP_VHL
-		hlen = IP_VHL_HL(icmpip4->ip_vhl) << 2;
-#else
-		hlen = icmpip4->ip_hl << 2;
-#endif
-		icmpulp4 = (caddr_t)icmpip4 + hlen;
-		icmpulp6 = (caddr_t)icmpip6 + sizeof(struct ip6_hdr);
+		ulc4.ulc_tu.uh.uh_sport = ((struct udphdr *)icmpulp4)->uh_sport;
+		ulc4.ulc_tu.uh.uh_dport = ((struct udphdr *)icmpulp4)->uh_dport;
+		ulc6.ulc_tu.uh.uh_sport = ((struct udphdr *)icmpulp4)->uh_sport;
+		ulc6.ulc_tu.uh.uh_dport = ((struct udphdr *)icmpulp4)->uh_dport;
+
 		if (icmpip4->ip_p == IPPROTO_TCP) {
 			in4_cksum = ntohs(((struct tcphdr *)icmpulp4)->th_sum);
 		} else {
