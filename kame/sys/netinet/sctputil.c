@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.36 2005/03/06 16:04:19 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.37 2005/03/07 23:26:09 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -1707,7 +1707,7 @@ sctp_calculate_len(struct mbuf *m)
 		tlen += at->m_len;
 		at = at->m_next;
 	}
-	return(tlen);
+	return (tlen);
 }
 
 #if defined(SCTP_WITH_NO_CSUM)

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.47 2005/03/06 16:04:18 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.48 2005/03/07 23:26:08 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -1488,7 +1488,7 @@ sctp_do_connect_x(struct socket *so,
 	    (inp->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE)) {
 		SCTP_ASOC_CREATE_UNLOCK(inp);
 		splx(s);
-		return(EFAULT);
+		return (EFAULT);
 	}
 
 	totaddrp = mtod(m, int *);
@@ -3800,7 +3800,7 @@ sctp_connect(struct socket *so, struct mbuf *nam, struct proc *p)
 		SCTP_INP_WUNLOCK(inp);
 		SCTP_ASOC_CREATE_UNLOCK(inp);
 		splx(s);
-		return(EFAULT);
+		return (EFAULT);
 	}
 #ifdef INET6
 	if (((inp->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) == 0) &&
