@@ -510,29 +510,53 @@ get_name(addr, afd, res, numaddr, pai, port0)
 }
 
 static int
-get_addr(hostname, af, res, pai, port0)
+get_addr(hostname, af, res0, pai, port0)
 	const char *hostname;
 	int af;
-	struct addrinfo **res;
+	struct addrinfo **res0;
 	struct addrinfo *pai;
 	int port0;
 {
 #ifdef USE_GETIPNODEBY
-	return get_addr0(hostname, af, res, pai, port0);
+	return get_addr0(hostname, af, res0, pai, port0);
 #else
-	int i, error;
+	int i, error, ekeep;
 	struct addrinfo *cur;
+	struct addrinfo **res;
+	int retry;
+	int s;
 
+	res = res0;
+	ekeep = 0;
+	error = 0;
 	for (i = 0; afdl[i].a_af; i++) {
-		if (af == AF_UNSPEC || af == afdl[i].a_af) 
-			;
-		else
-			continue;
+		retry = 0;
+		if (af == AF_UNSPEC) {
+			/*
+			 * filter out AFs that are not supported by the kernel
+			 * XXX errno?
+			 */
+			s = socket(afdl[i].a_af, SOCK_DGRAM, 0);
+			if (s < 0)
+				continue;
+			close(s);
+		} else {
+			if (af != afdl[i].a_af)
+				continue;
+		}
+		/* It is WRONG, we need getipnodebyname(). */
+again:
 		error = get_addr0(hostname, afdl[i].a_af, res, pai, port0);
-		if (error == EAI_FAIL)
-			return error;
-		else
-			error = 0;
+		switch (error) {
+		case EAI_AGAIN:
+			if (++retry < 3)
+				goto again;
+			/* FALL THROUGH*/
+		default:
+			if (ekeep == 0)
+				ekeep = error;
+			break;
+		}
 		if (*res) {
 			/* make chain of addrs */
 			for (cur = *res;
@@ -545,7 +569,11 @@ get_addr(hostname, af, res, pai, port0)
 		}
 	}
 
-	return error;
+	/* if we got something, it's okay */
+	if (*res0)
+		return 0;
+
+	return error ? error : ekeep;
 #endif
 }
 
@@ -595,6 +623,7 @@ get_addr0(hostname, af, res, pai, port0)
 			error = EAI_AGAIN;
 			break;
 		case NO_RECOVERY:
+		case NETDB_INTERNAL:
 		default:
 			error = EAI_FAIL;
 			break;
