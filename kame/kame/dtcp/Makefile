@@ -4,7 +4,11 @@
 
 BINDIR=	$(PREFIX)/sbin
 
+.if (${OPSYS} != "NetBSD")
 MAN8=	dtcps.8 dtcpc.8
+.else
+MAN=	dtcps.8 dtcpc.8
+.endif
 
 .if (${OPSYS} == "NetBSD")
 LPREFIX=	/usr/pkg/bin
