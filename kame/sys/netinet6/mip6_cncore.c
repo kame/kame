@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.45 2003/11/02 23:04:02 jinmei Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.46 2003/11/04 02:28:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1716,7 +1716,7 @@ mip6_calculate_authenticator(key_bm, result, addr1, addr2, data, datalen,
 	mip6_hexdump("MN: Authdata: ", MIP6_AUTHENTICATOR_LEN, result);
 #endif
 
-	retrun (0);
+	return (0);
 }
 #else	/* !__OpenBSD __*/
 int
