@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.573 2000/02/18 17:00:49 itojun Exp $
+$Id: CHANGELOG,v 1.574 2000/02/18 17:53:36 itojun Exp $
 
 <200002>
+Sat Feb 19 02:52:09 JST 2000  itojun@iijlab.net
+	* {openbsd,netbsd,bsdi4}/sys/sys/socket.h: fix 64bit alignment issue
+	  in 64bit architecture.
+	  From: =?iso-8859-1?Q?G=F6ran_Bengtson?= <goeran@cdg.chalmers.se>
+
 Fri Feb 18 20:09:35 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/audio/mpg123: upgrade to latest IPv6 patch.
 	* netbsd/pkgsrc/net/{tcpdump,libpcap}: upgrade to 2/14 weekly snapshot.
