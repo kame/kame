@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.26 2001/09/03 00:48:28 itojun Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.27 2001/09/06 05:27:55 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -184,7 +184,7 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 	if (cv4.ats == NULL ){
 		struct cSlot	*csl;
 
-	if ((csl = natpt_lookForRule4(&cv4)) == NULL)
+		if ((csl = natpt_lookForRule4(&cv4)) == NULL)
 			return (IPPROTO_IP);
 		if ((cv4.ats = natpt_internHash4(csl, &cv4)) == NULL)
 			return (IPPROTO_IP);
