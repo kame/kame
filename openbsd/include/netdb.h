@@ -1,4 +1,4 @@
-/*	$OpenBSD: netdb.h,v 1.7 1999/07/03 18:14:51 deraadt Exp $	*/
+/*	$OpenBSD: netdb.h,v 1.9 2000/02/09 12:22:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -154,19 +154,6 @@ struct	protoent {
 	int	p_proto;	/* protocol # */
 };
 
-#if !defined(_XOPEN_SOURCE)
-struct addrinfo {
-	int	ai_flags;	/* AI_PASSIVE, AI_CANONNAME, AI_NUMERICHOST */
-	int	ai_family;	/* PF_xxx */
-	int	ai_socktype;	/* SOCK_xxx */
-	int	ai_protocol;	/* 0 or IPPROTO_xxx for IPv4 and IPv6 */
-	size_t	ai_addrlen;	/* length of ai_addr */
-	char	*ai_canonname;	/* canonical name for hostname */
-	struct sockaddr *ai_addr;	/* binary address */
-	struct addrinfo *ai_next;	/* next structure in linked list */
-};
-#endif
-
 /*
  * Error return codes from gethostbyname() and gethostbyaddr()
  * (left in extern int h_errno).
@@ -180,90 +167,28 @@ struct addrinfo {
 #define	NO_DATA		4 /* Valid name, no data record of requested type */
 #define	NO_ADDRESS	NO_DATA		/* no address, look for MX record */
 
-/*
- * Error return codes from getaddrinfo()
- */
-#if !defined(_XOPEN_SOURCE)
-#define	EAI_ADDRFAMILY	 1	/* address family for hostname not supported */
-#define	EAI_AGAIN	 2	/* temporary failure in name resolution */
-#define	EAI_BADFLAGS	 3	/* invalid value for ai_flags */
-#define	EAI_FAIL	 4	/* non-recoverable failure in name resolution */
-#define	EAI_FAMILY	 5	/* ai_family not supported */
-#define	EAI_MEMORY	 6	/* memory allocation failure */
-#define	EAI_NODATA	 7	/* no address associated with hostname */
-#define	EAI_NONAME	 8	/* hostname nor servname provided, or not known */
-#define	EAI_SERVICE	 9	/* servname not supported for ai_socktype */
-#define	EAI_SOCKTYPE	10	/* ai_socktype not supported */
-#define	EAI_SYSTEM	11	/* system error returned in errno */
-#define EAI_BADHINTS	12
-#define EAI_PROTOCOL	13
-#define EAI_MAX		14
-#endif /* !_XOPEN_SOURCE */
-
-/*
- * Flag values for getaddrinfo()
- */
-#if !defined(_XOPEN_SOURCE)
-#define	AI_PASSIVE	0x00000001 /* get address to use bind() */
-#define	AI_CANONNAME	0x00000002 /* fill ai_canonname */
-#define	AI_NUMERICHOST	0x00000004 /* prevent name resolution */
-/* valid flags for addrinfo */
-#define	AI_MASK \
-    (AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST | AI_ADDRCONFIG)
-#endif
-
-#if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 500
-#define	AI_ALL		0x00000100 /* IPv6 and IPv4-mapped (with AI_V4MAPPED) */
-#endif
-#if !defined(_XOPEN_SOURCE)
-#define	AI_V4MAPPED_CFG	0x00000200 /* accept IPv4-mapped if kernel supports */
-#endif
-#if !defined(_XOPEN_SOURCE) || (_XOPEN_SOURCE - 0) >= 500
-#define	AI_ADDRCONFIG	0x00000400 /* only if any address is assigned */
-#define	AI_V4MAPPED	0x00000800 /* accept IPv4-mapped IPv6 address */
-/* special recommended flags for getipnodebyname */
-#define	AI_DEFAULT	(AI_V4MAPPED_CFG | AI_ADDRCONFIG)
-#endif
-
-#if !defined(_XOPEN_SOURCE)
-/*
- * Constants for getnameinfo()
- */
-#define	NI_MAXHOST	1025
-#define	NI_MAXSERV	32
-
-/*
- * Flag values for getnameinfo()
- */
-#define	NI_NOFQDN	0x00000001
-#define	NI_NUMERICHOST	0x00000002
-#define	NI_NAMEREQD	0x00000004
-#define	NI_NUMERICSERV	0x00000008
-#define	NI_DGRAM	0x00000010
-#define NI_WITHSCOPEID	0x00000020
-#define NI_NUMERICSCOPE	0x00000040
-
-/*
- * Scope delimit character
- */
-#define SCOPE_DELIMITER '%'
-#endif /* !_XOPEN_SOURCE */
-
-#if 0	/*NRL IPv6*/
 /* Values for getaddrinfo() and getnameinfo() */
 #define AI_PASSIVE	1	/* socket address is intended for bind() */
 #define AI_CANONNAME	2	/* request for canonical name */
 #define AI_NUMERICHOST	4	/* don't ever try nameservice */
 #define AI_EXT		8	/* enable non-portable extensions */
+/* valid flags for addrinfo */
+#define AI_MASK		(AI_PASSIVE | AI_CANONNAME | AI_NUMERICHOST)
 
 #define NI_NUMERICHOST	1	/* return the host address, not the name */
 #define NI_NUMERICSERV	2	/* return the service address, not the name */
 #define NI_NOFQDN	4	/* return a short name if in the local domain */
 #define NI_NAMEREQD	8	/* fail if either host or service name is unknown */
 #define NI_DGRAM	16	/* look up datagram service instead of stream */
+#define NI_WITHSCOPEID	32	/* KAME hack: attach scopeid to host portion */
 
 #define NI_MAXHOST	MAXHOSTNAMELEN	/* max host name returned by getnameinfo */
 #define NI_MAXSERV	32	/* max serv. name length returned by getnameinfo */
+
+/*
+ * Scope delimit character (KAME hack)
+ */
+#define SCOPE_DELIMITER '%'
 
 #define EAI_BADFLAGS	-1	/* invalid value for ai_flags */
 #define EAI_NONAME	-2	/* name or service is not known */
@@ -276,6 +201,8 @@ struct addrinfo {
 #define EAI_ADDRFAMILY	-9	/* address family for name not supported */
 #define EAI_MEMORY	-10	/* memory allocation failure */
 #define EAI_SYSTEM	-11	/* system error (code indicated in errno) */
+#define EAI_BADHINTS	-12	/* invalid value for hints */
+#define EAI_PROTOCOL	-13	/* resolved protocol is unknown */
 
 struct addrinfo {
 	int ai_flags;		/* input flags */
@@ -287,7 +214,6 @@ struct addrinfo {
 	char *ai_canonname;	/* canonical name for service location (iff req) */
 	struct addrinfo *ai_next; /* pointer to next in list */
 };
-#endif	/*NRL*/
 
 __BEGIN_DECLS
 void		endhostent __P((void));
@@ -320,14 +246,6 @@ void		sethostent __P((int));
 /* void		sethostfile __P((const char *)); */
 void		setnetent __P((int));
 void		setprotoent __P((int));
-#if !defined(_XOPEN_SOURCE)
-int		getaddrinfo __P((const char *, const char *,
-				 const struct addrinfo *, struct addrinfo **));
-int		getnameinfo __P((const struct sockaddr *, socklen_t, char *,
-				 size_t, char *, size_t, int));
-void		freeaddrinfo __P((struct addrinfo *));
-char		*gai_strerror __P((int));
-#endif
 void		setservent __P((int));
 
 int		getaddrinfo __P((const char *name, const char *service,

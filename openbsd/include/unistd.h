@@ -1,4 +1,4 @@
-/*	$OpenBSD: unistd.h,v 1.27 1999/09/17 13:13:46 espie Exp $ */
+/*	$OpenBSD: unistd.h,v 1.31 2000/04/20 06:34:18 deraadt Exp $ */
 /*	$NetBSD: unistd.h,v 1.26.4.1 1996/05/28 02:31:51 mrg Exp $	*/
 
 /*-
@@ -112,6 +112,15 @@ ssize_t	 write __P((int, const void *, size_t));
 /* structure timeval required for select() */
 #include <sys/time.h>
 
+/*
+ * X/Open CAE Specification Issue 5 Version 2
+ */
+#if (!defined(_POSIX_C_SOURCE) && !defined(_XOPEN_SOURCE)) || \
+    (_XOPEN_VERSION - 0) >= 500
+ssize_t  pread __P((int, void *, size_t, off_t));
+ssize_t  pwrite __P((int, const void *, size_t, off_t));
+#endif
+
 int	 acct __P((const char *));
 char	*brk __P((const char *));
 int	 chroot __P((const char *));
@@ -137,6 +146,7 @@ char	*getusershell __P((void));
 char	*getwd __P((char *));			/* obsoleted by getcwd() */
 int	 initgroups __P((const char *, gid_t));
 int	 iruserok __P((u_int32_t, int, const char *, const char *));
+int	 iruserok_sa __P((const void *, int, int, const char *, const char *));
 int	 lchown __P((const char *, uid_t, gid_t));
 char	*mkdtemp __P((char *));
 int	 mkstemp __P((char *));
@@ -149,6 +159,8 @@ extern __const char *__const sys_siglist[];
 int	 profil __P((char *, size_t, unsigned long, unsigned int));
 int	 rcmd __P((char **, int, const char *,
 		const char *, const char *, int *));
+int	 rcmd_af __P((char **, int, const char *,
+		const char *, const char *, int *, int));
 int	 rcmdsh __P((char **, int, const char *,
 		const char *, const char *, char *));
 char	*re_comp __P((const char *));
@@ -158,12 +170,15 @@ int	 reboot __P((int));
 int	 revoke __P((const char *));
 int	 rfork __P((int opts));
 int	 rresvport __P((int *));
+int	 rresvport_af __P((int *, int));
 int	 ruserok __P((const char *, int, const char *, const char *));
 int	 quotactl __P((const char *, int, int, char *));
 char	*sbrk __P((int));
-#ifndef _XOPEN_SOURCE
+
+#if !defined(_XOPEN_SOURCE)
 int	 select __P((int, fd_set *, fd_set *, fd_set *, struct timeval *));
 #endif
+
 int	 setdomainname __P((const char *, size_t));
 int	 setegid __P((gid_t));
 int	 seteuid __P((uid_t));
@@ -181,7 +196,7 @@ int	 setruid __P((uid_t));
 void	 setusershell __P((void));
 void	 swab __P((const void *, void *, size_t));
 int	 swapon __P((const char *));
-int	 swapctl __P((int cmd, void *arg, int misc));
+int	 swapctl __P((int cmd, const void *arg, int misc));
 int	 symlink __P((const char *, const char *));
 void	 sync __P((void));
 int	 syscall __P((int, ...));
@@ -193,14 +208,6 @@ int	 usleep __P((useconds_t));
 void	*valloc __P((size_t));			/* obsoleted by malloc() */
 pid_t	 vfork __P((void));
 int	 issetugid __P((void));
-
-#if 1 /*INET6*/
-int	 rcmd_af __P((char **, int, const char *,
-		const char *, const char *, int *, int));
-int	 rresvport_af __P((int *, int));
-int	 iruserok_af __P((const void *, int, const char *, const char *, int));
-int	 iruserok_sa __P((const void *, int, int, const char *, const char *));
-#endif
 
 int	 getopt __P((int, char * const *, const char *));
 extern	 char *optarg;			/* getopt(3) external variables */

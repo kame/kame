@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.75 1999/10/05 22:29:36 beck Exp $
+#	$OpenBSD: Makefile,v 1.81 2000/03/10 22:04:18 niklas Exp $
 #	$NetBSD: Makefile,v 1.59 1996/05/15 21:36:43 jtc Exp $
 
 #	@(#)Makefile	5.45.1.1 (Berkeley) 5/6/91
@@ -10,9 +10,9 @@
 
 FILES=	a.out.h ar.h assert.h bitstring.h blf.h bm.h cast.h cpio.h ctype.h \
 	curses.h db.h dbm.h des.h dirent.h disktab.h elf_abi.h err.h fnmatch.h \
-	fstab.h fts.h glob.h grp.h ieeefp.h inttypes.h iso646.h kvm.h \
-	langinfo.h libgen.h limits.h locale.h malloc.h math.h md4.h md5.h \
-	memory.h mpool.h ndbm.h netdb.h netgroup.h nlist.h nl_types.h \
+	fstab.h fts.h glob.h grp.h ieeefp.h ifaddrs.h inttypes.h iso646.h \
+	kvm.h langinfo.h libgen.h limits.h locale.h malloc.h math.h md4.h \
+	md5.h memory.h mpool.h ndbm.h netdb.h netgroup.h nlist.h nl_types.h \
 	olf_abi.h paths.h poll.h pwd.h ranlib.h re_comp.h regex.h resolv.h \
 	rmd160.h search.h setjmp.h sgtty.h sha1.h skipjack.h signal.h stab.h \
 	stdbool.h stddef.h stdio.h stdlib.h string.h strings.h struct.h sysexits.h \
@@ -22,7 +22,6 @@ FILES=	a.out.h ar.h assert.h bitstring.h blf.h bm.h cast.h cpio.h ctype.h \
 	(${MACHINE_ARCH} != "powerpc")
 FILES+=	dlfcn.h link.h
 .endif
-FILES+=	ifaddrs.h
 
 MFILES=	float.h frame.h stdarg.h varargs.h
 LFILES=	errno.h fcntl.h syslog.h termios.h
@@ -32,8 +31,8 @@ MFILES+= link.h dlfcn.h
 .endif
 
 DIRS=	arpa protocols rpc rpcsvc
-LDIRS=	dev net netinet netinet6 netccitt netiso netns netipx nfs sys ufs vm \
-	ddb scsi netatalk isofs xfs uvm miscfs
+LDIRS=	crypto ddb dev isofs miscfs net netatalk netccitt netinet \
+	netinet6 netipx netiso netns nfs scsi sys ufs uvm vm xfs
 LDIRS+=	altq
 
 # Directories with an includes target
@@ -56,7 +55,7 @@ WDIRS=
 # Places using Makefile.bsd-wrapper that needs a prerequisite target met
 # before includes
 PWDIRS=
-#PWDIRS=	../lib/libssl ../usr.sbin/httpd
+#PWDIRS=	../lib/libssl ../usr.sbin/httpd ../gnu/egcs/libf2c
 
 NOOBJ=	noobj
 
@@ -64,8 +63,8 @@ NOOBJ=	noobj
 .include <bsd.own.mk>
 SYS_INCLUDE?=	copies
 #.if (${KERBEROS} == "yes")
-#RDIRS+=	../kerberosIV/include ../kerberosIV/kadm ../kerberosIV/krb
-#PRDIRS+=../kerberosIV/kadm ../kerberosIV/krb
+#RDIRS+=	../kerberosIV/lib
+#PRDIRS+=../kerberosIV/lib/kadm ../kerberosIV/lib/krb
 #.endif
 
 prereq:
@@ -129,7 +128,8 @@ copies:
 	cd ../sys; \
 	pax -rw -pa -L \
 	    `find ${LDIRS} -follow -type f -name '*.h' '!' -path \
-	    'netiso/xebec/*' -print` ${DESTDIR}/usr/include
+	    'netiso/xebec/*' '!' -path 'dev/microcode/*' \
+	    -print` ${DESTDIR}/usr/include
 	cd ${DESTDIR}/usr/include && rm -rf ${MACHINE} ${MACHINE_ARCH} machine
 	${INSTALL} -d -o ${BINOWN} -g ${BINGRP} -m 755 \
 		${DESTDIR}/usr/include/${MACHINE}
