@@ -1,4 +1,4 @@
-/*	$KAME: if_dummy.c,v 1.10 2000/06/14 14:50:59 suz Exp $	*/
+/*	$KAME: if_dummy.c,v 1.11 2000/06/17 20:29:44 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -378,11 +378,9 @@ dummyioctl(ifp, cmd, data)
 		break;
 
 #ifdef SIOCSIFMTU
-#ifndef __OpenBSD__
 	case SIOCSIFMTU:
 		ifp->if_mtu = ifr->ifr_mtu;
 		break;
-#endif
 #endif
 
 	case SIOCSIFFLAGS:

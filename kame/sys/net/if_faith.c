@@ -1,4 +1,4 @@
-/*	$KAME: if_faith.c,v 1.13 2000/05/05 11:00:55 sumikawa Exp $	*/
+/*	$KAME: if_faith.c,v 1.14 2000/06/17 20:29:44 itojun Exp $	*/
 
 /*
  * Copyright (c) 1982, 1986, 1993
@@ -311,11 +311,9 @@ faithioctl(ifp, cmd, data)
 		break;
 
 #ifdef SIOCSIFMTU
-#ifndef __OpenBSD__
 	case SIOCSIFMTU:
 		ifp->if_mtu = ifr->ifr_mtu;
 		break;
-#endif
 #endif
 
 	case SIOCSIFFLAGS:
