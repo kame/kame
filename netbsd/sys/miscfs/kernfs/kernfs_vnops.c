@@ -844,6 +844,14 @@ kernfs_readdir(v)
 		n = 0;
 		for (; i < nkern_targets && uio->uio_resid >= UIO_MX; i++) {
 			kt = &kern_targets[i];
+			if (kt->kt_tag == Pdevice) {
+				dev_t *dp = kt->kt_data;
+				struct vnode *fvp;
+
+				if (*dp == NODEV ||
+				    !vfinddev(*dp, kt->kt_vtype, &fvp))
+					continue;
+			}
 			d.d_namlen = kt->kt_namlen;
 			if (i < 2)
 				d.d_fileno = KERNFS_FILENO(&kern_targets[0],
