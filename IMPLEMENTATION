@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.188 2001/02/16 01:55:32 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.189 2001/02/16 02:42:33 jinmei Exp $
 
 1. IPv6
 
@@ -103,8 +103,9 @@ RFC2894: Router renumbering for IPv6
 RFC3041: Privacy Extensions for Stateless Address Autoconfiguration in IPv6
 RFC3056: Connection of IPv6 Domains via IPv4 Clouds
     * So-called "6to4".
-    * "stf" interface implements it.  Be sure to read the next item before
-      configuring it, there are security issues.
+    * "stf" interface implements it.  Be sure to read
+      draft-itojun-ipv6-transition-abuse-01.txt
+      below before configuring it, there can be security issues.
 draft-ietf-ipngwg-icmp-name-lookups-07: IPv6 Name Lookups Through ICMP
 draft-ietf-pim-ipv6-03.txt: PIM for IPv6
     * pim6dd implements dense mode.  pim6sd implements sparse mode.
