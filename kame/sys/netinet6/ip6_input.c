@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.233 2001/11/28 11:08:55 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.234 2001/12/01 08:52:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -205,6 +205,7 @@ const int int6intrq_present = 1;
 #endif
 
 #ifdef MEASURE_PERFORMANCE
+#define MEASURE_PERFORMANCE_UDPONLY
 #define IP6_PERFORM_LOGSIZE 10000
 int ip6_logentry;
 int ip6_logsize = IP6_PERFORM_LOGSIZE;
@@ -808,8 +809,6 @@ ip6_input(m)
 			if ((ia->ia6_flags & IN6_IFF_NOTREADY) == 0 &&
 			    IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr,
 					       &ip6->ip6_dst)) {
-				/* record address information into m_aux. */
-				(void)ip6_setdstifaddr(m, ia);
 #ifdef MEASURE_PERFORMANCE
 				ctr_end = read_tsc();
 #ifdef MEASURE_PERFORMANCE_UDPONLY
@@ -820,6 +819,9 @@ ip6_input(m)
 					add_performance_log(ctr_end - ctr_beg,
 							    &ip6->ip6_dst);
 #endif
+				/* record address information into m_aux. */
+				(void)ip6_setdstifaddr(m, ia);
+
 				ours = 1;
 				deliverifp = ia->ia_ifp;
 				goto hbhcheck;
@@ -831,14 +833,10 @@ ip6_input(m)
 	case OURS_CHECK_ALG_LARGEHASH:
 	{
 		struct in6_ifaddr *ia;
-		struct in6hash *ih;
+		struct in6hash *ih = NULL;
 
 		if ((ih = in6h_lookup(&ip6->ip6_dst, m->m_pkthdr.rcvif)) !=
-		    NULL &&
-		    (ia = ih->in6h_ifa) != NULL) {
-			/* record address information into m_aux. */
-			(void)ip6_setdstifaddr(m, ia);
-
+		    NULL && (ia = ih->in6h_ifa) != NULL) {
 #ifdef MEASURE_PERFORMANCE
 			ctr_end = read_tsc();
 #ifdef MEASURE_PERFORMANCE_UDPONLY
@@ -849,6 +847,10 @@ ip6_input(m)
 				add_performance_log(ctr_end - ctr_beg,
 						    &ip6->ip6_dst);
 #endif
+
+			/* record address information into m_aux. */
+			(void)ip6_setdstifaddr(m, ia);
+
 			ours = 1;
 			deliverifp = m->m_pkthdr.rcvif;
 			goto hbhcheck;
