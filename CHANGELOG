@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.375 1999/12/27 02:16:04 sumikawa Exp $
+$Id: CHANGELOG,v 1.376 1999/12/27 07:31:20 itojun Exp $
 
 <199912>
+Mon Dec 27 16:33:20 JST 1999  itojun@iijlab.net
+	* freebsd2/ports/mnews: add IPv6-ready port directory for version 1.22.
+	  note that this configuration is Japanese-message enabled version;
+	  you may find the default configuration annoying...
+
 Mon Dec 27 11:15:26 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/python: Upgrade to 1.5.2.
 
