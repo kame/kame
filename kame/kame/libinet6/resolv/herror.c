@@ -55,12 +55,13 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)herror.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: herror.c,v 1.1 1999/08/08 23:30:04 itojun Exp $";
+static char rcsid[] = "$Id: herror.c,v 1.2 2000/05/05 16:26:07 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/uio.h>
+#include <sys/socket.h>
 #include <netdb.h>
 # include <unistd.h>
 # include <string.h>
