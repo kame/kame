@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2185 2002/06/14 15:36:40 jinmei Exp $
+$KAME: CHANGELOG,v 1.2186 2002/06/15 00:14:02 itojun Exp $
 
 <200206>
+Sat Jun 15 09:11:47 JST 2002  itojun@iijlab.net
+	* sys/netinet6/ipsec.c: use per-socket policy cache even more.
+
 2002-06-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6:
 	- caught up some changes in dhcpv6-26.
