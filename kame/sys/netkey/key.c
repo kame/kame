@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.22 1999/11/01 00:53:56 sakane Exp $ */
+/* KAME $Id: key.c,v 1.23 1999/11/03 12:48:28 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -312,6 +312,7 @@ static struct sadb_msg *key_update __P((caddr_t *mhp));
 static struct secasvar *key_getsavbyseq __P((struct secashead *sah,
 						u_int32_t seq));
 static struct sadb_msg *key_add __P((caddr_t *mhp));
+static int key_setident __P((struct secashead *sah, caddr_t *mhp));
 static struct sadb_msg *key_getmsgbuf_x1 __P((caddr_t *mhp));
 static struct sadb_msg *key_delete __P((caddr_t *mhp));
 static struct sadb_msg *key_get __P((caddr_t *mhp));
@@ -3579,6 +3580,10 @@ key_update(mhp)
 		return NULL;
 	}
 
+	/* set spidx if there */
+	if (key_setident(sah, mhp) < 0)
+		return NULL;
+
 	/* find a SA with sequence number. */
 	if ((sav = key_getsavbyseq(sah, msg0->sadb_msg_seq)) == NULL) {
 		printf("key_update: no larval SA with sequence %u exists.\n",
@@ -3750,6 +3755,10 @@ key_add(mhp)
 		}
 	}
 
+	/* set spidx if there */
+	if (key_setident(newsah, mhp) < 0)
+		return NULL;
+
 	/* create new SA entry. */
 	/* We can create new SA only if SPI is differenct. */
 	if (key_getsavbyspi(newsah, sa0->sadb_sa_spi)) {
@@ -3785,6 +3794,105 @@ key_add(mhp)
     }
 }
 
+static int
+key_setident(sah, mhp)
+	struct secashead *sah;
+	caddr_t *mhp;
+{
+	struct sadb_msg *msg0;
+	struct sadb_ident *idsrc, *iddst;
+	int idsrclen, iddstlen;
+
+	/* sanity check */
+	if (sah == NULL || mhp == NULL || mhp[0] == NULL)
+		panic("key_setident: NULL pointer is passed.\n");
+
+	msg0 = (struct sadb_msg *)mhp[0];
+
+	/* don't make buffer if not there */
+	if (mhp[SADB_EXT_IDENTITY_SRC] == NULL
+	 && mhp[SADB_EXT_IDENTITY_DST] == NULL) {
+		sah->idents = NULL;
+		sah->identd = NULL;
+		return 0;
+	}
+	
+	if (mhp[SADB_EXT_IDENTITY_SRC] == NULL
+	 || mhp[SADB_EXT_IDENTITY_DST] == NULL) {
+		printf("key_setident: invalid identity.\n");
+		msg0->sadb_msg_errno = EINVAL;
+		return -1;
+	}
+
+	idsrc = (struct sadb_ident *)mhp[SADB_EXT_IDENTITY_SRC];
+	iddst = (struct sadb_ident *)mhp[SADB_EXT_IDENTITY_DST];
+	idsrclen = PFKEY_UNUNIT64(idsrc->sadb_ident_len);
+	iddstlen = PFKEY_UNUNIT64(idsrc->sadb_ident_len);
+
+	/* validity check */
+	if (idsrc->sadb_ident_type != iddst->sadb_ident_type) {
+		printf("key_setident: ident type mismatch.\n");
+		msg0->sadb_msg_errno = EINVAL;
+		return -1;
+	}
+
+	switch (idsrc->sadb_ident_type) {
+	case SADB_X_IDENTTYPE_ADDR:
+		if (idsrclen !=
+		    sizeof(*idsrc) + ((struct sockaddr *)(idsrc + 1))->sa_len
+		 || iddstlen !=
+		    sizeof(*iddst) + ((struct sockaddr *)(iddst + 1))->sa_len) {
+			printf("key_setident: invalid length is passed.\n");
+			msg0->sadb_msg_errno = EINVAL;
+			return -1;
+		}
+		if (((struct sockaddr *)(idsrc + 1))->sa_len >
+				sizeof(struct sockaddr_storage)
+		 || ((struct sockaddr *)(iddst + 1))->sa_len >
+				sizeof(struct sockaddr_storage)) {
+			printf("key_setident: invalid sa_len is passed.\n");
+			msg0->sadb_msg_errno = EINVAL;
+			return -1;
+		}
+#define __IDENTXID(a) ((union sadb_x_ident_id *)&(a)->sadb_ident_id)
+		if (__IDENTXID(idsrc)->sadb_x_ident_id_addr.ul_proto
+		 != __IDENTXID(iddst)->sadb_x_ident_id_addr.ul_proto) {
+			printf("key_setident: ul_proto mismatch.\n");
+			msg0->sadb_msg_errno = EINVAL;
+			return -1;
+		}
+#undef __IDENTXID(a)
+		break;
+	case SADB_IDENTTYPE_PREFIX:
+	case SADB_IDENTTYPE_FQDN:
+	case SADB_IDENTTYPE_USERFQDN:
+	default:
+		/* XXX do nothing */
+		sah->idents = NULL;
+		sah->identd = NULL;
+	 	return 0;
+	}
+
+	/* make structure */
+	KMALLOC(sah->idents, struct sadb_ident *, idsrclen);
+	if (sah->idents == NULL) {
+		printf("key_setident: No more memory.\n");
+		msg0->sadb_msg_errno = ENOBUFS;
+		return -1;
+	}
+	KMALLOC(sah->identd, struct sadb_ident *, iddstlen);
+	if (sah->identd == NULL) {
+		KFREE(sah->idents);
+		printf("key_setident: No more memory.\n");
+		msg0->sadb_msg_errno = ENOBUFS;
+		return -1;
+	}
+	bcopy(idsrc, sah->idents, idsrclen);
+	bcopy(iddst, sah->identd, iddstlen);
+
+	return 0;
+}
+
 static struct sadb_msg *
 key_getmsgbuf_x1(mhp)
 	caddr_t *mhp;
@@ -3808,7 +3916,11 @@ key_getmsgbuf_x1(mhp)
 	    + (mhp[SADB_EXT_LIFETIME_HARD] == NULL
 		? 0 : sizeof(struct sadb_lifetime))
 	    + (mhp[SADB_EXT_LIFETIME_SOFT] == NULL
-		? 0 : sizeof(struct sadb_lifetime));
+		? 0 : sizeof(struct sadb_lifetime))
+	    + (mhp[SADB_EXT_IDENTITY_SRC] == NULL
+		? 0 : PFKEY_EXTLEN(mhp[SADB_EXT_IDENTITY_SRC]))
+	    + (mhp[SADB_EXT_IDENTITY_DST] == NULL
+		? 0 : PFKEY_EXTLEN(mhp[SADB_EXT_IDENTITY_DST]));
 
 	KMALLOC(newmsg, struct sadb_msg *, len);
 	if (newmsg == NULL)
@@ -3829,6 +3941,11 @@ key_getmsgbuf_x1(mhp)
 
 	if (mhp[SADB_EXT_LIFETIME_SOFT] != NULL)
 		p = key_setsadbext(p, mhp[SADB_EXT_LIFETIME_SOFT]);
+
+	if (mhp[SADB_EXT_IDENTITY_SRC] != NULL)
+		p = key_setsadbext(p, mhp[SADB_EXT_IDENTITY_SRC]);
+	if (mhp[SADB_EXT_IDENTITY_DST] != NULL)
+		p = key_setsadbext(p, mhp[SADB_EXT_IDENTITY_DST]);
 
 	return newmsg;
 }
