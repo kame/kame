@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.18 2001/05/08 04:36:39 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.19 2001/08/12 10:29:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -537,14 +537,14 @@ shortdump(msg)
 		else
 			t = (u_long)(cur - ltc->sadb_lifetime_addtime);
 		if (t >= 1000)
-			strcpy(buf, " big/");
+			strlcpy(buf, " big/", sizeof(buf));
 		else
 			snprintf(buf, sizeof(buf), " %3lu/", (u_long)t);
 		printf("%s", buf);
 
 		t = (u_long)lth->sadb_lifetime_addtime;
 		if (t >= 1000)
-			strcpy(buf, "big");
+			strlcpy(buf, "big", sizeof(buf));
 		else
 			snprintf(buf, sizeof(buf), "%-3lu", (u_long)t);
 		printf("%s", buf);
