@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.236 2002/04/05 14:11:06 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.237 2002/04/05 15:33:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -957,14 +957,15 @@ nd6_lookup(addr6, create, ifp)
 			 * to create a Neighbor Cache entry for the
 			 * destination in nd6_rtrequest which will be
 			 * called in rtrequest via ifa->ifa_rtrequest.
+			 * We also specify RTF_CACHE so that the entry
+			 * will be subject to cached route management.
 			 */
 			if ((e = rtrequest(RTM_ADD, (struct sockaddr *)addr6,
 					   ifa->ifa_addr,
 					   (struct sockaddr *)&all1_sa,
-					   (ifa->ifa_flags |
-					    RTF_HOST | RTF_LLINFO) &
-					   ~RTF_CLONING,
-					   &rt)) != 0) {
+					   (ifa->ifa_flags | RTF_HOST |
+					    RTF_LLINFO | RTF_CACHE) &
+					   ~RTF_CLONING, &rt)) != 0) {
 #if 0
 				log(LOG_ERR,
 				    "nd6_lookup: failed to add route for a "
