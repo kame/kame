@@ -83,6 +83,7 @@ kern/kern_time.c	standard
 kern/kern_xxx.c		standard
 kern/md5c.c		optional md5
 kern/md5c.c		optional ipsec
+kern/md5c.c		optional inet6
 kern/subr_autoconf.c	standard
 kern/subr_diskslice.c	standard
 kern/subr_dkbad.c	standard
@@ -109,6 +110,7 @@ kern/tty_tb.c		optional tb
 kern/tty_tty.c		standard
 kern/uipc_domain.c	standard
 kern/uipc_mbuf.c	standard
+kern/uipc_mbuf2.c	standard
 kern/uipc_proto.c	standard
 kern/uipc_socket.c	standard
 kern/uipc_socket2.c	standard
