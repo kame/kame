@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.155 2002/12/04 09:50:25 t-momose Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.156 2002/12/09 10:51:20 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2774,13 +2774,10 @@ mip6_tunnel_input(mp, offp, proto)
 	struct ip6_hdr *ip6;
 	int s;
 
-	ip6 = mtod(m, struct ip6_hdr *);
 	m_adj(m, *offp);
 
 	switch (proto) {
 	case IPPROTO_IPV6:
-	{
-		struct ip6_hdr *ip6;
 		if (m->m_len < sizeof(*ip6)) {
 			m = m_pullup(m, sizeof(*ip6));
 			if (!m)
@@ -2808,7 +2805,6 @@ mip6_tunnel_input(mp, offp, proto)
 #endif
 		splx(s);
 		break;
-	}
 	default:
 		mip6log((LOG_ERR,
 			 "%s:%d: protocol %d not supported.\n",
