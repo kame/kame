@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.226 2001/10/24 06:17:32 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.227 2001/10/29 12:25:41 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2427,6 +2427,8 @@ ip6_nexthdr(m, off, proto, nxtp)
 		if (nxtp)
 			*nxtp = ip6e.ip6e_nxt;
 		off += (ip6e.ip6e_len + 2) << 2;
+		if (m->m_pkthdr.len < off)
+			return -1;
 		return off;
 
 	case IPPROTO_HOPOPTS:
@@ -2438,6 +2440,8 @@ ip6_nexthdr(m, off, proto, nxtp)
 		if (nxtp)
 			*nxtp = ip6e.ip6e_nxt;
 		off += (ip6e.ip6e_len + 1) << 3;
+		if (m->m_pkthdr.len < off)
+			return -1;
 		return off;
 
 	case IPPROTO_NONE:
