@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.348 2004/03/12 12:07:22 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.349 2004/04/09 05:07:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -573,14 +573,15 @@ nd6_llinfo_timer(arg)
 	if ((ifp = rt->rt_ifp) == NULL)
 		panic("ln->ln_rt->rt_ifp == NULL");
 	ndi = ND_IFINFO(ifp);
-	dst = &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr;
 
 	/* sanity check */
 	if (rt->rt_llinfo && (struct llinfo_nd6 *)rt->rt_llinfo != ln)
 		panic("rt_llinfo(%p) is not equal to ln(%p)",
 		      rt->rt_llinfo, ln);
-	if (!dst)
-		panic("dst=0 in nd6_timer(ln=%p)", ln);
+	if (rt_key(rt) == NULL)
+		panic("rt key is NULL in nd6_timer(ln=%p)", ln);
+
+	dst = &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr;
 
 	switch (ln->ln_state) {
 	case ND6_LLINFO_INCOMPLETE:
