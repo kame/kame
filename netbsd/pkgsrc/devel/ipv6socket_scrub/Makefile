@@ -1,4 +1,4 @@
-# $NetBSD$
+# $Id: Makefile,v 1.3 1999/11/25 08:42:02 sumikawa Exp $
 #
 
 DISTNAME=		IPv6socket_scrub
