@@ -1,4 +1,4 @@
-/*	$OpenBSD: fingerd.c,v 1.13 1999/02/24 17:00:01 aaron Exp $	*/
+/*	$OpenBSD: fingerd.c,v 1.16 1999/08/02 17:42:39 pjanzen Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -43,7 +43,7 @@ static char copyright[] =
 #if 0
 static char sccsid[] = "from: @(#)fingerd.c	8.1 (Berkeley) 6/4/93";
 #else
-static char rcsid[] = "$OpenBSD: fingerd.c,v 1.13 1999/02/24 17:00:01 aaron Exp $";
+static char rcsid[] = "$OpenBSD: fingerd.c,v 1.16 1999/08/02 17:42:39 pjanzen Exp $";
 #endif
 #endif /* not lint */
 
@@ -62,6 +62,16 @@ static char rcsid[] = "$OpenBSD: fingerd.c,v 1.13 1999/02/24 17:00:01 aaron Exp 
 #include "pathnames.h"
 
 void err __P((const char *, ...));
+void usage __P((void));
+
+void
+usage()
+{
+	syslog(LOG_ERR,
+	    "usage: fingerd [-slumMpS] [-P filename]");
+	exit(2);
+}
+
 
 int
 main(argc, argv)
@@ -74,6 +84,7 @@ main(argc, argv)
 	size_t linesiz;
 #define	ENTRIES	50
 	char **ap, *av[ENTRIES + 1], **comp, *line, *prog, *lp, *hname;
+	char hostbuf[MAXHOSTNAMELEN];
 
 	prog = _PATH_FINGER;
 	logging = secure = user_required = short_list = 0;
@@ -108,24 +119,19 @@ main(argc, argv)
 			break;
 		case '?':
 		default:
-			err("illegal option -- %c", ch);
+			usage();
 		}
 
 	if (logging) {
-		struct hostent *hp;
-		struct sockaddr_in sin;
+		struct sockaddr_storage ss;
 		int sval;
 
-		sval = sizeof(sin);
-		if (getpeername(0, (struct sockaddr *)&sin, &sval) < 0)
+		sval = sizeof(ss);
+		if (getpeername(0, (struct sockaddr *)&ss, &sval) < 0)
 			err("getpeername: %s", strerror(errno));
-		if ((hp = gethostbyaddr((char *)&sin.sin_addr.s_addr,
-		    sizeof(sin.sin_addr.s_addr), AF_INET)))
-			hname = strdup(hp->h_name);
-		else
-			hname = strdup(inet_ntoa(sin.sin_addr));
-		if (hname == NULL)
-			err("Out of memory");
+		(void)getnameinfo((struct sockaddr *)&ss, ss.ss_len,
+		    hostbuf, sizeof(hostbuf), NULL, 0, 0);
+		hname = hostbuf;
 	}
 
 	if ((lp = fgetln(stdin, &linesiz)) == NULL) {
