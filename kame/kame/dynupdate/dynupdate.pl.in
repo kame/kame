@@ -1,6 +1,6 @@
-#! /usr/pkg/bin/perl
+#! @PERL@
 
-#	$KAME: dynupdate.pl,v 1.2 2001/02/20 03:22:38 itojun Exp $
+#	$KAME: dynupdate.pl.in,v 1.1 2001/02/20 03:26:17 itojun Exp $
 
 # Copyright (C) 2001 WIDE Project.
 # All rights reserved.
@@ -40,13 +40,14 @@
 # TODO: register PTR record for reverse lookup
 #
 
-$nsupdate = '/usr/pkg/bin/nsupdate';
+$ifconfig = '@IFCONFIG@';
+$nsupdate = '@NSUPDATE@';
 #$tsigkey = 'dyn.your.domain:secret';
 $name = 'yourhost';
 $domain = 'dyn.your.domain';
 $ttl = 3600;
 
-open(ADDRS, "ifconfig -a |") || die;
+open(ADDRS, "$ifconfig -a |") || die;
 
 while (<ADDRS>) {
 	next if !/^\tinet6/;
