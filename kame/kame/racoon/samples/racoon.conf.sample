@@ -1,18 +1,20 @@
-# $KAME: racoon.conf.sample,v 1.8 2000/06/01 05:46:03 jinmei Exp $
+# $KAME: racoon.conf.sample,v 1.9 2000/07/20 06:25:00 itojun Exp $
 
-# "path" must be placed before it should be used.
-# You can overwrite which you defined, but it should not use due to confusing.
+# "path" affects "include" directive.  "path" must be specified before any
+# "include" directive with relative file path.
+# you can overwrite "path" directive afterwards, however, doing so may add
+# more confusion.
 #path include "/usr/local/v6/etc" ;
 #include "remote.conf" ;
 
-# search this file for pre_shared_key with various ID key.
+# the file should contain key ID/key pairs, for pre-shared key authentication.
 path pre_shared_key "/usr/local/v6/etc/psk.txt" ;
 
-# racoon will search this directory if the certificate or certificate request
-# is received.
+# racoon will look for certificate file in the directory,
+# if the certificate/certificate request payload is received.
 #path certificate "/usr/local/openssl/certs" ;
 
-# personal information.
+# identification for our side.
 identifier user_fqdn "foo@kame.net";
 identifier fqdn "foo.kame.net";
 
