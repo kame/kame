@@ -41,7 +41,7 @@
 #include "opt_inet.h"
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 #include "bpf.h"
 #define NBPFILTER NBPF
 #else
@@ -98,7 +98,7 @@
 
 struct pflog_softc pflogif[NPFLOG];
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 void	pflogattach(void *);
 PSEUDO_SET(pflogattach, if_pflog);
 #else
@@ -114,7 +114,7 @@ void	pflogstart(struct ifnet *);
 extern int ifqmaxlen;
 #endif
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 void
 pflogattach(void *pflog)
 #else

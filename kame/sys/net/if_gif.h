@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.h,v 1.35 2003/06/28 03:56:15 itojun Exp $	*/
+/*	$KAME: if_gif.h,v 1.36 2004/05/26 09:54:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -37,7 +37,7 @@
 #define _NET_IF_GIF_H_
 
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 #if defined(_KERNEL) && !defined(_LKM)
 #include "opt_inet.h"
 #endif
@@ -105,11 +105,7 @@ void gif_input __P((struct mbuf *, int, struct ifnet *));
 #endif
 int gif_output __P((struct ifnet *, struct mbuf *,
 		    struct sockaddr *, struct rtentry *));
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
-int gif_ioctl __P((struct ifnet *, int, caddr_t));
-#else
 int gif_ioctl __P((struct ifnet *, u_long, caddr_t));
-#endif
 int gif_set_tunnel __P((struct ifnet *, struct sockaddr *, struct sockaddr *));
 void gif_delete_tunnel __P((struct ifnet *));
 #ifdef __OpenBSD__

@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.113 2004/05/26 07:51:27 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.114 2004/05/26 09:54:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -73,7 +73,7 @@
  * Note that there is no way to be 100% secure.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_global.h"
@@ -91,9 +91,7 @@
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
 #include <sys/errno.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/ioctl.h>
-#endif
 #include <sys/protosw.h>
 #ifdef __FreeBSD__
 #include <sys/kernel.h>
@@ -105,7 +103,7 @@
 #include <sys/syslog.h>
 #include <machine/cpu.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <sys/malloc.h>
 #endif
 
@@ -136,7 +134,7 @@
 #include <net/if_stf.h>
 #include <net/net_osdep.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 #include "bpf.h"
 #define NBPFILTER	NBPF
 #else
@@ -187,13 +185,13 @@ struct protosw in_stf_protosw =
   rip_output,
 #endif
   0,		rip_ctloutput,
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
   0,
 #else
   rip_usrreq,
 #endif
   0,            0,              0,              0,
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
   &rip_usrreqs
 #endif
 };
@@ -271,7 +269,7 @@ stfattach(dummy)
 		/* turn off ingress filter */
 		sc->sc_if.if_flags  |= IFF_LINK2;
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 		sc->sc_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
 #endif
 		if_attach(&sc->sc_if);
@@ -392,7 +390,7 @@ stf_getsrcifa6(ifp)
 		for (ia4 = in_ifaddr.tqh_first;
 		     ia4;
 		     ia4 = ia4->ia_list.tqe_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+#elif defined(__FreeBSD__)
 		for (ia4 = TAILQ_FIRST(&in_ifaddrhead);
 		     ia4;
 		     ia4 = TAILQ_NEXT(ia4, ia_link))
@@ -744,7 +742,7 @@ stf_checkaddr4(sc, in, inifp)
 	 */
 #if defined(__OpenBSD__) || defined(__NetBSD__)
 	for (ia4 = in_ifaddr.tqh_first; ia4; ia4 = ia4->ia_list.tqe_next)
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+#elif defined(__FreeBSD__)
 	for (ia4 = TAILQ_FIRST(&in_ifaddrhead);
 	     ia4;
 	     ia4 = TAILQ_NEXT(ia4, ia_link))
@@ -843,7 +841,7 @@ stf_checkaddr46(struct stf_softc *sc, struct in_addr *in, struct in6_addr *in6)
 }
 
 void
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifdef __FreeBSD__
 in_stf_input(m, off)
 	struct mbuf *m;
 	int off;
@@ -854,14 +852,14 @@ in_stf_input(struct mbuf *m, ...)
 in_stf_input(m, va_alist)
 	struct mbuf *m;
 #endif
-#endif /* (defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 {
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 	int off, proto;
 	va_list ap;
 #else
 	int proto;
-#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 	struct stf_softc *sc;
 	struct ip *ip;
 	struct ip6_hdr *ip6;
@@ -873,15 +871,15 @@ in_stf_input(m, va_alist)
 	struct ifqueue *ifq = NULL;
 	struct ifnet *ifp;
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifndef __FreeBSD__
 	va_start(ap, m);
 	off = va_arg(ap, int);
 	proto = va_arg(ap, int);
 	va_end(ap);
-#endif /* !(defined(__FreeBSD__) && __FreeBSD__ >= 4) */
+#endif
 
 	ip = mtod(m, struct ip *);
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	proto = ip->ip_p;
 #endif
 

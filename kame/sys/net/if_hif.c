@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.69 2004/02/13 04:52:33 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.70 2004/05/26 09:54:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -74,7 +74,7 @@ t.
  */
 
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_mip6.h"
@@ -86,14 +86,14 @@ t.
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <sys/malloc.h>
 #endif
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/errno.h>
-#if defined(__FreeBSD__) || __FreeBSD__ >= 3
+#if __FreeBSD__
 /*nothing*/
 #else
 #include <sys/ioctl.h>
@@ -143,7 +143,7 @@ t.
 #include <netinet6/mip6_mncore.h>
 
 #include "hif.h"
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 #include "bpf.h"
 #define NBPFILTER	NBPF
 #else
@@ -205,7 +205,7 @@ hifattach(dummy)
 #ifdef __NetBSD__
 		sc->hif_if.if_dlt = DLT_NULL;
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 		IFQ_SET_MAXLEN(&sc->hif_if.if_snd, ifqmaxlen);
 		IFQ_SET_READY(&sc->hif_if.if_snd);
 #endif
@@ -251,11 +251,7 @@ hifattach(dummy)
 int
 hif_ioctl(ifp, cmd, data)
 	struct ifnet *ifp;
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
-	int cmd;
-#else
 	u_long cmd;
-#endif
 	caddr_t data;
 {
 	int s;

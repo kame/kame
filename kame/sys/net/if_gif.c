@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.107 2004/05/26 07:51:27 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.108 2004/05/26 09:54:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #endif
@@ -41,14 +41,14 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include <sys/malloc.h>
 #endif
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/errno.h>
-#if defined(__FreeBSD__) || __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 /*nothing*/
 #else
 #include <sys/ioctl.h>
@@ -99,7 +99,7 @@
 #include <net/if_gif.h>
 
 #include "gif.h"
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 #include "bpf.h"
 #define NBPFILTER	NBPF
 #else
@@ -192,7 +192,7 @@ gifattach0(sc)
 #ifdef __NetBSD__
 	sc->gif_if.if_dlt = DLT_NULL;
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	IFQ_SET_MAXLEN(&sc->gif_if.if_snd, IFQ_MAXLEN);
 #endif
 	IFQ_SET_READY(&sc->gif_if.if_snd);
@@ -632,11 +632,7 @@ gif_input(m, af, ifp)
 int
 gif_ioctl(ifp, cmd, data)
 	struct ifnet *ifp;
-#if defined(__FreeBSD__) && __FreeBSD__ < 3
-	int cmd;
-#else
 	u_long cmd;
-#endif
 	caddr_t data;
 {
 	struct gif_softc *sc  = (struct gif_softc*)ifp;
@@ -657,7 +653,7 @@ gif_ioctl(ifp, cmd, data)
 
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 		switch (ifr->ifr_addr.sa_family) {
 #ifdef INET
 		case AF_INET:	/* IP supports Multicast */
@@ -671,7 +667,7 @@ gif_ioctl(ifp, cmd, data)
 			error = EAFNOSUPPORT;
 			break;
 		}
-#endif /*not FreeBSD3*/
+#endif
 		break;
 
 #ifdef	SIOCSIFMTU /* xxx */

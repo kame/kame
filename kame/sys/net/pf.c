@@ -44,7 +44,7 @@
 #include "opt_altq.h"
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 #include "bpf.h"
 #define NBPFILTER NBPF
 #else
@@ -4896,7 +4896,7 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 	m0->m_pkthdr.csum_flags |= sw_csum;
 #endif
 	m1 = m0;
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 	error = ip_fragment(ip, &m0, ifp->if_mtu, ifp->if_hwassist, sw_csum);
 #else
 	error = ip_fragment(m0, ifp, ifp->if_mtu);

@@ -34,7 +34,7 @@
 #include "opt_inet.h"
 #endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 #include "bpf.h"
 #define NBPFILTER	NBPF
 #else
@@ -93,7 +93,7 @@ int pfsyncdebug;
 
 struct pfsync_softc pfsyncif;
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 void	pfsyncattach(void *);
 PSEUDO_SET(pfsyncattach, if_pfsync);
 #else
