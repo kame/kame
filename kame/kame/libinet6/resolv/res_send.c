@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_send.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_send.c,v 1.4 2000/03/23 08:34:45 itojun Exp $";
+static char rcsid[] = "$Id: res_send.c,v 1.5 2000/04/24 14:07:26 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 	/* change this to "0"
@@ -151,7 +151,8 @@ static void Perror __P((FILE *, char *, int));
 	if (_res.options & RES_DEBUG) {
 #ifdef INET6
 		getnameinfo(address, address->sa_len, abuf, sizeof(abuf),
-			    pbuf, sizeof(pbuf), NI_NUMERICHOST|NI_NUMERICSERV);
+			    pbuf, sizeof(pbuf),
+			    NI_NUMERICHOST|NI_NUMERICSERV|NI_WITHSCOPEID);
 		fprintf(file, "res_send: %s ([%s].%s): %s\n",
 			string, abuf, pbuf, strerror(error));
 #else /* INET6 */
@@ -229,6 +230,7 @@ res_isourserver(inp)
 			srv6 = (struct sockaddr_in6 *)&_res_ext.nsaddr_list[ns];
 			if (srv6->sin6_family == in6p->sin6_family &&
 			    srv6->sin6_port == in6p->sin6_port &&
+			    srv6->sin6_scope_id == in6p->sin6_scope_id &&
 			    (memcmp(&srv6->sin6_addr, &in6addr_any,
 				    sizeof(struct in6_addr)) == 0 ||
 			     memcmp(&srv6->sin6_addr, &in6p->sin6_addr,
@@ -423,7 +425,7 @@ res_send(buf, buflen, ans, anssiz)
 #ifdef INET6
 		Dprint((_res.options & RES_DEBUG) &&
 		       getnameinfo(nsap, nsap->sa_len, abuf, sizeof(abuf),
-				   NULL, 0, NI_NUMERICHOST) == 0,
+				   NULL, 0, NI_NUMERICHOST | NI_WITHSCOPEID) == 0,
 		       (stdout, ";; Querying server (# %d) address = %s\n",
 			ns + 1, abuf));
 #else /* INET6 */
