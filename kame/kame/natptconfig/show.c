@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: show.c,v 1.3 2000/02/06 09:51:47 itojun Exp $
+ *	$Id: show.c,v 1.4 2000/02/14 09:51:26 itojun Exp $
  */
 
 #include <stdio.h>
@@ -100,7 +100,7 @@ static void	_showRuleFaith		__P((int, struct _cSlot *));
 static void	_showIPaddrCouple	__P((int, int, union inaddr *));
 static void	_showIPaddr		__P((int, union inaddr *));
 
-static void	_showXlate		__P((int));
+static void	_showXlate		__P((u_long));
 static void	_showXlateHeterogeneous	__P((struct _tSlot *));
 static void	_showXlateHomogeneous	__P((struct _tSlot *));
 
@@ -166,7 +166,7 @@ showRule(int type)
     struct _cell	 cons;
     char		*n_name = "_ptrStatic";
     int			 num = 0;
-    int			 pos;
+    u_long		 pos;
     int			 rv;
 
     if (type == NATPT_DYNAMIC)
@@ -182,7 +182,7 @@ showRule(int type)
 	{
 	    struct _cSlot	acs;
 
-	    readKvm((caddr_t)&acs, sizeof(struct _cSlot), (int)cons.car);
+	    readKvm((void *)&acs, sizeof(struct _cSlot), (u_long)cons.car);
 	    switch (acs.c.flags)
 	    {
 	      case NATPT_STATIC:	_showRuleStatic(num, &acs);	break;
@@ -190,7 +190,7 @@ showRule(int type)
 	      case NATPT_FAITH:		_showRuleFaith(num, &acs);	break;
 	    }
 	}
-	pos = (int)cons.cdr;
+	pos = (u_long)cons.cdr;
     }
 }
 
@@ -364,7 +364,7 @@ _showIPaddr(int family, union inaddr *addr)
 
 
 static void
-_showXlate(int pos)
+_showXlate(u_long pos)
 {
     Cell	 cons;
     int		 rv;
@@ -376,7 +376,7 @@ _showXlate(int pos)
 
     while (pos)
     {
-	readKvm((caddr_t)&cons, sizeof(Cell), pos);
+	readKvm((void *)&cons, sizeof(Cell), pos);
 	if (cons.car)
 	{
 	    struct _tSlot	 tslot;
@@ -385,7 +385,7 @@ _showXlate(int pos)
 	    int			 idle;
 	    char		*p;
 
-	    readKvm((caddr_t)&tslot, sizeof(struct _tSlot), (int)cons.car);
+	    readKvm((void *)&tslot, sizeof(struct _tSlot), (u_long)cons.car);
 
 	    switch (tslot.ip_payload)
 	    {
@@ -419,7 +419,7 @@ _showXlate(int pos)
 		{
 		    struct _tcpstate	ts;
 
-		    readKvm((caddr_t)&ts, sizeof(struct _tcpstate), (int)tslot.suit.tcp);
+		    readKvm((void *)&ts, sizeof(struct _tcpstate), (u_long)tslot.suit.tcp);
 
 		    if ((ts._state >= 0) && (ts._state < TCP_NSTATES))
 			printf(" %s ", tcpstates[ts._state]);
@@ -432,7 +432,7 @@ _showXlate(int pos)
 
 	    printf("\n");
 	}
-	pos = (int)cons.cdr;
+	pos = (u_long)cons.cdr;
     }
 }
 
@@ -466,7 +466,7 @@ _showXlateHomogeneous(struct _tSlot *tslot)
 
 #ifdef readKMEM
 int
-readNL(caddr_t buf, int nbytes, char *n_name)
+readNL(void *buf, int nbytes, char *n_name)
 {
     int			 rv;
     struct nlist	*nlp;
@@ -484,7 +484,7 @@ readNL(caddr_t buf, int nbytes, char *n_name)
 }
 
 
-int
+u_long
 openKvm()
 {
     int		rv;
@@ -514,12 +514,12 @@ openKvm()
     if ((rv = kvm_nlist(kd, nl)) < 0)
 	err(errno, "Read failure on kvm_nlist");
 
-    return ((int)kd);
+    return ((u_long)kd);
 }
 
 
 int
-readKvm(caddr_t buf, int nbytes, int pos)
+readKvm(void *buf, int nbytes, u_long pos)
 {
     int	rv;
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: showvar.h,v 1.2 2000/01/07 14:33:33 fujisawa Exp $
+ *	$Id: showvar.h,v 1.3 2000/02/14 09:51:27 itojun Exp $
  */
 
 void	 showInterface		__P((char *));
@@ -38,8 +38,8 @@ void	 showMapping		__P((void));
 
 
 #ifdef readKMEM
-int	 readNL			__P((caddr_t, int, char *));
-int	 openKvm		__P((void));
-int	 readKvm		__P((caddr_t, int, int));
+int	 readNL			__P((void *, int, char *));
+u_long	 openKvm		__P((void));
+int	 readKvm		__P((void *, int, u_long));
 void	 closeKvm		__P((void));
 #endif	/* ifdef readKMEM	*/
