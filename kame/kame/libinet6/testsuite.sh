@@ -41,9 +41,10 @@ $TEST '' ''
 echo
 
 echo '== sock_raw'
-$TEST -R localhost ''
-$TEST -R localhost 80
-$TEST -R localhost www
+$TEST -R -p 0 localhost ''
+$TEST -R -p 59 localhost ''
+$TEST -R -p 59 localhost 80
+$TEST -R -p 59 localhost www
 $TEST -R -p 59 ::1 ''
 echo
 
