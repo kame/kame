@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.231 2005/02/23 22:59:17 suz Exp $	*/
+/*	$KAME: ipsec.c,v 1.232 2005/03/09 14:14:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1072,7 +1072,7 @@ ipsec4_get_ulp(m, spidx, needport)
 			    uh.uh_dport;
 			return;
 		case IPPROTO_AH:
-			if (m->m_pkthdr.len > off + sizeof(ip6e))
+			if (off + sizeof(ip6e) > m->m_pkthdr.len)
 				return;
 			m_copydata(m, off, sizeof(ip6e), (caddr_t)&ip6e);
 			off += (ip6e.ip6e_len + 2) << 2;
