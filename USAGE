@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 1999/10/07 02:50:34 $
+		     $Date: 1999/10/07 03:00:29 $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -13,21 +13,32 @@ related to KAME kit.
 
 <<<ifconfig>>>
 
-A link-local address is automatically assigned to each interface on
-the first time that the interface becomes up.  Althogh it is usually
-the boot time, there are some exceptions.  If you find an interface
-without a link-local address, please make the interface up by hand.
+A link-local address is automatically assigned to each interface, when
+the interface becomes up for the first time.  Even if you find an interface
+without a link-local address, do not panic.  The link-local address will be
+assigned when it becomes up (with "ifconfig IF up").
+
 Some network drivers allow an interface to become up even without a
-hardware address (e.g. for PCMCIA network cards).  In such cases, it is
+hardware address (for example, PCMCIA network cards).  In such cases, it is
 possible that an interface has no link-local address even if the
 interface is up.  If you see such situation, please disable the
 interface once and then re-enable it (i.e. do `ifconfig IF down;
 ifconfig IF up').
 
+Pseudo interfaces (like "gif" tunnel device) will borrow IPv6 interface
+identifier (lowermost 64bit of the address) from EUI64/IEEE802 sources,
+like ethernet cards.  Pseudo interfaces will be able to get IPv6 link-local
+address, if you have other "real" interface configured beforehand.
+If you have no EUI64/IEEE802 sources on the node, you may need to configure
+link-local address manually.  Though we have last-resort code in the kernel,
+which generates interface identifier from MD5(hostname), it may not suitable
+for your usage (for example, if you configure same hostname on both sides
+of gif tunnel, you will be doomed).
+
 If you have a router announcing Router Advertisement,
 global addresses will be assigned automatically.  So, neither
 "ifconfig" nor "prefix" is necessary for your *host*. (Please refer to
-"sysctl" section to accept Router Advertisement.)
+"sysctl" section for configuring a host to accept Router Advertisement.)
 
 If you want to set up a router, you need to assign global addresses
 for two or more interfaces by "ifconfig" or "prefix". (prefix command
