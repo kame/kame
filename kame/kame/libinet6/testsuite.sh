@@ -3,35 +3,55 @@ TEST=./test
 #TEST='./test -v'
 IF=`ifconfig -l | awk '{print $1}'`
 
+echo '== basic ones'
 $TEST ::1 http
-$TEST ::1 echo
-$TEST ::1 tftp
 $TEST 127.0.0.1 http
-$TEST 127.0.0.1 echo
-$TEST 127.0.0.1 tftp
 $TEST localhost http
-$TEST localhost echo
+$TEST ::1 tftp
+$TEST 127.0.0.1 tftp
 $TEST localhost tftp
+$TEST ::1 echo
+$TEST 127.0.0.1 echo
+$TEST localhost echo
+echo
 
+echo '== specific address family'
 $TEST -4 localhost http
 $TEST -6 localhost http
+echo
 
+echo '== empty hostname'
 $TEST '' http
 $TEST '' echo
 $TEST '' tftp
 $TEST '' 80
-$TEST -p '' http
-$TEST -p '' echo
-$TEST -p '' tftp
-$TEST -p '' 80
+$TEST -P '' http
+$TEST -P '' echo
+$TEST -P '' tftp
+$TEST -P '' 80
 $TEST -S '' 80
 $TEST -D '' 80
+echo
 
+echo '== empty servname'
 $TEST ::1 ''
 $TEST 127.0.0.1 ''
 $TEST localhost ''
 $TEST '' ''
+echo
 
-# the following items are local to KAME.
+echo '== sock_raw'
+$TEST -R localhost ''
+$TEST -R localhost 80
+$TEST -R localhost www
+$TEST -R -p 59 ::1 ''
+echo
+
+echo '== unsupported family'
+$TEST -f 99 localhost ''
+echo
+
+echo '== the following items are local to KAME.'
 $TEST fe80::1@lo0 http
 $TEST fe80::1@$IF http
+echo

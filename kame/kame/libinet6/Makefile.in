@@ -1,5 +1,6 @@
 srcdir=	@srcdir@
 .PATH:	@srcdir@ @srcdir@/resolv
+VPATH=	@srcdir@ @srcdir@/resolv
 
 prefix=	@prefix@
 exec_prefix=@exec_prefix@
