@@ -1,4 +1,4 @@
-.\"	$KAME: ping6.8,v 1.58 2003/06/20 12:00:22 itojun Exp $
+.\"	$KAME: ping6.8,v 1.59 2004/09/20 18:28:06 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -202,7 +202,7 @@ asks the kernel to fragment packets to fit into the minimum IPv6 MTU.
 will suppress the behavior in the following two levels:
 when the option is specified once, the behavior will be disabled for
 unicast packets.
-When the option is more than once, it will be disabled for both
+When the option is specified more than once, it will be disabled for both
 unicast and multicast packets.
 .It Fl n
 Numeric output only.
