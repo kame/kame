@@ -1,3 +1,5 @@
+/*	$KAME: in6_pcb.h,v 1.2 2000/03/29 20:01:50 sumikawa Exp $	*/
+
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
