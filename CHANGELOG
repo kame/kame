@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1164 2000/07/29 01:43:34 itojun Exp $
+$KAME: CHANGELOG,v 1.1165 2000/07/29 23:24:21 jinmei Exp $
 
 <200007>
+2000-07-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6sd/vif.c (init_vifs):
+	* kame/kame/pim6sd/cfparse.y (phyint_config):
+	made sure to check if a valid global address exists after parsing
+	the configuration file, in order to avoid unexpected hang up.
+	From: Kengo NAGAHASHI <kenken@wide.ad.jp>
+
 Sat Jul 29 JST 2000  itojun@iijlab.net
 	* freebsd2/bsdi3: repair NEW_STRUCT_ROUTE support.
 
