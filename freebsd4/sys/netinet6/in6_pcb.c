@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.4 2001/08/13 16:26:17 ume Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.45 2002/02/02 07:07:39 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.46 2002/02/02 09:39:03 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -908,23 +908,4 @@ in6_pcblookup_hash(pcbinfo, faddr, fport_arg, laddr, lport_arg, wildcard, ifp)
 	 * Not found.
 	 */
 	return (NULL);
-}
-
-void
-init_sin6(struct sockaddr_in6 *sin6, struct mbuf *m)
-{
-	struct ip6_hdr *ip;
-
-	ip = mtod(m, struct ip6_hdr *);
-	bzero(sin6, sizeof(*sin6));
-	sin6->sin6_len = sizeof(*sin6);
-	sin6->sin6_family = AF_INET6;
-	sin6->sin6_addr = ip->ip6_src;
-	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		sin6->sin6_addr.s6_addr16[1] = 0;
-	sin6->sin6_scope_id =
-		(m->m_pkthdr.rcvif && IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		? m->m_pkthdr.rcvif->if_index : 0;
-
-	return;
 }
