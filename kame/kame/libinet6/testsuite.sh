@@ -52,7 +52,7 @@ echo '== unsupported family'
 $TEST -f 99 localhost ''
 echo
 
-echo '== the following items are local to KAME.'
+echo '== the following items are specified in jinmei scopeaddr format doc.'
 $TEST fe80::1%lo0 http
 $TEST fe80::1%$IF http
 echo
