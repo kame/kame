@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.62 2003/07/20 18:01:20 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.63 2003/07/22 08:53:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -251,6 +251,7 @@ esp_schedule(algo, sav)
 	if (error) {
 		ipseclog((LOG_ERR, "esp_schedule %s: error %d\n",
 		    algo->name, error));
+		bzero(sav->sched, sav->schedlen);
 		free(sav->sched, M_SECA);
 		sav->sched = NULL;
 		sav->schedlen = 0;

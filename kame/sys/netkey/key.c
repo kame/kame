@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.296 2003/07/08 22:01:38 itojun Exp $	*/
+/*	$KAME: key.c,v 1.297 2003/07/22 08:53:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3337,6 +3337,7 @@ key_setsaval(sav, m, mhp)
 		sav->key_enc = NULL;
 	}
 	if (sav->sched) {
+		bzero(sav->sched, sav->schedlen);
 		KFREE(sav->sched);
 		sav->sched = NULL;
 	}
