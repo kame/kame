@@ -30,6 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF 
  * SUCH DAMAGE.
  *
+ * $FreeBSD: src/include/pthread.h,v 1.10.2.3 2000/01/04 10:42:12 tg Exp $
  */
 #ifndef _PTHREAD_H_
 #define _PTHREAD_H_
@@ -85,6 +86,15 @@
  */
 #define PTHREAD_PROCESS_PRIVATE     0
 #define PTHREAD_PROCESS_SHARED      1	
+
+/*
+ * Flags for cancelling threads
+ */
+#define PTHREAD_CANCEL_ENABLE		0
+#define PTHREAD_CANCEL_DISABLE		1
+#define PTHREAD_CANCEL_DEFERRED		0
+#define PTHREAD_CANCEL_ASYNCHRONOUS	2
+#define PTHREAD_CANCELED		((void *) 1)
 
 /*
  * Forward structure definitions.
@@ -235,7 +245,7 @@ int		pthread_join __P((pthread_t, void **));
 int		pthread_key_create __P((pthread_key_t *,
 			void (*routine) (void *)));
 int		pthread_key_delete __P((pthread_key_t));
-int		pthread_kill __P((struct pthread *, int));
+int		pthread_kill __P((pthread_t, int));
 int		pthread_mutexattr_init __P((pthread_mutexattr_t *));
 int		pthread_mutexattr_destroy __P((pthread_mutexattr_t *));
 int		pthread_mutexattr_settype __P((pthread_mutexattr_t *, int));
@@ -259,15 +269,18 @@ int		pthread_rwlockattr_init __P((pthread_rwlockattr_t *));
 int		pthread_rwlockattr_getpshared __P((const pthread_rwlockattr_t *,
 			int *));
 int		pthread_rwlockattr_setpshared __P((pthread_rwlockattr_t *,
-			int *));
+			int));
 int		pthread_rwlockattr_destroy __P((pthread_rwlockattr_t *));
 pthread_t	pthread_self __P((void));
 int		pthread_setcancelstate __P((int, int *));
 int		pthread_setcanceltype __P((int, int *));
 int		pthread_setspecific __P((pthread_key_t, const void *));
 int		pthread_sigmask __P((int, const sigset_t *, sigset_t *));
-int		pthread_testcancel __P((void));
 
+int		pthread_cancel __P((pthread_t));
+int		pthread_setcancelstate __P((int, int *));
+int		pthread_setcanceltype __P((int, int *));
+void		pthread_testcancel __P((void));
 
 int		pthread_getprio __P((pthread_t));
 int		pthread_setprio __P((pthread_t, int));
@@ -297,26 +310,24 @@ int		pthread_mutexattr_setprotocol __P((pthread_mutexattr_t *,
 #endif
 
 #if defined(_POSIX_THREAD_PRIORITY_SCHEDULING)
-int		pthread_attr_getinheritsched __P((pthread_attr_t *, int *));
-int		pthread_attr_getschedparam __P((pthread_attr_t *,
+int		pthread_attr_getinheritsched __P((const pthread_attr_t *, int *));
+int		pthread_attr_getschedparam __P((const pthread_attr_t *,
 			struct sched_param *));
-int		pthread_attr_getschedpolicy __P((pthread_attr_t *, int *));
-int		pthread_attr_getscope __P((pthread_attr_t *, int *));
+int		pthread_attr_getschedpolicy __P((const pthread_attr_t *, int *));
+int		pthread_attr_getscope __P((const pthread_attr_t *, int *));
 int		pthread_attr_setinheritsched __P((pthread_attr_t *, int));
 int		pthread_attr_setschedparam __P((pthread_attr_t *,
-			struct sched_param *));
+			const struct sched_param *));
 int		pthread_attr_setschedpolicy __P((pthread_attr_t *, int));
 int		pthread_attr_setscope __P((pthread_attr_t *, int));
 int		pthread_getschedparam __P((pthread_t pthread, int *policy,
 			struct sched_param * param));
 int		pthread_setschedparam __P((pthread_t pthread, int policy,
-			struct sched_param * param));
+			const struct sched_param * param));
 #endif
 
 int		pthread_attr_setfloatstate __P((pthread_attr_t *, int));
 int		pthread_attr_getfloatstate __P((pthread_attr_t *, int *));
-int		pthread_attr_setcleanup __P((pthread_attr_t *,
-			void (*routine) (void *), void *));
 __END_DECLS
 
 #endif

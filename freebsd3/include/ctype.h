@@ -39,6 +39,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ctype.h	8.4 (Berkeley) 1/21/94
+ *      $FreeBSD: src/include/ctype.h,v 1.14.2.2 2000/06/13 15:36:19 asmodai Exp $
  */
 
 #ifndef _CTYPE_H_
@@ -50,20 +51,20 @@
  */
 #include <runetype.h>
 
-#define	_A	0x00000100L		/* Alpha */
-#define	_C	0x00000200L		/* Control */
-#define	_D	0x00000400L		/* Digit */
-#define	_G	0x00000800L		/* Graph */
-#define	_L	0x00001000L		/* Lower */
-#define	_P	0x00002000L		/* Punct */
-#define	_S	0x00004000L		/* Space */
-#define	_U	0x00008000L		/* Upper */
-#define	_X	0x00010000L		/* X digit */
-#define	_B	0x00020000L		/* Blank */
-#define	_R	0x00040000L		/* Print */
-#define	_I	0x00080000L		/* Ideogram */
-#define	_T	0x00100000L		/* Special */
-#define	_Q	0x00200000L		/* Phonogram */
+#define	_CTYPE_A	0x00000100L		/* Alpha */
+#define	_CTYPE_C	0x00000200L		/* Control */
+#define	_CTYPE_D	0x00000400L		/* Digit */
+#define	_CTYPE_G	0x00000800L		/* Graph */
+#define	_CTYPE_L	0x00001000L		/* Lower */
+#define	_CTYPE_P	0x00002000L		/* Punct */
+#define	_CTYPE_S	0x00004000L		/* Space */
+#define	_CTYPE_U	0x00008000L		/* Upper */
+#define	_CTYPE_X	0x00010000L		/* X digit */
+#define	_CTYPE_B	0x00020000L		/* Blank */
+#define	_CTYPE_R	0x00040000L		/* Print */
+#define	_CTYPE_I	0x00080000L		/* Ideogram */
+#define	_CTYPE_T	0x00100000L		/* Special */
+#define	_CTYPE_Q	0x00200000L		/* Phonogram */
 
 __BEGIN_DECLS
 int	isalnum __P((int));
@@ -81,42 +82,46 @@ int	tolower __P((int));
 int	toupper __P((int));
 
 #if !defined(_ANSI_SOURCE) && !defined(_POSIX_SOURCE)
+int	digittoint __P((int));
 int	isascii __P((int));
 int	isblank __P((int));
+int	ishexnumber __P((int));
+int	isideogram __P((int));
+int	isnumber __P((int));
+int	isphonogram __P((int));
+int	isrune __P((int));
+int	isspecial __P((int));
 int	toascii __P((int));
-int	digittoint __P((int));
 #endif
 __END_DECLS
 
 #define	__istype(c,f)	(!!__maskrune((c),(f)))
 
-#define	isalnum(c)	__istype((c), _A|_D)
-#define	isalpha(c)	__istype((c), _A)
-#define	iscntrl(c)	__istype((c), _C)
-#define	isdigit(c)	__isctype((c), _D) /* ANSI -- locale independent */
-#define	isgraph(c)	__istype((c), _G)
-#define	islower(c)	__istype((c), _L)
-#define	isprint(c)	__istype((c), _R)
-#define	ispunct(c)	__istype((c), _P)
-#define	isspace(c)	__istype((c), _S)
-#define	isupper(c)	__istype((c), _U)
-#define	isxdigit(c)	__isctype((c), _X) /* ANSI -- locale independent */
+#define	isalnum(c)	__istype((c), _CTYPE_A|_CTYPE_D)
+#define	isalpha(c)	__istype((c), _CTYPE_A)
+#define	iscntrl(c)	__istype((c), _CTYPE_C)
+#define	isdigit(c)	__isctype((c), _CTYPE_D) /* ANSI -- locale independent */
+#define	isgraph(c)	__istype((c), _CTYPE_G)
+#define	islower(c)	__istype((c), _CTYPE_L)
+#define	isprint(c)	__istype((c), _CTYPE_R)
+#define	ispunct(c)	__istype((c), _CTYPE_P)
+#define	isspace(c)	__istype((c), _CTYPE_S)
+#define	isupper(c)	__istype((c), _CTYPE_U)
+#define	isxdigit(c)	__isctype((c), _CTYPE_X) /* ANSI -- locale independent */
 #define	tolower(c)	__tolower(c)
 #define	toupper(c)	__toupper(c)
 
 #if !defined(_ANSI_SOURCE) && !defined(_POSIX_SOURCE)
-#define	isascii(c)	(((c) & ~0x7F) == 0)
-#define	isblank(c)	__istype((c), _B)
-#define	toascii(c)	((c) & 0x7F)
 #define	digittoint(c)	__maskrune((c), 0xFF)
-
-/* XXX the following macros are not backed up by functions. */
-#define	ishexnumber(c)	__istype((c), _X)
-#define	isideogram(c)	__istype((c), _I)
-#define	isnumber(c)	__istype((c), _D)
-#define	isphonogram(c)	__istype((c), _Q)
+#define	isascii(c)	(((c) & ~0x7F) == 0)
+#define	isblank(c)	__istype((c), _CTYPE_B)
+#define	ishexnumber(c)	__istype((c), _CTYPE_X)
+#define	isideogram(c)	__istype((c), _CTYPE_I)
+#define	isnumber(c)	__istype((c), _CTYPE_D)
+#define	isphonogram(c)	__istype((c), _CTYPE_Q)
 #define	isrune(c)	__istype((c), 0xFFFFFF00L)
-#define	isspecial(c)	__istype((c), _T)
+#define	isspecial(c)	__istype((c), _CTYPE_T)
+#define	toascii(c)	((c) & 0x7F)
 #endif
 
 /* See comments in <machine/ansi.h> about _BSD_CT_RUNE_T_. */

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/include/dlfcn.h,v 1.2.2.2 1999/12/17 01:39:41 jkh Exp $
+ * $FreeBSD: src/include/dlfcn.h,v 1.2.2.3 2000/01/21 02:31:40 jdp Exp $
  */
 
 #ifndef _DLFCN_H_
@@ -66,6 +66,13 @@ __BEGIN_DECLS
 int dladdr __P((const void *, Dl_info *));
 int dlclose __P((void *));
 const char *dlerror __P((void));
+void dllockinit __P((void *_context,
+		     void *(*_lock_create)(void *_context),
+		     void (*_rlock_acquire)(void *_lock),
+		     void (*_wlock_acquire)(void *_lock),
+		     void (*_lock_release)(void *_lock),
+		     void (*_lock_destroy)(void *_lock),
+		     void (*_context_destroy)(void *_context)));
 void *dlopen __P((const char *, int));
 void *dlsym __P((void *, const char *));
 __END_DECLS
