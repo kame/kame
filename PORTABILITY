@@ -1,6 +1,6 @@
-Portability guideline
-KAME project
-$Id: PORTABILITY,v 1.20 1999/12/01 01:44:40 itojun Exp $
+	Portability guideline
+	KAME project
+	$Id: PORTABILITY,v 1.21 1999/12/09 12:30:30 kazu Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -21,7 +21,7 @@ across those possibilities.
 			....
 		}
 
-		baa(this, that,
+		baz(this, that,
 	#if foo
 			something);
 	#else
@@ -38,13 +38,13 @@ across those possibilities.
 		}
 
 	#ifdef foo
-		baa(this, that, something);
+		baz(this, that, something);
 	#else
-		baa(this, that, something, anything);
+		baz(this, that, something, anything);
 	#endif
 
 		/* latter part can also be like follows... */
-		baa(this, that,
+		baz(this, that,
 			something
 	#ifndef foo
 			, anything
