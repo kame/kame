@@ -491,14 +491,6 @@ tunoutput(
 		return (EHOSTDOWN);
 	}
 
-	/*
-	 * if the queueing discipline needs packet classification,
-	 * do it before prepending link headers.
-	 */
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
-	IFQ_CLASSIFY(&ifp->if_snd, m0, dst->sa_family, &pktattr);
-#endif
-
 	/* BPF write needs to be handled specially */
 	if (dst->sa_family == AF_UNSPEC) {
 		dst->sa_family = *(mtod(m0, int *));
@@ -551,7 +543,7 @@ tunoutput(
 	IFQ_HANDOFF(ifp, m0, error);
 	if (error) {
 		ifp->if_collisions++;
-		return (error);
+		return (ENOBUFS);
 	}
 	ifp->if_opackets++;
 	return (0);
@@ -658,7 +650,6 @@ tunioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td
 			IFQ_UNLOCK(&tp->tun_if.if_snd);
 		} else
 			*(int *)data = 0;
-		IFQ_UNLOCK(&tp->tun_if.if_snd);
 		splx(s);
 		break;
 	case FIOSETOWN:

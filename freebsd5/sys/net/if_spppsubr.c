@@ -1058,7 +1058,7 @@ sppp_isempty(struct ifnet *ifp)
 
 	s = splimp();
 	empty = !sp->pp_fastq.ifq_head && !sp->pp_cpq.ifq_head &&
-		IFQ_IS_EMPTY(&sp->pp_if.if_snd);
+		!sp->pp_if.if_snd.ifq_head;
 	splx(s);
 	return (empty);
 }
@@ -1085,7 +1085,7 @@ sppp_dequeue(struct ifnet *ifp)
 	    (sppp_ncp_check(sp) || sp->pp_mode == IFF_CISCO)) {
 		IF_DEQUEUE(&sp->pp_fastq, m);
 		if (m == NULL)
-			IFQ_DEQUEUE (&sp->pp_if.if_snd, m);
+			IF_DEQUEUE (&sp->pp_if.if_snd, m);
 	}
 	splx(s);
 	return m;
@@ -1107,7 +1107,7 @@ sppp_pick(struct ifnet *ifp)
 	if (m == NULL &&
 	    (sp->pp_phase == PHASE_NETWORK || sp->pp_mode == IFF_CISCO))
 		if ((m = sp->pp_fastq.ifq_head) == NULL)
-			IFQ_POLL(&sp->pp_if.if_snd, m);
+			m = sp->pp_if.if_snd.ifq_head;
 	splx (s);
 	return (m);
 }

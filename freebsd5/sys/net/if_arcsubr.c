@@ -119,10 +119,6 @@ arc_output(ifp, m, dst, rt0)
 
 	error = 0;
 
-	/*
-	 * if the queueing discipline needs packet classification,
-	 * do it before prepending link headers.
-	 */
 	switch (dst->sa_family) {
 #ifdef INET
 	case AF_INET:

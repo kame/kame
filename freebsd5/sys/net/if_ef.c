@@ -222,7 +222,7 @@ ef_start(struct ifnet *ifp)
 
 	EFDEBUG("\n");
 	for (;;) {
-		IFQ_DEQUEUE(&ifp->if_snd, m);
+		IF_DEQUEUE(&ifp->if_snd, m);
 		if (m == 0)
 			break;
 		BPF_MTAP(ifp, m);

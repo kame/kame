@@ -320,7 +320,6 @@ slcreate()
 	sc->sc_fastq.ifq_maxlen = 32;
 	sc->sc_if.if_linkmib = sc;
 	sc->sc_if.if_linkmiblen = sizeof *sc;
-	IFQ_SET_READY(&sc->sc_if.if_snd);
 	mtx_init(&sc->sc_fastq.ifq_mtx, "sl_fastq", NULL, MTX_DEF);
 
 	/*
@@ -588,7 +587,7 @@ sloutput(ifp, m, dst, rtp)
 		IFQ_HANDOFF(&sc->sc_if, m, error);
 	if (error) {
 		sc->sc_if.if_oerrors++;
-		return (error);
+		return (ENOBUFS);
 	}
 	return (0);
 }
@@ -653,7 +652,7 @@ sltstart(tp)
 		if (m)
 			sc->sc_if.if_omcasts++;		/* XXX */
 		else
-			IFQ_DEQUEUE(&sc->sc_if.if_snd, m);
+			IF_DEQUEUE(&sc->sc_if.if_snd, m);
 		splx(s);
 		if (m == NULL)
 			return 0;
