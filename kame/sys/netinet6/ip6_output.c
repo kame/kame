@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.332 2002/09/11 03:46:47 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.333 2002/09/17 05:56:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -299,6 +299,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #endif
 #ifdef MIP6
 	struct mip6_pktopts mip6opt;
+	int have_hao = 0;
 #ifdef NEW_STRUCT_ROUTE
 	struct route mip6_ip6route;
 #else
@@ -426,6 +427,8 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			}
 		}
 		/* Home Address Destinatio Option. */
+		if (mip6opt.mip6po_haddr != NULL)
+			have_hao = 1;
 		MAKE_EXTHDR(mip6opt.mip6po_haddr, &exthdrs.ip6e_haddr);
 		/*
 		 * add a mobility header only when there is no
@@ -1016,7 +1019,11 @@ skip_ipsec2:;
 		return error;  /* Nothing more to be done */
 	}
 #else
-	if (needipsec && needipsectun) {
+	if (needipsec && needipsectun
+#ifdef MIP6
+	    && (have_hao == 0)
+#endif /* MIP6 */
+		) {
 		struct ipsec_output_state state;
 
 		/*
