@@ -1,4 +1,4 @@
-/*	$KAME: radixwalk.c,v 1.9 2002/03/28 10:07:54 jinmei Exp $	*/
+/*	$KAME: radixwalk.c,v 1.10 2002/03/28 10:09:24 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
