@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.22 2000/02/23 06:29:58 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.23 2000/02/23 08:06:32 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -237,6 +237,57 @@ eay_check_x509sign(source, sig, cert)
 
 	bp = cert->v;
 	x509 = d2i_X509(NULL, &bp, cert->l);
+	if (x509 == NULL)
+		return -1;
+
+	evp = X509_get_pubkey(x509);
+	X509_free(x509);
+	if (evp == NULL)
+		return -1;
+
+	/* Verify the signature */
+	/* XXX: to be handled EVP_dss() */
+	EVP_VerifyInit(&md_ctx, EVP_sha1());
+	EVP_VerifyUpdate(&md_ctx, source->v, source->l);
+	error = EVP_VerifyFinal(&md_ctx, sig->v, sig->l, evp);
+
+	EVP_PKEY_free(evp);
+
+	if (error != 1)
+		return -1;
+
+	return 0;
+}
+
+/*
+ * check a signature by signed with PKCS7 certificate.
+ *	XXX: to be get hash type from my cert ?
+ *		to be handled EVP_dss().
+ * OUT: return -1 when error.
+ *	0
+ */
+int
+eay_check_pkcs7sign(source, sig, cert)
+	vchar_t *source;
+	vchar_t *sig;
+	vchar_t *cert;
+{
+	X509 *x509;
+	EVP_MD_CTX md_ctx;
+	EVP_PKEY *evp;
+	int error;
+	BIO *bio = BIO_new(BIO_s_mem());
+	char *bp;
+
+	if (bio == NULL)
+		return -1;
+	error = BIO_write(bio, cert->v, cert->l);
+	if (error != cert->l)
+		return -1;
+
+	bp = cert->v;
+	x509 = PEM_read_bio_X509(bio, NULL, NULL, NULL);
+	BIO_free(bio);
 	if (x509 == NULL)
 		return -1;
 
