@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.15 2000/10/25 04:30:44 jinmei Exp $	*/
+/*	$KAME: if.c,v 1.16 2001/01/19 03:07:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -256,17 +256,6 @@ rtbuf_len()
 		return(-1);
 
 	return(len);
-}
-
-int
-get_rtinfo(char *buf, size_t *len)
-{
-	int mib[6] = {CTL_NET, AF_ROUTE, 0, AF_INET6, NET_RT_DUMP, 0};
-
-	if (sysctl(mib, 6, buf, len, NULL, 0) < 0)
-		return(-1);
-
-	return(0);
 }
 
 #define FILTER_MATCH(type, filter) ((0x1 << type) & filter)
