@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.125 2002/08/20 21:56:12 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.126 2002/09/11 02:34:17 itojun Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -767,9 +767,9 @@ sysctl_ip6_temppltime SYSCTL_HANDLER_ARGS
 	if (ip6_temp_preferred_lifetime <
 	    ip6_desync_factor + ip6_temp_regen_advance) {
 		ip6_temp_preferred_lifetime = old;
-		return(EINVAL);
+		return (EINVAL);
 	}
-	return(error);
+	return (error);
 }
 
 static int
@@ -789,9 +789,9 @@ sysctl_ip6_tempvltime SYSCTL_HANDLER_ARGS
 	error = SYSCTL_IN(req, arg1, sizeof(int));
 	if (ip6_temp_valid_lifetime < ip6_temp_preferred_lifetime) {
 		ip6_temp_preferred_lifetime = old;
-		return(EINVAL);
+		return (EINVAL);
 	}
-	return(error);
+	return (error);
 }
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
@@ -817,7 +817,7 @@ sysctl_ip6_pmtu_expire(SYSCTL_HANDLER_ARGS)
 	 */
 	if (pmtu_expire != 0 && pmtu_expire < 60 * 5) {
 		pmtu_expire = old;
-		return(EINVAL);
+		return (EINVAL);
 	}
 
 	/* update the timeout value */
@@ -825,7 +825,7 @@ sysctl_ip6_pmtu_expire(SYSCTL_HANDLER_ARGS)
 		rt_timer_queue_change(icmp6_mtudisc_timeout_q,
 				      (long)pmtu_expire);
 
-	return(error);
+	return (error);
 }
 #endif /* freebsd4 */
 

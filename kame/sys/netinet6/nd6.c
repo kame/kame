@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.297 2002/09/06 10:27:55 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.298 2002/09/11 02:34:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -768,12 +768,12 @@ regen_tmpaddr(ia6)
 		if ((e = in6_tmpifadd(public_ifa6, 0)) != 0) {
 			log(LOG_NOTICE, "regen_tmpaddr: failed to create a new"
 			    " tmp addr,errno=%d\n", e);
-			return(-1);
+			return (-1);
 		}
-		return(0);
+		return (0);
 	}
 
-	return(-1);
+	return (-1);
 }
 
 /*
@@ -907,7 +907,7 @@ nd6_lookup(addr6, create, ifp)
 			struct ifaddr *ifa =
 			    ifaof_ifpforaddr((struct sockaddr *)addr6, ifp);
 			if (ifa == NULL)
-				return(NULL);
+				return (NULL);
 
 			/*
 			 * Create a new route.  RTF_LLINFO is necessary
@@ -927,17 +927,17 @@ nd6_lookup(addr6, create, ifp)
 				    "neighbor(%s), errno=%d\n",
 				    ip6_sprintf(addr6->sin6_addr), e);
 #endif
-				return(NULL);
+				return (NULL);
 			}
 			if (rt == NULL)
-				return(NULL);
+				return (NULL);
 			if (rt->rt_llinfo) {
 				struct llinfo_nd6 *ln =
 				    (struct llinfo_nd6 *)rt->rt_llinfo;
 				ln->ln_state = ND6_LLINFO_NOSTATE;
 			}
 		} else
-			return(NULL);
+			return (NULL);
 	}
 	rt->rt_refcnt--;
 	/*
@@ -961,9 +961,9 @@ nd6_lookup(addr6, create, ifp)
 			    ip6_sprintf(&addr6->sin6_addr),
 			    ifp ? if_name(ifp) : "unspec");
 		}
-		return(NULL);
+		return (NULL);
 	}
-	return(rt);
+	return (rt);
 }
 
 /*
@@ -986,7 +986,7 @@ nd6_is_addr_neighbor(addr, ifp)
 	 */
 	if (IN6_IS_ADDR_LINKLOCAL(&addr->sin6_addr) &&
 	    ntohs(*(u_int16_t *)&addr->sin6_addr.s6_addr[2]) == ifp->if_index)
-		return(1);
+		return (1);
 
 	/*
 	 * If the address matches one of our on-link prefixes, it should be a
@@ -1012,7 +1012,7 @@ nd6_is_addr_neighbor(addr, ifp)
 	 */
 	if (!ip6_forwarding && TAILQ_FIRST(&nd_defrouter) == NULL &&
 	    nd6_defifindex == ifp->if_index) {
-		return(1);
+		return (1);
 	}
 
 	/*
@@ -1020,9 +1020,9 @@ nd6_is_addr_neighbor(addr, ifp)
 	 * in the neighbor cache.
 	 */
 	if ((rt = nd6_lookup(addr, 0, ifp)) != NULL)
-		return(1);
+		return (1);
 
-	return(0);
+	return (0);
 }
 
 /*
@@ -1070,7 +1070,7 @@ nd6_free(rt, gc)
 			 */
 			ln->ln_expire = dr->expire;
 			splx(s);
-			return(ln->ln_next);
+			return (ln->ln_next);
 		}
 
 		if (ln->ln_router || dr) {
@@ -1142,7 +1142,7 @@ nd6_free(rt, gc)
 	rtrequest(RTM_DELETE, rt_key(rt), (struct sockaddr *)0,
 	    rt_mask(rt), 0, (struct rtentry **)0);
 
-	return(next);
+	return (next);
 }
 
 /*
@@ -1745,11 +1745,11 @@ nd6_ioctl(cmd, data, ifp)
 		nb_addr.sin6_addr = nbi->addr;
 		if ((error = in6_addr2zoneid(ifp, &nb_addr.sin6_addr,
 		    &nb_addr.sin6_scope_id)) != 0) {
-			return(error);
+			return (error);
 		}
 		if ((error = in6_embedscope(&nb_addr.sin6_addr, &nb_addr))
 		    != 0) {
-			return(error);
+			return (error);
 		}
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -1775,10 +1775,10 @@ nd6_ioctl(cmd, data, ifp)
 		ndif->ifindex = nd6_defifindex;
 		break;
 	case SIOCSDEFIFACE_IN6:	/* XXX: should be implemented as a sysctl? */
-		return(nd6_setdefaultiface(ndif->ifindex));
+		return (nd6_setdefaultiface(ndif->ifindex));
 		break;
 	}
-	return(error);
+	return (error);
 }
 
 /*
@@ -2268,7 +2268,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		    ND6_RETRANS_SEC(ND_IFINFO(ifp)->retrans);
 		nd6_ns_output(ifp, NULL, dst, ln, 0);
 	}
-	return(0);
+	return (0);
 
   sendpkt:
 #if defined(__OpenBSD__) && defined(IPSEC)
@@ -2289,7 +2289,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 			goto bad;
 		}
 #endif /* IPSEC */
-		return((*ifp->if_output)(origifp, m, (struct sockaddr *)dst,
+		return ((*ifp->if_output)(origifp, m, (struct sockaddr *)dst,
 					 rt));
 	}
 #if defined(__OpenBSD__) && defined(IPSEC)
@@ -2301,7 +2301,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		goto bad;
 	}
 #endif /* IPSEC */
-	return((*ifp->if_output)(ifp, m, (struct sockaddr *)dst, rt));
+	return ((*ifp->if_output)(ifp, m, (struct sockaddr *)dst, rt));
 
   bad:
 	if (m)
@@ -2339,9 +2339,9 @@ nd6_need_cache(ifp)
 	case IFT_VRRP:
 #endif
 	case IFT_GIF:		/* XXX need more cases? */
-		return(1);
+		return (1);
 	default:
-		return(0);
+		return (0);
 	}
 }
 
@@ -2374,7 +2374,7 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 #endif
 			ETHER_MAP_IPV6_MULTICAST(&SIN6(dst)->sin6_addr,
 						 desten);
-			return(1);
+			return (1);
 		case IFT_IEEE1394:
 			/*
 			 * netbsd can use if_broadcastaddr, but we don't do so
@@ -2382,25 +2382,25 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 			 */
 			for (i = 0; i < ifp->if_addrlen; i++)
 				desten[i] = ~0;
-			return(1);
+			return (1);
 		case IFT_ARCNET:
 			*desten = 0;
-			return(1);
+			return (1);
 		default:
 			m_freem(m);
-			return(0);
+			return (0);
 		}
 	}
 
 	if (rt == NULL) {
 		/* this could happen, if we could not allocate memory */
 		m_freem(m);
-		return(0);
+		return (0);
 	}
 	if (rt->rt_gateway->sa_family != AF_LINK) {
 		printf("nd6_storelladdr: something odd happens\n");
 		m_freem(m);
-		return(0);
+		return (0);
 	}
 	sdl = SDL(rt->rt_gateway);
 	if (sdl->sdl_alen == 0) {
@@ -2408,11 +2408,11 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 		printf("nd6_storelladdr: sdl_alen == 0, dst=%s, if=%s\n",
 		    ip6_sprintf(&SIN6(dst)->sin6_addr), if_name(ifp));
 		m_freem(m);
-		return(0);
+		return (0);
 	}
 
 	bcopy(LLADDR(sdl), desten, sdl->sdl_alen);
-	return(1);
+	return (1);
 }
 
 /*
@@ -2496,7 +2496,7 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 	if (p)
 		free(p, M_TEMP);
 
-	return(error);
+	return (error);
 }
 #else
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
@@ -2524,7 +2524,7 @@ nd6_sysctl_drlist SYSCTL_HANDLER_ARGS
 	if (req->newptr)
 		return EPERM;
 
-	return(fill_drlist(req));
+	return (fill_drlist(req));
 }
 
 static int
@@ -2537,7 +2537,7 @@ nd6_sysctl_prlist SYSCTL_HANDLER_ARGS
 	if (req->newptr)
 		return EPERM;
 
-	return(fill_prlist(req));
+	return (fill_prlist(req));
 }
 #endif
 
@@ -2618,7 +2618,7 @@ fill_drlist(req)
 
 	splx(s);
 
-	return(error);
+	return (error);
 }
 
 #ifndef __FreeBSD__
@@ -2768,5 +2768,5 @@ fill_prlist(req)
 
 	splx(s);
 
-	return(error);
+	return (error);
 }

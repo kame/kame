@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.98 2002/06/09 14:43:58 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.99 2002/09/11 02:34:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -225,7 +225,7 @@ in6_gif_output(ifp, family, m)
 
 	if (!ip6_setpktaddrs(m, sin6_src, sin6_dst)) {
 		m_freem(m);
-		return(ENOBUFS);
+		return (ENOBUFS);
 	}
 #ifdef IPV6_MINMTU
 	/*
@@ -241,7 +241,7 @@ in6_gif_output(ifp, family, m)
 	if (sc->gif_ro6.ro_rt && mono_time.tv_sec >= sc->rtcache_expire)
 		sc->rtcache_expire = mono_time.tv_sec + in6_gif_rtcachettl;
 
-	return(error);
+	return (error);
 #else	/* !__OpenBSD__ */
 	struct gif_softc *sc = (struct gif_softc*)ifp;
 	struct sockaddr_in6 *dst = (struct sockaddr_in6 *)&sc->gif_ro6.ro_dst;
@@ -355,7 +355,7 @@ in6_gif_output(ifp, family, m)
 
 	if (!ip6_setpktaddrs(m, sin6_src, sin6_dst)) {
 		m_freem(m);
-		return(ENOBUFS);
+		return (ENOBUFS);
 	}
 #ifdef IPV6_MINMTU
 	/*
@@ -375,7 +375,7 @@ in6_gif_output(ifp, family, m)
 	if (sc->gif_ro6.ro_rt && mono_time.tv_sec >= sc->rtcache_expire)
 		sc->rtcache_expire = mono_time.tv_sec + in6_gif_rtcachettl;
 
-	return(error);
+	return (error);
 #endif	/* __OpenBSD__ */
 }
 
@@ -553,7 +553,7 @@ gif_encapcheck6(m, off, proto, arg)
 {
 	if (!(m->m_flags & M_PKTHDR)) {
 		/* we do not expect this case, but check it for safety. */
-		return(EINVAL);
+		return (EINVAL);
 	}
 
 	return gif_validate6(m, (struct gif_softc *)arg, m->m_pkthdr.rcvif);

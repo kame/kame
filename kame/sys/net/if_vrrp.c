@@ -1,4 +1,4 @@
-/*      $KAME: if_vrrp.c,v 1.2 2002/07/10 07:21:01 ono Exp $ */
+/*      $KAME: if_vrrp.c,v 1.3 2002/09/11 02:34:15 itojun Exp $ */
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -111,7 +111,7 @@ vrrp_setmulti(struct ifnet *ifp)
 	 * when we do.
 	 */
 	if (ifp_p == NULL)
-		return(0);
+		return (0);
 
 	bzero((char *)&sdl, sizeof sdl);
 	sdl.sdl_len = sizeof sdl;
@@ -126,7 +126,7 @@ vrrp_setmulti(struct ifnet *ifp)
 		bcopy((char *)&mc->mc_addr, LLADDR(&sdl), ETHER_ADDR_LEN);
 		error = if_delmulti(ifp_p, (struct sockaddr *)&sdl);
 		if (error)
-			return(error);
+			return (error);
 		SLIST_REMOVE_HEAD(&sc->vrrp_mc_listhead, mc_entries);
 		free(mc, M_VRRP);
 	}
@@ -143,10 +143,10 @@ vrrp_setmulti(struct ifnet *ifp)
 		    LLADDR(&sdl), ETHER_ADDR_LEN);
 		error = if_addmulti(ifp_p, (struct sockaddr *)&sdl, &rifma);
 		if (error)
-			return(error);
+			return (error);
 	}
 
-	return(0);
+	return (0);
 }
 
 static int
@@ -474,7 +474,7 @@ vrrp_unconfig(struct ifnet *ifp)
 			bcopy((char *)&mc->mc_addr, LLADDR(&sdl), ETHER_ADDR_LEN);
 			error = if_delmulti(p, (struct sockaddr *)&sdl);
 			if (error)
-				return(error);
+				return (error);
 			SLIST_REMOVE_HEAD(&ifv->vrrp_mc_listhead, mc_entries);
 			free(mc, M_VRRP);
 		}

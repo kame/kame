@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.44 2002/06/09 14:43:58 itojun Exp $	*/
+/*	$KAME: frag6.c,v 1.45 2002/09/11 02:34:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -364,14 +364,14 @@ frag6_input(mp, offp, proto)
 			    offset - sizeof(struct ip6_frag) +
 			    offsetof(struct ip6_frag, ip6f_offlg));
 			IP6Q_UNLOCK();
-			return(IPPROTO_DONE);
+			return (IPPROTO_DONE);
 		}
 	} else if (fragoff + frgpartlen > IPV6_MAXPACKET) {
 		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
 			    offset - sizeof(struct ip6_frag) +
 				offsetof(struct ip6_frag, ip6f_offlg));
 		IP6Q_UNLOCK();
-		return(IPPROTO_DONE);
+		return (IPPROTO_DONE);
 	}
 	/*
 	 * If it's the first fragment, do the above check for each

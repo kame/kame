@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.164 2002/09/06 10:27:54 suz Exp $	*/
+/*	$KAME: mip6.c,v 1.165 2002/09/11 02:34:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2545,15 +2545,15 @@ mip6_setpktaddrs(m)
 
 	/* recover scope zone IDs */
 	if ((error = in6_recoverscope(&src_sa, src, NULL)) != 0)
-		return(error);
+		return (error);
 	src_sa.sin6_addr = *src; /* XXX */
 	if ((error = in6_recoverscope(&dst_sa, dst, NULL)) != 0)
-		return(error);
+		return (error);
 	dst_sa.sin6_addr = *dst; /* XXX */
 
 	if (!ip6_setpktaddrs(m, &src_sa, &dst_sa))
-		return(ENOBUFS);
-	return(0);
+		return (ENOBUFS);
+	return (0);
 }
 
 #ifdef MIP6_DRAFT18

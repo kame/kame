@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.292 2002/09/05 08:09:36 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.293 2002/09/11 02:34:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1195,7 +1195,7 @@ ip6_setpktaddrs(m, src, dst)
 				printf("ip6_setpktaddrs: illegal src: "
 				       "family=%d, len=%d\n",
 				       src->sin6_family, src->sin6_len);
-				return(NULL);
+				return (NULL);
 			}
 			/*
 			 * we only copy the "address" part to avoid misuse
@@ -1213,7 +1213,7 @@ ip6_setpktaddrs(m, src, dst)
 				printf("ip6_setpktaddrs: illegal dst: "
 				       "family=%d, len=%d\n",
 				       dst->sin6_family, dst->sin6_len);
-				return(NULL);
+				return (NULL);
 			}
 			sin6 = &mtod(n, struct ip6aux *)->ip6a_dst;
 			bzero(sin6, sizeof(*sin6));
@@ -1223,7 +1223,7 @@ ip6_setpktaddrs(m, src, dst)
 		}
 	}
 
-	return(n);
+	return (n);
 }
 
 int
@@ -1234,7 +1234,7 @@ ip6_getpktaddrs(m, src, dst)
 	struct mbuf *n;
 
 	if (src == NULL && dst == NULL)
-		return(-1);
+		return (-1);
 
 	if ((n = ip6_findaux(m)) == NULL) {
 		struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
@@ -1255,7 +1255,7 @@ ip6_getpktaddrs(m, src, dst)
 	if (dst)
 		*dst = &mtod(n, struct ip6aux *)->ip6a_dst;
 
-	return(0);
+	return (0);
 }
 
 /*
@@ -1303,11 +1303,11 @@ ip6_hopopts_input(plenp, rtalertp, mp, offp)
 
 	if (ip6_process_hopopts(m, (u_int8_t *)hbh + sizeof(struct ip6_hbh),
 				hbhlen, rtalertp, plenp) < 0)
-		return(-1);
+		return (-1);
 
 	*offp = off;
 	*mp = m;
-	return(0);
+	return (0);
 }
 
 /*
@@ -1467,14 +1467,14 @@ ip6_unknown_opt(optp, m, off)
 
 	switch (IP6OPT_TYPE(*optp)) {
 	case IP6OPT_TYPE_SKIP: /* ignore the option */
-		return((int)*(optp + 1));
+		return ((int)*(optp + 1));
 	case IP6OPT_TYPE_DISCARD:	/* silently discard */
 		m_freem(m);
-		return(-1);
+		return (-1);
 	case IP6OPT_TYPE_FORCEICMP: /* send ICMP even if multicasted */
 		ip6stat.ip6s_badoptions++;
 		icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_OPTION, off);
-		return(-1);
+		return (-1);
 	case IP6OPT_TYPE_ICMP: /* send ICMP if not multicasted */
 		ip6stat.ip6s_badoptions++;
 		ip6 = mtod(m, struct ip6_hdr *);
@@ -1484,11 +1484,11 @@ ip6_unknown_opt(optp, m, off)
 		else
 			icmp6_error(m, ICMP6_PARAM_PROB,
 				    ICMP6_PARAMPROB_OPTION, off);
-		return(-1);
+		return (-1);
 	}
 
 	m_freem(m);		/* XXX: NOTREACHED */
-	return(-1);
+	return (-1);
 }
 
 /*
@@ -1943,7 +1943,7 @@ ip6_get_prevhdr(m, off)
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 
 	if (off == sizeof(struct ip6_hdr))
-		return(&ip6->ip6_nxt);
+		return (&ip6->ip6_nxt);
 	else {
 		int len, nxt;
 		struct ip6_ext *ip6e = NULL;
@@ -1967,7 +1967,7 @@ ip6_get_prevhdr(m, off)
 			nxt = ip6e->ip6e_nxt;
 		}
 		if (ip6e)
-			return(&ip6e->ip6e_nxt);
+			return (&ip6e->ip6e_nxt);
 		else
 			return NULL;
 	}
@@ -2319,18 +2319,18 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		if (ip6_temp_preferred_lifetime <
 		    ip6_desync_factor + ip6_temp_regen_advance) {
 			ip6_temp_preferred_lifetime = old;
-			return(EINVAL);
+			return (EINVAL);
 		}
-		return(error);
+		return (error);
 	case IPV6CTL_TEMPVLTIME:
 		old = ip6_temp_valid_lifetime;
 		error = sysctl_int(oldp, oldlenp, newp, newlen,
 		    &ip6_temp_valid_lifetime);
 		if (ip6_temp_valid_lifetime < ip6_temp_preferred_lifetime) {
 			ip6_temp_valid_lifetime = old;
-			return(EINVAL);
+			return (EINVAL);
 		}
-		return(error);
+		return (error);
 	case IPV6CTL_AUTO_LINKLOCAL:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 		    &ip6_auto_linklocal);
@@ -2380,17 +2380,17 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		if (ip6_temp_preferred_lifetime <
 		    ip6_desync_factor + ip6_temp_regen_advance) {
 			ip6_temp_preferred_lifetime = *(int *)oldp;
-			return(EINVAL);
+			return (EINVAL);
 		}
-		return(error);
+		return (error);
 	case IPV6CTL_TEMPVLTIME:
 		error = sysctl_int_arr(ip6_sysvars, name, namelen,
 		    oldp, oldlenp, newp, newlen);
 		if (ip6_temp_valid_lifetime < ip6_temp_preferred_lifetime) {
 			ip6_temp_valid_lifetime = *(int *)oldp;
-			return(EINVAL);
+			return (EINVAL);
 		}
-		return(error);
+		return (error);
 #if _BSDI_VERSION < 199802
 	case IPV6CTL_V6ONLY:
 		/* bsdi3: the variable is readonly */

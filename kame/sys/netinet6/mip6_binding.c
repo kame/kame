@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.131 2002/09/08 03:52:39 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.132 2002/09/11 02:34:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2778,7 +2778,7 @@ mip6_tunnel_output(mp, mbc)
 	}
 	if (ip6_setpktaddrs(m, encap_src, encap_dst) == NULL) {
 		m_freem(m);
-		return(error);
+		return (error);
 	}
 #if defined(IPV6_MINMTU) && 0
 	/*
@@ -2786,9 +2786,9 @@ mip6_tunnel_output(mp, mbc)
 	 * it is too painful to ask for resend of inner packet, to achieve
 	 * path MTU discovery for encapsulated packets.
 	 */
-	return(ip6_output(m, 0, 0, IPV6_MINMTU, 0, NULL));
+	return (ip6_output(m, 0, 0, IPV6_MINMTU, 0, NULL));
 #else
-	return(ip6_output(m, 0, 0, 0, 0, NULL));
+	return (ip6_output(m, 0, 0, 0, 0, NULL));
 #endif
 }
 

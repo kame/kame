@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.169 2002/09/01 05:38:42 keiichi Exp $	*/
+/*	$KAME: ipsec.c,v 1.170 2002/09/11 02:34:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1175,7 +1175,7 @@ ipsec6_setspidx_ipaddr(m, spidx)
 		/* this should be a bug.  we intentionally bark here. */
 		log(LOG_ERR, "ipsec6_setspidx_ipaddr: "
 		    "packet does not have addresses\n");
-		return(EIO);	/* XXX: should not happen */
+		return (EIO);	/* XXX: should not happen */
 	}
 
 	*(struct sockaddr_in6 *)&spidx->src = *src_sa;
@@ -3884,10 +3884,10 @@ ipsec_copypkt(m)
 		mpp = &n->m_next;
 	}
 
-	return(m);
+	return (m);
   fail:
 	m_freem(m);
-	return(NULL);
+	return (NULL);
 }
 
 static struct mbuf *
@@ -4262,39 +4262,39 @@ ipsec_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	switch (name[0]) {
 	case IPSECCTL_STATS:
 		return sysctl_struct(oldp, oldlenp, newp, newlen,
-				     &ipsecstat, sizeof(ipsecstat));
+		    &ipsecstat, sizeof(ipsecstat));
 	case IPSECCTL_DEF_POLICY:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip4_def_policy->policy);
+		    &ip4_def_policy->policy);
 	case IPSECCTL_DEF_ESP_TRANSLEV:
 		if (newp != NULL)
 			ipsec_invalpcbcacheall();
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip4_esp_trans_deflev);
+		    &ip4_esp_trans_deflev);
 	case IPSECCTL_DEF_ESP_NETLEV:
 		if (newp != NULL)
 			ipsec_invalpcbcacheall();
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip4_esp_net_deflev);
+		    &ip4_esp_net_deflev);
 	case IPSECCTL_DEF_AH_TRANSLEV:
 		if (newp != NULL)
 			ipsec_invalpcbcacheall();
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip4_ah_trans_deflev);
+		    &ip4_ah_trans_deflev);
 	case IPSECCTL_DEF_AH_NETLEV:
 		if (newp != NULL)
 			ipsec_invalpcbcacheall();
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip4_ah_net_deflev);
+		    &ip4_ah_net_deflev);
 	case IPSECCTL_AH_CLEARTOS:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip4_ah_cleartos);
+		    &ip4_ah_cleartos);
 	case IPSECCTL_AH_OFFSETMASK:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip4_ah_offsetmask);
+		    &ip4_ah_offsetmask);
 	case IPSECCTL_DFBIT:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip4_ipsec_dfbit);
+		    &ip4_ipsec_dfbit);
 	case IPSECCTL_ECN:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &ip4_ipsec_ecn);
 	case IPSECCTL_DEBUG:
@@ -4367,30 +4367,30 @@ ipsec6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	switch (name[0]) {
 	case IPSECCTL_STATS:
 		return sysctl_struct(oldp, oldlenp, newp, newlen,
-				     &ipsec6stat, sizeof(ipsec6stat));
+		    &ipsec6stat, sizeof(ipsec6stat));
 	case IPSECCTL_DEF_POLICY:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip6_def_policy->policy);
+		    &ip6_def_policy->policy);
 	case IPSECCTL_DEF_ESP_TRANSLEV:
 		if (newp != NULL)
 			ipsec_invalpcbcacheall();
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip6_esp_trans_deflev);
+		    &ip6_esp_trans_deflev);
 	case IPSECCTL_DEF_ESP_NETLEV:
 		if (newp != NULL)
 			ipsec_invalpcbcacheall();
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip6_esp_net_deflev);
+		    &ip6_esp_net_deflev);
 	case IPSECCTL_DEF_AH_TRANSLEV:
 		if (newp != NULL)
 			ipsec_invalpcbcacheall();
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip6_ah_trans_deflev);
+		    &ip6_ah_trans_deflev);
 	case IPSECCTL_DEF_AH_NETLEV:
 		if (newp != NULL)
 			ipsec_invalpcbcacheall();
 		return sysctl_int(oldp, oldlenp, newp, newlen,
-				  &ip6_ah_net_deflev);
+		    &ip6_ah_net_deflev);
 	case IPSECCTL_ECN:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &ip6_ipsec_ecn);
 	case IPSECCTL_DEBUG:

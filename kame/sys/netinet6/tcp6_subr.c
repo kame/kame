@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.44 2002/06/09 14:44:03 itojun Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.45 2002/09/11 02:34:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -251,7 +251,7 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 	if (m == 0) {
 		m = m_gethdr(M_DONTWAIT, MT_HEADER);
 		if (m == NULL)
-			return(ENOBUFS);
+			return (ENOBUFS);
 #ifdef TCP6_COMPAT_42
 		tlen = 1;
 #else
@@ -269,7 +269,7 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 	} else {
 		if (ip6_getpktaddrs(m, &src6, &dst6)) {
 			m_freem(m); /* XXX: should not happen */
-			return(EINVAL);	/* XXX */
+			return (EINVAL);	/* XXX */
 		}
 		m_freem(m->m_next);
 		m->m_next = 0;
@@ -336,7 +336,7 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 		m_freem(m);
 		return ENOBUFS;
 	}
-	return(ip6_output(m, NULL, ro, ip6oflags, NULL, NULL));
+	return (ip6_output(m, NULL, ro, ip6oflags, NULL, NULL));
 }
 
 /*

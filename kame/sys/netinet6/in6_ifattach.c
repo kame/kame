@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.171 2002/09/10 11:14:49 suz Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.172 2002/09/11 02:34:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -618,12 +618,12 @@ in6_ifattach_linklocal(ifp, altifp)
 		if (get_ifid(ifp, altifp, &ifra.ifra_addr.sin6_addr) != 0) {
 			nd6log((LOG_ERR,
 			    "%s: no ifid available\n", if_name(ifp)));
-			return(-1);
+			return (-1);
 		}
 	}
 	if (in6_addr2zoneid(ifp, &ifra.ifra_addr.sin6_addr,
 			    &ifra.ifra_addr.sin6_scope_id)) {
-		return(-1);
+		return (-1);
 	}
 	in6_embedscope(&ifra.ifra_addr.sin6_addr, &ifra.ifra_addr); /* XXX */
 #ifndef SCOPEDROUTING
@@ -666,7 +666,7 @@ in6_ifattach_linklocal(ifp, altifp)
 			    "configure a link-local address on %s "
 			    "(errno=%d)\n",
 			    if_name(ifp), error));
-		return(-1);
+		return (-1);
 	}
 
 	/*
@@ -721,7 +721,7 @@ in6_ifattach_linklocal(ifp, altifp)
 	 */
 	if (nd6_prefix_lookup(&pr0) == NULL) {
 		if ((error = nd6_prelist_add(&pr0, NULL, NULL)) != 0)
-			return(error);
+			return (error);
 	}
 
 	return 0;
@@ -773,7 +773,7 @@ in6_ifattach_loopback(ifp)
 		nd6log((LOG_ERR, "in6_ifattach_loopback: failed to configure "
 		    "the loopback address on %s (errno=%d)\n",
 		    if_name(ifp), error));
-		return(-1);
+		return (-1);
 	}
 
 	return 0;
@@ -1161,10 +1161,10 @@ in6_get_tmpifid(ifp, retbuf, baseid, generate)
 	bcopy(ndi->randomid, retbuf, 8);
 	if (generate && bcmp(retbuf, nullbuf, sizeof(nullbuf)) == 0) {
 		/* generate_tmp_ifid could not found a good ID. */
-		return(-1);
+		return (-1);
 	}
 
-	return(0);
+	return (0);
 }
 
 void

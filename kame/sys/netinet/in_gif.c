@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.87 2002/07/14 21:07:44 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.88 2002/09/11 02:34:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -372,7 +372,7 @@ in_gif_output(ifp, family, m)
 	}
 
 	error = ip_output(m, NULL, &sc->gif_ro, 0, NULL);
-	return(error);
+	return (error);
 #endif /* OpenBSD */
 }
 

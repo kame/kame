@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.c,v 1.7 2002/07/30 04:12:34 itojun Exp $	*/
+/*	$KAME: sctp_indata.c,v 1.8 2002/09/11 02:34:15 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_indata.c,v 1.124 2002/04/04 18:48:39 randall Exp	*/
 
 /*
@@ -176,7 +176,7 @@ sctp_build_ctl(struct sctp_tcb *stcb,
 	MGET(ret,M_DONTWAIT,MT_CONTROL);
 	if (ret == NULL)
 		/* No space */
-		return(ret);
+		return (ret);
 
 	/* We need a CMSG header followed by the struct  */
 	cmh = mtod(ret,struct cmsghdr *);
@@ -197,7 +197,7 @@ sctp_build_ctl(struct sctp_tcb *stcb,
 	outinfo->sinfo_assoc_id = (caddr_t)stcb;
 	outinfo->sinfo_tsn = chk->rec.data.TSN_seq;
 	ret->m_len = cmh->cmsg_len;
-	return(ret);
+	return (ret);
 }
 
 #ifndef __FreeBSD__
@@ -279,7 +279,7 @@ sctp_deliver_data(struct sctp_tcb *stcb,
 			}
 			sctppcbinfo.ipi_gencnt_chunk++;
 		}
-		return(0);
+		return (0);
 	}
 	if (chk != NULL) {
 		TAILQ_INSERT_TAIL(&asoc->delivery_queue,chk,sctp_next);
@@ -295,7 +295,7 @@ sctp_deliver_data(struct sctp_tcb *stcb,
 			printf("Fragmented delivery in progress?\n");
 		}
 #endif
-		return(0);
+		return (0);
 	}
 	/* Now grab the first one  */
 	chk = TAILQ_FIRST(&asoc->delivery_queue);
@@ -308,7 +308,7 @@ sctp_deliver_data(struct sctp_tcb *stcb,
 #endif
 		asoc->size_on_delivery_queue = 0;
 		asoc->cnt_on_delivery_queue = 0;
-		return(0);
+		return (0);
 	}
 
 	if ((!stcb->on_toqueue) &&
@@ -325,7 +325,7 @@ sctp_deliver_data(struct sctp_tcb *stcb,
 	}
 	if (stcb->sctp_socket->so_rcv.sb_cc >= stcb->sctp_socket->so_rcv.sb_hiwat) {
 		/* Boy, there really is NO room */
-		return(0);
+		return (0);
 	}
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_INDATA1) {
@@ -339,7 +339,7 @@ sctp_deliver_data(struct sctp_tcb *stcb,
 			MGETHDR(m, M_DONTWAIT, MT_DATA);
 			if (m == NULL) {
 				/* no room! */
-				return(0);
+				return (0);
 			}
 			m->m_pkthdr.len = chk->send_size;
 			m->m_len = 0;
@@ -386,7 +386,7 @@ sctp_deliver_data(struct sctp_tcb *stcb,
 			 * hold the control. We will just
 			 * queue this chunk for later consumption.
 			 */
-			return(0);
+			return (0);
 		}
 		to = (struct sockaddr *)&chk->whoTo->ra._l_addr;
 		if ((stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_NEEDS_MAPPED_V4) &&
@@ -451,7 +451,7 @@ sctp_deliver_data(struct sctp_tcb *stcb,
 		}
 		sctppcbinfo.ipi_gencnt_chunk++;
 	}
-	return(free_it);
+	return (free_it);
 }
 
 
@@ -901,25 +901,25 @@ sctp_is_all_msg_on_reasm(struct sctp_association *asoc,
 	chk = TAILQ_FIRST(&asoc->reasmqueue);
 	if (chk == NULL) {
 		/* nothing on the queue */
-		return(0);
+		return (0);
 	}
 	if ((chk->rec.data.rcv_flags & SCTP_DATA_FIRST_FRAG) == 0) {
 		/* Not a first on the queue */
-		return(0);
+		return (0);
 	}
 	tsn = chk->rec.data.TSN_seq;
 	while (chk) {
 		if (tsn != chk->rec.data.TSN_seq) {
-			return(0);
+			return (0);
 		}
 		*t_size += chk->send_size;
 		if (chk->rec.data.rcv_flags & SCTP_DATA_LAST_FRAG) {
-			return(1);
+			return (1);
 		}
 		tsn++;
 		chk = TAILQ_NEXT(chk,sctp_next);
 	}
-	return(0);
+	return (0);
 }
 
 
@@ -1278,17 +1278,17 @@ sctp_does_chk_belong_to_reasm(struct sctp_association *asoc,
 					 * that is NOT last, it should be a middle/last,
 					 * not a complete chunk.
 					 */
-					return(1);
+					return (1);
 				} else {
 					/* This guy is ok since its a LAST and the new
 					 * chunk is a fully self-contained one.
 					 */
-					return(0);
+					return (0);
 				}
 			}
 		} else if (chk->rec.data.TSN_seq == at->rec.data.TSN_seq) {
 			/* Software error since I have a dup? */
-			return(1);
+			return (1);
 		} else {
 			/* Ok, 'at' is larger than new chunk but does it
 			 * need to be right before it.
@@ -1297,14 +1297,14 @@ sctp_does_chk_belong_to_reasm(struct sctp_association *asoc,
 			if (tsn_est == at->rec.data.TSN_seq) {
 				/* Yep, It better be a first */
 				if ((at->rec.data.rcv_flags&SCTP_DATA_FRAG_MASK) != SCTP_DATA_FIRST_FRAG) {
-					return(1);
+					return (1);
 				} else {
-					return(0);
+					return (0);
 				}
 			}
 		}
 	}
-	return(0);
+	return (0);
 }
 static int
 sctp_process_a_data_chunk(struct sctp_tcb *stcb,
@@ -1334,7 +1334,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 			asoc->dup_tsns[asoc->numduptsns] = tsn;
 			asoc->numduptsns++;
 		}
-		return(0);
+		return (0);
 	}
 	/* Calculate the number of TSN's between the base and this TSN */
 	if (tsn >= asoc->mapping_array_base_tsn) {
@@ -1344,7 +1344,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 	}
 	if (gap > (SCTP_MAPPING_ARRAY << 3)) {
 		/* Can't hold the bit in the mapping array toss it */
-		return(0);
+		return (0);
 	}
 	if (compare_with_wrap(tsn,*high_tsn,MAX_TSN)) {
 		*high_tsn = tsn;
@@ -1366,7 +1366,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 					 stcb->sctp_ep,
 					 stcb,NULL);
 		}
-		return(0);
+		return (0);
 	}
 	/* Now before going further we see
 	 * if there is room. If NOT then
@@ -1398,7 +1398,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 			}
 			sctp_pegs[SCTP_RWND_DROPS]++;
 			*break_flag = 1;
-			return(0);
+			return (0);
 		}
 	} else if (asoc->my_rwnd <= 0) {
 #ifdef SCTP_DEBUG
@@ -1412,7 +1412,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 		sctp_sorwakeup(stcb->sctp_ep,stcb->sctp_socket);
 		*break_flag = 1;
 		sctp_pegs[SCTP_RWND_DROPS]++;
-		return(0);
+		return (0);
 	}
 	if (ntohs(ch->dp.stream_id) >= asoc->streamincnt) {
 		struct sctp_paramhdr *phdr;
@@ -1439,7 +1439,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 			sctp_queue_op_err(stcb,mb);
 		}
 		sctp_pegs[SCTP_BAD_STRMNO]++;
-		return(0);
+		return (0);
 	}
 	/* Before we continue lets validate that we are not
 	 * being fooled by an evil attacker. We can only
@@ -1473,7 +1473,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 					  (struct mbuf *)NULL);
 		sctp_pegs[SCTP_BAD_SSN_WRAP]++;
 		*abort_flag = 1;
-		return(0);
+		return (0);
 	}
 	/* If we reach here this is a new chunk */
 #if defined(__FreeBSD__)
@@ -1486,7 +1486,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 	if (chk == NULL) {
 		/* No memory so we drop the chunk */
 		sctp_pegs[SCTP_DROP_NOMEMORY]++;
-		return(0);
+		return (0);
 	}
 	sctppcbinfo.ipi_count_chunk++;
 	sctppcbinfo.ipi_gencnt_chunk++;
@@ -1520,7 +1520,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 		}
 		sctppcbinfo.ipi_gencnt_chunk++;
 		sctp_pegs[SCTP_DROP_NOMEMORY]++;
-		return(0);
+		return (0);
 	}
 	/* Mark it as received */
 	/* Now queue it where it belongs */
@@ -1569,7 +1569,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 								  (struct mbuf *)NULL);
 					*abort_flag = 1;
 					sctp_pegs[SCTP_DROP_FRAG]++;
-					return(0);
+					return (0);
 				} else {
 					if (sctp_does_chk_belong_to_reasm(asoc,chk)) {
 						sctp_abort_an_association(stcb->sctp_ep,
@@ -1577,7 +1577,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 									  (struct mbuf *)NULL);
 						*abort_flag = 1;
 						sctp_pegs[SCTP_DROP_FRAG]++;
-						return(0);
+						return (0);
 					}
 				}
 			} else {
@@ -1593,7 +1593,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 									  (struct mbuf *)NULL);
 						*abort_flag = 1;
 						sctp_pegs[SCTP_DROP_FRAG]++;
-						return(0);
+						return (0);
 					}
 				}
 			}
@@ -1609,7 +1609,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 			sctp_queue_data_for_reasm(stcb,asoc,chk,abort_flag);
 			if (*abort_flag) {
 				sctp_pegs[SCTP_DROP_FRAG]++;
-				return(0);
+				return (0);
 			}
 		}
 	}
@@ -1621,7 +1621,7 @@ sctp_process_a_data_chunk(struct sctp_tcb *stcb,
 	sctp_pegs[SCTP_PEG_TSNS_RCVD]++;
 	/* Set it present please */
 	SCTP_SET_TSN_PRESENT(asoc->mapping_array,gap);
-	return(1);
+	return (1);
 }
 
 
@@ -1849,7 +1849,7 @@ sctp_process_data(struct mbuf *m,
 			 * data chunk.
 			 */
 			sctp_abort_association(inp,stcb,m,iphlen,NULL);
-			return(1);
+			return (1);
 		}
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_INPUT1) {
@@ -1870,7 +1870,7 @@ sctp_process_data(struct mbuf *m,
 #endif
 		}
 		if (abort_flag)
-			return(1);
+			return (1);
 
 		if (break_flag)
 			/* Set because of out of rwnd space, no more data please */
@@ -1913,7 +1913,7 @@ sctp_process_data(struct mbuf *m,
 	}
 	/* Start a sack timer or QUEUE a SACK for sending */
 	sctp_sack_check(stcb,1);
-	return(0);
+	return (0);
 }
 
 static void
@@ -2942,7 +2942,7 @@ sctp_kick_unrel_reorder_queue(struct sctp_tcb *stcb,
 			strmin->next_spoke.tqe_prev = NULL;
 		}
 	}
-	return(ret);
+	return (ret);
 }
 #endif
 

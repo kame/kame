@@ -1,4 +1,4 @@
-/*	$KAME: sctp_crc32.c,v 1.4 2002/07/30 04:12:34 itojun Exp $	*/
+/*	$KAME: sctp_crc32.c,v 1.5 2002/09/11 02:34:15 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_crc32.c,v 1.12 2002/04/02 15:34:44 lei Exp	*/
 
 /*
@@ -137,7 +137,7 @@ update_crc32(u_int32_t crc32,
 	for (i = 0; i < length; i++) {
 		SCTP_CRC32C(crc32, buffer[i]);
 	}
-	return(crc32);
+	return (crc32);
 }
 
 u_int32_t
@@ -172,7 +172,7 @@ sctp_csum_finalize(u_int32_t crc32)
 	 */
 	crc32 = result;
 #endif
-	return(crc32);
+	return (crc32);
 }
 
 #endif

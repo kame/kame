@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.8 2002/07/30 04:12:35 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.9 2002/09/11 02:34:16 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.c,v 1.153 2002/04/04 16:59:01 randall Exp	*/
 
 /*
@@ -182,7 +182,7 @@ find_next_best_mtu(int totsz)
 			break;
 		}
 	}
-	return(sctp_mtu_sizes[perfer]);
+	return (sctp_mtu_sizes[perfer]);
 }
 
 void
@@ -214,7 +214,7 @@ u_int32_t sctp_select_initial_TSN(struct sctp_pcb *m)
 		u_int32_t ret;
 		ret = m->initial_sequence_debug;
 		m->initial_sequence_debug++;
-		return(ret);
+		return (ret);
 	}
 	if ((m->store_at+sizeof(u_long)) > SCTP_SIGNATURE_SIZE) {
 		/* Refill the random store */
@@ -224,7 +224,7 @@ u_int32_t sctp_select_initial_TSN(struct sctp_pcb *m)
 	xp = (u_long *)p;
 	x = *xp;
 	m->store_at += sizeof(u_long);
-	return(x);
+	return (x);
 }
 
 u_int32_t sctp_select_a_tag(struct sctp_inpcb *m)
@@ -240,7 +240,7 @@ u_int32_t sctp_select_a_tag(struct sctp_inpcb *m)
 			not_done = 0;
 		}
 	}
-	return(x);
+	return (x);
 }
 
 
@@ -518,7 +518,7 @@ sctp_timer_start(int t_type,
 	struct sctp_timer *tmr;
 
 	if (ep == NULL)
-		return(EFAULT);
+		return (EFAULT);
 
 	to_ticks = 0;
 
@@ -529,7 +529,7 @@ sctp_timer_start(int t_type,
 		{
 			int rto_val;
 			if ((tcb == NULL) || (net == NULL)) {
-				return(EFAULT);
+				return (EFAULT);
 			}
 			tmr = &net->rxt_timer;
 			if (net->RTO == 0) {
@@ -546,7 +546,7 @@ sctp_timer_start(int t_type,
 		 * usually about 1 minute.
 		 */
 		if ((tcb == NULL) || (net == NULL)) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		tmr = &net->rxt_timer;
 		if (net->RTO == 0) {
@@ -561,7 +561,7 @@ sctp_timer_start(int t_type,
 		 * ususually about 200ms.
 		 */
 		if (tcb == NULL) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		tmr = &tcb->asoc.dack_timer;
 		to_ticks = ep->sctp_ep.sctp_timeoutticks[SCTP_TIMER_RECV];
@@ -569,7 +569,7 @@ sctp_timer_start(int t_type,
 	case SCTP_TIMER_TYPE_SHUTDOWN:
 		/* Here we use the RTO of the destination. */
 		if ((tcb == NULL) || (net == NULL)) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		if (net->RTO == 0) {
 			to_ticks = (tcb->asoc.initial_rto * hz)/1000;
@@ -585,7 +585,7 @@ sctp_timer_start(int t_type,
 		 * HB timer PLUS a random jitter.
 		 */
 		if (tcb == NULL) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		{
 			u_int rndval;
@@ -632,7 +632,7 @@ sctp_timer_start(int t_type,
 		 * be using the RTO initial value.
 		 */
 		if ((tcb == NULL) || (net == NULL)) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		if (net->RTO == 0) {
 			to_ticks = (tcb->asoc.initial_rto * hz)/1000;
@@ -655,7 +655,7 @@ sctp_timer_start(int t_type,
 		 * ususually about 10 minutes.
 		 */
 		if (tcb == NULL) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		to_ticks = ep->sctp_ep.sctp_timeoutticks[SCTP_TIMER_PMTU];
 		tmr = &tcb->asoc.pmtu;
@@ -663,7 +663,7 @@ sctp_timer_start(int t_type,
 	case SCTP_TIMER_TYPE_SHUTDOWNACK:
 		/* Here we use the RTO of the destination */
 		if ((tcb == NULL) || (net == NULL)) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		if (net->RTO == 0) {
 			to_ticks = (tcb->asoc.initial_rto * hz)/1000;
@@ -678,7 +678,7 @@ sctp_timer_start(int t_type,
 		 * usually about 3 minutes.
 		 */
 		if (tcb == NULL) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		to_ticks = ep->sctp_ep.sctp_timeoutticks[SCTP_TIMER_MAXSHUTDOWN];
 		tmr = &tcb->asoc.shut_guard_timer;
@@ -689,7 +689,7 @@ sctp_timer_start(int t_type,
 		 * but its value is from the RTO.
 		 */
 		if ((tcb == NULL) && (net == NULL)) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		if (net->RTO == 0) {
 			to_ticks = (tcb->asoc.initial_rto * hz)/1000;
@@ -700,11 +700,11 @@ sctp_timer_start(int t_type,
 		break;
 	case SCTP_TIMER_TYPE_AUTOCLOSE:
 		if (tcb == NULL) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		if (tcb->asoc.sctp_autoclose_ticks == 0) {
 			/* Really an error since tcb is NOT set to autoclose */
-			return(0);
+			return (0);
 		}
 		to_ticks = tcb->asoc.sctp_autoclose_ticks;
 		tmr = &tcb->asoc.autoclose_timer;
@@ -716,7 +716,7 @@ sctp_timer_start(int t_type,
 			       t_type);
 		}
 #endif /* SCTP_DEBUG */
-		return(EFAULT);
+		return (EFAULT);
 		break;
 	};
 	if (callout_pending(&tmr->timer)) {
@@ -724,7 +724,7 @@ sctp_timer_start(int t_type,
 		 * we do NOT allow you to have it already running.
 		 * if it is we leave the current one up unchanged
 		 */
-		return(EALREADY);
+		return (EALREADY);
 	}
 	if ((to_ticks <= 0) || (tmr == NULL)) {
 #ifdef SCTP_DEBUG
@@ -733,7 +733,7 @@ sctp_timer_start(int t_type,
 			       t_type,to_ticks, (u_int)tmr);
 		}
 #endif /* SCTP_DEBUG */
-		return(EFAULT);
+		return (EFAULT);
 	}
 	/* At this point we can proceed */
 	tmr->type = t_type;
@@ -741,7 +741,7 @@ sctp_timer_start(int t_type,
 	tmr->tcb = (void *)tcb;
 	tmr->net = (void *)net;
 	callout_reset(&tmr->timer, to_ticks, sctp_timeout_handler, tmr);
-	return(0);
+	return (0);
 }
 
 int
@@ -753,43 +753,43 @@ sctp_timer_stop(int t_type,
 	struct sctp_timer *tmr;
 
 	if (ep == NULL)
-		return(EFAULT);
+		return (EFAULT);
 
 	tmr = NULL;
 	switch (t_type) {
 	case SCTP_TIMER_TYPE_SEND:
 		if ((tcb == NULL) || (net == NULL)) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		tmr = &net->rxt_timer;
 		break;
 	case SCTP_TIMER_TYPE_INIT:
 		if ((tcb == NULL) || (net == NULL)) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		tmr = &net->rxt_timer;
 		break;
 	case SCTP_TIMER_TYPE_RECV:
 		if (tcb == NULL) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		tmr = &tcb->asoc.dack_timer;
 		break;
 	case SCTP_TIMER_TYPE_SHUTDOWN:
 		if ((tcb == NULL) || (net == NULL)) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		tmr = &net->rxt_timer;
 		break;
 	case SCTP_TIMER_TYPE_HEARTBEAT:
 		if (tcb == NULL) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		tmr = &tcb->asoc.hb_timer;
 		break;
 	case SCTP_TIMER_TYPE_COOKIE:
 		if ((tcb == NULL) || (net == NULL)) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		tmr = &net->rxt_timer;
 		break;
@@ -799,31 +799,31 @@ sctp_timer_stop(int t_type,
 		break;
 	case SCTP_TIMER_TYPE_PATHMTURAISE:
 		if (tcb == NULL) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		tmr = &tcb->asoc.pmtu;
 		break;
 	case SCTP_TIMER_TYPE_SHUTDOWNACK:
 		if ((tcb == NULL) || (net == NULL)) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		tmr = &net->rxt_timer;
 		break;
 	case SCTP_TIMER_TYPE_SHUTDOWNGUARD:
 		if (tcb == NULL) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		tmr = &tcb->asoc.shut_guard_timer;
 		break;
 	case SCTP_TIMER_TYPE_ASCONF:
 		if (tcb == NULL) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		tmr = &tcb->asoc.asconf_timer;
 		break;
 	case SCTP_TIMER_TYPE_AUTOCLOSE:
 		if (tcb == NULL) {
-			return(EFAULT);
+			return (EFAULT);
 		}
 		tmr = &tcb->asoc.autoclose_timer;
 		break;
@@ -843,13 +843,13 @@ sctp_timer_stop(int t_type,
 		 * running the timer that the caller wants
 		 * stopped. so just return.
 		 */
-		return(0);
+		return (0);
 	}
 	if (tmr == NULL)
-		return(EFAULT);
+		return (EFAULT);
 
 	callout_stop(&tmr->timer);
-	return(0);
+	return (0);
 }
 
 #ifdef SCTP_USE_ADLER32
@@ -948,7 +948,7 @@ sctp_calculate_sum(m, pktlen, offset)
 	/* CRC-32c */
 	base = sctp_csum_finalize(base);
 #endif
-	return(base);
+	return (base);
 }
 
 void
@@ -1034,14 +1034,14 @@ sctp_calculate_rto(struct sctp_tcb *stcb,
 				     (u_long)old->tv_usec)/1000;
 		} else if ((u_long)now.tv_usec < (u_long)old->tv_usec) {
 			/* impossible .. garbage in nothing out */
-			return(0);
+			return (0);
 		} else {
 			/* impossible .. garbage in nothing out */
-			return(0);
+			return (0);
 		}
 	} else {
 		/* Clock wrapped? */
-		return(0);
+		return (0);
 	}
 
 	/***************************/
@@ -1093,7 +1093,7 @@ sctp_calculate_rto(struct sctp_tcb *stcb,
 		new_rto = stcb->sctp_ep->sctp_ep.sctp_maxrto;
 	}
 	/* we are now returning the RTT Smoothed */
-	return((u_int32_t)new_rto);
+	return ((u_int32_t)new_rto);
 }
 
 
@@ -1111,7 +1111,7 @@ sctp_m_getptr(struct mbuf *m, int off, int len, u_int8_t *in_ptr)
 	u_int8_t *ptr;
 	ptr = in_ptr;
 	if ((off < 0) || (len <= 0))
-		return(NULL);
+		return (NULL);
 
 	/* find the desired start location */
 	while ((m != NULL) && (off > 0)) {
@@ -1121,11 +1121,11 @@ sctp_m_getptr(struct mbuf *m, int off, int len, u_int8_t *in_ptr)
 		m = m->m_next;
 	}
 	if (m == NULL)
-		return(NULL);
+		return (NULL);
 
 	/* is the current mbuf large enough (eg. contiguous)? */
 	if ((m->m_len - off) >= len) {
-		return(mtod(m, caddr_t) + off);
+		return (mtod(m, caddr_t) + off);
 	} else {
 		/* else, it spans more than one mbuf, so save a temp copy... */
 		while ((m != NULL) && (len > 0)) {
@@ -1137,9 +1137,9 @@ sctp_m_getptr(struct mbuf *m, int off, int len, u_int8_t *in_ptr)
 			m = m->m_next;
 		}
 		if ((m == NULL) && (len > 0))
-			return(NULL);
+			return (NULL);
 		else
-			return((caddr_t)in_ptr);
+			return ((caddr_t)in_ptr);
 	}
 }
 
@@ -1151,7 +1151,7 @@ sctp_get_next_param(struct mbuf *m,
 		    int pull_limit)
 {
 	/* This just provides a typed signature to Peter's Pull routine */
-	return((struct sctp_paramhdr *)sctp_m_getptr(m, offset, pull_limit,
+	return ((struct sctp_paramhdr *)sctp_m_getptr(m, offset, pull_limit,
 						     (u_int8_t *)pull));
 }
 
@@ -1166,7 +1166,7 @@ sctp_add_pad_tombuf(struct mbuf *m, int padlen)
 	u_int8_t *dp;
 	int i;
 	if (padlen > 3) {
-		return(ENOBUFS);
+		return (ENOBUFS);
 	}
 	if (M_TRAILINGSPACE(m)) {
 		/*
@@ -1181,7 +1181,7 @@ sctp_add_pad_tombuf(struct mbuf *m, int padlen)
 		MGET(tmp, M_DONTWAIT, MT_DATA);
 		if (tmp == NULL) {
 			/* Out of space GAK! we are in big trouble. */
-			return(ENOSPC);
+			return (ENOSPC);
 		}
 		/* setup and insert in middle */
 		tmp->m_next = m->m_next;
@@ -1194,7 +1194,7 @@ sctp_add_pad_tombuf(struct mbuf *m, int padlen)
 		*dp = 0;
 		dp++;
 	}
-	return(0);
+	return (0);
 }
 
 int
@@ -1205,11 +1205,11 @@ sctp_pad_lastmbuf(struct mbuf *m, int padval)
 	m_at = m;
 	while (m_at) {
 		if (m_at->m_next == NULL) {
-			return(sctp_add_pad_tombuf(m_at, padval));
+			return (sctp_add_pad_tombuf(m_at, padval));
 		}
 		m_at = m_at->m_next;
 	}
-	return(EFAULT);
+	return (EFAULT);
 }
 
 #ifndef __FreeBSD__
@@ -1945,12 +1945,12 @@ sctp_is_there_an_abort_here(struct mbuf *m, int off)
 		/* we seem to be ok, is it an abort? */
 		if (desc.chunk_type == SCTP_ABORT_ASSOCIATION) {
 			/* yep, tell them */
-			return(1);
+			return (1);
 		}
 		/* Nope, move to the next chunk */
 		at += x;
 	}
-	return(0);
+	return (0);
 }
 
 
@@ -1970,17 +1970,17 @@ sctp_is_same_scope(struct sockaddr_in6 *addr1, struct sockaddr_in6 *addr2)
 	if (a.sin6_scope_id == 0)
 		if (in6_recoverscope(&a, &a.sin6_addr, NULL))
 			/* can't get scope, so can't match */
-			return(0);
+			return (0);
 
 	if (b.sin6_scope_id == 0)
 		if (in6_recoverscope(&b, &b.sin6_addr, NULL))
 			/* can't get scope, so can't match */
-			return(0);
+			return (0);
 
 	if (a.sin6_scope_id != b.sin6_scope_id)
-		return(0);
+		return (0);
 
-	return(1);
+	return (1);
 }
 
 /*
@@ -2003,7 +2003,7 @@ sctp_recover_scope(struct sockaddr_in6 *addr, struct sockaddr_in6 *store)
 			}
 		}
 	}
-	return(addr);
+	return (addr);
 }
 
 /*
@@ -2014,11 +2014,11 @@ int
 sctp_cmpaddr(struct sockaddr *sa1, struct sockaddr *sa2) {
 	/* must be valid */
 	if ((sa1 == NULL) || (sa2 == NULL))
-		return(0);
+		return (0);
 
 	/* must be the same family */
 	if (sa1->sa_family != sa2->sa_family)
-		return(0);
+		return (0);
 
 	if (sa1->sa_family == AF_INET6) {
 		/* IPv6 addresses */
@@ -2026,7 +2026,7 @@ sctp_cmpaddr(struct sockaddr *sa1, struct sockaddr *sa2) {
 
 		sin6_1 = (struct sockaddr_in6 *)sa1;
 		sin6_2 = (struct sockaddr_in6 *)sa2;
-		return(memcmp(&sin6_1->sin6_addr, &sin6_2->sin6_addr,
+		return (memcmp(&sin6_1->sin6_addr, &sin6_2->sin6_addr,
 			      sizeof(struct in6_addr)) == 0);
 	} else if (sa1->sa_family == AF_INET) {
 		/* IPv4 addresses */
@@ -2034,10 +2034,10 @@ sctp_cmpaddr(struct sockaddr *sa1, struct sockaddr *sa2) {
 
 		sin_1 = (struct sockaddr_in *)sa1;
 		sin_2 = (struct sockaddr_in *)sa2;
-		return(sin_1->sin_addr.s_addr == sin_2->sin_addr.s_addr);
+		return (sin_1->sin_addr.s_addr == sin_2->sin_addr.s_addr);
 	} else {
 		/* we don't do these... */
-		return(0);
+		return (0);
 	}
 }
 
@@ -2320,14 +2320,14 @@ rtfinalize_route(struct sockaddr *dst, struct rtentry *rt, int s)
 			rt_missmsg(RTM_MISS, &info, 0, err);
 			rt->rt_refcnt++;
 			splx(s);
-			return(rt);
+			return (rt);
 		} else {
 			rt = newrt;
 			if (rt->rt_flags & RTF_XRESOLVE) {
 				info.rti_info[RTAX_DST] = dst;
 				rt_missmsg(RTM_RESOLVE, &info, 0, err);
 				splx(s);
-				return(rt);
+				return (rt);
 			}
 			/* Inform listeners of the new route */
 			info.rti_info[RTAX_DST] = rt_key(rt);
@@ -2339,7 +2339,7 @@ rtfinalize_route(struct sockaddr *dst, struct rtentry *rt, int s)
 		rt->rt_refcnt++;
 	}
 	splx(s);
-	return(rt);
+	return (rt);
 }
 
 static int
@@ -2350,13 +2350,13 @@ sctp_rn_are_keys_same(struct radix_node *exist,
     int len;
     if (exist->rn_key == cmp->rn_key) {
 	/* Mask holds same pointer. Must be same */
-	return(1);
+	return (1);
     }
     if ((exist->rn_key == NULL) || (cmp->rn_key == NULL)) {
 	/*
 	 * One is null (host route) the other is not. Can't be same.
 	 */
-	return(0);
+	return (0);
     }
     e = exist->rn_key;
     c = cmp->rn_key;
@@ -2364,14 +2364,14 @@ sctp_rn_are_keys_same(struct radix_node *exist,
     cplim = e + len;
     while (e < cplim)
 	if (*e++ != *c++)
-	    return(0);
+	    return (0);
     /* so far the keys are the same */
     if (exist->rn_mask != cmp->rn_mask) {
 	/* different masks */
-	return(0);
+	return (0);
     }
     /* They are the same :-) */
-    return(1);
+    return (1);
 }
 
 
@@ -2394,7 +2394,7 @@ sctp_rt_scan_dups(struct sockaddr *dst,struct rtentry *existing,int s)
 	    cmp = cmp->rn_dupedkey;
 	}
     }
-    return(NULL);
+    return (NULL);
 }
 
 /*
@@ -2451,7 +2451,7 @@ sctp_rtalloc_alternate(struct sockaddr *dst,
 	tmp = sctp_rt_scan_dups(dst,
 				(struct rtentry *)&existing->rt_nodes[0],s);
 	if (tmp)
-	    return(tmp);
+	    return (tmp);
 
 	/* We have scanned from existing to the end of the
 	 * dupedkey chain, but it could be that existing
@@ -2473,7 +2473,7 @@ sctp_rtalloc_alternate(struct sockaddr *dst,
 	    tmp2 = sctp_rt_scan_dups(dst,tmp,s);
 	    if (tmp2) {
 		/* found it */
-		return(tmp2);
+		return (tmp2);
 	    } else {
 		/* Move on to next element. 
 		 * If it turns to NULL it won't match existing and
@@ -2553,7 +2553,7 @@ sctp_rtalloc_alternate(struct sockaddr *dst,
 			continue;
 		}
 		/* Ok it is NOT the same so we have a new route */
-		return(rtfinalize_route(dst, tmp, s));
+		return (rtfinalize_route(dst, tmp, s));
 	}
  noexisting:
 #ifdef __FreeBSD__
@@ -2562,7 +2562,7 @@ sctp_rtalloc_alternate(struct sockaddr *dst,
 	tmp = rtalloc1(dst, 1);
 #endif
 	splx(s);
-	return(tmp);
+	return (tmp);
 }
 #endif /* SCTP_ALTERNATE_ROUTE */
 
@@ -2576,12 +2576,12 @@ rtalloc_alternate (struct sockaddr *dst ,struct rtentry *old,
      * order for this to work. Right now this is only supported under
      * netbsd.
      */
-   return(sctp_rtalloc_alternate(dst,old,peer_dest_route));
+   return (sctp_rtalloc_alternate(dst,old,peer_dest_route));
 #else
 #ifdef __FreeBSD__
-    return(rtalloc1(dst, 1, 0UL));
+    return (rtalloc1(dst, 1, 0UL));
 #else
-    return(rtalloc1(dst, 1));
+    return (rtalloc1(dst, 1));
 #endif
 #endif
 }

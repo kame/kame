@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.8 2002/07/30 04:12:35 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.9 2002/09/11 02:34:16 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_timer.c,v 1.60 2002/04/04 17:47:19 randall Exp	*/
 
 /*
@@ -202,7 +202,7 @@ sctp_threshold_management(struct sctp_inpcb *ep,
 #endif
 	}
 	if (tcb == NULL)
-		return(0);
+		return (0);
 	tcb->asoc.overall_error_count++;
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_TIMER4) {
@@ -219,9 +219,9 @@ sctp_threshold_management(struct sctp_inpcb *ep,
 		       tcb->asoc.overall_error_count, threshold);
 		sctp_abort_an_association(ep, tcb, SCTP_FAILED_THRESHOLD,
 					  NULL);
-		return(1);
+		return (1);
 	}
-	return(0);
+	return (0);
 }
 
 struct sctp_nets *
@@ -234,7 +234,7 @@ sctp_find_alternate_net(struct sctp_tcb *tcb,
 
 	if (tcb->asoc.numnets == 1) {
 		/* No others but net */
-		return(TAILQ_FIRST(&tcb->asoc.nets));
+		return (TAILQ_FIRST(&tcb->asoc.nets));
 	}
 	mnet = net;
 	once = 0;
@@ -285,9 +285,9 @@ sctp_find_alternate_net(struct sctp_tcb *tcb,
 		} while (alt != NULL);
 	}
 	if (alt == NULL) {
-		return(net);
+		return (net);
 	}
-	return(alt);
+	return (alt);
 }
 
 static void
@@ -443,9 +443,9 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 	}
 	/* We return 1 if we only have a window probe outstanding */
 	if (win_probes && (non_win_probes == 0))
-		return(1);
+		return (1);
 
-	return(0);
+	return (0);
 }
 
 static void
@@ -830,21 +830,21 @@ sctp_getnext_mtu(struct sctp_inpcb *ep,u_int32_t cur_mtu)
 
 	if (cur_mtu >= ep->sctp_ep.max_mtu) {
 		/* never get bigger than the max of all our interface MTU's */
-		return(ep->sctp_ep.max_mtu);
+		return (ep->sctp_ep.max_mtu);
 	}
 	for (i = 0; i < SCTP_NUMBER_OF_MTU_SIZES; i++) {
 		if (cur_mtu < mtu_sizes[i]) {
 			if (ep->sctp_ep.max_mtu < mtu_sizes[i]) {
 				/* is max_mtu smaller? if so return it */
-				return(ep->sctp_ep.max_mtu);
+				return (ep->sctp_ep.max_mtu);
 			} else {
 				/* no max_mtu is bigger than this one */
-				return(mtu_sizes[i]);
+				return (mtu_sizes[i]);
 			}
 		}
 	}
 	/* here return the highest allowable */
-	return(ep->sctp_ep.max_mtu);
+	return (ep->sctp_ep.max_mtu);
 }
 
 

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.122 2002/08/28 12:13:02 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.123 2002/09/11 02:34:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -232,7 +232,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		/* get the outgoing interface */
 		if ((*errorp = in6_selectif(dstsock, opts, mopts, ro, &ifp))
 		    != 0) {
-			return(NULL);
+			return (NULL);
 		}
 
 		/*
@@ -247,12 +247,12 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 			if (in6_addr2zoneid(ifp, &pi->ipi6_addr,
 					    &srcsock.sin6_scope_id)) {
 				*errorp = EINVAL; /* XXX */
-				return(NULL);
+				return (NULL);
 			}
 		}
 		if ((*errorp = in6_embedscope(&srcsock.sin6_addr, &srcsock))
 		    != 0) {
-			return(NULL);
+			return (NULL);
 		}
 #ifndef SCOPEDROUTING
 		srcsock.sin6_scope_id = 0; /* XXX: ifa_ifwithaddr expects 0 */
@@ -261,19 +261,19 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		if (ia6 == NULL ||
 		    (ia6->ia6_flags & (IN6_IFF_ANYCAST | IN6_IFF_NOTREADY))) {
 			*errorp = EADDRNOTAVAIL;
-			return(NULL);
+			return (NULL);
 		}
 		pi->ipi6_addr = srcsock.sin6_addr; /* XXX: this overrides pi */
 		if (ifpp)
 			*ifpp = ifp;
-		return(&ia6->ia_addr);
+		return (&ia6->ia_addr);
 	}
 
 	/*
 	 * Otherwise, if the socket has already bound the source, just use it.
 	 */
 	if (laddr && !SA6_IS_ADDR_UNSPECIFIED(laddr))
-		return(laddr);
+		return (laddr);
 
 	/*
 	 * If the address is not specified, choose the best one based on
@@ -281,7 +281,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	 */
 	/* get the outgoing interface */
 	if ((*errorp = in6_selectif(dstsock, opts, mopts, ro, &ifp)) != 0)
-		return(NULL);
+		return (NULL);
 
 #ifdef MIP6
 	/*
@@ -316,7 +316,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 #endif
 	if (in6_addr2zoneid(ifp, dst, &odstzone)) { /* impossible */
 		*errorp = EIO;	/* XXX */
-		return(NULL);
+		return (NULL);
 	}
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
 		int new_scope = -1, new_matchlen = -1;
@@ -623,12 +623,12 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 
 	if ((ia = ia_best) == NULL) {
 		*errorp = EADDRNOTAVAIL;
-		return(NULL);
+		return (NULL);
 	}
 
 	if (ifpp)
 		*ifpp = ifp;
-	return(&ia->ia_addr);
+	return (&ia->ia_addr);
 }
 #undef REPLACE
 #undef BREAK
@@ -652,7 +652,7 @@ in6_selectif(dstsock, opts, mopts, ro, retifp)
 	clone = IN6_IS_ADDR_MULTICAST(&dstsock->sin6_addr) ? 0 : 1;
 	if ((error = in6_selectroute(dstsock, opts, mopts, ro, retifp,
 				     &rt, clone)) != 0) {
-		return(error);
+		return (error);
 	}
 
 	/*
@@ -673,7 +673,7 @@ in6_selectif(dstsock, opts, mopts, ro, retifp)
 	 * We thus reject the case here.
 	 */
 	if (rt && (rt->rt_flags & (RTF_REJECT | RTF_BLACKHOLE))) {
-		return(rt->rt_flags & RTF_HOST ? EHOSTUNREACH : ENETUNREACH);
+		return (rt->rt_flags & RTF_HOST ? EHOSTUNREACH : ENETUNREACH);
 	}
 
 	/*
@@ -686,7 +686,7 @@ in6_selectif(dstsock, opts, mopts, ro, retifp)
 	if (rt && rt->rt_ifa && rt->rt_ifa->ifa_ifp)
 		*retifp = rt->rt_ifa->ifa_ifp;
 
-	return(0);
+	return (0);
 }
 
 int
@@ -919,7 +919,7 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 	if (retrt != NULL)
 		*retrt = rt;	/* rt may be NULL */
 
-	return(error);
+	return (error);
 }
 
 /*
@@ -939,11 +939,11 @@ in6_selecthlim(in6p, ifp)
 	struct ifnet *ifp;
 {
 	if (in6p && in6p->in6p_hops >= 0)
-		return(in6p->in6p_hops);
+		return (in6p->in6p_hops);
 	else if (ifp)
-		return(ND_IFINFO(ifp)->chlim);
+		return (ND_IFINFO(ifp)->chlim);
 	else
-		return(ip6_defhlim);
+		return (ip6_defhlim);
 }
 #ifdef HAVE_NRL_INPCB
 #undef in6pcb
@@ -1047,7 +1047,7 @@ in6_pcbsetport(laddr, in6p, p)
 	}
 
 	in6p->in6p_lport = lport;
-	return(0);		/* success */
+	return (0);		/* success */
 }
 #ifdef HAVE_NRL_INPCB
 #undef in6pcb
@@ -1158,7 +1158,7 @@ in6_pcbsetport(laddr, inp, p)
 		return (EAGAIN);
 	}
 
-	return(0);
+	return (0);
 }
 #endif
 
@@ -1180,7 +1180,7 @@ in6_embedscope(in6, sin6)
 	 * XXX: the SCOPEDROUTING code path is NOT expected to work at this
 	 * moment (20011112).  We added this just in case.
 	 */
-	return(0);		/* do nothing */
+	return (0);		/* do nothing */
 #else
 	struct ifnet *ifp;
 	u_int32_t zoneid = sin6->sin6_scope_id;
@@ -1196,14 +1196,14 @@ in6_embedscope(in6, sin6)
 		/* KAME assumption: link id == interface id */
 		if (zoneid) {
 			if (if_index < zoneid)
-				return(ENXIO);  /* XXX EINVAL? */
+				return (ENXIO);  /* XXX EINVAL? */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
 			ifp = ifnet_byindex(zoneid);
 #else
 			ifp = ifindex2ifnet[zoneid];
 #endif
 			if (ifp == NULL) /* XXX: this can happen for some OS */
-				return(ENXIO);
+				return (ENXIO);
 
 			/* XXX assignment to 16bit from 32bit variable */
 			in6->s6_addr16[1] = htons(zoneid & 0xffff);
@@ -1290,7 +1290,7 @@ lookup_addrsel_policy(key)
 	else
 		match->use++;
 
-	return(match);
+	return (match);
 }
 
 /*
@@ -1354,7 +1354,7 @@ in6_src_sysctl(oldp, oldlenp, newp, newlen)
   end:
 	splx(s);
 
-	return(error);
+	return (error);
 }
 #else  /* !FreeBSD */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
@@ -1383,7 +1383,7 @@ in6_src_sysctl SYSCTL_HANDLER_ARGS
 	bzero(&w, sizeof(w));
 	w.w_req = req;
 
-	return(walk_addrsel_policy(dump_addrsel_policyent, &w));
+	return (walk_addrsel_policy(dump_addrsel_policyent, &w));
 }
 #endif /* FreeBSD */
 
@@ -1396,15 +1396,15 @@ in6_src_ioctl(cmd, data)
 	struct in6_addrpolicy ent0;
 
 	if (cmd != SIOCAADDRCTL_POLICY && cmd != SIOCDADDRCTL_POLICY)
-		return(EOPNOTSUPP); /* check for safety */
+		return (EOPNOTSUPP); /* check for safety */
 
 	ent0 = *(struct in6_addrpolicy *)data;
 
 	if (ent0.label == ADDR_LABEL_NOTAPP)
-		return(EINVAL);
+		return (EINVAL);
 	/* check if the prefix mask is consecutive. */
 	if (in6_mask2len(&ent0.addrmask.sin6_addr, NULL) < 0)
-		return(EINVAL);
+		return (EINVAL);
 	/* clear trailing garbages (if any) of the prefix address. */
 	for (i = 0; i < 4; i++) {
 		ent0.addr.sin6_addr.s6_addr32[i] &=
@@ -1414,12 +1414,12 @@ in6_src_ioctl(cmd, data)
 
 	switch (cmd) {
 	case SIOCAADDRCTL_POLICY:
-		return(add_addrsel_policyent(&ent0));
+		return (add_addrsel_policyent(&ent0));
 	case SIOCDADDRCTL_POLICY:
-		return(delete_addrsel_policyent(&ent0));
+		return (delete_addrsel_policyent(&ent0));
 	}
 
-	return(0);		/* XXX: compromise compilers */
+	return (0);		/* XXX: compromise compilers */
 }
 
 /*
@@ -1456,7 +1456,7 @@ add_addrsel_policyent(newpolicy)
 				       &pol->ape_policy.addr) &&
 		    SA6_ARE_ADDR_EQUAL(&newpolicy->addrmask,
 				       &pol->ape_policy.addrmask)) {
-			return(EEXIST);	/* or override it? */
+			return (EEXIST);	/* or override it? */
 		}
 	}
 
@@ -1469,7 +1469,7 @@ add_addrsel_policyent(newpolicy)
 
 	TAILQ_INSERT_TAIL(&addrsel_policytab, new, ape_entry);
 
-	return(0);
+	return (0);
 }
 
 static int
@@ -1488,11 +1488,11 @@ delete_addrsel_policyent(key)
 		}
 	}
 	if (pol == NULL)
-		return(ESRCH);
+		return (ESRCH);
 
 	TAILQ_REMOVE(&addrsel_policytab, pol, ape_entry);
 
-	return(0);
+	return (0);
 }
 
 static int
@@ -1506,10 +1506,10 @@ walk_addrsel_policy(callback, w)
 	for (pol = TAILQ_FIRST(&addrsel_policytab); pol;
 	     pol = TAILQ_NEXT(pol, ape_entry)) {
 		if ((error = (*callback)(&pol->ape_policy, w)) != 0)
-			return(error);
+			return (error);
 	}
 
-	return(error);
+	return (error);
 }
 
 static int
@@ -1525,13 +1525,13 @@ dump_addrsel_policyent(pol, arg)
 #else
 	if (w->w_where && w->w_where + sizeof(*pol) <= w->w_limit) {
 		if ((error = copyout(pol, w->w_where, sizeof(*pol))) != 0)
-			return(error);
+			return (error);
 		w->w_where += sizeof(*pol);
 	}
 	w->w_total += sizeof(*pol);
 #endif
 
-	return(error);
+	return (error);
 }
 
 static struct in6_addrpolicy *
@@ -1577,5 +1577,5 @@ match_addrsel_policy(key)
 		continue;
 	}
 
-	return(bestpol);
+	return (bestpol);
 }

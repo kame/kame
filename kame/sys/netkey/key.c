@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.258 2002/08/23 06:02:47 sakane Exp $	*/
+/*	$KAME: key.c,v 1.259 2002/09/11 02:34:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2611,7 +2611,7 @@ key_newsah(saidx)
 	newsah->state = SADB_SASTATE_MATURE;
 	LIST_INSERT_HEAD(&sahtree, newsah, chain);
 
-	return(newsah);
+	return (newsah);
 }
 
 /*
@@ -3272,7 +3272,7 @@ key_mature(sav)
 		if (sav->alg_enc != SADB_EALG_NONE) {
 			ipseclog((LOG_DEBUG, "key_mature: "
 			    "protocol and algorithm mismated.\n"));
-			return(EINVAL);
+			return (EINVAL);
 		}
 		checkmask = 2;
 		mustmask = 2;
@@ -3281,12 +3281,12 @@ key_mature(sav)
 		if (sav->alg_auth != SADB_AALG_NONE) {
 			ipseclog((LOG_DEBUG, "key_mature: "
 				"protocol and algorithm mismated.\n"));
-			return(EINVAL);
+			return (EINVAL);
 		}
 		if ((sav->flags & SADB_X_EXT_RAWCPI) == 0
 		 && ntohl(sav->spi) >= 0x10000) {
 			ipseclog((LOG_DEBUG, "key_mature: invalid cpi for IPComp.\n"));
-			return(EINVAL);
+			return (EINVAL);
 		}
 		checkmask = 4;
 		mustmask = 4;

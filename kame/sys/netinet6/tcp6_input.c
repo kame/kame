@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.59 2002/09/09 07:53:26 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.60 2002/09/11 02:34:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2033,7 +2033,7 @@ tcp6_maxseg(t6p, maxseg)
 	if (t6p->t_flags & TF_USE_SCALE)
 		maxseg -= TCP6OLEN_TSTAMP_APPA;
 #endif
-	return(tcp6_mss_round(maxseg));
+	return (tcp6_mss_round(maxseg));
 }
 
 static int
@@ -2102,7 +2102,7 @@ tcp6_rtlookup(in6p)
 	ro = &in6p->in6p_route;
 	if ((rt = ro->ro_rt) != 0) {
 		if (rt->rt_flags & RTF_UP)
-			return(rt);
+			return (rt);
 		RTFREE(rt);
 		ro->ro_rt = (struct rtentry *)0;
 	}
@@ -2126,7 +2126,7 @@ tcp6_rtlookup(in6p)
 #endif
 
 	}
-	return(ro->ro_rt);
+	return (ro->ro_rt);
 }
 
 /*
@@ -2695,7 +2695,7 @@ syn_cache_add6(so, m, off, optp, optlen, oi)
 		return (0);
 
 	if (ip6_getpktaddrs(m, &src, &dst))
-		return(0);	/* XXX */
+		return (0);	/* XXX */
 
 	/*
 	 * Initialize some local state.

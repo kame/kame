@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.65 2002/08/30 22:26:56 suz Exp $	*/
+/*	$KAME: udp6_output.c,v 1.66 2002/09/11 02:34:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -206,10 +206,10 @@ udp6_output(in6p, m, addr6, control)
 		fsa6 = mtod(addr6, struct sockaddr_in6 *);
 
 		if (addr6->m_len != sizeof(*fsa6))
-			return(EINVAL);
+			return (EINVAL);
 
 		if (fsa6->sin6_family != AF_INET6)
-			return(EAFNOSUPPORT);
+			return (EAFNOSUPPORT);
 #endif
 
 		/* protect *sin6 from overwrites */
@@ -217,7 +217,7 @@ udp6_output(in6p, m, addr6, control)
 		fsa6 = &tmp;
 
 		if ((error = scope6_check_id(fsa6, ip6_use_defzone)) != 0)
-			return(error);
+			return (error);
 	}
 
 	if (control) {
@@ -550,5 +550,5 @@ releaseopt:
 		in6p->in6p_outputopts = stickyopt;
 		m_freem(control);
 	}
-	return(error);
+	return (error);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.129 2002/07/20 21:11:43 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.130 2002/09/11 02:34:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -291,7 +291,7 @@ rip6_input(mp, offp, proto)
 			if (!ip6_setpktaddrs(m, src, dst)) {
 				m_freem(m);
 				ip6stat.ip6s_delivered--;
-				return(IPPROTO_DONE); /* XXX */
+				return (IPPROTO_DONE); /* XXX */
 			}
 		}
 		last = in6p;
@@ -644,7 +644,7 @@ rip6_output(m, va_alist)
 		in6p->in6p_outputopts = stickyopt;
 		m_freem(control);
 	}
-	return(error);
+	return (error);
 }
 
 /*
@@ -916,7 +916,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 		src_storage.sin6_len = sizeof(src_storage);
 		if ((error = in6_recoverscope(&src_storage, &src->sin6_addr,
 		    NULL)) != 0) {
-			return(error);
+			return (error);
 		}
 		src_storage.sin6_addr = src->sin6_addr;	/* XXX */
 		src = &src_storage;
@@ -1003,7 +1003,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 		/*
 		 * stat: don't bother with a blocksize
 		 */
-		return(0);
+		return (0);
 	/*
 	 * Not supported.
 	 */
@@ -1028,5 +1028,5 @@ rip6_usrreq(so, req, m, nam, control, p)
 	}
 	if (m != NULL)
 		m_freem(m);
-	return(error);
+	return (error);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.77 2002/09/05 08:09:37 suz Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.78 2002/09/11 02:34:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -314,7 +314,7 @@ ip6_mrouter_set(so, sopt)
 	}
 
 	(void)m_freem(m);
-	return(error);
+	return (error);
 }
 #else
 int
@@ -397,10 +397,10 @@ mrt6_ioctl(cmd, data)
 
 	switch (cmd) {
 	case SIOCGETSGCNT_IN6:
-		return(get_sg_cnt((struct sioc_sg_req6 *)data));
+		return (get_sg_cnt((struct sioc_sg_req6 *)data));
 		break;		/* for safety */
 	case SIOCGETMIFCNT_IN6:
-		return(get_mif6_cnt((struct sioc_mif_req6 *)data));
+		return (get_mif6_cnt((struct sioc_mif_req6 *)data));
 		break;		/* for safety */
 	default:
 		return (EINVAL);
@@ -431,7 +431,7 @@ get_sg_cnt(req)
 		req->bytecnt = rt->mf6c_byte_cnt;
 		req->wrong_if = rt->mf6c_wrong_if;
 	} else
-		return(ESRCH);
+		return (ESRCH);
 #if 0
 		req->pktcnt = req->bytecnt = req->wrong_if = 0xffffffff;
 #endif
@@ -1589,7 +1589,7 @@ ip6_mdq(m, ifp, rt)
 	 * members downstream on the interface.
 	 */
 	if (ip6_getpktaddrs(m, &s0, &d0))
-		return(-1);	/* XXX: impossible */
+		return (-1);	/* XXX: impossible */
 	/* make a local copies to reuse */
 	src_sa = *s0;
 	dst_sa = *d0;
@@ -1626,7 +1626,7 @@ ip6_mdq(m, ifp, rt)
 	}
 	/* recover the packet addresses */
 	if (!ip6_setpktaddrs(m, &src_sa, &dst_sa))
-		return(-1);
+		return (-1);
 	return 0;
 }
 
@@ -1841,7 +1841,7 @@ pim6_input(mp, offp, proto)
 			log(LOG_DEBUG,"pim6_input: PIM packet too short\n");
 #endif
 		m_freem(m);
-		return(IPPROTO_DONE);
+		return (IPPROTO_DONE);
 	}
 
 	/*
@@ -1895,7 +1895,7 @@ pim6_input(mp, offp, proto)
 				    "pim6_input: invalid checksum\n");
 #endif
 			m_freem(m);
-			return(IPPROTO_DONE);
+			return (IPPROTO_DONE);
 		}
 	}
 #endif /* PIM_CHECKSUM */
@@ -1909,7 +1909,7 @@ pim6_input(mp, offp, proto)
 		    pim->pim_ver, PIM_VERSION);
 #endif
 		m_freem(m);
-		return(IPPROTO_DONE);
+		return (IPPROTO_DONE);
 	}
 
 	if (pim->pim_type == PIM_REGISTER) {
@@ -1935,7 +1935,7 @@ pim6_input(mp, offp, proto)
 				    reg_mif_num);
 #endif
 			m_freem(m);
-			return(IPPROTO_DONE);
+			return (IPPROTO_DONE);
 		}
 
 		reghdr = (u_int32_t *)(pim + 1);
@@ -1956,7 +1956,7 @@ pim6_input(mp, offp, proto)
 			    pimlen, ip6_sprintf(&ip6->ip6_src));
 #endif
 			m_freem(m);
-			return(IPPROTO_DONE);
+			return (IPPROTO_DONE);
 		}
 
 		eip6 = (struct ip6_hdr *) (reghdr + 1);
@@ -1979,7 +1979,7 @@ pim6_input(mp, offp, proto)
 			    (eip6->ip6_vfc & IPV6_VERSION));
 #endif
 			m_freem(m);
-			return(IPPROTO_NONE);
+			return (IPPROTO_NONE);
 		}
 
 		/* verify the inner packet is destined to a mcast group */
@@ -1993,7 +1993,7 @@ pim6_input(mp, offp, proto)
 				    ip6_sprintf(&eip6->ip6_dst));
 #endif
 			m_freem(m);
-			return(IPPROTO_DONE);
+			return (IPPROTO_DONE);
 		}
 
 		/*
@@ -2007,7 +2007,7 @@ pim6_input(mp, offp, proto)
 			    "could not copy register head\n");
 #endif
 			m_freem(m);
-			return(IPPROTO_DONE);
+			return (IPPROTO_DONE);
 		}
 
 		/*
@@ -2052,7 +2052,7 @@ pim6_input(mp, offp, proto)
 	 */
   pim6_input_to_daemon:
 	rip6_input(&m, offp, proto);
-	return(IPPROTO_DONE);
+	return (IPPROTO_DONE);
 }
 
 /*
@@ -2072,7 +2072,7 @@ m_copy_withpktaddrs(m, off, len)
 		panic("ip6_mloopback: null mbuf aux\n");
 
 	if (ip6_getpktaddrs(m, &src, &dst))
-		return(NULL);	/* XXX: impossible! */
+		return (NULL);	/* XXX: impossible! */
 
 	m->m_pkthdr.aux = NULL;
 	copym = m_copy(m, off, len);
@@ -2083,5 +2083,5 @@ m_copy_withpktaddrs(m, off, len)
 		copym = NULL;
 	}
 
-	return(copym);
+	return (copym);
 }

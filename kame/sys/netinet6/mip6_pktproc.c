@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.47 2002/09/06 10:27:55 suz Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.48 2002/09/11 02:34:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1007,7 +1007,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 					 "%s:%d: can't find CoA interface\n",
 					 __FILE__, __LINE__));
 				m_freem(m);
-				return(EINVAL);	/* XXX */
+				return (EINVAL);	/* XXX */
 			}
 
 			bzero(&daddr, sizeof(daddr));
@@ -1021,7 +1021,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 					 "%s:%d: in6_addr2zoneid failed\n",
 					 __FILE__, __LINE__));
 				m_freem(m);
-				return(EIO);
+				return (EIO);
 			}
 			if ((error = in6_embedscope(&daddr.sin6_addr,
 						    &daddr))) {
@@ -1030,7 +1030,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 					 "%s:%d: in6_embedscope failed\n",
 					 __FILE__, __LINE__));
 				m_freem(m);
-				return(error);
+				return (error);
 			}
 
 			bzero(&taddr, sizeof(taddr));
@@ -1934,7 +1934,7 @@ mip6_cksum(src_sa, dst_sa, plen, nh, mobility)
 	}
 
 	REDUCE;
-	return(~sum & 0xffff);
+	return (~sum & 0xffff);
 }
 #undef ADDCARRY
 #undef REDUCE

@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.31 2002/09/04 06:05:36 k-sugyou Exp $	*/
+/*	$KAME: if_hif.c,v 1.32 2002/09/11 02:34:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -915,7 +915,7 @@ hif_subnet_list_update_withmpfx(sc, data)
 			error = mip6_prefix_list_insert(&mip6_prefix_list,
 							mpfx);
 			if (error) {
-				return(error);
+				return (error);
 			}
 
 			mspfx = mip6_subnet_prefix_create(mpfx);
@@ -1128,7 +1128,7 @@ contiguousfail:
  done:
 
 	m_freem(m);
-	return(0);
+	return (0);
 
 }
 

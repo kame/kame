@@ -128,7 +128,7 @@ in6_pcballoc(so, head)
 
 	MALLOC(in6p, struct in6pcb *, sizeof(*in6p), M_PCB, M_NOWAIT);
 	if (in6p == NULL)
-		return(ENOBUFS);
+		return (ENOBUFS);
 	bzero((caddr_t)in6p, sizeof(*in6p));
 	in6p->in6p_head = head;
 	in6p->in6p_socket = so;
@@ -142,7 +142,7 @@ in6_pcballoc(so, head)
 	       sizeof(struct ip6_recvpktopts), M_IP6OPT, M_NOWAIT);
 	if (in6p->in6p_inputopts == NULL) {
 		FREE(in6p, M_PCB);
-		return(ENOBUFS); /* XXX */
+		return (ENOBUFS); /* XXX */
 	}
 	bzero(in6p->in6p_inputopts, sizeof(struct ip6_recvpktopts));
 #ifdef IPSEC
@@ -168,7 +168,7 @@ in6_pcballoc(so, head)
 	if (ip6_auto_flowlabel)
 		in6p->in6p_flags |= IN6P_AUTOFLOWLABEL;
 	so->so_pcb = (caddr_t)in6p;
-	return(0);
+	return (0);
 }
 
 #ifdef __NetBSD__
@@ -195,7 +195,7 @@ in6_pcbbind(in6p, nam)
 	int error;
 
 	if (in6p->in6p_lport || !SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa))
-		return(EINVAL);
+		return (EINVAL);
 	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0 &&
 	   ((so->so_proto->pr_flags & PR_CONNREQUIRED) == 0 ||
 	    (so->so_options & SO_ACCEPTCONN) == 0))
@@ -203,13 +203,13 @@ in6_pcbbind(in6p, nam)
 	if (nam) {
 		sin6 = mtod(nam, struct sockaddr_in6 *);
 		if (nam->m_len != sizeof(*sin6))
-			return(EINVAL);
+			return (EINVAL);
 		/*
 		 * We should check the family, but old programs
 		 * incorrectly fail to intialize it.
 		 */
 		if (sin6->sin6_family != AF_INET6)
-			return(EAFNOSUPPORT);
+			return (EAFNOSUPPORT);
 
 #ifdef __NetBSD__
 		/*
@@ -219,10 +219,10 @@ in6_pcbbind(in6p, nam)
 		 * other users.
 		 */
 		if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
-			return(EADDRNOTAVAIL);
+			return (EADDRNOTAVAIL);
 #endif
 		if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
-			return(error);
+			return (error);
 
 		lport = sin6->sin6_port;
 		if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)) {
@@ -262,7 +262,7 @@ in6_pcbbind(in6p, nam)
 #endif
 			if ((in6p->in6p_flags & IN6P_FAITH) == 0 &&
 			    (ia = ifa_ifwithaddr((struct sockaddr *)sin6)) == 0)
-				return(EADDRNOTAVAIL);
+				return (EADDRNOTAVAIL);
 #ifndef SCOPEDROUTING
 			sin6->sin6_scope_id = lzone;
 #endif
@@ -283,7 +283,7 @@ in6_pcbbind(in6p, nam)
 			if (ia &&
 			    ((struct in6_ifaddr *)ia)->ia6_flags &
 			    (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY|IN6_IFF_DETACHED))
-				return(EADDRNOTAVAIL);
+				return (EADDRNOTAVAIL);
 		}
 		if (lport) {
 #if !(defined(__NetBSD__) && defined(IPNOPRIVPORTS))
@@ -296,7 +296,7 @@ in6_pcbbind(in6p, nam)
 			priv = (p && !suser(p->p_ucred, &p->p_acflag)) ? 1 : 0;
 			/* GROSS */
 			if (ntohs(lport) < IPV6PORT_RESERVED && !priv)
-				return(EACCES);
+				return (EACCES);
 #endif
 
 #ifndef TCP6
@@ -322,7 +322,7 @@ in6_pcbbind(in6p, nam)
 				if (t &&
 				    (reuseport & t->in6p_socket->so_options)
 				    == 0) {
-					return(EADDRINUSE);
+					return (EADDRINUSE);
 				}
 			}
 		}
@@ -332,7 +332,7 @@ in6_pcbbind(in6p, nam)
 	if (lport == 0) {
 		int e;
 		if ((e = in6_pcbsetport(&in6p->in6p_lsa, in6p, p)) != 0)
-			return(e);
+			return (e);
 	}
 	else
 		in6p->in6p_lport = lport;
@@ -340,7 +340,7 @@ in6_pcbbind(in6p, nam)
 #if 0
 	in6p->in6p_flowinfo = 0;	/* XXX */
 #endif
-	return(0);
+	return (0);
 }
 
 /*
@@ -367,11 +367,11 @@ in6_pcbconnect(in6p, nam)
 	struct sockaddr_in6 tmp;
 
 	if (nam->m_len != sizeof(*sin6))
-		return(EINVAL);
+		return (EINVAL);
 	if (sin6->sin6_family != AF_INET6)
-		return(EAFNOSUPPORT);
+		return (EAFNOSUPPORT);
 	if (sin6->sin6_port == 0)
-		return(EADDRNOTAVAIL);
+		return (EADDRNOTAVAIL);
 
 #ifndef TCP6
 	/* sanity check for mapped address case */
@@ -394,7 +394,7 @@ in6_pcbconnect(in6p, nam)
 	sin6 = &tmp;
 
 	if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
-		return(error);
+		return (error);
 
 	/* Source address selection. */
 #ifndef TCP6
@@ -413,7 +413,7 @@ in6_pcbconnect(in6p, nam)
 		if (sinp == 0) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
-			return(error);
+			return (error);
 		}
 		bzero(&mapped_sa, sizeof(mapped_sa));
 		mapped_sa.sin6_family = AF_INET6;
@@ -435,11 +435,11 @@ in6_pcbconnect(in6p, nam)
 		if (src6 == NULL) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
-			return(error);
+			return (error);
 		}
 		if (ifp && sin6->sin6_scope_id == 0 &&
 		    (error = scope6_setzoneid(ifp, sin6)) != 0) { /* XXX */
-			return(error);
+			return (error);
 		}
 #ifndef SCOPEDROUTING	 /* XXX: addr6 may not have a valid zone id */
 		src6_storage = *src6;
@@ -462,7 +462,7 @@ in6_pcbconnect(in6p, nam)
 			  src6 : &in6p->in6p_lsa,
 			  in6p->in6p_lport,
 			  0)) {
-		return(EADDRINUSE);
+		return (EADDRINUSE);
 	}
 #ifndef TCP6
 	if (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)
@@ -499,7 +499,7 @@ in6_pcbconnect(in6p, nam)
 	if (in6p->in6p_socket->so_type == SOCK_STREAM)
 		ipsec_pcbconn(in6p->in6p_sp);
 #endif
-	return(0);
+	return (0);
 }
 
 void
@@ -942,7 +942,7 @@ in6_pcblookup(head, faddr6, fport_arg, laddr6, lport_arg, flags)
 				break;
 		}
 	}
-	return(match);
+	return (match);
 }
 
 #ifndef TCP6

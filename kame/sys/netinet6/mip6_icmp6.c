@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.50 2002/08/27 09:52:39 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.51 2002/09/11 02:34:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -433,7 +433,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 
 	if ((error = mip6_setpktaddrs(n)) != 0) { /* XXX */
 		m_freem(n);
-		return(0);
+		return (0);
 	}
 	error = ip6_output(n, NULL, NULL, 0, NULL, NULL);
 	if (error) {
@@ -892,7 +892,7 @@ mip6_icmp6_ha_discov_req_output(sc)
 	/* send the DHAAD request packet to the home agent anycast address. */
 	if (!ip6_setpktaddrs(m, &hif_coa, &haanyaddr)) {
 		m_freem(m);
-		return(EINVAL);
+		return (EINVAL);
 	}
 	error = ip6_output(m, NULL, NULL, 0, NULL, NULL);
 	if (error) {
@@ -1017,7 +1017,7 @@ mip6_icmp6_mp_sol_output(mpfx, mha)
 
 	if (!ip6_setpktaddrs(m, &mpfx->mpfx_haddr, &mha->mha_gaddr)) {
 		m_freem(m);
-		return(EINVAL);
+		return (EINVAL);
 	}
 	error = ip6_output(m, 0, 0, 0, 0,NULL);
 	if (error) {
@@ -1026,7 +1026,7 @@ mip6_icmp6_mp_sol_output(mpfx, mha)
 			 __FILE__, __LINE__, error));
 	}
 
-	return(error);
+	return (error);
 }
 
 #if 0
@@ -1133,9 +1133,9 @@ mip6_tunneled_rs_output(sc, mpfx)
 
 	if ((mip6_setpktaddrs(m)) != 0) { /* XXX */
 		m_freem(m);
-		return(-1);
+		return (-1);
 	}
-	return(ip6_output(m, 0, 0, 0, 0,NULL));
+	return (ip6_output(m, 0, 0, 0, 0,NULL));
 }
 
 #endif /* 0 tunneled rs */

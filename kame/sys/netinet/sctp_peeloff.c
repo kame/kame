@@ -1,4 +1,4 @@
-/*	$KAME: sctp_peeloff.c,v 1.6 2002/07/30 04:12:35 itojun Exp $	*/
+/*	$KAME: sctp_peeloff.c,v 1.7 2002/09/11 02:34:16 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_peeloff.c,v 1.16 2002/04/04 19:12:45 randall Exp	*/
 
 /*
@@ -98,16 +98,16 @@ sctp_can_peel_off(struct socket *head, caddr_t assoc_id)
 	struct sctp_tcb *tcb;
 	inp = (struct sctp_inpcb *)head->so_pcb;
 	if (inp == NULL) {
-		return(EFAULT);
+		return (EFAULT);
 	}
 	tcb = sctp_findassociation_ep_asocid(inp, assoc_id);
 	if (tcb == NULL) {
-		return(ENOTCONN);
+		return (ENOTCONN);
 	}
 	/* We are clear to peel this one off */
-	return(0);
+	return (0);
 #else
-	return(EOPNOTSUPP);
+	return (EOPNOTSUPP);
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 }
 
@@ -128,17 +128,17 @@ sctp_get_peeloff(struct socket *head, caddr_t assoc_id, int *error)
 	inp = (struct sctp_inpcb *)head->so_pcb;
 	if (inp == NULL) {
 		*error = EFAULT;
-		return(NULL);
+		return (NULL);
 	}
 	tcb = sctp_findassociation_ep_asocid(inp, assoc_id);
 	if (tcb == NULL) {
 		*error = ENOTCONN;
-		return(NULL);
+		return (NULL);
 	}
 	newso = sonewconn(head, SS_ISCONNECTED);
 	if (newso == NULL) {
 		*error = ENOMEM;
-		return(newso);
+		return (newso);
 	}
 	n_inp = (struct sctp_inpcb *)newso->so_pcb;
 	n_inp->sctp_flags = (SCTP_PCB_FLAGS_UDPTYPE |
@@ -168,10 +168,10 @@ sctp_get_peeloff(struct socket *head, caddr_t assoc_id, int *error)
 	 * the tcb in the right place.
 	 */
 	sctp_move_pcb_and_assoc(inp, n_inp, tcb);
-	return(newso);
+	return (newso);
 #else
 	/* We don't support this without the TCP model */
 	*error = EOPNOTSUPP;
-	return(NULL);
+	return (NULL);
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 }

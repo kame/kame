@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.8 2002/09/06 10:27:55 suz Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.9 2002/09/11 02:34:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -595,5 +595,5 @@ mip6_bu_fsm(mbu, event, data)
 	mip6log((LOG_INFO, "st=%d:ev=%d\n", *mbu_fsm_state, event));
 #endif
 
-	return(0);
+	return (0);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.17 2002/07/30 04:12:35 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.18 2002/09/11 02:34:16 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
 
 /*
@@ -311,7 +311,7 @@ sctp_ctlinput(cmd, sa, vip)
 #if defined(__FreeBSD__)
 		return;
 #else
-		return(NULL);
+		return (NULL);
 #endif
 	}
 
@@ -321,7 +321,7 @@ sctp_ctlinput(cmd, sa, vip)
 #if defined(__FreeBSD__)
 		return;
 #else
-		return(NULL);
+		return (NULL);
 #endif
 	}
 	if (ip) {
@@ -389,7 +389,7 @@ sctp_ctlinput(cmd, sa, vip)
 #if defined(__FreeBSD__)
 	return;
 #else
-	return(NULL);
+	return (NULL);
 #endif
 }
 
@@ -738,7 +738,7 @@ sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 			m_freem(control);
 			control = NULL;
 		}
-		return(error);
+		return (error);
 	}
 #ifdef INET6
 	if (addr->sa_family != AF_INET) {
@@ -769,13 +769,13 @@ sctp_disconnect(struct socket *so)
 #endif
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == NULL) {
-		return(ENOTCONN);
+		return (ENOTCONN);
 	}
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) {
 		if (LIST_EMPTY(&inp->sctp_asoc_list)) {
 			/* No connection */
 			splx(s);
-			return(ENOTCONN);
+			return (ENOTCONN);
 		} else {
 			int some_on_streamwheel = 0;
 			struct sctp_association *asoc;
@@ -783,7 +783,7 @@ sctp_disconnect(struct socket *so)
 
 			tcb = LIST_FIRST(&inp->sctp_asoc_list);
 			if (tcb == NULL)
-				return(EINVAL);
+				return (EINVAL);
 
 			asoc = &tcb->asoc;
 			if (!TAILQ_EMPTY(&asoc->out_wheel)) {
@@ -828,7 +828,7 @@ sctp_disconnect(struct socket *so)
 				 */
 				asoc->state |= SCTP_STATE_SHUTDOWN_PENDING;
 			}
-			return(0);
+			return (0);
 		}
 	} else {
 		/* UDP model does not support this */
@@ -857,7 +857,7 @@ sctp_shutdown(struct socket *so)
 		so->so_state &= ~SS_CANTRCVMORE;
 		/* This proc will wakeup for read and do nothing (I hope) */
 		splx(s);
-		return(EOPNOTSUPP);
+		return (EOPNOTSUPP);
 	}
 #ifdef SCTP_TCP_MODEL_SUPPORT
 	/*
@@ -876,7 +876,7 @@ sctp_shutdown(struct socket *so)
 			 * call was made after an abort or something.
 			 * Nothing to do now.
 			 */
-			return(0);
+			return (0);
 		}
 		asoc = &tcb->asoc;
 
@@ -919,7 +919,7 @@ sctp_shutdown(struct socket *so)
 	return 0;
 #endif
 	splx(s);
-	return(EOPNOTSUPP);
+	return (EOPNOTSUPP);
 }
 
 /*
@@ -934,7 +934,7 @@ sctp_fill_user_address(struct sockaddr_storage *ss, struct sockaddr *sa)
 	sa = (struct sockaddr *)sctp_recover_scope((struct sockaddr_in6 *)sa,
 						   &lsa6);
 	memcpy(ss, sa, sa->sa_len);
-	return(0);
+	return (0);
 }
 
 
@@ -949,7 +949,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 	int loopback_scope, ipv4_local_scope, local_scope, site_scope, actual;
 	actual = 0;
 	if (limit <= 0)
-		return(actual);
+		return (actual);
 
 	if (tcb) {
 		/* Turn on all the appropriate scope */
@@ -1000,7 +1000,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 					sas = (struct sockaddr_storage *)((caddr_t)sas + sizeof(*sin));
 					actual += sizeof(*sin);
 					if (actual >= limit) {
-						return(actual);
+						return (actual);
 					}
 				} else if (ifa->ifa_addr->sa_family ==
 					   AF_INET6) {
@@ -1031,7 +1031,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 					sas = (struct sockaddr_storage *)((caddr_t)sas + sizeof(*sin6));
 					actual += sizeof(*sin6);
 					if (actual >= limit) {
-						return(actual);
+						return (actual);
 					}
 				}
 			}
@@ -1059,7 +1059,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 								  laddr->ifa->ifa_addr->sa_len);
 				actual += laddr->ifa->ifa_addr->sa_len;
 				if (actual >= limit) {
-					return(actual);
+					return (actual);
 				}
 			}
 		} else {
@@ -1075,7 +1075,7 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 									  laddr->ifa->ifa_addr->sa_len);
 					actual += laddr->ifa->ifa_addr->sa_len;
 					if (actual >= limit) {
-						return(actual);
+						return (actual);
 					}
 				}
 			} else {
@@ -1089,13 +1089,13 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 									  laddr->ifa->ifa_addr->sa_len);
 					actual += laddr->ifa->ifa_addr->sa_len;
 					if (actual >= limit) {
-						return(actual);
+						return (actual);
 					}
 				}
 			}
 		}
 	}
-	return(actual);
+	return (actual);
 }
 
 static int
@@ -1128,7 +1128,7 @@ sctp_count_max_addresses(struct sctp_inpcb *inp)
 			cnt += laddr->ifa->ifa_addr->sa_len;
 		}
 	}
-	return(cnt);
+	return (cnt);
 }
 
 extern int sctp_cwnd_posts[SCTP_CWND_POSTS_LIST];
@@ -1162,7 +1162,7 @@ sctp_optsget(struct socket *so,
 			printf("optsget:MP is NULL EINVAL\n");
 		}
 #endif /* SCTP_DEBUG */
-		return(EINVAL);
+		return (EINVAL);
 	}
 	m = *mp;
 	if (m == NULL) {
@@ -1172,7 +1172,7 @@ sctp_optsget(struct socket *so,
 			printf("Huh no mbuf\n");
 		}
 #endif /* SCTP_DEBUG */
-		return(EINVAL);
+		return (EINVAL);
 	}
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_USRREQ2) {
@@ -1920,7 +1920,7 @@ sctp_optsget(struct socket *so,
 		error = ENOPROTOOPT;
 		break;
 	} /* end switch(sopt->sopt_name) */
-	return(error);
+	return (error);
 }
 
 static int
@@ -1939,11 +1939,11 @@ sctp_optsset(struct socket *so,
 			printf("optsset:MP is NULL EINVAL\n");
 		}
 #endif /* SCTP_DEBUG */
-		return(EINVAL);
+		return (EINVAL);
 	}
 	m = *mp;
 	if (m == NULL)
-		return(EINVAL);
+		return (EINVAL);
 
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == 0)
@@ -1972,7 +1972,7 @@ sctp_optsset(struct socket *so,
 			if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) {
 				set_opt = SCTP_PCB_FLAGS_NEEDS_MAPPED_V4;
 			} else {
-				return(EINVAL);
+				return (EINVAL);
 			}
 			break;
 		case SCTP_NODELAY:
@@ -2570,7 +2570,7 @@ sctp_optsset(struct socket *so,
 		error = ENOPROTOOPT;
 		break;
 	} /* end switch(opt) */
-	return(error);
+	return (error);
 }
 
 
@@ -2592,7 +2592,7 @@ sctp_ctloutput(struct socket *so, struct sockopt *sopt)
 	if (inp == 0) {
 		splx(s);
 		/* I made the same as TCP since we are not setup? */
-		return(ECONNRESET);
+		return (ECONNRESET);
 	}
 	if (sopt->sopt_level != IPPROTO_SCTP) {
 		/* wrong proto level... send back up to IP */
@@ -2603,7 +2603,7 @@ sctp_ctloutput(struct socket *so, struct sockopt *sopt)
 #endif /* INET6 */
 			error = ip_ctloutput(so, sopt);
 		splx(s);
-		return(error);
+		return (error);
 	}
 	if (sopt->sopt_valsize > MCLBYTES) {
 		/*
@@ -2644,7 +2644,7 @@ sctp_ctloutput(struct socket *so, struct sockopt *sopt)
 	}
  out:
 	splx(s);
-	return(error);
+	return (error);
 }
 
 #else
@@ -2723,7 +2723,7 @@ sctp_ctloutput(op, so, level, optname, mp)
 		error = EINVAL;
 	}
 	splx(s);
-	return(error);
+	return (error);
 }
 
 #endif
@@ -2752,13 +2752,13 @@ sctp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	if (inp == 0) {
 		splx(s);
 		/* I made the same as TCP since we are not setup? */
-		return(ECONNRESET);
+		return (ECONNRESET);
 	}
 #ifdef INET6
 	if (((inp->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) == 0) &&
 	    (nam->sa_family == AF_INET6)) {
 		splx(s);
-		return(EINVAL);
+		return (EINVAL);
 	}
 #endif /* INET6 */
 	if ((inp->sctp_flags & SCTP_PCB_FLAGS_UNBOUND) ==
@@ -2771,7 +2771,7 @@ sctp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		error = sctp_inpcb_bind(so, (struct sockaddr *)&sin, p);
 		if (error) {
 			splx(s);
-			return(error);
+			return (error);
 		}
 	}
 	/* Now do we connect? */
@@ -2781,7 +2781,7 @@ sctp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	    (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED)) {
 		/* We are already connected AND the TCP model */
 		splx(s);
-		return(EADDRINUSE);
+		return (EADDRINUSE);
 	}
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 #ifdef SCTP_TCP_MODEL_SUPPORT
@@ -2794,7 +2794,7 @@ sctp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	if (tcb != NULL) {
 		/* Already have or am bring up an association */
 		splx(s);
-		return(EALREADY);
+		return (EALREADY);
 	}
 	/* We are GOOD to go */
 	tcb = sctp_aloc_assoc(inp, nam, 1, &error);
@@ -2804,7 +2804,7 @@ sctp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 #ifdef SCTP_DEBUG
 		printf("Can't allocate a TCB?\n");
 #endif
-		return(error);
+		return (error);
 	}
 #ifdef SCTP_TCP_MODEL_SUPPORT
 	if (tcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) {
@@ -2839,7 +2839,7 @@ sctp_usr_recvd(struct socket *so, int flags)
 	if (inp == 0) {
 		splx(s);
 		/* I made the same as TCP since we are not setup? */
-		return(ECONNRESET);
+		return (ECONNRESET);
 	}
 	/*
 	 * Grab the first one on the list. It will re-insert itself if
@@ -2876,7 +2876,7 @@ sctp_usr_recvd(struct socket *so, int flags)
 		}
 	}
 	splx(s);
-	return(0);
+	return (0);
 }
 
 int
@@ -2902,14 +2902,14 @@ sctp_listen(struct socket *so, struct proc *p)
 	if (inp == 0) {
 		splx(s);
 		/* I made the same as TCP since we are not setup? */
-		return(ECONNRESET);
+		return (ECONNRESET);
 	}
 #ifdef SCTP_TCP_MODEL_SUPPORT
 	if ((inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) &&
 	    (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED)) {
 		/* We are already connected AND the TCP model */
 		splx(s);
-		return(EADDRINUSE);
+		return (EADDRINUSE);
 	}
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_UNBOUND) {
@@ -2918,7 +2918,7 @@ sctp_listen(struct socket *so, struct proc *p)
 					     p))) {
 			/* bind error, probably perm */
 			splx(s);
-			return(error);
+			return (error);
 		}
 	}
 	if (inp->sctp_socket->so_qlimit) {
@@ -2943,7 +2943,7 @@ sctp_listen(struct socket *so, struct proc *p)
 		}
 	}
 	splx(s);
-	return(error);
+	return (error);
 }
 
 int
@@ -2969,11 +2969,11 @@ sctp_accept(struct socket *so,
 
 	if (inp == 0) {
 		splx(s);
-		return(ECONNRESET);
+		return (ECONNRESET);
 	}
 	if (so->so_state & SS_ISDISCONNECTED) {
 		splx(s);
-		return(ECONNABORTED);
+		return (ECONNABORTED);
 	}
 	if (inp == 0) {
 		splx(s);
@@ -2982,7 +2982,7 @@ sctp_accept(struct socket *so,
 	tcb = LIST_FIRST(&inp->sctp_asoc_list);
 	if (tcb == NULL) {
 		splx(s);
-		return(ECONNRESET);
+		return (ECONNRESET);
 	}
 	prim = (struct sockaddr *)&tcb->asoc.primary_destination->ra._l_addr;
 	if (prim->sa_family == AF_INET) {
@@ -3039,10 +3039,10 @@ sctp_accept(struct socket *so,
 		}
 	}
 	splx(s);
-	return(0);
+	return (0);
 #else
 	/* No TCP model, we don't support accept then */
-	return(EOPNOTSUPP);
+	return (EOPNOTSUPP);
 #endif
 }
 
@@ -3112,7 +3112,7 @@ sctp_ingetaddr(struct socket *so,
 #if defined(__FreeBSD__)
 	*nam = (struct sockaddr *)sin;
 #endif
-	return(0);
+	return (0);
 }
 
 int
@@ -3134,7 +3134,7 @@ sctp_peeraddr(struct socket *so,
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if ((inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) == 0) {
 		/* UDP type and listeners will drop out here */
-		return(ENOTCONN);
+		return (ENOTCONN);
 	}
 #if defined(__FreeBSD__)
 	MALLOC(sin, struct sockaddr_in *, sizeof *sin, M_SONAME, M_WAITOK |
@@ -3190,7 +3190,7 @@ sctp_peeraddr(struct socket *so,
 #if defined(__FreeBSD__)
 	*nam = (struct sockaddr *)sin;
 #endif
-	return(0);
+	return (0);
 }
 
 #if defined(__FreeBSD__)
@@ -3255,7 +3255,7 @@ sctp_usrreq(so, req, m, nam, control)
 			error =  EAFNOSUPPORT;
 		}
 		splx(s);
-		return(error);
+		return (error);
 	}
 #ifdef __NetBSD__
 	if (req == PRU_PURGEIF) {
@@ -3303,7 +3303,7 @@ sctp_usrreq(so, req, m, nam, control)
 		if (nam)
 			name = mtod(nam, struct sockaddr *);
 		else
-			return(EINVAL);
+			return (EINVAL);
 		error  = sctp_bind(so, name
 #if defined(__NetBSD__)
 				   , p
@@ -3328,7 +3328,7 @@ sctp_usrreq(so, req, m, nam, control)
 		if (nam)
 			name = mtod(nam, struct sockaddr *);
 		else
-			return(EINVAL);
+			return (EINVAL);
 		error = sctp_connect(so, name
 #if defined(__NetBSD__)
 				     , p
@@ -3347,7 +3347,7 @@ sctp_usrreq(so, req, m, nam, control)
 		if (nam)
 			name = mtod(nam, struct sockaddr *);
 		else
-			return(EINVAL);
+			return (EINVAL);
 		error = sctp_accept(so, name);
 	}
 	break;
@@ -3402,7 +3402,7 @@ sctp_usrreq(so, req, m, nam, control)
 		if (nam)
 			name = mtod(nam, struct sockaddr *);
 		else
-			return(EINVAL);
+			return (EINVAL);
 		error = sctp_peeraddr(so, name);
 	}
 	break;
@@ -3412,7 +3412,7 @@ sctp_usrreq(so, req, m, nam, control)
 		if (nam)
 			name = mtod(nam, struct sockaddr *);
 		else
-			return(EINVAL);
+			return (EINVAL);
 
 		error = sctp_ingetaddr(so, name);
 	}

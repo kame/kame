@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.c,v 1.10 2001/07/26 19:08:37 itojun Exp $	*/
+/*	$KAME: net_osdep.c,v 1.11 2002/09/11 02:34:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -69,7 +69,7 @@ if_name(ifp)
 #else
 	snprintf(cp, IFNAMSIZ + 10, "%s%d", ifp->if_name, ifp->if_unit);
 #endif
-	return((const char *)cp);
+	return ((const char *)cp);
 #undef MAXNUMBUF
 }
 #endif

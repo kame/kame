@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.106 2002/06/09 14:44:03 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.107 2002/09/11 02:34:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -638,7 +638,7 @@ udp6_usrreq(so, req, m, addr6, control)
 	 *  and AF_INET6 socket for AF_INET6 addrs.
 	 */
 	if (req == PRU_CONTROL)
-		return(in6_control(so, (u_long)m, (caddr_t)addr6,
+		return (in6_control(so, (u_long)m, (caddr_t)addr6,
 				   (struct ifnet *)control
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 				   , p
@@ -751,9 +751,9 @@ udp6_usrreq(so, req, m, addr6, control)
 
 	case PRU_SEND:
 #ifdef __NetBSD__
-		return(udp6_output(in6p, m, addr6, control, p));
+		return (udp6_output(in6p, m, addr6, control, p));
 #else
-		return(udp6_output(in6p, m, addr6, control));
+		return (udp6_output(in6p, m, addr6, control));
 #endif
 
 	case PRU_ABORT:
@@ -773,7 +773,7 @@ udp6_usrreq(so, req, m, addr6, control)
 		/*
 		 * stat: don't bother with a blocksize
 		 */
-		return(0);
+		return (0);
 
 	case PRU_SENDOOB:
 	case PRU_FASTTIMO:
@@ -785,7 +785,7 @@ udp6_usrreq(so, req, m, addr6, control)
 
 	case PRU_RCVD:
 	case PRU_RCVOOB:
-		return(EOPNOTSUPP);	/* do not free mbuf's */
+		return (EOPNOTSUPP);	/* do not free mbuf's */
 
 	default:
 		panic("udp6_usrreq");
@@ -796,7 +796,7 @@ release:
 		m_freem(control);
 	if (m)
 		m_freem(m);
-	return(error);
+	return (error);
 }
 
 static void

@@ -1,4 +1,4 @@
-/*	$KAME: keysock.c,v 1.26 2002/03/21 14:00:14 itojun Exp $	*/
+/*	$KAME: keysock.c,v 1.27 2002/09/11 02:34:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -140,7 +140,7 @@ key_usrreq(so, req, m, nam, control, p)
 			free((caddr_t)kp, M_PCB);
 			so->so_pcb = (caddr_t) 0;
 			splx(s);
-			return(error);
+			return (error);
 		}
 
 		kp->kp_promisc = kp->kp_registered = 0;
@@ -165,7 +165,7 @@ key_usrreq(so, req, m, nam, control, p)
 			free((caddr_t)kp, M_PCB);
 			so->so_pcb = (caddr_t) 0;
 			splx(s);
-			return(error);
+			return (error);
 		}
 		MGET(n, M_WAITOK, MT_DATA);
 		if (!n) {
@@ -175,7 +175,7 @@ key_usrreq(so, req, m, nam, control, p)
 			free((caddr_t)kp, M_PCB);
 			so->so_pcb = (caddr_t) 0;
 			splx(s);
-			return(error);
+			return (error);
 		}
 		m->m_len = sizeof(key_src);
 		kp->kp_raw.rcb_laddr = mtod(m, struct sockaddr *);
@@ -189,7 +189,7 @@ key_usrreq(so, req, m, nam, control, p)
 		so->so_options |= SO_USELOOPBACK;
 	}
 	splx(s);
-	return(error);
+	return (error);
 }
 #endif /* other than FreeBSD >= 3 */
 

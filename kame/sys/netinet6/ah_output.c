@@ -1,4 +1,4 @@
-/*	$KAME: ah_output.c,v 1.33 2002/08/09 08:49:03 itojun Exp $	*/
+/*	$KAME: ah_output.c,v 1.34 2002/09/11 02:34:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -351,7 +351,7 @@ ah_hdrlen(sav)
 		ahlen = plen + sizeof(struct newah);
 	}
 
-	return(ahlen);
+	return (ahlen);
 }
 
 #ifdef INET6
@@ -499,7 +499,7 @@ ah6_output(m, nexthdrp, md, isr)
 	}
 	ipsec6stat.out_ahhist[sav->alg_auth]++;
 
-	return(error);
+	return (error);
 }
 #endif
 

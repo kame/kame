@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.37 2002/06/09 14:44:02 itojun Exp $	*/
+/*	$KAME: scope6.c,v 1.38 2002/09/11 02:34:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -109,7 +109,7 @@ scope6_set(ifp, idlist)
 	struct scope6_id *sid = SID(ifp);
 
 	if (!sid)	/* paranoid? */
-		return(EINVAL);
+		return (EINVAL);
 
 	/*
 	 * XXX: We need more consistency checks of the relationship among
@@ -137,7 +137,7 @@ scope6_set(ifp, idlist)
 			if (i == IPV6_ADDR_SCOPE_INTFACELOCAL &&
 			    idlist->s6id_list[i] != ifp->if_index) {
 				splx(s);
-				return(EINVAL);
+				return (EINVAL);
 			}
 
 			if (i == IPV6_ADDR_SCOPE_LINKLOCAL &&
@@ -149,7 +149,7 @@ scope6_set(ifp, idlist)
 				 * safety in later use.
 				 */
 				splx(s);
-				return(EINVAL);
+				return (EINVAL);
 			}
 
 			/*
@@ -162,7 +162,7 @@ scope6_set(ifp, idlist)
 	}
 	splx(s);
 
-	return(error);
+	return (error);
 }
 
 int
@@ -173,11 +173,11 @@ scope6_get(ifp, idlist)
 	struct scope6_id *sid = SID(ifp);
 
 	if (sid == NULL)	/* paranoid? */
-		return(EINVAL);
+		return (EINVAL);
 
 	*idlist = *sid;
 
-	return(0);
+	return (0);
 }
 
 
@@ -276,10 +276,10 @@ in6_addr2zoneid(ifp, addr, ret_id)
 	 */
 	if (IN6_IS_ADDR_LOOPBACK(addr)) {
 		if (!(ifp->if_flags & IFF_LOOPBACK))
-			return(-1);
+			return (-1);
 		else {
 			*ret_id = 0; /* there's no ambiguity */
-			return(0);
+			return (0);
 		}
 	}
 
@@ -308,7 +308,7 @@ in6_addr2zoneid(ifp, addr, ret_id)
 	}
 
 	*ret_id = zoneid;
-	return(0);
+	return (0);
 }
 
 void
@@ -340,7 +340,7 @@ scope6_get_default(idlist)
 
 	*idlist = sid_default;
 
-	return(0);
+	return (0);
 }
 
 u_int32_t
@@ -352,9 +352,9 @@ scope6_addr2default(addr)
 	 * link-local, but there's no ambiguity in the syntax.
 	 */
 	if (IN6_IS_ADDR_LOOPBACK(addr))
-		return(0);
+		return (0);
 
-	return(sid_default.s6id_list[in6_addrscope(addr)]);
+	return (sid_default.s6id_list[in6_addrscope(addr)]);
 }
 
 /*
@@ -372,15 +372,15 @@ scope6_setzoneid(ifp, sin6)
 	int error;
 
 	if (in6_addr2zoneid(ifp, &sin6->sin6_addr, &zoneid))
-		return(EADDRNOTAVAIL);
+		return (EADDRNOTAVAIL);
 
 	if (zoneid) {
 		sin6->sin6_scope_id = zoneid;
 		if ((error = in6_embedscope(&sin6->sin6_addr, sin6)) != 0)
-			return(error);
+			return (error);
 	}
 
-	return(0);
+	return (0);
 }
 
 /*
@@ -418,21 +418,21 @@ scope6_check_id(sin6, defaultok)
 		if (IN6_IS_SCOPE_LINKLOCAL(in6) ||
 		    IN6_IS_ADDR_MC_INTFACELOCAL(in6)) {
 			if (if_index < zoneid)
-				return(ENXIO);
+				return (ENXIO);
 #if defined(__FreeBSD__) && __FreeBSD__ >= 5
 			ifp = ifnet_byindex(zoneid);
 #else
 			ifp = ifindex2ifnet[zoneid];
 #endif
 			if (ifp == NULL) /* XXX: this can happen for some OS */
-				return(ENXIO);
+				return (ENXIO);
 		}
 	} else if (defaultok)
 		sin6->sin6_scope_id = scope6_addr2default(in6);
 
 	/* KAME hack: embed scopeid */
 	if (in6_embedscope(in6, sin6) != 0)
-		return(EINVAL);
+		return (EINVAL);
 
-	return(0);
+	return (0);
 }
