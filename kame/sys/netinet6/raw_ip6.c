@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.42 2000/11/30 04:12:02 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.43 2000/11/30 05:08:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -274,7 +274,7 @@ rip6_ctlinput(cmd, sa, d)
 		sa6.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
 						     ip6cp->ip6c_finaldst);
 #ifndef SCOPEDROUTING
-		if (in6_embedscope(ip6cp->ip6c_finaldst, &sa6, NULL, NULL)) {
+		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
 			/* should be impossbile */
 			printf("rip6_ctlinput: in6_embedscope failed\n");
 			return;
