@@ -284,7 +284,7 @@ struct protosw inetsw[] = {
 },
 #endif
 	/* raw wildcard */
-{ SOCK_RAW,	&inetdomain,	0,		PR_ATOMIC|PR_ADDR,
+{ SOCK_RAW,	&inetdomain,	0,		PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   rip_input,	0,		0,		rip_ctloutput,
   0,
   rip_init,	0,		0,		0,
