@@ -1,4 +1,4 @@
-/*	$KAME: timer.c,v 1.3 2002/09/24 14:20:50 itojun Exp $	*/
+/*	$KAME: timer.c,v 1.4 2003/02/11 05:33:37 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -167,7 +167,7 @@ dhcp6_timer_rest(timer)
 	if (TIMEVAL_LEQ(timer->tm, now)) {
 		syslog(LOG_DEBUG,
 		       "<%s> a timer must be expired, but not yet",
-		       __FUNCTION__);
+		       FNAME);
 		returnval.tv_sec = returnval.tv_usec = 0;
 	} else
 		timeval_sub(&timer->tm, &now, &returnval);
