@@ -11,6 +11,8 @@ PATCH_DIST_STRIP=	-p1
 MAINTAINER=	itojun@itojun.org
 HOMEPAGE=	http://www.BitWizard.nl/mtr/
 
+BROKEN=		"security issues (local root compromise possible)"
+
 GNU_CONFIGURE=	yes
 USE_GMAKE=	yes
 CONFIGURE_ARGS+=--enable-ipv6
