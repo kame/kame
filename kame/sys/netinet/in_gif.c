@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.46 2000/11/06 07:06:57 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.47 2000/11/06 11:49:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -54,6 +54,7 @@
 #if !defined(__FreeBSD__) || __FreeBSD__ < 3
 #include <sys/ioctl.h>
 #endif
+#include <sys/syslog.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <sys/malloc.h>
@@ -501,9 +502,16 @@ gif_encapcheck4(m, off, proto, arg)
 #else
 		rt = rtalloc1((struct sockaddr *)&sin, 0);
 #endif
-		if (!rt)
+		if (!rt) {
+			log(LOG_WARNING, "%s: packet from 0x%x dropped "
+			    "due to ingress filter\n", if_name(&sc->gif_if),
+			    (u_int32_t)ntohl(sin.sin_addr.s_addr));
 			return 0;
+		}
 		if (rt->rt_ifp != m->m_pkthdr.rcvif) {
+			log(LOG_WARNING, "%s: packet from 0x%x dropped "
+			    "due to ingress filter\n", if_name(&sc->gif_if),
+			    (u_int32_t)ntohl(sin.sin_addr.s_addr));
 			rtfree(rt);
 			return 0;
 		}

@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.44 2000/11/06 07:06:56 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.45 2000/11/06 11:49:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -93,6 +93,7 @@
 #ifdef __FreeBSD__
 #include <sys/kernel.h>
 #endif
+#include <sys/syslog.h>
 #include <machine/cpu.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -597,9 +598,16 @@ stf_checkaddr4(sc, in, inifp)
 #else
 		rt = rtalloc1((struct sockaddr *)&sin, 0);
 #endif
-		if (!rt)
+		if (!rt) {
+			log(LOG_WARNING, "%s: packet from 0x%x dropped "
+			    "due to ingress filter\n", if_name(&sc->sc_if),
+			    (u_int32_t)ntohl(sin.sin_addr.s_addr));
 			return -1;
+		}
 		if (rt->rt_ifp != inifp) {
+			log(LOG_WARNING, "%s: packet from 0x%x dropped "
+			    "due to ingress filter\n", if_name(&sc->sc_if),
+			    (u_int32_t)ntohl(sin.sin_addr.s_addr));
 			rtfree(rt);
 			return -1;
 		}
