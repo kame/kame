@@ -1,4 +1,4 @@
-.\"	$KAME: ifmcstat.8,v 1.5 2001/07/15 06:15:07 jinmei Exp $
+.\"	$KAME: ifmcstat.8,v 1.6 2002/10/31 04:23:43 suz Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -35,6 +35,10 @@
 .Nd dump multicast group management statistics per interface
 .Sh SYNOPSIS
 .Nm
+.Op Fl i Ar interface
+.Op Fl f Ar address-family
+.Op Fl k Ar kernel
+.Nm
 .Op Ar kernel
 .\"
 .Sh DESCRIPTION
@@ -42,9 +46,25 @@ The
 .Nm
 command dumps multicast group information in the kernel.
 .Pp
-.Ar kernel
+The following options are supported:
+.Bl -tag -width Fl
+.It Fl i Ar interface
+specifies the interface to be displayed.
+.Pp
+.It Fl f Ar address-family
+specifies the address-family to be displayed; currently 
+.Ar inet
+and
+.Ar inet6
+are supported.
+.It Fl k Ar kernel
 specifies the kernel binary file the program uses, like
 .Pa /netbsd.test .
+.It Nm Ar kernel
+equal to
+.Nm
+.Fl k Ar kernel .
+(supported only for backward compatibility)
 .Sh BUGS
 .Nm
 needs superuser privilege.

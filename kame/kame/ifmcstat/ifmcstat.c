@@ -34,6 +34,7 @@
 #include <nlist.h>
 #include <string.h>
 #include <limits.h>
+#include <unistd.h>
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -80,6 +81,8 @@
 #include <netdb.h>
 
 kvm_t	*kvmd;
+int ifindex = 0;
+int af = AF_UNSPEC;
 
 struct	nlist nl[] = {
 #define	N_IFNET	0
@@ -162,7 +165,7 @@ int main(argc, argv)
 	int argc;
 	char **argv;
 {
-	char	buf[_POSIX2_LINE_MAX], ifname[IFNAMSIZ];
+	char	buf[_POSIX2_LINE_MAX], ifname[IFNAMSIZ], c;
 	struct	ifnet	*ifp, *nifp, ifnet;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #ifndef __NetBSD__
@@ -174,16 +177,38 @@ int main(argc, argv)
 #endif
 	const char *kernel = NULL;
 
-	switch (argc) {
-	case 1:
-		kernel = NULL;
-		break;
-	case 2:
+	/* "ifmcstat [kernel]" format is supported for backward compatiblity */
+	if (argc == 2)
 		kernel = argv[1];
-		break;
-	default:
-		fprintf(stderr, "usage: ifmcstat [kernel]\n");
-		exit(1);
+
+	while ((c = getopt(argc, argv, "i:f:k:")) != -1) {
+		switch (c) {
+		case 'i':
+			if ((ifindex = if_nametoindex(optarg)) == 0) {
+				fprintf(stderr, "%s: unknown interface\n", optarg);
+				exit(1);
+			}
+			break;
+		case 'f':
+			if (strcmp(optarg, "inet") == 0) {
+				af = AF_INET;
+				break;
+			}
+			if (strcmp(optarg, "inet6") == 0) {
+				af = AF_INET6;
+				break;
+			}
+			fprintf(stderr, "%s: unknown address family\n", optarg);
+			exit(1);
+			/*NOTREACHED*/
+		case 'k':
+			kernel = strdup(optarg);
+			break;
+		default:
+			fprintf(stderr, "usage: ifmcstat [-i interface] [-f address family] [-k kernel]\n");
+			exit(1);
+			/*NOTREACHED*/
+		}
 	}
 
 	if ((kvmd = kvm_openfiles(kernel, NULL, NULL, O_RDONLY, buf)) == NULL) {
@@ -201,19 +226,25 @@ int main(argc, argv)
 	KREAD(nl[N_IFNET].n_value, &ifp, struct ifnet *);
 	while (ifp) {
 		KREAD(ifp, &ifnet, struct ifnet);
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+		nifp = ifnet.if_list.tqe_next;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+		nifp = ifnet.if_link.tqe_next;
+#else
+		nifp = ifnet.if_next;
+#endif
+		if (ifindex && ifindex != ifnet.if_index)
+			goto next;
+	
 		printf("%s:\n", if_indextoname(ifnet.if_index, ifname));
-
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		if_addrlist(ifnet.if_addrlist.tqh_first);
 		if6_addrlist(ifnet.if_addrlist.tqh_first);
-		nifp = ifnet.if_list.tqe_next;
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 3
 		if_addrlist(TAILQ_FIRST(&ifnet.if_addrhead));
 		if6_addrlist(TAILQ_FIRST(&ifnet.if_addrhead));
-		nifp = ifnet.if_link.tqe_next;
 #else
 		if6_addrlist(ifnet.if_addrlist);
-		nifp = ifnet.if_next;
 #endif
 
 #ifdef __NetBSD__
@@ -244,6 +275,7 @@ int main(argc, argv)
 		}
 #endif
 
+next:
 		ifp = nifp;
 	}
 
@@ -316,6 +348,8 @@ if6_addrlist(ifap)
 #endif
 	struct ifaddr *ifap0;
 
+	if (af && af != AF_INET6)
+		return;
 	ifap0 = ifap;
 	while (ifap) {
 		KREAD(ifap, &ifa, struct ifaddr);
@@ -509,6 +543,8 @@ if_addrlist(ifap)
 #endif
 	struct ifaddr *ifap0;
 
+	if (af && af != AF_INET)
+		return;
 	ifap0 = ifap;
 	while (ifap) {
 		KREAD(ifap, &ifa, struct ifaddr);
