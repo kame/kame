@@ -1,7 +1,7 @@
 SRCDIR=	${.CURDIR}/../../kame/natptconfig
 
 PROG=	natptconfig
-SRCS=	main.c natptconfig.y.c natptconfig.l.c misc.c show.c yylex.c
+SRCS=	main.c natptconfig.y.c natptconfig.l.c misc.c show.c yylex.c showsubs.c
 
 MAN=	natptconfig.8
 
