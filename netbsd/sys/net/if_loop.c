@@ -248,8 +248,6 @@ looutput(ifp, m, dst, rt)
 			m_copydata(m, 0, m->m_pkthdr.len, mtod(n, caddr_t));
 			n->m_len = m->m_pkthdr.len;
 			n->m_next = NULL;
-			n->m_pkthdr.aux = m->m_pkthdr.aux;
-			m->m_pkthdr.aux = NULL;
 			m_freem(m);
 		} else {
 			m_copydata(m, 0, maxlen, mtod(n, caddr_t));
