@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.c,v 1.7 2000/10/18 09:15:22 kjc Exp $	*/
+/*	$KAME: altq_conf.c,v 1.8 2000/12/01 12:48:44 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_conf.c,v 1.7 2000/10/18 09:15:22 kjc Exp $
+ * $Id: altq_conf.c,v 1.8 2000/12/01 12:48:44 kjc Exp $
  */
 
 #ifdef ALTQ
@@ -180,7 +180,7 @@ void	altqattach __P((int));
 #endif
 #elif defined(__OpenBSD__)
 #if defined(__i386__)
-#define	CDEV_MAJOR 66		/* OpenBSD i386 (not official) */
+#define	CDEV_MAJOR 67		/* OpenBSD i386 (not official) */
 #elif defined(__alpha__)
 #define	CDEV_MAJOR 52		/* OpenBSD alpha (not official) */
 #else
