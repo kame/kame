@@ -2,7 +2,7 @@
 
 			KAME Project
 
-			$Date: 2000/04/17 07:35:40 $
+			$Date: 2000/04/17 10:01:09 $
 
 <<<Project Overview>>>
 
@@ -25,6 +25,7 @@ merged into BSD/OS, FreeBSD, and OpenBSD(IPv6 stuff only).
 "KAME" officially indicates a short word of <Ka>rigo<me> where our office
 locates.  But it, in fact, stands for turtle in Japanese.
 
+
 <<<Our Goals>>>
 
 KAME Project aims to provide FREE reference implementations of
@@ -33,6 +34,7 @@ KAME Project aims to provide FREE reference implementations of
 	(3) advanced internetworking such as advanced packet queuing, 
 	    ATM, mobility, and whatever interesting
 on several BSD variants.
+
 
 <<<Copyright>>>
 
@@ -45,6 +47,7 @@ to be terminated in March 2002.
 READ CAREFULLY: Several countries have legal enforcement for
 export/import/use of cryptographic software.  Check it before playing
 with the kit.
+
 
 <<<What's Next?>>>
 
@@ -59,10 +62,31 @@ IMPLEMENTATION.
 
 Before you start using this kit, please take a look at USAGE. 
 
+
+<<<What is the difference with *BSD IPv6/IPsec code and KAME code?>>>
+
+Starting summer 1999, *BSD distributions start incorporating KAME IPv6/IPsec
+stack into their development track (i.e. *BSD-current).  Recently some of
+*BSDs ship with integrated IPv6 code (for example, FreeBSD 4.0-RELEASE).
+Basically,
+- *BSD distributions ship with past KAME code.  and they do not include
+  some of experimental code in KAME tree (merger did not take place for
+  some of experimental portion, on purpose).
+- KAME kit includes more recent IPv6/IPsec changes by KAME team.
+  It also includes more experimental code than the *BSD distributions, as
+  well as additional functionalities which haven't integrated into *BSDs yet.
+
+http://www.kame.net/project-overview.html#release talks more about this issue.
+
+Please do not mix up development cycle in *BSD team, and in KAME team.  They
+are totally separate.  For example, "FreeBSD 4.0-STABLE" has nothing to do
+with "KAME STABLE kit".
+
+
 <<<Reporting bugs>>
 
 When you report bugs, please be sure to include the following information:
-- the opertaing system platform you are using (like "FreeBSD 2.2.8")
+- the opertaing system platform you are using (like "FreeBSD 2.2.8-RELEASE")
 - the hardware architecture you are using (i386, sparc, vax or whatever)
 - the version of KAME you are using ("SNAP dated Jan 1 2000", or
   "grabbed via anonymous CVS around Jan 1 2000")
@@ -76,8 +100,8 @@ When you report bugs, please be sure to include the following information:
 - (if necessary) packet trace taken by "tcpdump" command.
 - (if necessary) IPv6/v4 connectivity status in your network
 
-Don't try to *describe* your settings, paste command output onto the report
-instead.
+Don't try to *describe* your settings, paste command output itself
+onto the report instead.
 
 If you track the bugs, please notice the following items:
 - be sure to use "ping6 -n", not "ping6", when you probe reachability.
@@ -89,6 +113,7 @@ it to snap-users mailing list.
 	snap-users mailing list: http://www.kame.net/snap-users/
 
 Thanks for your feedbacks!
+
 
 <<<Contact Points>>
 
@@ -109,6 +134,7 @@ If you have questions about commercial usage or other administrative/political
 issues, please send the questions to:
 	kame-secretary@kame.net
 
+
 <<<Researchers>>>
 
 Current core members are:
@@ -121,6 +147,7 @@ Current core members are:
            Kazushi SUGYO  NEC Corporation
          Yoshinobu INOUE  Fujitsu Limited
 	     Kenjiro CHO  Sony Computer Science Laboratory Inc.
+
 
 <<<Acknowledgements>>>
 
