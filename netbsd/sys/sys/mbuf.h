@@ -119,8 +119,8 @@ struct m_hdr {
 /* record/packet header in first mbuf of chain; valid if M_PKTHDR set */
 struct	pkthdr {
 	struct	ifnet *rcvif;		/* rcv interface */
-	int	len;			/* total packet length */
 	void	*aux;			/* extra data buffer; ipsec/others */
+	int	len;			/* total packet length */
 };
 
 /* description of external storage mapped into mbuf, valid if M_EXT set */
