@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.112 2000/09/22 17:25:03 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.113 2000/09/29 18:45:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.112 2000/09/22 17:25:03 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.113 2000/09/29 18:45:10 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -569,14 +569,18 @@ t2isakmpsa(trns, sa)
 	if (keylen) {
 		switch (sa->enctype) {
 		case OAKLEY_ATTR_ENC_ALG_DES:
+#ifdef HAVE_OPENSSL_IDEA_H
 		case OAKLEY_ATTR_ENC_ALG_IDEA:
+#endif
 		case OAKLEY_ATTR_ENC_ALG_3DES:
 			plog(logp, LOCATION, NULL,
 				"keylen must not be specified for encryption algorithm %d\n",
 				sa->enctype);
 			goto err;
 		case OAKLEY_ATTR_ENC_ALG_BLOWFISH:
+#ifdef HAVE_OPENSSL_RC5_H
 		case OAKLEY_ATTR_ENC_ALG_RC5:
+#endif
 		case OAKLEY_ATTR_ENC_ALG_CAST:
 			break;
 		default:
@@ -1811,9 +1815,13 @@ check_attr_isakmp(trns)
 			switch (lorv) {
 			case OAKLEY_ATTR_ENC_ALG_DES:
 			case OAKLEY_ATTR_ENC_ALG_3DES:
+#ifdef HAVE_OPENSSL_IDEA_H
 			case OAKLEY_ATTR_ENC_ALG_IDEA:
+#endif
 			case OAKLEY_ATTR_ENC_ALG_BLOWFISH:
+#ifdef HAVE_OPENSSL_RC5_H
 			case OAKLEY_ATTR_ENC_ALG_RC5:
+#endif
 			case OAKLEY_ATTR_ENC_ALG_CAST:
 				break;
 			default:

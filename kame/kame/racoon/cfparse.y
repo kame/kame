@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.71 2000/09/22 18:13:10 itojun Exp $	*/
+/*	$KAME: cfparse.y,v 1.72 2000/09/29 18:45:09 itojun Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -1154,8 +1154,25 @@ isakmpproposal_spec
 				yyerror("algorithm mismatched");
 				return -1;
 			}
+
 			switch ($1) {
 			case algclass_isakmp_enc:
+			/* reject suppressed algorithms */
+#ifndef HAVE_OPENSSL_RC5_H
+				if ($2 == algtype_rc5) {
+					yyerror("algorithm %s not supported",
+					    s_attr_isakmp_enc(doi));
+					return -1;
+				}
+#endif
+#ifndef HAVE_OPENSSL_IDEA_H
+				if ($2 == algtype_idea) {
+					yyerror("algorithm %s not supported",
+					    s_attr_isakmp_enc(doi));
+					return -1;
+				}
+#endif
+
 				prhead->spspec->algclass[algclass_isakmp_enc] = doi;
 				defklen = default_keylen($1, $2);
 				if (defklen == 0) {
