@@ -1,4 +1,4 @@
-/*	$KAME: addrselect.c,v 1.7 2001/12/19 14:32:09 jinmei Exp $	*/
+/*	$KAME: addrselect.c,v 1.8 2001/12/20 08:55:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -78,40 +78,28 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	int ch;
-
-	while ((ch = getopt(argc, argv, "c:")) != -1) {
-		switch(ch) {
-		case 'c':
-			configfile = optarg;
-			break;
-		default:
-			usage();
-			/* NOTREACHED */
-		}
-	}
-	argc -= optind;
-	argv += optind;
-
 	TAILQ_INIT(&policyhead);
 
-	if (configfile) {
-		make_policy_fromfile(configfile);
-		set_policy();
-	} else if (argc == 0 || strcasecmp(argv[0], "show") == 0) {
+	if (argc == 1 || strcasecmp(argv[1], "show") == 0) {
 		get_policy();
 		dump_policy();
-	} else if (strcasecmp(argv[0], "add") == 0) {
-		if (argc < 4)
+	} else if (strcasecmp(argv[1], "add") == 0) {
+		if (argc < 5)
 			usage();
-		add_policy(argv[1], argv[2], argv[3]);
+		add_policy(argv[2], argv[3], argv[4]);
 	} else if (strcasecmp(argv[0], "delete") == 0) {
-		if (argc < 2)
+		if (argc < 3)
 			usage();
-		delete_policy(argv[1]);
-	} else if (strcasecmp(argv[0], "flush") == 0) {
+		delete_policy(argv[2]);
+	} else if (strcasecmp(argv[1], "flush") == 0) {
 		get_policy();
 		flush_policy();
+	} else if (strcasecmp(argv[1], "install") == 0) {
+		if (argc < 3)
+			usage();
+		configfile = argv[2];
+		make_policy_fromfile(configfile);
+		set_policy();
 	} else
 		usage();
 
@@ -468,12 +456,12 @@ flush_policy()
 static void
 usage()
 {
-	fprintf(stderr, "usage: addrselect -c <configfile>\n");
-	fprintf(stderr, "       addrselect [show]\n");
+	fprintf(stderr, "usage: addrselect [show]\n");
 	fprintf(stderr, "       addrselect add "
 		"<prefix> <precedence> <label>\n");
 	fprintf(stderr, "       addrselect delete <prefix>\n");
 	fprintf(stderr, "       addrselect flush\n");
+	fprintf(stderr, "       addrselect install <configfile>\n");
 
 	exit(1);
 }
