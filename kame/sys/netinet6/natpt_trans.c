@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.146 2002/08/21 23:34:37 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.147 2002/08/22 07:13:52 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1611,6 +1611,7 @@ natpt_translateFragment4to6(struct pcv *cv4, struct pAddr *pad)
 
 	bcopy(cv4->pyld.caddr, pyld6, cv4->plen);
 	m6->m_pkthdr.len = m6->m_len = NATPT_FRGHDRSZ + cv4->plen;
+	m6->m_pkthdr.rcvif = cv4->m->m_pkthdr.rcvif;
 
 	return (m6);
 }
