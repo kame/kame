@@ -1,3 +1,4 @@
+/*	$KAME: mchat.c,v 1.14 2001/06/08 04:36:39 jinmei Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
  * All rights reserved.
