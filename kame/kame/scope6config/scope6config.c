@@ -90,7 +90,7 @@ main(argc, argv)
 		exit(1);
 	}
 
-	if (strcasecmp(argv[0], "default") == 0)
+	if (argc > 0 && strcasecmp(argv[0], "default") == 0)
 		error = print_default();
 	else if (!aflag)
 		error = scopeconfig(argv[0], linkid, siteid, orgid);
