@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.89 2002/06/23 05:37:11 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.90 2002/06/28 07:29:43 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -98,10 +98,6 @@ static int rmsgctllen;
 static char *rmsgctlbuf;
 static struct duid server_duid;
 static struct dhcp6_list arg_dnslist;
-
-#define LINK_LOCAL_PLEN 10
-#define SITE_LOCAL_PLEN 10
-#define GLOBAL_PLEN 3
 
 #define DUID_FILE "/etc/dhcp6s_duid"
 #define DHCP6S_CONF "/usr/local/v6/etc/dhcp6s.conf"
