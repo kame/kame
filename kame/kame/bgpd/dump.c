@@ -262,6 +262,46 @@ dump_bgp_rtentry(FILE *fp, struct rt_entry *rte, char *indent)
 			fprintf(fp, "...");
 		fputc('\n', fp);
 	}
+
+}
+
+static void
+dump_bgp_exportlist(FILE *fp, struct rt_entry *rte, char *indent)
+{
+	char inetaddrstr[INET_ADDRSTRLEN];
+	extern struct rpcb *bgb;
+	struct rpcb *srcbnp = rte->rt_proto.rtp_bgp, *obnp;
+	int first = 1;
+
+	obnp = bgb;
+	while(obnp) {
+		struct rtproto *rtp = obnp->rp_adj_ribs_out;
+
+		if (obnp != srcbnp &&
+		    obnp->rp_state == BGPSTATE_ESTABLISHED) {
+			while(rtp) {
+				if (rtp->rtp_type == RTPROTO_BGP &&
+				    rtp->rtp_bgp == srcbnp) {
+				}
+				if (first == 1) {
+					fprintf(fp, "%s  Exported to:\n",
+						indent);
+					first = 0; 
+				}
+				fprintf(fp,
+					"%s    %s(%s), ID=%s\n",
+					indent,
+					bgp_peerstr(obnp),
+					(obnp->rp_mode & BGPO_IGP) ?
+					"IBGP" : "EBGP",
+					inet_ntop(AF_INET, &obnp->rp_id,
+						  inetaddrstr,
+						  INET_ADDRSTRLEN));
+			}
+		}
+	}
+	if (first == 1)
+		fprintf(fp, "%s  Not exported\n", indent);
 }
 
 static void
@@ -536,6 +576,7 @@ show_bgp_route_entry(fp, bre)
 	fprintf(fp, "%s            ID: %s, Type: %s\n", indent,
 		inet_ntop(AF_INET, &bnp->rp_id, inetaddrstr, INET_ADDRSTRLEN),
 		(bnp->rp_mode & BGPO_IGP) ? "IBGP" : "EBGP");
+	dump_bgp_exportlist(fp, bre->rte, indent);
 }
 
 static struct bgproute_entry *
