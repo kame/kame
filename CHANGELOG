@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.441 2000/01/16 07:28:33 itojun Exp $
+$Id: CHANGELOG,v 1.442 2000/01/16 12:51:08 itojun Exp $
 
 <200001>
+Sun Jan 16 21:49:38 JST 2000  itojun@iijlab.net
+	* netbsd/usr.bin/fstat: make it IPv6 ready.
+	  NetBSD PR: 9199
+	  From: ura@hiru.aoba.yokohama.jp
+
 Sat Jan 15 03:56:50 JST 2000  itojun@iijlab.net
 	* kame/sys/netinet6/ipcomp_core.c: change default deflate window size
 	  for inbound to default (2^15).  without this change we can't
