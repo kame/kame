@@ -16,7 +16,7 @@
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
 # $FreeBSD: src/sys/i386/conf/GENERIC,v 1.143.2.24 1999/12/05 01:56:42 luoqi Exp $
-# $Id: GENERIC.v6,v 1.11 2000/02/09 12:48:34 itojun Exp $
+# $Id: GENERIC.v6,v 1.12 2000/02/14 14:05:47 sumikawa Exp $
 
 machine		"i386"
 cpu		"I386_CPU"
@@ -47,9 +47,6 @@ options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 #options 	IPSEC_DEBUG		#debug for IP security
 #options 	NATM			#native mode ATM
 options 	MAPPED_ADDR_ENABLED	#enable IPv4, on IPv6 socket
-
-# special kernel for TAHI test team - not for general users
-###options		TAHI
 
 # IPv6 firewall
 #options 	"IPV6FIREWALL"
