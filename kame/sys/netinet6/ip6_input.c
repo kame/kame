@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.75 2000/03/28 23:11:05 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.76 2000/03/30 14:19:03 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,7 +66,9 @@
 
 #ifdef __FreeBSD__
 #include "opt_ip6fw.h"
+#if __FreeBSD__ <= 3
 #include "opt_natpt.h"
+#endif
 #endif
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 #include "opt_inet.h"
@@ -99,6 +101,9 @@
 #include <net/if_dl.h>
 #include <net/route.h>
 #include <net/netisr.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#include <net/intrq.h>
+#endif
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -139,9 +144,10 @@
 #include "loop.h"
 #endif
 #include "faith.h"
-
 #include "gif.h"
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #include "bpfilter.h"
+#endif
 
 #include <net/net_osdep.h>
 
@@ -162,7 +168,9 @@ extern struct ifnet *loifp;
 u_char ip6_protox[IPPROTO_MAX];
 static int ip6qmaxlen = IFQ_MAXLEN;
 struct in6_ifaddr *in6_ifaddr;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 struct ifqueue ip6intrq;
+#endif
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 extern struct ifnet loif[NLOOP];
@@ -170,6 +178,9 @@ extern struct ifnet loif[NLOOP];
 int ip6_forward_srcrt;			/* XXX */
 int ip6_sourcecheck;			/* XXX */
 int ip6_sourcecheck_interval;		/* XXX */
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+const int int6intrq_present = 1;
+#endif
 
 #ifdef IPV6FIREWALL
 /* firewall hooks */
@@ -223,6 +234,9 @@ ip6_init()
 		    pr->pr_protocol && pr->pr_protocol != IPPROTO_RAW)
 			ip6_protox[pr->pr_protocol] = pr - inet6sw;
 	ip6intrq.ifq_maxlen = ip6qmaxlen;
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+	register_netisr(NETISR_IPV6, ip6intr);
+#endif
 	nd6_init();
 	frag6_init();
 #ifdef IPV6FIREWALL
@@ -301,7 +315,7 @@ ip6intr()
 	}
 }
 
-#ifdef __FreeBSD__
+#if (defined(__FreeBSD__) && __FreeBSD__ <= 3)
 NETISR_SET(NETISR_IPV6, ip6intr);
 #endif
 
@@ -348,8 +362,7 @@ ip6_input(m)
 #else
 				ip6stat.ip6s_m2m[loif[0].if_index]++;	/*XXX*/
 #endif
-			}
-			else if (m->m_pkthdr.rcvif->if_index <= 31)
+			} else if (m->m_pkthdr.rcvif->if_index <= 31)
 				ip6stat.ip6s_m2m[m->m_pkthdr.rcvif->if_index]++;
 			else
 				ip6stat.ip6s_m2m[0]++;
@@ -710,8 +723,7 @@ ip6_input(m)
 			m_freem(m);
 			return;
 		}
-	}
-	else if (!ours) {
+	} else if (!ours) {
 		ip6_forward(m, 0);
 		return;
 	}	
@@ -1064,9 +1076,12 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 			prevctl = *prevctlp;
 	}
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 3)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
 		privileged++;
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+	if (p && !suser(p))
+ 		privileged++;
 #else
 #ifdef HAVE_NRL_INPCB
 	if ((in6p->inp_socket->so_state & SS_PRIV) != 0)
