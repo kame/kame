@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.56 2000/01/17 10:55:59 itojun Exp $ */
+/* KAME $Id: key.c,v 1.57 2000/01/17 12:07:43 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -4873,6 +4873,12 @@ key_register(mhp, so)
 		panic("key_register: NULL pointer is passed.\n");
 
 	msg0 = (struct sadb_msg *)mhp[0];
+
+	/* check for invalid register message */
+	if (msg0->sadb_msg_satype >= sizeof(regtree)/sizeof(regtree[0])) {
+		msg0->sadb_msg_errno = EINVAL;
+		return NULL;
+	}
 
 	/* When SATYPE_UNSPEC is specified, only return sabd_supported. */
 	if (msg0->sadb_msg_satype == SADB_SATYPE_UNSPEC)
