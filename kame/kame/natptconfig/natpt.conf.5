@@ -1,4 +1,4 @@
-.\"	$KAME: natpt.conf.5,v 1.9 2001/11/08 23:19:18 fujisawa Exp $
+.\"	$KAME: natpt.conf.5,v 1.10 2001/11/09 01:02:38 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -81,12 +81,12 @@ is used to indicate a choice between optional
 parameters.
 .Pp
 The following directives are available in the configuration file.
-.Bl -tag -width Ds -offset indent
+.Bl -tag -width Ds
 .\"
 .It Xo Sy prefix
 .Xc
-Set NAT-PT prefix.  Packet addressed to this prefix will subject to
-translate.  Prefix length is always assumed as 96 bit.
+Set NAT-PT prefix.  Packet addressed to this prefix is subject to
+translate.  Prefix length is always assumed as 96 bits.
 .\"
 .It Xo Sy map from ...
 .Xc
@@ -109,12 +109,13 @@ Translate IPv6 packet to IPv4 packet.
 .Pp
 The former is translate IPv6 packet coming from arbitrary host.  The
 latter is translate IPv4 packet coming from specified host or address
-range.  The number after
+range.  Both rules translate incoming IPv6 packet to packet coming out
+of specified IPv4 address.  The number after
 .Sy \&/
-specifies address mask, and when address mask is not specified, it is
-same as
-.Ar v6addr Sy \&/
-128.  If
+specifies address mask.  When address mask is not specified, it is
+treated as if 
+.Sy \&/
+128 is specified.  If
 .Sy port
 is specified, convert source port number into the number that is not
 used with specified range.  If not, source port number is not
@@ -263,10 +264,13 @@ show subcommand.
 .\"
 .Sh EXAMPLES
 The following example is typical NAT-PT configuration.
-IPv6 packets which has the prefix 3ffe:ffff:ffff:ffff::/96 are translated
-into IPv4 packet.
-Source address of the translated IPv4 packets are set to 172.16.11.22.
-.Bd -literal -offset
+IPv6 packets which has the prefix
+.Em 3ffe:ffff:ffff:ffff::/96
+are translated into IPv4 packet.
+Source address of the translated IPv4 packets are set to
+.Em 172.16.11.22 .
+.Pp
+.Bd -literal -offset indent
 prefix 3ffe:ffff:ffff:ffff::
 map from any6 to 172.16.11.22
 map enable
@@ -275,7 +279,7 @@ map enable
 .Sh COMPATIBILITY
 Caution is needed because some syntax was changed.  The following is
 changed point of syntax.
-.Bl -bullet -offset indent
+.Bl -bullet
 .It
 .Ql interface
 directive was removed.
@@ -294,11 +298,10 @@ and
 .Ql outbound
 became needless.  Use
 .Ql dport
-when you want to change destination port number.
-.Pp
-i.e.
-.Pp
+when you want to change destination port number.  i.e.,
+.Bd -literal -offset XXXX
 map from 202.249.11.251 dport 65305 to 3ffe:0501:041c::1 dport 23
+.Ed
 .El
 .\"
 .Sh SEE ALSO
