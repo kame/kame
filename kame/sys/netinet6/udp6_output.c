@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.5 2000/05/18 15:04:35 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.6 2000/06/04 17:00:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,7 +78,7 @@
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <sys/systm.h>
-#ifdef __NetBSD__
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined (__NetBSD__)
 #include <sys/proc.h>
 #endif
 #include <sys/syslog.h>
@@ -139,12 +139,26 @@
 #define udp6stat	udpstat
 #define udp6s_opackets	udps_opackets
 #endif
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#define in6pcb		inpcb
+#define udp6stat	udpstat
+#define udp6s_opackets	udps_opackets
+#endif
 
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 int
+udp6_output(in6p, m, addr6, control, p)
+	register struct in6pcb *in6p;
+	register struct mbuf *m;
+	struct mbuf *control;
+	struct sockaddr *addr6;
+	struct proc *p;
+#else
 udp6_output(in6p, m, addr6, control)
 	register struct in6pcb *in6p;
 	register struct mbuf *m;
 	struct mbuf *addr6, *control;
+#endif
 {
 	register u_int32_t ulen = m->m_pkthdr.len;
 	u_int32_t plen = sizeof(struct udphdr) + ulen;
@@ -155,7 +169,7 @@ udp6_output(in6p, m, addr6, control)
 	int error = 0;
 	struct ip6_pktopts opt, *stickyopt = in6p->in6p_outputopts;
 	int priv;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifdef __NetBSD__
 	struct proc *p = curproc;	/* XXX */
 #endif
 	int af, hlen;
@@ -187,6 +201,9 @@ udp6_output(in6p, m, addr6, control)
 		 * and In6_pcbsetport in order to fill in the local address
 		 * and the local port.
 		 */
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)addr6;
+#else
 		struct sockaddr_in6 *sin6 = mtod(addr6, struct sockaddr_in6 *);
 
 		if (addr6->m_len != sizeof(*sin6)) {
@@ -197,6 +214,7 @@ udp6_output(in6p, m, addr6, control)
 			error = EAFNOSUPPORT;
 			goto release;
 		}
+#endif
 		if (sin6->sin6_port == 0) {
 			error = EADDRNOTAVAIL;
 			goto release;
@@ -267,7 +285,12 @@ udp6_output(in6p, m, addr6, control)
 			goto release;
 		}
 		if (in6p->in6p_lport == 0 &&
-		    (error = in6_pcbsetport(laddr, in6p)) != 0)
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		    (error = in6_pcbsetport(laddr, in6p, p)) != 0
+#else
+		    (error = in6_pcbsetport(laddr, in6p)) != 0
+#endif
+			)
 			goto release;
 	} else {
 		if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {

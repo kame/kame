@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.15 2000/05/30 10:16:24 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.16 2000/06/04 17:00:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -502,3 +502,101 @@ in6_pcbsetport(laddr, in6p)
 #undef IN6PLOOKUP_WILDCARD
 #endif
 #endif /* !FreeBSD3 && !OpenBSD*/
+
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+/*
+ * XXX: this is 
+ */
+int
+in6_pcbsetport(laddr, inp, p)
+	struct in6_addr *laddr;
+	struct inpcb *inp;
+	struct proc *p;
+{
+	struct socket *so = inp->inp_socket;
+	u_int16_t lport = 0, first, last, *lastport;
+	int count, error = 0, wild = 0;
+	struct inpcbinfo *pcbinfo = inp->inp_pcbinfo;
+
+	/* XXX: this is redundant when called from in6_pcbbind */
+	if ((so->so_options & (SO_REUSEADDR|SO_REUSEPORT)) == 0)
+		wild = INPLOOKUP_WILDCARD;
+
+	inp->inp_flags |= INP_ANONPORT;
+
+	if (inp->inp_flags & INP_HIGHPORT) {
+		first = ipport_hifirstauto;	/* sysctl */
+		last  = ipport_hilastauto;
+		lastport = &pcbinfo->lasthi;
+	} else if (inp->inp_flags & INP_LOWPORT) {
+		if (p && (error = suser(p->p_ucred, &p->p_acflag)))
+			return error;
+		first = ipport_lowfirstauto;	/* 1023 */
+		last  = ipport_lowlastauto;	/* 600 */
+		lastport = &pcbinfo->lastlow;
+	} else {
+		first = ipport_firstauto;	/* sysctl */
+		last  = ipport_lastauto;
+		lastport = &pcbinfo->lastport;
+	}
+	/*
+	 * Simple check to ensure all ports are not used up causing
+	 * a deadlock here.
+	 *
+	 * We split the two cases (up and down) so that the direction
+	 * is not being tested on each round of the loop.
+	 */
+	if (first > last) {
+		/*
+		 * counting down
+		 */
+		count = first - last;
+
+		do {
+			if (count-- < 0) {	/* completely used? */
+				/*
+				 * Undo any address bind that may have
+				 * occurred above.
+				 */
+				inp->in6p_laddr = in6addr_any;
+				return (EAGAIN);
+			}
+			--*lastport;
+			if (*lastport > first || *lastport < last)
+				*lastport = first;
+			lport = htons(*lastport);
+		} while (in6_pcblookup_local(pcbinfo,
+					     &inp->in6p_laddr, lport, wild));
+	} else {
+		/*
+			 * counting up
+			 */
+		count = last - first;
+
+		do {
+			if (count-- < 0) {	/* completely used? */
+				/*
+				 * Undo any address bind that may have
+				 * occurred above.
+				 */
+				inp->in6p_laddr = in6addr_any;
+				return (EAGAIN);
+			}
+			++*lastport;
+			if (*lastport < first || *lastport > last)
+				*lastport = first;
+			lport = htons(*lastport);
+		} while (in6_pcblookup_local(pcbinfo,
+					     &inp->in6p_laddr, lport, wild));
+	}
+
+	inp->inp_lport = lport;
+	if (in_pcbinshash(inp) != 0) {
+		inp->in6p_laddr = in6addr_any;
+		inp->inp_lport = 0;
+		return (EAGAIN);
+	}
+
+	return(0);
+}
+#endif
