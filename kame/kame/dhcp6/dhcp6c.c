@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.61 2002/05/01 04:13:53 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.62 2002/05/01 04:21:08 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -194,12 +194,16 @@ client6_init()
 	int ifidx;
 
 	ifidx = if_nametoindex(device);
-	if (ifidx == 0)
-		errx(1, "if_nametoindex(%s)", device);
+	if (ifidx == 0) {
+		dprintf(LOG_ERR, "if_nametoindex(%s)");
+		exit(1);
+	}
 
 	/* get our DUID */
-	if (get_duid(DUID_FILE, &client_duid))
-		errx(1, "failed to get a DUID");
+	if (get_duid(DUID_FILE, &client_duid)) {
+		dprintf(LOG_ERR, "failed to get a DUID");
+		exit(1);
+	}
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET6;
@@ -208,64 +212,72 @@ client6_init()
 	hints.ai_flags = AI_PASSIVE;
 	error = getaddrinfo(NULL, DH6PORT_DOWNSTREAM, &hints, &res);
 	if (error) {
-		errx(1, "getaddrinfo: %s", gai_strerror(error));
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "getaddrinfo: %s", gai_strerror(error));
+		exit(1);
 	}
 	insock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (insock < 0) {
-		err(1, "socket(inbound)");
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "socket(inbound)");
+		exit(1);
 	}
 	if (setsockopt(insock, SOL_SOCKET, SO_REUSEPORT,
 		       &on, sizeof(on)) < 0) {
-		err(1, "setsockopt(inbound, SO_REUSEPORT)");
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "setsockopt(inbound, SO_REUSEPORT)");
+		exit(1);
 	}
 	if (bind(insock, res->ai_addr, res->ai_addrlen) < 0) {
-		err(1, "bind(inbonud)");
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "bind(inbonud): %s", strerror(errno));
+		exit(1);
 	}
 	freeaddrinfo(res);
 
 	hints.ai_flags = 0;
 	error = getaddrinfo(NULL, DH6PORT_UPSTREAM, &hints, &res);
 	if (error) {
-		errx(1, "getaddrinfo: %s", gai_strerror(error));
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "getaddrinfo: %s", gai_strerror(error));
+		exit(1);
 	}
 	outsock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (outsock < 0) {
-		err(1, "socket(outbound)");
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "socket(outbound): %s", strerror(errno));
+		exit(1);
 	}
 	if (setsockopt(outsock, IPPROTO_IPV6, IPV6_MULTICAST_IF,
 			&ifidx, sizeof(ifidx)) < 0) {
-		err(1, "setsockopt(outbound, IPV6_MULTICAST_IF)");
-		/* NOTREACHED */
+		dprintf(LOG_ERR,
+			"setsockopt(outbound, IPV6_MULTICAST_IF): %s",
+			strerror(errno));
+		exit(1);
 	}
 	if (setsockopt(outsock, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &on,
 		       sizeof(on)) < 0) {
-		err(1, "setsockopt(outsock, IPV6_MULTICAST_LOOP)");
-		/* NOTREACHED */
+		dprintf(LOG_ERR,
+			"setsockopt(outsock, IPV6_MULTICAST_LOOP): %s",
+			strerror(errno));
+		exit(1);
 	}
 	/* make the socket write-only */
 	if (shutdown(outsock, 0)) {
-		err(1, "shutdown(outbound, 0)");
-		/* NOTREACHED */
+		dprintf(LOG_ERR, "shutdown(outbound, 0): %s", strerror(errno));
+		exit(1);
 	}
 	freeaddrinfo(res);
 
 	/* open a routing socket to watch the routing table */
-	if ((rtsock = socket(PF_ROUTE, SOCK_RAW, 0)) < 0)
-		err(1, "open a routing socket");
+	if ((rtsock = socket(PF_ROUTE, SOCK_RAW, 0)) < 0) {
+		dprintf(LOG_ERR, "open a routing socket: %s", strerror(errno));
+		exit(1);
+	}
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET6;
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_protocol = IPPROTO_UDP;
 	error = getaddrinfo(DH6ADDR_ALLAGENT, DH6PORT_UPSTREAM, &hints, &res);
-	if (error)
-		errx(1, "getaddrinfo: %s", gai_strerror(error));
+	if (error) {
+		dprintf(LOG_ERR, "getaddrinfo: %s", gai_strerror(error));
+		exit(1);
+	}
 	memcpy(&sa6_allagent_storage, res->ai_addr, res->ai_addrlen);
 	sa6_allagent = (const struct sockaddr_in6 *)&sa6_allagent_storage;
 	freeaddrinfo(res);
