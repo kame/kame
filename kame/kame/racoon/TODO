@@ -1,4 +1,4 @@
-$Id: TODO,v 1.22 2000/09/21 20:00:18 itojun Exp $
+$Id: TODO,v 1.23 2000/09/21 20:09:16 itojun Exp $
 
 Please send any questions or bug reports to snap-users@kame.net.
 
@@ -11,6 +11,7 @@ o split log file based on client.  printf-like config directive, i.e.
 o fix flag for logging
 o IPComp SA with wellknown CPI in CPI field.  how to handle it?
   if wellknown CPI is used in IKE negotiation, we will end up installing it.
+o fix delete payload for IPComp SA.  use 2 byte SPI.
 
 MUST
 o Certificate type handling.  e.g. CRL, CR, PGP...
@@ -112,6 +113,25 @@ o full support for variable length SPI.  quickhack support for IPComp is done.
 
 MAY
 o Effective code.
+o interaction between IKE/IPsec and socket layer.
+  at this moment, IKE/IPsec failure is modeled as total packet loss to other
+  part of network subsystem, including socket layer.  this presents the
+  following behaviors:
+  - annoyingly long timeouts on tcp connection attempt, and IKE failure;
+    need to wait till tcp socket timeouts.
+  - blackhole if there's mismatching SAs.
+  we may be able to give socket layer some feedback from IKE/IPsec layer.
+  still not sure if those make sense or not.
+  for example:
+  - send PRU_HOSTDEAD to sockets if IKE negotiation failed
+    (sys/netkey/key.c:key_acquire2)
+    to do this, we need to remember which ACQUIRE was caused by which socket,
+    possibly into larval SAs.
+  - PRU_QUENCH on "no SA found on output"
+  - kick tcp retransmission timer on first SA establishment
+o IKE daemon should handle situations where peer does not run IKE daemon
+  (UDP port unreach for port 500) better.
+o rate-limit log messages from kernel IPsec errors, like "no SA found".
 
 TO BE TESTED.
 o IKE retransmit behavior
