@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.27 2000/09/21 22:44:40 sakane Exp $
+$KAME: sandiego0009-result.en,v 1.28 2000/09/21 23:19:28 itojun Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -151,7 +151,7 @@ vs Linux FreeSWAN
 	phase 1: main
 	    preshared, 3des-cbc, md5, DH group 2, lifetime 1h
 	phase 2: PFS group 2
-	    ESP 3des-cbc, hmac-md5, tunnel mode, lifetime 1h, PFS 2
+	    ESP 3des-cbc, hmac-md5, transport mode, lifetime 1h, PFS 2
 	    (the IPsec SA did not get installed into linux kernel)
 
 	Notes:
@@ -166,6 +166,10 @@ vs Linux FreeSWAN
 	  (negotiation was successful)
 	- linux side chokes if they gets proposal with algorithm # which linux
 	  side does not know about.
+	- racoon chokes if (1) racoon is phase 2 responder, (2) there's no id
+	  payload from initiator, and (3) kame side has tcp policy (not "any"
+	  policy).
+	- racoon choked if the peer (responder) reorders phase 2 proposals.
 
 vs HiFn
 	phase 1: initiator, main
