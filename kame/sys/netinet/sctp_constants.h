@@ -1,4 +1,4 @@
-/*	$KAME: sctp_constants.h,v 1.6 2002/11/07 03:23:48 itojun Exp $	*/
+/*	$KAME: sctp_constants.h,v 1.7 2003/03/10 05:58:12 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_constants.h,v 1.61 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_constants_h__
@@ -36,6 +36,18 @@
  * SUCH DAMAGE.
  */
 
+/*#define SCTP_AUDITING_ENABLED 1 used for debug/auditing */
+#define SCTP_AUDIT_SIZE 256
+
+#define SCTP_CWND_LOG_SIZE 127	/* can only get one mclusters worth */ 
+/* Places that CWND log can happen from */
+#define SCTP_CWND_LOG_FROM_FR	1
+#define SCTP_CWND_LOG_FROM_RTX	2
+#define SCTP_CWND_LOG_FROM_BRST	3
+#define SCTP_CWND_LOG_FROM_SS	4
+#define SCTP_CWND_LOG_FROM_CA	5
+#define SCTP_CWND_LOG_FROM_SAT	6
+
 /* if you want to support the TCP model, uncomment the following define */
 #define SCTP_TCP_MODEL_SUPPORT	1
 
@@ -45,7 +57,7 @@
 #define SCTP_SCALE_FOR_ADDR	2
 
 /* default AUTO_ASCONF mode enable(1)/disable(0) value (sysctl) */
-#define SCTP_DEFAULT_AUTO_ASCONF  0
+#define SCTP_DEFAULT_AUTO_ASCONF	0
 
 /*
  * If you wish to use MD5 instead of SLA uncomment the line below.
@@ -140,12 +152,25 @@
 /* draft-ietf-tsvwg-addip-sctp */
 #define SCTP_ASCONF		0xc1
 #define	SCTP_ASCONF_ACK		0x80
-/* draft-ietf-tsvwg-usctp */
+
+/* draft-ietf-stewart-prsctp */
 #define SCTP_FORWARD_CUM_TSN	0xc0
+
+/* draft-ietf-stewart-pktdrpsctp */
+#define SCTP_PACKET_DROPPED	0x81
+
 
 /* ABORT and SHUTDOWN COMPLETE FLAG */
 #define SCTP_HAD_NO_TCB		0x01
 
+/* Packet dropped flags */
+#define SCTP_FROM_MIDDLE_BOX	SCTP_HAD_NO_TCB
+#define SCTP_SUMMARY_PRESENT	0x02
+#define SCTP_BADCRC		0x04
+#define SCTP_PACKET_TRUNCATED	0x08
+
+#define SCTP_SAT_NETWORK_MIN	     400	/* min ms for RTT to set satellite time */
+#define SCTP_SAT_NETWORK_BURST_INCR  2		/* how many times to multiply maxburst in sat */
 /* Data Chuck Specific Flags */
 #define SCTP_DATA_FRAG_MASK	0x03
 #define SCTP_DATA_MIDDLE_FRAG	0x00
@@ -265,6 +290,10 @@
 #define SCTP_ADDR_OUT_OF_SCOPE		0x080
 #define SCTP_ADDR_DOUBLE_SWITCH		0x100
 
+#define SCTP_ACTIVE     SCTP_ADDR_REACHABLE
+#define SCTP_INACTIVE   SCTP_ADDR_NOT_REACHABLE
+#define SCTP_REACHABLE_MASK             0x003
+
 /* bound address types (e.g. valid address types to allow) */
 #define SCTP_BOUND_V6		0x01
 #define SCTP_BOUND_V4		0x02
@@ -340,6 +369,19 @@
 #define SCTP_MAXATTEMPT_INIT	2
 #define SCTP_MAXATTEMPT_SEND	3
 
+/* Maximum TSN's we will summarize in a drop report */
+
+#define SCTP_MAX_DROP_REPORT 16
+
+/* How many drop re-attempts we make on  INIT/COOKIE-ECHO */
+#define SCTP_RETRY_DROPPED_THRESH 4
+
+/* And the max we will keep a history of in the tcb 
+ * which MUST be lower than 256.
+ */
+
+#define SCTP_MAX_DROP_SAVE_REPORT 16
+
 /*
  * Here we define the default timers and the default number
  * of attemts we make for each respective side (send/init).
@@ -354,8 +396,8 @@
 /* recv timer def = 200ms (in nsec) */
 #define SCTP_RECV_SEC	(2000/hz)
 
-/* 30 seconds + RTO */
-#define SCTP_HB_DEFAULT	(30*hz)
+/* 30 seconds + RTO (in ms) */
+#define SCTP_HB_DEFAULT	(30000)
 
 /* Max time I will wait for Shutdown to complete */
 #define SCTP_DEF_MAX_SHUTDOWN (180*hz)
@@ -385,6 +427,16 @@
 
 /* How many streams I request initally by default */
 #define SCTP_OSTREAM_INITIAL 10
+
+#define SCTP_SEG_TO_RWND_UPD 32 /* How many smallest_mtu's need to increase before
+                                 * a window update sack is sent (should be a
+                                 * power of 2).
+                                 */
+#define SCTP_SCALE_OF_RWND_TO_UPD       4       /* Incr * this > hiwat, send 
+                                                 * window update. Should be a
+                                                 * power of 2.
+                                                 */
+#define SCTP_RESV_CONTROL_FRM_RWND     (2400) /* Reserve 40 entries of control 60 * 40 */
 
 /* This constant (SCTP_MAX_READBUFFER) define
  * how big the read/write buffer is
@@ -539,7 +591,7 @@
 #define SCTP_UNSET_TSN_PRESENT(arry, gap) (arry[(gap>>3)] &= ((~(0x01 << ((gap&0x07)))) & 0xff))
 
 /* pegs */
-#define SCTP_NUMBER_OF_PEGS 36
+#define SCTP_NUMBER_OF_PEGS 40
 /* peg index's */
 #define SCTP_PEG_SACKS_SEEN 0 /* XX */
 #define SCTP_PEG_SACKS_SENT 1 /* XX */
@@ -577,8 +629,10 @@
 #define SCTP_CALLS_TO_CO   33 /* XX */
 #define SCTP_CO_NODATASNT  34 /* XX */
 #define SCTP_CWND_INCRS    35 /* XX */
-
-
+#define SCTP_MAX_BURST_APL 36 /* XX */
+#define SCTP_EXPRESS_ROUTE 37 /* XX */
+#define SCTP_NO_COPY_IN    38 /* XX */
+#define SCTP_CACHED_SRC    39 /* XX */
 /*
  * This value defines the number of vtag block time wait entry's
  * per list element.  Each entry will take 2 4 byte ints (and of

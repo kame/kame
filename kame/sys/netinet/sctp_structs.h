@@ -1,4 +1,4 @@
-/*	$KAME: sctp_structs.h,v 1.6 2002/09/18 01:00:26 itojun Exp $	*/
+/*	$KAME: sctp_structs.h,v 1.7 2003/03/10 05:58:13 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_structs.h,v 1.67 2002/04/03 21:10:19 lei Exp	*/
 
 #ifndef __sctp_structs_h__
@@ -74,6 +74,7 @@ struct sctp_nets {
 	struct sctp_route {
 		struct rtentry *ro_rt;
 		struct sockaddr_storage _l_addr;	/* remote peer addr */
+		struct sockaddr_storage _s_addr;	/* our selected source address */
 	} ra;
 	int ref_count;
 	/* This is used for SHUTDOWN/SHUTDOWN-ACK/SEND or INIT timers */
@@ -108,6 +109,7 @@ struct sctp_nets {
 	 * SCTP_ADDR_SWITCH_PRIMARY flag
 	 */
 	u_int32_t next_tsn_at_change;
+
 	/* if this guy is ok or not ... status */
 	unsigned short dest_state;
 	/* number of transmit failures to down this guy */
@@ -120,6 +122,8 @@ struct sctp_nets {
 	u_int8_t fast_retran_ip;	/* fast retransmit in progress */
 	u_int8_t hb_responded;
 	u_int8_t cacc_saw_newack;	/* CACC algorithm flag */
+	u_int8_t src_addr_selected;
+	u_int8_t addr_is_local;		/* its a local address (if known) */
 };
 
 
@@ -129,8 +133,12 @@ struct sctp_data_chunkrec {
 	u_int16_t stream_number; /* the stream number of this guy */
 	u_int32_t payloadtype;
 	u_int32_t context;	/* from send */
+	/* part of the Highest sacked algorithm to be able to
+	 * stroke counts on ones that are FR'd.
+	 */
+	u_int32_t fast_retran_tsn;	/* sending_seq at the time of FR */
 	struct timeval timetodrop;	/* time we drop it from queue */
-	u_char doing_fast_retransmit;
+	u_char  doing_fast_retransmit;	
 	u_char rcv_flags; /* flags pulled from data chunk on inbound
 			   * for outbound holds sending flags.
 			   */
@@ -179,6 +187,7 @@ struct sctp_stream_out {
 	TAILQ_ENTRY(sctp_stream_out) next_spoke; /* next link in wheel */
 	u_short stream_no;
 	u_short next_sequence_sent; /* next one I expect to send out */
+	u_short next_unordered_sent;
 };
 
 /* used to keep track of the addresses yet to try to add/delete */
@@ -204,6 +213,7 @@ struct sctp_association {
 	struct timeval time_entered;		/* time we entered state */
 	struct timeval time_last_rcvd;
 	struct timeval time_last_sent;
+	struct timeval time_last_sat_advance;
 	struct sctp_sndrcvinfo def_send;	/* default send parameters */
 
 	/* timers and such */
@@ -265,6 +275,8 @@ struct sctp_association {
 	 */
 	long peers_rwnd;
 	long my_rwnd;
+	long my_last_reported_rwnd;
+	long my_rwnd_control_len;
 
 	/* This is the SCTP fragmentation threshold */
 	u_int32_t smallest_mtu;
@@ -359,6 +371,7 @@ struct sctp_association {
 	 * this is what last TSN I delivered
 	 */
 	u_int32_t tsn_last_delivered;
+	u_int32_t dropped_pkt_reports[SCTP_MAX_DROP_SAVE_REPORT];
 	u_int16_t str_of_pdapi;
 	u_int16_t ssn_of_pdapi;
 
@@ -431,6 +444,7 @@ struct sctp_association {
 	u_int32_t last_echo_tsn;
 	u_int32_t last_cwr_tsn;
 	u_int32_t fast_recovery_tsn;
+	u_int32_t sat_t3_recovery_tsn;
 
 	int numduptsns;
 	int dup_tsns[SCTP_MAX_DUP_TSNS];
@@ -452,6 +466,7 @@ struct sctp_association {
 
 	/* max burst after fast retransmit comletes */
 	u_int8_t max_burst;
+	u_int8_t sat_network;	/* RTT is in range of sat net or greater */
 
 	/* flag goes on when we are doing a partial delivery api */
 	u_int8_t hb_random_values[4];
@@ -491,6 +506,10 @@ struct sctp_association {
 	u_int8_t used_alt_onsack;
 	u_int8_t used_alt_asconfack;
 	u_int8_t fast_retran_loss_recovery;
+	u_int8_t sat_t3_loss_recovery;
+	u_int8_t last_dropped_rep;
+        u_int8_t dropped_special_cnt;
+	u_int8_t dropped_pkt_reports_data[SCTP_MAX_DROP_SAVE_REPORT][3];
 	/*
 	 * The mapping array is used to track out of order sequences
 	 * above last_acked_seq. 0 indicates packet missing 1 indicates

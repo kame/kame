@@ -625,10 +625,8 @@ rtrequest1(req, info, ret_nrt)
 		cache = 1;
 	switch (req) {
 	case RTM_DELETE:
-		if ((rn = rnh->rnh_deladdr(dst, netmask, rnh)) == NULL)
+		if ((rn = rnh->rnh_lookup(dst, netmask, rnh)) == 0)
 			senderr(ESRCH);
-		if (rn->rn_flags & (RNF_ACTIVE | RNF_ROOT))
-			panic ("rtrequest delete");
 		rt = (struct rtentry *)rn;
 #ifdef RADIX_MPATH
 		/*
@@ -642,6 +640,11 @@ rtrequest1(req, info, ret_nrt)
 				senderr(ESRCH);
 		}
 #endif
+		if ((rn = rnh->rnh_deladdr(dst, netmask, rnh)) == NULL)
+			senderr(ESRCH);
+		if (rn->rn_flags & (RNF_ACTIVE | RNF_ROOT))
+			panic ("rtrequest delete");
+		rt = (struct rtentry *)rn;
 		if (rt->rt_gwroute) {
 			rt = rt->rt_gwroute; RTFREE(rt);
 			(rt = (struct rtentry *)rn)->rt_gwroute = NULL;
@@ -663,6 +666,7 @@ rtrequest1(req, info, ret_nrt)
 			senderr(EINVAL);
 		ifa = rt->rt_ifa;
 		flags = rt->rt_flags & ~RTF_CLONING;
+		flags |= RTF_CLONED;
 		gateway = rt->rt_gateway;
 		if ((netmask = rt->rt_genmask) == NULL)
 			flags |= RTF_HOST;

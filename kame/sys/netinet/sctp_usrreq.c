@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.22 2002/11/07 03:23:49 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.23 2003/03/10 05:58:13 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
 
 /*
@@ -147,6 +147,69 @@ ip_2_ip6_hdr(struct ip6_hdr *ip6, struct ip *ip)
 #endif /* INET6 */
 
 static void
+sctp_split_chunks(struct sctp_stream_out *strm,struct sctp_tmit_chunk *chk)
+{
+	struct sctp_tmit_chunk *new_chk;
+
+	/* First we need a chunk.
+	 */
+#if defined(__FreeBSD__)
+	new_chk = (struct sctp_tmit_chunk *)zalloci(sctppcbinfo.ipi_zone_chunk);
+#endif
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	new_chk = (struct sctp_tmit_chunk *)pool_get(&sctppcbinfo.ipi_zone_chunk,
+							 PR_NOWAIT);
+#endif
+	if (new_chk == NULL) {
+		chk->flags |= CHUNK_FLAGS_FRAGMENT_OK;
+		return;
+	}
+	sctppcbinfo.ipi_count_chunk++;
+	sctppcbinfo.ipi_gencnt_chunk++;
+	/* Copy it all */
+	*new_chk = *chk;
+	/*  split the data */
+	new_chk->data = m_split(chk->data, (chk->send_size>>1), M_WAIT);
+	if (new_chk->data == NULL) {
+		/* Can't split */
+		chk->flags |= CHUNK_FLAGS_FRAGMENT_OK;
+#if defined(__FreeBSD__)
+		zfreei(sctppcbinfo.ipi_zone_chunk, new_chk);
+#endif
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+		pool_put(&sctppcbinfo.ipi_zone_chunk, new_chk);
+#endif
+		sctppcbinfo.ipi_count_chunk--;
+		if ((int)sctppcbinfo.ipi_count_chunk < 0) {
+			panic("Chunk count is negative");
+		}
+		sctppcbinfo.ipi_gencnt_chunk++;
+		return;
+
+	}
+	/* Data is now split adjust sizes */
+	chk->send_size >>= 1;
+	new_chk->send_size >>= 1;
+
+	chk->book_size >>= 1;
+	new_chk->book_size >>= 1;
+
+	/* now adjust the marks */
+	chk->rec.data.rcv_flags |= SCTP_DATA_FIRST_FRAG;
+	chk->rec.data.rcv_flags &= ~SCTP_DATA_LAST_FRAG;
+
+	new_chk->rec.data.rcv_flags &= ~SCTP_DATA_FIRST_FRAG;
+	new_chk->rec.data.rcv_flags |= SCTP_DATA_LAST_FRAG;
+	
+	/* Increase ref count if dest is set */
+	if (chk->whoTo) {
+		new_chk->whoTo->ref_count++;
+	}
+	/* now drop it on the end of the list*/
+	TAILQ_INSERT_AFTER(&strm->outqueue,chk,new_chk,sctp_next);
+}
+
+static void
 sctp_notify_mbuf(struct sctp_inpcb *inp,
 		 struct sctp_tcb *stcb,
 		 struct sctp_nets *netp,
@@ -199,9 +262,10 @@ sctp_notify_mbuf(struct sctp_inpcb *inp,
 	if (netp->mtu > nxtsz) {
 		netp->mtu = nxtsz;
 	}
+
 	/* now what about the ep? */
 	if (stcb->asoc.smallest_mtu > nxtsz) {
-		struct sctp_tmit_chunk *chk;
+		struct sctp_tmit_chunk *chk,*nchk;
 		struct sctp_stream_out *strm;
 		/* Adjust that too */
 		stcb->asoc.smallest_mtu = nxtsz;
@@ -219,14 +283,33 @@ sctp_notify_mbuf(struct sctp_inpcb *inp,
 				 * resend since we sent to big of chunk
 				 */
 				chk->flags |= CHUNK_FLAGS_FRAGMENT_OK;
+				if (chk->sent != SCTP_DATAGRAM_RESEND) {
+					stcb->asoc.sent_queue_retran_cnt++;
+				}
 				chk->sent = SCTP_DATAGRAM_RESEND;
+				chk->rec.data.doing_fast_retransmit = 0;
+
+				/* Clear any time so NO RTT is being done */
+				chk->sent_rcv_time.tv_sec = 0;
+				chk->sent_rcv_time.tv_usec = 0;
+				stcb->asoc.total_flight -= chk->send_size;
+				if (stcb->asoc.total_flight < 0) {
+					stcb->asoc.total_flight = 0;
+				}
+				netp->flight_size -= chk->send_size;
+				if (netp->flight_size < 0) {
+					netp->flight_size = 0;
+				}
 			}
 		}
 		TAILQ_FOREACH(strm, &stcb->asoc.out_wheel, next_spoke) {
-			TAILQ_FOREACH(chk, &strm->outqueue, sctp_next) {
-				if ((chk->send_size+IP_HDR_SIZE) > nxtsz) {
-					chk->flags |= CHUNK_FLAGS_FRAGMENT_OK;
+			chk = TAILQ_FIRST(&strm->outqueue);
+			while (chk) {
+				nchk = TAILQ_NEXT(chk, sctp_next);
+				if ((chk->send_size+SCTP_MED_OVERHEAD) > nxtsz) {
+					sctp_split_chunks(strm,chk);
 				}
+				chk = nchk;
 			}
 		}
 	}
@@ -306,6 +389,7 @@ sctp_ctlinput(cmd, sa, vip)
 	struct sctphdr *sh;
 	int s;
 
+
 	if (sa->sa_family != AF_INET ||
 	    ((struct sockaddr_in *)sa)->sin_addr.s_addr == INADDR_ANY) {
 #if defined(__FreeBSD__)
@@ -334,11 +418,12 @@ sctp_ctlinput(cmd, sa, vip)
 		bzero(&to, sizeof(to));
 		bzero(&from, sizeof(from));
 		from.sin_family = to.sin_family = AF_INET;
-		from.sin_family = to.sin_len = sizeof(to);
+		from.sin_len = to.sin_len = sizeof(to);
 		from.sin_port = sh->src_port;
 		from.sin_addr = ip->ip_src;
 		to.sin_port = sh->dest_port;
 		to.sin_addr = ip->ip_dst;
+
 		/*
 		 * 'to' will holds the destination of the packet that failed
 		 * to be sent.
@@ -354,7 +439,6 @@ sctp_ctlinput(cmd, sa, vip)
 		stcb = sctp_findassociation_addr_sa((struct sockaddr *)&from,
 						    (struct sockaddr *)&to,
 						    &inp, &netp);
-
 		if (stcb != NULL && inp && (inp->sctp_socket != NULL)) {
 			if (cmd != PRC_MSGSIZE) {
 				int cm;
@@ -607,22 +691,6 @@ sctp_abort(struct socket *so)
 #else
 	s = splnet();
 #endif
-	if (so && so->so_snd.sb_cc) {
-
-#ifdef SCTP_DEBUG
-		printf("Warning sb_cc:%x not 0 at close\n",
-		       (u_int)so->so_snd.sb_cc);
-#endif
- 		so->so_snd.sb_cc = 0;
- 	}
-	if (so && so->so_snd.sb_mbcnt) {
-
-#ifdef SCTP_DEBUG
-		printf("Warning sb_mbcnt:%x not 0 at close\n",
-		       (u_int)so->so_snd.sb_mbcnt);
-#endif
- 		so->so_snd.sb_mbcnt = 0;
- 	}
 	sctp_inpcb_free(inp,1);
 	splx(s);
 	return 0;
@@ -635,24 +703,28 @@ sctp_attach(struct socket *so, int proto, struct proc *p)
 	struct inpcb *ip_inp;
 	int s, error;
 
-	inp = (struct sctp_inpcb *)so->so_pcb;
-	if (inp != 0)
-		return EINVAL;
-
-	error = soreserve(so, sctp_sendspace, sctp_recvspace);
-	if (error)
-		return error;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
 #endif
+	inp = (struct sctp_inpcb *)so->so_pcb;
+	if (inp != 0) {
+		splx(s);
+		return EINVAL;
+	}
+	error = soreserve(so, sctp_sendspace, sctp_recvspace);
+	if (error) {
+		splx(s);
+		return error;
+	}
 	error = sctp_inpcb_alloc(so);
 
-	splx(s);
-	if (error)
-		return error;
 
+	if (error) {
+		splx(s);
+		return error;
+	}
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	inp->sctp_flags &= ~SCTP_PCB_FLAGS_BOUND_V6;	/* I'm not v6! */
 	ip_inp = &inp->ip_inp.inp;
@@ -673,6 +745,11 @@ sctp_attach(struct socket *so, int proto, struct proc *p)
 	}
 #endif
 #endif /*IPSEC*/
+
+#if defined(__NetBSD__)
+	so->so_send = sctp_sosend;
+#endif
+	splx(s);
 	return 0;
 }
 
@@ -716,23 +793,6 @@ sctp_detach(struct socket *so)
 #else
 	s = splnet();
 #endif
-	/* Just in case we zap the so->so_snd buffer counts */
-	if (so && so->so_snd.sb_cc) {
-
-#ifdef SCTP_DEBUG
-		printf("Warning sb_cc:%x not 0 at close\n",
-		       (u_int)so->so_snd.sb_cc);
-#endif
- 		so->so_snd.sb_cc = 0;
- 	}
-	if (so && so->so_snd.sb_mbcnt) {
-
-#ifdef SCTP_DEBUG
-		printf("Warning sb_mbcnt:%x not 0 at close\n",
-		       (u_int)so->so_snd.sb_mbcnt);
-#endif
- 		so->so_snd.sb_mbcnt = 0;
- 	}
 	if (((so->so_options & SO_LINGER) && (so->so_linger == 0)) ||
 	    (so->so_rcv.sb_cc > 0)) {
 		sctp_inpcb_free(inp,1);
@@ -743,7 +803,11 @@ sctp_detach(struct socket *so)
 	return 0;
 }
 
-static int
+int
+sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
+	  struct mbuf *control, struct proc *p);
+
+int
 sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	  struct mbuf *control, struct proc *p)
 {
@@ -762,7 +826,7 @@ sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	if ((addr == NULL) &&
 	   (((inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) == SCTP_PCB_FLAGS_CONNECTED) ||
 	    ((inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) == SCTP_PCB_FLAGS_TCPTYPE))) {
-		return sctp_output(inp, m, addr, control, p);
+		goto connected_type;
 	} else if (addr == NULL) {
 		error = EDESTADDRREQ;
 		m_freem(m);
@@ -784,8 +848,62 @@ sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		return EINVAL;
 	}
 #endif /* INET6 */
+ connected_type:
+	/* now what about control */
+	if (control) {
+		if (inp->control) {
+			printf("huh? control set?\n");
+			m_freem(inp->control);
+			inp->control = NULL;
+		}
+		inp->control = control;
+	}
+	/* add it in possibly */
+	if ((inp->pkt) && 
+	   (inp->pkt->m_flags & M_PKTHDR)) {
+		struct mbuf *x;
+		int c_len;
 
-	return sctp_output(inp, m, addr, control, p);
+		c_len = 0;
+		/* How big is it */
+		for (x=m;x;x = x->m_next) {
+			c_len += x->m_len;
+		}
+		inp->pkt->m_pkthdr.len += c_len;
+	}
+	/* Place the data */
+	if (inp->pkt) {
+		inp->pkt_last->m_next = m;
+		inp->pkt_last = m;
+	}else{
+		inp->pkt_last = inp->pkt = m;
+	}
+	if (
+#if defined (__FreeBSD__)
+	    /* FreeBSD uses a flag passed */
+	    ((flags & PRUS_MORETOCOME) == 0)
+#elif defined( __NetBSD__)
+	    /* NetBSD uses the so_state field */
+	    ((so->so_state & SS_MORETOCOME) == 0)
+#else
+	    1   /* Open BSD does not have any "more to come" indication */
+#endif
+	    ) {
+	    /* note with the current version this code will
+	     * only be used by OpenBSD, NetBSD and FreeBSD
+	     * have methods for re-defining sosend to use
+	     * the sctp_sosend. One can optionaly switch back
+	     * to this code (by changing back the defininitions
+	     * but this is not advisable.
+	     */
+		int ret;
+		ret = sctp_output(inp, inp->pkt , addr, inp->control, p);
+		inp->pkt = NULL;
+		inp->control = NULL;
+		return(ret);
+	}else{
+		return(0);
+	}
 }
 
 static int
@@ -808,19 +926,40 @@ sctp_disconnect(struct socket *so)
 		if (LIST_EMPTY(&inp->sctp_asoc_list)) {
 			/* No connection */
 			splx(s);
-			return (ENOTCONN);
+			return (0);
 		} else {
 			int some_on_streamwheel = 0;
 			struct sctp_association *asoc;
 			struct sctp_tcb *tcb;
+
 
 			tcb = LIST_FIRST(&inp->sctp_asoc_list);
 			if (tcb == NULL) {
 				splx(s);
 				return (EINVAL);
 			}
-
 			asoc = &tcb->asoc;
+			if (((so->so_options & SO_LINGER) && (so->so_linger == 0)) ||
+			    (so->so_rcv.sb_cc > 0)) {
+				if ((asoc->state & SCTP_STATE_MASK) !=
+				    SCTP_STATE_COOKIE_WAIT) {
+					/* Left with Data unread */
+					struct mbuf *err;
+					err = NULL;
+					MGET(err, M_DONTWAIT, MT_DATA);
+					if (err) {
+						/* Fill in the user initiated abort */
+						struct sctp_paramhdr *ph;
+						ph = mtod(err, struct sctp_paramhdr *);
+						ph->param_type = htons(SCTP_CAUSE_USER_INITIATED_ABT);
+						ph->param_length = htons(sizeof(struct sctp_paramhdr));
+					}
+					sctp_send_abort_tcb(tcb, err);
+				}
+				sctp_free_assoc(inp, tcb);
+				splx(s);
+				return(0);
+			}
 			if (!TAILQ_EMPTY(&asoc->out_wheel)) {
 				/* Check to see if some data queued */
 				struct sctp_stream_out *outs;
@@ -842,7 +981,7 @@ sctp_disconnect(struct socket *so)
 				/* only send SHUTDOWN 1st time thru */
 					sctp_send_shutdown(tcb,
 							   tcb->asoc.primary_destination);
-					sctp_chunk_output(tcb->sctp_ep, tcb, 3);
+					sctp_chunk_output(tcb->sctp_ep, tcb, 1);
 					asoc->state = SCTP_STATE_SHUTDOWN_SENT;
 					sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWN,
 							 tcb->sctp_ep, tcb,
@@ -940,7 +1079,7 @@ sctp_shutdown(struct socket *so)
 				/* only send SHUTDOWN the first time through */
 				sctp_send_shutdown(tcb,
 						   tcb->asoc.primary_destination);
-				sctp_chunk_output(tcb->sctp_ep, tcb, 3);
+				sctp_chunk_output(tcb->sctp_ep, tcb, 1);
 				asoc->state = SCTP_STATE_SHUTDOWN_SENT;
 				sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWN,
 						 tcb->sctp_ep, tcb,
@@ -1173,11 +1312,11 @@ sctp_count_max_addresses(struct sctp_inpcb *inp)
 	return (cnt);
 }
 
-
 static int
 sctp_optsget(struct socket *so,
 	     int opt,
-	     struct mbuf **mp)
+	     struct mbuf **mp,
+	     struct proc *p)
 {
 	struct sctp_inpcb *inp;
 	struct mbuf *m;
@@ -1233,7 +1372,7 @@ sctp_optsget(struct socket *so,
 			optval = inp->sctp_flags & SCTP_I_WANT_MAPPED_V4_ADDR;
 			break;
 		case SCTP_AUTO_ASCONF:
-		        optval = inp->sctp_flags & SCTP_PCB_FLAGS_AUTO_ASCONF;
+			optval = inp->sctp_flags & SCTP_PCB_FLAGS_AUTO_ASCONF;
 			break;
 		case SCTP_NODELAY:
 			optval = inp->sctp_flags & SCTP_PCB_FLAGS_NODELAY;
@@ -1284,6 +1423,13 @@ sctp_optsget(struct socket *so,
 			}
 		}
 		break;
+	case SCTP_MAXBURST:
+	{
+		u_int8_t *burst;
+		burst = mtod(m, u_int8_t *);
+		*burst = inp->sctp_ep.max_burst;
+	}
+	break;
 	case SCTP_MAXSEG:
 	{
 		u_int32_t *segsize;
@@ -1310,6 +1456,13 @@ sctp_optsget(struct socket *so,
 	error = EOPNOTSUPP;
 #endif
 	break;
+	case SCTP_GET_CWND_LOG:
+#ifdef SCTP_CWND_LOGGING
+		error = sctp_fill_cwnd_log(m);
+#else /* SCTP_DEBUG */
+		error = EOPNOTSUPP;
+#endif
+		break;
 	case SCTP_GET_PEGS:
 	{
 		u_int32_t *pt;
@@ -1420,9 +1573,17 @@ sctp_optsget(struct socket *so,
 			error = EINVAL;
 			break;
 		}
-		assoc_id = mtod(m, sctp_assoc_t *);
+		tcb = NULL;
 		val = mtod(m, u_int32_t *);
-		tcb = sctp_findassociation_ep_asocid(inp, *assoc_id);
+#ifdef SCTP_TCP_MODEL_SUPPORT
+		if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) {
+			tcb = LIST_FIRST(&inp->sctp_asoc_list);
+		}
+#endif /* SCTP_TCP_MODEL_SUPPORT */
+		if (tcb == NULL) {
+			assoc_id = mtod(m, sctp_assoc_t *);
+			tcb = sctp_findassociation_ep_asocid(inp, *assoc_id);
+		}
 		if (tcb == NULL) {
 			error = EINVAL;
 			break;
@@ -1656,13 +1817,17 @@ sctp_optsget(struct socket *so,
 		    (((struct sockaddr *)&paddri->spinfo_address)->sa_family == AF_INET6)) {
 				/* Lookup via address */
 #ifdef SCTP_TCP_MODEL_SUPPORT
-			if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED)
+		    if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) {
 				tcb = LIST_FIRST(&inp->sctp_asoc_list);
-			else
+				if (tcb)
+				    netp = sctp_findnet(tcb, 
+							(struct sockaddr *)&paddri->spinfo_address);
+		    }else{
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 				tcb = sctp_findassociation_ep_addr(&inp,
 								   (struct sockaddr *)&paddri->spinfo_address,
 								   &netp, NULL);
+		    }
 		} else {
 			tcb = NULL;
 		}
@@ -1670,9 +1835,9 @@ sctp_optsget(struct socket *so,
 			error = ENOENT;
 			break;
 		}
-		paddri->spinfo_state = netp->dest_state;
+		paddri->spinfo_state = netp->dest_state & SCTP_REACHABLE_MASK;
 		paddri->spinfo_cwnd = netp->cwnd;
-		paddri->spinfo_srtt = netp->lastsa;
+		paddri->spinfo_srtt = ((netp->lastsa >> 2) + netp->lastsv) >> 1;
 		paddri->spinfo_rto = netp->RTO;
 		paddri->spinfo_assoc_id = (sctp_assoc_t)tcb;
 	}
@@ -1747,7 +1912,7 @@ sctp_optsget(struct socket *so,
 		 * Again the user can get info from sctp_constants.h
 		 * for what the state of the network is.
 		 */
-		sstat->sstat_primary.spinfo_state = net->dest_state;
+		sstat->sstat_primary.spinfo_state = net->dest_state & SCTP_REACHABLE_MASK;
 		sstat->sstat_primary.spinfo_cwnd = net->cwnd;
 		sstat->sstat_primary.spinfo_srtt = net->lastsa;
 		sstat->sstat_primary.spinfo_rto = net->RTO;
@@ -1803,12 +1968,12 @@ sctp_optsget(struct socket *so,
 			break;
 		}
 		sasoc = mtod(m, struct sctp_assocparams *);
-		if (sasoc->sasoc_assoc_id) {
+		tcb = NULL;
 #ifdef SCTP_TCP_MODEL_SUPPORT
-			if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED)
-				tcb = LIST_FIRST(&inp->sctp_asoc_list);
-			else
+		if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED)
+			tcb = LIST_FIRST(&inp->sctp_asoc_list);
 #endif /* SCTP_MODEL_SUPPORT */
+		if ((sasoc->sasoc_assoc_id) && (tcb == NULL)) {
 				tcb = sctp_findassociation_ep_asocid(inp,
 								     sasoc->sasoc_assoc_id);
 			if (tcb == NULL) {
@@ -1939,7 +2104,8 @@ sctp_optsget(struct socket *so,
 static int
 sctp_optsset(struct socket *so,
 	     int opt,
-	     struct mbuf **mp)
+	     struct mbuf **mp,
+	     struct proc *p)
 {
 	int error, *mopt, set_opt;
 	struct mbuf *m;
@@ -1983,7 +2149,7 @@ sctp_optsset(struct socket *so,
 			set_opt = SCTP_PCB_FLAGS_NO_FRAGMENT;
 			break;
 		case SCTP_AUTO_ASCONF:
-		        set_opt = SCTP_PCB_FLAGS_AUTO_ASCONF;
+			set_opt = SCTP_PCB_FLAGS_AUTO_ASCONF;
 			break;
 
 		case SCTP_I_WANT_MAPPED_V4_ADDR:
@@ -2012,6 +2178,14 @@ sctp_optsset(struct socket *so,
 			inp->sctp_flags &= ~set_opt;
 		}
 		break;
+	case SCTP_MAXBURST:
+	{
+		u_int8_t *burst;
+		burst = mtod(m, u_int8_t *);
+		if (*burst) {
+			inp->sctp_ep.max_burst = *burst;
+		}
+	}
 	case SCTP_MAXSEG:
 	{
 		u_int32_t *segsize;
@@ -2433,10 +2607,24 @@ sctp_optsset(struct socket *so,
 			break;
 		}
 		addrs = mtod(m, struct sctp_getaddresses *);
+		if (inp->sctp_flags & SCTP_PCB_FLAGS_UNBOUND) {
+				if (p == NULL) {
+					/* Can't get proc for Net/Open BSD */
+					error = EINVAL;
+					break;
+				}
+				error = sctp_inpcb_bind(so,
+							(struct sockaddr *)addrs->addr,
+							(struct proc *)p);
+				break;
+		}
 		if (addrs->sget_assoc_id == 0) {
-				/* add the address */
-			error = sctp_addr_mgmt_ep_sa(inp, addrs->addr,
+			/* add the address */
+			error = sctp_addr_mgmt_ep_sa(inp, (struct sockaddr *)addrs->addr,
 						     SCTP_ADD_IP_ADDRESS);
+			if (error)
+				break;
+			
 		} else {
 				/* FIX: decide whether we allow assoc based bindx */
 		}
@@ -2530,13 +2718,13 @@ sctp_ctloutput(struct socket *so, struct sockopt *sopt)
 		m->m_len = sopt->sopt_valsize;
 	}
 	if (sopt->sopt_dir == SOPT_SET) {
-		error = sctp_optsset(so, sopt->sopt_name, &m);
+		error = sctp_optsset(so, sopt->sopt_name, &m, sopt->sopt_p);
 	} else if (sopt->sopt_dir == SOPT_GET) {
-		error = sctp_optsget(so, sopt->sopt_name, &m);
+		error = sctp_optsget(so, sopt->sopt_name, &m, sopt->sopt_p);
 	} else {
 		error = EINVAL;
 	}
-	if (m != NULL) {
+	if ( (error == 0) && (m != NULL)) {
 		error = sooptcopyout(sopt, mtod(m, caddr_t), m->m_len);
 		m_freem(m);
 	}
@@ -2612,11 +2800,11 @@ sctp_ctloutput(op, so, level, optname, mp)
 	}
 	/* Ok if we reach here it is a SCTP option we hope */
 	if (op == PRCO_SETOPT) {
-		error = sctp_optsset(so, optname, mp);
+		error = sctp_optsset(so, optname, mp,(struct proc *)NULL);
 		if (*mp)
 			(void) m_free(*mp);
 	} else if (op ==  PRCO_GETOPT) {
-		error = sctp_optsget(so, optname, mp);
+		error = sctp_optsget(so, optname, mp,(struct proc *)NULL);
 	} else {
 		error = EINVAL;
 	}
@@ -2640,9 +2828,9 @@ sctp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-	        printf("Connect called in SCTP to ");
+		printf("Connect called in SCTP to ");
 		sctp_print_address(nam);
-                printf("Port %d\n", ntohs(((struct sockaddr_in *)nam)->sin_port));
+		printf("Port %d\n", ntohs(((struct sockaddr_in *)nam)->sin_port));
 	}
 #endif /* SCTP_DEBUG */
 
@@ -2728,14 +2916,8 @@ sctp_usr_recvd(struct socket *so, int flags)
 	 */
 	struct sctp_inpcb *inp;
 	struct sctp_tcb *tcb;
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-	s = splsoftnet();
-#else
-	s = splnet();
-#endif
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == 0) {
-		splx(s);
 		/* I made the same as TCP since we are not setup? */
 		return (ECONNRESET);
 	}
@@ -2785,26 +2967,39 @@ sctp_usr_recvd(struct socket *so, int flags)
 		}
 	}
 #endif
-
 	tcb = TAILQ_FIRST(&inp->sctp_queue_list);
 	if (tcb) {
+		long incr;
 		/*
 		 * Question: should we go further than just the first
 		 * entry? By only doing one assoc we limit how long we
 		 * spend here.
 		 */
-		u_int32_t rwnd;
-		rwnd = tcb->asoc.my_rwnd;
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+		s = splsoftnet();
+#else
+		s = splnet();
+#endif
 
 		TAILQ_REMOVE(&inp->sctp_queue_list, tcb, sctp_toqueue);
 		tcb->on_toqueue = 0;
-
+		if (flags & MSG_EOR) {
+			tcb->asoc.my_rwnd_control_len -= (sizeof(struct sctp_sndrcvinfo) +
+							  CMSG_ALIGN(sizeof(struct cmsghdr)));
+			if (tcb->asoc.my_rwnd_control_len < 0)
+				tcb->asoc.my_rwnd_control_len = 0;
+		}
 		sctp_service_queues(tcb, &tcb->asoc);
 		sctp_set_rwnd(tcb, &tcb->asoc);
 		/* if we increase by 1 or more MTU's (smallest MTUs of all nets)
 		 * we send a window update sack
 		 */
-		if (tcb->asoc.my_rwnd >= (rwnd + tcb->asoc.smallest_mtu)) {
+		incr = tcb->asoc.my_rwnd - tcb->asoc.my_last_reported_rwnd;
+		if (incr < 0) {
+			incr = 0;
+		}
+		if ((incr >= (tcb->asoc.smallest_mtu * SCTP_SEG_TO_RWND_UPD)) ||
+		    ((incr*SCTP_SCALE_OF_RWND_TO_UPD) >= so->so_rcv.sb_hiwat)) {
 			if (callout_pending(&tcb->asoc.dack_timer.timer)) {
 				/* If the timer is up, stop it */
 				sctp_timer_stop(SCTP_TIMER_TYPE_RECV,
@@ -2815,8 +3010,8 @@ sctp_usr_recvd(struct socket *so, int flags)
 			/* Now do the output */
 			sctp_chunk_output(inp, tcb, 10);
 		}
+		splx(s);
 	}
-	splx(s);
 	return (0);
 }
 
@@ -2970,8 +3165,9 @@ sctp_accept(struct socket *so,
 		inp->sctp_flags &= ~SCTP_PCB_FLAGS_DONT_WAKE;
 		if (inp->sctp_flags & SCTP_PCB_FLAGS_WAKEOUTPUT) {
 			inp->sctp_flags &= ~SCTP_PCB_FLAGS_WAKEOUTPUT;
-			if (sowriteable(inp->sctp_socket))
+			if (sowriteable(inp->sctp_socket)) {
 				sowwakeup(inp->sctp_socket);
+			}
 		}
 		if (inp->sctp_flags & SCTP_PCB_FLAGS_WAKEINPUT) {
 			inp->sctp_flags &= ~SCTP_PCB_FLAGS_WAKEINPUT;
@@ -3111,6 +3307,12 @@ sctp_peeraddr(struct socket *so,
 		/* UDP type and listeners will drop out here */
 		return (ENOTCONN);
 	}
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+
 #if defined(__FreeBSD__)
 	MALLOC(sin, struct sockaddr_in *, sizeof *sin, M_SONAME, M_WAITOK |
 	       M_ZERO);
@@ -3121,11 +3323,6 @@ sctp_peeraddr(struct socket *so,
 	sin->sin_family = AF_INET;
 	sin->sin_len = sizeof(*sin);
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-	s = splsoftnet();
-#else
-	s = splnet();
-#endif
 	/* We must recapture incase we blocked */
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (!inp) {
@@ -3173,7 +3370,7 @@ struct pr_usrreqs sctp_usrreqs = {
 	sctp_abort, sctp_accept, sctp_attach, sctp_bind, sctp_connect,
 	pru_connect2_notsupp, in_control, sctp_detach, sctp_disconnect,
 	sctp_listen, sctp_peeraddr, sctp_usr_recvd, pru_rcvoob_notsupp,
-	sctp_send, pru_sense_null, sctp_shutdown, sctp_ingetaddr, sosend,
+	sctp_send, pru_sense_null, sctp_shutdown, sctp_ingetaddr, sctp_sosend,
 	soreceive, sopoll
 };
 

@@ -1,4 +1,4 @@
-/*    $KAME: sctp.h,v 1.9 2002/11/07 03:23:48 itojun Exp $    */
+/*    $KAME: sctp.h,v 1.10 2003/03/10 05:58:12 itojun Exp $    */
 /*	Header: /home/sctpBsd/netinet/sctp.h,v 1.43 2002/04/02 15:34:44 lei Exp	*/
 
 
@@ -72,27 +72,28 @@ struct sctp_paramhdr {
  * user socket options
  */
 /* read-write options */
-#define SCTP_RTOINFO			 0x00000001
-#define SCTP_ASSOCINFO			 0x00000002
-#define	SCTP_INITMSG			 0x00000004
-#define SCTP_NODELAY			 0x00000008
-#define SCTP_AUTOCLOSE			 0x00000010
-#define SCTP_SET_PRIMARY_ADDR		 0x00000020
-#define SCTP_SET_PEER_PRIMARY_ADDR	 0x00000040
+#define SCTP_NODELAY			0x00000001
+#define SCTP_MAXSEG			0x00000002
+#define SCTP_ASSOCINFO			0x00000004
+
+#define SCTP_INITMSG			0x00000008
+#define SCTP_AUTOCLOSE			0x00000010
+#define SCTP_SET_PRIMARY_ADDR		0x00000020
+#define SCTP_SET_PEER_PRIMARY_ADDR	0x00000040
 
 /* read-only options */
-#define SCTP_STATUS			 0x00000080
-#define SCTP_PCB_STATUS			 0x00000100
+#define SCTP_STATUS			0x00000080
+#define SCTP_PCB_STATUS			0x00000100
 
 /* ancillary data/notification interest options */
-#define SCTP_SET_EVENTS			 0x00000200
+#define SCTP_SET_EVENTS			0x00000200
 /* sctp_opt_info params */
-#define SCTP_SET_PEER_ADDR_PARAMS 	 0x00000400
-#define SCTP_GET_PEER_ADDR_PARAMS	 0x00000800
-#define SCTP_GET_PEER_ADDR_INFO		 0x00001000
+#define SCTP_SET_PEER_ADDR_PARAMS 	0x00000400
+#define SCTP_GET_PEER_ADDR_PARAMS	0x00000800
+#define SCTP_GET_PEER_ADDR_INFO		0x00001000
 /* Hidden socket option that gets the addresses */
-#define SCTP_GET_PEER_ADDRESSES		 0x00002000
-#define SCTP_GET_LOCAL_ADDRESSES	 0x00004000
+#define SCTP_GET_PEER_ADDRESSES		0x00002000
+#define SCTP_GET_LOCAL_ADDRESSES	0x00004000
 /*
  * Blocking I/O is enabled on any TCP type socket by default.
  * For the UDP model if this is turned on then the socket buffer is
@@ -127,8 +128,11 @@ struct sctp_paramhdr {
 #define SCTP_GET_PEGS			 0x00800000
 #define SCTP_DEFAULT_SEND_PARAM		 0x01000000
 #define SCTP_SET_DEBUG_LEVEL		 0x02000000
-#define SCTP_MAXSEG			 0x04000000
+#define SCTP_RTOINFO			 0x04000000
 #define SCTP_AUTO_ASCONF		 0x08000000
+#define SCTP_MAXBURST			 0x10000000
+#define SCTP_GET_CWND_LOG                0x20000000
+/* Test/debug get a route */
 
 /* Debug things that need to be purged */
 #define SCTP_SET_INITIAL_DBG_SEQ	 0x80000000
@@ -208,5 +212,14 @@ struct sctp_error_unrecognized_chunk {
 	struct sctp_error_cause cause;	/* code=SCTP_ERROR_UNRECOG_CHUNK */
 	struct sctp_chunkhdr ch;	/* header from chunk in error */
 };
+
+#define HAVE_SCTP			1
+#define HAVE_KERNEL_SCTP		1
+#define HAVE_SCTP_PRSCTP		1
+#define HAVE_SCTP_ADDIP			1
+#define HAVE_SCTP_CANSET_PRIMARY	1
+#define HAVE_SCTP_SAT_NETWORK_CAPABILITY1
+
+#include <netinet/sctp_uio.h>
 
 #endif /* !_NETINET_SCTP_H_ */

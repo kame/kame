@@ -609,11 +609,10 @@ rtrequest1(req, info, ret_nrt)
 		 * Remove the item from the tree and return it.
 		 * Complain if it is not there and do no more processing.
 		 */
-		if ((rn = rnh->rnh_deladdr(dst, netmask, rnh)) == 0)
+		if ((rn = rnh->rnh_lookup(dst, netmask, rnh)) == 0)
 			senderr(ESRCH);
-		if (rn->rn_flags & (RNF_ACTIVE | RNF_ROOT))
-			panic ("rtrequest delete");
 		rt = (struct rtentry *)rn;
+
 #ifdef RADIX_MPATH
 		/*
 		 * if we got multipath routes, we require users to specify
@@ -626,6 +625,11 @@ rtrequest1(req, info, ret_nrt)
 				senderr(ESRCH);
 		}
 #endif
+		if ((rn = rnh->rnh_deladdr(dst, netmask, rnh)) == 0)
+			senderr(ESRCH);
+		if (rn->rn_flags & (RNF_ACTIVE | RNF_ROOT))
+			panic ("rtrequest delete");
+		rt = (struct rtentry *)rn;
 		/*
 		 * Now search what's left of the subtree for any cloned
 		 * routes which might have been formed from this node.

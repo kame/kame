@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.c,v 1.10 2002/11/07 03:23:48 itojun Exp $	*/
+/*	$KAME: sctp_asconf.c,v 1.11 2003/03/10 05:58:12 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_asconf.c,v 1.72 2002/04/04 15:40:35 randall Exp	*/
 
 /*
@@ -343,7 +343,7 @@ sctp_process_asconf_add_ip(struct sctp_asconf_paramhdr *aph,
 	} /* end switch */
 
 	/* add the address */
-	if (sctp_add_remote_addr(stcb, sa, 0) != 0) {
+	if (sctp_add_remote_addr(stcb, sa, 0, 6) != 0) {
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_ASCONF1) {
 			printf("process_asconf_add_ip: error adding address\n");
@@ -1744,15 +1744,18 @@ sctp_addr_mgmt_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tcb,
 		}
 	} else if (ifa->ifa_addr->sa_family == AF_INET) {
 		struct sockaddr_in *sin;
-
+		struct in6pcb *inp6;
+		inp6 = (struct in6pcb *)&ep->ip_inp.inp;
 		/* invalid if we are a v6 only endpoint */
 		if ((ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) &&
 #if defined(__OpenBSD__)
-		    (0)	/* For openbsd we do dual bind only */
+		    (0) /* we always do dual bind */
+#elif defined (__NetBSD__)
+		    (inp6->in6p_flags & IN6P_IPV6_V6ONLY)
 #else
-		    (ep->ip_inp.inp.inp_flags & IN6P_IPV6_V6ONLY)
+		    (inp6->inp_flags & IN6P_IPV6_V6ONLY)
 #endif
-)
+			)
 			return;
 
 		sin = (struct sockaddr_in *)ifa->ifa_addr;
@@ -1840,13 +1843,18 @@ sctp_addr_mgmt_ep(struct sctp_inpcb *ep, struct ifaddr *ifa, uint16_t type) {
 			return;
 	} else if (ifa->ifa_addr->sa_family == AF_INET) {
 		/* invalid if we are a v6 only endpoint */
+		struct in6pcb *inp6;
+		inp6 = (struct in6pcb *)&ep->ip_inp.inp;
+
 		if ((ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) &&
 #if defined(__OpenBSD__)
-		    (0)	/* For openbsd we do dual bind only */
+		    (0) /* we always do dual bind */
+#elif defined (__NetBSD__)
+		    (inp6->in6p_flags & IN6P_IPV6_V6ONLY)
 #else
-		    (ep->ip_inp.inp.inp_flags & IN6P_IPV6_V6ONLY)
+		    (inp6->inp_flags & IN6P_IPV6_V6ONLY)
 #endif
-)
+			)
 			return;
 	} else {
 		/* invalid address family */

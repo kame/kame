@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.h,v 1.5 2002/10/09 18:01:21 itojun Exp $	*/
+/*	$KAME: sctp_output.h,v 1.6 2003/03/10 05:58:12 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.h,v 1.33 2002/04/01 21:59:20 randall Exp	*/
 
 #ifndef __sctp_output_h__
@@ -96,6 +96,14 @@ void sctp_send_hb(struct sctp_tcb *, int, struct sctp_nets *);
 
 void sctp_send_ecn_echo(struct sctp_tcb *, struct sctp_nets *, u_int32_t);
 
+void
+sctp_resend_packet_dropped(struct sctp_tcb *tcb, struct sctp_nets *net);
+
+void
+sctp_send_packet_dropped(struct sctp_tcb *tcb, struct sctp_nets *net, u_int32_t *list, 
+			 int num,u_int8_t data_list[SCTP_MAX_DROP_SAVE_REPORT][3]);
+
+
 void sctp_send_cwr(struct sctp_tcb *, struct sctp_nets *, u_int32_t);
 
 void sctp_handle_ecn_cwr(struct sctp_cwr_chunk *, struct sctp_tcb *);
@@ -107,6 +115,24 @@ void sctp6_send_abort(struct mbuf *, struct ip6_hdr *, struct sctphdr *, int,
 	u_int32_t, struct mbuf *);
 void sctp_send_operr_to(struct mbuf *, int, struct mbuf *, struct sctphdr *,
 	u_int32_t);
+
+int
+sctp_sosend(struct socket *so,
+#ifdef __NetBSD__
+	    struct mbuf *addr_mbuf,
+#else
+	    struct sockaddr *addr,
+#endif
+	    struct uio *uio,
+	    struct mbuf *top,
+	    struct mbuf *control,
+#ifdef __NetBSD__
+	    int flags
+#else
+	    int flags,
+	    struct proc *p
+#endif
+	);
 
 #endif
 #endif

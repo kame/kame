@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.14 2002/11/07 03:23:49 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.15 2003/03/10 05:58:13 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.c,v 1.153 2002/04/04 16:59:01 randall Exp	*/
 
 /*
@@ -138,6 +138,291 @@
 extern u_int32_t sctp_debug_on;
 #endif
 
+#ifdef SCTP_CWND_LOGGING
+int sctp_cwnd_log_at=0;
+int sctp_cwnd_log_rolled=0;
+struct sctp_cwnd_log sctp_clog[SCTP_CWND_LOG_SIZE];
+
+void sctp_log_cwnd(struct sctp_nets *net,int augment, uint8_t from)
+{
+    sctp_clog[sctp_cwnd_log_at].net = net;
+    sctp_clog[sctp_cwnd_log_at].cwnd_new_value = net->cwnd;
+    sctp_clog[sctp_cwnd_log_at].cwnd_augment = augment;
+    sctp_clog[sctp_cwnd_log_at].from = from;
+    sctp_cwnd_log_at++;
+    if (sctp_cwnd_log_at >= SCTP_CWND_LOG_SIZE) {
+	sctp_cwnd_log_at = 0;
+	sctp_cwnd_log_rolled = 1;
+    }
+}
+
+
+int
+sctp_fill_cwnd_log(struct mbuf *m)
+{
+    struct sctp_cwnd_log_req *req;
+    int size_limit,num,i,at;
+    if (m == NULL)
+	return(EINVAL);
+
+    size_limit = (m->m_len - sizeof(struct sctp_cwnd_log_req));
+    if (size_limit < sizeof(struct sctp_cwnd_log)) {
+	return(EINVAL);
+    }
+    req = mtod(m,struct sctp_cwnd_log_req *);
+    num = size_limit/sizeof(struct sctp_cwnd_log);
+    if (sctp_cwnd_log_rolled)
+	req->num_in_log = SCTP_CWND_LOG_SIZE;
+    else
+	req->num_in_log = sctp_cwnd_log_at;
+
+    if ((num < SCTP_CWND_LOG_SIZE) && 
+       ((sctp_cwnd_log_rolled) || (sctp_cwnd_log_at > num))) {
+	/* we can't return all of it */
+	if (((req->start_at == 0) && (req->end_at == 0)) ||
+	   (req->start_at >= SCTP_CWND_LOG_SIZE) ||
+	   (req->end_at >= SCTP_CWND_LOG_SIZE)) {
+	    /* No user request or user is wacked. */
+	    req->num_ret = num;
+	    req->end_at = sctp_cwnd_log_at - 1;
+	    if ((sctp_cwnd_log_at - num) < 0) {
+		int cc;
+		cc = num - sctp_cwnd_log_at;
+		req->start_at = SCTP_CWND_LOG_SIZE - cc;
+	    } else {
+		req->start_at = sctp_cwnd_log_at - num;
+	    }
+	} else {
+	    /* a user request */
+	    int cc;
+	    if (req->start_at > req->end_at) {
+		cc = (SCTP_CWND_LOG_SIZE - req->start_at) + (req->end_at + 1);
+	    } else {
+		cc = req->end_at - req->start_at;
+	    }
+	    if (cc < num) {
+		num = cc;
+	    }
+	    req->num_ret = num;
+	}
+    } else {
+	/* We can return all  of it */
+	if (sctp_cwnd_log_rolled) {
+	    req->num_ret = SCTP_CWND_LOG_SIZE;
+	    req->start_at = sctp_cwnd_log_at;
+	    req->end_at = sctp_cwnd_log_at-1;
+	} else {
+	    req->start_at = 0;
+	    req->end_at = sctp_cwnd_log_at-1;
+	    req->num_ret = sctp_cwnd_log_at;
+	}
+    }
+    for (i=0,at=req->start_at;i<req->num_ret;i++) {
+
+	req->log[i] = sctp_clog[at];
+	at++;
+	if (at >= SCTP_CWND_LOG_SIZE)
+	    at = 0;
+    }
+    return(0);
+}
+
+#endif
+
+#ifdef SCTP_AUDITING_ENABLED
+u_int8_t sctp_audit_data[SCTP_AUDIT_SIZE][2];
+static int sctp_audit_indx=0;
+
+static
+void sctp_print_audit_report(void)
+{
+	int i;
+	int cnt;
+	cnt = 0;
+	for (i=sctp_audit_indx;i<SCTP_AUDIT_SIZE;i++) {
+		if ((sctp_audit_data[i][0] == 0xe0) &&
+		   (sctp_audit_data[i][1] == 0x01)) {
+			cnt =0;
+			printf("\n");
+		} else if (sctp_audit_data[i][0] == 0xf0) {
+			cnt =0;
+			printf("\n");
+		} else if ((sctp_audit_data[i][0] == 0xc0) &&
+			 (sctp_audit_data[i][1] == 0x01)) {
+			printf("\n");
+			cnt = 0;
+		}
+		printf("%2.2x%2.2x ",
+		       (u_int)sctp_audit_data[i][0],
+		       (u_int)sctp_audit_data[i][1]);
+		cnt++;
+		if ((cnt % 14) == 0)
+			printf("\n");
+	}
+	for (i=0;i<sctp_audit_indx;i++) {
+		if ((sctp_audit_data[i][0] == 0xe0) &&
+		   (sctp_audit_data[i][1] == 0x01)) {
+			cnt =0;
+			printf("\n");
+		} else if (sctp_audit_data[i][0] == 0xf0) {
+			cnt =0;
+			printf("\n");
+		} else if ((sctp_audit_data[i][0] == 0xc0) &&
+			 (sctp_audit_data[i][1] == 0x01)) {
+			printf("\n");
+			cnt = 0;
+		}
+		printf("%2.2x%2.2x ",
+		       (u_int)sctp_audit_data[i][0],
+		       (u_int)sctp_audit_data[i][1]);
+		cnt++;
+		if ((cnt % 14) == 0)
+			printf("\n");
+	}
+	printf("\n");
+}
+
+void sctp_auditing(int from,struct sctp_inpcb *ep,struct sctp_tcb *tcb,struct sctp_nets *net)
+{
+	int s,resend_cnt,tot_out,rep;
+	struct sctp_nets *lnet;
+	struct sctp_tmit_chunk *chk;
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+	sctp_audit_data[sctp_audit_indx][0] = 0xAA;
+	sctp_audit_data[sctp_audit_indx][1] = 0x000000ff & from;
+	sctp_audit_indx++;
+	if (sctp_audit_indx >= SCTP_AUDIT_SIZE) {
+		sctp_audit_indx = 0;
+	}
+	if (ep == NULL) {
+		sctp_audit_data[sctp_audit_indx][0] = 0xAF;
+		sctp_audit_data[sctp_audit_indx][1] = 0x01;
+		sctp_audit_indx++;
+		if (sctp_audit_indx >= SCTP_AUDIT_SIZE) {
+			sctp_audit_indx = 0;
+		}
+		splx(s);
+		return;
+	}
+	if (tcb == NULL) {
+		sctp_audit_data[sctp_audit_indx][0] = 0xAF;
+		sctp_audit_data[sctp_audit_indx][1] = 0x02;
+		sctp_audit_indx++;
+		if (sctp_audit_indx >= SCTP_AUDIT_SIZE) {
+			sctp_audit_indx = 0;
+		}
+		splx(s);
+		return;
+	}
+	sctp_audit_data[sctp_audit_indx][0] = 0xA1;
+	sctp_audit_data[sctp_audit_indx][1] = (0x000000ff & tcb->asoc.sent_queue_retran_cnt);
+	sctp_audit_indx++;
+	if (sctp_audit_indx >= SCTP_AUDIT_SIZE) {
+		sctp_audit_indx = 0;
+	}
+	rep = 0;
+	resend_cnt = tot_out = 0;
+	TAILQ_FOREACH(chk, &tcb->asoc.sent_queue, sctp_next) {
+		if (chk->sent == SCTP_DATAGRAM_RESEND) {
+			resend_cnt++;
+		} else if (chk->sent < SCTP_DATAGRAM_RESEND) {
+			tot_out += chk->send_size;
+		}
+	}
+	if (resend_cnt != tcb->asoc.sent_queue_retran_cnt) {
+		sctp_audit_data[sctp_audit_indx][0] = 0xAF;
+		sctp_audit_data[sctp_audit_indx][1] = 0xA1;
+		sctp_audit_indx++;
+		if (sctp_audit_indx >= SCTP_AUDIT_SIZE) {
+			sctp_audit_indx = 0;
+		}
+		printf("resend_cnt:%d asoc-tot:%d\n",
+		       resend_cnt,tcb->asoc.sent_queue_retran_cnt);
+		rep = 1;
+		tcb->asoc.sent_queue_retran_cnt = resend_cnt;
+		sctp_audit_data[sctp_audit_indx][0] = 0xA2;
+		sctp_audit_data[sctp_audit_indx][1] = (0x000000ff & tcb->asoc.sent_queue_retran_cnt);
+		sctp_audit_indx++;
+		if (sctp_audit_indx >= SCTP_AUDIT_SIZE) {
+			sctp_audit_indx = 0;
+		}
+	}
+	if (tot_out != tcb->asoc.total_flight) {
+		sctp_audit_data[sctp_audit_indx][0] = 0xAF;
+		sctp_audit_data[sctp_audit_indx][1] = 0xA2;
+		sctp_audit_indx++;
+		if (sctp_audit_indx >= SCTP_AUDIT_SIZE) {
+			sctp_audit_indx = 0;
+		}
+		rep = 1;
+		printf("tot_flt:%d asoc_tot:%d\n",
+		       tot_out,
+		       (int)tcb->asoc.total_flight
+		       );
+		tcb->asoc.total_flight = tot_out;
+	}
+	tot_out = 0;
+	TAILQ_FOREACH(lnet,&tcb->asoc.nets, sctp_next) {
+		tot_out += lnet->flight_size;
+	}
+	if (tot_out != tcb->asoc.total_flight) {
+		sctp_audit_data[sctp_audit_indx][0] = 0xAF;
+		sctp_audit_data[sctp_audit_indx][1] = 0xA3;
+		sctp_audit_indx++;
+		if (sctp_audit_indx >= SCTP_AUDIT_SIZE) {
+			sctp_audit_indx = 0;
+		}
+		rep = 1;
+		printf("real flight:%d net total was %d\n",
+		       tcb->asoc.total_flight,
+		       tot_out
+			);
+		/* now corrective action */
+		TAILQ_FOREACH(lnet,&tcb->asoc.nets, sctp_next) {
+			tot_out = 0;
+			TAILQ_FOREACH(chk, &tcb->asoc.sent_queue, sctp_next) {
+				if ((chk->whoTo == lnet) && (chk->sent < SCTP_DATAGRAM_RESEND)) {
+					tot_out += chk->send_size;
+				}
+			}
+			if (lnet->flight_size != tot_out) {
+				printf("net:%x flight was %d corrected to %d\n",
+				       (u_int)lnet,lnet->flight_size,tot_out);
+				lnet->flight_size = tot_out;
+			}
+
+		}
+	}
+	
+	if (rep) {
+		sctp_print_audit_report();
+	}
+	splx(s);
+}
+
+void
+sctp_audit_log(u_int8_t ev, u_int8_t fd)
+{
+	int s;
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+	sctp_audit_data[sctp_audit_indx][0] = ev;
+	sctp_audit_data[sctp_audit_indx][1] = fd;
+	sctp_audit_indx++;
+	if (sctp_audit_indx >= SCTP_AUDIT_SIZE) {
+		sctp_audit_indx = 0;
+	}
+	splx(s);
+}
+
+#endif
 
 /*
  * a list of sizes based on typical mtu's, used only if next hop
@@ -163,7 +448,6 @@ static int sctp_mtu_sizes[] = {
 	32000,
 	65535
 };
-
 
 int
 find_next_best_mtu(int totsz)
@@ -271,6 +555,7 @@ sctp_init_asoc(struct sctp_inpcb *m, struct sctp_association *asoc,
 	asoc->peer_supports_asconf = 1;
 	asoc->peer_supports_asconf_setprim = 1;
 
+	asoc->sent_queue_retran_cnt = 0;
 	/* This will need to be adjusted */
 	asoc->last_cwr_tsn = asoc->init_seq_number - 1;
 	asoc->last_acked_seq = asoc->init_seq_number - 1;
@@ -284,20 +569,22 @@ sctp_init_asoc(struct sctp_inpcb *m, struct sctp_association *asoc,
 	asoc->def_net_failure = m->sctp_ep.def_net_failure;
 
 	if (m->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) {
-		struct inpcb *in_inp;
+		struct in6pcb *inp6;
+
 
 		/* Its a V6 socket */
-		in_inp = (struct inpcb *)m;
+		inp6 = (struct in6pcb *)m;
 		asoc->ipv6_addr_legal = 1;
 		/* Now look at the binding flag to see if V4 will be legal */
-		if (
-#ifndef __OpenBSD__
-			(in_inp->inp_flags & IN6P_IPV6_V6ONLY)
+	if (
+#if defined(__OpenBSD__)
+		(0) /* we always do dual bind */
+#elif defined (__NetBSD__)
+		(inp6->in6p_flags & IN6P_IPV6_V6ONLY)
 #else
-			(0)
+		(inp6->inp_flags & IN6P_IPV6_V6ONLY)
 #endif
-			== 0) {
-
+	     == 0) {
 			asoc->ipv4_addr_legal = 1;
 		} else {
 			/* V4 addresses are NOT legal on the association */
@@ -343,6 +630,7 @@ sctp_init_asoc(struct sctp_inpcb *m, struct sctp_association *asoc,
 		 * to the upper layer as failed to send.
 		 */
 		asoc->strmout[i].next_sequence_sent = 0x0;
+		asoc->strmout[i].next_unordered_sent = 0x0;
 		TAILQ_INIT(&asoc->strmout[i].outqueue);
 		asoc->strmout[i].stream_no = i;
 		asoc->strmout[i].next_spoke.tqe_next = 0;
@@ -372,15 +660,20 @@ sctp_timeout_handler(void *t)
 	struct sctp_timer *tmr;
 	int s, did_output, typ;
 
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
 	tmr = (struct sctp_timer *)t;
 	ep = (struct sctp_inpcb *)tmr->ep;
 	tcb = (struct sctp_tcb *)tmr->tcb;
 	net = (struct sctp_nets *)tmr->net;
 	did_output = 1;
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-	s = splsoftnet();
-#else
-	s = splnet();
+
+#ifdef SCTP_AUDITING_ENABLED
+	sctp_audit_log(0xF0,(u_int8_t)tmr->type);
+	sctp_auditing(3,ep,tcb,net);
 #endif
 	sctp_pegs[SCTP_TIMERS_EXP]++;
 	if (ep) {
@@ -424,6 +717,9 @@ sctp_timeout_handler(void *t)
 	case SCTP_TIMER_TYPE_SEND:
 		sctp_pegs[SCTP_TMIT_TIMER]++;
 		sctp_t3rxt_timer(ep, tcb, net);
+#ifdef SCTP_AUDITING_ENABLED
+	sctp_auditing(4,ep,tcb,net);
+#endif
 		sctp_chunk_output(ep, tcb, 1);
 		break;
 	case SCTP_TIMER_TYPE_INIT:
@@ -434,18 +730,30 @@ sctp_timeout_handler(void *t)
 	case SCTP_TIMER_TYPE_RECV:
 		sctp_pegs[SCTP_RECV_TIMER]++;
 		sctp_send_sack(tcb);
+#ifdef SCTP_AUDITING_ENABLED
+	sctp_auditing(4,ep,tcb,net);
+#endif
 		sctp_chunk_output(ep, tcb, 4);
 		break;
 	case SCTP_TIMER_TYPE_SHUTDOWN:
 		sctp_shutdown_timer(ep, tcb, net);
+#ifdef SCTP_AUDITING_ENABLED
+	sctp_auditing(4,ep,tcb,net);
+#endif
 		sctp_chunk_output(ep, tcb, 5);
 		break;
 	case SCTP_TIMER_TYPE_HEARTBEAT:
 		sctp_heartbeat_timer(ep, tcb, net);
+#ifdef SCTP_AUDITING_ENABLED
+	sctp_auditing(4,ep,tcb,net);
+#endif
 		sctp_chunk_output(ep, tcb, 6);
 		break;
 	case SCTP_TIMER_TYPE_COOKIE:
 		sctp_cookie_timer(ep, tcb, net);
+#ifdef SCTP_AUDITING_ENABLED
+	sctp_auditing(4,ep,tcb,net);
+#endif
 		sctp_chunk_output(ep, tcb, 1);
 		break;
 	case SCTP_TIMER_TYPE_NEWCOOKIE:
@@ -475,6 +783,9 @@ sctp_timeout_handler(void *t)
 		break;
 	case SCTP_TIMER_TYPE_SHUTDOWNACK:
 		sctp_shutdownack_timer(ep, tcb, net);
+#ifdef SCTP_AUDITING_ENABLED
+	sctp_auditing(4,ep,tcb,net);
+#endif
 		sctp_chunk_output(ep, tcb, 7);
 		break;
 	case SCTP_TIMER_TYPE_SHUTDOWNGUARD:
@@ -491,6 +802,9 @@ sctp_timeout_handler(void *t)
 		break;
 	case SCTP_TIMER_TYPE_ASCONF:
 		sctp_asconf_timer(ep, tcb, net);
+#ifdef SCTP_AUDITING_ENABLED
+	sctp_auditing(4,ep,tcb,net);
+#endif
 		sctp_chunk_output(ep, tcb, 8);
 		break;
 	case SCTP_TIMER_TYPE_AUTOCLOSE:
@@ -506,6 +820,10 @@ sctp_timeout_handler(void *t)
 #endif /* SCTP_DEBUG */
 		break;
 	};
+#ifdef SCTP_AUDITING_ENABLED
+	sctp_audit_log(0xF1,(u_int8_t)tmr->type);
+	sctp_auditing(5,ep,tcb,net);
+#endif
 	splx(s);
 	if (did_output) {
 		/*
@@ -542,20 +860,20 @@ sctp_timer_start(int t_type,
 	switch (t_type) {
 	case SCTP_TIMER_TYPE_SEND:
 		/* Here we use the RTO timer */
-		{
-			int rto_val;
-			if ((tcb == NULL) || (net == NULL)) {
-				return (EFAULT);
-			}
-			tmr = &net->rxt_timer;
-			if (net->RTO == 0) {
-				rto_val = tcb->asoc.initial_rto;
-			} else {
-				rto_val = net->RTO;
-			}
-			to_ticks = (rto_val * hz)/1000;
+	{
+		int rto_val;
+		if ((tcb == NULL) || (net == NULL)) {
+			return (EFAULT);
 		}
-		break;
+		tmr = &net->rxt_timer;
+		if (net->RTO == 0) {
+			rto_val = tcb->asoc.initial_rto;
+		} else {
+			rto_val = net->RTO;
+		}
+		to_ticks = (rto_val * hz)/1000;
+	}
+	break;
 	case SCTP_TIMER_TYPE_INIT:
 		/*
 		 * Here we use the INIT timer default
@@ -606,38 +924,40 @@ sctp_timer_start(int t_type,
 		{
 			u_int rndval;
 			u_int8_t this_random;
-			if (tcb->asoc.hb_random_values[0] == 4) {
+			if (tcb->asoc.hb_random_idx > 3) {
+				
 				rndval = sctp_select_initial_TSN(&ep->sctp_ep);
 				memcpy(tcb->asoc.hb_random_values, &rndval,
 				       sizeof(tcb->asoc.hb_random_values));
 				this_random = tcb->asoc.hb_random_values[0];
-				tcb->asoc.hb_random_values[0] = 1;
+				tcb->asoc.hb_random_idx = 0;
+				tcb->asoc.hb_ect_randombit = 0;
 			} else {
-				int indx;
-				indx = tcb->asoc.hb_random_values[0];
-				this_random = tcb->asoc.hb_random_values[indx];
-				tcb->asoc.hb_random_values[0]++;
+				this_random = tcb->asoc.hb_random_values[tcb->asoc.hb_random_idx];
+				tcb->asoc.hb_random_idx++;
+				tcb->asoc.hb_ect_randombit = 0;
 			}
-			/*
-			 * We divide by 4 to get a value between 0 - 63 ticks
-			 * for the random factor..
-			 * i.e. 0 - 630ms of random jitter
+			/* this_random will be 0 - 256 ms 
+			 * RTO is in ms.
 			 */
 			if (net) {
 				int rto_val;
 				if (net->RTO == 0) {
+					/* Never been checked */
 					rto_val = tcb->asoc.initial_rto;
 				} else {
+					/* set rto_val to the ms */
 					rto_val = net->RTO;
 				}
-				to_ticks = tcb->asoc.heart_beat_delay +
-					((rto_val * hz)/1000) +
-					(this_random >> 2);
+				to_ticks = tcb->asoc.heart_beat_delay + rto_val + this_random;
 			} else {
-				to_ticks = (tcb->asoc.heart_beat_delay +
-					    (this_random >> 2) +
-					    tcb->asoc.initial_rto);
+				to_ticks = tcb->asoc.heart_beat_delay + this_random + tcb->asoc.initial_rto;
 			}
+			/* Now we must convert the to_ticks that are now in ms to
+			 * ticks.
+			 */
+			to_ticks *= hz;
+			to_ticks /= 1000;
 			tmr = &tcb->asoc.hb_timer;
 		}
 		break;
@@ -1054,16 +1374,15 @@ sctp_calculate_rto(struct sctp_tcb *stcb,
 				     (u_long)old->tv_usec)/1000;
 		} else if ((u_long)now.tv_usec < (u_long)old->tv_usec) {
 			/* impossible .. garbage in nothing out */
-			return (0);
+			return (((net->lastsa >> 2) + net->lastsv) >> 1);
 		} else {
 			/* impossible .. garbage in nothing out */
-			return (0);
+			return (((net->lastsa >> 2) + net->lastsv) >> 1);
 		}
 	} else {
 		/* Clock wrapped? */
-		return (0);
+		return (((net->lastsa >> 2) + net->lastsv) >> 1);
 	}
-
 	/***************************/
 	/* 2. update RTTVAR & SRTT */
 	/***************************/
@@ -1105,6 +1424,9 @@ sctp_calculate_rto(struct sctp_tcb *stcb,
 		net->lastsv = calc_time >> 1;
 	}
 	new_rto = ((net->lastsa >> 2) + net->lastsv) >> 1;
+	if (new_rto > SCTP_SAT_NETWORK_MIN) {
+		stcb->asoc.sat_network = 1;
+	}
 	/* bound it, per C6/C7 in Section 5.3.1 */
 	if (new_rto < stcb->sctp_ep->sctp_ep.sctp_minrto) {
 		new_rto = stcb->sctp_ep->sctp_ep.sctp_minrto;
@@ -1254,7 +1576,7 @@ sctp_notify_assoc_change(u_int32_t event, struct sctp_tcb *stcb,
 	struct sockaddr *to;
 	struct sockaddr_in6 sin6, lsa6;
 
-         /* First if we are are going down dump everything we
+	 /* First if we are are going down dump everything we
 	  * can to the socket rcv queue.
 	  */
 	if ((event == SCTP_SHUTDOWN_COMP) ||
@@ -1395,6 +1717,7 @@ sctp_notify_peer_addr_change(struct sctp_tcb *stcb, uint32_t state,
 				  m_notify, NULL, stcb->asoc.my_vtag))
 		/* not enough room */
 		return;
+
 	sctp_sorwakeup(stcb->sctp_ep, stcb->sctp_socket);
 }
 
@@ -1435,16 +1758,16 @@ sctp_notify_send_failed(struct sctp_tcb *stcb, u_int32_t error,
 	ssf->ssf_info.sinfo_assoc_id = (sctp_assoc_t)stcb;
 	ssf->ssf_assoc_id = (sctp_assoc_t)stcb;
 	m_notify->m_next = chk->data;
-        if (m_notify->m_next == NULL)
+	if (m_notify->m_next == NULL)
 		m_notify->m_flags |= M_EOR | M_NOTIFICATION;
-        else {
+	else {
 		struct mbuf *m;
 		m_notify->m_flags |= M_NOTIFICATION;
 		m = m_notify;
 		while (m->m_next != NULL)
 			m = m->m_next;
 		m->m_flags |= M_EOR;
-        }
+	}
 	m_notify->m_pkthdr.len = length;
 	m_notify->m_pkthdr.rcvif = 0;
 	m_notify->m_len = length;
@@ -1753,6 +2076,10 @@ sctp_report_all_outbound(struct sctp_tcb *stcb)
 	struct sctp_tmit_chunk *chk;
 
 	asoc = &stcb->asoc;
+
+	if (stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE) {
+		return;
+	}
 	/* now through all the gunk freeing chunks */
 	TAILQ_FOREACH(outs, &asoc->out_wheel, next_spoke) {
 		/* now clean up any chunks here */
@@ -1844,6 +2171,9 @@ sctp_report_all_outbound(struct sctp_tcb *stcb)
 void
 sctp_abort_notification(struct sctp_tcb *stcb, int error)
 {
+	if (stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE) {
+	    return;
+	}
 	/* Tell them we lost the asoc */
 	sctp_ulp_notify(SCTP_NOTIFY_ASSOC_ABORTED, stcb, error, NULL);
 	sctp_report_all_outbound(stcb);
@@ -1894,11 +2224,15 @@ sctp_abort_an_association(struct sctp_inpcb *inp,
 		return;
 	vtag = stcb->asoc.peer_vtag;
 	/* notify the ulp */
-	sctp_abort_notification(stcb, error);
+	if ((inp->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE) == 0)
+	    sctp_abort_notification(stcb, error);
 	/* notify the peer */
 	sctp_send_abort_tcb(stcb, operr);
 	/* now free the asoc */
 	sctp_free_assoc(inp, stcb);
+	if (inp->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE) {
+	    sctp_inpcb_free(inp,0);
+	}
 }
 
 void
@@ -1947,6 +2281,9 @@ sctp_handle_ootb(struct sctp_inpcb *ep,
 			break;
 		}
 		switch (ch->chunk_type) {
+		case SCTP_PACKET_DROPPED:
+			/* we don't respond to pkt-dropped */
+			return;
 		case SCTP_ABORT_ASSOCIATION:
 			/* we don't respond with an ABORT to an ABORT */
 			return;
@@ -2117,100 +2454,100 @@ sctp_cmpaddr(struct sockaddr *sa1, struct sockaddr *sa2) {
 
 const char *
 sctp_ntop4(const u_char *src, char *dst, size_t size) {
-        char tmp[sizeof("255.255.255.255")];
+	char tmp[sizeof("255.255.255.255")];
 
-        if (SPRINTF((tmp, "%u.%u.%u.%u", src[0], src[1], src[2], src[3])) >
+	if (SPRINTF((tmp, "%u.%u.%u.%u", src[0], src[1], src[2], src[3])) >
 	    size) {
-                return (NULL);
-        }
-        strcpy(dst, tmp);
-        return (dst);
+		return (NULL);
+	}
+	strcpy(dst, tmp);
+	return (dst);
 }
 
 const char *
 sctp_ntop6(const u_char *src, char *dst, size_t size) {
-        /*
-         * Note that int32_t and int16_t need only be "at least" large enough
-         * to contain a value of the specified size.  On some systems, like
-         * Crays, there is no such thing as an integer variable with 16 bits.
-         * Keep this in mind if you think this function should have been coded
-         * to use pointer overlays.  All the world's not a VAX.
-         */
-        char tmp[sizeof "ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255"], *tp;
-        struct { int base, len; } best, cur;
-        u_int words[NS_IN6ADDRSZ / NS_INT16SZ];
-        int i;
+	/*
+	 * Note that int32_t and int16_t need only be "at least" large enough
+	 * to contain a value of the specified size.  On some systems, like
+	 * Crays, there is no such thing as an integer variable with 16 bits.
+	 * Keep this in mind if you think this function should have been coded
+	 * to use pointer overlays.  All the world's not a VAX.
+	 */
+	char tmp[sizeof "ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255"], *tp;
+	struct { int base, len; } best, cur;
+	u_int words[NS_IN6ADDRSZ / NS_INT16SZ];
+	int i;
 
-        /*
-         * Preprocess:
-         *      Copy the input (bytewise) array into a wordwise array.
-         *      Find the longest run of 0x00's in src[] for :: shorthanding.
-         */
-        memset(words, '\0', sizeof words);
-        for (i = 0; i < NS_IN6ADDRSZ; i++)
-                words[i / 2] |= (src[i] << ((1 - (i % 2)) << 3));
-        best.base = -1;
-        cur.base = -1;
-        for (i = 0; i < (NS_IN6ADDRSZ / NS_INT16SZ); i++) {
-                if (words[i] == 0) {
-                        if (cur.base == -1)
-                                cur.base = i, cur.len = 1;
-                        else
-                                cur.len++;
-                } else {
-                        if (cur.base != -1) {
-                                if (best.base == -1 || cur.len > best.len)
-                                        best = cur;
-                                cur.base = -1;
-                        }
-                }
-        }
-        if (cur.base != -1) {
-                if (best.base == -1 || cur.len > best.len)
-                        best = cur;
-        }
-        if (best.base != -1 && best.len < 2)
-                best.base = -1;
+	/*
+	 * Preprocess:
+	 *      Copy the input (bytewise) array into a wordwise array.
+	 *      Find the longest run of 0x00's in src[] for :: shorthanding.
+	 */
+	memset(words, '\0', sizeof words);
+	for (i = 0; i < NS_IN6ADDRSZ; i++)
+		words[i / 2] |= (src[i] << ((1 - (i % 2)) << 3));
+	best.base = -1;
+	cur.base = -1;
+	for (i = 0; i < (NS_IN6ADDRSZ / NS_INT16SZ); i++) {
+		if (words[i] == 0) {
+			if (cur.base == -1)
+				cur.base = i, cur.len = 1;
+			else
+				cur.len++;
+		} else {
+			if (cur.base != -1) {
+				if (best.base == -1 || cur.len > best.len)
+					best = cur;
+				cur.base = -1;
+			}
+		}
+	}
+	if (cur.base != -1) {
+		if (best.base == -1 || cur.len > best.len)
+			best = cur;
+	}
+	if (best.base != -1 && best.len < 2)
+		best.base = -1;
 
-        /*
-         * Format the result.
-         */
-        tp = tmp;
-        for (i = 0; i < (NS_IN6ADDRSZ / NS_INT16SZ); i++) {
-                /* Are we inside the best run of 0x00's? */
-                if (best.base != -1 && i >= best.base &&
-                    i < (best.base + best.len)) {
-                        if (i == best.base)
-                                *tp++ = ':';
-                        continue;
-                }
-                /* Are we following an initial run of 0x00s or any real hex? */
-                if (i != 0)
-                        *tp++ = ':';
-                /* Is this address an encapsulated IPv4? */
-                if (i == 6 && best.base == 0 &&
-                    (best.len == 6 || (best.len == 5 && words[5] == 0xffff))) {
-                        if (!sctp_ntop4(src+12, tp, sizeof tmp - (tp - tmp)))
-                                return (NULL);
-                        tp += strlen(tp);
-                        break;
-                }
-                tp += SPRINTF((tp, "%x", words[i]));
-        }
-        /* Was it a trailing run of 0x00's? */
-        if (best.base != -1 && (best.base + best.len) ==
-            (NS_IN6ADDRSZ / NS_INT16SZ))
-                *tp++ = ':';
-        *tp++ = '\0';
+	/*
+	 * Format the result.
+	 */
+	tp = tmp;
+	for (i = 0; i < (NS_IN6ADDRSZ / NS_INT16SZ); i++) {
+		/* Are we inside the best run of 0x00's? */
+		if (best.base != -1 && i >= best.base &&
+		    i < (best.base + best.len)) {
+			if (i == best.base)
+				*tp++ = ':';
+			continue;
+		}
+		/* Are we following an initial run of 0x00s or any real hex? */
+		if (i != 0)
+			*tp++ = ':';
+		/* Is this address an encapsulated IPv4? */
+		if (i == 6 && best.base == 0 &&
+		    (best.len == 6 || (best.len == 5 && words[5] == 0xffff))) {
+			if (!sctp_ntop4(src+12, tp, sizeof tmp - (tp - tmp)))
+				return (NULL);
+			tp += strlen(tp);
+			break;
+		}
+		tp += SPRINTF((tp, "%x", words[i]));
+	}
+	/* Was it a trailing run of 0x00's? */
+	if (best.base != -1 && (best.base + best.len) ==
+	    (NS_IN6ADDRSZ / NS_INT16SZ))
+		*tp++ = ':';
+	*tp++ = '\0';
 
-        /*
-         * Check for overflow, copy, and we're done.
-         */
-        if ((size_t)(tp - tmp) > size) {
-                return (NULL);
-        }
-        strcpy(dst, tmp);
-        return (dst);
+	/*
+	 * Check for overflow, copy, and we're done.
+	 */
+	if ((size_t)(tp - tmp) > size) {
+		return (NULL);
+	}
+	strcpy(dst, tmp);
+	return (dst);
 }
 
 void
@@ -2362,12 +2699,32 @@ sbappendaddr_nocheck(sb, asa, m0, control, tag)
 #ifdef SCTP_ALTERNATE_ROUTE
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-#define rn_offset rn_off
+#define rn_offset rn_u.rn_node.rn_Off
 #define rn_bit rn_b
 #define rn_parent rn_p
+#define rn_left rn_u.rn_node.rn_L
 #endif
+
+static int
+sctp_is_interior_node(struct radix_node *node)
+{
+    if (node->rn_bit < 0) {
+	/* Negative numbers are exterior/leaf nodes
+	 * i.e. the actual pointer to the info
+	 */
+	return(0);
+    } else {
+	/* postive numbers are interior (tree structure) 
+	 * nodes.
+	 */
+	return(1);
+    }
+}
+
+
+
 static struct rtentry *
-rtfinalize_route(struct sockaddr *dst, struct rtentry *rt, int s)
+rtfinalize_route(struct sockaddr *dst, struct rtentry *rt)
 {
 	/*
 	 * We handle cloning in this module (if needed). 
@@ -2390,14 +2747,12 @@ rtfinalize_route(struct sockaddr *dst, struct rtentry *rt, int s)
 			info.rti_info[RTAX_DST] = dst;
 			rt_missmsg(RTM_MISS, &info, 0, err);
 			rt->rt_refcnt++;
-			splx(s);
 			return (rt);
 		} else {
 			rt = newrt;
 			if (rt->rt_flags & RTF_XRESOLVE) {
 				info.rti_info[RTAX_DST] = dst;
 				rt_missmsg(RTM_RESOLVE, &info, 0, err);
-				splx(s);
 				return (rt);
 			}
 			/* Inform listeners of the new route */
@@ -2409,7 +2764,6 @@ rtfinalize_route(struct sockaddr *dst, struct rtentry *rt, int s)
 		/* No cloning needed */
 		rt->rt_refcnt++;
 	}
-	splx(s);
 	return (rt);
 }
 
@@ -2419,6 +2773,11 @@ sctp_rn_are_keys_same(struct radix_node *exist,
 {
 	caddr_t e, c, cplim;
 	int len;
+	if (sctp_is_interior_node(exist) || sctp_is_interior_node(cmp)) {
+		/* can't compare interior nodes */
+		return(0);
+	}
+
 	if (exist->rn_key == cmp->rn_key) {
 		/* Mask holds same pointer. Must be same */
 		return (1);
@@ -2439,7 +2798,7 @@ sctp_rn_are_keys_same(struct radix_node *exist,
 		}
 		e++;
 		c++;
-	}
+ 	}
 	/* so far the keys are the same */
 	if (exist->rn_mask != cmp->rn_mask) {
 		/* different masks */
@@ -2449,43 +2808,394 @@ sctp_rn_are_keys_same(struct radix_node *exist,
 	return (1);
 }
 
-static struct rtentry *
-sctp_rtalloc(register struct sockaddr *dst)
+
+static int
+sctp_are_gw_the_same(struct rtentry *rt1, struct rtentry *rt2)
 {
-	struct rtentry *tmp;
-#ifdef __FreeBSD__
-	tmp = rtalloc1(dst,0,(RTF_CLONING | RTF_PRCLONING));
-#else
+    if (!rt1 || !rt2)
+	return(0);
 
-	tmp = rtalloc1(dst, 0);
-#endif
-	tmp->rt_refcnt--;
-	return (tmp);
+    if (rt1 == rt2)
+	return(1);
 
+    if (rt1->rt_gateway == rt2->rt_gateway)
+	return(1);
+    if (rt1->rt_gateway->sa_len == rt2->rt_gateway->sa_len) {
+	/* I think we don't actually need to do this
+	 * since I believe pointers would match first, but
+	 * to be cautious I will put this in for
+	 * now and we can rip it out later. This would
+	 * optimize the search if we remove the memcmp.
+	 */
+	int ret;
+	ret = memcmp(rt1->rt_gateway,rt2->rt_gateway,rt1->rt_gateway->sa_len);
+	if (ret == 0) {
+	    return(1);
+	}
+    }
+    return(0);
 }
 
 
-
 static struct rtentry *
-sctp_rt_scan_dups(struct sockaddr *dst, struct rtentry *existing, int s)
+sctp_rt_scan_dups(struct sockaddr *dst, struct rtentry *existing, int finalize)
 {
-	struct radix_node *exist, *cmp;
+	struct radix_node *exist, *cmp, *prev;
 	struct rtentry *dupped;
 	exist = (struct radix_node *)existing;
 
+	if (sctp_is_interior_node(exist)) {
+		/* Can't look at a interior node */
+		return(NULL);
+	}
+	/* get the dupedkey from this one */
 	cmp = exist->rn_dupedkey;
 	while (cmp != NULL) {
+		if (sctp_is_interior_node(cmp)) {
+			return(NULL);
+		}
 		dupped = (struct rtentry *)cmp;
-		if ((dupped->rt_gateway != existing->rt_gateway) &&
-		   sctp_rn_are_keys_same(exist, cmp)) {
+		if (dupped->rt_flags &  
+#ifdef __FreeBSD__
+		   RTF_WASCLONED
+#else
+		   RTF_CLONED
+#endif
+			) {
+			/* We don't consider a cloned route
+			 * as via-able. We use the base route
+			 * only and then finalize from that.
+			 */
+ 			return(NULL);
+		}
+		if ((!sctp_are_gw_the_same(dupped,existing)) &&
+		    sctp_rn_are_keys_same(exist, cmp)) {
 			/* Keys are no longer the same */
-			dupped = rtfinalize_route(dst,(struct rtentry *)cmp, s);
-			return (dupped);
+			if (finalize) {
+				dupped = rtfinalize_route(dst,(struct rtentry *)cmp);
+				return (dupped);
+			} else {
+				return((struct rtentry *)cmp);
+			}
+		} else {
+			cmp = cmp->rn_dupedkey;
+		}
+	}
+	/* If we ran down to the end of the chain then
+	 * lets go from the beginning of the chain 
+	 * and run forward through the list.
+	 */
+	cmp = exist->rn_parent;
+	prev = exist;
+	while (cmp) {
+		/* We move back until we hit a interior node
+		 * or the RNF_ROOT flag (if we are on the default
+		 * chain). This gets us to the point where
+		 * prev points to the top of the chain.
+		 */
+		if (sctp_is_interior_node(cmp) ||
+		   (cmp->rn_flags & RNF_ROOT)) {
+			/* we expect this to break at the 
+			 * interior parent or in the case of
+			 * the default we will find a exterior
+			 * node marked as ROOT.
+			 */
+			break;
+		}
+		prev = cmp;
+		cmp = cmp->rn_parent;
+	}
+	if (cmp == NULL) {
+		return(NULL);
+	}
+	/* now set to prev one */
+	cmp = prev;
+	/* now move forward until we see exist */
+	while (cmp != exist) {
+		dupped = (struct rtentry *)cmp;
+		if (dupped->rt_flags &  
+#ifdef __FreeBSD__
+		   RTF_WASCLONED
+#else
+		   RTF_CLONED
+#endif
+			) {
+			/* We don't consider a cloned route
+			 * as via-able. We use the base route
+			 * only and then finalize from that.
+			 */
+ 			return(NULL);
+		}
+		if ((!sctp_are_gw_the_same(dupped,existing)) &&
+		    sctp_rn_are_keys_same(exist, cmp)) {
+			/* Keys are no longer the same */
+			if (finalize) {
+				dupped = rtfinalize_route(dst,(struct rtentry *)cmp);
+				return (dupped);
+			} else {
+				return((struct rtentry *)cmp);
+			}
 		} else {
 			cmp = cmp->rn_dupedkey;
 		}
 	}
 	return (NULL);
+}
+
+
+static struct rtentry *
+sctp_find_cloned_in(struct radix_node *entry, struct rtentry *rt)
+{
+
+	if (entry->rn_flags & RNF_ROOT) {
+		/* Huh, can't search root */
+		return(NULL);
+	}
+	if (sctp_is_interior_node(entry)) {
+		/* Here we hunt the left side only. Left is
+		 * 0 bit match and we need to get less specific
+		 * i.e. when at 10.1.1.1 we look for 10.1.1.0,
+		 * 10.1.0.0 and 10.0.0.0... we don't want to
+		 * find 10.1.3.0, which we would if we looked
+		 * right.
+		 */
+		if (entry->rn_left) {
+			struct rtentry *res;
+			res = sctp_find_cloned_in(entry->rn_left,rt);
+			if (res) {
+				return(res);
+			}
+		}
+	} else {
+		/* Exterior node, compare the gateways */
+		while (entry) {
+			if (((struct rtentry *)(entry))->rt_flags & 
+			   (RTF_CLONING
+#ifdef __FreeBSD__
+|RTF_PRCLONING
+#endif
+)
+				) {
+				/* only with these flags can it be a candidate */
+				if (sctp_are_gw_the_same(rt,((struct rtentry *)(entry)))) {
+					return(((struct rtentry *)(entry)));
+				}
+			}
+			entry = entry->rn_dupedkey;
+		}
+	}
+	return(NULL);
+}
+
+
+static struct rtentry *
+sctp_find_cloned_from(struct sockaddr *dst,
+		      struct rtentry *rt)
+{
+	/* This a very very tricky. We must hunt
+	 * the radix_node tree looking for where
+	 * we were cloned from. This must be a
+	 * node that has the RTF_CLONING or
+	 * RTF_PRCLONING flags set on it and
+	 * the corresponding gateway matches that
+	 * of rt.
+	 */
+	struct radix_node_head *rnh;
+	struct radix_node *base, *cmp, *prev, *top,*topleft,*def;
+	struct rtentry *result;
+
+	base = (struct radix_node *)rt;
+	if (sctp_is_interior_node(base)) {
+		return(NULL);
+	}
+
+	/* First we must look from the table up. 
+	 * Most likely a clone of the default but
+	 * we don't optimize for that otherwise we
+	 * reverse the order of the tree :<
+	 */
+
+	prev = base;
+	cmp = base->rn_parent;
+	while (cmp &&
+	      (!sctp_is_interior_node(cmp))) {
+		/* find the first interior node up from my base */
+		prev = cmp;
+		cmp = cmp->rn_parent;
+	}
+	/* Now traverse the tree */
+	while (cmp && ((cmp->rn_flags & RNF_ROOT) == 0)) {
+		/* Here we hunt the left side only. Left is
+		 * 0 bit match and we need to get less specific
+		 * i.e. when at 10.1.1.1 we look for 10.1.1.0,
+		 * 10.1.0.0 and 10.0.0.0... we don't want to
+		 * find 10.1.3.0, which we would if we looked
+		 * right. Note that we optimize by verifying that
+		 * we are not looking at ourselve... i.e. if we
+		 * were cloned from the default, we may find that
+		 * there is nothing to the left but our node.
+		 */
+		if (prev != cmp->rn_left) {
+			result = sctp_find_cloned_in(cmp->rn_left,rt);
+			if (result) {
+				/* found him */
+				return(result);
+			}
+		}
+		/* We have now checked rt's parents left side, 
+		 * now we must go up looking for our cloning source
+		 * for rt.
+		 */
+
+		/* save were we looked in prev, so we don't
+		 * check where we already looked.
+		 */
+		prev = cmp;
+		/* move up to parent */
+		cmp = cmp->rn_parent;
+	}
+	/* 
+	 * Now lets go look at the default.
+	 */
+	def = NULL;
+	/* get the top of the tree */
+	rnh = rt_tables[dst->sa_family];
+	if (rnh) {
+		top = rnh->rnh_treetop;
+		/* valdiate that the top is an interior node */
+		if (sctp_is_interior_node(top)) {
+			/* move left as far as possible to
+			 * get to the ROOT node that is 
+			 * the default edge.
+			 */
+			topleft = top->rn_left;
+			while (topleft && sctp_is_interior_node(topleft)) {
+				topleft = topleft->rn_left;
+			}
+			if (topleft &&
+			   (topleft->rn_flags & RNF_ROOT) &&
+			   (sctp_is_interior_node(topleft) == 0)
+				) {
+				/* copy the dupedky .. it may be NULL. */
+				def = topleft->rn_dupedkey;
+			}
+		} else {
+			return(NULL);
+		}
+	}
+	if (def) {
+		/* we have a default, was it cloned from that? */
+		result = sctp_find_cloned_in(def,rt);
+		if (result) {
+			return(result);
+		}
+	}
+	return(NULL);
+}
+
+static struct rtentry *
+sctp_check_cloned_route(struct sockaddr *dst,
+			struct rtentry *rt)
+
+{
+    /* Given a cloned route, find the route that
+     * it was cloned from in the routing table and
+     * then use the base to scan for valid alternates.
+     */
+    struct rtentry *cloned_from,*ent,*sameone;
+    struct radix_node *base, *prev;	
+
+    /* Note: that cloned_from and rt SHOULD have
+     * the same gateway as the existing route
+     * or else we would have used an alternate
+     * and not gotten into checking the cloned
+     * routes.
+     */
+    cloned_from = sctp_find_cloned_from(dst,rt);
+    if (cloned_from) {
+	ent = sctp_rt_scan_dups(dst, cloned_from,0);
+	if (ent == NULL) {
+		return(ent);
+	}
+	/* if it does not require cloning just finalize */
+	if ((ent->rt_flags & (RTF_CLONING
+#ifdef __FreeBSD__
+			    | RTF_PRCLONING
+#endif
+		    )) == 0) {
+		ent->rt_refcnt++;
+		return(ent);
+	}
+	/* Ok if the route requires cloning we must 
+	 * validate that we have not already cloned it
+	 * to the original list in rt.. if so we return
+	 * that otherwise we proceed with cloning by calling
+	 * rtfinalize.
+	 */
+	base = ((struct radix_node *)rt)->rn_dupedkey;
+	while (base != NULL) {
+		if (sctp_is_interior_node(base)) {
+			/* Gak, a interior node? */
+			return(NULL);
+		}
+		sameone = (struct rtentry *)base;
+		if ((sctp_are_gw_the_same(sameone,ent)) &&
+		    sctp_rn_are_keys_same(((struct radix_node *)rt), base)) {
+			/* found it */
+			sameone->rt_refcnt++;
+			return(sameone);
+		} else {
+			base = base->rn_dupedkey;
+		}
+	}
+	/* Went to end now must go back to beginning */
+	base = ((struct radix_node *)rt)->rn_parent;
+	prev = (struct radix_node *)rt;
+	while (base) {
+		/* We move back until we hit a interior node
+		 * or the RNF_ROOT flag (if we are on the default
+		 * chain). This gets us to the point where
+		 * prev points to the top of the chain.
+		 */
+		if (sctp_is_interior_node(base) ||
+		   (base->rn_flags & RNF_ROOT)) {
+			/* we expect this to break at the 
+			 * interior parent or in the case of
+			 * the default we will find a exterior
+			 * node marked as ROOT.
+			 */
+			break;
+		}
+		prev = base;
+		base = base->rn_parent;
+	}
+	if (base == NULL) {
+		/* punt */
+		return(rtfinalize_route(dst,ent));
+	}
+
+	/* now set to prev one */
+	base = prev;
+	/* now move forward until we see exist */
+	while (base != (struct radix_node *)rt) {
+		if (sctp_is_interior_node(base)) {
+			/* Gak, a interior node? */
+			return(NULL);
+		}
+		sameone = (struct rtentry *)base;
+		if ((sctp_are_gw_the_same(sameone,ent)) &&
+		    sctp_rn_are_keys_same((struct radix_node *)rt, base)) {
+			/* found it */
+			sameone->rt_refcnt++;
+			return(sameone);
+		} else {
+			base = base->rn_dupedkey;
+		}
+	}
+	/* finalize what came back */
+	return(rtfinalize_route(dst,ent));
+    } else
+	return(NULL);
 }
 
 /*
@@ -2498,180 +3208,120 @@ sctp_rtalloc_alternate(struct sockaddr *dst,
 		       int peer_dest_route)
 {
 	int cursalen, s;
-	struct rtentry *tmp,*tmp2;
-	struct radix_node *exist, *curparent;
+	struct rtentry *base_rt,*tmp2;
+	struct radix_node *base, *base_nxt;
 	struct sockaddr_storage s_store;
 	struct sockaddr *sa;
+	static void *my_xx1,*my_xx2;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
 #endif
+	/* setup fence and boundary stuff */
+	memset(&s_store,0,sizeof(s_store));
+	my_xx1 = &cursalen;
+	my_xx2 = &sa;
 
+	/* now on with the show */
 	if (existing == NULL) {
 		/* No existing route, we just to rtalloc1() */
 		goto noexisting;
 	}
-	exist = &existing->rt_nodes[0];
-	if ((exist->rn_dupedkey == NULL) &&
+
+	/* We must do the following:
+	 *  - Using the existing route look at each duplicate that
+	 *    may be found on the duped list. If we find a different
+	 *    gateway, we are done.
+	 *  - For each cloned route that is in my current dupedkey
+	 *    chain (including existing) I must search back and
+	 *    find the route that was cloned, then look at its
+	 *    dupped chain. 
+	 */
+
+	/* 1: first look up and down the chain for alternates at our level
+	 *    note, that this will NOT find cloned routes, but will allow
+	 *    us to see added host routes at our level in the tree.
+	 */
+	tmp2 = sctp_rt_scan_dups(dst,existing,1);
+	if (tmp2) {
+		 splx(s);
+		 return(tmp2);
+	 }
+	/* First step un-successful, so now lets re-examine each
+	 * route that scan_dups looked at and see if the WAS_CLONED
+	 * flag was set on the route. If so we must find the base
+	 * route and do a scan_dups on that as well.
+	 */
+	base_rt = existing;
+	while (base_rt) {
+	    if (base_rt->rt_flags &
 #ifdef __FreeBSD__
-	    ((existing->rt_flags & RTF_WASCLONED) == RTF_WASCLONED)
+		   RTF_WASCLONED
 #else
-	    ((existing->rt_flags & RTF_CLONED) == RTF_CLONED)
+		   RTF_CLONED
+#endif
+
+		) {
+		/* yep this one was cloned 
+		 * check it.
+		 */
+		tmp2 = sctp_check_cloned_route(dst,base_rt);
+		if (tmp2) {
+		    splx(s);
+		    return(tmp2);
+		}
+	    }
+	    /* now advance to next node */
+	    base = (struct radix_node *)base_rt;
+	    if (base->rn_dupedkey) {
+		/* check to make sure it is an exterior node */
+		if (sctp_is_interior_node(base->rn_dupedkey)) {
+		    break;
+		}
+	    }
+	    base_rt = (struct rtentry *)base->rn_dupedkey;
+	}
+	/* Now we must back UP from existing */
+	base = (struct radix_node *)existing;
+	/* get previous */
+	base_nxt = base->rn_parent;
+	while ((base_nxt != NULL) &&
+	      (sctp_is_interior_node(base_nxt) == 0) &&
+	      ((base_nxt->rn_flags & RNF_ROOT) == 0)) {
+	    base_rt = (struct rtentry *)base_nxt;
+	    if (base_rt->rt_flags &
+#ifdef __FreeBSD__
+		   RTF_WASCLONED
+#else
+		   RTF_CLONED
 #endif
 		) {
-		/* No duplicated routes that we can access sorry :-< */
-		goto nodups;
-	}
-	/*
-	 * ok if we reach here there is a chance we can allocate
-	 * an alternate route. Qualifications are:
-	 *
-	 * - We look for a route with a matching key but differnt IFP.
-	 * - If we hit the end of the chain, we go ahead and rtalloc1()
-	 *   and start at the top again in case there are some ahead
-	 *   of existing.
-	 * - The end of the chain is either a NULL or where the netmask
-	 *   changes.
-	 * - When we reach the end of the chain we have a choice we
-	 *   can give up, or we can do a search for a higher level
-	 *   route with a less specific key. So if some one put in
-	 *   say a network route to 128.10.1.0 and we found no duplicate
-	 *   to it we could look upwards with a less specific route
-	 *   say to 128.10.0.0 or default by backing up the tree after
-	 *   modifying the dst we are searching for.
-	 *
-	 */
-	/* first lets look in the rn_dupedkey chain */
-	tmp = sctp_rt_scan_dups(dst, existing, s);
-	if (tmp) {
-		splx(s);
-		return (tmp);
-	}
-
-	/*
-	 * ok if we reach here then from existing on out there were
-	 * no dups that matched are qualifications. Lets rewind to
-	 * the start of the list. End qualification is now we find
-	 * existing.
-	 */
-	tmp = sctp_rtalloc(dst);
-	if (tmp == NULL) {
-		goto noexisting;
-	}
-	if (tmp && (tmp != existing)) {
-		tmp2 = sctp_rt_scan_dups(dst, tmp, s);
-		if (tmp2) {
-			splx(s);
-			return (tmp2);
-		}
-	}
- nodups:
-	/*
-	 * Now at this point we have two choices. We give up or
-	 * move up the tree to see if a less specific route has
-	 * a different outbound gateway.
-	 */
-	memcpy(&s_store, dst, dst->sa_len);
-	sa = (struct sockaddr *)&s_store;
-	cursalen = sa->sa_len;
-	curparent = existing->rt_nodes[1].rn_parent;
-	while (curparent && ((curparent->rn_flags & RNF_ROOT) == 0)) {
-		caddr_t tc;
-		if ((curparent->rn_flags & RNF_ACTIVE) == 0) {
-			/* If we find a node in our tree that
-			 * is NOT active, something is WRONG!
-			 */
-#ifdef SCTP_DEBUG
-			printf("Gak. Found a NON-ACTIVE node?\n");
-#endif
-			break;
-		}
-		if (curparent->rn_bit < 0) {
-			/* Not a internal node, up man up. */
-			curparent = curparent->rn_parent;
-			continue;
-		}
-		/*
-		 * Now we must handle rn_offset by turning OFF the bit 
-		 * of the last branch of the copy of our address.
+		/* yep this one was cloned 
+		 * check it.
 		 */
-
-		/* Turn off the bit in question */
-		tc = (caddr_t)sa + curparent->rn_offset;
-		*tc &= ~curparent->rn_bmask;
-		
-		/* now can we get a different route for this one? */
-		tmp = sctp_rtalloc(sa);
-		if (tmp == NULL) {
-			goto noexisting;
-		}
-		if (tmp == existing) {
-			/* Got the same result, move up */
-			curparent = curparent->rn_parent;
-			continue;
-		}
-		if (
-#ifdef __FreeBSD__
-			((tmp->rt_flags & RTF_WASCLONED) == RTF_WASCLONED)
-#else
-			((tmp->rt_flags & RTF_CLONED) == RTF_CLONED)
-#endif
-			) {
-			/* we do not want to consider cloned routes */
-			curparent = curparent->rn_parent;
-			continue;
-		}
-                if (existing->rt_gateway != tmp->rt_gateway) {
-			/* found a different gateway */
-			tmp2 = rtfinalize_route(dst, tmp, s);
-			splx(s);
-			return (tmp2);
-		}
-		/* now what about any dup's of tmp? */
-		tmp2 = sctp_rt_scan_dups(dst, tmp, s);
+		tmp2 = sctp_check_cloned_route(dst,base_rt);
 		if (tmp2) {
-			splx(s);
-			return (tmp2);
+		    splx(s);
+		    return(tmp2);
 		}
-		/* Ok we need to move up a level */
-		curparent = curparent->rn_parent;
+	    }
+	    /* back up again */
+	    base_nxt = base_nxt->rn_parent;
 	}
-	/*
-	 * We climbed all the way up to the root, see
-	 * if a default route exists.. if so go get it
-	 * and look for its dup's.
+	/* If we fall out here, we have checkd all and
+	 * failed, give them back a normal rtalloc1() which
+	 * will yeild the same result.
 	 */
-	memset(&s_store, 0, dst->sa_len);
-	sa->sa_family = dst->sa_family;
-	sa->sa_len = dst->sa_len;
-	tmp = sctp_rtalloc(sa);
-	if ((tmp == NULL) ||  (tmp == existing)) {
-		/* no default route here or
-		 * we already scanned it.
-		 */
-		goto noexisting;
-	}
-	if (existing->rt_gateway != tmp->rt_gateway) {
-		/* found a different gateway out */
-		tmp2 = rtfinalize_route(dst, tmp, s);
-		splx(s);
-		return (tmp2);
-	}
-	/* now what about any dup's of tmp? */
-	tmp2 = sctp_rt_scan_dups(dst, tmp, s);
-	if (tmp2) {
-		splx(s);
-		return (tmp2);
-	}
+
  noexisting:
 #ifdef __FreeBSD__
-	tmp = rtalloc1(dst, 1, 0);
+	tmp2 = rtalloc1(dst, 1, 0);
 #else
-	tmp = rtalloc1(dst, 1);
+	tmp2 = rtalloc1(dst, 1);
 #endif
 	splx(s);
-	return (tmp);
+	return (tmp2);
 }
 
 #endif

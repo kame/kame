@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.16 2002/10/09 18:01:21 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.17 2003/03/10 05:58:12 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.c,v 1.207 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -185,7 +185,6 @@ sctp_tcb_special_locate(struct sctp_inpcb **p_ep,
 			struct sockaddr *from,
 			struct sockaddr *to,
 			struct sctp_nets **netp)
-
 {
 	/* Note for this module care must be taken when observing
 	 * what to is for. In most of the rest of the code the TO
@@ -220,8 +219,9 @@ sctp_tcb_special_locate(struct sctp_inpcb **p_ep,
 	 * tcb from it.
 	 */
 	LIST_FOREACH(inp, ephead, sctp_hash) {
-		if (lport != inp->sctp_lport)
+		if (lport != inp->sctp_lport) {
 			continue;
+		}
 
 		/* check to see if the ep has one of the addresses */
 		if ((inp->sctp_flags & SCTP_PCB_FLAGS_BOUNDALL) == 0) {
@@ -235,6 +235,7 @@ sctp_tcb_special_locate(struct sctp_inpcb **p_ep,
 						printf("An ounce of prevention is worth a pound of cure\n");
 					}
 #endif
+
 					continue;
 				}
 				if (laddr->ifa->ifa_addr == NULL) {
@@ -274,7 +275,7 @@ sctp_tcb_special_locate(struct sctp_inpcb **p_ep,
 		}
 		/*
 		 * Ok if we hit here the ep has the address, does it hold the
-		 * association?
+		 * 
 		 */
 		tcb = LIST_FIRST(&inp->sctp_asoc_list);
 		if (tcb == NULL)
@@ -345,47 +346,56 @@ sctp_findassociation_ep_addr(struct sctp_inpcb **p_ep,
 	} else {
 		rport = (((struct sockaddr_in6 *)to)->sin6_port);
 	}
-
-	if (ep->sctp_tcbhash == NULL) {
-		/*
-		 * Probably a TCP model guy if tcbhash is null
-		 * in that case the list should only have one entry,
-		 * but just in case we will LIST_FOREACH it.
+	if (ep->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) {
+		/* Now either this guy is our listner or
+		 * its the connector. If it is the one that issued
+		 * the connect, then it's only chance is to 
+		 * be the first TCB in the list. On the other hand
+		 * if it is the acceptor, then we must do the
+		 * special_lookup to hash and find the real ep.
 		 */
-		head = &ep->sctp_asoc_list;
-		LIST_FOREACH(tcb, head, sctp_tcblist) {
-			if (tcb->rport != rport)
-				/* remote port does not match. */
-				continue;
-			/* now look at the list of remote addresses */
-			TAILQ_FOREACH(net, &tcb->asoc.nets, sctp_next) {
-				if (((struct sockaddr *)(&net->ra._l_addr))->sa_family !=
-				    to->sa_family) {
-					/* not the same family */
-					continue;
-				}
-				if (to->sa_family == AF_INET) {
-					struct sockaddr_in *sin, *rsin;
-					sin = (struct sockaddr_in *)&net->ra._l_addr;
-					rsin = (struct sockaddr_in *)to;
-					if (sin->sin_addr.s_addr == rsin->sin_addr.s_addr) {
-						/* found it */
-						if (netp != NULL) {
-							*netp = net;
-						}
-						return (tcb);
+		if (ep->sctp_flags & SCTP_PCB_FLAGS_ACCEPTING) {
+			tcb = sctp_tcb_special_locate(p_ep,
+						       to,  /* this is my peer address */
+						       from, /* this is my address */
+						       netp);
+			return(tcb);
+		} else {
+			tcb = LIST_FIRST(&ep->sctp_asoc_list);
+			if (tcb) {
+				if (tcb->rport != rport)
+					/* remote port does not match. */
+					return(NULL);
+				/* now look at the list of remote addresses */
+				TAILQ_FOREACH(net, &tcb->asoc.nets, sctp_next) {
+					if (((struct sockaddr *)(&net->ra._l_addr))->sa_family !=
+					    to->sa_family) {
+						/* not the same family */
+						continue;
 					}
-				} else {
-					struct sockaddr_in6 *sin6, *rsin6;
-					sin6 = (struct sockaddr_in6 *)&net->ra._l_addr;
-					rsin6 = (struct sockaddr_in6 *)to;
-					if (SCTP6_ARE_ADDR_EQUAL(&sin6->sin6_addr,
-								 &rsin6->sin6_addr)) {
-						/* found it */
-						if (netp != NULL) {
-							*netp = net;
+					if (to->sa_family == AF_INET) {
+						struct sockaddr_in *sin, *rsin;
+						sin = (struct sockaddr_in *)&net->ra._l_addr;
+						rsin = (struct sockaddr_in *)to;
+						if (sin->sin_addr.s_addr == rsin->sin_addr.s_addr) {
+							/* found it */
+							if (netp != NULL) {
+								*netp = net;
+							}
+							return (tcb);
 						}
-						return (tcb);
+					} else {
+						struct sockaddr_in6 *sin6, *rsin6;
+						sin6 = (struct sockaddr_in6 *)&net->ra._l_addr;
+						rsin6 = (struct sockaddr_in6 *)to;
+						if (SCTP6_ARE_ADDR_EQUAL(&sin6->sin6_addr,
+									 &rsin6->sin6_addr)) {
+							/* found it */
+							if (netp != NULL) {
+								*netp = net;
+							}
+							return (tcb);
+						}
 					}
 				}
 			}
@@ -393,12 +403,14 @@ sctp_findassociation_ep_addr(struct sctp_inpcb **p_ep,
 	} else {
 		head = &ep->sctp_tcbhash[SCTP_PCBHASH_ALLADDR(rport,
 							      ep->sctp_hashmark)];
-		if (head == NULL)
+		if (head == NULL) {
 			return (NULL);
+		}
 		LIST_FOREACH(tcb, head, sctp_tcbhash) {
-			if (tcb->rport != rport)
+			if (tcb->rport != rport) {
 				/* remote port does not match */
 				continue;
+			}
 			/* now look at the list of remote addresses */
 			TAILQ_FOREACH(net, &tcb->asoc.nets, sctp_next) {
 				if (((struct sockaddr *)(&net->ra._l_addr))->sa_family !=
@@ -432,13 +444,6 @@ sctp_findassociation_ep_addr(struct sctp_inpcb **p_ep,
 				}
 			}
 		}
-	}
-	if (from == NULL) {
-		/*
-		 * If you are SURE your EP is correct you can pass a
-		 * from=NULL to disable change of the EP in the TCP model.
-		 */
-		return (NULL);
 	}
 	/* not found */
 	return (NULL);
@@ -506,7 +511,6 @@ sctp_endpoint_probe(struct sockaddr *nam,
 		/* unsupported family */
 		return ((struct sctp_inpcb *)NULL);
 	}
-
 	LIST_FOREACH(ep, head, sctp_hash) {
 		if ((ep->sctp_flags & SCTP_PCB_FLAGS_BOUNDALL) &&
 		    (ep->sctp_lport == lport)) {
@@ -526,9 +530,10 @@ sctp_endpoint_probe(struct sockaddr *nam,
 				/* IPv4 on a IPv6 socket with ONLY IPv6 set */
 				continue;
 			}
+			/* A V6 address and the endpoint is NOT bound V6 */
 			if ((nam->sa_family == AF_INET6) &&
-			    ((ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) == 0)) {
-				/* IPv4 socket and this is a IPv6 address */
+			   ((ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) == 0)) {
+				continue;
 			}
 			return (ep);
 		}
@@ -548,7 +553,7 @@ sctp_endpoint_probe(struct sockaddr *nam,
 	 */
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-	        printf("Ok, there is NO bound-all available for port:%x\n", ntohs(lport));
+		printf("Ok, there is NO bound-all available for port:%x\n", ntohs(lport));
 	}
 #endif
 	LIST_FOREACH(ep, head, sctp_hash) {
@@ -569,7 +574,7 @@ sctp_endpoint_probe(struct sockaddr *nam,
 			LIST_FOREACH(laddr, &ep->sctp_addr_list, sctp_nxt_addr) {
 				if (laddr->ifa == NULL) {
 #ifdef SCTP_DEBUG
-					if (sctp_debug_on & SCTP_DEBUG_PCB1) {
+					if (sctp_debug_on & SCTP_DEBUG_PCB1) { 
 						printf("An ounce of prevention is worth a pound of cure\n");
 					}
 #endif
@@ -628,7 +633,7 @@ sctp_endpoint_probe(struct sockaddr *nam,
 		}
 	}
 #ifdef SCTP_DEBUG
-        if (sctp_debug_on & SCTP_DEBUG_PCB1) {
+	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
 		printf("NO, Falls out to NULL\n");
 	}
 #endif
@@ -650,7 +655,7 @@ sctp_pcb_findep(struct sockaddr *nam)
 	int lport;
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-	        printf("Looking for endpoint %d :",
+		printf("Looking for endpoint %d :",
 		       ntohs(((struct sockaddr_in *)nam)->sin_port));
 		sctp_print_address(nam);
 	}
@@ -674,10 +679,10 @@ sctp_pcb_findep(struct sockaddr *nam)
 	head = &sctppcbinfo.sctp_ephash[SCTP_PCBHASH_ALLADDR(lport, sctppcbinfo.hashmark)];
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-	        printf("Main hash to lookup at head:%x\n",(u_int)head);
+		printf("Main hash to lookup at head:%x\n",(u_int)head);
 	}
 #endif
-	ep = sctp_endpoint_probe(nam, head, lport);
+ 	ep = sctp_endpoint_probe(nam, head, lport);
 
 #ifdef SCTP_TCP_MODEL_SUPPORT
 	/*
@@ -703,8 +708,8 @@ sctp_pcb_findep(struct sockaddr *nam)
 			 */
 			head = &sctppcbinfo.sctp_tcpephash[i];
 			if (LIST_FIRST(head)) {
-			        ep = sctp_endpoint_probe(nam, head, lport);
-			        if (ep) {
+				ep = sctp_endpoint_probe(nam, head, lport);
+				if (ep) {
 					/* Found one */
 					break;
 				}
@@ -714,7 +719,7 @@ sctp_pcb_findep(struct sockaddr *nam)
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-	        printf("EP to return is %x\n",(u_int)(ep));
+		printf("EP to return is %x\n",(u_int)(ep));
 	}
 #endif
 	return (ep);
@@ -747,10 +752,11 @@ sctp_findassociation_addr_sa(struct sockaddr *to, struct sockaddr *from,
 	 * endpoint call. Since in reality this chain is used from the
 	 * inbound packet side.
 	 */
-	if (inp != NULL)
+	if (inp != NULL) {
 		return (sctp_findassociation_ep_addr(inp, from, netp, to));
-	else
+	} else {
 		return (sctp_findassociation_ep_addr(&ep, from, netp, to));
+	}
 }
 
 
@@ -856,7 +862,7 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 			  struct sctp_nets **netp)
 {
 #ifdef SCTP_TCP_MODEL_SUPPORT
-        int to_tcp_pool;
+	int to_tcp_pool;
 #endif
 	struct ip *iph;
 	struct sctphdr *sh;
@@ -871,8 +877,11 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 	iph = mtod(pkt, struct ip *);
 	if (iph->ip_v == IPVERSION) {
 		/* its IPv4 */
+/*
+  I think we don't need to bzero these 
 		bzero(&to4, sizeof(to4));
 		bzero(&from4, sizeof(from4));
+*/
 		from4.sin_family = to4.sin_family = AF_INET;
 		from4.sin_len = to4.sin_len = sizeof(struct sockaddr_in);
 		sh = (struct sctphdr *)((caddr_t)iph + iphlen);
@@ -885,8 +894,11 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 	} else {
 		/* its IPv6 */
 		struct ip6_hdr *ip6;
+/*
+  I think we don't need to bzero these
 		bzero(&to, sizeof(to6));
 		bzero(&from6, sizeof(from6));
+*/
 		from6.sin6_family = to6.sin6_family = AF_INET6;
 		from6.sin6_len = to6.sin6_len = sizeof(struct sockaddr_in6);
 		ip6 = mtod(pkt, struct ip6_hdr *);
@@ -900,7 +912,7 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 	}
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-	        printf("Looking for port %d address :",
+		printf("Looking for port %d address :",
 		       ntohs(((struct sockaddr_in *)to)->sin_port));
 		sctp_print_address(to);
 		printf("From for port %d address :",
@@ -916,7 +928,7 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 	}
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-	        printf("ret:%x linp:%x\n",(u_int)ret,(u_int)linp);
+		printf("ret:%x linp:%x\n",(u_int)ret,(u_int)linp);
 	}
 #endif
 #ifdef SCTP_TCP_MODEL_SUPPORT
@@ -945,8 +957,8 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 	if ((ret == NULL) && (linp)) {
 		/* Found a EP but not this address */
 #ifdef SCTP_DEBUG
-	        if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-		        printf("Found endpoint %x but not address state:%x\n",
+		if (sctp_debug_on & SCTP_DEBUG_PCB1) {
+			printf("Found endpoint %x but not address state:%x\n",
 			       (unsigned int)linp,
 			       linp->sctp_flags
 			       );
@@ -967,8 +979,8 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 			 */
 			if (linp->sctp_flags & SCTP_PCB_FLAGS_IN_TCPPOOL) {
 #ifdef SCTP_DEBUG
-			        if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-				        printf("Gak, its in the TCP pool... return NULL");
+				if (sctp_debug_on & SCTP_DEBUG_PCB1) {
+					printf("Gak, its in the TCP pool... return NULL");
 				}
 
 #endif
@@ -979,8 +991,8 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 			}
 #endif /* SCTP_TCP_MODEL_SUPPORT */
 #ifdef SCTP_DEBUG
-   	                if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-		                printf("Now doing SPECIAL find");
+			if (sctp_debug_on & SCTP_DEBUG_PCB1) {
+				printf("Now doing SPECIAL find");
 			}
 #endif
 			ret = sctp_findassociation_special_addr(inp, netp, pkt,
@@ -1245,9 +1257,16 @@ sctp_move_pcb_and_assoc(struct sctp_inpcb *old_inp,
 	struct sctppcbhead *head;
 	struct sctp_laddr *laddr, *oladdr;
 
+	new_inp->sctp_ep.time_of_secret_change = old_inp->sctp_ep.time_of_secret_change;
+	memcpy(new_inp->sctp_ep.secret_key, old_inp->sctp_ep.secret_key, sizeof(old_inp->sctp_ep.secret_key));
+	new_inp->sctp_ep.size_of_a_cookie = old_inp->sctp_ep.size_of_a_cookie;
+	new_inp->sctp_ep.current_secret_number = old_inp->sctp_ep.current_secret_number;
+	new_inp->sctp_ep.last_secret_number = old_inp->sctp_ep.last_secret_number;
+
 	lport = new_inp->sctp_lport = old_inp->sctp_lport;
 	rport = tcb_tomove->rport;
 	/* Pull the tcb from the old association */
+	
 	LIST_REMOVE(tcb_tomove, sctp_tcbhash);
 	LIST_REMOVE(tcb_tomove, sctp_tcblist);
 	/* Now insert the new_inp into the TCP connected hash */
@@ -1307,7 +1326,7 @@ sctp_move_pcb_and_assoc(struct sctp_inpcb *old_inp,
 
 
 static int
-sctp_isport_inuse(u_short lport)
+sctp_isport_inuse(struct sctp_inpcb *ep, u_short lport)
 {
 	struct sctppcbhead *head;
 	struct sctp_inpcb *lep;
@@ -1315,6 +1334,48 @@ sctp_isport_inuse(u_short lport)
 	LIST_FOREACH(lep, head, sctp_hash) {
 		if (lep->sctp_lport == lport) {
 			/* This one is in use. */
+			/* check the v6/v4 binding issue */
+			if ((lep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) &&
+#if defined(__FreeBSD__)
+			   (((struct inpcb *)lep)->inp_flags & IN6P_IPV6_V6ONLY)
+#else
+#if defined(__OpenBSD__)
+			   (0)	/* For open bsd we do dual bind only */
+#else
+			   (((struct in6pcb *)lep)->in6p_flags & IN6P_IPV6_V6ONLY)
+#endif
+#endif
+				) {
+				if (ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) {
+					/* collision in V6 space */
+					return(1);
+				}else{
+					/* ep is BOUND_V4 no conflict */
+					continue;
+				}
+			}else if (lep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) {
+				/* lep is bound v4 and v6 
+				 * conflict no matter what.
+				 */
+				return(1);
+			}else{
+				/* lep is bound only V4 */
+				if ((ep->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) &&
+#if defined(__FreeBSD__)
+				   (((struct inpcb *)ep)->inp_flags & IN6P_IPV6_V6ONLY)
+#else
+#if defined(__OpenBSD__)
+				   (0)	/* For open bsd we do dual bind only */
+#else
+				   (((struct in6pcb *)ep)->in6p_flags & IN6P_IPV6_V6ONLY)
+#endif
+#endif
+					) {
+					/* no conflict */
+					continue;
+				}
+				/* else fall through to conflict */
+			}
 			return (1);
 		}
 	}
@@ -1451,9 +1512,9 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 		lep = sctp_pcb_findep(addr);
 		if (lep != NULL) {
 			/* If it is NOT in the TCP pool then it exists */
-			if ((lep->sctp_flags & SCTP_PCB_FLAGS_IN_TCPPOOL) == 0)
+			if ((lep->sctp_flags & SCTP_PCB_FLAGS_IN_TCPPOOL) == 0) {
 				return (EADDRNOTAVAIL);
-			else
+			} else
 				/*
 				 * In this case it IS only found in the TCP
 				 * pool which means the main listner went away
@@ -1463,9 +1524,10 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 		}
 		if (bindall) {
 			/* verify that no lport is not used by a singleton */
-			if (sctp_isport_inuse(lport))
+			if (sctp_isport_inuse(ep, lport)) {
 				/* Sorry someone already has this one bound */
 				return (EADDRNOTAVAIL);
+			}
 		}
 	} else {
 		/*
@@ -1543,7 +1605,7 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 					(*lastport)--;
 				}
 				lport = htons(*lastport);
-			} while (sctp_isport_inuse(lport));
+			} while (sctp_isport_inuse(ep, lport));
 		} else {
 			/* we are assigning from small towards large */
 			int max, cnt;
@@ -1563,7 +1625,7 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 					(*lastport)++;
 				}
 				lport = htons(*lastport);
-			} while (sctp_isport_inuse(lport));
+			} while (sctp_isport_inuse(ep, lport));
 		}
 	}
 	/* ok we look clear to give out this port, so lets setup the binding */
@@ -1655,7 +1717,7 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 	LIST_INSERT_HEAD(head, ep, sctp_hash);
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-	        printf("Main hash to bind at head:%x, bound port:%d\n",(u_int)head, ntohs(lport));
+		printf("Main hash to bind at head:%x, bound port:%d\n",(u_int)head, ntohs(lport));
 	}
 #endif
 	/* set in the port */
@@ -1687,19 +1749,34 @@ sctp_inpcb_free(struct sctp_inpcb *ep, int immediate)
 	struct inpcb *ip_pcb;
 	struct socket *so;
 	struct rtentry *rt;
-	int s;
+	int s, cnt;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
 	s = splnet();
 #endif
+	if (ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_ALLGONE) {
+		/* been here before */
+		splx(s);
+		printf("Endpoint was all gone (dup free)?\n");
+		return;
+	}
 	sctp_timer_stop(SCTP_TIMER_TYPE_NEWCOOKIE, ep, NULL, NULL);
+	if (ep->control) {
+		m_freem(ep->control);
+		ep->control = NULL;
+	}
+	if (ep->pkt) {
+		m_freem(ep->pkt);
+		ep->pkt = NULL;
+	}
 	so  = ep->sctp_socket;
 	m = &ep->sctp_ep;
 	ip_pcb = &ep->ip_inp.inp; /* we could just cast the main
 				   * pointer here but I will
 				   * be nice :> ( i.e. ip_pcb = ep;)
 				   */
+
 	ep->sctp_flags |= SCTP_PCB_FLAGS_SOCKET_GONE;
 	if (immediate == 0) {
 		int cnt_in_sd;
@@ -1736,7 +1813,8 @@ sctp_inpcb_free(struct sctp_inpcb *ep, int immediate)
 				continue;
 			} else if (TAILQ_EMPTY(&asoc->asoc.send_queue) &&
 				  TAILQ_EMPTY(&asoc->asoc.sent_queue)) {
-				if ((asoc->asoc.state & SCTP_STATE_MASK) != SCTP_STATE_SHUTDOWN_SENT) {
+				if (((asoc->asoc.state & SCTP_STATE_MASK) != SCTP_STATE_SHUTDOWN_SENT) &&
+				    ((asoc->asoc.state & SCTP_STATE_MASK) != SCTP_STATE_SHUTDOWN_ACK_SENT)) {
 					/* there is nothing queued to send, so I send shutdown */
 					sctp_send_shutdown(asoc, asoc->asoc.primary_destination);
 					asoc->asoc.state = SCTP_STATE_SHUTDOWN_SENT;
@@ -1744,7 +1822,7 @@ sctp_inpcb_free(struct sctp_inpcb *ep, int immediate)
 							 asoc->asoc.primary_destination);
 					sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWNGUARD, asoc->sctp_ep, asoc,
 							 asoc->asoc.primary_destination);
-					sctp_chunk_output(ep, asoc, 3);
+					sctp_chunk_output(ep, asoc, 1);
 				}
 			} else {
 				/* mark into shutdown pending */
@@ -1752,51 +1830,60 @@ sctp_inpcb_free(struct sctp_inpcb *ep, int immediate)
 			}
 			cnt_in_sd++;
 		}
-		/* now is there some left in our SHUTDOWN state? */
+		/* now is there some left in our SHUTDOWN state? */ 
 		if (cnt_in_sd) {
 			splx(s);
 			return;
 		}
 	}
+	ep->sctp_flags |= SCTP_PCB_FLAGS_SOCKET_ALLGONE;
 	rt = ip_pcb->inp_route.ro_rt;
+	if (so) {
 	/* First take care of socket level things */
 #ifdef IPSEC
 #ifdef __OpenBSD__
 	/* XXX IPsec cleanup here */
-{
-	int s = spltdb();
-	if (ip_pcb->inp_tdb_in)
-		TAILQ_REMOVE(&ip_pcb->inp_tdb_in->tdb_inp_in,
-			     ip_pcb, inp_tdb_in_next);
-	if (ip_pcb->inp_tdb_out)
-		TAILQ_REMOVE(&ip_pcb->inp_tdb_out->tdb_inp_out, ip_pcb,
-			     inp_tdb_out_next);
-	if (ip_pcb->inp_ipsec_localid)
-		ipsp_reffree(ip_pcb->inp_ipsec_localid);
-	if (ip_pcb->inp_ipsec_remoteid)
-		ipsp_reffree(ip_pcb->inp_ipsec_remoteid);
-	if (ip_pcb->inp_ipsec_localcred)
-		ipsp_reffree(ip_pcb->inp_ipsec_localcred);
-	if (ip_pcb->inp_ipsec_remotecred)
-		ipsp_reffree(ip_pcb->inp_ipsec_remotecred);
-	if (ip_pcb->inp_ipsec_localauth)
-		ipsp_reffree(ip_pcb->inp_ipsec_localauth);
-	if (ip_pcb->inp_ipsec_remoteauth)
-		ipsp_reffree(ip_pcb->inp_ipsec_remoteauth);
-	splx(s);
-}
+	    {
+		int s2 = spltdb();
+		if (ip_pcb->inp_tdb_in)
+		    TAILQ_REMOVE(&ip_pcb->inp_tdb_in->tdb_inp_in,
+				 ip_pcb, inp_tdb_in_next);
+		if (ip_pcb->inp_tdb_out)
+		    TAILQ_REMOVE(&ip_pcb->inp_tdb_out->tdb_inp_out, ip_pcb,
+				 inp_tdb_out_next);
+		if (ip_pcb->inp_ipsec_localid)
+		    ipsp_reffree(ip_pcb->inp_ipsec_localid);
+		if (ip_pcb->inp_ipsec_remoteid)
+		    ipsp_reffree(ip_pcb->inp_ipsec_remoteid);
+		if (ip_pcb->inp_ipsec_localcred)
+		    ipsp_reffree(ip_pcb->inp_ipsec_localcred);
+		if (ip_pcb->inp_ipsec_remotecred)
+		    ipsp_reffree(ip_pcb->inp_ipsec_remotecred);
+		if (ip_pcb->inp_ipsec_localauth)
+		    ipsp_reffree(ip_pcb->inp_ipsec_localauth);
+		if (ip_pcb->inp_ipsec_remoteauth)
+		    ipsp_reffree(ip_pcb->inp_ipsec_remoteauth);
+		splx(s2);
+	    }
 #else
-	ipsec4_delete_pcbpolicy(ip_pcb);
+	    ipsec4_delete_pcbpolicy(ip_pcb);
 #endif
 #endif /*IPSEC*/
-	so->so_pcb = 0;
-	sofree(so);
-	if (ip_pcb->inp_options)
+	    so->so_pcb = 0;
+	    sofree(so);
+	}
+	if (ip_pcb->inp_options) {
 		(void)m_free(ip_pcb->inp_options);
+		ip_pcb->inp_options = 0;
+	}
 	if (rt) {
 		RTFREE(rt);
+		ip_pcb->inp_route.ro_rt = 0;
 	}
-	ip_freemoptions(ip_pcb->inp_moptions);
+	if (ip_pcb->inp_moptions) {
+		ip_freemoptions(ip_pcb->inp_moptions);
+		ip_pcb->inp_moptions = 0;
+	}
 #ifndef __FreeBSD__
 	ep->inp_vflag = 0;
 #else
@@ -1810,6 +1897,7 @@ sctp_inpcb_free(struct sctp_inpcb *ep, int immediate)
 	 * the macro here since le_next will get freed as part of the
 	 * sctp_free_assoc() call.
 	 */
+	cnt = 0;
 	for ((asoc = LIST_FIRST(&ep->sctp_asoc_list)); asoc != NULL;
 	     asoc = nasoc) {
 		nasoc = LIST_NEXT(asoc, sctp_tcblist);
@@ -1817,6 +1905,7 @@ sctp_inpcb_free(struct sctp_inpcb *ep, int immediate)
 		    SCTP_STATE_COOKIE_WAIT) {
 			sctp_send_abort_tcb(asoc, NULL);
 		}
+		cnt++;
 		sctp_free_assoc(ep, asoc);
 	}
 	ep->sctp_socket = 0;
@@ -1870,8 +1959,10 @@ sctp_inpcb_free(struct sctp_inpcb *ep, int immediate)
 		sctppcbinfo.ipi_count_laddr--;
 	}
 	/* Now lets see about freeing the EP hash table. */
-	if (ep->sctp_tcbhash != NULL)
+	if (ep->sctp_tcbhash != NULL) {
 		free(ep->sctp_tcbhash, M_PCB);
+		ep->sctp_tcbhash = 0;
+	}
 
 	/* Now we must put the ep memory back into the zone pool */
 #if defined(__FreeBSD__)
@@ -1915,8 +2006,42 @@ sctp_findnet(struct sctp_tcb *tcb, struct sockaddr *addr)
  * initialize all the cwnd stats of stuff.
  */
 int
+sctp_is_address_on_local_host(struct sockaddr *addr)
+{
+	struct ifnet *ifn;
+	struct ifaddr *ifa;
+	TAILQ_FOREACH(ifn,&ifnet, if_list) {
+		TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
+			if (addr->sa_family == ifa->ifa_addr->sa_family) {
+				/* same family */
+				if (addr->sa_family == AF_INET) {
+					struct sockaddr_in *sin,*sin_c;
+					sin = (struct sockaddr_in *)addr;
+					sin_c = (struct sockaddr_in *)ifa->ifa_addr;
+					if (sin->sin_addr.s_addr == sin_c->sin_addr.s_addr) {
+						/* we are on the same machine */
+						return(1);
+					}
+				} else if (addr->sa_family == AF_INET6) {
+					struct sockaddr_in6 *sin6,*sin_c6;
+					sin6 = (struct sockaddr_in6 *)addr;
+					sin_c6 = (struct sockaddr_in6 *)ifa->ifa_addr;
+					if (SCTP6_ARE_ADDR_EQUAL(&sin6->sin6_addr,
+								&sin_c6->sin6_addr)) {
+						/* we are on the same machine */
+						return(1);
+					}
+				}
+			}
+		}
+	}
+	return(0);
+}
+
+
+int
 sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
-		     int set_scope)
+		     int set_scope, int from)
 {
 	/*
 	 * The following is redundant to the same lines in the
@@ -1928,10 +2053,26 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-		printf("Adding an address to the peer: ");
+		printf("Adding an address (from:%d) to the peer: ", from);
 		sctp_print_address(newaddr);
 	}
-#endif /* SCTP_DEBUG */
+#endif  SCTP_DEBUG 
+	netfirst = sctp_findnet(tasoc, newaddr);
+	if (netfirst) {
+		/* Lie and return ok, we don't want to 
+		 * make the association go away for
+		 * this behavior. It will happen in the 
+		 * TCP model in a connected socket. It does
+		 * not reach the hash table until after the
+		 * association is built so it can't be found.
+		 * Mark as reachable, since the initial creation
+		 * will have been cleared and the NOT_IN_ASSOC flag
+		 * will have been added... and we don't wan't to
+		 * end up removing it back out.
+		 */
+		netfirst->dest_state = SCTP_ADDR_REACHABLE;
+		return(0);
+	}
 	addr_inscope = 1;
 	if (newaddr->sa_family == AF_INET) {
 		struct sockaddr_in *sin;
@@ -1950,7 +2091,7 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 				tasoc->asoc.ipv4_local_scope = 1;
 			}
 #endif /* SCTP_DONT_DO_PRIVADDR_SCOPE */
-			if (IN4_ISLOOPBACK_ADDRESS(&sin->sin_addr)) {
+			if (sctp_is_address_on_local_host(newaddr)) {
 				tasoc->asoc.loopback_scope = 1;
 				tasoc->asoc.ipv4_local_scope = 1;
 				tasoc->asoc.local_scope = 1;
@@ -1974,7 +2115,7 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 		/* assure len is set */
 		sin6->sin6_len = sizeof(struct sockaddr_in6);
 		if (set_scope) {
-			if (IN6_IS_ADDR_LOOPBACK(&sin6->sin6_addr)) {
+			if (sctp_is_address_on_local_host(newaddr)) {
 				tasoc->asoc.loopback_scope = 1;
 				tasoc->asoc.local_scope = 1;
 				tasoc->asoc.ipv4_local_scope = 1;
@@ -2026,7 +2167,20 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 	}
 	bzero((caddr_t)netp, sizeof(*netp));
 	memcpy(&netp->ra._l_addr, newaddr, newaddr->sa_len);
-	netp->cwnd = tasoc->asoc.smallest_mtu * 2;
+#if defined(__FreeBSD__)
+	if (newaddr->sa_family == AF_INET6)
+		netp->addr_is_local = in6_localaddr((struct sockaddr_in6 *)newaddr);
+	else
+		netp->addr_is_local = in_localaddr(((struct sockaddr_in *)newaddr)->sin_addr);
+#else
+	netp->addr_is_local = 0;
+#endif
+
+	if (netp->addr_is_local) {
+		netp->cwnd = tasoc->asoc.smallest_mtu * 4;
+	}else{
+		netp->cwnd = tasoc->asoc.smallest_mtu * 2;
+	}
 	netp->mtu = tasoc->asoc.smallest_mtu;
 	netp->ssthresh = tasoc->asoc.peers_rwnd;
 	netp->failure_threshold = tasoc->asoc.def_net_failure;
@@ -2050,6 +2204,7 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 	/* Now generate a route for this guy */
 	netp->ra.ro_rt = rtalloc_alternate((struct sockaddr *)&netp->ra._l_addr,
 					   NULL, 0);
+	netp->src_addr_selected = 0;
 	netfirst = TAILQ_FIRST(&tasoc->asoc.nets);
 	if (netp->ra.ro_rt == NULL) {
 		/* Since we have no route put it at the back */
@@ -2147,7 +2302,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 		if ((sin->sin_port == 0) || (sin->sin_addr.s_addr == 0)) {
 			/* Invalid address */
 #ifdef SCTP_DEBUG
-		        if (sctp_debug_on & SCTP_DEBUG_PCB3) {
+			if (sctp_debug_on & SCTP_DEBUG_PCB3) {
 				printf("peer address invalid\n");
 			}
 #endif
@@ -2162,7 +2317,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 		    (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))) {
 			/* Invalid address */
 #ifdef SCTP_DEBUG
-		        if (sctp_debug_on & SCTP_DEBUG_PCB3) {
+			if (sctp_debug_on & SCTP_DEBUG_PCB3) {
 				printf("peer address invalid\n");
 			}
 #endif
@@ -2173,7 +2328,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 	} else {
 		/* not supported family type */
 #ifdef SCTP_DEBUG
-	        if (sctp_debug_on & SCTP_DEBUG_PCB3) {
+		if (sctp_debug_on & SCTP_DEBUG_PCB3) {
 			printf("BAD family %d\n", firstaddr->sa_family);
 		}
 #endif
@@ -2187,16 +2342,16 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 		 */
 
 #ifdef SCTP_DEBUG
-	        if (sctp_debug_on & SCTP_DEBUG_PCB3) {
-		        printf("Doing implicit BIND\n");
+		if (sctp_debug_on & SCTP_DEBUG_PCB3) {
+			printf("Doing implicit BIND\n");
 		}
 #endif
 		if ((imp_ret = sctp_inpcb_bind(ep->sctp_socket, (struct sockaddr *)NULL,
 					       (struct proc *)NULL))) {
 			/* bind error, probably perm */
 #ifdef SCTP_DEBUG
-		        if (sctp_debug_on & SCTP_DEBUG_PCB3) {
-			        printf("BIND FAILS ret:%d\n", imp_ret);
+			if (sctp_debug_on & SCTP_DEBUG_PCB3) {
+				printf("BIND FAILS ret:%d\n", imp_ret);
 			}
 #endif
 			*error = imp_ret;
@@ -2215,9 +2370,9 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 	if (tasoc == NULL) {
 		/* out of memory? */
 #ifdef SCTP_DEBUG
-	        if (sctp_debug_on & SCTP_DEBUG_PCB3) {
+		if (sctp_debug_on & SCTP_DEBUG_PCB3) {
 			printf("aloc_assoc: no assoc mem left, tasoc=NULL\n");
-	        }
+		}
 #endif
 		*error = ENOMEM;
 		return (NULL);
@@ -2247,7 +2402,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 
 	/* and the port */
 	tasoc->rport = rport;
-	if ((imp_ret = sctp_add_remote_addr(tasoc, firstaddr, 1))) {
+	if ((imp_ret = sctp_add_remote_addr(tasoc, firstaddr, 1, 1))) {
 		/* failure.. memory error? */
 #if defined(__FreeBSD__)
 		zfreei(sctppcbinfo.ipi_zone_asoc, tasoc);
@@ -2258,9 +2413,9 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 #endif
 		sctppcbinfo.ipi_count_asoc--;
 #ifdef SCTP_DEBUG
-	        if (sctp_debug_on & SCTP_DEBUG_PCB3) {
+		if (sctp_debug_on & SCTP_DEBUG_PCB3) {
 			printf("aloc_assoc: couldn't add remote addr!\n");
-	        }
+		}
 #endif
 		*error = imp_ret;
 		return (NULL);
@@ -2725,6 +2880,12 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 #endif
 	sctppcbinfo.ipi_count_asoc--;
 #ifdef SCTP_TCP_MODEL_SUPPORT
+	if ((ep->sctp_socket->so_snd.sb_cc) ||
+	   (ep->sctp_socket->so_snd.sb_mbcnt)) {
+		/* This will happen when a abort is done */
+		ep->sctp_socket->so_snd.sb_cc = 0;
+		ep->sctp_socket->so_snd.sb_mbcnt = 0;
+	}
 	if (ep->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) {
 		if ((ep->sctp_flags & SCTP_PCB_FLAGS_IN_TCPPOOL) == 0) {
 			if (ep->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) {
@@ -3464,10 +3625,10 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 		/* no scope set here since we have a tcb already. */
 		if ((sa->sa_family == AF_INET) &&
 		    (stcb->asoc.ipv4_addr_legal)) {
-			sctp_add_remote_addr(stcb, sa, 0);
+			sctp_add_remote_addr(stcb, sa, 0, 2);
 		} else if ((sa->sa_family == AF_INET6) &&
 			   (stcb->asoc.ipv6_addr_legal)) {
-			sctp_add_remote_addr(stcb, sa, 0);
+			sctp_add_remote_addr(stcb, sa, 0, 3);
 		}
 	} else {
 		if ((net_tmp != NULL) && (t_tcb == stcb)) {
@@ -3510,7 +3671,7 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 						(ep == NULL))) {
 				/* we must add the source address */
 				/* no scope set since we have a tcb already */
-				sctp_add_remote_addr(stcb, sa, 0);
+				sctp_add_remote_addr(stcb, sa, 0, 4);
 			} else if (t_tcb == stcb) {
 				if (net != NULL) {
 					/* clear flag */
@@ -3539,7 +3700,7 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 			if ((t_tcb == NULL) && ((ep == stcb->sctp_ep) ||
 						(ep == NULL))) {
 				/* we must add the address, no scope set */
-				sctp_add_remote_addr(stcb, sa, 0);
+				sctp_add_remote_addr(stcb, sa, 0, 5);
 			} else if (t_tcb == stcb) {
 				if (net != NULL) {
 					/* clear flag */
@@ -3582,6 +3743,9 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 		    SCTP_ADDR_NOT_IN_ASSOC) {
 			/* This address has been removed from the asoc */
 			/* remove and free it */
+			printf("Removing net %x from association state:%x\n",
+			       (u_int)net,(u_int)net->dest_state);
+			stcb->asoc.numnets--;
 			TAILQ_REMOVE(&stcb->asoc.nets, net, sctp_next);
 			sctp_free_remote_addr(net);
 			if (net == stcb->asoc.primary_destination) {
@@ -3780,7 +3944,7 @@ sctp_drain_mbufs(register struct sctp_inpcb *inp,
 		chk = nchk;
 	}
 	/* Ok that was fun, now we will drain all the inbound streams? */
-	for (strmat=0; strmat<asoc->streamincnt; strmat++) {
+	for (strmat = 0; strmat < asoc->streamincnt; strmat++) {
 		chk = TAILQ_FIRST(&asoc->strmin[strmat].inqueue);
 		while (chk) {
 			nchk = TAILQ_NEXT(chk, sctp_next);
@@ -3892,7 +4056,7 @@ callout_init(struct callout *c)
 void
 callout_reset(struct callout *c, int to_ticks, void (*ftn)(void *), void *arg)
 {
-        int s;
+	int s;
 
 	s = splhigh();
 	if (c->c_flags & CALLOUT_PENDING)

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_uio.h,v 1.3 2002/10/09 18:01:22 itojun Exp $	*/
+/*	$KAME: sctp_uio.h,v 1.4 2003/03/10 05:58:13 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_uio.h,v 1.40 2002/04/04 16:34:41 lei Exp	*/
 
 #ifndef __sctp_uio_h__
@@ -210,15 +210,15 @@ struct sctp_rcv_pdapi_event {
 #define SCTP_PARTIAL_DELIVERY_EVENT      0x0007
 
 struct sctp_tlv {
-	u_int16_t type;
-	u_int16_t flags;
-	u_int32_t length;
+	u_int16_t sn_type;
+	u_int16_t sn_flags;
+	u_int32_t sn_length;
 };
 
 
 /* notification event */
 union sctp_notification {
-	struct sctp_tlv sn_type;
+	struct sctp_tlv sn_header;
 	struct sctp_assoc_change sn_assoc_change;
 	struct sctp_paddr_change sn_paddr_change;
 	struct sctp_remote_error sn_remote_error;
@@ -299,6 +299,23 @@ struct sctp_status {
 	struct sctp_paddrinfo sstat_primary;
 };
 
+
+struct sctp_cwnd_log{
+	struct sctp_nets *net;
+	u_int32_t cwnd_new_value;
+	int cwnd_augment;
+	u_int8_t from;
+	u_int8_t resv[3];
+};
+
+struct sctp_cwnd_log_req{
+	int num_in_log;     /* Number in log */
+	int num_ret;        /* Number returned */
+	int start_at;       /* start at this one */
+	int end_at;         /* end at this one */
+	struct sctp_cwnd_log log[0];
+};
+
 /*
  * API system calls
  */
@@ -312,25 +329,11 @@ int	sctp_getpaddrs	__P((int, sctp_assoc_t, struct sockaddr_storage **));
 void	sctp_freepaddrs	__P((struct sockaddr_storage *));
 int	sctp_getladdrs	__P((int, sctp_assoc_t, struct sockaddr_storage **));
 void	sctp_freeladdrs	__P((struct sockaddr_storage *));
+int     sctp_opt_info   __P((int fd, sctp_assoc_t id, int opt, void *arg, size_t *size));
+
 __END_DECLS
 
-#define sctp_opt_info(fd, asoc, opt, arg, sz) \
-do { \
-	if ((opt == SCTP_RTOINFO) || \
-	    (opt == SCTP_ASSOCINFO) || \
-	    (opt == SCTP_SET_PRIMARY_ADDR) || \
-	    (opt == SCTP_SET_PEER_PRIMARY_ADDR) || \
-	    (opt == SCTP_SET_STREAM_TIMEOUTS) || \
-	    (opt == SCTP_SET_PEER_ADDR_PARAMS) || \
-	    (opt == SCTP_GET_PEER_ADDR_PARAMS) || \
-	    (opt == SCTP_STATUS) || \
-	    (opt == SCTP_GET_PEER_ADDR_INFO)) { \
-		*(sctp_assoc_t *)arg = asoc; \
-		return(getsockopt(fd, IPPROTO_SCTP, opt, arg, sz)); \
-	} else { \
-		return(EOPNOTSUPP); \
-	} \
-} while(0);
+
 
 #endif /* !_KERNEL */
 

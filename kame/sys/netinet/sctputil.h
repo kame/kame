@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.h,v 1.7 2002/10/09 18:01:22 itojun Exp $	*/
+/*	$KAME: sctputil.h,v 1.8 2003/03/10 05:58:13 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.h,v 1.36 2002/04/01 21:59:20 randall Exp	*/
 
 #ifndef __sctputil_h__
@@ -116,6 +116,17 @@ void sctp_grub_through_socket_buffer(struct sctp_inpcb *,
 
 void sctp_free_bufspace(struct sctp_tcb *, struct sctp_association *,
 	struct sctp_tmit_chunk *);
+
+#ifdef SCTP_CWND_LOGGING
+void sctp_log_cwnd(struct sctp_nets *net,int augment,uint8_t from);
+int sctp_fill_cwnd_log(struct mbuf *m);
+#endif
+
+#ifdef SCTP_AUDITING_ENABLED
+void sctp_auditing(int from,struct sctp_inpcb *ep,struct sctp_tcb *tcb,struct sctp_nets *net);
+void sctp_audit_log(u_int8_t ev, u_int8_t fd);
+
+#endif
 
 #endif /* KERNEL */
 #endif

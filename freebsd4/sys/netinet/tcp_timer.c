@@ -492,6 +492,11 @@ tcp_timer_rexmt(xtp)
 	}
 	(void) tcp_output(tp);
 
+	/* Assure a timer is running */
+	if (!callout_active(tp->tt_rexmt) &&
+	    !callout_active(tp->tt_persist))
+		callout_reset(tp->tt_rexmt, tp->t_rxtcur,
+			      tcp_timer_rexmt, tp);
 out:
 #ifdef TCPDEBUG
 	if (tp && (tp->t_inpcb->inp_socket->so_options & SO_DEBUG))

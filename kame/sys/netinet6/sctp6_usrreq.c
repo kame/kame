@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.15 2002/11/07 02:57:09 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.16 2003/03/10 05:58:13 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -99,6 +99,16 @@
 
 extern struct protosw inetsw[];
 extern struct sctp_epinfo sctppcbinfo;
+
+#if defined(HAVE_NRL_INPCB) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef in6pcb
+#define in6pcb		inpcb
+#endif
+#ifndef sotoin6pcb
+#define sotoin6pcb      sotoinpcb
+#endif
+#endif
+
 
 static	int sctp6_detach __P((struct socket *so));
 
@@ -258,56 +268,66 @@ sctp6_input(mp, offp, proto)
 	 * Check AH/ESP integrity.
 	 */
 #ifdef __OpenBSD__
-  {
-    struct inpcb *i_inp;
-    struct m_tag *mtag;
-    struct tdb_ident *tdbi;
-    struct tdb *tdb;
-    int error, s;
+        {
+            struct inpcb *i_inp;
+            struct m_tag *mtag;
+            struct tdb_ident *tdbi;
+            struct tdb *tdb;
+            int error, s;
 
-    i_inp = in6p_ip;
-    mtag = m_tag_find(m, PACKET_TAG_IPSEC_IN_DONE, NULL);
-    s = splnet();
-    if (mtag != NULL) {
-      tdbi = (struct tdb_ident *)(mtag + 1);
-      tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
-    } else
-      tdb = NULL;
-    ipsp_spd_lookup(m, AF_INET, iphlen, &error,
-		    IPSP_DIRECTION_IN, tdb, i_inp);
+            /* Find most recent IPsec tag */
+            i_inp = in6p_ip;
+            mtag = m_tag_find(m, PACKET_TAG_IPSEC_IN_DONE, NULL);
+            s = splnet();
+            if (mtag != NULL) {
+                tdbi = (struct tdb_ident *)(mtag + 1);
+                tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
+            } else
+		tdb = NULL;
 
-    /* Latch SA only if the socket is connected */
-    if (i_inp->inp_tdb_in != tdb &&
-	(i_inp->inp_socket->so_state & SS_ISCONNECTED)) {
-      if (tdb) {
-	tdb_add_inp(tdb, i_inp, 1);
-	if (i_inp->inp_ipsec_remoteid == NULL &&
-	    tdb->tdb_srcid != NULL) {
-	  i_inp->inp_ipsec_remoteid = tdb->tdb_srcid;
-	  tdb->tdb_srcid->ref_count++;
-	}
-	if (i_inp->inp_ipsec_remotecred == NULL &&
-	    tdb->tdb_remote_cred != NULL) {
-	  i_inp->inp_ipsec_remotecred =
-	    tdb->tdb_remote_cred;
-	  tdb->tdb_remote_cred->ref_count++;
-	}
-	if (i_inp->inp_ipsec_remoteauth == NULL &&
-	    tdb->tdb_remote_auth != NULL) {
-	  i_inp->inp_ipsec_remoteauth =
-	    tdb->tdb_remote_auth;
-	  tdb->tdb_remote_auth->ref_count++;
-	}
-      } else { /* Just reset */
-	TAILQ_REMOVE(&i_inp->inp_tdb_in->tdb_inp_in, i_inp,
-		     inp_tdb_in_next);
-	i_inp->inp_tdb_in = NULL;
-      }
-    }
-    splx(s);
-    /* Error or otherwise drop-packet indication. */
-    if (error)
-      goto out_of;
+            ipsp_spd_lookup(m, af, iphlen, &error, IPSP_DIRECTION_IN,
+                            tdb, i_inp);
+            if (error) {
+		splx(s);
+                goto out_of;
+            }
+
+            /* Latch SA */
+            if (i_inp->inp_tdb_in != tdb) {
+		if (tdb) {
+                    tdb_add_inp(tdb, i_inp, 1);
+                    if (i_inp->inp_ipo == NULL) {
+                        i_inp->inp_ipo = ipsec_add_policy(i_inp, af,
+                                                        IPSP_DIRECTION_OUT);
+                        if (i_inp->inp_ipo == NULL) {
+                            splx(s);
+                            goto bad;
+                        }
+                    }
+                    if (i_inp->inp_ipo->ipo_dstid == NULL &&
+                        tdb->tdb_srcid != NULL) {
+                        i_inp->inp_ipo->ipo_dstid = tdb->tdb_srcid;
+                        tdb->tdb_srcid->ref_count++;
+                    }
+                    if (i_inp->inp_ipsec_remotecred == NULL &&
+                        tdb->tdb_remote_cred != NULL) {
+                        i_inp->inp_ipsec_remotecred =
+                            tdb->tdb_remote_cred;
+                        tdb->tdb_remote_cred->ref_count++;
+                    }
+                    if (i_inp->inp_ipsec_remoteauth == NULL &&
+                        tdb->tdb_remote_auth != NULL) {
+                        i_inp->inp_ipsec_remoteauth =
+                            tdb->tdb_remote_auth;
+                        tdb->tdb_remote_auth->ref_count++;
+                    }
+		} else { /* Just reset */
+                    TAILQ_REMOVE(&i_inp->inp_tdb_in->tdb_inp_in, i_inp,
+                                 inp_tdb_in_next);
+                    i_inp->inp_tdb_in = NULL;
+		}
+            }
+            splx(s);
   }
 #else
 	if (ipsec6_in_reject_so(m, in6p->sctp_socket)) {
@@ -420,10 +440,20 @@ sctp6_notify_mbuf(struct sctp_inpcb *inp,
 			if ((chk->send_size+IP_HDR_SIZE) > nxtsz) {
 				/*
 				 * For this guy we also mark for immediate
-				 * resend since we sent too big of chunk
+				 * resend since we sent to big of chunk
 				 */
 				chk->flags |= CHUNK_FLAGS_FRAGMENT_OK;
+				if (chk->sent != SCTP_DATAGRAM_RESEND)
+					stcb->asoc.sent_queue_retran_cnt++;
 				chk->sent = SCTP_DATAGRAM_RESEND;
+				chk->rec.data.doing_fast_retransmit = 0;
+
+				chk->sent = SCTP_DATAGRAM_RESEND;
+				/* Clear any time so NO RTT is being done */
+				chk->sent_rcv_time.tv_sec = 0;
+				chk->sent_rcv_time.tv_usec = 0;
+				stcb->asoc.total_flight -= chk->send_size;
+				netp->flight_size -= chk->send_size;
 			}
 		}
 		TAILQ_FOREACH(strm, &stcb->asoc.out_wheel, next_spoke) {
@@ -644,6 +674,12 @@ sctp6_attach(struct socket *so, int proto, struct proc *p)
 	inp->inp_vflag |=  INP_IPV6;
 #endif
 #endif
+#if defined(__NetBSD__)
+	if (ip6_v6only) {
+		inp6->in6p_flags |= IN6P_IPV6_V6ONLY;
+	}
+	so->so_send = sctp_sosend;
+#endif
 	inp6->in6p_hops = -1;	        /* use kernel default */
 	inp6->in6p_cksum = -1;	/* just to be sure */
 #ifdef INET
@@ -670,14 +706,14 @@ static int
 sctp6_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 {
 	struct sctp_inpcb *inp;
-	struct inpcb *inp6;
+	struct in6pcb *inp6;
 	int s, error;
 
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == 0)
 		return EINVAL;
 
-	inp6 = &inp->ip_inp.inp;
+	inp6 = (struct in6pcb *)inp;
 #if defined(__FreeBSD__)
 	inp6->inp_vflag &= ~INP_IPV4;
 	inp6->inp_vflag |= INP_IPV6;
@@ -691,8 +727,10 @@ sctp6_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 #endif
 #endif
 	if (
-#ifdef __OpenBSD__
+#if defined(__OpenBSD__)
 	     (0) /* we always do dual bind */
+#elif defined (__NetBSD__)
+	     (inp6->in6p_flags & IN6P_IPV6_V6ONLY)
 #else
 	     (inp6->inp_flags & IN6P_IPV6_V6ONLY)
 #endif
@@ -884,19 +922,25 @@ sctp6_disconnect(struct socket *so)
 	}
 }
 
+int
+sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
+	  struct mbuf *control, struct proc *p);
+
+
 static int
 sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	   struct mbuf *control, struct proc *p)
 {
 	struct sctp_inpcb *inp;
 	struct inpcb *in_inp;
-
+	struct in6pcb *inp6;
 	/* No SPL needed since sctp_output does this */
 #ifdef INET
 	struct sockaddr_in6 *sin6;
 #endif /* INET */
 
 	inp = (struct sctp_inpcb *)so->so_pcb;
+	
 	if (inp == 0) {
 	        if (control) {
 			m_freem(control);
@@ -906,14 +950,14 @@ sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 		return EINVAL;
 	}
 	in_inp = (struct inpcb *)inp;
-
+	inp6 = (struct in6pcb *)inp;
 #ifdef SCTP_TCP_MODEL_SUPPORT
 	/* For the TCP model we may get a NULL addr, if we
 	 * are a connected socket thats ok.
 	 */
 	if ((inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) &&
 	    (addr == NULL)) {
-	        return sctp_output(inp, m, addr, control, p);
+	        goto connected_type;
 	}
 #endif
 	if (addr == NULL) {
@@ -928,10 +972,13 @@ sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 #ifdef INET
 	sin6 = (struct sockaddr_in6 *)addr;
 	if (
-#ifdef __OpenBSD__
-	    (0)	/* We don't allow V6 only bind in openbsd */
+
+#if defined(__OpenBSD__)
+	     (0) /* we always do dual bind */
+#elif defined (__NetBSD__)
+	     (inp6->in6p_flags & IN6P_IPV6_V6ONLY)
 #else
-	    (in_inp->inp_flags & IN6P_IPV6_V6ONLY)
+	     (inp6->inp_flags & IN6P_IPV6_V6ONLY)
 #endif
 	    ) {
 		/*
@@ -951,15 +998,70 @@ sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 			struct sockaddr_in sin;
 			/* convert v4-mapped into v4 addr and send */
 			in6_sin6_2_sin(&sin, sin6);
-			return sctp_output(inp, m, (struct sockaddr *)&sin,
+			return sctp_send(so, flags,  m, (struct sockaddr *)&sin,
 					   control, p);
 		} else {
 			/* mapped addresses aren't enabled */
 			return EINVAL;
 		}
-	} else
+	} 
 #endif /* INET */
-		return sctp_output(inp, m, addr, control, p);
+ connected_type:
+	/* now what about control */
+	if (control) {
+		if (inp->control) {
+			printf("huh? control set?\n");
+			m_freem(inp->control);
+			inp->control = NULL;
+		}
+		inp->control = control;
+	}
+	/* add it in possibly */
+	if ((inp->pkt) && 
+	    (inp->pkt->m_flags & M_PKTHDR)) {
+		struct mbuf *x;
+		int c_len;
+
+		c_len = 0;
+		/* How big is it */
+		for (x=m;x;x = x->m_next) {
+			c_len += x->m_len;
+		}
+		inp->pkt->m_pkthdr.len += c_len;
+	}
+	/* Place the data */
+	if (inp->pkt) {
+		inp->pkt_last->m_next = m;
+		inp->pkt_last = m;
+	} else {
+		inp->pkt_last = inp->pkt = m;
+	}
+	if (
+#if defined (__FreeBSD__)
+            /* FreeBSD uses a flag passed */
+            ((flags & PRUS_MORETOCOME) == 0)
+#elif defined( __NetBSD__)
+            /* NetBSD uses the so_state field */
+            ((so->so_state & SS_MORETOCOME) == 0)
+#else
+            1   /* Open BSD does not have any "more to come" indication */
+#endif
+            ) {
+		/* note with the current version this code will
+		 * only be used by OpenBSD, NetBSD and FreeBSD
+		 * have methods for re-defining sosend to use
+		 * the sctp_sosend. One can optionaly switch back
+		 * to this code (by changing back the defininitions
+		 * but this is not advisable.
+		 */
+		int ret;
+		ret = sctp_output(inp, inp->pkt , addr, inp->control, p);
+		inp->pkt = NULL;
+		inp->control = NULL;
+		return(ret);
+	} else {
+		return(0);
+	}
 }
 
 static int
@@ -972,6 +1074,7 @@ sctp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 #endif
 	int error = 0;
 	struct sctp_inpcb *inp;
+	struct in6pcb *inp6;
 	struct sctp_tcb *tcb;
 	struct sockaddr *addr;
 #ifdef INET
@@ -979,6 +1082,7 @@ sctp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	struct sockaddr_storage ss;
 #endif /* INET */
 
+	inp6 = (struct in6pcb *)so->so_pcb;
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == 0) {
 		splx(s);
@@ -1010,10 +1114,12 @@ sctp6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 #ifdef INET
 	sin6 = (struct sockaddr_in6 *)nam;
 	if (
-#ifdef __OpenBSD__
-	    (0)	/* dual bind only */
+#if defined(__OpenBSD__)
+	     (0) /* we always do dual bind */
+#elif defined (__NetBSD__)
+	     (inp6->in6p_flags & IN6P_IPV6_V6ONLY)
 #else
-	    (inp->ip_inp.inp.inp_flags & IN6P_IPV6_V6ONLY)
+	     (inp6->inp_flags & IN6P_IPV6_V6ONLY)
 #endif
 	    ) {
 		/*
@@ -1263,10 +1369,10 @@ sctp6_in6getaddr(struct socket *so,
 #endif
 		 )
 {
-	struct inpcb *inp = sotoinpcb(so);
+	struct in6pcb *inp6 = sotoin6pcb(so);
 	int	error, s;
 
-	if (inp == NULL)
+	if (inp6 == NULL)
 		return EINVAL;
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -1285,10 +1391,12 @@ sctp6_in6getaddr(struct socket *so,
 		}
 		/* if I'm V6ONLY, convert it to v4-mapped */
 		if (
-#ifdef __OpenBSD__
-		    (0)	/* dual bind only */
+#if defined(__OpenBSD__)
+	     (0) /* we always do dual bind */
+#elif defined (__NetBSD__)
+	     (inp6->in6p_flags & IN6P_IPV6_V6ONLY)
 #else
-		    (inp->inp_flags & IN6P_IPV6_V6ONLY)
+	     (inp6->inp_flags & IN6P_IPV6_V6ONLY)
 #endif
 		    ) {
 			struct sockaddr_in6 sin6;
@@ -1315,10 +1423,10 @@ sctp6_getpeeraddr(struct socket *so,
 #endif
 		  )
 {
-	struct inpcb *inp = sotoinpcb(so);
+	struct in6pcb *inp6 = sotoin6pcb(so);
 	int	error, s;
 
-	if (inp == NULL)
+	if (inp6 == NULL)
 		return EINVAL;
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
@@ -1337,10 +1445,12 @@ sctp6_getpeeraddr(struct socket *so,
 		}
 		/* if I'm V6ONLY, convert it to v4-mapped */
 		if (
-#ifdef __OpenBSD__
-		    (0) /* dual bind only */
+#if defined(__OpenBSD__)
+	     (0) /* we always do dual bind */
+#elif defined (__NetBSD__)
+	     (inp6->in6p_flags & IN6P_IPV6_V6ONLY)
 #else
-		    (inp->inp_flags & IN6P_IPV6_V6ONLY)
+	     (inp6->inp_flags & IN6P_IPV6_V6ONLY)
 #endif
 		    ) {
 			struct sockaddr_in6 sin6;
@@ -1363,7 +1473,7 @@ struct pr_usrreqs sctp6_usrreqs = {
 	sctp6_connect, pru_connect2_notsupp, in6_control,
 	sctp6_detach, sctp6_disconnect, sctp_listen, sctp6_getpeeraddr,
 	sctp_usr_recvd, pru_rcvoob_notsupp, sctp6_send, pru_sense_null,
-	sctp_shutdown, sctp6_in6getaddr, sosend, soreceive, sopoll
+	sctp_shutdown, sctp6_in6getaddr, sctp_sosend, soreceive, sopoll
 };
 
 #else

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.h,v 1.7 2002/10/09 18:01:21 itojun Exp $	*/
+/*	$KAME: sctp_pcb.h,v 1.8 2003/03/10 05:58:13 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.h,v 1.92 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_pcb_h__
@@ -105,6 +105,7 @@ LIST_HEAD(sctpvtaghead, sctp_tagblock);
 #define SCTP_PCB_FLAGS_NEEDS_MAPPED_V4	0x02000000
 #define SCTP_PCB_FLAGS_BLOCKING_IO      0x04000000
 #define SCTP_PCB_FLAGS_SOCKET_GONE	0x08000000
+#define SCTP_PCB_FLAGS_SOCKET_ALLGONE	0x10000000
 
 /* flags to copy to new PCB */
 #define SCTP_PCB_COPY_FLAGS             0x0707ff64
@@ -254,7 +255,7 @@ struct sctp_pcb {
 	u_int32_t initial_sequence_debug;
 	u_int32_t adaption_layer_indicator;
 	char store_at;
-	char max_burst;
+	u_int8_t max_burst;
 	char current_secret_number;
 	char last_secret_number;
 };
@@ -282,6 +283,7 @@ struct sctp_inpcb {
 	LIST_ENTRY(sctp_inpcb) sctp_list;	/* lists all endpoints */
 	/* hash of all endpoints for model */
 	LIST_ENTRY(sctp_inpcb) sctp_hash;
+
 	/* count of local addresses bound, 0 if bound all */
 	int laddr_count;
 	/* list of addrs in use by the EP */
@@ -306,7 +308,8 @@ struct sctp_inpcb {
 	int  error_on_block;
 	int32_t sctp_frag_point;
 	u_int32_t sctp_vtag_last;
-
+	struct mbuf *pkt,*pkt_last;
+	struct mbuf *control;
 #ifndef SCTP_VTAG_TIMEWAIT_PER_STACK
 	struct sctpvtaghead vtag_timewait[SCTP_NUMBER_IN_VTAG_BLOCK];
 #endif
@@ -377,6 +380,9 @@ struct sctp_tcb *sctp_findassociation_ep_asocid(struct sctp_inpcb *, caddr_t);
 
 int sctp_inpcb_alloc(struct socket *);
 
+
+int sctp_is_address_on_local_host(struct sockaddr *addr);
+
 void sctp_inpcb_free(struct sctp_inpcb *, int);
 
 struct sctp_tcb *sctp_aloc_assoc(struct sctp_inpcb *, struct sockaddr *,
@@ -394,7 +400,7 @@ int sctp_del_local_addr_ep(struct sctp_inpcb *, struct ifaddr *);
 
 int sctp_del_local_addr_ep_sa(struct sctp_inpcb *, struct sockaddr *);
 
-int sctp_add_remote_addr(struct sctp_tcb *, struct sockaddr *, int);
+int sctp_add_remote_addr(struct sctp_tcb *, struct sockaddr *, int, int);
 
 int sctp_del_remote_addr(struct sctp_tcb *, struct sockaddr *);
 

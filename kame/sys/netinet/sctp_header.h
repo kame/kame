@@ -1,4 +1,4 @@
-/*    $KAME: sctp_header.h,v 1.5 2002/09/18 01:00:25 itojun Exp $     */
+/*    $KAME: sctp_header.h,v 1.6 2003/03/10 05:58:12 itojun Exp $     */
 /*	Header: /home/sctpBsd/netinet/sctp_header.h,v 1.34 2002/04/03 21:10:19 lei Exp	*/
 
 #ifndef __sctp_header_h__
@@ -354,6 +354,26 @@ struct sctp_forward_tsn_msg {
 	struct sctp_forward_tsn_chunk msg;
 };
 
+struct sctp_chunk_desc {
+	u_int8_t chunk_type;
+	u_int8_t  data_bytes[3];
+	u_int32_t tsn_ifany;
+};
+
+
+struct sctp_packet_drop {
+	struct sctp_chunkhdr ch;
+	u_int32_t bottle_bw;
+	u_int32_t current_onq;
+	u_int16_t trunc_len;
+	u_int16_t num_desc;
+	union{
+		u_int8_t data[0];
+		struct sctp_chunk_desc desc[0];
+	}u;
+};
+
+
 /*
  * we pre-reserve enough room for a ECNE or CWR AND a SACK with no
  * missing pieces. If ENCE is missing we could have a couple of blocks.
@@ -370,6 +390,11 @@ struct sctp_forward_tsn_msg {
 			   sizeof(struct sctp_sack_chunk) + \
 			   sizeof(struct ip6_hdr))
 
+#define SCTP_MED_OVERHEAD (sizeof(struct sctp_data_chunk) + \
+			   sizeof(struct sctphdr) + \
+			   sizeof(struct ip6_hdr))
+
+
 #define SCTP_MIN_OVERHEAD (sizeof(struct ip6_hdr) + \
                            sizeof(struct sctphdr))
 
@@ -380,10 +405,22 @@ struct sctp_forward_tsn_msg {
 			   sizeof(struct sctp_sack_chunk) + \
 			   sizeof(struct ip))
 
+#define SCTP_MED_OVERHEAD (sizeof(struct sctp_data_chunk) + \
+			   sizeof(struct sctphdr) + \
+			   sizeof(struct ip))
+
+
 #define SCTP_MIN_OVERHEAD (sizeof(struct ip) + \
                            sizeof(struct sctphdr))
 
 #endif /* AF_INET6 */
 #endif /* !SCTP_MAX_OVERHEAD */
+
+#define SCTP_MED_V4_OVERHEAD (sizeof(struct sctp_data_chunk) + \
+			      sizeof(struct sctphdr) + \
+  			      sizeof(struct ip))
+
+#define SCTP_MIN_V4_OVERHEAD (sizeof(struct ip) + \
+                              sizeof(struct sctphdr))
 
 #endif /* !__sctp_header_h__ */
