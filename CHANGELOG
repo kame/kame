@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2086 2002/02/22 16:36:18 jinmei Exp $
+$KAME: CHANGELOG,v 1.2087 2002/02/24 07:10:10 suz Exp $
 
 <200202>
+2002-02-24  SUZUKI, Shinsuke <suz@sdl.hitachi.co.jp>
+	* kame/route6d/route6d.c:
+	not remove global addresses on loopback interface from routing
+	table by route aging.
+
 2002-02-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_rtrequest): rejected the process of
 	RESOLVE when the interface does not need neighbor caches.

@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.79 2002/01/11 02:29:30 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.80 2002/02/24 07:10:10 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.79 2002/01/11 02:29:30 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.80 2002/02/24 07:10:10 suz Exp $";
 #endif
 
 #include <stdio.h>
@@ -1966,8 +1966,11 @@ ifrt(ifcp, again)
 	time_t t_lifetime;
 	int need_trigger = 0;
 
+#if 0
 	if (ifcp->ifc_flags & IFF_LOOPBACK)
 		return 0;			/* ignore loopback */
+#endif
+
 	if (ifcp->ifc_flags & IFF_POINTOPOINT) {
 		ifrt_p2p(ifcp, again);
 		return 0;
@@ -1989,6 +1992,13 @@ ifrt(ifcp, again)
 #endif
 			continue;
 		}
+		if (IN6_IS_ADDR_LOOPBACK(&ifa->ifa_addr)) {
+#if 0
+			trace(1, "route: %s: skip loopback address\n",
+			    ifcp->ifc_name);
+#endif
+			continue;
+		}
 		if (ifcp->ifc_flags & IFF_UP) {
 			if ((rrt = MALLOC(struct riprt)) == NULL)
 				fatal("malloc: struct riprt");
@@ -2000,7 +2010,10 @@ ifrt(ifcp, again)
 			rrt->rrt_info.rip6_tag = htons(routetag & 0xffff);
 			rrt->rrt_info.rip6_metric = 1 + ifcp->ifc_metric;
 			rrt->rrt_info.rip6_plen = ifa->ifa_plen;
-			rrt->rrt_flags = RTF_CLONING;
+			if (ifa->ifa_plen == 128)
+				rrt->rrt_flags = RTF_HOST;
+			else
+				rrt->rrt_flags = RTF_CLONING;
 			rrt->rrt_rflags |= RRTF_CHANGED;
 			applyplen(&rrt->rrt_info.rip6_dest, ifa->ifa_plen);
 			memset(&rrt->rrt_gw, 0, sizeof(struct in6_addr));
