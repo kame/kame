@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.273 2002/06/03 00:51:05 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.274 2002/06/04 12:29:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -271,9 +271,9 @@ nd6_setmtu0(ifp, ndi)
 #ifdef IFT_FDDI
 	case IFT_FDDI:
 #ifdef FDDIIPMTU
-		ndi->maxmtu = MIN(FDDIIPMTU, ifp->if_mtu);
+		ndi->maxmtu = MIN(FDDIIPMTU, ifp->if_mtu); /* RFC2467 */
 #else
-		ndi->maxmtu = MIN(FDDIMTU, ifp->if_mtu);
+		ndi->maxmtu = MIN(4352, ifp->if_mtu); /* RFC2467 */
 #endif
 		break;
 #endif
