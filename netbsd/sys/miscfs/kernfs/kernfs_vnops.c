@@ -1047,10 +1047,8 @@ kernfs_inactive(v)
 		m = key_setdumpsa_spi(htonl(kfs->kfs_value));
 		if (m)
 			m_freem(m);
-		else {
-			/* should never happen as we hold a refcnt */
+		else
 			vgone(vp);
-		}
 		break;
 	case Pipsecsp:
 		sp = key_getspbyid(kfs->kfs_value);
