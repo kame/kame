@@ -122,7 +122,8 @@ int (*mrt_ioctl)(int, caddr_t, struct proc *) = _mrt_ioctl;
 void
 rsvp_input(m, off, proto)		/* XXX must fixup manually */
 	struct mbuf *m;
-	int off, proto;
+	int off;
+	int proto;
 {
     /* Can still get packets with rsvp_on = 0 if there is a local member
      * of the group to which the RSVP packet is addressed.  But in this
@@ -1616,12 +1617,13 @@ encap_send(ip, vifp, m)
  */
 void
 #ifdef MROUTE_LKM
-X_ipip_input(m, off)
+X_ipip_input(m, off, proto)
 #else
-ipip_input(m, off)
+ipip_input(m, off, proto)
 #endif
 	register struct mbuf *m;
 	int off;
+	int proto;
 {
     struct ifnet *ifp = m->m_pkthdr.rcvif;
     register struct ip *ip = mtod(m, struct ip *);
@@ -1631,7 +1633,7 @@ ipip_input(m, off)
     register struct vif *vifp;
 
     if (!have_encap_tunnel) {
-	    rip_input(m, off);
+	    rip_input(m, off, proto);
 	    return;
     }
     /*
@@ -2126,13 +2128,13 @@ ip_rsvp_force_done(so)
 }
 
 void
-rsvp_input(m, off)
+rsvp_input(m, off, proto)		/* XXX must fixup manually */
 	struct mbuf *m;
 	int off;
+	int proto;
 {
     int vifi;
     register struct ip *ip = mtod(m, struct ip *);
-    int proto = ip->ip_p;
     static struct sockaddr_in rsvp_src = { sizeof rsvp_src, AF_INET };
     register int s;
     struct ifnet *ifp;
@@ -2184,7 +2186,7 @@ rsvp_input(m, off)
 	if (ip_rsvpd != NULL) {
 	    if (rsvpdebug)
 		printf("rsvp_input: Sending packet up old-style socket\n");
-	    rip_input(m, off);  /* xxx */
+	    rip_input(m, off, proto);  /* xxx */
 	} else {
 	    if (rsvpdebug && vifi == numvifs)
 		printf("rsvp_input: Can't find vif for packet.\n");
