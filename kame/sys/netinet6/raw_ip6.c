@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.136 2003/02/07 10:19:40 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.137 2003/05/27 22:33:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -524,7 +524,11 @@ rip6_output(m, va_alist)
 		code = icmp6->icmp6_code;
 	}
 
-	M_PREPEND(m, sizeof(*ip6), M_WAIT);
+	M_PREPEND(m, sizeof(*ip6), M_DONTWAIT);
+	if (!m) {
+		error = ENOBUFS;
+		goto bad;
+	}
 	ip6 = mtod(m, struct ip6_hdr *);
 
 	/* Source address selection. */
