@@ -1203,6 +1203,7 @@ static void wi_start(ifp)
 	 */
 	if (ntohs(eh->ether_type) == ETHERTYPE_IP ||
 	    ntohs(eh->ether_type) == ETHERTYPE_ARP ||
+	    ntohs(eh->ether_type) == ETHERTYPE_IPV6 ||
 	    ntohs(eh->ether_type) == ETHERTYPE_REVARP) {
 		bcopy((char *)&eh->ether_dhost,
 		    (char *)&tx_frame.wi_addr1, ETHER_ADDR_LEN);
