@@ -459,6 +459,27 @@ union mcluster {
 )
 
 /*
+ * Move just m_pkthdr from from to to,
+ * remove M_PKTHDR and clean the tag for from.
+ */
+#define M_MOVE_HDR(to, from) do {					\
+	(to)->m_pkthdr = (from)->m_pkthdr;				\
+	(from)->m_flags &= ~M_PKTHDR;					\
+	SLIST_INIT(&(from)->m_pkthdr.tags);				\
+} while (0)
+
+/*
+ * MOVE mbuf pkthdr from from to to.
+ * from must have M_PKTHDR set, and to must be empty.
+ * aux pointer will be moved to `to'.
+ */
+#define	M_MOVE_PKTHDR(to, from) do {					\
+	(to)->m_flags = (from)->m_flags & M_COPYFLAGS;			\
+	M_MOVE_HDR((to), (from));					\
+	(to)->m_data = (to)->m_pktdat;					\
+} while (0)
+
+/*
  * Copy mbuf pkthdr from "from" to "to".
  * from must have M_PKTHDR set, and to must be empty.
  */
