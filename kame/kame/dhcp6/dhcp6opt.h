@@ -28,7 +28,7 @@
  */
 
 /*
- * draft-ietf-dhc-v6exts-10
+ * draft-ietf-dhc-v6exts-11
  */
 
 #ifndef __DHCP6OPT_H_DEFINED
@@ -66,6 +66,7 @@ struct dhcp6_opt {
 #define DH6T_MIN_SOLICIT_DELAY		13	/* milliseconds */
 #define DH6T_MAX_SOLICIT_DELAY		14	/* milliseconds */
 #define DH6T_XID_TIMEOUT		15	/* milliseconds */
+#define DH6T_RECONF_MULTICAST_REQUEST_WAIT 16	/* milliseconds */
 
 extern struct dhcp6_opt *dh6o_pad;
 extern struct dhcp6_opt *dh6o_end;
