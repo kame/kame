@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.33 2000/05/17 05:07:26 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.34 2000/05/17 05:20:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1731,7 +1731,7 @@ nd6_setdefaultiface(ifindex)
 		/*
 		 * Our current implementation assumes one-to-one maping between
 		 * interfaces and links, so it would be natural to use the
-		 * default interface as default link.
+		 * default interface as the default link.
 		 */
 		scope6_setdefault(nd6_defifp);
 	}
