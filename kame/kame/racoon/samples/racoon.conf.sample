@@ -1,4 +1,4 @@
-# $KAME: racoon.conf.sample,v 1.18 2000/10/11 23:32:27 sakane Exp $
+# $KAME: racoon.conf.sample,v 1.19 2000/10/19 02:49:09 sakane Exp $
 
 # "path" affects "include" directive.  "path" must be specified before any
 # "include" directive with relative file path.
@@ -51,7 +51,7 @@ remote anonymous
 # - permutation of the crypto/hash/compression algorithms presented below
 sainfo anonymous
 {
-	pfs_group 1;
+	pfs_group 2;
 	lifetime time 12 hour ;
 	lifetime byte 50 MB ;
 	encryption_algorithm 3des, cast128, blowfish, des, twofish, rijndael ;
