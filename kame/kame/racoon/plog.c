@@ -1,4 +1,4 @@
-/*	$KAME: plog.c,v 1.11 2000/12/17 21:51:56 sakane Exp $	*/
+/*	$KAME: plog.c,v 1.12 2000/12/19 04:57:33 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -178,14 +178,19 @@ plogdump(pri, data, len)
 	if (pri > loglevel)
 		return;
 
+	/*
+	 * 2 words a bytes + 1 space 4 bytes + 1 newline 32 bytes
+	 * + 1 newline + '\0'
+	 */
 	buflen = (len * 2) + (len / 4) + (len / 32) + 2;
 	buf = malloc(buflen);
 
 	i = 0;
 	j = 0;
-	while (i < buflen) {
+	while (j < len) {
 		if (j % 32 == 0)
 			buf[i++] = '\n';
+		else
 		if (j % 4 == 0)
 			buf[i++] = ' ';
 		snprintf(&buf[i], buflen - i, "%02x",
@@ -193,6 +198,8 @@ plogdump(pri, data, len)
 		i += 2;
 		j++;
 	}
+	if (j % 32 != 0)
+		buf[i++] = '\n';
 	buf[i] = '\0';
 	plog(pri, LOCATION, NULL, "%s", buf);
 
