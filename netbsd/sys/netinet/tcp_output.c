@@ -267,7 +267,16 @@ tcp_segsize(tp, txsegsizep, rxsegsizep)
 
  out:
 	*txsegsizep = min(tp->t_peermss, size);
+	/*
+	 * XXX it looks awkward to determine segment size for incoming packets
+	 * based on MSS advertisement from peer.  we may want to avoid using
+	 * the variable "size".
+	 */
+#if 0
+	*rxsegsizep = tp->t_ourmss;
+#else
 	*rxsegsizep = min(tp->t_ourmss, size);
+#endif
 
 	if (*txsegsizep != tp->t_segsz) {
 		/*
@@ -604,26 +613,7 @@ send:
 
 		tp->snd_nxt = tp->iss;
 		tp->t_ourmss = tcp_mss_to_advertise(rt != NULL ? 
-						    rt->rt_ifp : NULL);
-#ifdef IPSEC
-	    {
-		size_t t;
-		switch (af) {
-		case AF_INET:
-			t = ipsec4_hdrsiz_tcp(tp);
-			break;
-#if defined(INET6) && !defined(TCP6)
-		case AF_INET6:
-			t = ipsec6_hdrsiz_tcp(tp);
-			break;
-#endif
-		default:
-			t = 0;
-		}
-		if (t < tp->t_ourmss)
-			tp->t_ourmss -= t;
-	    }
-#endif
+						    rt->rt_ifp : NULL, af);
 		if ((tp->t_flags & TF_NOOPT) == 0) {
 			opt[0] = TCPOPT_MAXSEG;
 			opt[1] = 4;

@@ -3046,7 +3046,6 @@ syn_cache_add(src, dst, th, hlen, so, m, optp, optlen, oi)
 	struct syn_cache *sc;
 	struct syn_cache_head *scp;
 	struct mbuf *ipopts;
-	size_t ipsechdrsiz;
 
 	tp = sototcpcb(so);
 
@@ -3067,22 +3066,16 @@ syn_cache_add(src, dst, th, hlen, so, m, optp, optlen, oi)
 		if (IN_MULTICAST(((struct sockaddr_in *)src)->sin_addr.s_addr)
 		 || IN_MULTICAST(((struct sockaddr_in *)dst)->sin_addr.s_addr))
 			return 0;
-#ifdef IPSEC
-		ipsechdrsiz = ipsec4_hdrsiz_tcp(tp);
-#endif
 		break;
 #ifdef INET6
 	case AF_INET6:
 		if (IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6 *)src)->sin6_addr)
 		 || IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6 *)dst)->sin6_addr))
 			return 0;
-#if defined(IPSEC) && !defined(TCP6)
-		ipsechdrsiz = ipsec6_hdrsiz_tcp(tp);
-#endif
 		break;
 #endif
 	default:
-		ipsechdrsiz = 0;
+		return 0;
 	}
 
 	/*
@@ -3150,11 +3143,8 @@ syn_cache_add(src, dst, th, hlen, so, m, optp, optlen, oi)
 	sc->sc_iss = tcp_new_iss(sc, sizeof(struct syn_cache), 0);
 	sc->sc_peermaxseg = oi->maxseg;
 	sc->sc_ourmaxseg = tcp_mss_to_advertise(m->m_flags & M_PKTHDR ?
-						m->m_pkthdr.rcvif : NULL);
-#ifdef IPSEC
-	if (ipsechdrsiz < sc->sc_ourmaxseg)
-		sc->sc_ourmaxseg -= ipsechdrsiz;
-#endif
+						m->m_pkthdr.rcvif : NULL,
+						sc->sc_src.sa.sa_family);
 	sc->sc_win = win;
 	sc->sc_timestamp = tb.ts_recent;
 	if (tcp_do_rfc1323 && (tb.t_flags & TF_RCVD_TSTMP))
