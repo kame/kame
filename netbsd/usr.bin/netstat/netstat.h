@@ -85,6 +85,7 @@ void	tcp6_stats __P((u_long, char *));
 void	tcp6_dump __P((u_long));
 void	udp6_stats __P((u_long, char *));
 void	ip6_stats __P((u_long, char *));
+void	ip6_ifstat __P((char *));
 void	icmp6_stats __P((u_long, char *));
 void	pim6_stats __P((u_long, char *));
 void	mroute6pr __P((u_long, u_long, u_long));
@@ -96,8 +97,6 @@ void	mbpr(u_long, u_long, u_long, u_long, u_long);
 
 void	hostpr __P((u_long, u_long));
 void	impstats __P((u_long, u_long));
-
-void	intpr __P((int, u_long));
 
 void	pr_rthdr __P((void));
 void	pr_family __P((int));
@@ -121,7 +120,7 @@ void	nserr_stats __P((u_long, char *));
 void	atalkprotopr __P((u_long, char *));
 void	ddp_stats __P((u_long, char *));
 
-void	intpr __P((int, u_long));
+void	intpr __P((int, u_long, void (*) __P((char *))));
 
 void	unixpr __P((u_long));
 

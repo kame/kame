@@ -37,13 +37,14 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.2 1999/08/05 16:12:39 itojun Exp $");
+__RCSID("$Id: inet6.c,v 1.3 1999/08/23 08:24:38 jinmei Exp $");
 #endif
 #endif /* not lint */
 
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <sys/ioctl.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
 
@@ -58,6 +59,7 @@ __RCSID("$Id: inet6.c,v 1.2 1999/08/05 16:12:39 itojun Exp $");
 #include <netinet/ip_var.h>
 #endif
 #include <netinet6/in6_pcb.h>
+#include <netinet6/in6_var.h>
 #include <netinet6/ip6_var.h>
 #ifdef TCP6
 #include <netinet6/tcp6.h>
@@ -959,6 +961,63 @@ icmp6_stats(off, name)
 		}
 	p(icp6s_reflect, "\t%lu message response%s generated\n");
 #undef p
+#undef p_5
+}
+
+/*
+ * Dump IPv6 per-interface statistics based on RFC 2465.
+ */
+void
+ip6_ifstat(ifname)
+	char *ifname;
+{
+	struct in6_ifreq ifr;
+	int s;
+#define	p(f, m) if (ifr.ifr_ifru.ifru_stat.f || sflag <= 1) \
+    printf(m, ifr.ifr_ifru.ifru_stat.f, plural(ifr.ifr_ifru.ifru_stat.f))
+#define	p_5(f, m) if (ifr.ifr_ifru.ifru_stat.f || sflag <= 1) \
+    printf(m, ip6stat.f)
+
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
+		perror("Warning: socket(AF_INET6)");
+		return;
+	}
+
+	strcpy(ifr.ifr_name, ifname);
+	printf("ip6 on %s:\n", ifr.ifr_name);
+
+	if (ioctl(s, SIOCGIFSTAT_IN6, (char *)&ifr) < 0) {
+		perror("Warning: ioctl(SIOCGIFSTAT_IN6)");
+		goto end;
+	}
+
+	p(ifs6_in_receive, "\t%qu total input datagram%s\n");
+	p(ifs6_in_hdrerr, "\t%qu datagram%s with invalid header received\n");
+	p(ifs6_in_toobig, "\t%qu datagram%s exceeded MTU received\n");
+	p(ifs6_in_noroute, "\t%qu datagram%s with no route received\n");
+	p(ifs6_in_addrerr, "\t%qu datagram%s with invalid dst received\n");
+	p(ifs6_in_protounknown, "\t%qu datagram%s with unknown proto received\n");
+	p(ifs6_in_discard, "\t%qu input datagram%s discarded\n");
+	p(ifs6_in_deliver,
+	  "\t%qu datagram%s delivered to an upper layer protocol\n");
+	p(ifs6_out_forward, "\t%qu datagram%s forwarded to this interface\n");
+	p(ifs6_out_request,
+	  "\t%qu datagram%s sent from an upper layer protocol\n");
+	p(ifs6_out_discard, "\t%qu total discarded output datagram%s\n");
+	p(ifs6_out_fragok, "\t%qu output datagram%s fragmented\n");
+	p(ifs6_out_fragfail, "\t%qu output datagram%s failed on fragment\n");
+	p(ifs6_out_fragcreat, "\t%qu output datagram%s succeeded on fragment\n");
+	p(ifs6_reass_reqd, "\t%qu incoming datagram%s fragmented\n");
+	p(ifs6_reass_ok, "\t%qu datagram%s reassembled\n");
+	p(ifs6_reass_fail, "\t%qu datagram%s failed on reassembling\n");
+	p(ifs6_in_mcast, "\t%qu multicast datagram%s received\n");
+	p(ifs6_out_mcast, "\t%qu multicast datagram%s sent\n");
+
+  end:
+	close(s);
+
+#undef p
+#undef p_5
 }
 
 /*

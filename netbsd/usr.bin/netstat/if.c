@@ -81,9 +81,10 @@ static char ntop_buf[INET6_ADDRSTRLEN];		/* for inet_ntop() */
  * which is a TAILQ_HEAD.
  */
 void
-intpr(interval, ifnetaddr)
+intpr(interval, ifnetaddr, pfunc)
 	int interval;
 	u_long ifnetaddr;
+	void (*pfunc)(char *);
 {
 	struct ifnet ifnet;
 	union {
@@ -118,22 +119,24 @@ intpr(interval, ifnetaddr)
 		return;
 	ifnetaddr = (u_long)ifhead.tqh_first;
 
-	if (bflag) {
-		printf("%-5.5s %-5.5s %-13.13s %-17.17s "
-			"%10.10s %10.10s",
-			"Name", "Mtu", "Network", "Address", 
-			"Ibytes", "Obytes");
-	} else {
-		printf("%-5.5s %-5.5s %-13.13s %-17.17s "
-			"%8.8s %5.5s %8.8s %5.5s %5.5s",
-			"Name", "Mtu", "Network", "Address", "Ipkts", "Ierrs",
-			"Opkts", "Oerrs", "Colls");
+	if (!sflag) {
+		if (bflag) {
+			printf("%-5.5s %-5.5s %-13.13s %-17.17s "
+			       "%10.10s %10.10s",
+			       "Name", "Mtu", "Network", "Address", 
+			       "Ibytes", "Obytes");
+		} else {
+			printf("%-5.5s %-5.5s %-13.13s %-17.17s "
+			       "%8.8s %5.5s %8.8s %5.5s %5.5s",
+			       "Name", "Mtu", "Network", "Address", "Ipkts", "Ierrs",
+			       "Opkts", "Oerrs", "Colls");
+		}
+		if (tflag)
+			printf(" %4.4s", "Time");
+		if (dflag)
+			printf(" %5.5s", "Drops");
+		putchar('\n');
 	}
-	if (tflag)
-		printf(" %4.4s", "Time");
-	if (dflag)
-		printf(" %5.5s", "Drops");
-	putchar('\n');
 	ifaddraddr = 0;
 	while (ifnetaddr || ifaddraddr) {
 		struct sockaddr_in *sin;
@@ -152,6 +155,12 @@ intpr(interval, ifnetaddr)
 			if (interface != 0 && strcmp(name, interface) != 0)
 				continue;
 			cp = strchr(name, '\0');
+
+			if (pfunc) {
+				(*pfunc)(name);
+				continue;
+			}
+
 			if ((ifnet.if_flags & IFF_UP) == 0)
 				*cp++ = '*';
 			*cp = '\0';
