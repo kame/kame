@@ -1,7 +1,20 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2297 2003/01/08 05:27:04 itojun Exp $
+$KAME: CHANGELOG,v 1.2298 2003/01/08 05:40:41 suz Exp $
 
 <200301>
+Wed Jan  8 14:33:42 JST 2003	suz@crl.hitachi.co.jp
+	* kame/kame/man/man4/stf.4, kame/sys/net/if_stf.[ch],
+	  kame/sys/netinet6/in6.h, in6_ifattach.c, ip6_input.c,
+	  freebsd4/sys/sys/sockio.h, freebsd4/sys/net/if.h:
+	  ISATAP kernel implementation based on draft-ietf-ngtrans-isatap-08.txt
+	  for FreeBSD-4 
+
+	* kame/kame/rtadvd, kame/kame/rtsold, freebsd4/sbin/ifconfig
+	  ISATAP userland implementation based on 
+	  draft-ietf-ngtrans-isatap-08.txt for FreeBSD-4 
+	  
+	please see "man stf" for further detail.
+
 Wed Jan  8 14:26:17 JST 2003  itojun@iijlab.net
 	* sys/netkey/keydb.h: in struct secashead, "struct route" is not
 	  sufficient if !NEW_STRUCT_ROUTE.  NetBSD PR 18751.
