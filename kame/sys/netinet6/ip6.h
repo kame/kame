@@ -350,7 +350,6 @@ do {									\
     }									\
 } while (0)
 
-#ifdef __NetBSD__
 /*
  * IP6_EXTHDR_GET ensures that intermediate protocol header (from "off" to
  * "len") is located in single mbuf, on contiguous memory region.
@@ -370,8 +369,10 @@ do {									\
 		if (t->m_len < tmp + (len))				\
 			panic("m_pulldown malfunction");		\
 		(val) = (typ)(mtod(t, caddr_t) + tmp);			\
-	} else								\
+	} else {							\
 		(val) = (typ)NULL;					\
+		(m) = NULL;						\
+	}								\
 } while (0)
 
 #define IP6_EXTHDR_GET0(val, typ, m, off, len) \
@@ -382,10 +383,10 @@ do {									\
 		if (t->m_len < (len))					\
 			panic("m_pulldown malfunction");		\
 		(val) = (typ)mtod(t, caddr_t);				\
-	} else								\
+	} else {							\
 		(val) = (typ)NULL;					\
+		(m) = NULL;						\
+	}								\
 } while (0)
-
-#endif /*NetBSD*/
 
 #endif /* not _NETINET_IPV6_H_ */
