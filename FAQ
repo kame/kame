@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.23 2001/07/13 02:13:05 jinmei Exp $
+$KAME: FAQ,v 1.24 2001/07/13 02:14:35 itojun Exp $
 
 
 GENERAL
@@ -35,7 +35,7 @@ Q: How can I contribute?
 	  and supply enough information.
 
 	- Reviewing documents
-	  Since the KAME core team does not contain native English speakers,
+	  Since the KAME core team does not have native English speakers,
 	  documents in English include many typos, wording mistakes,
 	  and so forth.  We would be very grateful if you review our
 	  documents and send us updates.
