@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.10 2000/06/04 03:31:27 itojun Exp $	*/
+/*	$KAME: mip6.h,v 1.11 2001/01/28 10:10:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -707,7 +707,7 @@ extern void mip6_probe_defrouter
 extern void mip6_probe_pfxrtrs
 	__P((void));
 extern void mip6_store_advint
-	__P((struct nd_opt_advint *, struct nd_defrouter *));
+	__P((struct nd_opt_advinterval *, struct nd_defrouter *));
 extern int mip6_delete_ifaddr
 	__P((struct in6_addr *addr, struct ifnet *ifp));
 extern struct nd_prefix *mip6_get_home_prefix

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.29 2001/01/20 16:37:01 sumikawa Exp $	*/
+/*	$KAME: nd6.h,v 1.30 2001/01/28 10:10:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -272,8 +272,8 @@ union nd_opts {
 		struct nd_opt_rd_hdr *rh;
 		struct nd_opt_mtu *mtu;
 		struct nd_opt_hdr *six;
-		struct nd_opt_advint *adv;
-		struct nd_opt_hai *hai;
+		struct nd_opt_advinterval *adv;
+		struct nd_opt_homeagent_info *hai;
 		struct nd_opt_hdr *search;	/* multiple opts */
 		struct nd_opt_hdr *last;	/* multiple opts */
 		int done;
