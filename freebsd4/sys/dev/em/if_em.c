@@ -484,9 +484,9 @@ em_start(struct ifnet *ifp)
       return;
 
    s = splimp();      
-   while (ifp->if_snd.ifq_head != NULL) {
+   while (!IFQ_IS_EMPTY(&ifp->if_snd)) {
 
-      IF_DEQUEUE(&ifp->if_snd, m_head);
+      IFQ_POLL(&ifp->if_snd, m_head);
       
       if(m_head == NULL) break;
 
@@ -495,7 +495,6 @@ em_start(struct ifnet *ifp)
 
       if (Adapter->NumTxDescriptorsAvail <= TX_CLEANUP_THRESHOLD) {
          ifp->if_flags |= IFF_OACTIVE;
-         IF_PREPEND(&ifp->if_snd, m_head);
 #ifdef DBG_STATS
          Adapter->NoTxDescAvail++;
 #endif
@@ -516,13 +515,13 @@ em_start(struct ifnet *ifp)
          tx_buffer = STAILQ_FIRST(&Adapter->FreeSwTxPacketList);
          if (!tx_buffer) {
             ifp->if_flags |= IFF_OACTIVE;
-            IF_PREPEND(&ifp->if_snd, m_head);
 #ifdef DBG_STATS
             Adapter->NoTxBufferAvail2++;
 #endif
             break;
          }
       }
+      IFQ_DEQUEUE(&ifp->if_snd, m_head);
       STAILQ_REMOVE_HEAD(&Adapter->FreeSwTxPacketList, em_tx_entry);
       tx_buffer->NumTxDescriptorsUsed = 0;
       tx_buffer->Packet = m_head;
@@ -1005,7 +1004,7 @@ em_intr(void *arg)
 
    EnableInterrupts(Adapter);
 
-   if(ifp->if_flags & IFF_RUNNING && ifp->if_snd.ifq_head != NULL)
+   if(ifp->if_flags & IFF_RUNNING && !IFQ_IS_EMPTY(&ifp->if_snd))
       em_start(ifp);
    
    return;
@@ -1312,7 +1311,8 @@ em_setup_interface(device_t dev, struct adapter * Adapter)
    ifp->if_ioctl = em_ioctl;
    ifp->if_start = em_start;
    ifp->if_watchdog = em_watchdog;
-   ifp->if_snd.ifq_maxlen = Adapter->NumTxDescriptors - 1;
+   IFQ_SET_MAXLEN(&ifp->if_snd, Adapter->NumTxDescriptors - 1);
+   IFQ_SET_READY(&ifp->if_snd);
    ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
    /* 

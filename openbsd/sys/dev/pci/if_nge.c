@@ -917,7 +917,8 @@ void nge_attach(parent, self, aux)
 	ifp->if_start = nge_start;
 	ifp->if_watchdog = nge_watchdog;
 	ifp->if_baudrate = 1000000000;
-	ifp->if_snd.ifq_maxlen = NGE_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, NGE_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 	ifp->if_capabilities =
 	    IFCAP_CSUM_IPv4 | IFCAP_CSUM_TCPv4 | IFCAP_CSUM_UDPv4;
 #if NVLAN > 0
@@ -1428,7 +1429,7 @@ void nge_tick(xsc)
 			if (IFM_SUBTYPE(mii->mii_media_active) == IFM_1000_TX)
 				DPRINTFN("%s: gigabit link up\n",
 					 sc->sc_dv.dv_xname);
-			if (ifp->if_snd.ifq_head != NULL)
+			if (!IFQ_IS_EMPTY(&ifp->if_snd))
 				nge_start(ifp);
 		} else
 			timeout_add(&sc->nge_timeout, hz);
@@ -1498,7 +1499,7 @@ int nge_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, NGE_IER, 1);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		nge_start(ifp);
 
 	return claimed;
@@ -1598,6 +1599,7 @@ void nge_start(ifp)
 	struct nge_softc	*sc;
 	struct mbuf		*m_head = NULL;
 	u_int32_t		idx;
+	int			pkts = 0;
 
 	sc = ifp->if_softc;
 
@@ -1610,15 +1612,18 @@ void nge_start(ifp)
 		return;
 
 	while(sc->nge_ldata->nge_tx_list[idx].nge_mbuf == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		if (nge_encap(sc, m_head, &idx)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		/* now we are committed to transmit the packet */
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		pkts++;
 
 #if NBPFILTER > 0
 		/*
@@ -1629,6 +1634,8 @@ void nge_start(ifp)
 			bpf_mtap(ifp->if_bpf, m_head);
 #endif
 	}
+	if (pkts == 0)
+		return;
 
 	/* Transmit */
 	sc->nge_cdata.nge_tx_prod = idx;
@@ -1965,7 +1972,7 @@ void nge_watchdog(ifp)
 	ifp->if_flags &= ~IFF_RUNNING;
 	nge_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		nge_start(ifp);
 }
 

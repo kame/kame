@@ -288,6 +288,7 @@ niattach(parent, self, aux)
 	ifp->if_start = nistart;
 	ifp->if_ioctl = niioctl;
 	ifp->if_watchdog = nitimeout;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Start init sequence.
@@ -524,13 +525,12 @@ nistart(ifp)
 #endif
 
 	while (fqb->nf_dforw) {
-		IF_DEQUEUE(&sc->sc_if.if_snd, m);
+		IFQ_POLL(&ifp->if_snd, m);
 		if (m == 0)
 			break;
 
 		data = REMQHI(&fqb->nf_dforw);
 		if ((int)data == Q_EMPTY) {
-			IF_PREPEND(&sc->sc_if.if_snd, m);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
@@ -545,6 +545,8 @@ nistart(ifp)
 				cnt++;
 		if (cnt > NTXFRAGS)
 			panic("nistart"); /* XXX */
+
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 
 #if NBPFILTER > 0
 		if (ifp->if_bpf)

@@ -285,6 +285,7 @@ bah_zbus_attach(parent, self, aux)
 	    IFF_NOTRAILERS | IFF_NOARP;
 
 	ifp->if_mtu = ARCMTU;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	if_attach(ifp);
 	arc_ifattach(ifp);
@@ -557,7 +558,7 @@ bah_start(ifp)
 		return;
 	}
 
-	IF_DEQUEUE(&ifp->if_snd, m);
+	IFQ_DEQUEUE(&ifp->if_snd, m);
 	buffer = sc->sc_tx_act ^ 1;
 
 	splx(s);

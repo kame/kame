@@ -1,4 +1,4 @@
-/*	$NetBSD: if_xi.c,v 1.2.2.1 2000/08/09 23:14:52 gmcgarry Exp $	*/
+/*	$NetBSD: if_xi.c,v 1.2.2.2 2001/06/11 19:17:03 he Exp $	*/
 /*	OpenBSD: if_xe.c,v 1.9 1999/09/16 11:28:42 niklas Exp 	*/
 
 /*
@@ -462,7 +462,8 @@ xi_pcmcia_attach(parent, self, aux)
 	ifp->if_watchdog = xi_watchdog;
 	ifp->if_flags =
 	    IFF_BROADCAST | IFF_NOTRAILERS | IFF_SIMPLEX | IFF_MULTICAST;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Reset and initialize the card. */
 	xi_full_reset(sc);
@@ -786,7 +787,7 @@ xi_intr(arg)
 	}
 			
 	/* Try to start more packets transmitting. */
-	if (ifp->if_snd.ifq_head)
+	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		xi_start(ifp);
 
 	/* Detected excessive collisions? */
@@ -849,6 +850,7 @@ xi_get(sc)
 		return (recvcount);
 	m->m_pkthdr.rcvif = ifp;
 	m->m_pkthdr.len = pktlen;
+	m->m_flags |= M_HASFCS;
 	len = MHLEN;
 	top = 0;
 	mp = &top;
@@ -1183,7 +1185,7 @@ xi_start(ifp)
 	}
 
 	/* Peek at the next packet. */
-	m0 = ifp->if_snd.ifq_head;
+	IFQ_POLL(&ifp->if_snd, m0);
 	if (m0 == 0)
 		return;
 
@@ -1206,7 +1208,7 @@ xi_start(ifp)
 		return;
 	}
 
-	IF_DEQUEUE(&ifp->if_snd, m0);
+	IFQ_DEQUEUE(&ifp->if_snd, m0);
 
 #if NBPFILTER > 0
 	if (ifp->if_bpf)

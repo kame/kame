@@ -1,4 +1,4 @@
-/*	$NetBSD: ofnet.c,v 1.15 1998/07/05 00:51:22 jonathan Exp $	*/
+/*	$NetBSD: ofnet.c,v 1.19 2000/05/16 05:45:52 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996 Wolfgang Solfrank.
@@ -36,6 +36,7 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/device.h>
 #include <sys/ioctl.h>
 #include <sys/mbuf.h>
@@ -76,6 +77,7 @@ struct ofnet_softc {
 	int sc_phandle;
 	int sc_ihandle;
 	struct ethercom sc_ethercom;
+	struct callout sc_callout;
 };
 
 static int ofnet_match __P((struct device *, struct cfdata *, void *));
@@ -86,7 +88,7 @@ struct cfattach ofnet_ca = {
 };
 
 static void ofnet_read __P((struct ofnet_softc *));
-static void ofnet_timer __P((struct ofnet_softc *));
+static void ofnet_timer __P((void *));
 static void ofnet_init __P((struct ofnet_softc *));
 static void ofnet_stop __P((struct ofnet_softc *));
 
@@ -151,13 +153,16 @@ ofnet_attach(parent, self, aux)
 	    sizeof myaddr) < 0)
 		panic("ofnet_attach: no mac-address");
 	printf(": address %s\n", ether_sprintf(myaddr));
-	
+
+	callout_init(&of->sc_callout);
+
 	bcopy(of->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
 	ifp->if_softc = of;
 	ifp->if_start = ofnet_start;
 	ifp->if_ioctl = ofnet_ioctl;
 	ifp->if_watchdog = ofnet_watchdog;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	if_attach(ifp);
 	ether_ifattach(ifp, myaddr);
@@ -165,8 +170,9 @@ ofnet_attach(parent, self, aux)
 #if NBPFILTER > 0
 	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
 #endif
-
+#ifdef __BROKEN_DK_ESTABLISH
 	dk_establish(0, self);					/* XXX */
+#endif
 }
 
 static char buf[ETHERMTU + sizeof(struct ether_header)];
@@ -176,7 +182,6 @@ ofnet_read(of)
 	struct ofnet_softc *of;
 {
 	struct ifnet *ifp = &of->sc_ethercom.ec_if;
-	struct ether_header *eh;
 	struct mbuf *m, **mp, *head;
 	int l, len;
 	char *bufp;
@@ -256,24 +261,24 @@ ofnet_read(of)
 		}
 		if (head == 0)
 			continue;
-		eh = mtod(head, struct ether_header *);
 
 #if NBPFILTER > 0
 		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m);
 #endif
-		m_adj(head, sizeof(struct ether_header));
 		ifp->if_ipackets++;
-		ether_input(ifp, eh, head);
+		(*ifp->if_input)(ifp, head);
 	}
 }
 
 static void
-ofnet_timer(of)
-	struct ofnet_softc *of;
+ofnet_timer(arg)
+	void *arg;
 {
+	struct ofnet_softc *of = arg;
+
 	ofnet_read(of);
-	timeout(ofnet_timer, of, 1);
+	callout_reset(&of->sc_callout, 1, ofnet_timer, of);
 }
 
 static void
@@ -296,7 +301,7 @@ static void
 ofnet_stop(of)
 	struct ofnet_softc *of;
 {
-	untimeout(ofnet_timer, of);
+	callout_stop(&of->sc_callout);
 	of->sc_ethercom.ec_if.if_flags &= ~IFF_RUNNING;
 }
 
@@ -317,7 +322,7 @@ ofnet_start(ifp)
 		ofnet_read(of);
 		
 		/* Now get the first packet on the queue */
-		IF_DEQUEUE(&ifp->if_snd, m0);
+		IFQ_DEQUEUE(&ifp->if_snd, m0);
 		if (!m0)
 			return;
 		

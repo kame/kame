@@ -346,7 +346,8 @@ gx_attach(device_t dev)
 	ifp->if_watchdog = gx_watchdog;
 	ifp->if_init = gx_init;
 	ifp->if_mtu = ETHERMTU;
-	ifp->if_snd.ifq_maxlen = GX_TX_RING_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, GX_TX_RING_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* see if we can enable hardware checksumming */
 	if (gx->gx_vflags & GXF_CSUM) {
@@ -1453,7 +1454,7 @@ gx_intr(void *xsc)
 	/* Turn interrupts on. */
 	CSR_WRITE_4(gx, GX_INT_MASK_SET, GX_INT_WANTED);
 
-	if (ifp->if_flags & IFF_RUNNING && ifp->if_snd.ifq_head != NULL)
+	if (ifp->if_flags & IFF_RUNNING && !IFQ_IS_EMPTY(&ifp->if_snd))
 		gx_start(ifp);
 
 	splx(s);
@@ -1593,7 +1594,7 @@ gx_start(struct ifnet *ifp)
 	gx = ifp->if_softc;
 
 	for (;;) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -1603,10 +1604,11 @@ gx_start(struct ifnet *ifp)
 		 * for the NIC to drain the ring.
 		 */
 		if (gx_encap(gx, m_head) != 0) {
-			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame

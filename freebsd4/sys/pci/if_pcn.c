@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_pcn.c,v 1.5.2.4 2000/11/17 00:35:19 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_pcn.c,v 1.5.2.8 2001/12/16 15:46:07 luigi Exp $
  */
 
 /*
@@ -96,7 +96,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_pcn.c,v 1.5.2.4 2000/11/17 00:35:19 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_pcn.c,v 1.5.2.8 2001/12/16 15:46:07 luigi Exp $";
 #endif
 
 /*
@@ -110,6 +110,7 @@ static struct pcn_type pcn_devs[] = {
 
 static u_int32_t pcn_csr_read	__P((struct pcn_softc *, int));
 static u_int16_t pcn_csr_read16	__P((struct pcn_softc *, int));
+static u_int16_t pcn_bcr_read16	__P((struct pcn_softc *, int));
 static void pcn_csr_write	__P((struct pcn_softc *, int, int));
 static u_int32_t pcn_bcr_read	__P((struct pcn_softc *, int));
 static void pcn_bcr_write	__P((struct pcn_softc *, int, int));
@@ -226,6 +227,14 @@ static u_int32_t pcn_bcr_read(sc, reg)
 {
 	CSR_WRITE_4(sc, PCN_IO32_RAP, reg);
 	return(CSR_READ_4(sc, PCN_IO32_BDP));
+}
+
+static u_int16_t pcn_bcr_read16(sc, reg)
+	struct pcn_softc	*sc;
+	int			reg;
+{
+	CSR_WRITE_2(sc, PCN_IO16_RAP, reg);
+	return(CSR_READ_2(sc, PCN_IO16_BDP));
 }
 
 static void pcn_bcr_write(sc, reg, val)
@@ -416,10 +425,38 @@ static int pcn_probe(dev)
 			 * lnc driver's probe routine, the chip will
 			 * be locked into 32-bit operation and the lnc
 			 * driver will be unable to attach to it.
+			 * Note II: if the chip happens to already
+			 * be in 32-bit mode, we still need to check
+			 * the chip ID, but first we have to detect
+			 * 32-bit mode using only 16-bit operations.
+			 * The safest way to do this is to read the
+			 * PCI subsystem ID from BCR23/24 and compare
+			 * that with the value read from PCI config
+			 * space.   
 			 */
-			chip_id = pcn_csr_read16(sc, PCN_CSR_CHIPID1);
+			chip_id = pcn_bcr_read16(sc, PCN_BCR_PCISUBSYSID);
 			chip_id <<= 16;
-			chip_id |= pcn_csr_read16(sc, PCN_CSR_CHIPID0);
+			chip_id |= pcn_bcr_read16(sc, PCN_BCR_PCISUBVENID);
+			/*
+			 * Note III: the test for 0x10001000 is a hack to
+			 * pacify VMware, who's pseudo-PCnet interface is
+			 * broken. Reading the subsystem register from PCI
+			 * config space yeilds 0x00000000 while reading the
+			 * same value from I/O space yeilds 0x10001000. It's
+			 * not supposed to be that way.
+			 */
+			if (chip_id == pci_read_config(dev,
+			    PCIR_SUBVEND_0, 4) || chip_id == 0x10001000) {
+				/* We're in 16-bit mode. */
+				chip_id = pcn_csr_read16(sc, PCN_CSR_CHIPID1);
+				chip_id <<= 16;
+				chip_id |= pcn_csr_read16(sc, PCN_CSR_CHIPID0);
+			} else {
+				/* We're in 32-bit mode. */
+				chip_id = pcn_csr_read(sc, PCN_CSR_CHIPID1);
+				chip_id <<= 16;
+				chip_id |= pcn_csr_read(sc, PCN_CSR_CHIPID0);
+			}
 			bus_release_resource(dev, PCN_RES,
 			    PCN_RID, sc->pcn_res);
 			chip_id >>= 12;
@@ -594,7 +631,8 @@ static int pcn_attach(dev)
 	ifp->if_watchdog = pcn_watchdog;
 	ifp->if_init = pcn_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = PCN_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, PCN_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Do MII setup.
@@ -716,16 +754,11 @@ static int pcn_newbuf(sc, idx, m)
 
 	if (m == NULL) {
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-		if (m_new == NULL) {
-			printf("pcn%d: no memory for rx list "
-			    "-- packet dropped!\n", sc->pcn_unit);
+		if (m_new == NULL)
 			return(ENOBUFS);
-		}
 
 		MCLGET(m_new, M_DONTWAIT);
 		if (!(m_new->m_flags & M_EXT)) {
-			printf("pcn%d: no memory for rx list "
-			    "-- packet dropped!\n", sc->pcn_unit);
 			m_freem(m_new);
 			return(ENOBUFS);
 		}
@@ -896,7 +929,7 @@ static void pcn_tick(xsc)
 		if (mii->mii_media_status & IFM_ACTIVE &&
 		    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE)
 			sc->pcn_link++;
-			if (ifp->if_snd.ifq_head != NULL)
+			if (!IFQ_IS_EMPTY(&ifp->if_snd))
 				pcn_start(ifp);
 	}
 
@@ -940,7 +973,7 @@ static void pcn_intr(arg)
 		}
 	}
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		pcn_start(ifp);
 
 	return;
@@ -1023,15 +1056,16 @@ static void pcn_start(ifp)
 		return;
 
 	while(sc->pcn_cdata.pcn_tx_chain[idx] == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		if (pcn_encap(sc, m_head, &idx)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -1041,6 +1075,8 @@ static void pcn_start(ifp)
 			bpf_mtap(ifp, m_head);
 
 	}
+	if (idx == sc->pcn_cdata.pcn_tx_prod)
+		return;
 
 	/* Transmit */
 	sc->pcn_cdata.pcn_tx_prod = idx;
@@ -1166,7 +1202,7 @@ static void pcn_init(xsc)
 	PCN_CSR_SETBIT(sc, PCN_CSR_TFEAT, PCN_TFEAT_PAD_TX);
 
 	/* Disable MII autoneg (we handle this ourselves). */
-	PCN_BCR_CLRBIT(sc, PCN_BCR_MIICTL, PCN_MIICTL_DANAS);
+	PCN_BCR_SETBIT(sc, PCN_BCR_MIICTL, PCN_MIICTL_DANAS);
 
 	if (sc->pcn_type == Am79C978)
 		pcn_bcr_write(sc, PCN_BCR_PHYSEL,
@@ -1313,7 +1349,7 @@ static void pcn_watchdog(ifp)
 	pcn_reset(sc);
 	pcn_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		pcn_start(ifp);
 
 	return;

@@ -596,7 +596,8 @@ cs_attach(struct cs_softc *sc, int unit, int flags)
 		ifp->if_ioctl=cs_ioctl;
 		ifp->if_watchdog=cs_watchdog;
 		ifp->if_init=cs_init;
-		ifp->if_snd.ifq_maxlen= IFQ_MAXLEN;
+		IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+		IFQ_SET_READY(&ifp->if_snd);
 		/*
                  *  MIB DATA
                  */
@@ -956,7 +957,7 @@ cs_start(struct ifnet *ifp)
 		if (sc->buf_len)
 			length = sc->buf_len;
 		else {
-			IF_DEQUEUE( &ifp->if_snd, m );
+			IFQ_DEQUEUE( &ifp->if_snd, m );
 
 			if (m==NULL) {
 				(void) splx(s);

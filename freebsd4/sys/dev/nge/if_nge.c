@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.4 2001/08/01 01:08:44 fenner Exp $
+ * $FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.7 2001/12/14 19:44:38 jlemon Exp $
  */
 
 /*
@@ -87,8 +87,6 @@
  * if the user selects an MTU larger than 8152 (8170 - 18)
  */
 
-#include "vlan.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -102,11 +100,8 @@
 #include <net/ethernet.h>
 #include <net/if_dl.h>
 #include <net/if_media.h>
-
-#if NVLAN > 0
 #include <net/if_types.h>
 #include <net/if_vlan_var.h>
-#endif
 
 #include <net/bpf.h>
 
@@ -137,7 +132,7 @@ MODULE_DEPEND(nge, miibus, 1, 1, 1);
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.4 2001/08/01 01:08:44 fenner Exp $";
+  "$FreeBSD: src/sys/dev/nge/if_nge.c,v 1.13.2.7 2001/12/14 19:44:38 jlemon Exp $";
 #endif
 
 #define NGE_CSUM_FEATURES	(CSUM_IP | CSUM_TCP | CSUM_UDP)
@@ -949,8 +944,11 @@ static int nge_attach(dev)
 	ifp->if_watchdog = nge_watchdog;
 	ifp->if_init = nge_init;
 	ifp->if_baudrate = 1000000000;
-	ifp->if_snd.ifq_maxlen = NGE_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, NGE_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 	ifp->if_hwassist = NGE_CSUM_FEATURES;
+	ifp->if_capabilities = IFCAP_HWCSUM;
+	ifp->if_capenable = ifp->if_capabilities;
 
 	/*
 	 * Do MII setup.
@@ -1402,16 +1400,14 @@ static void nge_rxeof(sc)
 			m->m_pkthdr.csum_data = 0xffff;
 		}
 
-#if NVLAN > 0
 		/*
 		 * If we received a packet with a vlan tag, pass it
 		 * to vlan_input() instead of ether_input().
 		 */
 		if (extsts & NGE_RXEXTSTS_VLANPKT) {
-			vlan_input_tag(eh, m, extsts & NGE_RXEXTSTS_VTCI);
+			VLAN_INPUT_TAG(eh, m, extsts & NGE_RXEXTSTS_VTCI);
                         continue;
                 }
-#endif
 
 		ether_input(ifp, eh, m);
 	}
@@ -1521,7 +1517,7 @@ static void nge_tick(xsc)
 			if (IFM_SUBTYPE(mii->mii_media_active) == IFM_1000_TX)
 				printf("nge%d: gigabit link up\n",
 				    sc->nge_unit);
-			if (ifp->if_snd.ifq_head != NULL)
+			if (!IFQ_IS_EMPTY(&ifp->if_snd))
 				nge_start(ifp);
 		} else
 			sc->nge_stat_ch = timeout(nge_tick, sc, hz);
@@ -1567,11 +1563,13 @@ static void nge_intr(arg)
 
 		if ((status & NGE_ISR_RX_DESC_OK) ||
 		    (status & NGE_ISR_RX_ERR) ||
+		    (status & NGE_ISR_RX_OFLOW) ||
 		    (status & NGE_ISR_RX_OK))
 			nge_rxeof(sc);
-
+#ifdef notdef
 		if ((status & NGE_ISR_RX_OFLOW))
 			nge_rxeoc(sc);
+#endif
 
 		if (status & NGE_ISR_SYSERR) {
 			nge_reset(sc);
@@ -1588,7 +1586,7 @@ static void nge_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, NGE_IER, 1);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		nge_start(ifp);
 
 	return;
@@ -1606,14 +1604,12 @@ static int nge_encap(sc, m_head, txidx)
 	struct nge_desc		*f = NULL;
 	struct mbuf		*m;
 	int			frag, cur, cnt = 0;
-#if NVLAN > 0
 	struct ifvlan		*ifv = NULL;
 
 	if ((m_head->m_flags & (M_PROTO1|M_PKTHDR)) == (M_PROTO1|M_PKTHDR) &&
 	    m_head->m_pkthdr.rcvif != NULL &&
 	    m_head->m_pkthdr.rcvif->if_type == IFT_L2VLAN)
 		ifv = m_head->m_pkthdr.rcvif->if_softc;
-#endif
 
 	/*
  	 * Start packing the mbufs in this chain into
@@ -1655,12 +1651,10 @@ static int nge_encap(sc, m_head, txidx)
 			    NGE_TXEXTSTS_UDPCSUM;
 	}
 
-#if NVLAN > 0
 	if (ifv != NULL) {
 		sc->nge_ldata->nge_tx_list[cur].nge_extsts |=
 			(NGE_TXEXTSTS_VLANPKT|ifv->ifv_tag);
 	}
-#endif
 
 	sc->nge_ldata->nge_tx_list[cur].nge_mbuf = m_head;
 	sc->nge_ldata->nge_tx_list[cur].nge_ctl &= ~NGE_CMDSTS_MORE;
@@ -1684,6 +1678,7 @@ static void nge_start(ifp)
 	struct nge_softc	*sc;
 	struct mbuf		*m_head = NULL;
 	u_int32_t		idx;
+	int			pkts = 0;
 
 	sc = ifp->if_softc;
 
@@ -1696,15 +1691,18 @@ static void nge_start(ifp)
 		return;
 
 	while(sc->nge_ldata->nge_tx_list[idx].nge_mbuf == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		if (nge_encap(sc, m_head, &idx)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		/* now we are committed to transmit the packet */
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		pkts++;
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -1714,6 +1712,8 @@ static void nge_start(ifp)
 			bpf_mtap(ifp, m_head);
 
 	}
+	if (pkts == 0)
+		return;
 
 	/* Transmit */
 	sc->nge_cdata.nge_tx_prod = idx;
@@ -1821,15 +1821,13 @@ static void nge_init(xsc)
 	 */
 	CSR_WRITE_4(sc, NGE_VLAN_IP_RXCTL, NGE_VIPRXCTL_IPCSUM_ENB);
 
-#if NVLAN > 0
 	/*
-	 * If VLAN support is enabled, tell the chip to detect
-	 * and strip VLAN tag info from received frames. The tag
-	 * will be provided in the extsts field in the RX descriptors.
+	 * Tell the chip to detect and strip VLAN tag info from
+	 * received frames. The tag will be provided in the extsts
+	 * field in the RX descriptors.
 	 */
 	NGE_SETBIT(sc, NGE_VLAN_IP_RXCTL,
 	    NGE_VIPRXCTL_TAG_DETECT_ENB|NGE_VIPRXCTL_TAG_STRIP_ENB);
-#endif
 
 	/* Set TX configuration */
 	CSR_WRITE_4(sc, NGE_TX_CFG, NGE_TXCFG);
@@ -1839,14 +1837,11 @@ static void nge_init(xsc)
 	 */
 	CSR_WRITE_4(sc, NGE_VLAN_IP_TXCTL, NGE_VIPTXCTL_CSUM_PER_PKT);
 
-#if NVLAN > 0
 	/*
-	 * If VLAN support is enabled, tell the chip to insert
-	 * VLAN tags on a per-packet basis as dictated by the
-	 * code in the frame encapsulation routine.
+	 * Tell the chip to insert VLAN tags on a per-packet basis as
+	 * dictated by the code in the frame encapsulation routine.
 	 */
 	NGE_SETBIT(sc, NGE_VLAN_IP_TXCTL, NGE_VIPTXCTL_TAG_PER_PKT);
-#endif
 
 	/* Set full/half duplex mode. */
 	if ((mii->mii_media_active & IFM_GMASK) == IFM_FDX) {
@@ -2035,7 +2030,7 @@ static void nge_watchdog(ifp)
 	ifp->if_flags &= ~IFF_RUNNING;
 	nge_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		nge_start(ifp);
 
 	return;

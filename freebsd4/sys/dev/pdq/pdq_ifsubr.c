@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/pdq/pdq_ifsubr.c,v 1.11 2000/01/13 09:13:22 mdodd Exp $
+ * $FreeBSD: src/sys/dev/pdq/pdq_ifsubr.c,v 1.11.2.1 2000/08/02 22:39:30 peter Exp $
  *
  */
 
@@ -86,6 +86,7 @@ arp_ifinit(
     ifa->ifa_rtrequest = arp_rtrequest;
     ifa->ifa_flags |= RTF_CLONING;
 #endif
+}
 #endif
 
 
@@ -130,13 +131,7 @@ pdq_ifwatchdog(
 
     ifp->if_flags &= ~IFF_OACTIVE;
     ifp->if_timer = 0;
-    for (;;) {
-	struct mbuf *m;
-	IF_DEQUEUE(&ifp->if_snd, m);
-	if (m == NULL)
-	    return;
-	m_freem(m);
-    }
+    IFQ_PURGE(&ifp->if_snd);
 }
 
 ifnet_ret_t
@@ -144,7 +139,6 @@ pdq_ifstart(
     struct ifnet *ifp)
 {
     pdq_softc_t *sc = (pdq_softc_t *) ((caddr_t) ifp - offsetof(pdq_softc_t, sc_ac.ac_if));
-    struct ifqueue *ifq = &ifp->if_snd;
     struct mbuf *m;
     int tx = 0;
 
@@ -159,15 +153,16 @@ pdq_ifstart(
 	return;
     }
     for (;; tx = 1) {
-	IF_DEQUEUE(ifq, m);
+	IFQ_POLL(&ifp->if_snd, m);
 	if (m == NULL)
 	    break;
 
 	if (pdq_queue_transmit_data(sc->sc_pdq, m) == PDQ_FALSE) {
 	    ifp->if_flags |= IFF_OACTIVE;
-	    IF_PREPEND(ifq, m);
 	    break;
 	}
+
+	IFQ_DEQUEUE(&ifp->if_snd, m);
     }
     if (tx)
 	PDQ_DO_TYPE2_PRODUCER(sc->sc_pdq);
@@ -203,7 +198,7 @@ pdq_os_restart_transmitter(
 {
     pdq_softc_t *sc = (pdq_softc_t *) pdq->pdq_os_ctx;
     sc->sc_if.if_flags &= ~IFF_OACTIVE;
-    if (sc->sc_if.if_snd.ifq_head != NULL) {
+    if (!IFQ_IS_EMPTY(&sc->sc_if.if_snd)) {
 	sc->sc_if.if_timer = PDQ_OS_TX_TIMEOUT;
 	pdq_ifstart(&sc->sc_if);
     } else {
@@ -372,7 +367,8 @@ pdq_ifattach(
     ifp->if_ioctl = pdq_ifioctl;
     ifp->if_output = fddi_output;
     ifp->if_start = pdq_ifstart;
-    ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+    IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+    IFQ_SET_READY(&ifp->if_snd);
 #warning "Implement fddi_resolvemulti!"
 /*    ifp->if_resolvemulti = ether_resolvemulti; XXX */
   

@@ -270,6 +270,7 @@ int an_attach(sc)
 	ifp->if_ioctl = an_ioctl;
 	ifp->if_start = an_start;
 	ifp->if_watchdog = an_watchdog;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	memcpy(ifp->if_xname, sc->an_dev.dv_xname, IFNAMSIZ);
 
@@ -584,7 +585,7 @@ int an_intr(xsc)
 	/* Re-enable interrupts. */
 	CSR_WRITE_2(sc, AN_INT_EN, AN_INTRS);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		an_start(ifp);
 
 	return 1;
@@ -1325,7 +1326,7 @@ static void an_start(ifp)
 	bzero((char *)&tx_frame_802_3, sizeof(tx_frame_802_3));
 
 	while(sc->an_rdata.an_tx_ring[idx] == 0) {
-		IF_DEQUEUE(&ifp->if_snd, m0);
+		IFQ_DEQUEUE(&ifp->if_snd, m0);
 		if (m0 == NULL)
 			break;
 
@@ -1377,6 +1378,8 @@ static void an_start(ifp)
 
 		AN_INC(idx, AN_TX_RING_CNT);
 	}
+	if (idx == sc->an_rdata.an_tx_prod)
+		return;
 
 	if (m0 != NULL)
 		ifp->if_flags |= IFF_OACTIVE;

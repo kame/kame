@@ -1,4 +1,4 @@
-/*	$NetBSD: if_aue.c,v 1.42.2.1 2000/09/20 19:57:23 itojun Exp $	*/
+/*	$NetBSD: if_aue.c,v 1.42.2.2 2001/03/13 20:45:36 he Exp $	*/
 /*
  * Copyright (c) 1997, 1998, 1999, 2000
  *	Bill Paul <wpaul@ee.columbia.edu>.  All rights reserved.
@@ -613,7 +613,9 @@ aue_setmulti(struct aue_softc *sc)
 
 	ifp = GET_IFP(sc);
 
-	if (ifp->if_flags & IFF_ALLMULTI || ifp->if_flags & IFF_PROMISC) {
+	if (ifp->if_flags & IFF_PROMISC) {
+allmulti:
+		ifp->if_flags |= IFF_ALLMULTI;
 		AUE_SETBIT(sc, AUE_CTL0, AUE_CTL0_ALLMULTI);
 		return;
 	}
@@ -640,18 +642,16 @@ aue_setmulti(struct aue_softc *sc)
 	ETHER_FIRST_MULTI(step, &sc->arpcom, enm);
 #endif
 	while (enm != NULL) {
-#if 1
 		if (memcmp(enm->enm_addrlo,
-			   enm->enm_addrhi, ETHER_ADDR_LEN) != 0) {
-			ifp->if_flags |= IFF_ALLMULTI;
-			AUE_SETBIT(sc, AUE_CTL0, AUE_CTL0_ALLMULTI);
-			return;
-		}
-#endif
+		    enm->enm_addrhi, ETHER_ADDR_LEN) != 0)
+			goto allmulti;
+
 		h = aue_crc(enm->enm_addrlo);
 		AUE_SETBIT(sc, AUE_MAR + (h >> 3), 1 << (h & 0x7));
 		ETHER_NEXT_MULTI(step, enm);
 	}
+
+	ifp->if_flags &= ~IFF_ALLMULTI;
 #endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
 }
 
@@ -832,7 +832,7 @@ USB_ATTACH(aue)
 	ifp->if_start = aue_start;
 	ifp->if_watchdog = aue_watchdog;
 	ifp->if_init = aue_init;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
 
 	/*
 	 * Do MII setup.
@@ -879,9 +879,11 @@ USB_ATTACH(aue)
 	ifp->if_start = aue_start;
 	ifp->if_watchdog = aue_watchdog;
 #if defined(__OpenBSD__)
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
 #endif
 	strncpy(ifp->if_xname, USBDEVNAME(sc->aue_dev), IFNAMSIZ);
+
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Initialize MII/media info. */
 	mii = &sc->aue_mii;
@@ -1327,7 +1329,7 @@ aue_txeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	m_freem(c->aue_mbuf);
 	c->aue_mbuf = NULL;
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		aue_start(ifp);
 #endif /* defined(__NetBSD__) || defined(__OpenBSD__) */
 
@@ -1365,7 +1367,7 @@ aue_tick(void *xsc)
 			DPRINTFN(2,("%s: %s: got link\n",
 				    USBDEVNAME(sc->aue_dev),__FUNCTION__));
 			sc->aue_link++;
-			if (ifp->if_snd.ifq_head != NULL)
+			if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 				aue_start(ifp);
 		}
 	}
@@ -1441,15 +1443,16 @@ aue_start(struct ifnet *ifp)
 	if (ifp->if_flags & IFF_OACTIVE)
 		return;
 
-	IF_DEQUEUE(&ifp->if_snd, m_head);
+	IFQ_POLL(&ifp->if_snd, m_head);
 	if (m_head == NULL)
 		return;
 
 	if (aue_send(sc, m_head, 0)) {
-		IF_PREPEND(&ifp->if_snd, m_head);
 		ifp->if_flags |= IFF_OACTIVE;
 		return;
 	}
+
+	IFQ_DEQUEUE(&ifp->if_snd, m_head);
 
 #if NBPFILTER > 0
 	/*
@@ -1766,7 +1769,7 @@ aue_watchdog(struct ifnet *ifp)
 	aue_init(sc);
 	usbd_set_polling(sc->aue_udev, 0);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		aue_start(ifp);
 }
 

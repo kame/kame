@@ -1,4 +1,4 @@
-/* $NetBSD: if_ti.c,v 1.1.2.2 1999/10/06 13:29:34 he Exp $ */
+/* $NetBSD: if_ti.c,v 1.8.4.3 2001/03/13 20:44:13 he Exp $ */
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -75,15 +75,12 @@
  *   for testing
  * - Raymond Lee of Netgear, for providing a pair of Netgear
  *   GA620 Tigon 2 boards for testing
- * - Ulf Zimmermann, for bringing the GA260 to my attention and
+ * - Ulf Zimmermann, for bringing the GA620 to my attention and
  *   convincing me to write this driver.
  * - Andrew Gallatin for providing FreeBSD/Alpha support.
  */
 
 #include "bpfilter.h"
-#if 0
-#include "vlan.h"
-#endif
 #include "opt_inet.h"
 #include "opt_ns.h"
 
@@ -107,13 +104,6 @@
 #include <net/bpf.h>
 #endif
 
-#if 0
-#if NVLAN > 0
-#include <net/if_types.h>
-#include <net/if_vlan_var.h>
-#endif
-#endif
-
 #ifdef INET
 #include <netinet/in.h>
 #include <netinet/if_inarp.h>
@@ -124,17 +114,7 @@
 #include <netns/ns_if.h>
 #endif
 
-#if 0
-#include <vm/vm.h>              /* for vtophys */
-#include <vm/pmap.h>            /* for vtophys */
-#include <machine/clock.h>      /* for DELAY */
-#endif
 #include <machine/bus.h>
-#if 0
-#include <machine/resource.h>
-#include <sys/bus.h>
-#include <sys/rman.h>
-#endif
 
 #include <dev/pci/pcireg.h>
 #include <dev/pci/pcivar.h>
@@ -156,21 +136,24 @@
 
 static struct ti_type ti_devs[] = {
 	{ PCI_VENDOR_ALTEON,	PCI_PRODUCT_ALTEON_ACENIC,
-		"Alteon AceNIC Gigabit Ethernet" },
+		"Alteon AceNIC 1000baseSX Gigabit Ethernet" },
+	{ PCI_VENDOR_ALTEON,	PCI_PRODUCT_ALTEON_ACENIC_COPPER,
+		"Alteon AceNIC 1000baseT Gigabit Ethernet" },
 	{ PCI_VENDOR_3COM,	PCI_PRODUCT_3COM_3C985,
 		"3Com 3c985-SX Gigabit Ethernet" },
 	{ PCI_VENDOR_NETGEAR, PCI_PRODUCT_NETGEAR_GA620,
-		"Netgear GA620 Gigabit Ethernet" },
+		"Netgear GA620 1000baseSX Gigabit Ethernet" },
+	{ PCI_VENDOR_NETGEAR, PCI_PRODUCT_NETGEAR_GA620T,
+		"Netgear GA620 1000baseT Gigabit Ethernet" },
 	{ PCI_VENDOR_SGI, PCI_PRODUCT_SGI_TIGON,
 		"Silicon Graphics Gigabit Ethernet" },
 	{ 0, 0, NULL }
 };
 
+static struct ti_type *ti_type_match __P((struct pci_attach_args *));
 static int ti_probe	__P((struct device *, struct cfdata *, void *));
 static void ti_attach	__P((struct device *, struct device *, void *));
-#if 0
-static int ti_detach		__P((device_t));
-#endif
+static void ti_shutdown __P((void *));
 static void ti_txeof		__P((struct ti_softc *));
 static void ti_rxeof		__P((struct ti_softc *));
 
@@ -185,9 +168,6 @@ static void ti_init		__P((void *));
 static void ti_init2		__P((struct ti_softc *));
 static void ti_stop		__P((struct ti_softc *));
 static void ti_watchdog		__P((struct ifnet *));
-#if 0
-static void ti_shutdown		__P((device_t));
-#endif
 static int ti_ifmedia_upd	__P((struct ifnet *));
 static void ti_ifmedia_sts	__P((struct ifnet *, struct ifmediareq *));
 
@@ -210,9 +190,6 @@ static void ti_handle_events	__P((struct ti_softc *));
 static int ti_alloc_jumbo_mem	__P((struct ti_softc *));
 static void *ti_jalloc		__P((struct ti_softc *));
 static void ti_jfree		__P((caddr_t, u_int, void *));
-#if 0
-static void ti_jref		__P((caddr_t, u_int));
-#endif
 static int ti_newbuf_std	__P((struct ti_softc *, int, struct mbuf *, bus_dmamap_t));
 static int ti_newbuf_mini	__P((struct ti_softc *, int, struct mbuf *, bus_dmamap_t));
 static int ti_newbuf_jumbo	__P((struct ti_softc *, int, struct mbuf *));
@@ -242,7 +219,7 @@ static u_int32_t ti_eeprom_putbyte(sc, byte)
 	struct ti_softc		*sc;
 	int			byte;
 {
-	register int		i, ack = 0;
+	int		i, ack = 0;
 
 	/*
 	 * Make sure we're in TX mode.
@@ -289,7 +266,7 @@ static u_int8_t ti_eeprom_getbyte(sc, addr, dest)
 	int			addr;
 	u_int8_t		*dest;
 {
-	register int		i;
+	int		i;
 	u_int8_t		byte = 0;
 
 	EEPROM_START;
@@ -387,11 +364,10 @@ static void ti_mem(sc, addr, len, buf)
 	caddr_t			buf;
 {
 	int			segptr, segsize, cnt;
-	caddr_t			ti_winbase, ptr;
+	caddr_t			ptr;
 
 	segptr = addr;
 	cnt = len;
-	ti_winbase = (caddr_t)(sc->ti_vhandle + TI_WINDOW);
 	ptr = buf;
 
 	while(cnt) {
@@ -400,12 +376,14 @@ static void ti_mem(sc, addr, len, buf)
 		else
 			segsize = TI_WINLEN - (segptr % TI_WINLEN);
 		CSR_WRITE_4(sc, TI_WINBASE, (segptr & ~(TI_WINLEN - 1)));
-		if (buf == NULL)
-			bzero((char *)ti_winbase + (segptr &
-			    (TI_WINLEN - 1)), segsize);
-		else {
-			bcopy((char *)ptr, (char *)ti_winbase +
-			    (segptr & (TI_WINLEN - 1)), segsize);
+		if (buf == NULL) {
+			bus_space_set_region_4(sc->ti_btag, sc->ti_bhandle,
+			    TI_WINDOW + (segptr & (TI_WINLEN - 1)), 0,
+			    segsize / 4);
+		} else {
+			bus_space_write_region_4(sc->ti_btag, sc->ti_bhandle,
+			    TI_WINDOW + (segptr & (TI_WINLEN - 1)),
+			    (u_int32_t *)ptr, segsize / 4);
 			ptr += segsize;
 		}
 		segptr += segsize;
@@ -484,9 +462,6 @@ static void ti_cmd(sc, cmd)
 {
 	u_int32_t		index;
 
-	if (sc->ti_rdata->ti_cmd_ring == NULL)
-		return;
-
 	index = sc->ti_cmd_saved_prodidx;
 	CSR_WRITE_4(sc, TI_GCR_CMDRING + (index * 4), *(u_int32_t *)(cmd));
 	TI_INC(index, TI_CMD_RING_CNT);
@@ -507,10 +482,7 @@ static void ti_cmd_ext(sc, cmd, arg, len)
 	int			len;
 {
 	u_int32_t		index;
-	register int		i;
-
-	if (sc->ti_rdata->ti_cmd_ring == NULL)
-		return;
+	int		i;
 
 	index = sc->ti_cmd_saved_prodidx;
 	CSR_WRITE_4(sc, TI_GCR_CMDRING + (index * 4), *(u_int32_t *)(cmd));
@@ -613,7 +585,7 @@ static int ti_alloc_jumbo_mem(sc)
 	struct ti_softc		*sc;
 {
 	caddr_t			ptr;
-	register int		i;
+	int		i;
 	struct ti_jpool_entry   *entry;
 	bus_dma_segment_t dmaseg;
 	int error, dmanseg;
@@ -658,21 +630,12 @@ static int ti_alloc_jumbo_mem(sc)
 
 	/*
 	 * Now divide it up into 9K pieces and save the addresses
-	 * in an array. Note that we play an evil trick here by using
-	 * the first few bytes in the buffer to hold the address
-	 * of the softc structure for this interface. This is because
-	 * ti_jfree() needs it, but it is called by the mbuf management
-	 * code which will not pass it to us explicitly.
+	 * in an array.
 	 */
 	ptr = sc->ti_cdata.ti_jumbo_buf;
 	for (i = 0; i < TI_JSLOTS; i++) {
-		u_int64_t		**aptr;
-		aptr = (u_int64_t **)ptr;
-		aptr[0] = (u_int64_t *)sc;
-		ptr += sizeof(u_int64_t);
-		sc->ti_cdata.ti_jslots[i].ti_buf = ptr;
-		sc->ti_cdata.ti_jslots[i].ti_inuse = 0;
-		ptr += (TI_JLEN - sizeof(u_int64_t));
+		sc->ti_cdata.ti_jslots[i] = ptr;
+		ptr += TI_JLEN;
 		entry = malloc(sizeof(struct ti_jpool_entry), 
 			       M_DEVBUF, M_NOWAIT);
 		if (entry == NULL) {
@@ -707,50 +670,8 @@ static void *ti_jalloc(sc)
 
 	SIMPLEQ_REMOVE_HEAD(&sc->ti_jfree_listhead, entry, jpool_entries);
 	SIMPLEQ_INSERT_HEAD(&sc->ti_jinuse_listhead, entry, jpool_entries);
-	sc->ti_cdata.ti_jslots[entry->slot].ti_inuse = 1;
-	return(sc->ti_cdata.ti_jslots[entry->slot].ti_buf);
+	return(sc->ti_cdata.ti_jslots[entry->slot]);
 }
-
-#if 0
-/*
- * Adjust usage count on a jumbo buffer. In general this doesn't
- * get used much because our jumbo buffers don't get passed around
- * too much, but it's implemented for correctness.
- */
-static void ti_jref(buf, size)
-	caddr_t			buf;
-	u_int			size;
-{
-	struct ti_softc		*sc;
-	u_int64_t		**aptr;
-	register int		i;
-
-	/* Extract the softc struct pointer. */
-	aptr = (u_int64_t **)(buf - sizeof(u_int64_t));
-	sc = (struct ti_softc *)(aptr[0]);
-
-	if (sc == NULL)
-		panic("ti_jref: can't find softc pointer!");
-
-	if (size != TI_JUMBO_FRAMELEN)
-		panic("ti_jref: adjusting refcount of buf of wrong size!");
-
-	/* calculate the slot this buffer belongs to */
-
-	i = ((caddr_t)aptr 
-	     - (caddr_t)sc->ti_cdata.ti_jumbo_buf) / TI_JLEN;
-
-	if ((i < 0) || (i >= TI_JSLOTS))
-		panic("ti_jref: asked to reference buffer "
-		    "that we don't manage!");
-	else if (sc->ti_cdata.ti_jslots[i].ti_inuse == 0)
-		panic("ti_jref: buffer already free!");
-	else
-		sc->ti_cdata.ti_jslots[i].ti_inuse++;
-
-	return;
-}
-#endif
 
 /*
  * Release a jumbo buffer.
@@ -758,45 +679,33 @@ static void ti_jref(buf, size)
 static void ti_jfree(buf, size, arg)
 	caddr_t			buf;
 	u_int			size;
-	void *arg; /* XXX NetBSD: we should really use it */
+	void *arg;
 {
 	struct ti_softc		*sc;
-	u_int64_t		**aptr;
 	int		        i;
 	struct ti_jpool_entry   *entry;
 
 	/* Extract the softc struct pointer. */
-	aptr = (u_int64_t **)(buf - sizeof(u_int64_t));
-	sc = (struct ti_softc *)(aptr[0]);
+	sc = (struct ti_softc *)arg;
 
 	if (sc == NULL)
-		panic("ti_jfree: can't find softc pointer!");
-
-	if (size != TI_JUMBO_FRAMELEN)
-		panic("ti_jfree: freeing buffer of wrong size!");
+		panic("ti_jfree: didn't get softc pointer!");
 
 	/* calculate the slot this buffer belongs to */
 
-	i = ((caddr_t)aptr 
+	i = ((caddr_t)buf
 	     - (caddr_t)sc->ti_cdata.ti_jumbo_buf) / TI_JLEN;
 
 	if ((i < 0) || (i >= TI_JSLOTS))
 		panic("ti_jfree: asked to free buffer that we don't manage!");
-	else if (sc->ti_cdata.ti_jslots[i].ti_inuse == 0)
-		panic("ti_jfree: buffer already free!");
-	else {
-		sc->ti_cdata.ti_jslots[i].ti_inuse--;
-		if(sc->ti_cdata.ti_jslots[i].ti_inuse == 0) {
-			entry = SIMPLEQ_FIRST(&sc->ti_jinuse_listhead);
-			if (entry == NULL)
-				panic("ti_jfree: buffer not in use!");
-			entry->slot = i;
-			SIMPLEQ_REMOVE_HEAD(&sc->ti_jinuse_listhead, 
-					    entry, jpool_entries);
-			SIMPLEQ_INSERT_HEAD(&sc->ti_jfree_listhead, 
-					     entry, jpool_entries);
-		}
-	}
+	entry = SIMPLEQ_FIRST(&sc->ti_jinuse_listhead);
+	if (entry == NULL)
+		panic("ti_jfree: buffer not in use!");
+	entry->slot = i;
+	SIMPLEQ_REMOVE_HEAD(&sc->ti_jinuse_listhead, 
+	    entry, jpool_entries);
+	SIMPLEQ_INSERT_HEAD(&sc->ti_jfree_listhead, 
+	     entry, jpool_entries);
 
 	return;
 }
@@ -983,9 +892,6 @@ static int ti_newbuf_jumbo(sc, i, m)
 		    m_new->m_ext.ext_size = TI_JUMBO_FRAMELEN;
 		m_new->m_ext.ext_free = ti_jfree;
 		m_new->m_ext.ext_arg = sc;
-#if 0
-		m_new->m_ext.ext_ref = ti_jref;
-#endif
 		MCLINITREFERENCE(m_new);
 	} else {
 		m_new = m;
@@ -1020,7 +926,7 @@ static int ti_newbuf_jumbo(sc, i, m)
 static int ti_init_rx_ring_std(sc)
 	struct ti_softc		*sc;
 {
-	register int		i;
+	int		i;
 	struct ti_cmd_desc	cmd;
 
 	for (i = 0; i < TI_SSLOTS; i++) {
@@ -1037,7 +943,7 @@ static int ti_init_rx_ring_std(sc)
 static void ti_free_rx_ring_std(sc)
 	struct ti_softc		*sc;
 {
-	register int		i;
+	int		i;
 
 	for (i = 0; i < TI_STD_RX_RING_CNT; i++) {
 		if (sc->ti_cdata.ti_rx_std_chain[i] != NULL) {
@@ -1058,7 +964,7 @@ static void ti_free_rx_ring_std(sc)
 static int ti_init_rx_ring_jumbo(sc)
 	struct ti_softc		*sc;
 {
-	register int		i;
+	int		i;
 	struct ti_cmd_desc	cmd;
 
 	for (i = 0; i < (TI_JSLOTS - 20); i++) {
@@ -1075,7 +981,7 @@ static int ti_init_rx_ring_jumbo(sc)
 static void ti_free_rx_ring_jumbo(sc)
 	struct ti_softc		*sc;
 {
-	register int		i;
+	int		i;
 
 	for (i = 0; i < TI_JUMBO_RX_RING_CNT; i++) {
 		if (sc->ti_cdata.ti_rx_jumbo_chain[i] != NULL) {
@@ -1092,7 +998,7 @@ static void ti_free_rx_ring_jumbo(sc)
 static int ti_init_rx_ring_mini(sc)
 	struct ti_softc		*sc;
 {
-	register int		i;
+	int		i;
 
 	for (i = 0; i < TI_MSLOTS; i++) {
 		if (ti_newbuf_mini(sc, i, NULL, 0) == ENOBUFS)
@@ -1108,7 +1014,7 @@ static int ti_init_rx_ring_mini(sc)
 static void ti_free_rx_ring_mini(sc)
 	struct ti_softc		*sc;
 {
-	register int		i;
+	int		i;
 
 	for (i = 0; i < TI_MINI_RX_RING_CNT; i++) {
 		if (sc->ti_cdata.ti_rx_mini_chain[i] != NULL) {
@@ -1129,7 +1035,7 @@ static void ti_free_rx_ring_mini(sc)
 static void ti_free_tx_ring(sc)
 	struct ti_softc		*sc;
 {
-	register int		i;
+	int		i;
 	struct txdmamap_pool_entry *dma;
 
 	if (sc->ti_rdata->ti_tx_ring == NULL)
@@ -1282,40 +1188,62 @@ static void ti_setmulti(sc)
 
 	ifp = &sc->ethercom.ec_if;
 
-	if (ifp->if_flags & IFF_ALLMULTI) {
-		TI_DO_CMD(TI_CMD_SET_ALLMULTI, TI_CMD_CODE_ALLMULTI_ENB, 0);
-		return;
-	} else {
-		TI_DO_CMD(TI_CMD_SET_ALLMULTI, TI_CMD_CODE_ALLMULTI_DIS, 0);
-	}
-
 	/* Disable interrupts. */
 	intrs = CSR_READ_4(sc, TI_MB_HOSTINTR);
 	CSR_WRITE_4(sc, TI_MB_HOSTINTR, 1);
 
 	/* First, zot all the existing filters. */
-	while (SIMPLEQ_FIRST(&sc->ti_mc_listhead) != NULL) {
-		mc = SIMPLEQ_FIRST(&sc->ti_mc_listhead);
+	while ((mc = SIMPLEQ_FIRST(&sc->ti_mc_listhead)) != NULL) {
 		ti_del_mcast(sc, &mc->mc_addr);
 		SIMPLEQ_REMOVE_HEAD(&sc->ti_mc_listhead, mc, mc_entries);
 		free(mc, M_DEVBUF);
 	}
 
-	/* Now program new ones. */
+	/*
+	 * Remember all multicast addresses so that we can delete them
+	 * later.  Punt if there is a range of addresses or memory shortage.
+	 */
 	ETHER_FIRST_MULTI(step, &sc->ethercom, enm);
 	while (enm != NULL) {
-		mc = malloc(sizeof(struct ti_mc_entry), M_DEVBUF, M_NOWAIT);
-		bcopy(enm->enm_addrlo,
-		    (char *)&mc->mc_addr, ETHER_ADDR_LEN);
+		if (memcmp(enm->enm_addrlo, enm->enm_addrhi,
+		    ETHER_ADDR_LEN) != 0)
+			goto allmulti;
+		if ((mc = malloc(sizeof(struct ti_mc_entry), M_DEVBUF,
+		    M_NOWAIT)) == NULL)
+			goto allmulti;
+		memcpy(&mc->mc_addr, enm->enm_addrlo, ETHER_ADDR_LEN);
 		SIMPLEQ_INSERT_HEAD(&sc->ti_mc_listhead, mc, mc_entries);
-		ti_add_mcast(sc, &mc->mc_addr);
 		ETHER_NEXT_MULTI(step, enm);
 	}
+
+	/* Accept only programmed multicast addresses */
+	ifp->if_flags &= ~IFF_ALLMULTI;
+	TI_DO_CMD(TI_CMD_SET_ALLMULTI, TI_CMD_CODE_ALLMULTI_DIS, 0);
+
+	/* Now program new ones. */
+	for (mc = SIMPLEQ_FIRST(&sc->ti_mc_listhead); mc != NULL;
+	    mc = SIMPLEQ_NEXT(mc, mc_entries))
+		ti_add_mcast(sc, &mc->mc_addr);
 
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, TI_MB_HOSTINTR, intrs);
 
 	return;
+
+allmulti:
+	/* No need to keep individual multicast addresses */
+	while ((mc = SIMPLEQ_FIRST(&sc->ti_mc_listhead)) != NULL) {
+		SIMPLEQ_REMOVE_HEAD(&sc->ti_mc_listhead, mc,
+		    mc_entries);
+		free(mc, M_DEVBUF);
+	}
+
+	/* Accept all multicast addresses */
+	ifp->if_flags |= IFF_ALLMULTI;
+	TI_DO_CMD(TI_CMD_SET_ALLMULTI, TI_CMD_CODE_ALLMULTI_ENB, 0);
+
+	/* Re-enable interrupts. */
+	CSR_WRITE_4(sc, TI_MB_HOSTINTR, intrs);
 }
 
 /*
@@ -1532,8 +1460,6 @@ static int ti_gibinit(sc)
 	/* Set up the command ring and producer mailbox. */
 	rcb = &sc->ti_rdata->ti_info.ti_cmd_rcb;
 
-	sc->ti_rdata->ti_cmd_ring =
-	    (struct ti_cmd_desc *)(sc->ti_vhandle + TI_GCR_CMDRING);
 	TI_HOSTADDR(rcb->ti_hostaddr) = TI_GCR_NIC_ADDR(TI_GCR_CMDRING);
 	rcb->ti_flags = 0;
 	rcb->ti_max_len = 0;
@@ -1563,9 +1489,7 @@ static int ti_gibinit(sc)
 #ifdef TI_CSUM_OFFLOAD
 	rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM|TI_RCB_FLAG_IP_CKSUM;
 #endif
-#if NVLAN > 0
 	rcb->ti_flags |= TI_RCB_FLAG_VLAN_ASSIST;
-#endif
 
 	/* Set up the jumbo receive ring. */
 	rcb = &sc->ti_rdata->ti_info.ti_jumbo_rx_rcb;
@@ -1576,9 +1500,7 @@ static int ti_gibinit(sc)
 #ifdef TI_CSUM_OFFLOAD
 	rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM|TI_RCB_FLAG_IP_CKSUM;
 #endif
-#if NVLAN > 0
 	rcb->ti_flags |= TI_RCB_FLAG_VLAN_ASSIST;
-#endif
 
 	/*
 	 * Set up the mini ring. Only activated on the
@@ -1596,9 +1518,7 @@ static int ti_gibinit(sc)
 #ifdef TI_CSUM_OFFLOAD
 	rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM|TI_RCB_FLAG_IP_CKSUM;
 #endif
-#if NVLAN > 0
 	rcb->ti_flags |= TI_RCB_FLAG_VLAN_ASSIST;
-#endif
 
 	/*
 	 * Set up the receive return ring.
@@ -1633,9 +1553,7 @@ static int ti_gibinit(sc)
 		rcb->ti_flags = 0;
 	else
 		rcb->ti_flags = TI_RCB_FLAG_HOST_RING;
-#if NVLAN > 0
 	rcb->ti_flags |= TI_RCB_FLAG_VLAN_ASSIST;
-#endif
 	rcb->ti_max_len = TI_TX_RING_CNT;
 	if (sc->ti_hwrev == TI_HWREV_TIGON)
 		TI_HOSTADDR(rcb->ti_hostaddr) = TI_TX_RING_BASE;
@@ -1648,7 +1566,8 @@ static int ti_gibinit(sc)
 		    - (caddr_t)sc->ti_rdata);
 
 	/* Set up tuneables */
-	if (ifp->if_mtu > (ETHERMTU + ETHER_HDR_LEN + ETHER_CRC_LEN))
+	if (ifp->if_mtu > (ETHERMTU + ETHER_HDR_LEN + ETHER_CRC_LEN) ||
+	    (sc->ethercom.ec_capenable & ETHERCAP_VLAN_MTU))
 		CSR_WRITE_4(sc, TI_GCR_RX_COAL_TICKS,
 		    (sc->ti_rx_coal_ticks / 10));
 	else
@@ -1670,6 +1589,26 @@ static int ti_gibinit(sc)
 }
 
 /*
+ * look for id in the device list, returning the first match
+ */
+static struct ti_type * ti_type_match(pa)
+	struct pci_attach_args *pa;
+{
+	struct ti_type          *t;
+
+	t = ti_devs;
+	while(t->ti_name != NULL) {
+		if ((PCI_VENDOR(pa->pa_id) == t->ti_vid) &&
+		    (PCI_PRODUCT(pa->pa_id) == t->ti_did)) {
+			return (t);
+		}
+		t++;
+	}
+
+	return(NULL);
+}
+
+/*
  * Probe for a Tigon chip. Check the PCI vendor and device IDs
  * against our list and return its name if we find a match.
  */
@@ -1681,24 +1620,15 @@ static int ti_probe(parent, match, aux)
 	struct pci_attach_args *pa = aux;
 	struct ti_type		*t;
 
-	t = ti_devs;
+	t = ti_type_match(pa);
 
-	while(t->ti_name != NULL) {
-		if ((PCI_VENDOR(pa->pa_id) == t->ti_vid) &&
-		    (PCI_PRODUCT(pa->pa_id) == t->ti_did)) {
-			return(1);
-		}
-		t++;
-	}
-
-	return(0);
+	return((t == NULL) ? 0 : 1);
 }
 
 static void ti_attach(parent, self, aux)
 	struct device *parent, *self;
 	void *aux;
 {
-	int			s;
 	u_int32_t		command;
 	struct ifnet		*ifp;
 	struct ti_softc		*sc;
@@ -1708,23 +1638,39 @@ static void ti_attach(parent, self, aux)
 	pci_intr_handle_t ih;
 	const char *intrstr = NULL;
 	bus_dma_segment_t dmaseg;
-	int error, dmanseg;
+	int error, dmanseg, nolinear;
+	struct ti_type		*t;
 
-	s = splimp();
+	t = ti_type_match(pa);
+	if (t == NULL) {
+		printf("ti_attach: were did the card go ?\n");
+		return;
+	}
+
+	printf(": %s (rev. 0x%02x)\n", t->ti_name, PCI_REVISION(pa->pa_class));
 
 	sc = (struct ti_softc *)self;
 
 	/*
 	 * Map control/status registers.
 	 */
-	if (pci_mapreg_map(pa, 0x10, PCI_MAPREG_TYPE_MEM, BUS_SPACE_MAP_LINEAR,
-	    &sc->ti_btag, &sc->ti_bhandle, NULL, NULL)) {
-		printf(": can't map i/o space\n");
-		goto fail;
+	nolinear = 0;
+	if (pci_mapreg_map(pa, 0x10,
+	    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT,
+	    BUS_SPACE_MAP_LINEAR , &sc->ti_btag, &sc->ti_bhandle,
+	    NULL, NULL)) {
+		nolinear = 1;
+		if (pci_mapreg_map(pa, 0x10,
+		    PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT,
+		    0 , &sc->ti_btag, &sc->ti_bhandle, NULL, NULL)) {
+			printf(": can't map memory space\n");
+			return;
+		}
 	}
-	sc->ti_vhandle = (void *)(sc->ti_bhandle); /* XXX XXX XXX */
-
-	printf("\n");
+	if (nolinear == 0)
+		sc->ti_vhandle = (void *)(sc->ti_bhandle); /* XXX XXX XXX */
+	else 
+		sc->ti_vhandle = NULL;
 
 	command = pci_conf_read(pc, pa->pa_tag, PCI_COMMAND_STATUS_REG);
 	command |= PCI_COMMAND_MASTER_ENABLE;
@@ -1734,7 +1680,7 @@ static void ti_attach(parent, self, aux)
 	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
 	    pa->pa_intrline, &ih)) {
 		printf("%s: couldn't map interrupt\n", sc->sc_dev.dv_xname);
-		goto fail;
+		return;;
 	}
 	intrstr = pci_intr_string(pc, ih);
 	sc->sc_ih = pci_intr_establish(pc, ih, IPL_NET, ti_intr, sc);
@@ -1744,18 +1690,22 @@ static void ti_attach(parent, self, aux)
 		if (intrstr != NULL)
 			printf(" at %s", intrstr);
 		printf("\n");
-		goto fail;
+		return;;
 	}
+	printf("%s: interrupting at %s\n", sc->sc_dev.dv_xname, intrstr);
+	/*
+	 * Add shutdown hook so that DMA is disabled prior to reboot. Not
+	 * doing do could allow DMA to corrupt kernel memory during the
+	 * reboot before the driver initializes.
+	 */ 
+	(void) shutdownhook_establish(ti_shutdown, sc);
 
 	if (ti_chipinit(sc)) {
 		printf("%s: chip initialization failed\n", self->dv_xname);
-#if 0
-		bus_teardown_intr(dev, sc->ti_irq, sc->ti_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->ti_irq);
-		bus_release_resource(dev, SYS_RES_MEMORY,
-		    TI_PCI_LOMEM, sc->ti_res);
-#endif
-		goto fail;
+		goto fail2;
+	}
+	if (sc->ti_hwrev == TI_HWREV_TIGON && nolinear == 1) {
+		printf("%s: memory space not mapped linear\n", self->dv_xname);
 	}
 
 	/* Zero out the NIC's on-board SRAM. */
@@ -1764,13 +1714,7 @@ static void ti_attach(parent, self, aux)
 	/* Init again -- zeroing memory may have clobbered some registers. */
 	if (ti_chipinit(sc)) {
 		printf("%s: chip initialization failed\n", self->dv_xname);
-#if 0
-		bus_teardown_intr(dev, sc->ti_irq, sc->ti_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->ti_irq);
-		bus_release_resource(dev, SYS_RES_MEMORY,
-		    TI_PCI_LOMEM, sc->ti_res);
-#endif
-		goto fail;
+		goto fail2;
 	}
 
 	/*
@@ -1783,13 +1727,7 @@ static void ti_attach(parent, self, aux)
 	if (ti_read_eeprom(sc, (caddr_t)&eaddr,
 				TI_EE_MAC_OFFSET + 2, ETHER_ADDR_LEN)) {
 		printf("%s: failed to read station address\n", self->dv_xname);
-#if 0
-		bus_teardown_intr(dev, sc->ti_irq, sc->ti_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->ti_irq);
-		bus_release_resource(dev, SYS_RES_MEMORY,
-		    TI_PCI_LOMEM, sc->ti_res);
-#endif
-		goto fail;
+		goto fail2;
 	}
 
 	/*
@@ -1806,7 +1744,7 @@ static void ti_attach(parent, self, aux)
 	    BUS_DMA_NOWAIT)) != 0) {
 		printf("%s: can't allocate ring buffer, error = %d\n",
 		       sc->sc_dev.dv_xname, error);
-		goto fail;
+		goto fail2;
 	}
 
 	if ((error = bus_dmamem_map(sc->sc_dmat, &dmaseg, dmanseg,
@@ -1814,7 +1752,7 @@ static void ti_attach(parent, self, aux)
 	    BUS_DMA_NOWAIT|BUS_DMA_COHERENT)) != 0) {
 		printf("%s: can't map ring buffer, error = %d\n",
 		       sc->sc_dev.dv_xname, error);
-		goto fail;
+		goto fail2;
 	}
 
 	if ((error = bus_dmamap_create(sc->sc_dmat,
@@ -1823,7 +1761,7 @@ static void ti_attach(parent, self, aux)
 	    &sc->info_dmamap)) != 0) {
 		printf("%s: can't create ring buffer DMA map, error = %d\n",
 		       sc->sc_dev.dv_xname, error);
-		goto fail;
+		goto fail2;
 	}
 
 	if ((error = bus_dmamap_load(sc->sc_dmat, sc->info_dmamap,
@@ -1831,7 +1769,7 @@ static void ti_attach(parent, self, aux)
 	    BUS_DMA_NOWAIT)) != 0) {
 		printf("%s: can't load ring buffer DMA map, error = %d\n",
 		       sc->sc_dev.dv_xname, error);
-		goto fail;
+		goto fail2;
 	}
 
 	sc->info_dmaaddr = sc->info_dmamap->dm_segs[0].ds_addr;
@@ -1841,15 +1779,25 @@ static void ti_attach(parent, self, aux)
 	/* Try to allocate memory for jumbo buffers. */
 	if (ti_alloc_jumbo_mem(sc)) {
 		printf("%s: jumbo buffer allocation failed\n", self->dv_xname);
-#if 0
-		bus_teardown_intr(dev, sc->ti_irq, sc->ti_intrhand);
-		bus_release_resource(dev, SYS_RES_IRQ, 0, sc->ti_irq);
-		bus_release_resource(dev, SYS_RES_MEMORY,
-		    TI_PCI_LOMEM, sc->ti_res);
-		free(sc->ti_rdata, M_DEVBUF);
-#endif
-		goto fail;
+		goto fail2;
 	}
+
+	SIMPLEQ_INIT(&sc->ti_mc_listhead);
+
+	/*
+	 * We really need a better way to tell a 1000baseTX card
+	 * from a 1000baseSX one, since in theory there could be
+	 * OEMed 1000baseTX cards from lame vendors who aren't
+	 * clever enough to change the PCI ID. For the moment
+	 * though, the AceNIC is the only copper card available.
+	 */
+	if ((PCI_VENDOR(pa->pa_id) == PCI_VENDOR_ALTEON &&
+	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_ALTEON_ACENIC_COPPER) ||
+	    (PCI_VENDOR(pa->pa_id) == PCI_VENDOR_NETGEAR &&
+	    PCI_PRODUCT(pa->pa_id) == PCI_PRODUCT_NETGEAR_GA620T))
+		sc->ti_copper = 1;
+	else
+		sc->ti_copper = 0;
 
 	/* Set default tuneable values. */
 	sc->ti_stat_ticks = 2 * TI_TICKS_PER_SEC;
@@ -1865,26 +1813,42 @@ static void ti_attach(parent, self, aux)
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = ti_ioctl;
-#if 0
-	ifp->if_output = ether_output;
-#endif
 	ifp->if_start = ti_start;
 	ifp->if_watchdog = ti_watchdog;
-	ifp->if_baudrate = 10000000;
-#if 0
-	ifp->if_init = ti_init;
-	ifp->if_mtu = ETHERMTU;
-#endif
-	ifp->if_snd.ifq_maxlen = TI_TX_RING_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, TI_TX_RING_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
+
+	/*
+	 * We can support 802.1Q VLAN-sized frames.
+	 */
+	sc->ethercom.ec_capabilities |=
+	    ETHERCAP_VLAN_MTU | ETHERCAP_VLAN_HWTAGGING;
 
 	/* Set up ifmedia support. */
 	ifmedia_init(&sc->ifmedia, IFM_IMASK, ti_ifmedia_upd, ti_ifmedia_sts);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_10_FL, 0, NULL);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_10_FL|IFM_FDX, 0, NULL);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_100_FX, 0, NULL);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_100_FX|IFM_FDX, 0, NULL);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_1000_FX, 0, NULL);
-	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_1000_FX|IFM_FDX, 0, NULL);
+	if (sc->ti_copper) {
+                /*
+                 * Copper cards allow manual 10/100 mode selection,
+                 * but not manual 1000baseTX mode selection. Why?
+                 * Becuase currently there's no way to specify the
+                 * master/slave setting through the firmware interface,
+                 * so Alteon decided to just bag it and handle it
+                 * via autonegotiation.
+                 */
+                ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_10_T, 0, NULL);
+                ifmedia_add(&sc->ifmedia,
+                    IFM_ETHER|IFM_10_T|IFM_FDX, 0, NULL);
+                ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_100_TX, 0, NULL);
+                ifmedia_add(&sc->ifmedia,
+                    IFM_ETHER|IFM_100_TX|IFM_FDX, 0, NULL);
+                ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_1000_TX, 0, NULL);
+                ifmedia_add(&sc->ifmedia,
+                    IFM_ETHER|IFM_1000_TX|IFM_FDX, 0, NULL);
+	} else {
+		/* Fiber cards don't support 10/100 modes. */
+		ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_1000_SX, 0, NULL);
+		ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_1000_SX|IFM_FDX, 0, NULL);
+	}
 	ifmedia_add(&sc->ifmedia, IFM_ETHER|IFM_AUTO, 0, NULL);
 	ifmedia_set(&sc->ifmedia, IFM_ETHER|IFM_AUTO);
 
@@ -1899,39 +1863,11 @@ static void ti_attach(parent, self, aux)
 		  sizeof(struct ether_header));
 #endif
 
-fail:
-	splx(s);
+	return;
+fail2:
+	pci_intr_disestablish(pc, sc->sc_ih);
+	return;
 }
-
-#if 0
-static int ti_detach(dev)
-	device_t		dev;
-{
-	struct ti_softc		*sc;
-	struct ifnet		*ifp;
-	int			s;
-
-	s = splimp();
-
-	sc = device_get_softc(dev);
-	ifp = &sc->arpcom.ac_if;
-
-	if_detach(ifp);
-	ti_stop(sc);
-
-	bus_teardown_intr(dev, sc->ti_irq, sc->ti_intrhand);
-	bus_release_resource(dev, SYS_RES_IRQ, 0, sc->ti_irq);
-	bus_release_resource(dev, SYS_RES_MEMORY, TI_PCI_LOMEM, sc->ti_res);
-
-	free(sc->ti_cdata.ti_jumbo_buf, M_DEVBUF);
-	free(sc->ti_rdata, M_DEVBUF);
-	ifmedia_removeall(&sc->ifmedia);
-
-	splx(s);
-
-	return(0);
-}
-#endif
 
 /*
  * Frame reception handling. This is called if there's a frame
@@ -1957,10 +1893,8 @@ static void ti_rxeof(sc)
 		u_int32_t		rxidx;
 		struct ether_header	*eh;
 		struct mbuf		*m = NULL;
-#if NVLAN > 0
 		u_int16_t		vlan_tag = 0;
 		int			have_tag = 0;
-#endif
 #ifdef TI_CSUM_OFFLOAD
 		struct ip		*ip;
 #endif
@@ -1971,12 +1905,10 @@ static void ti_rxeof(sc)
 		rxidx = cur_rx->ti_idx;
 		TI_INC(sc->ti_rx_saved_considx, TI_RETURN_RING_CNT);
 
-#if NVLAN > 0
 		if (cur_rx->ti_flags & TI_BDFLAG_VLAN_TAG) {
 			have_tag = 1;
 			vlan_tag = cur_rx->ti_vlan_tag;
 		}
-#endif
 
 		if (cur_rx->ti_flags & TI_BDFLAG_JUMBO_RING) {
 			TI_INC(sc->ti_jumbo, TI_JUMBO_RX_RING_CNT);
@@ -2060,19 +1992,20 @@ static void ti_rxeof(sc)
 			m->m_flags |= M_HWCKSUM;
 #endif
 
-#if NVLAN > 0 /* XXX NetBSD: broken because m points to ether pkt */
-		/*
-		 * If we received a packet with a vlan tag, pass it
-		 * to vlan_input() instead of ether_input().
-		 */
 		if (have_tag) {
-			vlan_input_tag(eh, m, vlan_tag);
+			struct mbuf *n;
+			n = m_aux_add(m, AF_LINK, ETHERTYPE_VLAN);
+			if (n) {
+				*mtod(n, int *) = vlan_tag;
+				n->m_len = sizeof(int);
+			} else {
+				printf("%s: no mbuf for tag\n", ifp->if_xname);
+				m_freem(m);
+				continue;
+			}
 			have_tag = vlan_tag = 0;
-			continue;
 		}
-#endif
-		m->m_data += sizeof(struct ether_header);
-		ether_input(ifp, eh, m);
+		(*ifp->if_input)(ifp, m);
 	}
 
 	/* Only necessary on the Tigon 1. */
@@ -2173,7 +2106,8 @@ static int ti_intr(xsc)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, TI_MB_HOSTINTR, 0);
 
-	if (ifp->if_flags & IFF_RUNNING && ifp->if_snd.ifq_head != NULL)
+	if ((ifp->if_flags & IFF_RUNNING) != 0 &&
+	    IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		ti_start(ifp);
 
 	return (1);
@@ -2210,16 +2144,12 @@ static int ti_encap(sc, m_head, txidx)
 	struct txdmamap_pool_entry *dma;
 	bus_dmamap_t dmamap;
 	int error, i;
-#if NVLAN > 0
-	struct ifvlan		*ifv = NULL;
-
-	if ((m_head->m_flags & (M_PROTO1|M_PKTHDR)) == (M_PROTO1|M_PKTHDR) &&
-	    m_head->m_pkthdr.rcvif != NULL &&
-	    m_head->m_pkthdr.rcvif->if_type == IFT_8021_VLAN)
-		ifv = m_head->m_pkthdr.rcvif->if_softc;
-#endif
+	struct mbuf *n;
 
 	dma = SIMPLEQ_FIRST(&sc->txdma_list);
+	if (dma == NULL) {
+		return ENOMEM;
+	}
 	dmamap = dma->dmamap;
 
 	error = bus_dmamap_load_mbuf(sc->sc_dmat, dmamap, m_head, 0);
@@ -2262,14 +2192,13 @@ static int ti_encap(sc, m_head, txidx)
 			TI_HOSTADDR(f->ti_addr) = dmamap->dm_segs[i].ds_addr;
 			f->ti_len = dmamap->dm_segs[i].ds_len;
 			f->ti_flags = 0;
-#if NVLAN > 0
-			if (ifv != NULL) {
+			n = m_aux_find(m_head, AF_LINK, ETHERTYPE_VLAN);
+			if (n) {
 				f->ti_flags |= TI_BDFLAG_VLAN_TAG;
-				f->ti_vlan_tag = ifv->ifv_tag;
+				f->ti_vlan_tag = *mtod(n, int *);
 			} else {
 				f->ti_vlan_tag = 0;
 			}
-#endif
 			/*
 			 * Sanity check: avoid coming within 16 descriptors
 			 * of the end of the ring.
@@ -2312,13 +2241,14 @@ static void ti_start(ifp)
 	struct ti_softc		*sc;
 	struct mbuf		*m_head = NULL;
 	u_int32_t		prodidx = 0;
+	int			pkts = 0;
 
 	sc = ifp->if_softc;
 
 	prodidx = CSR_READ_4(sc, TI_MB_SENDPROD_IDX);
 
 	while(sc->ti_cdata.ti_tx_chain[prodidx] == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -2328,10 +2258,12 @@ static void ti_start(ifp)
 		 * for the NIC to drain the ring.
 		 */
 		if (ti_encap(sc, m_head, &prodidx)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		pkts++;
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -2342,6 +2274,8 @@ static void ti_start(ifp)
 			bpf_mtap(ifp->if_bpf, m_head);
 #endif
 	}
+	if (pkts == 0)
+		return;
 
 	/* Transmit */
 	CSR_WRITE_4(sc, TI_MB_SENDPROD_IDX, prodidx);
@@ -2390,8 +2324,13 @@ static void ti_init2(sc)
 
 	/* Specify MTU and interface index. */
 	CSR_WRITE_4(sc, TI_GCR_IFINDEX, sc->sc_dev.dv_unit); /* ??? */
-	CSR_WRITE_4(sc, TI_GCR_IFMTU, ifp->if_mtu +
-	    ETHER_HDR_LEN + ETHER_CRC_LEN);
+	if ((sc->ethercom.ec_capenable & ETHERCAP_VLAN_MTU) &&
+	    ifp->if_mtu < ETHERMTU + ETHER_VLAN_ENCAP_LEN)
+		CSR_WRITE_4(sc, TI_GCR_IFMTU, ETHER_MAX_LEN +
+		    ETHER_VLAN_ENCAP_LEN);
+	else
+		CSR_WRITE_4(sc, TI_GCR_IFMTU, ifp->if_mtu +
+		    ETHER_HDR_LEN + ETHER_CRC_LEN);
 	TI_DO_CMD(TI_CMD_UPDATE_GENCOM, 0, 0);
 
 	/* Load our MAC address. */
@@ -2423,7 +2362,7 @@ static void ti_init2(sc)
 	ti_init_rx_ring_std(sc);
 
 	/* Init jumbo RX ring. */
-	if (ifp->if_mtu > (ETHERMTU + ETHER_HDR_LEN + ETHER_CRC_LEN))
+	if (ifp->if_mtu > (MCLBYTES - ETHER_HDR_LEN - ETHER_CRC_LEN))
 		ti_init_rx_ring_jumbo(sc);
 
 	/*
@@ -2490,18 +2429,29 @@ static int ti_ifmedia_upd(ifp)
 		TI_DO_CMD(TI_CMD_LINK_NEGOTIATION,
 		    TI_CMD_CODE_NEGOTIATE_BOTH, 0);
 		break;
-	case IFM_1000_FX:
-		CSR_WRITE_4(sc, TI_GCR_GLINK, TI_GLNK_PREF|TI_GLNK_1000MB|
-		    TI_GLNK_FULL_DUPLEX|TI_GLNK_RX_FLOWCTL_Y|TI_GLNK_ENB);
+	case IFM_1000_SX:
+	case IFM_1000_TX:
+		if ((ifm->ifm_media & IFM_GMASK) == IFM_FDX) {
+			CSR_WRITE_4(sc, TI_GCR_GLINK,
+			    TI_GLNK_PREF|TI_GLNK_1000MB|TI_GLNK_FULL_DUPLEX|
+			    TI_GLNK_RX_FLOWCTL_Y|TI_GLNK_ENB);
+		} else {
+			CSR_WRITE_4(sc, TI_GCR_GLINK,
+			    TI_GLNK_PREF|TI_GLNK_1000MB|
+			    TI_GLNK_RX_FLOWCTL_Y|TI_GLNK_ENB);
+		}
 		CSR_WRITE_4(sc, TI_GCR_LINK, 0);
 		TI_DO_CMD(TI_CMD_LINK_NEGOTIATION,
 		    TI_CMD_CODE_NEGOTIATE_GIGABIT, 0);
 		break;
 	case IFM_100_FX:
 	case IFM_10_FL:
+	case IFM_100_TX:
+	case IFM_10_T:
 		CSR_WRITE_4(sc, TI_GCR_GLINK, 0);
 		CSR_WRITE_4(sc, TI_GCR_LINK, TI_LNK_ENB|TI_LNK_PREF);
-		if (IFM_SUBTYPE(ifm->ifm_media) == IFM_100_FX) {
+		if (IFM_SUBTYPE(ifm->ifm_media) == IFM_100_FX ||
+		    IFM_SUBTYPE(ifm->ifm_media) == IFM_100_TX) {
 			TI_SETBIT(sc, TI_GCR_LINK, TI_LNK_100MB);
 		} else {
 			TI_SETBIT(sc, TI_GCR_LINK, TI_LNK_10MB);
@@ -2516,6 +2466,9 @@ static int ti_ifmedia_upd(ifp)
 		break;
 	}
 
+	sc->ethercom.ec_if.if_baudrate =
+	    ifmedia_baudrate(ifm->ifm_media);
+
 	return(0);
 }
 
@@ -2527,6 +2480,7 @@ static void ti_ifmedia_sts(ifp, ifmr)
 	struct ifmediareq	*ifmr;
 {
 	struct ti_softc		*sc;
+	u_int32_t               media = 0;
 
 	sc = ifp->if_softc;
 
@@ -2538,21 +2492,38 @@ static void ti_ifmedia_sts(ifp, ifmr)
 
 	ifmr->ifm_status |= IFM_ACTIVE;
 
-	if (sc->ti_linkstat == TI_EV_CODE_GIG_LINK_UP)
-		ifmr->ifm_active |= IFM_1000_FX|IFM_FDX;
-	else if (sc->ti_linkstat == TI_EV_CODE_LINK_UP) {
-		u_int32_t		media;
+	if (sc->ti_linkstat == TI_EV_CODE_GIG_LINK_UP) {
+		media = CSR_READ_4(sc, TI_GCR_GLINK_STAT);
+		if (sc->ti_copper)
+			ifmr->ifm_active |= IFM_1000_TX;
+		else
+			ifmr->ifm_active |= IFM_1000_SX;
+		if (media & TI_GLNK_FULL_DUPLEX)
+			ifmr->ifm_active |= IFM_FDX;
+		else
+			ifmr->ifm_active |= IFM_HDX;
+	} else if (sc->ti_linkstat == TI_EV_CODE_LINK_UP) {
 		media = CSR_READ_4(sc, TI_GCR_LINK_STAT);
-		if (media & TI_LNK_100MB)
-			ifmr->ifm_active |= IFM_100_FX;
-		if (media & TI_LNK_10MB)
-			ifmr->ifm_active |= IFM_10_FL;
+		if (sc->ti_copper) {
+			if (media & TI_LNK_100MB)
+				ifmr->ifm_active |= IFM_100_TX;
+			if (media & TI_LNK_10MB)
+				ifmr->ifm_active |= IFM_10_T;
+		} else {
+			if (media & TI_LNK_100MB)
+				ifmr->ifm_active |= IFM_100_FX;
+			if (media & TI_LNK_10MB)
+				ifmr->ifm_active |= IFM_10_FL;
+		}
 		if (media & TI_LNK_FULL_DUPLEX)
 			ifmr->ifm_active |= IFM_FDX;
 		if (media & TI_LNK_HALF_DUPLEX)
 			ifmr->ifm_active |= IFM_HDX;
 	}
-	
+
+	sc->ethercom.ec_if.if_baudrate =
+	    ifmedia_baudrate(sc->ifmedia.ifm_media);
+
 	return;
 }
 
@@ -2579,7 +2550,7 @@ ti_ether_ioctl(ifp, cmd, data)
 #ifdef NS
 		case AF_NS:
 		    {
-			 register struct ns_addr *ina = &IA_SNS(ifa)->sns_addr;
+			 struct ns_addr *ina = &IA_SNS(ifa)->sns_addr;
 
 			 if (ns_nullhost(*ina))
 				ina->x_host = *(union ns_host *)
@@ -2662,8 +2633,12 @@ static int ti_ioctl(ifp, command, data)
 		break;
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
-		if (ifp->if_flags & IFF_RUNNING) {
-			ti_setmulti(sc);
+		error = (command == SIOCADDMULTI) ?
+		    ether_addmulti(ifr, &sc->ethercom) :
+		    ether_delmulti(ifr, &sc->ethercom);
+		if (error == ENETRESET) {
+			if (ifp->if_flags & IFF_RUNNING)
+				ti_setmulti(sc);
 			error = 0;
 		}
 		break;
@@ -2743,20 +2718,16 @@ static void ti_stop(sc)
 	return;
 }
 
-#if 0
 /*
  * Stop all chip I/O so that the kernel's probe routines don't
  * get confused by errant DMAs when rebooting.
  */
-static void ti_shutdown(dev)
-	device_t		dev;
+static void ti_shutdown(v)
+	void *v;
 {
-	struct ti_softc		*sc;
-
-	sc = device_get_softc(dev);
+	struct ti_softc		*sc = v;
 
 	ti_chipinit(sc);
 
 	return;
 }
-#endif

@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/lge/if_lge.c,v 1.5.2.1 2001/06/19 19:42:38 wpaul Exp $
+ * $FreeBSD: src/sys/dev/lge/if_lge.c,v 1.5.2.2 2001/12/14 19:49:23 jlemon Exp $
  */
 
 /*
@@ -114,7 +114,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/lge/if_lge.c,v 1.5.2.1 2001/06/19 19:42:38 wpaul Exp $";
+  "$FreeBSD: src/sys/dev/lge/if_lge.c,v 1.5.2.2 2001/12/14 19:49:23 jlemon Exp $";
 #endif
 
 /*
@@ -647,7 +647,10 @@ static int lge_attach(dev)
 	ifp->if_watchdog = lge_watchdog;
 	ifp->if_init = lge_init;
 	ifp->if_baudrate = 1000000000;
-	ifp->if_snd.ifq_maxlen = LGE_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, LGE_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
+	ifp->if_capabilities = IFCAP_RXCSUM;
+	ifp->if_capenable = ifp->if_capabilities;
 
 	if (CSR_READ_4(sc, LGE_GMIIMODE) & LGE_GMIIMODE_PCSENH)
 		sc->lge_pcs = 1;
@@ -1192,7 +1195,7 @@ static void lge_tick(xsc)
 			    IFM_SUBTYPE(mii->mii_media_active) == IFM_1000_TX)
 				printf("lge%d: gigabit link up\n",
 				    sc->lge_unit);
-			if (ifp->if_snd.ifq_head != NULL)
+			if (!IFQ_IS_EMPTY(&ifp->if_snd))
 				lge_start(ifp);
 		}
 	}
@@ -1250,7 +1253,7 @@ static void lge_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, LGE_IMR, LGE_IMR_SETRST_CTL0|LGE_IMR_INTR_ENB);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		lge_start(ifp);
 
 	return;
@@ -1316,6 +1319,7 @@ static void lge_start(ifp)
 	struct lge_softc	*sc;
 	struct mbuf		*m_head = NULL;
 	u_int32_t		idx;
+	int			pkts = 0;
 
 	sc = ifp->if_softc;
 
@@ -1331,15 +1335,18 @@ static void lge_start(ifp)
 		if (CSR_READ_1(sc, LGE_TXCMDFREE_8BIT) == 0)
 			break;
 
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		if (lge_encap(sc, m_head, &idx)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		/* now we are committed to transmit the packet */
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		pkts++;
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -1348,6 +1355,8 @@ static void lge_start(ifp)
 		if (ifp->if_bpf)
 			bpf_mtap(ifp, m_head);
 	}
+	if (pkts == 0)
+		return;
 
 	sc->lge_cdata.lge_tx_prod = idx;
 
@@ -1619,7 +1628,7 @@ static void lge_watchdog(ifp)
 	ifp->if_flags &= ~IFF_RUNNING;
 	lge_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		lge_start(ifp);
 
 	return;

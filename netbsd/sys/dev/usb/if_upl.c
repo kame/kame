@@ -311,6 +311,7 @@ USB_ATTACH(upl)
 	ifp->if_output = upl_output;
 	ifp->if_input = upl_input;
 	ifp->if_baudrate = 12000000;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Attach the interface. */
 	if_attach(ifp);
@@ -628,7 +629,7 @@ upl_txeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	m_freem(c->upl_mbuf);
 	c->upl_mbuf = NULL;
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		upl_start(ifp);
 
 	splx(s);
@@ -687,7 +688,7 @@ upl_start(struct ifnet *ifp)
 	if (ifp->if_flags & IFF_OACTIVE)
 		return;
 
-	IF_DEQUEUE(&ifp->if_snd, m_head);
+	IFQ_POLL(&ifp->if_snd, m_head);
 	if (m_head == NULL)
 		return;
 
@@ -696,6 +697,8 @@ upl_start(struct ifnet *ifp)
 		ifp->if_flags |= IFF_OACTIVE;
 		return;
 	}
+
+	IFQ_DEQUEUE(&ifp->if_snd, m_head);
 
 #if NBPFILTER > 0
 	/*
@@ -934,7 +937,7 @@ upl_watchdog(struct ifnet *ifp)
 	upl_stop(sc);
 	upl_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		upl_start(ifp);
 }
 
@@ -1028,24 +1031,32 @@ Static int
 upl_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 	   struct rtentry *rt0)
 {
-	int s;
+	int s, len, error;
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	DPRINTFN(10,("%s: %s: enter\n",
 		     USBDEVNAME(((struct upl_softc *)ifp->if_softc)->sc_dev),
 		     __FUNCTION__));
 
+	/*
+	 * if the queueing discipline needs packet classification,
+	 * do it now.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+
+	len = m->m_pkthdr.len;
 	s = splimp();
 	/*
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-	if (IF_QFULL(&ifp->if_snd)) {
-		IF_DROP(&ifp->if_snd);
+	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+	if (error) {
+		/* mbuf is already freed */
 		splx(s);
-		return (ENOBUFS);
+		return (error);
 	}
-	ifp->if_obytes += m->m_pkthdr.len;
-	IF_ENQUEUE(&ifp->if_snd, m);
+	ifp->if_obytes += len;
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);

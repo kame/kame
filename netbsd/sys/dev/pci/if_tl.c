@@ -1052,7 +1052,7 @@ tl_intr(v)
 				TL_HR_WRITE(sc, TL_HOST_CMD, HOST_CMD_GO);
 			}
 			sc->tl_if.if_timer = 0;
-			if (!IFQ_IS_EMPTY(&sc->tl_if.if_snd))
+			if (IFQ_IS_EMPTY(&sc->tl_if.if_snd) == 0)
 				tl_ifstart(&sc->tl_if);
 			return 1;
 		}
@@ -1062,7 +1062,7 @@ tl_intr(v)
 		}
 #endif
 		sc->tl_if.if_timer = 0;
-		if (!IFQ_IS_EMPTY(&sc->tl_if.if_snd))
+		if (IFQ_IS_EMPTY(&sc->tl_if.if_snd) == 0)
 			tl_ifstart(&sc->tl_if);
 		break;
 	case TL_INTR_Stat:
@@ -1521,15 +1521,12 @@ static void tl_ticks(v)
 				m->m_len = m->m_pkthdr.len =
 				    sizeof(struct ether_header) + 3;
 				s = splnet();
-#if 1
 #ifdef ALTQ
-				IFQ_ENQUEUE(&sc->tl_if.if_snd, m, NULL, error);
-#else
-				IFQ_ENQUEUE(&sc->tl_if.if_snd, m, error);
+				if (ALTQ_IS_ENABLED(&sc->tl_if.if_snd))
+					IFQ_ENQUEUE(&sc->tl_if.if_snd, m, NULL, error);
+				else
 #endif
-#else
-				IF_PREPEND(&sc->tl_if.if_snd, m);
-#endif
+					IF_PREPEND(&sc->tl_if.if_snd, m);
 				tl_ifstart(&sc->tl_if);
 				splx(s);
 			}

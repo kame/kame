@@ -1,5 +1,5 @@
 /*	$OpenBSD: if_txp.c,v 1.48 2001/06/27 06:34:50 kjc Exp $	*/
-/*	$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.4.2.2 2001/07/31 16:39:34 wpaul Exp $ */
+/*	$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.4.2.4 2001/12/14 19:50:43 jlemon Exp $ */
 
 /*
  * Copyright (c) 2001
@@ -39,8 +39,6 @@
  * Driver for 3c990 (Typhoon) Ethernet ASIC
  */
 
-#include "vlan.h"
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/sockio.h>
@@ -54,6 +52,7 @@
 #include <net/ethernet.h>
 #include <net/if_dl.h>
 #include <net/if_types.h>
+#include <net/if_vlan_var.h>
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -65,10 +64,6 @@
 #include <net/if_media.h>
 
 #include <net/bpf.h>
-
-#if NVLAN > 0
-#include <net/if_vlan_var.h>
-#endif
 
 #include <vm/vm.h>              /* for vtophys */
 #include <vm/pmap.h>            /* for vtophys */
@@ -93,7 +88,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.4.2.2 2001/07/31 16:39:34 wpaul Exp $";
+  "$FreeBSD: src/sys/dev/txp/if_txp.c,v 1.4.2.4 2001/12/14 19:50:43 jlemon Exp $";
 #endif
 
 /*
@@ -356,7 +351,8 @@ txp_attach(dev)
 	ifp->if_watchdog = txp_watchdog;
 	ifp->if_init = txp_init;
 	ifp->if_baudrate = 100000000;
-	ifp->if_snd.ifq_maxlen = TX_ENTRIES;
+	IFQ_SET_MAXLEN(&ifp->if_snd, TX_ENTRIES);
+	IFQ_SET_READY(&ifp->if_snd);
 	ifp->if_hwassist = 0;
 	txp_capabilities(sc);
 
@@ -783,14 +779,11 @@ txp_rx_reclaim(sc, r)
 		/* Remove header from mbuf and pass it on. */
 		m_adj(m, sizeof(struct ether_header));
 
-#if NVLAN > 0
 		if (rxd->rx_stat & RX_STAT_VLAN) {
-			if (vlan_input_tag(eh, m,
-			    htons(rxd->rx_vlan >> 16)) < 0)
-				ifp->if_noproto++;
+			VLAN_INPUT_TAG(eh, m, htons(rxd->rx_vlan >> 16));
 			goto next;
 		}
-#endif
+
 		ether_input(ifp, eh, m);
 
 next:
@@ -1291,9 +1284,7 @@ txp_start(ifp)
 	struct mbuf *m, *m0;
 	struct txp_swdesc *sd;
 	u_int32_t firstprod, firstcnt, prod, cnt;
-#if NVLAN > 0
 	struct ifvlan		*ifv;
-#endif
 
 	if ((ifp->if_flags & (IFF_RUNNING | IFF_OACTIVE)) != IFF_RUNNING)
 		return;
@@ -1302,7 +1293,7 @@ txp_start(ifp)
 	cnt = r->r_cnt;
 
 	while (1) {
-		IF_DEQUEUE(&ifp->if_snd, m);
+		IFQ_POLL(&ifp->if_snd, m);
 		if (m == NULL)
 			break;
 
@@ -1330,14 +1321,13 @@ txp_start(ifp)
 		if (++cnt >= (TX_ENTRIES - 4))
 			goto oactive;
 
-#if NVLAN > 0
 		if ((m->m_flags & (M_PROTO1|M_PKTHDR)) == (M_PROTO1|M_PKTHDR) &&
 		    m->m_pkthdr.rcvif != NULL) {
 			ifv = m->m_pkthdr.rcvif->if_softc;
 			txd->tx_pflags = TX_PFLAGS_VLAN |
 			    (htons(ifv->ifv_tag) << TX_PFLAGS_VLANTAG_S);
 		}
-#endif
+
 		if (m->m_pkthdr.csum_flags & CSUM_IP)
 			txd->tx_pflags |= TX_PFLAGS_IPCKSUM;
 
@@ -1372,6 +1362,9 @@ txp_start(ifp)
 
 		}
 
+		/* now we are committed to transmit the packet */
+		IFQ_DEQUEUE(&ifp->if_snd, m);
+
 		ifp->if_timer = 5;
 
 		if (ifp->if_bpf)
@@ -1387,7 +1380,6 @@ oactive:
 	ifp->if_flags |= IFF_OACTIVE;
 	r->r_prod = firstprod;
 	r->r_cnt = firstcnt;
-	IF_PREPEND(&ifp->if_snd, m);
 	return;
 }
 
@@ -1853,13 +1845,12 @@ txp_capabilities(sc)
 
 	sc->sc_tx_capability = ext->ext_1 & OFFLOAD_MASK;
 	sc->sc_rx_capability = ext->ext_2 & OFFLOAD_MASK;
+	ifp->if_capabilities = 0;
 
-#if NVLAN > 0
 	if (rsp->rsp_par2 & rsp->rsp_par3 & OFFLOAD_VLAN) {
 		sc->sc_tx_capability |= OFFLOAD_VLAN;
 		sc->sc_rx_capability |= OFFLOAD_VLAN;
 	}
-#endif
 
 #if 0
 	/* not ready yet */
@@ -1873,6 +1864,7 @@ txp_capabilities(sc)
 	if (rsp->rsp_par2 & rsp->rsp_par3 & OFFLOAD_IPCKSUM) {
 		sc->sc_tx_capability |= OFFLOAD_IPCKSUM;
 		sc->sc_rx_capability |= OFFLOAD_IPCKSUM;
+		ifp->if_capabilities |= IFCAP_HWCSUM;
 		ifp->if_hwassist |= CSUM_IP;
 	}
 
@@ -1881,9 +1873,7 @@ txp_capabilities(sc)
 		sc->sc_tx_capability |= OFFLOAD_TCPCKSUM;
 #endif
 		sc->sc_rx_capability |= OFFLOAD_TCPCKSUM;
-#if 0
-		ifp->if_capabilities |= CSUM_TCP;
-#endif
+		ifp->if_capabilities |= IFCAP_HWCSUM;
 	}
 
 	if (rsp->rsp_par2 & rsp->rsp_par3 & OFFLOAD_UDPCKSUM) {
@@ -1891,10 +1881,9 @@ txp_capabilities(sc)
 		sc->sc_tx_capability |= OFFLOAD_UDPCKSUM;
 #endif
 		sc->sc_rx_capability |= OFFLOAD_UDPCKSUM;
-#if 0
-		ifp->if_capabilities |= CSUM_UDP;
-#endif
+		ifp->if_capabilities |= IFCAP_HWCSUM;
 	}
+	ifp->if_capenable = ifp->if_capabilities;
 
 	if (txp_command(sc, TXP_CMD_OFFLOAD_WRITE, 0,
 	    sc->sc_tx_capability, sc->sc_rx_capability, NULL, NULL, NULL, 1))

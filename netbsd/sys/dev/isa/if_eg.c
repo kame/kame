@@ -1,4 +1,4 @@
-/*	$NetBSD: if_eg.c,v 1.46 1999/03/25 23:21:38 thorpej Exp $	*/
+/*	$NetBSD: if_eg.c,v 1.49 2000/03/30 12:45:33 augustss Exp $	*/
 
 /*
  * Copyright (c) 1993 Dean Huxley <dean@fsa.ca>
@@ -480,7 +480,8 @@ egattach(parent, self, aux)
 	ifp->if_ioctl = egioctl;
 	ifp->if_watchdog = egwatchdog;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS;
-	
+	IFQ_SET_READY(&ifp->if_snd);
+
 	/* Now we can attach the interface. */
 	if_attach(ifp);
 	ether_ifattach(ifp, myaddr);
@@ -500,9 +501,9 @@ egattach(parent, self, aux)
 
 void
 eginit(sc)
-	register struct eg_softc *sc;
+	struct eg_softc *sc;
 {
-	register struct ifnet *ifp = &sc->sc_ethercom.ec_if;
+	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
 
@@ -588,7 +589,7 @@ void
 egstart(ifp)
 	struct ifnet *ifp;
 {
-	register struct eg_softc *sc = ifp->if_softc;
+	struct eg_softc *sc = ifp->if_softc;
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
 	struct mbuf *m0, *m;
@@ -602,7 +603,7 @@ egstart(ifp)
 
 loop:
 	/* Dequeue the next datagram. */
-	IF_DEQUEUE(&ifp->if_snd, m0);
+	IFQ_DEQUEUE(&ifp->if_snd, m0);
 	if (m0 == 0)
 		return;
 	
@@ -613,7 +614,7 @@ loop:
 		printf("%s: no header mbuf\n", sc->sc_dev.dv_xname);
 		panic("egstart");
 	}
-	len = max(m0->m_pkthdr.len, ETHER_MIN_LEN);
+	len = max(m0->m_pkthdr.len, ETHER_MIN_LEN - ETHER_CRC_LEN);
 
 #if NBPFILTER > 0
 	if (ifp->if_bpf)
@@ -660,7 +661,7 @@ int
 egintr(arg)
 	void *arg;
 {
-	register struct eg_softc *sc = arg;
+	struct eg_softc *sc = arg;
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
 	int i, len, serviced;
@@ -798,9 +799,7 @@ egread(sc, buf, len)
 	}
 #endif
 
-	/* We assume the header fit entirely in one mbuf. */
-	m_adj(m, sizeof(struct ether_header));
-	ether_input(ifp, eh, m);
+	(*ifp->if_input)(ifp, m);
 }
 
 /*
@@ -855,7 +854,7 @@ bad:
 
 int
 egioctl(ifp, cmd, data)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	u_long cmd;
 	caddr_t data;
 {
@@ -880,7 +879,7 @@ egioctl(ifp, cmd, data)
 #ifdef NS
 		case AF_NS:
 		    {
-			register struct ns_addr *ina = &IA_SNS(ifa)->sns_addr;
+			struct ns_addr *ina = &IA_SNS(ifa)->sns_addr;
 				
 			if (ns_nullhost(*ina))
 				ina->x_host =
@@ -964,7 +963,7 @@ egwatchdog(ifp)
 
 void
 egstop(sc)
-	register struct eg_softc *sc;
+	struct eg_softc *sc;
 {
 	
 	bus_space_write_1(sc->sc_iot, sc->sc_ioh, EG_CONTROL, 0);

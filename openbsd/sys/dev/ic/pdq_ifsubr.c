@@ -144,13 +144,7 @@ pdq_ifwatchdog(
 
     ifp->if_flags &= ~IFF_OACTIVE;
     ifp->if_timer = 0;
-    for (;;) {
-	struct mbuf *m;
-	IFQ_DEQUEUE(&ifp->if_snd, m);
-	if (m == NULL)
-	    return;
-	m_freem(m);
-    }
+    IFQ_PURGE(&ifp->if_snd);
 }
 
 ifnet_ret_t
@@ -372,9 +366,7 @@ pdq_ifattach(
     ifp->if_ioctl = pdq_ifioctl;
     ifp->if_output = fddi_output;
     ifp->if_start = pdq_ifstart;
-#ifdef notyet /* if_fddisubr.c hasn't been converted yet */
     IFQ_SET_READY(&ifp->if_snd);
-#endif
   
     if_attach(ifp);
     fddi_ifattach(ifp);

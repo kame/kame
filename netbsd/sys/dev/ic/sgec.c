@@ -1,4 +1,4 @@
-/*      $NetBSD: sgec.c,v 1.6 2000/06/05 02:28:19 matt Exp $ */
+/*      $NetBSD: sgec.c,v 1.6.2.1 2001/04/21 21:31:10 he Exp $ */
 /*
  * Copyright (c) 1999 Ludd, University of Lule}, Sweden. All rights reserved.
  *
@@ -204,6 +204,7 @@ sgec_attach(sc)
 	ifp->if_start = zestart;
 	ifp->if_ioctl = zeioctl;
 	ifp->if_watchdog = zetimeout;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
 	 * Attach the interface.
@@ -326,7 +327,7 @@ zestart(ifp)
 			continue;
 		}
 		idx = sc->sc_nexttx;
-		IF_DEQUEUE(&sc->sc_if.if_snd, m);
+		IFQ_POLL(&sc->sc_if.if_snd, m);
 		if (m == 0)
 			goto out;
 		/*
@@ -341,7 +342,6 @@ zestart(ifp)
 			panic("zestart"); /* XXX */
 
 		if ((i + sc->sc_inq) >= (TXDESCS - 1)) {
-			IF_PREPEND(&sc->sc_if.if_snd, m);
 			ifp->if_flags |= IFF_OACTIVE;
 			goto out;
 		}
@@ -383,6 +383,7 @@ zestart(ifp)
 				idx = 0;
 			sc->sc_inq++;
 		}
+		IFQ_DEQUEUE(&ifp->if_snd, m);
 #ifdef DIAGNOSTIC
 		if (totlen != m->m_pkthdr.len)
 			panic("zestart: len fault");
@@ -428,6 +429,7 @@ sgec_intr(sc)
 			ze_add_rxbuf(sc, sc->sc_nextrx);
 			m->m_pkthdr.rcvif = ifp;
 			m->m_pkthdr.len = m->m_len = len;
+			m->m_flags |= M_HASFCS;
 			if (++sc->sc_nextrx == RXDESCS)
 				sc->sc_nextrx = 0;
 			eh = mtod(m, struct ether_header *);

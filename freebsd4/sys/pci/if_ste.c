@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_ste.c,v 1.14 1999/12/07 20:14:42 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_ste.c,v 1.14.2.5 2001/12/16 15:46:08 luigi Exp $
  */
 
 #include <sys/param.h>
@@ -47,11 +47,6 @@
 #include <net/if_media.h>
 
 #include <net/bpf.h>
-
-#include "opt_bdg.h"
-#ifdef BRIDGE
-#include <net/bridge.h>
-#endif
 
 #include <vm/vm.h>              /* for vtophys */
 #include <vm/pmap.h>            /* for vtophys */
@@ -78,7 +73,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_ste.c,v 1.14 1999/12/07 20:14:42 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_ste.c,v 1.14.2.5 2001/12/16 15:46:08 luigi Exp $";
 #endif
 
 /*
@@ -587,8 +582,10 @@ static void ste_setmulti(sc)
 	}
 
 	/* first, zot all the existing hash bits */
-	CSR_WRITE_4(sc, STE_MAR0, 0);
-	CSR_WRITE_4(sc, STE_MAR1, 0);
+	CSR_WRITE_2(sc, STE_MAR0, 0);
+	CSR_WRITE_2(sc, STE_MAR1, 0);
+	CSR_WRITE_2(sc, STE_MAR2, 0);
+	CSR_WRITE_2(sc, STE_MAR3, 0);
 
 	/* now program new ones */
 	for (ifma = ifp->if_multiaddrs.lh_first; ifma != NULL;
@@ -602,8 +599,10 @@ static void ste_setmulti(sc)
 			hashes[1] |= (1 << (h - 32));
 	}
 
-	CSR_WRITE_4(sc, STE_MAR0, hashes[0]);
-	CSR_WRITE_4(sc, STE_MAR1, hashes[1]);
+	CSR_WRITE_2(sc, STE_MAR0, hashes[0] & 0xFFFF);
+	CSR_WRITE_2(sc, STE_MAR1, (hashes[0] >> 16) & 0xFFFF);
+	CSR_WRITE_2(sc, STE_MAR2, hashes[1] & 0xFFFF);
+	CSR_WRITE_2(sc, STE_MAR3, (hashes[1] >> 16) & 0xFFFF);
 	STE_CLRBIT1(sc, STE_RX_MODE, STE_RXMODE_ALLMULTI);
 	STE_SETBIT1(sc, STE_RX_MODE, STE_RXMODE_MULTIHASH);
 
@@ -653,7 +652,7 @@ static void ste_intr(xsc)
 	/* Re-enable interrupts */
 	CSR_WRITE_2(sc, STE_IMR, STE_INTRS);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		ste_start(ifp);
 
 	return;
@@ -727,38 +726,6 @@ again:
 		eh = mtod(m, struct ether_header *);
 		m->m_pkthdr.rcvif = ifp;
 		m->m_pkthdr.len = m->m_len = total_len;
-
-		/* Handle BPF listeners. Let the BPF user see the packet. */
-		if (ifp->if_bpf)
-			bpf_mtap(ifp, m);
-
-#ifdef BRIDGE
-		if (do_bridge) {
-			struct ifnet *bdg_ifp ;
-			bdg_ifp = bridge_in(m);
-			if (bdg_ifp != BDG_LOCAL && bdg_ifp != BDG_DROP)
-				bdg_forward(&m, bdg_ifp);
-			if (((bdg_ifp != BDG_LOCAL) && (bdg_ifp != BDG_BCAST) &&
-			    (bdg_ifp != BDG_MCAST)) || bdg_ifp == BDG_DROP) {
-				m_freem(m);
-				continue;
-			}
-		}
-#endif
-
-		/*
-		 * Don't pass packet up to the ether_input() layer unless it's
-		 * a broadcast packet, multicast packet, matches our ethernet
-		 * address or the interface is in promiscuous mode.
-		 */
-		if (ifp->if_bpf) {
-			if (ifp->if_flags & IFF_PROMISC &&
-			    (bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-			    ETHER_ADDR_LEN) && (eh->ether_dhost[0] & 1) == 0)){
-				m_freem(m);
-				continue;
-			}
-		}
 
 		/* Remove header from mbuf and pass it on. */
 		m_adj(m, sizeof(struct ether_header));
@@ -897,7 +864,7 @@ static void ste_stats_update(xsc)
 		if (mii->mii_media_status & IFM_ACTIVE &&
 		    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE)
 			sc->ste_link++;
-			if (ifp->if_snd.ifq_head != NULL)
+			if (!IFQ_IS_EMPTY(&ifp->if_snd))
 				ste_start(ifp);
 	}
 
@@ -981,10 +948,10 @@ static int ste_attach(dev)
 	/*
 	 * Map control/status registers.
 	 */
-	command = pci_read_config(dev, PCI_COMMAND_STATUS_REG, 4);
+	command = pci_read_config(dev, PCIR_COMMAND, 4);
 	command |= (PCIM_CMD_PORTEN|PCIM_CMD_MEMEN|PCIM_CMD_BUSMASTEREN);
-	pci_write_config(dev, PCI_COMMAND_STATUS_REG, command, 4);
-	command = pci_read_config(dev, PCI_COMMAND_STATUS_REG, 4);
+	pci_write_config(dev, PCIR_COMMAND, command, 4);
+	command = pci_read_config(dev, PCIR_COMMAND, 4);
 
 #ifdef STE_USEIOSPACE
 	if (!(command & PCIM_CMD_PORTEN)) {
@@ -1100,16 +1067,13 @@ static int ste_attach(dev)
 	ifp->if_watchdog = ste_watchdog;
 	ifp->if_init = ste_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = STE_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, STE_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
-	 * Call MI attach routines.
+	 * Call MI attach routine.
 	 */
-
-	if_attach(ifp);
-	ether_ifattach(ifp);
-
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
 fail:
 	splx(s);
@@ -1129,7 +1093,7 @@ static int ste_detach(dev)
 	ifp = &sc->arpcom.ac_if;
 
 	ste_stop(sc);
-	if_detach(ifp);
+	ether_ifdetach(ifp, ETHER_BPF_SUPPORTED);
 
 	bus_generic_detach(dev);
 	device_delete_child(dev, sc->ste_miibus);
@@ -1154,15 +1118,10 @@ static int ste_newbuf(sc, c, m)
 
 	if (m == NULL) {
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-		if (m_new == NULL) {
-			printf("ste%d: no memory for rx list -- "
-			    "packet dropped\n", sc->ste_unit);
+		if (m_new == NULL)
 			return(ENOBUFS);
-		}
 		MCLGET(m_new, M_DONTWAIT);
 		if (!(m_new->m_flags & M_EXT)) {
-			printf("ste%d: no memory for rx list -- "
-			    "packet dropped\n", sc->ste_unit);
 			m_freem(m_new);
 			return(ENOBUFS);
 		}
@@ -1546,7 +1505,7 @@ static void ste_start(ifp)
 			break;
 		}
 
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -1599,7 +1558,7 @@ static void ste_watchdog(ifp)
 	ste_reset(sc);
 	ste_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		ste_start(ifp);
 
 	return;

@@ -1,4 +1,4 @@
-/*	$NetBSD: if_el.c,v 1.57 1999/03/25 23:21:38 thorpej Exp $	*/
+/*	$NetBSD: if_el.c,v 1.60 2000/03/30 12:45:33 augustss Exp $	*/
 
 /*
  * Copyright (c) 1994, Matthew E. Kimmel.  Permission is hereby granted
@@ -233,6 +233,7 @@ elattach(parent, self, aux)
 	ifp->if_ioctl = elioctl;
 	ifp->if_watchdog = elwatchdog;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_NOTRAILERS;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Now we can attach the interface. */
 	DPRINTF(("Attaching interface...\n"));
@@ -382,7 +383,7 @@ elstart(ifp)
 	 */
 	for (;;) {
 		/* Dequeue the next datagram. */
-		IF_DEQUEUE(&ifp->if_snd, m0);
+		IFQ_DEQUEUE(&ifp->if_snd, m0);
 
 		/* If there's nothing to send, return. */
 		if (m0 == 0)
@@ -400,7 +401,8 @@ elstart(ifp)
 
 		/* Transfer datagram to board. */
 		DPRINTF(("el: xfr pkt length=%d...\n", m0->m_pkthdr.len));
-		off = EL_BUFSIZ - max(m0->m_pkthdr.len, ETHER_MIN_LEN);
+		off = EL_BUFSIZ - max(m0->m_pkthdr.len,
+		    ETHER_MIN_LEN - ETHER_CRC_LEN);
 #ifdef DIAGNOSTIC
 		if ((off & 0xffff) != off)
 			printf("%s: bogus off 0x%x\n",
@@ -504,7 +506,7 @@ int
 elintr(arg)
 	void *arg;
 {
-	register struct el_softc *sc = arg;
+	struct el_softc *sc = arg;
 	bus_space_tag_t iot = sc->sc_iot;
 	bus_space_handle_t ioh = sc->sc_ioh;
 	u_int8_t rxstat;
@@ -572,7 +574,7 @@ elintr(arg)
  */
 void
 elread(sc, len)
-	register struct el_softc *sc;
+	struct el_softc *sc;
 	int len;
 {
 	struct ifnet *ifp = &sc->sc_ethercom.ec_if;
@@ -622,9 +624,7 @@ elread(sc, len)
 	}
 #endif
 
-	/* We assume that the header fit entirely in one mbuf. */
-	m_adj(m, sizeof(struct ether_header));
-	ether_input(ifp, eh, m);
+	(*ifp->if_input)(ifp, m);
 }
 
 /*
@@ -690,7 +690,7 @@ bad:
  */
 int
 elioctl(ifp, cmd, data)
-	register struct ifnet *ifp;
+	struct ifnet *ifp;
 	u_long cmd;
 	caddr_t data;
 {
@@ -716,7 +716,7 @@ elioctl(ifp, cmd, data)
 		/* XXX - This code is probably wrong. */
 		case AF_NS:
 		    {
-			register struct ns_addr *ina = &IA_SNS(ifa)->sns_addr;
+			struct ns_addr *ina = &IA_SNS(ifa)->sns_addr;
 
 			if (ns_nullhost(*ina))
 				ina->x_host =

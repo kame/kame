@@ -780,6 +780,7 @@ fe_attach (device_t dev)
 	if (sc->sc_if.if_snd.ifq_maxlen == 0)
 		sc->sc_if.if_snd.ifq_maxlen = ifqmaxlen;
 #endif
+	IFQ_SET_READY(&sc->sc_if.if_snd);
 
 #if FE_SINGLE_TRANSMISSION
 	/* Override txb config to allocate minimum.  */
@@ -1268,7 +1269,7 @@ fe_start (struct ifnet *ifp)
 		/*
 		 * Get the next mbuf chain for a packet to send.
 		 */
-		IF_DEQUEUE(&sc->sc_if.if_snd, m);
+		IFQ_DEQUEUE(&sc->sc_if.if_snd, m);
 		if (m == NULL) {
 			/* No more packets to send.  */
 			goto indicate_inactive;

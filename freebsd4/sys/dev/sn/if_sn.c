@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *   $FreeBSD: src/sys/dev/sn/if_sn.c,v 1.7 2000/01/22 17:24:16 hosokawa Exp $
+ *   $FreeBSD: src/sys/dev/sn/if_sn.c,v 1.7.2.3 2001/02/04 04:38:38 toshi Exp $
  */
 
 /*
@@ -155,7 +155,8 @@ static const char *chip_ids[15] = {
 	 /* 5 */ "SMC91C95",
 	NULL,
 	 /* 7 */ "SMC91C100",
-	NULL, NULL, NULL, NULL,
+	 /* 8 */ "SMC91C100FD",
+	NULL, NULL, NULL,
 	NULL, NULL, NULL
 };
 
@@ -221,11 +222,11 @@ sn_attach(device_t dev)
 	ifp->if_ioctl = snioctl;
 	ifp->if_watchdog = snwatchdog;
 	ifp->if_init = sninit;
-	ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+	IFQ_SET_READY(&ifp->if_snd);
 	ifp->if_timer = 0;
 
-	if_attach(ifp);
-	ether_ifattach(ifp);
+	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 
 	/*
 	 * Fill the hardware address into ifa_addr if we find an AF_LINK
@@ -244,8 +245,6 @@ sn_attach(device_t dev)
 		sdl->sdl_slen = 0;
 		bcopy(sc->arpcom.ac_enaddr, LLADDR(sdl), ETHER_ADDR_LEN);
 	}
-
-	bpfattach(ifp, DLT_EN10MB, sizeof(struct ether_header));
 
 	return 0;
 }
@@ -384,7 +383,7 @@ startagain:
 	/*
 	 * Sneak a peek at the next packet
 	 */
-	m = sc->arpcom.ac_if.if_snd.ifq_head;
+	IFQ_POLL(&sc->arpcom.ac_if.if_snd, m);
 	if (m == 0) {
 		splx(s);
 		return;
@@ -405,7 +404,7 @@ startagain:
 	if (len + pad > ETHER_MAX_LEN - ETHER_CRC_LEN) {
 		printf("sn%d: large packet discarded (A)\n", ifp->if_unit);
 		++sc->arpcom.ac_if.if_oerrors;
-		IF_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
+		IFQ_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
 		m_freem(m);
 		goto readcheck;
 	}
@@ -499,7 +498,7 @@ startagain:
 	 * Get the packet from the kernel.  This will include the Ethernet
 	 * frame header, MAC Addresses etc.
 	 */
-	IF_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
+	IFQ_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
 
 	/*
 	 * Push out the data to the card.
@@ -603,7 +602,7 @@ snresume(struct ifnet *ifp)
 	/*
 	 * Sneak a peek at the next packet
 	 */
-	m = sc->arpcom.ac_if.if_snd.ifq_head;
+	IFQ_POLL(&sc->arpcom.ac_if.if_snd, m);
 	if (m == 0) {
 		printf("sn%d: snresume() with nothing to send\n", ifp->if_unit);
 		return;
@@ -624,7 +623,7 @@ snresume(struct ifnet *ifp)
 	if (len + pad > ETHER_MAX_LEN - ETHER_CRC_LEN) {
 		printf("sn%d: large packet discarded (B)\n", ifp->if_unit);
 		++sc->arpcom.ac_if.if_oerrors;
-		IF_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
+		IFQ_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
 		m_freem(m);
 		return;
 	}
@@ -700,7 +699,7 @@ snresume(struct ifnet *ifp)
 	 * Get the packet from the kernel.  This will include the Ethernet
 	 * frame header, MAC Addresses etc.
 	 */
-	IF_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
+	IFQ_DEQUEUE(&sc->arpcom.ac_if.if_snd, m);
 
 	/*
 	 * Push out the data to the card.
@@ -1097,26 +1096,6 @@ read_another:
 		*data = inb(BASE + DATA_REG_B);
 	}
 	++sc->arpcom.ac_if.if_ipackets;
-
-	if (sc->arpcom.ac_if.if_bpf)
-	{
-		bpf_mtap(&sc->arpcom.ac_if, m);
-
-		/*
-		 * Note that the interface cannot be in promiscuous mode if
-		 * there are no BPF listeners.  And if we are in promiscuous
-		 * mode, we have to check if this packet is really ours.
-		 */
-		if ((sc->arpcom.ac_if.if_flags & IFF_PROMISC) &&
-		    (eh->ether_dhost[0] & 1) == 0 &&
-		    bcmp(eh->ether_dhost, sc->arpcom.ac_enaddr,
-			 sizeof(eh->ether_dhost)) != 0 &&
-		    bcmp(eh->ether_dhost, etherbroadcastaddr,
-			 sizeof(eh->ether_dhost)) != 0) {
-			m_freem(m);
-			goto out;
-		}
-	}
 
 	/*
 	 * Remove link layer addresses and whatnot.

@@ -558,9 +558,7 @@ pdq_ifattach(
     ifp->if_output = fddi_output;
 #endif
     ifp->if_start = pdq_ifstart;
-#ifdef notyet /* if_fddisubr.c hasn't been converted yet */
     IFQ_SET_READY(&ifp->if_snd);
-#endif
 
 #if defined(IFM_FDDI)
     {

@@ -1688,7 +1688,8 @@ bge_attach(dev)
 	ifp->if_watchdog = bge_watchdog;
 	ifp->if_init = bge_init;
 	ifp->if_mtu = ETHERMTU;
-	ifp->if_snd.ifq_maxlen = BGE_TX_RING_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, BGE_TX_RING_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 	ifp->if_hwassist = BGE_CSUM_FEATURES;
 	ifp->if_capabilities = IFCAP_HWCSUM;
 	ifp->if_capenable = ifp->if_capabilities;
@@ -2073,7 +2074,7 @@ bge_intr(xsc)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, BGE_MBX_IRQ0_LO, 0);
 
-	if (ifp->if_flags & IFF_RUNNING && ifp->if_snd.ifq_head != NULL)
+	if (ifp->if_flags & IFF_RUNNING && !IFQ_IS_EMPTY(&ifp->if_snd))
 		bge_start(ifp);
 
 	return;
@@ -2106,7 +2107,7 @@ bge_tick(xsc)
 			sc->bge_link++;
 			CSR_WRITE_4(sc, BGE_MAC_STS, 0xFFFFFFFF);
 			printf("bge%d: gigabit link up\n", sc->bge_unit);
-			if (ifp->if_snd.ifq_head != NULL)
+			if (!IFQ_IS_EMPTY(&ifp->if_snd))
 				bge_start(ifp);
 		}
 		return;
@@ -2124,7 +2125,7 @@ bge_tick(xsc)
 			    IFM_SUBTYPE(mii->mii_media_active) == IFM_1000_SX)
 				printf("bge%d: gigabit link up\n",
 				   sc->bge_unit);
-			if (ifp->if_snd.ifq_head != NULL)
+			if (!IFQ_IS_EMPTY(&ifp->if_snd))
 				bge_start(ifp);
 		}
 	}
@@ -2257,6 +2258,7 @@ bge_start(ifp)
 	struct bge_softc *sc;
 	struct mbuf *m_head = NULL;
 	u_int32_t prodidx = 0;
+	int pkts = 0;
 
 	sc = ifp->if_softc;
 
@@ -2266,7 +2268,7 @@ bge_start(ifp)
 	prodidx = CSR_READ_4(sc, BGE_MBX_TX_HOST_PROD0_LO);
 
 	while(sc->bge_cdata.bge_tx_chain[prodidx] == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
@@ -2282,7 +2284,6 @@ bge_start(ifp)
 		    m_head->m_pkthdr.csum_flags & (CSUM_DELAY_DATA)) {
 			if ((BGE_TX_RING_CNT - sc->bge_txcnt) <
 			    m_head->m_pkthdr.csum_data + 16) {
-				IF_PREPEND(&ifp->if_snd, m_head);
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
 			}
@@ -2294,10 +2295,13 @@ bge_start(ifp)
 		 * for the NIC to drain the ring.
 		 */
 		if (bge_encap(sc, m_head, &prodidx)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		/* now we are committed to transmit the packet */
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		pkts++;
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -2306,6 +2310,8 @@ bge_start(ifp)
 		if (ifp->if_bpf)
 			bpf_mtap(ifp, m_head);
 	}
+	if (pkts == 0)
+		return;
 
 	/* Transmit */
 	CSR_WRITE_4(sc, BGE_MBX_TX_HOST_PROD0_LO, prodidx);
