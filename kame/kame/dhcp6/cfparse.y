@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.12 2002/05/23 11:08:57 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.13 2002/05/23 11:57:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -115,7 +115,7 @@ statement:
 	;
 
 interface_statement:
-	INTERFACE IFNAME BCL declarations ECL 
+	INTERFACE IFNAME BCL declarations ECL EOS 
 	{
 		struct cf_namelist *ifl;
 
@@ -127,7 +127,7 @@ interface_statement:
 	;
 
 prefix_interface_statement:
-	PREFIX_INTERFACE IFNAME BCL ifparams ECL
+	PREFIX_INTERFACE IFNAME BCL ifparams ECL EOS
 	{
 		struct cf_namelist *ifl;
 
@@ -139,7 +139,7 @@ prefix_interface_statement:
 	;
 
 host_statement:
-	HOST HOSTNAME BCL declarations ECL
+	HOST HOSTNAME BCL declarations ECL EOS
 	{
 		struct cf_namelist *host;
 
