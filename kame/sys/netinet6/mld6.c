@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.71 2002/11/04 07:13:08 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.72 2002/11/04 07:32:06 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -588,6 +588,7 @@ mld6_input(m, off)
 			goto mldv2_query;
 		}
 #endif
+		goto mldv1_query;
 
 mldv1_query:
 		/*
