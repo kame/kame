@@ -765,7 +765,7 @@ netname6(sa6, mask)
 	u_char *p = (u_char *)mask;
 	u_char *q = (u_char *)&sin6.sin6_addr;
 	u_char *lim;
-	int masklen, illegal = 0, flag = NI_WITHSCOPEID;
+	int masklen, illegal = 0, flag = 0;
 
 	if (mask) {
 		masklen = 0;
@@ -833,7 +833,7 @@ routename6(sa6)
 	struct sockaddr_in6 *sa6;
 {
 	static char line[MAXHOSTNAMELEN + 1];
-	int flag = NI_WITHSCOPEID;
+	int flag = 0;
 	/* use local variable for safety */
 	struct sockaddr_in6 sa6_local;
 
