@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.30 2002/07/01 04:57:41 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.31 2002/07/01 21:06:25 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -384,7 +384,8 @@ makeTSlotLine(char *wow, int size, struct tSlot *tsl,
 	case IPPROTO_ICMP:
 	case IPPROTO_ICMPV6:
 		concat(&lmsg, "%5d/%-5d ",
-		       tsl->suit.ih_idseq.icd_id, tsl->suit.ih_idseq.icd_seq);
+		       ntohs(tsl->suit.ih_idseq.icd_id),
+		       ntohs(tsl->suit.ih_idseq.icd_seq));
 		break;
 
 	case IPPROTO_TCP:
