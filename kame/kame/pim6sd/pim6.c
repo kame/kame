@@ -1,4 +1,4 @@
-/*	$KAME: pim6.c,v 1.19 2001/08/30 11:21:38 suz Exp $	*/
+/*	$KAME: pim6.c,v 1.20 2001/11/27 07:00:32 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -102,8 +102,7 @@
 #include "debug.h"
 
 struct sockaddr_in6 allpim6routers_group;
-struct sockaddr_in6 ssmtransientprefix;
-struct sockaddr_in6 ssmpermanentprefix;
+struct sockaddr_in6 ssmprefix;
 struct in6_addr ssmmask;
 
 int pim6_socket;
@@ -164,20 +163,18 @@ init_pim6()
 		      (void *)&sockaddr6_d.sin6_addr) != 1)
 		log(LOG_ERR, 0, "inet_pton failed for ff00::");
 
-	memset(&ssmtransientprefix, 0, sizeof(ssmtransientprefix));
-	ssmtransientprefix.sin6_len = sizeof(ssmtransientprefix);
-	ssmtransientprefix.sin6_family = AF_INET6;
-	if (inet_pton(AF_INET6, "ff30::", (void *) &ssmtransientprefix.sin6_addr) != 1)
-	    log(LOG_ERR, 0, "inet_pton failed for ff3::");
+	/* 
+	 * according to draft-ietf-ipngwg-uni-based-mcast-03.txt
+	 * the SSM-prefix is ff3x::/96.
+	 */
+	if (inet_pton(AF_INET6, "fff0:ffff:ffff:ffff:ffff:ffff::", (void *) &ssmmask) != 1)
+	    log(LOG_ERR, 0, "inet_pton failed for fff0:ffff:ffff:ffff:ffff:ffff::");
 
-	if (inet_pton(AF_INET6, "fff0::", (void *) &ssmmask) != 1)
-	    log(LOG_ERR, 0, "inet_pton failed for fff::");
-
-	memset(&ssmpermanentprefix, 0, sizeof(ssmpermanentprefix));
-	ssmpermanentprefix.sin6_len = sizeof(ssmpermanentprefix);
-	ssmpermanentprefix.sin6_family = AF_INET6;
-	if (inet_pton(AF_INET6, "ff20::", (void *) &ssmpermanentprefix.sin6_addr) != 1)
-	    log(LOG_ERR, 0, "inet_pton failed for ff2::");
+	memset(&ssmprefix, 0, sizeof(ssmprefix));
+	ssmprefix.sin6_len = sizeof(ssmprefix);
+	ssmprefix.sin6_family = AF_INET6;
+	if (inet_pton(AF_INET6, "ff30::", (void *) &ssmprefix.sin6_addr) != 1)
+	    log(LOG_ERR, 0, "inet_pton failed for ff30::");
 
 	/* specify to tell receiving interface */
 	on = 1;

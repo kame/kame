@@ -1,4 +1,4 @@
-/*	$KAME: pim6.h,v 1.6 2001/07/11 09:14:34 suz Exp $	*/
+/*	$KAME: pim6.h,v 1.7 2001/11/27 07:00:32 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -50,12 +50,10 @@
 #define PIM6_H
 
 extern struct sockaddr_in6 allpim6routers_group;
-extern struct sockaddr_in6 ssmtransientprefix;
-extern struct sockaddr_in6 ssmpermanentprefix;
+extern struct sockaddr_in6 ssmprefix;
 extern struct in6_addr ssmmask;
 
-#define SSMGROUP(g)	(inet6_same_prefix(g,&ssmtransientprefix,&ssmmask) \
-			|| inet6_same_prefix(g,&ssmpermanentprefix,&ssmmask))
+#define SSMGROUP(g)	(inet6_same_prefix(g,&ssmprefix,&ssmmask))
 
 extern char *pim6_send_buf;
 extern int 	pim6_socket;
