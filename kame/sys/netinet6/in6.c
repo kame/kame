@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.268 2002/03/02 15:51:35 keiichi Exp $	*/
+/*	$KAME: in6.c,v 1.269 2002/03/21 02:47:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -325,7 +325,7 @@ in6_ifremloop(struct ifaddr *ifa)
 		 * Before deleting, check if a corresponding loopbacked host
 		 * route surely exists.  With this check, we can avoid to
 		 * delete an interface direct route whose destination is same
-		 * as the address being removed.  This can happen when remofing
+		 * as the address being removed.  This can happen when removing
 		 * a subnet-router anycast address on an interface attahced
 		 * to a shared medium.
 		 */
