@@ -10,7 +10,7 @@ SRCS+=	ipsec_strerror.c policy_parse.y policy_token.l
 SRCS+=	ipsec_get_policylen.c ipsec_dump_policy.c
 SRCS+=	key_debug.c
 LDADD+=	-ll -ly
-CLEANFILES+=	y.tab.c y.tab.h
+CLEANFILES+=	y.tab.c y.tab.h policy_token.c policy_parse.c
 YFLAGS+=-d -p __libyy
 LFLAGS+=-P__libyy
 
