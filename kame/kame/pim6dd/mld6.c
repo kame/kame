@@ -63,7 +63,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: mld6.c,v 1.14 2000/10/05 22:20:38 itojun Exp $
+ *  $Id: mld6.c,v 1.15 2000/11/29 13:19:56 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -149,7 +149,13 @@ init_mld6()
     k_set_rcvbuf(mld6_socket, SO_RECV_BUF_SIZE_MAX,
 		 SO_RECV_BUF_SIZE_MIN);	/* lots of input buffering */
     k_set_hlim(mld6_socket, MINHLIM);	/* restrict multicasts to one hop */
+#if 0
+    /*
+     * Since we don't have to handle DMVRP messages via the MLD6 socket,
+     * we can just let outgoing multicast packets be loop-backed.
+     */
     k_set_loop(mld6_socket, FALSE);	/* disable multicast loopback     */
+#endif
 
     /* address initialization */
     allnodes_group.sin6_addr = in6addr_linklocal_allnodes;
@@ -515,15 +521,11 @@ send_mld6(type, code, src, dst, group, index, delay, datalen, alert)
     int index, delay, alert;
     int datalen;		/* for trace packets only */
 {
-    int setloop = 0;
     struct sockaddr_in6 *dstp;
 	
     make_mld6_msg(type, code, src, dst, group, index, delay, datalen, alert);
     dstp = (struct sockaddr_in6 *)sndmh.msg_name;
-    if (IN6_ARE_ADDR_EQUAL(&dstp->sin6_addr, &allnodes_group.sin6_addr)) {
-	setloop = 1;
-	k_set_loop(mld6_socket, TRUE);
-    }
+
     if (sendmsg(mld6_socket, &sndmh, 0) < 0) {
 	if (errno == ENETDOWN)
 	    check_vif_state();
@@ -534,8 +536,6 @@ send_mld6(type, code, src, dst, group, index, delay, datalen, alert)
 		src ? inet6_fmt(&src->sin6_addr) : "(unspec)",
 		ifindex2str(index));
 
-	if (setloop)
-	    k_set_loop(mld6_socket, FALSE);
 	return;
     }
     
