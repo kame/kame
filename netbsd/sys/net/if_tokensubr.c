@@ -434,7 +434,9 @@ token_output(ifp, m0, dst, rt0)
 		trrif = TOKEN_RIF(trh);
 		bcopy(rif, trrif, riflen);
 	}
+#ifdef INET
 send:
+#endif
 
 	s = splimp();
 	/*
