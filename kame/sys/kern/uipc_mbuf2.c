@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.26 2001/02/14 08:37:31 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.27 2001/02/14 12:26:39 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -87,7 +87,7 @@
 	 ((m)->m_ext.ext_free || mclrefcnt[mtocl((m)->m_ext.ext_buf)] > 1))
 #endif
 
-#ifndef __NetBSD__
+#if !(defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3))
 static struct mbuf *m_dup __P((struct mbuf *, int, int, int));
 #endif
 
@@ -335,7 +335,7 @@ ok:
 	return n;
 }
 
-#ifndef __NetBSD__
+#if !(defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3))
 static struct mbuf *
 m_dup(m, off, len, wait)
 	struct mbuf *m;
