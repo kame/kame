@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.262 2001/11/12 11:11:22 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.263 2001/11/20 03:23:50 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -781,12 +781,22 @@ icmp6_input(mp, offp, proto)
 
 #ifdef MIP6
 	case ICMP6_HADISCOV_REQUEST:
-	case ICMP6_HADISCOV_REPLY:
+		if (icmp6len < sizeof(struct ha_discov_req))
+			goto badlen;
 		if (code != 0)
 			goto badcode;
 		if (mip6_icmp6_input(m, off, icmp6len))
 			goto freeit;
 		break;
+	case ICMP6_HADISCOV_REPLY:
+		if (icmp6len < sizeof(struct ha_discov_rep))
+			goto badlen;
+		if (code != 0)
+			goto badcode;
+		if (mip6_icmp6_input(m, off, icmp6len))
+			goto freeit;
+		break;
+#ifndef MIP6_DRAFT13
 	case ICMP6_MOBILEPREFIX_SOLICIT:
 	case ICMP6_MOBILEPREFIX_ADVERT:
 		if (code != 0)
@@ -794,6 +804,7 @@ icmp6_input(mp, offp, proto)
 		if (mip6_icmp6_input(m, off, icmp6len))
 			goto freeit;
 		break;
+#endif /* !MIP6_DRAFT13 */
 #endif /* MIP6 */
 
 	case MLD6_LISTENER_QUERY:
