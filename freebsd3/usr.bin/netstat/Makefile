@@ -10,10 +10,14 @@ BINGRP=	kmem
 BINMODE=2555
 DPADD=	${LIBKVM} ${LIBIPX}
 LDADD=	-lkvm -lipx
-CFLAGS+=	-DINET6 -DIPSEC -DKAME_SCOPEID
+CFLAGS+=	-DINET6 -DKAME_SCOPEID
 LDADD+= -L${.OBJDIR}/../../lib/libinet6 \
         -L/usr/local/v6/lib -linet6
 DPADD+= ${.OBJDIR}/../../lib/libinet6/libinet6.a \
         /usr/local/v6/lib/libinet6.a
+
+CFLAGS+=-DIPSEC -I${.CURDIR}
+SRCS+=	ipsec.c
+.PATH:	${.CURDIR}/../../kame/netstat
 
 .include <bsd.prog.mk>
