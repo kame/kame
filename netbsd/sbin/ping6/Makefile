@@ -23,6 +23,6 @@ DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \
 CPPFLAGS+=-DKAME_SCOPEID
 
 # new advanced API
-CFLAGS+=-DUSE_RFC2292BIS
+CPPFLAGS+=-DUSE_RFC2292BIS
 
 .include <bsd.prog.mk>
