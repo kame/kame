@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1985 2001/11/21 05:21:57 itojun Exp $
+$KAME: CHANGELOG,v 1.1986 2001/11/25 10:48:06 jinmei Exp $
 
 <200111>
+2001-11-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/{altq*, hroute6d, ppp, pvc*, ifconfig}/Makefile:
+	linked KAME's libinet6 in order to make sure to use the latest
+	getaddrinfo() and getnameinfo().  Those applications may not work
+	well with libc due to latest changes of handling IPv6 scoped
+	addresses, particularly the lack of NI_WITHSCOPEID.
+
 Wed Nov 21 14:17:10 JST 2001  itojun@iijlab.net
 	* sys/netinet/ip_output.c: update outgoing interface only if ipsec
 	  tunnel mode encapsulation is applied.  the change is necessary to
