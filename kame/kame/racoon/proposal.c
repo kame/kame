@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.c,v 1.7 2000/08/09 17:23:20 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.c,v 1.8 2000/08/23 01:41:03 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -252,15 +252,27 @@ cmpsaprop_alloc(ph1, pp1, pp2)
 			goto err;
 		}
 
-	if (pp1->pfs_group != pp2->pfs_group) {
-		YIPSDEBUG(DEBUG_SA,
-			plog(logp, LOCATION, NULL,
-				"WARNING: pfs group mismatched: "
-				"my:%d peer:%d\n",
-				pp2->pfs_group, pp1->pfs_group));
-		/* FALLTHRU */
+	/* check PFS */
+	switch (ph1->rmconf->pcheck_level) {
+	case PROP_CHECK_OBEY:
+		newpp->pfs_group = pp1->pfs_group;
+		break;
+	case PROP_CHECK_STRICT:
+	case PROP_CHECK_CLAIM:
+		if (pp1->pfs_group != pp2->pfs_group) {
+			YIPSDEBUG(DEBUG_SA,
+				plog(logp, LOCATION, NULL,
+					"ERROR: pfs group mismatched: "
+					"my:%d peer:%d\n",
+					pp2->pfs_group, pp1->pfs_group));
+			goto err;
+		}
+		break;
+	default:
+		plog(logp, LOCATION, NULL,
+			"FATAL: invalid pcheck_level why?.\n");
+		goto err;
 	}
-	newpp->pfs_group = pp1->pfs_group;
 
 	/* check protocol order */
 	pr1 = pp1->head;

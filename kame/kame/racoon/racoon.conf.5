@@ -236,7 +236,7 @@ Not yet.
 enable to send INITIAL-CONTACT message.
 .\"
 .It Ic proposal_check Ar level ;
-specifies the action of lifetime length selection on the responder side.
+specifies the action of lifetime length and PFS selection on the responder side.
 default level is
 .Ic strict .
 If the
@@ -248,12 +248,15 @@ the responder obey the initiator anytime.
 .It Ic strict
 If the responder's length is longer than the initiator's one, the
 responder uses the intitiator's one.  Otherwise rejects the proposal.
+If PFS is required and if the responder's group is not equal to
+the initiator's one, then the responder reject the proposal.
 .It Ic claim
 If the responder's length is longer than the initiator's one, the
 responder use the intitiator's one.  If the responder's length is
 shorter than the initiator's one, the responder uses own length
 AND send RESPONDER-LIFETIME notify message to a initiator in the
-case of lifetime.
+case of lifetime.  About PFS, this directive is same as
+.Ic strict .
 .El
 .\"
 .It Ic support_mip6 (on \(ba off) ;
