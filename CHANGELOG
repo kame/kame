@@ -1,6 +1,10 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1395 2000/11/21 14:51:55 kawa Exp $
+$KAME: CHANGELOG,v 1.1396 2000/11/23 16:46:18 sumikawa Exp $
+
+Fri Nov 24 01:43:21 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* kame/freebsd4/usr.sbin/syslogd: IPv6 enabled syslogd from
+	  masahito_endo@ydc.co.jp. '-a' option does not work now.
 
 <200011>
 2000-11-21  Koji Kawano <K.Kawano@rdmg.mgcs.mei.co.jp>
