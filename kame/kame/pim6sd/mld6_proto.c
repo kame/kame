@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.30 2002/12/02 02:42:33 itojun Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.31 2002/12/02 03:48:15 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -307,6 +307,8 @@ accept_listener_report(src, dst, group)
 
 	v = &uvifs[mifi];
 	bzero(&group_sa, sizeof(group_sa));
+	group_sa.sin6_family = AF_INET6;
+	group_sa.sin6_len = sizeof(group_sa);
 	group_sa.sin6_addr = *group;
 	group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
 
@@ -435,6 +437,8 @@ accept_listener_done(src, dst, group)
 
 	v = &uvifs[mifi];
 	bzero(&group_sa, sizeof(group_sa));
+	group_sa.sin6_family = AF_INET6;
+	group_sa.sin6_len = sizeof(group_sa);
 	group_sa.sin6_addr = *group;
 	group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
 
