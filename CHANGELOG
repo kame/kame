@@ -1,6 +1,12 @@
-$Id: CHANGELOG,v 1.500 2000/01/30 15:44:07 itojun Exp $
+$Id: CHANGELOG,v 1.501 2000/01/31 07:27:31 itojun Exp $
 
 <200001>
+Mon Jan 31 16:25:42 JST 2000  itojun@iijlab.net
+	* non-openbsd: don't reuse m->m_pkthdr.rcvif for passing extra
+	  inforation necessary for ipsec.  use ipsec_[sg]etsocket() and
+	  m->m_pkthdr.aux.
+	* kame/sys/crypto/sha1.[ch]: const poisoning.
+	  
 Mon Jan 31 00:42:47 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/mail/{sendmail,smtpfeed}: upgrade smtpfeed to 1.04.
 	  synchronize with latest NetBSD pkgsrc.
