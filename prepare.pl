@@ -15,12 +15,27 @@ $dst = $ARGV[1];
 sub dig {
 	local($curdir, $src, $dst) = @_;
 	local(@all);
+	local(%exclude);
 
 	print "start: $curdir, $src, $dst\n";
 
 	opendir(DIR, $curdir);
 	@all = readdir(DIR);
 	closedir(DIR);
+
+	if (-f "$dst/.prepare") {
+		%exclude = ();
+		open(IN, "< $dst/.prepare");
+		while (<IN>) {
+			s/\n$//;
+			if (/^exclude\s+(\S+)$/) {
+				$exclude{$1}++;
+			}
+		}
+		close(IN);
+		print "exclude in $dst: " . join(keys %exclude) . "\n"
+			if ($debug);
+	}
 	foreach $i (@all) {
 		next if ($i eq '.');
 		next if ($i eq '..');
@@ -42,8 +57,12 @@ sub dig {
 					print "unlink $dst/$i (symlink)\n" if $debug;
 					unlink "$dst/$i";
 				}
-				print "ln -s $src/$i $dst/$i\n" if $debug;
-				symlink "$src/$i", "$dst/$i" if (!$test);
+				if ($exclude{$i}) {
+					print "exclude $dst/$i\n" if $debug;
+				} else {
+					print "ln -s $src/$i $dst/$i\n" if $debug;
+					symlink "$src/$i", "$dst/$i" if (!$test);
+				}
 			}
 		}
 	}
