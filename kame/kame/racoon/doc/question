@@ -1,4 +1,4 @@
-$Id: question,v 1.7 2000/01/11 15:55:21 sakane Exp $
+$Id: question,v 1.8 2000/01/12 19:22:30 itojun Exp $
 
 HOW DO I DO ?
 Q. ID payload handling in phase 2 besides IPSECDOI_ID_IP*.
@@ -19,13 +19,17 @@ Q. The padding for data attribute.
 Q. vendorid's hash algorithm
 	For aggressive mode ?.
 	In mail mode, should I use negotiated algorithm ?
+
+	-> it's not negotiated
 Q. encryption during aggressive mode.
 	when receive encrypted packet of 1st exchange from responder,
 	it can be decoded.  When we are responder, should we send encrypted ?
 Q. packet padding ? in particular, variable attribute.
 Q. What is the perpose of exchange of DH attribute on quick mode ?
+	-> pfs
 Q. Should I do acceptable check of phase 2 pfs group ?.
    If initiator requests PFS, should we accept without acceptable check.
+	-> well-known issue
 Q. base mode
    3.1. Base Mode Authenticated with Signatures
    HDR, SA, Idii, Ni_b     =>
@@ -35,6 +39,7 @@ Q. base mode
 Q. What's proto_id in notify message of responder 2nd message with commit bit
   processing when multiple different SA applyed ?
 Q. Is it forbidden to clear commit bit during phase2 negotiation ?
+	-> not forbidden,
 
 Q. how many time is the notify message sent ?
 A. don't resend notify message because peer can use Acknowledged
@@ -78,3 +83,5 @@ Q. What kind of policy configuration is desired?
 Q. Waht's msgid of informational exchange for error notify message during
    phase2 ?  Is it same as msgid of phase2 negotiation caused error ?
    Or new msgid created ?  If later case, spi must be conveyed.
+	-> new msgid should be used
+	-> then, how can we deduce phase 2 from the notification?
