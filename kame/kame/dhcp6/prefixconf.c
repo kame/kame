@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.12 2003/01/06 02:58:55 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.13 2003/01/06 06:45:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -218,7 +218,7 @@ update_prefix(ia, pinfo, pifc, dhcpifp, ctlp, callback)
 	 * If the new vltime is 0, this prefix immediatly expires.
 	 * Otherwise, set up or update the associated timer.
 	 */
-	switch(sp->prefix.vltime) {
+	switch (sp->prefix.vltime) {
 	case 0:
 		remove_siteprefix(sp);
 		break;
