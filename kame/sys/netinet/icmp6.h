@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.89 2004/01/29 01:32:38 suz Exp $	*/
+/*	$KAME: icmp6.h,v 1.90 2004/02/13 11:58:42 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -901,6 +901,7 @@ struct	in6_multi;
 void	icmp6_init __P((void));
 void	icmp6_paramerror __P((struct mbuf *, int));
 void	icmp6_error __P((struct mbuf *, int, int, int));
+void	icmp6_error2 __P((struct mbuf *, int, int, int, struct ifnet *));
 int	icmp6_input __P((struct mbuf **, int *, int));
 void	icmp6_fasttimo __P((void));
 void	icmp6_slowtimo __P((void));
