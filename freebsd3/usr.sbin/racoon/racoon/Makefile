@@ -11,7 +11,7 @@ SRCS=	main.c session.c isakmp.c handler.c \
 # debugging code with print-isakmp.c
 SRCS+=	print-isakmp.c
 CFLAGS+=-I${SRCDIR}/../tcpdump -I${SRCDIR}/../tcpdump/lbl \
-	-DHAVE_PRINT_ISAKMP_C=1
+	-DHAVE_PRINT_ISAKMP_C=1 -DHAVE_GETIFADDRS=1
 
 MAN5=	racoon.conf.5
 MAN8=	racoon.8
