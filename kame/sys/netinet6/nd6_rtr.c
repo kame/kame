@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.127 2001/06/29 15:31:50 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.128 2001/07/18 11:20:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1435,9 +1435,13 @@ pfxlist_onlink_check()
 			break;
 	}
 
-	if (pr) {
+	if (pr != NULL || TAILQ_FIRST(&nd_defrouter) != NULL) {
 		/*
-		 * There is at least one prefix that has a reachable router.
+		 * There is at least one prefix that has a reachable router,
+		 * or at least a router which probably does not advertise
+		 * any prefixes.  The latter would be the case when we move
+		 * to a new link where we have a router that does not provide
+		 * prefixes and we configure an address by hand.
 		 * Detach prefixes which have no reachable advertising
 		 * router, and attach other prefixes.
 		 */
@@ -1523,7 +1527,7 @@ pfxlist_onlink_check()
 	 * The precise detection logic is same as the one for prefixes.
 	 */
 	for (ifa = in6_ifaddr; ifa; ifa = ifa->ia_next) {
-		if ((ifa->ia6_flags & IN6_IFF_AUTOCONF) == 0)
+		if (!(ifa->ia6_flags & IN6_IFF_AUTOCONF))
 			continue;
 
 		if (ifa->ia6_ndpr == NULL) {
