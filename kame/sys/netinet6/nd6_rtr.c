@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.62 2001/01/23 11:53:09 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.63 2001/01/23 12:12:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1254,7 +1254,7 @@ find_pfxlist_reachable_router(pr)
 /*
  * Check if each prefix in the prefix list has at least one available router
  * that advertised the prefix (A router is "available" if its neighbor cache
- * entry has reachable or probably reachable).
+ * entry is reachable or probably reachable).
  * If the check fails, the prefix may be off-link, because, for example,
  * we have moved from the network but the lifetime of the prefix has not
  * been expired yet. So we should not use the prefix if there is another
