@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.33 2000/04/19 04:11:46 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.34 2000/04/19 04:51:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -241,13 +241,7 @@ int in6_gif_input(mp, offp, proto)
 
 	gifp = (struct ifnet *)encap_getarg(m);
 
-	if (gifp == NULL) {
-		m_freem(m);
-		ip6stat.ip6s_nogif++;
-		return IPPROTO_DONE;
-	}
-
-	if ((gifp->if_flags & IFF_UP) == 0) {
+	if (gifp == NULL || (gifp->if_flags & IFF_UP) == 0) {
 		m_freem(m);
 		ip6stat.ip6s_nogif++;
 		return IPPROTO_DONE;

@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.35 2000/04/19 01:52:47 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.36 2000/04/19 04:51:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -277,27 +277,7 @@ in_gif_input(m, va_alist)
 
 	gifp = (struct ifnet *)encap_getarg(m);
 
-	if (gifp == NULL) {
-		/* for backward compatibility */
-		if (proto == IPPROTO_IPV4) {
-#ifdef __OpenBSD__
-#if defined(MROUTING) || defined(IPSEC)
-			ip4_input(m, off, proto);
-			return;
-#endif
-#else
-#ifdef MROUTING
-			ipip_input(m, off, proto);
-			return;
-#endif /*MROUTING*/
-#endif
-		}
-		m_freem(m);
-		ipstat.ips_nogif++;
-		return;
-	}
-
-	if ((gifp->if_flags & IFF_UP) == 0) {
+	if (gifp == NULL || (gifp->if_flags & IFF_UP) == 0) {
 		m_freem(m);
 		ipstat.ips_nogif++;
 		return;
