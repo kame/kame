@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.135 2001/07/24 10:08:45 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.136 2001/07/24 12:28:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -345,17 +345,17 @@ found:
 
 	/* get EUI64 */
 	switch (ifp->if_type) {
+	/* IEEE802/EUI64 cases - what others? */
 	case IFT_ETHER:
 	case IFT_FDDI:
 	case IFT_ATM:
 	case IFT_IEEE1394:
 #ifdef IFT_IEEE80211
 	case IFT_IEEE80211:
-#endif
-		/* IEEE802/EUI64 cases - what others? */
 		/* IEEE1394 uses 16byte length address starting with EUI64 */
 		if (ifp->if_type == IFT_IEEE80211 && addrlen > 8)
 			addrlen = 8;
+#endif
 
 		/* look at IEEE802/EUI64 only */
 		if (addrlen != 8 && addrlen != 6)
