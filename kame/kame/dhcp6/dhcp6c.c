@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.117 2003/04/11 13:11:48 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.118 2003/04/11 13:16:14 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -182,7 +182,7 @@ main(argc, argv)
 
 	/* dump current PID */
 	pid = getpid();
-	if ((pidfp = fopen(DHCP6C_PIDFILE, "w")) != NULL) {
+	if ((pidfp = fopen(pid_file, "w")) != NULL) {
 		fprintf(pidfp, "%d\n", pid);
 		fclose(pidfp);
 	}
@@ -481,7 +481,7 @@ process_signals()
 	if ((sig_flags & SIGF_TERM)) {
 		exit_ok = 1;
 		free_resources();
-		unlink(DHCP6C_PIDFILE);
+		unlink(pid_file);
 		check_exit();
 	}
 	if ((sig_flags & SIGF_HUP)) {
