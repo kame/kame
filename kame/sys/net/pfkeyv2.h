@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.37 2003/09/06 05:15:43 itojun Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.38 2003/09/10 21:10:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -222,6 +222,7 @@ struct sadb_x_sa3 {
   u_int16_t sadb_x_sa3_exttype;
   u_int32_t sadb_x_sa3_id;		/* SA id */
   u_int64_t sadb_x_sa3_sequence;	/* 64bit sequence number */
+  u_int64_t sadb_x_sa3_socket;		/* struct socket * */
 };
 #endif
 
