@@ -1544,8 +1544,13 @@ ip_forward(m, srcrt)
 	 * Pullup to avoid sharing mbuf cluster between m and mcopy.
 	 */
 	mcopy = m_copym(m, 0, imin((int)ip->ip_len, 64), M_DONTWAIT);
-	if (mcopy)
+	if (mcopy) {
+#ifdef _IP_VHL
+		mcopy = m_pullup(mcopy, IP_VHL_HL(ip->ip_vhl) << 2);
+#else
 		mcopy = m_pullup(mcopy, ip->ip_hl << 2);
+#endif
+	}
 
 	/*
 	 * If forwarding packet using same interface that it came in on,
