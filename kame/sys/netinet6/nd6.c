@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.75 2000/10/15 15:23:11 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.76 2000/11/05 16:53:46 onoe Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -245,6 +245,9 @@ nd6_setmtu(ifp)
 		 ndi->maxmtu = MIN(ATMMTU, ifp->if_mtu);
 		 break;
 #endif
+	 case IFT_IEEE1394:	/* XXX should be IEEE1394MTU(1500) */
+		 ndi->maxmtu = MIN(ETHERMTU, ifp->if_mtu);
+		 break;
 	 default:
 		 ndi->maxmtu = ifp->if_mtu;
 		 break;
@@ -1008,6 +1011,7 @@ nd6_resolve(ifp, rt, m, dst, desten)
 {
 	struct llinfo_nd6 *ln = (struct llinfo_nd6 *)NULL;
 	struct sockaddr_dl *sdl;
+	int i;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
@@ -1019,11 +1023,13 @@ nd6_resolve(ifp, rt, m, dst, desten)
 			ETHER_MAP_IPV6_MULTICAST(&SIN6(dst)->sin6_addr,
 						 desten);
 			return(1);
-			break;
+		case IFT_IEEE1394:
+			for (i = 0; i < ifp->if_addrlen; i++)
+				desten[i] = ~0;
+			return(1);
 		case IFT_ARCNET:
 			*desten = 0;
 			return(1);
-			break;
 		default:
 			return(0);
 		}
@@ -1911,6 +1917,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	case IFT_ARCNET:
 	case IFT_ETHER:
 	case IFT_FDDI:
+	case IFT_IEEE1394:
 	case IFT_GIF:		/* XXX need more cases? */
 		break;
 	default:
@@ -2097,6 +2104,7 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 	struct sockaddr *dst;
 	u_char *desten;
 {
+	int i;
 	struct sockaddr_dl *sdl;
 
 	if (m->m_flags & M_MCAST) {
@@ -2106,7 +2114,10 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 			ETHER_MAP_IPV6_MULTICAST(&SIN6(dst)->sin6_addr,
 						 desten);
 			return(1);
-			break;
+		case IFT_IEEE1394:
+			for (i = 0; i < ifp->if_addrlen; i++)
+				desten[i] = ~0;
+			return(1);
 		case IFT_ARCNET:
 			*desten = 0;
 			return(1);

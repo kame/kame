@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.109 2000/10/24 07:19:01 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.110 2000/11/05 16:53:46 onoe Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1004,6 +1004,7 @@ in6_update_ifa(ifp, ifra, ia)
 	case IFT_ARCNET:
 	case IFT_ETHER:
 	case IFT_FDDI:
+	case IFT_IEEE1394:
 #if 0
 	case IFT_ATM:
 	case IFT_SLIP:
@@ -1537,6 +1538,7 @@ in6_ifinit(ifp, ia, sin6, newhost, newprefix)
 	case IFT_ARCNET:
 	case IFT_ETHER:
 	case IFT_FDDI:
+	case IFT_IEEE1394:
 		ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
 		ia->ia_ifa.ifa_flags |= RTF_CLONING;
 		break;

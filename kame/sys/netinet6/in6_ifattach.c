@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.68 2000/10/18 18:44:24 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.69 2000/11/05 16:53:46 onoe Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -178,7 +178,11 @@ found:
 	case IFT_ETHER:
 	case IFT_FDDI:
 	case IFT_ATM:
+	case IFT_IEEE1394:
 		/* IEEE802/EUI64 cases - what others? */
+		/* IEEE1394 uses 16byte length address starting with EUI64 */
+		if (addrlen > 8)
+			addrlen = 8;
 
 		/* look at IEEE802/EUI64 only */
 		if (addrlen != 8 && addrlen != 6)
@@ -528,6 +532,7 @@ in6_ifattach_addaddr(ifp, ia)
 		case IFT_ARCNET:
 		case IFT_ETHER:
 		case IFT_FDDI:
+		case IFT_IEEE1394:
 #else
 		default:
 #endif
