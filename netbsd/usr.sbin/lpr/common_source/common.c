@@ -155,6 +155,7 @@ getport(rhost, rport)
 	/*
 	 * Try connecting to the server.
 	 */
+	s = -1;
 	for (r = res; r; r = r->ai_next) {
 retry:
 		seteuid(euid);
@@ -165,6 +166,7 @@ retry:
 		if (connect(s, r->ai_addr, r->ai_addrlen) < 0) {
 			error = errno;
 			(void)close(s);
+			s = -1;
 			errno = error;
 			if (errno == EADDRINUSE) {
 				lport--;
