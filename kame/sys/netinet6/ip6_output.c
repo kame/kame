@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.444 2004/03/24 09:11:21 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.445 2004/04/06 11:21:54 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2376,8 +2376,34 @@ do { \
 				}
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-				optbuf = sopt->sopt_val;
+				/* sanity check for the given sopt_valsize */
+				switch (optname) {
+				case IPV6_PKTINFO:
+					if (sopt->sopt_valsize != 
+					    sizeof(struct in6_pktinfo))
+						error = EINVAL;
+					break;
+				case IPV6_NEXTHOP:
+					if (sopt->sopt_valsize >
+					    SOCK_MAXADDRLEN)
+						error = EINVAL;
+					break;
+				default:
+					if (sopt->sopt_valsize > IPV6_MAXOPTHDR)
+						error = EINVAL;
+					break;
+				}
+				if (error)
+					break;
+
 				optlen = sopt->sopt_valsize;
+				optbuf = malloc(optlen, M_TEMP, M_WAITOK);
+				error = sooptcopyin(sopt, optbuf, optlen,
+				    optlen);
+				if (error) {
+					free(optbuf, M_TEMP);
+					break;
+				}
 #else  /* !fbsd3 */
 				if (m && m->m_next) {
 					error = EINVAL;	/* XXX */
@@ -2395,6 +2421,9 @@ do { \
 				error = ip6_pcbopt(optname,
 						   optbuf, optlen,
 						   optp, privileged, uproto);
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				free(optbuf, M_TEMP);
+#endif
 				break;
 			}
 #undef OPTSET
