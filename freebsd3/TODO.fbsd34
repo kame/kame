@@ -18,9 +18,8 @@ ports
 	bump the major version of several shared libraries: done
 	sync with ports-current
 		ssh:
-		vic6:
-		vat6:
-		ruby:
+		vic6: done
+		vat6: done
 
 sbin
 	ifconfig: done
@@ -37,8 +36,8 @@ usr.bin
 	tftp: done
 
 usr.sbin
-	inetd:
-	lpr:
+	inetd: done
+	lpr: done
 
 MEMOs:
 	- conf/options: keyword "PTR" is still used as opt_ptr.h.
@@ -47,5 +46,4 @@ MEMOs:
 	- NETGRAPH has include in FreeBSD-3.4. We check whether it is
 	  friendly with KAME IPv6
 
-	- ip6fw is not synced from FreeBSD-3.2...
-
+	- ip6fw has not been synced from FreeBSD-3.2...
