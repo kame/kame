@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.36 2001/08/16 13:12:12 itojun Exp $
+$KAME: helsinki-result.jp,v 1.37 2001/08/16 13:42:45 sakane Exp $
 
 
 generic
@@ -80,10 +80,19 @@ Compaq Tru54 UNIX X5.1B-BL4
 	opensslのバージョン下げちゃったので
 	ipv6 address as subjectAltName は出来ず。
 
+Sun
+	Thu Aug 16 16:30 EEST 2001
+	phase1: RSA signature, 3des, sha1, dh5
+	phase2: ESP transport, aes 128, sha1, dh5
+
+	まぁ問題なし
+
+	Sunは phase2のAESの鍵長をつけてなかった。draftによるとmust。
+	racoon側がdefault鍵長をセットするようにして対応。
+
 IBM AIX 5.1
 	Tue Aug 14 17:33:43 JST 2001
 	IPv6 testしようと言われるも、先方のマシン(遠隔地)にglobal addressなし。
-
 
 F-Secure VPN+ 5.40
 	Tue Aug 14 19:44:15 JST 2001
