@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.32 2002/04/24 14:31:32 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.33 2002/04/25 02:39:02 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -542,14 +542,14 @@ gethwid(buf, len, ifname, hwtypep)
 }
 
 int
-get_dhcp6_option(bp, ep, opt, retbuf)
-	struct dhcp6opt *bp, *ep;
+get_dhcp6_option(p, ep, opt, retbuf)
+	struct dhcp6opt *p, *ep;
 	int opt;
 	void *retbuf;
 {
 	char *cp;
 	struct duid *duid;
-	struct dhcp6opt *p, *np;
+	struct dhcp6opt *np;
 	int optlen;
 
 	for (; p + 1 <= ep; p = np) {
