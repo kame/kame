@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1069 2000/06/27 16:19:32 suz Exp $
+$Id: CHANGELOG,v 1.1070 2000/06/28 06:00:38 sakane Exp $
 
 <200006>
+Wed Jun 28 15:01:09 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	improved sending a notify message including delete payload.
+	It's sent when one of below situations happens:
+		o receiving SADB_DELETE message from kernel.
+		o receiving SADB_FLUSH message from kernel.
+		o flushing phase2 handler.
+
 Wed Jun 28 01:16:41 JST 2000	SUZUKI Shinsuke <suz@sdl.hitachi.co.jp>
 	* freebsd4/INSTALL
 	write up configuration-related matters for FreeBSD-4.0
