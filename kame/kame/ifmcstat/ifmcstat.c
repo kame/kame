@@ -448,21 +448,22 @@ in6_multientry(mc)
 	printf("\t\tgroup %s", inet6_n2a(&multi.in6m_sa));
 	printf(" refcnt %u", multi.in6m_refcount);
 
-	KREAD(multi.in6m_rti, &rt6i, struct router_info);
-	switch (rt6i.rt6i_type) {
-	case MLD_V1_ROUTER:
-		printf("\tmld_ver 1");
-		break;
+	if (multi.in6m_rti != NULL) {
+		KREAD(multi.in6m_rti, &rt6i, struct router_info);
+		switch (rt6i.rt6i_type) {
+		case MLD_V1_ROUTER:
+			printf("\tmld_ver 1");
+			break;
 #ifdef HAVE_MLDV2
-	case MLD_V2_ROUTER:
-		printf("\tmld_ver 2");
-		break;
+		case MLD_V2_ROUTER:
+			printf("\tmld_ver 2");
+			break;
 #endif
-	default:
-		printf("\tmld_ver ?(%d)", rt6i.rt6i_type);
-		break;
+		default:
+			printf("\tmld_ver ?(%d)", rt6i.rt6i_type);
+			break;
+		}
 	}
-
 
 #ifdef HAVE_MLDV2
 	if (multi.in6m_source == NULL) {
@@ -625,22 +626,24 @@ in_multientry(mc)
 	KREAD(mc, &multi, struct in_multi);
 	printf("\t\tgroup %s", inet_ntoa(multi.inm_addr));
 
-	KREAD(multi.inm_rti, &rti, struct router_info);
-	switch (rti.rti_type) {
-	case IGMP_v1_ROUTER:
-		printf("\tigmp_ver 1");
-		break;
-	case IGMP_v2_ROUTER:
-		printf("\tigmp_ver 2");
-		break;
+	if (multi.inm_rti != NULL) {
+		KREAD(multi.inm_rti, &rti, struct router_info);
+		switch (rti.rti_type) {
+		case IGMP_v1_ROUTER:
+			printf("\tigmp_ver 1");
+			break;
+		case IGMP_v2_ROUTER:
+			printf("\tigmp_ver 2");
+			break;
 #ifdef HAVE_IGMPV3
-	case IGMP_v3_ROUTER:
-		printf("\tigmp_ver 3");
-		break;
+		case IGMP_v3_ROUTER:
+			printf("\tigmp_ver 3");
+			break;
 #endif
-	default:
-		printf("\tigmp_ver ?(%d)", rti.rti_type);
-		break;
+		default:
+			printf("\tigmp_ver ?(%d)", rti.rti_type);
+			break;
+		}
 	}
 
 #ifdef HAVE_IGMPV3
