@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.8 2000/01/11 04:53:02 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.9 2000/01/11 15:56:03 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -217,7 +217,6 @@ ident_i2recv(iph1, msg)
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
-			error = 0;
 			plog(logp, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
@@ -359,7 +358,6 @@ ident_i3recv(iph1, msg)
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
-			error = 0;
 			plog(logp, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
@@ -473,7 +471,6 @@ ident_i4recv(iph1, msg0)
 
 	/* decrypting */
 	if (!ISSET(((struct isakmp *)msg0->v)->flags, ISAKMP_FLAG_E)) {
-		error = 0;
 		plog(logp, LOCATION, iph1->remote,
 			"ignore the packet, "
 			"expecting the packet encrypted.\n");
@@ -530,7 +527,6 @@ ident_i4recv(iph1, msg0)
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
-			error = 0;
 			plog(logp, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
@@ -685,7 +681,6 @@ ident_r1recv(iph1, msg)
 			 * the re-sent packet.  And we do same behavior
 			 * when we expect encrypted packet.
 			 */
-			error = 0;
 			plog(logp, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
@@ -857,7 +852,6 @@ ident_r2recv(iph1, msg)
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
-			error = 0;
 			plog(logp, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
@@ -969,7 +963,6 @@ ident_r3recv(iph1, msg0)
 
 	/* decrypting */
 	if (!ISSET(((struct isakmp *)msg0->v)->flags, ISAKMP_FLAG_E)) {
-		error = 0;
 		plog(logp, LOCATION, iph1->remote,
 			"ignore the packet, "
 			"expecting the packet encrypted.\n");
@@ -1026,7 +1019,6 @@ ident_r3recv(iph1, msg0)
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
-			error = 0;
 			plog(logp, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",

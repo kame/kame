@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.16 2000/01/11 05:18:02 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.17 2000/01/11 15:56:04 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -433,10 +433,6 @@ isakmp_info_send_n1(iph1, type, data)
 	 * by cookie and SPI has no meaning, 0 <= SPI size <= 16.
 	 */
 
-#if 0
-	return 0;
-#endif
-
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
 	tlen = sizeof(*n) + spisiz;
@@ -533,7 +529,6 @@ isakmp_info_send_common(iph1, payload, np, flags)
 	vchar_t *hash = NULL;
 	struct isakmp *isakmp;
 	struct isakmp_gen *gen;
-	u_int32_t msgid;
 	char *p;
 	int tlen;
 	int error = -1;
@@ -559,7 +554,7 @@ isakmp_info_send_common(iph1, payload, np, flags)
 		}
 
 		/* generate HASH(1) */
-		hash = oakley_compute_hash1(iph2->ph1, msgid, payload);
+		hash = oakley_compute_hash1(iph2->ph1, iph2->msgid, payload);
 		if (hash == NULL) {
 			delph2(iph2);
 			goto end;
@@ -603,7 +598,7 @@ isakmp_info_send_common(iph1, payload, np, flags)
 		isakmp->flags = (hash == NULL ? 0 : ISAKMP_FLAG_E);
 	else
 		isakmp->flags = (hash == NULL ? 0 : ISAKMP_FLAG_A);
-	memcpy(&isakmp->msgid, &msgid, sizeof(isakmp->msgid));
+	memcpy(&isakmp->msgid, &iph2->msgid, sizeof(isakmp->msgid));
 	isakmp->len   = htonl(tlen);
 	p = (char *)(isakmp + 1);
 
@@ -626,7 +621,7 @@ isakmp_info_send_common(iph1, payload, np, flags)
 #endif
 
 	/* encoding */
-	if ((flags & ISAKMP_FLAG_E) != 0) {
+	if (ISSET(isakmp->flags, ISAKMP_FLAG_E)) {
 		vchar_t *tmp;
 
 		tmp = oakley_do_encrypt(iph2->ph1, iph2->sendbuf, iph2->ivm->ive,
@@ -747,7 +742,7 @@ isakmp_info_recv_n(iph1, msg, remote)
 	if (type > sizeof(isakmp_notify_msg)/sizeof(isakmp_notify_msg[0])) {
 		plog(logp, LOCATION, remote,
 			"received unsupported message type %d.\n", type);
-		return(-1);
+		return -1;
 	}
 
 	switch (type) {
@@ -758,11 +753,30 @@ isakmp_info_recv_n(iph1, msg, remote)
 		/* do something */
 		break;
 	default:
-		/* delete ph1 */
+	    {
+		u_int32_t msgid = ((struct isakmp *)msg->v)->msgid;
+		struct ph2handle *iph2;
+
 		/* XXX there is a potential of dos attack. */
-		plog(logp, LOCATION, remote, "delete phase1 handle.\n");
-		remph1(iph1);
-		delph1(iph1);
+		if (msgid == 0) {
+			/* delete ph1 */
+			plog(logp, LOCATION, remote, "delete phase1 handle.\n");
+			remph1(iph1);
+			delph1(iph1);
+		} else {
+			iph2 = getph2bymsgid(iph1, msgid);
+			if (iph2 == NULL) {
+				plog(logp, LOCATION, remote,
+					"unknown notify message, "
+					"no phase2 handle found.\n");
+			} else {
+				/* delete ph2 */
+				unbindph12(iph2);
+				remph2(iph2);
+				delph2(iph2);
+			}
+		}
+	    }
 		break;
 	}
 

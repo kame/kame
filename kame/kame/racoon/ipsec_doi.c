@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.14 2000/01/11 13:06:23 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.15 2000/01/11 15:56:02 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -152,8 +152,9 @@ static int (*check_attributes[]) __P((struct isakmp_pl_t *)) = {
 	check_attr_ipcomp,	/* IPSECDOI_PROTO_IPCOMP */
 };
 
-static int getph1proplen __P((struct isakmpsa *proposal));
-static caddr_t setph1attr __P((caddr_t buf, struct isakmpsa *sa, int *len));
+static int setph1prop __P((struct isakmpsa *props, caddr_t buf));
+static int setph1trns __P((struct isakmpsa *props, caddr_t buf));
+static int setph1attr __P((struct isakmpsa *props, caddr_t buf));
 static int getph2proplen __P((struct ipsecsa *proposal));
 static caddr_t setph2attr __P((caddr_t buf, struct ipsecsa *sa, int *len));
 static vchar_t *sockaddr2id __P((struct sockaddr *saddr,
@@ -2192,165 +2193,187 @@ check_attr_ipcomp(trns)
  * NOT INCLUDING isakmp general header of SA payload
  */
 vchar_t *
-ipsecdoi_setph1proposal(proposal)
-	struct isakmpsa *proposal;
+ipsecdoi_setph1proposal(props)
+	struct isakmpsa *props;
 {
 	vchar_t *mysa;
-	struct isakmp_pl_p *prop;
-	struct isakmp_pl_t *trns;
-	struct isakmpsa *s = NULL;
-	int tlen;	/* total sa length */
-	u_int8_t *np_t; /* pointer next trns type in previous header */
-	int proplen, trns_num, attrlen;
-	caddr_t p;
+	int sablen;
 
 	/* count total size of SA minus isakpm general header */
 	/* not including isakmp general header of SA payload */
-	tlen = sizeof(struct ipsecdoi_sa_b);
-	tlen += getph1proplen(proposal);
+	sablen = sizeof(struct ipsecdoi_sa_b);
+	sablen += setph1prop(props, NULL);
 
-	mysa = vmalloc(tlen);
+	mysa = vmalloc(sablen);
 	if (mysa == NULL) {
 		plog(logp, LOCATION, NULL,
 			"failed to allocate my sa buffer (%s)\n",
 			strerror(errno)); 
 		return NULL;
 	}
-	p = mysa->v;
 
 	/* create SA payload */
 	/* not including isakmp general header */
-	((struct ipsecdoi_sa_b *)p)->doi = htonl(proposal->rmconf->doitype);
-	((struct ipsecdoi_sa_b *)p)->sit = htonl(proposal->rmconf->sittype);
-	p += sizeof(struct ipsecdoi_sa_b);
+	((struct ipsecdoi_sa_b *)mysa->v)->doi = htonl(props->rmconf->doitype);
+	((struct ipsecdoi_sa_b *)mysa->v)->sit = htonl(props->rmconf->sittype);
 
-	/* create proposal */
-	prop = (struct isakmp_pl_p *)p;
-	prop->h.np = ISAKMP_NPTYPE_NONE;
-	prop->p_no = proposal->prop_no;
-	prop->proto_id = IPSECDOI_PROTO_ISAKMP;
-	prop->spi_size = 0;
-	p += sizeof(*prop);
-
-	np_t = NULL;
-	trns_num = 0;
-	proplen = 0;
-
-	for (s = proposal; s != NULL; s = s->next) {
-		if (np_t)
-			*np_t = ISAKMP_NPTYPE_T;
-
-		/* create transform */
-		trns = (struct isakmp_pl_t *)p;
-		trns->h.np  = ISAKMP_NPTYPE_NONE;
-		trns->t_no  = s->trns_no;
-		trns->t_id  = IPSECDOI_KEY_IKE;
-		p += sizeof(*trns);
-
-		attrlen = 0;
-		p = setph1attr(p, s, &attrlen);
-
-		trns->h.len = htons(sizeof(*trns) + attrlen);
-
-		/* count up transform length */
-		proplen += sizeof(*trns) + attrlen;
-		trns_num++;
-
-		/* save buffer to pre-next payload */
-		np_t = &trns->h.np;
-	}
-
-	/* update proposal length */
-	prop->h.len = htons(sizeof(*prop) + proplen);
-	prop->num_t = trns_num;
+	(void)setph1prop(props, mysa->v + sizeof(struct ipsecdoi_sa_b));
 
 	return mysa;
 }
 
 static int
-getph1proplen(proposal)
-	struct isakmpsa *proposal;
+setph1prop(props, buf)
+	struct isakmpsa *props;
+	caddr_t buf;
 {
-	struct isakmpsa *s;
-	int len = 0;
+	struct isakmp_pl_p *prop = NULL;
+	struct isakmpsa *s = NULL;
+	int proplen, trnslen;
+	u_int8_t *np_t; /* pointer next trns type in previous header */
+	int trns_num;
+	caddr_t p = buf;
 
-	len = sizeof(struct isakmp_pl_p);
+	proplen = sizeof(*prop);
+	if (buf) {
+		/* create proposal */
+		prop = (struct isakmp_pl_p *)p;
+		prop->h.np = ISAKMP_NPTYPE_NONE;
+		prop->p_no = props->prop_no;
+		prop->proto_id = IPSECDOI_PROTO_ISAKMP;
+		prop->spi_size = 0;
+		p += sizeof(*prop);
+	}
 
-	for (s = proposal; s != NULL; s = s->next) {
-		if (s->lifetime) {
-			len += sizeof(struct isakmp_data) +
-				sizeof(struct isakmp_data) + sizeof(s->lifetime);
-		}
-		if (s->lifebyte) {
-			len += sizeof(struct isakmp_data) +
-				sizeof(struct isakmp_data) + sizeof(s->lifebyte);
-		}
-		if (s->enctype)
-			len += sizeof(struct isakmp_data);
-		if (s->encklen)
-			len += sizeof(struct isakmp_data);
-		if (s->authmethod)
-			len += sizeof(struct isakmp_data);
-		if (s->hashtype)
-			len += sizeof(struct isakmp_data);
-		if (s->dh_group) {
-			len += sizeof(struct isakmp_data) +
-				sizeof(struct isakmp_data);
+	np_t = NULL;
+	trns_num = 0;
+
+	for (s = props; s != NULL; s = s->next) {
+		if (np_t)
+			*np_t = ISAKMP_NPTYPE_T;
+
+		trnslen = setph1trns(s, p);
+		proplen += trnslen;
+		if (buf) {
+			/* save buffer to pre-next payload */
+			np_t = &((struct isakmp_pl_t *)p)->h.np;
+			p += trnslen;
+
+			/* count up transform length */
+			trns_num++;
 		}
 	}
 
-	return len;
+	/* update proposal length */
+	if (buf) {
+		prop->h.len = htons(proplen);
+		prop->num_t = trns_num;
+	}
+
+	return proplen;
 }
 
-static caddr_t
-setph1attr(buf, sa, len)
-	caddr_t buf;
+static int
+setph1trns(sa, buf)
 	struct isakmpsa *sa;
-	int *len;
+	caddr_t buf;
 {
+	struct isakmp_pl_t *trns = NULL;
+	int trnslen, attrlen;
 	caddr_t p = buf;
 
-	*len = 0;
+	trnslen = sizeof(*trns);
+	if (buf) {
+		/* create transform */
+		trns = (struct isakmp_pl_t *)p;
+		trns->h.np  = ISAKMP_NPTYPE_NONE;
+		trns->t_no  = sa->trns_no;
+		trns->t_id  = IPSECDOI_KEY_IKE;
+		p += sizeof(*trns);
+	}
+
+	attrlen = setph1attr(sa, p);
+	trnslen += attrlen;
+	if (buf)
+		p += attrlen;
+
+	if (buf)
+		trns->h.len = htons(trnslen);
+
+	return trnslen;
+}
+
+static int
+setph1attr(sa, buf)
+	struct isakmpsa *sa;
+	caddr_t buf;
+{
+	caddr_t p = buf;
+	int attrlen = 0;
 
 	if (sa->lifetime) {
-		u_int32_t v = htonl((u_int32_t)sa->lifetime); /* XXX */
-		p = isakmp_set_attr_l(p, OAKLEY_ATTR_SA_LD_TYPE, OAKLEY_ATTR_SA_LD_TYPE_SEC);
-		p = isakmp_set_attr_v(p, OAKLEY_ATTR_SA_LD, (caddr_t)&v, sizeof(v));
+		attrlen += sizeof(struct isakmp_data) +
+			sizeof(struct isakmp_data) + sizeof(sa->lifetime);
+		if (buf) {
+			u_int32_t v = htonl((u_int32_t)sa->lifetime); /* XXX */
+			p = isakmp_set_attr_l(p, OAKLEY_ATTR_SA_LD_TYPE, OAKLEY_ATTR_SA_LD_TYPE_SEC);
+			p = isakmp_set_attr_v(p, OAKLEY_ATTR_SA_LD, (caddr_t)&v, sizeof(v));
+		}
 	}
 
 	if (sa->lifebyte) {
-		u_int32_t v = htonl((u_int32_t)sa->lifebyte); /* XXX */
-		p = isakmp_set_attr_l(p, OAKLEY_ATTR_SA_LD_TYPE, OAKLEY_ATTR_SA_LD_TYPE_KB);
-		p = isakmp_set_attr_v(p, OAKLEY_ATTR_SA_LD, (caddr_t)&v, sizeof(v));
+		attrlen += sizeof(struct isakmp_data) +
+			sizeof(struct isakmp_data) + sizeof(sa->lifebyte);
+		if (buf) {
+			u_int32_t v = htonl((u_int32_t)sa->lifebyte); /* XXX */
+			p = isakmp_set_attr_l(p, OAKLEY_ATTR_SA_LD_TYPE, OAKLEY_ATTR_SA_LD_TYPE_KB);
+			p = isakmp_set_attr_v(p, OAKLEY_ATTR_SA_LD, (caddr_t)&v, sizeof(v));
+		}
 	}
-	if (sa->enctype)
-		p = isakmp_set_attr_l(p, OAKLEY_ATTR_ENC_ALG, sa->enctype);
-	if (sa->encklen)
-		p = isakmp_set_attr_l(p, OAKLEY_ATTR_KEY_LEN, sa->encklen);
-	if (sa->authmethod)
-		p = isakmp_set_attr_l(p, OAKLEY_ATTR_AUTH_METHOD, sa->authmethod);
-	if (sa->hashtype)
-		p = isakmp_set_attr_l(p, OAKLEY_ATTR_HASH_ALG, sa->hashtype);
+	if (sa->enctype) {
+		attrlen += sizeof(struct isakmp_data);
+		if (buf)
+			p = isakmp_set_attr_l(p, OAKLEY_ATTR_ENC_ALG, sa->enctype);
+	}
+	if (sa->encklen) {
+		attrlen += sizeof(struct isakmp_data);
+		if (buf)
+			p = isakmp_set_attr_l(p, OAKLEY_ATTR_KEY_LEN, sa->encklen);
+	}
+	if (sa->authmethod) {
+		attrlen += sizeof(struct isakmp_data);
+		if (buf)
+			p = isakmp_set_attr_l(p, OAKLEY_ATTR_AUTH_METHOD, sa->authmethod);
+	}
+	if (sa->hashtype) {
+		attrlen += sizeof(struct isakmp_data);
+		if (buf)
+			p = isakmp_set_attr_l(p, OAKLEY_ATTR_HASH_ALG, sa->hashtype);
+	}
 	switch (sa->dh_group) {
 	case OAKLEY_ATTR_GRP_DESC_MODP768:
 	case OAKLEY_ATTR_GRP_DESC_MODP1024:
 	case OAKLEY_ATTR_GRP_DESC_MODP1536:
-		p = isakmp_set_attr_l(p, OAKLEY_ATTR_GRP_DESC, sa->dh_group);
-		p = isakmp_set_attr_l(p, OAKLEY_ATTR_GRP_TYPE, OAKLEY_ATTR_GRP_TYPE_MODP);
+		attrlen += sizeof(struct isakmp_data) + sizeof(struct isakmp_data);
+		if (buf) {
+			p = isakmp_set_attr_l(p, OAKLEY_ATTR_GRP_DESC, sa->dh_group);
+			p = isakmp_set_attr_l(p, OAKLEY_ATTR_GRP_TYPE, OAKLEY_ATTR_GRP_TYPE_MODP);
+		}
 		break;
 	case OAKLEY_ATTR_GRP_DESC_EC2N155:
 	case OAKLEY_ATTR_GRP_DESC_EC2N185:
-		p = isakmp_set_attr_l(p, OAKLEY_ATTR_GRP_DESC, sa->dh_group);
-		p = isakmp_set_attr_l(p, OAKLEY_ATTR_GRP_TYPE, OAKLEY_ATTR_GRP_TYPE_EC2N);
+		attrlen += sizeof(struct isakmp_data) + sizeof(struct isakmp_data);
+		if (buf) {
+			p = isakmp_set_attr_l(p, OAKLEY_ATTR_GRP_DESC, sa->dh_group);
+			p = isakmp_set_attr_l(p, OAKLEY_ATTR_GRP_TYPE, OAKLEY_ATTR_GRP_TYPE_EC2N);
+		}
 		break;
 	case 0:
 	default:
 		break;
 	}
 
-	*len = p - buf;
-
-	return p;
+	return attrlen;
 }
 
 /*

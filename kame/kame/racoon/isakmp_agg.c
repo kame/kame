@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.7 2000/01/11 05:30:25 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.8 2000/01/11 15:56:03 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -262,7 +262,6 @@ agg_i2recv(iph1, msg)
 			break;
 		default:
 			/* don't send information, see isakmp_ident_r1() */
-			error = 0;
 			plog(logp, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
@@ -492,7 +491,6 @@ agg_r1recv(iph1, msg)
 			break;
 		default:
 			/* don't send information, see isakmp_ident_r1() */
-			error = 0;
 			plog(logp, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
@@ -730,7 +728,6 @@ agg_r2recv(iph1, msg0)
 			break;
 		default:
 			/* don't send information, see isakmp_ident_r1() */
-			error = 0;
 			plog(logp, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",

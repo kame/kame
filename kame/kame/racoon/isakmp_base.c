@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.5 2000/01/10 23:47:29 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.6 2000/01/11 15:56:03 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -233,7 +233,6 @@ base_i2recv(iph1, msg)
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
-			error = 0;
 			plog(logp, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
@@ -379,7 +378,6 @@ base_i3recv(iph1, msg)
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
-			error = 0;
 			plog(logp, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
@@ -505,7 +503,6 @@ base_r1recv(iph1, msg)
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
-			error = 0;
 			plog(logp, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
@@ -692,7 +689,6 @@ base_r2recv(iph1, msg)
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
-			error = 0;
 			plog(logp, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",

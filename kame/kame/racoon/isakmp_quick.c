@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.7 2000/01/11 04:59:30 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.8 2000/01/11 15:56:04 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -425,7 +425,6 @@ quick_i2recv(iph2, msg0)
 
 		default:
 			/* don't send information, see ident_r1recv() */
-			error = 0;
 			plog(logp, LOCATION, iph2->ph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
@@ -705,7 +704,6 @@ quick_i3recv(iph2, msg0)
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
-			error = 0;
 			plog(logp, LOCATION, iph2->ph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
@@ -980,7 +978,6 @@ quick_r1recv(iph2, msg0)
 			break;
 
 		default:
-			error = 0;
 			plog(logp, LOCATION, iph2->ph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
@@ -1366,7 +1363,6 @@ quick_r3recv(iph2, msg0)
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
-			error = 0;
 			plog(logp, LOCATION, iph2->ph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
@@ -1419,14 +1415,11 @@ quick_r3recv(iph2, msg0)
 	}
     }
 
-	/* if there is commit bit don't set up SA now. */
+	/* if there is commit bit, don't set up SA now. */
 	if (ISSET(iph2->ph1->flags, ISAKMP_FLAG_C)) {
 		iph2->status = PHASE2ST_COMMIT;
-		error = 0;
-		goto end;
-	}
-
-	iph2->status = PHASE2ST_STATUS6;
+	} else
+		iph2->status = PHASE2ST_STATUS6;
 
 	error = 0;
 
