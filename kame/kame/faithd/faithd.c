@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.34 2000/11/19 11:45:38 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.35 2001/02/10 05:24:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -612,8 +612,14 @@ play_child(int s_src, struct sockaddr *srcaddr)
 		ftp_relay(s_src, s_dst);
 		break;
 	case RSH_PORT:
+		syslog(LOG_WARNING,
+		    "WARINNG: it is insecure to relay rsh port");
 		rsh_relay(s_src, s_dst);
 		break;
+	case RLOGIN_PORT:
+		syslog(LOG_WARNING,
+		    "WARINNG: it is insecure to relay rlogin port");
+		/*FALLTHROUGH*/
 	default:
 		tcp_relay(s_src, s_dst, service);
 		break;
