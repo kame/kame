@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.27 2003/08/25 11:28:40 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.28 2003/08/25 12:02:00 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -397,9 +397,11 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 		if (mpfx) {
 			/* found an existing entry.  just update it. */
 			mpfx->mpfx_vltime = tmpmpfx.mpfx_vltime;
-			mpfx->mpfx_vlexpire = time_second + mpfx->mpfx_vltime;
+			mpfx->mpfx_vlexpire = mono_time.tv_sec
+			    + mpfx->mpfx_vltime;
 			mpfx->mpfx_pltime = tmpmpfx.mpfx_pltime;
-			mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
+			mpfx->mpfx_plexpire = mono_time.tv_sec
+			    + mpfx->mpfx_pltime;
 			/* XXX mpfx->mpfx_haddr; */
 			mip6_prefix_settimer(mpfx,
 			    MIP6_PREFIX_EXPIRE_TIME(mpfx->mpfx_pltime) * hz);
