@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.88 2002/03/28 07:30:03 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.89 2002/04/02 03:37:27 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -92,6 +92,13 @@
 #define	FTPS_LPSV	3
 #define	FTPS_EPRT	4
 #define	FTPS_EPSV	5
+
+
+struct pseudohdr {
+	struct in_addr	ip_src, ip_dst;
+	u_int16_t	ip_p;
+	u_int16_t	ip_len;
+};
 
 
 struct ftpparam {
@@ -1201,6 +1208,41 @@ natpt_translateUDPv4To6(struct pcv *cv4, struct pAddr *pad)
 {
 	struct pcv	cv6;
 	struct mbuf	*m6;
+	struct udphdr	*udp4 = cv4->pyld.udp;
+
+	if ((udp4->uh_sum == 0)
+	    || (udp4->uh_sum == 65535)) {
+		int		 hlen, dlen;
+		struct mbuf	*m4 = cv4->m;
+		struct pseudohdr *ph;
+		char		 savedip[64];
+
+		if (isFragment(cv4))
+			return (NULL);	/* drop this packet */
+
+#ifdef _IP_VHL
+		hlen = IP_VHL_HL(cv4->ip.ip4->ip_vhl) << 2;
+#else
+		hlen = cv4->ip.ip4->ip_hl << 2;
+#endif
+
+		bcopy(cv4->ip.ip4, &savedip, hlen);
+		dlen = hlen - sizeof(struct pseudohdr);
+		m4->m_data += dlen;
+		m4->m_len  -= dlen;
+
+		ph = (struct pseudohdr *)m4->m_data;
+		ph->ip_src = ((struct ip *)&savedip)->ip_src;
+		ph->ip_dst = ((struct ip *)&savedip)->ip_dst;
+		ph->ip_p   = htons(((struct ip *)&savedip)->ip_p);
+		ph->ip_len = udp4->uh_ulen;
+
+		udp4->uh_sum = 0;
+		udp4->uh_sum = in_cksum(cv4->m, ph->ip_len + sizeof(struct pseudohdr));
+		m4->m_data -= dlen;
+		m4->m_len  += dlen;
+		bcopy(&savedip, cv4->ip.ip4, hlen);
+	}
 
 	bzero(&cv6, sizeof(struct pcv));
 	if ((m6 = natpt_translateTCPUDPv4To6(cv4, pad, &cv6)) == NULL)
