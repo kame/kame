@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: grabmyaddr.c,v 1.7 2000/02/07 12:25:22 itojun Exp $ */
+/* YIPS @(#)$Id: grabmyaddr.c,v 1.8 2000/02/07 18:03:20 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -381,6 +381,8 @@ void
 delmyaddr(myaddr)
 	struct myaddrs *myaddr;
 {
+	if (myaddr->addr)
+		free(myaddr->addr);
 	free(myaddr);
 }
 
