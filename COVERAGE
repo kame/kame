@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.59 2000/07/19 13:47:50 itojun Exp $
+$KAME: COVERAGE,v 1.60 2000/07/26 08:04:08 itojun Exp $
 
 
 x: supported/integrated
@@ -58,6 +58,14 @@ IPsec ESP, rc5-cbc
 		x	-	?	x	notyet	?	x
 			(*1)
     (*1) rc5-cbc omitted for possible patent issues
+
+RFC2367 conformance: sadb_msg
+		x	x	-	x	notyet	-	(*1)
+    (*1) very old KAME declaration, violates RFC2367 (sadb_msg_mode)
+
+RFC2367 conformance: SADB_[EAC]ALG
+		x	x	-	(*1)	notyet	-	(*1)
+    (*1) old KAME declaration, violates RFC2367 namespace
 
 TCP/UDP		see IMPLEMENTATION for details
 
