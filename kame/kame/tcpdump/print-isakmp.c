@@ -30,7 +30,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.11 2000/06/19 09:10:34 sakane Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.12 2000/09/22 20:36:19 itojun Exp $ (LBL)";
 #endif
 
 #include <string.h>
@@ -334,11 +334,11 @@ struct attrmap {
 static u_char *
 isakmp_attrmap_print(u_char *p, u_char *ep, struct attrmap *map, size_t nmap)
 {
-	u_short *q;
+	u_int16_t *q;
 	int totlen;
 	u_int32_t t, v;
 
-	q = (u_short *)p;
+	q = (u_int16_t *)p;
 	if (p[0] & 0x80)
 		totlen = 4;
 	else
@@ -372,11 +372,11 @@ isakmp_attrmap_print(u_char *p, u_char *ep, struct attrmap *map, size_t nmap)
 static u_char *
 isakmp_attr_print(u_char *p, u_char *ep)
 {
-	u_short *q;
+	u_int16_t *q;
 	int totlen;
 	u_int32_t t;
 
-	q = (u_short *)p;
+	q = (u_int16_t *)p;
 	if (p[0] & 0x80)
 		totlen = 4;
 	else
