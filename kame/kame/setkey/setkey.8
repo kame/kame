@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.73 2002/05/14 11:05:35 itojun Exp $
+.\"	$KAME: setkey.8,v 1.74 2002/05/14 11:09:38 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -113,7 +113,7 @@ makes each timestamps unformatted.
 .Ss Configuration syntax
 With
 .Fl c
-or 
+or
 .Fl f
 on the command line,
 .Nm
@@ -526,7 +526,7 @@ It corresponds to
 .Ar extensions Fl u
 of the manual SA configuration.
 When you want to use SA bundle, you can define multiple rules.
-For example, IP header was followed by AH header followed by ESP header
+For example, if an IP header was followed by AH header followed by ESP header
 followed by an upper layer protocol header, the rule
 would be:
 .Dl esp/transport//require ah/transport//require ;
