@@ -64,6 +64,8 @@
  *	@(#)udp_usrreq.c	8.6 (Berkeley) 5/23/95
  */
 
+#define PULLDOWN_TEST
+
 #include "opt_ipsec.h"
 
 #include "ipkdb.h"
@@ -102,6 +104,13 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/udp6_var.h>
+#endif
+
+#ifdef PULLDOWN_TEST
+#ifndef INET6
+/* always need ip6.h for IP6_EXTHDR_GET */
+#include <netinet/ip6.h>
+#endif
 #endif
 
 #include <machine/stdarg.h>
@@ -187,7 +196,7 @@ udp_input(m, va_alist)
 	 * Get IP and UDP header together in first mbuf.
 	 */
 	ip = mtod(m, struct ip *);
-#if 0
+#ifndef PULLDOWN_TEST
 	if (m->m_len < iphlen + sizeof(struct udphdr)) {
 		if ((m = m_pullup(m, iphlen + sizeof(struct udphdr))) == 0) {
 			udpstat.udps_hdrops++;
@@ -197,23 +206,11 @@ udp_input(m, va_alist)
 	}
 	uh = (struct udphdr *)((caddr_t)ip + iphlen);
 #else
-    {
-	struct mbuf *n;
-	int off;
-#if 1
-	n = m_pulldown(m, iphlen, sizeof(struct udphdr), &off);
-#else
-	n = m_pulldown(m, iphlen, sizeof(struct udphdr), NULL);
-	off = 0;
-#endif
-	if (n == NULL) {
+	IP6_EXTHDR_GET(uh, struct udphdr *, m, iphlen, sizeof(struct udphdr));
+	if (uh == NULL) {
 		udpstat.udps_hdrops++;
 		return;
 	}
-	if (n->m_len < off + sizeof(struct udphdr))
-		panic("m_pulldown malfunction");
-	uh = (struct udphdr *)(mtod(n, caddr_t) + off);
-    }
 #endif
 
 	/*
@@ -337,32 +334,20 @@ udp6_input(mp, offp, proto)
 
 	udp6stat.udp6s_ipackets++;
 
-#if 0
+#ifndef PULLDOWN_TEST
 	IP6_EXTHDR_CHECK(m, off, sizeof(struct udphdr), IPPROTO_DONE);
 #endif
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	plen = ntohs(ip6->ip6_plen) - off + sizeof(*ip6); /*XXX jumbogram*/
-#if 0
+#ifndef PULLDOWN_TEST
 	uh = (struct udphdr *)((caddr_t)ip6 + off);
 #else
-    {
-	struct mbuf *n;
-	int uoff;
-#if 0
-	n = m_pulldown(m, off, sizeof(struct udphdr), NULL);
-	uoff = 0;
-#else
-	n = m_pulldown(m, off, sizeof(struct udphdr), &uoff);
-#endif
-	if (n == NULL) {
+	IP6_EXTHDR_GET(uh, struct udphdr *, m, off, sizeof(struct udphdr));
+	if (uh == NULL) {
 		ip6stat.ip6s_tooshort++;
 		return IPPROTO_DONE;
 	}
-	if (n->m_len < uoff + sizeof(struct udphdr))
-		panic("m_pulldown malfunction");
-	uh = (struct udphdr *)(mtod(n, caddr_t) + uoff);
-    }
 #endif
 	ulen = ntohs((u_short)uh->uh_ulen);
 
