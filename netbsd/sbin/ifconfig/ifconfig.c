@@ -178,6 +178,7 @@ void	settunnel __P((const char *, const char *));
 void	deletetunnel __P((const char *, int));
 #ifdef INET6
 void 	setia6flags __P((const char *, int));
+void	setia6deprecated __P((const char *, int));
 void	setia6pltime __P((const char *, int));
 void	setia6vltime __P((const char *, int));
 void	setia6lifetime __P((const char *, const char *));
@@ -257,8 +258,8 @@ const struct cmd {
 	{ "-anycast",	-IN6_IFF_ANYCAST,	0,	setia6flags },
 	{ "tentative",	IN6_IFF_TENTATIVE,	0,	setia6flags },
 	{ "-tentative",	-IN6_IFF_TENTATIVE,	0,	setia6flags },
-	{ "deprecated",	IN6_IFF_DEPRECATED,	0,	setia6flags },
-	{ "-deprecated", -IN6_IFF_DEPRECATED,	0,	setia6flags },
+	{ "deprecated",	1,		0,	setia6deprecated },
+	{ "-deprecated", 0,		0,	setia6deprecated },
 	{ "autoconf",	IN6_IFF_AUTOCONF,	0,	setia6flags },
 	{ "-autoconf",	-IN6_IFF_AUTOCONF,	0,	setia6flags },
 	{ "pltime",	NEXTARG,	0,		setia6pltime },
@@ -1176,6 +1177,15 @@ setia6flags(vname, value)
 		in6_addreq.ifra_flags &= ~value;
 	} else
 		in6_addreq.ifra_flags |= value;
+}
+
+void
+setia6deprecated(vname, deprecated)
+	const char *vname;
+	int deprecated;
+{
+	if (deprecated)
+		setia6lifetime("pltime", "0");
 }
 
 void
@@ -2178,6 +2188,7 @@ in6_alias(creq)
 	struct sockaddr_in6 *sin6;
 	char hbuf[NI_MAXHOST];
 	u_int32_t scopeid;
+	struct in6_addrlifetime lifetime0, *lifetime;
 #ifdef NI_WITHSCOPEID
 	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
 #else
@@ -2236,6 +2247,18 @@ in6_alias(creq)
 	(void) memset(&ifr6, 0, sizeof(ifr6));
 	(void) strncpy(ifr6.ifr_name, name, sizeof(ifr6.ifr_name));
 	ifr6.ifr_addr = creq->ifr_addr;
+	if (ioctl(s, SIOCGIFALIFETIME_IN6, (caddr_t)&ifr6) == -1) {
+		if (errno != EADDRNOTAVAIL)
+			warn("SIOCGIFALIFETIME_IN6");
+		lifetime = NULL;
+	} else {
+		lifetime0 = ifr6.ifr_ifru.ifru_lifetime;
+		lifetime = &lifetime0;
+	}
+
+	(void) memset(&ifr6, 0, sizeof(ifr6));
+	(void) strncpy(ifr6.ifr_name, name, sizeof(ifr6.ifr_name));
+	ifr6.ifr_addr = creq->ifr_addr;
 	if (ioctl(s, SIOCGIFAFLAG_IN6, (caddr_t)&ifr6) == -1) {
 		if (errno != EADDRNOTAVAIL)
 			warn("SIOCGIFAFLAG_IN6");
@@ -2248,7 +2271,11 @@ in6_alias(creq)
 			printf(" duplicated");
 		if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DETACHED) != 0)
 			printf(" detached");
-		if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_DEPRECATED) != 0)
+		/*
+		 * XXX: we used to have a flag for deprecated addresses, but
+		 * it was obsolete except for compatibility purposes.
+		 */
+		if (lifetime && lifetime->ia6t_pltime == 0)
 			printf(" deprecated");
 		if ((ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_AUTOCONF) != 0)
 			printf(" autoconf");
@@ -2263,33 +2290,24 @@ in6_alias(creq)
 	if (scopeid)
 		printf(" scopeid 0x%x", scopeid);
 
-	if (Lflag) {
-		struct in6_addrlifetime *lifetime;
-		(void) memset(&ifr6, 0, sizeof(ifr6));
-		(void) strncpy(ifr6.ifr_name, name, sizeof(ifr6.ifr_name));
-		ifr6.ifr_addr = creq->ifr_addr;
-		lifetime = &ifr6.ifr_ifru.ifru_lifetime;
-		if (ioctl(s, SIOCGIFALIFETIME_IN6, (caddr_t)&ifr6) == -1) {
-			if (errno != EADDRNOTAVAIL)
-				warn("SIOCGIFALIFETIME_IN6");
-		} else if (lifetime->ia6t_preferred || lifetime->ia6t_expire) {
-			time_t t = time(NULL);
-			printf(" pltime ");
-			if (lifetime->ia6t_preferred) {
-				printf("%s", lifetime->ia6t_preferred < t
-					? "0"
-					: sec2str(lifetime->ia6t_preferred - t));
-			} else
-				printf("infty");
+	else if (Lflag && lifetime &&
+	    (lifetime->ia6t_preferred || lifetime->ia6t_expire)) {
+		time_t t = time(NULL);
+		printf(" pltime ");
+		if (lifetime->ia6t_preferred) {
+			printf("%s", lifetime->ia6t_preferred < t
+			    ? "0"
+			    : sec2str(lifetime->ia6t_preferred - t));
+		} else
+			printf("infty");
 
-			printf(" vltime ");
-			if (lifetime->ia6t_expire) {
-				printf("%s", lifetime->ia6t_expire < t
-					? "0"
-					: sec2str(lifetime->ia6t_expire - t));
-			} else
-				printf("infty");
-		}
+		printf(" vltime ");
+		if (lifetime->ia6t_expire) {
+			printf("%s", lifetime->ia6t_expire < t
+			    ? "0"
+			    : sec2str(lifetime->ia6t_expire - t));
+		} else
+			printf("infty");
 	}
 
 	printf("\n");
