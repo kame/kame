@@ -748,7 +748,7 @@ udp_output(inp, m, addr, control, p)
 
 #ifdef IPSEC
 	if (ipsec_setsocket(m, inp->inp_socket) != 0) {
-		error = ENOBUFS:
+		error = ENOBUFS;
 		goto release;
 	}
 #endif /*IPSEC*/
