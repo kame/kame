@@ -4,31 +4,40 @@
  *          v2.0: Vincent Rijmen
  */
 
-#include <stdio.h>
-#include <stdlib.h>
-
-#include "rijndael-alg-fst.h"
+#include <sys/cdefs.h>
+#include <crypto/rijndael/rijndael-alg-fst.h>
 
 #define SC	((BC - 4) >> 1)
 
 #include "boxes-fst.dat"
 
 static word8 shifts[3][4][2] = {
-   0, 0,
-   1, 3,
-   2, 2,
-   3, 1,
-   
-   0, 0,
-   1, 5,
-   2, 4,
-   3, 3,
-   
-   0, 0,
-   1, 7,
-   3, 5,
-   4, 4
-}; 
+ {
+   { 0, 0, },
+   { 1, 3, },
+   { 2, 2, },
+   { 3, 1, },
+ },
+ {
+   { 0, 0, },
+   { 1, 5, },
+   { 2, 4, },
+   { 3, 3, },
+ },
+ {
+   { 0, 0, },
+   { 1, 7, },
+   { 3, 5, },
+   { 4, 4, },
+ }
+};
+
+word8 mul __P((word8, word8));
+void KeyAddition __P((word8[4][4], word8[4][4], word8));
+void ShiftRow __P((word8[4][4], word8, word8));
+void Substitution __P((word8[4][4], word8[256], word8));
+void MixColumn __P((word8[4][4], word8));
+void InvMixColumn __P((word8[4][4], word8));
 
 
 word8 mul(word8 a, word8 b) {

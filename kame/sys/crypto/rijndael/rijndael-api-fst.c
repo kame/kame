@@ -4,11 +4,10 @@
  *          v2.0: Vincent Rijmen
  */
 
-#include <stdlib.h>
-#include <string.h>
-
-#include "rijndael-alg-fst.h"
-#include "rijndael-api-fst.h"
+#include <sys/param.h>
+#include <sys/systm.h>
+#include <crypto/rijndael/rijndael-alg-fst.h>
+#include <crypto/rijndael/rijndael-api-fst.h>
 
 int makeKey(keyInstance *key, BYTE direction, int keyLen, char *keyMaterial)
 {
@@ -120,7 +119,7 @@ int blockEncrypt(cipherInstance *cipher,
 		break;
 		
 	case MODE_CBC:
-#if STRICT_ALIGN 
+#if 1 /*STRICT_ALIGN*/
 		memcpy(block,cipher->IV,16); 
 #else
 		*((word32*)block) =  *((word32*)(cipher->IV));
@@ -143,7 +142,7 @@ int blockEncrypt(cipherInstance *cipher,
 		break;
 	
 	case MODE_CFB1:
-#if STRICT_ALIGN 
+#if 1 /*STRICT_ALIGN*/
 		memcpy(iv,cipher->IV,16); 
 #else
 		*((word32*)iv[0]) = *((word32*)(cipher->IV));
@@ -175,7 +174,7 @@ int blockEncrypt(cipherInstance *cipher,
 				iv[3][0] = (iv[3][0] << 1) | (iv[3][1] >> 7);
 				iv[3][1] = (iv[3][1] << 1) | (iv[3][2] >> 7);
 				iv[3][2] = (iv[3][2] << 1) | (iv[3][3] >> 7);
-				iv[3][3] = (iv[3][3] << 1) | (outBuffer[k/8] >> (7-(k&7))) & 1;
+				iv[3][3] = (iv[3][3] << 1) | ((outBuffer[k/8] >> (7-(k&7))) & 1);
 			}
 		}
 		break;
@@ -195,7 +194,7 @@ int blockDecrypt(cipherInstance *cipher,
 
 	if (cipher == NULL ||
 		key == NULL ||
-		cipher->mode != MODE_CFB1 && key->direction == DIR_ENCRYPT) {
+		(cipher->mode != MODE_CFB1 && key->direction == DIR_ENCRYPT)) {
 		return BAD_CIPHER_STATE;
 	}
 	
@@ -218,7 +217,7 @@ int blockDecrypt(cipherInstance *cipher,
 		/* first block */ 
 
 		rijndaelDecrypt (input, block, key->keySched);
-#if STRICT_ALIGN
+#if 1 /*STRICT_ALIGN*/
 		memcpy(outBuffer,cipher->IV,16); 
   		*((word32*)(outBuffer)) ^= *((word32*)block);
   		*((word32*)(outBuffer+4)) ^= *((word32*)(block+4));
@@ -251,7 +250,7 @@ int blockDecrypt(cipherInstance *cipher,
 		break;
 	
 	case MODE_CFB1:
-#if STRICT_ALIGN 
+#if 1 /*STRICT_ALIGN*/
 		memcpy(iv,cipher->IV,16); 
 #else
 		*((word32*)iv[0]) = *((word32*)(cipher->IV));
@@ -282,7 +281,7 @@ int blockDecrypt(cipherInstance *cipher,
 				iv[3][0] = (iv[3][0] << 1) | (iv[3][1] >> 7);
 				iv[3][1] = (iv[3][1] << 1) | (iv[3][2] >> 7);
 				iv[3][2] = (iv[3][2] << 1) | (iv[3][3] >> 7);
-				iv[3][3] = (iv[3][3] << 1) | (input[k/8] >> (7-(k&7))) & 1;
+				iv[3][3] = (iv[3][3] << 1) | ((input[k/8] >> (7-(k&7))) & 1);
 				outBuffer[k/8] ^= (block[0] & 0x80) >> (k & 7);
 			}
 		}

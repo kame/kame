@@ -3,8 +3,7 @@
  */
 
 
-#include <stdio.h>
-#include "rijndael-alg-fst.h"
+#include <crypto/rijndael/rijndael-alg-fst.h>
 
 /*  Defines:
 	Add any additional defines you need
