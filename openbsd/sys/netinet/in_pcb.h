@@ -289,8 +289,4 @@ struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
 #endif
 int	in6_selecthlim __P((struct inpcb *, struct ifnet *));
 int	in6_pcbsetport __P((struct in6_addr *, struct inpcb *));
-int in6_embedscope __P((struct in6_addr *, const struct sockaddr_in6 *,
-	struct inpcb *, struct ifnet **));
-int in6_recoverscope __P((struct sockaddr_in6 *, const struct in6_addr *,
-	struct ifnet *));
 #endif
