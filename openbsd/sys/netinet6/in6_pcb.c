@@ -70,8 +70,8 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 
 #include <netinet6/in6.h>
 #include <netinet6/in6_var.h>
-#include <netinet6/ipv6.h>
-#include <netinet6/ipv6_var.h>
+#include <netinet6/ip6.h>
+#include <netinet6/ip6_var.h>
 
 #if __OpenBSD__
 #undef IPSEC
@@ -147,6 +147,7 @@ extern int ipport_hilastauto;
  * I also put it here, because, quite frankly, it belongs here, not in
  * ip{v6,}_input().
  */
+#if 0
 u_char inet6ctlerrmap[PRC_NCMDS] = {
         0,              0,              0,              0,
         0,              EMSGSIZE,       EHOSTDOWN,      EHOSTUNREACH,
@@ -155,6 +156,7 @@ u_char inet6ctlerrmap[PRC_NCMDS] = {
         0,              0,              0,              0,
         ENOPROTOOPT
 };
+#endif
 
 /*----------------------------------------------------------------------
  * Bind an address (or at least a port) to an PF_INET6 socket.
@@ -323,7 +325,7 @@ in6_pcbbind(inp, nam)
       inp->inp_laddr6 = sin6->sin6_addr;
 
       if (!IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
-	inp->inp_ipv6.ipv6_versfl = htonl(0x60000000) | 
+	inp->inp_ipv6.ip6_flow = htonl(0x60000000) | 
 	  (sin6->sin6_flowinfo & htonl(0x0fffffff));
 
       /*
@@ -643,13 +645,13 @@ in6_pcbladdr(inp, nam, plocal_sin)
 #define ifatoi6a(ifa)	((struct in6_ifaddr *)(ifa))
       struct in6_ifaddr *ti6a = NULL;
 
-      for (i6a = in6_ifaddr; i6a; i6a = i6a->i6a_next)
+      for (i6a = in6_ifaddr; i6a; i6a = i6a->ia_next)
         {
           /* Find first (non-link-local if possible) address for
              source usage.  If multiple link-locals, use last one found. */
-	  if (IN6_IS_ADDR_LINKLOCAL(&I6A_SIN(i6a)->sin6_addr))
+	  if (IN6_IS_ADDR_LINKLOCAL(&IA6_SIN6(i6a)->sin6_addr))
 	    ti6a=i6a;
-	  else if (!IN6_IS_ADDR_LOOPBACK(&I6A_SIN(i6a)->sin6_addr))
+	  else if (!IN6_IS_ADDR_LOOPBACK(&IA6_SIN6(i6a)->sin6_addr))
 	    break;
         }
       if (i6a == NULL && ti6a != NULL)
@@ -658,7 +660,7 @@ in6_pcbladdr(inp, nam, plocal_sin)
 
   if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
     {
-      register struct route6 *ro;
+      register struct route_in6 *ro;
 
       i6a = NULL;
       /* 
@@ -689,6 +691,7 @@ in6_pcbladdr(inp, nam, plocal_sin)
 	  rtalloc((struct route *)ro);
 	}
 
+#if 0 /* NRL IPv6*/
       if (ro->ro_rt == NULL)
 	{
 	  /*
@@ -700,6 +703,7 @@ in6_pcbladdr(inp, nam, plocal_sin)
 	  ipv6_onlink_query((struct sockaddr_in6 *)&ro->ro_dst);
 	  rtalloc((struct route *)ro);
 	}
+#endif
       if (ro->ro_rt == NULL)
 	{
 	  /*
@@ -774,13 +778,13 @@ in6_pcbladdr(inp, nam, plocal_sin)
 	    {
 	      struct in6_ifaddr *ti6a = NULL;
 	      
-	      for (i6a = in6_ifaddr; i6a; i6a = i6a->i6a_next)
+	      for (i6a = in6_ifaddr; i6a; i6a = i6a->ia_next)
 		{
 		  /* Find first (non-local if possible) address for
 		     source usage.  If multiple locals, use last one found. */
-		  if (IN6_IS_ADDR_LINKLOCAL(&I6A_SIN(i6a)->sin6_addr))
+		  if (IN6_IS_ADDR_LINKLOCAL(&IA6_SIN6(i6a)->sin6_addr))
 		    ti6a=i6a;
-		  else if (!IN6_IS_ADDR_LOOPBACK(&I6A_SIN(i6a)->sin6_addr))
+		  else if (!IN6_IS_ADDR_LOOPBACK(&IA6_SIN6(i6a)->sin6_addr))
 		    break;
 		}
 	      if (i6a == NULL && ti6a != NULL)
@@ -797,15 +801,15 @@ in6_pcbladdr(inp, nam, plocal_sin)
       if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr) && inp->inp_moptions6 != NULL &&
 	  (inp->inp_flags & INP_IPV6_MCAST))
 	{
-	  struct ipv6_moptions *i6mo;
+	  struct ip6_hdr_moptions *im6o;
 	  struct ifnet *ifp;
 	  
-	  i6mo = inp->inp_moptions6;
-	  if (i6mo->i6mo_multicast_ifp != NULL)
+	  im6o = inp->inp_moptions6;
+	  if (im6o->im6o_multicast_ifp != NULL)
 	    {
-	      ifp = i6mo->i6mo_multicast_ifp;
-	      for (i6a = in6_ifaddr; i6a; i6a = i6a->i6a_next)
-		if (i6a->i6a_ifp == ifp)  /* Linkloc vs. global? */
+	      ifp = im6o->im6o_multicast_ifp;
+	      for (i6a = in6_ifaddr; i6a; i6a = i6a->ia_next)
+		if (i6a->ia_ifp == ifp)  /* Linkloc vs. global? */
 		  break;
 	      if (i6a == NULL)
 		return EADDRNOTAVAIL;
@@ -944,13 +948,13 @@ in6_pcbconnect(inp, nam)
 #define ifatoi6a(ifa)	((struct in6_ifaddr *)(ifa))
       struct in6_ifaddr *ti6a = NULL;
 
-      for (i6a = in6_ifaddr; i6a; i6a = i6a->i6a_next)
+      for (i6a = in6_ifaddr; i6a; i6a = i6a->ia_next)
         {
           /* Find first (non-link-local if possible) address for
              source usage.  If multiple link-locals, use last one found. */
-	  if (IN6_IS_ADDR_LINKLOCAL(&I6A_SIN(i6a)->sin6_addr))
+	  if (IN6_IS_ADDR_LINKLOCAL(&IA6_SIN6(i6a)->sin6_addr))
 	    ti6a=i6a;
-	  else if (!IN6_IS_ADDR_LOOPBACK(&I6A_SIN(i6a)->sin6_addr))
+	  else if (!IN6_IS_ADDR_LOOPBACK(&IA6_SIN6(i6a)->sin6_addr))
 	    break;
         }
       if (i6a == NULL && ti6a != NULL)
@@ -959,8 +963,7 @@ in6_pcbconnect(inp, nam)
 
   if (IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
     {
-      register struct route6 *ro;
-
+      register struct route_in6 *ro;
 
       i6a = NULL;
       /* 
@@ -991,6 +994,7 @@ in6_pcbconnect(inp, nam)
 	  rtalloc((struct route *)ro);
 	}
 
+#if 0 /* NRL IPv6*/
       if (ro->ro_rt == NULL)
 	{
 	  /*
@@ -1002,6 +1006,7 @@ in6_pcbconnect(inp, nam)
 	  ipv6_onlink_query((struct sockaddr_in6 *)&ro->ro_dst);
 	  rtalloc((struct route *)ro);
 	}
+#endif
       if (ro->ro_rt == NULL)
 	{
 	  /*
@@ -1012,6 +1017,7 @@ in6_pcbconnect(inp, nam)
 	  return ENETUNREACH;
 	}
 
+#if 0	/*NRL IPv6*/
       if (ro->ro_rt->rt_ifa == NULL)
 	{
 	  /*
@@ -1040,6 +1046,7 @@ in6_pcbconnect(inp, nam)
 	  if (ro->ro_rt == NULL || ro->ro_rt->rt_ifa == NULL)
 	    panic("Oops2, I'm forgetting something after verify_onlink().");
 	}
+#endif
 
 
       /*
@@ -1076,13 +1083,13 @@ in6_pcbconnect(inp, nam)
 	    {
 	      struct in6_ifaddr *ti6a = NULL;
 	      
-	      for (i6a = in6_ifaddr; i6a; i6a = i6a->i6a_next)
+	      for (i6a = in6_ifaddr; i6a; i6a = i6a->ia_next)
 		{
 		  /* Find first (non-local if possible) address for
 		     source usage.  If multiple locals, use last one found. */
-		  if (IN6_IS_ADDR_LINKLOCAL(&I6A_SIN(i6a)->sin6_addr))
+		  if (IN6_IS_ADDR_LINKLOCAL(&IA6_SIN6(i6a)->sin6_addr))
 		    ti6a=i6a;
-		  else if (!IN6_IS_ADDR_LOOPBACK(&I6A_SIN(i6a)->sin6_addr))
+		  else if (!IN6_IS_ADDR_LOOPBACK(&IA6_SIN6(i6a)->sin6_addr))
 		    break;
 		}
 	      if (i6a == NULL && ti6a != NULL)
@@ -1099,22 +1106,22 @@ in6_pcbconnect(inp, nam)
       if (IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr) && inp->inp_moptions6 != NULL &&
 	  (inp->inp_flags & INP_IPV6_MCAST))
 	{
-	  struct ipv6_moptions *i6mo;
+	  struct ip6_moptions *im6o;
 	  struct ifnet *ifp;
 	  
-	  i6mo = inp->inp_moptions6;
-	  if (i6mo->i6mo_multicast_ifp != NULL)
+	  im6o = inp->inp_moptions6;
+	  if (im6o->im6o_multicast_ifp != NULL)
 	    {
-	      ifp = i6mo->i6mo_multicast_ifp;
-	      for (i6a = in6_ifaddr; i6a; i6a = i6a->i6a_next)
-		if (i6a->i6a_ifp == ifp)  /* Linkloc vs. global? */
+	      ifp = im6o->im6o_multicast_ifp;
+	      for (i6a = in6_ifaddr; i6a; i6a = i6a->ia_next)
+		if (i6a->ia_ifp == ifp)  /* Linkloc vs. global? */
 		  break;
 	      if (i6a == NULL)
 		return EADDRNOTAVAIL;
 	    }
 	}
 
-      ifaddr = (struct sockaddr_in6 *)&i6a->i6a_addr;
+      ifaddr = (struct sockaddr_in6 *)&i6a->ia_addr;
     }
 
 #if __FreeBSD__
@@ -1155,7 +1162,7 @@ in6_pcbconnect(inp, nam)
   /*
    * Assumes user specify flowinfo in network order.
    */
-  inp->inp_ipv6.ipv6_versfl = htonl(0x60000000) | 
+  inp->inp_ipv6.ip6_flow = htonl(0x60000000) | 
     (sin6->sin6_flowinfo & htonl(0x0fffffff));
 
 #if __NetBSD__

@@ -74,9 +74,9 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 
 #include <netinet6/in6.h>
 #include <netinet6/in6_var.h>
-#include <netinet6/ipv6.h>
-#include <netinet6/ipv6_var.h>
-#include <netinet6/icmpv6.h>
+#include <netinet6/ip6.h>
+#include <netinet6/ip6_var.h>
+#include <netinet6/icmp6.h>
 
 #if __OpenBSD__
 #undef IPSEC
@@ -110,7 +110,7 @@ struct inpcbtable rawin6pcbtable;
 #else /* __NetBSD__ || __OpenBSD__ */
 struct inpcb rawin6pcb;
 #endif /* __NetBSD__ || __OpenBSD__ */
-struct sockaddr_in6 ripv6src = { sizeof(struct sockaddr_in6), AF_INET6 };
+struct sockaddr_in6 rip6src = { sizeof(struct sockaddr_in6), AF_INET6 };
 
 /*
  * Nominal space allocated to a raw ip socket.
@@ -118,8 +118,13 @@ struct sockaddr_in6 ripv6src = { sizeof(struct sockaddr_in6), AF_INET6 };
 
 #define	RIPV6SNDQ		8192
 #define	RIPV6RCVQ		8192
-u_long ripv6_sendspace = RIPV6SNDQ;
-u_long ripv6_recvspace = RIPV6RCVQ;
+#if 0
+u_long rip6_sendspace = RIPV6SNDQ;
+u_long rip6_recvspace = RIPV6RCVQ;
+#else
+extern u_long rip6_sendspace;
+extern u_long rip6_recvspace;
+#endif
 
 /*
  * External globals
@@ -129,7 +134,9 @@ static struct inpcbhead ri6pcb;
 static struct inpcbinfo ri6pcbinfo;
 #endif /* __FreeBSD__ */
 
-extern struct ipv6stat ipv6stat;
+#if 0
+extern struct ip6_hdrstat ipv6stat;
+#endif
 
 #define RETURN_ERROR(x) { \
   DPRINTF(EVENT, ("%s: returning %s\n", DEBUG_STATUS, #x)); \
@@ -145,7 +152,7 @@ extern struct ipv6stat ipv6stat;
  ----------------------------------------------------------------------*/
 
 void
-ripv6_init()
+rip6_init()
 {
 #if __FreeBSD__
 	LIST_INIT(&ri6pcb);
@@ -194,50 +201,50 @@ static int ipv6_findnexthdr(struct mbuf *m, size_t extra)
   do {
     switch(nexthdr) {
       case IPPROTO_IPV6:
-	hl = sizeof(struct ipv6);
+	hl = sizeof(struct ip6_hdr);
 
 	if ((extra -= hl) < 0)
 	  return -1;
 
-	nexthdr = ((struct ipv6 *)p)->ipv6_nexthdr;
+	nexthdr = ((struct ip6_hdr *)p)->ip6_nxt;
 	break;
       case IPPROTO_HOPOPTS:
       case IPPROTO_DSTOPTS:
-	if (extra < sizeof(struct ipv6_opthdr))
+	if (extra < sizeof(struct ip6_ext))
 	  return -1;
 
-	hl = sizeof(struct ipv6_opthdr) +
-	     (((struct ipv6_opthdr *)p)->oh_extlen << 3);
+	hl = sizeof(struct ip6_ext) +
+	     (((struct ip6_ext *)p)->ip6e_len << 3);
 
 	if ((extra -= hl) < 0)
 	  return -1;
 
-	nexthdr = ((struct ipv6_opthdr *)p)->oh_nexthdr;
+	nexthdr = ((struct ip6_ext *)p)->ip6e_nxt;
 	break;
       case IPPROTO_ROUTING:
-	if (extra < sizeof(struct ipv6_srcroute0))
+	if (extra < sizeof(struct ip6_rthdr0))
 	  return -1;
 
-	hl = sizeof(struct ipv6_srcroute0) +
-	     (((struct ipv6_srcroute0 *)p)->i6sr_len << 3);
+	hl = sizeof(struct ip6_rthdr0) +
+	     (((struct ip6_rthdr0 *)p)->ip6r0_len << 3);
 
 	if ((extra -= hl) < 0)
 	  return -1;
 
-	nexthdr = ((struct ipv6_srcroute0 *)p)->i6sr_nexthdr;
+	nexthdr = ((struct ip6_rthdr0 *)p)->ip6r0_nxt;
 	break;
 #ifdef IPSEC
       case IPPROTO_AH:
-	if (extra < sizeof(struct ipv6_srcroute0))
+	if (extra < sizeof(struct ip6_hdr_srcroute0))
 	  return -1;
 
-	hl = sizeof(struct ipv6_srcroute0) +
-	     ((struct ipv6_srcroute0 *)p)->i6sr_len << 3;
+	hl = sizeof(struct ip6_hdr_srcroute0) +
+	     ((struct ip6_hdr_srcroute0 *)p)->i6sr_len << 3;
 
 	if ((extra -= hl) < 0)
 	  return -1;
 
-	nexthdr = ((struct ipv6_srcroute0 *)p)->i6sr_nexthdr;
+	nexthdr = ((struct ip6_hdr_srcroute0 *)p)->i6sr_nexthdr;
 	break;
 #endif /* IPSEC */
       default:
@@ -252,52 +259,44 @@ static int ipv6_findnexthdr(struct mbuf *m, size_t extra)
 /*----------------------------------------------------------------------
  * If no HLP's are found for an IPv6 datagram, this routine is called.
  ----------------------------------------------------------------------*/
-void
-#if __OpenBSD__
-ripv6_input(struct mbuf *m, ...)
-#else /* __OpenBSD__ */
-ripv6_input(m,extra)
-     struct mbuf *m;
-     int extra;
-#endif /* __OpenBSD__ */
+int
+rip6_input(mp, offp, proto)
+     struct mbuf **mp;
+     int *offp, proto;
 {
-  register struct ipv6 *ipv6 = mtod(m, struct ipv6 *); /* Will have been
+  struct mbuf *m = *mp;
+  register struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *); /* Will have been
 							  pulled up by 
 							  ipv6_input(). */
   register struct inpcb *inp;
-  int nexthdr, icmpv6type;
+  int nexthdr, icmp6type;
   int foundone = 0;
   struct mbuf *m2 = NULL, *opts = NULL;
   struct sockaddr_in6 srcsa;
 #ifdef IPSEC
   struct sockaddr_in6 dstsa;
 #endif /* IPSEC */
-#if __OpenBSD__
-  int extra;
-  va_list ap;
+  int extra = *offp;
 
-  va_start(ap, m);
-  extra = va_arg(ap, int);
-  va_end(ap);
-#endif /* __OpenBSD__ */
-
-  DPRINTF(FINISHED, ("ripv6_input(m=%08x, extra=%d)\n", OSDEP_PCAST(m), extra));
+  DPRINTF(FINISHED, ("rip6_input(m=%08x, extra=%d)\n", OSDEP_PCAST(m), extra));
   DP(FINISHED, m->m_pkthdr.len, d);
-  DDO(FINISHED,printf("In ripv6_input(), header is:\n");dump_mchain(m));
-  DPRINTF(EVENT, ("In ripv6_input()\n"));
+  DDO(FINISHED,printf("In rip6_input(), header is:\n");dump_mchain(m));
+  DPRINTF(EVENT, ("In rip6_input()\n"));
   DPRINTF(EVENT, ("Header is: "));
+#if 0
   DDO(GROSSEVENT, dump_ipv6(ipv6));
+#endif
 
   bzero(&srcsa, sizeof(struct sockaddr_in6));
   srcsa.sin6_family = AF_INET6;
   srcsa.sin6_len = sizeof(struct sockaddr_in6);
-  srcsa.sin6_addr = ipv6->ipv6_src;
+  srcsa.sin6_addr = ip6->ip6_src;
 
 #if IPSEC
   bzero(&dstsa, sizeof(struct sockaddr_in6));
   dstsa.sin6_family = AF_INET6;
   dstsa.sin6_len = sizeof(struct sockaddr_in6);
-  dstsa.sin6_addr = ipv6->ipv6_dst;
+  dstsa.sin6_addr = ip6->ip6_dst;
 #endif /* IPSEC */
 
 #if 0
@@ -305,28 +304,28 @@ ripv6_input(m,extra)
   if (m->m_len < extra)) {
 	if (!(m = m_pullup2(m, extra)))
 		return;
-	ipv6 = mtod(m, struct ipv6 *);
+	ip6 = mtod(m, struct ip6_hdr *);
   }
 #endif /* 0 */
 
   if ((nexthdr = ipv6_findnexthdr(m, extra)) < 0) {
-    DPRINTF(ERROR, ("ripv6_input: ipv6_findnexthdr failed\n"));
+    DPRINTF(ERROR, ("rip6_input: ipv6_findnexthdr failed\n"));
     goto ret;
   }
 
   DP(FINISHED, nexthdr, d);
 
   if (nexthdr == IPPROTO_ICMPV6) {
-    if (m->m_len < extra + sizeof(struct icmpv6hdr)) {
-      if (!(m = m_pullup2(m, extra + sizeof(struct icmpv6hdr)))) {
-        DPRINTF(ERROR, ("ripv6_input: m_pullup2 failed\n"));
+    if (m->m_len < extra + sizeof(struct icmp6_hdr)) {
+      if (!(m = m_pullup2(m, extra + sizeof(struct icmp6_hdr)))) {
+        DPRINTF(ERROR, ("rip6_input: m_pullup2 failed\n"));
         goto ret;
       }
-      ipv6 = mtod(m, struct ipv6 *);
+      ip6 = mtod(m, struct ip6_hdr *);
     }
-    icmpv6type = ((struct icmpv6hdr *)(mtod(m, caddr_t) + extra))->icmpv6_type;
+    icmp6type = ((struct icmp6_hdr *)(mtod(m, caddr_t) + extra))->icmp6_type;
   } else
-    icmpv6type = -1;
+    icmp6type = -1;
 
   /*
    * Locate raw PCB for incoming datagram.
@@ -342,16 +341,16 @@ ripv6_input(m,extra)
   for (inp = rawin6pcb.inp_next; inp != &rawin6pcb; inp = inp->inp_next) {
 #endif /* __NetBSD__ || __OpenBSD__ */
 #endif /* __FreeBSD__ */
-    if (inp->inp_ipv6.ipv6_nexthdr && inp->inp_ipv6.ipv6_nexthdr != nexthdr)
+    if (inp->inp_ipv6.ip6_nxt && inp->inp_ipv6.ip6_nxt != nexthdr)
       continue;
     if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6) && 
-	!IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6, &ipv6->ipv6_dst))
+	!IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6, &ip6->ip6_dst))
       continue;
     if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6) && 
-	!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, &ipv6->ipv6_src))
+	!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, &ip6->ip6_src))
       continue;
-    if ((icmpv6type >= 0) && 
-	ICMPV6_FILTER_WILLBLOCK(icmpv6type, &inp->inp_filter))
+    if ((icmp6type >= 0) && 
+	ICMP6_FILTER_WILLBLOCK(icmp6type, &inp->inp_icmp6filt))
       continue;
 
     DPRINTF(IDL_EVENT, ("Found a raw pcb (>1)\n"));
@@ -375,10 +374,14 @@ ripv6_input(m,extra)
     if ((m2 = m_copym(m, 0, (int)M_COPYALL, M_DONTWAIT))) {
       m_adj(m2, extra);
       DP(FINISHED, m2->m_pkthdr.len, d);
+#if 0
       if (inp->inp_flags & INP_CONTROLOPTS)
-        opts = ipv6_headertocontrol(m, extra, inp->inp_flags);
+	ip6_savecontrol(inp, &opts, ip6, m);
       else
         opts = NULL;
+#else
+      opts = NULL;
+#endif
       if (sbappendaddr(&inp->inp_socket->so_rcv, (struct sockaddr *)&srcsa, m2,
                        opts)) {
         sorwakeup(inp->inp_socket);
@@ -393,37 +396,43 @@ ripv6_input(m,extra)
      * We should send an ICMPv6 protocol unreachable here,
      * though original UCB 4.4-lite BSD's IPv4 does not do so.
      */
+#if 0
     ipv6stat.ips_noproto++;
     ipv6stat.ips_delivered--;
+#endif
   }
 
 ret:
   if (m)
     m_freem(m);
 
-  DPRINTF(FINISHED, ("ripv6_input\n"));
+  DPRINTF(FINISHED, ("rip6_input\n"));
+  return IPPROTO_DONE;
 }
 
 /*----------------------------------------------------------------------
- * Output function for raw IPv6.  Called from ripv6_usrreq(), and
+ * Output function for raw IPv6.  Called from rip6_usrreq(), and
  * ipv6_icmp_usrreq().
  ----------------------------------------------------------------------*/
 
 #if __OpenBSD__
-int ripv6_output(struct mbuf *m, ...)
+int rip6_output(struct mbuf *m, ...)
 #else /* __OpenBSD__ */
 int
-ripv6_output(m, so, dst, control)
+rip6_output(m, so, dst, control)
      struct mbuf *m;
      struct socket *so;
      struct in6_addr *dst;
      struct mbuf *control;
 #endif /* __OpenBSD__ */
 {
-  register struct ipv6 *ipv6;
+  register struct ip6_hdr *ip6;
   register struct inpcb *inp;
   int flags;
+#if 0
   struct ifnet *forceif = NULL;
+  struct ip6_pktopts opt, *optp = NULL;
+#endif
 #if __OpenBSD__
   va_list ap;
   struct socket *so;
@@ -440,6 +449,7 @@ ripv6_output(m, so, dst, control)
   inp = sotoinpcb(so);
   flags = (so->so_options & SO_DONTROUTE);
 
+#if 0
   if (inp->inp_flags & INP_HDRINCL)
     {
       flags |= IPV6_RAWOUTPUT;
@@ -448,14 +458,15 @@ ripv6_output(m, so, dst, control)
 	 expects it to be contiguous. */
     }
   else
+#endif
     {
-      M_PREPEND(m, sizeof(struct ipv6), M_WAIT);
-      ipv6 = mtod(m, struct ipv6 *);
-      ipv6->ipv6_nexthdr = inp->inp_ipv6.ipv6_nexthdr;
-      ipv6->ipv6_hoplimit = MAXHOPLIMIT;
-      ipv6->ipv6_src = inp->inp_laddr6;
-      ipv6->ipv6_dst = *dst;
-      ipv6->ipv6_versfl = 0;  /* Or possibly user flow label, in host order. */
+      M_PREPEND(m, sizeof(struct ip6_hdr), M_WAIT);
+      ip6 = mtod(m, struct ip6_hdr *);
+      ip6->ip6_nxt = inp->inp_ipv6.ip6_nxt;
+      ip6->ip6_hlim = 255;	/*XXX*/
+      ip6->ip6_src = inp->inp_laddr6;
+      ip6->ip6_dst = *dst;
+      ip6->ip6_flow = 0;  /* Or possibly user flow label, in host order. */
       /*
        * Question:  How do I handle options?
        *
@@ -464,21 +475,28 @@ ripv6_output(m, so, dst, control)
     }
 
   {
-    int payload = sizeof(struct ipv6);
-    int nexthdr = mtod(m, struct ipv6 *)->ipv6_nexthdr;
+    int payload = sizeof(struct ip6_hdr);
+    int nexthdr = mtod(m, struct ip6_hdr *)->ip6_nxt;
+#if 0
     int error;
+#endif
 
-    if (control)
-      if ((error = ipv6_controltoheader(&m, control, &forceif, &payload))) {
+#if 0
+    if (control) {
+      if ((error = ip6_setpktoptions(control, &opt, 1))) {
         m_freem(m);
         return error;
-      }
+      } else
+	optp = &opt;
+    } else
+      optp = inp->inp_outputopts;
+#endif
 
     if (inp->inp_csumoffset >= 0) {
       uint16_t *csum;
 
       if (!(m = m_pullup2(m, payload + inp->inp_csumoffset))) {
-	DPRINTF(IDL_ERROR, ("ripv6_output: m_pullup2(m, %d) failed\n", payload + inp->inp_csumoffset));
+	DPRINTF(IDL_ERROR, ("rip6_output: m_pullup2(m, %d) failed\n", payload + inp->inp_csumoffset));
 	m_freem(m);
 	return ENOBUFS;
       };
@@ -490,7 +508,7 @@ ripv6_output(m, so, dst, control)
     };
   };
 
-  return ipv6_output(m,&inp->inp_route6,flags,inp->inp_moptions6, forceif, so);
+  return ip6_output(m, NULL/*XXX*/, &inp->inp_route6, flags, inp->inp_moptions6, NULL /*XXX*/);
 }
 
 /*----------------------------------------------------------------------
@@ -498,7 +516,7 @@ ripv6_output(m, so, dst, control)
  ----------------------------------------------------------------------*/
 
 #if __FreeBSD__
-int ripv6_ctloutput(struct socket *so, struct sockopt *sopt)
+int rip6_ctloutput(struct socket *so, struct sockopt *sopt)
 {
   register struct inpcb *inp = sotoinpcb(so);
   int op;
@@ -506,7 +524,7 @@ int ripv6_ctloutput(struct socket *so, struct sockopt *sopt)
   int optname;
   int optval;
 
-  DPRINTF(FINISHED, ("ripv6_ctloutput(so=%08x, sopt=%08x)\n",
+  DPRINTF(FINISHED, ("rip6_ctloutput(so=%08x, sopt=%08x)\n",
 		       OSDEP_PCAST(so), OSDEP_PCAST(sopt)));
 
   switch(sopt->sopt_dir) {
@@ -524,7 +542,7 @@ int ripv6_ctloutput(struct socket *so, struct sockopt *sopt)
   optname = sopt->sopt_name;
 #else /* __FreeBSD__ */
 int
-ripv6_ctloutput (op, so, level, optname, m)
+rip6_ctloutput (op, so, level, optname, m)
      int op;
      struct socket *so;
      int level, optname;
@@ -532,7 +550,7 @@ ripv6_ctloutput (op, so, level, optname, m)
 {
   register struct inpcb *inp = sotoinpcb(so);
 
-  DPRINTF(FINISHED, ("ripv6_ctloutput(op=%x,so,level=%x,optname=%x,m)\n", op, level, optname));
+  DPRINTF(FINISHED, ("rip6_ctloutput(op=%x,so,level=%x,optname=%x,m)\n", op, level, optname));
 #endif /* __FreeBSD__ */
 
   if ((level != IPPROTO_IP) && (level != IPPROTO_IPV6) && (level != IPPROTO_ICMPV6)) {
@@ -572,34 +590,34 @@ ripv6_ctloutput (op, so, level, optname, m)
         return 0;
       };
       break;
-    case ICMPV6_FILTER:
+    case ICMP6_FILTER:
       if (op == PRCO_SETOPT || op == PRCO_GETOPT) {
 #if __FreeBSD__
         if (!sopt->sopt_val || (sopt->sopt_valsize !=
-            sizeof(struct icmpv6_filter)))
+            sizeof(struct icmp6_filter)))
 	  RETURN_ERROR(EINVAL);
         if (op == PRCO_SETOPT) {
-          struct icmpv6_filter icmpv6_filter;
-          int error = sooptcopyin(sopt, &icmpv6_filter,
-            sizeof(struct icmpv6_filter), sizeof(struct icmpv6_filter));
+          struct icmp6_filter icmp6_filter;
+          int error = sooptcopyin(sopt, &icmp6_filter,
+            sizeof(struct icmp6_filter), sizeof(struct icmp6_filter));
           if (error)
             return error;
 
-          inp->inp_filter = icmpv6_filter;
+          inp->inp_icmp6filt = icmp6_filter;
 
           return 0;
         } else
-          return sooptcopyout(sopt, &inp->inp_filter,
-            sizeof(struct icmpv6_filter));
+          return sooptcopyout(sopt, &inp->inp_icmp6filt,
+            sizeof(struct icmp6_filter));
 #else /* __FreeBSD__ */
-        if (!m || !*m || (*m)->m_len != sizeof(struct icmpv6_filter))
+        if (!m || !*m || (*m)->m_len != sizeof(struct icmp6_filter))
 	  RETURN_ERROR(EINVAL);
         if (op == PRCO_SETOPT) {
-          inp->inp_filter = *mtod(*m, struct icmpv6_filter *);
+          inp->inp_icmp6filt = *mtod(*m, struct icmp6_filter *);
           m_freem(*m);
         } else {
-          (*m)->m_len = sizeof(struct icmpv6_filter);
-          *mtod(*m, struct icmpv6_filter *) = inp->inp_filter;
+          (*m)->m_len = sizeof(struct icmp6_filter);
+          *mtod(*m, struct icmp6_filter *) = inp->inp_icmp6filt;
         };
         return 0;
 #endif /* __FreeBSD__ */
@@ -683,9 +701,9 @@ ripv6_ctloutput (op, so, level, optname, m)
       };
   }
 #if __FreeBSD__
-  return ipv6_ctloutput(so, sopt);
+  return ip6_ctloutput(so, sopt);
 #else /* __FreeBSD__ */
-  return ipv6_ctloutput(op, so, level, optname, m);
+  return ip6_ctloutput(op, so, level, optname, m);
 #endif /* __FreeBSD__ */
 }
 
@@ -698,17 +716,17 @@ ripv6_ctloutput (op, so, level, optname, m)
 #endif /* __GNUC__ && __GNUC__ >= 2 && __OPTIMIZE__ && !__FreeBSD__ */
 
 #if __NetBSD__ || __FreeBSD__
-MAYBESTATIC MAYBEINLINE int ripv6_usrreq_attach(struct socket *so, int proto,
+MAYBESTATIC MAYBEINLINE int rip6_usrreq_attach(struct socket *so, int proto,
                                                 struct proc *p)
 #else /* __NetBSD__ || __FreeBSD__ */
-MAYBESTATIC MAYBEINLINE int ripv6_usrreq_attach(struct socket *so, int proto)
+MAYBESTATIC MAYBEINLINE int rip6_usrreq_attach(struct socket *so, int proto)
 #endif /* __NetBSD__ || __FreeBSD__ */
 {
   register struct inpcb *inp = sotoinpcb(so);
   register int error = 0;
 
   if (inp)
-     panic("ripv6_attach - Already got PCB");
+     panic("rip6_attach - Already got PCB");
 
 #if __NetBSD__ || __FreeBSD__
   if (p == 0 || (error = suser(p->p_ucred, &p->p_acflag)))
@@ -719,7 +737,7 @@ MAYBESTATIC MAYBEINLINE int ripv6_usrreq_attach(struct socket *so, int proto)
     error = EACCES;
     return error;
   }
-  if ((error = soreserve(so, ripv6_sendspace, ripv6_recvspace)) ||
+  if ((error = soreserve(so, rip6_sendspace, rip6_recvspace)) ||
 
 #if __FreeBSD__
     (error = in_pcballoc(so, &ri6pcbinfo, p)))
@@ -735,23 +753,23 @@ MAYBESTATIC MAYBEINLINE int ripv6_usrreq_attach(struct socket *so, int proto)
      
   inp = sotoinpcb(so);
 #ifdef	__alpha__
-  inp->inp_ipv6.ipv6_nexthdr = (u_long)proto;     /*nam;  Nam contains protocol
+  inp->inp_ipv6.ip6_nxt = (u_long)proto;     /*nam;  Nam contains protocol
 						 type, apparently. */
 #else
-  inp->inp_ipv6.ipv6_nexthdr = (int)proto;     /*nam;   Nam contains protocol
+  inp->inp_ipv6.ip6_nxt = (int)proto;     /*nam;   Nam contains protocol
 						 type, apparently. */
 #endif
-  if (inp->inp_ipv6.ipv6_nexthdr == IPPROTO_ICMPV6)
+  if (inp->inp_ipv6.ip6_nxt == IPPROTO_ICMPV6)
      inp->inp_csumoffset = 2;
   return error;
 }
 
-MAYBESTATIC MAYBEINLINE int ripv6_usrreq_detach(struct socket *so)
+MAYBESTATIC MAYBEINLINE int rip6_usrreq_detach(struct socket *so)
 {
   register struct inpcb *inp = sotoinpcb(so);
 
   if (inp == 0)
-     panic("ripv6_detach");
+     panic("rip6_detach");
 #ifdef MROUTING
       /* More MROUTING stuff. */
 #endif
@@ -759,24 +777,24 @@ MAYBESTATIC MAYBEINLINE int ripv6_usrreq_detach(struct socket *so)
   return 0;
 }
 
-MAYBESTATIC MAYBEINLINE int ripv6_usrreq_abort(struct socket *so)
+MAYBESTATIC MAYBEINLINE int rip6_usrreq_abort(struct socket *so)
 {
    soisdisconnected(so);
-   return ripv6_usrreq_detach(so);
+   return rip6_usrreq_detach(so);
 }
 
-static MAYBEINLINE int ripv6_usrreq_disconnect(struct socket *so)
+static MAYBEINLINE int rip6_usrreq_disconnect(struct socket *so)
 { 
    if ((so->so_state & SS_ISCONNECTED) == 0)
       return ENOTCONN;
-   return ripv6_usrreq_abort(so);
+   return rip6_usrreq_abort(so);
 }
 
 #if __NetBSD__ || __FreeBSD__
-MAYBESTATIC MAYBEINLINE int ripv6_usrreq_bind(struct socket *so,
+MAYBESTATIC MAYBEINLINE int rip6_usrreq_bind(struct socket *so,
 				         struct sockaddr *nam, struct proc *p)
 #else /* __NetBSD__ || __FreeBSD__ */
-MAYBESTATIC MAYBEINLINE int ripv6_usrreq_bind(struct socket *so,
+MAYBESTATIC MAYBEINLINE int rip6_usrreq_bind(struct socket *so,
 					      struct sockaddr *nam)
 #endif /* __NetBSD__ || __FreeBSD__ */
 {
@@ -800,10 +818,10 @@ MAYBESTATIC MAYBEINLINE int ripv6_usrreq_bind(struct socket *so,
 }
 
 #if __NetBSD__ || __FreeBSD__
-MAYBESTATIC MAYBEINLINE int ripv6_usrreq_connect(struct socket *so,
+MAYBESTATIC MAYBEINLINE int rip6_usrreq_connect(struct socket *so,
 					 struct sockaddr *nam, struct proc *p)
 #else /* __NetBSD__ || __FreeBSD__ */
-MAYBESTATIC MAYBEINLINE int ripv6_usrreq_connect(struct socket *so,
+MAYBESTATIC MAYBEINLINE int rip6_usrreq_connect(struct socket *so,
 						 struct sockaddr *nam)
 #endif /* __NetBSD__ || __FreeBSD__ */
 {
@@ -828,22 +846,25 @@ MAYBESTATIC MAYBEINLINE int ripv6_usrreq_connect(struct socket *so,
    return 0;
 }
 
-MAYBESTATIC MAYBEINLINE int ripv6_usrreq_shutdown(struct socket *so)
+MAYBESTATIC MAYBEINLINE int rip6_usrreq_shutdown(struct socket *so)
 { 
   socantsendmore(so);
   return 0;
 }
+
+static int rip6_usrreq_send __P((struct socket *so, int flags, struct mbuf *m,
+                      struct sockaddr *addr, struct mbuf *control));
 
 #if __NetBSD__ || __FreeBSD__
 /*
  * Note that flags and p are not used, but required by protosw in 
  * FreeBSD.
  */
-int ripv6_usrreq_send(struct socket *so, int flags, struct mbuf *m,
+static int rip6_usrreq_send(struct socket *so, int flags, struct mbuf *m,
                       struct sockaddr *addr, struct mbuf *control,
 		      struct proc *p)
 #else /* __NetBSD__ || __FreeBSD__ */
-int ripv6_usrreq_send(struct socket *so, int flags, struct mbuf *m,
+static int rip6_usrreq_send(struct socket *so, int flags, struct mbuf *m,
                       struct sockaddr *addr, struct mbuf *control)
 #endif /* __NetBSD__ || __FreeBSD__ */
 {
@@ -875,16 +896,16 @@ int ripv6_usrreq_send(struct socket *so, int flags, struct mbuf *m,
        dst = &((struct sockaddr_in6 *)addr)->sin6_addr;
      }
 
-   error = ripv6_output(m,so,dst,control);
+   error = rip6_output(m,so,dst,control);
    /* m = NULL; */
    return error;
 }
 
 #if __NetBSD__ || __FreeBSD__
-MAYBESTATIC MAYBEINLINE int ripv6_usrreq_control(struct socket *so, u_long cmd,
+MAYBESTATIC MAYBEINLINE int rip6_usrreq_control(struct socket *so, u_long cmd,
                                caddr_t data, struct ifnet *ifp, struct proc *p)
 #else /* __NetBSD__ || __FreeBSD__ */
-MAYBESTATIC MAYBEINLINE int ripv6_usrreq_control(struct socket *so, int cmd,
+MAYBESTATIC MAYBEINLINE int rip6_usrreq_control(struct socket *so, int cmd,
                                                caddr_t data, struct ifnet *ifp)
 #endif /* __NetBSD__ || __FreeBSD__ */
 { 
@@ -897,7 +918,7 @@ MAYBESTATIC MAYBEINLINE int ripv6_usrreq_control(struct socket *so, int cmd,
 #endif /* __NetBSD__ || __FreeBSD__ */
 }
 
-MAYBESTATIC MAYBEINLINE int ripv6_usrreq_sense(struct socket *so,
+MAYBESTATIC MAYBEINLINE int rip6_usrreq_sense(struct socket *so,
                                                struct stat *sb)
 { 
   /* services stat(2) call. */
@@ -905,10 +926,10 @@ MAYBESTATIC MAYBEINLINE int ripv6_usrreq_sense(struct socket *so,
 }
 
 #if __FreeBSD__
-MAYBESTATIC MAYBEINLINE int ripv6_usrreq_sockaddr(struct socket *so,
+MAYBESTATIC MAYBEINLINE int rip6_usrreq_sockaddr(struct socket *so,
                                                   struct sockaddr **nam)
 #else /* __FreeBSD__ */
-MAYBESTATIC MAYBEINLINE int ripv6_usrreq_sockaddr(struct socket *so,
+MAYBESTATIC MAYBEINLINE int rip6_usrreq_sockaddr(struct socket *so,
                                                   struct mbuf *nam)
 #endif /* __FreeBSD__ */
 {
@@ -917,10 +938,10 @@ MAYBESTATIC MAYBEINLINE int ripv6_usrreq_sockaddr(struct socket *so,
 }
 
 #if __FreeBSD__
-MAYBESTATIC MAYBEINLINE int ripv6_usrreq_peeraddr(struct socket *so,
+MAYBESTATIC MAYBEINLINE int rip6_usrreq_peeraddr(struct socket *so,
                                                   struct sockaddr **nam)
 #else /* __FreeBSD__ */
-MAYBESTATIC MAYBEINLINE int ripv6_usrreq_peeraddr(struct socket *so,
+MAYBESTATIC MAYBEINLINE int rip6_usrreq_peeraddr(struct socket *so,
                                                   struct mbuf *nam)
 #endif /* __FreeBSD__ */
 {
@@ -929,13 +950,13 @@ MAYBESTATIC MAYBEINLINE int ripv6_usrreq_peeraddr(struct socket *so,
 }
 
 #if __FreeBSD__
-struct pr_usrreqs ripv6_usrreqs = {
-  ripv6_usrreq_abort, pru_accept_notsupp, ripv6_usrreq_attach,
-  ripv6_usrreq_bind, ripv6_usrreq_connect, pru_connect2_notsupp,
-  ripv6_usrreq_control, ripv6_usrreq_detach, ripv6_usrreq_detach,
-  pru_listen_notsupp, ripv6_usrreq_peeraddr, pru_rcvd_notsupp,
-  pru_rcvoob_notsupp, ripv6_usrreq_send, ripv6_usrreq_sense,
-  ripv6_usrreq_shutdown, ripv6_usrreq_sockaddr, sosend, soreceive, sopoll
+struct pr_usrreqs rip6_usrreqs = {
+  rip6_usrreq_abort, pru_accept_notsupp, rip6_usrreq_attach,
+  rip6_usrreq_bind, rip6_usrreq_connect, pru_connect2_notsupp,
+  rip6_usrreq_control, rip6_usrreq_detach, rip6_usrreq_detach,
+  pru_listen_notsupp, rip6_usrreq_peeraddr, pru_rcvd_notsupp,
+  pru_rcvoob_notsupp, rip6_usrreq_send, rip6_usrreq_sense,
+  rip6_usrreq_shutdown, rip6_usrreq_sockaddr, sosend, soreceive, sopoll
 };
 #endif /* __FreeBSD__ */
 
@@ -944,21 +965,15 @@ struct pr_usrreqs ripv6_usrreqs = {
  ----------------------------------------------------------------------*/
 #if !__FreeBSD__
 int
-#if __NetBSD__
-ripv6_usrreq(so, req, m, nam, control, p)
-#else /* __NetBSD__ */
-ripv6_usrreq(so, req, m, nam, control)
-#endif /* __NetBSD__ */
+rip6_usrreq(so, req, m, nam, control, p)
      struct socket *so;
      int req;
      struct mbuf *m, *nam, *control;
-#if __NetBSD__
      struct proc *p;
-#endif /* __NetBSD__ */
 {
   register int error = 0;
 
-  DPRINTF(IDL_EVENT, ("ripv6_usrreq(so, req, m, nam, control)\n"));
+  DPRINTF(IDL_EVENT, ("rip6_usrreq(so, req, m, nam, control)\n"));
 
 #ifdef MROUTING
   /*
@@ -974,23 +989,23 @@ ripv6_usrreq(so, req, m, nam, control)
     {
     case PRU_ATTACH:
 #if __NetBSD__
-      error = ripv6_usrreq_attach(so, 0, p);  /* XXX */
+      error = rip6_usrreq_attach(so, 0, p);  /* XXX */
 #else /* __NetBSD__ */
-      error = ripv6_usrreq_attach(so, 0);  /* XXX */
+      error = rip6_usrreq_attach(so, 0);  /* XXX */
 #endif /* __NetBSD__ */
       break;
     case PRU_DISCONNECT:
-      error = ripv6_usrreq_disconnect(so);
+      error = rip6_usrreq_disconnect(so);
       break;
       /* NOT */
       /* FALLTHROUGH */
     case PRU_ABORT:
-      error = ripv6_usrreq_abort(so);
+      error = rip6_usrreq_abort(so);
       break;
       /* NOT */
       /* FALLTHROUGH */
     case PRU_DETACH:
-      error = ripv6_usrreq_detach(so);
+      error = rip6_usrreq_detach(so);
       break;
     case PRU_BIND:
       if (nam->m_len != sizeof(struct sockaddr_in6))
@@ -999,9 +1014,9 @@ ripv6_usrreq(so, req, m, nam, control)
        * Be strict regarding sockaddr_in6 fields.
        */
 #if __NetBSD__
-      error = ripv6_usrreq_bind(so, mtod(nam, struct sockaddr *), p);
+      error = rip6_usrreq_bind(so, mtod(nam, struct sockaddr *), p);
 #else /* __NetBSD__ */
-      error = ripv6_usrreq_bind(so, mtod(nam, struct sockaddr *));
+      error = rip6_usrreq_bind(so, mtod(nam, struct sockaddr *));
 #endif /* __NetBSD__ */
       break;
     case PRU_CONNECT:
@@ -1011,13 +1026,13 @@ ripv6_usrreq(so, req, m, nam, control)
       if (nam->m_len != sizeof(struct sockaddr_in6))
           return EINVAL;
 #if __NetBSD__
-      error = ripv6_usrreq_connect(so, mtod(nam, struct sockaddr *), p);
+      error = rip6_usrreq_connect(so, mtod(nam, struct sockaddr *), p);
 #else /* __NetBSD__ */
-      error = ripv6_usrreq_connect(so, mtod(nam, struct sockaddr *));
+      error = rip6_usrreq_connect(so, mtod(nam, struct sockaddr *));
 #endif /* __NetBSD__ */
       break;
     case PRU_SHUTDOWN:
-      error = ripv6_usrreq_shutdown(so);
+      error = rip6_usrreq_shutdown(so);
       break;
     case PRU_SEND:
       /*
@@ -1026,22 +1041,22 @@ ripv6_usrreq(so, req, m, nam, control)
       if (nam->m_len != sizeof(struct sockaddr_in6))
           return EINVAL;
 #if __NetBSD__
-      error = ripv6_usrreq_send(so, 0, m, mtod(nam, struct sockaddr *), control, p);
+      error = rip6_usrreq_send(so, 0, m, mtod(nam, struct sockaddr *), control, p);
 #else /* __NetBSD__ */
-      error = ripv6_usrreq_send(so, 0, m, mtod(nam, struct sockaddr *), control);
+      error = rip6_usrreq_send(so, 0, m, mtod(nam, struct sockaddr *), control);
 #endif /* __NetBSD__ */
       m = NULL;
       break;
     case PRU_CONTROL:
 #if __NetBSD__
-      return ripv6_usrreq_control(so, (u_long)m, (caddr_t) nam, 
+      return rip6_usrreq_control(so, (u_long)m, (caddr_t) nam, 
                                (struct ifnet *) control, p);
 #else /* __NetBSD__ */
-      return ripv6_usrreq_control(so, (int)m, (caddr_t) nam, 
+      return rip6_usrreq_control(so, (int)m, (caddr_t) nam, 
                                (struct ifnet *) control);
 #endif /* __NetBSD__ */
     case PRU_SENSE:
-      return ripv6_usrreq_sense(so, NULL); /* XXX */
+      return rip6_usrreq_sense(so, NULL); /* XXX */
     case PRU_CONNECT2:
     case PRU_RCVOOB:
     case PRU_LISTEN:
@@ -1051,13 +1066,13 @@ ripv6_usrreq(so, req, m, nam, control)
       error = EOPNOTSUPP;
       break;
     case PRU_SOCKADDR:
-      error = ripv6_usrreq_sockaddr(so, nam);
+      error = rip6_usrreq_sockaddr(so, nam);
       break;
     case PRU_PEERADDR:
-      error = ripv6_usrreq_peeraddr(so, nam);
+      error = rip6_usrreq_peeraddr(so, nam);
       break;
     default:
-      panic ("ripv6_usrreq - unknown req\n");
+      panic ("rip6_usrreq - unknown req\n");
     }
   if (m != NULL)
     m_freem(m);

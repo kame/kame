@@ -145,6 +145,7 @@ struct	ipstat {
 	u_long	ips_badfrags;		/* malformed fragments (bad length) */
 	u_long	ips_rcvmemdrop;		/* frags dropped for lack of memory */
 	u_long	ips_toolong;		/* ip length > max ip packet size */
+	u_long	ips_nogif;		/* no match gif found */
 };
 
 #ifdef _KERNEL

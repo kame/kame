@@ -53,6 +53,11 @@ static const char rcsid[] = "@(#)$Id: ip_auth.c,v 1.5 1999/02/05 05:58:49 deraad
 #include <net/af.h>
 #endif
 #include <net/route.h>
+#ifdef _KERNEL
+#ifndef INET
+#error ipfilter assumes options INET
+#endif
+#endif
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>

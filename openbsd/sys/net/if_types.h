@@ -97,3 +97,9 @@
 #define	IFT_PROPVIRTUAL	0x35		/* Proprietary Virtual/internal */
 #define	IFT_PROPMUX	0x36		/* Proprietary Multiplexing */
 #define IFT_ENC		0x37		/* Encapsulation */
+
+/* private usage... how should we define these? */
+#define	IFT_GIF		0xf0
+#define	IFT_DUMMY	0xf1
+#define IFT_PVC		0xf2
+#define IFT_FAITH	0xf3

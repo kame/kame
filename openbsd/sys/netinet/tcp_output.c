@@ -444,14 +444,14 @@ send:
         /*
 	 * For IPv6, this has changed to be:
 	 *      max_linkhdr + sizeof(struct tcphdr) + optlen + 
-	 *           sizeof(struct ipv6)  <= MHLEN
+	 *           sizeof(struct ip6_hdr)  <= MHLEN
 	 * This MIGHT be harder...
 	 */
 #endif /* INET6 */
 	optlen = 0;
 #ifdef INET6
 	if (tp->pf == PF_INET6)  /* if tp->pf is 0, then assume IPv4. */
-	  hdrlen = sizeof(struct tcphdr) + sizeof(struct ipv6);
+	  hdrlen = sizeof(struct tcphdr) + sizeof(struct ip6_hdr);
 	else
 #endif /* INET6 */
 	hdrlen = sizeof (struct tcpiphdr);
@@ -584,13 +584,20 @@ send:
 		m->m_data -= hdrlen;
 #else
 		MGETHDR(m, M_DONTWAIT, MT_HEADER);
+		if (m != NULL) {
+			MCLGET(m, M_DONTWAIT);
+			if ((m->m_flags & M_EXT) == 0) {
+				m_freem(m);
+				m = NULL;
+			}
+		}
 		if (m == NULL) {
 			error = ENOBUFS;
 			goto out;
 		}
 		m->m_data += max_linkhdr;
 		m->m_len = hdrlen;
-		if (len <= MHLEN - hdrlen - max_linkhdr) {
+		if (len <= MCLBYTES - hdrlen - max_linkhdr) {
 			m_copydata(so->so_snd.sb_mb, off, (int) len,
 			    mtod(m, caddr_t) + hdrlen);
 			m->m_len += len;
@@ -622,6 +629,13 @@ send:
 			tcpstat.tcps_sndwinup++;
 
 		MGETHDR(m, M_DONTWAIT, MT_HEADER);
+		if (m != NULL) {
+			MCLGET(m, M_DONTWAIT);
+			if ((m->m_flags & M_EXT) == 0) {
+				m_freem(m);
+				m = NULL;
+			}
+		}
 		if (m == NULL) {
 			error = ENOBUFS;
 			goto out;
@@ -742,7 +756,7 @@ send:
 	if (tp->pf == PF_INET6) {
 	  th->th_sum = in6_cksum(m, IPPROTO_TCP,
 				 sizeof(struct tcphdr) + optlen + len,
-				 sizeof(struct ipv6));
+				 sizeof(struct ip6_hdr));
 	} else
 #endif /* INET6 */
 	{
@@ -849,15 +863,15 @@ send:
 #endif
 #ifdef INET6
 	if (tp->pf == PF_INET6) {
-	  ((struct ipv6 *)ti6)->ipv6_length = m->m_pkthdr.len - sizeof(struct ipv6);
+	  ((struct ip6_hdr *)ti6)->ip6_plen = m->m_pkthdr.len - sizeof(struct ip6_hdr);
 
 	  /* Following fields are already grabbed from the tcp_template. */
-	  /* ((struct ipv6 *)ti6)->ipv6_versfl   = ntohl(0x60000000);
-	  ((struct ipv6 *)ti6)->ipv6_nexthdr  = IPPROTO_TCP;
-	  ((struct ipv6 *)ti6)->ipv6_hoplimit = 
-	    tp->t_inpcb->inp_ipv6.ipv6_hoplimit;*/
+	  /* ((struct ip6_hdr *)ti6)->ip6_flow   = ntohl(0x60000000);
+	  ((struct ip6_hdr *)ti6)->ipv6_nexthdr  = IPPROTO_TCP;
+	  ((struct ip6_hdr *)ti6)->ip6_hlim = 
+	    tp->t_inpcb->inp_ipv6.ip6_hlim;*/
 
-	  error = ipv6_output(m, &tp->t_inpcb->inp_route6, (so->so_options & SO_DONTROUTE), NULL, NULL, tp->t_inpcb->inp_socket);
+	  error = ip6_output(m, NULL, &tp->t_inpcb->inp_route6, (so->so_options & SO_DONTROUTE), NULL, NULL);
 	} else
 #endif /* INET6 */
     {

@@ -51,7 +51,7 @@
 #define	MLEN		(MSIZE - sizeof(struct m_hdr))	/* normal data len */
 #define	MHLEN		(MLEN - sizeof(struct pkthdr))	/* data len w/pkthdr */
 
-#define	MINCLSIZE	(MHLEN+MLEN+1)	/* smallest amount to put in cluster */
+#define	MINCLSIZE	(MHLEN + 1)	/* smallest amount to put in cluster */
 #define	M_MAXCOMPRESS	(MHLEN / 2)	/* max amount to copy for compression */
 
 /*
@@ -126,14 +126,30 @@ struct mbuf {
 #define	M_BCAST		0x0100	/* send/received as link-level broadcast */
 #define	M_MCAST		0x0200	/* send/received as link-level multicast */
 #define M_CONF		0x0400  /* packet was encrypted (ESP-transport) */
+#if 0 /* NRL IPv6 */
 #define M_AUTH		0x0800  /* packet was authenticated (AH) */
 #define M_TUNNEL       	0x1000  /* packet was tunneled */
-
 #define M_DAD		0x2000	/* Used on outbound packets to indicate that
 				 * this is for duplicate address detection */
+#endif
+
+/* KAME IPv6 */
+#define M_ANYCAST6	0x0800	/* received as IPv6 anycast */
+#if 0
+#define M_AUTHIPHDR	0x0010	/* data origin authentication for IP header */
+#define M_DECRYPTED	0x0020	/* confidentiality */
+#endif
+#define M_LOOP		0x0040	/* for Mbuf statistics */
+#if 0
+#define M_AUTHIPDGM     0x0080  /* data origin authentication */
+#endif
 
 /* flags copied when copying m_pkthdr */
-#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_BCAST|M_MCAST|M_CONF|M_AUTH|M_TUNNEL|M_DAD)
+#if 0
+#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_BCAST|M_MCAST|M_CONF|M_AUTH|M_TUNNEL|M_LOOP)
+#else
+#define	M_COPYFLAGS	(M_PKTHDR|M_EOR|M_BCAST|M_MCAST|M_CONF|M_ANYCAST6|M_LOOP)
+#endif
 
 /* mbuf types */
 #define	MT_FREE		0	/* should be on free list */

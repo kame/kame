@@ -73,6 +73,11 @@ static const char rcsid[] = "@(#)$Id: ip_fil.c,v 1.21 1999/04/16 13:44:25 deraad
 # endif
 #endif
 #include <net/route.h>
+#ifdef _KERNEL
+#ifndef INET
+#error ipfilter assumes options INET
+#endif
+#endif
 #include <netinet/in.h>
 #if !(defined(__sgi) && !defined(IFF_DRVRLOCK)) /* IRIX < 6 */
 #include <netinet/in_var.h>

@@ -86,6 +86,14 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netipx/ipx_if.h>
 #endif
 
+#ifdef INET6
+#ifndef INET
+#include <netinet/in.h>
+#include <netinet/in_var.h>
+#endif
+#include <netinet6/nd6.h>
+#endif
+
 #ifdef NS
 #include <netns/ns.h>
 #include <netns/ns_if.h>
@@ -194,6 +202,19 @@ fddi_output(ifp, m0, dst, rt0)
 #endif
 #ifdef INET6
 	case AF_INET6:
+#ifdef OLDIP6OUTPUT
+		if (!nd6_resolve(ifp, rt, m, dst, edst))
+			return (0);	/* if not yet resolved */
+#else
+		if (!nd6_storelladdr(ifp, rt, m, dst, (u_char *)edst))
+			return 0;
+#endif
+		type = htons(ETHERTYPE_IPV6);
+		break;
+#endif
+#if 0	/*NRL IPv6*/
+#ifdef INET6
+	case AF_INET6:
 		/*
 		 * The bottom line here is to either queue the outgoing packet
 		 * in the discovery engine, or fill in edst with something
@@ -214,6 +235,7 @@ fddi_output(ifp, m0, dst, rt0)
 		type = htons(ETHERTYPE_IPV6);
 		break;
 #endif /* INET6 */
+#endif
 #ifdef IPX
 	case AF_IPX:
 		type = htons(ETHERTYPE_IPX);
@@ -492,7 +514,7 @@ fddi_input(ifp, fh, m)
 #ifdef INET6
 		case ETHERTYPE_IPV6:
 			schednetisr(NETISR_IPV6);
-			inq = &ipv6intrq;
+			inq = &ip6intrq;
 			break;
 #endif /* INET6 */
 #ifdef IPX

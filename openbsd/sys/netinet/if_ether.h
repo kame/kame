@@ -91,6 +91,23 @@ struct	ether_header {
 	(enaddr)[4] = ((u_int8_t *)ipaddr)[2];				\
 	(enaddr)[5] = ((u_int8_t *)ipaddr)[3];				\
 }
+
+/*
+ * Macro to map an IPv6 multicast address to an Ethernet multicast address.
+ * The high-order 16 bits of the Ethernet address are statically assigned,
+ * and the low-order 32 bits are taken from the low end of the IPv6 address.
+ */
+#define ETHER_MAP_IPV6_MULTICAST(ip6addr, enaddr)			\
+	/* struct in6_addr *ip6addr; */					\
+	/* u_int8_t enaddr[ETHER_ADDR_LEN]; */				\
+{									\
+	(enaddr)[0] = 0x33;						\
+	(enaddr)[1] = 0x33;						\
+	(enaddr)[2] = ((u_int8_t *)ip6addr)[12];			\
+	(enaddr)[3] = ((u_int8_t *)ip6addr)[13];			\
+	(enaddr)[4] = ((u_int8_t *)ip6addr)[14];			\
+	(enaddr)[5] = ((u_int8_t *)ip6addr)[15];			\
+}
 #endif
 
 /*

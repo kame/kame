@@ -504,7 +504,7 @@ tcp_ctloutput(op, so, level, optname, mp)
 		 * AF_INET6 sockets which get SET/GET options for IPv4.
 		 */
 		if (tp->pf == PF_INET6)
-			error = ipv6_ctloutput(op, so, level, optname, mp);
+			error = ip6_ctloutput(op, so, level, optname, mp);
 		else
 #endif /* INET6 */
 			error = ip_ctloutput(op, so, level, optname, mp);

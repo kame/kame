@@ -2,6 +2,35 @@
 /*	$NetBSD: in_pcb.h,v 1.14 1996/02/13 23:42:00 christos Exp $	*/
 
 /*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
+/*
  * Copyright (c) 1982, 1986, 1990, 1993
  *	The Regents of the University of California.  All rights reserved.
  *
@@ -37,9 +66,12 @@
  */
 
 #include <sys/queue.h>
-#include <netinet6/ipv6.h>
-#include <netinet6/ipv6_var.h>
-#include <netinet6/icmpv6.h>
+#if 0	/*KAME IPSEC*/
+#include <netinet6/ipsec.h>
+#endif
+#include <netinet6/ip6.h>
+#include <netinet6/ip6_var.h>
+#include <netinet6/icmp6.h>
 #include <netinet/ip_ipsp.h>
 
 union inpaddru {
@@ -73,21 +105,21 @@ struct inpcb {
 	caddr_t	  inp_ppcb;		/* pointer to per-protocol pcb */
 	union {				/* Route (notice increased size). */
 		struct route ru_route;
-		struct route6 ru_route6;
+		struct route_in6 ru_route6;
 	} inp_ru;
 #define	inp_route	inp_ru.ru_route
 #define	inp_route6	inp_ru.ru_route6
 	int	  inp_flags;		/* generic IP/datagram flags */
 	union {				/* Header prototype. */
 		struct ip hu_ip;
-		struct ipv6 hu_ipv6;
+		struct ip6_hdr hu_ipv6;
 	} inp_hu;
 #define	inp_ip		inp_hu.hu_ip
 #define	inp_ipv6	inp_hu.hu_ipv6
 	struct	  mbuf *inp_options;	/* IP options */
 	union {
 		struct ip_moptions *mou_mo;    /* IPv4 multicast options */
-		struct ipv6_moptions *mou_mo6; /* IPv6 multicast options */
+		struct ip6_moptions *mou_mo6; /* IPv6 multicast options */
 	} inp_mou;
 #define inp_moptions inp_mou.mou_mo
 #define inp_moptions6 inp_mou.mou_mo6
@@ -104,7 +136,12 @@ struct inpcb {
 	struct tdb     *inp_tdb;	/* If tdb_dst matches our dst, use */
 	int	inp_fflowinfo;          /* Foreign flowlabel & priority */
 	int	inp_csumoffset;
-	struct	icmpv6_filter inp_filter;
+	struct	icmp6_filter inp_icmp6filt;
+#if 0 /*KAME IPSEC*/
+	struct secpolicy *inp_sp;	/* security policy. It may not be
+					 * used according to policy selection.
+					 */
+#endif
 };
 
 struct inpcbtable {
@@ -201,4 +238,11 @@ void	 in_rtchange __P((struct inpcb *, int));
 void	 in_setpeeraddr __P((struct inpcb *, struct mbuf *));
 void	 in_setsockaddr __P((struct inpcb *, struct mbuf *));
 int	 in_baddynamic __P((u_int16_t, u_int16_t));
+extern struct sockaddr_in *in_selectsrc __P((struct sockaddr_in *,
+	struct route *, int, struct ip_moptions *, int *));
+
+/* INET6 stuff */
+int	in6_pcbnotify __P((struct inpcbtable *, struct sockaddr *,
+			   u_int, struct in6_addr *, u_int, int,
+			   void (*)(struct inpcb *, int)));
 #endif

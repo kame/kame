@@ -717,6 +717,8 @@ insert:
 	 * Make header visible.
 	 */
 	ip->ip_len = next;
+	ip->ip_ttl = 0;	/* xxx */
+	ip->ip_sum = 0;
 	ip->ip_src = fp->ipq_src;
 	ip->ip_dst = fp->ipq_dst;
 	LIST_REMOVE(fp, ipq_q);
@@ -1068,7 +1070,7 @@ save_rte(option, dst)
 #ifdef DIAGNOSTIC
 	if (ipprintfs)
 		printf("save_rte: olen %d\n", olen);
-#endif
+#endif /* 0 */
 	if (olen > sizeof(ip_srcrt) - (1 + sizeof(dst)))
 		return;
 	bcopy((caddr_t)option, (caddr_t)ip_srcrt.srcopt, olen);
@@ -1249,6 +1251,9 @@ ip_forward(m, srcrt)
 	struct mbuf *mcopy;
 	n_long dest;
 	struct ifnet *destifp;
+#ifdef IPSEC
+	struct ifnet dummyifp;
+#endif
 
 	dest = 0;
 #ifdef DIAGNOSTIC
@@ -1329,6 +1334,9 @@ ip_forward(m, srcrt)
 		}
 	}
 
+#ifdef IPSEC
+	m->m_pkthdr.rcvif = NULL;
+#endif /*IPSEC*/
 	error = ip_output(m, (struct mbuf *)0, &ipforward_rt,
 	    (IP_FORWARDING | (ip_directedbcast ? IP_ALLOWBROADCAST : 0)), 
 	    0, NULL, NULL);
@@ -1366,8 +1374,57 @@ ip_forward(m, srcrt)
 	case EMSGSIZE:
 		type = ICMP_UNREACH;
 		code = ICMP_UNREACH_NEEDFRAG;
+#ifndef IPSEC
 		if (ipforward_rt.ro_rt)
 			destifp = ipforward_rt.ro_rt->rt_ifp;
+#else
+		/*
+		 * If the packet is routed over IPsec tunnel, tell the
+		 * originator the tunnel MTU.
+		 *	tunnel MTU = if MTU - sizeof(IP) - ESP/AH hdrsiz
+		 * XXX quickhack!!!
+		 */
+		if (ipforward_rt.ro_rt) {
+			struct secpolicy *sp;
+			int ipsecerror;
+			int ipsechdr;
+			struct route *ro;
+
+			sp = ipsec4_getpolicybyaddr(mcopy,
+						    IP_FORWARDING,
+						    &ipsecerror);
+
+			if (sp == NULL)
+				destifp = ipforward_rt.ro_rt->rt_ifp;
+			else {
+				/* count IPsec header size */
+				ipsechdr = ipsec4_hdrsiz(mcopy, NULL);
+
+				/*
+				 * find the correct route for outer IPv4
+				 * header, compute tunnel MTU.
+				 *
+				 * XXX BUG ALERT
+				 * The "dummyifp" code relies upon the fact
+				 * that icmp_error() touches only ifp->if_mtu.
+				 */
+				/*XXX*/
+				destifp = NULL;
+				if (sp->req != NULL
+				 && sp->req->sa != NULL) {
+					ro = &sp->req->sa->saidx->sa_route;
+					if (ro->ro_rt && ro->ro_rt->rt_ifp) {
+						dummyifp.if_mtu =
+						    ro->ro_rt->rt_ifp->if_mtu;
+						dummyifp.if_mtu -= ipsechdr;
+						destifp = &dummyifp;
+					}
+				}
+
+				key_freesp(sp);
+			}
+		}
+#endif /*IPSEC*/
 		ipstat.ips_cantfrag++;
 		break;
 

@@ -149,7 +149,9 @@
 #define M_DISCQ		93	/* IPv6 discq */
 #define M_FRAGQ		94	/* IPv6 fragq */
 #define M_SECA		95	/* Sec Assoc */
+#if 0 /* NRL IPv6 */
 #define M_I6IFP		96	/* IPv6 if info */
+#endif
 
 #define	M_RAIDFRAME	97	/* Raidframe data */
 
@@ -157,8 +159,14 @@
 #define M_UVMAOBJ	99	/* UVM aobj and realted */
 #define M_POOL		100	/* Pool memory */
 
-#define	M_TEMP		127	/* misc temporary data buffers */
-#define M_LAST          128     /* Must be last type + 1 */
+/* KAME IPv6 */
+#define	M_IP6OPT	125	/* IPv6 options */
+#define	M_IP6NDP	126	/* IPv6 Neighbour Discovery */
+#define	M_IP6RR		127	/* IPv6 Router Renumbering Prefix */
+#define	M_RR_ADDR	128	/* IPv6 Router Renumbering Ifid */
+
+#define	M_TEMP		129	/* misc temporary data buffers */
+#define M_LAST          130     /* Must be last type + 1 */
 
 
 #define	INITKMEMNAMES { \
@@ -268,8 +276,12 @@
 	NULL, NULL, NULL, NULL, NULL, \
 	NULL, NULL, NULL, NULL, NULL, \
 	NULL, NULL, NULL, NULL, NULL, \
-	NULL, NULL, NULL, NULL, NULL, \
-	"temp",		/* 127 M_TEMP */ \
+	NULL, NULL, NULL, \
+	"ip6_options",	/* 125 M_IP6OPT */ \
+	"NDP",		/* 126 M_IP6NDP */ \
+	"ip6rr",	/* 127 M_IP6RR */ \
+	"rp_addr",	/* 128 M_RR_ADDR */ \
+	"temp",		/* 129 M_TEMP */ \
 }
 
 struct kmemstats {
