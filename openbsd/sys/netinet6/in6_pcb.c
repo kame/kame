@@ -248,21 +248,23 @@ in6_pcbbind(inp, nam)
 	{
 	  struct sockaddr_in sin;
 
+	  bzero(&sin, sizeof(sin));
 	  sin.sin_port = 0;
 	  sin.sin_len = sizeof(sin);
 	  sin.sin_family = AF_INET;
 	  sin.sin_addr.s_addr = sin6->sin6_addr.s6_addr32[3];
-	  bzero(&sin.sin_zero,8);
 
 	  sin6->sin6_port = 0;  /* Yechhhh, because of upcoming call to
 				   ifa_ifwithaddr(), which does bcmp's
 				   over the PORTS as well.  (What about flow?)
 				   */
 	  sin6->sin6_flowinfo = 0;
-	  if (ifa_ifwithaddr((struct sockaddr *)sin6) == 0)
+	  if (ifa_ifwithaddr((struct sockaddr *)sin6) == 0) {
 	    if (!IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr) ||
-		ifa_ifwithaddr((struct sockaddr *)&sin) == 0)
+		ifa_ifwithaddr((struct sockaddr *)&sin) == 0) {
 	      return EADDRNOTAVAIL;
+	    }
+	  }
 	}
       if (lport)
 	{
