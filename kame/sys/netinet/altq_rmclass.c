@@ -1,4 +1,4 @@
-/* $Id: altq_rmclass.c,v 1.1 1999/08/05 14:33:08 itojun Exp $ */
+/* $Id: altq_rmclass.c,v 1.1 1999/08/05 17:18:20 itojun Exp $ */
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
  * All rights reserved.
@@ -34,7 +34,7 @@
  * LBL code modified by speer@eng.sun.com, May 1977.
  * For questions and/or comments, please send mail to cbq@ee.lbl.gov
  *
- * $Id: altq_rmclass.c,v 1.1 1999/08/05 14:33:08 itojun Exp $
+ * $Id: altq_rmclass.c,v 1.1 1999/08/05 17:18:20 itojun Exp $
  */
 
 #ident "@(#)rm_class.c  1.48     97/12/05 SMI"

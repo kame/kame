@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_var.h,v 1.1 1999/08/05 14:33:09 itojun Exp $
+ * $Id: altq_var.h,v 1.1 1999/08/05 17:18:21 itojun Exp $
  */
 #ifndef _NETINET_ALTQ_VAR_H_
 #define _NETINET_ALTQ_VAR_H_

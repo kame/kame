@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_afmap.c,v 1.1 1999/08/05 14:33:03 itojun Exp $
+ * $Id: altq_afmap.c,v 1.1 1999/08/05 17:18:17 itojun Exp $
  */
 
 /*

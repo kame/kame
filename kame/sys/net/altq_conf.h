@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_conf.h,v 1.1 1999/08/05 14:32:57 itojun Exp $
+ * $Id: altq_conf.h,v 1.1 1999/08/05 17:18:22 itojun Exp $
  */
 #ifndef _NET_ALTQ_CONF_H_
 #define _NET_ALTQ_CONF_H_

@@ -1,4 +1,4 @@
-/* $Id: altq_rmclass.h,v 1.1 1999/08/05 14:33:08 itojun Exp $ */
+/* $Id: altq_rmclass.h,v 1.1 1999/08/05 17:18:20 itojun Exp $ */
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
  * All rights reserved.

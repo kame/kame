@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_rio.h,v 1.1 1999/08/05 14:33:08 itojun Exp $
+ * $Id: altq_rio.h,v 1.1 1999/08/05 17:18:20 itojun Exp $
  */
 
 #ifndef _NETINET_ALTQ_RIO_H_

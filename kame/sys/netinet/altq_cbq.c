@@ -27,7 +27,7 @@
  *  
  * These notices must be retained in any copies of any part of this software.
  *
- * $Id: altq_cbq.c,v 1.1 1999/08/05 14:33:04 itojun Exp $
+ * $Id: altq_cbq.c,v 1.1 1999/08/05 17:18:18 itojun Exp $
  */
 
 #ifndef _NO_OPT_ALTQ_H_

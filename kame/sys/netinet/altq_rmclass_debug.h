@@ -1,4 +1,4 @@
-/* $Id: altq_rmclass_debug.h,v 1.1 1999/08/05 14:33:09 itojun Exp $ */
+/* $Id: altq_rmclass_debug.h,v 1.1 1999/08/05 17:18:20 itojun Exp $ */
 /*
  * Copyright (c) Sun Microsystems, Inc. 1998 All rights reserved.
  *
