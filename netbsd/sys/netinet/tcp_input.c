@@ -2853,8 +2853,8 @@ syn_cache_get(src, dst, th, hlen, tlen, so, m)
 				ip6_copypktopts(oin6p->in6p_outputopts,
 						M_NOWAIT);
 
-		if ((in6p->in6p_flags & IN6P_CONTROLOPTS)
-		 && m->m_len >= sizeof(struct ip6_hdr)) {
+		if ((in6p->in6p_flags & IN6P_CONTROLOPTS) &&
+		    hlen > sizeof(struct ip6_hdr)) {
 			struct ip6_recvpktopts newopts;
 			struct ip6_hdr *ip6;
 
@@ -3292,18 +3292,20 @@ syn_cache_respond(sc, m)
 	tlen = hlen + sizeof(struct tcphdr) + optlen;
 
 	/*
-	 * Create the IP+TCP header from scratch.  Reuse the received mbuf
-	 * if possible.
+	 * Create the IP+TCP header from scratch.
 	 */
-	if (m != NULL) {
-		m_freem(m->m_next);
-		m->m_next = NULL;
-		MRESETDATA(m);
-	} else {
-		MGETHDR(m, M_DONTWAIT, MT_DATA);
-		if (m == NULL)
-			return (ENOBUFS);
+	if (m)
+		m_freem(m);
+	MGETHDR(m, M_DONTWAIT, MT_DATA);
+	if (m && tlen > MHLEN) {
+		MCLGET(m, M_DONTWAIT);
+		if ((m->m_flags & M_EXT) == NULL) {
+			m_freem(m);
+			m = NULL;
+		}
 	}
+	if (m == NULL)
+		return (ENOBUFS);
 
 	/* Fixup the mbuf. */
 	m->m_data += max_linkhdr;
