@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.209 2001/04/04 05:17:29 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.210 2001/04/04 05:52:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -459,6 +459,12 @@ icmp6_error(m, type, code, param)
 	icmp6->icmp6_type = type;
 	icmp6->icmp6_code = code;
 	icmp6->icmp6_pptr = htonl((u_int32_t)param);
+
+	/*
+	 * icmp6_reflect() is designed to be in the input path.  we are calling
+	 * it from output path.  clear m->m_pkthdr.rcvif for safety.
+	 */
+	m->m_pkthdr.rcvif = NULL;
 
 	icmp6stat.icp6s_outhist[type]++;
 	icmp6_reflect(m, sizeof(struct ip6_hdr)); /*header order: IPv6 - ICMPv6*/
