@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: main.c,v 1.5 2000/04/25 06:02:38 sakane Exp $ */
+/* YIPS @(#)$Id: main.c,v 1.6 2000/05/11 09:18:56 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -64,7 +64,7 @@ int f_debugcmd = 0;	/* specifyed debug level by command line. */
 int f_local = 0;	/* local test mode.  behave like a wall. */
 int vflag = 1;		/* for print-isakmp.c */
 
-static char version[] = "@(#)racoon 2.0 sakane@ydc.co.jp";
+static char version[] = "@(#)racoon 20000501 sakane@ydc.co.jp";
 static char *pname;
 
 static void Usage __P((void));
