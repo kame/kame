@@ -169,6 +169,17 @@ rip6_input(mp, offp, proto)
 		}
 		if (last) {
 			struct mbuf *n = m_copy(m, 0, (int)M_COPYALL);
+
+#ifdef IPSEC
+			/*
+			 * Check AH/ESP integrity.
+			 */
+			if (n && ipsec6_in_reject_so(n, last->inp_socket)) {
+				m_freem(n);
+				ipsec6stat.in_polvio++;
+				/* do not inject data into pcb */
+			} else
+#endif /*IPSEC*/
 			if (n) {
 				if (last->in6p_flags & IN6P_CONTROLOPTS ||
 				    last->in6p_socket->so_options & SO_TIMESTAMP)
@@ -190,6 +201,17 @@ rip6_input(mp, offp, proto)
 		}
 		last = in6p;
 	}
+#ifdef IPSEC
+	/*
+	 * Check AH/ESP integrity.
+	 */
+	if (last && ipsec6_in_reject_so(m, last->inp_socket)) {
+		m_freem(m);
+		ipsec6stat.in_polvio++;
+		ip6stat.ip6s_delivered--;
+		/* do not inject data into pcb */
+	} else
+#endif /*IPSEC*/
 	if (last) {
 		if (last->in6p_flags & IN6P_CONTROLOPTS ||
 		    last->in6p_socket->so_options & SO_TIMESTAMP)

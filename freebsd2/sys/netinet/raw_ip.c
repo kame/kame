@@ -129,6 +129,14 @@ rip_input(m, off, proto)
 			continue;
 		if (last) {
 			struct mbuf *n = m_copy(m, 0, (int)M_COPYALL);
+#ifdef IPSEC
+			/* check AH/ESP integrity. */
+			if (n && ipsec4_in_reject(n, last)) {
+				m_freem(n);
+				ipsecstat.in_polvio++;
+				/* do not inject data to pcb */
+			} else
+#endif /*IPSEC*/
 			if (n) {
 				if (last->inp_flags & INP_CONTROLOPTS ||
 				    last->inp_socket->so_options & SO_TIMESTAMP)
@@ -147,6 +155,15 @@ rip_input(m, off, proto)
 		}
 		last = inp;
 	}
+#ifdef IPSEC
+	/* check AH/ESP integrity. */
+	if (last && ipsec4_in_reject(m, last)) {
+		m_freem(m);
+		ipsecstat.in_polvio++;
+		ipstat.ips_delivered--;
+		/* do not inject data to pcb */
+	} else
+#endif /*IPSEC*/
 	if (last) {
 		if (last->inp_flags & INP_CONTROLOPTS ||
 		    last->inp_socket->so_options & SO_TIMESTAMP)

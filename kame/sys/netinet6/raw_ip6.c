@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.65 2001/02/08 18:36:17 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.66 2001/02/26 06:33:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -239,6 +239,16 @@ rip6_input(mp, offp, proto)
 		}
 		if (last) {
 			struct	mbuf *n;
+
+#ifdef IPSEC
+			/*
+			 * Check AH/ESP integrity.
+			 */
+			if (ipsec6_in_reject(m, last)) {
+				ipsec6stat.in_polvio++;
+				/* do not inject data into pcb */
+			} else
+#endif /*IPSEC*/
 			if ((n = m_copy(m, 0, (int)M_COPYALL)) != NULL) {
 				if (last->in6p_flags & IN6P_CONTROLOPTS)
 					ip6_savecontrol(last, ip6, n, &opts,
@@ -259,6 +269,16 @@ rip6_input(mp, offp, proto)
 		}
 		last = in6p;
 	}
+#ifdef IPSEC
+	/*
+	 * Check AH/ESP integrity.
+	 */
+	if (last && ipsec6_in_reject(m, last)) {
+		m_freem(m);
+		ipsec6stat.in_polvio++;
+		/* do not inject data into pcb */
+	} else
+#endif /*IPSEC*/
 	if (last) {
 		if (last->in6p_flags & IN6P_CONTROLOPTS)
 			ip6_savecontrol(last, ip6, m, &opts, NULL);
