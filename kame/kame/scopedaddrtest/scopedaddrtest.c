@@ -70,7 +70,7 @@ rtest(name, nflag, Nflag, scopeid)
 	getnameinfo((struct sockaddr *)&sa6, sa6.sin6_len, buf, sizeof(buf),
 		    NULL, 0, flag);
 
-	printf("getnameinfo returned %s\n", buf, flag);
+	printf("getnameinfo returned %s\n", buf);
 	exit(0);
 }
 
