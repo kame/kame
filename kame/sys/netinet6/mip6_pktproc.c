@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.38 2002/08/05 11:49:17 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.39 2002/08/06 12:47:52 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -382,6 +382,11 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 		return (error);
 	}
 
+	mbu->mbu_home_nonce_index = ntohs(ip6mh->ip6mh_nonce_index);
+	mip6log((LOG_INFO,
+		 "%s:%d: Got HoT Nonce index: %d.\n",
+		 __FILE__, __LINE__,mbu->mbu_home_nonce_index));
+
 	return (0);
 }
 
@@ -453,6 +458,11 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 		m_freem(m);
 		return (error);
 	}
+
+	mbu->mbu_careof_nonce_index = ntohs(ip6mc->ip6mc_nonce_index);
+	mip6log((LOG_INFO,
+		 "%s:%d: Got CoT Nonce index: %d.\n",
+		 __FILE__, __LINE__, mbu->mbu_careof_nonce_index));
 
 	return (0);
 }
