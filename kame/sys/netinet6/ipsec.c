@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.185 2003/04/10 02:02:32 suz Exp $	*/
+/*	$KAME: ipsec.c,v 1.186 2003/04/10 04:11:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3811,8 +3811,8 @@ ipsec_copypkt(m)
 					M_MOVE_PKTHDR(mnew, n);
 #else
 					M_COPY_PKTHDR(mnew, n);
-#endif
 					mnew->m_flags = n->m_flags & M_COPYFLAGS;
+#endif
 				}
 				else {
 					MGET(mnew, M_DONTWAIT, MT_DATA);
