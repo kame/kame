@@ -33,7 +33,7 @@ HDRS = 	*.h
 OBJS = 	$(SRCS:%.c=%.o) $(GENSRCS:%.c=%.o)
 CLEANFILES = $(OBJS) $(PROG) $(GENSRC) lex.yy.c y.tab.c y.tab.h
 
-CFLAGS += -Wall -DHAVE_STDARG_H -DUSE_RFC2292BIS @OPTFLAGS@ @DEFS@
+CFLAGS += -Wall @OPTFLAGS@ @DEFS@
 LIBS += @LDFLAGS@ -ly -ll -lcompat
 
 CC=	@CC@

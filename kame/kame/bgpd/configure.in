@@ -24,10 +24,19 @@ for bgp_lib6_dir in /usr/local/v6/lib $srcdir/../libinet6; do
 	fi
 done
 AC_MSG_RESULT($bgp_cv_lib6_dir)
+AC_CHECK_FUNCS(if_nameindex,,[
 AC_CHECK_LIB(inet6, if_nameindex, [LDFLAGS="-linet6 $LDFLAGS"], [dnl
 	echo Fatal: no inet6 library found. cannot continue;
 	echo You need to fetch libinet6.a from kit and compile beforehand.
-	exit 1])
+	exit 1])])
+
+AC_MSG_CHECKING(for rfc2292bis support)
+AC_TRY_COMPILE([#include <sys/types.h>
+#include <netinet/in.h>],
+	[int x = IPV6_RECVPKTINFO;],
+	[AC_DEFINE(USE_RFC2292BIS)
+	AC_MSG_RESULT(yes)],
+	[AC_MSG_RESULT(no)])
 
 dnl guess implementation type
 v6type=unknown
@@ -92,6 +101,6 @@ if test "$bgp_cv_ntop" = no; then
         LDFLAGS="-lresolv $LDFLAGS"
 fi
 
-AC_CHECK_HEADERS(search.h)
+AC_CHECK_HEADERS(search.h stdarg.h)
 
 AC_OUTPUT(Makefile)
