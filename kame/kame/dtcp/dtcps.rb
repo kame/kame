@@ -32,7 +32,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-# $Id: dtcps.rb,v 1.1 1999/08/08 23:29:24 itojun Exp $
+# $Id: dtcps.rb,v 1.2 2000/03/22 00:00:43 itojun Exp $
 #
 
 require "socket"
@@ -64,10 +64,10 @@ def daemon(nochdir, noclose)
 
   Dir.chdir('/') if (nochdir == 0)
   if noclose == 0
-    devnull = open("/dev/null", "rw")
+    devnull = open("/dev/null", "r+")
     $stdin.reopen(devnull)
     $stdout.reopen(devnull)
-    p = pipe
+    p = IO::pipe
     pid = fork
     if pid == -1
       $stderr.reopen(devnull)
