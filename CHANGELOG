@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2395 2003/05/09 05:22:26 suz Exp $
+$KAME: CHANGELOG,v 1.2396 2003/05/15 04:00:37 jinmei Exp $
 
 <200305>
+2003-05-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/net/if.c (if_detach): be sure to reset the
+	ifindex2ifnet[] entry for the detached interface.
+
 Fri May  9 14:19:07 JST 2003	suz@crl.hitachi.co.jp
 	* kame/pim6[sd]d: moved the default location of the configuration file
 	  from /usr/local/v6/etc/... to /etc/...,  for the convenience of
