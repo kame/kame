@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.32 2000/05/30 02:06:51 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.33 2000/05/30 04:19:37 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1617,36 +1617,75 @@ static int
 get_sainfo_r(iph2)
 	struct ph2handle *iph2;
 {
-	vchar_t idsrc, iddst;
+	vchar_t *idsrc = NULL, *iddst = NULL;
+	int prefixlen;
+	int error = -1;
 
 	if (iph2->id_p == NULL) {
-		idsrc.l = iph2->src->sa_len;
-		idsrc.v = (caddr_t)iph2->src;
+		switch (iph2->dst->sa_family) {
+		case AF_INET:
+			prefixlen = sizeof(struct in_addr) << 3;
+			break;
+		case AF_INET6:
+			prefixlen = sizeof(struct in6_addr) << 3;
+			break;
+		default:
+			plog(logp, LOCATION, NULL,
+				"invalid family: %d\n", iph2->dst->sa_family);
+			goto end;
+		}
+		idsrc = ipsecdoi_sockaddr2id(iph2->dst, prefixlen, IPSEC_ULPROTO_ANY);
 	} else {
-		idsrc.l = iph2->id_p->l;
-		idsrc.v = iph2->id_p->v;
+		idsrc = vdup(iph2->id_p);
+	}
+	if (idsrc == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to set ID for source.\n");
+		goto end;
 	}
 
 	if (iph2->id == NULL) {
-		iddst.l = iph2->dst->sa_len;
-		iddst.v = (caddr_t)iph2->dst;
+		switch (iph2->src->sa_family) {
+		case AF_INET:
+			prefixlen = sizeof(struct in_addr) << 3;
+			break;
+		case AF_INET6:
+			prefixlen = sizeof(struct in6_addr) << 3;
+			break;
+		default:
+			plog(logp, LOCATION, NULL,
+				"invalid family: %d\n", iph2->src->sa_family);
+			goto end;
+		}
+		iddst = ipsecdoi_sockaddr2id(iph2->dst, prefixlen, IPSEC_ULPROTO_ANY);
 	} else {
-		iddst.l = iph2->id->l;
-		iddst.v = iph2->id->v;
+		idsrc = vdup(iph2->id);
+	}
+	if (idsrc == NULL) {
+		plog(logp, LOCATION, NULL,
+			"failed to set ID for destination.\n");
+		goto end;
 	}
 
-	iph2->sainfo = getsainfo(&idsrc, &iddst);
+	iph2->sainfo = getsainfo(idsrc, iddst);
 	if (iph2->sainfo == NULL) {
 		plog(logp, LOCATION, NULL,
 			"failed to get sainfo.\n");
-		return -1;
+		goto end;
 	}
 
 	YIPSDEBUG(DEBUG_MISC,
 		plog(logp, LOCATION, NULL,
 			"get sa info: %s\n", sainfo2str(iph2->sainfo)));
 
-	return 0;
+	error = 0;
+end:
+	if (idsrc)
+		vfree(idsrc);
+	if (iddst)
+		vfree(iddst);
+
+	return error;
 }
 
 /*
