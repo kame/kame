@@ -277,6 +277,7 @@ make_padnopt(char *name)
 {
 	char optbuf[BUFSIZ];
 	u_char len;
+	short reallen;
 
 	if (tgetent(optbuf, name) <= 0) {
 		fprintf(stderr, "v6test: unknown option %s\n", name);
@@ -284,9 +285,10 @@ make_padnopt(char *name)
 	}
 	*pbp = 1;		/* PadN option */
 	MUSTHAVE(len, "padoptlen", optbuf);
+	MAYHAVE(reallen, "padoptreallen", len, optbuf);
 	*(pbp + 1) = len;
-	bzero(pbp + 2, len);
-	pbp += (len + 2);
+	bzero(pbp + 2, reallen);
+	pbp += (reallen + 2);
 }
 
 void
