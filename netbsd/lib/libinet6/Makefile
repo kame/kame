@@ -23,6 +23,8 @@ SRCS+=	res_send.c
 SRCS+=	inet_pton.c inet_addr.c
 SRCS+=	bindresvport.c
 SRCS+=	getrrsetbyname.c
+# experimental scope library
+SRCS+=	scope.c
 
 MAN=	getaddrinfo.3 getnameinfo.3 gethostbyname.3 resolver.3 \
 	rresvport_af.3 if_indextoname.3 getipnodebyname.3 inet6_option_space.3 \

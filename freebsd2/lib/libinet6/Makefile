@@ -21,6 +21,8 @@ SRCS+=	inet_pton.c
 SRCS+=	bindresvport.c
 SRCS+=	getifaddrs.c
 SRCS+=	strlcat.c strlcpy.c
+# experimental scope library
+SRCS+=	scope.c
 
 # compatibility
 SRCS+=	vfprintf.c
