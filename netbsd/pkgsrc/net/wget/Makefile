@@ -3,7 +3,7 @@
 # Date created:		31 December 1996
 # Whom:			Thomas Gellekum <tg@FreeBSD.ORG>
 #
-# $Id: Makefile,v 1.2 2000/08/16 06:42:49 itojun Exp $
+# $Id: Makefile,v 1.3 2000/09/16 13:26:54 itojun Exp $
 #
 
 DISTNAME=	wget-1.5.3
@@ -16,7 +16,7 @@ MASTER_SITES=	${MASTER_SITE_GNU} \
 MASTER_SITE_SUBDIR=	wget
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	wget-153-v6-20000816.diff.gz
+PATCHFILES=	wget-153-v6-20000915.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	sumikawa@kame.net
