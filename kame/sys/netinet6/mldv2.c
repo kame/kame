@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.4 2004/02/06 08:52:32 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.5 2004/02/17 11:36:14 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -249,7 +249,7 @@ SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_MLD_ALWAYSV2, mld_alwaysv2, CTLFLAG_RW,
 	} \
 }
 
-void mld_sendbuf(struct mbuf *, struct ifnet *);
+static void mld_sendbuf(struct mbuf *, struct ifnet *);
 int mld_set_timer(struct ifnet *, struct router6_info *, struct mld_hdr *,
 		  u_int16_t, u_int8_t);
 void mld_set_hostcompat(struct ifnet *, struct router6_info *, int);
@@ -1008,7 +1008,7 @@ mld_allocbuf(mh, len, in6m, type)
 	return mldh;
 }
 
-void
+static void
 mld_sendbuf(mh, ifp)
 	struct mbuf *mh;
 	struct ifnet *ifp;
