@@ -1076,6 +1076,13 @@ icmp6_stats(off, name)
 
 	p(icp6s_reflect, "\t%qu message response%s generated\n");
 	p(icp6s_nd_toomanyopt, "\t%qu message%s with too many ND options\n");
+	p(icp6s_nd_badopt, "\t%qu message%s with bad ND options\n");
+	p(icp6s_badns, "\t%qu bad neighbor solicitation message%s\n");
+	p(icp6s_badna, "\t%qu bad neighbor advertisement message%s\n");
+	p(icp6s_badrs, "\t%qu bad router solicitation message%s\n");
+	p(icp6s_badra, "\t%qu bad router advertisement message%s\n");
+	p(icp6s_badredirect, "\t%qu bad redirect message%s\n");
+	p(icp6s_pmtuchg, "\t%llu path MTU change%s\n");
 #undef p
 #undef p_5
 }
