@@ -347,6 +347,11 @@ if_detach(ifp)
 	in6_ifdetach(ifp);
 #endif
 
+	/* We can now free link ifaddr. */
+	ifa = TAILQ_FIRST(&ifp->if_addrhead);
+	TAILQ_REMOVE(&ifp->if_addrhead, ifa, ifa_link);
+	IFAFREE(ifa);
+
 	/*
 	 * Delete all remaining routes using this interface
 	 * Unfortuneatly the only way to do this is to slog through
