@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.54 2001/06/22 21:47:19 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.55 2001/06/22 22:11:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -104,6 +104,7 @@ static int mainloop0 __P((struct sockdb *));
 static int conf_mediator __P((struct sockdb *));
 static char *encode_name __P((char **, int, const char *));
 static char *decode_name __P((const char **, int));
+static int decode_edns0 __P((const HEADER *, const char **, int));
 static int dnsdump __P((const char *, const char *, int,
 	const struct sockaddr *));
 static int ptr2in __P((const char *, struct in_addr *));
@@ -126,6 +127,10 @@ static int serve __P((struct sockdb *, char *, int, struct sockaddr *));
 
 #ifndef offsetof
 #define offsetof(type, member)	((size_t)(&((type *)0)->member))
+#endif
+
+#ifndef T_OPT
+#define T_OPT	41	/* OPT pseudo-RR, RFC2761 */
 #endif
 
 void
@@ -410,6 +415,37 @@ decode_name(bufp, len)
 fail:
 	free(str);
 	return NULL;
+}
+
+/* bufp has to point additional section */
+static int
+decode_edns0(hp, bufp, len)
+	const HEADER *hp;
+	const char **bufp;
+	int len;
+{
+	int edns0len;
+	char *str;
+	char *p;
+	const char *q;
+	const char *buf = *bufp;
+
+	if (ntohs(hp->arcount) != 1 || len != 11)
+		return -1;
+	if (buf[0] != 0)	/* . */
+		return -1;
+	buf++;
+	if (ntohs(*(u_int16_t *)&buf[0]) != T_OPT || buf[4] != NOERROR ||
+	    buf[5] != 0)
+	if (ntohs(*(u_int16_t *)&buf[6]) != 0)	/*MBZ*/
+		return -1;
+	if (ntohs(*(u_int16_t *)&buf[8]) != 0)	/*RDLEN*/
+		return -1;
+
+	edns0len = ntohs(*(u_int16_t *)&buf[2]);
+	buf += 10;
+	*bufp = buf;
+	return edns0len;
 }
 
 static int
@@ -1031,6 +1067,7 @@ relay(sd, buf, len, from)
 	const char *n = NULL;
 	const char *d;
 	enum sdtype servtype;	/* type of server we want to relay to */
+	size_t rbuflen = PACKETSZ;
 
 	if (sizeof(*hp) > len)
 		return -1;
@@ -1042,6 +1079,20 @@ relay(sd, buf, len, from)
 		free((char *)n);
 		return -1;
 	}
+	d += 4;	/* skip type/class on query */
+
+	/* XXX should drop assumption on packet format */
+	if (ntohs(hp->qdcount) == 1 && ntohs(hp->ancount) == 0 &&
+	    ntohs(hp->nscount) == 0) {
+		int edns0len;
+		edns0len = decode_edns0(hp, &d, len - (d - buf));
+		if (edns0len > rbuflen) {
+			if (dflag)
+				printf("EDNS0: %d\n", edns0len);
+			rbuflen = edns0len;
+		}
+	}
+
 	if (islocalname(n)) {
 		multicast = 1;
 		unicast = 0;
@@ -1060,7 +1111,7 @@ relay(sd, buf, len, from)
 		gettimeofday(&qc->ttq, NULL);
 		qc->ttq.tv_sec += MDNS_TIMEO;
 		qc->sd = sd;
-		qc->rbuflen = PACKETSZ;	/* should look at EDNS0 */
+		qc->rbuflen = rbuflen;
 
 		ord = hp->rd;
 
@@ -1152,7 +1203,7 @@ serve(sd, buf, len, from)
 	int count;
 	int scoped, loopback;
 	const struct addrinfo *ai;
-	size_t rbuflen = PACKETSZ;	/* should look at EDNS0 */
+	size_t rbuflen = PACKETSZ;
 
 	if (dflag)
 		dnsdump("serve I", buf, len, from);
@@ -1190,6 +1241,17 @@ serve(sd, buf, len, from)
 	d += 4;		/* "d" points to end of question section */
 	if (class != C_IN)
 		goto fail;
+
+	/* XXX should drop assumption on packet format */
+	if (ntohs(hp->ancount) == 0 && ntohs(hp->nscount) == 0) {
+		int edns0len;
+		edns0len = decode_edns0(hp, &d, len - (d - buf));
+		if (edns0len > rbuflen) {
+			if (dflag)
+				printf("EDNS0: %d\n", edns0len);
+			rbuflen = edns0len;
+		}
+	}
 
 	if (ismyname(n)) {
 		/* hostname for forward query - advertise my addresses */
