@@ -1,4 +1,4 @@
-.\"	$KAME: altq.conf.5,v 1.10 2001/07/25 09:35:57 kjc Exp $
+.\"	$KAME: altq.conf.5,v 1.11 2001/07/25 10:40:15 kjc Exp $
 .\"
 .\" Copyright (C) 2000
 .\" Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -49,7 +49,6 @@ HFSC (Hierarchical Fair Service Curve), PRIQ (Priority Queueing),
 RED (Random Early Detection), RIO (RED with IN/OUT),
 WFQ (Weighted Fair Queueing),
 and CDNR (Diffserv Traffic Conditioner) can be configured in this file.
-.Pp
 .Ss Interface Commands
 .Bl -tag -width interface -offset indent
 .It Cm interface
@@ -100,7 +99,6 @@ discipline,
 .Ar sched_type
 can be omitted.
 .El
-.Pp
 .Ss Class Command
 .Bl -tag -width class -offset indent
 .It Cm class
@@ -148,7 +146,6 @@ ECN implies RED.
 .It Cm cleardscp
 Clear diffserv codepoint in the IP header.
 .El
-.Pp
 .Ss Filter Commands
 .Bl -tag -width filter -offset indent
 .It Cm filter
@@ -268,7 +265,6 @@ keyword can be used to specify the Security Parameter Index value for
 IPSec.
 .Pp
 When filter value 0 is used, it is taken as a wildcard.
-.Pp
 .Ss CBQ Commands
 CBQ (Class Based Queueing) achieves both partitioning and sharing of
 link bandwidth by hierarchically structured classes.
@@ -442,7 +438,6 @@ enables RED/flow-valve (a.k.a. red-penalty-box) on this class queue.
 .It Cm cleardscp
 clears diffserv codepoint in the IP header.
 .El
-.Pp
 .Ss HFSC Commands
 HFSC (Hierarchical Fair Service Curve) supports both link-sharing and
 guaranteed real-time services.
@@ -585,7 +580,6 @@ enables RED/ECN on this class queue.
 .It Cm cleardscp
 clears diffserv codepoint in the IP header.
 .El
-.Pp
 .Ss PRIQ Commands
 PRIQ (Priority Queueing) implements a simple priority-based queueing.
 A higher priority class is always served first.
@@ -664,7 +658,6 @@ enables RED/ECN on this class queue.
 .It Cm cleardscp
 clears diffserv codepoint in the IP header.
 .El
-.Pp
 .Ss WFQ Commands
 WFQ (Weighted Fair Queueing) implements a weighted-round robin
 scheduler for a set of queue.
@@ -711,7 +704,6 @@ specifies a hashing policy by IP source port number.
 Default is
 .Cm dstaddr
 .El
-.Pp
 .Ss FIFOQ Commands
 FIFOQ (First-In First-Out Queueing) is a simple tail-drop FIFO queue.
 FIFOQ is the simplest possible implementation of a queueing discipline
@@ -742,7 +734,6 @@ for FIFOQ.
 The maximum queue size in number of packets.
 Default value is 50.
 .El
-.Pp
 .Ss RED Commands
 RED (Random Early Detection) is an implicit congestion notification
 mechanism that exercises packet dropping or packet marking
@@ -813,7 +804,6 @@ enables ECN.
 .It Cm flowvalve
 enables flowvalve.
 .El
-.Pp
 .Ss RIO Commands
 ALTQ/RIO has 3 drop precedence levels defined for the Assured
 Forwarding of DiffServ (RFC2597).
@@ -914,7 +904,6 @@ The inverse of the maximum drop probability for high drop precedence.
 .It Cm ecn
 enables ECN.
 .El
-.Pp
 .Ss BLUE Commands
 .Bl -tag -width interface -offset indent
 .It Cm interface
@@ -952,7 +941,6 @@ specifies the hold time in usec.
 .It Cm ecn
 enables ECN.
 .El
-.Pp
 .Ss CDNR Commands
 The
 .Cm conditioner
@@ -1086,7 +1074,6 @@ rate, and is specified in milli-second.
 500 msec is ok for normal settings.
 .El
 .El
-.Pp
 .Sh EXAMPLES
 .Ss CBQ Example
 .Bd -literal
