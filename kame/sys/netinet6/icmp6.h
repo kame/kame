@@ -508,6 +508,7 @@ struct icmp6stat {
 	u_long	icp6s_badlen;		/* calculated bound mismatch */
 	u_long	icp6s_reflect;		/* number of responses */
 	u_long	icp6s_inhist[256];	
+	u_long	icp6s_nd_toomanyopt;	/* too many ND options */
 };
 
 /*
