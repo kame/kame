@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.10 2003/10/20 08:33:33 ono Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.11 2003/10/20 08:36:19 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -261,9 +261,7 @@ dccp_input(struct mbuf *m, int off)
 	int isipv6 = 0;
 #ifdef INET6
 	struct ip6_hdr *ip6 = NULL;
-#if !defined(__FreeBSD__) || __FreeBSD_version < 500000
 	struct sockaddr_in6 src_sa6, dst_sa6;
-#endif
 #endif
 
 
@@ -411,15 +409,10 @@ dccp_input(struct mbuf *m, int off)
 	 */
 #ifdef INET6
 	if (isipv6) {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-		inp = in6_pcblookup_hash(&dccpbinfo, &ip6->ip6_src, dh->dh_sport,
-		    &ip6->ip6_dst, dh->dh_dport, 1, m->m_pkthdr.rcvif);
-#else
 		if (ip6_getpktaddrs(m, &src_sa6, &dst_sa6))
 			goto badunlocked;
 		inp = in6_pcblookup_hash(&dccpbinfo, &src_sa6, dh->dh_sport,
 		    &dst_sa6, dh->dh_dport, 1, m->m_pkthdr.rcvif);
-#endif
 	} else
 #endif
 	{
@@ -1805,11 +1798,7 @@ dccp_doconnect(struct dccpcb *dp, struct sockaddr *nam,
 	struct socket *so = inp->inp_socket;
 #ifdef INET6
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)nam;
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	struct in6_addr *addr6;
-#else
 	struct sockaddr_in6 *addr6;
-#endif
 #endif
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	struct in_addr laddr;
@@ -1873,15 +1862,10 @@ dccp_doconnect(struct dccpcb *dp, struct sockaddr *nam,
 
 #ifdef INET6
 	if (isipv6) {
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-		if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
-			inp->in6p_laddr = *addr6;
-#else
 		if (SA6_IS_ADDR_UNSPECIFIED(&inp->in6p_lsa)) {
 			inp->in6p_lsa.sin6_addr = addr6->sin6_addr;
 			inp->in6p_lsa.sin6_scope_id = addr6->sin6_scope_id;
 		}
-#endif
 		inp->in6p_faddr = sin6->sin6_addr;
 		inp->inp_fport = sin6->sin6_port;
 		if ((sin6->sin6_flowinfo & IPV6_FLOWINFO_MASK) != 0)
