@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.187 2003/04/10 04:37:09 jinmei Exp $	*/
+/*	$KAME: ipsec.c,v 1.188 2003/04/23 09:15:50 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -105,7 +105,6 @@
 #include <netinet6/nd6.h>
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
-extern struct mip6_bc_list mip6_bc_list;
 #endif /* MIP6 */
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000

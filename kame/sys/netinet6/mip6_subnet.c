@@ -1,4 +1,4 @@
-/*	$KAME: mip6_subnet.c,v 1.25 2002/11/29 11:46:37 keiichi Exp $	*/
+/*	$KAME: mip6_subnet.c,v 1.26 2003/04/23 09:15:51 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -68,13 +68,13 @@
 
 #include <net/if_hif.h>
 
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
+#include <netinet6/mip6_mncore.h>
 
 struct mip6_subnet_list mip6_subnet_list;
 static int mip6_subnet_count = 0;
-
-extern struct mip6_prefix_list mip6_prefix_list;
 
 static void mip6_subnet_ha_timeout(struct mip6_subnet_ha *);
 static void mip6_subnet_prefix_timeout(struct mip6_subnet_prefix *,

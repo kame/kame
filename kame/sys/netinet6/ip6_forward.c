@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.117 2003/02/07 10:17:09 suz Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.118 2003/04/23 09:15:50 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -102,9 +102,12 @@
 
 #ifdef MIP6
 #include <net/if_hif.h>
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
-extern struct mip6_bc_list mip6_bc_list;
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
+#ifdef MIP6_HOME_AGENT
+#include <netinet6/mip6_hacore.h>
+#endif
 #endif /* MIP6 */
 
 #include <net/net_osdep.h>
@@ -396,7 +399,7 @@ ip6_forward(m, srcrt)
     skip_ipsec:
 #endif /* IPSEC */
 
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_HOME_AGENT)
 	{
 		/*
 		 * intercept and tunnel packets for home addresses
@@ -456,7 +459,7 @@ ip6_forward(m, srcrt)
 			tunnel_out = 1;
 		}
 	}
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_HOME_AGENT */
 
 #ifdef IPSEC
     if (!ipsecrt) {

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.337 2003/02/07 10:17:08 suz Exp $	*/
+/*	$KAME: in6.c,v 1.338 2003/04/23 09:15:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -125,8 +125,12 @@
 
 #ifdef MIP6
 #include <net/if_hif.h>
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
+#ifdef MIP6_MOBILE_NODE
+#include <netinet6/mip6_mncore.h>
+#endif /* MIP6_MOBILE_NODE */
 #endif /* MIP6 */
 
 #ifdef MLDV2
@@ -816,7 +820,7 @@ in6_control(so, cmd, data, ifp)
 		pr0.ndpr_plen = in6_mask2len(&ifra->ifra_prefixmask.sin6_addr,
 		    NULL);
 		if (pr0.ndpr_plen == 128) {
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 			if (MIP6_IS_MN)
 				if (mip6_process_movement()) {
 					mip6log((LOG_WARNING,
@@ -824,7 +828,7 @@ in6_control(so, cmd, data, ifp)
 					    __FILE__, __LINE__));
 					/* ignore this error... */
 				}
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 			break;	/* we don't need to install a host route. */
 		}
 		pr0.ndpr_prefix = ifra->ifra_addr;
@@ -1208,11 +1212,11 @@ in6_update_ifa(ifp, ifra, ia)
 	 * source address.
 	 */
 	ia->ia6_flags &= ~IN6_IFF_DUPLICATED;	/* safety */
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	if (hostIsNew && in6if_do_dad(ifp) && mip6_ifa_need_dad(ia))
-#else /* !MIP6 */
+#else
 	if (hostIsNew && in6if_do_dad(ifp))
-#endif /* !MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 		ia->ia6_flags |= IN6_IFF_TENTATIVE;
 
 	/*
@@ -1447,13 +1451,13 @@ in6_update_ifa(ifp, ifra, ia)
 	 * XXX It may be of use, if we can administratively
 	 * disable DAD.
 	 */
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	if (hostIsNew && in6if_do_dad(ifp) && mip6_ifa_need_dad(ia) &&
 	    (ifra->ifra_flags & IN6_IFF_NODAD) == 0)
-#else /* !MIP6 */
+#else
 	if (hostIsNew && in6if_do_dad(ifp) &&
 	    (ifra->ifra_flags & IN6_IFF_NODAD) == 0)
-#endif /* !MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 	{
 		nd6_dad_start((struct ifaddr *)ia, NULL);
 	}

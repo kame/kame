@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.313 2003/02/07 10:17:09 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.314 2003/04/23 09:15:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2093,12 +2093,12 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	struct m_tag *mtag;
 #endif /* IPSEC */
 
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	struct hif_softc *sc;
 	struct sockaddr_in6 src;
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	if (ip6_getpktaddrs(m0, &src, NULL)) {
 		error = EIO;
 		goto bad;
@@ -2109,7 +2109,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		    (struct sockaddr *)dst, rt));
 	}
 
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 
 	if (IN6_IS_ADDR_MULTICAST(&dst->sin6_addr))
 		goto sendpkt;

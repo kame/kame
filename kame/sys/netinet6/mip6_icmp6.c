@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.66 2003/04/09 10:08:28 suz Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.67 2003/04/23 09:15:51 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -95,11 +95,10 @@
 
 #include <net/if_hif.h>
 
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
-
-extern struct mip6_bc_list mip6_bc_list;
-extern struct mip6_subnet_list mip6_subnet_list;
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
+#include <netinet6/mip6_mncore.h>
 
 u_int16_t mip6_dhaad_id = 0;
 
@@ -189,6 +188,7 @@ mip6_icmp6_input(m, off, icmp6len)
 		/* XXX: TODO */
 		break;
 
+#ifdef MIP6_MOBILE_NODE
 	case ICMP6_PARAM_PROB:
 		if (!MIP6_IS_MN)
 			break;
@@ -267,188 +267,7 @@ mip6_icmp6_input(m, off, icmp6len)
 			break;
 		}
 		break;
-	}
-
-	return (0);
-}
-
-int
-mip6_icmp6_tunnel_input(m, off, icmp6len)
-	struct mbuf *m;
-	int off;
-	int icmp6len;
-{
-	struct mbuf *n;
-	struct ip6_hdr *ip6, *otip6, oip6, *nip6;
-	int otip6off, nxt;
-	struct sockaddr_in6 dst_sa, oip6src_sa, oip6dst_sa;
-	struct icmp6_hdr *icmp6, *nicmp6;
-	struct mip6_bc *mbc;
-	int error = 0;
-
-	if (!MIP6_IS_HA) {
-		/*
-		 * this check is needed only for the node that is
-		 * acting as a home agent.
-		 */
-		return (0);
-	}
-
-	/* get packet addresses. */
-	if (ip6_getpktaddrs(m, NULL, &dst_sa))
-		return (EINVAL);
-
-	/* check if we have enough icmp payload size. */
-	if (icmp6len < sizeof(*otip6) + sizeof(oip6)) {
-		/*
-		 * we don't have enough size of icmp payload.  to
-		 * determine that this icmp is against the tunneled
-		 * packet, we at least have two ip header, one is for
-		 * tunneling from a home agent to a correspondent node
-		 * and the other is a original header from a mobile
-		 * node to the correspondent node.
-		 */
-		return (0);
-	}
-
-	/*
-	 * check if this icmp is generated on the way from a home
-	 * agent to a mobile node by encapsulating an original packet
-	 * which is from a correspondent node to the mobile node.  if
-	 * so, relay this icmp to the sender of the original packet.
-	 *
-	 * the icmp packet against the encapsulated packet looks like
-	 * as follows.
-	 *
-	 *   ip(src=??,dst=ha)
-	 *     |icmp|ip(src=ha,dst=mncoa)|ip(src=cn,dst=mnhoa)|payload
-	 */
-	ip6 = mtod(m, struct ip6_hdr *);
-	icmp6 = (struct icmp6_hdr *)((caddr_t)ip6 + off);
-	if (icmp6->icmp6_type >= 128) {
-		/*
-		 * this is not an icmp error message.  no need to
-		 * relay.
-		 */
-		return (0);
-	}
-
-#ifndef PULLDOWN_TEST
-	IP6_EXTHDR_CHECK(m, off + sizeof(*icmp6), sizeof(*otip6), EINVAL);
-	otip6 = (struct ip6_hdr *)(mtod(m, caddr_t) + off + sizeof(*icmp6));
-#else
-	IP6_EXTHDR_GET(otip6, struct ip6_hdr *, m, off + sizeof(*icmp6),
-		       sizeof(*otip6));
-	if (otip6 == NULL)
-		return (EINVAL);
-#endif
-	otip6off = off + sizeof(*icmp6) + sizeof(*otip6);
-	nxt = otip6->ip6_nxt;
-	while (nxt != IPPROTO_IPV6) {
-		int off;
-
-		off = otip6off;
-		otip6off = ip6_nexthdr(m, off, nxt, &nxt);
-		if ((otip6off < 0) ||
-		    (otip6off < off) ||
-		    (otip6off == off)) {
-			/* too short or there is no ip hdr in this
-			 * icmp payload. */
-			return (0);
-		}
-		off = otip6off;
-	}
-	if (m->m_pkthdr.len < otip6off + sizeof(oip6)) {
-		/* too short icmp packet. */
-		return (0);
-	}
-	m_copydata(m, otip6off, sizeof(oip6), (caddr_t)&oip6);
-	/* create a src addr of the original packet. */
-	oip6src_sa.sin6_len = sizeof(oip6src_sa);
-	oip6src_sa.sin6_family = AF_INET6;
-	oip6src_sa.sin6_addr = oip6.ip6_src;
-	if (in6_addr2zoneid(m->m_pkthdr.rcvif, &oip6src_sa.sin6_addr,
-			   &oip6src_sa.sin6_scope_id))
-		return (0); /* XXX */
-	if (in6_embedscope(&oip6src_sa.sin6_addr, &oip6src_sa))
-		return (0); /* XXX */
-	/* create a dst addr of the original packet. */
-	oip6dst_sa.sin6_len = sizeof(oip6dst_sa);
-	oip6dst_sa.sin6_family = AF_INET6;
-	oip6dst_sa.sin6_addr = oip6.ip6_dst;
-	if (in6_addr2zoneid(m->m_pkthdr.rcvif, &oip6dst_sa.sin6_addr,
-			   &oip6dst_sa.sin6_scope_id))
-		return (0); /* XXX */
-	if (in6_embedscope(&oip6dst_sa.sin6_addr, &oip6dst_sa))
-		return (0); /* XXX */
-
-	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &oip6dst_sa);
-	if (mbc == NULL) {
-		/* we are not a home agent of this mobile node ?? */
-		return (0);
-	}
-
-	n = m_copym(m, 0, M_COPYALL, M_DONTWAIT);
-	if (n == NULL) {
-		mip6log((LOG_ERR,
-			 "%s:%d: mbuf allocation failed.\n",
-			 __FILE__, __LINE__));
-		/* continue, anyway. */
-		return (0);
-	}
-	m_adj(n, otip6off);
-	M_PREPEND(n, sizeof(struct ip6_hdr) + sizeof(struct icmp6_hdr),
-		  M_DONTWAIT);
-	if (n == NULL) {
-		mip6log((LOG_ERR,
-			 "%s:%d: mbuf prepend for ip6/icmp6 failed.\n",
-			 __FILE__, __LINE__));
-		/* continue. */
-		return (0);
-	}
-	if (!ip6_setpktaddrs(n, &dst_sa, &oip6src_sa)) {
-		m_freem(n);
-		return (0);
-	}
-	/* fill the ip6_hdr. */
-	nip6 = mtod(n, struct ip6_hdr *);
-	nip6->ip6_flow = 0;
-	nip6->ip6_vfc &= ~IPV6_VERSION_MASK;
-	nip6->ip6_vfc |= IPV6_VERSION;
-	nip6->ip6_plen = htons(n->m_pkthdr.len - sizeof(struct ip6_hdr));
-	nip6->ip6_nxt = IPPROTO_ICMPV6;
-	nip6->ip6_hlim = ip6_defhlim;
-	nip6->ip6_src = dst_sa.sin6_addr;
-	in6_clearscope(&nip6->ip6_src);
-	nip6->ip6_dst = oip6src_sa.sin6_addr;
-	in6_clearscope(&nip6->ip6_dst);
-
-	/* fill the icmp6_hdr. */
-	nicmp6 = (struct icmp6_hdr *)(nip6 + 1);
-	nicmp6->icmp6_type = icmp6->icmp6_type;
-	nicmp6->icmp6_code = icmp6->icmp6_code;
-	nicmp6->icmp6_data32[0] = icmp6->icmp6_data32[0];
-
-	/* XXX modify icmp data in some case.  (ex. TOOBIG) */
-
-	/* calculate the checksum. */
-	nicmp6->icmp6_cksum = 0;
-	nicmp6->icmp6_cksum = in6_cksum(n, IPPROTO_ICMPV6,
-					sizeof(*nip6), ntohs(nip6->ip6_plen));
-
-	/* XXX IPSEC? */
-
-	error = ip6_output(n, NULL, NULL, 0, NULL, NULL
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-			   , NULL
-#endif
-			  );
-	if (error) {
-		mip6log((LOG_ERR,
-			 "%s:%d: send failed. (errno = %d)\n",
-			 __FILE__, __LINE__, error));
-		/* continue processing 'm' (the original icmp). */
-		return (0);
+#endif /* MIP6_MOBILE_NODE */
 	}
 
 	return (0);

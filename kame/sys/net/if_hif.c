@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.46 2003/04/09 10:08:29 suz Exp $	*/
+/*	$KAME: if_hif.c,v 1.47 2003/04/23 09:15:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -135,8 +135,10 @@ t.
 #include <net/if_hif.h>
 
 #include <netinet6/nd6.h>
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
+#include <netinet6/mip6_mncore.h>
 
 #include "hif.h"
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
@@ -149,9 +151,6 @@ t.
 #include <net/net_osdep.h>
 
 #if NHIF > 0
-
-extern struct mip6_subnet_list mip6_subnet_list;
-extern struct mip6_prefix_list mip6_prefix_list;
 
 static int hif_subnet_list_update_withmpfx __P((struct hif_softc *, caddr_t));
 static int hif_ha_list_update_withioctl __P((struct hif_softc *, caddr_t));

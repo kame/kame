@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.134 2003/04/17 03:08:40 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.135 2003/04/23 09:15:49 keiichi Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -188,8 +188,9 @@
 
 #ifdef MIP6
 #include <net/if_hif.h>
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
 #endif /* MIP6 */
 
 #include <net/net_osdep.h>
@@ -533,7 +534,7 @@ struct ip6protosw inet6sw[] = {
 },
 };
 
-#ifdef MIP6
+#if defined(MIP6) && (defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE))
 struct ip6protosw mip6_tunnel_protosw =
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
   mip6_tunnel_input, rip6_output,	0,	rip6_ctloutput,
@@ -547,7 +548,7 @@ struct ip6protosw mip6_tunnel_protosw =
   &rip6_usrreqs
 #endif
 };
-#endif /* MIP6 */
+#endif /* MIP6 && (MIP6_HOME_AGENT || MIP6_MOBILE_NODE) */
 
 #ifdef __FreeBSD__
 extern int in6_inithead __P((void **, int));

@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.22 2003/04/09 10:08:29 suz Exp $	*/
+/*	$KAME: mobility6.c,v 1.23 2003/04/23 09:15:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -61,12 +61,17 @@
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>
+
 #ifdef MIP6
 #include <net/if_hif.h>
 #include <netinet6/nd6.h>
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
-#endif
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
+#ifdef MIP6_MOBILE_NODE
+#include <netinet6/mip6_mncore.h>
+#endif /* MIP6_MOBILE_NODE */
+#endif /* MIP6 */
 
 #include <net/net_osdep.h>
 
@@ -165,6 +170,7 @@ mobility6_input(mp, offp, proto)
 			return (IPPROTO_DONE);
 		break;
 
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	case IP6M_HOME_TEST:
 		if (!MIP6_IS_MN)
 			break;
@@ -188,12 +194,6 @@ mobility6_input(mp, offp, proto)
 		mip6stat.mip6s_br++;
 		break;
 
-	case IP6M_BINDING_UPDATE:
-		if (mip6_ip6mu_input(m, (struct ip6m_binding_update *)mh6,
-		    mh6len) != 0)
-			return (IPPROTO_DONE);
-		break;
-
 	case IP6M_BINDING_ACK:
 		if (!MIP6_IS_MN)
 			break;
@@ -204,6 +204,13 @@ mobility6_input(mp, offp, proto)
 
 	case IP6M_BINDING_ERROR:
 		if (mip6_ip6me_input(m, (struct ip6m_binding_error *)mh6,
+		    mh6len) != 0)
+			return (IPPROTO_DONE);
+		break;
+#endif /* MIP6 && MIP6_MOBILE_NODE */
+
+	case IP6M_BINDING_UPDATE:
+		if (mip6_ip6mu_input(m, (struct ip6m_binding_update *)mh6,
 		    mh6len) != 0)
 			return (IPPROTO_DONE);
 		break;
@@ -242,7 +249,7 @@ mobility6_input(mp, offp, proto)
 				home_sa = &sin6;
 			}
 			(void)mobility6_send_be(&ip6a->ip6a_dst, &src_sa,
-			    IP6ME_STATUS_UNKNOWN_MH_TYPE, home_sa);
+			    IP6ME_STATUS_UNRECOGNIZED_TYPE, home_sa);
 		}
 		m_freem(m);
 		mip6stat.mip6s_unknowntype++;

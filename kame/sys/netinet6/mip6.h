@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.57 2002/12/13 10:32:55 k-sugyou Exp $	*/
+/*	$KAME: mip6.h,v 1.58 2003/04/23 09:15:50 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -31,37 +31,7 @@
 #ifndef _MIP6_H_
 #define _MIP6_H_
 
-#define SIOCSMIP6CFG _IOW('m', 120, int)
-#define SIOCSMIP6CFG_ENABLEMN        0
-#define SIOCSMIP6CFG_DISABLEMN       1
-#define SIOCSMIP6CFG_ENABLEHA        2
-#define SIOCSMIP6CFG_ENABLEIPSEC     3
-#define SIOCSMIP6CFG_DISABLEIPSEC    4
-#define SIOCSMIP6CFG_ENABLEAUTHDATA  5
-#define SIOCSMIP6CFG_DISABLEAUTHDATA 6
-#define SIOCSMIP6CFG_ENABLEDEBUG     128
-#define SIOCSMIP6CFG_DISABLEDEBUG    129
-#define SIOCGBC               _IOWR('m', 122, struct mip6_req)
-#define SIOCSUNUSEHA          _IOW('m', 123, struct mip6_req)
-#define SIOCGUNUSEHA          _IOWR('m', 124, struct mip6_req)
-#define SIOCDUNUSEHA          _IOW('m', 125, struct mip6_req)
-#define SIOCDBC               _IOW('m', 126, struct mip6_req)
-#define SIOCSPREFERREDIFNAMES _IOW('m', 127, struct mip6_req)
-
-struct mip6_preferred_ifnames {
-	char mip6pi_ifname[3][IFNAMSIZ];
-	/* is 3 enough? or should it be dynamic? */
-};
-struct mip6_req {
-	u_int8_t mip6r_count;
-	union {
-		struct mip6_bc *mip6r_mbc;
-		struct sockaddr_in6 mip6r_sin6;
-		struct mip6_preferred_ifnames mip6r_ifnames;
-	} mip6r_ru;
-};
-
-/* protocol constants */
+/* protocol constants. */
 #define MIP6_HA_DEFAULT_LIFETIME   1800
 #define MIP6_MAX_UPDATE_RATE       5
 #define MIP6_MAX_PFX_ADV_DELAY     1000
@@ -71,7 +41,7 @@ struct mip6_req {
 #define MIP6_BA_MAX_TIMEOUT        256
 #define MIP6_BU_MAX_BACKOFF        7
 
-/* Binding Ack status code. */
+/* binding ack status code. */
 #define IP6MA_STATUS_ACCEPTED              0	/* Binding Update accepted */
 #define IP6MA_STATUS_ERRORBASE             128	/* ERROR BASE */
 #define IP6MA_STATUS_UNSPECIFIED           128	/* Reason unspecified */
@@ -86,12 +56,4 @@ struct mip6_req {
 #define IP6MA_STATUS_CAREOF_NONCE_EXPIRED  137	/* Expired Care-of Nonce Index */
 #define IP6MA_STATUS_NONCE_EXPIRED         138	/* Expired Nonces */
 
-/* Binding Error status code. */
-#define IP6ME_STATUS_NO_BINDING		1	/* Home Address destination
-						   option used without a binding
-						 */
-#define IP6ME_STATUS_UNKNOWN_MH_TYPE	2	/* Received message had an
-						   unknown value for the MH Type
-						   field
-						  */
 #endif /* !_MIP6_H_ */

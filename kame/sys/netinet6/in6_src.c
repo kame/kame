@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.129 2003/03/31 09:27:18 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.130 2003/04/23 09:15:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -115,8 +115,11 @@
 
 #ifdef MIP6
 #include <net/if_hif.h>
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#ifdef MIP6_MOBILE_NODE
+#include <netinet6/mip6_mncore.h>
+#endif /* MIP6_MOBILE_NODE */
 #endif /* MIP6 */
 
 #include <net/net_osdep.h>
@@ -133,9 +136,9 @@ struct in6_addrpolicy defaultaddrpolicy;
 
 int ip6_prefer_tempaddr = 0;
 
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 struct mip6_unuse_hoa_list mip6_unuse_hoa;
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 
 #ifdef NEW_STRUCT_ROUTE
 static int in6_selectif __P((struct sockaddr_in6 *, struct ip6_pktopts *,
@@ -207,11 +210,11 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	struct in6_addrpolicy *dst_policy = NULL, *best_policy = NULL;
 	u_int32_t odstzone;
 	int prefer_tempaddr;
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	struct hif_softc *sc;
 	struct mip6_unuse_hoa *uh;
 	u_int8_t usecoa = 0;
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 
 	dst = &dstsock->sin6_addr;
 	*errorp = 0;
@@ -283,7 +286,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 	if ((*errorp = in6_selectif(dstsock, opts, mopts, ro, &ifp)) != 0)
 		return (NULL);
 
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	/*
 	 * a caller can specify IP6PO_USECOA to not to use a home
 	 * address.  for example, the case that the neighbour
@@ -308,7 +311,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 			break;
 		}
 	}
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 
 #ifdef DIAGNOSTIC
 	if (ifp == NULL)	/* this should not happen */
@@ -385,7 +388,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 		 * XXX: This is a TODO.  We should probably merge the MIP6
 		 * case above.
 		 */
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 		{
 			struct mip6_bu *mbu_ia_best = NULL, *mbu_ia = NULL;
 			struct sockaddr_in6 ia_addr;
@@ -524,7 +527,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 				}
 			}
 		}
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 
 		/* Rule 5: Prefer outgoing interface */
 		if (ia_best->ia_ifp == ifp && ia->ia_ifp != ifp)

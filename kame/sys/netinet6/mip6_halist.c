@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.36 2002/06/09 14:44:01 itojun Exp $	*/
+/*	$KAME: mip6_halist.c,v 1.1 2003/04/23 09:15:51 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -68,15 +68,15 @@
 
 #include <net/if_hif.h>
 
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
-
-extern struct mip6_subnet_list mip6_subnet_list;
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
+#include <netinet6/mip6_mncore.h>
 
 struct mip6_ha_list mip6_ha_list;
 
 void
-mip6_ha_init()
+mip6_halist_init()
 {
 	LIST_INIT(&mip6_ha_list);
 }

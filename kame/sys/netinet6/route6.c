@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.42 2003/02/07 09:34:40 jinmei Exp $	*/
+/*	$KAME: route6.c,v 1.43 2003/04/23 09:15:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -57,8 +57,12 @@
 #ifdef MIP6
 #include <net/if_hif.h>
 #include <netinet6/nd6.h>
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
+#ifdef MIP6_MOBILE_NODE
+#include <netinet6/mip6_mncore.h>
+#endif /* MIP6_MOBILE_NODE */
 #endif /* MIP6 */
 
 static int ip6_rthdr0 __P((struct mbuf *, struct ip6_hdr *,
@@ -131,7 +135,7 @@ route6_input(mp, offp, proto)
 		if (ip6_rthdr0(m, ip6, (struct ip6_rthdr0 *)rh))
 			return (IPPROTO_DONE);
 		break;
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	case IPV6_RTHDR_TYPE_2:
 		/* sanity check. */
 		if (!MIP6_IS_MN) {
@@ -165,7 +169,7 @@ route6_input(mp, offp, proto)
 		if (ip6_rthdr2(m, ip6, (struct ip6_rthdr2 *)rh))
 			return (IPPROTO_DONE);
 		break;
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 	default:
 		/* unknown routing type */
 		if (rh->ip6r_segleft == 0) {
@@ -300,7 +304,7 @@ ip6_rthdr0(m, ip6, rh0)
 	return (-1);
 }
 
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 /*
  * type 2 routing header processing.
  */
@@ -454,4 +458,4 @@ ip6_rthdr2(m, ip6, rh2)
 	m_freem(m);
 	return (-1);
 }
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */

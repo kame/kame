@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.345 2003/04/09 09:28:19 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.346 2003/04/23 09:15:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -131,8 +131,14 @@
 
 #ifdef MIP6
 #include <net/if_hif.h>
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#ifdef MIP6_HOME_AGENT
+#include <netinet6/mip6_hacore.h>
+#endif /* MIP6_HOME_AGENT */
+#ifdef MIP6_MOBILE_NODE
+#include <netinet6/mip6_mncore.h>
+#endif /* MIP6_MOBILE_NODE */
 #endif /* MIP6 */
 
 #include <net/net_osdep.h>
@@ -623,21 +629,21 @@ icmp6_input(mp, offp, proto)
 	src = src0;
 	dst = dst0;
 
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_HOME_AGENT)
 	if (mip6_icmp6_tunnel_input(m, off, icmp6len)) {
 		m = NULL;
 		goto freeit;
 	}
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_HOME_AGENT */
 	switch (icmp6->icmp6_type) {
 	case ICMP6_DST_UNREACH:
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_dstunreach);
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 		if (mip6_icmp6_input(m, off, icmp6len)) {
 			m = NULL;
 			goto freeit;
 		}
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 		switch (code) {
 		case ICMP6_DST_UNREACH_NOROUTE:
 			code = PRC_UNREACH_NET;
@@ -698,12 +704,12 @@ icmp6_input(mp, offp, proto)
 
 	case ICMP6_PARAM_PROB:
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_paramprob);
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 		if (mip6_icmp6_input(m, off, icmp6len)) {
 			m = NULL;
 			goto freeit;
 		}
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 		switch (code) {
 		case ICMP6_PARAMPROB_NEXTHEADER:
 			code = PRC_UNREACH_PROTOCOL;
@@ -812,7 +818,7 @@ icmp6_input(mp, offp, proto)
 			goto badcode;
 		break;
 
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_HOME_AGENT)
 	case ICMP6_DHAAD_REQUEST:
 		if (icmp6len < sizeof(struct dhaad_req))
 			goto badlen;
@@ -820,6 +826,15 @@ icmp6_input(mp, offp, proto)
 			goto badcode;
 		break;
 
+	case ICMP6_MOBILEPREFIX_SOLICIT:
+		if (icmp6len < sizeof(struct mobile_prefix_solicit))
+			goto badlen;
+		if (code != 0)
+			goto badcode;
+		break;
+#endif /* MIP6 && MIP6_HOME_AGENT */
+
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	case ICMP6_DHAAD_REPLY:
 		if (icmp6len < sizeof(struct dhaad_rep))
 			goto badlen;
@@ -829,13 +844,6 @@ icmp6_input(mp, offp, proto)
 			m = NULL;
 			goto freeit;
 		}
-		break;
-
-	case ICMP6_MOBILEPREFIX_SOLICIT:
-		if (icmp6len < sizeof(struct mobile_prefix_solicit))
-			goto badlen;
-		if (code != 0)
-			goto badcode;
 		break;
 
 	case ICMP6_MOBILEPREFIX_ADVERT:
@@ -848,7 +856,7 @@ icmp6_input(mp, offp, proto)
 			goto freeit;
 		}
 		break;
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 
 	case MLD_LISTENER_QUERY:
 	case MLD_LISTENER_REPORT:

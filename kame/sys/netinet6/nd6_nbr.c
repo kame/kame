@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.121 2003/04/09 09:28:20 suz Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.122 2003/04/23 09:15:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -86,8 +86,15 @@
 
 #ifdef MIP6
 #include <net/if_hif.h>
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
+#ifdef MIP6_HOME_AGENT
+#include <netinet6/mip6_hacore.h>
+#endif /* MIP6_HOME_AGENT */
+#ifdef MIP6_MOBILE_NODE
+#include <netinet6/mip6_mncore.h>
+#endif /* MIP6_MOBILE_NODE */
 #endif /* MIP6 */
 
 #include <net/net_osdep.h>
@@ -261,11 +268,11 @@ nd6_ns_input(m, off, icmp6len)
 		if (rt)
 			rtfree(rt);
 	}
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_HOME_AGENT)
 	if (!ifa) {
 		ifa = mip6_dad_find(&taddr6.sin6_addr, ifp);
 	}
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_HOME_AGENT */
 	if (!ifa) {
 		/*
 		 * We've got an NS packet, and we don't have that adddress
@@ -396,9 +403,9 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 	int icmp6len;
 	int maxlen;
 	caddr_t mac;
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	int unicast_ns = 0;
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 #ifdef NEW_STRUCT_ROUTE
 	struct route ro;
 #else
@@ -460,7 +467,7 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 		return;
 	m->m_pkthdr.rcvif = NULL;
 
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	if (MIP6_IS_MN && daddr6 == NULL && !dad) {
 		struct hif_softc *sc;
 		struct mip6_bu *mbu;
@@ -490,7 +497,7 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 		}
 	}
 	if (!unicast_ns)
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 	if (daddr6 == NULL || IN6_IS_ADDR_MULTICAST(&daddr6->sin6_addr)) {
 		m->m_flags |= M_MCAST;
 		im6o.im6o_multicast_ifp = ifp;
@@ -517,10 +524,10 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 	src_sa.sin6_len = dst_sa.sin6_len = sizeof(struct sockaddr_in6);
 	if (daddr6)
 		dst_sa = *daddr6;
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	else if (unicast_ns)
 		dst_sa = *taddr6;
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 	else {
 		dst_sa.sin6_addr.s6_addr16[0] = IPV6_ADDR_INT16_MLL;
 		dst_sa.sin6_addr.s6_addr16[1] = 0;
@@ -773,11 +780,11 @@ nd6_na_input(m, off, icmp6len)
 	}
 
 	ifa = (struct ifaddr *)in6ifa_ifpwithaddr(ifp, &taddr6.sin6_addr);
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_HOME_AGENT)
 	if (!ifa) {
 		ifa = mip6_dad_find(&taddr6.sin6_addr, ifp);
 	}
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_HOME_AGENT */
 
 	/*
 	 * Target address matches one of my interface address.
@@ -1322,24 +1329,24 @@ nd6_dad_start(ifa, tick)
 	}
 	if (!ip6_dad_count) {
 		ia->ia6_flags &= ~IN6_IFF_TENTATIVE;
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_HOME_AGENT)
 		mip6_dad_success(ifa);
-#endif
+#endif /* MIP6 && MIP6_HOME_AGENT */
 		return;
 	}
 	if (!ifa->ifa_ifp)
 		panic("nd6_dad_start: ifa->ifa_ifp == NULL");
 	if (!(ifa->ifa_ifp->if_flags & IFF_UP)) {
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_HOME_AGENT)
 		mip6_dad_error(ifa, IP6MA_STATUS_RESOURCES);
-#endif
+#endif /* MIP6 && MIP6_HOME_AGENT */
 		return;
 	}
 	if (nd6_dad_find(ifa) != NULL) {
 		/* DAD already in progress */
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_HOME_AGENT)
 		mip6_dad_error(ifa, IP6MA_STATUS_RESOURCES);
-#endif
+#endif /* MIP6 && MIP6_HOME_AGENT */
 		return;
 	}
 
@@ -1349,9 +1356,9 @@ nd6_dad_start(ifa, tick)
 			"%s(%s)\n",
 			ip6_sprintf(&ia->ia_addr.sin6_addr),
 			ifa->ifa_ifp ? if_name(ifa->ifa_ifp) : "???");
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_HOME_AGENT)
 		mip6_dad_error(ifa, IP6MA_STATUS_RESOURCES);
-#endif
+#endif /* MIP6 && MIP6_HOME_AGENT */
 		return;
 	}
 	bzero(dp, sizeof(*dp));
@@ -1472,9 +1479,9 @@ nd6_dad_timer(ifa)
 		TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
 		free(dp, M_IP6NDP);
 		dp = NULL;
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_HOME_AGENT)
 		if (mip6_dad_success(ifa) == ENOENT)
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_HOME_AGENT */
 		IFAFREE(ifa);
 		goto done;
 	}
@@ -1553,9 +1560,9 @@ nd6_dad_timer(ifa)
 			TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
 			free(dp, M_IP6NDP);
 			dp = NULL;
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_HOME_AGENT)
 			if (mip6_dad_success(ifa) == ENOENT)
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_HOME_AGENT */
 			IFAFREE(ifa);
 		}
 	}
@@ -1596,9 +1603,9 @@ nd6_dad_duplicated(ifa)
 	TAILQ_REMOVE(&dadq, (struct dadq *)dp, dad_list);
 	free(dp, M_IP6NDP);
 	dp = NULL;
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_HOME_AGENT)
 	if (mip6_dad_duplicated(ifa) == ENOENT)
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_HOME_AGENT */
 	IFAFREE(ifa);
 }
 

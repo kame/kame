@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.55 2003/02/07 09:34:38 jinmei Exp $	*/
+/*	$KAME: dest6.c,v 1.56 2003/04/23 09:15:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -65,18 +65,15 @@
 #ifdef MIP6
 #include <net/if_hif.h>
 #include <netinet6/nd6.h>
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
 #endif /* MIP6 */
 
 #ifdef MIP6
 static int	dest6_swap_hao __P((struct ip6_hdr *, struct ip6aux *,
 				    struct ip6_opt_home_address *));
 static int	dest6_nextopt __P((struct mbuf *, int, struct ip6_opt *));
-#endif /* MIP6 */
-
-#ifdef MIP6
-extern struct mip6_bc_list mip6_bc_list;
 #endif /* MIP6 */
 
 /*
@@ -383,7 +380,7 @@ dest6_mip6_hao(m, mhoff, nxt)
 	home_sa = ip6a->ip6a_src;
 	home_sa.sin6_addr = *(struct in6_addr *)haopt.ip6oh_addr;
 	mobility6_send_be(&ip6a->ip6a_dst, &ip6a->ip6a_src,
-	    IP6ME_STATUS_NO_BINDING, &home_sa);
+	    IP6ME_STATUS_UNKNOWN_BINDING, &home_sa);
 
 	return (-1);
 }

@@ -1,7 +1,7 @@
-/*	$KAME: mip6_fsm.c,v 1.20 2003/03/28 08:09:27 suz Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.21 2003/04/23 09:15:51 keiichi Exp $	*/
 
 /*
- * Copyright (C) 2001 WIDE Project.  All rights reserved.
+ * Copyright (C) 2002 WIDE Project.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -61,8 +61,10 @@
 
 #include <net/if_hif.h>
 
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
+#include <netinet6/mip6_mncore.h>
 
 static int mip6_bu_pri_fsm(struct mip6_bu *, int, void *);
 static int mip6_bu_pri_fsm_home_registration(struct mip6_bu *);

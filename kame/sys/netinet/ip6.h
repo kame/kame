@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.43 2003/02/14 08:02:40 t-momose Exp $	*/
+/*	$KAME: ip6.h,v 1.44 2003/04/23 09:15:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -386,6 +386,21 @@ struct ip6m_binding_ack {
 	/* followed by mobility options */
 } __attribute__((__packed__));
 
+/* Binding Ack status codes */
+#define IP6MA_STATUS_ACCEPTED              0	/* Binding Update accepted */
+#define IP6MA_STATUS_ERRORBASE             128	/* ERROR BASE */
+#define IP6MA_STATUS_UNSPECIFIED           128	/* Reason unspecified */
+#define IP6MA_STATUS_PROHIBIT              129	/* Administratively prohibited */
+#define IP6MA_STATUS_RESOURCES             130	/* Insufficient resources */
+#define IP6MA_STATUS_NOT_SUPPORTED         131	/* Home registration not supported */
+#define IP6MA_STATUS_NOT_HOME_SUBNET       132	/* Not home subnet */
+#define IP6MA_STATUS_NOT_HOME_AGENT        133	/* Not home agent for this mobile node */
+#define IP6MA_STATUS_DAD_FAILED            134	/* Duplicate Address Detection failed */
+#define IP6MA_STATUS_SEQNO_TOO_SMALL       135	/* Sequence number out of window */
+#define IP6MA_STATUS_HOME_NONCE_EXPIRED    136	/* Expired Home Nonce Index */
+#define IP6MA_STATUS_CAREOF_NONCE_EXPIRED  137	/* Expired Care-of Nonce Index */
+#define IP6MA_STATUS_NONCE_EXPIRED         138	/* Expired Nonces */
+
 /* Binding Error (BE) message */
 struct ip6m_binding_error {
 	u_int8_t ip6me_pproto;
@@ -400,8 +415,8 @@ struct ip6m_binding_error {
 } __attribute__((__packed__));
 
 /* Binding Error status codes */
-#define IP6ME_UNVERIFIED_HAO	1
-#define IP6ME_UNKNOWN_TYPE	2
+#define IP6ME_STATUS_UNKNOWN_BINDING	1
+#define IP6ME_STATUS_UNRECOGNIZED_TYPE	2
 
 /* Mobility options */
 struct ip6m_opt {

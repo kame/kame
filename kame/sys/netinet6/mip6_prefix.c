@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.19 2002/06/09 14:44:02 itojun Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.20 2003/04/23 09:15:51 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -69,16 +69,27 @@
 
 #include <net/if_hif.h>
 
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
+#include <netinet6/mip6_mncore.h>
 
 struct mip6_prefix_list mip6_prefix_list;
 
-extern struct mip6_subnet_list mip6_subnet_list;
+#ifdef __NetBSD__
+struct callout mip6_pfx_ch = CALLOUT_INITIALIZER;
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+struct callout mip6_pfx_ch;
+#endif
 
 void
 mip6_prefix_init(void)
 {
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	callout_init(&mip6_pfx_ch, NULL);
+#elif defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	callout_init(&mip6_pfx_ch);
+#endif
 	LIST_INIT(&mip6_prefix_list);
 }
 

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.311 2003/04/09 09:28:19 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.312 2003/04/23 09:15:50 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -141,8 +141,12 @@
 #endif
 #ifdef MIP6
 #include <net/if_hif.h>
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
+#ifdef MIP6_MOBILE_NODE
+#include <netinet6/mip6_mncore.h>
+#endif /* MIP6_MOBILE_NODE */
 #endif /* MIP6 */
 
 #include <net/if_stf.h>
@@ -1215,7 +1219,7 @@ ip6_input(m)
 			goto bad;
 		}
 #endif
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 		/*
 		 * XXX
 		 * check if the packet was tunneled after all extention
@@ -1231,7 +1235,7 @@ ip6_input(m)
 			if (mip6_route_optimize(m))
 				goto bad;
 		}
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 		nxt = (*inet6sw[ip6_protox[nxt]].pr_input)(&m, &off, nxt);
 	}
 	return;

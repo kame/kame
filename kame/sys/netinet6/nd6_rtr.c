@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.229 2003/03/31 02:19:26 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.230 2003/04/23 09:15:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -73,8 +73,12 @@
 
 #ifdef MIP6
 #include <net/if_hif.h>
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
+#ifdef MIP6_MOBILE_NODE
+#include <netinet6/mip6_mncore.h>
+#endif /* MIP6_MOBILE_NODE */
 #endif /* MIP6 */
 
 #include <net/net_osdep.h>
@@ -338,7 +342,7 @@ nd6_ra_input(m, off, icmp6len)
 		ndi->chlim = nd_ra->nd_ra_curhoplimit;
 	dr = defrtrlist_update(&dr0);
 
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	if (MIP6_IS_MN) {
 		if (mip6_prelist_update(&src_sa6, &ndopts, dr, m)) {
 			mip6log((LOG_ERR,
@@ -347,7 +351,7 @@ nd6_ra_input(m, off, icmp6len)
 			/* waht should we do? */
 		}
 	}
-#endif
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 
 	/*
 	 * prefix
@@ -430,14 +434,14 @@ nd6_ra_input(m, off, icmp6len)
 		}
 	}
 
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	if (MIP6_IS_MN) {
 		/* check reachability of all routers. */
 		mip6_probe_routers();
 	}
 
 	/* update home agent list. */
-	if ((MIP6_IS_MN || MIP6_IS_HA) && dr) {
+	if ((MIP6_IS_MN /* || MIP6_IS_HA */) && dr) {
 		if (mip6_ha_list_update_hainfo(&mip6_ha_list,
 					       dr, ndopts.nd_opts_hai)) {
 			mip6log((LOG_ERR,
@@ -458,7 +462,7 @@ nd6_ra_input(m, off, icmp6len)
 			}
 		}
 	}
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 
 	/*
 	 * MTU
@@ -1830,7 +1834,7 @@ pfxlist_onlink_check()
 		}
 	}
 
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	if (MIP6_IS_MN)
 		if (mip6_process_movement()) {
 			mip6log((LOG_WARNING,
@@ -1838,7 +1842,7 @@ pfxlist_onlink_check()
 				 __FILE__, __LINE__));
 			/* ignore this error... */
 		}
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 }
 
 int

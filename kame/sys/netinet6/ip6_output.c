@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.364 2003/04/09 09:28:19 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.365 2003/04/23 09:15:50 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -166,8 +166,12 @@ extern int ipsec_ipcomp_default_level;
 #ifdef MIP6
 #include <sys/syslog.h>
 #include <net/if_hif.h>
-#include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
+#ifdef MIP6_MOBILE_NODE
+#include <netinet6/mip6_mncore.h>
+#endif /* MIP6_MOBILE_NODE */
 #endif /* MIP6 */
 
 #include <net/net_osdep.h>
@@ -793,7 +797,7 @@ skip_ipsec2:;
 #endif
 	}
 
-#ifdef MIP6
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
 	if ((flags & IPV6_FORWARDING) == 0) {
 		/*
 		 * after the IPsec processing, the IPv6 header source
@@ -817,7 +821,7 @@ skip_ipsec2:;
 		 * headers at all.
 		 */
 	}
-#endif /* MIP6 */
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 
 	/*
 	 * If there is a routing header, replace the destination address field
