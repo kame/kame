@@ -1,4 +1,4 @@
-/*	$KAME: random.c,v 1.2 2000/10/05 06:34:56 itojun Exp $	*/
+/*	$KAME: random.c,v 1.3 2000/10/05 06:46:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -49,7 +49,7 @@ random_init()
 {
 	fd = open("/dev/urandom", O_RDONLY, 0600);
 	if (fd < 0) {
-		err(1, "open");
+		err(1, "/dev/urandom");
 		/*NOTREACHED*/
 	}
 }
