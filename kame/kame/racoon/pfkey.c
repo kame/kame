@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.94 2000/12/18 01:36:50 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.95 2001/01/04 06:43:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1286,7 +1286,7 @@ pk_recvexpire(mhp)
 	proto_id = pfkey2ipsecdoi_proto(msg->sadb_msg_satype);
 	if (proto_id == ~0) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"ERROR: invalid proto_id %d\n", msg->sadb_msg_satype);
+			"invalid proto_id %d\n", msg->sadb_msg_satype);
 		return -1;
 	}
 

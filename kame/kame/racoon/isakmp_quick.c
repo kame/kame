@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.70 2001/01/04 06:41:03 sakane Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.71 2001/01/04 06:41:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1878,8 +1878,8 @@ get_proposal_r(iph2)
 
 	sp_out = getsp_r(&spidx);
 	if (!sp_out) {
-		plog(LLV_ERROR, LOCATION, NULL,
-			"ERROR: no outbound policy found: %s\n",
+		plog(LLV_WARNING, LOCATION, NULL,
+			"no outbound policy found: %s\n",
 			spidx2str(&spidx));
 	}
     }
