@@ -1,4 +1,4 @@
-/*	$KAME: backupsa.h,v 1.1 2001/01/31 05:32:55 sakane Exp $	*/
+/*	$KAME: backupsa.h,v 1.2 2001/01/31 05:38:44 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -34,4 +34,4 @@ extern int backupsa_to_file __P((u_int, u_int,
 	caddr_t, u_int, u_int, u_int, u_int, u_int,
 	u_int32_t, u_int64_t, u_int64_t, u_int64_t, u_int32_t));
 extern int backupsa_from_file __P((void));
-
+extern int backupsa_clean __P((void));

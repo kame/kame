@@ -1,4 +1,4 @@
-/*	$KAME: backupsa.c,v 1.1 2001/01/31 05:32:55 sakane Exp $	*/
+/*	$KAME: backupsa.c,v 1.2 2001/01/31 05:38:44 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,7 +67,6 @@
 #include "safefile.h"
 #include "backupsa.h"
 #include "libpfkey.h"
-#include "htonq.h"
 
 /*
  * (time string)%(sa parameter)
@@ -327,3 +326,17 @@ do { \
 	return 0;
 }
 
+int
+backupsa_clean()
+{
+	FILE *fp;
+
+	fp = fopen(lcconf->pathinfo[LC_PATHTYPE_BACKUPSA], "w+");
+	if (fp == NULL) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"failed to clean the backup file %s.\n",
+			lcconf->pathinfo[LC_PATHTYPE_BACKUPSA]);
+		return -1;
+	}
+	return 0;
+}
