@@ -47,7 +47,10 @@
 #endif
 #include <net/if_types.h>
 #include <net/if_dl.h>
+#include <net/route.h>
 #include <netinet/in.h>
+#include <netinet/in_systm.h>
+#include <netinet/ip.h>
 #include <netinet/igmp.h>
 #ifdef HAVE_IGMPV3
 #include <netinet/in_msf.h>
