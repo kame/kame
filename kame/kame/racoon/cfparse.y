@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.92 2001/03/16 04:36:01 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.93 2001/03/21 22:18:55 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -164,7 +164,7 @@ static int fix_lifebyte __P((u_long));
 
 %type <num> NUMBER BOOLEAN SWITCH keylength
 %type <num> PATHTYPE IDENTIFIERTYPE LOGLEV 
-%type <num> ALGORITHM_CLASS algorithm_types algorithm_type dh_group_num
+%type <num> ALGORITHM_CLASS dh_group_num
 %type <num> ALGORITHMTYPE STRENGTHTYPE
 %type <num> PREFIX prefix PORT port ike_port DIRTYPE ACTION PLADDRTYPE WHICHSIDE
 %type <num> ul_proto UL_PROTO secproto
@@ -192,11 +192,9 @@ statement
 	|	padding_statement
 	|	listen_statement
 	|	timer_statement
-	|	algorithm_statement
 	|	policy_statement
 	|	sainfo_statement
 	|	remote_statement
-	|	staticsa_statement
 	|	special_statement
 	;
 
@@ -393,38 +391,6 @@ timer_stmt
 			lcconf->wait_ph2complete = $2 * $3;
 		}
 		EOS
-	;
-
-	/* algorithm */
-algorithm_statement
-	:	ALGORITHM_LEVEL
-		{
-			/*XXX to be deleted.XXX*/
-		} BOC algorithm_stmts EOC
-	;
-algorithm_stmts
-	:	/* nothing */
-	|	algorithm_stmts algorithm_stmt
-	;
-algorithm_stmt
-	:	algorithm_class BOC algorithm_strengthes EOC
-	;
-algorithm_class
-	:	ALGORITHM_CLASS
-	;
-algorithm_strengthes
-	:	/* nothing */
-	|	algorithm_strengthes algorithm_strength
-	;
-algorithm_strength
-	:	STRENGTHTYPE algorithm_types EOS
-	;
-algorithm_types
-	:	algorithm_type 
-	|	algorithm_type algorithm_types 
-	;
-algorithm_type
-	:	ALGORITHMTYPE
 	;
 
 	/* policy */
