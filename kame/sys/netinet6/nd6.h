@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.21 2000/05/17 12:35:59 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.22 2000/06/04 12:46:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -48,6 +48,7 @@ struct	llinfo_nd6 {
 	u_long	ln_expire;	/* lifetime for NDP state transition */
 	short	ln_state;	/* reachability state */
 	short	ln_router;	/* 2^0: ND6 router bit */
+	int	ln_byhint;	/* # of times we made it reachable by UL hint */
 };
 
 #define ND6_LLINFO_NOSTATE	-2
@@ -290,7 +291,7 @@ void nd6_setmtu __P((struct ifnet *));
 void nd6_timer __P((void *));
 void nd6_purge __P((struct ifnet *));
 void nd6_free __P((struct rtentry *));
-void nd6_nud_hint __P((struct rtentry *, struct in6_addr *));
+void nd6_nud_hint __P((struct rtentry *, struct in6_addr *, int));
 int nd6_resolve __P((struct ifnet *, struct rtentry *,
 		     struct mbuf *, struct sockaddr *, u_char *));
 #if defined(__bsdi__) && _BSDI_VERSION >= 199802

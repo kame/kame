@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.36 2000/05/17 12:35:59 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.37 2000/06/04 12:46:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -662,6 +662,7 @@ nd6_na_input(m, off, icmp6len)
 		bcopy(lladdr, LLADDR(sdl), ifp->if_addrlen);
 		if (is_solicited) {
 			ln->ln_state = ND6_LLINFO_REACHABLE;
+			ln->ln_byhint = 0;
 			if (ln->ln_expire)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 				ln->ln_expire = time.tv_sec +
@@ -735,6 +736,7 @@ nd6_na_input(m, off, icmp6len)
 			 */
 			if (is_solicited) {
 				ln->ln_state = ND6_LLINFO_REACHABLE;
+				ln->ln_byhint = 0;
 				if (ln->ln_expire) {
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 					ln->ln_expire = time.tv_sec +

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.65 2000/06/04 03:31:27 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.66 2000/06/04 12:46:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -121,6 +121,8 @@ int	nd6_useloopback = 1;	/* use loopback interface for local traffic */
 
 /* preventing too many loops in ND option parsing */
 int nd6_maxndopt = 10;	/* max # of ND options allowed */
+
+int nd6_max_nudhint = 0;	/* max # of subsequent upper layer hints */
 
 /* for debugging? */
 static int nd6_inuse, nd6_allocated;
@@ -951,9 +953,10 @@ nd6_free(rt)
  * XXX cost-effective metods?
  */
 void
-nd6_nud_hint(rt, dst6)
+nd6_nud_hint(rt, dst6, force)
 	struct rtentry *rt;
 	struct in6_addr *dst6;
+	int force;
 {
 	struct llinfo_nd6 *ln;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -971,11 +974,10 @@ nd6_nud_hint(rt, dst6)
 			return;
 	}
 
-	if ((rt->rt_flags & RTF_GATEWAY)
-	 || (rt->rt_flags & RTF_LLINFO) == 0
-	 || !rt->rt_llinfo
-	 || !rt->rt_gateway
-	 || rt->rt_gateway->sa_family != AF_LINK) {
+	if ((rt->rt_flags & RTF_GATEWAY) != 0 ||
+	    (rt->rt_flags & RTF_LLINFO) == 0 ||
+	    !rt->rt_llinfo || !rt->rt_gateway ||
+	    rt->rt_gateway->sa_family != AF_LINK) {
 		/* This is not a host route. */
 		return;
 	}
@@ -983,6 +985,16 @@ nd6_nud_hint(rt, dst6)
 	ln = (struct llinfo_nd6 *)rt->rt_llinfo;
 	if (ln->ln_state < ND6_LLINFO_REACHABLE)
 		return;
+
+	/*
+	 * if we get upper-layer reachability confirmation many times,
+	 * it is possible we have false information.
+	 */
+	if (!force) {
+		ln->ln_byhint++;
+		if (ln->ln_byhint > nd6_max_nudhint)
+			return;
+	}
 
 	ln->ln_state = ND6_LLINFO_REACHABLE;
 	if (ln->ln_expire)
@@ -1216,6 +1228,7 @@ nd6_rtrequest(req, rt, sa)
 			 * which is specified by ndp command.
 			 */
 			ln->ln_state = ND6_LLINFO_REACHABLE;
+			ln->ln_byhint = 0;
 		} else {
 		        /*
 			 * When req == RTM_RESOLVE, rt is created and
@@ -1240,6 +1253,7 @@ nd6_rtrequest(req, rt, sa)
 			caddr_t macp = nd6_ifptomac(ifp);
 			ln->ln_expire = 0;
 			ln->ln_state = ND6_LLINFO_REACHABLE;
+			ln->ln_byhint = 0;
 			if (macp) {
 				Bcopy(macp, LLADDR(SDL(gate)), ifp->if_addrlen);
 				SDL(gate)->sdl_alen = ifp->if_addrlen;
@@ -1273,6 +1287,7 @@ nd6_rtrequest(req, rt, sa)
 		} else if (rt->rt_flags & RTF_ANNOUNCE) {
 			ln->ln_expire = 0;
 			ln->ln_state = ND6_LLINFO_REACHABLE;
+			ln->ln_byhint = 0;
 
 			/* join solicited node multicast for proxy ND */
 			if (ifp->if_flags & IFF_MULTICAST) {

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.110 2000/06/03 12:43:49 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.111 2000/06/04 12:46:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -800,7 +800,7 @@ skip_ipsec2:;
 	 * Upper-layer reachability confirmation
 	 */
 	if (opt && (opt->ip6po_flags & IP6PO_REACHCONF))
-		nd6_nud_hint(ro->ro_rt, NULL);
+		nd6_nud_hint(ro->ro_rt, NULL, 0);
 
 	/*
 	 * Determine path MTU.
@@ -3179,7 +3179,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 		}
 
 		case IPV6_REACHCONF:
-#if 1
+#if 0
 			/*
 			 * it looks dangerous to allow IPV6_REACHCONF to
 			 * normal user.  it affects the ND state (system state)
@@ -3187,8 +3187,12 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 			 */
 			if (!priv)
 				return(EPERM);
+#else
+			/*
+			 * we limit max # of subsequent userland reachability
+			 * conformation by using ln->ln_byhint.
+			 */
 #endif
-			
 			if (cm->cmsg_len != CMSG_LEN(0))
 				return(EINVAL);
 			opt->ip6po_flags |= IP6PO_REACHCONF;
