@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1009 2000/06/13 10:19:13 jinmei Exp $
+$Id: CHANGELOG,v 1.1010 2000/06/13 11:10:21 itojun Exp $
 
 <200006>
+Tue Jun 13 20:08:38 JST 2000 itojun@iijlab.net
+	* openbsd/sys/netinet/udp_usrreq.c,  openbsd/sys/netinet6/raw_ipv6.c:
+	  correct scoped address handling and flowinfo manipulation.
+
 2000-06-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_purgeaddr): tried to restore an
 	interface direct route if we have an address that shares the same
