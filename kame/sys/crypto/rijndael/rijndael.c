@@ -1,4 +1,4 @@
-/*	$KAME: rijndael.c,v 1.2 2003/08/28 08:23:20 itojun Exp $	*/
+/*	$KAME: rijndael.c,v 1.3 2003/08/28 14:20:22 itojun Exp $	*/
 
 /**             
  * rijndael-alg-fst.c 
@@ -25,9 +25,6 @@
  * OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE,
  * EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
-#include <sys/cdefs.h>
-__KERNEL_RCSID(0, "$NetBSD: rijndael.c,v 1.6 2003/08/27 14:23:27 itojun Exp $");
 
 #include <sys/types.h>
 #include <sys/systm.h>
