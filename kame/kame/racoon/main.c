@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.40 2001/08/16 14:37:29 itojun Exp $	*/
+/*	$KAME: main.c,v 1.41 2001/08/17 07:06:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -85,7 +85,7 @@ static char version[] = "@(#)racoon 20001216 " RACOON_VERSION ;
 #endif
 
 int main __P((int, char **));
-static void Usage __P((void));
+static void usage __P((void));
 static void parse __P((int, char **));
 static void restore_params __P((void));
 static void save_params __P((void));
@@ -93,10 +93,9 @@ static void saverestore_params __P((int));
 static void cleanup_pidfile __P((void));
 
 void
-Usage()
+usage()
 {
-	printf("Usage: %s [-BdFv%s] %s[-f (file)] [-l (file)] [-p (port)]\n",
-		pname,
+	printf("usage: racoon [-BdFv%s] %s[-f (file)] [-l (file)] [-p (port)]\n",
 #ifdef INET6
 		"46",
 #else
@@ -337,7 +336,7 @@ parse(ac, av)
 			loading_sa++;
 			break;
 		default:
-			Usage();
+			usage();
 			/* NOTREACHED */
 		}
 	}
@@ -345,7 +344,7 @@ parse(ac, av)
 	av += optind;
 
 	if (ac != 0) {
-		Usage();
+		usage();
 		/* NOTREACHED */
 	}
 
