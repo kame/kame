@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.139 2001/07/21 09:42:10 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.140 2001/07/21 09:43:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -978,7 +978,7 @@ insert:
 	/* insert at the end of the group */
 	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
 	     dr = TAILQ_NEXT(dr, dr_entry)) {
-		if (rtpref(dr) < rtpref(n))
+		if (rtpref(n) > rtpref(dr))
 			break;
 	}
 	if (dr)
