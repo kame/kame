@@ -10,6 +10,7 @@ struct addrinfo ai;
 char host[1024];
 char serv[1024];
 
+int
 main(argc, argv)
 	int argc;
 	char *argv[];
@@ -53,5 +54,7 @@ main(argc, argv)
 		printf("\thost %s\n", host);
 		printf("\tserv %s\n", serv);
 		i++;
-	} while (res = res->ai_next);
+	} while ((res = res->ai_next) != NULL);
+
+	exit(0);
 }
