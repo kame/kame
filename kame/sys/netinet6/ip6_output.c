@@ -1463,7 +1463,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_IPSEC_POLICY:
 			    {
 				caddr_t req = NULL;
-				int len = 0;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				struct mbuf *m;
 #endif
@@ -1474,10 +1473,8 @@ ip6_ctloutput(op, so, level, optname, mp)
 				if (error = soopt_mcopyin(sopt, m)) /* XXX */
 					break;
 #endif
-				if (m != 0) {
+				if (m != 0)
 					req = mtod(m, caddr_t);
-					len = m->m_len;
-				}
 				error = ipsec6_set_policy(in6p, optname, req,
 				                          privileged);
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
