@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1136 2000/07/17 05:23:14 jinmei Exp $
+$Id: CHANGELOG,v 1.1137 2000/07/17 09:49:30 itojun Exp $
 
 <200006>
+Mon Jul 17 18:45:11 JST 2000  itojun@iijlab.net
+	* sys/netkey/key.c: allow ESP with no authentication.  it was
+	  mistakenly forbidden with the recent key.c change.
+
 Mon Jul 17 03:31:47 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/ruby: upgrade to 1.4.5.
 
