@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.112 2001/09/07 08:14:47 itojun Exp $
+$KAME: COVERAGE,v 1.113 2001/09/07 16:44:20 itojun Exp $
 
 
 x: supported/integrated
@@ -123,7 +123,7 @@ advanced API	2292bis	2292	2292	2292	2292	2292	2292	2292bis
     (*1) 2292 API is supplied for binary backward compatibility
 
 CMSG_FIRSTHDR validates msg_controllen
-		x	x	-	-	-	-	-	-
+		x	x	x	-	-	-	-	-
 
 getifaddrs	x	x	x	x	x	x	x	x
 
