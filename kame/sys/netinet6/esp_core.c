@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.16 2000/07/15 16:07:48 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.17 2000/07/16 08:41:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -530,7 +530,9 @@ esp_cbc_mature(sav)
 		break;
 	case SADB_X_EALG_BLOWFISHCBC:
 	case SADB_X_EALG_CAST128CBC:
+#ifdef SADB_X_EALG_RC5CBC
 	case SADB_X_EALG_RC5CBC:
+#endif
 		break;
 	}
 
