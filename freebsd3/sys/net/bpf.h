@@ -38,7 +38,7 @@
  *      @(#)bpf.h	8.1 (Berkeley) 6/10/93
  *	@(#)bpf.h	1.34 (LBL)     6/16/96
  *
- * $Id: bpf.h,v 1.16 1998/10/04 21:53:59 alex Exp $
+ * $FreeBSD: src/sys/net/bpf.h,v 1.16.2.2 1999/12/06 20:38:23 archie Exp $
  */
 
 #ifndef _NET_BPF_H_
@@ -111,6 +111,8 @@ struct bpf_version {
 #define BIOCVERSION	_IOR('B',113, struct bpf_version)
 #define BIOCGRSIG	_IOR('B',114, u_int)
 #define BIOCSRSIG	_IOW('B',115, u_int)
+#define BIOCGHDRCMPLT	_IOR('B',116, u_int)
+#define BIOCSHDRCMPLT	_IOW('B',117, u_int)
 
 /*
  * Structure prepended to each packet.
@@ -224,12 +226,12 @@ struct bpf_insn {
 #define BPF_JUMP(code, k, jt, jf) { (u_short)(code), jt, jf, k }
 
 #ifdef KERNEL
-int	 bpf_validate __P((struct bpf_insn *, int));
+int	 bpf_validate __P((const struct bpf_insn *, int));
 void	 bpf_tap __P((struct ifnet *, u_char *, u_int));
 void	 bpf_mtap __P((struct ifnet *, struct mbuf *));
 void	 bpfattach __P((struct ifnet *, u_int, u_int));
 void	 bpfilterattach __P((int));
-u_int	 bpf_filter __P((struct bpf_insn *, u_char *, u_int, u_int));
+u_int	 bpf_filter __P((const struct bpf_insn *, u_char *, u_int, u_int));
 #endif
 
 /*
