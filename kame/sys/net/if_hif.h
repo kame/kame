@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.16 2003/07/24 07:11:17 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.17 2003/07/28 07:36:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -138,15 +138,15 @@ void hif_restore_location(void);
 
 struct hif_ha *hif_ha_list_insert(struct hif_ha_list *,	struct mip6_ha *);
 void hif_ha_list_remove(struct hif_ha_list *, struct hif_ha *);
-struct mip6_ha *hif_ha_list_find_withprefix(struct hif_ha_list *,
+struct hif_ha *hif_ha_list_find_withprefix(struct hif_ha_list *,
     struct sockaddr_in6 *, int);
-struct mip6_ha *hif_ha_list_find_withaddr(struct hif_ha_list *,
+struct hif_ha *hif_ha_list_find_withaddr(struct hif_ha_list *,
     struct sockaddr_in6 *);
-struct mip6_ha *hif_ha_list_find_withmpfx(struct hif_ha_list *,
+struct hif_ha *hif_ha_list_find_withmpfx(struct hif_ha_list *,
     struct mip6_prefix *);
-struct mip6_ha *hif_ha_list_find_withmha(struct hif_ha_list *,
+struct hif_ha *hif_ha_list_find_withmha(struct hif_ha_list *,
     struct mip6_ha *);
-struct mip6_ha *hif_ha_list_find_preferable(struct hif_ha_list *,
+struct hif_ha *hif_ha_list_find_preferable(struct hif_ha_list *,
     struct mip6_prefix *);
 
 #endif /* _KERNEL */

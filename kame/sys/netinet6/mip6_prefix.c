@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.21 2003/07/24 07:11:18 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.22 2003/07/28 07:36:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -276,7 +276,6 @@ mip6_prefix_ha_list_find_withaddr(mpfxha_list, addr)
 	struct sockaddr_in6 *addr;
 {
 	struct mip6_prefix_ha *mpfxha;
-	struct sockaddr_in6 *tmpaddr;
 
 	for (mpfxha = LIST_FIRST(mpfxha_list); mpfxha;
 	     mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {

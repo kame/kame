@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.49 2003/07/24 07:11:17 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.50 2003/07/28 07:36:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -429,6 +429,9 @@ hif_ha_list_insert(hha_list, mha)
 {
 	struct hif_ha *hha;
 
+	if ((hha_list == NULL) || (mha == NULL))
+		panic("hha_list nor mha must not be NULL");
+
 	MALLOC(hha, struct hif_ha *, sizeof(struct hif_ha), M_TEMP, M_NOWAIT);
 	if (hha == NULL) {
 		mip6log((LOG_ERR, "%s:%d: memory allocation failed.\n",
@@ -446,18 +449,21 @@ hif_ha_list_remove(hha_list, hha)
 	struct hif_ha_list *hha_list;
 	struct hif_ha *hha;
 {
+	if ((hha_list == NULL) || (hha == NULL))
+		panic("hha_list nor hha must not be NULL");
+
 	LIST_REMOVE(hha, hha_entry);
 	MIP6_HA_FREE(hha->hha_mha);
 	FREE(hha, M_TEMP);
 }
 
 /*
- * return the pointer of the entity of mip6_ha structure advertising
+ * return the pointer of the entity of hif_ha structure advertising
  * the specified prefix, which is listed in hif_ha_list structure.
  * even if there are more than one entitiy, return the first found
  * one.
  */
-struct mip6_ha *
+struct hif_ha *
 hif_ha_list_find_withprefix(hif_ha_list, prefix, prefixlen)
 	struct hif_ha_list *hif_ha_list;
 	struct sockaddr_in6 *prefix;
@@ -470,7 +476,7 @@ hif_ha_list_find_withprefix(hif_ha_list, prefix, prefixlen)
 	for (hha = LIST_FIRST(hif_ha_list); hha;
 	    hha = LIST_NEXT(hha, hha_entry)) {
 		if (hha->hha_mha == NULL)
-			continue;
+			panic("hha_mha == NULL");
 		for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
 		    mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
 			if (!in6_are_prefix_equal(&mpfx->mpfx_prefix.sin6_addr,
@@ -482,7 +488,7 @@ hif_ha_list_find_withprefix(hif_ha_list, prefix, prefixlen)
 					continue;
 				if (hha->hha_mha == mpfxha->mpfxha_mha) {
 					/* found. */
-					return (hha->hha_mha);
+					return (hha);
 				}
 			}
 		}
@@ -497,7 +503,7 @@ hif_ha_list_find_withprefix(hif_ha_list, prefix, prefixlen)
  * even if there are more than one entitiy, return the first found
  * one.
  */    
-struct mip6_ha *
+struct hif_ha *
 hif_ha_list_find_withaddr(hif_ha_list, addr)
 	struct hif_ha_list *hif_ha_list;
 	struct sockaddr_in6 *addr;
@@ -507,39 +513,39 @@ hif_ha_list_find_withaddr(hif_ha_list, addr)
 	for (hha = LIST_FIRST(hif_ha_list); hha;
 	    hha = LIST_NEXT(hha, hha_entry)) {
 		if (hha->hha_mha == NULL)
-			continue;
+			panic("hha->hha_mha == NULL");
 		if (SA6_ARE_ADDR_EQUAL(&hha->hha_mha->mha_lladdr, addr))
-			return (hha->hha_mha);
+			return (hha);
 		/* XXX for each gaddr. */
 		if (SA6_ARE_ADDR_EQUAL(&hha->hha_mha->mha_gaddr, addr))
-			return (hha->hha_mha);
+			return (hha);
 	}
 	/* not found. */
 	return (NULL);
 }
 
-struct mip6_ha *
+struct hif_ha *
 hif_ha_list_find_withmpfx(hif_ha_list, mpfx)
 	struct hif_ha_list *hif_ha_list;
 	struct mip6_prefix *mpfx;
 {
 	struct mip6_prefix_ha *mpfxha;
-	struct mip6_ha *mha;
+	struct hif_ha *hha;
 
 	for (mpfxha = LIST_FIRST(&mpfx->mpfx_ha_list); mpfxha;
 	     mpfxha = LIST_NEXT(mpfxha, mpfxha_entry)) {
 		if (mpfxha->mpfxha_mha == NULL)
 			continue;
-		mha = hif_ha_list_find_withmha(hif_ha_list,
+		hha = hif_ha_list_find_withmha(hif_ha_list,
 		    mpfxha->mpfxha_mha);
-		if (mha)
-			return (mha);
+		if (hha != NULL)
+			return (hha);
 	}
 	/* not found. */
 	return (NULL);
 }
 
-struct mip6_ha *
+struct hif_ha *
 hif_ha_list_find_withmha(hif_ha_list, mha)
 	struct hif_ha_list *hif_ha_list;
 	struct mip6_ha *mha;
@@ -549,15 +555,15 @@ hif_ha_list_find_withmha(hif_ha_list, mha)
 	for (hha = LIST_FIRST(hif_ha_list); hha;
 	    hha = LIST_NEXT(hha, hha_entry)) {
 		if (hha->hha_mha == NULL)
-			continue;
+			panic("hha->hha_mha == NULL");
 		if (hha->hha_mha == mha)
-			return (hha->hha_mha);
+			return (hha);
 	}
 	/* not found. */
 	return (NULL);
 }
 
-struct mip6_ha *
+struct hif_ha *
 hif_ha_list_find_preferable(hif_ha_list, mpfx)
 	struct hif_ha_list *hif_ha_list;
 	struct mip6_prefix *mpfx;
@@ -567,7 +573,7 @@ hif_ha_list_find_preferable(hif_ha_list, mpfx)
 	/* XXX */
 	hha = LIST_FIRST(hif_ha_list);
 	if (hha)
-		return(hha->hha_mha);
+		return(hha);
 	return (NULL);
 }
 
@@ -579,6 +585,7 @@ hif_ha_list_update_withioctl(sc, data)
 	struct hif_ifreq *hifr = (struct hif_ifreq *)data;
 	struct mip6_ha *nmha = (struct mip6_ha *)data;
 	struct mip6_ha *mha;
+	struct hif_ha *hha;
 	int error = 0;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
@@ -591,9 +598,9 @@ hif_ha_list_update_withioctl(sc, data)
 		return (EINVAL);
 	}
 
-	mha = hif_ha_list_find_withaddr(&sc->hif_ha_list_home,
+	hha = hif_ha_list_find_withaddr(&sc->hif_ha_list_home,
 	    &nmha->mha_lladdr);
-	if (mha == NULL) {
+	if (hha == NULL) {
 		mha = mip6_ha_create(&nmha->mha_lladdr, &nmha->mha_gaddr,
 		    nmha->mha_flags, nmha->mha_pref, nmha->mha_lifetime);
 		if (mha == NULL) {
@@ -606,7 +613,8 @@ hif_ha_list_update_withioctl(sc, data)
 		if (error) {
 			return (error);
 		}
-	}
+	} else
+		mha = hha->hha_mha;
 
 	mha->mha_lladdr = nmha->mha_lladdr;
 	mha->mha_gaddr = nmha->mha_gaddr;
@@ -656,6 +664,7 @@ hif_ha_list_update_withmpfx(sc, data)
 	struct mip6_prefix *nmpfx, *mpfx;
 	int mpfx_is_new = 0;
 	struct mip6_ha *mha;
+	struct hif_ha *hha;
 	int error = 0;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
@@ -692,12 +701,13 @@ hif_ha_list_update_withmpfx(sc, data)
 	mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
 
 	if (mpfx_is_new) {
-		mha = hif_ha_list_find_withmpfx(&sc->hif_ha_list_home, mpfx);
-		if (mha == NULL) {
+		hha = hif_ha_list_find_withmpfx(&sc->hif_ha_list_home, mpfx);
+		if (hha == NULL) {
 			mha = mip6_ha_create(&sa6_any, NULL, 0, 0,
 			    MIP6_HA_DEFAULT_LIFETIME);
 			hif_ha_list_insert(&sc->hif_ha_list_home, mha);
-		}
+		} else
+			mha = hha->hha_mha;
 		mip6_prefix_ha_list_insert(&mpfx->mpfx_ha_list, mha);
 	}
 

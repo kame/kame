@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.15 2003/07/25 08:13:20 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.16 2003/07/28 07:36:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -226,6 +226,7 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 	int mha_is_new, mpfx_is_new;
 	struct mip6_ha *mha;
 	struct mip6_prefix tmpmpfx, *mpfx;
+	struct hif_ha *hha;
 	int error = 0;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
@@ -295,9 +296,9 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 		prefix_sa.sin6_len = sizeof(prefix_sa);
 		prefix_sa.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
 		/* XXX scope? */
-		mha = hif_ha_list_find_withprefix(&sc->hif_ha_list_home,
+		hha = hif_ha_list_find_withprefix(&sc->hif_ha_list_home,
 		    &prefix_sa, ndopt_pi->nd_opt_pi_prefix_len);
-		if (mha != NULL)
+		if (hha != NULL)
 			is_home++;
 
 		if (ndopt_pi->nd_opt_pi_flags_reserved
@@ -307,17 +308,17 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 			prefix_sa.sin6_len = sizeof(prefix_sa);
 			prefix_sa.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
 			/* XXX scope? */
-			mha = hif_ha_list_find_withaddr(&sc->hif_ha_list_home,
+			hha = hif_ha_list_find_withaddr(&sc->hif_ha_list_home,
 			    &prefix_sa);
-			if (mha != NULL)
+			if (hha != NULL)
 				is_home++;
 		}
 	}
 
 	/* check is the router is on our home agent list. */
-	mha = hif_ha_list_find_withaddr(&sc->hif_ha_list_home, rtaddr);
+	hha = hif_ha_list_find_withaddr(&sc->hif_ha_list_home, rtaddr);
 
-	if ((is_home != 0) || (mha != NULL)) {
+	if ((is_home != 0) || (hha != NULL)) {
 		/* we are home. */
 		location = HIF_LOCATION_HOME;
 	} else {
@@ -471,12 +472,21 @@ mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 			mip6_prefix_ha_list_insert(&mpfx->mpfx_ha_list, mha);
 
 		if (location == HIF_LOCATION_HOME) {
+			hha = hif_ha_list_find_withmha(
+			    &sc->hif_ha_list_foreign, mha);
+			if (hha != NULL)
+				hif_ha_list_remove(&sc->hif_ha_list_foreign,
+				    hha);
 			if (hif_ha_list_find_withmha(&sc->hif_ha_list_home,
-				mha) == NULL)
+			    mha) == NULL)
 				hif_ha_list_insert(&sc->hif_ha_list_home, mha);
 		} else {
+			hha = hif_ha_list_find_withmha(&sc->hif_ha_list_home,
+			    mha);
+			if (hha != NULL)
+				hif_ha_list_remove(&sc->hif_ha_list_home, hha);
 			if (hif_ha_list_find_withmha(&sc->hif_ha_list_foreign,
-				mha) == NULL)
+			    mha) == NULL)
 				hif_ha_list_insert(&sc->hif_ha_list_foreign,
 				    mha);
 		}
@@ -1513,6 +1523,8 @@ mip6_home_registration(sc)
 {
 	struct mip6_prefix *mpfx;
 	struct mip6_bu *mbu;
+	const struct sockaddr_in6 *haaddr;
+	struct hif_ha *hha;
 
 	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
 	     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
@@ -1530,9 +1542,6 @@ mip6_home_registration(sc)
 		}
 		if (mbu == NULL) {
 			/* not exist */
-			const struct sockaddr_in6 *haaddr;
-			struct mip6_ha *mha;
-
 			if (sc->hif_location == HIF_LOCATION_HOME) {
 				/*
 				 * we are home and we have no binding
@@ -1558,10 +1567,10 @@ mip6_home_registration(sc)
 			 */
 
 			/* pick the preferable HA from the list. */
-			mha = hif_ha_list_find_preferable(
+			hha = hif_ha_list_find_preferable(
 				&sc->hif_ha_list_home, mpfx);
 				    
-			if (mha == NULL) {
+			if (hha == NULL) {
 				/*
 				 * if no HA is found, try to find a HA
 				 * using Dynamic Home Agent Discovery.
@@ -1572,7 +1581,7 @@ mip6_home_registration(sc)
 				mip6_icmp6_dhaad_req_output(sc);
 				haaddr = &sin6_any;
 			} else {
-				haaddr = &mha->mha_gaddr;
+				haaddr = &hha->hha_mha->mha_gaddr;
 			}
 
 			mbu = mip6_bu_create(haaddr, mpfx, &hif_coa,
