@@ -1080,7 +1080,7 @@ findpcb:
 			 * that the association is unique, and the
 			 * local address is always set here.
 			 */
-			if (IN6_IS_ADDR_ANY(&inp->in6p_laddr))
+			if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr))
 				inp->in6p_laddr = ip6->ip6_dst;
 			inp->in6p_faddr = ip6->ip6_src;
 			inp->inp_fport = th->th_sport;

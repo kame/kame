@@ -171,7 +171,7 @@ in6_pcbbind(inp, nam, p)
 			 */
 			if (so->so_options & SO_REUSEADDR)
 				reuseport = SO_REUSEADDR|SO_REUSEPORT;
-		} else if (!IN6_IS_ADDR_ANY(&sin6->sin6_addr)) {
+		} else if (!IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
 			struct ifaddr *ia = NULL;
 
 			sin6->sin6_port = 0;		/* yech... */
@@ -367,7 +367,7 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 		 */
 #define	satosin6(sa)	((struct sockaddr_in6 *)(sa))
 #define ifatoia6(ifa)	((struct in6_ifaddr *)(ifa))
-		if (IN6_IS_ADDR_ANY(&sin6->sin6_addr))
+		if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
 			sin6->sin6_addr = in6addr_loopback;
 	}
 	if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr)) {
@@ -431,12 +431,12 @@ in6_pcbconnect(inp, nam, p)
 
 	if (in6_pcblookup_hash(inp->inp_pcbinfo, &sin6->sin6_addr,
 			       sin6->sin6_port,
-			      IN6_IS_ADDR_ANY(&inp->in6p_laddr)
+			      IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr)
 			      ? addr6 : &inp->in6p_laddr,
 			      inp->inp_lport, 0, NULL) != NULL) {
 		return (EADDRINUSE);
 	}
-	if (IN6_IS_ADDR_ANY(&inp->in6p_laddr)) {
+	if (IN6_IS_ADDR_UNSPECIFIED(&inp->in6p_laddr)) {
 		if (inp->inp_lport == 0)
 			(void)in6_pcbbind(inp, (struct sockaddr *)0, p);
 		inp->in6p_laddr = *addr6;
@@ -482,7 +482,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, errorp)
 	 * the interface.
 	 */
 	if (opts && (pi = opts->ip6po_pktinfo)) {
-		if (!IN6_IS_ADDR_ANY(&pi->ipi6_addr))
+		if (!IN6_IS_ADDR_UNSPECIFIED(&pi->ipi6_addr))
 			return(&pi->ipi6_addr);
 		else if (pi->ipi6_ifindex) {
 			/* XXX boundary check is assumed to be already done. */
@@ -835,7 +835,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 	if ((unsigned)cmd > PRC_NCMDS || dst->sa_family != AF_INET6)
 		return;
 	faddr6 = ((struct sockaddr_in6 *)dst)->sin6_addr;
-	if (IN6_IS_ADDR_ANY(&faddr6))
+	if (IN6_IS_ADDR_UNSPECIFIED(&faddr6))
 		return;
 
 	/*
@@ -862,7 +862,7 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 		if (!IN6_ARE_ADDR_EQUAL(&inp->in6p_faddr, &faddr6) ||
 		   inp->inp_socket == 0 ||
 		   (lport && inp->inp_lport != lport) ||
-		   (!IN6_IS_ADDR_ANY(laddr6) &&
+		   (!IN6_IS_ADDR_UNSPECIFIED(laddr6) &&
 		    !IN6_ARE_ADDR_EQUAL(&inp->in6p_laddr, laddr6)) ||
 		   (fport && inp->inp_fport != fport)) {
 			inp = LIST_NEXT(inp, inp_list);

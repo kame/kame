@@ -1163,7 +1163,7 @@ if_delmulti(ifp, sa)
 		 * to all of Ethernet multicast addresses.
 		 */
 		sin6 = (struct sockaddr_in6 *)ifma->ifma_addr;
-		if (IN6_IS_ADDR_ANY(&sin6->sin6_addr))
+		if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
 			ifp->if_flags &= ~IFF_ALLMULTI;
 	}
 #endif /* INET6 */
