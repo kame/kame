@@ -43,6 +43,9 @@
 # endif
 #endif
 #include <net/if.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include <net/if_var.h>
+#endif
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
 #include <stdio.h>
@@ -444,7 +447,7 @@ in6_matchflags(addr, ifnam, flags)
 	ifr6.ifr_addr = *(struct sockaddr_in6 *)addr;
 
 	if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
-		warn("in6_matchflags: ioctl(SIOCGIFAFLAG_IN6)");/* assert? */
+		warn("in6_matchflags: ioctl(SIOCGIFAFLAG_IN6)"); /* assert? */
 		close(s);
 		return(-1);
 	}
