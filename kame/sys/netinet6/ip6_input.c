@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.285 2002/06/14 03:50:39 sakane Exp $	*/
+/*	$KAME: ip6_input.c,v 1.286 2002/06/17 08:43:07 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -804,10 +804,38 @@ ip6_input(m)
 	    IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
 	    &rt6_key(ip6_forward_rt.ro_rt)->sin6_addr)
 #endif
-	    ip6_forward_rt.ro_rt->rt_ifp->if_type == IFT_LOOP) {
+#ifdef MIP6
+	    ((ip6_forward_rt.ro_rt->rt_flags & RTF_ANNOUNCE) ||
+	     ip6_forward_rt.ro_rt->rt_ifp->if_type == IFT_LOOP)
+#else
+	    ip6_forward_rt.ro_rt->rt_ifp->if_type == IFT_LOOP
+#endif
+								) {
 		struct in6_ifaddr *ia6 =
 			(struct in6_ifaddr *)ip6_forward_rt.ro_rt->rt_ifa;
-
+#ifdef MIP6
+		/* check unicast NS */
+	    	if ((ip6_forward_rt.ro_rt->rt_flags & RTF_ANNOUNCE) != 0) {
+			int nxt, loff;
+			struct icmp6_hdr *icp;
+			loff = ip6_lasthdr(m, 0, IPPROTO_IPV6, &nxt);
+			if (loff <  0 || nxt != IPPROTO_ICMPV6)
+				goto mip6_fowarding;
+#ifndef PULLDOWN_TEST
+			IP6_EXTHDR_CHECK(m, 0, loff + sizeof(struct icmp6_hdr),);
+			icp = (struct icmp6_hdr *)(mtod(m, caddr_t) + loff);
+#else
+			IP6_EXTHDR_GET(icp, struct icmp6_hdr *, m, loff,
+				sizeof(*icp));
+			if (icp == NULL) {
+				icmp6stat.icp6s_tooshort++;
+				return;
+			}
+#endif
+			if (icp->icmp6_type != ND_NEIGHBOR_SOLICIT)
+				goto mip6_fowarding;
+		}
+#endif
 		/*
 		 * record address information into m_aux.
 		 */
@@ -841,6 +869,9 @@ ip6_input(m)
 			goto bad;
 		}
 	}
+#ifdef MIP6
+ mip6_fowarding:
+#endif
 
 	/*
 	 * FAITH (Firewall Aided Internet Translator)

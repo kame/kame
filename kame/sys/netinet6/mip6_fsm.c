@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.2 2002/06/13 07:54:31 k-sugyou Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.3 2002/06/17 08:43:07 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -93,7 +93,9 @@ mip6_bu_fsm(mbu, event, data)
 
 	mbu_fsm_state = &mbu->mbu_fsm_state;
 
+#ifdef MIP6_DEBUG
 	printf("st=%d:ev=%d =>", *mbu_fsm_state, event);
+#endif
 
 	switch (*mbu_fsm_state)
 	{

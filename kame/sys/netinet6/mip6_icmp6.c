@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.47 2002/06/09 16:16:00 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.48 2002/06/17 08:43:07 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -510,8 +510,7 @@ mip6_icmp6_find_addr(m, icmp6off, icmp6len, sin6local, sin6peer)
 			rh = (struct ip6_rthdr0 *)(icmp6 + off);
 			rlen = (rh->ip6r0_len + 1) << 3;
 			if ((off + rlen) > icmp6len) break;
-			if (rh->ip6r0_type != 0) break;
-			if ((rh->ip6r0_type != 0) || (rh->ip6r0_len % 2)) {
+			if ((rh->ip6r0_type != 2) || (rh->ip6r0_len % 2)) {
 				nxt = rh->ip6r0_nxt;
 				off += (rh->ip6r0_len + 1) << 3;
 				continue;
@@ -523,13 +522,13 @@ mip6_icmp6_find_addr(m, icmp6off, icmp6len, sin6local, sin6peer)
 			nxt = rh->ip6r0_nxt;
 			off += (rh->ip6r0_len + 1) << 3;
 			continue;
-		} else {
+		}
+		if (nxt == IPPROTO_HOPOPTS) {
 			ehdr = (struct ip6_ext *)(icmp6 + off);
 			nxt = ehdr->ip6e_nxt;
 			off += (ehdr->ip6e_len + 1) << 3;
 			continue;
 		}
-
 
 		/* Only look at the unfragmentable part.  Other headers
 		   may be present but they are of no interest. */

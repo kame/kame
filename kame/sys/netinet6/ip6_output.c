@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.313 2002/06/09 16:16:00 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.314 2002/06/17 08:43:07 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1528,6 +1528,12 @@ skip_ipsec2:;
 			m->m_data += max_linkhdr;
 			mhip6 = mtod(m, struct ip6_hdr *);
 			*mhip6 = *ip6;
+#ifdef MIP6
+			if (!ip6_setpktaddrs(m, src_sa, dst_sa)) {
+				error = ENOBUFS;
+				goto sendorfree;
+			}
+#endif
 			m->m_len = sizeof(*mhip6);
 			error = ip6_insertfraghdr(m0, m, hlen, &ip6f);
 			if (error) {
