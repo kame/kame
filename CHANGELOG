@@ -1,9 +1,21 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.98 1999/09/05 12:00:42 itojun Exp $
+$Id: CHANGELOG,v 1.99 1999/09/07 07:50:46 itojun Exp $
 
 
 <199909>
+Tue Sep  7 16:42:41 JST 1999  itojun@iijlab.net
+	* kame/rip6query: use getaddrinfo() and getnameinfo(), not inet_pton()
+	  and alike.  allow interface to be specified with -I.
+	* netbsd/usr.bin/whois: fix getaddrinfo() loop.
+	* kame/racoon: fix compilation with --disable-ipv6 (include path).
+	* sys/netinet6/ipsec.c: support IPsec-only kernel compilation again.
+	* sys/netkey/key.c: allow any SPI value to be put into kernel,
+	  for IPComp SA that uses well-known CPI field.
+	* kame/libipsec: allow "setkey -D" on IPComp SA.
+	* kame/tcpdump/print-ripng.c: format ripng information better
+	  if -v is specified (but it eats more lines on screen).
+
 Sun Sep  5 04:00:08 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/net/ucd-snmp, freebsd[23]/ports/ucd-snmp:
 	  upgrade to latest IPv6 patch.  icmp6 per-if stat is now available.
