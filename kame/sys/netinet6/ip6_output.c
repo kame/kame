@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.451 2004/06/02 05:53:15 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.452 2004/07/03 06:54:48 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2582,7 +2582,7 @@ do { \
 				struct mbuf *m;
 #endif
 
-#ifdef _FreeBSD__
+#ifdef __FreeBSD__
 				if ((error = soopt_getm(sopt, &m)) != 0) /* XXX */
 					break;
 				if ((error = soopt_mcopyin(sopt, m)) != 0) /* XXX */
@@ -3099,7 +3099,7 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 				in6p->in6p_cksum = optval;
 			break;
 
-#ifdef _FreeBSD__
+#ifdef __FreeBSD__
 		case SOPT_GET:
 #else
 		case PRCO_GETOPT:
