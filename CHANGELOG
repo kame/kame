@@ -1,8 +1,20 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.46 1999/08/21 16:35:42 jinmei Exp $
+$Id: CHANGELOG,v 1.47 1999/08/23 16:58:33 jinmei Exp $
 
 <199908>
+1999-08-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* *bsd*/usr.{bin,sbin}/netstat: supported per-interface
+	statistics. Try
+	% netstat [-p [ip6|icmp6] | -f inet6] -s -I if_name
+	for printing statistics on a specified interface, or
+	% netstat [-p [ip6|icmp6] | -f inet6] -s -i
+	for all interfaces.
+
+1999-08-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6: implemented per-interface ICMPv6 statistics
+	based on RFC2466. ioctl(SIOCGIFSTAT_ICMP6) is availabe as API.
+
 1999-08-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* sys/netinet6/udp6_usrreq.c (udp6_output): now got rid of
 	in6_pcbconnect, which needs splnet and affects performance, since
