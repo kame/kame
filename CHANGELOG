@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2285 2002/12/04 05:42:35 fujisawa Exp $
+$KAME: CHANGELOG,v 1.2286 2002/12/05 15:36:13 jinmei Exp $
 
 <200212>
+2002-12-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_unlink_ifa): always decremented the
+	reference count of the associated prefix.  Otherwise, the prefix
+	would never be purged after a manually configured address expires.
+
+2002-12-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_control): initialized the lifetimes
+	of a manually configured prefix correctly.
+
 2002-12-04  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_trans.c: Support FTP connection from v4
 	  client to v6 server with non-passive mode.
