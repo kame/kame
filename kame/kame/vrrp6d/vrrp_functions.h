@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: vrrp_functions.h,v 1.1 2002/07/09 07:19:21 ono Exp $
+ * $Id: vrrp_functions.h,v 1.2 2002/07/09 07:28:59 ono Exp $
  */
 
 #include <net/route.h>
@@ -39,21 +39,22 @@
 char            vrrp_state_initialize(struct vrrp_vr *);
 char            vrrp_state_set_master(struct vrrp_vr *);
 char            vrrp_state_set_backup(struct vrrp_vr *);
-char            vrrp_state_check_priority(struct vrrp_hdr *, struct vrrp_vr *, struct in_addr);
+char            vrrp_state_check_priority(struct vrrp_hdr *, struct vrrp_vr *, struct in6_addr *);
 char            vrrp_state_master(struct vrrp_vr *);
 char            vrrp_state_backup(struct vrrp_vr *);
 
 /* vrrp_interface.c functions */
 void            vrrp_interface_owner_verify(struct vrrp_vr *);
 char            vrrp_interface_ethaddr_set(char *, struct ether_addr *);
-char            vrrp_interface_ipaddr_set(char *, struct in_addr, in_addr_t netmask);
-char            vrrp_interface_ipaddr_delete(char *, struct in_addr, int);
+char            vrrp_interface_ipaddr_set(char *, struct in6_addr *, struct in6_addr *netmask);
+char            vrrp_interface_ipaddr_delete(char *, struct in6_addr *, int);
 char            vrrp_interface_vripaddr_set(struct vrrp_vr *);
 char            vrrp_interface_vripaddr_delete(struct vrrp_vr *);
 char            vrrp_interface_down(char *);
 char            vrrp_interface_up(char *);
 
 /* vrrp_network.c functions */
+char            vrrp_network_set_socket(struct vrrp_vr *);
 int             vrrp_network_open_bpf(struct vrrp_vr *);
 void            vrrp_network_close_bpf(struct vrrp_vr *);
 void            vrrp_network_initialize(void);
@@ -64,24 +65,23 @@ void            vrrp_network_init_ethhdr(char *, struct vrrp_vr *);
 void            vrrp_network_init_iphdr(char *, struct vrrp_vr *);
 void            vrrp_network_init_vrrphdr(char *, struct vrrp_vr *);
 char            vrrp_network_send_advertisement(struct vrrp_vr *);
-char            vrrp_network_send_gratuitous_arp(char *, struct ether_addr *, struct in_addr, struct vrrp_vr *);
-char            vrrp_network_send_gratuitous_arp_ips(struct vrrp_vr *, struct ether_addr *);
-char            vrrp_network_send_gratuitous_arp_vripaddrs(struct vrrp_vr *, struct ether_addr *);
-char            vrrp_network_send_gratuitous_arp_ipaddrs(struct vrrp_vr *, struct ether_addr *);
-char            vrrp_network_delete_local_route(struct in_addr);
+char            vrrp_network_send_neighbor_advertisement(struct vrrp_vr *);
+char            vrrp_network_delete_local_route(struct in6_addr *);
 int             vrrp_network_flush_bpf(int);
 
 /* vrrp_misc.c functions */
 void            rt_xaddrs(caddr_t, caddr_t, struct rt_addrinfo *);
-char            vrrp_misc_get_if_infos(char *, struct ether_addr *, struct in_addr *, int *);
+char            vrrp_misc_get_if_infos(char *, struct ether_addr *, struct in6_addr *, int *);
 int             vrrp_misc_get_priority(struct vrrp_vr *);
-u_int16_t       vrrp_misc_compute_checksum(u_int16_t *, int);
+u_int16_t       vrrp_misc_compute_checksum(struct ip6_pseudohdr *, u_char *);
 char            vrrp_misc_calcul_tminterval(struct timeval *, u_int);
 char            vrrp_misc_calcul_tmrelease(struct timeval *, struct timeval *);
-char            vrrp_misc_check_vrrp_packet(struct vrrp_vr *, char *);
+char            vrrp_misc_check_vrrp_packet(struct vrrp_vr *, char *, struct ip6_pseudohdr *, int);
 void            vrrp_misc_quit(int);
 struct vrrp_if *vrrp_misc_search_if_entry(char *);
 int		vrrp_misc_search_sdbpf_entry(char *);
+void            vrrp_misc_log(int, const char *, ...);
+#define         syslog vrrp_misc_log
 
 /* vrrp_conf.c functions */
 int             vrrp_conf_ident_option_arg(char *, char *, char *);
@@ -91,9 +91,9 @@ char            vrrp_conf_lecture_fichier(struct vrrp_vr *, FILE *);
 FILE           *vrrp_conf_open_file(char *);
 
 /* vrrp_multicast.c functions */
-char            vrrp_multicast_join_group(int, u_char *, struct in_addr *);
-char            vrrp_multicast_set_ttl(int, int);
-char            vrrp_multicast_set_if(int, struct in_addr *, char *);
+char            vrrp_multicast_join_group(int, u_char *, u_int);
+char            vrrp_multicast_set_hops(int, int);
+char            vrrp_multicast_set_if(int, u_int, char *);
 char            vrrp_multicast_set_socket(struct vrrp_vr *);
 char            vrrp_multicast_open_socket(struct vrrp_vr *);
 
@@ -117,3 +117,9 @@ void            vrrp_thread_mutex_unlock_bpf(void);
 void            vrrp_thread_launch_vrrprouter(void *);
 char            vrrp_thread_initialize(void);
 char            vrrp_thread_create_vrid(struct vrrp_vr *);
+
+
+/* vrrp_main.c */
+extern int optflag_f;
+extern int optflag_d;
+

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: vrrp_misc.c,v 1.1 2002/07/09 07:19:20 ono Exp $
+ * $Id: vrrp_misc.c,v 1.2 2002/07/09 07:29:00 ono Exp $
  */
 
 #include "vrrp_misc.h"
@@ -55,13 +55,13 @@ rt_xaddrs(caddr_t cp, caddr_t cplim, struct rt_addrinfo * rtinfo)
 }
 
 char 
-vrrp_misc_get_if_infos(char *if_name, struct ether_addr * ethaddr, struct in_addr * ip_addrs, int *size)
+vrrp_misc_get_if_infos(char *if_name, struct ether_addr * ethaddr, struct in6_addr * ip_addrs, int *size)
 {
 	int             addrcount;
 	struct if_msghdr *ifm, *nextifm;
 	struct ifa_msghdr *ifam;
 	struct sockaddr_dl *sdl;
-	struct sockaddr_in *sin;
+	struct sockaddr_in6 *sin;
 	char           *buf, *lim, *next;
 	char            name[32];
 	struct rt_addrinfo info;
@@ -73,7 +73,7 @@ vrrp_misc_get_if_infos(char *if_name, struct ether_addr * ethaddr, struct in_add
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
 	mib[2] = 0;
-	mib[3] = AF_INET;
+	mib[3] = AF_INET6;
 	mib[4] = NET_RT_IFLIST;
 	mib[5] = 0;
 
@@ -119,9 +119,14 @@ vrrp_misc_get_if_infos(char *if_name, struct ether_addr * ethaddr, struct in_add
 				ifam = (struct ifa_msghdr *) nextifm;
 				info.rti_addrs = ifam->ifam_addrs;
 				rt_xaddrs((char *)(ifam + 1), ifam->ifam_msglen + (char *)ifam, &info);
-				sin = (struct sockaddr_in *) info.rti_info[RTAX_IFA];
-				if (myinterface)
-					ip_addrs[addrcount] = sin->sin_addr;
+				sin = (struct sockaddr_in6 *) info.rti_info[RTAX_IFA];
+				if (myinterface) {
+#ifdef __KAME__
+					/* KAME specific hack; removed the embedded id */
+					*(u_int16_t *)&sin->sin6_addr.s6_addr[2] = 0;
+#endif
+					memcpy(&ip_addrs[addrcount], &sin->sin6_addr, sizeof(struct in6_addr));
+				}
 				addrcount++;
 				if (*size <= addrcount)
 					break;
@@ -144,10 +149,11 @@ vrrp_misc_get_priority(struct vrrp_vr * vr)
 {
 	u_char          i = 0, j = 0;
 
+#ifdef INET6
 	if (vr->cnt_ip == vr->vr_if->nb_ip) {
 		while (j < vr->cnt_ip) {
 			while (i < vr->vr_if->nb_ip) {
-				if (vr->vr_if->ip_addrs[j].s_addr == vr->vr_ip[i].addr.s_addr)
+			  if (memcmp(&vr->vr_if->ip_addrs[j], &vr->vr_ip[i].addr, sizeof(struct in6_addr)) == 0)
 					break;
 				i++;
 			}
@@ -157,28 +163,55 @@ vrrp_misc_get_priority(struct vrrp_vr * vr)
 		}
 		return VRRP_PRIORITY_MASTER;
 	} else
+#else
+	if (vr->cnt_ip == vr->vr_if->nb_ip) {
+		while (j < vr->cnt_ip) {
+			while (i < vr->vr_if->nb_ip) {
+			  if (memcmp(&vr->vr_if->ip_addrs[j], &vr->vr_ip[i].addr, sizeof(struct in6_addr)) == 0)
+					break;
+				i++;
+			}
+			if (i >= vr->vr_if->nb_ip)
+				return VRRP_PRIORITY_DEFAULT;
+			j++;
+		}
+		return VRRP_PRIORITY_MASTER;
+	} else
+#endif
 		return VRRP_PRIORITY_DEFAULT;
 }
 
-u_short 
-vrrp_misc_compute_checksum(u_short * addr, register int len)
+u_short
+vrrp_misc_compute_checksum(struct ip6_pseudohdr *phdr, u_char *payload)
 {
-	int             nleft = len;
-	const u_short * w = addr;
-	u_short         answer;
-	int             sum = 0;
-
-	while (nleft > 1) {
-		sum += *w++;
-		nleft -= 2;
+	u_int32_t sum = 0;
+#ifndef IPV6_HDRLEN
+#define IPV6_HDRLEN 40
+#endif
+	int       i   = IPV6_HDRLEN;
+	int       len = ntohl(phdr->ph6_uplen);
+	
+	while(i > 1) {
+		sum += *((u_int16_t *) phdr)++;
+		if (sum & 0x80000000)
+			sum = (sum & 0xffff) + (sum >> 16);
+		i -= 2;
 	}
-	if (nleft == 1)
-		sum += htons(*(u_char *) w << 8);
-	sum = (sum >> 16) + (sum & 0xFFFF);
-	sum += (sum >> 16);
-	answer = ~sum;
-
-	return answer;
+	
+	while(len > 1) {
+		sum += *((u_int16_t *) payload)++;
+		if (sum & 0x80000000)
+			sum = (sum & 0xffff) + (sum >> 16);
+		len -= 2;
+	}
+	
+	if (len)
+		sum += (u_int16_t)*(u_char *)payload;
+	
+	while (sum >> 16)
+		sum = (sum & 0xffff) + (sum >> 16);
+	
+	return ~sum;
 }
 
 char 
@@ -221,57 +254,44 @@ vrrp_misc_calcul_tmrelease(struct timeval * timer, struct timeval * interval)
 u_short 
 vrrp_misc_vphdr_len(struct vrrp_hdr * vph)
 {
-	return (sizeof(struct vrrp_hdr) + (vph->cnt_ip << 2) + VRRP_AUTH_DATA_LEN);
+	return (sizeof(struct vrrp_hdr) + sizeof(struct in6_addr) + VRRP_AUTH_DATA_LEN);
 }
 
 char 
-vrrp_misc_check_vrrp_packet(struct vrrp_vr * vr, char *packet)
+vrrp_misc_check_vrrp_packet(struct vrrp_vr * vr, char *packet, struct ip6_pseudohdr *phdr, int hlim)
 {
-	struct ip      *iph = (struct ip *) packet;
-	struct vrrp_hdr *vph = (struct vrrp_hdr *) & packet[sizeof(struct ip)];
-	struct in_addr *ip_addrs = (struct in_addr *) & packet[sizeof(struct ip) + sizeof(struct vrrp_hdr)];
+//	struct ip6_hdr  *iph = (struct ip6_hdr *) ip;
+	struct vrrp_hdr *vph = (struct vrrp_hdr *) packet;
+	struct in6_addr *ip_addrs = (struct in6_addr *) & packet[sizeof(struct vrrp_hdr)];
 	char           *password = NULL;
 	int             error = 0;
-	int             cpt, cpt2;
+	int             cpt2;
 	char            detected;
-	u_short         checksum_orig = vph->csum;
 	/* VERIFIER TOUT CE QUI CONCERNE LE PACKET RECU */
 	/* NON FAIT POUR LE MOMENT */
 
-	if (iph->ip_ttl != VRRP_PRIORITY_MASTER) {
-		syslog(LOG_ERR, "ip ttl of vrrp packet isn't set to 255. Packet is discarded !");
+	if (hlim != VRRP6_MULTICAST_HOPS) {
+		syslog(LOG_ERR, "ip hlim(%d) of vrrp packet isn't set to 255. Packet is discarded !",(int)hlim);
 		return -1;
 	}
 	if (vph->vrrp_v != VRRP_PROTOCOL_VERSION) {
 		syslog(LOG_ERR, "vrrp version of vrrp packet is not valid or compatible with this daemon. Packet is discarded !");
 		return -1;
 	}
-	if (ntohs(iph->ip_len) < sizeof(struct ip) + vrrp_misc_vphdr_len(vph)) {
+	if (ntohl(phdr->ph6_uplen) < vrrp_misc_vphdr_len(vph)) {
 		syslog(LOG_ERR, "invalid vrrp packet received (invalid size). Packet is discarded !");
 		return -1;
 	}
-	vph->csum = 0;
-	if (vrrp_misc_compute_checksum((u_short *) vph, vrrp_misc_vphdr_len(vph)) != checksum_orig) {
-		syslog(LOG_ERR, "checksum of vrrp packet is invalid. Packet is discarded !");
-		return -1;
-	}
-	vph->csum = checksum_orig;
 	if (vph->vr_id != vr->vr_id)
 		return -1;
-	if (vph->cnt_ip != vr->cnt_ip)
+
+	detected = 0;
+	for (cpt2 = 0; cpt2 < vr->cnt_ip; cpt2++) {
+		if (memcmp(&ip_addrs[0],&vr->vr_ip[cpt2].addr, sizeof(struct in6_addr)) == 0)
+			detected = 1;
+	}
+	if (!detected) {
 		error = 1;
-	else {
-		for (cpt = 0; cpt < vph->cnt_ip; cpt++) {
-			detected = 0;
-			for (cpt2 = 0; cpt2 < vr->cnt_ip; cpt2++) {
-				if (ntohl(ip_addrs[cpt].s_addr) == vr->vr_ip[cpt2].addr.s_addr)
-					detected = 1;
-			}
-			if (!detected) {
-				error = 1;
-				break;
-			}
-		}
 	}
 	if (error == 1) {
 		syslog(LOG_ERR, "detection of misconfigured server on the network for vrid = %u and priority = %u", vph->vr_id, vph->priority);
@@ -285,7 +305,7 @@ vrrp_misc_check_vrrp_packet(struct vrrp_vr * vr, char *packet)
 		return -1;
 	}
 	/* Verification of Authentification */
-	password = (char *)&ip_addrs[vph->cnt_ip];
+	password = (char *)&ip_addrs[1];
 	if (vr->auth_type == 1 && strncmp(vr->password, password, 8)) {
 		syslog(LOG_ERR, "authentification incorrect in a received vrrp packet. Packet is discarded !");
 		return -1;
@@ -329,4 +349,31 @@ vrrp_misc_search_sdbpf_entry(char *name)
 	}
 
 	return -1;
+}
+
+void
+vrrp_misc_log(int priority, const char *message, ...)
+{
+#define BUFSIZE 256
+	char buf[BUFSIZE], buf2[BUFSIZE];
+	va_list arg;
+	char *ptr;
+	
+	if ((ptr = strstr(message, "%m")) != NULL) {
+		strncpy(buf, message, ptr - message);
+		buf[ptr - message] = '\0';
+		snprintf(buf2, sizeof buf2, "%s%s%s", buf, strerror(errno), ptr+2);
+	} else {
+		strncpy(buf2, message, sizeof buf2);
+	}
+	va_start(arg, buf2);
+	vsnprintf(buf, sizeof buf2, buf2, arg);
+	va_end(arg);
+
+	if (optflag_f) {
+		printf("%s\n", buf);
+	} else {
+#undef syslog
+		syslog(priority, "%s", buf);
+	}
 }

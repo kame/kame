@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: vrrp_signal.c,v 1.1 2002/07/09 07:19:21 ono Exp $
+ * $Id: vrrp_signal.c,v 1.2 2002/07/09 07:29:00 ono Exp $
  */
 
 #include "vrrp_signal.h"
@@ -56,17 +56,19 @@ void
 vrrp_signal_quit(int sig)
 {
 	int             cpt = 0;
-	int             cpt2 = 0;
+//	int             cpt2 = 0;
 	struct ether_addr *ethaddr;
 
 	while (vr_ptr[cpt]) {
 		ethaddr = &vr_ptr[cpt]->vr_if->ethaddr;
 		vrrp_interface_vripaddr_delete(vr_ptr[cpt]);
+#if 0 /* XXX*/
 		while (vr_ptr[cpt]->vr_if->ip_addrs[cpt2].s_addr) {
 			syslog(LOG_NOTICE, "update all ARP caches of the LAN for %.2X:%.2X:%.2X:%.2X:%.2X:%.2X", ethaddr->octet[0], ethaddr->octet[1], ethaddr->octet[2], ethaddr->octet[3], ethaddr->octet[4], ethaddr->octet[5]);
 			vrrp_network_send_gratuitous_arp(vr_ptr[cpt]->vr_if->if_name, ethaddr, vr_ptr[cpt]->vr_if->ip_addrs[cpt2], vr_ptr[cpt]);
 			cpt2++;
 		}
+#endif
 		close(vr_ptr[cpt]->sd);
 		cpt++;
 	}

@@ -1,0 +1,16 @@
+#!/bin/sh
+
+case "$1" in
+	start)		
+		[ -x /usr/local/v6/sbin/vrrp6d ] && /usr/local/v6/sbin/vrrp6d && echo -n ' vrrp6d'
+		;;
+	stop)
+		killall vrrp6d > /dev/null 2>&1 & && echo -n ' vrrp6d'
+		;;
+	*)
+		echo ""
+		echo "Usage: `basename $0` { start | stop }"
+		echo ""
+		exit 64
+		;;
+esac

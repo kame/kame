@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: vrrp_proto.h,v 1.1 2002/07/09 07:19:20 ono Exp $
+ * $Id: vrrp_proto.h,v 1.2 2002/07/09 07:29:00 ono Exp $
  */
 
 #include <sys/types.h>
@@ -49,7 +49,7 @@ struct vrrp_hdr {
 #endif
 	u_char          vr_id;
 	u_char          priority;
-	u_char          cnt_ip;
+	u_char          reserved;
 	u_char          auth_type;
 	u_char          adv_int;
 	u_short         csum;
@@ -63,7 +63,8 @@ struct vrrp_hdr {
 struct vrrp_if {
 	char            if_name[IFNAMSIZ];
 	u_char          nb_ip;
-	struct in_addr  ip_addrs[MAX_IP_ALIAS];
+	u_int           if_index;
+	struct in6_addr  ip_addrs[MAX_IP_ALIAS];
 	struct ether_addr ethaddr;
 	/*
 	 * For this time we don't change ethernet address of the real
@@ -77,7 +78,7 @@ struct vrrp_if {
 };
 
 struct vrrp_vip {
-	struct in_addr  addr;
+	struct in6_addr  addr;
 	u_char          owner;
 };
 
@@ -110,6 +111,8 @@ struct vrrp_vr {
 	u_char          auth_data[VRRP_AUTH_DATA_LEN];
 	struct vrrp_if *vr_if;
 	char           *password;
+	char            vrrpif_name[IFNAMSIZ];
+	u_int           vrrpif_index;
 };
 
 /*
@@ -117,3 +120,13 @@ struct vrrp_vr {
  * struct ether_addr ethaddr; struct vrrp_ethaddr_list *next; struct
  * vrrp_ethaddr_list *previous; };
  */
+
+struct ip6_pseudohdr 
+{
+	struct in6_addr ph6_src;	/* Source      Address       */
+	struct in6_addr ph6_dst;	/* Destination Address       */
+	u_int32_t       ph6_uplen;	/* Upper-Layer Packet Length */
+	u_int8_t        ph6_zero[3];	/* zero                      */
+	u_int8_t        ph6_nxt;	/* Next Header               */
+};
+

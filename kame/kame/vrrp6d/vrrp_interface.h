@@ -29,15 +29,19 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: vrrp_interface.h,v 1.1 2002/07/09 07:19:21 ono Exp $
+ * $Id: vrrp_interface.h,v 1.2 2002/07/09 07:28:59 ono Exp $
  */
 
 #include <sys/types.h>
-#include <netinet/in.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <net/ethernet.h>
 #include <net/if.h>
+#include <net/if_var.h>
+#include <net/if_vrrp_var.h>
+#include <netinet/in.h>
+#include <netinet/in_var.h>
+#include <netinet6/nd6.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <math.h>
@@ -46,6 +50,7 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <varargs.h>
+#include <netdb.h>
 #include "vrrp_define.h"
 #include "vrrp_proto.h"
 #include "vrrp_functions.h"

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: vrrp_network.c,v 1.1 2002/07/09 07:19:20 ono Exp $
+ * $Id: vrrp_network.c,v 1.2 2002/07/09 07:29:00 ono Exp $
  */
 
 #include "vrrp_network.h"
@@ -105,11 +105,34 @@ vrrp_network_initialize(void)
 char 
 vrrp_network_open_socket(struct vrrp_vr * vr)
 {
-	vr->sd = socket(AF_INET, SOCK_RAW, IPPROTO_VRRP);
+	int offset = 6;
+	vr->sd = socket(AF_INET6, SOCK_RAW, IPPROTO_VRRP);
 	if (vr->sd == -1) {
-		syslog(LOG_ERR, "cannot open raw socket for VRRP protocol [ AF_INET, SOCK_RAW, IPPROTO_VRRP ]");
+		syslog(LOG_ERR, "cannot open raw socket for VRRP protocol [ AF_INET6, SOCK_RAW, IPPROTO_VRRP ]");
 		return -1;
 	}
+	if (setsockopt(vr->sd, IPPROTO_IPV6, IPV6_CHECKSUM, &offset, sizeof(offset)) < 0) {
+		syslog(LOG_ERR, "setsockopt(IPV6_CHECKSUM):%m");
+		return -1;
+	}
+
+	return 0;
+}
+
+char 
+vrrp_network_set_socket(struct vrrp_vr * vr)
+{
+	int on;
+
+	if (setsockopt(vr->sd, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on, sizeof(on)) < 0) {
+		syslog(LOG_ERR, "setsockopt(IPV6_RECVPKTINFO):%m");
+		return -1;
+	}
+	if (setsockopt(vr->sd, IPPROTO_IPV6, IPV6_RECVHOPLIMIT, &on, sizeof(on)) < 0) {
+		syslog(LOG_ERR, "setsockopt(IPV6_RECVHOPLIMIT):%m");
+		return -1;
+	}
+
 	return 0;
 }
 
@@ -136,7 +159,7 @@ vrrp_network_vrrphdr_len(struct vrrp_vr * vr)
 {
 	u_int           len = sizeof(struct vrrp_hdr);
 
-	len += (vr->cnt_ip << 2) + VRRP_AUTH_DATA_LEN;
+	len += sizeof(struct in6_addr) + VRRP_AUTH_DATA_LEN;
 
 	return len;
 }
@@ -145,10 +168,25 @@ void
 vrrp_network_init_ethhdr(char *buffer, struct vrrp_vr * vr)
 {
 	struct ether_header *ethhdr = (struct ether_header *) buffer;
+	struct ip6_hdr      *ip = (struct ip6_hdr *) & buffer[sizeof(struct ether_header)];
 
 	memcpy(&ethhdr->ether_shost, &vr->ethaddr, ETHER_ADDR_LEN);
-	memset(ethhdr->ether_dhost, 0xFF, ETHER_ADDR_LEN);
-	ethhdr->ether_type = htons(ETHERTYPE_IP);
+	if (IN6_IS_ADDR_MULTICAST(&(ip->ip6_dst))) {
+		ethhdr->ether_dhost[0] = 0x33;
+		ethhdr->ether_dhost[1] = 0x33;
+		ethhdr->ether_dhost[2] = ip->ip6_dst.s6_addr[12];
+		ethhdr->ether_dhost[3] = ip->ip6_dst.s6_addr[13];
+		ethhdr->ether_dhost[4] = ip->ip6_dst.s6_addr[14];
+		ethhdr->ether_dhost[5] = ip->ip6_dst.s6_addr[15];
+	} else {
+		ethhdr->ether_dhost[0] = ip->ip6_dst.s6_addr[8] & 0xfd;
+		ethhdr->ether_dhost[1] = ip->ip6_dst.s6_addr[9];
+		ethhdr->ether_dhost[2] = ip->ip6_dst.s6_addr[10];
+		ethhdr->ether_dhost[3] = ip->ip6_dst.s6_addr[13];
+		ethhdr->ether_dhost[4] = ip->ip6_dst.s6_addr[14];
+		ethhdr->ether_dhost[5] = ip->ip6_dst.s6_addr[15];
+	}		
+	ethhdr->ether_type = htons(ETHERTYPE_IPV6);
 
 	return;
 }
@@ -156,20 +194,18 @@ vrrp_network_init_ethhdr(char *buffer, struct vrrp_vr * vr)
 void 
 vrrp_network_init_iphdr(char *buffer, struct vrrp_vr * vr)
 {
-	struct ip      *iph = (struct ip *) & buffer[sizeof(struct ether_header)];
+	struct ip6_hdr      *ip = (struct ip6_hdr *) & buffer[sizeof(struct ether_header)];
 
-	iph->ip_hl = 5;
-	iph->ip_v = 4;
-	iph->ip_tos = 0;
-	iph->ip_len = sizeof(struct ip) + vrrp_network_vrrphdr_len(vr);
-	iph->ip_len = htons(iph->ip_len);
-	iph->ip_id = ++ip_id;
-	iph->ip_off = 0;
-	iph->ip_ttl = VRRP_MULTICAST_TTL;
-	iph->ip_p = IPPROTO_VRRP;
-	iph->ip_src.s_addr = vr->vr_if->ip_addrs[0].s_addr;
-	iph->ip_dst.s_addr = inet_addr(VRRP_MULTICAST_IP);
-	iph->ip_sum = vrrp_misc_compute_checksum((u_short *) iph, iph->ip_hl << 2);
+	memset(ip, 0, sizeof(struct ip6_hdr));
+
+	ip->ip6_vfc = IPV6_VERSION;
+	ip->ip6_plen = htons(vrrp_network_vrrphdr_len(vr));
+	ip->ip6_hlim = VRRP6_MULTICAST_HOPS;
+	ip->ip6_nxt = IPPROTO_VRRP;
+	ip->ip6_src = vr->vr_if->ip_addrs[0];
+
+	inet_pton(AF_INET6, VRRP6_MULTICAST_IP, &ip->ip6_dst);
+	/* XXX error */
 
 	return;
 }
@@ -178,27 +214,36 @@ void
 vrrp_network_init_vrrphdr(char *buffer, struct vrrp_vr * vr)
 {
 	struct vrrp_hdr *vp;
-	struct in_addr *addr;
+	struct in6_addr *addr;
+	struct ip6_hdr      *ip = (struct ip6_hdr *) & buffer[sizeof(struct ether_header)];
 	char           *password;
-	int             cpt;
+	struct ip6_pseudohdr phdr;
 
-	vp = (struct vrrp_hdr *) & buffer[ETHER_HDR_LEN + sizeof(struct ip)];
+	vp = (struct vrrp_hdr *) & buffer[ETHER_HDR_LEN + sizeof(struct ip6_hdr)];
+
+	memset(vp, 0, vrrp_network_vrrphdr_len(vr));
+
 	vp->vrrp_v = VRRP_PROTOCOL_VERSION;
 	vp->vrrp_t = VRRP_PROTOCOL_ADVERTISEMENT;
 	vp->vr_id = vr->vr_id;
 	vp->priority = vr->priority;
-	vp->cnt_ip = vr->cnt_ip;
+//	vp->cnt_ip = vr->cnt_ip;
 	vp->auth_type = vr->auth_type;
 	vp->adv_int = vr->adv_int;
-	addr = (struct in_addr *) & buffer[ETHER_HDR_LEN + sizeof(struct ip) + sizeof(*vp)];
-	for (cpt = 0; cpt < vr->cnt_ip; cpt++) {
-		addr[cpt].s_addr = htonl(vr->vr_ip[cpt].addr.s_addr);
-	}
+	addr = (struct in6_addr *) & buffer[ETHER_HDR_LEN + sizeof(struct ip6_hdr) + sizeof(*vp)];
+	*addr =  vr->vr_ip[0].addr;
 	if (vr->auth_type == 1) {
-		password = (char *)&addr[vr->cnt_ip];
+		password = (char *)&addr[1];
 		strncpy(password, vr->password, 8);
 	}
-	vp->csum = vrrp_misc_compute_checksum((u_short *) vp, vrrp_network_vrrphdr_len(vr));
+
+	bzero(&phdr,sizeof(phdr));
+	phdr.ph6_uplen = htonl(vrrp_network_vrrphdr_len(vr));
+	phdr.ph6_src = ip->ip6_src;
+	phdr.ph6_dst = ip->ip6_dst;
+	phdr.ph6_nxt = IPPROTO_VRRP;
+	
+	vp->csum = vrrp_misc_compute_checksum(&phdr, (u_char *) vp);
 
 	return;
 }
@@ -207,7 +252,7 @@ char
 vrrp_network_send_advertisement(struct vrrp_vr * vr)
 {
 	u_char         *buffer;
-	u_int           len = ETHER_HDR_LEN + sizeof(struct ip) + vrrp_network_vrrphdr_len(vr);
+	u_int           len = ETHER_HDR_LEN + sizeof(struct ip6_hdr) + vrrp_network_vrrphdr_len(vr);
 
 	buffer = (u_char *) malloc(len);
 	bzero(buffer, len);
@@ -223,83 +268,99 @@ vrrp_network_send_advertisement(struct vrrp_vr * vr)
 	return 0;
 }
 
-char 
-vrrp_network_send_gratuitous_arp(char *if_name, struct ether_addr * ethaddr, struct in_addr addr, struct vrrp_vr * vr)
+char
+vrrp_network_send_icmp_packet(char *p, int len, int ifindex)
 {
-	char            buffer[ETHER_HDR_LEN + sizeof(struct arp_header)];
-	struct ether_header *ethhdr = (struct ether_header *) buffer;
-	struct arp_header *arph = (struct arp_header *) & buffer[ETHER_HDR_LEN];
+    struct msghdr m;
+    struct iovec iov[2];
+    static struct sockaddr_in6 sin6_buf, *sin6 = 0;
+    int sd;
+    u_int hlim = 255;
+    int ret;
 
-	memset(ethhdr->ether_dhost, 0xFF, ETHER_ADDR_LEN);
-	bcopy(ethaddr, ethhdr->ether_shost, ETHER_ADDR_LEN);
-	ethhdr->ether_type = htons(ETHERTYPE_ARP);
-	bzero(arph, sizeof(*arph));
-	arph->ar_hrd = htons(ARPHRD_ETHER);
-	arph->ar_pro = htons(ETHERTYPE_IP);
-	arph->ar_hln = ETHER_ADDR_LEN;
-	arph->ar_pln = 4;
-	arph->ar_op = htons(ARPOP_REQUEST);
-	memcpy(arph->ar_sha, ethhdr->ether_shost, ETHER_ADDR_LEN);
-	if (vr->sd_bpf == -1)
-		return -1;
-	memcpy(arph->ar_spa, &addr, sizeof(struct in_addr));
-	memcpy(arph->ar_tpa, &addr, sizeof(struct in_addr));
-	vrrp_thread_mutex_lock_bpf();
-	if (write(vr->sd_bpf, buffer, ETHER_HDR_LEN + sizeof(struct arp_header)) == -1) {
-		vrrp_thread_mutex_unlock_bpf();
-		syslog(LOG_ERR, "cannot write on socket descriptor vr->sd_bpf: %m");
-		return -1;
+    sd = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
+    if (sd == -1) {
+	syslog(LOG_ERR, "cannot open raw socket for ICMP protocol [ AF_INET6, SOCK_RAW, IPPROTO_ICMPV6 ]");
+	return -1;
+    }
+
+    if (setsockopt(sd, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &hlim, sizeof(hlim)) == -1) {
+	syslog(LOG_ERR, "setsockopt(IPV6_MULTICAST_HOPS)");
+	return -1;
+    }
+    if (setsockopt(sd, IPPROTO_IPV6, IPV6_MULTICAST_IF, &ifindex, sizeof(ifindex)) == 1) {
+	syslog(LOG_ERR, "setsockopt(IPV6_MULTICAST_IF)");
+	return -1;
+    }
+
+    if (sin6 == 0) {
+	struct addrinfo hints, *res;
+	int error;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_RAW;
+	hints.ai_protocol = IPPROTO_ICMPV6;
+
+	error = getaddrinfo(ALLHOSTS_MULTICAST_IPV6, NULL, &hints, &res);
+	if (error) {
+	    /* XXX error */
+	    syslog(LOG_ERR, "getaddrinfo: %s", gai_strerror(error));
+	    exit(1);
 	}
-	vrrp_thread_mutex_unlock_bpf();
+	sin6 = &sin6_buf;
+	memcpy(sin6, res->ai_addr, res->ai_addrlen);
+	freeaddrinfo(res);
+    }
 
+    m.msg_name = (caddr_t)sin6;
+    m.msg_namelen = sin6->sin6_len;
+    iov[0].iov_base = p;
+    iov[0].iov_len = len;
+    m.msg_iov = iov;
+    m.msg_iovlen = 1;
+    m.msg_control = NULL;
+    m.msg_controllen = 0;
+
+    ret = sendmsg(sd, &m, 0);
+    close(sd);
+    return len == ret ? 0 : -1;
+}
+
+      
+
+char
+vrrp_network_send_neighbor_advertisement(struct vrrp_vr *vr)
+{
+#define ROUNDUP8(a) (1 + (((a) - 1) | 7))
+	struct nd_neighbor_advert *icp;
+	struct nd_opt_hdr *ndopt;
+	u_char outpack[sizeof(struct nd_neighbor_advert) + ROUNDUP8(ETHER_ADDR_LEN + 2)];
+	
+	memset(outpack, 0, sizeof outpack);
+	icp = (struct nd_neighbor_advert *)outpack;
+	
+	icp->nd_na_type = ND_NEIGHBOR_ADVERT;
+	icp->nd_na_code = 0;
+	icp->nd_na_cksum = 0;
+	icp->nd_na_flags_reserved = ND_NA_FLAG_ROUTER|ND_NA_FLAG_OVERRIDE;
+
+	memcpy(&icp->nd_na_target, &vr->vr_ip->addr, sizeof(struct in6_addr));
+	ndopt = (struct nd_opt_hdr *)(icp+1);
+	
+	ndopt->nd_opt_type = ND_OPT_TARGET_LINKADDR;
+	ndopt->nd_opt_len = (ROUNDUP8(ETHER_ADDR_LEN + 2)) >> 3;
+	memcpy(ndopt + 1, &vr->ethaddr, ETHER_ADDR_LEN);
+
+	if (vrrp_network_send_icmp_packet(outpack, sizeof outpack, vr->vrrpif_index) != 0) {
+	    return -1;
+	}
 	return 0;
-}
-
-char 
-vrrp_network_send_gratuitous_arp_vripaddrs(struct vrrp_vr * vr, struct ether_addr * ethaddr)
-{
-	int             cpt;
-	char            coderet = 0;
-
-	for (cpt = 0; cpt < vr->cnt_ip; cpt++)
-		coderet = vrrp_network_send_gratuitous_arp(vr->vr_if->if_name, ethaddr, vr->vr_ip[cpt].addr, vr);
-
-	return coderet;
-}
-
-/*
- * char vrrp_network_send_gratuitous_arp_ipaddrs(struct vrrp_vr *vr, struct
- * ether_addr *ethaddr) { int cpt; char coderet = 0;
- * 
- * for (cpt = 0; cpt < vr->vr_if->nb_ip; cpt++) coderet =
- * vrrp_network_send_gratuitous_arp(vr->vr_if->if_name, ethaddr,
- * vr->vr_if->ip_addrs[cpt]);
- * 
- * return coderet; }
- */
-
-char 
-vrrp_network_send_gratuitous_arp_ips(struct vrrp_vr * vr, struct ether_addr * ethaddr)
-{
-	int             cpt = 0;
-	struct in_addr  addrs[MAX_IP_ALIAS];
-	int             size = MAX_IP_ALIAS;
-	char            coderet = 0;
-
-	bzero(addrs, sizeof(addrs));
-	vrrp_misc_get_if_infos(vr->vr_if->if_name, NULL, addrs, &size);
-	while (addrs[cpt].s_addr) {
-		coderet = vrrp_network_send_gratuitous_arp(vr->vr_if->if_name, ethaddr, addrs[cpt], vr);
-		syslog(LOG_ERR, "send ip = %s, eth = %x:%x:%x:%x:%x:%x", inet_ntoa(addrs[cpt]), ethaddr->octet[0], ethaddr->octet[1], ethaddr->octet[2], ethaddr->octet[3], ethaddr->octet[4], ethaddr->octet[5]);
-		cpt++;
-	}
-
-	return coderet;
 }
 
 #define rtm rtmsg.rthdr
 char 
-vrrp_network_delete_local_route(struct in_addr addr)
+vrrp_network_delete_local_route(struct in6_addr *addr)
 {
 	struct routemsg rtmsg;
 	int             sd;
@@ -315,9 +376,9 @@ vrrp_network_delete_local_route(struct in_addr addr)
 	rtm.rtm_flags = RTF_UP | RTF_HOST | RTF_LOCAL | RTF_WASCLONED;
 	rtm.rtm_addrs = RTA_DST;
 	rtm.rtm_msglen = sizeof(rtmsg);
-	rtmsg.addr.sin_len = sizeof(rtmsg.addr);
-	rtmsg.addr.sin_family = AF_INET;
-	rtmsg.addr.sin_addr = addr;
+	rtmsg.addr.sin6_len = sizeof(rtmsg.addr);
+	rtmsg.addr.sin6_family = AF_INET6;
+	rtmsg.addr.sin6_addr = *addr;
 	if (write(sd, &rtmsg, sizeof(rtmsg)) == -1) {
 		close(sd);
 		return -1;

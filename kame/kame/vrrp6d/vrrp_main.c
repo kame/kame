@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: vrrp_main.c,v 1.1 2002/07/09 07:19:20 ono Exp $
+ * $Id: vrrp_main.c,v 1.2 2002/07/09 07:29:00 ono Exp $
  */
 
 #include "vrrp_main.h"
@@ -69,27 +69,67 @@ void
 vrrp_main_print_struct(struct vrrp_vr * vr)
 {
 	int             cpt;
+	char addr[NI_MAXHOST];
 
 	fprintf(stderr, "VServer ID\t\t: %u\n", vr->vr_id);
 	fprintf(stderr, "VServer PRIO\t\t: %u\n", vr->priority);
 	fprintf(stderr, "VServer ETHADDR\t\t: %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n", vr->ethaddr.octet[0], vr->ethaddr.octet[1], vr->ethaddr.octet[2], vr->ethaddr.octet[3], vr->ethaddr.octet[4], vr->ethaddr.octet[5]);
-	fprintf(stderr, "VServer CNT_IP\t\t: %u\n", vr->cnt_ip);
-	fprintf(stderr, "VServer IPs\t\t:\n");
-	for (cpt = 0; cpt < vr->cnt_ip; cpt++)
-		fprintf(stderr, "\t%s\n", inet_ntoa(vr->vr_ip[cpt].addr));
+	fprintf(stderr, "VServer IPs\t\t: %s\n", inet_ntop(AF_INET6, &vr->vr_ip[0].addr, &addr[0], sizeof(addr)) ? addr : "<NULL>");
 	fprintf(stderr, "VServer ADV_INT\t\t: %u\n", vr->adv_int);
 	fprintf(stderr, "VServer MASTER_DW_TM\t: %u\n", vr->master_down_int);
 	fprintf(stderr, "VServer SKEW_TIME\t: %u\n", vr->skew_time);
 	fprintf(stderr, "VServer State\t\t: %u\n", vr->state);
+	fprintf(stderr, "VServer VRRPIF_NAME\t: %s\n", vr->vrrpif_name);
 	fprintf(stderr, "Server IF_NAME\t\t: %s\n", vr->vr_if->if_name);
 	fprintf(stderr, "Server NB_IP\t\t: %u\n", vr->vr_if->nb_ip);
 	fprintf(stderr, "Server IPs\t\t:\n");
 	for (cpt = 0; cpt < vr->vr_if->nb_ip; cpt++)
-		fprintf(stderr, "\t%s\n", inet_ntoa(vr->vr_if->ip_addrs[cpt]));
+	  fprintf(stderr, "\t%s\n", inet_ntop(AF_INET6, &vr->vr_if->ip_addrs[cpt], &addr[0], sizeof(addr)) ? addr : "<NULL>");
 	fprintf(stderr, "Server ETHADDR\t\t: %.2x:%.2x:%.2x:%.2x:%.2x:%.2x\n", vr->vr_if->ethaddr.octet[0], vr->vr_if->ethaddr.octet[1], vr->vr_if->ethaddr.octet[2], vr->vr_if->ethaddr.octet[3], vr->vr_if->ethaddr.octet[4], vr->vr_if->ethaddr.octet[5]);
 
 	return;
 }
+
+int optflag_f;
+int optflag_d;
+char *vrrp_conf_file_name = NULL;
+
+void
+usage()
+{
+	printf("Usage: vrrp6d [options] \n");
+	printf("Options:\n");
+	printf("   -c file config file.\n");
+	printf("   -f      run as foreground mode.\n");
+	printf("   -d      show more verbose messages.\n");
+	exit(1);
+}
+
+void
+vrrp_main_parse_options(int argc, char **argv)
+{
+	int ch;
+
+	optflag_f = optflag_d = 0;
+	while ((ch = getopt(argc, argv, "c:fdh")) != -1)
+		switch (ch) 
+		{
+		case 'f':
+			optflag_f = 1;
+			break;
+		case 'c':
+			vrrp_conf_file_name = optarg;
+			break;
+		case 'd':
+			optflag_d = 1;
+			break;
+		case 'h':
+		case '?':
+		default:
+			usage();
+		}
+}
+
 
 int
 main(int argc, char **argv)
@@ -99,8 +139,16 @@ main(int argc, char **argv)
 	struct vrrp_vr *vr;
 	int		sd_bpf = 0;
 
-	daemon(0, 0);
-	if ((stream = vrrp_conf_open_file(VRRP_CONF_FILE_NAME)) == NULL)
+
+	vrrp_main_parse_options(argc, argv);
+
+	if (!optflag_f)
+		daemon(0, 0);
+
+	if (vrrp_conf_file_name == NULL) {
+		vrrp_conf_file_name = VRRP_CONF_FILE_NAME;
+	}
+	if ((stream = vrrp_conf_open_file(vrrp_conf_file_name)) == NULL)
 		return -1;
 	/* Initialisation of struct vrrp_vr * adresses table */
 	bzero(&vr_ptr, sizeof(vr_ptr));
@@ -121,6 +169,7 @@ main(int argc, char **argv)
 		 * (vrrp_list_initialize(vr, &vr->vr_if->ethaddr) < 0) return
 		 * -1;
 		 */
+
 		vrrp_interface_owner_verify(vr);
 		sd_bpf = vrrp_misc_search_sdbpf_entry(vr->vr_if->if_name);
 		if (sd_bpf < 0) {
@@ -131,11 +180,13 @@ main(int argc, char **argv)
 		vr->sd_bpf = sd_bpf;
 		if (vrrp_multicast_open_socket(vr) == -1)
 			return -1;
+		vrrp_interface_ethaddr_set(vr->vrrpif_name, &vr->ethaddr);
 		vrrp_main_print_struct(vr);
 		if (vrrp_thread_create_vrid(vr) == -1)
 			return -1;
 	}
-	syslog(LOG_NOTICE, "launching in background into daemon mode");
+	if (!optflag_f)
+		syslog(LOG_NOTICE, "launching in background into daemon mode");
 	pthread_exit(NULL);
 
 	return 0;

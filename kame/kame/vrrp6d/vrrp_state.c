@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: vrrp_state.c,v 1.1 2002/07/09 07:19:20 ono Exp $
+ * $Id: vrrp_state.c,v 1.2 2002/07/09 07:29:00 ono Exp $
  */
 
 #include "vrrp_state.h"
@@ -37,6 +37,7 @@
 char 
 vrrp_state_initialize(struct vrrp_vr * vr)
 {
+	syslog(LOG_NOTICE, "server state vrid %d: initialize", vr->vr_id);
 	if (vr->priority == 255) {
 		if (vrrp_state_set_master(vr) == -1)
 			return -1;
@@ -49,13 +50,14 @@ vrrp_state_initialize(struct vrrp_vr * vr)
 char 
 vrrp_state_set_master(struct vrrp_vr * vr)
 {
+	vrrp_interface_up(vr->vrrpif_name);
 	vrrp_network_send_advertisement(vr);
 	vrrp_thread_mutex_lock();
 	if (vrrp_interface_vripaddr_set(vr) == -1)
 		return -1;
 	vrrp_thread_mutex_unlock();
-	if (vrrp_network_send_gratuitous_arp_vripaddrs(vr, &vr->vr_if->ethaddr) == -1)
-		return -1;
+	if (vrrp_network_send_neighbor_advertisement(vr) == -1)
+	    return -1;
 	if (vrrp_misc_calcul_tminterval(&vr->tm.adv_tm, vr->adv_int) == -1)
 		return -1;
 	vr->state = VRRP_STATE_MASTER;
@@ -67,8 +69,7 @@ vrrp_state_set_master(struct vrrp_vr * vr)
 char 
 vrrp_state_set_backup(struct vrrp_vr * vr)
 {
-	struct ether_addr ethaddr;
-
+	vrrp_interface_down(vr->vrrpif_name);
 	vrrp_thread_mutex_lock();
 	vrrp_interface_vripaddr_delete(vr);
 	vrrp_thread_mutex_unlock();
@@ -86,13 +87,93 @@ char
 vrrp_state_select(struct vrrp_vr * vr, struct timeval * interval)
 {
 	int             coderet;
-	fd_set          readfds;
+	static int             fd_ok = 0;
+	static fd_set          readfds;
 
-	FD_ZERO(&readfds);
-	FD_SET(vr->sd, &readfds);
+//	if (fd_ok == 0) {
+		FD_ZERO(&readfds);
+		FD_SET(vr->sd, &readfds);
+		fd_ok = 1;
+//	}
 	coderet = select(vr->sd + 1, &readfds, NULL, NULL, interval);
 
 	return coderet;
+}
+
+int
+vrrp_state_get_packet(struct vrrp_vr *vr,
+		      u_char *packet, int buflen,
+		      int *hlim, 
+		      struct ip6_pseudohdr *phdr)
+{
+	struct msghdr msg;
+	struct iovec iov[1];
+	int rcvcmsglen;
+	struct cmsghdr *cm;
+	static u_char *rcvcmsgbuf = NULL;
+	struct sockaddr_in6 src;
+	struct in6_pktinfo *pi = NULL;
+	int plen, hlim_data = -1;
+	
+	plen=0;
+	iov[0].iov_base = (caddr_t) packet;
+	iov[0].iov_len = buflen;
+	msg.msg_name = &src;
+	msg.msg_namelen = sizeof(src);
+	msg.msg_iov = iov;
+	msg.msg_iovlen = 1;
+	rcvcmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo));
+	rcvcmsglen += CMSG_SPACE(sizeof(int));
+	if (rcvcmsgbuf == NULL &&
+	    (rcvcmsgbuf = (u_char *)malloc(rcvcmsglen)) == NULL) {
+		syslog(LOG_ERR, "malloc failed");
+		return -1;
+	}
+	msg.msg_control = (caddr_t ) rcvcmsgbuf;
+	msg.msg_controllen = rcvcmsglen;
+	
+	if ((plen = recvmsg(vr->sd, &msg, 0)) == -1) {
+		syslog(LOG_ERR, "can't read on vr->sd socket descriptor: %m");
+		return -1;
+	}
+	
+	/* extract vital information via Advanced API */
+	for(cm = (struct cmsghdr *)CMSG_FIRSTHDR(&msg);
+	    cm;
+	    cm =(struct cmsghdr *)CMSG_NXTHDR(&msg , cm ))
+	{
+		
+		if( cm->cmsg_level == IPPROTO_IPV6 &&
+		    cm->cmsg_type == IPV6_PKTINFO &&
+		    cm->cmsg_len == CMSG_LEN(sizeof(struct in6_pktinfo)))
+		{
+			pi=(struct in6_pktinfo *)(CMSG_DATA(cm));
+		}
+		
+		if( cm->cmsg_level == IPPROTO_IPV6 &&
+		    cm->cmsg_type == IPV6_HOPLIMIT &&
+		    cm->cmsg_len == CMSG_LEN(sizeof(int)))
+		{
+			hlim_data = *(int *)(CMSG_DATA(cm));
+		}
+	}
+
+	if (pi == NULL) {
+		syslog(LOG_WARNING, "can't get IPV6_PKTINFO");
+		return -1;
+	}
+
+	if (hlim_data < 0) {
+		syslog(LOG_WARNING, "can't get IPV6_HOPLIMIT");
+		return -1;
+	}
+
+	*hlim = hlim_data;
+	phdr->ph6_dst=pi->ipi6_addr;
+	phdr->ph6_src=src.sin6_addr;
+	phdr->ph6_uplen = htonl(plen);
+	phdr->ph6_nxt = IPPROTO_VRRP;
+	return 0;
 }
 
 /* Operation a effectuer durant l'etat master */
@@ -100,21 +181,21 @@ char
 vrrp_state_master(struct vrrp_vr * vr)
 {
 	int             coderet;
-	u_char          packet[4096];
-	struct ip      *ipp = (struct ip *) packet;
-	struct vrrp_hdr *vrrph = (struct vrrp_hdr *) & packet[sizeof(struct ip)];
+	static u_char   packet[4096];
+	struct vrrp_hdr *vrrph = (struct vrrp_hdr *) packet;
 	struct timeval  interval;
+	struct ip6_pseudohdr phdr;
+	int hlim;
 
 	for (;;) {
 		if (vrrp_misc_calcul_tmrelease(&vr->tm.adv_tm, &interval) == -1)
 			return -1;
 		coderet = vrrp_state_select(vr, &interval);
 		if (coderet > 0) {
-			if (read(vr->sd, packet, sizeof(packet)) == -1) {
-				syslog(LOG_ERR, "can't read on vr->sd socket descriptor: %m");
-				return -1;
-			}
-			if (vrrp_misc_check_vrrp_packet(vr, packet) == -1)
+			bzero(&phdr, sizeof(phdr));
+			if (vrrp_state_get_packet(vr,packet, sizeof(packet), &hlim, &phdr) != 0)
+				continue;
+			if (vrrp_misc_check_vrrp_packet(vr, packet, &phdr, hlim) == -1)
 				continue;
 			if (vrrph->priority == 0) {
 				if (vr->sd_bpf == -1)
@@ -124,7 +205,7 @@ vrrp_state_master(struct vrrp_vr * vr)
 					return -1;
 				continue;
 			}
-			if (vrrp_state_check_priority(vrrph, vr, ipp->ip_src)) {
+			if (vrrp_state_check_priority(vrrph, vr, &phdr.ph6_src)) {
 				if (vrrp_state_set_backup(vr) == -1)
 					return -1;
 			}
@@ -151,19 +232,20 @@ vrrp_state_backup(struct vrrp_vr * vr)
 {
 	int             coderet;
 	u_char          packet[4096];
-	struct vrrp_hdr *vrrph = (struct vrrp_hdr *) & packet[sizeof(struct ip)];
+	struct vrrp_hdr *vrrph = (struct vrrp_hdr *) & packet;
 	struct timeval  interval;
+	struct ip6_pseudohdr phdr;
+	int hlim;
 
 	for (;;) {
 		if (vrrp_misc_calcul_tmrelease(&vr->tm.master_down_tm, &interval) == -1)
 			return -1;
 		coderet = vrrp_state_select(vr, &interval);
 		if (coderet > 0) {
-			if (read(vr->sd, packet, sizeof(packet)) == -1) {
-				syslog(LOG_ERR, "can't read on vr->sd socket descriptor: %m");
-				return -1;
-			}
-			if (vrrp_misc_check_vrrp_packet(vr, packet) == -1)
+			bzero(&phdr, sizeof(phdr));
+			if (vrrp_state_get_packet(vr, packet, sizeof(packet), &hlim, &phdr) != 0)
+				continue;
+			if (vrrp_misc_check_vrrp_packet(vr, packet, &phdr, hlim) == -1)
 				continue;
 			if (vrrph->priority == 0) {
 				if (vrrp_misc_calcul_tminterval(&vr->tm.master_down_tm, vr->skew_time) == -1)
@@ -192,11 +274,11 @@ vrrp_state_backup(struct vrrp_vr * vr)
 }
 
 char 
-vrrp_state_check_priority(struct vrrp_hdr * vrrph, struct vrrp_vr * vr, struct in_addr addr)
+vrrp_state_check_priority(struct vrrp_hdr * vrrph, struct vrrp_vr * vr, struct in6_addr *addr)
 {
 	if (vrrph->priority > vr->priority)
 		return 1;
-	if ((vrrph->priority == vr->priority) && (addr.s_addr > vr->vr_if->ip_addrs[0].s_addr))
+	if ((vrrph->priority == vr->priority) && memcmp((char *)addr, (char *)&vr->vr_if->ip_addrs[0], sizeof(struct in6_addr)) > 0)
 		return 1;
 
 	return 0;

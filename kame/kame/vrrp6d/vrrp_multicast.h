@@ -29,11 +29,12 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: vrrp_multicast.h,v 1.1 2002/07/09 07:19:20 ono Exp $
+ * $Id: vrrp_multicast.h,v 1.2 2002/07/09 07:29:00 ono Exp $
  */
 
 #include <sys/types.h>
 #include <sys/socket.h>
+#include <sys/errno.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <stdio.h>
@@ -41,6 +42,7 @@
 #include <syslog.h>
 #include <unistd.h>
 #include <varargs.h>
+#include <netdb.h>
 #include "vrrp_define.h"
 #include "vrrp_proto.h"
 #include "vrrp_functions.h"

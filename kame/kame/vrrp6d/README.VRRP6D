@@ -1,0 +1,61 @@
+#
+# $Id: README.VRRP6D,v 1.1 2002/07/09 07:28:58 ono Exp $
+#
+
+USAGE:
+	1) Add the following option to your kernel configuration file,
+           and make your kernel. 
+	
+	   pseudo-device vrrp 4
+
+	   The number defines how many VRRP virtual interfaces you can
+           use.
+	   Reboot your machine to make your new kernel available.
+
+        2) Make and install the vrrp6 daemon.
+	   % make
+           # make install 
+
+	3) Copy sample configuration file, and edit it.
+	   # cd /usr/local/v6/etc
+	   # cp vrrp6d.conf.sample vrrp6d.conf
+	   # vi vrrp6d.conf
+           
+        4) Run vrrp6 daemon.
+           # /usr/local/v6/sbin/vrrp6d
+
+        5) Edit your rtadvd.conf for vrrp and run rtadvd.
+
+           Edit rtadvd.conf to specify prefixes advertised.
+           Example: (/etc/rtadvd.conf)
+
+           vrrp0:\
+                  :addrs#1:addr="fec0:0:0:6::":prefixlen#64:
+           vrrp1:\
+                  :addrs#1:addr="2001:0:0:6::":prefixlen#64:
+
+           Run rtadvd.
+           # rtadvd vrrp0 vrrp1
+
+           * You should not specify real interface of vrrp interfaces
+           as argument of rtadvd.
+
+
+RESTRICTIONS:
+        * Don't use with netgraph/bridge/vlan.
+        * Cannot set own address as vrrp address.
+
+TODO:
+	* Support configure.
+	* Create vrrp interface dynamically.
+	* Filtering with hardware to get packets addressed to virtual
+          MAC. (not promiscous mode).
+	* Change MTU of vrrp interface if MTU of parent interface is changed.
+	* IF_TYPE change
+	* Enable to set own link local address as vrrp address.
+	* Allocate individual numbers to SIOCGETVRRP/SIOCSETVRRP.
+	* More debug messages.
+	* rtadvd: enable to get advertising prefixes from parent
+          interfaces. (Now, you must specify it manually)
+	* Porting to other *BSD. (NetBSD, OpenBSD, BSD/OS, ...)
+	* Manual pages. vrrp6d.8

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: vrrp_conf.c,v 1.1 2002/07/09 07:19:20 ono Exp $
+ * $Id: vrrp_conf.c,v 1.2 2002/07/09 07:28:59 ono Exp $
  */
 
 #include "vrrp_conf.h"
@@ -94,14 +94,14 @@ vrrp_conf_split_args(char *args, char delimiter)
 	while (i < strlen(args)) {
 		ptr = &args[i];
 		j = 0;
-		while (ptr[j] != delimiter && ptr[j] != 0 && (isalnum(ptr[j]) || ptr[j] == '.' || ptr[j] == '/')) {
+		while (ptr[j] != delimiter && ptr[j] != 0 && (isalnum(ptr[j]) || ptr[j] == ':' || ptr[j] == '/')) {
 			i++;
 			j++;
 		}
 		tabargs[nbargs] = (char *)calloc(j + 1, 1);
 		strncpy(tabargs[nbargs], ptr, j);
 		i++;
-		while (!isalnum(args[i]) && args[i] != '.' && args[i] != '/' && args[i])
+		while (!isalnum(args[i]) && args[i] != ':' && args[i] != '/' && args[i])
 			i++;
 		nbargs++;
 		if (nbargs >= VRRP_CONF_MAX_ARGS) {
@@ -203,7 +203,10 @@ vrrp_conf_lecture_fichier(struct vrrp_vr * vr, FILE * stream)
 						syslog(LOG_ERR, "bad value in the configuration file for addr option: %s", arg);
 						exit(-1);
 					}
-					vr->vr_ip[i].addr.s_addr = inet_addr(temp2[0]);
+					if (inet_pton(AF_INET6, temp2[0], &vr->vr_ip[i].addr) == 0) {
+						syslog(LOG_ERR, "inet_pton error");
+						return -1;
+					}
 					vr->vr_netmask[i] = atoi(temp2[1]);
 					i++;
 				}
@@ -215,7 +218,14 @@ vrrp_conf_lecture_fichier(struct vrrp_vr * vr, FILE * stream)
 				if (!(vr->vr_if = vrrp_misc_search_if_entry(temp[0]))) {
 					vr->vr_if = (struct vrrp_if *) malloc(sizeof(struct vrrp_if));
 					strncpy(vr->vr_if->if_name, temp[0], sizeof(vr->vr_if->if_name));
+					vr->vr_if->if_index = if_nametoindex(temp[0]);
 				}
+				vrrp_conf_freeargs(temp);
+			}
+			if (!strcmp(option, "vrrpinterface")) {
+				temp = vrrp_conf_split_args(arg, ',');
+				strncpy(vr->vrrpif_name, temp[0], sizeof(vr->vrrpif_name));
+				vr->vrrpif_index = if_nametoindex(temp[0]);
 				vrrp_conf_freeargs(temp);
 			}
 			if (!strcmp(option, "serverid")) {

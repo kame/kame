@@ -1,0 +1,112 @@
+.\"	$KAME: vrrp6d.8,v 1.1 2002/07/09 07:28:59 ono Exp $
+.\"
+.\" Copyright (C) 2002 WIDE Project.
+.\" All rights reserved.
+.\"
+.\" Redistribution and use in source and binary forms, with or without
+.\" modification, are permitted provided that the following conditions
+.\" are met:
+.\" 1. Redistributions of source code must retain the above copyright
+.\"    notice, this list of conditions and the following disclaimer.
+.\" 2. Redistributions in binary form must reproduce the above copyright
+.\"    notice, this list of conditions and the following disclaimer in the
+.\"    documentation and/or other materials provided with the distribution.
+.\" 3. Neither the name of the project nor the names of its contributors
+.\"    may be used to endorse or promote products derived from this software
+.\"    without specific prior written permission.
+.\"
+.\" THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+.\" ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+.\" IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+.\" ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+.\" FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+.\" DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+.\" OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+.\" HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+.\" LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+.\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+.\" SUCH DAMAGE.
+.\"
+.Dd Jul 9, 2002
+.Dt VRRP6D 8
+.Os KAME
+.Sh NAME
+.Nm vrrp6d
+.Nd Virtual Redundancy Router Protocol for IPv6 daemon
+.\"
+.Sh SYNOPSIS
+.Nm vrrp6d
+.Bk -words
+.Op Fl f
+.Ek
+.Bk -words
+.Op Fl c Ar configfile
+.Ek
+.\"
+.Sh DESCRIPTION
+.Nm vrrp6d
+is a draft-ietf-vrrp-ipv6-spec-02.txt compliant daemon, you can use VRRP protocol with multiple interfaces and multiple VRID. For each VRID defined in the configuration file,
+.Nm vrrp6d
+create a thread for managing a poll of one virtual IP address. This daemon works only in IPv6 environnement.
+.Pp
+you can eliminate all point of failures of your network with this utility. When 
+.Nm vrrp6d
+is started, it reads /usr/local/v6/etc/vrrp6d.conf file and go to background. All options are defined in this file. For more informations, you can read comments on this file.
+.Pp
+Options supported by
+.Nm Ns :
+.Bl -tag -width Ds
+.It Fl c Ar configfile
+Specify alternate location,
+.Ar configfile,
+for configuration file.
+By default,
+.Pa /usr/local/v6/etc/vrrp6d.conf
+is used.
+.It Fl f
+Run in foreground mode.
+Do not daemonize on invocation.
+.El
+.Pp
+List of functionnalities :
+.Bl -bullet -compact
+.It
+Support of multiples VRID
+.It
+Master announce state by sending multicast packets via BPF device
+.It
+Changing routes and IP in 3 seconds
+.It
+Send an Unsolicited ND Neighbor Advertisement to override the cache of all hosts
+.It
+Election between differents SLAVE servers with differents priorities
+.It
+Same host can be a SLAVE and MASTER at the same time for different VRID
+.It
+Autmatic downgrade to SLAVE state if a MASTER is up again
+.It
+Support of plain text authentication described in draft-ietf-vrrp-ipv6-spec-02.txt
+.El
+.Sh IMPLEMENTATION NOTES
+This utility doesn't quit properly if you use the -KILL signal. If you want to stop vrrp6d, you can use kill [PID] and not kill -9 [PID], then it can delete virtual IP addresses and routes properly on shutdown.
+.Sh BUGS
+.Nm vrrp6d
+is in active developpement, please send me bugs report and suggestions.
+.\"
+.Sh FILES
+.Bl -tag -width Pa -compact
+.It Pa /usr/local/v6/etc/vrrp6d.conf
+The default configuration file.
+.El
+.\"
+.Sh SEE ALSO
+.Xr vrrp6d.conf 8
+.\"
+.Sh HISTORY
+The
+.Nm
+command is based on
+.Ic freevrrpd ,
+which is an IPv4 VRRP daemon developed by 
+.An Sebastien Petit Aq spe@bsdfr.org .
+.\"

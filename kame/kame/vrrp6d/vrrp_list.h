@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: vrrp_list.h,v 1.1 2002/07/09 07:19:20 ono Exp $
+ * $Id: vrrp_list.h,v 1.2 2002/07/09 07:28:59 ono Exp $
  */
 
 #include <stdio.h>

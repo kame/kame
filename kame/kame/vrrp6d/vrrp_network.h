@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: vrrp_network.h,v 1.1 2002/07/09 07:19:20 ono Exp $
+ * $Id: vrrp_network.h,v 1.2 2002/07/09 07:29:00 ono Exp $
  */
 
 #include <sys/ioctl.h>
@@ -44,6 +44,9 @@
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <netinet/ip6.h>
+#include <netinet/icmp6.h>
+#include <netdb.h>
 #include <arpa/inet.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -80,5 +83,5 @@ struct arp_header {
 
 struct routemsg {
 	struct rt_msghdr rthdr;
-	struct sockaddr_in addr;
+	struct sockaddr_in6 addr;
 };

@@ -1,25 +1,35 @@
-# $Id: Makefile,v 1.1 2002/07/09 07:19:20 ono Exp $
+# $Id: Makefile,v 1.2 2002/07/09 07:28:58 ono Exp $
 
-PROG=		freevrrpd
-SRCS=		vrrp_misc.c vrrp_multicast.c vrrp_main.c vrrp_thread.c vrrp_state.c vrrp_network.c vrrp_interface.c vrrp_conf.c vrrp_signal.c # vrrp_list.c
-CFLAGS+=	-D_REENTRANT -Wall
-LDADD=		-fomit-frame-pointer -ansi -lm -pthread
-WARNS=		0
-BINDIR=		/usr/local/sbin
-MANDIR=		/usr/local/man/man
+.if exists(${.CURDIR}/../Makefile.opsys)
+.include "${.CURDIR}/../Makefile.opsys"
+.endif
 
-# Must write a man page
-# MAN=	freevrrpd.8
-MAN8=	freevrrpd.8
+.if (${OPSYS} == "FreeBSD")
+PROG=	vrrp6d
+SRCS=	vrrp_misc.c vrrp_multicast.c vrrp_main.c vrrp_thread.c \
+	vrrp_state.c vrrp_network.c vrrp_interface.c vrrp_conf.c \
+	vrrp_signal.c  
+BINDIR=	$(PREFIX)/sbin
+ETCDIR= $(PREFIX)/etc
+CFLAGS+=-D_REENTRANT -Wall -DINET6 -g -DVRRP_CONF_FILE_NAME=\"${ETCDIR}/vrrp6d.conf\"
+LDADD=	-fomit-frame-pointer -lm -pthread
+WARNS=	0
+MAN=
 
-beforeinstall:
-	@echo "Installing files..."
-	install -c -o root -g wheel -m 644 freevrrpd.conf.sample /usr/local/etc
-	install -c -o root -g wheel -m 755 freevrrpd.sh.sample /usr/local/etc/rc.d
-	@echo "#####################################################################"
-	@echo "# !! WARNING !! You must copy /usr/local/etc/vrrpd.conf.sample to   #"
-	@echo "# /usr/local/etc/vrrpd.conf and configure /usr/local/etc/vrrpd.conf #"
-	@echo "# before running vrrpd. to run vrrpd type /usr/local/libexec/vrrpd  #"
-	@echo "#####################################################################"
+.if exists(/usr/local/v6/lib/libinet6.a)
+LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
+	-L/usr/local/v6/lib -linet6
+DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
+	${.OBJDIR}/../libinet6/obj/libinet6.a \
+	/usr/local/v6/lib/libinet6.a
+.endif
 
+realinstall:
+	install ${COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
+		${INSTALLFLAGS} vrrp6d ${BINDIR}
+	install ${COPY} -o ${BINOWN} -g ${BINGRP} -m ${BINMODE} \
+		${INSTALLFLAGS} vrrp6d.conf.sample ${ETCDIR}
+
+.endif
 .include <bsd.prog.mk>
+
