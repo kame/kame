@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.9 2003/01/27 13:21:52 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.10 2003/01/27 14:50:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -54,10 +54,6 @@ struct ia {
 	/* back pointer to configuration */
 	struct ia_conf *conf;
 
-	/* identifier of this IA */
-	iatype_t iatype;
-	u_int32_t iaid;
-
 	/* common parameters of IA */
 	u_int32_t t1;		/* duration for renewal */
 	u_int32_t t2;		/* duration for rebind  */
@@ -83,7 +79,7 @@ static struct ia *get_ia __P((iatype_t, struct dhcp6_if *, struct ia_conf *,
 static struct ia *find_ia __P((struct ia_conf *, iatype_t, u_int32_t));
 static struct dhcp6_timer *ia_timo __P((void *));
 
-static char *iastr __P((iatype_t));
+static char *iastr __P((iastate_t));
 static char *statestr __P((iastate_t));
 
 void
@@ -155,7 +151,8 @@ update_ia(iatype, ialist, ifp, serverid)
 					dprintf(LOG_INFO, "%s"
 					    "receive NoBinding against "
 					    "renew/rebind for %s-%lu", FNAME,
-					    iastr(ia->iatype), ia->iaid);
+					    iastr(ia->conf->type),
+					    ia->conf->iaid);
 					remove_ia(ia);
 					goto nextia;
 				}
@@ -166,7 +163,7 @@ update_ia(iatype, ialist, ifp, serverid)
 		/* see if this IA is still valid.  if not, remove it. */
 		if (ia->ctl == NULL || !(*ia->ctl->isvalid)(ia->ctl)) {
 			dprintf(LOG_DEBUG, "%s" "IA %s-%lu is invalidated",
-			    FNAME, iastr(ia->iatype), ia->iaid);
+			    FNAME, iastr(ia->conf->type), ia->conf->iaid);
 			remove_ia(ia);
 			continue;
 		}
@@ -232,7 +229,7 @@ callback(ia)
 	/* see if this IA is still valid.  if not, remove it. */
 	if (ia->ctl == NULL || !(*ia->ctl->isvalid)(ia->ctl)) {
 		dprintf(LOG_DEBUG, "%s" "IA %s-%lu is invalidated",
-		    FNAME, iastr(ia->iatype), ia->iaid);
+		    FNAME, iastr(ia->conf->type), ia->conf->iaid);
 		remove_ia(ia);
 	}
 }
@@ -271,7 +268,7 @@ release_ia(ia)
 	struct dhcp6_eventdata *evd;
 
 	dprintf(LOG_DEBUG, "%s" "release an IA: %s-%lu", FNAME,
-	    iastr(ia->iatype), ia->iaid);
+	    iastr(ia->conf->type), ia->conf->iaid);
 
 	if ((ev = dhcp6_create_event(ia->ifp, DHCP6S_RELEASE))
 	    == NULL) {
@@ -300,7 +297,7 @@ release_ia(ia)
 		goto fail;
 	}
 	memset(evd, 0, sizeof(*evd));
-	iaparam.iaid = ia->iaid;
+	iaparam.iaid = ia->conf->iaid;
 	/* XXX: should we set T1/T2 to 0?  spec is silent on this. */
 	iaparam.t1 = ia->t1;
 	iaparam.t2 = ia->t2;
@@ -336,7 +333,7 @@ remove_ia(ia)
 	struct dhcp6_if *ifp = ia->ifp;
 
 	dprintf(LOG_DEBUG, "%s" "remove an IA: %s-%lu", FNAME,
-	    iastr(ia->iatype), ia->iaid);
+	    iastr(ia->conf->type), ia->conf->iaid);
 
 	TAILQ_REMOVE(&iac->iadata, ia, link);
 
@@ -374,7 +371,7 @@ ia_timo(arg)
 	int dhcpstate;
 
 	dprintf(LOG_DEBUG, "%s" "IA timeout for %s-%lu, state=%s", FNAME,
-	    iastr(ia->iatype), ia->iaid, statestr(ia->state));
+	    iastr(ia->conf->type), ia->conf->iaid, statestr(ia->state));
 
 	/* cancel the current event for the prefix. */
 	if (ia->evdata) {
@@ -442,7 +439,7 @@ ia_timo(arg)
 		}
 	}
 
-	iaparam.iaid = ia->iaid;
+	iaparam.iaid = ia->conf->iaid;
 	iaparam.t1 = ia->t1;
 	iaparam.t2 = ia->t2;
 	switch(ia->state) {
@@ -517,8 +514,6 @@ get_ia(type, ifp, iac, iaparam, serverid)
 			return (NULL);
 		}
 		memset(ia, 0, sizeof(*ia));
-		ia->iatype = type;
-		ia->iaid = iaparam->val_ia.iaid;
 		ia->state = IAS_ACTIVE;
 
 		TAILQ_INSERT_TAIL(&iac->iadata, ia, link);
@@ -534,7 +529,7 @@ get_ia(type, ifp, iac, iaparam, serverid)
 	ia->serverid = newserver;
 
 	dprintf(LOG_DEBUG, "%s" "%s an IA: %s-%lu", FNAME,
-	    create ? "make" : "update", iastr(type), ia->iaid);
+	    create ? "make" : "update", iastr(type), ia->conf->iaid);
 
 	return (ia);
 }
@@ -549,7 +544,7 @@ find_ia(iac, type, iaid)
 
 	for (ia = TAILQ_FIRST(&iac->iadata); ia;
 	    ia = TAILQ_NEXT(ia, link)) {
-		if (ia->iatype == type && ia->iaid == iaid)
+		if (ia->conf->type == type && ia->conf->iaid == iaid)
 			return (ia);
 	}
 
