@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.349 2003/06/03 10:06:53 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.350 2003/06/16 09:30:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3511,6 +3511,8 @@ icmp6_recover_src(m)
 					      sizeof(t));
 					bcopy(&t, &oip6->ip6_src,
 					      sizeof(t));
+					if(!ip6_setpktaddrs(m, &src_sa, NULL))
+						goto bad;
 					finished = 1;
 					break;
 				default:
