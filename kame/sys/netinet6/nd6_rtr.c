@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.142 2001/07/21 10:42:10 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.143 2001/07/21 10:45:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -600,11 +600,9 @@ defrouter_delifreq()
 {
 	struct sockaddr_in6 def, mask;
 	struct rtentry *oldrt = NULL;
-	struct ifaddr *ifa;
 
 	if (!nd6_defif_installed)
 		return;
-	ifa = nd6_defif_installed;
 
 	Bzero(&def, sizeof(def));
 	Bzero(&mask, sizeof(mask));
@@ -613,7 +611,7 @@ defrouter_delifreq()
 	def.sin6_family = mask.sin6_family = AF_INET6;
 
 	rtrequest(RTM_DELETE, (struct sockaddr *)&def,
-	    (struct sockaddr *)ifa->ifa_addr,
+	    (struct sockaddr *)nd6_defif_installed->ifa_addr,
 	    (struct sockaddr *)&mask, RTF_GATEWAY, &oldrt);
 	if (oldrt) {
 		nd6_rtmsg(RTM_DELETE, oldrt);
