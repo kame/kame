@@ -400,6 +400,8 @@ esp_output(m, nexthdrp, md, isr, af)
 	struct ip *ip = NULL;
 #endif
 	size_t padbound;
+	u_char *extend;
+	int i;
 
 	if (algo->padbound)
 		padbound = algo->padbound;
@@ -422,31 +424,7 @@ esp_output(m, nexthdrp, md, isr, af)
 	 * two consequtive TCP packets.
 	 */
 	if (!(n->m_flags & M_EXT) && extendsiz < M_TRAILINGSPACE(n)) {
-		switch (sav->flags & SADB_X_EXT_PMASK) {
-		case SADB_X_EXT_PRAND:
-		    {
-			int i;
-			u_char *p;
-			p = mtod(n, u_char *) + n->m_len;
-			for (i = 0; i < extendsiz; i++)
-				p[i] = random() & 0xff;
-			break;
-		    }
-			break;
-		case SADB_X_EXT_PZERO:
-			bzero((caddr_t)(mtod(n, u_int8_t *) + n->m_len),
-				extendsiz);
-			break;
-		case SADB_X_EXT_PSEQ:
-		    {
-			int i;
-			u_char *p;
-			p = mtod(n, u_char *) + n->m_len;
-			for (i = 0; i < extendsiz; i++)
-				p[i] = i + 1;
-			break;
-		    }
-		}
+		extend = mtod(n, u_char *) + n->m_len;
 		n->m_len += extendsiz;
 		m->m_pkthdr.len += extendsiz;
 	} else {
@@ -460,35 +438,25 @@ esp_output(m, nexthdrp, md, isr, af)
 			error = ENOBUFS;
 			goto fail;
 		}
+		extend = mtod(nn, u_char *);
 		nn->m_len = extendsiz;
-		switch (sav->flags & SADB_X_EXT_PMASK) {
-		case SADB_X_EXT_PRAND:
-		    {
-			int i;
-			u_char *p;
-			p = mtod(nn, u_char *);
-			for (i = 0; i < extendsiz; i++)
-				p[i] = random() & 0xff;
-			break;
-		    }
-			break;
-		case SADB_X_EXT_PZERO:
-			bzero(mtod(nn, caddr_t), extendsiz);
-			break;
-		case SADB_X_EXT_PSEQ:
-		    {
-			int i;
-			u_char *p;
-			p = mtod(nn, u_char *);
-			for (i = 0; i < extendsiz; i++)
-				p[i] = i + 1;
-			break;
-		    }
-		}
 		nn->m_next = NULL;
 		n->m_next = nn;
 		n = nn;
 		m->m_pkthdr.len += extendsiz;
+	}
+	switch (sav->flags & SADB_X_EXT_PMASK) {
+	case SADB_X_EXT_PRAND:
+		for (i = 0; i < extendsiz; i++)
+			extend[i] = random() & 0xff;
+		break;
+	case SADB_X_EXT_PZERO:
+		bzero(extend, extendsiz);
+		break;
+	case SADB_X_EXT_PSEQ:
+		for (i = 0; i < extendsiz; i++)
+			extend[i] = (i + 1) & 0xff;
+		break;
 	}
 
 	/* initialize esp trailer. */
