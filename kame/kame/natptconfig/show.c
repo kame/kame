@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.29 2002/06/19 06:07:33 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.30 2002/06/19 07:13:44 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -113,7 +113,7 @@ showRules(int cui)
 		errx(0, "%s(): cSlot not initialized", fn);
 
 	if (TAILQ_EMPTY(&csl_head))
-		errx(0, "No Rules.\n");
+		errx(0, "No Rules.");
 
 	readKvm(&csl, sizeof(struct cSlot), TAILQ_FIRST(&csl_head));
 	while (TRUE) {
