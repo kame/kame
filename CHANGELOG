@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2680 2004/11/17 15:12:24 suz Exp $
+$KAME: CHANGELOG,v 1.2681 2004/11/18 08:37:06 jinmei Exp $
 
 <200411>
+2004-11-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_if2idlen): introduced a new
+	function, which was previously a local module "if2idlen", and
+	called it when necessary.  With this change we do not store the
+	IFID length in in6_ifextra{}.  It did not always work as intended
+	due to initialization timing issues.
+
 2004-11-18  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/netinet6/route6.c (route6_input): removed the previous
 	fix on Nov 12, since it can lead to a buffer overrun. (RFC2460 
