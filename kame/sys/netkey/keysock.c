@@ -1,4 +1,4 @@
-/*	$KAME: keysock.c,v 1.16 2000/05/05 13:27:15 sumikawa Exp $	*/
+/*	$KAME: keysock.c,v 1.17 2000/05/07 12:57:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -209,10 +209,9 @@ key_output(m, va_alist)
 	va_dcl
 #endif
 {
-	struct sadb_msg *msg = NULL;
+	struct sadb_msg *msg;
 	int len, error = 0;
 	int s;
-	int target;
 	struct socket *so;
 	va_list ap;
 
@@ -265,43 +264,19 @@ key_output(m, va_alist)
 		goto end;
 	}
 
-	/*
-	 * allocate memory for sadb_msg, and copy to sadb_msg from mbuf
-	 * XXX: To be processed directly without a copy.
-	 */
-	msg = (struct sadb_msg *)malloc(len, M_SECA, M_NOWAIT);
-	if (msg == NULL) {
-#ifdef IPSEC_DEBUG
-		printf("key_output: No more memory.\n");
-#endif
-		error = ENOBUFS;
-		pfkeystat.out_nomem++;
-		goto end;
-		/* or do panic ? */
-	}
-	m_copydata(m, 0, len, (caddr_t)msg);
-
 	/*XXX giant lock*/
 #ifdef __NetBSD__
 	s = splsoftnet();
 #else
 	s = splnet();
 #endif
-	if ((len = key_parse(&msg, so, &target)) == 0) {
-		/* discard. i.e. no need to reply. */
-		/* msg has been freed at key_parse() */
-		error = 0;
-		splx(s);
-		goto end;
-	}
-
-	/* send up message to the socket */
-	error = key_sendup(so, msg, len, target);
+	error = key_parse(m, so);
+	m = NULL;
 	splx(s);
-	free(msg, M_SECA);
 end:
-	m_freem(m);
-	return (error);
+	if (m)
+		m_freem(m);
+	return error;
 }
 
 /*

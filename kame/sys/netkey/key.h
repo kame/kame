@@ -1,4 +1,4 @@
-/*	$KAME: key.h,v 1.14 2000/05/07 03:50:46 itojun Exp $	*/
+/*	$KAME: key.h,v 1.15 2000/05/07 12:57:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -62,8 +62,7 @@ extern int key_spdacquire __P((struct secpolicy *));
 extern void key_timehandler __P((void));
 extern void key_srandom __P((void));
 extern void key_freereg __P((struct socket *));
-extern int key_parse __P((struct sadb_msg **, struct socket *,
-			int *));
+extern int key_parse __P((struct mbuf *, struct socket *));
 extern void key_init __P((void));
 extern int key_checktunnelsanity __P((struct secasvar *, u_int,
 					caddr_t, caddr_t));
