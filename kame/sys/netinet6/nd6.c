@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.88 2001/01/20 16:37:01 sumikawa Exp $	*/
+/*	$KAME: nd6.c,v 1.89 2001/01/21 03:33:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1199,10 +1199,10 @@ nd6_rtrequest(req, rt, sa)
 		 *   (7.2.6 paragraph 4), however, it also says that we
 		 *   SHOULD provide a mechanism to prevent multicast NA storm.
 		 *   we don't have anything like it right now.
-		 *   note that the mechanism need a mutual agreement
+		 *   note that the mechanism needs a mutual agreement
 		 *   between proxies, which means that we need to implement
-		 *   a new protocol, or new kludge.
-		 * - from RFC2461 6.2.4, host MUST NOT send unsolicited NA.
+		 *   a new protocol, or a new kludge.
+		 * - from RFC2461 6.2.4, host MUST NOT send an unsolicited NA.
 		 *   we need to check ip6forwarding before sending it.
 		 *   (or should we allow proxy ND configuration only for
 		 *   routers?  there's no mention about proxy ND from hosts)
