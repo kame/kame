@@ -1,4 +1,4 @@
-/*	$OpenBSD: net.c,v 1.6 1998/07/10 15:45:16 mickey Exp $	*/
+/*	$OpenBSD: net.c,v 1.7 1999/12/11 10:05:04 itojun Exp $	*/
 
 /*
  * Copyright (c) 1989 The Regents of the University of California.
@@ -38,7 +38,7 @@
 
 #ifndef lint
 /*static char sccsid[] = "from: @(#)net.c	5.5 (Berkeley) 6/1/90";*/
-static char rcsid[] = "$OpenBSD: net.c,v 1.6 1998/07/10 15:45:16 mickey Exp $";
+static char rcsid[] = "$OpenBSD: net.c,v 1.7 1999/12/11 10:05:04 itojun Exp $";
 #endif /* not lint */
 
 #include <sys/types.h>
@@ -64,7 +64,7 @@ netfinger(name)
 	char *host;
 	struct addrinfo hints, *res0, *res;
 	int error;
-	char hbuf[MAXHOSTNAMELEN];
+	char hbuf[NI_MAXHOST];
 
 	lastc = 0;
 	if (!(host = strrchr(name, '@')))
@@ -101,8 +101,10 @@ netfinger(name)
 	}
 
 	/* have network connection; identify the host connected with */
-	getnameinfo(res->ai_addr, res->ai_addrlen, hbuf, sizeof(hbuf),
-		NULL, 0, NI_NUMERICHOST);
+	if (getnameinfo(res->ai_addr, res->ai_addrlen, hbuf, sizeof(hbuf),
+			NULL, 0, NI_NUMERICHOST) != 0) {
+		strcpy(hbuf, "(invalid)");
+	}
 	(void)printf("[%s/%s]\n", host, hbuf);
 
 	freeaddrinfo(res0);
