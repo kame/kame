@@ -1,6 +1,6 @@
 TODOs for KAME/OpenBSD
 KAME project
-$Id: TODO,v 1.1 1999/09/18 18:09:14 itojun Exp $
+$Id: TODO,v 1.2 1999/09/18 18:12:32 itojun Exp $
 
 
 Things we can do with the current code:
@@ -25,3 +25,11 @@ Things we can't do with the current code:
 	I was told that OpenBSD guys will never replace IPsec code.
 	Since we use same symbol (#ifdef IPSEC) to control ipsec code,
 	we need to wrap KAME shared ipsec code by "#ifndef __OpenBSD__".
+
+Cleanup todo:
+- move in6_select{src,hlim} out of kame/sys/netinet6/in6_pcb.c, put somewhere
+  in kame/sys/netinet6/*.c, so that we can share the code among all the
+  platforms
+	(after kame/openbsd is stabilized enough)
+- nuke unnecessary #ifdef NRL tcp/udp layer, for more readability
+	(is it okay to do it?)
