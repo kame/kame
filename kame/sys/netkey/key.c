@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.171 2000/10/24 08:28:30 sakane Exp $	*/
+/*	$KAME: key.c,v 1.172 2000/12/01 15:57:10 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -5158,10 +5158,10 @@ key_getmsgbuf_x1(m, mhp)
 /*
  * SADB_DELETE processing
  * receive
- *   <base, SA(*), address(SD)>
+ *   <base, SA(*), (SA2), address(SD)>
  * from the ikmpd, and set SADB_SASTATE_DEAD,
  * and send,
- *   <base, SA(*), address(SD)>
+ *   <base, SA(*), (SA2), address(SD)>
  * to the ikmpd.
  *
  * m will always be freed.
@@ -5178,6 +5178,7 @@ key_delete(so, m, mhp)
 	struct secashead *sah;
 	struct secasvar *sav = NULL;
 	u_int16_t proto;
+	u_int8_t mode;
 
 	/* sanity check */
 	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
@@ -5207,19 +5208,23 @@ key_delete(so, m, mhp)
 #endif
 		return key_senderror(so, m, EINVAL);
 	}
+	if (mhp->ext[SADB_X_EXT_SA2] != NULL)
+		mode = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_mode;
+	else
+		mode = IPSEC_MODE_ANY;
 
 	sa0 = (struct sadb_sa *)mhp->ext[SADB_EXT_SA];
 	src0 = (struct sadb_address *)(mhp->ext[SADB_EXT_ADDRESS_SRC]);
 	dst0 = (struct sadb_address *)(mhp->ext[SADB_EXT_ADDRESS_DST]);
 
 	/* XXX boundary check against sa_len */
-	KEY_SETSECASIDX(proto, IPSEC_MODE_ANY, 0, src0 + 1, dst0 + 1, &saidx);
+	KEY_SETSECASIDX(proto, mode, 0, src0 + 1, dst0 + 1, &saidx);
 
 	/* get a SA header */
 	LIST_FOREACH(sah, &sahtree, chain) {
 		if (sah->state == SADB_SASTATE_DEAD)
 			continue;
-		if (key_cmpsaidx_withoutmode(&sah->saidx, &saidx) == 0)
+		if (key_cmpsaidx_withmode(&saidx, &sah->saidx) == 0)
 			continue;
 
 		/* get a SA with SPI. */
@@ -5265,10 +5270,10 @@ key_delete(so, m, mhp)
 /*
  * SADB_GET processing
  * receive
- *   <base, SA(*), address(SD)>
+ *   <base, SA(*), (SA2), address(SD)>
  * from the ikmpd, and get a SP and a SA to respond,
  * and send,
- *   <base, SA, (lifetime(HSC),) address(SD), (address(P),) key(AE),
+ *   <base, SA, (SA2), (lifetime(HSC),) address(SD), (address(P),) key(AE),
  *       (identity(SD),) (sensitivity)>
  * to the ikmpd.
  *
@@ -5286,6 +5291,7 @@ key_get(so, m, mhp)
 	struct secashead *sah;
 	struct secasvar *sav = NULL;
 	u_int16_t proto;
+	u_int8_t mode;
 
 	/* sanity check */
 	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
@@ -5315,19 +5321,23 @@ key_get(so, m, mhp)
 #endif
 		return key_senderror(so, m, EINVAL);
 	}
+	if (mhp->ext[SADB_X_EXT_SA2] != NULL)
+		mode = ((struct sadb_x_sa2 *)mhp->ext[SADB_X_EXT_SA2])->sadb_x_sa2_mode;
+	else
+		mode = IPSEC_MODE_ANY;
 
 	sa0 = (struct sadb_sa *)mhp->ext[SADB_EXT_SA];
 	src0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_SRC];
 	dst0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_DST];
 
 	/* XXX boundary check against sa_len */
-	KEY_SETSECASIDX(proto, IPSEC_MODE_ANY, 0, src0 + 1, dst0 + 1, &saidx);
+	KEY_SETSECASIDX(proto, mode, 0, src0 + 1, dst0 + 1, &saidx);
 
 	/* get a SA header */
 	LIST_FOREACH(sah, &sahtree, chain) {
 		if (sah->state == SADB_SASTATE_DEAD)
 			continue;
-		if (key_cmpsaidx_withoutmode(&sah->saidx, &saidx) == 0)
+		if (key_cmpsaidx_withmode(&saidx, &sah->saidx) == 0)
 			continue;
 
 		/* get a SA with SPI. */
