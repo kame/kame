@@ -734,9 +734,9 @@ udp_ctlinput(cmd, sa, v)
 	} else
 #endif /* INET6 */
 	if (ip) {
-		uh = (struct udphdr *)((caddr_t)ip + (ip->ip_hl << 2));
-		in_pcbnotify(&udbtable, sa, uh->uh_dport, ip->ip_src,
-		    uh->uh_sport, errno, notify);
+		uhp = (struct udphdr *)((caddr_t)ip + (ip->ip_hl << 2));
+		in_pcbnotify(&udbtable, sa, uhp->uh_dport, ip->ip_src,
+		    uhp->uh_sport, errno, notify);
 	} else
 		in_pcbnotifyall(&udbtable, sa, errno, notify);
 	return NULL;
