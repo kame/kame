@@ -117,7 +117,7 @@
 #endif /* TCP_SIGNATURE */
 
 #if defined(INET6) && defined(MIP6)
-static mip6_hdrsiz_tcp(struct tcpcb *);
+static int mip6_hdrsiz_tcp(struct tcpcb *);
 #endif /* INET6 && MIP6 */
 
 #ifdef notyet

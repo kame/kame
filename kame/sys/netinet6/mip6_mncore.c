@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.39 2003/10/22 02:12:54 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.40 2003/10/31 12:19:41 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -58,6 +58,10 @@
 #include <sys/proc.h>
 #include <sys/syslog.h>
 
+#ifdef __OpenBSD__
+#include <dev/rndvar.h>
+#endif
+
 #include <net/if.h>
 #include <net/if_types.h>
 #include <net/route.h>
@@ -91,6 +95,12 @@ struct mip6_preferred_ifnames mip6_preferred_ifnames;
 struct callout mip6_bu_ch = CALLOUT_INITIALIZER;
 #elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 struct callout mip6_bu_ch;
+#elif defined(__OpenBSD__)
+struct timeout mip6_bu_ch;
+#endif
+
+#ifdef __OpenBSD__
+#undef IPSEC
 #endif
 
 static const struct sockaddr_in6 sin6_any = {
@@ -3003,10 +3013,17 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		return (EINVAL);
 	}
 
+#ifdef M_DECRYPTED	/* not openbsd */
 	if (((m->m_flags & M_DECRYPTED) != 0)
 	    || ((m->m_flags & M_AUTHIPHDR) != 0)) {
 		ba_safe = 1;
 	}
+#endif
+#ifdef __OpenBSD__
+	if ((m->m_flags & M_AUTH) != 0) {
+		ba_safe = 1;
+	}
+#endif
 
 	if ((error = mip6_get_mobility_options((struct ip6_mobility *)ip6ma,
 					       sizeof(*ip6ma),
@@ -3075,16 +3092,17 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 				   ignore_co_nonce ? NULL : &mbu->mbu_careof_token,
 				   key_bm);
 		/* Calculate Authenticator */
-		mip6_calculate_authenticator(key_bm, authdata,
+		if (mip6_calculate_authenticator(key_bm, authdata,
 			&mbu->mbu_coa.sin6_addr, &ip6->ip6_dst,
 			(caddr_t)ip6ma, ip6malen,
 			(caddr_t)mopt.mopt_auth + 2 - (caddr_t)ip6ma,
-			min(MOPT_AUTH_LEN(&mopt) + 2, MIP6_AUTHENTICATOR_LEN));
-		ip6ma->ip6ma_cksum = cksum_backup;
-		if (bcmp(authdata, mopt.mopt_auth + 2,
-			 min(MOPT_AUTH_LEN(&mopt) + 2, MIP6_AUTHENTICATOR_LEN))
-			 == 0)
-			goto accept_binding_ack;
+			min(MOPT_AUTH_LEN(&mopt) + 2, MIP6_AUTHENTICATOR_LEN)) == 0) {
+			ip6ma->ip6ma_cksum = cksum_backup;
+			if (bcmp(authdata, mopt.mopt_auth + 2,
+				 min(MOPT_AUTH_LEN(&mopt) + 2, MIP6_AUTHENTICATOR_LEN))
+				 == 0)
+				goto accept_binding_ack;
+		}
 	}
 
 	if (!mip6ctl_use_ipsec && (mbu->mbu_flags & IP6MU_HOME)) {
@@ -3858,11 +3876,16 @@ mip6_hexdump("MN: Kbm: ", sizeof(key_bm), key_bm);
 
 		/* Calculate authenticator (5.2.6) */
 		/* First(96, HMAC_SHA1(Kbm, (coa, | cn | BU))) */
-		mip6_calculate_authenticator(key_bm, (u_int8_t *)(mopt_auth + 1), 
+		if (mip6_calculate_authenticator(key_bm, (u_int8_t *)(mopt_auth + 1), 
 			&mbu->mbu_coa.sin6_addr, &dst->sin6_addr, 
 			(caddr_t)ip6mu, bu_size + nonce_size + auth_size, 
 			bu_size + nonce_size + sizeof(struct ip6m_opt_authdata) ,
-			MIP6_AUTHENTICATOR_LEN);
+			MIP6_AUTHENTICATOR_LEN)) {
+			mip6log((LOG_ERR,
+			    "%s:%d: Authenticator caluclation was failed\n",
+			    __FILE__, __LINE__));
+			return (EINVAL);
+		}
 #ifdef RR_DBG
 mip6_hexdump("MN: Authenticator: ", (u_int8_t *)(mopt_auth + 1), MIP6_AUTHENTICATOR_LEN);
 #endif

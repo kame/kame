@@ -667,5 +667,11 @@ extern int ipsp_aux_match(struct ipsec_ref *, struct ipsec_ref *,
     struct ipsec_ref *, struct ipsec_ref *, struct ipsec_ref *,
     struct sockaddr_encap *, struct sockaddr_encap *,
     struct sockaddr_encap *, struct sockaddr_encap *);
+#if (defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE)) && !defined(MIP6_NOHAIPSEC)
+extern int key_mip6_update_mobile_node_ipsecdb(struct sockaddr_in6 *,
+    struct sockaddr_in6 *, struct sockaddr_in6 *, struct sockaddr_in6 *);
+extern int key_mip6_update_home_agent_ipsecdb(struct sockaddr_in6 *,
+    struct sockaddr_in6 *, struct sockaddr_in6 *, struct sockaddr_in6 *);
+#endif
 #endif /* _KERNEL */
 #endif /* _NETINET_IPSP_H_ */

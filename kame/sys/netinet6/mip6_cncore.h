@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.h,v 1.9 2003/10/21 03:03:10 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.h,v 1.10 2003/10/31 12:19:41 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -89,7 +89,7 @@ int mip6_bc_send_ba(struct sockaddr_in6 *, struct sockaddr_in6 *,
 /* return routablity processing. */
 int mip6_get_nonce(u_int16_t, mip6_nonce_t *);
 int mip6_get_nodekey(u_int16_t, mip6_nodekey_t *);
-void mip6_create_keygen_token(struct in6_addr *, mip6_nodekey_t *,
+int mip6_create_keygen_token(struct in6_addr *, mip6_nodekey_t *,
     mip6_nonce_t *, u_int8_t, void *);
 int mip6_is_valid_bu(struct ip6_hdr *, struct ip6m_binding_update *,
     int, struct mip6_mobility_options *, struct sockaddr_in6 *,
@@ -98,7 +98,7 @@ int mip6_calculate_kbm_from_index(struct sockaddr_in6 *, struct sockaddr_in6 *,
     u_int16_t, u_int16_t, int, u_int8_t *);
 void mip6_calculate_kbm(mip6_home_token_t *, mip6_careof_token_t *,
     u_int8_t *);
-void mip6_calculate_authenticator(u_int8_t *, u_int8_t *, struct in6_addr *,
+int mip6_calculate_authenticator(u_int8_t *, u_int8_t *, struct in6_addr *,
     struct in6_addr *, caddr_t, size_t, int, size_t);
 
 /* Mobility Header processing. */

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.43 2003/10/21 10:53:33 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.44 2003/10/31 12:19:41 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -104,13 +104,24 @@
 #include <netkey/keydb.h>
 #endif /* IPSEC && !__OpenBSD__ */
 
+#ifdef __OpenBSD__
+#include <netinet/ip_ipsp.h>
+#endif
+
 #ifdef HAVE_SHA1
 #include <sys/sha1.h>
 #define SHA1_RESULTLEN	20
 #else
 #include <crypto/sha1.h>
+#ifdef __OpenBSD__
+#define SHA1_RESULTLEN	20
 #endif
+#endif
+#ifdef __OpenBSD__
+#include <crypto/cryptodev.h>
+#else
 #include <crypto/hmac.h>
+#endif
 
 #include <net/if_hif.h>
 
@@ -123,6 +134,10 @@
 #ifdef MIP6_MOBILE_NODE
 #include <netinet6/mip6_mncore.h>
 #endif /* MIP6_MOBILE_NODE */
+
+#ifdef __OpenBSD__
+#undef IPSEC
+#endif
 
 struct mip6_bc_list mip6_bc_list;
 #ifdef __NetBSD__
@@ -192,7 +207,7 @@ static void mip6_bc_timeout(void *);
 /* return routability processing. */
 static void mip6_create_nonce(mip6_nonce_t *);
 static void mip6_create_nodekey(mip6_nodekey_t *);
-static void mip6_update_nonce_nodekey(void *);
+/*static void mip6_update_nonce_nodekey(void *);*/
 
 /* Mobility Header processing. */
 static int mip6_ip6mh_create(struct ip6_mobility **, struct sockaddr_in6 *,
@@ -1305,6 +1320,7 @@ mip6_create_nodekey(nodekey)
 		((u_long *)nodekey)[i] = random();
 }
 
+#if 0
 /* This function should be called periodically */
 static void
 mip6_update_nonce_nodekey(ignored_arg)
@@ -1336,6 +1352,7 @@ mip6_update_nonce_nodekey(ignored_arg)
 
 	splx(s);
 }
+#endif
 
 int
 mip6_get_nonce(index, nonce)
@@ -1391,7 +1408,8 @@ mip6_get_nodekey(index, nodekey)
 }
 
 /* Generate keygen */
-void
+#ifndef __OpenBSD__
+int
 mip6_create_keygen_token(addr, nodekey, nonce, hc, token)
 	struct in6_addr *addr;
 	mip6_nodekey_t *nodekey;
@@ -1411,7 +1429,80 @@ mip6_create_keygen_token(addr, nodekey, nonce, hc, token)
 	hmac_result(&hmac_ctx, result, sizeof(result));
 	/* First64 */
 	bcopy(result, token, 8);
+
+	return (0);
 }
+#else /* OpenBSD */
+int
+mip6_create_keygen_token(addr, nodekey, nonce, hc, token)
+	struct in6_addr *addr;
+	mip6_nodekey_t *nodekey;
+	mip6_nonce_t *nonce;
+	u_int8_t hc;
+	void *token;		/* 64 bit */
+{
+	struct cryptoini cria;
+	struct cryptop *crp;
+	u_int64_t sid = 0;
+	int error = 0;
+	static int mip6_create_keygen_token_cb(void *);
+
+	bzero(&cria, sizeof(cria));
+	cria.cri_alg = CRYPTO_SHA1_HMAC;
+	cria.cri_klen = sizeof(mip6_nodekey_t) * 8;	/* bit */
+	cria.cri_key = (caddr_t)nodekey;
+
+	if ((error = crypto_newsession(&sid, &cria, 0))) {
+		return (error);
+	}
+
+	if ((crp = malloc(sizeof(struct cryptop), M_TEMP, M_WAITOK)) == NULL) {
+		error = ENOMEM;
+		goto done;
+	}
+	bzero(crp, sizeof(crp));
+	crp->crp_ilen = sizeof(*addr) + sizeof(*nonce) + sizeof(hc);
+	crp->crp_olen = HMACSIZE;
+	crp->crp_flags = 0;
+	if ((crp->crp_buf = malloc(crp->crp_ilen, M_TEMP, M_WAITOK)) == NULL) {
+		free(crp, M_TEMP);
+		error = ENOMEM;
+		goto done;
+	}
+	bzero(crp->crp_buf, crp->crp_ilen);
+	bcopy(addr, crp->crp_buf, sizeof(*addr));
+	bcopy(nonce, crp->crp_buf + sizeof(*addr), sizeof(*nonce));
+	bcopy(&hc, crp->crp_buf + sizeof(*addr) + sizeof(*nonce), sizeof(hc));
+	crp->crp_callback = (int (*) (struct cryptop *)) mip6_create_keygen_token_cb;
+	crp->crp_sid = sid;
+	crp->crp_opaque = NULL;
+	crypto_dispatch(crp);
+
+	if (tsleep(crp, PSOCK, "mip6keygen", 0)) {
+		free(crp->crp_buf, M_TEMP);
+		free(crp, M_TEMP);
+		error = EINVAL;
+	}
+
+	/* First64 */
+	bcopy(crp->crp_buf, token, 8);
+
+done:
+	
+	crypto_freesession(sid);
+	return (error);
+}
+
+static int
+mip6_create_keygen_token_cb(void *op)
+{
+	struct cryptop *crp;
+
+	crp = (struct cryptop *)op;
+	wakeup(crp);
+	return (0);
+}
+#endif
 
 /*
  *	Check a Binding Update packet whether it is valid 
@@ -1447,12 +1538,14 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa, cache_req, status)
 	cksum_backup = ip6mu->ip6mu_cksum;
 	ip6mu->ip6mu_cksum = 0;
 	/* Calculate authenticator */
-	mip6_calculate_authenticator(key_bm, authdata,
+	if (mip6_calculate_authenticator(key_bm, authdata,
 		&coa_sa->sin6_addr, &ip6->ip6_dst,
 		(caddr_t)ip6mu, ip6mulen, 
 		(u_int8_t *)mopt->mopt_auth + sizeof(struct ip6m_opt_authdata)
 			 - (u_int8_t *)ip6mu, 
-		MOPT_AUTH_LEN(mopt) + 2);
+		MOPT_AUTH_LEN(mopt) + 2)) {
+		return (EINVAL);
+	}
 
 	ip6mu->ip6mu_cksum = cksum_backup;
 
@@ -1510,16 +1603,26 @@ mip6_hexdump("CN: Careof Nodekey: ", sizeof(coa_nodekey), &coa_nodekey);
 #endif
 
 	/* Calculate home keygen token */
-	mip6_create_keygen_token(&hoa_sa->sin6_addr,
-			   &home_nodekey, &home_nonce, 0, &home_token);
+	if (mip6_create_keygen_token(&hoa_sa->sin6_addr,
+			   &home_nodekey, &home_nonce, 0, &home_token)) {
+		mip6log((LOG_ERR,
+			 "%s:%d: Failed of creation of home keygen token\n",
+			 __FILE__, __LINE__));
+		return (IP6MA_STATUS_UNSPECIFIED);
+	}
 #ifdef RR_DBG
 mip6_hexdump("CN: Home keygen token: ", sizeof(home_token), (u_int8_t *)&home_token);
 #endif
 
 	if (!ignore_co_nonce) {
 		/* Calculate care-of keygen token */
-		mip6_create_keygen_token(&coa_sa->sin6_addr,
-			   &coa_nodekey, &careof_nonce, 1, &careof_token);
+		if (mip6_create_keygen_token(&coa_sa->sin6_addr,
+			   &coa_nodekey, &careof_nonce, 1, &careof_token)) {
+			mip6log((LOG_ERR,
+			 	"%s:%d: Failed of creation of care-of keygen token\n",
+			 	__FILE__, __LINE__));
+			return (IP6MA_STATUS_UNSPECIFIED);
+		}
 #ifdef RR_DBG
 mip6_hexdump("CN: Care-of keygen token: ", sizeof(careof_token), (u_int8_t *)&careof_token);
 #endif
@@ -1562,7 +1665,8 @@ mip6_calculate_kbm(home_token, careof_token, key_bm)
  *   - - - - - - - ->
  *     exclude_offset
  */
-void
+#ifndef __OpenBSD__
+int
 mip6_calculate_authenticator(key_bm, result, addr1, addr2, data, datalen,
     exclude_offset, exclude_data_len)
 	u_int8_t *key_bm;		/* Kbm */
@@ -1611,7 +1715,92 @@ mip6_calculate_authenticator(key_bm, result, addr1, addr2, data, datalen,
 #ifdef RR_DBG
 	mip6_hexdump("MN: Authdata: ", MIP6_AUTHENTICATOR_LEN, result);
 #endif
+
+	retrun (0);
 }
+#else	/* !__OpenBSD __*/
+int
+mip6_calculate_authenticator(key_bm, result, addr1, addr2, data, datalen,
+    exclude_offset, exclude_data_len)
+	u_int8_t *key_bm;		/* Kbm */
+	u_int8_t *result;
+	struct in6_addr *addr1, *addr2;
+	caddr_t data;
+	size_t datalen;
+	int exclude_offset;
+	size_t exclude_data_len;
+{
+	struct cryptoini cria;
+	struct cryptop *crp;
+	u_int64_t sid = 0;
+	int error = 0;
+	int restlen;
+	caddr_t p;
+	static int mip6_calculate_authenticator_cb(void *);
+
+	bzero(&cria, sizeof(cria));
+	cria.cri_alg = CRYPTO_SHA1_HMAC;
+	cria.cri_klen = MIP6_KBM_LEN * 8;	/* bit */
+	cria.cri_key = key_bm;
+
+	if ((error = crypto_newsession(&sid, &cria, 0))) {
+		return (error);
+	}
+
+	if ((crp = malloc(sizeof(struct cryptop), M_TEMP, M_WAITOK)) == NULL) {
+		error = ENOMEM;
+		goto done;
+	}
+	restlen = datalen - (exclude_offset + exclude_data_len);
+	bzero(crp, sizeof(crp));
+	crp->crp_ilen = sizeof(*addr1) + sizeof(*addr2) + exclude_offset + restlen;
+	crp->crp_olen = HMACSIZE;
+	crp->crp_flags = 0;
+	if ((crp->crp_buf = malloc(crp->crp_ilen, M_TEMP, M_WAITOK)) == NULL) {
+		free(crp, M_TEMP);
+		error = ENOMEM;
+		goto done;
+	}
+	bzero(crp->crp_buf, crp->crp_ilen);
+
+	p = crp->crp_buf;
+	bcopy(addr1, p, sizeof(*addr1)); p += sizeof(*addr1);
+	bcopy(addr2, p, sizeof(*addr2)); p += sizeof(*addr2);
+	bcopy(data, p, exclude_offset); p += exclude_offset;
+	/* Exclude authdata field in the mobility option to calculate authdata 
+	   But it should be included padding area */
+	if (restlen > 0) {
+		bcopy(data + exclude_offset + exclude_data_len, p, restlen); p += restlen;
+	}
+	crp->crp_callback = (int (*) (struct cryptop *)) mip6_calculate_authenticator_cb;
+	crp->crp_sid = sid;
+	crp->crp_opaque = NULL;
+	crypto_dispatch(crp);
+
+	if (tsleep(crp, PSOCK, "mip6keygen", 0)) {
+		/* Never happen ... */
+		free(crp->crp_buf, M_TEMP);
+		free(crp, M_TEMP);
+		error = EINVAL;
+	}
+	/* First(96, sha1_result) */
+	bcopy(crp->crp_buf, result, MIP6_AUTHENTICATOR_LEN);
+
+done:
+	crypto_freesession(sid);
+	return (error);
+}
+
+static int
+mip6_calculate_authenticator_cb(void *op)
+{
+	struct cryptop *crp;
+
+	crp = (struct cryptop *)op;
+	wakeup(crp);
+	return (0);
+}
+#endif	/* !__OpenBSD__ */
 
 int
 mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
@@ -1870,10 +2059,17 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 
 	bi.mbc_flags = ip6mu->ip6mu_flags;
 
+#ifdef M_DECRYPTED	/* not openbsd */
 	if (((m->m_flags & M_DECRYPTED) != 0)
 	    || ((m->m_flags & M_AUTHIPHDR) != 0)) {
 		isprotected = 1;
 	}
+#endif
+#ifdef __OpenBSD__
+	if ((m->m_flags & M_AUTH) != 0) {
+		isprotected = 1;
+	}
+#endif
 
 	bi.mbc_pcoa = src_sa;
 	n = ip6_findaux(m);
@@ -2147,8 +2343,13 @@ mip6_ip6mh_create(pktopt_mobility, src, dst, cookie)
 	ip6mh->ip6mh_type = IP6M_HOME_TEST;
 	ip6mh->ip6mh_nonce_index = htons(nonce_index);
 	bcopy(cookie, ip6mh->ip6mh_cookie, sizeof(ip6mh->ip6mh_cookie));
-	mip6_create_keygen_token(&dst->sin6_addr,
-			   &home_nodekey, &home_nonce, 0, ip6mh->ip6mh_token);
+	if (mip6_create_keygen_token(&dst->sin6_addr,
+			   &home_nodekey, &home_nonce, 0, ip6mh->ip6mh_token)) {
+		mip6log((LOG_ERR,
+		 	"%s:%d: Failed of creation of home keygen token\n",
+		 	__FILE__, __LINE__));
+		 return (EINVAL);
+	}
 
 	/* calculate checksum. */
 	ip6mh->ip6mh_cksum = mip6_cksum(src, dst,
@@ -2189,9 +2390,14 @@ mip6_ip6mc_create(pktopt_mobility, src, dst, cookie)
 	ip6mc->ip6mc_type = IP6M_CAREOF_TEST;
 	ip6mc->ip6mc_nonce_index = htons(nonce_index);
 	bcopy(cookie, ip6mc->ip6mc_cookie, sizeof(ip6mc->ip6mc_cookie));
-	mip6_create_keygen_token(&dst->sin6_addr,
+	if (mip6_create_keygen_token(&dst->sin6_addr,
 				 &careof_nodekey, &careof_nonce, 1,
-				 ip6mc->ip6mc_token);
+				 ip6mc->ip6mc_token)) {
+		mip6log((LOG_ERR,
+		 	"%s:%d: Failed of creation of home keygen token\n",
+		 	__FILE__, __LINE__));
+		 return (EINVAL);
+	}
 
 	/* calculate checksum. */
 	ip6mc->ip6mc_cksum = mip6_cksum(src, dst,
@@ -2743,9 +2949,7 @@ mip6_tunnel_control(action, entry, func, ep)
 	return (0);
 }
 
-#if !defined(MIP6_NOHAIPSEC)
-#ifdef IPSEC
-#ifndef __OpenBSD__
+#if !defined(MIP6_NOHAIPSEC) && (defined(IPSEC) || defined(__OpenBSD__))
 static int
 mip6_update_ipsecdb(haddr, ocoa, ncoa, haaddr)
 	struct sockaddr_in6 *haddr;
@@ -2771,13 +2975,8 @@ mip6_update_ipsecdb(haddr, ocoa, ncoa, haaddr)
 	if (MIP6_IS_MN) {
 		key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr);
 	}
-
 	return (0);
 }
-#else
-/* __OpenBSD__ part.  not yet. */
-#endif
-#endif /* IPSEC */
 #endif /* !MIP6_NOHAIPSEC */
 
 #endif /* MIP6_HOME_AGENT || MIP6_MOBILE_NODE */

@@ -20,3 +20,12 @@ include	"arch/i386/conf/GENERIC"
 # Source-Specific Multicast (SSM)
 #options 	IGMPV3		# IPv4
 #options 	MLDV2		# IPv6
+
+# Mobile IPv6
+#options	MIP6
+#options	MIP6_HOME_AGENT
+#options	MIP6_MOBILE_NODE
+#pseudo-device	hif	1
+#options	MIP6_NOHAIPSEC
+#options	MIP6_DEBUG
+

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.108 2003/10/22 02:12:54 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.109 2003/10/31 12:19:42 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -40,7 +40,11 @@
 #ifndef _MIP6_VAR_H_
 #define _MIP6_VAR_H_
 
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/callout.h>
+#elif defined(__OpenBSD__)
+#include <sys/timeout.h>
+#endif
 
 #define GET_NETVAL_S(p, v)	bcopy((p), &(v), sizeof(v)), v = ntohs(v)
 #define GET_NETVAL_L(p, v)	bcopy((p), &(v), sizeof(v)), v = ntohl(v)

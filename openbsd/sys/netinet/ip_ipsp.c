@@ -1486,3 +1486,35 @@ ipsp_parse_headers(struct mbuf *m, int off, u_int8_t proto)
 	}
 }
 #endif /* notyet */
+
+#if (defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE)) && !defined(MIP6_NOHAIPSEC)
+int
+key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
+	struct sockaddr_in6 *haddr;
+	struct sockaddr_in6 *ocoa;   /* not used.  may be NULL. */
+	struct sockaddr_in6 *ncoa;
+	struct sockaddr_in6 *haaddr;
+{
+	int s = spltdb();
+
+	/* To be written soon */
+
+	splx(s);
+	return (0);
+}
+
+int
+key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr)
+	struct sockaddr_in6 *haddr;
+	struct sockaddr_in6 *ocoa;
+	struct sockaddr_in6 *ncoa;
+	struct sockaddr_in6 *haaddr;
+{	
+	int s = spltdb();
+
+	/* To be written soon */
+
+	splx(s);
+	return (0);
+}
+#endif
