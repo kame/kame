@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.37 2004/07/03 11:02:11 jinmei Exp $	*/
+/*	$KAME: setkey.c,v 1.38 2004/07/24 00:51:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -383,6 +383,7 @@ again:
 
 	msg = (struct sadb_msg *)rbuf;
 	do {
+nextmsg:
 		if ((l = recv(so, rbuf, sizeof(rbuf), 0)) < 0) {
 			perror("recv");
 			goto end;
@@ -397,6 +398,10 @@ again:
 			kdebug_sadb((struct sadb_msg *)rbuf);
 			printf("\n");
 		}
+
+		if (msg->sadb_msg_pid != getpid())
+			goto nextmsg;
+
 		if (postproc(msg, l) < 0)
 			break;
 	} while (msg->sadb_msg_errno || msg->sadb_msg_seq);
