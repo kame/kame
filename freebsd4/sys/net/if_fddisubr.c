@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	from: if_ethersubr.c,v 1.5 1994/12/13 22:31:45 wollman Exp
- * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.41.2.6 2001/07/25 17:27:56 jlemon Exp $
+ * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.41.2.8 2002/02/20 23:34:09 fjoe Exp $
  */
 
 #include "opt_atalk.h"
@@ -166,7 +166,7 @@ fddi_output(ifp, m, dst, rt0)
 #ifdef INET
 	case AF_INET: {
 #if !defined(__bsdi__) || _BSDI_VERSION >= 199401
-		if (!ARPRESOLVE(ac, rt, m, dst, edst, rt0))
+		if (!ARPRESOLVE(ifp, rt, m, dst, edst, rt0))
 			return (0);	/* if not yet resolved */
 #else
 		int usetrailers;

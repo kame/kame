@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/isp_freebsd.h,v 1.26.2.12 2001/12/14 08:21:04 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/isp_freebsd.h,v 1.26.2.15 2002/04/16 21:41:22 mjacob Exp $ */
 /*
  * Qlogic ISP SCSI Host Adapter FreeBSD Wrapper Definitions
  * Copyright (c) 1997, 1998, 1999, 2000, 2001 by Matthew Jacob
@@ -68,7 +68,7 @@
 
 #define	HANDLE_LOOPSTATE_IN_OUTER_LAYERS	1
 
-typedef void ispfwfunc __P((int, int, int, const u_int16_t **));
+typedef void ispfwfunc(int, int, int, u_int16_t **);
 
 #ifdef	ISP_TARGET_MODE
 #define	ISP_TARGET_FUNCTIONS	1
@@ -114,6 +114,10 @@ struct isposinfo {
 	int			islocked;
 	int			splsaved;
 	struct proc		*kproc;
+	bus_dma_tag_t		cdmat;
+	bus_dmamap_t		cdmap;
+#define	isp_cdmat		isp_osinfo.cdmat
+#define	isp_cdmap		isp_osinfo.cdmap
 #ifdef	ISP_TARGET_MODE
 #define	TM_WANTED		0x80
 #define	TM_BUSY			0x40
@@ -124,7 +128,7 @@ struct isposinfo {
 	u_int16_t		rollinfo;
 	tstate_t		tsdflt[2];	/* two busses */
 	tstate_t		*lun_hash[LUN_HASH_SIZE];
-	atio_private_data_t 	atpdp[ATPDPSIZE];
+	atio_private_data_t	atpdp[ATPDPSIZE];
 #endif
 };
 
@@ -145,7 +149,7 @@ struct isposinfo {
 
 #define	INLINE			__inline
 
-#define	ISP2100_SCRLEN		0x400
+#define	ISP2100_SCRLEN		0x800
 
 #define	MEMZERO			bzero
 #define	MEMCPY(dst, src, amt)	bcopy((src), (dst), (amt))
@@ -184,6 +188,9 @@ struct isposinfo {
 	} \
 	isp->isp_mboxbsy = 0
 #define	MBOX_RELEASE(isp)
+
+#define	FC_SCRATCH_ACQUIRE(isp)
+#define	FC_SCRATCH_RELEASE(isp)
 
 #ifndef	SCSI_GOOD
 #define	SCSI_GOOD	SCSI_STATUS_OK
@@ -378,9 +385,10 @@ static INLINE void
 isp_mbox_wait_complete(struct ispsoftc *isp)
 {
 	if (isp->isp_osinfo.intsok) {
+		int lim = ((isp->isp_mbxwrk0)? 120 : 20) * hz;
 		isp->isp_osinfo.mboxwaiting = 1;
 		(void) tsleep(&isp->isp_osinfo.mboxwaiting, PRIBIO,
-		    "isp_mboxwaiting", 10 * hz);
+		    "isp_mboxwaiting", lim);
 		if (isp->isp_mboxbsy != 0) {
 			isp_prt(isp, ISP_LOGWARN,
 			    "Interrupting Mailbox Command (0x%x) Timeout",
@@ -389,8 +397,9 @@ isp_mbox_wait_complete(struct ispsoftc *isp)
 		}
 		isp->isp_osinfo.mboxwaiting = 0;
 	} else {
+		int lim = ((isp->isp_mbxwrk0)? 240 : 60) * 10000;
 		int j;
-		for (j = 0; j < 60 * 10000; j++) {
+		for (j = 0; j < lim; j++) {
 			u_int16_t isr, sema, mbox;
 			if (isp->isp_mboxbsy == 0) {
 				break;

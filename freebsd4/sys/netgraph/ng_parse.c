@@ -37,7 +37,7 @@
  * Author: Archie Cobbs <archie@freebsd.org>
  *
  * $Whistle: ng_parse.c,v 1.3 1999/11/29 01:43:48 archie Exp $
- * $FreeBSD: src/sys/netgraph/ng_parse.c,v 1.3.2.5 2001/05/26 16:41:37 jdp Exp $
+ * $FreeBSD: src/sys/netgraph/ng_parse.c,v 1.3.2.7 2002/02/12 18:37:43 archie Exp $
  */
 
 #include <sys/types.h>
@@ -1227,6 +1227,8 @@ static int
 ng_unparse_composite(const struct ng_parse_type *type, const u_char *data,
 	int *off, char *cbuf, int cbuflen, const enum comptype ctype)
 {
+	const struct ng_mesg *const hdr
+	    = (const struct ng_mesg *)(data - sizeof(*hdr));
 	const int num = ng_get_composite_len(type, data, data + *off, ctype);
 	const int workSize = 20 * 1024;		/* XXX hard coded constant */
 	int nextIndex = 0, didOne = 0;
@@ -1249,14 +1251,18 @@ ng_unparse_composite(const struct ng_parse_type *type, const u_char *data,
 		/* Skip any alignment pad bytes */
 		*off += ng_parse_get_elem_pad(type, index, ctype, *off);
 
-		/* See if element is equal to its default value; skip if so */
-		if (*off < workSize) {
-			int tempsize = workSize - *off;
+		/*
+		 * See if element is equal to its default value; skip if so.
+		 * Copy struct ng_mesg header for types that peek into it.
+		 */
+		if (sizeof(*hdr) + *off < workSize) {
+			int tempsize = workSize - sizeof(*hdr) - *off;
 
-			bcopy(data, workBuf, *off);
-			if (ng_get_composite_elem_default(type, index, workBuf,
-			      workBuf + *off, &tempsize, ctype) == 0
-			    && bcmp(workBuf + *off,
+			bcopy(hdr, workBuf, sizeof(*hdr) + *off);
+			if (ng_get_composite_elem_default(type, index, workBuf
+			      + sizeof(*hdr), workBuf + sizeof(*hdr) + *off,
+			      &tempsize, ctype) == 0
+			    && bcmp(workBuf + sizeof(*hdr) + *off,
 			      data + *off, tempsize) == 0) {
 				*off += tempsize;
 				continue;

@@ -12,7 +12,7 @@
  *
  * Aug, 1994	Implemented on FreeBSD 1.1.5.1R (Toshiba AVS001WD)
  *
- * $FreeBSD: src/sys/i386/include/apm_bios.h,v 1.27.2.1 2000/08/19 17:13:48 ume Exp $
+ * $FreeBSD: src/sys/i386/include/apm_bios.h,v 1.27.2.2 2002/04/12 16:47:00 bmah Exp $
  */
 
 #ifndef	_MACHINE_APM_BIOS_H_
@@ -95,6 +95,7 @@
 #define PMDV_ALLDEV		0x0001
 #define PMDV_DISP0		0x0100
 #define PMDV_DISP1		0x0101
+#define PMDV_DISPALL		0x01ff
 #define PMDV_2NDSTORAGE0	0x0200
 #define PMDV_2NDSTORAGE1	0x0201
 #define PMDV_2NDSTORAGE2	0x0202

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_input.c	8.12 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.107.2.20 2001/12/14 20:21:12 jlemon Exp $
+ * $FreeBSD: src/sys/netinet/tcp_input.c,v 1.107.2.23 2002/04/28 05:40:26 suz Exp $
  */
 
 #include "opt_ipfw.h"		/* for ipfw_fwd		*/
@@ -343,7 +343,6 @@ tcp_input(m, off0, proto)
 	register int thflags;
 	struct socket *so = 0;
 	int todrop, acked, ourfinisacked, needoutput = 0;
-	int iss = 0;
 	u_long tiwin;
 	struct tcpopt to;		/* options in this segment */
 	struct rmxp_tao *taop;		/* pointer to our TAO cache entry */
@@ -498,6 +497,8 @@ tcp_input(m, off0, proto)
 	 * Because ip6_savecontrol() is going to parse the mbuf to
 	 * search for data to be passed up to user-land, it wants mbuf
 	 * parameters to be unchanged.
+	 * XXX: the call of ip6_savecontrol() has been obsoleted based on
+	 * latest version of the advanced API (20020110).
 	 */
 	drop_hdrlen = off0 + off;
 
@@ -798,11 +799,10 @@ findpcb:
 		}
 		/*
 		 * RFC1122 4.2.3.10, p. 104: discard bcast/mcast SYN
-		 * in_broadcast() should never return true on a received
-		 * packet with M_BCAST not set.
- 		 *
- 		 * Packets with a multicast source address should also
- 		 * be discarded.
+		 *
+		 * Note that it is quite possible to receive unicast
+		 * link-layer packets with a broadcast IP address. Use
+		 * in_broadcast() to find them.
 		 */
 		if (m->m_flags & (M_BCAST|M_MCAST))
 			goto drop;
@@ -815,7 +815,8 @@ findpcb:
 #endif
 		if (IN_MULTICAST(ntohl(ip->ip_dst.s_addr)) ||
 		    IN_MULTICAST(ntohl(ip->ip_src.s_addr)) ||
-		    ip->ip_src.s_addr == htonl(INADDR_BROADCAST))
+		    ip->ip_src.s_addr == htonl(INADDR_BROADCAST) ||
+		    in_broadcast(ip->ip_dst, m->m_pkthdr.rcvif))
 			goto drop;
 		/*
 		 * SYN appears to be valid; create compressed TCP state
@@ -1491,7 +1492,6 @@ trimthenstep6:
 			if (thflags & TH_SYN &&
 			    tp->t_state == TCPS_TIME_WAIT &&
 			    SEQ_GT(th->th_seq, tp->rcv_nxt)) {
-				iss = tcp_new_isn(tp);
 				tp = tcp_close(tp);
 				goto findpcb;
 			}
@@ -2171,7 +2171,8 @@ dropwithreset:
 #endif /* INET6 */
 	if (IN_MULTICAST(ntohl(ip->ip_dst.s_addr)) ||
 	    IN_MULTICAST(ntohl(ip->ip_src.s_addr)) ||
-	    ip->ip_src.s_addr == htonl(INADDR_BROADCAST))
+	    ip->ip_src.s_addr == htonl(INADDR_BROADCAST) ||
+	    in_broadcast(ip->ip_dst, m->m_pkthdr.rcvif))
 		goto drop;
 	/* IPv6 anycast check is done at tcp6_input() */
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_mbuf.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/kern/uipc_mbuf.c,v 1.51.2.10 2001/12/04 02:13:11 luigi Exp $
+ * $FreeBSD: src/sys/kern/uipc_mbuf.c,v 1.51.2.13 2002/05/06 20:07:13 silby Exp $
  */
 
 #include "opt_param.h"
@@ -349,8 +349,7 @@ m_clalloc_fail:
 		mbstat.m_drops++;
 		if (ticks < last_report || (ticks - last_report) >= hz) {
 			last_report = ticks;
-			printf("m_clalloc failed, consider increase "
-				"NMBCLUSTERS value\n");
+			printf("All mbuf clusters exhausted, please see tuning(7).\n");
 		}
 		return (0);
 	}
@@ -445,7 +444,7 @@ m_retry(i, t)
 		mbstat.m_drops++;
 		if (ticks < last_report || (ticks - last_report) >= hz) {
 			last_report = ticks;
-			printf("m_retry failed, consider increase mbuf value\n");
+			printf("All mbufs exhausted, please see tuning(7).\n");
 		}
 	}
 
@@ -485,7 +484,7 @@ m_retryhdr(i, t)
 		mbstat.m_drops++;
 		if (ticks < last_report || (ticks - last_report) >= hz) {
 			last_report = ticks;
-			printf("m_retryhdr failed, consider increase mbuf value\n");
+			printf("All mbufs exhausted, please see tuning(7).\n");
 		}
 	}
 	
@@ -611,6 +610,34 @@ failed:
 	return (NULL);
 }
 
+/*
+ * MFREE(struct mbuf *m, struct mbuf *n)
+ * Free a single mbuf and associated external storage.
+ * Place the successor, if any, in n.
+ *
+ * we do need to check non-first mbuf for m_aux, since some of existing
+ * code does not call M_PREPEND properly.
+ * (example: call to bpf_mtap from drivers)
+ */
+#define	MFREE(m, n) MBUFLOCK(						\
+	struct mbuf *_mm = (m);						\
+									\
+	KASSERT(_mm->m_type != MT_FREE, ("freeing free mbuf"));		\
+	mbtypes[_mm->m_type]--;						\
+	if ((_mm->m_flags & M_PKTHDR) != 0 && _mm->m_pkthdr.aux) {	\
+		m_freem(_mm->m_pkthdr.aux);				\
+		_mm->m_pkthdr.aux = NULL;				\
+	}								\
+	if (_mm->m_flags & M_EXT)					\
+		MEXTFREE1(m);						\
+	(n) = _mm->m_next;						\
+	_mm->m_type = MT_FREE;						\
+	mbtypes[MT_FREE]++;						\
+	_mm->m_next = mmbfree;						\
+	mmbfree = _mm;							\
+	MMBWAKEUP();							\
+)
+
 struct mbuf *
 m_free(m)
 	struct mbuf *m;
@@ -623,16 +650,11 @@ m_free(m)
 
 void
 m_freem(m)
-	register struct mbuf *m;
+	struct mbuf *m;
 {
-	register struct mbuf *n;
-
-	if (m == NULL)
-		return;
-	do {
-		MFREE(m, n);
-		m = n;
-	} while (m);
+	while (m) {
+		m = m_free(m);
+	}
 }
 
 /*
@@ -1126,8 +1148,10 @@ m_split(m0, len0, wait)
 			if (n->m_next == 0) {
 				(void) m_free(n);
 				return (0);
-			} else
+			} else {
+				n->m_len = 0;
 				return (n);
+			}
 		} else
 			MH_ALIGN(n, remain);
 	} else if (remain == 0) {

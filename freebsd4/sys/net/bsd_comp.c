@@ -40,7 +40,7 @@
 /*
  * This version is for use with mbufs on BSD-derived systems.
  *
- * $FreeBSD: src/sys/net/bsd_comp.c,v 1.11 1999/08/28 00:48:14 peter Exp $
+ * $FreeBSD: src/sys/net/bsd_comp.c,v 1.11.2.1 2002/04/14 21:41:48 luigi Exp $
  */
 
 #include <sys/param.h>
@@ -355,7 +355,7 @@ bsd_alloc(options, opt_len, decomp)
 	MALLOC(db->lens, u_int16_t *, (maxmaxcode+1) * sizeof(db->lens[0]),
 	       M_DEVBUF, M_NOWAIT);
 	if (!db->lens) {
-	    FREE(db, M_DEVBUF);
+	    free(db, M_DEVBUF);
 	    return NULL;
 	}
     }
@@ -376,8 +376,8 @@ bsd_free(state)
     struct bsd_db *db = (struct bsd_db *) state;
 
     if (db->lens)
-	FREE(db->lens, M_DEVBUF);
-    FREE(db, M_DEVBUF);
+	free(db->lens, M_DEVBUF);
+    free(db, M_DEVBUF);
 }
 
 static void *

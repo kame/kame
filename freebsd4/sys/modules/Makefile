@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/modules/Makefile,v 1.110.2.44 2001/12/26 17:55:45 pdeuskar Exp $
+# $FreeBSD: src/sys/modules/Makefile,v 1.110.2.50 2002/05/04 08:23:52 asmodai Exp $
 
 # XXX present but broken: ip_mroute_mod pcic
 
@@ -30,6 +30,7 @@ SUBDIR=	accf_data \
 	if_tap \
 	if_tun \
 	if_vlan \
+	iir \
 	ip6fw \
 	ipfilter \
 	ipfw \
@@ -61,6 +62,7 @@ SUBDIR=	accf_data \
 	sf \
 	sis \
 	sk \
+	snp \
 	sound \
 	ste \
 	syscons \
@@ -68,6 +70,7 @@ SUBDIR=	accf_data \
 	tl \
 	twe \
 	txp \
+	ufm \
 	ugen \
 	uhid \
 	ukbd \
@@ -111,7 +114,8 @@ SUBDIR+=aac \
 	streams \
 	svr4 \
 	vesa \
-	wi
+	wi \
+	xe
 .endif
 
 .if ${MACHINE} == "pc98"

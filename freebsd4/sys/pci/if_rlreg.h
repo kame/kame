@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_rlreg.h,v 1.14.2.2 2001/12/01 16:16:08 iwasaki Exp $
+ * $FreeBSD: src/sys/pci/if_rlreg.h,v 1.14.2.4 2002/04/21 15:39:57 luigi Exp $
  */
 
 /*
@@ -369,6 +369,9 @@ struct rl_softc {
 	struct rl_chain_data	rl_cdata;
 	struct callout_handle	rl_stat_ch;
  	int			suspended;	/* 0 = normal  1 = suspended */
+#ifdef DEVICE_POLLING
+	int			rxcycles;
+#endif /* DEVICE_POLLING */
  
  	u_int32_t		saved_maps[5];	/* pci data */
  	u_int32_t		saved_biosaddr;
@@ -418,6 +421,11 @@ struct rl_softc {
  * Accton MPX 5030/5038 device ID.
  */
 #define ACCTON_DEVICEID_5030			0x1211
+
+/*
+ * Nortel PCI vendor ID
+ */
+#define NORTEL_VENDORID				0x126C
 
 /*
  * Delta Electronics Vendor ID.

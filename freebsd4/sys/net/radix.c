@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)radix.c	8.4 (Berkeley) 11/2/94
- * $FreeBSD: src/sys/net/radix.c,v 1.20.2.2 2001/03/06 00:56:50 obrien Exp $
+ * $FreeBSD: src/sys/net/radix.c,v 1.20.2.3 2002/04/28 05:40:25 suz Exp $
  */
 
 /*
@@ -673,7 +673,7 @@ on2:
 			mmask = m->rm_leaf->rn_mask;
 			if (tt->rn_flags & RNF_NORMAL) {
 			    log(LOG_ERR,
-			        "Non-unique normal route, mask not entered");
+			        "Non-unique normal route, mask not entered\n");
 				return tt;
 			}
 		} else

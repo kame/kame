@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_vnops.c,v 1.2.2.4 2001/12/20 16:11:49 sheldonh Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_vnops.c,v 1.2.2.5 2002/04/22 04:18:58 bp Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -1244,6 +1244,9 @@ smbfs_lookup(ap)
 		 * Handle RENAME or CREATE case...
 		 */
 		if ((nameiop == CREATE || nameiop == RENAME) && wantparent && islastcn) {
+			error = VOP_ACCESS(dvp, VWRITE, cnp->cn_cred, p);
+			if (error)
+				return error;
 			cnp->cn_flags |= SAVENAME;
 			if (!lockparent) {
 				VOP_UNLOCK(dvp, 0, p);

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_exit.c	8.7 (Berkeley) 2/12/94
- * $FreeBSD: src/sys/kern/kern_exit.c,v 1.92.2.8 2001/12/14 03:33:50 luigi Exp $
+ * $FreeBSD: src/sys/kern/kern_exit.c,v 1.92.2.10 2002/04/29 09:42:35 dwmalone Exp $
  */
 
 #include "opt_compat.h"
@@ -116,9 +116,7 @@ exit1(p, rv)
 {
 	register struct proc *q, *nq;
 	register struct vmspace *vm;
-#ifdef KTRACE
 	struct vnode *vtmp;
-#endif
 	struct exitlist *ep;
 
 	if (p->p_pid == 1) {
@@ -264,6 +262,14 @@ exit1(p, rv)
 		vrele(vtmp);
 	}
 #endif
+	/*
+	 * Release reference to text vnode
+	 */
+	if ((vtmp = p->p_textvp) != NULL) {
+		p->p_textvp = NULL;
+		vrele(vtmp);
+	}
+
 	/*
 	 * Remove proc from allproc queue and pidhash chain.
 	 * Place onto zombproc.  Unlink from parent's child list.
@@ -478,12 +484,6 @@ loop:
 			 * Decrement the count of procs running with this uid.
 			 */
 			(void)chgproccnt(p->p_cred->p_uidinfo, -1, 0);
-
-			/*
-			 * Release reference to text vnode
-			 */
-			if (p->p_textvp)
-				vrele(p->p_textvp);
 
 			/*
 			 * Free up credentials.

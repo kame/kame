@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $FreeBSD: src/sys/netatm/port.h,v 1.2 1999/08/28 00:48:40 peter Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/port.h,v 1.2.2.1 2002/02/13 00:43:11 dillon Exp $
  *
  */
 
@@ -274,10 +274,10 @@ typedef struct mbuf	KBuffer;
 	(prev)->m_next = (new);				\
 }
 #define	KB_UNLINKHEAD(head, next) {			\
-	MFREE((head), (next));				\
+	next = m_free((head));				\
 }
 #define	KB_UNLINK(old, prev, next) {			\
-	MFREE((old), (next));				\
+	next = m_free((old));				\
 	(prev)->m_next = (next);			\
 }
 #define	KB_ISPKT(bfr)		(((bfr)->m_flags & M_PKTHDR) != 0)
@@ -407,10 +407,10 @@ typedef struct mbuf	KBuffer;
 	(prev)->m_next = (new);				\
 }
 #define	KB_UNLINKHEAD(head, next) {			\
-	MFREE((head), (next));				\
+	next = m_free((head));				\
 }
 #define	KB_UNLINK(old, prev, next) {			\
-	MFREE((old), (next));				\
+	next = m_free((old));				\
 	(prev)->m_next = (next);			\
 }
 #define	KB_ISPKT(bfr)		(0)

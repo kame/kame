@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/nge/if_ngereg.h,v 1.4.2.2 2001/09/19 23:14:28 wpaul Exp $
+ * $FreeBSD: src/sys/dev/nge/if_ngereg.h,v 1.4.2.3 2002/04/21 07:58:48 phk Exp $
  */
 
 #define NGE_CSR			0x00
@@ -226,7 +226,8 @@
 #define NGE_INTRS	\
 	(NGE_IMR_RX_OFLOW|NGE_IMR_TX_UFLOW|NGE_IMR_TX_OK|\
 	 NGE_IMR_TX_IDLE|NGE_IMR_RX_OK|NGE_IMR_RX_ERR|\
-	 NGE_IMR_SYSERR|NGE_IMR_PHY_INTR)
+	 NGE_IMR_SYSERR|NGE_IMR_PHY_INTR|\
+	 NGE_IMR_RX_IDLE|NGE_IMR_RX_FIFO_OFLOW)
 
 /* Interrupt enable register */
 #define NGE_IER_INTRENB		0x00000001

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/kbd/atkbd.c,v 1.25.2.3 2001/07/30 16:46:43 yokota Exp $
+ * $FreeBSD: src/sys/dev/kbd/atkbd.c,v 1.25.2.4 2002/04/08 19:21:38 asmodai Exp $
  */
 
 #include "opt_kbd.h"
@@ -265,7 +265,7 @@ static fkeytab_t	default_fkeytab[NUM_FKEYS];
  * to tickle keyboard drivers when the low-level console is being initialized.
  * Almost nothing in the kernel has been initialied yet.  Try to probe
  * keyboards if possible.
- * NOTE: because of the way the low-level conole is initialized, this routine
+ * NOTE: because of the way the low-level console is initialized, this routine
  * may be called more than once!!
  */
 static int

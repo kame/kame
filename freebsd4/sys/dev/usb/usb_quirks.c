@@ -1,5 +1,5 @@
 /*	$NetBSD: usb_quirks.c,v 1.26 2000/04/27 15:26:50 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb_quirks.c,v 1.21.2.4 2001/01/06 23:32:58 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb_quirks.c,v 1.21.2.5 2002/02/15 14:09:16 joe Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -50,6 +50,8 @@
 extern int usbdebug;
 #endif
 
+#define ANY 0xffff
+
 Static struct usbd_quirk_entry {
 	u_int16_t idVendor;
 	u_int16_t idProduct;
@@ -75,6 +77,13 @@ Static struct usbd_quirk_entry {
  	0x100, { UQ_ASSUME_CM_OVER_DATA | UQ_NO_STRINGS }},
  { USB_VENDOR_ACERP, USB_PRODUCT_ACERP_ACERSCAN_320U,
  						    0x000, { UQ_NO_STRINGS }},
+ /* XXX These should have a revision number, but I don't know what they are. */
+ { USB_VENDOR_HP, USB_PRODUCT_HP_895C,		    ANY,   { UQ_BROKEN_BIDIR }},
+ { USB_VENDOR_HP, USB_PRODUCT_HP_880C,		    ANY,   { UQ_BROKEN_BIDIR }},
+ { USB_VENDOR_HP, USB_PRODUCT_HP_815C,		    ANY,   { UQ_BROKEN_BIDIR }},
+ { USB_VENDOR_HP, USB_PRODUCT_HP_810C,		    ANY,   { UQ_BROKEN_BIDIR }},
+ { USB_VENDOR_HP, USB_PRODUCT_HP_830C,		    ANY,   { UQ_BROKEN_BIDIR }},
+
  { 0, 0, 0, { 0 } }
 };
 

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_xl.c,v 1.72.2.11 2001/12/19 10:40:46 silby Exp $
+ * $FreeBSD: src/sys/pci/if_xl.c,v 1.72.2.12 2002/02/15 04:23:59 silby Exp $
  */
 
 /*
@@ -145,7 +145,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_xl.c,v 1.72.2.11 2001/12/19 10:40:46 silby Exp $";
+  "$FreeBSD: src/sys/pci/if_xl.c,v 1.72.2.12 2002/02/15 04:23:59 silby Exp $";
 #endif
 
 #define XL905B_CSUM_FEATURES	(CSUM_IP | CSUM_TCP | CSUM_UDP)
@@ -1721,16 +1721,11 @@ static int xl_newbuf(sc, c)
 	struct mbuf		*m_new = NULL;
 
 	MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-	if (m_new == NULL) {
-		printf("xl%d: no memory for rx list -- "
-		    "packet dropped!\n", sc->xl_unit);
+	if (m_new == NULL)
 		return(ENOBUFS);
-	}
 
 	MCLGET(m_new, M_DONTWAIT);
 	if (!(m_new->m_flags & M_EXT)) {
-		printf("xl%d: no memory for rx list -- "
-		    "packet dropped!\n", sc->xl_unit);
 		m_freem(m_new);
 		return(ENOBUFS);
 	}

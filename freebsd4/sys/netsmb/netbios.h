@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/netbios.h,v 1.1.2.1 2001/05/22 08:32:33 bp Exp $
+ * $FreeBSD: src/sys/netsmb/netbios.h,v 1.1.2.2 2002/04/22 04:24:25 bp Exp $
  */
 #ifndef _NETSMB_NETBIOS_H_
 #define	_NETSMB_NETBIOS_H_
@@ -60,8 +60,15 @@
 /*
  * name types
  */
-#define	NBT_WKSTA	0x00
-#define	NBT_SERVER	0x20
+#define	NBT_WKSTA		0x00
+#define	NBT_MESSENGER		0x03
+#define	NBT_RAS_SERVER		0x06
+#define	NBT_DOMAIN_MASTER_BROWSER	0x1B
+#define	NBT_DOMAIN_CONTROLLER	0x1C
+#define	NBT_MASTER_BROWSER	0x1D
+#define	NBT_NETDDE		0x1F
+#define	NBT_SERVER		0x20
+#define	NBT_RAS_CLIENT		0x21
 
 /*
  * Session packet types

@@ -31,13 +31,14 @@
  * SUCH DAMAGE.
  *
  *	@(#)unpcb.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/unpcb.h,v 1.9 1999/08/28 00:52:09 peter Exp $
+ * $FreeBSD: src/sys/sys/unpcb.h,v 1.9.2.1 2002/03/09 05:22:23 dd Exp $
  */
 
 #ifndef _SYS_UNPCB_H_
 #define _SYS_UNPCB_H_
 
 #include <sys/queue.h>
+#include <sys/ucred.h>
 
 /*
  * Protocol control block for an active
@@ -80,7 +81,25 @@ struct	unpcb {
 	int	unp_cc;			/* copy of rcv.sb_cc */
 	int	unp_mbcnt;		/* copy of rcv.sb_mbcnt */
 	unp_gen_t unp_gencnt;		/* generation count of this instance */
+	int	unp_flags;		/* flags */
+	struct	xucred unp_peercred;	/* peer credentials, if applicable */
 };
+
+/*
+ * Flags in unp_flags.
+ *
+ * UNP_HAVEPC - indicates that the unp_peercred member is filled in
+ * and is really the credentials of the connected peer.  This is used
+ * to determine whether the contents should be sent to the user or
+ * not.
+ *
+ * UNP_HAVEPCCACHED - indicates that the unp_peercred member is filled
+ * in, but does *not* contain the credentials of the connected peer
+ * (there may not even be a peer).  This is set in unp_listen() when
+ * it fills in unp_peercred for later consumption by unp_connect().
+ */
+#define UNP_HAVEPC			0x001
+#define UNP_HAVEPCCACHED		0x002
 
 #define	sotounpcb(so)	((struct unpcb *)((so)->so_pcb))
 

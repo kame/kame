@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mount.h	8.21 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/sys/mount.h,v 1.89.2.5 2001/11/04 18:59:11 dillon Exp $
+ * $FreeBSD: src/sys/sys/mount.h,v 1.89.2.6 2002/04/26 00:46:00 iedowse Exp $
  */
 
 #ifndef _SYS_MOUNT_H_
@@ -202,7 +202,13 @@ struct mount {
  * MNTK_UNMOUNT locks the mount entry so that name lookup cannot proceed
  * past the mount point.  This keeps the subtree stable during mounts
  * and unmounts.
+ *
+ * MNTK_UNMOUNTF permits filesystems to detect a forced unmount while
+ * dounmount() is still waiting to lock the mountpoint. This allows
+ * the filesystem to cancel operations that might otherwise deadlock
+ * with the unmount attempt (used by NFS).
  */
+#define MNTK_UNMOUNTF	0x00000001	/* forced unmount in progress */
 #define MNTK_UNMOUNT	0x01000000	/* unmount in progress */
 #define	MNTK_MWAIT	0x02000000	/* waiting for unmount to finish */
 #define MNTK_WANTRDWR	0x04000000	/* upgrade to read/write requested */

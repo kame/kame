@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/buffer.h,v 1.1.2.2 2001/08/01 03:41:03 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/buffer.h,v 1.1.2.3 2002/04/22 15:49:35 cg Exp $
  */
 
 #define ISA_DMA(b) (sndbuf_getflags((b)) & SNDBUF_F_ISADMA)
@@ -33,7 +33,7 @@
 #define	SNDBUF_F_XRUN		0x00000002
 #define	SNDBUF_F_RUNNING	0x00000004
 
-struct snd_dbuf *sndbuf_create(char *drv, char *desc);
+struct snd_dbuf *sndbuf_create(device_t dev, char *drv, char *desc);
 void sndbuf_destroy(struct snd_dbuf *b);
 
 void sndbuf_dump(struct snd_dbuf *b, char *s, u_int32_t what);

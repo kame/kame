@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1999 Doug Rabson
  * All rights reserved.
  *
@@ -22,12 +22,12 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- *	$FreeBSD: src/sys/dev/sound/isa/es1888.c,v 1.5.2.4 2001/08/01 03:40:55 cg Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
 #include <dev/sound/isa/sb.h>
+
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/es1888.c,v 1.5.2.5 2002/04/22 15:49:30 cg Exp $");
 
 #ifdef __alpha__
 static int

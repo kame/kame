@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_syscalls.c	8.13 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.151.2.13 2002/01/07 20:47:34 se Exp $
+ * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.151.2.16 2002/04/26 00:46:04 iedowse Exp $
  */
 
 /* For 4.3 integer FS ID compatibility */
@@ -163,8 +163,6 @@ mount(p, uap)
 			vput(vp);
 			return (EOPNOTSUPP);	/* Needs translation */
 		}
-		mp->mnt_flag |=
-		    SCARG(uap, flags) & (MNT_RELOAD | MNT_FORCE | MNT_UPDATE);
 		/*
 		 * Only root, or the user that did the original mount is
 		 * permitted to update it.
@@ -178,6 +176,18 @@ mount(p, uap)
 			vput(vp);
 			return (EBUSY);
 		}
+		simple_lock(&vp->v_interlock);
+		if ((vp->v_flag & VMOUNT) != 0 ||
+		    vp->v_mountedhere != NULL) {
+			simple_unlock(&vp->v_interlock);
+			vfs_unbusy(mp, p);
+			vput(vp);
+			return (EBUSY);
+		}
+		vp->v_flag |= VMOUNT;
+		simple_unlock(&vp->v_interlock);
+		mp->mnt_flag |=
+		    SCARG(uap, flags) & (MNT_RELOAD | MNT_FORCE | MNT_UPDATE);
 		VOP_UNLOCK(vp, 0, p);
 		goto update;
 	}
@@ -191,8 +201,10 @@ mount(p, uap)
 		vput(vp);
 		return (error);
 	}
-	if ((error = vinvalbuf(vp, V_SAVE, p->p_ucred, p, 0, 0)) != 0)
+	if ((error = vinvalbuf(vp, V_SAVE, p->p_ucred, p, 0, 0)) != 0) {
+		vput(vp);
 		return (error);
+	}
 	if (vp->v_type != VDIR) {
 		vput(vp);
 		return (ENOTDIR);
@@ -301,7 +313,6 @@ update:
 	 */
 	error = VFS_MOUNT(mp, SCARG(uap, path), SCARG(uap, data), &nd, p);
 	if (mp->mnt_flag & MNT_UPDATE) {
-		vrele(vp);
 		if (mp->mnt_kern_flag & MNTK_WANTRDWR)
 			mp->mnt_flag &= ~MNT_RDONLY;
 		mp->mnt_flag &=~ (MNT_UPDATE | MNT_RELOAD | MNT_FORCE);
@@ -319,6 +330,10 @@ update:
 			mp->mnt_syncer = NULL;
 		}
 		vfs_unbusy(mp, p);
+		simple_lock(&vp->v_interlock);
+		vp->v_flag &= ~VMOUNT;
+		simple_unlock(&vp->v_interlock);
+		vrele(vp);
 		return (error);
 	}
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
@@ -468,8 +483,22 @@ dounmount(mp, flags, p)
 	int async_flag;
 
 	simple_lock(&mountlist_slock);
+	if (mp->mnt_kern_flag & MNTK_UNMOUNT) {
+		simple_unlock(&mountlist_slock);
+		return (EBUSY);
+	}
 	mp->mnt_kern_flag |= MNTK_UNMOUNT;
-	lockmgr(&mp->mnt_lock, LK_DRAIN | LK_INTERLOCK, &mountlist_slock, p);
+	/* Allow filesystems to detect that a forced unmount is in progress. */
+	if (flags & MNT_FORCE)
+		mp->mnt_kern_flag |= MNTK_UNMOUNTF;
+	error = lockmgr(&mp->mnt_lock, LK_DRAIN | LK_INTERLOCK |
+	    ((flags & MNT_FORCE) ? 0 : LK_NOWAIT), &mountlist_slock, p);
+	if (error) {
+		mp->mnt_kern_flag &= ~(MNTK_UNMOUNT | MNTK_UNMOUNTF);
+		if (mp->mnt_kern_flag & MNTK_MWAIT)
+			wakeup((caddr_t)mp);
+		return (error);
+	}
 
 	if (mp->mnt_flag & MNT_EXPUBLIC)
 		vfs_setpublicfs(NULL, NULL, NULL);
@@ -488,7 +517,7 @@ dounmount(mp, flags, p)
 	if (error) {
 		if ((mp->mnt_flag & MNT_RDONLY) == 0 && mp->mnt_syncer == NULL)
 			(void) vfs_allocate_syncvnode(mp);
-		mp->mnt_kern_flag &= ~MNTK_UNMOUNT;
+		mp->mnt_kern_flag &= ~(MNTK_UNMOUNT | MNTK_UNMOUNTF);
 		mp->mnt_flag |= async_flag;
 		lockmgr(&mp->mnt_lock, LK_RELEASE | LK_INTERLOCK | LK_REENABLE,
 		    &mountlist_slock, p);

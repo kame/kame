@@ -1,5 +1,5 @@
 /*	$NetBSD: usbdi.h,v 1.39 2000/01/19 00:23:59 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usbdi.h,v 1.21.2.2 2000/10/31 23:23:30 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usbdi.h,v 1.21.2.3 2002/02/14 02:30:47 joe Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -184,6 +184,15 @@ usb_endpoint_descriptor_t *usbd_get_endpoint_descriptor
 	(usbd_interface_handle iface, u_int8_t address);
 
 usbd_status usbd_reload_device_desc(usbd_device_handle);
+
+struct usb_devno {
+	u_int16_t ud_vendor;
+	u_int16_t ud_product;
+};
+const struct usb_devno *usb_match_device(const struct usb_devno *tbl,
+	u_int nentries, u_int sz, u_int16_t vendor, u_int16_t product);
+#define usb_lookup(tbl, vendor, product) \
+	usb_match_device((const struct usb_devno *)(tbl), sizeof (tbl) / sizeof ((tbl)[0]), sizeof ((tbl)[0]), (vendor), (product))
 
 /* NetBSD attachment information */
 

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs.h	8.4 (Berkeley) 5/1/95
- * $FreeBSD: src/sys/nfs/nfs.h,v 1.53.2.4 2001/12/20 19:56:28 dillon Exp $
+ * $FreeBSD: src/sys/nfs/nfs.h,v 1.53.2.5 2002/02/20 01:35:34 iedowse Exp $
  */
 
 #ifndef _NFS_NFS_H_
@@ -632,6 +632,7 @@ int	nfs_savenickauth __P((struct nfsmount *, struct ucred *, int,
 			      struct mbuf *));
 int	nfs_adv __P((struct mbuf **, caddr_t *, int, int));
 void	nfs_nhinit __P((void));
+int	nfs_nmcancelreqs __P((struct nfsmount *));
 void	nfs_timer __P((void*));
 int	nfsrv_dorec __P((struct nfssvc_sock *, struct nfsd *, 
 			 struct nfsrv_descript **));

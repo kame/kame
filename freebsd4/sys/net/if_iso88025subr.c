@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_iso88025subr.c,v 1.7.2.4 2001/07/25 17:27:56 jlemon Exp $
+ * $FreeBSD: src/sys/net/if_iso88025subr.c,v 1.7.2.6 2002/02/20 23:34:09 fjoe Exp $
  *
  */
 
@@ -122,7 +122,7 @@ iso88025_ioctl(struct ifnet *ifp, int command, caddr_t data)
 #ifdef INET
                 case AF_INET:
                         ifp->if_init(ifp->if_softc);    /* before arpwhohas */
-                        arp_ifinit((struct arpcom *)ifp, ifa);
+                        arp_ifinit(ifp, ifa);
                         break;
 #endif
                 default:
@@ -221,7 +221,7 @@ iso88025_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst, struct 
 	switch (dst->sa_family) {
 #ifdef INET
 	case AF_INET:
-		if (!arpresolve(ac, rt, m, dst, edst, rt0))
+		if (!arpresolve(ifp, rt, m, dst, edst, rt0))
 			return (0);	/* if not yet resolved */
 		/* Add LLC and SNAP headers */
 		M_PREPEND(m, 8, M_DONTWAIT);

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/pci/agp_amd.c,v 1.3.2.2 2001/12/20 10:27:41 murray Exp $
+ *	$FreeBSD: src/sys/pci/agp_amd.c,v 1.3.2.4 2002/04/25 23:41:36 cokane Exp $
  */
 
 #include "opt_bus.h"
@@ -58,9 +58,10 @@ MALLOC_DECLARE(M_AGP);
 
 struct agp_amd_gatt {
 	u_int32_t	ag_entries;
+	u_int32_t      *ag_virtual;	/* virtual address of gatt */
+	vm_offset_t     ag_physical;
 	u_int32_t      *ag_vdir;	/* virtual address of page dir */
 	vm_offset_t	ag_pdir;	/* physical address of page dir */
-	u_int32_t      *ag_virtual;	/* virtual address of gatt */
 };
 
 struct agp_amd_softc {
@@ -78,7 +79,7 @@ agp_amd_alloc_gatt(device_t dev)
 	u_int32_t apsize = AGP_GET_APERTURE(dev);
 	u_int32_t entries = apsize >> AGP_PAGE_SHIFT;
 	struct agp_amd_gatt *gatt;
-	int i, npages;
+	int i, npages, pdir_offset;
 
 	if (bootverbose)
 		device_printf(dev,
@@ -92,6 +93,8 @@ agp_amd_alloc_gatt(device_t dev)
 	/*
 	 * The AMD751 uses a page directory to map a non-contiguous
 	 * gatt so we don't need to use contigmalloc.
+	 * Malloc individual gatt pages and map them into the page
+	 * directory.
 	 */
 	gatt->ag_entries = entries;
 	gatt->ag_virtual = malloc(entries * sizeof(u_int32_t),
@@ -108,6 +111,7 @@ agp_amd_alloc_gatt(device_t dev)
 	 * Allocate the page directory.
 	 */
 	gatt->ag_vdir = malloc(AGP_PAGE_SIZE, M_AGP, M_NOWAIT);
+
 	if (!gatt->ag_vdir) {
 		if (bootverbose)
 			device_printf(dev,
@@ -118,20 +122,39 @@ agp_amd_alloc_gatt(device_t dev)
 	}
 	bzero(gatt->ag_vdir, AGP_PAGE_SIZE);
 	gatt->ag_pdir = vtophys((vm_offset_t) gatt->ag_vdir);
-	gatt->ag_pdir = vtophys(gatt->ag_virtual);
+	if(bootverbose)
+		device_printf(dev, "gatt -> ag_pdir %8x\n",
+				(vm_offset_t)gatt->ag_pdir);
+	/*
+	 * Allocate the gatt pages
+	 */
+	gatt->ag_entries = entries;
+	if(bootverbose)
+		device_printf(dev, "allocating GATT for %d AGP page entries\n", 
+			gatt->ag_entries);
+	gatt->ag_physical = vtophys((vm_offset_t) gatt->ag_virtual);
 
 	/*
 	 * Map the pages of the GATT into the page directory.
+	 *
+	 * The GATT page addresses are mapped into the directory offset by
+	 * an amount dependent on the base address of the aperture. This
+	 * is and offset into the page directory, not an offset added to
+	 * the addresses of the gatt pages.
 	 */
+
+	pdir_offset = pci_read_config(dev, AGP_AMD751_APBASE, 4) >> 22;
+
 	npages = ((entries * sizeof(u_int32_t) + AGP_PAGE_SIZE - 1)
 		  >> AGP_PAGE_SHIFT);
+
 	for (i = 0; i < npages; i++) {
 		vm_offset_t va;
 		vm_offset_t pa;
 
 		va = ((vm_offset_t) gatt->ag_virtual) + i * AGP_PAGE_SIZE;
 		pa = vtophys(va);
-		gatt->ag_vdir[i] = pa | 1;
+		gatt->ag_vdir[i + pdir_offset] = pa | 1;
 	}
 
 	/*
@@ -161,10 +184,16 @@ agp_amd_match(device_t dev)
 		return NULL;
 
 	switch (pci_get_devid(dev)) {
+
 	case 0x70061022:
 		return ("AMD 751 host to AGP bridge");
+	
 	case 0x700e1022:
 		return ("AMD 761 host to AGP bridge");
+
+	case 0x700c1022:
+		return ("AMD 762 host to AGP bridge");
+
 	};
 
 	return NULL;
@@ -303,9 +332,13 @@ agp_amd_set_aperture(device_t dev, u_int32_t aperture)
 
 	vas = ffs(aperture / 32*1024*1024) - 1;
 	
+	/* 
+	 * While the size register is bits 1-3 of APCTRL, bit 0 must be
+	 * set for the size value to be 'valid'
+	 */
 	pci_write_config(dev, AGP_AMD751_APCTRL,
-			 ((pci_read_config(dev, AGP_AMD751_APCTRL, 1) & ~0x06)
-			  | vas << 1), 1);
+			 (((pci_read_config(dev, AGP_AMD751_APCTRL, 1) & ~0x06)
+			  | ((vas << 1) | 1))), 1);
 
 	return 0;
 }
@@ -319,6 +352,9 @@ agp_amd_bind_page(device_t dev, int offset, vm_offset_t physical)
 		return EINVAL;
 
 	sc->gatt->ag_virtual[offset >> AGP_PAGE_SHIFT] = physical | 1;
+
+	/* invalidate the cache */
+	AGP_FLUSH_TLB(dev);
 	return 0;
 }
 

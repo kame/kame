@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)trap.c	7.4 (Berkeley) 5/13/91
- * $FreeBSD: src/sys/i386/i386/trap.c,v 1.147.2.8 2002/01/12 11:03:30 bde Exp $
+ * $FreeBSD: src/sys/i386/i386/trap.c,v 1.147.2.9 2002/02/09 23:02:38 luigi Exp $
  */
 
 /*
@@ -211,6 +211,11 @@ userret(p, frame, oticks, have_mplock)
 	return(have_mplock);
 }
 
+#ifdef DEVICE_POLLING
+extern u_int32_t poll_in_trap;
+extern int ether_poll __P((int count));
+#endif /* DEVICE_POLLING */
+
 /*
  * Exception, fault, and trap interface to the FreeBSD kernel.
  * This common code is called from assembly language IDT gate entry
@@ -265,6 +270,11 @@ trap(frame)
 		eva = rcr2();
 		enable_intr();
 	}
+
+#ifdef DEVICE_POLLING
+	if (poll_in_trap)
+		ether_poll(poll_in_trap);
+#endif /* DEVICE_POLLING */
 
 #if defined(I586_CPU) && !defined(NO_F00F_HACK)
 restart:

@@ -26,7 +26,7 @@
  *
  * 	From Id: probe_keyboard.c,v 1.13 1997/06/09 05:10:55 bde Exp
  *
- * $FreeBSD: src/sys/boot/pc98/libpc98/vidconsole.c,v 1.5.2.2 2001/12/18 13:03:25 nyan Exp $
+ * $FreeBSD: src/sys/boot/pc98/libpc98/vidconsole.c,v 1.5.2.3 2002/02/11 04:50:11 nyan Exp $
  */
 
 #include <stand.h>
@@ -739,7 +739,7 @@ delay7(void)
  * This routine uses an inb to an unused port, the time to execute that
  * inb is approximately 1.25uS.  This value is pretty constant across
  * all CPU's and all buses, with the exception of some PCI implentations
- * that do not forward this I/O adress to the ISA bus as they know it
+ * that do not forward this I/O address to the ISA bus as they know it
  * is not a valid ISA bus address, those machines execute this inb in
  * 60 nS :-(.
  *

@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_page.h,v 1.75.2.6 2001/06/03 05:00:12 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_page.h,v 1.75.2.8 2002/03/06 01:07:09 dillon Exp $
  */
 
 /*
@@ -202,21 +202,13 @@ struct vm_page {
 
 #define PQ_L2_MASK (PQ_L2_SIZE - 1)
 
-#if 1
 #define PQ_NONE 0
 #define PQ_FREE	1
 #define PQ_INACTIVE (1 + 1*PQ_L2_SIZE)
 #define PQ_ACTIVE (2 + 1*PQ_L2_SIZE)
 #define PQ_CACHE (3 + 1*PQ_L2_SIZE)
-#define PQ_COUNT (3 + 2*PQ_L2_SIZE)
-#else
-#define PQ_NONE		PQ_COUNT
-#define PQ_FREE		0
-#define PQ_INACTIVE	PQ_L2_SIZE
-#define PQ_ACTIVE	(1 +   PQ_L2_SIZE)
-#define PQ_CACHE	(2 +   PQ_L2_SIZE)
-#define PQ_COUNT	(2 + 2*PQ_L2_SIZE)
-#endif
+#define PQ_HOLD  (3 + 2*PQ_L2_SIZE)
+#define PQ_COUNT (4 + 2*PQ_L2_SIZE)
 
 struct vpgqueues {
 	struct pglist pl;
@@ -401,37 +393,39 @@ vm_page_io_finish(vm_page_t m)
 #define	VM_ALLOC_ZERO		3
 #define	VM_ALLOC_RETRY		0x80
 
-void vm_page_activate __P((vm_page_t));
-vm_page_t vm_page_alloc __P((vm_object_t, vm_pindex_t, int));
-vm_page_t vm_page_grab __P((vm_object_t, vm_pindex_t, int));
-void vm_page_cache __P((register vm_page_t));
-int vm_page_try_to_cache __P((vm_page_t));
-int vm_page_try_to_free __P((vm_page_t));
-void vm_page_dontneed __P((register vm_page_t));
-static __inline void vm_page_copy __P((vm_page_t, vm_page_t));
-static __inline void vm_page_free __P((vm_page_t));
-static __inline void vm_page_free_zero __P((vm_page_t));
-void vm_page_deactivate __P((vm_page_t));
-void vm_page_insert __P((vm_page_t, vm_object_t, vm_pindex_t));
-vm_page_t vm_page_lookup __P((vm_object_t, vm_pindex_t));
-void vm_page_remove __P((vm_page_t));
-void vm_page_rename __P((vm_page_t, vm_object_t, vm_pindex_t));
-vm_offset_t vm_page_startup __P((vm_offset_t, vm_offset_t, vm_offset_t));
-vm_page_t vm_add_new_page __P((vm_offset_t pa));
-void vm_page_unmanage __P((vm_page_t));
-void vm_page_unwire __P((vm_page_t, int));
-void vm_page_wire __P((vm_page_t));
-void vm_page_unqueue __P((vm_page_t));
-void vm_page_unqueue_nowakeup __P((vm_page_t));
-void vm_page_set_validclean __P((vm_page_t, int, int));
-void vm_page_set_dirty __P((vm_page_t, int, int));
-void vm_page_clear_dirty __P((vm_page_t, int, int));
-void vm_page_set_invalid __P((vm_page_t, int, int));
-static __inline boolean_t vm_page_zero_fill __P((vm_page_t));
-int vm_page_is_valid __P((vm_page_t, int, int));
-void vm_page_test_dirty __P((vm_page_t));
-int vm_page_bits __P((int, int));
-vm_page_t _vm_page_list_find __P((int, int));
+void vm_page_unhold(vm_page_t mem);
+
+void vm_page_activate (vm_page_t);
+vm_page_t vm_page_alloc (vm_object_t, vm_pindex_t, int);
+vm_page_t vm_page_grab (vm_object_t, vm_pindex_t, int);
+void vm_page_cache (register vm_page_t);
+int vm_page_try_to_cache (vm_page_t);
+int vm_page_try_to_free (vm_page_t);
+void vm_page_dontneed (register vm_page_t);
+static __inline void vm_page_copy (vm_page_t, vm_page_t);
+static __inline void vm_page_free (vm_page_t);
+static __inline void vm_page_free_zero (vm_page_t);
+void vm_page_deactivate (vm_page_t);
+void vm_page_insert (vm_page_t, vm_object_t, vm_pindex_t);
+vm_page_t vm_page_lookup (vm_object_t, vm_pindex_t);
+void vm_page_remove (vm_page_t);
+void vm_page_rename (vm_page_t, vm_object_t, vm_pindex_t);
+vm_offset_t vm_page_startup (vm_offset_t, vm_offset_t, vm_offset_t);
+vm_page_t vm_add_new_page (vm_offset_t pa);
+void vm_page_unmanage (vm_page_t);
+void vm_page_unwire (vm_page_t, int);
+void vm_page_wire (vm_page_t);
+void vm_page_unqueue (vm_page_t);
+void vm_page_unqueue_nowakeup (vm_page_t);
+void vm_page_set_validclean (vm_page_t, int, int);
+void vm_page_set_dirty (vm_page_t, int, int);
+void vm_page_clear_dirty (vm_page_t, int, int);
+void vm_page_set_invalid (vm_page_t, int, int);
+static __inline boolean_t vm_page_zero_fill (vm_page_t);
+int vm_page_is_valid (vm_page_t, int, int);
+void vm_page_test_dirty (vm_page_t);
+int vm_page_bits (int, int);
+vm_page_t _vm_page_list_find (int, int);
 #if 0
 int vm_page_sleep(vm_page_t m, char *msg, char *busy);
 int vm_page_asleep(vm_page_t m, char *msg, char *busy);
@@ -449,13 +443,6 @@ static __inline void
 vm_page_hold(vm_page_t mem)
 {
 	mem->hold_count++;
-}
-
-static __inline void
-vm_page_unhold(vm_page_t mem)
-{
-	--mem->hold_count;
-	KASSERT(mem->hold_count >= 0, ("vm_page_unhold: hold count < 0!!!"));
 }
 
 /*

@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/sound/pci/csa.c,v 1.8.2.9 2001/11/29 16:16:32 bmah Exp $
  */
 
 #include <sys/param.h>
@@ -49,6 +47,8 @@
 #include <pci/pcivar.h>
 
 #include <gnu/dev/sound/pci/csaimg.h>
+
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/csa.c,v 1.8.2.10 2002/04/22 15:49:32 cg Exp $");
 
 /* This is the pci device id. */
 #define CS4610_PCI_ID 0x60011013

@@ -1,7 +1,7 @@
 # This file tells config what files go into building a kernel,
 # files marked standard are always included.
 #
-# $FreeBSD: src/sys/conf/files.alpha,v 1.43.2.6 2000/10/25 06:26:54 sos Exp $
+# $FreeBSD: src/sys/conf/files.alpha,v 1.43.2.8 2002/03/26 10:22:22 ume Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -170,16 +170,10 @@ alpha/pci/t2.c			optional	dec_2100_a500
 alpha/pci/t2_pci.c		optional	dec_2100_a500
 alpha/pci/tsunami.c		optional	dec_st6600
 alpha/pci/tsunami_pci.c		optional	dec_st6600
+crypto/blowfish/bf_enc.c	optional	ipsec ipsec_esp
+crypto/des/des_enc.c		optional	ipsec ipsec_esp
 dev/advansys/adv_isa.c		optional	adv isa
 dev/aic/aic_isa.c		optional	aic isa
-dev/ata/ata-all.c		optional	ata
-dev/ata/ata-dma.c		optional	ata
-dev/ata/ata-disk.c		optional	atadisk
-dev/ata/ata-raid.c		optional	atadisk
-dev/ata/atapi-all.c		optional	ata
-dev/ata/atapi-cd.c		optional	atapicd
-dev/ata/atapi-fd.c		optional	atapifd
-dev/ata/atapi-tape.c		optional	atapist
 dev/fb/fb.c			optional	fb
 dev/fb/fb.c			optional	vga
 dev/fb/splash.c			optional	splash

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/pci/agp_intel.c,v 1.1.2.2 2001/11/19 07:16:40 kuriyama Exp $
+ *	$FreeBSD: src/sys/pci/agp_intel.c,v 1.1.2.3 2002/02/13 01:23:22 benno Exp $
  */
 
 #include "opt_bus.h"
@@ -77,6 +77,9 @@ agp_intel_match(device_t dev)
 
 	case 0x25008086:
  		return ("Intel 82820 host to AGP bridge");
+
+	case 0x35758086:
+		return ("Intel 82830 host to AGP bridge");
 
 	case 0x1a218086:
  		return ("Intel 82840 host to AGP bridge");

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/boot/i386/loader/conf.c,v 1.11.2.5 2001/12/21 22:20:37 jhb Exp $
+ * $FreeBSD: src/sys/boot/i386/loader/conf.c,v 1.11.2.6 2002/04/08 13:50:09 sobomax Exp $
  */
 
 #include <stand.h>
@@ -60,6 +60,7 @@ struct fs_ops *file_system[] = {
     &ext2fs_fsops,
     &dosfs_fsops,
     &cd9660_fsops,
+    &splitfs_fsops,
 #ifdef LOADER_GZIP_SUPPORT
     &zipfs_fsops,
 #endif

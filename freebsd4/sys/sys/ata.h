@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 2000,2001 Søren Schmidt <sos@FreeBSD.org>
+ * Copyright (c) 2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/ata.h,v 1.8.2.1 2001/11/04 13:32:01 asmodai Exp $
+ * $FreeBSD: src/sys/sys/ata.h,v 1.8.2.4 2002/04/02 14:47:35 sos Exp $
  */
 
 #ifndef _SYS_ATA_H_
@@ -233,6 +233,11 @@ struct ata_cmd {
 #define ATAATTACH		5
 #define ATADETACH		6
 #define ATAPICMD		7
+#define ATARAIDREBUILD		8
+#define ATARAIDCREATE		9
+#define ATARAIDDELETE		10
+#define ATARAIDSTATUS		11
+#define ATAENCSTAT		12
 
     union {
 	struct {
@@ -243,6 +248,35 @@ struct ata_cmd {
 	    char		name[2][32];
 	    struct ata_params	params[2];
 	} param;
+	struct raid_setup {
+	    int			type;
+#define	AR_RAID0			1
+#define	AR_RAID1			2
+#define	AR_SPAN				4
+
+	    int			total_disks;
+	    int			disks[16];
+	    int			interleave;
+	    int			unit;
+	} raid_setup;
+	struct raid_status {
+	    int			type;
+	    int			total_disks;
+	    int			disks[16];
+	    int			interleave;
+	    int			status;
+#define	AR_READY			1
+#define	AR_DEGRADED			2
+#define	AR_REBUILDING			4
+
+	    int			progress;
+	} raid_status;
+	struct {
+	    int			fan;
+	    int			temp;
+	    int			v05;
+	    int			v12;
+	} enclosure;
 	struct {
 	    char		ccb[16];
 	    caddr_t		data;

@@ -3,7 +3,7 @@
 #
 # modified for PC-9801
 #
-# $FreeBSD: src/sys/conf/files.pc98,v 1.140.2.26 2001/12/20 11:39:24 nyan Exp $
+# $FreeBSD: src/sys/conf/files.pc98,v 1.140.2.35 2002/04/28 20:20:30 imp Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -70,24 +70,21 @@ trlld.o				optional	oltr			\
 contrib/dev/oltr/trlldbm.c	optional	oltr
 contrib/dev/oltr/trlldhm.c	optional	oltr
 contrib/dev/oltr/trlldmac.c	optional	oltr
-crypto/des/des_ecb.c		optional	netsmbcrypto
-crypto/des/des_setkey.c		optional	netsmbcrypto
+bf_enc.o			optional	ipsec ipsec_esp		\
+	dependency	"$S/crypto/blowfish/arch/i386/bf_enc.S $S/crypto/blowfish/arch/i386/bf_enc_586.S $S/crypto/blowfish/arch/i386/bf_enc_686.S"		\
+	compile-with	"${CC} -c -I$S/crypto/blowfish/arch/i386 ${ASM_CFLAGS} ${WERROR} ${.IMPSRC}"	\
+	no-implicit-rule
+crypto/des/arch/i386/des_enc.S		optional	ipsec ipsec_esp
+crypto/des/des_ecb.c			optional	netsmbcrypto
+crypto/des/arch/i386/des_enc.S		optional	netsmbcrypto
+crypto/des/des_setkey.c			optional	netsmbcrypto
 #dev/advansys/adv_isa.c		optional	adv isa
 dev/aic/aic_cbus.c		optional	aic isa
-dev/ata/ata-all.c		optional	ata
-dev/ata/ata-dma.c		optional	ata
-dev/ata/ata-disk.c		optional	atadisk
-dev/ata/ata-raid.c		optional	atadisk
-dev/ata/atapi-all.c		optional	atapicd
-dev/ata/atapi-all.c		optional	atapifd
-dev/ata/atapi-all.c		optional	atapist
-dev/ata/atapi-cd.c		optional	atapicd
-dev/ata/atapi-fd.c		optional	atapifd
-dev/ata/atapi-tape.c		optional	atapist
 dev/ct/bshw_machdep.c		optional	ct
 dev/ct/ct.c			optional	ct
 dev/ct/ct_isa.c			optional	ct isa
 dev/dgb/dgm.c			optional	dgm
+dev/cm/if_cm_isa.c		optional	cm isa
 dev/ed/if_ed.c			optional	ed
 dev/ed/if_ed_cbus.c		optional	ed isa
 dev/ed/if_ed_pccard.c		optional	ed card
@@ -103,6 +100,8 @@ dev/kbd/kbd.c			optional	kbd
 dev/kbd/kbd.c			optional	sc
 dev/kbd/kbd.c			optional	ukbd
 dev/kbd/kbd.c			optional	pckbd
+dev/puc/puc.c			optional	puc
+dev/puc/pucdata.c		optional	puc
 dev/sbni/if_sbni.c		optional	sbni
 dev/sbni/if_sbni_isa.c		optional	sbni isa
 dev/snc/dp83932.c		optional	snc
@@ -157,6 +156,8 @@ i386/i386/autoconf.c		standard
 i386/i386/bios.c		standard
 i386/i386/bioscall.s		standard
 i386/i386/busdma_machdep.c	standard
+pc98/i386/busio.s		standard
+pc98/i386/busiosubr.c		standard
 i386/i386/db_disasm.c		optional	ddb
 i386/i386/db_interface.c	optional	ddb
 i386/i386/db_trace.c		optional	ddb
@@ -237,7 +238,6 @@ i386/isa/if_le.c		optional	le
 i386/isa/if_lnc.c		optional	lnc
 i386/isa/if_rdp.c		optional	rdp
 i386/isa/if_sr.c		optional	sr
-i386/isa/if_wi.c		optional	wi
 i386/isa/if_wl.c		optional	wl
 i386/isa/intr_machdep.c		standard
 i386/isa/ipl_funcs.c		standard				   \
@@ -386,7 +386,7 @@ i386/svr4/svr4_locore.s		optional	compat_svr4		   \
 	dependency	"svr4_assym.h"
 i386/svr4/svr4_machdep.c	optional	compat_svr4
 #
-# isdn4bsd, needed for isic | iwic | ifpi | ihfc | ifpnp | itjc
+# isdn4bsd, needed for isic | iwic | ifpi | | ifpi2 | ihfc | ifpnp | itjc
 #
 i4b/layer1/i4b_l1dmux.c         	optional        isic
 i4b/layer1/i4b_l1lib.c          	optional        isic
@@ -394,6 +394,8 @@ i4b/layer1/i4b_l1dmux.c         	optional        iwic
 i4b/layer1/i4b_l1lib.c          	optional        iwic
 i4b/layer1/i4b_l1dmux.c         	optional        ifpi
 i4b/layer1/i4b_l1lib.c          	optional        ifpi
+i4b/layer1/i4b_l1dmux.c         	optional        ifpi2
+i4b/layer1/i4b_l1lib.c          	optional        ifpi2
 i4b/layer1/i4b_l1dmux.c         	optional        ihfc
 i4b/layer1/i4b_l1lib.c          	optional        ihfc
 i4b/layer1/i4b_l1dmux.c         	optional        ifpnp
@@ -442,6 +444,13 @@ i4b/layer1/ifpi/i4b_ifpi_pci.c		optional	ifpi
 i4b/layer1/ifpi/i4b_ifpi_isac.c		optional	ifpi
 i4b/layer1/ifpi/i4b_ifpi_l1.c		optional	ifpi
 i4b/layer1/ifpi/i4b_ifpi_l1fsm.c	optional	ifpi
+#
+# isdn4bsd, ifpi2
+#
+i4b/layer1/ifpi2/i4b_ifpi2_pci.c	optional	ifpi2
+i4b/layer1/ifpi2/i4b_ifpi2_isacsx.c	optional	ifpi2
+i4b/layer1/ifpi2/i4b_ifpi2_l1.c		optional	ifpi2
+i4b/layer1/ifpi2/i4b_ifpi2_l1fsm.c	optional	ifpi2
 #
 # isdn4bsd, ifpnp
 #

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)param.c	8.3 (Berkeley) 8/20/94
- * $FreeBSD: src/sys/kern/subr_param.c,v 1.42.2.8 2002/01/25 18:19:54 dillon Exp $
+ * $FreeBSD: src/sys/kern/subr_param.c,v 1.42.2.10 2002/03/09 21:05:47 silby Exp $
  */
 
 #include "opt_param.h"
@@ -139,14 +139,15 @@ init_param2(int physpages)
 {
 
 	/* Base parameters */
-	if ((maxusers = MAXUSERS) == 0) {
+	maxusers = MAXUSERS;
+	TUNABLE_INT_FETCH("kern.maxusers", &maxusers);
+	if (maxusers == 0) {
 		maxusers = physpages / (2 * 1024 * 1024 / PAGE_SIZE);
 		if (maxusers < 32)
 		    maxusers = 32;
 		if (maxusers > 384)
 		    maxusers = 384;
 	}
-	TUNABLE_INT_FETCH("kern.maxusers", &maxusers);
 
 	/*
 	 * The following can be overridden after boot via sysctl.  Note:
@@ -154,6 +155,12 @@ init_param2(int physpages)
 	 */
 	maxproc = NPROC;
 	TUNABLE_INT_FETCH("kern.maxproc", &maxproc);
+	/*
+	 * Limit maxproc so that kmap entries cannot be exhausted by
+	 * processes.
+	 */
+	if (maxproc > (physpages / 12))
+		maxproc = physpages / 12;
 	maxfiles = MAXFILES;
 	TUNABLE_INT_FETCH("kern.maxfiles", &maxfiles);
 	maxprocperuid = (maxproc * 9) / 10;

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/syscons/syscons.c,v 1.336.2.12 2001/11/15 19:13:51 asmodai Exp $
+ * $FreeBSD: src/sys/dev/syscons/syscons.c,v 1.336.2.13 2002/04/08 13:37:26 sobomax Exp $
  */
 
 #include "splash.h"
@@ -733,6 +733,7 @@ scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct proc *p)
 	vid_info_t *ptr = (vid_info_t*)data;
 	if (ptr->size == sizeof(struct vid_info)) {
 	    ptr->m_num = sc->cur_scp->index;
+	    ptr->font_size = scp->font_size;
 	    ptr->mv_col = scp->xpos;
 	    ptr->mv_row = scp->ypos;
 	    ptr->mv_csz = scp->xsize;

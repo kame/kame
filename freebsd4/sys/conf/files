@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/files,v 1.340.2.87 2001/12/19 20:59:27 fjoe Exp $
+# $FreeBSD: src/sys/conf/files,v 1.340.2.102 2002/05/04 08:48:53 msmith Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -80,7 +80,6 @@ contrib/ipfilter/netinet/ip_nat.c	optional ipfilter inet
 contrib/ipfilter/netinet/ip_proxy.c	optional ipfilter inet
 contrib/ipfilter/netinet/ip_state.c	optional ipfilter inet
 contrib/ipfilter/netinet/mlfk_ipl.c	optional ipfilter inet
-crypto/blowfish/bf_enc.c	optional ipsec ipsec_esp
 crypto/blowfish/bf_skey.c	optional ipsec ipsec_esp
 crypto/cast128/cast128.c	optional ipsec ipsec_esp
 crypto/des/des_ecb.c	optional ipsec ipsec_esp
@@ -111,6 +110,7 @@ dev/aac/aac.c		optional aac
 #dev/aac/aac_debug.c	optional aac
 dev/aac/aac_disk.c	optional aac
 dev/aac/aac_pci.c	optional aac pci
+dev/aac/aac_cam.c	optional aacp aac
 dev/advansys/adv_eisa.c	optional adv eisa
 dev/advansys/adv_pci.c	optional adv pci
 dev/advansys/advansys.c	optional adv
@@ -125,6 +125,19 @@ dev/an/if_an_isa.c	optional an isa
 dev/an/if_an_pci.c	optional an pci
 dev/an/if_an_pccard.c	optional an card
 dev/asr/asr.c		optional asr pci
+dev/ata/ata-all.c	optional ata
+dev/ata/ata-isa.c	optional ata isa
+dev/ata/ata-card.c	optional ata card
+dev/ata/ata-pci.c	optional ata pci
+dev/ata/ata-dma.c	optional ata pci
+dev/ata/ata-disk.c	optional atadisk
+dev/ata/ata-raid.c	optional atadisk
+dev/ata/atapi-all.c	optional atapicd
+dev/ata/atapi-all.c	optional atapifd
+dev/ata/atapi-all.c	optional atapist
+dev/ata/atapi-cd.c	optional atapicd
+dev/ata/atapi-fd.c	optional atapifd
+dev/ata/atapi-tape.c	optional atapist
 #dev/amr/amr_cam.c	optional amr
 dev/amr/amr_disk.c	optional amr
 dev/amr/amr_pci.c	optional amr
@@ -141,7 +154,7 @@ dev/aic7xxx/ahc_eisa.c	optional ahc eisa
 dev/aic7xxx/ahc_pci.c	optional ahc pci
 dev/aic7xxx/aic7xxx.c	optional ahc
 dev/aic7xxx/aic7xxx_93cx6.c	optional ahc
-dev/aic7xxx/aic7xxx_freebsd.c	optional ahc
+dev/aic7xxx/aic7xxx_osm.c	optional ahc
 dev/aic7xxx/aic7xxx_pci.c	optional ahc pci
 dev/bge/if_bge.c	optional bge
 dev/buslogic/bt.c	optional bt
@@ -151,6 +164,7 @@ dev/buslogic/bt_eisa.c	optional bt eisa
 dev/buslogic/bt_pci.c	optional bt pci
 dev/ccd/ccd.c		optional ccd
 dev/ciss/ciss.c		optional ciss
+dev/cm/smc90cx6.c	optional cm
 dev/cs/if_cs.c		optional cs
 dev/cs/if_cs_isa.c	optional cs isa
 dev/cs/if_cs_pccard.c	optional cs card
@@ -203,8 +217,12 @@ dev/ida/ida_eisa.c	optional ida eisa
 dev/ida/ida_pci.c	optional ida pci
 dev/isp/isp_freebsd.c	optional isp
 dev/isp/isp.c		optional isp
+dev/isp/isp_pci.c	optional isp
 dev/isp/isp_target.c	optional isp
 dev/ispfw/ispfw.c	optional ispfw
+dev/iir/iir.c		optional iir
+dev/iir/iir_ctrl.c	optional iir
+dev/iir/iir_pci.c	optional iir pci
 dev/lge/if_lge.c	optional lge
 dev/mca/mca_bus.c	optional mca
 dev/md/md.c		optional md
@@ -249,6 +267,7 @@ dev/mlx/mlx.c		optional mlx
 dev/mly/mly.c		optional mly
 dev/mly/mly_cam.c	optional mly
 dev/mly/mly_pci.c	optional mly
+dev/my/if_my.c		optional my
 dev/musycc/musycc.c	optional musycc
 dev/ncv/ncr53c500.c	optional ncv
 dev/ncv/ncr53c500_pccard.c	optional ncv card
@@ -379,6 +398,7 @@ dev/si/si_pci.c		optional si pci
 dev/sn/if_sn.c		optional sn
 dev/sn/if_sn_isa.c	optional sn isa
 dev/sn/if_sn_pccard.c	optional sn card
+dev/snp/snp.c		optional snp
 dev/stg/tmc18c30.c	optional stg
 dev/stg/tmc18c30_isa.c	optional stg isa
 dev/stg/tmc18c30_pccard.c	optional stg card
@@ -438,6 +458,10 @@ dev/vn/vn.c			optional vn
 dev/vx/if_vx.c			optional vx
 dev/vx/if_vx_eisa.c		optional vx eisa
 dev/vx/if_vx_pci.c		optional vx pci
+dev/wi/if_wi.c			optional wi
+dev/wi/if_wi_pccard.c		optional wi card
+dev/wi/if_wi_pci.c		optional wi pci
+dev/wi/wi_hostap.c		optional wi
 dev/xe/if_xe.c			optional xe card
 gnu/ext2fs/ext2_alloc.c		optional ext2fs
 gnu/ext2fs/ext2_balloc.c	optional ext2fs
@@ -460,7 +484,6 @@ net/slcompress.c		optional i4bipr
 i4b/driver/i4b_ctl.c		optional i4bctl
 i4b/driver/i4b_ing.c		optional i4bing
 i4b/driver/i4b_isppp.c		optional i4bisppp
-i4b/driver/i4b_ispppsubr.c	optional i4bisppp
 net/slcompress.c		optional i4bisppp
 #
 # isdn4bsd CAPI driver
@@ -546,6 +569,7 @@ kern/kern_malloc.c	standard
 kern/kern_mib.c		standard
 kern/kern_ntptime.c	standard
 kern/kern_physio.c	standard
+kern/kern_poll.c	optional device_polling
 kern/kern_proc.c	standard
 kern/kern_prot.c	standard
 kern/kern_random.c	standard
@@ -593,7 +617,6 @@ kern/tty_compat.c	standard
 kern/tty_conf.c		standard
 kern/tty_cons.c		standard
 kern/tty_pty.c		optional pty
-kern/tty_snoop.c	optional snp
 kern/tty_subr.c		standard
 kern/tty_tty.c		standard
 kern/uipc_accf.c	optional inet
@@ -665,6 +688,7 @@ net/bridge.c		optional bridge
 net/bsd_comp.c		optional ppp_bsdcomp
 #net/hostcache.c		standard
 net/if.c		standard
+net/if_arcsubr.c	optional arcnet
 net/if_atmsubr.c	optional atm
 net/if_disc.c		optional disc
 net/if_ef.c		optional ef
@@ -679,6 +703,7 @@ net/if_mib.c		standard
 net/if_ppp.c		optional ppp
 net/if_sl.c		optional sl
 net/if_spppsubr.c	optional sppp
+net/if_spppsubr.c	optional i4bisppp
 net/if_stf.c		optional stf
 net/if_tun.c		optional tun
 net/if_tap.c		optional tap
@@ -1003,9 +1028,9 @@ pci/if_vr.c		optional vr
 pci/if_wb.c		optional wb
 pci/if_wx.c		optional wx
 pci/if_xl.c		optional xl
-pci/isp_pci.c		optional isp
 pci/intpm.c		optional intpm
 pci/amdpm.c		optional amdpm
+pci/viapm.c		optional viapm
 pci/meteor.c		optional meteor pci
 pci/ncr.c		optional ncr
 dev/sym/sym_hipd.c	optional sym					\
@@ -1108,6 +1133,7 @@ dev/usb/usb_ethersubr.c	optional usb
 dev/usb/usb_subr.c	optional usb
 dev/usb/usb_quirks.c	optional usb
 dev/usb/hid.c		optional usb
+dev/usb/ufm.c		optional ufm
 dev/usb/ugen.c		optional ugen
 dev/usb/uhid.c		optional uhid
 dev/usb/ums.c		optional ums

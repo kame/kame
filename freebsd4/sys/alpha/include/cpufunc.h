@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/include/cpufunc.h,v 1.6.2.1 2000/07/04 01:50:24 mjacob Exp $
+ * $FreeBSD: src/sys/alpha/include/cpufunc.h,v 1.6.2.2 2002/02/12 01:20:50 gallatin Exp $
  */
 
 #ifndef _MACHINE_CPUFUNC_H_
@@ -33,6 +33,7 @@
 
 #include <sys/types.h>
 #include <machine/chipset.h>
+#include <machine/alpha_cpu.h>
 
 #ifdef __GNUC__
 
@@ -112,6 +113,18 @@ extern void memcpy_io(u_int32_t, u_int32_t, size_t);
 extern void memset_io(u_int32_t, int, size_t);
 extern void memsetw(void *, int, size_t);
 extern void memsetw_io(u_int32_t, int, size_t);
+
+static __inline void
+enable_intr(void)
+{
+	(void)alpha_pal_swpipl(ALPHA_PSL_IPL_0);
+}
+
+static __inline void
+disable_intr(void)
+{
+	(void)alpha_pal_swpipl(ALPHA_PSL_IPL_HIGH);
+}
 
 
 #endif /* _KERNEL */

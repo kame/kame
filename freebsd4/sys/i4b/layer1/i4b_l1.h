@@ -27,7 +27,7 @@
  *	i4b_l1.h - isdn4bsd layer 1 header file
  *	---------------------------------------
  *
- * $FreeBSD: src/sys/i4b/layer1/i4b_l1.h,v 1.7.2.2 2001/08/10 14:08:36 obrien Exp $
+ * $FreeBSD: src/sys/i4b/layer1/i4b_l1.h,v 1.7.2.3 2002/04/25 12:29:55 gj Exp $
  *
  *      last edit-date: [Tue Jan 23 17:04:57 2001]
  *
@@ -58,6 +58,7 @@
 #define L0IFPNPUNIT(u) ( (((L1DRVR_IFPNP) << 8) & 0xff00) | ((u) & 0xff))
 #define L0ICCHPUNIT(u) ( (((L1DRVR_ICCHP) << 8) & 0xff00) | ((u) & 0xff))
 #define L0ITJCUNIT(u) ( (((L1DRVR_ITJC) << 8) & 0xff00) | ((u) & 0xff))
+#define L0IFPI2UNIT(u) ( (((L1DRVR_IFPI2) << 8) & 0xff00) | ((u) & 0xff))
 
 /* jump table for the multiplex functions */
 struct i4b_l1mux_func {

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ether.h	8.3 (Berkeley) 5/2/95
- * $FreeBSD: src/sys/netinet/if_ether.h,v 1.24 1999/12/29 04:40:58 peter Exp $
+ * $FreeBSD: src/sys/netinet/if_ether.h,v 1.24.2.1 2002/02/13 21:38:56 fjoe Exp $
  */
 
 #ifndef _NETINET_IF_ETHER_H_
@@ -114,9 +114,9 @@ extern u_char	ether_ipmulticast_min[ETHER_ADDR_LEN];
 extern u_char	ether_ipmulticast_max[ETHER_ADDR_LEN];
 extern struct	ifqueue arpintrq;
 
-int	arpresolve __P((struct arpcom *, struct rtentry *, struct mbuf *,
+int	arpresolve __P((struct ifnet *, struct rtentry *, struct mbuf *,
 			struct sockaddr *, u_char *, struct rtentry *));
-void	arp_ifinit __P((struct arpcom *, struct ifaddr *));
+void	arp_ifinit __P((struct ifnet *, struct ifaddr *));
 #endif
 
 #endif

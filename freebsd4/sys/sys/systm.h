@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)systm.h	8.7 (Berkeley) 3/29/95
- * $FreeBSD: src/sys/sys/systm.h,v 1.111.2.13 2001/12/13 19:18:01 dillon Exp $
+ * $FreeBSD: src/sys/sys/systm.h,v 1.111.2.14 2002/04/27 00:57:39 mux Exp $
  */
 
 #ifndef _SYS_SYSTM_H_
@@ -173,6 +173,8 @@ void	stopprofclock __P((struct proc *));
 void	setstatclockrate __P((int hzrate));
 
 char	*getenv __P((const char *name));
+#define	testenv	getenv
+#define	freeenv
 int	getenv_int __P((const char *name, int *data));
 int	getenv_string __P((const char *name, char *data, int size));
 int	getenv_quad __P((const char *name, quad_t *data));

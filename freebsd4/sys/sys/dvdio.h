@@ -1,5 +1,5 @@
 /*-
- * Copyright (c) 1999,2000 Søren Schmidt
+ * Copyright (c) 1999,2000,2001,2002 Søren Schmidt <sos@FreeBSD.org>
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/dvdio.h,v 1.2.2.1 2000/05/31 03:14:38 ken Exp $
+ * $FreeBSD: src/sys/sys/dvdio.h,v 1.2.2.2 2002/03/18 08:34:53 sos Exp $
  */
 
 #ifndef _SYS_DVDIO_H_

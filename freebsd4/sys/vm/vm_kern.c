@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_kern.c,v 1.61.2.1 2000/08/04 22:31:11 peter Exp $
+ * $FreeBSD: src/sys/vm/vm_kern.c,v 1.61.2.2 2002/03/12 18:25:26 tegge Exp $
  */
 
 /*
@@ -361,6 +361,18 @@ retry:
 				VM_WAIT;
 				vm_map_lock(map);
 				goto retry;
+			}
+			/* 
+			 * Free the pages before removing the map entry.
+			 * They are already marked busy.  Calling
+			 * vm_map_delete before the pages has been freed or
+			 * unbusied will cause a deadlock.
+			 */
+			while (i != 0) {
+				i -= PAGE_SIZE;
+				m = vm_page_lookup(kmem_object,
+						   OFF_TO_IDX(offset + i));
+				vm_page_free(m);
 			}
 			vm_map_delete(map, addr, addr + size);
 			vm_map_unlock(map);

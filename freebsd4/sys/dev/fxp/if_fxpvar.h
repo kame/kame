@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fxp/if_fxpvar.h,v 1.17.2.4 2001/11/02 16:50:42 jlemon Exp $
+ * $FreeBSD: src/sys/dev/fxp/if_fxpvar.h,v 1.17.2.5 2002/02/09 23:02:39 luigi Exp $
  */
 
 /*
@@ -57,7 +57,11 @@
  * Number of receive frame area buffers. These are large so chose
  * wisely.
  */
+#ifdef DEVICE_POLLING
+#define FXP_NRFABUFS	192
+#else
 #define FXP_NRFABUFS    64
+#endif
 
 /*
  * Maximum number of seconds that the receiver can be idle before we

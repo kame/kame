@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)conf.h	8.5 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/sys/conf.h,v 1.103.2.4 2001/11/08 07:11:23 imp Exp $
+ * $FreeBSD: src/sys/sys/conf.h,v 1.103.2.6 2002/03/11 01:14:55 dd Exp $
  */
 
 #ifndef _SYS_CONF_H_
@@ -254,6 +254,7 @@ d_dump_t	nodump;
 d_open_t	nullopen;
 d_close_t	nullclose;
 
+l_ioctl_t	l_nullioctl;
 l_read_t	l_noread;
 l_write_t	l_nowrite;
 
@@ -286,6 +287,7 @@ dev_t	makebdev __P((int maj, int min));
 dev_t	make_dev __P((struct cdevsw *devsw, int minor, uid_t uid, gid_t gid, int perms, const char *fmt, ...)) __printflike(6, 7);
 int	lminor __P((dev_t dev));
 void	setconf __P((void));
+dev_t	getdiskbyname(char *name);
 
 /*
  * XXX: This included for when DEVFS resurfaces 

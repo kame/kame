@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/twe/twe_tables.h,v 1.1.2.1 2000/10/27 06:04:02 msmith Exp $
+ *	$FreeBSD: src/sys/dev/twe/twe_tables.h,v 1.1.2.2 2002/03/07 09:57:02 msmith Exp $
  */
 
 /*
@@ -118,7 +118,7 @@ struct twe_code_lookup twe_table_aen[] = {
     {"q queue empty",			0x00},
     {"q soft reset",			0x01},
     {"c degraded mirror",		0x02},
-    {"p controller error",		0x03},
+    {"a controller error",		0x03},
     {"c rebuild fail",			0x04},
     {"c rebuild done",			0x05},
     {"c incomplete unit",		0x06},
@@ -127,7 +127,23 @@ struct twe_code_lookup twe_table_aen[] = {
     {"c drive timeout",			0x09},
     {"c drive error",			0x0a},
     {"c rebuild started",		0x0b},
-    {"p aen queue full",		0xff},
+    {"c init started",			0x0c},
+    {"c logical unit deleted",		0x0d},
+    {"p SMART threshold exceeded",	0x0f},
+    {"p ATA UDMA downgrade",		0x21},
+    {"p ATA UDMA upgrade",		0x22},
+    {"p sector repair occurred",	0x23},
+    {"a SBUF integrity check failure",	0x24},
+    {"p lost cached write",		0x25},
+    {"p drive ECC error detected",	0x26},
+    {"p DCB checksum error",		0x27},
+    {"p DCB unsupported version",	0x28},
+    {"c verify started",		0x29},
+    {"c verify failed",			0x2a},
+    {"c verify complete",		0x2b},
+    {"p overwrote bad sector during rebuild",	0x2c},
+    {"p encountered bad sector during rebuild",	0x2d},
+    {"a aen queue full",		0xff},
     {NULL, 0},
     {"x unknown AEN",		0}
 };

@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_tty.c,v 1.7.2.2 2000/10/24 18:36:46 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_tty.c,v 1.7.2.3 2002/02/13 00:43:12 dillon Exp $
  * $Whistle: ng_tty.c,v 1.21 1999/11/01 09:24:52 julian Exp $
  */
 
@@ -429,7 +429,6 @@ ngt_start(struct tty *tp)
 
 		/* Send as much of it as possible */
 		while (m) {
-			struct mbuf *m2;
 			int     sent;
 
 			sent = m->m_len
@@ -438,8 +437,7 @@ ngt_start(struct tty *tp)
 			m->m_len -= sent;
 			if (m->m_len > 0)
 				break;	/* device can't take no more */
-			MFREE(m, m2);
-			m = m2;
+			m = m_free(m);
 		}
 
 		/* Put remainder of mbuf chain (if any) back on queue */

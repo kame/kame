@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/module.h,v 1.14.2.1 2000/08/09 00:00:07 peter Exp $
+ * $FreeBSD: src/sys/sys/module.h,v 1.14.2.3 2002/03/17 11:07:45 alfred Exp $
  */
 
 #ifndef _SYS_MODULE_H_
@@ -44,7 +44,7 @@ typedef	int (*modeventhand_t)(module_t mod, int /*modeventtype_t*/ what,
  * Struct for registering modules statically via SYSINIT.
  */
 typedef struct moduledata {
-	char		*name;	/* module name */
+	const char	*name;	/* module name */
 	modeventhand_t	evhand;	/* event handler */
 	void		*priv;	/* extra data */
 } moduledata_t;
@@ -117,10 +117,10 @@ struct module_stat {
 #include <sys/cdefs.h>
 
 __BEGIN_DECLS
-int	modnext(int modid);
-int	modfnext(int modid);
-int	modstat(int modid, struct module_stat* stat);
-int	modfind(const char *name);
+int	modnext(int _modid);
+int	modfnext(int _modid);
+int	modstat(int _modid, struct module_stat* _stat);
+int	modfind(const char *_name);
 __END_DECLS
 
 #endif

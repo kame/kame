@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/netgraph.h,v 1.6.2.5 2001/09/03 06:38:15 julian Exp $
+ * $FreeBSD: src/sys/netgraph/netgraph.h,v 1.6.2.7 2002/04/14 23:31:08 julian Exp $
  * $Whistle: netgraph.h,v 1.29 1999/11/01 07:56:13 julian Exp $
  */
 
@@ -121,7 +121,7 @@ void	ng_unref_node(node_p node); /* don't move this */
 #define NG_NODE_HAS_NAME(node)	((node)->name[0] + 0)
 #define NG_NODE_ID(node)	((node)->ID + 0)
 #define NG_NODE_REF(node)	atomic_add_int(&(node)->refs, 1)
-#define NG_NODE_UNREF(node)	ng_unref_node(node)
+#define NG_NODE_UNREF(node)	ng_unref(node)
 #define NG_NODE_SET_PRIVATE(node, val)	do {(node)->private = val;} while (0)
 #define NG_NODE_PRIVATE(node)	((node)->private)
 #define NG_NODE_IS_VALID(node)	(!((node)->flags & NG_INVALID))
@@ -217,6 +217,12 @@ struct ng_type {
 		(error) = ng_send_data((hook), (m), (a));		\
 		(m) = NULL;						\
 		(a) = NULL;						\
+	} while (0)
+
+#define NG_SEND_DATA_ONLY(error, hook, m)				\
+	do {								\
+		(error) = ng_send_data((hook), (m), NULL);		\
+		(m) = NULL;						\
 	} while (0)
 
 /* Send  queued data packet with meta-data */

@@ -1,4 +1,4 @@
-/*-
+/*
  * Copyright (c) 1999 Seigo Tanimura
  * All rights reserved.
  *
@@ -22,13 +22,13 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/sound/isa/sbc.c,v 1.19.2.10 2001/10/06 17:42:21 greid Exp $
  */
 
 #include <dev/sound/chip.h>
 #include <dev/sound/pcm/sound.h>
 #include <dev/sound/isa/sb.h>
+
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/isa/sbc.c,v 1.19.2.11 2002/04/22 15:49:31 cg Exp $");
 
 #define IO_MAX	3
 #define IRQ_MAX	1
@@ -114,7 +114,7 @@ static void sb_setmixer(struct resource *io, u_int port, u_int value);
 static void
 sbc_lockinit(struct sbc_softc *scp)
 {
-	scp->lock = snd_mtxcreate(device_get_nameunit(scp->dev));
+	scp->lock = snd_mtxcreate(device_get_nameunit(scp->dev), "sound softc");
 }
 
 static void

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_socket.c	8.3 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/uipc_socket.c,v 1.68.2.17 2001/12/01 21:32:42 dillon Exp $
+ * $FreeBSD: src/sys/kern/uipc_socket.c,v 1.68.2.21 2002/05/01 03:27:35 silby Exp $
  */
 
 #include "opt_inet.h"
@@ -115,7 +115,6 @@ soalloc(waitok)
 		/* XXX race condition for reentrant kernel */
 		bzero(so, sizeof *so);
 		so->so_gencnt = ++so_gencnt;
-		so->so_zone = socket_zone;
 		TAILQ_INIT(&so->so_aiojobq);
 	}
 	return so;
@@ -208,7 +207,7 @@ sodealloc(so)
 	}
 #endif /* INET */
 	crfree(so->so_cred);
-	zfreei(so->so_zone, so);
+	zfreei(socket_zone, so);
 }
 
 int
@@ -257,7 +256,6 @@ sofree(so)
 		} else {
 			panic("sofree: not queued");
 		}
-		head->so_qlen--;
 		so->so_state &= ~SS_INCOMP;
 		so->so_head = NULL;
 	}
@@ -525,7 +523,7 @@ restart:
 		if ((atomic && resid > so->so_snd.sb_hiwat) ||
 		    clen > so->so_snd.sb_hiwat)
 			snderr(EMSGSIZE);
-		if (space < resid + clen && uio &&
+		if (space < resid + clen &&
 		    (atomic || space < so->so_snd.sb_lowat || space < clen)) {
 			if (so->so_state & SS_NBIO)
 				snderr(EWOULDBLOCK);
@@ -782,7 +780,7 @@ dontblock:
 			m = m->m_next;
 		} else {
 			sbfree(&so->so_rcv, m);
-			MFREE(m, so->so_rcv.sb_mb);
+			so->so_rcv.sb_mb = m_free(m);
 			m = so->so_rcv.sb_mb;
 		}
 	}
@@ -803,7 +801,7 @@ dontblock:
 				m->m_next = 0;
 				m = so->so_rcv.sb_mb;
 			} else {
-				MFREE(m, so->so_rcv.sb_mb);
+				so->so_rcv.sb_mb = m_free(m);
 				m = so->so_rcv.sb_mb;
 			}
 		}
@@ -867,8 +865,7 @@ dontblock:
 					so->so_rcv.sb_mb = m = m->m_next;
 					*mp = (struct mbuf *)0;
 				} else {
-					MFREE(m, so->so_rcv.sb_mb);
-					m = so->so_rcv.sb_mb;
+					so->so_rcv.sb_mb = m = m_free(m);
 				}
 				if (m)
 					m->m_nextpkt = nextrecord;
@@ -1643,6 +1640,6 @@ filt_solisten(struct knote *kn, long hint)
 {
 	struct socket *so = (struct socket *)kn->kn_fp->f_data;
 
-	kn->kn_data = so->so_qlen - so->so_incqlen;
+	kn->kn_data = so->so_qlen;
 	return (! TAILQ_EMPTY(&so->so_comp));
 }

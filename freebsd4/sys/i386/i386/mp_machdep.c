@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.115.2.10 2001/10/05 06:20:17 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/mp_machdep.c,v 1.115.2.12 2002/04/28 18:18:17 tegge Exp $
  */
 
 #include "opt_cpu.h"
@@ -455,6 +455,7 @@ init_secondary(void)
 {
 	int	gsel_tss;
 	int	x, myid = bootAP;
+	u_int	cr0;
 
 	gdt_segs[GPRIV_SEL].ssd_base = (int) &SMP_prvspace[myid];
 	gdt_segs[GPROC0_SEL].ssd_base =
@@ -484,6 +485,15 @@ init_secondary(void)
 	tss_gdt = &gdt[myid * NGDT + GPROC0_SEL].sd;
 	common_tssd = *tss_gdt;
 	ltr(gsel_tss);
+
+	/*
+	 * Set to a known state:
+	 * Set by mpboot.s: CR0_PG, CR0_PE
+	 * Set by cpu_setregs: CR0_NE, CR0_MP, CR0_TS, CR0_WP, CR0_AM
+	 */
+	cr0 = rcr0();
+	cr0 &= ~(CR0_CD | CR0_NW | CR0_EM);
+	load_cr0(cr0);
 
 	pmap_set_opt();
 }
@@ -1002,7 +1012,7 @@ revoke_apic_irq(int irq)
 	int oldintpin;
 	
 	if (int_to_apicintpin[irq].ioapic == -1)
-		panic("assign_apic_irq: inconsistent table");
+		panic("revoke_apic_irq: inconsistent table");
 	
 	oldapic = int_to_apicintpin[irq].ioapic;
 	oldintpin = int_to_apicintpin[irq].int_pin;
@@ -1015,7 +1025,7 @@ revoke_apic_irq(int irq)
 	for (x = 0; x < nintrs; x++) {
 		if ((io_apic_ints[x].int_type == 0 || 
 		     io_apic_ints[x].int_type == 3) &&
-		    io_apic_ints[x].int_vector == 0xff &&
+		    io_apic_ints[x].int_vector != 0xff &&
 		    io_apic_ints[x].dst_apic_id == IO_TO_ID(oldapic) &&
 		    io_apic_ints[x].dst_apic_int == oldintpin)
 			io_apic_ints[x].int_vector = 0xff;

@@ -1,5 +1,5 @@
 /*	$NetBSD: usbdi_util.c,v 1.24 1999/11/17 23:00:50 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usbdi_util.c,v 1.15.2.3 2000/10/31 23:23:30 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usbdi_util.c,v 1.15.2.4 2002/01/30 13:49:59 joe Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -460,6 +460,7 @@ usbd_alloc_report_desc(ifc, descp, sizep, mem)
 				       *sizep, *descp);
 	if (err) {
 		free(*descp, mem);
+		*descp = NULL;
 		return (err);
 	}
 	return (USBD_NORMAL_COMPLETION);

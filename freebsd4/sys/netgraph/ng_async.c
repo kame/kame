@@ -36,7 +36,7 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_async.c,v 1.6.2.3 2000/10/24 18:36:44 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_async.c,v 1.6.2.4 2002/02/13 00:43:12 dillon Exp $
  * $Whistle: ng_async.c,v 1.17 1999/11/01 09:24:51 julian Exp $
  */
 
@@ -452,15 +452,12 @@ nga_rcv_sync(const sc_p sc, struct mbuf *m, meta_p meta)
 
 	/* Add packet payload */
 	while (m != NULL) {
-		struct mbuf *n;
-
 		while (m->m_len > 0) {
 			ADD_BYTE(*mtod(m, u_char *));
 			m->m_data++;
 			m->m_len--;
 		}
-		MFREE(m, n);
-		m = n;
+		m = m_free(m);
 	}
 
 	/* Add checksum and final sync flag */
@@ -567,8 +564,7 @@ reset:
 				sc->fcs = PPP_FCS(sc->fcs, ch);
 			}
 		}
-		MFREE(m, n);
-		m = n;
+		m = m_free(m);
 	}
 	return (0);
 }

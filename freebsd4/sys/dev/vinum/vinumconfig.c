@@ -46,7 +46,7 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinumconfig.c,v 1.30 2000/05/01 09:45:50 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumconfig.c,v 1.32.2.5.4.1 2002/01/28 02:38:32 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumconfig.c,v 1.32.2.6 2002/02/03 00:43:35 grog Exp $
  */
 
 #define STATIC static
@@ -100,7 +100,7 @@ throw_rude_remark(int error, char *msg,...)
     int was_finishing;
 
     if ((vinum_conf.flags & VF_LOCKED) == 0)		    /* bug catcher */
-	panic ("throw_rude_remark: called without config lock");
+    	panic ("throw_rude_remark: called without config lock");
     va_start(ap, msg);
     if ((ioctl_reply != NULL)				    /* we're called from the user */
     &&(!(vinum_conf.flags & VF_READING_CONFIG))) {	    /* and not reading from disk: return msg */

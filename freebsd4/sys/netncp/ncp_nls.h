@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netncp/ncp_nls.h,v 1.4 1999/12/29 04:46:16 peter Exp $
+ * $FreeBSD: src/sys/netncp/ncp_nls.h,v 1.4.2.1 2002/04/30 08:18:25 bp Exp $
  */
 #ifndef _NETNCP_NCP_NLS_H_
 #define _NETNCP_NCP_NLS_H_
@@ -58,7 +58,9 @@ struct ncp_nlstables {
 #define	NCP_NLS_AS_IS		1
 #define	NCP_NLS_AS_IS_NAME	"asis"
 #define	NCP_NLS_KOI_866		2
+#define	NCP_NLS_SE		3
 #define	NCP_NLS_KOI_866_NAME	"koi2cp866"
+#define	NCP_NLS_SE_NAME		"se"
 
 extern struct ncp_nlstables ncp_nls;	/* active nls */
 

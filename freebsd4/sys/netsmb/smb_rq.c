@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/smb_rq.c,v 1.1.2.1 2001/05/22 08:32:33 bp Exp $
+ * $FreeBSD: src/sys/netsmb/smb_rq.c,v 1.1.2.2 2002/04/23 03:45:01 bp Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -451,8 +451,8 @@ smb_t2_reply(struct smb_t2rq *t2p)
 		return 0;
 	}
 	/*
-	 * Now we have to get all subseqent responses. The CIFS specification
-	 * says that they can be misordered which is weird.
+	 * Now we have to get all subsequent responses. The CIFS specification
+	 * says that they can be disordered which is weird.
 	 * TODO: timo
 	 */
 	totpgot = totdgot = 0;
@@ -479,7 +479,7 @@ smb_t2_reply(struct smb_t2rq *t2p)
 		    (error = md_get_uint16le(mdp, &pdisp)) != 0)
 			break;
 		if (pcount != 0 && pdisp != totpgot) {
-			SMBERROR("Can't handle misordered parameters %d:%d\n",
+			SMBERROR("Can't handle disordered parameters %d:%d\n",
 			    pdisp, totpgot);
 			error = EINVAL;
 			break;
@@ -489,7 +489,7 @@ smb_t2_reply(struct smb_t2rq *t2p)
 		    (error = md_get_uint16le(mdp, &ddisp)) != 0)
 			break;
 		if (dcount != 0 && ddisp != totdgot) {
-			SMBERROR("Can't handle misordered data\n");
+			SMBERROR("Can't handle disordered data\n");
 			error = EINVAL;
 			break;
 		}

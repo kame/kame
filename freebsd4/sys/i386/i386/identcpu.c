@@ -38,7 +38,7 @@
  * SUCH DAMAGE.
  *
  *	from: Id: machdep.c,v 1.193 1996/06/18 01:22:04 bde Exp
- * $FreeBSD: src/sys/i386/i386/identcpu.c,v 1.80.2.7 2001/10/18 04:05:14 jdp Exp $
+ * $FreeBSD: src/sys/i386/i386/identcpu.c,v 1.80.2.11 2002/04/28 22:50:51 dwmalone Exp $
  */
 
 #include "opt_cpu.h"
@@ -78,7 +78,6 @@ static void print_AMD_info(u_int amd_maxregs);
 static void print_AMD_assoc(int i);
 static void print_transmeta_info(void);
 static void setup_tmx86_longrun(void);
-static void do_cpuid(u_int ax, u_int *p);
 
 u_int	cyrix_did;		/* Device ID of Cyrix CPU */
 int cpu_class = CPUCLASS_386;	/* least common denominator */
@@ -110,16 +109,6 @@ static struct cpu_nameclass i386_cpus[] = {
 	{ "Pentium 4",		CPUCLASS_686 },		/* CPU_P4 */
 };
 
-static void
-do_cpuid(u_int ax, u_int *p)
-{
-	__asm __volatile(
-	"cpuid"
-	: "=a" (p[0]), "=b" (p[1]), "=c" (p[2]), "=d" (p[3])
-	:  "0" (ax)
-	);
-}
-
 #if defined(I586_CPU) && !defined(NO_F00F_HACK)
 int has_f00f_bug = 0;
 #endif
@@ -150,6 +139,32 @@ printcpuinfo(void)
 			switch (cpu_id & 0xf00) {
 			case 0x400:
 				strcat(cpu_model, "i486 ");
+			        /* Check the particular flavor of 486 */
+				switch (cpu_id & 0xf0) {
+				case 0x00:
+				case 0x10:
+					strcat(cpu_model, "DX");
+					break;
+				case 0x20:
+					strcat(cpu_model, "SX");
+					break;
+				case 0x30:
+					strcat(cpu_model, "DX2");
+					break;
+				case 0x40:
+					strcat(cpu_model, "SL");
+					break;
+				case 0x50:
+					strcat(cpu_model, "SX2");
+					break;
+				case 0x70:
+					strcat(cpu_model,
+					    "DX2 Write-Back Enhanced");
+					break;
+				case 0x80:
+					strcat(cpu_model, "DX4");
+					break;
+				}
 				break;
 			case 0x500:
 			        /* Check the particular flavor of 586 */
@@ -227,26 +242,6 @@ printcpuinfo(void)
 				break;
 			}
 
-			switch (cpu_id & 0xff0) {
-			case 0x400:
-				strcat(cpu_model, "DX"); break;
-			case 0x410:
-				strcat(cpu_model, "DX"); break;
-			case 0x420:
-				strcat(cpu_model, "SX"); break;
-			case 0x430:
-				strcat(cpu_model, "DX2"); break;
-			case 0x440:
-				strcat(cpu_model, "SL"); break;
-			case 0x450:
-				strcat(cpu_model, "SX2"); break;
-			case 0x470:
-				strcat(cpu_model, "DX2 Write-Back Enhanced");
-				break;
-			case 0x480:
-				strcat(cpu_model, "DX4"); break;
-				break;
-			}
 		}
 	} else if (strcmp(cpu_vendor,"AuthenticAMD") == 0) {
 		/*
@@ -263,13 +258,11 @@ printcpuinfo(void)
 			strcat(cpu_model, "Am486DX2/4 Write-Through");
 			break;
 		case 0x470:
+		case 0x490:
 			strcat(cpu_model, "Enhanced Am486DX4 Write-Back");
 			break;
 		case 0x480:
 			strcat(cpu_model, "Enhanced Am486DX4 Write-Through");
-			break;
-		case 0x490:
-			strcat(cpu_model, "Enhanced Am486DX4 Write-Back");
 			break;
 		case 0x4E0:
 			strcat(cpu_model, "Am5x86 Write-Through");
@@ -475,17 +468,19 @@ printcpuinfo(void)
 			strcat(cpu_model, "Unknown");
 		}
 	} else if (strcmp(cpu_vendor, "CentaurHauls") == 0) {
-		strcpy(cpu_model, "IDT ");
 		switch (cpu_id & 0xff0) {
 		case 0x540:
-			strcat(cpu_model, "WinChip C6");
+			strcpy(cpu_model, "IDT WinChip C6");
 			tsc_is_broken = 1;
 			break;
 		case 0x580:
-			strcat(cpu_model, "WinChip 2");
+			strcpy(cpu_model, "IDT WinChip 2");
+			break;
+		case 0x670:
+			strcpy(cpu_model, "VIA C3 Samuel 2");
 			break;
 		default:
-			strcat(cpu_model, "Unknown");
+			strcpy(cpu_model, "VIA/IDT Unknown");
 		}
 	} else if (strcmp(cpu_vendor, "IBM") == 0) {
 		strcpy(cpu_model, "Blue Lightning CPU");
@@ -538,7 +533,7 @@ printcpuinfo(void)
 		break;
 #endif
 	default:
-		printf("unknown");	/* will panic below... */
+		printf("Unknown");	/* will panic below... */
 	}
 	printf("-class CPU)\n");
 #if defined(I486_CPU) || defined(I586_CPU) || defined(I686_CPU)
@@ -736,7 +731,7 @@ identblue(void)
 	setidt(6, bluetrap6, SDT_SYS386TGT, SEL_KPL, GSEL(GCODE_SEL, SEL_KPL));
 
 	/*
-	 * Certain BIOS disables cpuid instructnion of Cyrix 6x86MX CPU.
+	 * Certain BIOS disables cpuid instruction of Cyrix 6x86MX CPU.
 	 * In this case, rdmsr generates general protection fault, and
 	 * exception will be trapped by bluetrap13().
 	 */

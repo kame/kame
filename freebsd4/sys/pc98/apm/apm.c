@@ -15,7 +15,7 @@
  *
  * Sep, 1994	Implemented on FreeBSD 1.1.5.1R (Toshiba AVS001WD)
  *
- * $FreeBSD: src/sys/pc98/apm/apm.c,v 1.5.2.1 2001/02/08 13:43:41 nyan Exp $
+ * $FreeBSD: src/sys/pc98/apm/apm.c,v 1.5.2.2 2002/04/15 13:45:17 nyan Exp $
  */
 
 #include <sys/param.h>
@@ -329,12 +329,21 @@ apm_display(int newstate)
 	sc->bios.r.ebx = PMDV_DISP0;
 	sc->bios.r.ecx = newstate ? PMST_APMENABLED:PMST_SUSPEND;
 	sc->bios.r.edx = 0;
-	if (apm_bioscall()) {
- 		printf("Display off failure: errcode = %d\n",
-		       0xff & (sc->bios.r.eax >> 8));
- 		return 1;
+	if (apm_bioscall() == 0) {
+		return 0;
  	}
- 	return 0;
+
+	/* If failed, then try to blank all display devices instead. */
+	sc->bios.r.eax = (APM_BIOS << 8) | APM_SETPWSTATE;
+	sc->bios.r.ebx = PMDV_DISPALL;	/* all display devices */
+	sc->bios.r.ecx = newstate ? PMST_APMENABLED:PMST_SUSPEND;
+	sc->bios.r.edx = 0;
+	if (apm_bioscall() == 0) {
+		return 0;
+ 	}
+ 	printf("Display off failure: errcode = %d\n",
+	       0xff & (sc->bios.r.eax >> 8));
+ 	return 1;
 }
 
 /*

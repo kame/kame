@@ -65,7 +65,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_pageout.c,v 1.151.2.11 2001/12/25 01:44:44 dillon Exp $
+ * $FreeBSD: src/sys/vm/vm_pageout.c,v 1.151.2.14 2002/03/06 22:44:24 silby Exp $
  */
 
 /*
@@ -482,7 +482,7 @@ vm_pageout_object_deactivate_pages(map, object, desired, map_remove_only)
 			    p->hold_count != 0 ||
 			    p->busy != 0 ||
 			    (p->flags & (PG_BUSY|PG_UNMANAGED)) ||
-			    !pmap_page_exists(vm_map_pmap(map), p)) {
+			    !pmap_page_exists_quick(vm_map_pmap(map), p)) {
 				p = next;
 				continue;
 			}
@@ -1124,8 +1124,7 @@ rescan0:
 			/*
 			 * if this is a system process, skip it
 			 */
-			if ((p->p_flag & P_SYSTEM) || (p->p_lock > 0) ||
-			    (p->p_pid == 1) ||
+			if ((p->p_flag & P_SYSTEM) || (p->p_pid == 1) ||
 			    ((p->p_pid < 48) && (vm_swap_size != 0))) {
 				continue;
 			}
@@ -1352,7 +1351,6 @@ vm_pageout()
 	if (vm_pageout_stats_free_max == 0)
 		vm_pageout_stats_free_max = 5;
 
-	curproc->p_flag |= P_BUFEXHAUST;
 	swap_pager_swap_init();
 	pass = 0;
 	/*

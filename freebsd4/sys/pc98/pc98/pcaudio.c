@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/pc98/pcaudio.c,v 1.32.2.1 2000/04/13 10:36:25 nyan Exp $
+ * $FreeBSD: src/sys/pc98/pc98/pcaudio.c,v 1.32.2.2 2002/03/25 12:53:45 nyan Exp $
  */
 
 #include <sys/param.h>
@@ -574,12 +574,15 @@ pcaintr(struct clockframe *frame)
 			: : "a" ((char)pca_status.oldval) );
 		__asm__("xlatb\n"
 #ifdef PC98
-			"outb %0,$0x3fdb"
+			"outb %0,%%dx"
+			: : "a" ((char)pca_status.buffer[pca_status.index]),
+			    "b" (volume_table),
+			    "d" ((u_short)0x3fdb) );
 #else
 			"outb %0,$0x42"
-#endif
 			: : "a" ((char)pca_status.buffer[pca_status.index]),
 			    "b" (volume_table) );
+#endif
 		enable_intr();
 		pca_status.counter += pca_status.scale;
 		pca_status.index = (pca_status.counter >> 8);

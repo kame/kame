@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tty_conf.c	8.4 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/tty_conf.c,v 1.16 2000/01/30 10:14:13 peter Exp $
+ * $FreeBSD: src/sys/kern/tty_conf.c,v 1.16.2.1 2002/03/11 01:14:55 dd Exp $
  */
 
 #include "opt_compat.h"
@@ -52,7 +52,6 @@
 
 static l_open_t		l_noopen;
 static l_close_t	l_noclose;
-static l_ioctl_t	l_nullioctl;
 static l_rint_t		l_norint;
 static l_start_t	l_nostart;
 
@@ -198,7 +197,7 @@ l_nostart(tp)
  * Do nothing specific version of line
  * discipline specific ioctl command.
  */
-static int
+int
 l_nullioctl(tp, cmd, data, flags, p)
 	struct tty *tp;
 	u_long cmd;

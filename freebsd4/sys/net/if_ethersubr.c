@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ethersubr.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.70.2.23 2002/01/16 20:50:42 jesper Exp $
+ * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.70.2.26 2002/04/04 05:51:55 luigi Exp $
  */
 
 #include "opt_atalk.h"
@@ -177,7 +177,7 @@ ether_output(ifp, m, dst, rt0)
 	switch (dst->sa_family) {
 #ifdef INET
 	case AF_INET:
-		if (!arpresolve(ac, rt, m, dst, edst, rt0))
+		if (!arpresolve(ifp, rt, m, dst, edst, rt0))
 			return (0);	/* if not yet resolved */
 		off = m->m_pkthdr.len - m->m_len;
 		type = htons(ETHERTYPE_IP);
@@ -600,7 +600,12 @@ ether_demux(ifp, eh, m)
                 return;
 #endif NETATALK
 	case ETHERTYPE_VLAN:
-		VLAN_INPUT(eh, m);
+		if (vlan_input_p != NULL)
+			(*vlan_input_p)(eh, m);
+		else {
+			m->m_pkthdr.rcvif->if_noproto++;
+			m_freem(m);
+		}
 		return;
 	default:
 #ifdef IPX
@@ -751,7 +756,7 @@ ether_ioctl(ifp, command, data)
 #ifdef INET
 		case AF_INET:
 			ifp->if_init(ifp->if_softc);	/* before arpwhohas */
-			arp_ifinit(IFP2AC(ifp), ifa);
+			arp_ifinit(ifp, ifa);
 			break;
 #endif
 #ifdef IPX

@@ -13,7 +13,7 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- * $FreeBSD: src/sys/netinet/ip_fw.c,v 1.131.2.30 2002/01/07 22:40:22 cjc Exp $
+ * $FreeBSD: src/sys/netinet/ip_fw.c,v 1.131.2.33 2002/05/01 21:30:05 cjc Exp $
  */
 
 #define        DEB(x)
@@ -1423,8 +1423,12 @@ check_ports:
 			break;
 
 bogusfrag:
-		if (fw_verbose && ip != NULL)
-			ipfw_report(NULL, ip, offset, ip_len, rif, oif);
+		if (fw_verbose) {
+			if (ip != NULL)
+				ipfw_report(NULL, ip, offset, ip_len, rif, oif);
+			else
+				printf("pullup failed\n");
+		}
 		goto dropit;
 
 		}
@@ -1465,11 +1469,13 @@ got_match:
 			return(f->fw_divert_port | IP_FW_PORT_TEE_FLAG);
 #endif
 		case IP_FW_F_SKIPTO: /* XXX check */
-			f = f->next_rule_ptr ? f->next_rule_ptr :
-				lookup_next_rule(f) ;
+			if (f->next_rule_ptr == NULL)
+			    f->next_rule_ptr = lookup_next_rule(f) ;
+			f = f->next_rule_ptr;
 			if (!f)
 			    goto dropit;
 			goto again ;
+
 		case IP_FW_F_PIPE:
 		case IP_FW_F_QUEUE:
 			*flow_id = f ; /* XXX set flow id */
@@ -2089,7 +2095,9 @@ ipfw_modevent(module_t mod, int type, void *unused)
 {
 	int s;
 	int err = 0 ;
+#if defined(KLD_MODULE)
 	struct ip_fw *fcp;
+#endif
 	
 	switch (type) {
 	case MOD_LOAD:
@@ -2111,12 +2119,8 @@ ipfw_modevent(module_t mod, int type, void *unused)
 		s = splimp();
 		ip_fw_chk_ptr = NULL ;
 		ip_fw_ctl_ptr = NULL ;
-		{
-		struct ip_fw *fcp;
-
 		while ( (fcp = LIST_FIRST(&ip_fw_chain_head)) != NULL)
 			free_chain(fcp);
-		}
 		splx(s);
 		printf("IP firewall unloaded\n");
 #endif

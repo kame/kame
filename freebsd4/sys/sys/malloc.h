@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)malloc.h	8.5 (Berkeley) 5/3/95
- * $FreeBSD: src/sys/sys/malloc.h,v 1.48.2.1 2000/10/25 09:14:03 phk Exp $
+ * $FreeBSD: src/sys/sys/malloc.h,v 1.48.2.2 2002/03/16 02:19:16 archie Exp $
  */
 
 #ifndef _SYS_MALLOC_H_
@@ -176,6 +176,10 @@ void	free __P((void *addr, struct malloc_type *type));
 void	*malloc __P((unsigned long size, struct malloc_type *type, int flags));
 void	malloc_init __P((void *));
 void	malloc_uninit __P((void *));
+void	*realloc __P((void *addr, unsigned long size,
+		      struct malloc_type *type, int flags));
+void	*reallocf __P((void *addr, unsigned long size,
+		      struct malloc_type *type, int flags));
 #endif /* _KERNEL */
 
 #endif /* !_SYS_MALLOC_H_ */

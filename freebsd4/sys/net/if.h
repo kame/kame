@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if.h,v 1.58.2.5 2001/12/14 19:35:49 jlemon Exp $
+ * $FreeBSD: src/sys/net/if.h,v 1.58.2.7 2002/02/09 23:02:39 luigi Exp $
  */
 
 #ifndef _NET_IF_H_
@@ -131,6 +131,15 @@ struct if_data {
 #define	IFF_ALTPHYS	IFF_LINK2	/* use alternate physical connection */
 #define	IFF_MULTICAST	0x8000		/* supports multicast */
 
+/*
+ * The following flag(s) ought to go in if_flags, but we cannot change
+ * struct ifnet because of binary compatibility, so we store them in
+ * if_ipending, which is not used so far.
+ * If possible, make sure the value is not conflicting with other
+ * IFF flags, so we have an easier time when we want to merge them.
+ */
+#define	IFF_POLLING	0x10000		/* Interface is in polling mode. */
+
 /* flags set internally only: */
 #define	IFF_CANTCHANGE \
 	(IFF_BROADCAST|IFF_POINTOPOINT|IFF_RUNNING|IFF_OACTIVE|\
@@ -186,6 +195,21 @@ struct ifma_msghdr {
 	int	ifmam_flags;	/* value of ifa_flags */
 	u_short	ifmam_index;	/* index for associated ifp */
 };
+
+/*
+ * Message format announcing the arrival or departure of a network interface.
+ */
+struct if_announcemsghdr {
+	u_short	ifan_msglen;	/* to skip over non-understood messages */
+	u_char	ifan_version;	/* future binary compatibility */
+	u_char	ifan_type;	/* message type */
+	u_short	ifan_index;	/* index for associated ifp */
+	char	ifan_name[IFNAMSIZ]; /* if name, e.g. "en0" */
+	u_short	ifan_what;	/* what type of announcement */
+};
+
+#define	IFAN_ARRIVAL	0	/* interface arrival */
+#define	IFAN_DEPARTURE	1	/* interface departure */
 
 /*
  * Interface request structure used for socket

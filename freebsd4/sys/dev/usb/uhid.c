@@ -1,5 +1,5 @@
 /*	$NetBSD: uhid.c,v 1.38 2000/04/27 15:26:48 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/uhid.c,v 1.27.2.6 2001/10/05 07:02:48 peter Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/uhid.c,v 1.27.2.8 2002/02/24 14:23:14 alfred Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -229,8 +229,6 @@ USB_ATTACH(uhid)
 	if (err) {
 		printf("%s: no report descriptor\n", USBDEVNAME(sc->sc_dev));
 		sc->sc_dying = 1;
-		if (desc != NULL)
-			free(desc, M_USBDEV);
 		USB_ATTACH_ERROR_RETURN;
 	}
 	
@@ -640,9 +638,9 @@ uhid_do_ioctl(sc, cmd, addr, flag, p)
 
 	case USB_GET_REPORT_DESC:
 		rd = (struct usb_ctl_report_desc *)addr;
-		size = min(sc->sc_repdesc_size, sizeof rd->data);
-		rd->size = size;
-		memcpy(rd->data, sc->sc_repdesc, size);
+		size = min(sc->sc_repdesc_size, sizeof rd->ucrd_data);
+		rd->ucrd_size = size;
+		memcpy(rd->ucrd_data, sc->sc_repdesc, size);
 		break;
 
 	case USB_SET_IMMED:
@@ -660,7 +658,7 @@ uhid_do_ioctl(sc, cmd, addr, flag, p)
 
 	case USB_GET_REPORT:
 		re = (struct usb_ctl_report *)addr;
-		switch (re->report) {
+		switch (re->ucr_report) {
 		case UHID_INPUT_REPORT:
 			size = sc->sc_isize;
 			id = sc->sc_iid;
@@ -676,7 +674,7 @@ uhid_do_ioctl(sc, cmd, addr, flag, p)
 		default:
 			return (EINVAL);
 		}
-		err = usbd_get_report(sc->sc_iface, re->report, id, re->data,
+		err = usbd_get_report(sc->sc_iface, re->ucr_report, id, re->ucr_data,
 			  size);
 		if (err)
 			return (EIO);
@@ -684,7 +682,7 @@ uhid_do_ioctl(sc, cmd, addr, flag, p)
 
 	case USB_SET_REPORT:
 		re = (struct usb_ctl_report *)addr;
-		switch (re->report) {
+		switch (re->ucr_report) {
 		case UHID_INPUT_REPORT:
 			size = sc->sc_isize;
 			id = sc->sc_iid;
@@ -700,7 +698,7 @@ uhid_do_ioctl(sc, cmd, addr, flag, p)
 		default:
 			return (EINVAL);
 		}
-		err = usbd_set_report(sc->sc_iface, re->report, id, re->data,
+		err = usbd_set_report(sc->sc_iface, re->ucr_report, id, re->ucr_data,
 			  size);
 		if (err)
 			return (EIO);

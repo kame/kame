@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/asnames.h,v 1.44.2.5 2001/12/08 00:04:14 luigi Exp $
+ * $FreeBSD: src/sys/i386/include/asnames.h,v 1.44.2.6 2002/02/09 23:02:38 luigi Exp $
  */
 
 #ifndef _MACHINE_ASNAMES_H_
@@ -225,6 +225,7 @@
 #define _get_mplock			get_mplock
 #define _get_syscall_lock		get_syscall_lock
 #define _idle				idle
+#define _idle_poll 			idle_poll
 #define _ihandlers			ihandlers
 #define _imen				imen
 #define _imen_lock			imen_lock

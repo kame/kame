@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/cam_xpt.c,v 1.80.2.14 2001/12/19 05:27:51 ken Exp $
+ * $FreeBSD: src/sys/cam/cam_xpt.c,v 1.80.2.15 2002/04/24 17:13:36 mjacob Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -500,6 +500,11 @@ static struct xpt_quirk_entry xpt_quirk_table[] =
 		/* TeraSolutions special settings for TRC-22 RAID */
 		{ T_DIRECT, SIP_MEDIA_FIXED, "TERASOLU", "TRC-22", "*" },
 		  /*quirks*/0, /*mintags*/55, /*maxtags*/255
+	},
+	{
+		/* Veritas Storage Appliance */
+		{ T_DIRECT, SIP_MEDIA_FIXED, "VERITAS", "*", "*" },
+		  CAM_QUIRK_HILUNS, /*mintags*/2, /*maxtags*/1024
 	},
 	{
 		/*

@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/dev/isp/isp_target.c,v 1.5.4.8 2001/12/14 08:21:04 mjacob Exp $ */
+/* $FreeBSD: src/sys/dev/isp/isp_target.c,v 1.5.4.9 2002/02/22 19:56:22 mjacob Exp $ */
 /*
  * Machine and OS Independent Target Mode Code for the Qlogic SCSI/FC adapters.
  *
@@ -28,6 +28,10 @@
  * SUCH DAMAGE.
  */
 
+/*
+ * Bug fixes gratefully acknowledged from:
+ *	Oded Kedem <oded@kashya.com>
+ */
 /*
  * Include header file appropriate for platform we're building on.
  */
@@ -678,6 +682,7 @@ isp_notify_ack(struct ispsoftc *isp, void *arg)
 			na->na_task_flags = inp->in_task_flags;
 			na->na_seqid = inp->in_seqid;
 			na->na_flags = NAFC_RCOUNT;
+			na->na_status = inp->in_status;
 			if (inp->in_status == IN_RESET) {
 				na->na_flags |= NAFC_RST_CLRD;
 			}

@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *	from:	@(#)pmap.c	7.7 (Berkeley)	5/12/91
- * $FreeBSD: src/sys/i386/i386/pmap.c,v 1.250.2.15 2002/01/04 01:17:33 peter Exp $
+ * $FreeBSD: src/sys/i386/i386/pmap.c,v 1.250.2.18 2002/03/06 22:48:53 silby Exp $
  */
 
 /*
@@ -942,6 +942,16 @@ pmap_dispose_proc(p)
 	if (cpu_class <= CPUCLASS_386)
 		invltlb();
 #endif
+
+	/*
+	 * If the process got swapped out some of its UPAGES might have gotten
+	 * swapped.  Just get rid of the object to clean up the swap use
+	 * proactively.  NOTE! might block waiting for paging I/O to complete.
+	 */
+	if (upobj->type == OBJT_SWAP) {
+		p->p_upages_obj = NULL;
+		vm_object_deallocate(upobj);
+	}
 }
 
 /*
@@ -1578,16 +1588,12 @@ pmap_remove_entry(pmap, m, va)
 
 	s = splvm();
 	if (m->md.pv_list_count < pmap->pm_stats.resident_count) {
-		for (pv = TAILQ_FIRST(&m->md.pv_list);
-			pv;
-			pv = TAILQ_NEXT(pv, pv_list)) {
+		TAILQ_FOREACH(pv, &m->md.pv_list, pv_list) {
 			if (pmap == pv->pv_pmap && va == pv->pv_va) 
 				break;
 		}
 	} else {
-		for (pv = TAILQ_FIRST(&pmap->pm_pvlist);
-			pv;
-			pv = TAILQ_NEXT(pv, pv_plist)) {
+		TAILQ_FOREACH(pv, &pmap->pm_pvlist, pv_plist) {
 			if (va == pv->pv_va) 
 				break;
 		}
@@ -2867,15 +2873,19 @@ pmap_pageable(pmap, sva, eva, pageable)
 }
 
 /*
- * this routine returns true if a physical page resides
- * in the given pmap.
+ * Returns true if the pmap's pv is one of the first
+ * 16 pvs linked to from this page.  This count may
+ * be changed upwards or downwards in the future; it
+ * is only necessary that true be returned for a small
+ * subset of pmaps for proper page aging.
  */
 boolean_t
-pmap_page_exists(pmap, m)
+pmap_page_exists_quick(pmap, m)
 	pmap_t pmap;
 	vm_page_t m;
 {
-	register pv_entry_t pv;
+	pv_entry_t pv;
+	int loops = 0;
 	int s;
 
 	if (!pmap_initialized || (m->flags & PG_FICTITIOUS))
@@ -2883,16 +2893,14 @@ pmap_page_exists(pmap, m)
 
 	s = splvm();
 
-	/*
-	 * Not found, check current mappings returning immediately if found.
-	 */
-	for (pv = TAILQ_FIRST(&m->md.pv_list);
-		pv;
-		pv = TAILQ_NEXT(pv, pv_list)) {
+	TAILQ_FOREACH(pv, &m->md.pv_list, pv_list) {
 		if (pv->pv_pmap == pmap) {
 			splx(s);
 			return TRUE;
 		}
+		loops++;
+		if (loops >= 16)
+			break;
 	}
 	splx(s);
 	return (FALSE);
@@ -3003,10 +3011,7 @@ pmap_testbit(m, bit)
 
 	s = splvm();
 
-	for (pv = TAILQ_FIRST(&m->md.pv_list);
-		pv;
-		pv = TAILQ_NEXT(pv, pv_list)) {
-
+	TAILQ_FOREACH(pv, &m->md.pv_list, pv_list) {
 		/*
 		 * if the bit being tested is the modified bit, then
 		 * mark clean_map and ptes as never
@@ -3055,10 +3060,7 @@ pmap_changebit(m, bit, setem)
 	 * Loop over all current mappings setting/clearing as appropos If
 	 * setting RO do we need to clear the VAC?
 	 */
-	for (pv = TAILQ_FIRST(&m->md.pv_list);
-		pv;
-		pv = TAILQ_NEXT(pv, pv_list)) {
-
+	TAILQ_FOREACH(pv, &m->md.pv_list, pv_list) {
 		/*
 		 * don't write protect pager mappings
 		 */
@@ -3124,7 +3126,14 @@ pmap_phys_address(ppn)
 /*
  *	pmap_ts_referenced:
  *
- *	Return the count of reference bits for a page, clearing all of them.
+ *	Return a count of reference bits for a page, clearing those bits.
+ *	It is not necessary for every reference bit to be cleared, but it
+ *	is necessary that 0 only be returned when there are truly no
+ *	reference bits set.
+ *
+ *	XXX: The exact number of bits to check and clear is a matter that
+ *	should be tested and standardized at some point in the future for
+ *	optimal aging of shared pages.
  */
 int
 pmap_ts_referenced(vm_page_t m)
@@ -3465,9 +3474,7 @@ pmap_pvdump(pa)
 
 	printf("pa %x", pa);
 	m = PHYS_TO_VM_PAGE(pa);
-	for (pv = TAILQ_FIRST(&m->md.pv_list);
-		pv;
-		pv = TAILQ_NEXT(pv, pv_list)) {
+	TAILQ_FOREACH(pv, &m->md.pv_list, pv_list) {
 #ifdef used_to_be
 		printf(" -> pmap %p, va %x, flags %x",
 		    (void *)pv->pv_pmap, pv->pv_va, pv->pv_flags);

@@ -23,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THEPOSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/sound/pci/ich.c,v 1.3.2.5 2002/01/21 17:26:57 orion Exp $
  */
 
 #include <dev/sound/pcm/sound.h>
@@ -34,11 +32,16 @@
 #include <pci/pcireg.h>
 #include <pci/pcivar.h>
 
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/ich.c,v 1.3.2.9 2002/05/11 02:33:13 orion Exp $");
+
 /* -------------------------------------------------------------------- */
 
 #define ICH_TIMEOUT 1000 /* semaphore timeout polling count */
 #define ICH_DTBL_LENGTH 32
 #define ICH_DEFAULT_BUFSZ 16384
+#define ICH_MAX_BUFSZ 65536
+
+#define SIS7012ID       0x70121039      /* SiS 7012 needs special handling */
 
 /* buffer descriptor */
 struct ich_desc {
@@ -50,8 +53,8 @@ struct sc_info;
 
 /* channel registers */
 struct sc_chinfo {
-	u_int32_t num, run;
-	u_int32_t blksz, blkcnt;
+	u_int32_t num:8, run:1, run_save:1;
+	u_int32_t blksz, blkcnt, spd;
 	u_int32_t regbase, spdreg;
 	u_int32_t imask;
 	u_int32_t civ;
@@ -66,8 +69,9 @@ struct sc_chinfo {
 /* device private data */
 struct sc_info {
 	device_t dev;
-	int hasvra, hasvrm;
-	int chnum;
+	int hasvra, hasvrm, hasmic;
+	unsigned int chnum, bufsz;
+	int sample_size, swap_reg;
 
 	struct resource *nambar, *nabmbar, *irq;
 	int nambarid, nabmbarid, irqid;
@@ -190,7 +194,8 @@ ich_filldtbl(struct sc_chinfo *ch)
 
 	for (i = 0; i < ICH_DTBL_LENGTH; i++) {
 		ch->dtbl[i].buffer = base + (ch->blksz * (i % ch->blkcnt));
-		ch->dtbl[i].length = ICH_BDC_IOC | (ch->blksz / 2);
+		ch->dtbl[i].length = ICH_BDC_IOC
+				   | (ch->blksz / ch->parent->sample_size);
 	}
 }
 
@@ -229,7 +234,7 @@ ichchan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *
 {
 	struct sc_info *sc = devinfo;
 	struct sc_chinfo *ch;
-	int num;
+	unsigned int num;
 
 	num = sc->chnum++;
 	ch = &sc->ch[num];
@@ -240,7 +245,7 @@ ichchan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *
 	ch->run = 0;
 	ch->dtbl = sc->dtbl + (ch->num * ICH_DTBL_LENGTH);
 	ch->blkcnt = 2;
-	ch->blksz = ICH_DEFAULT_BUFSZ / ch->blkcnt;
+	ch->blksz = sc->bufsz / ch->blkcnt;
 
 	switch(ch->num) {
 	case 0: /* play */
@@ -268,7 +273,7 @@ ichchan_init(kobj_t obj, void *devinfo, struct snd_dbuf *b, struct pcm_channel *
 		return NULL;
 	}
 
-	if (sndbuf_alloc(ch->buffer, sc->dmat, ICH_DEFAULT_BUFSZ))
+	if (sndbuf_alloc(ch->buffer, sc->dmat, sc->bufsz))
 		return NULL;
 
 	ich_wr(sc, ch->regbase + ICH_REG_X_BDBAR, (u_int32_t)vtophys(ch->dtbl), 4);
@@ -292,12 +297,17 @@ ichchan_setspeed(kobj_t obj, void *data, u_int32_t speed)
 		int r;
 		if (sc->ac97rate <= 32000 || sc->ac97rate >= 64000)
 			sc->ac97rate = 48000;
-		r = speed * 48000 / sc->ac97rate;
-		return ac97_setrate(sc->codec, ch->spdreg, r) * 
-			sc->ac97rate / 48000;
+		r = (speed * 48000) / sc->ac97rate;
+		/*
+		 * Cast the return value of ac97_setrate() to u_int so that
+		 * the math don't overflow into the negative range.
+		 */
+		ch->spd = ((u_int)ac97_setrate(sc->codec, ch->spdreg, r) *
+		    sc->ac97rate) / 48000;
 	} else {
-		return 48000;
+		ch->spd = 48000;
 	}
+	return ch->spd;
 }
 
 static int
@@ -323,7 +333,7 @@ ichchan_trigger(kobj_t obj, void *data, int go)
 	case PCMTRIG_START:
 		ch->run = 1;
 		ich_wr(sc, ch->regbase + ICH_REG_X_BDBAR, (u_int32_t)vtophys(ch->dtbl), 4);
-		ich_wr(sc, ch->regbase + ICH_REG_X_CR, ICH_X_CR_RPBM | ICH_X_CR_LVBIE | ICH_X_CR_IOCE | ICH_X_CR_FEIE, 1);
+		ich_wr(sc, ch->regbase + ICH_REG_X_CR, ICH_X_CR_RPBM | ICH_X_CR_LVBIE | ICH_X_CR_IOCE, 1);
 		break;
 
 	case PCMTRIG_ABORT:
@@ -391,7 +401,9 @@ ich_intr(void *p)
 		if ((ch->imask & gs) == 0) 
 			continue;
 		gs &= ~ch->imask;
-		st = ich_rd(sc, ch->regbase + ICH_REG_X_SR, 2);
+		st = ich_rd(sc, ch->regbase + 
+				(sc->swap_reg ? ICH_REG_X_PICB : ICH_REG_X_SR),
+			    2);
 		st &= ICH_X_SR_FIFOE | ICH_X_SR_BCIS | ICH_X_SR_LVBCI;
 		if (st & (ICH_X_SR_BCIS | ICH_X_SR_LVBCI)) {
 				/* block complete - update buffer */
@@ -413,7 +425,9 @@ ich_intr(void *p)
 
 		}
 		/* clear status bit */
-		ich_wr(sc, ch->regbase + ICH_REG_X_SR, st, 2);
+		ich_wr(sc, ch->regbase + 
+			   (sc->swap_reg ? ICH_REG_X_PICB : ICH_REG_X_SR),
+		       st, 2);
 	}
 	if (gs != 0) {
 		device_printf(sc->dev, 
@@ -428,9 +442,8 @@ static int
 ich_initsys(struct sc_info* sc)
 {
 #ifdef SND_DYNSYSCTL
-	struct snddev_info *d = device_get_softc(sc->dev);
-	SYSCTL_ADD_INT(&d->sysctl_tree, 
-		       SYSCTL_CHILDREN(d->sysctl_tree_top),
+	SYSCTL_ADD_INT(snd_sysctl_tree(sc->dev), 
+		       SYSCTL_CHILDREN(snd_sysctl_tree_top(sc->dev)),
 		       OID_AUTO, "ac97rate", CTLFLAG_RW, 
 		       &sc->ac97rate, 48000, 
 		       "AC97 link rate (default = 48000)");
@@ -520,6 +533,7 @@ unsigned int ich_calibrate(struct sc_info *sc)
 			printf(", will use %d Hz", sc->ac97rate);
 	 	printf("\n");
 	}
+
 	return sc->ac97rate;
 }
 
@@ -547,7 +561,9 @@ ich_init(struct sc_info *sc)
 
 	ich_wr(sc, ICH_REG_GLOB_CNT, ICH_GLOB_CTL_COLD | ICH_GLOB_CTL_PRES, 4);
 
-	if (ich_resetchan(sc, 0) || ich_resetchan(sc, 1) || ich_resetchan(sc, 2))
+	if (ich_resetchan(sc, 0) || ich_resetchan(sc, 1))
+		return ENXIO;
+	if (sc->hasmic && ich_resetchan(sc, 2))
 		return ENXIO;
 
 	if (bus_dmamem_alloc(sc->dmat, (void **)&sc->dtbl, BUS_DMA_NOWAIT, &sc->dtmap))
@@ -586,6 +602,14 @@ ich_pci_probe(device_t dev)
 		device_set_desc(dev, "Intel 82801CA (ICH3)");
 		return 0;
 
+	case SIS7012ID:
+		device_set_desc(dev, "SiS 7012");
+		return 0;
+
+	case 0x01b110de:
+		device_set_desc(dev, "Nvidia nForce AC97 controller");
+		return 0;
+
 	default:
 		return ENXIO;
 	}
@@ -607,6 +631,18 @@ ich_pci_attach(device_t dev)
 	bzero(sc, sizeof(*sc));
 	sc->dev = dev;
 
+	/*
+	 * The SiS 7012 register set isn't quite like the standard ich.
+	 * There really should be a general "quirks" mechanism.
+	 */
+	if (pci_get_devid(dev) == SIS7012ID) {
+		sc->swap_reg = 1;
+		sc->sample_size = 1;
+	} else {
+		sc->swap_reg = 0;
+		sc->sample_size = 2;
+	}
+
 	data = pci_read_config(dev, PCIR_COMMAND, 2);
 	data |= (PCIM_CMD_PORTEN | PCIM_CMD_MEMEN | PCIM_CMD_BUSMASTEREN);
 	pci_write_config(dev, PCIR_COMMAND, data, 2);
@@ -627,8 +663,9 @@ ich_pci_attach(device_t dev)
 	sc->nabmbart = rman_get_bustag(sc->nabmbar);
 	sc->nabmbarh = rman_get_bushandle(sc->nabmbar);
 
+	sc->bufsz = pcm_getbuffersize(dev, 4096, ICH_DEFAULT_BUFSZ, ICH_MAX_BUFSZ);
 	if (bus_dma_tag_create(NULL, 8, 0, BUS_SPACE_MAXADDR_32BIT, BUS_SPACE_MAXADDR,
-			       NULL, NULL, ICH_DEFAULT_BUFSZ, 1, 0x3ffff, 0, &sc->dmat) != 0) {
+			       NULL, NULL, sc->bufsz, 1, 0x3ffff, 0, &sc->dmat) != 0) {
 		device_printf(dev, "unable to create dma tag\n");
 		goto bad;
 	}
@@ -654,17 +691,19 @@ ich_pci_attach(device_t dev)
 	extcaps = ac97_getextcaps(sc->codec);
 	sc->hasvra = extcaps & AC97_EXTCAP_VRA;
 	sc->hasvrm = extcaps & AC97_EXTCAP_VRM;
+	sc->hasmic = ac97_getcaps(sc->codec) & AC97_CAP_MICCHANNEL;
 	ac97_setextmode(sc->codec, sc->hasvra | sc->hasvrm);
 
-	if (pcm_register(dev, sc, 1, 2))
+	if (pcm_register(dev, sc, 1, sc->hasmic? 2 : 1))
 		goto bad;
 
-	pcm_addchan(dev, PCMDIR_PLAY, &ichchan_class, sc);
-	pcm_addchan(dev, PCMDIR_REC, &ichchan_class, sc);
-	pcm_addchan(dev, PCMDIR_REC, &ichchan_class, sc);
+	pcm_addchan(dev, PCMDIR_PLAY, &ichchan_class, sc);		/* play */
+	pcm_addchan(dev, PCMDIR_REC, &ichchan_class, sc);		/* record */
+	if (sc->hasmic)
+		pcm_addchan(dev, PCMDIR_REC, &ichchan_class, sc);	/* record mic */
 
-	snprintf(status, SND_STATUSLEN, "at io 0x%lx, 0x%lx irq %ld",
-		 rman_get_start(sc->nambar), rman_get_start(sc->nabmbar), rman_get_start(sc->irq));
+	snprintf(status, SND_STATUSLEN, "at io 0x%lx, 0x%lx irq %ld bufsz %u",
+		 rman_get_start(sc->nambar), rman_get_start(sc->nabmbar), rman_get_start(sc->irq), sc->bufsz);
 
 	pcm_setstatus(dev, status);
 
@@ -676,16 +715,16 @@ ich_pci_attach(device_t dev)
 bad:
 	if (sc->codec)
 		ac97_destroy(sc->codec);
+	if (sc->ih)
+		bus_teardown_intr(dev, sc->irq, sc->ih);
+	if (sc->irq)
+		bus_release_resource(dev, SYS_RES_IRQ, sc->irqid, sc->irq);
 	if (sc->nambar)
 		bus_release_resource(dev, SYS_RES_IOPORT,
 		    sc->nambarid, sc->nambar);
 	if (sc->nabmbar)
 		bus_release_resource(dev, SYS_RES_IOPORT,
 		    sc->nabmbarid, sc->nabmbar);
-	if (sc->ih)
-		bus_teardown_intr(dev, sc->irq, sc->ih);
-	if (sc->irq)
-		bus_release_resource(dev, SYS_RES_IRQ, sc->irqid, sc->irq);
 	free(sc, M_DEVBUF);
 	return ENXIO;
 }
@@ -711,9 +750,26 @@ ich_pci_detach(device_t dev)
 }
 
 static int
+ich_pci_suspend(device_t dev)
+{
+	struct sc_info *sc;
+	int i;
+
+	sc = pcm_getdevinfo(dev);	
+	for (i = 0 ; i < 3; i++) {
+		sc->ch[i].run_save = sc->ch[i].run;
+		if (sc->ch[i].run) {
+			ichchan_trigger(0, &sc->ch[i], PCMTRIG_ABORT);
+		}
+	}
+	return 0;
+}
+
+static int
 ich_pci_resume(device_t dev)
 {
 	struct sc_info *sc;
+	int i;
 
 	sc = pcm_getdevinfo(dev);
 
@@ -727,6 +783,15 @@ ich_pci_resume(device_t dev)
 		device_printf(dev, "unable to reinitialize the mixer\n");
 		return ENXIO;
 	}
+	/* Re-start DMA engines */
+	for (i = 0 ; i < 3; i++) {
+		struct sc_chinfo *ch = &sc->ch[i];
+		if (sc->ch[i].run_save) {
+			ichchan_setblocksize(0, ch, ch->blksz);
+			ichchan_setspeed(0, ch, ch->spd);
+			ichchan_trigger(0, ch, PCMTRIG_START);
+		}
+	}
 	return 0;
 }
 
@@ -735,6 +800,7 @@ static device_method_t ich_methods[] = {
 	DEVMETHOD(device_probe,		ich_pci_probe),
 	DEVMETHOD(device_attach,	ich_pci_attach),
 	DEVMETHOD(device_detach,	ich_pci_detach),
+	DEVMETHOD(device_suspend, 	ich_pci_suspend),
 	DEVMETHOD(device_resume,	ich_pci_resume),
 	{ 0, 0 }
 };
@@ -742,7 +808,7 @@ static device_method_t ich_methods[] = {
 static driver_t ich_driver = {
 	"pcm",
 	ich_methods,
-	sizeof(struct snddev_info),
+	PCM_SOFTC_SIZE,
 };
 
 DRIVER_MODULE(snd_ich, pci, ich_driver, pcm_devclass, 0, 0);

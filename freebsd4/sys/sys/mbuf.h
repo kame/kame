@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mbuf.h	8.5 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.11 2001/10/26 06:44:51 luigi Exp $
+ * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.12 2002/02/13 00:43:11 dillon Exp $
  */
 
 #ifndef _SYS_MBUF_H_
@@ -409,34 +409,6 @@ union mcluster {
 
 #define	MEXTFREE(m) MBUFLOCK(						\
 	MEXTFREE1(m);							\
-)
-
-/*
- * MFREE(struct mbuf *m, struct mbuf *n)
- * Free a single mbuf and associated external storage.
- * Place the successor, if any, in n.
- *
- * we do need to check non-first mbuf for m_aux, since some of existing
- * code does not call M_PREPEND properly.
- * (example: call to bpf_mtap from drivers)
- */
-#define	MFREE(m, n) MBUFLOCK(						\
-	struct mbuf *_mm = (m);						\
-									\
-	KASSERT(_mm->m_type != MT_FREE, ("freeing free mbuf"));		\
-	mbtypes[_mm->m_type]--;						\
-	if ((_mm->m_flags & M_PKTHDR) != 0 && _mm->m_pkthdr.aux) {	\
-		m_freem(_mm->m_pkthdr.aux);				\
-		_mm->m_pkthdr.aux = NULL;				\
-	}								\
-	if (_mm->m_flags & M_EXT)					\
-		MEXTFREE1(m);						\
-	(n) = _mm->m_next;						\
-	_mm->m_type = MT_FREE;						\
-	mbtypes[MT_FREE]++;						\
-	_mm->m_next = mmbfree;						\
-	mmbfree = _mm;							\
-	MMBWAKEUP();							\
 )
 
 /*

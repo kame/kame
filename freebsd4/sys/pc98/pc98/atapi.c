@@ -13,7 +13,7 @@
  *
  * Version 1.9, Mon Oct  9 22:34:47 MSK 1995
  *
- * $FreeBSD: src/sys/pc98/pc98/atapi.c,v 1.5.4.1 2000/04/03 20:13:08 n_hibma Exp $
+ * $FreeBSD: src/sys/pc98/pc98/atapi.c,v 1.5.4.2 2002/02/15 12:04:00 nyan Exp $
  */
 
 /*
@@ -254,11 +254,14 @@ int atapi_attach (int ctlr, int unit, int port)
 	case AT_TYPE_DIRECT:            /* direct-access */
 #if NWFD > 0
 		/* ATAPI Floppy(LS-120) */
-		if (wfdattach (ata, unit, ap, ata->debug) < 0)
-			break;
+		if (wfdattach (ata, unit, ap, ata->debug) >= 0) {
 			/* Device attached successfully. */
-		ata->attached[unit] = 1;
-		return (1);
+			ata->attached[unit] = 1;
+			return (1);
+		}
+#endif
+#if NWCD > 0
+		/* FALLTHROUGH */
 #else
 		printf ("wdc%d: ATAPI Floppies not configured\n", ctlr);
 		break;

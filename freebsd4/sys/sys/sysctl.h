@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sysctl.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/sysctl.h,v 1.81.2.7 2001/07/18 15:36:56 pirzyk Exp $
+ * $FreeBSD: src/sys/sys/sysctl.h,v 1.81.2.8 2002/03/17 11:08:38 alfred Exp $
  */
 
 #ifndef _SYS_SYSCTL_H_
@@ -174,7 +174,7 @@ TAILQ_HEAD(sysctl_ctx_list, sysctl_ctx_entry);
 #define SYSCTL_OID(parent, nbr, name, kind, a1, a2, handler, fmt, descr) \
 	static struct sysctl_oid sysctl__##parent##_##name = {		 \
 		&sysctl_##parent##_children, { 0 },			 \
-		nbr, kind, a1, a2, #name, handler, fmt };		 \
+		nbr, kind, a1, a2, #name, handler, fmt, 0 };		 \
 	DATA_SET(sysctl_set, sysctl__##parent##_##name);
 
 #define SYSCTL_ADD_OID(ctx, parent, nbr, name, kind, a1, a2, handler, fmt, descr) \

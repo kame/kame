@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/dev/twe/tweio.h,v 1.1.2.1 2000/10/27 06:04:02 msmith Exp $
+ *	$FreeBSD: src/sys/dev/twe/tweio.h,v 1.1.2.2 2002/03/07 09:57:02 msmith Exp $
  */
 
 

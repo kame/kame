@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.59.2.20 2001/12/20 10:30:18 ru Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.59.2.23 2002/05/02 02:36:50 silby Exp $
  */
 
 #include "opt_ipsec.h"
@@ -408,12 +408,15 @@ in_pcbladdr(inp, nam, plocal_sin)
 		/*
 		 * If route is known or can be allocated now,
 		 * our src addr is taken from the i/f, else punt.
+		 * Note that we should check the address family of the cached
+		 * destination, in case of sharing the cache with IPv6.
 		 */
 		ro = &inp->inp_route;
 		if (ro->ro_rt &&
-		    (satosin(&ro->ro_dst)->sin_addr.s_addr !=
-			sin->sin_addr.s_addr ||
-		    inp->inp_socket->so_options & SO_DONTROUTE)) {
+		    (ro->ro_dst.sa_family != AF_INET ||
+		     satosin(&ro->ro_dst)->sin_addr.s_addr !=
+		     sin->sin_addr.s_addr ||
+		     inp->inp_socket->so_options & SO_DONTROUTE)) {
 			RTFREE(ro->ro_rt);
 			ro->ro_rt = (struct rtentry *)0;
 		}
@@ -421,6 +424,7 @@ in_pcbladdr(inp, nam, plocal_sin)
 		    (ro->ro_rt == (struct rtentry *)0 ||
 		    ro->ro_rt->rt_ifp == (struct ifnet *)0)) {
 			/* No route yet, so try to acquire one */
+			bzero(&ro->ro_dst, sizeof(struct sockaddr_in));
 			ro->ro_dst.sa_family = AF_INET;
 			ro->ro_dst.sa_len = sizeof(struct sockaddr_in);
 			((struct sockaddr_in *) &ro->ro_dst)->sin_addr =

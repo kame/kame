@@ -1,5 +1,5 @@
 /*	$NetBSD: usbdi.c,v 1.60 2000/01/19 00:23:58 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usbdi.c,v 1.34.2.4 2000/10/31 23:23:30 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usbdi.c,v 1.34.2.6 2002/02/24 14:23:15 alfred Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -824,7 +824,7 @@ usb_transfer_complete(xfer)
 	}
 
 	/* Count completed transfers. */
-	++pipe->device->bus->stats.requests
+	++pipe->device->bus->stats.uds_requests
 		[pipe->endpoint->edesc->bmAttributes & UE_XFERTYPE];
 
 	xfer->done = 1;
@@ -1093,6 +1093,22 @@ usbd_get_endpoint_descriptor(iface, address)
 			return (iface->endpoints[i].edesc);
 	}
 	return (0);
+}
+
+/*
+ * Search for a vendor/product pair in an array.  The item size is
+ * given as an argument.
+ */
+const struct usb_devno *
+usb_match_device(const struct usb_devno *tbl, u_int nentries, u_int sz,
+		 u_int16_t vendor, u_int16_t product)
+{
+	while (nentries-- > 0) {
+		if (tbl->ud_vendor == vendor && tbl->ud_product == product)
+			return (tbl);
+		tbl = (const struct usb_devno *)((const char *)tbl + sz);
+	}
+	return (NULL);
 }
 
 #if defined(__FreeBSD__)

@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.151.2.25 2002/01/12 11:03:31 bde Exp $
+ * $FreeBSD: src/sys/pc98/i386/machdep.c,v 1.151.2.26 2002/03/25 12:59:03 nyan Exp $
  */
 
 #include "apm.h"
@@ -1126,6 +1126,10 @@ SYSCTL_STRUCT(_machdep, CPU_BOOTINFO, bootinfo,
 
 SYSCTL_INT(_machdep, CPU_WALLCLOCK, wall_cmos_clock,
 	CTLFLAG_RW, &wall_cmos_clock, 0, "");
+
+extern u_long bootdev;		/* not a dev_t - encoding is different */
+SYSCTL_ULONG(_machdep, OID_AUTO, guessed_bootdev,
+	CTLFLAG_RD, &bootdev, 0, "Boot device (not in dev_t format)");
 
 /*
  * Initialize 386 and configure to run kernel

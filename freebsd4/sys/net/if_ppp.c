@@ -69,7 +69,7 @@
  * Paul Mackerras (paulus@cs.anu.edu.au).
  */
 
-/* $FreeBSD: src/sys/net/if_ppp.c,v 1.67.2.1 2001/09/11 09:49:54 kris Exp $ */
+/* $FreeBSD: src/sys/net/if_ppp.c,v 1.67.2.4 2002/04/14 21:41:48 luigi Exp $ */
 /* from if_sl.c,v 1.11 84/10/04 12:54:47 rick Exp */
 /* from NetBSD: if_ppp.c,v 1.15.2.2 1994/07/28 05:17:58 cgd Exp */
 
@@ -309,19 +309,19 @@ pppdealloc(sc)
 #endif /* PPP_COMPRESS */
 #ifdef PPP_FILTER
     if (sc->sc_pass_filt.bf_insns != 0) {
-	FREE(sc->sc_pass_filt.bf_insns, M_DEVBUF);
+	free(sc->sc_pass_filt.bf_insns, M_DEVBUF);
 	sc->sc_pass_filt.bf_insns = 0;
 	sc->sc_pass_filt.bf_len = 0;
     }
     if (sc->sc_active_filt.bf_insns != 0) {
-	FREE(sc->sc_active_filt.bf_insns, M_DEVBUF);
+	free(sc->sc_active_filt.bf_insns, M_DEVBUF);
 	sc->sc_active_filt.bf_insns = 0;
 	sc->sc_active_filt.bf_len = 0;
     }
 #endif /* PPP_FILTER */
 #ifdef VJC
     if (sc->sc_comp != 0) {
-	FREE(sc->sc_comp, M_DEVBUF);
+	free(sc->sc_comp, M_DEVBUF);
 	sc->sc_comp = 0;
     }
 #endif
@@ -518,11 +518,11 @@ pppioctl(sc, cmd, data, flag, p)
 	    }
 	    if ((error = copyin((caddr_t)nbp->bf_insns, (caddr_t)newcode,
 			       newcodelen)) != 0) {
-		FREE(newcode, M_DEVBUF);
+		free(newcode, M_DEVBUF);
 		return error;
 	    }
 	    if (!bpf_validate(newcode, nbp->bf_len)) {
-		FREE(newcode, M_DEVBUF);
+		free(newcode, M_DEVBUF);
 		return EINVAL;
 	    }
 	} else
@@ -534,7 +534,7 @@ pppioctl(sc, cmd, data, flag, p)
 	bp->bf_insns = newcode;
 	splx(s);
 	if (oldcode != 0)
-	    FREE(oldcode, M_DEVBUF);
+	    free(oldcode, M_DEVBUF);
 	break;
 #endif
 
@@ -1381,9 +1381,10 @@ ppp_inproc(sc, m)
 	if (m->m_len <= M_TRAILINGSPACE(mp)) {
 	    bcopy(mtod(m, u_char *), mtod(mp, u_char *) + mp->m_len, m->m_len);
 	    mp->m_len += m->m_len;
-	    MFREE(m, mp->m_next);
-	} else
+	    mp->m_next = m_free(m);
+	} else {
 	    mp->m_next = m;
+	}
 	m = mp;
 	ilen += hlen - xlen;
 
@@ -1471,13 +1472,10 @@ ppp_inproc(sc, m)
 	m->m_pkthdr.len -= PPP_HDRLEN;
 	m->m_data += PPP_HDRLEN;
 	m->m_len -= PPP_HDRLEN;
-	if (ipflow_fastforward(m)) {
-	    sc->sc_last_recv = time_second;
+	if (ipflow_fastforward(m))
 	    return;
-	}
 	schednetisr(NETISR_IP);
 	inq = &ipintrq;
-	sc->sc_last_recv = time_second;	/* update time of last pkt rcvd */
 	break;
 #endif
 #ifdef IPX

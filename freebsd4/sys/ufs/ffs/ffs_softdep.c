@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)ffs_softdep.c	9.59 (McKusick) 6/21/00
- * $FreeBSD: src/sys/ufs/ffs/ffs_softdep.c,v 1.57.2.9 2001/03/02 17:22:26 dillon Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_softdep.c,v 1.57.2.11 2002/02/05 18:46:53 dillon Exp $
  */
 
 /*
@@ -233,8 +233,6 @@ static struct lockit {
 } lk = { 0 };
 #define ACQUIRE_LOCK(lk)		(lk)->lkt_spl = splbio()
 #define FREE_LOCK(lk)			splx((lk)->lkt_spl)
-#define ACQUIRE_LOCK_INTERLOCKED(lk)
-#define FREE_LOCK_INTERLOCKED(lk)
 
 #else /* DEBUG */
 static struct lockit {
@@ -245,13 +243,10 @@ static int lockcnt;
 
 static	void acquire_lock __P((struct lockit *));
 static	void free_lock __P((struct lockit *));
-static	void acquire_lock_interlocked __P((struct lockit *));
-static	void free_lock_interlocked __P((struct lockit *));
+void	softdep_panic __P((char *));
 
 #define ACQUIRE_LOCK(lk)		acquire_lock(lk)
 #define FREE_LOCK(lk)			free_lock(lk)
-#define ACQUIRE_LOCK_INTERLOCKED(lk)	acquire_lock_interlocked(lk)
-#define FREE_LOCK_INTERLOCKED(lk)	free_lock_interlocked(lk)
 
 static void
 acquire_lock(lk)
@@ -283,35 +278,77 @@ free_lock(lk)
 	splx(lk->lkt_spl);
 }
 
-static void
-acquire_lock_interlocked(lk)
+/*
+ * Function to release soft updates lock and panic.
+ */
+void
+softdep_panic(msg)
+	char *msg;
+{
+
+	if (lk.lkt_held != -1)
+		FREE_LOCK(&lk);
+	panic(msg);
+}
+#endif /* DEBUG */
+
+static	int interlocked_sleep __P((struct lockit *, int, void *, int,
+	    const char *, int));
+
+/*
+ * When going to sleep, we must save our SPL so that it does
+ * not get lost if some other process uses the lock while we
+ * are sleeping. We restore it after we have slept. This routine
+ * wraps the interlocking with functions that sleep. The list
+ * below enumerates the available set of operations.
+ */
+#define	UNKNOWN		0
+#define	SLEEP		1
+#define	LOCKBUF		2
+
+static int
+interlocked_sleep(lk, op, ident, flags, wmesg, timo)
 	struct lockit *lk;
+	int op;
+	void *ident;
+	int flags;
+	const char *wmesg;
+	int timo;
 {
 	pid_t holder;
+	int s, retval;
 
+	s = lk->lkt_spl;
+#	ifdef DEBUG
+	if (lk->lkt_held == -1)
+		panic("interlocked_sleep: lock not held");
+	lk->lkt_held = -1;
+#	endif /* DEBUG */
+	switch (op) {
+	case SLEEP:
+		retval = tsleep(ident, flags, wmesg, timo);
+		break;
+	case LOCKBUF:
+		retval = BUF_LOCK((struct buf *)ident, flags);
+		break;
+	default:
+		panic("interlocked_sleep: unknown operation");
+	}
+#	ifdef DEBUG
 	if (lk->lkt_held != -1) {
 		holder = lk->lkt_held;
 		FREE_LOCK(lk);
 		if (holder == CURPROC->p_pid)
-			panic("softdep_lock_interlocked: locking against self");
+			panic("interlocked_sleep: locking against self");
 		else
-			panic("softdep_lock_interlocked: lock held by %d",
-			    holder);
+			panic("interlocked_sleep: lock held by %d", holder);
 	}
 	lk->lkt_held = CURPROC->p_pid;
 	lockcnt++;
+#	endif /* DEBUG */
+	lk->lkt_spl = s;
+	return (retval);
 }
-
-static void
-free_lock_interlocked(lk)
-	struct lockit *lk;
-{
-
-	if (lk->lkt_held == -1)
-		panic("softdep_unlock_interlocked: lock not held");
-	lk->lkt_held = -1;
-}
-#endif /* DEBUG */
 
 /*
  * Place holder for real semaphores.
@@ -348,12 +385,13 @@ sema_get(semap, interlock)
 {
 
 	if (semap->value++ > 0) {
-		if (interlock != NULL)
-			FREE_LOCK_INTERLOCKED(interlock);
-		tsleep((caddr_t)semap, semap->prio, semap->name, semap->timo);
 		if (interlock != NULL) {
-			ACQUIRE_LOCK_INTERLOCKED(interlock);
+			interlocked_sleep(interlock, SLEEP, (caddr_t)semap,
+			    semap->prio, semap->name, semap->timo);
 			FREE_LOCK(interlock);
+		} else {
+			tsleep((caddr_t)semap, semap->prio, semap->name,
+			    semap->timo);
 		}
 		return (0);
 	}
@@ -4080,6 +4118,11 @@ softdep_sync_metadata(ap)
 	 */
 	waitfor = MNT_NOWAIT;
 top:
+	/*
+	 * We must wait for any I/O in progress to finish so that
+	 * all potential buffers on the dirty list will be visible.
+	 */
+	drain_output(vp, 1);
 	if (getdirtybuf(&TAILQ_FIRST(&vp->v_dirtyblkhd), MNT_WAIT) == 0) {
 		FREE_LOCK(&lk);
 		return (0);
@@ -4236,15 +4279,8 @@ loop:
 		goto loop;
 	}
 	/*
-	 * We must wait for any I/O in progress to finish so that
-	 * all potential buffers on the dirty list will be visible.
-	 * Once they are all there, proceed with the second pass
-	 * which will wait for the I/O as per above.
-	 */
-	drain_output(vp, 1);
-	/*
 	 * The brief unlock is to allow any pent up dependency
-	 * processing to be done.
+	 * processing to be done.  Then proceed with the second pass.
 	 */
 	if (waitfor == MNT_NOWAIT) {
 		waitfor = MNT_WAIT;
@@ -4270,7 +4306,11 @@ loop:
 	 * partially written files have been written to disk. The only easy
 	 * way to accomplish this is to sync the entire filesystem (luckily
 	 * this happens rarely).
+	 *
+	 * We must wait for any I/O in progress to finish so that
+	 * all potential buffers on the dirty list will be visible.
 	 */
+	drain_output(vp, 1);
 	if (vn_isdisk(vp, NULL) && 
 	    vp->v_specmountpoint && !VOP_ISLOCKED(vp, NULL) &&
 	    (error = VFS_SYNC(vp->v_specmountpoint, MNT_WAIT, ap->a_cred,
@@ -4591,9 +4631,8 @@ request_cleanup(resource, islocked)
 	proc_waiting += 1;
 	if (handle.callout == NULL)
 		handle = timeout(pause_timer, 0, tickdelay > 2 ? tickdelay : 2);
-	FREE_LOCK_INTERLOCKED(&lk);
-	(void) tsleep((caddr_t)&proc_waiting, PPAUSE, "softupdate", 0);
-	ACQUIRE_LOCK_INTERLOCKED(&lk);
+	interlocked_sleep(&lk, SLEEP, (caddr_t)&proc_waiting, PPAUSE,
+	    "softupdate", 0);
 	proc_waiting -= 1;
 	if (islocked == 0)
 		FREE_LOCK(&lk);
@@ -4824,6 +4863,7 @@ getdirtybuf(bpp, waitfor)
 	int waitfor;
 {
 	struct buf *bp;
+	int error;
 
 	for (;;) {
 		if ((bp = *bpp) == NULL)
@@ -4835,17 +4875,18 @@ getdirtybuf(bpp, waitfor)
 			if (waitfor != MNT_WAIT)
 				return (0);
 			bp->b_xflags |= BX_BKGRDWAIT;
-			FREE_LOCK_INTERLOCKED(&lk);
-			tsleep(&bp->b_xflags, PRIBIO, "getbuf", 0);
-			ACQUIRE_LOCK_INTERLOCKED(&lk);
+			interlocked_sleep(&lk, SLEEP, &bp->b_xflags, PRIBIO,
+			    "getbuf", 0);
 			continue;
 		}
 		if (waitfor != MNT_WAIT)
 			return (0);
-		FREE_LOCK_INTERLOCKED(&lk);
-		if (BUF_LOCK(bp, LK_EXCLUSIVE | LK_SLEEPFAIL) != ENOLCK)
+		error = interlocked_sleep(&lk, LOCKBUF, bp,
+		    LK_EXCLUSIVE | LK_SLEEPFAIL, 0, 0);
+		if (error != ENOLCK) {
+			FREE_LOCK(&lk);
 			panic("getdirtybuf: inconsistent lock");
-		ACQUIRE_LOCK_INTERLOCKED(&lk);
+		}
 	}
 	if ((bp->b_flags & B_DELWRI) == 0) {
 		BUF_UNLOCK(bp);
@@ -4869,9 +4910,8 @@ drain_output(vp, islocked)
 		ACQUIRE_LOCK(&lk);
 	while (vp->v_numoutput) {
 		vp->v_flag |= VBWAIT;
-		FREE_LOCK_INTERLOCKED(&lk);
-		tsleep((caddr_t)&vp->v_numoutput, PRIBIO + 1, "drainvp", 0);
-		ACQUIRE_LOCK_INTERLOCKED(&lk);
+		interlocked_sleep(&lk, SLEEP, (caddr_t)&vp->v_numoutput,
+		    PRIBIO + 1, "drainvp", 0);
 	}
 	if (!islocked)
 		FREE_LOCK(&lk);

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/netinet/accf_http.c,v 1.1.2.3 2001/01/03 19:52:37 alfred Exp $
+ *	$FreeBSD: src/sys/netinet/accf_http.c,v 1.1.2.4 2002/05/01 08:34:37 alfred Exp $
  */
 
 #define ACCEPT_FILTER_MOD
@@ -125,6 +125,8 @@ mbufstrcmp(struct mbuf *m, struct mbuf *npkt, int offset, char *cmp)
 					return (0);
 				}
 			}
+			if (*cmp == '\0')
+				return (1);
 			offset = 0;
 		}
 	}
@@ -153,6 +155,8 @@ mbufstrncmp(struct mbuf *m, struct mbuf *npkt, int offset, int max, char *cmp)
 					return (0);
 				}
 			}
+			if (max == 0 || *cmp == '\0')
+				return (1);
 			offset = 0;
 		}
 	}

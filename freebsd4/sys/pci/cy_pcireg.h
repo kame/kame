@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/cy_pcireg.h,v 1.7 1999/08/28 00:50:45 peter Exp $
+ * $FreeBSD: src/sys/pci/cy_pcireg.h,v 1.7.2.1 2002/03/17 04:14:18 bde Exp $
  */
 
 #define CY_PCI_BASE_ADDR0		0x10
@@ -35,6 +35,7 @@
 #define CY_PLX_9060_ICS			0x68
 #define CY_PLX_9050_ICS_IENABLE		0x040
 #define CY_PLX_9050_ICS_LOCAL_IENABLE	0x001
+#define CY_PLX_9050_ICS_LOCAL_IPOLARITY	0x002
 #define CY_PLX_9060_ICS_IENABLE		0x100
 #define CY_PLX_9060_ICS_LOCAL_IENABLE	0x800
 

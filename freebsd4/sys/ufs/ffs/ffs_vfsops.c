@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vfsops.c	8.31 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.117.2.7 2001/12/25 01:44:44 dillon Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_vfsops.c,v 1.117.2.9 2002/04/08 09:39:30 bde Exp $
  */
 
 #include "opt_quota.h"
@@ -190,6 +190,14 @@ ffs_mount( mp, path, data, ndp, p)
 		err = 0;
 		ronly = fs->fs_ronly;	/* MNT_RELOAD might change this */
 		if (ronly == 0 && (mp->mnt_flag & MNT_RDONLY)) {
+			/*
+			 * Flush any dirty data.
+			 */
+			VFS_SYNC(mp, MNT_WAIT, p->p_ucred, p);
+			/*
+			 * Check for and optionally get rid of files open
+			 * for writing.
+			 */
 			flags = WRITECLOSE;
 			if (mp->mnt_flag & MNT_FORCE)
 				flags |= FORCECLOSE;
@@ -617,7 +625,7 @@ ffs_mountfs(devvp, mp, p, malloctype)
 	VOP_UNLOCK(devvp, 0, p);
 	if (error)
 		return (error);
-	if (devvp->v_rdev->si_iosize_max > mp->mnt_iosize_max)
+	if (devvp->v_rdev->si_iosize_max != 0)
 		mp->mnt_iosize_max = devvp->v_rdev->si_iosize_max;
 	if (mp->mnt_iosize_max > MAXPHYS)
 		mp->mnt_iosize_max = MAXPHYS;

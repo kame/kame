@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/hostcache.c,v 1.6 1999/08/28 00:48:15 peter Exp $
+ * $FreeBSD: src/sys/net/hostcache.c,v 1.6.2.1 2002/04/14 21:41:48 luigi Exp $
  */
 
 #include <sys/param.h>
@@ -196,7 +196,7 @@ hc_delete(struct hcentry *hc)
 	LIST_REMOVE(hc, hc_link);
 	hc->hc_hct->hct_idle--;
 	splx(s);
-	FREE(hc, M_HOSTCACHE);
+	free(hc, M_HOSTCACHE);
 	return 0;
 }
 

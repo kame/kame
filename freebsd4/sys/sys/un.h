@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)un.h	8.3 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/un.h,v 1.17 1999/12/29 04:24:49 peter Exp $
+ * $FreeBSD: src/sys/sys/un.h,v 1.17.2.1 2002/03/09 05:22:23 dd Exp $
  */
 
 #ifndef _SYS_UN_H_
@@ -46,12 +46,16 @@ struct	sockaddr_un {
 	char	sun_path[104];		/* path name (gag) */
 };
 
+/* Socket options. */
+#define LOCAL_PEERCRED		0x001		/* retrieve peer credentails */
+
 #ifdef _KERNEL
 struct mbuf;
 struct socket;
 
 int	uipc_usrreq __P((struct socket *so, int req, struct mbuf *m,
 		struct mbuf *nam, struct mbuf *control));
+int	uipc_ctloutput __P((struct socket *so, struct sockopt *sopt));
 int	unp_connect2 __P((struct socket *so, struct socket *so2));
 void	unp_dispose __P((struct mbuf *m));
 int	unp_externalize __P((struct mbuf *rights));

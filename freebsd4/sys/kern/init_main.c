@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)init_main.c	8.9 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/init_main.c,v 1.134.2.6 2001/06/15 09:37:55 scottl Exp $
+ * $FreeBSD: src/sys/kern/init_main.c,v 1.134.2.7 2002/05/01 22:56:08 iedowse Exp $
  */
 
 #include "opt_init_path.h"
@@ -452,6 +452,7 @@ start_init(void *dummy)
 	p->p_fd->fd_cdir = rootvnode;
 	VREF(p->p_fd->fd_cdir);
 	p->p_fd->fd_rdir = rootvnode;
+	VREF(p->p_fd->fd_rdir);
 	VOP_UNLOCK(rootvnode, 0, p);
 
 	/*

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/smb_rq.h,v 1.1.2.1 2001/05/22 08:32:34 bp Exp $
+ * $FreeBSD: src/sys/netsmb/smb_rq.h,v 1.1.2.2 2002/04/23 03:45:01 bp Exp $
  */
 #ifndef _NETSMB_SMB_RQ_H_
 #define	_NETSMB_SMB_RQ_H_
@@ -119,7 +119,7 @@ struct smb_t2rq {
 	int		t2_flags;	/* SMBT2_ */
 	struct mbchain	t2_tparam;	/* parameters to transmit */
 	struct mbchain	t2_tdata;	/* data to transmit */
-	struct mdchain	t2_rparam;	/* received paramters */
+	struct mdchain	t2_rparam;	/* received parameters */
 	struct mdchain	t2_rdata;	/* received data */
 	struct smb_cred*t2_cred;
 	struct smb_connobj *t2_source;

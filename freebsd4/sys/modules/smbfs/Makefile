@@ -1,6 +1,7 @@
-# $FreeBSD: src/sys/modules/smbfs/Makefile,v 1.1.2.3 2002/01/10 11:45:47 sheldonh Exp $
+# $FreeBSD: src/sys/modules/smbfs/Makefile,v 1.1.2.4 2002/03/26 10:12:29 ume Exp $
 
 .PATH:	${.CURDIR}/../../crypto/des \
+	${.CURDIR}/../../crypto/des/arch/${MACHINE_ARCH} \
 	${.CURDIR}/../../kern \
 	${.CURDIR}/../../libkern \
 	${.CURDIR}/../../netsmb \
@@ -27,6 +28,11 @@ NETSMBCRYPTO=yes
 
 .if defined(NETSMBCRYPTO)
 SRCS+=	des_ecb.c des_setkey.c
+.if ${MACHINE_ARCH} == "i386"
+SRCS+=	des_enc.S
+.else
+SRCS+=	des_enc.c
+.endif
 .endif
 
 # Build with IPX support (1|0)

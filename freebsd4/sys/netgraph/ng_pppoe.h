@@ -36,7 +36,7 @@
  *
  * Author: Julian Elischer <julian@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_pppoe.h,v 1.7.2.3 2001/09/03 06:38:16 julian Exp $
+ * $FreeBSD: src/sys/netgraph/ng_pppoe.h,v 1.7.2.4 2002/03/26 11:40:20 brian Exp $
  * $Whistle: ng_pppoe.h,v 1.7 1999/10/16 10:16:43 julian Exp $
  */
 
@@ -64,7 +64,7 @@
 
 /**********************************************************************
  * Netgraph commands understood by this node type.
- * FAIL, SUCCESS and CLOSE are sent by the node rather than received.
+ * FAIL, SUCCESS, CLOSE and ACNAME are sent by the node rather than received.
  ********************************************************************/
 enum cmd {
 	NGM_PPPOE_SET_FLAG = 1,
@@ -75,6 +75,7 @@ enum cmd {
 	NGM_PPPOE_FAIL     = 6,	/* State machine could not connect */
 	NGM_PPPOE_CLOSE    = 7,	/* Session closed down */
 	NGM_PPPOE_SERVICE  = 8,	/* additional Service to advertise (in PADO) */
+	NGM_PPPOE_ACNAME   = 9,	/* AC_NAME for informational purposes */
 	NGM_PPPOE_GET_STATUS
 };
 

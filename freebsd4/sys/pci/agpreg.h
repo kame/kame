@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$FreeBSD: src/sys/pci/agpreg.h,v 1.3.2.2 2001/11/19 07:16:40 kuriyama Exp $
+ *	$FreeBSD: src/sys/pci/agpreg.h,v 1.3.2.3 2002/04/12 16:57:54 cokane Exp $
  */
 
 #ifndef _PCI_AGPREG_H_
@@ -89,6 +89,7 @@
 /*
  * Config offsets for the AMD 751 chipset.
  */
+#define AGP_AMD751_APBASE	0x10
 #define AGP_AMD751_REGISTERS	0x14
 #define AGP_AMD751_APCTRL	0xac
 #define AGP_AMD751_MODECTRL	0xb0

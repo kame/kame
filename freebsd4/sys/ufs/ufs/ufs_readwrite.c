@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_readwrite.c	8.11 (Berkeley) 5/8/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_readwrite.c,v 1.65.2.8 2001/11/18 07:11:00 dillon Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_readwrite.c,v 1.65.2.10 2002/03/06 19:53:08 dillon Exp $
  */
 
 #define	BLKSIZE(a, b, c)	blksize(a, b, c)
@@ -237,12 +237,12 @@ READ(ap)
 		if (bytesinfile < xfersize)
 			xfersize = bytesinfile;
 
-		if (lblktosize(fs, nextlbn) >= ip->i_size)
+		if (lblktosize(fs, nextlbn) >= ip->i_size) {
 			/*
 			 * Don't do readahead if this is the end of the file.
 			 */
 			error = bread(vp, lbn, size, NOCRED, &bp);
-		else if ((vp->v_mount->mnt_flag & MNT_NOCLUSTERR) == 0)
+		} else if ((vp->v_mount->mnt_flag & MNT_NOCLUSTERR) == 0) {
 			/* 
 			 * Otherwise if we are allowed to cluster,
 			 * grab as much as we can.
@@ -252,7 +252,7 @@ READ(ap)
 			 */
 			error = cluster_read(vp, ip->i_size, lbn,
 				size, NOCRED, uio->uio_resid, seqcount, &bp);
-		else if (seqcount > 1) {
+		} else if (seqcount > 1) {
 			/*
 			 * If we are NOT allowed to cluster, then
 			 * if we appear to be acting sequentially,
@@ -264,13 +264,14 @@ READ(ap)
 			int nextsize = BLKSIZE(fs, ip, nextlbn);
 			error = breadn(vp, lbn,
 			    size, &nextlbn, &nextsize, 1, NOCRED, &bp);
-		} else
+		} else {
 			/*
 			 * Failing all of the above, just read what the 
 			 * user asked for. Interestingly, the same as
 			 * the first option above.
 			 */
 			error = bread(vp, lbn, size, NOCRED, &bp);
+		}
 		if (error) {
 			brelse(bp);
 			bp = NULL;
@@ -292,7 +293,13 @@ READ(ap)
 		 * However, if the short read did not cause an error,
 		 * then we want to ensure that we do not uiomove bad
 		 * or uninitialized data.
+		 *
+		 * XXX b_resid is only valid when an actual I/O has occured
+		 * and may be incorrect if the buffer is B_CACHE or if the
+		 * last op on the buffer was a failed write.  This KASSERT
+		 * is a precursor to removing it from the UFS code.
 		 */
+		KASSERT(bp->b_resid == 0, ("bp->b_resid != 0"));
 		size -= bp->b_resid;
 		if (size < xfersize) {
 			if (size == 0)

@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/vm/vm_map.c,v 1.187.2.12 2001/11/10 22:27:09 tegge Exp $
+ * $FreeBSD: src/sys/vm/vm_map.c,v 1.187.2.13 2002/03/08 17:22:20 dillon Exp $
  */
 
 /*
@@ -1741,8 +1741,11 @@ vm_map_clean(map, start, end, syncio, invalidate)
 		 * to write out.
 		 * We invalidate (remove) all pages from the address space
 		 * anyway, for semantic correctness.
+		 *
+		 * note: certain anonymous maps, such as MAP_NOSYNC maps,
+		 * may start out with a NULL object.
 		 */
-		while (object->backing_object) {
+		while (object && object->backing_object) {
 			object = object->backing_object;
 			offset += object->backing_object_offset;
 			if (object->size < OFF_TO_IDX( offset + size))

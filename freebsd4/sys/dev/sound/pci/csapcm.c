@@ -26,8 +26,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $FreeBSD: src/sys/dev/sound/pci/csapcm.c,v 1.8.2.6 2001/08/01 03:40:57 cg Exp $
  */
 
 #include <sys/soundcard.h>
@@ -39,6 +37,8 @@
 
 #include <pci/pcireg.h>
 #include <pci/pcivar.h>
+
+SND_DECLARE_FILE("$FreeBSD: src/sys/dev/sound/pci/csapcm.c,v 1.8.2.7 2002/04/22 15:49:32 cg Exp $");
 
 /* Buffer size on dma transfer. Fixed for CS416x. */
 #define CS461x_BUFFSIZE   (4 * 1024)
@@ -839,7 +839,7 @@ static device_method_t pcmcsa_methods[] = {
 static driver_t pcmcsa_driver = {
 	"pcm",
 	pcmcsa_methods,
-	sizeof(struct snddev_info),
+	PCM_SOFTC_SIZE,
 };
 
 DRIVER_MODULE(snd_csapcm, csa, pcmcsa_driver, pcm_devclass, 0, 0);

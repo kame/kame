@@ -1,8 +1,8 @@
 /*	$OpenBSD: if_tx.c,v 1.9.2.1 2000/02/21 22:29:13 niklas Exp $	*/
-/* $FreeBSD: src/sys/pci/if_tx.c,v 1.34.2.9 2001/12/04 20:01:54 brooks Exp $ */
+/* $FreeBSD: src/sys/pci/if_tx.c,v 1.34.2.12 2002/04/22 18:40:23 semenu Exp $ */
 
 /*-
- * Copyright (c) 1997 Semen Ustimenko (semen@iclub.nsu.ru)
+ * Copyright (c) 1997 Semen Ustimenko (semenu@FreeBSD.org)
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -863,7 +863,6 @@ epic_ifstart(ifp)
 		if( NULL != m ){
 			EPIC_MGETCLUSTER(m);
 			if( NULL == m ){
-				printf(EPIC_FORMAT ": cannot allocate mbuf cluster\n",EPIC_ARGS(sc));
 				m_freem(m0);
 				ifp->if_oerrors++;
 				continue;
@@ -941,7 +940,6 @@ epic_rx_done(sc)
 		/* Try to get mbuf cluster */
 		EPIC_MGETCLUSTER( buf->mbuf );
 		if( NULL == buf->mbuf ) { 
-			printf(EPIC_FORMAT ": cannot allocate mbuf cluster\n",EPIC_ARGS(sc));
 			buf->mbuf = m;
 			desc->status = 0x8000;
 			sc->sc_if.if_ierrors++;
@@ -1355,7 +1353,7 @@ epic_miibus_statchg(dev)
 	}
 
 	/* Update baudrate */
-	if (IFM_SUBTYPE(media) == IFM_100_TX &&
+	if (IFM_SUBTYPE(media) == IFM_100_TX ||
 	    IFM_SUBTYPE(media) == IFM_100_FX)
 		sc->sc_if.if_baudrate = 100000000;
 	else

@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options,v 1.191.2.37 2001/11/03 01:41:07 ps Exp $
+# $FreeBSD: src/sys/conf/options,v 1.191.2.40 2002/04/30 17:48:08 tmm Exp $
 #
 #        On the handling of kernel options
 #
@@ -162,6 +162,7 @@ HZ		opt_param.h
 MAXFILES	opt_param.h
 NBUF		opt_param.h
 NMBCLUSTERS	opt_param.h
+NMBUFS		opt_param.h
 NSFBUFS		opt_param.h
 VM_BCACHE_SIZE_MAX	opt_param.h
 VM_SWZONE_SIZE_MAX	opt_param.h
@@ -386,6 +387,7 @@ MSGBUF_SIZE		opt_msgbuf.h
 
 # PCI related options
 PCI_QUIET		opt_pci.h
+PCI_ENABLE_IO_MODES	opt_pci.h
 
 # NFS options
 NFS_MINATTRTIMO		opt_nfs.h
@@ -462,3 +464,6 @@ ROOTDEVNAME		opt_rootdevname.h
 FDC_DEBUG		opt_fdc.h
 PCFCLOCK_VERBOSE	opt_pcfclock.h
 PCFCLOCK_MAX_RETRIES	opt_pcfclock.h
+
+# Polling device handling
+DEVICE_POLLING		opt_global.h

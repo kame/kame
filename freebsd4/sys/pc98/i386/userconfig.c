@@ -46,7 +46,7 @@
  ** (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  ** THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **
- ** $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.106.2.9 2001/12/20 11:37:14 nyan Exp $
+ ** $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.106.2.10 2002/02/15 12:13:27 nyan Exp $
  **/
 
 /**
@@ -358,6 +358,7 @@ static DEV_INFO device_info[] = {
 {"ad",		"ATA/ATAPI compatible storage device",	FLG_INVISIBLE,	CLS_STORAGE},	
 {"fd",		"Floppy disk device",			FLG_INVISIBLE,	CLS_STORAGE},
 
+{"cm",		"SMC COM90Cx6-based Arcnet adapters",	0,		CLS_NETWORK},
 {"cs",          "IBM EtherJet, CS89x0-based Ethernet adapters",0,	CLS_NETWORK},
 #ifdef PC98
 {"ed",          "NS8390 Ethernet adapters",	0,	CLS_NETWORK},
@@ -2449,7 +2450,7 @@ visuserconfig(void)
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.106.2.9 2001/12/20 11:37:14 nyan Exp $
+ * $FreeBSD: src/sys/pc98/i386/userconfig.c,v 1.106.2.10 2002/02/15 12:13:27 nyan Exp $
  */
 
 #include "scbus.h"

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_fork.c	8.6 (Berkeley) 4/8/94
- * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72.2.8 2001/10/24 19:14:51 dillon Exp $
+ * $FreeBSD: src/sys/kern/kern_fork.c,v 1.72.2.10 2002/02/26 05:32:43 silby Exp $
  */
 
 #include "opt_ktrace.h"
@@ -68,9 +68,6 @@
 
 static MALLOC_DEFINE(M_ATFORK, "atfork", "atfork callback");
 
-static int	fast_vfork = 1;
-SYSCTL_INT(_kern, OID_AUTO, fast_vfork, CTLFLAG_RW, &fast_vfork, 0, "");
-
 /*
  * These are the stuctures used to create a callout list for things to do
  * when forking a process
@@ -88,6 +85,8 @@ struct fork_args {
 	int     dummy;
 };
 #endif
+
+int forksleep; /* Place for fork1() to sleep on. */
 
 /* ARGSUSED */
 int
@@ -232,8 +231,8 @@ fork1(p1, flags, procp)
 	 * processes, maxproc is the limit.
 	 */
 	uid = p1->p_cred->p_ruid;
-	if ((nprocs >= maxproc - 1 && uid != 0) || nprocs >= maxproc) {
-		tablefull("proc");
+	if ((nprocs >= maxproc - 10 && uid != 0) || nprocs >= maxproc) {
+		tsleep(&forksleep, PUSER, "fork", hz / 2);
 		return (EAGAIN);
 	}
 	/*
@@ -253,6 +252,7 @@ fork1(p1, flags, procp)
 		 * Back out the process count
 		 */
 		nprocs--;
+		tsleep(&forksleep, PUSER, "fork", hz / 2);
 		return (EAGAIN);
 	}
 

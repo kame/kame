@@ -22,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/ufs/ufs/ufs_dirhash.c,v 1.3.2.4 2001/11/21 14:14:21 iedowse Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_dirhash.c,v 1.3.2.6 2002/04/10 21:41:14 dwmalone Exp $
  */
 /*
  * This implements a hash-based lookup scheme for UFS directories.
@@ -52,7 +52,9 @@
 #include <ufs/ufs/ufs_extern.h>
 
 #define WRAPINCR(val, limit)	(((val) + 1 == (limit)) ? 0 : ((val) + 1))
+#define WRAPDECR(val, limit)	(((val) == 0) ? ((limit) - 1) : ((val) - 1))
 #define OFSFMT(vp)		((vp)->v_mount->mnt_maxsymlinklen <= 0)
+#define BLKFREE2IDX(n)		((n) > DH_NFSTATS ? DH_NFSTATS : (n))
 
 static MALLOC_DEFINE(M_DIRHASH, "UFS dirhash", "UFS directory hash tables");
 
@@ -772,12 +774,12 @@ ufsdirhash_checkblock(struct inode *ip, char *buf, doff_t offset)
 	if (dh->dh_blkfree[block] * DIRALIGN != nfree)
 		panic("ufsdirhash_checkblock: bad free count");
 
-	ffslot = nfree / DIRALIGN;
-	if (ffslot > DH_NFSTATS)
-		ffslot = DH_NFSTATS;
+	ffslot = BLKFREE2IDX(nfree / DIRALIGN);
 	for (i = 0; i <= DH_NFSTATS; i++)
 		if (dh->dh_firstfree[i] == block && i != ffslot)
 			panic("ufsdirhash_checkblock: bad first-free");
+	if (dh->dh_firstfree[ffslot] == -1)
+		panic("ufsdirhash_checkblock: missing first-free entry");
 }
 
 /*
@@ -786,7 +788,17 @@ ufsdirhash_checkblock(struct inode *ip, char *buf, doff_t offset)
 static int
 ufsdirhash_hash(struct dirhash *dh, char *name, int namelen)
 {
-	return (fnv_32_buf(name, namelen, FNV1_32_INIT) % dh->dh_hlen);
+	u_int32_t hash;
+
+	/*
+	 * We hash the name and then some ofther bit of data which is
+	 * invarient over the dirhash's lifetime. Otherwise names
+	 * differing only in the last byte are placed close to one
+	 * another in the table, which is bad for linear probing.
+	 */
+	hash = fnv_32_buf(name, namelen, FNV1_32_INIT);
+	hash = fnv_32_buf(dh, sizeof(dh), hash);
+	return (hash % dh->dh_hlen);
 }
 
 /*
@@ -804,20 +816,16 @@ ufsdirhash_adjfree(struct dirhash *dh, doff_t offset, int diff)
 	block = offset / DIRBLKSIZ;
 	KASSERT(block < dh->dh_nblk && block < dh->dh_dirblks,
 	     ("dirhash bad offset"));
-	ofidx = dh->dh_blkfree[block];
-	if (ofidx > DH_NFSTATS)
-		ofidx = DH_NFSTATS;
+	ofidx = BLKFREE2IDX(dh->dh_blkfree[block]);
 	dh->dh_blkfree[block] = (int)dh->dh_blkfree[block] + (diff / DIRALIGN);
-	nfidx = dh->dh_blkfree[block];
-	if (nfidx > DH_NFSTATS)
-		nfidx = DH_NFSTATS;
+	nfidx = BLKFREE2IDX(dh->dh_blkfree[block]);
 
 	/* Update the `first free' list if necessary. */
 	if (ofidx != nfidx) {
 		/* If removing, scan forward for the next block. */
 		if (dh->dh_firstfree[ofidx] == block) {
 			for (i = block + 1; i < dh->dh_dirblks; i++)
-				if (dh->dh_blkfree[i] == ofidx)
+				if (BLKFREE2IDX(dh->dh_blkfree[i]) == ofidx)
 					break;
 			dh->dh_firstfree[ofidx] = (i < dh->dh_dirblks) ? i : -1;
 		}
@@ -869,10 +877,11 @@ ufsdirhash_delslot(struct dirhash *dh, int slot)
 	for (i = slot; DH_ENTRY(dh, i) == DIRHASH_DEL; )
 		i = WRAPINCR(i, dh->dh_hlen);
 	if (DH_ENTRY(dh, i) == DIRHASH_EMPTY) {
-		for (i = slot; DH_ENTRY(dh, i) == DIRHASH_DEL; ) {
+		i = WRAPDECR(i, dh->dh_hlen);
+		while (DH_ENTRY(dh, i) == DIRHASH_DEL) {
 			DH_ENTRY(dh, i) = DIRHASH_EMPTY;
 			dh->dh_hused--;
-			i = WRAPINCR(i, dh->dh_hlen);
+			i = WRAPDECR(i, dh->dh_hlen);
 		}
 		KASSERT(dh->dh_hused >= 0, ("ufsdirhash_delslot neg hlen"));
 	}

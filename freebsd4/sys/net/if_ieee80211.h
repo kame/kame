@@ -1,5 +1,5 @@
 /*	$NetBSD: if_ieee80211.h,v 1.5 2000/07/21 04:47:40 onoe Exp $	*/
-/* $FreeBSD: src/sys/net/if_ieee80211.h,v 1.3.2.3 2001/07/04 00:12:38 brooks Exp $ */
+/* $FreeBSD: src/sys/net/if_ieee80211.h,v 1.3.2.4 2002/04/24 15:20:19 imp Exp $ */
 
 #ifndef _NET_IF_IEEE80211_H_
 #define _NET_IF_IEEE80211_H_
@@ -200,6 +200,8 @@ typedef u_int8_t *	ieee80211_mgt_auth_t;
 #define	IEEE80211_STATUS_SEQUENCE		14
 #define	IEEE80211_STATUS_CHALLENGE		15
 #define	IEEE80211_STATUS_TIMEOUT		16
+#define IEEE80211_STATUS_TOO_MANY_STATIONS	17
+#define IEEE80211_STATUS_RATES			18
 
 #define	IEEE80211_WEP_KEYLEN			5	/* 40bit */
 #define	IEEE80211_WEP_IVLEN			3	/* 24bit */

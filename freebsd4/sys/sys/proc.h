@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)proc.h	8.15 (Berkeley) 5/19/95
- * $FreeBSD: src/sys/sys/proc.h,v 1.99.2.6 2002/01/22 17:23:02 nectar Exp $
+ * $FreeBSD: src/sys/sys/proc.h,v 1.99.2.7 2002/01/31 18:40:29 dillon Exp $
  */
 
 #ifndef _SYS_PROC_H_
@@ -283,7 +283,7 @@ struct	proc {
 #define	P_SWAPINREQ	0x80000	/* Swapin request due to wakeup */
 
 /* Marked a kernel thread */
-#define	P_BUFEXHAUST	0x100000 /* dirty buffers flush is in progress */
+#define	P_UNUSED100000	0x100000
 #define	P_KTHREADP	0x200000 /* Process is really a kernel thread */
 
 #define	P_DEADLKTREAT   0x800000 /* lock aquisition - deadlock treatment */

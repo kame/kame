@@ -37,7 +37,7 @@
  *
  *      @(#)bpf.c	8.2 (Berkeley) 3/28/94
  *
- * $FreeBSD: src/sys/net/bpf.c,v 1.59.2.9 2001/12/19 04:47:52 dd Exp $
+ * $FreeBSD: src/sys/net/bpf.c,v 1.59.2.12 2002/04/14 21:41:48 luigi Exp $
  */
 
 #include "bpf.h"
@@ -393,7 +393,7 @@ bpfclose(dev, flags, fmt, p)
 	splx(s);
 	bpf_freed(d);
 	dev->si_drv1 = 0;
-	FREE(d, M_BPF);
+	free(d, M_BPF);
 
 	return (0);
 }
@@ -1085,7 +1085,7 @@ bpfpoll(dev, events, p)
 	if (d->bd_bif == NULL)
 		return (ENXIO);
 
-	revents = events & (POLLIN | POLLWRNORM);
+	revents = events & (POLLOUT | POLLWRNORM);
 	s = splimp();
 	if (events & (POLLIN | POLLRDNORM)) {
 		/*

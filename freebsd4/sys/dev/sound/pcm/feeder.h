@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pcm/feeder.h,v 1.2.2.3 2001/08/01 03:41:03 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pcm/feeder.h,v 1.2.2.4 2002/04/22 15:49:36 cg Exp $
  */
 
 struct pcm_feederdesc {
@@ -43,10 +43,11 @@ struct feeder_class {
 struct pcm_feeder {
     	KOBJ_FIELDS;
 	int align;
-	struct pcm_feederdesc *desc;
+	struct pcm_feederdesc *desc, desc_static;
 	void *data;
 	struct feeder_class *class;
-	struct pcm_feeder *source;
+	struct pcm_feeder *source, *parent;
+
 };
 
 void feeder_register(void *p);

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)subr_prf.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/subr_prf.c,v 1.61.2.3 2001/12/02 17:05:33 iedowse Exp $
+ * $FreeBSD: src/sys/kern/subr_prf.c,v 1.61.2.4 2002/05/14 20:43:44 dwmalone Exp $
  */
 
 #include <sys/param.h>
@@ -91,6 +91,10 @@ static void  snprintf_func __P((int ch, void *arg));
 static int consintr = 1;		/* Ok to handle console interrupts? */
 static int msgbufmapped;		/* Set when safe to use msgbuf */
 int msgbuftrigger;
+
+static int      log_console_output = 1;
+SYSCTL_INT(_kern, OID_AUTO, log_console_output, CTLFLAG_RW,
+    &log_console_output, 0, "");
 
 /*
  * Warn that a system table is full.
@@ -248,6 +252,9 @@ log_console(struct uio *uio)
 	struct iovec *miov = NULL;
 	char *consbuffer;
 	int pri;
+
+	if (!log_console_output)
+		return;
 
 	pri = LOG_INFO | LOG_CONSOLE;
 	muio = *uio;

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tty_pty.c	8.4 (Berkeley) 2/20/95
- * $FreeBSD: src/sys/kern/tty_pty.c,v 1.74.2.3 2001/07/24 09:49:41 dd Exp $
+ * $FreeBSD: src/sys/kern/tty_pty.c,v 1.74.2.4 2002/02/20 19:58:13 dillon Exp $
  */
 
 /*
@@ -518,7 +518,7 @@ ptcpoll(dev, events, p)
 		    ((pti->pt_flags & PF_REMOTE) ?
 		     (tp->t_canq.c_cc == 0) : 
 		     ((tp->t_rawq.c_cc + tp->t_canq.c_cc < TTYHOG - 2) ||
-		      (tp->t_canq.c_cc == 0 && (tp->t_iflag & ICANON)))))
+		      (tp->t_canq.c_cc == 0 && (tp->t_lflag & ICANON)))))
 			revents |= events & (POLLOUT | POLLWRNORM);
 
 	if (events & POLLHUP)
@@ -610,7 +610,7 @@ again:
 		}
 		while (cc > 0) {
 			if ((tp->t_rawq.c_cc + tp->t_canq.c_cc) >= TTYHOG - 2 &&
-			   (tp->t_canq.c_cc > 0 || !(tp->t_iflag&ICANON))) {
+			   (tp->t_canq.c_cc > 0 || !(tp->t_lflag&ICANON))) {
 				wakeup(TSA_HUP_OR_INPUT(tp));
 				goto block;
 			}

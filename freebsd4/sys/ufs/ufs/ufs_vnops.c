@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_vnops.c	8.27 (Berkeley) 5/27/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_vnops.c,v 1.131.2.6 2001/12/14 20:28:52 jlemon Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_vnops.c,v 1.131.2.7 2002/02/05 18:35:04 dillon Exp $
  */
 
 #include "opt_quota.h"
@@ -155,13 +155,12 @@ ufs_itimes(vp)
 	ip = VTOI(vp);
 	if ((ip->i_flag & (IN_ACCESS | IN_CHANGE | IN_UPDATE)) == 0)
 		return;
+	if ((vp->v_type == VBLK || vp->v_type == VCHR) && !DOINGSOFTDEP(vp))
+		ip->i_flag |= IN_LAZYMOD;
+	else
+		ip->i_flag |= IN_MODIFIED;
 	if ((vp->v_mount->mnt_flag & MNT_RDONLY) == 0) {
 		vfs_timestamp(&ts);
-		if ((vp->v_type == VBLK || vp->v_type == VCHR) &&
-		    !DOINGSOFTDEP(vp))
-			ip->i_flag |= IN_LAZYMOD;
-		else
-			ip->i_flag |= IN_MODIFIED;
 		if (ip->i_flag & IN_ACCESS) {
 			ip->i_atime = ts.tv_sec;
 			ip->i_atimensec = ts.tv_nsec;

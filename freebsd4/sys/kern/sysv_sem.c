@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/kern/sysv_sem.c,v 1.24.2.6 2001/09/10 11:37:34 dd Exp $ */
+/* $FreeBSD: src/sys/kern/sysv_sem.c,v 1.24.2.7 2002/03/13 12:54:02 maxim Exp $ */
 
 /*
  * Implementation of SVID semaphores
@@ -415,7 +415,7 @@ __semctl(p, uap)
 		return (ENOSYS);
 
 	semid = IPCID_TO_IX(semid);
-	if (semid < 0 || semid >= seminfo.semmsl)
+	if (semid < 0 || semid >= seminfo.semmni)
 		return(EINVAL);
 
 	semaptr = &sema[semid];
@@ -700,7 +700,7 @@ semop(p, uap)
 
 	semid = IPCID_TO_IX(semid);	/* Convert back to zero origin */
 
-	if (semid < 0 || semid >= seminfo.semmsl)
+	if (semid < 0 || semid >= seminfo.semmni)
 		return(EINVAL);
 
 	semaptr = &sema[semid];

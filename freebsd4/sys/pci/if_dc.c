@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.31 2001/12/19 18:37:34 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.33 2002/02/26 04:21:30 ambrisko Exp $
  */
 
 /*
@@ -101,6 +101,8 @@
 #include <net/ethernet.h>
 #include <net/if_dl.h>
 #include <net/if_media.h>
+#include <net/if_types.h>
+#include <net/if_vlan_var.h>
 
 #include <net/bpf.h>
 
@@ -132,7 +134,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.31 2001/12/19 18:37:34 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_dc.c,v 1.9.2.33 2002/02/26 04:21:30 ambrisko Exp $";
 #endif
 
 /*
@@ -1995,6 +1997,11 @@ static int dc_attach(dev)
 	ether_ifattach(ifp, ETHER_BPF_SUPPORTED);
 	callout_handle_init(&sc->dc_stat_ch);
 
+	/*
+	 * Tell the upper layer(s) we support long frames.
+	 */
+	ifp->if_data.ifi_hdrlen = sizeof(struct ether_vlan_header);
+
 #ifdef SRM_MEDIA
         sc->dc_srm_media = 0;
 
@@ -2343,6 +2350,13 @@ static void dc_rxeof(sc)
 
 	while(!(sc->dc_ldata->dc_rx_list[i].dc_status & DC_RXSTAT_OWN)) {
 
+#ifdef DEVICE_POLLING
+		if (ifp->if_ipending & IFF_POLLING) {
+			if (sc->rxcycles <= 0)
+				break;
+			sc->rxcycles--;
+		}
+#endif /* DEVICE_POLLING */
 		cur_rx = &sc->dc_ldata->dc_rx_list[i];
 		rxstat = cur_rx->dc_status;
 		m = sc->dc_cdata.dc_rx_chain[i];
@@ -2368,19 +2382,25 @@ static void dc_rxeof(sc)
 		 * If an error occurs, update stats, clear the
 		 * status word and leave the mbuf cluster in place:
 		 * it should simply get re-used next time this descriptor
-	 	 * comes up in the ring.
+		 * comes up in the ring.  However, don't report long
+		 * frames as errors since they could be vlans
 		 */
-		if (rxstat & DC_RXSTAT_RXERR) {
-			ifp->if_ierrors++;
-			if (rxstat & DC_RXSTAT_COLLSEEN)
-				ifp->if_collisions++;
-			dc_newbuf(sc, i, m);
-			if (rxstat & DC_RXSTAT_CRCERR) {
-				DC_INC(i, DC_RX_LIST_CNT);
-				continue;
-			} else {
-				dc_init(sc);
-				return;
+		if ((rxstat & DC_RXSTAT_RXERR)){ 
+			if (!(rxstat & DC_RXSTAT_GIANT) ||
+			    (rxstat & (DC_RXSTAT_CRCERR | DC_RXSTAT_DRIBBLE |
+				       DC_RXSTAT_MIIERE | DC_RXSTAT_COLLSEEN |
+				       DC_RXSTAT_RUNT   | DC_RXSTAT_DE))) {
+				ifp->if_ierrors++;
+				if (rxstat & DC_RXSTAT_COLLSEEN)
+					ifp->if_collisions++;
+				dc_newbuf(sc, i, m);
+				if (rxstat & DC_RXSTAT_CRCERR) {
+					DC_INC(i, DC_RX_LIST_CNT);
+					continue;
+				} else {
+					dc_init(sc);
+					return;
+				}
 			}
 		}
 
@@ -2660,6 +2680,60 @@ static void dc_tx_underrun(sc)
 	return;
 }
 
+#ifdef DEVICE_POLLING
+static poll_handler_t dc_poll;
+
+static void
+dc_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
+{
+	struct	dc_softc *sc = ifp->if_softc;
+
+	if (cmd == POLL_DEREGISTER) { /* final call, enable interrupts */
+		/* Re-enable interrupts. */
+		CSR_WRITE_4(sc, DC_IMR, DC_INTRS);
+		return;
+	}
+	sc->rxcycles = count;
+	dc_rxeof(sc);
+	dc_txeof(sc);
+	if (ifp->if_snd.ifq_head != NULL && !(ifp->if_flags & IFF_OACTIVE))
+		dc_start(ifp);
+
+	if (cmd == POLL_AND_CHECK_STATUS) { /* also check status register */
+		u_int32_t          status;
+
+		status = CSR_READ_4(sc, DC_ISR);
+		status &= (DC_ISR_RX_WATDOGTIMEO|DC_ISR_RX_NOBUF|
+			DC_ISR_TX_NOBUF|DC_ISR_TX_IDLE|DC_ISR_TX_UNDERRUN|
+			DC_ISR_BUS_ERR);
+		if (!status)
+			return ;
+		/* ack what we have */
+		CSR_WRITE_4(sc, DC_ISR, status);
+
+		if (status & (DC_ISR_RX_WATDOGTIMEO|DC_ISR_RX_NOBUF) ) {
+			u_int32_t r = CSR_READ_4(sc, DC_FRAMESDISCARDED);
+			ifp->if_ierrors += (r & 0xffff) + ((r >> 17) & 0x7ff);
+
+			if (dc_rx_resync(sc))
+				dc_rxeof(sc);
+		}
+		/* restart transmit unit if necessary */
+		if (status & DC_ISR_TX_IDLE && sc->dc_cdata.dc_tx_cnt)
+			CSR_WRITE_4(sc, DC_TXSTART, 0xFFFFFFFF);
+
+		if (status & DC_ISR_TX_UNDERRUN)
+			dc_tx_underrun(sc);
+
+		if (status & DC_ISR_BUS_ERR) {
+			printf("dc_poll: dc%d bus error\n", sc->dc_unit);
+			dc_reset(sc);
+			dc_init(sc);
+		}
+	}
+}
+#endif /* DEVICE_POLLING */
+
 static void dc_intr(arg)
 	void			*arg;
 {
@@ -2669,6 +2743,15 @@ static void dc_intr(arg)
 
 	sc = arg;
 	ifp = &sc->arpcom.ac_if;
+
+#ifdef DEVICE_POLLING
+	if (ifp->if_ipending & IFF_POLLING)
+		return;
+	if (ether_poll_register(dc_poll, ifp)) { /* ok, disable interrupts */
+		CSR_WRITE_4(sc, DC_IMR, 0x00000000);
+		return;
+	}
+#endif /* DEVICE_POLLING */
 
 	if ( (CSR_READ_4(sc, DC_ISR) & DC_INTRS) == 0)
 		return ;
@@ -3011,6 +3094,16 @@ static void dc_init(xsc)
 	/*
 	 * Enable interrupts.
 	 */
+#ifdef DEVICE_POLLING
+	/*
+	 * ... but only if we are not polling, and make sure they are off in
+	 * the case of polling. Some cards (e.g. fxp) turn interrupts on
+	 * after a reset.
+	 */
+	if (ifp->if_ipending & IFF_POLLING)
+		CSR_WRITE_4(sc, DC_IMR, 0x00000000);
+	else
+#endif
 	CSR_WRITE_4(sc, DC_IMR, DC_INTRS);
 	CSR_WRITE_4(sc, DC_ISR, 0xFFFFFFFF);
 
@@ -3221,6 +3314,9 @@ static void dc_stop(sc)
 	untimeout(dc_tick, sc, sc->dc_stat_ch);
 
 	ifp->if_flags &= ~(IFF_RUNNING | IFF_OACTIVE);
+#ifdef DEVICE_POLLING
+	ether_poll_deregister(ifp);
+#endif
 
 	DC_CLRBIT(sc, DC_NETCFG, (DC_NETCFG_RX_ON|DC_NETCFG_TX_ON));
 	CSR_WRITE_4(sc, DC_IMR, 0x00000000);

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/atapi-tape.h,v 1.11.2.4 2002/01/02 15:30:23 sos Exp $
+ * $FreeBSD: src/sys/dev/ata/atapi-tape.h,v 1.11.2.5 2002/03/18 08:37:34 sos Exp $
  */
 
 /* ATAPI tape drive Capabilities and Mechanical Status Page */
@@ -144,17 +144,17 @@ struct ast_readposition {
 };
 
 struct ast_softc {
-    struct atapi_softc		*atp;		/* controller structure */
+    struct ata_device		*device;	/* device softc */
     int				lun;		/* logical device unit */
     int				flags;		/* device state flags */
 #define		F_CTL_WARN		0x0001	/* warned about CTL wrong? */
-#define 	F_WRITEPROTECT		0x0002	/* media is writeprotected */
-#define 	F_DATA_WRITTEN		0x0004	/* data has been written */
-#define 	F_FM_WRITTEN		0x0008	/* filemark has been written */
-#define 	F_ONSTREAM		0x0100	/* OnStream ADR device */
+#define		F_WRITEPROTECT		0x0002	/* media is writeprotected */
+#define		F_DATA_WRITTEN		0x0004	/* data has been written */
+#define		F_FM_WRITTEN		0x0008	/* filemark has been written */
+#define		F_ONSTREAM		0x0100	/* OnStream ADR device */
 
     int				blksize;	/* block size (512 | 1024) */
-    struct buf_queue_head	bio_queue;	/* queue of i/o requests */
+    struct buf_queue_head	queue;		/* queue of i/o requests */
     struct atapi_params		*param;		/* drive parameters table */
     struct ast_cappage		cap;		/* capabilities page info */
     struct devstat		stats;		/* devstat entry */

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)cd9660_vfsops.c	8.18 (Berkeley) 5/22/95
- * $FreeBSD: src/sys/isofs/cd9660/cd9660_vfsops.c,v 1.74.2.6 2001/12/09 23:37:54 ken Exp $
+ * $FreeBSD: src/sys/isofs/cd9660/cd9660_vfsops.c,v 1.74.2.7 2002/04/08 09:39:29 bde Exp $
  */
 
 #include <sys/param.h>
@@ -317,6 +317,10 @@ iso_mountfs(devvp, mp, p, argp)
 	VOP_UNLOCK(devvp, 0, p);
 	if (error)
 		return error;
+	if (devvp->v_rdev->si_iosize_max != 0)
+		mp->mnt_iosize_max = devvp->v_rdev->si_iosize_max;
+	if (mp->mnt_iosize_max > MAXPHYS)
+		mp->mnt_iosize_max = MAXPHYS;
 
 	needclose = 1;
 

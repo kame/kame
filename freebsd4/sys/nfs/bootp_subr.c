@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/nfs/bootp_subr.c,v 1.20.2.6 2001/02/13 22:33:44 tegge Exp $	*/
+/* $FreeBSD: src/sys/nfs/bootp_subr.c,v 1.20.2.8 2002/03/16 15:56:06 luigi Exp $	*/
 
 /*
  * Copyright (c) 1995 Gordon Ross, Adam Glass
@@ -54,6 +54,7 @@
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <sys/sysctl.h>
 #include <sys/uio.h>
 
 #include <net/if.h>
@@ -101,7 +102,7 @@ struct bootp_packet {
 	unsigned char chaddr[16];
 	char sname[64];
 	char file[128];
-	unsigned char vend[256];
+	unsigned char vend[1222];
 };
 
 struct bootpc_ifcontext {
@@ -196,6 +197,7 @@ struct bootpc_globalcontext {
 #define TAG_SWAPSIZE	129
 #define TAG_ROOTOPTS	130
 #define TAG_SWAPOPTS	131
+#define TAG_COOKIE	134	/* ascii info for userland, exported via sysctl */
 
 #define TAG_DHCP_MSGTYPE 53
 #define TAG_DHCP_REQ_ADDR 50
@@ -210,6 +212,10 @@ struct bootpc_globalcontext {
 
 extern int nfs_diskless_valid;
 extern struct nfsv3_diskless nfsv3_diskless;
+static char bootp_cookie[128];
+SYSCTL_DECL(_kern);
+SYSCTL_STRING(_kern, OID_AUTO, bootp_cookie, CTLFLAG_RD,
+	bootp_cookie, 0, "Cookie (T134) supplied by bootp server");
 
 /* mountd RPC */
 static int md_mount(struct sockaddr_in *mdsin, char *path,
@@ -1645,6 +1651,14 @@ bootpc_decode_reply(nd, ifctx, gctx)
 			printf("hostname %s ",hostname);
 			gctx->sethostname = ifctx;
 		}
+	}
+	p = bootpc_tag(&gctx->tag, &ifctx->reply, ifctx->replylen,
+		       TAG_COOKIE);
+	if (p != NULL) {	/* store in a sysctl variable */
+		int i, l = sizeof(bootp_cookie) - 1;
+		for (i = 0; i < l && p[i] != '\0'; i++)
+			bootp_cookie[i] = p[i];
+		p[i] = '\0';
 	}
 
 	printf("\n");

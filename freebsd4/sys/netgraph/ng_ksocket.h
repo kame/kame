@@ -36,12 +36,14 @@
  *
  * Author: Archie Cobbs <archie@freebsd.org>
  *
- * $FreeBSD: src/sys/netgraph/ng_ksocket.h,v 1.2.2.3 2001/12/07 02:59:20 archie Exp $
+ * $FreeBSD: src/sys/netgraph/ng_ksocket.h,v 1.2.2.4 2002/04/14 23:31:08 julian Exp $
  * $Whistle: ng_ksocket.h,v 1.1 1999/11/16 20:04:40 archie Exp $
  */
 
 #ifndef _NETGRAPH_KSOCKET_H_
 #define _NETGRAPH_KSOCKET_H_
+
+#include <sys/socket.h>
 
 /* Node type name and magic cookie */
 #define NG_KSOCKET_NODE_TYPE	"ksocket"
@@ -67,6 +69,21 @@ struct ng_ksocket_sockopt {
 	  { "value",		(svtype)		},	\
 	  { NULL },						\
 	}							\
+}
+
+/* For NGM_KSOCKET_ACCEPT control message responses */
+struct ng_ksocket_accept {
+	u_int32_t	nodeid;		/* node ID of connected ksocket */
+	struct sockaddr	addr;		/* peer's address (variable length) */
+};
+
+/* Keep this in sync with the above structure definition */
+#define	NGM_KSOCKET_ACCEPT_INFO {					\
+	{								\
+	  { "nodeid",		&ng_parse_hint32_type		  },	\
+	  { "addr",		&ng_ksocket_generic_sockaddr_type },	\
+	  { NULL }							\
+	}								\
 }
 
 /* Netgraph commands */

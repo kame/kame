@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/pcibus.c,v 1.57.2.6 2001/12/23 08:17:43 pirzyk Exp $
+ * $FreeBSD: src/sys/i386/isa/pcibus.c,v 1.57.2.7 2002/04/07 12:57:25 asmodai Exp $
  *
  */
 
@@ -128,6 +128,9 @@ nexus_pcib_is_host_bridge(pcicfgregs *cfg,
 			*busnum = pxb[3];
 			break;
 		}
+		break;
+	case 0x1A308086:
+		s = "Intel 82845 Host to PCI bridge";
 		break;
 
 		/* AMD -- vendor 0x1022 */

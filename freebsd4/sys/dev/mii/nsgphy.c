@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/mii/nsgphy.c,v 1.1.2.1 2001/06/18 18:49:13 wpaul Exp $
+ * $FreeBSD: src/sys/dev/mii/nsgphy.c,v 1.1.2.2 2002/05/06 09:36:19 phk Exp $
  */
 
 /*
@@ -69,7 +69,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/mii/nsgphy.c,v 1.1.2.1 2001/06/18 18:49:13 wpaul Exp $";
+  "$FreeBSD: src/sys/dev/mii/nsgphy.c,v 1.1.2.2 2002/05/06 09:36:19 phk Exp $";
 #endif
 
 static int nsgphy_probe		__P((device_t));
@@ -313,12 +313,12 @@ nsgphy_service(sc, mii, cmd)
 			return (0);
 
 		/*
-		 * Only retry autonegotiation every 5 seconds.
+		 * Only retry autonegotiation every 17 seconds.
 		 * Actually, for gigE PHYs, we should wait longer, since
 		 * 5 seconds is the mimimum time the documentation
 		 * says to wait for a 1000mbps link to be established.
 		 */
-		if (++sc->mii_ticks != 10)
+		if (++sc->mii_ticks != 17)
 			return (0);
 		
 		sc->mii_ticks = 0;

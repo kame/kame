@@ -20,7 +20,7 @@
  * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/include/mouse.h,v 1.16.2.1 2000/03/21 14:44:11 yokota Exp $
+ * $FreeBSD: src/sys/alpha/include/mouse.h,v 1.16.2.2 2002/04/16 13:12:33 ru Exp $
  *	from: i386/include mouse.h,v 1.10
  */
 
@@ -159,6 +159,7 @@ typedef struct mousemode {
 #define MOUSE_PROTO_X10MOUSEREM	13	/* X10 MouseRemote, 3 bytes */
 #define MOUSE_PROTO_KIDSPAD	14	/* Genius Kidspad */
 #define MOUSE_PROTO_VERSAPAD	15	/* Interlink VersaPad, 6 bytes */
+#define	MOUSE_PROTO_JOGDIAL	16	/* Vaio's JogDial */
 
 #define MOUSE_RES_UNKNOWN	(-1)
 #define MOUSE_RES_DEFAULT	0

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/twe/twe_compat.h,v 1.1.2.2 2000/10/27 06:04:02 msmith Exp $
+ * $FreeBSD: src/sys/dev/twe/twe_compat.h,v 1.1.2.3 2002/03/07 09:57:02 msmith Exp $
  */
 /*
  * Portability and compatibility interfaces.
@@ -130,8 +130,11 @@
 #define twe_printf(sc, fmt, args...)	device_printf(sc->twe_dev, fmt , ##args)
 #define twed_printf(twed, fmt, args...)	device_printf(twed->twed_dev, fmt , ##args)
 
-#if __FreeBSD_version < 500003		/* old buf style */
-# include <sys/buf.h>
+#if __FreeBSD_version < 500003
+# include <machine/clock.h>
+# define INTR_ENTROPY			0
+
+# include <sys/buf.h>			/* old buf style */
 typedef struct buf			twe_bio;
 typedef struct buf_queue_head		twe_bioq;
 # define TWE_BIO_QINIT(bq)		bufq_init(&bq);

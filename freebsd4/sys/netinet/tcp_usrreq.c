@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)tcp_usrreq.c	8.2 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.51.2.11 2001/12/14 20:14:43 jlemon Exp $
+ * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.51.2.12.2.1 2002/06/07 20:54:02 obrien Exp $
  */
 
 #include "opt_ipsec.h"
@@ -375,6 +375,7 @@ tcp6_usr_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	}
 	inp->inp_vflag &= ~INP_IPV4;
 	inp->inp_vflag |= INP_IPV6;
+	inp->inp_inc.inc_isipv6 = 1;
 	if ((error = tcp6_connect(tp, nam, p)) != 0)
 		goto out;
 	error = tcp_output(tp);
@@ -995,7 +996,7 @@ tcp_ctloutput(so, sopt)
 u_long	tcp_sendspace = 1024*32;
 SYSCTL_INT(_net_inet_tcp, TCPCTL_SENDSPACE, sendspace, CTLFLAG_RW, 
     &tcp_sendspace , 0, "Maximum outgoing TCP datagram size");
-u_long	tcp_recvspace = 1024*64;
+u_long	tcp_recvspace = 57344;	/* largest multiple of PAGE_SIZE < 64k */
 SYSCTL_INT(_net_inet_tcp, TCPCTL_RECVSPACE, recvspace, CTLFLAG_RW, 
     &tcp_recvspace , 0, "Maximum incoming TCP datagram size");
 

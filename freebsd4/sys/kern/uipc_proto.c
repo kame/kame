@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_proto.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/uipc_proto.c,v 1.21 1999/10/11 15:19:11 peter Exp $
+ * $FreeBSD: src/sys/kern/uipc_proto.c,v 1.21.2.1 2002/03/09 05:22:23 dd Exp $
  */
 
 #include <sys/param.h>
@@ -51,7 +51,7 @@
 
 static struct protosw localsw[] = {
 { SOCK_STREAM,	&localdomain,	0,	PR_CONNREQUIRED|PR_WANTRCVD|PR_RIGHTS,
-  0,		0,		0,		0,
+  0,		0,		0,		&uipc_ctloutput,
   0,
   0,		0,		0,		0,
   &uipc_usrreqs

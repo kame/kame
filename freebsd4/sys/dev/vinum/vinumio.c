@@ -34,7 +34,7 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinumio.c,v 1.30 2000/05/10 23:23:30 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumio.c,v 1.52.2.5 2001/05/28 05:56:27 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumio.c,v 1.52.2.6 2002/05/02 08:43:44 grog Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -93,6 +93,9 @@ open_drive(struct drive *drive, struct proc *p, int verbose)
     } else if (bcmp(dname, "idad", 4) == 0) {
 	devmajor = 109;
 	dname += 2;
+    } else if (bcmp(dname, "twed", 4) == 0) {               /* 3ware raid */
+      devmajor = 147;
+      dname += 2;
     } else
 	return ENODEV;
     dname += 2;						    /* point past */

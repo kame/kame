@@ -46,7 +46,7 @@
  ** (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  ** THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **
- ** $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.175.2.7 2001/12/19 20:59:29 fjoe Exp $
+ ** $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.175.2.9 2002/05/20 04:33:33 jhb Exp $
  **/
 
 /**
@@ -350,6 +350,7 @@ static DEV_INFO device_info[] = {
 {"ad",		"ATA/ATAPI compatible storage device",	FLG_INVISIBLE,	CLS_STORAGE},	
 {"fd",		"Floppy disk device",			FLG_INVISIBLE,	CLS_STORAGE},
 
+{"cm",		"SMC COM90Cx6-based Arcnet adapters",	0,		CLS_NETWORK},
 {"cs",          "IBM EtherJet, CS89x0-based Ethernet adapters",0,	CLS_NETWORK},
 {"ed",          "NE1000,NE2000,3C503,WD/SMC80xx Ethernet adapters",0,	CLS_NETWORK},
 {"el",          "3C501 Ethernet adapter",		0,		CLS_NETWORK},
@@ -2424,7 +2425,7 @@ visuserconfig(void)
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.175.2.7 2001/12/19 20:59:29 fjoe Exp $
+ * $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.175.2.9 2002/05/20 04:33:33 jhb Exp $
  */
 
 #include "scbus.h"
@@ -2479,9 +2480,7 @@ static int set_device_enable(CmdParm *);
 static int set_device_disable(CmdParm *);
 static int quitfunc(CmdParm *);
 static int helpfunc(CmdParm *);
-#if defined(INTRO_USERCONFIG)
 static int introfunc(CmdParm *);
-#endif
 
 #if NPNP > 0
 static int lspnp(void);
@@ -2542,9 +2541,7 @@ static Cmd CmdList[] = {
     { "ex", 	quitfunc, 		NULL },		/* exit (quit)	*/
     { "f",	set_device_flags,	int_parms },	/* flags dev mask */
     { "h", 	helpfunc, 		NULL },		/* help		*/
-#if defined(INTRO_USERCONFIG)
     { "intro", 	introfunc, 		NULL },		/* intro screen	*/
-#endif
     { "iom",	set_device_mem,		addr_parms },	/* iomem dev addr */
     { "ios",	set_device_iosize,	int_parms },	/* iosize dev size */
     { "ir",	set_device_irq,		int_parms },	/* irq dev #	*/
@@ -2977,8 +2974,6 @@ helpfunc(CmdParm *parms)
     return 0;
 }
 
-#if defined(INTRO_USERCONFIG) 
-
 #if defined (VISUAL_USERCONFIG)
 static void
 center(int y, char *str)
@@ -3123,7 +3118,6 @@ introfunc(CmdParm *parms)
     }
 #endif
 }
-#endif
 
 #if NPNP > 0
 static int

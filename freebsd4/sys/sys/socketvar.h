@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)socketvar.h	8.3 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/socketvar.h,v 1.46.2.6 2001/08/31 13:45:49 jlemon Exp $
+ * $FreeBSD: src/sys/sys/socketvar.h,v 1.46.2.8 2002/05/01 03:26:32 silby Exp $
  */
 
 #ifndef _SYS_SOCKETVAR_H_
@@ -51,7 +51,6 @@ typedef	u_quad_t so_gen_t;
 struct accept_filter;
 
 struct socket {
-	struct	vm_zone *so_zone;	/* zone we were allocated from */
 	short	so_type;		/* generic type, see socket.h */
 	short	so_options;		/* from socket call, see socket.h */
 	short	so_linger;		/* time to linger while closing */
@@ -371,8 +370,6 @@ void	soisconnecting __P((struct socket *so));
 void	soisdisconnected __P((struct socket *so));
 void	soisdisconnecting __P((struct socket *so));
 int	solisten __P((struct socket *so, int backlog, struct proc *p));
-struct socket *
-	sodropablereq __P((struct socket *head));
 struct socket *
 	sonewconn __P((struct socket *head, int connstatus));
 struct socket *

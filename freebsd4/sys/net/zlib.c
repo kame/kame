@@ -10,7 +10,7 @@
  * - added inflateIncomp and deflateOutputPending
  * - allow strm->next_out to be NULL, meaning discard the output
  *
- * $FreeBSD: src/sys/net/zlib.c,v 1.10 1999/12/29 04:38:38 peter Exp $
+ * $FreeBSD: src/sys/net/zlib.c,v 1.10.2.3 2002/03/24 23:12:48 jedgar Exp $
  */
 
 /* 
@@ -776,7 +776,7 @@ int deflateInit2_(strm, level, method, windowBits, memLevel, strategy,
         windowBits = -windowBits;
     }
     if (memLevel < 1 || memLevel > MAX_MEM_LEVEL || method != Z_DEFLATED ||
-        windowBits < 8 || windowBits > 15 || level < 0 || level > 9 ||
+        windowBits < 9 || windowBits > 15 || level < 0 || level > 9 ||
 	strategy < 0 || strategy > Z_HUFFMAN_ONLY) {
         return Z_STREAM_ERROR;
     }
@@ -3864,10 +3864,11 @@ int r;
                              &s->sub.trees.tb, z);
       if (t != Z_OK)
       {
-        ZFREE(z, s->sub.trees.blens);
         r = t;
-        if (r == Z_DATA_ERROR)
+        if (r == Z_DATA_ERROR) {
+          ZFREE(z, s->sub.trees.blens);
           s->mode = BADB;
+        }
         LEAVE
       }
       s->sub.trees.index = 0;
@@ -3932,11 +3933,12 @@ int r;
 #endif
         t = inflate_trees_dynamic(257 + (t & 0x1f), 1 + ((t >> 5) & 0x1f),
                                   s->sub.trees.blens, &bl, &bd, &tl, &td, z);
-        ZFREE(z, s->sub.trees.blens);
         if (t != Z_OK)
         {
-          if (t == (uInt)Z_DATA_ERROR)
+          if (t == (uInt)Z_DATA_ERROR) {
+            ZFREE(z, s->sub.trees.blens);
             s->mode = BADB;
+          }
           r = t;
           LEAVE
         }
@@ -3949,6 +3951,11 @@ int r;
           r = Z_MEM_ERROR;
           LEAVE
         }
+	/*
+	 * this ZFREE must occur *BEFORE* we mess with sub.decode, because
+	 * sub.trees is union'd with sub.decode.
+	 */
+        ZFREE(z, s->sub.trees.blens);
         s->sub.decode.codes = c;
         s->sub.decode.tl = tl;
         s->sub.decode.td = td;

@@ -38,7 +38,7 @@
  *
  *	from: @(#)vm_machdep.c	7.3 (Berkeley) 5/13/91
  *	Utah $Hdr: vm_machdep.c 1.16.1.1 89/06/23$
- * $FreeBSD: src/sys/alpha/alpha/vm_machdep.c,v 1.28.2.4 2001/10/20 17:37:29 mjacob Exp $
+ * $FreeBSD: src/sys/alpha/alpha/vm_machdep.c,v 1.28.2.5 2002/02/10 19:22:48 gallatin Exp $
  */
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.
@@ -379,11 +379,12 @@ grow_stack(p, sp)
 	return (1);
 }
 
+SYSCTL_DECL(_vm_stats_misc);
 
 static int cnt_prezero;
 
-SYSCTL_INT(_machdep, OID_AUTO, cnt_prezero, CTLFLAG_RD, &cnt_prezero, 0, "");
-
+SYSCTL_INT(_vm_stats_misc, OID_AUTO,
+	cnt_prezero, CTLFLAG_RD, &cnt_prezero, 0, "");
 /*
  * Implement the pre-zeroed page mechanism.
  * This routine is called from the idle loop.

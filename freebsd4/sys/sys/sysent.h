@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/sysent.h,v 1.27.2.3 2001/02/22 05:15:12 marcel Exp $
+ * $FreeBSD: src/sys/sys/sysent.h,v 1.27.2.5 2002/03/17 11:08:38 alfred Exp $
  */
 
 #ifndef _SYS_SYSENT_H_
@@ -101,7 +101,7 @@ struct syscall_module_data {
 
 #define SYSCALL_MODULE(name, offset, new_sysent, evh, arg)     \
 static struct syscall_module_data name##_syscall_mod = {       \
-       evh, arg, offset, new_sysent                            \
+       evh, arg, offset, new_sysent, { 0, NULL }               \
 };                                                             \
                                                                \
 static moduledata_t name##_mod = {                             \
@@ -110,6 +110,17 @@ static moduledata_t name##_mod = {                             \
        &name##_syscall_mod                                     \
 };                                                             \
 DECLARE_MODULE(name, name##_mod, SI_SUB_DRIVERS, SI_ORDER_MIDDLE)
+
+#define SYSCALL_MODULE_HELPER(syscallname)              \
+static int syscallname##_syscall = SYS_##syscallname;   \
+static struct sysent syscallname##_sysent = {           \
+    (sizeof(struct syscallname ## _args )               \
+     / sizeof(register_t)),                             \
+    (sy_call_t *)& syscallname                          \
+};                                                      \
+SYSCALL_MODULE(syscallname,                             \
+    & syscallname##_syscall, & syscallname##_sysent,    \
+    NULL, NULL);
 
 int    syscall_register __P((int *offset, struct sysent *new_sysent,
                              struct sysent *old_sysent));

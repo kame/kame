@@ -38,7 +38,7 @@
  *
  *	from: Utah $Hdr: mem.c 1.13 89/10/08$
  *	from: @(#)mem.c	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/alpha/alpha/mem.c,v 1.19.2.3 2000/05/14 00:29:44 obrien Exp $
+ * $FreeBSD: src/sys/alpha/alpha/mem.c,v 1.19.2.5 2002/03/02 01:33:48 alfred Exp $
  */
 
 /*
@@ -57,6 +57,7 @@
 #include <sys/msgbuf.h>
 #include <sys/random.h>
 #include <sys/signalvar.h>
+#include <sys/fcntl.h>
 
 #include <machine/frame.h>
 #include <machine/psl.h>
@@ -138,7 +139,7 @@ mmopen(dev, flags, fmt, p)
 	switch (minor(dev)) {
 	case 0:
 	case 1:
-		if (securelevel >= 1)
+		if ((flags & FWRITE) && securelevel > 0)
 			return (EPERM);
 		break;
 	case 32:

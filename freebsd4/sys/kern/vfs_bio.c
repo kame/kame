@@ -11,7 +11,7 @@
  * 2. Absolutely no warranty of function or purpose is made by the author
  *		John S. Dyson.
  *
- * $FreeBSD: src/sys/kern/vfs_bio.c,v 1.242.2.14 2001/12/20 19:56:27 dillon Exp $
+ * $FreeBSD: src/sys/kern/vfs_bio.c,v 1.242.2.16 2002/04/03 17:11:13 dillon Exp $
  */
 
 /*
@@ -1211,11 +1211,8 @@ brelse(struct buf * bp)
 	 * If B_INVAL, clear B_DELWRI.  We've already placed the buffer
 	 * on the correct queue.
 	 */
-	if ((bp->b_flags & (B_INVAL|B_DELWRI)) == (B_INVAL|B_DELWRI)) {
-		bp->b_flags &= ~B_DELWRI;
-		--numdirtybuffers;
-		numdirtywakeup(lodirtybuffers);
-	}
+	if ((bp->b_flags & (B_INVAL|B_DELWRI)) == (B_INVAL|B_DELWRI))
+		bundirty(bp);
 
 	/*
 	 * Fixup numfreebuffers count.  The bp is on an appropriate queue
@@ -1802,7 +1799,6 @@ buf_daemon()
 	/*
 	 * This process is allowed to take the buffer cache to the limit
 	 */
-	curproc->p_flag |= P_BUFEXHAUST;
 	s = splbio();
 
 	for (;;) {

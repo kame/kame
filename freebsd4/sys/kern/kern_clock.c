@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_clock.c	8.5 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_clock.c,v 1.105.2.6 2001/12/08 00:04:14 luigi Exp $
+ * $FreeBSD: src/sys/kern/kern_clock.c,v 1.105.2.8 2002/02/09 23:02:37 luigi Exp $
  */
 
 #include "opt_ntp.h"
@@ -66,6 +66,11 @@
 #ifdef GPROF
 #include <sys/gmon.h>
 #endif
+
+#ifdef DEVICE_POLLING
+extern void init_device_poll(void);
+extern void hardclock_device_poll(void);
+#endif /* DEVICE_POLLING */
 
 /*
  * Number of timecounters used to implement stable storage
@@ -187,6 +192,10 @@ initclocks(dummy)
 	psdiv = pscnt = 1;
 	cpu_initclocks();
 
+#ifdef DEVICE_POLLING
+	init_device_poll();
+#endif
+
 	/*
 	 * Compute profhz/stathz, and fix profhz if needed.
 	 */
@@ -234,6 +243,10 @@ hardclock(frame)
 
 	tco_forward(0);
 	ticks++;
+
+#ifdef DEVICE_POLLING
+	hardclock_device_poll();	/* this is very short and quick */
+#endif /* DEVICE_POLLING */
 
 	/*
 	 * Process callouts at a very low cpu priority, so we don't keep the
@@ -602,7 +615,7 @@ microuptime(struct timeval *tv)
 	tv->tv_sec = tc->tc_offset_sec;
 	tv->tv_usec = tc->tc_offset_micro;
 	tv->tv_usec += ((u_int64_t)tco_delta(tc) * tc->tc_scale_micro) >> 32;
-	if (tv->tv_usec >= 1000000) {
+	while (tv->tv_usec >= 1000000) {
 		tv->tv_usec -= 1000000;
 		tv->tv_sec++;
 	}
@@ -622,7 +635,7 @@ nanouptime(struct timespec *ts)
 	delta += ((u_int64_t)count * tc->tc_scale_nano_f);
 	delta >>= 32;
 	delta += ((u_int64_t)count * tc->tc_scale_nano_i);
-	if (delta >= 1000000000) {
+	while (delta >= 1000000000) {
 		delta -= 1000000000;
 		ts->tv_sec++;
 	}
@@ -801,7 +814,7 @@ tco_forward(int force)
 	tc->tc_nanotime.tv_nsec = 
 	    (tc->tc_offset_nano >> 32) + boottime.tv_usec * 1000;
 	tc->tc_microtime.tv_usec = tc->tc_offset_micro + boottime.tv_usec;
-	if (tc->tc_nanotime.tv_nsec >= 1000000000) {
+	while (tc->tc_nanotime.tv_nsec >= 1000000000) {
 		tc->tc_nanotime.tv_nsec -= 1000000000;
 		tc->tc_microtime.tv_usec -= 1000000;
 		tc->tc_nanotime.tv_sec++;

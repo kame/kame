@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_prot.c	8.6 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_prot.c,v 1.53.2.7 2001/05/17 03:51:28 dillon Exp $
+ * $FreeBSD: src/sys/kern/kern_prot.c,v 1.53.2.9 2002/03/09 05:20:26 dd Exp $
  */
 
 /*
@@ -162,7 +162,7 @@ getsid(p, uap)
 	if (uap->pid == 0)
 		goto found;
 
-	if ((pt == pfind(uap->pid)) == 0)
+	if ((pt = pfind(uap->pid)) == 0)
 		return ESRCH;
 found:
 	p->p_retval[0] = pt->p_session->s_sid;
@@ -1056,6 +1056,22 @@ crdup(cr)
 	uihold(newcr->cr_uidinfo);
 	newcr->cr_ref = 1;
 	return (newcr);
+}
+
+/*
+ * Fill in a struct xucred based on a struct ucred.
+ */
+void
+cru2x(cr, xcr)
+	struct ucred *cr;
+	struct xucred *xcr;
+{
+
+	bzero(xcr, sizeof(*xcr));
+	xcr->cr_version = XUCRED_VERSION;
+	xcr->cr_uid = cr->cr_uid;
+	xcr->cr_ngroups = cr->cr_ngroups;
+	bcopy(cr->cr_groups, xcr->cr_groups, sizeof(cr->cr_groups));
 }
 
 /*

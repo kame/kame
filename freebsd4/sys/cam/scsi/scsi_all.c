@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/cam/scsi/scsi_all.c,v 1.14.2.5 2001/02/24 19:25:30 gibbs Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_all.c,v 1.14.2.7 2002/05/15 19:51:43 billf Exp $
  */
 
 #include <sys/param.h>
@@ -2364,10 +2364,16 @@ scsi_print_inquiry(struct scsi_inquiry_data *inq_data)
 		dtype = "Communication";
 		break;
 	case T_STORARRAY:
-		dtype = "Storage Arrray";
+		dtype = "Storage Array";
 		break;
 	case T_ENCLOSURE:
 		dtype = "Enclosure Services";
+		break;
+	case T_RBC:
+		dtype = "Simplified Direct Access";
+		break;
+	case T_OCRW:
+		dtype = "Optical Card Read/Write";
 		break;
 	case T_NODEVICE:
 		dtype = "Uninstalled";

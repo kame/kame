@@ -38,7 +38,7 @@
  */
 
 /*
- * $FreeBSD: src/sys/dev/ep/if_ep.c,v 1.95.2.2 2000/07/17 21:24:26 archie Exp $
+ * $FreeBSD: src/sys/dev/ep/if_ep.c,v 1.95.2.3 2002/03/06 07:26:35 imp Exp $
  *
  *  Promiscuous mode added and interrupt logic slightly changed
  *  to reduce the number of adapter failures. Transceiver select
@@ -554,8 +554,13 @@ ep_intr(arg)
 
     sc = (struct ep_softc *)arg;
 
-    if (sc->gone)
+     /*
+      * quick fix: Try to detect an interrupt when the card goes away.
+      */
+    if (sc->gone || inw(BASE + EP_STATUS) == 0xffff) {
+	    splx(x);
 	    return;
+    }
 
     ifp = &sc->arpcom.ac_if;
 
@@ -568,10 +573,8 @@ rescan:
 	/* first acknowledge all interrupt sources */
 	outw(BASE + EP_COMMAND, ACK_INTR | (status & S_MASK));
 
-	if (status & (S_RX_COMPLETE | S_RX_EARLY)) {
+	if (status & (S_RX_COMPLETE | S_RX_EARLY))
 	    epread(sc);
-	    continue;
-	}
 	if (status & S_TX_AVAIL) {
 	    /* we need ACK */
 	    ifp->if_timer = 0;

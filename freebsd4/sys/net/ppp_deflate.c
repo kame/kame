@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/net/ppp_deflate.c,v 1.12 1999/08/28 00:48:26 peter Exp $	*/
+/* $FreeBSD: src/sys/net/ppp_deflate.c,v 1.12.2.1 2002/04/14 21:41:48 luigi Exp $	*/
 
 /*
  * ppp_deflate.c - interface the zlib procedures for Deflate compression
@@ -134,7 +134,7 @@ z_free(notused, ptr)
     void *notused;
     void *ptr;
 {
-    FREE(ptr, M_DEVBUF);
+    free(ptr, M_DEVBUF);
 }
 
 /*
@@ -168,7 +168,7 @@ z_comp_alloc(options, opt_len)
     state->strm.zfree = z_free;
     if (deflateInit2(&state->strm, Z_DEFAULT_COMPRESSION, DEFLATE_METHOD_VAL,
 		     -w_size, 8, Z_DEFAULT_STRATEGY) != Z_OK) {
-	FREE(state, M_DEVBUF);
+	free(state, M_DEVBUF);
 	return NULL;
     }
 
@@ -184,7 +184,7 @@ z_comp_free(arg)
     struct deflate_state *state = (struct deflate_state *) arg;
 
     deflateEnd(&state->strm);
-    FREE(state, M_DEVBUF);
+    free(state, M_DEVBUF);
 }
 
 static int
@@ -397,7 +397,7 @@ z_decomp_alloc(options, opt_len)
     state->strm.zalloc = z_alloc;
     state->strm.zfree = z_free;
     if (inflateInit2(&state->strm, -w_size) != Z_OK) {
-	FREE(state, M_DEVBUF);
+	free(state, M_DEVBUF);
 	return NULL;
     }
 
@@ -413,7 +413,7 @@ z_decomp_free(arg)
     struct deflate_state *state = (struct deflate_state *) arg;
 
     inflateEnd(&state->strm);
-    FREE(state, M_DEVBUF);
+    free(state, M_DEVBUF);
 }
 
 static int

@@ -28,7 +28,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/bus.h,v 1.7.2.1 2000/04/14 13:08:53 nyan Exp $
+ * $FreeBSD: src/sys/i386/include/bus.h,v 1.7.2.2 2002/03/03 05:42:50 nyan Exp $
  */
 
 #ifndef _I386_BUS_H_
@@ -41,5 +41,6 @@
 /* IBM-PC */
 #include <machine/bus_at386.h>
 #endif
+#include <machine/bus_dma.h>
 
 #endif /* _I386_BUS_H_ */

@@ -30,7 +30,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/bge/if_bge.c,v 1.3.2.6 2001/12/18 08:08:34 peter Exp $
+ * $FreeBSD: src/sys/dev/bge/if_bge.c,v 1.3.2.10 2002/04/24 04:22:13 jdp Exp $
  */
 
 /*
@@ -57,7 +57,7 @@
  * function in a 32-bit/64-bit 33/66Mhz bus, or a 64-bit/133Mhz bus.
  * 
  * The BCM5701 is a single-chip solution incorporating both the BCM5700
- * MAC and a BCM5401 10/100/1000 PHY. Unlike the BCM5700, the BCM5700
+ * MAC and a BCM5401 10/100/1000 PHY. Unlike the BCM5700, the BCM5701
  * does not support external SSRAM.
  *
  * Broadcom also produces a variation of the BCM5700 under the "Altima"
@@ -120,7 +120,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/dev/bge/if_bge.c,v 1.3.2.6 2001/12/18 08:08:34 peter Exp $";
+  "$FreeBSD: src/sys/dev/bge/if_bge.c,v 1.3.2.10 2002/04/24 04:22:13 jdp Exp $";
 #endif
 
 /*
@@ -141,6 +141,8 @@ static struct bge_type bge_devs[] = {
 		"Broadcom BCM5701 Gigabit Ethernet" },
 	{ SK_VENDORID, SK_DEVICEID_ALTIMA,
 		"SysKonnect Gigabit Ethernet" },
+	{ ALTIMA_VENDORID, ALTIMA_DEVICE_AC1000,
+		"Altima AC1000 Gigabit Ethernet" },
 	{ 0, 0, NULL }
 };
 
@@ -478,8 +480,8 @@ bge_miibus_readreg(dev, phy, reg)
 	sc = device_get_softc(dev);
 	ifp = &sc->arpcom.ac_if;
 
-	if (ifp->if_flags & IFF_RUNNING)
-		BGE_CLRBIT(sc, BGE_MI_MODE, BGE_MIMODE_AUTOPOLL);
+	if (sc->bge_asicrev == BGE_ASICREV_BCM5701_B5 && phy != 1)
+		return(0);
 
 	CSR_WRITE_4(sc, BGE_MI_COMM, BGE_MICMD_READ|BGE_MICOMM_BUSY|
 	    BGE_MIPHY(phy)|BGE_MIREG(reg));
@@ -496,9 +498,6 @@ bge_miibus_readreg(dev, phy, reg)
 	}
 
 	val = CSR_READ_4(sc, BGE_MI_COMM);
-
-	if (ifp->if_flags & IFF_RUNNING)
-		BGE_SETBIT(sc, BGE_MI_MODE, BGE_MIMODE_AUTOPOLL);
 
 	if (val & BGE_MICOMM_READFAIL)
 		return(0);
@@ -773,15 +772,11 @@ bge_newbuf_std(sc, i, m)
 	if (m == NULL) {
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
 		if (m_new == NULL) {
-			printf("bge%d: mbuf allocation failed "
-			    "-- packet dropped!\n", sc->bge_unit);
 			return(ENOBUFS);
 		}
 
 		MCLGET(m_new, M_DONTWAIT);
 		if (!(m_new->m_flags & M_EXT)) {
-			printf("bge%d: cluster allocation failed "
-			    "-- packet dropped!\n", sc->bge_unit);
 			m_freem(m_new);
 			return(ENOBUFS);
 		}
@@ -822,8 +817,6 @@ bge_newbuf_jumbo(sc, i, m)
 		/* Allocate the mbuf. */
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
 		if (m_new == NULL) {
-			printf("bge%d: mbuf allocation failed "
-			    "-- packet dropped!\n", sc->bge_unit);
 			return(ENOBUFS);
 		}
 
@@ -1489,8 +1482,12 @@ bge_blockinit(sc)
 	/* Enable PHY auto polling (for MII/GMII only) */
 	if (sc->bge_tbi) {
 		CSR_WRITE_4(sc, BGE_MI_STS, BGE_MISTS_LINK);
-	} else
+ 	} else {
 		BGE_SETBIT(sc, BGE_MI_MODE, BGE_MIMODE_AUTOPOLL|10<<16);
+		if (sc->bge_asicrev == BGE_ASICREV_BCM5700)
+			CSR_WRITE_4(sc, BGE_MAC_EVT_ENB,
+			    BGE_EVTENB_MI_INTERRUPT);
+	}
 
 	/* Enable link state change attentions. */
 	BGE_SETBIT(sc, BGE_MAC_EVT_ENB, BGE_EVTENB_LINK_CHANGED);
@@ -1544,6 +1541,7 @@ bge_attach(dev)
 	u_int32_t command;
 	struct ifnet *ifp;
 	struct bge_softc *sc;
+	u_int32_t hwcfg = 0;
 	int unit, error = 0, rid;
 
 	s = splimp();
@@ -1692,6 +1690,28 @@ bge_attach(dev)
 	ifp->if_hwassist = BGE_CSUM_FEATURES;
 	ifp->if_capabilities = IFCAP_HWCSUM;
 	ifp->if_capenable = ifp->if_capabilities;
+
+	/* Save ASIC rev. */
+
+	sc->bge_asicrev =
+	    pci_read_config(dev, BGE_PCI_MISC_CTL, 4) &
+	    BGE_PCIMISCCTL_ASICREV;
+
+	/* Pretend all 5700s are the same */
+	if ((sc->bge_asicrev & 0xFF000000) == BGE_ASICREV_BCM5700)
+		sc->bge_asicrev = BGE_ASICREV_BCM5700;
+
+	/*
+	 * Figure out what sort of media we have by checking the
+	 * hardware config word in the EEPROM. Note: on some BCM5700
+	 * cards, this value appears to be unset. If that's the
+	 * case, we have to rely on identifying the NIC by its PCI
+	 * subsystem ID, as we do below for the SysKonnect SK-9D41.
+	 */
+	bge_read_eeprom(sc, (caddr_t)&hwcfg,
+		    BGE_EE_HWCFG_OFFSET, sizeof(hwcfg));
+	if ((ntohl(hwcfg) & BGE_HWCFG_MEDIA) == BGE_MEDIA_FIBER)
+		sc->bge_tbi = 1;
 
 	/* The SysKonnect SK-9D41 is a 1000baseSX card. */
 	if ((pci_read_config(dev, BGE_PCI_SUBSYS, 4) >> 16) == SK_SUBSYSID_9D41)
@@ -2048,16 +2068,43 @@ bge_intr(xsc)
 	/* Ack interrupt and stop others from occuring. */
 	CSR_WRITE_4(sc, BGE_MBX_IRQ0_LO, 1);
 
-	/* Process link state changes. */
-	if (sc->bge_rdata->bge_status_block.bge_status &
-	    BGE_STATFLAG_LINKSTATE_CHANGED) {
-		sc->bge_link = 0;
-		untimeout(bge_tick, sc, sc->bge_stat_ch);
-		bge_tick(sc);
-		/* ack the event to clear/reset it */
-		CSR_WRITE_4(sc, BGE_MAC_STS, BGE_MACSTAT_SYNC_CHANGED|
-		    BGE_MACSTAT_CFG_CHANGED);
-		CSR_WRITE_4(sc, BGE_MI_STS, 0);
+	/*
+	 * Process link state changes.
+	 * Grrr. The link status word in the status block does
+	 * not work correctly on the BCM5700 rev AX and BX chips,
+	 * according to all avaibable information. Hence, we have
+	 * to enable MII interrupts in order to properly obtain
+	 * async link changes. Unfortunately, this also means that
+	 * we have to read the MAC status register to detect link
+	 * changes, thereby adding an additional register access to
+	 * the interrupt handler.
+	 */
+
+	if (sc->bge_asicrev == BGE_ASICREV_BCM5700) {
+		u_int32_t		status;
+
+		status = CSR_READ_4(sc, BGE_MAC_STS);
+		if (status & BGE_MACSTAT_MI_INTERRUPT) {
+			sc->bge_link = 0;
+			untimeout(bge_tick, sc, sc->bge_stat_ch);
+			bge_tick(sc);
+			/* Clear the interrupt */
+			CSR_WRITE_4(sc, BGE_MAC_EVT_ENB,
+			    BGE_EVTENB_MI_INTERRUPT);
+			bge_miibus_readreg(sc->bge_dev, 1, BRGPHY_MII_ISR);
+			bge_miibus_writereg(sc->bge_dev, 1, BRGPHY_MII_IMR,
+			    BRGPHY_INTRS);
+		}
+	} else {
+		if (sc->bge_rdata->bge_status_block.bge_status &
+		    BGE_STATFLAG_LINKSTATE_CHANGED) {
+			sc->bge_link = 0;
+			untimeout(bge_tick, sc, sc->bge_stat_ch);
+			bge_tick(sc);
+			/* Clear the interrupt */
+			CSR_WRITE_4(sc, BGE_MAC_STS, BGE_MACSTAT_SYNC_CHANGED|
+			    BGE_MACSTAT_CFG_CHANGED);
+		}
 	}
 
 	if (ifp->if_flags & IFF_RUNNING) {
@@ -2096,8 +2143,10 @@ bge_tick(xsc)
 
 	bge_stats_update(sc);
 	sc->bge_stat_ch = timeout(bge_tick, sc, hz);
-	if (sc->bge_link)
+	if (sc->bge_link) {
+		splx(s);
 		return;
+	}
 
 	if (sc->bge_tbi) {
 		ifm = &sc->bge_ifmedia;
@@ -2109,6 +2158,7 @@ bge_tick(xsc)
 			if (ifp->if_snd.ifq_head != NULL)
 				bge_start(ifp);
 		}
+		splx(s);
 		return;
 	}
 

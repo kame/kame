@@ -23,11 +23,12 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/pci.c,v 1.141.2.14 2002/01/10 12:08:22 mdodd Exp $
+ * $FreeBSD: src/sys/pci/pci.c,v 1.141.2.15 2002/04/30 17:48:18 tmm Exp $
  *
  */
 
 #include "opt_bus.h"
+#include "opt_pci.h"
 
 #include "opt_simos.h"
 

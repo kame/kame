@@ -38,7 +38,7 @@
  * advised of the possibility of such damage.
  *
  * $Id: vinumrequest.c,v 1.30 2001/01/09 04:20:55 grog Exp grog $
- * $FreeBSD: src/sys/dev/vinum/vinumrequest.c,v 1.44.2.3 2001/03/13 02:59:43 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumrequest.c,v 1.44.2.4 2002/02/03 07:10:26 grog Exp $
  */
 
 #include <dev/vinum/vinumhdr.h>
@@ -1052,8 +1052,8 @@ allocrqg(struct request *rq, int elements)
 	bzero(rqg, size);				    /* no old junk */
 	rqg->rq = rq;					    /* point back to the parent request */
 	rqg->count = elements;				    /* number of requests in the group */
+	rqg->lockbase = -1;				    /* no lock required yet */
     }
-    rqg->lockbase = -1;					    /* no lock required yet */
     return rqg;
 }
 

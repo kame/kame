@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_sl.c	8.6 (Berkeley) 2/1/94
- * $FreeBSD: src/sys/net/if_sl.c,v 1.84.2.1 2000/12/26 02:22:57 peter Exp $
+ * $FreeBSD: src/sys/net/if_sl.c,v 1.84.2.2 2002/02/13 00:43:10 dillon Exp $
  */
 
 /*
@@ -548,7 +548,6 @@ slstart(tp)
 	register u_char *cp;
 	register struct ip *ip;
 	int s;
-	struct mbuf *m2;
 	u_char bpfbuf[SLTMAX + SLIP_HDRLEN];
 	register int len = 0;
 
@@ -702,8 +701,7 @@ slstart(tp)
 					sc->sc_if.if_obytes += 2;
 				}
 			}
-			MFREE(m, m2);
-			m = m2;
+			m = m_free(m);
 		}
 
 		if (putc(FRAME_END, &tp->t_outq)) {

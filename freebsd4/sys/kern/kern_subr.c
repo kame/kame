@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_subr.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_subr.c,v 1.31.2.1 2001/09/28 16:58:35 dillon Exp $
+ * $FreeBSD: src/sys/kern/kern_subr.c,v 1.31.2.2 2002/04/21 08:09:37 bde Exp $
  */
 
 #include <sys/param.h>
@@ -419,8 +419,8 @@ uio_yield()
 	int s;
 
 	p = curproc;
-	p->p_priority = p->p_usrpri;
 	s = splhigh();
+	p->p_priority = p->p_usrpri;
 	setrunqueue(p);
 	p->p_stats->p_ru.ru_nivcsw++;
 	mi_switch();

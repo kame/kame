@@ -1,5 +1,5 @@
 /*	$NetBSD: usb_port.h,v 1.15 1999/11/16 12:04:28 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.25.2.5 2001/01/06 22:36:15 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb_port.h,v 1.25.2.6 2002/02/14 02:32:16 joe Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -61,6 +61,8 @@
 #endif
 
 #define Static static
+
+typedef struct proc *usb_proc_ptr;
 
 typedef struct device *device_ptr_t;
 #define USBBASEDEVICE struct device
@@ -164,6 +166,8 @@ __CONCAT(dname,_detach)(self, flags) \
 #endif
 
 #define Static static
+
+typedef struct proc *usb_proc_ptr;
 
 #define	memcpy(d, s, l)		bcopy((s),(d),(l))
 #define	memset(d, v, l)		bzero((d),(l))
@@ -285,6 +289,8 @@ __CONCAT(dname,_detach)(self, flags) \
 #define USBDEVUNIT(bdev) device_get_unit(bdev)
 
 #define DECLARE_USB_DMA_T typedef char * usb_dma_t
+
+typedef struct proc *usb_proc_ptr;
 
 /* XXX Change this when FreeBSD has memset */
 #define	memcpy(d, s, l)		bcopy((s),(d),(l))

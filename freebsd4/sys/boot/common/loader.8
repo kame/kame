@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD: src/sys/boot/common/loader.8,v 1.18.2.12 2001/12/14 15:23:50 ru Exp $
+.\" $FreeBSD: src/sys/boot/common/loader.8,v 1.18.2.13 2002/02/04 13:09:23 sobomax Exp $
 .\"
 .\" Note: The date here should be updated whenever a non-trivial
 .\" change is made to the manual page.
@@ -392,6 +392,13 @@ when the kernel is booted.
 This can be overridden by setting
 .Va rootdev
 explicitly.
+.It Va dumpdev
+A name of device where the kernel can save a crash dump in the case
+of a panic.
+This automatically sets
+.Va kern.dumpdev
+.Xr sysctl 3
+MIB variable.
 .El
 .Pp
 Other variables are used to override kernel tunable parameters.

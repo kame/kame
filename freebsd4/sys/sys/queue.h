@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)queue.h	8.5 (Berkeley) 8/20/94
- * $FreeBSD: src/sys/sys/queue.h,v 1.32.2.6 2001/12/18 10:09:02 ru Exp $
+ * $FreeBSD: src/sys/sys/queue.h,v 1.32.2.7 2002/04/17 14:21:02 des Exp $
  */
 
 #ifndef _SYS_QUEUE_H_
@@ -439,12 +439,12 @@ struct {								\
 
 #define	CIRCLEQ_FOREACH(var, head, field)				\
 	for ((var) = CIRCLEQ_FIRST((head));				\
-	    (var) != (void *)(head);					\
+	    (var) != (void *)(head) || ((var) = NULL);			\
 	    (var) = CIRCLEQ_NEXT((var), field))
 
 #define	CIRCLEQ_FOREACH_REVERSE(var, head, field)			\
 	for ((var) = CIRCLEQ_LAST((head));				\
-	    (var) != (void *)(head);					\
+	    (var) != (void *)(head) || ((var) = NULL);			\
 	    (var) = CIRCLEQ_PREV((var), field))
 
 #define	CIRCLEQ_INIT(head) do {						\

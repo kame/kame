@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/cy_pci.c,v 1.17 1999/08/28 00:50:45 peter Exp $
+ * $FreeBSD: src/sys/pci/cy_pci.c,v 1.17.2.1 2002/03/17 04:14:18 bde Exp $
  */
 
 /*
@@ -133,9 +133,9 @@ cy_attach(config_id, unit)
 	plx_ver = *((u_char *)vaddr + PLX_VER) & 0x0f;
 	switch (plx_ver) {
 	case PLX_9050:
-		outw(ioport + CY_PLX_9050_ICS, 
-		    inw(ioport + CY_PLX_9050_ICS) | CY_PLX_9050_ICS_IENABLE |
-		    CY_PLX_9050_ICS_LOCAL_IENABLE);
+		outw(ioport + CY_PLX_9050_ICS,
+		    CY_PLX_9050_ICS_IENABLE | CY_PLX_9050_ICS_LOCAL_IENABLE |
+		    CY_PLX_9050_ICS_LOCAL_IPOLARITY);
 		break;
 	case PLX_9060:
 	case PLX_9080:

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/kern/kern_environment.c,v 1.10.2.5 2001/11/03 01:41:08 ps Exp $
+ * $FreeBSD: src/sys/kern/kern_environment.c,v 1.10.2.7 2002/05/07 09:57:16 bde Exp $
  */
 
 /*
@@ -58,10 +58,11 @@ getenv(const char *name)
     for (cp = kern_envp; cp != NULL; cp = kernenv_next(cp)) {
 	for (ep = cp; (*ep != '=') && (*ep != 0); ep++)
 	    ;
+	if (*ep != '=')
+	    continue;
 	len = ep - cp;
-	if (*ep == '=')
-	    ep++;
-	if (!strncmp(name, cp, len))
+	ep++;
+	if (!strncmp(name, cp, len) && name[len] == 0)
 	    return(ep);
     }
     return(NULL);
@@ -76,7 +77,7 @@ getenv_string(const char *name, char *data, int size)
     char *tmp;
 
     tmp = getenv(name);
-    if (tmp == NULL) {
+    if (tmp != NULL) {
 	strncpy(data, tmp, size);
 	data[size - 1] = 0;
 	return (1);

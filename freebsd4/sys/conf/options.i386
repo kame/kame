@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options.i386,v 1.132.2.11 2001/12/10 12:17:04 hm Exp $
+# $FreeBSD: src/sys/conf/options.i386,v 1.132.2.15 2002/04/28 23:01:29 dwmalone Exp $
 
 DISABLE_PSE
 IDE_DELAY
@@ -62,6 +62,7 @@ CYRIX_CACHE_WORKS		opt_cpu.h
 CYRIX_CACHE_REALLY_WORKS	opt_cpu.h
 NO_MEMORY_HOLE			opt_cpu.h
 CPU_ENABLE_SSE			opt_cpu.h
+CPU_ATHLON_SSE_HACK		opt_cpu.h
 
 # The CPU type affects the endian conversion functions all over the kernel.
 I386_CPU		opt_global.h
@@ -104,6 +105,8 @@ PSM_RESETAFTERSUSPEND	opt_psm.h
 PSM_DEBUG		opt_psm.h
 
 PCIC_RESUME_RESET	opt_pcic.h
+
+PUC_FASTINTR		opt_puc.h
 
 ATKBD_DFLT_KEYMAP	opt_atkbd.h
 

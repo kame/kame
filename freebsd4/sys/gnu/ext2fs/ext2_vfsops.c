@@ -37,7 +37,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_vfsops.c	8.8 (Berkeley) 4/18/94
- *	$FreeBSD: src/sys/gnu/ext2fs/ext2_vfsops.c,v 1.63.2.5 2001/11/04 18:57:52 dillon Exp $
+ *	$FreeBSD: src/sys/gnu/ext2fs/ext2_vfsops.c,v 1.63.2.6 2002/04/08 09:39:29 bde Exp $
  */
 
 #include "opt_quota.h"
@@ -647,6 +647,10 @@ ext2_mountfs(devvp, mp, p)
 	VOP_UNLOCK(devvp, 0, p);
 	if (error)
 		return (error);
+	if (devvp->v_rdev->si_iosize_max != 0)
+		mp->mnt_iosize_max = devvp->v_rdev->si_iosize_max;
+	if (mp->mnt_iosize_max > MAXPHYS)
+		mp->mnt_iosize_max = MAXPHYS;
 	if (VOP_IOCTL(devvp, DIOCGPART, (caddr_t)&dpart, FREAD, NOCRED, p) != 0)
 		size = DEV_BSIZE;
 	else {

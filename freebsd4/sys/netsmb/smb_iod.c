@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netsmb/smb_iod.c,v 1.1.2.1 2001/05/22 08:32:33 bp Exp $
+ * $FreeBSD: src/sys/netsmb/smb_iod.c,v 1.1.2.2 2002/04/23 03:45:01 bp Exp $
  */
  
 #include <sys/param.h>
@@ -87,7 +87,7 @@ smb_iod_invrq(struct smbiod *iod)
 	struct smb_rq *rqp;
 
 	/*
-         * Invalidate all outstanding requests for this connection
+	 * Invalidate all outstanding requests for this connection
 	 */
 	SMB_IOD_RQLOCK(iod);
 	TAILQ_FOREACH(rqp, &iod->iod_rqlist, sr_link) {

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_inode.c	8.9 (Berkeley) 5/14/95
- * $FreeBSD: src/sys/ufs/ufs/ufs_inode.c,v 1.25.2.1 2001/08/01 19:33:39 iedowse Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_inode.c,v 1.25.2.2 2002/02/05 18:35:04 dillon Exp $
  */
 
 #include "opt_quota.h"
@@ -81,7 +81,7 @@ ufs_inactive(ap)
 	 */
 	if (ip->i_mode == 0)
 		goto out;
-	if (ip->i_nlink <= 0 && (vp->v_mount->mnt_flag & MNT_RDONLY) == 0) {
+	if (ip->i_nlink <= 0) {
 #ifdef QUOTA
 		if (!getinoquota(ip))
 			(void)chkiq(ip, -1, NOCRED, 0);

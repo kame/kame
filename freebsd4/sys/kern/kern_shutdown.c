@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_shutdown.c	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.72.2.10 2002/01/22 13:05:26 nik Exp $
+ * $FreeBSD: src/sys/kern/kern_shutdown.c,v 1.72.2.12 2002/02/21 19:15:10 dillon Exp $
  */
 
 #include "opt_ddb.h"
@@ -54,6 +54,7 @@
 #include <sys/vnode.h>
 #include <sys/kernel.h>
 #include <sys/kthread.h>
+#include <sys/malloc.h>
 #include <sys/mount.h>
 #include <sys/queue.h>
 #include <sys/sysctl.h>
@@ -256,6 +257,8 @@ boot(howto)
 			if (nbusy < pbusy)
 				iter = 0;
 			pbusy = nbusy;
+			if (iter > 5 && bioops.io_sync)
+				(*bioops.io_sync)(NULL);
 			sync(&proc0, NULL);
 			DELAY(50000 * iter);
 		}
@@ -276,8 +279,8 @@ boot(howto)
 				nbusy++;
 #if defined(SHOW_BUSYBUFS) || defined(DIAGNOSTIC)
 				printf(
-			    "%d: dev:%s, flags:%08lx, blkno:%ld, lblkno:%ld\n",
-				    nbusy, devtoname(bp->b_dev),
+			    "%p %d: dev:%s, flags:%08lx, blkno:%ld, lblkno:%ld\n",
+				    bp, nbusy, devtoname(bp->b_dev),
 				    bp->b_flags, (long)bp->b_blkno,
 				    (long)bp->b_lblkno);
 #endif
@@ -438,6 +441,16 @@ static void
 dump_conf(dummy)
 	void *dummy;
 {
+	char *path;
+	dev_t dev;
+
+	path = malloc(MNAMELEN, M_TEMP, M_WAITOK);
+	if (TUNABLE_STR_FETCH("dumpdev", path, MNAMELEN) != 0) {
+		dev = getdiskbyname(path);
+		if (dev != NODEV)
+			dumpdev = dev;
+	}
+	free(path, M_TEMP);
 	if (setdumpdev(dumpdev) != 0)
 		dumpdev = NODEV;
 }

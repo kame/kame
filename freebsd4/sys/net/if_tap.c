@@ -31,8 +31,8 @@
  */
 
 /*
- * $FreeBSD: src/sys/net/if_tap.c,v 1.3.2.1 2000/07/27 13:57:05 nsayer Exp $
- * $Id: if_tap.c,v 1.1.1.1 2000/11/21 08:40:09 kawa Exp $
+ * $FreeBSD: src/sys/net/if_tap.c,v 1.3.2.3 2002/04/14 21:41:48 luigi Exp $
+ * $Id: if_tap.c,v 1.1.1.2 2002/06/21 01:21:58 suz Exp $
  */
 
 #include "opt_inet.h"
@@ -172,7 +172,7 @@ tapmodevent(mod, type, data)
 				ether_ifdetach(ifp, 1);
 				splx(s);
 				destroy_dev(tp->tap_dev);
-				FREE(tp, M_TAP);
+				free(tp, M_TAP);
 			}
 			else
 				unit ++;
@@ -642,7 +642,7 @@ tapread(dev, uio, flag)
 {
 	struct tap_softc	*tp = dev->si_drv1;
 	struct ifnet		*ifp = &tp->tap_if;
-	struct mbuf		*m = NULL, *m0 = NULL;
+	struct mbuf		*m0 = NULL;
 	int			 error = 0, len, s;
 
 	TAPDEBUG("%s%d reading, minor = %#x\n",
@@ -686,8 +686,7 @@ tapread(dev, uio, flag)
 			break;
 
 		error = uiomove(mtod(m0, caddr_t), len, uio);
-		MFREE(m0, m);
-		m0 = m;
+		m0 = m_free(m0);
 	}
 
 	if (m0 != NULL) {

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_subr.c	8.31 (Berkeley) 5/26/95
- * $FreeBSD: src/sys/kern/vfs_subr.c,v 1.249.2.23 2002/01/19 21:01:32 dillon Exp $
+ * $FreeBSD: src/sys/kern/vfs_subr.c,v 1.249.2.27 2002/02/16 16:05:27 iedowse Exp $
  */
 
 /*
@@ -84,6 +84,7 @@ static MALLOC_DEFINE(M_NETADDR, "Export Host", "Export host address structure");
 static void	insmntque __P((struct vnode *vp, struct mount *mp));
 static void	vclean __P((struct vnode *vp, int flags, struct proc *p));
 static unsigned long	numvnodes;
+static void	vlruvp(struct vnode *vp);
 SYSCTL_INT(_debug, OID_AUTO, numvnodes, CTLFLAG_RD, &numvnodes, 0, "");
 
 enum vtype iftovt_tab[16] = {
@@ -464,6 +465,20 @@ vlrureclaim(struct mount *mp, int count)
 {
 	struct vnode *vp;
 	int done;
+	int trigger;
+	int usevnodes;
+
+	/*
+	 * Calculate the trigger point, don't allow user
+	 * screwups to blow us up.   This prevents us from
+	 * recycling vnodes with lots of resident pages.  We
+	 * aren't trying to free memory, we are trying to
+	 * free vnodes.
+	 */
+	usevnodes = desiredvnodes;
+	if (usevnodes <= 0)
+		usevnodes = 1;
+	trigger = cnt.v_page_count * 2 / usevnodes;
 
 	done = 0;
 	simple_lock(&mntvnode_slock);
@@ -474,6 +489,7 @@ vlrureclaim(struct mount *mp, int count)
 		if (vp->v_type != VNON &&
 		    vp->v_type != VBAD &&
 		    VMIGHTFREE(vp) &&		/* critical path opt */
+		    (vp->v_object == NULL || vp->v_object->resident_page_count < trigger) &&
 		    simple_lock_try(&vp->v_interlock)
 		) {
 			simple_unlock(&mntvnode_slock);
@@ -1521,6 +1537,8 @@ vget(vp, flags, p)
 			vp->v_usecount--;
 			if (VSHOULDFREE(vp))
 				vfree(vp);
+			else
+				vlruvp(vp);
 			simple_unlock(&vp->v_interlock);
 		}
 		return (error);
@@ -1561,17 +1579,19 @@ vrele(vp)
 
 	if (vp->v_usecount == 1) {
 		vp->v_usecount--;
+		/*
+		 * We must call VOP_INACTIVE with the node locked.
+		 * If we are doing a vpu, the node is already locked,
+		 * but, in the case of vrele, we must explicitly lock
+		 * the vnode before calling VOP_INACTIVE
+		 */
+
+		if (vn_lock(vp, LK_EXCLUSIVE | LK_INTERLOCK, p) == 0)
+			VOP_INACTIVE(vp, p);
 		if (VSHOULDFREE(vp))
 			vfree(vp);
-	/*
-	 * If we are doing a vput, the node is already locked, and we must
-	 * call VOP_INACTIVE with the node locked.  So, in the case of
-	 * vrele, we explicitly lock the vnode before calling VOP_INACTIVE.
-	 */
-		if (vn_lock(vp, LK_EXCLUSIVE | LK_INTERLOCK, p) == 0) {
-			VOP_INACTIVE(vp, p);
-		}
-
+		else
+			vlruvp(vp);
 	} else {
 #ifdef DIAGNOSTIC
 		vprint("vrele: negative ref count", vp);
@@ -1599,16 +1619,17 @@ vput(vp)
 
 	if (vp->v_usecount == 1) {
 		vp->v_usecount--;
-		if (VSHOULDFREE(vp))
-			vfree(vp);
-	/*
-	 * If we are doing a vput, the node is already locked, and we must
-	 * call VOP_INACTIVE with the node locked.  So, in the case of
-	 * vrele, we explicitly lock the vnode before calling VOP_INACTIVE.
-	 */
+		/*
+		 * We must call VOP_INACTIVE with the node locked.
+		 * If we are doing a vpu, the node is already locked,
+		 * so we just need to release the vnode mutex.
+		 */
 		simple_unlock(&vp->v_interlock);
 		VOP_INACTIVE(vp, p);
-
+		if (VSHOULDFREE(vp))
+			vfree(vp);
+		else
+			vlruvp(vp);
 	} else {
 #ifdef DIAGNOSTIC
 		vprint("vput: negative ref count", vp);
@@ -1684,14 +1705,9 @@ vflush(mp, rootrefs, flags)
 {
 	struct proc *p = curproc;	/* XXX */
 	struct vnode *vp, *nvp, *rootvp = NULL;
+	struct vattr vattr;
 	int busy = 0, error;
 
-	/* Hack to prevent crashes with old filesystem modules. */
-	if (rootrefs < 0 || rootrefs > 10) {
-		printf("vflush: %s: bad rootrefs %d\n",
-		    mp->mnt_stat.f_fstypename, rootrefs);
-		return (EBUSY);
-	}
 	if (rootrefs > 0) {
 		KASSERT((flags & (SKIPSYSTEM | WRITECLOSE)) == 0,
 		    ("vflush: bad args"));
@@ -1723,10 +1739,14 @@ loop:
 			continue;
 		}
 		/*
-		 * If WRITECLOSE is set, only flush out regular file vnodes
-		 * open for writing.
+		 * If WRITECLOSE is set, flush out unlinked but still open
+		 * files (even if open only for reading) and regular file
+		 * vnodes open for writing. 
 		 */
 		if ((flags & WRITECLOSE) &&
+		    (vp->v_type == VNON ||
+		    (VOP_GETATTR(vp, &vattr, p->p_ucred, p) == 0 &&
+		    vattr.va_nlink > 0)) &&
 		    (vp->v_writecount == 0 || vp->v_type != VREG)) {
 			simple_unlock(&vp->v_interlock);
 			continue;
@@ -1787,6 +1807,28 @@ loop:
 	for (; rootrefs > 0; rootrefs--)
 		vrele(rootvp);
 	return (0);
+}
+
+/*
+ * We do not want to recycle the vnode too quickly.
+ *
+ * XXX we can't move vp's around the nvnodelist without really screwing
+ * up the efficiency of filesystem SYNC and friends.  This code is 
+ * disabled until we fix the syncing code's scanning algorithm.
+ */
+static void
+vlruvp(struct vnode *vp)
+{
+#if 0
+	struct mount *mp;
+
+	if ((mp = vp->v_mount) != NULL) {
+		simple_lock(&mntvnode_slock);
+		TAILQ_REMOVE(&mp->mnt_nvnodelist, vp, v_nmntvnodes);
+		TAILQ_INSERT_TAIL(&mp->mnt_nvnodelist, vp, v_nmntvnodes);
+		simple_unlock(&mntvnode_slock);
+	}
+#endif
 }
 
 /*

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/fs/smbfs/smbfs_io.c,v 1.3.2.1 2001/05/22 08:32:26 bp Exp $
+ * $FreeBSD: src/sys/fs/smbfs/smbfs_io.c,v 1.3.2.2 2002/04/30 08:33:11 bp Exp $
  *
  */
 #include <sys/param.h>
@@ -185,6 +185,12 @@ smbfs_readvnode(struct vnode *vp, struct uio *uiop, struct ucred *cred)
 	struct vattr vattr;
 	struct smb_cred scred;
 	int error, lks;
+
+	/*
+	 * Protect against method which is not supported for now
+	 */
+	if (uiop->uio_segflg == UIO_NOCOPY)
+		return EOPNOTSUPP;
 
 	if (vp->v_type != VREG && vp->v_type != VDIR) {
 		SMBFSERR("vn types other than VREG or VDIR are unsupported !\n");

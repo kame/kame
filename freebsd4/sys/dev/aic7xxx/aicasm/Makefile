@@ -1,16 +1,17 @@
-# $Id: Makefile,v 1.1.1.2 2001/04/23 13:09:49 sumikawa Exp $
+# $Id: Makefile,v 1.1.1.3 2002/06/21 01:21:01 suz Exp $
 #
-# $FreeBSD: src/sys/dev/aic7xxx/aicasm/Makefile,v 1.8.2.2 2001/01/07 22:52:35 gibbs Exp $
+# $FreeBSD: src/sys/dev/aic7xxx/aicasm/Makefile,v 1.8.2.3 2002/04/29 19:36:36 gibbs Exp $
 
 PROG=	aicasm
 
 CSRCS=	aicasm.c aicasm_symbol.c
-GENSRCS= aicasm_gram.c aicasm_scan.c
+YSRCS=	aicasm_gram.y aicasm_macro_gram.y
+LSRCS=	aicasm_scan.l aicasm_macro_scan.l
 
-GENHDRS=	y.tab.h
+GENHDRS=	aicasm_gram.h aicasm_macro_gram.h
 
-SRCS=	${GENSRCS} ${CSRCS}
-CLEANFILES+= ${GENSRCS} ${GENHDRS} y.output
+SRCS=	${GENHDRS} ${CSRCS} ${YSRCS} ${LSRCS}
+CLEANFILES+= ${GENHDRS} ${YSRCS:R:C/(.*)/\1.output/g}
 DPADD+=	${LIBL}
 LDADD+=	-ll
 
@@ -23,8 +24,10 @@ DEPENDFILE=
 
 CFLAGS+= -I/usr/include -I.
 NOMAN=	noman
+YFLAGS= -b ${.TARGET:R} ${.TARGET:M*macro*:S/$(.TARGET)/-p mm/} -d
+LFLAGS+= ${.TARGET:M*macro*:S/$(.TARGET)/-Pmm/}
 
-.ifdef DEBUG
+.ifdef AICASM_DEBUG
 CFLAGS+= -DDEBUG -g
 YFLAGS+= -t -v
 LFLAGS+= -d

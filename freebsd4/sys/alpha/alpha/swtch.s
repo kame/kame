@@ -1,4 +1,4 @@
-/* $FreeBSD: src/sys/alpha/alpha/swtch.s,v 1.14 1999/11/10 21:14:24 dfr Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/swtch.s,v 1.14.2.2 2002/02/12 01:56:28 gallatin Exp $ */
 /* $NetBSD: locore.s,v 1.47 1998/03/22 07:26:32 thorpej Exp $ */
 
 /*
@@ -100,10 +100,17 @@ Lidle1:	LDGP(pv)
 	call_pal PAL_OSF1_swpipl
 Lidle2:
 	CALL(procrunnable)
-	beq	v0, Lidle2
+	beq	v0, Lpgzero
 	ldiq	a0, ALPHA_PSL_IPL_HIGH		/* disable all interrupts */
 	call_pal PAL_OSF1_swpipl
 	jmp	zero, sw1			/* jump back into the fray */
+Lpgzero:
+#ifdef	DEVICE_POLLING
+	CALL(idle_poll)
+#else	/* standard code */
+	CALL(vm_page_zero_idle)
+#endif
+	br	zero, Lidle2
 	END(idle)
 
 /*

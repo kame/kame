@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.c	8.3 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/net/if.c,v 1.85.2.11 2001/12/20 10:30:16 ru Exp $
+ * $FreeBSD: src/sys/net/if.c,v 1.85.2.18 2002/04/28 05:40:25 suz Exp $
  */
 
 #include "opt_compat.h"
@@ -224,6 +224,9 @@ if_attach(ifp)
 			sdl->sdl_data[--namelen] = 0xff;
 		TAILQ_INSERT_HEAD(&ifp->if_addrhead, ifa, ifa_link);
 	}
+
+	/* Announce the interface. */
+	rt_ifannouncemsg(ifp, IFAN_ARRIVAL);
 }
 
 /*
@@ -301,6 +304,9 @@ if_detach(ifp)
 			continue;
 		(void) rnh->rnh_walktree(rnh, if_rtdel, ifp);
 	}
+
+	/* Announce that the interface is gone. */
+	rt_ifannouncemsg(ifp, IFAN_DEPARTURE);
 
 	TAILQ_REMOVE(&ifnet, ifp, if_link);
 	splx(s);
@@ -608,11 +614,7 @@ ifa_ifwithnet(addr)
 
 			if (ifa->ifa_addr->sa_family != af)
 next:				continue;
-			if (
-#ifdef INET6 /* XXX: for maching gif tunnel dst as routing entry gateway */
-			    addr->sa_family != AF_INET6 &&
-#endif
-			    ifp->if_flags & IFF_POINTOPOINT) {
+			if (af == AF_INET && ifp->if_flags & IFF_POINTOPOINT) {
 				/*
 				 * This is a bit broken as it doesn't
 				 * take into account that the remote end may
@@ -1203,7 +1205,7 @@ ifioctl(so, cmd, data, p)
 
 		if ((oif_flags ^ ifp->if_flags) & IFF_UP) {
 #ifdef INET6
-			DELAY(100);/* XXX: temporal workaround for fxp issue*/
+			DELAY(100);/* XXX: temporary workaround for fxp issue*/
 			if (ifp->if_flags & IFF_UP) {
 				int s = splimp();
 				in6_if_up(ifp);
@@ -1360,11 +1362,13 @@ if_allmulti(ifp, onswitch)
 {
 	int error = 0;
 	int s = splimp();
+	struct ifreq ifr;
 
 	if (onswitch) {
 		if (ifp->if_amcount++ == 0) {
 			ifp->if_flags |= IFF_ALLMULTI;
-			error = ifp->if_ioctl(ifp, SIOCSIFFLAGS, 0);
+			ifr.ifr_flags = ifp->if_flags;
+			error = ifp->if_ioctl(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 		}
 	} else {
 		if (ifp->if_amcount > 1) {
@@ -1372,7 +1376,8 @@ if_allmulti(ifp, onswitch)
 		} else {
 			ifp->if_amcount = 0;
 			ifp->if_flags &= ~IFF_ALLMULTI;
-			error = ifp->if_ioctl(ifp, SIOCSIFFLAGS, 0);
+			ifr.ifr_flags = ifp->if_flags;
+			error = ifp->if_ioctl(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 		}
 	}
 	splx(s);
@@ -1560,6 +1565,7 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 {
 	struct sockaddr_dl *sdl;
 	struct ifaddr *ifa;
+	struct ifreq ifr;
 
 	ifa = ifnet_addrs[ifp->if_index - 1];
 	if (ifa == NULL)
@@ -1588,9 +1594,22 @@ if_setlladdr(struct ifnet *ifp, const u_char *lladdr, int len)
 	 */
 	if ((ifp->if_flags & IFF_UP) != 0) {
 		ifp->if_flags &= ~IFF_UP;
-		(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, NULL);
+		ifr.ifr_flags = ifp->if_flags;
+		(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
 		ifp->if_flags |= IFF_UP;
-		(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, NULL);
+		ifr.ifr_flags = ifp->if_flags;
+		(*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr);
+#ifdef INET
+		/*
+		 * Also send gratuitous ARPs to notify other nodes about
+		 * the address change.
+		 */
+		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link) {
+			if (ifa->ifa_addr != NULL &&
+			    ifa->ifa_addr->sa_family == AF_INET)
+				arp_ifinit((struct arpcom *)ifp, ifa);
+		}
+#endif
 	}
 	return (0);
 }

@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/include/cpufunc.h,v 1.96.2.2 2001/07/12 02:57:11 bsd Exp $
+ * $FreeBSD: src/sys/i386/include/cpufunc.h,v 1.96.2.3 2002/04/28 22:50:54 dwmalone Exp $
  */
 
 /*
@@ -92,6 +92,14 @@ disable_intr(void)
 #ifdef SMP
 	MPINTR_LOCK();
 #endif
+}
+
+static __inline void
+do_cpuid(u_int ax, u_int *p)
+{
+	__asm __volatile("cpuid"
+			 : "=a" (p[0]), "=b" (p[1]), "=c" (p[2]), "=d" (p[3])
+			 :  "0" (ax));
 }
 
 static __inline void
@@ -573,6 +581,7 @@ int	breakpoint	__P((void));
 u_int	bsfl		__P((u_int mask));
 u_int	bsrl		__P((u_int mask));
 void	disable_intr	__P((void));
+void	do_cpuid	__P((u_int ax, u_int *p));
 void	enable_intr	__P((void));
 u_char	inb		__P((u_int port));
 u_int	inl		__P((u_int port));

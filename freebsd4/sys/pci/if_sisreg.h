@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/pci/if_sisreg.h,v 1.1.4.7 2002/01/13 00:32:22 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_sisreg.h,v 1.1.4.10 2002/02/19 15:59:38 ambrisko Exp $
  */
 
 /*
@@ -309,7 +309,7 @@ struct sis_desc {
 #define SIS_LASTDESC(x)		(!((x)->sis_ctl & SIS_CMDSTS_MORE)))
 #define SIS_OWNDESC(x)		((x)->sis_ctl & SIS_CMDSTS_OWN)
 #define SIS_INC(x, y)		{ if (++(x) == y) x=0 ; }
-#define SIS_RXBYTES(x)		((x)->sis_ctl & SIS_CMDSTS_BUFLEN)
+#define SIS_RXBYTES(x)		(((x)->sis_ctl & SIS_CMDSTS_BUFLEN) - ETHER_CRC_LEN)
 
 #define SIS_RXSTAT_COLL		0x00010000
 #define SIS_RXSTAT_LOOPBK	0x00020000
@@ -369,7 +369,7 @@ struct sis_ring_data {
 #define SIS_REV_630E		0x0081
 #define SIS_REV_630S		0x0082
 #define SIS_REV_630EA1		0x0083
-#define SIS_REV_630ET		0x0083
+#define SIS_REV_630ET		0x0084
 #define SIS_REV_635		0x0090
 
 /*
@@ -407,6 +407,9 @@ struct sis_softc {
 	struct sis_list_data	*sis_ldata;
 	struct sis_ring_data	sis_cdata;
 	struct callout_handle	sis_stat_ch;
+#ifdef DEVICE_POLLING
+	int			rxcycles;
+#endif
 };
 
 /*

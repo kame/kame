@@ -1,4 +1,4 @@
-$FreeBSD: src/sys/dev/mii/miidevs,v 1.4.2.7 2001/10/01 18:31:08 wpaul Exp $
+$FreeBSD: src/sys/dev/mii/miidevs,v 1.4.2.9 2002/04/11 07:03:27 wpaul Exp $
 /*$NetBSD: miidevs,v 1.6 1999/05/14 11:37:30 drochner Exp $*/
 
 /*-
@@ -59,6 +59,7 @@ oui JATO			0x00e083	Jato Technologies
 oui LEVEL1			0x00207b	Level 1
 oui NATSEMI			0x080017	National Semiconductor
 oui QUALSEMI			0x006051	Quality Semiconductor
+oui REALTEK			0x000020	RealTek Semicondctor
 oui SEEQ			0x00a07d	Seeq
 oui SIS				0x00e006	Silicon Integrated Systems
 oui TDK				0x00c039	TDK
@@ -107,6 +108,7 @@ model BROADCOM 3c905Cphy	0x0017 3c905C 10/100 internal PHY
 model xxBROADCOM BCM5400	0x0004 Broadcom 1000baseTX PHY
 model xxBROADCOM BCM5401	0x0005 BCM5401 10/100/1000baseTX PHY
 model xxBROADCOM BCM5411	0x0007 BCM5411 10/100/1000baseTX PHY
+model xxBROADCOM BCM5701	0x0011 BCM5701 10/100/1000baseTX PHY
 
 /* Davicom Semiconductor PHYs */
 model xxDAVICOM DM9101		0x0000 DM9101 10/100 media interface
@@ -135,6 +137,9 @@ model NATSEMI DP83861		0x0006 DP83861 10/100/1000 media interface
 
 /* Quality Semiconductor PHYs */
 model QUALSEMI QS6612		0x0000 QS6612 10/100 media interface
+
+/* RealTek Semiconductor PHYs */
+model REALTEK RTL8201L		0x0020 RTL8201L 10/100 media interface
 
 /* Seeq PHYs */
 model xxSEEQ 80220		0x0003 Seeq 80220 10/100 media interface

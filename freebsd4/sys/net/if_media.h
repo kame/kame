@@ -1,5 +1,5 @@
 /*	$NetBSD: if_media.h,v 1.3 1997/03/26 01:19:27 thorpej Exp $	*/
-/* $FreeBSD: src/sys/net/if_media.h,v 1.9.2.1 2001/07/04 00:12:38 brooks Exp $ */
+/* $FreeBSD: src/sys/net/if_media.h,v 1.9.2.2 2002/04/24 04:12:39 imp Exp $ */
 
 /*
  * Copyright (c) 1997
@@ -178,6 +178,7 @@ int	ifmedia_ioctl __P((struct ifnet *ifp, struct ifreq *ifr,
 #define IFM_IEEE80211_DS11	8	/* Direct Sequence 11Mbps */
 #define IFM_IEEE80211_DS22	9	/* Direct Sequence 22Mbps */
 #define IFM_IEEE80211_ADHOC	0x00000100	/* Operate in Adhoc mode */
+#define IFM_IEEE80211_HOSTAP	0x00000200	/* Operate in Host AP mode */
 
 /*
  * Shared media sub-types
@@ -375,6 +376,7 @@ struct ifmedia_description {
 
 #define	IFM_SUBTYPE_IEEE80211_OPTION_DESCRIPTIONS {			\
 	{ IFM_IEEE80211_ADHOC, "adhoc" },				\
+	{ IFM_IEEE80211_HOSTAP, "hostap" },				\
 	{ 0, NULL },							\
 }
 

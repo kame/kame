@@ -23,14 +23,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THEPOSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/sound/pci/als4000.h,v 1.1.2.2 2001/08/01 03:40:57 cg Exp $
+ * $FreeBSD: src/sys/dev/sound/pci/als4000.h,v 1.1.2.3 2002/04/22 15:49:31 cg Exp $
  */
 
 #define ALS_PCI_ID0 		0x40004005
 #define ALS_PCI_POWERREG	0xe0
 
 #define ALS_CONFIG_SPACE_BYTES	128
-#define ALS_BUFFER_SIZE		8192
 
 #define ALS_GCR_DATA		0x08
 #define ALS_GCR_INDEX		0x0c

@@ -33,7 +33,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/i386/swtch.s,v 1.89.2.6 2001/12/08 00:04:14 luigi Exp $
+ * $FreeBSD: src/sys/i386/i386/swtch.s,v 1.89.2.7 2002/02/09 23:02:38 luigi Exp $
  */
 
 #include "npx.h"
@@ -246,7 +246,11 @@ idle_loop:
 	call	_procrunnable
 	testl	%eax,%eax
 	CROSSJUMP(jnz, sw1a, jz)
+#ifdef	DEVICE_POLLING
+	call	_idle_poll
+#else	/* standard code */
 	call	_vm_page_zero_idle
+#endif
 	testl	%eax, %eax
 	jnz	idle_loop
 	call	*_hlt_vector			/* wait for interrupt */

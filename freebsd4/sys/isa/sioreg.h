@@ -31,15 +31,11 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)comreg.h	7.2 (Berkeley) 5/9/91
- * $FreeBSD: src/sys/isa/sioreg.h,v 1.15 1999/09/08 10:59:03 peter Exp $
+ * $FreeBSD: src/sys/isa/sioreg.h,v 1.15.2.2 2002/03/10 06:26:45 nyan Exp $
  */
 
-
-/* 16 bit baud rate divisor (lower byte in dca_data, upper in dca_ier) */
-#define	COMBRD(x)	(1843200 / (16*(x)))
-#ifdef PC98
-#define	COMBRD_RSA(x)	(14745600 / (16*(x)))
-#endif
+/* Receiver clock frequency for "standard" pc serial ports. */
+#define	DEFAULT_RCLK	1843200
 
 /* interrupt enable register */
 #define	IER_ERXRDY	0x1

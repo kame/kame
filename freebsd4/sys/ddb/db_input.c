@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $FreeBSD: src/sys/ddb/db_input.c,v 1.28 2000/01/11 14:53:53 yokota Exp $
+ * $FreeBSD: src/sys/ddb/db_input.c,v 1.28.2.1 2002/03/08 16:37:10 yar Exp $
  */
 
 /*
@@ -194,6 +194,12 @@ db_inputchar(c)
 		if (db_lc < db_le)
 		    db_delete(1, DEL_FWD);
 		break;
+	    case CTRL('u'):
+		/* kill entire line: */
+		/* at first, delete to beginning of line */
+		if (db_lc > db_lbuf_start)
+		    db_delete(db_lc - db_lbuf_start, DEL_BWD);
+		/* FALLTHROUGH */
 	    case CTRL('k'):
 		/* delete to end of line */
 		if (db_lc < db_le)

@@ -1,5 +1,5 @@
 /*	$NetBSD: usb_quirks.h,v 1.11 2000/04/27 15:26:50 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/usb_quirks.h,v 1.11.2.4 2001/01/06 23:32:58 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/usb_quirks.h,v 1.11.2.5 2002/02/15 14:09:16 joe Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -50,6 +50,7 @@ struct usbd_quirks {
 #define UQ_SPUR_BUT_UP	0x0080	/* spurious mouse button up events */
 #define UQ_NO_XU	0x0100	/* audio device has broken extension unit */
 #define UQ_ASSUME_CM_OVER_DATA 0x0200 /* modem device breaks on cm over data */
+#define UQ_BROKEN_BIDIR	0x2000	/* printer has broken bidir mode */
 };
 
 extern struct usbd_quirks usbd_no_quirk;

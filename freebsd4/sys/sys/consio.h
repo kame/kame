@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/sys/consio.h,v 1.5.2.4 2001/07/28 12:51:37 yokota Exp $
+ * $FreeBSD: src/sys/sys/consio.h,v 1.5.2.5 2002/04/08 13:37:31 sobomax Exp $
  */
 
 #ifndef	_SYS_CONSIO_H_
@@ -207,6 +207,7 @@ struct colors	{
 struct vid_info {
 	short		size;
 	short		m_num;
+	u_short		font_size;
 	u_short		mv_row, mv_col;
 	u_short		mv_rsz, mv_csz;
 	struct colors	mv_norm,

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)route.h	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/net/route.h,v 1.36.2.4 2001/12/20 10:30:17 ru Exp $
+ * $FreeBSD: src/sys/net/route.h,v 1.36.2.5 2002/02/01 11:48:01 ru Exp $
  */
 
 #ifndef _NET_ROUTE_H_
@@ -207,6 +207,7 @@ struct rt_msghdr {
 #define RTM_IFINFO	0xe	/* iface going up/down etc. */
 #define	RTM_NEWMADDR	0xf	/* mcast group membership being added to if */
 #define	RTM_DELMADDR	0x10	/* mcast group membership being deleted */
+#define	RTM_IFANNOUNCE	0x11	/* iface arrival/departure */
 
 /*
  * Bitmask values for rtm_inits and rmx_locks.
@@ -278,6 +279,7 @@ struct proc;
 
 void	 route_init __P((void));
 int	 rt_getifa __P((struct rt_addrinfo *));
+void	 rt_ifannouncemsg __P((struct ifnet *, int));
 void	 rt_ifmsg __P((struct ifnet *));
 void	 rt_missmsg __P((int, struct rt_addrinfo *, int, int));
 void	 rt_newaddrmsg __P((int, struct ifaddr *, int, struct rtentry *));

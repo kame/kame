@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, Revision 2.2  92/04/04  11:34:26  rpd
- * $FreeBSD: src/sys/boot/pc98/boot2/serial_16550.S,v 1.1.2.1 2000/04/16 03:55:16 nyan Exp $
+ * $FreeBSD: src/sys/boot/pc98/boot2/serial_16550.S,v 1.1.2.2 2002/03/08 13:00:22 nyan Exp $
  */
 
 /*
@@ -151,10 +151,10 @@ ENTRY(init_serial)
 	outb	%al, %dx	# enable DLAB
 
 	subl	$3, %edx	# divisor latch, low byte
-	movb	$COMBRD(CONSPEED) & 0xff, %al
+	movb	(1843200 / (16*(CONSPEED))) & 0xff, %al
 	outb	%al, %dx
 	incl	%edx		# divisor latch, high byte
-	movb	$COMBRD(CONSPEED) >> 8, %al
+	movb	(1843200 / (16*(CONSPEED))) >> 8, %al
 	outb	%al, %dx
 
 	incl	%edx		# fifo control register (if any)

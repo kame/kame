@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_vfsops.c	8.12 (Berkeley) 5/20/95
- * $FreeBSD: src/sys/nfs/nfs_vfsops.c,v 1.91.2.4 2001/10/25 19:18:53 dillon Exp $
+ * $FreeBSD: src/sys/nfs/nfs_vfsops.c,v 1.91.2.5 2002/02/20 01:35:34 iedowse Exp $
  */
 
 #include "opt_bootp.h"
@@ -973,6 +973,12 @@ nfs_unmount(mp, mntflags, p)
 	 * - Close the socket
 	 * - Free up the data structures
 	 */
+	/* In the forced case, cancel any outstanding requests. */
+	if (flags & FORCECLOSE) {
+		error = nfs_nmcancelreqs(nmp);
+		if (error)
+			return (error);
+	}
 	/*
 	 * Must handshake with nqnfs_clientd() if it is active.
 	 */
