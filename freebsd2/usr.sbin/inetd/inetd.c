@@ -1096,10 +1096,10 @@ ipsecsetup(sep)
 	if (policy_in != NULL) {
 		opt = (level == IPPROTO_IP) ? IP_IPSEC_POLICY
 					    : IPV6_IPSEC_POLICY;
-		len = ipsec_get_policylen(policy_in);
-		if (len >= 0 && (buf = (char *)malloc(len)) != NULL) {
-			ipsec_set_policy(buf, len, policy_in);
-			if (setsockopt(sep->se_fd, level, opt, buf, len) < 0) {
+		buf = ipsec_set_policy(policy_in, strlen(policy_in));
+		if (buf != NULL) {
+			if (setsockopt(sep->se_fd, level, opt,
+					buf, ipsec_get_policylen(buf)) < 0) {
 				syslog(LOG_ERR,
 					"%s/%s: ipsec initialization failed; %s",
 					sep->se_service, sep->se_proto,
@@ -1113,10 +1113,10 @@ ipsecsetup(sep)
 	if (policy_out != NULL) {
 		opt = (level == IPPROTO_IP) ? IP_IPSEC_POLICY
 					    : IPV6_IPSEC_POLICY;
-		len = ipsec_get_policylen(policy_out);
-		if (len >= 0 && (buf = (char *)malloc(len)) != NULL) {
-			ipsec_set_policy(buf, len, policy_out);
-			if (setsockopt(sep->se_fd, level, opt, buf, len) < 0) {
+		buf = ipsec_set_policy(policy_out, strlen(policy_out));
+		if (buf != NULL) {
+			if (setsockopt(sep->se_fd, level, opt,
+					buf, ipsec_get_policylen(buf)) < 0) {
 				syslog(LOG_ERR,
 					"%s/%s: ipsec initialization failed; %s",
 					sep->se_service, sep->se_proto,
