@@ -634,7 +634,7 @@ send:
 			       m->m_pkthdr.len - sizeof(struct ip6_hdr));
 
 #ifdef IPSEC
-	m->m_pkthdr.rcvif = (struct ifnet *)so;
+	ipsec_setsocket(m, so);
 #endif /*IPSEC*/
 
 #if BSD >= 43
