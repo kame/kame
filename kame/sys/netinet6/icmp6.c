@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.156 2000/10/19 19:21:07 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.157 2000/11/15 04:35:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1087,10 +1087,13 @@ icmp6_input(mp, offp, proto)
 		ip6cp.ip6c_off = eoff;
 		ip6cp.ip6c_finaldst = finaldst;
 
+		if (icmp6type == ICMP6_PACKET_TOO_BIG) {
+			ip6cp.ip6c_cmdarg = (void *)&icmp6->icmp6_mtu;
 #if !(defined(__NetBSD__) || defined(__OpenBSD__))
-		if (icmp6type == ICMP6_PACKET_TOO_BIG)
 			icmp6_mtudisc_update(&ip6cp);
 #endif
+		}
+
 		ctlfunc = (void (*) __P((int, struct sockaddr *, void *)))
 			(inet6sw[ip6_protox[nxt]].pr_ctlinput);
 		if (ctlfunc) {

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.45 2000/11/08 17:50:11 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.46 2000/11/15 04:35:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -319,10 +319,14 @@ int	ip6_process_hopopts __P((struct mbuf *, u_int8_t *, int, u_int32_t *,
 void	ip6_savecontrol __P((struct inpcb *, struct ip6_hdr *, struct mbuf *,
 			     struct ip6_recvpktopts *,
 			     struct ip6_recvpktopts **));
+void	ip6_notify_pmtu __P((struct inpcb *, struct sockaddr_in6 *,
+			     u_int32_t *));
 #else
 void	ip6_savecontrol __P((struct in6pcb *, struct ip6_hdr *, struct mbuf *,
 			     struct ip6_recvpktopts *,
 			     struct ip6_recvpktopts **));
+void	ip6_notify_pmtu __P((struct in6pcb *, struct sockaddr_in6 *,
+			     u_int32_t *));
 #endif
 void	ip6_update_recvpcbopt __P((struct ip6_recvpktopts *,
 				   struct ip6_recvpktopts *));

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.132 2000/11/09 13:37:34 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.133 2000/11/15 04:35:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1851,6 +1851,58 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 # undef in6p_flags
 #endif
 #undef IS2292
+}
+
+void
+ip6_notify_pmtu(in6p, dst, mtu)
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
+	register struct inpcb *in6p;
+#else
+	register struct in6pcb *in6p;
+#endif
+	struct sockaddr_in6 *dst;
+	u_int32_t *mtu;
+{
+	struct socket *so;
+	struct mbuf *m_mtu;
+	struct ip6_mtuinfo mtuctl;
+#ifdef __bsdi__
+# define sbcreatecontrol	so_cmsg
+#endif
+
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
+	so =  in6p->inp_socket;
+#else
+	so = in6p->in6p_socket;
+#endif
+
+	if (mtu == NULL)
+		return;
+
+#ifdef DIAGNOSTIC
+	if (so == NULL)		/* I believe this is impossible */
+		panic("ip6_notify_pmtu: socket is NULL");
+#endif
+
+	bzero(&mtuctl, sizeof(mtuctl));	/* zero-clear for safety */
+	mtuctl.ip6mtu_mtu = *mtu;
+	mtuctl.ip6mtu_dst = *dst;
+
+	if ((m_mtu = sbcreatecontrol((caddr_t)&mtuctl, sizeof(mtuctl),
+				     IPV6_PATHMTU, IPPROTO_IPV6)) == NULL)
+		return;
+
+	if (sbappendaddr(&so->so_rcv, dst, NULL, m_mtu) == 0) {
+		m_freem(m_mtu);
+		/* XXX: should count statistics */
+	} else
+		sorwakeup(so);
+
+	return;
+
+#ifdef __bsdi__
+# undef sbcreatecontrol
+#endif
 }
 
 #ifdef PULLDOWN_TEST

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.130 2000/11/01 08:13:52 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.131 2000/11/15 04:35:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1485,9 +1485,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_RECVHOPLIMIT:
 			case IPV6_RECVRTHDR:
 			case IPV6_USE_MIN_MTU:
-#ifdef notyet			/* To be implemented */
 			case IPV6_RECVPATHMTU:
-#endif
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
 			case IPV6_BINDV6ONLY:
 #endif
@@ -1667,6 +1665,10 @@ do { \
 
 				case IPV6_USE_MIN_MTU:
 					OPTSET(IN6P_MINMTU);
+					break;
+
+				case IPV6_RECVPATHMTU:
+					OPTSET(IN6P_MTU);
 					break;
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
@@ -2000,9 +2002,7 @@ do { \
 			case IPV6_RECVHOPLIMIT:
 			case IPV6_RECVRTHDR:
 			case IPV6_USE_MIN_MTU:
-#ifdef notyet			/* To be implemented */
 			case IPV6_RECVPATHMTU:
-#endif
 
 			case IPV6_FAITH:
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
@@ -2053,6 +2053,10 @@ do { \
 
 				case IPV6_USE_MIN_MTU:
 					optval = OPTBIT(IN6P_MINMTU);
+					break;
+
+				case IPV6_RECVPATHMTU:
+					optval = OPTBIT(IN6P_MTU);
 					break;
 
 				case IPV6_FAITH:
