@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/02/08 04:24:58 $
+		     $Date: 2000/02/09 14:14:38 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -53,7 +53,9 @@ those platforms.  Here is a brief list of important differences:
 - NAT/PT
 	KAME/FreeBSD228 only at this moment.
 - Ericsson mobile-ip6
-	compilable but not tested	KAME/NetBSD, KAME/FreeBSD228
-	no support			others
+	compilable but not tested	KAME/NetBSD, KAME/FreeBSD228,
+					KAME/BSDI4
+	no support			KAME/OpenBSD(*)
+	(*) not compilable due to duplicated include file
 
 							<end of RELNOTES>
