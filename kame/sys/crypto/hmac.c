@@ -1,4 +1,4 @@
-/*	$KAME: hmac.c,v 1.6 2003/07/25 05:43:59 itojun Exp $	*/
+/*	$KAME: hmac.c,v 1.7 2003/07/25 06:16:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -346,7 +346,7 @@ hmac_result(ctx, addr, l)
 	ctx->hash->result(ctx, digest, ctx->hash->hash_resultlen);
 
 	bcopy(digest, (void *)addr,
-	    ctx->hash->hash_resultlen > l ? l : sizeof(digest));
+	    ctx->hash->hash_resultlen > l ? l : ctx->hash->hash_resultlen);
 
 	free(digest, M_TEMP);
 
