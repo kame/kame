@@ -832,6 +832,8 @@ Optional Packages:
   --with-opt-pdel=VALUE   specify DHCP option value for prefix delegation
   --with-opt-pinfo=VALUE  specify DHCP option value for prefix information
   --with-opt-preq=VALUE   specify DHCP option value for prefix request
+  --with-opt-pa-pd=VALUE  specify DHCP option value for IA_PD
+  --with-opt-preq=VALUE   specify DHCP option value for IA_PD prefix
 
 Some influential environment variables:
   CC          C compiler command
@@ -4279,6 +4281,46 @@ echo "${ECHO_T}using $dhcpopt_preq" >&6
 fi
 
 
+echo "$as_me:$LINENO: checking for DHCP IA_PD option" >&5
+echo $ECHO_N "checking for DHCP IA_PD option... $ECHO_C" >&6
+
+# Check whether --with-opt-ia-pd or --without-opt-ia-pd was given.
+if test "${with_opt_ia_pd+set}" = set; then
+  withval="$with_opt_ia_pd"
+  dhcpopt_ia_pd="$withval"
+else
+  dhcpopt_ia_pd=0
+fi;
+if test $dhcpopt_ia_pd = 0 ; then
+	dhcpopt_ia_pd=33
+	echo "$as_me:$LINENO: result: unspecified and using $dhcpopt_ia_pd" >&5
+echo "${ECHO_T}unspecified and using $dhcpopt_ia_pd" >&6
+else
+	echo "$as_me:$LINENO: result: using $dhcpopt_ia_pd" >&5
+echo "${ECHO_T}using $dhcpopt_ia_pd" >&6
+fi
+
+
+echo "$as_me:$LINENO: checking for DHCP IA_PD_PREFIX option" >&5
+echo $ECHO_N "checking for DHCP IA_PD_PREFIX option... $ECHO_C" >&6
+
+# Check whether --with-opt-ia-pd-prefix or --without-opt-ia-pd-prefix was given.
+if test "${with_opt_ia_pd_prefix+set}" = set; then
+  withval="$with_opt_ia_pd_prefix"
+  dhcpopt_ia_pd_prefix="$withval"
+else
+  dhcpopt_ia_pd_prefix=0
+fi;
+if test $dhcpopt_ia_pd_prefix = 0 ; then
+	dhcpopt_ia_pd_prefix=34
+	echo "$as_me:$LINENO: result: unspecified and using $dhcpopt_ia_pd_prefix" >&5
+echo "${ECHO_T}unspecified and using $dhcpopt_ia_pd_prefix" >&6
+else
+	echo "$as_me:$LINENO: result: using $dhcpopt_ia_pd_prefix" >&5
+echo "${ECHO_T}using $dhcpopt_ia_pd_prefix" >&6
+fi
+
+
 
 for ac_header in stdarg.h
 do
@@ -4990,6 +5032,8 @@ s,@dhcpopt_dns@,$dhcpopt_dns,;t t
 s,@dhcpopt_pdel@,$dhcpopt_pdel,;t t
 s,@dhcpopt_pinfo@,$dhcpopt_pinfo,;t t
 s,@dhcpopt_preq@,$dhcpopt_preq,;t t
+s,@dhcpopt_ia_pd@,$dhcpopt_ia_pd,;t t
+s,@dhcpopt_ia_pd_prefix@,$dhcpopt_ia_pd_prefix,;t t
 CEOF
 
 _ACEOF
