@@ -860,6 +860,10 @@ explore_numeric_scope(pai, hostname, servname, res)
 #ifdef INET6
 	case AF_INET6:
 		scope = if_nametoindex(cp);
+		if (scope == 0) {
+			free(hostname2);
+			return (EAI_NONAME);
+		}
 		break;
 #endif
 	}
