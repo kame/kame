@@ -1,4 +1,4 @@
-/*	$KAME: sctp.c,v 1.1 2004/08/17 04:07:49 itojun Exp $	*/
+/*	$KAME: sctp.c,v 1.2 2005/03/07 22:12:18 suz Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -368,7 +368,7 @@ sctp_protopr(off, name)
 					kread((u_long)nets_next, (char *)&nets,
 					    sizeof(nets));
 					nets_next = nets.sctp_next.tqe_next;
-					sa = (struct sockaddr *)&nets.ra._l_addr;
+					sa = (struct sockaddr *)&nets.ro._l_addr;
 					if (sa->sa_family == AF_INET) {
 						sin_r = (struct sockaddr_in *)sa;
 					} else if (sa->sa_family == AF_INET6) {
