@@ -82,10 +82,20 @@ dnl fi
 if test "x$crypto_dir" = "x"; then
 	case $host_os in
 	netbsd*)	crypto_dir="/usr/pkg";;
-	freebsd*)	crypto_dir="/usr/local";;
+	freebsd*)
+		if test -d /usr/local/ssl; then
+			crypto_dir="/usr/local/ssl"
+		else
+			crypto_dir="/usr/local"
+		fi
+		;;
 	esac
 fi
-RACOON_SEARCH_HEADER(des.h,
+dnl for some reason, past version of freebsd port requires us to set -I for
+dnl BOTH openssl/cast.h and cast.h.  who should I blame (or am I mistaken?)
+RACOON_SEARCH_HEADER(cast.h,
+	/usr/include/openssl /usr/include/ssleay ${crypto_dir}/include ${crypto_dir}/include/openssl ${crypto_dir}/include/ssleay)
+RACOON_SEARCH_HEADER(openssl/cast.h,
 	/usr/include/openssl /usr/include/ssleay ${crypto_dir}/include ${crypto_dir}/include/openssl ${crypto_dir}/include/ssleay)
 RACOON_PATH_LIBS(CAST_cfb64_encrypt, crypto,
 	${crypto_dir}/lib ${crypto_dir}/lib ${crypto_dir}/lib)
