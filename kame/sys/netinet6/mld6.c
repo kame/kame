@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.64 2002/10/22 06:21:14 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.65 2002/11/04 04:01:09 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -232,9 +232,9 @@ static struct mld_hdr * mld_allocbuf(struct mbuf **, int, struct in6_multi *,
 static struct router6_info *find_rt6i(struct ifnet *);
 void mld_sendbuf(struct mbuf *, struct ifnet *);
 int mld_set_timer(struct ifnet *, struct router6_info *, struct mld_hdr *,
-		  int, u_int8_t);
+		  u_int16_t, u_int8_t);
 void mld_set_hostcompat(struct ifnet *, struct router6_info *, int);
-int mld_record_queried_source(struct in6_multi *, struct mld_hdr *, int);
+int mld_record_queried_source(struct in6_multi *, struct mld_hdr *, u_int16_t);
 void mld_send_all_current_state_report(struct ifnet *);
 int mld_send_current_state_report(struct mbuf **, int *, struct in6_multi *);
 static int mld_create_group_record(struct mbuf *, int *, struct in6_multi *,
@@ -1210,7 +1210,7 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 	struct ifnet *ifp;
 	struct router6_info *rti;
 	struct mld_hdr *mld;
-	int mldlen;
+	u_int16_t mldlen;
 	u_int8_t query_type;
 {
 	struct in6_multi *in6m;
@@ -1446,7 +1446,7 @@ int
 mld_record_queried_source(in6m, mld, mldlen)
 	struct in6_multi *in6m;
 	struct mld_hdr *mld;
-	int mldlen;
+	u_int16_t mldlen;
 {
 	struct in6_addr_source *curias;
 	u_int16_t numsrc, i;
