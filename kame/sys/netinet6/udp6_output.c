@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.63 2002/08/26 12:43:09 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.64 2002/08/26 12:44:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -81,9 +81,7 @@
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <sys/systm.h>
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined (__NetBSD__)
 #include <sys/proc.h>
-#endif
 #include <sys/syslog.h>
 
 #include <net/if.h>
