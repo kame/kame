@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.19 2002/07/13 17:55:24 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.20 2002/07/14 14:54:20 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -69,7 +69,12 @@
 
 #include <netinet6/mip6_var.h>
 #include <netinet6/mip6.h>
+#ifdef __NetBSD__
+#include <sys/sha1.h>
+#define SHA1_RESULTLEN	20
+#else
 #include <crypto/sha1.h>
+#endif
 #include <crypto/hmac.h>
 
 #include <net/net_osdep.h>
@@ -1541,7 +1546,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 			  auth_size -
 			  (sizeof(struct ip6m_opt_authdata) + SHA1_RESULTLEN));
 	}
-	hmac_result(&hmac_ctx, mopt_auth + 1);
+	hmac_result(&hmac_ctx, (u_int8_t *)(mopt_auth + 1));
 
 	/* calculate checksum. */
 	ip6mu->ip6mu_cksum = mip6_cksum(src, dst, ip6mu_size,
