@@ -1,4 +1,4 @@
-/*	$NetBSD: main.c,v 1.22 1999/03/14 18:30:04 kristerw Exp $	*/
+/*	$NetBSD: main.c,v 1.27.4.2 2000/10/30 22:47:48 tv Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -43,7 +43,7 @@ __COPYRIGHT("@(#) Copyright (c) 1983, 1988, 1993\n\
 #if 0
 static char sccsid[] = "from: @(#)main.c	8.4 (Berkeley) 3/1/94";
 #else
-__RCSID("$NetBSD: main.c,v 1.22 1999/03/14 18:30:04 kristerw Exp $");
+__RCSID("$NetBSD: main.c,v 1.27.4.2 2000/10/30 22:47:48 tv Exp $");
 #endif
 #endif /* not lint */
 
@@ -305,8 +305,6 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	extern char *optarg;
-	extern int optind;
 	struct protoent *p;
 	struct protox *tp;	/* for printing cblocks & stats */
 	int ch;
@@ -320,7 +318,7 @@ main(argc, argv)
 	af = AF_UNSPEC;
 	pcbaddr = 0;
 
-	while ((ch = getopt(argc, argv, "Aabdf:ghI:liM:mN:nP:p:rstuvw:")) != -1)
+	while ((ch = getopt(argc, argv, "Aabdf:ghI:LliM:mN:nP:p:rstuvw:")) != -1)
 		switch(ch) {
 		case 'A':
 			Aflag = 1;
@@ -365,6 +363,9 @@ main(argc, argv)
 			break;
 		case 'i':
 			iflag = 1;
+			break;
+		case 'L':
+			Lflag = 1;
 			break;
 		case 'l':
 			lflag = 1;

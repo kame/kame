@@ -1,3 +1,5 @@
+/*	$NetBSD: mroute6.c,v 1.7 2000/02/26 09:55:24 itojun Exp $	*/
+
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.

@@ -1,3 +1,4 @@
+/*	$NetBSD: inet6.c,v 1.9.2.2 2000/10/18 01:32:48 tv Exp $	*/
 /*	BSDI inet.c,v 2.3 1995/10/24 02:19:29 prb Exp	*/
 
 /*
@@ -67,7 +68,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$Id: inet6.c,v 1.40 2000/10/22 09:47:59 itojun Exp $");
+__RCSID("$NetBSD: inet6.c,v 1.9.2.2 2000/10/18 01:32:48 tv Exp $");
 #endif
 #endif /* not lint */
 
@@ -156,7 +157,7 @@ ip6protopr(off, name)
 	register struct in6pcb *prev, *next;
 	int istcp;
 	static int first = 1;
-
+	int width = 22;
 	if (off == 0)
 		return;
 	istcp = strcmp(name, "tcp6") == 0;
@@ -191,20 +192,22 @@ ip6protopr(off, name)
 			if (aflag)
 				printf(" (including servers)");
 			putchar('\n');
-			if (Aflag)
+			if (Aflag) {
 				printf("%-8.8s ", "PCB");
-			printf(Aflag ?
-				"%-5.5s %-6.6s %-6.6s  %-18.18s %-18.18s %s\n" :
-				"%-5.5s %-6.6s %-6.6s  %-22.22s %-22.22s %s\n",
+				width = 18;
+			}
+			printf( "%-5.5s %-6.6s %-6.6s  %*.*s %*.*s %s\n",
 				"Proto", "Recv-Q", "Send-Q",
-				"Local Address", "Foreign Address", "(state)");
+				-width, width, "Local Address", 
+				-width, width, "Foreign Address", 
+				"(state)");
 			first = 0;
 		}
 		if (Aflag) {
 			if (istcp)
-				printf("%8lx ", (u_long)in6pcb.in6p_ppcb);
+				printf("%8p ", in6pcb.in6p_ppcb);
 			else
-				printf("%8lx ", (u_long)next);
+				printf("%8p ", next);
 		}
 		printf("%-5.5s %6ld %6ld ", name, sockb.so_rcv.sb_cc,
 			sockb.so_snd.sb_cc);
@@ -1385,18 +1388,22 @@ tcp6_dump(pcbaddr)
 
 	printf("snd_una %u, snd_nxt %u, snd_up %u\n",
 	    tcp6cb.snd_una, tcp6cb.snd_nxt, tcp6cb.snd_up);
-	printf("snd_wl1 %u, snd_wl2 %u, iss %u, snd_wnd %lu\n\n",
-	    tcp6cb.snd_wl1, tcp6cb.snd_wl2, tcp6cb.iss, tcp6cb.snd_wnd);
+	printf("snd_wl1 %u, snd_wl2 %u, iss %u, snd_wnd %llu\n\n",
+	    tcp6cb.snd_wl1, tcp6cb.snd_wl2, tcp6cb.iss,
+	    (unsigned long long)tcp6cb.snd_wnd);
 
-	printf("rcv_wnd %lu, rcv_nxt %u, rcv_up %u, irs %u\n\n",
-	    tcp6cb.rcv_wnd, tcp6cb.rcv_nxt, tcp6cb.rcv_up, tcp6cb.irs);
+	printf("rcv_wnd %llu, rcv_nxt %u, rcv_up %u, irs %u\n\n",
+	    (unsigned long long)cp6cb.rcv_wnd, tcp6cb.rcv_nxt,
+	    tcp6cb.rcv_up, tcp6cb.irs);
 
-	printf("rcv_adv %u, snd_max %u, snd_cwnd %lu, snd_ssthresh %lu\n",
-	    tcp6cb.rcv_adv, tcp6cb.snd_max, tcp6cb.snd_cwnd, tcp6cb.snd_ssthresh);
+	printf("rcv_adv %u, snd_max %u, snd_cwnd %llu, snd_ssthresh %llu\n",
+	    tcp6cb.rcv_adv, tcp6cb.snd_max, (unsigned long long)tcp6cb.snd_cwnd,
+	    (unsigned long long)tcp6cb.snd_ssthresh);
 
 	printf("idle %d, rtt %d, rtseq %u, srtt %d, rttvar %d, rttmin %d, "
-	    "max_sndwnd %lu\n\n", tcp6cb.t_idle, tcp6cb.t_rtt, tcp6cb.t_rtseq,
-	    tcp6cb.t_srtt, tcp6cb.t_rttvar, tcp6cb.t_rttmin, tcp6cb.max_sndwnd);
+	    "max_sndwnd %llu\n\n", tcp6cb.t_idle, tcp6cb.t_rtt, tcp6cb.t_rtseq,
+	    tcp6cb.t_srtt, tcp6cb.t_rttvar, tcp6cb.t_rttmin,
+	    (unsigned long long)tcp6cb.max_sndwnd);
 
 	printf("oobflags %d, iobc %d, softerror %d\n\n", tcp6cb.t_oobflags,
 	    tcp6cb.t_iobc, tcp6cb.t_softerror);

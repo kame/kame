@@ -1,4 +1,4 @@
-/*	$NetBSD: trpt.c,v 1.8 1998/07/06 07:50:20 mrg Exp $	*/
+/*	$NetBSD: trpt.c,v 1.9 1999/07/01 19:15:03 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -81,7 +81,7 @@ __COPYRIGHT(
 #if 0
 static char sccsid[] = "@(#)trpt.c	8.1 (Berkeley) 6/6/93";
 #else
-__RCSID("$NetBSD: trpt.c,v 1.8 1998/07/06 07:50:20 mrg Exp $");
+__RCSID("$NetBSD: trpt.c,v 1.9 1999/07/01 19:15:03 itojun Exp $");
 #endif
 #endif /* not lint */
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: if.c,v 1.31 1999/03/14 22:28:05 mycroft Exp $	*/
+/*	$NetBSD: if.c,v 1.40.4.2 2000/10/18 01:32:48 tv Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)if.c	8.2 (Berkeley) 2/21/94";
 #else
-__RCSID("$NetBSD: if.c,v 1.31 1999/03/14 22:28:05 mycroft Exp $");
+__RCSID("$NetBSD: if.c,v 1.40.4.2 2000/10/18 01:32:48 tv Exp $");
 #endif
 #endif /* not lint */
 
@@ -70,6 +70,10 @@ __RCSID("$NetBSD: if.c,v 1.31 1999/03/14 22:28:05 mycroft Exp $");
 
 static void sidewaysintpr __P((u_int, u_long));
 static void catchalarm __P((int));
+
+#ifdef INET6
+char *netname6 __P((struct sockaddr_in6 *, struct in6_addr *));
+#endif
 
 /*
  * Print a description of the network interfaces.
@@ -170,13 +174,18 @@ intpr(interval, ifnetaddr, pfunc)
 			*cp = '\0';
 			ifaddraddr = (u_long)ifnet.if_addrlist.tqh_first;
 		}
-		printf("%-5.5s %-5lu ", name, ifnet.if_mtu);
+		if (vflag)
+			n = strlen(name) < 5 ? 5 : strlen(name);
+		else
+			n = 5;
+		printf("%-*.*s %-5llu ", n, n, name,
+		    (unsigned long long)ifnet.if_mtu);
 		if (ifaddraddr == 0) {
 			printf("%-13.13s ", "none");
 			printf("%-17.17s ", "none");
 		} else {
 			char hexsep = '.';		/* for hexprint */
-			const char *hexfmt = "%x%c";	/* for hexprint */
+			const char hexfmt[] = "%02x%c";	/* for hexprint */
 			if (kread(ifaddraddr, (char *)&ifaddr, sizeof ifaddr)) {
 				ifaddraddr = 0;
 				continue;
@@ -199,10 +208,10 @@ intpr(interval, ifnetaddr, pfunc)
 				in = inet_makeaddr(ifaddr.in.ia_subnet,
 					INADDR_ANY);
 				cp = netname(in.s_addr,
-				    ifaddr.in.ia_subnetmask);
+					ifaddr.in.ia_subnetmask);
 #else
 				cp = netname(ifaddr.in.ia_subnet,
-				    ifaddr.in.ia_subnetmask);
+					ifaddr.in.ia_subnetmask);
 #endif
 				if (vflag)
 					n = strlen(cp) < 13 ? 13 : strlen(cp);
@@ -335,7 +344,7 @@ intpr(interval, ifnetaddr, pfunc)
 				    cp = (char *)LLADDR(sdl);
 				    if (sdl->sdl_type == IFT_FDDI
 					|| sdl->sdl_type == IFT_ETHER)
-					    hexsep = ':', hexfmt = "%02x%c";
+					    hexsep = ':';
 				    n = sdl->sdl_alen;
 				}
 				m = printf("%-13.13s ", "<Link>");
@@ -358,13 +367,16 @@ intpr(interval, ifnetaddr, pfunc)
 			ifaddraddr = (u_long)ifaddr.ifa.ifa_list.tqe_next;
 		}
 		if (bflag) {
-			printf("%10lu %10lu", 
-			       ifnet.if_ibytes, ifnet.if_obytes);
+			printf("%10llu %10llu", 
+				(unsigned long long)ifnet.if_ibytes,
+				(unsigned long long)ifnet.if_obytes);
 		} else {
-			printf("%8lu %5lu %8lu %5lu %5lu",
-			       ifnet.if_ipackets, ifnet.if_ierrors,
-			       ifnet.if_opackets, ifnet.if_oerrors,
-			       ifnet.if_collisions);
+			printf("%8llu %5llu %8llu %5llu %5llu",
+				(unsigned long long)ifnet.if_ipackets,
+				(unsigned long long)ifnet.if_ierrors,
+				(unsigned long long)ifnet.if_opackets,
+				(unsigned long long)ifnet.if_oerrors,
+				(unsigned long long)ifnet.if_collisions);
 		}
 		if (tflag)
 			printf(" %4d", ifnet.if_timer);
@@ -376,15 +388,15 @@ intpr(interval, ifnetaddr, pfunc)
 
 #define	MAXIF	100
 struct	iftot {
-	char	ift_name[IFNAMSIZ];	/* interface name */
-	u_long	ift_ip;			/* input packets */
-	u_long	ift_ib;			/* input bytes */
-	u_long	ift_ie;			/* input errors */
-	u_long	ift_op;			/* output packets */
-	u_long	ift_ob;			/* output bytes */
-	u_long	ift_oe;			/* output errors */
-	u_long	ift_co;			/* collisions */
-	int	ift_dr;			/* drops */
+	char ift_name[IFNAMSIZ];	/* interface name */
+	u_quad_t ift_ip;		/* input packets */
+	u_quad_t ift_ib;		/* input bytes */
+	u_quad_t ift_ie;		/* input errors */
+	u_quad_t ift_op;		/* output packets */
+	u_quad_t ift_ob;		/* output bytes */
+	u_quad_t ift_oe;		/* output errors */
+	u_quad_t ift_co;		/* collisions */
+	int ift_dr;			/* drops */
 } iftot[MAXIF];
 
 u_char	signalled;			/* set if alarm goes off "early" */
@@ -512,20 +524,28 @@ loop:
 		}
 		if (ip == interesting) {
 			if (bflag) {
-				printf("%10lu %8.8s %10lu %5.5s",
-					ifnet.if_ibytes - ip->ift_ib, " ",
-					ifnet.if_obytes - ip->ift_ob, " ");
+				printf("%10llu %8.8s %10llu %5.5s",
+				    (unsigned long long)(ifnet.if_ibytes -
+					ip->ift_ib), " ",
+				    (unsigned long long)(ifnet.if_obytes -
+					ip->ift_ob), " ");
 			} else {
-				printf("%8lu %5lu %8lu %5lu %5lu",
-					ifnet.if_ipackets - ip->ift_ip,
-					ifnet.if_ierrors - ip->ift_ie,
-					ifnet.if_opackets - ip->ift_op,
-					ifnet.if_oerrors - ip->ift_oe,
-					ifnet.if_collisions - ip->ift_co);
+				printf("%8llu %5llu %8llu %5llu %5llu",
+				    (unsigned long long)
+					(ifnet.if_ipackets - ip->ift_ip),
+				    (unsigned long long)
+					(ifnet.if_ierrors - ip->ift_ie),
+				    (unsigned long long)
+					(ifnet.if_opackets - ip->ift_op),
+				    (unsigned long long)
+					(ifnet.if_oerrors - ip->ift_oe),
+				    (unsigned long long)
+					(ifnet.if_collisions - ip->ift_co));
 			}
 			if (dflag)
-				printf(" %5d",
-				    ifnet.if_snd.ifq_drops - ip->ift_dr);
+				printf(" %5llu",
+				    (unsigned long long)
+					(ifnet.if_snd.ifq_drops - ip->ift_dr));
 		}
 		ip->ift_ip = ifnet.if_ipackets;
 		ip->ift_ib = ifnet.if_ibytes;
@@ -547,19 +567,27 @@ loop:
 	}
 	if (lastif - iftot > 0) {
 		if (bflag) {
-			printf("  %10lu %8.8s %10lu %5.5s",
-				sum->ift_ib - total->ift_ib, " ",
-				sum->ift_ob - total->ift_ob, " ");
+			printf("  %10llu %8.8s %10llu %5.5s",
+			    (unsigned long long)
+				(sum->ift_ib - total->ift_ib), " ",
+			    (unsigned long long)
+				(sum->ift_ob - total->ift_ob), " ");
 		} else {
-			printf("  %8lu %5lu %8lu %5lu %5lu",
-				sum->ift_ip - total->ift_ip,
-				sum->ift_ie - total->ift_ie,
-				sum->ift_op - total->ift_op,
-				sum->ift_oe - total->ift_oe,
-				sum->ift_co - total->ift_co);
+			printf("  %8llu %5llu %8llu %5llu %5llu",
+			    (unsigned long long)
+				(sum->ift_ip - total->ift_ip),
+			    (unsigned long long)
+				(sum->ift_ie - total->ift_ie),
+			    (unsigned long long)
+				(sum->ift_op - total->ift_op),
+			    (unsigned long long)
+				(sum->ift_oe - total->ift_oe),
+			    (unsigned long long)
+				(sum->ift_co - total->ift_co));
 		}
 		if (dflag)
-			printf(" %5d", sum->ift_dr - total->ift_dr);
+			printf(" %5llu",
+			    (unsigned long long)(sum->ift_dr - total->ift_dr));
 	}
 	*total = *sum;
 	putchar('\n');
