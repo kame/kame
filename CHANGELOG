@@ -1,8 +1,23 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.336 1999/12/13 06:00:58 itojun Exp $
+$Id: CHANGELOG,v 1.337 1999/12/13 11:13:11 jinmei Exp $
 
 <199912>
+1999-12-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ndp/ndp.c (getdefif): was added to allow the -I option
+	not to take an argument, which now means to show the current
+	default interface. The -I option now takes a special argument
+	`delete' to remove the current default interface from the kernel.
+	Note: both the command and the kernel should be recompiled.
+
+1999-12-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_ioctl): a new ioctl
+	SIOCGDEFIFACE_IN6 was added to tell application the current
+	default interface.
+	A new structure in6_ndifreq{} was introduced for the option and
+	SIOCSDEFIFACE_IN6, so that a user can remove the current default
+	interface from the kernel.
+
 Mon Dec 13 14:58:04 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/net/ethereal: upgrade to 0.79.
 
