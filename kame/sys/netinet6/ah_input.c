@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.65 2001/10/19 05:20:55 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.66 2001/12/07 07:07:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -699,7 +699,7 @@ ah6_input(mp, offp, proto)
 	ip6 = mtod(m, struct ip6_hdr *);
 	nxt = ah->ah_nxt;
 
-	/* find the sassoc.  */
+	/* find the sassoc. */
 	spi = ah->ah_spi;
 
 	if (ntohs(ip6->ip6_plen) == 0) {

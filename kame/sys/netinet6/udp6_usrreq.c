@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.96 2001/11/06 07:40:00 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.97 2001/12/07 07:07:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -240,7 +240,7 @@ udp6_input(mp, offp, proto)
 		udp_in6.sin6_len = sizeof(struct sockaddr_in6);
 		udp_in6.sin6_family = AF_INET6;
 		udp_in6.sin6_port = uh->uh_sport;
-#if 0 /* XXX inbound flowinfo  */
+#if 0 /* XXX inbound flowinfo */
 		udp_in6.sin6_flowinfo = ip6->ip6_flow & IPV6_FLOWINFO_MASK;
 #endif
 		/* KAME hack: recover scopeid */

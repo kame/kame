@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.49 2001/11/19 05:34:41 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.50 2001/12/07 07:07:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -483,7 +483,7 @@ udp6_output(in6p, m, addr6, control)
 				flags |= IP_SENDONES;
 		}
 		if (flags & IP_SENDONES) {
-			/* See the comment in udp_output().  */
+			/* See the comment in udp_output(). */
 			ui->ui_dst.s_addr = INADDR_BROADCAST;
 			udp6->uh_sum = in_cksum(m, ulen);
 			bcopy(&faddr->s6_addr[12], &ui->ui_dst,

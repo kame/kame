@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.148 2001/11/28 11:08:55 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.149 2001/12/07 07:07:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -140,7 +140,7 @@ static int in6_ifattach_loopback __P((struct ifnet *));
 static int
 get_hostid_ifid(ifp, in6)
 	struct ifnet *ifp;
-	struct in6_addr *in6;	/* upper 64bits are preserved  */
+	struct in6_addr *in6;	/* upper 64bits are preserved */
 {
 	int off, len;
 	static u_int8_t allzero[8] = { 0, 0, 0, 0, 0, 0, 0, 0 };
@@ -182,7 +182,7 @@ get_hostid_ifid(ifp, in6)
 static int
 get_rand_ifid(ifp, in6)
 	struct ifnet *ifp;
-	struct in6_addr *in6;	/* upper 64bits are preserved  */
+	struct in6_addr *in6;	/* upper 64bits are preserved */
 {
 	MD5_CTX ctxt;
 	u_int8_t digest[16];
@@ -369,7 +369,7 @@ generate_tmp_ifid(seed0, seed1, ret)
 static int
 get_hw_ifid(ifp, in6)
 	struct ifnet *ifp;
-	struct in6_addr *in6;	/* upper 64bits are preserved  */
+	struct in6_addr *in6;	/* upper 64bits are preserved */
 {
 	struct ifaddr *ifa;
 	struct sockaddr_dl *sdl;

@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.35 2001/07/26 06:53:20 jinmei Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.36 2001/12/07 07:07:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -128,7 +128,7 @@ extern	int tcp6_do_rfc1323;
 #endif
 
 #ifndef __bsdi__
-extern int ip_next_mtu __P((int, int));	/* XXX netinet/ip_icmp.c  */
+extern int ip_next_mtu __P((int, int));	/* XXX netinet/ip_icmp.c */
 #endif
 
 extern struct in6pcb *tcp6_last_in6pcb;

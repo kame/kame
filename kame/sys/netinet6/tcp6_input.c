@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.43 2001/07/26 06:53:19 jinmei Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.44 2001/12/07 07:07:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1126,7 +1126,7 @@ trimthenstep6:
 	if (opti.ts_present && (thflags & TH_RST) == 0 && t6p->ts_recent &&
 	    TSTMP_LT(opti.ts_val, t6p->ts_recent)) {
 
-		/* Check to see if ts_recent is over 24 days old.  */
+		/* Check to see if ts_recent is over 24 days old. */
 		if ((int)(tcp6_now - t6p->ts_recent_age) > TCP6_PAWS_IDLE) {
 			/*
 			 * Invalidate ts_recent.  If this segment updates
@@ -2186,7 +2186,7 @@ tcp6_peer_mss(t6p, offer)
 
 #ifdef RTV_MTU	/* if route characteristics exist ... */
 
-	/* While we're here, do any initial rtt or rttvar initialization.  */
+	/* While we're here, do any initial rtt or rttvar initialization. */
 	tcp6_rtt_init(t6p, rt);
 
 	/* if there's an mtu associated with the route, use it */
@@ -2394,7 +2394,7 @@ syn_cache_insert6(sc, prevp, headp)
 	if (scp->sch_timer_sum > 0)
 		sc->sc_timer = tcp6_syn_cache_timeo - scp->sch_timer_sum;
 	else if (scp->sch_timer_sum == 0) {
-		/* When the bucket timer is 0, it is not in the cache queue.  */
+		/* When the bucket timer is 0, it is not in the cache queue. */
 		scp->sch_headq = tcp6_syn_cache_first;
 		tcp6_syn_cache_first = scp;
 		sc->sc_timer = tcp6_syn_cache_timeo;

@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_usrreq.c,v 1.18 2001/07/26 06:53:20 jinmei Exp $	*/
+/*	$KAME: tcp6_usrreq.c,v 1.19 2001/12/07 07:07:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -279,7 +279,7 @@ tcp6_usrreq(so, req, m, nam, control)
 			error = ENOBUFS;
 			break;
 		}
-		/* Compute window scaling to request.  */
+		/* Compute window scaling to request. */
 		while (t6p->request_r_scale < TCP6_MAX_WINSHIFT &&
 		    (TCP6_MAXWIN << t6p->request_r_scale) < so->so_rcv.sb_hiwat)
 			t6p->request_r_scale++;

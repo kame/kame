@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.84 2001/12/04 10:36:57 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.85 2001/12/07 07:07:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1667,7 +1667,7 @@ mip6_haddr_destopt_create(pktopt_haddr, dst, sc)
 	bzero((caddr_t)optbuf.buf, MIP6_BUFFER_SIZE);
 	optbuf.off = 2;
 
-	/* Add Home Address option  */
+	/* Add Home Address option */
 	mip6_add_opt2dh((u_int8_t *)&haddr_opt, &optbuf);
 	mip6_align_destopt(&optbuf);
 
@@ -1909,7 +1909,7 @@ mip6_align_destopt(buf)
 caddr_t
 mip6_add_opt2dh(opt, dh)
 	caddr_t opt;            /* BU, BR, BA or Home Address option */
-	struct mip6_buffer *dh; /* Buffer containing the IPv6 DH  */
+	struct mip6_buffer *dh; /* Buffer containing the IPv6 DH */
 {
 	struct ip6_opt_binding_update  *bu;
 	struct ip6_opt_binding_ack     *ba;
@@ -2066,7 +2066,7 @@ mip6_add_opt2dh(opt, dh)
 static int
 mip6_add_subopt2dh(subopt, dh)
 	u_int8_t *subopt; /* MIP6 sub-options */
-	struct mip6_buffer *dh; /* Buffer containing the IPv6 DH  */
+	struct mip6_buffer *dh; /* Buffer containing the IPv6 DH */
 {
 	int suboptlen = 0;
 	u_int8_t type, padn;

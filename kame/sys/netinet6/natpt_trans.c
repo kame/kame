@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.65 2001/12/04 07:44:40 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.66 2001/12/07 07:07:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1361,7 +1361,7 @@ natpt_icmp4TimeExceed(struct pcv *cv4from, struct mbuf *m4)
 		innerip4to->ip_sum = htons(cksum);
 
 		Dum.p = ats->remote.port[0];
-		Dum.p = ats->local.port[0];	/* XXX BUG?  */
+		Dum.p = ats->local.port[0];	/* XXX BUG? */
 		cksum = natpt_fixCksum(ntohs(icmp4to->icmp_cksum),
 				       (u_char *)&Dum, sizeof(Dum),
 				       (u_char *)&Dee, sizeof(Dee));

@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.109 2001/11/10 09:40:32 jinmei Exp $	*/
+/*	$KAME: in6_proto.c,v 1.110 2001/12/07 07:07:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -523,7 +523,7 @@ int	ip6_gif_hlim = 0;
 #endif
 int	ip6_use_deprecated = 1;	/* allow deprecated addr (RFC2462 5.5.4) */
 int	ip6_rr_prune = 5;	/* router renumbering prefix
-				 * walk list every 5 sec.    */
+				 * walk list every 5 sec. */
 #if defined(__NetBSD__)
 int	ip6_v6only = 1;
 #elif defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 2) || (defined(__bsdi__) && _BSDI_VERSION < 199802) || defined(TCP6)

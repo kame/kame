@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.53 2001/11/27 09:47:30 sakane Exp $	*/
+/*	$KAME: esp_core.c,v 1.54 2001/12/07 07:07:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -642,8 +642,8 @@ esp_cbc_decrypt(m, off, sav, algo, ivlen)
 {
 	struct mbuf *s;
 	struct mbuf *d, *d0, *dp;
-	int soff, doff;	/* offset from the head of chain, to head of this mbuf  */
-	int sn, dn;	/* offset from the head of the mbuf, to meat  */
+	int soff, doff;	/* offset from the head of chain, to head of this mbuf */
+	int sn, dn;	/* offset from the head of the mbuf, to meat */
 	size_t ivoff, bodyoff;
 	u_int8_t iv[MAXIVLEN], *ivp;
 	u_int8_t sbuf[MAXIVLEN], *sp;
@@ -846,8 +846,8 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 {
 	struct mbuf *s;
 	struct mbuf *d, *d0, *dp;
-	int soff, doff;	/* offset from the head of chain, to head of this mbuf  */
-	int sn, dn;	/* offset from the head of the mbuf, to meat  */
+	int soff, doff;	/* offset from the head of chain, to head of this mbuf */
+	int sn, dn;	/* offset from the head of the mbuf, to meat */
 	size_t ivoff, bodyoff;
 	u_int8_t iv[MAXIVLEN], *ivp;
 	u_int8_t sbuf[MAXIVLEN], *sp;
