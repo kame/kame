@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.205 2001/03/21 07:48:57 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.206 2001/03/23 06:07:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1345,6 +1345,7 @@ ni6_input(m, off)
 	struct ip6_hdr *ip6;
 	int oldfqdn = 0;	/* if 1, return pascal string (03 draft) */
 	char *subj = NULL;
+	struct in6_ifaddr *ia6 = NULL;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 #ifndef PULLDOWN_TEST
@@ -1370,9 +1371,16 @@ ni6_input(m, off)
 	sin6.sin6_len = sizeof(struct sockaddr_in6);
 	bcopy(&ip6->ip6_dst, &sin6.sin6_addr, sizeof(sin6.sin6_addr));
 	/* XXX scopeid */
-	if (ifa_ifwithaddr((struct sockaddr *)&sin6))
-		; /* unicast/anycast, fine */
-	else if (IN6_IS_ADDR_MC_LINKLOCAL(&sin6.sin6_addr))
+	if ((ia6 = (struct in6_ifaddr *)ifa_ifwithaddr((struct sockaddr *)&sin6)) != NULL) {
+		/* unicast/anycast, fine */
+		if ((ia6->ia6_flags & IN6_IFF_TEMPORARY) != 0 &&
+		    (icmp6_nodeinfo & 4) == 0) {
+			nd6log((LOG_DEBUG, "ni6_input: ignore node info to "
+				"a temporary address in %s:%d",
+			       __FILE__, __LINE__));
+			goto bad;
+		}
+	} else if (IN6_IS_ADDR_MC_LINKLOCAL(&sin6.sin6_addr))
 		; /* link-local multicast, fine */
 	else
 		goto bad;
@@ -1386,7 +1394,7 @@ ni6_input(m, off)
 		/* 07 draft */
 		if (ni6->ni_code == ICMP6_NI_SUBJ_FQDN && subjlen == 0)
 			break;
-		/*FALLTHROUGH*/
+		/* FALLTHROUGH */
 	case NI_QTYPE_FQDN:
 	case NI_QTYPE_NODEADDR:
 		switch (ni6->ni_code) {
@@ -1881,7 +1889,10 @@ ni6_addrs(ni6, m, ifpp, subj)
 			if ((ifa6->ia6_flags & IN6_IFF_ANYCAST) != 0 &&
 			    (niflags & NI_NODEADDR_FLAG_ANYCAST) == 0)
 				continue; /* we need only unicast addresses */
-
+			if ((ifa6->ia6_flags & IN6_IFF_TEMPORARY) != 0 &&
+			    (icmp6_nodeinfo & 4) == 0) {
+				continue;
+			}
 			addrsofif++; /* count the address */
 		}
 		if (iffound) {
@@ -1981,6 +1992,10 @@ ni6_store_addrs(ni6, nni6, ifp0, resid)
 			if ((ifa6->ia6_flags & IN6_IFF_ANYCAST) != 0 &&
 			    (niflags & NI_NODEADDR_FLAG_ANYCAST) == 0)
 				continue;
+			if ((ifa6->ia6_flags & IN6_IFF_TEMPORARY) != 0 &&
+			    (icmp6_nodeinfo & 4) == 0) {
+				continue;
+			}
 
 			/* now we can copy the address */
 			if (resid < sizeof(struct in6_addr) +
