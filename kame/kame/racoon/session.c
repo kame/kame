@@ -1,4 +1,4 @@
-/*	$KAME: session.c,v 1.13 2000/09/22 18:35:53 itojun Exp $	*/
+/*	$KAME: session.c,v 1.14 2000/09/24 17:28:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: session.c,v 1.13 2000/09/22 18:35:53 itojun Exp $ */
+/* YIPS @(#)$Id: session.c,v 1.14 2000/09/24 17:28:16 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -112,8 +112,10 @@ session(void)
 
 	FD_ZERO(&mask0);
 
+#ifdef ENABLE_ADMINPORT
 	FD_SET(lcconf->sock_admin, &mask0);
 	nfds = (nfds > lcconf->sock_admin ? nfds : lcconf->sock_admin);
+#endif
 	FD_SET(lcconf->sock_pfkey, &mask0);
 	nfds = (nfds > lcconf->sock_pfkey ? nfds : lcconf->sock_pfkey);
 	FD_SET(lcconf->rtsock, &mask0);
@@ -157,8 +159,10 @@ session(void)
 			/*NOTREACHED*/
 		}
 
+#ifdef ENABLE_ADMINPORT
 		if (FD_ISSET(lcconf->sock_admin, &rfds))
 			admin_handler();
+#endif
 
 		for (p = lcconf->myaddrs; p; p = p->next) {
 			if (!p->addr)
@@ -185,9 +189,11 @@ session(void)
 			FD_ZERO(&mask0);
 			nfds = 0;
 
+#ifdef ENABLE_ADMINPORT
 			FD_SET(lcconf->sock_admin, &mask0);
 			nfds = (nfds > lcconf->sock_admin
 				? nfds : lcconf->sock_admin);
+#endif
 			FD_SET(lcconf->sock_pfkey, &mask0);
 			nfds = (nfds > lcconf->sock_pfkey
 				? nfds : lcconf->sock_pfkey);
@@ -364,7 +370,9 @@ close_sockets()
 {
 	isakmp_close();
 	pfkey_close(lcconf->sock_pfkey);
+#ifdef ENABLE_ADMINPORT
 	(void)admin_close();
+#endif
 	return 0;
 }
 
