@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.139 2001/04/27 01:37:15 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.140 2001/04/27 15:09:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -65,6 +65,9 @@
 #endif
 #include <sys/syslog.h>
 #include <sys/queue.h>
+#ifdef __FreeBSD__
+#include <sys/sysctl.h>
+#endif
 #ifdef __OpenBSD__
 #include <dev/rndvar.h>
 #endif
@@ -1658,24 +1661,14 @@ nd6_ioctl(cmd, data, ifp)
 			struct nd_pfxrouter *pfr;
 			int j;
 
-#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__)
 			(void)in6_embedscope(&prl->prefix[i].prefix,
 			    &pr->ndpr_prefix, NULL, NULL);
-#else
-			/* XXX binary backward compatibility breakage */
-			prl->prefix[i].prefix = pr->ndpr_prefix;
-#endif
 			prl->prefix[i].raflags = pr->ndpr_raf;
 			prl->prefix[i].prefixlen = pr->ndpr_plen;
 			prl->prefix[i].vltime = pr->ndpr_vltime;
 			prl->prefix[i].pltime = pr->ndpr_pltime;
 			prl->prefix[i].if_index = pr->ndpr_ifp->if_index;
 			prl->prefix[i].expire = pr->ndpr_expire;
-#if !(defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__))
-			/* XXX binary backward compatibility breakage */
-			prl->prefix[i].refcnt = pr->ndpr_refcnt;
-			prl->prefix[i].flags = pr->ndpr_stateflags;
-#endif
 
 			pfr = pr->ndpr_advrtrs.lh_first;
 			j = 0;
@@ -1710,13 +1703,8 @@ nd6_ioctl(cmd, data, ifp)
 		     rpp = LIST_NEXT(rpp, rp_entry)) {
 			if (i >= PRLSTSIZ)
 				break;
-#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__)
 			(void)in6_embedscope(&prl->prefix[i].prefix,
 			    &pr->ndpr_prefix, NULL, NULL);
-#else
-			/* XXX binary backward compatibility breakage */
-			prl->prefix[i].prefix = rpp->rp_prefix;
-#endif
 			prl->prefix[i].raflags = rpp->rp_raf;
 			prl->prefix[i].prefixlen = rpp->rp_plen;
 			prl->prefix[i].vltime = rpp->rp_vltime;
@@ -1724,10 +1712,6 @@ nd6_ioctl(cmd, data, ifp)
 			prl->prefix[i].if_index = rpp->rp_ifp->if_index;
 			prl->prefix[i].expire = rpp->rp_expire;
 			prl->prefix[i].advrtrs = 0;
-#if !(defined(__NetBSD__) || defined(__OpenBSD__) || defined(__bsdi__))
-			/* XXX binary backward compatibility breakage */
-			prl->prefix[i].refcnt = pr->ndpr_refcnt; /* XXX */
-#endif
 			prl->prefix[i].origin = rpp->rp_origin;
 			i++;
 		}
@@ -2427,6 +2411,7 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 	return(1);
 }
 
+#ifndef __FreeBSD__
 int
 nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 	int name;
@@ -2569,3 +2554,127 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 	}
 	return error;
 }
+#else
+static int nd6_sysctl_drlist SYSCTL_HANDLER_ARGS;
+static int nd6_sysctl_prlist SYSCTL_HANDLER_ARGS;
+SYSCTL_NODE(_net_inet6_icmp6, ICMPV6CTL_ND6_DRLIST, nd6_drlist,
+	CTLFLAG_RD, nd6_sysctl_drlist, "");
+SYSCTL_NODE(_net_inet6_icmp6, ICMPV6CTL_ND6_PRLIST, nd6_prlist,
+	CTLFLAG_RD, nd6_sysctl_prlist, "");
+
+static int
+nd6_sysctl_drlist SYSCTL_HANDLER_ARGS
+{
+	int error;
+	char buf[1024];
+	struct in6_defrouter *d, *de;
+	struct nd_defrouter *dr;
+
+	if (req->newptr)
+		return EPERM;
+	error = 0;
+
+	for (dr = TAILQ_FIRST(&nd_defrouter);
+	     dr;
+	     dr = TAILQ_NEXT(dr, dr_entry)) {
+		d = (struct in6_defrouter *)buf;
+		de = (struct in6_defrouter *)(buf + sizeof(buf));
+
+		if (d + 1 <= de) {
+			bzero(d, sizeof(*d));
+			d->rtaddr.sin6_family = AF_INET6;
+			d->rtaddr.sin6_len = sizeof(d->rtaddr);
+			if (in6_recoverscope(&d->rtaddr, &dr->rtaddr,
+			    dr->ifp) != 0)
+				log(LOG_ERR,
+				    "scope error in "
+				    "default router list (%s)\n",
+				    ip6_sprintf(&dr->rtaddr));
+			d->flags = dr->flags;
+			d->rtlifetime = dr->rtlifetime;
+			d->expire = dr->expire;
+			d->if_index = dr->ifp->if_index;
+		} else
+			panic("buffer too short");
+
+		error = SYSCTL_OUT(req, buf, sizeof(*d));
+		if (error)
+			break;
+	}
+	return error;
+}
+
+static int
+nd6_sysctl_prlist SYSCTL_HANDLER_ARGS
+{
+	int error;
+	char buf[1024];
+	struct in6_prefix *p, *pe;
+	struct nd_prefix *pr;
+
+	if (req->newptr)
+		return EPERM;
+	error = 0;
+
+	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
+		u_short advrtrs;
+		size_t advance;
+		struct sockaddr_in6 *sin6, *s6;
+		struct nd_pfxrouter *pfr;
+
+		p = (struct in6_prefix *)buf;
+		pe = (struct in6_prefix *)(buf + sizeof(buf));
+
+		if (p + 1 <= pe) {
+			bzero(p, sizeof(*p));
+			sin6 = (struct sockaddr_in6 *)(p + 1);
+
+			p->prefix = pr->ndpr_prefix;
+			if (in6_recoverscope(&p->prefix,
+			    &p->prefix.sin6_addr, pr->ndpr_ifp) != 0)
+				log(LOG_ERR,
+				    "scope error in prefix list (%s)\n",
+				    ip6_sprintf(&p->prefix.sin6_addr));
+			p->raflags = pr->ndpr_raf;
+			p->prefixlen = pr->ndpr_plen;
+			p->vltime = pr->ndpr_vltime;
+			p->pltime = pr->ndpr_pltime;
+			p->if_index = pr->ndpr_ifp->if_index;
+			p->expire = pr->ndpr_expire;
+			p->refcnt = pr->ndpr_refcnt;
+			p->flags = pr->ndpr_stateflags;
+			p->origin = PR_ORIG_RA;
+			advrtrs = 0;
+			for (pfr = pr->ndpr_advrtrs.lh_first;
+			     pfr;
+			     pfr = pfr->pfr_next) {
+				if ((void *)&sin6[advrtrs + 1] >
+				    (void *)pe) {
+					advrtrs++;
+					continue;
+				}
+				s6 = &sin6[advrtrs];
+				bzero(s6, sizeof(*s6));
+				s6->sin6_family = AF_INET6;
+				s6->sin6_len = sizeof(*sin6);
+				if (in6_recoverscope(s6,
+				    &pfr->router->rtaddr,
+				    pfr->router->ifp) != 0)
+					log(LOG_ERR,
+					    "scope error in "
+					    "prefix list (%s)\n",
+					    ip6_sprintf(&pfr->router->rtaddr));
+				advrtrs++;
+			}
+			p->advrtrs = advrtrs;
+		} else 
+			panic("buffer too short");
+
+		advance = sizeof(*p) + sizeof(*sin6) * advrtrs;
+		error = SYSCTL_OUT(req, buf, advance);
+		if (error)
+			break;
+	}
+	return error;
+}
+#endif
