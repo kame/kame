@@ -40,7 +40,7 @@
  *   to let it do PF_UNSPEC (actually we never pass PF_UNSPEC to
  *   getipnodebyname().
  * - The code filters out AFs that are not supported by the kernel,
- *   when resolving FQDNs and globbing NULL hostname.  Is it the right
+ *   when globbing NULL hostname (to loopback, or wildcard).  Is it the right
  *   thing to do?  What is the relationship with post-RFC2553 AI_ADDRCONFIG
  *   in ai_flags?
  */
