@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.643 2000/03/01 09:47:26 sakane Exp $
+$Id: CHANGELOG,v 1.644 2000/03/01 17:02:36 itojun Exp $
 
 <200003>
+Thu Mar  2 02:01:48 JST 2000  itojun@iijlab.net
+	* sys/netinet6/mip6*.c: bring in update from ericsson for mobile-ip6.
+
 Wed Mar  1 18:46:24 JST 2000 sakane@ydc.co.jp
 	* kame/kame/setkey:
 	  Fix to delete a SPD entry.  "spddelete" can work.
