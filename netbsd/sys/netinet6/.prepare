@@ -11,3 +11,15 @@ exclude tcp6_timer.c
 exclude tcp6_timer.h
 exclude tcp6_usrreq.c
 exclude tcp6_var.h
+exclude ptr_defs.h
+exclude ptr_dispatch.c
+exclude ptr_list.c
+exclude ptr_list.h
+exclude ptr_log.c
+exclude ptr_log.h
+exclude ptr_rule.c
+exclude ptr_soctl.h
+exclude ptr_trans.c
+exclude ptr_tslot.c
+exclude ptr_usrreq.c
+exclude ptr_var.h
