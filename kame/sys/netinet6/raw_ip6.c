@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.104 2001/11/13 07:31:18 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.105 2001/11/14 09:22:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,6 +76,7 @@
 #include <sys/socketvar.h>
 #include <sys/errno.h>
 #include <sys/systm.h>
+#include <sys/syslog.h>
 #ifdef __NetBSD__
 #include <sys/proc.h>
 #endif
@@ -961,10 +962,19 @@ rip6_usrreq(so, req, m, nam, control, p)
 				error = EINVAL;
 				break;
 			}
+
 			tmp = *mtod(nam, struct sockaddr_in6 *);
 			dst = &tmp;
 
-			if (dst->sin6_family != AF_INET6) {
+			if (dst->sin6_family == AF_UNSPEC) {
+				/*
+				 * XXX: we allow this case for backward
+				 * compatibility to buggy applications that
+				 * rely on old (and wrong) kernel behavior.
+				 */
+				log(LOG_INFO,
+				    "rip6 SEND: address family is unspec\n");
+			} else if (dst->sin6_family != AF_INET6) {
 				error = EAFNOSUPPORT;
 				break;
 			}
