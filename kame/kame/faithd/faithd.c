@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.36 2001/02/27 06:17:28 sakane Exp $	*/
+/*	$KAME: faithd.c,v 1.37 2001/02/27 06:28:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -775,25 +775,16 @@ sig_terminate(int sig)
 static void
 start_daemon(void)
 {
-#ifdef __FreeBSD__
 	struct sigaction sa;
-#endif
 
 	if (daemon(0, 0) == -1)
 		exit_stderr("daemon: %s", ERRSTR);
 
-#ifdef __FreeBSD__
 	memset(&sa, 0, sizeof(sa));
 	sa.sa_handler = sig_child;
 	sa.sa_flags = SA_NOCLDWAIT;
 	sigemptyset(&sa.sa_mask);
 	sigaction(SIGCHLD, &sa, (struct sigaction *)0);
-#else
-	if (signal(SIGCHLD, sig_child) == SIG_ERR) {
-		exit_failure("signal CHLD: %s", ERRSTR);
-		/*NOTREACHED*/
-	}
-#endif
 
 	if (signal(SIGTERM, sig_terminate) == SIG_ERR) {
 		exit_failure("signal TERM: %s", ERRSTR);
