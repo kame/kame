@@ -1,4 +1,4 @@
-.\"	$NetBSD: ifconfig.8,v 1.24 1998/09/06 17:51:32 christos Exp $
+.\"	$NetBSD: ifconfig.8,v 1.32.4.7 2000/08/13 17:52:42 wiz Exp $
 .\"
 .\" Copyright (c) 1983, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -49,20 +49,27 @@
 .Op Ar parameters
 .Nm ""
 .Op Fl A
-.Op Fl m
+.Op Fl mL
 .Ar interface
 .Op Ar protocol_family
 .Nm ""
 .Fl a
 .Op Fl A
-.Op Fl m
+.Op Fl mL
+.Op Fl b
 .Op Fl d
 .Op Fl u
+.Op Fl s
 .Op Ar protocol_family
 .Nm ""
 .Fl l
+.Op Fl b
 .Op Fl d
 .Op Fl u
+.Op Fl s
+.Nm ""
+.Fl s
+.Ar interface
 .Sh DESCRIPTION
 .Nm
 is used to assign an address
@@ -77,7 +84,7 @@ or other operating parameters.
 Available operands for
 .Nm "" :
 .Bl -tag -width Ds
-.It Ar Address
+.It Ar address
 For the
 .Tn DARPA-Internet
 family,
@@ -117,11 +124,12 @@ with different naming schemes, specifying the address family is recommended.
 The address or protocol families currently
 supported are
 .Dq inet ,
+.Dq inet6 ,
 .Dq atalk ,
 .Dq iso ,
 and
 .Dq ns .
-.It Ar Interface
+.It Ar interface
 The
 .Ar interface
 parameter is a string of the form
@@ -137,6 +145,8 @@ The following parameters may be set with
 Establish an additional network address for this interface.
 This is sometimes useful when changing network numbers, and
 one wishes to accept packets addressed to the old interface.
+.It Fl alias
+Remove the specified network address alias.
 .It Cm arp
 Enable the use of the Address Resolution Protocol in mapping
 between network level addresses and link level addresses (default).
@@ -146,6 +156,12 @@ Internet
 addresses and 10Mb/s Ethernet addresses.
 .It Fl arp
 Disable the use of the Address Resolution Protocol.
+.It Cm anycast
+(inet6 only)
+Set the IPv6 anycast address bit.
+.It Fl anycast
+(inet6 only)
+Clear the IPv6 anycast address bit.
 .It Cm broadcast Ar mask
 (Inet only)
 Specify the address to use to represent broadcasts to the
@@ -164,7 +180,12 @@ was no longer needed.
 If you have incorrectly set an NS address having the side effect
 of specifying the host portion, removing all NS addresses will
 allow you to respecify the host portion.
-.It Cm dest_address
+.Cm delete
+does not work for IPv6 addresses.
+Use
+.Fl alias
+with explicit IPv6 address instead.
+.It Ar dest_address
 Specify the address of the correspondent on the other end
 of a point to point link.
 .It Cm down
@@ -229,7 +250,7 @@ Set the maximum transmission unit of the interface to
 .Ar n .
 Most interfaces don't support this option.
 .It Cm netmask Ar mask
-(Inet and ISO)
+(Inet, inet6 and ISO)
 Specify how much of the address to reserve for subdividing
 networks into sub-networks.
 The mask includes the network part of the local address
@@ -244,6 +265,9 @@ and 0's for the host part.
 The mask should contain at least the standard network portion,
 and the subnet field should be contiguous with the network
 portion.
+.Pp
+For INET and INET6 addresses, the netmask can also be given with
+slash-notation after the address (e.g 192.168.17.3/24).
 .\" see
 .\" Xr eon 5 .
 .It Cm nsellength Ar n
@@ -271,24 +295,68 @@ There is some evidence that a number different from 1 may be useful
 for
 .Tn AFI
 37 type addresses.
-.It Cm trailers
-Request the use of a ``trailer'' link level encapsulation when
-sending (default).
-If a network interface supports
-.Cm trailers ,
-the system will, when possible, encapsulate outgoing
-messages in a manner which minimizes the number of
-memory to memory copy operations performed by the receiver.
-On networks that support the Address Resolution Protocol (see
-.Xr arp 4 ;
-currently, only 10 Mb/s Ethernet),
-this flag indicates that the system should request that other
-systems use trailers when sending to this host.
-Similarly, trailer encapsulations will be sent to other
-hosts that have made such requests.
-Currently used by Internet protocols only.
-.It Fl trailers
-Disable the use of a ``trailer'' link level encapsulation.
+.It Cm nwid Ar id
+(IEEE 802.11 devices only)
+Configure network ID for IEEE 802.11-based wireless network interfaces.
+The
+.Ar id
+can either be any text string up to 32 characters in length,
+or a series of hexadecimal digits up to 64 digits.
+The empty string allows the interface to connect to any available
+access points.
+.It Cm nwkey Ar key
+(IEEE 802.11 devices only)
+Enable WEP encryption for IEEE 802.11-based wireless network interfaces
+with the
+.Ar key .
+The
+.Ar key
+can either be a string, a series of hexadecimal digits, or a set of keys
+in the form
+.Ar n:k1,k2,k3,k4 ,
+where
+.Ar n
+specifies which of keys will be used for all transmitted packets,
+and four keys,
+.Ar k1
+through
+.Ar k4 ,
+are configured as WEP keys.
+Note that the order must be match within same network if multiple keys
+are used.
+For IEEE 802.11 wireless network, the length of each key is restricted to
+40 bits, i.e. 5-character string or 10 hexadecimal digits,
+while the WaveLAN/IEEE Gold cards accept the 104 bits (13 characters) key.
+.It Fl nwkey
+(IEEE 802.11 devices only)
+Disable WEP encryption for IEEE 802.11-based wireless network interfaces.
+.It Cm tunnel Ar src_addr Ar dest_addr
+(IP tunnel devices only)
+Configure the physical source and destination address for IP tunnel
+interfaces (gif).  The arguments
+.Ar src_addr
+and
+.Ar dest_addr
+are interpreted as the outer source/destination for the encapsulating
+IPv4/IPv6 header.
+.It Cm deletetunnel
+Unconfigure the physical source and destination address for IP tunnel
+interfaces previously configured with
+.Cm tunnel .
+.It Cm pltime Ar n
+(inet6 only)
+Set preferred lifetime for the address.
+.It Cm prefixlen Ar n
+(inet6 only)
+Effect is similar to
+.Cm netmask .
+but you can specify by prefix length by digits.
+.It Cm tentative
+(inet6 only)
+Set the IPv6 tentative address bit.
+.It Fl tentative
+(inet6 only)
+Clear the IPv6 tentative address bit.
 .It Cm link[0-2]
 Enable special processing of the link level of the interface.
 These three options are interface specific in actual effect, however,
@@ -305,19 +373,40 @@ This may be used to enable an interface after an ``ifconfig down.''
 It happens automatically when setting the first address on an interface.
 If the interface was reset when previously marked down,
 the hardware will be re-initialized.
+.It Cm vltime Ar n
+(inet6 only)
+Set valid lifetime for the address.
 .El
 .Pp
 .Nm
 displays the current configuration for a network interface
 when no optional parameters are supplied.
 If a protocol family is specified,
-Ifconfig will report only the details specific to that protocol family.
+.Nm
+will report only the details specific to that protocol
+family.
+.Pp
+If the
+.Fl s
+flag is passed before an interface name,
+.Nm
+will attempt to query the interface for its media status.  If the
+interface supports reporting media status, and it reports that it does
+not appear to be connected to a network,
+.Nm 
+will exit with status of 1 (false); otherwise, it will exit with a
+zero (true) exit status.  Not all interface drivers support media
+status reporting.
 .Pp
 If the
 .Fl m
 flag is passed before an interface name,
 .Nm
 will display all of the supported media for the specified interface.
+If the
+.Fl L
+flag is supplied, address lifetime is displayed for IPv6 addresses,
+as time offset string.
 .Pp
 Optionally, the
 .Fl a
@@ -325,9 +414,13 @@ flag may be used instead of an interface name.  This flag instructs
 .Nm
 to display information about all interfaces in the system.
 .Fl d
-limits this to interfaces that are down, and
+limits this to interfaces that are down,
 .Fl u
-limits this to interfaces that are up.
+limits this to interfaces that are up,
+.Fl b
+limits this to broadcast interfaces, and
+.Fl s
+omits interfaces which appear not to be connected to a network.
 .Pp
 If the
 .Fl A
@@ -340,23 +433,26 @@ flag may be used to list all available interfaces on the system, with
 no other additional information.  Use of this flag is mutually exclusive
 with all other flags and commands, except for
 .Fl d
-(only list interfaces that are down)
-and
+(only list interfaces that are down),
 .Fl u
-(only list interfaces that are up).
+(only list interfaces that are up),
+.Fl s
+(only list interfaces that may be connected),
+.Fl b
+(only list broadcast interfaces).
 .Pp
 Only the super-user may modify the configuration of a network interface.
 .Sh DIAGNOSTICS
-Messages indicating the specified interface does not exit, the
+Messages indicating the specified interface does not exist, the
 requested address is unknown, or the user is not privileged and
 tried to alter an interface's configuration.
 .Sh SEE ALSO
-.Xr ifmedia 4 ,
 .Xr netstat 1 ,
+.Xr ifmedia 4 ,
 .Xr netintro 4 ,
+.\" .Xr eon 5 ,
 .Xr rc 8 ,
-.Xr routed 8 ,
-.\" .Xr eon 5
+.Xr routed 8
 .Sh HISTORY
 The
 .Nm
