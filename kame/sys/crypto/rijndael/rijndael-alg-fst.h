@@ -1,28 +1,39 @@
-/* rijndael-alg-fst.h   v2.0   August '99
+/*
+ * rijndael-alg-fst.h   v2.3   April '2000
+ *
  * Optimised ANSI C code
+ *
+ * #define INTERMEDIATE_VALUE_KAT to generate the Intermediate Value Known Answer Test.
  */
-#ifndef __RIJNDAEL_ALG_H
-#define __RIJNDAEL_ALG_H
 
-#define MAXKC				(256/32)
-#define MAXROUNDS			14
+#ifndef __RIJNDAEL_ALG_FST_H
+#define __RIJNDAEL_ALG_FST_H
 
-typedef unsigned char		word8;	
-typedef unsigned short		word16;	
-typedef unsigned int		word32;
+#define MAXKC			(256/32)
+#define MAXROUNDS		14
 
-int ROUNDS;
+#ifndef USUAL_TYPES
+#define USUAL_TYPES
+typedef unsigned char	byte;
+typedef unsigned char	word8;	
+typedef unsigned short	word16;	
+typedef unsigned int	word32;
+#endif /* USUAL_TYPES */
 
-int rijndaelKeySched (word8 k[MAXKC][4], int keyBits,  
-		word8 rk[MAXROUNDS+1][4][4]);
-int rijndaelKeyEnctoDec (int keyBits, word8 W[MAXROUNDS+1][4][4]);
-int rijndaelEncrypt (word8 a[16], word8 b[16], 
-		word8 rk[MAXROUNDS+1][4][4]);
-int rijndaelEncryptRound (word8 a[4][4],  
-		word8 rk[MAXROUNDS+1][4][4], int rounds);
-int rijndaelDecrypt (word8 a[16], word8 b[16],
-		word8 rk[MAXROUNDS+1][4][4]);
-int rijndaelDecryptRound (word8 a[4][4],  
-		word8 rk[MAXROUNDS+1][4][4], int rounds);
+int rijndaelKeySched(word8 k[MAXKC][4], word8 rk[MAXROUNDS+1][4][4], int ROUNDS);
 
-#endif /* __RIJNDAEL_ALG_H */
+int rijndaelKeyEncToDec(word8 W[MAXROUNDS+1][4][4], int ROUNDS);
+
+int rijndaelEncrypt(word8 a[16], word8 b[16], word8 rk[MAXROUNDS+1][4][4], int ROUNDS);
+
+#ifdef INTERMEDIATE_VALUE_KAT
+int rijndaelEncryptRound(word8 a[4][4], word8 rk[MAXROUNDS+1][4][4], int ROUNDS, int rounds);
+#endif /* INTERMEDIATE_VALUE_KAT */
+
+int rijndaelDecrypt(word8 a[16], word8 b[16], word8 rk[MAXROUNDS+1][4][4], int ROUNDS);
+
+#ifdef INTERMEDIATE_VALUE_KAT
+int rijndaelDecryptRound(word8 a[4][4], word8 rk[MAXROUNDS+1][4][4], int ROUNDS, int rounds);
+#endif /* INTERMEDIATE_VALUE_KAT */
+
+#endif /* __RIJNDAEL_ALG_FST_H */
