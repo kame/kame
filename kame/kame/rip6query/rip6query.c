@@ -114,7 +114,7 @@ main(argc, argv)
 	snprintf(pbuf, sizeof(pbuf), "%d", RIP6_PORT);
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
-	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_socktype = SOCK_DGRAM;
 	error = getaddrinfo(argv[0], pbuf, &hints, &res);
 	if (error) {
 		errx(1, "%s: %s", argv[0], gai_strerror(error));
