@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.c,v 1.5 2001/01/27 00:15:57 thorpej Exp $	*/
+/*	$KAME: gssapi.c,v 1.6 2001/01/27 00:32:14 thorpej Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -116,6 +116,9 @@ gssapi_init(struct ph1handle *iph1)
 	}
 	gps->gss_context = GSS_C_NO_CONTEXT;
 	gps->gss_cred = GSS_C_NO_CREDENTIAL;
+
+	iph1->gssapi_state = gps;
+
 	if (iph1->rmconf->proposal->gssid != NULL) {
 		id_token.length = iph1->rmconf->proposal->gssid->l;
 		id_token.value = iph1->rmconf->proposal->gssid->v;
@@ -123,6 +126,7 @@ gssapi_init(struct ph1handle *iph1)
 		    &princ);
 		if (GSS_ERROR(maj_stat)) {
 			gssapi_error(maj_stat, LOCATION, "import name\n");
+			gssapi_free_state(iph1);
 			return -1;
 		}
 	} else
@@ -138,18 +142,17 @@ gssapi_init(struct ph1handle *iph1)
 
 	if (GSS_ERROR(maj_stat)) {
 		gssapi_error(maj_stat, LOCATION, "export name\n");
+		gssapi_free_state(iph1);
 		return -1;
 	}
 
 	maj_stat = gss_acquire_cred(&min_stat, princ, GSS_C_INDEFINITE,
 	    GSS_C_NO_OID_SET, GSS_C_BOTH, &gps->gss_cred, NULL, NULL);
 	if (GSS_ERROR(maj_stat)) {
-		gssapi_error(maj_stat, LOCATION,
-		    "acquire cred\n");
+		gssapi_error(maj_stat, LOCATION, "acquire cred\n");
+		gssapi_free_state(iph1);
 		return -1;
 	}
-
-	iph1->gssapi_state = gps;
 
 	return 0;
 }
@@ -326,7 +329,7 @@ gssapi_get_token_to_send(struct ph1handle *iph1, vchar_t **token)
 	gps = gssapi_get_state(iph1);
 	if (gps == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"gssapi not yet initialized?\n");
+		    "gssapi not yet initialized?\n");
 		return -1;
 	}
 	gsstoken = &gps->gss[gps->gsscnt - 1];
@@ -347,7 +350,8 @@ gssapi_get_itokens(struct ph1handle *iph1, vchar_t **tokens)
 
 	gps = gssapi_get_state(iph1);
 	if (gps == NULL) {
-		plog(LLV_ERROR, LOCATION, NULL, "gssapi not yet initialized?\n");
+		plog(LLV_ERROR, LOCATION, NULL,
+		    "gssapi not yet initialized?\n");
 		return -1;
 	}
 
@@ -382,13 +386,13 @@ gssapi_get_rtokens(struct ph1handle *iph1, vchar_t **tokens)
 	gps = gssapi_get_state(iph1);
 	if (gps == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"gssapi not yet initialized?\n");
+		    "gssapi not yet initialized?\n");
 		return -1;
 	}
 
 	if (gssapi_more_tokens(iph1)) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"gssapi roundtrips not complete\n");
+		    "gssapi roundtrips not complete\n");
 		return -1;
 	}
 
@@ -421,13 +425,13 @@ gssapi_wraphash(struct ph1handle *iph1)
 	gps = gssapi_get_state(iph1);
 	if (gps == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"gssapi not yet initialized?\n");
+		    "gssapi not yet initialized?\n");
 		return NULL;
 	}
 
 	if (gssapi_more_tokens(iph1)) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"gssapi roundtrips not complete\n");
+		    "gssapi roundtrips not complete\n");
 		return NULL;
 	}
 
@@ -460,7 +464,7 @@ gssapi_unwraphash(struct ph1handle *iph1)
 	gps = gssapi_get_state(iph1);
 	if (gps == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
-			"gssapi not yet initialized?\n");
+		    "gssapi not yet initialized?\n");
 		return NULL;
 	}
 
@@ -533,6 +537,8 @@ gssapi_free_state(struct ph1handle *iph1)
 
 	if (gps == NULL)
 		return;
+
+	iph1->gssapi_state = NULL;
 
 	if (gps->gss_cred != GSS_C_NO_CREDENTIAL)
 		gss_release_cred(&min_stat, &gps->gss_cred);
