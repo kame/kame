@@ -21,7 +21,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-pim.c,v 1.5 1999/12/16 04:42:25 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-pim.c,v 1.6 2000/01/19 07:21:49 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -45,8 +45,8 @@ struct pim {
 			 * Graft-Ack (PIM-DM only), C-RP-Adv
 			 */
 			/* lower 4bit: PIM version number; 2 for PIMv2 */
-#define PIM_TYPE(x)	(((x) & 0xf0) >> 4)
-#define PIM_VER(x)	((x) & 0x0f)
+#define PIM_VER(x)	(((x) & 0xf0) >> 4)
+#define PIM_TYPE(x)	((x) & 0x0f)
 	u_char  pim_rsv;	/* Reserved */
 	u_short	pim_cksum;	/* IP style check sum */
 };
