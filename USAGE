@@ -1,6 +1,6 @@
 	USAGE
 	KAME Project
-	$KAME: USAGE,v 1.30 2000/11/15 16:55:04 itojun Exp $
+	$KAME: USAGE,v 1.31 2000/11/15 16:55:52 itojun Exp $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -205,6 +205,7 @@ PING6(56=40+8+8 bytes) fe80::5254:ff:feda:cb7d --> ff02::1%ed0
 56 bytes from fe80::5254:ff:feda:d161%ed0, icmp_seq=0 hlim=64 time=1.459 ms(DUP!)
 56 bytes from fe80::260:97ff:fec2:80bf%ed0, icmp_seq=0 hlim=64 time=1.538 ms(DUP!)
 56 bytes from 3ffe:501:4819:2000:5054:ff:fedb:aa46, icmp_seq=0 hlim=255 time=1.615 ms(DUP!)
+
 
 <<<ping6 -w>>>
 
@@ -494,11 +495,13 @@ to be AH transport mode inner ESP tunnel mode like below.
 
 
 <<<mobile-ip6>>>
+
 KAME kit includes mobile-ip6 code.  For more details, please look at
 kame/kame/mip6config/QUICKSTART,README_MIP6.txt} and manpages.
 
 
 <<<altq>>>
+
 ALTQ implements several queueing disciplines that can be used to
 manage traffic.  ALTQ supports diffserv EF and AF PHBs, and traffic
 conditioners.  For more details, please look at altqd(8), altq.conf(5)
