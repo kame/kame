@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.53 2000/05/22 11:02:49 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.54 2000/05/22 11:25:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -530,7 +530,7 @@ u_long	rip6_recvspace = RIPV6RCVQ;
 /* ICMPV6 parameters */
 int	icmp6_rediraccept = 1;		/* accept and process redirects */
 int	icmp6_redirtimeout = 10 * 60;	/* 10 minutes */
-u_int	icmp6errratelim = 1000;		/* 1000usec = 1msec */
+struct timeval icmp6errratelim = { 0, 1000 };	/* 1000usec = 1msec */
 int	icmp6_nodeinfo = 1;		/* enable/disable NI response */
 
 #ifdef TCP6
@@ -674,6 +674,30 @@ sysctl_ip6_forwarding SYSCTL_HANDLER_ARGS
 	return (error);
 }
 
+static int
+sysctl_icmp6_ratelimit SYSCTL_HANDLER_ARGS
+{
+	int rate_usec, error, s;
+
+	/*
+	 * The sysctl specifies the rate in usec-between-icmp,
+	 * so we must convert from/to a timeval.
+	 */
+	rate_usec = (icmp6errratelim.tv_sec * 1000000) +
+	    icmp6errratelim.tv_usec;
+	error = sysctl_handle_int(oidp, &rate_usec, 0, req);
+	if (error)
+		return (error);
+	if (rate_usec < 0)
+		return (EINVAL);
+	s = splnet();
+	icmp6errratelim.tv_sec = rate_usec / 1000000;
+	icmp6errratelim.tv_usec = rate_usec % 1000000;
+	splx(s);
+
+	return (0);
+}
+
 SYSCTL_OID(_net_inet6_ip6, IPV6CTL_FORWARDING, forwarding,
 	   CTLTYPE_INT|CTLFLAG_RW, &ip6_forwarding, 0, sysctl_ip6_forwarding,
 	   "I", "");
@@ -717,8 +741,9 @@ SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_REDIRTIMEOUT,
 	redirtimeout, CTLFLAG_RW,	&icmp6_redirtimeout,	0, "");
 SYSCTL_STRUCT(_net_inet6_icmp6, ICMPV6CTL_STATS, stats, CTLFLAG_RD,
 	&icmp6stat, icmp6stat, "");
-SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ERRRATELIMIT,
-	errratelimit, CTLFLAG_RW,	&icmp6errratelim,	0, "");
+SYSCTL_PROC(_net_inet6_icmp6, ICMPV6CTL_ERRRATELIMIT,
+	errratelimit, CTLTYPE_INT|CTLFLAG_RW,
+	0, sizeof(int), sysctl_icmp6_ratelimit, "I", "");
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_PRUNE,
 	nd6_prune, CTLFLAG_RW,		&nd6_prune,	0, "");
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_ND6_DELAY,
