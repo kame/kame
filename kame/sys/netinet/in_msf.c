@@ -2086,6 +2086,9 @@ ip_setmopt_srcfilter(sop, imsfp)
 	int error = 0;
 	int init, final;
 	int s;
+#if defined(__OpenBSD__) && defined(MROUTING)
+	extern struct socket *ip_mrouter;
+#endif
 
 	if (*imsfp == NULL)
 		return EINVAL;
@@ -2663,6 +2666,9 @@ sock_setmopt_srcfilter(sop, grpfp)
 	int error = 0;
 	int init, final;
 	int s;
+#if defined(__OpenBSD__) && defined(MROUTING)
+	extern struct socket *ip_mrouter;
+#endif
 
 	if (*grpfp == NULL)
 		return EINVAL;
