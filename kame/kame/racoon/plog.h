@@ -1,4 +1,4 @@
-/*	$KAME: plog.h,v 1.8 2001/10/08 23:56:28 sakane Exp $	*/
+/*	$KAME: plog.h,v 1.9 2002/04/26 00:00:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -62,7 +62,7 @@ extern int f_foreground;
 struct sockaddr;
 extern void plog __P((int, const char *, struct sockaddr *, const char *, ...));
 extern void plogv __P((int, const char *, struct sockaddr *,
-	const char *, va_list));
+	const char *, ...));
 extern void plogdump __P((int, void *, size_t));
 extern void ploginit __P((void));
 extern void plogset __P((char *));

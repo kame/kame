@@ -1,4 +1,4 @@
-/*	$KAME: plog.c,v 1.21 2002/04/25 23:52:38 itojun Exp $	*/
+/*	$KAME: plog.c,v 1.22 2002/04/26 00:00:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -131,9 +131,10 @@ plog(int pri, const char *func, struct sockaddr *sa, const char *fmt, ...)
 
 void
 plogv(int pri, const char *func, struct sockaddr *sa,
-	const char *fmt, va_list ap)
+	const char *fmt, ...)
 {
 	char *newfmt;
+	va_list ap;
 
 	if (pri > loglevel)
 		return;
