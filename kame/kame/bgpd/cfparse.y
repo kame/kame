@@ -55,7 +55,7 @@
 #include "ripng.h"
 #include "ripng_var.h"
 #include "debug.h"
-#include "cfparse.h"
+#include "cfparse_proto.h"
 #include "vmbuf.h"
 
 #define set_param(var,val,p) \

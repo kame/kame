@@ -41,8 +41,12 @@
 
 #include "vmbuf.h"
 #include "debug.h"
+#include "cfparse_proto.h"
+#ifdef HAVE_CFPARSE_H
 #include "cfparse.h"
+#else
 #include "y.tab.h"
+#endif
 
 static int yyerrorcount = 0;
 int lineno = 1;

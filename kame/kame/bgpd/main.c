@@ -40,7 +40,7 @@
 #include "ripng_var.h"
 #include "parse.h"
 #include "ospf.h"
-#include "cfparse.h"
+#include "cfparse_proto.h"
 
 int confcheck = 0;		/* configuration check only */
 int              rtsock;       /* the routing socket               */
