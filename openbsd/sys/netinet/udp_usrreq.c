@@ -692,6 +692,8 @@ udp6_ctlinput(cmd, sa, d)
 	struct mbuf *m;
 	int off;
 
+	if (sa == NULL)
+		return;
 	if (sa->sa_family != AF_INET6)
 		return;
 
@@ -701,14 +703,12 @@ udp6_ctlinput(cmd, sa, d)
 		ip6 = ip6cp->ip6c_ip6;
 		m = ip6cp->ip6c_m;
 		off = ip6cp->ip6c_off;
-	} else {
-		ip6 = NULL;
-		m = NULL;
-	}
+	} else
+		return;
 
 	/* translate addresses into internal form */
 	sa6 = *(struct sockaddr_in6 *)sa;
-	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr))
+	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr) && m && m->m_pkthdr.rcvif)
 		sa6.sin6_addr.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 	sa = (struct sockaddr *)&sa6;
 
@@ -736,6 +736,8 @@ udp_ctlinput(cmd, sa, v)
 	else if (cmd == PRC_HOSTDEAD)
 		ip = 0;
 	else if (errno == 0)
+		return NULL;
+	if (sa == NULL)
 		return NULL;
 #ifdef INET6
 	if (sa->sa_family == AF_INET6) {
