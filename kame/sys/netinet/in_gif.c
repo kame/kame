@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.34 2000/04/18 05:14:35 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.35 2000/04/19 01:52:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -204,8 +204,7 @@ in_gif_output(ifp, family, m, rt)
 		printf("ENOBUFS in in_gif_output %d\n", __LINE__);
 		return ENOBUFS;
 	}
-
-	*(mtod(m, struct ip *)) = iphdr;
+	bcopy(&iphdr, mtod(m, struct ip *), sizeof(struct ip));
 
 	if (dst->sin_family != sin_dst->sin_family ||
 	    dst->sin_addr.s_addr != sin_dst->sin_addr.s_addr) {
@@ -227,6 +226,12 @@ in_gif_output(ifp, family, m, rt)
 		if (sc->gif_ro.ro_rt == NULL) {
 			m_freem(m);
 			return ENETUNREACH;
+		}
+
+		/* if it constitutes infinite encapsulation, punt. */
+		if (sc->gif_ro.ro_rt->rt_ifp == ifp) {
+			m_freem(m);
+			return ENETUNREACH;	/*XXX*/
 		}
 #if 0
 		ifp->if_mtu = sc->gif_ro.ro_rt->rt_ifp->if_mtu
