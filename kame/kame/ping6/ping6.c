@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.140 2001/11/05 07:42:22 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.141 2001/11/09 06:58:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -385,7 +385,7 @@ main(argc, argv)
 #if defined(SO_SNDBUF) && defined(SO_RCVBUF)
 			sockbufsize = atoi(optarg);
 #else
-			err(1,
+			errx(1,
 "-b option ignored: SO_SNDBUF/SO_RCVBUF socket options not supported");
 #endif
 			break;
