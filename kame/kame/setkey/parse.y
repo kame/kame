@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.56 2001/08/17 05:53:36 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.57 2001/08/17 06:00:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -290,7 +290,13 @@ ipcomp_spec
 	;
 
 enc_alg
-	:	ALG_ENC { p_alg_enc = $1; }
+	:	ALG_ENC {
+			if ($1 == ~0) {
+				yyerror("unsupported algorithm");
+				return -1;
+			}
+			p_alg_enc = $1;
+		}
 	|	ALG_ENC_DESDERIV
 		{
 			p_alg_enc = $1;
@@ -334,7 +340,13 @@ enc_key
 	;
 
 auth_alg
-	:	ALG_AUTH { p_alg_auth = $1; }
+	:	ALG_AUTH {
+			if ($1 == ~0) {
+				yyerror("unsupported algorithm");
+				return -1;
+			}
+			p_alg_auth = $1;
+		}
 	;
 
 auth_key

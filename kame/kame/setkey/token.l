@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.30 2001/08/17 05:53:36 itojun Exp $	*/
+/*	$KAME: token.l,v 1.31 2001/08/17 06:00:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -66,6 +66,20 @@ void yyerror __P((const char *s));
 extern void parse_init __P((void));
 int parse __P((FILE **));
 int yyparse __P((void));
+
+/* make the code compile on *BSD-current */
+#ifndef SADB_X_AALG_SHA2_256
+#define SADB_X_AALG_SHA2_256	(~0)
+#endif
+#ifndef SADB_X_AALG_SHA2_384
+#define SADB_X_AALG_SHA2_384	(~0)
+#endif
+#ifndef SADB_X_AALG_SHA2_512
+#define SADB_X_AALG_SHA2_512	(~0)
+#endif
+#ifndef SADB_X_EALG_TWOFISHCBC
+#define SADB_X_EALG_TWOFISHCBC	(~0)
+#endif
 %}
 
 /* common section */
