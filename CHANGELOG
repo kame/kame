@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1493 2001/01/21 11:14:36 jinmei Exp $
+$KAME: CHANGELOG,v 1.1494 2001/01/21 11:15:37 itojun Exp $
 
 <200101>
+Sun Jan 21 JST 2001  itojun@iijlab.net
+	* libinet6/getaddrinfo.c: disallow invalid scope identifier
+	  (like fe80::1%junk).  it was broken around Jan 5 2001.
+
 2001-01-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sbin/ifconfig/ifconfig.c (main): set IPv6 address
 	lifetimes correctly (i.e. set infinite). Without this, ifconfig
