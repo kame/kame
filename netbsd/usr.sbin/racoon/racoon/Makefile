@@ -1,7 +1,11 @@
 PROG=	racoon
-SRCS=	handler.c isakmp.c isakmp_inf.c ipsec_doi.c pfkey.c main.c \
-	post_com.c schedule.c session.c crypto.c cfparse.c cftoken.c \
-	admin.c misc.c vmbuf.c
+SRCS=	main.c session.c isakmp.c handler.c \
+	isakmp_ident.c isakmp_agg.c \
+	isakmp_quick.c isakmp_inf.c isakmp_newg.c \
+	pfkey.c admin.c ipsec_doi.c oakley.c grabmyaddr.c signing.c \
+	policy.c localconf.c remoteconf.c crypto_openssl.c algorithm.c \
+	cfparse.c cftoken.c strnames.c \
+	vmbuf.c plog.c logger.c schedule.c str2val.c misc.c sockmisc.c
 
 # debugging code with print-isakmp.c
 SRCS+=	print-isakmp.c

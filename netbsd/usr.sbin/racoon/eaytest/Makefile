@@ -1,5 +1,6 @@
 PROG=	eaytest
-SRCS=	eaytest.c crypto.c misc.c vmbuf.c
+SRCS=	eaytest.c crypto_openssl.c misc.c vmbuf.c str2val.c
+CPPFLAGS+=	-DNOUSE_PLOG
 
 NOMAN=	yes
 
