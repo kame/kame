@@ -1746,6 +1746,8 @@ passive()
 	int len;
 	char *p, *a;
 
+	if (pdata >= 0)
+		close(pdata);
 	pdata = socket(AF_INET, SOCK_STREAM, 0);
 	if (pdata < 0 || !logged_in) {
 		perror_reply(425, "Can't open passive connection");
@@ -1824,6 +1826,8 @@ long_passive(char *cmd, int pf)
 		}
 	}
  		
+	if (pdata >= 0)
+		close(pdata);
 	pdata = socket(ctrl_addr.su_family, SOCK_STREAM, 0);
 	if (pdata < 0) {
 		perror_reply(425, "Can't open passive connection");
