@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.70 2001/09/12 07:09:57 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.71 2001/09/12 07:25:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -581,7 +581,7 @@ encap_remove(ep)
 	LIST_REMOVE(ep, chain);
 #ifdef USE_RADIX
 	if (!ep->func && rnh) {
-		if (! rnh->rnh_deladdr((caddr_t)ep->addrpack,
+		if (!rnh->rnh_deladdr((caddr_t)ep->addrpack,
 		    (caddr_t)ep->maskpack, rnh))
 			error = ESRCH;
 	}
