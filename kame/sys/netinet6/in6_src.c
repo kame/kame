@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.56 2001/08/18 05:37:22 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.57 2001/08/18 05:42:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -352,10 +352,19 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 				NEXT(7);
 		}
 
-		/* Rule 8: Use longest matching prefix. */
+		/*
+		 * Rule 14: Use longest matching prefix.
+		 * Note: in the address selection draft, this rule is
+		 * documented as "Rule 8".  However, since it is also
+		 * documented that this rule can be overridden, we assign
+		 * a large number so that it is easy to assign smaller numbers
+		 * to higher preferred rules.
+		 */
 		new_matchlen = in6_matchlen(&ia->ia_addr.sin6_addr, dst);
 		if (best_matchlen < new_matchlen)
-			REPLACE(8);
+			REPLACE(14);
+
+		/* Rule is 15 is reserved. */
 
 		/*
 		 * Last resort: just keep the current candidate.
