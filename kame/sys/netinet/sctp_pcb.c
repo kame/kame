@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.23 2003/08/29 06:37:38 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.24 2003/10/22 09:02:47 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.c,v 1.207 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -2096,7 +2096,7 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 		printf("Adding an address (from:%d) to the peer: ", from);
 		sctp_print_address(newaddr);
 	}
-#endif  SCTP_DEBUG 
+#endif
 	netfirst = sctp_findnet(tasoc, newaddr);
 	if (netfirst) {
 		/* Lie and return ok, we don't want to 

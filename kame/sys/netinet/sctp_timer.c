@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.16 2003/08/29 06:37:38 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.17 2003/10/22 09:02:47 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_timer.c,v 1.60 2002/04/04 17:47:19 randall Exp	*/
 
 /*
@@ -346,7 +346,7 @@ sctp_backoff_on_timeout(struct sctp_inpcb *ep,
 			printf("collapse cwnd to 1MTU ssthresh to %d\n",
 			       net->ssthresh);
 		}
-#endif SCTP_DEBUG 
+#endif
 
 	}
 }
@@ -550,7 +550,7 @@ sctp_mark_all_for_resend(struct sctp_tcb *tcb,
 			printf("WIN_PROBE set via o_rwnd=0 tf=0 and all:%d fit in mtu:%d\n",
 			       orig_flight, net->mtu);
 		}
-#endif  SCTP_DEBUG
+#endif
 	}
 
 	if (audit_tf) {
