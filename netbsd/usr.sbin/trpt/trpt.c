@@ -1,4 +1,4 @@
-/*	$NetBSD: trpt.c,v 1.12 2001/09/11 15:45:01 thorpej Exp $	*/
+/*	$NetBSD: trpt.c,v 1.18 2003/09/19 08:24:07 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -49,11 +49,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -81,7 +77,7 @@ __COPYRIGHT(
 #if 0
 static char sccsid[] = "@(#)trpt.c	8.1 (Berkeley) 6/6/93";
 #else
-__RCSID("$NetBSD: trpt.c,v 1.12 2001/09/11 15:45:01 thorpej Exp $");
+__RCSID("$NetBSD: trpt.c,v 1.18 2003/09/19 08:24:07 itojun Exp $");
 #endif
 #endif /* not lint */
 
@@ -133,9 +129,11 @@ __RCSID("$NetBSD: trpt.c,v 1.12 2001/09/11 15:45:01 thorpej Exp $");
 #include <unistd.h>
 
 struct nlist nl[] = {
-#define	N_TCP_DEBUG	0
+#define	N_HARDCLOCK_TICKS	0
+	{ "_hardclock_ticks" },
+#define	N_TCP_DEBUG		1
 	{ "_tcp_debug" },
-#define	N_TCP_DEBX	1
+#define	N_TCP_DEBX		2
 	{ "_tcp_debx" },
 	{ NULL },
 };
@@ -165,12 +163,13 @@ main(argc, argv)
 	int ch, i, jflag, npcbs;
 	char *system, *core, *cp, errbuf[_POSIX2_LINE_MAX];
 	gid_t egid = getegid();
+	unsigned long l;
 
 	(void)setegid(getgid());
 	system = core = NULL;
 
 	jflag = npcbs = 0;
-	while ((ch = getopt(argc, argv, "afjp:st")) != -1) {
+	while ((ch = getopt(argc, argv, "afjp:stN:M:")) != -1) {
 		switch (ch) {
 		case 'a':
 			++aflag;
@@ -186,9 +185,13 @@ main(argc, argv)
 			if (npcbs >= TCP_NDEBUG)
 				errx(1, "too many pcbs specified");
 			errno = 0;
-			tcp_pcbs[npcbs++] = (caddr_t)strtoul(optarg, &cp, 16);
-			if (*cp != '\0' || errno == ERANGE)
+			cp = NULL;
+			l = strtoul(optarg, &cp, 16);
+			tcp_pcbs[npcbs] = (caddr_t)l;
+			if (*optarg == '\0' || *cp != '\0' || errno ||
+			    (unsigned long)tcp_pcbs[npcbs] != l)
 				errx(1, "invalid address: %s", optarg);
+			npcbs++;
 			break;
 		case 's':
 			++sflag;
@@ -202,7 +205,6 @@ main(argc, argv)
 		case 'M':
 			core = optarg;
 			break;
-		case '?':
 		default:
 			usage();
 			/* NOTREACHED */
@@ -510,12 +512,17 @@ skipact:
 	if (tflag) {
 		register char *cp = "\t";
 		register int i;
+		int hardticks;
+
+		if (kvm_read(kd, nl[N_HARDCLOCK_TICKS].n_value,
+		    (char *)&hardticks, sizeof(hardticks)) != sizeof(hardticks))
+			errx(3, "hardclock_ticks: %s", kvm_geterr(kd));
 
 		for (i = 0; i < TCPT_NTIMERS; i++) {
-			if ((tp->t_timer[i].c_flags & CALLOUT_ACTIVE) == 0)
+			if ((tp->t_timer[i].c_flags & CALLOUT_PENDING) == 0)
 				continue;
-			printf("%s%s=%llu", cp, tcptimers[i],
-			    (unsigned long long) tp->t_timer[i].c_time);
+			printf("%s%s=%d", cp, tcptimers[i],
+			    tp->t_timer[i].c_time - hardticks);
 			if (i == TCPT_REXMT)
 				printf(" (t_rxtshft=%d)", tp->t_rxtshift);
 			cp = ", ";
