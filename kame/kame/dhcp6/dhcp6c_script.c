@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_script.c,v 1.7 2003/08/01 07:06:53 suz Exp $	*/
+/*	$KAME: dhcp6c_script.c,v 1.8 2003/10/31 05:51:46 suz Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -66,22 +66,21 @@ static char ntpserver_str[] = "new_ntp_servers";
 
 static int safefile __P((const char *));
 
-void
-client6_script(ifp, state, optinfo)
-	struct dhcp6_if *ifp;
+int
+client6_script(scriptpath, state, optinfo)
+	char *scriptpath;
 	int state;
 	struct dhcp6_optinfo *optinfo;
 {
-	int i, dnsservers, ntpservers, dnsnamelen, envc, elen;
-	char **envp, *s, *scriptpath;
+	int i, dnsservers, ntpservers, dnsnamelen, envc, elen, ret = 0;
+	char **envp, *s;
 	char reason[] = "REASON=NBI";
 	struct dhcp6_listval *v;
 	pid_t pid, wpid;
 
 	/* if a script is not specified, do nothing */
-	if (ifp->scriptpath == NULL)
-		return;
-	scriptpath = ifp->scriptpath;
+	if (scriptpath == NULL || strlen(scriptpath) == 0)
+		return -1;
 
 	/* initialize counters */
 	dnsservers = 0;
@@ -106,7 +105,7 @@ client6_script(ifp, state, optinfo)
 	if ((envp = malloc(sizeof (char *) * envc)) == NULL) {
 		dprintf(LOG_NOTICE, FNAME,
 		    "failed to allocate environment buffer");
-		return;
+		return -1;
 	}
 	memset(envp, 0, sizeof (char *) * envc);
 
@@ -118,6 +117,7 @@ client6_script(ifp, state, optinfo)
 	if ((envp[i++] = strdup(reason)) == NULL) {
 		dprintf(LOG_NOTICE, FNAME,
 		    "failed to allocate reason strings");
+		ret = -1;
 		goto clean;
 	}
 	/* "var=addr1 addr2 ... addrN" + null char for termination */
@@ -127,6 +127,7 @@ client6_script(ifp, state, optinfo)
 		if ((s = envp[i++] = malloc(elen)) == NULL) {
 			dprintf(LOG_NOTICE, FNAME,
 			    "failed to allocate strings for DNS servers");
+			ret = -1;
 			goto clean;
 		}
 		memset(s, 0, elen);
@@ -146,6 +147,7 @@ client6_script(ifp, state, optinfo)
 		if ((s = envp[i++] = malloc(elen)) == NULL) {
 			dprintf(LOG_NOTICE, FNAME,
 			    "failed to allocate strings for NTP servers");
+			ret = -1;
 			goto clean;
 		}
 		memset(s, 0, elen);
@@ -165,6 +167,7 @@ client6_script(ifp, state, optinfo)
 		if ((s = envp[i++] = malloc(elen)) == NULL) {
 			dprintf(LOG_NOTICE, FNAME,
 			    "failed to allocate strings for DNS name");
+			ret = -1;
 			goto clean;
 		}
 		memset(s, 0, elen);
@@ -180,6 +183,7 @@ client6_script(ifp, state, optinfo)
 	pid = fork();
 	if (pid < 0) {
 		dprintf(LOG_ERR, FNAME, "failed to fork: %s", strerror(errno));
+		ret = -1;
 		goto clean;
 	} else if (pid) {
 		int wstatus;
@@ -208,7 +212,7 @@ client6_script(ifp, state, optinfo)
 			exit(1);
 		}
 
-		if ((fd = open("/dev/null", O_RDWR)) != -1) {
+		if (foreground == 0 && (fd = open("/dev/null", O_RDWR)) != -1) {
 			dup2(fd, STDIN_FILENO);
 			dup2(fd, STDOUT_FILENO);
 			dup2(fd, STDERR_FILENO);
@@ -228,7 +232,7 @@ client6_script(ifp, state, optinfo)
 		free(envp[i]);
 	free(envp);
 
-	return;
+	return ret;
 }
 
 static int

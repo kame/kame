@@ -1,5 +1,5 @@
 #
-# $Id: Makefile.in,v 1.24 2003/09/29 04:03:05 jinmei Exp $
+# $Id: Makefile.in,v 1.25 2003/10/31 05:51:46 suz Exp $
 #
 
 srcdir=	@srcdir@
@@ -8,7 +8,7 @@ LDFLAGS=@LDFLAGS@
 LIBOBJS=@LIBOBJS@
 LIBS=	@LIBS@ -ly -ll
 CC=	@CC@
-TARGET=	dhcp6c dhcp6s dhcp6relay
+TARGET=	dhcp6c dhcp6s dhcp6relay dhcp6lc
 
 INSTALL=@INSTALL@
 INSTALL_PROGRAM=@INSTALL_PROGRAM@
@@ -33,6 +33,7 @@ CLIENTOBJS=	dhcp6c.o common.o config.o prefixconf.o dhcp6c_ia.o timer.o \
 	dhcp6c_script.o $(GENSRCS:%.c=%.o)
 SERVOBJS=	dhcp6s.o common.o config.o timer.o $(GENSRCS:%.c=%.o)
 RELAYOBJS =	dhcp6relay.o common.o timer.o
+LITECLIENTOBJS=	dhcp6lc.o common.o if.o timer.o dhcp6c_script.o
 CLEANFILES+=	y.tab.h
 
 all:	$(TARGET) 
@@ -42,6 +43,8 @@ dhcp6s:	$(SERVOBJS) $(LIBOBJS)
 	$(CC) $(LDFLAGS) -o dhcp6s $(SERVOBJS) $(LIBOBJS) $(LIBS) 
 dhcp6relay: $(RELAYOBJS) $(LIBOBJS)
 	$(CC) $(LDFLAGS) -o $@ $(RELAYOBJS) $(LIBOBJS) $(LIBS) 
+dhcp6lc:$(LITECLIENTOBJS) $(LIBOBJS)
+	$(CC) $(LDFLAGS) -o $@ $(LITECLIENTOBJS) $(LIBOBJS) $(LIBS)
 
 cfparse.c y.tab.h: cfparse.y
 	yacc -d cfparse.y

@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.34 2003/08/06 19:53:36 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.35 2003/10/31 05:51:46 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -49,7 +49,6 @@
 
 extern int errno;
 
-struct dhcp6_if *dhcp6_if;
 struct prefix_ifconf *prefix_ifconflist;
 struct dhcp6_list dnslist, dnsnamelist, ntplist;
 
@@ -91,56 +90,6 @@ static void clear_iaconf __P((struct ia_conflist *));
 static void clear_hostconf __P((struct host_conf *));
 static int configure_duid __P((char *, struct duid *));
 static int get_default_ifid __P((struct prefix_ifconf *));
-
-void
-ifinit(ifname)
-	char *ifname;
-{
-	struct dhcp6_if *ifp;
-
-	if ((ifp = find_ifconfbyname(ifname)) != NULL) {
-		dprintf(LOG_NOTICE, FNAME, "duplicated interface: %s", ifname);
-		return;
-	}
-
-	if ((ifp = malloc(sizeof(*ifp))) == NULL) {
-		dprintf(LOG_ERR, FNAME, "malloc failed");
-		goto die;
-	}
-	memset(ifp, 0, sizeof(*ifp));
-
-	TAILQ_INIT(&ifp->event_list);
-
-	if ((ifp->ifname = strdup(ifname)) == NULL) {
-		dprintf(LOG_ERR, FNAME, "failed to copy ifname");
-		goto die;
-	}
-
-	if ((ifp->ifid = if_nametoindex(ifname)) == 0) {
-		dprintf(LOG_ERR, FNAME, "invalid interface(%s): %s",
-			ifname, strerror(errno));
-		goto die;
-	}
-#ifdef HAVE_SCOPELIB
-	if (inet_zoneid(AF_INET6, 2, ifname, &ifp->linkid)) {
-		dprintf(LOG_ERR, FNAME, "failed to get link ID for %s",
-		    ifname);
-		goto die;
-	}
-#else
-	ifp->linkid = ifp->ifid; /* XXX */
-#endif
-
-	TAILQ_INIT(&ifp->reqopt_list);
-	TAILQ_INIT(&ifp->iaconf_list);
-
-	ifp->next = dhcp6_if;
-	dhcp6_if = ifp;
-	return;
-
-  die:
-	exit(1);
-}
 
 int
 configure_interface(iflist)
@@ -1054,34 +1003,6 @@ add_prefix(head, name, prefix0)
 	}
 
 	return (0);
-}
-
-struct dhcp6_if *
-find_ifconfbyname(ifname)
-	char *ifname;
-{
-	struct dhcp6_if *ifp;
-
-	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
-		if (strcmp(ifp->ifname, ifname) == 0)
-			return (ifp);
-	}
-
-	return (NULL);
-}
-
-struct dhcp6_if *
-find_ifconfbyid(id)
-	unsigned int id;
-{
-	struct dhcp6_if *ifp;
-
-	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
-		if (ifp->ifid == id)
-			return (ifp);
-	}
-
-	return (NULL);
 }
 
 struct ia_conf *
