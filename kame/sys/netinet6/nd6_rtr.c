@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.125 2001/06/29 09:47:26 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.126 2001/06/29 11:51:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -86,7 +86,7 @@ static void pfxrtr_add __P((struct nd_prefix *, struct nd_defrouter *));
 static void pfxrtr_del __P((struct nd_pfxrouter *));
 static struct nd_pfxrouter *find_pfxlist_reachable_router
 	__P((struct nd_prefix *));
-static void defrouter_delreq __P((struct nd_defrouter *, int));
+static void defrouter_delreq __P(());
 static void defrouter_addifreq __P((struct ifnet *));
 static void nd6_rtmsg __P((int, struct rtentry *));
 
@@ -593,43 +593,6 @@ defrouter_lookup(addr, ifp)
 	return(NULL);		/* search failed */
 }
 
-static void
-defrouter_delreq(dr, dofree)
-	struct nd_defrouter *dr;
-	int dofree;
-{
-	struct sockaddr_in6 def, mask, gate;
-	struct rtentry *oldrt = NULL;
-
-	Bzero(&def, sizeof(def));
-	Bzero(&mask, sizeof(mask));
-	Bzero(&gate, sizeof(gate));
-
-	def.sin6_len = mask.sin6_len = gate.sin6_len
-		= sizeof(struct sockaddr_in6);
-	def.sin6_family = mask.sin6_family = gate.sin6_family = AF_INET6;
-	gate.sin6_addr = dr->rtaddr;
-
-	rtrequest(RTM_DELETE, (struct sockaddr *)&def,
-		  (struct sockaddr *)&gate,
-		  (struct sockaddr *)&mask,
-		  RTF_GATEWAY, &oldrt);
-	if (oldrt) {
-		nd6_rtmsg(RTM_DELETE, oldrt);
-		if (oldrt->rt_refcnt <= 0) {
-			/*
-			 * XXX: borrowed from the RTM_DELETE case of
-			 * rtrequest().
-			 */
-			oldrt->rt_refcnt++;
-			rtfree(oldrt);
-		}
-	}
-
-	if (dofree)		/* XXX: necessary? */
-		free(dr, M_IP6NDP);
-}
-
 void
 defrtrlist_del(dr)
 	struct nd_defrouter *dr;
@@ -676,6 +639,39 @@ defrtrlist_del(dr)
 }
 
 /*
+ * Remove the default route for a given router.
+ * This is just a subroutine function for defrouter_select(), and should
+ * not be called from anywhere else.
+ */
+static void
+defrouter_delreq()
+{
+	struct sockaddr_in6 def, mask;
+	struct rtentry *oldrt = NULL;
+
+	Bzero(&def, sizeof(def));
+	Bzero(&mask, sizeof(mask));
+
+	def.sin6_len = mask.sin6_len = sizeof(struct sockaddr_in6);
+	def.sin6_family = mask.sin6_family = AF_INET6;
+
+	rtrequest(RTM_DELETE, (struct sockaddr *)&def, NULL,
+		  (struct sockaddr *)&mask,
+		  RTF_GATEWAY, &oldrt);
+	if (oldrt) {
+		nd6_rtmsg(RTM_DELETE, oldrt);
+		if (oldrt->rt_refcnt <= 0) {
+			/*
+			 * XXX: borrowed from the RTM_DELETE case of
+			 * rtrequest().
+			 */
+			oldrt->rt_refcnt++;
+			rtfree(oldrt);
+		}
+	}
+}
+
+/*
  * Default Router Selection according to Section 6.3.6 of RFC 2461:
  * 1) Routers that are reachable or probably reachable should be
  *    preferred.
@@ -693,7 +689,7 @@ defrouter_select()
 #else
 	int s = splnet();
 #endif
-	struct nd_defrouter *dr, anydr;
+	struct nd_defrouter *dr;
 	struct rtentry *rt = NULL;
 	struct llinfo_nd6 *ln = NULL;
 
@@ -742,8 +738,7 @@ defrouter_select()
 		 * the head entry will be used anyway.
 		 * XXX: do we have to check the current routing table entry?
 		 */
-		bzero(&anydr, sizeof(anydr));
-		defrouter_delreq(&anydr, 0);
+		defrouter_delreq();
 		defrouter_addreq(dr);
 	}
 	else {
@@ -762,8 +757,7 @@ defrouter_select()
 			 * De-install the current default route
 			 * in advance.
 			 */
-			bzero(&anydr, sizeof(anydr));
-			defrouter_delreq(&anydr, 0);
+			defrouter_delreq();
 			if (nd6_defifp) {
 				/*
 				 * Install a route to the default interface
