@@ -1,4 +1,4 @@
-/*	$KAME: ftp.c,v 1.16 2002/06/23 14:36:30 itojun Exp $	*/
+/*	$KAME: ftp.c,v 1.17 2002/06/23 14:39:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -491,6 +491,7 @@ passivefail:
 			n = snprintf(sbuf, sizeof(sbuf),
 				"500 could not translate from PASV\r\n");
 			if (n < 0 || n >= sizeof(sbuf))
+				n = 0;
 			if (n)
 				write(src, sbuf, n);
 			return n;
