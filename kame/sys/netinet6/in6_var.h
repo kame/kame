@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.39 2000/08/12 08:08:00 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.40 2000/08/12 09:47:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -98,6 +98,8 @@ struct in6hash {
 	struct	in6_addr in6h_addr;
 	struct	in6_ifaddr *in6h_ifa;
 	int	in6h_flags;
+	int	in6h_hit;	/* number of hits for this entry */
+	int	in6h_miss;	/* number of failures for this entry */
 };
 #endif
 

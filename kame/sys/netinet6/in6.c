@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.100 2000/08/12 08:08:00 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.101 2000/08/12 09:47:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2603,6 +2603,9 @@ void
 in6h_addifa(ia)
 	struct in6_ifaddr *ia;
 {
+	if (ia->ia6_hash.in6h_ifa == NULL)
+		ia->ia6_hash.in6h_ifa = ia;
+
 	ia->ia6_hash.in6h_addr = IA6_SIN6(ia)->sin6_addr; /* scope? */
 	if (IN6_IS_ADDR_UNSPECIFIED(&ia->ia6_hash.in6h_addr))
 		return;
@@ -2683,12 +2686,16 @@ in6h_lookup(addr, ifp)
 
 	for (ih = in6hash[HASH6(addr) % in6_nhash]; ih; ih = ih->in6h_next) {
 		if (IN6_ARE_ADDR_EQUAL(&ih->in6h_addr, addr)) {
+			ih->in6h_hit++;
+
 			if (ih->in6h_ifa == NULL ||
 			    ih->in6h_ifa->ia_ifp == ifp || ifp == NULL)
 				return (ih);
 			if (maybe_ih == NULL)
 				maybe_ih = ih;
 		}
+		else
+			ih->in6h_miss++;
 	}
 	return (maybe_ih);
 }
