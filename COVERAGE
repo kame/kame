@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.67 2000/08/06 16:44:45 itojun Exp $
+$KAME: COVERAGE,v 1.68 2000/08/11 02:53:06 itojun Exp $
 
 
 x: supported/integrated
@@ -35,6 +35,9 @@ KAME extended resolver (IPv6 transport, EDNS0, bogus address filtering)
 
 CMSG passing in unix domain socket obeys CMSG_xx
 		-	-	-	-	x	-	-
+
+faithd support in inetd
+		x	-	-	-	-	x	-
 
 
 (+): see above for KAME/*BSD differences
