@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.3 2001/08/07 08:06:14 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.4 2001/09/20 06:07:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -158,7 +158,11 @@ void hif_attach __P((void *));
 #else
 void hif_attach __P((int));
 #endif
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__)
+static void hif_rtrequest __P((int, struct rtentry *, struct rt_addrinfo *));
+#else
 static void hif_rtrequest __P((int, struct rtentry *, struct sockaddr *));
+#endif
 
 #ifdef __FreeBSD__
 PSEUDO_SET(hif_attach, if_hif);
@@ -202,7 +206,7 @@ hif_attach(dummy)
 #ifdef HAVE_OLD_BPF
 		bpfattach(&sc->hif_if, DLT_NULL, sizeof(u_int));
 #else
-		bpfattach(&sc->hif_if.if_bpf, &sc->mip6_if, DLT_NULL, sizeof(u_int));
+		bpfattach(&sc->hif_if.if_bpf, &sc->hif_if, DLT_NULL, sizeof(u_int));
 #endif /* HAVE_OLD_BPF */
 #endif /* NBPFILTER > 0 */
 
@@ -600,9 +604,18 @@ hif_coa_get_ifaddr(hcoa)
 		return (NULL);
 
 	match = NULL;
+#if defined(__OpenBSD__) || defined(__NetBSD__)
+	for (ia = hcoa->hcoa_ifp->if_addrlist.tqh_first;
+	     ia;
+	     ia = ia->ifa_list.tqe_next)
+#elif defined(__FreeBSD_) && __FreeBSD__ >= 3
 	for (ia = hcoa->hcoa_ifp->if_addrhead.tqh_first;
 	     ia;
-	     ia = ia->ifa_link.tqe_next) {
+	     ia = ia->ifa_link.tqe_next)
+#else
+	for (ia = hcoa->hcoa_ifp->if_addrlist; ia; ia = ia->ifa_next)
+#endif
+	{
 		if (ia->ifa_addr->sa_family != AF_INET6)
 			continue;
 		ia6 = (struct in6_ifaddr *)ia;
@@ -1071,10 +1084,17 @@ hif_subnet_list_update_withmpfx(sc, data)
 }
 
 static void
+#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__)
+hif_rtrequest(cmd, rt, info)
+	int cmd;
+	struct rtentry *rt;
+	struct rt_addrinfo *info;
+#else
 hif_rtrequest(cmd, rt, sa)
 	int cmd;
 	struct rtentry *rt;
 	struct sockaddr *sa;
+#endif
 {
 	/* Copyed from lortrequest. */
 	if (rt) {
