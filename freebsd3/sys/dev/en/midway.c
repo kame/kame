@@ -1365,7 +1365,7 @@ caddr_t data;
 		    sprintf(ifr->ifr_name, "%s%d",
 			    sifp->if_name, sifp->if_unit);
 #if defined(__KAME__) && defined(INET6)
-		    in6_ifattach(sifp, IN6_IFT_P2P, sc->macaddr, 0);
+		    in6_ifattach(sifp);
 #endif
 		  }
 		  else
