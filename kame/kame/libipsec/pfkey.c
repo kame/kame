@@ -28,7 +28,7 @@
  */
 
 #ifndef lint
-static char *rcsid = "@(#) pfkey.c $Revision: 1.5 $";
+static char *rcsid = "@(#) pfkey.c $Revision: 1.6 $";
 #endif
 
 #include <sys/types.h>
@@ -954,11 +954,19 @@ int
 pfkey_open()
 {
 	int so;
+	const int bufsiz = 128 * 1024;	/*is 128K enough?*/
 
 	if ((so = socket(PF_KEY, SOCK_RAW, PF_KEY_V2)) < 0) {
 		ipsec_set_strerror(strerror(errno));
 		return -1;
 	}
+
+	/*
+	 * This is a temporary workaround for KAME PR 154.
+	 * Don't really care even if it fails.
+	 */
+	(void)setsockopt(so, SOL_SOCKET, SO_SNDBUF, &bufsiz, sizeof(bufsiz));
+	(void)setsockopt(so, SOL_SOCKET, SO_RCVBUF, &bufsiz, sizeof(bufsiz));
 
 	ipsec_errcode = EIPSEC_NO_ERROR;
 	return so;
