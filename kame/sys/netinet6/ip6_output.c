@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.274 2002/01/08 02:40:57 k-sugyou Exp $	*/
+/*	$KAME: ip6_output.c,v 1.275 2002/01/10 12:56:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3257,10 +3257,12 @@ ip6_clearpktopts(pktopt, optname)
 	struct ip6_pktopts *pktopt;
 	int optname;
 {
-	int needfree = pktopt->needfree;
+	int needfree;
 
 	if (pktopt == NULL)
 		return;
+
+	needfree = pktopt->needfree;
 
 	if (optname == -1 || optname == IPV6_PKTINFO) {
 		if (needfree && pktopt->ip6po_pktinfo)
