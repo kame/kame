@@ -256,7 +256,7 @@ log_level
 			/* command line option has a priority than it. */
 			if (!f_debugcmd) {
 				u_long v;
-				v = strtoul($1.v, NULL, 0);
+				v = strtoul($1.v, NULL, 16);
 				debug |= v;
 			}
 			free($1.v);
