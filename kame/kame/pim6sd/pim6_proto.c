@@ -1285,7 +1285,6 @@ join_or_prune(mrtentry_ptr, upstream_router)
     return (PIM_ACTION_NOTHING);
 }
 
-
 /* TODO: too long, simplify it! */
 #define PIM6_JOIN_PRUNE_MINLEN (4 + PIM6_ENCODE_UNI_ADDR_LEN + 4)
 
