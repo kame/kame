@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.57 2001/08/17 06:00:55 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.58 2001/08/17 06:09:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -551,6 +551,13 @@ portstr
 	|	BLCL ANY ELCL
 		{
 			$$.buf = strdup("0");
+			$$.len = strlen($$.buf);
+		}
+	|	BLCL DECSTRING ELCL
+		{
+			char buf[20];
+			snprintf(buf, sizeof(buf), "%lu", $2);
+			$$.buf = strdup(buf);
 			$$.len = strlen($$.buf);
 		}
 	|	BLCL STRING ELCL
