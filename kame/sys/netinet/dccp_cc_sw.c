@@ -25,8 +25,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: dccp_cc_sw.c,v 1.1 2003/10/17 07:27:26 ono Exp $
+ * $Id: dccp_cc_sw.c,v 1.2 2003/10/17 11:34:27 ono Exp $
  */
+
+#include "opt_dccp.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -40,7 +42,9 @@
 #include <sys/signalvar.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 #include <sys/sx.h>
+#endif
 #include <sys/sysctl.h>
 #include <sys/syslog.h>
 #include <sys/queue.h>
@@ -60,7 +64,9 @@
 
 #include <netinet/dccp.h>
 #include <netinet/dccp_var.h>
+#ifdef DCCP_TFRC
 #include <netinet/dccp_tfrc.h>
+#endif
 #include <netinet/dccp_tcplike.h>
 #include <netinet/dccp_cc_sw.h>
 
@@ -72,7 +78,9 @@ struct dccp_cc_sw cc_sw[] = {
   {tcplike_send_init,tcplike_send_free,tcplike_send_packet,tcplike_send_packet_sent,
    tcplike_send_packet_recv,
    tcplike_recv_init,tcplike_recv_free,tcplike_recv_packet_recv},
+#ifdef DCCP_TFRC
   {tfrc_send_init,tfrc_send_free,tfrc_send_packet,tfrc_send_packet_sent,
    tfrc_send_packet_recv,
    tfrc_recv_init,tfrc_recv_free,tfrc_recv_packet_recv}
+#endif
 };

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * * $Id: dccp_usrreq.c,v 1.1 2003/10/17 07:27:26 ono Exp $
+ * * $Id: dccp_usrreq.c,v 1.2 2003/10/17 11:34:27 ono Exp $
  */
 
 /*
@@ -125,7 +125,11 @@
 #define ACK_DEBUG(args)
 #endif
 
+#ifdef DCCP_TFRC
 #define DEFAULT_CCID 2
+#else
+#define DEFAULT_CCID 1
+#endif
 
 /* Congestion control switch table */
 extern struct dccp_cc_sw cc_sw[];

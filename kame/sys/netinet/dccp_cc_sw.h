@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: dccp_cc_sw.h,v 1.1 2003/10/17 07:27:26 ono Exp $
+ * $Id: dccp_cc_sw.h,v 1.2 2003/10/17 11:34:27 ono Exp $
  */
 
 #ifndef _NETINET_DCCP_CC_SW_H_
@@ -94,6 +94,10 @@ struct dccp_cc_sw {
 };
 
 /* Max ccid (i.e. cc_sw has DCCP_CC_MAX_CCID+2 elements) */
+#ifdef DCCP_TFRC
 #define DCCP_CC_MAX_CCID 3
+#else
+#define DCCP_CC_MAX_CCID 2
+#endif
 
 #endif
