@@ -2857,6 +2857,8 @@ sourceroute(ai, arg, cpp, protop, optp)
 		break;
 #ifdef INET6
 	case AF_INET6:
+#ifdef IPV6_PKTOPTIONS
+		/* RFC2292 */
 		cmsg = inet6_rthdr_init(rhbuf, IPV6_RTHDR_TYPE_0);
 		if (*cp != '@')
 			return -1;
@@ -2864,6 +2866,10 @@ sourceroute(ai, arg, cpp, protop, optp)
 		*protop = IPPROTO_IPV6;
 		*optp = IPV6_PKTOPTIONS;
 		break;
+#else
+		/* no advanced API */
+		return -1;
+#endif
 #endif
 	default:
 		return -1;
