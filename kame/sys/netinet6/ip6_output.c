@@ -1304,7 +1304,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 
 #if defined(HAVE_NRL_INPCB)
-	rcvopts = &inp->in6p_inputopts;
+	rcvopts = &inp->inp_inputopts6;
 #else
 	rcvopts = &in6p->in6p_inputopts;
 #endif
