@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.153 2003/04/17 13:47:10 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.154 2003/04/22 05:38:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -181,6 +181,8 @@ struct explore {
 #define WILD_AF(ex)		((ex)->e_wild & 0x01)
 #define WILD_SOCKTYPE(ex)	((ex)->e_wild & 0x02)
 #define WILD_PROTOCOL(ex)	((ex)->e_wild & 0x04)
+#define WILD_ACTIVE(ex)		((ex)->e_wild & 0x08)
+#define WILD_PASSIVE(ex)	((ex)->e_wild & 0x10)
 };
 
 static const struct explore explore[] = {
@@ -188,23 +190,27 @@ static const struct explore explore[] = {
 	{ PF_LOCAL, ANY, ANY, NULL, 0x01 },
 #endif
 #ifdef INET6
-	{ PF_INET6, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x07 },
+	{ PF_INET6, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x1f },
 #if 0	/*???*/
-	{ PF_INET6, SOCK_DGRAM, IPPROTO_SCTP, "sctp", 0x07 },
+	{ PF_INET6, SOCK_DGRAM, IPPROTO_SCTP, "sctp", 0x1f },
 #endif
-	{ PF_INET6, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x07 },
-	{ PF_INET6, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x07 },
-	{ PF_INET6, SOCK_SEQPACKET, IPPROTO_SCTP, "sctp", 0x07 },
-	{ PF_INET6, SOCK_RAW, ANY, NULL, 0x05 },
+	{ PF_INET6, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x0f },
+	{ PF_INET6, SOCK_STREAM, IPPROTO_TCP, "sctp", 0x0f },
+	{ PF_INET6, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x17 },
+	{ PF_INET6, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x17 },
+	{ PF_INET6, SOCK_SEQPACKET, IPPROTO_SCTP, "sctp", 0x1f },
+	{ PF_INET6, SOCK_RAW, ANY, NULL, 0x1d },
 #endif
-	{ PF_INET, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x07 },
+	{ PF_INET, SOCK_DGRAM, IPPROTO_UDP, "udp", 0x1f },
 #if 0	/*???*/
-	{ PF_INET, SOCK_DGRAM, IPPROTO_SCTP, "sctp", 0x07 },
+	{ PF_INET, SOCK_DGRAM, IPPROTO_SCTP, "sctp", 0x1f },
 #endif
-	{ PF_INET, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x07 },
-	{ PF_INET, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x07 },
-	{ PF_INET, SOCK_SEQPACKET, IPPROTO_SCTP, "sctp", 0x07 },
-	{ PF_INET, SOCK_RAW, ANY, NULL, 0x05 },
+	{ PF_INET, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x0f },
+	{ PF_INET, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x0f },
+	{ PF_INET, SOCK_STREAM, IPPROTO_TCP, "tcp", 0x17 },
+	{ PF_INET, SOCK_STREAM, IPPROTO_SCTP, "sctp", 0x17 },
+	{ PF_INET, SOCK_SEQPACKET, IPPROTO_SCTP, "sctp", 0x1f },
+	{ PF_INET, SOCK_RAW, ANY, NULL, 0x1d },
 	{ -1, 0, 0, NULL, 0 },
 };
 
@@ -432,7 +438,7 @@ getaddrinfo(hostname, servname, hints, res)
 	const struct explore *ex;
 	struct addrinfo *afailist[sizeof(afdl)/sizeof(afdl[0])];
 	struct addrinfo *afai_unspec;
-	int pass, found;
+	int found;
 	int numeric = 0;
 
 	/* ensure we return NULL on errors */
@@ -628,8 +634,6 @@ getaddrinfo(hostname, servname, hints, res)
 #endif
 
 globcopy:
-	pass = 1;
-copyagain:
 	for (ex = explore; ex->e_af >= 0; ex++) {
 		*pai = ai0;
 
@@ -653,22 +657,12 @@ copyagain:
 			continue;
 #endif
 
-		/*
-		 * XXX: Dirty hack.  Some passive applications only assume
-		 * a single entry returned and makes a socket for the head
-		 * entry.  In such a case, it would be safer to return
-		 * "traditional" socktypes (e.g. TCP/UDP) first.
-		 * We should, ideally, fix the applications rather than to
-		 * introduce the grotty workaround in the library, but we do
-		 * not want to break deployed apps just due to adding a new
-		 * protocol type.
-		 */
-		if ((pai->ai_flags & AI_PASSIVE)) {
-			if (pass == 1 && ex->e_protocol == IPPROTO_SCTP)
-				continue;
-			if (pass == 2 && ex->e_protocol != IPPROTO_SCTP)
-				continue;
-		}
+		if ((pai->ai_flags & AI_PASSIVE) != 0 && WILD_ACTIVE(ex))
+			;
+		else if ((pai->ai_flags & AI_PASSIVE) == 0 && WILD_PASSIVE(ex))
+			;
+		else
+			continue;
 
 		if (pai->ai_family == PF_UNSPEC)
 			pai->ai_family = ex->e_af;
@@ -699,8 +693,6 @@ copyagain:
 		while (cur && cur->ai_next)
 			cur = cur->ai_next;
 	}
-	if ((pai->ai_flags & AI_PASSIVE) && ++pass <= 2)
-		goto copyagain;
 
 	/* XXX inhibit errors if we have the result */
 	if (sentinel.ai_next)
