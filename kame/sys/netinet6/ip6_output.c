@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.132 2000/11/21 12:29:55 kawa Exp $	*/
+/*	$KAME: ip6_output.c,v 1.133 2000/11/27 14:18:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -876,12 +876,20 @@ skip_ipsec2:;
 	}
 
 	/*
-	 * advanced API (IPV6_USE_MIN_MTU) overrides mtu setting
+	 * advanced API (IPV6_USE_MIN_MTU or IPV6_USE_MTU - the latter is
+	 * KAME-specific at this moment -) overrides mtu setting. We ignore
+	 * the specified MTU if it is larger than the already-known path MTU.
+	 * XXX: which should be preferred, if both IPV6_USE_MIN_MTU and
+	 * IPV6_USE_MTU are specified?
 	 */
 	if (mtu > IPV6_MMTU) {
 		if ((opt && (opt->ip6po_flags & IP6PO_MINMTU)) ||
 		    (flags & IPV6_MINMTU)) {
 			mtu = IPV6_MMTU;
+		}
+		else if (opt && (opt->ip6po_mtu != -1) &&
+			 mtu > opt->ip6po_mtu) {
+			mtu = opt->ip6po_mtu;
 		}
 	}
 
@@ -3178,6 +3186,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 
 	bzero(opt, sizeof(*opt));
 	opt->ip6po_hlim = -1; /* -1 means to use default hop limit */
+	opt->ip6po_mtu = -1; /* -1 means not to specify the MTU */
 	opt->ip6po_tclass = 0x00;
 	opt->needfree = needcopy;
 
@@ -3422,6 +3431,14 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 			if (cm->cmsg_len != CMSG_LEN(0))
 				return(EINVAL);
 			opt->ip6po_flags |= IP6PO_MINMTU;
+			break;
+
+		case IPV6_USE_MTU:
+			if (cm->cmsg_len != CMSG_LEN(sizeof(int)))
+				return(EINVAL);
+			opt->ip6po_mtu = *(int *)CMSG_DATA(cm);
+			if (opt->ip6po_mtu < IPV6_MINMTU)
+				return(EINVAL);
 			break;
 
 		default:
