@@ -1328,6 +1328,8 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPV6CTL_USE_DEPRECATED:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 				&ip6_use_deprecated);
+	case IPV6CTL_RR_PRUNE:
+		return sysctl_int(oldp, oldlenp, newp, newlen, &ip6_rr_prune);
 #if defined(__NetBSD__) && !defined(INET6_BINDV6ONLY)
 	case IPV6CTL_BINDV6ONLY:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
