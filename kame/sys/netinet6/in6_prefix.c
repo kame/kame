@@ -1,4 +1,4 @@
-/*	$KAME: in6_prefix.c,v 1.38 2001/01/06 06:07:19 jinmei Exp $	*/
+/*	$KAME: in6_prefix.c,v 1.39 2001/01/21 09:53:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -582,7 +582,7 @@ in6_prefix_add_ifid(int iilen, struct in6_ifaddr *ia)
 		} else if (rap->ra_addr != ia) {
 			/* There may be some inconsistencies between addrs. */
 			log(LOG_ERR, "ip6_prefix.c: addr %s/%d matched prefix"
-			    "has already another ia %p(%s) on its ifid list\n",
+			    " already has another ia %p(%s) on its ifid list\n",
 			    ip6_sprintf(IA6_IN6(ia)), plen,
 			    rap->ra_addr,
 			    ip6_sprintf(IA6_IN6(rap->ra_addr)));
