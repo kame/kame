@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.108 2004/02/10 14:43:26 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.109 2004/05/24 03:51:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1461,6 +1461,7 @@ pfx_flush()
 	strlcpy(dummyif, "lo0", sizeof(dummyif)); /* dummy */
 	if (ioctl(s, SIOCSPFXFLUSH_IN6, (caddr_t)&dummyif) < 0)
 		err(1, "ioctl(SIOCSPFXFLUSH_IN6)");
+	close(s);
 }
 
 void
