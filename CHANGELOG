@@ -1,8 +1,21 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.890 2000/05/17 10:18:34 sumikawa Exp $
+$Id: CHANGELOG,v 1.891 2000/05/17 12:42:05 jinmei Exp $
 
 <200005>
+2000-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_output): 
+	* kame/sys/netinet6/ip6_output.c (ip6_output):
+	made scoped addresses more friendly with loopback interfaces;
+	if a packet containing scoped addresses in the source or
+	destination address fields is going to be sent on a loopback
+	interface, pass looutput() the interface to which the scoped
+	address(es) belongs.
+	For example, you won't see "lo0" when you ping to your own
+	link-local address.
+	This is currently experimental and enabled only when the
+	FAKE_LOOPBACK_IF kernel compile option is specified.
+
 Wed May 17 19:09:51 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* kame/freebsd3/ports/{squid11, qmail}: upgrade to latest IPv6
 	  patch.
