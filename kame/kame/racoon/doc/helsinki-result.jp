@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.28 2001/08/16 04:55:34 itojun Exp $
+$KAME: helsinki-result.jp,v 1.29 2001/08/16 05:02:13 itojun Exp $
 
 
 generic
@@ -25,6 +25,8 @@ generic
 
 	phase 2で、ipsec enc modeがついていなかったときの取り扱い
 	(transport modeと思ってよいのではないか)。
+
+	長いKEYMATの計算のとき、必要鍵長の計算にbugあり (修正済)
 
 
 latest isakmpd on KAME

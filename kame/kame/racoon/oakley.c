@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.95 2001/08/14 14:55:27 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.96 2001/08/16 05:02:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -412,6 +412,8 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 	int pfs = 0;
 	int dupkeymat;	/* generate K[1-dupkeymat] */
 	struct saproto *pr;
+	struct satrns *tr;
+	int encklen, authklen, l;
 
 	pfs = ((iph2->approval->pfs_group && iph2->dhgxy) ? 1 : 0);
 	
@@ -460,12 +462,56 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 		if (res == NULL)
 			goto end;
 
-		/* a guess: ESP: 128bit minimum, AH: 160 bit minimum */
-		dupkeymat = ((pr->len ? pr->len : 128) + 160) / 8 / res->l;
+		/* compute key length needed */
+		encklen = authklen = 0;
+		switch (pr->proto_id) {
+		case IPSECDOI_PROTO_IPSEC_ESP:
+#if 0
+			/* safety: ESP uses max 192bit, for fixed-keylen */
+			/* safety: ESP hash uses max 512bit, for fixed-keylen */
+			encklen = 192;
+			authklen = 512;
+#endif
+			for (tr = pr->head; tr; tr = tr->next) {
+				l = alg_ipsec_encdef_keylen(tr->trns_id,
+				    tr->encklen);
+				if (l > encklen)
+					encklen = l;
+
+				l = alg_ipsec_hmacdef_hashlen(tr->authtype);
+				if (l > authklen)
+					authklen = l;
+			}
+			break;
+		case IPSECDOI_PROTO_IPSEC_AH:
+#if 0
+			/* safety: AH uses max 512bit, for fixed-keylen */
+			authklen = 512;
+#endif
+			for (tr = pr->head; tr; tr = tr->next) {
+				l = alg_ipsec_hmacdef_hashlen(tr->trns_id);
+				if (l > authklen)
+					authklen = l;
+			}
+			break;
+		default:
+#if 0
+			/* safety: ESP 192 + AH 512 */
+			encklen = 192;
+			authklen = 512;
+#endif
+			break;
+		}
+		plog(LLV_DEBUG, LOCATION, NULL, "encklen=%d authklen=%d\n",
+		    encklen, authklen);
+
+		dupkeymat = (encklen + authklen) / 8 / res->l;
 		dupkeymat += 2;	/* safety mergin */
 		if (dupkeymat < 3)
 			dupkeymat = 3;
-		plog(LLV_DEBUG, LOCATION, NULL, "dupkeymat=%d\n", dupkeymat);
+		plog(LLV_DEBUG, LOCATION, NULL,
+		    "generating %d bits of key (dupkeymat=%d)\n",
+		    dupkeymat * 8 * res->l, dupkeymat);
 		if (0 < --dupkeymat) {
 			vchar_t *prev = res;	/* K(n-1) */
 			vchar_t *seed = NULL;	/* seed for Kn */
