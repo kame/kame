@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.51 2001/12/17 08:36:27 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.52 2001/12/18 01:30:44 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2664,6 +2664,10 @@ mip6_tunnel_control(action, entry, func, ep)
 					&mip6_tunnel_protosw,
 					(void *)entry);
 		if (*ep == NULL) {
+			mip6log((LOG_ERR,
+				 "%s:%d: "
+				 "encap entry create failed.\n",
+				 __FILE__, __LINE__));
 			return (EINVAL);
 		}
 		break;
@@ -2892,20 +2896,32 @@ mip6_tunnel_output(mp, mbc)
 	dst.sin6_family = AF_INET6;
 	dst.sin6_addr = mbc->mbc_pcoa;
 
-	if (ep->af != AF_INET6)
+	if (ep->af != AF_INET6) {
+		mip6log((LOG_ERR,
+			 "%s:%d: illegal address family type %d\n",
+			 __FILE__, __LINE__, ep->af));
 		return (EFAULT);
+	}
 
 	/* Recursion problems? */
 
-	if (IN6_IS_ADDR_UNSPECIFIED(encap_src))
+	if (IN6_IS_ADDR_UNSPECIFIED(encap_src)) {
+		mip6log((LOG_ERR,
+			 "%s:%d: the encap source address is unspecified\n",
+			 __FILE__, __LINE__));
 		return (EFAULT);
+	}
 
 	len = m->m_pkthdr.len; /* payload length */
 
 	if (m->m_len < sizeof(*ip6)) {
 		m = m_pullup(m, sizeof(*ip6));
-		if (!m)
+		if (!m) {
+			mip6log((LOG_ERR,
+				 "%s:%d: m_pullup failed\n",
+				 __FILE__, __LINE__));
 			return (ENOBUFS);
+		}
 	}
 	ip6 = mtod(m, struct ip6_hdr *);
 
@@ -2915,7 +2931,7 @@ mip6_tunnel_output(mp, mbc)
 		m = m_pullup(m, sizeof(struct ip6_hdr));
 	if (m == NULL) {
 		mip6log((LOG_ERR,
-			 "%s:%d: ENOBUFS in mip6_tunnel_output\n",
+			 "%s:%d: outer header allocation failed\n",
 			 __FILE__, __LINE__));
 		return (ENOBUFS);
 	}
@@ -2934,8 +2950,11 @@ mip6_tunnel_output(mp, mbc)
 	if (!IN6_IS_ADDR_UNSPECIFIED(encap_dst))
 		ip6->ip6_dst = *encap_dst;
 	else {
+		mip6log((LOG_ERR,
+			 "%s:%d: the encap dest address is unspecified\n",
+			 __FILE__, __LINE__));
 		m_freem(m);
-		return ENETUNREACH;
+		return (ENETUNREACH);
 	}
 #if defined(IPV6_MINMTU) && 0
 	/*

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.86 2001/11/28 11:08:55 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.87 2001/12/18 01:30:43 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -373,8 +373,17 @@ ip6_forward(m, srcrt)
 
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
 						   &ip6->ip6_dst);
-		if (mbc && (mbc->mbc_flags & IP6_BUF_HOME)) {
-			/* we are acting as a home agent for ip6_dst. */
+		if (mbc &&
+		    (mbc->mbc_flags & IP6_BUF_HOME) &&
+		    (mbc->mbc_encap != NULL)) {
+			/*
+			 * if we have a binding cache entry for the
+			 * ip6_dst, we are acting as a home agent for
+			 * that node.  before sending a packet as a
+			 * tunneled packet, we must make sure that
+			 * encaptab is ready.  if dad is enabled and
+			 * not completed yet, encaptab will be NULL.
+			 */
 			if (mip6_tunnel_output(&m, mbc) != 0) {
 				ip6stat.ip6s_cantforward++;
 			}
