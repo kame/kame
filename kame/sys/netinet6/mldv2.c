@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.2 2004/02/06 07:29:07 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.3 2004/02/06 07:56:48 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -471,6 +471,7 @@ mld6_input(m, off)
 	int timer = 0;		/* timer value in the MLD query header */
 	struct mldv2_hdr *mldv2h;
 	int query_ver = 0;
+	int query_type;
 	u_int16_t mldlen;
 	struct router6_info *rt6i;
 
@@ -484,7 +485,6 @@ mld6_input(m, off)
 		return;
 	}
 #endif
-	mldv2h = (struct mldv2_hdr *) mldh;
 
 	/* source address validation */
 	ip6 = mtod(m, struct ip6_hdr *); /* in case mpullup */
@@ -513,8 +513,7 @@ mld6_input(m, off)
 		    "mld6_input: src %s is not link-local (grp=%s)\n",
 		    ip6_sprintf(&ip6->ip6_src), ip6_sprintf(&mldh->mld_addr));
 #endif
-		m_freem(m);
-		return;
+		goto end;
 	}
 
 	/* convert the multicast address into a full sockaddr form */
@@ -522,195 +521,22 @@ mld6_input(m, off)
 	mc_sa.sin6_family = AF_INET6;
 	mc_sa.sin6_len = sizeof(mc_sa);
 	mc_sa.sin6_addr = mldh->mld_addr;
-	if (in6_addr2zoneid(ifp, &mc_sa.sin6_addr, &mc_sa.sin6_scope_id)) {
-		/* XXX: this should not happen! */
-		m_freem(m);
-		return;
-	}
-	if (in6_embedscope(&mc_sa.sin6_addr, &mc_sa)) {
-		/* XXX: this should not happen! */
-		m_freem(m);
-		return;
-	}
+	if (in6_addr2zoneid(ifp, &mc_sa.sin6_addr, &mc_sa.sin6_scope_id))
+		goto end; /* XXX: this should not happen! */
+	if (in6_embedscope(&mc_sa.sin6_addr, &mc_sa))
+		goto end; /* XXX: this should not happen! */
 
 	rt6i = find_rt6i(ifp);
 	if (rt6i == NULL) {
 		mldlog((LOG_DEBUG, "mld_input(): cannot find router6_info at link#%d\n", ifp->if_index));
-		m_freem(m);
-		return;	/* XXX */
+		goto end;
 	}
 
-	/*
-	 * In the MLD specification, there are 3 states and a flag.
-	 *
-	 * In Non-Listener state, we simply don't have a membership record.
-	 * In Delaying Listener state, our timer is running (in6m->in6m_timer)
-	 * In Idle Listener state, our timer is not running (in6m->in6m_timer==0)
-	 *
-	 * The flag is in6m->in6m_state, it is set to MLD_OTHERLISTENER if
-	 * we have heard a report from another member, or MLD_IREPORTEDLAST
-	 * if we sent the last report.
+	/* 
+	 * just transit to idle state preparing for MLDv1-fallback:
+	 * same as mld_input in mld6.c
 	 */
-	switch (mldh->mld_type) {
-	case MLD_LISTENER_QUERY:
-		if (ifp->if_flags & IFF_LOOPBACK)
-			break;
-
-		if (!IN6_IS_ADDR_UNSPECIFIED(&mldh->mld_addr) &&
-		    !IN6_IS_ADDR_MULTICAST(&mldh->mld_addr))
-			break;	/* print error or log stat? */
-
-		all_sa = *all_nodes_linklocal;
-		if (in6_addr2zoneid(ifp, &all_sa.sin6_addr,
-		    &all_sa.sin6_scope_id)) {
-			/* XXX: this should not happen! */
-			break;
-		}
-		if (in6_embedscope(&all_sa.sin6_addr, &all_sa)) {
-			/* XXX: this should not happen! */
-			break;
-		}
-
-		/*
-		 * MLD version and Query type check.
-		 * MLDv1 Query: length = 24 octets AND Max-Resp-Code = 0
-		 * MLDv2 Query: length >= 28 octets AND Max-Resp-Code != 0
-		 * (MLDv1 implementation must accept only the first 24
-		 * octets of the query message)
-		 */
-		mldlen = m->m_pkthdr.len - off;
-		if (mldlen > MLD_MINLEN && mldlen < MLD_V2_QUERY_MINLEN) {
-			mldlog((LOG_DEBUG, "ignores MLD packet with improper length (%d)\n", mldlen));
-			m_freem(m);
-			return;
-		}
-		if (mldlen == MLD_MINLEN) {
-			rt6i->rt6i_type = query_ver = MLD_V1_ROUTER;
-			mldlog((LOG_DEBUG, "regard it as MLDv1 Query from %s for %s\n",
-			       ip6_sprintf(&ip6->ip6_src),
-			       ip6_sprintf(&mldh->mld_addr)));
-		} else {
-			query_ver = MLD_V2_ROUTER;
-			goto mldv2_query;
-		}
-		goto mldv1_query;
-
-mldv1_query:
-		/*
-		 * - Start the timers in all of our membership records
-		 *   that the query applies to for the interface on
-		 *   which the query arrived excl. those that belong
-		 *   to the "all-nodes" group (ff02::1).
-		 * - Restart any timer that is already running but has
-		 *   A value longer than the requested timeout.
-		 * - Use the value specified in the query message as
-		 *   the maximum timeout.
-		 */
-
-		/*
-		 * XXX: System timer resolution is too low to handle Max
-		 * Response Delay, so set the internal timer to 1 even if
-		 * the calculated value equals to zero when Max Response
-		 * Delay is positive.
-		 */
-		timer = ntohs(mldh->mld_maxdelay) * PR_FASTHZ / MLD_TIMER_SCALE;
-		if (timer == 0 && mldh->mld_maxdelay)
-			timer = 1;
-
-
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-		TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
-#elif defined(__FreeBSD__)
-		for (ifma = LIST_FIRST(&ifp->if_multiaddrs);
-		     ifma;
-		     ifma = LIST_NEXT(ifma, ifma_link))
-#else
-		IFP_TO_IA6(ifp, ia);
-		if (ia == NULL)
-			return; /* XXX */
-		for (in6m = LIST_FIRST(&ia->ia6_multiaddrs);
-		     in6m;
-		     in6m = LIST_NEXT(in6m, in6m_entry))
-#endif
-		{
-#ifdef __FreeBSD__
-			if (ifma->ifma_addr->sa_family != AF_INET6)
-				continue;
-			in6m = (struct in6_multi *)ifma->ifma_protospec;
-#endif
-
-			if (IN6_ARE_ADDR_EQUAL(&in6m->in6m_addr,
-			    &all_sa.sin6_addr) ||
-			    IPV6_ADDR_MC_SCOPE(&in6m->in6m_addr) <
-			    IPV6_ADDR_SCOPE_LINKLOCAL)
-				continue;
-
-			if (!IN6_IS_ADDR_UNSPECIFIED(&mldh->mld_addr) &&
-			    !IN6_ARE_ADDR_EQUAL(&mldh->mld_addr,
-			    &in6m->in6m_addr))
-				continue;
-
-			if (timer == 0) {
-				mldlog((LOG_DEBUG, "send a MLDv1 report immediately\n"));
-				/* send a report immediately */
-				mld6_sendpkt(in6m, MLD_LISTENER_REPORT, NULL);
-				in6m->in6m_timer = 0; /* reset timer */
-				in6m->in6m_state = MLD_IREPORTEDLAST;
-			} else if (in6m->in6m_timer == 0 || /*idle state*/
-				   in6m->in6m_timer > timer) {
-				mldlog((LOG_DEBUG, "invoke a MLDv1 timer\n"));
-				in6m->in6m_timer = MLD_RANDOM_DELAY(timer);
-				mld_group_timers_are_running = 1;
-			}
-		}
-
-		/*
-		 * MLDv1 Querier Present is set to Older Version Querier
-		 * Present Timeout seconds whenever an MLDv1 General Query
-		 * is received.
-		 */
-		if (mldalways_v2 == 0 &&
-		    IN6_ARE_ADDR_EQUAL(&mldh->mld_addr, &in6addr_any)) {
-			mldlog((LOG_DEBUG, "shift to MLDv1-compat mode\n"));
-			mld_set_hostcompat(ifp, rt6i, query_ver);
-		}
-		break;
-
-
-mldv2_query:
-		if (query_ver == MLD_V2_ROUTER) {
-			int query_type;
-
-			/* mldlen >= MLD_V2_QUERY_MINLEN */
-			if (IN6_IS_ADDR_UNSPECIFIED(&mldh->mld_addr) &&
-			    mldv2h->mld_numsrc == 0) {
-				query_type = MLD_V2_GENERAL_QUERY;
-				mldlog((LOG_DEBUG, "regard it as MLDv2 general Query\n"));
-			} else if (IN6_IS_ADDR_MULTICAST(&mldh->mld_addr) &&
-				 mldv2h->mld_numsrc == 0) {
-				query_type = MLD_V2_GROUP_QUERY;
-				mldlog((LOG_DEBUG, "regard it as MLDv2 group Query\n"));
-			} else if (IN6_IS_ADDR_MULTICAST(&mldh->mld_addr) &&
-				 ntohs(mldv2h->mld_numsrc) > 0) {
-				query_type = MLD_V2_GROUP_SOURCE_QUERY;
-				mldlog((LOG_DEBUG, "regard it as MLDv2 source-group Query\n"));
-			} else {
-				mldlog((LOG_DEBUG, "ignores MLD packet with invalid format(%d)\n", mldlen));
-				m_freem(m);
-				return;
-			}
-			if (rt6i->rt6i_type == MLD_V1_ROUTER)
-				goto mldv1_query;
-			if (mld_set_timer(ifp, rt6i, mldh, mldlen, query_type)
-			    != 0) {
-				mldlog((LOG_DEBUG, "mld_input: receive bad query\n"));
-				m_freem(m);
-				return;
-			}
-		}
-		break;
-
-	case MLD_LISTENER_REPORT:
+	if (mldh->mld_type == MLD_LISTENER_REPORT) {
 		/*
 		 * For fast leave to work, we have to know that we are the
 		 * last person to send a report for this group.  Reports
@@ -721,10 +547,10 @@ mldv2_query:
 		 * interface to looutput.
 		 */
 		if (m->m_flags & M_LOOP) /* XXX: grotty flag, but efficient */
-			break;
+			goto end;
 
 		if (!IN6_IS_ADDR_MULTICAST(&mldh->mld_addr))
-			break;
+			goto end;
 
 		/*
 		 * If we belong to the group being reported, stop
@@ -735,20 +561,151 @@ mldv2_query:
 			in6m->in6m_timer = 0; /* transit to idle state */
 			in6m->in6m_state = MLD_OTHERLISTENER; /* clear flag */
 		}
-		break;
-	default:
-#if 0
-		/*
-		 * this case should be impossible because of filtering in
-		 * icmp6_input().  But we explicitly disabled this part
-		 * just in case.
-		 */
-		log(LOG_ERR, "mld6_input: illegal type(%d)", mldh->mld_type);
-#endif
-		break;
+		goto end;
 	}
 
+	if (mldh->mld_type != MLD_LISTENER_QUERY)
+		goto end;
+
+	/* MLDv1/v2 Query */
+	if (ifp->if_flags & IFF_LOOPBACK)
+		goto end;
+
+	if (!IN6_IS_ADDR_UNSPECIFIED(&mldh->mld_addr) &&
+	    !IN6_IS_ADDR_MULTICAST(&mldh->mld_addr))
+		goto end;	/* print error or log stat? */
+
+	/* XXX: there should be no error here! */
+	all_sa = *all_nodes_linklocal;
+	if (in6_addr2zoneid(ifp, &all_sa.sin6_addr, &all_sa.sin6_scope_id))
+		goto end;
+	if (in6_embedscope(&all_sa.sin6_addr, &all_sa))
+		goto end;
+
+	/*
+	 * MLD version and Query type check.
+	 * MLDv1 Query: length = 24 octets AND Max-Resp-Code = 0
+	 * MLDv2 Query: length >= 28 octets AND Max-Resp-Code != 0
+	 * (MLDv1 implementation must accept only the first 24
+	 * octets of the query message)
+	 */
+	mldlen = m->m_pkthdr.len - off;
+	if (mldlen > MLD_MINLEN && mldlen < MLD_V2_QUERY_MINLEN) {
+		mldlog((LOG_DEBUG, "invalid MLD packet(len=%d)\n", mldlen));
+		goto end;
+	}
+	if (mldlen == MLD_MINLEN) {
+		rt6i->rt6i_type = query_ver = MLD_V1_ROUTER;
+		mldlog((LOG_DEBUG, "regard it as MLDv1 Query from %s for %s\n",
+		       ip6_sprintf(&ip6->ip6_src),
+		       ip6_sprintf(&mldh->mld_addr)));
+		goto mldv1_query;
+	}
+
+	/* MLDv2 Query: fall back to MLDv1 Query, if necessary */
+	query_ver = MLD_V2_ROUTER;
+
+	/* no buffer-overrun here, since mldlen >= MLD_V2_QUERY_MINLEN */
+	mldv2h = (struct mldv2_hdr *) mldh;
+	if (query_ver != MLD_V2_ROUTER)
+		goto end;
+
+	/* judge query type */
+	if (IN6_IS_ADDR_UNSPECIFIED(&mldh->mld_addr)) {
+		if (mldv2h->mld_numsrc != 0) {
+			mldlog((LOG_DEBUG, "invalid general query(numsrc=%d)\n",
+				mldv2h->mld_numsrc));
+			goto end;
+		}
+		query_type = MLD_V2_GENERAL_QUERY;
+		mldlog((LOG_DEBUG, "MLDv2 general Query\n"));
+		goto set_timer;
+	} 
+	if (IN6_IS_ADDR_MULTICAST(&mldh->mld_addr)) {
+		if (mldv2h->mld_numsrc == 0) {
+			query_type = MLD_V2_GROUP_QUERY;
+			mldlog((LOG_DEBUG, "MLDv2 group Query\n"));
+		} else {
+			query_type = MLD_V2_GROUP_SOURCE_QUERY;
+			mldlog((LOG_DEBUG, "MLDv2 source-group Query\n"));
+		}
+		goto set_timer;
+	}
+	mldlog((LOG_DEBUG, "invalid MLDv2 Query (group=%s)\n",
+		ip6_sprintf(&mldh->mld_addr)));
+	goto end;
+
+set_timer:
+	if (rt6i->rt6i_type == MLD_V1_ROUTER)
+		goto mldv1_query;
+	if (mld_set_timer(ifp, rt6i, mldh, mldlen, query_type) != 0)
+		mldlog((LOG_DEBUG, "mld_input: receive bad query\n"));
+	goto end;
+
+mldv1_query:
+	/* MLDv1 Query: same as mld_input in mld6.c */
+	timer = ntohs(mldh->mld_maxdelay) * PR_FASTHZ / MLD_TIMER_SCALE;
+	if (timer == 0 && mldh->mld_maxdelay)
+		timer = 1;
+
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link)
+#elif defined(__FreeBSD__)
+	for (ifma = LIST_FIRST(&ifp->if_multiaddrs);
+	     ifma;
+	     ifma = LIST_NEXT(ifma, ifma_link))
+#else
+	IFP_TO_IA6(ifp, ia);
+	if (ia == NULL)
+		return; /* XXX */
+	for (in6m = LIST_FIRST(&ia->ia6_multiaddrs);
+	     in6m;
+	     in6m = LIST_NEXT(in6m, in6m_entry))
+#endif
+	{
+#ifdef __FreeBSD__
+		if (ifma->ifma_addr->sa_family != AF_INET6)
+			continue;
+		in6m = (struct in6_multi *)ifma->ifma_protospec;
+#endif
+
+		if (IN6_ARE_ADDR_EQUAL(&in6m->in6m_addr, &all_sa.sin6_addr) ||
+		    IPV6_ADDR_MC_SCOPE(&in6m->in6m_addr) <
+		    IPV6_ADDR_SCOPE_LINKLOCAL)
+			continue;
+
+		if (!IN6_IS_ADDR_UNSPECIFIED(&mldh->mld_addr) &&
+		    !IN6_ARE_ADDR_EQUAL(&mldh->mld_addr, &in6m->in6m_addr))
+			continue;
+
+		if (timer == 0) {
+			mldlog((LOG_DEBUG, "send an MLDv1 report now\n"));
+			/* send a report immediately */
+			mld6_sendpkt(in6m, MLD_LISTENER_REPORT, NULL);
+			in6m->in6m_timer = 0; /* reset timer */
+			in6m->in6m_state = MLD_IREPORTEDLAST;
+		} else if (in6m->in6m_timer == 0 || /*idle state*/
+			   in6m->in6m_timer > timer) {
+			mldlog((LOG_DEBUG, "invoke a MLDv1 timer\n"));
+			in6m->in6m_timer = MLD_RANDOM_DELAY(timer);
+			mld_group_timers_are_running = 1;
+		}
+	}
+
+	/*
+	 * MLDv1 Querier Present is set to Older Version Querier Present 
+	 * Timeout seconds whenever an MLDv1 General Query is received.
+	 */
+	if (mldalways_v2 == 0 &&
+	    IN6_ARE_ADDR_EQUAL(&mldh->mld_addr, &in6addr_any)) {
+		mldlog((LOG_DEBUG, "shift to MLDv1-compat mode\n"));
+		mld_set_hostcompat(ifp, rt6i, query_ver);
+	}
+	goto end;
+
+end:
 	m_freem(m);
+	return;
 }
 
 void
