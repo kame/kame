@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.51 2001/07/24 19:25:19 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.52 2001/07/24 19:26:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -62,8 +62,8 @@
  * The code assumes that radix table code can handle non-continuous netmask,
  * as it will pass radix table memory region with (src + dst) sockaddr pair.
  *
- * FreeBSD is excluded here as they make max_keylen a static variable,
- * forbidding definition of radix table other than proper domains.
+ * FreeBSD is excluded here as they make max_keylen a static variable, and
+ * thus forbid definition of radix table other than proper domains.
  */
 #ifndef __FreeBSD__
 #define USE_RADIX
