@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.22 2000/06/09 00:22:16 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.23 2000/06/12 08:15:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -620,6 +620,11 @@ in6_pcbsetport(laddr, inp, p)
  *
  * this function should be nuked in the future, when we get rid of
  * embedded scopeid thing.
+ *
+ * XXX actually, it is over-specification to return ifp against sin6_scope_id.
+ * there can be multiple interfaces that belong to a particular scope zone
+ * (in specification, we have 1:N mapping between a scope zone and interfaces).
+ * we may want to change the function to return something other than ifp.
  */
 int
 in6_embedscope(in6, sin6, in6p, ifpp)
