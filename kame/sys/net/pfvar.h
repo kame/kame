@@ -44,7 +44,10 @@
 #include <netinet/tcp_fsm.h>
 
 #ifdef __FreeBSD__
+#ifdef _KERNEL
+#include <sys/malloc.h>
 MALLOC_DECLARE(M_PF);
+#endif
 #endif
 
 #define	PF_TCPS_PROXY_SRC	((TCP_NSTATES)+0)
