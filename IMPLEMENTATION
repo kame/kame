@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.317 2002/10/27 04:28:44 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.318 2002/10/30 05:45:53 suz Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -196,6 +196,9 @@ RFC3152: Delegation of IP6.ARPA
     * libinet6 resolvers contained in the KAME snaps support to use
       the ip6.arpa domain (with the nibble format) for IPv6 reverse
       lookups.
+RFC3376: Internet Group Management Protocol, Version 3
+    * host-side implementation on kame/freebsd4, kame/netbsd, and kame/openbsd.
+    * Multicast Source Filter works only for UDP packets.
 draft-ietf-ipngwg-icmp-name-lookups-09: IPv6 Name Lookups Through ICMP
 draft-ietf-dhc-dhcpv6-26.txt: DHCPv6
 draft-ietf-dhc-dhcpv6exts-12.txt: Extensions for DHCPv6
@@ -255,8 +258,8 @@ draft-itojun-ipv6-transition-abuse-01.txt:
 draft-itojun-ipv6-flowlabel-api-01.txt: Socket API for IPv6 flow label field
     * no consideration is made against the use of routing headers and such.
 draft-troan-dhcpv6-opt-prefix-delegation-01.txt: IPv6 Prefix Options for DHCPv6
-draft-vida-mld-v2-03.txt: Multicast Listener Discovery Version 2 (MLDv2) for IPv6
-    * works only on kame/freebsd4 and kame/netbsd.
+draft-vida-mld-v2-05.txt: Multicast Listener Discovery Version 2 (MLDv2) for IPv6
+    * host-side & router-side implementation on kame/freebsd4 and kame/netbsd.
     * Multicast Source Filter works only for UDP packets.
 draft-ietf-idmr-msf-api-03.txt: Socket Interface Extensions for Multicast Source Filters
     * IPv4 works for kame/freebsd4, kame/netbsd, and kame/openbsd.
