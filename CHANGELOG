@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.110 1999/09/13 11:43:26 itojun Exp $
+$Id: CHANGELOG,v 1.111 1999/09/13 11:52:51 itojun Exp $
 
 
 <199909>
@@ -9,6 +9,7 @@ Mon Sep 13 20:42:07 JST 1999  itojun@iijlab.net
 	  with u bit != 0, as source of interface id for pseudo interfaces.
 	  this is because IEEE802/EUI64 addr with u bit != 0 is not globally
 	  unique (there are such ethernet cards exist - yes, I have one).
+	  NOTE: this change may affect your "gif" interface configuration
 
 Mon Sep 13 20:41:07 JST 1999  shin@kame.net
 	* */sys/netinet/raw_ip.c, */sys/netinet/udp_usrreq.c,
