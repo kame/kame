@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.6 2002/10/08 03:13:08 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.7 2002/10/10 05:36:22 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -2134,6 +2134,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	struct in6pcb *ipcbp;
 	struct ip6_moptions *imop;
 	struct in6_multi_mship *imm = NULL;
+	struct sock_msf *msf;
 	struct ifnet *ifp;
 	struct group_filter ogrpf;
 	struct group_filter *grpf;
@@ -2251,10 +2252,10 @@ sock6_setmopt_srcfilter(sop, grpfp)
 			break;
 	}
 	if (imm != NULL) {
+		msf = imm->i6mm_msf;
 		if ((grpf->gf_fmode == MCAST_EXCLUDE) &&
 		    (grpf->gf_numsrc == 0) &&
-		    (imm->i6mm_msf != NULL) &&
-		    (imm->i6mm_msf->msf_grpjoin != 0)) {
+		    (msf && msf->msf_grpjoin != 0)) {
 			splx(s);
 			return EADDRINUSE;
 		}
@@ -2277,6 +2278,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 			FREE(imm, M_IPMADDR);
 			return error;
 		}
+		msf = imm->i6mm_msf;
 		LIST_INSERT_HEAD(&imop->im6o_memberships, imm,
 				 i6mm_chain);
 		init = 1;
@@ -2290,7 +2292,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 		I6AS_LIST_ALLOC(iasl);
 		if (error != 0) {
 			if (init) {
-				IMO_MSF_FREE(imm->i6mm_msf);
+				IMO_MSF_FREE(msf);
 				LIST_REMOVE(imm, i6mm_chain);
 				FREE(imm, M_IPMADDR);
 			}
@@ -2356,7 +2358,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 			FREE(iasl->head, M_MSFILTER);
 			FREE(iasl, M_MSFILTER);
 			if (init) {
-				IMO_MSF_FREE(imm->i6mm_msf);
+				IMO_MSF_FREE(msf);
 				LIST_REMOVE(imm, i6mm_chain);
 				FREE(imm, M_IPMADDR);
 			}
@@ -2375,7 +2377,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 			FREE(iasl->head, M_MSFILTER);
 			FREE(iasl, M_MSFILTER);
 			if (init) {
-				IMO_MSF_FREE(imm->i6mm_msf);
+				IMO_MSF_FREE(msf);
 				LIST_REMOVE(imm, i6mm_chain);
 				FREE(imm, M_IPMADDR);
 			}
@@ -2399,11 +2401,12 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	 */
 	old_ss = NULL;
 	old_mode = MCAST_INCLUDE;
-	if (imm->i6mm_msf->msf_grpjoin != 0)
+	msf = imm->i6mm_msf;
+	if (msf->msf_grpjoin != 0)
 		old_mode = MCAST_EXCLUDE;
-	else if (imm->i6mm_msf->msf_numsrc != 0) {
+	else if (msf->msf_numsrc != 0) {
 		MALLOC(old_ss, struct sockaddr_storage *,
-		       sizeof(*old_ss) * imm->i6mm_msf->msf_numsrc,
+		       sizeof(*old_ss) * msf->msf_numsrc,
 		       M_IPMOPTS, M_NOWAIT);
 		if (old_ss == NULL) {
 			if (ss_src != NULL)
@@ -2412,9 +2415,9 @@ sock6_setmopt_srcfilter(sop, grpfp)
 			return ENOBUFS;
 		}
 		old_mode = MCAST_INCLUDE;
-	} else if (imm->i6mm_msf->msf_blknumsrc != 0) {
+	} else if (msf->msf_blknumsrc != 0) {
 		MALLOC(old_ss, struct sockaddr_storage *,
-			sizeof(*old_ss) * imm->i6mm_msf->msf_blknumsrc,
+			sizeof(*old_ss) * msf->msf_blknumsrc,
 			M_IPMOPTS, M_NOWAIT);
 		if (old_ss == NULL) {
 			if (ss_src != NULL)
@@ -2430,7 +2433,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	 * addresses to old_ss if needed.
 	 */
 	add_num = old_num = 0;
-	error = in6_setmopt_source_list(imm->i6mm_msf, grpf->gf_numsrc,
+	error = in6_setmopt_source_list(msf, grpf->gf_numsrc,
 					(struct sockaddr_in6 *)ss_src,
 					grpf->gf_fmode,
 					&add_num,
@@ -2442,7 +2445,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 		if (ss_src != NULL)
 			FREE(ss_src, M_IPMOPTS);
 		if (init) {
-			IMO_MSF_FREE(imm->i6mm_msf);
+			IMO_MSF_FREE(msf);
 			LIST_REMOVE(imm, i6mm_chain);
 			FREE(imm, M_IPMADDR);		
 		}
@@ -2460,7 +2463,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	final = 0;
 	if ((grpf->gf_fmode == MCAST_INCLUDE) && (grpf->gf_numsrc == 0)) {
 		final = 1;
-		if (imm->i6mm_msf->msf_grpjoin != 0) {
+		if (msf->msf_grpjoin != 0) {
 			in6_delmulti(imm->i6mm_maddr, &error, 0, NULL,
 				     MCAST_EXCLUDE, final);
 			if (error != 0) {
@@ -2476,8 +2479,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 #ifdef MLDV2_DEBUG
 				printf("sock6_setmopt_srcfilter: error %d. undo for IN{non NULL}/EX{non NULL} -> IN{NULL}\n", error);
 #endif
-				in6_undomopt_source_list
-					(imm->i6mm_msf, grpf->gf_fmode);
+				in6_undomopt_source_list(msf, grpf->gf_fmode);
 				if (old_num != 0)
 					FREE(old_ss, M_IPMOPTS);
 				splx(s);
@@ -2501,11 +2503,11 @@ sock6_setmopt_srcfilter(sop, grpfp)
 #ifdef MLDV2_DEBUG
 			printf("sock6_setmopt_srcfilter: error %d. undo for IN{non NULL}/EX{non NULL} -> EX{NULL} or IN{NULL} -> EX{NULL}\n", error);
 #endif
-			in6_undomopt_source_list(imm->i6mm_msf, grpf->gf_fmode);
+			in6_undomopt_source_list(msf, grpf->gf_fmode);
 			if (old_num != 0)
 				FREE(old_ss, M_IPMOPTS);
 			if (init) {
-				IMO_MSF_FREE(imm->i6mm_msf);
+				IMO_MSF_FREE(msf);
 				LIST_REMOVE(imm, i6mm_chain);
 				FREE(imm, M_IPMADDR);
 			}
@@ -2526,8 +2528,7 @@ sock6_setmopt_srcfilter(sop, grpfp)
 #ifdef MLDV2_DEBUG
 				printf("sock6_setmopt_srcfilter: in6_delmulti retuned error=%d. undo.\n", error);
 #endif
-				in6_undomopt_source_list
-					(imm->i6mm_msf, grpf->gf_fmode);
+				in6_undomopt_source_list(msf, grpf->gf_fmode);
 				FREE(old_ss, M_IPMOPTS);
 				if (ss_src != NULL)
 					FREE(ss_src, M_IPMOPTS);
@@ -2542,19 +2543,18 @@ sock6_setmopt_srcfilter(sop, grpfp)
 					   grpf->gf_fmode, old_num,
 					   (struct sockaddr_in6 *)old_ss,
 					   old_mode, init,
-					   imm->i6mm_msf->msf_grpjoin);
+					   msf->msf_grpjoin);
 			if (error != 0) {
 #ifdef MLDV2_DEBUG
 				printf("sock6_setmopt_srcfilter: in6_modmulti returned error=%d. undo.\n", error);
 #endif
-				in6_undomopt_source_list
-					(imm->i6mm_msf, grpf->gf_fmode);
+				in6_undomopt_source_list(msf, grpf->gf_fmode);
 				if (old_num != 0)
 					FREE(old_ss, M_IPMOPTS);
 				if (ss_src != NULL)
 					FREE(ss_src, M_IPMOPTS);
 				if (init) {
-					IMO_MSF_FREE(imm->i6mm_msf);
+					IMO_MSF_FREE(msf);
 					LIST_REMOVE(imm, i6mm_chain);
 					FREE(imm, M_IPMADDR);
 				}
@@ -2572,32 +2572,30 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	 */
 	if (grpf->gf_fmode == MCAST_INCLUDE) {
 		if (old_mode == MCAST_EXCLUDE)
-			in6_freemopt_source_list(imm->i6mm_msf, NULL,
-						 imm->i6mm_msf->msf_blkhead);
+			in6_freemopt_source_list(msf, NULL, msf->msf_blkhead);
 		else {
-			for (msfsrc = LIST_FIRST(imm->i6mm_msf->msf_head);
+			for (msfsrc = LIST_FIRST(msf->msf_head);
 			     msfsrc; msfsrc = nmsfsrc) {
 				nmsfsrc = LIST_NEXT(msfsrc, list);
 				if (msfsrc->refcount == 0) {
 					LIST_REMOVE(msfsrc, list);
 					FREE(msfsrc, M_IPMOPTS);
-					--imm->i6mm_msf->msf_numsrc;
+					--msf->msf_numsrc;
 				} else
 					msfsrc->refcount = 1;
 			}
 		}
 	} else {
 		if (old_mode == MCAST_INCLUDE)
-			in6_freemopt_source_list(imm->i6mm_msf,
-						 imm->i6mm_msf->msf_head, NULL);
+			in6_freemopt_source_list(msf, msf->msf_head, NULL);
 		else {
-			for (msfsrc = LIST_FIRST(imm->i6mm_msf->msf_blkhead);
+			for (msfsrc = LIST_FIRST(msf->msf_blkhead);
 			     msfsrc; msfsrc = nmsfsrc) {
 				nmsfsrc = LIST_NEXT(msfsrc, list);
 				if (msfsrc->refcount == 0) {
 					LIST_REMOVE(msfsrc, list);
 					FREE(msfsrc, M_IPMOPTS);
-					--imm->i6mm_msf->msf_blknumsrc;
+					--msf->msf_blknumsrc;
 				} else
 					msfsrc->refcount = 1;
 			}
@@ -2605,21 +2603,20 @@ sock6_setmopt_srcfilter(sop, grpfp)
 	}
 
 	if (grpf->gf_numsrc == 0) {
-		in6_freemopt_source_list(imm->i6mm_msf, imm->i6mm_msf->msf_head,
-					 imm->i6mm_msf->msf_blkhead);
+		in6_freemopt_source_list(msf, msf->msf_head, msf->msf_blkhead);
 		if (grpf->gf_fmode == MCAST_EXCLUDE)
-			imm->i6mm_msf->msf_grpjoin = 1;
+			msf->msf_grpjoin = 1;
 		/*
 		 * Remove the gap in the membership array if there is no
 		 * msf member.
 		 */
 		if (final) {
-			IMO_MSF_FREE(imm->i6mm_msf);
+			IMO_MSF_FREE(msf);
 			LIST_REMOVE(imm, i6mm_chain);
 			FREE(imm, M_IPMADDR);
 		}
-	} else if (imm->i6mm_msf->msf_grpjoin)
-		imm->i6mm_msf->msf_grpjoin = 0;
+	} else if (msf->msf_grpjoin)
+		msf->msf_grpjoin = 0;
 
 	if (old_ss != NULL)
 		FREE(old_ss, M_IPMOPTS);
@@ -2641,6 +2638,7 @@ sock6_getmopt_srcfilter(sop, grpfp)
 	struct in6pcb *ipcbp;
 	struct ip6_moptions *imop;
 	struct in6_multi_mship *imm;
+	struct sock_msf *msf;
 	struct ifnet *ifp;
 	struct group_filter ogrpf;
 	struct group_filter *grpf;
@@ -2714,15 +2712,16 @@ sock6_getmopt_srcfilter(sop, grpfp)
 		return error;
 	}
 
-	if (imm->i6mm_msf->msf_grpjoin != 0) {
+	msf = imm->i6mm_msf;
+
+	if (msf->msf_grpjoin != 0) {
 		/* (*,G) join */
 		grpf->gf_numsrc = 0;
 		grpf->gf_fmode = MCAST_EXCLUDE;
 		error = copyout((void *)grpf, (void *)*grpfp,
 				GROUP_FILTER_SIZE(0));
 		return error;
-	} else if ((imm->i6mm_msf->msf_numsrc == 0) &&
-			(imm->i6mm_msf->msf_blknumsrc == 0)) {
+	} else if ((msf->msf_numsrc == 0) && (msf->msf_blknumsrc == 0)) {
 		/* no msf entry */
 		grpf->gf_numsrc = 0;
 		grpf->gf_fmode = MCAST_INCLUDE;
@@ -2733,17 +2732,17 @@ sock6_getmopt_srcfilter(sop, grpfp)
 
 	if (grpf->gf_fmode != MCAST_INCLUDE &&
 			grpf->gf_fmode != MCAST_EXCLUDE) {
-		if (imm->i6mm_msf->msf_numsrc > 0)
+		if (msf->msf_numsrc > 0)
 			grpf->gf_fmode = MCAST_INCLUDE;
 		else
 			grpf->gf_fmode = MCAST_EXCLUDE;
 	}
 	if (grpf->gf_fmode == MCAST_INCLUDE) {
-		LIST_FIRST(&head) = LIST_FIRST(imm->i6mm_msf->msf_head);
-		numsrc = min(imm->i6mm_msf->msf_numsrc, grpf->gf_numsrc);
+		LIST_FIRST(&head) = LIST_FIRST(msf->msf_head);
+		numsrc = min(msf->msf_numsrc, grpf->gf_numsrc);
 	} else {
-		LIST_FIRST(&head) = LIST_FIRST(imm->i6mm_msf->msf_blkhead);
-		numsrc = min(imm->i6mm_msf->msf_blknumsrc, grpf->gf_numsrc);
+		LIST_FIRST(&head) = LIST_FIRST(msf->msf_blkhead);
+		numsrc = min(msf->msf_blknumsrc, grpf->gf_numsrc);
 	}
 	grpf->gf_numsrc = numsrc;
 	if ((error = copyout((void *)grpf, (void *)*grpfp,

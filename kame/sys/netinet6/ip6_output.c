@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.340 2002/10/09 12:14:25 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.341 2002/10/10 05:36:22 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3557,6 +3557,7 @@ ip6_setmoptions(optname, im6op, m)
 	struct ifnet *loifp = &loif;
 #endif
 #ifdef MLDV2
+	struct sock_msf *msf;
 	struct sockaddr_storage ss_src, ss_grp;
 	int init;		/* indicate initial group join */
 	int final;		/* indicate final group leave */
@@ -3758,7 +3759,8 @@ ip6_setmoptions(optname, im6op, m)
 		if (imm == NULL)
 			break;
 #ifdef MLDV2
-		imm->i6mm_msf->msf_grpjoin = 1;
+		msf = imm->i6mm_msf;
+		msf->msf_grpjoin = 1;
 #endif
 		LIST_INSERT_HEAD(&im6o->im6o_memberships, imm, i6mm_chain);
 		break;
@@ -3884,7 +3886,8 @@ ip6_setmoptions(optname, im6op, m)
 		imm = in6_joingroup(ifp, SIN6(&ss_grp), &error);
 		if (error != 0)
 			break;
-		imm->i6mm_msf->msf_grpjoin = 1;
+		msf = imm->i6mm_msf;
+		msf->msf_grpjoin = 1;
                 LIST_INSERT_HEAD(&im6o->im6o_memberships, imm, i6mm_chain);
 		break;
 
@@ -3929,18 +3932,20 @@ ip6_setmoptions(optname, im6op, m)
 		/* ToDo: upper limit check */
 
 		if (imm != NULL) {
+			msf = imm->i6mm_msf;
+
 			/*
 			 * If Any-Source join was already requested, return
 			 * EINVAL.
 			 */
-			if (imm->i6mm_msf->msf_grpjoin != 0) {
+			if (msf->msf_grpjoin != 0) {
 				error = EINVAL;
 				break;
 			}
 			/*
 			 * If there is EXCLUDE msf state, return EINVAL.
 			 */
-			if (imm->i6mm_msf->msf_blknumsrc != 0) {
+			if (msf->msf_blknumsrc != 0) {
 				error = EINVAL;
 				break;
 			}
@@ -3949,7 +3954,7 @@ ip6_setmoptions(optname, im6op, m)
 			 * maximum number of sources in a source filter,
 			 * ENOBUFS is generated.
 			 */
-			if (imm->i6mm_msf->msf_numsrc >= mldsomaxsrc) {
+			if (msf->msf_numsrc >= mldsomaxsrc) {
 				error = ENOBUFS;
 				break;
 			}
@@ -3961,6 +3966,7 @@ ip6_setmoptions(optname, im6op, m)
 				break;
 			}
 			IMO_MSF_ALLOC(imm->i6mm_msf);
+			msf = imm->i6mm_msf;
 			if (error != 0) {
 				FREE(imm, M_IPMADDR);
 				break;
@@ -3975,11 +3981,10 @@ ip6_setmoptions(optname, im6op, m)
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
-		error = in6_setmopt_source_addr(SIN6(&ss_src), imm->i6mm_msf,
-						optname);
+		error = in6_setmopt_source_addr(SIN6(&ss_src), msf, optname);
 		if (error != 0) {
 			if (init) {
-				IMO_MSF_FREE(imm->i6mm_msf);
+				IMO_MSF_FREE(msf);
 				LIST_REMOVE(imm, i6mm_chain);
 				FREE(imm, M_IPMADDR);
 			} 
@@ -3996,14 +4001,14 @@ ip6_setmoptions(optname, im6op, m)
 				    SIN6(&ss_src), MCAST_INCLUDE, init);
 		if (error != 0) {
 			if (init) {
-				IMO_MSF_FREE(imm->i6mm_msf);
+				IMO_MSF_FREE(msf);
 				LIST_REMOVE(imm, i6mm_chain);
 			} else {
-				in6_undomopt_source_addr(imm->i6mm_msf, optname);
+				in6_undomopt_source_addr(msf, optname);
 			}
 			break;
 		}
-                in6_cleanmopt_source_addr(imm->i6mm_msf, optname);
+                in6_cleanmopt_source_addr(msf, optname);
 		if (init)
 			 LIST_INSERT_HEAD(&im6o->im6o_memberships, imm, i6mm_chain);
                 break;
@@ -4025,6 +4030,8 @@ ip6_setmoptions(optname, im6op, m)
 			error = EADDRNOTAVAIL;
 			break;
 		}
+		msf = imm->i6mm_msf;
+
 		/*
 		 * Remove source address from the msf.
 		 * If (*,G) join or EXCLUDE join was requested previously,
@@ -4034,16 +4041,14 @@ ip6_setmoptions(optname, im6op, m)
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
-		if ((imm->i6mm_msf->msf_grpjoin != 0) ||
-		    (imm->i6mm_msf->msf_blknumsrc != 0)) {
+		if ((msf->msf_grpjoin != 0) || (msf->msf_blknumsrc != 0)) {
 			error = EINVAL;
 			break;
 		}
-		error = in6_setmopt_source_addr(SIN6(&ss_src), imm->i6mm_msf,
-						optname);
+		error = in6_setmopt_source_addr(SIN6(&ss_src), msf, optname);
 		if (error != 0)
 			break;
-		if (imm->i6mm_msf->msf_numsrc == 0)
+		if (msf->msf_numsrc == 0)
 			final = 1;
 		else
 			final = 0;
@@ -4056,10 +4061,10 @@ ip6_setmoptions(optname, im6op, m)
 			     MCAST_INCLUDE, final);
 		if (error != 0) {
 			printf("ip6_setmoptions: error must be 0! panic!\n");
-			in6_undomopt_source_addr(imm->i6mm_msf, optname);
+			in6_undomopt_source_addr(msf, optname);
 			break; /* strange... */
 		}
-		in6_cleanmopt_source_addr(imm->i6mm_msf, optname);
+		in6_cleanmopt_source_addr(msf, optname);
 
 
 		/*
@@ -4087,14 +4092,16 @@ ip6_setmoptions(optname, im6op, m)
 		}
 		/* ToDo: upper limit check */
 		if (imm != NULL) {
+			msf = imm->i6mm_msf;
+
 			/*
 			 * If there is INCLUDE msf state, return EINVAL.
 			 */
-			if (imm->i6mm_msf->msf_numsrc != 0) {
+			if (msf->msf_numsrc != 0) {
 				error = EINVAL;
 				break;
 			}
-			if (imm->i6mm_msf->msf_blknumsrc >= mldsomaxsrc) {
+			if (msf->msf_blknumsrc >= mldsomaxsrc) {
 				error = ENOBUFS;
 				break;
 			}
@@ -4106,10 +4113,12 @@ ip6_setmoptions(optname, im6op, m)
 				break;
 			}
 			IMO_MSF_ALLOC(imm->i6mm_msf);
+			msf = imm->i6mm_msf;
 			if (error != 0)
 				break;
 			init = 1;
 		}
+
 
 		/*
 		 * Set source address to the msf.
@@ -4118,11 +4127,10 @@ ip6_setmoptions(optname, im6op, m)
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
-		error = in6_setmopt_source_addr(SIN6(&ss_src), imm->i6mm_msf,
-						optname);
+		error = in6_setmopt_source_addr(SIN6(&ss_src), msf, optname);
 		if (error != 0) {
 			if (init)
-				IMO_MSF_FREE(imm->i6mm_msf);
+				IMO_MSF_FREE(msf);
 			break;
 		}
 
@@ -4132,7 +4140,7 @@ ip6_setmoptions(optname, im6op, m)
 		 * But if some error occurs when source list is added to
 		 * the list, undo added msf list from the socket.
 		 */
-		if (imm->i6mm_msf->msf_grpjoin == 0) {
+		if (msf->msf_grpjoin == 0) {
 			/* IN{NULL}/EX{non NULL} -> EX{non NULL} */
 			imm->i6mm_maddr = 
 				in6_addmulti(SIN6(&ss_grp), ifp, &error, 1,
@@ -4140,10 +4148,10 @@ ip6_setmoptions(optname, im6op, m)
 					     init);
 			if (error != 0) {
 				if (init) {
-					IMO_MSF_FREE(imm->i6mm_msf);
+					IMO_MSF_FREE(msf);
 					FREE(imm, M_IPMADDR);
 				} else {
-					in6_undomopt_source_addr(imm->i6mm_msf, optname);
+					in6_undomopt_source_addr(msf, optname);
 				}
 				break;
 			}
@@ -4153,19 +4161,19 @@ ip6_setmoptions(optname, im6op, m)
 				in6_modmulti(SIN6(&ss_grp), ifp, &error, 1,
 					     SIN6(&ss_src), MCAST_EXCLUDE,
 					     0, NULL, MCAST_EXCLUDE, init,
-					     imm->i6mm_msf->msf_grpjoin);
+					     msf->msf_grpjoin);
 			if (imm->i6mm_maddr == NULL) {
 				if (init) {
-					IMO_MSF_FREE(imm->i6mm_msf);
+					IMO_MSF_FREE(msf);
 					FREE(imm, M_IPMADDR);
 				} else {
-					 in6_undomopt_source_addr(imm->i6mm_msf, optname);
+					 in6_undomopt_source_addr(msf, optname);
 				}
 				break;
 			}
-			imm->i6mm_msf->msf_grpjoin = 0;
+			msf->msf_grpjoin = 0;
 		}
-		in6_cleanmopt_source_addr(imm->i6mm_msf, optname);
+		in6_cleanmopt_source_addr(msf, optname);
 		if (init)
 			LIST_INSERT_HEAD(&im6o->im6o_memberships, imm,
 					 i6mm_chain);
@@ -4198,16 +4206,15 @@ ip6_setmoptions(optname, im6op, m)
 		 * If there is not enough memory, return ENOBUFS.
 		 * Otherwise, 0 will be returned, which means okay.
 		 */
-		if ((imm->i6mm_msf->msf_grpjoin != 0) ||
-		    (imm->i6mm_msf->msf_numsrc != 0)) {
+		msf = imm->i6mm_msf;
+		if ((msf->msf_grpjoin != 0) || (msf->msf_numsrc != 0)) {
 			error = EINVAL;
 			break;
 		}
-		error = in6_setmopt_source_addr(SIN6(&ss_src), imm->i6mm_msf,
-						optname);
+		error = in6_setmopt_source_addr(SIN6(&ss_src), msf, optname);
 		if (error != 0)
 			break;
-		if (imm->i6mm_msf->msf_blknumsrc == 0)
+		if (msf->msf_blknumsrc == 0)
 			final = 1;
 		else
 			final = 0;
@@ -4220,10 +4227,10 @@ ip6_setmoptions(optname, im6op, m)
 			     MCAST_EXCLUDE, final);
 		if (error != 0) {
 			printf("ip6_setmoptions: error must be 0! panic!\n");
-			in6_undomopt_source_addr(imm->i6mm_msf, optname);
+			in6_undomopt_source_addr(msf, optname);
 			break; /* strange... */
 		}
-		in6_cleanmopt_source_addr(imm->i6mm_msf, optname);
+		in6_cleanmopt_source_addr(msf, optname);
 
 		/*
 		 * Remove the gap in the membership array if there is no

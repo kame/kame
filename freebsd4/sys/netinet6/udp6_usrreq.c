@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.9 2002/04/28 05:40:27 suz Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.56 2002/10/02 06:15:59 suz Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.57 2002/10/10 05:36:22 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -131,6 +131,7 @@ udp6_input(mp, offp, proto)
 	int plen, ulen;
 	struct sockaddr_in6 *src, *dst, src_storage, dst_storage, fromsa;
 #ifdef MLDV2
+	struct sock_msf *msf;
 	struct ip6_moptions *im6o;
 	struct in6_multi_mship *imm;
 	struct sockaddr_in6 src_h;
@@ -357,7 +358,8 @@ udp6_input(mp, offp, proto)
 				if (SS_CMP(&imm->i6mm_maddr->in6m_sa, !=, dst))
 					continue;
 
-				if (imm->i6mm_msf == NULL) {
+				msf = imm->i6mm_msf;
+				if (msf == NULL) {
 #ifdef MLDV2_DEBUG
 					printf("XXX: unexpected case occured at %s:%d",
 					       __FILE__, __LINE__);
@@ -366,19 +368,17 @@ udp6_input(mp, offp, proto)
 				}
 
 				/* receive data from any source */
-				if (imm->i6mm_msf->msf_grpjoin != 0) {
+				if (msf->msf_grpjoin != 0) {
 					PASS_TO_PCB6();
 					break;
 				}
 				goto search_allow_list;
 
 			search_allow_list:
-				if (imm->i6mm_msf->msf_numsrc == 0)
+				if (msf->msf_numsrc == 0)
 					goto search_block_list;
 
-				LIST_FOREACH(msfsrc,
-					     imm->i6mm_msf->msf_head,
-					     list) {
+				LIST_FOREACH(msfsrc, msf->msf_head, list) {
 					if (msfsrc->src.ss_family != AF_INET6)
 						continue;
 					if (SS_CMP(&msfsrc->src, <, &src_h))
@@ -394,12 +394,10 @@ udp6_input(mp, offp, proto)
 				}
 
 			search_block_list:
-				if (imm->i6mm_msf->msf_blknumsrc == 0)
+				if (msf->msf_blknumsrc == 0)
 					goto end_of_search;
 
-				LIST_FOREACH(msfsrc,
-					     imm->i6mm_msf->msf_blkhead,
-					     list) {
+				LIST_FOREACH(msfsrc, msf->msf_blkhead, list) {
 					if (msfsrc->src.ss_family != AF_INET6)
 						continue;
 					if (SS_CMP(&msfsrc->src, <, &src_h))

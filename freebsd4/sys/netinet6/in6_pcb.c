@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.8 2002/04/28 05:40:26 suz Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.53 2002/09/05 08:09:34 suz Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.54 2002/10/09 10:28:08 suz Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -760,6 +760,7 @@ in6_pcbpurgeif0(head, ifp)
 	struct ip6_moptions *im6o;
 	struct in6_multi_mship *imm, *nimm;
 #ifdef MLDV2
+	struct sock_msf *msf;
 	struct sockaddr_storage *del_ss;
 	u_int16_t numsrc;
 	u_int mode;
@@ -789,9 +790,11 @@ in6_pcbpurgeif0(head, ifp)
 				if (imm->i6mm_maddr->in6m_ifp == ifp) {
 					LIST_REMOVE(imm, i6mm_chain);
 #ifdef MLDV2
-					error = in_getmopt_source_list
-						(imm->i6mm_msf, &numsrc,
-						 &del_ss, &mode);
+					msf = imm->i6mm_msf;
+					error = in_getmopt_source_list(msf,
+								       &numsrc,
+								       &del_ss,
+								       &mode);
 					if (error != 0) {
 						/* XXX strange... panic/skip? */
 						if (del_ss != NULL)
@@ -804,11 +807,10 @@ in6_pcbpurgeif0(head, ifp)
 						     final);
 					if (del_ss != NULL)
 						FREE(del_ss, M_IPMOPTS);
-					in6_freemopt_source_list
-						(imm->i6mm_msf,
-						 imm->i6mm_msf->msf_head,
-						 imm->i6mm_msf->msf_blkhead);
-					IMO_MSF_FREE(imm->i6mm_msf);
+					in6_freemopt_source_list(msf,
+								 msf->msf_head,
+								 msf->msf_blkhead);
+					IMO_MSF_FREE(msf);
 #else
 					in6_delmulti(imm->i6mm_maddr);
 #endif
