@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.36 2001/09/19 04:44:45 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.37 2001/09/19 04:45:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,7 +80,7 @@ static int fflag = 0;
 /* a == b */
 #define TIMEVAL_EQ(a, b) (((a).tv_sec==(b).tv_sec) && ((a).tv_usec==(b).tv_usec))
 
-int main __P((int argc, char *argv[]));
+int main __P((int, char **));
 
 /* static variables and functions */
 static int mobile_node = 0;
@@ -88,26 +88,26 @@ static int do_dump;
 static char *dumpfilename = "/var/run/rtsold.dump"; /* XXX: should be configurable */
 static char *pidfilename = "/var/run/rtsold.pid"; /* should be configurable */
 
-static int ifconfig __P((char *ifname));
+static int ifconfig __P((char *));
 static void iflist_init __P((void));
 #if 0
-static int ifreconfig __P((char *ifname));
+static int ifreconfig __P((char *));
 #endif
-static int make_packet __P((struct ifinfo *ifinfo));
+static int make_packet __P((struct ifinfo *));
 static struct timeval *rtsol_check_timer __P((void));
-static void TIMEVAL_ADD __P((struct timeval *a, struct timeval *b,
-			     struct timeval *result));
-static void TIMEVAL_SUB __P((struct timeval *a, struct timeval *b,
-			     struct timeval *result));
+static void TIMEVAL_ADD __P((struct timeval *, struct timeval *,
+	struct timeval *));
+static void TIMEVAL_SUB __P((struct timeval *, struct timeval *,
+	struct timeval *));
 
 static void rtsold_set_dump_file __P((void));
-static void usage __P((char *progname));
+static void usage __P((char *));
 static char **autoifprobe __P((void));
 
 int
 main(argc, argv)
 	int argc;
-	char *argv[];
+	char **argv;
 {
 	int s, maxfd, ch;
 	int rtsock;
