@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.183 1999/10/12 10:13:37 itojun Exp $
+$Id: CHANGELOG,v 1.184 1999/10/13 05:39:17 jinmei Exp $
 
 <199910>
+1999-10-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/bgpd/bgp_util.c (bgp_peerstr): was added to print a
+	BGP-peer address (link-local or global).
+	* kame/kame/bgpd/in6.c (ip6str): took a new argument (ifindex) to
+	print link-identifier as well for a link-local address.
+	* the way to treat the dump file was also changed. See bgpd(8) in
+	detail.
+	
 Tue Oct 12 19:14:53 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/net/ethereal: ethereal port for version 0.7.5.
 
