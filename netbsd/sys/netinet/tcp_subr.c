@@ -1775,6 +1775,8 @@ ipsec4_hdrsiz_tcp(tp)
 {
 	struct inpcb *inp;
 	size_t hdrsiz;
+	struct mbuf *m;
+	struct ip *ip;
 
 	/* XXX mapped addr case (tp->t_in6pcb) */
 	if (!tp || !tp->t_template || !(inp = tp->t_inpcb))
@@ -1782,7 +1784,20 @@ ipsec4_hdrsiz_tcp(tp)
 	switch (tp->t_family) {
 	case AF_INET:
 		/* XXX: should use currect direction. */
-		hdrsiz = ipsec4_hdrsiz(tp->t_template, IPSEC_DIR_OUTBOUND, inp);
+		MGETHDR(m, M_DONTWAIT, MT_DATA);
+		if (!m)
+			return 0;
+
+		m->m_pkthdr.len = m->m_len = sizeof(struct tcpiphdr);
+		ip = mtod(m, struct ip *);
+		bcopy(mtod(tp->t_template, caddr_t), ip,
+		      sizeof(struct tcpiphdr));
+		ip->ip_v = IPVERSION;
+		ip->ip_hl = sizeof(struct ip) >> 2;
+
+		hdrsiz = ipsec4_hdrsiz(m, IPSEC_DIR_OUTBOUND, inp);
+
+		m_freem(m);
 		break;
 	default:
 		hdrsiz = 0;
@@ -1802,9 +1817,9 @@ ipsec6_hdrsiz_tcp(tp)
 
 	if (!tp || !tp->t_template || !(in6p = tp->t_in6pcb))
 		return 0;
+
 	switch (tp->t_family) {
 	case AF_INET6:
-		/* XXX: should use currect direction. */
 		hdrsiz = ipsec6_hdrsiz(tp->t_template, IPSEC_DIR_OUTBOUND, in6p);
 		break;
 	case AF_INET:
