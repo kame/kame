@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.113 2001/09/07 16:44:20 itojun Exp $
+$KAME: COVERAGE,v 1.114 2001/09/13 12:35:33 itojun Exp $
 
 
 x: supported/integrated
@@ -63,7 +63,7 @@ Kernel PPP	x	?	-	-	x	?	?
 (+): see above for KAME/*BSD differences
 
 		KAME	merged *-current	merged
-		*BSD	net	open	free	net151	open29	free43	bsdi42
+		*BSD	net	open	free	net152	open29	free43	bsdi42
 		--	--	--	--	--	--	--	---
 KAME IPv6 as of	latest	early	early	0528	early	early	early	apr00
 			jun00	jun00	2001	jun00	jun00	jun00
