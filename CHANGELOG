@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.261 1999/11/05 13:04:36 itojun Exp $
+$Id: CHANGELOG,v 1.262 1999/11/06 15:20:20 itojun Exp $
 
 <199911>
+Sun Nov  6 JST 1999  itojun@iijlab.net
+	* freebsd2/release: improvements to IPv6+PAO boot floppy.  add
+	  isc dhcp client for easier network configuration.
+	  From: Takahiro Yugawa <yugawa@itjit.ad.jp>
+	* netbsd/distrib: IPv6-ready boot floppy generator code.
+	  At this moment for i386 only.
+	  From: ichiro@ichiro.org
+
 Fri Nov  5 22:02:00 JST 1999  itojun@iijlab.net
 	* kame/sys/netinet6/{ip6_input,icmp6,route6}.c: clarify mbuf
 	  chain requirements.  add m_pulldown experimental code (#ifdef'ed).
