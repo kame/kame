@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.702 2000/03/18 03:10:36 itojun Exp $
+$Id: CHANGELOG,v 1.703 2000/03/18 07:18:54 jinmei Exp $
 
 <200003>
+2000-03-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_output): just sent packets on a p2p
+	interface where NUD is disabled. Withtout this fix, the following
+	would not work:
+	# route add -inet6 default ::1 -ifp gif0
+	Also note that you'll have to do like
+	# ndp -i gif0 -nud
+	to disable NUD.
+
 Sat Mar 18 12:09:15 JST 2000  itojun@iijlab.net
 	* sync with latest ericsson mobile-ip6.
 	  major changes include:
