@@ -366,6 +366,11 @@ int	ip6_gif_hlim = GIF_HLIM;
 int	ip6_gif_hlim = 0;
 #endif
 int	ip6_use_deprecated = 1;	/* allow deprecated addr (RFC2462 5.5.4) */
+int	ip6_rr_prune = 5;	/* router renumbering prefix
+				 * walk list every 5 sec.    */
+#ifdef MAPPED_ADDR_ENABLED
+int	ip6_mapped_addr_on = 1;
+#endif /* MAPPED_ADDR_ENABLED */
 
 u_int32_t ip6_id = 0UL;
 int	ip6_keepfaith = 0;
@@ -522,6 +527,12 @@ SYSCTL_STRING(_net_inet6_ip6, IPV6CTL_KAME_VERSION,
 	kame_version, CTLFLAG_RD,	__KAME_VERSION,		0, "");
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_USE_DEPRECATED,
 	use_deprecated, CTLFLAG_RW,	&ip6_use_deprecated,	0, "");
+SYSCTL_INT(_net_inet6_ip6, IPV6CTL_RR_PRUNE,
+	rr_prune, CTLFLAG_RW,	&ip6_rr_prune,			0, "");
+#ifdef MAPPED_ADDR_ENABLED
+SYSCTL_INT(_net_inet6_ip6, IPV6CTL_MAPPED_ADDR,
+	mapped_addr, CTLFLAG_RW,	&ip6_mapped_addr_on,	0, "");
+#endif /* MAPPED_ADDR_ENABLED */
 
 /* net.inet6.icmp6 */
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_REDIRACCEPT,

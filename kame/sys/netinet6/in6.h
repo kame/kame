@@ -472,8 +472,22 @@ struct in6_pktinfo {
 #define IPV6CTL_GIF_HLIM	19	/* default HLIM for gif encap packet */
 #define IPV6CTL_KAME_VERSION	20
 #define IPV6CTL_USE_DEPRECATED	21	/* use deprecated addr (RFC2462 5.5.4) */
+#define IPV6CTL_RR_PRUNE	22	/* walk timer for router renumbering */
+#ifdef MAPPED_ADDR_ENABLED
+#define IPV6CTL_MAPPED_ADDR	23
+#endif /* MAPPED_ADDR_ENABLED */
 /* New entries should be added here from current IPV6CTL_MAXID value. */
-#define IPV6CTL_MAXID		22
+#define IPV6CTL_MAXID		24
+
+#ifdef MAPPED_ADDR_ENABLED
+#define IPV6CTL_NAMES_MAPPED_ADDR	"mapped_addr"
+#define IPV6CTL_TYPE_MAPPED_ADDR	CTLTYPE_INT
+#define IPV6CTL_VARS_MAPPED_ADDR	&ip6_mapped_addr_on
+#else  /* MAPPED_ADDR_ENABLED */
+#define IPV6CTL_NAMES_MAPPED_ADDR	0
+#define IPV6CTL_TYPE_MAPPED_ADDR	0
+#define IPV6CTL_VARS_MAPPED_ADDR	0
+#endif /* MAPPED_ADDR_ENABLED */
 
 #define IPV6CTL_NAMES { \
 	{ 0, 0 }, \
@@ -498,6 +512,8 @@ struct in6_pktinfo {
 	{ "gifhlim", CTLTYPE_INT }, \
 	{ "kame_version", CTLTYPE_STRING }, \
 	{ "use_deprecated", CTLTYPE_INT }, \
+	{ "rr_prune", CTLTYPE_INT }, \
+	{ IPV6CTL_NAMES_MAPPED_ADDR, IPV6CTL_TYPE_MAPPED_ADDR }, \
 }
 
 #define IPV6CTL_VARS { \
@@ -523,6 +539,8 @@ struct in6_pktinfo {
 	&ip6_gif_hlim, \
 	0, \
 	&ip6_use_deprecated, \
+	&ip6_rr_prune, \
+	IPV6CTL_VARS_MAPPED_ADDR, \
 }
 #endif /* !_XOPEN_SOURCE */
 

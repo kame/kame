@@ -783,7 +783,11 @@ ip6_unknown_opt(optp, m, off)
  */
 void
 ip6_savecontrol(in6p, mp, ip6, m)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+	register struct inpcb *in6p;
+#else
 	register struct in6pcb *in6p;
+#endif
 	register struct mbuf **mp;
 	register struct ip6_hdr *ip6;
 	register struct mbuf *m;

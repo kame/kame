@@ -201,6 +201,12 @@ extern int ip6_auto_flowlabel;
 #if !defined(__FreeBSD__) || __FreeBSD__ < 3
 struct in6pcb;
 #endif
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+extern struct	pr_usrreqs rip6_usrreqs;
+
+struct inpcb;
+struct sockopt;
+#endif
 
 int	icmp6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 void	ip6_init __P((void));
@@ -212,8 +218,13 @@ char *	ip6_get_prevhdr __P((struct mbuf *, int));
 int	ip6_mforward __P((struct ip6_hdr *, struct ifnet *, struct mbuf *));
 int	ip6_process_hopopts __P((struct mbuf *, u_int8_t *, int, u_int32_t *,
 				 u_int32_t *));
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+void	ip6_savecontrol __P((struct inpcb *, struct mbuf **, struct ip6_hdr *,
+		struct mbuf *));
+#else
 void	ip6_savecontrol __P((struct in6pcb *, struct mbuf **, struct ip6_hdr *,
 		struct mbuf *));
+#endif
 int	ip6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 
 void	ip6_forward __P((struct mbuf *, int));
@@ -224,7 +235,11 @@ int	ip6_output __P((struct mbuf *, struct ip6_pktopts *,
 			struct ip6_moptions *));
 int	ip6_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 int	ip6_setpktoptions __P((struct mbuf *, struct ip6_pktopts *, int));
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+int	ip6_optlen __P((struct inpcb *));
+#else
 int	ip6_optlen __P((struct in6pcb *));
+#endif
 
 int	route6_input __P((struct mbuf **, int *, int));
 
