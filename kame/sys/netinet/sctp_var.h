@@ -1,4 +1,4 @@
-/*	$KAME: sctp_var.h,v 1.11 2003/04/18 06:50:07 jinmei Exp $	*/
+/*	$KAME: sctp_var.h,v 1.12 2003/04/18 07:06:50 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_var.h,v 1.46 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -40,30 +40,7 @@
 #include <sys/socketvar.h>
 #endif
 
-#ifdef __FreeBSD__
-#include <netinet/sctp_pcb.h>
-#include <netinet/sctp_uio.h>
-#endif
-
 /* SCTP Kernel structures */
-
-/*
- * SCTP_INPCB structure exported to user-land via sysctl(3).
- * Evil hack: declare only if in_pcb.h and sys/socketvar.h have been
- * included.  Not all of our clients do.
- *
- * XXX don't do this, as sctp_inpcb and stuff are not exposed to userland!
- */
-#ifdef __FreeBSD__
-struct  xsctp_inpcb {
-	size_t xs_len;
-	struct inpcb		xs_inp;
-	struct sctp_inpcb	xs_sctp_inpcb;
-	struct sctp_tcb		xs_sctp_tcb;
-	struct xsocket		xs_socket;
-	u_quad_t		xs_alignment_hack;
-};
-#endif /* __FreeBSD__ */
 
 /*
  * Names for SCTP sysctl objects
@@ -71,7 +48,9 @@ struct  xsctp_inpcb {
 #define SCTPCTL_STATS		1	/* statistics (read-only) */
 #define	SCTPCTL_MAXDGRAM	2	/* max datagram size */
 #define	SCTPCTL_RECVSPACE	3	/* default receive buffer space */
+#if 0
 #define	SCTPCTL_PCBLIST		4	/* list of PCBs for SCTP sockets */
+#endif
 #if 0 /* skip 5 and 6 for now */
 #define SCTPCTL_ASOC_CNT	5	/* number of assoc for zinit */
 #define SCTPCTL_SCALE_VAL	6	/* how to scale up for addr's */
@@ -85,10 +64,10 @@ struct  xsctp_inpcb {
 	{ "stats", CTLTYPE_STRUCT }, \
 	{ "maxdgram", CTLTYPE_INT }, \
 	{ "recvspace", CTLTYPE_INT }, \
-	{ "pcblist", CTLTYPE_STRUCT }, \
+	{ 0, 0 }, \
 	{ "asoccount", CTLTYPE_INT }, \
 	{ "asocscale", CTLTYPE_INT }, \
-        { "autoasconf", CTLTYPE_INT }, \
+	{ "autoasconf", CTLTYPE_INT }, \
 }
 #else
 #define SCTPCTL_NAMES { \
@@ -96,8 +75,8 @@ struct  xsctp_inpcb {
 	{ "stats", CTLTYPE_STRUCT }, \
 	{ "maxdgram", CTLTYPE_INT }, \
 	{ "recvspace", CTLTYPE_INT }, \
-	{ "pcblist", CTLTYPE_STRUCT }, \
-        { "autoasconf", CTLTYPE_INT }, \
+	{ 0, 0 }, \
+	{ "autoasconf", CTLTYPE_INT }, \
 }
 #endif /* if 0 */
 
