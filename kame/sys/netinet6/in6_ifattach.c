@@ -668,6 +668,9 @@ in6_ifattach(ifp, type, laddr, noloop)
 	return;
 }
 
+/*
+ * TODO: cleanup multicast address kludge table (non-freebsd3)
+ */
 void
 in6_ifdetach(ifp)
 	struct ifnet *ifp;
@@ -680,6 +683,10 @@ in6_ifdetach(ifp)
 	struct rtentry *rt;
 	short rtflags;
 	struct sockaddr_in6 sin6;
+	struct in6_multi *in6m;
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	struct in6_multi *in6m_next;
+#endif
 
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
@@ -696,6 +703,12 @@ in6_ifdetach(ifp)
 		}
 
 		ia = (struct in6_ifaddr *)ifa;
+
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		/* leave from all multicast groups joined */
+		while ((in6m = LIST_FIRST(&oia->ia6_multiaddrs)) != NULL)
+			in6_delmulti(in6m);
+#endif
 
 		/* remove from the routing table */
 		if ((ia->ia_flags & IFA_ROUTE)
@@ -741,6 +754,17 @@ in6_ifdetach(ifp)
 
 		free(ia, M_IFADDR);
 	}
+
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	/* leave from all multicast groups joined */
+	for (in6m = LIST_FIRST(&in6_multihead); in6m; in6m = in6m_next) {
+		in6m_next = LIST_NEXT(in6m, in6m_entry);
+		if (in6m->in6m_ifp != ifp)
+			continue;
+		in6_delmulti(in6m);
+		in6m = NULL;
+	}
+#endif
 
 	/* remove route to link-local allnodes multicast (ff02::1) */
 	bzero(&sin6, sizeof(sin6));
