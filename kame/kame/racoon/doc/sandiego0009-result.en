@@ -1,4 +1,4 @@
-$KAME: sandiego0009-result.en,v 1.13 2000/09/20 15:22:00 sakane Exp $
+$KAME: sandiego0009-result.en,v 1.14 2000/09/20 15:40:38 itojun Exp $
 Mon Sep 18 2000 - Fri Sep 22 2000
 Paradise Point Hotel, San Diego, CA
 
@@ -142,5 +142,20 @@ vs Linux FreeSWAN
 	  KAME: jenkins draft, uses oldest key possible
 	  linux: uses latest key possible, and assumes that phase 2 responder
 		will install inbound SA on reception of 1st packet
+
+vs NxNetworks
+	phase 1: responder, main
+	    preshared, 3des-cbc, sha1, DH group 2
+	phase 2: PFS group 2
+	    ESP 3des-cbc, hmac-sha1, tunnel mode, PFS 2
+
+	phase 1: responder, main
+	    preshared, 3des-cbc, md5, DH group 2
+	phase 2: PFS group 2
+	    ESP blowfish, hmac-md5, tunnel mode, no PFS
+
+	Notes:
+	- fragmented packets did not get through NxNet gw.
+	- phase 2 ID: (KAME) the gw itself (NxNet) net10 addr behind NxNet
 
 vs HiFn
