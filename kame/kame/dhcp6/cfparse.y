@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.2 2002/05/01 10:30:34 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.3 2002/05/01 10:31:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -50,6 +50,7 @@ static void cleanup_dhcpoption __P((struct cf_dhcpoption *));
 
 %token INTERFACE IFNAME
 %token SEND
+%token ALLOW
 %token RAPID_COMMIT
 %token INFO_ONLY
 %token NUMBER SLASH EOS BCL ECL STRING
