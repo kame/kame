@@ -1292,6 +1292,17 @@ bgp_output_filter(bnp, rte)
 {
 	struct rpcb *abnp;
 
+	if ((rte->rt_flags & (RTF_BLACKHOLE|RTF_REJECT)) != 0) {
+	  IFLOG(LOG_BGPOUTPUT)
+	    syslog(LOG_DEBUG,
+		   "<%s>: rejected route (%s/%d) not advertised to %s",
+		   __FUNCTION__,
+		   ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		   rte->rt_ripinfo.rip6_plen,
+		   bgp_peerstr(bnp));
+	  return(1);
+	}
+
 	if ((abnp = find_aopen_peer(bnp)) == NULL)
 		return(1);	/* treat it as filtered */
 

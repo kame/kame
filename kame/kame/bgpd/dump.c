@@ -121,14 +121,21 @@ dump_if_rtable(FILE *fp, struct rt_entry *base)
 			rte->rt_ripinfo.rip6_plen,
 			rte->rt_ripinfo.rip6_metric);
 
-		if (rte->rt_flags & (RTF_BGPDIFSTATIC | RTF_BGPDGWSTATIC))
-			fprintf(fp, " static");
-
 		if (rte->rt_flags & RTF_BGPDGWSTATIC) {
 			fprintf(fp, " gateway=%s",
 				ip6str(&rte->rt_gw,
 				       rte->rt_proto.rtp_if->ifi_ifn->if_index));
 		}
+
+		fprintf(fp, " Flags:");
+		if ((rte->rt_flags & (RTF_BGPDIFSTATIC | RTF_BGPDGWSTATIC)))
+			fprintf(fp, " BGPDSTATIC");
+		if ((rte->rt_flags & RTF_REJECT))
+			fprintf(fp, " REJECT");
+		if ((rte->rt_flags & RTF_STATIC))
+			fprintf(fp, " STATIC");
+		if ((rte->rt_flags & RTF_BLACKHOLE))
+			fprintf(fp, " BLACKHOLE");
 
 		fputc('\n', fp);
 

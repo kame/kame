@@ -673,8 +673,6 @@ rip_process_request(ripif, nn)
   /* End of rip_process_request() */
 }
 
-
-
 /*
  *
  *  rip_process_response()
@@ -1240,7 +1238,6 @@ rip_sendmsg(sin, pktinfo, len)
   /* End of rip_sendmsg */
 }
 
-
 /*
  *  rip_make_dump() 
  *    DESCRIPTION: make a RIP dump msg.
@@ -1306,6 +1303,17 @@ rip_make_dump(ripif)
       if ((rte->rt_flags & RTF_UP ||   /* iw97: avoid doublebooking */
 	   (rtp->rtp_type == RTPROTO_RIP &&
 	    rte->rt_flags & RTF_IGP_EGP_SYNC))) {
+
+	if ((rte->rt_flags & (RTF_BLACKHOLE|RTF_REJECT)) != 0) {
+	  IFLOG(LOG_RIP)
+	    syslog(LOG_DEBUG,
+		   "<%s>: rejected route (%s/%d) not advertised on %s",
+		   __FUNCTION__,
+		   ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		   rte->rt_ripinfo.rip6_plen,
+		   ripif->rip_ife->ifi_ifn->if_name);
+	  goto nextroute;
+	}
 
 	agg = rte->rt_aggr.ag_agg;
 

@@ -111,13 +111,13 @@ krt_entry(rtm)
   sin6_dst = sin6_gw = sin6_mask = sin6_genmask = sin6_ifp = 0;
   if ((rtm->rtm_flags & RTF_UP) == 0 ||
 #ifdef __FreeBSD__
-      (rtm->rtm_flags & (RTF_XRESOLVE|RTF_BLACKHOLE|RTF_WASCLONED))
+      (rtm->rtm_flags & (RTF_XRESOLVE|RTF_WASCLONED))
 #endif /* __FreeBSD__ */
 #ifdef __bsdi__
-      (rtm->rtm_flags & (RTF_XRESOLVE|RTF_BLACKHOLE|RTF_CLONED))
+      (rtm->rtm_flags & (RTF_XRESOLVE|RTF_CLONED))
 #endif /*__bsdi__*/
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-      (rtm->rtm_flags & (RTF_XRESOLVE|RTF_BLACKHOLE))
+      (rtm->rtm_flags & (RTF_XRESOLVE))
 #endif /* __NetBSD__ || __OpenBSD__ */
       )
     return;             /* not interested in the link route */
@@ -150,9 +150,11 @@ krt_entry(rtm)
     rtmp += ROUNDUP(sin6_ifp->sin6_len);
   }
 
+#if 0
   /* checking previously added P-to-P self route (1998/04/24) */
   if (IN6_IS_ADDR_LOOPBACK(&sin6_gw->sin6_addr))
     return;
+#endif
 
   /* flush */
   if (!(rtm->rtm_flags & RTF_STATIC)  &&
@@ -167,7 +169,6 @@ krt_entry(rtm)
     }
     return;
   }
-
 
   MALLOC(rrt, struct rt_entry);  /* a new space */
 
@@ -221,6 +222,7 @@ krt_entry(rtm)
     ife->ifi_rte = rrt;
   };
 
+#if 0 /* KAME kernel automatically install such routes */
   /*
    * Add a route for our own address on a point-to-point interface.
    */
@@ -249,6 +251,7 @@ krt_entry(rtm)
     insque(rte, ife->ifi_rte);
     return;
   }
+#endif
   /*  End of krt_entry()  */
 }
 
