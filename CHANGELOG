@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.897 2000/05/18 07:34:37 itojun Exp $
+$Id: CHANGELOG,v 1.898 2000/05/18 12:23:06 sumikawa Exp $
 
 <200005>
+Thu May 18 21:15:32 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/fetchmail: upgrade to 5.4.0
+	* freebsd3/ports/heimdal: upgrade to 0.2t.
+	* freebsd3/ports/w3m: upgrade to 0.1.9.
+	* freebsd3/ports/netperf: use latest IPv6 patch.
+
 Thu May 18 16:34:18 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/mail/fetchmail: upgrade to 5.4.0.
 
