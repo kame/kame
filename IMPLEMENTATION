@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/08/20 13:03:36 $
+			$Date: 1999/08/20 14:16:06 $
 
 1. IPv6
 
@@ -16,7 +16,7 @@ come with KAME, or comments in the source code.
 
 Conformance tests have been performed on the previous KAME STABLE kit at
 TAHI project.
-Results can be viewed at http://www.tahi.org/report/KAME/freebsd-stable-9903/.
+Results can be viewed at http://www.tahi.org/report/KAME/freebsd-stable-9907/.
 We also attended Univ. of New Hampshire IOL tests (http://www.iol.unh.edu/)
 in the past, with our past snapshots.
 
@@ -36,8 +36,7 @@ RFC2283: Multiprotocol Extensions for BGP-4
     * so-called "BGP4+".
     * KAME-supplied bgpd supports this.
 RFC2292: Advanced Sockets API for IPv6
-    * For supported library functions/kernel APIs, see
-      kame/sys/netinet6/ADVAPI.
+    * For supported library functions/kernel APIs, see sys/netinet6/ADVAPI.
 RFC2362: Protocol Independent Multicast-Sparse Mode (PIM-SM)
     * RFC2362 defines packet formats for PIM-SM.  draft-ietf-pim-ipv6-01.txt
       is written based on this.
@@ -67,7 +66,7 @@ RFC2545: Use of BGP-4 Multiprotocol Extensions for IPv6 Inter-Domain Routing
 RFC2553: Basic Socket Interface Extensions for IPv6
     * IPv4 mapped address (3.7) and special behavior of IPv6 wildcard bind
       socket (3.8) are,
-	- supported on KAME/FreeBSD3x and it seems to be working well.
+	- supported on KAME/FreeBSD3x,
 	- supported only for tcp on KAME/NetBSD,
 	- not supported on KAME/FreeBSD228 and KAME/BSDI3.
       see 1.12 in this document for details.
@@ -106,6 +105,9 @@ Some of the network driver loops multicast packets back to itself,
 even if instructed not to do so (especially in promiscuous mode).
 In such cases DAD may fail, because DAD engine sees inbound NS packet
 (actually from the node itself) and considers it as a sign of duplicate.
+You may want to look at #if condition marked "heuristics" in
+sys/netinet6/nd6_nbr.c:nd6_dad_timer() as workaround (note that the code
+fragment in "heuristics" section is not spec conformant).
 
 Neighbor Discovery specification (RFC2461) does not talk about neighbor
 cache handling in the following cases:
@@ -154,8 +156,8 @@ care about portability of your application, we suggest you to use
 advanced API rather than sin6_scope_id.
 
 In the kernel, an interface index for link-local scoped address is
-embedded into in6_addr.s6_addr16[1].  For example, you may see
-something like:
+embedded into 2nd 16bit-word (3rd and 4th byte) in IPv6 address.
+For example, you may see something like:
 	fe80:1::200:f8ff:fe01:6317
 in the routing table and interface address structure (struct
 in6_ifaddr).  The address above is a link-local unicast address
@@ -166,7 +168,7 @@ little code change.
 Routing daemons and configuration programs, like route6d and
 ifconfig, will need to manipulate the "embedded" scope index.
 These programs use routing sockets and ioctls (like SIOCGIFADDR_IN6)
-and the kernel API will return IPv6 addresses with in6_addr.s6_addr16[1]
+and the kernel API will return IPv6 addresses with 2nd 16bit-word
 filled in.  The APIs are for manipulating kernel internal structure.
 Programs that use these APIs have to be prepared about differences
 in kernels anyway.
@@ -192,20 +194,36 @@ userland.
 
 1.4.1 Assignment of link-local, and special addresses
 
-When the kernel boots up, an IPv6 link-local address is assigned to each
-interface.  Also, direct route for the link-local address is added to
-routing table. Here is an output of netstat command:
+IPv6 link-local address is generated from IEEE802 adddress (ethernet MAC
+address).  Each of interface is assigned an IPv6 link-local address
+automatically, when the interface becomes up (IFF_UP).  Also, direct route
+for the link-local address is added to routing table.
+
+Here is an output of netstat command:
 
 Internet6:
 Destination                   Gateway                   Flags      Netif Expire
 fe80:1::/64                   link#1                    UC           ed0
 fe80:2::/64                   link#2                    UC           ep0
 
+Interfaces that has no IEEE802 address (pseudo interfaces like tunnel
+interfaces, or ppp interfaces) will bollow IEEE802 address from other
+interfaces, such as ethernet interfaces, whenever possible.
+If there is no IEEE802 hardware attached, pseudo interfaces will not
+get a link-local address automatically.  In such case, you will need to
+configure the interface manually.
+
+If an interface is not capable of handling IPv6 (such as lack of multicast
+support), link-local address will not be assigned to that interface.
+See section 2 for details.
+
 Each interface joins the solicited multicast address and the
-link-local all-nodes multicast addresses (e.g.  fe80:1::1:ff01:6317
-and ff02:1::1, respectively).  In addition to a link-local address,
-the loopback address (::1) is assigned to the loopback interface.  It
-adds ::1/128 and ff01::/32 to routing table and joins ff01::1.
+link-local all-nodes multicast addresses (e.g.  fe80::1:ff01:6317
+and ff02::1, respectively, on the link the interface is attached).
+In addition to a link-local address, the loopback address (::1) will be
+assigned to the loopback interface.  Also, ::1/128 and ff01::/32 are
+automatically added to routing table, and loopback interface joins
+node-local multicast group ff01::1.
 
 1.4.2 Stateless address autoconfiguration on hosts
 
@@ -229,7 +247,9 @@ cases are left unspecified:
 - Only hosts will listen to router advertisements
 - Hosts have single network interface (except loopback)
 Therefore, this is unwise to enable net.inet6.ip6.accept_rtadv on routers,
-or multi-interface host.  A misconfigured node can behave strange.
+or multi-interface host.  A misconfigured node can behave strange
+(the behavior is not prohibited, for those who would like to do some
+experiments).
 
 RFC2462 has validation rule against incoming RA prefix information option,
 in 5.5.3 (e).  This is to protect hosts from malicious (or misconfigured)
@@ -286,12 +306,13 @@ by the following rule:
        This is the last resort, which may cause scope violation.
 
 For instance, ::1 is selected for ff01::1, fe80:1::200:f8ff:fe01:6317
-for fe80:1::2a0:24ff:feab:839b.  If the outgoing interface has
-multiple address for the scope, a source is selected longest match
-basis (rule 3).  Suppose 3ffe:501:808:1:200:f8ff:fe01:6317 and
-3ffe:2001:9:124:200:f8ff:fe01:6317 are given to the outgoing
-interface.  3ffe:501:808:1:200:f8ff:fe01:6317 is chosen as the source
-for the destination 3ffe:501:800::1.
+for fe80:1::2a0:24ff:feab:839b (note that embedded interface index - described
+in 1.3 - helps us choose the right source address).
+If the outgoing interface has multiple address for the scope,
+a source is selected longest match basis (rule 3).  Suppose
+3ffe:501:808:1:200:f8ff:fe01:6317 and 3ffe:2001:9:124:200:f8ff:fe01:6317
+are given to the outgoing interface.  3ffe:501:808:1:200:f8ff:fe01:6317
+is chosen as the source for the destination 3ffe:501:800::1.
 
 Note that the above rule is not documented in the IPv6 spec.  It is
 considered "up to implementation" item.
@@ -302,6 +323,15 @@ Another example is source address for Neighbor Advertisement.
 Under the spec (RFC2461 7.2.2) NA's source should be the target
 address of the corresponding NS's target.  In this case we follow
 the spec rather than the above longest-match rule.
+
+For new connections (when rule 1 does not apply), deprecated addresses
+(addresses with preferred lifetime = 0) will not be chosen as source address
+if other choises are available.  If no other choices are available,
+deprecated address will be used as a last resort.  If there are multiple
+choice of deprecated addresses, the above scope rule will be used to choose
+from those deprecated addreses.  If you would like to prohibit the use
+of deprecated address for some reason, configure net.inet6.ip6.use_deprecated
+to 0.  The issue related to deprecated address is described in RFC2462 5.5.4.
 
 1.7 Jumbo Payload
 
@@ -351,14 +381,16 @@ we have no medium (other than loopback) to test this.  Contact us if you
 need this.
 
 IPsec does not work on jumbograms.  This is due to some specification twists
-in supporting AH with jumbograms.
+in supporting AH with jumbograms (AH header size influences payload length,
+and this makes it real hard to authenticate inbound packet with jumbo payload
+option as well as AH).
 
 1.8 Loop prevention in header processing
 
 IPv6 specification allows arbitrary number of extension headers to
 be placed onto packets.  If we implement IPv6 packet processing
 code in the way BSD IPv4 code is implemented, kernel stack may
-overflow due to deep function call chain.  KAME sys/netinet6 code
+overflow due to long function call chain.  KAME sys/netinet6 code
 is carefully designed to avoid kernel stack overflow.  Because of
 this, KAME sys/netinet6 code defines its own protocol switch
 structure, as "struct ip6protosw" (see netinet6/ip6protosw.h).
@@ -461,9 +493,9 @@ different between them.  To summarize:
 - KAME/BSDI3 and KAME/FreeBSD228 does not support IPv4 mapped address,
   nor special wildcard bind on AF_INET6.
 - KAME/FreeBSD3x supports IPv4 mapped address, and special wildcard bind on
-  AF_INET6.  They seem to be working well and enabled by default.
-  You can disable those two by runtime and kernel compile configuration.
-  (you can't enable only one of them: they comes together)
+  AF_INET6.  It is enabled by default.  You can disable those two by runtime
+  and kernel compile configuration.
+  (you can't enable only one of them: they come together)
 - KAME/NetBSD supports both, for TCP only.  This is always enabled.
 
 The following sections will give you the details, and how you can
@@ -472,7 +504,7 @@ configure the behavior.
 Advise to application implementers: to implement a portable IPv6 application
 (which works on multiple IPv6 kernels), we believe that the following
 is the key to the success:
-- NEVER hardcode AF_INET or AF_INET6.
+- NEVER hardcode AF_INET nor AF_INET6.
 - Use getaddrinfo() and getnameinfo() throughout the system.
   Never use gethostby*(), getaddrby*(), inet_*() or getipnodeby*().
 - If you would like to listen to connections, use getaddrinfo() (maybe
@@ -481,6 +513,9 @@ is the key to the success:
   all the destination returned, like telnet does.
 - Some of the IPv6 stack is shipped with buggy getaddrinfo().  Ship a minimal
   working version with your application and use that as last resort.
+- Try to avoid use of IPv4 mapped address (waiting for IPv4 connection on
+  AF_INET6 socket).  Listen to both AF_INET socket and AF_INET6 socket,
+  if you support both address families.
 It looks that RFC2553 talks too little on wildcard bind issue,
 especially on the port space issue, failure mode and relationship
 between AF_INET/INET6 wildcard bind.  There can be several separate
@@ -549,8 +584,6 @@ accept both IPv4 and IPv6 connections to the tcp/udp port.
 If you run two daemons, which binds to AF_INET6 wildcard socket and
 AF_INET socket (say, sendmail4 and sendmail6), story start to look
 a bit complicated.  The next sections have the detail.
-
-(* the following paragraphs are different between KAME/FreeBSD3x and 228)
 
 Wildcard bind on AF_INET6 behaves like "wildcard bind between two
 address families".  It will grab IPv4 connection if and only if
