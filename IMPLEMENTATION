@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/07 00:49:03 $
+			$Date: 1999/10/07 03:08:03 $
 
 1. IPv6
 
@@ -218,9 +218,10 @@ fe80:2::/64                   link#2                    UC           ep0
 Interfaces that has no IEEE802 address (pseudo interfaces like tunnel
 interfaces, or ppp interfaces) will bollow IEEE802 address from other
 interfaces, such as ethernet interfaces, whenever possible.
-If there is no IEEE802 hardware attached, pseudo interfaces will not
-get a link-local address automatically.  In such case, you will need to
-configure the interface manually.
+If there is no IEEE802 hardware attached, last-resort pseudorandom value,
+which is from MD5(hostname), will be used as source of link-local address.
+If it is not suitable for your usage, you will need to configure the
+link-local address manually.
 
 If an interface is not capable of handling IPv6 (such as lack of multicast
 support), link-local address will not be assigned to that interface.
