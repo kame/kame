@@ -286,6 +286,7 @@ doaccept(parent, event, arg)
 
 	/* XXX this shouldn't happen, but the symptom happens on freebsd45 */
 	if (IN6_IS_ADDR_V4MAPPED(&from.sin6_addr)) {
+		logmsg(LOG_ERR, "relay from IPv4 mapped address rejected");
 		close(relay->r.s);
 		free(relay);
 		return;
