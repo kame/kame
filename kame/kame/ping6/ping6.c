@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.98 2000/11/08 09:07:31 sumikawa Exp $	*/
+/*	$KAME: ping6.c,v 1.99 2000/11/08 09:55:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -572,11 +572,10 @@ main(argc, argv)
 
 	if ((options & F_NOUSERDATA) == 0) {
 		if (datalen >= sizeof(struct timeval)) {
-			/* can we time transfer */
+			/* we can time transfer */
 			timing = 1;
-		} else {
+		} else
 			timing = 0;
-		}
 	} else {
 		/* suppress timing for node information query */
 		timing = 0;
