@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.1 2001/07/11 09:13:26 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.2 2001/07/11 15:51:59 suz Exp $
  */
 
 /*
@@ -141,7 +141,7 @@ SendQueryV2spec(arg)
     cbk_t          *cbk = (cbk_t *) arg;
     struct listaddr *sources = cbk->s;
     struct listaddr *logsrc = cbk->s;
-    register struct uvif *v = &uvifs[cbk->vifi];
+    register struct uvif *v = &uvifs[cbk->mifi];
 
     /* we use the check list var for the group  to see */
     /* if we are in state checking listener for this group/source(s)*/
@@ -678,7 +678,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 	    	cbk->g=g;
 	  	cbk->s=spec;
 	    	cbk->q_time=MLD6_LAST_LISTENER_QUERY_INTERVAL;
- 	    	cbk->vifi=vifi;
+ 	    	cbk->mifi=vifi;
 
 	    	SendQueryV2spec(cbk);
 	    }
@@ -704,7 +704,7 @@ DelVifV2(arg)
     void           *arg;
 {
     cbk_t          *cbk = (cbk_t *) arg;
-    vifi_t          vifi = cbk->vifi;
+    vifi_t          vifi = cbk->mifi;
     struct uvif    *v = &uvifs[vifi];
     struct listaddr *a, **anp, *g = cbk->g;
     struct listaddr *b, **anq, *s = cbk->s;
@@ -798,7 +798,7 @@ SetTimerV2(vifi, g, s)
     cbk_t          *cbk;
 
     cbk = (cbk_t *) malloc(sizeof(cbk_t));
-    cbk->vifi = vifi;
+    cbk->mifi = vifi;
     cbk->g = g;
     cbk->s = s;
     return timer_setTimer(s->al_timer, DelVifV2, cbk);
