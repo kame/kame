@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.673 2000/03/09 13:16:58 sakane Exp $
+$Id: CHANGELOG,v 1.674 2000/03/09 16:07:08 itojun Exp $
 
 <200003>
+Fri Mar 10 01:05:05 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ah_core.c: add strict mbuf boundary checks for IPv6
+	  AH computation.  now IPv6 AH processing is m_pulldown safe.
+
 Thu Mar  9 22:15:33 JST 2000 sakane@ydc.co.jp
 	* kame/sys/netkey,netinet6:
 	implement pfkey function for policy management.
