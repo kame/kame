@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.210 2005/01/31 08:25:28 t-momose Exp $	*/
+/*	$Id: mip6.c,v 1.211 2005/01/31 09:42:56 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -561,17 +561,25 @@ mip6_bc_list_remove(mbc)
 }
 
 int
-mip6_bce_remove(cnaddr, hoa, coa, flags, bid)
+mip6_bce_remove_addr(cnaddr, hoa, coa, flags, bid)
 	struct sockaddr_in6 *cnaddr, *hoa, *coa;
 	u_int16_t flags, bid;
 {
-	int s;
-	int error = 0;
 	struct mip6_bc_internal *mbc;
 	
 	mbc = mip6_bce_get(&hoa->sin6_addr, &cnaddr->sin6_addr, NULL, bid);
 	if (!mbc)
 		return (0);
+
+	return (mip6_bce_remove_bc(mbc));
+}
+
+int
+mip6_bce_remove_bc(mbc)
+	struct mip6_bc_internal *mbc;
+{
+	int s;
+	int error = 0;
 
 #if 0
 	mbc->mbc_refcnt--;
@@ -596,8 +604,8 @@ mip6_bce_remove(cnaddr, hoa, coa, flags, bid)
 			mip6_dad_stop(mbc);
 		} else {
 #endif
-			error = mip6_bc_proxy_control(&hoa->sin6_addr,
-						      &cnaddr->sin6_addr, RTM_DELETE);
+			error = mip6_bc_proxy_control(&mbc->mbc_hoa,
+						      &mbc->mbc_cnaddr, RTM_DELETE);
 			error = encap_detach(mbc->mbc_encap);
 #if 0
 		}

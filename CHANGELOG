@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2719 2005/01/22 19:23:43 suz Exp $
+$KAME: CHANGELOG,v 1.2720 2005/01/31 09:42:56 t-momose Exp $
 
 <200501>
+2005-01-31  Tsuyoshi MOMOSE  <momose@az.jp.nec.com>
+	* kame/sys/netinet6/mip6.c: stop proxy ND on a home agent when 
+	the home agent daemon was terminated.
+	This problem was found by Christian Vogt<chvogt@tm.uka.de>.
+
 2005-01-23  suz@crl.hitachi.co.jp
 	* kame/sys/netinet6/nd6.h: fixed an IPv6 packet output failure 
 	  when an ICMPv6 Redirect message announces that the destination

@@ -1,4 +1,4 @@
-/* $Id: mipsock.c,v 1.3 2005/01/25 02:44:05 ryuji Exp $ */
+/* $Id: mipsock.c,v 1.4 2005/01/31 09:42:56 t-momose Exp $ */
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -374,7 +374,7 @@ mipus_output(m, va_alist)
 #ifdef MIP6_MCOA
 		bid = mipc->mipc_bid;
 #endif /* MIP6_MCOA */
-		error = mip6_bce_remove((struct sockaddr_in6 *)MIPC_CNADDR(mipc),
+		error = mip6_bce_remove_addr((struct sockaddr_in6 *)MIPC_CNADDR(mipc),
 		    (struct sockaddr_in6 *)MIPC_HOA(mipc),
 		    (struct sockaddr_in6 *)MIPC_COA(mipc), mipc->mipc_flags,
 		    bid);

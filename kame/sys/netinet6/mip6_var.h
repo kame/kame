@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.120 2005/01/25 02:44:52 ryuji Exp $	*/
+/*	$KAME: mip6_var.h,v 1.121 2005/01/31 09:42:57 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -158,8 +158,9 @@ int mip6_bce_update(struct sockaddr_in6 *, struct sockaddr_in6 *,
     struct sockaddr_in6 *, u_int16_t, u_int16_t);
 struct mip6_bc_internal *mip6_bce_get(struct in6_addr *, struct in6_addr *,
     struct in6_addr *, u_int16_t);
-int mip6_bce_remove(struct sockaddr_in6 *, struct sockaddr_in6 *,
+int mip6_bce_remove_addr(struct sockaddr_in6 *, struct sockaddr_in6 *,
     struct sockaddr_in6 *, u_int16_t, u_int16_t);
+int mip6_bce_remove_bc(struct mip6_bc_internal *);
 void mip6_bce_remove_all (void);
 struct ip6_rthdr2 *mip6_create_rthdr2(struct in6_addr *);
 
