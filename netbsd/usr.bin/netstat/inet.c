@@ -1,4 +1,4 @@
-/*	$NetBSD: inet.c,v 1.51.2.2 2003/10/22 06:06:23 jmc Exp $	*/
+/*	$NetBSD: inet.c,v 1.60 2003/10/17 22:28:11 enami Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "from: @(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-__RCSID("$NetBSD: inet.c,v 1.51.2.2 2003/10/22 06:06:23 jmc Exp $");
+__RCSID("$NetBSD: inet.c,v 1.60 2003/10/17 22:28:11 enami Exp $");
 #endif
 #endif /* not lint */
 
@@ -134,7 +130,7 @@ protopr(off, name)
 	kread(off, (char *)&table, sizeof table);
 	prev = head =
 	    (struct inpcb *)&((struct inpcbtable *)off)->inpt_queue.cqh_first;
-	next = table.inpt_queue.cqh_first;
+	next = (struct inpcb *)table.inpt_queue.cqh_first;
 
 	compact = 0;
 	if (Aflag) {
@@ -148,12 +144,15 @@ protopr(off, name)
 		width = 22;
 	while (next != head) {
 		kread((u_long)next, (char *)&inpcb, sizeof inpcb);
-		if (inpcb.inp_queue.cqe_prev != prev) {
+		if ((struct inpcb *)inpcb.inp_queue.cqe_prev != prev) {
 			printf("???\n");
 			break;
 		}
 		prev = next;
-		next = inpcb.inp_queue.cqe_next;
+		next = (struct inpcb *)inpcb.inp_queue.cqe_next;
+
+		if (inpcb.inp_af != AF_INET)
+			continue;
 
 		if (!aflag &&
 		    inet_lnaof(inpcb.inp_laddr) == INADDR_ANY)
@@ -493,6 +492,7 @@ ip_stats(off, name)
 	ps(ips_badvers, "\t%llu with incorrect version number\n");
 	p(ips_fragments, "\t%llu fragment%s received\n");
 	p(ips_fragdropped, "\t%llu fragment%s dropped (dup or out of space)\n");
+	p(ips_rcvmemdrop, "\t%llu fragment%s dropped (out of ipqent)\n");
 	p(ips_badfrags, "\t%llu malformed fragment%s dropped\n");
 	p(ips_fragtimeout, "\t%llu fragment%s dropped after timeout\n");
 	p(ips_reassembled, "\t%llu packet%s reassembled ok\n");
@@ -504,6 +504,7 @@ ip_stats(off, name)
 		putchar('\n');
 	p(ips_cantforward, "\t%llu packet%s not forwardable\n");
 	p(ips_redirectsent, "\t%llu redirect%s sent\n");
+	p(ips_nogif, "\t%llu packet%s no matching gif found\n");
 	p(ips_localout, "\t%llu packet%s sent from this host\n");
 	p(ips_rawout, "\t%llu packet%s sent with fabricated ip header\n");
 	p(ips_odropped, "\t%llu output packet%s dropped due to no bufs, etc.\n");
@@ -700,7 +701,7 @@ inetprint(in, port, proto, numeric_port)
 		sp = getservbyport((int)port, proto);
 	space = sizeof line - (cp-line);
 	if (sp || port == 0)
-		(void)snprintf(cp, space, "%.8s", sp ? sp->s_name : "*");
+		(void)snprintf(cp, space, "%s", sp ? sp->s_name : "*");
 	else
 		(void)snprintf(cp, space, "%u", ntohs(port));
 	(void)printf(" %-*.*s", width, width, line);
@@ -754,9 +755,9 @@ inetname(inp)
 		}
 	}
 	if (inp->s_addr == INADDR_ANY)
-		strncpy(line, "*", sizeof line);
+		strlcpy(line, "*", sizeof line);
 	else if (cp)
-		strncpy(line, cp, sizeof line);
+		strlcpy(line, cp, sizeof line);
 	else {
 		inp->s_addr = ntohl(inp->s_addr);
 #define C(x)	((x) & 0xff)
@@ -765,7 +766,6 @@ inetname(inp)
 		    C(inp->s_addr >> 8), C(inp->s_addr));
 #undef C
 	}
-	line[sizeof(line) - 1] = '\0';
 	return (line);
 }
 
@@ -777,17 +777,18 @@ tcp_dump(pcbaddr)
 	u_long pcbaddr;
 {
 	struct tcpcb tcpcb;
-	int i;
+	int i, hardticks;
 
 	kread(pcbaddr, (char *)&tcpcb, sizeof(tcpcb));
+	hardticks = get_hardticks();
 
 	printf("TCP Protocol Control Block at 0x%08lx:\n\n", pcbaddr);
 
 	printf("Timers:\n");
 	for (i = 0; i < TCPT_NTIMERS; i++) {
-		printf("\t%s: %llu", tcptimers[i],
-		    (tcpcb.t_timer[i].c_flags & CALLOUT_ACTIVE) ?
-		    (unsigned long long) tcpcb.t_timer[i].c_time : 0);
+		printf("\t%s: %d", tcptimers[i],
+		    (tcpcb.t_timer[i].c_flags & CALLOUT_PENDING) ?
+		    tcpcb.t_timer[i].c_time - hardticks : 0);
 	}
 	printf("\n\n");
 

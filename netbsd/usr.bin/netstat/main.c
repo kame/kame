@@ -1,4 +1,4 @@
-/*	$NetBSD: main.c,v 1.34 2001/10/18 09:26:16 itojun Exp $	*/
+/*	$NetBSD: main.c,v 1.43.2.3 2004/07/14 10:19:17 tron Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -43,7 +39,7 @@ __COPYRIGHT("@(#) Copyright (c) 1983, 1988, 1993\n\
 #if 0
 static char sccsid[] = "from: @(#)main.c	8.4 (Berkeley) 3/1/94";
 #else
-__RCSID("$NetBSD: main.c,v 1.34 2001/10/18 09:26:16 itojun Exp $");
+__RCSID("$NetBSD: main.c,v 1.43.2.3 2004/07/14 10:19:17 tron Exp $");
 #endif
 #endif /* not lint */
 
@@ -52,6 +48,7 @@ __RCSID("$NetBSD: main.c,v 1.34 2001/10/18 09:26:16 itojun Exp $");
 #include <sys/protosw.h>
 #include <sys/socket.h>
 
+#include <net/if.h>
 #include <netinet/in.h>
 
 #include <ctype.h>
@@ -151,41 +148,65 @@ struct nlist nl[] = {
 	{ "_divstat"},
 #define N_IP6STAT	40
 	{ "_ip6stat" },
-#define N_TCB6		41
-	{ "_tcb6" },
-#define N_TCP6STAT	42
+#define N_TCP6STAT	41
 	{ "_tcp6stat" },
-#define N_UDB6		43
-	{ "_udb6" },
-#define N_UDP6STAT	44
+#define N_UDP6STAT	42
 	{ "_udp6stat" },
-#define N_ICMP6STAT	45
+#define N_ICMP6STAT	43
 	{ "_icmp6stat" },
-#define N_IPSECSTAT	46
+#define N_IPSECSTAT	44
 	{ "_ipsecstat" },
-#define N_IPSEC6STAT	47
+#define N_IPSEC6STAT	45
 	{ "_ipsec6stat" },
-#define N_PIM6STAT	48
+#define N_PIM6STAT	46
 	{ "_pim6stat" },
-#define N_MRT6PROTO	49
+#define N_MRT6PROTO	47
 	{ "_ip6_mrtproto" },
-#define N_MRT6STAT	50
+#define N_MRT6STAT	48
 	{ "_mrt6stat" },
-#define N_MF6CTABLE	51
+#define N_MF6CTABLE	49
 	{ "_mf6ctable" },
-#define N_MIF6TABLE	52
+#define N_MIF6TABLE	50
 	{ "_mif6table" },
-#define N_PFKEYSTAT	53
+#define N_PFKEYSTAT	51
 	{ "_pfkeystat" },
-#define N_ARPSTAT	54
+#define N_ARPSTAT	52
 	{ "_arpstat" },
-#define N_RIP6STAT	55
+#define N_RIP6STAT	53
 	{ "_rip6stat" },
-#define N_DCCPSTAT	56
+#define	N_ARPINTRQ	54
+	{ "_arpintrq" },
+#define	N_IPINTRQ	55
+	{ "_ipintrq" },
+#define	N_IP6INTRQ	56
+	{ "_ip6intrq" },
+#define	N_ATINTRQ1	57
+	{ "_atintrq1" },
+#define	N_ATINTRQ2	58
+	{ "_atintrq2" },
+#define	N_NSINTRQ	59
+	{ "_nsintrq" },
+#define	N_CLNLINTRQ	60
+	{ "_clnlintrq" },
+#define	N_LLCINTRQ	61
+	{ "_llcintrq" },
+#define	N_HDINTRQ	62
+	{ "_hdintrq" },
+#define	N_NATMINTRQ	63
+	{ "_natmintrq" },
+#define	N_PPPOEDISCINQ	64
+	{ "_ppoediscinq" },
+#define	N_PPPOEINQ	65
+	{ "_ppoeinq" },
+#define	N_PKINTRQ	66
+	{ "_pkintrq" },
+#define	N_HARDCLOCK_TICKS 67
+	{ "_hardclock_ticks" },
+#define N_DCCPSTAT	68
 	{ "_dccpstat" },
-#define	N_DCCPBTABLE	57
+#define	N_DCCPBTABLE	69
 	{ "_dccpbtable" },
-#define	N_DCCPB6	58
+#define	N_DCCPB6	70
 	{ "_dccpb6" },
 	{ "" },
 };
@@ -220,7 +241,7 @@ struct protox {
 	  igmp_stats,	NULL,		0,	"igmp" },
 #ifdef IPSEC
 	{ -1,		N_IPSECSTAT,	1,	0,
-	  ipsec_stats,	NULL,		0,	"ipsec" },
+	  ipsec_switch,	NULL,		0,	"ipsec" },
 #endif
 	{ -1,		-1,		0,	0,
 	  0,		NULL,		0,	0 }
@@ -233,13 +254,13 @@ struct protox ip6protox[] = {
 	{ -1,		N_ICMP6STAT,	1,	0,
 	  icmp6_stats,	icmp6_ifstats,	0,	"icmp6" },
 #ifdef TCP6
-	{ N_TCB6,	N_TCP6STAT,	1,	ip6protopr,
+	{ N_TCBTABLE,	N_TCP6STAT,	1,	ip6protopr,
 	  tcp6_stats,	NULL,		tcp6_dump,	"tcp6" },
 #else
-	{ N_TCB6,	N_TCP6STAT,	1,	ip6protopr,
+	{ N_TCBTABLE,	N_TCP6STAT,	1,	ip6protopr,
 	  tcp_stats,	NULL,		tcp_dump,	"tcp6" },
 #endif
-	{ N_UDB6,	N_UDP6STAT,	1,	ip6protopr,
+	{ N_UDBTABLE,	N_UDP6STAT,	1,	ip6protopr,
 	  udp6_stats,	NULL,		0,	"udp6" },
 #ifdef DCCP
 	{ N_DCCPB6,	N_DCCPSTAT,	1,	ip6protopr,
@@ -247,7 +268,7 @@ struct protox ip6protox[] = {
 #endif	
 #ifdef IPSEC
 	{ -1,		N_IPSEC6STAT,	1,	0,
-	  ipsec_stats,	NULL,		0,	"ipsec6" },
+	  ipsec_switch,	NULL,		0,	"ipsec6" },
 #endif
 	{ -1,		N_PIM6STAT,	1,	0,
 	  pim6_stats,	NULL,		0,	"pim6" },
@@ -320,8 +341,29 @@ struct protox *protoprotox[] = { protox,
 #endif
 				 NULL };
 
+const struct softintrq {
+	const char *siq_name;
+	int siq_index;
+} softintrq[] = {
+	{ "arpintrq", N_ARPINTRQ },
+	{ "ipintrq", N_IPINTRQ },
+	{ "ip6intrq", N_IP6INTRQ },
+	{ "atintrq1", N_ATINTRQ1 },
+	{ "atintrq2", N_ATINTRQ2 },
+	{ "nsintrq", N_NSINTRQ },
+	{ "clnlintrq", N_CLNLINTRQ },
+	{ "llcintrq", N_LLCINTRQ },
+	{ "hdintrq", N_HDINTRQ },
+	{ "natmintrq", N_NATMINTRQ },
+	{ "ppoediscinq", N_PPPOEDISCINQ },
+	{ "ppoeinq", N_PPPOEINQ },
+	{ "pkintrq", N_PKINTRQ },
+	{ NULL, -1 },
+};
+
 int main __P((int, char *[]));
 static void printproto __P((struct protox *, char *));
+static void print_softintrq __P((void));
 static void usage __P((void));
 static struct protox *name2protox __P((char *));
 static struct protox *knownname __P((char *));
@@ -346,8 +388,9 @@ main(argc, argv)
 	af = AF_UNSPEC;
 	pcbaddr = 0;
 
-	while ((ch = getopt(argc, argv, "Aabdf:ghI:LliM:mN:nP:p:rsStuvw:")) != -1)
-		switch(ch) {
+	while ((ch = getopt(argc, argv,
+	    "Aabdf:ghI:LliM:mN:nP:p:qrsStuvw:")) != -1)
+		switch (ch) {
 		case 'A':
 			Aflag = 1;
 			break;
@@ -413,6 +456,7 @@ main(argc, argv)
 			numeric_addr = numeric_port = 1;
 			break;
 		case 'P':
+			errno = 0;
 			pcbaddr = strtoul(optarg, &cp, 16);
 			if (*cp != '\0' || errno == ERANGE)
 				errx(1, "invalid PCB address %s",
@@ -424,6 +468,9 @@ main(argc, argv)
 				errx(1, "%s: unknown or uninstrumented protocol",
 				    optarg);
 			pflag = 1;
+			break;
+		case 'q':
+			qflag = 1;
 			break;
 		case 'r':
 			rflag = 1;
@@ -441,7 +488,7 @@ main(argc, argv)
 			af = AF_LOCAL;
 			break;
 		case 'v':
-			vflag = 1;
+			vflag++;
 			break;
 		case 'w':
 			interval = atoi(optarg);
@@ -483,6 +530,8 @@ main(argc, argv)
 	else
 		(void)setegid(egid);
 
+	use_sysctl = (nlistf == NULL && memf == NULL);
+
 	if ((kvmd = kvm_openfiles(nlistf, memf, NULL, O_RDONLY,
 	    buf)) == NULL)
 		errx(1, "%s", buf);
@@ -522,6 +571,10 @@ main(argc, argv)
 				tp->pr_name);
 		else
 			printf("%s: no stats routine\n", tp->pr_name);
+		exit(0);
+	}
+	if (qflag) {
+		print_softintrq();
 		exit(0);
 	}
 	/*
@@ -653,6 +706,29 @@ printproto(tp, name)
 }
 
 /*
+ * Print softintrq status.
+ */
+void
+print_softintrq()
+{
+	struct ifqueue intrq, *ifq = &intrq;
+	const struct softintrq *siq;
+	u_long off;
+
+	for (siq = softintrq; siq->siq_name != NULL; siq++) {
+		off = nl[siq->siq_index].n_value;
+		if (off == 0)
+			continue;
+
+		kread(off, (char *)ifq, sizeof(*ifq));
+		printf("%s:\n", siq->siq_name);
+		printf("\tqueue length: %d\n", ifq->ifq_len);
+		printf("\tmaximum queue length: %d\n", ifq->ifq_maxlen);
+		printf("\tpackets dropped: %d\n", ifq->ifq_drops);
+	}
+}
+
+/*
  * Read kernel memory, return 0 on success.
  */
 int
@@ -663,7 +739,7 @@ kread(addr, buf, size)
 {
 
 	if (kvm_read(kvmd, addr, buf, size) != size) {
-		warnx("%s\n", kvm_geterr(kvmd));
+		warnx("%s", kvm_geterr(kvmd));
 		return (-1);
 	}
 	return (0);
@@ -683,6 +759,16 @@ plurales(n)
 {
 
 	return (n != 1 ? "es" : "");
+}
+
+int
+get_hardticks(void)
+{
+	int hardticks;
+
+	kread(nl[N_HARDCLOCK_TICKS].n_value, (char *)&hardticks,
+	    sizeof(hardticks));
+	return (hardticks);
 }
 
 /*
@@ -740,13 +826,17 @@ usage()
 	(void)fprintf(stderr,
 "usage: %s [-Aan] [-f address_family] [-M core] [-N system]\n", progname);
 	(void)fprintf(stderr,
-"       %s [-gimnrsSv] [-f address_family] [-M core] [-N system]\n", 
+"       %s [-bdgiLmnqrsSv] [-f address_family] [-M core] [-N system]\n", 
 	progname);
 	(void)fprintf(stderr,
-"       %s [-n] [-I interface] [-M core] [-N system] [-w wait]\n", progname);
+"       %s [-dn] [-I interface] [-M core] [-N system] [-w wait]\n", progname);
 	(void)fprintf(stderr,
-"       %s [-M core] [-N system] [-p protocol]\n", progname);
+"       %s [-p protocol] [-M core] [-N system]\n", progname);
 	(void)fprintf(stderr,
-"       %s [-M core] [-N system] [-p protocol] -P pcbaddr\n", progname);
+"       %s [-p protocol] [-M core] [-N system] -P pcbaddr\n", progname);
+	(void)fprintf(stderr,
+"       %s [-p protocol] [-i] [-I Interface] \n", progname);
+	(void)fprintf(stderr,
+"       %s [-s] [-f address_family] [-i] [-I Interface]\n", progname);
 	exit(1);
 }

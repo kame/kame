@@ -1,4 +1,4 @@
-/*	$NetBSD: netstat.c,v 1.20 2000/12/01 02:19:44 simonb Exp $	*/
+/*	$NetBSD: netstat.c,v 1.25 2003/09/04 09:23:35 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1980, 1992, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "@(#)netstat.c	8.1 (Berkeley) 6/6/93";
 #endif
-__RCSID("$NetBSD: netstat.c,v 1.20 2000/12/01 02:19:44 simonb Exp $");
+__RCSID("$NetBSD: netstat.c,v 1.25 2003/09/04 09:23:35 itojun Exp $");
 #endif /* not lint */
 
 /*
@@ -133,7 +129,7 @@ opennetstat(void)
 
 	sethostent(1);
 	setnetent(1);
-	return (subwin(stdscr, LINES-5-1, 0, 5, 0));
+	return (subwin(stdscr, -1, 0, 5, 0));
 }
 
 void
@@ -162,12 +158,6 @@ static struct nlist namelist[] = {
 	{ "_tcbtable" },
 #define	X_UDBTABLE	1
 	{ "_udbtable" },
-#ifdef INET6
-#define	X_TCB6		2
-	{ "_tcb6" },
-#define	X_UDB6		3
-	{ "_udb6" },
-#endif
 	{ "" },
 };
 
@@ -209,10 +199,10 @@ fetchnetstat(void)
 	if ((protos & UDP) && namelist[X_UDBTABLE].n_type)
 		fetchnetstat4(NPTR(X_UDBTABLE), 0);
 #ifdef INET6
-	if ((protos & TCP) && namelist[X_TCB6].n_type)
-		fetchnetstat6(NPTR(X_TCB6), 1);
-	if ((protos & UDP) && namelist[X_UDB6].n_type)
-		fetchnetstat6(NPTR(X_UDB6), 0);
+	if ((protos & TCP) && namelist[X_TCBTABLE].n_type)
+		fetchnetstat6(NPTR(X_TCBTABLE), 1);
+	if ((protos & UDP) && namelist[X_UDBTABLE].n_type)
+		fetchnetstat6(NPTR(X_UDBTABLE), 0);
 #endif
 }
 
@@ -228,10 +218,10 @@ fetchnetstat4(void *off, int istcp)
 
 	KREAD(off, &pcbtable, sizeof pcbtable);
 	prev = head = (struct inpcb *)&((struct inpcbtable *)off)->inpt_queue;
-	next = pcbtable.inpt_queue.cqh_first;
+	next = (struct inpcb *)pcbtable.inpt_queue.cqh_first;
 	while (next != head) {
 		KREAD(next, &inpcb, sizeof (inpcb));
-		if (inpcb.inp_queue.cqe_prev != prev) {
+		if ((struct inpcb *)inpcb.inp_queue.cqe_prev != prev) {
 printf("prev = %p, head = %p, next = %p, inpcb...prev = %p\n", prev, head, next, inpcb.inp_queue.cqe_prev);
 			p = netcb.ni_forw;
 			for (; p != (struct netinfo *)&netcb; p = p->ni_forw)
@@ -240,8 +230,10 @@ printf("prev = %p, head = %p, next = %p, inpcb...prev = %p\n", prev, head, next,
 			return;
 		}
 		prev = next;
-		next = inpcb.inp_queue.cqe_next;
+		next = (struct inpcb *)inpcb.inp_queue.cqe_next;
 
+		if (inpcb.inp_af != AF_INET)
+			continue;
 		if (!aflag && inet_lnaof(inpcb.inp_laddr) == INADDR_ANY)
 			continue;
 		if (nhosts && !checkhost(&inpcb))
@@ -261,19 +253,20 @@ printf("prev = %p, head = %p, next = %p, inpcb...prev = %p\n", prev, head, next,
 static void
 fetchnetstat6(void *off, int istcp)
 {
+	struct inpcbtable pcbtable;
+	struct in6pcb *head6, *prev6, *next6;
 	struct netinfo *p;
 	struct socket sockb;
 	struct tcpcb tcpcb;
 	struct in6pcb in6pcb;
-	struct in6pcb *head6, *prev6, *next6;
 
-	KREAD(off, &in6pcb, sizeof (struct in6pcb));
-	prev6 = head6 = (struct in6pcb *)off;
-	next6 = in6pcb.in6p_next;
+	KREAD(off, &pcbtable, sizeof pcbtable);
+	prev6 = head6 = (struct in6pcb *)&((struct inpcbtable *)off)->inpt_queue;
+	next6 = (struct in6pcb *)pcbtable.inpt_queue.cqh_first;
 	while (next6 != head6) {
 		KREAD(next6, &in6pcb, sizeof (in6pcb));
-		if (in6pcb.in6p_prev != prev6) {
-printf("prev = %p, head = %p, next = %p, in6pcb...prev = %p\n", prev6, head6, next6, in6pcb.in6p_prev);
+		if ((struct in6pcb *)in6pcb.in6p_queue.cqe_prev != prev6) {
+printf("prev = %p, head = %p, next = %p, in6pcb...prev = %p\n", prev6, head6, next6, in6pcb.in6p_queue.cqe_prev);
 			p = netcb.ni_forw;
 			for (; p != (struct netinfo *)&netcb; p = p->ni_forw)
 				p->ni_seen = 1;
@@ -281,8 +274,10 @@ printf("prev = %p, head = %p, next = %p, in6pcb...prev = %p\n", prev6, head6, ne
 			return;
 		}
 		prev6 = next6;
-		next6 = in6pcb.in6p_next;
+		next6 = (struct in6pcb *)in6pcb.in6p_queue.cqe_next;
 
+		if (in6pcb.in6p_af != AF_INET6)
+			continue;
 		if (!aflag && IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_laddr))
 			continue;
 		if (nhosts && !checkhost6(&in6pcb))
@@ -338,7 +333,7 @@ enter(struct inpcb *inp, struct socket *so, int state, char *proto)
 		p->ni_faddr = inp->inp_faddr;
 		p->ni_fport = inp->inp_fport;
 		p->ni_proto = proto;
-		p->ni_flags = NIF_LACHG|NIF_FACHG;
+		p->ni_flags = NIF_LACHG | NIF_FACHG;
 		p->ni_family = AF_INET;
 	}
 	p->ni_rcvcc = so->so_rcv.sb_cc;
@@ -387,7 +382,7 @@ enter6(struct in6pcb *in6p, struct socket *so, int state, char *proto)
 		p->ni_faddr6 = in6p->in6p_faddr;
 		p->ni_fport = in6p->in6p_fport;
 		p->ni_proto = proto;
-		p->ni_flags = NIF_LACHG|NIF_FACHG;
+		p->ni_flags = NIF_LACHG | NIF_FACHG;
 		p->ni_family = AF_INET6;
 	}
 	p->ni_rcvcc = so->so_rcv.sb_cc;
@@ -408,6 +403,7 @@ enter6(struct in6pcb *in6p, struct socket *so, int state, char *proto)
 void
 labelnetstat(void)
 {
+	struct netinfo *p;
 
 	if (namelist[X_TCBTABLE].n_type == 0)
 		return;
@@ -418,6 +414,13 @@ labelnetstat(void)
 	mvwaddstr(wnd, 0, RCVCC, "Recv-Q");
 	mvwaddstr(wnd, 0, SNDCC, "Send-Q");
 	mvwaddstr(wnd, 0, STATE, "(state)"); 
+	
+	p = netcb.ni_forw;
+	for (; p != (struct netinfo *)&netcb; p = p->ni_forw) {
+		if (p->ni_line == -1)
+			continue;
+		p->ni_flags |= NIF_LACHG | NIF_FACHG;
+	}
 }
 
 void
@@ -442,7 +445,7 @@ shownetstat(void)
 			if (q != p && q->ni_line > p->ni_line) {
 				q->ni_line--;
 				/* this shouldn't be necessary */
-				q->ni_flags |= NIF_LACHG|NIF_FACHG;
+				q->ni_flags |= NIF_LACHG | NIF_FACHG;
 			}
 		lastrow--;
 		q = p->ni_forw;
@@ -462,7 +465,7 @@ shownetstat(void)
 			if (lastrow > getmaxy(wnd))
 				continue;
 			p->ni_line = lastrow++;
-			p->ni_flags |= NIF_LACHG|NIF_FACHG;
+			p->ni_flags |= NIF_LACHG | NIF_FACHG;
 		}
 		if (p->ni_flags & NIF_LACHG) {
 			wmove(wnd, p->ni_line, LADDR);
@@ -602,9 +605,9 @@ inetname(struct in_addr in)
 		}
 	}
 	if (in.s_addr == INADDR_ANY)
-		strncpy(line, "*", sizeof(line) - 1);
+		strlcpy(line, "*", sizeof(line));
 	else if (cp)
-		strncpy(line, cp, sizeof(line) - 1);
+		strlcpy(line, cp, sizeof(line));
 	else {
 		in.s_addr = ntohl(in.s_addr);
 #define C(x)	((x) & 0xff)
@@ -613,7 +616,6 @@ inetname(struct in_addr in)
 		    C(in.s_addr >> 8), C(in.s_addr));
 #undef C
 	}
-	line[sizeof(line) - 1] = '\0';
 	return (line);
 }
 
@@ -656,17 +658,10 @@ netstat_all(char *args)
 void
 netstat_names(char *args)
 {
-	struct netinfo *p;
 
 	if (nflag == 0)
 		return;
 	
-	p = netcb.ni_forw;
-	for (; p != (struct netinfo *)&netcb; p = p->ni_forw) {
-		if (p->ni_line == -1)
-			continue;
-		p->ni_flags |= NIF_LACHG|NIF_FACHG;
-	}
 	nflag = 0;
 	wclear(wnd);
 	labelnetstat();
@@ -677,17 +672,10 @@ netstat_names(char *args)
 void
 netstat_numbers(char *args)
 {
-	struct netinfo *p;
 
 	if (nflag != 0)
 		return;
 	
-	p = netcb.ni_forw;
-	for (; p != (struct netinfo *)&netcb; p = p->ni_forw) {
-		if (p->ni_line == -1)
-			continue;
-		p->ni_flags |= NIF_LACHG|NIF_FACHG;
-	}
 	nflag = 1;
 	wclear(wnd);
 	labelnetstat();

@@ -1,4 +1,4 @@
-.\"	$NetBSD: systat.1,v 1.25 2002/02/08 01:36:33 ross Exp $
+.\"	$NetBSD: systat.1,v 1.33 2003/09/15 13:17:24 wiz Exp $
 .\"
 .\" Copyright (c) 1985, 1990, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -11,11 +11,7 @@
 .\" 2. Redistributions in binary form must reproduce the above copyright
 .\"    notice, this list of conditions and the following disclaimer in the
 .\"    documentation and/or other materials provided with the distribution.
-.\" 3. All advertising materials mentioning features or use of this software
-.\"    must display the following acknowledgement:
-.\"	This product includes software developed by the University of
-.\"	California, Berkeley and its contributors.
-.\" 4. Neither the name of the University nor the names of its contributors
+.\" 3. Neither the name of the University nor the names of its contributors
 .\"    may be used to endorse or promote products derived from this software
 .\"    without specific prior written permission.
 .\"
@@ -33,7 +29,7 @@
 .\"
 .\"	@(#)systat.1	8.2 (Berkeley) 12/30/93
 .\"
-.Dd December 30, 1993
+.Dd September 12, 2003
 .Dt SYSTAT 1
 .Os
 .Sh NAME
@@ -107,7 +103,7 @@ subcommand in
 See
 .Ar refresh-interval .
 .It Fl t Ar turns
-How many refreshs to show each screen in 'all' display mode.
+How many refreshes to show each screen in 'all' display mode.
 .It Ar display
 The
 .Ar display
@@ -142,7 +138,7 @@ flag.
 .El
 .Pp
 Certain characters cause immediate action by
-.Nm ""  .
+.Nm  .
 These are
 .Bl -tag -width Fl
 .It Ic \&^L
@@ -152,8 +148,8 @@ Print the name of the current ``display'' being shown in
 the lower window and the refresh interval.
 .It Ic \&^Z
 Stop
-.Nm ""  .
-.It Ic ? , Ic h
+.Nm  .
+.It Ic \&? , Ic h
 Print the names of the available displays on the command line.
 .It Ic \&:
 Move the cursor to the command line and interpret the input
@@ -191,7 +187,7 @@ Supplying only a number will set the refresh interval to this
 value.
 .It Ic quit
 Exit
-.Nm ""  .
+.Nm  .
 (This may be abbreviated to
 .Ic q  . )
 .El
@@ -258,6 +254,10 @@ statistics in bar graph form (default).
 .It Cm secs
 Toggle the display of time in disk activity (the default is to
 not display time).
+.It Cm all
+Show the read and write statistics combined (default).
+.It Cm rw
+Show the read and write statistics separately.
 .El
 .It Ic mbufs
 Display, in the lower window, the number of mbufs allocated
@@ -364,22 +364,7 @@ etc.
 The upper left quadrant of the screen shows the number
 of users logged in and the load average over the last one, five,
 and fifteen minute intervals.
-Below this line are statistics on memory utilization.
-The first row of the table reports memory usage only among
-active processes, that is processes that have run in the previous
-twenty seconds.
-The second row reports on memory usage of all processes.
-The first column reports on the number of physical pages
-claimed by processes.
-The second column reports the number of physical pages that
-are devoted to read only text pages.
-The third and fourth columns report the same two figures for
-virtual pages, that is the number of pages that would be
-needed if all processes had all of their pages.
-Finally the last column shows the number of physical pages
-on the free list.
-.Pp
-Below the memory display is a list of the
+Below this is a list of the
 average number of processes (over the last refresh interval)
 that are runnable (`r'), in page wait (`p'),
 in disk wait other than paging (`d'),
@@ -389,13 +374,23 @@ a bar graph showing the amount of
 system (shown as `='), user (shown as `\*[Gt]'),
 nice (shown as `-'), and idle time (shown as ` ').
 .Pp
-Next to the process statistics is a column that
+To the right of the process statistics is a column that
 lists the average number of context switches (`Csw'),
 traps (`Trp'; includes page faults), system calls (`Sys'), interrupts (`Int'),
 network software interrupts (`Sof'),
 page faults (`Flt').
 .Pp
-Below the process display are statistics on name translations.
+Below this are statistics on memory utilization.
+The first row of the table reports memory usage only among
+active processes, that is processes that have run in the previous
+twenty seconds.
+The second row reports on memory usage of all processes.
+The first column reports on the number of physical pages
+claimed by processes.
+The second column reports the number of pages of memory and swap.
+The third column gives the number of pages of free memory and swap.
+.Pp
+Below the memory display are statistics on name translations.
 It lists the number of names translated in the previous interval,
 the number and percentage of the translations that were
 handled by the system wide name translation cache, and
@@ -407,7 +402,9 @@ It reports the number of seeks, transfers, number
 of kilobyte blocks transferred per second averaged over the
 refresh period of the display (by default, five seconds), and
 the time spent in disk accesses.
-Note that the system only keeps statistics on at most four disks.
+If there are more than five disks, and the terminal window has more
+than 24 lines, the disks display will be flipped so that more
+of the disk statistics are visible.
 .Pp
 Under the date in the upper right hand quadrant are statistics
 on paging and swapping activity.
@@ -430,8 +427,8 @@ percentage of zfod's used (`%zfod'), number of kernel pages (`kern'),
 number of wired pages (`wire'), number of active pages (`act'), number
 of inactive pages (`inact'), number of free pages (`free'), pages freed
 by daemon (`daefr'), pages freed by exiting processes (`prcfr'), number
-of pages reactived from freelist (`react'), scans in page out daemon
-(`scan'), revolutions of the hand (`hdrev'), and intransit blocking page
+of pages reactivated from freelist (`react'), scans in page out daemon
+(`scan'), revolutions of the hand (`hdrev'), and in-transit blocking page
 faults (`intrn'), per second over the refresh period.
 Note that the `%zfod' percentage is usually less than 100%,
 however it may exceed 100% if a large number of requests
@@ -441,7 +438,7 @@ Thus this figure is most interesting when observed over
 a long time period, such as from boot time
 (see below on getting such a display).
 .Pp
-Running down the right hand side of the display is a breakdown
+To the left of the column of paging statistics is a breakdown
 of the interrupts being handled by the system.
 At the top of the list is the total interrupts per second
 over the time interval.
@@ -466,13 +463,17 @@ These commands are used to select a set of drives to report on,
 should your system have more drives configured than can normally
 be displayed on the screen.
 .Pp
-.Bl -tag -width Tx -compact
-.It Cm ignore Op Ar drives
-Do not display information about the drives indicated.s
-Multiple drives may be specified, separated by spaces.
+.Bl -tag -width Ar -compact
 .It Cm display Op Ar drives
 Display information about the drives indicated.
 Multiple drives may be specified, separated by spaces.
+.It Cm ignore Op Ar drives
+Do not display information about the drives indicated.
+Multiple drives may be specified, separated by spaces.
+.It Cm drives Op Ar drives
+With no arguments, display a list of available drives.
+With arguments, replace the list of currently displayed drives
+with the ones specified.
 .El
 .Pp
 The following commands are specific to the

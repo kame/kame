@@ -1,4 +1,4 @@
-/*	$NetBSD: mroute6.c,v 1.8 2001/05/28 04:22:56 assar Exp $	*/
+/*	$NetBSD: mroute6.c,v 1.11 2003/08/07 11:15:21 agc Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -30,9 +30,41 @@
  */
 
 /*
- * Copyright (c) 1989 Stephen Deering
  * Copyright (c) 1992, 1993
  *	The Regents of the University of California.  All rights reserved.
+ *
+ * This code is derived from software contributed to Berkeley by
+ * Stephen Deering of Stanford University.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the University nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	@(#)mroute.c	8.2 (Berkeley) 4/28/95
+ */
+
+/*
+ * Copyright (c) 1989 Stephen Deering
  *
  * This code is derived from software contributed to Berkeley by
  * Stephen Deering of Stanford University.
@@ -115,18 +147,17 @@ mroute6pr(mrpaddr, mfcaddr, mifaddr)
 
 	kread(mrpaddr, (char *)&mrtproto, sizeof(mrtproto));
 	switch (mrtproto) {
+	case 0:
+		printf("no IPv6 multicast routing compiled into this system\n");
+		return;
 
-	 case 0:
-		 printf("no IPv6 multicast routing compiled into this system\n");
-		 return;
+	case IPPROTO_PIM:
+		break;
 
-	 case IPPROTO_PIM:
-		 break;
-
-	 default:
-		 printf("IPv6 multicast routing protocol %u, unknown\n",
-			mrtproto);
-		 return;
+	default:
+		printf("IPv6 multicast routing protocol %u, unknown\n",
+		    mrtproto);
+		return;
 	}
 
 	if (mfcaddr == 0) {
@@ -154,15 +185,13 @@ mroute6pr(mrpaddr, mfcaddr, mifaddr)
 		maxmif = mifi;
 		if (!banner_printed) {
 			printf("\nIPv6 Multicast Interface Table\n"
-			       " Mif   Rate   PhyIF   "
-			       "Pkts-In   Pkts-Out\n");
+			    " Mif   Rate   PhyIF   Pkts-In   Pkts-Out\n");
 			banner_printed = 1;
 		}
 
-		printf("  %2u   %4d",
-		       mifi, mifp->m6_rate_limit);
+		printf("  %2u   %4d", mifi, mifp->m6_rate_limit);
 		printf("   %5s", (mifp->m6_flags & MIFF_REGISTER) ?
-		       "reg0" : if_indextoname(ifnet.if_index, ifname));
+		    "reg0" : if_indextoname(ifnet.if_index, ifname));
 
 		printf(" %9llu  %9llu\n", (unsigned long long)mifp->m6_pkt_in,
 		    (unsigned long long)mifp->m6_pkt_out);
@@ -179,16 +208,16 @@ mroute6pr(mrpaddr, mfcaddr, mifaddr)
 			if (!banner_printed) {
 				printf ("\nIPv6 Multicast Forwarding Cache\n");
 				printf(" %-*.*s %-*.*s %s",
-				       WID_ORG, WID_ORG, "Origin",
-				       WID_GRP, WID_GRP, "Group",
-				       "  Packets Waits In-Mif  Out-Mifs\n");
+				    WID_ORG, WID_ORG, "Origin",
+				    WID_GRP, WID_GRP, "Group",
+				    "  Packets Waits In-Mif  Out-Mifs\n");
 				banner_printed = 1;
 			}
 			
 			printf(" %-*.*s", WID_ORG, WID_ORG,
-			       routename6(&mfc.mf6c_origin));
+			    routename6(&mfc.mf6c_origin));
 			printf(" %-*.*s", WID_GRP, WID_GRP,
-			       routename6(&mfc.mf6c_mcastgrp));
+			    routename6(&mfc.mf6c_mcastgrp));
 			printf(" %9llu", (unsigned long long)mfc.mf6c_pkt_cnt);
 
 			for (waitings = 0, rtep = mfc.mf6c_stall; rtep; ) {
@@ -234,17 +263,17 @@ mrt6_stats(mrpaddr, mstaddr)
 
 	kread(mrpaddr, (char *)&mrtproto, sizeof(mrtproto));
 	switch (mrtproto) {
-	 case 0:
-		 printf("no IPv6 multicast routing compiled into this system\n");
-		 return;
+	case 0:
+		printf("no IPv6 multicast routing compiled into this system\n");
+		return;
 
-	 case IPPROTO_PIM:
-		 break;
+	case IPPROTO_PIM:
+		break;
 
-	 default:
-		 printf("IPv6 multicast routing protocol %u, unknown\n",
+	default:
+		printf("IPv6 multicast routing protocol %u, unknown\n",
 			mrtproto);
-		 return;
+		return;
 	}
 
 	if (mstaddr == 0) {

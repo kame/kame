@@ -1,4 +1,4 @@
-/*	$NetBSD: main.c,v 1.30 2001/12/06 12:40:51 blymn Exp $	*/
+/*	$NetBSD: main.c,v 1.35 2003/08/07 11:15:59 agc Exp $	*/
 
 /*-
  * Copyright (c) 1980, 1992, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -40,7 +36,7 @@ __COPYRIGHT("@(#) Copyright (c) 1980, 1992, 1993\n\
 #if 0
 static char sccsid[] = "@(#)main.c	8.1 (Berkeley) 6/6/93";
 #endif
-__RCSID("$NetBSD: main.c,v 1.30 2001/12/06 12:40:51 blymn Exp $");
+__RCSID("$NetBSD: main.c,v 1.35 2003/08/07 11:15:59 agc Exp $");
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -54,6 +50,8 @@ __RCSID("$NetBSD: main.c,v 1.30 2001/12/06 12:40:51 blymn Exp $");
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <termios.h>
+#include <sys/ioctl.h>
 
 #include "systat.h"
 #include "extern.h"
@@ -90,6 +88,9 @@ int     allcounter;
 
 static	WINDOW *wload;			/* one line window for load average */
 
+static void (*sv_stop_handler)(int);
+
+static void stop(int);
 static void usage(void);
 int main(int, char **);
 
@@ -182,15 +183,17 @@ main(int argc, char **argv)
 		(void)setegid(getgid());
 
 	if (kvm_nlist(kd, namelist)) {
-		nlisterr(namelist);
-		exit(1);
+		if (nlistf)
+			errx(1, "%s: no namelist", nlistf);
+		else
+			errx(1, "no namelist");
 	}
-	if (namelist[X_FIRST].n_type == 0)
-		errx(1, "couldn't read namelist");
+
 	signal(SIGINT, die);
 	signal(SIGQUIT, die);
 	signal(SIGTERM, die);
 	signal(SIGWINCH, redraw);
+	sv_stop_handler = signal(SIGTSTP, stop);
 
 	/*
 	 * Initialize display.  Load average appears in a one line
@@ -317,13 +320,38 @@ void
 redraw(int signo)
 {
 	sigset_t set;
+	struct winsize win;
 
 	sigemptyset(&set);
 	sigaddset(&set, SIGALRM);
 	sigprocmask(SIG_BLOCK, &set, NULL);
-	wrefresh(curscr);
-	refresh();
+
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &win) != -1 &&
+	    (win.ws_row != LINES || win.ws_col != COLS)) {
+		resizeterm(win.ws_row, win.ws_col);
+		CMDLINE = LINES - 1;
+		labels();
+	}
+
 	sigprocmask(SIG_UNBLOCK, &set, NULL);
+	display(0);
+}
+
+static void
+stop(int signo)
+{
+	sigset_t set;
+
+	signal(SIGTSTP, sv_stop_handler);
+	/* unblock SIGTSTP */
+	sigemptyset(&set);
+	sigaddset(&set, SIGTSTP);
+	sigprocmask(SIG_UNBLOCK, &set, NULL);
+	/* stop ourselves */
+	kill(0, SIGTSTP);
+	/* must have been restarted */
+	signal(SIGTSTP, stop);
+	redraw(signo);
 }
 
 void
@@ -376,6 +404,7 @@ nlisterr(struct nlist namelist[])
 	move(CMDLINE, 0);
 	clrtoeol();
 	refresh();
+	sleep(5);
 	endwin();
 	exit(1);
 }

@@ -1,4 +1,4 @@
-/*	$NetBSD: fstat.c,v 1.55 2002/02/12 03:28:20 simonb Exp $	*/
+/*	$NetBSD: fstat.c,v 1.65.2.1 2004/04/02 14:54:17 tron Exp $	*/
 
 /*-
  * Copyright (c) 1988, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -43,7 +39,7 @@ __COPYRIGHT("@(#) Copyright (c) 1988, 1993\n\
 #if 0
 static char sccsid[] = "@(#)fstat.c	8.3 (Berkeley) 5/2/95";
 #else
-__RCSID("$NetBSD: fstat.c,v 1.55 2002/02/12 03:28:20 simonb Exp $");
+__RCSID("$NetBSD: fstat.c,v 1.65.2.1 2004/04/02 14:54:17 tron Exp $");
 #endif
 #endif /* not lint */
 
@@ -148,7 +144,7 @@ int maxfiles;
 
 kvm_t *kd;
 
-void	dofiles __P((struct kinfo_proc *));
+void	dofiles __P((struct kinfo_proc2 *));
 int	ext2fs_filestat __P((struct vnode *, struct filestat *));
 int	getfname __P((char *));
 void	getinetproto __P((int));
@@ -161,6 +157,7 @@ int	nfs_filestat __P((struct vnode *, struct filestat *));
 static const char *inet6_addrstr __P((struct in6_addr *));
 #endif
 void	socktrans __P((struct socket *, int));
+void	kqueuetrans __P((void *, int));
 int	ufs_filestat __P((struct vnode *, struct filestat *));
 void	usage __P((void));
 char   *vfilestat __P((struct vnode *, struct filestat *));
@@ -174,7 +171,7 @@ main(argc, argv)
 	char **argv;
 {
 	struct passwd *passwd;
-	struct kinfo_proc *p, *plast;
+	struct kinfo_proc2 *p, *plast;
 	int arg, ch, what;
 	char *memf, *nlistf;
 	char buf[_POSIX2_LINE_MAX];
@@ -262,7 +259,7 @@ main(argc, argv)
 	if (nlistf == NULL && memf == NULL)
 		(void)setgid(getgid());
 
-	if ((p = kvm_getprocs(kd, what, arg, &cnt)) == NULL) {
+	if ((p = kvm_getproc2(kd, what, arg, sizeof *p, &cnt)) == NULL) {
 		errx(1, "%s", kvm_geterr(kd));
 	}
 	if (nflg)
@@ -277,7 +274,7 @@ main(argc, argv)
 		putchar('\n');
 
 	for (plast = &p[cnt]; p < plast; ++p) {
-		if (p->kp_proc.p_stat == SZOMB)
+		if (p->p_stat == SZOMB)
 			continue;
 		dofiles(p);
 	}
@@ -310,33 +307,31 @@ pid_t	Pid;
  * print open files attributed to this process
  */
 void
-dofiles(kp)
-	struct kinfo_proc *kp;
+dofiles(p)
+	struct kinfo_proc2 *p;
 {
 	int i;
 	struct filedesc0 filed0;
 #define	filed	filed0.fd_fd
 	struct cwdinfo cwdi;
-	struct proc *p = &kp->kp_proc;
-	struct eproc *ep = &kp->kp_eproc;
 
-	Uname = user_from_uid(ep->e_ucred.cr_uid, 0);
+	Uname = user_from_uid(p->p_uid, 0);
 	Pid = p->p_pid;
 	Comm = p->p_comm;
 
-	if (p->p_fd == NULL || p->p_cwdi == NULL)
+	if (p->p_fd == 0 || p->p_cwdi == 0)
 		return;
 	if (!KVM_READ(p->p_fd, &filed0, sizeof (filed0))) {
-		warnx("can't read filedesc at %p for pid %d", p->p_fd, Pid);
+		warnx("can't read filedesc at %#llx for pid %d", (unsigned long long)p->p_fd, Pid);
 		return;
 	}
 	if (!KVM_READ(p->p_cwdi, &cwdi, sizeof(cwdi))) {
-		warnx("can't read cwdinfo at %p for pid %d", p->p_cwdi, Pid);
+		warnx("can't read cwdinfo at %#llx for pid %d", (unsigned long long)p->p_cwdi, Pid);
 		return;
 	}
 	if (filed.fd_nfiles < 0 || filed.fd_lastfile >= filed.fd_nfiles ||
 	    filed.fd_freefile > filed.fd_lastfile + 1) {
-		dprintf("filedesc corrupted at %p for pid %d", p->p_fd, Pid);
+		dprintf("filedesc corrupted at %#llx for pid %d", (unsigned long long)p->p_fd, Pid);
 		return;
 	}
 	/*
@@ -352,7 +347,7 @@ dofiles(kp)
 	 * ktrace vnode, if one
 	 */
 	if (p->p_tracep)
-		ftrans(p->p_tracep, TRACE);
+		ftrans((struct file *)(intptr_t)p->p_tracep, TRACE);
 	/*
 	 * open files
 	 */
@@ -399,6 +394,10 @@ ftrans (fp, i)
 		if (checkfile == 0)
 			ptrans(&file, (struct pipe *)file.f_data, i);
 		break;
+	case DTYPE_KQUEUE:
+		if (checkfile == 0)
+			kqueuetrans((void *)file.f_data, i);
+		break;
 	default:
 		dprintf("unknown file type %d for file %d of pid %d",
 		    file.f_type, i, Pid);
@@ -420,9 +419,7 @@ vfilestat(vp, fsp)
 	else
 		switch (vp->v_tag) {
 		case VT_UFS:
-			if (!ufs_filestat(vp, fsp))
-				badtype = "error";
-			break;
+		case VT_LFS:
 		case VT_MFS:
 			if (!ufs_filestat(vp, fsp))
 				badtype = "error";
@@ -527,9 +524,9 @@ vtrans(vp, i, flag)
 	}
 	rw[0] = '\0';
 	if (flag & FREAD)
-		strcat(rw, "r");
+		strlcat(rw, "r", sizeof(rw));
 	if (flag & FWRITE)
-		strcat(rw, "w");
+		strlcat(rw, "w", sizeof(rw));
 	printf(" %-2s", rw);
 	if (filename && !fsflg)
 		printf("  %s", filename);
@@ -542,16 +539,37 @@ ufs_filestat(vp, fsp)
 	struct filestat *fsp;
 {
 	struct inode inode;
+	union dinode {
+		struct ufs1_dinode dp1;
+		struct ufs2_dinode dp2;
+	} dip;
 
 	if (!KVM_READ(VTOI(vp), &inode, sizeof (inode))) {
 		dprintf("can't read inode at %p for pid %d", VTOI(vp), Pid);
 		return 0;
 	}
+
+	if (!KVM_READ(inode.i_din.ffs1_din, &dip, sizeof(struct ufs1_dinode))) {
+		dprintf("can't read dinode at %p for pid %d",
+		    inode.i_din.ffs1_din, Pid);
+		return 0;
+	}
+	if (inode.i_size == dip.dp1.di_size)
+		fsp->rdev = dip.dp1.di_rdev;
+	else {
+		if (!KVM_READ(inode.i_din.ffs1_din, &dip,
+		    sizeof(struct ufs2_dinode))) {
+			dprintf("can't read dinode at %p for pid %d",
+			    inode.i_din.ffs1_din, Pid);
+			return 0;
+		}
+		fsp->rdev = dip.dp2.di_rdev;
+	}
+
 	fsp->fsid = inode.i_dev & 0xffff;
 	fsp->fileid = (long)inode.i_number;
-	fsp->mode = (mode_t)inode.i_ffs_mode;
-	fsp->size = inode.i_ffs_size;
-	fsp->rdev = inode.i_ffs_rdev;
+	fsp->mode = (mode_t)inode.i_mode;
+	fsp->size = inode.i_size;
 
 	return 1;
 }
@@ -562,6 +580,8 @@ ext2fs_filestat(vp, fsp)
 	struct filestat *fsp;
 {
 	struct inode inode;
+	u_int16_t mode;
+	u_int32_t size;
 
 	if (!KVM_READ(VTOI(vp), &inode, sizeof (inode))) {
 		dprintf("can't read inode at %p for pid %d", VTOI(vp), Pid);
@@ -569,8 +589,20 @@ ext2fs_filestat(vp, fsp)
 	}
 	fsp->fsid = inode.i_dev & 0xffff;
 	fsp->fileid = (long)inode.i_number;
-	fsp->mode = (mode_t)inode.i_e2fs_mode;
-	fsp->size = inode.i_e2fs_size;
+
+	if (!KVM_READ(&inode.i_e2fs_mode, &mode, sizeof mode)) {
+		dprintf("can't read inode %p's mode at %p for pid %d", VTOI(vp),
+			&inode.i_e2fs_mode, Pid);
+		return 0;
+	}
+	fsp->mode = mode;
+
+	if (!KVM_READ(&inode.i_e2fs_size, &size, sizeof size)) {
+		dprintf("can't read inode %p's size at %p for pid %d", VTOI(vp),
+			&inode.i_e2fs_size, Pid);
+		return 0;
+	}
+	fsp->size = size;
 	fsp->rdev = 0;  /* XXX */
 	return 1;
 }
@@ -841,14 +873,14 @@ socktrans(sock, i)
 				goto bad;
 			}
 			printf(" %lx", (long)in6pcb.in6p_ppcb);
-			sprintf(xaddrbuf, "[%s]",
+			snprintf(xaddrbuf, sizeof(xaddrbuf), "[%s]",
 			    inet6_addrstr(&in6pcb.in6p_laddr));
 			printf(" %s:%d",
 			    IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_laddr) ? "*" :
 			    xaddrbuf,
 			    ntohs(in6pcb.in6p_lport));
 			if (in6pcb.in6p_fport) {
-				sprintf(xaddrbuf, "[%s]", 
+				snprintf(xaddrbuf, sizeof(xaddrbuf), "[%s]", 
 				    inet6_addrstr(&in6pcb.in6p_faddr));
 				printf(" <-> %s:%d",
 			            IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_faddr) ? "*" :
@@ -864,14 +896,14 @@ socktrans(sock, i)
 				goto bad;
 			}
 			printf(" %lx", (long)so.so_pcb);
-			sprintf(xaddrbuf, "[%s]", 
+			snprintf(xaddrbuf, sizeof(xaddrbuf), "[%s]", 
 			    inet6_addrstr(&in6pcb.in6p_laddr));
 			printf(" %s:%d",
 		            IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_laddr) ? "*" :
 			    xaddrbuf,
 			    ntohs(in6pcb.in6p_lport));
 			if (in6pcb.in6p_fport) {
-				sprintf(xaddrbuf, "[%s]", 
+				snprintf(xaddrbuf, sizeof(xaddrbuf), "[%s]", 
 				    inet6_addrstr(&in6pcb.in6p_faddr));
 				printf(" <-> %s:%d",
 			            IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_faddr) ? "*" :
@@ -943,6 +975,17 @@ ptrans(fp, cpipe, i)
 	return;
 bad:
 	printf("* error\n");
+}
+
+void
+kqueuetrans(kq, i)
+	void *kq;
+	int i;
+{
+
+	PREFIX(i);
+	printf("* kqueue %lx", (long)kq);
+	printf("\n");
 }
 
 /*
