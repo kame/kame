@@ -36,7 +36,7 @@
 #include <stdlib.h>
 #include <err.h>
 #include <syslog.h>
-#include <getopt.h>
+#include <unistd.h>
 #include "event.h"
 #include "prefix.h"
 
