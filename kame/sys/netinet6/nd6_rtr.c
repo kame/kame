@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.94 2001/02/06 03:45:16 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.95 2001/02/07 08:09:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -209,11 +209,13 @@ nd6_rs_input(m, off, icmp6len)
 	}
 
 	nd6_cache_lladdr(ifp, &saddr6, lladdr, lladdrlen, ND_ROUTER_SOLICIT, 0);
+
+ freeit:
+	m_freem(m);
 	return;
 
  bad:
 	icmp6stat.icp6s_badrs++;
- freeit:
 	m_freem(m);
 }
 
@@ -459,11 +461,12 @@ nd6_ra_input(m, off, icmp6len)
 	}
 #endif
 
+ freeit:
+	m_freem(m);
 	return;
 
  bad:
 	icmp6stat.icp6s_badra++;
- freeit:
 	m_freem(m);
 }
 

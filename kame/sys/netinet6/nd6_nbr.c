@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.55 2001/02/06 04:21:26 jinmei Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.56 2001/02/07 08:09:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -842,11 +842,12 @@ nd6_na_input(m, off, icmp6len)
 		ln->ln_hold = 0;
 	}
 
+ freeit:
+	m_freem(m);
 	return;
 
  bad:
 	icmp6stat.icp6s_badna++;
- freeit:
 	m_freem(m);
 }
 
