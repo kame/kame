@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.25 2002/05/16 05:55:48 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.26 2002/05/17 02:13:56 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -126,6 +126,8 @@ struct dhcp6 {
 #define DH6OPT_IADDR 5
 #define DH6OPT_ORO 6
 #define DH6OPT_PREFERENCE 7
+#  define DH6OPT_PREF_UNDEF -1
+#  define DH6OPT_PREF_MAX 255
 #define DH6OPT_ELAPSED_TIME 8
 #define DH6OPT_CLIENT_MSG 9
 #define DH6OPT_SERVER_MSG 10
@@ -139,17 +141,17 @@ struct dhcp6 {
 #define DH6OPT_INTERFACE_ID 18
 #define DH6OPT_RECONF_MSG 19
 
-#define DH6OPT_PREF_UNDEF -1
-#define DH6OPT_PREF_MAX 255
-
 /*
  * The option type has not been assigned for the following options.
- * We use type values from 256 temporarily. 
+ * We temporarily adopt values used in the service specification document
+ * (20020510 version) by NTT Communications.
+ * Note that we'll change the following definitions if different type values
+ * are officially defined.
  */
-#define DH6OPT_DNS 256
-#define DH6OPT_PREFIX_DELEGATION 257
-#define DH6OPT_PREFIX_INFORMATION 258
-#define DH6OPT_PREFIX_REQUEST 259
+#define DH6OPT_DNS 20
+#define DH6OPT_PREFIX_DELEGATION 25
+#define DH6OPT_PREFIX_INFORMATION 26
+#define DH6OPT_PREFIX_REQUEST 27
 
 struct dhcp6opt {
 	u_int16_t dh6opt_type;
