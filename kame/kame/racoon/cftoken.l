@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.39 2000/10/11 19:54:08 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.40 2000/10/12 09:11:05 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -242,6 +242,7 @@ octetstring	{octet}({dot}{octet})+
 <S_SAINFS>{ecl}		{ BEGIN S_INI; return(EOC); }
 <S_SAINFS>pfs_group	{ YYD; return(PFS_GROUP); }
 <S_SAINFS>identifier	{ YYD; return(IDENTIFIER); }
+<S_SAINFS>my_identifier	{ YYD; return(MY_IDENTIFIER); }
 <S_SAINFS>lifetime	{ YYD; return(LIFETIME); }
 <S_SAINFS>time		{ YYD; yylval.num = CF_LIFETYPE_TIME; return(LIFETYPE); }
 <S_SAINFS>byte		{ YYD; yylval.num = CF_LIFETYPE_BYTE; return(LIFETYPE); }
