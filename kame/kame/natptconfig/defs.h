@@ -1,4 +1,4 @@
-/*	$KAME: defs.h,v 1.13 2002/06/07 02:40:03 fujisawa Exp $	*/
+/*	$KAME: defs.h,v 1.14 2002/06/28 01:08:51 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -51,6 +51,8 @@
 #define	XLATE_LONG		1
 #define	XLATE_SHORT		2
 
+#define	XLATE_LOCAL		0
+#define	XLATE_REMOTE		1
 
 #define	GETA			64
 

@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.27 2002/06/21 08:44:40 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.28 2002/06/28 01:08:51 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -371,8 +371,8 @@ makeTSlotLine(char *wow, int size, struct tSlot *tsl,
 	default:		concat(&lmsg, "unk   ");	break;
 	}
 
-	appendPAddrXL(&lmsg, &tsl->local, type, 0);
-	appendPAddrXL(&lmsg, &tsl->remote, type, 1);
+	appendPAddrXL(&lmsg, &tsl->local, type, XLATE_LOCAL);
+	appendPAddrXL(&lmsg, &tsl->remote, type, XLATE_REMOTE);
 
 	concat(&lmsg, "%6d%6d ", tsl->tofrom, tsl->fromto);
 
@@ -422,7 +422,7 @@ appendPAddrXL4(struct logmsg *lmsg, struct pAddr *pad, int type, int inv)
 	char	Bow[128];
 	char	Wow[128];
 
-	if (inv == 0) {
+	if (inv == XLATE_LOCAL) {
 		switch (type) {
 		case XLATE_SHORT:
 			inet_ntop(AF_INET, &pad->in4src, Bow, sizeof(Bow));
@@ -465,7 +465,7 @@ appendPAddrXL4(struct logmsg *lmsg, struct pAddr *pad, int type, int inv)
 void
 appendPAddrXL6(struct logmsg *lmsg, struct pAddr *pad, int type, int inv)
 {
-	if (inv == 0) {
+	if (inv == XLATE_LOCAL) {
 		switch (type) {
 		case XLATE_SHORT:
 			appendpAddrXL6short(lmsg, &pad->in6src, pad->port[0]);
