@@ -1,9 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.132 1999/09/23 15:40:16 itojun Exp $
+$Id: CHANGELOG,v 1.133 1999/09/24 12:16:56 itojun Exp $
 
 
 <199909>
+Fri Sep 24 21:15:02 JST 1999  itojun@iijlab.net
+	* freebsd2/sys/netinet/ip_output.c: prevent kernel panic on
+	  per-socket IPsec policy specification, like:
+	  # ping -P 'out ipsec ah/transport/x-x/use' x
+	  (the cause was only a pair of parens, we'd better have -Wall in
+	  kernel Makefile...)
+
 Fri Sep 24 00:36:05 JST 1999  itojun@iijlab.net
 	* kame/sys/netinet6/in6_ifattach.c: do not allow all-zero EUI64/
 	  IEEE802 to be used as interface id source for pseudo interfaces.
