@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.31 2001/05/21 16:39:15 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.32 2001/06/19 07:03:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -114,8 +114,6 @@
 #include <netinet6/ipsec.h>
 #endif /*IPSEC*/
 #endif
-
-#include "faith.h"
 
 #include <net/net_osdep.h>
 

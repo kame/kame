@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.94 2001/05/21 11:28:48 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.95 2001/05/25 07:26:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -99,7 +99,6 @@
 #ifdef __NetBSD__
 extern struct ifnet loif[NLOOP];
 #endif
-#include "faith.h"
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
