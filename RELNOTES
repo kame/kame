@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.71 2001/03/14 05:05:33 itojun Exp $
+	$KAME: RELNOTES,v 1.72 2001/03/14 13:25:20 itojun Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -94,7 +94,7 @@ Many of old ones have been solved.
   drivers use interrupts for multicast filter setup, and KAME code calls
   multicast initialization code in splimp() or splnet(). 
   It is not KAME problem, it is problem in drivers.  These drivers should
-  be corrected not to use interropts in initialization sequence.
+  be corrected not to use interrupts in initialization sequence.
 
   KAME/FreeBSD: fxp driver, no workaround available.
   KAME/OpenBSD: fxp driver, workaround is in KAME tree (sys/net/if.c)
