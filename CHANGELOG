@@ -1,6 +1,12 @@
-$KAME: CHANGELOG,v 1.2458 2003/08/18 05:39:09 itojun Exp $
+$KAME: CHANGELOG,v 1.2459 2003/08/18 18:32:13 jinmei Exp $
 
 <200308>
+2003-08-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6relay.c: fixed a missing initialization.
+	Without this fix, dhcp6relay could crash when it has no global
+	addresses.
+	From: Hajimu UMEMOTO <ume@mahoroba.org>
+
 Sun Aug 17 JST 2003  itojun@iijlab.net
 	* sys/netinet{,6}/in{,6}_proto.c: enforce inbound IPsec policy on
 	  protocols that falls into raw socket as a wildcard case.
