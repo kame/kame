@@ -227,9 +227,7 @@ udp_input(struct mbuf *m, ...)
 	int error, s;
 #endif /* IPSEC */
 #ifdef IGMPV3
-	u_int32_t src_h;
 	struct ip_moptions *imo;
-	struct sockaddr_in *sin;
 	struct sock_msf_source *msfsrc;
 	int i;
 #endif
@@ -579,7 +577,6 @@ udp_input(struct mbuf *m, ...)
 			}
 			
 			imo = inp->inp_moptions;
-			src_h = ntohl(ip->ip_src.s_addr);
 			for (i = 0; i < imo->imo_num_memberships; i++) {
 				if (imo->imo_membership[i]->inm_addr.s_addr
 				    != ip->ip_dst.s_addr)
@@ -599,10 +596,10 @@ udp_input(struct mbuf *m, ...)
 				LIST_FOREACH(msfsrc,
 					     imo->imo_msf[i]->msf_head,
 					     list) {
-					sin = (struct sockaddr_in *)&msfsrc->src;
-					if (sin->sin_addr.s_addr < src_h)
+					if (SS_CMP(&msfsrc->src, <, &srcsa)) {
 						continue;
-					if (sin->sin_addr.s_addr > src_h) {
+					}
+					if (SS_CMP(&msfsrc->src, >, &srcsa)) {
 						/* terminate search, as there
 						 * will be no match */
 						break;
@@ -619,10 +616,10 @@ udp_input(struct mbuf *m, ...)
 				LIST_FOREACH(msfsrc,
 					     imo->imo_msf[i]->msf_blkhead,
 					     list) {
-					sin = (struct sockaddr_in *)&msfsrc->src;
-					if (sin->sin_addr.s_addr < src_h)
+					if (SS_CMP(&msfsrc->src, <, &srcsa)) {
 						continue;
-					if (sin->sin_addr.s_addr == src_h) {
+					}
+					if (SS_CMP(&msfsrc->src, ==, &srcsa)) {
 						/* blocks since the src matched
 						 * with block list */
 						break;
