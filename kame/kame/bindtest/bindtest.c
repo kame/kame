@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.31 2001/05/14 14:15:18 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.32 2001/05/18 08:35:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -105,6 +105,7 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
+static char *versionstr = "$KAME: bindtest.c,v 1.32 2001/05/18 08:35:48 jinmei Exp $"; 
 static char *port = NULL;
 static char *otheraddr = NULL;
 static struct addrinfo *oai;
@@ -708,7 +709,6 @@ conntest(sa, sb, ai)
 				       printsa(from, fromlen));
 			} else
 				recva++;
-			close(newsa);
 		}
 	}
 	if (FD_ISSET(sb, &fdset)) {
@@ -727,7 +727,6 @@ conntest(sa, sb, ai)
 				       printsa(from, fromlen));
 			} else
 				recvb++;
-			close(newsb);
 		}
 	}
 
@@ -745,4 +744,8 @@ conntest(sa, sb, ai)
   done:
 	if (s >= 0)
 		close(s);
+	if (newsa >= 0)
+		close(newsa);
+	if (newsb >= 0)
+		close(newsb);
 }
