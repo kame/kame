@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.91 2001/03/15 11:44:08 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.92 2001/03/16 04:36:01 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -1096,6 +1096,8 @@ remote_spec
 		EOS
 	|	LIFETIME LIFETYPE_BYTE NUMBER unittype_byte
 		{
+			yywarn("the lifetime of bytes in phase 1 "
+				"will be ignored at the moment.");
 			prhead->lifebyte = fix_lifebyte($3 * $4);
 			if (prhead->lifebyte == 0)
 				return -1;
