@@ -668,9 +668,6 @@ in6_ifattach(ifp, type, laddr, noloop)
 	return;
 }
 
-/*
- * TODO: cleanup multicast address kludge table (non-freebsd3)
- */
 void
 in6_ifdetach(ifp)
 	struct ifnet *ifp;
@@ -764,6 +761,11 @@ in6_ifdetach(ifp)
 		in6_delmulti(in6m);
 		in6m = NULL;
 	}
+#endif
+
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	/* cleanup multicast address kludge table, if there is any */
+	in6_purgemkludge(ifp);
 #endif
 
 	/* remove route to link-local allnodes multicast (ff02::1) */
