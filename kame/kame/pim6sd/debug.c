@@ -660,7 +660,7 @@ dump_pim_mrt(fp)
 		    r->timer, r->jp_timer, r->rs_timer, r->assert_timer);
 
 	    fprintf(fp, "  MIF   0   1   2   3   4   5   6   7   8   9\n");
-	    for (vifi = 0, i = 0; i <= numvifs / 10; i++) {
+	    for (vifi = 0, i = 0; i < numvifs / 10; i++) {
 		    int j;
 
 		    fprintf(fp, " %4d", i);
@@ -741,14 +741,17 @@ dump_pim_mrt(fp)
 	    fprintf(fp, "Upstream nbr: %s\n",
 		    r->upstream ? inet6_fmt(&r->upstream->address.sin6_addr) : "NONE");
 
-	    fprintf(fp, "\nTIMERS:  Entry   JP   RS Assert MIFS:");
-	    for (vifi = 0; vifi < numvifs; vifi++)
-		fprintf(fp, "  %d", vifi);
-	    fprintf(fp, "\n           %d    %d    %d    %d        ",
+	    fprintf(fp, "\nTIMERS: Entry=%d JP=%d RS=%d Assert=%d\n",
 		    r->timer, r->jp_timer, r->rs_timer, r->assert_timer);
-	    for (vifi = 0; vifi < numvifs; vifi++)
-		fprintf(fp, " %d", r->vif_timers[vifi]);
-	    fprintf(fp, "\n");
+
+	    fprintf(fp, "  MIF   0   1   2   3   4   5   6   7   8   9\n");
+	    for (vifi = 0, i = 0; i < numvifs / 10; i++) {
+		    int j;
+
+		    fprintf(fp, " %4d", i);
+		    for (j = 0; j < 10 && vifi < numvifs; j++, vifi++)
+			    fprintf(fp, " %3d", r->vif_timers[vifi]);
+		    fprintf(fp, "\n");
 	}
     }				/* for all groups */
 
@@ -824,14 +827,17 @@ dump_pim_mrt(fp)
 	    fprintf(fp, "Outgoing oifs: %-20s\n", oifs);
 	    fprintf(fp, "Incoming     : %-20s\n", incoming_iif);
 
-	    fprintf(fp, "\nTIMERS:  Entry   JP   RS Assert MIFS:");
-	    for (vifi = 0; vifi < numvifs; vifi++)
-		fprintf(fp, "  %d", vifi);
-	    fprintf(fp, "\n           %d    %d    %d    %d        ",
+	    fprintf(fp, "\nTIMERS: Entry=%d JP=%d RS=%d Assert=%d\n",
 		    r->timer, r->jp_timer, r->rs_timer, r->assert_timer);
-	    for (vifi = 0; vifi < numvifs; vifi++)
-		fprintf(fp, " %d", r->vif_timers[vifi]);
-	    fprintf(fp, "\n");
+
+	    fprintf(fp, "  MIF   0   1   2   3   4   5   6   7   8   9\n");
+	    for (vifi = 0, i = 0; i < numvifs / 10; i++) {
+		    int j;
+
+		    fprintf(fp, " %4d", i);
+		    for (j = 0; j < 10 && vifi < numvifs; j++, vifi++)
+			    fprintf(fp, " %3d", r->vif_timers[vifi]);
+		    fprintf(fp, "\n");
 	}
     }				/* For all (*,*,RP) */
 
