@@ -120,7 +120,7 @@ extern struct	inpcbinfo ripcbinfo;
 extern u_long	rip_sendspace;
 extern u_long	rip_recvspace;
 
-static struct rip6stat rip6stat;
+struct rip6stat rip6stat;
 
 /*
  * Setup generic address and protocol structures

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.193 2001/05/22 07:57:21 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.194 2001/05/27 13:28:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -129,6 +129,9 @@
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/nd6.h>
 #include <netinet6/in6_prefix.h>
+#ifdef __bsdi__
+#include <netinet6/raw_ip6.h>
+#endif
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 #include <netinet6/ipsec.h>
@@ -2745,6 +2748,9 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPV6CTL_V6ONLY:
 		/* XXX for bsdi4, should be made modifiable */
 		return sysctl_rdint(oldp, oldlenp, newp, ip6_v6only);
+	case IPV6CTL_RIP6STATS:
+		return sysctl_rdtrunc(oldp, oldlenp, newp, &rip6stat,
+		    sizeof(rip6stat));
 	default:
 		return (sysctl_int_arr(ip6_sysvars, name, namelen,
 				       oldp, oldlenp, newp, newlen));

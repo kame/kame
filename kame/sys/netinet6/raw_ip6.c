@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.77 2001/05/27 12:13:37 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.78 2001/05/27 13:28:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -154,7 +154,7 @@ struct	in6pcb rawin6pcb;
 #endif
 #define ifatoia6(ifa)	((struct in6_ifaddr *)(ifa))
 
-static struct rip6stat rip6stat;
+struct rip6stat rip6stat;
 
 /*
  * Initialize raw connection block queue.

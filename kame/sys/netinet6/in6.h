@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.88 2001/05/25 01:32:07 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.89 2001/05/27 13:28:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -643,10 +643,11 @@ struct ip6_mtuinfo {
 #define IPV6CTL_TEMPPLTIME	33	/* preferred lifetime for tmpaddrs */
 #define IPV6CTL_TEMPVLTIME	34	/* valid lifetime for tmpaddrs */
 #define IPV6CTL_AUTO_LINKLOCAL	35	/* automatic link-local addr assign */
+#define IPV6CTL_RIP6STATS	36	/* raw_ip6 stats */
 
 /* New entries should be added here from current IPV6CTL_MAXID value. */
 /* to define items, should talk with KAME guys first, for *BSD compatibility */
-#define IPV6CTL_MAXID		36
+#define IPV6CTL_MAXID		37
 
 #ifdef IPV6CTL_RTEXPIRE
 #define __IPV6CTL_NAMES_RTEXPIRE	"rtexpire"
@@ -756,6 +757,7 @@ struct ip6_mtuinfo {
 	{ "temppltime", CTLTYPE_INT }, \
 	{ "tempvltime", CTLTYPE_INT }, \
 	{ "auto_linklocal", CTLTYPE_INT }, \
+	{ 0, 0 }, \
 }
 
 #ifdef __bsdi__
@@ -796,6 +798,7 @@ struct ip6_mtuinfo {
 	&ip6_temp_preferred_lifetime, \
 	&ip6_temp_valid_lifetime, \
 	&ip6_auto_linklocal, \
+	0, \
 }
 #endif
 #endif /* !_XOPEN_SOURCE */

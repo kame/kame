@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.90 2001/04/24 16:42:15 sumikawa Exp $	*/
+/*	$KAME: in6_proto.c,v 1.91 2001/05/27 13:28:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -139,6 +139,10 @@
 #include <netinet6/tcp6_timer.h>
 #include <netinet6/tcp6_var.h>
 #endif
+#endif
+
+#ifdef __FreeBSD__
+#include <netinet6/raw_ip6.h>
 #endif
 
 #if !defined(__OpenBSD__) && !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
@@ -762,6 +766,8 @@ SYSCTL_INT(_net_inet6_ip6, IPV6CTL_V6ONLY,
 #endif
 SYSCTL_INT(_net_inet6_ip6, IPV6CTL_AUTO_LINKLOCAL,
 	auto_linklocal, CTLFLAG_RW, &ip6_auto_linklocal,	0, "");
+SYSCTL_STRUCT(_net_inet6_ip6, IPV6CTL_RIP6STATS, rip6stats, CTLFLAG_RD,
+	&rip6stat, rip6stat, "");
 
 /* net.inet6.icmp6 */
 SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_REDIRACCEPT,

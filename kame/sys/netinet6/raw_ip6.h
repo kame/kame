@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.h,v 1.1 2001/05/27 12:13:37 itojun Exp $	*/
+/*	$KAME: raw_ip6.h,v 1.2 2001/05/27 13:28:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -45,5 +45,9 @@ struct rip6stat {
 
 	u_quad_t rip6s_opackets;	/* total output packets */
 };
+
+#ifdef _KERNEL
+extern struct rip6stat rip6stat;
+#endif
 
 #endif
