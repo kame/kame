@@ -164,7 +164,7 @@ if_attachsetup(ifp)
 	 *	struct ifnet **ifindex2ifnet
 	 */
 	if (ifnet_addrs == 0 || ifindex2ifnet == 0 || if_index >= if_indexlim) {
-		size_t n;
+		size_t m, n, oldlim;
 		caddr_t q;
 		
 		oldlim = if_indexlim;
