@@ -1,4 +1,4 @@
-/*	$KAME: radix_mpath.c,v 1.16 2004/11/06 15:44:28 itojun Exp $	*/
+/*	$KAME: radix_mpath.c,v 1.17 2004/11/08 10:29:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -206,8 +206,10 @@ rt_mpath_conflict(rnh, rt, netmask)
 	}
 
  maskmatched:;
+#ifdef __OpenBSD__
 	if (!mpathok)
 		return EEXIST;
+#endif
 
 	/* key/mask were the same.  compare gateway for all multipaths */
 	do {
