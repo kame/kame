@@ -630,6 +630,13 @@ if test $signing = "yes"; then
 fi
 AC_CHECK_HEADERS(openssl/cversion.h openssl/opensslv.h)
 
+dnl checking rijndael
+AC_SUBST(CRYPTOBJS)
+AC_CHECK_HEADERS(openssl/rijndael.h, [], [
+	CPPFLAGS="$CPPFLAGS -I./missing"
+	CRYPTOBJS="$CRYPTOBJS rijndael-api-fst.o rijndael-alg-fst.o"
+])
+
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
 AC_TYPE_PID_T
