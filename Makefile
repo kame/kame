@@ -3,6 +3,9 @@ TARGET?=	netbsd
 prepare::
 	perl prepare.pl kame ${TARGET}
 
+clean::
+	find ${TARGET} -type l -print | perl -nle unlink
+
 # only for developers
 bsdi3:
 	(set CVSROOT=cvs.kame.net/cvsroot/kame-local; export CVSROOT; cvs -d cvs.kame.net:/cvsroot/kame-local co -d bsdi3 -P kame/bsdi3)
@@ -17,15 +20,15 @@ PLAT=	freebsd2 freebsd3 kame netbsd openbsd
 
 update: update-doc update-plat
 update-doc:
-	cvs update -d -P $(DOC)
+	cvs update -d -P ${DOC}
 update-plat:
-	for i in kame $(TARGET); do \
+	for i in kame ${TARGET}; do \
 		if test -d $$i; then \
 			(cd $$i; cvs update -d -P); \
 		fi \
 	done
 update-all: update-doc
-	for i in $(PLAT); do \
+	for i in ${PLAT}; do \
 		if test -d $$i; then \
 			(cd $$i; cvs update -d -P); \
 		fi \
