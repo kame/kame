@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.142 2001/05/17 03:48:30 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.143 2001/05/17 05:57:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -888,7 +888,7 @@ nd6_purge(ifp)
 			 * Previously, pr->ndpr_addr is removed as well,
 			 * but I strongly believe we don't have to do it.
 			 * nd6_purge() is only called from in6_ifdetach(),
-			 * which removes all the associated interface address
+			 * which removes all the associated interface addresses
 			 * by itself.
 			 * (jinmei@kame.net 20010129)
 			 */
