@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.14 2002/10/11 07:23:35 k-sugyou Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.15 2002/11/07 02:57:09 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -792,7 +792,11 @@ sctp6_detach(struct socket *so)
 #else
 	s = splnet();
 #endif
-	sctp_inpcb_free(inp,0);
+	if (((so->so_options & SO_LINGER) && (so->so_linger == 0)) ||
+	    (so->so_rcv.sb_cc > 0))
+		sctp_inpcb_free(inp, 1);
+	else
+		sctp_inpcb_free(inp, 0);
 	splx(s);
 	return 0;
 }
