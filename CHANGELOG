@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.802 2000/04/23 03:42:04 jinmei Exp $
+$Id: CHANGELOG,v 1.803 2000/04/23 05:22:47 itojun Exp $
 
 <200004>
+Sun Apr 23 14:21:32 JST 2000  itojun@iijlab.net
+	* freebsd2/usr.bin/ftp: use RFC2732 URL format for Host: HTTP directive.
+	* openbsd/usr.bin/ftp: support RFC2732 URL format (bracket around
+	  IPv6 numeric address).
+
 2000-04-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_mroute.c (ip6_mdq): do not check scope
 	boundary check for packets through the PIM register
