@@ -91,6 +91,70 @@ slash		\/
 
 	/* logging */
 <S_CNF>log { DP("begin logging"); BEGIN S_LOG; return(LOG); }
+<S_LOG>(no)?aspath {
+	YYD_ECHO;
+	yylval.num = LOG_ASPATH;
+	if (strncmp("no", yytext, 2))
+		return(LOGLEV);
+	else
+		return(NOLOGLEV);
+}
+<S_LOG>(no)?bgpstate {
+	YYD_ECHO;
+	yylval.num = LOG_BGPSTATE;
+	if (strncmp("no", yytext, 2))
+		return(LOGLEV);
+	else
+		return(NOLOGLEV);
+}
+<S_LOG>(no)?bgpconnect {
+	YYD_ECHO;
+	yylval.num = LOG_BGPCONNECT;
+	if (strncmp("no", yytext, 2))
+		return(LOGLEV);
+	else
+		return(NOLOGLEV);
+}
+<S_LOG>(no)?bgpinput {
+	YYD_ECHO;
+	yylval.num = LOG_BGPINPUT;
+	if (strncmp("no", yytext, 2))
+		return(LOGLEV);
+	else
+		return(NOLOGLEV);
+}
+<S_LOG>(no)?bgpoutput {
+	YYD_ECHO;
+	yylval.num = LOG_BGPOUTPUT;
+	if (strncmp("no", yytext, 2))
+		return(LOGLEV);
+	else
+		return(NOLOGLEV);
+}
+<S_LOG>(no)?bgproute {
+	YYD_ECHO;
+	yylval.num = LOG_BGPROUTE;
+	if (strncmp("no", yytext, 2))
+		return(LOGLEV);
+	else
+		return(NOLOGLEV);
+}
+<S_LOG>(no)?interface {
+	YYD_ECHO;
+	yylval.num = LOG_INTERFACE;
+	if (strncmp("no", yytext, 2))
+		return(LOGLEV);
+	else
+		return(NOLOGLEV);
+}
+<S_LOG>(no)?inet6 {
+	YYD_ECHO;
+	yylval.num = LOG_INET6;
+	if (strncmp("no", yytext, 2))
+		return(LOGLEV);
+	else
+		return(NOLOGLEV);
+}
 <S_LOG>(no)?bgp {
 	YYD_ECHO;
 	yylval.num = LOG_BGP;
@@ -102,6 +166,30 @@ slash		\/
 <S_LOG>(no)?rip {
 	YYD_ECHO;
 	yylval.num = LOG_RIP;
+	if (strncmp("no", yytext, 2))
+		return(LOGLEV);
+	else
+		return(NOLOGLEV);
+}
+<S_LOG>(no)?route {
+	YYD_ECHO;
+	yylval.num = LOG_ROUTE;
+	if (strncmp("no", yytext, 2))
+		return(LOGLEV);
+	else
+		return(NOLOGLEV);
+}
+<S_LOG>(no)?filter {
+	YYD_ECHO;
+	yylval.num = LOG_FILTER;
+	if (strncmp("no", yytext, 2))
+		return(LOGLEV);
+	else
+		return(NOLOGLEV);
+}
+<S_LOG>(no)?timer {
+	YYD_ECHO;
+	yylval.num = LOG_TIMER;
 	if (strncmp("no", yytext, 2))
 		return(LOGLEV);
 	else

@@ -210,6 +210,11 @@ extern int yylex __P((void));
 %token YES NO ALL DESCR DESCSTRING IGNORE_END
 %token NUMBER STRING SLASH
 %token LOG LOGLEV NOLOGLEV
+%token LOGASPATH NOLOGASPATH LOGBGPSTATE NOLOGBGPSTATE LOGBGPCONNECT
+%token NOLOGBGPCONNECT LOGBGPINPUT NOLOGBGPINPUT LOGBGPOUTPUT NOLOGBGPOUTPUT
+%token LOGBGPROUTE NOLOGBGPROUTE LOGINTERFACE NOLOGINTERFACE LOGINET6
+%token NOLOGINET6 LOGRIP NOLOGRIP LOGROUTE NOLOGROUTE LOGFILTER NOLOGFILTER
+%token LOGTIMER NOLOGTIMER
 %token DUMPFILE
 %token AUTONOMOUSSYSTEM ROUTERID CLUSTERID HOLDTIME ROUTEREFLECTOR BGPSBSIZE
 %token INTERFACE IFNAME
@@ -1152,7 +1157,7 @@ param_config()
 {
 	struct in_addr ipv4id;
 
-	if (yy_debug >= 0) {	/* debug flag */
+	if (yy_debug) {		/* debug flag */
 		logflags = yy_debug;
 		cprint("set %x to the debug flag\n", (u_int)logflags);
 	}
@@ -2203,7 +2208,8 @@ cf_post_config()
 void
 cf_init()
 {
-	yy_debug = yy_asnum = yy_bgpsbsize = yy_holdtime = yy_rrflag = -1;
+	yy_debug = 0;
+	yy_asnum = yy_bgpsbsize = yy_holdtime = yy_rrflag = -1;
 	yy_rip = yy_rip_sitelocal = yy_bgp = -1;
 	yy_routerid = yy_clusterid = -1;
 	yy_dumpfile = NULL;

@@ -1757,7 +1757,7 @@ rip_output_filter(struct ripif *ripif, struct ripinfo6 *ripinfo)
 	if (output_filter_check(f, rip_use_sitelocal, ripinfo)) {
 		IFLOG(LOG_RIP)
 			syslog(LOG_DEBUG,
-			       "<%s>: output route %s/%d on %s was filtered"
+			       "<%s>: output route %s/%d on %s was filtered",
 			       __FUNCTION__,
 			       ip6str(&ripinfo->rip6_dest, 0),
 			       ripinfo->rip6_plen,
