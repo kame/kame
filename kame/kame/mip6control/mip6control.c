@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.19 2002/01/22 06:23:01 k-sugyou Exp $	*/
+/*	$KAME: mip6control.c,v 1.20 2002/01/22 07:01:15 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -104,12 +104,14 @@ static const char *ipaddr_fmt[] = {
 };
 
 struct nlist nl[] = {
+	{ "_mip6_config" },
+#define N_MIP6_CONFIG 0
 	{ "_hif_softc_list" },
-#define N_HIF_SOFTC_LIST 0
+#define N_HIF_SOFTC_LIST 1
 	{ "_mip6_bc_list" },
-#define N_MIP6_BC_LIST 1
+#define N_MIP6_BC_LIST 2
 	{ "_mip6_unuse_hoa" },
-#define N_MIP6_UNUSE_HOA 2
+#define N_MIP6_UNUSE_HOA 3
 	{ "" },
 };
 
@@ -262,6 +264,37 @@ main(argc, argv)
 	if((s = socket(AF_INET6, SOCK_DGRAM, 0)) == -1) {
 		perror("socket");
 		exit(1);
+	}
+
+	if (optind <= 1) {
+		struct mip6_config mip6_config;
+		char *type = "corresponding node";
+
+		if (nl[N_MIP6_CONFIG].n_value == 0) {
+			fprintf(stderr, "mip6 not found\n");
+			exit(1);
+		}
+		KREAD(nl[N_MIP6_CONFIG].n_value, &mip6_config, mip6_config);
+		switch (mip6_config.mcfg_type) {
+		case MIP6_CONFIG_TYPE_MN:
+			type = "mobile node";
+			break;
+		case MIP6_CONFIG_TYPE_HA:
+			type = "home agent";
+			break;
+		default:
+			if (mip6_config.mcfg_type)
+				printf("unknown type %d\n",
+				       mip6_config.mcfg_type);
+			break;
+		}
+		printf("node type: %s\n", type);
+		printf("IPsec protection: %s\n",
+		       mip6_config.mcfg_use_ipsec ? "enable" : "disable");
+		printf("authentication sub-option: %s\n",
+		       mip6_config.mcfg_use_authdata ? "enable" : "disable");
+		printf("debug: %s\n",
+		       mip6_config.mcfg_debug ? "enable" : "disable");
 	}
 
 	if (enablemn) {
