@@ -1,7 +1,24 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1975 2001/11/10 08:55:13 jinmei Exp $
+$KAME: CHANGELOG,v 1.1976 2001/11/11 16:59:44 jinmei Exp $
 
 <200111>
+2001-11-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* {kame, *BSD}/sys/netinet6/various files: introduced a new sysctl
+	variable "net.inet[6].ip6.use_defaultzone" to enable the notion of
+	default scope zone.  When the variable is non-0, the kernel will
+	try to set an appropriate zone ID for an address given from an
+	application if its scope zone is ambiguous.
+	TODO: port to openbsd.
+
+2001-11-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_setpktoption): disabled the
+	check for the address part of IPV6_PKTINFO, and let
+	in6_selectsrc() do the check.
+	* kame/sys/netinet6/in6_src.c (in6_selectsrc): validate the
+	address specified by IPV6_PKTINFO.  This change will introduce
+	additional cost when the option is specified as a sticky option,
+	but this type of usage should be rare and can be ignored.
+
 2001-11-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/netinet6/in6_pcb.c (in6_pcbladdr, in6_pcbbind):
 	set the default scope zone ID when unspecified.
