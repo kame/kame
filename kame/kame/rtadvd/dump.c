@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.17 2001/06/01 17:41:29 jinmei Exp $	*/
+/*	$KAME: dump.c,v 1.18 2001/06/01 17:48:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -232,7 +232,7 @@ if_dump()
 				inet_ntop(AF_INET6, &rti->prefix,
 					  prefixbuf, sizeof(prefixbuf)),
 				rti->prefixlen);
-			fprintf(fp, "Preference: %s, ",
+			fprintf(fp, "preference: %s, ",
 				rtpref_str[0xff & (rti->rtpref >> 3)]);
 			if (rti->ltime == ND6_INFINITE_LIFETIME)
 				fprintf(fp, "lifetime: infinity");
