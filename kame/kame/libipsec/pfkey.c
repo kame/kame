@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.29 2000/06/10 06:47:11 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.30 2000/06/10 07:10:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -67,7 +67,7 @@ static caddr_t pfkey_setsadbaddr __P((caddr_t, u_int,
 static caddr_t pfkey_setsadbkey __P((caddr_t, u_int, caddr_t, u_int));
 static caddr_t pfkey_setsadblifetime __P((caddr_t, u_int, u_int32_t, u_int32_t,
 	u_int32_t, u_int32_t));
-static caddr_t pfkey_setsadbxsa2 __P((caddr_t, u_int8_t, u_int32_t));
+static caddr_t pfkey_setsadbxsa2 __P((caddr_t, u_int32_t, u_int32_t));
 
 /*
  * check key length against algorithm specified.
@@ -1573,15 +1573,16 @@ pfkey_setsadblifetime(buf, type, l_alloc, l_bytes, l_addtime, l_usetime)
  * `buf' must has been allocated sufficiently.
  */
 static caddr_t
-pfkey_setsadbxsa2(buf, mode, reqid)
+pfkey_setsadbxsa2(buf, mode0, reqid)
 	caddr_t buf;
-	u_int8_t mode;
+	u_int32_t mode0;
 	u_int32_t reqid;
 {
 	struct sadb_x_sa2 *p;
+	u_int8_t mode = mode0 & 0xff;
 	u_int len;
 
-	p = (struct sadb_sa *)buf;
+	p = (struct sadb_x_sa2 *)buf;
 	len = sizeof(struct sadb_x_sa2);
 
 	memset(p, 0, len);
