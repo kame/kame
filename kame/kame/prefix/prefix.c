@@ -110,8 +110,6 @@ int	flags;
 int	newprefix_setdel, newprefix_match, newprefix_use, newprefix_uselen,
 	newprefix_keeplen;
 
-char ntop_buf[INET6_ADDRSTRLEN];	/*inet_ntop()*/
-
 void	Perror __P((const char *cmd));
 int	prefix __P((int argc, char *const *argv));
 void	usage __P((void));
