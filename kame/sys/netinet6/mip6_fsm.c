@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.17 2002/11/13 00:58:10 k-sugyou Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.18 2002/11/29 11:19:30 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -173,6 +173,15 @@ mip6_bu_pri_fsm(mbu, event, data)
 			/*
 			 * Start RR.
 			 */
+			if ((mbu->mbu_state
+			    & (MIP6_BU_STATE_BUNOTSUPP|MIP6_BU_STATE_MIP6NOTSUPP))
+			    != 0) {
+				/*
+				 * if the peer doesn't support MIP6,
+				 * keep IDLE state.
+				 */
+				break;
+			}
 			error = mip6_bu_sec_fsm(mbu,
 			    MIP6_BU_SEC_FSM_EVENT_START_RR,
 			    data);
