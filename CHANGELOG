@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1737 2001/06/20 12:53:58 jinmei Exp $
+$KAME: CHANGELOG,v 1.1738 2001/06/20 15:05:29 jinmei Exp $
 
 <200106>
+2001-06-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_reflect): removed ifdef'ed
+	blocks to keep an older rule about the size of icmp6 echo replies
+	specified in rfc 1885, in order to make the code simpler.
+	The history about the behavior was described as a comment just
+	before the function definition.
+
 2001-06-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/advapitest/sender.c:
 	* kame/kame/ping6/ping6.c:
