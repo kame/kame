@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_send.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_send.c,v 1.10 2000/06/04 13:30:30 itojun Exp $";
+static char rcsid[] = "$Id: res_send.c,v 1.11 2000/06/18 20:53:52 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 	/* change this to "0"
@@ -385,6 +385,16 @@ res_send(buf, buflen, ans, anssiz)
 	for (try = 0; try < _res.retry; try++) {
 	    for (ns = 0; ns < _res.nscount; ns++) {
 		struct sockaddr *nsap = get_nsaddr(ns);
+		int salen;
+
+		if (nsap->sa_len)
+			salen = nsap->sa_len;
+#ifdef INET6
+		else if (nsap->sa_family == AF_INET6)
+			salen = sizeof(struct sockaddr_in6);
+#endif
+		else if (nsap->sa_family == AF_INET)
+			salen = sizeof(struct sockaddr_in);
 
     same_ns:
 		if (badns & (1 << ns)) {
@@ -424,7 +434,7 @@ res_send(buf, buflen, ans, anssiz)
 		}
 
 		Dprint((_res.options & RES_DEBUG) &&
-		       getnameinfo(nsap, nsap->sa_len, abuf, sizeof(abuf),
+		       getnameinfo(nsap, salen, abuf, sizeof(abuf),
 				   NULL, 0, NI_NUMERICHOST | NI_WITHSCOPEID) == 0,
 		       (stdout, ";; Querying server (# %d) address = %s\n",
 			ns + 1, abuf));
@@ -459,7 +469,7 @@ res_send(buf, buflen, ans, anssiz)
 #endif
 				}
 				errno = 0;
-				if (connect(s, nsap, nsap->sa_len) < 0) {
+				if (connect(s, nsap, salen) < 0) {
 					terrno = errno;
 					Aerror(stderr, "connect/vc",
 					       errno, nsap);
@@ -640,7 +650,7 @@ read_len:
 				 * receive a response from another server.
 				 */
 				if (!connected) {
-					if (connect(s, nsap, nsap->sa_len) < 0) {
+					if (connect(s, nsap, salen) < 0) {
 						Aerror(stderr,
 						       "connect(dg)",
 						       errno, nsap);
@@ -696,7 +706,7 @@ read_len:
 					errno = 0;
 				}
 				if (sendto(s, (char*)buf, buflen, 0,
-					   nsap, nsap->sa_len) != buflen) {
+					   nsap, salen) != buflen) {
 					Aerror(stderr, "sendto", errno, nsap);
 					badns |= (1 << ns);
 					res_close();
