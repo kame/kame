@@ -2,7 +2,7 @@
 # Date created:		Fri Dec 25 14:47:35 JST 1998
 # Whom:			itojun@itojun.org
 #
-# $Id: Makefile,v 1.7 2001/01/06 17:17:57 jinmei Exp $
+# $Id: Makefile,v 1.8 2001/01/28 15:53:18 itojun Exp $
 #
 
 PORTNAME=	bind
@@ -14,6 +14,8 @@ DISTFILES=	bind-8.1.2-src.tar.gz bind-8.1.2-doc.tar.gz
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
 PATCHFILES=	bind8-812-v6-20000322a.diff.gz
 PATCH_DIST_STRIP=	-p2
+
+BROKEN=		"lots of security issues"
 
 # Based on jsager's bind8 port, imported 18 July 1997
 MAINTAINER=	itojun@itojun.org
