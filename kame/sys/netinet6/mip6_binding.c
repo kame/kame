@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.99 2002/03/14 07:26:14 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.100 2002/03/15 05:12:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -980,45 +980,38 @@ mip6_bdt_create(sc, paddr)
 	struct hif_softc *sc;
 	struct sockaddr_in6 *paddr;
 {
-	struct sockaddr_in6 dst, gate, mask;
+	struct rt_addrinfo rti;
+	struct sockaddr_in6 dst, mask;
+	struct sockaddr_dl gate;
 	struct rtentry *retrt;
-	struct ifaddr *ia;
-	struct in6_ifaddr *ia6 = NULL;
 	int error = 0;
 
 	(void)mip6_bdt_delete(paddr);
 
 	dst = *paddr;
-	for (ia = TAILQ_FIRST(&sc->hif_if.if_addrhead);
-	     ia;
-	     ia = TAILQ_NEXT(ia, ifa_link)) {
-		if (ia->ifa_addr->sa_family != AF_INET6)
-			continue;
-		ia6 = (struct in6_ifaddr *)ia;
-		if ((ia6->ia6_flags & IN6_IFF_HOME) == 0) {
-			ia6 = NULL;
-			continue;
-		}
-		break;
-	}
-	if (ia6 == NULL)
-		return (EINVAL);
-	gate = ia6->ia_addr;
+
+	/* XXX correct? */
+	bzero(&gate, sizeof(gate));
+	gate.sdl_len = sizeof(gate);
+	gate.sdl_family = AF_LINK;
+
         bzero(&mask, sizeof(mask));
-        mask.sin6_family = AF_INET6;
         mask.sin6_len = sizeof(struct sockaddr_in6);
+        mask.sin6_family = AF_INET6;
         mask.sin6_addr = in6mask128;
+
+	bzero((caddr_t)&rti, sizeof(rti));
+	rti.rti_flags = RTF_UP|RTF_HOST;
+	rti.rti_info[RTAX_DST] = (struct sockaddr *)&dst;
+	rti.rti_info[RTAX_GATEWAY] = (struct sockaddr *)&gate;
+	rti.rti_info[RTAX_NETMASK] = (struct sockaddr *)&mask;
+	rti.rti_ifp = (struct ifnet *)sc;
+
 #ifndef SCOPEDROUTING
 	dst.sin6_scope_id = 0;
-	gate.sin6_scope_id = 0;
 	mask.sin6_scope_id = 0;
-#endif /* !SCOPEDROUTING */
-	error = rtrequest(RTM_ADD,
-			  (struct sockaddr *)&dst,
-			  (struct sockaddr *)&gate,
-			  (struct sockaddr *)&mask,
-			  RTF_UP|RTF_HOST,
-			  &retrt);
+#endif	
+	error = rtrequest1(RTM_ADD, &rti, &retrt);
 	if (error == 0) {
 		retrt->rt_refcnt--;
 	}
@@ -1038,7 +1031,11 @@ mip6_bdt_delete(paddr)
 #ifndef SCOPEDROUTING
 	dst.sin6_scope_id = 0;
 #endif /* !SCOPEDROUTING */
+#ifdef __FreeBSD__
 	rt = rtalloc1((struct sockaddr *)&dst, 0, 0UL);
+#else
+	rt = rtalloc1((struct sockaddr *)&dst, 0);
+#endif /* __FreeBSD__ */
 	if (rt
 	    && ((rt->rt_flags & RTF_HOST) != 0)
 	    && (SA6_ARE_ADDR_EQUAL(&dst, (struct sockaddr_in6 *)rt_key(rt)))) {
@@ -4062,13 +4059,13 @@ mip6_tunnel_output(mp, mbc)
 
 	/* fill the outer header */
 	ip6 = mtod(m, struct ip6_hdr *);
-	ip6->ip6_flow	= 0;
-	ip6->ip6_vfc	&= ~IPV6_VERSION_MASK;
-	ip6->ip6_vfc	|= IPV6_VERSION;
-	ip6->ip6_plen	= htons((u_short)len);
-	ip6->ip6_nxt	= IPPROTO_IPV6;
-	ip6->ip6_hlim	= ip6_defhlim;
-	ip6->ip6_src	= encap_src->sin6_addr;
+	ip6->ip6_flow = 0;
+	ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
+	ip6->ip6_vfc |= IPV6_VERSION;
+	ip6->ip6_plen = htons((u_short)len);
+	ip6->ip6_nxt = IPPROTO_IPV6;
+	ip6->ip6_hlim = ip6_defhlim;
+	ip6->ip6_src = encap_src->sin6_addr;
 
 	/* bidirectional configured tunnel mode */
 	if (!SA6_IS_ADDR_UNSPECIFIED(encap_dst))
@@ -4080,22 +4077,18 @@ mip6_tunnel_output(mp, mbc)
 		m_freem(m);
 		return (ENETUNREACH);
 	}
+	if (ip6_setpktaddrs(m, encap_src, encap_dst) == NULL) {
+		m_freem(m);
+		return(error);
+	}
 #if defined(IPV6_MINMTU) && 0
 	/*
 	 * force fragmentation to minimum MTU, to avoid path MTU discovery.
 	 * it is too painful to ask for resend of inner packet, to achieve
 	 * path MTU discovery for encapsulated packets.
 	 */
-	if (ip6_setpktaddrs(m, encap_src, encap_dst) == NULL {
-		m_freem(m);
-		return(error);
-	}
 	return(ip6_output(m, 0, 0, IPV6_MINMTU, 0, NULL));
 #else
-	if (ip6_setpktaddrs(m, encap_src, encap_dst) == NULL) {
-		m_freem(m);
-		return(error);
-	}
 	return(ip6_output(m, 0, 0, 0, 0, NULL));
 #endif
 }
