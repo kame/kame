@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.141 2000/07/15 16:07:49 itojun Exp $	*/
+/*	$KAME: key.c,v 1.142 2000/07/17 01:42:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3021,7 +3021,10 @@ key_mature(sav)
 #endif
 			return EINVAL;
 		}
-		checkmask = 3;
+		if (sav->alg_auth == SADB_AALG_NONE)
+			checkmask = 1;
+		else
+			checkmask = 3;
 		mustmask = 1;
 		break;
 	case IPPROTO_AH:
