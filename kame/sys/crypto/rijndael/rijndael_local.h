@@ -6,5 +6,3 @@ typedef u_int32_t		word32;
 
 #define MAXKC		RIJNDAEL_MAXKC
 #define MAXROUNDS	RIJNDAEL_MAXROUNDS
-
-int rijndaelROUNDS;
