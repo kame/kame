@@ -5,6 +5,9 @@ include	"arch/macppc/conf/GENERIC"
 options 	NEW_STRUCT_ROUTE		# mandatory
 
 # Mobile IPv6
-#options 	MIP6
-#options 	MIP6_DEBUG
-#pseudo-device	hif	1
+#options	MIP6			# required for all node types
+#options	MIP6_HOME_AGENT		# required for a home agent
+#options	MIP6_MOBILE_NODE	# required for a mobile node
+#pseudo-device	hif	1		# required for a mobile node
+#options	MIP6_HAIPSEC		# ha-ipsec draft support
+#options	MIP6_DEBUG
