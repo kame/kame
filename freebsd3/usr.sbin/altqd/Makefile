@@ -1,5 +1,5 @@
 PROG=	altqd
-SRCS=	altqd.c if_nameindex.c
+SRCS=	altqd.c
 
 MAN5=	altq.conf.5
 MAN8=	altqd.8
