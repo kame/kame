@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.39 2000/06/12 03:28:01 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.40 2000/07/31 18:06:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -30,6 +30,8 @@
  */
 
 /*
+ * multicast DNS resolver, based on draft-aboba-dnsext-mdns-00.txt.
+ *
  * TODO:
  * - query timeout
  * - cache replies seen, honor TTL
@@ -44,6 +46,17 @@
  *	- conflict resolution
  * - [phmb]-mode configuration - is it necessary?
  * - spec conformance check
+ *
+ * 00 -> 01 difference:
+ * - 01 specification requires us to query names under "lcl.arpa" only.
+ *   For example, we cannot use 01 mdns to lookup address against
+ *   "starfruit.itojun.org".  We are allowed to use 01 mdns, only when we
+ *   lookup "starfruit.lcl.arpa" only.  (Q: what should we do about reverse
+ *   mapping?)
+ * - 00 mdns resolver queries to linklocal and local multicast group address.
+ *   01 mdns resolver will query linklocal multicast group address only.
+ * - 00 defines AA (authoritative answer) bit handling.  01 drops the comment
+ *   and puts it as future study.
  */
 
 #include <sys/types.h>
