@@ -194,7 +194,7 @@ in_pcballoc(so, v)
 	inp->inp_socket = so;
 	inp->inp_errormtu = -1;
 #ifdef IPSEC
-	error = ipsec_init_policy(so, &inp->inp_sp);
+	error = ipsec_init_pcbpolicy(so, &inp->inp_sp);
 	if (error != 0) {
 		pool_put(&inpcb_pool, inp);
 		return error;

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.15 2002/06/09 16:29:55 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.16 2002/06/11 17:54:30 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
 
 /*
@@ -655,7 +655,7 @@ sctp_attach(struct socket *so, int proto, struct proc *p)
 
 #ifdef IPSEC
 #ifndef __OpenBSD__
-	error = ipsec_init_policy(so, &ip_inp->inp_sp);
+	error = ipsec_init_pcbpolicy(so, &ip_inp->inp_sp);
 	if (error != 0) {
 		sctp_inpcb_free(inp,1);
 		return error;

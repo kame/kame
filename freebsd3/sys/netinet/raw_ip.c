@@ -494,7 +494,7 @@ rip_attach(struct socket *so, int proto, struct proc *p)
 	inp->inp_vflag |= INP_IPV4;
 	inp->inp_ip_p = proto;
 #ifdef IPSEC
-	error = ipsec_init_policy(so, &inp->inp_sp);
+	error = ipsec_init_pcbpolicy(so, &inp->inp_sp);
 	if (error != 0) {
 		in_pcbdetach(inp);
 		return error;

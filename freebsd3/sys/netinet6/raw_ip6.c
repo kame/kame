@@ -589,7 +589,7 @@ rip6_attach(struct socket *so, int proto, struct proc *p)
 	inp->in6p_hops = -1;	/* use kernel default */
 	inp->in6p_cksum = -1;
 #ifdef IPSEC
-	error = ipsec_init_policy(so, &inp->in6p_sp);
+	error = ipsec_init_pcbpolicy(so, &inp->in6p_sp);
 	if (error != 0) {
 		in6_pcbdetach(inp);
 		return (error);

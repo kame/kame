@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.8 2002/06/09 16:29:54 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.9 2002/06/11 17:54:30 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.c,v 1.207 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -1065,7 +1065,7 @@ sctp_inpcb_alloc(struct socket *so)
 #ifndef __OpenBSD__
 	{
 		struct inpcbpolicy *pcb_sp = NULL;
-		error = ipsec_init_policy(so, &pcb_sp);
+		error = ipsec_init_pcbpolicy(so, &pcb_sp);
 		/* Arrange to share the policy */
 		inp->ip_inp.inp.inp_sp = pcb_sp;
 		((struct in6pcb *)(&inp->ip_inp.inp))->in6p_sp = pcb_sp;

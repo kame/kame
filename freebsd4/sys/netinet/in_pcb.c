@@ -152,7 +152,7 @@ in_pcballoc(so, pcbinfo, p)
 	inp->inp_pcbinfo = pcbinfo;
 	inp->inp_socket = so;
 #ifdef IPSEC
-	error = ipsec_init_policy(so, &inp->inp_sp);
+	error = ipsec_init_pcbpolicy(so, &inp->inp_sp);
 	if (error != 0) {
 		zfreei(pcbinfo->ipi_zone, inp);
 		return error;

@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.47 2001/11/06 08:05:01 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.48 2002/06/11 17:54:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -528,7 +528,7 @@ udp6_attach(struct socket *so, int proto, struct proc *p)
 	 */
 	inp->inp_ip_ttl = ip_defttl;
 #ifdef IPSEC
-	error = ipsec_init_policy(so, &inp->in6p_sp);
+	error = ipsec_init_pcbpolicy(so, &inp->in6p_sp);
 	if (error != 0) {
 		in6_pcbdetach(inp);
 		return (error);

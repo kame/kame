@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.141 2002/06/11 16:51:45 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.142 2002/06/11 17:54:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1325,7 +1325,7 @@ ipsec_delpcbpolicy(p)
 
 /* initialize policy in PCB */
 int
-ipsec_init_policy(so, pcb_sp)
+ipsec_init_pcbpolicy(so, pcb_sp)
 	struct socket *so;
 	struct inpcbpolicy **pcb_sp;
 {
@@ -1333,11 +1333,11 @@ ipsec_init_policy(so, pcb_sp)
 
 	/* sanity check. */
 	if (so == NULL || pcb_sp == NULL)
-		panic("ipsec_init_policy: NULL pointer was passed.\n");
+		panic("ipsec_init_pcbpolicy: NULL pointer was passed.\n");
 
 	new = ipsec_newpcbpolicy();
 	if (new == NULL) {
-		ipseclog((LOG_DEBUG, "ipsec_init_policy: No more memory.\n"));
+		ipseclog((LOG_DEBUG, "ipsec_init_pcbpolicy: No more memory.\n"));
 		return ENOBUFS;
 	}
 	bzero(new, sizeof(*new));
@@ -1382,7 +1382,7 @@ ipsec_init_policy(so, pcb_sp)
 
 /* copy old ipsec policy into new */
 int
-ipsec_copy_policy(old, new)
+ipsec_deepcopy_pcbpolicy(old, new)
 	struct inpcbpolicy *old, *new;
 {
 	struct secpolicy *sp;

@@ -146,7 +146,7 @@ in6_pcballoc(so, head)
 	}
 	bzero(in6p->in6p_inputopts, sizeof(struct ip6_recvpktopts));
 #ifdef IPSEC
-	error = ipsec_init_policy(so, &in6p->in6p_sp);
+	error = ipsec_init_pcbpolicy(so, &in6p->in6p_sp);
 	if (error != 0) {
 		FREE(in6p->in6p_inputopts, M_IP6OPT);
 		FREE(in6p, M_PCB);

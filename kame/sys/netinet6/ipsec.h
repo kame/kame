@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.54 2002/06/09 14:44:01 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.55 2002/06/11 17:54:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -396,8 +396,8 @@ struct inpcb;
 #ifdef INET6
 struct in6pcb;
 #endif
-extern int ipsec_init_policy __P((struct socket *so, struct inpcbpolicy **));
-extern int ipsec_copy_policy
+extern int ipsec_init_pcbpolicy __P((struct socket *so, struct inpcbpolicy **));
+extern int ipsec_deepcopy_pcbpolicy
 	__P((struct inpcbpolicy *, struct inpcbpolicy *));
 extern u_int ipsec_get_reqlevel __P((struct ipsecrequest *));
 

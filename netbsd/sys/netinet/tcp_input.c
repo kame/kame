@@ -3196,13 +3196,13 @@ syn_cache_get(src, dst, th, hlen, tlen, so, m)
 	 */
 	if (inp) {
 		/* copy old policy into new socket's */
-		if (ipsec_copy_policy(sotoinpcb(oso)->inp_sp, inp->inp_sp))
+		if (ipsec_deepcopy_pcbpolicy(sotoinpcb(oso)->inp_sp, inp->inp_sp))
 			printf("tcp_input: could not copy policy\n");
 	}
 #ifdef INET6
 	else if (in6p) {
 		/* copy old policy into new socket's */
-		if (ipsec_copy_policy(sotoin6pcb(oso)->in6p_sp, in6p->in6p_sp))
+		if (ipsec_deepcopy_pcbpolicy(sotoin6pcb(oso)->in6p_sp, in6p->in6p_sp))
 			printf("tcp_input: could not copy policy\n");
 	}
 #endif

@@ -1020,7 +1020,7 @@ tcp_attach(so, p)
 		return (error);
 	inp = sotoinpcb(so);
 #ifdef IPSEC
-	error = ipsec_init_policy(so, &inp->inp_sp);
+	error = ipsec_init_pcbpolicy(so, &inp->inp_sp);
 	if (error) {
 #ifdef INET6
 		if (isipv6)
