@@ -87,6 +87,7 @@
 #define	IPPROTO_UDP		17		/* user datagram protocol */
 #define	IPPROTO_IDP		22		/* xns idp */
 #define	IPPROTO_TP		29 		/* tp-4 w/ class negotiation */
+#define IPPROTO_DCCP		33		/* Datagram congestion Control Protocol */
 #define IPPROTO_IPV6		41		/* IPv6 in IPv6 */
 #define IPPROTO_ROUTING		43		/* Routing header */
 #define IPPROTO_FRAGMENT	44		/* Fragmentation/reassembly header */

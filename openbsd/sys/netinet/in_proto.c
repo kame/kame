@@ -182,6 +182,11 @@
 #include <netinet/sctp_var.h>
 #endif /* SCTP */
 
+#ifdef DCCP
+#include <netinet/dccp.h>
+#include <netinet/dccp_var.h>
+#endif /* DCCP */
+
 extern	struct domain inetdomain;
 
 struct protosw inetsw[] = {
@@ -222,6 +227,14 @@ struct protosw inetsw[] = {
   0,		0,		0,		sctp_drain,	sctp_sysctl
 },
 #endif /* SCTP */
+#ifdef DCCP
+{ SOCK_DGRAM,	&inetdomain,	IPPROTO_DCCP,
+	PR_CONNREQUIRED|PR_WANTRCVD|PR_ATOMIC|PR_ABRTACPTDIS,
+  dccp_input,	0,		dccp_ctlinput,	dccp_ctloutput,
+  dccp_usrreq,
+  dccp_init,	0,              0,              0,		dccp_sysctl
+},
+#endif /* DCCP */
 { SOCK_RAW,	&inetdomain,	IPPROTO_RAW,	PR_ATOMIC|PR_ADDR,
   rip_input,	rip_output,	0,		rip_ctloutput,
   rip_usrreq,
