@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.157 2000/11/15 04:35:11 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.158 2000/11/17 19:55:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -937,9 +937,7 @@ icmp6_input(mp, offp, proto)
 			sizeof(struct ip6_hdr);
 		struct ip6ctlparam ip6cp;
 		struct in6_addr *finaldst = NULL;
-#if !(defined(__NetBSD__) || defined(__OpenBSD__))
 		int icmp6type = icmp6->icmp6_type;
-#endif
 		struct ip6_frag *fh;
 		struct ip6_rthdr *rth;
 		struct ip6_rthdr0 *rth0;
