@@ -379,7 +379,7 @@ udp_input(m, off)
 			/*
 			 * Receive multicast data which fits MSF condition.
 			 */
-			if (!IN_MULTICAST(ip->ip_dst.s_addr))
+			if (!IN_MULTICAST(ntohl(ip->ip_dst.s_addr)))
 				goto bypass_msf_condition_check;
 			
 			imo = inp->inp_moptions;
