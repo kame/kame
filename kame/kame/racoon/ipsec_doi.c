@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.63 2000/05/11 07:53:05 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.64 2000/05/11 09:13:06 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -89,7 +89,7 @@ static int get_ph2approvalx __P((struct ph2handle *, struct prop_pair *));
 static int get_transform
 	__P((struct isakmp_pl_p *prop, struct prop_pair **pair, int *num_p));
 static vchar_t *get_sabyproppair __P((struct prop_pair *pair));
-static u_int32_t ipsecdoi_set_ld __P((int type, vchar_t *buf));
+static u_int32_t ipsecdoi_set_ld __P((vchar_t *buf));
 
 static int check_doi __P((u_int32_t));
 static int check_situation __P((u_int32_t));
@@ -359,9 +359,9 @@ t2isakmpsa(trns, sa)
 	d = (struct isakmp_data *)(trns + 1);
 
 	/* default */
-	sa->lifebyte = 0;
 	life_t = OAKLEY_ATTR_SA_LD_TYPE_DEFAULT;
 	sa->lifetime = OAKLEY_ATTR_SA_LD_SEC_DEFAULT;
+	sa->lifebyte = 0;
 	sa->dhgrp = CALLOC(sizeof(struct dhgroup), struct dhgroup *);
 	if (!sa->dhgrp)
 		goto err;
@@ -484,10 +484,7 @@ t2isakmpsa(trns, sa)
 			break;
 		}
 		case OAKLEY_ATTR_SA_LD:
-		    {
-			u_int32_t t;
-
-			if (!life_t || !prev
+			if (!prev
 			 || (ntohs(prev->type) & ~ISAKMP_GEN_MASK) !=
 					OAKLEY_ATTR_SA_LD_TYPE) {
 				plog(logp, LOCATION, NULL,
@@ -497,23 +494,29 @@ t2isakmpsa(trns, sa)
 
 			switch (life_t) {
 			case IPSECDOI_ATTR_SA_LD_TYPE_SEC:
-				t = ipsecdoi_set_ld(life_t, val);
-				if (t == ~0)
-					sa->lifetime = OAKLEY_ATTR_SA_LD_SEC_DEFAULT;
-				else
-					sa->lifetime = ipsecdoi_set_ld(life_t, val);
+				sa->lifetime = ipsecdoi_set_ld(val);
+				vfree(val);
+				if (sa->lifetime == 0) {
+					plog(logp, LOCATION, NULL,
+						"invalid life duration.\n");
+					goto err;
+				}
 				break;
 			case IPSECDOI_ATTR_SA_LD_TYPE_KB:
-				t = ipsecdoi_set_ld(life_t, val);
-				if (t == ~0)
-					sa->lifebyte = 0;	/*XXX*/
-				else
-					sa->lifebyte = t;
-
+				sa->lifebyte = ipsecdoi_set_ld(val);
+				vfree(val);
+				if (sa->lifetime == 0) {
+					plog(logp, LOCATION, NULL,
+						"invalid life duration.\n");
+					goto err;
+				}
 				break;
+			default:
+				vfree(val);
+				plog(logp, LOCATION, NULL,
+					"invalid life type: %d\n", life_t);
+				goto err;
 			}
-			vfree(val);
-		    }
 			break;
 
 		case OAKLEY_ATTR_KEY_LEN:
@@ -1143,14 +1146,19 @@ get_sabysaprop(pp0, sa0)
 	return newsa;
 }
 
+/*
+ * If some error happens then return 0.  Although 0 means that lifetime is zero,
+ * such a value should not be accepted.
+ * Also 0 of lifebyte should not be included in a packet although 0 means not
+ * to care of it.
+ */
 static u_int32_t
-ipsecdoi_set_ld(type, buf)
-	int type;
+ipsecdoi_set_ld(buf)
 	vchar_t *buf;
 {
 	u_int32_t ld;
 
-	if (type == 0 || buf == 0)
+	if (buf == 0)
 		return 0;
 
 	switch (buf->l) {
@@ -1164,7 +1172,7 @@ ipsecdoi_set_ld(type, buf)
 		plog(logp, LOCATION, NULL,
 			"length %d of life duration "
 			"isn't supported.\n", buf->l);
-		return ~0;
+		return 0;
 	}
 
 	return ld;
@@ -2918,7 +2926,6 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 	int flag, type;
 	int error = -1;
 	int life_t;
-	vchar_t *ld_buf = NULL;
 	int tlen;
 
 	tr->trns_no = t->t_no;
@@ -2930,6 +2937,8 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 
 	/* default */
 	life_t = IPSECDOI_ATTR_SA_LD_TYPE_DEFAULT;
+	pp->lifetime = IPSECDOI_ATTR_SA_LD_SEC_DEFAULT;
+	pp->lifebyte = 0;
 
 	while (tlen > 0) {
 
@@ -2960,8 +2969,7 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 			break;
 		}
 		case IPSECDOI_ATTR_SA_LD:
-			if (life_t == NULL
-			 || prev == NULL
+			if (prev == NULL
 			 || (ntohs(prev->type) & ~ISAKMP_GEN_MASK) !=
 					IPSECDOI_ATTR_SA_LD_TYPE) {
 				plog(logp, LOCATION, NULL,
@@ -2971,6 +2979,8 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 
 		    {
 			u_int32_t t;
+			vchar_t *ld_buf = NULL;
+
 			if (flag) {
 				/* i.e. ISAKMP_GEN_TV */
 				ld_buf = vmalloc(sizeof(d->lorv));
@@ -2993,35 +3003,50 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 			}
 			switch (life_t) {
 			case IPSECDOI_ATTR_SA_LD_TYPE_SEC:
-				t = ipsecdoi_set_ld(life_t, ld_buf);
-				if (t != ~0) {
-					/* lifetime must be equal in a proposal. */
-					if (pp->lifetime == 0)
-						pp->lifetime = t;
-					else if (pp->lifetime != t) {
-						plog(logp, LOCATION, NULL,
-							"lifetime mismatched "
-							"in a proposal.\n");
-						goto end;
-					}
-				} else if (pp->lifetime == 0)
-					pp->lifetime = IPSECDOI_ATTR_SA_LD_SEC_DEFAULT;
+				t = ipsecdoi_set_ld(ld_buf);
+				vfree(ld_buf);
+				if (t == 0) {
+					plog(logp, LOCATION, NULL,
+						"invalid life duration.\n");
+					goto end;
+				}
+				/* lifetime must be equal in a proposal. */
+				if (pp->lifetime == IPSECDOI_ATTR_SA_LD_SEC_DEFAULT)
+					pp->lifetime = t;
+				else if (pp->lifetime != t) {
+					plog(logp, LOCATION, NULL,
+						"lifetime mismatched "
+						"in a proposal, "
+						"prev:%ld curr:%ld.\n",
+						pp->lifetime, t);
+					goto end;
+				}
 				break;
 			case IPSECDOI_ATTR_SA_LD_TYPE_KB:
-				t = ipsecdoi_set_ld(life_t, ld_buf);
-				if (t == ~0) {
-					/* lifebyte must be equal in a proposal. */
-					if (pp->lifebyte == 0)
-						pp->lifebyte = t;
-					else if (pp->lifebyte != t) {
-						plog(logp, LOCATION, NULL,
-							"lifebyte mismatched "
-							"in a proposal.\n");
-						goto end;
-					}
-				} else if (pp->lifebyte == 0)
-					pp->lifebyte = 0;	/* XXX */
+				t = ipsecdoi_set_ld(ld_buf);
+				vfree(ld_buf);
+				if (t == 0) {
+					plog(logp, LOCATION, NULL,
+						"invalid life duration.\n");
+					goto end;
+				}
+				/* lifebyte must be equal in a proposal. */
+				if (pp->lifebyte == 0)
+					pp->lifebyte = t;
+				else if (pp->lifebyte != t) {
+					plog(logp, LOCATION, NULL,
+						"lifebyte mismatched "
+						"in a proposal, "
+						"prev:%ld curr:%ld.\n",
+						pp->lifebyte, t);
+					goto end;
+				}
 				break;
+			default:
+				vfree(ld_buf);
+				plog(logp, LOCATION, NULL,
+					"invalid life type: %d\n", life_t);
+				goto end;
 			}
 		    }
 			break;
@@ -3092,9 +3117,6 @@ ipsecdoi_t2satrns(t, pp, pr, tr)
 
 	error = 0;
 end:
-	if (ld_buf)
-		vfree(ld_buf);
-
 	return error;
 }
 
