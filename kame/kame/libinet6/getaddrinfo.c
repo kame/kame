@@ -131,6 +131,7 @@ static const struct afd {
 
 struct explore {
 	int e_af;
+	int e_wildaf;
 	int e_socktype;
 	int e_protocol;
 	const char *e_protostr;
@@ -138,17 +139,17 @@ struct explore {
 
 static const struct explore explore[] = {
 #if 0
-	{ PF_LOCAL, ANY, ANY, NULL },
+	{ PF_LOCAL, 0, ANY, ANY, NULL },
 #endif
 #ifdef INET6
-	{ PF_INET6, SOCK_DGRAM, IPPROTO_UDP, "udp" },
-	{ PF_INET6, SOCK_STREAM, IPPROTO_TCP, "tcp" },
-	{ PF_INET6, SOCK_RAW, ANY },
+	{ PF_INET6, 1, SOCK_DGRAM, IPPROTO_UDP, "udp" },
+	{ PF_INET6, 1, SOCK_STREAM, IPPROTO_TCP, "tcp" },
+	{ PF_INET6, 0, SOCK_RAW, ANY },
 #endif
-	{ PF_INET, SOCK_DGRAM, IPPROTO_UDP, "udp" },
-	{ PF_INET, SOCK_STREAM, IPPROTO_TCP, "tcp" },
-	{ PF_INET, SOCK_RAW, ANY, NULL },
-	{ -1, 0, 0, NULL },
+	{ PF_INET, 1, SOCK_DGRAM, IPPROTO_UDP, "udp" },
+	{ PF_INET, 1, SOCK_STREAM, IPPROTO_TCP, "tcp" },
+	{ PF_INET, 0, SOCK_RAW, ANY, NULL },
+	{ -1, 0, 0, 0, NULL },
 };
 
 #ifdef INET6
@@ -375,8 +376,13 @@ getaddrinfo(hostname, servname, hints, res)
 	for (ex = explore; ex->e_af >= 0; ex++) {
 		*pai = ai0;
 
-		if (!MATCH_FAMILY(pai->ai_family, ex->e_af))
-			continue;
+		if (ex->e_wildaf) {
+			if (!MATCH_FAMILY(pai->ai_family, ex->e_af))
+				continue;
+		} else {
+			if (pai->ai_family != ex->e_af)
+				continue;
+		}
 		if (!MATCH(pai->ai_socktype, ex->e_socktype))
 			continue;
 		if (!MATCH(pai->ai_protocol, ex->e_protocol))
@@ -384,16 +390,10 @@ getaddrinfo(hostname, servname, hints, res)
 
 		if (pai->ai_family == PF_UNSPEC)
 			pai->ai_family = ex->e_af;
-		if (pai->ai_socktype == ANY) {
-			if (ex->e_socktype == ANY)
-				continue;
+		if (pai->ai_socktype == ANY && ex->e_socktype != ANY)
 			pai->ai_socktype = ex->e_socktype;
-		}
-		if (pai->ai_protocol == ANY) {
-			if (ex->e_protocol == ANY)
-				continue;
+		if (pai->ai_protocol == ANY && ex->e_protocol != ANY)
 			pai->ai_protocol = ex->e_protocol;
-		}
 
 		if (hostname == NULL)
 			error = explore_null(pai, hostname, servname, &cur->ai_next);
@@ -437,8 +437,13 @@ getaddrinfo(hostname, servname, hints, res)
 			if (pai->ai_family == PF_UNSPEC)
 				pai->ai_family = afd->a_af;
 
-			if (!MATCH_FAMILY(pai->ai_family, ex->e_af))
-				continue;
+			if (ex->e_wildaf) {
+				if (!MATCH_FAMILY(pai->ai_family, ex->e_af))
+					continue;
+			} else {
+				if (pai->ai_family != ex->e_af)
+					continue;
+			}
 			if (!MATCH(pai->ai_socktype, ex->e_socktype))
 				continue;
 			if (!MATCH(pai->ai_protocol, ex->e_protocol))
@@ -446,16 +451,10 @@ getaddrinfo(hostname, servname, hints, res)
 
 			if (pai->ai_family == PF_UNSPEC)
 				pai->ai_family = ex->e_af;
-			if (pai->ai_socktype == ANY) {
-				if (ex->e_socktype == ANY)
-					continue;
+			if (pai->ai_socktype == ANY && ex->e_socktype != ANY)
 				pai->ai_socktype = ex->e_socktype;
-			}
-			if (pai->ai_protocol == ANY) {
-				if (ex->e_protocol == ANY)
-					continue;
+			if (pai->ai_protocol == ANY && ex->e_protocol != ANY)
 				pai->ai_protocol = ex->e_protocol;
-			}
 
 			error = explore_fqdn(pai, hostname, servname,
 				&cur->ai_next);
