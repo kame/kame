@@ -427,7 +427,9 @@ if_detach_queues(ifp, q)
 	struct ifqueue *q;
 {
 	struct mbuf *m, *prev, *next;
+	int s;
 
+	s = splimp();
 	prev = NULL;
 	for (m = q->ifq_head; m; m = next) {
 		next = m->m_nextpkt;
@@ -454,6 +456,7 @@ if_detach_queues(ifp, q)
 		m_freem(m);
 		IF_DROP(q);
 	}
+	splx(s);
 }
 #endif /* defined(INET) || ... */
 
