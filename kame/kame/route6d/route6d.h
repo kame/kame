@@ -1,4 +1,4 @@
-/*	$KAME: route6d.h,v 1.4 2001/01/15 03:50:54 inoue Exp $	*/
+/*	$KAME: route6d.h,v 1.5 2001/09/05 03:05:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,10 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-/* not yet in use 
-#define	ROUTE6D_CONF	"/usr/local/v6/etc/route6d.conf"
-*/
 
 #define	ROUTE6D_DUMP	"/var/run/route6d_dump"
 #define	ROUTE6D_PID	"/var/run/route6d.pid"
