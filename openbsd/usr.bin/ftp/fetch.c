@@ -659,7 +659,7 @@ bad_ftp_url:
 
 			/* split off host[:port] if there is */
 			if (cp) {
-				portnum = strrchr(cp, ':');
+				portnum = strchr(cp, ':');
 				if (!portnum)
 					;
 				else {
