@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.76 2001/08/20 02:01:02 kjc Exp $	*/
+/*	$KAME: if_gif.c,v 1.77 2001/08/22 07:21:53 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -191,11 +191,9 @@ gifattach0(sc)
 	sc->gif_if.if_output = gif_output;
 	sc->gif_if.if_type   = IFT_GIF;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
-	sc->gif_if.if_snd.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&sc->gif_if.if_snd, IFQ_MAXLEN);
 #endif
-#ifdef ALTQ
 	IFQ_SET_READY(&sc->gif_if.if_snd);
-#endif
 	if_attach(&sc->gif_if);
 #if NBPFILTER > 0
 #ifdef HAVE_OLD_BPF
@@ -235,11 +233,7 @@ gif_start(ifp)
 
 	for (;;) {
 		s = splimp();
-#ifdef ALTQ
 		IFQ_DEQUEUE(&ifp->if_snd, m);
-#else
-		IF_DEQUEUE(&ifp->if_snd, m);
-#endif
 		splx(s);
 
 		if (m == NULL) return;
@@ -387,19 +381,13 @@ gif_output(ifp, m, dst, rt)
 	s = splnet();
 #ifdef ALTQ
 	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+#else
+	IFQ_ENQUEUE(&ifp->if_snd, m, error);
+#endif
 	if (error) {
 		splx(s);
 		goto end;
 	}
-#else
-	if (IF_QFULL(&ifp->if_snd)) {
-		m_freem(m);
-		error = ENOBUFS;
-		splx(s);
-		goto end;
-	}
-	IF_ENQUEUE(&ifp->if_snd, m);
-#endif /* ALTQ */
 	splx(s);
 
 #ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
@@ -446,11 +434,7 @@ gifintr(arg)
 	/* output processing */
 	while (1) {
 		s = splnet();
-#ifdef ALTQ
 		IFQ_DEQUEUE(&sc->gif_if.if_snd, m);
-#else
-		IF_DEQUEUE(&sc->gif_if.if_snd, m);
-#endif
 		splx(s);
 		if (m == NULL)
 			break;
