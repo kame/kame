@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.63 2001/07/23 14:07:29 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.64 2001/07/23 16:12:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -249,12 +249,6 @@ struct nd_prefix {
 #define ndpr_raf		ndpr_flags
 #define ndpr_raf_onlink		ndpr_flags.onlink
 #define ndpr_raf_auto		ndpr_flags.autonomous
-
-/*
- * We keep expired prefix for certain amount of time, for validation purposes.
- * 1800s = MaxRtrAdvInterval
- */
-#define NDPR_KEEP_EXPIRED	(1800 * 2)
 
 /*
  * Message format for use in obtaining information about prefixes
