@@ -94,6 +94,7 @@
 #endif /* INET || INET6 */
 #ifdef INET6
 #include <netinet6/nd6.h>
+#include <netinet6/in6_ifattach.h>
 #endif
 
 #ifdef IPX
