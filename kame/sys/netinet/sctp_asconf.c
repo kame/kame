@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.c,v 1.17 2004/01/19 09:48:25 itojun Exp $	*/
+/*	$KAME: sctp_asconf.c,v 1.18 2004/01/26 07:46:13 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -1044,7 +1044,7 @@ sctp_asconf_queue_add(struct sctp_tcb *tcb, struct ifaddr *ifa, uint16_t type)
 		memcpy(&aa->ap.addrp.addr, &sin6->sin6_addr,
 		    sizeof(struct in6_addr));
 #ifdef SCTP_DEBUG
-		sctp_ntop6((char *)&sin6->sin6_addr, buf, sizeof(buf));
+		strlcpy(buf, ip6_sprintf(&sin6->sin6_addr), sizeof(buf));
 #endif /* SCTP_DEBUG */
 
 	} else if (ifa->ifa_addr->sa_family == AF_INET) {
@@ -1058,7 +1058,7 @@ sctp_asconf_queue_add(struct sctp_tcb *tcb, struct ifaddr *ifa, uint16_t type)
 		memcpy(&aa->ap.addrp.addr, &sin->sin_addr,
 		    sizeof(struct in_addr));
 #ifdef SCTP_DEBUG
-		sctp_ntop4((char *)&sin->sin_addr, buf, sizeof(buf));
+		strlcpy(buf, inet_ntoa(&sin->sin_addr), sizeof(buf));
 #endif /* SCTP_DEBUG */
 	} else {
 		/* invalid family! */
@@ -1733,7 +1733,7 @@ sctp_addr_mgmt_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tcb,
 
 		sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
 #ifdef SCTP_DEBUG
-		sctp_ntop6((char *)&sin6->sin6_addr, buf, sizeof(buf));
+		strlcpy(buf, ip6_sprintf(&sin6->sin6_addr), sizeof(buf));
 #endif /* SCTP_DEBUG */
 		if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
 			/* we skip unspecifed addresses */
@@ -1791,7 +1791,7 @@ sctp_addr_mgmt_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tcb,
 
 		sin = (struct sockaddr_in *)ifa->ifa_addr;
 #ifdef SCTP_DEBUG
-		sctp_ntop4((char *)&sin->sin_addr, buf, sizeof(buf));
+		strlcpy(buf, inet_ntoa(&sin->sin_addr), sizeof(buf));
 #endif /* SCTP_DEBUG */
 		if (sin->sin_addr.s_addr == 0) {
 			/* we skip unspecifed addresses */

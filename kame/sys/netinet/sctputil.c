@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.26 2004/01/26 03:30:44 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.27 2004/01/26 07:46:13 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -31,6 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
 #ifndef __OpenBSD__
 #include "opt_ipsec.h"
 #endif
@@ -63,7 +64,6 @@
 #include <sys/proc.h>
 #include <sys/kernel.h>
 #include <sys/sysctl.h>
-
 
 #include <net/radix.h>
 #include <net/route.h>
@@ -142,28 +142,26 @@
 
 #define NUMBER_OF_MTU_SIZES 18
 
-
 #ifdef SCTP_DEBUG
 extern u_int32_t sctp_debug_on;
 #endif
 
-
 #ifdef SCTP_STAT_LOGGING
-
 int sctp_cwnd_log_at=0;
 int sctp_cwnd_log_rolled=0;
 struct sctp_cwnd_log sctp_clog[SCTP_STAT_LOG_SIZE];
 
-void sctp_clr_stat_log()
+void sctp_clr_stat_log(void)
 {
+
 	sctp_cwnd_log_at=0;
 	sctp_cwnd_log_rolled=0;
 }
 
 void
-sctp_log_strm_del_alt(u_int32_t tsn, u_int16_t sseq,
-		      int from)
+sctp_log_strm_del_alt(u_int32_t tsn, u_int16_t sseq, int from)
 {
+
 	sctp_clog[sctp_cwnd_log_at].from = (u_int8_t)from;
 	sctp_clog[sctp_cwnd_log_at].event_type = (u_int8_t)SCTP_LOG_EVENT_STRM;
 	sctp_clog[sctp_cwnd_log_at].x.strlog.n_tsn = tsn;
@@ -181,6 +179,7 @@ sctp_log_strm_del_alt(u_int32_t tsn, u_int16_t sseq,
 void
 sctp_log_map(uint32_t map, uint32_t cum, uint32_t high, int from)
 {
+
 	sctp_clog[sctp_cwnd_log_at].from = (u_int8_t)from;
 	sctp_clog[sctp_cwnd_log_at].event_type = (u_int8_t)SCTP_LOG_EVENT_MAP;
 	sctp_clog[sctp_cwnd_log_at].x.map.base = map;
@@ -194,8 +193,10 @@ sctp_log_map(uint32_t map, uint32_t cum, uint32_t high, int from)
 }
 
 void
-sctp_log_fr(uint32_t biggest_tsn, uint32_t biggest_new_tsn, uint32_t tsn, int from)
+sctp_log_fr(uint32_t biggest_tsn, uint32_t biggest_new_tsn, uint32_t tsn,
+    int from)
 {
+
 	sctp_clog[sctp_cwnd_log_at].from = (u_int8_t)from;
 	sctp_clog[sctp_cwnd_log_at].event_type = (u_int8_t)SCTP_LOG_EVENT_FR;
 	sctp_clog[sctp_cwnd_log_at].x.fr.largest_tsn = biggest_tsn;
@@ -206,13 +207,11 @@ sctp_log_fr(uint32_t biggest_tsn, uint32_t biggest_new_tsn, uint32_t tsn, int fr
 		sctp_cwnd_log_at = 0;
 		sctp_cwnd_log_rolled = 1;
 	}
-
 }
 
 void
-sctp_log_strm_del(struct sctp_tmit_chunk *chk,
-		  struct sctp_tmit_chunk *poschk,
-		  int from)
+sctp_log_strm_del(struct sctp_tmit_chunk *chk, struct sctp_tmit_chunk *poschk,
+    int from)
 {
 
 	if (chk == NULL) {
@@ -224,8 +223,10 @@ sctp_log_strm_del(struct sctp_tmit_chunk *chk,
 	sctp_clog[sctp_cwnd_log_at].x.strlog.n_tsn = chk->rec.data.TSN_seq;
 	sctp_clog[sctp_cwnd_log_at].x.strlog.n_sseq = chk->rec.data.stream_seq;
 	if (poschk != NULL) {
-		sctp_clog[sctp_cwnd_log_at].x.strlog.e_tsn = poschk->rec.data.TSN_seq;
-		sctp_clog[sctp_cwnd_log_at].x.strlog.e_sseq = poschk->rec.data.stream_seq;
+		sctp_clog[sctp_cwnd_log_at].x.strlog.e_tsn =
+		    poschk->rec.data.TSN_seq;
+		sctp_clog[sctp_cwnd_log_at].x.strlog.e_sseq =
+		    poschk->rec.data.stream_seq;
 	} else {
 		sctp_clog[sctp_cwnd_log_at].x.strlog.e_tsn = 0;
 		sctp_clog[sctp_cwnd_log_at].x.strlog.e_sseq = 0;
@@ -235,11 +236,11 @@ sctp_log_strm_del(struct sctp_tmit_chunk *chk,
 		sctp_cwnd_log_at = 0;
 		sctp_cwnd_log_rolled = 1;
 	}
-
 }
 
 void sctp_log_cwnd(struct sctp_nets *net, int augment, uint8_t from)
 {
+
 	sctp_clog[sctp_cwnd_log_at].from = (u_int8_t)from;
 	sctp_clog[sctp_cwnd_log_at].event_type = (u_int8_t)SCTP_LOG_EVENT_CWND;
 	sctp_clog[sctp_cwnd_log_at].x.cwnd.net = net;
@@ -253,8 +254,10 @@ void sctp_log_cwnd(struct sctp_nets *net, int augment, uint8_t from)
 	}
 }
 
-void sctp_log_block(uint8_t from, struct socket *so, struct sctp_association *asoc)
+void sctp_log_block(uint8_t from, struct socket *so,
+    struct sctp_association *asoc)
 {
+
 	sctp_clog[sctp_cwnd_log_at].from = (u_int8_t)from;
 	sctp_clog[sctp_cwnd_log_at].event_type = (u_int8_t)SCTP_LOG_EVENT_BLOCK;
 	sctp_clog[sctp_cwnd_log_at].x.blk.maxmb = (u_int16_t)(so->so_snd.sb_mbmax/1024);
@@ -678,7 +681,8 @@ sctp_init_asoc(struct sctp_inpcb *m, struct sctp_association *asoc,
 	 * routine's bzero
 	 */
 
-	/* Up front select what scoping to apply on addresses I tell my peer
+	/*
+	 * Up front select what scoping to apply on addresses I tell my peer
 	 * Not sure what to do with these right now, we will need to come up
 	 * with a way to set them. We may need to pass them through from the
 	 * caller in the sctp_aloc_assoc() function.
@@ -902,10 +906,11 @@ sctp_timeout_handler(void *t)
 		    (tcb->asoc.sent_queue_cnt > 0)
 			) {
 			struct sctp_tmit_chunk *chk;
-			/* safeguard. If there on some on the sent queue somewhere but 
-			 * no timers running something is wrong... so we start
-			 * a timer on the first chunk on the send queue on whatever
-			 * net it is sent to.
+			/*
+			 * safeguard. If there on some on the sent queue
+			 * somewhere but no timers running something is
+			 * wrong... so we start a timer on the first chunk on
+			 * the send queue on whatever net it is sent to.
 			 */
 			sctp_pegs[SCTP_T3_SAFEGRD]++;
 			chk = TAILQ_FIRST(&tcb->asoc.sent_queue);
@@ -1128,7 +1133,8 @@ sctp_timer_start(int t_type, struct sctp_inpcb *ep, struct sctp_tcb *tcb,
 				tcb->asoc.hb_random_idx++;
 				tcb->asoc.hb_ect_randombit = 0;
 			}
-			/* this_random will be 0 - 256 ms 
+			/*
+			 * this_random will be 0 - 256 ms 
 			 * RTO is in ms.
 			 */
 			if (tcb->asoc.heart_beat_delay == 0) {
@@ -1156,8 +1162,9 @@ sctp_timer_start(int t_type, struct sctp_inpcb *ep, struct sctp_tcb *tcb,
 			} else {
 				to_ticks = tcb->asoc.heart_beat_delay + this_random + tcb->asoc.initial_rto;
 			}
-			/* Now we must convert the to_ticks that are now in ms to
-			 * ticks.
+			/*
+			 * Now we must convert the to_ticks that are now in
+			 * ms to ticks.
 			 */
 			to_ticks *= hz;
 			to_ticks /= 1000;
@@ -1385,7 +1392,8 @@ sctp_timer_stop(int t_type,
 		break;
 	};
 	if (tmr->type != t_type) {
-		/* Ok we have a timer that is under
+		/*
+		 * Ok we have a timer that is under
 		 * joint use. Cookie timer per chance with
 		 * the SEND timer. We therefore are NOT
 		 * running the timer that the caller wants
@@ -1676,6 +1684,7 @@ sctp_calculate_rto(struct sctp_tcb *stcb,
 	/***************************/
 	/* 2. update RTTVAR & SRTT */
 	/***************************/
+#if 0
 	/*	if (net->lastsv || net->lastsa) {*/
 	/* per Section 5.3.1 C3 in SCTP */
 	/*		net->lastsv = (int) 	*//* RTTVAR */
@@ -1695,6 +1704,7 @@ sctp_calculate_rto(struct sctp_tcb *stcb,
 		}
 		new_rto = net->lastsa + 4 * net->lastsv;
 	*/
+#endif
 	o_calctime = calc_time;
 	/* this is Van Jacobson's integer version */
 	if (net->RTO) {
@@ -1844,14 +1854,6 @@ sctp_pad_lastmbuf(struct mbuf *m, int padval)
 	return (EFAULT);
 }
 
-#ifndef __FreeBSD__
-/*
- * Don't know why but without this I get an unknown reference when
- * compiling NetBSD... hmm
- */
-extern void in6_sin_2_v4mapsin6(struct sockaddr_in *, struct sockaddr_in6 *);
-#endif
-
 extern int sctp_deliver_data(struct sctp_tcb *, struct sctp_association *,
 	struct sctp_tmit_chunk *);
 
@@ -1864,9 +1866,10 @@ sctp_notify_assoc_change(u_int32_t event, struct sctp_tcb *stcb,
 	struct sockaddr *to;
 	struct sockaddr_in6 sin6, lsa6;
 
-	 /* First if we are are going down dump everything we
-	  * can to the socket rcv queue.
-	  */
+	/*
+	 * First if we are are going down dump everything we
+	 * can to the socket rcv queue.
+	 */
 	if ((event == SCTP_SHUTDOWN_COMP) || (event == SCTP_COMM_LOST)) {
 		sctp_deliver_data(stcb, &stcb->asoc, NULL);
 	}
@@ -1921,8 +1924,17 @@ sctp_notify_assoc_change(u_int32_t event, struct sctp_tcb *stcb,
 	/* append to socket */
 	to = (struct sockaddr *)&stcb->asoc.primary_destination->ra._l_addr;
 	if ((stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_NEEDS_MAPPED_V4) &&
-	    (to->sa_family == AF_INET)) {
-		in6_sin_2_v4mapsin6((struct sockaddr_in *)to, &sin6);
+	    to->sa_family == AF_INET) {
+		struct sockaddr_in *sin;
+
+		sin = (struct sockaddr_in *)to;
+		bzero(&sin6, sizeof(sin6));
+		sin6.sin6_family = AF_INET6;
+		sin6.sin6_len = sizeof(struct sockaddr_in6);
+		sin6.sin6_addr.s6_addr16[2] = 0xffff;
+		bcopy(&sin->sin_addr, &sin6.sin6_addr.s6_addr16[3],
+		    sizeof(sin6.sin6_addr.s6_addr16[3]));
+		sin6.sin6_port = sin->sin_port;
 		to = (struct sockaddr *)&sin6;
 	}
 	/* check and strip embedded scope junk */
@@ -1985,15 +1997,25 @@ sctp_notify_peer_addr_change(struct sctp_tcb *stcb, uint32_t state,
 	m_notify->m_len = sizeof(struct sctp_paddr_change);
 	m_notify->m_next = NULL;
 
-	to = (struct sockaddr *)(struct sockaddr *)&stcb->asoc.primary_destination->ra._l_addr;
+	to = (struct sockaddr *)(struct sockaddr *)
+	    &stcb->asoc.primary_destination->ra._l_addr;
 	if ((stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_NEEDS_MAPPED_V4) &&
-	    (to->sa_family == AF_INET)) {
-		in6_sin_2_v4mapsin6((struct sockaddr_in *)to, &sin6);
+	    to->sa_family == AF_INET) {
+		struct sockaddr_in *sin;
+
+		sin = (struct sockaddr_in *)to;
+		bzero(&sin6, sizeof(sin6));
+		sin6.sin6_family = AF_INET6;
+		sin6.sin6_len = sizeof(struct sockaddr_in6);
+		sin6.sin6_addr.s6_addr16[2] = 0xffff;
+		bcopy(&sin->sin_addr, &sin6.sin6_addr.s6_addr16[3],
+		    sizeof(sin6.sin6_addr.s6_addr16[3]));
+		sin6.sin6_port = sin->sin_port;
 		to = (struct sockaddr *)&sin6;
 	}
 	/* check and strip embedded scope junk */
 	to = (struct sockaddr *)sctp_recover_scope((struct sockaddr_in6 *)to,
-						   &lsa6);
+	    &lsa6);
 
 	if (sctp_sbspace(&stcb->sctp_socket->so_rcv) < m_notify->m_len) {
 		m_freem(m_notify);
@@ -2067,8 +2089,17 @@ sctp_notify_send_failed(struct sctp_tcb *stcb, u_int32_t error,
 	chk->data = NULL;
 	to = (struct sockaddr *)(struct sockaddr *)&stcb->asoc.primary_destination->ra._l_addr;
 	if ((stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_NEEDS_MAPPED_V4) &&
-	    (to->sa_family == AF_INET)) {
-		in6_sin_2_v4mapsin6((struct sockaddr_in *)to, &sin6);
+	    to->sa_family == AF_INET) {
+		struct sockaddr_in *sin;
+
+		sin = (struct sockaddr_in *)to;
+		bzero(&sin6, sizeof(sin6));
+		sin6.sin6_family = AF_INET6;
+		sin6.sin6_len = sizeof(struct sockaddr_in6);
+		sin6.sin6_addr.s6_addr16[2] = 0xffff;
+		bcopy(&sin->sin_addr, &sin6.sin6_addr.s6_addr16[3],
+		    sizeof(sin6.sin6_addr.s6_addr16[3]));
+		sin6.sin6_port = sin->sin_port;
 		to = (struct sockaddr *)&sin6;
 	}
 	/* check and strip embedded scope junk */
@@ -2126,7 +2157,16 @@ sctp_notify_adaption_layer(struct sctp_tcb *stcb,
 	to = (struct sockaddr *)(struct sockaddr *)&stcb->asoc.primary_destination->ra._l_addr;
 	if ((stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_NEEDS_MAPPED_V4) &&
 	    (to->sa_family == AF_INET)) {
-		in6_sin_2_v4mapsin6((struct sockaddr_in *)to, &sin6);
+		struct sockaddr_in *sin;
+
+		sin = (struct sockaddr_in *)to;
+		bzero(&sin6, sizeof(sin6));
+		sin6.sin6_family = AF_INET6;
+		sin6.sin6_len = sizeof(struct sockaddr_in6);
+		sin6.sin6_addr.s6_addr16[2] = 0xffff;
+		bcopy(&sin->sin_addr, &sin6.sin6_addr.s6_addr16[3],
+		    sizeof(sin6.sin6_addr.s6_addr16[3]));
+		sin6.sin6_port = sin->sin_port;
 		to = (struct sockaddr *)&sin6;
 	}
 	/* check and strip embedded scope junk */
@@ -2182,7 +2222,16 @@ sctp_notify_partial_delivery_indication(struct sctp_tcb *stcb,
 	to = (struct sockaddr *)(struct sockaddr *)&stcb->asoc.primary_destination->ra._l_addr;
 	if ((stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_NEEDS_MAPPED_V4) &&
 	    (to->sa_family == AF_INET)) {
-		in6_sin_2_v4mapsin6((struct sockaddr_in *)to, &sin6);
+		struct sockaddr_in *sin;
+
+		sin = (struct sockaddr_in *)to;
+		bzero(&sin6, sizeof(sin6));
+		sin6.sin6_family = AF_INET6;
+		sin6.sin6_len = sizeof(struct sockaddr_in6);
+		sin6.sin6_addr.s6_addr16[2] = 0xffff;
+		bcopy(&sin->sin_addr, &sin6.sin6_addr.s6_addr16[3],
+		    sizeof(sin6.sin6_addr.s6_addr16[3]));
+		sin6.sin6_port = sin->sin_port;
 		to = (struct sockaddr *)&sin6;
 	}
 	/* check and strip embedded scope junk */
@@ -2249,13 +2298,22 @@ sctp_notify_shutdown_event(struct sctp_tcb *stcb)
 
 	to = (struct sockaddr *)(struct sockaddr *)&stcb->asoc.primary_destination->ra._l_addr;
 	if ((stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_NEEDS_MAPPED_V4) &&
-	    (to->sa_family == AF_INET)) {
-		in6_sin_2_v4mapsin6((struct sockaddr_in *)to, &sin6);
+	    to->sa_family == AF_INET) {
+		struct sockaddr_in *sin;
+
+		sin = (struct sockaddr_in *)to;
+		bzero(&sin6, sizeof(sin6));
+		sin6.sin6_family = AF_INET6;
+		sin6.sin6_len = sizeof(struct sockaddr_in6);
+		sin6.sin6_addr.s6_addr16[2] = 0xffff;
+		bcopy(&sin->sin_addr, &sin6.sin6_addr.s6_addr16[3],
+		    sizeof(sin6.sin6_addr.s6_addr16[3]));
+		sin6.sin6_port = sin->sin_port;
 		to = (struct sockaddr *)&sin6;
 	}
 	/* check and strip embedded scope junk */
 	to = (struct sockaddr *)sctp_recover_scope((struct sockaddr_in6 *)to,
-						   &lsa6);
+	    &lsa6);
 	if (sctp_sbspace(&stcb->sctp_socket->so_rcv) < m_notify->m_len) {
 		m_freem(m_notify);
 		return;
@@ -2485,8 +2543,9 @@ sctp_report_all_outbound(struct sctp_tcb *stcb)
 void
 sctp_abort_notification(struct sctp_tcb *stcb, int error)
 {
+
 	if (stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE) {
-	    return;
+		return;
 	}
 	/* Tell them we lost the asoc */
 	sctp_ulp_notify(SCTP_NOTIFY_ASSOC_ABORTED, stcb, error, NULL);
@@ -2512,9 +2571,11 @@ sctp_abort_association(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 	}
 	if (iph->ip_v == IPVERSION) {
 		sctp_send_abort(m, iph, sh, iphlen, vtag, operr);
-	} else {
+	} else if (iph->ip_v == (IPV6_VERSION >> 4)) {
 		ip6 = mtod(m, struct ip6_hdr *);
 		sctp6_send_abort(m, ip6, sh, iphlen, vtag, operr);
+	} else {
+		/* XXX m_freem(m)? */
 	}
 	if (stcb != NULL) {
 		/* Ok, now lets free it */
@@ -2554,7 +2615,6 @@ sctp_handle_ootb(struct sctp_inpcb *ep, struct mbuf *m, int iphlen, int offset,
 	struct sockaddr_in sin;
 	struct sockaddr_in6 sin6;
 	struct sockaddr *to;
-
 	int ch_len;
 	struct ip *iph;
 	struct ip6_hdr *ip6h;
@@ -2572,7 +2632,7 @@ sctp_handle_ootb(struct sctp_inpcb *ep, struct mbuf *m, int iphlen, int offset,
 		sin.sin_family = AF_INET;
 		sin.sin_port = sctphdr->src_port;
 		sin.sin_addr = iph->ip_src;
-	} else {
+	} else if (iph->ip_v == (IPV6_VERSION >> 4)) {
 		/* form a sockaddr_in6 to send to. */
 		memset(&sin6,0,sizeof(sin6));
 		to = (struct sockaddr *)&sin6;
@@ -2580,12 +2640,15 @@ sctp_handle_ootb(struct sctp_inpcb *ep, struct mbuf *m, int iphlen, int offset,
 		sin6.sin6_family = AF_INET6;
 		sin6.sin6_port = sctphdr->src_port;
 		sin6.sin6_addr = ip6h->ip6_src;
+	} else {
+		/* XXX m_freem(m)? */
+		return;
 	}
 	ch = (struct sctp_chunkhdr *)sctp_m_getptr(m, offset,
 	    sizeof(struct sctp_chunkhdr), chunk_buf);
 	while (ch != NULL) {
 		ch_len = ntohs(ch->chunk_length);
-		if ((ch_len < sizeof(*ch)) || (ch_len > length)) {
+		if (ch_len < sizeof(*ch) || ch_len > length) {
 			/* break to abort land */
 			break;
 		}
@@ -2604,9 +2667,11 @@ sctp_handle_ootb(struct sctp_inpcb *ep, struct mbuf *m, int iphlen, int offset,
 			return;
 		case SCTP_SHUTDOWN_ACK:
 			if (to->sa_family == AF_INET) {
-				sctp_send_shutdown_complete2(ep, iph, sctphdr, iphlen);
+				sctp_send_shutdown_complete2(ep, iph, sctphdr,
+				    iphlen);
 			} else {
-				sctp_send_shutdown_complete2_v6(m, ep, ip6h, sctphdr, iphlen);
+				sctp_send_shutdown_complete2_v6(m, ep, ip6h,
+				    sctphdr, iphlen);
 			}
 
 			return;
@@ -2629,14 +2694,13 @@ sctp_handle_ootb(struct sctp_inpcb *ep, struct mbuf *m, int iphlen, int offset,
 	}
 }
 
-
+/*
+ * check the inbound datagram to make sure there is not an abort
+ * inside it, if there is return 1, else return 0.
+ */
 int
 sctp_is_there_an_abort_here(struct mbuf *m, int off, int *vtagfill)
 {
-	/*
-	 * check the inbound datagram to make sure there is not an abort
-	 * inside it, if there is return 1, else return 0.
-	 */
 	struct sctp_chunkhdr desc;
 	int at, x;
 
@@ -2653,7 +2717,7 @@ sctp_is_there_an_abort_here(struct mbuf *m, int off, int *vtagfill)
 		}
 
 		/* is it to large? */
-		if ((x + at) > m->m_pkthdr.len) {
+		if (x + at > m->m_pkthdr.len) {
 			/* packet is probably corrupt */
 			break;
 		}
@@ -2664,7 +2728,7 @@ sctp_is_there_an_abort_here(struct mbuf *m, int off, int *vtagfill)
 		}
 		if (desc.chunk_type == SCTP_INITIATION) {
 			/* need to update the Vtag */
-			if ((at+sizeof(struct sctp_init_chunk)) >=
+			if (at + sizeof(struct sctp_init_chunk) >=
 			    m->m_pkthdr.len) {
 				/* there is a INIT here */
 				struct sctp_init_chunk ic;
@@ -2681,7 +2745,6 @@ sctp_is_there_an_abort_here(struct mbuf *m, int off, int *vtagfill)
 	return (0);
 }
 
-
 /*
  * currently (2/02), ifa_addr embeds scope_id's and don't
  * have sin6_scope_id set (i.e. it's 0)
@@ -2691,6 +2754,7 @@ uint32_t
 sctp_is_same_scope(struct sockaddr_in6 *addr1, struct sockaddr_in6 *addr2)
 {
 	struct sockaddr_in6 a, b;
+
 	/* save copies */
 	a = *addr1;
 	b = *addr2;
@@ -2717,6 +2781,7 @@ sctp_is_same_scope(struct sockaddr_in6 *addr1, struct sockaddr_in6 *addr2)
 struct sockaddr_in6 *
 sctp_recover_scope(struct sockaddr_in6 *addr, struct sockaddr_in6 *store)
 {
+
 	/* check and strip embedded scope junk */
 	if (addr->sin6_family == AF_INET6) {
 		if (IN6_IS_SCOPE_LINKLOCAL(&addr->sin6_addr)) {
@@ -2739,9 +2804,11 @@ sctp_recover_scope(struct sockaddr_in6 *addr, struct sockaddr_in6 *store)
  * returns: 1 if same, 0 if not
  */
 int
-sctp_cmpaddr(struct sockaddr *sa1, struct sockaddr *sa2) {
+sctp_cmpaddr(struct sockaddr *sa1, struct sockaddr *sa2)
+{
+
 	/* must be valid */
-	if ((sa1 == NULL) || (sa2 == NULL))
+	if (sa1 == NULL || sa2 == NULL)
 		return (0);
 
 	/* must be the same family */
@@ -2769,129 +2836,21 @@ sctp_cmpaddr(struct sockaddr *sa1, struct sockaddr *sa2) {
 	}
 }
 
-
-/*
- * ntop() routines
- */
-#define NS_INT16SZ    2       /* #/bytes of data in a u_int16_t */
-#define NS_IN6ADDRSZ  16      /* IPv6 T_AAAA */
-
-const char *
-sctp_ntop4(const u_char *src, char *dst, size_t size) {
-	char tmp[sizeof("255.255.255.255")];
-
-	if (snprintf(tmp, sizeof(tmp), "%u.%u.%u.%u",
-	    src[0], src[1], src[2], src[3]) > size) {
-		return (NULL);
-	}
-	strlcpy(dst, tmp, sizeof(dst));
-	return (dst);
-}
-
-const char *
-sctp_ntop6(const u_char *src, char *dst, size_t size) {
-	/*
-	 * Note that int32_t and int16_t need only be "at least" large enough
-	 * to contain a value of the specified size.  On some systems, like
-	 * Crays, there is no such thing as an integer variable with 16 bits.
-	 * Keep this in mind if you think this function should have been coded
-	 * to use pointer overlays.  All the world's not a VAX.
-	 */
-	char tmp[sizeof "ffff:ffff:ffff:ffff:ffff:ffff:255.255.255.255"], *tp;
-	struct { int base, len; } best, cur;
-	u_int words[NS_IN6ADDRSZ / NS_INT16SZ];
-	int i;
-
-	/*
-	 * Preprocess:
-	 *      Copy the input (bytewise) array into a wordwise array.
-	 *      Find the longest run of 0x00's in src[] for :: shorthanding.
-	 */
-	memset(words, '\0', sizeof words);
-	for (i = 0; i < NS_IN6ADDRSZ; i++)
-		words[i / 2] |= (src[i] << ((1 - (i % 2)) << 3));
-	best.base = -1;
-	cur.base = -1;
-	for (i = 0; i < (NS_IN6ADDRSZ / NS_INT16SZ); i++) {
-		if (words[i] == 0) {
-			if (cur.base == -1)
-				cur.base = i, cur.len = 1;
-			else
-				cur.len++;
-		} else {
-			if (cur.base != -1) {
-				if (best.base == -1 || cur.len > best.len)
-					best = cur;
-				cur.base = -1;
-			}
-		}
-	}
-	if (cur.base != -1) {
-		if (best.base == -1 || cur.len > best.len)
-			best = cur;
-	}
-	if (best.base != -1 && best.len < 2)
-		best.base = -1;
-
-	/*
-	 * Format the result.
-	 */
-	tp = tmp;
-	for (i = 0; i < (NS_IN6ADDRSZ / NS_INT16SZ); i++) {
-		/* Are we inside the best run of 0x00's? */
-		if (best.base != -1 && i >= best.base &&
-		    i < (best.base + best.len)) {
-			if (i == best.base)
-				*tp++ = ':';
-			continue;
-		}
-		/* Are we following an initial run of 0x00s or any real hex? */
-		if (i != 0)
-			*tp++ = ':';
-		/* Is this address an encapsulated IPv4? */
-		if (i == 6 && best.base == 0 &&
-		    (best.len == 6 || (best.len == 5 && words[5] == 0xffff))) {
-			if (!sctp_ntop4(src+12, tp, sizeof tmp - (tp - tmp)))
-				return (NULL);
-			tp += strlen(tp);
-			break;
-		}
-		tp += snprintf(tp, sizeof(tmp) - (tp - tmp), "%x", words[i]);
-	}
-	/* Was it a trailing run of 0x00's? */
-	if (best.base != -1 && (best.base + best.len) ==
-	    (NS_IN6ADDRSZ / NS_INT16SZ))
-		*tp++ = ':';
-	*tp++ = '\0';
-
-	/*
-	 * Check for overflow, copy, and we're done.
-	 */
-	if ((size_t)(tp - tmp) > size) {
-		return (NULL);
-	}
-	strlcpy(dst, tmp, sizeof(dst));
-	return (dst);
-}
-
 void
 sctp_print_address(struct sockaddr *sa)
 {
-	char buf[128];
 
 	if (sa->sa_family == AF_INET6) {
 		struct sockaddr_in6 *sin6;
 		sin6 = (struct sockaddr_in6 *)sa;
-		sctp_ntop6((char *)&sin6->sin6_addr, buf, sizeof(buf));
-		printf("IPv6 address: %s:%d scope:%u\n", buf,
-		       ntohs(sin6->sin6_port),
-		       sin6->sin6_scope_id);
+		printf("IPv6 address: %s:%d scope:%u\n",
+		    ip6_sprintf(&sin6->sin6_addr), ntohs(sin6->sin6_port),
+		    sin6->sin6_scope_id);
 	} else if (sa->sa_family == AF_INET) {
 		struct sockaddr_in *sin;
 		sin = (struct sockaddr_in *)sa;
-		sctp_ntop4((char *)&sin->sin_addr, buf, sizeof(buf));
-		printf("IPv4 address: %s:%d\n", buf,
-		       ntohs(sin->sin_port));
+		printf("IPv4 address: %s:%d\n", inet_ntoa(sin->sin_addr),
+		    ntohs(sin->sin_port));
 	} else {
 		printf("?\n");
 	}
@@ -3060,13 +3019,12 @@ sbappendaddr_nocheck(sb, asa, m0, control, tag, inp)
  *************ALTERNATE ROUTING CODE
  */
 
-
-
 struct mbuf *
 sctp_generate_invmanparam(int err)
 {
 	/* Return a MBUF with a invalid mandatory parameter */
 	struct mbuf *m;
+
 	MGET(m, M_DONTWAIT, MT_DATA);
 	if (m) {
 		struct sctp_paramhdr *ph;
@@ -3082,7 +3040,8 @@ static int
 sctp_should_be_moved(struct mbuf *this, struct sctp_association *asoc)
 {
 	struct mbuf *m;
-	/* given a mbuf chain, look through it finding
+	/*
+	 * given a mbuf chain, look through it finding
 	 * the M_PKTHDR and return 1 if it belongs to
 	 * the association given. We tell this by
 	 * a kludge where we stuff the my_vtag of the assoc
@@ -3092,14 +3051,12 @@ sctp_should_be_moved(struct mbuf *this, struct sctp_association *asoc)
 	while (m) {
 		if (m->m_flags & M_PKTHDR) {
 			/* check it */
-			if (
 #if defined(__FreeBSD__) || defined(__NetBSD__)
-				(u_int32_t)m->m_pkthdr.csum_data
-#else
-/* OpenBSD */
-				(u_int32_t)m->m_pkthdr.csum
+			if ((u_int32_t)m->m_pkthdr.csum_data == asoc->my_vtag)
+#else /* OpenBSD */
+			if ((u_int32_t)m->m_pkthdr.csum == asoc->my_vtag)
 #endif
-				== asoc->my_vtag) {
+			{
 				/* Yep */
 				return (1);
 			}
@@ -3129,25 +3086,21 @@ sctp_get_last_vtag_from_sb(struct socket *so)
 					at = at->m_next;
 			}
 			/* now do we have a m_pkthdr */
-			if (at  && (at->m_flags & M_PKTHDR)) {
+			if (at && (at->m_flags & M_PKTHDR)) {
 				/* check it */
-				if (
 #if defined(__FreeBSD__) || defined(__NetBSD__)
-					(u_int32_t)at->m_pkthdr.csum_data
-#else
-/* OpenBSD */
-					(u_int32_t)at->m_pkthdr.csum
+				if ((u_int32_t)at->m_pkthdr.csum_data != 0)
+#else /* OpenBSD */
+				if ((u_int32_t)at->m_pkthdr.csum != 0)
 #endif
-					!= 0) {
+				{
 					/* its the one */
-					retval = 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
-						(u_int32_t)at->m_pkthdr.csum_data
-#else
-/* OpenBSD */
-						(u_int32_t)at->m_pkthdr.csum
+					retval =
+					    (u_int32_t)at->m_pkthdr.csum_data;
+#else /* OpenBSD */
+					retval = (u_int32_t)at->m_pkthdr.csum;
 #endif
-						;
 					break;
 				}
 			}
@@ -3159,10 +3112,8 @@ sctp_get_last_vtag_from_sb(struct socket *so)
 	
 }
 void
-sctp_grub_through_socket_buffer(struct sctp_inpcb *inp,
-				struct socket *old,
-				struct socket *new,
-				struct sctp_tcb *tcb)
+sctp_grub_through_socket_buffer(struct sctp_inpcb *inp, struct socket *old,
+    struct socket *new, struct sctp_tcb *tcb)
 {
 	struct mbuf **put,**take,*next,*this;
 	struct sockbuf *old_sb,*new_sb;	
@@ -3180,7 +3131,8 @@ sctp_grub_through_socket_buffer(struct sctp_inpcb *inp,
 		/* First one must be moved */
 		struct mbuf *mm;
 		for (mm = old_sb->sb_mb; mm; mm = mm->m_next) {
-			/* Go down the chain and fix
+			/*
+			 * Go down the chain and fix
 			 * the space allocation of the
 			 * two sockets.
 			 */
@@ -3210,7 +3162,8 @@ sctp_grub_through_socket_buffer(struct sctp_inpcb *inp,
 			this->m_nextpkt = NULL;
 			*put = this;
 			for (mm = this; mm; mm = mm->m_next) {
-				/* Go down the chain and fix
+				/*
+				 * Go down the chain and fix
 				 * the space allocation of the
 				 * two sockets.
 				 */
@@ -3225,7 +3178,8 @@ sctp_grub_through_socket_buffer(struct sctp_inpcb *inp,
 		}
 	} 
 	if (moved_top) {
-		/* Ok so now we must re-postion vtag_last to
+		/*
+		 * Ok so now we must re-postion vtag_last to
 		 * match the new first one since we moved the
 		 * mbuf at the top.
 		 */
@@ -3234,9 +3188,8 @@ sctp_grub_through_socket_buffer(struct sctp_inpcb *inp,
 }
 
 void
-sctp_free_bufspace(struct sctp_tcb *stcb,
-		   struct sctp_association *asoc,
-		   struct sctp_tmit_chunk *tp1)
+sctp_free_bufspace(struct sctp_tcb *stcb, struct sctp_association *asoc,
+    struct sctp_tmit_chunk *tp1)
 {
 	struct mbuf *mm;
 	int mbcnt=0;
@@ -3246,7 +3199,8 @@ sctp_free_bufspace(struct sctp_tcb *stcb,
 	if (tp1->data == NULL) {
 		return;
 	}
-	/* The book_size accounts for all 
+	/*
+	 * The book_size accounts for all 
 	 * of the actual data size, so instead here
 	 * we need to go through and sum up
 	 * the MBUF/M_EXT useage for subtraction.
@@ -3319,7 +3273,8 @@ sctp_release_pr_sctp_chunk(struct sctp_tcb *tcb, struct sctp_tmit_chunk *tp1,
 			    sctp_next);
 			tcb->asoc.sent_queue_cnt++;
 		}
-		if ((tp1->rec.data.rcv_flags & SCTP_DATA_NOT_FRAG) == SCTP_DATA_NOT_FRAG) {
+		if ((tp1->rec.data.rcv_flags & SCTP_DATA_NOT_FRAG) ==
+		    SCTP_DATA_NOT_FRAG) {
 			/* not frag'ed we ae done   */
 			notdone = 0;
 			foundeom = 1;
@@ -3334,11 +3289,13 @@ sctp_release_pr_sctp_chunk(struct sctp_tcb *tcb, struct sctp_tmit_chunk *tp1,
 		}
 	} while (tp1 && notdone);
 	if ((foundeom == 0) && (queue == &tcb->asoc.sent_queue)) {
-		/* The multi-part message was scattered 
+		/*
+		 * The multi-part message was scattered 
 		 * across the send and sent queue.
 		 */
 		tp1 = TAILQ_FIRST(&tcb->asoc.send_queue);
-		/* recurse throught the send_queue too, starting at the
+		/*
+		 * recurse throught the send_queue too, starting at the
 		 * beginning.
 		 */
 		if (tp1) {
