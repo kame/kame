@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.10 2001/10/22 04:09:33 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.11 2001/10/22 05:35:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -32,6 +32,7 @@
 #include <sys/socket.h>
 #include <sys/param.h>
 #include <sys/ioctl.h>
+#include <sys/queue.h>
 #include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/icmp6.h>
@@ -47,7 +48,12 @@
 #include <err.h>
 #include <errno.h>
 #include <ifaddrs.h>
+#ifdef HAVE_MD5_H
 #include <md5.h>
+#endif
+#ifdef HAVE_OPENSSL_MD5_H
+#include <openssl/md5.h>
+#endif
 #include <ctype.h>
 
 /* portability */
@@ -253,6 +259,12 @@ joingroups(name)
 
 	return 0;
 }
+
+#ifdef HAVE_OPENSSL_MD5_H
+#define MD5Init	MD5_Init
+#define MD5Update	MD5_Update
+#define MD5Final	MD5_Final
+#endif
 
 const char *
 nigroup(name)

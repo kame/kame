@@ -11,6 +11,16 @@ MAN8=	nodeinfod.0
 MAN8=	nodeinfod.8
 .endif
 
+.if ${OPSYS} == "BSD/OS"
+CFLAGS+=-DHAVE_OPENSSL_MD5_H -I/usr/contrib/include
+LDADD+=	-L/usr/contrib/lib -lcrypto -L/usr/local/v6/lib -linet6
+DPADD+=	/usr/contrib/lib/libcrypto.a /usr/local/v6/lib/libinet6.a
+.elif ${OPSYS} == "NetBSD"
+CPPFLAGS+=-DHAVE_MD5_H
+.else
+CFLAGS+=-DHAVE_MD5_H
+.endif
+
 WARNS?=	1
 
 .include <bsd.prog.mk>
