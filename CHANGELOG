@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.604 2000/02/24 10:07:25 jinmei Exp $
+$Id: CHANGELOG,v 1.605 2000/02/24 10:10:11 jinmei Exp $
 
 <200002>
 2000-02-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* bsdi4/usr.sbin/{traceroute6, ping6}/: enabled IPsec related
+	* bsdi4/usr.sbin/{traceroute6, ping6}/Makefile: enabled IPsec related
 	definitions.
 
 Thu Feb 24 18:59:14 JST 2000  itojun@iijlab.net
