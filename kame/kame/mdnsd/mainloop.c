@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.24 2000/05/31 12:16:11 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.25 2000/05/31 12:25:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -674,6 +674,8 @@ relay(buf, len, from)
 		for (ns = LIST_FIRST(&nsdb); ns; ns = LIST_NEXT(ns, link)) {
 			for (i = 0; i < nsock; i++) {
 				if (sockaf[i] != ns->addr.ss_family)
+					continue;
+				if (sockflag[i] & SOCK_MEDIATOR)
 					continue;
 
 				hp->rd = ord;
