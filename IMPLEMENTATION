@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/12/15 23:57:26 $
+			$Date: 1999/12/17 06:49:58 $
 
 1. IPv6
 
@@ -717,10 +717,10 @@ If you do not do the both, the behavior is disabled.
 1.13 sockaddr_storage
 
 When RFC2553 was about to be finalized, there was discusson on how struct
-sockaddr_storage members are named.  One proposal is to append "__" to the
-members (like __ss_len) as they should not be touched.  The other proposal
-was that don't append it (like ss_len) as we need to touch those members
-directly.
+sockaddr_storage members are named.  One proposal is to prepend "__" to the
+members (like "__ss_len") as they should not be touched.  The other proposal
+was that don't prepend it (like "ss_len") as we need to touch those members
+directly.  There was no clear consensus on it.
 
 As a result, RFC2553 defines struct sockaddr_storage as follows:
 	struct sockaddr_storage {
@@ -738,16 +738,20 @@ On the contrary, XNET draft defines as follows:
 In December 1999, it was agreed that RFC2553bis should pick the latter (XNET)
 definition.
 
-KAME kit prior to December 1999 used RFC2553 definition.  Post December 1999
-KAME kit will conform to XNET definition, based on RFC2553bis discusson.
+KAME kit prior to December 1999 used RFC2553 definition.  KAME kit after
+December 1999 (including December) will conform to XNET definition,
+based on RFC2553bis discusson.
 
-You can still see both definition used on IPv6 operating systems.
-As a userland programmer, the most portable way of dealing with it is to:
-(1) have -Dss_len=__ss_len to unify all occurences (including header file)
-    into __ss_len, or
-(2) never touch __ss_len.  cast to sockaddr * and use sa_len like:
+If you look at multiple IPv6 implementations, you will be able to see
+both definitions.  As an userland programmer, the most portable way of
+dealing with it is to:
+(1) ensure ss_family and/or ss_len are available on the platform, by using
+    GNU autoconf,
+(2) have -Dss_family=__ss_family to unify all occurences (including header
+    file) into __ss_family, or
+(3) never touch __ss_family.  cast to sockaddr * and use sa_family like:
 	struct sockaddr_storage ss;
-	len = ((struct sockaddr *)&ss)->sa_len
+	family = ((struct sockaddr *)&ss)->sa_family
 
 2. Network Drivers
 
