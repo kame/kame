@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.232 1999/10/28 05:02:17 itojun Exp $
+$Id: CHANGELOG,v 1.233 1999/10/28 10:40:35 itojun Exp $
 
 <199910>
+Thu Oct 28 19:39:02 JST 1999  itojun@iijlab.net
+	* openbsd/sys/sys/socket.h: fix alignment constraint for
+	  ancillary data.
+
 Thu Oct 28 14:00:45 JST 1999  itojun@iijlab.net
 	* freebsd3/ports/ucd-snmp: upgrade to 4.0.1 with IPv6 patch.
 	  it looks tcb/udb dump is not working.
