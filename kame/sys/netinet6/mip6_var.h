@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.39 2002/06/26 02:33:36 k-sugyou Exp $	*/
+/*	$KAME: mip6_var.h,v 1.40 2002/07/11 04:44:39 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -55,9 +55,10 @@
 #define CAREOF_COOKIE_SIZE	16
 #define MIP6_NONCE_SIZE		16	/* recommended by the spec (5.5.2) */
 					/* must be multiple of size of u_short */
+#define MIP6_NODEKEY_SIZE	20	/* This size is specified at 5.5.1 in mip6 spec */
 #define MIP6_NONCE_HISTORY	32
 typedef u_int8_t mip6_nonce_t[MIP6_NONCE_SIZE];
-typedef u_int8_t mip6_nodekey_t[20];	/* This size is specified at 5.5.1 in mip6 spec */
+typedef u_int8_t mip6_nodekey_t[MIP6_NODEKEY_SIZE];
 typedef u_int8_t mip6_home_cookie_t[HOME_COOKIE_SIZE];
 typedef u_int8_t mip6_careof_cookie_t[CAREOF_COOKIE_SIZE];
 

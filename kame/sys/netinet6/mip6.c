@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.140 2002/07/10 05:09:36 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.141 2002/07/11 04:44:39 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2530,7 +2530,10 @@ static void
 mip6_create_nodekey(nodekey)
 	mip6_nodekey_t *nodekey;
 {
-	/* To Be Written, soon */
+	int i;
+
+	for (i = 0; i < MIP6_NODEKEY_SIZE / sizeof(u_long); i++)
+		((u_long *)nodekey)[i] = random();
 }
 
 int
@@ -2554,11 +2557,25 @@ mip6_get_nonce(index, nonce)
 }
 
 int
-mip6_get_nodekey(index, nonce)
+mip6_get_nodekey(index, nodekey)
 	int index;	/* nonce index */
-	mip6_nodekey_t *nonce;
+	mip6_nodekey_t *nodekey;
 {
-	/* To Be Written, soon */
+	signed int offset = index - nonce_index;
+	mip6_nodekey_t *nodekey_head;
+
+	if (offset > 0)
+		return (-1);
+	
+	if (nonce_head + offset >= mip6_nonce + MIP6_NONCE_HISTORY)
+		offset = offset - MIP6_NONCE_HISTORY;
+	
+	if (nonce_head + offset < mip6_nonce)
+		return (-1);
+
+	nodekey_head = mip6_nodekey + (nonce_head - mip6_nonce);
+	bcopy(&nodekey_head[offset], nodekey, sizeof(mip6_nodekey_t));
+
 	return (0);
 }
 
@@ -2581,6 +2598,7 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa)
 	u_int8_t authdata[SHA1_RESULTLEN];
 	SHA1_CTX sha1_ctx;
 	HMAC_CTX hmac_ctx;
+	int restlen;
 
 	/* Nonce index & Auth. data mobility options are required */
 	if ((mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA)) == 0)
@@ -2594,6 +2612,7 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa)
 	    (mip6_get_nodekey(mopt->mopt_co_nonce_idx, &coa_nodekey) != 0))
 		return (EINVAL);
 
+	/* Calculate home cookie */
 	hmac_init(&hmac_ctx, (u_int8_t *)&home_nodekey,
 		  sizeof(home_nodekey), HMAC_SHA1);
 	hmac_loop(&hmac_ctx, (u_int8_t *)&ip6mu->ip6mu_addr,
@@ -2601,28 +2620,37 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa)
 	hmac_loop(&hmac_ctx, (u_int8_t *)&home_nonce, sizeof(home_nonce));
 	hmac_result(&hmac_ctx, (u_int8_t *)&home_cookie);
 
+	/* Calculate care-of cookie */
 	hmac_init(&hmac_ctx, (u_int8_t *)&coa_nodekey,
 		  sizeof(coa_nodekey), HMAC_SHA1);
 	hmac_loop(&hmac_ctx, (u_int8_t *)&ip6->ip6_src,
-		       sizeof(ip6->ip6_src));
+		  sizeof(ip6->ip6_src));
 	hmac_loop(&hmac_ctx, (u_int8_t *)&careof_nonce, sizeof(careof_nonce));
 	hmac_result(&hmac_ctx, (u_int8_t *)&careof_cookie);
 
+	/* Calculate K_bu */
 	SHA1Init(&sha1_ctx);
 	SHA1Update(&sha1_ctx, (caddr_t)&home_cookie, sizeof(home_cookie));
 	SHA1Update(&sha1_ctx, (caddr_t)&careof_cookie, sizeof(careof_cookie));
 	SHA1Final(key_bu, &sha1_ctx);
 
+	/* Calculate authenticator */
 	hmac_init(&hmac_ctx, key_bu, sizeof(key_bu), HMAC_SHA1);
 	hmac_loop(&hmac_ctx, (u_int8_t *)&ip6->ip6_src,
-		       sizeof(ip6->ip6_src));
+		  sizeof(ip6->ip6_src));
 	hmac_loop(&hmac_ctx, (u_int8_t *)&ip6->ip6_dst,
-		       sizeof(ip6->ip6_dst));
-	hmac_loop(&hmac_ctx, (u_int8_t *)ip6mu, ip6mulen);
-	/* XXX must exclude Authentication mobility option */
+		  sizeof(ip6->ip6_dst));
+	hmac_loop(&hmac_ctx, (u_int8_t *)ip6mu,
+		  (u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu);
+	restlen = ip6mulen - (((u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu) + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len);
+	if (restlen > 0) {
+	    hmac_loop(&hmac_ctx,
+		      mopt->mopt_auth
+		      + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len + 2, restlen);
+	}
 	hmac_result(&hmac_ctx, authdata);
 
-	return (bcmp(mopt->mopt_auth, authdata, sizeof(authdata)));
+	return (bcmp(mopt->mopt_auth + 2, authdata, sizeof(authdata)));
 }
 
 int
@@ -2638,6 +2666,9 @@ mip6_get_mobility_options(ip6mu, ip6mulen, mopt)
 	mhend = (caddr_t)(ip6mu) + ip6mulen;
 	mopt->valid_options = 0;
 
+#define check_mopt_len(mopt_len)	\
+	if (*(mh + 1) != mopt_len) break;
+  
 	while (mh < mhend) {
 		valid_option = 0;
 		switch (*mh) {
@@ -2647,23 +2678,25 @@ mip6_get_mobility_options(ip6mu, ip6mulen, mopt)
 			case IP6MOPT_PADN:
 				break;
 			case IP6MOPT_UID:
-				/* XXX Should be checked length value ? */
+				check_mopt_len(4);
 				valid_option = MOPT_UID;
 				GET_NETVAL_S(mh + 2, mopt->mopt_uid);
 				break;
 			case IP6MOPT_ALTCOA:
+				check_mopt_len(18);
 				valid_option = MOPT_ALTCOA;
 				bcopy(mh + 2, &mopt->mopt_altcoa,
 				      sizeof(mopt->mopt_altcoa));
 				break;
 			case IP6MOPT_NONCE:
+				check_mopt_len(6);
 				valid_option = MOPT_NONCE_IDX;
 				GET_NETVAL_S(mh + 2, mopt->mopt_ho_nonce_idx);
 				GET_NETVAL_S(mh + 4, mopt->mopt_co_nonce_idx);
 				break;
 			case IP6MOPT_AUTHDATA:
 				valid_option = MOPT_AUTHDATA;
-				mopt->mopt_auth = mh + 2;
+				mopt->mopt_auth = mh;
 				break;
 			default:
 				/*	'... MUST quietly ignore ... (6.2.1)'
@@ -2677,6 +2710,8 @@ mip6_get_mobility_options(ip6mu, ip6mulen, mopt)
 		mh += *(mh + 1) + 2;
 		mopt->valid_options |= valid_option;
 	}
+
+#undef check_mopt_len
 	
 	return (0);
 }
