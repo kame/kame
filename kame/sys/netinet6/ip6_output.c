@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.167 2001/03/11 06:04:01 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.168 2001/03/12 02:54:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -719,6 +719,7 @@ skip_ipsec2:;
 		if (tdb == NULL) {
 			error = EHOSTUNREACH;
 			m_freem(m);
+			splx(s);
 			goto done;
 		}
 
