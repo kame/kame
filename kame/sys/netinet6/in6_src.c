@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.64 2001/09/05 08:30:02 keiichi Exp $	*/
+/*	$KAME: in6_src.c,v 1.65 2001/09/05 09:25:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -265,7 +265,6 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	if (ifp == NULL)	/* this should not happen */
 		panic("in6_selectsrc: NULL ifp");
 #endif
-p
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
 		int new_scope = -1, new_matchlen = -1;
 		int srczone, dstzone;
