@@ -53,6 +53,7 @@ struct ifinfo {
 #define IFS_DELAY	1
 #define IFS_PROBE	2
 #define IFS_DOWN	3
+#define IFS_TENTATIVE	4
 
 struct ifinfo *find_ifinfo(int ifindex);
 void rtsol_timer_update(struct ifinfo *ifinfo);

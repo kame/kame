@@ -122,15 +122,16 @@ interface_up(char *name)
 		return(0);
 	}
 	else {
-		if (ifa.ia6_flags & IN6_IFF_TENTATIVE)
+		if (ifa.ia6_flags & IN6_IFF_TENTATIVE) {
 			warnmsg(LOG_DEBUG, __FUNCTION__, "%s is tentative",
 			       name);
+			return IFS_TENTATIVE;
+		}
 		if (ifa.ia6_flags & IN6_IFF_DUPLICATED)
 			warnmsg(LOG_DEBUG, __FUNCTION__, "%s is duplicated",
 			       name);
+		return -1;
 	}
-
-	return(-1);
 }
 
 int

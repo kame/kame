@@ -120,7 +120,7 @@ main(argc, argv)
 	} else
 		opts = "dDfm1";
 
-	while((ch = getopt(argc, argv, opts)) != -1) {
+	while ((ch = getopt(argc, argv, opts)) != -1) {
 		switch(ch) {
 		 case 'd':
 			 dflag = 1;
@@ -165,7 +165,7 @@ main(argc, argv)
 	/* configuration per interface */
 	if (ifinit())
 		errx(1, "failed to initilizatoin interfaces");
-	while(argc--) {
+	while (argc--) {
 		if (ifconfig(*argv))
 			errx(1, "failed to initilize %s", *argv);
 		argv++;
@@ -191,9 +191,21 @@ main(argc, argv)
 
 		timeout = rtsol_check_timer();
 
-		/* with -1, if we have no timeout, we are done (or failed) */
-		if (once && timeout == NULL)
-			break;
+		if (once) {
+			struct ifinfo *ifi;
+
+			/* if we have no timeout, we are done (or failed) */
+			if (timeout == NULL)
+				break;
+
+			/* if all if have got RA packet, we are done */
+			for (ifi = iflist; ifi; ifi = ifi->next) {
+				if (ifi->state != IFS_DOWN && ifi->racnt == 0)
+					break;
+			}
+			if (ifi == NULL)
+				break;
+		}
 
 		if ((e = select(s + 1, &select_fd, NULL, NULL, timeout)) < 1) {
 			if (e < 0) {
@@ -206,17 +218,6 @@ main(argc, argv)
 		/* packet reception */
 		if (FD_ISSET(s, &fdset))
 			rtsol_input(s);
-
-		if (once) {
-			/* with -1, if all if have got RA packet, we are done */
-			struct ifinfo *ifi;
-			for (ifi = iflist; ifi; ifi = ifi->next) {
-				if (ifi->racnt == 0)
-					break;
-			}
-			if (ifi == NULL)
-				break;
-		}
 	}
 	/* NOTREACHED */
 }
@@ -226,6 +227,7 @@ ifconfig(char *ifname)
 {
 	struct ifinfo *ifinfo;
 	struct sockaddr_dl *sdl;
+	int flags;
 
 	if ((sdl = if_nametosdl(ifname)) == NULL) {
 		warnmsg(LOG_ERR, __FUNCTION__,
@@ -266,10 +268,13 @@ ifconfig(char *ifname)
 	}
 
 	/* activate interface: interface_up returns 0 on success */
-	if (interface_up(ifinfo->ifname))
-		ifinfo->state = IFS_DOWN;
-	else
+	flags = interface_up(ifinfo->ifname);
+	if (flags == 0)
 		ifinfo->state = IFS_DELAY;
+	else if (flags == IFS_TENTATIVE)
+		ifinfo->state = IFS_TENTATIVE;
+	else
+		ifinfo->state = IFS_DOWN;
 
 	rtsol_timer_update(ifinfo);
 
@@ -342,12 +347,13 @@ rtsol_check_timer()
 	static struct timeval returnval;
 	struct timeval now, rtsol_timer;
 	struct ifinfo *ifinfo;
+	int flags;
 
 	gettimeofday(&now, NULL);
 
 	rtsol_timer = tm_max;
 
-	for(ifinfo = iflist; ifinfo; ifinfo = ifinfo->next) {
+	for (ifinfo = iflist; ifinfo; ifinfo = ifinfo->next) {
 		if (TIMEVAL_LEQ(ifinfo->expire, now)) {
 			if (dflag > 1)
 				warnmsg(LOG_DEBUG, __FUNCTION__,
@@ -356,58 +362,64 @@ rtsol_check_timer()
 				       ifinfo->state);
 
 			switch(ifinfo->state) {
-			 case IFS_DOWN:
-				 /* interface_up returns 0 on success */
-				 if (interface_up(ifinfo->ifname) == 0)
-					 ifinfo->state = IFS_DELAY;
-				 break;
-			 case IFS_IDLE:
-			 {
-				 int oldstatus = ifinfo->active;
-				 int probe = 0;
+			case IFS_DOWN:
+			case IFS_TENTATIVE:
+				/* interface_up returns 0 on success */
+				flags = interface_up(ifinfo->ifname);
+				if (flags == 0)
+					ifinfo->state = IFS_DELAY;
+				else if (flags == IFS_TENTATIVE)
+					ifinfo->state = IFS_TENTATIVE;
+				else
+					ifinfo->state = IFS_DOWN;
+				break;
+			case IFS_IDLE:
+			{
+				int oldstatus = ifinfo->active;
+				int probe = 0;
 
-				 ifinfo->active =
-					 interface_status(ifinfo);
+				ifinfo->active =
+					interface_status(ifinfo);
 
-				 if (oldstatus != ifinfo->active) {
-					 warnmsg(LOG_DEBUG, __FUNCTION__,
-						 "%s status is changed"
+				if (oldstatus != ifinfo->active) {
+					warnmsg(LOG_DEBUG, __FUNCTION__,
+						"%s status is changed"
 						" from %d to %d",
 						ifinfo->ifname,
 						oldstatus, ifinfo->active);
-					 probe = 1;
-					 ifinfo->state = IFS_DELAY;
-				 }
-				 else if (ifinfo->probeinterval &&
-					  (ifinfo->probetimer -=
-					   ifinfo->timer.tv_sec) <= 0) {
-					 /* probe timer expired */
-					 ifinfo->probetimer =
-						 ifinfo->probeinterval;
-					 probe = 1;
-					 ifinfo->state = IFS_PROBE;
-				 }
+					probe = 1;
+					ifinfo->state = IFS_DELAY;
+				}
+				else if (ifinfo->probeinterval &&
+					 (ifinfo->probetimer -=
+					  ifinfo->timer.tv_sec) <= 0) {
+					/* probe timer expired */
+					ifinfo->probetimer =
+						ifinfo->probeinterval;
+					probe = 1;
+					ifinfo->state = IFS_PROBE;
+				}
 
-				 if (probe && mobile_node)
-					 defrouter_probe(ifinfo->sdl->sdl_index);
-				 break;
-			 }
-			 case IFS_DELAY:
-				 ifinfo->state = IFS_PROBE;
-				 sendpacket(ifinfo);
-				 break;
-			 case IFS_PROBE:
-				 if (ifinfo->probes < MAX_RTR_SOLICITATIONS)
-					 sendpacket(ifinfo);
-				 else {
-					 warnmsg(LOG_INFO, __FUNCTION__,
-						 "No answer "
-						 "after sending %d RSs",
+				if (probe && mobile_node)
+					defrouter_probe(ifinfo->sdl->sdl_index);
+				break;
+			}
+			case IFS_DELAY:
+				ifinfo->state = IFS_PROBE;
+				sendpacket(ifinfo);
+				break;
+			case IFS_PROBE:
+				if (ifinfo->probes < MAX_RTR_SOLICITATIONS)
+					sendpacket(ifinfo);
+				else {
+					warnmsg(LOG_INFO, __FUNCTION__,
+						"No answer "
+						"after sending %d RSs",
 						ifinfo->probes);
-					 ifinfo->probes = 0;
-					 ifinfo->state = IFS_IDLE;
-				 }
-				 break;
+					ifinfo->probes = 0;
+					ifinfo->state = IFS_IDLE;
+				}
+				break;
 			}
 			rtsol_timer_update(ifinfo);
 		}
@@ -443,36 +455,37 @@ rtsol_timer_update(struct ifinfo *ifinfo)
 
 	bzero(&ifinfo->timer, sizeof(ifinfo->timer));
 
-	switch(ifinfo->state) {
-	 case IFS_DOWN:
-		 if (++ifinfo->dadcount > DADRETRY) {
-			 ifinfo->dadcount = 0;
-			 ifinfo->timer.tv_sec = PROBE_INTERVAL;
-		 }
-		 else
-			 ifinfo->timer.tv_sec = 1;
-		 break;
-	 case IFS_IDLE:
-		 if (mobile_node) {
-			 /* XXX should be configurable */ 
-			 ifinfo->timer.tv_sec = 3;
-		 }
-		 else
-			 ifinfo->timer = tm_max;	/* stop timer(valid?) */
-		 break;
-	 case IFS_DELAY:
-		 interval = random() % (MAX_RTR_SOLICITATION_DELAY * MILLION);
-		 ifinfo->timer.tv_sec = interval / MILLION;
-		 ifinfo->timer.tv_usec = interval % MILLION;
-		 break;
-	 case IFS_PROBE:
-		 ifinfo->timer.tv_sec = RTR_SOLICITATION_INTERVAL;
-		 break;
-	 default:
-		 warnmsg(LOG_ERR, __FUNCTION__,
-			 "illegal interface state(%d) on %s",
+	switch (ifinfo->state) {
+	case IFS_DOWN:
+	case IFS_TENTATIVE:
+		if (++ifinfo->dadcount > DADRETRY) {
+			ifinfo->dadcount = 0;
+			ifinfo->timer.tv_sec = PROBE_INTERVAL;
+		}
+		else
+			ifinfo->timer.tv_sec = 1;
+		break;
+	case IFS_IDLE:
+		if (mobile_node) {
+			/* XXX should be configurable */ 
+			ifinfo->timer.tv_sec = 3;
+		}
+		else
+			ifinfo->timer = tm_max;	/* stop timer(valid?) */
+		break;
+	case IFS_DELAY:
+		interval = random() % (MAX_RTR_SOLICITATION_DELAY * MILLION);
+		ifinfo->timer.tv_sec = interval / MILLION;
+		ifinfo->timer.tv_usec = interval % MILLION;
+		break;
+	case IFS_PROBE:
+		ifinfo->timer.tv_sec = RTR_SOLICITATION_INTERVAL;
+		break;
+	default:
+		warnmsg(LOG_ERR, __FUNCTION__,
+			"illegal interface state(%d) on %s",
 			ifinfo->state, ifinfo->ifname);
-		 return;
+		return;
 	}
 
 	/* reset the timer */
