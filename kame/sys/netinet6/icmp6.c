@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.329 2002/11/05 03:48:32 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.330 2002/11/11 03:16:53 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3832,6 +3832,14 @@ icmp6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case ICMPV6CTL_ND6_DRLIST:
 	case ICMPV6CTL_ND6_PRLIST:
 		return nd6_sysctl(name[0], oldp, oldlenp, newp, newlen);
+
+#ifdef MLDV2
+	case ICMPV6CTL_MLD_MAXSRCFILTER:
+	case ICMPV6CTL_MLD_SOMAXSRC:
+	case ICMPV6CTL_MLD_ALWAYSV2:
+		return mld_sysctl(&name[0], namelen, oldp, oldlenp, newp, newlen);
+#endif
+
 	default:
 		return ENOPROTOOPT;
 	}
