@@ -772,13 +772,13 @@ udp6_ctlinput(cmd, sa, d)
 				updatemtu = 1;
 #endif
 
-			/*
-			 * Now that we've validated that we are actually
-			 * communicating with the host indicated in the ICMPv6
-			 * message, recalculate the new MTU, and create the
-			 * corresponding routing entry.
-			 */
 			if (updatemtu) {
+				/*
+				 * Now that we've validated that we are actually
+				 * communicating with the host indicated in the
+				 * ICMPv6 message, recalculate the new MTU, and
+				 * create the corresponding routing entry.
+				 */
 				icmp6_mtudisc_update((struct ip6ctlparam *)d);
 				return;
 			}
