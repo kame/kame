@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.20 2000/08/31 15:03:47 itojun Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.21 2000/08/31 15:31:40 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -198,6 +198,10 @@ getpsk(str, len)
 	}
 
 	while (fgets(buf, sizeof(buf), fp) != NULL) {
+		/* comment line */
+		if (buf[0] == '#')
+			continue;
+
 		/* search the end of 1st string. */
 		for (p = buf; *p != '\0' && !isspace(*p); p++)
 			;
