@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.145 2001/01/21 08:26:24 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.146 2001/01/21 08:46:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -628,20 +628,19 @@ ip6_input(m)
 	 * we should correct it by changing in6_ifattach to install
 	 * "goto ours" hack route.
 	 */
-	if ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) != 0) {
-		if (IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst)) {
-			if (in6ifa_ifpwithaddr(m->m_pkthdr.rcvif,
-			    &ip6->ip6_dst)) {
-				ours = 1;
-				deliverifp = m->m_pkthdr.rcvif;
-				goto hbhcheck;
-			} else {
-				icmp6_error(m, ICMP6_DST_UNREACH,
-				    ICMP6_DST_UNREACH_ADDR, 0);
-				/* m is already freed */
-				return;
-			}
+	if ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) != 0 &&
+	    IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst)) {
+		if (!in6ifa_ifpwithaddr(m->m_pkthdr.rcvif,
+		    &ip6->ip6_dst)) {
+			icmp6_error(m, ICMP6_DST_UNREACH,
+			    ICMP6_DST_UNREACH_ADDR, 0);
+			/* m is already freed */
+			return;
 		}
+
+		ours = 1;
+		deliverifp = m->m_pkthdr.rcvif;
+		goto hbhcheck;
 	}
 
 	/*
