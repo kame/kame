@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.178 2004/04/21 03:15:10 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.179 2004/04/21 03:27:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -584,11 +584,10 @@ getaddrinfo(hostname, servname, hints, res)
 
 	/*
 	 * hostname as alphabetical name.
-	 * first, try to query DNS for all possible address families.
 	 */
 #ifdef USE_FQDN_UNSPEC_LOOKUP
 	/*
-	 * the operating systems support PF_UNSPEC lookup in explore_fqdn().
+	 * the operating system supports PF_UNSPEC lookup in explore_fqdn().
 	 */
 	*pai = ai0;
 	error = explore_fqdn(pai, hostname, servname, &afai_unspec);
