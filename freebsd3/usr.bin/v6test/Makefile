@@ -4,10 +4,9 @@ PROG=	v6test
 SRCS=	v6test.c cksum.c testcap.c getconfig.c
 
 CFLAGS+=-I${SRCDIR}
-LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
+LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
 	-L/usr/local/v6/lib -linet6
-DPADD+= ${.CURDIR}/../lib/libinet6/libinet6.a \
-	${.CURDIR}/../lib/libinet6/obj/libinet6.a \
+DPADD+= ${.OBJDIR}/../lib/libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
 #CFLAGS += -DDEFAUT_IF="ep0"

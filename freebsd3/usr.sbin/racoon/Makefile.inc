@@ -21,11 +21,11 @@ CFLAGS+=-I/usr/local/ssl/include/openssl
 
 LDADD+=	-ly -ll
 DPADD+=	${LIBY} ${LIBL}
-LDADD+=	-L${.CURDIR}/../../../lib/libipsec -L${.CURDIR}/../../../lib/libinet6 \
+LDADD+=	-L${.OBJDIR}/../../../lib/libipsec -L${.OBJDIR}/../../../lib/libinet6 \
 	-L/usr/local/v6/lib -lipsec -linet6
-DPADD+=	${.CURDIR}/../../../lib/libipsec/libipsec.a \
+DPADD+=	${.OBJDIR}/../../../lib/libipsec/libipsec.a \
 	/usr/local/v6/lib/libipsec.a
-DPADD+=	-L${.CURDIR}/../../../lib/libinet6/libinet6.a \
+DPADD+=	-L${.OBJDIR}/../../../lib/libinet6/libinet6.a \
 	-L/usr/local/v6/lib/libinet6.a
 .if exists(/usr/local/lib/libcrypto.a)
 LDADD+= -L/usr/local/lib -lcrypto
