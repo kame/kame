@@ -1,4 +1,4 @@
-/*	$KAME: altqd.c,v 1.7 2001/11/19 09:14:22 kjc Exp $	*/
+/*	$KAME: altqd.c,v 1.8 2001/12/03 08:24:30 kjc Exp $	*/
 /*
  * Copyright (c) 2001 Theo de Raadt
  * All rights reserved.
@@ -72,7 +72,9 @@
 #include "altq_qop.h"
 #include "quip_server.h"
 
+#ifdef __FreeBSD__
 #define  ALTQD_PID_FILE		"/var/run/altqd.pid"
+#endif
 #define MAX_CLIENT		10
 
 int	altqd_socket = -1;
@@ -132,7 +134,6 @@ main(int argc, char **argv)
 {
 	int		c;
 	int		i, maxfd;
-	extern char	*optarg;
 
 	m_debug = DEFAULT_DEBUG_MASK;
 	l_debug = DEFAULT_LOGGING_LEVEL;
@@ -203,24 +204,28 @@ main(int argc, char **argv)
 	}
 
 	if (daemonize) {
-		FILE *fp;
-
 		daemon(0, 0);
 
 		/* save pid to the pid file (/var/tmp/altqd.pid) */
-		if ((fp = fopen(ALTQD_PID_FILE, "w")) != NULL) {
-			fprintf(fp, "%d\n", getpid());
-			fclose(fp);
-		} else
-			warn("can't open pid file: %s: %s",
-			    ALTQD_PID_FILE, strerror(errno));
+#ifdef __FreeBSD__
+		{
+			FILE *fp;
+
+			if ((fp = fopen(ALTQD_PID_FILE, "w")) != NULL) {
+				fprintf(fp, "%d\n", getpid());
+				fclose(fp);
+			} else
+				LOG(LOG_WARNING, errno, "can't open pid file");
+		}
+#else
+		if (pidfile(NULL))
+			LOG(LOG_WARNING, errno, "can't open pid file");
+#endif
 	} else {
 		/* interactive mode */
 		if (infile) {
-			if ((infp = fopen(infile, "r")) == NULL) {
-				perror("Cannot open input file");
-				exit(1);
-			}
+			if ((infp = fopen(infile, "r")) == NULL)
+				err(1, "Cannot open input file");
 		} else {
 			infp = stdin;
 			printf("\nEnter ? or command:\n");
@@ -252,25 +257,16 @@ main(int argc, char **argv)
 			printf("reinitializing altqd...\n");
 			qcmd_init();
 		}
-		if (gotsig_term) {
-			fprintf(stderr, "Exiting on signal %d\n", SIGTERM);
-
+		if (gotsig_term || gotsig_int) {
+			fprintf(stderr, "Exiting on signal %d\n",
+				gotsig_term ? SIGTERM : SIGINT);
 			qcmd_destroyall();
 
-			/* if we have a pid file, remove it */
 			if (daemonize) {
+#ifdef __FreeBSD__
+				/* if we have a pid file, remove it */
 				unlink(ALTQD_PID_FILE);
-				closelog();
-			}
-			exit(0);
-		}
-		if (gotsig_int) {
-			fprintf(stderr, "Exiting on signal %d\n", SIGINT);
-			qcmd_destroyall();
-
-			/* if we have a pid file, remove it */
-			if (daemonize) {
-				unlink(ALTQD_PID_FILE);
+#endif
 				closelog();
 			}
 			exit(0);
@@ -279,10 +275,8 @@ main(int argc, char **argv)
 		FD_COPY(&fds, &t_fds);
 		rc = select(maxfd, &t_fds, NULL, NULL, NULL);
 		if (rc < 0) {
-			if (errno != EINTR) {
-				perror("select");
-				exit(1);
-			}
+			if (errno != EINTR)
+				err(1, "select");
 			continue;
 		}
 

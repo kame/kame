@@ -19,7 +19,7 @@ install: $(PROGS)
 	$(INSTALL) $(COPY) -m 0644 $(MAN8) $(PREFIX)/man/man8
 
 altqd: $(ALTQD_OBJS)
-	$(CC) $(CFLAGS) $(INCLUDES) $(DEFINES) -o $@ $(ALTQD_OBJS) $(SYS_LIBS) -lm
+	$(CC) $(CFLAGS) $(INCLUDES) $(DEFINES) -o $@ $(ALTQD_OBJS) $(SYS_LIBS) -lm -lutil
 
 .c.o: 
 	$(CC) $(CFLAGS) $(INCLUDES) $(DEFINES) -c $*.c
