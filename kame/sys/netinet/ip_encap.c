@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 /*
- * My grandfather said that there's a devil lives in tunnelling technology...
+ * My grandfather said that there's a devil inside tunnelling technology...
  *
  * We have surprisingly many protocol that want packets with IP protocol
  * #4 or #41.  Here's a list of protocols that want protocol #41:
