@@ -349,8 +349,6 @@ extern	int  (*ng_ether_output_p)(struct ifnet *ifp, struct mbuf **mp);
 extern	void (*ng_ether_attach_p)(struct ifnet *ifp);
 extern	void (*ng_ether_detach_p)(struct ifnet *ifp);
 
-extern	int (*vrrp_input_p)(struct ether_header *eh, struct mbuf *m);
-
 extern	int (*vlan_input_p)(struct ether_header *eh, struct mbuf *m);
 extern	int (*vlan_input_tag_p)(struct ether_header *eh, struct mbuf *m,
 		u_int16_t t);
