@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.66 2001/08/01 16:50:20 jinmei Exp $	*/
+/*	$KAME: ip6_var.h,v 1.67 2001/08/16 11:41:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -249,6 +249,9 @@ struct	ip6stat {
 
 	u_quad_t ip6s_forward_cachehit;
 	u_quad_t ip6s_forward_cachemiss;
+
+	/* number of times that each rule of source selection is applied. */
+	u_quad_t ip6s_sources_rule[16];
 };
 
 #ifdef _KERNEL
@@ -331,6 +334,8 @@ extern int   ip6_lowportmin;		/* minimum reserved port */
 extern int   ip6_lowportmax;		/* maximum reserved port */
 
 extern int	ip6_use_tempaddr; /* whether to use temporary addresses. */
+extern int	ip6_prefer_tempaddr; /* whether to prefer temporary addresses
+					in the source address selection */
 
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 struct in6pcb;
