@@ -194,7 +194,7 @@ void	in6_setsockaddr __P((struct in6pcb *, struct mbuf *));
 /* in in6_src.c */
 int	in6_selecthlim __P((struct in6pcb *, struct ifnet *));
 int	in6_pcbsetport __P((struct in6_addr *, struct in6pcb *, struct proc *));
-#ifndef TCP6
+#ifdef __NetBSD__
 extern struct rtentry *
 	in6_pcbrtentry __P((struct in6pcb *));
 extern struct in6pcb *in6_pcblookup_connect __P((struct in6pcb *,

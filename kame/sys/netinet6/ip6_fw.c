@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.33 2004/05/20 08:15:55 suz Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.34 2004/05/24 11:06:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -91,11 +91,6 @@
 #include <netinet/in_pcb.h>
 
 #include <netinet6/ip6_fw.h>
-#ifdef TCP6
-#include <netinet6/tcp6.h>
-#include <netinet6/tcp6_timer.h>
-#include <netinet6/tcp6_var.h>
-#endif
 #include <netinet/ip_var.h>
 #include <netinet/tcp.h>
 #include <netinet/tcp_seq.h>
@@ -852,18 +847,12 @@ got_match:
 				flags = TH_RST|TH_ACK;
 			}
 			bcopy(&ti, ip6, sizeof(ti));
-#ifdef TCP6
-			tcp6_respond(NULL, ip6, (struct tcp6hdr *)(ip6 + 1),
-				*m, ack, seq, flags);
-#elif defined(__NetBSD__)
+#ifdef __NetBSD__
 			tcp_respond(NULL, NULL, *m, (struct tcphdr *)(ip6 + 1),
 				ack, seq, flags);
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#elif defined(__FreeBSD__)
 			tcp_respond(NULL, ip6, (struct tcphdr *)(ip6 + 1),
 				*m, ack, seq, flags);
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 3
-			tcp_respond(NULL, ip6, (struct tcphdr *)(ip6 + 1),
-				*m, ack, seq, flags, 1);
 #else
 			m_freem(*m);
 #endif

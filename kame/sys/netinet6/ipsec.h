@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.71 2004/05/21 08:17:58 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.72 2004/05/24 11:06:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -419,7 +419,7 @@ extern size_t ipsec4_hdrsiz_tcp __P((struct tcpcb *));
 extern size_t ipsec6_hdrsiz __P((struct mbuf *, u_int, struct inpcb *));
 #else
 extern size_t ipsec6_hdrsiz __P((struct mbuf *, u_int, struct in6pcb *));
-#if defined(__NetBSD__) && !defined(TCP6)
+#ifdef __NetBSD__
 extern size_t ipsec6_hdrsiz_tcp __P((struct tcpcb *));
 #else
 extern size_t ipsec6_hdrsiz_tcp __P((struct tcp6cb *));

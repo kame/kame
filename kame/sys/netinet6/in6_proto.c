@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.150 2004/05/21 09:44:50 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.151 2004/05/24 11:06:14 itojun Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -109,17 +109,15 @@
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
 #include <netinet/ip_encap.h>
-#if defined(__FreeBSD__) || (defined(__NetBSD__) && !defined(TCP6)) || defined(__OpenBSD__)
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
-#endif
-#if (defined(__NetBSD__) && !defined(TCP6)) || defined(__OpenBSD__)
+#if defined(__OpenBSD__)
 #include <netinet/in_pcb.h>
 #endif
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
-#if !defined(__FreeBSD__) && !defined(__OpenBSD__)
+#if defined(__NetBSD__)
 #include <netinet6/in6_pcb.h>
 #endif
 
@@ -133,7 +131,6 @@
 #include <netinet6/tcp6_var.h>
 #endif
 #else
-#if defined(__NetBSD__) && !defined(TCP6)
 #include <netinet/tcp.h>
 #include <netinet/tcp_fsm.h>
 #include <netinet/tcp_seq.h>
@@ -141,23 +138,17 @@
 #include <netinet/tcp_var.h>
 #include <netinet/tcpip.h>
 #include <netinet/tcp_debug.h>
-#else
-#include <netinet6/tcp6.h>
-#include <netinet6/tcp6_fsm.h>
-#include <netinet6/tcp6_seq.h>
-#include <netinet6/tcp6_timer.h>
-#include <netinet6/tcp6_var.h>
-#endif
 #endif
 
 #ifdef __FreeBSD__
 #include <netinet6/raw_ip6.h>
 #endif
 
-#ifndef __OpenBSD__
-#ifndef __FreeBSD__
+#ifdef __NetBSD__
 #include <netinet6/udp6.h>
+#include <netinet6/udp6_var.h>
 #endif
+#ifdef __FreeBSD__
 #include <netinet6/udp6_var.h>
 #endif
 
@@ -266,18 +257,6 @@ struct ip6protosw inet6sw[] = {
   &udp6_usrreqs,
 #endif
 },
-#ifdef TCP6
-{ SOCK_STREAM,	&inet6domain,	IPPROTO_TCP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_LISTEN|PR_ABRTACPTDIS,
-  tcp6_input,	0,		tcp6_ctlinput,	tcp6_ctloutput,
-  tcp6_usrreq,
-  tcp6_init,	tcp6_fasttimo,	tcp6_slowtimo,	tcp6_drain,
-#ifndef __FreeBSD__
-  tcp6_sysctl,
-#else
-  &tcp6_usrreqs,
-#endif
-},
-#else
 { SOCK_STREAM,	&inet6domain,	IPPROTO_TCP,	PR_CONNREQUIRED|PR_WANTRCVD|PR_LISTEN,
   tcp6_input,	0,		tcp6_ctlinput,	tcp_ctloutput,
 #ifdef __FreeBSD__
@@ -307,7 +286,6 @@ struct ip6protosw inet6sw[] = {
   &tcp6_usrreqs,
 #endif
 },
-#endif /* TCP6 */
 #ifdef SCTP
 { SOCK_DGRAM,	&inet6domain,	IPPROTO_SCTP,	PR_ADDR_OPT|PR_WANTRCVD,
   sctp6_input,	0,		sctp6_ctlinput,	sctp_ctloutput,
@@ -621,12 +599,10 @@ int	ip6_auto_flowlabel = 1;
 int	ip6_use_deprecated = 1;	/* allow deprecated addr (RFC2462 5.5.4) */
 int	ip6_rr_prune = 5;	/* router renumbering prefix
 				 * walk list every 5 sec. */
-#if defined(__NetBSD__)
-int	ip6_v6only = 1;
-#elif defined(__OpenBSD__) || defined(TCP6)
+#if defined(__OpenBSD__)
 const int ip6_v6only = 1;
 #else
-int	ip6_v6only = 0;
+int	ip6_v6only = 1;
 #endif
 
 int	ip6_keepfaith = 0;
@@ -639,9 +615,6 @@ time_t	ip6_log_time = (time_t)0L;
  * or so? (jinmei@kame.net 19990310)
  */
 int pmtu_expire = 60*10;
-#ifdef TCP6
-int pmtu_probe = 60*2;
-#endif
 
 /* raw IP6 parameters */
 /*
@@ -658,81 +631,6 @@ int	icmp6_rediraccept = 1;		/* accept and process redirects */
 int	icmp6_redirtimeout = 10 * 60;	/* 10 minutes */
 int	icmp6errppslim = 100;		/* 100pps */
 int	icmp6_nodeinfo = 3;		/* enable/disable NI response */
-
-#ifdef TCP6
-/* TCP on IP6 parameters */
-int	tcp6_sendspace = 1024 * 8;
-int	tcp6_recvspace = 1024 * 8;
-int 	tcp6_mssdflt = TCP6_MSS;
-int 	tcp6_rttdflt = TCP6TV_SRTTDFLT / PR_SLOWHZ;
-int	tcp6_do_rfc1323 = 1;
-int	tcp6_conntimeo = TCP6TV_KEEP_INIT;	/* initial connection timeout */
-int	tcp6_43maxseg = 0;
-int	tcp6_pmtu = 0;
-
-/*
- * Parameters for keepalive option.
- * Connections for which SO_KEEPALIVE is set will be probed
- * after being idle for a time of tcp6_keepidle (in units of PR_SLOWHZ).
- * Starting at that time, the connection is probed at intervals
- * of tcp6_keepintvl (same units) until a response is received
- * or until tcp6_keepcnt probes have been made, at which time
- * the connection is dropped.  Note that a tcp6_keepidle value
- * under 2 hours is nonconformant with RFC-1122, Internet Host Requirements.
- */
-int	tcp6_keepidle = TCP6TV_KEEP_IDLE;	/* time before probing idle */
-int	tcp6_keepintvl = TCP6TV_KEEPINTVL;	/* interval betwn idle probes */
-int	tcp6_keepcnt = TCP6TV_KEEPCNT;		/* max idle probes */
-int	tcp6_maxpersistidle = TCP6TV_KEEP_IDLE;	/* max idle time in persist */
-
-#ifndef INET_SERVER
-#define	TCP6_LISTEN_HASH_SIZE	17
-#define	TCP6_CONN_HASH_SIZE	97
-#define	TCP6_SYN_HASH_SIZE	293
-#define	TCP6_SYN_BUCKET_SIZE	35
-#else
-#define	TCP6_LISTEN_HASH_SIZE	97
-#define	TCP6_CONN_HASH_SIZE	9973
-#define	TCP6_SYN_HASH_SIZE	997
-#define	TCP6_SYN_BUCKET_SIZE	35
-#endif
-int	tcp6_listen_hash_size = TCP6_LISTEN_HASH_SIZE;
-int	tcp6_conn_hash_size = TCP6_CONN_HASH_SIZE;
-struct	tcp6_hash_list tcp6_listen_hash[TCP6_LISTEN_HASH_SIZE],
-	tcp6_conn_hash[TCP6_CONN_HASH_SIZE];
-
-int	tcp6_syn_cache_size = TCP6_SYN_HASH_SIZE;
-int	tcp6_syn_cache_limit = TCP6_SYN_HASH_SIZE*TCP6_SYN_BUCKET_SIZE;
-int	tcp6_syn_bucket_limit = 3*TCP6_SYN_BUCKET_SIZE;
-struct	syn_cache_head6 tcp6_syn_cache[TCP6_SYN_HASH_SIZE];
-struct	syn_cache_head6 *tcp6_syn_cache_first;
-int	tcp6_syn_cache_interval = 8;	/* runs timer every 4 seconds */
-int	tcp6_syn_cache_timeo = TCP6TV_KEEP_INIT;
-
-/*
- * Parameters for computing a desirable data segment size
- * given an upper bound (either interface MTU, or peer's MSS option)_.
- * As applications tend to use a buffer size that is a multiple
- * of kilobytes, try for something that divides evenly. However,
- * do not round down too much.
- *
- * Round segment size down to a multiple of TCP6_ROUNDSIZE if this
- * does not result in lowering by more than (size/TCP6_ROUNDFRAC).
- * For example, round 536 to 512.  Older versions of the system
- * effectively used MCLBYTES (1K or 2K) as TCP6_ROUNDSIZE, with
- * a value of 1 for TCP6_ROUNDFRAC (eliminating its effect).
- * We round to a multiple of 256 for SLIP.
- */
-#ifndef	TCP6_ROUNDSIZE
-#define	TCP6_ROUNDSIZE	256	/* round to multiple of 256 */
-#endif
-#ifndef	TCP6_ROUNDFRAC
-#define	TCP6_ROUNDFRAC	10	/* round down at most N/10, or 10% */
-#endif
-
-int	tcp6_roundsize = TCP6_ROUNDSIZE;
-int	tcp6_roundfrac = TCP6_ROUNDFRAC;
-#endif /* TCP6 */
 
 /* UDP on IP6 parameters */
 int	udp6_sendspace = 9216;		/* really max datagram size */
