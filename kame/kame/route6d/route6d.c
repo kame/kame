@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.24 2000/05/17 04:02:53 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.25 2000/05/17 09:05:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.24 2000/05/17 04:02:53 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.25 2000/05/17 09:05:36 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -1966,16 +1966,13 @@ ifrt_p2p(ifcp, again)
 		case GATED:
 			/*
 			 * prefixlen on p2p interface is meaningless.
+			 * advertise addr/128 and dest/128.
 			 *
 			 * do not install network route to route6d routing
 			 * table (if we do, it would prevent route installation
 			 * for other p2p interface that shares addr/plen).
-			 * advertise dest/128.  since addr/128 is not
-			 * advertised, addr/128 is not reachable from other
-			 * interfaces (if p2p interface is A, addr/128 is not
-			 * reachable from other interfaces).  not sure why it
-			 * is not advertised.
 			 */
+			advert |= P2PADVERT_ADDR;
 			advert |= P2PADVERT_DEST;
 			ignore |= P2PADVERT_NETWORK;
 			break;
