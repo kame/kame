@@ -3,19 +3,23 @@ bin/des
 bin/ftp
 bin/kauth
 bin/kdestroy
+bin/kgetcred
 bin/kinit
 bin/klist
 bin/kpasswd
+bin/kx
 bin/login
 bin/otp
 bin/otpprint
 bin/pfrom
-bin/rpw
 bin/rsh
-bin/speed
+bin/rxtelnet
+bin/rxterm
 bin/string2key
 bin/telnet
-include/admin.h
+bin/tenletxr
+bin/verify_krb5_conf
+bin/xnlock
 include/asn1.h
 include/asn1_err.h
 include/base64.h
@@ -23,8 +27,11 @@ include/com_err.h
 include/com_right.h
 include/der.h
 include/des.h
+include/editline.h
 include/getarg.h
 include/gssapi.h
+include/hdb-private.h
+include/hdb-protos.h
 include/hdb.h
 include/hdb_asn1.h
 include/hdb_err.h
@@ -32,8 +39,8 @@ include/heim_err.h
 include/kadm5/admin.h
 include/kadm5/kadm5_err.h
 include/kadm5/private.h
-@dirrm include/kadm5
 include/kafs.h
+include/krb5-private.h
 include/krb5-protos.h
 include/krb5-types.h
 include/krb5.h
@@ -41,6 +48,7 @@ include/krb5_err.h
 include/md4.h
 include/md5.h
 include/otp.h
+include/parse_bytes.h
 include/parse_time.h
 include/parse_units.h
 include/resolve.h
@@ -48,32 +56,23 @@ include/roken-common.h
 include/roken.h
 include/sha.h
 include/sl.h
-include/xdbm.h
+include/ss/ss.h
 @unexec install-info --delete %D/info/heimdal.info %D/info/dir
 info/heimdal.info
-@exec install-info %D/info/heimdal.info %D/info/dir
+@exec install-info %D/info/bash.info %D/info/dir
 lib/libasn1.a
-lib/libasn1.la
 lib/libcom_err.a
-lib/libcom_err.la
 lib/libdes.a
-lib/libdes.la
 lib/libeditline.a
 lib/libgssapi.a
-lib/libgssapi.la
 lib/libhdb.a
-lib/libhdb.la
 lib/libkadm5clnt.a
-lib/libkadm5clnt.la
 lib/libkadm5srv.a
-lib/libkadm5srv.la
 lib/libkrb5.a
-lib/libkrb5.la
 lib/libotp.a
-lib/libotp.la
 lib/libroken.a
-lib/libroken.la
 lib/libsl.a
+lib/libss.a
 libexec/ftpd
 libexec/hprop
 libexec/hpropd
@@ -82,6 +81,7 @@ libexec/ipropd-slave
 libexec/kadmind
 libexec/kdc
 libexec/kpasswdd
+libexec/kxd
 libexec/popper
 libexec/push
 libexec/rshd
@@ -91,11 +91,7 @@ sbin/kadmin
 sbin/kstash
 sbin/ktutil
 sbin/replay_log
-share/heimdal/examples/krb5.conf.sample
-share/heimdal/examples/inetd.conf.sample
-share/heimdal/examples/services.sample
-@dirrm share/heimdal/examples
-@dirrm share/heimdal
-@cwd /var
-@exec mkdir %D/heimdal
-@dirrm heimdal
+@dirrm include/kadm5
+@dirrm include/ss
+@exec /usr/bin/env OBJFORMAT=%%PORTOBJFORMAT%% /sbin/ldconfig -m %D/lib
+@unexec /usr/bin/env OBJFORMAT=%%PORTOBJFORMAT%% /sbin/ldconfig -R
