@@ -1,12 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.909 2000/05/19 20:04:00 itojun Exp $
+$Id: CHANGELOG,v 1.910 2000/05/21 15:27:39 itojun Exp $
 
 <200005>
 Sat May 20 04:59:26 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_{forward,output,input}.c:
-	  correct link-local scoped address handling on looopback interface.
-	  broken on FAKE_LOOPBACK_IF code committed on 17 May 2000.
+	  correct link-local scoped address handling on loopback interface.
+	  broken by FAKE_LOOPBACK_IF code committed on 17 May 2000.
 
 2000-05-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_mroute.c (ip6_mdq): loosened scope check
@@ -16,7 +16,7 @@ Sat May 20 04:59:26 JST 2000  itojun@iijlab.net
 	<takamiya@po.ntts.co.jp>
 	
 Fri May 19 11:41:05 JST 2000  itojun@iijlab.net
-	* sys/netinet6/ip6_mroute.[ch]: add backward compatibility code with
+	* sys/netinet6/ip6_mroute.[ch]: add backward compatibility code
 	  for 2000/4/12 mrt6msg change (is not used in kame tree).
 	  freebsd40 and openbsd27 are shipped with old declaration, so we
 	  need to provide backward compat to some degree.
