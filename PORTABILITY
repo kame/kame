@@ -1,6 +1,6 @@
 Portability guideline
 KAME project
-$Id: PORTABILITY,v 1.7 1999/08/25 00:41:37 itojun Exp $
+$Id: PORTABILITY,v 1.8 1999/09/11 17:55:21 itojun Exp $
 
 
 Source code in "kame" directory will be shared among operating systems
@@ -74,14 +74,19 @@ across those possibilities.
 
 - On manpage installation.
   for BSDI3, you need to set MAN[0-9] in Makefile like below.  MANDIR must
-  point to "cat" directory, not "man".
+  point to "catN" directory, not "manN", without "N":
+	MANDIR=	/usr/local/v6/man/cat
 	MAN5=	foo.0
 	MAN8=	baz.0
 	MLINKS=	foo.5 baa.5
-  For NetBSD, you need to set MAN (not MAN[0-9]):
+  For NetBSD, you need to set MAN (not MAN[0-9]).  MANDIR needs to point to
+  "man" directory right above "catN" or "manN" directory:
+	MANDIR=	/usr/local/v6/man
 	MAN=	foo.5 baz.8
 	MLINKS=	foo.5 baa.5
-  For other cases, you need to set MAN[0-9] like below:
+  For other cases, you need to set MAN[0-9] like below.  MANDIR needs to point
+  to "manN" directory, without "N":
+	MANDIR=	/usr/local/v6/man/man
 	MAN5=	foo.5
 	MAN8=	baz.8
 	MLINKS=	foo.5 baa.5
