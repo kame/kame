@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.109 2001/02/06 04:53:34 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.110 2001/02/06 09:14:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1509,82 +1509,6 @@ nd6_rtrequest(req, rt, sa)
 		if (ln->ln_hold)
 			m_freem(ln->ln_hold);
 		Free((caddr_t)ln);
-	}
-}
-
-void
-#if (defined(__bsdi__) && _BSDI_VERSION >= 199802) || defined(__NetBSD__) || defined(__OpenBSD__)
-nd6_p2p_rtrequest(req, rt, info)
-	int	req;
-	struct rtentry *rt;
-	struct rt_addrinfo *info; /* xxx unused */
-#else
-nd6_p2p_rtrequest(req, rt, sa)
-	int	req;
-	struct rtentry *rt;
-	struct sockaddr *sa; /* xxx unused */
-#endif
-{
-	struct sockaddr *gate = rt->rt_gateway;
-	static struct sockaddr_dl null_sdl = {sizeof(null_sdl), AF_LINK};
-	struct ifnet *ifp = rt->rt_ifp;
-	struct ifaddr *ifa;
-
-	if (rt->rt_flags & RTF_GATEWAY)
-		return;
-
-	switch (req) {
-	case RTM_ADD:
-		/*
-		 * There is no backward compatibility :)
-		 *
-		 * if ((rt->rt_flags & RTF_HOST) == 0 &&
-		 *     SIN(rt_mask(rt))->sin_addr.s_addr != 0xffffffff)
-		 *	   rt->rt_flags |= RTF_CLONING;
-		 */
-		if (rt->rt_flags & RTF_CLONING) {
-			/*
-			 * Case 1: This route should come from
-			 * a route to interface.
-			 */
-			rt_setgate(rt, rt_key(rt),
-				   (struct sockaddr *)&null_sdl);
-			gate = rt->rt_gateway;
-			SDL(gate)->sdl_type = ifp->if_type;
-			SDL(gate)->sdl_index = ifp->if_index;
-			break;
-		}
-		/* Announce a new entry if requested. */
-		if (rt->rt_flags & RTF_ANNOUNCE)
-			nd6_na_output(ifp,
-				      &SIN6(rt_key(rt))->sin6_addr,
-				      &SIN6(rt_key(rt))->sin6_addr,
-				      ip6_forwarding ? ND_NA_FLAG_ROUTER : 0,
-				      1, NULL);
-		/* FALLTHROUGH */
-	case RTM_RESOLVE:
-		/*
-		 * check if rt_key(rt) is one of my address assigned
-		 * to the interface.
-		 */
- 		ifa = (struct ifaddr *)in6ifa_ifpwithaddr(rt->rt_ifp,
-					  &SIN6(rt_key(rt))->sin6_addr);
-		if (ifa) {
-			if (nd6_useloopback) {
-#ifdef __bsdi__
-#if _BSDI_VERSION >= 199802
-				extern struct ifnet *loifp;
-				rt->rt_ifp = loifp;	/*XXX*/
-#else
-				extern struct ifnet loif;
-				rt->rt_ifp = &loif;	/*XXX*/
-#endif
-#else
-				rt->rt_ifp = &loif[0];	/*XXX*/
-#endif /*__bsdi__*/
-			}
-		}
-		break;
 	}
 }
 
