@@ -1,4 +1,4 @@
-/*	$KAME: gaistatd.c,v 1.4 2001/07/19 07:13:30 itojun Exp $	*/
+/*	$KAME: gaistatd.c,v 1.5 2001/07/20 01:22:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -58,6 +58,7 @@ struct gai_orderstat
 #define PATH_STATFILE "/var/run/gaistat"
 #define PATH_LOGIFLE "/var/log/gai.log"
 
+int main __P((void));
 static void timeval_sub __P((struct timeval *, struct timeval *,
 			     struct timeval *));
 
@@ -66,7 +67,7 @@ main()
 {
 	int s;
 	struct sockaddr_un sun;
-	struct gai_orderstat stat;
+	struct gai_orderstat st;
 	char buf[_POSIX2_LINE_MAX];
 	kvm_t *kvmd;
 
@@ -94,17 +95,17 @@ main()
 		socklen_t fromlen;
 		static char timebuf[64], *timestr, *crp;
 		struct kinfo_proc *proc;
-		char *procname = NULL;
+		const char *procname = NULL;
 		FILE *fp;
 
 		fromlen = sizeof(from);
-		cc = recvfrom(s, &stat, sizeof(stat), 0,
-			      (struct sockaddr *)&from, &fromlen);
+		cc = recvfrom(s, &st, sizeof(st), 0,
+		    (struct sockaddr *)&from, &fromlen);
 
-		if (cc != sizeof(stat))
+		if (cc != sizeof(st))
 			continue; /* bogus input, ignore it. */
 
-		if ((proc = kvm_getprocs(kvmd, KERN_PROC_PID, stat.pid, &cnt))
+		if ((proc = kvm_getprocs(kvmd, KERN_PROC_PID, st.pid, &cnt))
 		    != NULL) {
 			procname = proc->kp_proc.p_comm;
 		}
@@ -112,9 +113,9 @@ main()
 			procname = "???";
 
 		memset(&delay, 0, sizeof(delay));
-		timeval_sub(&stat.end, &stat.start, &delay);
+		timeval_sub(&st.end, &st.start, &delay);
 
-		timestr = ctime(&stat.start.tv_sec);
+		timestr = ctime(&st.start.tv_sec);
 		strncpy(timebuf, timestr, sizeof(timebuf));
 		if (timebuf[sizeof(timebuf) - 1] != '\0')
 			timebuf[sizeof(timebuf) - 1] = '\0';
@@ -125,9 +126,9 @@ main()
 			continue;
 		fprintf(fp, "%s (%lu.%06lu): pid=%d, proc=%s, "
 			"delay=%lu.%06lu, numeric=%d, entries=%d\n", timebuf,
-			(u_long)stat.start.tv_sec, (u_long)stat.start.tv_usec,
-			stat.pid, procname, (u_long)delay.tv_sec,
-			(u_long)delay.tv_usec, stat.numeric, stat.entries);
+			(u_long)st.start.tv_sec, (u_long)st.start.tv_usec,
+			st.pid, procname, (u_long)delay.tv_sec,
+			(u_long)delay.tv_usec, st.numeric, st.entries);
 		fclose(fp);
 	}
 }
