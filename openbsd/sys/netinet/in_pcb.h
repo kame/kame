@@ -126,11 +126,6 @@ struct inpcb {
 #define	inp_ip		inp_hu.hu_ip
 #define	inp_ipv6	inp_hu.hu_ipv6
 	struct	  mbuf *inp_options;	/* IPv4 options */
-	/*
-	 * IP6 options for incoming packets.
-	 * XXX: currently unused but remained just in case.
-	 */
-	struct ip6_recvpktopts *inp_inputopts6;
 	struct ip6_pktopts *inp_outputopts6; /* IP6 opts for outgoing pkts */
 	int inp_hops;
 	union {
@@ -168,7 +163,6 @@ struct inpcb {
  * other *BSDs.
  */
 #define in6p_socket inp_socket
-#define in6p_inputopts inp_inputopts6
 #define in6p_outputopts inp_outputopts6
 #define in6p_hops inp_hops
 #define in6p_lport inp_lport
