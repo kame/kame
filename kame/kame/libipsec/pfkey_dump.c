@@ -1,4 +1,4 @@
-/*	$KAME: pfkey_dump.c,v 1.30 2001/06/27 13:20:15 sakane Exp $	*/
+/*	$KAME: pfkey_dump.c,v 1.31 2001/09/21 12:27:45 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -99,7 +99,7 @@ do { \
 } while (0)
 
 static char *str_ipaddr __P((struct sockaddr *));
-static char *str_prefport __P((u_int, u_int, u_int));
+static char *str_prefport __P((u_int, u_int, u_int, u_int));
 static char *str_time __P((time_t));
 static void str_lifetime_byte __P((struct sadb_lifetime *, char *));
 
@@ -405,7 +405,8 @@ pfkey_spdump(m)
 			port = atoi(pbuf);
 		printf("%s%s ", str_ipaddr(sa),
 			str_prefport(sa->sa_family,
-			    m_saddr->sadb_address_prefixlen, port));
+			    m_saddr->sadb_address_prefixlen, port,
+			    m_saddr->sadb_address_proto));
 		break;
 	default:
 		printf("unknown-af ");
@@ -428,7 +429,8 @@ pfkey_spdump(m)
 			port = atoi(pbuf);
 		printf("%s%s ", str_ipaddr(sa),
 			str_prefport(sa->sa_family,
-			    m_daddr->sadb_address_prefixlen, port));
+			    m_daddr->sadb_address_prefixlen, port,
+			    m_saddr->sadb_address_proto));
 		break;
 	default:
 		printf("unknown-af ");
@@ -512,8 +514,8 @@ str_ipaddr(sa)
  * set "/prefix[port number]" to buffer.
  */
 static char *
-str_prefport(family, pref, port)
-	u_int family, pref, port;
+str_prefport(family, pref, port, ulp)
+	u_int family, pref, port, ulp;
 {
 	static char buf[128];
 	char prefbuf[10];
@@ -536,7 +538,8 @@ str_prefport(family, pref, port)
 	else
 		snprintf(prefbuf, sizeof(prefbuf), "/%u", pref);
 
-	if (port == IPSEC_PORT_ANY)
+	if ((ulp == IPPROTO_ICMPV6 && port == (u_int16_t)~0)
+	 || (ulp != IPPROTO_ICMPV6 && port == IPSEC_PORT_ANY))
 		snprintf(portbuf, sizeof(portbuf), "[%s]", "any");
 	else
 		snprintf(portbuf, sizeof(portbuf), "[%u]", port);
