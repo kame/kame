@@ -226,7 +226,7 @@ set_incoming(srcentry_ptr, srctype)
      */
     /* WARNING WARNING WARNING WARNING */
     v = &uvifs[srcentry_ptr->incoming];
-    if (inet6_equal(&source,&neighbor_addr))
+    if (inet6_equal(&source, &neighbor_addr))
     {
 	srcentry_ptr->upstream=v->uv_pim_neighbors;
  	return (TRUE);
@@ -234,9 +234,9 @@ set_incoming(srcentry_ptr, srctype)
 
     for (n = v->uv_pim_neighbors; n != NULL; n = n->next)
     {
-	if (inet6_lessthan(&neighbor_addr,&n->address))
+	if (inet6_lessthan(&neighbor_addr, &n->address))
 	    continue;
-	if (inet6_equal(&neighbor_addr,&n->address))
+	if (inet6_equal(&neighbor_addr, &n->address))
 	{
 	    /*
 	     * The upstream router is found in the list of neighbors. We are
