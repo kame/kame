@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.68 2001/06/02 17:36:06 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.69 2001/06/03 06:42:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.68 2001/06/02 17:36:06 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.69 2001/06/03 06:42:16 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -1542,6 +1542,14 @@ rtrecv()
 			len, (u_long)sizeof(*rtm));
 		return;
 	}
+	if (dflag >= 2) {
+		fprintf(stderr, "rtmsg:\n");
+		for (i = 0; i < len; i++) {
+			fprintf(stderr, "%02x ", buf[i] & 0xff);
+			if (i % 16 == 15) fprintf(stderr, "\n");
+		}
+		fprintf(stderr, "\n");
+	}
 
 	for (p = buf; p - buf < len; p += ((struct rt_msghdr *)p)->rtm_msglen) {
 		/* safety against bogus message */
@@ -2006,14 +2014,8 @@ ifrt(ifcp, again)
 			np = &rrt->rrt_info;
 			search_rrt = rtsearch(np, &prev_rrt);
 			if (search_rrt != NULL) {
-				if (search_rrt->rrt_info.rip6_metric >
+				if (search_rrt->rrt_info.rip6_metric <=
 				    rrt->rrt_info.rip6_metric) {
-					if (prev_rrt)
-						prev_rrt->rrt_next = rrt->rrt_next;
-					else
-						riprt = rrt->rrt_next;
-					delroute(&rrt->rrt_info, &rrt->rrt_gw);
-				} else {
 					/* Already have better route */
 					if (!again) {
 						trace(1, "route: %s/%d: "
@@ -2023,6 +2025,12 @@ ifrt(ifcp, again)
 					}
 					goto next;
 				}
+
+				if (prev_rrt)
+					prev_rrt->rrt_next = rrt->rrt_next;
+				else
+					riprt = rrt->rrt_next;
+				delroute(&rrt->rrt_info, &rrt->rrt_gw);
 			}
 			/* Attach the route to the list */
 			trace(1, "route: %s/%d: register route (%s)\n",
