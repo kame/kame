@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: setkey.c,v 1.4 1999/10/25 13:30:22 sakane Exp $ */
+/* KAME $Id: setkey.c,v 1.5 1999/10/26 09:39:37 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -87,7 +87,7 @@ extern int parse __P((FILE **));
 void
 Usage()
 {
-	printf("Usage:\t%s [-dv] -c", pname);
+	printf("Usage:\t%s [-dv] -c\n", pname);
 	printf("\t%s [-dv] -f (file)\n", pname);
 	printf("\t%s [-Padlv] -D\n", pname);
 	printf("\t%s [-Pdv] -F\n", pname);
