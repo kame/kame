@@ -22,10 +22,7 @@ option		SCTP		# adds SCTP stack to kernel - requires INET6
 
 # Mobile IPv6
 #option		MIP6
-#option		MIP6_HOME_AGENT
-#option		MIP6_MOBILE_NODE
-#pseudo-device	hif	1
-#option		MIP6_NOHAIPSEC
+#pseudo-device	mip	1
 #option		MIP6_DEBUG
 
 # Datagram Congestion Control Protocol

@@ -132,7 +132,8 @@ struct	linger {
 #define AF_KEY		30
 #define pseudo_AF_HDRCMPLT 31		/* Used by BPF to not rewrite headers
 					   in interface output routine */
-#define	AF_MAX		32
+#define AF_MOBILITY	32
+#define	AF_MAX		33
 
 /*
  * Structure used by kernel to store most
@@ -210,6 +211,7 @@ struct sockproto {
 #define	PF_SIP		AF_SIP
 #define PF_KEY		AF_KEY
 #define PF_BPF		pseudo_AF_HDRCMPLT
+#define PF_MOBILITY	AF_MOBILITY
 #define	PF_MAX		AF_MAX
 
 /*

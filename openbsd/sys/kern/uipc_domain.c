@@ -114,6 +114,9 @@ domaininit()
 	ADDDOMAIN(key);
 #endif
 #endif
+#ifdef MIP6
+	ADDDOMAIN(mip);
+#endif
 	ADDDOMAIN(route);
 #endif
 

@@ -1606,7 +1606,104 @@ ipsp_parse_headers(struct mbuf *m, int off, u_int8_t proto)
 }
 #endif /* notyet */
 
-#if (defined(MIP6_HOME_AGENT) || defined(MIP6_MOBILE_NODE)) && !defined(MIP6_NOHAIPSEC)
+#if MIP6
+struct update_db_addrs {
+	struct sockaddr_in6 *haddr;
+	struct sockaddr_in6 *ocoa;
+	struct sockaddr_in6 *ncoa;
+	struct sockaddr_in6 *haaddr;
+	int node;
+#define HA_DB	1
+#define MN_DB	0
+};
+
+static int update_walker(struct tdb *tdbp, void *addrs, int last);
+
+
+static int
+update_walker(struct tdb *tdbp, void *addrs, int last)
+{
+	u_int32_t hashval;
+	struct tdb *tdbpp;
+	struct update_db_addrs *update_db_addrs = addrs;
+
+	/* check addresses. */
+	if (tdbp->tdb_src.sa.sa_family != AF_INET6 ||
+	    tdbp->tdb_dst.sa.sa_family != AF_INET6)
+		return (0);
+
+	if (!(tdbp->tdb_flags & TDBF_TUNNELING))
+		return (0);
+	if (update_db_addrs->node) {
+		if (!IN6_ARE_ADDR_EQUAL(&update_db_addrs->haddr->sin6_addr, &tdbp->tdb_src.sin6.sin6_addr))
+			return (0);
+		if (!IN6_ARE_ADDR_EQUAL(&update_db_addrs->ocoa->sin6_addr, &tdbp->tdb_dst.sin6.sin6_addr))
+			return (0);
+	} else {
+	}
+
+
+	hashval = tdb_hash(tdbp->tdb_spi, &tdbp->tdb_dst, tdbp->tdb_sproto);
+
+	if (tdbh[hashval] == tdbp) {
+		tdbpp = tdbp;
+		tdbh[hashval] = tdbp->tdb_hnext;
+	} else {
+		for (tdbpp = tdbh[hashval]; tdbpp != NULL;
+		    tdbpp = tdbpp->tdb_hnext) {
+			if (tdbpp->tdb_hnext == tdbp) {
+				tdbpp->tdb_hnext = tdbp->tdb_hnext;
+				tdbpp = tdbp;
+				break;
+			}
+		}
+	}
+
+	tdbp->tdb_hnext = NULL;
+
+	hashval = tdb_hash(0, &tdbp->tdb_dst, tdbp->tdb_sproto);
+
+	if (tdbaddr[hashval] == tdbp) {
+		tdbpp = tdbp;
+		tdbaddr[hashval] = tdbp->tdb_anext;
+	} else {
+		for (tdbpp = tdbaddr[hashval]; tdbpp != NULL;
+		    tdbpp = tdbpp->tdb_anext) {
+			if (tdbpp->tdb_anext == tdbp) {
+				tdbpp->tdb_anext = tdbp->tdb_anext;
+				tdbpp = tdbp;
+				break;
+			}
+		}
+	}
+
+	hashval = tdb_hash(0, &tdbp->tdb_src, tdbp->tdb_sproto);
+
+	if (tdbsrc[hashval] == tdbp) {
+		tdbpp = tdbp;
+		tdbsrc[hashval] = tdbp->tdb_snext;
+	}
+	else {
+		for (tdbpp = tdbsrc[hashval]; tdbpp != NULL;
+		    tdbpp = tdbpp->tdb_snext) {
+			if (tdbpp->tdb_snext == tdbp) {
+				tdbpp->tdb_snext = tdbp->tdb_snext;
+				tdbpp = tdbp;
+				break;
+			}
+		}
+	}
+
+	if (update_db_addrs->node) {
+		bcopy(update_db_addrs->ncoa, &tdbp->tdb_dst.sin6, update_db_addrs->ncoa->sin6_len);
+	} else {
+	}
+	puttdb(tdbp);
+	tdb_count--;
+
+	return (0);
+}
+
 int
 key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 	struct sockaddr_in6 *haddr;
@@ -1630,8 +1727,13 @@ key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr)
 	struct sockaddr_in6 *haaddr;
 {	
 	int s = spltdb();
+	struct update_db_addrs addrs;
 
-	/* To be written soon */
+	addrs.haddr = haddr;
+	addrs.ocoa = ocoa;
+	addrs.ncoa = ncoa;
+	addrs.haaddr = haaddr;
+	tdb_walk(update_walker, &addrs);
 
 	splx(s);
 	return (0);

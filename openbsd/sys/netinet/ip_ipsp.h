@@ -623,6 +623,10 @@ extern int ipcomp4_input_cb(struct mbuf *, ...);
 #ifdef INET6
 extern int ipcomp6_input(struct mbuf **, int *, int);
 extern int ipcomp6_input_cb(struct mbuf *, int, int);
+#ifdef MIP6
+int key_mip6_update_mobile_node_ipsecdb(struct sockaddr_in6 *, struct sockaddr_in6 *, struct sockaddr_in6 *, struct sockaddr_in6 *);
+int key_mip6_update_home_agent_ipsecdb(struct sockaddr_in6 *, struct sockaddr_in6 *, struct sockaddr_in6 *, struct sockaddr_in6 *);
+#endif /* MIP6 */
 #endif /* INET6 */
 
 /* XF_TCPSIGNATURE */

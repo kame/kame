@@ -220,6 +220,7 @@ struct rt_msghdr {
 #define RTM_DELADDR	0xd	/* address being removed from iface */
 #define RTM_IFINFO	0xe	/* iface going up/down etc. */
 #define RTM_IFANNOUNCE	0xf	/* iface arrival/departure */
+#define	RTM_ADDRINFO	0x10	/* change address flags */
 
 #define RTV_MTU		0x1	/* init or lock _mtu */
 #define RTV_HOPCOUNT	0x2	/* init or lock _hopcount */
@@ -337,6 +338,7 @@ int	 route_output(struct mbuf *, ...);
 int	 route_usrreq(struct socket *, int, struct mbuf *,
 			   struct mbuf *, struct mbuf *);
 void	 rt_ifmsg(struct ifnet *);
+void	 rt_addrinfomsg __P((struct ifaddr *));
 void	 rt_ifannouncemsg(struct ifnet *, int);
 void	 rt_maskedcopy(struct sockaddr *,
 	    struct sockaddr *, struct sockaddr *);

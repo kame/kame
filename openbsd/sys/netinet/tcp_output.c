@@ -98,17 +98,6 @@
 #include <netinet6/in6_var.h>
 #endif /* INET6 */
 
-#if defined(INET6) && defined(MIP6)
-#include <netinet/ip6mh.h>
-#include <netinet6/mip6.h>
-#include <netinet6/mip6_var.h>
-#include <netinet6/mip6_cncore.h>
-#endif /* INET6 && MIP6 */
-
-#if defined(INET6) && defined(MIP6)
-static int mip6_hdrsiz_tcp(struct tcpcb *);
-#endif /* INET6 && MIP6 */
-
 #ifdef notyet
 extern struct mbuf *m_copypack();
 #endif
@@ -540,9 +529,6 @@ send:
 #ifdef INET6
 	case PF_INET6:
 		hdrlen = sizeof(struct ip6_hdr) + sizeof(struct tcphdr);
-#ifdef MIP6
-		hdrlen += mip6_hdrsiz_tcp(tp);
-#endif /* MIP6 */
 		break;
 #endif /* INET6 */
 	default:
@@ -1191,17 +1177,3 @@ tcp_setpersist(struct tcpcb *tp)
 	if (tp->t_rxtshift < TCP_MAXRXTSHIFT)
 		tp->t_rxtshift++;
 }
-
-#if defined(INET6) && defined(MIP6)
-static int
-mip6_hdrsiz_tcp(tp)
-	struct tcpcb *tp;
-{
-	struct inpcb *inp;
-
-	if ((tp == NULL) || ((inp = tp->t_inpcb) == NULL))
-		return (0);
-
-	return (mip6_exthdr_size(&inp->inp_laddr6, &inp->inp_faddr6));
-}
-#endif /* INET6 && MIP6 */

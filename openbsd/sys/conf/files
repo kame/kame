@@ -397,7 +397,7 @@ pseudo-device crypto: ifnet
 pseudo-device dummy: ifnet
 pseudo-device ist: ifnet
 pseudo-device stf: ifnet
-pseudo-device hif: ifnet
+pseudo-device mip: ifnet
 
 pseudo-device altq: ifnet
 
@@ -681,7 +681,7 @@ file net/if_arcsubr.c			arc			needs-flag
 file net/if_atmsubr.c			atm			needs-flag
 file net/if_ethersubr.c			ether | inet | fddi | token needs-flag
 file net/if_fddisubr.c			fddi
-file net/if_hif.c			hif			needs-count
+file net/if_mip.c			mip			needs-count
 file net/if_spppsubr.c			sppp
 file net/if_loop.c			loop
 file net/if_media.c			ifmedia
@@ -708,6 +708,7 @@ file net/rtsock.c
 file net/slcompress.c			sl | ppp | strip
 file net/if_enc.c			enc			needs-count
 file net/if_gre.c			gre			needs-count
+file net/mipsock.c			mip6
 #file net/if_ieee1394subr.c		ieee1394
 file net80211/ieee80211.c		wlan
 file net80211/ieee80211_compat.c	wlan
@@ -942,14 +943,7 @@ file netinet6/ip6_forward.c		inet6
 file netinet6/ip6_mroute.c		inet6
 file netinet6/ip6_output.c		inet6
 file netinet6/route6.c			inet6
-file netinet6/mobility6.c		inet6 & mip6
-file netinet6/mip6_cncore.c		inet6 & mip6
-file netinet6/mip6_icmp6.c		inet6 & mip6
-file netinet6/mip6_hacore.c		inet6 & mip6 & mip6_home_agent
-file netinet6/mip6_mncore.c		inet6 & mip6 & mip6_mobile_node
-file netinet6/mip6_prefix.c		inet6 & mip6 & mip6_mobile_node
-file netinet6/mip6_halist.c		inet6 & mip6 & mip6_mobile_node
-file netinet6/mip6_fsm.c		inet6 & mip6 & mip6_mobile_node
+file netinet6/mip6.c			inet6 & mip6
 file netinet6/mld6.c			inet6
 file netinet6/mldv2.c			inet6 & mldv2
 file netinet6/nd6.c			inet6

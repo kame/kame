@@ -789,6 +789,35 @@ rt_ifannouncemsg(struct ifnet *ifp, int what)
 }
 
 /*
+ * This routine is called to generate a message from the routing
+ * socket indicating that the status of a address has changed.
+ */
+void
+rt_addrinfomsg(ifa)
+	register struct ifaddr *ifa;
+{
+	struct ifnet *ifp = ifa->ifa_ifp;
+	struct ifa_msghdr *ifam;
+	struct mbuf *m;
+	struct rt_addrinfo info;
+
+	if (route_cb.any_count == 0)
+		return;
+	bzero((caddr_t)&info, sizeof(info));
+	info.rti_info[RTAX_IFA] = ifa->ifa_addr;
+	m = rt_msg1(RTM_ADDRINFO, &info);
+	if (m == 0)
+		return;
+	ifam = mtod(m, struct ifa_msghdr *);
+	ifam->ifam_index = ifp->if_index;
+	ifam->ifam_metric = ifa->ifa_metric;
+	ifam->ifam_flags = ifa->ifa_flags;
+	ifam->ifam_addrs = info.rti_addrs;
+	route_proto.sp_protocol = 0;
+	raw_input(m, &route_proto, &route_src, &route_dst);
+}
+
+/*
  * This is used in dumping the kernel table via sysctl().
  */
 int
