@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_socket2.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/uipc_socket2.c,v 1.55 2000/03/03 11:13:05 shin Exp $
+ * $FreeBSD: src/sys/kern/uipc_socket2.c,v 1.55.2.7 2000/09/07 19:13:37 truckman Exp $
  */
 
 #include "opt_param.h"
@@ -51,6 +51,7 @@
 #include <sys/signalvar.h>
 #include <sys/sysctl.h>
 #include <sys/aio.h> /* for aio_swake proto */
+#include <sys/event.h>
 
 int	maxsockets;
 
@@ -103,13 +104,21 @@ soisconnecting(so)
 
 void
 soisconnected(so)
-	register struct socket *so;
+	struct socket *so;
 {
-	register struct socket *head = so->so_head;
+	struct socket *head = so->so_head;
 
 	so->so_state &= ~(SS_ISCONNECTING|SS_ISDISCONNECTING|SS_ISCONFIRMING);
 	so->so_state |= SS_ISCONNECTED;
 	if (head && (so->so_state & SS_INCOMP)) {
+		if ((so->so_options & SO_ACCEPTFILTER) != 0) {
+			so->so_upcall = head->so_accf->so_accept_filter->accf_callback;
+			so->so_upcallarg = head->so_accf->so_accept_filter_arg;
+			so->so_rcv.sb_flags |= SB_UPCALL;
+			so->so_options &= ~SO_ACCEPTFILTER;
+			so->so_upcall(so, so->so_upcallarg, 0);
+			return;
+		}
 		TAILQ_REMOVE(&head->so_incomp, so, so_list);
 		head->so_incqlen--;
 		so->so_state &= ~SS_INCOMP;
@@ -340,6 +349,7 @@ sowakeup(so, sb)
 		(*so->so_upcall)(so, so->so_upcallarg, M_DONTWAIT);
 	if (sb->sb_flags & SB_AIO)
 		aio_swake(so, sb);
+	KNOTE(&sb->sb_sel.si_note, 0);
 }
 
 /*
@@ -410,7 +420,6 @@ sbreserve(sb, cc, so, p)
 	struct socket *so;
 	struct proc *p;
 {
-	rlim_t delta;
 
 	/*
 	 * p will only be NULL when we're in an interrupt
@@ -418,12 +427,10 @@ sbreserve(sb, cc, so, p)
 	 */
 	if ((u_quad_t)cc > (u_quad_t)sb_max * MCLBYTES / (MSIZE + MCLBYTES))
 		return (0);
-	delta = (rlim_t)cc - sb->sb_hiwat;
-	if (p && delta >= 0 && chgsbsize(so->so_cred->cr_uid, 0) + delta >
-	    p->p_rlimit[RLIMIT_SBSIZE].rlim_cur)
+	if (!chgsbsize(so->so_cred->cr_uidinfo, &sb->sb_hiwat, cc,
+	    p ? p->p_rlimit[RLIMIT_SBSIZE].rlim_cur : RLIM_INFINITY)) {
 		return (0);
-	(void)chgsbsize(so->so_cred->cr_uid, delta);
-	sb->sb_hiwat = cc;
+	}
 	sb->sb_mbmax = min(cc * sb_efficiency, sb_max);
 	if (sb->sb_lowat > sb->sb_hiwat)
 		sb->sb_lowat = sb->sb_hiwat;
@@ -440,8 +447,9 @@ sbrelease(sb, so)
 {
 
 	sbflush(sb);
-	(void)chgsbsize(so->so_cred->cr_uid, -(rlim_t)sb->sb_hiwat);
-	sb->sb_hiwat = sb->sb_mbmax = 0;
+	(void)chgsbsize(so->so_cred->cr_uidinfo, &sb->sb_hiwat, 0,
+	    RLIM_INFINITY);
+	sb->sb_mbmax = 0;
 }
 
 /*
