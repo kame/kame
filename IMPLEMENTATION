@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/12/19 04:11:07 $
+			$Date: 1999/12/20 08:23:13 $
 
 1. IPv6
 
@@ -706,11 +706,13 @@ namely:
 
 KAME/OpenBSD uses NRL-based TCP/UDP stack and inpcb source code,
 which was derived from NRL IPv6/IPsec stack.  However, KAME/OpenBSD
-disables AF_INET6 wildcard bind for security reasons (if AF_INET6 wildcard
-bind is allowed, access control will become much harder) unlike
-KAME/BSDI4.
-As a result the behavior is similar to KAME/BSDI3 and KAME/FreeBSD228
-(see 1.12.1 for more detail).
+disables special behavior on AF_INET6 wildcard bind for security reasons
+(if IPv4 traffic toward AF_INET6 wildcard bind is allowed, access control
+will become much harder).  KAME/BSDI4 uses NRL-based TCP/UDP stack as well,
+however, the behavior is different.
+
+As a result the behavior of KAME/OpenBSD is similar to KAME/BSDI3 and
+KAME/FreeBSD228 (see 1.12.1 for more detail).
 
 1.12.7 configuration and implementation
 
