@@ -1128,18 +1128,6 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPV6CTL_STATS:
 		return sysctl_rdtrunc(oldp, oldlenp, newp, &ip6stat,
 		    sizeof(ip6stat));
-#if 0
-	case IPV6CTL_FORWARDING:
-	    {
-		int error, old;
-
-		old = ip6_forwarding;
-		error = sysctl_int_arr(ip6_sysvars, name, namelen,
-		    oldp, oldlenp, newp, newlen);
-		ip6_check_forwarding(old, ip6_forwarding);
-		return error;
-	    }
-#endif
 	case IPV6CTL_KAME_VERSION:
 		return sysctl_rdstring(oldp, oldlenp, newp, __KAME_VERSION);
 	default:
