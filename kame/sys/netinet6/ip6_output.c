@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.454 2004/07/14 02:20:54 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.455 2004/07/14 02:23:30 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1273,6 +1273,10 @@ skip_ipsec2:;
 	if ((error = ip6_getpmtu(ro_pmtu, ro, ifp, &finaldst, &mtu,
 	    &alwaysfrag)) != 0)
 		goto bad;
+#ifdef IPSEC
+	if (needipsectun)
+		mtu = IPV6_MMTU;
+#endif
 
 	/*
 	 * The caller of this function may specify to use the minimum MTU
