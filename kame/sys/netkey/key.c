@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.282 2003/06/27 07:00:20 sakane Exp $	*/
+/*	$KAME: key.c,v 1.283 2003/06/27 07:11:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3913,7 +3913,7 @@ key_setsadbxtag(tag)
 
 	bzero(p, len);
 	p->sadb_x_tag_len = PFKEY_UNIT64(len);
-	p->sadb_x_tag_exttype = SADB_X_EXT_SA2;
+	p->sadb_x_tag_exttype = SADB_X_EXT_TAG;
 	pf_tag2tagname(tag, p->sadb_x_tag_name);
 
 	return m;
