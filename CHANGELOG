@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2666 2004/09/07 05:15:13 jinmei Exp $
+$KAME: CHANGELOG,v 1.2667 2004/09/14 08:09:15 jinmei Exp $
 
 <200409>
 2004-09-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -324,7 +324,7 @@ Wed May 26 11:58:56 JST 2004  itojun@iijlab.net
 	setsockopt().
 
 2004-04-20  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
-	* kame/sys/netinet6/icmp6.c: ICMPv6 packets regarding multicast 
+	* kame/sys/netinet6/icmp6.c: ICMPv6 packets regarding multicast
 	routing (e.g. MLDv1 report) shouldn't be a target of MSF, although
 	draft-vida-mld-v2-08.txt says only MLDv2 is such exception.
 	(otherwise multicast routing process cannot receive such packets,
@@ -359,7 +359,7 @@ Wed May 26 11:58:56 JST 2004  itojun@iijlab.net
 
 2004-04-15  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/netinet/icmp6.h: ICMPv6 Type number of MLDv2-Listener-
-	REPORT has been changed to the official one (=143)! 
+	REPORT has been changed to the official one (=143)!
 
 2004-04-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c (getaddrinfo): clean-up:
@@ -396,7 +396,7 @@ Fri Apr  2 17:35:45 JST 2004 sakane@kame.net
 
 Fri Apr  2 16:27:00 JST 2004 sakane@kame.net
 	* kame/kame/tcpdump/print-isakmp.c:
-	fixed that there was a possibility tcpdump(8) fell into infinite loop. 
+	fixed that there was a possibility tcpdump(8) fell into infinite loop.
 	and the problem was at print-isakmp.c, so racoon also fell into it
 	when the debug option was used.
 
@@ -435,7 +435,7 @@ Wed Mar 31 15:47:19 JST 2004 sakane@kame.net
 	the option and the lifetime expires.
 
 2004-03-19  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
-	* kame/kame/mld6query: to receive an MLD report for any group, 
+	* kame/kame/mld6query: to receive an MLD report for any group,
 	it behaves like an IPv6 multicast daemon, instead of joining to ::.
 	If cannot, just transmits MLDv1 Queries.
 
