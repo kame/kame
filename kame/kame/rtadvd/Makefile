@@ -30,12 +30,15 @@ CFLAGS+=-DINET6
 .else
 CPPFLAGS+=-DINET6
 .endif
+.if exists(/usr/local/v6/lib/libinet6.a)
 LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
-	-L/usr/local/v6/lib -linet6 -lcompat
+	-L/usr/local/v6/lib -linet6
 DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
 	${.OBJDIR}/../libinet6/obj/libinet6.a \
-	/usr/local/v6/lib/libinet6.a \
-	${LIBCOMPAT}
+	/usr/local/v6/lib/libinet6.a
+.endif
+LDADD+=	-lcompat
+DPADD+=	${LIBCOMPAT}
 
 .if (${OPSYS} != "NetBSD")
 MAN5=	rtadvd.conf.5

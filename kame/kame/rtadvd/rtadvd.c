@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.46 2000/11/11 16:37:07 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.47 2001/01/15 05:50:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -68,6 +68,7 @@ static size_t rcvcmsgbuflen;
 static u_char *sndcmsgbuf = NULL;
 static size_t sndcmsgbuflen;
 static int do_dump;
+static int do_die;
 struct msghdr sndmhdr;
 struct iovec rcviov[2];
 struct iovec sndiov[2];
@@ -122,7 +123,8 @@ u_int32_t ndopt_flags[] = {
 };
 
 int main __P((int, char *[]));
-static void die __P((int));
+static void set_die __P((int));
+static void die __P((void));
 static void sock_open __P((void));
 static void rtsock_open __P((void));
 static void rtadvd_input __P((void));
@@ -252,7 +254,7 @@ main(argc, argv)
 	if (rtsock > sock)
 		maxfd = rtsock;
 
-	signal(SIGTERM, (void *)die);
+	signal(SIGTERM, (void *)set_die);
 	signal(SIGUSR1, (void *)rtadvd_set_dump_file);
 
 	while (1) {
@@ -261,6 +263,11 @@ main(argc, argv)
 		if (do_dump) {	/* SIGUSR1 */
 			do_dump = 0;
 			rtadvd_dump_file(dumpfilename);
+		}
+
+		if (do_die) {
+			die();
+			/*NOTREACHED*/
 		}
 
 		/* timer expiration check and reset the timer */
@@ -304,8 +311,14 @@ rtadvd_set_dump_file()
 }
 
 static void
-die(sig)
+set_die(sig)
 	int sig;
+{
+	do_die = 1;
+}
+
+static void
+die()
 {
 	struct rainfo *ra;
 	int i;
