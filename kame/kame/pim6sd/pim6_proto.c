@@ -3658,7 +3658,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 				    MIFF_REGISTER | VIFF_TUNNEL | VIFF_NONBRS))
 	    continue;
 
-	bcopy(pim_message, (char *) (pim6_send_buf), datalen);
+	bcopy(pim_message, (char *)(pim6_send_buf), datalen);
 
 	send_pim6(pim6_send_buf, &uvifs[mifi].uv_linklocal->pa_addr,
 		  &allpim6routers_group, PIM_BOOTSTRAP,
@@ -3714,9 +3714,9 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 		if (data_ptr + PIM6_ENCODE_UNI_ADDR_LEN + sizeof(u_int32_t)
 		    > max_data_ptr) {
 		    log(LOG_NOTICE, 0,
-			"receive_pim6_bootstrap: Bootstrap from %s does not "
-			"have enough length to contatin RP information",
-			inet6_fmt(&src->sin6_addr));
+			"receive_pim6_bootstrap: Bootstrap from %s on %s " 
+			"does not have enough length to contatin RP information",
+			inet6_fmt(&src->sin6_addr), v->uv_name);
 
 		    /*
 		     * Ignore the rest of the message.
@@ -3771,13 +3771,10 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 		    & curr_group_mask.s6_addr[i];
 	}
 	
-
 	for (grp_mask_ptr = segmented_grp_mask_list;
 	     grp_mask_ptr != (grp_mask_t *) NULL;
 	     grp_mask_ptr = grp_mask_ptr->next)
 	{
-
-
 	    for (i = 0; i < sizeof(struct in6_addr); i++) {
 		prefix_h2.sin6_addr.s6_addr[i] =
 		    grp_mask_ptr->group_addr.sin6_addr.s6_addr[i]
@@ -3790,12 +3787,12 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 		break;
 	}
 	if ((grp_mask_ptr != (grp_mask_t *) NULL)
-	    && (IN6_ARE_ADDR_EQUAL(&grp_mask_ptr->group_addr.sin6_addr,&curr_group_addr.mcast_addr))
-	    && (IN6_ARE_ADDR_EQUAL(&grp_mask_ptr->group_mask,&curr_group_mask))
+	    && (IN6_ARE_ADDR_EQUAL(&grp_mask_ptr->group_addr.sin6_addr,
+				   &curr_group_addr.mcast_addr))
+	    && (IN6_ARE_ADDR_EQUAL(&grp_mask_ptr->group_mask, &curr_group_mask))
 	    && (grp_mask_ptr->group_rp_number + curr_frag_rp_count
 		== curr_rp_count))
 	{
-
 	    /* All missing PRs have arrived. Add all RP entries */
 	    while (curr_frag_rp_count--)
 	    {

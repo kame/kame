@@ -403,7 +403,6 @@ add_grp_mask(used_grp_mask_list, group_addr, group_mask, hash_mask)
  * grp_mask may be required by the addition of the new entry!!! Remapping all
  * groups might be a costly process...
  */
-
 rp_grp_entry_t *
 add_rp_grp_entry(used_cand_rp_list, used_grp_mask_list,
 		 rp_addr, rp_priority, rp_holdtime, group_addr, group_mask,
