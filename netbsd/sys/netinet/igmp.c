@@ -394,9 +394,9 @@ igmp_input(m, va_alist)
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct ip *ip = mtod(m, struct ip *);
 	struct igmp *igmp;
-#ifdef m_pulldown
+#ifdef PULLDOWN_TEST
 	struct mbuf *n;
-	int *offp;
+	int off;
 #endif
 	int query_ver;
 	struct in_multi *inm;
@@ -425,13 +425,13 @@ igmp_input(m, va_alist)
 	}
 	igmplen = ip->ip_len - iphlen;
 #ifdef m_pulldown
-	if ((n = m_pulldown(m, iphlen, igmplen, offp)) == NULL) {
+	if ((n = m_pulldown(m, iphlen, igmplen, &off)) == NULL) {
 		++igmpstat.igps_rcv_query_fails;
 		m_freem(m);
 		return;
 	}
 
-	igmp = (struct igmp *)(mtod(n, caddr_t) + *offp);
+	igmp = (struct igmp *)(mtod(n, caddr_t) + off);
 	/* No need to assert alignment here. */
 	if (in_cksum(n, igmplen)) {
 		++igmpstat.igps_rcv_badsum;
