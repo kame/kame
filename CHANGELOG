@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2444 2003/07/28 05:43:54 keiichi Exp $
+$KAME: CHANGELOG,v 1.2445 2003/07/28 11:07:10 keiichi Exp $
 
 <200307>
+Mon Jul 28 20:03:46 JST 2003	keiichi@iij.ad.jp
+	* kame/sys/netinet6/mip6_cncore.c,mip6_mncore.[hc],in6.c,nd6_rtr.c
+	  kame/sys/net/if_hif.[hc]
+	assign a CoA separately for each home interface, since a home
+	interface is logically independent from each other.
+
 Mon Jul 28 14:38:11 JST 2003	keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6_hacore.c,mip6_cncore.c:
 	- fixed a bug not sending a binding ack when DAD for a link-local
