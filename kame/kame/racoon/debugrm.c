@@ -1,4 +1,4 @@
-/*	$KAME: debugrm.c,v 1.4 2001/11/26 16:54:29 sakane Exp $	*/
+/*	$KAME: debugrm.c,v 1.5 2001/12/07 21:37:07 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -52,7 +52,7 @@ struct drm_list_t {
 };
 static struct drm_list_t drmlist[DRMLISTSIZE];
 
-static int drm_illegal;
+static int drm_unknown;
 
 static void DRM_add __P((void *, char *));
 static void DRM_del __P((void *));
@@ -62,7 +62,7 @@ void
 DRM_init()
 {
 	int i;
-	drm_illegal = 0;
+	drm_unknown = 0;
 	for (i = 0; i < sizeof(drmlist)/sizeof(drmlist[0]); i++)
 		drmlist[i].ptr = 0;
 }
@@ -76,7 +76,7 @@ DRM_dump()
 	fp = fopen(DRMDUMPFILE, "w");
 	if (fp == NULL)
 		err(1, "fopen");	/*XXX*/
-	fprintf(fp, "drm_illegal=%d\n", drm_illegal);
+	fprintf(fp, "drm_unknown=%d\n", drm_unknown);
 	for (i = 0; i < sizeof(drmlist)/sizeof(drmlist[0]); i++) {
 		if (drmlist[i].ptr)
 			fprintf(fp, "%s\n", drmlist[i].msg);
@@ -114,7 +114,7 @@ DRM_del(p)
 			return;
 		}
 	}
-	drm_illegal++;
+	drm_unknown++;
 }
 
 static void
