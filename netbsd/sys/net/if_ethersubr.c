@@ -177,6 +177,9 @@ ether_output(ifp, m0, dst, rt0)
 #ifdef NETATALK
 	struct at_ifaddr *aa;
 #endif /* NETATALK */
+#ifdef ALTQ
+	struct pr_hdr pr_hdr;
+#endif
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
@@ -213,6 +216,14 @@ ether_output(ifp, m0, dst, rt0)
 			    time.tv_sec < rt->rt_rmx.rmx_expire)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
+#ifdef ALTQ
+	/*
+	 * save a pointer to the protocol level header before adding
+	 * link headers.
+	 */
+	pr_hdr.ph_family = dst->sa_family;
+	pr_hdr.ph_hdr = mtod(m, caddr_t);
+#endif /* ALTQ */
 	switch (dst->sa_family) {
 
 #ifdef INET
@@ -459,6 +470,22 @@ ether_output(ifp, m0, dst, rt0)
 	else
 	 	bcopy(LLADDR(ifp->if_sadl), (caddr_t)eh->ether_shost,
 		    sizeof(eh->ether_shost));
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+	        s = splimp();
+		error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr, ALTEQ_NORMAL);
+		splx(s);
+		if (error) {
+			IF_DROP(&ifp->if_snd);
+		}
+		else {
+		    ifp->if_obytes += m->m_pkthdr.len;
+		    if (m->m_flags & M_MCAST)
+		    	ifp->if_omcasts++;
+		}
+		return (error);
+	}
+#endif /* ALTQ */
 	s = splimp();
 	/*
 	 * Queue message on interface, and start output if interface
@@ -466,11 +493,17 @@ ether_output(ifp, m0, dst, rt0)
 	 */
 	if (IF_QFULL(&ifp->if_snd)) {
 		IF_DROP(&ifp->if_snd);
+#ifdef ALTQ_ACCOUNT
+		ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCDROP);
+#endif
 		splx(s);
 		senderr(ENOBUFS);
 	}
 	ifp->if_obytes += m->m_pkthdr.len;
 	IF_ENQUEUE(&ifp->if_snd, m);
+#ifdef ALTQ_ACCOUNT
+	ALTQ_ACCOUNTING(ifp, m, &pr_hdr, ALTEQ_ACCOK);
+#endif
 	if ((ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 	splx(s);

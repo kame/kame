@@ -117,6 +117,9 @@
 #undef vtophys
 #define	vtophys(va)	alpha_XXX_dmamap((vaddr_t)(va))
 #endif
+#ifdef ALTQ
+extern int altq_mkctlhdr __P((struct pr_hdr *));
+#endif
 
 /* number of transmit/receive buffers */
 #ifndef TL_NBUF 
@@ -442,6 +445,9 @@ tl_pci_attach(parent, self, aux)
 	ifp->if_start = tl_ifstart;
 	ifp->if_watchdog = tl_ifwatchdog;
 	ifp->if_timer = 0;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 	if_attach(ifp);
 	ether_ifattach(&(sc)->tl_if, (sc)->tl_enaddr);
 #if NBPFILTER > 0
@@ -1048,6 +1054,12 @@ tl_intr(v)
 				TL_HR_WRITE(sc, TL_HOST_CMD, HOST_CMD_GO);
 			}
 			sc->tl_if.if_timer = 0;
+#ifdef ALTQ
+			if (ALTQ_IS_ON(ifp)) {
+				tl_ifstart(&sc->tl_if);
+			}
+			else
+#endif
 			if (sc->tl_if.if_snd.ifq_head != NULL)
 				tl_ifstart(&sc->tl_if);
 			return 1;
@@ -1058,6 +1070,12 @@ tl_intr(v)
 		}
 #endif
 		sc->tl_if.if_timer = 0;
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			tl_ifstart(&sc->tl_if);
+		}
+		else
+#endif
 		if (sc->tl_if.if_snd.ifq_head != NULL)
 			tl_ifstart(&sc->tl_if);
 		break;
@@ -1255,6 +1273,12 @@ txloop:
 		return;
 	}
 	/* Grab a paquet for output */
+#ifdef ALTQ
+	if (ALTQ_IS_ON(ifp)) {
+		mb_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+	}
+	else
+#endif
 	IF_DEQUEUE(&ifp->if_snd, mb_head);
 	if (mb_head == NULL) {
 #ifdef TLDEBUG_TX
@@ -1516,6 +1540,18 @@ static void tl_ticks(v)
 				m->m_len = m->m_pkthdr.len =
 				    sizeof(struct ether_header) + 3;
 				s = splnet();
+#ifdef ALTQ
+				if (ALTQ_IS_ON(&sc->tl_if)) {
+					struct ifnet *ifp = &sc->tl_if;
+					struct pr_hdr pr_hdr;
+
+					/* fake a control type header */
+					altq_mkctlhdr(&pr_hdr);  
+					(void)(*ifp->if_altqenqueue)
+					      (ifp, m, &pr_hdr, ALTEQ_NORMAL);
+				}
+				else
+#endif /* ALTQ */
 				IF_PREPEND(&sc->tl_if.if_snd, m);
 				tl_ifstart(&sc->tl_if);
 				splx(s);

@@ -1053,6 +1053,13 @@ vr_start(ifp)
 		/*
 		 * Grab a packet off the queue.
 		 */
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			/* do not dequeue a packet at this point */
+			m0 = (*ifp->if_altqdequeue)(ifp, ALTDQ_PEEK);
+		}
+		else
+#endif
 		IF_DEQUEUE(&ifp->if_snd, m0);
 		if (m0 == NULL)
 			break;
@@ -1076,6 +1083,9 @@ vr_start(ifp)
 			if (m == NULL) {
 				printf("%s: unable to allocate Tx mbuf\n",
 				    sc->vr_dev.dv_xname);
+#ifdef ALTQ
+				if (!ALTQ_IS_ON(ifp))
+#endif
 				IF_PREPEND(&ifp->if_snd, m0);
 				break;
 			}
@@ -1085,12 +1095,18 @@ vr_start(ifp)
 					printf("%s: unable to allocate Tx "
 					    "cluster\n", sc->vr_dev.dv_xname);
 					m_freem(m);
+#ifdef ALTQ
+					if (!ALTQ_IS_ON(ifp))
+#endif
 					IF_PREPEND(&ifp->if_snd, m0);
 					break;
 				}
 			}
 			m_copydata(m0, 0, m0->m_pkthdr.len, mtod(m, caddr_t));
 			m->m_pkthdr.len = m->m_len = m0->m_pkthdr.len;
+#ifdef ALTQ
+			if (!ALTQ_IS_ON(ifp))
+#endif
 			m_freem(m0);
 			m0 = m;
 			error = bus_dmamap_load_mbuf(sc->vr_dmat,
@@ -1098,10 +1114,24 @@ vr_start(ifp)
 			if (error) {
 				printf("%s: unable to load Tx buffer, "
 				    "error = %d\n", sc->vr_dev.dv_xname, error);
+#ifdef ALTQ
+				if (ALTQ_IS_ON(ifp)) {
+					/* ick!  discard the new mbuf */
+					m_freem(m);
+				}
+				else
+#endif
 				IF_PREPEND(&ifp->if_snd, m0);
 				break;
 			}
 		}
+
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+			/* remove the peeked packet from the queue */
+			(void)(*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		}
+#endif
 
 		/* Sync the DMA map. */
 		bus_dmamap_sync(sc->vr_dmat, ds->ds_dmamap, 0,
@@ -1756,6 +1786,9 @@ vr_attach(parent, self, aux)
 	ifp->if_watchdog = vr_watchdog;
 	ifp->if_baudrate = 10000000;
 	bcopy(sc->vr_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	/*
 	 * Initialize MII/media info.

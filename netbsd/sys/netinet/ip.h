@@ -79,7 +79,7 @@ struct ip {
 #define	IPTOS_THROUGHPUT	0x08
 #define	IPTOS_RELIABILITY	0x04
 /*	IPTOS_LOWCOST		0x02 XXX */
-#if 1
+#if 1 /* ALTQ_ECN */
 /* ECN bits proposed by Sally Floyd */
 #define IPTOS_CE		0x01	/* congestion experienced */
 #define IPTOS_ECT		0x02	/* ECN-capable transport */

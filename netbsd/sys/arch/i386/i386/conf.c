@@ -354,6 +354,9 @@ struct cdevsw	cdevsw[] =
 	cdev_disk_init(NRAID,raid),	/* 62: RAIDframe disk driver */
 	cdev_esh_init(NESH, esh_fp),	/* 63: HIPPI (esh) raw device */
 	cdev_ugen_init(NUGEN,ugen),	/* 64: USB generic driver */
+#ifdef ALTQ
+	cdev_notdef(),			/* 65: ALTQ */
+#endif
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 

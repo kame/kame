@@ -139,6 +139,10 @@
 
 struct	ifnet loif[NLOOP];
 
+#ifdef ALTQ
+static void lo_altqstart __P((struct ifnet *));
+#endif
+
 void
 loopattach(n)
 	int n;
@@ -157,6 +161,10 @@ loopattach(n)
 		ifp->if_type = IFT_LOOP;
 		ifp->if_hdrlen = 0;
 		ifp->if_addrlen = 0;
+#ifdef ALTQ
+		ifp->if_start = lo_altqstart;
+		ifp->if_altqflags |= ALTQF_READY;
+#endif
 		if_attach(ifp);
 #if NBPFILTER > 0
 		bpfattach(&ifp->if_bpf, ifp, DLT_NULL, sizeof(u_int));
@@ -240,6 +248,35 @@ contiguousfail:
 
 	ifp->if_opackets++;
 	ifp->if_obytes += m->m_pkthdr.len;
+#ifdef ALTQ
+	/*
+	 * altq for loop is just for debugging.
+	 * only used when called for loop interface (not for
+	 * a simplex interface).
+	 */
+	if (ALTQ_IS_ON(ifp) && ifp->if_start == lo_altqstart) {
+		struct pr_hdr pr_hdr;
+		int32_t *afp;
+	        int error;
+
+		pr_hdr.ph_family = dst->sa_family;
+		pr_hdr.ph_hdr = mtod(m, caddr_t);
+
+		M_PREPEND(m, sizeof(int32_t), M_DONTWAIT);
+		if (m == 0)
+			return(ENOBUFS);
+		afp = mtod(m, int32_t *);
+		*afp = (int32_t)dst->sa_family;
+
+	        s = splimp();
+		error = (*ifp->if_altqenqueue)(ifp, m, &pr_hdr, ALTEQ_NORMAL);
+		splx(s);
+		if (error) {
+			IF_DROP(&ifp->if_snd);
+		}
+		return (error);
+	}
+#endif /* ALTQ */
 	switch (dst->sa_family) {
 
 #ifdef INET
@@ -299,6 +336,84 @@ contiguousfail:
 	splx(s);
 	return (0);
 }
+
+#ifdef ALTQ
+static void
+lo_altqstart(ifp)
+	struct ifnet *ifp;
+{
+	struct ifqueue *ifq;
+	struct mbuf *m;
+	int32_t af, *afp;
+	int s, isr;
+	
+	if (!ALTQ_IS_ON(ifp))
+		return;
+    
+	while (1) {
+		s = splimp();
+		m = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		splx(s);
+
+		if (m == NULL)
+			return;
+
+		afp = mtod(m, int32_t *);
+		af = *afp;
+		m_adj(m, sizeof(int32_t));
+
+		switch (af) {
+#ifdef INET
+		case AF_INET:
+			ifq = &ipintrq;
+			isr = NETISR_IP;
+			break;
+#endif
+#ifdef IPX
+		case AF_IPX:
+			ifq = &ipxintrq;
+			isr = NETISR_IPX;
+			break;
+#endif
+#ifdef NS
+		case AF_NS:
+			ifq = &nsintrq;
+			isr = NETISR_NS;
+			break;
+#endif
+#ifdef ISO
+		case AF_ISO:
+			ifq = &clnlintrq;
+			isr = NETISR_ISO;
+			break;
+#endif
+#ifdef NETATALK
+		case AF_APPLETALK:
+			ifq = &atintrq2;
+			isr = NETISR_ATALK;
+			break;
+#endif NETATALK
+		default:
+			printf("lo_altqstart: can't handle af%d\n", af);
+			m_freem(m);
+			return;
+		}
+
+		s = splimp();
+		if (IF_QFULL(ifq)) {
+			IF_DROP(ifq);
+			m_freem(m);
+			splx(s);
+			return;
+		}
+		IF_ENQUEUE(ifq, m);
+		schednetisr(isr);
+		ifp->if_ipackets++;
+		ifp->if_ibytes += m->m_pkthdr.len;
+		splx(s);
+	}
+}
+#endif /* ALTQ */
 
 /* ARGSUSED */
 void

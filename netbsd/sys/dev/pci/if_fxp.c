@@ -478,6 +478,9 @@ fxp_attach(parent, self, aux)
 	ifp->if_ioctl = fxp_ioctl;
 	ifp->if_start = fxp_start;
 	ifp->if_watchdog = fxp_watchdog;
+#ifdef ALTQ
+	ifp->if_altqflags |= ALTQF_READY;
+#endif
 
 	/*
 	 * Attach the interface.
@@ -738,14 +741,28 @@ fxp_start(ifp)
 	 * We're finished if there is nothing more to add to the list or if
 	 * we're all filled up with buffers to transmit.
 	 */
+#ifdef ALTQ
+	while (sc->tx_queued < FXP_NTXCB) {
+#else
 	while (ifp->if_snd.ifq_head != NULL && sc->tx_queued < FXP_NTXCB) {
+#endif
 		struct mbuf *mb_head;
 		int segment, error;
 
 		/*
 		 * Grab a packet to transmit.
 		 */
+#ifdef ALTQ
+		if (ALTQ_IS_ON(ifp)) {
+		    mb_head = (*ifp->if_altqdequeue)(ifp, ALTDQ_DEQUEUE);
+		}
+		else
+			IF_DEQUEUE(&ifp->if_snd, mb_head);
+		if (mb_head == NULL)
+			break;
+#else
 		IF_DEQUEUE(&ifp->if_snd, mb_head);
+#endif
 
 		/*
 		 * Get pointer to next available tx desc.
@@ -1019,6 +1036,11 @@ fxp_intr(arg)
 			/*
 			 * Try to start more packets transmitting.
 			 */
+#ifdef ALTQ
+			if (ALTQ_IS_ON(ifp))
+			        fxp_start(ifp);
+			else
+#endif
 			if (ifp->if_snd.ifq_head != NULL)
 				fxp_start(ifp);
 		}

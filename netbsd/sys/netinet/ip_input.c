@@ -193,6 +193,10 @@ int	ipprintfs = 0;
 
 struct rttimer_queue *ip_mtudisc_timeout_q = NULL;
 
+#ifdef ALTQ
+int (*altq_input) __P((struct mbuf *, int)) = NULL;
+#endif
+
 extern	struct domain inetdomain;
 extern	struct protosw inetsw[];
 u_char	ip_protox[IPPROTO_MAX];
@@ -402,6 +406,11 @@ ip_input(struct mbuf *m)
 		goto bad;
 	}
 
+#ifdef ALTQ
+	if (altq_input != NULL && (*altq_input)(m, AF_INET) == 0)
+		/* packet is dropped by traffic conditioner */
+		return;
+#endif
 	/*
 	 * Convert fields to host representation.
 	 */

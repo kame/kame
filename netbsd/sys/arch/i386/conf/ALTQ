@@ -1,0 +1,22 @@
+include	"arch/i386/conf/GENERIC"
+
+# a pseudo device needed for ALTQ
+pseudo-device	altq			# altq pseudo-device
+
+# ALTQ options
+options 	ALTQ		# alternate queueing
+options 	CBQ		#class based queueing
+options 	HFSC		#hierarchical fair service curve
+options 	WFQ		#weighted fair queueing
+options 	FIFOQ		#fifo queueing
+options 	RED		#random early detection
+options 	RIO		#twin red for diffserv (needs RED)
+options 	FLOWVALVE	#flowvalve for RED (needs RED)
+options 	CBQ_RED		#red for cbq (needs CBQ and RED)
+options 	CBQ_RIO		#rio for cbq (needs CBQ, RIO, RED, CBQ_RED)
+options 	LOCALQ		#local use
+options 	HFSC_RED	#red for hfsc (needs HFSC and RED)
+options 	HFSC_RIO	#rio for hfsc (needs HFSC, RIO, RED, HFSC_RED)
+options 	CDNR		#diffserv traffic conditioner
+options 	BLUE		#blue by wu-chang feng
+
