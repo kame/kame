@@ -186,6 +186,7 @@ pseudo-device sppp: ifnet
 pseudo-device faith: ifnet
 pseudo-device gif: ifnet
 pseudo-device dummy: ifnet
+pseudo-device stf: ifnet
 
 pseudo-device altq: ifnet
 
@@ -696,6 +697,7 @@ file netinet6/raw_ipv6.c		inet6
 file net/if_dummy.c			dummy			needs-count
 file net/if_faith.c			faith			needs-count
 file net/if_gif.c			gif			needs-count
+file net/if_stf.c			stf & inet & inet6	needs-flag
 file net/net_osdep.c
 file netinet/ip_ecn.c			inet | inet6
 file netinet/ip_encap.c			inet | inet6

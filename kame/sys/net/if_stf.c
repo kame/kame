@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.12 2000/03/12 00:06:14 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.13 2000/03/12 02:03:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -295,9 +295,15 @@ stf_getsrcifa6(ifp)
 #ifdef __NetBSD__
 		INADDR_TO_IA(in, ia4);
 #else
-
-		for (ia4 = in_ifaddr; ia4 != NULL; ia4 = ia4->ia_next) {
-			if (IA_SIN(ia4)->sin_addr.s_addr == in.s_addr)
+#ifdef __OpenBSD__
+		for (ia4 = in_ifaddr.tqh_first;
+		     ia4;
+		     ia4 = ia4->ia_list.tqe_next)
+#else
+		for (ia4 = in_ifaddr; ia4 != NULL; ia4 = ia4->ia_next)
+#endif
+		{
+			if (ia4->ia_addr.sin_addr.s_addr == in.s_addr)
 				break;
 		}
 #endif
