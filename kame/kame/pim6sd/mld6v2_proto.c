@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.20 2004/05/14 02:37:20 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.21 2004/05/23 15:35:59 suz Exp $
  */
 
 /*
@@ -935,7 +935,7 @@ mld_shift_to_v1mode(mifi, src, grp)
 update_timer:
 	if (g->al_timerid)
 		g->al_timerid = DeleteTimerV1compat(g->al_timerid);
-	SET_TIMER(g->al_timer, MLD6_LISTENER_INTERVAL);
+	SET_TIMER(g->al_timer, MLD6_OLDER_VERSION_HOST_PRESENT);
 	g->al_timerid = SetTimerV1compat(mifi, g);
 	return;
 }
