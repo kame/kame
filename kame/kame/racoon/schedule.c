@@ -1,4 +1,4 @@
-/*	$KAME: schedule.c,v 1.11 2000/10/04 03:30:43 itojun Exp $	*/
+/*	$KAME: schedule.c,v 1.12 2000/10/04 17:41:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: schedule.c,v 1.11 2000/10/04 03:30:43 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>

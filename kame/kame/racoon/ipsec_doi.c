@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.114 2000/10/03 23:44:41 itojun Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.115 2000/10/04 17:40:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.114 2000/10/03 23:44:41 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>

@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_var.h,v 1.18 2000/10/04 03:30:42 itojun Exp $	*/
+/*	$KAME: isakmp_var.h,v 1.19 2000/10/04 17:41:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_var.h,v 1.18 2000/10/04 03:30:42 itojun Exp $ */
 
 #define PORT_ISAKMP 500
 

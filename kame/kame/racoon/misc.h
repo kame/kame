@@ -1,4 +1,4 @@
-/*	$KAME: misc.h,v 1.7 2000/09/13 04:50:27 itojun Exp $	*/
+/*	$KAME: misc.h,v 1.8 2000/10/04 17:41:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: misc.h,v 1.7 2000/09/13 04:50:27 itojun Exp $ */
 
 #define BIT2STR(b) bit2str(b, sizeof(b)<<3)
 #define PVDUMP(var) hexdump((var)->v, (var)->l)

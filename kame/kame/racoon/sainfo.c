@@ -1,4 +1,4 @@
-/*	$KAME: sainfo.c,v 1.10 2000/09/19 19:00:21 sakane Exp $	*/
+/*	$KAME: sainfo.c,v 1.11 2000/10/04 17:41:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sainfo.c,v 1.10 2000/09/19 19:00:21 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>

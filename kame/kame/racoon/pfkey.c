@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.85 2000/10/04 03:30:42 itojun Exp $	*/
+/*	$KAME: pfkey.c,v 1.86 2000/10/04 17:41:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.85 2000/10/04 03:30:42 itojun Exp $ */
 
 #define _PFKEY_C_
 

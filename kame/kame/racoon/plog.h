@@ -1,4 +1,4 @@
-/*	$KAME: plog.h,v 1.3 2000/09/13 04:50:28 itojun Exp $	*/
+/*	$KAME: plog.h,v 1.4 2000/10/04 17:41:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: plog.h,v 1.3 2000/09/13 04:50:28 itojun Exp $ */
 
 #define LC_DEFAULT_LOGF	"/var/log/racoon.log"
 

@@ -1,4 +1,4 @@
-/*	$KAME: strnames.h,v 1.8 2000/09/13 04:50:29 itojun Exp $	*/
+/*	$KAME: strnames.h,v 1.9 2000/10/04 17:41:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: strnames.h,v 1.8 2000/09/13 04:50:29 itojun Exp $ */
 
 extern char *s_isakmp_certtype __P((int));
 extern char *s_isakmp_etype __P((int));

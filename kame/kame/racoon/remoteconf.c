@@ -1,4 +1,4 @@
-/*	$KAME: remoteconf.c,v 1.15 2000/09/22 18:03:09 sakane Exp $	*/
+/*	$KAME: remoteconf.c,v 1.16 2000/10/04 17:41:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.c,v 1.15 2000/09/22 18:03:09 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>

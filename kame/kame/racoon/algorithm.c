@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.c,v 1.9 2000/09/22 20:40:29 itojun Exp $	*/
+/*	$KAME: algorithm.c,v 1.10 2000/10/04 17:40:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: algorithm.c,v 1.9 2000/09/22 20:40:29 itojun Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>

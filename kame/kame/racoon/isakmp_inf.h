@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.h,v 1.12 2000/09/13 04:50:26 itojun Exp $	*/
+/*	$KAME: isakmp_inf.h,v 1.13 2000/10/04 17:41:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.h,v 1.12 2000/09/13 04:50:26 itojun Exp $ */
 
 struct saproto;
 extern int isakmp_info_recv __P((struct ph1handle *, vchar_t *));

@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.h,v 1.4 2000/09/13 04:50:26 itojun Exp $	*/
+/*	$KAME: isakmp_quick.h,v 1.5 2000/10/04 17:41:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.h,v 1.4 2000/09/13 04:50:26 itojun Exp $ */
 
 extern int quick_i1prep __P((struct ph2handle *, vchar_t *));
 extern int quick_i1send __P((struct ph2handle *, vchar_t *));

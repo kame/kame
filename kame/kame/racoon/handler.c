@@ -1,4 +1,4 @@
-/*	$KAME: handler.c,v 1.37 2000/10/04 03:30:41 itojun Exp $	*/
+/*	$KAME: handler.c,v 1.38 2000/10/04 17:40:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.37 2000/10/04 03:30:41 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>

@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.h,v 1.13 2000/10/04 03:30:42 itojun Exp $	*/
+/*	$KAME: pfkey.h,v 1.14 2000/10/04 17:41:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.h,v 1.13 2000/10/04 03:30:42 itojun Exp $ */
 
 extern int pfkey_handler __P((void));
 extern vchar_t *pfkey_dump_sadb __P((int));

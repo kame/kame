@@ -1,4 +1,4 @@
-/*	$KAME: admin_var.h,v 1.2 2000/09/13 04:50:23 itojun Exp $	*/
+/*	$KAME: admin_var.h,v 1.3 2000/10/04 17:40:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin_var.h,v 1.2 2000/09/13 04:50:23 itojun Exp $ */
 
 #define PORT_ADMIN ((u_short)61225)
 

@@ -1,4 +1,4 @@
-/*	$KAME: logger.c,v 1.6 2000/09/23 07:08:25 itojun Exp $	*/
+/*	$KAME: logger.c,v 1.7 2000/10/04 17:41:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -27,9 +27,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- */
-/*
- * $Id: logger.c,v 1.6 2000/09/23 07:08:25 itojun Exp $
  */
 
 #include <sys/types.h>
