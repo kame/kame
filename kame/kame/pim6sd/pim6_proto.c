@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.44 2001/08/14 06:16:43 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.45 2001/08/31 09:59:51 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -571,6 +571,7 @@ parse_pim6_hello(pim_message, datalen, src, opts)
     struct pim_hello_options *opts;
 {
     u_int8         *pim_hello_message;
+    u_int8         *end_of_message;
     u_int8         *data_ptr, *lim;
     u_int16         option_type;
     u_int16         option_length;
@@ -578,14 +579,19 @@ parse_pim6_hello(pim_message, datalen, src, opts)
     int             option_total_length;
     pim6_encod_uni_addr_t 	encod_uniaddr;
 
+    /* 
+     * KAME kernel has already checked the existence of pim header,
+     * so don't need to check "pim_hello_message" does not exceed the buffer.
+     */
     pim_hello_message = (u_int8 *) (pim_message + sizeof(struct pim));
-    datalen -= sizeof(struct pim);
-    for (; datalen >= sizeof(pim_hello_t);)
+    end_of_message = (u_int8 *) (pim_message + datalen);
+
+    for (data_ptr = pim_hello_message; data_ptr + sizeof(pim_hello_t) < end_of_message; )
     {
 	/* Ignore any data if shorter than (pim_hello header) */
-	data_ptr = pim_hello_message;
 	GET_HOSTSHORT(option_type, data_ptr);
 	GET_HOSTSHORT(option_length, data_ptr);
+
 	switch (option_type)
 	{
 	case PIM_MESSAGE_HELLO_HOLDTIME:
@@ -647,25 +653,9 @@ parse_pim6_hello(pim_message, datalen, src, opts)
 	    /* Ignore any unknown options */
 	    break;
 	}
-
-	/* Move to the next option */
-	/*
-	 * XXX: TODO: If we are padding to the end of the 32 bit boundary,
-	 * use the first method to move to the next option, otherwise simply
-	 * (sizeof(pim_hello_t) + option_length).
-	 */
-
-#ifdef BOUNDARY_32_BIT
-	option_total_length = (sizeof(pim_hello_t) + (option_length & ~0x3) +
-			       ((option_length & 0x3) ? 4 : 0));
-#else
-	option_total_length = (sizeof(pim_hello_t) + option_length);
-#endif				/* BOUNDARY_32_BIT */
-	datalen -= option_total_length;
-	pim_hello_message += option_total_length;
     }
 
-    if (datalen != 0)		/* malformed packet */
+    if (data_ptr != end_of_message)	/* malformed packet */
 	return(FALSE);
 
     /* holdtime is actually mandatory, so we return FALSE if not included. */

@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1855 2001/08/31 06:23:51 jinmei Exp $
+$KAME: CHANGELOG,v 1.1856 2001/08/31 09:59:52 suz Exp $
 
 <200108>
+2001-08-31  SUZUKI Shinsuke  <suz@sdl.hitachi.co.jp>
+	* pim6sd/pim6_proto.c (parse_pim6_hello): strengthens length check for
+	Hello packet.  Without this fix, pim6sd may crash if it receives a
+	Hello packet with a too short Hello option.
+
 2001-08-31  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/{in6.c in6_ifattach.c, nd6_rtr.c}: revised the
 	support of the privacy extension of stateless address
