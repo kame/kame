@@ -1,6 +1,6 @@
 	README of KAME kit
 	KAME Project
-	$KAME: README,v 1.67 2002/06/28 15:11:52 jinmei Exp $
+	$KAME: README,v 1.68 2002/07/18 12:46:17 suz Exp $
 
 <<<Project Overview>>>
 
@@ -228,7 +228,8 @@ Fenner, Goeran Bengtson, Tomio Narita, Conny Larsson, Ryuji Somegawa,
 Akira Kato, Ronald van der Pol, Graham Wheeler, Kris Kennaway, Kazuo Horikawa,
 larry baird, rimi guyomarch, Makoto MATSUSHITA, Kevin Lahey
 SHIMIZU Ryo, Shigeyuki Fukushima, Toshiaki Nakatsu, Florent Parent,
-SHIRASAKI Yasuhiro, Constantine Sapuntzakis, Jun-ya Kato and Kazuyoshi Tomita.
+SHIRASAKI Yasuhiro, Constantine Sapuntzakis, Jun-ya Kato, Kazuyoshi Tomita,
+and Hitoshi Asaeda.
 (in no particular order).
 
 We would also like to thank BSDI (http://www.bsdi.com/) for donating

@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2200 2002/07/18 00:00:16 sakane Exp $
+$KAME: CHANGELOG,v 1.2201 2002/07/18 12:46:16 suz Exp $
 
 <200207>
+Thu Jul 18 21:08:27 JST 2002 suz@crl.hitachi.co.jp
+	* netbsd, kame/sys/netinet/in_msf.[ch]: merged NetBSD IGMPv3 code 
+	  written by Hitoshi Asaeda@INRIA.
+	* freebsd4: ported the above implementation into FreeBSD-4.
+
 Thu Jul 18 08:53:47 JST 2002 sakane@kame.net
 	* sys/netinet6/esp_input:
 	fixed re-making mbuf chain after decrypting ipv6 esp packet
