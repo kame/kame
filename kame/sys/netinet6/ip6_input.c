@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.122 2000/09/11 11:36:41 sumikawa Exp $	*/
+/*	$KAME: ip6_input.c,v 1.123 2000/10/02 08:42:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1288,6 +1288,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 # define sbcreatecontrol	so_cmsg
 #endif
 	int privileged = 0;
+	int rthdr_exist = 0;
 
 
 	if (ctl == NULL)	/* validity check */
@@ -1332,7 +1333,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 #endif
 
 #ifdef SO_TIMESTAMP
-	if (in6p->in6p_socket->so_options & SO_TIMESTAMP) {
+	if ((in6p->in6p_socket->so_options & SO_TIMESTAMP) != 0) {
 		struct timeval tv;
 
 		microtime(&tv);
@@ -1347,7 +1348,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 #endif
 
 	/* RFC 2292 sec. 5 */
-	if (in6p->in6p_flags & IN6P_PKTINFO) {
+	if ((in6p->in6p_flags & IN6P_PKTINFO) != 0) {
 		struct in6_pktinfo pi6, *prevpi = NULL;
 		bcopy(&ip6->ip6_dst, &pi6.ipi6_addr, sizeof(struct in6_addr));
 		if (IN6_IS_SCOPE_LINKLOCAL(&pi6.ipi6_addr))
@@ -1376,7 +1377,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 		}
 	}
 
-	if (in6p->in6p_flags & IN6P_HOPLIMIT) {
+	if ((in6p->in6p_flags & IN6P_HOPLIMIT) != 0) {
 		int hlim = ip6->ip6_hlim & 0xff, oldhlim = -1;
 
 		if (prevctl && prevctl->hlim) {
@@ -1402,7 +1403,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 	 * be some hop-by-hop options which can be returned to normal user.
 	 * See RFC 2292 section 6.
 	 */
-	if ((in6p->in6p_flags & IN6P_HOPOPTS) && privileged) {
+	if ((in6p->in6p_flags & IN6P_HOPOPTS) != 0 && privileged) {
 		/*
 		 * Check if a hop-by-hop options header is contatined in the
 		 * received packet, and if so, store the options as ancillary
@@ -1472,10 +1473,41 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 	}
 
 	/* IPV6_DSTOPTS and IPV6_RTHDR socket options */
-	if (in6p->in6p_flags & (IN6P_DSTOPTS | IN6P_RTHDR)) {
+	if ((in6p->in6p_flags & (IN6P_DSTOPTS | IN6P_RTHDRDSTOPTS)) != 0) {
+		int proto, off, nxt;
+
+		/*
+		 * go through the header chain to see if a routing header is
+		 * contained in the packet. We need this information to store
+		 * destination options headers (if any) properly.
+		 * XXX: performance issue. We should record this info when
+		 * processing extension headers in incoming routine.
+		 * (todo) use m_aux? 
+		 */
+		proto = IPPROTO_IPV6;
+		off = 0;
+		nxt = -1;
+		while (1) {
+			int newoff;
+
+			newoff = ip6_nexthdr(m, off, proto, &nxt);
+			if (newoff < 0)
+				break;
+			if (newoff < off) /* invalid, check for safety */
+				break;
+			if ((proto = nxt) == IPPROTO_ROUTING) {
+				rthdr_exist = 1;
+				break;
+			}
+			off = newoff;
+		}
+	}
+
+	if ((in6p->in6p_flags &
+	     (IN6P_RTHDR | IN6P_DSTOPTS | IN6P_RTHDRDSTOPTS)) != 0) {
 		struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 		int nxt = ip6->ip6_nxt, off = sizeof(struct ip6_hdr);
-		int rthdr = 0;	/* flag if we've passed a routing header */
+		int pass_rthdr = 0; /* flag if we've passed a routing header */
 
 		/*
 		 * Search for destination options headers or routing
@@ -1556,7 +1588,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 				  * Save a dst opt header before a routing
 				  * header if the user wanted.
 				  */
-				if (rthdr == 0 &&
+				if (rthdr_exist && pass_rthdr == 0 &&
 				    (in6p->in6p_flags & IN6P_RTHDRDSTOPTS)) {
 					if (prevctl && prevctl->dest1) {
 						cm = mtod(prevctl->dest1,
@@ -1592,7 +1624,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 				 * Save a dst opt header after a routing
 				 * header if the user wanted.
 				 */
-				if (rthdr &&
+				if ((rthdr_exist == 0 || pass_rthdr) &&
 				    (in6p->in6p_flags & IN6P_DSTOPTS)) {
 					if (prevctl && prevctl->dest2) {
 						cm = mtod(prevctl->dest2,
@@ -1610,9 +1642,9 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 						break;
 
 					*mp = sbcreatecontrol((caddr_t)ip6e,
-					    elen,
-					    IS2292(IPV6_2292DSTOPTS, IPV6_DSTOPTS),
-					    IPPROTO_IPV6);
+							      elen,
+							      IS2292(IPV6_2292DSTOPTS, IPV6_DSTOPTS),
+							      IPPROTO_IPV6);
 					if (ctl->dest2 == NULL)
 						ctl->dest2 = *mp;
 
@@ -1626,7 +1658,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctlp)
 				struct ip6_rthdr *prevrth = NULL;
 				int prevrhlen = 0;
 
-				rthdr++;
+				pass_rthdr++;
 				if (!in6p->in6p_flags & IN6P_RTHDR)
 					break;
 
