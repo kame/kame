@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.33 2002/07/29 09:40:33 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.34 2002/07/29 10:30:20 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -90,9 +90,6 @@ static int mip6_ip6mc_create __P((struct ip6_mobility **,
 				  struct sockaddr_in6 *,
 				  struct sockaddr_in6 *,
 				  u_int32_t));
-static int mip6_ip6mu_process __P((struct mbuf *,
-				   struct ip6m_binding_update *, int,
-				   struct mip6_bc *));
 static int mip6_ip6ma_process __P((struct mbuf *,
 				   struct ip6m_binding_ack *, int));
 static int mip6_ip6mhi_create __P((struct ip6_mobility **,
@@ -469,12 +466,14 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	struct ip6_hdr *ip6;
 	struct sockaddr_in6 *src_sa, *dst_sa, coa_sa, hoa_sa;
 	struct mbuf *n;
-	struct ip6aux *ip6a;
+	struct ip6aux *ip6a = NULL;
 	u_int8_t ip6mu_flags;
 	u_int8_t isprotected;
 	u_int8_t haseen;
 	struct mip6_bc *mbc;
 	u_int16_t seqno;
+	u_int32_t lifetime;
+
 	int error = 0;
 	u_int8_t bu_safe = 0;	/* To accept bu always without authentication, this value is set to non-zero */
 	struct mip6_mobility_options mopt;
@@ -525,7 +524,6 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		ip6a = mtod(n, struct ip6aux *);
 		if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
 			haseen = 1;
-			coa_sa = *src_sa;
 			coa_sa.sin6_addr = ip6a->ip6a_coa;
 		}
 	}
@@ -575,6 +573,12 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			 __FILE__, __LINE__, mopt.valid_options,
 		 "\20\4AUTH\3NONCE\2ALTCOA\1UID\n"));
 
+	if (mopt.valid_options & MOPT_ALTCOA)
+		coa_sa.sin6_addr = mopt.mopt_altcoa;
+
+	seqno = ntohs(ip6mu->ip6mu_seqno);
+	lifetime = ntohl(ip6mu->ip6mu_lifetime);
+
 	/* ip6_src and HAO has been already swapped at this point. */
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &hoa_sa);
 	if (mbc == NULL) {
@@ -587,7 +591,6 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		}
 	} else {
 		/* check a sequence number. */
-		seqno = ntohs(ip6mu->ip6mu_seqno);
 		if (MIP6_LEQ(seqno, mbc->mbc_seqno)) {
 			mip6log((LOG_NOTICE,
 			    "%s:%d: received sequence no (%d) <= current "
@@ -618,51 +621,6 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		}
 	}
 
-	return (mip6_ip6mu_process(m, ip6mu, ip6mulen, mbc));
-}
-
-static int
-mip6_ip6mu_process(m, ip6mu, ip6mulen, mbc)
-	struct mbuf *m;
-	struct ip6m_binding_update *ip6mu;
-	int ip6mulen;
-	struct mip6_bc *mbc;
-{
-	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *src_sa, *dst_sa;
-	struct sockaddr_in6 *coa_sa, coa_storage, hoa_sa;
-	struct mbuf *n;
-	struct ip6aux *ip6a;
-	u_int32_t lifetime;
-	u_int16_t seqno;
-	int error = 0;
-
-	ip6 = mtod(m, struct ip6_hdr *);
-	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
-		/* must not happen. */
-		m_freem(m);
-		return (EINVAL);
-	}
-	n = ip6_findaux(m);
-	if (!n) {
-		m_freem(m);
-		return (EINVAL);
-	}
-	ip6a = mtod(n, struct ip6aux *);
-	if (ip6a == NULL) {
-		m_freem(m);
-		return (EINVAL);
-	}
-
-	/* XXX find alt CoA. */
-	coa_storage = *src_sa;
-	if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0)
-		coa_storage.sin6_addr = ip6a->ip6a_coa;
-	coa_sa = &coa_storage;
-
-	lifetime = ntohl(ip6mu->ip6mu_lifetime);
-	seqno = ntohs(ip6mu->ip6mu_seqno);
-
 #define IS_REQUEST_TO_CACHE(lifetime, hoa, coa)	\
 	(((lifetime) != 0) &&			\
 	 (!SA6_ARE_ADDR_EQUAL((hoa), (coa))))
@@ -672,19 +630,20 @@ mip6_ip6mu_process(m, ip6mu, ip6mulen, mbc)
 		if (!MIP6_IS_HA) {
 			/* this is not a homeagent. */
 			/* XXX */
-			mip6_bc_send_ba(dst_sa, src_sa, coa_sa,
+			mip6_bc_send_ba(dst_sa, src_sa, &coa_sa,
 					IP6MA_STATUS_NOT_SUPPORTED,
 					seqno, 0, 0);
 			return (0);
 		}
 
 		/* limit the max duration of bindings. */
-		if (lifetime > mip6_config.mcfg_hrbc_lifetime_limit)
+		if (mip6_config.mcfg_hrbc_lifetime_limit > 0 &&
+		    lifetime > mip6_config.mcfg_hrbc_lifetime_limit)
 			lifetime = mip6_config.mcfg_hrbc_lifetime_limit;
 
-		if (IS_REQUEST_TO_CACHE(lifetime, src_sa, coa_sa)) {
-			error = mip6_process_hrbu(src_sa,
-						  coa_sa,
+		if (IS_REQUEST_TO_CACHE(lifetime, &hoa_sa, &coa_sa)) {
+			error = mip6_process_hrbu(&hoa_sa,
+						  &coa_sa,
 						  ip6mu->ip6mu_flags,
 						  seqno,
 						  lifetime,
@@ -696,8 +655,8 @@ mip6_ip6mu_process(m, ip6mu, ip6mulen, mbc)
 				/* continue. */
 			}
 		} else {
-			error = mip6_process_hurbu(src_sa,
-						   coa_sa,
+			error = mip6_process_hurbu(&hoa_sa,
+						   &coa_sa,
 						   ip6mu->ip6mu_flags,
 						   seqno,
 						   lifetime,
@@ -710,17 +669,15 @@ mip6_ip6mu_process(m, ip6mu, ip6mulen, mbc)
 			}
 		}
 	} else {
-		hoa_sa = *src_sa;
-		hoa_sa.sin6_addr = ip6mu->ip6mu_addr;
 		/* request to cache/remove a binding for CN. */
-		if (IS_REQUEST_TO_CACHE(lifetime, &hoa_sa, coa_sa)) {
+		if (IS_REQUEST_TO_CACHE(lifetime, &hoa_sa, &coa_sa)) {
 			if (mbc == NULL)
-				error = mip6_bc_register(src_sa, coa_sa, dst_sa,
+				error = mip6_bc_register(&hoa_sa, &coa_sa, dst_sa,
 							 ip6mu->ip6mu_flags,
 							 seqno, lifetime);
 			else
 			  /* Update a cache */
-				error = mip6_bc_update(mbc, coa_sa, dst_sa,
+				error = mip6_bc_update(mbc, &coa_sa, dst_sa,
 						       ip6mu->ip6mu_flags,
 						       seqno, lifetime);
 		} else {
@@ -728,9 +685,9 @@ mip6_ip6mu_process(m, ip6mu, ip6mulen, mbc)
 		}
 
 		if (ip6mu->ip6mu_flags & IP6MU_ACK) {
-			if (mip6_bc_send_ba(&ip6a->ip6a_dst,
-					    &ip6a->ip6a_home,
-					    coa_sa,
+			if (mip6_bc_send_ba(dst_sa,
+					    &hoa_sa,
+					    &coa_sa,
 					    IP6MA_STATUS_ACCEPTED, /* XXX */
 					    seqno,
 					    lifetime,
@@ -739,8 +696,8 @@ mip6_ip6mu_process(m, ip6mu, ip6mulen, mbc)
 					 "%s:%d: sending BA to %s(%s) failed. "
 					 "send it later.\n",
 					 __FILE__, __LINE__,
-					 ip6_sprintf(&ip6a->ip6a_home.sin6_addr),
-					 ip6_sprintf(&coa_sa->sin6_addr)));
+					 ip6_sprintf(&hoa_sa.sin6_addr),
+					 ip6_sprintf(&coa_sa.sin6_addr)));
 			}
 		}
 	}
@@ -1529,6 +1486,8 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 	ip6mu->ip6mu_addr = mbu->mbu_haddr.sin6_addr;
 	in6_clearscope(&ip6mu->ip6mu_addr);
 
+	busrc_sa = src;
+
 	if (need_rr) {
 		/* nonce indices and authdata insersion. */
 		/* Nonce Indicies */
@@ -1596,7 +1555,7 @@ printf("MN: Authdata: %*D\n", SHA1_RESULTLEN, (u_int8_t *)(mopt_auth + 1), ":");
 	}
 
 	/* calculate checksum. */
-	ip6mu->ip6mu_cksum = mip6_cksum(src, dst, ip6mu_size,
+	ip6mu->ip6mu_cksum = mip6_cksum(busrc_sa, dst, ip6mu_size,
 					IPPROTO_MOBILITY, (char *)ip6mu);
 
 	*pktopt_mobility = (struct ip6_mobility *)ip6mu;
@@ -1722,7 +1681,15 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 			/* we have no binding update entry for the CN. */
 			goto bad;
 		}
+		break;
 
+	default:
+		mip6log((LOG_INFO,
+		    "%s:%d: unknown BE status code (status = %u) "
+		    "from host %s.\n",
+		    __FILE__, __LINE__,
+		    ip6me->ip6me_status, ip6_sprintf(&src_sa->sin6_addr)));
+		goto bad;
 		break;
 	}
 
