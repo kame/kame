@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.731 2000/03/28 08:24:07 itojun Exp $
+$Id: CHANGELOG,v 1.732 2000/03/28 12:48:42 sumikawa Exp $
 
 <200003>
+Tue Mar 28 21:45:54 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd2/ports/ncftp3: upgrade to 3.0.0.
+
 Tue Mar 28 10:35:50 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/socks64: upgrade to latest patch.
 
