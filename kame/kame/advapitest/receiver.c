@@ -97,7 +97,11 @@ pr_addr(addr, numeric)
 	flag |= NI_WITHSCOPEID;
 #endif
 
+#ifdef SIN6_LEN
 	getnameinfo(addr, addr->sa_len, buf, sizeof(buf), NULL, 0, flag);
+#else
+	getnameinfo(addr, SA_LEN(addr), buf, sizeof(buf), NULL, 0, flag);
+#endif
 
 	return (buf);
 }
