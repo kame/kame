@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.146 2001/07/14 05:48:32 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.147 2001/07/14 14:06:40 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -140,6 +140,7 @@ static int ph1_main __P((struct ph1handle *, vchar_t *));
 static int quick_main __P((struct ph2handle *, vchar_t *));
 static int isakmp_ph1begin_r __P((vchar_t *,
 	struct sockaddr *, struct sockaddr *, u_int8_t));
+static int isakmp_ph2begin_i __P((struct ph1handle *, struct ph2handle *));
 static int isakmp_ph2begin_r __P((struct ph1handle *, vchar_t *));
 static int etypesw1 __P((int));
 static int etypesw2 __P((int));
@@ -640,8 +641,8 @@ ph1_main(iph1, msg)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%d %d %d) %8.6f",
-		"phase1", iph1->etype, iph1->side, iph1->status,
+	syslog(LOG_ALERT, "%s(%s) %8.6f",
+		"phase1", s_isakmp_state(iph1->etype, iph1->side, iph1->status),
 		timedelta(&start, &end));
     }
 #endif
@@ -772,8 +773,9 @@ quick_main(iph2, msg)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%d %d) %8.6f",
-		"phase2", iph2->side, iph2->status,
+	syslog(LOG_ALERT, "%s(%s) %8.6f",
+		"phase2",
+		s_isakmp_state(ISAKMP_ETYPE_QUICK, iph2->side, iph2->status),
 		timedelta(&start, &end));
     }
 #endif
@@ -850,8 +852,9 @@ isakmp_ph1begin_i(rmconf, remote)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%d %d %d) %8.6f",
-		"phase1", iph1->etype, iph1->side, iph1->status,
+	syslog(LOG_ALERT, "%s(%s) %8.6f",
+		"phase1",
+		s_isakmp_state(iph1->etype, iph1->side, iph1->status),
 		timedelta(&start, &end));
     }
 #endif
@@ -949,8 +952,9 @@ isakmp_ph1begin_r(msg, remote, local, etype)
 	}
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%d %d %d) %8.6f",
-		"phase1", iph1->etype, iph1->side, iph1->status,
+	syslog(LOG_ALERT, "%s(%s) %8.6f",
+		"phase1",
+		s_isakmp_state(iph1->etype, iph1->side, iph1->status),
 		timedelta(&start, &end));
     }
 #endif
@@ -961,6 +965,34 @@ isakmp_ph1begin_r(msg, remote, local, etype)
 		return -1;
 	}
 
+	return 0;
+}
+
+/* new negotiation of phase 2 for initiator */
+static int
+isakmp_ph2begin_i(iph1, iph2)
+	struct ph1handle *iph1;
+	struct ph2handle *iph2;
+{
+	/* found ISAKMP-SA. */
+	plog(LLV_DEBUG, LOCATION, NULL, "begin QUICK mode.\n");
+
+#ifdef ENABLE_STATS
+	gettimeofday(&iph2->start, NULL);
+#endif
+	/* found isakmp-sa */
+	bindph12(iph1, iph2);
+	iph2->status = PHASE2ST_STATUS2;
+
+	if ((ph2exchange[etypesw2(ISAKMP_ETYPE_QUICK)]
+			 [iph2->side]
+			 [iph2->status])(iph2, NULL) < 0) {
+		unbindph12(iph2);
+		/* release ipsecsa handler due to internal error. */
+		remph2(iph2);
+		delph2(iph2);
+		return -1;
+	}
 	return 0;
 }
 
@@ -1084,8 +1116,9 @@ isakmp_ph2begin_r(iph1, msg)
 	}
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%d %d) %8.6f",
-		"phase2", iph1->side, iph1->status,
+	syslog(LOG_ALERT, "%s(%s) %8.6f",
+		"phase2",
+		s_isakmp_state(ISAKMP_ETYPE_QUICK, iph2->side, iph2->status),
 		timedelta(&start, &end));
     }
 #endif
@@ -1731,30 +1764,8 @@ isakmp_post_acquire(iph2)
 	plog(LLV_DEBUG, LOCATION, NULL, "begin QUICK mode.\n");
 
 	/* begin quick mode */
-	bindph12(iph1, iph2);
-	iph2->status = PHASE2ST_STATUS2;
-
-#ifdef ENABLE_STATS
-	gettimeofday(&iph2->start, NULL);
-#endif
-
-#ifdef ENABLE_STATS
-    {
-	struct timeval start, end;
-	gettimeofday(&start, NULL);
-#endif
-	if ((ph2exchange[etypesw2(ISAKMP_ETYPE_QUICK)]
-	                [iph2->side]
-	                [iph2->status])(iph2, NULL) != 0) {
+	if (isakmp_ph2begin_i(iph1, iph2))
 		return -1;
-	}
-#ifdef ENABLE_STATS
-	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%d %d) %8.6f",
-		"phase2", iph2->side, iph2->status,
-		timedelta(&start, &end));
-    }
-#endif
 
 	return 0;
 }
@@ -1785,8 +1796,9 @@ isakmp_post_getspi(iph2)
 		return -1;
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%d %d) %8.6f",
-		"phase2", iph2->side, iph2->status,
+	syslog(LOG_ALERT, "%s(%s) %8.6f",
+		"phase2",
+		s_isakmp_state(ISAKMP_ETYPE_QUICK, iph2->side, iph2->status),
 		timedelta(&start, &end));
     }
 #endif
@@ -1835,29 +1847,8 @@ isakmp_chkph1there(iph2)
 	if (iph1 != NULL
 	 && iph1->status == PHASE1ST_ESTABLISHED) {
 		/* found isakmp-sa */
-		bindph12(iph1, iph2);
-		iph2->status = PHASE2ST_STATUS2;
-#ifdef ENABLE_STATS
-    {
-	struct timeval start, end;
-	gettimeofday(&iph2->start, NULL);
-	gettimeofday(&start, NULL);
-#endif
-		if ((ph2exchange[etypesw2(ISAKMP_ETYPE_QUICK)]
-		                 [iph2->side]
-		                 [iph2->status])(iph2, NULL) < 0) {
-			unbindph12(iph2);
-			remph2(iph2);
-			delph2(iph2);
-			/* release ipsecsa handler due to internal error. */
-		}
-#ifdef ENABLE_STATS
-	gettimeofday(&end, NULL);
-	syslog(LOG_ALERT, "%s(%d %d) %8.6f",
-		"phase2", iph2->side, iph2->status,
-		timedelta(&start, &end));
-    }
-#endif
+		/* begin quick mode */
+		(void)isakmp_ph2begin_i(iph1, iph2);
 		return;
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: strnames.h,v 1.10 2001/01/24 06:22:51 sakane Exp $	*/
+/*	$KAME: strnames.h,v 1.11 2001/07/14 14:06:40 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,6 +29,7 @@
  * SUCH DAMAGE.
  */
 
+extern char * s_isakmp_state __P((int, int, int));
 extern char *s_isakmp_certtype __P((int));
 extern char *s_isakmp_etype __P((int));
 extern char *s_isakmp_notify_msg __P((int));
