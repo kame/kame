@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.210 2001/07/24 09:12:49 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.211 2001/07/24 09:17:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -517,9 +517,9 @@ in6_control(so, cmd, data, ifp)
 	 * Find address for this interface, if it exists.
 	 *
 	 * In netinet code, we have checked ifra_addr in SIOCSIF*ADDR operation
-	 * only, and used the first interface address as the target of the
-	 * operation.  This was because netinet code/API assumed at most 1
-	 * interface address per interface.
+	 * only, and used the first interface address as the target of other
+	 * operations (without checking ifra_addr).  This was because netinet
+	 * code/API assumed at most 1 interface address per interface.
 	 * Since IPv6 allows a node to assign multiple addresses
 	 * on a single interface, we almost always look and check the
 	 * presense of ifra_addr, and reject invalid ones here.
