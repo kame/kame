@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.152 2001/02/02 14:23:41 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.153 2001/02/02 15:21:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -174,6 +174,10 @@ struct ifqueue ip6intrq;
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 extern struct ifnet loif[NLOOP];
 #endif
+#ifdef __NetBSD__
+extern struct callout in6_tmpaddrtimer_ch;
+#endif
+
 int ip6_forward_srcrt;			/* XXX */
 int ip6_sourcecheck;			/* XXX */
 int ip6_sourcecheck_interval;		/* XXX */

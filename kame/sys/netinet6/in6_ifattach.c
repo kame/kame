@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.92 2001/02/02 14:23:41 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.93 2001/02/02 15:21:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -31,9 +31,6 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#ifdef __NetBSD__
-#include <sys/callout.h>
-#endif
 #include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
@@ -77,11 +74,12 @@ size_t in6_ifstatmax = 0;
 size_t icmp6_ifstatmax = 0;
 unsigned long in6_maxmtu = 0;
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-static int get_hostid_ifid __P((struct ifnet *, struct in6_addr *));
-#endif
 #ifdef __NetBSD__
 struct callout in6_tmpaddrtimer_ch;
+#endif
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+static int get_hostid_ifid __P((struct ifnet *, struct in6_addr *));
 #endif
 static int get_rand_ifid __P((struct ifnet *, struct in6_addr *));
 static int generate_tmp_ifid __P((u_int8_t *, const u_int8_t *, u_int8_t *));
@@ -440,7 +438,7 @@ get_ifid(ifp0, altifp, in6)
 		goto success;
 	}
 
-	/* try secondary EUI64 source. this basically is for ATM PVC */
+	/* try secondary EUI64 source. this basiocally is for ATM PVC */
 	if (altifp && get_hw_ifid(altifp, in6) == 0) {
 #ifdef ND6_DEBUG
 		printf("%s: got interface identifier from %s\n",

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.97 2001/02/02 14:27:32 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.98 2001/02/02 15:21:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -700,6 +700,9 @@ regen_tmpaddr(ia6)
 	struct ifaddr *ifa;
 	struct ifnet *ifp;
 	struct in6_ifaddr *public_ifa6 = NULL;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	ifp = ia6->ia_ifa.ifa_ifp;
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
