@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.26 2000/04/24 21:06:52 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.27 2000/04/26 21:46:41 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -182,8 +182,7 @@ quick_i1send(iph2, msg)
 	pfsgroup = iph2->proposal->pfs_group;
 	if (pfsgroup) {
 		/* DH group settting if PFS is required. */
-		if (oakley_setdhgroup(iph2->sainfo->pfs_group,
-				&iph2->pfsgrp) < 0) {
+		if (oakley_setdhgroup(pfsgroup, &iph2->pfsgrp) < 0) {
 			plog(logp, LOCATION, NULL,
 				"failed to set DH value.\n");
 			goto end;
@@ -1141,8 +1140,7 @@ quick_r2send(iph2, msg)
 	pfsgroup = iph2->approval->pfs_group;
 	if (iph2->dhpub_p != NULL && pfsgroup != 0) {
 		/* DH group settting if PFS is required. */
-		if (oakley_setdhgroup(iph2->sainfo->pfs_group,
-				&iph2->pfsgrp) < 0) {
+		if (oakley_setdhgroup(pfsgroup, &iph2->pfsgrp) < 0) {
 			plog(logp, LOCATION, NULL,
 				"failed to set DH value.\n");
 			goto end;
