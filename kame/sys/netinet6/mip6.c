@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.192 2003/01/20 13:39:46 jinmei Exp $	*/
+/*	$KAME: mip6.c,v 1.193 2003/01/21 05:45:58 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -180,7 +180,7 @@ struct callout mip6_nonce_upd_ch;
 #endif
 
 static int mip6_prefix_list_update_sub(struct hif_softc *,
-    struct sockaddr_in6 *, struct nd_prefix *, struct nd_defrouter *);
+    struct sockaddr_in6 *, struct nd_prefixctl *, struct nd_defrouter *);
 static int mip6_register_current_location(void);
 static int mip6_haddr_config(struct hif_softc *);
 static int mip6_attach_haddrs(struct hif_softc *);
@@ -269,7 +269,7 @@ mip6_init()
 int
 mip6_prefix_list_update(saddr, ndpr, dr, m)
 	struct sockaddr_in6 *saddr;
-	struct nd_prefix *ndpr;
+	struct nd_prefixctl *ndpr;
 	struct nd_defrouter *dr;
 	struct mbuf *m;
 {
@@ -337,7 +337,7 @@ static int
 mip6_prefix_list_update_sub(sc, rtaddr, ndpr, dr)
 	struct hif_softc *sc;
 	struct sockaddr_in6 *rtaddr;
-	struct nd_prefix *ndpr;
+	struct nd_prefixctl *ndpr;
 	struct nd_defrouter *dr;
 {
 	struct hif_subnet *hs, *hsbypfx, *hsbyha;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.78 2003/01/10 08:53:13 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.79 2003/01/21 05:45:58 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -384,7 +384,7 @@ extern struct mip6stat mip6stat;	/* statistics */
 void mip6_init(void);
 int mip6_ioctl(u_long, caddr_t);
 
-int mip6_prefix_list_update(struct sockaddr_in6 *, struct nd_prefix *,
+int mip6_prefix_list_update(struct sockaddr_in6 *, struct nd_prefixctl *,
     struct nd_defrouter *, struct mbuf *);
 int mip6_process_pfxlist_status_change(struct sockaddr_in6 *);
 void mip6_probe_routers(void);
