@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.122 2000/08/19 02:12:02 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.123 2000/08/20 04:44:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2612,6 +2612,17 @@ ip6_clearpktopts(pktopt, needfree, optname)
 	if (pktopt == NULL)
 		return;
 
+#ifdef DIAGNOSTIC
+	if ((needfree && !pktopt->needfree) ||
+	    (!needfree && pktopt->needfree)) {
+#if 0
+		panic("needfree inconsistent");
+#else
+		printf("needfree inconsistent: %p %d %d\n", pktopt, needfree,
+		    pktopt->needfree);
+#endif
+	}
+#endif
 	if (optname == -1 || optname == IPV6_PKTINFO) {
 		if (needfree && pktopt->ip6po_pktinfo)
 			free(pktopt->ip6po_pktinfo, M_IP6OPT);
@@ -2675,6 +2686,7 @@ ip6_copypktopts(src, canwait)
 	if (dst == NULL && canwait == M_NOWAIT)
 		goto bad;
 	bzero(dst, sizeof(*dst));
+	dst->needfree = 1;
 
 	dst->ip6po_hlim = src->ip6po_hlim;
 	dst->ip6po_flags = src->ip6po_flags;
@@ -3124,6 +3136,7 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 
 	bzero(opt, sizeof(*opt));
 	opt->ip6po_hlim = -1; /* -1 means to use default hop limit */
+	opt->needfree = needcopy;
 
 	/*
 	 * XXX: Currently, we assume all the optional information is stored
