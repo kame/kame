@@ -1,5 +1,6 @@
-$NetBSD$
-
+SHA1 (sendmail.8.9.3.tar.gz) = da2314aedca810e61722de6d2880db2ad81e9e64
+RMD160 (sendmail.8.9.3.tar.gz) = 8e39e8e8188dc7266ca07f5c3faf631b4bcb8d11
 MD5 (sendmail.8.9.3.tar.gz) = efedacfbce84a71d1cfb0e617b84596e
+SHA1 (sendmail893+3.2W.patch.gz) = 15ed748881be75ae66bd2f6330c7dec0d0ac9f7c
+RMD160 (sendmail893+3.2W.patch.gz) = 0de32ed059d95dc8240c042a73374c87bb202eea
 MD5 (sendmail893+3.2W.patch.gz) = 77e2183c40e304a2b1410a5bb041cd46
-MD5 (sendmail.893+W3.2.kame-ipsec.19990521.diff.gz) = 63767c1f6a5953bb203d3e31e1952d8d

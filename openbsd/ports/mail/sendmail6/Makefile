@@ -20,9 +20,9 @@ PATCH_SITES=	${MASTER_SITES}
 PATCHFILES+=	sendmail${WIDEPATCHVER}.patch.gz
 
 # ipsec hack
-MASETER_SITES+=	ftp://ftp.kame.net/pub/kame/misc/
-IPSECHACK=	sendmail.893+W3.2.kame-ipsec.19990521.diff.gz
-DISTFILES+=	${IPSECHACK}
+#MASETER_SITES+=	ftp://ftp.kame.net/pub/kame/misc/
+#IPSECHACK=	sendmail.893+W3.2.kame-ipsec.19990521.diff.gz
+#DISTFILES+=	${IPSECHACK}
 
 MAINTAINER=	itojun@itojun.org
 
@@ -40,7 +40,7 @@ do-build:
 	@(cd ${WRKSRC}; ./Build -f site.config-v6.kame)
 
 do-install:
-	${INSTALL} -c -o root -g kmem -m 6555 ${WRKSRC}/obj.NetBSD.*/sendmail \
+	${INSTALL} -c -o root -g kmem -m 6555 ${WRKSRC}/obj.OpenBSD.*/sendmail \
 		${PREFIX}/sbin/sendmail6
 	${MKDIR} ${PREFIX}/share/doc/sendmail${SENDMAILVER}
 	for i in FAQ LICENSE README; do \
@@ -52,4 +52,4 @@ do-install:
 			${PREFIX}/share/doc/sendmail${SENDMAILVER}; \
 	done
 
-.include "../../mk/bsd.pkg.mk"
+.include <bsd.port.mk>
