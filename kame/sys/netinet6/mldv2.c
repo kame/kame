@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.27 2004/12/27 10:19:29 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.28 2004/12/27 11:45:03 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1176,13 +1176,17 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 	else
 		rti->rt6i_qri /= MLD_TIMER_SCALE;
 
-	if ((ntohs(mldh->mld_maxdelay) > 0) &&
-	    (ntohs(mldh->mld_maxdelay) < 32768))
+	if (ntohs(mldh->mld_maxdelay) == 0)
+		/*
+		 * XXX: this interval prevents an MLD-Report flooding caused 
+		 * by an MLD-query with Max-Reponse-Delay=0 (KAME local design)
+		 */
+		timer = 1000;	
+	else if (ntohs(mldh->mld_maxdelay) < 32768)
 		timer = ntohs(mldh->mld_maxdelay);
 	else
 		timer = (MLD_MRC_MANT(mldh->mld_maxdelay) | 0x1000)
 			<< (MLD_MRC_EXP(mldh->mld_maxdelay) + 3);
-
 	mldlog((LOG_DEBUG, "mld_set_timer: qrv=%d,qqi=%d,qri=%d,timer=%d\n",
 		rti->rt6i_qrv, rti->rt6i_qqi, rti->rt6i_qri, timer));
 	/*
