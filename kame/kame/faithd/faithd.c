@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.20 2000/07/01 11:40:45 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.21 2000/07/04 03:18:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -203,7 +203,6 @@ inetd_main(int argc, char **argv)
 	if (error < 0)
 		exit_error("setsockopt(SO_OOBINLINE): %s", ERRSTR);
 
-	syslog(LOG_INFO, "%s %d", __FILE__, __LINE__);
 	play_child(STDIN_FILENO, (struct sockaddr *)&from);
 	exit_failure("should not reach here");
 	return 0;	/*dummy!*/
