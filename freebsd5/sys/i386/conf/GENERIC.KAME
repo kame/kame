@@ -289,7 +289,6 @@ options 	NEW_STRUCT_ROUTE	# mandatory
 #options 	SCTP_DEBUG	# adds debugging support for SCTP
 #options 	SCTP_TCP_MODEL_SUPPORT	# adds TCP model support
 #options 	SCTP_USE_ADLER32	# use obsolete Adler32 checksum,
-#options 	SCTP_ALTERNATE_ROUTE	# alternate route support - TBD
 
 # Router Preference on host side
 #options 	RTPREF

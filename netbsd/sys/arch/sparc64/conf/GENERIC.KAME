@@ -1,3 +1,0 @@
-include	"arch/sparc64/conf/GENERIC"
-
-# INET6 and IPSEC items are defined in GENERIC
