@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.176 2003/01/21 06:33:04 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.177 2003/02/03 09:54:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -249,12 +249,12 @@ static struct mbuf *ipsec6_splithdr __P((struct mbuf *));
 static int ipsec4_encapsulate __P((struct mbuf *, struct secasvar *));
 #endif
 #ifdef INET6
-#ifdef MIP6
+#if defined(MIP6) && !defined(MIP6_HAIPSEC)
 static int ipsec6_encapsulate __P((struct mbuf *, struct mbuf **,
     struct mbuf **, struct secasvar *));
 #else
 static int ipsec6_encapsulate __P((struct mbuf *, struct secasvar *));
-#endif /* MIP6 */
+#endif /* MIP6 && !MIP6_HAIPSEC */
 #endif
 static struct m_tag *ipsec_addaux __P((struct mbuf *));
 static struct m_tag *ipsec_findaux __P((struct mbuf *));
@@ -2216,7 +2216,7 @@ ipsec4_encapsulate(m, sav)
 #endif /* INET */
 
 #ifdef INET6
-#ifdef MIP6
+#if defined(MIP6) && !defined(MIP6_HAIPSEC)
 static int
 ipsec6_encapsulate(m, m_hao, m_rthdr2, sav)
 	struct mbuf *m;
@@ -2256,7 +2256,7 @@ ipsec6_encapsulate(m, sav)
 	 */
 	if (m->m_len != sizeof(struct ip6_hdr))
 		panic("ipsec6_encapsulate: assumption failed (first mbuf length)");
-#ifndef MIP6
+#if defined(MIP6) && !defined(MIP6_HAIPSEC)
 	if (M_LEADINGSPACE(m->m_next) < sizeof(struct ip6_hdr))
 #endif
 	{
@@ -2272,7 +2272,7 @@ ipsec6_encapsulate(m, sav)
 		m->m_pkthdr.len += sizeof(struct ip6_hdr);
 		oip6 = mtod(n, struct ip6_hdr *);
 	}
-#ifndef MIP6
+#if defined(MIP6) && !defined(MIP6_HAIPSEC)
 	else {
 		m->m_next->m_len += sizeof(struct ip6_hdr);
 		m->m_next->m_data -= sizeof(struct ip6_hdr);
@@ -2293,7 +2293,7 @@ ipsec6_encapsulate(m, sav)
 	encap_hdr_len = sizeof(struct ip6_hdr);
 	ip6->ip6_nxt = IPPROTO_IPV6;
 
-#ifdef MIP6
+#if defined(MIP6) && !defined(MIP6_HAIPSEC)
 	/*
 	 * check if this tunnel is from the mobile node to the home
 	 * agent or not.  if the packet is from the mobile node to the
@@ -2406,7 +2406,7 @@ ipsec6_encapsulate(m, sav)
 			plen += (*m_rthdr2)->m_len;
 		}
 	}
-#endif /* MIP6 */
+#endif /* MIP6 && !MIP6_HAIPSEC */
 	if (plen < IPV6_MAXPACKET - encap_hdr_len)
 		ip6->ip6_plen = htons(plen);
 	else {
@@ -3193,10 +3193,10 @@ ipsec6_output_tunnel(state, sp, flags)
 	int plen;
 	struct sockaddr_in6 *dst6, *sa_src, *sa_dst;
 	int s;
-#ifdef MIP6
+#if defined(MIP6) && !defined(MIP6_HAIPSEC)
 	u_char *nxt;
 	struct mbuf *m_hao, *m_rthdr2, *m_nxt;
-#endif /* MIP6 */
+#endif /* MIP6 && !MIP6_HAIPSEC */
 
 	if (!state)
 		panic("state == NULL in ipsec6_output_tunnel");
@@ -3289,12 +3289,12 @@ ipsec6_output_tunnel(state, sp, flags)
 				error = ENOMEM;
 				goto bad;
 			}
-#ifdef MIP6
+#if defined(MIP6) && !defined(MIP6_HAIPSEC)
 			error = ipsec6_encapsulate(state->m, &m_hao, &m_rthdr2,
 			    isr->sav);
 #else
 			error = ipsec6_encapsulate(state->m, isr->sav);
-#endif /* MIP6 */
+#endif /* MIP6 && !MIP6_HAIPSEC */
 			splx(s);
 			if (error) {
 				state->m = 0;
@@ -3350,7 +3350,7 @@ ipsec6_output_tunnel(state, sp, flags)
 			goto bad;
 		}
 		ip6 = mtod(state->m, struct ip6_hdr *);
-#ifdef MIP6
+#if defined(MIP6) && !defined(MIP6_HAIPSEC)
 		if (m_hao != NULL) {
 			nxt = mtod((m_hao), u_int8_t *);
 			m_nxt = m_hao->m_next;
@@ -3365,24 +3365,24 @@ ipsec6_output_tunnel(state, sp, flags)
 		switch (isr->saidx.proto) {
 		case IPPROTO_ESP:
 #ifdef IPSEC_ESP
-#ifdef MIP6
+#if defined(MIP6) && !defined(MIP6_HAIPSEC)
 			error = esp6_output(state->m, nxt, m_nxt, isr);
 #else
 			error = esp6_output(state->m, &ip6->ip6_nxt,
 					    state->m->m_next, isr);
-#endif /* MIP6 */
+#endif /* MIP6 && !MIP6_HAIPSEC */
 #else
 			m_freem(state->m);
 			error = EINVAL;
 #endif
 			break;
 		case IPPROTO_AH:
-#ifdef MIP6
+#if defined(MIP6) && !defined(MIP6_HAIPSEC)
 			error = ah6_output(state->m, nxt, m_nxt, isr);
 #else
 			error = ah6_output(state->m, &ip6->ip6_nxt,
 					   state->m->m_next, isr);
-#endif /* MIP6 */
+#endif /* MIP6 && !MIP6_HAIPSEC */
 			break;
 		case IPPROTO_IPCOMP:
 			/* XXX code should be here */
@@ -3409,7 +3409,7 @@ ipsec6_output_tunnel(state, sp, flags)
 		}
 		ip6 = mtod(state->m, struct ip6_hdr *);
 		ip6->ip6_plen = htons(plen);
-#ifdef MIP6
+#if defined(MIP6) && !defined(MIP6_HAIPSEC)
 		/* exchage the address in the HAO and ip6_src. */
 		if (MIP6_IS_MN && (m_hao != NULL))
 			mip6_addr_exchange(state->m, m_hao);
@@ -3500,7 +3500,7 @@ ipsec6_output_tunnel(state, sp, flags)
 			}
 		}
 		}
-#endif /* MIP6 */
+#endif /* MIP6 && !MIP6_HAIPSEC */
 	}
 
 	return 0;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.165 2003/01/22 00:34:08 suz Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.166 2003/02/03 09:54:47 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2593,9 +2593,40 @@ mip6_tunnel_control(action, entry, func, ep)
 	int (*func)(const struct mbuf *, int, int, void *);
 	const struct encaptab **ep;
 {
+#ifdef MIP6_HAIPSEC
+	struct mip6_bu *mbu;
+	struct mip6_bc *mbc;
+#endif /* MIP6_HAIPSEC */
 	if ((entry == NULL) && (ep == NULL)) {
 		return (EINVAL);
 	}
+
+#ifdef MIP6_HAIPSEC
+	/* XXX */
+	if (func == mip6_bu_encapcheck) {
+		mbu = (struct mip6_bu *)entry;
+		if (mip6_update_ipsecdb(&mbu->mbu_haddr, NULL, &mbu->mbu_coa,
+			&mbu->mbu_paddr)) {
+			mip6log((LOG_ERR,
+			    "%s:%d: failed to update ipsec database.\n",
+			    __FILE__, __LINE__));
+			/* what shoud we do? */
+			return (EINVAL);
+			
+		}
+	} else if (func == mip6_bc_encapcheck) {
+		mbc = (struct mip6_bc *)entry;
+		if (mip6_update_ipsecdb(&mbc->mbc_phaddr, NULL, &mbc->mbc_pcoa,
+			&mbc->mbc_addr)) {
+			mip6log((LOG_ERR,
+			    "%s:%d: failed to update ipsec database.\n",
+			    __FILE__, __LINE__));
+			/* what shoud we do? */
+			return (EINVAL);
+			
+		}
+	}
+#endif /* MIP6_HAIPSEC */
 
 	/* before doing anything, remove an existing encap entry. */
 	switch (action) {
@@ -2963,7 +2994,7 @@ int
 mip6_route_optimize(m)
 	struct mbuf *m;
 {
-	struct m_tag *n;
+	struct m_tag *mtag;
 	struct in6_ifaddr *ia;
 	struct ip6aux *ip6a;
 	struct ip6_hdr *ip6;
@@ -2999,9 +3030,9 @@ mip6_route_optimize(m)
 		}
 	}
 
-	n = ip6_findaux(m);
-	if (n) {
-		ip6a = (struct ip6aux *) (n + 1);
+	mtag = ip6_findaux(m);
+	if (mtag) {
+		ip6a = (struct ip6aux *) (mtag + 1);
 		if (ip6a->ip6a_flags & IP6A_ROUTEOPTIMIZED) {
 			/* no need to optimize route. */
 			return (0);
@@ -3095,3 +3126,38 @@ mip6_route_optimize(m)
 	m_freem(m);
 	return (error);
 }
+
+#ifdef IPSEC
+#ifndef __OpenBSD__
+int
+mip6_update_ipsecdb(haddr, ocoa, ncoa, haaddr)
+	struct sockaddr_in6 *haddr;
+	struct sockaddr_in6 *ocoa;
+	struct sockaddr_in6 *ncoa;
+	struct sockaddr_in6 *haaddr;
+{
+	/*
+	 * if i am a home agent, update the entries bellow:
+	 *  policy: inbound HoA -> :: mobility tunnel (1)
+	 *          outbound :: -> HoA mobility tunnel (2)
+	 *  sa: CoA-HA related to (1)
+	 *      HA-CoA related to (2)
+	 * if i am a mobile node,
+	 *  policy: inbound :: -> HoA mobility tunnel (3)
+	 *          outbound HoA -> :: mobility tunnel (4)
+	 *  sa: HA-CoA related to (3)
+	 *      CoA-HA related to (4)
+	 */
+	if (MIP6_IS_HA) {
+		key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr);
+	}
+	if (MIP6_IS_MN) {
+		key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr);
+	}
+
+	return (0);
+}
+#else
+/* __OpenBSD__ part.  not yet. */
+#endif
+#endif /* IPSEC */
