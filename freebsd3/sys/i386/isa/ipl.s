@@ -36,7 +36,7 @@
  *
  *	@(#)ipl.s
  *
- *	$Id: ipl.s,v 1.24 1998/08/11 17:01:32 bde Exp $
+ * $FreeBSD: src/sys/i386/isa/ipl.s,v 1.24.2.1 1999/08/29 16:07:26 peter Exp $
  */
 
 

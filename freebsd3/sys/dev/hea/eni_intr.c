@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $Id: eni_intr.c,v 1.3 1998/10/31 20:06:45 phk Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hea/eni_intr.c,v 1.3.2.1 1999/08/29 16:22:55 peter Exp $
  *
  */
 
@@ -43,7 +43,7 @@
 #include <dev/hea/eni_var.h>
 
 #ifndef lint
-__RCSID("@(#) $Id: eni_intr.c,v 1.3 1998/10/31 20:06:45 phk Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hea/eni_intr.c,v 1.3.2.1 1999/08/29 16:22:55 peter Exp $");
 #endif
 
 static void	eni_suni_intr __P((Eni_unit *));

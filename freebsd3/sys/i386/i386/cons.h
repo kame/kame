@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)cons.h	7.2 (Berkeley) 5/9/91
- *	$Id: cons.h,v 1.19 1999/01/09 14:07:37 bde Exp $
+ * $FreeBSD: src/sys/i386/i386/cons.h,v 1.19.2.1 1999/08/29 16:05:36 peter Exp $
  */
 
 #ifndef _MACHINE_CONS_H_

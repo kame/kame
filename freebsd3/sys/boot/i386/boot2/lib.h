@@ -14,7 +14,7 @@
  */
 
 /*
- *	$Id: lib.h,v 1.1 1998/10/15 20:04:21 rnordier Exp $
+ * $FreeBSD: src/sys/boot/i386/boot2/lib.h,v 1.1.2.1 1999/08/29 16:20:46 peter Exp $
  */
 
 void sio_init(void);

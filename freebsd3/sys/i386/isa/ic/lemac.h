@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *      $Id: lemac.h,v 1.4 1997/02/22 09:38:03 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/ic/lemac.h,v 1.4.4.1 1999/08/29 16:07:45 peter Exp $
  */
 #ifndef _LEMAC_H_
 #define	_LEMAC_H_

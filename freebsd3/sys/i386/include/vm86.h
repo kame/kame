@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: vm86.h,v 1.8.2.1 1999/04/15 21:01:14 jlemon Exp $
+ * $FreeBSD: src/sys/i386/include/vm86.h,v 1.8.2.2 1999/08/29 16:06:57 peter Exp $
  */
 
 #ifndef _MACHINE_VM86_H_

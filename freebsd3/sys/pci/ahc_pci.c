@@ -34,7 +34,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: ahc_pci.c,v 1.5.2.5 1999/05/17 21:58:40 gibbs Exp $
+ * $FreeBSD: src/sys/pci/ahc_pci.c,v 1.5.2.9 1999/09/11 15:51:48 gibbs Exp $
  */
 
 #include <pci.h>
@@ -84,10 +84,13 @@ ahc_compose_id(u_int device, u_int vendor, u_int subdevice, u_int subvendor)
 #define ID_AIC7850		0x5078900400000000ull
 #define ID_AHA_2910_15_20_30C	0x5078900478509004ull
 #define ID_AIC7855		0x5578900400000000ull
+#define ID_AIC7859		0x3860900400000000ull
+#define ID_AHA_2930CU		0x3860900438699004ull
 #define ID_AIC7860		0x6078900400000000ull
 #define ID_AIC7860C		0x6078900478609004ull
 #define ID_AHA_2940AU_0		0x6178900400000000ull
 #define ID_AHA_2940AU_1		0x6178900478619004ull
+#define ID_AHA_2940AU_CN	0x2178900478219004ull
 #define ID_AHA_2930C_VAR	0x6038900438689004ull
 
 #define ID_AIC7870		0x7078900400000000ull
@@ -99,7 +102,6 @@ ahc_compose_id(u_int device, u_int vendor, u_int subdevice, u_int subvendor)
 
 #define ID_AIC7880		0x8078900400000000ull
 #define ID_AIC7880_B		0x8078900478809004ull
-#define ID_AHA_2940AU_CN	0x2178900478219004ull
 #define ID_AHA_2940U		0x8178900400000000ull
 #define ID_AHA_3940U		0x8278900400000000ull
 #define ID_AHA_2944U		0x8478900400000000ull
@@ -137,6 +139,8 @@ typedef int (ahc_device_setup_t)(pcici_t, char *, ahc_chip *,
 				 ahc_feature *, ahc_flag *);
 
 static ahc_device_setup_t ahc_aic7850_setup;
+static ahc_device_setup_t ahc_aic7855_setup;
+static ahc_device_setup_t ahc_aic7859_setup;
 static ahc_device_setup_t ahc_aic7860_setup;
 static ahc_device_setup_t ahc_aic7870_setup;
 static ahc_device_setup_t ahc_aha394X_setup;
@@ -167,6 +171,13 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 		"Adaptec 2910/15/20/30C SCSI adapter",
 		ahc_aic7850_setup
 	},
+	/* aic7859 based controllers */
+	{
+		ID_AHA_2930CU & ID_DEV_VENDOR_MASK,
+		ID_DEV_VENDOR_MASK,
+		"Adaptec 2930CU SCSI adapter",
+		ahc_aic7859_setup
+	},
 	/* aic7860 based controllers */
 	{
 		ID_AHA_2940AU_0 & ID_DEV_VENDOR_MASK,
@@ -174,9 +185,15 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 		"Adaptec 2940A Ultra SCSI adapter",
 		ahc_aic7860_setup
 	},
+  	{
+		ID_AHA_2940AU_CN & ID_DEV_VENDOR_MASK,
+		ID_DEV_VENDOR_MASK,
+		"Adaptec 2940A/CN Ultra SCSI adapter",
+		ahc_aic7860_setup
+	},
 	{
-		ID_AHA_2930C_VAR,
-		ID_ALL_MASK,
+		ID_AHA_2930C_VAR & ID_DEV_VENDOR_MASK,
+		ID_DEV_VENDOR_MASK,
 		"Adaptec 2930C SCSI adapter (VAR)",
 		ahc_aic7860_setup
 	},
@@ -213,69 +230,57 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 	},
 	/* aic7880 based controllers */
 	{
-		ID_AHA_2940AU_CN,
-		ID_ALL_MASK,
-		"Adaptec 2940A/CN Ultra SCSI adapter",
-		ahc_aic7880_setup
-	},
-	{
-		ID_AHA_2940U,
-		ID_ALL_MASK,
+		ID_AHA_2940U & ID_DEV_VENDOR_MASK,
+		ID_DEV_VENDOR_MASK,
 		"Adaptec 2940 Ultra SCSI adapter",
 		ahc_aic7880_setup
 	},
 	{
-		ID_AHA_3940U,
-		ID_ALL_MASK,
+		ID_AHA_3940U & ID_DEV_VENDOR_MASK,
+		ID_DEV_VENDOR_MASK,
 		"Adaptec 3940 Ultra SCSI adapter",
 		ahc_aha394XU_setup
 	},
 	{
-		ID_AHA_2944U,
-		ID_ALL_MASK,
+		ID_AHA_2944U & ID_DEV_VENDOR_MASK,
+		ID_DEV_VENDOR_MASK,
 		"Adaptec 2944 Ultra SCSI adapter",
 		ahc_aic7880_setup
 	},
 	{
-		ID_AHA_3944U,
-		ID_ALL_MASK,
+		ID_AHA_3944U & ID_DEV_VENDOR_MASK,
+		ID_DEV_VENDOR_MASK,
 		"Adaptec 3944 Ultra SCSI adapter",
 		ahc_aha394XU_setup
 	},
 	{
-		ID_AHA_398XU,
-		ID_ALL_MASK,
+		ID_AHA_398XU & ID_DEV_VENDOR_MASK,
+		ID_DEV_VENDOR_MASK,
 		"Adaptec 398X Ultra SCSI RAID adapter",
 		ahc_aha398XU_setup
 	},
 	{
 		/* XXX Don't know the slot numbers so can't identify channels */
-		ID_AHA_4944U,
-		ID_ALL_MASK,
+		ID_AHA_4944U & ID_DEV_VENDOR_MASK,
+		ID_DEV_VENDOR_MASK,
 		"Adaptec 4944 Ultra SCSI adapter",
 		ahc_aic7880_setup
 	},
 	{
-		ID_AHA_2940UB,
-		ID_ALL_MASK,
-		"Adaptec 2940B Ultra SCSI adapter",
-		ahc_aic7880_setup
-	},
-	{
-		ID_AHA_2930U,
-		ID_ALL_MASK,
+		ID_AHA_2930U & ID_DEV_VENDOR_MASK,
+		ID_DEV_VENDOR_MASK,
 		"Adaptec 2930 Ultra SCSI adapter",
 		ahc_aic7880_setup
 	},
 	{
-		ID_AHA_2940U_PRO,
-		ID_ALL_MASK,
+		ID_AHA_2940U_PRO & ID_DEV_VENDOR_MASK,
+		ID_DEV_VENDOR_MASK,
 		"Adaptec 2940 Pro Ultra SCSI adapter",
 		ahc_aic7880_setup
 	},
 	{
-		ID_AHA_2940U_CN,
-		ID_ALL_MASK,
+		ID_AHA_2940U_CN & ID_DEV_VENDOR_MASK,
+		ID_DEV_VENDOR_MASK,
 		"Adaptec 2940/CN Ultra SCSI adapter",
 		ahc_aic7880_setup
 	},
@@ -365,8 +370,14 @@ struct ahc_pci_identity ahc_pci_ident_table [] =
 		ID_AIC7855 & ID_DEV_VENDOR_MASK,
 		ID_DEV_VENDOR_MASK,
 		"Adaptec aic7855 SCSI adapter",
-		ahc_aic7850_setup
+		ahc_aic7855_setup
 	},
+	{
+		ID_AIC7859 & ID_DEV_VENDOR_MASK,
+		ID_DEV_VENDOR_MASK,
+		"Adaptec aic7859 SCSI adapter",
+		ahc_aic7859_setup
+  	},
 	{
 		ID_AIC7860 & ID_DEV_VENDOR_MASK,
 		ID_DEV_VENDOR_MASK,
@@ -611,9 +622,9 @@ ahc_pci_attach(pcici_t config_id, int unit)
 	
 	/* Remeber how the card was setup in case there is no SEEPROM */
 	ahc_outb(ahc, HCNTRL, ahc->pause);
-	if ((ahc->features & AHC_ULTRA2) != 0)
+	if ((ahc->features & AHC_ULTRA2) != 0) {
 		our_id = ahc_inb(ahc, SCSIID_ULTRA2) & OID;
-	else
+	} else
 		our_id = ahc_inb(ahc, SCSIID) & OID;
 	sxfrctl1 = ahc_inb(ahc, SXFRCTL1) & STPWEN;
 	scsiseq = ahc_inb(ahc, SCSISEQ);
@@ -773,6 +784,12 @@ ahc_pci_attach(pcici_t config_id, int unit)
 		case AHC_AIC7860:
 			id_string = "aic7860 ";
 			break;
+		case AHC_AIC7859:
+			id_string = "aic7859 ";
+			break;
+		case AHC_AIC7855:
+			id_string = "aic7855 ";
+			break;
 		case AHC_AIC7850:
 			id_string = "aic7850 ";
 			break;
@@ -798,7 +815,7 @@ ahc_pci_attach(pcici_t config_id, int unit)
 		 * and 75% on ULTRA2 controllers.
 		 */
 		if ((ahc->features & AHC_ULTRA2) != 0) {
-			ahc_outb(ahc, DFF_THRSH, RD_DFTHRSH_75|WR_DFTHRSH_75);
+			ahc_outb(ahc, DFF_THRSH, RD_DFTHRSH_MAX|WR_DFTHRSH_MAX);
 		} else {
 			ahc_outb(ahc, DSPCISTATUS, DFTHRSH_100);
 		}
@@ -1232,16 +1249,16 @@ ahc_ultra2_term_detect(struct ahc_softc *ahc, int *enableSEC_low,
 	 * BRDDAT7 = Eeprom
 	 * BRDDAT6 = Enable Secondary High Byte termination
 	 * BRDDAT5 = Enable Secondary Low Byte termination
-	 * BRDDAT4 = Enable Primary low byte termination
-	 * BRDDAT3 = Enable Primary high byte termination
+	 * BRDDAT4 = Enable Primary high byte termination
+	 * BRDDAT3 = Enable Primary low byte termination
 	 */
 	brdctl = read_brdctl(ahc);
 
 	*eeprom_present = brdctl & BRDDAT7;
 	*enableSEC_high = (brdctl & BRDDAT6);
 	*enableSEC_low = (brdctl & BRDDAT5);
-	*enablePRI_low = (brdctl & BRDDAT4);
-	*enablePRI_high = (brdctl & BRDDAT3);
+	*enablePRI_high = (brdctl & BRDDAT4);
+	*enablePRI_low = (brdctl & BRDDAT3);
 }
 
 static void
@@ -1445,6 +1462,26 @@ ahc_aic7850_setup(pcici_t dev, char *channel, ahc_chip *chip,
 }
 
 static int
+ahc_aic7855_setup(pcici_t dev, char *channel, ahc_chip *chip,
+		  ahc_feature *features, ahc_flag *flags)
+{
+	*channel = 'A';
+	*chip = AHC_AIC7855;
+	*features = AHC_AIC7855_FE;
+	return (0);
+}
+
+static int
+ahc_aic7859_setup(pcici_t dev, char *channel, ahc_chip *chip,
+		  ahc_feature *features, ahc_flag *flags)
+{
+	*channel = 'A';
+	*chip = AHC_AIC7859;
+	*features = AHC_AIC7859_FE;
+	return (0);
+}
+
+static int
 ahc_aic7860_setup(pcici_t dev, char *channel, ahc_chip *chip,
 		  ahc_feature *features, ahc_flag *flags)
 {
@@ -1529,6 +1566,7 @@ ahc_aic7890_setup(pcici_t dev, char *channel, ahc_chip *chip,
 	*channel = 'A';
 	*chip = AHC_AIC7890;
 	*features = AHC_AIC7890_FE;
+	*flags |= AHC_NEWEEPROM_FMT;
 	return (0);
 }
 
@@ -1537,10 +1575,17 @@ ahc_aic7895_setup(pcici_t dev, char *channel, ahc_chip *chip,
 		  ahc_feature *features, ahc_flag *flags)
 {
 	u_int32_t devconfig;
+	u_int8_t revid;
 
 	*channel = dev->func == 1 ? 'B' : 'A';
 	*chip = AHC_AIC7895;
-	*features = AHC_AIC7895_FE;
+	/* The 'C' revision of the aic7895 has a few additional features */
+	revid = pci_cfgread(dev, PCIR_REVID, /*bytes*/1);
+	if (revid >= 4)
+		*features = AHC_AIC7895C_FE;
+	else
+		*features = AHC_AIC7895_FE;
+ 	*flags |= AHC_NEWEEPROM_FMT;
 	devconfig = pci_cfgread(dev, DEVCONFIG, /*bytes*/4);
 	devconfig &= ~SCBSIZE32;
 	pci_cfgwrite(dev, DEVCONFIG, devconfig, /*bytes*/4);
@@ -1554,6 +1599,7 @@ ahc_aic7896_setup(pcici_t dev, char *channel, ahc_chip *chip,
 	*channel = dev->func == 1 ? 'B' : 'A';
 	*chip = AHC_AIC7896;
 	*features = AHC_AIC7896_FE;
+	*flags |= AHC_NEWEEPROM_FMT;
 	return (0);
 }
 
@@ -1580,6 +1626,7 @@ ahc_aha394XX_setup(pcici_t dev, char *channel, ahc_chip *chip,
 		printf("adapter at unexpected slot %d\n"
 		       "unable to map to a channel\n",
 		       dev->slot);
+		*channel = 'A';
 	}
 	return (0);
 }
@@ -1602,6 +1649,7 @@ ahc_aha398XX_setup(pcici_t dev, char *channel, ahc_chip *chip,
 		printf("adapter at unexpected slot %d\n"
 		       "unable to map to a channel\n",
 		       dev->slot);
+		*channel = 'A';
 	}
 	*flags |= AHC_LARGE_SEEPROM;
 	return (0);

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: if_ic.c,v 1.3 1998/12/07 21:58:16 archie Exp $
+ * $FreeBSD: src/sys/dev/iicbus/if_ic.c,v 1.3.2.1 1999/08/29 16:23:11 peter Exp $
  */
 
 /*

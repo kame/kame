@@ -34,7 +34,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: divdi3.c,v 1.5 1997/02/22 09:39:52 peter Exp $
+ * $FreeBSD: src/sys/libkern/divdi3.c,v 1.5.4.1 1999/08/29 16:26:31 peter Exp $
  */
 
 #include <libkern/quad.h>

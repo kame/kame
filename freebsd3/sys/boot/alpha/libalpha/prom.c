@@ -1,4 +1,4 @@
-/* $Id: prom.c,v 1.1.1.1 1998/08/21 03:17:42 msmith Exp $ */
+/* $FreeBSD: src/sys/boot/alpha/libalpha/prom.c,v 1.1.1.1.2.1 1999/08/29 16:20:18 peter Exp $ */
 /* $NetBSD: prom.c,v 1.3 1997/09/06 14:03:58 drochner Exp $ */
 
 /*  

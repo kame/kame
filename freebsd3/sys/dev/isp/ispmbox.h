@@ -1,10 +1,9 @@
-/* $Id: ispmbox.h,v 1.4.2.1 1999/05/11 05:49:59 mjacob Exp $ */
-/* release_5_11_99 */
+/* $FreeBSD: src/sys/dev/isp/ispmbox.h,v 1.4.2.5 1999/08/29 16:23:31 peter Exp $ */
 /*
  * Mailbox and Queue Entry Definitions for for Qlogic ISP SCSI adapters.
  *
  *---------------------------------------
- * Copyright (c) 1997, 1998 by Matthew Jacob
+ * Copyright (c) 1997, 1998, 1999 by Matthew Jacob
  * NASA/Ames Research Center
  * All rights reserved.
  *---------------------------------------
@@ -130,6 +129,10 @@
 #define	MBOX_GET_PORT_NAME		0x6a
 #define	MBOX_GET_LINK_STATUS		0x6b
 #define	MBOX_INIT_LIP_RESET		0x6c
+#define	MBOX_SEND_SNS			0x6e
+#define	MBOX_FABRIC_LOGIN		0x6f
+#define	MBOX_SEND_CHANGE_REQUEST	0x70
+#define	MBOX_FABRIC_LOGOUT		0x71
 #define	MBOX_INIT_LIP_LOGIN		0x72
 
 #define	ISP2100_SET_PCI_PARAM		0x00ff
@@ -435,51 +438,67 @@ typedef struct {
 /*
  * Initialization Control Block
  *
- * Version One format.
+ * Version One (prime) format.
  */
-typedef struct {
+typedef struct isp_icb {
 	u_int8_t	icb_version;
 	u_int8_t	_reserved0;
-        u_int16_t	icb_fwoptions;
-        u_int16_t	icb_maxfrmlen;
+	u_int16_t	icb_fwoptions;
+	u_int16_t	icb_maxfrmlen;
 	u_int16_t	icb_maxalloc;
 	u_int16_t	icb_execthrottle;
 	u_int8_t	icb_retry_count;
 	u_int8_t	icb_retry_delay;
-        u_int8_t	icb_nodename[8];
+	u_int8_t	icb_portname[8];
 	u_int16_t	icb_hardaddr;
 	u_int8_t	icb_iqdevtype;
-	u_int8_t	_reserved1;
-        u_int8_t	icb_portname[8];
+	u_int8_t	icb_logintime;
+	u_int8_t	icb_nodename[8];
 	u_int16_t	icb_rqstout;
 	u_int16_t	icb_rspnsin;
-        u_int16_t	icb_rqstqlen;
-        u_int16_t	icb_rsltqlen;
-        u_int16_t	icb_rqstaddr[4];
-        u_int16_t	icb_respaddr[4];
+	u_int16_t	icb_rqstqlen;
+	u_int16_t	icb_rsltqlen;
+	u_int16_t	icb_rqstaddr[4];
+	u_int16_t	icb_respaddr[4];
+	u_int16_t	icb_lunenables;
+	u_int8_t	icb_ccnt;
+	u_int8_t	icb_icnt;
+	u_int16_t	icb_lunetimeout;
+	u_int16_t	_reserved1;
+	u_int16_t	icb_xfwoptions;
+	u_int8_t	icb_racctimer;
+	u_int8_t	icb_idelaytimer;
+	u_int16_t	icb_zfwoptions;
+	u_int16_t	_reserved2[13];
 } isp_icb_t;
 #define	ICB_VERSION1	1
 
-#define	ICBOPT_HARD_ADDRESS	(1<<0)
-#define	ICBOPT_FAIRNESS		(1<<1)
-#define	ICBOPT_FULL_DUPLEX	(1<<2)
-#define	ICBOPT_FAST_POST	(1<<3)
-#define	ICBOPT_TGT_ENABLE	(1<<4)
-#define	ICBOPT_INI_DISABLE	(1<<5)
-#define	ICBOPT_INI_ADISC	(1<<6)
-#define	ICBOPT_INI_TGTTYPE	(1<<7)
-#define	ICBOPT_PDBCHANGE_AE	(1<<8)
-#define	ICBOPT_NOLIP		(1<<9)
-#define	ICBOPT_SRCHDOWN		(1<<10)
-#define	ICBOPT_PREVLOOP		(1<<11)
-#define	ICBOPT_STOP_ON_QFULL	(1<<12)
-#define	ICBOPT_FULL_LOGIN	(1<<13)
-#define	ICBOPT_USE_PORTNAME	(1<<14)
+#define	ICBOPT_HARD_ADDRESS	0x0001
+#define	ICBOPT_FAIRNESS		0x0002
+#define	ICBOPT_FULL_DUPLEX	0x0004
+#define	ICBOPT_FAST_POST	0x0008
+#define	ICBOPT_TGT_ENABLE	0x0010
+#define	ICBOPT_INI_DISABLE	0x0020
+#define	ICBOPT_INI_ADISC	0x0040
+#define	ICBOPT_INI_TGTTYPE	0x0080
+#define	ICBOPT_PDBCHANGE_AE	0x0100
+#define	ICBOPT_NOLIP		0x0200
+#define	ICBOPT_SRCHDOWN		0x0400
+#define	ICBOPT_PREVLOOP		0x0800
+#define	ICBOPT_STOP_ON_QFULL	0x1000
+#define	ICBOPT_FULL_LOGIN	0x2000
+#define	ICBOPT_USE_PORTNAME	0x4000
+#define	ICBOPT_EXTENDED		0x8000
 
 
 #define	ICB_MIN_FRMLEN		256
 #define	ICB_MAX_FRMLEN		2112
 #define	ICB_DFLT_FRMLEN		1024
+#define	ICB_DFLT_ALLOC		256
+#define	ICB_DFLT_THROTTLE	16
+#define	ICB_DFLT_RDELAY		5
+#define	ICB_DFLT_RCOUNT		3
+
 
 #define	RQRSP_ADDR0015	0
 #define	RQRSP_ADDR1631	1
@@ -552,8 +571,6 @@ typedef struct {
 	u_int16_t	pdb_sl_ptr;
 } isp_pdb_t;
 
-#define	INVALID_PDB_OPTIONS	0xDEAD
-
 #define	PDB_OPTIONS_XMITTING	(1<<11)
 #define	PDB_OPTIONS_LNKXMIT	(1<<10)
 #define	PDB_OPTIONS_ABORTED	(1<<9)
@@ -575,6 +592,30 @@ typedef struct {
 #define		SVC3_TGT_ROLE		0x10
 #define 	SVC3_INI_ROLE		0x20
 #define			SVC3_ROLE_MASK	0x30
+#define			SVC3_ROLE_SHIFT	4
+
+#define	SNS_GAN	0x100
+#define	SNS_GP3	0x171
+typedef struct {
+	u_int16_t	snscb_rblen;	/* response buffer length (words) */
+	u_int16_t	snscb_res0;
+	u_int16_t	snscb_addr[4];	/* response buffer address */
+	u_int16_t	snscb_sblen;	/* subcommand buffer length (words) */
+	u_int16_t	snscb_res1;
+	u_int16_t	snscb_data[1];	/* variable data */
+} sns_screq_t;	/* Subcommand Request Structure */
+#define	SNS_GAN_REQ_SIZE	(sizeof (sns_screq_t)+(5*(sizeof (u_int16_t))))
+#define	SNS_GP3_REQ_SIZE	(sizeof (sns_screq_t)+(5*(sizeof (u_int16_t))))
+
+typedef struct {
+	u_int8_t	snscb_cthdr[16];
+	u_int8_t	snscb_port_type;
+	u_int8_t	snscb_port_id[3];
+	u_int8_t	snscb_portname[8];
+	u_int16_t	snscb_data[1];	/* variable data */
+} sns_scrsp_t;	/* Subcommand Response Structure */
+#define	SNS_GAN_RESP_SIZE	608	/* Maximum response size (bytes) */
+#define	SNS_GP3_RESP_SIZE	532	/* XXX: For 128 ports */
 
 /*
  * Target Mode Structures

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfsrvcache.h	8.3 (Berkeley) 3/30/95
- * $Id: nfsrvcache.h,v 1.11 1998/05/31 20:09:00 peter Exp $
+ * $FreeBSD: src/sys/nfs/nfsrvcache.h,v 1.11.2.1 1999/08/29 16:30:36 peter Exp $
  */
 
 

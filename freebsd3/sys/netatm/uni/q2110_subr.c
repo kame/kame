@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $Id: q2110_subr.c,v 1.2 1998/10/31 20:06:59 phk Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/q2110_subr.c,v 1.2.2.1 1999/08/29 16:29:07 peter Exp $
  *
  */
 
@@ -44,7 +44,7 @@
 #include <netatm/uni/sscop_var.h>
 
 #ifndef lint
-__RCSID("@(#) $Id: q2110_subr.c,v 1.2 1998/10/31 20:06:59 phk Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/q2110_subr.c,v 1.2.2.1 1999/08/29 16:29:07 peter Exp $");
 #endif
 
 

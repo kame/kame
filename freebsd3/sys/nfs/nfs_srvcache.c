@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_srvcache.c	8.3 (Berkeley) 3/30/95
- * $Id: nfs_srvcache.c,v 1.17 1998/07/02 12:41:42 kato Exp $
+ * $FreeBSD: src/sys/nfs/nfs_srvcache.c,v 1.17.2.1 1999/08/29 16:30:30 peter Exp $
  */
 
 /*

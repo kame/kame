@@ -35,7 +35,7 @@
  *
  *	@(#)null_subr.c	8.7 (Berkeley) 5/14/95
  *
- * $Id: null_subr.c,v 1.19 1998/07/30 17:40:45 bde Exp $
+ * $FreeBSD: src/sys/miscfs/nullfs/null_subr.c,v 1.19.2.1 1999/08/29 16:26:46 peter Exp $
  */
 
 #include "opt_debug_nullfs.h"

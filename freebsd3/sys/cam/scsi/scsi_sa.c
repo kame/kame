@@ -1,5 +1,5 @@
 /*
- * $Id: scsi_sa.c,v 1.16.2.4 1999/05/11 05:40:43 mjacob Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_sa.c,v 1.16.2.8 1999/08/29 16:21:49 peter Exp $
  *
  * Implementation of SCSI Sequential Access Peripheral driver for CAM.
  *
@@ -248,6 +248,14 @@ static struct sa_quirk_entry sa_quirk_table[] =
 	{
 		{ T_SEQUENTIAL, SIP_MEDIA_REMOVABLE, "TANDBERG",
 		  " TDC 3600", "U07:"}, SA_QUIRK_NOCOMP|SA_QUIRK_1FM, 512
+	},
+	{
+		{ T_SEQUENTIAL, SIP_MEDIA_REMOVABLE, "TANDBERG",
+		  " TDC 3800", "*"}, SA_QUIRK_NOCOMP|SA_QUIRK_1FM, 512
+	},
+	{
+		{ T_SEQUENTIAL, SIP_MEDIA_REMOVABLE, "TANDBERG",
+		  " TDC 4100", "*"}, SA_QUIRK_NOCOMP|SA_QUIRK_1FM, 512
 	},
 	{
 		{ T_SEQUENTIAL, SIP_MEDIA_REMOVABLE, "TANDBERG",
@@ -1267,15 +1275,8 @@ saasync(void *callback_arg, u_int32_t code,
 				"due to status 0x%x\n", status);
 		break;
 	}
-	case AC_LOST_DEVICE:
-		cam_periph_invalidate(periph);
-		break;
-	case AC_TRANSFER_NEG:
-	case AC_SENT_BDR:
-	case AC_SCSI_AEN:
-	case AC_UNSOL_RESEL:
-	case AC_BUS_RESET:
 	default:
+		cam_periph_async(periph, code, path, arg);
 		break;
 	}
 }

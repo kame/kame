@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $Id: eni_globals.c,v 1.2 1998/10/31 20:06:45 phk Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hea/eni_globals.c,v 1.2.2.2 1999/08/29 16:22:54 peter Exp $
  *
  */
 
@@ -42,7 +42,7 @@
 #include <dev/hea/eni_var.h>
 
 #ifndef lint
-__RCSID("@(#) $Id: eni_globals.c,v 1.2 1998/10/31 20:06:45 phk Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hea/eni_globals.c,v 1.2.2.2 1999/08/29 16:22:54 peter Exp $");
 #endif
 
 /*
@@ -90,7 +90,7 @@ struct sp_info eni_nif_pool = {
 	"eni nif pool",			/* si_name */
 	sizeof(struct atm_nif),		/* si_blksiz */
 	5,				/* si_blkcnt */
-	20				/* si_maxallow */
+	52				/* si_maxallow */
 };
 
 struct sp_info eni_vcc_pool = {

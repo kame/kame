@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *      $Id: wfd.c,v 1.17.2.1 1999/02/18 22:06:08 ken Exp $
+ * $FreeBSD: src/sys/i386/isa/wfd.c,v 1.17.2.3 1999/08/29 16:07:35 peter Exp $
  */
 
 /*
@@ -664,7 +664,7 @@ int wfdioctl (dev_t dev, u_long cmd, caddr_t addr, int flag, struct proc *p)
 
 	error = dsioctl("wfd", dev, cmd, addr, flag, &t->dk_slices,
 			wfdstrategy1, (ds_setgeom_t *)NULL);
-	if (error != -1)
+	if (error != ENOIOCTL)
 		return (error);
 
 	if (t->flags & F_MEDIA_CHANGED)

@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: pcic_p.h,v 1.3.4.1 1999/05/02 05:59:13 nate Exp $
+ * $FreeBSD: src/sys/pci/pcic_p.h,v 1.3.4.2 1999/08/29 16:31:56 peter Exp $
  */
 
 /* PCI/CardBus Device IDs */

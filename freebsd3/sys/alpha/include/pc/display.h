@@ -1,7 +1,7 @@
 /*
  * IBM PC display definitions
  *
- *	$Id: display.h,v 1.5 1998/08/06 09:15:54 dfr Exp $
+ * $FreeBSD: src/sys/alpha/include/pc/display.h,v 1.5.2.1 1999/08/29 15:57:14 peter Exp $
  *	from: i386/include/pc display.h,v 1.4
  */
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: bt848_i2c.h,v 1.1 1998/10/31 11:26:38 nsouch Exp $
+ * $FreeBSD: src/sys/pci/bt848_i2c.h,v 1.1.2.1 1999/08/29 16:31:27 peter Exp $
  *
  */
 #ifndef _BT848_I2C_H

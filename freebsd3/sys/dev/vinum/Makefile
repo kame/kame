@@ -1,4 +1,4 @@
-#       $Id: Makefile,v 1.5 1998/12/28 16:28:23 peter Exp $ 
+# $FreeBSD: src/sys/dev/vinum/Makefile,v 1.5.2.1 1999/08/29 16:24:12 peter Exp $ 
 
 .PATH:  ${.CURDIR}/../../sys/dev/ccd
 KMOD=   vinum_mod

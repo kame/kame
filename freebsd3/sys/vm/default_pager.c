@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: default_pager.c,v 1.16 1998/10/13 08:24:42 dg Exp $
+ * $FreeBSD: src/sys/vm/default_pager.c,v 1.16.2.1 1999/08/29 16:33:26 peter Exp $
  */
 
 #include <sys/param.h>

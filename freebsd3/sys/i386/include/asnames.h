@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: asnames.h,v 1.26.2.3 1999/02/25 14:36:28 bde Exp $
+ * $FreeBSD: src/sys/i386/include/asnames.h,v 1.26.2.6 1999/09/10 01:18:44 msmith Exp $
  */
 
 #ifndef _MACHINE_ASNAMES_H_
@@ -132,6 +132,7 @@
 #define _Xintr9				Xintr9
 #define _XintrRTC			XintrRTC
 #define _Xinvltlb			Xinvltlb
+#define _Xrendezvous			Xrendezvous
 #define _Xmchk				Xmchk
 #define _Xmissing			Xmissing
 #define _Xnmi				Xnmi
@@ -337,6 +338,7 @@
 #define _sigcode			sigcode
 #define _siopoll			siopoll
 #define _smp_active			smp_active
+#define _smp_rendezvous_action		smp_rendezvous_action
 #define _soft_imask			soft_imask
 #define _softclock			softclock
 #define _softnet_imask			softnet_imask

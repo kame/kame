@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: pcaudio.c,v 1.20 1998/12/30 08:08:05 kato Exp $
+ * $FreeBSD: src/sys/pc98/pc98/pcaudio.c,v 1.20.2.1 1999/08/29 16:31:14 peter Exp $
  */
 
 #include "pca.h"

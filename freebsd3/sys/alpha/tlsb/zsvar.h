@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: zsvar.h,v 1.1 1998/06/14 13:58:57 dfr Exp $
+ * $FreeBSD: src/sys/alpha/tlsb/zsvar.h,v 1.1.2.1 1999/08/29 15:57:45 peter Exp $
  */
 
 int zs_cnattach(vm_offset_t base, vm_offset_t offset);

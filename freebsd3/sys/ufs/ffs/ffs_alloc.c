@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_alloc.c	8.18 (Berkeley) 5/26/95
- * $Id: ffs_alloc.c,v 1.56 1999/01/07 16:14:16 bde Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_alloc.c,v 1.56.2.2 1999/08/30 12:30:11 sheldonh Exp $
  */
 
 #include "opt_quota.h"
@@ -523,10 +523,12 @@ ffs_reallocblks(ap)
 			    dbtofsb(fs, buflist->bs_children[i]->b_blkno),
 			    fs->fs_bsize);
 		buflist->bs_children[i]->b_blkno = fsbtodb(fs, blkno);
-#ifdef DEBUG
+#ifdef DIAGNOSTIC
 		if (!ffs_checkblk(ip,
 		   dbtofsb(fs, buflist->bs_children[i]->b_blkno), fs->fs_bsize))
 			panic("ffs_reallocblks: unallocated block 3");
+#endif
+#ifdef DEBUG
 		if (prtrealloc)
 			printf(" %d,", blkno);
 #endif

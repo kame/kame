@@ -1,4 +1,4 @@
-/* $Id: sticreg.h,v 1.1 1998/08/20 08:27:10 dfr Exp $ */
+/* $FreeBSD: src/sys/alpha/tc/sticreg.h,v 1.1.2.1 1999/08/29 15:57:31 peter Exp $ */
 /*	$NetBSD: sticreg.h,v 1.1 1997/11/08 07:27:50 jonathan Exp $	*/
 
 /*

@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- *	$Id: machdep.c,v 1.322.2.5 1999/04/14 04:55:20 jdp Exp $
+ * $FreeBSD: src/sys/i386/i386/machdep.c,v 1.322.2.8 1999/08/29 16:05:43 peter Exp $
  */
 
 #include "apm.h"
@@ -431,6 +431,8 @@ again:
 	 */
 	SLIST_INIT(&callfree);
 	for (i = 0; i < ncallout; i++) {
+		callout_init(&callout[i]);
+		callout[i].c_flags = CALLOUT_LOCAL_ALLOC;
 		SLIST_INSERT_HEAD(&callfree, &callout[i], c_links.sle);
 	}
 
@@ -1022,31 +1024,31 @@ struct soft_segment_descriptor gdt_segs[
 	0  			/* limit granularity (byte/page units)*/ },
 /* GAPMCODE32_SEL 8 APM BIOS 32-bit interface (32bit Code) */
 {	0,			/* segment base address (overwritten by APM)  */
-	0xfffff,		/* length */
+	0xffff,			/* length (overwritten by APM)  */
 	SDT_MEMERA,		/* segment type */
 	0,			/* segment descriptor priority level */
 	1,			/* segment descriptor present */
 	0, 0,
 	1,			/* default 32 vs 16 bit size */
-	1  			/* limit granularity (byte/page units)*/ },
+	0  			/* limit granularity (byte/page units)*/ },
 /* GAPMCODE16_SEL 9 APM BIOS 32-bit interface (16bit Code) */
 {	0,			/* segment base address (overwritten by APM)  */
-	0xfffff,		/* length */
+	0xffff,			/* length (overwritten by APM)  */
 	SDT_MEMERA,		/* segment type */
 	0,			/* segment descriptor priority level */
 	1,			/* segment descriptor present */
 	0, 0,
 	0,			/* default 32 vs 16 bit size */
-	1  			/* limit granularity (byte/page units)*/ },
+	0  			/* limit granularity (byte/page units)*/ },
 /* GAPMDATA_SEL	10 APM BIOS 32-bit interface (Data) */
 {	0,			/* segment base address (overwritten by APM) */
-	0xfffff,		/* length */
+	0xffff,			/* length (overwritten by APM)  */
 	SDT_MEMRWA,		/* segment type */
 	0,			/* segment descriptor priority level */
 	1,			/* segment descriptor present */
 	0, 0,
-	1,			/* default 32 vs 16 bit size */
-	1  			/* limit granularity (byte/page units)*/ },
+	0,			/* default 32 vs 16 bit size */
+	0  			/* limit granularity (byte/page units)*/ },
 };
 
 static struct soft_segment_descriptor ldt_segs[] = {

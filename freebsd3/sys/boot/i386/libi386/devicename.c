@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: devicename.c,v 1.3 1998/09/26 10:51:38 dfr Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/devicename.c,v 1.3.2.1 1999/08/29 16:21:02 peter Exp $
  */
 
 #include <stand.h>

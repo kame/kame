@@ -1,4 +1,4 @@
-/* $Id: mcclock_ioasic.c,v 1.1 1998/08/20 08:27:10 dfr Exp $ */
+/* $FreeBSD: src/sys/alpha/tc/mcclock_ioasic.c,v 1.1.2.1 1999/08/29 15:57:31 peter Exp $ */
 /* $NetBSD: mcclock_ioasic.c,v 1.8 1997/09/02 13:20:14 thorpej Exp $ */
 
 /*

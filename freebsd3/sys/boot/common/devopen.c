@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: devopen.c,v 1.2 1998/09/26 10:51:37 dfr Exp $
+ * $FreeBSD: src/sys/boot/common/devopen.c,v 1.2.2.1 1999/08/29 16:20:27 peter Exp $
  */
 
 

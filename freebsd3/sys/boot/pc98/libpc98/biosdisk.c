@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: biosdisk.c,v 1.1.2.3 1999/03/11 10:27:15 kato Exp $
+ * $FreeBSD: src/sys/boot/pc98/libpc98/biosdisk.c,v 1.1.2.6 1999/08/29 16:21:28 peter Exp $
  */
 
 /*
@@ -58,6 +58,7 @@
 #define WFDMAJOR		1
 #define FDMAJOR			2
 #define DAMAJOR			4
+#define FLAMAJOR		28
 
 #ifdef DISK_DEBUG
 # define DEBUG(fmt, args...)	printf("%s: " fmt "\n" , __FUNCTION__ , ## args)
@@ -94,7 +95,7 @@ static struct bdinfo
     int		bd_flags;
     int		bd_type;		/* BIOS 'drive type' (floppy only) */
 #ifdef PC98
-    int         bd_drive;
+    int         bd_da_unit;		/* kernel unit number for da */
 #endif
 } bdinfo [MAXBDDEV];
 static int nbdinfo = 0;
@@ -165,7 +166,7 @@ bd_init(void)
     int		base, unit;
 
 #ifdef PC98
-    int         hd_drive=0, n=-0x10;
+    int         da_drive=0, n=-0x10;
     /* sequence 0x90, 0x80, 0xa0 */
     for (base = 0x90; base <= 0xa0; base += n, n += 0x30) {
 	for (unit = base; (nbdinfo < MAXBDDEV) || ((unit & 0x0f) < 4); unit++) {
@@ -174,14 +175,14 @@ bd_init(void)
 
 	    /* XXX add EDD probes */
 	    if (!bd_int13probe(&bdinfo[nbdinfo])){
-		if ((unit & 0xf0) == 0xa0 && (unit & 0x0f) < 6)
+		if (((unit & 0xf0) == 0x90 && (unit & 0x0f) < 4) ||
+		    ((unit & 0xf0) == 0xa0 && (unit & 0x0f) < 6))
 		    continue;	/* Target IDs are not contiguous. */
 		else
 		    break;
 	    }
 
 	    if (bdinfo[nbdinfo].bd_flags & BD_FLOPPY){
-	        bdinfo[nbdinfo].bd_drive = 'A' + (unit & 0xf);
 		/* available 1.44MB access? */
 		if (*(u_char *)PTOV(0xA15AE) & (1<<(unit & 0xf))){
 		    /* boot media 1.2MB FD? */
@@ -189,11 +190,13 @@ bd_init(void)
 		        bdinfo[nbdinfo].bd_unit = 0x30 + (unit & 0xf);
 		}
 	    }
-	    else
-	        bdinfo[nbdinfo].bd_drive = 'C' + hd_drive++;
+	    else {
+		if ((unit & 0xa0) == 0xa0)
+		    bdinfo[nbdinfo].bd_da_unit = da_drive++;
+	    }
 	    /* XXX we need "disk aliases" to make this simpler */
 	    printf("BIOS drive %c: is disk%d\n", 
-		   bdinfo[nbdinfo].bd_drive, nbdinfo);
+		   'A' + nbdinfo, nbdinfo);
 	    nbdinfo++;
 	}
     }
@@ -272,8 +275,7 @@ bd_print(int verbose)
     
     for (i = 0; i < nbdinfo; i++) {
 #ifdef PC98
-	sprintf(line, "    disk%d:   BIOS drive %c:\n", i, 
-		bdinfo[i].bd_drive);
+	sprintf(line, "    disk%d:   BIOS drive %c:\n", i, 'A' + i);
 #else
 	sprintf(line, "    disk%d:   BIOS drive %c:\n", i, 
 		(bdinfo[i].bd_unit < 0x80) ? ('A' + bdinfo[i].bd_unit) : ('C' + bdinfo[i].bd_unit - 0x80));
@@ -978,6 +980,9 @@ bd_getdev(struct i386_devdesc *dev)
 		if ((cp != nip) && (*cp == 0))
 		    unitofs = i;
 	    }
+	} else if ((od->od_flags & BD_LABELOK) && 
+	  (od->od_disklabel.d_type == DTYPE_DOC2K)) {
+	    major = FLAMAJOR;
 	} else {
 	    /* assume an IDE disk */
 	    major = WDMAJOR;
@@ -991,7 +996,10 @@ bd_getdev(struct i386_devdesc *dev)
 	    unit = i;
     } else {
 #ifdef PC98
-        unit = biosdev & 0xf;					/* allow for #wd compenstation in da case */
+	if ((biosdev & 0xf0) == 0xa0)
+	    unit = bdinfo[dev->d_kind.biosdisk.unit].bd_da_unit;
+	else
+            unit = biosdev & 0xf;
 #else
 	unit = (biosdev & 0x7f) - unitofs;					/* allow for #wd compenstation in da case */
 #endif

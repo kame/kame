@@ -25,8 +25,10 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *  $Id: linux_misc.c,v 1.51.2.2 1999/03/02 00:42:08 julian Exp $
+ * $FreeBSD: src/sys/i386/linux/linux_misc.c,v 1.51.2.8 1999/08/29 16:07:51 peter Exp $
  */
+
+#include "opt_compat.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -59,6 +61,14 @@
 #include <i386/linux/linux.h>
 #include <i386/linux/linux_proto.h>
 #include <i386/linux/linux_util.h>
+
+#include <posix4/sched.h>
+
+static unsigned int linux_to_bsd_resource[LINUX_RLIM_NLIMITS] = {
+	RLIMIT_CPU, RLIMIT_FSIZE, RLIMIT_DATA, RLIMIT_STACK,
+	RLIMIT_CORE, RLIMIT_RSS, RLIMIT_NPROC, RLIMIT_NOFILE,
+	RLIMIT_MEMLOCK, -1
+};
 
 int
 linux_alarm(struct proc *p, struct linux_alarm_args *args)
@@ -172,7 +182,7 @@ linux_uselib(struct proc *p, struct linux_uselib_args *args)
     locked = 0;
     vp = NULL;
 
-    NDINIT(&ni, LOOKUP, FOLLOW | LOCKLEAF, UIO_SYSSPACE, args->library, p);
+    NDINIT(&ni, LOOKUP, FOLLOW | LOCKLEAF, UIO_USERSPACE, args->library, p);
     if (error = namei(&ni))
 	goto cleanup;
 
@@ -561,6 +571,25 @@ linux_fork(struct proc *p, struct linux_fork_args *args)
     return 0;
 }
 
+int
+linux_vfork(p, args)
+	struct proc *p;
+	struct linux_vfork_args *args;
+{
+	int error;
+
+#ifdef DEBUG
+	printf("Linux-emul(%ld): vfork()\n", (long)p->p_pid);
+#endif
+
+	if ((error = vfork(p, (struct vfork_args *)args)) != 0)
+		return error;
+	/* Are we the child? */
+	if (p->p_retval[1] == 1)
+		p->p_retval[0] = 0;
+	return 0;
+}
+
 #define CLONE_VM	0x100
 #define CLONE_FS	0x200
 #define CLONE_FILES	0x400
@@ -879,11 +908,11 @@ linux_newuname(struct proc *p, struct linux_newuname_args *args)
     printf("Linux-emul(%d): newuname(*)\n", p->p_pid);
 #endif
     bzero(&linux_newuname, sizeof(struct linux_newuname_t));
-    strncpy(linux_newuname.sysname, ostype,
+    strncpy(linux_newuname.sysname, "Linux",
 	sizeof(linux_newuname.sysname) - 1);
     strncpy(linux_newuname.nodename, hostname,
 	sizeof(linux_newuname.nodename) - 1);
-    strncpy(linux_newuname.release, osrelease,
+    strncpy(linux_newuname.release, "2.0.36",
 	sizeof(linux_newuname.release) - 1);
     strncpy(linux_newuname.version, version,
 	sizeof(linux_newuname.version) - 1);
@@ -1139,73 +1168,201 @@ linux_nice(struct proc *p, struct linux_nice_args *args)
 
 int
 linux_setgroups(p, uap)
-     struct proc *p;
-     struct linux_setgroups_args *uap;
+	struct proc *p;
+	struct linux_setgroups_args *uap;
 {
-  struct pcred *pc = p->p_cred;
-  linux_gid_t linux_gidset[NGROUPS];
-  gid_t *bsd_gidset;
-  int ngrp, error;
+	struct pcred *pc;
+	linux_gid_t linux_gidset[NGROUPS];
+	gid_t *bsd_gidset;
+	int ngrp, error;
 
-  if ((error = suser(pc->pc_ucred, &p->p_acflag)))
-    return error;
+	pc = p->p_cred;
+	ngrp = uap->gidsetsize;
 
-  if (uap->gidsetsize > NGROUPS)
-    return EINVAL;
+	/*
+	 * cr_groups[0] holds egid. Setting the whole set from
+	 * the supplied set will cause egid to be changed too.
+	 * Keep cr_groups[0] unchanged to prevent that.
+	 */
 
-  ngrp = uap->gidsetsize;
-  pc->pc_ucred = crcopy(pc->pc_ucred);
-  if (ngrp >= 1) {
-    if ((error = copyin((caddr_t)uap->gidset,
-                      (caddr_t)linux_gidset,
-                        ngrp * sizeof(linux_gid_t))))
-      return error;
+	if ((error = suser(pc->pc_ucred, &p->p_acflag)))
+		return (error);
 
-    pc->pc_ucred->cr_ngroups = ngrp;
+	if (ngrp >= NGROUPS)
+		return (EINVAL);
 
-    bsd_gidset = pc->pc_ucred->cr_groups;
-    ngrp--;
-    while (ngrp >= 0) {
-      bsd_gidset[ngrp] = linux_gidset[ngrp];
-      ngrp--;
-    }
-  }
-  else
-    pc->pc_ucred->cr_ngroups = 1;
+	pc->pc_ucred = crcopy(pc->pc_ucred);
+	if (ngrp > 0) {
+		error = copyin((caddr_t)uap->gidset, (caddr_t)linux_gidset,
+			       ngrp * sizeof(linux_gid_t));
+		if (error)
+			return (error);
 
-  setsugid(p);
-  return 0;
+		pc->pc_ucred->cr_ngroups = ngrp + 1;
+
+		bsd_gidset = pc->pc_ucred->cr_groups;
+		ngrp--;
+		while (ngrp >= 0) {
+			bsd_gidset[ngrp + 1] = linux_gidset[ngrp];
+			ngrp--;
+		}
+	}
+	else
+		pc->pc_ucred->cr_ngroups = 1;
+
+	setsugid(p);
+	return (0);
 }
 
 int
 linux_getgroups(p, uap)
-     struct proc *p;
-     struct linux_getgroups_args *uap;
+	struct proc *p;
+	struct linux_getgroups_args *uap;
 {
-  struct pcred *pc = p->p_cred;
-  linux_gid_t linux_gidset[NGROUPS];
-  gid_t *bsd_gidset;
-  int ngrp, error;
+	struct pcred *pc;
+	linux_gid_t linux_gidset[NGROUPS];
+	gid_t *bsd_gidset;
+	int bsd_gidsetsz, ngrp, error;
 
-  if ((ngrp = uap->gidsetsize) == 0) {
-    p->p_retval[0] = pc->pc_ucred->cr_ngroups;
-    return 0;
-  }
+	pc = p->p_cred;
+	bsd_gidset = pc->pc_ucred->cr_groups;
+	bsd_gidsetsz = pc->pc_ucred->cr_ngroups - 1;
 
-  if (ngrp < pc->pc_ucred->cr_ngroups)
-    return EINVAL;
+	/*
+	 * cr_groups[0] holds egid. Returning the whole set
+	 * here will cause a duplicate. Exclude cr_groups[0]
+	 * to prevent that.
+	 */
 
-  ngrp = 0;
-  bsd_gidset = pc->pc_ucred->cr_groups;
-  while (ngrp < pc->pc_ucred->cr_ngroups) {
-    linux_gidset[ngrp] = bsd_gidset[ngrp];
-    ngrp++;
-  }
+	if ((ngrp = uap->gidsetsize) == 0) {
+		p->p_retval[0] = bsd_gidsetsz;
+		return (0);
+	}
 
-  if ((error = copyout((caddr_t)linux_gidset, (caddr_t)uap->gidset,
-                       ngrp * sizeof(linux_gid_t))))
-    return error;
+	if (ngrp < bsd_gidsetsz)
+		return (EINVAL);
 
-  p->p_retval[0] = ngrp;
-  return (0);
+	ngrp = 0;
+	while (ngrp < bsd_gidsetsz) {
+		linux_gidset[ngrp] = bsd_gidset[ngrp + 1];
+		ngrp++;
+	}
+
+	if ((error = copyout((caddr_t)linux_gidset, (caddr_t)uap->gidset,
+	    ngrp * sizeof(linux_gid_t))))
+		return (error);
+
+	p->p_retval[0] = ngrp;
+	return (0);
+}
+
+int
+linux_setrlimit(p, uap)
+	struct proc *p;
+	struct linux_setrlimit_args *uap;
+{
+	struct osetrlimit_args bsd;
+
+#ifdef DEBUG
+	printf("Linux-emul(%ld): setrlimit(%d, %p)\n", (long)p->p_pid,
+	       uap->resource, (void *)uap->rlim);
+#endif
+
+	if (uap->resource >= LINUX_RLIM_NLIMITS)
+		return EINVAL;
+
+	bsd.which = linux_to_bsd_resource[uap->resource];
+
+	if (bsd.which == -1)
+		return EINVAL;
+
+	bsd.rlp = uap->rlim;
+	return osetrlimit(p, &bsd);
+}
+
+int
+linux_getrlimit(p, uap)
+	struct proc *p;
+	struct linux_getrlimit_args *uap;
+{
+	struct ogetrlimit_args bsd;
+
+#ifdef DEBUG
+	printf("Linux-emul(%ld): getrlimit(%d, %p)\n", (long)p->p_pid,
+	       uap->resource, (void *)uap->rlim);
+#endif
+
+	if (uap->resource >= LINUX_RLIM_NLIMITS)
+		return EINVAL;
+
+	bsd.which = linux_to_bsd_resource[uap->resource];
+
+	if (bsd.which == -1)
+		return EINVAL;
+
+	bsd.rlp = uap->rlim;
+	return ogetrlimit(p, &bsd);
+}
+
+int
+linux_sched_setscheduler(p, uap)
+	struct proc *p;
+	struct linux_sched_setscheduler_args *uap;
+{
+	struct sched_setscheduler_args bsd;
+ 
+#ifdef DEBUG
+	printf("Linux-emul(%ld): sched_setscheduler(%d, %d, %p)\n",
+	       (long)p->p_pid, uap->pid, uap->policy, (void *)uap->param);
+#endif
+
+	switch (uap->policy) {
+	case LINUX_SCHED_OTHER:
+		bsd.policy = SCHED_OTHER;
+		break;
+	case LINUX_SCHED_FIFO:
+		bsd.policy = SCHED_FIFO;
+		break;
+	case LINUX_SCHED_RR:
+		bsd.policy = SCHED_RR;
+		break;
+	default:
+		return EINVAL;
+	}
+
+	bsd.pid = uap->pid;
+	bsd.param = uap->param;
+	return sched_setscheduler(p, &bsd);
+}
+
+int
+linux_sched_getscheduler(p, uap)
+	struct proc *p;
+	struct linux_sched_getscheduler_args *uap;
+{
+	struct sched_getscheduler_args bsd;
+	int error;
+
+#ifdef DEBUG
+	printf("Linux-emul(%ld): sched_getscheduler(%d)\n",
+	       (long)p->p_pid, uap->pid);
+#endif
+
+
+	bsd.pid = uap->pid;
+	error = sched_getscheduler(p, &bsd);
+
+	switch (p->p_retval[0]) {
+	case SCHED_OTHER:
+		p->p_retval[0] = LINUX_SCHED_OTHER;
+		break;
+	case SCHED_FIFO:
+		p->p_retval[0] = LINUX_SCHED_FIFO;
+		break;
+	case SCHED_RR:
+		p->p_retval[0] = LINUX_SCHED_RR;
+		break;
+	}
+
+	return error;
 }

@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.12 1998/10/16 04:30:42 peter Exp $
+# $FreeBSD: src/sys/modules/atapi/Makefile,v 1.12.2.1 1999/08/29 16:27:05 peter Exp $
 
 .PATH:          ${.CURDIR}/../../i386/isa
 KMOD            = atapi

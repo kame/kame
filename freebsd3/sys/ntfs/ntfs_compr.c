@@ -1,3 +1,5 @@
+/*	$NetBSD: ntfs_compr.c,v 1.2 1999/05/06 15:43:18 christos Exp $	*/
+
 /*-
  * Copyright (c) 1998, 1999 Semen Ustimenko
  * All rights reserved.
@@ -23,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: ntfs_compr.c,v 1.2.2.1 1999/03/14 09:47:05 semenu Exp $
+ * $FreeBSD: src/sys/ntfs/ntfs_compr.c,v 1.2.2.3 1999/08/29 16:30:40 peter Exp $
  */
 
 #include <sys/param.h>
@@ -36,7 +38,9 @@
 #include <sys/buf.h>
 #include <sys/file.h>
 #include <sys/malloc.h>
+#ifdef __FreeBSD__
 #include <machine/clock.h>
+#endif
 
 #include <miscfs/specfs/specdev.h>
 

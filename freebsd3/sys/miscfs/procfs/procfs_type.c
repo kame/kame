@@ -34,7 +34,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: procfs_type.c,v 1.5 1997/08/02 14:32:18 bde Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_type.c,v 1.5.2.1 1999/08/29 16:26:55 peter Exp $
  */
 
 #include <sys/param.h>

@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.5 1997/02/22 09:42:59 peter Exp $
+# $FreeBSD: src/sys/pc98/boot/Makefile,v 1.5.4.1 1999/08/29 16:30:46 peter Exp $
   
 SUBDIR=	biosboot kzipboot netboot rawboot
 

@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- *	$Id: db_lex.h,v 1.11 1998/07/08 09:11:36 bde Exp $
+ * $FreeBSD: src/sys/ddb/db_lex.h,v 1.11.2.1 1999/08/29 16:22:17 peter Exp $
  */
 
 #ifndef _DDB_DB_LEX_H_

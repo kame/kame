@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: kbdreg.h,v 1.2.2.1 1999/05/09 11:02:14 yokota Exp $
+ * $FreeBSD: src/sys/dev/kbd/kbdreg.h,v 1.2.2.2 1999/08/29 16:23:37 peter Exp $
  */
 
 #ifndef _DEV_KBD_KBDREG_H_

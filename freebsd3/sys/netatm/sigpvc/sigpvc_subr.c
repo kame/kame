@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $Id: sigpvc_subr.c,v 1.2 1998/10/31 20:06:56 phk Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/sigpvc/sigpvc_subr.c,v 1.2.2.1 1999/08/29 16:28:58 peter Exp $
  *
  */
 
@@ -41,7 +41,7 @@
 #include <netatm/sigpvc/sigpvc_var.h>
 
 #ifndef lint
-__RCSID("@(#) $Id: sigpvc_subr.c,v 1.2 1998/10/31 20:06:56 phk Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/sigpvc/sigpvc_subr.c,v 1.2.2.1 1999/08/29 16:28:58 peter Exp $");
 #endif
 
 extern struct sp_info sigpvc_vcpool;

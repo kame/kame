@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: md_var.h,v 1.5 1998/10/30 05:41:13 msmith Exp $
+ * $FreeBSD: src/sys/alpha/include/md_var.h,v 1.5.2.1 1999/08/29 15:56:59 peter Exp $
  */
 
 #ifndef _MACHINE_MD_VAR_H_

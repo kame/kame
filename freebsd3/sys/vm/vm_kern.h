@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $Id: vm_kern.h,v 1.17 1997/10/11 10:39:19 peter Exp $
+ * $FreeBSD: src/sys/vm/vm_kern.h,v 1.17.2.1 1999/08/29 16:33:33 peter Exp $
  */
 
 #ifndef _VM_VM_KERN_H_

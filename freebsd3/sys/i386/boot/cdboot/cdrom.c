@@ -27,7 +27,7 @@
  * IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: cdrom.c,v 1.3 1997/12/04 21:52:47 joerg Exp $
+ * $FreeBSD: src/sys/i386/boot/cdboot/cdrom.c,v 1.3.2.1 1999/08/29 16:04:55 peter Exp $
  */
 
 

@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: eisaconf.h,v 1.17 1997/09/21 21:35:23 gibbs Exp $
+ * $FreeBSD: src/sys/i386/eisa/eisaconf.h,v 1.17.2.1 1999/08/29 16:05:31 peter Exp $
  */
 
 #ifndef _I386_EISA_EISACONF_H_

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: smbus.c,v 1.7 1999/01/09 18:08:24 nsouch Exp $
+ * $FreeBSD: src/sys/dev/smbus/smbus.c,v 1.7.2.1 1999/08/29 16:24:02 peter Exp $
  *
  */
 #include <sys/param.h>

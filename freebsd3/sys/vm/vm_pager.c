@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $Id: vm_pager.c,v 1.40 1998/11/10 09:16:27 peter Exp $
+ * $FreeBSD: src/sys/vm/vm_pager.c,v 1.40.2.1 1999/08/29 16:33:38 peter Exp $
  */
 
 /*

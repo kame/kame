@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, Revision 2.2  92/04/04  11:34:13  rpd
- *	$Id: asm.S,v 1.4 1997/09/01 10:38:24 kato Exp $
+ * $FreeBSD: src/sys/pc98/boot/biosboot/asm.S,v 1.4.2.1 1999/08/29 16:30:49 peter Exp $
  */
 
 

@@ -1,4 +1,4 @@
-/* $Id: if_wl_wavelan.h,v 1.3 1998/02/03 20:24:13 bde Exp $ */
+/* $FreeBSD: src/sys/i386/include/if_wl_wavelan.h,v 1.3.2.1 1999/08/29 16:06:33 peter Exp $ */
 /* 
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions

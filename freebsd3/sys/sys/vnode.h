@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vnode.h	8.7 (Berkeley) 2/4/94
- * $Id: vnode.h,v 1.80.2.1 1999/03/20 09:37:49 semenu Exp $
+ * $FreeBSD: src/sys/sys/vnode.h,v 1.80.2.3 1999/09/16 02:02:16 alfred Exp $
  */
 
 #ifndef _SYS_VNODE_H_
@@ -116,7 +116,8 @@ struct vnode {
 	enum	vtagtype v_tag;			/* type of underlying data */
 	void 	*v_data;			/* private data for fs */
 	LIST_HEAD(, namecache) v_cache_src;	/* Cache entries from us */
-	TAILQ_HEAD(, namecache) v_cache_dst;	/* Cache entries to us */
+	TAILQ_HEAD(cdst, namecache) v_cache_dst;	/* Cache entries to us */
+	int     v_cache_dst_count;			/* number of cache entries pointing to us */
 	struct	vnode *v_dd;			/* .. vnode */
 	u_long	v_ddid;				/* .. capability identifier */
 	struct	{

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: bootinfo.c,v 1.15.2.1 1999/01/24 00:16:00 msmith Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/bootinfo.c,v 1.15.2.3 1999/08/29 16:21:01 peter Exp $
  */
 
 #include <stand.h>
@@ -231,7 +231,7 @@ bi_load(char *args, int *howtop, int *bootdevp, vm_offset_t *bip)
     struct i386_devdesc		*rootdev;
     vm_offset_t			addr, bootinfo_addr;
     char			*rootdevname;
-    int				bootdevnr;
+    int				bootdevnr, i;
     u_int			pad;
     char			*kernelname;
     const char			*kernelpath;
@@ -271,7 +271,8 @@ bi_load(char *args, int *howtop, int *bootdevp, vm_offset_t *bip)
     bi.bi_kernelname = 0;		/* XXX char * -> kernel name */
     bi.bi_nfs_diskless = 0;		/* struct nfs_diskless * */
     bi.bi_n_bios_used = 0;		/* XXX would have to hook biosdisk driver for these */
-    /* bi.bi_bios_geom[] */
+    for (i = 0; i < N_BIOS_GEOM; i++)
+        bi.bi_bios_geom[i] = bd_getbigeom(i);
     bi.bi_size = sizeof(bi);
     bi.bi_memsizes_valid = 1;
     bi.bi_basemem = getbasemem();

@@ -2,7 +2,7 @@
 # LINT -- config file for checking all the sources, tries to pull in
 #	as much of the source tree as it can.
 #
-#	$Id: LINT,v 1.539.2.19 1999/05/14 17:41:10 roger Exp $
+# $FreeBSD: src/sys/i386/conf/LINT,v 1.539.2.38 1999/09/14 22:53:31 jkh Exp $
 #
 # NB: You probably don't want to try running a kernel built from this
 # file.  Instead, you should start from GENERIC, and add options from
@@ -389,8 +389,8 @@ options		NETATALK		#Appletalk communications protocols
 # Network interfaces:
 #  The `loop' pseudo-device is MANDATORY when networking is enabled.
 #  The `ether' pseudo-device provides generic code to handle
-#  Ethernets; it is MANDATORY when a Ethernet device driver is
-#  configured.
+#  Ethernets; it is MANDATORY when a Ethernet device driver or a
+#  Token-ring device driver is configured.
 #  The 'fddi' pseudo-device provides generic code to support FDDI.
 #  The `sppp' pseudo-device serves a similar role for certain types
 #  of synchronous PPP links (like `cx', `ar').
@@ -403,7 +403,7 @@ options		NETATALK		#Appletalk communications protocols
 #  The `disc' pseudo-device implements a minimal network interface,
 #  which throws away all packets sent and never receives any.  It is
 #  included for testing purposes.
-#  The `tun' pseudo-device implements the User Process PPP (iijppp)
+#  The `tun' pseudo-device provides a generic packet tunnel interface.
 #
 # The PPP_BSDCOMP option enables support for compress(1) style entire
 # packet compression, the PPP_DEFLATE is for zlib/gzip style compression.
@@ -412,12 +412,13 @@ options		NETATALK		#Appletalk communications protocols
 # See pppd(8) for more details.
 #
 pseudo-device	ether			#Generic Ethernet
+pseudo-device	token			#Generic TokenRing
 pseudo-device	fddi			#Generic FDDI
 pseudo-device	sppp			#Generic Synchronous PPP
 pseudo-device	loop			#Network loopback device
 pseudo-device	bpfilter 4		#Berkeley packet filter
 pseudo-device	disc			#Discard device
-pseudo-device	tun	1		#Tunnel driver (user process ppp(8))
+pseudo-device	tun	1		#Tunnel driver
 pseudo-device	sl	2		#Serial Line IP
 pseudo-device	ppp	2		#Point-to-point protocol
 options PPP_BSDCOMP			#PPP BSD-compress support
@@ -566,8 +567,8 @@ options		DEVFS			#devices filesystem
 # making abrupt shutdown less risky.  It is not enabled by default due
 # to copyright restraints on the code that implement it.
 #
-# Read .../../ufs/ffs/README.softupdates to learn what you need to
-# do to enable this.  ../../../contrib/sys/softupdates/README gives
+# Read ../../ufs/ffs/README.softupdates to learn what you need to
+# do to enable this.  ../../contrib/softupdates/README gives
 # more details on how they actually work.
 #
 #options		SOFTUPDATES
@@ -699,7 +700,6 @@ device		ch0	#SCSI media changers
 device		da0	#SCSI direct access devices (aka disks)
 device		sa0	#SCSI tapes
 device		cd0	#SCSI CD-ROMs
-#device		od0	#SCSI optical disk
 device		pass0	#CAM passthrough driver
 
 # The previous devices (ch, da, st, cd) are recognized by config.
@@ -761,6 +761,10 @@ options		"CHANGER_MAX_BUSY_SECONDS=10"
 options		"SA_SPACE_TIMEOUT=(60)"
 options		"SA_REWIND_TIMEOUT=(2*60)"
 options		"SA_ERASE_TIMEOUT=(4*60)"
+
+# Optional timeout for the CAM processor target (pt) device
+# This is specified in seconds.  The default is 60 seconds.
+options		SCSI_PT_DEFAULT_TIMEOUT="60"
 
 
 #####################################################################
@@ -1066,11 +1070,30 @@ options		IDE_DELAY=8000	# Be optimistic about Joe IDE device
 device          acd0
 
 # IDE floppy driver - requires wdc controller and ATAPI option
-device          wfd0
+device		wfd0
 
 # IDE tape driver - requires wdc controller and ATAPI option
-device          wst0
+device		wst0
 
+#
+# Compaq Intelligent Disk Array Controller
+#
+controller	ida0	at isa? bio irq ? vector idaintr
+disk		id0	at ida0 drive 0
+disk		id1	at ida0 drive 1
+disk		id2	at ida0 drive 2
+disk		id3	at ida0 drive 3
+
+# Warning:
+# This driver can be configured to steal the ide devsw[] entries
+# so the IDE driver must also be present. If this behaviour is used,
+# the system will be unable to get to IDE drives. This is to allow 
+# systems to boot off the IDA array, while thinking they are booting off
+# an IDE drive. (The boot blocks only know about IDE and SCSI).
+# 
+# To disable this behaviour, the following line should be used.
+# Do this is you wish to boot of a different device.
+#options		IDA_CUCKOO_MODE=0
 
 #
 # Standard floppy disk controllers and floppy tapes: `fdc', `fd', and `ft'
@@ -1166,11 +1189,16 @@ options		"EXTRA_SIO=2"		#number of extra sio ports to allocate
 # lnc: Lance/PCnet cards (Isolan, Novell NE2100, NE32-VL, AMD Am7990 & Am79C960)
 # rdp: RealTek RTL 8002-based pocket ethernet adapters
 # sr: RISCom/N2 hdlc sync 1/2 port V.35/X.21 serial driver (requires sppp)
+# wi: Lucent WaveLAN/IEEE 802.11 PCMCIA adapters. Note: this supports both
+#     the PCMCIA and ISA cards: the ISA card is really a PCMCIA to ISA
+#     bridge with a PCMCIA adapter plugged into it.
 # wl: Lucent Wavelan (ISA card only).
 # ze: IBM/National Semiconductor PCMCIA ethernet controller.
 # zp: 3Com PCMCIA Etherlink III (It does not require shared memory for
 #     send/receive operation, but it needs 'iomem' to read/write the
 #     attribute memory)
+# oltr: Olicom ISA token-ring adapters OC-3115, OC-3117, OC-3118 and OC-3133 
+#       (no options needed)
 #
 
 device ar0 at isa? port 0x300 net irq 10 iomem 0xd0000
@@ -1187,13 +1215,17 @@ device le0 at isa? port 0x300 net irq 5 iomem 0xd0000
 device lnc0 at isa? port 0x280 net irq 10 drq 0
 device rdp0 at isa? port 0x378 net irq 7 flags 2
 device sr0 at isa? port 0x300 net irq 5 iomem 0xd0000
+device wi0 at isa? port? net irq ?
 options		WLCACHE		# enables the signal-strength cache
 options		WLDEBUG		# enables verbose debugging output
 device wl0 at isa? port 0x300 net irq ?
+device xe0 at isa? port? irq ?
 # We can (bogusly) include both the dedicated PCCARD drivers and the generic
 # support when COMPILING_LINT.
 device ze0 at isa? port 0x300 net irq 5 iomem 0xd8000
 device zp0 at isa? port 0x300 net irq 10 iomem 0xd8000
+
+device oltr0 at isa?
 
 #
 # ATM related options
@@ -1335,9 +1367,12 @@ device pca0 at isa? port "IO_TIMER1" tty
 #
 # Notes on APM
 #  The flags takes the following meaning for apm0:
+#    0x0040  Use the segment limits that the BIOS reports.
 #    0x0020  Statclock is broken.
 #    0x0011  Limit APM protocol to 1.1 or 1.0
 #    0x0010  Limit APM protocol to 1.0
+#  If `options VM86' is set, V86 mode is used in APM initialization
+#  instead of real mode.  VM86 is recommended if you want to use APM.
 #
 #
 # Notes on the spigot:
@@ -1483,12 +1518,18 @@ options	"EISA_SLOTS=12"
 # The `ahc' device provides support for the Adaptec 29/3940(U)(W)
 # and motherboard based AIC7870/AIC7880 adapters.
 #
+# The `amd' device provides support for the AMD 53C974 SCSI host
+# adapter chip as found on devices such as the Tekram DC-390(T).
+#
 # The `ncr' device provides support for the NCR 53C810 and 53C825
 # self-contained SCSI host adapters.
 #
 # The `isp' device provides support for the Qlogic ISP 1020, 1040
 # nd 1040B PCI SCSI host adapters, as well as the Qlogic ISP 2100
 # FC/AL Host Adapter.
+#
+# The `al' device provides support for PCI fast ethernet adapters
+# based on the ADMtek Inc. AL981 "Comet" chip..
 #
 # The `ax' device provides support for PCI fast ethernet adapters
 # based on the ASIX Electronics AX88140A chip, including the Alfa
@@ -1516,10 +1557,23 @@ options	"EISA_SLOTS=12"
 # the MPX 5030/5038, which is either a RealTek in disguise or a RealTek
 # workalike.
 #
+# The 'sf' device provides support for Adaptec Duralink PCI fast
+# ethernet adapters based on the Adaptec AIC-6915 "starfire" controller.
+# This includes dual and quad port cards, as well as one 100baseFX card.
+# Most of these are 64-bit PCI devices, except for one single port
+# card which is 32-bit.
+#
+# The 'sk' device provides support for the SysKonnect SK-984x series
+# PCI gigabit ethernet NICs. This includes the SK-9841 and SK-9842
+# single port cards (single mode and multimode fiber) and the
+# SK-9843 and SK-9844 dual port cards (also single mode and multimode).
+# The driver will autodetect the number of ports on the card and
+# attach each one as a separate network interface.
+#
 # The 'ti' device provides support for PCI gigabit ethernet NICs based
 # on the Alteon Networks Tigon 1 and Tigon 2 chipsets. This includes the
 # Alteon AceNIC, the 3Com 3c985, the Netgear GA620 and various others.
-# Note that you will probably want to bump up NBMCLUSTERS a lot to use
+# Note that you will probably want to bump up NMBCLUSTERS a lot to use
 # this driver.
 #
 # The 'tl' device provides support for the Texas Instruments TNETE100
@@ -1583,8 +1637,12 @@ options	"EISA_SLOTS=12"
 #
 # Using sysctl(8) run-time overrides on a per-card basis can be made
 #
+# The oltr driver supports the following Olicom PCI token-ring adapters
+# OC-3136, OC-3137, OC-3139, OC-3140, OC-3141, OC-3540, OC-3250
+#
 controller	pci0
 controller	ahc1
+controller	amd0
 controller	ncr0
 controller	isp0
 #
@@ -1608,6 +1666,10 @@ controller	isp0
 #				  course, this can fail if the PCI implement-
 #				  ation doesn't support what you want.
 #
+#	SCSI_ISP_FCDUPLEX	- mask of isp unit numbers (obviously
+#				  a max of 32) that you wish to set fibre
+#				  channel full duplex mode on.
+#				  to disable the loading of firmware on.
 #	SCSI_ISP_FABRIC		  enable loading of Fabric f/w flavor (2100).
 #	SCSI_ISP_SCCLUN		  enable loading of expanded lun f/w (2100).
 #
@@ -1616,17 +1678,22 @@ controller	isp0
 #	ISP_DISABLE_2100_SUPPORT	Disable support for 2100 cards
 #	(these really just to save code space)
 #	(use of all three will cause the driver to not compile)
-options	SCSI_ISP_NO_FWLOAD_MASK="0x12"	# disable FW load for isp1 and isp4
-options SCSI_ISP_NO_NVRAM_MASK="0x1"	# disable NVRAM for isp0
-options SCSI_ISP_PREFER_MEM_MAP="0"	# prefer I/O mapping
-options	ISP_DISABLE_1080_SUPPORT="1"	# Disable support for Qlogic 1080
+options	"SCSI_ISP_NO_FWLOAD_MASK=0x12"	# disable FW load for isp1 and isp4
+options "SCSI_ISP_NO_NVRAM_MASK=0x1"	# disable NVRAM for isp0
+options "SCSI_ISP_PREFER_MEM_MAP=0"	# prefer I/O mapping
+options	"ISP_DISABLE_1080_SUPPORT=1"	# Disable support for Qlogic 1080
+options	"SCSI_ISP_FCDUPLEX=0x4"		# isp2 is a Fibre Channel card
+					# we want in full duplex mode.
 
+device		al0
 device		ax0
 device		de0
 device		fxp0
 device		mx0
 device		pn0
 device		rl0
+device		sf0
+device		sk0
 device		ti0
 device		tl0
 device		tx0
@@ -1636,6 +1703,8 @@ device		wb0
 device		xl0
 device		fpa0
 device		meteor0
+#The oltr driver in the ISA section will also find PCI cards.
+#device		oltr0
 
 
 # Brooktree driver has been ported to the new I2C framework. Thus,
@@ -2045,3 +2114,41 @@ options DPT_RESET_HBA
 # first.
 options DPT_SHUTDOWN_SLEEP=500
 
+#
+# Embedded system options:
+#
+# An embedded system might want to run something other than init.
+options         INIT_PATH="/sbin/init:/stand/sysinstall"
+
+# USB support
+# UHCI controller 
+controller	uhci0
+# OHCI controller
+controller	ohci0
+# General USB code (mandatory for USB)
+controller	usb0
+#
+# Generic USB device driver
+device		ugen0
+# Human Interface Device (anything with buttons and dials)
+device		uhid0
+# USB keyboard
+device		ukbd0
+# USB printer
+device		ulpt0
+# USB mouse
+device		ums0
+#
+
+# debugging options for the USB subsystem
+#
+options		UHCI_DEBUG
+options		OHCI_DEBUG
+options		USB_DEBUG
+
+options		UGEN_DEBUG
+options		UHID_DEBUG
+options		UHUB_DEBUG
+options		UKBD_DEBUG
+options		ULPT_DEBUG
+options		UMS_DEBUG

@@ -22,7 +22,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *      $Id: elf_machdep.c,v 1.3 1998/10/18 19:04:13 dfr Exp $
+ * $FreeBSD: src/sys/alpha/alpha/elf_machdep.c,v 1.3.2.2 1999/08/29 15:56:26 peter Exp $
  */
 
 #include <sys/param.h>
@@ -82,6 +82,7 @@ elf_reloc(linker_file_t lf, const void *data, int type, const char *sym)
 				linker_file_lookup_symbol(lf, sym, 1);
 			if (addr == NULL)
 				return -1;
+			addr += addend;
 			if (*where != addr)
 				*where = addr;
 			break;

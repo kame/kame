@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.8 1998/11/06 16:02:14 peter Exp $
+# $FreeBSD: src/sys/modules/coff/Makefile,v 1.8.2.1 1999/08/29 16:27:09 peter Exp $
 
 .PATH:	${.CURDIR}/../../i386/ibcs2
 KMOD=	ibcs2_coff

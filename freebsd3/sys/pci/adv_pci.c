@@ -47,7 +47,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: adv_pci.c,v 1.4 1998/12/22 18:14:15 gibbs Exp $
+ * $FreeBSD: src/sys/pci/adv_pci.c,v 1.4.2.2 1999/09/14 04:08:10 gibbs Exp $
  */
 
 #include <pci.h>
@@ -165,7 +165,7 @@ advpciattach(pcici_t config_id, int unit)
 
 	/* Allocate a dmatag for our transfer DMA maps */
 	/* XXX Should be a child of the PCI bus dma tag */
-	error = bus_dma_tag_create(/*parent*/NULL, /*alignment*/0,
+	error = bus_dma_tag_create(/*parent*/NULL, /*alignment*/1,
 				   /*boundary*/0,
 				   /*lowaddr*/ADV_PCI_MAX_DMA_ADDR,
 				   /*highaddr*/BUS_SPACE_MAXADDR,

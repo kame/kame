@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: locore.s,v 1.6 1998/11/28 09:55:15 dfr Exp $
+ * $FreeBSD: src/sys/alpha/alpha/locore.s,v 1.6.2.1 1999/08/29 15:56:31 peter Exp $
  */
 /*
  * Copyright (c) 1994, 1995, 1996 Carnegie-Mellon University.

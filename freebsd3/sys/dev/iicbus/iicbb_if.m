@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-#	$Id: iicbb_if.m,v 1.2 1998/11/08 18:35:52 nsouch Exp $
+# $FreeBSD: src/sys/dev/iicbus/iicbb_if.m,v 1.2.2.1 1999/08/29 16:23:12 peter Exp $
 #
 
 INTERFACE iicbb;

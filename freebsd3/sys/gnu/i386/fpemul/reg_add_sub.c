@@ -55,7 +55,7 @@
  * W. Metzenthen   June 1994.
  *
  *
- *     $Id: reg_add_sub.c,v 1.7 1997/06/14 15:11:05 bde Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/reg_add_sub.c,v 1.7.4.1 1999/08/29 16:24:42 peter Exp $
  *
  */
 

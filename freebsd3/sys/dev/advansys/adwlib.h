@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $Id: adwlib.h,v 1.1 1998/10/07 03:20:46 gibbs Exp $
+ * $FreeBSD: src/sys/dev/advansys/adwlib.h,v 1.1.2.1 1999/08/29 16:22:29 peter Exp $
  */
 /*
  * Ported from:

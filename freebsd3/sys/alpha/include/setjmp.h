@@ -1,4 +1,4 @@
-/* $Id: setjmp.h,v 1.2 1998/01/20 09:09:24 jb Exp $ */
+/* $FreeBSD: src/sys/alpha/include/setjmp.h,v 1.2.2.1 1999/08/29 15:57:07 peter Exp $ */
 /* From: NetBSD: setjmp.h,v 1.2 1997/04/06 08:47:41 cgd Exp */
 
 /*

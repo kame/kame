@@ -13,7 +13,7 @@
 # purpose.
 #
 
-#	$Id: btx.m4,v 1.1.1.1 1998/09/12 04:29:23 rnordier Exp $
+# $FreeBSD: src/sys/boot/i386/btx/btx/btx.m4,v 1.1.1.1.2.1 1999/08/29 16:20:48 peter Exp $
 
 define(_al,0x0)dnl
 define(_cl,0x1)dnl

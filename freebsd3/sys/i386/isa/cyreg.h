@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: cyreg.h,v 1.8 1998/11/23 13:58:55 bde Exp $
+ * $FreeBSD: src/sys/i386/isa/cyreg.h,v 1.8.2.1 1999/08/29 16:07:16 peter Exp $
  */
 
 /*

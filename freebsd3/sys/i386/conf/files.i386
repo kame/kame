@@ -1,7 +1,7 @@
 # This file tells config what files go into building a kernel,
 # files marked standard are always included.
 #
-#	$Id: files.i386,v 1.220.2.3 1999/05/09 11:02:28 yokota Exp $
+# $FreeBSD: src/sys/i386/conf/files.i386,v 1.220.2.13 1999/09/06 00:35:34 green Exp $
 #
 # The long compile-with and dependency lines are required because of
 # limitations in config: backslash-newline doesn't work in strings, and
@@ -34,6 +34,13 @@ ukbdmap.h			optional	ukbd_dflt_keymap	\
 	no-obj no-implicit-rule before-depend				\
 	clean		"ukbdmap.h"
 #
+contrib/dev/fla/fla.c		optional	fla
+msysosak.o			optional	fla			\
+	dependency	"$S/contrib/dev/fla/i386/msysosak.o.uu"		\
+	compile-with	"uudecode < $S/contrib/dev/fla/i386/msysosak.o.uu" \
+	no-implicit-rule
+
+#
 dev/fb/fb.c			optional	fb	device-driver
 dev/fb/fb.c			optional	vga	device-driver
 dev/fb/splash.c			optional	splash
@@ -57,6 +64,8 @@ i386/eisa/bt_eisa.c		optional	bt	device-driver
 i386/eisa/eisaconf.c		optional	eisa
 i386/eisa/if_vx_eisa.c		optional	vx	device-driver
 i386/eisa/if_fea.c		optional	fea	device-driver
+i386/i386/atomic.c		standard				\
+	compile-with	"${CC} -c ${CFLAGS} ${DEFINED_PROF:S/^$/-fomit-frame-pointer/} $<"
 i386/i386/autoconf.c		standard	device-driver
 i386/i386/bios.c		standard
 i386/i386/bioscall.s		standard
@@ -69,9 +78,13 @@ i386/i386/elf_machdep.c		standard
 i386/i386/exception.s		standard
 i386/i386/globals.s		standard
 i386/i386/i386-gdbstub.c	optional	ddb
+i386/i386/i686_mem.c		standard
 i386/i386/identcpu.c		standard
 i386/i386/in_cksum.c		optional	inet
 i386/i386/initcpu.c		standard
+# XXX green - it needs work (works but not... the right behavior,
+#	      causing crashes)
+# i386/i386/k6_mem.c		standard
 # locore.s needs to be handled in Makefile to put it first.  Otherwise it's
 # now normal.
 # i386/i386/locore.s		standard
@@ -131,6 +144,7 @@ i386/isa/fd.c			optional	fd	device-driver
 i386/isa/gpib.c			optional	gp	device-driver
 i386/isa/asc.c			optional	asc	device-driver
 i386/isa/gsc.c			optional	gsc	device-driver
+i386/isa/ida.c			optional	id	device-driver
 i386/isa/if_ar.c		optional	ar	device-driver
 i386/isa/if_cs.c		optional	cs	device-driver
 i386/isa/if_cx.c		optional	cx	device-driver
@@ -144,9 +158,19 @@ i386/isa/if_le.c		optional	le	device-driver
 i386/isa/if_lnc.c		optional	lnc	device-driver
 i386/isa/if_rdp.c		optional	rdp	device-driver
 i386/isa/if_sr.c		optional	sr	device-driver
+i386/isa/if_wi.c		optional	wi	device-driver
 i386/isa/if_wl.c		optional	wl	device-driver
+dev/pccard/if_xe.c		optional	xe	device-driver
 i386/isa/if_ze.c		optional	ze	device-driver
 i386/isa/if_zp.c		optional	zp	device-driver
+contrib/dev/oltr/if_oltr.c	optional	oltr	device-driver
+trlld.o				optional	oltr	device-driver	\
+	dependency	"$S/contrib/dev/oltr/i386-${KERNFORMAT}.trlld.o.uu"	\
+	compile-with	"uudecode < $S/contrib/dev/oltr/i386-${KERNFORMAT}.trlld.o.uu"	\
+	no-implicit-rule
+contrib/dev/oltr/trlldmac.c	optional	oltr	device-driver
+contrib/dev/oltr/trlldhm.c	optional	oltr	device-driver
+contrib/dev/oltr/trlldbm.c	optional	oltr	device-driver
 i386/isa/ipl_funcs.c		standard				   \
 	compile-with	"${CC} -c ${CFLAGS} ${DEFINED_PROF:S/^$/-fomit-frame-pointer/} $<"
 i386/isa/intr_machdep.c		standard
@@ -154,7 +178,7 @@ i386/isa/isa.c			optional	isa	device-driver
 i386/isa/istallion.c		optional	stli	device-driver
 i386/isa/joy.c			optional        joy     device-driver
 i386/isa/loran.c		optional	loran	device-driver
-i386/isa/lpt.c			optional	lpt	device-driver
+i386/isa/lpt.c			optional	olpt	device-driver
 i386/isa/labpc.c		optional	labpc	device-driver
 i386/isa/mcd.c			optional	mcd	device-driver
 i386/isa/mse.c			optional	mse	device-driver

@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: if_zpreg.h,v 1.6 1997/02/22 09:36:39 peter Exp $
+ * $FreeBSD: src/sys/i386/isa/if_zpreg.h,v 1.6.4.1 1999/08/29 16:07:25 peter Exp $
  */
 /**************************************************************************
  *										  *

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: pcibus.h,v 1.2 1998/11/15 18:25:16 dfr Exp $
+ * $FreeBSD: src/sys/alpha/pci/pcibus.h,v 1.2.2.1 1999/08/29 15:57:23 peter Exp $
  */
 
 void pci_init_resources(void);

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: scvesactl.c,v 1.9 1999/01/11 03:18:26 yokota Exp $
+ * $FreeBSD: src/sys/dev/syscons/scvesactl.c,v 1.9.2.1 1999/08/29 16:24:04 peter Exp $
  */
 
 #include "sc.h"

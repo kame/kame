@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.1.2.5 1999/04/26 23:27:39 kato Exp $
+# $FreeBSD: src/sys/boot/pc98/loader/Makefile,v 1.1.2.6 1999/08/29 16:21:31 peter Exp $
 
 BASE=		loader
 PROG=		${BASE}

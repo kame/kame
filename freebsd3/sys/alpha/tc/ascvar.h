@@ -1,4 +1,4 @@
-/* $Id: ascvar.h,v 1.1 1998/08/20 08:27:10 dfr Exp $ */
+/* $FreeBSD: src/sys/alpha/tc/ascvar.h,v 1.1.2.1 1999/08/29 15:57:25 peter Exp $ */
 /*	$NetBSD: ascvar.h,v 1.4 1997/11/28 18:23:40 mhitch Exp $	*/
 
 

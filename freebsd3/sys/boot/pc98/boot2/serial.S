@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, Revision 2.2  92/04/04  11:34:26  rpd
- *	$Id: serial.S,v 1.1.2.1 1999/02/06 07:37:12 kato Exp $
+ * $FreeBSD: src/sys/boot/pc98/boot2/serial.S,v 1.1.2.2 1999/08/29 16:21:16 peter Exp $
  */
 
 /*

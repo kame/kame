@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- *	$Id: db_variables.c,v 1.16 1998/07/08 09:11:39 bde Exp $
+ * $FreeBSD: src/sys/ddb/db_variables.c,v 1.16.2.1 1999/08/29 16:22:21 peter Exp $
  */
 
 /*

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: ibcs2_signal.c,v 1.12 1997/11/06 19:28:38 phk Exp $
+ * $FreeBSD: src/sys/i386/ibcs2/ibcs2_signal.c,v 1.12.2.1 1999/08/29 16:06:08 peter Exp $
  */
 
 #include <sys/param.h>

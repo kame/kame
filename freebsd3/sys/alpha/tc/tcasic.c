@@ -1,4 +1,4 @@
-/* $Id: tcasic.c,v 1.1 1998/08/20 08:27:11 dfr Exp $ */
+/* $FreeBSD: src/sys/alpha/tc/tcasic.c,v 1.1.2.1 1999/08/29 15:57:33 peter Exp $ */
 /* from $NetBSD: tcasic.c,v 1.23 1998/05/14 00:01:31 thorpej Exp $ */
 
 /*

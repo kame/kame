@@ -1,5 +1,5 @@
 /*
- * $Id: gatea20.c,v 1.1.1.1 1998/08/21 03:17:41 msmith Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/gatea20.c,v 1.1.1.1.2.1 1999/08/29 16:21:02 peter Exp $
  * From: $NetBSD: gatea20.c,v 1.2 1997/10/29 00:32:49 fvdl Exp $
  */
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: vpoio.c,v 1.5 1999/01/10 12:04:55 nsouch Exp $
+ * $FreeBSD: src/sys/dev/ppbus/vpoio.c,v 1.5.2.1 1999/08/29 16:23:58 peter Exp $
  *
  */
 

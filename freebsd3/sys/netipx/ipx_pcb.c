@@ -33,7 +33,7 @@
  *
  *	@(#)ipx_pcb.c
  *
- * $Id: ipx_pcb.c,v 1.14.2.1 1999/04/24 09:25:43 jhay Exp $
+ * $FreeBSD: src/sys/netipx/ipx_pcb.c,v 1.14.2.3 1999/08/30 16:52:10 jhay Exp $
  */
 
 #include <sys/param.h>
@@ -66,6 +66,8 @@ ipx_pcballoc(so, head, p)
 		return (ENOBUFS);
 	bzero(ipxp, sizeof *ipxp);
 	ipxp->ipxp_socket = so;
+	if (ipxcksum)
+		ipxp->ipxp_flags |= IPXP_CHECKSUM;
 	insque(ipxp, head);
 	so->so_pcb = (caddr_t)ipxp;
 	return (0);

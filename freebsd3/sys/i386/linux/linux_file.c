@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *  $Id: linux_file.c,v 1.23 1999/01/10 23:15:35 eivind Exp $
+ * $FreeBSD: src/sys/i386/linux/linux_file.c,v 1.23.2.4 1999/08/29 16:07:50 peter Exp $
  */
 
 #include "opt_compat.h"
@@ -214,11 +214,11 @@ linux_fcntl(struct proc *p, struct linux_fcntl_args *args)
 	   p->p_pid, args->fd, args->cmd);
 #endif
     fcntl_args.fd = args->fd;
-    fcntl_args.arg = 0;
 
     switch (args->cmd) {
     case LINUX_F_DUPFD:
 	fcntl_args.cmd = F_DUPFD;
+	fcntl_args.arg = args->arg;
 	return fcntl(p, &fcntl_args);
 
     case LINUX_F_GETFD:
@@ -227,6 +227,7 @@ linux_fcntl(struct proc *p, struct linux_fcntl_args *args)
 
     case LINUX_F_SETFD:
 	fcntl_args.cmd = F_SETFD;
+	fcntl_args.arg = args->arg;
 	return fcntl(p, &fcntl_args);
 
     case LINUX_F_GETFL:
@@ -244,6 +245,7 @@ linux_fcntl(struct proc *p, struct linux_fcntl_args *args)
 	return error;
 
     case LINUX_F_SETFL:
+	fcntl_args.arg = 0;
 	if (args->arg & LINUX_O_NDELAY) fcntl_args.arg |= O_NONBLOCK;
 	if (args->arg & LINUX_O_APPEND) fcntl_args.arg |= O_APPEND;
 	if (args->arg & LINUX_O_SYNC) fcntl_args.arg |= O_FSYNC;
@@ -828,3 +830,40 @@ linux_truncate(struct proc *p, struct linux_truncate_args *args)
 	return truncate(p, &bsd);
 }
 
+int
+linux_link(struct proc *p, struct linux_link_args *args)
+{
+	struct link_args bsd;
+	caddr_t sg;
+
+	sg = stackgap_init();
+	CHECKALTEXIST(p, &sg, args->path);
+	CHECKALTCREAT(p, &sg, args->to);
+
+#ifdef DEBUG
+	printf("Linux-emul(%ld): link(%s, %s)\n", (long)p->p_pid,
+	       args->path, args->to);
+#endif
+
+	bsd.path = args->path;
+	bsd.link = args->to;
+
+	return link(p, &bsd);
+}
+
+int
+linux_getcwd(p, args)
+	struct proc *p;
+	struct linux_getcwd_args *args;
+{
+	struct __getcwd_args bsd;
+
+#ifdef DEBUG
+	printf("Linux-emul(%ld): getcwd(%p, %ld)\n", (long)p->p_pid,
+	       args->buf, args->bufsize);
+#endif
+
+	bsd.buf = args->buf;
+	bsd.buflen = args->bufsize;
+	return (__getcwd(p, &bsd));
+}

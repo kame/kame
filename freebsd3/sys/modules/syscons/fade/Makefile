@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.8 1998/10/16 04:30:49 peter Exp $
+# $FreeBSD: src/sys/modules/syscons/fade/Makefile,v 1.8.2.1 1999/08/29 16:27:46 peter Exp $
 
 KMOD=	fade_saver
 SRCS= 	fade_saver.c

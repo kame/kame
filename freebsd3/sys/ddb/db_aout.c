@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- *	$Id: db_aout.c,v 1.22 1998/10/09 23:29:44 peter Exp $
+ * $FreeBSD: src/sys/ddb/db_aout.c,v 1.22.2.1 1999/08/29 16:22:12 peter Exp $
  */
 
 /*

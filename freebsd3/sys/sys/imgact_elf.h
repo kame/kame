@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: imgact_elf.h,v 1.10.2.1 1999/02/08 01:27:11 newton Exp $
+ * $FreeBSD: src/sys/sys/imgact_elf.h,v 1.10.2.3 1999/09/01 06:12:11 sef Exp $
  */
 
 #ifndef _SYS_IMGACT_ELF_H_
@@ -103,7 +103,7 @@ int	elf_remove_brand_entry __P((Elf64_Brandinfo *entry));
 
 struct proc;
 
-int	elf_coredump __P((struct proc *));
+int	elf_coredump __P((struct proc *, struct vnode *, off_t));
 
 #endif /* KERNEL */
 

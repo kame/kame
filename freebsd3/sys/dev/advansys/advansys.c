@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $Id: advansys.c,v 1.7.2.3 1999/05/07 00:43:19 ken Exp $
+ * $FreeBSD: src/sys/dev/advansys/advansys.c,v 1.7.2.5 1999/09/14 04:01:10 jkh Exp $
  */
 /*
  * Ported from:
@@ -1257,7 +1257,7 @@ adv_attach(adv)
 	 */
 
 	/* DMA tag for mapping buffers into device visible space. */
-	if (bus_dma_tag_create(adv->parent_dmat, /*alignment*/0, /*boundary*/0,
+	if (bus_dma_tag_create(adv->parent_dmat, /*alignment*/1, /*boundary*/0,
 			       /*lowaddr*/BUS_SPACE_MAXADDR,
 			       /*highaddr*/BUS_SPACE_MAXADDR,
 			       /*filter*/NULL, /*filterarg*/NULL,
@@ -1271,7 +1271,7 @@ adv_attach(adv)
 	adv->init_level++;
 
 	/* DMA tag for our sense buffers */
-	if (bus_dma_tag_create(adv->parent_dmat, /*alignment*/0, /*boundary*/0,
+	if (bus_dma_tag_create(adv->parent_dmat, /*alignment*/1, /*boundary*/0,
 			       /*lowaddr*/BUS_SPACE_MAXADDR,
 			       /*highaddr*/BUS_SPACE_MAXADDR,
 			       /*filter*/NULL, /*filterarg*/NULL,

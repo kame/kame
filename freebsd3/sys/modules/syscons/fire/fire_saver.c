@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: fire_saver.c,v 1.2.2.1 1999/05/10 15:20:30 des Exp $
+ * $FreeBSD: src/sys/modules/syscons/fire/fire_saver.c,v 1.2.2.2 1999/08/29 16:27:47 peter Exp $
  */
 
 /*

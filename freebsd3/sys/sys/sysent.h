@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: sysent.h,v 1.20 1999/01/09 14:15:40 dfr Exp $
+ * $FreeBSD: src/sys/sys/sysent.h,v 1.20.2.2 1999/09/01 06:12:12 sef Exp $
  */
 
 #ifndef _SYS_SYSENT_H_
@@ -69,7 +69,7 @@ struct sysentvec {
 	void		(*sv_prepsyscall) __P((struct trapframe *, int *,
 					       u_int *, caddr_t *));
 	char		*sv_name;	/* name of binary type */
-	int		(*sv_coredump) __P((struct proc *p));
+	int		(*sv_coredump) __P((struct proc *p, struct vnode *, off_t));
 					/* function to dump core, or NULL */
 };
 

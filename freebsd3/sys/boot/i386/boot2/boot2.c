@@ -14,7 +14,7 @@
  */
 
 /*
- *	$Id: boot2.c,v 1.18.2.3 1999/04/20 12:02:00 joerg Exp $
+ * $FreeBSD: src/sys/boot/i386/boot2/boot2.c,v 1.18.2.5 1999/08/29 16:20:44 peter Exp $
  */
 
 #include <sys/param.h>
@@ -251,7 +251,7 @@ load(const char *fname)
 	}
     } else {
 	fs_off = hdr.eh.e_phoff;
-	for (j = i = 0; i < hdr.eh.e_phoff && j < 2; i++) {
+	for (j = i = 0; i < hdr.eh.e_phnum && j < 2; i++) {
 	    if (xfsread(ino, ep + j, sizeof(ep[0])))
 		return;
 	    if (ep[j].p_type == PT_LOAD)

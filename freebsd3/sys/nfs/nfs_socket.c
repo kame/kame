@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_socket.c	8.5 (Berkeley) 3/30/95
- * $Id: nfs_socket.c,v 1.49.2.1 1999/05/08 04:58:29 alc Exp $
+ * $FreeBSD: src/sys/nfs/nfs_socket.c,v 1.49.2.4 1999/08/29 16:30:29 peter Exp $
  */
 
 /*
@@ -191,7 +191,6 @@ nfs_connect(nmp, rep)
 	int s, error, rcvreserve, sndreserve;
 	struct sockaddr *saddr;
 	struct sockaddr_in *sin;
-	u_int16_t tport;
 	struct proc *p = &proc0; /* only used for socreate and sobind */
 
 	nmp->nm_so = (struct socket *)0;
@@ -207,18 +206,39 @@ nfs_connect(nmp, rep)
 	 * Some servers require that the client port be a reserved port number.
 	 */
 	if (saddr->sa_family == AF_INET && (nmp->nm_flag & NFSMNT_RESVPORT)) {
+		struct sockopt sopt;
+		int ip;
 		struct sockaddr_in ssin;
+
+		bzero(&sopt, sizeof sopt);
+		ip = IP_PORTRANGE_LOW;
+		sopt.sopt_dir = SOPT_SET;
+		sopt.sopt_level = IPPROTO_IP;
+		sopt.sopt_name = IP_PORTRANGE;
+		sopt.sopt_val = (void *)&ip;
+		sopt.sopt_valsize = sizeof(ip);
+		sopt.sopt_p = NULL;
+		error = sosetopt(so, &sopt);
+		if (error)
+			goto bad;
 		bzero(&ssin, sizeof ssin);
 		sin = &ssin;
 		sin->sin_len = sizeof (struct sockaddr_in);
 		sin->sin_family = AF_INET;
 		sin->sin_addr.s_addr = INADDR_ANY;
-		tport = IPPORT_RESERVED - 1;
-		sin->sin_port = htons(tport);
-		while ((error = sobind(so, (struct sockaddr *)sin, p))
-		       == EADDRINUSE &&
-		       --tport > IPPORT_RESERVED / 2)
-			sin->sin_port = htons(tport);
+		sin->sin_port = htons(0);
+		error = sobind(so, (struct sockaddr *)sin, p);
+		if (error)
+			goto bad;
+		bzero(&sopt, sizeof sopt);
+		ip = IP_PORTRANGE_DEFAULT;
+		sopt.sopt_dir = SOPT_SET;
+		sopt.sopt_level = IPPROTO_IP;
+		sopt.sopt_name = IP_PORTRANGE;
+		sopt.sopt_val = (void *)&ip;
+		sopt.sopt_valsize = sizeof(ip);
+		sopt.sopt_p = NULL;
+		error = sosetopt(so, &sopt);
 		if (error)
 			goto bad;
 	}
@@ -905,7 +925,7 @@ nfs_request(vp, mrest, procnum, procp, cred, mrp, mdp, dposp)
 	struct mbuf **mdp;
 	caddr_t *dposp;
 {
-	register struct mbuf *m, *mrep;
+	register struct mbuf *m, *mrep, *m2;
 	register struct nfsreq *rep;
 	register u_int32_t *tl;
 	register int i;
@@ -1018,8 +1038,8 @@ tryagain:
 		if (nmp->nm_soflags & PR_CONNREQUIRED)
 			error = nfs_sndlock(&nmp->nm_flag, &nmp->nm_state, rep);
 		if (!error) {
-			m = m_copym(m, 0, M_COPYALL, M_WAIT);
-			error = nfs_send(nmp->nm_so, nmp->nm_nam, m, rep);
+			m2 = m_copym(m, 0, M_COPYALL, M_WAIT);
+			error = nfs_send(nmp->nm_so, nmp->nm_nam, m2, rep);
 			if (nmp->nm_soflags & PR_CONNREQUIRED)
 				nfs_sndunlock(&nmp->nm_flag, &nmp->nm_state);
 		}

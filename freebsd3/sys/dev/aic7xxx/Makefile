@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.5 1999/01/17 19:56:02 peter Exp $
+# $FreeBSD: src/sys/dev/aic7xxx/Makefile,v 1.5.2.1 1999/08/29 16:22:34 peter Exp $
 
 PROG=	aicasm
 

@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $Id: advlib.c,v 1.10.2.2 1999/05/07 00:43:21 ken Exp $
+ * $FreeBSD: src/sys/dev/advansys/advlib.c,v 1.10.2.3 1999/08/29 16:22:26 peter Exp $
  */
 /*
  * Ported from:

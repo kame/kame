@@ -5,7 +5,7 @@
  * provided that this notice is preserved and due credit is given
  * to the original author and the contributors.
  *
- * $Id: ip_log.c,v 1.6 1998/12/07 21:58:41 archie Exp $
+ * $FreeBSD: src/sys/netinet/ip_log.c,v 1.6.2.1 1999/08/29 16:29:46 peter Exp $
  */
 #include "opt_ipfilter.h"
 

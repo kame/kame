@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: main.c,v 1.1.2.3 1999/04/02 09:01:01 kato Exp $
+ * $FreeBSD: src/sys/boot/pc98/loader/main.c,v 1.1.2.4 1999/08/29 16:21:32 peter Exp $
  */
 
 /*

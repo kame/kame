@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: apecsvar.h,v 1.1 1998/08/10 07:53:59 dfr Exp $
+ * $FreeBSD: src/sys/alpha/pci/apecsvar.h,v 1.1.2.1 1999/08/29 15:57:18 peter Exp $
  */
 
 extern void apecs_init(void);

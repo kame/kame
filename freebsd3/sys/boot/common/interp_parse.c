@@ -11,7 +11,7 @@
  * Jordan K. Hubbard
  * 29 August 1998
  *
- *	$Id: interp_parse.c,v 1.6 1999/01/13 08:11:41 msmith Exp $
+ * $FreeBSD: src/sys/boot/common/interp_parse.c,v 1.6.2.2 1999/08/29 16:20:29 peter Exp $
  * 
  * The meat of the simple parser.
  */
@@ -167,6 +167,7 @@ parse(int *argc, char ***argv, char *str)
     *argc = ac;
     *argv = (char **)malloc((sizeof(char *) * ac + 1));
     bcopy(args, *argv, sizeof(char *) * ac + 1);
+    free(buf);
     free(copy);
     return 0;
 }

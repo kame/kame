@@ -1,5 +1,5 @@
 /*	$NetBSD: ohci.c,v 1.27 1999/01/13 10:33:53 augustss Exp $	*/
-/*	$FreeBSD: src/sys/dev/usb/ohci.c,v 1.10.2.1 1999/05/08 23:04:44 n_hibma Exp $	*/
+/*	$FreeBSD: src/sys/dev/usb/ohci.c,v 1.10.2.2 1999/05/18 22:31:49 n_hibma Exp $	*/
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -1205,11 +1205,12 @@ void
 ohci_timeout(addr)
 	void *addr;
 {
-#if 0
+#if OHCI_DEBUG
 	usbd_request_handle *reqh = addr;
-#endif
 
 	DPRINTF(("ohci_timeout: reqh=%p\n", reqh));
+#endif
+
 #if 0
 	int s;
 

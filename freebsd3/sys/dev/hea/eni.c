@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $Id: eni.c,v 1.5 1998/12/14 06:37:01 dillon Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hea/eni.c,v 1.5.2.1 1999/08/29 16:22:52 peter Exp $
  *
  */
 
@@ -42,7 +42,7 @@
 #include <dev/hea/eni_var.h>
 
 #ifndef	lint
-__RCSID("@(#) $Id: eni.c,v 1.5 1998/12/14 06:37:01 dillon Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hea/eni.c,v 1.5.2.1 1999/08/29 16:22:52 peter Exp $");
 #endif
 
 /*

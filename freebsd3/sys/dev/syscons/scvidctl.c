@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: scvidctl.c,v 1.7.2.1 1999/02/07 03:03:26 yokota Exp $
+ * $FreeBSD: src/sys/dev/syscons/scvidctl.c,v 1.7.2.3 1999/08/29 16:24:05 peter Exp $
  */
 
 #include "sc.h"
@@ -186,8 +186,10 @@ sc_set_graphics_mode(scr_stat *scp, struct tty *tp, int mode)
     scp->yoff = 0;
     scp->xpixel = info.vi_width;
     scp->ypixel = info.vi_height;
-    scp->xsize = info.vi_width/8;
-    scp->ysize = info.vi_height/info.vi_cheight;
+    /*
+     * Don't change xsize and ysize; preserve the previous vty
+     * and history buffers.
+     */
     scp->font_size = FONT_NONE;
     /* move the mouse cursor at the center of the screen */
     sc_move_mouse(scp, scp->xpixel / 2, scp->ypixel / 2);

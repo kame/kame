@@ -15,7 +15,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-	"$Id: mmap_test.c,v 1.4 1999/01/01 08:18:04 peter Exp $";
+  "$FreeBSD: src/sys/i386/isa/sound/mmap_test.c,v 1.4.2.1 1999/08/29 16:07:48 peter Exp $";
 #endif /* not lint */
 
 #include <err.h>

@@ -23,7 +23,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-#	$Id: clock_if.m,v 1.2 1998/11/08 18:35:51 nsouch Exp $
+# $FreeBSD: src/sys/alpha/alpha/clock_if.m,v 1.2.2.2 1999/08/29 15:56:22 peter Exp $
 #
 
 #include <machine/clockvar.h>
@@ -43,4 +43,9 @@ METHOD void get {
 METHOD void set {
 	device_t dev;
 	struct clocktime *ct;
+};
+
+METHOD int getsecs {
+	device_t dev;
+	int *secp;
 };

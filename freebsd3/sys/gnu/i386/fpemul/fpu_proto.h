@@ -1,6 +1,6 @@
 /*
  *
- *    $Id: fpu_proto.h,v 1.7 1997/02/22 09:29:07 peter Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/fpu_proto.h,v 1.7.4.1 1999/08/29 16:24:35 peter Exp $
  *
  */
 

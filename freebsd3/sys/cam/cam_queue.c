@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $Id: cam_queue.c,v 1.1.2.2 1999/04/19 21:36:28 gibbs Exp $
+ * $FreeBSD: src/sys/cam/cam_queue.c,v 1.1.2.4 1999/09/14 03:51:31 jkh Exp $
  */
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -242,8 +242,8 @@ cam_devq_init(struct cam_devq *devq, int devices, int openings)
 void
 cam_devq_free(struct cam_devq *devq)
 {
-	camq_free(&devq->alloc_queue);
-	camq_free(&devq->send_queue);
+	camq_fini(&devq->alloc_queue);
+	camq_fini(&devq->send_queue);
 	free(devq, M_DEVBUF);
 }
 

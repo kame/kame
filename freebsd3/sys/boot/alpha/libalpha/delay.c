@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: delay.c,v 1.1.1.1 1998/08/21 03:17:42 msmith Exp $
+ * $FreeBSD: src/sys/boot/alpha/libalpha/delay.c,v 1.1.1.1.2.1 1999/08/29 16:20:15 peter Exp $
  */
 
 #include <stand.h>

@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.4 1998/10/16 04:30:47 peter Exp $
+# $FreeBSD: src/sys/modules/kernfs/Makefile,v 1.4.2.1 1999/08/29 16:27:23 peter Exp $
 
 .PATH:	${.CURDIR}/../../miscfs/kernfs
 KMOD=	kernfs

@@ -56,7 +56,7 @@
  * W. Metzenthen   June 1994.
  *
  *
- *      $Id: poly_tan.c,v 1.9 1997/06/14 15:11:05 bde Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/poly_tan.c,v 1.9.4.1 1999/08/29 16:24:41 peter Exp $
  *
  */
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)signalvar.h	8.6 (Berkeley) 2/19/95
- * $Id: signalvar.h,v 1.22.2.1 1999/01/27 20:51:42 julian Exp $
+ * $FreeBSD: src/sys/sys/signalvar.h,v 1.22.2.3 1999/09/01 06:12:12 sef Exp $
  */
 
 #ifndef	_SYS_SIGNALVAR_H_		/* tmp for user.h */
@@ -157,7 +157,6 @@ extern int sugid_coredump;	/* Sysctl variable kern.sugid_coredump */
  * Machine-independent functions:
  */
 void	execsigs __P((struct proc *p));
-char	*expand_name __P((const char*, int, int));
 void	gsignal __P((int pgid, int sig));
 int	issignal __P((struct proc *p));
 void	killproc __P((struct proc *p, char *why));

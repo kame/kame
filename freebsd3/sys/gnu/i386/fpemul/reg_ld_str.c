@@ -56,7 +56,7 @@
  * W. Metzenthen   June 1994.
  *
  *
- *     $Id: reg_ld_str.c,v 1.12 1998/08/16 01:21:48 bde Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/reg_ld_str.c,v 1.12.2.1 1999/08/29 16:24:44 peter Exp $
  *
  */
 

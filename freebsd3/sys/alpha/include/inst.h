@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: inst.h,v 1.1 1998/12/04 10:52:48 dfr Exp $
+ * $FreeBSD: src/sys/alpha/include/inst.h,v 1.1.2.1 1999/08/29 15:56:56 peter Exp $
  */
 
 #ifndef _MACHINE_INST_H_

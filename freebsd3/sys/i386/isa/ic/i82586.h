@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: i82586.h,v 1.7 1998/08/10 17:21:48 bde Exp $
+ * $FreeBSD: src/sys/i386/isa/ic/i82586.h,v 1.7.2.1 1999/08/29 16:07:45 peter Exp $
  */
 
 /*

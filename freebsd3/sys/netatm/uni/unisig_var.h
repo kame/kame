@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $Id: unisig_var.h,v 1.2 1998/12/11 21:47:46 phk Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/unisig_var.h,v 1.2.2.1 1999/08/29 16:29:26 peter Exp $
  *
  */
 

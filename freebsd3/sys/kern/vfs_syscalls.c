@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)vfs_syscalls.c	8.13 (Berkeley) 4/15/94
- * $Id: vfs_syscalls.c,v 1.112.2.2 1999/02/27 07:10:39 julian Exp $
+ * $FreeBSD: src/sys/kern/vfs_syscalls.c,v 1.112.2.6 1999/08/29 16:26:15 peter Exp $
  */
 
 /* For 4.3 integer FS ID compatibility */
@@ -1839,13 +1839,23 @@ setfflags(p, vp, flags)
 	int error;
 	struct vattr vattr;
 
+  	/*
+	 * Prevent non-root users from setting flags on devices.  When
+	 * a device is reused, users can retain ownership of the device
+	 * if they are allowed to set flags and programs assume that
+	 * chown can't fail when done as root.
+	 */
+	if ((vp->v_type == VCHR || vp->v_type == VBLK) && 
+	    ((error = suser(p->p_ucred, &p->p_acflag)) != 0))
+		return (error);
+
 	VOP_LEASE(vp, p, p->p_ucred, LEASE_WRITE);
 	vn_lock(vp, LK_EXCLUSIVE | LK_RETRY, p);
 	VATTR_NULL(&vattr);
 	vattr.va_flags = flags;
 	error = VOP_SETATTR(vp, &vattr, p->p_ucred, p);
 	VOP_UNLOCK(vp, 0, p);
-	return error;
+	return (error);
 }
 
 /*
@@ -2211,7 +2221,7 @@ lutimes(p, uap)
 	} else if (error = copyin((caddr_t)SCARG(uap, tptr), (caddr_t)tv,
 	    sizeof (tv)))
   		return (error);
-	NDINIT(&nd, LOOKUP, FOLLOW, UIO_USERSPACE, SCARG(uap, path), p);
+	NDINIT(&nd, LOOKUP, NOFOLLOW, UIO_USERSPACE, SCARG(uap, path), p);
 	if (error = namei(&nd))
 		return (error);
 

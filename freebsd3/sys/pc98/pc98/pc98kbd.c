@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: pc98kbd.c,v 1.4.2.1 1999/05/09 12:57:12 kato Exp $
+ * $FreeBSD: src/sys/pc98/pc98/pc98kbd.c,v 1.4.2.2 1999/08/29 16:31:14 peter Exp $
  */
 
 #include "pckbd.h"

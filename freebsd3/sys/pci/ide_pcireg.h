@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	From: wd82371reg.h,v 1.3 1997/02/22 09:44:15 peter Exp $
- *	$Id: ide_pcireg.h,v 1.1 1997/07/29 12:57:10 sos Exp $
+ * $FreeBSD: src/sys/pci/ide_pcireg.h,v 1.1.2.1 1999/08/29 16:31:32 peter Exp $
  */
 
 #ifndef _PCI_IDEPCIREG_H_

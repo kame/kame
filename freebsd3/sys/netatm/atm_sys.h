@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $Id: atm_sys.h,v 1.2 1998/09/17 09:34:59 phk Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_sys.h,v 1.2.2.1 1999/08/29 16:28:47 peter Exp $
  *
  */
 

@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: atkbdcreg.h,v 1.1 1999/01/09 02:44:50 yokota Exp $
+ * $FreeBSD: src/sys/dev/kbd/atkbdcreg.h,v 1.1.2.1 1999/08/29 16:23:35 peter Exp $
  * from kbdio.h,v 1.8 1998/09/25 11:55:46 yokota Exp
  */
 

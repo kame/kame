@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $Id: uniarp_vcm.c,v 1.3 1998/10/31 20:07:00 phk Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/uni/uniarp_vcm.c,v 1.3.2.1 1999/08/29 16:29:18 peter Exp $
  *
  */
 
@@ -43,7 +43,7 @@
 #include <netatm/uni/uniip_var.h>
 
 #ifndef lint
-__RCSID("@(#) $Id: uniarp_vcm.c,v 1.3 1998/10/31 20:07:00 phk Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/uni/uniarp_vcm.c,v 1.3.2.1 1999/08/29 16:29:18 peter Exp $");
 #endif
 
 

@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.22 1999/01/04 08:02:13 kato Exp $
+# $FreeBSD: src/sys/pc98/boot/biosboot/Makefile,v 1.22.2.1 1999/08/29 16:30:47 peter Exp $
 #
 
 PROG=	boot

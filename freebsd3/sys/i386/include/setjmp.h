@@ -1,4 +1,4 @@
-/* $Id: setjmp.h,v 1.2 1998/01/20 09:09:24 jb Exp $ */
+/* $FreeBSD: src/sys/i386/include/setjmp.h,v 1.2.2.1 1999/08/29 16:06:48 peter Exp $ */
 /*
  * Copyright (c) 1998 John Birrell <jb@cimlogic.com.au>.
  * All rights reserved.

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: daemon_saver.c,v 1.14.2.1 1999/02/07 03:03:28 yokota Exp $
+ * $FreeBSD: src/sys/modules/syscons/daemon/daemon_saver.c,v 1.14.2.2 1999/08/29 16:27:45 peter Exp $
  */
 
 #include <sys/param.h>

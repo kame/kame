@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: if_pn.c,v 1.6.2.10 1999/04/14 19:44:53 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_pn.c,v 1.6.2.13 1999/08/29 16:31:40 peter Exp $
  */
 
 /*
@@ -97,7 +97,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-	"$Id: if_pn.c,v 1.6.2.10 1999/04/14 19:44:53 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_pn.c,v 1.6.2.13 1999/08/29 16:31:40 peter Exp $";
 #endif
 
 /*
@@ -108,8 +108,6 @@ static struct pn_type pn_devs[] = {
 		"82c168 PNIC 10/100BaseTX" },
 	{ PN_VENDORID, PN_DEVICEID_PNIC,
 		"82c169 PNIC 10/100BaseTX" },
-	{ PN_VENDORID, PN_DEVICEID_PNIC_II,
-		"82c115 PNIC II 10/100BaseTX" },
 	{ 0, 0, NULL }
 };
 
@@ -1401,7 +1399,7 @@ static void pn_rx_bug_war(sc, cur_rx)
 	while ((c->pn_ptr->pn_status & PN_WHOLEFRAME) != PN_WHOLEFRAME) {
 		rxstat = c->pn_ptr->pn_status;
 		m_copydata(c->pn_mbuf, 0, PN_RXLEN, ptr);
-		ptr += PN_RXLEN - 2; /* round down to 32-bit boundary */
+		ptr += PN_RXLEN;
 		if (c == cur_rx)
 			break;
 		if (rxstat & PN_RXSTAT_LASTFRAG)

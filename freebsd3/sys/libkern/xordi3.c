@@ -34,7 +34,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: xordi3.c,v 1.4 1997/02/22 09:40:07 peter Exp $
+ * $FreeBSD: src/sys/libkern/xordi3.c,v 1.4.4.1 1999/08/29 16:26:35 peter Exp $
  */
 
 #include "quad.h"

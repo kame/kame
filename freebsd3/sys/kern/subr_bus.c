@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: subr_bus.c,v 1.14 1999/01/16 17:44:09 dfr Exp $
+ * $FreeBSD: src/sys/kern/subr_bus.c,v 1.14.2.1 1999/08/29 16:26:05 peter Exp $
  */
 
 #include <sys/param.h>

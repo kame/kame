@@ -33,7 +33,7 @@
  *
  *	@(#)ipx.h
  *
- * $Id: ipx.h,v 1.13 1997/06/26 19:35:43 jhay Exp $
+ * $FreeBSD: src/sys/netipx/ipx.h,v 1.13.4.2 1999/08/30 16:52:10 jhay Exp $
  */
 
 #ifndef _NETIPX_IPX_H_
@@ -95,6 +95,7 @@
 #define	SO_ALL_PACKETS		7
 #define SO_MTU			8
 #define SO_IPXTUN_ROUTE		9
+#define SO_IPX_CHECKSUM		10
 
 /*
  * IPX addressing

@@ -35,7 +35,7 @@
  *
  *	@(#)null.h	8.3 (Berkeley) 8/20/94
  *
- * $Id: null.h,v 1.8 1997/09/07 05:26:04 bde Exp $
+ * $FreeBSD: src/sys/miscfs/nullfs/null.h,v 1.8.2.1 1999/08/29 16:26:46 peter Exp $
  */
 
 struct null_args {

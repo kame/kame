@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, Revision 2.2  92/04/04  11:35:49  rpd
- *	$Id: disk.c,v 1.9 1997/05/28 09:22:59 kato Exp $
+ * $FreeBSD: src/sys/pc98/boot/biosboot/disk.c,v 1.9.4.1 1999/08/29 16:30:51 peter Exp $
  */
 
 /*

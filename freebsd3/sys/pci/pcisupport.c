@@ -1,6 +1,6 @@
 /**************************************************************************
 **
-**  $Id: pcisupport.c,v 1.86.2.6 1999/05/10 13:33:08 peter Exp $
+** $FreeBSD: src/sys/pci/pcisupport.c,v 1.86.2.12 1999/09/02 23:57:04 msmith Exp $
 **
 **  Device driver for DEC/INTEL PCI chipsets.
 **
@@ -285,6 +285,10 @@ chipset_probe (pcici_t tag, pcidi_t type)
 		return ("Intel 82371AB PCI to ISA bridge");
 	case 0x71138086:
 		return ("Intel 82371AB Power management controller");
+	case 0x71808086:
+		return ("Intel 82443LX host to PCI bridge");
+	case 0x71818086:
+		return ("Intel 82443LX PCI-PCI bridge");
 	case 0x71908086:
 		return ("Intel 82443BX host to PCI bridge");
 	case 0x71918086:
@@ -398,6 +402,10 @@ chipset_probe (pcici_t tag, pcidi_t type)
 		return ("NEC 002C PCI to PC-98 C-bus bridge");
 	case 0x003b1033:
 		return ("NEC 003B PCI to PC-98 C-bus bridge");
+
+	/* OPTi -- vendor 0x1045 */
+	case 0xc8221045:
+		return ("OPTi 82C822 host to PCI Bridge");
 
 	/* Ross (?) -- vendor 0x1166 */
 	case 0x00051166:
@@ -995,6 +1003,16 @@ static const char* vga_probe (pcici_t tag, pcidi_t typea)
 			chip = "NM2160 laptop";	break;
 		}
 		break;
+	case 0x121a:
+		vendor = "3Dfx";
+		type = "graphics accelerator";
+		switch (id >> 16) {
+		case 0x0003:
+			chip = "Voodoo Banshee"; break;
+		case 0x0005:
+			chip = "Voodoo 3"; break;
+		}
+		break;
 	case 0x102b:
 		vendor = "Matrox";
 		type = "graphics accelerator";
@@ -1205,37 +1223,11 @@ static const char* vga_probe (pcici_t tag, pcidi_t typea)
 	if (vendor && chip) {
 		char *buf;
 		int len;
-#if 0
-		int i;
-		int reqmapmem;
-#endif
 
 		if (type == 0) {
 			type = "SVGA controller";
 		}
 
-#if 0
-		reqmapmem = PCI_MAPMEM;
-		for (i = 0; i < tag->nummaps; i++) {
-			pcimap *m = &tag->map[i];
-			if (m->type & PCI_MAPMEMP)
-				reqmapmem |= PCI_MAPMEMP;
-		}
-
-		for (i = 0; i < tag->nummaps; i++) {
-			unsigned mapaddr;
-			pcimap *m = &tag->map[i];
-			mapaddr = (m->base >> 12);
-			if (m->type == reqmapmem) {
-				pmap_setdevram(m->base, (1 << m->ln2size));
-			}
-		}
-#endif
-
-#ifdef __i386__
-		pmap_setvidram();
-#endif
-		
 		len = strlen(vendor) + strlen(chip) + strlen(type) + 4;
 		MALLOC(buf, char *, len, M_TEMP, M_NOWAIT);
 		if (buf)

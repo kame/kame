@@ -1,4 +1,6 @@
 /*
+ * Copyright (c) 1999 Roger Hardiman
+ * Copyright (c) 1998 Amancio Hasty
  * Copyright (c) 1995 Mark Tinguely and Jim Lowe
  * All rights reserved.
  *
@@ -28,14 +30,14 @@
  * ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: brktree_reg.h,v 1.23.2.2 1999/03/01 10:48:18 roger Exp $
+ * $FreeBSD: src/sys/pci/brktree_reg.h,v 1.23.2.6 1999/09/01 16:14:02 roger Exp $
  */
 #ifndef PCI_LATENCY_TIMER
 #define	PCI_LATENCY_TIMER		0x0c	/* pci timer register */
 #endif
 
 /*
- * Definitions for the Philips SAA7116 digital video to pci interface.
+ * Definitions for the Brooktree 848/878 video capture to pci interface.
  */
 #define BROOKTREE_848_PCI_ID            0x0350109E
 #define BROOKTREE_849_PCI_ID            0x0351109E
@@ -44,7 +46,7 @@
 
 #define BROOKTREE_848                   1
 #define BROOKTREE_848A                  2
-#define BROOKTREE_849                   3
+#define BROOKTREE_849A                  3
 #define BROOKTREE_878                   4
 #define BROOKTREE_879                   5
 
@@ -356,8 +358,10 @@ struct CARDTYPE {
 	u_char			msp3400c;	/* Has msp3400c chip? */
 	u_char			eepromAddr;
 	u_char			eepromSize;	/* bytes / EEPROMBLOCKSIZE */
-	u_char			audiomuxs[ 5 ];	/* tuner, ext, int/unused,
-						    mute, present */
+	u_int			audiomuxs[ 5 ];	/* tuner, ext (line-in) */
+						/* int/unused (radio) */
+						/* mute, present */
+	u_int			gpio_mux_bits;	/* GPIO mask for audio mux */
 };
 
 struct format_params {
@@ -373,9 +377,11 @@ struct format_params {
   u_char adelay, bdelay;
   /* Iform XTSEL value */
   int iform_xtsel;
+  /* VBI number of lines per field, and number of samples per line */
+  int vbi_num_lines, vbi_num_samples;
 };
 
-#ifdef __FreeBSD__
+#if ((defined(__FreeBSD__)) && (NSMBUS > 0))
 struct bktr_i2c_softc {
 	device_t iicbus;
 	device_t smbus;
@@ -383,24 +389,82 @@ struct bktr_i2c_softc {
 #endif
 
 typedef struct bktr_clip bktr_clip_t;
+
+
 /*
  * BrookTree 848  info structure, one per bt848 card installed.
  */
 struct bktr_softc {
-#ifdef __bsdi__
+
+#if defined (__bsdi__)
     struct device bktr_dev;	/* base device */
     struct isadev bktr_id;	/* ISA device */
     struct intrhand bktr_ih;	/* interrupt vectoring */
-#define pcici_t pci_devaddr_t
+    #define pcici_t pci_devaddr_t
 #endif
-#ifdef __FreeBSD__
-    struct bktr_i2c_softc i2c_sc;	/* bt848_i2c device */
+
+#if defined(__NetBSD__)
+    struct device bktr_dev;     /* base device */
+    bus_space_tag_t	memt;
+    bus_space_handle_t	memh;
+    bus_size_t		obmemsz;        /* size of en card (bytes) */
+    void		*ih;
+    bus_dmamap_t	dm_prog;
+    bus_dmamap_t	dm_oprog;
+    bus_dmamap_t	dm_mem;
+    bus_dmamap_t	dm_vbidata;
+    bus_dmamap_t	dm_vbibuffer;
+    vm_offset_t		phys_base;	/* Bt848 register physical address */
 #endif
+
+#if defined(__OpenBSD__)
+    struct device bktr_dev;     /* base device */
+    bus_dma_tag_t	dmat;   /* DMA tag */
+    bus_space_tag_t	memt;
+    bus_space_handle_t	memh;
+    bus_size_t		obmemsz;        /* size of en card (bytes) */
+    void		*ih;
+    bus_dmamap_t	dm_prog;
+    bus_dmamap_t	dm_oprog;
+    bus_dmamap_t	dm_mem;
+    bus_dmamap_t	dm_vbidata;
+    bus_dmamap_t	dm_vbibuffer;
+    size_t		dm_mapsize;
+    pci_chipset_tag_t	pc;	/* Opaque PCI chipset tag */
+    pcitag_t		tag;	/* PCI tag, for doing PCI commands */
+    vm_offset_t		phys_base;	/* Bt848 register physical address */
+#endif
+
+#if defined (__FreeBSD__)
+    #if (__FreeBSD_version < 400000)
+    vm_offset_t     phys_base;	/* 2.x Bt848 register physical address */
+    pcici_t         tag;	/* 2.x PCI tag, for doing PCI commands */
+    #endif
+    #if (__FreeBSD_version >= 400000)
+    struct resource *res_mem;	/* 4.x resource descriptor for registers */
+    struct resource *res_irq;	/* 4.x resource descriptor for interrupt */
+    void            *res_ih;	/* 4.x newbus interrupt handler cookie */
+    #endif
+    #if (NSMBUS > 0)
+      struct bktr_i2c_softc i2c_sc;	/* bt848_i2c device */
+    #endif
+#endif
+
+    /* the following definitions are common over all platforms */
     bt848_ptr_t base;		/* Bt848 register physical address */
-    vm_offset_t phys_base;	/* Bt848 register physical address */
-    pcici_t	tag;		/* PCI tag, for doing PCI commands */
     vm_offset_t bigbuf;		/* buffer that holds the captured image */
     int		alloc_pages;	/* number of pages in bigbuf */
+
+    vm_offset_t vbidata;	/* RISC program puts VBI data from the current frame here */
+    vm_offset_t vbibuffer;	/* Circular buffer holding VBI data for the user */
+    int         vbiinsert;      /* Position for next write into circular buffer */
+    int         vbistart;       /* Position of last read from circular buffer */
+    int         vbisize;        /* Number of bytes in the circular buffer */
+    u_long	vbi_sequence_number;	/* sequence number for VBI */
+    int		vbi_read_blocked;	/* user process blocked on read() from /dev/vbi */
+    struct selinfo vbi_select;	/* Data used by select() on /dev/vbi */
+    
+
     struct proc	*proc;		/* process to receive raised signal */
     int		signal;		/* signal to send to process */
     int		clr_on_start;	/* clear cap buf on capture start? */
@@ -473,9 +537,13 @@ struct bktr_softc {
 #define	METEOR_WANT_TS		0x08000000	/* time-stamp a frame */
 #define METEOR_RGB		0x20000000	/* meteor rgb unit */
 #define METEOR_FIELD_MODE	0x80000000
-    u_char	tflags;
+    u_char	tflags;				/* Tuner flags (/dev/tuner) */
 #define	TUNER_INITALIZED	0x00000001
 #define	TUNER_OPEN		0x00000002 
+    u_char      vbiflags;			/* VBI flags (/dev/vbi) */
+#define VBI_INITALIZED          0x00000001
+#define VBI_OPEN                0x00000002
+#define VBI_CAPTURE             0x00000004
     u_short	fps;		/* frames per second */
     struct meteor_video video;
     struct TVTUNER	tuner;
@@ -501,7 +569,9 @@ struct bktr_softc {
 #define BT848_USE_XTALS 0
 #define BT848_USE_PLL   1
     int                 xtal_pll_mode;	/* Use XTAL or PLL mode for PAL/SECAM */    int                 remote_control;      /* remote control detected */
-    int                 remote_control_addr; /* remote control i2c address */
+    int                 remote_control_addr;   /* remote control i2c address */
+    char		msp_version_string[9]; /* MSP version string 34xxx-xx */
+
 
 };
 

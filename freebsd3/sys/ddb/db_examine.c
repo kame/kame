@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- *	$Id: db_examine.c,v 1.24 1998/07/08 10:53:47 bde Exp $
+ * $FreeBSD: src/sys/ddb/db_examine.c,v 1.24.2.1 1999/08/29 16:22:15 peter Exp $
  */
 
 /*

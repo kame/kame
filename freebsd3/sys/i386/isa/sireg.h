@@ -30,7 +30,7 @@
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
  * NO EVENT SHALL THE AUTHORS BE LIABLE.
  *
- *	$Id: sireg.h,v 1.6.2.1 1999/03/31 23:57:12 nsayer Exp $
+ * $FreeBSD: src/sys/i386/isa/sireg.h,v 1.6.2.2 1999/08/29 16:07:33 peter Exp $
  */
 
 /*

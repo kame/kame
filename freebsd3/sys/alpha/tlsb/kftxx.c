@@ -1,4 +1,4 @@
-/* $Id: kftxx.c,v 1.4 1998/11/15 18:25:16 dfr Exp $ */
+/* $FreeBSD: src/sys/alpha/tlsb/kftxx.c,v 1.4.2.1 1999/08/29 15:57:41 peter Exp $ */
 /* $NetBSD: kftxx.c,v 1.9 1998/05/14 00:01:32 thorpej Exp $ */
 
 /*

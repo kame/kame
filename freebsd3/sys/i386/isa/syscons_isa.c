@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: syscons_isa.c,v 1.1 1999/01/19 11:30:56 yokota Exp $
+ * $FreeBSD: src/sys/i386/isa/syscons_isa.c,v 1.1.2.1 1999/08/29 16:07:33 peter Exp $
  */
 
 #include "sc.h"

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $Id: bt.c,v 1.13.2.3 1999/05/07 00:43:31 ken Exp $
+ * $FreeBSD: src/sys/dev/buslogic/bt.c,v 1.13.2.6 1999/09/14 04:07:50 gibbs Exp $
  */
 
  /*
@@ -722,7 +722,7 @@ bt_init(struct bt_softc* bt)
 	 */
 
 	/* DMA tag for mapping buffers into device visible space. */
-	if (bus_dma_tag_create(bt->parent_dmat, /*alignment*/0, /*boundary*/0,
+	if (bus_dma_tag_create(bt->parent_dmat, /*alignment*/1, /*boundary*/0,
 			       /*lowaddr*/BUS_SPACE_MAXADDR,
 			       /*highaddr*/BUS_SPACE_MAXADDR,
 			       /*filter*/NULL, /*filterarg*/NULL,
@@ -735,7 +735,7 @@ bt_init(struct bt_softc* bt)
 
 	bt->init_level++;
 	/* DMA tag for our mailboxes */
-	if (bus_dma_tag_create(bt->parent_dmat, /*alignment*/0, /*boundary*/0,
+	if (bus_dma_tag_create(bt->parent_dmat, /*alignment*/1, /*boundary*/0,
 			       /*lowaddr*/BUS_SPACE_MAXADDR,
 			       /*highaddr*/BUS_SPACE_MAXADDR,
 			       /*filter*/NULL, /*filterarg*/NULL,
@@ -771,7 +771,7 @@ bt_init(struct bt_softc* bt)
 	btinitmboxes(bt);
 
 	/* DMA tag for our ccb structures */
-	if (bus_dma_tag_create(bt->parent_dmat, /*alignment*/0, /*boundary*/0,
+	if (bus_dma_tag_create(bt->parent_dmat, /*alignment*/1, /*boundary*/0,
 			       /*lowaddr*/BUS_SPACE_MAXADDR,
 			       /*highaddr*/BUS_SPACE_MAXADDR,
 			       /*filter*/NULL, /*filterarg*/NULL,
@@ -801,7 +801,7 @@ bt_init(struct bt_softc* bt)
 	bt->init_level++;
 
 	/* DMA tag for our S/G structures.  We allocate in page sized chunks */
-	if (bus_dma_tag_create(bt->parent_dmat, /*alignment*/0, /*boundary*/0,
+	if (bus_dma_tag_create(bt->parent_dmat, /*alignment*/1, /*boundary*/0,
 			       /*lowaddr*/BUS_SPACE_MAXADDR,
 			       /*highaddr*/BUS_SPACE_MAXADDR,
 			       /*filter*/NULL, /*filterarg*/NULL,
@@ -1901,6 +1901,7 @@ bt_cmd(struct bt_softc *bt, bt_op_t opcode, u_int8_t *params, u_int param_len,
 		status = bt_inb(bt, STATUS_REG);
 		intstat = bt_inb(bt, INTSTAT_REG);
 		splx(s);
+	
 		if ((intstat & (INTR_PENDING|CMD_COMPLETE))
 		 == (INTR_PENDING|CMD_COMPLETE)) {
 			saved_status = status;
@@ -1914,7 +1915,6 @@ bt_cmd(struct bt_softc *bt, bt_op_t opcode, u_int8_t *params, u_int param_len,
 		}
 		if ((status & DATAIN_REG_READY) != 0)
 			break;
-
 		if ((status & CMD_REG_BUSY) == 0) {
 			bt_outb(bt, COMMAND_REG, *params++);
 			param_len--;
@@ -1937,6 +1937,16 @@ bt_cmd(struct bt_softc *bt, bt_op_t opcode, u_int8_t *params, u_int param_len,
 		s = splcam();
 		status = bt_inb(bt, STATUS_REG);
 		intstat = bt_inb(bt, INTSTAT_REG);
+		/*
+		 * It may be that this command was issued with
+		 * controller interrupts disabled.  We'll never
+		 * get to our command if an incoming mailbox
+		 * interrupt is pending, so take care of completed
+		 * mailbox commands by calling our interrupt handler.
+		 */
+		if ((intstat & (INTR_PENDING|IMB_LOADED))
+		 == (INTR_PENDING|IMB_LOADED))
+			bt_intr(bt);
 		splx(s);
 
 		if (bt->command_cmp != 0) {
@@ -1992,8 +2002,8 @@ bt_cmd(struct bt_softc *bt, bt_op_t opcode, u_int8_t *params, u_int param_len,
 	if (cmd_timeout == 0) {
 		printf("%s: bt_cmd: Timeout waiting for command (%x) "
 		       "to complete.\n%s: status = 0x%x, intstat = 0x%x, "
-		       "rlen %d\n", bt_name(bt), opcode, bt_name(bt),
-		       status, intstat, reply_len);
+		       "rlen %d\n", bt_name(bt), opcode,
+		       bt_name(bt), status, intstat, reply_len);
 		error = (ETIMEDOUT);
 	}
 

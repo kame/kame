@@ -1,0 +1,20 @@
+dir /src/3.2-STABLE/src/sys/modules/vinum
+dir /src/3.2-STABLE/src/sys/i386/conf
+dir /src/3.2-STABLE/src/sys
+file /src/3.2-STABLE/src/sys/compile/DAEMON/kernel.debug
+define asf
+   set $file = linker_files.tqh_first
+   set $found = 0
+   while ($found == 0)
+     if (*$file->filename == 'v')
+	set $found = 1
+     else
+       set $file = $file->link.tqe_next
+     end
+   end
+   shell /usr/bin/objdump --section-headers /src/obj/src/3.2-STABLE/src/sys/modules/vinum/vinum.ko | grep ' .text' | awk '{print "add-symbol-file /src/obj/src/3.2-STABLE/src/sys/modules/vinum/vinum.ko \$file->address+0x" $4}' > .asf
+   source .asf
+end
+document asf
+Find the load address of Vinum in the kernel and add the symbols at this address
+end

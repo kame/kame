@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $Id: busdma_machdep.c,v 1.12 1998/12/14 05:35:56 dillon Exp $
+ * $FreeBSD: src/sys/i386/i386/busdma_machdep.c,v 1.12.2.2 1999/09/14 04:07:56 gibbs Exp $
  */
 
 #include <sys/param.h>
@@ -352,7 +352,7 @@ bus_dmamem_free(bus_dma_tag_t dmat, void *vaddr, bus_dmamap_t map)
 	 * dmamem does not need to be bounced, so the map should be
 	 * NULL
 	 */
-	if (map != &nobounce_dmamap)
+	if (map != NULL)
 		panic("bus_dmamem_free: Invalid map freed\n");
 	/* XXX There is no "contigfree" and "free" doesn't work */
 	if ((dmat->maxsize <= PAGE_SIZE) && dmat->lowaddr >= ptoa(Maxmem))

@@ -1,4 +1,4 @@
-/* $Id: ccdvar.h,v 1.7 1998/09/15 10:07:26 gibbs Exp $ */
+/* $FreeBSD: src/sys/sys/ccdvar.h,v 1.7.2.1 1999/08/29 16:32:10 peter Exp $ */
 
 /*	$NetBSD: ccdvar.h,v 1.7.2.1 1995/10/12 21:30:18 thorpej Exp $	*/
 

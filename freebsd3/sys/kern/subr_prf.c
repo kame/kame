@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)subr_prf.c	8.3 (Berkeley) 1/21/94
- * $Id: subr_prf.c,v 1.51 1998/12/03 04:45:56 archie Exp $
+ * $FreeBSD: src/sys/kern/subr_prf.c,v 1.51.2.3 1999/08/29 16:26:07 peter Exp $
  */
 
 #include <sys/param.h>
@@ -60,23 +60,26 @@
 #define TOTTY	0x02
 #define TOLOG	0x04
 
-struct	tty *constty;			/* pointer to console "window" tty */
+/* Max number conversion buffer length: a long in base 2, plus NUL byte. */
+#define MAXNBUF	(sizeof(long) * NBBY + 1)
 
 struct putchar_arg {
-	int flags;
-	struct tty *tty;
+	int	flags;
+	struct	tty *tty;
 };
 
 struct snprintf_arg {
-	char *str;
-	size_t remain;
+	char	*str;
+	size_t	remain;
 };
+
+struct	tty *constty;			/* pointer to console "window" tty */
 
 static void (*v_putc)(int) = cnputc;	/* routine to putc on virtual console */
 static void  logpri __P((int level));
 static void  msglogchar(int c, void *dummyarg);
 static void  putchar __P((int ch, void *arg));
-static char *ksprintn __P((u_long num, int base, int *len));
+static char *ksprintn __P((char *nbuf, u_long num, int base, int *len));
 static void  snprintf_func __P((int ch, void *arg));
 
 static int consintr = 1;		/* Ok to handle console interrupts? */
@@ -214,10 +217,11 @@ static void
 logpri(level)
 	int level;
 {
+	char nbuf[MAXNBUF];
 	register char *p;
 
 	msglogchar('<', NULL);
-	for (p = ksprintn((u_long)level, 10, NULL); *p;)
+	for (p = ksprintn(nbuf, (u_long)level, 10, NULL); *p;)
 		msglogchar(*p--, NULL);
 	msglogchar('>', NULL);
 }
@@ -382,24 +386,26 @@ snprintf_func(int ch, void *arg)
 }
 
 /*
- * Put a number (base <= 16) in a buffer in reverse order; return an
- * optional length and a pointer to the NULL terminated (preceded?)
- * buffer.
+ * Put a NUL-terminated ASCII number (base <= 16) in a buffer in reverse
+ * order; return an optional length and a pointer to the last character
+ * written in the buffer (i.e., the first character of the string).
+ * The buffer pointed to by `nbuf' must have length >= MAXNBUF.
  */
 static char *
-ksprintn(ul, base, lenp)
+ksprintn(nbuf, ul, base, lenp)
+	char *nbuf;
 	register u_long ul;
 	register int base, *lenp;
-{					/* A long in base 8, plus NULL. */
-	static char buf[sizeof(long) * NBBY / 3 + 2];
+{
 	register char *p;
 
-	p = buf;
+	p = nbuf;
+	*p = '\0';
 	do {
 		*++p = hex2ascii(ul % base);
 	} while (ul /= base);
 	if (lenp)
-		*lenp = p - buf;
+		*lenp = p - nbuf;
 	return (p);
 }
 
@@ -433,6 +439,7 @@ int
 kvprintf(char const *fmt, void (*func)(int, void*), void *arg, int radix, va_list ap)
 {
 #define PCHAR(c) {int cc=(c); if (func) (*func)(cc,arg); else *d++ = cc; retval++; }
+	char nbuf[MAXNBUF];
 	char *p, *q, *d;
 	u_char *up;
 	int ch, n;
@@ -511,7 +518,7 @@ reswitch:	switch (ch = (u_char)*fmt++) {
 		case 'b':
 			ul = va_arg(ap, int);
 			p = va_arg(ap, char *);
-			for (q = ksprintn(ul, *p++, NULL); *q;)
+			for (q = ksprintn(nbuf, ul, *p++, NULL); *q;)
 				PCHAR(*q--);
 
 			if (!ul)
@@ -610,7 +617,7 @@ number:			if (sign && (long)ul < 0L) {
 				neg = 1;
 				ul = -(long)ul;
 			}
-			p = ksprintn(ul, base, &tmp);
+			p = ksprintn(nbuf, ul, base, &tmp);
 			if (sharpflag && ul != 0) {
 				if (base == 8)
 					tmp++;

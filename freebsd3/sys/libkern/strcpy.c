@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: strcpy.c,v 1.5 1997/08/02 14:31:50 bde Exp $
+ * $FreeBSD: src/sys/libkern/strcpy.c,v 1.5.2.1 1999/08/29 16:26:34 peter Exp $
  */
 
 #include <string.h>

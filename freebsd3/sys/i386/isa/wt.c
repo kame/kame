@@ -20,7 +20,7 @@
  * the original CMU copyright notice.
  *
  * Version 1.3, Thu Nov 11 12:09:13 MSK 1993
- * $Id: wt.c,v 1.47 1998/12/18 18:07:10 bde Exp $
+ * $FreeBSD: src/sys/i386/isa/wt.c,v 1.47.2.1 1999/08/29 16:07:36 peter Exp $
  *
  */
 

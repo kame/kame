@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)isa_device.h	7.1 (Berkeley) 5/9/91
- *	$Id: intr_machdep.h,v 1.13 1998/06/18 15:32:06 bde Exp $
+ * $FreeBSD: src/sys/i386/isa/intr_machdep.h,v 1.13.2.3 1999/09/02 23:56:55 msmith Exp $
  */
 
 #ifndef _I386_ISA_INTR_MACHDEP_H_
@@ -113,6 +113,9 @@
 #define XCPUCHECKSTATE_OFFSET	(ICU_OFFSET + 113)
 #endif
 
+/* inter-CPU rendezvous */
+#define XRENDEZVOUS_OFFSET	(ICU_OFFSET + 114)
+
 /* IPI to generate an additional software trap at the target CPU */
 #define XCPUAST_OFFSET		(ICU_OFFSET +  48)
 
@@ -179,7 +182,8 @@ inthand_t
 	Xcpuast,	/* Additional software trap on other cpu */ 
 	Xforward_irq,	/* Forward irq to cpu holding ISR lock */
 	Xcpustop,	/* CPU stops & waits for another CPU to restart it */
-	Xspuriousint;	/* handle APIC "spurious INTs" */
+	Xspuriousint,	/* handle APIC "spurious INTs" */
+	Xrendezvous;	/* handle CPU rendezvous */
 
 #ifdef TEST_TEST1
 inthand_t

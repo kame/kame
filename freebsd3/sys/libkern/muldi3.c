@@ -34,7 +34,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: muldi3.c,v 1.5 1997/02/22 09:39:56 peter Exp $
+ * $FreeBSD: src/sys/libkern/muldi3.c,v 1.5.4.1 1999/08/29 16:26:32 peter Exp $
  */
 
 #include "quad.h"

@@ -1,6 +1,6 @@
 # Makefile for syscall tables
 #
-# $Id: Makefile,v 1.3 1997/03/29 11:17:26 peter Exp $
+# $FreeBSD: src/sys/i386/linux/Makefile,v 1.3.4.1 1999/08/29 16:07:49 peter Exp $
 
 all:
 	@echo "make linux_sysent.c only"

@@ -33,7 +33,7 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumio.h,v 1.6.2.2 1999/04/06 09:05:57 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumio.h,v 1.6.2.4 1999/08/29 16:24:18 peter Exp $
  */
 
 #ifdef VINUMDEBUG
@@ -97,6 +97,7 @@ enum objecttype {
 enum objectstate {
     object_down,
     object_initializing,
+    object_initialized,
     object_up
 };
 
@@ -124,7 +125,8 @@ struct vinum_ioctl_msg {
 #define VINUM_LABEL 		_IOC(IOC_IN | IOC_OUT, L, 81, MAX_IOCTL_REPLY) /* label a volume */
 #define VINUM_INITSD 		_IOW(L, 82, int)	    /* initialize a subdisk */
 #define VINUM_REMOVE 		_IOWR(L, 83, struct vinum_ioctl_msg) /* remove an object */
-/* 84, 85 going begging */
+#define VINUM_READPOL 		_IOWR(L, 84, struct vinum_ioctl_msg) /* set read policy */
+#define VINUM_SETSTATE_FORCE	_IOC(IOC_IN | IOC_OUT, L, 85, MAX_IOCTL_REPLY) /* diddle object state */
 #define VINUM_RESETSTATS	_IOWR(L, 86, struct vinum_ioctl_msg) /* reset object stats */
 #define VINUM_ATTACH		_IOWR(L, 87, struct vinum_ioctl_msg) /* attach an object */
 #define VINUM_DETACH		_IOWR(L, 88, struct vinum_ioctl_msg) /* remove an object */

@@ -56,7 +56,7 @@
  * W. Metzenthen   June 1994.
  *
  *
- *     $Id: get_address.c,v 1.7 1998/08/16 01:21:48 bde Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/get_address.c,v 1.7.2.1 1999/08/29 16:24:37 peter Exp $
  *
  */
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: zsreg.h,v 1.2 1998/07/05 12:16:55 dfr Exp $
+ * $FreeBSD: src/sys/alpha/tlsb/zsreg.h,v 1.2.2.1 1999/08/29 15:57:44 peter Exp $
  */
 
 #define ZSC_CHANNELA	0x80

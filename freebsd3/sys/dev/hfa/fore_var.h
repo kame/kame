@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $Id: fore_var.h,v 1.1 1998/09/15 08:22:56 phk Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_var.h,v 1.1.2.1 1999/08/29 16:23:09 peter Exp $
  *
  */
 

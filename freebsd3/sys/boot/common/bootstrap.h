@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: bootstrap.h,v 1.18.2.1 1999/02/06 14:27:29 dcs Exp $
+ * $FreeBSD: src/sys/boot/common/bootstrap.h,v 1.18.2.2 1999/08/29 16:20:25 peter Exp $
  */
 
 #include <sys/types.h>

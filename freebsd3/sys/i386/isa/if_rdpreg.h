@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: if_rdpreg.h,v 1.1.1.1 1998/12/21 18:01:15 joerg Exp $
+ * $FreeBSD: src/sys/i386/isa/if_rdpreg.h,v 1.1.1.1.2.1 1999/08/29 16:07:23 peter Exp $
  */
 
 /*

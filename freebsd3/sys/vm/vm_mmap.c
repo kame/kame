@@ -38,7 +38,7 @@
  * from: Utah $Hdr: vm_mmap.c 1.6 91/10/21$
  *
  *	@(#)vm_mmap.c	8.4 (Berkeley) 1/12/94
- * $Id: vm_mmap.c,v 1.86.2.2 1999/05/10 17:09:25 luoqi Exp $
+ * $FreeBSD: src/sys/vm/vm_mmap.c,v 1.86.2.3 1999/08/29 16:33:34 peter Exp $
  */
 
 /*

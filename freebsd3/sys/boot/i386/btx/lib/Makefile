@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.2 1998/10/11 11:27:48 rnordier Exp $
+# $FreeBSD: src/sys/boot/i386/btx/lib/Makefile,v 1.2.2.1 1999/08/29 16:20:51 peter Exp $
 
 OBJS=		btxcsu.o btxsys.o btxv86.o
 AFLAGS+=	-elf

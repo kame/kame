@@ -1,3 +1,3 @@
-# $Id: Makefile.inc,v 1.1 1998/10/16 04:30:49 peter Exp $
+# $FreeBSD: src/sys/modules/syscons/Makefile.inc,v 1.1.2.1 1999/08/29 16:27:41 peter Exp $
 
 .include "../Makefile.inc"

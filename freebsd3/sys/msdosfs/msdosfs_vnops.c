@@ -1,4 +1,4 @@
-/*	$Id: msdosfs_vnops.c,v 1.80 1998/12/07 21:58:35 archie Exp $ */
+/* $FreeBSD: src/sys/msdosfs/msdosfs_vnops.c,v 1.80.2.1 1999/08/29 16:28:07 peter Exp $ */
 /*	$NetBSD: msdosfs_vnops.c,v 1.68 1998/02/10 14:10:04 mrg Exp $	*/
 
 /*-

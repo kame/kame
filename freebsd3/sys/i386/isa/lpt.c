@@ -46,7 +46,7 @@
  * SUCH DAMAGE.
  *
  *	from: unknown origin, 386BSD 0.1
- *	$Id: lpt.c,v 1.72.2.1 1999/02/15 02:51:18 des Exp $
+ * $FreeBSD: src/sys/i386/isa/lpt.c,v 1.72.2.2 1999/08/29 16:07:27 peter Exp $
  */
 
 /*

@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $Id: mplock.s,v 1.25 1998/06/21 14:53:03 bde Exp $
+ * $FreeBSD: src/sys/i386/i386/mplock.s,v 1.25.2.1 1999/08/29 16:05:48 peter Exp $
  *
  * Functions for locking between CPUs in a SMP system.
  *

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)npx.h	5.3 (Berkeley) 1/18/91
- *	$Id: npx.h,v 1.14 1997/07/20 11:06:44 bde Exp $
+ * $FreeBSD: src/sys/i386/include/npx.h,v 1.14.2.1 1999/08/29 16:06:41 peter Exp $
  */
 
 /*

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: if_tlreg.h,v 1.7.2.2 1999/03/31 04:12:29 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_tlreg.h,v 1.7.2.3 1999/08/29 16:31:47 peter Exp $
  */
 
 

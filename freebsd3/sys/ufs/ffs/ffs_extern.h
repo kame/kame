@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ffs_extern.h	8.6 (Berkeley) 3/30/95
- * $Id: ffs_extern.h,v 1.25 1999/01/07 16:14:16 bde Exp $
+ * $FreeBSD: src/sys/ufs/ffs/ffs_extern.h,v 1.25.2.1 1999/08/29 16:33:10 peter Exp $
  */
 
 #ifndef _UFS_FFS_EXTERN_H

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: linux.h,v 1.26 1998/12/30 21:19:59 sos Exp $
+ * $FreeBSD: src/sys/i386/linux/linux.h,v 1.26.2.7 1999/08/29 16:07:50 peter Exp $
  */
 
 #ifndef _I386_LINUX_LINUX_H_
@@ -56,6 +56,16 @@ typedef struct {
 	void (*sa_restorer)(void);
 } linux_sigaction_t;
 typedef int linux_key_t;
+
+typedef struct {
+	unsigned	long sig[2];
+} linux_new_sigset_t;
+typedef struct {
+	void		(*lsa_handler)(int);
+	unsigned	long lsa_flags;
+	void		(*lsa_restorer)(void);
+	linux_new_sigset_t lsa_mask;
+} linux_new_sigaction_t;
 
 /*
  * The Linux sigcontext, pretty much a standard 386 trapframe.
@@ -154,6 +164,9 @@ struct trapframe;
 
 /* sigaction flags */
 #define LINUX_SA_NOCLDSTOP	0x00000001
+#define LINUX_SA_NOCLDWAIT	0x00000002
+#define LINUX_SA_SIGINFO	0x00000004
+#define LINUX_SA_RESTORER	0x04000000
 #define LINUX_SA_ONSTACK	0x08000000
 #define LINUX_SA_RESTART	0x10000000
 #define LINUX_SA_INTERRUPT	0x20000000
@@ -164,6 +177,20 @@ struct trapframe;
 #define LINUX_SIG_BLOCK		0
 #define LINUX_SIG_UNBLOCK	1
 #define LINUX_SIG_SETMASK	2
+
+/* resource limits */
+#define LINUX_RLIMIT_CPU	0
+#define LINUX_RLIMIT_FSIZE	1
+#define LINUX_RLIMIT_DATA	2
+#define LINUX_RLIMIT_STACK	3
+#define LINUX_RLIMIT_CORE	4
+#define LINUX_RLIMIT_RSS	5
+#define LINUX_RLIMIT_NPROC	6
+#define LINUX_RLIMIT_NOFILE	7
+#define LINUX_RLIMIT_MEMLOCK	8
+#define LINUX_RLIMIT_AS		9	/* address space limit */
+
+#define LINUX_RLIM_NLIMITS	10
 
 /* keyboard defines */
 #define LINUX_KIOCSOUND		0x4B2F
@@ -239,10 +266,15 @@ struct trapframe;
 #define LINUX_VT_GETMODE        0x5601
 #define LINUX_VT_SETMODE        0x5602
 #define LINUX_VT_GETSTATE       0x5603
+#define LINUX_VT_RELDISP        0x5605
 #define LINUX_VT_ACTIVATE       0x5606  
 #define LINUX_VT_WAITACTIVE     0x5607
 
-
+/* arguments for tcflow() and LINUX_TCXONC */
+#define LINUX_TCOOFF		0
+#define LINUX_TCOON		1
+#define LINUX_TCIOFF		2
+#define LINUX_TCION		3
 
 /* arguments for tcflush() and LINUX_TCFLSH */
 #define LINUX_TCIFLUSH        0
@@ -659,5 +691,41 @@ struct linux_ifreq
 #define LINUX_ASYNC_PGRP_LOCKOUT    	0x0200
 #define LINUX_ASYNC_CALLOUT_NOHUP   	0x0400
 #define LINUX_ASYNC_FLAGS     		0x0FFF
+
+/* cdrom */
+#define LINUX_CDROMPAUSE		0x5301 
+#define LINUX_CDROMRESUME		0x5302
+#define LINUX_CDROMPLAYMSF		0x5303
+#define LINUX_CDROMPLAYTRKIND		0x5304
+#define LINUX_CDROMREADTOCHDR		0x5305
+#define LINUX_CDROMREADTOCENTRY		0x5306
+#define LINUX_CDROMSTOP			0x5307
+#define LINUX_CDROMSTART		0x5308
+#define LINUX_CDROMEJECT		0x5309
+#define LINUX_CDROMVOLCTRL		0x530a
+#define LINUX_CDROMSUBCHNL		0x530b
+#define LINUX_CDROMREADMODE2		0x530c
+#define LINUX_CDROMREADMODE1		0x530d
+#define LINUX_CDROMREADAUDIO		0x530e
+#define LINUX_CDROMEJECT_SW		0x530f
+#define LINUX_CDROMMULTISESSION		0x5310
+#define LINUX_CDROM_GET_UPC		0x5311
+#define LINUX_CDROMRESET		0x5312
+#define LINUX_CDROMVOLREAD		0x5313
+#define LINUX_CDROMREADRAW		0x5314
+#define LINUX_CDROMREADCOOKED		0x5315
+#define LINUX_CDROMSEEK			0x5316
+#define LINUX_CDROMPLAYBLK		0x5317
+#define LINUX_CDROMREADALL		0x5318
+#define LINUX_CDROMCLOSETRAY		0x5319
+#define LINUX_CDROMLOADFROMSLOT		0x531a
+
+#define LINUX_CDROM_LBA                 0x01
+#define LINUX_CDROM_MSF                 0x02
+
+/* Scheduling policies */
+#define LINUX_SCHED_OTHER		0
+#define LINUX_SCHED_FIFO		1
+#define LINUX_SCHED_RR			2
 
 #endif /* !_I386_LINUX_LINUX_H_ */

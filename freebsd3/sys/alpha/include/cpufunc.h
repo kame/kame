@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: cpufunc.h,v 1.3 1998/08/17 08:21:31 dfr Exp $
+ * $FreeBSD: src/sys/alpha/include/cpufunc.h,v 1.3.2.1 1999/08/29 15:56:51 peter Exp $
  */
 
 #ifndef _MACHINE_CPUFUNC_H_

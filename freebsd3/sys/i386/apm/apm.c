@@ -15,21 +15,28 @@
  *
  * Sep, 1994	Implemented on FreeBSD 1.1.5.1R (Toshiba AVS001WD)
  *
- *	$Id: apm.c,v 1.77 1998/12/10 23:36:14 msmith Exp $
+ * $FreeBSD: src/sys/i386/apm/apm.c,v 1.77.2.8 1999/09/12 01:06:28 iwasaki Exp $
  */
 
 #include "opt_devfs.h"
 #include "opt_vm86.h"
 
 #include <sys/param.h>
+#include <sys/systm.h>
 #include <sys/conf.h>
 #include <sys/kernel.h>
 #ifdef DEVFS
 #include <sys/devfsext.h>
 #endif /*DEVFS*/
-#include <sys/systm.h>
 #include <sys/time.h>
 #include <sys/reboot.h>
+#include <sys/select.h>
+#include <sys/poll.h>
+#include <sys/fcntl.h>
+#include <sys/proc.h>
+#include <sys/uio.h>
+#include <sys/signalvar.h>
+#include <sys/sysctl.h>
 #include <i386/isa/isa_device.h>
 #include <machine/apm_bios.h>
 #include <machine/segments.h>
@@ -48,23 +55,44 @@
 static int apm_display __P((int newstate));
 static int apm_int __P((u_long *eax, u_long *ebx, u_long *ecx, u_long *edx));
 static void apm_resume __P((void));
+static int apm_check_function_supported __P((u_int version, u_int func));
+
+#define APM_NEVENTS 16
+#define APM_NPMEV   13
+
+int	apm_evindex;
 
 /* static data */
 struct apm_softc {
-	int	initialized, active;
+	int	initialized, active, bios_busy;
 	int	always_halt_cpu, slow_idle_cpu;
 	int	disabled, disengaged;
+ 	int	standby_countdown, suspend_countdown;
 	u_int	minorversion, majorversion;
 	u_int	cs32_base, cs16_base, ds_base;
 	u_int	cs16_limit, cs32_limit, ds_limit;
 	u_int	cs_entry;
 	u_int	intversion;
+ 	u_int	standbys, suspends;
 	struct apmhook sc_suspend;
 	struct apmhook sc_resume;
+	struct selinfo sc_rsel;
+	int	sc_flags;
+	int	event_count;
+	int	event_ptr;
+	struct	apm_event_info event_list[APM_NEVENTS];
+	u_char	event_filter[APM_NPMEV];
 #ifdef DEVFS
 	void 	*sc_devfs_token;
 #endif
 };
+#define	SCFLAG_ONORMAL	0x0000001
+#define	SCFLAG_OCTL	0x0000002
+#define	SCFLAG_OPEN	(SCFLAG_ONORMAL|SCFLAG_OCTL)
+
+#define APMDEV(dev)	(minor(dev)&0x0f)
+#define APMDEV_NORMAL	0
+#define APMDEV_CTL	8
 
 static struct apm_softc apm_softc;
 static struct apmhook	*hook[NAPM_HOOK];		/* XXX */
@@ -80,13 +108,15 @@ static struct callout_handle apm_timeout_ch =
 static timeout_t apm_timeout;
 static d_open_t apmopen;
 static d_close_t apmclose;
+static d_write_t apmwrite;
 static d_ioctl_t apmioctl;
+static d_poll_t apmpoll;
 
 #define CDEV_MAJOR 39
 static struct cdevsw apm_cdevsw = 
-	{ apmopen,	apmclose,	noread,		nowrite,	/*39*/
+	{ apmopen,	apmclose,	noread,		apmwrite,	/*39*/
 	  apmioctl,	nostop,		nullreset,	nodevtotty,/* APM */
-	  seltrue,	nommap,		NULL ,	"apm"	,NULL,	-1};
+	  apmpoll,	nommap,		NULL ,	"apm"	,NULL,	-1};
 
 /* setup APM GDT discriptors */
 static void
@@ -118,6 +148,40 @@ struct addr48 {
 
 static int apm_errno;
 
+static int apm_suspend_delay = 1;
+static int apm_standby_delay = 1;
+
+SYSCTL_INT(_machdep, OID_AUTO, apm_suspend_delay, CTLFLAG_RW, &apm_suspend_delay, 1, "");
+SYSCTL_INT(_machdep, OID_AUTO, apm_standby_delay, CTLFLAG_RW, &apm_standby_delay, 1, "");
+
+/*
+ * return  0 if the function successfull,
+ * return  1 if the function unsuccessfull,
+ * return -1 if the function unsupported.
+ */
+static int
+apm_do_int(struct apm_bios_arg *apap)
+{
+	struct apm_softc *sc = &apm_softc;
+	int errno = 0;
+	u_long apm_func = apap->eax & 0x00ff;
+
+	if (!apm_check_function_supported(sc->intversion, apm_func)) {
+#ifdef APM_DEBUG
+		printf("apm_bioscall: function 0x%x is not supported in v%d.%d\n
+",
+			apm_func, sc->majorversion, sc->minorversion);
+
+#endif
+		return (-1);
+	}
+
+	sc->bios_busy = 1;
+	errno = apm_bios_call(apap);
+	sc->bios_busy = 0;
+	return errno;
+}
+
 static int
 apm_int(u_long *eax, u_long *ebx, u_long *ecx, u_long *edx)
 {
@@ -128,7 +192,9 @@ apm_int(u_long *eax, u_long *ebx, u_long *ecx, u_long *edx)
 	apa.ebx = *ebx;
 	apa.ecx = *ecx;
 	apa.edx = *edx;
-	cf = apm_bios_call(&apa);
+	apa.esi = 0;	/* clear register */
+	apa.edi = 0;	/* clear register */
+	cf = apm_do_int(&apa);
 	*eax = apa.eax;
 	*ebx = apa.ebx;
 	*ecx = apa.ecx;
@@ -137,6 +203,34 @@ apm_int(u_long *eax, u_long *ebx, u_long *ecx, u_long *edx)
 	return cf;
 }
 
+
+/* check whether APM function is supported (1)  or not (0). */
+static int
+apm_check_function_supported(u_int version, u_int func)
+{
+	/* except driver version */
+	if (func == APM_DRVVERSION) {
+		return (1);
+	}
+
+	switch (version) {
+	case INTVERSION(1, 0):
+		if (func > APM_GETPMEVENT) {
+			return (0); /* not supported */
+		}
+		break;
+	case INTVERSION(1, 1):
+		if (func > APM_ENGAGEDISENGAGEPM &&
+		    func < APM_OEMFUNC) {
+			return (0); /* not supported */
+		}
+		break;
+	case INTVERSION(1, 2):
+		break;
+	}
+
+	return (1); /* supported */
+}
 
 /* enable/disable power management */
 static int
@@ -157,6 +251,7 @@ apm_enable_disable_pm(int enable)
 	return apm_int(&eax, &ebx, &ecx, &edx);
 }
 
+/* register driver version (APM 1.1 or later) */ 
 static void
 apm_driver_version(int version)
 {
@@ -167,8 +262,17 @@ apm_driver_version(int version)
 	ebx  = 0x0;
 	ecx  = version;
 	edx = 0;
-	if(!apm_int(&eax, &ebx, &ecx, &edx)) 
-		apm_version = eax & 0xffff;
+	if (!apm_int(&eax, &ebx, &ecx, &edx)) {
+		/*
+		 * Some old BIOSes don't return
+		 * the connection version in %ax.
+		 */
+		if (eax == ((APM_BIOS << 8) | APM_DRVVERSION)) {
+			apm_version = version;
+		} else {
+			apm_version = eax & 0xffff;
+		}
+	}
 }
 
 /* engage/disengage power management (APM 1.1 or later) */
@@ -419,7 +523,92 @@ apm_default_suspend(void *arg)
 	return 0;
 }
 
+static int apm_record_event __P((struct apm_softc *, u_int));
 static void apm_processevent(void);
+
+static u_int apm_op_inprog = 0;
+
+static void
+apm_do_suspend(void)
+{
+	struct apm_softc *sc = &apm_softc;
+
+	if (!sc)
+		return;
+
+	apm_op_inprog = 0;
+	sc->suspends = sc->suspend_countdown = 0;
+
+	if (sc->initialized) {
+		apm_execute_hook(hook[APM_HOOK_SUSPEND]);
+		if (apm_suspend_system(PMST_SUSPEND) == 0)
+			apm_processevent();
+		else
+			/* Failure, 'resume' the system again */
+			apm_execute_hook(hook[APM_HOOK_RESUME]);
+	}
+}
+
+static void
+apm_do_standby(void)
+{
+	struct apm_softc *sc = &apm_softc;
+
+	if (!sc)
+		return;
+
+	apm_op_inprog = 0;
+	sc->standbys = sc->standby_countdown = 0;
+
+	if (sc->initialized) {
+		/*
+		 * As far as standby, we don't need to execute 
+		 * all of suspend hooks.
+		 */
+		apm_default_suspend(&apm_softc);
+		if (apm_suspend_system(PMST_STANDBY) == 0)
+			apm_processevent();
+	}
+}
+
+static void
+apm_lastreq_notify(void)
+{
+	u_long eax, ebx, ecx, edx;
+
+	eax = (APM_BIOS << 8) | APM_SETPWSTATE;
+	ebx = PMDV_ALLDEV;
+	ecx = PMST_LASTREQNOTIFY;
+	edx = 0;
+
+	apm_int(&eax, &ebx, &ecx, &edx);
+}
+
+static int
+apm_lastreq_rejected(void)
+{
+	u_long eax, ebx, ecx, edx;
+
+	if (apm_op_inprog == 0) {
+		return 1;	/* no operation in progress */
+	}
+
+	eax = (APM_BIOS << 8) | APM_SETPWSTATE;
+	ebx = PMDV_ALLDEV;
+	ecx = PMST_LASTREQREJECT;
+	edx = 0;
+
+	if (apm_int(&eax, &ebx, &ecx, &edx)) {
+#ifdef APM_DEBUG
+		printf("apm_lastreq_rejected: failed\n");
+#endif
+		return 1;
+	}
+
+	apm_op_inprog = 0;
+
+	return 0;
+}
 
 /*
  * Public interface to the suspend/resume:
@@ -433,17 +622,26 @@ apm_suspend(int state)
 {
 	struct apm_softc *sc = &apm_softc;
 
-	if (!sc)
+	switch (state) {
+	case PMST_SUSPEND:
+		if (sc->suspends)
+			return;
+		sc->suspends++;
+		sc->suspend_countdown = apm_suspend_delay;
+		break;
+	case PMST_STANDBY:
+		if (sc->standbys)
+			return;
+		sc->standbys++;
+		sc->standby_countdown = apm_standby_delay;
+		break;
+	default:
+		printf("apm_suspend: Unknown Suspend state 0x%x\n", state);
 		return;
-
-	if (sc->initialized) {
-		apm_execute_hook(hook[APM_HOOK_SUSPEND]);
-		if (apm_suspend_system(state) == 0)
-			apm_processevent();
-		else
-			/* Failure, 'resume' the system again */
-			apm_execute_hook(hook[APM_HOOK_RESUME]);
 	}
+
+	apm_op_inprog++;
+	apm_lastreq_notify();
 }
 
 void
@@ -566,7 +764,18 @@ apm_timeout(void *dummy)
 {
 	struct apm_softc *sc = &apm_softc;
 
-	apm_processevent();
+	if (apm_op_inprog)
+		apm_lastreq_notify();
+
+	if (sc->standbys && sc->standby_countdown-- <= 0)
+		apm_do_standby();
+
+	if (sc->suspends && sc->suspend_countdown-- <= 0)
+		apm_do_suspend();
+
+	if (!sc->bios_busy)
+		apm_processevent();
+  
 	if (sc->active == 1)
 		/* Run slightly more oftan than 1 Hz */
 		apm_timeout_ch = timeout(apm_timeout, NULL, hz - 1 );
@@ -704,25 +913,50 @@ apmprobe(struct isa_device *dvp)
 	switch (apm_version) {
 	case APMINI_CANTFIND:
 		/* silent */
-		return 0;
+		return ENXIO;
 	case APMINI_NOT32BIT:
 		printf("apm: 32bit connection is not supported.\n");
-		return 0;
+		return ENXIO;
 	case APMINI_CONNECTERR:
 		printf("apm: 32-bit connection error.\n");
-		return 0;
+		return ENXIO;
 	}
 	if (dvp->id_flags & 0x20)
 		statclock_disable = 1;
 	return -1;
 }
 
+/*
+ * return 0 if the user will notice and handle the event,
+ * return 1 if the kernel driver should do so.
+ */
+static int
+apm_record_event(struct apm_softc *sc, u_int event_type)
+{
+	struct apm_event_info *evp;
+
+	if ((sc->sc_flags & SCFLAG_OPEN) == 0)
+		return 1;		/* no user waiting */
+	if (sc->event_count == APM_NEVENTS)
+		return 1;			/* overflow */
+	if (sc->event_filter[event_type] == 0)
+		return 1;		/* not registered */
+	evp = &sc->event_list[sc->event_ptr];
+	sc->event_count++;
+	sc->event_ptr++;
+	sc->event_ptr %= APM_NEVENTS;
+	evp->type = event_type;
+	evp->index = ++apm_evindex;
+	selwakeup(&sc->sc_rsel);
+	return (sc->sc_flags & SCFLAG_OCTL) ? 0 : 1; /* user may handle */
+}
 
 /* Process APM event */
 static void
 apm_processevent(void)
 {
 	int apm_event;
+	struct apm_softc *sc = &apm_softc;
 
 #ifdef APM_DEBUG
 #  define OPMEV_DEBUGMESSAGE(symbol) case symbol: \
@@ -734,34 +968,69 @@ apm_processevent(void)
 		apm_event = apm_getevent();
 		switch (apm_event) {
 		    OPMEV_DEBUGMESSAGE(PMEV_STANDBYREQ);
-			apm_suspend(PMST_STANDBY);
+			if (apm_op_inprog == 0) {
+			    apm_op_inprog++;
+			    if (apm_record_event(sc, apm_event)) {
+				apm_suspend(PMST_STANDBY);
+			    }
+			}
+			break;
+		    OPMEV_DEBUGMESSAGE(PMEV_USERSTANDBYREQ);
+			if (apm_op_inprog == 0) {
+			    apm_op_inprog++;
+			    if (apm_record_event(sc, apm_event)) {
+				apm_suspend(PMST_STANDBY);
+			    }
+			}
 			break;
 		    OPMEV_DEBUGMESSAGE(PMEV_SUSPENDREQ);
-			apm_suspend(PMST_SUSPEND);
-			break;
+ 			apm_lastreq_notify();
+			if (apm_op_inprog == 0) {
+			    apm_op_inprog++;
+			    if (apm_record_event(sc, apm_event)) {
+				apm_do_suspend();
+			    }
+			}
+			return; /* XXX skip the rest */
 		    OPMEV_DEBUGMESSAGE(PMEV_USERSUSPENDREQ);
-			apm_suspend(PMST_SUSPEND);
-			break;
+ 			apm_lastreq_notify();
+			if (apm_op_inprog == 0) {
+			    apm_op_inprog++;
+			    if (apm_record_event(sc, apm_event)) {
+				apm_do_suspend();
+			    }
+			}
+			return; /* XXX skip the rest */
 		    OPMEV_DEBUGMESSAGE(PMEV_CRITSUSPEND);
-			apm_suspend(PMST_SUSPEND);
+			apm_do_suspend();
 			break;
 		    OPMEV_DEBUGMESSAGE(PMEV_NORMRESUME);
+			apm_record_event(sc, apm_event);
 			apm_resume();
 			break;
 		    OPMEV_DEBUGMESSAGE(PMEV_CRITRESUME);
+			apm_record_event(sc, apm_event);
 			apm_resume();
 			break;
 		    OPMEV_DEBUGMESSAGE(PMEV_STANDBYRESUME);
+			apm_record_event(sc, apm_event);
 			apm_resume();
 			break;
 		    OPMEV_DEBUGMESSAGE(PMEV_BATTERYLOW);
-			apm_battery_low();
-			apm_suspend(PMST_SUSPEND);
+			if (apm_record_event(sc, apm_event)) {
+			    apm_battery_low();
+			    apm_suspend(PMST_SUSPEND);
+			}
 			break;
 		    OPMEV_DEBUGMESSAGE(PMEV_POWERSTATECHANGE);
+			apm_record_event(sc, apm_event);
 			break;
 		    OPMEV_DEBUGMESSAGE(PMEV_UPDATETIME);
+			apm_record_event(sc, apm_event);
 			inittodr(0);	/* adjust time to RTC */
+			break;
+		    OPMEV_DEBUGMESSAGE(PMEV_CAPABILITIESCHANGE);
+			apm_record_event(sc, apm_event);
 			break;
 		    case PMEV_NOEVENT:
 			break;
@@ -799,6 +1068,13 @@ apmattach(struct isa_device *dvp)
 	sc->cs16_limit = apm_cs16_limit - 1;
 	sc->ds_limit = apm_ds_limit - 1;
 	sc->cs_entry = apm_cs_entry;
+
+	if (!(dvp->id_flags & 0x40)) {
+		/* Don't trust the segment limits that the BIOS reports. */
+		sc->cs32_limit = 0xffff;
+		sc->cs16_limit = 0xffff;
+		sc->ds_limit   = 0xffff;
+	}
 
 	/* Always call HLT in idle loop */
 	sc->always_halt_cpu = 1;
@@ -903,8 +1179,6 @@ apmattach(struct isa_device *dvp)
         apm_hook_establish(APM_HOOK_SUSPEND, &sc->sc_suspend);
         apm_hook_establish(APM_HOOK_RESUME , &sc->sc_resume);
 
-	apm_event_enable();
-
 	/* Power the system off using APM */
 	at_shutdown_pri(apm_power_off, NULL, SHUTDOWN_FINAL, SHUTDOWN_PRI_LAST);
 
@@ -921,16 +1195,50 @@ static int
 apmopen(dev_t dev, int flag, int fmt, struct proc *p)
 {
 	struct apm_softc *sc = &apm_softc;
+	int ctl = APMDEV(dev);
 
-	if (minor(dev) != 0 || !sc->initialized)
+	if (!sc->initialized)
 		return (ENXIO);
 
+	switch (ctl) {
+	case APMDEV_CTL:
+		if (!(flag & FWRITE))
+			return EINVAL;
+		if (sc->sc_flags & SCFLAG_OCTL)
+			return EBUSY;
+		sc->sc_flags |= SCFLAG_OCTL;
+		bzero(sc->event_filter, sizeof sc->event_filter);
+		break;
+	case APMDEV_NORMAL:
+		sc->sc_flags |= SCFLAG_ONORMAL;
+		break;
+	default:
+		return ENXIO;
+		break;
+	}
 	return 0;
 }
 
 static int
 apmclose(dev_t dev, int flag, int fmt, struct proc *p)
 {
+	struct apm_softc *sc = &apm_softc;
+	int ctl = APMDEV(dev);
+
+	switch (ctl) {
+	case APMDEV_CTL:
+		apm_lastreq_rejected();
+		sc->sc_flags &= ~SCFLAG_OCTL;
+		bzero(sc->event_filter, sizeof sc->event_filter);
+		break;
+	case APMDEV_NORMAL:
+		sc->sc_flags &= ~SCFLAG_ONORMAL;
+		break;
+	}
+	if ((sc->sc_flags & SCFLAG_OPEN) == 0) {
+		sc->event_count = 0;
+		sc->event_ptr = 0;
+	}
 	return 0;
 }
 
@@ -939,9 +1247,10 @@ apmioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct proc *p)
 {
 	struct apm_softc *sc = &apm_softc;
 	int error = 0;
+	int ret;
 	int newstate;
 
-	if (minor(dev) != 0 || !sc->initialized)
+	if (!sc->initialized)
 		return (ENXIO);
 #ifdef APM_DEBUG
 	printf("APM ioctl: cmd = 0x%x\n", cmd);
@@ -999,14 +1308,108 @@ apmioctl(dev_t dev, u_long cmd, caddr_t addr, int flag, struct proc *p)
 			error = ENXIO;
 		break;
 	case APMIO_BIOS:
-		if (apm_bios_call((struct apm_bios_arg*)addr) == 0)
+		if ((ret = apm_do_int((struct apm_bios_arg*)addr))) {
+			/*
+			 * Return code 1 means bios call was unsuccessful.
+			 * Error code is stored in %ah.
+			 * Return code -1 means bios call was unsupported
+			 * in the APM BIOS version.
+			 */
+			if (ret == -1) {
+				error = EINVAL;
+			}
+		} else {
+			/*
+			 * Return code 0 means bios call was successful.
+			 * We need only %al and can discard %ah.
+			 */
 			((struct apm_bios_arg*)addr)->eax &= 0xff;
+		}
 		break;
 	default:
 		error = EINVAL;
 		break;
 	}
+
+	/* for /dev/apmctl */
+	if (APMDEV(dev) == APMDEV_CTL) {
+		struct apm_event_info *evp;
+		int i;
+
+		error = 0;
+		switch (cmd) {
+		case APMIO_NEXTEVENT:
+			if (!sc->event_count) {
+				error = EAGAIN;
+			} else {
+				evp = (struct apm_event_info *)addr;
+				i = sc->event_ptr + APM_NEVENTS - sc->event_count;
+				i %= APM_NEVENTS;
+				*evp = sc->event_list[i];
+				sc->event_count--;
+			}
+			break;
+		case APMIO_REJECTLASTREQ:
+			if (apm_lastreq_rejected()) {
+				error = EINVAL;
+			}
+			break;
+		default:
+			error = EINVAL;
+			break;
+		}
+	}
+
 	return error;
+}
+
+static int
+apmwrite(dev_t dev, struct uio *uio, int ioflag)
+{
+	struct apm_softc *sc = &apm_softc;
+	u_int event_type;
+	int error;
+	u_char enabled;
+
+	if (APMDEV(dev) != APMDEV_CTL)
+		return(ENODEV);
+	if (uio->uio_resid != sizeof(u_int))
+		return(E2BIG);
+
+	if ((error = uiomove((caddr_t)&event_type, sizeof(u_int), uio)))
+		return(error);
+
+	if (event_type < 0 || event_type >= APM_NPMEV)
+		return(EINVAL);
+
+	if (sc->event_filter[event_type] == 0) {
+		enabled = 1;
+	} else {
+		enabled = 0;
+	}
+	sc->event_filter[event_type] = enabled;
+#ifdef APM_DEBUG
+	printf("apmwrite: event 0x%x %s\n", event_type, is_enabled(enabled));
+#endif
+
+	return uio->uio_resid;
+}
+
+static int
+apmpoll(dev_t dev, int events, struct proc *p)
+{
+	struct apm_softc *sc = &apm_softc;
+	int revents = 0;
+
+	if (events & (POLLIN | POLLRDNORM)) {
+		if (sc->event_count) {
+			revents |= events & (POLLIN | POLLRDNORM);
+		} else {
+			selrecord(p, &sc->sc_rsel);
+		}
+	}
+
+	return (revents);
 }
 
 

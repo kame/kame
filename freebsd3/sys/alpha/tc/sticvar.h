@@ -1,4 +1,4 @@
-/* $Id: sticvar.h,v 1.1 1998/08/20 08:27:10 dfr Exp $ */
+/* $FreeBSD: src/sys/alpha/tc/sticvar.h,v 1.1.2.1 1999/08/29 15:57:32 peter Exp $ */
 /*	$NetBSD: sticvar.h,v 1.1 1997/11/08 07:27:51 jonathan Exp $	*/
 
 /*

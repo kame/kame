@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $Id: vm_page.h,v 1.49 1999/01/08 17:31:28 eivind Exp $
+ * $FreeBSD: src/sys/vm/vm_page.h,v 1.49.2.1 1999/08/29 16:33:37 peter Exp $
  */
 
 /*

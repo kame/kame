@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
- *	$Id: sio.c,v 1.76.2.4 1999/04/18 14:59:09 kato Exp $
+ * $FreeBSD: src/sys/pc98/pc98/sio.c,v 1.76.2.8 1999/08/29 16:31:16 peter Exp $
  */
 
 #include "opt_comconsole.h"
@@ -2450,7 +2450,7 @@ more_intr:
 				count = tc->tc_get_timecount(tc);
 				pps_event(&com->pps, tc, count, 
 				    (modem_status & MSR_DCD) ? 
-				    PPS_CAPTURECLEAR : PPS_CAPTUREASSERT);
+				    PPS_CAPTUREASSERT : PPS_CAPTURECLEAR);
 			}
 		}
 		line_status = inb(com->line_status_port);
@@ -3549,7 +3549,7 @@ siostop(tp, rw)
 	if (com->gone)
 		return;
 #ifdef PC98
-	if (IS_8251(com->pc98_if_type))
+	if (!IS_8251(com->pc98_if_type))
 	    port_shift = if_16550a_type[com->pc98_if_type & 0x0f].port_shift;
 #endif
 	disable_intr();
@@ -4695,10 +4695,10 @@ pc98_check_if_type(struct isa_device *dev, struct siodev *iod)
 		iod->irq = 4;
 
 		/* XXX check new internal port. */
-		outb(0x138, 0);
+		outb(0x13a, 0);
 		DELAY(10);
 		for (tmp = 0; tmp < 100; tmp++) {
-		    if ((inb(0x138) & 1) == 0) {
+		    if ((inb(0x13a) & 0x80) == 0) {
 			PC98SIO_baud_rate_port(if_type) = 0x13a;
 			if_8251_type[if_type].name = " (internal fast)";
 			if_8251_type[if_type].speedtab = pc98fast_speedtab;

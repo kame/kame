@@ -56,7 +56,7 @@
  * W. Metzenthen   June 1994.
  *
  *
- *    $Id: errors.c,v 1.9 1998/08/24 02:28:14 bde Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/errors.c,v 1.9.2.1 1999/08/29 16:24:31 peter Exp $
  *
  */
 

@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: splashreg.h,v 1.2 1999/01/11 03:06:28 yokota Exp $
+ * $FreeBSD: src/sys/dev/fb/splashreg.h,v 1.2.2.1 1999/08/29 16:22:50 peter Exp $
  */
 
 #ifndef _DEV_FB_SPLASHREG_H_

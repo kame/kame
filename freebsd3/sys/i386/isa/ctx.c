@@ -8,7 +8,7 @@
  *	of this software, nor does the author assume any responsibility
  *	for damages incurred with its use.
  *
- *	$Id: ctx.c,v 1.29 1998/12/09 02:56:48 eivind Exp $
+ * $FreeBSD: src/sys/i386/isa/ctx.c,v 1.29.2.1 1999/08/29 16:07:15 peter Exp $
  */
 
 /*

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ns_input.c	8.1 (Berkeley) 6/10/93
- * $Id: ns_input.c,v 1.10 1997/02/22 09:42:18 peter Exp $
+ * $FreeBSD: src/sys/netns/ns_input.c,v 1.10.4.1 1999/08/29 16:30:17 peter Exp $
  */
 
 #include <sys/param.h>

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: if_pnreg.h,v 1.4.2.7 1999/05/06 15:39:36 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_pnreg.h,v 1.4.2.10 1999/08/29 16:31:40 peter Exp $
  */
 
 /*
@@ -393,7 +393,7 @@ struct pn_desc {
 #define PN_TX_LIST_CNT		128
 #define PN_MIN_FRAMELEN		60
 #define PN_FRAMELEN		1536
-#define PN_RXLEN		1518
+#define PN_RXLEN		1536
 
 /*
  * A tx 'super descriptor' is actually 16 regular descriptors
@@ -525,7 +525,6 @@ struct pn_softc {
  * Lite-On PNIC PCI device ID.
  */
 #define	PN_DEVICEID_PNIC	0x0002
-#define PN_DEVICEID_PNIC_II	0xc115
 
 /*
  * The 82c168 chip has the same PCI vendor/device ID as the

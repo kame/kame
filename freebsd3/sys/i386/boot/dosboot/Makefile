@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.5 1998/12/30 10:26:18 bde Exp $
+# $FreeBSD: src/sys/i386/boot/dosboot/Makefile,v 1.5.2.1 1999/08/29 16:04:57 peter Exp $
 #
 
 MPROG=	fbsdboot.exe

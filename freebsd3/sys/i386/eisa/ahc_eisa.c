@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: ahc_eisa.c,v 1.4.2.2 1999/05/16 00:07:57 gibbs Exp $
+ * $FreeBSD: src/sys/i386/eisa/ahc_eisa.c,v 1.4.2.4 1999/09/14 04:07:54 gibbs Exp $
  */
 
 #include "eisa.h"
@@ -182,7 +182,7 @@ aic7770_attach(struct eisa_device *e_dev)
 	}
 
 	/* XXX Should be a child of the EISA bus dma tag */
-	error = bus_dma_tag_create(/*parent*/NULL, /*alignment*/0,
+	error = bus_dma_tag_create(/*parent*/NULL, /*alignment*/1,
 				   /*boundary*/0,
 				   /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
 				   /*highaddr*/BUS_SPACE_MAXADDR,

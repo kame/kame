@@ -26,7 +26,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *		$Id: initcpu.c,v 1.17 1999/01/16 13:41:33 kato Exp $
+ * $FreeBSD: src/sys/i386/i386/initcpu.c,v 1.17.2.1 1999/08/29 16:05:42 peter Exp $
  */
 
 #include "opt_cpu.h"

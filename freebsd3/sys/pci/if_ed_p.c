@@ -17,7 +17,7 @@
  * 4. Modifications may be freely made to this file if the above conditions
  *    are met.
  *
- *	$Id: if_ed_p.c,v 1.14 1998/12/14 05:47:27 dillon Exp $
+ * $FreeBSD: src/sys/pci/if_ed_p.c,v 1.14.2.1 1999/08/29 16:31:36 peter Exp $
  */
 
 #include "pci.h"

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $Id: aicasm.h,v 1.4 1998/09/15 07:24:17 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aicasm.h,v 1.4.2.1 1999/08/29 16:22:38 peter Exp $
  */
 
 #include <sys/queue.h>

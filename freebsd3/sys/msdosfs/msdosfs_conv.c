@@ -1,4 +1,4 @@
-/*	$Id: msdosfs_conv.c,v 1.28 1998/11/21 00:20:24 dt Exp $ */
+/* $FreeBSD: src/sys/msdosfs/msdosfs_conv.c,v 1.28.2.1 1999/08/29 16:28:05 peter Exp $ */
 /*	$NetBSD: msdosfs_conv.c,v 1.25 1997/11/17 15:36:40 ws Exp $	*/
 
 /*-

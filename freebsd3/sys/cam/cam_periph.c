@@ -2,7 +2,7 @@
  * Common functions for CAM "type" (peripheral) drivers.
  *
  * Copyright (c) 1997, 1998 Justin T. Gibbs.
- * Copyright (c) 1997, 1998 Kenneth D. Merry.
+ * Copyright (c) 1997, 1998, 1999 Kenneth D. Merry.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $Id: cam_periph.c,v 1.9.2.2 1999/05/09 01:27:21 ken Exp $
+ * $FreeBSD: src/sys/cam/cam_periph.c,v 1.9.2.7 1999/08/29 16:21:38 peter Exp $
  */
 
 #include <sys/param.h>
@@ -519,6 +519,7 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 		}
 		break;
 	case XPT_SCSI_IO:
+	case XPT_CONT_TARGET_IO:
 		if ((ccb->ccb_h.flags & CAM_DIR_MASK) == CAM_DIR_NONE)
 			return(0);
 
@@ -558,7 +559,7 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 			return(E2BIG);
 		}
 
-		if (dirs[i] & CAM_DIR_IN) {
+		if (dirs[i] & CAM_DIR_OUT) {
 			flags[i] = B_READ;
 			if (useracc(*data_ptrs[i], lengths[i], B_READ) == 0){
 				printf("cam_periph_mapmem: error, "
@@ -574,7 +575,7 @@ cam_periph_mapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 		 * XXX this check is really bogus, since B_WRITE currently
 		 * is all 0's, and so it is "set" all the time.
 		 */
-		if (dirs[i] & CAM_DIR_OUT) {
+		if (dirs[i] & CAM_DIR_IN) {
 			flags[i] |= B_WRITE;
 			if (useracc(*data_ptrs[i], lengths[i], B_WRITE) == 0){
 				printf("cam_periph_mapmem: error, "
@@ -653,6 +654,7 @@ cam_periph_unmapmem(union ccb *ccb, struct cam_periph_map_info *mapinfo)
 		}
 		break;
 	case XPT_SCSI_IO:
+	case XPT_CONT_TARGET_IO:
 		data_ptrs[0] = &ccb->csio.data_ptr;
 		numbufs = min(mapinfo->num_bufs_used, 1);
 		break;
@@ -832,6 +834,17 @@ cam_periph_runccb(union ccb *ccb,
 					DEVSTAT_READ);
 
 	return(error);
+}
+
+void
+cam_freeze_devq(struct cam_path *path)
+{
+	struct ccb_hdr ccb_h;
+
+	xpt_setup_ccb(&ccb_h, path, /*priority*/1);
+	ccb_h.func_code = XPT_NOOP;
+	ccb_h.flags = CAM_DEV_QFREEZE;
+	xpt_action((union ccb *)&ccb_h);
 }
 
 u_int32_t
@@ -1015,6 +1028,70 @@ camperiphdone(struct cam_periph *periph, union ccb *done_ccb)
 }
 
 /*
+ * Generic Async Event handler.  Peripheral drivers usually
+ * filter out the events that require personal attention,
+ * and leave the rest to this function.
+ */
+void
+cam_periph_async(struct cam_periph *periph, u_int32_t code,
+		 struct cam_path *path, void *arg)
+{
+	switch (code) {
+	case AC_LOST_DEVICE:
+		cam_periph_invalidate(periph);
+		break; 
+	case AC_SENT_BDR:
+	case AC_BUS_RESET:
+	{
+		cam_periph_bus_settle(periph, SCSI_DELAY);
+		break;
+	}
+	default:
+		break;
+	}
+}
+
+void
+cam_periph_bus_settle(struct cam_periph *periph, u_int bus_settle)
+{
+	struct ccb_getdevstats cgds;
+
+	xpt_setup_ccb(&cgds.ccb_h, periph->path, /*priority*/1);
+	cgds.ccb_h.func_code = XPT_GDEV_STATS;
+	xpt_action((union ccb *)&cgds);
+	cam_periph_freeze_after_event(periph, &cgds.last_reset, bus_settle);
+}
+
+void
+cam_periph_freeze_after_event(struct cam_periph *periph,
+			      struct timeval* event_time, u_int duration_ms)
+{
+	struct timeval delta;
+	struct timeval duration_tv;
+	int s;
+
+	s = splclock();
+	microtime(&delta);
+	splx(s);
+	timevalsub(&delta, event_time);
+	duration_tv.tv_sec = duration_ms / 1000;
+	duration_tv.tv_usec = (duration_ms % 1000) * 1000;
+	if (timevalcmp(&delta, &duration_tv, <)) {
+		timevalsub(&duration_tv, &delta);
+
+		duration_ms = duration_tv.tv_sec * 1000;
+		duration_ms += duration_tv.tv_usec / 1000;
+		cam_freeze_devq(periph->path); 
+		cam_release_devq(periph->path,
+				RELSIM_RELEASE_AFTER_TIMEOUT,
+				/*reduction*/0,
+				/*timeout*/duration_ms,
+				/*getcount_only*/0);
+	}
+
+}
+
+/*
  * Generic error handler.  Peripheral drivers usually filter
  * out the errors that they handle in a unique mannor, then
  * call this function.
@@ -1037,7 +1114,6 @@ cam_periph_error(union ccb *ccb, cam_flags camflags,
 	sense  = (status & CAM_AUTOSNS_VALID) != 0;
 	status &= CAM_STATUS_MASK;
 	relsim_flags = 0;
-
 
 	switch (status) {
 	case CAM_REQ_CMP:
@@ -1387,23 +1463,25 @@ cam_periph_error(union ccb *ccb, cam_flags camflags,
 		case SCSI_STATUS_QUEUE_FULL:
 		{
 			/* no decrement */
-			struct ccb_getdev cgd;
+			struct ccb_getdevstats cgds;
 
 			/*
 			 * First off, find out what the current
 			 * transaction counts are.
 			 */
-			xpt_setup_ccb(&cgd.ccb_h,
+			xpt_setup_ccb(&cgds.ccb_h,
 				      ccb->ccb_h.path,
 				      /*priority*/1);
-			cgd.ccb_h.func_code = XPT_GDEV_TYPE;
-			xpt_action((union ccb *)&cgd);
+			cgds.ccb_h.func_code = XPT_GDEV_STATS;
+			xpt_action((union ccb *)&cgds);
 
 			/*
 			 * If we were the only transaction active, treat
 			 * the QUEUE FULL as if it were a BUSY condition.
 			 */
-			if (cgd.dev_active != 0) {
+			if (cgds.dev_active != 0) {
+				int total_openings;
+
 				/*
 			 	 * Reduce the number of openings to
 				 * be 1 less than the amount it took
@@ -1411,10 +1489,12 @@ cam_periph_error(union ccb *ccb, cam_flags camflags,
 				 * minimum allowed tag count for this
 				 * device.
 			 	 */
-				openings = cgd.dev_active;
-				if (openings < cgd.mintags)
-					openings = cgd.mintags;
-				if (openings < cgd.dev_active+cgd.dev_openings)
+				total_openings =
+				    cgds.dev_active+cgds.dev_openings;
+				openings = cgds.dev_active;
+				if (openings < cgds.mintags)
+					openings = cgds.mintags;
+				if (openings < total_openings)
 					relsim_flags = RELSIM_ADJUST_OPENINGS;
 				else {
 					/*

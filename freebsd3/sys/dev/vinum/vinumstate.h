@@ -33,7 +33,7 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinumstate.h,v 1.4.2.2 1999/04/06 09:05:58 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinumstate.h,v 1.4.2.4 1999/08/29 16:24:25 peter Exp $
  */
 
 /*
@@ -156,6 +156,13 @@ enum sdstate {
      */
     sd_initializing,
 
+    /*
+     * A subdisk entry which has been initialized,
+     * but which can't come up because it would
+     * cause inconsistencies.
+     */
+    sd_initialized,
+
     /* *** The following states represent invalid data */
     /*
      * A subdisk entry which has been created completely.
@@ -244,3 +251,7 @@ enum drivestate {
 
     drive_laststate = drive_up				    /* last value, for table dimensions */
 };
+
+/* Local Variables: */
+/* fill-column: 50 */
+/* End: */

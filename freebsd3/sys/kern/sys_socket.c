@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sys_socket.c	8.1 (Berkeley) 6/10/93
- * $Id: sys_socket.c,v 1.19.2.1 1999/05/05 22:53:05 dt Exp $
+ * $FreeBSD: src/sys/kern/sys_socket.c,v 1.19.2.2 1999/08/29 16:26:08 peter Exp $
  */
 
 #include <sys/param.h>

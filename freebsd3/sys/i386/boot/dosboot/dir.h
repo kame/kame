@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)dir.h	7.3 (Berkeley) 2/5/91
- *	$Id: dir.h,v 1.4 1997/02/22 09:30:42 peter Exp $
+ * $FreeBSD: src/sys/i386/boot/dosboot/dir.h,v 1.4.4.1 1999/08/29 16:05:01 peter Exp $
  */
 
 /*

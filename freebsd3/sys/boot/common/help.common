@@ -184,9 +184,18 @@
 	Selects the default device.  Syntax for devices is odd.
 
 ################################################################################
+# Tset Sinit_path DSet the list of init candidates
+
+	set init_path=<path>[:<path>...]
+
+	Sets the list of binaries which the kernel will try to run as initial
+	process.
+
+
+################################################################################
 # Tset Smodule_path DSet the module search path
 
-	set module_path=<path>[,<path>...]
+	set module_path=<path>[;<path>...]
 
 	Sets the list of directories which will be searched in for modules
 	named in a load command or implicitly required by a dependancy.
@@ -259,16 +268,6 @@
 
 	The entire contents of <filename> are read into memory before executing
 	commands, so it is safe to source a file from removable media.
-
-	A number of modifiers may be prefixed to commands within a script file
-	to alter their behaviour:
-
-	#	Ignore the line (use for comments).
-
-	@	Suppresses the printing of the command when executed.
-
-	-	Prevents the script from terminating if the command returns
-		an error.
 
 ################################################################################
 # Tread DRead input from the terminal

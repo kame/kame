@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: fb.c,v 1.3 1999/01/19 11:31:10 yokota Exp $
+ * $FreeBSD: src/sys/dev/fb/fb.c,v 1.3.2.1 1999/08/29 16:22:49 peter Exp $
  */
 
 #include "fb.h"

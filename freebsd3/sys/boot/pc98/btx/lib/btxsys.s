@@ -13,7 +13,7 @@
 # purpose.
 #
 
-#	$Id: btxsys.s,v 1.1.2.1 1999/02/06 07:37:13 kato Exp $
+# $FreeBSD: src/sys/boot/pc98/btx/lib/btxsys.s,v 1.1.2.2 1999/08/29 16:21:25 peter Exp $
 
 #
 # BTX system calls.

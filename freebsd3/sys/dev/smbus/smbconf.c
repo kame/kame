@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: smbconf.c,v 1.4 1999/01/09 18:08:23 nsouch Exp $
+ * $FreeBSD: src/sys/dev/smbus/smbconf.c,v 1.4.2.1 1999/08/29 16:24:01 peter Exp $
  *
  */
 #include <sys/param.h>

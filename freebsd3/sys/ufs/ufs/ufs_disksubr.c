@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ufs_disksubr.c	8.5 (Berkeley) 1/21/94
- * $Id: ufs_disksubr.c,v 1.39 1998/12/14 05:37:37 dillon Exp $
+ * $FreeBSD: src/sys/ufs/ufs/ufs_disksubr.c,v 1.39.2.1 1999/08/29 16:33:19 peter Exp $
  */
 
 #include <sys/param.h>

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: chipset.h,v 1.6 1998/11/15 18:25:16 dfr Exp $
+ * $FreeBSD: src/sys/alpha/include/chipset.h,v 1.6.2.1 1999/08/29 15:56:50 peter Exp $
  */
 
 #ifndef _MACHINE_CHIPSET_H_

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: diskslice.h,v 1.29 1998/08/23 20:16:35 phk Exp $
+ * $FreeBSD: src/sys/sys/diskslice.h,v 1.29.2.1 1999/08/29 16:32:16 peter Exp $
  */
 
 #ifndef	_SYS_DISKSLICE_H_

@@ -35,7 +35,7 @@
  *
  *	@(#)fdesc_vnops.c	8.9 (Berkeley) 1/21/94
  *
- * $Id: fdesc_vnops.c,v 1.40 1998/12/14 05:00:57 dillon Exp $
+ * $FreeBSD: src/sys/miscfs/fdesc/fdesc_vnops.c,v 1.40.2.1 1999/08/29 16:26:42 peter Exp $
  */
 
 /*

@@ -1,4 +1,4 @@
-/* $Id: espvar.h,v 1.2 1998/12/04 22:54:42 archie Exp $ */
+/* $FreeBSD: src/sys/alpha/tc/espvar.h,v 1.2.2.1 1999/08/29 15:57:27 peter Exp $ */
 /*	$NetBSD: espvar.h,v 1.3.4.1 1996/09/10 17:28:18 cgd Exp $	*/
 
 /*

@@ -1,6 +1,6 @@
 /*
  *	from: vector.s, 386BSD 0.1 unknown origin
- *	$Id: apic_vector.s,v 1.34 1998/09/06 22:41:41 tegge Exp $
+ * $FreeBSD: src/sys/i386/isa/apic_vector.s,v 1.34.2.4 1999/09/10 01:20:32 msmith Exp $
  */
 
 
@@ -911,6 +911,27 @@ MCOUNT_LABEL(bintr)
 	INTR(23,intr23)
 MCOUNT_LABEL(eintr)
 
+/*
+ * Executed by a CPU when it receives a RENDEZVOUS IPI from another CPU.
+ *
+ * - Calls the generic rendezvous action function.
+ */
+	.text
+	SUPERALIGN_TEXT
+	.globl	_Xrendezvous
+_Xrendezvous:
+	PUSH_FRAME
+	movl	$KDSEL, %eax
+	movl	%ax, %ds		/* use KERNEL data segment */
+	movl	%ax, %es
+
+	call	_smp_rendezvous_action
+
+	movl	$0, lapic_eoi		/* End Of Interrupt to APIC */
+	POP_FRAME
+	iret
+
+	
 	.data
 /*
  * Addresses of interrupt handlers.

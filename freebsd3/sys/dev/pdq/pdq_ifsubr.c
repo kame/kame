@@ -21,7 +21,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: pdq_ifsubr.c,v 1.7 1998/02/20 13:11:45 bde Exp $
+ * $FreeBSD: src/sys/dev/pdq/pdq_ifsubr.c,v 1.7.2.1 1999/08/29 16:23:46 peter Exp $
  *
  */
 

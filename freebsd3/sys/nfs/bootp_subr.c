@@ -1,4 +1,4 @@
-/*	$Id: bootp_subr.c,v 1.18 1998/12/07 21:58:43 archie Exp $	*/
+/* $FreeBSD: src/sys/nfs/bootp_subr.c,v 1.18.2.1 1999/08/29 16:30:24 peter Exp $	*/
 
 /*
  * Copyright (c) 1995 Gordon Ross, Adam Glass

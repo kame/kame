@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.1 1999/01/11 03:34:55 yokota Exp $
+# $FreeBSD: src/sys/modules/splash/bmp/Makefile,v 1.1.2.1 1999/08/29 16:27:38 peter Exp $
 
 KMOD=	splash_bmp
 SRCS= 	splash_bmp.c

@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: load_elf.c,v 1.10.2.1 1999/04/07 05:20:54 peter Exp $
+ * $FreeBSD: src/sys/boot/common/load_elf.c,v 1.10.2.2 1999/08/29 16:20:31 peter Exp $
  */
 
 #include <sys/param.h>

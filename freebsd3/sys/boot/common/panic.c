@@ -1,5 +1,5 @@
 /*
- * $Id: panic.c,v 1.4 1998/09/26 01:29:13 msmith Exp $
+ * $FreeBSD: src/sys/boot/common/panic.c,v 1.4.2.1 1999/08/29 16:20:33 peter Exp $
  * From: $NetBSD: panic.c,v 1.2 1997/03/22 01:48:36 thorpej Exp $
  */
 

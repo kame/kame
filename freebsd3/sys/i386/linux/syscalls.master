@@ -1,4 +1,4 @@
-	$Id: syscalls.master,v 1.16 1998/12/30 20:58:28 sos Exp $
+ $FreeBSD: src/sys/i386/linux/syscalls.master,v 1.16.2.5 1999/08/29 16:07:53 peter Exp $
 
 ;	@(#)syscalls.master	8.1 (Berkeley) 7/19/93
 ; System call name/number master file (or rather, slave, from LINUX).
@@ -40,7 +40,7 @@
 6	NOPROTO	LINUX	{ int close(int fd); }
 7	STD	LINUX	{ int linux_waitpid(int pid, int *status, int options);}
 8	STD	LINUX	{ int linux_creat(char *path, int mode); }
-9	NOPROTO	LINUX	{ int link(char *path, char *link); }
+9	STD	LINUX	{ int linux_link(char *path, char *to); }
 10	STD	LINUX	{ int linux_unlink(char *path); }
 11	STD	LINUX	{ int linux_execve(char *path, char **argp, char **envp); }
 12	STD	LINUX	{ int linux_chdir(char *path); }
@@ -110,10 +110,10 @@
 73	STD	LINUX	{ int linux_sigpending(linux_sigset_t *mask); }
 74	NOPROTO	LINUX	{ int osethostname(char *hostname, \
 			    u_int len);}
-75	NOPROTO	LINUX	{ int osetrlimit(u_int which, \
-			    struct ogetrlimit *rlp); }
-76	NOPROTO	LINUX	{ int ogetrlimit(u_int which, \
-			    struct ogetrlimit *rlp); }
+75	STD	LINUX	{ int linux_setrlimit(u_int resource, \
+			    struct ogetrlimit *rlim); }
+76	STD	LINUX	{ int linux_getrlimit(u_int resource, \
+			    struct ogetrlimit *rlim); }
 77	NOPROTO	LINUX	{ int getrusage(int who, struct rusage *rusage); }
 78	NOPROTO	LINUX	{ int gettimeofday(struct timeval *tp, \
 			    struct timezone *tzp); }
@@ -224,8 +224,9 @@
 154	NOPROTO	POSIX	{ int sched_setparam (pid_t pid, const struct sched_param *param); }
 155	NOPROTO	POSIX	{ int sched_getparam (pid_t pid, struct sched_param *param); }
 
-156	NOPROTO	POSIX	{ int sched_setscheduler (pid_t pid, int policy, const struct sched_param *param); }
-157	NOPROTO	POSIX	{ int sched_getscheduler (pid_t pid); }
+156	STD	POSIX	{ int linux_sched_setscheduler(pid_t pid, int policy, \
+				const struct sched_param *param); }
+157	STD	POSIX	{ int linux_sched_getscheduler(pid_t pid); }
 
 158	NOPROTO	POSIX	{ int sched_yield (void); }
 159	NOPROTO	POSIX	{ int sched_get_priority_max (int policy); }
@@ -248,8 +249,14 @@
 171	UNIMPL	LINUX	getresgid
 172	UNIMPL	LINUX	prctl
 173	UNIMPL	LINUX	rt_sigreturn
-174	UNIMPL	LINUX	rt_sigaction
-175	UNIMPL	LINUX	rt_sigprocmask
+174	STD	LINUX	{ int linux_rt_sigaction(int sig, \
+				struct linux_new_sigaction *act, \
+				struct linux_new_sigaction *oact, \
+				size_t sigsetsize); }
+175	STD	LINUX	{ int linux_rt_sigprocmask(int how, \
+				struct linux_new_sigset *mask, \
+				struct linux_new_sigset *omask, \
+				size_t sigsetsize); }
 176	UNIMPL	LINUX	rt_sigpending
 177	UNIMPL	LINUX	rt_sigtimedwait
 178	UNIMPL	LINUX	rt_sigqueueinfo
@@ -257,3 +264,11 @@
 180	UNIMPL	LINUX	pread
 181	UNIMPL	LINUX	pwrite
 182	STD	LINUX	{ int linux_chown(char *path, int uid, int gid); }
+183	STD	LINUX	{ int linux_getcwd(char *buf, unsigned long bufsize); }
+184	UNIMPL	LINUX	capget
+185	UNIMPL	LINUX	capset
+186	UNIMPL	LINUX	sigaltstack
+187	UNIMPL	LINUX	sendfile
+188	UNIMPL	LINUX	getpmsg
+189	UNIMPL	LINUX	putpmsg
+190	STD	LINUX	{ int linux_vfork(void); }

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.13 1999/01/10 14:48:04 rnordier Exp $
+# $FreeBSD: src/sys/boot/i386/libi386/Makefile,v 1.13.2.1 1999/08/29 16:20:58 peter Exp $
 #
 LIB=			i386
 NOPIC=

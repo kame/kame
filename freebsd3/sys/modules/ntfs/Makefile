@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.1.1.1.2.1 1999/03/14 09:59:54 semenu Exp $
+# $FreeBSD: src/sys/modules/ntfs/Makefile,v 1.1.1.1.2.2 1999/08/29 16:27:31 peter Exp $
 
 .PATH:	${.CURDIR}/../../ntfs
 KMOD=	ntfs

@@ -54,7 +54,7 @@
  * W. Metzenthen   June 1994.
  *
  *
- *    $Id: version.h,v 1.5 1997/02/22 09:29:28 peter Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/version.h,v 1.5.4.1 1999/08/29 16:24:49 peter Exp $
  *
  */
 

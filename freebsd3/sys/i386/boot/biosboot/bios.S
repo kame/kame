@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, Revision 2.2  92/04/04  11:34:26  rpd
- *	$Id: bios.S,v 1.14 1998/09/23 06:50:45 yokota Exp $
+ * $FreeBSD: src/sys/i386/boot/biosboot/bios.S,v 1.14.2.1 1999/08/29 16:04:46 peter Exp $
  */
 
 /*

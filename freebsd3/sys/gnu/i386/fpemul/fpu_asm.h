@@ -54,7 +54,7 @@
  * W. Metzenthen   June 1994.
  *
  *
- *    $Id: fpu_asm.h,v 1.7 1997/04/22 06:54:45 jdp Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/fpu_asm.h,v 1.7.4.1 1999/08/29 16:24:33 peter Exp $
  *
  */
 

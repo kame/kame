@@ -1,6 +1,6 @@
 /*
  *
- *    $Id: math_emu.h,v 1.4 1997/02/22 09:29:11 peter Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/math_emu.h,v 1.4.4.1 1999/08/29 16:24:37 peter Exp $
  *
  */
 

@@ -1,5 +1,5 @@
 /* 
- * $Id: bbinfo.h,v 1.1.1.1 1998/08/21 03:17:42 msmith Exp $
+ * $FreeBSD: src/sys/boot/alpha/libalpha/bbinfo.h,v 1.1.1.1.2.1 1999/08/29 16:20:14 peter Exp $
  * From $NetBSD: bbinfo.h,v 1.2 1997/04/06 08:40:57 cgd Exp $ 
  */
 

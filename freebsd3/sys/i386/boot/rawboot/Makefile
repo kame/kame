@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.12 1998/12/30 10:55:50 bde Exp $
+# $FreeBSD: src/sys/i386/boot/rawboot/Makefile,v 1.12.2.1 1999/08/29 16:05:17 peter Exp $
 #
 
 PROG=	boot

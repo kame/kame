@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: biosdisk.c,v 1.20.2.4 1999/03/16 14:58:25 dcs Exp $
+ * $FreeBSD: src/sys/boot/i386/libi386/biosdisk.c,v 1.20.2.7 1999/08/29 16:20:59 peter Exp $
  */
 
 /*
@@ -58,6 +58,7 @@
 #define WFDMAJOR		1
 #define FDMAJOR			2
 #define DAMAJOR			4
+#define FLAMAJOR		28
 
 #ifdef DISK_DEBUG
 # define DEBUG(fmt, args...)	printf("%s: " fmt "\n" , __FUNCTION__ , ## args)
@@ -747,6 +748,35 @@ bd_getgeom(struct open_disk *od)
 }
 
 /*
+ * Return the BIOS geometry of a given "fixed drive" in a format
+ * suitable for the legacy bootinfo structure.  Since the kernel is
+ * expecting raw int 0x13/0x8 values for N_BIOS_GEOM drives, we
+ * prefer to get the information directly, rather than rely on being
+ * able to put it together from information already maintained for
+ * different purposes and for a probably different number of drives.
+ *
+ * For valid drives, the geometry is expected in the format (31..0)
+ * "000000cc cccccccc hhhhhhhh 00ssssss"; and invalid drives are
+ * indicated by returning the geometry of a "1.2M" PC-format floppy
+ * disk.  And, incidentally, what is returned is not the geometry as
+ * such but the highest valid cylinder, head, and sector numbers.
+ */
+u_int32_t
+bd_getbigeom(int bunit)
+{
+
+    v86.ctl = V86_FLAGS;
+    v86.addr = 0x13;
+    v86.eax = 0x800;
+    v86.edx = 0x80 + bunit;
+    v86int();
+    if (v86.efl & 0x1)
+	return 0x4f010f;
+    return ((v86.ecx & 0xc0) << 18) | ((v86.ecx & 0xff00) << 8) |
+	   (v86.edx & 0xff00) | (v86.ecx & 0x3f);
+}
+
+/*
  * Return a suitable dev_t value for (dev).
  *
  * In the case where it looks like (dev) is a SCSI disk, we allow the number of
@@ -790,6 +820,9 @@ bd_getdev(struct i386_devdesc *dev)
 		if ((cp != nip) && (*cp == 0))
 		    unitofs = i;
 	    }
+	} else if ((od->od_flags & BD_LABELOK) && 
+	  (od->od_disklabel.d_type == DTYPE_DOC2K)) {
+	    major = FLAMAJOR;
 	} else {
 	    /* assume an IDE disk */
 	    major = WDMAJOR;

@@ -4,7 +4,7 @@
  * v1.4 by Eric S. Raymond (esr@snark.thyrsus.com) Aug 1993
  * modified for FreeBSD by Andrew A. Chernov <ache@astral.msk.su>
  *
- *    $Id: spkr.c,v 1.35 1998/08/24 02:28:16 bde Exp $
+ * $FreeBSD: src/sys/i386/isa/spkr.c,v 1.35.2.1 1999/08/29 16:07:33 peter Exp $
  */
 
 #include "speaker.h"

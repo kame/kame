@@ -11,7 +11,7 @@
  * 2. Absolutely no warranty of function or purpose is made by the author
  *		John S. Dyson.
  *
- * $Id: vfs_bio.c,v 1.193.2.5 1999/04/20 19:54:20 dt Exp $
+ * $FreeBSD: src/sys/kern/vfs_bio.c,v 1.193.2.8 1999/09/16 01:50:29 alfred Exp $
  */
 
 /*
@@ -1053,9 +1053,13 @@ trytofreespace:
 		 * Certain layered filesystems can recursively re-enter the vfs_bio
 		 * code, due to delayed writes.  This helps keep the system from
 		 * deadlocking.
+		 * This hack to avoid premature panic is courtesy of alfred
+		 *   (alfred@freebsd.org)
 		 */
 		if (writerecursion > 0) {
 			if (writerecursion > 5) {
+				int loop = 0;
+norecurse:
 				bp = TAILQ_FIRST(&bufqueues[QUEUE_AGE]);
 				while (bp) {
 					if ((bp->b_flags & B_DELWRI) == 0)
@@ -1070,8 +1074,17 @@ trytofreespace:
 						bp = TAILQ_NEXT(bp, b_freelist);
 					}
 				}
-				if (bp == NULL)
-					panic("getnewbuf: cannot get buffer, infinite recursion failure");
+				if (bp == NULL) {
+					needsbuffer |= VFS_BIO_NEED_ANY;
+					if (tsleep(&needsbuffer, 
+						(PRIBIO + 4) | slpflag, 
+						"nbufhack", slptimeo+1))
+							return (NULL);
+					if (loop++ < 5)
+						goto norecurse;
+					else
+						goto start;
+				}
 			} else {
 				bremfree(bp);
 				bp->b_flags |= B_BUSY | B_AGE | B_ASYNC;
@@ -1219,7 +1232,7 @@ static void
 waitfreebuffers(int slpflag, int slptimeo) {
 	while (numfreebuffers < hifreebuffers) {
 		flushdirtybuffers(slpflag, slptimeo);
-		if (numfreebuffers < hifreebuffers)
+		if (numfreebuffers >= hifreebuffers)
 			break;
 		needsbuffer |= VFS_BIO_NEED_FREE;
 		if (tsleep(&needsbuffer, (PRIBIO + 4)|slpflag, "biofre", slptimeo))

@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# $Id: linux.sh,v 1.6 1998/11/05 04:19:26 peter Exp $
+# $FreeBSD: src/sys/modules/linux/linux.sh,v 1.6.2.1 1999/08/29 16:27:25 peter Exp $
 
 FOUND=`kldstat -v | egrep 'linux(aout|elf)'`
 

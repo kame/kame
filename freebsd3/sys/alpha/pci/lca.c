@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: lca.c,v 1.5 1998/12/04 22:54:42 archie Exp $
+ * $FreeBSD: src/sys/alpha/pci/lca.c,v 1.5.2.1 1999/08/29 15:57:21 peter Exp $
  */
 
 #include <sys/param.h>

@@ -1,4 +1,4 @@
-#       $Id: Makefile,v 1.6 1998/10/16 04:30:44 peter Exp $
+# $FreeBSD: src/sys/modules/if_disc/Makefile,v 1.6.2.1 1999/08/29 16:27:15 peter Exp $
 
 .PATH:  ${.CURDIR}/../../net
 KMOD=   if_disc

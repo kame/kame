@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: iiconf.c,v 1.4.2.3 1999/02/04 14:14:30 roger Exp $
+ * $FreeBSD: src/sys/dev/iicbus/iiconf.c,v 1.4.2.4 1999/08/29 16:23:15 peter Exp $
  *
  */
 #include <sys/param.h>

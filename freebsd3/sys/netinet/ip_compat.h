@@ -6,7 +6,7 @@
  * to the original author and the contributors.
  *
  * @(#)ip_compat.h	1.8 1/14/96
- * $Id: ip_compat.h,v 1.1.1.6 1998/06/20 18:17:46 peter Exp $
+ * $FreeBSD: src/sys/netinet/ip_compat.h,v 1.1.1.6.2.1 1999/08/29 16:29:40 peter Exp $
  */
 
 #ifndef	__IP_COMPAT_H__

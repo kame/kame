@@ -26,7 +26,7 @@
  *
  * 	From Id: probe_keyboard.c,v 1.13 1997/06/09 05:10:55 bde Exp
  *
- *	$Id: vidconsole.c,v 1.1.2.2 1999/03/05 08:12:17 kato Exp $
+ * $FreeBSD: src/sys/boot/pc98/libpc98/vidconsole.c,v 1.1.2.3 1999/08/29 16:21:30 peter Exp $
  */
 
 #include <stand.h>

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)profile.h	8.1 (Berkeley) 6/11/93
- * $Id: profile.h,v 1.18 1998/09/07 23:32:00 jdp Exp $
+ * $FreeBSD: src/sys/i386/include/profile.h,v 1.18.2.1 1999/08/29 16:06:45 peter Exp $
  */
 
 #ifndef _MACHINE_PROFILE_H_

@@ -33,7 +33,7 @@
  *
  *	@(#)spx_usrreq.h
  *
- * $Id: spx_usrreq.c,v 1.22.2.1 1999/04/24 09:25:44 jhay Exp $
+ * $FreeBSD: src/sys/netipx/spx_usrreq.c,v 1.22.2.3 1999/08/30 16:52:11 jhay Exp $
  */
 
 #include <sys/param.h>
@@ -1081,11 +1081,7 @@ send:
 		si->si_ack = htons(cb->s_ack);
 
 		if (ipxcksum) {
-			si->si_sum = 0;
-			len = ntohs(si->si_len);
-			if (len & 1)
-				len++;
-			si->si_sum = ipx_cksum(m, len);
+			si->si_sum = ipx_cksum(m, ntohs(si->si_len));
 		} else
 			si->si_sum = 0xffff;
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)exec.h	8.1 (Berkeley) 6/11/93
- *	$Id: imgact.h,v 1.4 1997/02/22 09:30:55 peter Exp $
+ * $FreeBSD: src/sys/i386/boot/dosboot/imgact.h,v 1.4.4.1 1999/08/29 16:05:05 peter Exp $
  */
 
 #ifndef	_IMGACT_AOUT_H_

@@ -1,4 +1,4 @@
-/*	FreeBSD $Id: uhci_pci.c,v 1.8.2.1 1999/05/08 23:05:14 n_hibma Exp $ */
+/*	FreeBSD $FreeBSD: src/sys/dev/pci/uhci_pci.c,v 1.8.2.3 1999/08/29 16:23:42 peter Exp $ */
 
 /*
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -161,7 +161,7 @@ uhci_pci_attach(pcici_t config_id, int unit)
 		return;                    
 	}
 
-#ifndef USBVERBOSE
+#ifndef UHCI_DEBUG
 	if (bootverbose)
 #endif
 	{
@@ -194,7 +194,7 @@ uhci_pci_attach(pcici_t config_id, int unit)
 
 	legsup = pci_conf_read(config_id, PCI_LEGSUP);
 	if ( !(legsup & PCI_LEGSUP_USBPIRQDEN) ) {
-#if ! (defined(USBVERBOSE) || defined(USB_DEBUG))
+#ifndef UHCI_DEBUG
 		if (bootverbose)
 #endif
 			printf("uhci%d: PIRQD enable not set\n", unit);

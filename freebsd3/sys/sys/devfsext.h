@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  * 
- * $Id: devfsext.h,v 1.22 1998/12/10 19:57:01 eivind Exp $
+ * $FreeBSD: src/sys/sys/devfsext.h,v 1.22.2.1 1999/08/29 16:32:13 peter Exp $
  */
 
 #ifndef _SYS_DEVFSEXT_H_

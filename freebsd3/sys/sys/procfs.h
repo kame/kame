@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: procfs.h,v 1.1 1998/09/14 22:46:08 jdp Exp $
+ * $FreeBSD: src/sys/sys/procfs.h,v 1.1.2.1 1999/08/29 16:32:37 peter Exp $
  */
 
 #ifndef _SYS_PROCFS_H_

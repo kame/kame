@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: vm86.c,v 1.19.2.2 1999/04/15 21:00:53 jlemon Exp $
+ * $FreeBSD: src/sys/i386/i386/vm86.c,v 1.19.2.3 1999/08/29 16:05:57 peter Exp $
  */
 
 #include "opt_vm86.h"

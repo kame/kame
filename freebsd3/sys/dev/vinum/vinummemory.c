@@ -33,15 +33,12 @@
  * otherwise) arising in any way out of the use of this software, even if
  * advised of the possibility of such damage.
  *
- * $Id: vinummemory.c,v 1.6.2.3 1999/05/05 05:20:01 grog Exp $
+ * $FreeBSD: src/sys/dev/vinum/vinummemory.c,v 1.6.2.6 1999/08/29 16:24:21 peter Exp $
  */
 
-#define REALLYKERNEL
-#include "opt_vinum.h"
 #include <dev/vinum/vinumhdr.h>
 
 #ifdef VINUMDEBUG
-jmp_buf command_fail;					    /* return on a failed command */
 #undef longjmp						    /* this was defined as LongJmp */
 void longjmp(jmp_buf, int);				    /* the kernel doesn't define this */
 

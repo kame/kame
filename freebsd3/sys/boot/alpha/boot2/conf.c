@@ -1,5 +1,5 @@
 /*
- * $Id: conf.c,v 1.2 1998/08/31 21:10:36 msmith Exp $
+ * $FreeBSD: src/sys/boot/alpha/boot2/conf.c,v 1.2.2.1 1999/08/29 16:20:08 peter Exp $
  * From	$NetBSD: conf.c,v 1.2 1997/03/22 09:03:29 thorpej Exp $	 
  */
 

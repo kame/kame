@@ -1,5 +1,5 @@
-#	$Id: Makefile,v 1.7 1998/10/14 20:40:56 rnordier Exp $
+# $FreeBSD: src/sys/boot/i386/Makefile,v 1.7.2.2 1999/08/29 16:20:40 peter Exp $
 
-SUBDIR=		boot0 btx boot2 libi386 loader
+SUBDIR=		mbr boot0 kgzldr btx boot2 libi386 loader
 
 .include <bsd.subdir.mk>

@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $Id: fore_output.c,v 1.2 1998/10/31 20:06:53 phk Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_output.c,v 1.2.2.1 1999/08/29 16:23:05 peter Exp $
  *
  */
 
@@ -38,7 +38,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $Id: fore_output.c,v 1.2 1998/10/31 20:06:53 phk Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_output.c,v 1.2.2.1 1999/08/29 16:23:05 peter Exp $");
 #endif
 
 

@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $Id: scsi_da.c,v 1.19.2.4 1999/05/09 01:27:39 ken Exp $
+ * $FreeBSD: src/sys/cam/scsi/scsi_da.c,v 1.19.2.10 1999/08/29 16:21:46 peter Exp $
  */
 
 #include "opt_hw_wdog.h"
@@ -284,7 +284,7 @@ daopen(dev_t dev, int flags, int fmt, struct proc *p)
 	softc = (struct da_softc *)periph->softc;
 
 	CAM_DEBUG(periph->path, CAM_DEBUG_TRACE,
-	    ("daopen: dev=0x%x (unit %d , partition %d)\n", dev,
+	    ("daopen: dev=0x%lx (unit %d , partition %d)\n", (long) dev,
 	     unit, part));
 
 	if ((error = cam_periph_lock(periph, PRIBIO|PCATCH)) != 0) {
@@ -950,9 +950,6 @@ daasync(void *callback_arg, u_int32_t code,
 				"due to status 0x%x\n", status);
 		break;
 	}
-	case AC_LOST_DEVICE:
-		cam_periph_invalidate(periph);
-		break;
 	case AC_SENT_BDR:
 	case AC_BUS_RESET:
 	{
@@ -971,12 +968,10 @@ daasync(void *callback_arg, u_int32_t code,
 		     ccbh != NULL; ccbh = LIST_NEXT(ccbh, periph_links.le))
 			ccbh->ccb_state |= DA_CCB_RETRY_UA;
 		splx(s);
-		break;
+		/* FALLTHROUGH*/
 	}
-	case AC_TRANSFER_NEG:
-	case AC_SCSI_AEN:
-	case AC_UNSOL_RESEL:
 	default:
+		cam_periph_async(periph, code, path, arg);
 		break;
 	}
 }
@@ -1330,12 +1325,15 @@ dadone(struct cam_periph *periph, union ccb *done_ccb)
 			dasetgeom(periph, rdcap);
 			dp = &softc->params;
 			snprintf(announce_buf, sizeof(announce_buf),
-				"%ldMB (%d %d byte sectors: %dH %dS/T %dC)",
-				dp->sectors / ((1024L * 1024L) / dp->secsize),
-				dp->sectors, dp->secsize, dp->heads,
-				dp->secs_per_track, dp->cylinders);
+			        "%luMB (%u %u byte sectors: %dH %dS/T %dC)",
+				(unsigned long) (((u_int64_t)dp->secsize *
+				dp->sectors) / (1024*1024)), dp->sectors,
+				dp->secsize, dp->heads, dp->secs_per_track,
+				dp->cylinders);
 		} else {
 			int	error;
+
+			announce_buf[0] = '\0';
 
 			/*
 			 * Retry any UNIT ATTENTION type errors.  They
@@ -1418,7 +1416,6 @@ dadone(struct cam_periph *periph, union ccb *done_ccb)
 					 * Free up resources.
 					 */
 					cam_periph_invalidate(periph);
-					announce_buf[0] = '\0';
 				} 
 			}
 		}

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: alpha_copy.c,v 1.3 1998/09/20 21:46:19 dfr Exp $
+ * $FreeBSD: src/sys/boot/alpha/libalpha/alpha_copy.c,v 1.3.2.1 1999/08/29 16:20:13 peter Exp $
  */
 /*
  * MD primitives supporting placement of module data 

@@ -32,7 +32,7 @@
  *
  *	@(#)scanc.c	8.1 (Berkeley) 6/10/93
  *
- * $Id: scanc.c,v 1.7 1997/02/22 09:40:00 peter Exp $
+ * $FreeBSD: src/sys/libkern/scanc.c,v 1.7.4.1 1999/08/29 16:26:33 peter Exp $
  */
 
 #include <sys/libkern.h>

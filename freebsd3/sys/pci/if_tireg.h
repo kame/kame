@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: if_tireg.h,v 1.1.2.1 1999/04/30 19:32:24 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_tireg.h,v 1.1.2.6 1999/08/29 16:31:46 peter Exp $
  */
 
 /*
@@ -128,7 +128,7 @@
  */
 #define TI_FIRMWARE_MAJOR		0xc
 #define TI_FIRMWARE_MINOR		0x3
-#define TI_FIRMWARE_FIX			0x9
+#define TI_FIRMWARE_FIX			0xa
 
 /*
  * Miscelaneous Local Control register.
@@ -801,17 +801,10 @@ struct ti_tx_desc {
  * boundary.
  */
 
-#ifdef __alpha__
 #define ETHER_ALIGN 2
-#endif
-
-#ifdef __i386__
-#define ETHER_ALIGN 0
-#endif
-
 
 #define TI_FRAMELEN		1518
-#define TI_JUMBO_FRAMELEN	9018 + ETHER_ALIGN
+#define TI_JUMBO_FRAMELEN	9018
 #define TI_JUMBO_MTU		(TI_JUMBO_FRAMELEN-ETHER_HDR_LEN-ETHER_CRC_LEN)
 #define TI_PAGE_SIZE		PAGE_SIZE
 #define TI_MIN_FRAMELEN		60
@@ -1035,7 +1028,7 @@ struct ti_event_desc {
 #define TI_MSLOTS	256
 #define TI_JSLOTS	256
 
-#define TI_JRAWLEN (TI_JUMBO_FRAMELEN + sizeof(u_int64_t))
+#define TI_JRAWLEN (TI_JUMBO_FRAMELEN + ETHER_ALIGN + sizeof(u_int64_t))
 #define TI_JLEN (TI_JRAWLEN + (sizeof(u_int64_t) - \
 	(TI_JRAWLEN % sizeof(u_int64_t))))
 #define TI_JPAGESZ PAGE_SIZE
@@ -1135,12 +1128,6 @@ struct ti_softc {
 	u_int16_t		ti_std;		/* current std ring head */
 	u_int16_t		ti_mini;	/* current mini ring head */
 	u_int16_t		ti_jumbo;	/* current jumo ring head */
-	u_int16_t		ti_std_old;
-	u_int16_t		ti_mini_old;
-	u_int16_t		ti_jumbo_old;
-	u_int16_t		ti_std_cnt;
-	u_int16_t		ti_mini_cnt;
-	u_int16_t		ti_jumbo_cnt;
 	SLIST_HEAD(__ti_mchead, ti_mc_entry)	ti_mc_listhead;
 	SLIST_HEAD(__ti_jfreehead, ti_jpool_entry)	ti_jfree_listhead;
 	SLIST_HEAD(__ti_jinusehead, ti_jpool_entry)	ti_jinuse_listhead;
@@ -1151,6 +1138,7 @@ struct ti_softc {
 	u_int32_t		ti_tx_max_coal_bds;
 	u_int32_t		ti_tx_buf_ratio;
 	int			ti_if_flags;
+	int			ti_txcnt;
 };
 
 /*

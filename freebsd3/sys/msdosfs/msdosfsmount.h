@@ -1,4 +1,4 @@
-/*	$Id: msdosfsmount.h,v 1.16 1998/02/23 16:44:37 ache Exp $ */
+/* $FreeBSD: src/sys/msdosfs/msdosfsmount.h,v 1.16.2.1 1999/08/29 16:28:08 peter Exp $ */
 /*	$NetBSD: msdosfsmount.h,v 1.17 1997/11/17 15:37:07 ws Exp $	*/
 
 /*-

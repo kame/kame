@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)dkbad.h	8.1 (Berkeley) 6/2/93
- * $Id: dkbad.h,v 1.4 1997/02/22 09:30:47 peter Exp $
+ * $FreeBSD: src/sys/i386/boot/dosboot/dkbad.h,v 1.4.4.1 1999/08/29 16:05:03 peter Exp $
  */
 
 #ifndef _SYS_DKBAD_H_

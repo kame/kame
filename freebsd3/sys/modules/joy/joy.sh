@@ -1,4 +1,4 @@
 #!/bin/sh
-# $Id: joy.sh,v 1.4 1998/11/05 04:19:26 peter Exp $
+# $FreeBSD: src/sys/modules/joy/joy.sh,v 1.4.2.1 1999/08/29 16:27:22 peter Exp $
 
 kldload joy

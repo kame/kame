@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $Id: fore_globals.c,v 1.2 1998/10/31 20:06:52 phk Exp $
+ *	@(#) $FreeBSD: src/sys/dev/hfa/fore_globals.c,v 1.2.2.2 1999/08/29 16:23:02 peter Exp $
  *
  */
 
@@ -38,7 +38,7 @@
 #include <dev/hfa/fore_include.h>
 
 #ifndef lint
-__RCSID("@(#) $Id: fore_globals.c,v 1.2 1998/10/31 20:06:52 phk Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/dev/hfa/fore_globals.c,v 1.2.2.2 1999/08/29 16:23:02 peter Exp $");
 #endif
 
 
@@ -101,7 +101,7 @@ struct sp_info fore_nif_pool = {
 	"fore nif pool",		/* si_name */
 	sizeof(struct atm_nif),		/* si_blksiz */
 	5,				/* si_blkcnt */
-	20				/* si_maxallow */
+	52				/* si_maxallow */
 };
 
 struct sp_info fore_vcc_pool = {

@@ -61,7 +61,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- * $Id: vm_prot.h,v 1.8 1997/04/06 02:29:45 dyson Exp $
+ * $FreeBSD: src/sys/vm/vm_prot.h,v 1.8.4.1 1999/08/29 16:33:39 peter Exp $
  */
 
 /*

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: probe_keyboard.c,v 1.14 1999/01/11 03:50:01 yokota Exp $
+ * $FreeBSD: src/sys/i386/boot/biosboot/probe_keyboard.c,v 1.14.2.1 1999/08/29 16:04:49 peter Exp $
  */
 
 #include <sys/types.h>

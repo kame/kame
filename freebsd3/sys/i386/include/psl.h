@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)psl.h	5.2 (Berkeley) 1/18/91
- *	$Id: psl.h,v 1.9 1997/02/22 09:35:02 peter Exp $
+ * $FreeBSD: src/sys/i386/include/psl.h,v 1.9.4.1 1999/08/29 16:06:46 peter Exp $
  */
 
 #ifndef _MACHINE_PSL_H_

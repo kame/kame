@@ -32,7 +32,7 @@
  *  dptpci.c:  PCI Bus Attachment for DPT SCSI HBAs
  */
 
-#ident "$Id: dpt_pci.c,v 1.11 1998/12/14 06:32:55 dillon Exp $"
+#ident "$FreeBSD: src/sys/pci/dpt_pci.c,v 1.11.2.2 1999/09/14 04:08:10 gibbs Exp $"
 
 #include "opt_devfs.h"
 #include "opt_dpt.h"
@@ -158,7 +158,7 @@ dpt_pci_attach(pcici_t config_id, int unit)
 	
 	/* Allocate a dmatag representing the capabilities of this attachment */
 	/* XXX Should be a child of the PCI bus dma tag */
-	if (bus_dma_tag_create(/*parent*/NULL, /*alignemnt*/0, /*boundary*/0,
+	if (bus_dma_tag_create(/*parent*/NULL, /*alignemnt*/1, /*boundary*/0,
 			       /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
 			       /*highaddr*/BUS_SPACE_MAXADDR,
 			       /*filter*/NULL, /*filterarg*/NULL,

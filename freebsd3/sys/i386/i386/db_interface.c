@@ -23,7 +23,7 @@
  * any improvements or extensions that they make and grant Carnegie the
  * rights to redistribute these changes.
  *
- *	$Id: db_interface.c,v 1.43 1998/12/28 23:02:56 msmith Exp $
+ * $FreeBSD: src/sys/i386/i386/db_interface.c,v 1.43.2.1 1999/08/29 16:05:37 peter Exp $
  */
 
 /*

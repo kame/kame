@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.6 1998/10/19 19:13:52 rnordier Exp $
+# $FreeBSD: src/sys/boot/i386/boot0/Makefile,v 1.6.2.2 1999/08/29 16:20:41 peter Exp $
 
 PROG=		boot0
 NOMAN=
@@ -8,7 +8,7 @@ BINMODE=	444
 
 M4?=	m4
 
-B0FLAGS=0x0
+B0FLAGS=0xf
 B0TICKS=0xb6
 
 ORG=	0x600

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: kftxxvar.h,v 1.3 1998/06/14 13:45:25 dfr Exp $
+ * $FreeBSD: src/sys/alpha/tlsb/kftxxvar.h,v 1.3.2.1 1999/08/29 15:57:42 peter Exp $
  */
 
 /*

@@ -6,7 +6,7 @@
  *   of this software, nor does the author assume any responsibility
  *   for damages incurred with its use.
  *
- * $Id: if_edreg.h,v 1.25 1998/10/08 17:20:58 kato Exp $
+ * $FreeBSD: src/sys/i386/isa/if_edreg.h,v 1.25.2.1 1999/08/29 16:07:20 peter Exp $
  */
 /*
  * National Semiconductor DS8390 NIC register definitions

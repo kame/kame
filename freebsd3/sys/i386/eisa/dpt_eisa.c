@@ -33,7 +33,7 @@
  */
 
 /*
- * $Id: dpt_eisa.c,v 1.4 1998/09/15 08:33:35 gibbs Exp $
+ * $FreeBSD: src/sys/i386/eisa/dpt_eisa.c,v 1.4.2.2 1999/09/14 04:07:55 gibbs Exp $
  */
 
 #include "eisa.h"
@@ -162,7 +162,7 @@ dpt_eisa_attach(e_dev)
 
 	/* Allocate a dmatag representing the capabilities of this attachment */
 	/* XXX Should be a child of the EISA bus dma tag */
-	if (bus_dma_tag_create(/*parent*/NULL, /*alignemnt*/0, /*boundary*/0,
+	if (bus_dma_tag_create(/*parent*/NULL, /*alignemnt*/1, /*boundary*/0,
 			       /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
 			       /*highaddr*/BUS_SPACE_MAXADDR,
 			       /*filter*/NULL, /*filterarg*/NULL,

@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_fork.c	8.6 (Berkeley) 4/8/94
- * $Id: kern_fork.c,v 1.54.2.2 1999/03/02 00:42:08 julian Exp $
+ * $FreeBSD: src/sys/kern/kern_fork.c,v 1.54.2.4 1999/08/29 16:25:59 peter Exp $
  */
 
 #include "opt_ktrace.h"
@@ -245,6 +245,8 @@ fork1(p1, flags)
 	}
 
 	newproc->p_wakeup = 0;
+
+	newproc->p_vmspace = NULL;
 
 	/*
 	 * Find an unused process ID.  We remember a range of unused IDs

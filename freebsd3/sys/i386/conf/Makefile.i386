@@ -1,7 +1,7 @@
 # Makefile.i386 -- with config changes.
 # Copyright 1990 W. Jolitz
 #	from: @(#)Makefile.i386	7.1 5/10/91
-#	$Id: Makefile.i386,v 1.136.2.5 1999/04/25 12:44:06 des Exp $
+# $FreeBSD: src/sys/i386/conf/Makefile.i386,v 1.136.2.9 1999/09/05 21:03:48 jkh Exp $
 #
 # Makefile for FreeBSD
 #
@@ -163,7 +163,6 @@ setdef1.o: setdef1.c setdefs.h
 	${NORMAL_C}
 
 setdef0.c setdef1.c setdefs.h: ${OBJS}
-	@echo generating linker set emulation glue for ELF
 	@gensetdefs ${OBJS}
 
 # this rule stops ./assym.s in .depend from causing problems
@@ -194,15 +193,18 @@ cleandepend:
 	rm -f .depend
 
 links:
-	egrep '#if' ${CFILES:Nswapkernel.c} | sed -f $S/conf/defines | \
+	egrep '#if' ${CFILES} | sed -f $S/conf/defines | \
 	  sed -e 's/:.*//' -e 's/\.c/.o/' | sort -u > dontlink
-	echo ${CFILES:Nswapkernel.c} | tr -s ' ' '\12' | sed 's/\.c/.o/' | \
+	echo ${CFILES} | tr -s ' ' '\12' | sed 's/\.c/.o/' | \
 	  sort -u | comm -23 - dontlink | \
 	  sed 's,../.*/\(.*.o\),rm -f \1;ln -s ../GENERIC/\1 \1,' > makelinks
 	sh makelinks && rm -f dontlink
 
 tags:
-	@echo "see $S/kern/Makefile for tags"
+	@[ -f .depend ] || { echo "you must make depend first"; exit 1; }
+	sh $S/conf/systags.sh
+	rm -f tags1
+	sed -e 's,      ../,    ,' tags > tags1
 
 install:
 	@if [ ! -f kernel ] ; then \

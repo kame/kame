@@ -36,7 +36,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)dir.h	8.2 (Berkeley) 1/21/94
- * $Id: dir.h,v 1.8 1997/03/18 19:52:17 peter Exp $
+ * $FreeBSD: src/sys/ufs/ufs/dir.h,v 1.8.4.1 1999/08/29 16:33:18 peter Exp $
  */
 
 #ifndef _UFS_UFS_DIR_H_

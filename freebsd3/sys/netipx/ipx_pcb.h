@@ -33,7 +33,7 @@
  *
  *	@(#)ipx_pcb.h
  *
- * $Id: ipx_pcb.h,v 1.12 1997/08/16 19:15:44 wollman Exp $
+ * $FreeBSD: src/sys/netipx/ipx_pcb.h,v 1.12.2.2 1999/08/30 16:52:11 jhay Exp $
  */
 
 #ifndef _NETIPX_IPX_PCB_H_
@@ -64,6 +64,7 @@ struct ipxpcb {
 #define IPXP_RAWIN		0x2	/* show headers on input */
 #define IPXP_RAWOUT		0x4	/* show header on output */
 #define IPXP_ALL_PACKETS	0x8	/* Turn off higher proto processing */
+#define	IPXP_CHECKSUM		0x10	/* use checksum on this socket */
 
 #define	IPX_WILDCARD		1
 

@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.7.2.1 1999/02/06 14:27:45 dcs Exp $
+# $FreeBSD: src/sys/boot/ficl/Makefile,v 1.7.2.2 1999/08/29 16:20:35 peter Exp $
 #
 LIB=			ficl
 NOPROFILE=		yes

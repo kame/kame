@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $Id: bioscall.s,v 1.1 1997/08/01 06:07:13 msmith Exp $
+ * $FreeBSD: src/sys/i386/i386/bioscall.s,v 1.1.2.1 1999/08/29 16:05:35 peter Exp $
  */
 
 /*

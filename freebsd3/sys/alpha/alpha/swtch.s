@@ -1,4 +1,4 @@
-/* $Id: swtch.s,v 1.7.2.1 1999/04/16 17:01:48 gallatin Exp $ */
+/* $FreeBSD: src/sys/alpha/alpha/swtch.s,v 1.7.2.2 1999/08/29 15:56:36 peter Exp $ */
 /* $NetBSD: locore.s,v 1.47 1998/03/22 07:26:32 thorpej Exp $ */
 
 /*

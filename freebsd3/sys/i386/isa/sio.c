@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)com.c	7.5 (Berkeley) 5/16/91
- *	$Id: sio.c,v 1.224.2.5 1999/04/13 18:54:43 jhay Exp $
+ * $FreeBSD: src/sys/i386/isa/sio.c,v 1.224.2.7 1999/08/29 16:07:32 peter Exp $
  */
 
 #include "opt_comconsole.h"
@@ -1531,7 +1531,7 @@ siointr1(com)
 				count = tc->tc_get_timecount(tc);
 				pps_event(&com->pps, tc, count, 
 				    (modem_status & MSR_DCD) ? 
-				    PPS_CAPTURECLEAR : PPS_CAPTUREASSERT);
+				    PPS_CAPTUREASSERT : PPS_CAPTURECLEAR);
 			}
 		}
 		line_status = inb(com->line_status_port);

@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_syscalls.c	8.5 (Berkeley) 3/30/95
- * $Id: nfs_syscalls.c,v 1.44 1998/12/07 21:58:44 archie Exp $
+ * $FreeBSD: src/sys/nfs/nfs_syscalls.c,v 1.44.2.2 1999/08/29 16:30:31 peter Exp $
  */
 
 #include <sys/param.h>
@@ -657,7 +657,7 @@ nfssvc_nfsd(nsd, argp, p)
 				slp, nfsd->nfsd_procp, &mreq);
 			if (mreq == NULL)
 				break;
-			if (error) {
+			if (error != 0 && error != NFSERR_RETVOID) {
 				if (nd->nd_procnum != NQNFSPROC_VACATED)
 					nfsstats.srv_errs++;
 				nfsrv_updatecache(nd, FALSE, mreq);

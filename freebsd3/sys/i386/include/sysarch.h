@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: sysarch.h,v 1.10 1998/07/28 15:22:51 jlemon Exp $
+ * $FreeBSD: src/sys/i386/include/sysarch.h,v 1.10.2.1 1999/08/29 16:06:53 peter Exp $
  */
 
 /*

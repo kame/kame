@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: sys_process.c,v 1.41 1998/12/26 17:14:37 dfr Exp $
+ * $FreeBSD: src/sys/kern/sys_process.c,v 1.41.2.1 1999/08/29 16:26:08 peter Exp $
  */
 
 #include <sys/param.h>

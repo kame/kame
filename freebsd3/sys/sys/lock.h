@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)lock.h	8.12 (Berkeley) 5/19/95
- * $Id: lock.h,v 1.13 1999/01/20 14:49:12 eivind Exp $
+ * $FreeBSD: src/sys/sys/lock.h,v 1.13.2.1 1999/08/29 16:32:30 peter Exp $
  */
 
 #ifndef	_LOCK_H_

@@ -61,7 +61,7 @@
  * W. Metzenthen   June 1994.
  *
  *
- *     $Id: reg_u_sub.s,v 1.8 1997/06/14 15:11:06 bde Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/reg_u_sub.s,v 1.8.4.1 1999/08/29 16:24:48 peter Exp $
  *
  */
 

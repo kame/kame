@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.13 1998/10/16 04:30:48 peter Exp $
+# $FreeBSD: src/sys/modules/procfs/Makefile,v 1.13.2.1 1999/08/29 16:27:35 peter Exp $
 
 .PATH:	${.CURDIR}/../../miscfs/procfs
 KMOD=	procfs

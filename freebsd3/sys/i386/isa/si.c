@@ -30,7 +30,7 @@
  * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN
  * NO EVENT SHALL THE AUTHORS BE LIABLE.
  *
- *	$Id: si.c,v 1.78 1999/01/12 00:36:35 eivind Exp $
+ * $FreeBSD: src/sys/i386/isa/si.c,v 1.78.2.1 1999/08/29 16:07:32 peter Exp $
  */
 
 #ifndef lint

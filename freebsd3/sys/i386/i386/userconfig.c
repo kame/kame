@@ -46,7 +46,7 @@
  ** (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  ** THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  **
- **      $Id: userconfig.c,v 1.126.2.4 1999/05/10 23:33:58 bde Exp $
+ ** $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.126.2.10 1999/09/01 16:43:58 nsayer Exp $
  **/
 
 /**
@@ -376,12 +376,17 @@ static DEV_INFO device_info[] = {
 {"ix",          "Intel EtherExpress Ethernet adapter",	0,		CLS_NETWORK},
 {"le",          "DEC Etherworks 2 and 3 Ethernet adapters",	0,	CLS_NETWORK},
 {"lnc",         "Isolan, Novell NE2100/NE32-VL Ethernet adapters",	0,CLS_NETWORK},
+{"sf",          "Adaptec AIC-6915 PCI Ethernet adapters ",		0,CLS_NETWORK},
+{"sk",          "SysKonnect SK-984x gigabit Ethernet adapters ",	0,CLS_NETWORK},
+{"ti",          "Alteon Networks Tigon gigabit Ethernet adapters ",	0,CLS_NETWORK},
 {"tl",          "Texas Instruments ThunderLAN Ethernet adapters",	0,CLS_NETWORK},
 {"tx",          "SMC 9432TX Ethernet adapters",			0,	CLS_NETWORK},
 {"vx",          "3COM 3C590/3C595 Ethernet adapters",		0,	CLS_NETWORK},
+{"xe",          "Xircom PC Card Ethernet adapter",		0,	CLS_NETWORK},
 {"ze",          "IBM/National Semiconductor PCMCIA Ethernet adapter",0,	CLS_NETWORK},
 {"zp",          "3COM PCMCIA Etherlink III Ethernet adapter",	0,	CLS_NETWORK},
-{"ax",          "ASIC AX88140A ethernet adapter",	FLG_FIXED,	CLS_NETWORK},
+{"al",          "ADMtek AL981 ethernet adapter",	FLG_FIXED,	CLS_NETWORK},
+{"ax",          "ASIX AX88140A ethernet adapter",	FLG_FIXED,	CLS_NETWORK},
 {"de",          "DEC DC21040 Ethernet adapter",		FLG_FIXED,	CLS_NETWORK},
 {"fpa",         "DEC DEFPA PCI FDDI adapter",		FLG_FIXED,	CLS_NETWORK},
 {"rl",          "RealTek 8129/8139 ethernet adapter",	FLG_FIXED,	CLS_NETWORK},
@@ -398,7 +403,7 @@ static DEV_INFO device_info[] = {
 {"cy",          "Cyclades multiport async adapter",	0,		CLS_COMMS},
 {"cyy",         "Cyclades Ye/PCI multiport async adapter",FLG_INVISIBLE,CLS_COMMS},
 {"dgb",         "Digiboard PC/Xe, PC/Xi async adapter",	0,		CLS_COMMS},
-{"si",          "Specialix SI/XIO async adapter",	0,		CLS_COMMS},
+{"si",          "Specialix SI/XIO/SX async adapter",	0,		CLS_COMMS},
 {"stl",         "Stallion EasyIO/Easy Connection 8/32 async adapter",0,	CLS_COMMS},
 {"stli",        "Stallion intelligent async adapter"	,0,		CLS_COMMS},
 {"lpt",         "Parallel printer port",		0,		CLS_COMMS},
@@ -2506,7 +2511,7 @@ visuserconfig(void)
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $Id: userconfig.c,v 1.126.2.4 1999/05/10 23:33:58 bde Exp $
+ * $FreeBSD: src/sys/i386/i386/userconfig.c,v 1.126.2.10 1999/09/01 16:43:58 nsayer Exp $
  */
 
 #include "scbus.h"
@@ -2814,7 +2819,7 @@ set_device_irq(CmdParm *parms)
 
     irq = parms[1].parm.iparm;
     if (irq == 2) {
-	printf("Warning: Remapping IRQ 2 to IRQ 9 - see config(8)\n");
+	printf("Warning: Remapping IRQ 2 to IRQ 9\n");
 	irq = 9;
     }
     else if (irq != -1 && irq > 15) {
@@ -3039,8 +3044,8 @@ helpfunc(CmdParm *parms)
     "pnp <csn> <ldn> [os|bios]\tset parameters using FreeBSD or BIOS\n"
     "pnp <csn> <ldn> [portX <addr>]\tset addr for port X (0..7)\n"
     "pnp <csn> <ldn> [memX <maddr>]\tset addr for memory range X (0..3)\n"
-    "pnp <csn> <ldn> [irq <number>]\tset irq X (0..1) to number, 0=unused\n"
-    "pnp <csn> <ldn> [drq <number>]\tset drq X (0..1) to number, 4=unused\n");
+    "pnp <csn> <ldn> [irqX <number>]\tset irq X (0..1) to number, 0=unused\n"
+    "pnp <csn> <ldn> [drqX <number>]\tset drq X (0..1) to number, 4=unused\n");
 #endif
 #if NEISA > 0
     printf("eisa <number>\t\tSet the number of EISA slots to probe\n");

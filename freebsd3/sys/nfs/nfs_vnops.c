@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)nfs_vnops.c	8.16 (Berkeley) 5/27/95
- * $Id: nfs_vnops.c,v 1.116.2.3 1999/02/13 08:03:47 dillon Exp $
+ * $FreeBSD: src/sys/nfs/nfs_vnops.c,v 1.116.2.7 1999/08/29 16:30:32 peter Exp $
  */
 
 
@@ -1007,6 +1007,11 @@ nfs_readlinkrpc(vp, uiop, cred)
 		nfsm_postop_attr(vp, attrflag);
 	if (!error) {
 		nfsm_strsiz(len, NFS_MAXPATHLEN);
+		if (len == NFS_MAXPATHLEN) {
+			struct nfsnode *np = VTONFS(vp);
+			if (np->n_size && np->n_size < NFS_MAXPATHLEN)
+				len = np->n_size;
+		}
 		nfsm_mtouio(uiop, len);
 	}
 	nfsm_reqdone;
@@ -2330,7 +2335,7 @@ nfs_readdirplusrpc(vp, uiop, cred)
 					newvp = NFSTOV(np);
 				}
 			    }
-			    if (doit) {
+			    if (doit && bigenough) {
 				dpossav2 = dpos;
 				dpos = dpossav1;
 				mdsav2 = md;
@@ -2344,7 +2349,7 @@ nfs_readdirplusrpc(vp, uiop, cred)
 				cnp->cn_hash = 0;
 				for (cp = cnp->cn_nameptr, i = 1; i <= len;
 				    i++, cp++)
-				    cnp->cn_hash += (unsigned char)*cp * i;
+				    cnp->cn_hash += (unsigned char)*cp;
 			        cache_enter(ndp->ni_dvp, ndp->ni_vp, cnp);
 			    }
 			} else {
@@ -2354,7 +2359,10 @@ nfs_readdirplusrpc(vp, uiop, cred)
 			    nfsm_adv(nfsm_rndup(i));
 			}
 			if (newvp != NULLVP) {
-			    vrele(newvp);
+			    if (newvp == vp)
+				vrele(newvp);
+			    else
+				vput(newvp);
 			    newvp = NULLVP;
 			}
 			nfsm_dissect(tl, u_int32_t *, NFSX_UNSIGNED);

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: timers.h,v 1.3 1997/02/22 09:46:10 peter Exp $
+ * $FreeBSD: src/sys/sys/timers.h,v 1.3.4.1 1999/08/29 16:32:51 peter Exp $
  *
  * Description : Basic timers header.
  */

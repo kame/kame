@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: if_ex.c,v 1.13 1998/10/22 05:58:39 bde Exp $
+ * $FreeBSD: src/sys/i386/isa/if_ex.c,v 1.13.2.1 1999/08/29 16:07:21 peter Exp $
  */
 
 /*

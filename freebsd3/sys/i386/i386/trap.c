@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)trap.c	7.4 (Berkeley) 5/13/91
- *	$Id: trap.c,v 1.133 1999/01/06 23:05:36 julian Exp $
+ * $FreeBSD: src/sys/i386/i386/trap.c,v 1.133.2.1 1999/08/29 16:05:56 peter Exp $
  */
 
 /*

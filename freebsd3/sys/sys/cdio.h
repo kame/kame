@@ -1,7 +1,7 @@
 /*
  * 16 Feb 93	Julian Elischer	(julian@dialix.oz.au)
  *
- *	$Id: cdio.h,v 1.19 1998/09/08 20:57:47 sos Exp $
+ * $FreeBSD: src/sys/sys/cdio.h,v 1.19.2.1 1999/08/29 16:32:11 peter Exp $
  */
 
 /*

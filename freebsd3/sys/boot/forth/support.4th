@@ -22,7 +22,7 @@
 \ OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 \ SUCH DAMAGE.
 \
-\	$Id: support.4th,v 1.1.2.1 1999/04/24 17:44:35 dcs Exp $
+\ $FreeBSD: src/sys/boot/forth/support.4th,v 1.1.2.2 1999/08/29 16:20:39 peter Exp $
 
 \ Loader.rc support functions:
 \

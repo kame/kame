@@ -54,7 +54,7 @@
  * W. Metzenthen   June 1994.
  *
  *
- *        $Id: control_w.h,v 1.6 1997/02/22 09:29:00 peter Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/control_w.h,v 1.6.4.1 1999/08/29 16:24:30 peter Exp $
  *
  */
 

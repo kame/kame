@@ -1,5 +1,5 @@
 /*-
- *  dgreg.h $Id: dgreg.h,v 1.8 1998/04/21 21:06:57 brian Exp $
+ *  dgreg.h $FreeBSD: src/sys/gnu/i386/isa/dgreg.h,v 1.8.2.1 1999/08/29 16:24:56 peter Exp $
  *
  *  Digiboard driver.
  *

@@ -54,7 +54,7 @@
  * W. Metzenthen   June 1994.
  *
  *
- *    $Id: exception.h,v 1.8 1997/06/14 15:11:03 bde Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/exception.h,v 1.8.4.1 1999/08/29 16:24:32 peter Exp $
  *
  *
  */

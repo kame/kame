@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $Id: atm_signal.c,v 1.2 1998/10/31 20:06:54 phk Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_signal.c,v 1.2.2.1 1999/08/29 16:28:45 peter Exp $
  *
  */
 
@@ -38,7 +38,7 @@
 #include <netatm/kern_include.h>
 
 #ifndef lint
-__RCSID("@(#) $Id: atm_signal.c,v 1.2 1998/10/31 20:06:54 phk Exp $");
+__RCSID("@(#) $FreeBSD: src/sys/netatm/atm_signal.c,v 1.2.2.1 1999/08/29 16:28:45 peter Exp $");
 #endif
 
 

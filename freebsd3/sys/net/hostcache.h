@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: hostcache.h,v 1.2 1997/10/12 20:25:07 phk Exp $
+ * $FreeBSD: src/sys/net/hostcache.h,v 1.2.2.1 1999/08/29 16:28:14 peter Exp $
  */
 
 #ifndef _NET_HOSTCACHE_H

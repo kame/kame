@@ -1,4 +1,4 @@
-/* $Id: db_elf.c,v 1.4 1998/10/09 23:32:03 peter Exp $ */
+/* $FreeBSD: src/sys/ddb/db_elf.c,v 1.4.2.1 1999/08/29 16:22:14 peter Exp $ */
 /*	$NetBSD: db_elf.c,v 1.4 1998/05/03 18:49:54 thorpej Exp $	*/
 
 /*-

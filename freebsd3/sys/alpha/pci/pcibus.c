@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: pcibus.c,v 1.8 1998/12/27 18:03:29 dfr Exp $
+ * $FreeBSD: src/sys/alpha/pci/pcibus.c,v 1.8.2.1 1999/08/29 15:57:22 peter Exp $
  *
  */
 

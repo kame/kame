@@ -56,7 +56,7 @@
  * W. Metzenthen   June 1994.
  *
  *
- *     $Id: reg_compare.c,v 1.10 1997/07/01 00:08:34 bde Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/reg_compare.c,v 1.10.4.1 1999/08/29 16:24:43 peter Exp $
  *
  */
 

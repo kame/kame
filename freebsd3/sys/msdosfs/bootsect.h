@@ -1,4 +1,4 @@
-/*	$Id: bootsect.h,v 1.6 1998/02/18 09:28:21 jkh Exp $ */
+/* $FreeBSD: src/sys/msdosfs/bootsect.h,v 1.6.2.1 1999/08/29 16:28:02 peter Exp $ */
 /*	$NetBSD: bootsect.h,v 1.9 1997/11/17 15:36:17 ws Exp $	*/
 
 /*

@@ -24,7 +24,7 @@
  * the rights to redistribute these changes.
  *
  *	from: Mach, Revision 2.2  92/04/04  11:35:57  rpd
- *	$Id: io.c,v 1.25 1997/12/04 21:52:42 joerg Exp $
+ * $FreeBSD: src/sys/i386/boot/biosboot/io.c,v 1.25.2.1 1999/08/29 16:04:48 peter Exp $
  */
 
 #include "boot.h"

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: prof_machdep.c,v 1.11 1998/12/14 18:21:34 bde Exp $
+ * $FreeBSD: src/sys/i386/isa/prof_machdep.c,v 1.11.2.1 1999/08/29 16:07:30 peter Exp $
  */
 
 #ifdef GUPROF

@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.5 1998/10/13 18:29:18 rnordier Exp $
+# $FreeBSD: src/sys/boot/i386/btx/btx/Makefile,v 1.5.2.1 1999/08/29 16:20:48 peter Exp $
 
 M4?=	m4
 

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ns.c	8.2 (Berkeley) 11/15/93
- * $Id: ns.c,v 1.8 1997/02/22 09:42:13 peter Exp $
+ * $FreeBSD: src/sys/netns/ns.c,v 1.8.4.1 1999/08/29 16:30:14 peter Exp $
  */
 
 #include <sys/param.h>

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)exec.h	8.1 (Berkeley) 6/11/93
- *	$Id: imgact_aout.h,v 1.9 1998/09/14 05:36:51 jdp Exp $
+ * $FreeBSD: src/sys/sys/imgact_aout.h,v 1.9.2.2 1999/09/01 06:12:10 sef Exp $
  */
 
 #ifndef	_IMGACT_AOUT_H_
@@ -151,7 +151,7 @@ struct exec {
 struct proc;
 
 __BEGIN_DECLS
-int aout_coredump __P((struct proc *));
+int aout_coredump __P((struct proc *, struct vnode *, off_t));
 __END_DECLS
 #endif /* KERNEL */
 

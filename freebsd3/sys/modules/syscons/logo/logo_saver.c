@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: logo_saver.c,v 1.4.2.2 1999/04/17 19:31:16 des Exp $
+ * $FreeBSD: src/sys/modules/syscons/logo/logo_saver.c,v 1.4.2.3 1999/08/29 16:27:50 peter Exp $
  */
 
 #include <sys/param.h>

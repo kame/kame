@@ -23,7 +23,7 @@
  * Copies of this Software may be made, however, the above copyright
  * notice must be reproduced on all copies.
  *
- *	@(#) $Id: atm_sigmgr.h,v 1.1 1998/09/15 08:22:58 phk Exp $
+ *	@(#) $FreeBSD: src/sys/netatm/atm_sigmgr.h,v 1.1.2.1 1999/08/29 16:28:45 peter Exp $
  *
  */
 

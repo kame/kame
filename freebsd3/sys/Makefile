@@ -1,9 +1,9 @@
-#	$Id: Makefile,v 1.16 1998/12/30 12:06:08 bde Exp $
+# $FreeBSD: src/sys/Makefile,v 1.16.2.2 1999/08/29 16:20:04 peter Exp $
 
 # This is the old aout only boot loader.
 .if	exists(${MACHINE}/boot) && ${OBJFORMAT} == "aout"
 SUBDIR=	${MACHINE}/boot
-.elif	exists(boot) && ${MACHINE} == "i386" && ${OBJFORMAT} == "elf"
+.elif	exists(boot) && ${MACHINE_ARCH} == "i386" && ${OBJFORMAT} == "elf"
 SUBDIR=	boot
 .endif
 

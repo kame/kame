@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: bt_eisa.c,v 1.1.2.2 1999/03/23 07:41:53 gibbs Exp $
+ * $FreeBSD: src/sys/i386/eisa/bt_eisa.c,v 1.1.2.4 1999/09/14 04:07:55 gibbs Exp $
  */
 
 #include "eisa.h"
@@ -289,7 +289,7 @@ bt_eisa_attach(struct eisa_device *e_dev)
 
 	/* Allocate a dmatag for our SCB DMA maps */
 	/* XXX Should be a child of the PCI bus dma tag */
-	if (bus_dma_tag_create(/*parent*/NULL, /*alignment*/0, /*boundary*/0,
+	if (bus_dma_tag_create(/*parent*/NULL, /*alignment*/1, /*boundary*/0,
 			       /*lowaddr*/BUS_SPACE_MAXADDR_32BIT,
 			       /*highaddr*/BUS_SPACE_MAXADDR,
 			       /*filter*/NULL, /*filterarg*/NULL,

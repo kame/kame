@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $Id: bios.c,v 1.11.2.1 1999/03/16 21:12:14 msmith Exp $
+ * $FreeBSD: src/sys/i386/i386/bios.c,v 1.11.2.2 1999/08/29 16:05:35 peter Exp $
  */
 
 /*

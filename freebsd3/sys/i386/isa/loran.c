@@ -6,7 +6,7 @@
  * this stuff is worth it, you can buy me a beer in return.   Poul-Henning Kamp
  * ----------------------------------------------------------------------------
  *
- * $Id: loran.c,v 1.14 1998/12/16 11:46:41 phk Exp $
+ * $FreeBSD: src/sys/i386/isa/loran.c,v 1.14.2.1 1999/08/29 16:07:27 peter Exp $
  *
  * This device-driver helps the userland controlprogram for a LORAN-C
  * receiver avoid monopolizing the CPU.

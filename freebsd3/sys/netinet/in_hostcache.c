@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: in_hostcache.c,v 1.2 1997/11/07 08:53:20 phk Exp $
+ * $FreeBSD: src/sys/netinet/in_hostcache.c,v 1.2.2.1 1999/08/29 16:29:35 peter Exp $
  */
 
 #include <sys/param.h>

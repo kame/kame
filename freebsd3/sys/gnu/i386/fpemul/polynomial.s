@@ -64,7 +64,7 @@
  * W. Metzenthen   June 1994.
  *
  *
- *     $Id: polynomial.s,v 1.7 1997/04/22 06:54:49 jdp Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/polynomial.s,v 1.7.4.1 1999/08/29 16:24:41 peter Exp $
  *
  */
 

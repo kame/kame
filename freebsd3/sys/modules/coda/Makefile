@@ -1,4 +1,4 @@
-#	$Id: Makefile,v 1.4 1999/01/17 20:25:22 peter Exp $
+# $FreeBSD: src/sys/modules/coda/Makefile,v 1.4.2.1 1999/08/29 16:27:08 peter Exp $
 
 .PATH:	${.CURDIR}/../../coda
 KMOD=	coda

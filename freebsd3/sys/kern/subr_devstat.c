@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: subr_devstat.c,v 1.8.2.1 1999/02/18 22:06:13 ken Exp $
+ * $FreeBSD: src/sys/kern/subr_devstat.c,v 1.8.2.2 1999/08/29 16:26:06 peter Exp $
  */
 
 #include <sys/param.h>

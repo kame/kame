@@ -1,4 +1,4 @@
-/* $Id: cpu.h,v 1.4.2.1 1999/02/13 09:30:55 bde Exp $ */
+/* $FreeBSD: src/sys/alpha/include/cpu.h,v 1.4.2.2 1999/08/29 15:56:51 peter Exp $ */
 /* From: NetBSD: cpu.h,v 1.18 1997/09/23 23:17:49 mjacob Exp */
 
 /*

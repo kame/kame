@@ -56,7 +56,7 @@
  * W. Metzenthen   June 1994.
  *
  *
- *   $Id: poly_2xm1.c,v 1.7 1997/06/14 15:11:04 bde Exp $
+ * $FreeBSD: src/sys/gnu/i386/fpemul/poly_2xm1.c,v 1.7.4.1 1999/08/29 16:24:38 peter Exp $
  *
  */
 

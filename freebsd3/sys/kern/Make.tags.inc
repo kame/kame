@@ -1,5 +1,5 @@
 #	@(#)Make.tags.inc	8.1 (Berkeley) 6/11/93
-# $Id: Make.tags.inc,v 1.4 1997/02/22 09:38:55 peter Exp $
+# $FreeBSD: src/sys/kern/Make.tags.inc,v 1.4.4.1 1999/08/29 16:25:53 peter Exp $
 
 # Common files for "make tags".
 # Included by the Makefile for each architecture.

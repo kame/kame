@@ -1,4 +1,4 @@
-#       $Id: Makefile,v 1.7.2.2 1999/02/01 00:52:51 grog Exp $ 
+# $FreeBSD: src/sys/modules/vinum/Makefile,v 1.7.2.4 1999/08/29 16:28:01 peter Exp $ 
 
 MAINTAINER  =  grog@FreeBSD.org
 SOURCE=	${.CURDIR}/../../dev/vinum
@@ -9,7 +9,7 @@ SRCS=   vnode_if.h opt_vinum.h vinumstate.h vinumvar.h \
 	vinumhdr.h request.h vinumext.h vinumio.h vinumkw.h \
 	vinum.c vinumparser.c vinumconfig.c vinumio.c vinumutil.c \
 	vinumstate.c vinummemory.c vinumrequest.c vinumlock.c \
-	vinumrevive.c vinumioctl.c vinuminterrupt.c vinumdaemon.c
+	vinumrevive.c vinumioctl.c vinuminterrupt.c vinumdaemon.c vinumraid5.c
 
 NOMAN=
 

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: alpha_module.c,v 1.2 1998/08/31 21:10:40 msmith Exp $
+ * $FreeBSD: src/sys/boot/alpha/libalpha/alpha_module.c,v 1.2.2.1 1999/08/29 16:20:13 peter Exp $
  */
 
 /*

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)specdev.h	8.6 (Berkeley) 5/21/95
- * $Id: specdev.h,v 1.15 1998/04/19 23:32:29 julian Exp $
+ * $FreeBSD: src/sys/miscfs/specfs/specdev.h,v 1.15.2.1 1999/08/29 16:26:58 peter Exp $
  */
 
 /*

@@ -33,7 +33,7 @@
  *
  *	@(#)spx_debug.c
  *
- * $Id: spx_debug.c,v 1.13 1998/08/17 01:05:25 bde Exp $
+ * $FreeBSD: src/sys/netipx/spx_debug.c,v 1.13.2.1 1999/08/29 16:30:10 peter Exp $
  */
 
 #include "opt_inet.h"

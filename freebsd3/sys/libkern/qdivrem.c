@@ -34,7 +34,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qdivrem.c,v 1.7 1997/11/07 09:20:40 phk Exp $
+ * $FreeBSD: src/sys/libkern/qdivrem.c,v 1.7.2.1 1999/08/29 16:26:32 peter Exp $
  */
 
 /*

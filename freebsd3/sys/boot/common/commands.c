@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: commands.c,v 1.9.2.1 1999/02/06 14:27:30 dcs Exp $
+ * $FreeBSD: src/sys/boot/common/commands.c,v 1.9.2.3 1999/08/29 16:20:25 peter Exp $
  */
 
 #include <stand.h>
@@ -192,8 +192,14 @@ command_help(int argc, char *argv[])
     close(hfd);
     if (!matched) {
 	sprintf(command_errbuf, "no help available for '%s'", topic);
+	free(topic);
+	if (subtopic)
+	    free(subtopic);
 	return(CMD_ERROR);
     }
+    free(topic);
+    if (subtopic)
+	free(subtopic);
     return(CMD_OK);
 }
 

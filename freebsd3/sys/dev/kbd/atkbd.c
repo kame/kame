@@ -23,7 +23,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: atkbd.c,v 1.3.2.2 1999/05/09 11:02:11 yokota Exp $
+ * $FreeBSD: src/sys/dev/kbd/atkbd.c,v 1.3.2.6 1999/08/29 16:23:34 peter Exp $
  */
 
 #include "atkbd.h"
@@ -380,6 +380,9 @@ atkbd_configure(int flags)
 	struct isa_device *dev;
 	int i;
 
+	/* probe the keyboard controller */
+	atkbdc_configure();
+
 	/* XXX: a kludge to obtain the device configuration flags */
 	dev = find_isadev(isa_devtab_tty, &atkbddriver, 0);
 	if (dev != NULL) {
@@ -391,15 +394,14 @@ atkbd_configure(int flags)
 				kbd = kbd_get_keyboard(i);
 				kbd_unregister(kbd);
 				kbd->kb_flags &= ~KB_REGISTERED;
-				return 0;
 			}
+			return 0;
 		}
 	}
-#endif
-
+#else
 	/* probe the keyboard controller */
 	atkbdc_configure();
-
+#endif
 	/* probe the default keyboard */
 	arg[0] = -1;
 	arg[1] = -1;
@@ -525,6 +527,7 @@ atkbd_init(int unit, keyboard_t **kbdp, void *arg, int flags)
 		KBD_PROBE_DONE(kbd);
 	}
 	if (!KBD_IS_INITIALIZED(kbd) && !(flags & KB_CONF_PROBE_ONLY)) {
+		kbd->kb_config = flags & ~KB_CONF_PROBE_ONLY;
 		if (KBD_HAS_DEVICE(kbd)
 	    	    && init_keyboard(state->kbdc, &kbd->kb_type, kbd->kb_config)
 	    	    && (kbd->kb_config & KB_CONF_FAIL_IF_NO_KBD))
@@ -827,7 +830,7 @@ next_code:
 
 	/* compose a character code */
 	if (state->ks_flags & COMPOSE) {
-		switch (keycode) {
+		switch (keycode | (scancode & 0x80)) {
 		/* key pressed, process it */
 		case 0x47: case 0x48: case 0x49:	/* keypad 7,8,9 */
 			state->ks_composed_char *= 10;

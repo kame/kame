@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tty_tty.c	8.2 (Berkeley) 9/23/93
- * $Id: tty_tty.c,v 1.25 1998/08/23 08:26:42 bde Exp $
+ * $FreeBSD: src/sys/kern/tty_tty.c,v 1.25.2.1 1999/08/29 16:26:11 peter Exp $
  */
 
 /*

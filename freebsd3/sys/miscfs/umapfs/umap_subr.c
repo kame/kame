@@ -35,7 +35,7 @@
  *
  *	@(#)umap_subr.c	8.9 (Berkeley) 5/14/95
  *
- * $Id: umap_subr.c,v 1.16 1999/01/01 10:14:37 bde Exp $
+ * $FreeBSD: src/sys/miscfs/umapfs/umap_subr.c,v 1.16.2.1 1999/08/29 16:26:59 peter Exp $
  */
 
 #include <sys/param.h>

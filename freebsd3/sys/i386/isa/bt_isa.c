@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: bt_isa.c,v 1.5.2.1 1999/03/08 21:37:28 gibbs Exp $
+ * $FreeBSD: src/sys/i386/isa/bt_isa.c,v 1.5.2.5 1999/09/15 03:12:17 jkh Exp $
  */
 
 #include <sys/param.h>
@@ -118,8 +118,8 @@ bt_isa_probe(dev)
 		bt_mark_probed_bio(port_index);
 
 		if (bt_port_probe(bt, &info) != 0) {
-			printf("bt_isa_probe: Probe failled for card at 0x%x\n",
-			       ioport);
+			if (bootverbose)
+				printf("bt_isa_probe: Probe failed for card at 0x%x\n", ioport);
 			bt_free(bt);
 			continue;
 		}
@@ -179,7 +179,7 @@ bt_isa_attach(dev)
 	}
 			
 	/* XXX Should be a child of the ISA or VL bus dma tag */
-	if (bus_dma_tag_create(/*parent*/NULL, /*alignemnt*/0, /*boundary*/0,
+	if (bus_dma_tag_create(/*parent*/NULL, /*alignemnt*/1, /*boundary*/0,
                                lowaddr, /*highaddr*/BUS_SPACE_MAXADDR,
                                filter, filter_arg,
                                /*maxsize*/BUS_SPACE_MAXSIZE_32BIT,
@@ -197,7 +197,7 @@ bt_isa_attach(dev)
 
 	if (lowaddr != BUS_SPACE_MAXADDR_32BIT) {
 		/* DMA tag for our sense buffers */
-		if (bus_dma_tag_create(bt->parent_dmat, /*alignment*/0,
+		if (bus_dma_tag_create(bt->parent_dmat, /*alignment*/1,
 				       /*boundary*/0,
 				       /*lowaddr*/BUS_SPACE_MAXADDR,
 				       /*highaddr*/BUS_SPACE_MAXADDR,

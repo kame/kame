@@ -1,4 +1,4 @@
-/* $Id: tcdsvar.h,v 1.1 1998/08/20 08:27:11 dfr Exp $ */
+/* $FreeBSD: src/sys/alpha/tc/tcdsvar.h,v 1.1.2.1 1999/08/29 15:57:36 peter Exp $ */
 /*	$NetBSD: tcdsvar.h,v 1.3.4.1 1996/09/10 17:28:20 cgd Exp $	*/
 
 /*

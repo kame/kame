@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $Id: advlib.h,v 1.4 1998/09/15 07:03:33 gibbs Exp $
+ * $FreeBSD: src/sys/dev/advansys/advlib.h,v 1.4.2.2 1999/09/14 04:07:44 gibbs Exp $
  */
 /*
  * Ported from:
@@ -50,6 +50,7 @@
 #include <sys/queue.h>
 
 struct cam_path;
+union ccb;
 
 typedef u_int8_t target_bit_vector;
 #define	TARGET_BIT_VECTOR_SET -1

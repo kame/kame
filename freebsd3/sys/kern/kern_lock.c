@@ -38,7 +38,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kern_lock.c	8.18 (Berkeley) 5/21/95
- * $Id: kern_lock.c,v 1.23.2.3 1999/05/13 23:49:56 dg Exp $
+ * $FreeBSD: src/sys/kern/kern_lock.c,v 1.23.2.4 1999/08/29 16:26:00 peter Exp $
  */
 
 #include "opt_lint.h"

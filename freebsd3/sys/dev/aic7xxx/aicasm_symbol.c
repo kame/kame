@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *      $Id: aicasm_symbol.c,v 1.5.2.1 1999/05/16 00:08:47 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aicasm_symbol.c,v 1.5.2.2 1999/08/29 16:22:39 peter Exp $
  */
 
 

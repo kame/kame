@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: link_aout.c,v 1.17 1998/11/04 15:20:57 peter Exp $
+ * $FreeBSD: src/sys/kern/link_aout.c,v 1.17.2.1 1999/08/29 16:26:04 peter Exp $
  */
 
 #ifndef __alpha__

@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: if_ti.c,v 1.4.2.1 1999/04/30 19:32:22 wpaul Exp $
+ * $FreeBSD: src/sys/pci/if_ti.c,v 1.4.2.7 1999/08/29 16:31:45 peter Exp $
  */
 
 /*
@@ -128,7 +128,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-	"$Id: if_ti.c,v 1.4.2.1 1999/04/30 19:32:22 wpaul Exp $";
+  "$FreeBSD: src/sys/pci/if_ti.c,v 1.4.2.7 1999/08/29 16:31:45 peter Exp $";
 #endif
 
 /*
@@ -198,7 +198,6 @@ static int ti_init_rx_ring_jumbo	__P((struct ti_softc *));
 static void ti_free_rx_ring_jumbo	__P((struct ti_softc *));
 static int ti_init_rx_ring_mini	__P((struct ti_softc *));
 static void ti_free_rx_ring_mini	__P((struct ti_softc *));
-static void ti_refill_rx_rings	__P((struct ti_softc *));
 static void ti_free_tx_ring	__P((struct ti_softc *));
 static int ti_init_tx_ring	__P((struct ti_softc *));
 
@@ -672,7 +671,7 @@ static void ti_jref(buf, size)
 	if (sc == NULL)
 		panic("ti_jref: can't find softc pointer!");
 
-	if (size != TI_JUMBO_FRAMELEN - ETHER_ALIGN)
+	if (size != TI_JUMBO_FRAMELEN)
 		panic("ti_jref: adjusting refcount of buf of wrong size!");
 
 	/* calculate the slot this buffer belongs to */
@@ -710,7 +709,7 @@ static void ti_jfree(buf, size)
 	if (sc == NULL)
 		panic("ti_jfree: can't find softc pointer!");
 
-	if (size != TI_JUMBO_FRAMELEN - ETHER_ALIGN)
+	if (size != TI_JUMBO_FRAMELEN)
 		panic("ti_jfree: freeing buffer of wrong size!");
 
 	/* calculate the slot this buffer belongs to */
@@ -751,9 +750,7 @@ static int ti_newbuf_std(sc, i, m)
 	struct mbuf		*m_new = NULL;
 	struct ti_rx_desc	*r;
 
-	if (m != NULL) {
-		m_new = m;
-	} else {
+	if (m == NULL) {
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
 		if (m_new == NULL) {
 			printf("ti%d: mbuf allocation failed "
@@ -768,10 +765,14 @@ static int ti_newbuf_std(sc, i, m)
 			m_freem(m_new);
 			return(ENOBUFS);
 		}
+		m_new->m_len = m_new->m_pkthdr.len = MCLBYTES;
+	} else {
+		m_new = m;
+		m_new->m_len = m_new->m_pkthdr.len = MCLBYTES;
+		m_new->m_data = m_new->m_ext.ext_buf;
 	}
 
-	m_new->m_len -= ETHER_ALIGN;
-	m_new->m_data += ETHER_ALIGN;
+	m_adj(m_new, ETHER_ALIGN);
 	sc->ti_cdata.ti_rx_std_chain[i] = m_new;
 	r = &sc->ti_rdata->ti_rx_std_ring[i];
 	TI_HOSTADDR(r->ti_addr) = vtophys(mtod(m_new, caddr_t));
@@ -781,7 +782,7 @@ static int ti_newbuf_std(sc, i, m)
 #else
 	r->ti_flags = 0;
 #endif
-	r->ti_len = MCLBYTES - ETHER_ALIGN;
+	r->ti_len = m_new->m_len;
 	r->ti_idx = i;
 
 	return(0);
@@ -799,18 +800,21 @@ static int ti_newbuf_mini(sc, i, m)
 	struct mbuf		*m_new = NULL;
 	struct ti_rx_desc	*r;
 
-	if (m != NULL) {
-		m_new = m;
-	} else {
+	if (m == NULL) {
 		MGETHDR(m_new, M_DONTWAIT, MT_DATA);
 		if (m_new == NULL) {
 			printf("ti%d: mbuf allocation failed "
 			    "-- packet dropped!\n", sc->ti_unit);
 			return(ENOBUFS);
 		}
+		m_new->m_len = m_new->m_pkthdr.len = MHLEN;
+	} else {
+		m_new = m;
+		m_new->m_data = m_new->m_pktdat;
+		m_new->m_len = m_new->m_pkthdr.len = MHLEN;
 	}
-	m_new->m_len -= ETHER_ALIGN;
-	m_new->m_data += ETHER_ALIGN;
+
+	m_adj(m_new, ETHER_ALIGN);
 	r = &sc->ti_rdata->ti_rx_mini_ring[i];
 	sc->ti_cdata.ti_rx_mini_chain[i] = m_new;
 	TI_HOSTADDR(r->ti_addr) = vtophys(mtod(m_new, caddr_t));
@@ -819,7 +823,7 @@ static int ti_newbuf_mini(sc, i, m)
 #ifdef TI_CSUM_OFFLOAD
 	r->ti_flags |= TI_BDFLAG_TCP_UDP_CKSUM|TI_BDFLAG_IP_CKSUM;
 #endif
-	r->ti_len = MHLEN - ETHER_ALIGN;
+	r->ti_len = m_new->m_len;
 	r->ti_idx = i;
 
 	return(0);
@@ -837,9 +841,7 @@ static int ti_newbuf_jumbo(sc, i, m)
 	struct mbuf		*m_new = NULL;
 	struct ti_rx_desc	*r;
 
-	if (m != NULL) {
-		m_new = m;
-	} else {
+	if (m == NULL) {
 		caddr_t			*buf = NULL;
 
 		/* Allocate the mbuf. */
@@ -861,13 +863,18 @@ static int ti_newbuf_jumbo(sc, i, m)
 
 		/* Attach the buffer to the mbuf. */
 		m_new->m_data = m_new->m_ext.ext_buf = (void *)buf;
-		m_new->m_data += ETHER_ALIGN;
 		m_new->m_flags |= M_EXT;
-		m_new->m_ext.ext_size = TI_JUMBO_FRAMELEN - ETHER_ALIGN;
+		m_new->m_len = m_new->m_pkthdr.len =
+		    m_new->m_ext.ext_size = TI_JUMBO_FRAMELEN;
 		m_new->m_ext.ext_free = ti_jfree;
 		m_new->m_ext.ext_ref = ti_jref;
+	} else {
+		m_new = m;
+		m_new->m_data = m_new->m_ext.ext_buf;
+		m_new->m_ext.ext_size = TI_JUMBO_FRAMELEN;
 	}
 
+	m_adj(m_new, ETHER_ALIGN);
 	/* Set up the descriptor. */
 	r = &sc->ti_rdata->ti_rx_jumbo_ring[i];
 	sc->ti_cdata.ti_rx_jumbo_chain[i] = m_new;
@@ -877,7 +884,7 @@ static int ti_newbuf_jumbo(sc, i, m)
 #ifdef TI_CSUM_OFFLOAD
 	r->ti_flags |= TI_BDFLAG_TCP_UDP_CKSUM|TI_BDFLAG_IP_CKSUM;
 #endif
-	r->ti_len = TI_JUMBO_FRAMELEN - ETHER_ALIGN;
+	r->ti_len = m_new->m_len;
 	r->ti_idx = i;
 
 	return(0);
@@ -901,8 +908,7 @@ static int ti_init_rx_ring_std(sc)
 	};
 
 	TI_UPDATE_STDPROD(sc, i - 1);
-	sc->ti_std_old = sc->ti_std = i - 1;
-	sc->ti_std_cnt = 0;
+	sc->ti_std = i - 1;
 
 	return(0);
 }
@@ -936,8 +942,7 @@ static int ti_init_rx_ring_jumbo(sc)
 	};
 
 	TI_UPDATE_JUMBOPROD(sc, i - 1);
-	sc->ti_jumbo_old = sc->ti_jumbo = i - 1;
-	sc->ti_jumbo_cnt = 0;
+	sc->ti_jumbo = i - 1;
 
 	return(0);
 }
@@ -970,8 +975,7 @@ static int ti_init_rx_ring_mini(sc)
 	};
 
 	TI_UPDATE_MINIPROD(sc, i - 1);
-	sc->ti_mini_old = sc->ti_mini = i - 1;
-	sc->ti_mini_cnt = 0;
+	sc->ti_mini = i - 1;
 
 	return(0);
 }
@@ -988,55 +992,6 @@ static void ti_free_rx_ring_mini(sc)
 		}
 		bzero((char *)&sc->ti_rdata->ti_rx_mini_ring[i],
 		    sizeof(struct ti_rx_desc));
-	}
-
-	return;
-}
-
-/*
- * In order to reduce the amount of work we have to do in the interrupt
- * handler, we delay putting new buffers in the receive rings until a
- * certain amount have been used. This lets us hand over descriptors to
- * the NIC in fairly large chunks instead of one (or a few) at a time,
- * and it lets tx_rxeof() run a bit faster some of the time.
- */
-static void ti_refill_rx_rings(sc)
-	struct ti_softc		*sc;
-{
-	register int		i;
-	struct ti_cmd_desc	cmd;
-
-	if (sc->ti_std_cnt > 15) {
-		for (i = sc->ti_std_old; i != sc->ti_std;
-		    TI_INC(i, TI_STD_RX_RING_CNT)) {
-			if (ti_newbuf_std(sc, i, NULL) == ENOBUFS)
-				break;
-		};
-		TI_UPDATE_STDPROD(sc, i);
-		sc->ti_std_old = i;
-		sc->ti_std_cnt = 0;
-	}
-
-	if (sc->ti_jumbo_cnt > 15) {
-		for (i = sc->ti_jumbo_old; i != sc->ti_jumbo;
-		    TI_INC(i, TI_JUMBO_RX_RING_CNT)) {
-			if (ti_newbuf_jumbo(sc, i, NULL) == ENOBUFS)
-				break;
-		};
-		TI_UPDATE_JUMBOPROD(sc, i);
-		sc->ti_jumbo_old = i;
-		sc->ti_jumbo_cnt = 0;
-	}
-
-	if (sc->ti_mini_cnt > 15) {
-		for (i = sc->ti_mini_old; i != sc->ti_mini;
-		    TI_INC(i, TI_MINI_RX_RING_CNT)) {
-			if (ti_newbuf_mini(sc, i, NULL) == ENOBUFS)
-				break;
-		};
-		TI_UPDATE_MINIPROD(sc, i);
-		sc->ti_mini_old = i;
-		sc->ti_mini_cnt = 0;
 	}
 
 	return;
@@ -1065,6 +1020,7 @@ static void ti_free_tx_ring(sc)
 static int ti_init_tx_ring(sc)
 	struct ti_softc		*sc;
 {
+	sc->ti_txcnt = 0;
 	sc->ti_tx_saved_considx = 0;
 	CSR_WRITE_4(sc, TI_MB_SENDPROD_IDX, 0);
 	return(0);
@@ -1445,7 +1401,7 @@ static int ti_gibinit(sc)
 	rcb = &sc->ti_rdata->ti_info.ti_jumbo_rx_rcb;
 	TI_HOSTADDR(rcb->ti_hostaddr) =
 	    vtophys(&sc->ti_rdata->ti_rx_jumbo_ring);
-	rcb->ti_max_len = TI_JUMBO_FRAMELEN - ETHER_ALIGN;
+	rcb->ti_max_len = TI_JUMBO_FRAMELEN;
 	rcb->ti_flags = 0;
 #ifdef TI_CSUM_OFFLOAD
 	rcb->ti_flags |= TI_RCB_FLAG_TCP_UDP_CKSUM|TI_RCB_FLAG_IP_CKSUM;
@@ -1761,6 +1717,7 @@ static void ti_rxeof(sc)
 	struct ti_softc		*sc;
 {
 	struct ifnet		*ifp;
+	struct ti_cmd_desc	cmd;
 
 	ifp = &sc->arpcom.ac_if;
 
@@ -1796,10 +1753,13 @@ static void ti_rxeof(sc)
 			if (cur_rx->ti_flags & TI_BDFLAG_ERROR) {
 				ifp->if_ierrors++;
 				ti_newbuf_jumbo(sc, sc->ti_jumbo, m);
-				TI_INC(sc->ti_jumbo_old, TI_JUMBO_RX_RING_CNT);
 				continue;
 			}
-			sc->ti_jumbo_cnt++;
+			if (ti_newbuf_jumbo(sc, sc->ti_jumbo, NULL) == ENOBUFS) {
+				ifp->if_ierrors++;
+				ti_newbuf_jumbo(sc, sc->ti_jumbo, m);
+				continue;
+			}
 		} else if (cur_rx->ti_flags & TI_BDFLAG_MINI_RING) {
 			TI_INC(sc->ti_mini, TI_MINI_RX_RING_CNT);
 			m = sc->ti_cdata.ti_rx_mini_chain[rxidx];
@@ -1807,10 +1767,13 @@ static void ti_rxeof(sc)
 			if (cur_rx->ti_flags & TI_BDFLAG_ERROR) {
 				ifp->if_ierrors++;
 				ti_newbuf_mini(sc, sc->ti_mini, m);
-				TI_INC(sc->ti_mini_old, TI_MINI_RX_RING_CNT);
 				continue;
 			}
-			sc->ti_mini_cnt++;
+			if (ti_newbuf_mini(sc, sc->ti_mini, NULL) == ENOBUFS) {
+				ifp->if_ierrors++;
+				ti_newbuf_mini(sc, sc->ti_mini, m);
+				continue;
+			}
 		} else {
 			TI_INC(sc->ti_std, TI_STD_RX_RING_CNT);
 			m = sc->ti_cdata.ti_rx_std_chain[rxidx];
@@ -1818,10 +1781,13 @@ static void ti_rxeof(sc)
 			if (cur_rx->ti_flags & TI_BDFLAG_ERROR) {
 				ifp->if_ierrors++;
 				ti_newbuf_std(sc, sc->ti_std, m);
-				TI_INC(sc->ti_std_old, TI_STD_RX_RING_CNT);
 				continue;
 			}
-			sc->ti_std_cnt++;
+			if (ti_newbuf_std(sc, sc->ti_std, NULL) == ENOBUFS) {
+				ifp->if_ierrors++;
+				ti_newbuf_std(sc, sc->ti_std, m);
+				continue;
+			}
 		}
 
 		m->m_pkthdr.len = m->m_len = cur_rx->ti_len;
@@ -1877,7 +1843,9 @@ static void ti_rxeof(sc)
 		CSR_WRITE_4(sc, TI_GCR_RXRETURNCONS_IDX,
 		    sc->ti_rx_saved_considx);
 
-	ti_refill_rx_rings(sc);
+	TI_UPDATE_STDPROD(sc, sc->ti_std);
+	TI_UPDATE_MINIPROD(sc, sc->ti_mini);
+	TI_UPDATE_JUMBOPROD(sc, sc->ti_jumbo);
 
 	return;
 }
@@ -1920,6 +1888,7 @@ static void ti_txeof(sc)
 			m_freem(sc->ti_cdata.ti_tx_chain[idx]);
 			sc->ti_cdata.ti_tx_chain[idx] = NULL;
 		}
+		sc->ti_txcnt--;
 		TI_INC(sc->ti_tx_saved_considx, TI_TX_RING_CNT);
 		ifp->if_timer = 0;
 	}
@@ -1996,7 +1965,7 @@ static int ti_encap(sc, m_head, txidx)
 {
 	struct ti_tx_desc	*f = NULL;
 	struct mbuf		*m;
-	u_int32_t		frag, cur;
+	u_int32_t		frag, cur, cnt = 0;
 #if NVLAN > 0
 	struct ifvlan		*ifv = NULL;
 
@@ -2045,8 +2014,15 @@ static int ti_encap(sc, m_head, txidx)
 				f->ti_vlan_tag = 0;
 			}
 #endif
+			/*
+			 * Sanity check: avoid coming within 16 descriptors
+			 * of the end of the ring.
+			 */
+			if ((TI_TX_RING_CNT - (sc->ti_txcnt + cnt)) < 16)
+				return(ENOBUFS);
 			cur = frag;
 			TI_INC(frag, TI_TX_RING_CNT);
+			cnt++;
 		}
 	}
 
@@ -2061,7 +2037,8 @@ static int ti_encap(sc, m_head, txidx)
 		    TI_BDFLAG_END;
 	else
 		sc->ti_rdata->ti_tx_ring[cur].ti_flags |= TI_BDFLAG_END;
-	sc->ti_cdata.ti_tx_chain[*txidx] = m_head;
+	sc->ti_cdata.ti_tx_chain[cur] = m_head;
+	sc->ti_txcnt += cnt;
 
 	*txidx = frag;
 

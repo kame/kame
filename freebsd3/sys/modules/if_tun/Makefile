@@ -1,4 +1,4 @@
-#       $Id: Makefile,v 1.8 1999/01/17 20:53:47 peter Exp $
+# $FreeBSD: src/sys/modules/if_tun/Makefile,v 1.8.2.1 1999/08/29 16:27:18 peter Exp $
 
 .PATH:  ${.CURDIR}/../../net
 KMOD=   if_tun

@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	$Id: pc98gdc.c,v 1.3.2.2 1999/03/02 12:41:17 kato Exp $
+ * $FreeBSD: src/sys/pc98/pc98/pc98gdc.c,v 1.3.2.3 1999/08/29 16:31:13 peter Exp $
  */
 
 #include "gdc.h"

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: icu_ipl.h,v 1.2 1997/07/20 12:26:34 bde Exp $
+ * $FreeBSD: src/sys/i386/isa/icu_ipl.h,v 1.2.2.1 1999/08/29 16:07:18 peter Exp $
  */
 
 #ifndef _I386_ISA_ICU_IPL_H_

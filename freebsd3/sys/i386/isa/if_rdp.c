@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: if_rdp.c,v 1.3 1999/01/12 00:36:31 eivind Exp $
+ * $FreeBSD: src/sys/i386/isa/if_rdp.c,v 1.3.2.1 1999/08/29 16:07:23 peter Exp $
  */
 
 /*

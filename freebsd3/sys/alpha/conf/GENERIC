@@ -11,13 +11,13 @@
 # device lines is present in the ./LINT configuration file. If you are 
 # in doubt as to the purpose or necessity of a line, check first in LINT.
 #
-#	$Id: GENERIC,v 1.14.2.6 1999/05/09 11:44:39 dfr Exp $
+# $FreeBSD: src/sys/alpha/conf/GENERIC,v 1.14.2.13 1999/08/29 15:56:40 peter Exp $
 
 machine		"alpha"
 cpu		"EV4"
 cpu		"EV5"
 ident		GENERIC
-maxusers	10
+maxusers	32
 
 # Platforms supported
 options		"DEC_AXPPCI_33"		# UDB, Multia, AXPpci33, Noname
@@ -97,13 +97,17 @@ device		sio1	at isa0 port "IO_COM2" irq 3 flags 0x50
 # this list of network interfaces until the probes have been fixed.
 # Right now it appears that the ie0 must be probed before ep0. See
 # revision 1.20 of this file.
+device al0
 device ax0
 device de0
 device fxp0
 device le0
 device mx0
 device pn0
+device rl0
+device sf0
 device tl0
+device wb0
 device xl0
 
 pseudo-device	loop
@@ -112,7 +116,6 @@ pseudo-device	sl	1
 pseudo-device	ppp	1
 pseudo-device	tun	1
 pseudo-device	pty	16
-pseudo-device	gzip		# Exec gzipped a.out's
 
 # KTRACE enables the system-call tracing facility ktrace(2).
 # This adds 4 KB bloat to your kernel, and slightly increases

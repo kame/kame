@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)comreg.h	7.2 (Berkeley) 5/9/91
- *	$Id: sioreg.h,v 1.11 1999/01/03 05:03:45 kato Exp $
+ * $FreeBSD: src/sys/i386/isa/sioreg.h,v 1.11.2.1 1999/08/29 16:07:33 peter Exp $
  */
 
 

@@ -32,7 +32,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: aic7xxx.reg,v 1.12.2.3 1999/05/16 00:08:46 gibbs Exp $
+ * $FreeBSD: src/sys/dev/aic7xxx/aic7xxx.reg,v 1.12.2.5 1999/09/11 15:52:55 gibbs Exp $
  */
 
 /*
@@ -750,7 +750,6 @@ register INTSTAT {
 						 * that require a kernel based
 						 * message state engine.
 						 */
-	mask	TARGET_MSG_HELP	0xb0|SEQINT
 	mask	TRACEPOINT	0xd0|SEQINT
 	mask	MSGIN_PHASEMIS	0xe0|SEQINT	/*
 						 * Target changed phase on us

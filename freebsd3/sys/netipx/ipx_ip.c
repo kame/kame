@@ -33,7 +33,7 @@
  * 
  *	@(#)ipx_ip.c
  *
- * $Id: ipx_ip.c,v 1.22 1998/08/23 03:07:15 wollman Exp $
+ * $FreeBSD: src/sys/netipx/ipx_ip.c,v 1.22.2.1 1999/08/29 16:30:05 peter Exp $
  */
 
 /*
