@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.69 2001/07/23 12:17:59 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.70 2001/07/23 12:34:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -272,9 +272,9 @@ nd6_ns_input(m, off, icmp6len)
 	}
 
 	if (IN6_ARE_ADDR_EQUAL(&myaddr6, &saddr6)) {
-		log(LOG_INFO,
+		nd6log((LOG_INFO,
 		    "nd6_ns_input: duplicate IP6 address %s\n",
-		    ip6_sprintf(&saddr6));
+		    ip6_sprintf(&saddr6)));
 		goto freeit;
 	}
 
@@ -631,7 +631,7 @@ nd6_na_input(m, off, icmp6len)
 		goto freeit;
 	}
 
-	/* Just for safety, maybe unnecessery. */
+	/* Just for safety, maybe unnecessary. */
 	if (ifa) {
 		log(LOG_ERR,
 		    "nd6_na_input: duplicate IP6 address %s\n",
@@ -849,13 +849,14 @@ nd6_na_output(ifp, daddr6, taddr6, flags, tlladdr, sdl0)
 	/* estimate the size of message */
 	maxlen = sizeof(*ip6) + sizeof(*nd_na);
 	maxlen += (sizeof(struct nd_opt_hdr) + ifp->if_addrlen + 7) & ~7;
-	if (max_linkhdr + maxlen >= MCLBYTES) {
 #ifdef DIAGNOSTIC
+	if (max_linkhdr + maxlen >= MCLBYTES) {
 		printf("nd6_na_output: max_linkhdr + maxlen >= MCLBYTES "
 		    "(%d + %d > %d)\n", max_linkhdr, maxlen, MCLBYTES);
-#endif
+		panic("nd6_na_output: insufficient MCLBYTES");
 		return;
 	}
+#endif
 
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (m && max_linkhdr + maxlen >= MHLEN) {
