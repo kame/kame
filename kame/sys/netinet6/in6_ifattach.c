@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.63 2000/07/21 12:38:56 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.64 2000/08/12 08:08:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -439,6 +439,16 @@ in6_ifattach_addaddr(ifp, ia)
 		IFAFREE(&ia->ia_ifa);
 		return -1;
 	}
+
+#ifdef MEASURE_PERFORMANCE
+	{
+		int s = splnet();
+
+		in6h_addifa(ia);
+
+		splx(s);
+	}
+#endif
 
 	/* configure link-layer address resolution */
 	rtflag = 0;

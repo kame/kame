@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.38 2000/07/19 12:59:55 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.39 2000/08/12 08:08:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -89,6 +89,18 @@ struct in6_addrlifetime {
 	u_int32_t ia6t_pltime;	/* prefix lifetime */
 };
 
+#ifdef MEASURE_PERFORMANCE
+/*
+ * Structure for hashing "local" IPv6 addresses for lookup in IPv6 input.
+ */
+struct in6hash {
+	struct	in6hash *in6h_next;
+	struct	in6_addr in6h_addr;
+	struct	in6_ifaddr *in6h_ifa;
+	int	in6h_flags;
+};
+#endif
+
 struct	in6_ifaddr {
 	struct	ifaddr ia_ifa;		/* protocol-independent info */
 #define	ia_ifp		ia_ifa.ifa_ifp
@@ -107,6 +119,10 @@ struct	in6_ifaddr {
 
 	struct in6_addrlifetime ia6_lifetime;	/* NULL = infty */
 	struct ifprefix *ia6_ifpr; /* back pointer to ifprefix */
+
+#ifdef MEASURE_PERFORMANCE
+	struct in6hash ia6_hash;	/* hash for ia_addr */
+#endif
 };
 
 /*
@@ -675,6 +691,12 @@ int	in6_prefix_ioctl __P((struct socket *so, u_long cmd, caddr_t data,
 int	in6_prefix_add_ifid __P((int iilen, struct in6_ifaddr *ia));
 void	in6_prefix_remove_ifid __P((int iilen, struct in6_ifaddr *ia));
 void	in6_purgeprefix __P((struct ifnet *));
+
+#ifdef MEASURE_PERFORMANCE
+void in6h_hashinit __P((void));
+void in6h_addifa __P((struct in6_ifaddr *));
+struct in6hash *in6h_lookup __P((struct in6_addr *, struct ifnet *));
+#endif
 #endif /* _KERNEL */
 
 #endif /* _NETINET6_IN6_VAR_H_ */

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.99 2000/07/11 17:00:58 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.100 2000/08/12 08:08:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -170,6 +170,13 @@ struct multi6_kludge {
 	struct ifnet *mk_ifp;
 	struct in6_multihead mk_head;
 };
+#endif
+
+#ifdef MEASURE_PERFORMANCE
+static void in6h_delifa __P((struct in6_ifaddr *));
+static void in6h_rebuild __P((void));
+static void in6h_addhash __P((struct in6hash *));
+static void in6h_delhash __P((struct in6hash *));
 #endif
 
 /*
@@ -732,6 +739,9 @@ in6_update_ifa(ifp, ifra, ia)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	time_t time_second = (time_t)time.tv_sec;
 #endif
+#ifdef MEASURE_PERFORMANCE
+	int new_ifa = 0;
+#endif
 
 	/* Validate parameters */
 	if (ifp == NULL || ifra == NULL)/* this maybe redundant */
@@ -845,6 +855,10 @@ in6_update_ifa(ifp, ifra, ia)
 #endif
 		/* gain another refcnt for the link from if_addrlist */
 		ia->ia_ifa.ifa_refcnt++;
+
+#ifdef MEASURE_PERFORMANCE
+		new_ifa = 1;
+#endif
 	}
 
 	/* check if a new address is being added */
@@ -970,6 +984,17 @@ in6_update_ifa(ifp, ifra, ia)
 			time_second + ia->ia6_lifetime.ia6t_pltime;
 	} else
 		ia->ia6_lifetime.ia6t_preferred = 0;
+
+#ifdef MEASURE_PERFORMANCE
+	{
+		int s = splnet();
+		if (new_ifa)
+			in6h_addifa(ia);
+		else
+			in6h_rebuild();
+		splx(s);
+	}
+#endif
 
 	/*
 	 * Perform DAD, if needed.
@@ -1103,6 +1128,10 @@ in6_unlink_ifa(ia, ifp)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	if (oia->ia6_multiaddrs.lh_first != NULL)
 		in6_savemkludge(oia);
+#endif
+
+#ifdef MEASURE_PERFORMANCE
+	in6h_delifa(oia);
 #endif
 
 	/* release another refcnt for the link from in6_ifaddr */
@@ -2544,3 +2573,123 @@ in6_sin_2_v4mapsin6_in_sock(struct sockaddr **nam)
 	*nam = (struct sockaddr *)sin6_p;
 }
 #endif /*freebsd3*/
+
+#ifdef MEASURE_PERFORMANCE
+#ifndef	IN6_ADDRHASH
+#ifndef INET6_SERVER
+#define	IN6_ADDRHASH	23
+#else
+#define	IN6_ADDRHASH	997
+#endif
+#endif
+
+static struct in6hash in6h_hash_any = { NULL, IN6ADDR_ANY_INIT, NULL, 0 };
+struct in6hash *in6hash[IN6_ADDRHASH];	/* hash buckets for local IPv6 addrs */
+int in6_nhash = IN6_ADDRHASH;		/* number of hash buckets for addrs */
+
+#define HASH6(in6) ((in6)->s6_addr32[0]^(in6)->s6_addr32[1]^\
+	(in6)->s6_addr32[2]^(in6)->s6_addr32[3])
+
+/*
+ * Initialize the hash by adding entries for IN6ADDR_ANY
+ */
+void
+in6h_hashinit()
+{
+	in6h_addhash(&in6h_hash_any);
+}
+
+void
+in6h_addifa(ia)
+	struct in6_ifaddr *ia;
+{
+	ia->ia6_hash.in6h_addr = IA6_SIN6(ia)->sin6_addr; /* scope? */
+	if (IN6_IS_ADDR_UNSPECIFIED(&ia->ia6_hash.in6h_addr))
+		return;
+	in6h_addhash(&ia->ia6_hash);
+}
+
+/*
+ * Rebuild the hash when any interface addresses have been changed.
+ * Since this should happen infrequently we remove all the interfaces
+ * from the hash and add them all back.  This insures that the order
+ * of addresses in the hash is consistent.
+ */
+static void
+in6h_rebuild()
+{
+	struct in6_ifaddr *ia;
+
+	for (ia = in6_ifaddr; ia != NULL; ia = ia->ia_next)
+		in6h_delifa(ia);
+
+	for (ia = in6_ifaddr; ia != NULL; ia = ia->ia_next)
+		in6h_addifa(ia);
+}
+
+/* Remove hash entries for local address on an in6_ifaddr. */
+void
+in6h_delifa(ia)
+	struct in6_ifaddr *ia;
+{
+	if (IN6_IS_ADDR_UNSPECIFIED(&ia->ia6_hash.in6h_addr))
+		return;
+	in6h_delhash(&ia->ia6_hash);
+	ia->ia6_hash.in6h_addr = in6addr_any;
+}
+
+static void
+in6h_addhash(ih)
+	struct in6hash *ih;
+{
+	struct in6hash **prev;
+
+	/* Add to tail of hash list, as address is at end of address list */
+	for (prev = &in6hash[HASH6(&ih->in6h_addr) % in6_nhash]; *prev;
+	     prev = &((*prev)->in6h_next))
+		;
+	*prev = ih;
+	ih->in6h_next = NULL;
+}
+
+static void
+in6h_delhash(ih)
+	struct in6hash *ih;
+{
+	struct in6hash **prev;
+
+	for (prev = &in6hash[HASH6(&ih->in6h_addr) % in6_nhash];
+	     *prev != ih; prev = &((*prev)->in6h_next)) {
+#ifdef DEBUG
+		if (*prev == NULL)
+			panic("in6h_delhash: lost entry");
+#endif
+	}
+	*prev = (*prev)->in6h_next;
+}
+
+/*
+ * Look up hash structure for specified IP address
+ * and (optional) interface; matches any interface
+ * if ifp is null, or this address is not associated
+ * with the specified interface.
+ */
+struct in6hash *
+in6h_lookup(addr, ifp) 
+	struct in6_addr *addr;
+	struct ifnet *ifp;
+{
+	struct in6hash *ih, *maybe_ih = NULL;
+
+	for (ih = in6hash[HASH6(addr) % in6_nhash]; ih; ih = ih->in6h_next) {
+		if (IN6_ARE_ADDR_EQUAL(&ih->in6h_addr, addr)) {
+			if (ih->in6h_ifa == NULL ||
+			    ih->in6h_ifa->ia_ifp == ifp || ifp == NULL)
+				return (ih);
+			if (maybe_ih == NULL)
+				maybe_ih = ih;
+		}
+	}
+	return (maybe_ih);
+}
+#endif /* MEASURE_PERFORMANCE */

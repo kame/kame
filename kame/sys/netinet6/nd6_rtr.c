@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.47 2000/08/08 08:58:42 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.48 2000/08/12 08:08:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1496,6 +1496,16 @@ in6_ifadd(ifp, in6, addr, prefixlen)
 	ia->ia_prefixmask.sin6_family = AF_INET6;
 	bcopy(&mask, &ia->ia_prefixmask.sin6_addr,
 		sizeof(ia->ia_prefixmask.sin6_addr));
+
+#ifdef MEASURE_PERFORMANCE
+	{
+		int s = splnet();
+
+		in6h_addifa(ia);
+
+		splx(s);
+	}
+#endif
 
 	/* same routine */
 	ia->ia_ifa.ifa_rtrequest =

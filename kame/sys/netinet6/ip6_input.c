@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.103 2000/08/02 11:02:27 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.104 2000/08/12 08:08:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -292,6 +292,10 @@ ip6_init()
 	/* Initialize the Mobile IPv6 code */
 	mip6_init();
 #endif
+
+#ifdef MEASURE_PERFORMANCE
+	in6h_hashinit();
+#endif
 }
 
 static void
@@ -571,10 +575,42 @@ ip6_input(m)
 		goto hbhcheck;
 	}
 
-#if 1				/* XXX */
 	/*
 	 *  Unicast check
 	 */
+#ifdef OURS_CHECK_LINER
+	/* traditional linear search: just for measurement */
+	{
+		struct in6_ifaddr *ia;
+
+		for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
+			if ((ia->ia6_flags & IN6_IFF_NOTREADY) == 0 &&
+			    IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr,
+					       &ip6->ip6_dst)) {
+				if ((ia->ia6_flags & IN6_IFF_ANYCAST) != 0)
+					m->m_flags |= M_ANYCAST6;
+				ours = 1;
+				deliverifp = ia->ia_ifp;
+				goto hbhcheck;
+			}
+		}
+	}
+#elif defined(OURS_CHECK_HASH) && defined(MEASURE_PERFORMANCE)
+	{
+		struct in6_ifaddr *ia;
+		struct in6hash *ih;
+
+		if ((ih = in6h_lookup(&ip6->ip6_dst, m->m_pkthdr.rcvif)) !=
+		    NULL) {
+			ia = ih->in6h_ifa;
+			if ((ia->ia6_flags & IN6_IFF_ANYCAST) != 0)
+				m->m_flags |= M_ANYCAST6;
+			ours = 1;
+			deliverifp = m->m_pkthdr.rcvif;
+			goto hbhcheck;
+		}
+	}
+#else
 	if (ip6_forward_rt.ro_rt != NULL &&
 	    (ip6_forward_rt.ro_rt->rt_flags & RTF_UP) != 0 && 
 	    IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
@@ -654,24 +690,7 @@ ip6_input(m)
 			goto bad;
 		}
 	}
-#else  /* corresponds to 'ifdef [01] (with XXX)' above */
-	/* traditional linear search: just for measurement */
-	{
-		struct in6_ifaddr *ia;
-
-		for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
-			if ((ia->ia6_flags & IN6_IFF_NOTREADY) == 0 &&
-			    IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr,
-					       &ip6->ip6_dst)) {
-				if ((ia->ia6_flags & IN6_IFF_ANYCAST) != 0)
-					m->m_flags |= M_ANYCAST6;
-				ours = 1;
-				deliverifp = ia->ia_ifp;
-				goto hbhcheck;
-			}
-		}
-	}
-#endif /* corresponds to '[01] (with XXX)' above */
+#endif
 
 	/*
 	 * FAITH(Firewall Aided Internet Translator)
