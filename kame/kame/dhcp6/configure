@@ -4114,7 +4114,7 @@ cat >conftest.$ac_ext <<_ACEOF
 int
 main ()
 {
-void func(void) {printf("%s\n", __func__ "");}
+void func(void) {printf("%s\n", __func__);}
   ;
   return 0;
 }
