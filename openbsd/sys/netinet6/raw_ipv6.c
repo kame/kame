@@ -364,7 +364,7 @@ rip6_ctlinput(cmd, sa, d)
 		sa6.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
 						     ip6cp->ip6c_finaldst);
 #ifndef SCOPEDROUTING
-		if (in6_embedscope(ip6cp->ip6c_finaldst, &sa6, NULL, NULL)) {
+		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
 			/* should be impossbile */
 			printf("rip6_ctlinput: in6_embedscope failed\n");
 			return;
