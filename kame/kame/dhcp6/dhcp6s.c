@@ -1,3 +1,4 @@
+/*	$KAME: dhcp6s.c,v 1.58 2002/04/24 14:31:32 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.

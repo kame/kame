@@ -1,3 +1,4 @@
+/*	$KAME: dhcp6relay.c,v 1.33 2002/04/24 14:31:32 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
