@@ -292,24 +292,20 @@ add_leaf(vifi, source, group)
     if_set     new_oifs;
     if_set     new_leaves;
 
+    if ((uvifs[vifi].uv_flags & VIFF_DR) != 0) {
+	    /*
+	     * I am not the DR on the subnet on which the report is received.
+	     * Ignore the report.
+	     */
+	    log(LOG_DEBUG, 0, "I'm not the DR on mif %d. Ignore a report.\n",
+		vifi);
+	    return;
+    }
 
     mrtentry_ptr = find_route(&sockaddr6_any, group, MRTF_WC, CREATE);
 
     if (mrtentry_ptr == (mrtentry_t *) NULL)
 	return;
-
-    if ((mrtentry_ptr->incoming == vifi)
-	&& (!(uvifs[vifi].uv_flags & VIFF_DR)))
-    {
-	/*
-	 * The report is received on the iif for this routing entry and I am
-	 * not the DR for that subnet. Ignore it.
-	 */
-
-	if (mrtentry_ptr->flags & MRTF_NEW)
-	    delete_mrtentry(mrtentry_ptr);
-	return;
-    }
 
     IF_DEBUG(DEBUG_MRT)
 	log(LOG_DEBUG, 0, "Adding vif %d for group %s", vifi,
