@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.16 2001/10/31 08:07:23 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.17 2001/11/07 15:35:26 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -113,6 +113,7 @@ yyerror(char *msg, ...)
 %token		SMAPPING
 %token		SPORT
 %token		SPREFIX
+%token		SPROTO
 %token		SRULES
 %token		SSET
 %token		SSHOW
@@ -410,8 +411,8 @@ opt_ports
 opt_proto
 		:
 		    { $$ = 0; }
-		| protos
-		    { $$ = $1; }
+		| SPROTO protos
+		    { $$ = $2; }
 		;
 
 opt_all

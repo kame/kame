@@ -1,4 +1,4 @@
-/*	$KAME: yylex.c,v 1.12 2001/10/31 08:07:24 fujisawa Exp $	*/
+/*	$KAME: yylex.c,v 1.13 2001/11/07 15:35:27 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -67,6 +67,7 @@ struct
 	{ "mapping",	SMAPPING,	"SMAPPING",	},
 	{ "port",	SPORT,		"SPORT",	},
 	{ "prefix",	SPREFIX,	"SPREFIX",	},
+	{ "proto",	SPROTO,		"SPROTO",	},
 	{ "rules",	SRULES,		"SRULES",	},
 	{ "set",	SSET,		"SSET",		},
 	{ "show",	SSHOW,		"SSHOW",	},
