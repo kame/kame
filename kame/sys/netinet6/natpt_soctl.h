@@ -1,4 +1,4 @@
-/*	$KAME: natpt_soctl.h,v 1.15 2002/02/01 13:35:06 fujisawa Exp $	*/
+/*	$KAME: natpt_soctl.h,v 1.16 2002/02/01 15:05:40 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -40,7 +40,7 @@
 #define	NATPT_ENBTRANS	_IOW ('n',   2, struct natpt_msgBox)	/* Enable  translation	*/
 #define NATPT_DSBTRANS	_IOW ('n',   3, struct natpt_msgBox)	/* Disable translation	*/
 #define	NATPT_SETRULES	_IOW ('n',   4, struct natpt_msgBox)	/* Set rules		*/
-#define	NATPT_GETRULE	_IOWR('n',   5, struct natpt_msgBox)	/* Get rule		*/
+#define	NATPT_RMRULE	_IOW ('n',   5, struct natpt_msgBox)	/* Get rule		*/
 #define NATPT_RENUMRULE	_IOW ('n',   6, struct natpt_msgBox)	/* Flush rule		*/
 #define NATPT_FLUSHRULE	_IOW ('n',   7, struct natpt_msgBox)	/* Renumber rule	*/
 #define	NATPT_SETPREFIX	_IOW ('n',   8, struct natpt_msgBox)	/* Set prefix		*/

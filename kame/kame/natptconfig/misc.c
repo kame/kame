@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.26 2002/02/01 13:35:07 fujisawa Exp $	*/
+/*	$KAME: misc.c,v 1.27 2002/02/01 15:05:42 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -201,6 +201,21 @@ renumRules(int start, int interval)
 	mBox.m_int1 = interval;
 
 	if (soctl(sfd, NATPT_RENUMRULE, &mBox) < 0)
+		soctlFailure(fn);
+}
+
+
+void
+rmRules(int num)
+{
+	const char *fn = __FUNCTION__;
+
+	struct natpt_msgBox	 mBox;
+
+	bzero(&mBox, sizeof(struct natpt_msgBox));
+	mBox.m_uint = num;
+
+	if (soctl(sfd, NATPT_RMRULE, &mBox) < 0)
 		soctlFailure(fn);
 }
 

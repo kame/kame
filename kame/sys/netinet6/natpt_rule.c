@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.41 2002/02/01 13:35:06 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.42 2002/02/01 15:05:40 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -402,6 +402,31 @@ natpt_renumRules(caddr_t addr)
 	}
 	splx(s);
 
+	return (0);
+}
+
+
+int
+natpt_rmRules(caddr_t addr)
+{
+	int			 s;
+	int			 rnum;
+	struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
+	struct cSlot		*csl, *csln;
+
+	rnum = mbx->m_uint;
+	s = splnet();
+	csl = TAILQ_FIRST(&csl_head);
+	while (csl) {
+		csln = TAILQ_NEXT(csl, csl_list);
+		if (csl->rnum == rnum) {
+			TAILQ_REMOVE(&csl_head, csl, csl_list);
+			FREE(csl, M_NATPT);
+		}
+		csl = csln;
+	}
+	splx(s);
+		
 	return (0);
 }
 

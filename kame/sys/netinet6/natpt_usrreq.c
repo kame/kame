@@ -1,4 +1,4 @@
-/*	$KAME: natpt_usrreq.c,v 1.21 2002/02/01 13:35:06 fujisawa Exp $	*/
+/*	$KAME: natpt_usrreq.c,v 1.22 2002/02/01 15:05:40 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -322,6 +322,9 @@ natpt_control(struct socket *so, int cmd, caddr_t data, struct ifnet *ifp)
 
 	case NATPT_SETRULES:
 		return (natpt_setRules(data));
+
+	case NATPT_RMRULE:
+		return (natpt_rmRules(data));
 
 	case NATPT_RENUMRULE:
 		return (natpt_renumRules(data));
