@@ -24,7 +24,7 @@ static const char copyright[] =
     "@(#) Copyright (c) 1988, 1989, 1991, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n";
 static const char rcsid[] =
-    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.16 2001/05/08 04:36:40 itojun Exp $ (LBL)";
+    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.17 2001/11/09 09:40:56 itojun Exp $ (LBL)";
 #endif
 
 /*
@@ -1306,6 +1306,10 @@ gethostinfo(register char *hostname)
 	addr = inet_addr(hostname);
 	if ((int32_t)addr != -1) {
 		hi->name = strdup(hostname);
+		if (!hi->name) {
+			Fprintf(stderr, "%s: strdup failed\n", prog);
+			exit(1);
+		}
 		hi->n = 1;
 		hi->addrs = calloc(1, sizeof(hi->addrs[0]));
 		if (hi->addrs == NULL) {
@@ -1327,6 +1331,10 @@ gethostinfo(register char *hostname)
 		exit(1);
 	}
 	hi->name = strdup(hp->h_name);
+	if (!hi->name) {
+		Fprintf(stderr, "%s: strdup failed\n", prog);
+		exit(1);
+	}
 	for (n = 0, p = hp->h_addr_list; *p != NULL; ++n, ++p)
 		continue;
 	hi->n = n;
