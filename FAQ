@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.4 2001/06/18 06:32:09 itojun Exp $
+$KAME: FAQ,v 1.5 2001/06/18 06:33:59 itojun Exp $
 
 
 GENERAL
@@ -189,7 +189,7 @@ Q: How can I restrict RIPng route announcement for some of the interfaces?
 	of the interfaces.
 
 	bgpd(contributed from Toshiba) also has the configuration
-	file. You can specify not to listen and/or advertise RIPng
+	file.  You can specify not to listen and/or advertise RIPng
 	messages on the specified interfaces.
 
 	Other routing daemons (zebra/mrt/whatever) may have
@@ -307,7 +307,7 @@ Q: What is the crypto export/import situation in Japan?
 	NOTE: the following description does not reflect intentions
 	of KAME participating companies, employers of KAME core
 	team or KAME contributors, or such.  KAME project and other
-	partieis are completely separate entity. Please do not
+	partieis are completely separate entity.  Please do not
 	misinterpret.
 
 	As far as I checked, there's no legal restriction for
@@ -316,7 +316,7 @@ Q: What is the crypto export/import situation in Japan?
 
 	Japan seems to be in Wassenaar agreement, and Wassenaar
 	agreement is reflected to the Japan's export/import control
-	law. It says that business parties must acquire approval
+	law.  It says that business parties must acquire approval
 	for crypto export order larger than 50000JPY.
 
 	We checked with several attoneys to get answers which vary
