@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.124 2000/06/11 13:36:08 itojun Exp $	*/
+/*	$KAME: key.c,v 1.125 2000/06/11 23:50:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3898,7 +3898,7 @@ key_cmpspidx_withmask(spidx0, spidx1)
 		    satosin(&spidx1->dst)->sin_port)
 			return 0;
 		if (!key_bbcmp((caddr_t)&satosin(&spidx0->dst)->sin_addr,
-		    (caddr_t)&satosin(&spidx1->dst)->sin_addr, spidx0->prefs))
+		    (caddr_t)&satosin(&spidx1->dst)->sin_addr, spidx0->prefd))
 			return 0;
 		break;
 	case AF_INET6:
@@ -3910,7 +3910,7 @@ key_cmpspidx_withmask(spidx0, spidx1)
 		    satosin6(&spidx1->dst)->sin6_scope_id)
 			return 0;
 		if (!key_bbcmp((caddr_t)&satosin6(&spidx0->dst)->sin6_addr,
-		    (caddr_t)&satosin6(&spidx1->dst)->sin6_addr, spidx0->prefs))
+		    (caddr_t)&satosin6(&spidx1->dst)->sin6_addr, spidx0->prefd))
 			return 0;
 		break;
 	default:
