@@ -1,4 +1,4 @@
-/*	$KAME: gifconfig.c,v 1.8 2000/05/13 07:52:46 itojun Exp $	*/
+/*	$KAME: gifconfig.c,v 1.9 2000/05/17 04:26:38 itojun Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -684,7 +684,7 @@ in6_status(force)
 			}
 #endif
 			getnameinfo((struct sockaddr *)sin, sin->sin6_len,
-				    hostname, sizeof(hostname), 0, 0, flags);
+				    hostname, sizeof(hostname), 0, 0, niflags);
 			printf("--> %s ", hostname);
 		}
 	}
