@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1772 2001/07/15 09:54:05 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1773 2001/07/15 19:36:54 fujisawa Exp $
 
 <200107>
+2001-07-16 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_dispatch.c (configCv4, configCv6):
+	- configCv4() and configCv6() returns real payload number or
+	  IPPROTO_IP.  Packet passes to the next process when value of
+	  IPPROTO_IP was returned.
+
 2001-07-15 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_{dispatch.c,var.h}
 	- Separate natpt_pyldaddr() from foundFinalPayload().  This
