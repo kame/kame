@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.73 2001/10/02 04:34:37 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.74 2001/10/02 08:56:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -578,9 +578,6 @@ in6_gif_ctlinput(cmd, sa, d)
 	void *cmdarg;
 	const struct sockaddr_in6 *sa6_src = NULL;
 	struct sockaddr_in6 *dst6;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
-	int i;
-#endif
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))

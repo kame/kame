@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.85 2001/10/02 04:34:37 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.86 2001/10/02 08:56:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1011,9 +1011,6 @@ gif_set_tunnel(ifp, src, dst)
 	struct gif_softc *sc2;
 	struct sockaddr *osrc, *odst, *sa;
 	int s;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
-	int i;
-#endif
 	int error = 0; 
 
 #ifdef __NetBSD__
