@@ -1,12 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2130 2002/04/22 08:29:48 jinmei Exp $
+$KAME: CHANGELOG,v 1.2131 2002/04/22 08:38:25 jinmei Exp $
 
 <200204>
 2002-04-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_output): if there has been no NS
 	for a neighbor after entering the INCOMPLETE state, send the
 	first solicitation in nd6_output(), regardless of the timer value.
-	This change will improve the response time to the first NS.
+	This change will effectively improve the response time to the
+	first NS.
 
 2002-04-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/netinet/tcp_subr.c (tcp_respond): if
