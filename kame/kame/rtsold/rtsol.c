@@ -1,4 +1,4 @@
-/*	$KAME: rtsol.c,v 1.23 2003/04/16 10:21:47 suz Exp $	*/
+/*	$KAME: rtsol.c,v 1.24 2003/05/27 06:39:24 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -298,7 +298,7 @@ rtsol_input(int s)
 	}
 
 	if (i < sizeof(struct nd_router_advert)) {
-		warnmsg(LOG_ERR, __func__,
+		warnmsg(LOG_INFO, __func__,
 		    "packet size(%d) is too short", i);
 		return;
 	}
