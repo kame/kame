@@ -439,7 +439,11 @@ int	ip6_use_deprecated = 1;	/* allow deprecated addr (RFC2462 5.5.4) */
 int	ip6_rr_prune = 5;	/* router renumbering prefix
 				 * walk list every 5 sec.    */
 #ifdef MAPPED_ADDR_ENABLED
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 int	ip6_mapped_addr_on = 1;
+#else
+int	ip6_mapped_addr_on = MAPPED_ADDR_ENABLED;
+#endif
 #endif /* MAPPED_ADDR_ENABLED */
 
 u_int32_t ip6_id = 0UL;

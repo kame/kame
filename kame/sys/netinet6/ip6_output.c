@@ -1337,9 +1337,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_CHECKSUM:
 			case IPV6_FAITH:
 #ifdef MAPPED_ADDR_ENABLED
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 			case IPV6_BINDV6ONLY:
-#endif
 #endif /* MAPPED_ADDR_ENABLED */
 				if (optlen != sizeof(int))
 					error = EINVAL;
@@ -1433,11 +1431,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 						break;
 
 #ifdef MAPPED_ADDR_ENABLED
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 					case IPV6_BINDV6ONLY:
 						OPTSET(IN6P_BINDV6ONLY);
 						break;
-#endif
 #endif /* MAPPED_ADDR_ENABLED */
 					}
 				}
@@ -1671,9 +1667,7 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_CHECKSUM:
 			case IPV6_FAITH:
 #ifdef MAPPED_ADDR_ENABLED
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 			case IPV6_BINDV6ONLY:
-#endif
 #endif /* MAPPED_ADDR_ENABLED */
 #ifndef __bsdi__
 			case IPV6_PORTRANGE:
@@ -1739,11 +1733,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 					break;
 
 #ifdef MAPPED_ADDR_ENABLED
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				case IPV6_BINDV6ONLY:
 					optval = OPTBIT(IN6P_BINDV6ONLY);
 					break;
-#endif
 #endif /* MAPPED_ADDR_ENABLED */
 
 #ifndef __bsdi__

@@ -1289,6 +1289,11 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPV6CTL_USE_DEPRECATED:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 				&ip6_use_deprecated);
+#ifdef MAPPED_ADDR_ENABLED
+	case IPV6CTL_MAPPED_ADDR:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+				&ip6_mapped_addr_on);
+#endif
 	default:
 		return EOPNOTSUPP;
 	}

@@ -117,6 +117,7 @@ struct	in6pcb {
 #define IN6P_LOWPORT		0x20	/* user wants "low" port binding */
 #define IN6P_ANONPORT		0x40	/* port chosen for user */
 #define IN6P_FAITH		0x80	/* accept FAITH'ed connections */
+#define IN6P_BINDV6ONLY		0x100	/* do not grab IPv4 traffic */
 #define IN6P_PKTINFO		0x010000
 #define IN6P_HOPLIMIT		0x020000
 #define IN6P_NEXTHOP		0x040000
