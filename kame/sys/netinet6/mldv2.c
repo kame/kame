@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.19 2004/04/22 02:47:16 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.20 2004/04/22 02:52:15 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2313,9 +2313,7 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init)
 
 		/*
 		 * Let MLD know that we have joined a new IP6 multicast
-		 * group with source list if upstream router is MLDv2 capable.
-		 * If the router doesn't speak MLDv2, then send Report message
-		 * with no source address since it is a first join request.
+		 * group (MLD version is checked in mld_start_listening()).
 		 */
 		if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER) {
 			if (curmode != newmode) {
@@ -3004,9 +3002,7 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init)
 
 	/*
 	 * Let MLD know that we have joined a new IPv6 multicast group
-	 * with source list if upstream router is MLDv2 capable.
-	 * If the router doesn't speak MLDv2, then send Report message
-	 * with no source address since it is a first join request.
+	 * (MLD version is checked in mld_start_listening()).
 	 */
 	if (in6m->in6m_rti->rt6i_type == MLD_V2_ROUTER) {
 		if (curmode != newmode) {
@@ -3016,15 +3012,8 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init)
 			else 
 				type = CHANGE_TO_EXCLUDE_MODE;
 		}
-		mld_send_state_change_report
-			(&m, &buflen, in6m, type, timer_init);
-	} else {
-		mldlog((LOG_DEBUG, "in6_addmultisrc: clear MLDv2 stat since I'm MLDv1\n"));
-		/*
-		 * If MSF's pending records exist, they must be deleted.
-		 */
-		in6_clear_all_pending_report(in6m);
 	}
+	mld_start_listening(in6m, type);
 	*errorp = 0;
 	if (newhead != NULL)
 	    /* Each i6as is linked from new curhead, so only newhead (not
