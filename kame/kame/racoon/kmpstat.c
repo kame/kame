@@ -1,4 +1,4 @@
-/*	$KAME: kmpstat.c,v 1.17 2000/09/13 04:50:26 itojun Exp $	*/
+/*	$KAME: kmpstat.c,v 1.18 2000/09/16 09:37:19 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.17 2000/09/13 04:50:26 itojun Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.18 2000/09/16 09:37:19 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -57,6 +57,7 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+#include <err.h>
 
 #include "libpfkey.h"
 
@@ -75,80 +76,78 @@
 #include "admin_var.h"
 #include "admin.h"
 
-#if 0 /*quickhack */
-struct myaddrs {
-	struct myaddrs *next;
-	struct sockaddr *addr;
-	int sock;
-};
-struct myaddrs *myaddrs = NULL;
-#endif
+static void Usage __P((void));
+static int com_init __P((void));
+static int com_send __P((vchar_t *));
+static vchar_t *com_recv __P((void));
 
-struct command_tag {
+static vchar_t *get_combuf __P((int, char **));
+static vchar_t *f_reload __P((int, char **));
+static vchar_t *f_getsched __P((int, char **));
+static vchar_t *f_getsa __P((int, char **));
+static vchar_t *f_flushsa __P((int, char **));
+static vchar_t *f_deletesa __P((int, char **));
+static vchar_t *f_exchangesa __P((int, char **));
+
+struct cmd_tag {
+	vchar_t *(*func) __P((int, char **));
+	int cmd;
 	char *str;
-	u_int16_t cmd;
-} command[] = {
-{ "reload-config",	ADMIN_RELOAD_CONF },
-{ "rc",			ADMIN_RELOAD_CONF },
-{ "show-schedule",	ADMIN_SHOW_SCHED },
-{ "sc",			ADMIN_SHOW_SCHED },
-{ "show-sa",		ADMIN_SHOW_SA },
-{ "ss",			ADMIN_SHOW_SA },
-{ "flush-sa",		ADMIN_FLUSH_SA },
-{ "fs",			ADMIN_FLUSH_SA },
-{ "delete-sa",		ADMIN_DELETE_SA },
-{ "ds",			ADMIN_DELETE_SA },
-{ "establish-sa",	ADMIN_ESTABLISH_SA },
-{ "es",			ADMIN_ESTABLISH_SA },
+} cmdtab[] = {
+	{ f_reload,	ADMIN_RELOAD_CONF,	"reload-config" },
+	{ f_reload,	ADMIN_RELOAD_CONF,	"rc" },
+	{ f_getsched,	ADMIN_SHOW_SCHED,	"show-schedule" },
+	{ f_getsched,	ADMIN_SHOW_SCHED,	"sc" },
+	{ f_getsa,	ADMIN_SHOW_SA,		"show-sa" },
+	{ f_getsa,	ADMIN_SHOW_SA,		"ss" },
+	{ f_flushsa,	ADMIN_FLUSH_SA,		"flush-sa" },
+	{ f_flushsa,	ADMIN_FLUSH_SA,		"fs" },
+	{ f_deletesa,	ADMIN_DELETE_SA,	"delete-sa" },
+	{ f_deletesa,	ADMIN_DELETE_SA,	"ds" },
+	{ f_exchangesa,	ADMIN_ESTABLISH_SA,	"establish-sa" },
+	{ f_exchangesa,	ADMIN_ESTABLISH_SA,	"es" },
+	{ NULL, 0, NULL },
 };
+
+static int get_proto __P((char *));
+static vchar_t *get_index __P((int, char **));
+static int get_family __P((char *));
+static vchar_t *get_comindexes __P((int, int, char **));
+static int get_comindex __P((char *, char **, char **, char **));
+static struct sockaddr *get_sockaddr __P((int, char *, char *));
+static int get_ulproto __P((char *));
 
 struct proto_tag {
+	int proto;
 	char *str;
-	u_int32_t proto;
-} proto[] = {
-{ "isakmp",	ADMIN_PROTO_ISAKMP },
-{ "ipsec",	ADMIN_PROTO_IPSEC },
-{ "ah",		ADMIN_PROTO_AH },
-{ "esp",	ADMIN_PROTO_ESP },
-{ "internal",	ADMIN_PROTO_INTERNAL },
+} prototab[] = {
+	{ ADMIN_PROTO_ISAKMP,	"isakmp" },
+	{ ADMIN_PROTO_IPSEC,	"ipsec" },
+	{ ADMIN_PROTO_AH,	"ah" },
+	{ ADMIN_PROTO_ESP,	"esp" },
+	{ ADMIN_PROTO_INTERNAL,	"internal" },
+	{ 0, NULL },
 };
 
-struct ul_proto_tag {
+struct ulproto_tag {
+	int ul_proto;
 	char *str;
-	u_short ul_proto;
-} ul_proto[] = {
-{ "any",	0 },
-{ "icmp",	IPPROTO_ICMP },
-{ "tcp",	IPPROTO_TCP },
-{ "udp",	IPPROTO_UDP },
+} ulprototab[] = {
+	{ 0,		"any" },
+	{ IPPROTO_ICMP,	"icmp" },
+	{ IPPROTO_TCP,	"tcp" },
+	{ IPPROTO_UDP,	"udp" },
+	{ 0, NULL },
 };
 
 int port = PORT_ADMIN;
 int so;
 
-char combuf[512];
-
-char *comarg;
 static char _addr1_[NI_MAXHOST], _addr2_[NI_MAXHOST];
 
 char *pname;
 int long_format = 0;
 u_int32_t debug = 0;
-
-void Usage __P((void));
-int com_init __P((void));
-int com_send __P((void));
-int com_recv __P((void));
-
-int get_combuf __P((int ac, char **));
-u_int set_combuf_cmd __P((char *));
-u_int set_combuf_proto __P((char *));
-int set_combuf_index __P((caddr_t, int, char **));
-int set_combuf_indexes __P((caddr_t, int, char **));
-u_int set_combuf_family __P((char *));
-int set_combuf_comb_address __P((void *, u_int, char *, u_int *));
-int set_combuf_sockaddr __P((void *, u_int, char *, char *));
-u_int set_combuf_ul_proto __P((char *));
 
 void dump_isakmp_sa __P((char *, int));
 void dump_internal __P((char *, int));
@@ -156,14 +155,14 @@ char *pindex_isakmp __P((isakmp_index *));
 void print_schedule __P((caddr_t, int));
 char * fixed_addr __P((char *, char *, int));
 
-void
+static void
 Usage()
 {
 	printf(
 "Usage:\n"
 "  %s [-p (admin port)] reload-config\n"
-"  %s [-p (admin port)] [-l] show-sa <protocol>\n"
-"  %s [-p (admin port)] flush-sa <protocol>\n"
+"  %s [-p (admin port)] [-l [-l]] show-sa [protocol]\n"
+"  %s [-p (admin port)] flush-sa [protocol]\n"
 "  %s [-p (admin port)] delete-sa <saopts>\n"
 "  %s [-p (admin port)] establish-sa <saopts>\n"
 "\n"
@@ -185,11 +184,12 @@ main(ac, av)
 {
 	extern char *optarg;
 	extern int optind;
+	vchar_t *combuf;
 	int c;
 
 	pname = *av;
 
-	while ((c = getopt(ac, av, "p:lhd")) != EOF) {
+	while ((c = getopt(ac, av, "p:ld")) != EOF) {
 		switch(c) {
 		case 'p':
 			port = atoi(optarg);
@@ -203,35 +203,32 @@ main(ac, av)
 			debug = 0xffffffff;
 			break;
 
-		case 'h':
+		default:
 			Usage();
 			exit(0);
-		default:
-			printf("Unsupported option: %c\n", c);
-			goto bad;
 		}
 	}
 
 	ac -= optind;
 	av += optind;
 
-	if (get_combuf(ac, av) < 0) {
-		Usage();
-		goto bad;
-	}
+	combuf = get_combuf(ac, av);
+	if (!combuf)
+		err(1, "get_combuf");
 
-	if (debug) {
+	if (debug)
 		hexdump(combuf, ((struct admin_com *)combuf)->ac_len);
-		exit(0);
-	}
 
 	if (com_init() < 0)
 		goto bad;
 
-	if (com_send() < 0)
+	if (com_send(combuf) < 0)
 		goto bad;
 
-	if (com_recv() < 0)
+	vfree(combuf);
+
+	combuf = com_recv();
+	if (!combuf)
 		goto bad;
 
 	exit(0);
@@ -240,7 +237,7 @@ main(ac, av)
 	exit(-1);
 }
 
-int
+static int
 com_init()
 {
 	struct sockaddr_in name;
@@ -277,12 +274,13 @@ com_init()
 	return so;
 }
 
-int
-com_send()
+static int
+com_send(combuf)
+	vchar_t *combuf;
 {
-	int len = ((struct admin_com *)combuf)->ac_len;
+	int len;
 
-	if ((len = send(so, combuf, len, 0)) < 0){
+	if ((len = send(so, combuf->v, combuf->l, 0)) < 0){
 		perror("send");
 		(void)close(so);
 		return -1;
@@ -291,51 +289,42 @@ com_send()
 	return len;
 }
 
-int
+static vchar_t *
 com_recv()
 {
-	struct admin_com *com;
-	caddr_t buf0, buf;
+	vchar_t *combuf = NULL;
+	struct admin_com h, *com;
+	caddr_t buf;
 	int len;
 
 	/* receive by PEEK */
-	if ((len = recv(so, combuf, sizeof(combuf), MSG_PEEK)) < 0) {
-		perror("recv");
+	len = recv(so, &h, sizeof(h), MSG_PEEK);
+	if (len == -1)
 		goto bad;
-	}
-	com = (struct admin_com *)combuf;
 
 	/* sanity check */
-	if (len < sizeof(*com))
-		goto bad;
+	if (len < sizeof(h))
+		return NULL;
 	if (len == 0)
-		goto bad;	/* ignore */
+		goto bad;
 
 	/* error ? */
-	switch (com->ac_errno) {
-	case 0:
-		break;
-	case ENOENT:
-		printf("no entry\n");
-		goto end;
-	default:
-		printf("Error occured with %d\n", com->ac_errno);
-		goto end;
+	if (h.ac_errno) {
+		errno = h.ac_errno;
+		goto bad;
 	}
 
 	/* allocate buffer */
-	buf0 = malloc(com->ac_len);
-	if (buf0 == NULL) {
-		fprintf(stderr, "no buffer available.\n");
+	combuf = vmalloc(h.ac_len);
+	if (combuf == NULL)
 		goto bad;
-	}
 
 	/* read real message */
     {
 	int l = 0;
-	caddr_t p = buf0;
-	while (l < com->ac_len) {
-		if ((len = recv(so, p, com->ac_len, 0)) < 0) {
+	caddr_t p = combuf->v;
+	while (l < combuf->l) {
+		if ((len = recv(so, p, h.ac_len, 0)) < 0) {
 			perror("recv");
 			goto bad;
 		}
@@ -344,9 +333,9 @@ com_recv()
 	}
     }
 
-	com = (struct admin_com *)buf0;
+	com = (struct admin_com *)combuf->v;
 	len = com->ac_len - sizeof(*com);
-	buf = buf0 + sizeof(*com);
+	buf = combuf->v + sizeof(*com);
 
 	switch (com->ac_cmd) {
 	case ADMIN_SHOW_SCHED:
@@ -405,209 +394,293 @@ com_recv()
 		/* IGNORE */
 	}
 
-    end:
 	(void)close(so);
-	return 0;
+	return combuf;
 
     bad:
-	return -1;
+	(void)close(so);
+	return NULL;
 }
 
 /* %%% */
-int
+/*
+ * return command buffer.
+ */
+static vchar_t *
 get_combuf(ac, av)
 	int ac;
 	char **av;
 {
-	struct admin_com *com = (struct admin_com *)combuf;
+	struct cmd_tag *cp;
 
-	/* checking the string of command. */
-	if ((com->ac_cmd = set_combuf_cmd(*av)) == (u_int16_t)~0)
-		goto bad;
-	av++;
-	ac--;
-
-	/* initialization */
-	com->ac_len = sizeof(struct admin_com);
-	com->ac_errno = 0;
-	com->ac_proto = 0;
-
-	switch (com->ac_cmd) {
-	case ADMIN_RELOAD_CONF:
-	case ADMIN_SHOW_SCHED:
-		break;
-
-	case ADMIN_SHOW_SA:
-	case ADMIN_FLUSH_SA:
-		/* validity check */
-		if (ac != 1)
-			goto bad;
-
-		if ((com->ac_proto = set_combuf_proto(*av)) == (u_int16_t)~0)
-			goto bad;
-		break;
-		
-	case ADMIN_DELETE_SA:
-	case ADMIN_ESTABLISH_SA:
-		/* validity check */
-		if (ac < 1)
-			goto bad;
-
-		if ((com->ac_proto = set_combuf_proto(*av)) == (u_int16_t)~0)
-			goto bad;
-		av++;
-		ac--;
-	    {
-		caddr_t p = combuf + sizeof(*com);
-
-		/* get index(es) */
-		switch (com->ac_proto) {
-		case ADMIN_PROTO_ISAKMP:
-			if (set_combuf_index(p, ac, av) < 0)
-				goto bad;
-			break;
-		case ADMIN_PROTO_AH:
-		case ADMIN_PROTO_ESP:
-			if (set_combuf_indexes(p, ac, av) < 0)
-				goto bad;
-			break;
-		default:
-			printf("Illegal protocol.\n");
-			goto bad;
-		}
-	    }
-
-		com->ac_len += sizeof(struct admin_com_indexes);
-		break;
-
-	default:
-		goto bad;
+	/* if no argument, it's interpreted the command as showing status. */
+	if (ac == 0) {
+		printf("XXXXXXXXXXXXXxx\n");
+		return NULL;
 	}
 
-	return 0;
+	/* checking the string of command. */
+	for (cp = &cmdtab[0]; cp->str; cp++) {
+		if (strcmp(*av, cp->str) == 0) {
+			break;
+		}
+	}
+	if (!cp->str) {
+		printf("Invalid command [%s]\n", *av);
+		errno = EINVAL;
+		return NULL;
+	}
 
-    bad:
+	ac--;
+	av++;
+	return (cp->func)(ac, av);
+}
+
+static vchar_t *
+f_reload(ac, av)
+	int ac;
+	char **av;
+{
+	vchar_t *buf;
+	struct admin_com *head;
+
+	buf = vmalloc(sizeof(*head));
+	if (buf == NULL)
+		return NULL;
+
+	head = (struct admin_com *)buf->v;
+	head->ac_len = buf->l;
+	head->ac_cmd = ADMIN_RELOAD_CONF;
+	head->ac_errno = 0;
+	head->ac_proto = 0;
+
+	return buf;
+}
+
+static vchar_t *
+f_getsched(ac, av)
+	int ac;
+	char **av;
+{
+	vchar_t *buf;
+	struct admin_com *head;
+
+	buf = vmalloc(sizeof(*head));
+	if (buf == NULL)
+		return NULL;
+
+	head = (struct admin_com *)buf->v;
+	head->ac_len = buf->l;
+	head->ac_cmd = ADMIN_SHOW_SCHED;
+	head->ac_errno = 0;
+	head->ac_proto = 0;
+
+	return buf;
+}
+
+static vchar_t *
+f_getsa(ac, av)
+	int ac;
+	char **av;
+{
+	vchar_t *buf;
+	struct admin_com *head;
+	int proto;
+
+	/* need protocol */
+	if (ac != 1)
+		return NULL;
+	proto = get_proto(*av);
+	if (proto == -1)
+		return NULL;
+
+	buf = vmalloc(sizeof(*head));
+	if (buf == NULL)
+		return NULL;
+
+	head = (struct admin_com *)buf->v;
+	head->ac_len = buf->l;
+	head->ac_cmd = ADMIN_SHOW_SA;
+	head->ac_errno = 0;
+	head->ac_proto = proto;
+
+	return buf;
+}
+
+static vchar_t *
+f_flushsa(ac, av)
+	int ac;
+	char **av;
+{
+	vchar_t *buf;
+	struct admin_com *head;
+	int proto;
+
+	/* need protocol */
+	if (ac != 1)
+		return NULL;
+	proto = get_proto(*av);
+	if (proto == -1)
+		return NULL;
+
+	buf = vmalloc(sizeof(*head));
+	if (buf == NULL)
+		return NULL;
+
+	head = (struct admin_com *)buf->v;
+	head->ac_len = buf->l;
+	head->ac_cmd = ADMIN_FLUSH_SA;
+	head->ac_errno = 0;
+	head->ac_proto = proto;
+
+	return buf;
+}
+
+static vchar_t *
+f_deletesa(ac, av)
+	int ac;
+	char **av;
+{
+	vchar_t *buf, *index;
+	struct admin_com *head;
+	int proto;
+
+	/* need protocol */
+	if (ac < 1) {
+		errno = EINVAL;
+		return NULL;
+	}
+	proto = get_proto(*av);
+	if (proto == -1)
+		return NULL;
+
+	/* get index(es) */
+	av++;
+	ac--;
+	switch (proto) {
+	case ADMIN_PROTO_ISAKMP:
+		index = get_index(ac, av);
+		if (index == NULL)
+			return NULL;
+		break;
+	case ADMIN_PROTO_AH:
+	case ADMIN_PROTO_ESP:
+		index = get_index(ac, av);
+		if (index == NULL)
+			return NULL;
+		break;
+	default:
+		errno = EPROTONOSUPPORT;
+		return NULL;
+	}
+
+	buf = vmalloc(sizeof(*head) + index->l);
+	if (buf == NULL)
+		return NULL;
+
+	head = (struct admin_com *)buf->v;
+	head->ac_len = buf->l + index->l;
+	head->ac_cmd = ADMIN_DELETE_SA;
+	head->ac_errno = 0;
+	head->ac_proto = proto;
+
+	return buf;
+}
+
+static vchar_t *
+f_exchangesa(ac, av)
+	int ac;
+	char **av;
+{
+	vchar_t *buf, *index;
+	struct admin_com *head;
+	int proto;
+
+	/* need protocol */
+	if (ac < 1) {
+		errno = EINVAL;
+		return NULL;
+	}
+	if ((proto = get_proto(*av)) == -1)
+		return NULL;
+
+	/* get index(es) */
+	av++;
+	ac--;
+	switch (proto) {
+	case ADMIN_PROTO_ISAKMP:
+		index = get_index(ac, av);
+		if (index == NULL)
+			return NULL;
+		break;
+	case ADMIN_PROTO_AH:
+	case ADMIN_PROTO_ESP:
+		index = get_index(ac, av);
+		if (index == NULL)
+			return NULL;
+		break;
+	default:
+		errno = EPROTONOSUPPORT;
+		return NULL;
+	}
+
+	buf = vmalloc(sizeof(*head) + index->l);
+	if (buf == NULL)
+		return NULL;
+
+	head = (struct admin_com *)buf->v;
+	head->ac_len = buf->l + index->l;
+	head->ac_cmd = ADMIN_DELETE_SA;
+	head->ac_errno = 0;
+	head->ac_proto = proto;
+
+	return buf;
+}
+
+static int
+get_proto(str)
+	char *str;
+{
+	struct proto_tag *cp;
+
+	if (str == NULL) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	/* checking the string of command. */
+	for (cp = &prototab[0]; cp->str; cp++) {
+		if (strcmp(str, cp->str) == 0)
+			return cp->proto;
+	}
+
+	errno = EINVAL;
 	return -1;
 }
 
-u_int
-set_combuf_cmd(str)
-	char *str;
-{
-	int i;
-
-	if (str == NULL)
-		return ~0;
-
-	for (i = 0; i < sizeof(command)/sizeof(command[0]); i++) {
-		if (strcmp(command[i].str, str) == 0)
-			return command[i].cmd;
-	}
-
-	printf("Invalid command [%s]\n", str);
-
-	return ~0;
-}
-
-u_int
-set_combuf_proto(str)
-	char *str;
-{
-	int i;
-
-	if (str == NULL)
-		return ~0;
-
-	/* checking the string of protocol */
-	for (i = 0; i < sizeof(proto)/sizeof(proto[0]); i++) {
-		if (strcmp(proto[i].str, str) == 0)
-			return proto[i].proto;
-	}
-
-	printf("Invalid proto [%s]\n", str);
-
-	return ~0;
-}
-
-int
-set_combuf_index(buf, ac, av)
-	caddr_t buf;
+static vchar_t *
+get_index(ac, av)
 	int ac;
 	char **av;
 {
-	struct admin_com_indexes *index_buf = (struct admin_com_indexes *)buf;
-	u_int family;
-
-	memset((caddr_t)index_buf, 0, sizeof(struct admin_com_indexes));
-
-	if (*av == NULL)
-		return -1;
+	int family;
 
 	if (ac != 3) {
-		printf("Too few arguments.\n");
-		return -1;
+		errno = EINVAL;
+		return NULL;
 	}
 
 	/* checking the string of family */
-	if ((family = set_combuf_family(*av)) == ~0)
-		return -1;
+	family = get_family(*av);
+	if (family == -1)
+		return NULL;
 	av++;
 
-	/* set soruce address */
-	if (set_combuf_sockaddr(&index_buf->src, family, *av, NULL) < 0)
-		return -1;
-	av++;
-
-	/* set destination address */
-	if (set_combuf_sockaddr(&index_buf->dst, family, *av, NULL) < 0)
-		return -1;
-
-	return sizeof(struct admin_com_indexes);
+	return get_comindexes(family, ac, av);
 }
 
-int
-set_combuf_indexes(buf, ac, av)
-	caddr_t buf;
-	int ac;
-	char **av;
-{
-	struct admin_com_indexes *index_buf = (struct admin_com_indexes *)buf;
-	u_int family;
-
-	memset((caddr_t)index_buf, 0, sizeof(struct admin_com_indexes));
-
-	if (ac != 4 && ac != 6)
-		return -1;
-
-	if (*av == NULL)
-		return -1;
-
-	/* checking the string of family */
-	if ((family = set_combuf_family(*av)) == ~0)
-		return -1;
-	av++;
-
-	/* set soruce address */
-	if (set_combuf_comb_address(&index_buf->src,
-			family, *av, (u_int *)&index_buf->prefs) < 0)
-		return -1;
-	av++;
-
-	/* set destination address */
-	if (set_combuf_comb_address(&index_buf->dst,
-			family, *av, (u_int *)&index_buf->prefd) < 0)
-		return -1;
-	av++;
-
-	/* checking the string of upper layer protocol */
-	if ((index_buf->ul_proto = set_combuf_ul_proto(*av)) == (u_int8_t)~0)
-		return -1;
-
-	return sizeof(struct admin_com_indexes);
-}
-
-u_int
-set_combuf_family(str)
+static int
+get_family(str)
 	char *str;
 {
 	if (strcmp("inet", str) == 0)
@@ -616,49 +689,135 @@ set_combuf_family(str)
 	else if (strcmp("inet6", str) == 0)
 		return AF_INET6;
 #endif
-
-	printf("Invalid family [%s].\n", str);
-
-	return ~0;
+	errno = EAFNOSUPPORT;
+	return -1;
 }
 
-int
-set_combuf_comb_address(buf, family, str, pref)
-	void *buf;
-	u_int family;
-	char *str;
-	u_int *pref;
+static vchar_t *
+get_comindexes(family, ac, av)
+	int family;
+	int ac;
+	char **av;
 {
-	int i;
-	char p_name[124], *p_pref, *p;
+	vchar_t *buf;
+	struct admin_com_indexes *ci;
+	char *p_name = NULL, *p_port = NULL;
+	char *p_prefs = NULL, *p_prefd = NULL;
+	struct sockaddr *src = NULL, *dst = NULL;
+	int ulproto;
 
-	for (i = 0, p = str; *p != NULL && *p != '/'; p++, i++) ;
-	if (i == strlen(str) || *p == NULL || *++p == NULL) {
-		printf("Illegal format [%s].\n", str);
-		return -1;
+	if (ac != 2) {
+		errno = EINVAL;
+		return NULL;
 	}
-	memcpy(p_name, str, i);
-	p_name[i] = NULL;
-	p_pref = p;
-	for (i = 0; *p != NULL && *p != '/'; p++, i++) ;
-	if (*p == NULL || *++p == NULL) {
-		printf("Illegal format [%s].\n", str);
-		return -1;
-	}
-	p_pref[i] = NULL;
-	*pref = (u_int8_t)atoi(p_pref);
-		/* XXX should be handled the error to atoi(). */
 
-	if (set_combuf_sockaddr(buf, family, p_name, p) < 0)
-		return -1;
+	if (get_comindex(*av, &p_name, &p_port, &p_prefs) == -1)
+		goto bad;
+	src = get_sockaddr(family, p_name, p_port);
+	if (p_name) {
+		free(p_name);
+		p_name = NULL;
+	}
+	if (p_port) {
+		free(p_port);
+		p_port = NULL;
+	}
+	if (src == NULL)
+		goto bad;
+	av++;
+	if (get_comindex(*av, &p_name, &p_port, &p_prefd) == -1)
+		goto bad;
+	dst = get_sockaddr(family, p_name, p_port);
+	if (dst == NULL)
+		goto bad;
+
+	buf = vmalloc(sizeof(*ci));
+	if (buf == NULL)
+		goto bad;
+
+	av++;
+	ulproto = get_ulproto(*av);
+	if (ulproto == -1)
+		goto bad;
+
+	ci = (struct admin_com_indexes *)buf;
+	ci->prefs = (u_int8_t)atoi(p_prefs); /* XXX should be handled error. */
+	ci->prefd = (u_int8_t)atoi(p_prefd); /* XXX should be handled error. */
+	ci->ul_proto = ulproto;
+	memcpy(&ci->src, src, src->sa_len);
+	memcpy(&ci->dst, dst, dst->sa_len);
+
+	if (p_name)
+		
+	return buf;
+
+   bad:
+	if (p_name)
+		free(p_name);
+	if (p_port)
+		free(p_port);
+	if (p_prefs);
+		free(p_prefs);
+	if (p_prefd);
+		free(p_prefd);
+	return NULL;
+}
+
+static int
+get_comindex(str, name, port, pref)
+	char *str, **name, **port, **pref;
+{
+	char *p;
+
+	*name = *port = *pref = NULL;
+
+	*name = strdup(str);
+	p = strpbrk(*name, "/[");
+	if (p != NULL) {
+		if (*(p + 1) == '\0')
+			goto bad;
+		if (*p == '/') {
+			*p = '\0';
+			*pref = strdup(p + 1);
+			p = strchr(*pref, '[');
+			if (p != NULL) {
+				if (*(p + 1) == '\0')
+					goto bad;
+				*p = '\0';
+				*port = strdup(p + 1);
+				p = strchr(*pref, ']');
+				if (p == NULL)
+					goto bad;
+				*p = '\0';
+			}
+		} else if (*p == '[') {
+			*p = '\0';
+			*port = strdup(p + 1);
+			p = strchr(*pref, ']');
+			if (p == NULL)
+				goto bad;
+			*p = '\0';
+		} else {
+			/* XXX */
+		}
+	}
 
 	return 0;
+
+    bad:
+	if (*name)
+		free(*name);
+	if (*port)
+		free(*port);
+	if (*pref)
+		free(*pref);
+	*name = *port = *pref = NULL;
+	return -1;
 }
 
-int
-set_combuf_sockaddr(buf, family, name, port)
-	void *buf;
-	u_int family;
+static struct sockaddr *
+get_sockaddr(family, name, port)
+	int family;
 	char *name, *port;
 {
 	struct addrinfo hint, *ai;
@@ -668,29 +827,29 @@ set_combuf_sockaddr(buf, family, name, port)
 	hint.ai_family = PF_UNSPEC;
 	hint.ai_socktype = SOCK_STREAM;
 
-	if ((error = getaddrinfo(name, port, &hint, &ai)) != 0) {
-		printf("%s, %s/%s\n", gai_strerror(error), name, port);
-		return -1;
+	error = getaddrinfo(name, port, &hint, &ai);
+	if (error != 0) {
+		printf("%s: %s/%s\n", gai_strerror(error), name, port);
+		return NULL;
 	}
 
-	memcpy(buf, ai->ai_addr, ai->ai_addr->sa_len);
-
-	return ai->ai_addr->sa_len;
+	return ai->ai_addr;
 }
 
-u_int
-set_combuf_ul_proto(str)
+static int
+get_ulproto(str)
 	char *str;
 {
-	int i;
+	struct ulproto_tag *cp;
 
-	for (i = 0; i < sizeof(ul_proto)/sizeof(ul_proto[0]); i++) {
-		if (strcmp(ul_proto[i].str, str) == 0)
-			return ul_proto[i].ul_proto;
+	/* checking the string of upper layer protocol. */
+	for (cp = &ulprototab[0]; cp->str; cp++) {
+		if (strcmp(str, cp->str) == 0)
+			return cp->ul_proto;
 	}
 
-	printf("Invalud ulp [%s]\n", str);
-	return ~0;
+	errno = EINVAL;
+	return -1;
 }
 
 /* %%% */
