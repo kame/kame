@@ -794,6 +794,7 @@ netname6(sa6, mask)
 
 	if (nflag)
 		sprintf(&line[strlen(line)], "/%d", masklen);
+
 	return line;
 }
 
