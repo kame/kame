@@ -559,14 +559,35 @@ ether_input(ifp, eh, m)
 		m_freem(m);
 		return;
 	}
-	ifp->if_ibytes += m->m_pkthdr.len + sizeof (*eh);
 	if (bcmp((caddr_t)etherbroadcastaddr, (caddr_t)eh->ether_dhost,
 	    sizeof(etherbroadcastaddr)) == 0)
 		m->m_flags |= M_BCAST;
-	else if (eh->ether_dhost[0] & 1)
+	else if (eh->ether_dhost[0] & 1) {
+		/*
+		 * If this is not a simplex interface, drop the packet
+		 * if it came from us.
+		 */
+		if ((ifp->if_flags & IFF_SIMPLEX) == 0) {
+			struct ifaddr *ifa;
+			struct sockaddr_dl *sdl = NULL;
+
+			/* find link-layer address */
+			for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
+				if ((sdl = (struct sockaddr_dl *)ifa->ifa_addr) &&
+				    sdl->sdl_family == AF_LINK)
+					break;
+
+			if (sdl && memcmp(LLADDR(sdl), eh->ether_shost,
+			    ETHER_ADDR_LEN) == 0) {
+				m_freem(m);
+				return;
+			}
+		}
 		m->m_flags |= M_MCAST;
+	}
 	if (m->m_flags & (M_BCAST|M_MCAST))
 		ifp->if_imcasts++;
+	ifp->if_ibytes += m->m_pkthdr.len + sizeof (*eh);
 
 	ether_type = ntohs(eh->ether_type);
 
