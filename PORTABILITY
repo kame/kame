@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.22 1999/12/12 10:24:20 itojun Exp $
+	$Id: PORTABILITY,v 1.23 1999/12/13 11:31:49 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -201,5 +201,16 @@ across those possibilities.
   In the future, we may provide s6_addr{8,16,32} to the userland when updates
   to RFC2553 defines them.  They are, in fact, very convenient and we would
   like to see them defined in standard document.
+
+- Developers are advised to use pedantic compilation options (like -Wall
+  -Werror).  To configure default make settings, /etc/make.conf (freebsd)
+  and/or /etc/mk.conf (netbsd/openbsd) should be useful.
+
+  Note that the meaning of -Wall is different across *BSD because *BSD uses
+  different version of gnu cc.  Sometimes -Wall raises bogus warning due to
+  bugs in code generator.  Also, since function prototypes are defined
+  differently in some cases (like ntohl), certain tweaks are needed to
+  eliminate warnings on all the platforms.  Don't worry about it too much,
+  you can always talk with other developers.
 
 - For portability in kernel networking code, look at kame/sys/net/net_osdep.h.
