@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.51.2.13 2001/08/20 18:38:41 brooks Exp $";
+  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.51.2.15 2001/12/14 23:36:23 jlemon Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -123,8 +123,6 @@ struct	netrange	at_nr;		/* AppleTalk net range */
 
 char	name[32];
 int	flags;
-int	metric;
-int	mtu;
 int	setaddr;
 int	setipdst;
 int	setmask;
@@ -179,7 +177,7 @@ c_func  setip6vltime;
 c_func2	setip6lifetime;
 #endif
 c_func	setifipdst;
-c_func	setifflags, setifmetric, setifmtu, setiflladdr;
+c_func	setifflags, setifmetric, setifmtu, setiflladdr, setifcap;
 c_func	clone_destroy;
 
 
@@ -274,6 +272,12 @@ struct	cmd {
 	{ "nwkey",	NEXTARG,	set80211nwkey },	/* NetBSD */
 	{ "-nwkey",	0,		set80211wep },		/* NetBSD */
 #endif
+	{ "rxcsum",	IFCAP_RXCSUM,	setifcap },
+	{ "-rxcsum",	-IFCAP_RXCSUM,	setifcap },
+	{ "txcsum",	IFCAP_TXCSUM,	setifcap },
+	{ "-txcsum",	-IFCAP_TXCSUM,	setifcap },
+	{ "netcons",	IFCAP_NETCONS,	setifcap },
+	{ "-netcons",	-IFCAP_NETCONS,	setifcap },
 	{ "normal",	-IFF_LINK0,	setifflags },
 	{ "compress",	IFF_LINK0,	setifflags },
 	{ "noicmp",	IFF_LINK1,	setifflags },
@@ -1034,6 +1038,29 @@ setifflags(vname, value, s, afp)
 }
 
 void
+setifcap(vname, value, s, afp)
+	const char *vname;
+	int value;
+	int s;
+	const struct afswtch *afp;
+{
+
+ 	if (ioctl(s, SIOCGIFCAP, (caddr_t)&ifr) < 0) {
+ 		Perror("ioctl (SIOCGIFCAP)");
+ 		exit(1);
+ 	}
+	flags = ifr.ifr_curcap;
+	if (value < 0) {
+		value = -value;
+		flags &= ~value;
+	} else
+		flags |= value;
+	ifr.ifr_reqcap = flags;
+	if (ioctl(s, SIOCSIFCAP, (caddr_t)&ifr) < 0)
+		Perror(vname);
+}
+
+void
 setifmetric(val, dummy, s, afp)
 	const char *val;
 	int dummy __unused;
@@ -1088,6 +1115,9 @@ setiflladdr(val, dummy, s, afp)
 "\10NOARP\11PROMISC\12ALLMULTI\13OACTIVE\14SIMPLEX\15LINK0\16LINK1\17LINK2" \
 "\20MULTICAST"
 
+#define	IFCAPBITS \
+"\003\1rxcsum\2txcsum\3netcons"
+
 /*
  * Print the status of the interface.  If an address family was
  * specified, show it and it only; otherwise, show them all.
@@ -1117,29 +1147,25 @@ status(afp, addrcount, sdl, ifm, ifam)
 	if ((s = socket(ifr.ifr_addr.sa_family, SOCK_DGRAM, 0)) < 0)
 		err(1, "socket");
 
-	/*
-	 * XXX is it we are doing a SIOCGIFMETRIC etc for one family.
-	 * is it possible that the metric and mtu can be different for
-	 * each family?  If so, we have a format problem, because the
-	 * metric and mtu is printed on the global the flags line.
-	 */
-	if (ioctl(s, SIOCGIFMETRIC, (caddr_t)&ifr) < 0)
-		warn("ioctl (SIOCGIFMETRIC)");
-	else
-		metric = ifr.ifr_metric;
-
-	if (ioctl(s, SIOCGIFMTU, (caddr_t)&ifr) < 0)
-		warn("ioctl (SIOCGIFMTU)");
-	else
-		mtu = ifr.ifr_mtu;
-
 	printf("%s: ", name);
 	printb("flags", flags, IFFBITS);
-	if (metric)
-		printf(" metric %d", metric);
-	if (mtu)
-		printf(" mtu %d", mtu);
+	if (ifm->ifm_data.ifi_metric)
+		printf(" metric %ld", ifm->ifm_data.ifi_metric);
+	if (ifm->ifm_data.ifi_mtu)
+		printf(" mtu %ld", ifm->ifm_data.ifi_mtu);
 	putchar('\n');
+
+	if (ioctl(s, SIOCGIFCAP, (caddr_t)&ifr) == 0) {
+		if (ifr.ifr_curcap != 0) {
+			printb("\toptions", ifr.ifr_curcap, IFCAPBITS);
+			putchar('\n');
+		}
+		if (supmedia && ifr.ifr_reqcap != 0) {
+			printf("\tcapability list:\n");
+			printb("\t\t", ifr.ifr_reqcap, IFCAPBITS);
+			putchar('\n');
+		}
+	}
 
 	tunnel_status(s);
 

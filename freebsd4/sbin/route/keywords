@@ -1,5 +1,5 @@
 #	@(#)keywords	8.2 (Berkeley) 3/19/94
-# $FreeBSD: src/sbin/route/keywords,v 1.4 1999/12/07 17:38:53 shin Exp $
+# $FreeBSD: src/sbin/route/keywords,v 1.4.2.1 2001/10/02 10:04:01 ru Exp $
 
 add
 atalk
@@ -36,6 +36,7 @@ osi
 prefixlen
 proto1
 proto2
+proxy
 recvpipe
 reject
 rtt
