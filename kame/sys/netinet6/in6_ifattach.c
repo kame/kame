@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.65 2000/08/22 08:31:58 suz Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.66 2000/08/30 05:47:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -671,9 +671,11 @@ nigroup(ifp, name, namelen, in6)
 	struct in6_addr *in6;
 {
 	const char *p;
+	u_char *q;
 	MD5_CTX ctxt;
 	u_int8_t digest[16];
 	char l;
+	char n[64];	/* a single label must not exceed 63 chars */
 
 	if (!namelen || !name)
 		return -1;
@@ -681,16 +683,21 @@ nigroup(ifp, name, namelen, in6)
 	p = name;
 	while (p && *p && *p != '.' && p - name < namelen)
 		p++;
-	if (p - name > 63)
+	if (p - name > sizeof(n) - 1)
 		return -1;	/*label too long*/
 	l = p - name;
+	strncpy(n, name, l);
+	n[(int)l] = '\0';
+	for (q = n; *q; q++) {
+		if ('A' <= *q && *q <= 'Z')
+			*q = *q - 'A' + 'a';
+	}
 
 	/* generate 8 bytes of pseudo-random value. */
 	bzero(&ctxt, sizeof(ctxt));
 	MD5Init(&ctxt);
 	MD5Update(&ctxt, &l, sizeof(l));
-	/* LINTED const cast */
-	MD5Update(&ctxt, (void *)name, p - name);
+	MD5Update(&ctxt, n, l);
 	MD5Final(digest, &ctxt);
 
 	bzero(in6, sizeof(*in6));
