@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.167 2004/04/13 09:31:41 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.168 2004/04/13 12:13:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1387,18 +1387,6 @@ explore_numeric_scope(pai, hostname, servname, res)
 	if (cp == NULL)
 		return explore_numeric(pai, hostname, servname, res, hostname);
 
-#if 0
-	/*
-	 * Handle special case of <scope id><delimiter><scoped_address>
-	 */
-	hostname2 = strdup(hostname);
-	if (hostname2 == NULL)
-		return EAI_MEMORY;
-	/* terminate at the delimiter */
-	hostname2[cp - hostname] = '\0';
-	scope = hostname2;
-	addr = cp + 1;
-#else
 	/*
 	 * Handle special case of <scoped_address><delimiter><scope id>
 	 */
@@ -1409,7 +1397,6 @@ explore_numeric_scope(pai, hostname, servname, res)
 	hostname2[cp - hostname] = '\0';
 	addr = hostname2;
 	scope = cp + 1;
-#endif
 
 	error = explore_numeric(pai, addr, servname, res, hostname);
 	if (error == 0) {
