@@ -344,6 +344,7 @@ bgp_recover_rte(drte)
 #ifdef DEBUG_BGP
 	    syslog(LOG_NOTICE,
 		   "<%s>: route recover for %s/%d, origin: %s (not installed)",
+		   __FUNCTION__,
 		   ip6str(&drte->rt_ripinfo.rip6_dest, 0),
 		   drte->rt_ripinfo.rip6_plen,
 		   bgp_peerstr(rrte->rt_proto.rtp_bgp));
