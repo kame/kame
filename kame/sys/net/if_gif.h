@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.h,v 1.11 2000/04/19 05:34:35 itojun Exp $	*/
+/*	$KAME: if_gif.h,v 1.12 2000/04/19 06:20:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -67,8 +67,6 @@ struct gif_softc {
 #ifdef INET6
 #define gif_ro6 gifsc_gifscr.gifscr_ro6
 #endif
-
-#define	GIFF_INUSE	0x1	/* gif is in use */
 
 #define GIF_MTU		(1280)	/* Default MTU */
 #define	GIF_MTU_MIN	(1280)	/* Minimum MTU */

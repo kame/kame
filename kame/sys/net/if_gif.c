@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.20 2000/04/19 05:34:35 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.21 2000/04/19 06:20:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -283,9 +283,6 @@ gif_output(ifp, m, dst, rt)
 #endif
 	m->m_flags &= ~(M_BCAST|M_MCAST);
 	if (!(ifp->if_flags & IFF_UP) ||
-#if 0	
-	    sc->gif_flags & GIFF_INUSE ||
-#endif
 	    sc->gif_psrc == NULL || sc->gif_pdst == NULL) {
 		m_freem(m);
 		error = ENETDOWN;
@@ -317,10 +314,6 @@ gif_output(ifp, m, dst, rt)
 #endif
 	ifp->if_opackets++;	
 	ifp->if_obytes += m->m_pkthdr.len;
-#if 0
-	s = splnet();
-	sc->gif_flags |= GIFF_INUSE;
-#endif
 
 	/* XXX should we check if our outer source is legal? */
 
@@ -339,10 +332,6 @@ gif_output(ifp, m, dst, rt)
 		m_freem(m);		
 		error = ENETDOWN;
 	}
-#if 0
-	sc->gif_flags &= ~GIFF_INUSE;
-	splx(s);
-#endif
 
   end:
 	called = 0;		/* reset recursion counter */
