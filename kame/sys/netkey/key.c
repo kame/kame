@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.278 2003/06/27 05:36:19 itojun Exp $	*/
+/*	$KAME: key.c,v 1.279 2003/06/27 05:42:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -108,6 +108,8 @@
 #include "pf.h"
 #if NPF > 0
 #include <net/pfvar.h>
+#else
+#define NPF 0
 #endif
 
 /* randomness */
@@ -1766,10 +1768,21 @@ key_spdadd(so, m, mhp)
 	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
 		panic("key_spdadd: NULL pointer is passed.");
 
-	if ((mhp->ext[SADB_EXT_ADDRESS_SRC] == NULL &&
-	     mhp->ext[SADB_EXT_ADDRESS_DST] == NULL) ||
-	    mhp->ext[SADB_X_EXT_TAG] == NULL ||
-	    mhp->ext[SADB_X_EXT_POLICY] == NULL) {
+	if ((mhp->ext[SADB_EXT_ADDRESS_SRC] != NULL &&
+	     mhp->ext[SADB_EXT_ADDRESS_DST] != NULL) ||
+	    mhp->ext[SADB_X_EXT_TAG] != NULL) {
+		;
+	} else {
+		ipseclog((LOG_DEBUG, "key_spdadd: invalid message is passed.\n"));
+		return key_senderror(so, m, EINVAL);
+	}
+#if NPF == 0
+	if (mhp->ext[SADB_X_EXT_TAG] != NULL) {
+		ipseclog((LOG_DEBUG, "key_spdadd: tag not supported.\n"));
+		return key_senderror(so, m, EOPNOTSUPP);
+	}
+#endif
+	if (mhp->ext[SADB_X_EXT_POLICY] == NULL) {
 		ipseclog((LOG_DEBUG, "key_spdadd: invalid message is passed.\n"));
 		return key_senderror(so, m, EINVAL);
 	}
@@ -1839,9 +1852,14 @@ key_spdadd(so, m, mhp)
 	 */
 	if (mhp->ext[SADB_EXT_ADDRESS_SRC])
 		newsp = key_getsp(&spidx, xpl0->sadb_x_policy_dir);
-	else
+	else {
+#if NPF > 0
 		newsp = key_getspbytag(pf_tagname2tag(tag->sadb_x_tag_name),
 		    xpl0->sadb_x_policy_dir);
+#else
+		panic("PF");
+#endif
+	}
 	if (mhp->msg->sadb_msg_type == SADB_X_SPDUPDATE) {
 		if (newsp) {
 			key_sp_dead(newsp);
@@ -1880,8 +1898,13 @@ key_spdadd(so, m, mhp)
 			keydb_delsecpolicy(newsp);
 			return key_senderror(so, m, EINVAL);
 		}
-	} else
+	} else {
+#if NPF > 0
 		newsp->tag = pf_tagname2tag(tag->sadb_x_tag_name);
+#else
+		panic("PF");
+#endif
+	}
 
 	for (isr = newsp->req; isr; isr = isr->next) {
 		struct sockaddr *sa;
@@ -3871,6 +3894,7 @@ static struct mbuf *
 key_setsadbxtag(tag)
 	u_int16_t tag;
 {
+#if NPF > 0
 	struct mbuf *m;
 	struct sadb_x_tag *p;
 	size_t len;
@@ -3891,6 +3915,9 @@ key_setsadbxtag(tag)
 	pf_tag2tagname(tag, p->sadb_x_tag_name);
 
 	return m;
+#else
+	return NULL;
+#endif
 }
 
 /*
