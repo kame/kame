@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.88 2000/05/07 16:42:38 itojun Exp $	*/
+/*	$KAME: key.c,v 1.89 2000/05/08 02:19:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -102,6 +102,10 @@
 #include <netinet6/ipcomp.h>
 
 #include <net/net_osdep.h>
+
+#ifndef offsetof
+#define offsetof(type, member)	((size_t)(&((type *)0)->member))
+#endif
 
 /*
  * Note on SA reference counting:
@@ -6760,7 +6764,8 @@ key_align(m, mhp)
 
 			ext_addr = (struct sadb_address *)ext;
 			sa = (struct sockaddr *)(ext_addr + 1);
-			if (sizeof(*ext_addr) + PFKEY_ALIGN8(sa->sa_len) != extlen) {
+			if (extlen < sizeof(*ext_addr) + offsetof(struct sockaddr, sa_len) ||
+			    sizeof(*ext_addr) + PFKEY_ALIGN8(sa->sa_len) != extlen) {
 #ifdef IPSEC_DEBUG
 				printf("key_align: invalid sa_len.\n");
 #endif
