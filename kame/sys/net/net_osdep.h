@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.58 2001/07/28 03:00:55 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.59 2001/07/28 03:03:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -183,6 +183,10 @@
  * - splnet()
  *	NetBSD 1.4 or later requires splsoftnet().
  *	other operating systems use splnet().
+ *
+ * - splimp()
+ *	NetBSD-current (2001/4/13): use splnet() in network, splvm() in vm.
+ *	other operating systems: use splimp().
  *
  * - dtom()
  *	NEVER USE IT!
