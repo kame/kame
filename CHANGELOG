@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.53 1999/08/24 09:30:01 itojun Exp $
+$Id: CHANGELOG,v 1.54 1999/08/24 10:10:27 jinmei Exp $
 
 <199908>
+1999-08-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6dd: fixed a bug that pim6dd with a local listener
+	didn't correctly stop forwarding when it became an assert looser.
+	(The bug seemed to be derived from the original pimdd.)
+	Thanks to Mickael Hoerdt<mhoerdt@iutsud.u-strasbg.fr> for finding
+	the problem.
+
 Tue Aug 24 18:19:19 JST 1999  itojun@iijlb.net
 	* netbsd/sys/netinet/tcp*.c: Improve syn cache cleanup again.
 	  When listening socket goes away, syn cache entries associated to the
