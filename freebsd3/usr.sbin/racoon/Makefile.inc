@@ -25,7 +25,7 @@ CFLAGS+=-DNO_IDEA=1
 .if exists(/usr/local/include/openssl/cversion.h) || exists(/usr/local/ssl/include/openssl/cversion.h)
 CFLAGS+=-DHAVE_OPENSSL_CVERSION_H=1
 .endif
-.if exists(/usr/local/openssl/include/opensslv.h) || exists(/usr/local/ssl/include/openssl/opensslv.h)
+.if exists(/usr/local/openssl/include/opensslv.h) || exists(/usr/local/ssl/include/openssl/opensslv.h) || exists(/usr/local/include/openssl/opensslv.h)
 CFLAGS+=-DHAVE_OPENSSL_OPENSSLV_H=1
 .endif
 .if exists(/usr/local/include/openssl)
