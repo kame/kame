@@ -1,11 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.749 2000/04/04 14:46:54 itojun Exp $
+$Id: CHANGELOG,v 1.750 2000/04/05 12:27:47 itojun Exp $
 
 <200003>
 Tue Apr  4 17:48:20 JST 2000  itojun@iijlab.net
 	* sys/netinet6/ip6_output.c: support IPV6_USE_MIN_MTU in 2292bis
-	  advanced API.  We support it in setsockopt and in ancillary data.
+	  advanced API.  We support it in setsockopt (IPv6 UDP only) and
+	  in ancillary data.
 
 Mon Apr  3 12:36:01 JST 2000  itojun@iijlab.net
 	* */lib/libpcap, */usr.sbin/tcpdump: remove to avoid duplicated effort
