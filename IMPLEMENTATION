@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.214 2001/05/18 13:11:40 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.215 2001/05/25 07:41:54 jinmei Exp $
 
 1. IPv6
 
@@ -129,7 +129,7 @@ draft-ietf-ngtrans-tcpudp-relay-04.txt:
       details.
 draft-ietf-ipngwg-router-selection-01.txt:
 	Default Router Preferences and More-Specific Routes
-    * router-side, router preferences only.
+    * router-side only.
 draft-ietf-ipngwg-scoping-arch-02.txt:
 	The architecture, text representation, and usage of IPv6
 	scoped addresses.
