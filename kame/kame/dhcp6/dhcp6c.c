@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.95 2002/06/23 07:30:18 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.96 2002/06/28 07:30:35 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -749,9 +749,9 @@ client6_send(ev)
 	dst = *sa6_allagent;
 	dst.sin6_scope_id = ifp->linkid;
 
-	if (transmit_sa(ifp->outsock, (struct sockaddr *)&dst, buf, len)
-	    != 0) {
-		dprintf(LOG_ERR, "%s" "transmit failed", FNAME);
+	if (sendto(ifp->outsock, buf, len, 0, (struct sockaddr *)&dst,
+	    ((struct sockaddr *)&dst)->sa_len) == -1) {
+		dprintf(LOG_ERR, FNAME "transmit failed: %s", strerror(errno));
 		goto end;
 	}
 
@@ -826,8 +826,8 @@ client6_send_renew(ev)
 			}
 			break;
 		default:
-			dprintf(LOG_ERR, "%s" "unexpected event data (d)",
-				FNAME, evd->type);
+			dprintf(LOG_ERR, FNAME "unexpected event data (%d)",
+			    evd->type);
 			exit(1);
 		}
 	}
@@ -850,9 +850,9 @@ client6_send_renew(ev)
 	dst = *sa6_allagent;
 	dst.sin6_scope_id = ifp->linkid;
 
-	if (transmit_sa(ifp->outsock, (struct sockaddr *)&dst, buf,
-			len) != 0) {
-		dprintf(LOG_ERR, "%s" "transmit failed", FNAME);
+	if (sendto(ifp->outsock, buf, len, 0, (struct sockaddr *)&dst,
+	    ((struct sockaddr *)&dst)->sa_len) == -1) {
+		dprintf(LOG_ERR, FNAME "transmit failed: %s", strerror(errno));
 		goto end;
 	}
 
@@ -946,9 +946,9 @@ client6_send_rebind(ev)
 	dst = *sa6_allagent;
 	dst.sin6_scope_id = ifp->linkid;
 
-	if (transmit_sa(ifp->outsock, (struct sockaddr *)&dst, buf,
-			len) != 0) {
-		dprintf(LOG_ERR, "%s" "transmit failed", FNAME);
+	if (sendto(ifp->outsock, buf, len, 0, (struct sockaddr *)&dst,
+	    ((struct sockaddr *)&dst)->sa_len) == -1) {
+		dprintf(LOG_ERR, FNAME "transmit failed: %s", strerror(errno));
 		goto end;
 	}
 
@@ -1258,7 +1258,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	if (ev->state == DHCP6S_RENEW || ev->state == DHCP6S_REBIND) {
 		/*
 		 * Update configuration information to be renewed or rebound.
-		 * Note that the returned list is empty, in which case
+		 * Note that the returned list may be empty, in which case
 		 * the waiting information should be removed.
 		 */
 		prefix6_update(ev, &optinfo->prefix_list, &optinfo->serverID);
