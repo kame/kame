@@ -1,10 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.834 2000/04/28 17:12:25 itojun Exp $
+$Id: CHANGELOG,v 1.835 2000/04/28 17:16:20 itojun Exp $
 
 <200004>
 Sat Apr 29 02:11:18 JST 2000  itojun@iijlab.net
-	* freebsd4: fix kame/freebsd4 sync issue - KAME PR 244.
+	* freebsd4: fix various kame/freebsd4 sync issue, including KAME
+	  PR 244.  there can be more issues left - pls report if you find one.
 	* */libinet6/getaddrinfo.c, kame/libinet6/name6.c: correct
 	  FILTER_V4MAPPED code.  avoid unaligned memory accesses.
 
