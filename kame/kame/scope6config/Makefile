@@ -28,6 +28,9 @@
 .include "${.CURDIR}/../Makefile.opsys"
 .endif
 
+BINDIR=	$(PREFIX)/sbin
+PROG=	scope6config
+
 CFLAGS+=-Wall
 .if (${OPSYS} != "BSD/OS")
 CFLAGS+=-Werror
@@ -37,7 +40,6 @@ CFLAGS+=	-DINET6
 .else
 CPPFLAGS+=	-DINET6
 .endif
-PROG=	scope6config
 NOMAN=	yes
 
 LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
