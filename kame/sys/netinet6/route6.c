@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.12 2000/05/05 11:01:04 sumikawa Exp $	*/
+/*	$KAME: route6.c,v 1.13 2000/06/22 20:58:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -59,7 +59,6 @@
 static int ip6_rthdr0 __P((struct mbuf *, struct ip6_hdr *,
     struct ip6_rthdr0 *));
 
-
 int
 route6_input(mp, offp, proto)
 	struct mbuf **mp;
@@ -85,6 +84,7 @@ route6_input(mp, offp, proto)
 
 	switch(rh->ip6r_type) {
 	 case IPV6_RTHDR_TYPE_0:
+		 /* XXX the code chokes with ip6r_segleft > 127 */
 		 rhlen = (rh->ip6r_len + 1) << 3;
 #ifndef PULLDOWN_TEST
 		 IP6_EXTHDR_CHECK(m, off, rhlen, IPPROTO_DONE);
