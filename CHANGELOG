@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1783 2001/07/18 12:49:47 jinmei Exp $
+$KAME: CHANGELOG,v 1.1784 2001/07/20 05:24:46 itojun Exp $
 
 <200107>
+Fri Jul 20 14:20:51 JST 2001  itojun@iijlab.net
+	* nodeinfod: a daemon that responds to node information queries.
+	  we are wondering if it is a good idea to migrate to a userland
+	  implementation, for complicated query type handling (like node
+	  addresses, FQDN response with DNS encoding, NI group address,
+	  and such).  we still find ping6 -w responses quite useful and
+	  would like to keep it in the kernel (so that every node responds to).
+	  or should we implement CDP? :-)  experimental.
+
 2001-07-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c (getaddrinfo): enabled
 	destination address reordering (that I introduced on July 3) by
