@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.45 2005/01/25 06:54:54 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.46 2005/02/02 01:48:03 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -409,8 +409,6 @@ dccp_input(struct mbuf *m, ...)
 			cslen = len;
 	}
 	
-	DCCP_DEBUG((LOG_INFO, "Checksum extend header and data! dh->dh_cscov = %u, cslen = %u, len = %u, dh->dh_sum = 0x%04x\n", dh->dh_cscov, cslen, len, dh->dh_sum));
-
 	/*
 	 * Checksum extended DCCP header and data.
 	 */
@@ -418,13 +416,8 @@ dccp_input(struct mbuf *m, ...)
 #ifdef INET6
 	if (isipv6) {
 		if (in6_cksum(m, IPPROTO_DCCP, off, cslen) != 0) {
-			DCCP_DEBUG((LOG_INFO, "Bad checksum, not dropping packet!, dh->dh_sum = 0x%04x\n", dh->dh_sum));
 			dccpstat.dccps_badsum++;
-#if 0
 			goto badunlocked;
-#endif
-		} else {
-			DCCP_DEBUG((LOG_INFO, "Correct checksum, dh->dh_sum = 0x%04x off = %u, cslen = %u\n", dh->dh_sum, off, cslen));
 		}
 	} else
 #endif
@@ -434,13 +427,8 @@ dccp_input(struct mbuf *m, ...)
 		dh->dh_sum = in4_cksum(m, IPPROTO_DCCP, off, cslen);
 
 		if (dh->dh_sum) {
-			DCCP_DEBUG((LOG_INFO, "Bad checksum, not dropping packet!, dh->dh_sum = 0x%04x\n", dh->dh_sum));
 			dccpstat.dccps_badsum++;
-#if 0
 			goto badunlocked;
-#endif
-		} else {
-			DCCP_DEBUG((LOG_INFO, "Correct checksum, dh->dh_sum = 0x%04x\n", dh->dh_sum));
 		}
 	}
 
@@ -1812,6 +1800,7 @@ again:
 	m->m_pkthdr.csum = 0;
 #endif
 
+	dh->dh_sum = 0;
 #ifdef INET6
 	if (isipv6) {
 		dh->dh_sum = in6_cksum(m, IPPROTO_DCCP, sizeof(struct ip6_hdr),
@@ -1838,8 +1827,6 @@ again:
 		m->m_pkthdr.csum_data = offsetof(struct dccphdr, dh_sum);
 #endif
 	}
-
-	DCCP_DEBUG((LOG_INFO, "Calculated checksum,  dh->dh_cscov = %u, cslen = %u, len = %li hdrlen = %u, dh->dh_sum = 0x%04x\n", dh->dh_cscov, cslen, len, hdrlen, dh->dh_sum));
 
 	dccpstat.dccps_opackets++;
 	dccpstat.dccps_obytes += m->m_pkthdr.len;
