@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1111 2000/07/08 03:13:30 itojun Exp $
+$Id: CHANGELOG,v 1.1112 2000/07/09 03:31:25 itojun Exp $
 
 <200006>
+Sun Jul  9 12:29:24 JST 2000  itojun@iijlab.net
+	* freebsd4/sys/net/if_ethersubr.c: repair IPV6_JOIN_GROUP(::).
+
 Sat Jul  8 12:11:34 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/bind9: use bind 9.0.0b5
 	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 7/3 snapshot.
