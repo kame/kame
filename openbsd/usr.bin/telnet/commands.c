@@ -2285,6 +2285,11 @@ tn(argc, argv)
     char *cmd, *hostp = 0, *portp = 0, *user = 0, *aliasp = 0;
     int family, port;
     int retry;
+#ifdef NI_WITHSCOPEID
+    const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+    const int niflags = NI_NUMERICHOST;
+#endif
 
     /* clear the socket address prior to use */
     memset((char *)&sin, 0, sizeof(sin));
@@ -2406,7 +2411,7 @@ tn(argc, argv)
 	    char hbuf[NI_MAXHOST];
 
 	    if (getnameinfo(res->ai_addr, res->ai_addrlen, hbuf, sizeof(hbuf),
-		    NULL, 0, NI_NUMERICHOST) != 0) {
+		    NULL, 0, niflags) != 0) {
 		strcpy(hbuf, "(invalid)");
 	    }
 	    printf("Trying %s...\r\n", hbuf);
@@ -2467,7 +2472,7 @@ tn(argc, argv)
 	    char hbuf[NI_MAXHOST];
 
 	    if (getnameinfo(res->ai_addr, res->ai_addrlen, hbuf, sizeof(hbuf),
-		    NULL, 0, NI_NUMERICHOST) != 0) {
+		    NULL, 0, niflags) != 0) {
 		strcpy(hbuf, "(invalid)");
 	    }
 	    fprintf(stderr, "telnet: connect to address %s: ", hbuf);
