@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.106 2001/05/30 18:32:52 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.107 2001/07/03 08:13:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,6 +96,15 @@
 #include <sys/socket.h>
 #include <net/if.h>
 #include <netinet/in.h>
+#ifdef INET6
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#include <sys/queue.h>
+#include <net/if_var.h>
+#endif
+#include <sys/ioctl.h>
+#include <net/if.h>
+#include <netinet6/in6_var.h>	/* XXX */
+#endif
 #include <arpa/inet.h>
 #include <arpa/nameser.h>
 #include <netdb.h>
@@ -183,6 +192,20 @@ static const struct explore explore[] = {
 #define PTON_MAX	4
 #endif
 
+#define AIO_SRCFLAG_DEPRECATED 0x1
+
+struct ai_order {
+	union {
+		struct sockaddr_storage aiou_ss;
+		struct sockaddr aiou_sa;
+	} aio_src_un;
+#define aio_srcsa aio_src_un.aiou_sa
+	u_int32_t aio_srcflag;
+	int aio_srcscope;
+	int aio_dstscope;
+	struct addrinfo *aio_ai; 
+};
+
 /* types for OS dependent portion */
 #if defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #if 0
@@ -227,9 +250,13 @@ static int get_portmatch __P((const struct addrinfo *, const char *));
 static int get_port __P((struct addrinfo *, const char *, int));
 static const struct afd *find_afd __P((int));
 static int addrconfig __P((int));
+static void reorder __P((struct addrinfo *));
+static void set_source __P((struct ai_order *));
+static int comp_dst __P((const void *, const void *));
 #ifdef INET6
 static int ip6_str2scopeid __P((char *, struct sockaddr_in6 *));
 #endif
+static int gai_addr2scopetype __P((struct sockaddr *));
 
 /* functions in OS dependent portion */
 static int explore_fqdn __P((const struct addrinfo *, const char *,
@@ -632,6 +659,8 @@ globcopy:
 	 */
 	if (error == 0) {
 		if (sentinel.ai_next) {
+			if (getenv("GAI_USE_ORDERING") != NULL)
+				reorder(&sentinel);
 			*res = sentinel.ai_next;
 			error = 0;
 		} else
@@ -649,6 +678,220 @@ bad:
 		if (sentinel.ai_next)
 			freeaddrinfo(sentinel.ai_next);
 	return error;
+}
+
+static void
+reorder(sentinel)
+	struct addrinfo *sentinel;
+{
+	struct addrinfo *ai, **aip;
+	struct ai_order *aio;
+	int i, n;
+
+	/* counter the number of addrinfo element for sorting. */
+	for (n = 0, ai = sentinel->ai_next; ai != NULL; ai = ai->ai_next, n++)
+		;
+
+	/* allocate a temporary array for sort and initialize it. */
+	if ((aio = malloc(sizeof(*aio) * n)) == NULL)
+		return;		/* give up reordering */
+	memset(aio, 0, sizeof(*aio) * n);
+	for (i = 0, ai = sentinel->ai_next; i < n; ai = ai->ai_next, i++) {
+		aio[i].aio_ai = ai;
+		aio[i].aio_dstscope = gai_addr2scopetype(ai->ai_addr);
+		set_source(&aio[i]);
+	}
+
+	/* perform sorting. */
+	qsort(aio, n, sizeof(*aio), comp_dst);
+
+	/* reorder the addrinfo chain. */
+	for (i = 0, aip = &sentinel->ai_next; i < n; i++) {
+		*aip = aio[i].aio_ai;
+		aip = &aio[i].aio_ai->ai_next;
+	}
+	*aip = NULL;
+
+	/* cleanup and return */
+	free(aio);
+	return;
+}
+
+static void
+set_source(aio)
+	struct ai_order *aio;
+{
+	struct addrinfo *ai = aio->aio_ai;
+	int s, srclen;
+
+	/* set unspec ("no source is available"), just in case */
+	aio->aio_srcsa.sa_family = AF_UNSPEC;
+	aio->aio_srcscope = -1;
+	/* open a socket to get the source address (is UDP too specific?) */
+	if ((s = socket(ai->ai_family, SOCK_DGRAM, IPPROTO_UDP)) < 0)
+		return;		/* give up */
+	if (connect(s, ai->ai_addr, ai->ai_addrlen) < 0)
+		goto cleanup;
+	srclen = ai->ai_addrlen;
+	if (getsockname(s, &aio->aio_srcsa, &srclen) < 0) {
+		aio->aio_srcsa.sa_family = AF_UNSPEC;
+		goto cleanup;
+	}
+	aio->aio_srcscope = gai_addr2scopetype(&aio->aio_srcsa);
+#ifdef INET6
+	if (ai->ai_family == AF_INET6) {
+		struct in6_ifreq ifr6;
+		u_int32_t flags6;
+
+		/* XXX: interface name should not be hardcoded */
+		strncpy(ifr6.ifr_name, "lo0", sizeof(ifr6.ifr_name));
+		memset(&ifr6, 0, sizeof(ifr6));
+		memcpy(&ifr6.ifr_addr, ai->ai_addr, ai->ai_addrlen);
+		if (ioctl(s, SIOCGIFAFLAG_IN6, &ifr6) == 0) {
+			flags6 = ifr6.ifr_ifru.ifru_flags6;
+			if ((flags6 & IN6_IFF_DEPRECATED))
+				aio->aio_srcflag |= AIO_SRCFLAG_DEPRECATED;
+		}
+	}
+#endif
+
+  cleanup:
+	close(s);
+	return;
+}
+
+static int
+comp_dst(arg1, arg2)
+	const void *arg1, *arg2;
+{
+	const struct ai_order *dst1 = arg1, *dst2 = arg2;
+
+	/*
+	 * Rule 1: Avoid unusable destinations.
+	 * XXX: we currently do not consider if an appropriate route exists.
+	 */
+	if (dst1->aio_srcsa.sa_family != AF_UNSPEC &&
+	    dst2->aio_srcsa.sa_family == AF_UNSPEC)
+		return(-1);
+	if (dst1->aio_srcsa.sa_family == AF_UNSPEC &&
+	    dst2->aio_srcsa.sa_family != AF_UNSPEC)
+		return(1);
+
+	/* Rule 2: Prefer matching scope. */
+	if (dst1->aio_dstscope == dst1->aio_srcscope &&
+	    dst2->aio_dstscope != dst2->aio_srcscope)
+		return(-1);
+	if (dst1->aio_dstscope != dst1->aio_srcscope &&
+	    dst2->aio_dstscope == dst2->aio_srcscope)
+		return(1);
+
+	/* Rule 3: Avoid deprecated addresses. */
+	if (dst1->aio_srcsa.sa_family != AF_UNSPEC &&
+	    dst2->aio_srcsa.sa_family != AF_UNSPEC) {
+		if (!(dst1->aio_srcflag & AIO_SRCFLAG_DEPRECATED) &&
+		    (dst2->aio_srcflag & AIO_SRCFLAG_DEPRECATED))
+			return(-1);
+		if ((dst1->aio_srcflag & AIO_SRCFLAG_DEPRECATED) &&
+		    !(dst2->aio_srcflag & AIO_SRCFLAG_DEPRECATED))
+			return(1);
+	}
+
+	/* Rule 4: Prefer home addresses. */
+	/* XXX: not implemented yet */
+
+	/* Rule 5: Prefer matching label. */
+	/* XXX: not implemented yet */
+
+	/*
+	 * Rule 6: Prefer higher precedence.
+	 * XXX: at this moment, we just prefer IPv6 to IPv4.
+	 * We might want to implement generic policy table as described in
+	 * draft-ietf-ipngwg-default-addr-select.
+	 */
+	if (dst1->aio_srcsa.sa_family == AF_INET6 &&
+	    dst2->aio_srcsa.sa_family == AF_INET)
+		return(-1);
+	if (dst1->aio_srcsa.sa_family == AF_INET &&
+	    dst2->aio_srcsa.sa_family == AF_INET6)
+		return(1);
+
+	/* Rule 7: Prefer smaller scope. */
+	if (dst1->aio_dstscope >= 0 &&
+	    dst1->aio_dstscope < dst2->aio_dstscope)
+		return(-1);
+	if (dst2->aio_dstscope >= 0 &&
+	    dst2->aio_dstscope < dst1->aio_dstscope)
+		return(1);
+
+	/* Rule 8: Use longest matching prefix. */
+	/* XXX: not implemented yet */
+
+	/* Rule 9: Otherwise, leave the order unchanged. */
+	return(-1);
+}
+
+/*
+ * Copy from scope.c.
+ * XXX: we should standardize the functions and link them as standard
+ * library.
+ */
+static int
+gai_addr2scopetype(sa)
+	struct sockaddr *sa;
+{
+#ifdef INET6
+	struct sockaddr_in6 *sa6;
+#endif
+	struct sockaddr_in *sa4;
+
+	switch(sa->sa_family) {
+#ifdef INET6
+	case AF_INET6:
+		sa6 = (struct sockaddr_in6 *)sa;
+		if (IN6_IS_ADDR_MULTICAST(&sa6->sin6_addr)) {
+			/* just use the scope field of the multicast address */
+			return(sa6->sin6_addr.s6_addr[2] & 0x0f);
+		}
+		/*
+		 * Unicast addresses: map scope type to corresponding scope
+		 * value defined for multcast addresses.
+		 * XXX: hardcoded scope type values are bad...
+		 */
+		if (IN6_IS_ADDR_LOOPBACK(&sa6->sin6_addr))
+			return(1); /* node local scope */
+		if (IN6_IS_ADDR_LINKLOCAL(&sa6->sin6_addr))
+			return(2); /* link-local scope */
+		if (IN6_IS_ADDR_SITELOCAL(&sa6->sin6_addr))
+			return(5); /* site-local scope */
+		return(14);	/* global scope */
+		break;
+#endif
+	case AF_INET:
+		/*
+		 * IPv4 pseudo scoping according to
+		 * draft-ietf-ipngwg-default-addr-select.
+		 */
+		sa4 = (struct sockaddr_in *)sa;
+		/* IPv4 autoconfiguration addresses have link-local scope. */
+		if (((u_char *)&sa4->sin_addr)[0] == 169 &&
+		    ((u_char *)&sa4->sin_addr)[1] == 254)
+			return(2);
+		/* Private addresses have site-local scope. */
+		if (((u_char *)&sa4->sin_addr)[0] == 10 ||
+		    (((u_char *)&sa4->sin_addr)[0] == 172 &&
+		     (((u_char *)&sa4->sin_addr)[1] & 0xf0) == 16) ||
+		    (((u_char *)&sa4->sin_addr)[0] == 192 &&
+		     ((u_char *)&sa4->sin_addr)[1] == 168))
+			return(5);
+		/* Loopback addresses have link-local scope. */
+		if (((u_char *)&sa4->sin_addr)[0] == 127)
+			return(2);
+		return(14);
+		break;
+	default:
+		errno = EAFNOSUPPORT; /* is this a good error? */
+		return(-1);
+	}
 }
 
 static int
