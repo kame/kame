@@ -61,21 +61,17 @@
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>	/* for ICMP_BANDLIM		*/
-#ifdef INET6
-#include <netinet/ip6.h>
 #include <netinet/in_var.h>
-#include <netinet6/nd6.h>
-#include <netinet/icmp6.h>
-#endif
+#include <netinet/icmp_var.h>	/* for ICMP_BANDLIM		*/
 #include <netinet/in_pcb.h>
-#ifdef INET6
-#include <netinet6/in6_pcb.h>
-#endif
 #include <netinet/ip_var.h>
 #ifdef INET6
+#include <netinet/ip6.h>
+#include <netinet/icmp6.h>
+#include <netinet6/nd6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/in6_pcb.h>
 #endif
-#include <netinet/icmp_var.h>	/* for ICMP_BANDLIM		*/
 #include <netinet/tcp.h>
 #include <netinet/tcp_fsm.h>
 #include <netinet/tcp_seq.h>
@@ -641,18 +637,6 @@ findpcb:
 	else
 		tiwin = th->th_win;
 
-#ifdef INET6
-	/* save packet options if user wanted */
-	if (isipv6 && inp->in6p_flags & INP_CONTROLOPTS) {
-		if (inp->in6p_options) {
-			m_freem(inp->in6p_options);
-			inp->in6p_options = 0;
-		}
-		ip6_savecontrol(inp, &inp->in6p_options, ip6, m);
-	}
-        /* else, should also do ip_srcroute() here? */
-#endif /* INET6 */
-
 	so = inp->inp_socket;
 	if (so->so_options & (SO_DEBUG|SO_ACCEPTCONN)) {
 #ifdef TCPDEBUG
@@ -775,21 +759,25 @@ findpcb:
 #endif
 #ifdef INET6
 			if (isipv6) {
-				/*
-				 * inherit socket options from the listening
-				 * socket.
-				 */
+  				/*
+ 				 * Inherit socket options from the listening
+  				 * socket.
+ 				 * Note that in6p_inputopts are not (even
+ 				 * should not be) copied, since it stores
+				 * previously received options and is used to
+ 				 * detect if each new option is different than
+ 				 * the previous one and hence should be passed
+ 				 * to a user.
+ 				 * If we copied in6p_inputopts, a user would
+ 				 * not be able to receive options just after
+ 				 * calling the accept system call.
+ 				 */
 				inp->inp_flags |=
 					oinp->inp_flags & INP_CONTROLOPTS;
-				if (inp->inp_flags & INP_CONTROLOPTS) {
-					if (inp->in6p_options) {
-						m_freem(inp->in6p_options);
-						inp->in6p_options = 0;
-					}
-					ip6_savecontrol(inp,
-							&inp->in6p_options,
-							ip6, m);
-				}
+ 				if (oinp->in6p_outputopts)
+ 					inp->in6p_outputopts =
+ 						ip6_copypktopts(oinp->in6p_outputopts,
+ 								M_NOWAIT);
 			} else
 #endif /* INET6 */
 			inp->inp_options = ip_srcroute();
@@ -810,6 +798,30 @@ findpcb:
 				tp->request_r_scale++;
 		}
 	}
+
+#ifdef INET6
+	/* save packet options if user wanted */
+	if (isipv6 && (inp->in6p_flags & INP_CONTROLOPTS) != 0) {
+		struct ip6_recvpktopts opts6;
+
+		/*
+		 * Temporarily re-adjusting the mbuf before ip6_savecontrol(),
+		 * which is necessary for FreeBSD only due to difference from
+		 * other BSD stacks.
+		 * XXX: we'll soon make a more natural fix after getting a
+		 *      consensus.
+		 */
+		ip6_savecontrol(inp, ip6, m, &opts6, &inp->in6p_inputopts);
+		if (inp->in6p_inputopts)
+			ip6_update_recvpcbopt(inp->in6p_inputopts, &opts6);
+		if (opts6.head) {
+			if (sbappendcontrol(&inp->in6p_socket->so_rcv,
+					    NULL, opts6.head)
+			    == 0)
+				m_freem(opts6.head);
+		}
+	}
+#endif /* INET6 */
 
 	/*
 	 * Segment received on connection.
