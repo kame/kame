@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.32 2004/06/10 10:42:58 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.33 2004/06/12 07:27:59 jinmei Exp $	*/
 
 %{
 /*
@@ -78,6 +78,7 @@ static void cfdebug_print __P((char *, char *, int));
 
 #define DP(str) if (cfdebug) cfdebug_print(str, yytext, yyleng)
 #define DECHO if (cfdebug) cfdebug_print(NULL, yytext, yyleng);
+#define DNOECHO if (cfdebug) cfdebug_print(NULL, "****", yyleng);
 %}
 
 /* abbreviations */
@@ -108,6 +109,7 @@ ecl		\}
 %s S_IA
 %s S_AUTH
 %s S_KEY
+%s S_SECRET
 
 %%
 %{
@@ -231,7 +233,13 @@ ecl		\}
 	/* key parameters */
 <S_CNF>realm { DECHO; return (REALM); }
 <S_CNF>keyid { DECHO; return (KEYID); }
-<S_CNF>secret { DECHO; return (SECRET); }
+<S_CNF>secret { DECHO; BEGIN S_SECRET; return (SECRET); }
+<S_SECRET>{quotedstring} {
+	DNOECHO;
+	yylval.str = strdup(yytext);
+	BEGIN S_CNF;
+	return (QSTRING);
+}
 <S_CNF>expire { DECHO; return (EXPIRE); }
 
 	/* quoted string */
