@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.6 2000/01/11 22:26:12 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.7 2000/01/12 04:24:27 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -297,7 +297,7 @@ extern struct ph1handle *newph1 __P((void));
 extern void delph1 __P((struct ph1handle *iph1));
 extern int insph1 __P((struct ph1handle *iph1));
 extern void remph1 __P((struct ph1handle *iph1));
-extern void flushph1 __P((u_int proto));
+extern void flushph1 __P((void));
 extern void initph1tree __P((void));
 
 extern struct ph2handle *getph2byspidx __P((struct policyindex *spidx));
@@ -309,6 +309,7 @@ extern void initph2 __P((struct ph2handle *iph2));
 extern void delph2 __P((struct ph2handle *iph2));
 extern int insph2 __P((struct ph2handle *iph2));
 extern void remph2 __P((struct ph2handle *iph2));
+extern void flushph2 __P((void));
 extern void initph2tree __P((void));
 
 extern void bindph12 __P((struct ph1handle *iph1, struct ph2handle *iph2));

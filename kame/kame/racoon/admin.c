@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.c,v 1.3 2000/01/09 01:31:20 itojun Exp $ */
+/* YIPS @(#)$Id: admin.c,v 1.4 2000/01/12 04:24:25 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -197,7 +197,7 @@ admin_process(so2, combuf)
 					com->ac_errno = -1;
 				break;
 			case ADMIN_FLUSH_SA:
-				flushph1(com->ac_proto);
+				flushph1();
 				break;
 			}
 			break;

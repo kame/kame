@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.h,v 1.3 2000/01/11 12:22:48 itojun Exp $ */
+/* YIPS @(#)$Id: policy.h,v 1.4 2000/01/12 04:24:28 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -89,6 +89,7 @@ extern struct policyindex *newspidx __P((void));
 extern void delspidx __P((struct policyindex *spidx));
 extern void insspidx __P((struct policyindex *spidx));
 extern void remspidx __P((struct policyindex *spidx));
+extern void flushspidx __P((void));
 extern void initspidx __P((void));
 
 extern struct ipsecpolicy *newipsp __P((void));

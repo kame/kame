@@ -34,6 +34,7 @@
 #include "remoteconf.h"
 #include "grabmyaddr.h"
 #include "isakmp_var.h"
+#include "handler.h"
 #include "isakmp.h"
 #include "ipsec_doi.h"
 #include "strnames.h"
@@ -1356,7 +1357,16 @@ cfparse()
 int
 cfreparse()
 {
-	/* clean it up */
+	flushph2();
+	flushph1();
+	flushrmconf();
+	flushspidx();
+	cleanprhead();
+	clean_tmpalgtype();
+	yycf_init_buffer();
+
+	if (yycf_set_buffer(lcconf->racoon_conf) != 0)
+		return -1;
 
 	return(cfparse());
 }

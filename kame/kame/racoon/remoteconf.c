@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.c,v 1.3 2000/01/11 01:06:29 sakane Exp $ */
+/* YIPS @(#)$Id: remoteconf.c,v 1.4 2000/01/12 04:24:29 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -149,7 +149,33 @@ void
 delrmconf(rmconf)
 	struct remoteconf *rmconf;
 {
+	if (rmconf->etypes)
+		deletypes(rmconf->etypes);
+	if (rmconf->dhgrp)
+		oakley_dhgrp_free(rmconf->dhgrp);
+	if (rmconf->proposal)
+		delisakmpsa(rmconf->proposal);
 	free(rmconf);
+}
+
+void
+delisakmpsa(sa)
+	struct isakmpsa *sa;
+{
+	if (sa->dhgrp)
+		oakley_dhgrp_free(sa->dhgrp);
+	if (sa->next)
+		delisakmpsa(sa->next);
+	free(sa);
+}
+
+void
+deletypes(e)
+	struct etypes *e;
+{
+	if (e->next)
+		deletypes(e->next);
+	free(e);
 }
 
 /*
@@ -167,6 +193,18 @@ remrmconf(rmconf)
 	struct remoteconf *rmconf;
 {
 	LIST_REMOVE(rmconf, chain);
+}
+
+void
+flushrmconf()
+{
+	struct remoteconf *p, *next;
+
+	for (p = LIST_FIRST(&rmtree); p; p = next) {
+		next = LIST_NEXT(p, chain);
+		remrmconf(p);
+		delrmconf(p);
+	}
 }
 
 void

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.12 2000/01/12 04:08:13 itojun Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.13 2000/01/12 04:24:27 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -262,18 +262,15 @@ remph1(iph1)
  * flush isakmp-sa
  */
 void
-flushph1(proto)
-	u_int proto;
+flushph1()
 {
 	struct ph1handle *p, *next;
 
-	/* get length of buffer */
 	for (p = LIST_FIRST(&ph1tree); p; p = next) {
 		next = LIST_NEXT(p, chain);
+		remph1(p);
 		delph1(p);
 	}
-
-	return;
 }
 
 void
@@ -454,6 +451,19 @@ void
 initph2tree()
 {
 	LIST_INIT(&ph2tree);
+}
+
+void
+flushph2()
+{
+	struct ph2handle *p, *next;
+
+	for (p = LIST_FIRST(&ph2tree); p; p = next) {
+		next = LIST_NEXT(p, chain);
+		unbindph12(p);
+		remph2(p);
+		delph2(p);
+	}
 }
 
 /* %%% */

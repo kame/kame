@@ -58,6 +58,7 @@ int yyerrorcount = 0;
 
 static struct include_stack {
 	char *path;
+	FILE *fp;
 	YY_BUFFER_STATE state;
 	int lineno;
 } incstack[MAX_INCLUDE_DEPTH];
@@ -512,6 +513,7 @@ yycf_set_buffer(path)
 	}
 
 	/* initialize */
+	incstack[incstackp].fp = yyin;
 	incstack[incstackp].path = strdup(path);
 	incstack[incstackp].lineno = 1;
 
@@ -525,6 +527,7 @@ yycf_init_buffer()
 
 	for (i = 0; i < MAX_INCLUDE_DEPTH; i++)
 		memset(&incstack[i], 0, sizeof(incstack[i]));
+	incstackp = 0;
 }
 
 void
@@ -533,8 +536,11 @@ yycf_clean_buffer()
 	int i;
 
 	for (i = 0; i < MAX_INCLUDE_DEPTH; i++) {
-		if (incstack[i].path != 0)
+		if (incstack[i].path != NULL) {
+			fclose(incstack[i].fp);
 			free(incstack[i].path);
+			incstack[i].path = NULL;
+		}
 	}
 }
 

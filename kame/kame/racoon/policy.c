@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.9 2000/01/12 00:40:49 itojun Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.10 2000/01/12 04:24:28 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -50,10 +50,10 @@
 
 #include "policy.h"
 #include "localconf.h"
-
 #include "isakmp_var.h"
 #include "isakmp.h"
 #include "handler.h"
+#include "oakley.h"
 
 static LIST_HEAD(_sptree, policyindex) sptree;
 
@@ -229,6 +229,13 @@ void
 delspidx(spidx)
 	struct policyindex *spidx;
 {
+	if (spidx->policy) {
+		if (spidx->policy->pfsgrp)
+			oakley_dhgrp_free(spidx->policy->pfsgrp);
+		if (spidx->policy->proposal)
+			delipsecsa(spidx->policy->proposal);
+	}
+	
 	free(spidx);
 }
 
@@ -244,6 +251,18 @@ remspidx(spidx)
 	struct policyindex *spidx;
 {
 	LIST_REMOVE(spidx, chain);
+}
+
+void
+flushspidx()
+{
+	struct policyindex *p, *next;
+
+	for (p = LIST_FIRST(&sptree); p; p = next) {
+		next = LIST_NEXT(p, chain);
+		remspidx(p);
+		delspidx(p);
+	}
 }
 
 void
