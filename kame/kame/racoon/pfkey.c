@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.135 2003/05/29 06:47:05 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.136 2003/05/29 08:58:21 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1468,7 +1468,7 @@ pk_recvacquire(mhp)
 	/* ignore if type is not IPSEC_POLICY_IPSEC */
 	if (xpl->sadb_x_policy_type != IPSEC_POLICY_IPSEC) {
 		plog(LLV_DEBUG, LOCATION, NULL,
-			"ignore SPDGET message. type is not IPsec.\n");
+			"ignore ACQUIRE message. type is not IPsec.\n");
 		return 0;
 	}
 
