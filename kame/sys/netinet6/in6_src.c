@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.147 2004/07/07 10:16:04 suz Exp $	*/
+/*	$KAME: in6_src.c,v 1.148 2004/08/12 03:54:30 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -798,8 +798,8 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 		 */
 		ron = &opts->ip6po_nextroute;
 		if ((ron->ro_rt &&
-		     (ron->ro_rt->rt_flags & (RTF_UP | RTF_LLINFO)) !=
-		     (RTF_UP | RTF_LLINFO)) ||
+		    (ron->ro_rt->rt_flags & (RTF_UP | RTF_GATEWAY)) !=
+		    RTF_UP) ||
 		    !IN6_ARE_ADDR_EQUAL(&satosin6(&ron->ro_dst)->sin6_addr,
 		    &sin6_next->sin6_addr)) {
 			if (ron->ro_rt) {
@@ -811,7 +811,7 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 		if (ron->ro_rt == NULL) {
 			rtalloc((struct route *)ron); /* multi path case? */
 			if (ron->ro_rt == NULL ||
-			    !(ron->ro_rt->rt_flags & RTF_LLINFO)) {
+			    (ron->ro_rt->rt_flags & RTF_GATEWAY)) {
 				if (ron->ro_rt) {
 					RTFREE(ron->ro_rt);
 					ron->ro_rt = NULL;
@@ -819,6 +819,12 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 				error = EHOSTUNREACH;
 				goto done;
 			}
+		}
+		if (!nd6_is_addr_neighbor(sin6_next, ron->ro_rt->rt_ifp)) {
+			RTFREE(ron->ro_rt);
+			ron->ro_rt = NULL;
+			error = EHOSTUNREACH;
+			goto done;
 		}
 		rt = ron->ro_rt;
 		ifp = rt->rt_ifp;

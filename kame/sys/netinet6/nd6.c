@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.363 2004/08/11 10:20:48 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.364 2004/08/12 03:54:30 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1105,6 +1105,7 @@ nd6_is_addr_neighbor(addr, ifp)
 {
 	struct nd_prefix *pr;
 	struct rtentry *rt;
+	struct ifaddr *dstaddr;
 
 	/*
 	 * A link-local address is always a neighbor.
@@ -1138,6 +1139,14 @@ nd6_is_addr_neighbor(addr, ifp)
 		    &addr->sin6_addr, &pr->ndpr_mask))
 			return (1);
 	}
+
+	/*
+	 * If the address is assigned on the node of the other side of
+	 * a p2p interface, the address should be a neighbor.
+	 */
+	dstaddr = ifa_ifwithdstaddr((struct sockaddr *)addr);
+	if ((dstaddr != NULL) && (dstaddr->ifa_ifp == ifp))
+		return (1);
 
 	/*
 	 * If the default router list is empty, all addresses are regarded
