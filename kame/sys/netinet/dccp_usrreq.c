@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.43 2005/01/20 05:06:04 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.44 2005/01/21 09:00:07 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -427,7 +427,7 @@ dccp_input(struct mbuf *m, ...)
 #endif
 	{
 		bzero(ipov->ih_x1, sizeof(ipov->ih_x1));
-		((struct ipovly *)ip)->ih_len = htons(len);
+		ip->ip_len = htons(m->m_pkthdr.len);
 		dh->dh_sum = in4_cksum(m, IPPROTO_DCCP, off, cslen);
 
 		if (dh->dh_sum) {
@@ -1585,8 +1585,8 @@ again:
 			type = DCCP_TYPE_DATA;
 			extrah_len = 0;
 		} else {
-		  DCCP_DEBUG((LOG_INFO, "No ack or data to send!\n"));
-		  return 0;
+			DCCP_DEBUG((LOG_INFO, "No ack or data to send!\n"));
+			return 0;
 		}
 	} else if (dp->state == DCCPS_CLIENT_CLOSE) {
 		DCCP_DEBUG((LOG_INFO, "Sending DCCP TYPE_CLOSE!\n"));
