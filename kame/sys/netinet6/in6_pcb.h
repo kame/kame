@@ -94,13 +94,6 @@ struct	in6pcb {
 	int	in6p_hops;		/* default hop limit */
 	struct	ip6_hdr in6p_ip6;	/* header prototype */
 	struct	ip6_recvpktopts in6p_inputopts; /* IP6 options for incoming packets */
-#if 0
-#define in6p_recvpktinfo in6p_inputopts.pktinfo
-#define in6p_recvhbh in6p_inputopts.hbh
-#define in6p_recvdest1 in6p_inputopts.dest1
-#define in6p_recvdest2 in6p_inputopts.dest2
-#define in6p_recvrthdr in6p_inputopts.rthdr
-#endif
 	struct	ip6_pktopts *in6p_outputopts; /* IP6 options for outgoing packets */
 	struct	ip6_moptions *in6p_moptions; /* IP6 multicast options */
 
