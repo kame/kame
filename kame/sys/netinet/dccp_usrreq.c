@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.25 2003/11/18 04:55:43 ono Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.26 2003/11/18 08:07:52 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -3960,7 +3960,6 @@ dccp_nocc_packet_recv(void *ccb, char* options ,int optlen)
 #ifdef DCCP_DEBUG_ON
 void
 dccp_log(int level, char *format, ...)
-#endif
 {
 	va_list ap;
 
@@ -3970,4 +3969,5 @@ dccp_log(int level, char *format, ...)
 
 	return;
 }
+#endif
 #endif

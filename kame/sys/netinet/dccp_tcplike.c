@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.c,v 1.10 2003/11/18 04:55:42 ono Exp $	*/
+/*	$KAME: dccp_tcplike.c,v 1.11 2003/11/18 08:07:52 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -73,7 +73,6 @@
 #define TCPLIKE_DEBUG(args)
 #define MALLOC_DEBUG(args) log args
 #define CWND_DEBUG(args)
-#define ACK_DEBUG(args)
 #define ACKRATIO_DEBUG(args)
 #define LOSS_DEBUG(args)
 #define TIMEOUT_DEBUG(args)
@@ -224,6 +223,8 @@ void *tcplike_send_init(struct dccpcb* pcb)
 		dccpstat.tcplikes_send_memerr++;
 		return 0;
 	}
+
+	memset(cb, 0, sizeof (struct tcplike_send_ccb));
 	
 	/* init sender */
 	cb->pcb = pcb;
@@ -263,6 +264,7 @@ void *tcplike_send_init(struct dccpcb* pcb)
 		dccpstat.tcplikes_send_memerr++;
 		return 0;
 	}
+	memset(cb->cwndvector, 0, cb->cv_size/8);
 	cb->cv_hs = cb->cv_ts = 0;
 	cb->cv_hp = cb->cwndvector;
 
@@ -878,6 +880,8 @@ void *tcplike_recv_init(struct dccpcb *pcb)
 		dccpstat.tcplikes_recv_memerr++;
 		return 0;
 	}
+
+	memset(ccb, 0, sizeof (struct tcplike_recv_ccb));
 	
 	ccb->pcb = pcb;
 	ccb->unacked = 0;
@@ -1050,6 +1054,7 @@ void _avlist_add(struct tcplike_recv_ccb *cb, u_int32_t localseq, u_int32_t ackt
 		dccpstat.tcplikes_recv_memerr++;
 		return;
 	}
+	memset(a, 0, sizeof(struct ack_list));
 	a->localseq = localseq;
 	a->ackthru = ackthru;
 	a->next = cb->av_list;

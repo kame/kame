@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.13 2003/11/18 04:55:43 ono Exp $	*/
+/*	$KAME: dccp_var.h,v 1.14 2003/11/18 08:07:52 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -248,7 +248,11 @@ extern const char *dccpstates[];
 #endif
 
 #ifdef ACKDEBUG
+#ifdef __FreeBSD__
 #define ACK_DEBUG(args) log args
+#else
+#define ACK_DEBUG(args) dccp_log args
+#endif
 #else
 #define ACK_DEBUG(args)
 #endif
