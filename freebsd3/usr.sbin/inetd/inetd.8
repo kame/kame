@@ -573,6 +573,42 @@ If invalid IPsec policy string appears on
 will leave error message using
 .Xr syslog 3 ,
 and terminates itself.
+.Ss IPv6 TCP/UDP behavior
+If you wish to run a server for IPv4 and IPv6 traffic,
+you'll need to run two separate process for the same server program,
+specified as two separate lines on 
+.Pa inetd.conf ,
+for
+.Dq tcp4
+and
+.Dq tcp6 .
+.Pp
+Under various combination of IPv4/v6 daemon settings,
+.Nm
+will behave as follows:
+.Bl -bullet -compact
+.It
+If you have only one server on
+.Dq tcp4 ,
+IPv4 traffic will be routed to the server.
+IPv6 traffic will not be accepted.
+.It
+If you have two servers on
+.Dq tcp4
+and
+.Dq tcp6 ,
+IPv4 traffic will be routed to the server on
+.Dq tcp4 ,
+and IPv6 traffic will go to server on
+.Dq tcp6 .
+.It
+If you have only one server on
+.Dq tcp6 ,
+both IPv4 and IPv6 traffic will be routed to the server.
+See
+.Xr inet6 4
+for twists in this case.
+.El
 .Sh "FILES"
 .Bl -tag -width /var/run/inet46d.pid -compact
 .It Pa /usr/local/v6/etc/inet6d.conf
