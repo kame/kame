@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1700 2001/05/31 15:45:10 sakane Exp $
+$KAME: CHANGELOG,v 1.1701 2001/05/31 23:47:51 jinmei Exp $
 
 <200105>
+2001-06-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_cache_lladdr): when the link-layer
+	address of a router changes, select the best router again.  This
+	is important especially when the neighbor entry is newly created,
+	since it might make a new default router that is probably
+	reachable, which affects the selection policy.
+
 Fri Jun  1 00:44:00 JST 2001 sakane@kame.net
 	* sys/netkey/key.c:
 	Fixed to make a response in key_spdadd().
