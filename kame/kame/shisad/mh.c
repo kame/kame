@@ -1,4 +1,4 @@
-/*      $KAME: mh.c,v 1.11 2005/01/28 02:12:07 ryuji Exp $  */
+/*      $KAME: mh.c,v 1.12 2005/01/31 08:25:28 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -705,6 +705,19 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 #endif /* MIP_CN */
 	} else {
 #ifdef MIP_CN
+		/*
+		 * According to the TAHI conformance test tool,
+		 * the judgement of 'H' bit should be done proior
+		 * authentic confirmation.
+		 */
+		if (!homeagent_mode && (flags & IP6_MH_BU_HOME)) {
+			if (mip6_bc_lookup(hoa, dst, bid))
+				statuscode= IP6_MH_BAS_REG_NOT_ALLOWED;
+			else
+				statuscode = IP6_MH_BAS_HA_NOT_SUPPORTED;
+			goto sendba;
+		}
+	
 		/* 
 		 * If an authenticator is not present, just
 		 * silently drop this BU 
@@ -760,14 +773,15 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 #ifdef MIP_CN
 	/* 
 	 * Home Registration flag check. 
-	 * Note L and K flags are ignored.
+	 * Note L and K flags are ignored on cnd if this node acts as HA.
 	 */
-	if (flags & IP6_MH_BU_HOME) {
+	if (homeagent_mode && (flags & IP6_MH_BU_HOME)) {
 		/* 
 		 * this BU is verified by had.
 		 * silently discard by cnd
 		 */
 		return (-1);
+
 	}
 #elif defined(MIP_HA)
 	/* 
@@ -805,7 +819,7 @@ receive_bu(src, dst, hoa, rtaddr, bu, mhlen)
 	}
 #endif /* MIP_NEMO */
 
-	/* if H flags is disabled suddenly, sending BA */
+	/* if 'H' flags is disabled suddenly, sending BA */
 	if (!(flags & IP6_MH_BU_HOME) && 
 	    (bc && (bc->bc_flags & IP6_MH_BU_HOME))) {
 		statuscode = IP6_MH_BAS_REG_NOT_ALLOWED;
@@ -1204,12 +1218,7 @@ send_bu(bul)
 			if (mpt->mpt_regmode == NEMO_IMPLICIT) {
 				; /* when implicit mode, nothing to append */
 			} else if (mpt->mpt_regmode == NEMO_EXPLICIT) {
-
-				/*
-				pad = mhopt_calculatepad(IP6_MHOPT_PREFIX, buflen);
-				mhopt_add_pads((bufp + buflen), pad);
-				*/
-				pad = MIP6_PADLEN(buflen, 8, 4);	/* 8n+4 */
+				pad = MIP6_PADLEN(buflen, 8, 4);  /* 8n+4 */
 				MIP6_FILL_PADDING(bufp + buflen, pad);
 				buflen += pad;
 
@@ -1387,6 +1396,7 @@ send_ba(src, coa, acoa, hoa, recv_bu, kbm_p, status, seqno, lifetime, refresh, b
 		syslog(LOG_INFO, "  from %s", ip6_sprintf(src));
 		syslog(LOG_INFO, "  to   %s", ip6_sprintf(hoa));
 		syslog(LOG_INFO, "  via  %s", ip6_sprintf(coa));
+		syslog(LOG_INFO, "  status=%d seqno=%d", status, seqno);
 	}
 
 	/* section 9.5.4 if hoa is not unicast global, BA should not be sent */
@@ -1508,7 +1518,8 @@ send_ba(src, coa, acoa, hoa, recv_bu, kbm_p, status, seqno, lifetime, refresh, b
 			   (uint16_t *)bufp, buflen, IPPROTO_MH);
 
 	if (debug) {
-		syslog(LOG_INFO, "BA is transmitted to %s\n", ip6_sprintf(hoa));
+		syslog(LOG_INFO, "BA is transmitted to %s\n",
+		       ip6_sprintf(hoa));
 		syslog(LOG_INFO, "from %s\n", ip6_sprintf(src));
 		syslog(LOG_INFO, "via %s\n", ip6_sprintf(coa));
 	}

@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.209 2005/01/25 02:44:52 ryuji Exp $	*/
+/*	$Id: mip6.c,v 1.210 2005/01/31 08:25:28 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -1423,8 +1423,6 @@ mip6_encapsulate(mm, osrc, odst)
 			goto done;
 		}
 	}
-
-
 
 	M_PREPEND(m, sizeof(struct ip6_hdr), M_DONTWAIT);
 	if (m && m->m_len < sizeof(struct ip6_hdr))

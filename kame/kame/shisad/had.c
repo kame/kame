@@ -1,4 +1,4 @@
-/*	$KAME: had.c,v 1.4 2005/01/22 12:56:55 t-momose Exp $	*/
+/*	$KAME: had.c,v 1.5 2005/01/31 08:25:28 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -762,15 +762,21 @@ send_mpa(dst, mps_id, ifindex)
 	mpa->mip6_pa_cksum = 0; 
 	mpa->mip6_pa_id = mps_id;
 
-	ndopt_pi = (struct nd_opt_prefix_info *)mpa;	
+	ndopt_pi = (struct nd_opt_prefix_info *)(mpa + 1);
+	reqlen += sizeof(*mpa);
 	LIST_FOREACH(hpfx, &hpfx_head, hpfx_entry) {
-		/* filling the address */
+		/* filling the addresses */
 		ndopt_pi->nd_opt_pi_type = ND_OPT_PREFIX_INFORMATION;
 		ndopt_pi->nd_opt_pi_len = 4;
 		ndopt_pi->nd_opt_pi_prefix_len = hpfx->hpfx_prefixlen;
 		ndopt_pi->nd_opt_pi_flags_reserved = 0;
-		
+		ndopt_pi->nd_opt_pi_valid_time = htonl(hpfx->hpfx_vltime);
+		ndopt_pi->nd_opt_pi_preferred_time = htonl(hpfx->hpfx_pltime);
+		ndopt_pi->nd_opt_pi_reserved2 = 0;
+		memcpy(&ndopt_pi->nd_opt_pi_prefix, &hpfx->hpfx_prefix,
+		       sizeof(struct in6_addr));
 
+		reqlen += sizeof(struct nd_opt_prefix_info);
 		ndopt_pi += sizeof(struct nd_opt_prefix_info);
 	}
 
