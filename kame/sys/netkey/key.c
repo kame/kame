@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.303 2003/09/07 07:56:17 itojun Exp $	*/
+/*	$KAME: key.c,v 1.304 2003/09/07 13:49:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2471,7 +2471,6 @@ key_spdflush(so, m, mhp)
 {
 	struct sadb_msg *newmsg;
 	struct secpolicy *sp, *nextsp;
-	u_int dir;
 
 	/* sanity check */
 	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
@@ -2480,15 +2479,13 @@ key_spdflush(so, m, mhp)
 	if (m->m_len != PFKEY_ALIGN8(sizeof(struct sadb_msg)))
 		return key_senderror(so, m, EINVAL);
 
-	for (dir = 0; dir < IPSEC_DIR_MAX; dir++) {
-		for (sp = LIST_FIRST(&sptree[dir]); sp != NULL; sp = nextsp) {
-			nextsp = LIST_NEXT(sp, chain);
-			if (sp->state == IPSEC_SPSTATE_DEAD)
-				continue;
-			key_sp_dead(sp);
-			key_sp_unlink(sp);
-			sp = NULL;
-		}
+	for (sp = TAILQ_FIRST(&sptailq); sp; sp = nextsp) {
+		nextsp = TAILQ_NEXT(sp, tailq);
+		if (sp->state == IPSEC_SPSTATE_DEAD)
+			continue;
+		key_sp_dead(sp);
+		key_sp_unlink(sp);
+		sp = NULL;
 	}
 
 	/* invalidate all cached SPD pointers on pcb */
@@ -6861,9 +6858,7 @@ key_flush(so, m, mhp)
 	}
 
 	/* no SATYPE specified, i.e. flushing all SA. */
-	for (sah = LIST_FIRST(&sahtree);
-	     sah != NULL;
-	     sah = nextsah) {
+	for (sah = LIST_FIRST(&sahtree); sah != NULL; sah = nextsah) {
 		nextsah = LIST_NEXT(sah, chain);
 
 		if (mhp->msg->sadb_msg_satype != SADB_SATYPE_UNSPEC &&
@@ -7555,15 +7550,13 @@ key_init()
 	callout_init(&key_timehandler_ch);
 #endif
 
-	for (i = 0; i < IPSEC_DIR_MAX; i++) {
+	for (i = 0; i < IPSEC_DIR_MAX; i++)
 		LIST_INIT(&sptree[i]);
-	}
 
 	LIST_INIT(&sahtree);
 
-	for (i = 0; i <= SADB_SATYPE_MAX; i++) {
+	for (i = 0; i <= SADB_SATYPE_MAX; i++)
 		LIST_INIT(&regtree[i]);
-	}
 
 #ifndef IPSEC_NONBLOCK_ACQUIRE
 	LIST_INIT(&acqtree);
@@ -7968,9 +7961,7 @@ key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 		return (-1);
 
 	/* update a SADB from a home agent to a mobile node. */
-	for (sa = LIST_FIRST(&sahtree);
-	     sa != NULL;
-	     sa = LIST_NEXT(sa, chain)) {
+	for (sa = LIST_FIRST(&sahtree); sa != NULL; sa = LIST_NEXT(sa, chain)) {
 		if (!SA6_ARE_ADDR_EQUAL(haaddr,
 			(struct sockaddr_in6 *)&sa->saidx.src))
 			continue;
@@ -8015,9 +8006,7 @@ key_mip6_update_mobile_node_ipsecdb(haddr, ocoa, ncoa, haaddr)
 		return (-1);
 
 	/* update a SADB from a mobile node to a home agent. */
-	for (sa = LIST_FIRST(&sahtree);
-	     sa != NULL;
-	     sa = LIST_NEXT(sa, chain)) {
+	for (sa = LIST_FIRST(&sahtree); sa != NULL; sa = LIST_NEXT(sa, chain)) {
 /* XXX don't check the old CoA.  instead, we use uniqid.
 		if (!SA6_ARE_ADDR_EQUAL(ocoa,
 			(struct sockaddr_in6 *)&sa->saidx.src))
@@ -8073,9 +8062,7 @@ key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr)
 		return (-1);
 
 	/* update a SADB from a mobile node to a home agent. */
-	for (sa = LIST_FIRST(&sahtree);
-	     sa != NULL;
-	     sa = LIST_NEXT(sa, chain)) {
+	for (sa = LIST_FIRST(&sahtree); sa != NULL; sa = LIST_NEXT(sa, chain)) {
 /* XXX don't check the old CoA.  instead we use a uniqid.
 		if (!SA6_ARE_ADDR_EQUAL(ocoa,
 			(struct sockaddr_in6 *)&sa->saidx.src))
@@ -8116,9 +8103,7 @@ key_mip6_update_home_agent_ipsecdb(haddr, ocoa, ncoa, haaddr)
 		return (-1);
 
 	/* update a SADB from a home agent to a mobile node. */
-	for (sa = LIST_FIRST(&sahtree);
-	     sa != NULL;
-	     sa = LIST_NEXT(sa, chain)) {
+	for (sa = LIST_FIRST(&sahtree); sa != NULL; sa = LIST_NEXT(sa, chain)) {
 		if (!SA6_ARE_ADDR_EQUAL(haaddr,
 			(struct sockaddr_in6 *)&sa->saidx.src))
 			continue;
