@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.23 2001/07/15 09:42:33 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.24 2001/07/15 19:34:05 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -284,8 +284,8 @@ natpt_incomingIPv4(int sess, struct ifBox *ifb, struct mbuf *m4, struct mbuf **m
     struct _fragment	*frg = NULL;
 #endif
 
-    if ((rv = configCv4(sess, m4, &cv)) == IPPROTO_MAX)
-	return (IPPROTO_MAX);				/* discard this packet	*/
+    if ((rv = configCv4(sess, m4, &cv)) == IPPROTO_IP)
+	return (rv);			/* goto the following process		*/
 
     if ((rv = sanityCheckIn4(&cv)) != IPPROTO_IPV4)
 	return (IPPROTO_DONE);		/* discard this packet without free	*/
@@ -395,8 +395,8 @@ natpt_outgoingIPv4(int sess, struct ifBox *ifb, struct mbuf *m4, struct mbuf **m
     struct _fragment	*frg = NULL;
 #endif
 
-    if ((rv = configCv4(sess, m4, &cv)) == IPPROTO_MAX)
-	return (IPPROTO_MAX);				/* discard this packet	*/
+    if ((rv = configCv4(sess, m4, &cv)) == IPPROTO_IP)
+	return (rv);			/* goto the following process		*/
 
 #if defined(NATPT_NAT) && defined(NATPT_FRAGMENT)
     ip4 = mtod(m4, struct ip *);
@@ -502,9 +502,8 @@ natpt_incomingIPv6(int sess, struct ifBox *ifb, struct mbuf *m6, struct mbuf **m
     struct _cSlot	*acs;
     struct ip6_hdr	*ip6;
 
-    rv = configCv6(sess, m6, &cv);
-    if ((rv == IPPROTO_IP) || (rv == IPPROTO_MAX) || (rv == IPPROTO_DONE))
-	return (rv);
+    if ((rv = configCv6(sess, m6, &cv)) == IPPROTO_IP)
+	return (rv);				/* goto the following process	*/
 
     if ((cv.ats = lookingForIncomingV6Hash(&cv)) == NULL)
     {
@@ -538,9 +537,8 @@ natpt_outgoingIPv6(int sess, struct ifBox *ifb, struct mbuf *m6, struct mbuf **m
     struct _cv		 cv6;
     struct _cSlot	*acs;
 
-    rv = configCv6(sess, m6, &cv6);
-    if ((rv == IPPROTO_IP) || (rv == IPPROTO_MAX) || (rv == IPPROTO_DONE))
-	return (rv);
+    if ((rv = configCv6(sess, m6, &cv6)) == IPPROTO_IP)
+	return (rv);				/* goto the following process	*/
 
     if ((rv = sanityCheckOut6(&cv6)) != IPPROTO_IPV6)
 	return (IPPROTO_DONE);				/* discard this packet	*/
@@ -589,7 +587,7 @@ configCv4(int sess, struct mbuf *m, struct _cv *cv)
 	return (ip->ip_p);
     }
 
-    return (IPPROTO_MAX);
+    return (IPPROTO_IP);
 }
 
 
@@ -624,7 +622,7 @@ configCv6(int sess, struct mbuf *m, struct _cv *cv)
 	}
     }
 
-    return (proto);
+    return (IPPROTO_IP);
 }
 
 
