@@ -1,4 +1,4 @@
-.\"	$KAME: faithd.8,v 1.28 2001/04/25 11:24:15 itojun Exp $
+.\"	$KAME: faithd.8,v 1.29 2001/05/23 10:16:50 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -201,6 +201,8 @@ to avoid stale sessions from chewing up resources.
 This may be inappropriate for some of the services
 .Pq should this be configurable? .
 .Ss inetd mode
+NOTE: The mode is available on KAME/NetBSD and KAME/BSDI3 only.
+.Pp
 When
 .Nm
 is invoked via
@@ -396,8 +398,8 @@ command first appeared in WIDE Hydrangea IPv6 protocol stack kit.
 It is very insecure to use
 .Xr rhosts 5
 and other IP-address based authentication, for connections relayed by
-.Nm
-.Pq and any other TCP relaying services .
+.Nm Ns ,
+and any other TCP relaying services.
 .Pp
 Administrators are advised to limit accesses to
 .Nm
