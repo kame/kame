@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.49 2000/01/14 16:08:28 itojun Exp $ */
+/* KAME $Id: key.c,v 1.50 2000/01/16 12:56:12 sumikawa Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -75,15 +75,18 @@
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/in_var.h>
-#include <netinet/in_pcb.h>
 
 #ifdef INET6
 #include <netinet6/ip6.h>
 #include <netinet6/in6_var.h>
 #if !(defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet6/ip6_var.h>
-#include <netinet6/in6_pcb.h>
 #endif
+#endif /* INET6 */
+
+#include <netinet/in_pcb.h>
+#ifdef INET6
+#include <netinet6/in6_pcb.h>
 #endif /* INET6 */
 
 #include <netkey/keyv2.h>
