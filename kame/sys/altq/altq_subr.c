@@ -1,4 +1,4 @@
-/*	$KAME: altq_subr.c,v 1.8 2000/12/14 08:12:46 thorpej Exp $	*/
+/*	$KAME: altq_subr.c,v 1.9 2001/09/04 06:31:15 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -1263,6 +1263,9 @@ ip4f_cache(ip, fin)
 
 	fp = ip4f_alloc();
 	fp->ip4f_id = ip->ip_id;
+	fp->ip4f_info.fi_proto = ip->ip_p;
+	fp->ip4f_info.fi_src.s_addr = ip->ip_src.s_addr;
+	fp->ip4f_info.fi_dst.s_addr = ip->ip_dst.s_addr;
 
 	/* save port numbers */
 	fp->ip4f_info.fi_sport = fin->fi_sport;
