@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.64 2001/05/08 04:36:37 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.65 2001/06/02 00:12:41 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.64 2001/05/08 04:36:37 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.65 2001/06/02 00:12:41 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -2389,10 +2389,10 @@ ifflags(flags)
 	strlcpy(buf, "", sizeof(buf));
 #define	IFFLAG(s, f) \
 do { \
-	if (flags & f) { \
+	if (flags & (f)) { \
 		if (buf[0]) \
 			strlcat(buf, ",", sizeof(buf)); \
-		strlcat(buf, s, sizeof(buf)); \
+		strlcat(buf, (s), sizeof(buf)); \
 	} \
 } while (0)
 	IFFLAG("UP", IFF_UP);
