@@ -697,40 +697,51 @@ find_vif_direct_local(src)
     return (NO_VIF);
 }
 
-if_set *vif_forwarder(if_set *p1 , if_set *p2)
+int
+vif_forwarder(if_set *p1 , if_set *p2)
 {
 	int idx;
 
-	IF_ZERO(&if_result);
-
 	for(idx=0 ; idx < sizeof(*p1)/sizeof(fd_mask) ; idx++)
 	{
-		if_result.ifs_bits[idx] = p1->ifs_bits[idx] & p2->ifs_bits[idx];
+		if (p1->ifs_bits[idx] & p2->ifs_bits[idx])
+			return(TRUE);
 		
 	}
-	
-	if(IF_ISEMPTY(&if_result))
-		return NULL;
-	else
-		return &if_result;
+
+	/* (p1 & p2) is empty. We're not the forwarder */
+	return(FALSE);
 }
 
-if_set *vif_xor(if_set *p1 , if_set *p2)
+if_set *
+vif_and(if_set *p1 , if_set *p2, if_set *result)
 {
 	int idx;
 
-	IF_ZERO(&if_result);
+	IF_ZERO(result);
 
 	for(idx=0 ; idx < sizeof(*p1)/sizeof(fd_mask) ; idx++)
 	{
-		if_result.ifs_bits[idx] = p1->ifs_bits[idx] ^ p2->ifs_bits[idx];
-		
+		result->ifs_bits[idx] = p1->ifs_bits[idx] & p2->ifs_bits[idx];
 	}
-	
-	if(IF_ISEMPTY(&if_result))
-		return NULL;
-	else
-		return &if_result;
+
+	return(result);
+}
+
+if_set *
+vif_xor(if_set *p1 , if_set *p2, if_set *result)
+{
+	int idx;
+
+	IF_ZERO(result);
+
+	for(idx=0 ; idx < sizeof(*p1)/sizeof(fd_mask) ; idx++)
+	{
+		result->ifs_bits[idx] =
+			p1->ifs_bits[idx] ^ p2->ifs_bits[idx];
+	}
+
+	return(result);
 }
 /*  
  * stop all vifs

@@ -508,7 +508,7 @@ age_routes()
 			< kernel_cache_ptr->sg_count.bytecnt)
 		    {
 			if (vif_forwarder(&mrtentry_rp->leaves,
-					   &mrtentry_rp->oifs))
+					  &mrtentry_rp->oifs) == TRUE)
 			{
 #ifdef KERNEL_MFC_WC_G
 // TODO (one day... :))
@@ -696,7 +696,7 @@ age_routes()
 				< kernel_cache_ptr->sg_count.bytecnt)
 			    {
 				if (vif_forwarder(&mrtentry_grp->leaves,
-						   &mrtentry_grp->oifs))
+						  &mrtentry_grp->oifs) == TRUE)
 				{
 #ifdef KERNEL_MFC_WC_G
 // TODO 
@@ -953,7 +953,8 @@ age_routes()
 				< kernel_cache_ptr->sg_count.bytecnt)
 			    {
 				if (vif_forwarder(&mrtentry_srcs->leaves,
-						   &mrtentry_srcs->oifs))
+						  &mrtentry_srcs->oifs)
+				    == TRUE)
 				{
 				    switch_shortest_path(&kernel_cache_ptr->source, &kernel_cache_ptr->group);
 				    did_switch_flag = TRUE;
@@ -1140,16 +1141,13 @@ age_routes()
 			if (mrtentry_srcs->group->grp_route
 			    != (mrtentry_t *) NULL)
 			{
-				if_set *r1;
-				if_set  r2;
-				if_set r3;	
-				r1 = vif_forwarder(&mrtentry_srcs->group->grp_route->leaves,
-					&mrtentry_srcs->leaves);
-				IF_COPY(r1,&r2);
-				r1 = vif_xor(&r2 ,&mrtentry_srcs->leaves); 
-				IF_COPY(r1,&r3);
-
-			    if (IF_ISEMPTY(&r3))
+				if_set r_and, r_xor;
+				vif_and(&mrtentry_srcs->group->grp_route->leaves,
+					&mrtentry_srcs->leaves,
+					&r_and);
+				vif_xor(&r_and ,&mrtentry_srcs->leaves,
+					&r_xor);
+			    if (IF_ISEMPTY(&r_xor))
 			    {
 				delete_mrtentry(mrtentry_srcs);
 				continue;

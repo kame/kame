@@ -240,7 +240,7 @@ extern vifi_t   local_address       __P((struct sockaddr_in6 *src));
 struct sockaddr_in6 * local_iface( char *ifname );
 extern vifi_t   find_vif_direct     __P((struct sockaddr_in6 *src));
 extern vifi_t  find_vif_direct_local   __P((struct sockaddr_in6 *src));
-extern if_set *	vif_forwarder			__P((if_set *p1 ,if_set *p2));
-extern if_set * vif_xor					__P((if_set *p1 , if_set *p2));
-
+extern int vif_forwarder __P((if_set *p1 ,if_set *p2));
+extern if_set *vif_and __P((if_set *p1, if_set *p2, if_set *result)); 
+extern if_set *vif_xor __P((if_set *p1, if_set *p2, if_set *result));
 #endif
