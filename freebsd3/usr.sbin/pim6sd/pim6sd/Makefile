@@ -33,13 +33,15 @@ SRCS=	mld6.c mld6_proto.c\
 	cfparse.y cftoken.l
 CLEANFILES+= lex.yy.c y.tab.h y.tab.c
 CFLAGS+= -g
-CFLAGS+=-I.
+CFLAGS+=-I${.OBJDIR}
 CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -I${SRCDIR}
 CFLAGS+=-DHAVE_STDARG_H
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
 	-L/usr/local/v6/lib -linet6
 DPADD+=	${.OBJDIR}/../../../lib/libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
+LDADD+=	-ll -ly
+DPADD+=	${LIBL} ${LIBY}
 
 MAN5=	pim6sd.conf.5
 MAN8=	pim6sd.8
