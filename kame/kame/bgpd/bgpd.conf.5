@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: bgpd.conf.5,v 1.5 2000/02/19 17:18:09 jinmei Exp $
+.\"     $Id: bgpd.conf.5,v 1.6 2000/04/16 17:11:27 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt BGPD.CONF 5
@@ -104,7 +104,7 @@ option means all the BGP related options to be printed.
 .Sh Specifying Dump File
 .Bl -tag -width Ds -compact
 .It Xo
-.Ic dumpfile Ar filename;
+.Ic dumpfile Ar filename Ic ;
 .Xc
 Specifies the name of the dump file
 (see
@@ -115,7 +115,7 @@ Specifies the name of the dump file
 The following four route filters can be specified, each of which
 is for a RIPng interface or a BGP peer (see below).
 .Bl -tag -width Ds -compact
-.It Ic filterin Ar prefix
+.It Ic filterin Ar prefix Ic ;
 Specifies incoming route filtering. If an incoming route on the
 interface or from the peer matches the specified prefix,
 it will be ignored and will not be installed in the kernel.
@@ -138,7 +138,7 @@ but the latter is to specify filtering all routes that match
 .Ar ::/0 ,
 that is, filtering all incoming routes.
 .\"
-.It Ic restrictin Ar prefix
+.It Ic restrictin Ar prefix Ic ;
 Specifies incoming route restriction.
 An incoming route on the interface or from the peer
 will be ignored unless it matches
@@ -152,7 +152,7 @@ attribute, the special string
 can be specified as a prefix, which means that all non default routes
 will be ignored on the interface or from the peer.
 .\"
-.It Ic filterout Ar prefix
+.It Ic filterout Ar prefix Ic ;
 Specifies outgoing route filtering. If an outgoing route on the
 interface or to the peer matches the specified prefix,
 it will not be advertised.
@@ -172,7 +172,7 @@ of the
 .Ic noripout .
 attribute.
 .\"
-.It Ic restrictout Ar prefix
+.It Ic restrictout Ar prefix Ic ;
 Specifies outgoing route restriction.
 An outgoing route on the interface or to the peer will not be
 advertised unless it matches
@@ -189,32 +189,32 @@ advertised on the interface nor to the peer.
 .Sh The BGP Related Statements
 .Bl -tag -width Ds -compact
 .It Xo
-.Ic autonomoussystem Ar as_number;
+.Ic autonomoussystem Ar as_number Ic ;
 .Xc
 Sets the autonomous system number of this router to be autonomous
 system.
 This statement is required if BGP is in use.
 The AS number is assigned by the Network Information Center (NIC).
 .\"
-.It Ic bgpsbsize Ar size
+.It Ic bgpsbsize Ar size Ic ;
 Sets the size of socket write buffer for each BGP socket.
 .\"
-.It Ic routerid Ar router_id;
+.It Ic routerid Ar router_id Ic ;
 Sets the router identifier for use by the BGP and OSPF protocols.
 The default is the address of the first interface encountered by
 .Nm bgpd
 except the loopback address(127.0.0.1).
 .\"
-.It Ic clusterid Ar cluster_id;
+.It Ic clusterid Ar cluster_id Ic ;
 Sets the cluster identifier for use as a BGP route reflector.
 The default is the address of the first interface encountered by
 .Nm bgpd
 except the loopback address(127.0.0.1).
 .\"
-.It Ic IamRouteReflector;
+.It Ic IamRouteReflector ;
 Specifies to act as a route reflector.
 .\"
-.It Ic holdtime Ar seconds;
+.It Ic holdtime Ar seconds Ic ;
 Specifies the BGP holdtime value to use when negotiating the
 connection with this peer, in seconds.
 According to BGP, if bgpd does not receive a keepalive, update, or notification message
@@ -397,7 +397,7 @@ By default RIPng is disabled.
 Possible substatements are as follows.
 .\"
 .It Xo
-.Ic interface Ar interface attributes
+.Ic interface Ar interface Op Ar attributes...
 .Ic ;
 .Xc
 Controls various attributes of sending or receiving RIP on specific
