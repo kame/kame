@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.40 2000/06/12 09:35:06 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.41 2000/07/04 09:23:39 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -97,7 +97,7 @@ quick_i1prep(iph2, msg)
 	struct ph2handle *iph2;
 	vchar_t *msg; /* must be null pointer */
 {
-	int error = -1;
+	int error = ISAKMP_INTERNAL_ERROR;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -150,7 +150,7 @@ quick_i1send(iph2, msg)
 	struct isakmp_gen *gen;
 	char *p;
 	int tlen;
-	int error = -1;
+	int error = ISAKMP_INTERNAL_ERROR;
 	int pfsgroup;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
@@ -283,7 +283,7 @@ quick_i2recv(iph2, msg0)
 	int f_id;
 	char *p;
 	int tlen;
-	int error = -1;
+	int error = ISAKMP_INTERNAL_ERROR;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -519,7 +519,7 @@ quick_i2send(iph2, msg0)
 	vchar_t *buf = NULL;
 	char *p = NULL;
 	int tlen;
-	int error = -1;
+	int error = ISAKMP_INTERNAL_ERROR;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -647,7 +647,7 @@ quick_i3recv(iph2, msg0)
 	struct isakmp_parse_t *pa;
 	struct isakmp_pl_hash *hash = NULL;
 	vchar_t *notify = NULL;
-	int error = -1;
+	int error = ISAKMP_INTERNAL_ERROR;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -1085,7 +1085,7 @@ quick_r1prep(iph2, msg)
 	struct ph2handle *iph2;
 	vchar_t *msg;
 {
-	int error = -1;
+	int error = ISAKMP_INTERNAL_ERROR;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -1127,7 +1127,7 @@ quick_r2send(iph2, msg)
 	struct isakmp_gen *gen;
 	char *p;
 	int tlen;
-	int error = -1;
+	int error = ISAKMP_INTERNAL_ERROR;
 	int pfsgroup;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
@@ -1265,7 +1265,7 @@ quick_r3recv(iph2, msg0)
 	vchar_t *pbuf = NULL;	/* for payload parsing */
 	struct isakmp_parse_t *pa;
 	struct isakmp_pl_hash *hash = NULL;
-	int error = -1;
+	int error = ISAKMP_INTERNAL_ERROR;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -1391,7 +1391,7 @@ quick_r3send(iph2, msg0)
 	vchar_t *notify = NULL;
 	char *p;
 	int tlen;
-	int error = -1;
+	int error = ISAKMP_INTERNAL_ERROR;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -1488,7 +1488,7 @@ quick_r3prep(iph2, msg0)
 	vchar_t *msg0;
 {
 	vchar_t *msg = NULL;
-	int error = -1;
+	int error = ISAKMP_INTERNAL_ERROR;
 
 	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -1552,7 +1552,7 @@ quick_ir1sendmx(iph2, body)
 	char *p;
 	int tlen;
 	struct isakmp_gen *gen;
-	int error = -1;
+	int error = ISAKMP_INTERNAL_ERROR;
 
 	/* create buffer for isakmp payload */
 	tlen = sizeof(*isakmp)
@@ -1621,7 +1621,7 @@ get_sainfo_r(iph2)
 {
 	vchar_t *idsrc = NULL, *iddst = NULL;
 	int prefixlen;
-	int error = -1;
+	int error = ISAKMP_INTERNAL_ERROR;
 
 	if (iph2->id_p == NULL) {
 		switch (iph2->src->sa_family) {

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.77 2000/06/28 09:58:19 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.78 2000/07/04 09:23:39 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -527,6 +527,12 @@ ph1_main(iph1, msg)
 	struct ph1handle *iph1;
 	vchar_t *msg;
 {
+	int error;
+
+	/* ignore a packet */
+	if (iph1->status == PHASE1ST_ESTABLISHED)
+		return 0;
+
 	/* receive */
 	if (ph1exchange[etypesw1(iph1->etype)]
 		       [iph1->side]
@@ -535,12 +541,21 @@ ph1_main(iph1, msg)
 			"ERROR: why isn't the function defined.\n");
 		return -1;
 	}
-	if ((ph1exchange[etypesw1(iph1->etype)]
-			[iph1->side]
-			[iph1->status])(iph1, msg) < 0) {
+	error = (ph1exchange[etypesw1(iph1->etype)]
+			    [iph1->side]
+			    [iph1->status])(iph1, msg);
+	if (error != 0) {
 		plog(logp, LOCATION, iph1->remote,
 			"ERROR: failed to pre-process packet.\n");
+#if 0
+		/* XXX
+		 * To be responded with a notify and delete phase 1 handler,
+		 * OR not to be responded and keep phase 1 handler.
+		 */
 		return -1;
+#else
+		return 0;
+#endif
 	}
 
 	/* free resend buffer */
@@ -564,7 +579,7 @@ ph1_main(iph1, msg)
 	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
 	if ((ph1exchange[etypesw1(iph1->etype)]
 			[iph1->side]
-			[iph1->status])(iph1, msg) < 0) {
+			[iph1->status])(iph1, msg) != 0) {
 		plog(logp, LOCATION, iph1->remote,
 			"ERROR: failed to process packet.\n");
 		return -1;
@@ -584,6 +599,11 @@ quick_main(iph2, msg)
 	struct isakmp *isakmp = (struct isakmp *)msg->v;
 	int error;
 
+	/* ignore a packet */
+	if (iph2->status == PHASE2ST_ESTABLISHED
+	 || iph2->status == PHASE2ST_GETSPISENT)
+		return 0;
+
 	/* receive */
 	if (ph2exchange[etypesw2(isakmp->etype)]
 		       [iph2->side]
@@ -598,9 +618,10 @@ quick_main(iph2, msg)
 	if (error != 0) {
 		plog(logp, LOCATION, iph2->ph1->remote,
 			"ERROR: failed to pre-process packet.\n");
-		if (error != ISAKMP_INTERNAL_ERROR)
-			isakmp_info_send_n2(iph2, error, NULL);
-		return -1;
+		if (error == ISAKMP_INTERNAL_ERROR)
+			return 0;
+		isakmp_info_send_n2(iph2, error, NULL);
+			return -1;
 	}
 
 	/* free resend buffer */
@@ -624,7 +645,7 @@ quick_main(iph2, msg)
 	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
 	if ((ph2exchange[etypesw2(isakmp->etype)]
 			[iph2->side]
-			[iph2->status])(iph2, msg) < 0) {
+			[iph2->status])(iph2, msg) != 0) {
 		plog(logp, LOCATION, iph2->ph1->remote,
 			"ERROR: failed to process packet.\n");
 		return -1;
@@ -975,7 +996,7 @@ isakmp_parsewoh(np0, gen, len)
 
 		p->type = np;
 		p->len = ntohs(gen->len);
-		if (p->len == 0) {
+		if (p->len == 0 || p->len > tlen) {
 			plog(logp, LOCATION, NULL,
 				"invalid length of payload\n");
 			vfree(result);
