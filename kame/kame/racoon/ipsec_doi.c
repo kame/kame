@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.12 2000/01/11 04:59:29 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.13 2000/01/11 12:22:47 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -95,7 +95,16 @@ static struct prop_pair **get_proppair __P((struct ipsecdoi_pl_sa *sa, int mode)
 static struct isakmpsa *get_ph1approvalx __P((struct prop_pair *p, struct isakmpsa *proposal));
 static int t2isakmpsa __P((struct isakmp_pl_t *trns, struct isakmpsa *sa));
 static vchar_t *get_ph2approval __P((struct ph2handle *iph2, struct prop_pair **pair));
-static struct ipsecsa *get_ph2approvalx __P((struct prop_pair *p, struct ipsecsa *proposal));
+static int get_ph2approvalx __P((struct ph2handle *, struct prop_pair *));
+#if 0
+static const struct ipsecsa *find_proposalmatch
+	__P((const struct ipsecsa *p1, const struct ipsecsa *p2));
+#endif
+static int cmpproposal_bundles __P((const struct ipsecsa *p1,
+	const struct ipsecsa *p2));
+static int cmpproposal __P((const struct ipsecsa *p1,
+	const struct ipsecsa *p2));
+
 static int t2ipsecsa __P((struct isakmp_pl_t *trns, struct ipsecsa *sa));
 
 static struct prop_pair **get_proppair
@@ -151,8 +160,8 @@ static vchar_t *sockaddr2id __P((struct sockaddr *saddr,
 static int mksakeys __P((struct ipsecsa *b, struct ipsecsakeys **keys,
 	struct sockaddr *dst, struct sockaddr *src));
 
-static const char *ipsecdoi_printsa_bundle __P((struct ipsecsa *));
-static const char *ipsecdoi_printsa_1 __P((struct ipsecsa *));
+static const char *ipsecdoi_printsa_bundle __P((const struct ipsecsa *));
+static const char *ipsecdoi_printsa_1 __P((const struct ipsecsa *));
 
 /*%%%*/
 /*
@@ -630,7 +639,6 @@ get_ph2approval(iph2, pair)
 	struct prop_pair **pair;
 {
 	vchar_t *newsa;
-	struct ipsecsa *sa;
 	struct prop_pair *s;
 	int prophlen;
 	int i;
@@ -650,8 +658,7 @@ get_ph2approval(iph2, pair)
 			prophlen = sizeof(struct isakmp_pl_p)
 					+ s->prop->spi_size;
 			/* compare proposal and select one */
-			sa = get_ph2approvalx(s, iph2->spidx->policy->proposal);
-			if (sa != NULL)
+			if (get_ph2approvalx(iph2, s) == 0)
 				goto found;
 		}
 	}
@@ -661,8 +668,6 @@ get_ph2approval(iph2, pair)
 	return NULL;
 
 found:
-	iph2->approval = sa;
-
 	newsa = get_sabyproppair(s);
 	if (newsa == NULL)
 		iph2->approval = NULL;
@@ -671,14 +676,15 @@ found:
 }
 
 /* compare my proposal and peers proposal. */
-static struct ipsecsa *
-get_ph2approvalx(p, proposal)
+/* XXX bundle must properly be extracted from prop_pair */
+static int
+get_ph2approvalx(iph2, p)
+	struct ph2handle *iph2;
 	struct prop_pair *p;
-	struct ipsecsa *proposal;
 {
-	struct isakmp_pl_p *prop = p->prop;
-	struct isakmp_pl_t *trns = p->trns;
-	struct ipsecsa sa, *s;
+	const struct ipsecsa *proposal = iph2->spidx->policy->proposal;
+	struct ipsecsa sa;
+	struct ipsecsa *r;
 
 	YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL, "begin.\n"));
 
@@ -686,107 +692,209 @@ get_ph2approvalx(p, proposal)
 		plog(logp, LOCATION, NULL,
 	       		"prop#=%d prot-id=%s spi-size=%d #trns=%d "
 			"trns#=%d trns-id=%s\n",
-			prop->p_no, s_ipsecdoi_proto(prop->proto_id),
-			prop->spi_size, prop->num_t,
-			trns->t_no,
-			s_ipsecdoi_trns(prop->proto_id, trns->t_id)));
+			p->prop->p_no, s_ipsecdoi_proto(p->prop->proto_id),
+			p->prop->spi_size, p->prop->num_t,
+			p->trns->t_no,
+			s_ipsecdoi_trns(p->prop->proto_id, p->trns->t_id)));
 
 	/* XXX Is it good to compare directly ? */
 	memset(&sa, 0, sizeof(sa));
 
 	/* XXX structure of ipsecsa may be strange. should be fix ? */
-	sa.proto_id = prop->proto_id;
+	sa.proto_id = p->prop->proto_id;
 	if (sa.proto_id == IPSECDOI_PROTO_IPSEC_ESP)
-		sa.enctype = trns->t_id;
+		sa.enctype = p->trns->t_id;
 	if (sa.proto_id == IPSECDOI_PROTO_IPCOMP)
-		sa.comptype = trns->t_id;
+		sa.comptype = p->trns->t_id;
 
-	if (t2ipsecsa(trns, &sa) < 0)
-		return NULL;
+	if (t2ipsecsa(p->trns, &sa) < 0)
+		return -1;
 
 	YIPSDEBUG(DEBUG_DSA,
-		plog(logp, LOCATION, NULL, "peer's proposal:\n");
+		plog(logp, LOCATION, NULL, "peer's full proposal:\n");
 		plog(logp, LOCATION, NULL, "%s\n", ipsecdoi_printsa(&sa)););
+	YIPSDEBUG(DEBUG_DSA,
+		plog(logp, LOCATION, NULL, "my full proposal:\n");
+		plog(logp, LOCATION, NULL, "%s\n", ipsecdoi_printsa(proposal)););
 
-	for (s = proposal; s != NULL; s = s->next) {
-		YIPSDEBUG(DEBUG_DSA,
-			plog(logp, LOCATION, NULL, "my proposal:\n");
-			plog(logp, LOCATION, NULL, "%s\n",
-				ipsecdoi_printsa(s)););
+    {
+	const struct ipsecsa *q1;
+	const struct ipsecsa *q2;
 
-		if (sa.proto_id != s->proto_id)
-			continue;
-#if 0
-		/* XXX to be considered */
-		if (sa.lifetime > s->lifetime) ;
-		if (sa.lifebyte > s->lifebyte) ;
-		if (sa.encklen >= s->encklen) ;
-#endif
-		if (sa.encmode != s->encmode)
-			continue;
+	for (q1 = &sa; q1; q1 = q1->next) {
+		for (q2 = proposal; q2; q2 = q2->next) {
+			YIPSDEBUG(DEBUG_DSA,
+				plog(logp, LOCATION, NULL,
+					"peer's single bundle:\n");
+				plog(logp, LOCATION, NULL, "%s\n",
+					ipsecdoi_printsa_bundle(q1)););
+			YIPSDEBUG(DEBUG_DSA,
+				plog(logp, LOCATION, NULL,
+					"my single bundle:\n");
+				plog(logp, LOCATION, NULL, "%s\n",
+					ipsecdoi_printsa_bundle(q2)););
 
-#if 0
-		/* XXX Should I do acceptable check of phase 2 pfs group ? */
-		/* XXX to be held acceptable list of pfs group ? */
-		if (s->ipsp->pfs_group != 0
-		 && sa.pfs_group != s->ipsp->pfs_group)
-			continue;
-#endif
-
-		switch (sa.proto_id) {
-		case IPSECDOI_PROTO_IPSEC_ESP:
-			if (sa.enctype == s->enctype
-			 && sa.authtype == s->authtype)
+			if (cmpproposal_bundles(q1, q2) == 0)
 				goto found;
-			break;
-		case IPSECDOI_PROTO_IPSEC_AH:
-			if (sa.authtype == s->authtype)
-				goto found;
-			break;
-		case IPSECDOI_PROTO_IPCOMP:
-			if (sa.comptype == s->comptype)
-				goto found;
-			break;
-		default:
-			plog(logp, LOCATION, NULL,
-				"invalid proto_id found %d\n", sa.proto_id);
-			continue;
+
+			YIPSDEBUG(DEBUG_DSA,
+				plog(logp, LOCATION, NULL, "not matched\n"););
 		}
 	}
+	return -1;
 
-	YIPSDEBUG(DEBUG_SA,
-		plog(logp, LOCATION, NULL,
-			"no acceptable proposal found.\n"));
+found:
+	YIPSDEBUG(DEBUG_DSA, plog(logp, LOCATION, NULL, "matched\n"););
+	if (q1 == NULL) {
+		YIPSDEBUG(DEBUG_SA, plog(logp, LOCATION, NULL,
+				"no acceptable proposal found.\n"));
+		return -1;
+	}
 
+	/* duplicate the result for future modification */
+	r = dupipsecsa(q1);
+	delipsecsa(r->bundles);
+	r->bundles = NULL;
+    }
+
+	if (iph2->side == RESPONDER) {
+		/* XXX record spi? */
+	} else {
+		/* set peer's spi from proposal payload */
+		struct sockaddr *dst;
+		struct ipsecsakeys *k;
+
+		dst = r->dst ? r->dst : iph2->dst; /* XXX cheat */
+		for (k = iph2->keys; k != NULL; k = k->next) {
+			if (r->proto_id == k->proto_id
+			 && r->encmode == k->encmode
+			 && cmpsaddrwop(dst, k->dst) == 0)
+				break;
+		}
+		if (k == NULL) {
+			plog(logp, LOCATION, NULL,
+				"no SPI found for %s/%s\n",
+				s_ipsecdoi_proto(r->proto_id),
+				saddrwop2str(dst));
+			delipsecsa(r);
+			return -1;
+		}
+		memcpy(&k->spi_p, p->prop + 1, sizeof(k->spi_p));
+
+	}
+
+	iph2->approval = r;
+
+	return 0;
+}
+
+#if 0
+/*
+ * take a match against proposals (which is a linked list of bundles).
+ * returns element from first argument only.
+ */
+static const struct ipsecsa *
+find_proposalmatch(p1, p2)
+	const struct ipsecsa *p1;
+	const struct ipsecsa *p2;
+{
+	const struct ipsecsa *q1;
+	const struct ipsecsa *q2;
+
+	YIPSDEBUG(DEBUG_DSA,
+		plog(logp, LOCATION, NULL, "peer's single bundle:\n");
+		plog(logp, LOCATION, NULL, "%s\n",
+			ipsecdoi_printsa_bundle(p1)););
+	YIPSDEBUG(DEBUG_DSA,
+		plog(logp, LOCATION, NULL, "my single bundle:\n");
+		plog(logp, LOCATION, NULL, "%s\n",
+			ipsecdoi_printsa_bundle(p2)););
+
+	for (q1 = p1; q1; q1 = q1->next) {
+		for (q2 = p2; q2; q2 = q2->next) {
+			if (cmpproposal_bundles(q1, q2) == 0)
+				goto found;
+		}
+	}
+	YIPSDEBUG(DEBUG_DSA, plog(logp, LOCATION, NULL, "not matched\n"););
 	return NULL;
 
 found:
-	if (proposal->ipsp->spidx->ph2->side == RESPONDER)
-		return s;
+	YIPSDEBUG(DEBUG_DSA, plog(logp, LOCATION, NULL, "matched\n"););
+	return q1;
+}
+#endif
 
-	/* set peer's spi from proposal payload */
-    {
-	struct sockaddr *dst;
-	struct ipsecsakeys *k;
+/*
+ * take a complete match against bundles.  the order must match as well.
+ * 0 if equal.
+ */
+static int
+cmpproposal_bundles(p1, p2)
+	const struct ipsecsa *p1;
+	const struct ipsecsa *p2;
+{
+	const struct ipsecsa *q1;
+	const struct ipsecsa *q2;
 
-	dst = s->dst ? s->dst : proposal->ipsp->spidx->ph2->dst; /* XXX cheat */
-	for (k = proposal->ipsp->spidx->ph2->keys; k != NULL; k = k->next) {
-		if (s->proto_id == k->proto_id
-		 && s->encmode == k->encmode
-		 && cmpsaddrwop(dst, k->dst) == 0)
-			break;
+	q1 = p1;
+	q2 = p2;
+	while (q1 && q2) {
+		if (cmpproposal(q1, q2) != 0)
+			goto fail;
+		q1 = q1->bundles;
+		q2 = q2->bundles;
 	}
-	if (k == NULL) {
+
+	/* if the length of bundles is different, they don't match */
+	if (q1 || q2)
+		goto fail;
+
+	return 0;
+
+fail:
+	return 1;
+}
+
+/* take a single match betwee ipsecsa.  0 if equal. */
+static int
+cmpproposal(p1, p2)
+	const struct ipsecsa *p1;
+	const struct ipsecsa *p2;
+{
+	if (p1->proto_id != p2->proto_id)
+		goto fail;
+	if (p1->encmode != p2->encmode)
+		goto fail;
+#if 0
+	/* XXX to be considered */
+	if (p1->lifetime > p2->lifetime) ;
+	if (p1->lifebyte > p2->lifebyte) ;
+	if (p1->encklen >= p2->encklen) ;
+#endif
+
+	switch (p1->proto_id) {
+	case IPSECDOI_PROTO_IPSEC_ESP:
+		if (p1->enctype != p2->enctype || p1->authtype != p2->authtype)
+			goto fail;
+		break;
+	case IPSECDOI_PROTO_IPSEC_AH:
+		if (p1->authtype != p2->authtype)
+			goto fail;
+		break;
+	case IPSECDOI_PROTO_IPCOMP:
+		if (p1->comptype == p2->comptype)
+			goto fail;
+		break;
+	default:
 		plog(logp, LOCATION, NULL,
-			"no SPI found for %s/%s\n",
-			s_ipsecdoi_proto(s->proto_id),
-			saddrwop2str(dst));
-		return NULL;
+			"invalid proto_id found %d\n", p1->proto_id);
+		goto fail;
 	}
-	memcpy(&k->spi_p, prop + 1, sizeof(k->spi_p));
 
-	return s;
-    }
+	return 0;
+fail:
+	return 1;
 }
 
 /*
@@ -3059,13 +3167,13 @@ err:
 
 const char *
 ipsecdoi_printsa(s0)
-	struct ipsecsa *s0;
+	const struct ipsecsa *s0;
 {
 	static char *buf = NULL;
 	char *p;
 	size_t bufsiz = 0;
 	size_t l;
-	struct ipsecsa *s;
+	const struct ipsecsa *s;
 
 	l = 0;
 	for (s = s0; s; s = s->next)
@@ -3098,13 +3206,13 @@ ipsecdoi_printsa(s0)
 
 static const char *
 ipsecdoi_printsa_bundle(s0)
-	struct ipsecsa *s0;
+	const struct ipsecsa *s0;
 {
 	static char *buf = NULL;
 	char *p;
 	size_t bufsiz = 0;
 	size_t l;
-	struct ipsecsa *s;
+	const struct ipsecsa *s;
 
 	l = 0;
 	for (s = s0; s; s = s->bundles)
@@ -3137,7 +3245,7 @@ ipsecdoi_printsa_bundle(s0)
 
 static const char *
 ipsecdoi_printsa_1(s)
-	struct ipsecsa *s;
+	const struct ipsecsa *s;
 {
 	static char buf[BUFSIZ];
 

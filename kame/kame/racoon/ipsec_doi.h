@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.7 2000/01/11 05:18:00 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.8 2000/01/11 12:22:47 itojun Exp $ */
 
 /* refered to RFC2407 */
 
@@ -168,5 +168,5 @@ extern int ipproto2doi __P((int proto));
 extern int ipsecdoi_fixsakeys __P((struct ph2handle *iph2));
 extern int ipsecdoi_initsakeys __P((struct ph2handle *iph2));
 
-extern const char *ipsecdoi_printsa __P((struct ipsecsa *));
+extern const char *ipsecdoi_printsa __P((const struct ipsecsa *));
 

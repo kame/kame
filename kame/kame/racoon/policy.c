@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.5 2000/01/11 00:18:14 itojun Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.6 2000/01/11 12:22:48 itojun Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -308,6 +308,43 @@ insipsa(new, ipsp)
 	ipsp->proposal = new;
 
 	return;
+}
+
+struct ipsecsa *
+dupipsecsa(s)
+	const struct ipsecsa *s;
+{
+	struct ipsecsa *d;
+
+	if (!s)
+		return NULL;
+	d = newipsa();
+	if (d == NULL)
+		return NULL;
+	memcpy(d, s, sizeof(*s));
+	if (s->dst)
+		d->dst = dupsaddr(s->dst);
+	if (s->bundles)
+		d->bundles = dupipsecsa(s->bundles);
+	if (s->next)
+		d->next = dupipsecsa(s->next);
+	return d;
+}
+
+void
+delipsecsa(s)
+	struct ipsecsa *s;
+{
+
+	if (!s)
+		return;
+	if (s->dst)
+		free(s->dst);
+	if (s->bundles)
+		delipsecsa(s->bundles);
+	if (s->next)
+		delipsecsa(s->next);
+	free(s);
 }
 
 char *
