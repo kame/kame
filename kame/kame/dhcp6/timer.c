@@ -1,4 +1,4 @@
-/*	$KAME: timer.c,v 1.4 2003/02/11 05:33:37 suz Exp $	*/
+/*	$KAME: timer.c,v 1.5 2003/03/14 11:06:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -71,14 +71,14 @@ dhcp6_add_timer(timeout, timeodata)
 	struct dhcp6_timer *newtimer;
 
 	if ((newtimer = malloc(sizeof(*newtimer))) == NULL) {
-		dprintf(LOG_ERR, "%s" "can't allocate memory", FNAME);
+		dprintf(LOG_ERR, FNAME, "can't allocate memory");
 		return (NULL);
 	}
 
 	memset(newtimer, 0, sizeof(*newtimer));
 
 	if (timeout == NULL) {
-		dprintf(LOG_ERR, "%s" "timeout function unspecified", FNAME);
+		dprintf(LOG_ERR, FNAME, "timeout function unspecified");
 		exit(1);
 	}
 	newtimer->expire = timeout;
@@ -165,9 +165,8 @@ dhcp6_timer_rest(timer)
 
 	gettimeofday(&now, NULL);
 	if (TIMEVAL_LEQ(timer->tm, now)) {
-		syslog(LOG_DEBUG,
-		       "<%s> a timer must be expired, but not yet",
-		       FNAME);
+		syslog(LOG_DEBUG, FNAME,
+		    "a timer must be expired, but not yet");
 		returnval.tv_sec = returnval.tv_usec = 0;
 	} else
 		timeval_sub(&timer->tm, &now, &returnval);

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.20 2003/02/07 12:22:03 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.21 2003/03/14 11:06:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -80,8 +80,7 @@ extern void yyerror __P((char *, ...))
 	l->list = (pl); \
 	} while (0)
 
-static struct cf_namelist *iflist_head, *piflist_head, *hostlist_head,
-	*iapdlist_head;
+static struct cf_namelist *iflist_head, *hostlist_head, *iapdlist_head;
 struct cf_list *cf_dns_list;
 
 extern int yylex __P((void));

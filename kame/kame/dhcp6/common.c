@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.78 2003/02/04 02:47:15 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.79 2003/03/14 11:06:26 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -222,8 +222,8 @@ dhcp6_add_listval(head, type, val, sublist)
 	struct dhcp6_listval *lv = NULL;
 
 	if ((lv = malloc(sizeof(*lv))) == NULL) {
-		dprintf(LOG_ERR, "%s" "failed to allocate memory for list "
-		    "entry", FNAME);
+		dprintf(LOG_ERR, FNAME,
+		    "failed to allocate memory for list entry");
 		goto fail;
 	}
 	memset(lv, 0, sizeof(*lv));
@@ -247,8 +247,8 @@ dhcp6_add_listval(head, type, val, sublist)
 		lv->val_ia = *(struct dhcp6_ia *)val;
 		break;
 	default:
-		dprintf(LOG_ERR, "%s" "unexpected list value type (%d)",
-		    FNAME, type);
+		dprintf(LOG_ERR, FNAME,
+		    "unexpected list value type (%d)", type);
 		goto fail;
 	}
 
@@ -274,8 +274,8 @@ dhcp6_create_event(ifp, state)
 	struct dhcp6_event *ev;
 
 	if ((ev = malloc(sizeof(*ev))) == NULL) {
-		dprintf(LOG_ERR, "%s" "failed to allocate memory for an event",
-			FNAME);
+		dprintf(LOG_ERR, FNAME,
+		    "failed to allocate memory for an event");
 		return (NULL);
 	}
 	memset(ev, 0, sizeof(*ev));
@@ -292,8 +292,8 @@ dhcp6_remove_event(ev)
 {
 	struct dhcp6_serverinfo *sp, *sp_next;
 
-	dprintf(LOG_DEBUG, "%s" "removing an event on %s, state=%s", FNAME,
-		ev->ifp->ifname, dhcp6_event_statestr(ev));
+	dprintf(LOG_DEBUG, FNAME, "removing an event on %s, state=%s",
+	    ev->ifp->ifname, dhcp6_event_statestr(ev));
 
 	dhcp6_remove_evdata(ev);
 
@@ -306,8 +306,8 @@ dhcp6_remove_event(ev)
 	for (sp = ev->servers; sp; sp = sp_next) {
 		sp_next = sp->next;
 
-		dprintf(LOG_DEBUG, "%s" "removing server (ID: %s)",
-		    FNAME, duidstr(&sp->optinfo.serverID));
+		dprintf(LOG_DEBUG, FNAME, "removing server (ID: %s)",
+		    duidstr(&sp->optinfo.serverID));
 		dhcp6_clear_options(&sp->optinfo);
 		free(sp);
 	}
@@ -319,7 +319,7 @@ void
 dhcp6_remove_evdata(ev)
 	struct dhcp6_event *ev;
 {
-	struct dhcp6_eventdata *evd, *evd_next;
+	struct dhcp6_eventdata *evd;
 
 	while ((evd = TAILQ_FIRST(&ev->data_list)) != NULL) {
 		TAILQ_REMOVE(&ev->data_list, evd, link);
@@ -653,21 +653,21 @@ get_duid(idfile, duid)
 	char tmpbuf[256];	/* DUID should be no more than 256 bytes */
 
 	if ((fp = fopen(idfile, "r")) == NULL && errno != ENOENT)
-		dprintf(LOG_NOTICE, "%s" "failed to open DUID file: %s",
-		    FNAME, idfile);
+		dprintf(LOG_NOTICE, FNAME, "failed to open DUID file: %s",
+		    idfile);
 
 	if (fp) {
 		/* decode length */
 		if (fread(&len, sizeof(len), 1, fp) != 1) {
-			dprintf(LOG_ERR, "%s" "DUID file corrupted", FNAME);
+			dprintf(LOG_ERR, FNAME, "DUID file corrupted");
 			goto fail;
 		}
 	} else {
 		int l;
 
 		if ((l = gethwid(tmpbuf, sizeof(tmpbuf), NULL, &hwtype)) < 0) {
-			dprintf(LOG_INFO, "%s"
-			    "failed to get a hardware address", FNAME);
+			dprintf(LOG_INFO, FNAME,
+			    "failed to get a hardware address");
 			goto fail;
 		}
 		len = l + sizeof(struct dhcp6opt_duid_type1);
@@ -676,19 +676,19 @@ get_duid(idfile, duid)
 	memset(duid, 0, sizeof(*duid));
 	duid->duid_len = len;
 	if ((duid->duid_id = (char *)malloc(len)) == NULL) {
-		dprintf(LOG_ERR, "%s" "failed to allocate memory", FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to allocate memory");
 		goto fail;
 	}
 
 	/* copy (and fill) the ID */
 	if (fp) {
 		if (fread(duid->duid_id, len, 1, fp) != 1) {
-			dprintf(LOG_ERR, "%s" "DUID file corrupted", FNAME);
+			dprintf(LOG_ERR, FNAME, "DUID file corrupted");
 			goto fail;
 		}
 
-		dprintf(LOG_DEBUG, "%s"
-		    "extracted an existing DUID from %s: %s", FNAME,
+		dprintf(LOG_DEBUG, FNAME,
+		    "extracted an existing DUID from %s: %s",
 		    idfile, duidstr(duid));
 	} else {
 		u_int64_t t64;
@@ -701,28 +701,28 @@ get_duid(idfile, duid)
 		dp->dh6_duid1_time = htonl((u_long)(t64 & 0xffffffff));
 		memcpy((void *)(dp + 1), tmpbuf, (len - sizeof(*dp)));
 
-		dprintf(LOG_DEBUG, "%s" "generated a new DUID: %s", FNAME,
-			duidstr(duid));
+		dprintf(LOG_DEBUG, FNAME, "generated a new DUID: %s",
+		    duidstr(duid));
 	}
 
 	/* save the (new) ID to the file for next time */
 	if (!fp) {
 		if ((fp = fopen(idfile, "w+")) == NULL) {
-			dprintf(LOG_ERR, "%s"
-			    "failed to open DUID file for save", FNAME);
+			dprintf(LOG_ERR, FNAME,
+			    "failed to open DUID file for save");
 			goto fail;
 		}
 		if ((fwrite(&len, sizeof(len), 1, fp)) != 1) {
-			dprintf(LOG_ERR, "%s" "failed to save DUID", FNAME);
+			dprintf(LOG_ERR, FNAME, "failed to save DUID");
 			goto fail;
 		}
 		if ((fwrite(duid->duid_id, len, 1, fp)) != 1) {
-			dprintf(LOG_ERR, "%s" "failed to save DUID", FNAME);
+			dprintf(LOG_ERR, FNAME, "failed to save DUID");
 			goto fail;
 		}
 
-		dprintf(LOG_DEBUG, "%s" "saved generated DUID to %s", FNAME,
-			idfile);
+		dprintf(LOG_DEBUG, FNAME, "saved generated DUID to %s",
+		    idfile);
 	}
 
 	if (fp)
@@ -776,8 +776,8 @@ gethwid(buf, len, ifname, hwtypep)
 		default:
 			continue; /* XXX */
 		}
-		dprintf(LOG_DEBUG, "%s" "found an interface %s for DUID",
-			FNAME, ifa->ifa_name);
+		dprintf(LOG_DEBUG, FNAME, "found an interface %s for DUID",
+		    ifa->ifa_name);
 		memcpy(buf, LLADDR(sdl), sdl->sdl_alen);
 		l = sdl->sdl_alen; /* sdl will soon be freed */
 		freeifaddrs(ifap);
@@ -880,13 +880,12 @@ dhcp6_get_options(p, ep, optinfo)
 		cp = (char *)(p + 1);
 		np = (struct dhcp6opt *)(cp + optlen);
 
-		dprintf(LOG_DEBUG, "%s" "get DHCP option %s, len %d",
-		    FNAME, dhcp6optstr(opt), optlen);
+		dprintf(LOG_DEBUG, FNAME, "get DHCP option %s, len %d",
+		    dhcp6optstr(opt), optlen);
 
 		/* option length field overrun */
 		if (np > ep) {
-			dprintf(LOG_INFO,
-			    "%s" "malformed DHCP options", FNAME);
+			dprintf(LOG_INFO, FNAME, "malformed DHCP options");
 			return (-1);
 		}
 
@@ -898,8 +897,7 @@ dhcp6_get_options(p, ep, optinfo)
 			duid0.duid_id = cp;
 			dprintf(LOG_DEBUG, "  DUID: %s", duidstr(&duid0));
 			if (duidcpy(&optinfo->clientID, &duid0)) {
-				dprintf(LOG_ERR, "%s" "failed to copy DUID",
-					FNAME);
+				dprintf(LOG_ERR, FNAME, "failed to copy DUID");
 				goto fail;
 			}
 			break;
@@ -910,8 +908,7 @@ dhcp6_get_options(p, ep, optinfo)
 			duid0.duid_id = cp;
 			dprintf(LOG_DEBUG, "  DUID: %s", duidstr(&duid0));
 			if (duidcpy(&optinfo->serverID, &duid0)) {
-				dprintf(LOG_ERR, "%s" "failed to copy DUID",
-					FNAME);
+				dprintf(LOG_ERR, FNAME, "failed to copy DUID");
 				goto fail;
 			}
 			break;
@@ -927,8 +924,8 @@ dhcp6_get_options(p, ep, optinfo)
 
 			if (dhcp6_add_listval(&optinfo->stcode_list,
 			    DHCP6_LISTVAL_STCODE, &num, NULL) == NULL) {
-				dprintf(LOG_ERR, "%s" "failed to copy "
-				    "status code", FNAME);
+				dprintf(LOG_ERR, FNAME, "failed to copy "
+				    "status code");
 				goto fail;
 			}
 
@@ -949,16 +946,16 @@ dhcp6_get_options(p, ep, optinfo)
 
 				if (dhcp6_find_listval(&optinfo->reqopt_list,
 				    DHCP6_LISTVAL_NUM, &num, 0)) {
-					dprintf(LOG_INFO, "%s" "duplicated "
-					    "option type (%s)", FNAME,
+					dprintf(LOG_INFO, FNAME, "duplicated "
+					    "option type (%s)",
 					    dhcp6optstr(opttype));
 					goto nextoption;
 				}
 
 				if (dhcp6_add_listval(&optinfo->reqopt_list,
 				    DHCP6_LISTVAL_NUM, &num, NULL) == NULL) {
-					dprintf(LOG_ERR, "%s" "failed to copy "
-					    "requested option", FNAME);
+					dprintf(LOG_ERR, FNAME,
+					    "failed to copy requested option");
 					goto fail;
 				}
 			  nextoption:
@@ -967,11 +964,11 @@ dhcp6_get_options(p, ep, optinfo)
 		case DH6OPT_PREFERENCE:
 			if (optlen != 1)
 				goto malformed;
-			dprintf(LOG_DEBUG, "  preference: %d",
+			dprintf(LOG_DEBUG, "", "  preference: %d",
 			    (int)*(u_char *)cp);
 			if (optinfo->pref != DH6OPT_PREF_UNDEF) {
-				dprintf(LOG_INFO, "%s"
-				    "duplicated preference option", FNAME);
+				dprintf(LOG_INFO, FNAME,
+				    "duplicated preference option");
 			} else
 				optinfo->pref = (int)*(u_char *)cp;
 			break;
@@ -980,12 +977,12 @@ dhcp6_get_options(p, ep, optinfo)
 				goto malformed;
 			memcpy(&val16, cp, sizeof(val16));
 			val16 = ntohs(val16);
-			dprintf(LOG_DEBUG, "  elapsed time: %lu",
+			dprintf(LOG_DEBUG, "", "  elapsed time: %lu",
 			    (u_int32_t)val16);
 			if (optinfo->elapsed_time !=
 			    DH6OPT_ELAPSED_TIME_UNDEF) {
-				dprintf(LOG_INFO, "%s"
-				    "duplicated elapsed time option", FNAME);
+				dprintf(LOG_INFO, FNAME,
+				    "duplicated elapsed time option");
 			} else
 				optinfo->elapsed_time = val16;
 			break;
@@ -1001,8 +998,8 @@ dhcp6_get_options(p, ep, optinfo)
 			     val += sizeof(struct in6_addr)) {
 				if (dhcp6_find_listval(&optinfo->dns_list,
 				    DHCP6_LISTVAL_ADDR6, &num, 0)) {
-					dprintf(LOG_INFO, "%s" "duplicated "
-					    "DNS address (%s)", FNAME,
+					dprintf(LOG_INFO, FNAME, "duplicated "
+					    "DNS address (%s)",
 					    in6addr2str((struct in6_addr *)val,
 						0));
 					goto nextdns;
@@ -1010,8 +1007,8 @@ dhcp6_get_options(p, ep, optinfo)
 
 				if (dhcp6_add_listval(&optinfo->dns_list,
 				    DHCP6_LISTVAL_ADDR6, val, NULL) == NULL) {
-					dprintf(LOG_ERR, "%s" "failed to copy "
-					    "DNS address", FNAME);
+					dprintf(LOG_ERR, FNAME,
+					    "failed to copy DNS address");
 					goto fail;
 				}
 			  nextdns:
@@ -1026,14 +1023,15 @@ dhcp6_get_options(p, ep, optinfo)
 			ia.t1 = ntohl(optia.dh6_ia_t1);
 			ia.t2 = ntohl(optia.dh6_ia_t2);
 
-			dprintf(LOG_DEBUG, "  IA_PD: ID=%lu, T1=%lu, T2=%lu",
+			dprintf(LOG_DEBUG, "",
+			    "  IA_PD: ID=%lu, T1=%lu, T2=%lu",
 			    ia.iaid, ia.t1, ia.t2);
 
 			/* duplication check */
 			if (dhcp6_find_listval(&optinfo->iapd_list,
 			    DHCP6_LISTVAL_IAPD, &ia, 0)) {
-				dprintf(LOG_INFO, "%s" "duplicated IA_PD %lu",
-				    FNAME, ia.iaid);
+				dprintf(LOG_INFO, FNAME,
+				    "duplicated IA_PD %lu", ia.iaid);
 				break; /* ignore this IA_PD */
 			}
 
@@ -1060,9 +1058,9 @@ dhcp6_get_options(p, ep, optinfo)
 			break;
 		default:
 			/* no option specific behavior */
-			dprintf(LOG_INFO, "%s"
+			dprintf(LOG_INFO, FNAME,
 			    "unknown or unexpected DHCP6 option %s, len %d",
-			    FNAME, dhcp6optstr(opt), optlen);
+			    dhcp6optstr(opt), optlen);
 			break;
 		}
 	}
@@ -1070,8 +1068,8 @@ dhcp6_get_options(p, ep, optinfo)
 	return (0);
 
   malformed:
-	dprintf(LOG_INFO, "%s" "malformed DHCP option: type %d, len %d",
-	    FNAME, opt, optlen);
+	dprintf(LOG_INFO, FNAME, "malformed DHCP option: type %d, len %d",
+	    opt, optlen);
   fail:
 	dhcp6_clear_options(optinfo);
 	return (-1);
@@ -1101,11 +1099,11 @@ copyin_option(type, p, ep, list)
 		cp = (char *)(p + 1);
 		np = (struct dhcp6opt *)(cp + optlen);
 
-		dprintf(LOG_DEBUG, "%s" "get DHCP option %s, len %d",
-		    FNAME, dhcp6optstr(opt), optlen);
+		dprintf(LOG_DEBUG, FNAME, "get DHCP option %s, len %d",
+		    dhcp6optstr(opt), optlen);
 
 		if (np > ep) {
-			dprintf(LOG_INFO, "%s" "malformed DHCP option", FNAME);
+			dprintf(LOG_INFO, FNAME, "malformed DHCP option");
 			goto fail;
 		}
 
@@ -1113,8 +1111,8 @@ copyin_option(type, p, ep, list)
 		case DH6OPT_IA_PD_PREFIX:
 			/* check option context */
 			if (type != DH6OPT_IA_PD) {
-				dprintf(LOG_INFO, "%s"
-				    "%s is an invalid position for %s", FNAME,
+				dprintf(LOG_INFO, FNAME,
+				    "%s is an invalid position for %s",
 				    dhcp6optstr(type), dhcp6optstr(opt));
 				goto nextoption; /* or discard the message? */
 			}
@@ -1125,8 +1123,8 @@ copyin_option(type, p, ep, list)
 			/* copy and convert option values */
 			memcpy(&opt_iapd_prefix, p, sizeof(opt_iapd_prefix));
 			if (opt_iapd_prefix.dh6_iapd_prefix_prefix_len > 128) {
-				dprintf(LOG_INFO, "%s" "invalid prefix length "
-				    "(%d)", FNAME,
+				dprintf(LOG_INFO, FNAME,
+				    "invalid prefix length (%d)",
 				    opt_iapd_prefix.dh6_iapd_prefix_prefix_len);
 				goto malformed;
 			}
@@ -1148,8 +1146,8 @@ copyin_option(type, p, ep, list)
 
 			if (dhcp6_find_listval(list, DHCP6_LISTVAL_PREFIX6,
 			    &iapd_prefix, 0)) {
-				dprintf(LOG_INFO, "%s" "duplicated IA_PD "
-				    "prefix %s/%d", FNAME,
+				dprintf(LOG_INFO, FNAME, 
+				    "duplicated IA_PD prefix %s/%d",
 				    iapd_prefix.pltime, iapd_prefix.vltime);
 				goto nextoption;
 			}
@@ -1174,8 +1172,8 @@ copyin_option(type, p, ep, list)
 			/* check option context */
 			if (type != DH6OPT_IA_PD &&
 			    type != DH6OPT_IA_PD_PREFIX) {
-				dprintf(LOG_INFO, "%s"
-				    "%s is an invalid position for %s", FNAME,
+				dprintf(LOG_INFO, FNAME,
+				    "%s is an invalid position for %s",
 				    dhcp6optstr(type), dhcp6optstr(opt));
 				goto nextoption; /* or discard the message? */
 			}
@@ -1194,8 +1192,8 @@ copyin_option(type, p, ep, list)
 			/* duplication check */
 			if (dhcp6_find_listval(list, DHCP6_LISTVAL_STCODE,
 			    &opt_stcode.dh6_stcode_code, 0)) {
-				dprintf(LOG_INFO, "%s"
-				    "duplicated status code (%d)", FNAME,
+				dprintf(LOG_INFO, FNAME,
+				    "duplicated status code (%d)",
 				    opt_stcode.dh6_stcode_code);
 				goto nextoption;
 			}
@@ -1213,7 +1211,7 @@ copyin_option(type, p, ep, list)
 	return (0);
 
   malformed:
-	dprintf(LOG_INFO, "  malformed DHCP option: type %d", opt);
+	dprintf(LOG_INFO, "", "  malformed DHCP option: type %d", opt);
 
   fail:
 	dhcp6_clear_list(&sublist);
@@ -1243,8 +1241,7 @@ get_delegated_prefixes(p, ep, optinfo)
 			"len %d", dhcp6optstr(opt), optlen);
 
 		if (np > ep) {
-			dprintf(LOG_INFO, "%s" "malformed DHCP options",
-			    FNAME);
+			dprintf(LOG_INFO, FNAME, "malformed DHCP options");
 			return (-1);
 		}
 
@@ -1256,8 +1253,9 @@ get_delegated_prefixes(p, ep, optinfo)
 			memcpy(&pi, p, sizeof(pi));
 
 			if (pi.dh6_pi_plen > 128) {
-				dprintf(LOG_INFO, "%s" "invalid prefix length "
-				    "(%d)", FNAME, pi.dh6_pi_plen);
+				dprintf(LOG_INFO, FNAME,
+				    "invalid prefix length (%d)",
+				    pi.dh6_pi_plen);
 				goto malformed;
 			}
 
@@ -1286,8 +1284,8 @@ get_delegated_prefixes(p, ep, optinfo)
 
 			if (dhcp6_find_listval(&optinfo->prefix_list,
 			    DHCP6_LISTVAL_PREFIX6, &prefix, 0)) {
-				dprintf(LOG_INFO, "%s" "duplicated "
-				    "prefix (%s/%d)", FNAME,
+				dprintf(LOG_INFO, FNAME, 
+				    "duplicated prefix (%s/%d)",
 				    in6addr2str(&prefix.addr, 0),
 				    prefix.plen);
 				goto nextoption;
@@ -1295,8 +1293,8 @@ get_delegated_prefixes(p, ep, optinfo)
 
 			if (dhcp6_add_listval(&optinfo->prefix_list,
 			    DHCP6_LISTVAL_PREFIX6, &prefix, NULL) == NULL) {
-				dprintf(LOG_ERR, "%s" "failed to copy a "
-				    "prefix", FNAME);
+				dprintf(LOG_ERR, FNAME,
+				    "failed to copy a prefix");
 				goto fail;
 			}
 		}
@@ -1308,7 +1306,7 @@ get_delegated_prefixes(p, ep, optinfo)
 
   malformed:
 	dprintf(LOG_INFO,
-		"  malformed prefix delegation option: type %d, len %d",
+		"", "  malformed prefix delegation option: type %d, len %d",
 		opt, optlen);
   fail:
 	return (-1);
@@ -1316,7 +1314,7 @@ get_delegated_prefixes(p, ep, optinfo)
 
 #define COPY_OPTION(t, l, v, p) do { \
 	if ((void *)(ep) - (void *)(p) < (l) + sizeof(struct dhcp6opt)) { \
-		dprintf(LOG_INFO, "%s" "option buffer short for %s", FNAME, dhcp6optstr((t))); \
+		dprintf(LOG_INFO, FNAME, "option buffer short for %s", dhcp6optstr((t))); \
 		goto fail; \
 	} \
 	opth.dh6opt_type = htons((t)); \
@@ -1326,7 +1324,7 @@ get_delegated_prefixes(p, ep, optinfo)
 		memcpy((p) + 1, (v), (l)); \
 	(p) = (struct dhcp6opt *)((char *)((p) + 1) + (l)); \
  	(len) += sizeof(struct dhcp6opt) + (l); \
-	dprintf(LOG_DEBUG, "%s" "set %s", FNAME, dhcp6optstr((t))); \
+	dprintf(LOG_DEBUG, FNAME, "set %s", dhcp6optstr((t))); \
 } while (0)
 
 int
@@ -1381,8 +1379,8 @@ dhcp6_set_options(bp, ep, optinfo)
 		optlen = dhcp6_count_list(&optinfo->reqopt_list) *
 			sizeof(u_int16_t);
 		if ((tmpbuf = malloc(optlen)) == NULL) {
-			dprintf(LOG_ERR, "%s"
-			    "memory allocation failed for options", FNAME);
+			dprintf(LOG_ERR, FNAME,
+			    "memory allocation failed for options");
 			goto fail;
 		}
 		valp = (u_int16_t *)tmpbuf;
@@ -1402,8 +1400,8 @@ dhcp6_set_options(bp, ep, optinfo)
 		optlen = dhcp6_count_list(&optinfo->dns_list) *
 			sizeof(struct in6_addr);
 		if ((tmpbuf = malloc(optlen)) == NULL) {
-			dprintf(LOG_ERR, "%s"
-			    "memory allocation failed for DNS options", FNAME);
+			dprintf(LOG_ERR, FNAME,
+			    "memory allocation failed for DNS options");
 			goto fail;
 		}
 		in6 = (struct in6_addr *)tmpbuf;
@@ -1421,22 +1419,22 @@ dhcp6_set_options(bp, ep, optinfo)
 
 		tmpbuf = NULL;
 		if ((optlen = copyout_option(NULL, NULL, op)) < 0) {
-			dprintf(LOG_INFO, "%s" "failed to count option length",
-			    FNAME);
+			dprintf(LOG_INFO, FNAME,
+			    "failed to count option length");
 			goto fail;
 		}
 		if ((void *)ep - (void *)p < optlen) {
-			dprintf(LOG_INFO, "%s" "short buffer", FNAME);
+			dprintf(LOG_INFO, FNAME, "short buffer");
 			goto fail;
 		}
 		if ((tmpbuf = malloc(optlen)) == NULL) {
-			dprintf(LOG_NOTICE, "%s"
-			    "memory allocation failed for DNS options", FNAME);
+			dprintf(LOG_NOTICE, FNAME,
+			    "memory allocation failed for DNS options");
 			goto fail;
 		}
 		if (copyout_option(tmpbuf, tmpbuf + optlen, op) < 0) {
-			dprintf(LOG_ERR, "%s"
-			    "failed to construct an option", FNAME);
+			dprintf(LOG_ERR, FNAME,
+			    "failed to construct an option");
 			goto fail;
 		}
 		memcpy(p, tmpbuf, optlen);
@@ -1454,8 +1452,8 @@ dhcp6_set_options(bp, ep, optinfo)
 		optlen = dhcp6_count_list(&optinfo->prefix_list) *
 			sizeof(struct dhcp6opt_prefix_info);
 		if ((tmpbuf = malloc(optlen)) == NULL) {
-			dprintf(LOG_ERR, "%s"
-				"memory allocation failed for options", FNAME);
+			dprintf(LOG_ERR, FNAME,
+				"memory allocation failed for options");
 			goto fail;
 		}
 		for (dp = TAILQ_FIRST(&optinfo->prefix_list), tp = tmpbuf; dp;
@@ -1537,7 +1535,7 @@ copyout_option(p, ep, optval)
 		 * we encounter an unknown option.  this should be an internal
 		 * error.
 		 */
-		dprintf(LOG_ERR, "%s" "unknown option: code %d", FNAME,
+		dprintf(LOG_ERR, FNAME, "unknown option: code %d",
 		    optval->type);
 		return (-1);
 	}
@@ -1563,7 +1561,7 @@ copyout_option(p, ep, optval)
 	if (!p)
 		return(optlen);
 
-	dprintf(LOG_DEBUG, "%s" "set %s", FNAME, dhcp6optstr(opttype));
+	dprintf(LOG_DEBUG, FNAME, "set %s", dhcp6optstr(opttype));
 	if (ep - p < headlen) /* check it just in case */
 		return (-1);
 
@@ -1641,8 +1639,8 @@ dhcp6_set_timeoparam(ev)
 		ev->max_retrans_cnt = REL_MAX_RC;
 		break;
 	default:
-		dprintf(LOG_ERR, "%s" "unexpected event state %d on %s",
-		    FNAME, ev->state, ev->ifp->ifname);
+		dprintf(LOG_ERR, FNAME, "unexpected event state %d on %s",
+		    ev->state, ev->ifp->ifname);
 		exit(1);
 	}
 }
@@ -1695,8 +1693,8 @@ dhcp6_reset_timer(ev)
 
 	statestr = dhcp6_event_statestr(ev);
 
-	dprintf(LOG_DEBUG, "%s" "reset a timer on %s, "
-		"state=%s, timeo=%d, retrans=%d", FNAME,
+	dprintf(LOG_DEBUG, FNAME, "reset a timer on %s, "
+		"state=%s, timeo=%d, retrans=%d",
 		ev->ifp->ifname, statestr, ev->timeouts, ev->retrans);
 }
 
@@ -1706,7 +1704,7 @@ duidcpy(dd, ds)
 {
 	dd->duid_len = ds->duid_len;
 	if ((dd->duid_id = malloc(dd->duid_len)) == NULL) {
-		dprintf(LOG_ERR, "%s" "memory allocation failed", FNAME);
+		dprintf(LOG_ERR, FNAME, "memory allocation failed");
 		return (-1);
 	}
 	memcpy(dd->duid_id, ds->duid_id, dd->duid_len);
@@ -1911,13 +1909,17 @@ setloglevel(debuglevel)
 }
 
 void
-dprintf(int level, const char *fmt, ...)
+dprintf(int level, const char *fname, const char *fmt, ...)
 {
 	va_list ap;
 	char logbuf[LINE_MAX];
+	int printfname = 1;
 
 	va_start(ap, fmt);
 	vsnprintf(logbuf, sizeof(logbuf), fmt, ap);
+
+	if (*fname == '\0')
+		printfname = 0;
 
 	if (foreground && debug_thresh >= level) {
 		time_t now;
@@ -1930,11 +1932,12 @@ dprintf(int level, const char *fmt, ...)
 		if ((now = time(NULL)) < 0)
 			exit(1); /* XXX */
 		tm_now = localtime(&now);
-		fprintf(stderr, "%03s/%02d/%04d %02d:%02d:%02d %s\n",
-			month[tm_now->tm_mon], tm_now->tm_mday,
-			tm_now->tm_year + 1900,
-			tm_now->tm_hour, tm_now->tm_min, tm_now->tm_sec,
-			logbuf);
+		fprintf(stderr, "%s%s%3s/%02d/%04d %02d:%02d:%02d %s\n",
+		    fname, printfname ? ": " : "",
+		    month[tm_now->tm_mon], tm_now->tm_mday,
+		    tm_now->tm_year + 1900,
+		    tm_now->tm_hour, tm_now->tm_min, tm_now->tm_sec,
+		    logbuf);
 	} else
-		syslog(level, "%s", logbuf);
+		syslog(level, "%s%s%s", fname, printfname ? ": " : "", logbuf);
 }

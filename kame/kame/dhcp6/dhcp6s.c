@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.100 2003/01/27 13:21:52 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.101 2003/03/14 11:06:27 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -158,8 +158,6 @@ static void update_binding __P((struct dhcp6_binding *));
 static void remove_binding __P((struct dhcp6_binding *));
 static void free_binding __P((struct dhcp6_binding *));
 static struct dhcp6_timer *binding_timo __P((void *));
-static struct dhcp6_listval *find_bindg_ia __P((struct dhcp6_listval *,
-    struct dhcp6_binding *));
 static struct dhcp6_listval *find_binding_ia __P((struct dhcp6_listval *,
     struct dhcp6_binding *));
 static char *bindingstr __P((struct dhcp6_binding *));
@@ -235,16 +233,14 @@ main(argc, argv)
 	ifinit(device);
 
 	if ((cfparse(conffile)) != 0) {
-		dprintf(LOG_ERR, "%s" "failed to parse configuration file",
-			FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to parse configuration file");
 		exit(1);
 	}
 	/* prohibit a mixture of old and new style of DNS server config */
 	if (!TAILQ_EMPTY(&arg_dnslist)) {
 		if (!TAILQ_EMPTY(&dnslist)) {
-			dprintf(LOG_INFO, "%s" "do not specify DNS servers "
-			    "both by command line and by configuration file.",
-			    FNAME);
+			dprintf(LOG_INFO, FNAME, "do not specify DNS servers "
+			    "both by command line and by configuration file.");
 			exit(1);
 		}
 		dhcp6_move_list(&dnslist, &arg_dnslist);
@@ -283,13 +279,13 @@ server6_init()
 
 	ifidx = if_nametoindex(device);
 	if (ifidx == 0) {
-		dprintf(LOG_ERR, "%s" "invalid interface %s", FNAME, device);
+		dprintf(LOG_ERR, FNAME, "invalid interface %s", device);
 		exit(1);
 	}
 
 	/* get our DUID */
 	if (get_duid(DUID_FILE, &server_duid)) {
-		dprintf(LOG_ERR, "%s" "failed to get a DUID", FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to get a DUID");
 		exit(1);
 	}
 
@@ -300,7 +296,7 @@ server6_init()
 	rmh.msg_iovlen = 1;
 	rmsgctllen = CMSG_SPACE(sizeof(struct in6_pktinfo));
 	if ((rmsgctlbuf = (char *)malloc(rmsgctllen)) == NULL) {
-		dprintf(LOG_ERR, "%s" "memory allocation failed", FNAME);
+		dprintf(LOG_ERR, FNAME, "memory allocation failed");
 		exit(1);
 	}
 
@@ -312,55 +308,53 @@ server6_init()
 	hints.ai_flags = AI_PASSIVE;
 	error = getaddrinfo(NULL, DH6PORT_UPSTREAM, &hints, &res);
 	if (error) {
-		dprintf(LOG_ERR, "%s" "getaddrinfo: %s",
-			FNAME, gai_strerror(error));
+		dprintf(LOG_ERR, FNAME, "getaddrinfo: %s",
+		    gai_strerror(error));
 		exit(1);
 	}
 	insock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (insock < 0) {
-		dprintf(LOG_ERR, "%s" "socket(insock): %s",
-			FNAME, strerror(errno));
+		dprintf(LOG_ERR, FNAME, "socket(insock): %s",
+		    strerror(errno));
 		exit(1);
 	}
 	if (setsockopt(insock, SOL_SOCKET, SO_REUSEPORT, &on,
 		       sizeof(on)) < 0) {
-		dprintf(LOG_ERR, "%s" "setsockopt(insock, SO_REUSEPORT): %s",
-			FNAME, strerror(errno));
+		dprintf(LOG_ERR, FNAME, "setsockopt(insock, SO_REUSEPORT): %s",
+		    strerror(errno));
 		exit(1);
 	}
 	if (setsockopt(insock, SOL_SOCKET, SO_REUSEADDR, &on,
 		       sizeof(on)) < 0) {
-		dprintf(LOG_ERR, "%s" "setsockopt(insock, SO_REUSEADDR): %s",
-			FNAME, strerror(errno));
+		dprintf(LOG_ERR, FNAME, "setsockopt(insock, SO_REUSEADDR): %s",
+		    strerror(errno));
 		exit(1);
 	}
 #ifdef IPV6_RECVPKTINFO
 	if (setsockopt(insock, IPPROTO_IPV6, IPV6_RECVPKTINFO, &on,
 		       sizeof(on)) < 0) {
-		dprintf(LOG_ERR, "%s"
-			"setsockopt(inbound, IPV6_RECVPKTINFO): %s",
-			FNAME, strerror(errno));
+		dprintf(LOG_ERR, FNAME,
+		    "setsockopt(inbound, IPV6_RECVPKTINFO): %s",
+		    strerror(errno));
 		exit(1);
 	}
 #else
 	if (setsockopt(insock, IPPROTO_IPV6, IPV6_PKTINFO, &on,
 		       sizeof(on)) < 0) {
-		dprintf(LOG_ERR, "%s"
-			"setsockopt(inbound, IPV6_PKTINFO): %s",
-			FNAME, strerror(errno));
+		dprintf(LOG_ERR, FNAME,
+		    "setsockopt(inbound, IPV6_PKTINFO): %s",
+		    strerror(errno));
 		exit(1);
 	}
 #endif
 	if (setsockopt(insock, IPPROTO_IPV6, IPV6_V6ONLY,
 	    &on, sizeof(on)) < 0) {
-		dprintf(LOG_ERR, "%s"
-		    "setsockopt(inbound, IPV6_V6ONLY): %s",
-		    FNAME, strerror(errno));
+		dprintf(LOG_ERR, FNAME,
+		    "setsockopt(inbound, IPV6_V6ONLY): %s", strerror(errno));
 		exit(1);
 	}
 	if (bind(insock, res->ai_addr, res->ai_addrlen) < 0) {
-		dprintf(LOG_ERR, "%s" "bind(insock): %s",
-			FNAME, strerror(errno));
+		dprintf(LOG_ERR, FNAME, "bind(insock): %s", strerror(errno));
 		exit(1);
 	}
 	freeaddrinfo(res);
@@ -368,8 +362,8 @@ server6_init()
 	hints.ai_flags = 0;
 	error = getaddrinfo(DH6ADDR_ALLAGENT, DH6PORT_UPSTREAM, &hints, &res2);
 	if (error) {
-		dprintf(LOG_ERR, "%s" "getaddrinfo: %s",
-			FNAME, gai_strerror(error));
+		dprintf(LOG_ERR, FNAME, "getaddrinfo: %s",
+		    gai_strerror(error));
 		exit(1);
 	}
 	memset(&mreq6, 0, sizeof(mreq6));
@@ -379,8 +373,8 @@ server6_init()
 	    sizeof(mreq6.ipv6mr_multiaddr));
 	if (setsockopt(insock, IPPROTO_IPV6, IPV6_JOIN_GROUP,
 	    &mreq6, sizeof(mreq6))) {
-		dprintf(LOG_ERR, "%s" "setsockopt(insock, IPV6_JOIN_GROUP)",
-			FNAME, strerror(errno));
+		dprintf(LOG_ERR, FNAME, "setsockopt(insock, IPV6_JOIN_GROUP)",
+		    strerror(errno));
 		exit(1);
 	}
 	freeaddrinfo(res2);
@@ -389,8 +383,8 @@ server6_init()
 	error = getaddrinfo(DH6ADDR_ALLSERVER, DH6PORT_UPSTREAM,
 			    &hints, &res2);
 	if (error) {
-		dprintf(LOG_ERR, "%s" "getaddrinfo: %s",
-			FNAME, gai_strerror(error));
+		dprintf(LOG_ERR, FNAME, "getaddrinfo: %s",
+		    gai_strerror(error));
 		exit(1);
 	}
 	memset(&mreq6, 0, sizeof(mreq6));
@@ -400,9 +394,9 @@ server6_init()
 	    sizeof(mreq6.ipv6mr_multiaddr));
 	if (setsockopt(insock, IPPROTO_IPV6, IPV6_JOIN_GROUP,
 	    &mreq6, sizeof(mreq6))) {
-		dprintf(LOG_ERR,
-			"%s" "setsockopt(insock, IPV6_JOIN_GROUP): %s",
-			FNAME, strerror(errno));
+		dprintf(LOG_ERR, FNAME,
+		    "setsockopt(insock, IPV6_JOIN_GROUP): %s",
+		    strerror(errno));
 		exit(1);
 	}
 	freeaddrinfo(res2);
@@ -410,28 +404,28 @@ server6_init()
 	hints.ai_flags = 0;
 	error = getaddrinfo(NULL, DH6PORT_DOWNSTREAM, &hints, &res);
 	if (error) {
-		dprintf(LOG_ERR, "%s" "getaddrinfo: %s",
-			FNAME, gai_strerror(error));
+		dprintf(LOG_ERR, FNAME, "getaddrinfo: %s",
+		    gai_strerror(error));
 		exit(1);
 	}
 	outsock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (outsock < 0) {
-		dprintf(LOG_ERR, "%s" "socket(outsock): %s",
-			FNAME, strerror(errno));
+		dprintf(LOG_ERR, FNAME, "socket(outsock): %s",
+		    strerror(errno));
 		exit(1);
 	}
 	/* set outgoing interface of multicast packets for DHCP reconfig */
 	if (setsockopt(outsock, IPPROTO_IPV6, IPV6_MULTICAST_IF,
 	    &ifidx, sizeof(ifidx)) < 0) {
-		dprintf(LOG_ERR,
-			"%s" "setsockopt(outsock, IPV6_MULTICAST_IF): %s",
-			FNAME, strerror(errno));
+		dprintf(LOG_ERR, FNAME,
+		    "setsockopt(outsock, IPV6_MULTICAST_IF): %s",
+		    strerror(errno));
 		exit(1);
 	}
 	/* make the socket write-only */
 	if (shutdown(outsock, 0)) {
-		dprintf(LOG_ERR, "%s" "shutdown(outbound, 0): %s",
-			FNAME, strerror(errno));
+		dprintf(LOG_ERR, FNAME, "shutdown(outbound, 0): %s",
+		    strerror(errno));
 		exit(1);
 	}
 	freeaddrinfo(res);
@@ -442,8 +436,8 @@ server6_init()
 	hints.ai_protocol = IPPROTO_UDP;
 	error = getaddrinfo("::", DH6PORT_DOWNSTREAM, &hints, &res);
 	if (error) {
-		dprintf(LOG_ERR, "%s" "getaddrinfo: %s",
-			FNAME, gai_strerror(error));
+		dprintf(LOG_ERR, FNAME, "getaddrinfo: %s",
+		    gai_strerror(error));
 		exit(1);
 	}
 	memcpy(&sa6_any_downstream_storage, res->ai_addr, res->ai_addrlen);
@@ -467,8 +461,8 @@ server6_mainloop()
 		ret = select(insock + 1, &r, NULL, NULL, w);
 		switch (ret) {
 		case -1:
-			dprintf(LOG_ERR, "%s" "select: %s",
-				FNAME, strerror(errno));
+			dprintf(LOG_ERR, FNAME, "select: %s",
+			    strerror(errno));
 			exit(1);
 			/* NOTREACHED */
 		case 0:		/* timeout */
@@ -510,7 +504,7 @@ server6_recv(s)
 	mhdr.msg_controllen = sizeof(cmsgbuf);
 
 	if ((len = recvmsg(insock, &mhdr, 0)) < 0) {
-		dprintf(LOG_ERR, "%s" "recvmsg: %s", FNAME, strerror(errno));
+		dprintf(LOG_ERR, FNAME, "recvmsg: %s", strerror(errno));
 		return (-1);
 	}
 	fromlen = mhdr.msg_namelen;
@@ -524,23 +518,23 @@ server6_recv(s)
 		}
 	}
 	if (pi == NULL) {
-		dprintf(LOG_NOTICE, "%s" "failed to get packet info", FNAME);
+		dprintf(LOG_NOTICE, FNAME, "failed to get packet info");
 		return (-1);
 	}
 	if ((ifp = find_ifconfbyid((unsigned int)pi->ipi6_ifindex)) == NULL) {
-		dprintf(LOG_INFO, "%s" "unexpected interface (%d)", FNAME,
+		dprintf(LOG_INFO, FNAME, "unexpected interface (%d)",
 		    (unsigned int)pi->ipi6_ifindex);
 		return (-1);
 	}
 
 	if (len < sizeof(*dh6)) {
-		dprintf(LOG_INFO, "%s" "short packet", FNAME);
+		dprintf(LOG_INFO, FNAME, "short packet");
 		return (-1);
 	}
 	
 	dh6 = (struct dhcp6 *)rdatabuf;
 
-	dprintf(LOG_DEBUG, "%s" "received %s from %s", FNAME,
+	dprintf(LOG_DEBUG, FNAME, "received %s from %s",
 	    dhcp6msgstr(dh6->dh6_msgtype),
 	    addr2str((struct sockaddr *)&from));
 
@@ -555,7 +549,7 @@ server6_recv(s)
 	    dh6->dh6_msgtype == DH6_CONFIRM ||
 	    dh6->dh6_msgtype == DH6_REBIND ||
 	    dh6->dh6_msgtype == DH6_INFORM_REQ)) {
-		dprintf(LOG_INFO, "%s" "invalid unicast message", FNAME);
+		dprintf(LOG_INFO, FNAME, "invalid unicast message");
 		return (-1);
 	}
 
@@ -565,7 +559,7 @@ server6_recv(s)
 	dhcp6_init_options(&optinfo);
 	if (dhcp6_get_options((struct dhcp6opt *)(dh6 + 1),
 	    (struct dhcp6opt *)(rdatabuf + len), &optinfo) < 0) {
-		dprintf(LOG_INFO, "%s" "failed to parse options", FNAME);
+		dprintf(LOG_INFO, FNAME, "failed to parse options");
 		return (-1);
 	}
 
@@ -595,8 +589,8 @@ server6_recv(s)
 		    (struct sockaddr *)&from, fromlen);
 		break;
 	default:
-		dprintf(LOG_INFO, "%s" "unknown or unsupported msgtype (%s)",
-		    FNAME, dhcp6msgstr(dh6->dh6_msgtype));
+		dprintf(LOG_INFO, FNAME, "unknown or unsupported msgtype (%s)",
+		    dhcp6msgstr(dh6->dh6_msgtype));
 		break;
 	}
 
@@ -615,7 +609,6 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 {
 	struct dhcp6_optinfo roptinfo;
 	struct host_conf *client_conf;
-	struct dhcp6_listval *opt;
 	int resptype, do_binding = 0, error;
 
 	/*
@@ -623,17 +616,17 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 	 * Client Identifier option. [dhcpv6-28 Section 15.2]
 	 */
 	if (optinfo->clientID.duid_len == 0) {
-		dprintf(LOG_INFO, "%s" "no client ID option", FNAME);
+		dprintf(LOG_INFO, FNAME, "no client ID option");
 		return (-1);
 	} else {
-		dprintf(LOG_DEBUG, "%s" "client ID %s", FNAME,
-			duidstr(&optinfo->clientID));
+		dprintf(LOG_DEBUG, FNAME, "client ID %s",
+		    duidstr(&optinfo->clientID));
 	}
 
 	/* get per-host configuration for the client, if any. */
 	if ((client_conf = find_hostconf(&optinfo->clientID))) {
-		dprintf(LOG_DEBUG, "%s" "found a host configuration for %s",
-			FNAME, client_conf->name);
+		dprintf(LOG_DEBUG, FNAME, "found a host configuration for %s",
+		    client_conf->name);
 	}
 
 	/*
@@ -643,14 +636,14 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 
 	/* server information option */
 	if (duidcpy(&roptinfo.serverID, &server_duid)) {
-		dprintf(LOG_ERR, "%s" "failed to copy server ID", FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to copy server ID");
 		goto fail;
 	}
 
 	/* copy client information back (if provided) */
 	if (optinfo->clientID.duid_id &&
 	    duidcpy(&roptinfo.clientID, &optinfo->clientID)) {
-		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to copy client ID");
 		goto fail;
 	}
 
@@ -660,7 +653,7 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 
 	/* DNS server */
 	if (dhcp6_copy_list(&roptinfo.dns_list, &dnslist)) {
-		dprintf(LOG_ERR, "%s" "failed to copy DNS servers", FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to copy DNS servers");
 		goto fail;
 	}
 
@@ -687,8 +680,8 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 		/* make a local copy of the configured prefixes */
 		if (client_conf &&
 		    dhcp6_copy_list(&conflist, &client_conf->prefix_list)) {
-			dprintf(LOG_NOTICE, "%s" "failed to make local data",
-			    FNAME);
+			dprintf(LOG_NOTICE, FNAME,
+			    "failed to make local data");
 			goto fail;
 		}
 
@@ -762,17 +755,17 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 
 	/* the message must include a Server Identifier option */
 	if (optinfo->serverID.duid_len == 0) {
-		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
+		dprintf(LOG_INFO, FNAME, "no server ID option");
 		return (-1);
 	}
 	/* the contents of the Server Identifier option must match ours */
 	if (duidcmp(&optinfo->serverID, &server_duid)) {
-		dprintf(LOG_INFO, "%s" "server ID mismatch", FNAME);
+		dprintf(LOG_INFO, FNAME, "server ID mismatch");
 		return (-1);
 	}
 	/* the message must include a Client Identifier option */
 	if (optinfo->clientID.duid_len == 0) {
-		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
+		dprintf(LOG_INFO, FNAME, "no server ID option");
 		return (-1);
 	}
 
@@ -783,12 +776,12 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 
 	/* server information option */
 	if (duidcpy(&roptinfo.serverID, &server_duid)) {
-		dprintf(LOG_ERR, "%s" "failed to copy server ID", FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to copy server ID");
 		goto fail;
 	}
 	/* copy client information back */
 	if (duidcpy(&roptinfo.clientID, &optinfo->clientID)) {
-		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to copy client ID");
 		goto fail;
 	}
 
@@ -805,12 +798,11 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
 		u_int16_t stcode = DH6OPT_STCODE_USEMULTICAST;
 
-		dprintf(LOG_INFO, "%s" "unexpected unicast message from %s",
-		    FNAME, addr2str(from));
+		dprintf(LOG_INFO, FNAME, "unexpected unicast message from %s",
+		    addr2str(from));
 		if (dhcp6_add_listval(&roptinfo.stcode_list,
 		    DHCP6_LISTVAL_STCODE, &stcode, NULL) == NULL) {
-			dprintf(LOG_ERR, "%s" "failed to add a status code",
-			    FNAME);
+			dprintf(LOG_ERR, FNAME, "failed to add a status code");
 			goto fail;
 		}
 		server6_send(DH6_REPLY, ifp, dh6, optinfo, from,
@@ -820,8 +812,8 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 
 	/* get per-host configuration for the client, if any. */
 	if ((client_conf = find_hostconf(&optinfo->clientID))) {
-		dprintf(LOG_DEBUG, "%s" "found a host configuration named %s",
-			FNAME, client_conf->name);
+		dprintf(LOG_DEBUG, FNAME,
+		    "found a host configuration named %s", client_conf->name);
 	}
 
 	/*
@@ -847,8 +839,8 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 		/* make a local copy of the configured prefixes */
 		if (client_conf &&
 		    dhcp6_copy_list(&conflist, &client_conf->prefix_list)) {
-			dprintf(LOG_NOTICE, "%s" "failed to make local data",
-			    FNAME);
+			dprintf(LOG_NOTICE, FNAME,
+			    "failed to make local data");
 			goto fail;
 		}
 
@@ -868,15 +860,12 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 				 * case (Section 18.2.1).  We follow the same
 				 * logic for prefix delegation as well.
 				 */
-				struct dhcp6_list *stcode_list;
-
 				if (make_ia_stcode(DHCP6_LISTVAL_IAPD,
 				    iapd->val_ia.iaid,
 				    DH6OPT_STCODE_NOPREFIXAVAIL,
 				    &roptinfo.iapd_list)) {
-					dprintf(LOG_NOTICE, "%s"
-					    "failed to make an option list"
-					    FNAME);
+					dprintf(LOG_NOTICE, FNAME,
+					    "failed to make an option list");
 					dhcp6_clear_list(&conflist);
 					goto fail;
 				}
@@ -909,7 +898,7 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 	 */
 	/* DNS server */
 	if (dhcp6_copy_list(&roptinfo.dns_list, &dnslist)) {
-		dprintf(LOG_ERR, "%s" "failed to copy DNS servers", FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to copy DNS servers");
 		goto fail;
 	}
 
@@ -942,17 +931,17 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 
 	/* the message must include a Server Identifier option */
 	if (optinfo->serverID.duid_len == 0) {
-		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
+		dprintf(LOG_INFO, FNAME, "no server ID option");
 		return (-1);
 	}
 	/* the contents of the Server Identifier option must match ours */
 	if (duidcmp(&optinfo->serverID, &server_duid)) {
-		dprintf(LOG_INFO, "%s" "server ID mismatch", FNAME);
+		dprintf(LOG_INFO, FNAME, "server ID mismatch");
 		return (-1);
 	}
 	/* the message must include a Client Identifier option */
 	if (optinfo->clientID.duid_len == 0) {
-		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
+		dprintf(LOG_INFO, FNAME, "no server ID option");
 		return (-1);
 	}
 
@@ -963,12 +952,12 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 
 	/* server information option */
 	if (duidcpy(&roptinfo.serverID, &server_duid)) {
-		dprintf(LOG_ERR, "%s" "failed to copy server ID", FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to copy server ID");
 		goto fail;
 	}
 	/* copy client information back */
 	if (duidcpy(&roptinfo.clientID, &optinfo->clientID)) {
-		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to copy client ID");
 		goto fail;
 	}
 
@@ -985,12 +974,11 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
 		u_int16_t stcode = DH6OPT_STCODE_USEMULTICAST;
 
-		dprintf(LOG_INFO, "%s" "unexpected unicast message from %s",
-		    FNAME, addr2str(from));
+		dprintf(LOG_INFO, FNAME, "unexpected unicast message from %s",
+		    addr2str(from));
 		if (dhcp6_add_listval(&roptinfo.stcode_list,
 		    DHCP6_LISTVAL_STCODE, &stcode, NULL) == NULL) {
-			dprintf(LOG_ERR, "%s" "failed to add a status code",
-			    FNAME);
+			dprintf(LOG_ERR, FNAME, "failed to add a status code");
 			goto fail;
 		}
 		server6_send(DH6_REPLY, ifp, dh6, optinfo, from,
@@ -1014,7 +1002,7 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 	/* add other configuration information */
 	/* DNS server */
 	if (dhcp6_copy_list(&roptinfo.dns_list, &dnslist)) {
-		dprintf(LOG_ERR, "%s" "failed to copy DNS list");
+		dprintf(LOG_ERR, FNAME, "failed to copy DNS list");
 		goto fail;
 	}
 
@@ -1039,21 +1027,20 @@ server6_react_rebind(ifp, dh6, optinfo, from, fromlen)
 	int fromlen;
 {
 	struct dhcp6_optinfo roptinfo;
-	struct dhcp6_binding *binding;
 	struct dhcp6_listval *iapd;
 
 	/* message validation according to Section 15.7 of dhcpv6-28 */
 
 	/* the message must include a Client Identifier option */
 	if (optinfo->clientID.duid_len == 0) {
-		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
+		dprintf(LOG_INFO, FNAME, "no server ID option");
 		return (-1);
 	}
 
 	/* the message must not include a server Identifier option */
 	if (optinfo->serverID.duid_len) {
-		dprintf(LOG_INFO, "%s" "server ID option is included in "
-		    "a rebind message", FNAME);
+		dprintf(LOG_INFO, FNAME, "server ID option is included in "
+		    "a rebind message");
 		return (-1);
 	}
 
@@ -1064,12 +1051,12 @@ server6_react_rebind(ifp, dh6, optinfo, from, fromlen)
 
 	/* server information option */
 	if (duidcpy(&roptinfo.serverID, &server_duid)) {
-		dprintf(LOG_ERR, "%s" "failed to copy server ID", FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to copy server ID");
 		goto fail;
 	}
 	/* copy client information back */
 	if (duidcpy(&roptinfo.clientID, &optinfo->clientID)) {
-		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to copy client ID");
 		goto fail;
 	}
 
@@ -1094,15 +1081,14 @@ server6_react_rebind(ifp, dh6, optinfo, from, fromlen)
 	 * explicit knowledge, we should reply with the responsible part.
 	 */
 	if (TAILQ_EMPTY(&roptinfo.iapd_list)) {
-		dprintf(LOG_INFO, "%s" "no useful information for a rebind",
-		    FNAME);
+		dprintf(LOG_INFO, FNAME, "no useful information for a rebind");
 		goto fail;	/* discard the rebind */
 	}
 
 	/* add other configuration information */
 	/* DNS server */
 	if (dhcp6_copy_list(&roptinfo.dns_list, &dnslist)) {
-		dprintf(LOG_ERR, "%s" "failed to copy DNS list");
+		dprintf(LOG_ERR, FNAME, "failed to copy DNS list");
 		goto fail;
 	}
 
@@ -1134,17 +1120,17 @@ server6_react_release(ifp, pi, dh6, optinfo, from, fromlen)
 
 	/* the message must include a Server Identifier option */
 	if (optinfo->serverID.duid_len == 0) {
-		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
+		dprintf(LOG_INFO, FNAME, "no server ID option");
 		return (-1);
 	}
 	/* the contents of the Server Identifier option must match ours */
 	if (duidcmp(&optinfo->serverID, &server_duid)) {
-		dprintf(LOG_INFO, "%s" "server ID mismatch", FNAME);
+		dprintf(LOG_INFO, FNAME, "server ID mismatch");
 		return (-1);
 	}
 	/* the message must include a Client Identifier option */
 	if (optinfo->clientID.duid_len == 0) {
-		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
+		dprintf(LOG_INFO, FNAME, "no server ID option");
 		return (-1);
 	}
 
@@ -1155,12 +1141,12 @@ server6_react_release(ifp, pi, dh6, optinfo, from, fromlen)
 
 	/* server information option */
 	if (duidcpy(&roptinfo.serverID, &server_duid)) {
-		dprintf(LOG_ERR, "%s" "failed to copy server ID", FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to copy server ID");
 		goto fail;
 	}
 	/* copy client information back */
 	if (duidcpy(&roptinfo.clientID, &optinfo->clientID)) {
-		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to copy client ID");
 		goto fail;
 	}
 
@@ -1177,12 +1163,11 @@ server6_react_release(ifp, pi, dh6, optinfo, from, fromlen)
 	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
 		u_int16_t stcode = DH6OPT_STCODE_USEMULTICAST;
 
-		dprintf(LOG_INFO, "%s" "unexpected unicast message from %s",
-		    FNAME, addr2str(from));
+		dprintf(LOG_INFO, FNAME, "unexpected unicast message from %s",
+		    addr2str(from));
 		if (dhcp6_add_listval(&roptinfo.stcode_list,
 		    DHCP6_LISTVAL_STCODE, &stcode, NULL) == NULL) {
-			dprintf(LOG_ERR, "%s" "failed to add a status code",
-			    FNAME);
+			dprintf(LOG_ERR, FNAME, "failed to add a status code");
 			goto fail;
 		}
 		server6_send(DH6_REPLY, ifp, dh6, optinfo, from,
@@ -1209,8 +1194,7 @@ server6_react_release(ifp, pi, dh6, optinfo, from, fromlen)
 	stcode = DH6OPT_STCODE_SUCCESS;
 	if (dhcp6_add_listval(&roptinfo.stcode_list,
 	    DHCP6_LISTVAL_STCODE, &stcode, NULL) == NULL) {
-		dprintf(LOG_NOTICE, "%s" "failed to add a status code",
-		    FNAME);
+		dprintf(LOG_NOTICE, FNAME, "failed to add a status code");
 		goto fail;
 	}
 
@@ -1238,8 +1222,8 @@ make_binding_ia(msgtype, iapd, retlist, optinfo)
 
 	/* get per-host configuration for the client, if any. */
 	if ((client_conf = find_hostconf(&optinfo->clientID))) {
-		dprintf(LOG_DEBUG, "%s" "found a host configuration named %s",
-			FNAME, client_conf->name);
+		dprintf(LOG_DEBUG, FNAME,
+		    "found a host configuration named %s", client_conf->name);
 	}
 
 	if ((binding = find_binding(&optinfo->clientID, DHCP6_BINDING_IA,
@@ -1261,16 +1245,14 @@ make_binding_ia(msgtype, iapd, retlist, optinfo)
 		 * In this case, we should not include the error unless we have
 		 * an explicit knowledge that the binding has been invalidated.
 		 */
-		struct dhcp6_list *stcode_list;
-
-		dprintf(LOG_INFO, "%s" "no binding found for %s", FNAME,
+		dprintf(LOG_INFO, FNAME, "no binding found for %s",
 		    duidstr(&optinfo->clientID));
 
 		if (msgtype == DH6_RENEW &&
 		    make_ia_stcode(iapd->type, iapd->val_ia.iaid,
 		    DH6OPT_STCODE_NOBINDING, retlist)) {
-			dprintf(LOG_NOTICE, "%s"
-			    "failed to make an option list" FNAME);
+			dprintf(LOG_NOTICE, FNAME,
+			    "failed to make an option list");
 			return (-1);
 		}
 	} else {	/* we found a binding */
@@ -1296,8 +1278,8 @@ make_binding_ia(msgtype, iapd, retlist, optinfo)
 				blv = dhcp6_find_listval(&binding->val_list,
 				    DHCP6_LISTVAL_PREFIX6, &prefix, 0);
 				if (blv == NULL) {
-					dprintf(LOG_DEBUG, "%s"
-					    "%s/%d is not found in %s", FNAME,
+					dprintf(LOG_DEBUG, FNAME,
+					    "%s/%d is not found in %s",
 					    in6addr2str(&prefix.addr, 0),
 					    prefix.plen, bindingstr(binding));
 					prefix.pltime = 0;
@@ -1312,8 +1294,8 @@ make_binding_ia(msgtype, iapd, retlist, optinfo)
 				if (dhcp6_add_listval(&ialist,
 				    DHCP6_LISTVAL_PREFIX6, &prefix, NULL)
 				    == NULL) {
-					dprintf(LOG_NOTICE, "%s" "failed  to "
-					    "copy binding info", FNAME);
+					dprintf(LOG_NOTICE, FNAME,
+					    "failed  to copy binding info");
 					dhcp6_clear_list(&ialist);
 					return (-1);
 				}
@@ -1346,8 +1328,6 @@ release_binding_ia(iapd, retlist, optinfo)
 
 	if ((binding = find_binding(&optinfo->clientID, DHCP6_BINDING_IA,
 	    iapd->type, iapd->val_ia.iaid)) == NULL) {
-		struct dhcp6_list *stcode_list;
-
 		/*
 		 * For each IA in the Release message for which the server has
 		 * no binding information, the server adds an IA option using
@@ -1356,8 +1336,8 @@ release_binding_ia(iapd, retlist, optinfo)
 		 */
 		if (make_ia_stcode(iapd->type, iapd->val_ia.iaid,
 		    DH6OPT_STCODE_NOBINDING, retlist)) {
-			dprintf(LOG_NOTICE, "%s"
-			    "failed to make an option list" FNAME);
+			dprintf(LOG_NOTICE, FNAME,
+			    "failed to make an option list");
 			return (-1);
 		}
 	} else {
@@ -1378,9 +1358,9 @@ release_binding_ia(iapd, retlist, optinfo)
 			if ((lvia = find_binding_ia(lv, binding)) != NULL) {
 				switch (binding->iatype) {
 					case DHCP6_LISTVAL_IAPD:
-						dprintf(LOG_DEBUG, "%s"
+						dprintf(LOG_DEBUG, FNAME,
 						    "bound prefix %s/%d "
-						    "has been released", FNAME,
+						    "has been released",
 						    in6addr2str(&lvia->val_prefix6.addr,
 						    0),
 						    lvia->val_prefix6.plen);
@@ -1421,15 +1401,15 @@ server6_react_informreq(ifp, dh6, optinfo, from, fromlen)
 	 * [dhcpv6-28 Section 15]
 	 */
 	if (!TAILQ_EMPTY(&optinfo->iapd_list)) {
-		dprintf(LOG_INFO, "%s" "information request contains an IA_PD"
-		    " option", FNAME);
+		dprintf(LOG_INFO, FNAME,
+		    "information request contains an IA_PD option");
 		return (-1);
 	}
 
 	/* if a server information is included, it must match ours. */
 	if (optinfo->serverID.duid_len &&
 	    duidcmp(&optinfo->serverID, &server_duid)) {
-		dprintf(LOG_INFO, "%s" "server DUID mismatch", FNAME);
+		dprintf(LOG_INFO, FNAME, "server DUID mismatch");
 		return (-1);
 	}
 
@@ -1440,20 +1420,20 @@ server6_react_informreq(ifp, dh6, optinfo, from, fromlen)
 
 	/* server information option */
 	if (duidcpy(&roptinfo.serverID, &server_duid)) {
-		dprintf(LOG_ERR, "%s" "failed to copy server ID", FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to copy server ID");
 		goto fail;
 	}
 
 	/* copy client information back (if provided) */
 	if (optinfo->clientID.duid_id &&
 	    duidcpy(&roptinfo.clientID, &optinfo->clientID)) {
-		dprintf(LOG_ERR, "%s" "failed to copy client ID", FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to copy client ID");
 		goto fail;
 	}
 
 	/* DNS server */
 	if (dhcp6_copy_list(&roptinfo.dns_list, &dnslist)) {
-		dprintf(LOG_ERR, "%s" "failed to copy DNS servers", FNAME);
+		dprintf(LOG_ERR, FNAME, "failed to copy DNS servers");
 		goto fail;
 	}
 
@@ -1483,7 +1463,7 @@ server6_send(type, ifp, origmsg, optinfo, from, fromlen, roptinfo)
 	struct dhcp6 *dh6;
 
 	if (sizeof(struct dhcp6) > sizeof(replybuf)) {
-		dprintf(LOG_ERR, "%s" "buffer size assumption failed", FNAME);
+		dprintf(LOG_ERR, FNAME, "buffer size assumption failed");
 		return (-1);
 	}
 
@@ -1498,8 +1478,7 @@ server6_send(type, ifp, origmsg, optinfo, from, fromlen, roptinfo)
 					(struct dhcp6opt *)(replybuf +
 							    sizeof(replybuf)),
 					roptinfo)) < 0) {
-		dprintf(LOG_INFO, "%s" "failed to construct reply options",
-			FNAME);
+		dprintf(LOG_INFO, FNAME, "failed to construct reply options");
 		return (-1);
 	}
 	len += optlen;
@@ -1510,13 +1489,13 @@ server6_send(type, ifp, origmsg, optinfo, from, fromlen, roptinfo)
 	dst.sin6_scope_id = ((struct sockaddr_in6 *)from)->sin6_scope_id;
 	if (transmit_sa(outsock, (struct sockaddr *)&dst,
 			replybuf, len) != 0) {
-		dprintf(LOG_ERR, "%s" "transmit %s to %s failed", FNAME,
-			dhcp6msgstr(type), addr2str((struct sockaddr *)&dst));
+		dprintf(LOG_ERR, FNAME, "transmit %s to %s failed",
+		    dhcp6msgstr(type), addr2str((struct sockaddr *)&dst));
 		return (-1);
 	}
 
-	dprintf(LOG_DEBUG, "%s" "transmit %s to %s", FNAME,
-		dhcp6msgstr(type), addr2str((struct sockaddr *)&dst));
+	dprintf(LOG_DEBUG, FNAME, "transmit %s to %s",
+	    dhcp6msgstr(type), addr2str((struct sockaddr *)&dst));
 
 	return (0);
 }
@@ -1537,16 +1516,13 @@ make_ia_stcode(iatype, iaid, stcode, retlist)
 	TAILQ_INIT(&stcode_list);
 	if (dhcp6_add_listval(&stcode_list, DHCP6_LISTVAL_STCODE,
 	    &stcode, NULL) == NULL) {
-		dprintf(LOG_NOTICE, "%s"
-		    "failed to make an option list",
-		    FNAME);
+		dprintf(LOG_NOTICE, FNAME, "failed to make an option list");
 		return (-1);
 	}
 
 	if (dhcp6_add_listval(retlist, iatype,
 	    &ia_empty, &stcode_list) == NULL) {
-		dprintf(LOG_NOTICE, "%s" "failed to make an option list",
-		    FNAME);
+		dprintf(LOG_NOTICE, FNAME, "failed to make an option list");
 		dhcp6_clear_list(&stcode_list);
 		return (-1);
 	}
@@ -1577,8 +1553,8 @@ make_ia(spec, conflist, retlist, client_conf, do_binding)
 		struct dhcp6_list *blist = &binding->val_list;
 		struct dhcp6_listval *bia, *v;
 
-		dprintf(LOG_DEBUG, "%s" "we have a binding already: %s",
-		    FNAME, bindingstr(binding));
+		dprintf(LOG_DEBUG, FNAME, "we have a binding already: %s",
+		    bindingstr(binding));
 
 		update_binding(binding);
 
@@ -1588,8 +1564,8 @@ make_ia(spec, conflist, retlist, client_conf, do_binding)
 		calc_ia_timo(&ia, blist, client_conf);
 		if (dhcp6_add_listval(retlist, spec->type, &ia, blist)
 		    == NULL) {
-			dprintf(LOG_NOTICE, "%s"
-			    "failed to copy binding info", FNAME);
+			dprintf(LOG_NOTICE, FNAME,
+			    "failed to copy binding info");
 			return (0);
 		}
 
@@ -1644,8 +1620,8 @@ make_ia(spec, conflist, retlist, client_conf, do_binding)
 		if (found && do_binding) {
 			if (add_binding(&client_conf->duid, DHCP6_BINDING_IA,
 			    spec->type, spec->val_ia.iaid, &ialist) == NULL) {
-				dprintf(LOG_NOTICE, "%s" "failed to make a"
-				    " binding", FNAME);
+				dprintf(LOG_NOTICE, FNAME,
+				    "failed to make a binding");
 				found = 0;
 			}
 		}
@@ -1711,9 +1687,8 @@ calc_ia_timo(ia, ialist, client_conf)
 	iatype = TAILQ_FIRST(ialist)->type;
 	for (iav = TAILQ_FIRST(ialist); iav; iav = TAILQ_NEXT(iav, link)) {
 		if (iav->type != iatype) {
-			dprintf(LOG_ERR, "%s"
-			    "assumption failure: IA list is not consistent",
-			    FNAME);
+			dprintf(LOG_ERR, FNAME,
+			    "assumption failure: IA list is not consistent");
 			exit (1); /* XXX */
 		}
 		switch (iatype) {
@@ -1786,7 +1761,7 @@ update_binding_duration(binding)
 		break;
 	default:
 		/* should be internal error. */
-		dprintf(LOG_ERR, "%s" "unknown binding type (%d)", FNAME,
+		dprintf(LOG_ERR, FNAME, "unknown binding type (%d)",
 		    binding->type);
 		return;
 	}
@@ -1804,16 +1779,15 @@ add_binding(clientid, btype, iatype, iaid, val0)
 {
 	struct dhcp6_binding *binding = NULL;
 	u_int32_t duration = DHCP6_DURATITION_INFINITE;
-	char *val = NULL;
 
 	if ((binding = malloc(sizeof(*binding))) == NULL) {
-		dprintf(LOG_NOTICE, "%s" "failed to allocate memory", FNAME);
+		dprintf(LOG_NOTICE, FNAME, "failed to allocate memory");
 		return (NULL);
 	}
 	memset(binding, 0, sizeof(*binding));
 	binding->type = btype;
 	if (duidcpy(&binding->clientid, clientid)) {
-		dprintf(LOG_NOTICE, "%s" "failed to copy DUID");
+		dprintf(LOG_NOTICE, FNAME, "failed to copy DUID");
 		goto fail;
 	}
 	binding->iatype = iatype;
@@ -1825,14 +1799,13 @@ add_binding(clientid, btype, iatype, iaid, val0)
 		TAILQ_INIT(&binding->val_list);
 		if (dhcp6_copy_list(&binding->val_list,
 		    (struct dhcp6_list *)val0)) {
-			dprintf(LOG_NOTICE, "%s" "failed to copy binding data",
-			    FNAME);
+			dprintf(LOG_NOTICE, FNAME,
+			    "failed to copy binding data");
 			goto fail;
 		}
 		break;
 	default:
-		dprintf(LOG_ERR, "%s" "unexpected binding type(%d)",
-		    FNAME, btype);
+		dprintf(LOG_ERR, FNAME, "unexpected binding type(%d)", btype);
 		goto fail;
 	}
 
@@ -1844,7 +1817,7 @@ add_binding(clientid, btype, iatype, iaid, val0)
 
 		binding->timer = dhcp6_add_timer(binding_timo, binding);
 		if (binding->timer == NULL) {
-			dprintf(LOG_NOTICE, "%s" "failed to add timer", FNAME);
+			dprintf(LOG_NOTICE, FNAME, "failed to add timer");
 			goto fail;
 		}
 		timo.tv_sec = (long)duration;
@@ -1854,8 +1827,7 @@ add_binding(clientid, btype, iatype, iaid, val0)
 
 	TAILQ_INSERT_TAIL(&dhcp6_binding_head, binding, link);
 
-	dprintf(LOG_DEBUG, "%s" "add a new binding %s", FNAME,
-	    bindingstr(binding));
+	dprintf(LOG_DEBUG, FNAME, "add a new binding %s", bindingstr(binding));
 
 	return (binding);
 
@@ -1873,7 +1845,6 @@ find_binding(clientid, btype, iatype, iaid)
 	u_int32_t iaid;
 {
 	struct dhcp6_binding *bp;
-	struct dhcp6_prefix *pfx0, *pfx;
 
 	for (bp = TAILQ_FIRST(&dhcp6_binding_head); bp;
 	    bp = TAILQ_NEXT(bp, link)) {
@@ -1896,7 +1867,7 @@ update_binding(binding)
 {
 	struct timeval timo;
 
-	dprintf(LOG_DEBUG, "%s" "update binding %s for %s", FNAME,
+	dprintf(LOG_DEBUG, FNAME, "update binding %s for %s",
 	    bindingstr(binding), duidstr(&binding->clientid));
 
 	/* update timestamp and calculate new duration */
@@ -1917,7 +1888,7 @@ static void
 remove_binding(binding)
 	struct dhcp6_binding *binding;
 {
-	dprintf(LOG_DEBUG, "%s" "remove a binding %s", FNAME,
+	dprintf(LOG_DEBUG, FNAME, "remove a binding %s",
 	    bindingstr(binding));
 
 	if (binding->timer)
@@ -1940,7 +1911,7 @@ free_binding(binding)
 		dhcp6_clear_list(&binding->val_list);
 		break;
 	default:
-		dprintf(LOG_ERR, "%s" "unknown binding type %d", FNAME,
+		dprintf(LOG_ERR, FNAME, "unknown binding type %d",
 		    binding->type);
 		break;
 	}
@@ -1972,16 +1943,16 @@ binding_timo(arg)
 				lifetime = iav->val_prefix6.vltime;
 				break;
 			default:
-				dprintf(LOG_ERR, "%s" "internal error: "
-				    "unknown binding type (%d)", FNAME,
+				dprintf(LOG_ERR, FNAME, "internal error: "
+				    "unknown binding type (%d)",
 				    binding->iatype);
 				return (NULL); /* XXX */
 			}
 
 			if (lifetime != DHCP6_DURATITION_INFINITE &&
 			    lifetime <= past) {
-				dprintf(LOG_DEBUG, "%s" "bound prefix %s/%d"
-				    " in %s has expired", FNAME,
+				dprintf(LOG_DEBUG, FNAME, "bound prefix %s/%d"
+				    " in %s has expired",
 				    in6addr2str(&iav->val_prefix6.addr, 0),
 				    iav->val_prefix6.plen,
 				    bindingstr(binding));
@@ -1998,7 +1969,7 @@ binding_timo(arg)
 
 		break;
 	default:
-		dprintf(LOG_ERR, "%s" "unknown binding type %d", FNAME,
+		dprintf(LOG_ERR, FNAME, "unknown binding type %d",
 		    binding->type);
 		return (NULL);	/* XXX */
 	}
@@ -2007,7 +1978,7 @@ binding_timo(arg)
 
 	/* if the lease duration is infinite, there's nothing to do. */
 	if (binding->duration == DHCP6_DURATITION_INFINITE)
-		return;
+		return (NULL);
 
 	/* reset the timer with the duration */
 	timo.tv_sec = (long)binding->duration;
@@ -2023,13 +1994,12 @@ find_binding_ia(key, binding)
 	struct dhcp6_binding *binding;
 {
 	struct dhcp6_list *ia_list = &binding->val_list;
-	struct dhcp6_listval *iav;
 
 	switch (binding->type) {
 	case DHCP6_BINDING_IA:
 		return (dhcp6_find_listval(ia_list, key->type, &key->uv, 0));
 	default:
-		dprintf(LOG_ERR, "%s" "unknown binding type %d", FNAME,
+		dprintf(LOG_ERR, FNAME, "unknown binding type %d",
 		    binding->type);
 		return (NULL);	/* XXX */
 	}
@@ -2039,9 +2009,8 @@ static char *
 bindingstr(binding)
 	struct dhcp6_binding *binding;
 {
-	struct dhcp6_prefix *pfx;
 	static char strbuf[LINE_MAX];	/* XXX: thread unsafe */
-	char *iatype;
+	char *iatype = NULL;
 
 	switch (binding->type) {
 	case DHCP6_BINDING_IA:
@@ -2053,12 +2022,12 @@ bindingstr(binding)
 
 		snprintf(strbuf, sizeof(strbuf),
 		    "[IA: duid=%s, type=%s, iaid=%lu, duration=%lu]",
-		    duidstr(&binding->clientid), iatype, binding->iaid,
-		    binding->duration);
+		    duidstr(&binding->clientid), iatype, (u_long)binding->iaid,
+		    (u_long)binding->duration);
 		break;
 	default:
-		dprintf(LOG_ERR, "%s" "unexpected binding type(%d)", FNAME,
-			binding->type);
+		dprintf(LOG_ERR, FNAME, "unexpected binding type(%d)",
+		    binding->type);
 		return ("???");
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.18 2003/02/07 12:22:03 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.19 2003/03/14 11:06:26 jinmei Exp $	*/
 
 %{
 /*
@@ -197,10 +197,13 @@ cfdebug_print(w, t, l)
 	char *w, *t;
 	int l;
 {
-	if (w)
-		dprintf(LOG_DEBUG, "<%d>%s [%s] (%d)", yy_start, w, t, l);
-	else
-		dprintf(LOG_DEBUG, "<%d>[%s] (%d)", yy_start, t, l);
+	if (w) {
+		dprintf(LOG_DEBUG, FNAME,
+		    "<%d>%s [%s] (%d)", yy_start, w, t, l);
+	} else {
+		dprintf(LOG_DEBUG, FNAME,
+		    "<%d>[%s] (%d)", yy_start, t, l);
+	}
 }
 
 static void
@@ -214,7 +217,7 @@ yyerror0(int level, char *s, va_list ap)
 	if (bp < ep)
 		bp += vsnprintf(bp, ep - bp, s, ap);
 
-	dprintf(level, ebuf);
+	dprintf(level, FNAME, ebuf);
 }
 
 void

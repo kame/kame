@@ -1,4 +1,4 @@
-/*	$KAME: common.h,v 1.32 2003/01/27 13:21:52 jinmei Exp $	*/
+/*	$KAME: common.h,v 1.33 2003/03/14 11:06:26 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -32,9 +32,9 @@
 		IN6_IFF_DUPLICATED|IN6_IFF_DETACHED)
 
 #ifdef HAVE_ANSI_FUNC
-#define FNAME __func__ ": "
+#define FNAME __func__
 #elif defined (HAVE_GCC_FUNCTION)
-#define FNAME __FUNCTION__ ": "
+#define FNAME __FUNCTION__
 #else
 #define FNAME ""
 #endif
@@ -70,7 +70,7 @@ extern const char *getdev __P((struct sockaddr_in6 *));
 extern int in6_addrscopebyif __P((struct in6_addr *, char *));
 extern int in6_scope __P((struct in6_addr *));
 extern void setloglevel __P((int));
-extern void dprintf __P((int, const char *, ...));
+extern void dprintf __P((int, const char *, const char *, ...));
 extern int get_duid __P((char *, struct duid *));
 extern void dhcp6_init_options __P((struct dhcp6_optinfo *));
 extern void dhcp6_clear_options __P((struct dhcp6_optinfo *));
