@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.52 2002/05/07 12:00:07 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.53 2002/05/08 08:06:34 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -337,17 +337,11 @@ natpt_config6(struct mbuf *m, struct pcv *cv6)
 	cv6->ip.ip6 = mtod(m, struct ip6_hdr *);
 
 	if ((tcpudp = natpt_lastpyld(m, &proto, &offset, &cv6->fh))) {
-		switch (proto) {
-		case IPPROTO_ICMP:
-		case IPPROTO_ICMPV6:
-		case IPPROTO_TCP:
-		case IPPROTO_UDP:
-			cv6->ip_p = proto;
-			cv6->pyld.caddr = tcpudp;
-			cv6->poff = offset;
-			cv6->plen = (caddr_t)m->m_data + m->m_len - cv6->pyld.caddr;
-			return (proto);
-		}
+		cv6->ip_p = proto;
+		cv6->pyld.caddr = tcpudp;
+		cv6->poff = offset;
+		cv6->plen = (caddr_t)m->m_data + m->m_len - cv6->pyld.caddr;
+		return (proto);
 	}
 
 	cv6->ip_p = cv6->ip.ip6->ip6_nxt;
@@ -431,7 +425,9 @@ natpt_pyldaddr(struct ip6_hdr *ip6, caddr_t ip6end, int *proto, struct ip6_frag 
 			goto wayOut;
 
 		default:
-			return (NULL);
+			if (proto)
+				*proto = nxt;
+			return (ip6ext);
 		}
 	}
 
