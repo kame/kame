@@ -1,4 +1,4 @@
-/*	$NetBSD: swap.c,v 1.9 1998/12/26 07:05:08 marc Exp $	*/
+/*	$NetBSD: swap.c,v 1.12.2.1 2000/09/01 16:38:18 ad Exp $	*/
 
 /*-
  * Copyright (c) 1997 Matthew R. Green.  All rights reserved.
@@ -39,7 +39,7 @@
 #if 0
 static char sccsid[] = "@(#)swap.c	8.3 (Berkeley) 4/29/95";
 #endif
-__RCSID("$NetBSD: swap.c,v 1.9 1998/12/26 07:05:08 marc Exp $");
+__RCSID("$NetBSD: swap.c,v 1.12.2.1 2000/09/01 16:38:18 ad Exp $");
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -47,8 +47,7 @@ __RCSID("$NetBSD: swap.c,v 1.9 1998/12/26 07:05:08 marc Exp $");
 #include <sys/conf.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
-
-#include <vm/vm_swap.h>
+#include <sys/swap.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -59,7 +58,7 @@ __RCSID("$NetBSD: swap.c,v 1.9 1998/12/26 07:05:08 marc Exp $");
 #include "systat.h"
 #include "extern.h"
 
-void showspace __P((char *header, int hlen, long blocksize));
+void showspace(char *header, int hlen, long blocksize);
 
 static	long blocksize;
 static	int hlen, nswap, rnswap;
@@ -67,15 +66,14 @@ static	int first = 1;
 static	struct swapent *swap_devices;
 
 WINDOW *
-openswap()
+openswap(void)
 {
 
 	return (subwin(stdscr, LINES-5-1, 0, 5, 0));
 }
 
 void
-closeswap(w)
-	WINDOW *w;
+closeswap(WINDOW *w)
 {
 
 	if (w == NULL)
@@ -87,14 +85,14 @@ closeswap(w)
 
 /* do nothing */
 int
-initswap()
+initswap(void)
 {
 
 	return (1);
 }
 
 void
-fetchswap()
+fetchswap(void)
 {
 	int	update_label = 0;
 
@@ -108,21 +106,22 @@ fetchswap()
 
 	if (swap_devices)
 		(void)free(swap_devices);
-	swap_devices = (struct swapent *)malloc(nswap * sizeof(*swap_devices));
-	if (swap_devices == NULL)
-		/* XXX */ ;	/* XXX systat doesn't do errors! */
+	if ((swap_devices = malloc(nswap * sizeof(*swap_devices))) == NULL) {
+		error("malloc failed");
+		die(0);
+	}
 
-	rnswap = swapctl(SWAP_STATS, (void *)swap_devices, nswap);
-	if (nswap < 0)
-		/* XXX */ ;	/* XXX systat doesn't do errors! */
-	if (nswap != rnswap)
-		/* XXX */ ;	/* XXX systat doesn't do errors! */
+	if ((rnswap = swapctl(SWAP_STATS, (void *)swap_devices, nswap)) != nswap) {
+		error("swapctl failed");
+		die(0);
+	}
+		
 	if (update_label)
 		labelswap();
 }
 
 void
-labelswap()
+labelswap(void)
 {
 	char	*header;
 	int	row;
@@ -143,8 +142,9 @@ labelswap()
 }
 
 void
-showswap() {
-	int	col, div, i, j, avail, used, xsize, free;
+showswap(void)
+{
+	int	col, div, i, avail, used, xsize, free;
 	struct	swapent *sep;
 	char	*p;
 
@@ -168,17 +168,15 @@ showswap() {
 		avail += xsize;
 		free += xsize - used;
 		mvwprintw(wnd, i + 1, col, "%9d  ", used / div);
-		for (j = (100 * used / xsize + 1) / 2; j > 0; j--)
-			waddch(wnd, 'X');
 		wclrtoeol(wnd);
+		whline(wnd, 'X', (100 * used / xsize + 1) / 2);
 	}
 	/* do total if necessary */
 	if (nswap > 1) {
 		used = avail - free;
 		mvwprintw(wnd, i + 1, 0, "%-5s%*d%9d  ",
 		    "Total", hlen, avail / div, used / div);
-		for (j = (100 * used / avail + 1) / 2; j > 0; j--)
-			waddch(wnd, 'X');
 		wclrtoeol(wnd);
+		whline(wnd, 'X', (100 * used / avail + 1) / 2);
 	}
 }

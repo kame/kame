@@ -1,4 +1,4 @@
-/*	$NetBSD: fetch.c,v 1.4.2.1 1999/09/26 13:35:57 he Exp $	*/
+/*	$NetBSD: fetch.c,v 1.6.2.2 2000/10/18 01:32:52 tv Exp $	*/
 
 /*-
  * Copyright (c) 1980, 1992, 1993
@@ -38,22 +38,49 @@
 #if 0
 static char sccsid[] = "@(#)fetch.c	8.1 (Berkeley) 6/6/93";
 #endif
-__RCSID("$NetBSD: fetch.c,v 1.4.2.1 1999/09/26 13:35:57 he Exp $");
+__RCSID("$NetBSD: fetch.c,v 1.6.2.2 2000/10/18 01:32:52 tv Exp $");
 #endif /* not lint */
 
-#include <sys/types.h>
+#include <sys/param.h>
+#include <sys/sched.h>
+#include <sys/sysctl.h>
+#include <string.h>
 #include "systat.h"
 #include "extern.h"
 
 ssize_t
-kvm_ckread(a, b, l)
-	void *a, *b;
-	size_t l;
+kvm_ckread(void *a, void *b, size_t l)
 {
 	if (kvm_read(kd, (u_long)a, b, l) != l) {
 		if (verbose)
-			error("error reading kmem at %x\n", a);
+			error("error reading kmem at %p\n", a);
 		return (0);
 	} else
 		return (1);
+}
+
+int
+fetch_cptime(u_int64_t *cptime)
+{
+	size_t ssize;
+	int mib[2];
+
+	/*
+	 * XXX Need to locate the `correct' CPU when looking for this
+	 * XXX in crash dumps.  Just don't report it for now, in that
+	 * XXX case.
+	 */
+	ssize = CPUSTATES * sizeof(u_int64_t);
+	memset(cptime, 0, ssize);
+	if (memf == NULL) {
+		mib[0] = CTL_KERN;
+		mib[1] = KERN_CP_TIME;
+		if (sysctl(mib, 2, cptime, &ssize, NULL, 0) < 0) {
+			if (verbose)
+				error("error fetching cp_time\n");
+			return (0);
+		} else
+			return (1);
+	}
+	return (1);
 }

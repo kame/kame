@@ -1,4 +1,4 @@
-/*	$NetBSD: mbuf.c,v 1.14.2.1 1999/04/03 00:18:57 hubertf Exp $	*/
+/*	$NetBSD: mbuf.c,v 1.15 1999/04/02 22:45:45 hubertf Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)mbuf.c	8.1 (Berkeley) 6/6/93";
 #else
-__RCSID("$NetBSD: mbuf.c,v 1.14.2.1 1999/04/03 00:18:57 hubertf Exp $");
+__RCSID("$NetBSD: mbuf.c,v 1.15 1999/04/02 22:45:45 hubertf Exp $");
 #endif
 #endif /* not lint */
 

@@ -1,4 +1,4 @@
-.\"	$NetBSD: netstat.1,v 1.21 1999/03/22 18:16:40 garbled Exp $
+.\"	$NetBSD: netstat.1,v 1.26 1999/12/13 15:22:55 itojun Exp $
 .\"
 .\" Copyright (c) 1983, 1990, 1992, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -46,7 +46,7 @@
 .Op Fl M Ar core
 .Op Fl N Ar system
 .Nm ""
-.Op Fl dgimnrsv
+.Op Fl dgiLmnrsv
 .Op Fl f Ar address_family
 .Op Fl M Ar core
 .Op Fl N Ar system
@@ -65,6 +65,15 @@
 .Op Fl M Ar core
 .Op Fl N Ar system
 .Fl P Ar pcbaddr
+.Nm ""
+.Op Fl p Ar protocol
+.Op Fl i
+.Op Fl I Ar Interface
+.Nm ""
+.Op Fl s
+.Op Fl f Ar address_family
+.Op Fl i
+.Op Fl I Ar Interface
 .Sh DESCRIPTION
 The
 .Nm
@@ -83,6 +92,8 @@ interval specified,
 will continuously display the information regarding packet
 traffic on the configured network interfaces.
 The fourth form displays statistics about the named protocol.
+The fifth and sixth forms display per interface statistics for
+the specified protocol or address family.
 .Pp
 The options have the following meaning:
 .Bl -tag -width flag
@@ -112,6 +123,9 @@ are recognized:
 .Ar inet ,
 for
 .Dv AF_INET ;
+.Ar inet6 ,
+for
+.Dv AF_INET6 ;
 .Ar ns ,
 for
 .Dv AF_NS ;
@@ -138,6 +152,19 @@ Show information about the specified interface;
 used with a
 .Ar wait
 interval as described below.
+If the
+.Fl f Ar address_family
+option (with the
+.Fl s
+option) or the
+.Fl p Ar protocol
+option is present, show per-interface statistics on the
+.Ar interface
+for the specfied
+.Ar address_family
+or
+.Ar protocol,
+respectively.
 .It Fl i
 Show the state of interfaces which have been auto-configured
 (interfaces statically configured into a system, but not
@@ -148,6 +175,20 @@ options is also present, multicast addresses currently in use are shown
 for each Ethernet interface and for each IP interface address.
 Multicast addresses are shown on separate lines following the interface
 address with which they are associated.
+If the
+.Fl f Ar address_family
+option (with the
+.Fl s
+option) or the
+.Fl p Ar protocol
+option is present, show per-interface statistics on all interfaces
+for the specfied
+.Ar address_family
+or
+.Ar protocol,
+respectively.
+.It Fl L
+Don't show link-level routes (e.g., IPv4 ARP or IPv6 neighbour cache).
 .It Fl M
 Extract values associated with the name list from the specified core
 instead of the default
@@ -193,7 +234,9 @@ When
 .Fl s
 is also present, show routing statistics instead.
 .It Fl v
-Show extra (verbose) detail for the routing tables.
+Show extra (verbose) detail for the routing tables
+.Pq Fl r ,
+or avoid truncation of long addresses.
 .It Fl w Ar wait
 Show network interface statistics at intervals of
 .Ar wait
@@ -309,6 +352,7 @@ The
 .Nm
 command appeared in
 .Bx 4.2 .
+IPv6 support was added by WIDE/KAME project.
 .\" .Sh FILES
 .\" .Bl -tag -width /dev/kmem -compact
 .\" .It Pa /netbsd

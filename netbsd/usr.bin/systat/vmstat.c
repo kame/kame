@@ -1,4 +1,4 @@
-/*	$NetBSD: vmstat.c,v 1.19.2.1 2000/01/23 12:02:34 he Exp $	*/
+/*	$NetBSD: vmstat.c,v 1.31.2.1 2000/09/01 16:38:18 ad Exp $	*/
 
 /*-
  * Copyright (c) 1983, 1989, 1992, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)vmstat.c	8.2 (Berkeley) 1/12/94";
 #endif
-__RCSID("$NetBSD: vmstat.c,v 1.19.2.1 2000/01/23 12:02:34 he Exp $");
+__RCSID("$NetBSD: vmstat.c,v 1.31.2.1 2000/09/01 16:38:18 ad Exp $");
 #endif /* not lint */
 
 /*
@@ -53,6 +53,7 @@ __RCSID("$NetBSD: vmstat.c,v 1.19.2.1 2000/01/23 12:02:34 he Exp $");
 #include <sys/user.h>
 #include <sys/proc.h>
 #include <sys/namei.h>
+#include <sys/sched.h>
 #include <sys/sysctl.h>
 
 #include <vm/vm.h>
@@ -73,7 +74,7 @@ __RCSID("$NetBSD: vmstat.c,v 1.19.2.1 2000/01/23 12:02:34 he Exp $");
 #include "extern.h"
 
 static struct Info {
-	long	time[CPUSTATES];
+	u_int64_t time[CPUSTATES];
 	struct	uvmexp uvmexp;
 	struct	vmtotal Total;
 	struct	nchstats nchstats;
@@ -93,18 +94,18 @@ extern struct _disk	cur;
 
 static	enum state { BOOT, TIME, RUN } state = TIME;
 
-static void allocinfo __P((struct Info *));
-static void copyinfo __P((struct Info *, struct Info *));
-static float cputime __P((int));
-static void dinfo __P((int, int));
-static void getinfo __P((struct Info *, enum state));
-static void putint __P((int, int, int, int));
-static void putfloat __P((double, int, int, int, int, int));
-static int ucount __P((void));
+static void allocinfo(struct Info *);
+static void copyinfo(struct Info *, struct Info *);
+static float cputime(int);
+static void dinfo(int, int);
+static void getinfo(struct Info *, enum state);
+static void putint(int, int, int, int);
+static void putfloat(double, int, int, int, int, int);
+static int ucount(void);
 
 static	int ut;
 static	char buf[26];
-static	time_t t;
+static	u_int64_t t;
 static	double etime;
 static	float hertz;
 static	int nintr;
@@ -115,7 +116,7 @@ static	int nextintsrow;
 struct	utmp utmp;
 
 WINDOW *
-openkre()
+openvmstat(void)
 {
 
 	ut = open(_PATH_UTMP, O_RDONLY);
@@ -125,8 +126,7 @@ openkre()
 }
 
 void
-closekre(w)
-	WINDOW *w;
+closevmstat(WINDOW *w)
 {
 
 	(void) close(ut);
@@ -138,19 +138,17 @@ closekre(w)
 
 
 static struct nlist namelist[] = {
-#define X_CPTIME	0
-	{ "_cp_time" },
-#define X_TOTAL		1
+#define X_TOTAL		0
 	{ "_total" },
-#define	X_NCHSTATS	2
+#define	X_NCHSTATS	1
 	{ "_nchstats" },
-#define	X_INTRNAMES	3
+#define	X_INTRNAMES	2
 	{ "_intrnames" },
-#define	X_EINTRNAMES	4
+#define	X_EINTRNAMES	3
 	{ "_eintrnames" },
-#define	X_INTRCNT	5
+#define	X_INTRCNT	4
 	{ "_intrcnt" },
-#define	X_EINTRCNT	6
+#define	X_EINTRCNT	5
 	{ "_eintrcnt" },
 	{ "" },
 };
@@ -188,7 +186,7 @@ static struct nlist namelist[] = {
 #endif
 
 int
-initkre()
+initvmstat(void)
 {
 	char *intrnamebuf, *cp;
 	int i;
@@ -224,7 +222,7 @@ initkre()
 		intrname = calloc(nintr, sizeof (long));
 		intrnamebuf = malloc(namelist[X_EINTRNAMES].n_value -
 			namelist[X_INTRNAMES].n_value);
-		if (intrnamebuf == 0 || intrname == 0 || intrloc == 0) {
+		if (intrnamebuf == NULL || intrname == 0 || intrloc == 0) {
 			error("Out of memory\n");
 			if (intrnamebuf)
 				free(intrnamebuf);
@@ -253,7 +251,7 @@ initkre()
 }
 
 void
-fetchkre()
+fetchvmstat(void)
 {
 	time_t now;
 
@@ -264,7 +262,7 @@ fetchkre()
 }
 
 void
-labelkre()
+labelvmstat(void)
 {
 	int i, j;
 
@@ -305,7 +303,7 @@ labelkre()
 	mvprintw(GENSTATROW, GENSTATCOL, "  Csw  Trp  Sys  Int  Sof  Flt");
 
 	mvprintw(GRAPHROW, GRAPHCOL,
-		"    . %% Sys    . %% User    . %% Nice    . %% Idle");
+		"    . %% Sy    . %% Us    . %% Ni    . %% In    . %% Id");
 	mvprintw(PROCSROW, PROCSCOL, "Proc:r  d  s  w");
 	mvprintw(GRAPHROW + 1, GRAPHCOL,
 		"|    |    |    |    |    |    |    |    |    |    |");
@@ -317,12 +315,12 @@ labelkre()
 	mvprintw(DISKROW + 1, DISKCOL, "seeks");
 	mvprintw(DISKROW + 2, DISKCOL, "xfers");
 	mvprintw(DISKROW + 3, DISKCOL, "Kbyte");
-	mvprintw(DISKROW + 4, DISKCOL, "  sec");
+	mvprintw(DISKROW + 4, DISKCOL, "%%busy");
 	j = 0;
 	for (i = 0; i < dk_ndrive && j < MAXDRIVES; i++)
 		if (dk_select[i]) {
 			mvprintw(DISKROW, DISKCOL + 5 + 5 * j,
-				"  %3.3s", dr_name[j]);
+				" %4.4s", dr_name[j]);
 			j++;
 		}
 	for (i = 0; i < nintr; i++) {
@@ -339,11 +337,11 @@ labelkre()
 #define PUTRATE(fld, l, c, w) {Y(fld); putint((int)((float)s.fld/etime + 0.5), l, c, w);}
 #define MAXFAIL 5
 
-static	char cpuchar[CPUSTATES] = { '=' , '>', '-', ' ' };
-static	char cpuorder[CPUSTATES] = { CP_SYS, CP_USER, CP_NICE, CP_IDLE };
+static	char cpuchar[CPUSTATES] = { '=' , '>', '-', '%', ' ' };
+static	char cpuorder[CPUSTATES] = { CP_SYS, CP_USER, CP_NICE, CP_INTR, CP_IDLE };
 
 void
-showkre()
+showvmstat(void)
 {
 	float f1, f2;
 	int psiz, inttotal;
@@ -357,7 +355,7 @@ showkre()
 		X(time);
 		etime += s.time[i];
 	}
-	if (etime < 5.0) {	/* < 5 ticks - ignore this trash */
+	if (etime < 1.0) {	/* < 5 ticks - ignore this trash */
 		if (failcnt++ >= MAXFAIL) {
 			clear();
 			mvprintw(2, 10, "The alternate system clock has died!");
@@ -402,7 +400,7 @@ showkre()
 	/* 
 	 * Last CPU state not calculated yet.
 	 */
-	for (c = 0; c < CPUSTATES - 1; c++) {
+	for (c = 0; c < CPUSTATES; c++) {
 		i = cpuorder[c];
 		f1 = cputime(i);
 		f2 += f1;
@@ -410,12 +408,9 @@ showkre()
 		if (c == 0)
 			putfloat(f1, GRAPHROW, GRAPHCOL + 1, 5, 1, 0);
 		else
-			putfloat(f1, GRAPHROW, GRAPHCOL + 12 * c,
-				5, 1, 0);
-		move(GRAPHROW + 2, psiz);
+			putfloat(f1, GRAPHROW, GRAPHCOL + 10 * c + 1, 5, 1, 0);
+		mvhline(GRAPHROW + 2, psiz, cpuchar[c], l);
 		psiz += l;
-		while (l-- > 0)
-			addch(cpuchar[c]);
 	}
 
 	putint(ucount(), STATROW, STATCOL, 3);
@@ -474,7 +469,7 @@ showkre()
 	for (i = 0, c = 0; i < dk_ndrive && c < MAXDRIVES; i++)
 		if (dk_select[i]) {
 			mvprintw(DISKROW, DISKCOL + 5 + 5 * c,
-				"  %3.3s", dr_name[i]);
+				" %4.4s", dr_name[i]);
 			dinfo(i, ++c);
 		}
 	putint(s.nchcount, NAMEIROW + 2, NAMEICOL, 9);
@@ -488,38 +483,39 @@ showkre()
 #undef nz
 }
 
-int
-cmdkre(cmd, args)
-	char *cmd, *args;
+void
+vmstat_boot(char *args)
 {
+	copyinfo(&z, &s1);
+	state = BOOT;
+}
 
-	if (prefix(cmd, "run")) {
-		copyinfo(&s2, &s1);
-		state = RUN;
-		return (1);
-	}
-	if (prefix(cmd, "boot")) {
-		state = BOOT;
-		copyinfo(&z, &s1);
-		return (1);
-	}
-	if (prefix(cmd, "time")) {
-		state = TIME;
-		return (1);
-	}
-	if (prefix(cmd, "zero")) {
-		if (state == RUN)
-			getinfo(&s1, RUN);
-		return (1);
-	}
-	return (dkcmd(cmd, args));
+void
+vmstat_run(char *args)
+{
+	copyinfo(&s1, &s2);
+	state = RUN;
+}
+
+void
+vmstat_time (args)
+	char * args;
+{
+	state = TIME;
+}
+
+void
+vmstat_zero(char *args)
+{
+	if (state == RUN)
+		getinfo(&s1, RUN);
 }
 
 /* calculate number of users on the system */
 static int
-ucount()
+ucount(void)
 {
-	int nusers = 0;
+	int nusers = 0, onusers = -1;
 
 	if (ut < 0)
 		return (0);
@@ -527,13 +523,19 @@ ucount()
 		if (utmp.ut_name[0] != '\0')
 			nusers++;
 
+	if (nusers != onusers) {
+		if (nusers == 1)
+			mvprintw(STATROW, STATCOL + 8, " ");
+		else
+			mvprintw(STATROW, STATCOL + 8, "s");
+	}
 	lseek(ut, (off_t)0, SEEK_SET);
+	onusers = nusers;
 	return (nusers);
 }
 
 static float
-cputime(indx)
-	int indx;
+cputime(int indx)
 {
 	double t;
 	int i;
@@ -547,58 +549,49 @@ cputime(indx)
 }
 
 static void
-putint(n, l, c, w)
-	int n, l, c, w;
+putint(int n, int l, int c, int w)
 {
 	char b[128];
 
 	move(l, c);
 	if (n == 0) {
-		while (w-- > 0)
-			addch(' ');
+		hline(' ', w);
 		return;
 	}
 	(void)snprintf(b, sizeof b, "%*d", w, n);
 	if (strlen(b) > w) {
-		while (w-- > 0)
-			addch('*');
+		hline('*', w);
 		return;
 	}
 	addstr(b);
 }
 
 static void
-putfloat(f, l, c, w, d, nz)
-	double f;
-	int l, c, w, d, nz;
+putfloat(double f, int l, int c, int w, int d, int nz)
 {
 	char b[128];
 
 	move(l, c);
 	if (nz && f == 0.0) {
-		while (--w >= 0)
-			addch(' ');
+		hline(' ', w);
 		return;
 	}
 	(void)snprintf(b, sizeof b, "%*.*f", w, d, f);
 	if (strlen(b) > w) {
-		while (--w >= 0)
-			addch('*');
+		hline('*', w);
 		return;
 	}
 	addstr(b);
 }
 
 static void
-getinfo(s, st)
-	struct Info *s;
-	enum state st;
+getinfo(struct Info *s, enum state st)
 {
 	int mib[2];
 	size_t size;
 
 	dkreadstats();
-	NREAD(X_CPTIME, s->time, sizeof s->time);
+	(void) fetch_cptime(s->time);
 	NREAD(X_NCHSTATS, &s->nchstats, sizeof s->nchstats);
 	NREAD(X_INTRCNT, s->intrcnt, nintr * LONG);
 	size = sizeof(s->uvmexp);
@@ -618,18 +611,17 @@ getinfo(s, st)
 }
 
 static void
-allocinfo(s)
-	struct Info *s;
+allocinfo(struct Info *s)
 {
 
-	s->intrcnt = (long *) malloc(nintr * sizeof(long));
-	if (s->intrcnt == NULL)
-		errx(2, "out of memory");
+	if ((s->intrcnt = malloc(nintr * sizeof(long))) == NULL) {
+		error("malloc failed");
+		die(0);
+	}
 }
 
 static void
-copyinfo(from, to)
-	struct Info *from, *to;
+copyinfo(struct Info *from, struct Info *to)
 {
 	long *intrcnt;
 
@@ -639,8 +631,7 @@ copyinfo(from, to)
 }
 
 static void
-dinfo(dn, c)
-	int dn, c;
+dinfo(int dn, int c)
 {
 	double words, atime;
 
@@ -655,5 +646,5 @@ dinfo(dn, c)
 	putint((int)((float)cur.dk_seek[dn]/etime+0.5), DISKROW + 1, c, 5);
 	putint((int)((float)cur.dk_xfer[dn]/etime+0.5), DISKROW + 2, c, 5);
 	putint((int)(words/etime + 0.5), DISKROW + 3, c, 5);
-	putfloat(atime/etime, DISKROW + 4, c, 5, 1, 1);
+	putfloat(atime*100.0/etime, DISKROW + 4, c, 5, 1, 1);
 }

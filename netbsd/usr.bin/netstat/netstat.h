@@ -1,4 +1,4 @@
-/*	$NetBSD: netstat.h,v 1.13 1999/02/27 17:37:25 sommerfe Exp $	*/
+/*	$NetBSD: netstat.h,v 1.18 2000/02/26 09:55:24 itojun Exp $	*/
 
 /*
  * Copyright (c) 1992, 1993
@@ -45,6 +45,8 @@ int	dflag;		/* show i/f dropped packets */
 int	gflag;		/* show group (multicast) routing or stats */
 #endif
 int	iflag;		/* show interfaces */
+int	Lflag;		/* don't show LLINFO entries */
+int	lflag;		/* show routing table with use and ref */
 int	mflag;		/* show memory stats */
 int	nflag;		/* show addresses numerically */
 int	Pflag;		/* dump a PCB */
@@ -74,15 +76,36 @@ void	udp_stats __P((u_long, char *));
 void	ip_stats __P((u_long, char *));
 void	icmp_stats __P((u_long, char *));
 void	igmp_stats __P((u_long, char *));
+#ifdef IPSEC
+void	ipsec_stats __P((u_long, char *));
+#endif
+
+#ifdef INET6
+struct sockaddr_in6;
+void	ip6protopr __P((u_long, char *));
+void	tcp6_stats __P((u_long, char *));
+void	tcp6_dump __P((u_long));
+void	udp6_stats __P((u_long, char *));
+void	ip6_stats __P((u_long, char *));
+void	ip6_ifstats __P((char *));
+void	icmp6_stats __P((u_long, char *));
+void	icmp6_ifstats __P((char *));
+void	pim6_stats __P((u_long, char *));
+void	mroute6pr __P((u_long, u_long, u_long));
+void	mrt6_stats __P((u_long, u_long));
+char	*routename6 __P((struct sockaddr_in6 *));
+#endif /*INET6*/
+
+#ifdef IPSEC
+void	pfkey_stats __P((u_long, char *));
+#endif
 
 void	mbpr(u_long, u_long, u_long, u_long, u_long);
 
 void	hostpr __P((u_long, u_long));
 void	impstats __P((u_long, u_long));
 
-void	intpr __P((int, u_long));
-
-void	pr_rthdr __P((void));
+void	pr_rthdr __P((int));
 void	pr_family __P((int));
 void	rt_stats __P((u_long));
 char	*ns_phost __P((struct sockaddr *));
@@ -104,7 +127,7 @@ void	nserr_stats __P((u_long, char *));
 void	atalkprotopr __P((u_long, char *));
 void	ddp_stats __P((u_long, char *));
 
-void	intpr __P((int, u_long));
+void	intpr __P((int, u_long, void (*) __P((char *))));
 
 void	unixpr __P((u_long));
 

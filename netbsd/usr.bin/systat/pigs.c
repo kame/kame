@@ -1,4 +1,4 @@
-/*	$NetBSD: pigs.c,v 1.13.2.1 1999/09/26 13:38:01 he Exp $	*/
+/*	$NetBSD: pigs.c,v 1.19.2.1 2000/09/01 16:38:18 ad Exp $	*/
 
 /*-
  * Copyright (c) 1980, 1992, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)pigs.c	8.2 (Berkeley) 9/23/93";
 #endif
-__RCSID("$NetBSD: pigs.c,v 1.13.2.1 1999/09/26 13:38:01 he Exp $");
+__RCSID("$NetBSD: pigs.c,v 1.19.2.1 2000/09/01 16:38:18 ad Exp $");
 #endif /* not lint */
 
 /*
@@ -50,6 +50,7 @@ __RCSID("$NetBSD: pigs.c,v 1.13.2.1 1999/09/26 13:38:01 he Exp $");
 #include <sys/dir.h>
 #include <sys/time.h>
 #include <sys/proc.h>
+#include <sys/sched.h>
 #include <sys/sysctl.h>
 
 #include <curses.h>
@@ -63,26 +64,29 @@ __RCSID("$NetBSD: pigs.c,v 1.13.2.1 1999/09/26 13:38:01 he Exp $");
 #include "systat.h"
 #include "ps.h"
 
-int compare_pctcpu __P((const void *, const void *));
+int compare_pctcpu(const void *, const void *);
 
 int nproc;
 struct p_times *pt;
 
-long stime[CPUSTATES];
+u_int64_t stime[CPUSTATES];
 long	mempages;
 int     fscale;
 double  lccpu;
 
+#ifndef P_ZOMBIE
+#define P_ZOMBIE(p)	((p)->p_stat == SZOMB)
+#endif
+
 WINDOW *
-openpigs()
+openpigs(void)
 {
 
 	return (subwin(stdscr, LINES-5-1, 0, 5, 0));
 }
 
 void
-closepigs(w)
-	WINDOW *w;
+closepigs(WINDOW *w)
 {
 
 	if (w == NULL)
@@ -94,9 +98,9 @@ closepigs(w)
 
 
 void
-showpigs()
+showpigs(void)
 {
-	int i, j, y, k;
+	int i, y, k;
 	struct	eproc *ep;
 	float total;
 	int factor;
@@ -139,28 +143,24 @@ showpigs()
 		mvwaddstr(wnd, y, 9, pidstr);
 		(void)snprintf(pidname, sizeof(pidname), "%9.9s", pname);
 		mvwaddstr(wnd, y, 15, pidname);
-		wmove(wnd, y, 25);
-		for (j = pt[k].pt_pctcpu*factor + 0.5; j > 0; j--)
-			waddch(wnd, 'X');
+		mvwhline(wnd, y, 25, 'X', pt[k].pt_pctcpu*factor + 0.5);
 	}
 	wmove(wnd, y, 0); wclrtobot(wnd);
 }
 
 static struct nlist namelist[] = {
 #define X_FIRST		0
-#define X_CPTIME	0
-	{ "_cp_time" },
-#define X_CCPU          1
+#define X_CCPU          0
 	{ "_ccpu" },
-#define X_FSCALE        2
+#define X_FSCALE        1
 	{ "_fscale" },
-#define X_PHYSMEM	3
+#define X_PHYSMEM	2
 	{ "_physmem" },
 	{ "" }
 };
 
 int
-initpigs()
+initpigs(void)
 {
 	fixpt_t ccpu;
 
@@ -174,7 +174,7 @@ initpigs()
 			return(0);
 		}
 	}
-	KREAD(NPTR(X_CPTIME), stime, sizeof (stime));
+	(void) fetch_cptime(stime);
 	KREAD(NPTR(X_PHYSMEM), &mempages, sizeof (mempages));
 	NREAD(X_CCPU, &ccpu, sizeof ccpu);
 	NREAD(X_FSCALE,  &fscale, sizeof fscale);
@@ -184,14 +184,14 @@ initpigs()
 }
 
 void
-fetchpigs()
+fetchpigs(void)
 {
 	int i;
 	float time;
 	struct proc *pp;
 	float *pctp;
 	struct kinfo_proc *kpp;
-	long ctime[CPUSTATES];
+	u_int64_t ctime[CPUSTATES];
 	double t;
 	static int lastnproc = 0;
 
@@ -220,7 +220,7 @@ fetchpigs()
 		pp = &kpp[i].kp_proc;
 		pctp = &pt[i].pt_pctcpu;
 		time = pp->p_swtime;
-		if (pp->p_stat == SZOMB ||
+		if (P_ZOMBIE(pp) ||
 		    time == 0 || (pp->p_flag & P_INMEM) == 0)
 			*pctp = 0;
 		else
@@ -230,7 +230,7 @@ fetchpigs()
 	/*
 	 * and for the imaginary "idle" process
 	 */
-	KREAD(NPTR(X_CPTIME), ctime, sizeof (ctime));
+	(void) fetch_cptime(ctime);
 	t = 0;
 	for (i = 0; i < CPUSTATES; i++)
 		t += ctime[i] - stime[i];
@@ -243,7 +243,7 @@ fetchpigs()
 }
 
 void
-labelpigs()
+labelpigs(void)
 {
 	wmove(wnd, 0, 0);
 	wclrtoeol(wnd);
@@ -251,8 +251,7 @@ labelpigs()
 }
 
 int
-compare_pctcpu(a, b)
-	const void *a, *b;
+compare_pctcpu(const void *a, const void *b)
 {
 	return (((struct p_times *) a)->pt_pctcpu >
 		((struct p_times *) b)->pt_pctcpu)? -1: 1;

@@ -1,4 +1,4 @@
-/*	$NetBSD: main.c,v 1.22 1999/03/14 18:30:04 kristerw Exp $	*/
+/*	$NetBSD: main.c,v 1.27.4.2 2000/10/30 22:47:48 tv Exp $	*/
 
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -43,7 +43,7 @@ __COPYRIGHT("@(#) Copyright (c) 1983, 1988, 1993\n\
 #if 0
 static char sccsid[] = "from: @(#)main.c	8.4 (Berkeley) 3/1/94";
 #else
-__RCSID("$NetBSD: main.c,v 1.22 1999/03/14 18:30:04 kristerw Exp $");
+__RCSID("$NetBSD: main.c,v 1.27.4.2 2000/10/30 22:47:48 tv Exp $");
 #endif
 #endif /* not lint */
 
@@ -145,6 +145,38 @@ struct nlist nl[] = {
 	{ "_mbpool" },
 #define N_MCLPOOL	37
 	{ "_mclpool" },
+#define N_DIVPCB	38
+	{ "_divcb"},
+#define N_DIVSTAT	39
+	{ "_divstat"},
+#define N_IP6STAT	40
+	{ "_ip6stat" },
+#define N_TCB6		41
+	{ "_tcb6" },
+#define N_TCP6STAT	42
+	{ "_tcp6stat" },
+#define N_UDB6		43
+	{ "_udb6" },
+#define N_UDP6STAT	44
+	{ "_udp6stat" },
+#define N_ICMP6STAT	45
+	{ "_icmp6stat" },
+#define N_IPSECSTAT	46
+	{ "_ipsecstat" },
+#define N_IPSEC6STAT	47
+	{ "_ipsec6stat" },
+#define N_PIM6STAT	48
+	{ "_pim6stat" },
+#define N_MRT6PROTO	49
+	{ "_ip6_mrtproto" },
+#define N_MRT6STAT	50
+	{ "_mrt6stat" },
+#define N_MF6CTABLE	51
+	{ "_mf6ctable" },
+#define N_MIF6TABLE	52
+	{ "_mif6table" },
+#define N_PFKEYSTAT	53
+	{ "_pfkeystat" },
 	{ "" },
 };
 
@@ -156,58 +188,105 @@ struct protox {
 			__P((u_long, char *));
 	void	(*pr_stats)		/* statistics printing routine */
 			__P((u_long, char *));
+	void	(*pr_istats)
+			__P((char *));	/* per/if statistics printing routine */
 	void	(*pr_dump)		/* PCB state dump routine */
 			__P((u_long));
 	char	*pr_name;		/* well-known name */
 } protox[] = {
 	{ N_TCBTABLE,	N_TCPSTAT,	1,	protopr,
-	  tcp_stats,	tcp_dump,	"tcp" },
+	  tcp_stats,	NULL,		tcp_dump,	"tcp" },
 	{ N_UDBTABLE,	N_UDPSTAT,	1,	protopr,
-	  udp_stats,	0,		"udp" },
+	  udp_stats,	NULL,		0,	"udp" },
 	{ -1,		N_IPSTAT,	1,	0,
-	  ip_stats,	0,		"ip" },
+	  ip_stats,	NULL,		0,	"ip" },
 	{ -1,		N_ICMPSTAT,	1,	0,
-	  icmp_stats,	0,		"icmp" },
+	  icmp_stats,	NULL,		0,	"icmp" },
 	{ -1,		N_IGMPSTAT,	1,	0,
-	  igmp_stats,	0,		"igmp" },
+	  igmp_stats,	NULL,		0,	"igmp" },
+#ifdef IPSEC
+	{ -1,		N_IPSECSTAT,	1,	0,
+	  ipsec_stats,	NULL,		0,	"ipsec" },
+#endif
 	{ -1,		-1,		0,	0,
-	  0,		0,		0 }
+	  0,		NULL,		0,	0 }
 };
+
+#ifdef INET6
+struct protox ip6protox[] = {
+	{ -1,		N_IP6STAT,	1,	0,
+	  ip6_stats,	ip6_ifstats,	0,	"ip6" },
+	{ -1,		N_ICMP6STAT,	1,	0,
+	  icmp6_stats,	icmp6_ifstats,	0,	"icmp6" },
+#ifdef TCP6
+	{ N_TCB6,	N_TCP6STAT,	1,	ip6protopr,
+	  tcp6_stats,	NULL,		tcp6_dump,	"tcp6" },
+#else
+	{ N_TCB6,	N_TCP6STAT,	1,	ip6protopr,
+	  tcp_stats,	NULL,		tcp_dump,	"tcp6" },
+#endif
+	{ N_UDB6,	N_UDP6STAT,	1,	ip6protopr,
+	  udp6_stats,	NULL,		0,	"udp6" },
+#ifdef IPSEC
+	{ -1,		N_IPSEC6STAT,	1,	0,
+	  ipsec_stats,	NULL,		0,	"ipsec6" },
+#endif
+	{ -1,		N_PIM6STAT,	1,	0,
+	  pim6_stats,	NULL,		0,	"pim6" },
+	{ -1,		-1,		0,	0,
+	  0,		NULL,		0,	0 }
+};
+#endif
+
+#ifdef IPSEC
+struct protox pfkeyprotox[] = {
+	{ -1,		N_PFKEYSTAT,	1,	0,
+	  pfkey_stats,	NULL,		0,	"pfkey" },
+	{ -1,		-1,		0,	0,
+	  0,		NULL,		0,	0 }
+};
+#endif
 
 #ifndef SMALL
 struct protox atalkprotox[] = {
 	{ N_DDPCB,	N_DDPSTAT,	1,	atalkprotopr,
-	  ddp_stats,	0,		"ddp" },
+	  ddp_stats,	NULL,		0,	"ddp" },
 	{ -1,		-1,		0,	0,
-	  0,		0 }
+	  0,		NULL,		0 }
 };
 
 struct protox nsprotox[] = {
 	{ N_IDP,	N_IDPSTAT,	1,	nsprotopr,
-	  idp_stats,	0,		"idp" },
+	  idp_stats,	NULL,		0,	"idp" },
 	{ N_IDP,	N_SPPSTAT,	1,	nsprotopr,
-	  spp_stats,	0,		"spp" },
+	  spp_stats,	NULL,		0,	"spp" },
 	{ -1,		N_NSERR,	1,	0,
-	  nserr_stats,	0,		"ns_err" },
+	  nserr_stats,	NULL,		0,	"ns_err" },
 	{ -1,		-1,		0,	0,
-	  0,		0 }
+	  0,		NULL,		0 }
 };
 
 struct protox isoprotox[] = {
 	{ ISO_TP,	N_TPSTAT,	1,	iso_protopr,
-	  tp_stats,	0,		"tp" },
+	  tp_stats,	NULL,		0,	"tp" },
 	{ N_CLTP,	N_CLTPSTAT,	1,	iso_protopr,
-	  cltp_stats,	0,		"cltp" },
+	  cltp_stats,	NULL,		0,	"cltp" },
 	{ -1,		N_CLNPSTAT,	1,	 0,
-	  clnp_stats,	0,		"clnp"},
+	  clnp_stats,	NULL,		0,	"clnp"},
 	{ -1,		N_ESISSTAT,	1,	 0,
-	  esis_stats,	0,		"esis"},
+	  esis_stats,	NULL,		0,	"esis"},
 	{ -1,		-1,		0,	0,
-	  0,		0,		0 }
+	  0,		NULL,		0,	0 }
 };
 #endif
 
 struct protox *protoprotox[] = { protox,
+#ifdef INET6
+				 ip6protox,
+#endif
+#ifdef IPSEC
+				 pfkeyprotox,
+#endif
 #ifndef SMALL
 				 atalkprotox, nsprotox, isoprotox,
 #endif
@@ -226,8 +305,6 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	extern char *optarg;
-	extern int optind;
 	struct protoent *p;
 	struct protox *tp;	/* for printing cblocks & stats */
 	int ch;
@@ -241,7 +318,7 @@ main(argc, argv)
 	af = AF_UNSPEC;
 	pcbaddr = 0;
 
-	while ((ch = getopt(argc, argv, "Aabdf:ghI:iM:mN:nP:p:rstuvw:")) != -1)
+	while ((ch = getopt(argc, argv, "Aabdf:ghI:LliM:mN:nP:p:rstuvw:")) != -1)
 		switch(ch) {
 		case 'A':
 			Aflag = 1;
@@ -260,6 +337,8 @@ main(argc, argv)
 				af = AF_NS;
 			else if (strcmp(optarg, "inet") == 0)
 				af = AF_INET;
+			else if (strcmp(optarg, "inet6") == 0)
+				af = AF_INET6;
 			else if (strcmp(optarg, "unix") == 0
 			    || strcmp(optarg, "local") == 0)
 				af = AF_LOCAL;
@@ -282,6 +361,12 @@ main(argc, argv)
 			break;
 		case 'i':
 			iflag = 1;
+			break;
+		case 'L':
+			Lflag = 1;
+			break;
+		case 'l':
+			lflag = 1;
 			break;
 		case 'M':
 			memf = optarg;
@@ -395,7 +480,9 @@ main(argc, argv)
 		exit(0);
 	}
 	if (pflag) {
-		if (tp->pr_stats)
+		if (iflag && tp->pr_istats)
+			intpr(interval, nl[N_IFNET].n_value, tp->pr_istats);
+		else if (tp->pr_stats)
 			(*tp->pr_stats)(nl[tp->pr_sindex].n_value,
 				tp->pr_name);
 		else
@@ -409,7 +496,10 @@ main(argc, argv)
 	sethostent(1);
 	setnetent(1);
 	if (iflag) {
-		intpr(interval, nl[N_IFNET].n_value);
+		if (af != AF_UNSPEC)
+			goto protostat;
+
+		intpr(interval, nl[N_IFNET].n_value, NULL);
 		exit(0);
 	}
 	if (rflag) {
@@ -421,17 +511,33 @@ main(argc, argv)
 	}
 #ifndef SMALL
 	if (gflag) {
-		if (sflag)
-			mrt_stats(nl[N_MRTPROTO].n_value,
-			    nl[N_MRTSTAT].n_value);
-		else
-			mroutepr(nl[N_MRTPROTO].n_value,
-			    nl[N_MFCHASHTBL].n_value,
-			    nl[N_MFCHASH].n_value,
-			    nl[N_VIFTABLE].n_value);
+		if (sflag) {
+			if (af == AF_INET || af == AF_UNSPEC)
+				mrt_stats(nl[N_MRTPROTO].n_value,
+					  nl[N_MRTSTAT].n_value);
+#ifdef INET6
+			if (af == AF_INET6 || af == AF_UNSPEC)
+				mrt6_stats(nl[N_MRT6PROTO].n_value,
+					   nl[N_MRT6STAT].n_value);
+#endif
+		}
+		else {
+			if (af == AF_INET || af == AF_UNSPEC)
+				mroutepr(nl[N_MRTPROTO].n_value,
+					 nl[N_MFCHASHTBL].n_value,
+					 nl[N_MFCHASH].n_value,
+					 nl[N_VIFTABLE].n_value);
+#ifdef INET6
+			if (af == AF_INET6 || af == AF_UNSPEC)
+				mroute6pr(nl[N_MRT6PROTO].n_value,
+					  nl[N_MF6CTABLE].n_value,
+					  nl[N_MIF6TABLE].n_value);
+#endif
+		}
 		exit(0);
 	}
 #endif
+  protostat:
 	if (af == AF_INET || af == AF_UNSPEC) {
 		setprotoent(1);
 		setservent(1);
@@ -443,9 +549,23 @@ main(argc, argv)
 			if (tp->pr_name == 0 || tp->pr_wanted == 0)
 				continue;
 			printproto(tp, p->p_name);
+			tp->pr_wanted = 0;
 		}
 		endprotoent();
+		for (tp = protox; tp->pr_name; tp++)
+			if (tp->pr_wanted)
+				printproto(tp, tp->pr_name);
 	}
+#ifdef INET6
+	if (af == AF_INET6 || af == AF_UNSPEC)
+		for (tp = ip6protox; tp->pr_name; tp++)
+			printproto(tp, tp->pr_name);
+#endif
+#ifdef IPSEC
+	if (af == PF_KEY || af == AF_UNSPEC)
+		for (tp = pfkeyprotox; tp->pr_name; tp++)
+			printproto(tp, tp->pr_name);
+#endif
 #ifndef SMALL
 	if (af == AF_APPLETALK || af == AF_UNSPEC)
 		for (tp = atalkprotox; tp->pr_name; tp++)
@@ -476,8 +596,16 @@ printproto(tp, name)
 	u_long off;
 
 	if (sflag) {
-		pr = tp->pr_stats;
-		off = nl[tp->pr_sindex].n_value;
+		if (iflag) {
+			if (tp->pr_istats)
+				intpr(interval, nl[N_IFNET].n_value,
+				      tp->pr_istats);
+			return;
+		}
+		else {
+			pr = tp->pr_stats;
+			off = nl[tp->pr_sindex].n_value;
+		}
 	} else {
 		pr = tp->pr_cblocks;
 		off = nl[tp->pr_index].n_value;

@@ -1,4 +1,4 @@
-/*	$NetBSD: iostat.c,v 1.11 1998/07/19 17:47:07 drochner Exp $	*/
+/*	$NetBSD: iostat.c,v 1.15.2.1 2000/09/01 16:37:09 ad Exp $	*/
 
 /*
  * Copyright (c) 1980, 1992, 1993
@@ -38,10 +38,11 @@
 #if 0
 static char sccsid[] = "@(#)iostat.c	8.1 (Berkeley) 6/6/93";
 #endif
-__RCSID("$NetBSD: iostat.c,v 1.11 1998/07/19 17:47:07 drochner Exp $");
+__RCSID("$NetBSD: iostat.c,v 1.15.2.1 2000/09/01 16:37:09 ad Exp $");
 #endif not lint
 
 #include <sys/param.h>
+#include <sys/sched.h>
 #include <sys/dkstat.h>
 #include <sys/buf.h>
 #include <sys/time.h>
@@ -61,23 +62,22 @@ static  double etime;
 static  int numbers = 0;		/* default display bar graphs */
 static  int secs = 0;			/* default seconds shown */
 
-static int barlabels __P((int));
-static void histogram __P((double, int, double));
-static int numlabels __P((int));
-static int stats __P((int, int, int));
-static void stat1 __P((int, int));
+static int barlabels(int);
+static void histogram(double, int, double);
+static int numlabels(int);
+static int stats(int, int, int);
+static void stat1(int, int);
 
 
 WINDOW *
-openiostat()
+openiostat(void)
 {
 
 	return (subwin(stdscr, LINES-1-5, 0, 5, 0));
 }
 
 void
-closeiostat(w)
-	WINDOW *w;
+closeiostat(WINDOW *w)
 {
 
 	if (w == NULL)
@@ -88,7 +88,7 @@ closeiostat(w)
 }
 
 int
-initiostat()
+initiostat(void)
 {
 	extern gid_t egid;
 
@@ -98,7 +98,7 @@ initiostat()
 }
 
 void
-fetchiostat()
+fetchiostat(void)
 {
 
 	if (dk_ndrive == 0)
@@ -106,10 +106,10 @@ fetchiostat()
 	dkreadstats();
 }
 
-#define	INSET	10
+#define	INSET	14
 
 void
-labeliostat()
+labeliostat(void)
 {
 	int row;
 
@@ -121,11 +121,11 @@ labeliostat()
 	wmove(wnd, row, 0); wclrtobot(wnd);
 	mvwaddstr(wnd, row++, INSET,
 	    "/0   /10  /20  /30  /40  /50  /60  /70  /80  /90  /100");
-	mvwaddstr(wnd, row++, 0, "cpu  user|");
-	mvwaddstr(wnd, row++, 0, "     nice|");
-	mvwaddstr(wnd, row++, 0, "   system|");
-	mvwaddstr(wnd, row++, 0, "interrupt|");
-	mvwaddstr(wnd, row++, 0, "     idle|");
+	mvwaddstr(wnd, row++, 0, "    cpu  user|");
+	mvwaddstr(wnd, row++, 0, "         nice|");
+	mvwaddstr(wnd, row++, 0, "       system|");
+	mvwaddstr(wnd, row++, 0, "    interrupt|");
+	mvwaddstr(wnd, row++, 0, "         idle|");
 	if (numbers)
 		row = numlabels(row + 1);
 	else
@@ -133,8 +133,7 @@ labeliostat()
 }
 
 static int
-numlabels(row)
-	int row;
+numlabels(int row)
 {
 	int i, col, regions, ndrives;
 
@@ -172,8 +171,7 @@ numlabels(row)
 }
 
 static int
-barlabels(row)
-	int row;
+barlabels(int row)
 {
 	int i;
 
@@ -184,17 +182,16 @@ barlabels(row)
 		if (cur.dk_select[i] /*&& cur.dk_bytes[i] != 0.0*/) {
 			if (row > getmaxy(wnd) - linesperregion)
 				break;
-			mvwprintw(wnd, row++, 0, "%3.3s  KBps|", cur.dk_name[i]);
-			mvwaddstr(wnd, row++, 0, "      tps|");
+			mvwprintw(wnd, row++, 0, "%7.7s  KBps|", cur.dk_name[i]);
+			mvwaddstr(wnd, row++, 0, "          tps|");
 			if (secs)
-				mvwaddstr(wnd, row++, 0, "     msec|");
+				mvwaddstr(wnd, row++, 0, "         msec|");
 		}
 	return (row);
 }
 
-
 void
-showiostat()
+showiostat(void)
 {
 	int i, row, col;
 
@@ -248,8 +245,7 @@ showiostat()
 }
 
 static int
-stats(row, col, dn)
-	int row, col, dn;
+stats(int row, int col, int dn)
 {
 	double atime, words;
 
@@ -276,8 +272,7 @@ stats(row, col, dn)
 }
 
 static void
-stat1(row, o)
-	int row, o;
+stat1(int row, int o)
 {
 	int i;
 	double time;
@@ -293,10 +288,7 @@ stat1(row, o)
 }
 
 static void
-histogram(val, colwidth, scale)
-	double val;
-	int colwidth;
-	double scale;
+histogram(double val, int colwidth, double scale)
 {
 	char buf[10];
 	int k;
@@ -312,26 +304,33 @@ histogram(val, colwidth, scale)
 		wclrtoeol(wnd);
 		return;
 	}
-	while (k--)
-		waddch(wnd, 'X');
 	wclrtoeol(wnd);
+	whline(wnd, 'X', k);
 }
 
-int
-cmdiostat(cmd, args)
-	char *cmd, *args;
+void
+iostat_bars(char *args)
 {
-
-	if (prefix(cmd, "secs"))
-		secs = !secs;
-	else if (prefix(cmd, "numbers"))
-		numbers = 1;
-	else if (prefix(cmd, "bars"))
-		numbers = 0;
-	else if (!dkcmd(cmd, args))
-		return (0);
+	numbers = 0;
 	wclear(wnd);
 	labeliostat();
 	refresh();
-	return (1);
+}
+
+void
+iostat_numbers(char *args)
+{
+	numbers = 1;
+	wclear(wnd);
+	labeliostat();
+	refresh();
+}
+
+void
+iostat_secs(char *args)
+{
+	secs = !secs;
+	wclear(wnd);
+	labeliostat();
+	refresh();
 }

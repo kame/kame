@@ -1,4 +1,4 @@
-/*	$NetBSD: keyboard.c,v 1.5.2.1 1999/09/26 13:39:26 he Exp $	*/
+/*	$NetBSD: keyboard.c,v 1.11.4.1 2000/09/01 16:37:09 ad Exp $	*/
 
 /*-
  * Copyright (c) 1980, 1992, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)keyboard.c	8.1 (Berkeley) 6/6/93";
 #endif
-__RCSID("$NetBSD: keyboard.c,v 1.5.2.1 1999/09/26 13:39:26 he Exp $");
+__RCSID("$NetBSD: keyboard.c,v 1.11.4.1 2000/09/01 16:37:09 ad Exp $");
 #endif /* not lint */
 
 #include <sys/types.h>
@@ -53,7 +53,7 @@ __RCSID("$NetBSD: keyboard.c,v 1.5.2.1 1999/09/26 13:39:26 he Exp $");
 #include "extern.h"
 
 int
-keyboard()
+keyboard(void)
 {
 	char ch, rch, *line;
 	int i, linesz;
@@ -63,16 +63,16 @@ keyboard()
 	sigaddset(&set, SIGALRM);
 
 	linesz = COLS - 2;		/* XXX does not get updated on SIGWINCH */
-	line = malloc(linesz);
-	if (line == NULL) {
-		error("malloc");
-		exit(1);
+	if ((line = malloc(linesz)) == NULL) {
+		error("malloc failed");
+		die(0);
 	}
 
 	for (;;) {
 		col = 0;
 		move(CMDLINE, 0);
-		do {
+
+		while (col == 0 || (ch != '\r' && ch != '\n')) {
 			refresh();
 			ch = getch() & 0177;
 			if (ch == 0177 && ferror(stdin)) {
@@ -80,28 +80,43 @@ keyboard()
 				continue;
 			}
 			rch = ch;
-			if (ch >= 'A' && ch <= 'Z')
-				ch += 'a' - 'A';
 			if (col == 0) {
-				if (ch == CTRL('l')) {
+				switch(ch) {
+				    case '\n':
+				    case '\r':
+				    case ' ':
+					display(0);
+					break;
+				    case CTRL('l'):
 					sigprocmask(SIG_BLOCK, &set, NULL);
 					wrefresh(curscr);
 					sigprocmask(SIG_UNBLOCK, &set, NULL);
-					continue;
-				}
-				if (ch == CTRL('g')) {
+					break;
+				    case CTRL('g'):
 					sigprocmask(SIG_BLOCK, &set, NULL);
 					status();
 					sigprocmask(SIG_UNBLOCK, &set, NULL);
-					continue;
+					break;
+				    case '?':
+				    case 'H':
+				    case 'h':
+					command("help");
+					move(CMDLINE, 0);
+					break;
+				    case 'Q':
+					command("quit");
+					break;
+				    case ':':
+					move(CMDLINE, 0);
+					clrtoeol();
+					addch(':');
+					col++;
+					break;
 				}
-				if (ch != ':')
-					continue;
-				move(CMDLINE, 0);
-				clrtoeol();
+				continue;
 			}
 			if (ch == erasechar() && col > 0) {
-				if (col == 1 && line[0] == ':')
+				if (col == 1)
 					continue;
 				col--;
 				goto doerase;
@@ -110,37 +125,31 @@ keyboard()
 				while (--col >= 0 && isspace(line[col]));
 				col++;
 				while (--col >= 0 && !isspace(line[col]))
-					if (col == 0 && line[0] == ':')
+					if (col == 0)
 						break;
 				col++;
 				goto doerase;
 			}
 			if (ch == killchar() && col > 0) {
-				if (line[0] == ':')
-					col = 1;
-				else
-					col = 0;
+				col = 1;
 		doerase:
 				move(CMDLINE, col);
 				clrtoeol();
 				continue;
 			}
-			if (isprint(rch) || ch == ' ') {
+			if (isprint(rch) || rch == ' ') {
 				if (col < linesz) {
 					line[col] = rch;
 					mvaddch(CMDLINE, col, rch);
 					col++;
 				}
 			}
-		} while (col == 0 || (ch != '\r' && ch != '\n'));
+		}
 		line[col] = '\0';
 		/* pass commands as lowercase */
-		for (i = 1; i < col && line[i] != ' '; i++)
-		    if (line[i] >= 'A' && line[i] <= 'Z')
-			line[i] += 'a' - 'A';
-		sigprocmask(SIG_BLOCK, &set, NULL);
+		for (i = 1; i < col ; i++)
+			line[i] = tolower(line[i]);
 		command(line + 1);
-		sigprocmask(SIG_UNBLOCK, &set, NULL);
 	}
 	/* NOTREACHED */
 }
