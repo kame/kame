@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.100 2001/02/07 08:25:45 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.101 2001/02/07 11:00:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1197,7 +1197,7 @@ in6_ifdetach(ifp)
 	 * remove neighbor management table.  we call it twice just to make
 	 * sure we nuke everything.  maybe we need just one call.
 	 * XXX: since the first call did not release addresses, some prefixes
-	 * might remain.  We should cann nd6_purge() again to release the
+	 * might remain.  We should call nd6_purge() again to release the
 	 * prefixes after removing all addresses above.
 	 * (Or can we just delay calling nd6_purge until at this point?)
 	 */
