@@ -417,6 +417,11 @@ server6_react(siz, rcvpi)
 {
 	union dhcp6 *dh6;
 
+	if (siz < 1) {		/* we need at least 1 byte to check type */
+		dprintf((stderr, "relay6_react: short packet\n"));
+		return;
+	}
+
 	dh6 = (union dhcp6 *)rdatabuf;
 	dprintf((stderr, "msgtype=%d\n", dh6->dh6_msgtype));
 
