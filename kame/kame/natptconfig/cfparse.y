@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.17 2001/11/07 15:35:26 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.18 2001/11/16 07:42:22 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -291,6 +291,18 @@ rules
 		    }
 
 		| map SFROM           daddr4 dport STO daddr6 dport opt_proto
+		    {
+			u_short *us = (u_short *)malloc(sizeof(u_short[2]));
+
+			us[0] = $4;
+			us[1] = $7;
+			ruletab.fdaddr = $3;
+			ruletab.tdaddr = $6;
+			ruletab.dports = us;
+			ruletab.proto = $8;
+			setRules(NATPT_MAP46, &ruletab);
+		    }
+
 		| map SFROM ipv4addrs daddr4       STO daddr6       opt_proto
 		| map SFROM ipv4addrs daddr4 dport STO daddr6 dport opt_proto
 		| map SFROM ipv4addrs        dport STO daddr6 dport opt_proto
