@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.32 2000/04/25 07:21:05 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.33 2000/04/26 06:18:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -93,6 +93,9 @@
 #ifdef __OpenBSD__
 #include <netinet/ip_ipsp.h>
 #endif
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#include <netinet/ipprotosw.h>
+#endif
 
 #ifdef INET6
 #include <netinet/ip6.h>
@@ -144,7 +147,6 @@ encap_init()
 #endif
 }
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 void
 #if __STDC__
 encap4_input(struct mbuf *m, ...)
@@ -157,6 +159,11 @@ encap4_input(m, va_alist)
 	int off, proto;
 	struct ip *ip;
 	struct sockaddr_in s, d;
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+	const struct ipprotosw *psw;
+#else
+	const struct protosw *psw;
+#endif
 	struct encaptab *ep, *match;
 	va_list ap;
 	int prio, matchprio;
@@ -228,9 +235,14 @@ encap4_input(m, va_alist)
 
 	if (match) {
 		/* found a match, "match" has the best one */
-		if (match->psw && match->psw->pr_input) {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+		psw = (const struct ipprotosw *)match->psw;
+#else
+		psw = match->psw;
+#endif
+		if (psw && psw->pr_input) {
 			encap_fillarg(m, match);
-			(*match->psw->pr_input)(m, off, proto);
+			(*psw->pr_input)(m, off, proto);
 		} else
 			m_freem(m);
 		return;
@@ -267,7 +279,6 @@ encap4_input(m, va_alist)
 	/* last resort: inject to raw socket */
 	rip_input(m, off, proto);
 }
-#endif
 
 #ifdef INET6
 int
@@ -279,7 +290,7 @@ encap6_input(mp, offp, proto)
 	struct mbuf *m = *mp;
 	struct ip6_hdr *ip6;
 	struct sockaddr_in6 s, d;
-	struct ip6protosw *psw;
+	const struct ip6protosw *psw;
 	struct encaptab *ep, *match;
 	int prio, matchprio;
 
@@ -323,7 +334,7 @@ encap6_input(mp, offp, proto)
 
 	if (match) {
 		/* found a match */
-		psw = (struct ip6protosw *)match->psw;
+		psw = (const struct ip6protosw *)match->psw;
 		if (psw && psw->pr_input) {
 			encap_fillarg(m, match);
 			return (*psw->pr_input)(mp, offp, proto);
