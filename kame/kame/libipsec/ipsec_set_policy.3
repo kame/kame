@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: ipsec_set_policy.3,v 1.4 1999/10/07 06:38:44 sakane Exp $
+.\"     $Id: ipsec_set_policy.3,v 1.5 1999/10/20 00:21:06 sakane Exp $
 .\"
 .Dd May 5, 1998
 .Dt IPSEC_SET_POLICY 3
@@ -39,10 +39,10 @@
 .\" 
 .Sh SYNOPSIS
 .Fd #include <netinet6/ipsec.h>
+.Ft "char *"
+.Fn ipsec_set_policy "char *policy" "int len"
 .Ft int
-.Fn ipsec_set_policy "char *buf" "int len" "char *policy"
-.Ft int
-.Fn ipsec_get_policylen "char *policy"
+.Fn ipsec_get_policylen "char *buf"
 .Ft "char *"
 .Fn ipsec_dump_policy "char *buf" "char *delim"
 .\" 
@@ -54,21 +54,18 @@ and/or
 .Li struct sadb_x_ipsecrequest
 from human-readable policy specification.
 policy specification must be given as C string
-.Fa policy ,
-and the resulting structure will be generated at the buffer pointed to by
-.Fa buf ,
-length
-.Fa len .
-.Pp
-To obtain the required buffer size beforehand, use
-.Fn ipsec_get_policylen
-with the same
 .Fa policy
-argument.
+and length
+.Fa len
+of
+.Fa policy .
+.Fn ipsec_set_policy
+will return the buffer of IPsec policy specification structure.
+.Pp
+You may want the length of the generated buffer such when calling
+.Xr setsockopt 2 .
 .Fn ipsec_get_policylen
-will return the required buffer size,
-and you may want to allocate buffer dynamically for use with
-.Fn ipsec_set_policy .
+will return the length.
 .Pp
 .Fn ipsec_dump_policy
 converts IPsec policy structure into readable form.
@@ -232,7 +229,7 @@ in ipsec ipcomp/transport/10.1.1.2-10.1.1.1/use
 .\" 
 .Sh RETURN VALUES
 .Fn ipsec_set_policy
-returns with 0 on success, negative value on errors.
+returns a pointer to the allocated buffer of policy specification if successful; otherwise a NULL pointer is returned.
 .Fn ipsec_get_policylen
 returns with positive value
 .Pq meaning the buffer size
