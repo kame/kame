@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.7 2000/06/15 04:28:31 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.8 2000/06/24 14:43:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1604,7 +1604,6 @@ _nis_getaddrinfo(pai, hostname, res)
 	struct hostent *hp;
 	int h_error;
 	int af;
-	char *ap;
 	struct addrinfo sentinel, *cur;
 	int i;
 	const struct afd *afd;
@@ -1634,17 +1633,14 @@ _nis_getaddrinfo(pai, hostname, res)
 		return error;
 
 	for (i = 0; hp->h_addr_list[i] != NULL; i++) {
-		af = hp->h_addrtype;
-		ap = hp->h_addr_list[i];
-
-		if (af != pai->ai_family)
+		if (hp->h_addrtype != af)
 			continue;
 
-		afd = find_afd(af);
+		afd = find_afd(hp->h_addrtype);
 		if (afd == NULL)
 			continue;
 
-		GET_AI(cur->ai_next, afd, ap);
+		GET_AI(cur->ai_next, afd, hp->h_addr_list[i]);
 		if ((pai->ai_flags & AI_CANONNAME) != 0) {
 			/*
 			 * RFC2553 says that ai_canonname will be set only for
