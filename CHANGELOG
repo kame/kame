@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1844 2001/08/16 13:57:53 jinmei Exp $
+$KAME: CHANGELOG,v 1.1845 2001/08/16 14:41:32 itojun Exp $
 
 <200108>
 2001-08-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/usr.sbin/netstat/stats_inet6.h:
-	* freebsd4/usr.bin/netstat/inet6.c (ip6_stats):
+	* {freebsd4,netbsd}/usr.bin/netstat/inet6.c (ip6_stats):
 	printed statistics about the source address selection rules.
 	(experimental.  we may have to reconsider the way to print the
 	stat.)
