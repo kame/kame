@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2712 2005/01/06 06:57:37 suz Exp $
+$KAME: CHANGELOG,v 1.2713 2005/01/10 12:12:07 suz Exp $
 
 <200501>
+2005-01-10  suz@crl.hitachi.co.jp
+	* kame/sys/netkey/key.c: fixed an unexpected addr/port matching failure
+	  in SA management.
+
 2005-01-07  suz@crl.hitachi.co.jp
 	* kame/sys/netinet6/{udp6_var.h, udp6_usrreq.c}: fixed a NetBSD
 	  kernel crash by referring to an uninitialized variable.
