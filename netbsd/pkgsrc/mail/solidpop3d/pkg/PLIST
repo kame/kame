@@ -1,0 +1,7 @@
+bin/pop_auth
+sbin/spop3d
+man/man1/pop_auth.1
+man/man5/spop3d.conf.5 
+man/man5/dot-spop3d.5
+man/man8/spop3d.8
+etc/spop3d.conf.sample
