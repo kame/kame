@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.93 2000/12/15 14:27:03 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.94 2000/12/18 01:36:50 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -226,7 +226,7 @@ pfkey_handler()
 	msg = (struct sadb_msg *)mhp[0];
 
 	if (pkrecvf[msg->sadb_msg_type] == NULL) {
-		plog(LLV_ERROR, LOCATION, NULL,
+		plog(LLV_DEBUG, LOCATION, NULL,
 			"not supported command %s\n",
 			s_pfkey_type(msg->sadb_msg_type));
 		goto end;
