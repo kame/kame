@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: grabmyaddr.c,v 1.6 2000/02/07 12:01:41 itojun Exp $ */
+/* YIPS @(#)$Id: grabmyaddr.c,v 1.7 2000/02/07 12:25:22 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -61,6 +61,7 @@
 
 static unsigned int if_maxindex __P((void));
 static void clear_myaddr __P((struct myaddrs **));
+static struct myaddrs *find_myaddr __P((struct myaddrs *, struct myaddrs *));
 
 static unsigned int
 if_maxindex()
@@ -89,6 +90,36 @@ clear_myaddr(db)
 		*db = p;
 	}
 }
+  
+static struct myaddrs *
+find_myaddr(db, p)
+	struct myaddrs *db;
+	struct myaddrs *p;
+{
+	struct myaddrs *q;
+	char h1[NI_MAXHOST], h2[NI_MAXHOST];
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflags = NI_NUMERICHOST;
+#endif
+
+	if (getnameinfo(p->addr, p->addr->sa_len, h1, sizeof(h1), NULL, 0,
+	    niflags) != 0)
+		return NULL;
+
+	for (q = db; q; q = q->next) {
+		if (p->addr->sa_len != q->addr->sa_len)
+			continue;
+		if (getnameinfo(q->addr, q->addr->sa_len, h2, sizeof(h2),
+		    NULL, 0, niflags) != 0)
+			return NULL;
+		if (strcmp(h1, h2) == 0)
+			return q;
+	}
+
+	return NULL;
+}
 
 void
 grab_myaddrs()
@@ -99,7 +130,7 @@ grab_myaddrs()
 	struct ifreq *iflist;
 	struct ifconf ifconf;
 	struct ifreq *ifr, *ifr_end;
-	struct myaddrs *p;
+	struct myaddrs *p, *q, *old;
 #ifdef INET6
 #ifdef __KAME__
 	struct sockaddr_in6 *sin6;
@@ -137,7 +168,7 @@ grab_myaddrs()
 	}
 	close(s);
 
-	clear_myaddr(&lcconf->myaddrs);
+	old = lcconf->myaddrs;
 
 	/* Look for this interface in the list */
 	ifr_end = (struct ifreq *) (ifconf.ifc_buf + ifconf.ifc_len);
@@ -181,6 +212,11 @@ grab_myaddrs()
 				plog(logp, LOCATION, NULL,
 					"my interface: %s (%s)\n",
 					_addr1_, ifr->ifr_name));
+			q = find_myaddr(old, p);
+			if (q)
+				p->sock = q->sock;
+			else
+				p->sock = -1;
 			p->next = lcconf->myaddrs;
 			lcconf->myaddrs = p;
 			break;
@@ -188,6 +224,8 @@ grab_myaddrs()
 			break;
 		}
 	}
+
+	clear_myaddr(&old);
 
 	free(iflist);
 }
