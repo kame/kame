@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.69 2000/03/07 02:33:11 sakane Exp $	*/
+/*	$KAME: key.c,v 1.70 2000/03/09 13:15:02 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.69 2000/03/07 02:33:11 sakane Exp $ */
+/* KAME $Id: key.c,v 1.70 2000/03/09 13:15:02 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -134,6 +134,7 @@ static LIST_HEAD(_regtree, secreg) regtree[SADB_SATYPE_MAX + 1];
 #ifndef IPSEC_NONBLOCK_ACQUIRE
 static LIST_HEAD(_acqtree, secacq) acqtree;		/* acquiring list */
 #endif
+static LIST_HEAD(_spacqtree, secspacq) spacqtree;	/* SP acquiring list */
 
 struct key_cb key_cb;
 
@@ -289,6 +290,7 @@ static struct secpolicy *key_getsp __P((struct secpolicyindex *spidx));
 static u_int32_t key_newreqid __P((void));
 static struct sadb_msg *key_spdadd __P((caddr_t *mhp));
 static struct sadb_msg *key_spddelete __P((caddr_t *mhp));
+static int key_spdget __P((caddr_t *mhp, struct socket *so, int target));
 static struct sadb_msg *key_spdflush __P((caddr_t *mhp));
 static int key_spddump __P((caddr_t *mhp, struct socket *so, int target));
 static struct mbuf *key_setdumpsp __P((struct secpolicy *sp,
@@ -368,6 +370,8 @@ static int key_acquire __P((struct secasindex *saidx,
 static struct secacq *key_newacq __P((struct secasindex *saidx));
 static struct secacq *key_getacq __P((struct secasindex *saidx));
 static struct secacq *key_getacqbyseq __P((u_int32_t seq));
+static struct secspacq *key_newspacq __P((struct secpolicyindex *spidx));
+static struct secspacq *key_getspacq __P((struct secpolicyindex *spidx));
 static struct sadb_msg *key_acquire2 __P((caddr_t *mhp));
 static struct sadb_msg *key_register __P((caddr_t *mhp, struct socket *so));
 static int key_expire __P((struct secasvar *sav));
@@ -1285,7 +1289,7 @@ key_sp2msg(sp)
 }
 
 /*
- * SADB_SPDADD or SADB_SPDSETIDX processing
+ * SADB_X_SPDADD, SADB_X_SPDSETIDX or SADB_X_SPDUPDATE processing
  * add a entry to SP database, when received
  *   <base, address(SD), policy>
  * from the user(?).
@@ -1293,6 +1297,10 @@ key_sp2msg(sp)
  * and send
  *   <base, address(SD), policy>
  * to the socket which was send.
+ *
+ * SPDADD set a unique policy entry.
+ * SPDSETIDX like SPDADD without a part of policy requests.
+ * SPDUPDATE replace a unique policy entry.
  *
  * IN:	mhp: pointer to the pointer to each header.
  * OUT:	NULL if fail.
@@ -1352,15 +1360,32 @@ key_spdadd(mhp)
 		return NULL;
 	}
 
-	/* Is there SP in SPD ? */
+	/*
+	 * checking there is SP already or not.
+	 * If type is SPDUPDATE and no SP found, then error.
+	 * If type is either SPDADD or SPDSETIDX and SP found, then error.
+	 */
 	newsp = key_getsp(&spidx);
-	if (newsp != NULL) {
-		key_freesp(newsp);
+	if (msg0->sadb_msg_type == SADB_X_SPDUPDATE) {
+		if (newsp == NULL) {
 #ifdef IPSEC_DEBUG
-		printf("key_spdadd: a SP entry exists already.\n");
+			printf("key_spdadd: no SP found.\n");
 #endif
-		msg0->sadb_msg_errno = EEXIST;
-		return NULL;
+			msg0->sadb_msg_errno = ENOENT;
+			return NULL;
+		}
+
+		newsp->state = IPSEC_SPSTATE_DEAD;
+		key_freesp(newsp);
+	} else {
+		if (newsp != NULL) {
+			key_freesp(newsp);
+#ifdef IPSEC_DEBUG
+			printf("key_spdadd: a SP entry exists already.\n");
+#endif
+			msg0->sadb_msg_errno = EEXIST;
+			return NULL;
+		}
 	}
 
 	/* check policy */
@@ -1374,7 +1399,7 @@ key_spdadd(mhp)
 		return NULL;
 	}
 
-	/* requests are mandatory when action is ipsec. */
+	/* SPDADD; policy requests are mandatory when action is ipsec. */
         if (msg0->sadb_msg_type == SADB_X_SPDADD
 	 && xpl0->sadb_x_policy_type == IPSEC_POLICY_IPSEC
 	 && PFKEY_EXTLEN(xpl0) <= sizeof(*xpl0)) {
@@ -1402,6 +1427,16 @@ key_spdadd(mhp)
 	newsp->refcnt = 1;	/* do not reclaim until I say I do */
 	newsp->state = IPSEC_SPSTATE_ALIVE;
 	LIST_INSERT_HEAD(&sptree[newsp->spidx.dir], newsp, chain);
+
+	/* delete the entry in spacqtree */
+	if (msg0->sadb_msg_type == SADB_X_SPDUPDATE) {
+		struct secspacq *spacq;
+		if ((spacq = key_getspacq(&spidx)) != NULL) {
+			/* reset counter in order to deletion by timehander. */
+			spacq->tick = key_blockacq_lifetime;
+			spacq->count = 0;
+		}
+    	}
 
     {
 	struct sadb_msg *newmsg;
@@ -1552,6 +1587,205 @@ key_spddelete(mhp)
 
 	return newmsg;
     }
+}
+
+/*
+ * SADB_X_GET processing
+ * receive
+ *   <base, address(SD), policy(*)>
+ * from the user(?),
+ * and send,
+ *   <base, address(SD), policy(*)>
+ * to the ikmpd.
+ * policy(*) including direction of policy.
+ *
+ * IN:	mhp: pointer to the pointer to each header.
+ * OUT:	other if success, return pointer to the message to send.
+ *	0 if fail.
+ */
+static int
+key_spdget(mhp, so, target)
+	caddr_t *mhp;
+	struct socket *so;
+	int target;
+{
+	struct sadb_msg *msg0;
+	struct sadb_address *src0, *dst0;
+	struct sadb_x_policy *xpl0;
+	struct secpolicyindex spidx;
+	struct secpolicy *sp;
+	struct mbuf *m;
+
+	/* sanity check */
+	if (mhp == NULL || mhp[0] == NULL)
+		panic("key_spdget: NULL pointer is passed.\n");
+
+	msg0 = (struct sadb_msg *)mhp[0];
+
+	if (mhp[SADB_EXT_ADDRESS_SRC] == NULL
+	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
+	 || mhp[SADB_X_EXT_POLICY] == NULL) {
+#ifdef IPSEC_DEBUG
+		printf("key_spdget: invalid message is passed.\n");
+#endif
+		msg0->sadb_msg_errno = EINVAL;
+		return NULL;
+	}
+
+	src0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_SRC]);
+	dst0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_DST]);
+	xpl0 = (struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY];
+
+	/* make secindex */
+	KEY_SETSECSPIDX(xpl0->sadb_x_policy_dir,
+	                src0 + 1,
+	                dst0 + 1,
+	                src0->sadb_address_prefixlen,
+	                dst0->sadb_address_prefixlen,
+	                src0->sadb_address_proto,
+	                &spidx);
+
+	/* checking the direciton. */ 
+	switch (xpl0->sadb_x_policy_dir) {
+	case IPSEC_DIR_INBOUND:
+	case IPSEC_DIR_OUTBOUND:
+		break;
+	default:
+#ifdef IPSEC_DEBUG
+		printf("key_spdget: Invalid SP direction.\n");
+#endif
+		msg0->sadb_msg_errno = EINVAL;
+		return NULL;
+	}
+
+	/* Is there SP in SPD ? */
+	if ((sp = key_getsp(&spidx)) == NULL) {
+#ifdef IPSEC_DEBUG
+		printf("key_spdget: no SP found.\n");
+#endif
+		msg0->sadb_msg_errno = ENOENT;
+		return NULL;
+	}
+
+	m = key_setdumpsp(sp, SADB_X_SPDGET, 0, msg0->sadb_msg_pid);
+	if (m != NULL)
+		key_sendup_mbuf(so, m, target);
+
+	return 0;
+}
+
+/*
+ * SADB_X_SPDACQUIRE processing.
+ * Acquire policy and SA(s) for a *OUTBOUND* packet.
+ * send
+ *   <base, policy(*)>
+ * to KMD, and expect to receive
+ *   <base> with SADB_X_SPDACQUIRE if error occured,
+ * or
+ *   <base, policy>
+ * with SADB_X_SPDUPDATE from KMD by PF_KEY.
+ * policy(*) is without policy requests.
+ *
+ *    0     : succeed
+ *    others: error number
+ */
+int
+key_spdacquire(sp)
+	struct secpolicy *sp;
+{
+	struct secspacq *newspacq;
+	int error;
+
+	/* sanity check */
+	if (sp == NULL)
+		panic("key_spdacquire: NULL pointer is passed.\n");
+	if (sp->req != NULL)
+		panic("key_spdacquire: called but there is request.\n");
+	if (sp->policy != IPSEC_POLICY_IPSEC)
+		panic("key_spdacquire: policy mismathed. IPsec is expected.\n");
+
+	/* get a entry to check whether sent message or not. */
+	if ((newspacq = key_getspacq(&sp->spidx)) != NULL) {
+		if (key_blockacq_count < newspacq->count) {
+			/* reset counter and do send message. */
+			newspacq->count = 0;
+		} else {
+			/* increment counter and do nothing. */
+			newspacq->count++;
+			return 0;
+		}
+	} else {
+		/* make new entry for blocking to send SADB_ACQUIRE. */
+		if ((newspacq = key_newspacq(&sp->spidx)) == NULL)
+			return ENOBUFS;
+
+		/* add to acqtree */
+		LIST_INSERT_HEAD(&spacqtree, newspacq, chain);
+	}
+
+    {
+	struct sadb_msg *newmsg = NULL;
+	union sadb_x_ident_id id;
+	u_int len;
+	caddr_t p;
+
+	/* create new sadb_msg to reply. */
+	len = sizeof(struct sadb_msg)
+		+ sizeof(struct sadb_ident)
+		+ PFKEY_ALIGN8(sp->spidx.src.ss_len)
+		+ sizeof(struct sadb_ident)
+		+ PFKEY_ALIGN8(sp->spidx.dst.ss_len);
+
+	KMALLOC(newmsg, struct sadb_msg *, len);
+	if (newmsg == 0) {
+#ifdef IPSEC_DEBUG
+		printf("key_spdacquire: No more memory.\n");
+#endif
+		return ENOBUFS;
+	}
+	bzero((caddr_t)newmsg, len);
+
+	newmsg->sadb_msg_version = PF_KEY_V2;
+	newmsg->sadb_msg_type = SADB_X_SPDACQUIRE;
+	newmsg->sadb_msg_errno = 0;
+	newmsg->sadb_msg_satype = 0;
+	newmsg->sadb_msg_len = PFKEY_UNIT64(len);
+	newmsg->sadb_msg_mode = 0;
+	newmsg->sadb_msg_reqid = 0;
+	newmsg->sadb_msg_seq = 0;
+	newmsg->sadb_msg_pid = 0;
+	p = (caddr_t)newmsg + sizeof(struct sadb_msg);
+
+	/* set sadb_address for spidx's. */
+	bzero(&id, sizeof(id));
+	id.sadb_x_ident_id_addr.prefix = sp->spidx.prefs;
+	id.sadb_x_ident_id_addr.ul_proto = sp->spidx.ul_proto;
+	p = key_setsadbident(p,
+	                    SADB_EXT_IDENTITY_SRC,
+			    SADB_X_IDENTTYPE_ADDR,
+	                    (caddr_t)&sp->spidx.src,
+			    sp->spidx.src.ss_len,
+			    *(u_int64_t *)&id);
+
+	bzero(&id, sizeof(id));
+	id.sadb_x_ident_id_addr.prefix = sp->spidx.prefd;
+	id.sadb_x_ident_id_addr.ul_proto = sp->spidx.ul_proto;
+	p = key_setsadbident(p,
+	                    SADB_EXT_IDENTITY_DST,
+			    SADB_X_IDENTTYPE_ADDR,
+	                    (caddr_t)&sp->spidx.dst,
+			    sp->spidx.dst.ss_len,
+			    *(u_int64_t *)&id);
+
+	error = key_sendall(newmsg, len);
+#ifdef IPSEC_DEBUG
+	if (error != 0)
+		printf("key_spdacquire: key_sendall returned %d\n", error);
+#endif
+	return error;
+    }
+
+	return 0;
 }
 
 /*
@@ -4896,6 +5130,44 @@ key_getacqbyseq(seq)
 }
 #endif
 
+static struct secspacq *
+key_newspacq(spidx)
+	struct secpolicyindex *spidx;
+{
+	struct secspacq *acq;
+
+	/* get new entry */
+	KMALLOC(acq, struct secspacq *, sizeof(struct secspacq));
+	if (acq == NULL) {
+#ifdef IPSEC_DEBUG
+		printf("key_newspacq: No more memory.\n");
+#endif
+		return NULL;
+	}
+	bzero(acq, sizeof(*acq));
+
+	/* copy secindex */
+	bcopy(spidx, &acq->spidx, sizeof(acq->spidx));
+	acq->tick = 0;
+	acq->count = 0;
+
+	return acq;
+}
+
+static struct secspacq *
+key_getspacq(spidx)
+	struct secpolicyindex *spidx;
+{
+	struct secspacq *acq;
+
+	LIST_FOREACH(acq, &spacqtree, chain) {
+		if (key_cmpspidx_exactly(spidx, &acq->spidx))
+			return acq;
+	}
+
+	return NULL;
+}
+
 /*
  * SADB_ACQUIRE processing,
  * in first situation, is receiving
@@ -5741,6 +6013,7 @@ key_parse(msgp, so, targetp)
 		case SADB_X_SPDDUMP:
 		case SADB_X_SPDFLUSH:
 		case SADB_X_SPDSETIDX:
+		case SADB_X_SPDUPDATE:
 #ifdef IPSEC_DEBUG
 			printf("key_parse: illegal satype=%u\n",
 			    msg->sadb_msg_type);
@@ -5948,6 +6221,7 @@ key_parse(msgp, so, targetp)
 
 	case SADB_X_SPDADD:
 	case SADB_X_SPDSETIDX:
+	case SADB_X_SPDUPDATE:
 		if ((newmsg = key_spdadd(mhp)) == NULL)
 			return orglen;
 		if (targetp)
@@ -5959,6 +6233,18 @@ key_parse(msgp, so, targetp)
 			return orglen;
 		if (targetp)
 			*targetp = KEY_SENDUP_ALL;
+	        break;
+
+	case SADB_X_SPDGET:
+		/* key_spdget will call key_sendup() on her own */
+		error = key_spdget(mhp, so, KEY_SENDUP_ONE);
+		if (error) {
+			msg->sadb_msg_errno = error;
+			return orglen;
+		} else {
+			KFREE(msg);
+			return 0;
+		}
 	        break;
 
 	case SADB_X_SPDDUMP:

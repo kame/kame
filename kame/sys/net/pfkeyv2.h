@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.7 2000/03/09 13:12:37 sakane Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.8 2000/03/09 13:15:00 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: pfkeyv2.h,v 1.7 2000/03/09 13:12:37 sakane Exp $ */
+/* $Id: pfkeyv2.h,v 1.8 2000/03/09 13:15:00 sakane Exp $ */
 
 /*
  * This file has been derived rfc 2367,
@@ -66,14 +66,14 @@ you leave this credit intact on any copies of this file.
 #define SADB_X_PROMISC   11
 #define SADB_X_PCHANGE   12
 
-#define SADB_X_SPDUPDATE  13	/* not yet */
+#define SADB_X_SPDUPDATE  13
 #define SADB_X_SPDADD     14
 #define SADB_X_SPDDELETE  15
-#define SADB_X_SPDGET     16	/* not yet */
-#define SADB_X_SPDACQUIRE 17	/* not yet */
+#define SADB_X_SPDGET     16
+#define SADB_X_SPDACQUIRE 17
 #define SADB_X_SPDDUMP    18
 #define SADB_X_SPDFLUSH   19
-#define SADB_X_SPDSETIDX  20	/* add only SPD selector */
+#define SADB_X_SPDSETIDX  20
 #define SADB_X_SPDEXPIRE  21	/* not yet */
 #define SADB_MAX          21
 

@@ -1,4 +1,4 @@
-/*	$KAME: key.h,v 1.9 2000/02/22 14:06:40 itojun Exp $	*/
+/*	$KAME: key.h,v 1.10 2000/03/09 13:15:03 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: key.h,v 1.9 2000/02/22 14:06:40 itojun Exp $ */
+/* $Id: key.h,v 1.10 2000/03/09 13:15:03 sakane Exp $ */
 
 #ifndef _NETKEY_KEY_H_
 #define _NETKEY_KEY_H_
@@ -61,6 +61,7 @@ extern struct secpolicy *key_msg2sp __P((struct sadb_x_policy *xpl0,
 	size_t len, int *error));
 extern struct mbuf *key_sp2msg __P((struct secpolicy *sp));
 extern int key_ismyaddr __P((u_int family, caddr_t addr));
+extern int key_spdacquire __P((struct secpolicy *sp));
 extern void key_timehandler __P((void));
 extern void key_srandom __P((void));
 extern void key_freereg __P((struct socket *so));

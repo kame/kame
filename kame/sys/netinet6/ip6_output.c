@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.82 2000/03/09 08:34:23 sakane Exp $	*/
+/*	$KAME: ip6_output.c,v 1.83 2000/03/09 13:15:01 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -290,9 +290,8 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	
 	case IPSEC_POLICY_IPSEC:
 		if (sp->req == NULL) {
-			/* XXX should be panic ? */
-			printf("ip6_output: No IPsec request specified.\n");
-			error = EINVAL;
+			/* acquire a policy */
+			error = key_spdacquire(sp);
 			goto bad;
 		}
 		needipsec = 1;

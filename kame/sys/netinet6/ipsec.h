@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.26 2000/02/28 10:59:32 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.27 2000/03/09 13:15:02 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -103,6 +103,17 @@ struct inpcbpolicy {
 	struct secpolicy *sp_in;
 	struct secpolicy *sp_out;
 	int priv;			/* privileged socket ? */
+};
+
+/* SP acquiring list table. */ 
+struct secspacq {
+	LIST_ENTRY(secspacq) chain;
+
+	struct secpolicyindex spidx;
+
+	u_int32_t tick;		/* for lifetime */
+	int count;		/* for lifetime */
+	/* XXX: here is mbuf place holder to be sent ? */
 };
 #endif /*_KERNEL*/
 
