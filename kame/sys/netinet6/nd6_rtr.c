@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.150 2001/07/23 14:49:18 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.151 2001/07/23 15:09:42 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1195,7 +1195,7 @@ prelist_update(new, dr, m)
 		 */
 
 		/*
-		 * Update prefix information. Note that the on-link (L) bit
+		 * Update prefix information.  Note that the on-link (L) bit
 		 * and the autonomous (A) bit should NOT be changed from 1
 		 * to 0.
 		 */
@@ -1335,7 +1335,7 @@ prelist_update(new, dr, m)
 		/*
 		 * An already autoconfigured address matched.  Now that we
 		 * are sure there is at least one matched address, we can
-		 * proceed to 5.5.3. (e): update the lifetimes according to the
+		 * proceed to 5.5.3.  (e): update the lifetimes according to the
 		 * "two hours" rule and the privacy extension.
 		 */
 #define TWOHOUR		(120*60)
