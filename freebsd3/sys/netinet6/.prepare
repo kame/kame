@@ -15,3 +15,4 @@ conflict in6_pcb.h
 conflict raw_ip6.c
 conflict udp6_usrreq.c
 conflict udp6_var.h
+exclude in6_src.c
