@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1257 2000/09/06 15:32:51 jinmei Exp $
+$KAME: CHANGELOG,v 1.1258 2000/09/07 05:06:32 itojun Exp $
 
 <200009>
+Thu Sep  7 14:03:06 JST 2000  itojun@iijlab.net
+	* rtadvd/config.c: use getifaddrs to grab list of configured interface
+	  address prefixes.  previous code used routing table dump, and can be
+	  confused by misconfigured routing table (result in bogus prefix
+	  information option to be attached to RA).
+	  suppress bogus warning on source link-layer address option, attached
+	  to RA packets.
+
+	  XXX uses RTM_ADD/DELETE to check for new interface addresses.  should
+	  they be RTM_NEWADDR/DELADDR?
+
 2000-09-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ping6/ping6.c (pr_nodeaddr): printed address lifetime
 	according to the latest specification.
