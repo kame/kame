@@ -336,23 +336,36 @@ again:
 	 * Construct and send the request.  We're expecting a return
 	 * status of "200". Proxy requests don't want leading /.
 	 */
-	if (verbose) {
-		if (!proxy)
-			fprintf(ttyout, "Requesting %s\n", origline);
-		else
+	if (proxy) {
+		/*
+		 * Host: directive must use the destination host address for
+		 * the original URI (path).  We do not attach it at this moment.
+		 */
+		if (verbose)
 			fprintf(ttyout, "Requesting %s (via %s)\n",
 			    origline, proxyenv);
-	}
-	if (strchr(host, ':')) {
-		snprintf(buf, sizeof(buf),
-		    "GET %s%s HTTP/1.0\r\nHost: [%s]%s%s\r\n\r\n",
-		    proxy ? "" : "/", path, host,
-		    port ? ":" : "", port ? port : "");
+		snprintf(buf, sizeof(buf), "GET %s HTTP/1.0\r\n\r\n", path);
 	} else {
-		snprintf(buf, sizeof(buf),
-		    "GET %s%s HTTP/1.0\r\nHost: %s%s%s\r\n\r\n",
-		    proxy ? "" : "/", path, host,
-		    port ? ":" : "", port ? port : "");
+		if (verbose)
+			fprintf(ttyout, "Requesting %s\n", origline);
+		if (strchr(host, ':')) {
+			char *h, *p;
+
+			/* strip off scoped address portion, since it's local to node */
+			h = strdup(host);
+			if (h == NULL)
+				errx(1, "Can't allocate memory.");
+			if ((p = strchr(h, '%')) != NULL)
+				*p = '\0';
+			snprintf(buf, sizeof(buf),
+			    "GET /%s HTTP/1.0\r\nHost: [%s]%s%s\r\n\r\n",
+			    path, h, port ? ":" : "", port ? port : "");
+			free(h);
+		} else {
+			snprintf(buf, sizeof(buf),
+			    "GET /%s HTTP/1.0\r\nHost: %s%s%s\r\n\r\n",
+			    path, host, port ? ":" : "", port ? port : "");
+		}
 	}
 	len = strlen(buf);
 	if (write(s, buf, len) < len) {
