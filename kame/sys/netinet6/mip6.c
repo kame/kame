@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.81 2001/11/29 04:38:38 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.82 2001/11/29 11:03:45 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -108,7 +108,7 @@ static int mip6_process_movement __P((struct hif_softc *, int));
 static int mip6_select_coa __P((struct ifnet *));
 static int mip6_remove_addrs __P((struct ifnet *));
 static int mip6_attach_haddrs __P((struct hif_softc *, struct ifnet *));
-static int mip6_detach_haddrs __P((struct hif_softc *, struct ifnet *));
+static int mip6_detach_haddrs __P((struct hif_softc *));
 static int mip6_add_haddrs __P((struct hif_softc *, struct ifnet *));
 static int mip6_remove_haddrs __P((struct hif_softc *, struct ifnet *));
 static int mip6_remove_addr __P((struct ifnet *, struct in6_ifaddr *));
@@ -137,8 +137,12 @@ static int mip6_add_subopt2dh __P((u_int8_t *, struct mip6_buffer *));
 void
 mip6_init()
 {
-	mip6_config.mcfg_debug = 1;
 	mip6_config.mcfg_type = 0;
+#ifdef MIP6_DEBUG
+	mip6_config.mcfg_debug = 1;
+#else /* MIP6_DEBUG */
+	mip6_config.mcfg_debug = 0;
+#endif /* MIP6_DEBUG */
 
 	mip6_dr = NULL;
 
@@ -605,7 +609,7 @@ mip6_haddr_config(sc, ifp)
 			 * all physical addresses are assigned in a
 			 * address autoconfiguration manner.
 			 */
-			mip6_detach_haddrs(sc, ifp);
+			mip6_detach_haddrs(sc);
 			break;
 		}
 		break;
@@ -934,9 +938,8 @@ mip6_remove_haddrs(sc, ifp)
  * 2. add all haddr to ifp.
  */
 static int
-mip6_detach_haddrs(sc, ifp)
+mip6_detach_haddrs(sc)
 	struct hif_softc *sc;
-	struct ifnet *ifp;
 {
 	struct ifnet *hif_ifp = (struct ifnet *)sc;
 	struct ifaddr *ia, *ia_next;
@@ -978,8 +981,6 @@ mip6_detach_haddrs(sc, ifp)
 			return (error);
 		}
 	}
-
-	error = mip6_add_haddrs(sc, ifp);
 
 	return (error);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_ha.c,v 1.28 2001/11/28 06:30:59 k-sugyou Exp $	*/
+/*	$KAME: mip6_ha.c,v 1.29 2001/11/29 11:03:46 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -69,24 +69,10 @@ extern struct mip6_subnet_list mip6_subnet_list;
 
 struct mip6_ha_list mip6_ha_list;
 
-#ifdef __NetBSD__
-struct callout mip6_ha_ch = CALLOUT_INITIALIZER;
-#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-struct callout mip6_ha_ch;
-#endif
-int mip6_ha_count = 0;
-
-static void mip6_ha_timeout __P((void *));
-static void mip6_ha_starttimer __P((void));
-static void mip6_ha_stoptimer __P((void));
-
 void
 mip6_ha_init()
 {
 	LIST_INIT(&mip6_ha_list);
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3) 
-        callout_init(&mip6_ha_ch);
-#endif
 }
 
 struct mip6_ha *
@@ -146,13 +132,6 @@ mip6_ha_list_insert(mha_list, mha)
 
 	LIST_INSERT_HEAD(mha_list, mha, mha_entry);
 
-	if (mip6_ha_count == 0) {
-		mip6_ha_starttimer();
-		mip6log((LOG_INFO, "%s:%d: HA timer started.\n",
-			 __FILE__, __LINE__));
-	}
-	mip6_ha_count++;
-
 	return (0);
 }
 
@@ -186,11 +165,6 @@ mip6_ha_list_remove(mha_list, mha)
 
 	LIST_REMOVE(mha, mha_entry);
 	FREE(mha, M_TEMP);
-
-	mip6_ha_count--;
-	if (mip6_ha_count == 0) {
-		mip6_ha_stoptimer();
-	}
 
 	return (0);
 }
@@ -278,101 +252,4 @@ mip6_ha_list_find_withaddr(mha_list, addr)
 	}
 
 	return (mha);
-}
-
-static void
-mip6_ha_timeout(dummy)
-	void *dummy;
-{
-	struct mip6_ha *mha, *mha_next;
-	struct hif_softc *sc;
-	struct mip6_bu *mbu;
-	int s, error = 0;
-
-#ifdef __NetBSD__
-	s = splsoftnet();
-#else
-	s = splnet();
-#endif
-
-	mip6_ha_starttimer();
-
-	for (mha = LIST_FIRST(&mip6_ha_list); mha;
-	     mha = mha_next) {
-		mha_next = LIST_NEXT(mha, mha_entry);
-
-		if (!(mha->mha_flags & ND_RA_FLAG_HOME_AGENT)) {
-			/* this is not a home agent. */
-			continue;
-		}
-	
-		/* cout down HA lifetime remain. */
-#if 0
-		/* XXX.  disable timeout for now. */
-		mha->mha_remain -= MIP6_HA_TIMEOUT_INTERVAL;
-#endif
-		
-		if (mha->mha_remain < 0) {
-			/* this HA is not valid any more. */
-			for (sc = TAILQ_FIRST(&hif_softc_list); sc;
-			     /*
-			      * set in6addr_any as a home agent
-			      * address for each binding update entry.
-			      */
-			     sc = TAILQ_NEXT(sc, hif_entry)) {
-				for (mbu = LIST_FIRST(&sc->hif_bu_list); mbu;
-				     mbu = LIST_NEXT(mbu, mbu_entry)) {
-					if (!(mbu->mbu_flags & IP6_BUF_HOME)) {
-						/*
-						 * this is not a home
-						 * registration entry.
-						 */
-						continue;
-					}
-					if (IN6_ARE_ADDR_EQUAL(&mbu->mbu_paddr,
-							       &mha->mha_gaddr)) {
-						/*
-						 * the haaddr of this
-						 * BU entry is no
-						 * longer valid.
-						 * set haaddr to ANY.
-						 */
-						mbu->mbu_paddr = in6addr_any;
-					}
-				}
-			}
-			error = mip6_ha_list_remove(&mip6_ha_list, mha);
-			if (error) {
-				mip6log((LOG_ERR,
-					 "%s:%d: mha deletion failed "
-					 "(code %d).\n",
-					 __FILE__, __LINE__, error));
-			}
-		}
-	}
-
-	splx(s);
-}
-
-static void
-mip6_ha_starttimer()
-{
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	callout_reset(&mip6_ha_ch,
-		      MIP6_HA_TIMEOUT_INTERVAL * hz,
-		      mip6_ha_timeout, NULL);
-#else
-	timeout(mip6_ha_timeout, (void *)0,
-		MIP6_HA_TIMEOUT_INTERVAL * hz);
-#endif
-}
-
-static void
-mip6_ha_stoptimer()
-{
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	callout_stop(&mip6_ha_ch);
-#else
-	untimeout(mip6_ha_timeout, (void *)0);
-#endif
 }
