@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.107 2000/08/14 13:31:17 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.108 2000/08/14 15:06:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -184,7 +184,8 @@ const int int6intrq_present = 1;
 
 #ifdef MEASURE_PERFORMANCE
 #define IP6_PERFORM_LOGSIZE 10000
-static int logentry;
+int ip6_logentry;
+int ip6_logsize = IP6_PERFORM_LOGSIZE;
 unsigned long long ip6_performance_log[IP6_PERFORM_LOGSIZE];
 #endif
 #ifdef MEASURE_PERFORMANCE
@@ -233,6 +234,8 @@ int (*mip6_route_optimize_hook)(struct mbuf *m) = 0;
 #endif
 
 #ifdef MEASURE_PERFORMANCE
+unsigned long long ctr_beg, ctr_end;
+
 static __inline unsigned long long read_tsc __P((void));
 static __inline void add_performance_log __P((unsigned long long)); 
 #endif
@@ -251,8 +254,8 @@ static __inline void
 add_performance_log(val)
 	unsigned long long val;
 {
-	logentry = (logentry + 1) % IP6_PERFORM_LOGSIZE;
-	ip6_performance_log[logentry] = val;
+	ip6_logentry = (ip6_logentry + 1) % ip6_logsize;
+	ip6_performance_log[ip6_logentry] = val;
 }
 #endif
 
@@ -388,9 +391,6 @@ ip6_input(m)
 	struct ifnet *deliverifp = NULL;
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
-#endif
-#ifdef MEASURE_PERFORMANCE
-	unsigned long long ctr_beg, ctr_end;
 #endif
 
 #ifdef IPSEC
@@ -792,6 +792,9 @@ ip6_input(m)
 	if (!ip6_forwarding) {
 #ifdef MEASURE_PERFORMANCE
 		ctr_end = read_tsc();
+#ifdef MEASURE_PERFORMANCE_UDPONLY
+		if (ip6->ip6_nxt == IPPROTO_UDP)
+#endif
 		add_performance_log(ctr_end - ctr_beg);
 #endif
 		ip6stat.ip6s_cantforward++;
@@ -801,8 +804,13 @@ ip6_input(m)
 
   hbhcheck:
 #ifdef MEASURE_PERFORMANCE
+	if (ours) {
 		ctr_end = read_tsc();
-		add_performance_log(ctr_end - ctr_beg);
+#ifdef MEASURE_PERFORMANCE_UDPONLY
+		if (ip6->ip6_nxt == IPPROTO_UDP)
+#endif
+			add_performance_log(ctr_end - ctr_beg);
+	}
 #endif
 	/*
 	 * Process Hop-by-Hop options header if it's contained.
@@ -2183,7 +2191,7 @@ sysctl_ip6_oursalg SYSCTL_HANDLER_ARGS
 	for (i = 0; i < IP6_PERFORM_LOGSIZE; i++) {
 		ip6_performance_log[i] = 0;
 	}
-	logentry = 0;
+	ip6_logentry = 0;
 
 	switch(ip6_ours_check_algorithm) {
 	case OURS_CHECK_ALG_HASH:

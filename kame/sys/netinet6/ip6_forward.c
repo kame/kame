@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.46 2000/08/05 17:57:17 sumikawa Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.47 2000/08/14 15:06:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -90,6 +90,34 @@
 struct	route ip6_forward_rt;
 #else
 struct	route_in6 ip6_forward_rt;
+#endif
+
+#ifdef MEASURE_PERFORMANCE
+extern int ip6_logentry;
+extern int ip6_logsize;
+extern unsigned long long ip6_performance_log[];
+extern unsigned long long ctr_beg, ctr_end;
+
+static __inline unsigned long long read_tsc __P((void));
+static __inline void add_performance_log __P((unsigned long long)); 
+
+/* XXX: duplicated code */
+static __inline unsigned long long 
+read_tsc(void)
+{
+     unsigned int h,l;
+     /* read Pentium counter */
+     __asm__(".byte 0x0f,0x31" :"=a" (l), "=d" (h));
+     return ((unsigned long long)h<<32) | l;
+}
+
+static __inline void
+add_performance_log(val)
+	unsigned long long val;
+{
+	ip6_logentry = (ip6_logentry + 1) % ip6_logsize;
+	ip6_performance_log[ip6_logentry] = val;
+}
 #endif
 
 /*
@@ -381,6 +409,14 @@ ip6_forward(m, srcrt)
 		}
 	}
 	rt = ip6_forward_rt.ro_rt;
+
+#ifdef MEASURE_PERFORMANCE
+	ctr_end = read_tsc();
+#ifdef MEASURE_PERFORMANCE_UDPONLY
+	if (ip6->ip6_nxt == IPPROTO_UDP)
+#endif
+		add_performance_log(ctr_end - ctr_beg);
+#endif
 
 	/*
 	 * Scope check: if a packet can't be delivered to its destination
