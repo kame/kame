@@ -21,7 +21,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-udp.c,v 1.1.1.1 1999/08/08 23:32:09 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-udp.c,v 1.2 1999/09/11 04:43:49 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -437,7 +437,7 @@ udp_print(register const u_char *bp, u_int length, register const u_char *bp2)
 #else
 #ifdef INET6
 	if (ip6) {
-		if (bp == (u_char *)(ip6 + 1)) {
+		if (ip6->ip6_nxt == IPPROTO_UDP) {
 			(void)printf("%s.%s > %s.%s: ",
 				ip6addr_string(&ip6->ip6_src),
 				udpport_string(sport),
@@ -450,7 +450,7 @@ udp_print(register const u_char *bp, u_int length, register const u_char *bp2)
 	} else
 #endif /*INET6*/
 	{
-		if (bp == (u_char *)(ip + 1)) {
+		if (ip->ip_p == IPPROTO_UDP) {
 			(void)printf("%s.%s > %s.%s: ",
 				ipaddr_string(&ip->ip_src),
 				udpport_string(sport),
