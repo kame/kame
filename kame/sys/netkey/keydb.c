@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: keydb.c,v 1.33 2000/01/04 09:58:10 sakane Exp $ */
+/* KAME $Id: keydb.c,v 1.34 2000/01/04 12:00:32 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -330,8 +330,10 @@ static struct sadb_msg *key_getspi __P((caddr_t *mhp));
 static u_int32_t key_do_getnewspi __P((struct sadb_spirange *spirange,
 					struct secasindex *saidx));
 static struct sadb_msg *key_update __P((caddr_t *mhp));
+#ifdef IPSEC_DOSEQCHECK
 static struct secasvar *key_getsavbyseq __P((struct secashead *sah,
 						u_int32_t seq));
+#endif
 static struct sadb_msg *key_add __P((caddr_t *mhp));
 static int key_setident __P((struct secashead *sah, caddr_t *mhp));
 static struct sadb_msg *key_getmsgbuf_x1 __P((caddr_t *mhp));
@@ -3764,6 +3766,7 @@ key_update(mhp)
  *	NULL	: not found
  *	others	: found, pointer to a SA.
  */
+#ifdef IPSEC_DOSEQCHECK
 static struct secasvar *
 key_getsavbyseq(sah, seq)
 	struct secashead *sah;
@@ -3791,6 +3794,7 @@ key_getsavbyseq(sah, seq)
 
 	return NULL;
 }
+#endif
 
 /*
  * SADB_ADD processing
