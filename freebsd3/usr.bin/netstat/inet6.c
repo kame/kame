@@ -506,6 +506,9 @@ ip6_stats(off, name)
 			PRINT_SCOPESTAT(ip6s_sources_deprecated[i], i);
 		}
 	}
+
+	p1(ip6s_forward_cachehit, "\t%qu forward cache hit\n");
+	p1(ip6s_forward_cachemiss, "\t%qu forward cache miss\n");
 #undef p
 #undef p1
 }
