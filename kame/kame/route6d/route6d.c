@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.60 2001/03/08 02:15:42 onoe Exp $	*/
+/*	$KAME: route6d.c,v 1.61 2001/03/12 04:54:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.60 2001/03/08 02:15:42 onoe Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.61 2001/03/12 04:54:42 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -1530,7 +1530,7 @@ rtrecv()
 
 	if ((len = read(rtsock, buf, sizeof(buf))) < 0) {
 		perror("read from rtsock");
-		exit(-1);
+		exit(1);
 	}
 	if (len < sizeof(*rtm)) {
 		trace(1, "short read from rtsock: %d (should be > %lu)\n",
@@ -2759,12 +2759,12 @@ getroute(np, gw)
 		if (errno == ESRCH)	/* No such route found */
 			return NULL;
 		perror("write to rtsock");
-		exit(-1);
+		exit(1);
 	}
 	do {
 		if ((len = read(rtsock, buf, sizeof(buf))) < 0) {
 			perror("read from rtsock");
-			exit(-1);
+			exit(1);
 		}
 		rtm = (struct rt_msghdr *)buf;
 	} while (rtm->rtm_seq != myseq || rtm->rtm_pid != pid);

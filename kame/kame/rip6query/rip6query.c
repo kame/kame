@@ -1,4 +1,4 @@
-/*	$KAME: rip6query.c,v 1.9 2000/12/19 23:54:01 itojun Exp $	*/
+/*	$KAME: rip6query.c,v 1.10 2001/03/12 04:54:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -104,7 +104,7 @@ main(argc, argv)
 
 	if (argc != 1) {
 		usage();
-		exit(-1);
+		exit(1);
 	}
 
 	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
