@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.946 2000/05/28 06:35:16 itojun Exp $
+$Id: CHANGELOG,v 1.947 2000/05/28 15:08:44 itojun Exp $
 
 <200005>
+Mon May 29 00:04:15 JST 2000  itojun@iijlab.net
+	* bsdi4/sys/netinet/in_pcb.c: remove NRL bind(2) ordering constraint.
+	  NRL code forbids wildcard IPv4 bind after wildcard IPv6 bind on
+	  the same port number.  it was mistake.  now bind(2) is free from
+	  ordering constraint.
+
 Sun May 28 15:33:11 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 2000/5/22 weekly snap.
 
