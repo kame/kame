@@ -1117,6 +1117,10 @@ matchconf (old, new)
 	    &new->se_ctrladdr_in6.sin6_addr,
 	    sizeof(new->se_ctrladdr_in6.sin6_addr)) != 0)
 		return (0);
+	if (old->se_family == AF_INET6 && new->se_family == AF_INET6 &&
+	    old->se_ctrladdr_in6.sin6_scope_id !=
+	    new->se_ctrladdr_in6.sin6_scope_id)
+		return (0);
 
 	return (1);
 }
