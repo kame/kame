@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.25 2001/08/15 12:04:49 sakane Exp $
+$KAME: helsinki-result.jp,v 1.26 2001/08/15 12:08:11 itojun Exp $
 
 
 generic
@@ -288,6 +288,7 @@ Fitec
 	他の実装とうまくいかないのは、これが原因か？
 	そうでもなさそう、opensslの問題かも。
 
+
 SSH
 	ssh solaris version:
 	ssh側: IKEのパケットが出ない。
@@ -296,6 +297,7 @@ SSH
 		solarisはstatic cache entry入れるコマンドがないらしい。
 		一旦ping6してcacheを作った気になってもNSを出そうとする。
 	原因調査するから再戦してねと言われる。
+
 
 freeswan
 	IPv4, IPComp + ESP, transport mode
@@ -356,3 +358,43 @@ draft-shacham-ippcp-rfc2393bis-08.txt
 >2001-08-15 16:42:28: ERROR: proposal.c:497:cmpsatrns(): authtype mismatched: my:1 peer:2
 >2001-08-15 16:42:28: ERROR: proposal.c:365:cmpsaprop_alloc(): IPComp SPI size promoted from 16bit to 32bit
 >2001-08-15 16:42:28: ERROR: proposal.c:378:cmpsaprop_alloc(): encmode mismatched: my:2 peer:0			<-----
+
+
+netopia
+	Wed Aug 15 19:00 JST頃
+	IPv6, ESP, transport mode
+	phase 1 3DES + SHA1, group 2, lifetime = 24h
+	phase 2 3DES + SHA1, group 2, lifetime = 1h
+
+	KAMEベース実装。CPUがしょぼいらしくD-Hに5秒くらいかかってどきどきする。
+	bug reportなどあったら送ってもらうようお願いする。
+
+
+Ericsson
+	Wed Aug 15 20:30 JST頃
+	IPv6, ESP, transport mode
+	phase 1 3DES + SHA1, group 2, lifetime = 24h
+	phase 2 AES + SHA1, group 2, lifetime = 1h
+
+	成功
+
+	IPv6, ESP, transport mode
+	phase 1 3DES + SHA1, group 2, lifetime = 24h
+	phase 2 blowfish + SHA1, group 2, lifetime = 1h
+
+	失敗。blowfish、こっちがわの鍵の生成がおかしい(= 長い鍵の場合)。
+
+	IPv6, ESP, transport mode
+	phase 1 3DES + SHA1, group 2, lifetime = 24h
+	phase 2 3DES + SHA1, group 2, lifetime = 1h
+
+	失敗。ericsson側、NDがおかしい。
+
+
+Nokia EPOC
+	Wed Aug 15 20:51:25 JST 2001
+	IPv6, ESP, tunnel mode
+	phase 1 3DES + SHA1, group 2, lifetime = 3600min
+	phase 2 3DES + SHA1 + deflate, group 2, lifetime = 2min
+
+	IPsec keyも入るが、先方のポリシ問題でpingは返らない。
