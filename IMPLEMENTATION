@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.141 2000/08/01 14:38:33 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.142 2000/08/03 13:22:00 itojun Exp $
 
 1. IPv6
 
@@ -1152,6 +1152,28 @@ Routing daemons will join appropriate multicast groups, as necessary,
 like ff02::9 for RIPng.
 
 Users can join groups by using appropriate system calls like setsockopt(2).
+
+1.16 Advanced API
+
+Current KAME kernel implements 2292bis API, documented in
+draft-ietf-ipngwg-rfc2292bis-xx.txt.  It also implements RFC2292 API,
+for backward compatibility purposes with *BSD-integrated codebase.
+KAME tree ships with 2292bis headers.
+*BSD-integrated codebase implements either RFC2292, or 2292bis, API.
+see "COVERAGE" document for detailed implementation status.
+
+Here are couple of issues to mention:
+- *BSD-integrated binaries, compiled for RFC2292, will work on KAME kernel.
+  For example, OpenBSD 2.7 /sbin/rtsol will work on KAME/openbsd kernel.
+- KAME binaries, compiled using 2292bis, will not work on *BSD-integrated
+  kenrel.  For example, KAME /usr/local/v6/sbin/rtsol will not work on
+  OpenBSD 2.7 kernel.
+- 2292bis API is not compatible with RFC2292 API.  2292bis #define symbols
+  conflict with RFC2292 symbols.  Therefore, if you compile programs that
+  assume RFC2292 API, the compilation itself goes fine, however, the compiled
+  binary will not work correctly.  The problem is not KAME issue, but API
+  issue.  For example, Solaris 8 implements 2292bis API.  If you compile
+  RFC2292-based code on Solaris 8, the binary can behave strange.
 
 2. Network Drivers
 
