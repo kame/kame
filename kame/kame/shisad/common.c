@@ -1,4 +1,4 @@
-/*      $KAME: common.c,v 1.5 2005/01/22 12:56:55 t-momose Exp $  */
+/*      $KAME: common.c,v 1.6 2005/01/26 06:05:05 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -574,7 +574,8 @@ icmp6_input_common(fd)
 			if (hai_lifetime == 0)
 				hai_lifetime = ntohs(ndopts.ndpi->nd_opt_pi_valid_time);
 			
-			syslog(LOG_INFO, "prefix lifetime = %d\n", hai_lifetime);
+			if (debug)
+				syslog(LOG_INFO, "prefix lifetime = %d\n", hai_lifetime);
 
                         /* check H flag */
 			if (!(ndopts.ndpi->nd_opt_pi_flags_reserved & ND_OPT_PI_FLAG_ROUTER)) {
@@ -595,6 +596,31 @@ icmp6_input_common(fd)
 #else /* MIP_MN */
 				break; /* MN ignores RA which not having R flag */
 #endif /* MIP_HA */
+			} else {
+				/* 
+				 * when the prefix field does not
+				 * have global address, it should
+				 * be ignored 
+				 */
+			        if (IN6_IS_ADDR_LINKLOCAL(in6_gladdr)
+            				|| IN6_IS_ADDR_MULTICAST(in6_gladdr)
+            				|| IN6_IS_ADDR_LOOPBACK(in6_gladdr)
+            				|| IN6_IS_ADDR_V4MAPPED(in6_gladdr)
+            				|| IN6_IS_ADDR_UNSPECIFIED(in6_gladdr)) 
+					break;
+
+				/* 
+				 * when the prefix field does not
+				 * contain 128-bit address, it should
+				 * be ignored 
+				 */				
+				if ((in6_gladdr->s6_addr[15] == 0) && 
+				    (in6_gladdr->s6_addr[14] == 0) &&
+				    (in6_gladdr->s6_addr[13] == 0) &&
+				    (in6_gladdr->s6_addr[12] == 0) &&
+				    (in6_gladdr->s6_addr[11] == 0) &&
+				    (in6_gladdr->s6_addr[10] == 0))
+					break;
 			}
 			if (debug)
 				syslog(LOG_INFO, "RA received from HA (%s)\n", 
