@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.182 2001/02/16 23:43:01 thorpej Exp $	*/
+/*	$KAME: key.c,v 1.183 2001/03/22 08:09:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -570,6 +570,70 @@ found:
 		printf("DP key_allocsp cause refcnt++:%d SP:%p\n",
 			sp->refcnt, sp));
 
+	return sp;
+}
+
+/*
+ * return a policy that matches this particular inbound packet.
+ * XXX slow
+ */
+struct secpolicy *
+key_gettunnel(osrc, odst, isrc, idst)
+	struct sockaddr *osrc, *odst, *isrc, *idst;
+{
+	struct secpolicy *sp;
+	const int dir = IPSEC_DIR_INBOUND;
+	struct timeval tv;
+	int s;
+	struct ipsecrequest *r1, *r2, *p;
+	struct sockaddr *os, *od, *is, *id;
+
+	r1 = r2 = NULL;
+#ifdef __NetBSD__
+	s = splsoftnet();	/*called from softclock()*/
+#else
+	s = splnet();	/*called from softclock()*/
+#endif
+	LIST_FOREACH(sp, &sptree[dir], chain) {
+		if (sp->state == IPSEC_SPSTATE_DEAD)
+			continue;
+
+		p = sp->req;
+		while (p) {
+			if (p->saidx.mode != IPSEC_MODE_TUNNEL) {
+				p = p->next;
+				continue;
+			}
+			r1 = r2;
+			r2 = p;
+
+			if (!r1) {
+				is = (struct sockaddr *)&sp->spidx.src;
+				id = (struct sockaddr *)&sp->spidx.dst;
+			} else {
+				is = (struct sockaddr *)&r1->saidx.src;
+				id = (struct sockaddr *)&r1->saidx.dst;
+			}
+			os = (struct sockaddr *)&r2->saidx.src;
+			od = (struct sockaddr *)&r2->saidx.dst;
+
+			if (key_sockaddrcmp(os, osrc, 0) ||
+			    key_sockaddrcmp(od, odst, 0) ||
+			    key_sockaddrcmp(is, isrc, 0) ||
+			    key_sockaddrcmp(id, idst, 0))
+				continue;
+
+			goto found;
+		}
+	}
+	splx(s);
+	return NULL;
+
+found:
+	microtime(&tv);
+	sp->lastused = tv.tv_sec;
+	sp->refcnt++;
+	splx(s);
 	return sp;
 }
 
