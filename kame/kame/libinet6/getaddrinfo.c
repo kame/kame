@@ -371,6 +371,16 @@ getaddrinfo(hostname, servname, hints, res)
 	}
 
 	/*
+	 * post-2553: AI_ALL and AI_V4MAPPED are effective only against
+	 * AF_INET6 query.  Also, it is not allowed to specify AI_ALL alone.
+	 */
+	if ((pai->ai_flags & (AI_ALL | AI_V4MAPPED)) &&
+	    pai->ai_family != AF_INET6)
+		ERR(EAI_BADFLAGS);
+	if ((pai->ai_flags & (AI_ALL | AI_V4MAPPED)) == AI_ALL)
+		ERR(EAI_BADFLAGS);
+
+	/*
 	 * check for special cases.  (1) numeric servname is disallowed if
 	 * socktype/protocol are left unspecified. (2) servname is disallowed
 	 * for raw and other inet{,6} sockets.
