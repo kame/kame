@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.371 1999/12/24 03:08:07 jinmei Exp $
+$Id: CHANGELOG,v 1.372 1999/12/25 13:58:47 itojun Exp $
 
 <199912>
+Sat Dec 25 23:00:09 JST 1999  itojun@iijlab.net
+	* freebsd2/usr.bin/fetch: apply y2k patch.  this should be okay to
+	  apply it as freebsd228 is not maintained by freebsd project any more.
+	  From: Hideaki YOSHIFUJI <yoshfuji@ecei.tohoku.ac.jp>
+	* freebsd[23]/ports/inn: use latest v6 patch.
+	  From: Satosi KOBAYASI <kobayasi@north.ad.jp>
+
 1999-12-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ping6/ping6.c (main): restricted the -l (preload)
 	option to a privileged user.
