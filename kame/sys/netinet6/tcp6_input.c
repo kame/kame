@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.23 2000/04/12 04:12:35 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.24 2000/06/04 12:47:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -163,7 +163,7 @@ static int  tcp6_mss_round __P((int));
 #define ND6_HINT(t6p) \
 do { \
 	if (t6p && t6p->t_in6pcb && t6p->t_in6pcb->in6p_route.ro_rt) \
-		nd6_nud_hint(t6p->t_in6pcb->in6p_route.ro_rt, NULL); \
+		nd6_nud_hint(t6p->t_in6pcb->in6p_route.ro_rt, NULL, 0); \
 } while (0)
 
 /*

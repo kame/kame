@@ -133,7 +133,7 @@ do { \
 	if (tp && tp->t_inpcb && (tp->t_inpcb->inp_flags & INP_IPV6) \
 	 && !(tp->t_inpcb->inp_flags & INP_IPV6_MAPPED) \
 	 && tp->t_inpcb->inp_route6.ro_rt) { \
-		nd6_nud_hint(tp->t_inpcb->inp_route6.ro_rt, NULL); \
+		nd6_nud_hint(tp->t_inpcb->inp_route6.ro_rt, NULL, 0); \
 	} \
 } while (0)
 #else

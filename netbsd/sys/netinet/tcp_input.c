@@ -204,7 +204,7 @@ int	tcprexmtthresh = 3;
 do { \
 	if (tp && tp->t_in6pcb && tp->t_family == AF_INET6 \
 	 && tp->t_in6pcb->in6p_route.ro_rt) { \
-		nd6_nud_hint(tp->t_in6pcb->in6p_route.ro_rt, NULL); \
+		nd6_nud_hint(tp->t_in6pcb->in6p_route.ro_rt, NULL, 0); \
 	} \
 } while (0)
 #else

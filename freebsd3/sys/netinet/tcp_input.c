@@ -175,7 +175,7 @@ static void	 tcp_xmit_timer __P((struct tcpcb *, int));
  */
 #define ND6_HINT(tp) { \
 	if ((tp) && (tp)->t_inpcb && (tp)->t_inpcb->in6p_route.ro_rt) \
-		nd6_nud_hint((tp)->t_inpcb->in6p_route.ro_rt, NULL); \
+		nd6_nud_hint((tp)->t_inpcb->in6p_route.ro_rt, NULL, 0); \
 }
 
 /*

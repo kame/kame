@@ -147,7 +147,7 @@ do { \
 	if ((tp) && (tp)->t_inpcb && \
 	    ((tp)->t_inpcb->inp_vflag & INP_IPV6) != 0 && \
 	    (tp)->t_inpcb->in6p_route.ro_rt) \
-		nd6_nud_hint((tp)->t_inpcb->in6p_route.ro_rt, NULL); \
+		nd6_nud_hint((tp)->t_inpcb->in6p_route.ro_rt, NULL, 0); \
 } while (0)
 #else
 #define ND6_HINT(tp)
