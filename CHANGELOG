@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1907 2001/10/11 12:59:52 keiichi Exp $
+$KAME: CHANGELOG,v 1.1908 2001/10/14 17:25:29 fujisawa Exp $
 
 <200110>
+2001-10-15 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_{defs.h,trans.c}
+	- Fix a bug to miscalculate when compute a checksum in
+	  IPv6 -> IPv4 translation.
+
 Thu Oct 11 21:57:50 JST 2001 keiichi@iij.ad.jp
 	mip6
 	* fix BU list management function.
