@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.22 2000/03/30 14:42:26 itojun Exp $
+$Id: COVERAGE,v 1.23 2000/04/17 03:03:12 itojun Exp $
 
 
 x: supported/integrated
@@ -64,6 +64,8 @@ CMSG_ALIGN	sysctl	ALIGN	ALIGN	notyet	notyet	ALIGN
 			(*1)	(*2)			(*2)
     (*1) has namespace pollution bug, KAME PR 230.
     (*2) requires separate inclusion of machine/param.h.
+    (all) backward binary compatibility for old code that uses old CMSG_xx
+	  is not provided (yet).
 
 getaddrinfo obeys configured resolv order
 		x	x	-	notyet	notyet	-
