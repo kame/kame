@@ -1,4 +1,4 @@
-# $KAME: Makefile,v 1.2 2001/07/04 12:58:32 jinmei Exp $
+# $KAME: Makefile,v 1.3 2001/07/05 01:35:04 jinmei Exp $
 # Copyright (c) 2001 WIDE Project. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -29,6 +29,7 @@
 .include "${.CURDIR}/../Makefile.opsys"
 .endif
 
+BINDIR=	$(PREFIX)/sbin
 PROG=	gaistatd
 CFLAGS+=-Wall -Werror
 LDADD=	-lkvm
