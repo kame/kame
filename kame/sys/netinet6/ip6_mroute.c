@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.100 2003/07/08 12:26:22 ono Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.101 2003/07/08 20:54:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -627,7 +627,7 @@ ip6_mrouter_done()
 			if (mif6table[mifi].m6_ifp &&
 			    !(mif6table[mifi].m6_flags & MIFF_REGISTER)) {
 				ifr.ifr_addr.sin6_family = AF_INET6;
-				ifr.ifr_addr.sin6_addr= in6addr_any;
+				ifr.ifr_addr.sin6_addr = in6addr_any;
 				ifp = mif6table[mifi].m6_ifp;
 				(*ifp->if_ioctl)(ifp, SIOCDELMULTI,
 						 (caddr_t)&ifr);
