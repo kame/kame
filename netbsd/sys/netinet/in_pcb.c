@@ -391,82 +391,6 @@ in_pcbconnect(v, nam)
 	 * destinations.
 	 */
 	if (in_nullhost(inp->inp_laddr)) {
-#if 0
-		struct route *ro;
-
-		ia = (struct in_ifaddr *)0;
-		/* 
-		 * If route is known or can be allocated now,
-		 * our src addr is taken from the i/f, else punt.
-		 * Note that we should check the address family of the cached
-		 * destination, in case of sharing the cache with IPv6.
-		 */
-		ro = &inp->inp_route;
-		if (ro->ro_rt &&
-		    (!in_hosteq(satosin(&ro->ro_dst)->sin_addr,
-			sin->sin_addr) || 
-		    inp->inp_socket->so_options & SO_DONTROUTE)) {
-			RTFREE(ro->ro_rt);
-			ro->ro_rt = (struct rtentry *)0;
-		}
-		if ((inp->inp_socket->so_options & SO_DONTROUTE) == 0 && /*XXX*/
-		    (ro->ro_rt == (struct rtentry *)0 ||
-		    ro->ro_rt->rt_ifp == (struct ifnet *)0)) {
-			/* No route yet, so try to acquire one */
-			bzero(&ro->ro_dst, sizeof(struct sockaddr_in));
-			ro->ro_dst.sa_family = AF_INET;
-			ro->ro_dst.sa_len = sizeof(struct sockaddr_in);
-			satosin(&ro->ro_dst)->sin_addr = sin->sin_addr;
-			rtalloc(ro);
-		}
-		/*
-		 * If we found a route, use the address
-		 * corresponding to the outgoing interface
-		 * unless it is the loopback (in case a route
-		 * to our address on another net goes to loopback).
-		 * 
-		 * XXX Is this still true?  Do we care?
-		 */
-		if (ro->ro_rt && !(ro->ro_rt->rt_ifp->if_flags & IFF_LOOPBACK))
-			ia = ifatoia(ro->ro_rt->rt_ifa);
-		if (ia == NULL) {
-			u_int16_t fport = sin->sin_port;
-
-			sin->sin_port = 0;
-			ia = ifatoia(ifa_ifwithladdr(sintosa(sin)));
-			sin->sin_port = fport;
-			if (ia == 0) {
-				/* Find 1st non-loopback AF_INET address */
-				for (ia = in_ifaddr.tqh_first ; ia != NULL;
-				     ia = ia->ia_list.tqe_next) {
-					if ((ia->ia_ifp->if_flags &
-					     IFF_LOOPBACK) == 0)
-						break;
-				}
-			}
-			if (ia == NULL)
-				return (EADDRNOTAVAIL);
-		}
-		/*
-		 * If the destination address is multicast and an outgoing
-		 * interface has been set as a multicast option, use the
-		 * address of that interface as our source address.
-		 */
-		if (IN_MULTICAST(sin->sin_addr.s_addr) &&
-		    inp->inp_moptions != NULL) {
-			struct ip_moptions *imo;
-			struct ifnet *ifp;
-
-			imo = inp->inp_moptions;
-			if (imo->imo_multicast_ifp != NULL) {
-				ifp = imo->imo_multicast_ifp;
-				IFP_TO_IA(ifp, ia);		/* XXX */
-				if (ia == 0)
-					return (EADDRNOTAVAIL);
-			}
-		}
-		ifaddr = satosin(&ia->ia_addr);
-#else
 		int error;
 		ifaddr = in_selectsrc(sin, &inp->inp_route,
 			inp->inp_socket->so_options, inp->inp_moptions, &error);
@@ -475,7 +399,6 @@ in_pcbconnect(v, nam)
 				error = EADDRNOTAVAIL;
 			return error;
 		}
-#endif
 	}
 	if (in_pcblookup_connect(inp->inp_table, sin->sin_addr, sin->sin_port,
 	    !in_nullhost(inp->inp_laddr) ? inp->inp_laddr : ifaddr->sin_addr,
