@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.42 2000/12/15 13:43:54 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.43 2000/12/16 14:23:26 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -547,9 +547,9 @@ yywarn(char *s, ...)
 #endif
 	snprintf(fmt, sizeof(fmt), "%d: \"%s\" %s\n",
 		incstack[incstackp].lineno, yytext, s);
-	plogv(LLV_ERROR, LOCATION, NULL, fmt, ap);
+	plogv(LLV_WARNING, LOCATION, NULL, fmt, ap);
 	va_end(ap);
-	plog(LLV_ERROR, LOCATION, NULL,
+	plog(LLV_WARNING, LOCATION, NULL,
 		"in %s\n", incstack[incstackp].path);
 }
 
