@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.60 2003/02/07 09:34:39 jinmei Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.61 2003/02/20 04:31:20 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -620,87 +620,6 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	/* reset rate limitation factor. */
 	sc->hif_dhaad_count = 0;
 
-	/*
-	 * check if the home agent list contains sending the home
-	 * agent's own address.
-	 */
-	hacount = (icmp6len - sizeof(struct dhaad_rep))
-		/ sizeof(struct in6_addr);
-	haaddrptr = haaddrs;
-	for (i = 0; i < hacount; i++) {
-		/* XXX: check if these addresses are global. */
-		if (IN6_ARE_ADDR_EQUAL(&ip6->ip6_src, haaddrptr)) {
-			found = 1;
-			break;
-		}
-		haaddrptr++;
-	}
-
-	/*
-	 * install home agents to the internal home agent list.
-	 */
-	if (found == 0) {
-		/*
-		 * if the home agent list of the DHAAD reply doesn't
-		 * include the address of ip6_src field (that is, the
-		 * address of the home agent sending this DHAAD reply
-		 * packet), the address is considered as a most
-		 * preferable.
-		 */
-		/* XXX: TODO
-		 *
-		 * how do we make the HA specified in the ip src field
-		 * as a most preferable one ?
-		 */
-		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &sin6src);
-		if (mha) {
-			/*
-			 * if this home agent already exists in the list,
-			 * update its lifetime.
-			 */
-			/*
-			 * XXX: TODO
-			 *
-			 * how to get the REAL lifetime of the home agent?
-			 */
-			mha->mha_lifetime = MIP6_HA_DEFAULT_LIFETIME; /* XXX */
-		} else {
-			/*
-			 * create a new home agent entry and insert it
-			 * to the internal home agent list
-			 * (mip6_ha_list).
-			 */
-			/*
-			 * XXX: TODO
-			 *
-			 * DHAAD reply doesn't include home agents'
-			 * link-local addresses.  how we decide for
-			 * each hoem agent link-local address?  and
-			 * lifetime determination is a problem, also.
-			 */
-			bzero(&lladdr, sizeof(lladdr));
-			lladdr.sin6_len = sizeof(lladdr);
-			lladdr.sin6_family = AF_INET6;
-			mip6_icmp6_create_linklocal(&lladdr.sin6_addr,
-						    &sin6src.sin6_addr);
-			in6_addr2zoneid(m->m_pkthdr.rcvif, &lladdr.sin6_addr,
-					&lladdr.sin6_scope_id); /* XXX */
-			mha = mip6_ha_create(&lladdr, &sin6src,
-					     ND_RA_FLAG_HOME_AGENT,
-					     0, MIP6_HA_DEFAULT_LIFETIME);
-			if (mha == NULL) {
-				mip6log((LOG_ERR,
-					 "%s:%d: mip6_ha create failed\n",
-					 __FILE__, __LINE__));
-				m_freem(m);
-				return (ENOMEM);
-			}
-			mip6_ha_list_insert(&mip6_ha_list, mha);
-			mip6_dhaad_ha_list_insert(sc, mha);
-		}
-		mha_prefered = mha;
-	}
-
 	/* install HAs specified in the HA list */
 	haaddrptr = haaddrs;
 	for (i = 0; i < hacount; i++) {
@@ -714,12 +633,31 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 				&haaddr.sin6_scope_id); /* XXX */
 		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &haaddr);
 		if (mha) {
-			/* XXX: TODO the same problem above. */
+			/*
+			 * if this home agent already exists in the list,
+			 * update its lifetime.
+			 */
+			/*
+			 * XXX: TODO
+			 *
+			 * how to get the REAL lifetime of the home agent?
+			 */
 			mha->mha_lifetime = MIP6_HA_DEFAULT_LIFETIME;
 		} else {
 			struct sockaddr_in6 haaddr;
-
-			/* XXX: TODO the same problem above. */
+			/*
+			 * create a new home agent entry and insert it
+			 * to the internal home agent list
+			 * (mip6_ha_list).
+			 */
+			/*
+			 * XXX: TODO
+			 *
+			 * DHAAD reply doesn't include home agents'
+			 * link-local addresses.  how we decide for
+			 * each home agent link-local address?  and
+			 * lifetime determination is a problem, also.
+			 */
 			bzero(&lladdr, sizeof(lladdr));
 			lladdr.sin6_len = sizeof(lladdr);
 			lladdr.sin6_family = AF_INET6;

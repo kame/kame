@@ -1,4 +1,4 @@
-/*	$KAME: haadisc.c,v 1.7 2003/02/18 09:57:06 t-momose Exp $	*/
+/*	$KAME: haadisc.c,v 1.8 2003/02/20 04:31:20 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: haadisc.c,v 1.7 2003/02/18 09:57:06 t-momose Exp $
+ * $Id: haadisc.c,v 1.8 2003/02/20 04:31:20 t-momose Exp $
  */
 
 /*
@@ -1036,7 +1036,7 @@ haad_reply_output(msgid, coaddr, reqaddr, haif, type, ifga_index)
     cm->cmsg_len = CMSG_LEN(sizeof(struct in6_pktinfo));
     pi = (struct in6_pktinfo *)CMSG_DATA(cm);
     pi->ipi6_addr = src;
-    pi->ipi6_ifindex = 0; /* determined with routeing table */
+    pi->ipi6_ifindex = 0; /* determined with routing table */
 
     if ((len = sendmsg(sock, &sndmhdr, 0)) < 0) {
 	syslog(LOG_ERR, __FUNCTION__ "%s.\n", strerror(errno));
