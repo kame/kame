@@ -1,10 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.756 2000/04/10 05:38:45 itojun Exp $
+$Id: CHANGELOG,v 1.757 2000/04/10 05:44:26 itojun Exp $
 
 <200003>
 Mon Apr 10 14:38:00 JST 2000  itojun@iijlab.net
-	* netbsd/pkgsrc/mail/sendmail.beta: use 8.10.1.
+	* netbsd/pkgsrc/mail/sendmail.beta, freebsd2/ports/sendmail.beta:
+	  use 8.10.1. (not really beta already...)
 
 Sat Apr  8 09:49:57 JST 2000  itojun@iijlab.net
 	* gated-ipv6 ports/pkgsrc (netbsd/freebsd[23]): upgrade to 3/9 snapshot.
