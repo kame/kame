@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.102 2000/05/11 03:51:24 itojun Exp $	*/
+/*	$KAME: key.c,v 1.103 2000/05/11 13:54:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -430,7 +430,8 @@ static struct secasvar *key_getsavbyseq __P((struct secashead *, u_int32_t));
 #endif
 static int key_add __P((struct socket *, struct mbuf *,
 	const struct sadb_msghdr *));
-static int key_setident __P((struct secashead *, caddr_t *));
+static int key_setident __P((struct secashead *, struct mbuf *,
+	const struct sadb_msghdr *));
 static struct mbuf *key_getmsgbuf_x1 __P((struct mbuf *,
 	const struct sadb_msghdr *));
 static int key_delete __P((struct socket *, struct mbuf *,
@@ -456,6 +457,7 @@ static int key_promisc __P((struct socket *, struct mbuf *,
 	const struct sadb_msghdr *));
 static int key_sendall __P((struct sadb_msg *, u_int));
 static int key_senderror __P((struct socket *, struct mbuf *, int));
+static int key_validate_ext __P((const struct sadb_ext *, int));
 static int key_align __P((struct mbuf *, struct sadb_msghdr *));
 #if 0
 static const char *key_getfqdn __P((void));
@@ -1489,10 +1491,7 @@ fail:
  * SPDSETIDX like SPDADD without a part of policy requests.
  * SPDUPDATE replace a unique policy entry.
  *
- * IN:	mhp: pointer to the pointer to each header.
- * OUT:	NULL if fail.
- *	other if success, return pointer to the message to send.
- *
+ * m will always be freed.
  */
 static int
 key_spdadd(so, m, mhp)
@@ -1733,9 +1732,7 @@ key_getnewspid()
  * to the ikmpd.
  * policy(*) including direction of policy.
  *
- * IN:	mhp: pointer to the pointer to each header.
- * OUT:	other if success, return pointer to the message to send.
- *	0 if fail.
+ * m will always be freed.
  */
 static int
 key_spddelete(so, m, mhp)
@@ -1838,9 +1835,7 @@ key_spddelete(so, m, mhp)
  * to the ikmpd.
  * policy(*) including direction of policy.
  *
- * IN:	mhp: pointer to the pointer to each header.
- * OUT:	other if success, return pointer to the message to send.
- *	0 if fail.
+ * m will always be freed.
  */
 static int
 key_spddelete2(so, m, mhp)
@@ -1940,9 +1935,7 @@ key_spddelete2(so, m, mhp)
  * to the ikmpd.
  * policy(*) including direction of policy.
  *
- * IN:	mhp: pointer to the pointer to each header.
- * OUT:	other if success, return pointer to the message to send.
- *	0 if fail.
+ * m will always be freed.
  */
 static int
 key_spdget(so, m, mhp)
@@ -2108,9 +2101,7 @@ key_spdacquire(sp)
  * to the user.
  * NOTE: what to do is only marking SADB_SASTATE_DEAD.
  *
- * IN:	mhp: pointer to the pointer to each header.
- * OUT:	other if success, return pointer to the message to send.
- *	0 if fail.
+ * m will always be freed.
  */
 static int
 key_spdflush(so, m, mhp)
@@ -2160,9 +2151,7 @@ key_spdflush(so, m, mhp)
  *   <base> .....
  * to the ikmpd.
  *
- * IN:	mhp: pointer to the pointer to each header.
- * OUT:	other if success, return pointer to the message to send.
- *	0 if fail.
+ * m will always be freed.
  */
 static int
 key_spddump(so, m, mhp)
@@ -4561,9 +4550,7 @@ key_do_getnewspi(spirange, saidx)
  *       (identity(SD),) (sensitivity)>
  * to the ikmpd.
  *
- * IN:	mhp: pointer to the pointer to each header.
- * OUT:	NULL if fail.
- *	other if success, return pointer to the message to send.
+ * m will always be freed.
  */
 static int
 key_update(so, m, mhp)
@@ -4634,9 +4621,9 @@ key_update(so, m, mhp)
 
 	/* set spidx if there */
 	/* XXX rewrite */
-	if (key_setident(sah, (caddr_t *)mhp->ext) < 0) {
-		return key_senderror(so, m, 0);
-	}
+	error = key_setident(sah, m, mhp);
+	if (error)
+		return key_senderror(so, m, error);
 
 	/* find a SA with sequence number. */
 #ifdef IPSEC_DOSEQCHECK
@@ -4764,9 +4751,7 @@ key_getsavbyseq(sah, seq)
  *
  * IGNORE identity and sensitivity messages.
  *
- * IN:	mhp: pointer to the pointer to each header.
- * OUT:	NULL if fail.
- *	other if success, return pointer to the message to send.
+ * m will always be freed.
  */
 static int
 key_add(so, m, mhp)
@@ -4840,8 +4825,9 @@ key_add(so, m, mhp)
 
 	/* set spidx if there */
 	/* XXX rewrite */
-	if (key_setident(newsah, (caddr_t *)mhp->ext) < 0)
-		return key_sendup_mbuf(so, m, KEY_SENDUP_ONE);
+	error = key_setident(newsah, m, mhp);
+	if (error)
+		return key_senderror(so, m, error);
 
 	/* create new SA entry. */
 	/* We can create new SA only if SPI is differenct. */
@@ -4883,84 +4869,59 @@ key_add(so, m, mhp)
     }
 }
 
+/* m is retained */
 static int
-key_setident(sah, mhp)
+key_setident(sah, m, mhp)
 	struct secashead *sah;
-	caddr_t *mhp;
+	struct mbuf *m;
+	const struct sadb_msghdr *mhp;
 {
-	struct sadb_msg *msg0;
-	struct sadb_ident *idsrc, *iddst;
+	const struct sadb_ident *idsrc, *iddst;
 	int idsrclen, iddstlen;
 
 	/* sanity check */
-	if (sah == NULL || mhp == NULL || mhp[0] == NULL)
+	if (sah == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
 		panic("key_setident: NULL pointer is passed.\n");
 
-	msg0 = (struct sadb_msg *)mhp[0];
-
 	/* don't make buffer if not there */
-	if (mhp[SADB_EXT_IDENTITY_SRC] == NULL
-	 && mhp[SADB_EXT_IDENTITY_DST] == NULL) {
+	if (mhp->ext[SADB_EXT_IDENTITY_SRC] == NULL &&
+	    mhp->ext[SADB_EXT_IDENTITY_DST] == NULL) {
 		sah->idents = NULL;
 		sah->identd = NULL;
 		return 0;
 	}
 	
-	if (mhp[SADB_EXT_IDENTITY_SRC] == NULL
-	 || mhp[SADB_EXT_IDENTITY_DST] == NULL) {
+	if (mhp->ext[SADB_EXT_IDENTITY_SRC] == NULL ||
+	    mhp->ext[SADB_EXT_IDENTITY_DST] == NULL) {
 #ifdef IPSEC_DEBUG
 		printf("key_setident: invalid identity.\n");
 #endif
-		msg0->sadb_msg_errno = EINVAL;
-		return -1;
+		return EINVAL;
 	}
 
-	idsrc = (struct sadb_ident *)mhp[SADB_EXT_IDENTITY_SRC];
-	iddst = (struct sadb_ident *)mhp[SADB_EXT_IDENTITY_DST];
-	idsrclen = PFKEY_UNUNIT64(idsrc->sadb_ident_len);
-	iddstlen = PFKEY_UNUNIT64(idsrc->sadb_ident_len);
+	idsrc = (const struct sadb_ident *)mhp->ext[SADB_EXT_IDENTITY_SRC];
+	iddst = (const struct sadb_ident *)mhp->ext[SADB_EXT_IDENTITY_DST];
+	idsrclen = mhp->extlen[SADB_EXT_IDENTITY_SRC];
+	iddstlen = mhp->extlen[SADB_EXT_IDENTITY_DST];
 
 	/* validity check */
 	if (idsrc->sadb_ident_type != iddst->sadb_ident_type) {
 #ifdef IPSEC_DEBUG
 		printf("key_setident: ident type mismatch.\n");
 #endif
-		msg0->sadb_msg_errno = EINVAL;
-		return -1;
+		return EINVAL;
 	}
 
 	switch (idsrc->sadb_ident_type) {
 	case SADB_X_IDENTTYPE_ADDR:
-		if (idsrclen !=
-		    sizeof(*idsrc) + ((struct sockaddr *)(idsrc + 1))->sa_len
-		 || iddstlen !=
-		    sizeof(*iddst) + ((struct sockaddr *)(iddst + 1))->sa_len) {
-#ifdef IPSEC_DEBUG
-			printf("key_setident: invalid length is passed.\n");
-#endif
-			msg0->sadb_msg_errno = EINVAL;
-			return -1;
-		}
-		if (((struct sockaddr *)(idsrc + 1))->sa_len >
-				sizeof(struct sockaddr_storage)
-		 || ((struct sockaddr *)(iddst + 1))->sa_len >
-				sizeof(struct sockaddr_storage)) {
-#ifdef IPSEC_DEBUG
-			printf("key_setident: invalid sa_len is passed.\n");
-#endif
-			msg0->sadb_msg_errno = EINVAL;
-			return -1;
-		}
-#define __IDENTXID(a) ((union sadb_x_ident_id *)&(a)->sadb_ident_id)
-		if (__IDENTXID(idsrc)->sadb_x_ident_id_addr.ul_proto
-		 != __IDENTXID(iddst)->sadb_x_ident_id_addr.ul_proto) {
+#define IDENTXID(a) (((union sadb_x_ident_id *)(a))->sadb_x_ident_id_addr)
+		if (IDENTXID(idsrc).ul_proto != IDENTXID(iddst).ul_proto) {
 #ifdef IPSEC_DEBUG
 			printf("key_setident: ul_proto mismatch.\n");
 #endif
-			msg0->sadb_msg_errno = EINVAL;
-			return -1;
+			return EINVAL;
 		}
-#undef __IDENTXID(a)
+#undef IDENTXID(a)
 		break;
 	case SADB_IDENTTYPE_PREFIX:
 	case SADB_IDENTTYPE_FQDN:
@@ -4978,8 +4939,7 @@ key_setident(sah, mhp)
 #ifdef IPSEC_DEBUG
 		printf("key_setident: No more memory.\n");
 #endif
-		msg0->sadb_msg_errno = ENOBUFS;
-		return -1;
+		return ENOBUFS;
 	}
 	KMALLOC(sah->identd, struct sadb_ident *, iddstlen);
 	if (sah->identd == NULL) {
@@ -4987,8 +4947,7 @@ key_setident(sah, mhp)
 #ifdef IPSEC_DEBUG
 		printf("key_setident: No more memory.\n");
 #endif
-		msg0->sadb_msg_errno = ENOBUFS;
-		return -1;
+		return ENOBUFS;
 	}
 	bcopy(idsrc, sah->idents, idsrclen);
 	bcopy(iddst, sah->identd, iddstlen);
@@ -5040,9 +4999,7 @@ key_getmsgbuf_x1(m, mhp)
  *   <base, SA(*), address(SD)>
  * to the ikmpd.
  *
- * IN:	mhp: pointer to the pointer to each header.
- * OUT:	NULL if fail.
- *	other if success, return pointer to the message to send.
+ * m will always be freed.
  */
 static int
 key_delete(so, m, mhp)
@@ -5148,9 +5105,7 @@ key_delete(so, m, mhp)
  *       (identity(SD),) (sensitivity)>
  * to the ikmpd.
  *
- * IN:	mhp: pointer to the pointer to each header.
- * OUT:	NULL if fail.
- *	other if success, return pointer to the message to send.
+ * m will always be freed.
  */
 static int
 key_get(so, m, mhp)
@@ -6004,9 +5959,7 @@ key_expire(sav)
  * to the ikmpd.
  * NOTE: to do is only marking SADB_SASTATE_DEAD.
  *
- * IN:	mhp: pointer to the pointer to each header.
- * OUT:	NULL if fail.
- *	other if success, return pointer to the message to send.
+ * m will always be freed.
  */
 static int
 key_flush(so, m ,mhp)
@@ -6090,8 +6043,7 @@ key_flush(so, m ,mhp)
  *   <base> .....
  * to the ikmpd.
  *
- * IN:	mhp: pointer to the pointer to each header.
- * OUT:	error code.  0 on success.
+ * m will always be freed.
  */
 static int
 key_dump(so, m, mhp)
@@ -6177,6 +6129,8 @@ key_dump(so, m, mhp)
 
 /*
  * SADB_X_PROMISC processing
+ *
+ * m will always be freed.
  */
 static int
 key_promisc(so, m, mhp)
@@ -6695,15 +6649,9 @@ key_align(m, mhp)
 
 		extlen = PFKEY_UNUNIT64(ext->sadb_ext_len);
 
-		/* if it does not match minimum/maximum length, bail */
-		if (!minsize[ext->sadb_ext_type] || 
-		     extlen < minsize[ext->sadb_ext_type]) {
+		if (key_validate_ext(ext, extlen)) {
 			m_freem(m);
-			return EINVAL;
-		}
-		if (maxsize[ext->sadb_ext_type] &&
-		    extlen > maxsize[ext->sadb_ext_type]) {
-			m_freem(m);
+			pfkeystat.out_invlen++;
 			return EINVAL;
 		}
 
@@ -6714,30 +6662,6 @@ key_align(m, mhp)
 		}
 		ext = (struct sadb_ext *)(mtod(n, caddr_t) + toff);
 
-		/* more checks based on sadb_ext_type XXX need more */
-		switch (ext->sadb_ext_type) {
-		case SADB_EXT_ADDRESS_SRC:
-		case SADB_EXT_ADDRESS_DST:
-		case SADB_EXT_ADDRESS_PROXY:
-		    {
-			struct sockaddr *sa;
-			struct sadb_address *ext_addr;
-
-			ext_addr = (struct sadb_address *)ext;
-			sa = (struct sockaddr *)(ext_addr + 1);
-			if (extlen < sizeof(*ext_addr) + offsetof(struct sockaddr, sa_len) + sizeof(sa->sa_len) ||
-			    sizeof(*ext_addr) + PFKEY_ALIGN8(sa->sa_len) != extlen) {
-#ifdef IPSEC_DEBUG
-				printf("key_align: invalid sa_len.\n");
-#endif
-				m_freem(m);
-				pfkeystat.out_invlen++;
-				return EINVAL;
-			}
-			break;
-		    }
-		}
-
 		mhp->ext[ext->sadb_ext_type] = ext;
 		mhp->extoff[ext->sadb_ext_type] = off;
 		mhp->extlen[ext->sadb_ext_type] = extlen;
@@ -6747,6 +6671,61 @@ key_align(m, mhp)
 		m_freem(m);
 		pfkeystat.out_invlen++;
 		return EINVAL;
+	}
+
+	return 0;
+}
+
+static int
+key_validate_ext(ext, len)
+	const struct sadb_ext *ext;
+	int len;
+{
+	struct sockaddr *sa;
+	enum { NONE, ADDR } checktype = NONE;
+	int baselen;
+	const int sal = offsetof(struct sockaddr, sa_len) + sizeof(sa->sa_len);
+
+	if (len != PFKEY_UNUNIT64(ext->sadb_ext_len))
+		return EINVAL;
+
+	/* if it does not match minimum/maximum length, bail */
+	if (!minsize[ext->sadb_ext_type] || len < minsize[ext->sadb_ext_type])
+		return EINVAL;
+	if (maxsize[ext->sadb_ext_type] && len > maxsize[ext->sadb_ext_type])
+		return EINVAL;
+
+	/* more checks based on sadb_ext_type XXX need more */
+	switch (ext->sadb_ext_type) {
+	case SADB_EXT_ADDRESS_SRC:
+	case SADB_EXT_ADDRESS_DST:
+	case SADB_EXT_ADDRESS_PROXY:
+		baselen = sizeof(struct sadb_address);
+		checktype = ADDR;
+		break;
+	case SADB_EXT_IDENTITY_SRC:
+	case SADB_EXT_IDENTITY_DST:
+		if (((struct sadb_ident *)ext)->sadb_ident_type ==
+		    SADB_X_IDENTTYPE_ADDR) {
+			baselen = sizeof(struct sadb_ident);
+			checktype = ADDR;
+		} else
+			checktype = NONE;
+		break;
+	default:
+		checktype = NONE;
+		break;
+	}
+
+	switch (checktype) {
+	case NONE:
+		break;
+	case ADDR:
+		sa = (struct sockaddr *)((caddr_t)ext + baselen);
+		if (len < baselen + sal ||
+		    baselen + PFKEY_ALIGN8(sa->sa_len) != len)
+			return EINVAL;
+		break;
 	}
 
 	return 0;
@@ -7021,7 +7000,7 @@ key_alloc_mbuf(l)
 	int l;
 {
 	struct mbuf *m = NULL, *n;
-	int len;
+	int len, t;
 
 	len = l;
 	while (len > 0) {
@@ -7038,7 +7017,8 @@ key_alloc_mbuf(l)
 		n->m_len = M_TRAILINGSPACE(n);
 		/* use the bottom of mbuf, hoping we can prepend afterwards */
 		if (n->m_len > len) {
-			n->m_data += (n->m_len - len);
+			t = (n->m_len - len) & ~(sizeof(long) - 1);
+			n->m_data += t;
 			n->m_len = len;
 		}
 
