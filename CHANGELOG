@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2296 2003/01/05 17:13:59 jinmei Exp $
+$KAME: CHANGELOG,v 1.2297 2003/01/08 05:27:04 itojun Exp $
 
 <200301>
+Wed Jan  8 14:26:17 JST 2003  itojun@iijlab.net
+	* sys/netkey/keydb.h: in struct secashead, "struct route" is not
+	  sufficient if !NEW_STRUCT_ROUTE.  NetBSD PR 18751.
+
 2003-01-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: upgraded base specification of DHCPv6 and prefix
 	delegation using DHCPv6 according to the latest drafts.
