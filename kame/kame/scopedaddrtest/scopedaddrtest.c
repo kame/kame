@@ -48,7 +48,7 @@ rtest(name, nflag, Nflag, scopeid)
 	int nflag, Nflag, scopeid;
 {
 	static char buf[MAXHOSTNAMELEN];
-	int flag = NI_WITHSCOPEID;
+	int flag = 0;
 	struct sockaddr_in6 sa6;
 
 	memset(&sa6, 0, sizeof(sa6));

@@ -1,4 +1,4 @@
-/*	$KAME: prefix.c,v 1.10 2001/11/09 09:21:17 itojun Exp $	*/
+/*	$KAME: prefix.c,v 1.11 2001/11/13 12:38:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -54,11 +54,7 @@ static void config_show __P((void));
 #endif
 
 struct config *config_list = NULL;
-#ifdef NI_WITHSCOPEID
-const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
-#else
 const int niflags = NI_NUMERICHOST;
-#endif
 
 static int
 prefix_set(s, prefix, slash)

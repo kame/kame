@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.14 2001/09/26 02:27:32 itojun Exp $	*/
+/*	$KAME: main.c,v 1.15 2001/11/13 12:38:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -411,11 +411,7 @@ receive_initreq(s, from, fromlenp, ecode)
 	ssize_t l;
 	struct icmp6_prefix_delegation *p;
 	char hbuf[NI_MAXHOST];
-#ifdef NI_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
-#else
 	const int niflags = NI_NUMERICHOST;
-#endif
 	struct sockaddr_in6 sin6;
 	unsigned int plen;	/* delegated prefixlen */
 
@@ -532,11 +528,7 @@ cmpsockaddr(a, alen, b, blen)
 	int blen;
 {
 	char abuf[NI_MAXHOST], bbuf[NI_MAXHOST];
-#ifdef NI_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
-#else
 	const int niflags = NI_NUMERICHOST;
-#endif
 
 	if (getnameinfo(a, alen, abuf, sizeof(abuf), NULL, 0, niflags))
 		return 0;

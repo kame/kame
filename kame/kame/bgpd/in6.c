@@ -280,7 +280,7 @@ ip6str2(sa6)
 	cp = ip6buf[ip6round];
 
 	getnameinfo((struct sockaddr *)sa6, sa6->sin6_len, cp, MAXHOSTNAMELEN,
-		    NULL, 0, NI_NUMERICHOST|NI_WITHSCOPEID);
+		    NULL, 0, NI_NUMERICHOST);
 
 	return(cp);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: mconnect.c,v 1.5 2001/01/12 18:49:33 itojun Exp $ */
+/*	$KAME: mconnect.c,v 1.6 2001/11/13 12:38:46 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -279,9 +279,6 @@ mc_dprint(ai, str, error)
 	char hostbuf[NI_MAXHOST];
 
 	ni_flags |= NI_NUMERICHOST;
-#ifdef NI_WITHSCOPEID
-	ni_flags |= NI_WITHSCOPEID;
-#endif
 	if (ai != NULL &&
 	    getnameinfo(ai->ai_addr, ai->ai_addrlen, hostbuf, sizeof(hostbuf),
 			NULL, 0, ni_flags)) {

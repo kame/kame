@@ -1,4 +1,4 @@
-/*	$KAME: libtest.c,v 1.10 2001/05/08 04:36:29 itojun Exp $	*/
+/*	$KAME: libtest.c,v 1.11 2001/11/13 12:38:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -170,11 +170,7 @@ test_getnameinfo0(sa, hans, pans)
 	int i, j, k, l;
 	int fail;
 	int ntest;
-#ifdef NI_WITHSCOPEID
-	const int niflag = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
-#else
 	const int niflag = NI_NUMERICHOST | NI_NUMERICSERV;
-#endif
 
 	printf("%s: start addr %s port %s\n", FUNCNAME, hans, pans);
 

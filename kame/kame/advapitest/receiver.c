@@ -92,9 +92,6 @@ pr_addr(addr, numeric)
 
 	if (numeric)
 		flag |= NI_NUMERICHOST;
-#ifdef KAME_SCOPEID
-	flag |= NI_WITHSCOPEID;
-#endif
 
 #ifdef SIN6_LEN
 	getnameinfo(addr, addr->sa_len, buf, sizeof(buf), NULL, 0, flag);

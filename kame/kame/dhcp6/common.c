@@ -405,8 +405,7 @@ addr2str(sa)
 	round = (round + 1) & 7;
 	cp = addrbuf[round];
 
-	getnameinfo(sa, sa->sa_len, cp, NI_MAXHOST, NULL, 0,
-		    NI_NUMERICHOST|NI_WITHSCOPEID);
+	getnameinfo(sa, sa->sa_len, cp, NI_MAXHOST, NULL, 0, NI_NUMERICHOST);
 
 	return(cp);
 }

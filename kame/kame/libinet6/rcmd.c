@@ -1,4 +1,4 @@
-/*	$KAME: rcmd.c,v 1.16 2001/08/20 02:32:40 itojun Exp $	*/
+/*	$KAME: rcmd.c,v 1.17 2001/11/13 12:38:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -133,11 +133,7 @@ rcmd_af(ahost, rport, locuser, remuser, cmd, fd2p, af)
 	int refused;
 	char num[8];
 	static char canonnamebuf[MAXDNAME];	/* is it proper here? */
-#ifdef NI_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
-#else
 	const int niflags = NI_NUMERICHOST;
-#endif
 
 	pid = getpid();
 
@@ -755,11 +751,7 @@ __icheckhost_sa(raddr, rlen, lhost)
 	struct addrinfo hints, *res0, *res;
 	int error;
 	char h1[NI_MAXHOST], h2[NI_MAXHOST];
-#ifdef NI_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
-#else
 	const int niflags = NI_NUMERICHOST;
-#endif
 
 	if (getnameinfo(raddr, rlen, h1, sizeof(h1), NULL, 0, niflags) != 0)
 		return (0);

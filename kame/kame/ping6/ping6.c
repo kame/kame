@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.144 2001/11/10 08:06:06 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.145 2001/11/13 12:38:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2463,13 +2463,8 @@ pr_addr(addr, addrlen)
 	int addrlen;
 {
 	static char buf[NI_MAXHOST];
-	int flag;
+	int flag = 0;
 
-#ifdef NI_WITHSCOPEID
-	flag = NI_WITHSCOPEID;
-#else
-	flag = 0;
-#endif
 	if ((options & F_HOSTNAME) == 0)
 		flag |= NI_NUMERICHOST;
 

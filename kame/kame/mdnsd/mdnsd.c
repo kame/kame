@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.45 2001/08/22 03:07:09 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.46 2001/11/13 12:38:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -71,11 +71,7 @@ int lflag = 0;
 struct timeval hz = { 1, 0 };	/* timeout every 1 second */
 static int mflag = 0;
 int Nflag = 0;
-#ifdef NI_WITHSCOPEID
-const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
-#else
 const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
-#endif
 int signo = 0;
 int dormantcount = 5;
 int dormanttime = 5;
@@ -634,11 +630,7 @@ ismyaddr(sa, salen)
 	int ret;
 	char h1[NI_MAXHOST], h2[NI_MAXHOST];
 	char p[NI_MAXSERV];
-#ifdef NI_WITHSCOPEID
-	const int niflag = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
-#else
 	const int niflag = NI_NUMERICHOST | NI_NUMERICSERV;
-#endif
 
 	if (salen > sizeof(ss[0]))
 		return 0;

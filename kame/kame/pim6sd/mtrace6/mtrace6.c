@@ -1,4 +1,4 @@
-/*	$KAME: mtrace6.c,v 1.17 2001/01/12 18:52:11 itojun Exp $	*/
+/*	$KAME: mtrace6.c,v 1.18 2001/11/13 12:38:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -191,7 +191,6 @@ pr_addr(addr, numeric)
 
 	if (numeric)
 		flag |= NI_NUMERICHOST;
-	flag |= NI_WITHSCOPEID;
 
 	getnameinfo(addr, addr->sa_len, buf, sizeof(buf), NULL, 0, flag);
 

@@ -1,4 +1,4 @@
-/*	$KAME: gifconfig.c,v 1.18 2001/08/01 09:53:50 itojun Exp $	*/
+/*	$KAME: gifconfig.c,v 1.19 2001/11/13 12:38:45 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -701,9 +701,6 @@ in6_status(force)
 	int niflags = NI_NUMERICHOST;
 
 	memset(&null_sin, 0, sizeof(null_sin));
-#ifdef NI_WITHSCOPEID
-	niflags |= NI_WITHSCOPEID;
-#endif
 
 	sin = (struct sockaddr_in6 *)info.rti_info[RTAX_IFA];
 	if (!sin || sin->sin6_family != AF_INET6) {

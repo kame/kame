@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.81 2001/11/08 09:43:46 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.82 2001/11/13 12:38:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -116,10 +116,6 @@
 #include <unistd.h>
 #include <err.h>
 #include "gmt2local.h"
-
-#ifndef NI_WITHSCOPEID
-#define NI_WITHSCOPEID	0
-#endif
 
 /* packing rule for routing socket */
 #define ROUNDUP(a) \
@@ -470,7 +466,7 @@ get(host)
 	if (found_entry == 0) {
 		getnameinfo((struct sockaddr *)sin, sin->sin6_len, host_buf,
 			    sizeof(host_buf), NULL ,0,
-			    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
+			    (nflag ? NI_NUMERICHOST : 0));
 		printf("%s (%s) -- no entry\n", host, host_buf);
 		exit(1);
 	}
@@ -543,7 +539,7 @@ delete:
 		getnameinfo((struct sockaddr *)&s6,
 			    s6.sin6_len, host_buf,
 			    sizeof(host_buf), NULL, 0,
-			    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
+			    (nflag ? NI_NUMERICHOST : 0));
 		printf("%s (%s) deleted\n", host, host_buf);
 	}
 
@@ -644,7 +640,7 @@ again:;
 		}
 		getnameinfo((struct sockaddr *)sin, sin->sin6_len, host_buf,
 			    sizeof(host_buf), NULL, 0,
-			    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
+			    (nflag ? NI_NUMERICHOST : 0));
 		if (cflag == 1) {
 #ifdef RTF_WASCLONED
 			if (rtm->rtm_flags & RTF_WASCLONED)
@@ -1055,7 +1051,7 @@ rtrlist()
 
 		if (getnameinfo((struct sockaddr *)&p->rtaddr,
 		    p->rtaddr.sin6_len, host_buf, sizeof(host_buf), NULL, 0,
-		    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0)) != 0)
+		    (nflag ? NI_NUMERICHOST : 0)) != 0)
 			strlcpy(host_buf, "?", sizeof(host_buf));
 		
 		printf("%s if=%s", host_buf,
@@ -1099,7 +1095,7 @@ rtrlist()
 		sin6.sin6_addr = DR.rtaddr;
 		getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len, host_buf,
 			    sizeof(host_buf), NULL, 0,
-			    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
+			    (nflag ? NI_NUMERICHOST : 0));
 		
 		printf("%s if=%s", host_buf,
 		       if_indextoname(DR.if_index, ifix_buf));
@@ -1128,13 +1124,8 @@ plist()
 	struct sockaddr_in6 *advrtr;
 	size_t l;
 	struct timeval time;
-#ifdef NI_WITHSCOPEID
-	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
-	int ninflags = (nflag ? NI_NUMERICHOST : 0) | NI_WITHSCOPEID;
-#else
 	const int niflags = NI_NUMERICHOST;
 	int ninflags = nflag ? NI_NUMERICHOST : 0;
-#endif
 	char namebuf[NI_MAXHOST];
 
 	if (sysctl(mib, sizeof(mib) / sizeof(mib[0]), NULL, &l, NULL, 0) < 0) {
@@ -1284,9 +1275,6 @@ plist()
 		}
 
 		niflags = NI_NUMERICHOST;
-#ifdef __KAME__
-		niflags |= NI_WITHSCOPEID;
-#endif
 		if (getnameinfo((struct sockaddr *)&p6,
 				sizeof(p6), namebuf, sizeof(namebuf),
 				NULL, 0, niflags)) {
@@ -1382,7 +1370,7 @@ plist()
 				getnameinfo((struct sockaddr *)&sin6,
 					    sin6.sin6_len, host_buf,
 					    sizeof(host_buf), NULL, 0,
-					    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
+					    (nflag ? NI_NUMERICHOST : 0));
 				printf("    %s", host_buf);
 
 				nbi = getnbrinfo(&sin6.sin6_addr, PR.if_index,

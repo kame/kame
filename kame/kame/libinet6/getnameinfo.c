@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.56 2001/08/19 05:50:21 itojun Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.57 2001/11/13 12:38:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -39,8 +39,8 @@
  * - NI_NAMEREQD and NI_NUMERICHOST conflict with each other.
  * - (KAME extension) always attach textual scopeid (fe80::1%lo0), if
  *   sin6_scope_id is filled - standardization status?
- *   XXX breaks backward compat for code that expects no scopeid on
- *   !NI_WITHSCOPEID.  beware on merge.
+ *   XXX breaks backward compat for code that expects no scopeid.
+ *   beware on merge.
  */
 
 #ifdef HAVE_CONFIG_H

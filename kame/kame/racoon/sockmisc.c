@@ -1,4 +1,4 @@
-/*	$KAME: sockmisc.c,v 1.31 2001/10/16 14:55:57 sakane Exp $	*/
+/*	$KAME: sockmisc.c,v 1.32 2001/11/13 12:38:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -58,11 +58,7 @@
 #include "debug.h"
 #include "gcmalloc.h"
 
-#ifdef NI_WITHSCOPEID
-const int niflags = NI_WITHSCOPEID;
-#else
 const int niflags = 0;
-#endif
 
 /*
  * compare two sockaddr without port number.

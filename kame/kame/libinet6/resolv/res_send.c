@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_send.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_send.c,v 1.19 2001/09/18 12:31:20 jinmei Exp $";
+static char rcsid[] = "$Id: res_send.c,v 1.20 2001/11/13 12:38:47 jinmei Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 	/* change this to "0"
@@ -141,7 +141,7 @@ static void Perror __P((FILE *, char *, int));
 	if (_res.options & RES_DEBUG) {
 		if (getnameinfo(address, address->sa_len, abuf, sizeof(abuf),
 		    pbuf, sizeof(pbuf),
-		    NI_NUMERICHOST|NI_NUMERICSERV|NI_WITHSCOPEID) != 0) {
+		    NI_NUMERICHOST|NI_NUMERICSERV) != 0) {
 			strncpy(abuf, "?", sizeof(abuf));
 			strncpy(pbuf, "?", sizeof(pbuf));
 		}
@@ -446,7 +446,7 @@ res_send(buf, buflen, ans, anssiz)
 
 		Dprint((_res.options & RES_DEBUG) &&
 		       getnameinfo(nsap, salen, abuf, sizeof(abuf),
-			   NULL, 0, NI_NUMERICHOST | NI_WITHSCOPEID) == 0,
+			   NULL, 0, NI_NUMERICHOST) == 0,
 		       (stdout, ";; Querying server (# %d) address = %s\n",
 			ns + 1, abuf));
 

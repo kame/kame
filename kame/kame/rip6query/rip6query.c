@@ -1,4 +1,4 @@
-/*	$KAME: rip6query.c,v 1.12 2001/11/09 05:57:14 itojun Exp $	*/
+/*	$KAME: rip6query.c,v 1.13 2001/11/13 12:38:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,9 +55,6 @@
 #include "route6d.h"
 
 /* wrapper for KAME-special getnameinfo() */
-#ifndef NI_WITHSCOPEID
-#define NI_WITHSCOPEID	0
-#endif
 
 int	s;
 struct sockaddr_in6 sin6;
@@ -190,7 +187,7 @@ sa_n2a(sa)
 	static char buf[NI_MAXHOST];
 
 	if (getnameinfo(sa, sa->sa_len, buf, sizeof(buf),
-			NULL, 0, NI_NUMERICHOST | NI_WITHSCOPEID) != 0) {
+			NULL, 0, NI_NUMERICHOST) != 0) {
 		snprintf(buf, sizeof(buf), "%s", "(invalid)");
 	}
 	return buf;

@@ -1,4 +1,4 @@
-/*	$KAME: pfkey_dump.c,v 1.34 2001/10/02 02:14:42 sakane Exp $	*/
+/*	$KAME: pfkey_dump.c,v 1.35 2001/11/13 12:38:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -478,11 +478,7 @@ str_ipaddr(sa)
 	struct sockaddr *sa;
 {
 	static char buf[NI_MAXHOST];
-#ifdef NI_WITHSCOPEID
-	const int niflag = NI_NUMERICHOST | NI_WITHSCOPEID;
-#else
 	const int niflag = NI_NUMERICHOST;
-#endif
 
 	if (sa == NULL)
 		return "";

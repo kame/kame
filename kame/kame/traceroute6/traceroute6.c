@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.43 2001/08/20 07:15:11 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.44 2001/11/13 12:38:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -359,12 +359,6 @@ int verbose;
 int waittime = 5;		/* time to wait for response (in seconds) */
 int nflag;			/* print addresses numerically */
 int lflag;			/* print both numerical address & hostname */
-
-#ifdef KAME_SCOPEID
-const int niflag = NI_WITHSCOPEID;
-#else
-const int niflag = 0;
-#endif
 
 int
 main(argc, argv)
@@ -786,7 +780,7 @@ main(argc, argv)
 		}
 		if (getnameinfo((struct sockaddr *)&Src, Src.sin6_len,
 				src0, sizeof(src0), NULL, 0,
-				NI_NUMERICHOST | niflag)) {
+				NI_NUMERICHOST)) {
 			Fprintf(stderr, "getnameinfo failed for source\n");
 			exit(1);
 		}
@@ -820,7 +814,7 @@ main(argc, argv)
 	 * Message to users
 	 */
 	if (getnameinfo((struct sockaddr *)&Dst, Dst.sin6_len, hbuf,
-			sizeof(hbuf), NULL, 0, NI_NUMERICHOST | niflag))
+			sizeof(hbuf), NULL, 0, NI_NUMERICHOST))
 		strlcpy(hbuf, "(invalid)", sizeof(hbuf));
 	Fprintf(stderr, "traceroute6");
 	Fprintf(stderr, " to %s (%s)", hostname, hbuf);
@@ -1107,7 +1101,7 @@ packet_ok(mhdr, cc, seq)
 		if (verbose) {
 			if (getnameinfo((struct sockaddr *)from, from->sin6_len,
 			    hbuf, sizeof(hbuf), NULL, 0,
-			    NI_NUMERICHOST | niflag) != 0)
+			    NI_NUMERICHOST) != 0)
 				strlcpy(hbuf, "invalid", sizeof(hbuf));
 			Printf("packet too short (%d bytes) from %s\n", cc,
 			    hbuf);
@@ -1121,7 +1115,7 @@ packet_ok(mhdr, cc, seq)
 		if (verbose) {
 			if (getnameinfo((struct sockaddr *)from, from->sin6_len,
 			    hbuf, sizeof(hbuf), NULL, 0,
-			    NI_NUMERICHOST | niflag) != 0)
+			    NI_NUMERICHOST) != 0)
 				strlcpy(hbuf, "invalid", sizeof(hbuf));
 			Printf("data too short (%d bytes) from %s\n", cc, hbuf);
 		}
@@ -1179,7 +1173,7 @@ packet_ok(mhdr, cc, seq)
 		char sbuf[NI_MAXHOST+1], dbuf[INET6_ADDRSTRLEN];
 
 		if (getnameinfo((struct sockaddr *)from, from->sin6_len,
-		    sbuf, sizeof(sbuf), NULL, 0, NI_NUMERICHOST | niflag) != 0)
+		    sbuf, sizeof(sbuf), NULL, 0, NI_NUMERICHOST) != 0)
 			strlcpy(sbuf, "invalid", sizeof(hbuf));
 		Printf("\n%d bytes from %s to %s", cc, sbuf,
 		    rcvpktinfo ? inet_ntop(AF_INET6, &rcvpktinfo->ipi6_addr,
@@ -1258,7 +1252,7 @@ print(mhdr, cc)
 	char hbuf[NI_MAXHOST];
 
 	if (getnameinfo((struct sockaddr *)from, from->sin6_len,
-	    hbuf, sizeof(hbuf), NULL, 0, NI_NUMERICHOST | niflag) != 0)
+	    hbuf, sizeof(hbuf), NULL, 0, NI_NUMERICHOST) != 0)
 		strlcpy(hbuf, "invalid", sizeof(hbuf));
 	if (nflag)
 		Printf(" %s", hbuf);
@@ -1334,7 +1328,7 @@ inetname(sa)
 		return cp;
 
 	if (getnameinfo(sa, sa->sa_len, line, sizeof(line), NULL, 0,
-	    NI_NUMERICHOST | niflag) != 0)
+	    NI_NUMERICHOST) != 0)
 		strlcpy(line, "invalid", sizeof(line));
 	return line;
 }

@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.9 2001/09/18 10:49:56 jinmei Exp $ */
+/*	$KAME: common.c,v 1.10 2001/11/13 12:38:44 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -53,9 +53,6 @@ ip6str(sa6)
 	char *cp;
 	static char invalid[] = "(invalid)";
 	int flags = NI_NUMERICHOST;
-#ifdef NI_WITHSCOPEID
-	flags |= NI_WITHSCOPEID;
-#endif
 
 	ip6round = (ip6round + 1) & 7;
 	cp = ip6buf[ip6round];
