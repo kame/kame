@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.2 1999/08/12 05:42:05 itojun Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.3 1999/08/16 16:27:24 itojun Exp $ */
 
 #include <sys/types.h>
 #include <stdlib.h>
@@ -49,7 +49,9 @@
 #include <idea.h>
 #endif
 #include <blowfish.h>
+#ifdef HAVE_RC5_H
 #include <rc5.h>
+#endif
 #include <cast.h>
 
 /*
@@ -213,6 +215,7 @@ eay_bf_weakkey(key)
 	return 0;	/* XXX to be done. refer to RFC 2451 */
 }
 
+#ifdef HAVE_RC5_H
 /*
  * RC5-CBC
  */
@@ -267,6 +270,7 @@ eay_rc5_weakkey(key)
 	return 0;	/* No known weak keys when used with 16 rounds. */
 
 }
+#endif
 
 /*
  * 3DES-CBC

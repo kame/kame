@@ -1137,7 +1137,7 @@ for dir in $crypto_dir /usr/local/v6 /usr/local/ssl /usr/local /usr/pkg; do
 	fi
 	if test "$ssleay_lib" != "no" -a "$ssleay_include" != "no"; then
 		LIBS="-L$ssleay_lib $LIBS"
-		CFLAGS="$ssleay_include $CFLAGS"
+		CPPFLAGS="$ssleay_include $CPPFLAGS"
 		break;
 	fi
 done
@@ -1484,7 +1484,7 @@ if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
   egrep "yes" >/dev/null 2>&1; then
   rm -rf conftest*
   ipv6type=$i;
-				CFLAGS="-DINET6 $CFLAGS"
+				CPPFLAGS="-DINET6 $CPPFLAGS"
 fi
 rm -f conftest*
 
@@ -1507,7 +1507,7 @@ if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
 				ipseclib=ipsec;
 				ipv6libdir=/usr/local/v6/lib;
 				ipv6trylibc=yes
-				CFLAGS="-DINET6 $CFLAGS"
+				CPPFLAGS="-DINET6 $CPPFLAGS"
 fi
 rm -f conftest*
 
@@ -1518,7 +1518,7 @@ rm -f conftest*
 				ipv6lib=inet6
 				ipseclib=ipsec
 				ipv6libdir=/usr/inet6/lib
-				CFLAGS="-DINET6 -I/usr/inet6/include $CFLAGS"
+				CPPFLAGS="-DINET6 -I/usr/inet6/include $CPPFLAGS"
 			fi
 			;;
 		toshiba)
@@ -1538,7 +1538,7 @@ if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
 				ipv6lib=inet6;
 				ipseclib=ipsec;
 				ipv6libdir=/usr/local/v6/lib;
-				CFLAGS="-DINET6 $CFLAGS"
+				CPPFLAGS="-DINET6 $CPPFLAGS"
 fi
 rm -f conftest*
 
@@ -1560,7 +1560,7 @@ if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
 				ipv6lib=v6;
 				ipseclib=ipsec;
 				ipv6libdir=/usr/local/v6/lib;
-				CFLAGS="-I/usr/local/v6/include $CFLAGS"
+				CPPFLAGS="-I/usr/local/v6/include $CPPFLAGS"
 fi
 rm -f conftest*
 
@@ -1582,7 +1582,7 @@ if (eval "$ac_cpp conftest.$ac_ext") 2>&5 |
 				ipv6lib=inet6;
 				ipseclib=ipsec;
 				ipv6libdir=/usr/local/v6/lib;
-				CFLAGS="-DINET6 $CFLAGS"
+				CPPFLAGS="-DINET6 $CPPFLAGS"
 fi
 rm -f conftest*
 
@@ -1768,7 +1768,7 @@ if test "$buggygetaddrinfo" = "yes"; then
 		echo '       or you can specify "--disable-ipv6"'.
 		exit 1
 	else
-		CFLAGS="$CFLAGS -I./missing"
+		CPPFLAGS="$CPPFLAGS -I./missing"
 	fi
 fi
 for ac_func in getaddrinfo getnameinfo
@@ -1975,7 +1975,7 @@ EOF
 
 fi
 
-for ac_hdr in limits.h sys/time.h unistd.h stdarg.h varargs.h idea.h
+for ac_hdr in limits.h sys/time.h unistd.h stdarg.h varargs.h idea.h rc5.h
 do
 ac_safe=`echo "$ac_hdr" | sed 'y%./+-%__p_%'`
 echo $ac_n "checking for $ac_hdr""... $ac_c" 1>&6

@@ -71,7 +71,7 @@ for dir in $crypto_dir /usr/local/v6 /usr/local/ssl /usr/local /usr/pkg; do
 	fi
 	if test "$ssleay_lib" != "no" -a "$ssleay_include" != "no"; then
 		LIBS="-L$ssleay_lib $LIBS"
-		CFLAGS="$ssleay_include $CFLAGS"
+		CPPFLAGS="$ssleay_include $CPPFLAGS"
 		break;
 	fi
 done
@@ -181,7 +181,7 @@ if test "$ipv6" = "yes"; then
 yes
 #endif],
 				[ipv6type=$i;
-				CFLAGS="-DINET6 $CFLAGS"])
+				CPPFLAGS="-DINET6 $CPPFLAGS"])
 			;;
 		kame)
 			dnl http://www.kame.net/
@@ -195,7 +195,7 @@ yes
 				ipseclib=ipsec;
 				ipv6libdir=/usr/local/v6/lib;
 				ipv6trylibc=yes
-				CFLAGS="-DINET6 $CFLAGS"])
+				CPPFLAGS="-DINET6 $CPPFLAGS"])
 			;;
 		linux)
 			dnl http://www.v6.linux.or.jp/
@@ -204,7 +204,7 @@ yes
 				ipv6lib=inet6
 				ipseclib=ipsec
 				ipv6libdir=/usr/inet6/lib
-				CFLAGS="-DINET6 -I/usr/inet6/include $CFLAGS"
+				CPPFLAGS="-DINET6 -I/usr/inet6/include $CPPFLAGS"
 			fi
 			;;
 		toshiba)
@@ -217,7 +217,7 @@ yes
 				ipv6lib=inet6;
 				ipseclib=ipsec;
 				ipv6libdir=/usr/local/v6/lib;
-				CFLAGS="-DINET6 $CFLAGS"])
+				CPPFLAGS="-DINET6 $CPPFLAGS"])
 			;;
 		v6d)
 			AC_EGREP_CPP(yes, [dnl
@@ -229,7 +229,7 @@ yes
 				ipv6lib=v6;
 				ipseclib=ipsec;
 				ipv6libdir=/usr/local/v6/lib;
-				CFLAGS="-I/usr/local/v6/include $CFLAGS"])
+				CPPFLAGS="-I/usr/local/v6/include $CPPFLAGS"])
 			;;
 		zeta)
 			AC_EGREP_CPP(yes, [dnl
@@ -241,7 +241,7 @@ yes
 				ipv6lib=inet6;
 				ipseclib=ipsec;
 				ipv6libdir=/usr/local/v6/lib;
-				CFLAGS="-DINET6 $CFLAGS"])
+				CPPFLAGS="-DINET6 $CPPFLAGS"])
 			;;
 		esac
 		if test "$ipv6type" != "unknown"; then
@@ -384,7 +384,7 @@ if test "$buggygetaddrinfo" = "yes"; then
 		echo '       or you can specify "--disable-ipv6"'.
 		exit 1
 	else
-		CFLAGS="$CFLAGS -I./missing"
+		CPPFLAGS="$CPPFLAGS -I./missing"
 	fi
 fi
 AC_REPLACE_FUNCS(getaddrinfo getnameinfo)
@@ -392,7 +392,7 @@ AC_REPLACE_FUNCS(getaddrinfo getnameinfo)
 dnl Checks for header files.
 AC_HEADER_STDC
 AC_HEADER_SYS_WAIT
-AC_CHECK_HEADERS(limits.h sys/time.h unistd.h stdarg.h varargs.h idea.h)
+AC_CHECK_HEADERS(limits.h sys/time.h unistd.h stdarg.h varargs.h idea.h rc5.h)
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST

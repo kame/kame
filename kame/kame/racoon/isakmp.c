@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.2 1999/08/12 05:42:06 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.3 1999/08/16 16:27:24 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -206,9 +206,15 @@ struct cipher_algorithm cipher[] = {
 { "des",	eay_des_encrypt,	eay_des_decrypt,	eay_des_weakkey, },
 #ifdef HAVE_IDEA_H
 { "idea",	eay_idea_encrypt,	eay_idea_decrypt,	eay_idea_weakkey, },
+#else
+{ "*dummy*",	NULL,			NULL,			NULL, },
 #endif
 { "blowfish",	eay_bf_encrypt,		eay_bf_decrypt,		eay_bf_weakkey, },
+#ifdef HAVE_RC5_H
 { "rc5",	eay_rc5_encrypt,	eay_rc5_decrypt,	eay_rc5_weakkey, },
+#else
+{ "*dummy*",	NULL,			NULL,			NULL, },
+#endif
 { "3des",	eay_3des_encrypt,	eay_3des_decrypt,	eay_3des_weakkey, },
 { "cast",	eay_cast_decrypt,	eay_cast_decrypt,	eay_cast_weakkey, },
 };
