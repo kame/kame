@@ -130,7 +130,7 @@ main(argc, argv)
 				/* NOTREACHED */
 			}
 			if ((dle = malloc(sizeof *dle)) == NULL) {
-				errx(1, "malloca failed for a DNS server");
+				errx(1, "malloc failed for a DNS server");
 				/* NOTREACHED */
 			}
 			dle->addr = a;
