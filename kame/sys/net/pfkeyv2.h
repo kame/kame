@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.40 2004/12/02 08:39:17 itojun Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.41 2005/01/14 04:10:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -346,8 +346,8 @@ struct sadb_x_tag {
 #define SADB_X_EALG_BLOWFISHCBC	7
 #define SADB_X_EALG_RIJNDAELCBC	12
 #define SADB_X_EALG_AES		12
+#define SADB_X_EALG_AESCTR	13
 /* private allocations should use 249-255 (RFC2407) */
-#define SADB_X_EALG_AESCTR	249	/* draft-ietf-ipsec-ciph-aes-ctr-03 */
 #define SADB_X_EALG_TWOFISHCBC	253	/* draft-ietf-ipsec-ciph-aes-cbc-00 */
 
 /* private allocations - based on RFC2407/IANA assignment */
