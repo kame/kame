@@ -1,9 +1,24 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2346 2003/02/13 09:39:08 suz Exp $
+$KAME: CHANGELOG,v 1.2347 2003/02/14 12:24:38 t-momose Exp $
 
 <200302>
+2003-02-14  MOMOSE Tsuyoshi  <t-momose@netlab.nec.co.jp>
+	*  kame/kame/sys/netinet6/{mobility6.c,mip6_pktproc.c},
+	   kame/kame/sys/netinet/ip6.h
+	- Changed some codes to be MIP6 ID-20 compliant.
+	 + Binding Auth. Option no longer require alignments
+	 + Changed Binding Refresh Advice option type
+	 + Send Parameter Problem if received mobility header is too small
+	   or it's next header value is not no next header.
+
 Thu Feb 13 18:37:58 JST 2003	suz@crl.hitachi.co.jp
 	* kame/kame/ifmcstat: ifmcstat works on freebsd5 now
+
+2003-02-12  MOMOSE Tsuyoshi  <t-momose@netlab.nec.co.jp>
+	* kame/sys/netinet6/{mip6.c,mip6_pktproc.c,mip6_var.h}: Only Home
+	nonce is used for calculation Kbm when a binding update message
+	tells to delete a binding cache.(HoA==CoA || lifetime==0)
+	One of Known bugs in TODO.mobile-ip6 is fixed.
 
 Wed Feb 12 19:09:04 JST 2003	suz@crl.hitachi.co.jp
 	* kame/kame/pim6sd: fixed a pim6sd crash by SIGHUP
