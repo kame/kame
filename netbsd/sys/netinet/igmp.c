@@ -853,10 +853,11 @@ igmp_fasttimo()
 #endif
 
 #ifndef IGMPV3
-	if (!igmp_timers_are_running) {
+	if (!igmp_timers_are_running)
 #else
-	if (!igmp_timers_are_running && !state_change_timers_are_running) {
+	if (!igmp_timers_are_running && !state_change_timers_are_running)
 #endif
+	{
 		splx(s);
 		return;
 	}
