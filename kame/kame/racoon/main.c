@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: main.c,v 1.10 2000/08/31 10:21:22 sakane Exp $ */
+/* YIPS @(#)$Id: main.c,v 1.11 2000/08/31 15:10:16 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -75,12 +75,11 @@ static void parse __P((int, char **));
 void
 Usage()
 {
-	printf("Usage: %s [-hv] [-p (port)] [-a (port)] "
+	printf("Usage: %s [-v] [-p (port)] [-a (port)] "
 #ifdef INET6
 		"[-4|-6] "
 #endif
 		"[-f (file)] [-d (level)] [-l (file)]\n", pname);
-	printf("   -h: shows these helps.\n");
 	printf("   -v: be more verbose\n");
 	printf("   -p: The daemon always use a port %d of UDP to send\n",
 		PORT_ISAKMP);
@@ -186,7 +185,7 @@ parse(ac, av)
 
 	pname = *av;
 
-	while ((c = getopt(ac, av, "hd:Fp:a:f:l:vZ"
+	while ((c = getopt(ac, av, "d:Fp:a:f:l:vZ"
 #ifdef YYDEBUG
 			"y"
 #endif
