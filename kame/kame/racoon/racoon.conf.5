@@ -148,12 +148,17 @@ specifys default various timer.
 .Bl -tag -width Ds -compact
 .It Ic counter Ar number ;
 maximun trying count to send.
+Default count is 5.
 .It Ic interval Ar number Ar timeunit ;
-maximun interval to resend.
+interval to resend.  This unit is second.
+Default timer is 20 second.
 .It Ic persend Ar number ;
 the number of packets per a send.
+Default is 1 time.
 .It Ic phase1 Ar number Ar timeunit ;
+Default timer is 15 seconds.
 .It Ic phase2 Ar number Ar timeunit ;
+Default timer is 10 seconds.
 timer for waiting to complete each phase.
 .El
 .El
@@ -173,9 +178,11 @@ The followings are the list of statements.
 If this(these) is specifyed,
 .Xr racoon 8
 will only listen to its address.
+Default port is 500 as IANA defines.
 .It Ic admin Ic [ Ar port ] ;
 specify the port for connecting to
 .Xr kmpstat 8 .
+Default port is 61225.
 .It Ic strict_address ;
 require all addresses for ISAKMP must be bound.
 It will be ignored when you don't specify any addresses.
@@ -190,6 +197,7 @@ It will be ignored when you don't specify any addresses.
 .Ic { Ar statements Ic }
 .Xc
 definies the parameters of IKE phase 1 per remote node.
+Default port is 500.
 The followings are the list of statements.
 .Pp
 .Bl -tag -width Ds -compact
@@ -199,10 +207,9 @@ defined exchange mode of phase 1.
 .\"
 .It Ic doi Ar ipsec_doi ;
 means to use IPSEC-DOI specifyed RFC 2407.
-It must be stated.
 .\"
 .It Ic situation Ic identity_only ;
-It must be stated.
+means to use SIT_IDENTITY_ONLY specifyed RFC 2407.
 .\"
 .It Ic identifier Ar idtype ;
 specifies ID type to use phase 1 negotiation.
@@ -229,11 +236,10 @@ means a file name of secret key.
 .It Ic lifetime byte Ar number Ar byteunit ;
 define default lifetime of phase 1 SA.
 .\"
-.It Ic keepalive
-Not yet.
-.\"
 .It Ic initial_contact (on \(ba off) ;
 enable to send INITIAL-CONTACT message.
+default value is
+.Ic on .
 .\"
 .It Ic proposal_check Ar level ;
 specifies the action of lifetime length and PFS selection on the responder side.
@@ -262,11 +268,13 @@ case of lifetime.  About PFS, this directive is same as
 .It Ic support_mip6 (on \(ba off) ;
 If this value is set on then both values of ID payloads in phase 2 exchange
 are always used as the addresses of end-point of IPsec-SAs.
+Default is off.
 .\"
 .It Ic nonce_size Ar number ;
 define the byte size of nonce value.
 Racoon can send any value although
 RFC2409 specifys that the value MUST be between 8 and 256 bytes.
+Default size is 16 bytes.
 .\"
 .It Xo
 .Ic proposal { Ar sub-substatements Ic }
@@ -386,14 +394,21 @@ The followings are the list of statements.
 .Bl -tag -width Ds -compact
 .It Ic randomize (on \(ba off) ;
 enable to randomize a value in padding.
+Default is on.
 .It Ic randomize_length (on \(ba off) ;
 enable to randomize length of padding.
+Default is off.
 .It Ic maximum_length Ar number ;
 define a maximum length of padding.
+If
+.Ic randomize_length is off, it is ignored.
+Default is 20 bytes.
 .It Ic exclusive_tail (on \(ba off) ;
 means to set the number of pad bytes minus one into last part of the padding.
+Default is off.
 .It Ic strict_check (on \(ba off) ;
 means to be constrained the peer to set the number of pad bytes.
+Default is off.
 .El
 .El
 .\"
