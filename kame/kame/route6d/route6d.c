@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.49 2001/01/22 11:53:44 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.50 2001/01/22 11:58:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.49 2001/01/22 11:53:44 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.50 2001/01/22 11:58:38 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -835,7 +835,7 @@ ripsend(ifcp, sin, flag)
 }
 
 /*
- * outbound filter logic, per-route/inteface.
+ * outbound filter logic, per-route/interface.
  */
 int
 out_filter(rrt, ifcp)
@@ -3262,7 +3262,8 @@ hms()
 		fatal("localtime");
 		/*NOTREACHED*/
 	}
-	snprintf(buf, sizeof(buf), "%02d:%02d:%02d", tm->tm_hour, tm->tm_min, tm->tm_sec);
+	snprintf(buf, sizeof(buf), "%02d:%02d:%02d", tm->tm_hour, tm->tm_min,
+	    tm->tm_sec);
 	return buf;
 }
 
