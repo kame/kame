@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.48 2004/01/26 09:39:29 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.49 2004/01/26 09:40:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -289,7 +289,7 @@ mld6_read(i, rfd)
  */
 static void
 accept_mld6(recvlen)
-int recvlen;
+	int recvlen;
 {
 	struct in6_addr *group, *dst = NULL;
 	struct mld_hdr *mldh;
