@@ -1,4 +1,4 @@
-/*	$KAME: qop_jobs.c,v 1.1 2002/10/26 06:59:53 kjc Exp $	*/
+/*	$KAME: qop_jobs.c,v 1.2 2002/10/26 07:09:22 kjc Exp $	*/
 /*
  * Copyright (c) 2001-2002, by the Rector and Board of Visitors of 
  * the University of Virginia.
@@ -618,11 +618,11 @@ jobs_add_class(struct classinfo *clinfo)
 	memset(&class_add, 0, sizeof(class_add));
 	strncpy(class_add.iface.jobs_ifname, clinfo->ifinfo->ifname, IFNAMSIZ);
 	class_add.pri = jobs_clinfo->pri;
-	class_add.ADC = jobs_clinfo->adc;
-	class_add.RDC = jobs_clinfo->rdc;
-	class_add.ALC = jobs_clinfo->alc;
-	class_add.RLC = jobs_clinfo->rlc;
-	class_add.ARC = jobs_clinfo->arc;
+	class_add.cl_adc = jobs_clinfo->adc;
+	class_add.cl_rdc = jobs_clinfo->rdc;
+	class_add.cl_alc = jobs_clinfo->alc;
+	class_add.cl_rlc = jobs_clinfo->rlc;
+	class_add.cl_arc = jobs_clinfo->arc;
 	class_add.flags = jobs_clinfo->flags;
 	if (ioctl(jobs_fd, JOBS_ADD_CLASS, &class_add) < 0) {
 		clinfo->handle = JOBS_NULLCLASS_HANDLE;
@@ -645,11 +645,11 @@ jobs_modify_class(struct classinfo *clinfo, void *arg)
 	class_mod.class_handle = clinfo->handle;
 
 	class_mod.pri = jobs_clinfo->pri;
-	class_mod.ADC = jobs_clinfo->adc;
-	class_mod.RDC = jobs_clinfo->rdc;
-	class_mod.ALC = jobs_clinfo->alc;
-	class_mod.RLC = jobs_clinfo->rlc;
-	class_mod.ARC = jobs_clinfo->arc;
+	class_mod.cl_adc = jobs_clinfo->adc;
+	class_mod.cl_rdc = jobs_clinfo->rdc;
+	class_mod.cl_alc = jobs_clinfo->alc;
+	class_mod.cl_rlc = jobs_clinfo->rlc;
+	class_mod.cl_arc = jobs_clinfo->arc;
 	class_mod.flags = jobs_clinfo->flags;
 
 	if (ioctl(jobs_fd, JOBS_MOD_CLASS, &class_mod) < 0)
