@@ -383,7 +383,7 @@ chain_mbufs(struct lnc_softc *sc, int start_of_packet, int pkt_len)
 
 	head = desc->buff.mbuf;
 	head->m_flags |= M_PKTHDR;
-	bzero(&m->m_pkthdr, sizeof(m->m_pkthdr));
+	bzero(&head->m_pkthdr, sizeof(head->m_pkthdr));
 
 	m = head;
 	do {
