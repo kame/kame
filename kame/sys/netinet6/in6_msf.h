@@ -1,4 +1,4 @@
-/* $KAME: in6_msf.h,v 1.6 2004/02/06 10:34:25 suz Exp $	*/
+/* $KAME: in6_msf.h,v 1.7 2004/04/03 03:07:49 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -64,6 +64,7 @@
 #define _NETINET6_IN6MSF_H_
 
 #include <sys/queue.h>
+#include <net/net_osdep.h>
 #include <netinet/in_msf.h>
 #include <netinet6/ip6_var.h>
 
@@ -134,7 +135,13 @@ void	in6_undomopt_source_addr(struct sock_msf *, int);
 void	in6_undomopt_source_list(struct sock_msf *, u_int);
 int	match_msf6_per_if(struct in6_multi *, struct in6_addr *,
 			  struct in6_addr *);
+
+#ifdef HAVE_NRL_INPCB
+#define in6pcb inpcb
+#endif
+
 int	match_msf6_per_socket(struct in6pcb *, struct in6_addr *,
 			      struct in6_addr *);
+#undef in6pcb
 #endif /* _KERNEL */
 #endif /* _NETINET6_IN6MSF_H_ */
