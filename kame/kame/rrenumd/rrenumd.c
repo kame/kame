@@ -35,13 +35,14 @@
 #include <string.h>
 
 #include <net/route.h>
-#include <arpa/inet.h>
 
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
 #include <netinet/ip6.h>
 #include <netinet/icmp6.h>
+
+#include <arpa/inet.h>
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>
