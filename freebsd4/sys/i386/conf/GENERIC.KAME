@@ -238,8 +238,8 @@ pseudo-device	bpf		#Berkeley packet filter
 # KAME extensions
 #
 
-options 	IPSEC			#IP security
-options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
+#options 	IPSEC			#IP security
+#options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 #options 	"IPSEC_IPV6FWD"         #IP security tunnel for IPv6
 #options 	IPSEC_DEBUG		#debug for IP security
 #options 	NATM			#native mode ATM
