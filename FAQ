@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.5 2001/06/18 06:33:59 itojun Exp $
+$KAME: FAQ,v 1.6 2001/06/20 12:43:32 jinmei Exp $
 
 
 GENERAL
@@ -47,7 +47,6 @@ Which version of IPv6/IPsec does KAME support?
 	For list of currently-supported standard documents, please refer to
 	kit/IMPLEMENTATION in the distribution kit, or
 	http://www2.kame.net/dev/cvsweb.cgi/kit/IMPLEMENTATION.
-
 
 INSTALLATION
 ============
@@ -396,4 +395,9 @@ Q: What is "KAME"?  Why did you choose the name?
 	turtle please help me debug my code...".
 	(http://www.itojun.org/diary/19970930-1005/kame.html) This
 	is the real reason for the name.
+
+Q: How can I differentiate IPv6 http connections from IPv4 ones on my
+web page?  (In other words, how can I provide dancing stuff for IPv6
+users only, like www.kame.net?)
+      TBD
 
