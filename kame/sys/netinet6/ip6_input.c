@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.83 2000/05/05 13:27:14 sumikawa Exp $	*/
+/*	$KAME: ip6_input.c,v 1.84 2000/05/10 00:21:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -878,6 +878,7 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 	int optlen = 0;
 	u_int8_t *opt = opthead;
 	u_int16_t rtalert_val;
+	u_int32_t jumboplen;
 
 	for (; hbhlen > 0; hbhlen -= optlen, opt += optlen) {
 		switch(*opt) {
@@ -923,15 +924,20 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 			  * requirement of the jumbo payload option.
 			  */
 #if 0
-			 *plenp = ntohl(*(u_int32_t *)(opt + 2));
+			 jumboplen = ntohl(*(u_int32_t *)(opt + 2));
 #else
-			 bcopy(opt + 2, plenp, sizeof(*plenp));
-			 *plenp = htonl(*plenp);
+			 bcopy(opt + 2, &jumboplen, sizeof(jumboplen));
+			 jumboplen = (u_int32_t)htonl(jumboplen);
 #endif
-			 if (*plenp <= IPV6_MAXPACKET) {
+			 if (*plenp != 0 || jumboplen <= IPV6_MAXPACKET) {
 				 /*
+				  * payload length field must be zero.
 				  * jumbo payload length must be larger
-				  * than 65535
+				  * than 65535.
+				  *
+				  * if there are multiple jumbo payload
+				  * options, *plenp will be non-zero and
+				  * the packet will be rejected.
 				  */
 				 ip6stat.ip6s_badoptions++;
 				 icmp6_error(m, ICMP6_PARAM_PROB,
@@ -941,6 +947,7 @@ ip6_process_hopopts(m, opthead, hbhlen, rtalertp, plenp)
 					     opt + 2 - opthead);
 				 return(-1);
 			 }
+			 *plenp = jumboplen;
 
 			 ip6 = mtod(m, struct ip6_hdr *);
 			 if (ip6->ip6_plen) {
