@@ -1044,7 +1044,7 @@ in6_status(s, info)
 	if (scopeid)
 		printf(" scopeid 0x%x", scopeid);
 
-	if (ip6lifetime && (lifetime.ia6t_preferred || lifetime.ia6t_expire)) {
+	if (ip6lifetime) {
 		printf(" pltime");
 		if (lifetime.ia6t_preferred) {
 			printf(" %s", lifetime.ia6t_preferred < t
