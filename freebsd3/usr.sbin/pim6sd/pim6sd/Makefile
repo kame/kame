@@ -34,7 +34,7 @@ SRCS=	mld6.c mld6_proto.c\
 CLEANFILES+= lex.yy.c y.tab.h y.tab.c
 CFLAGS+= -g
 CFLAGS+=-I${.OBJDIR}
-CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -I${SRCDIR}
+CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -DUSE_RFC2292BIS -I${SRCDIR}
 CFLAGS+=-DHAVE_STDARG_H
 LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
 	-L/usr/local/v6/lib -linet6

@@ -33,7 +33,7 @@ SRCS=	mld6.c mld6_proto.c\
 	cfparse.y cftoken.l
 CFLAGS+= -g
 CFLAGS+=-I.
-CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -I${SRCDIR}
+CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -DUSE_RFC2292BIS -I${SRCDIR}
 CFLAGS+=-DHAVE_STDARG_H
 LDADD+=	-L${.CURDIR}/../../../lib/libinet6 \
 	-L${.CURDIR}/../../../lib/libinet6/obj \
