@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.55 2001/07/25 02:55:58 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.56 2001/07/27 04:52:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -275,7 +275,6 @@ encap4_lookup(m, off, proto)
 			matchprio -= 32;
 		else
 			matchprio = 1;
-printf("radix match=%p\n", match);
 	}
 #endif
 
@@ -325,7 +324,6 @@ printf("radix match=%p\n", match);
 		}
 	}
 
-printf("final match=%p\n", match);
 	return match;
 #undef s
 #undef d
