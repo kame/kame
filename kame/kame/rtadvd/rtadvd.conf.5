@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.19 2001/01/15 11:02:26 itojun Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.20 2001/01/18 01:44:51 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -199,14 +199,14 @@ is more than 0.
 .It Cm \&vltime
 (num) Valid lifetime field
 .Pq unit: seconds .
-The default value is 2592000(30 days).
+The default value is 2592000 (30 days).
 .It Cm \&vltimedecr
 (bool) This item means the advertised valid lifetime will decrements
 in real time, which is disabled by default.
 .It Cm \&pltime
 (num) Preferred lifetime field
 .Pq unit: seconds .
-The default value is 604800(7 days).
+The default value is 604800 (7 days).
 .It Cm \&pltimedecr
 (bool) This item means the advertised preferred lifetime will decrements
 in real time, which is disabled by default.
@@ -290,8 +290,8 @@ for details on the capability.
 #       See also: rtadvd(8)
 
 #default:\\
-#	:chlim#64:raflags#0:rltime#1800:rtime#30000:retrans#1000:\\
-#	:pinfoflags#192:vltime#3600000:pltime#3600000:mtu#1500:
+#	:chlim#64:raflags#0:rltime#1800:rtime#0:retrans#0:\\
+#	:pinfoflags#192:vltime#2592000:pltime#604800:mtu#1500:
 #ether:\\
 #	:mtu#1500:tc=default:
 
