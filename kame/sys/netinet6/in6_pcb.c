@@ -220,7 +220,12 @@ in6_pcbbind(in6p, nam)
 			struct ifaddr *ia = NULL;
 
 			sin6->sin6_port = 0;		/* yech... */
+#if defined(NFAITH) && NFAITH > 0
+			if ((in6p->in6p_flags & IN6P_FAITH) == 0
+			 && (ia = ifa_ifwithaddr((struct sockaddr *)sin6)) == 0)
+#else
 			if ((ia = ifa_ifwithaddr((struct sockaddr *)sin6)) == 0)
+#endif
 				return(EADDRNOTAVAIL);
 
 			/*
