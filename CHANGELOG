@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.443 2000/01/16 14:32:49 itojun Exp $
+$Id: CHANGELOG,v 1.444 2000/01/16 16:37:51 itojun Exp $
 
 <200001>
 Sun Jan 16 23:30:16 JST 2000  itojun@iijlab.net
@@ -55,7 +55,7 @@ Wed Jan 12 17:21:40 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	  FreeBSD-cuurent. No extra IPv6 patch is necessary anymore.
 
 Wed Jan 12 15:40:05 JST 2000  itojun@iijlab.net
-	* {bsdi3,netbsd}/usr.sbin/inetd: allow multiple IPsec policy
+	* {bsdi3,netbsd,freebsd2}/usr.sbin/inetd: allow multiple IPsec policy
 	  string specifier (separated by semicolon).  to be integrated into
 	  other operating systems as well.
 
