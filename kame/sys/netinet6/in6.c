@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.271 2002/05/14 13:31:33 keiichi Exp $	*/
+/*	$KAME: in6.c,v 1.272 2002/05/20 06:30:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1915,7 +1915,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 				s6->sin6_addr.s6_addr16[1] = 0;
 				if (in6_addr2zoneid(ifp, &s6->sin6_addr,
 						    &s6->sin6_scope_id))
-					return(EINVAL);	/* XXX: */
+					return(EINVAL);	/* XXX */
 			}
 #endif
 			if ((ifp->if_flags & IFF_POINTOPOINT) != 0) {
