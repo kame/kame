@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.68 2001/12/12 10:35:19 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.69 2001/12/14 06:39:38 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -186,7 +186,7 @@ void		 natpt_translateFragment4to66	__P((struct pcv *, struct pAddr *));
 
 /* IPv4 -> IPv4 */
 struct mbuf	*natpt_translateICMPv4To4	__P((struct pcv *, struct pAddr *));
-void		 natpt_icmp4TimeExceed		__P((struct pcv *, struct mbuf *));
+void		 natpt_icmp4TimeExceed		__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateTCPv4To4	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateUDPv4To4	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateTCPUDPv4To4	__P((struct pcv *, struct pAddr *,
@@ -1424,11 +1424,8 @@ natpt_translateICMPv4To4(struct pcv *cv4from, struct pAddr *pad)
 {
 	struct pcv	 cv4to;
 	struct mbuf	*m4;
-	struct ip	*ip4from, *ip4to;
+	struct ip	*ip4to;
 	struct icmp	*icmp4from;
-
-	ip4from = mtod(cv4from->m, struct ip *);
-	icmp4from = cv4from->pyld.icmp4;
 
 	if ((m4 = m_copym(cv4from->m, 0, M_COPYALL, M_NOWAIT)) == NULL)
 		return (NULL);
@@ -1436,12 +1433,12 @@ natpt_translateICMPv4To4(struct pcv *cv4from, struct pAddr *pad)
 	bzero(&cv4to, sizeof(struct pcv));
 	cv4to.m = m4;
 	cv4to.ip.ip4 = ip4to = mtod(m4, struct ip *);
-	cv4to.pyld.caddr = (caddr_t)cv4to.ip.ip4 + (ip4from->ip_hl << 2);
+	cv4to.pyld.caddr = (caddr_t)ip4to + (ip4to->ip_hl << 2);
 	cv4to.fromto = cv4from->fromto;
 
-	ip4to->ip_src = pad->in4dst;
 	ip4to->ip_dst = pad->in4src;
 
+	icmp4from = cv4from->pyld.icmp4;
 	switch (icmp4from->icmp_type) {
 	case ICMP_ECHOREPLY:		/* do nothing	*/
 	case ICMP_ECHO:
@@ -1451,13 +1448,13 @@ natpt_translateICMPv4To4(struct pcv *cv4from, struct pAddr *pad)
 		switch (icmp4from->icmp_code) {
 		case ICMP_UNREACH_PORT:
 		case ICMP_UNREACH_NEEDFRAG:
-			natpt_icmp4TimeExceed(cv4from, m4);
+			natpt_icmp4TimeExceed(&cv4to, pad);
 		}
 		break;
 
 	case ICMP_TIMXCEED:
 		if (icmp4from->icmp_code == ICMP_TIMXCEED_INTRANS)
-			natpt_icmp4TimeExceed(cv4from, m4);
+			natpt_icmp4TimeExceed(&cv4to, pad);
 		break;
 
 	default:
@@ -1465,68 +1462,40 @@ natpt_translateICMPv4To4(struct pcv *cv4from, struct pAddr *pad)
 		return (NULL);
 	}
 
-	m4->m_len = cv4from->m->m_len;
 	return (m4);
 }
 
-
 void
-natpt_icmp4TimeExceed(struct pcv *cv4from, struct mbuf *m4)
+natpt_icmp4TimeExceed(struct pcv *cv4to, struct pAddr *pad)
 {
-	struct ip	*ip4to;
-	struct icmp	*icmp4to;
-	struct ip	*innerip4to;
-	struct udphdr	*innerudp4to;
-	struct tSlot	*ats;
-
-	if (isDump(D_FAKETRACEROUTE))
-		natpt_logMBuf(LOG_DEBUG, cv4from->m, "natpt_icmp4TimeExceed().");
-
-	ip4to = mtod(m4, struct ip *);
-	icmp4to = (struct icmp *)((caddr_t)ip4to + (ip4to->ip_hl << 2));
-	innerip4to = &icmp4to->icmp_ip;
-	innerudp4to = (struct udphdr *)((caddr_t)innerip4to + (innerip4to->ip_hl << 2));
-
-	ats = cv4from->ats;
-	innerip4to->ip_src = ats->local.in4dst;
-	innerudp4to->uh_sport = ats->local.port[1];
-
+	u_short		 cksum;
+	struct ip	*ip4inner;
+	struct udphdr	*udp4inner;
+	struct
 	{
-		int	cksum;
-		struct
-		{
-			struct in_addr a;
-			u_int16_t p;
-		}	Dum, Dee;
+		struct in_addr	a;
+		u_int16_t	p;
+	}			Dee, Dum;
 
-		bcopy(&ats->remote.in4src, &Dum.a, sizeof(Dum.a));
-		bcopy(&ats->remote.in4dst, &Dee.a, sizeof(Dee.a));
-		cksum = natpt_fixCksum(ntohs(innerip4to->ip_sum),
-				       (u_char *)&Dum.a, sizeof(Dum.a),
-				       (u_char *)&Dee.a, sizeof(Dee.a));
-		innerip4to->ip_sum = htons(cksum);
+	bzero(&Dee, sizeof(Dee));
+	bzero(&Dum, sizeof(Dum));
 
-		Dum.p = ats->remote.port[0];
-		Dum.p = ats->local.port[0];	/* XXX BUG? */
-		cksum = natpt_fixCksum(ntohs(icmp4to->icmp_cksum),
-				       (u_char *)&Dum, sizeof(Dum),
-				       (u_char *)&Dee, sizeof(Dee));
-		icmp4to->icmp_cksum = htons(cksum);
-	}
+	ip4inner = &cv4to->pyld.icmp4->icmp_ip;
+	udp4inner = (struct udphdr *)((caddr_t)ip4inner + (ip4inner->ip_hl << 2));
 
-	{
-		int	hlen = ip4to->ip_hl << 2;
+	Dee.a = ip4inner->ip_src;
+	Dum.a = ip4inner->ip_src = pad->in4src;
+	cksum = natpt_fixCksum(ntohs(ip4inner->ip_sum),
+			       (u_char *)&Dee.a, sizeof(Dee.a),
+			       (u_char *)&Dum.a, sizeof(Dum.a));
+	ip4inner->ip_sum = htons(cksum);
 
-		m4->m_data += hlen;
-		m4->m_len  -= hlen;
-		icmp4to->icmp_cksum = 0;
-		icmp4to->icmp_cksum = in_cksum(m4, ip4to->ip_len - hlen);
-		m4->m_data -= hlen;
-		m4->m_len  += hlen;
-	}
-
-	if (isDump(D_FAKETRACEROUTE))
-		natpt_logMBuf(LOG_DEBUG, cv4from->m, "natpt_icmp4TimeExceed().");
+	Dee.p = udp4inner->uh_sport;
+	Dum.p = udp4inner->uh_sport = pad->port[0];
+	cksum = natpt_fixCksum(ntohs(cv4to->pyld.icmp4->icmp_cksum),
+			       (u_char *)&Dee.p, sizeof(Dee.p),
+			       (u_char *)&Dum.p, sizeof(Dum.p));
+	cv4to->pyld.icmp4->icmp_cksum = htons(cksum);
 }
 
 
