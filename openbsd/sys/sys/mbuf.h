@@ -206,6 +206,7 @@ struct mbuf {
 		(m)->m_nextpkt = (struct mbuf *)NULL; \
 		(m)->m_data = (m)->m_dat; \
 		(m)->m_flags = 0; \
+		(m)->m_pkthdr.aux = (struct mbuf *)NULL; \
 	} else \
 		(m) = m_retry((how), (type)); \
 }
@@ -298,9 +299,11 @@ union mcluster {
 /*
  * Copy mbuf pkthdr from from to to.
  * from must have M_PKTHDR set, and to must be empty.
+ * aux pointer will be moved to `to'.
  */
 #define	M_COPY_PKTHDR(to, from) { \
 	(to)->m_pkthdr = (from)->m_pkthdr; \
+	(from)->m_pkthdr.aux = (struct mbuf *)NULL; \
 	(to)->m_flags = (from)->m_flags & M_COPYFLAGS; \
 	(to)->m_data = (to)->m_pktdat; \
 }
