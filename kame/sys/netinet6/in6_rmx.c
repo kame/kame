@@ -1,4 +1,4 @@
-/*	$KAME: in6_rmx.c,v 1.9 2000/08/20 04:30:38 itojun Exp $	*/
+/*	$KAME: in6_rmx.c,v 1.10 2001/05/24 05:44:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -161,6 +161,7 @@ in6_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 		}
 	}
 
+#if __FreeBSD__ <= 2
 	/*
 	 * We also specify a send and receive pipe size for every
 	 * route added, to help TCP a bit.  TCP doesn't actually
@@ -177,6 +178,7 @@ in6_addroute(void *v_arg, void *n_arg, struct radix_node_head *head,
 
 	if (!rt->rt_rmx.rmx_recvpipe && !(rt->rt_rmx.rmx_locks & RTV_RPIPE))
 		rt->rt_rmx.rmx_recvpipe = tcp_recvspace;
+#endif
 
 	if (!rt->rt_rmx.rmx_mtu && !(rt->rt_rmx.rmx_locks & RTV_MTU)
 	    && rt->rt_ifp)
