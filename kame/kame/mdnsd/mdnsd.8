@@ -1,4 +1,4 @@
-.\"     $KAME: mdnsd.8,v 1.11 2000/05/31 11:29:57 itojun Exp $
+.\"     $KAME: mdnsd.8,v 1.12 2000/05/31 12:40:26 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -49,19 +49,31 @@
 serves as multicast DNS resolver.
 .Nm
 will get unicast DNS queries from local node,
-and forward the queries toward multicast DNS address on interface specified by
+and forward the queries toward link-local multicast DNS address on
 .Ar intface .
 Whenever a reply comes back against the multicast queries,
 .Nm
 will forward the reply to the original querier.
+.Nm
+can also relay queries to unicast DNS server(s).
 .Pp
 .Nm
-will also reply to multicast DNS queries from other nodes.
+will reply to multicast DNS queries from other nodes,
+to advertise mapping between the name of the local node and the addresses
+of the local node.
+If two or more nodes on the same link are running
+.Nm ,
+they can resolve their addresses without having to configure unicast
+DNS servers.
+Users just need to know the FQDN name for the neighboring node.
 .Pp
 .Bl -tag -width Ds
 .It Fl 4
 .It Fl 6
 Controls the address family to use for DNS transport.
+By default
+.Nm
+will listen to all the available address families.
 .It Fl D
 Enable trace messages for debugging.
 .It Fl d Ar dnsserv
@@ -90,9 +102,18 @@ will be used.
 specifies outgoing interface for multicast queries.
 The flag is mandatory.
 .It Fl m
-Listen to
+Be compatible with
 .Dq mediator
-DNS cache daemon configuration port.
+DNS cache daemon.
+Redistribution of 
+.Dq mediator
+code is
+.Pq still 
+restricted, hence
+.Fl m
+flag is not very useful for most of users.
+Do not send questions about this
+.Li :-)
 .It Fl p Ar inport
 .Nm
 listens to UDP port
@@ -117,7 +138,7 @@ for running two daemons on a single node for debugging
 .Pc .
 .It Ar userv
 Specify unicast DNS servers we may want to try sending queries.
-Multiple servers can be specified.There can be multiple 
+Users can list multiple DNS servers.
 .El
 .\"
 .Sh EXAMPLES
@@ -141,17 +162,6 @@ on the local node.
 search itojun.org
 nameserver ::
 .Ed
-.Pp
-DNS queries from normal application will be routed to
-.Nm Ns .
-.Nm
-will forward the query to multicast DNS servers.
-.Nm
-also acts as multicast DNS server for the local hostname.
-When a query from adjacent node reach
-.Nm Ns ,
-.Nm
-will transmit appropriate reply to the querier.
 .Pp
 If you would like to contact unicast DNS servers as well, you may want to
 specify them on the command line.
@@ -181,6 +191,8 @@ command first appeared in WIDE/KAME IPv6 protocol stack kit.
 .Nm
 does not become daemon at this moment.
 .Pp
+Specification conformance is still very low.
+.Pp
 .Nm
 does not handle DNS queries/replies over TCP transport.
 .Pp
@@ -191,13 +203,16 @@ the features are not implemented yet.
 Since there is no standard IPv6 multicast address assigned for multicast DNS,
 we use linklocal all-node multicast address at this moment.
 .Pp
-IPv4 mode does not work at this moment.
+IPv4 mode does not work well at this moment.
 .Pp
 .Nm
 is too aggressive when sending queries.
-For examle, if you specify
-.Fl u ,
+For example, if you specify unicast DNS servers by
+.Ar userv
+argument,
 .Nm
 will transmit DNS queries to both multicast and unicast servers at the
 same time.
-This is not a good behavior.
+Instead,
+.Nm
+should add some delay between subsequent transmissions.
