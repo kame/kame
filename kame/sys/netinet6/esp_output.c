@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.38 2001/02/28 12:27:11 itojun Exp $	*/
+/*	$KAME: esp_output.c,v 1.39 2001/02/28 13:31:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -411,7 +411,6 @@ esp_output(m, nexthdrp, md, isr, af)
     {
 	/*
 	 * find the last mbuf. make some room for ESP trailer.
-	 * XXX new-esp authentication data
 	 */
 #ifdef INET
 	struct ip *ip = NULL;
@@ -419,6 +418,7 @@ esp_output(m, nexthdrp, md, isr, af)
 	size_t padbound;
 	u_char *extend;
 	int i;
+	int randpadmax;
 
 	if (algo->padbound)
 		padbound = algo->padbound;
@@ -431,6 +431,39 @@ esp_output(m, nexthdrp, md, isr, af)
 	extendsiz = padbound - (plen % padbound);
 	if (extendsiz == 1)
 		extendsiz = padbound + 1;
+
+	/* random padding */
+	switch (af) {
+#ifdef INET
+	case AF_INET:
+		randpadmax = ip4_esp_randpad;
+		break;
+#endif
+#ifdef INET6
+	case AF_INET6:
+		randpadmax = ip6_esp_randpad;
+		break;
+#endif
+	default:
+		randpadmax = -1;
+		break;
+	}
+	if (randpadmax < 0 || plen + extendsiz >= randpadmax)
+		;
+	else {
+		int m, n;
+
+		m = randpadmax;
+		if (randpadmax > MLEN)
+			randpadmax = MLEN;
+		if (randpadmax >= 256)
+			randpadmax = 255;
+		/* round */
+		randpadmax = (randpadmax / padbound) * padbound;
+		n = (randpadmax - plen + extendsiz) / padbound;
+		if (n > 0)
+			extendsiz += (random() % n) * padbound;
+	}
 
 #ifdef DIAGNOSTIC
 	/*

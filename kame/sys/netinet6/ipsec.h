@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.42 2001/01/23 15:23:36 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.43 2001/02/28 13:32:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -239,7 +239,8 @@ struct ipsecstat {
 #define	IPSECCTL_DFBIT			10
 #define	IPSECCTL_ECN			11
 #define	IPSECCTL_DEBUG			12
-#define IPSECCTL_MAXID			13
+#define	IPSECCTL_ESP_RANDPAD		13
+#define IPSECCTL_MAXID			14
 
 #define IPSECCTL_NAMES { \
 	{ 0, 0 }, \
@@ -255,6 +256,7 @@ struct ipsecstat {
 	{ "dfbit", CTLTYPE_INT }, \
 	{ "ecn", CTLTYPE_INT }, \
 	{ "debug", CTLTYPE_INT }, \
+	{ "esp_randpad", CTLTYPE_INT }, \
 }
 
 #define IPSEC6CTL_NAMES { \
@@ -271,6 +273,7 @@ struct ipsecstat {
 	{ 0, 0 }, \
 	{ "ecn", CTLTYPE_INT }, \
 	{ "debug", CTLTYPE_INT }, \
+	{ "esp_randpad", CTLTYPE_INT }, \
 }
 
 #ifdef __bsdi__
@@ -288,6 +291,7 @@ struct ipsecstat {
 	&ip4_ipsec_dfbit, \
 	&ip4_ipsec_ecn, \
 	&ipsec_debug, \
+	&ip4_esp_randpad, \
 }
 
 #define IPSEC6CTL_VARS { \
@@ -304,6 +308,7 @@ struct ipsecstat {
 	0, \
 	&ip6_ipsec_ecn, \
 	&ipsec_debug, \
+	&ip6_esp_randpad, \
 }
 #endif
 
@@ -332,6 +337,7 @@ extern int ip4_ah_cleartos;
 extern int ip4_ah_offsetmask;
 extern int ip4_ipsec_dfbit;
 extern int ip4_ipsec_ecn;
+extern int ip4_esp_randpad;
 #endif
 
 #ifdef INET6
@@ -342,6 +348,7 @@ extern int ip6_esp_net_deflev;
 extern int ip6_ah_trans_deflev;
 extern int ip6_ah_net_deflev;
 extern int ip6_ipsec_ecn;
+extern int ip6_esp_randpad;
 #endif
 
 #define ipseclog(x)	do { if (ipsec_debug) log x; } while (0)

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.95 2001/02/20 01:32:18 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.96 2001/02/28 13:31:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -130,6 +130,7 @@ int ip4_ah_trans_deflev = IPSEC_LEVEL_USE;
 int ip4_ah_net_deflev = IPSEC_LEVEL_USE;
 struct secpolicy ip4_def_policy;
 int ip4_ipsec_ecn = 0;		/* ECN ignore(-1)/forbidden(0)/allowed(1) */
+int ip4_esp_randpad = -1;
 
 #ifdef __FreeBSD__
 #ifdef SYSCTL_DECL
@@ -162,6 +163,8 @@ SYSCTL_INT(_net_inet_ipsec, IPSECCTL_ECN,
 	ecn, CTLFLAG_RW,	&ip4_ipsec_ecn,	0, "");
 SYSCTL_INT(_net_inet_ipsec, IPSECCTL_DEBUG,
 	debug, CTLFLAG_RW,	&ipsec_debug,	0, "");
+SYSCTL_INT(_net_inet_ipsec, IPSECCTL_ESP_RANDPAD,
+	esp_randpad, CTLFLAG_RW,	&ip4_esp_randpad,	0, "");
 #endif /* __FreeBSD__ */
 
 #ifdef INET6
@@ -172,6 +175,7 @@ int ip6_ah_trans_deflev = IPSEC_LEVEL_USE;
 int ip6_ah_net_deflev = IPSEC_LEVEL_USE;
 struct secpolicy ip6_def_policy;
 int ip6_ipsec_ecn = 0;		/* ECN ignore(-1)/forbidden(0)/allowed(1) */
+int ip6_esp_randpad = -1;
 
 #ifdef __FreeBSD__
 /* net.inet6.ipsec6 */
@@ -191,6 +195,8 @@ SYSCTL_INT(_net_inet6_ipsec6, IPSECCTL_ECN,
 	ecn, CTLFLAG_RW,	&ip6_ipsec_ecn,	0, "");
 SYSCTL_INT(_net_inet6_ipsec6, IPSECCTL_DEBUG,
 	debug, CTLFLAG_RW,	&ipsec_debug,	0, "");
+SYSCTL_INT(_net_inet_ipsec6, IPSECCTL_ESP_RANDPAD,
+	esp_randpad, CTLFLAG_RW,	&ip6_esp_randpad,	0, "");
 #endif /*__FreeBSD__*/
 #endif /* INET6 */
 
@@ -3721,6 +3727,9 @@ ipsec_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return sysctl_int(oldp, oldlenp, newp, newlen, &ip4_ipsec_ecn);
 	case IPSECCTL_DEBUG:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &ipsec_debug);
+	case IPSECCTL_ESP_RANDPAD:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &ip4_esp_randpad);
 	default:
 		return EOPNOTSUPP;
 	}
@@ -3803,6 +3812,9 @@ ipsec6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		return sysctl_int(oldp, oldlenp, newp, newlen, &ip6_ipsec_ecn);
 	case IPSECCTL_DEBUG:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &ipsec_debug);
+	case IPSECCTL_ESP_RANDPAD:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &ip6_esp_randpad);
 	default:
 		return EOPNOTSUPP;
 	}
