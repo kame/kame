@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.119 2001/07/20 01:25:47 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.120 2001/07/20 16:45:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -729,7 +729,7 @@ reorder(sentinel)
 	if (n <= 1)
 		return(n);
 
-	/* allocate a temporary array for sort and initialize it. */
+	/* allocate a temporary array for sort and initialization of it. */
 	if ((aio = malloc(sizeof(*aio) * n)) == NULL)
 		return(n);	/* give up reordering */
 	memset(aio, 0, sizeof(*aio) * n);
@@ -764,6 +764,17 @@ set_source(aio)
 	/* set unspec ("no source is available"), just in case */
 	aio->aio_srcsa.sa_family = AF_UNSPEC;
 	aio->aio_srcscope = -1;
+
+	switch(ai->ai_family) {
+	case AF_INET:
+#ifdef INET6
+	case AF_INET6:
+#endif
+		break;
+	default:		/* ignore unsupported AFs explicitly */
+		return;
+	}
+
 	/* open a socket to get the source address (is UDP too specific?) */
 	if ((s = socket(ai->ai_family, SOCK_DGRAM, IPPROTO_UDP)) < 0)
 		return;		/* give up */
