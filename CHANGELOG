@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2645 2004/07/16 09:29:23 suz Exp $
+$KAME: CHANGELOG,v 1.2646 2004/07/19 05:12:02 jinmei Exp $
 
 <200407>
 2004-07-16  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
@@ -13,8 +13,8 @@ $KAME: CHANGELOG,v 1.2645 2004/07/16 09:29:23 suz Exp $
 
 2004-07-12  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/netinet6/in6.c: fixed a freebsd5 kernel crash due to LOR.
-	* freebsd5/sys/netinet6/in6_pcb.c: fixed a bug that some TCP/UDP packets
-	does not go outside on freebsd5.
+	* freebsd5/sys/netinet6/in6_pcb.c: fixed a bug that some TCP/UDP
+	packets does not go outside on freebsd5.
 
 2004-07-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *bsd/usr.sbin/Makefile: stopped building KAME bgpd.  It has
