@@ -1,8 +1,23 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1336 2000/10/15 11:16:28 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1337 2000/10/15 14:43:43 jinmei Exp $
 
 <200010>
+2000-10-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_mtudisc_update): update path
+	MTU information only when a corresponding host route already
+	exists. Currently for bsdi only.
+	This is an experimental fix for the KAME PR sys/292. We may choose
+	a different way in the future.
+
+2000-10-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netinet/tcp_subr.c (tcp6_ctlinput):
+	* bsdi4/sys/netinet/udp_usrreq.c (udp6_ctlinput):
+	added validation for the TCP or UDP headers of inner
+	packets. Without this, a bad remote user could make the kernel
+	core-dump.
+	(itojun seemed to merge the fix to other *BSDs)
+
 Sun Oct 15 19:18:45 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/squid11: use latest IPv6 patch.
 	* freebsd3/ports/lftp: upgrade to 2.3.4.
