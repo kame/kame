@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.55 2000/04/27 15:39:02 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.56 2000/05/05 06:54:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -843,7 +843,7 @@ in6_ifdetach(ifp)
 	struct ifnet *ifp;
 {
 	struct in6_ifaddr *ia, *oia;
-	struct ifaddr *ifa;
+	struct ifaddr *ifa, *next;
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 	struct ifaddr *ifaprev = NULL;
 #endif
@@ -861,12 +861,37 @@ in6_ifdetach(ifp)
 	/* remove neighbor management table */
 	nd6_purge(ifp);
 
+	/* nuke any of IPv6 addresses we have */
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
+	for (ifa = ifp->if_addrlist; ifa; ifa = next)
 #else
-	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = ifa->ifa_list.tqe_next)
+	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = next)
 #endif
 	{
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+		next = ifa->ifa_next;
+#else
+		next = ifa->ifa_list.tqe_next;
+#endif
+		if (ifa->ifa_addr->sa_family != AF_INET6)
+			continue;
+		in6_purgeaddr(ifa, ifp);
+	}
+
+	/* undo everything done by in6_ifattach(), just in case */
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	for (ifa = ifp->if_addrlist; ifa; ifa = next)
+#else
+	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = next)
+#endif
+	{
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+		next = ifa->ifa_next;
+#else
+		next = ifa->ifa_list.tqe_next;
+#endif
+
+
 		if (ifa->ifa_addr->sa_family != AF_INET6
 		 || !IN6_IS_ADDR_LINKLOCAL(&satosin6(&ifa->ifa_addr)->sin6_addr)) {
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
@@ -908,6 +933,7 @@ in6_ifdetach(ifp)
 #else
 		TAILQ_REMOVE(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
 #endif
+		IFAFREE(&ia->ia_ifa);
 
 		/* also remove from the IPv6 address chain(itojun&jinmei) */
 		oia = ia;
@@ -925,7 +951,7 @@ in6_ifdetach(ifp)
 #endif
 		}
 
-		free(oia, M_IFADDR);
+		IFAFREE(&oia->ia_ifa);
 	}
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
