@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1713 2001/06/07 23:31:38 itojun Exp $
+$KAME: CHANGELOG,v 1.1714 2001/06/08 04:55:00 jinmei Exp $
 
 <200106>
 Fri Jun  8 08:28:56 JST 2001  itojun@iijlab.net
@@ -1479,7 +1479,7 @@ Tue Jan  2 17:15:44 JST 2001  itojun@iijlab.net
 	  very experimental, and thus disabled by default. "options a6"
 	  and "options dname" in the /etc/resolv.conf file would enable A6
 	  and DNAME, respectively.
-	- EDNS0 OPT RR support with UDP buffer size negotiation. which is
+	- EDNS0 OPT RR support with UDP buffer size negotiation, which is
 	  disabled by default, and would enabled by "options edns0" in the
 	  /etc/resolv.conf file.
 	- clarification on the relationship between address family and irs
