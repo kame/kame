@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2518 2003/12/16 08:01:22 suz Exp $
+$KAME: CHANGELOG,v 1.2519 2003/12/16 12:41:01 t-momose Exp $
 
 <200312>
+2003-12-16  MOMOSE Tsuyoshi  <t-momose@netlab.nec.co.jp>
+	* kame/sys/netinet/icmp6.h: Some of ICMPv6 parameters related
+	mip6(DHAAD/MPS/MPA) were changed as assigned IANA.
+
 2003-12-16  SUZUKI Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/ip6addrctl: 'ip6addrctl delete ...' works now
 
