@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.43 2000/11/30 05:08:35 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.44 2000/11/30 05:20:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -243,6 +243,7 @@ rip6_ctlinput(cmd, sa, d)
 	register struct ip6_hdr *ip6;
 	struct mbuf *m;
 	int off;
+	struct ip6ctlparam *ip6cp = NULL;
 	void *cmdarg;
 	void (*notify) __P((struct in6pcb *, int)) = in6_rtchange;
 
@@ -261,16 +262,23 @@ rip6_ctlinput(cmd, sa, d)
 
 	/* if the parameter is from icmp6, decode it. */
 	if (d != NULL) {
-		struct ip6ctlparam *ip6cp = (struct ip6ctlparam *)d;
+		ip6cp = (struct ip6ctlparam *)d;
 		m = ip6cp->ip6c_m;
 		ip6 = ip6cp->ip6c_ip6;
 		off = ip6cp->ip6c_off;
 		cmdarg = ip6cp->ip6c_cmdarg;
+	} else {
+		m = NULL;
+		ip6 = NULL;
+		cmdarg = NULL;
+	}
 
+	if (ip6cp && ip6cp->ip6c_finaldst) {
 		bzero(&sa6, sizeof(sa6));
 		sa6.sin6_family = AF_INET6;
 		sa6.sin6_len = sizeof(sa6);
 		sa6.sin6_addr = *ip6cp->ip6c_finaldst;
+		/* XXX: assuming M is valid in this case */
 		sa6.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
 						     ip6cp->ip6c_finaldst);
 #ifndef SCOPEDROUTING
@@ -281,10 +289,6 @@ rip6_ctlinput(cmd, sa, d)
 		}
 #endif
 	} else {
-		m = NULL;
-		ip6 = NULL;
-		cmdarg = NULL;
-
 		/* XXX: translate addresses into internal form */
 		sa6 = *(struct sockaddr_in6 *)sa;
 #ifndef SCOPEDROUTING
@@ -310,7 +314,7 @@ rip6_ctlinput(cmd, sa, d)
 		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
 							 &ip6->ip6_src);
 #ifndef SCOPEDROUTING
-		if (in6_embedscope(&ip6->ip6_src, &sa6_src, NULL, NULL)) {
+		if (in6_embedscope(&sa6_src.sin6_addr, &sa6_src, NULL, NULL)) {
 			/* should be impossbile */
 			printf("rip6_ctlinput: in6_embedscope failed\n");
 			return;
