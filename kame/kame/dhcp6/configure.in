@@ -111,7 +111,7 @@ AC_ARG_ENABLE(pedant, [  --enable-pedant         pedantic compilation],
 	fi], [enableval=no])
 AC_MSG_RESULT($enableval);
 
-dnl Checks for optinal parameters
+dnl Checks predeclared identifers of function names
 AC_MSG_CHECKING(ANSI predeclared __func__)
 AC_TRY_COMPILE([],
 [void func(void) {printf("%s\n", __func__);}],
