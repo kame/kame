@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1175 2000/08/02 20:36:31 sakane Exp $
+$KAME: CHANGELOG,v 1.1176 2000/08/03 13:57:54 itojun Exp $
 
 <200007>
 Thu Aug  3 05:36:23 JST 2000 sakane@ydc.co.jp
@@ -18,6 +18,11 @@ Thu Aug  3 00:49:58 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	Tryed sending DELETE message against ISAKMP/IPsec SAs deleted
 	before racoon terminates.
+
+Thu Aug  2 JST 2000  itojun@iijlab.net
+	* sys/netinet6/icmp6.c: implement icmp6 nodeinfo "supported qtypes".
+	  need testing.
+	* sys/netinet6: remove bogus DIAGNOSTIC cases for sizeof(ro.ro_dst).
 
 Tue Aug  1 23:53:36 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/ja-mnews: upgrade to 1.22PL4.
