@@ -3,45 +3,31 @@
 # Date created:         08 August 1995
 # Whom:                 jkh
 #
-# $Id: Makefile,v 1.1 1999/08/09 01:37:20 itojun Exp $
+# $Id: Makefile,v 1.2 2000/01/20 09:43:00 itojun Exp $
 #
 
-DISTNAME=       pyth151
-PKGNAME=        python-1.5.1
+DISTNAME=       py152
+PKGNAME=        python-1.5.2
 CATEGORIES=	lang python tk80
-MASTER_SITES=	ftp://www.python.org/pub/python/src/ \
-		ftp://ftp.cwi.nl/pub/python/src/ \
-		ftp://ftp.kame.net/pub/kame/misc/ \
-		ftp://ftp.v6.kame.net/pub/kame/misc/
+MASTER_SITES=	ftp://ftp.python.org/pub/python/src/ \
+		ftp://ftp.cwi.nl/pub/python/src/
 EXTRACT_SUFX=	.tgz
-DISTFILES=	${DISTNAME}${EXTRACT_SUFX} ${V6PATCH}
-EXTRACT_ONLY=	${DISTNAME}${EXTRACT_SUFX}
 
-PATCH_SITES=	http://www.python.org/1.5/patches-1.5.1/
-PATCHFILES=	_tkinter.1.txt SocketServer.1.txt bltinmodule.1.txt \
-		bltinmodule.2.txt bltinmodule.3.txt \
-		ceval.1.txt classobject.1.txt fileobject.1.txt \
-		freeze.1.txt \
-		gzip.1.txt imaplib.1.txt imaplib.2.txt imaplib.3.txt \
-		import.1.txt longobject.1.txt object.1.txt \
-		parsermodule.1.txt pcre.1.txt sgmllib.1.txt sgmllib.2.txt \
-		string.1.txt stringobject.1.txt stropmodule.1.txt \
-		timemodule.1.txt urllib.1.txt urllib.2.txt zlibmodule.1.txt
-#		configure.2.txt 
+PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
+PATCHFILES=	python-152-v6-20000120.diff.gz
+PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@kame.net
 
-LIB_DEPENDS=	${TK_DEPENDS}
+#LIB_DEPENDS=	${TK_DEPENDS}
 
 DIST_SUBDIR=	python
-WRKSRC=		${WRKDIR}/Python-1.5.1
+WRKSRC=		${WRKDIR}/Python-1.5.2
 GNU_CONFIGURE=	yes
 CONFIGURE_ARGS=	--with-fpectl
 #MAKE_FLAGS=	'OPT=${CFLAGS}'
 INSTALL_TARGET=	install
 MAN1=		python.1
-
-V6PATCH=	python-151-v6-19990417.diff.gz
 
 #
 # The standard setup file
@@ -51,7 +37,7 @@ SETUP_FILE=	Setup
 #
 # Support for Tk is compiled in by default.
 #
-WITH_TK?=	yes
+WITH_TK?=	no
 .if defined(WITH_TK) && $(WITH_TK) == yes
 TK_DEPENDS=	tk80.1:${PORTSDIR}/x11-toolkits/tk80
 SETUP_LOCAL=	Setup.tk
@@ -100,16 +86,11 @@ CONFIGURE_ENV?=	LDFLAGS="${LDFLAGS}"
 .endif
 
 pre-install:
-.if ${OSVERSION} < 300000
-	${MKDIR} ${PREFIX}/lib/python1.5/plat-freebsd3
-	${INSTALL_DATA} ${WRKSRC}/Lib/plat-freebsd3/* ${PREFIX}/lib/python1.5/plat-freebsd3
-.else
 	${MKDIR} ${PREFIX}/lib/python1.5/plat-freebsd2
 	${INSTALL_DATA} ${WRKSRC}/Lib/plat-freebsd2/* ${PREFIX}/lib/python1.5/plat-freebsd2
-.endif
+#.endif
 
 post-install:
-	${INSTALL_SCRIPT} ${PREFIX}/lib/python1.5/plat-freebsd2/regen ${PREFIX}/lib/python1.5/plat-freebsd3
 	strip ${PREFIX}/bin/python
 
 .include <bsd.port.post.mk>
