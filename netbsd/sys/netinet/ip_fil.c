@@ -1981,7 +1981,7 @@ frdest_t *fdp;
 
 		if (m0->m_pkthdr.len <= ND_IFINFO(ifp)->linkmtu)
 			error = nd6_output(ifp, fin->fin_ifp, m0,
-			    &dst6->sin6_addr, ro->ro_rt);
+			    dst6, ro->ro_rt);
 		else
 			error = EMSGSIZE;
 	}
