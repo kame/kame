@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.321 2002/09/05 08:35:29 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.322 2002/09/06 03:08:44 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -864,7 +864,7 @@ icmp6_input(mp, offp, proto)
 
 	case MLD_LISTENER_QUERY:
 	case MLD_LISTENER_REPORT:
-		if (icmp6len < sizeof(struct mld_hdr))
+		if (icmp6len < MLD_MINLEN)
 			goto badlen;
 		if (icmp6->icmp6_type == MLD_LISTENER_QUERY) /* XXX: ugly... */
 			icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_mldquery);
@@ -882,7 +882,7 @@ icmp6_input(mp, offp, proto)
 
 	case MLD_LISTENER_DONE:
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_mlddone);
-		if (icmp6len < sizeof(struct mld_hdr))	/* necessary? */
+		if (icmp6len < MLD_MINLEN)	/* necessary? */
 			goto badlen;
 		break;		/* nothing to be done in kernel */
 

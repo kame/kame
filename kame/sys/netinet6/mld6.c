@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.52 2002/09/05 09:07:07 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.53 2002/09/06 03:08:45 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -463,10 +463,10 @@ mld6_input(m, off)
 #endif
 
 #ifndef PULLDOWN_TEST
-	IP6_EXTHDR_CHECK(m, off, sizeof(*mldh),);
+	IP6_EXTHDR_CHECK(m, off, MLD_MINLEN,);
 	mldh = (struct mld_hdr *)(mtod(m, caddr_t) + off);
 #else
-	IP6_EXTHDR_GET(mldh, struct mld_hdr *, m, off, sizeof(*mldh));
+	IP6_EXTHDR_GET(mldh, struct mld_hdr *, m, off, MLD_MINLEN);
 	if (mldh == NULL) {
 		icmp6stat.icp6s_tooshort++;
 		return;
@@ -917,7 +917,7 @@ mld6_sendpkt(in6m, type, dst)
 			return;
 	}
 #endif
-	mldh = mld_allocbuf(&mh, sizeof(*mldh), in6m, type, dst, ifp, ia);
+	mldh = mld_allocbuf(&mh, MLD_MINLEN, in6m, type, dst, ifp, ia);
 	if (mldh == NULL)
 		return;
 
@@ -926,7 +926,7 @@ mld6_sendpkt(in6m, type, dst)
 
 	mldh->mld_cksum = in6_cksum(mh, IPPROTO_ICMPV6,
 				    sizeof(struct ip6_hdr),
-				    sizeof(struct mld_hdr));
+				    MLD_MINLEN);
 
 	/* construct multicast option */
 	bzero(&im6o, sizeof(im6o));
@@ -1005,7 +1005,7 @@ mld_allocbuf(mh, len, in6m, type, dst, ifp, ia)
 
 	/* uses cluster in case of MLDv2 */
 	if (md && 
-	    (len > sizeof(struct mld_hdr) || type == MLDV2_LISTENER_REPORT)) {
+	    (len > MLD_MINLEN || type == MLDV2_LISTENER_REPORT)) {
 		/* XXX: assumes len is less than 2K Byte */
 		MCLGET(md, M_DONTWAIT);
 		if ((md->m_flags & M_EXT) == 0) {
@@ -1110,8 +1110,8 @@ mld_sendbuf(mh, ifp)
 	HTONS(mld_rhdr->mld_grpnum);
 	mld_rhdr->mld_cksum = 0;
 
-	mld_rhdr->mld_cksum = in6_cksum(mh, IPPROTO_ICMPV6, sizeof(struct ip6_hdr),
-					sizeof(struct mld_hdr));	
+	mld_rhdr->mld_cksum = in6_cksum(mh, IPPROTO_ICMPV6,
+					sizeof(struct ip6_hdr), MLD_MINLEN);
 
 	/*
 	 * At first, find a link local address on the outgoing interface
