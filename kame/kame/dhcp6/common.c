@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.41 2002/05/08 11:16:31 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.42 2002/05/08 14:48:52 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -811,7 +811,7 @@ duidstr(duid)
 {
 	int i;
 	char *cp;
-	static char duidstr[sizeof("xx:") * 3 + sizeof("...")];
+	static char duidstr[sizeof("xx:") * 256 + sizeof("...")];
 
 	cp = duidstr;
 	for (i = 0; i < duid->duid_len && i <= 256; i++) {
