@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.24 2001/05/08 03:32:48 itojun Exp $	*/
+/*	$KAME: bindtest.c,v 1.25 2001/05/08 03:38:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -75,7 +75,7 @@
 #include <netinet/in.h>
 
 /* portability */
-#if defined(__bsdi__) && _BSDI_VERSION < 199802
+#if (defined(__bsdi__) && _BSDI_VERSION < 199802) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 #define socklen_t	int
 #endif
 
