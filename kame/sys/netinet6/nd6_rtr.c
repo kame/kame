@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.151 2001/07/23 15:09:42 sumikawa Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.152 2001/07/23 15:10:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -741,6 +741,11 @@ defrouter_reset()
 	     dr = TAILQ_NEXT(dr, dr_entry))
 		defrouter_delreq(dr);
 	defrouter_delifreq();
+
+	/*
+	 * XXX should we also nuke any default routers in the kernel, by 
+	 * going through them by rtalloc1()?
+	 */
 }
 
 /*
