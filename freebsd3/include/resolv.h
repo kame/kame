@@ -1,3 +1,32 @@
+/*
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ */
+
 /*-
  * Copyright (c) 1983, 1987, 1989, 1993
  *	The Regents of the University of California.  All rights reserved.
@@ -60,6 +89,7 @@
 #include <sys/param.h>
 #include <sys/types.h>
 #include <sys/cdefs.h>
+#include <sys/socket.h>
 #include <stdio.h>
 
 /*
@@ -89,6 +119,9 @@
 #define	MAXDFLSRCH		3	/* # default domain levels to try */
 #define	MAXDNSRCH		6	/* max # domains in search path */
 #define	LOCALDOMAINPARTS	2	/* min levels in name that is "local" */
+#ifdef __NetBSD__
+#define	MAXDNSLUS		4	/* min # of host lookup types */
+#endif
 
 #define	RES_TIMEOUT		5	/* min. seconds between retries */
 #define	MAXRESOLVSORT		10	/* number of net to sort on */
@@ -113,8 +146,28 @@ struct __res_state {
 		struct in_addr	addr;
 		u_int32_t	mask;
 	} sort_list[MAXRESOLVSORT];
+#ifdef __NetBSD__
+	char	lookups[MAXDNSLUS];
+#else
 	char	pad[72];		/* on an i386 this means 512b total */
+#endif
 };
+
+#if 1 /* INET6 */
+/*
+ * replacement of __res_state, separated to keep binary compatibility.
+ */
+struct __res_state_ext {
+	struct sockaddr_storage nsaddr_list[MAXNS];
+	struct {
+		int	af;		/* address family for addr, mask */
+		union {
+			struct in_addr ina;
+			struct in6_addr in6a;
+		} addr, mask;
+	} sort_list[MAXRESOLVSORT];
+};
+#endif
 
 /*
  * Resolver options (keep these in synch with res_debug.c, please)
@@ -181,6 +234,9 @@ struct res_sym {
 };
 
 extern struct __res_state _res;
+#if 1 /* INET6 */
+extern struct __res_state_ext _res_ext;
+#endif
 extern const struct res_sym __p_class_syms[];
 extern const struct res_sym __p_type_syms[];
 
@@ -214,6 +270,7 @@ extern const struct res_sym __p_type_syms[];
 #define	p_cdname	__p_cdname
 #define	p_fqnname	__p_fqnname
 #define	p_fqname	__p_fqname
+#define	p_rr		__p_rr		/* XXX: from FreeBSD2.2.7 */
 #define	p_option	__p_option
 #define	p_secstodate	__p_secstodate
 #define	dn_count_labels	__dn_count_labels
@@ -262,6 +319,8 @@ const u_char *	p_cdname __P((const u_char *, const u_char *, FILE *));
 const u_char *	p_fqnname __P((const u_char *, const u_char *,
 			       int, char *, int));
 const u_char *	p_fqname __P((const u_char *, const u_char *, FILE *));
+/* XXX: from FreeBSD2.2.7 */
+const u_char *	p_rr __P((const u_char *, const u_char *, FILE *));
 const char *	p_option __P((u_long));
 char *		p_secstodate __P((u_long));
 int		dn_count_labels __P((const char *));
