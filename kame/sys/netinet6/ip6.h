@@ -138,7 +138,11 @@ struct ip6_dest {
 #define IP6OPT_PAD1		0x00	/* 00 0 00000 */
 #define IP6OPT_PADN		0x01	/* 00 0 00001 */
 #define IP6OPT_JUMBO		0xC2	/* 11 0 00010 = 194 */
-#define IP6OPT_RTALERT		0x05	/* 00 0 00101 */
+#define IP6OPT_NSAP_ADDR	0xC3	/* 11 0 00011 */
+#define IP6OPT_TUNNEL_LIMIT	0x04	/* 00 0 00100 */
+#define IP6OPT_RTALERT		0x05	/* 00 0 00101 (KAME definition) */
+#define IP6OPT_ROUTER_ALERT	0x05	/* (2292bis def, recommended) */
+
 #define IP6OPT_RTALERT_LEN	4
 #define IP6OPT_RTALERT_MLD	0	/* Datagram contains an MLD message */
 #define IP6OPT_RTALERT_RSVP	1	/* Datagram contains an RSVP message */
