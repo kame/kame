@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.68 2002/09/27 05:55:52 itojun Exp $	*/
+/*	$KAME: cftoken.l,v 1.69 2002/09/27 06:03:51 itojun Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -39,7 +39,11 @@
 #include "gcmalloc.h"
 #endif
 
+#ifdef HAVE_CFPARSE_H
+#include "cfparse.h"
+#else
 #include "y.tab.h"
+#endif
 
 int yyerrorcount = 0;
 

@@ -50,12 +50,14 @@ CPPFLAGS+=-I${RACOONSRCDIR}/missing
 .if (${MKKERBEROS} != "no")
 CPPFLAGS+=-DHAVE_GSSAPI 
 .endif
+# sys.mk generates cfparse.h, not y.tab.h
+CPPFLAGS+=-DHAVE_CFPARSE_H
 YFLAGS+=-d
 
 # Certificate support
 CPPFLAGS+=-DHAVE_SIGNING_C=1 -DHAVE_OPENSSL_PEM_H=1 -DHAVE_OPENSSL_X509_H=1
+CLEANFILES+=	cfparse.c cftoken.c cfparse.h
 
 .include <bsd.prog.mk>
 
 .PATH:	${RACOONSRCDIR} ${TCPDUMPSRCDIR} ${RACOONSRCDIR}/missing/crypto/rijndael ${RACOONSRCDIR}/missing/crypto/sha2 ${RACOONSRCDIR}/missing
-CLEANFILES+=	y.tab.h cfparse.c cftoken.c
