@@ -419,14 +419,14 @@ am7990_get(sc, boff, totlen)
 			}
 			len = MLEN;
 		}
-		if (totlen + ((!top) ? pad : 0) >= MINCLSIZE) {
+		if (totlen + pad >= MINCLSIZE) {
 			MCLGET(m, M_DONTWAIT);
 			if (m->m_flags & M_EXT)
 				len = MCLBYTES;
 		}
-		if (!top) {
+		if (!top && pad) {
 			m->m_data += pad;
-			len = MHLEN - pad;
+			len -= pad;
 		}
 		m->m_len = len = min(totlen, len);
 		(*sc->sc_copyfrombuf)(sc, mtod(m, caddr_t), boff, len);
@@ -434,6 +434,7 @@ am7990_get(sc, boff, totlen)
 		totlen -= len;
 		*mp = m;
 		mp = &m->m_next;
+		pad = 0;
 	}
 
 	return (top);
