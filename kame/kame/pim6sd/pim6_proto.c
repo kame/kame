@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.52 2002/02/22 15:18:53 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.53 2002/03/05 02:07:19 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -3034,6 +3034,11 @@ pack_jp6_message(pim_nbr)
     if ((bjpm == (build_jp_message_t *) NULL)
 	|| (inet6_equal(&bjpm->curr_group,&sockaddr6_any)))
 	return;
+
+    /* bypass (S,G), (*,G) addition in case of (*,*,RP) */
+    if (bjpm->rp_list_join_number + bjpm->rp_list_prune_number)
+	goto add_star_star_rp;
+
     data_ptr = bjpm->jp_message + bjpm->jp_message_size;
     PUT_EGADDR6(bjpm->curr_group.sin6_addr, bjpm->curr_group_msklen, 0, data_ptr);
     PUT_HOSTSHORT(bjpm->join_addr_number, data_ptr);
@@ -3058,6 +3063,8 @@ pack_jp6_message(pim_nbr)
     (*bjpm->num_groups_ptr)++;
     bjpm->curr_group = sockaddr6_any;
     bjpm->curr_group_msklen = 0;
+
+add_star_star_rp:
     if (*bjpm->num_groups_ptr == ((u_int8) ~ 0 - 1))
     {
 	if (bjpm->rp_list_join_number + bjpm->rp_list_prune_number)
