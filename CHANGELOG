@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2352 2003/02/19 10:34:28 ono Exp $
+$KAME: CHANGELOG,v 1.2353 2003/02/25 10:52:34 suz Exp $
 
 <200302>
+Tue Feb 25 19:50:40 JST 2003	suz@crl.hitachi.co.jp
+	* freebsd{4,5}/sys/netinet/tcp_syncache.c
+	  reflected FreeBSD-SA-03:03.syncookies (Brute force attack on SYN 
+	  cookies)
+
 2003-02-19  Hideki ONO  <ono@soft.net.fujitsu.co.jp>
 	* kame/kame/vrrp6d,
 	  kame/sys/net/{if_vrrp.c,if_vrrp_var.h},kame/sys/netinet6/mld6.c,
