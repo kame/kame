@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1253 2000/09/04 01:48:34 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1254 2000/09/06 07:11:02 sumikawa Exp $
 
 <200009>
+Wed Sep  6 16:08:52 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/xmms: xmms-1.2.2 with IPv6 patch
+	  From: ume@mahoroba.org
+
 Mon Sep  4 10:47:06 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/lynx: upgrade to 2.8.4dev9
 
