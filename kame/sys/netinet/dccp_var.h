@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.9 2003/10/31 08:47:12 ono Exp $	*/
+/*	$KAME: dccp_var.h,v 1.10 2003/11/05 06:36:11 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -103,10 +103,12 @@ struct dccpcb {
 #endif
 };
 
+#ifdef _KERNEL
 struct inp_dp {
 	struct inpcb inp;
 	struct dccpcb dp;
 };
+#endif
 
 #if defined(_NETINET_IN_PCB_H_) && defined(_SYS_SOCKETVAR_H_)
 struct xdccpcb {
@@ -197,6 +199,8 @@ const char *dccpstates[] = {
 	"CLOSED",	"LISTEN",	"REQEST",	"RESPOND",
 	"ESTABLISHED",	"SERVER-CLOSE",	"CLIENT-CLOSE", "TIME_WAIT",
 };
+#else
+extern const char *dccpstates[];
 #endif
 
 #define DCCP_UNDEF	0
@@ -264,7 +268,6 @@ int	dccp_ctloutput(int , struct socket *, int, int, struct mbuf **);
 int	dccp_sysctl(int *, u_int, void *, size_t *, void *, size_t);
 #ifdef __NetBSD__
 int	dccp_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *); 
-int	dccp6_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *);
 #else /* OpenBSD */
 int	dccp_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *);
 #endif
