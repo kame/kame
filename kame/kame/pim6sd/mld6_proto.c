@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.25 2002/06/26 10:24:48 jinmei Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.26 2002/09/17 09:57:19 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -174,8 +174,7 @@ accept_listener_query(src, dst, group, tmo)
 		return;
 	}
 	v = &uvifs[mifi];
-	if(v->uv_mld_version == MLDv2)
-	{
+	if ((v->uv_mld_version & MLDv1) == 0) {
 		log(LOG_WARNING,0,
 		    "Mif %s configured in MLDv2 received MLDv1 query (src %s)!",
 		    v->uv_name,sa6_fmt(src));
@@ -295,8 +294,7 @@ accept_listener_report(src, dst, group)
 		return;
 	}
 
-	if ((mifi = find_vif_direct_local(src)) == NO_VIF)
-	{
+	if ((mifi = find_vif_direct_local(src)) == NO_VIF) {
 		IF_DEBUG(DEBUG_MLD)
 			log(LOG_INFO, 0,
 			    "accept_listener_report: can't find a mif");
@@ -304,8 +302,7 @@ accept_listener_report(src, dst, group)
 	}
 
 	v = &uvifs[mifi];
-	if(v->uv_mld_version == MLDv2)
-	{
+	if (v->uv_mld_version & MLDv2) {
 		log(LOG_WARNING, 0,
 		    "Mif %s configured in MLDv2 received MLDv1 report (src %s)!"
 		    "(compat mode not implemented)",
@@ -421,8 +418,7 @@ accept_listener_done(src, dst, group)
 	}
 
 	v = &uvifs[mifi];
-	if(v->uv_mld_version == MLDv2)
-	{
+	if (v->uv_mld_version & MLDv2) {
 		log(LOG_WARNING, 0,
 		    "Mif %s configured in MLDv2 received MLDv1 done (src %s)!"
 		    "(compat mode not implemented)",

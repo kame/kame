@@ -1,4 +1,4 @@
-/*	$KAME: timer.c,v 1.20 2002/06/26 10:24:48 jinmei Exp $	*/
+/*	$KAME: timer.c,v 1.21 2002/09/17 09:57:20 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -235,16 +235,13 @@ age_vifs()
 		v->uv_querier_timo++; /* count statistics */
 
 		/* send gen. query, start gen. q timer */
-		switch(v->uv_mld_version) {
-		case MLDv1:
-			query_groups(v);
-			break;
 #ifdef MLDV2_LISTENER_REPORT
-		case MLDv2:
+		if (v->uv_mld_version & MLDv2)
 			query_groupsV2(v);
-			break;
+		else
 #endif
-		}
+		if (v->uv_mld_version & MLDv1)
+			query_groups(v);
 
 		/* act as a querier by myself */
 		v->uv_flags |= VIFF_QUERIER;
@@ -256,16 +253,13 @@ age_vifs()
 		/* We are in Querier state */
 		/* MLD6 query periodic */
 		IF_TIMEOUT(v->uv_gq_timer) {
-			switch(v->uv_mld_version) {
-			case 1:
-				query_groups(v);
-				break;
 #ifdef MLDV2_LISTENER_REPORT
-			case 2:
+			if (v->uv_mld_version & MLDv2)
 				query_groupsV2(v);
-				break;
+			else
 #endif
-			}
+			if (v->uv_mld_version & MLDv1)
+				query_groups(v);
 		}
 	}
 

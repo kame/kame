@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.21 2002/05/08 13:13:29 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.22 2002/09/17 09:57:19 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -714,8 +714,7 @@ phyint_config()
 				/* if the mld version is 2 we have to verify if this */
 				/* value is codable in the QQIC field */
 
-				if(v->uv_mld_version == MLDv2 )
-				{
+				if (v->uv_mld_version & MLDv2) {
 					qqic = codafloat(al->attru.number,&realnbr,3,4);
 					if(al->attru.number != realnbr )
 						yywarn("unrepresentable query int. value %.0f, corrected to %d",
@@ -723,7 +722,7 @@ phyint_config()
 				}
 #endif
 
-				if(v->uv_mld_version == MLDv2) 
+				if (v->uv_mld_version & MLDv2)
 					v->uv_mld_query_interval = realnbr;
 				else
 					v->uv_mld_query_interval = al->attru.number;
@@ -741,8 +740,7 @@ phyint_config()
 				/* value is codable in the MAX RESP CODE field */
 				/* if this is mld version 1 we have to verify if this */
 				/* can be coded in 16 bits */
-				if(v->uv_mld_version == MLDv2 )
-				{
+				if (v->uv_mld_version & MLDv2) {
 					qqic = codafloat(al->attru.number,&realnbr,3,12);
 					if(al->attru.number != realnbr )
 						yywarn("unrepresentable query resp. value %.0f, corrected to %d",
@@ -750,7 +748,7 @@ phyint_config()
 				}
 #endif
 
-				if(v->uv_mld_version == MLDv2 ) 
+				if (v->uv_mld_version & MLDv2) 
 					v->uv_mld_query_rsp_interval = realnbr;
 				else
 				{
@@ -775,8 +773,7 @@ phyint_config()
 				/* value is codable in the MAX RESP CODE field */
 				/* if this is mld version 1 we have to verify if this */
 				/* can be coded in 16 bits */
-				if(v->uv_mld_version == MLDv2 )
-				{
+				if (v->uv_mld_version & MLDv2) {
 					qqic = codafloat(al->attru.number,&realnbr,3,12);
 					if(al->attru.number != realnbr )
 						yywarn("unrepresentable llqi value %.0f, corrected to %d",
@@ -784,7 +781,7 @@ phyint_config()
 				}
 #endif
 
-				if(v->uv_mld_version == MLDv2 ) 
+				if (v->uv_mld_version & MLDv2) 
 					v->uv_mld_llqi = realnbr;
 				else
 				{

@@ -44,8 +44,8 @@
 
 /* compatibility modes and mld versions */
 
-#define MLDv2	2
-#define MLDv1	1
+#define MLDv2	0x0002
+#define MLDv1	0x0001
 
 extern void query_groupsV2 __P((struct uvif * v));
 extern void accept_listenerV2_query __P((struct sockaddr_in6 * src,

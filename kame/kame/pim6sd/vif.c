@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.26 2002/06/28 09:03:13 jinmei Exp $	*/
+/*	$KAME: vif.c,v 1.27 2002/09/17 09:57:20 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -343,7 +343,7 @@ void start_vif (mifi_t vifi)
 	     * Join the All-MLDv2-routers multicast group on the interface
 	     * if it is configured so.
 	     */
-	    if (v->uv_mld_version == MLDv2)
+	    if (v->uv_mld_version & MLDv2)
 		k_join(mld6_socket, &allmldv2routers_group.sin6_addr,
 		       v->uv_ifindex);
 
@@ -360,18 +360,13 @@ void start_vif (mifi_t vifi)
 	    v->uv_querier->al_addr = v->uv_linklocal->pa_addr;
 	    v->uv_querier->al_timer = MLD6_OTHER_QUERIER_PRESENT_INTERVAL;
 	    time(&v->uv_querier->al_ctime); /* reset timestamp */
-	    switch (v->uv_mld_version) {
-	    case MLDv1:
-		query_groups(v);
-		break;
 #ifdef MLD6V2_LISTENER_REPORT
-	    case MLDv2:
+	    if (v->uv_mld_version & MLDv2)
 		query_groupsV2(v);
-		break;
+	    else
 #endif
-	    default:
-		break;
-	    }
+	        if (v->uv_mld_version & MLDv2)
+			query_groups(v);
   
 	    /*
 	     * Send a probe via the new vif to look for neighbors.
@@ -405,7 +400,7 @@ void stop_vif( mifi_t vifi )
 	{
 		k_leave( mld6_socket , &allpim6routers_group.sin6_addr , v->uv_ifindex );
 		k_leave( mld6_socket , &allrouters_group.sin6_addr , v->uv_ifindex );
-		if (v->uv_mld_version == MLDv2)
+		if (v->uv_mld_version & MLDv2)
 		    k_leave(mld6_socket, &allmldv2routers_group.sin6_addr,
 		    	    v->uv_ifindex);
     /*
