@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.c,v 1.15 2002/09/26 12:03:32 kjc Exp $	*/
+/*	$KAME: altq_conf.c,v 1.16 2002/10/25 05:08:07 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -86,6 +86,9 @@ altqdev_decl(blue);
 #ifdef ALTQ_PRIQ
 altqdev_decl(priq);
 #endif
+#ifdef ALTQ_JOBS
+altqdev_decl(jobs);
+#endif
 
 /*
  * altq minor device (discipline) table
@@ -146,6 +149,11 @@ static struct altqsw altqsw[] = {				/* minor */
 	{"priq",priqopen,	priqclose,	priqioctl},	/* 11 */
 #else
 	{"noq",	noopen,		noclose,	noioctl},	/* 11 */
+#endif
+#ifdef ALTQ_JOBS
+	{"jobs",jobsopen,	jobsclose,	jobsioctl},	/* 12 */
+#else
+	{"noq", noopen,		noclose,	noioctl},	/* 12 */
 #endif
 };
 
