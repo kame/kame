@@ -92,6 +92,7 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
 #include <netinet6/nd6.h>
+#include <netinet6/scope6_var.h>
 
 #ifndef __bsdi__
 #include "loop.h"
@@ -208,6 +209,10 @@ in6_pcbbind(in6p, nam)
 			return(EADDRNOTAVAIL);
 #endif
 
+		if (ip6_use_defzone && sin6->sin6_scope_id == 0) {
+			sin6->sin6_scope_id =
+				scope6_addr2default(&sin6->sin6_addr);
+		}
 #ifndef SCOPEDROUTING
 		/* KAME hack: embed scopeid */
 		if (in6_embedscope(&sin6->sin6_addr, sin6, in6p, NULL) != 0)
@@ -370,6 +375,10 @@ in6_pcbconnect(in6p, nam)
 	tmp = *sin6;
 	sin6 = &tmp;
 
+	if (ip6_use_defzone && sin6->sin6_scope_id == 0) {
+		sin6->sin6_scope_id =
+			scope6_addr2default(&sin6->sin6_addr);
+	}
 #ifndef SCOPEDROUTING
 	/* KAME hack: embed scopeid */
 	if (in6_embedscope(&sin6->sin6_addr, sin6, in6p, &ifp) != 0)

@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.95 2001/10/29 03:53:49 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.96 2001/11/10 09:56:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -99,9 +99,7 @@
 #endif
 #include <netinet6/nd6.h>
 #include <netinet6/ip6protosw.h>
-#ifdef ENABLE_DEFAULT_SCOPE
 #include <netinet6/scope6_var.h>
-#endif
 #include <netinet6/raw_ip6.h>
 
 #ifdef __OpenBSD__
@@ -843,11 +841,10 @@ rip6_usrreq(so, req, m, nam, control, p)
 			error = EADDRNOTAVAIL;
 			break;
 		}
-#ifdef ENABLE_DEFAULT_SCOPE
-		if (addr->sin6_scope_id == 0)	/* not change if specified  */
+		if (ip6_use_defzone && addr->sin6_scope_id == 0) {
 			addr->sin6_scope_id =
 				scope6_addr2default(&addr->sin6_addr);
-#endif
+		}
 #ifndef SCOPEDROUTING
 		/* KAME hack: embed scopeid */
 		if (in6_embedscope(&addr->sin6_addr, addr, in6p, NULL) != 0)
@@ -885,9 +882,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 	    {
 		struct sockaddr_in6 *addr = mtod(nam, struct sockaddr_in6 *);
 		struct in6_addr *in6a = NULL;
-#ifdef ENABLE_DEFAULT_SCOPE
 		struct sockaddr_in6 sin6;
-#endif
 
 		if (nam->m_len != sizeof(*addr)) {
 			error = EINVAL;
@@ -907,15 +902,13 @@ rip6_usrreq(so, req, m, nam, control, p)
 			break;
 		}
 
-#ifdef ENABLE_DEFAULT_SCOPE
-		if (addr->sin6_scope_id == 0) {
+		if (ip6_use_defzone && addr->sin6_scope_id == 0) {
 			/* protect *addr */
 			sin6 = *addr;
 			addr = &sin6;
 			addr->sin6_scope_id =
 				scope6_addr2default(&addr->sin6_addr);
 		}
-#endif
 #ifndef SCOPEDROUTING
 		/* KAME hack: embed scopeid */
 		if (in6_embedscope(&addr->sin6_addr, addr, in6p, NULL) != 0)
@@ -980,12 +973,10 @@ rip6_usrreq(so, req, m, nam, control, p)
 			tmp = *mtod(nam, struct sockaddr_in6 *);
 			dst = &tmp;
 		}
-#ifdef ENABLE_DEFAULT_SCOPE
-		if (dst->sin6_scope_id == 0) {
+		if (ip6_use_defzone && dst->sin6_scope_id == 0) {
 			dst->sin6_scope_id =
 				scope6_addr2default(&dst->sin6_addr);
 		}
-#endif
 		error = rip6_output(m, so, dst, control);
 		m = NULL;
 		break;
