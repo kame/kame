@@ -189,7 +189,9 @@ getifaddr(addr, ifnam, prefix, plen)
 			for (i = 0; i < sizeof(a); i++)
 				a.s6_addr[i] &= m.s6_addr[i];
 
-			if (memcmp(&a, prefix, plen / 8) != 0)
+			if (memcmp(&a, prefix, plen / 8) != 0 ||
+			    a.s6_addr[plen / 8] !=
+			    (prefix->s6_addr[plen / 8] & m.s6_addr[plen / 8]))
 				continue;
 		}
 		memcpy(addr, &sin6.sin6_addr, sizeof(sin6.sin6_addr));
