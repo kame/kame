@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1710 2001/06/07 02:31:19 sakane Exp $
+$KAME: CHANGELOG,v 1.1711 2001/06/07 11:53:41 jinmei Exp $
 
 <200106>
+2001-06-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ping6/ping6.c: stop sending echo packets whenever the
+	upper limit is specified by the -c option, regardless of the -f
+	option.  Based on a comment from Tomohide Nagashima
+	<tomohide@japan-telecom.co.jp>.
+
 Thu Jun  7 11:30:38 JST 2001 sakane@kame.net
 	* kame/racoon:
 	fixed a segmentation fault when when racoon checks whether there is a
