@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.54 2002/09/06 03:14:34 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.55 2002/09/06 03:15:26 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1109,7 +1109,7 @@ mld_sendbuf(mh, ifp)
 	mld_rhdr->mld_cksum = 0;
 
 	mld_rhdr->mld_cksum = in6_cksum(mh, IPPROTO_ICMPV6,
-					sizeof(struct ip6_hdr), MLD_MINLEN);
+					sizeof(struct ip6_hdr), len);
 
 	/*
 	 * At first, find a link local address on the outgoing interface
