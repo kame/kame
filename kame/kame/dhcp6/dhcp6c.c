@@ -431,8 +431,11 @@ client6_findserv()
 				break;
 			}
 			client6_addserv(p);
+#if 0
 			if (p->st_pref == 255)
 				return;
+#endif
+			return;	/* XXX */
 			break;
 		}
 	}
@@ -450,6 +453,11 @@ client6_getreply(p)
 	/* sanity checks */
 	if (IN6_IS_ADDR_MULTICAST(&p->st_relay)
 	 || IN6_IS_ADDR_MULTICAST(&p->st_serv)) {
+		dprintf((stderr,
+			 "client6_getreply: "
+			 "invlalid server (%s) or relay (%s)\n",
+			 in6addr2str(&p->st_serv, 0),
+			 in6addr2str(&p->st_relay, 0)));
 		return(-1);
 	}
 
@@ -551,6 +559,8 @@ client6_recvadvert(s, serv)
 	 * we used in the Solicit message.
 	 */
 	memcpy(&solid, &dh6a->dh6adv_rsv_id, sizeof(solid));
+	dprintf((stderr, "solicit ID: %d (expected %d)\n",
+		 (ntohs(solid) & DH6SOL_SOLICIT_ID_MASK), current_solicit_id));
 	if ((ntohs(solid) & DH6SOL_SOLICIT_ID_MASK) != current_solicit_id) {
 		dprintf((stderr, "client6_recvadvert: solicit ID mismatch\n"));
 		return(-1);
@@ -633,9 +643,15 @@ client6_sendrequest(s, p)
 	freeaddrinfo(res);
 
 	/*
-	 * If the client is not on the same link as the destination
-	 * server, the client places the appropriate relay's address in the
-	 * ``relay-address'' field.
+	 * Place the address of the destination server in the
+	 * ``server-address'' field.
+	 */
+	dh6r->dh6req_serveraddr = p->st_serv;
+
+	/*
+	 * If the client is not on the same link as the destination server,
+	 * place the appropriate relay's address in the ``relay-address''
+	 * field.
 	 */
 	if (!IN6_IS_ADDR_LINKLOCAL(&p->st_serv)) {
 		offlinkserv = 1;
@@ -657,10 +673,10 @@ client6_sendrequest(s, p)
 	 */
 	if (offlinkserv) {
 		/* check scope */
-		if (getifaddr(&p->st_serv, device, &global_prefix, GLOBAL_PLEN,
+		if (getifaddr(&myaddr, device, &global_prefix, GLOBAL_PLEN,
 			      0, IN6_IFF_INVALID) == 0 ||
 		    (IN6_IS_ADDR_SITELOCAL(&p->st_serv) &&
-		     getifaddr(&p->st_serv, device, &site_local_prefix,
+		     getifaddr(&myaddr, device, &site_local_prefix,
 			       SITE_LOCAL_PLEN, 0, IN6_IFF_INVALID)))
 			direct = 1;
 		else
@@ -671,7 +687,7 @@ client6_sendrequest(s, p)
 		dst.sin6_scope_id = in6_addrscopebyif(&p->st_serv, device);
 	}
 	else {
-		memcpy(&dst.sin6_addr, &p->st_serv, sizeof(p->st_relay));
+		memcpy(&dst.sin6_addr, &p->st_relay, sizeof(p->st_relay));
 		dst.sin6_scope_id = in6_addrscopebyif(&p->st_relay, device);
 	}
 
@@ -680,6 +696,9 @@ client6_sendrequest(s, p)
 		err(1, "transmit failed");
 		/* NOTREACHED */
 	}
+
+	dprintf((stderr, "send request to %s\n",
+		 addr2str((struct sockaddr *)&dst)));
 }
 
 /* 11.4.3. Receipt of Reply message in response to a Request */
