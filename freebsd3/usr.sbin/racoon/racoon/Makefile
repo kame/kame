@@ -26,4 +26,4 @@ MAN8=	racoon.8
 .include <bsd.prog.mk>
 
 CLEANFILES+=	y.tab.h cfparse.c cftoken.c
-.PATH: ${SRCDIR}/missing/crypto/rijndael
+.PATH: ${SRCDIR}/missing/crypto/rijndael ${SRCDIR}/missing/crypto/sha2

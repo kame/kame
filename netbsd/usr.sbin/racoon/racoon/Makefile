@@ -13,7 +13,7 @@ SRCS=	main.c session.c isakmp.c handler.c random.c \
 	vmbuf.c plog.c logger.c schedule.c str2val.c misc.c sockmisc.c \
 	proposal.c sainfo.c vendorid.c safefile.c backupsa.c \
 	dnssec.c getcertsbyname.c
-SRCS+=	rijndael-alg-fst.c rijndael-api-fst.c
+SRCS+=	rijndael-alg-fst.c rijndael-api-fst.c sha2.c
 
 MAN=	racoon.8 racoon.conf.5
 
@@ -57,5 +57,5 @@ CPPFLAGS+=-DHAVE_SIGNING_C=1 -DHAVE_OPENSSL_PEM_H=1 -DHAVE_OPENSSL_X509_H=1
 
 .include <bsd.prog.mk>
 
-.PATH:	${RACOONSRCDIR} ${TCPDUMPSRCDIR} ${RACOONSRCDIR}/missing/crypto/rijndael
+.PATH:	${RACOONSRCDIR} ${TCPDUMPSRCDIR} ${RACOONSRCDIR}/missing/crypto/rijndael ${RACOONSRCDIR}/missing/crypto/sha2
 CLEANFILES+=	y.tab.h cfparse.c cftoken.c

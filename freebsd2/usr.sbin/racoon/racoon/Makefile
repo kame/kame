@@ -11,7 +11,7 @@ SRCS=	main.c session.c isakmp.c handler.c random.c \
 
 # debugging code with print-isakmp.c
 SRCS+=	print-isakmp.c
-SRCS+=	rijndael-alg-fst.c rijndael-api-fst.c
+SRCS+=	rijndael-alg-fst.c rijndael-api-fst.c sha2.c
 CFLAGS+=-I${SRCDIR}/../tcpdump -I${SRCDIR}/../tcpdump/lbl \
 	-DHAVE_PRINT_ISAKMP_C=1
 CFLAGS+=-I${SRCDIR}/missing
@@ -25,4 +25,4 @@ cftoken.o:	y.tab.h cftoken.l
 .include <bsd.prog.mk>
 
 CLEANFILES+=	y.tab.h cfparse.c cftoken.c
-.PATH: ${SRCDIR}/missing/crypto/rijndael
+.PATH: ${SRCDIR}/missing/crypto/rijndael ${SRCDIR}/missing/crypto/sha2
