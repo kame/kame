@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit, 2000
 
-$KAME: CHANGELOG.2000,v 1.2 2001/07/21 06:06:13 itojun Exp $
+$KAME: CHANGELOG.2000,v 1.3 2002/12/10 02:12:08 jinmei Exp $
 
 <200012>
 Thu Dec 28 08:48:12 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
@@ -4718,7 +4718,7 @@ Mon Jan 24 12:49:34 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 
 Sun Jan 23 13:24:00 JST 2000  itojun@iijlab.net
 	* kame/libinet6/getaddrinfo.c: remove #ifdef FAITH (and use of
-	  environment varaible GAI).  this has been broken for a long time
+	  environment variable GAI).  this has been broken for a long time
 	  (means noone is using it), and this shouldn't be here.
 	  if you would like to set FAITH'ed prefix, use totd or /etc/hosts.
 
