@@ -1,42 +1,39 @@
 /*
-//##
-//#------------------------------------------------------------------------
-//# Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
-//# All rights reserved.
-//# 
-//# Redistribution and use in source and binary forms, with or without
-//# modification, are permitted provided that the following conditions
-//# are met:
-//# 1. Redistributions of source code must retain the above copyright
-//#    notice, this list of conditions and the following disclaimer.
-//# 2. Redistributions in binary form must reproduce the above copyright
-//#    notice, this list of conditions and the following disclaimer in the
-//#    documentation and/or other materials provided with the distribution.
-//# 3. Neither the name of the project nor the names of its contributors
-//#    may be used to endorse or promote products derived from this software
-//#    without specific prior written permission.
-//# 
-//# THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
-//# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
-//# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
-//# ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
-//# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-//# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
-//# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
-//# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
-//# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
-//# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
-//# SUCH DAMAGE.
-//#
-//#	$Id: natpt_tslot.c,v 1.1 1999/08/12 12:41:13 shin Exp $
-//#
-//#------------------------------------------------------------------------
-*/
+ * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * All rights reserved.
+ * 
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the project nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THIS SOFTWARE IS PROVIDED BY THE PROJECT AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE PROJECT OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ *	$Id: natpt_tslot.c,v 1.2 1999/12/25 02:35:32 fujisawa Exp $
+ */
 
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/socket.h>
+#include <sys/syslog.h>
 #include <sys/systm.h>
 
 #include <net/if.h>
@@ -44,36 +41,30 @@
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <netinet/ip_icmp.h>
 #include <netinet/tcp.h>
 #include <netinet/tcp_fsm.h>
+#include <netinet/udp.h>
 
 #include <netinet6/in6.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-#include <netinet/tcp.h>
-#else
+#if !defined(__NetBSD__) && (!defined(__FreeBSD__) || (__FreeBSD__ < 3))
 #include <netinet6/tcp6.h>
 #endif
 
-#include <netinet6/ptr_defs.h>
-#include <netinet6/ptr_list.h>
-#include <netinet6/ptr_soctl.h>
-#include <netinet6/ptr_var.h>
+#include <netinet6/natpt_defs.h>
+#include <netinet6/natpt_list.h>
+#include <netinet6/natpt_soctl.h>
+#include <netinet6/natpt_var.h>
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-static MALLOC_DEFINE(M_PM, "SuMiRe", "Packet Management by SuMiRe");
-#endif
 
 /*
-//##
-//#------------------------------------------------------------------------
-//#
-//#------------------------------------------------------------------------
-*/
+ *
+ */
 
-static	Cell	*_insideHash [PTR_MAXHASH];
-static	Cell	*_outsideHash[PTR_MAXHASH];
+static	Cell	*_insideHash [NATPT_MAXHASH];
+static	Cell	*_outsideHash[NATPT_MAXHASH];
 
 static	Cell	*tSlotEntry;
 static	int	 tSlotEntryMax;
@@ -83,14 +74,17 @@ static	time_t	 tSlotTimer;
 static	time_t	 maxTTLany;
 static	time_t	 maxTTLicmp;
 static	time_t	 maxTTLudp;
-static  time_t	 maxTTLtcp;
+static	time_t	 maxTTLtcp;
 
-static	time_t	 _ptr_TCPT_2MSL;
-static	time_t	 _ptr_tcp_maxidle;
+static	time_t	 _natpt_TCPT_2MSL;
+static	time_t	 _natpt_tcp_maxidle;
 
-extern	struct in6_addr	 ptr_faith_prefix;
-extern	struct in6_addr	 ptr_faith_prefixmask;
+extern	struct in6_addr	 faith_prefix;
+extern	struct in6_addr	 faith_prefixmask;
 
+
+static struct _pat	*fillupOutgoingV6local	__P((struct _cSlot *, struct _cv *, struct _pat *));
+static struct _pat	*fillupOutgoingV6Remote	__P((struct _cSlot *, struct _cv *, struct _pat *));
 
 static struct _tSlot	*registTSlotEntry	__P((struct _tSlot *));
 static void	 _expireTSlot			__P((void *));
@@ -106,16 +100,15 @@ static int	 _hash_sockaddr4		__P((struct sockaddr_in *));
 static int	 _hash_sockaddr6		__P((struct sockaddr_in6 *));
 static int	 _hash_pjw			__P((u_char *, int));
 
-void	init_hash				__P((void));
-void	init_tslot				__P((void));
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+static	MALLOC_DEFINE(M_NATPT, "NATPT", "Network Address Translation - Protocol Translation");
+#endif
 
 
 /*
-//##
-//#------------------------------------------------------------------------
-//#
-//#------------------------------------------------------------------------
-*/
+ *
+ */
 
 struct _tSlot	*
 lookingForIncomingV4Hash(struct _cv *cv)
@@ -274,7 +267,7 @@ internIncomingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
 	local->dport = cv4->_payload._tcp4->th_dport;
     }
     local->src.u.in6.s6_addr32[3] = cv4->_ip._ip4->ip_src.s_addr;
-    local->dst.u.in6 = acs->local.u.in6;
+    local->dst.u.in6 = acs->local.in6;
     local->src.sa_family = local->dst.sa_family = AF_INET6;
 
     remote = &ats->remote;
@@ -285,7 +278,7 @@ internIncomingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
 	remote->sport = cv4->_payload._tcp4->th_dport;
 	remote->dport = cv4->_payload._tcp4->th_sport;
     }
-    remote->src.u.in4 = acs->remote.u.in4;
+    remote->src.u.in4 = acs->remote.in4;
     remote->dst.u.in4 = cv4->_ip._ip4->ip_src;
     remote->src.sa_family = remote->dst.sa_family = AF_INET;
 
@@ -331,15 +324,14 @@ internOutgoingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
 	local->dport = cv4->_payload._tcp4->th_sport;
     }
 
-    if (acs->type == PTR_FAITH)
+    if (acs->c.flags == NATPT_FAITH)
     {
 	local->src.u.in4 = cv4->_ip._ip4->ip_dst;
 	local->dst.u.in4 = cv4->_ip._ip4->ip_src;
     }
     else
     {
-
-	local->src.u.in4 = acs->local.u.in4;
+	local->src.u.in4 = acs->local.in4;
 	local->dst.u.in4 = cv4->_ip._ip4->ip_src;
     }
 
@@ -353,21 +345,21 @@ internOutgoingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
 	remote->dport = cv4->_payload._tcp4->th_dport;
     }
 
-    if (acs->type == PTR_FAITH)
+    if (acs->c.flags == NATPT_FAITH)
     {
 	struct in6_ifaddr	*ia6;
 
-	remote->dst.u.in6.s6_addr32[0] = ptr_faith_prefix.s6_addr32[0];
-	remote->dst.u.in6.s6_addr32[1] = ptr_faith_prefix.s6_addr32[1];
+	remote->dst.u.in6.s6_addr32[0] = faith_prefix.s6_addr32[0];
+	remote->dst.u.in6.s6_addr32[1] = faith_prefix.s6_addr32[1];
 	remote->dst.u.in6.s6_addr32[3] = cv4->_ip._ip4->ip_dst.s_addr;
 
-	ia6 = in6_ifawithscope(ptr_ip6src, &remote->dst.u.in6);
+	ia6 = in6_ifawithscope(natpt_ip6src, &remote->dst.u.in6);
 	remote->src.u.in6 = ia6->ia_addr.sin6_addr;
     }
     else
     {
 	remote->src.u.in6.s6_addr32[3] = cv4->_ip._ip4->ip_src.s_addr;
-	remote->dst.u.in6 = acs->remote.u.in6;
+	remote->dst.u.in6 = acs->remote.in6;
     }
 
     ats->ip_payload = cv4->ip_payload;
@@ -410,7 +402,7 @@ internIncomingV6Hash(int sess, struct _cSlot *acs, struct _cv *cv6)
 	local->sport = cv6->_payload._tcp6->th_sport;
 	local->dport = cv6->_payload._tcp6->th_dport;
     }
-    local->src.u.in4 = acs->local.u.in4;
+    local->src.u.in4 = acs->local.in4;
     local->dst.u.in4.s_addr = cv6->_ip._ip6->ip6_dst.s6_addr32[3];
     local->src.sa_family = local->dst.sa_family = AF_INET;
 
@@ -423,7 +415,7 @@ internIncomingV6Hash(int sess, struct _cSlot *acs, struct _cv *cv6)
 	remote->dport = cv6->_payload._tcp6->th_sport;
     }
     remote->src.u.in6 = cv6->_ip._ip6->ip6_dst;
-    remote->dst.u.in6 = acs->remote.u.in6;
+    remote->dst.u.in6 = acs->remote.in6;
     remote->src.sa_family = remote->dst.sa_family = AF_INET6;
 
     ats->ip_payload = cv6->ip_payload;
@@ -449,6 +441,8 @@ internOutgoingV6Hash(int sess, struct _cSlot *acs, struct _cv *cv6)
     struct _pat		*local, *remote;
     struct _tSlot	*ats;
 
+    natpt_logIp6(LOG_DEBUG, cv6->_ip._ip6);
+
     MALLOC(ats, struct _tSlot *, sizeof(struct _tSlot), M_TEMP, M_NOWAIT);
     if (ats == NULL)
     {
@@ -458,29 +452,12 @@ internOutgoingV6Hash(int sess, struct _cSlot *acs, struct _cv *cv6)
     
     bzero(ats, sizeof(struct _tSlot));
 
-    local = &ats->local;
-    local->ip_p = IPPROTO_IPV6;
-    if ((cv6->ip_payload == IPPROTO_TCP)
-	|| (cv6->ip_payload == IPPROTO_UDP))
+    local = fillupOutgoingV6local (acs, cv6, &ats->local);
+    if ((remote = fillupOutgoingV6Remote(acs, cv6, &ats->remote)) == 0)
     {
-	local->sport = cv6->_payload._tcp6->th_dport;
-	local->dport = cv6->_payload._tcp6->th_sport;
+	FREE(ats, M_TEMP);
+	return (NULL);
     }
-    local->src.u.in6 = cv6->_ip._ip6->ip6_dst;
-    local->dst.u.in6 = acs->local.u.in6;
-    local->src.sa_family = local->dst.sa_family = AF_INET6;
-
-    remote = &ats->remote;
-    remote->ip_p = IPPROTO_IPV4;
-    if ((cv6->ip_payload == IPPROTO_TCP)
-	|| (cv6->ip_payload == IPPROTO_UDP))
-    {
-	remote->sport = cv6->_payload._tcp6->th_sport;
-	remote->dport = cv6->_payload._tcp6->th_dport;
-    }
-    remote->src.u.in4 = acs->remote.u.in4;
-    remote->dst.u.in4.s_addr = cv6->_ip._ip6->ip6_dst.s6_addr32[3];
-    remote->src.sa_family = remote->dst.sa_family = AF_INET;
 
     ats->ip_payload = cv6->ip_payload;
     ats->session = sess;
@@ -495,6 +472,131 @@ internOutgoingV6Hash(int sess, struct _cSlot *acs, struct _cv *cv6)
     splx(s);
 
     return (ats);
+}
+
+
+struct _tSlot *
+checkTraceroute6Return(struct _cv *cv4)
+{
+    int			 hv;
+    Cell		*p;
+    struct ip		*icmpip4;
+    struct udphdr	*icmpudp4;
+    struct sockaddr_in	 src, dst;
+    struct _tSlot	*ats;
+
+    if ((cv4->ip_payload != IPPROTO_ICMP)
+	|| ((cv4->_payload._icmp4->icmp_type != ICMP_UNREACH)
+	    && (cv4->_payload._icmp4->icmp_type != ICMP_TIMXCEED)))
+	return (NULL);
+
+    icmpip4 = &cv4->_payload._icmp4->icmp_ip;
+    if (icmpip4->ip_p != IPPROTO_UDP)
+	return (NULL);
+
+#if defined(fixSuMiReICMPBug)
+    icmpip4->ip_src.s_addr = ICMPSRC;					/* XXX	*/
+#endif
+
+    icmpudp4 = (struct udphdr *)((caddr_t)icmpip4 + (icmpip4->ip_hl << 2));
+
+    bzero(&src, sizeof(struct sockaddr_in));
+    bzero(&dst, sizeof(struct sockaddr_in));
+    src.sin_addr = icmpip4->ip_src;
+    src.sin_port = icmpudp4->uh_sport;
+    dst.sin_addr = icmpip4->ip_dst;
+    dst.sin_port = icmpudp4->uh_dport;
+    hv = ((_hash_sockaddr4(&src) + _hash_sockaddr4(&dst)) % NATPT_MAXHASH);
+    for (p = _outsideHash[hv]; p; p = CDR(p))
+    {
+	ats = (struct _tSlot *)CAR(p);
+
+	if (ats->remote.ip_p != IPPROTO_IPV4)				continue;
+	if (ats->ip_payload  != IPPROTO_UDP)				continue;
+
+	if (icmpip4->ip_src.s_addr != ats->remote.src.u.in4.s_addr)	continue;
+	if (icmpip4->ip_dst.s_addr != ats->remote.dst.u.in4.s_addr)	continue;
+
+	if (icmpudp4->uh_sport != ats->remote.sport)			continue;
+	if (icmpudp4->uh_dport != ats->remote.dport)			continue;
+
+	cv4->flags |= NATPT_TRACEROUTE;
+	return (ats);
+    }
+
+    return (NULL);
+}
+
+
+static struct _pat *
+fillupOutgoingV6local(struct _cSlot *acs, struct _cv *cv6, struct _pat *local)
+{
+    local->ip_p = IPPROTO_IPV6;
+    local->src.sa_family = local->dst.sa_family = AF_INET6;
+    local->src.u.in6 = cv6->_ip._ip6->ip6_dst;
+    local->dst.u.in6 = cv6->_ip._ip6->ip6_src;
+
+    if ((cv6->ip_payload == IPPROTO_TCP)
+	|| (cv6->ip_payload == IPPROTO_UDP))
+    {
+	local->sport = cv6->_payload._tcp6->th_dport;
+	local->dport = cv6->_payload._tcp6->th_sport;
+    }
+
+    return (local);
+}
+
+
+static struct _pat *
+fillupOutgoingV6Remote(struct _cSlot *acs, struct _cv *cv6, struct _pat *remote)
+{
+    remote->ip_p = IPPROTO_IPV4;
+    remote->src.sa_family = remote->dst.sa_family = AF_INET;
+    remote->src.u.in4 = acs->remote.in4;
+    remote->dst.u.in4.s_addr = cv6->_ip._ip6->ip6_dst.s6_addr32[3];
+
+    if ((cv6->ip_payload == IPPROTO_TCP)
+	|| (cv6->ip_payload == IPPROTO_UDP))
+    {
+	remote->sport = cv6->_payload._tcp6->th_sport;
+	remote->dport = cv6->_payload._tcp6->th_dport;
+
+	if (acs->c.flags == NATPT_DYNAMIC)
+	{
+	    int		firsttime = 0;
+	    struct _pat	pata;	/* pata.{s,d}port hold network byte order	*/
+
+	    if (acs->aux->cport == 0)
+		acs->aux->cport = acs->sport - 1;
+
+	    bzero(&pata, sizeof(pata));
+	    pata.ip_p = IPPROTO_IPV4;
+	    pata.src.u.in4 = acs->remote.in4;
+	    pata.dst.u.in4.s_addr = cv6->_ip._ip6->ip6_dst.s6_addr32[3];
+	    pata.dport = remote->dport;
+
+	    for (;;)
+	    {
+		while (++acs->aux->cport <= acs->eport)
+		{
+		    pata.sport = htons(acs->aux->cport);
+		    if (_outsideHash[_hash_pat4(&pata)] == NULL)
+			goto found;
+		}
+
+		if (firsttime == 0)
+		    firsttime++,
+		    acs->aux->cport = acs->sport - 1;
+		else
+		    return (NULL);
+	    }
+
+	found:;
+	    remote->sport = pata.sport;
+	}
+    }
+
+    return (remote);
 }
 
 
@@ -529,17 +631,13 @@ registTSlotEntry(struct _tSlot *ats)
 
 
 /*
-//##
-//#------------------------------------------------------------------------
-//#
-//#------------------------------------------------------------------------
-*/
+ *
+ */
 
 static void
 _expireTSlot(void *ignored_arg)
 {
     struct timeval	atv;
-    int			s;
 
     timeout(_expireTSlot, (caddr_t)0, tSlotTimer);
     microtime(&atv);
@@ -577,13 +675,13 @@ _expireTSlotEntry(struct timeval *atv)
 	    switch (tsl->suit.tcp->_state)
 	    {
 	      case TCPS_CLOSED:
-		if ((atv->tv_sec - tsl->tstamp) >= _ptr_TCPT_2MSL)
+		if ((atv->tv_sec - tsl->tstamp) >= _natpt_TCPT_2MSL)
 		    _removeTSlotEntry(p0, q);
 		break;
 
 	      case TCPS_SYN_SENT:
 	      case TCPS_SYN_RECEIVED:
-		if ((atv->tv_sec - tsl->tstamp) >= _ptr_tcp_maxidle)
+		if ((atv->tv_sec - tsl->tstamp) >= _natpt_tcp_maxidle)
 		    _removeTSlotEntry(p0, q);
 		break;
 
@@ -594,12 +692,12 @@ _expireTSlotEntry(struct timeval *atv)
 
 	      case TCPS_FIN_WAIT_1:
 	      case TCPS_FIN_WAIT_2:
-		if ((atv->tv_sec - tsl->tstamp) >= _ptr_tcp_maxidle)
+		if ((atv->tv_sec - tsl->tstamp) >= _natpt_tcp_maxidle)
 		    _removeTSlotEntry(p0, q);
 		break;
 		
 	      case TCPS_TIME_WAIT:
-		if ((atv->tv_sec - tsl->tstamp) >= _ptr_TCPT_2MSL)
+		if ((atv->tv_sec - tsl->tstamp) >= _natpt_TCPT_2MSL)
 		    _removeTSlotEntry(p0, q);
 		break;
 
@@ -634,7 +732,7 @@ _removeTSlotEntry(struct _cell *p, struct _cell *q)
     if ((tsl->ip_payload == IPPROTO_TCP)
 	&& (tsl->suit.tcp != NULL))
     {
-	FREE(tsl->suit.tcp, M_PM);
+	FREE(tsl->suit.tcp, M_NATPT);
     }
 
     if (tsl->local.ip_p == IPPROTO_IPV4)
@@ -660,7 +758,7 @@ _removeTSlotEntry(struct _cell *p, struct _cell *q)
     splx(s);
 
     LST_free(p);
-    FREE(tsl, M_PM);
+    FREE(tsl, M_NATPT);
 
     tSlotEntryUsed--;
 }
@@ -703,11 +801,8 @@ _removeHash(Cell *(*table)[], int hv, caddr_t node)
 
 
 /*
-//##
-//#------------------------------------------------------------------------
-//#
-//#------------------------------------------------------------------------
-*/
+ *
+ */
 
 static int
 _hash_ip4(struct _cv *cv)
@@ -730,7 +825,7 @@ _hash_ip4(struct _cv *cv)
 	dst.sin_port = tcp->th_dport;
     }
 
-    return ((_hash_sockaddr4(&src) + _hash_sockaddr4(&dst)) % PTR_MAXHASH);
+    return ((_hash_sockaddr4(&src) + _hash_sockaddr4(&dst)) % NATPT_MAXHASH);
 }
 
 
@@ -755,7 +850,7 @@ _hash_ip6(struct _cv *cv)
 	dst.sin6_port = tcp6->th_dport;
     }
 
-    return ((_hash_sockaddr6(&src) + _hash_sockaddr6(&dst)) % PTR_MAXHASH);
+    return ((_hash_sockaddr6(&src) + _hash_sockaddr6(&dst)) % NATPT_MAXHASH);
 }
 
 
@@ -772,7 +867,7 @@ _hash_pat4(struct _pat *pat4)
     dst.sin_port = pat4->dport;
     dst.sin_addr = pat4->dst.u.in4;
 
-    return ((_hash_sockaddr4(&src) + _hash_sockaddr4(&dst)) % PTR_MAXHASH);
+    return ((_hash_sockaddr4(&src) + _hash_sockaddr4(&dst)) % NATPT_MAXHASH);
 }
 
 
@@ -789,7 +884,7 @@ _hash_pat6(struct _pat *pat6)
     dst.sin6_port = pat6->dport;
     dst.sin6_addr = pat6->dst.u.in6;
 
-    return ((_hash_sockaddr6(&src) + _hash_sockaddr6(&dst)) % PTR_MAXHASH);
+    return ((_hash_sockaddr6(&src) + _hash_sockaddr6(&dst)) % NATPT_MAXHASH);
 }
 
 
@@ -828,27 +923,24 @@ _hash_pjw(register u_char *s, int len)
     for (c = h = g = 0; c < len; c++, s++)
     {
 	h = (h << 4) + (*s);
-	if (g = h & 0xf0000000)
+	if ((g = h & 0xf0000000))
 	{
 	    h ^= (g >> 24);
 	    h ^= g;
 	}
     }
-    return (h % PTR_MAXHASH);
+    return (h % NATPT_MAXHASH);
 }
 
 
 /*
-//##
-//#------------------------------------------------------------------------
-//#
-//#------------------------------------------------------------------------
-*/
+ *
+ */
 
 void
 init_hash()
 {
-    bzero((caddr_t)_insideHash,  sizeof(_insideHash));
+    bzero((caddr_t)_insideHash,	 sizeof(_insideHash));
     bzero((caddr_t)_outsideHash, sizeof(_outsideHash));
 }
 
@@ -863,9 +955,9 @@ init_tslot()
     tSlotTimer = 60 * hz;
     timeout(_expireTSlot, (caddr_t)0, tSlotTimer);
 
-    _ptr_TCPT_2MSL   = 120;				/* [sec]	*/
-    _ptr_tcp_maxidle = 600;				/* [sec]	*/
+    _natpt_TCPT_2MSL   = 120;				/* [sec]	*/
+    _natpt_tcp_maxidle = 600;				/* [sec]	*/
 
-    maxTTLicmp = maxTTLudp = _ptr_TCPT_2MSL;
+    maxTTLicmp = maxTTLudp = _natpt_TCPT_2MSL;
     maxTTLtcp  = maxTTLany = 86400;			/* [sec]	*/
 }
