@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.64 2000/09/22 17:42:09 itojun Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.65 2000/09/22 20:33:53 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.64 2000/09/22 17:42:09 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.65 2000/09/22 20:33:53 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -216,9 +216,9 @@ quick_i1send(iph2, msg)
 	 */
 	id = (struct ipsecdoi_id_b *)iph2->id->v;
 	id_p = (struct ipsecdoi_id_b *)iph2->id_p->v;
-	if ((id->proto_id == IPPROTO_IP || id->proto_id == IPPROTO_IPV6) &&
-	    (id_p->proto_id == IPPROTO_IP || id_p->proto_id == IPPROTO_IPV6) &&
-	    ipsecdoi_transportmode(iph2)) {
+	if (id->proto_id == 0
+	 && id_p->proto_id == 0
+	 && ipsecdoi_transportmode(iph2)) {
 		/* XXX debug message? */
 		idci = idcr = 0;
 	} else
