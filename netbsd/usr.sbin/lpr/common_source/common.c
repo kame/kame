@@ -139,6 +139,7 @@ getport(rhost, rport)
 	int lport = IPPORT_RESERVEDMAX;
 	int error, s;
 	int timo = 1;
+	int refuse, trial;
 
 	/*
 	 * Get the host address and port number to connect to.
@@ -156,8 +157,10 @@ getport(rhost, rport)
 	 * Try connecting to the server.
 	 */
 	s = -1;
-	for (r = res; r; r = r->ai_next) {
 retry:
+	refuse = trial = 0;
+	for (r = res; r; r = r->ai_next) {
+		trial++;
 		seteuid(euid);
 		s = rresvport_af(&lport, r->ai_family);
 		seteuid(uid);
@@ -172,14 +175,16 @@ retry:
 				lport--;
 				goto retry;
 			}
-			if (errno == ECONNREFUSED && timo <= 16) {
-				sleep(timo);
-				timo *= 2;
-				goto retry;
-			}
+			if (errno == ECONNREFUSED)
+				refuse++;
 			continue;
 		} else
 			break;
+	}
+	if (trial == refuse && timo <= 16) {
+		sleep(timo);
+		timo *= 2;
+		goto retry;
 	}
 	if (res)
 		freeaddrinfo(res);
