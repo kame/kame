@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.127 2001/02/26 06:10:12 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.128 2001/02/26 07:03:02 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3212,7 +3212,6 @@ set_identifier(vpp, type, value)
 		FILE *fp;
 		char b[512];
 		int tlen, len;
-		vchar_t *p;
 
 		fp = fopen(value->v, "r");
 		if (fp == NULL) {
@@ -3221,15 +3220,13 @@ set_identifier(vpp, type, value)
 			return -1;
 		}
 		tlen = 0;
-		while ((len = fread(b, sizeof(b), 1, fp)) != 0) {
-			p = realloc(new, tlen + len);
-			if (!p) {
+		while ((len = fread(b, 1, sizeof(b), fp)) != 0) {
+			new = vrealloc(new, tlen + len);
+			if (!new) {
 				fclose(fp);
-				if (new)
-					vfree(new);
 				return -1;
 			}
-			memcpy(new + tlen, b, len);
+			memcpy(new->v + tlen, b, len);
 			tlen += len;
 		}
 		break;
