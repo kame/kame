@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.56 2002/01/11 02:29:31 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.57 2002/04/28 10:37:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -158,11 +158,9 @@ main(argc, argv)
 	int maxfd = 0;
 	struct timeval *timeout;
 	int i, ch;
-	int fflag = 0;
+	int fflag = 0, logopt;
 	FILE *pidfp;
 	pid_t pid;
-
-	openlog("rtadvd", LOG_NDELAY|LOG_PID, LOG_DAEMON);
 
 	/* get command line options and arguments */
 #ifdef MIP6
@@ -216,6 +214,12 @@ main(argc, argv)
 			"interfaces...\n");
 		exit(1);
 	}
+
+	logopt = LOG_NDELAY | LOG_PID;
+	if (fflag)
+		logopt |= LOG_PERROR;
+	openlog("rtadvd", logopt, LOG_DAEMON);
+
 
 	/* set log level */
 	if (dflag == 0)
