@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.24 2002/06/19 06:23:48 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.25 2002/06/19 06:50:00 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -294,11 +294,17 @@ appendPAddr6(struct logmsg *lmsg, struct cSlot *csl, struct mAddr *mpad)
 void
 appendPort(struct logmsg *lmsg, struct mAddr *mpad)
 {
+	char	*fmtd = " - %d";
+
+	if (cslmode == 0) {
+		fmtd = "-%d";
+	}
+
 	if (mpad->Port[0]) {
 		concat(lmsg, " port %d", ntohs(mpad->saddr.port[0]));
 		if (mpad->Port[1] != 0) {
 			if (mpad->saddr.pType == PORT_MINUS)
-				concat(lmsg, " - %d", ntohs(mpad->Port[1]));
+				concat(lmsg, fmtd, ntohs(mpad->Port[1]));
 			else
 				concat(lmsg, " : %d",
 				       ntohs(mpad->Port[1]) - ntohs(mpad->Port[0]));
