@@ -1,5 +1,5 @@
 /*
- * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.4 1999/09/02 12:18:10 itojun Exp $
+ * $Header: /usr/home/sumikawa/kame/kame/kame/kame/route6d/route6d.c,v 1.5 1999/09/08 02:55:03 itojun Exp $
  */
 
 /*
@@ -32,7 +32,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$Id: route6d.c,v 1.4 1999/09/02 12:18:10 itojun Exp $";
+static char _rcsid[] = "$Id: route6d.c,v 1.5 1999/09/08 02:55:03 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -49,6 +49,7 @@ static char _rcsid[] = "$Id: route6d.c,v 1.4 1999/09/02 12:18:10 itojun Exp $";
 #endif
 #include <syslog.h>
 #include <stddef.h>
+#include <err.h>
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -193,6 +194,8 @@ time_t	sup_trig_update = 0;
 
 FILE	*rtlog = NULL;
 
+int logopened = 0;
+
 static	u_long	seq = 0;
 
 #define	RTF_AGGREGATE		0x08000000
@@ -270,6 +273,7 @@ main(argc, argv)
 	sigset_t mask, omask;
 	FILE	*pidfile;
 	extern char *optarg;
+	extern int optind;
 	char *progname;
 
 	pid = getpid();
@@ -308,11 +312,14 @@ main(argc, argv)
 		FLAG('S', Sflag, 1);
 #undef	FLAG
 		default:
-			fprintf(stderr,
-				"Invalid option specified, terminating\n");
-			exit(1);
+			fatal("Invalid option specified, terminating");
 		}
 	}
+	argc -= optind;
+	argv += optind;
+	if (argc > 0)
+		fatal("bogus extra arguments");
+
 	if (geteuid()) {
 		nflag = 1;
 		fprintf(stderr, "No kernel update is allowed\n");
@@ -323,6 +330,7 @@ main(argc, argv)
 	else
 		progname = *argv;
 	openlog(progname, LOG_NDELAY|LOG_PID, LOG_DAEMON);
+	logopened++;
 	init();
 	ifconfig();
 	for (ifcp = ifc; ifcp; ifcp = ifcp->ifc_next) {
