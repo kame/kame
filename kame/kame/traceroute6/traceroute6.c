@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.40 2001/01/12 18:49:34 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.41 2001/01/12 20:04:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -582,7 +582,7 @@ main(argc, argv)
 	memcpy(&Dst, res->ai_addr, res->ai_addrlen);
 	hostname = res->ai_canonname ? strdup(res->ai_canonname) : *argv;
 	if (!hostname) {
-		(void)fprintf(stderr, "traceroute6: not enhough core\n");
+		(void)fprintf(stderr, "traceroute6: not enough core\n");
 		exit(1);
 	}
 
