@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.27 2003/10/05 00:09:36 itojun Exp $	*/
+/*	$KAME: if.c,v 1.28 2003/10/21 08:06:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -437,7 +437,7 @@ get_isatap_router(struct ifinfo *ifinfo, void **buf)
 	if (sysctl(mib, 4, NULL, &needed, NULL, 0) < 0)
 		return 0;
 	if (needed == 0)
-		return NULL;
+		return 0;
 	if ((*buf = malloc(needed)) == NULL) {
 		warnmsg(LOG_ERR, __func__, "malloc failed");
 		exit(1);
