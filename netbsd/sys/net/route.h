@@ -340,8 +340,5 @@ int	 rtrequest __P((int, struct sockaddr *,
 	    struct sockaddr *, struct sockaddr *, int, struct rtentry **));
 int	 rtrequest1 __P((int, struct rt_addrinfo *, struct rtentry **));
 
-#ifdef MIP6
-void	rt_mip6msg __P((int, struct ifnet *, struct rtentry *));
-#endif
 #endif /* _KERNEL */
 #endif /* _NET_ROUTE_H_ */

@@ -63,7 +63,6 @@
  * $FreeBSD: src/sys/net/rtsock.c,v 1.37.2.2 1999/12/30 09:17:22 ru Exp $
  */
 
-/* for MIP6 */
 #include "opt_inet.h"
 #include "opt_inet6.h"
 
@@ -1196,6 +1195,3 @@ static struct domain routedomain =
 
 DOMAIN_SET(route);
 
-#ifdef MIP6
-#include <net/rtsock_mip.c>
-#endif
