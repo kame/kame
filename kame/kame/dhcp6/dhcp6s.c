@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.88 2002/06/14 15:32:56 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.89 2002/06/23 05:37:11 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -574,7 +574,7 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 
 	/*
 	 * Servers MUST discard any Solicit messages that do not include a
-	 * Client Identifier option. [dhcpv6-24 Section 15.2]
+	 * Client Identifier option. [dhcpv6-26 Section 15.2]
 	 */
 	if (optinfo->clientID.duid_len == 0) {
 		dprintf(LOG_INFO, "%s" "no client ID option", FNAME);
@@ -644,7 +644,7 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 		 * server has been configured to respond with committed address
 		 * assignments and other resources, responds to the Solicit
 		 * with a Reply message.
-		 * [dhcpv6-24 Section 17.2.1]
+		 * [dhcpv6-26 Section 17.2.1]
 		 */
 		roptinfo.rapidcommit = 1;
 		resptype = DH6_REPLY;
@@ -674,7 +674,7 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 	struct host_conf *client_conf;
 	struct dhcp6_listval *opt, *p;
 
-	/* message validation according to Section 15.4 of dhcpv6-24 */
+	/* message validation according to Section 15.4 of dhcpv6-26 */
 
 	/* the message must include a Server Identifier option */
 	if (optinfo->serverID.duid_len == 0) {
@@ -712,9 +712,10 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 	 * When the server receives a Request message via unicast from a
 	 * client to which the server has not sent a unicast option, the server
 	 * discards the Request message and responds with a Reply message
-	 * containing a status code option with value UseMulticast and no other
-	 * options.
-	 * [dhcpv6-24 18.2.1]
+	 * containing a Status Code option with value UseMulticast, a Server
+	 * Identifier option containing the server's DUID, the Client
+	 * Identifier option from the client message and no other options.
+	 * [dhcpv6-26 18.2.1]
 	 * (Our current implementation never sends a unicast option.)
 	 */
 	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
@@ -756,7 +757,7 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 	 * server MUST include options in the Reply message for any options in
 	 * the Option Request option the server is configured to return to the
 	 * client.
-	 * [dhcpv6-24 18.2.1]
+	 * [dhcpv6-26 18.2.1]
 	 * Note: our current implementation always includes all information
 	 * that we can provide.  So we do not have to check the option request
 	 * options.
@@ -805,7 +806,7 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 	struct dhcp6_binding *binding;
 	int add_success = 0;
 
-	/* message validation according to Section 15.6 of dhcpv6-24 */
+	/* message validation according to Section 15.6 of dhcpv6-26 */
 
 	/* the message must include a Server Identifier option */
 	if (optinfo->serverID.duid_len == 0) {
@@ -840,12 +841,13 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 	}
 
 	/*
-	 * When the server receives a Request message via unicast from a
+	 * When the server receives a Renew message via unicast from a
 	 * client to which the server has not sent a unicast option, the server
 	 * discards the Request message and responds with a Reply message
-	 * containing a status code option with value UseMulticast and no other
-	 * options.
-	 * [dhcpv6-24 18.2.3]
+	 * containing a status code option with value UseMulticast, a Server
+	 * Identifier option containing the server's DUID, the Client
+	 * Identifier option from the client message and no other options.
+	 * [dhcpv6-26 18.2.3]
 	 * (Our current implementation never sends a unicast option.)
 	 */
 	if (!IN6_IS_ADDR_MULTICAST(&pi->ipi6_addr)) {
