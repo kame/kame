@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.117 2002/02/04 06:20:30 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.118 2002/02/21 05:15:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1000,6 +1000,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 				 */
 				log(LOG_INFO, "rip6 SEND: address family is "
 				    "unspec. Assume AF_INET6\n");
+				dst->sin6_family = AF_INET6;
 			} else if (dst->sin6_family != AF_INET6) {
 				error = EAFNOSUPPORT;
 				break;
