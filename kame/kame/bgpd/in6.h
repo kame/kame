@@ -76,7 +76,7 @@ struct ip6_pseudohdr {
 
 
 
-int              mask2len    __P((struct in6_addr  *));
+int              mask2len    __P((struct sockaddr_in6 *));
 void             mask_nset   __P((struct in6_addr  *, int));
 void             mask_nclear __P((struct in6_addr  *, int));
 int              inet_ptox   __P((int, const char *, void *, u_char *));

@@ -187,7 +187,7 @@ krt_entry(rtm)
   if (rtm->rtm_flags & RTF_HOST)                  /* host route */
     np->rip6_plen = 128;
   else if (sin6_mask)                             /*   other    */
-    np->rip6_plen = mask2len(&sin6_mask->sin6_addr);
+    np->rip6_plen = mask2len(sin6_mask);
   else
     np->rip6_plen = 0;
 

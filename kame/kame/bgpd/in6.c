@@ -37,17 +37,19 @@
 
 int
 mask2len(addr)
-        struct  in6_addr      *addr;
+        struct  sockaddr_in6      *addr;
 {
-        int     i = 0, j;
-        u_char  *p = (u_char *)addr;
-        
-        for (j = 0; j < sizeof(struct in6_addr); j++, p++) {
+        int     i = 0;
+        u_char  *p, *lim;
+
+	p = (u_char *)&addr->sin6_addr;
+	lim = (u_char *)addr + addr->sin6_len;
+        for (; p < lim; p++) {
                 if (*p != 0xff)
                         break;
                 i += 8;
         }
-        if (j < sizeof(struct in6_addr)) {
+        if (p < lim) {
                 switch (*p) {
 #define MASKLEN(m, l)   case m: i += l; break
                 MASKLEN(0xfe, 7);
