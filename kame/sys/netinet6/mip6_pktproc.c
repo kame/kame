@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.106 2003/02/07 09:34:39 jinmei Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.107 2003/02/12 08:31:05 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1555,7 +1555,8 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	if (need_rr) {
 		bu_size += PADLEN(bu_size, 2, 0);
 		nonce_size = sizeof(struct ip6m_opt_nonce);
-		nonce_size += PADLEN(bu_size + nonce_size, 8, 2);
+		/* Binding Auth Option no longer require any alignment.
+		   (6.2.7) */
 		auth_size = AUTH_SIZE;
 		auth_size += PADLEN(bu_size + nonce_size + auth_size, 8, 0);
 #ifdef RR_DBG
@@ -1734,10 +1735,8 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, dstcoa, status, seqno, lifetime, re
 		mopt->mopt_ho_nonce_idx, mopt->mopt_co_nonce_idx, 
 		key_bm) == 0) {
 		need_auth = 1;
-		if (refresh_size == 0)
-			ba_size += PADLEN(ba_size, 8, 2);
-		else
-			refresh_size += PADLEN(ba_size + refresh_size, 8, 2);
+		/* Binding Auth Option no longer require any alignment. 
+		   (6.2.7) */
 		auth_size = AUTH_SIZE;
 	}
 	ip6ma_size = ba_size + refresh_size + auth_size;
