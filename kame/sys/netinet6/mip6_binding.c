@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.47 2001/12/12 00:36:32 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.48 2001/12/12 15:56:50 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2067,6 +2067,10 @@ mip6_validate_ba(m, opt)
 	 * sure the packet is protected by the some authentication
 	 * mechanisms.
 	 */
+	if (ipsec_protected == 0) {
+		/* todo suboption write soon! this nonesense code is
+		 * to prevent the buildlab error temporally */
+	}
 
 	/*
 	 * check if the seq number of the send BU == the seq number of
