@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2327 2003/02/03 09:58:07 keiichi Exp $
+$KAME: CHANGELOG,v 1.2328 2003/02/04 03:01:33 jinmei Exp $
 
-<200301>
+<200302>
+2003-02-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6c.c (client6_timo): changed the upper bound
+	of retransmissions according to Section 14 of dhcpv6-28, so that
+	the total number of transmissions (including the first one) is
+	limited up to MRC.
+	pointed out by: Ozoe Nobumichi <ozoe@intap.or.jp>
+
 Mon Feb  3 18:53:50 JST 2003	keiichi@iij.ad.jp
 	* kame/sys/netinet6/{mip6_binding.c|ipsec.c}
 	* kame/sys/netkey/key.[hc]
@@ -9,6 +16,7 @@ Mon Feb  3 18:53:50 JST 2003	keiichi@iij.ad.jp
 	  define MIP6_HAIPSEC macro in your kernel config file to
 	  enable optimized tunneling format.
 
+<200301>
 Fri Jan 31 21:28:08 JST 2003	keiichi@iij.ad.jp
 	* kame/kame/mip6control:
 	- the file format for mip6makeconfig.sh has been changed.
