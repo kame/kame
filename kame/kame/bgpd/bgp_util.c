@@ -790,12 +790,16 @@ find_aopen_peer(key)
 
 	if (bnp == NULL) {
 		/*
-		 * we can't call bgp_peerstr here, since it causes an
+		 * This case could occur when receiving a connection
+		 * request from an unkown router.
+		 * We can't call bgp_peerstr here, since it causes an
 		 * infinite loop.
 		 */
-		syslog(LOG_NOTICE,
+#if 0				/* disabled since this would be noisy */
+		syslog(LOG_DEBUG,
 		       "<%s>: can't find an actively opened peer for %x",
 		       __FUNCTION__, key);
+#endif
 	}
 
 	return(bnp);
