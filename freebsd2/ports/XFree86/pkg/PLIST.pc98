@@ -1,20 +1,20 @@
 bin/SuperProbe
 bin/X
-bin/XF86Setup
-bin/XF86_3DLabs
-bin/XF86_8514
-bin/XF86_AGX
-bin/XF86_I128
-bin/XF86_Mach32
-bin/XF86_Mach64
-bin/XF86_Mach8
-bin/XF86_Mono
-bin/XF86_P9000
-bin/XF86_S3
-bin/XF86_S3V
-bin/XF86_SVGA
-bin/XF86_VGA16
-bin/XF86_W32
+bin/XF98Setup
+bin/XF98_EGC
+bin/XF98_GA968
+bin/XF98_GANBWAP
+bin/XF98_MGA
+bin/XF98_NEC480
+bin/XF98_NECS3
+bin/XF98_NKVNEC
+bin/XF98_PWLB
+bin/XF98_PWSKB
+bin/XF98_SVGA
+bin/XF98_TGUI
+bin/XF98_WABEP
+bin/XF98_WABS
+bin/XF98_WSNA
 bin/Xmark
 bin/Xnest
 bin/Xprt
@@ -66,7 +66,7 @@ bin/xconsole
 bin/xcutsel
 bin/xdm
 bin/xdpyinfo
-bin/xf86config
+bin/xf98config
 bin/xfd
 bin/xfindproxy
 bin/xfs
@@ -405,19 +405,21 @@ include/X11/fonts/fsmasks.h
 include/X11/keysym.h
 include/X11/keysymdef.h
 lib/X11/Cards
+lib/X11/Cards98
 lib/X11/XErrorDB
 lib/X11/XF86Config.eg
+lib/X11/XF86Config.98
 lib/X11/XF86Setup/LICENSE
 lib/X11/XF86Setup/card.tcl
 lib/X11/XF86Setup/carddata.tcl
 lib/X11/XF86Setup/done.tcl
-lib/X11/XF86Setup/filelist.tcl
+lib/X11/XF86Setup/filelist98.tcl
 lib/X11/XF86Setup/keyboard.tcl
 lib/X11/XF86Setup/modeselect.tcl
 lib/X11/XF86Setup/mondata.tcl
 lib/X11/XF86Setup/monitor.tcl
 lib/X11/XF86Setup/mouse.tcl
-lib/X11/XF86Setup/mseproto.tcl
+lib/X11/XF86Setup/mseproto98.tcl
 lib/X11/XF86Setup/phase1.tcl
 lib/X11/XF86Setup/phase2.tcl
 lib/X11/XF86Setup/phase3.tcl
@@ -505,8 +507,6 @@ lib/X11/config/Motif.tmpl
 lib/X11/config/NetBSD.cf
 lib/X11/config/Oki.cf
 lib/X11/config/OpenBSD.cf
-lib/X11/config/QNX.cf
-lib/X11/config/QNX.rules
 lib/X11/config/Server.tmpl
 lib/X11/config/ServerLib.tmpl
 lib/X11/config/Threads.tmpl
@@ -553,8 +553,6 @@ lib/X11/config/nec.cf
 lib/X11/config/necLib.rules
 lib/X11/config/necLib.tmpl
 lib/X11/config/noop.rules
-lib/X11/config/nto.cf
-lib/X11/config/nto.rules
 lib/X11/config/oldlib.rules
 lib/X11/config/os2.cf
 lib/X11/config/os2.rules
@@ -625,7 +623,6 @@ lib/X11/doc/README.cirrus
 lib/X11/doc/README.clkprog
 lib/X11/doc/README.cyrix
 lib/X11/doc/README.epson
-lib/X11/doc/README.i740
 lib/X11/doc/README.mouse
 lib/X11/doc/README.neo
 lib/X11/doc/README.rendition
@@ -636,6 +633,23 @@ lib/X11/doc/ServersOnly
 lib/X11/doc/VGADriver.Doc
 lib/X11/doc/VideoModes.doc
 lib/X11/doc/xinput
+lib/X11/doc/Japanese/AccelCards
+lib/X11/doc/Japanese/BUILD
+lib/X11/doc/Japanese/COPYRIGHT
+lib/X11/doc/Japanese/INSTALL
+lib/X11/doc/Japanese/LinkKit
+lib/X11/doc/Japanese/QuickStart.doc
+lib/X11/doc/Japanese/README
+lib/X11/doc/Japanese/README.Config
+lib/X11/doc/Japanese/README.Mach64
+lib/X11/doc/Japanese/README.S3
+lib/X11/doc/Japanese/README.ati
+lib/X11/doc/Japanese/README.chips
+lib/X11/doc/Japanese/README.cirrus
+lib/X11/doc/Japanese/README98
+lib/X11/doc/Japanese/README98.1st
+lib/X11/doc/Japanese/RELNOTES
+lib/X11/doc/Japanese/VGADriver.doc
 lib/X11/etc/et4000clock.c
 lib/X11/etc/postinst.sh
 lib/X11/etc/preinst.sh
@@ -1266,8 +1280,8 @@ lib/X11/locale/tbl_data/tab8859_9
 lib/X11/locale/tbl_data/tabkoi8_r
 lib/X11/locale/th_TH.TACTIS/XLC_LOCALE
 lib/X11/locale/zh/XLC_LOCALE
-lib/X11/locale/zh_TW.Big5/XLC_LOCALE
 lib/X11/locale/zh_TW/XLC_LOCALE
+lib/X11/locale/zh_TW.Big5/XLC_LOCALE
 lib/X11/proxymngr/pmconfig
 lib/X11/rgb.txt
 lib/X11/rstart/commands/@List
@@ -1306,7 +1320,6 @@ lib/X11/xkb/compat/accessx
 lib/X11/xkb/compat/basic
 lib/X11/xkb/compat/complete
 lib/X11/xkb/compat/default
-lib/X11/xkb/compat/group_led
 lib/X11/xkb/compat/iso9995
 lib/X11/xkb/compat/japan
 lib/X11/xkb/compat/keypad
@@ -1328,7 +1341,6 @@ lib/X11/xkb/geometry/everex
 lib/X11/xkb/geometry/fujitsu
 lib/X11/xkb/geometry/keytronic
 lib/X11/xkb/geometry/kinesis
-lib/X11/xkb/geometry/macintosh
 lib/X11/xkb/geometry/microsoft
 lib/X11/xkb/geometry/nec
 lib/X11/xkb/geometry/northgate
@@ -1347,7 +1359,6 @@ lib/X11/xkb/keycodes/digital/pc
 lib/X11/xkb/keycodes/fujitsu
 lib/X11/xkb/keycodes/hp
 lib/X11/xkb/keycodes/ibm
-lib/X11/xkb/keycodes/macintosh
 lib/X11/xkb/keycodes/sgi/indigo
 lib/X11/xkb/keycodes/sgi/indy
 lib/X11/xkb/keycodes/sgi/iris
@@ -1359,7 +1370,6 @@ lib/X11/xkb/keymap.dir
 lib/X11/xkb/keymap/amiga
 lib/X11/xkb/keymap/ataritt
 lib/X11/xkb/keymap/digital/us
-lib/X11/xkb/keymap/macintosh
 lib/X11/xkb/keymap/sgi/be
 lib/X11/xkb/keymap/sgi/bg
 lib/X11/xkb/keymap/sgi/ca
@@ -1409,7 +1419,6 @@ lib/X11/xkb/symbols/ca
 lib/X11/xkb/symbols/ca_enhanced
 lib/X11/xkb/symbols/cs
 lib/X11/xkb/symbols/ctrl
-lib/X11/xkb/symbols/czsk
 lib/X11/xkb/symbols/de
 lib/X11/xkb/symbols/de_CH
 lib/X11/xkb/symbols/digital/lk
@@ -1428,7 +1437,6 @@ lib/X11/xkb/symbols/fujitsu/us
 lib/X11/xkb/symbols/gb
 lib/X11/xkb/symbols/group
 lib/X11/xkb/symbols/hu
-lib/X11/xkb/symbols/is
 lib/X11/xkb/symbols/iso9995-3
 lib/X11/xkb/symbols/it
 lib/X11/xkb/symbols/jp
@@ -1465,7 +1473,7 @@ lib/X11/xsm/system.xsm
 lib/libFS.a
 lib/libICE.a
 lib/libICE.so
-lib/libICE.so.6.3
+lib/libICE.so.6
 lib/libPEX5.a
 lib/libPEX5.so
 lib/libPEX5.so.6
@@ -1474,19 +1482,19 @@ lib/libSM.so
 lib/libSM.so.6
 lib/libX11.a
 lib/libX11.so
-lib/libX11.so.6.1
+lib/libX11.so.6
 lib/libXIE.a
 lib/libXIE.so
 lib/libXIE.so.6
 lib/libXau.a
 lib/libXaw.a
 lib/libXaw.so
-lib/libXaw.so.6.1
+lib/libXaw.so.6
 lib/libXdmcp.a
 lib/libXdpms.a
 lib/libXext.a
 lib/libXext.so
-lib/libXext.so.6.3
+lib/libXext.so.6
 lib/libXi.a
 lib/libXi.so
 lib/libXi.so.6
@@ -1495,14 +1503,14 @@ lib/libXmu.so
 lib/libXmu.so.6
 lib/libXp.a
 lib/libXp.so
-lib/libXp.so.6.2
+lib/libXp.so.6
 lib/libXss.a
 lib/libXt.a
 lib/libXt.so
 lib/libXt.so.6
 lib/libXtst.a
 lib/libXtst.so
-lib/libXtst.so.6.1
+lib/libXtst.so.6
 lib/libXxf86dga.a
 lib/libXxf86misc.a
 lib/libXxf86vm.a
@@ -2605,7 +2613,6 @@ man/man5/XF86Config.5.gz
 @dirrm lib/X11/xkb/symbols/sony
 @dirrm lib/X11/xkb/symbols/sgi
 @dirrm lib/X11/xkb/symbols/nec
-@dirrm lib/X11/xkb/symbols/macintosh
 @dirrm lib/X11/xkb/symbols/fujitsu
 @dirrm lib/X11/xkb/symbols/digital
 @dirrm lib/X11/xkb/symbols
@@ -2633,7 +2640,6 @@ man/man5/XF86Config.5.gz
 @dirrm lib/X11/rstart/commands
 @dirrm lib/X11/rstart
 @dirrm lib/X11/proxymngr
-@dirrm lib/X11/locale/zh_TW.Big5
 @dirrm lib/X11/locale/zh_TW
 @dirrm lib/X11/locale/zh
 @dirrm lib/X11/locale/th_TH.TACTIS

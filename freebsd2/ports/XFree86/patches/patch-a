@@ -1,0 +1,21 @@
+--- config/imake/imakemdep.h~	Wed Nov 24 21:56:07 1999
++++ config/imake/imakemdep.h	Tue Nov 23 21:33:20 1999
+@@ -237,6 +237,9 @@
+ #ifdef hpux
+ #define USE_CC_E
+ #endif
++#if defined(__FreeBSD__)
++#define  USE_CC_E
++#endif
+ #ifdef WIN32
+ #define USE_CC_E
+ #define DEFAULT_CC "cl"
+@@ -265,7 +268,7 @@
+ #ifdef _CRAY
+ #define DEFAULT_CPP "/lib/pcpp"
+ #endif
+-#if defined(__386BSD__) || defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
++#if defined(__386BSD__) || defined(__NetBSD__) || defined(__OpenBSD__) 
+ #define DEFAULT_CPP "/usr/libexec/cpp"
+ #endif
+ #if defined(__sgi) && defined(__ANSI_CPP__)
