@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.34 2001/06/09 12:11:44 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.35 2001/06/09 12:53:57 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -140,11 +140,11 @@ void		 tr_icmp6ParamProb		__P((struct _cv *, struct _cv *));
 void		 tr_icmp6EchoRequest		__P((struct _cv *, struct _cv *));
 void		 tr_icmp6EchoReply		__P((struct _cv *, struct _cv *));
 
-void		 translatingPYLD4To6		__P((struct _cv *, struct pAddr *));
-int		 translatingFTP4ReplyTo6	__P((struct _cv *, struct pAddr *));
+void		 translatingPYLD4To6		__P((struct _cv *));
+int		 translatingFTP4ReplyTo6	__P((struct _cv *));
 
-void		 translatingPYLD6To4		__P((struct _cv *, struct _cv *));
-int		 translatingFTP6CommandTo4	__P((struct _cv *, struct _cv *));
+void		 translatingPYLD6To4		__P((struct _cv *));
+int		 translatingFTP6CommandTo4	__P((struct _cv *));
 
 struct ftpparam *parseFTPdialogue		__P((caddr_t, caddr_t, struct ftpparam *));
 struct sockaddr *parseLPRT			__P((caddr_t, caddr_t, struct sockaddr_in6 *));
@@ -845,7 +845,7 @@ translatingTCPv4To6(struct _cv *cv4, struct pAddr *pad)
     cv6.ip_p = cv6.ip_payload = IPPROTO_TCP;
 
     updateTcpStatus(cv4);
-    translatingPYLD4To6(&cv6, pad);
+    translatingPYLD4To6(&cv6);
     cksumOrg = ntohs(cv4->_payload._tcp4->th_sum);
     adjustUpperLayerChecksum(IPPROTO_IPV4, IPPROTO_TCP, &cv6, cv4);
 
@@ -874,7 +874,7 @@ translatingTCPv4To6(struct _cv *cv4, struct pAddr *pad)
 
 
 void
-translatingPYLD4To6(struct _cv *cv6, struct pAddr *pad)
+translatingPYLD4To6(struct _cv *cv6)
 {
     int			 delta = 0;
     struct tcphdr	*th6 = cv6->_payload._tcp6;
@@ -883,7 +883,7 @@ translatingPYLD4To6(struct _cv *cv6, struct pAddr *pad)
     if (cv6->ats && (cv6->ats->session == NATPT_OUTBOUND)
 	&& (htons(cv6->_payload._tcp6->th_sport) == FTP_CONTROL))
     {
-	if ((delta = translatingFTP4ReplyTo6(cv6, pad)) != 0)
+	if ((delta = translatingFTP4ReplyTo6(cv6)) != 0)
 	{
 	    struct mbuf		*mbf = cv6->m;
 	    struct ip6_hdr	*ip6 = cv6->_ip._ip6;
@@ -920,7 +920,7 @@ translatingPYLD4To6(struct _cv *cv6, struct pAddr *pad)
 
 
 int
-translatingFTP4ReplyTo6(struct _cv *cv6, struct pAddr *pad)
+translatingFTP4ReplyTo6(struct _cv *cv6)
 {
     int			 delta = 0;
     caddr_t		 kb, kk;
@@ -1493,7 +1493,7 @@ translatingTCPv6To4(struct _cv *cv6, struct pAddr *pad)
     cv4.ip_p = cv4.ip_payload = IPPROTO_TCP;
 
     updateTcpStatus(&cv4);
-    translatingPYLD6To4(cv6, &cv4);
+    translatingPYLD6To4(&cv4);
     cksumOrg = ntohs(cv6->_payload._tcp6->th_sum);
     adjustUpperLayerChecksum(IPPROTO_IPV6, IPPROTO_TCP, cv6, &cv4);
 
@@ -1506,7 +1506,7 @@ translatingTCPv6To4(struct _cv *cv6, struct pAddr *pad)
 
 
 void
-translatingPYLD6To4(struct _cv *cv6, struct _cv *cv4)
+translatingPYLD6To4(struct _cv *cv4)
 {
     int			 delta = 0;
     struct tcphdr	*th4 = cv4->_payload._tcp4;
@@ -1515,7 +1515,7 @@ translatingPYLD6To4(struct _cv *cv6, struct _cv *cv4)
     if (cv4->ats && (cv4->ats->session == NATPT_OUTBOUND)
 	&& (htons(cv4->_payload._tcp4->th_dport) == FTP_CONTROL))
     {
-	if ((delta = translatingFTP6CommandTo4(cv6, cv4)) != 0)
+	if ((delta = translatingFTP6CommandTo4(cv4)) != 0)
 	{
 	    struct mbuf		*mbf = cv4->m;
 	    struct ip		*ip4 = cv4->_ip._ip4;
@@ -1552,7 +1552,7 @@ translatingPYLD6To4(struct _cv *cv6, struct _cv *cv4)
 
 
 int
-translatingFTP6CommandTo4(struct _cv *cv6, struct _cv *cv4)
+translatingFTP6CommandTo4(struct _cv *cv4)
 {
     int			 delta = 0;
     char		*tstr;
