@@ -33,7 +33,7 @@
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
  *
- *  $Id: main.c,v 1.1 1999/08/08 23:30:52 itojun Exp $
+ *  $Id: main.c,v 1.2 1999/08/13 09:20:13 jinmei Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.
@@ -662,11 +662,13 @@ restart(i)
     /*
      * reset all the entries
      */
-    /* TODO: delete?
-       free_all_routes();
-       */
+    /*
+     * TODO: delete?
+     * free_all_routes();
+     */
     free_all_callouts();
     stop_all_vifs();
+    nhandlers=0;
     k_stop_pim(mld6_socket);
     close(mld6_socket);
     close(pim6_socket);
@@ -675,7 +677,6 @@ restart(i)
     /*
      * start processing again
      */
-    
     init_mld6();
     init_pim6();
 #ifdef HAVE_ROUTING_SOCKETS

@@ -34,7 +34,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: vif.c,v 1.1 1999/08/08 23:30:56 itojun Exp $
+ *  $Id: vif.c,v 1.2 1999/08/13 09:20:13 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -191,9 +191,12 @@ void
 stop_all_vifs()
 {
     vifi_t vifi;
+    struct uvif *v;
 
-    for (vifi = 0; vifi < numvifs; vifi++) {
-	stop_vif(vifi);
+    for (vifi = 0, v=uvifs; vifi < numvifs; ++vifi, ++v) {
+	if (!(v->uv_flags &  VIFF_DOWN)) {
+	    stop_vif(vifi);
+	}
     }
 }
 
