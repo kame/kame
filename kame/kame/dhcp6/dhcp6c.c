@@ -93,15 +93,6 @@ struct mediatro_control_msg mediator_msg;
 #endif 
 
 static int debug = 0;
-static int debug_thresh;
-
-#if 0
-#ifndef dprintf
-#define dprintf(x)	do { if (debug) fprintf x; } while (0)
-#endif
-#endif
-
-static int foreground = 0;
 static int signaled = 0;
 
 char *device = NULL;
@@ -152,8 +143,6 @@ static void client6_sleep __P((void));
 void client6_hup __P((int));
 static int sa2plen __P((struct sockaddr_in6 *));
 static void get_rtaddrs __P((int, struct sockaddr *, struct sockaddr **));
-static void setloglevel __P((void));
-static void dprintf __P((int, const char *, ...));
 
 #define DHCP6C_PIDFILE "/var/run/dhcp6c.pid"
 
@@ -206,7 +195,7 @@ main(argc, argv)
 			err(1, "daemon");
 	}
 
-	setloglevel();
+	setloglevel(debug);
 
 	/* dump current PID */
 	pid = getpid();
@@ -222,34 +211,7 @@ main(argc, argv)
 static void
 usage()
 {
-	fprintf(stderr, "usage: dhcpc [-d] intface\n");
-}
-
-static void
-setloglevel()
-{
-	if (foreground) {
-		switch(debug) {
-		case 0:
-			debug_thresh = LOG_ERR;
-			break;
-		case 1:
-			debug_thresh = LOG_INFO;
-			break;
-		default:
-			debug_thresh = LOG_DEBUG;
-			break;
-		}
-	} else {
-		switch(debug) {
-		case 0:
-			setlogmask(LOG_UPTO(LOG_ERR));
-			break;
-		case 1:
-			setlogmask(LOG_UPTO(LOG_INFO));
-			break;
-		}
-	}
+	fprintf(stderr, "usage: dhcpc [-dDf] intface\n");
 }
 
 #if 0
@@ -1194,19 +1156,4 @@ client6_recvreply(s, serv)
 	}
 
 	return(0);
-}
-
-void
-dprintf(int level, const char *fmt, ...)
-{
-	va_list ap;
-	char logbuf[LINE_MAX];
-
-	va_start(ap, fmt);
-	vsnprintf(logbuf, sizeof(logbuf), fmt, ap);
-
-	if (foreground && debug_thresh >= level)
-		fprintf(stderr, "%s\n", logbuf);
-	else
-		syslog(level, "%s", logbuf);
 }

@@ -49,6 +49,8 @@
 #include <netinet/in.h>
 #include <netinet6/in6_var.h>
 #include <stdio.h>
+#include <stdarg.h>
+#include <syslog.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
@@ -64,6 +66,9 @@
 
 #include <dhcp6.h>
 #include <common.h>
+
+int foreground;
+int debug_thresh;
 
 #if 0
 static unsigned int if_maxindex __P((void));
@@ -485,4 +490,47 @@ in6_matchflags(addr, ifnam, flags)
 	close(s);
 
 	return(ifr6.ifr_ifru.ifru_flags6 & flags);
+}
+
+void
+setloglevel(debuglevel)
+	int debuglevel;
+{
+	if (foreground) {
+		switch(debuglevel) {
+		case 0:
+			debug_thresh = LOG_ERR;
+			break;
+		case 1:
+			debug_thresh = LOG_INFO;
+			break;
+		default:
+			debug_thresh = LOG_DEBUG;
+			break;
+		}
+	} else {
+		switch(debuglevel) {
+		case 0:
+			setlogmask(LOG_UPTO(LOG_ERR));
+			break;
+		case 1:
+			setlogmask(LOG_UPTO(LOG_INFO));
+			break;
+		}
+	}
+}
+
+void
+dprintf(int level, const char *fmt, ...)
+{
+	va_list ap;
+	char logbuf[LINE_MAX];
+
+	va_start(ap, fmt);
+	vsnprintf(logbuf, sizeof(logbuf), fmt, ap);
+
+	if (foreground && debug_thresh >= level)
+		fprintf(stderr, "%s\n", logbuf);
+	else
+		syslog(level, "%s", logbuf);
 }

@@ -26,7 +26,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: dhcp6relay.8,v 1.6 2000/06/19 08:11:36 jinmei Exp $
+.\"     $Id: dhcp6relay.8,v 1.7 2000/06/28 12:25:59 jinmei Exp $
 .\"
 .Dd Apr 18, 2000
 .Dt DHCP6RELAY 8
@@ -37,7 +37,8 @@
 .\"
 .Sh SYNOPSIS
 .Nm
-.Op Fl d
+.Op Fl Dd
+.Op Fl f
 .Op Fl H Ar hoplim
 .Ar interface
 .\"
@@ -47,7 +48,7 @@ acts as an intermediary to deliver DHCPv6 messages between clients and
 servers, and is on the same link as a client.
 .\"
 .Nm Dhcp6relay
-needs a command line argumnet
+needs a command line argument
 .Ar interface ,
 which specifies the link.
 .Pp
@@ -56,8 +57,17 @@ Options supported by
 are:
 .Bl -tag -width Ds
 .It Fl d
-runs in debug mode; i.e. do not become daemon, and
-shows debugging messages on stderr.
+Print debugging messages.
+.It Fl D
+Even more debugging information is printed.
+.It Fl f
+Foreground mode (useful when debugging).
+Although
+.Nm
+usually prints warning, debugging, or error messages to
+.Xr syslog 8 ,
+it prints the messages to standard error if this option is
+specified.
 .It Fl H Ar hoplim
 specifies the hop limit of DHCPv6 Solicit messages forwarded to
 servers.

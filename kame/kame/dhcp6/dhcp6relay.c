@@ -45,8 +45,11 @@
 #include <arpa/inet.h>
 
 #include <stdio.h>
+#include <stdarg.h>
+#include <syslog.h>
 #include <unistd.h>
 #include <stdlib.h>		/* XXX: freebsd2 needs this for opt{arg,ind} */
+#include <errno.h>
 #include <err.h>
 #include <string.h>
 
@@ -59,9 +62,6 @@ static int icmp6sock;		/* socket to receive ICMPv6 errors */
 static int maxfd;		/* maxi file descriptor for select(2) */
 
 static int debug = 0;
-#ifndef dprintf
-#define dprintf(x)	do { if (debug) fprintf x; } while (0)
-#endif
 
 char *device = NULL;		/* must be global */
 
@@ -102,11 +102,23 @@ main(argc, argv)
 	char *argv[];
 {
 	int ch;
+	char *progname;
 
-	while((ch = getopt(argc, argv, "dH:")) != EOF) {
+	if ((progname = strrchr(*argv, '/')) == NULL)
+		progname = *argv;
+	else
+		progname++;
+
+	while((ch = getopt(argc, argv, "dDfH:")) != EOF) {
 		switch(ch) {
 		case 'd':
-			debug++;
+			debug = 1;
+			break;
+		case 'D':
+			debug = 2;
+			break;
+		case 'f':
+			foreground++;
 			break;
 		case 'H':
 			mhops = atoi(optarg);
@@ -129,8 +141,12 @@ main(argc, argv)
 	}
 	device = argv[0];
 
-	if (!debug)
-		daemon(0, 0);
+	if (foreground == 0) {
+		openlog(progname, LOG_NDELAY|LOG_PID, LOG_DAEMON);
+		if (daemon(0, 0) < 0)
+			err(1, "daemon");
+	}
+	setloglevel(debug);
 
 	relay6_init();
 	relay6_loop();
@@ -142,7 +158,7 @@ static void
 usage()
 {
 	fprintf(stderr,
-		"usage: dhcp6relay [-d] [-H hoplim] intface\n");
+		"usage: dhcp6relay [-dDf] [-H hoplim] intface\n");
 	exit(0);
 }
 
@@ -158,7 +174,8 @@ make_prefix(pstr0)
 
 	/* make a local copy for safety */
 	if (strlen(pstr0) + 1 > sizeof(pstr)) {
-		warnx("prefix string too long (maybe bogus): %s", pstr0);
+		dprintf(LOG_WARNING,
+			"prefix string too long (maybe bogus): %s", pstr0);
 		return(NULL);
 	}
 	strcpy(pstr, pstr0);
@@ -169,19 +186,22 @@ make_prefix(pstr0)
 	else {
 		plen = (int)strtoul(p + 1, &ep, 10);
 		if (*ep != '\0') {
-			warnx("illegal prefix length (ignored): %s", p + 1);
+			dprintf(LOG_WARNING,
+				"illegal prefix length (ignored): %s", p + 1);
 			return(NULL);
 		}
 		*p = '\0';
 	}
 	if (inet_pton(AF_INET6, pstr, &paddr) != 1) {
-		errx(1, "inet_pton failed for %s", pstr); /* warnx? */
+		dprintf(LOG_ERR, "inet_pton failed for %s", pstr); /* warn? */
+		exit(1);
 		/* NOTREACHED */
 	}
 
 	/* allocate a new entry */
 	if ((pent = (struct prefix_list *)malloc(sizeof(*pent))) == NULL) {
-		errx(1, "memory allocation failed");
+		dprintf(LOG_ERR, "memory allocation failed");
+		exit(1);
 		/* NOTREACHED */
 	}
 
@@ -422,12 +442,12 @@ relay6_recv(s, rdevice)
 	rmh.msg_namelen = sizeof(from);
 
 	if ((len = recvmsg(s, &rmh, 0)) < 0) {
-		warn("recvmsg"); /* should assert? */
-		return(-1);
+		dprintf(LOG_WARNING, "recvmsg: %s", strerror(errno));
+		return(-1);	/* should assert? */
 	}
 
-	dprintf((stderr, "relay6_recv: from %s, size %d\n",
-		 addr2str((struct sockaddr *)&from), len)); 
+	dprintf(LOG_DEBUG, "relay6_recv: from %s, size %d",
+		addr2str((struct sockaddr *)&from), len); 
 
 	/* get optional information as ancillary data (if available) */
 	for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(&rmh); cm;
@@ -443,7 +463,8 @@ relay6_recv(s, rdevice)
 	}
 	if (pi && rdevice) {
 		if (if_indextoname(pi->ipi6_ifindex, rdevice) == NULL) {
-			warn("if_indextoname(id = %d)", pi->ipi6_ifindex);
+			dprintf(LOG_WARNING, "if_indextoname(id = %d): %s",
+				pi->ipi6_ifindex, strerror(errno));
 			return(-1);
 		}
 	}
@@ -460,12 +481,12 @@ relay6_react(siz, buf, dev, fromclient)
 	union dhcp6 *dh6;
 
 	if (siz < 1) {		/* we need at least 1 byte to check type */
-		dprintf((stderr, "relay6_react: short packet\n"));
+		dprintf(LOG_DEBUG, "relay6_react: short packet");
 		return;
 	}
 	
 	dh6 = (union dhcp6 *)buf;
-	dprintf((stderr, "relay6_react: msgtype=%d\n", dh6->dh6_msgtype));
+	dprintf(LOG_DEBUG, "relay6_react: msgtype=%d", dh6->dh6_msgtype);
 
 	if (fromclient) {
 		switch (dh6->dh6_msgtype) {
@@ -478,7 +499,7 @@ relay6_react(siz, buf, dev, fromclient)
 #endif 
 			break;
 		default:
-			fprintf(stderr, "invalid msgtype (%d) from client\n",
+			fprintf(stderr, "invalid msgtype (%d) from client",
 				dh6->dh6_msgtype);
 			break;
 		}
@@ -494,7 +515,7 @@ relay6_react(siz, buf, dev, fromclient)
 #endif
 			break;
 		default:
-			fprintf(stderr, "invalid msgtype (%d) from server\n",
+			fprintf(stderr, "invalid msgtype (%d) from server",
 				dh6->dh6_msgtype);
 			break;
 		}
@@ -513,17 +534,19 @@ relay6_react_solicit(buf, siz, dev)
 	int plen;
 	u_char *cp_plen;
 
-	dprintf((stderr, "relay6_react_solicit\n"));
+	dprintf(LOG_DEBUG, "relay6_react_solicit");
 
 	if (siz < sizeof(*dh6s)) {
-		warnx("relay6_react_solicit: short packet (size = %d)", siz);
+		dprintf(LOG_INFO,
+			"relay6_react_solicit: short packet (size = %d)", siz);
 		return;
 	}
 	dh6s = (struct dhcp6_solicit *)buf;
 
 	if (!IN6_IS_ADDR_LINKLOCAL(&dh6s->dh6sol_cliaddr)) {
-		warnx("relay6_react_solicit: client address (%s) is not "
-		      "link-local\n", in6addr2str(&dh6s->dh6sol_cliaddr, 0));
+		dprintf(LOG_INFO,
+			"relay6_react_solicit: client address (%s) is not "
+			"link-local", in6addr2str(&dh6s->dh6sol_cliaddr, 0));
 		return;
 	}
 
@@ -534,9 +557,10 @@ relay6_react_solicit(buf, siz, dev)
 	 * But we just warn if the client did not conformed to these rules.
 	 */
 	if (!IN6_IS_ADDR_UNSPECIFIED(&dh6s->dh6sol_relayaddr)) {
-		warnx("relay6_react_solicit: relay address (%s) is not "
-		      "the Unspecified address (ignored)",
-		      in6addr2str(&dh6s->dh6sol_relayaddr, 0));
+		dprintf(LOG_INFO,
+			"relay6_react_solicit: relay address (%s) is not "
+			"the Unspecified address (ignored)",
+			in6addr2str(&dh6s->dh6sol_relayaddr, 0));
 	}
 
 	/* find a non-link-local address and fill in the relay address field */
@@ -547,8 +571,9 @@ relay6_react_solicit(buf, siz, dev)
 			break;
 	}
 	if (IN6_IS_ADDR_UNSPECIFIED(&myaddr)) {
-		warnx("relay6_react_solicit: can't find a non-link-local address "
-		      "on %s", dev);
+		dprintf(LOG_WARNING,
+			"relay6_react_solicit: can't find a non-link-local "
+			"address on %s", dev);
 		return;
 	}
 	dh6s->dh6sol_relayaddr = myaddr;
@@ -567,7 +592,8 @@ relay6_react_solicit(buf, siz, dev)
 	spktinfo->ipi6_addr = myaddr;
 	if ((spktinfo->ipi6_ifindex = if_nametoindex(dev)) == 0) {
 		/* this must not occur, so we might have to assert here */
-		warn("relay6_react_solicit: invlalid interface: %s", dev);
+		dprintf(LOG_WARNING,
+			"relay6_react_solicit: invlalid interface: %s", dev);
 		return;
 	}
 
@@ -580,10 +606,10 @@ relay6_react_solicit(buf, siz, dev)
 	smh.msg_iovlen = 1;
 
 	if (sendmsg(ssock, &smh, 0) != siz)
-		warn("relay6_react_solicit: sendmsg failed "
-		     "(ifid = %d, src = %s)",
-		     spktinfo->ipi6_ifindex,
-		     in6addr2str(&spktinfo->ipi6_addr, 0));
+		dprintf(LOG_WARNING, "relay6_react_solicit: sendmsg failed "
+			"(ifid = %d, src = %s): %s",
+			spktinfo->ipi6_ifindex,
+			in6addr2str(&spktinfo->ipi6_addr, 0), strerror(errno));
 }
 
 static void
@@ -595,10 +621,11 @@ relay6_react_advert(buf, siz, dev)
 	struct sockaddr_in6 sa6_relay;
 	char *sdev;
 
-	dprintf((stderr, "relay6_react_advert\n"));
+	dprintf(LOG_DEBUG, "relay6_react_advert");
 
 	if (siz < sizeof(*dh6a)) {
-		warnx("relay6_react_advert: short packet (size = %d)", siz);
+		dprintf(LOG_INFO,
+			"relay6_react_advert: short packet (size = %d)", siz);
 		return;
 	}
 	dh6a = (struct dhcp6_advert *)buf;
@@ -611,8 +638,9 @@ relay6_react_advert(buf, siz, dev)
 						    dev);
 
 	if (!IN6_IS_ADDR_LINKLOCAL(&dh6a->dh6adv_cliaddr)) {
-		warnx("relay6_react_advert: client address (%s) is not "
-		      "link-local", in6addr2str(&dh6a->dh6adv_cliaddr, 0));
+		dprintf(LOG_INFO,
+			"relay6_react_advert: client address (%s) is not "
+			"link-local", in6addr2str(&dh6a->dh6adv_cliaddr, 0));
 		return;
 	}
 
@@ -621,8 +649,9 @@ relay6_react_advert(buf, siz, dev)
 	 * host model.
 	 */
 	if ((sdev = getdev(&sa6_relay)) == NULL) {
-		warnx("relay6_react_advert: can't detect interface from %s",
-		      addr2str((struct sockaddr *)&sa6_relay));
+		dprintf(LOG_WARNING,
+			"relay6_react_advert: can't detect interface from %s",
+			addr2str((struct sockaddr *)&sa6_relay));
 		return;
 	}
 
@@ -637,7 +666,7 @@ relay6_forward_response(buf, siz, cliaddr, dev)
 {
 	static struct iovec iov[2];
 
-	dprintf((stderr, "relay6_forward_response\n"));
+	dprintf(LOG_DEBUG, "relay6_forward_response");
 
 	sa6_client.sin6_addr = *cliaddr;
 
@@ -652,10 +681,13 @@ relay6_forward_response(buf, siz, cliaddr, dev)
 	/* set the outgoing interface */
 	if ((spktinfo->ipi6_ifindex = if_nametoindex(dev)) == 0) {
 		/* this must not occur, so we might have to assert here */
-		warn("relay6_forward_response: invlalid interface: %s", dev);
+		dprintf(LOG_ERR,
+			"relay6_forward_response: invlalid interface: %s", dev);
 		return;
 	}
 
 	if (sendmsg(ssock, &smh, 0) != siz)
-		warn("relay6_forward_response: sendmsg failed on %s", dev);
+		dprintf(LOG_WARNING,
+			"relay6_forward_response: sendmsg failed on %s :%s",
+			dev, strerror(errno));
 }

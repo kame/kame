@@ -30,6 +30,8 @@
 #define IN6_IFF_INVALID (IN6_IFF_ANYCAST|IN6_IFF_TENTATIVE|\
 		IN6_IFF_DUPLICATED|IN6_IFF_DETACHED)
 
+extern int foreground;
+extern int debug_thresh;
 extern char *device;
 
 /* common.c */
@@ -43,3 +45,5 @@ extern char *in6addr2str __P((struct in6_addr *, int));
 extern char *getdev __P((struct sockaddr_in6 *));
 extern int in6_addrscopebyif __P((struct in6_addr *, char *));
 extern int in6_scope __P((struct in6_addr *));
+extern void setloglevel __P((int));
+extern void dprintf __P((int, const char *, ...));

@@ -26,7 +26,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: dhcp6s.8,v 1.9 2000/06/19 08:12:26 jinmei Exp $
+.\"     $Id: dhcp6s.8,v 1.10 2000/06/28 12:25:59 jinmei Exp $
 .\"
 .Dd Sep 12, 1999
 .Dt DHCP6S 8
@@ -37,7 +37,7 @@
 .\"
 .Sh SYNOPSIS
 .Nm
-.Op Fl d
+.Op Fl Dd
 .Op Fl n Ar dnsserv
 .Op Fl N Ar dnsdom
 .Ar interface
@@ -70,8 +70,22 @@ must be an IPv6 numeric address.
 specifies the local DNS domain name, like
 .Dq Li kame.net. .
 .Pp
-.Fl d
-turns on debugging messages.
+Other command line options are:
+.Bl -tag -width indent
+.\"
+.It Fl d
+Print debugging messages.
+.It Fl D
+Even more debugging information is printed.
+.It Fl f
+Foreground mode (useful when debugging).
+Although
+.Nm
+usually prints warning, debugging, or error messages to
+.Xr syslog 8 ,
+it prints the messages to standard error if this option is
+specified.
+.El
 .\"
 .Sh SEE ALSO
 .Xr dhcp6c 8 ,
@@ -101,7 +115,7 @@ To name a few:
 it does not manage client-agent mapping table nor client XID,
 .It
 it does not handle resource allocations
-.Pq such as IPv6 address ,
+.Pq such as an IPv6 address ,
 .It
 it does not implement DHCPv6 release nor reconfigure message handling.
 .El
