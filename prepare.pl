@@ -1,5 +1,6 @@
 #
 # perl prepare.pl kame <osname>
+# $Id: prepare.pl,v 1.6 1999/08/07 01:03:42 itojun Exp $
 #
 
 $debug = 1;
