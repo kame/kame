@@ -1,4 +1,4 @@
-/*	$KAME: altq_subr.c,v 1.10 2002/01/11 07:31:08 kjc Exp $	*/
+/*	$KAME: altq_subr.c,v 1.11 2002/01/11 08:11:49 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -585,8 +585,11 @@ extract_ports4(m, ip, fin)
 	while (off >= m0->m_len) {
 		off -= m0->m_len;
 		m0 = m0->m_next;
+		if (m0 == NULL)
+			return (0);  /* bogus ip_hl! */
 	}
-	ASSERT(m0->m_len >= off + 4);
+	if (m0->m_len < off + 4)
+		return (0);
 
 	switch (proto) {
 	case IPPROTO_TCP:
@@ -618,7 +621,7 @@ extract_ports4(m, ip, fin)
 			opt6 = (struct _opt6 *)(mtod(m0, caddr_t) + off);
 			proto = opt6->opt6_nxt;
 			off += 8 + (opt6->opt6_hlen * 4);
-			if (fin->fi_gpi == 0)
+			if (fin->fi_gpi == 0 && m0->m_len >= off + 8)
 				fin->fi_gpi = opt6->ah_spi;
 		}
 		/* goto the next header */
@@ -670,8 +673,11 @@ extract_ports6(m, ip6, fin6)
 		while (off >= m0->m_len) {
 			off -= m0->m_len;
 			m0 = m0->m_next;
+			if (m0 == NULL)
+				return (0);
 		}
-		ASSERT(m0->m_len >= off + 4);
+		if (m0->m_len < off + 4)
+			return (0);
 
 		switch (proto) {
 		case IPPROTO_TCP:
@@ -700,7 +706,7 @@ extract_ports6(m, ip6, fin6)
 			struct _opt6 *opt6;
 
 			opt6 = (struct _opt6 *)(mtod(m0, caddr_t) + off);
-			if (fin6->fi6_gpi == 0)
+			if (fin6->fi6_gpi == 0 && m0->m_len >= off + 8)
 				fin6->fi6_gpi = opt6->ah_spi;
 			proto = opt6->opt6_nxt;
 			off += 8 + (opt6->opt6_hlen * 4);
