@@ -33,7 +33,7 @@
 /*
  *      from nameser.h	8.1 (Berkeley) 6/2/93
  *	From: Id: nameser_compat.h,v 8.9 1998/03/20 23:25:10 halley Exp
- *	$Id: nameser_compat.h,v 1.1 1998/06/11 08:55:17 peter Exp $
+ * $FreeBSD: src/include/arpa/nameser_compat.h,v 1.1.2.1 1999/08/29 14:39:01 peter Exp $
  */
 
 #ifndef _ARPA_NAMESER_COMPAT_
@@ -166,6 +166,7 @@ typedef struct {
 #define	T_PX		ns_t_px
 #define	T_GPOS		ns_t_gpos
 #define	T_AAAA		ns_t_aaaa
+#define	T_OPT		ns_t_opt
 #define	T_LOC		ns_t_loc
 #define	T_NXT		ns_t_nxt
 #define	T_EID		ns_t_eid
