@@ -2,11 +2,11 @@
 # Date created:         Wed Jan 26 03:37:49 JST 2000
 # Whom:                 sumikawa
 #
-# $KAME: Makefile,v 1.15 2000/06/25 10:58:36 sumikawa Exp $
+# $KAME: Makefile,v 1.16 2000/07/09 12:27:33 sumikawa Exp $
 #
 
 PORTNAME=	libpcap
-SNAPVERSION=	2000_06_19
+SNAPVERSION=	2000_07_03
 PORTVERSION=	${SNAPVERSION:S/_//g}
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
