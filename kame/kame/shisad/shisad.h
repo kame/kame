@@ -1,4 +1,4 @@
-/*	$KAME: shisad.h,v 1.6 2005/01/27 02:35:19 ryuji Exp $	*/
+/*	$KAME: shisad.h,v 1.7 2005/01/28 02:12:07 ryuji Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.
  * All rights reserved.
@@ -126,6 +126,7 @@ struct mip6_hpfxl {
 	u_int8_t	    hpfx_flags;
 	struct home_agent_list_head hpfx_hal_head;   /* home agent list head */
 
+	struct mip6_mipif   *hpfx_mipif;
 	/* mn exclusive field: it is used when mn receives MPA */
 	struct mip6_hpfx_mn_exclusive {
 		u_int32_t hpfxlist_vltime;
@@ -302,6 +303,9 @@ struct mip6_mipif {
 
 	u_int16_t mipif_ifindex;
 
+	u_int16_t mipif_mps_id;
+	time_t    mipif_mps_lastsent;
+
 	/* will be added later */
 };
 LIST_HEAD(mip6_mipif_list, mip6_mipif);
@@ -389,8 +393,7 @@ void init_nonces (void);
 void create_keygentoken(struct in6_addr *, struct mip6_nonces_info *, 
 			u_int8_t *, u_int8_t);
 
-int send_mps(struct mip6_hoainfo *, struct in6_addr *);
-
+int send_mps(struct mip6_hpfxl *);
 
 /* binding.c */
 struct binding_update_list *bul_get(struct in6_addr *, struct in6_addr *);
@@ -472,12 +475,18 @@ int send_haadreq(struct mip6_hoainfo *, int, struct in6_addr *);
 struct home_agent_list *mnd_add_hal(struct  mip6_hpfxl *, struct in6_addr *, int);
 struct mip6_hpfxl *mnd_add_hpfxlist(struct in6_addr *, 
 		    u_int16_t, struct mip6_hpfx_mn_exclusive *, 
-				    struct mip6_hpfx_list *);
+				    struct mip6_mipif *);
 struct mip6_mipif *mnd_get_mipif(u_int16_t);
 int send_na_home(struct in6_addr *, u_int16_t);
 int set_default_bu_lifetime(struct mip6_hoainfo *);
 struct noro_host_list *noro_get(struct in6_addr *);
 void noro_add(struct in6_addr *);
+
+void hpfxlist_expire_timer(void *);
+void hxplist_stop_expire_timer(struct mip6_hpfxl *);
+void hpfxlist_set_expire_timer(struct mip6_hpfxl *, int);
+
+
 
 /* had.c */
 int mipsock_input(struct mip_msghdr *);

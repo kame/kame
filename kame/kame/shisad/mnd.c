@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.5 2005/01/26 07:42:00 t-momose Exp $	*/
+/*	$KAME: mnd.c,v 1.6 2005/01/28 02:12:07 ryuji Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -99,7 +99,7 @@ struct command_table command_table[] = {
 
 static void mn_lists_init(void);
 static int mipsock_recv_rr_hint(struct mip_msghdr *);
-static void mnd_init_homeprefix(u_int16_t, struct mip6_hpfx_list *);
+static void mnd_init_homeprefix(struct mip6_mipif *);
 static struct mip6_mipif *mnd_add_mipif(char *);
 static void terminate(int);
 static int mipsock_md_dereg_bul_fl(struct in6_addr *, struct in6_addr *, 
@@ -1041,21 +1041,78 @@ add_hal_by_commandline_xxx(homeagent)
 	return (0);
 }
 
+#ifdef MIP_MN
+void
+hpfxlist_set_expire_timer(hpfx, tick)
+        struct mip6_hpfxl *hpfx;
+        int tick;
+{
+        remove_callout_entry(hpfx->hpfx_retrans);
+        hpfx->hpfx_retrans = new_callout_entry(tick, hpfxlist_expire_timer,
+				       (void *)hpfx, "hpfxlist_expire_timer");
+}
+
+
+void
+hxplist_stop_expire_timer(hpfx)
+        struct mip6_hpfxl *hpfx;
+{
+        remove_callout_entry(hpfx->hpfx_retrans);
+}
+
+
+
+void
+hpfxlist_expire_timer(arg)
+	void *arg;
+{
+        struct mip6_hpfxl *hpfx = (struct mip6_hpfxl *)arg;
+	time_t now = time(0);
+
+	hxplist_stop_expire_timer(hpfx);
+
+	if (hpfx->hpfx_vlexpire <= now) {
+		syslog(LOG_INFO, 
+		       "Lifetime for the Home Prefix %s is expired\n", 
+		       ip6_sprintf(&hpfx->hpfx_prefix));
+		/* delete HoA XXXX */
+		;
+		return;
+	}
+
+	send_mps(hpfx);
+
+	hpfxlist_set_expire_timer(hpfx, (hpfx->hpfx_vltime - now));
+}
+
+#endif /* MIP_MN */
+
 struct mip6_hpfxl *
-mnd_add_hpfxlist(home_prefix, home_prefixlen, hpfx_mnoption, hpfxhead) 
+mnd_add_hpfxlist(home_prefix, home_prefixlen, hpfx_mnoption, mipif)
 	struct in6_addr *home_prefix;
 	u_int16_t home_prefixlen;
 	struct mip6_hpfx_mn_exclusive *hpfx_mnoption;
-	struct mip6_hpfx_list *hpfxhead;
+	struct mip6_mipif *mipif;
 {
 	struct mip6_hpfxl *hpfx = NULL;
+	time_t now;
 
-	hpfx = mip6_get_hpfxlist(home_prefix, home_prefixlen, hpfxhead);
+	if (mipif == NULL)
+		return NULL;
+
+	now = time(0);
+	hpfx = mip6_get_hpfxlist(home_prefix, 
+				 home_prefixlen, &mipif->mipif_hprefx_head);
 	if (hpfx) {
-		if (hpfx_mnoption)
-			memcpy(&hpfx->hpfx_for_mn, 
-				hpfx_mnoption, sizeof(hpfx->hpfx_for_mn));
-		/* need timer XXX */
+		if (hpfx_mnoption) {
+			hpfx->hpfx_vltime = hpfx_mnoption->hpfxlist_vltime;
+			hpfx->hpfx_vlexpire = now + hpfx->hpfx_vltime;
+			hpfx->hpfx_pltime = hpfx_mnoption->hpfxlist_pltime;
+			hpfx->hpfx_plexpire = now + hpfx->hpfx_pltime;
+
+			hpfxlist_set_expire_timer(hpfx, hpfx->hpfx_pltime);
+		}
+		
 		return (hpfx);
 	}
 
@@ -1064,11 +1121,15 @@ mnd_add_hpfxlist(home_prefix, home_prefixlen, hpfx_mnoption, hpfxhead)
 
 	hpfx->hpfx_prefix = *home_prefix;
 	hpfx->hpfx_prefixlen = home_prefixlen;
-	if (hpfx_mnoption)
-		memcpy(&hpfx->hpfx_for_mn, 
-			hpfx_mnoption, sizeof(hpfx->hpfx_for_mn));
-
-	/* need timer XXX */
+	hpfx->hpfx_mipif = mipif;
+	if (hpfx_mnoption) {
+		hpfx->hpfx_vltime = hpfx_mnoption->hpfxlist_vltime;
+		hpfx->hpfx_vlexpire = now + hpfx->hpfx_vltime;
+		hpfx->hpfx_pltime = hpfx_mnoption->hpfxlist_pltime;
+		hpfx->hpfx_plexpire = now + hpfx->hpfx_pltime;
+		
+		hpfxlist_set_expire_timer(hpfx, hpfx->hpfx_pltime);
+	}
 
 	LIST_INIT(&hpfx->hpfx_hal_head);
 
@@ -1076,7 +1137,7 @@ mnd_add_hpfxlist(home_prefix, home_prefixlen, hpfx_mnoption, hpfxhead)
 		syslog(LOG_INFO, "Home Prefix (%s/%d) added into home prefix list\n", 
 		       ip6_sprintf(home_prefix), home_prefixlen);
 	
-	LIST_INSERT_HEAD(hpfxhead, hpfx, hpfx_entry);
+	LIST_INSERT_HEAD(&mipif->mipif_hprefx_head, hpfx, hpfx_entry);
 
 	return (hpfx);
 }
@@ -1106,7 +1167,7 @@ mnd_add_mipif(ifname)
 	LIST_INIT(&mif->mipif_hprefx_head);
 
 	/* add all global prefixes assigned to this ifindex */
-	mnd_init_homeprefix(mif->mipif_ifindex, &mif->mipif_hprefx_head);
+	mnd_init_homeprefix(mif);
 
 	LIST_INSERT_HEAD(&mipifhead, mif, mipif_entry);
 
@@ -1142,9 +1203,8 @@ mnd_get_mipif(ifindex)
 
 
 static void
-mnd_init_homeprefix(ifindex, hpfx_head)
-	u_int16_t ifindex;
-	struct mip6_hpfx_list *hpfx_head;
+mnd_init_homeprefix(mipif)
+	struct mip6_mipif *mipif;
 {
 	struct ifaddrs *ifa, *ifap;
 	struct sockaddr *sa;
@@ -1152,6 +1212,7 @@ mnd_init_homeprefix(ifindex, hpfx_head)
 	int prefixlen = 0;
 	struct mip6_hpfxl *hpfxent = NULL;
 	struct mip6_hoainfo *hoa = NULL;
+	struct mip6_hpfx_mn_exclusive mnoption;
 #ifdef MIP_NEMO
 	struct nemo_mptable *mpt = NULL;
 #endif /* MIP_NEMO */
@@ -1166,7 +1227,7 @@ mnd_init_homeprefix(ifindex, hpfx_head)
 		
 		if (sa->sa_family != AF_INET6)
 			continue;
-		if (if_nametoindex(ifa->ifa_name) != ifindex) 
+		if (if_nametoindex(ifa->ifa_name) != mipif->mipif_ifindex) 
 			continue;
 
 		if (!(ifa->ifa_flags & IFF_UP)) 
@@ -1178,19 +1239,26 @@ mnd_init_homeprefix(ifindex, hpfx_head)
 			continue;
 
 		/* set Home Address to mip6_hoainfo */
-		hoa = hoainfo_insert(&addr_sin6->sin6_addr, ifindex);
+		hoa = hoainfo_insert(&addr_sin6->sin6_addr, 
+				     mipif->mipif_ifindex);
 		if (hoa == NULL)
 			continue;
 
 		mask_sin6 = (struct sockaddr_in6 *)ifa->ifa_netmask;
 		prefixlen = in6_mask2len(&mask_sin6->sin6_addr, NULL);
 
-		hpfxent = mip6_get_hpfxlist(&addr_sin6->sin6_addr, prefixlen, hpfx_head);
+		hpfxent = mip6_get_hpfxlist(&addr_sin6->sin6_addr, 
+					    prefixlen, 
+					    &mipif->mipif_hprefx_head);
 		if (hpfxent)
 			continue;
 
+		memset(&mnoption, 0, sizeof(mnoption)); 
+		mnoption.hpfxlist_vltime = 604800;
+		mnoption.hpfxlist_pltime = 10;
+
 		hpfxent = mnd_add_hpfxlist(&addr_sin6->sin6_addr, 
-			prefixlen, NULL, hpfx_head);
+			prefixlen, &mnoption, mipif);
 		if (hpfxent == NULL) {
 			syslog(LOG_ERR, "fail to add home prefix entry %s\n", 
 			       ip6_sprintf(&addr_sin6->sin6_addr));
@@ -1211,7 +1279,7 @@ mnd_init_homeprefix(ifindex, hpfx_head)
 	
 	freeifaddrs(ifap);
 	
-	if (LIST_EMPTY(hpfx_head)) {
+	if (LIST_EMPTY(&mipif->mipif_hprefx_head)) {
 		syslog(LOG_ERR, "please configure at least one global home prefix\n");
 		exit(0);
 	}
