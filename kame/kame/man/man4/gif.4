@@ -1,4 +1,4 @@
-.\"	$KAME: gif.4,v 1.9 2000/04/16 16:45:31 itojun Exp $
+.\"	$KAME: gif.4,v 1.10 2000/04/17 03:00:42 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -253,3 +253,12 @@ and are picky about outer header fields.
 For example, you cannot usually use
 .Nm
 to talk with IPsec devices that use IPsec tunnel mode.
+.Pp
+The current code does not check if the ingress address
+.Pq outer source address
+configured to
+.Nm
+makes sense.
+Make sure to configure an address which belongs to your node.
+Otherwise, your node will not be able to receive packets from the peer,
+and your node will generate packets with spoofed source address.
