@@ -1,8 +1,19 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.588 2000/02/22 12:31:58 sumikawa Exp $
+$Id: CHANGELOG,v 1.589 2000/02/23 05:09:53 jinmei Exp $
 
 <200002>
+2000-02-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* (all OSes)/usr.sbin/bgpd/Makefile: added the -DHAVE_GETIFADDRS
+	compile option.
+	Note: please be sure to update the whole tree, do "make prepare",
+	update include files, and then rebuild the whole kit.
+
+2000-02-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/bgpd/if.c (ifconfig): use getifaddrs (if available)
+	instead of SIOCGIFCONF, since the former interface is more
+	friendly and safer.
+
 Tue Feb 22 14:56:59 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd2/ports/openssh: upgrade to 1.2.2 and mark as broken. we
 	  need volunteers to make buildable this port.
