@@ -1707,39 +1707,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 			switch (optname) {
 
-			case IPV6_OPTIONS:
-			case IPV6_RETOPTS:
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-#if 0
-				if (in6p->in6p_options) {
-					error = sooptcopyout(sopt, 
-						     mtod(in6p->in6p_options,
-							  char *),
-						     in6p->in6p_options->m_len);
-				} else
-					sopt->sopt_valsize = 0;
-				break;
-#else
-				error = ENOPROTOOPT;
-				break;
-#endif
-#else
-#if 0
-				*mp = m = m_get(M_WAIT, MT_SOOPTS);
-				if (in6p->in6p_options) {
-					m->m_len = in6p->in6p_options->m_len;
-					bcopy(mtod(in6p->in6p_options, caddr_t),
-					      mtod(m, caddr_t),
-					      (unsigned)m->m_len);
-				} else
-					m->m_len = 0;
-				break;
-#else
-				error = ENOPROTOOPT;
-				break;
-#endif
-#endif
-
 			case IPV6_PKTOPTIONS:
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				if (in6p->in6p_options) {
@@ -1775,9 +1742,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 				}
 				/* fall through */
 			case IPV6_UNICAST_HOPS:
-			case IPV6_RECVOPTS:
-			case IPV6_RECVRETOPTS:
-			case IPV6_RECVDSTADDR:
 			case IPV6_CHECKSUM:
 
 			case IPV6_RECVPKTINFO:
