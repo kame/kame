@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.95 2000/10/19 18:16:37 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.96 2000/10/31 04:21:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -215,6 +215,7 @@ char *hostname;
 int ident;			/* process id to identify our packets */
 u_int8_t nonce[8];		/* nonce field for node information */
 struct in6_addr srcaddr;
+int hoplimit = -1;		/* hoplimit */
 
 /* counters */
 long npackets;			/* max packets to transmit */
@@ -222,7 +223,6 @@ long nreceived;			/* # of packets we got back */
 long nrepeats;			/* number of duplicates */
 long ntransmitted;		/* sequence # for outbound packets = #sent */
 struct timeval interval = {1, 0}; /* interval between packets */
-int hoplimit = -1;		/* hoplimit */
 
 /* timing */
 int timing;			/* flag to do timing */
