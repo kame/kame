@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.214 2001/06/18 07:59:28 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.215 2001/06/20 12:30:32 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2379,7 +2379,7 @@ icmp6_reflect(m, off)
 #ifdef COMPAT_RFC1885
 	ip6_output(m, NULL, &icmp6_reflect_rt, 0, NULL, &outif);
 #else
-	ip6_output(m, NULL, NULL, 0, NULL, &outif);
+	ip6_output(m, NULL, NULL, IPV6_MINMTU, NULL, &outif);
 #endif
 	if (outif)
 		icmp6_ifoutstat_inc(outif, type, code);
