@@ -1,6 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.237 1999/10/31 00:47:15 itojun Exp $
+$Id: CHANGELOG,v 1.238 1999/11/01 04:35:42 itojun Exp $
+
+<199911>
+Mon Nov  1 13:34:07 JST 1999  itojun@iijlab.net
+	* freebsd2/ports/openssl: port directory for OpenSSL 0.9.4.  required
+	  for freebsd2/ports/v6eval (and useful for building tcpdump and
+	  racoon).
+	* freebsd2/ports/{ct,v6eval}: port directory for TAHI IPv6 conformance
+	  test kit, version 0.4.
 
 <199910>
 Fri Oct 29 21:17:10 JST 1999  itojun@iijlab.net
