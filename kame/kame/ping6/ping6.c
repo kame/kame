@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.97 2000/11/06 16:44:23 kawa Exp $	*/
+/*	$KAME: ping6.c,v 1.98 2000/11/08 09:07:31 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -570,10 +570,13 @@ main(argc, argv)
 	if (options & F_FLOOD && options & F_INTERVAL)
 		errx(1, "-f and -i incompatible options");
 
-	if ((options & F_NOUSERDATA) == 0 &&
-	    datalen >= sizeof(struct timeval)) {
-		/* can we time transfer */
-		timing = 1;
+	if ((options & F_NOUSERDATA) == 0) {
+		if (datalen >= sizeof(struct timeval)) {
+			/* can we time transfer */
+			timing = 1;
+		} else {
+			timing = 0;
+		}
 	} else {
 		/* suppress timing for node information query */
 		timing = 0;
