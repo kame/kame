@@ -1,4 +1,4 @@
-/*	$KAME: trace.c,v 1.16 2002/06/26 10:24:49 jinmei Exp $	*/
+/*	$KAME: trace.c,v 1.17 2002/06/26 12:44:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -446,9 +446,9 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 
   sendit:
 	/*
-	 * if metric is 1 or no. of reports is 1, send response to requestor
+	 * if metric is 1 or no. of reports is 1, send response to requester
 	 * else send to upstream router.  If the upstream router can't handle
-	 * mtrace, set an error code and send to requestor anyway.
+	 * mtrace, set an error code and send to requester anyway.
 	 */
 	IF_DEBUG(DEBUG_TRACE)
 		log(LOG_DEBUG, 0, "rcount:%d, no:%d", rcount, no);
