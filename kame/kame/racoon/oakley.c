@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.107 2001/12/12 18:23:42 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.108 2001/12/12 21:18:33 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -561,7 +561,8 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 				}
 
 				l = res->l;
-				if (!VREALLOC(res, l + this->l)) {
+				res = vrealloc(res, l + this->l);
+				if (res == NULL) {
 					plog(LLV_ERROR, LOCATION, NULL,
 						"failed to get keymat buffer.\n");
 					if (prev && prev != res)

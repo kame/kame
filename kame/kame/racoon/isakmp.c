@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.169 2001/12/12 15:29:13 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.170 2001/12/12 21:18:32 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1110,7 +1110,7 @@ isakmp_parsewoh(np0, gen, len)
 
 	/*
 	 * 5 is a magic number, but any value larger than 2 should be fine
-	 * as we VREALLOC() in the following loop.
+	 * as we do vrealloc() in the following loop.
 	 */
 	result = vmalloc(sizeof(struct isakmp_parse_t) * 5);
 	if (result == NULL) {
@@ -1150,7 +1150,8 @@ isakmp_parsewoh(np0, gen, len)
 			int off;
 
 			off = p - (struct isakmp_parse_t *)result->v;
-			if (!VREALLOC(result, result->l * 2)) {
+			result = vrealloc(result->l * 2);
+			if (result == NULL) {
 				plog(LLV_DEBUG, LOCATION, NULL,
 					"failed to realloc buffer.\n");
 				vfree(result);
