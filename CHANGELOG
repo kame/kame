@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.424 2000/01/10 06:37:09 jinmei Exp $
+$Id: CHANGELOG,v 1.425 2000/01/10 06:56:16 jinmei Exp $
 
 <200001>
+2000-01-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/{in6.h, ip6_output}: disabled the following
+	socket options, that were just derived from IPv4 and were not
+	standards any more;
+	IPV6_OPTIONS, IPV6_RECVOPTS, IPV6_RECVRETOPTS, IPV6_RECVDSTADDR,
+	and IPV6_RETOPTS.
+
 2000-01-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/net/if_gif.c (gif_output): changed the (default) upper
 	limit of how many times gif_output can be called.
