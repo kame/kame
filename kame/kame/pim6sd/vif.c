@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.27 2002/09/17 09:57:20 suz Exp $	*/
+/*	$KAME: vif.c,v 1.28 2002/10/02 06:27:24 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -365,7 +365,7 @@ void start_vif (mifi_t vifi)
 		query_groupsV2(v);
 	    else
 #endif
-	        if (v->uv_mld_version & MLDv2)
+	        if (v->uv_mld_version & MLDv1)
 			query_groups(v);
   
 	    /*
