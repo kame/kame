@@ -1,5 +1,5 @@
 /* 
- * $Id: input.c,v 1.1 1999/08/08 23:29:46 itojun Exp $
+ * $Id: input.c,v 1.2 1999/08/17 14:23:31 itojun Exp $
  */
 
 /*
@@ -149,7 +149,8 @@ process_rip6_msg(struct msghdr *mh, int nbytes)
 		dnh.rip6_addr = src->sin6_addr;
 #ifdef __KAME__
 		if (IN6_IS_ADDR_LINKLOCAL(&dnh.rip6_addr))
-			dnh.rip6_addr.s6_addr16[1] = htons(if_index(ifp));
+			*(u_int16_t *)&dnh.rip6_addr.s6_addr[2] =
+				htons(if_index(ifp));
 #endif
 		dnh.rip6_metric = RIP6_NEXTHOP_METRIC;	/* no one cares. but */
 
@@ -683,11 +684,11 @@ int
 address_match(struct in6_addr *addr1, struct in6_addr *addr2,
 	      struct in6_addr *mask)
 {
-	if (((addr1->s6_addr32[0] ^ addr2->s6_addr32[0]) & mask->s6_addr32[0]) ||
-	    ((addr1->s6_addr32[1] ^ addr2->s6_addr32[1]) & mask->s6_addr32[1]) ||
-	    ((addr1->s6_addr32[2] ^ addr2->s6_addr32[2]) & mask->s6_addr32[2]) ||
-	    ((addr1->s6_addr32[3] ^ addr2->s6_addr32[3]) & mask->s6_addr32[3]))
-		return 0;
+	int i;
+	for (i = 0; i < sizeof(struct in6_addr); i++) {
+		if (((addr1->s6_addr[i] ^ addr2->s6_addr[i]) & mask->s6_addr[i]) != 0)
+			return 0;
+	}
 
 	return 1;
 }

@@ -1,5 +1,5 @@
 /* 
- * $Id: startup.c,v 1.1 1999/08/08 23:29:48 itojun Exp $
+ * $Id: startup.c,v 1.2 1999/08/17 14:23:31 itojun Exp $
  */
 
 /*
@@ -451,13 +451,13 @@ initialize_interface(void)
 				continue;
 			}
 		} else {
-#define vdst  plp->pl_dest.s6_addr32
-#define vsrc1 plp->pl_pref.prf_addr.s6_addr32
-#define vsrc2 plp->pl_mask.s6_addr32
-			vdst[0] = vsrc1[0] & vsrc2[0];
-			vdst[1] = vsrc1[1] & vsrc2[1];
-			vdst[2] = vsrc1[2] & vsrc2[2];
-			vdst[3] = vsrc1[3] & vsrc2[3];
+			int i;
+
+#define vdst  plp->pl_dest.s6_addr
+#define vsrc1 plp->pl_pref.prf_addr.s6_addr
+#define vsrc2 plp->pl_mask.s6_addr
+			for (i = 0; i < sizeof(struct in6_addr); i++)
+				vdst[i] = vsrc1[i] & vsrc2[i];
 #undef vsrc2
 #undef vsrc1
 #undef vdst
@@ -903,10 +903,7 @@ if_ifwithdstaddr(struct preflist *addr, struct interface *ifp)
 	register struct preflist *pl = NULL;
 
 	/* Unknown Address of the other side */
-	if (addr->pl_dest.s6_addr32[0] == 0 &&
-	    addr->pl_dest.s6_addr32[1] == 0 &&
-	    addr->pl_dest.s6_addr32[2] == 0 &&
-	    addr->pl_dest.s6_addr32[3] == 0)
+	if (IN6_IS_ADDR_UNSPECIFIED(&addr->pl_dest))
 		return (struct interface *)NULL;
 
 	for (inf = ifnet; inf; inf = inf->if_next) {
@@ -947,10 +944,7 @@ if_duplicate(struct preflist *pl, struct interface *ifp)
 	struct preflist *prf;
 
 	/* maybe already zapped */
-	if (pl->pl_pref.prf_addr.s6_addr32[0] == 0 &&
-	    pl->pl_pref.prf_addr.s6_addr32[1] == 0 &&
-	    pl->pl_pref.prf_addr.s6_addr32[2] == 0 &&
-	    pl->pl_pref.prf_addr.s6_addr32[3] == 0)
+	if (IN6_IS_ADDR_UNSPECIFIED(&pl->pl_pref.prf_addr))
 		return;
 
 	for (inf = ifnet; inf; inf = inf->if_next) {

@@ -1,5 +1,5 @@
 /* 
- * $Id: tree.c,v 1.1 1999/08/08 23:29:48 itojun Exp $
+ * $Id: tree.c,v 1.2 1999/08/17 14:23:31 itojun Exp $
  */
 
 /*
@@ -479,7 +479,7 @@ get_gateway(struct in6_addr *gw_addr, struct interface *if_ptr)
 	gw->gw_ifp = if_ptr;
 #ifdef __KAME__
 	if (IN6_IS_ADDR_LINKLOCAL(&gw->gw_addr))
-		gw->gw_addr.s6_addr16[1] = htons(if_index(if_ptr));
+		*(u_int16_t *)&gw->gw_addr.s6_addr[2] = htons(if_index(if_ptr));
 #endif
 
 	return (gw);
