@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.266 2001/12/24 18:49:47 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.267 2001/12/25 01:22:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1173,11 +1173,8 @@ skip_ipsec2:;
 	 * We ignore the specified MTU if it is larger than the already-known
 	 * path MTU.
 	 */
-	if (mtu > IPV6_MMTU &&
-	    ((opt && (opt->ip6po_flags & IP6PO_MINMTU)) ||
-	     (flags & IPV6_MINMTU))) {
+	if (mtu > IPV6_MMTU && opt && (opt->ip6po_flags & IP6PO_MINMTU))
 		mtu = IPV6_MMTU;
-	}
 
 	/* Fake scoped addresses */
 	if ((ifp->if_flags & IFF_LOOPBACK) != 0) {
@@ -1976,7 +1973,6 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_RECVPKTINFO:
 			case IPV6_RECVHOPLIMIT:
 			case IPV6_RECVRTHDR:
-			case IPV6_USE_MIN_MTU:
 			case IPV6_RECVPATHMTU:
 			case IPV6_RECVTCLASS:
 			case IPV6_V6ONLY:
@@ -2119,10 +2115,6 @@ do { \
 					OPTSET(IN6P_FAITH);
 					break;
 
-				case IPV6_USE_MIN_MTU:
-					OPTSET(IN6P_MINMTU);
-					break;
-
 				case IPV6_RECVPATHMTU:
 					OPTSET(IN6P_MTU);
 					break;
@@ -2199,6 +2191,7 @@ do { \
 
 			case IPV6_TCLASS:
 			case IPV6_DONTFRAG:
+			case IPV6_USE_MIN_MTU:
 				if (optlen != sizeof(optval)) {
 					error = EINVAL;
 					break;
@@ -2637,10 +2630,6 @@ do { \
 					break;
 #endif
 
-				case IPV6_USE_MIN_MTU:
-					optval = OPTBIT(IN6P_MINMTU);
-					break;
-
 				case IPV6_RECVPATHMTU:
 					optval = OPTBIT(IN6P_MTU);
 					break;
@@ -2679,8 +2668,18 @@ do { \
 					optval = OPTBIT(IN6P_AUTOFLOWLABEL);
 					break;
 
-				case IPV6_TCLASS:
+#define PKTOPTBIT(bit) ((in6p->in6p_outputopts && \
+		         (in6p->in6p_outputopts->ip6po_flags & (bit))) ? 1 : 0)
 				case IPV6_DONTFRAG:
+					optval = PKTOPTBIT(IP6PO_DONTFRAG);
+					break;
+
+				case IPV6_USE_MIN_MTU:
+					optval = PKTOPTBIT(IP6PO_MINMTU);
+					break;
+#undef PKTOPTBIT
+
+				case IPV6_TCLASS:
 					error = ip6_getpcbopt(in6p->in6p_outputopts,
 							      optname, &optdata,
 							      &optdatalen);
@@ -3253,6 +3252,7 @@ ip6_getpcbopt(pktopt, optname, datap, datalenp)
 		optdatalen = sizeof(pktopt->ip6po_tclass);
 		break;
 	case IPV6_HOPOPTS:
+		
 		if (pktopt->ip6po_hbh) {
 			optdata = (void *)pktopt->ip6po_hbh;
 			ip6e = (struct ip6_ext *)pktopt->ip6po_hbh;

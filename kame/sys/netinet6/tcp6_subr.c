@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.36 2001/12/07 07:07:10 itojun Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.37 2001/12/25 01:22:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -315,8 +315,10 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 				: NULL;
 #endif /* IPSEC */
 	ip6oflags = 0;
-	if (t6p && (t6p->t_in6pcb->in6p_flags & IN6P_MINMTU))
+	if (t6p && t6p->t_in6pcb->in6p_outputopts &&
+	    (t6p->t_in6pcb->in6p_outputopts->ip6po_flags & IP6PO_MINMTU)) {
 		ip6oflags |= IPV6_MINMTU;
+	}
 	return(ip6_output(m, NULL, ro, ip6oflags, NULL, NULL));
 }
 

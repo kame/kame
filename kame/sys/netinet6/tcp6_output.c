@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_output.c,v 1.16 2001/07/26 06:53:20 jinmei Exp $	*/
+/*	$KAME: tcp6_output.c,v 1.17 2001/12/25 01:22:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -401,9 +401,10 @@ send:
 	 * Adjust data length if insertion of options will
 	 * bump the packet length beyond the permissible segment length.
 	 */
-	if (t6p->t_in6pcb->in6p_flags & IN6P_MINMTU)
+	if (t6p->t_in6pcb->in6p_outputopts &&
+	    (t6p->t_in6pcb->in6p_outputopts->ip6po_flags & IP6PO_MINMTU)) {
 		maxseg = IPV6_MMTU - hdrlen;
-	else
+	} else
 		maxseg = t6p->t_maxseg;
 	if (len > maxseg - optlen - exthdrlen) {
 		len = maxseg - optlen - exthdrlen;
@@ -653,8 +654,10 @@ send:
 #endif /* IPSEC */
 
 	ip6oflags = 0;
-	if (t6p->t_in6pcb->in6p_flags & IN6P_MINMTU)
+	if (t6p->t_in6pcb->in6p_outputopts &&
+	    (t6p->t_in6pcb->in6p_outputopts->ip6po_flags & IP6PO_MINMTU)) {
 		ip6oflags |= IPV6_MINMTU;
+	}
 	ip6oflags |= (so->so_options & SO_DONTROUTE);
 
 	error = ip6_output(m, t6p->t_in6pcb->in6p_outputopts,

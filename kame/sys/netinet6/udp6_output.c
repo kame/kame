@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.52 2001/12/24 18:46:22 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.53 2001/12/25 01:22:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -423,9 +423,6 @@ udp6_output(in6p, m, addr6, control)
 				sizeof(struct ip6_hdr), plen)) == 0) {
 			udp6->uh_sum = 0xffff;
 		}
-
-		if (in6p->in6p_flags & IN6P_MINMTU)
-			flags |= IPV6_MINMTU;
 
 		udp6stat.udp6s_opackets++;
 #ifdef IPSEC

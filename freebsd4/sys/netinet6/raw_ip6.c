@@ -313,7 +313,6 @@ rip6_output(m, so, dstsock, control)
 	struct ifnet *oifp = NULL;
 	int type = 0, code = 0;		/* for ICMPv6 output statistics only */
 	int priv = 0;
-	int flags;
 	struct in6_addr *in6a;
 
 	in6p = sotoin6pcb(so);
@@ -324,8 +323,10 @@ rip6_output(m, so, dstsock, control)
 		priv = 1;
 	dst = &dstsock->sin6_addr;
 	if (control) {
-		if ((error = ip6_setpktoptions(control, &opt, stickyopt, priv, 0)) != 0)
+		if ((error = ip6_setpktoptions(control, &opt,
+					       stickyopt, priv, 0)) != 0) {
 			goto bad;
+		}
 		in6p->in6p_outputopts = &opt;
 	}
 
@@ -413,12 +414,8 @@ rip6_output(m, so, dstsock, control)
 	}
 #endif /*IPSEC*/
 
-	flags = 0;
-	if (in6p->in6p_flags & IN6P_MINMTU)
-		flags |= IPV6_MINMTU;
-
 	oifp = NULL;		/* just in case */
-	error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route, flags,
+	error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route, 0,
 			   in6p->in6p_moptions, &oifp);
 	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
 		if (oifp)

@@ -146,7 +146,6 @@ struct	in6pcb {
  */
 #define IN6P_BINDV6ONLY		0x10000000 /* do not grab IPv4 traffic */
 #endif
-#define IN6P_MINMTU		0x20000000 /* use minimum MTU */
 #define IN6P_RFC2292		0x40000000 /* used RFC2292 API on the socket */
 #define IN6P_MTU		0x80000000 /* receive path MTU */
 

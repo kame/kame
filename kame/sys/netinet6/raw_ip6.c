@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.112 2001/12/25 00:31:48 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.113 2001/12/25 01:22:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -469,7 +469,6 @@ rip6_output(m, va_alist)
 	int type, code;		/* for ICMPv6 output statistics only */
 	int priv = 0;
 	va_list ap;
-	int flags;
 	struct in6_addr *in6a;
 
 	va_start(ap, m);
@@ -589,11 +588,7 @@ rip6_output(m, va_alist)
 	}
 #endif /* IPSEC */
 
-	flags = 0;
-	if (in6p->in6p_flags & IN6P_MINMTU)
-		flags |= IPV6_MINMTU;
-	
-	error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route, flags,
+	error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route, 0,
 	    in6p->in6p_moptions, &oifp);
 	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
 		if (oifp)
