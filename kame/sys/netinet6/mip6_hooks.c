@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hooks.c,v 1.6 2000/03/18 03:05:40 itojun Exp $	*/
+/*	$KAME: mip6_hooks.c,v 1.7 2000/03/21 08:58:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -37,7 +37,7 @@
  *         Hesham Soliman <hesham.soliman@ericsson.com.au>
  *         Martti Kuparinen <martti.kuparinen@ericsson.com>
  *
- * $Id: mip6_hooks.c,v 1.6 2000/03/18 03:05:40 itojun Exp $
+ * $Id: mip6_hooks.c,v 1.7 2000/03/21 08:58:11 itojun Exp $
  *
  */
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
@@ -135,8 +135,8 @@ mip6_find_auto_home_addr(void)
 
 	for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
 #ifdef MIP6_DEBUG
-		mip6_debug("%s: scanning prefix %s (pr = %x)\n", __FUNCTION__,
-			   ip6_sprintf(&pr->ndpr_prefix.sin6_addr), (int)pr);
+		mip6_debug("%s: scanning prefix %s (pr = %p)\n", __FUNCTION__,
+			   ip6_sprintf(&pr->ndpr_prefix.sin6_addr), pr);
 #endif
 		if (IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr) ||
 		    IN6_IS_ADDR_MULTICAST(&pr->ndpr_addr) ||
@@ -152,8 +152,8 @@ mip6_find_auto_home_addr(void)
 #else
 #ifdef MIP6_DEBUG
 		mip6_debug("%s: skipping detached test on prefix %s "
-			   "(pr = %x)\n", __FUNCTION__,
-			   ip6_sprintf(&pr->ndpr_prefix.sin6_addr), (int)pr);
+			   "(pr = %p)\n", __FUNCTION__,
+			   ip6_sprintf(&pr->ndpr_prefix.sin6_addr), pr);
 #endif
 		break;
 #endif
