@@ -227,7 +227,7 @@ struct protosw inetsw[] = {
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
   encap4_input,	rip_output, 	0,		rip_ctloutput,
   rip_usrreq,	/*XXX*/
-  0,		0,		0,		0,
+  encap_init,	0,		0,		0,
 },
 #endif /* INET6 */
 #if NGRE > 0
@@ -265,7 +265,7 @@ struct protosw inetsw[] = {
 { SOCK_RAW,	&inetdomain,	IPPROTO_EON,	PR_ATOMIC|PR_ADDR,
   encap4_input,	rip_output,	0,		rip_ctloutput,
   rip_usrreq,	/*XXX*/
-  0,		0,		0,		0,
+  encap_init,	0,		0,		0,
 },
 #endif /* EON */
 #endif /* ISO */
