@@ -50,7 +50,7 @@ struct connection {
 	int shutdown;	/* read terminated */
 };
 
-enum state { NONE, EPRT, EPSV };
+enum state { NONE, LPSV, EPSV };
 
 struct datarelay {
 	struct event xfer;
@@ -466,7 +466,9 @@ resin(s, event, arg)
 		event_add(&relay->cli.outbound, NULL);
 		break;
 	case EPSV:
+	case LPSV:
 		/* recv: 227 Entering Passive Mode (x,x,x,x,x,x) */
+		/* send: 228 Entering Long Passive Mode (...) */
 		/* send: 229 Entering Extended Passive Mode (|||x|) */
 		if (strncmp(relay->ser.buf, "227 ", 3) != 0) {
 	epsvfail:
@@ -566,10 +568,27 @@ resin(s, event, arg)
 		    datarelay);
 		event_add(&datarelay->xfer, NULL);
 
-		relay->ser.len = snprintf(relay->ser.buf,
-		    sizeof(relay->ser.buf),
-		    "229 Entering Extended Passive Mode (|||%u|)\r\n",
-		    ntohs(sin6.sin6_port));
+		if (relay->state == EPSV) {
+			relay->ser.len = snprintf(relay->ser.buf,
+			    sizeof(relay->ser.buf),
+			    "229 Entering Extended Passive Mode (|||%u|)\r\n",
+			    ntohs(sin6.sin6_port));
+		} else {
+			u_int8_t *ap, *pp;
+#define UC(x)	((x) & 0xff)
+
+			ap = (u_int8_t *)&sin6.sin6_addr;
+			pp = (u_int8_t *)&sin6.sin6_port;
+
+			relay->ser.len = snprintf(relay->ser.buf,
+			    sizeof(relay->ser.buf),
+"228 Entering Long Passive Mode (%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u,%u)\r\n",
+			    6, 16, UC(ap[0]), UC(ap[1]), UC(ap[2]), UC(ap[3]),
+			    UC(ap[4]), UC(ap[5]), UC(ap[6]), UC(ap[7]),
+			    UC(ap[8]), UC(ap[9]), UC(ap[10]), UC(ap[11]),
+			    UC(ap[12]), UC(ap[13]), UC(ap[14]), UC(ap[15]),
+			    2, UC(pp[0]), UC(pp[1]));
+		}
 		event_add(&relay->cli.outbound, NULL);
 		break;
 	default:
@@ -650,8 +669,7 @@ cmdin(s, event, arg)
 		event_add(&relay->cli.inbound, NULL);
 		return;
 	}
-	if (strcasecmp(cmd, "EPRT") == 0 ||
-	    strcasecmp(cmd, "LPRT") == 0 || strcasecmp(cmd, "LPSV") == 0 ||
+	if (strcasecmp(cmd, "EPRT") == 0 || strcasecmp(cmd, "LPRT") == 0 ||
 	    strcasecmp(cmd, "PORT") == 0 || strcasecmp(cmd, "PASV") == 0) {
 		relay->ser.len = snprintf(relay->ser.buf,
 		    sizeof(relay->ser.buf), "502 %s not implemented.\r\n", cmd);
@@ -666,6 +684,11 @@ cmdin(s, event, arg)
 		relay->cli.len = snprintf(relay->cli.buf,
 		    sizeof(relay->cli.buf), "PASV\r\n");
 		relay->state = EPSV;
+	} else if (strcasecmp(cmd, "LPSV") == 0) {
+		/* LPSV -> PASV */
+		relay->cli.len = snprintf(relay->cli.buf,
+		    sizeof(relay->cli.buf), "PASV\r\n");
+		relay->state = LPSV;
 	} else if (relay->state == EPSV &&
 	    (strcasecmp(cmd, "STOR") == 0 || strcasecmp(cmd, "STOU") == 0 ||
 	     strcasecmp(cmd, "RETR") == 0 || strcasecmp(cmd, "LIST") == 0 ||
