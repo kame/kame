@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/07/16 10:32:43 $
+			$Date: 2000/07/19 07:50:22 $
 
 1. IPv6
 
@@ -1394,10 +1394,8 @@ Tunnel mode works basically fine, but comes with the following restrictions:
   IPsec tunnel as pseudo interfaces.
 - Authentication model for AH tunnel must be revisited.  We'll need to
   improve the policy management engine, eventually.
-- Tunnelling for IPv6 IPsec is still incomplete.  This is disabled by default.
-  If you need to perform experiments, add "options IPSEC_IPV6FWD" into
-  the kernel configuration file.  Note that path MTU discovery does not work
-  across IPv6 IPsec tunnel gateway due to insufficient code.
+- Path MTU discovery does not work across IPv6 IPsec tunnel gateway due to
+  insufficient code.
 
 AH specificaton does not talk much about "multiple AH on a packet" case.
 We incrementally compute AH checksum, from inside to outside.  Also, we
