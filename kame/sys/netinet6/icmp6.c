@@ -434,6 +434,8 @@ icmp6_input(mp, offp, proto)
 			break;
 		case ICMP6_DST_UNREACH_ADMIN:
 			icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_adminprohib);
+			code = PRC_UNREACH_PROTOCOL; /* is this a good code? */
+			break;
 		case ICMP6_DST_UNREACH_ADDR:
 			code = PRC_UNREACH_HOST;
 			break;
