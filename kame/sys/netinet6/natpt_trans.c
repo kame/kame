@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.92 2002/04/16 05:17:05 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.93 2002/04/17 09:10:53 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1107,7 +1107,7 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 	icmpip6->ip6_flow = 0;
 	icmpip6->ip6_vfc &= ~IPV6_VERSION_MASK;
 	icmpip6->ip6_vfc |=  IPV6_VERSION;
-	icmpip6->ip6_plen = htons(ntohs(icmpip4->ip_len) - sizeof(struct ip6_hdr));
+	icmpip6->ip6_plen = htons(ntohs(icmpip4->ip_len) - sizeof(struct ip));
 	icmpip6->ip6_nxt  = icmpip4->ip_p;
 	icmpip6->ip6_hlim = icmpip4->ip_ttl;
 	icmpip6->ip6_src  = pad->in6dst;
