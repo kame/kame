@@ -1,6 +1,16 @@
-$Id: CHANGELOG,v 1.492 2000/01/27 09:30:47 itojun Exp $
+$Id: CHANGELOG,v 1.493 2000/01/27 17:07:06 jinmei Exp $
 
 <200001>
+2000-01-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_pcb.h (and many related places):
+	  changed the type of the in6p_inputopts member of the in[6]pcb
+	  structure to a pointer type in order to avoid compilation and
+	  binary compatibility issues.
+	  I believe this fix solves all the recent problem reports due to
+	  the member.
+	  It is recommended to recompile both the kernel and all the
+	  userland applications with this fix.
+
 Thu Jan 27 15:04:12 JST 2000  itojun@iiljab.net
 	* netbsd/pkgsrc/net/rsync: upgrade to 2.3.2 with latest IPv6 patch.
 
