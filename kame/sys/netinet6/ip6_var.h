@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.113 2003/07/08 07:17:16 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.114 2003/07/28 11:58:14 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -289,6 +289,8 @@ struct ip6aux {
 #define IP6A_BRUID	0x04		/* BR Unique Identifier was present */
 #define IP6A_RTALERTSEEN 0x08		/* rtalert present */
 #define IP6A_ROUTEOPTIMIZED 0x10	/* route optimized packet */
+#define IP6A_NOTUSEBC	0x20		/* do not requrie to lookup BC */
+#define IP6A_TEMP_PROXYND_DEL	0x40	/* Marking for resuming proxy nd entry after sending sepcial BA */
 
 	/* ip6.ip6_src */
 	struct sockaddr_in6 ip6a_src;	/* source address in the IPv6 header */

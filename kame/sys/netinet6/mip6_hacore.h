@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.h,v 1.2 2003/07/25 09:15:12 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.h,v 1.3 2003/07/28 11:58:14 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -47,6 +47,8 @@
 int mip6_process_hrbu(struct mip6_bc *);
 int mip6_process_hurbu(struct mip6_bc *);
 int mip6_bc_proxy_control(struct sockaddr_in6 *, struct sockaddr_in6 *, int);
+void mip6_restore_proxynd_entry(struct mbuf *);
+struct mip6_bc *mip6_temp_deleted_proxy(struct mbuf *);
 int mip6_bc_encapcheck(const struct mbuf *, int, int, void *);
 struct ifaddr *mip6_dad_find(struct in6_addr *,	struct ifnet *);
 int mip6_dad_stop(struct mip6_bc *);

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.389 2003/07/10 05:53:06 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.390 2003/07/28 11:58:13 t-momose Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -417,6 +417,8 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #ifdef MIP6
 	bzero((caddr_t)&mip6opt, sizeof(mip6opt));
 	if ((flags & IPV6_FORWARDING) == 0) {
+		struct m_tag *n;
+		struct ip6aux *ip6a = NULL;
 		/*
 		 * XXX: reconsider the following routine.
 		 */
@@ -424,8 +426,12 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		 * MIP6 extention headers handling.
 		 * insert HA, BU, BA, BR options if necessary.
 		 */
-		if (mip6_exthdr_create(m, opt, &mip6opt))
-			goto freehdrs;
+		n = ip6_findaux(m);
+		if (n)
+			ip6a = (struct ip6_aux *) (n + 1);
+		if (!(ip6a && (ip6a->ip6a_flags & IP6A_NOTUSEBC)))
+			if (mip6_exthdr_create(m, opt, &mip6opt))
+				goto freehdrs;
 
 		if ((exthdrs.ip6e_rthdr2 == NULL)
 		    && (mip6opt.mip6po_rthdr2 != NULL)) {

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.19 2003/07/28 11:04:32 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.20 2003/07/28 11:58:14 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1057,6 +1057,8 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh, mopt)
 {
 	struct mbuf *m;
 	struct ip6_pktopts opt;
+	struct m_tag *n;
+	struct ip6aux *ip6a;
 	struct ip6_rthdr *pktopt_rthdr;
 	int error = 0;
 
@@ -1095,6 +1097,26 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh, mopt)
 		}
 		opt.ip6po_rthdr2 = pktopt_rthdr;
 	}
+
+	n = ip6_findaux(m);
+	if (n) {
+		ip6a = (struct ip6aux *)(n + 1);
+		ip6a->ip6a_flags |= IP6A_NOTUSEBC;
+	}
+
+#ifdef MIP6_HOME_AGENT
+	/* delete proxy nd entry temprolly */
+	if ((status >= IP6MA_STATUS_ERRORBASE) &&
+	     SA6_ARE_ADDR_EQUAL(dst, dstcoa)) {
+		struct mip6_bc *mbc;
+
+		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, dst);
+		if (n && mbc && mbc->mbc_flags & IP6MU_HOME &&
+		    (mip6_bc_proxy_control(&mbc->mbc_phaddr, &mbc->mbc_addr, RTM_DELETE) == 0)) {
+			ip6a->ip6a_flags |= IP6A_TEMP_PROXYND_DEL;
+		}
+	}
+#endif
 
 	mip6stat.mip6s_oba++;
 	mip6stat.mip6s_oba_hist[status]++;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.7 2003/07/28 03:23:39 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.8 2003/07/28 11:58:14 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -571,6 +571,40 @@ mip6_bc_proxy_control(target, local, cmd)
 	}
 
 	return (error);
+}
+
+void
+mip6_restore_proxynd_entry(m)
+	struct mbuf *m;
+{
+	struct mip6_bc *mbc;
+	
+	mbc = mip6_temp_deleted_proxy(m);
+	if (mbc)
+		mip6_bc_proxy_control(&mbc->mbc_phaddr, &mbc->mbc_addr, RTM_ADD);
+}
+
+struct mip6_bc *
+mip6_temp_deleted_proxy(m)
+	struct mbuf *m;
+{
+	struct m_tag *n;
+	struct mip6_bc *mbc = NULL;
+	struct sockaddr_in6 src, dst;
+	struct ip6aux *ip6a;
+	
+	n = ip6_findaux(m);
+	if (!n)
+		return NULL;
+
+	ip6a = (struct ip6aux *) (n + 1);
+	if ((ip6a->ip6a_flags & IP6A_TEMP_PROXYND_DEL) &&
+	     ip6_getpktaddrs(m, &src, &dst) == 0) {
+		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &dst);
+		ip6a->ip6a_flags &= ~IP6A_TEMP_PROXYND_DEL;
+	}
+
+	return (mbc);
 }
 
 int

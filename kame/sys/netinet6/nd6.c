@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.327 2003/06/25 07:43:20 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.328 2003/07/28 11:58:14 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -585,6 +585,9 @@ nd6_llinfo_timer(arg)
 			nd6_ns_output(ifp, NULL, dst, ln, 0);
 		} else {
 			struct mbuf *m = ln->ln_hold;
+#if defined(MIP6) && defined(MIP6_HOME_AGENT)
+			mip6_restore_proxynd_entry(m);
+#endif
 			if (m) {
 				ln->ln_hold = NULL;
 				/*

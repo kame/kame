@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.127 2003/06/25 07:46:18 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.128 2003/07/28 11:58:14 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -979,9 +979,20 @@ nd6_na_input(m, off, icmp6len)
 		 * we assume ifp is not a loopback here, so just set the 2nd
 		 * argument as the 1st one.
 		 */
+#if defined(MIP6) && defined(MIP6_HOME_AGENT)
+		struct mip6_bc *mbc;
+
+		mbc = mip6_temp_deleted_proxy(ln->ln_hold);
+#endif
 		nd6_output(ifp, ifp, ln->ln_hold,
 			   (struct sockaddr_in6 *)rt_key(rt), rt);
 		ln->ln_hold = NULL;
+#if defined(MIP6) && defined(MIP6_HOME_AGENT)
+		/* restore the temporally deleted proxy nd entry 
+		   to send binding ack. in some special cases */
+		if (mbc)
+			mip6_bc_proxy_control(&mbc->mbc_phaddr, &mbc->mbc_addr, RTM_ADD);
+#endif
 	}
 
  freeit:
