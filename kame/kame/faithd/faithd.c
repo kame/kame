@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.62 2003/08/19 21:20:33 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.63 2003/09/02 23:31:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -628,7 +628,7 @@ faith_prefix(struct sockaddr *dst)
 	}
 
 	if (memcmp(dst, &faith_prefix,
-			sizeof(struct in6_addr) - sizeof(struct in_addr) == 0) {
+	    sizeof(struct in6_addr) - sizeof(struct in_addr) == 0) {
 		return 1;
 	}
 	return 0;
