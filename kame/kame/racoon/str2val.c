@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: str2val.c,v 1.1 2000/01/09 01:31:33 itojun Exp $ */
+/* YIPS @(#)$Id: str2val.c,v 1.2 2000/02/07 11:24:49 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -65,7 +65,7 @@ val2str(buf, mlen)
 }
 
 /*
- * exchange a string based "base" to a vlaue.
+ * exchange a string based "base" to a value.
  */
 char *
 str2val(str, base, len)
