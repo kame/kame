@@ -54,6 +54,7 @@ cksum6(int linkhdrlen)
 	struct tcphdr *tcp;
 	struct udphdr *udp;
 	struct icmp6_hdr *icmp;
+	struct pim *pim;
 	struct ip6_rthdr0 *rh0;
 	u_char *packet = (u_char *)(buf) + linkhdrlen;
 	u_char nxt = packet[6];
@@ -107,6 +108,11 @@ cksum6(int linkhdrlen)
 			icmp  = (struct icmp6_hdr *)(packet + off);
 			nxt = IPPROTO_ICMPV6;
 			cksum = &(icmp->icmp6_cksum);
+			goto calc;
+		case IPPROTO_PIM:
+			pim = (struct pim *)(packet + off);
+			nxt = IPPROTO_PIM;
+			cksum = &(pim->pim_cksum);
 			goto calc;
 		default:
 			return;
