@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.28 2003/02/07 10:40:48 suz Exp $	*/
+/*	$KAME: main.c,v 1.29 2003/02/10 06:15:41 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -763,7 +763,9 @@ restart(i)
     close(mld6_socket);
     close(pim6_socket);
     close(udp_socket);
+#ifdef HAVE_ROUTING_SOCKETS
     close(routing_socket);
+#endif
 
     /*
      * start processing again
