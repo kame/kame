@@ -5,8 +5,9 @@
 SUBDIR += audio
 SUBDIR += devel
 SUBDIR += games
-SUBDIR += mail
 SUBDIR += lang
+SUBDIR += mail
+SUBDIR += mbone
 SUBDIR += net
 SUBDIR += security
 SUBDIR += www
