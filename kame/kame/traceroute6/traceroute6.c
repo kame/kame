@@ -373,6 +373,18 @@ main(argc, argv)
 	static u_char *rcvcmsgbuf;
 	char hbuf[NI_MAXHOST];
 
+	/*
+	 * Receive ICMP
+	 */
+	if ((rcvsock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) < 0) {
+		perror("socket(ICMPv6)");
+		exit(5);
+	}
+
+	/* revoke privs */
+	seteuid(getuid());
+	setuid(getuid());
+
 	on = 1;
 	seq = 0;
 	
@@ -518,13 +530,6 @@ main(argc, argv)
 	}
 	(void) bzero((char *)outpacket, datalen);
 
-	/*
-	 * Receive ICMP
-	 */
-	if ((rcvsock = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) < 0) {
-		perror("socket(ICMPv6)");
-		exit(5);
-	}
 	/* initialize msghdr for receiving packets */
 	rcviov[0].iov_base = (caddr_t)packet;
 	rcviov[0].iov_len = sizeof(packet);
