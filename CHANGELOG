@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.405 2000/01/05 10:44:32 itojun Exp $
+$Id: CHANGELOG,v 1.406 2000/01/05 16:47:49 itojun Exp $
 
 <200001>
+Thu Jan  6 01:40:50 JST 2000  itojun@iijlab.net
+	* sys/netinet6/icmp6.c: avoid panic on getsockopt(ICMPV6_FILTER).
+	  From: shigeya@foretune.co.jp
+
 Wed Jan  5 19:44:12 JST 2000  itojun@iijlab.net
 	* netbsd/usr.bin/systat, openbsd/usr.bin/systat:
 	  make systat IPv6 ready.  "netstat" subcommand is changed for this.
