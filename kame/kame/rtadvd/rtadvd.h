@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.h,v 1.12 2000/11/08 06:00:04 jinmei Exp $	*/
+/*	$KAME: rtadvd.h,v 1.13 2000/11/08 07:08:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -146,6 +146,9 @@ struct	rainfo {
 
 void ra_timeout __P((void *));
 void ra_timer_update __P((void *, struct timeval *));
+
+int prefix_match __P((struct in6_addr *, int, struct in6_addr *, int));
+struct rainfo *if_indextorainfo __P((int));
 
 #ifdef MIP6
 extern int mobileip6;

@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.39 2000/11/08 05:24:35 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.40 2000/11/08 07:08:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -133,7 +133,6 @@ static int prefix_check __P((struct nd_opt_prefix_info *, struct rainfo *,
 static int nd6_options __P((struct nd_opt_hdr *, int,
 			    union nd_opts *, u_int32_t));
 static void free_ndopts __P((union nd_opts *));
-static struct rainfo *if_indextorainfo __P((int));
 static void ra_output __P((struct rainfo *));
 static void rtmsg_input __P((void));
 static void rtadvd_set_dump_file __P((void));
@@ -1118,6 +1117,26 @@ find_prefix(struct rainfo *rai, struct in6_addr *prefix, int plen)
 	return(NULL);
 }
 
+/* check if p0/plen0 matches p1/plen1; return 1 if matches, otherwise 0. */
+int
+prefix_match(struct in6_addr *p0, int plen0,
+	     struct in6_addr *p1, int plen1)
+{
+	int bytelen, bitlen;
+
+	if (plen0 < plen1)
+		return(0);
+	bytelen = plen1 / 8;
+	bitlen = plen1 % 8;
+	if (memcmp((void *)p0, (void *)p1, bytelen))
+		return(0);
+	if (p0->s6_addr[bytelen] >> (8 - bitlen) ==
+	    p1->s6_addr[bytelen] >> (8 - bitlen))
+		return(1);
+
+	return(0);
+}
+
 static int
 nd6_options(struct nd_opt_hdr *hdr, int limit,
 	    union nd_opts *ndopts, u_int32_t optflags)
@@ -1362,7 +1381,7 @@ rtsock_open()
 	}
 }
 
-static struct rainfo *
+struct rainfo *
 if_indextorainfo(int index)
 {
 	struct rainfo *rai = ralist;
