@@ -1,4 +1,4 @@
-/*	$KAME: ip_ecn.c,v 1.10 2001/05/03 14:51:48 itojun Exp $	*/
+/*	$KAME: ip_ecn.c,v 1.11 2001/05/03 16:09:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -84,7 +84,6 @@ ip_ecn_ingress(mode, outer, inner)
 
 /*
  * modify inner ECN (TOS) field on egress operation (tunnel decapsulation).
- * call it after you've done the default initialization/copy for the inner.
  */
 void
 ip_ecn_egress(mode, outer, inner)
