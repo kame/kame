@@ -96,7 +96,9 @@
 #define C_NEXTHOPSELF	39
 #define C_LOCALADDR	40
 
-#define PARSE_MAX_BITS   C_LOCALADDR
+#define C_BGP_SBSIZE	41
+
+#define PARSE_MAX_BITS   C_BGP_SBSIZE
 
 
 /*  possiblly compatiblized with gated.conf */
@@ -146,7 +148,9 @@ char *sysatom[] = {
   "dumpfile",
 
   "nexthopself",
-  "lcladdr"
+  "lcladdr",
+
+  "bgpsbsize"
 };
 
 static int          i, j, line;
@@ -215,6 +219,26 @@ conf_check(char *filename)
 	    SENTENCE_END(i);
 
 	    continue;
+    }
+
+    /*
+     * socket buffer size
+     */
+    if (strncasecmp(&buf[i], sysatom[C_BGP_SBSIZE], strlen(sysatom[C_BGP_SBSIZE]))
+	== 0) {
+      if (bit_test(parsedflag, C_BGP_SBSIZE)) {
+	syslog(LOG_ERR, "%s:%d %s doubly defined",
+	       filename, line, sysatom[C_BGP_SBSIZE]);
+	fatalx("<conf_check>: doubly defined");
+      }
+      bit_set(parsedflag, C_BGP_SBSIZE);
+      i += strlen(sysatom[C_BGP_SBSIZE]);
+      SKIP_WHITE(i); READ_ATOM(i, j);
+
+      bgpsbsize = atoi(atom);  /* XXX: need validation? */
+
+      SENTENCE_END(i);
+      continue;
     }
 
     /*

@@ -27,6 +27,9 @@
  * SUCH DAMAGE.
  */
 
+#define BGP_DEFAULT_SBSIZE	32768
+extern int bgpsbsize;
+
 void             bgp_connect_start      __P((struct rpcb *));
 void             connect_try            __P((struct rpcb *));
 void             connect_process        __P((struct rpcb *));

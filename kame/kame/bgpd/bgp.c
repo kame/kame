@@ -39,6 +39,8 @@
 #include "ripng_var.h"
 
 int          bgpsock;              /* socket for BGP tcp communication */
+/* socket buffer size for outgoing BGP data */
+int          bgpsbsize = BGP_DEFAULT_SBSIZE;
 
 u_int16_t    my_as_number;         /* my AS number                     */
 u_int32_t    bgpIdentifier;        /* BGP Identifier  (net-order)      */
@@ -1751,9 +1753,11 @@ bgp_selectroute(rte, bnp)
 			 * (like RIPng metric) (1998/05/13)
 			 */
 			if (orte->rt_flags & RTF_UP) {
-				if (bgp_preferred_rte(rte, orte))
+				if (bgp_preferred_rte(rte, orte)) {
 					/* a new RTE may prefer */
 					bgp_disable_rte(orte);
+					orte->rt_flags &= ~RTF_INSTALLED;
+				}
 				else {
 					/*
 					 * Don't activate Kernel table
@@ -1990,6 +1994,11 @@ bgp_process_keepalive (struct rpcb *bnp) {
 
   case BGPSTATE_OPENCONFIRM:
     bnp->rp_state = BGPSTATE_ESTABLISHED;
+    if (bgpsbsize &&
+	setsockopt(bnp->rp_socket, SOL_SOCKET, SO_SNDBUF, &bgpsbsize,
+		   sizeof(bgpsbsize)) < 0) {
+	    fatal("bgp_process_keepalive>: setsockopt");
+    }
     bgp_dump(bnp);
     if (bnp && bnp->rp_hold_timer)
       task_timer_update(bnp->rp_hold_timer);
