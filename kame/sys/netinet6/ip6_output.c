@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.120 2000/08/06 13:18:14 kjc Exp $	*/
+/*	$KAME: ip6_output.c,v 1.121 2000/08/19 01:35:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -501,7 +501,7 @@ skip_ipsec2:;
 
 			 ip6->ip6_dst = *addr;
 			 bcopy((caddr_t)(addr + 1), (caddr_t)addr,
-				 sizeof(struct in6_addr)*(rh0->ip6r0_segleft - 1)
+				 sizeof(struct in6_addr) * (rh0->ip6r0_segleft - 1)
 				 );
 			 *(addr + rh0->ip6r0_segleft - 1) = finaldst;
 			 break;
@@ -1209,6 +1209,7 @@ ip6_insert_jumboopt(exthdrs, plen)
 {
 	struct mbuf *mopt;
 	u_char *optbuf;
+	u_int32_t v;
 
 #define JUMBOOPTLEN	8	/* length of jumbo payload option and padding */
 
@@ -1231,18 +1232,32 @@ ip6_insert_jumboopt(exthdrs, plen)
 
 		mopt = exthdrs->ip6e_hbh;
 		if (M_TRAILINGSPACE(mopt) < JUMBOOPTLEN) {
-			caddr_t oldoptp = mtod(mopt, caddr_t);
+			/*
+			 * XXX assumption: exthdrs->ip6e_hbh is not referenced
+			 * from places other than exthdrs.
+			 */
 			int oldoptlen = mopt->m_len;
+			struct mbuf *n;
 
-			if (mopt->m_flags & M_EXT)
-				return(ENOBUFS); /* XXX */
-			MCLGET(mopt, M_DONTWAIT);
-			if ((mopt->m_flags & M_EXT) == 0)
+			if (oldoptlen + JUMBOOPTLEN > MCLBYTES)
 				return(ENOBUFS);
-
-			bcopy(oldoptp, mtod(mopt, caddr_t), oldoptlen);
-			optbuf = mtod(mopt, caddr_t) + oldoptlen;
-			mopt->m_len = oldoptlen + JUMBOOPTLEN;
+			if (mopt->m_next)
+				return(ENOBUFS);
+			MGET(n, M_DONTWAIT, MT_DATA);
+			if (n) {
+				MCLGET(n, M_DONTWAIT);
+				if ((n->m_flags & M_EXT) == 0) {
+					m_freem(n);
+					n = NULL;
+				}
+			}
+			if (!n)
+				return(ENOBUFS);
+			n->m_len = oldoptlen + JUMBOOPTLEN;
+			bcopy(mtod(mopt, caddr_t), mtod(n, caddr_t), oldoptlen);
+			optbuf = mtod(n, caddr_t) + oldoptlen;
+			m_freem(mopt);
+			exthdrs->ip6e_hbh = n;
 		} else {
 			optbuf = mtod(mopt, u_char *) + mopt->m_len;
 			mopt->m_len += JUMBOOPTLEN;
@@ -1261,7 +1276,8 @@ ip6_insert_jumboopt(exthdrs, plen)
 	/* fill in the option. */
 	optbuf[2] = IP6OPT_JUMBO;
 	optbuf[3] = 4;
-	*(u_int32_t *)&optbuf[4] = htonl(plen + JUMBOOPTLEN);
+	v = (u_int32_t)htonl(plen + JUMBOOPTLEN);
+	bcopy(&v, &optbuf[4], sizeof(u_int32_t));
 
 	/* finally, adjust the packet header length */
 	exthdrs->ip6e_ip6->m_pkthdr.len += JUMBOOPTLEN;
@@ -2754,7 +2770,7 @@ ip6_setmoptions(optname, im6op, m)
 			error = EINVAL;
 			break;
 		}
-		ifindex = *(mtod(m, u_int *));
+		bcopy(mtod(m, u_int *), &ifindex, sizeof(ifindex));
 		if (ifindex < 0 || if_index < ifindex) {
 			error = ENXIO;	/* XXX EINVAL? */
 			break;
@@ -2777,7 +2793,7 @@ ip6_setmoptions(optname, im6op, m)
 			error = EINVAL;
 			break;
 		}
-		optval = *(mtod(m, u_int *));
+		bcopy(mtod(m, u_int *), &optval, sizeof(optval));
 		if (optval < -1 || optval >= 256)
 			error = EINVAL;
 		else if (optval == -1)
@@ -2792,8 +2808,12 @@ ip6_setmoptions(optname, im6op, m)
 		 * Set the loopback flag for outgoing multicast packets.
 		 * Must be zero or one.
 		 */
-		if (m == NULL || m->m_len != sizeof(u_int) ||
-		   (loop = *(mtod(m, u_int *))) > 1) {
+		if (m == NULL || m->m_len != sizeof(u_int)) {
+			error = EINVAL;
+			break;
+		}
+		bcopy(mtod(m, u_int *), &loop, sizeof(loop));
+		if (loop > 1) {
 			error = EINVAL;
 			break;
 		}
@@ -3123,8 +3143,8 @@ ip6_setpktoptions(control, opt, priv, needcopy)
 				opt->ip6po_pktinfo =
 					malloc(sizeof(struct in6_pktinfo),
 					       M_IP6OPT, M_WAITOK);
-				*opt->ip6po_pktinfo =
-					*(struct in6_pktinfo *)CMSG_DATA(cm);
+				bcopy(CMSG_DATA(cm), opt->ip6po_pktinfo,
+				    sizeof(struct in6_pktinfo));
 			} else
 				opt->ip6po_pktinfo =
 					(struct in6_pktinfo *)CMSG_DATA(cm);
