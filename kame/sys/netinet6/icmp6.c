@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.363 2003/10/21 03:03:10 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.364 2003/10/21 03:06:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -405,6 +405,10 @@ icmp6_error(m, type, code, param)
 	nxt = -1;
 	off = ip6_lasthdr(m, 0, IPPROTO_IPV6, &nxt);
 	if (off >= 0 && nxt == IPPROTO_ICMPV6) {
+		if (off + sizeof(icp) > m->m_pkthdr.len) {
+			icmp6stat.icp6s_tooshort++;
+			goto freeit;
+		}
 		m_copydata(m, off, sizeof(icp), (caddr_t)&icp);
 		if (icp.icmp6_type < ICMP6_ECHO_REQUEST ||
 		    icp.icmp6_type == ND_REDIRECT) {
