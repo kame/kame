@@ -5487,7 +5487,7 @@ key_add(so, m, mhp)
 	struct secasvar *newsav;
 	u_int16_t proto;
 	u_int8_t mode;
-	u_int32_t reqid;
+	u_int16_t reqid;
 	int error;
 
 	/* sanity check */
