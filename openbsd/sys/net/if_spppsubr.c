@@ -801,8 +801,7 @@ nosupport:
 				rv = ENOBUFS;
 		}
 		IF_ENQUEUE (ifq, m);
-	}
-	else
+	} else
 		IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, rv);
 	if (rv != 0) {
 		++ifp->if_oerrors;

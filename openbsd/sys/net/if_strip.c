@@ -744,6 +744,12 @@ stripoutput(ifp, m, dst, rt)
 		printf("\n");
 	}
 #endif
+	/*
+	 * if the queueing discipline needs packet classification,
+	 * do it before prepending link headers.
+	 */
+	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+
 	switch (dst->sa_family) {
 
             case AF_INET:

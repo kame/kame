@@ -119,7 +119,6 @@ atm_output(ifp, m0, dst, rt0)
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
 
-#ifdef ALTQ
 	/*
 	 * if the queueing discipline needs packet classification,
 	 * do it before prepending link headers.
