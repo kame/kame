@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.99 2001/02/03 15:30:53 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.100 2001/02/03 19:19:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -615,9 +615,30 @@ nd6_timer(ignored_arg)
 		nia6 = ia6->ia_next;
 		/* check address lifetime */
 		lt6 = &ia6->ia6_lifetime;
-		if (lt6->ia6t_expire && lt6->ia6t_expire < time_second)
+		if (lt6->ia6t_expire && lt6->ia6t_expire < time_second) {
+			int regen = 0;
+
+			/*
+			 * If the expiring address is temporary, try
+			 * regenerating a new one.  This would be useful when
+			 * we suspended a laptop PC, then turned on after a
+			 * period that could invalidate all temporary
+			 * addresses.  Although we may have to restart the
+			 * loop (see below), it must be after purging the
+			 * address.  Otherwise, we'd see an infinite loop of
+			 * regeneration. 
+			 */
+			if ((ia6->ia6_flags & IN6_IFF_TEMPORARY) != 0 &&
+			    ip6_use_tempaddr) {
+				if (regen_tmpaddr(ia6) == 0)
+					regen = 1;
+			}
+
 			in6_purgeaddr(&ia6->ia_ifa);
-		else if (lt6->ia6t_preferred &&
+
+			if (regen)
+				goto addrloop; /* XXX: see below */
+		} else if (lt6->ia6t_preferred &&
 			 lt6->ia6t_preferred < time_second) {
 			int oldflags = ia6->ia6_flags;
 
@@ -630,10 +651,6 @@ nd6_timer(ignored_arg)
 			if ((ia6->ia6_flags & IN6_IFF_TEMPORARY) != 0 &&
 			    (oldflags & IN6_IFF_DEPRECATED) == 0 &&
 			    ip6_use_tempaddr) {
-				/*
-				 * XXX: we separated the routine as a function
-				 * just because indentation issue...
-				 */
 				if (regen_tmpaddr(ia6) == 0) {
 					/*
 					 * A new temporary address is
