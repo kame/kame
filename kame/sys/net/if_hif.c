@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.10 2001/10/26 08:48:55 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.11 2001/11/19 08:09:37 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -238,8 +238,9 @@ hif_ioctl(ifp, cmd, data)
 {
 	int s;
 	struct hif_softc *sc = (struct hif_softc *)ifp;
-	struct hif_ifreq *ifr = (struct hif_ifreq *)data;
+	struct hif_ifreq *hifr = (struct hif_ifreq *)data;
 	struct ifaddr *ifa = (struct ifaddr *)data;
+	struct ifreq *ifr = (struct ifreq *)data;
 	int error = 0;
 
 #ifdef __NetBSD__
@@ -258,6 +259,23 @@ hif_ioctl(ifp, cmd, data)
 		 */
 		break;
 
+	case SIOCADDMULTI:
+	case SIOCDELMULTI:
+		if (ifr == 0) {
+			error = EAFNOSUPPORT;		/* XXX */
+			break;
+		}
+		switch (ifr->ifr_addr.sa_family) {
+#ifdef INET6
+		case AF_INET6:
+			break;
+#endif
+		default:
+			error = EAFNOSUPPORT;
+			break;
+		}
+		break;
+
 	case SIOCAHOMEPREFIX_HIF:
 		error = hif_subnet_list_update_withmpfx(sc, data);
 		break;
@@ -267,7 +285,7 @@ hif_ioctl(ifp, cmd, data)
 			struct hif_subnet *hs;
 			struct mip6_subnet *ms;
 			struct mip6_subnet_prefix *mspfx;
-			struct mip6_prefix *mpfx = ifr->ifr_ifru.ifr_mpfx;
+			struct mip6_prefix *mpfx = hifr->ifr_ifru.ifr_mpfx;
 			int i;
 
 			i = 0;
@@ -288,13 +306,13 @@ hif_ioctl(ifp, cmd, data)
 					}
 					*mpfx = *mspfx->mspfx_mpfx;
 					i++;
-					if (i > ifr->ifr_count)
+					if (i > hifr->ifr_count)
 						goto ghomeprefix_done;
 					mpfx++;
 				}
 			}
 		ghomeprefix_done:
-			ifr->ifr_count = i;
+			hifr->ifr_count = i;
 		}
 		
 		break;
@@ -309,7 +327,7 @@ hif_ioctl(ifp, cmd, data)
 			struct hif_subnet *hs;
 			struct mip6_subnet *ms;
 			struct mip6_subnet_ha *msha;
-			struct mip6_ha *mha = ifr->ifr_ifru.ifr_mha;
+			struct mip6_ha *mha = hifr->ifr_ifru.ifr_mha;
 			int i;
 
 			i = 0;
@@ -322,7 +340,7 @@ hif_ioctl(ifp, cmd, data)
 				     msha = TAILQ_NEXT(msha, msha_entry)) {
 					*mha = *msha->msha_mha;
 					i++;
-					if (i > ifr->ifr_count)
+					if (i > hifr->ifr_count)
 						goto ghomeagent_done;
 					mha++;
 				}
@@ -336,20 +354,20 @@ hif_ioctl(ifp, cmd, data)
 				     msha = TAILQ_NEXT(msha, msha_entry)) {
 					*mha = *msha->msha_mha;
 					i++;
-					if (i > ifr->ifr_count)
+					if (i > hifr->ifr_count)
 						goto ghomeagent_done;
 					mha++;
 				}
 			}
 		ghomeagent_done:
-			ifr->ifr_count = i;
+			hifr->ifr_count = i;
 		}
 		break;
 
 	case SIOCGBU_HIF:
 		{
 			struct mip6_bu *tmpmbu;
-			struct mip6_bu *mbu = ifr->ifr_ifru.ifr_mbu;
+			struct mip6_bu *mbu = hifr->ifr_ifru.ifr_mbu;
 			int i;
 
 			i = 0;
@@ -358,11 +376,11 @@ hif_ioctl(ifp, cmd, data)
 			     tmpmbu = LIST_NEXT(tmpmbu, mbu_entry)) {
 				*mbu = *tmpmbu;
 				i++;
-				if (i > ifr->ifr_count)
+				if (i > hifr->ifr_count)
 					break;
 				mbu++;
 			}
-			ifr->ifr_count = i;
+			hifr->ifr_count = i;
 		}
 		break;
 	default:
@@ -645,7 +663,7 @@ hif_ha_list_update_withioctl(sc, data)
      struct hif_softc *sc;
      caddr_t data;
 {
-	struct hif_ifreq *ifr = (struct hif_ifreq *)data;
+	struct hif_ifreq *hifr = (struct hif_ifreq *)data;
 	struct hif_subnet *hs;
 	struct mip6_subnet *ms;
 	struct mip6_subnet_ha *msha;
@@ -653,10 +671,10 @@ hif_ha_list_update_withioctl(sc, data)
 	struct mip6_ha *mha;
 	int error = 0;
 
-	if (ifr == NULL) {
+	if (hifr == NULL) {
 		return (EINVAL);
 	}
-	if ((nmha = ifr->ifr_ifru.ifr_mha) == NULL) {
+	if ((nmha = hifr->ifr_ifru.ifr_mha) == NULL) {
 		return (EINVAL);
 	}
 
@@ -769,7 +787,7 @@ hif_subnet_list_update_withmpfx(sc, data)
      caddr_t data;
 {
 	struct hif_softc *othersc;
-	struct hif_ifreq *ifr = (struct hif_ifreq *)data;
+	struct hif_ifreq *hifr = (struct hif_ifreq *)data;
 	struct hif_subnet *hs;
 	struct mip6_subnet *ms;
 	struct mip6_prefix *nmpfx;
@@ -777,10 +795,10 @@ hif_subnet_list_update_withmpfx(sc, data)
 	struct mip6_subnet_prefix *mspfx;
 	int error = 0;
 
-	if (ifr == NULL) {
+	if (hifr == NULL) {
 		return (EINVAL);
 	}
-	if ((nmpfx = ifr->ifr_ifru.ifr_mpfx) == NULL) {
+	if ((nmpfx = hifr->ifr_ifru.ifr_mpfx) == NULL) {
 		return (EINVAL);
 	}
 
