@@ -667,7 +667,7 @@ udp6_ctlinput(cmd, sa, d)
 	struct mbuf *m;
 	int off;
 	void *cmdarg;
-	struct in6_addr s;
+	struct ip6ctlparam *ip6cp = NULL;
 	struct in6_addr finaldst;
 	struct udp_portonly {
 		u_int16_t uh_sport;
@@ -692,16 +692,32 @@ udp6_ctlinput(cmd, sa, d)
 
 	/* if the parameter is from icmp6, decode it. */
 	if (d != NULL) {
-		struct ip6ctlparam *ip6cp = (struct ip6ctlparam *)d;
+		ip6cp = (struct ip6ctlparam *)d;
 		m = ip6cp->ip6c_m;
 		ip6 = ip6cp->ip6c_ip6;
 		off = ip6cp->ip6c_off;
 		cmdarg = ip6cp->ip6c_cmdarg;
+	} else {
+		m = NULL;
+		ip6 = NULL;
+		cmdarg = NULL;
+		/* XXX: translate addresses into internal form */
+		sa6 = *(struct sockaddr_in6 *)sa;
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(&sa6.sin6_addr, &sa6, NULL, NULL)) {
+			/* should be impossbile */
+			printf("udp6_ctlinput: in6_embedscope failed\n");
+			return;
+		}
+#endif
+	}
 
+	if (ip6cp && ip6cp->ip6c_finaldst) {
 		bzero(&sa6, sizeof(sa6));
 		sa6.sin6_family = AF_INET6;
 		sa6.sin6_len = sizeof(sa6);
 		sa6.sin6_addr = *ip6cp->ip6c_finaldst;
+		/* XXX: assuming M is valid in this case */
 		sa6.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
 						     ip6cp->ip6c_finaldst);
 #ifndef SCOPEDROUTING
@@ -711,13 +727,7 @@ udp6_ctlinput(cmd, sa, d)
 			return;
 		}
 #endif
-		bcopy(&ip6->ip6_src, &s, sizeof(s));
-		if (IN6_IS_ADDR_LINKLOCAL(&s))
-			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 	} else {
-		m = NULL;
-		ip6 = NULL;
-		cmdarg = NULL;
 		/* XXX: translate addresses into internal form */
 		sa6 = *(struct sockaddr_in6 *)sa;
 #ifndef SCOPEDROUTING
@@ -734,6 +744,7 @@ udp6_ctlinput(cmd, sa, d)
 		 * XXX: We assume that when IPV6 is non NULL,
 		 * M and OFF are valid.
 		 */
+		struct sockaddr_in6 sa6_src;
 
 		/* check if we can safely examine src and dst ports */
 		if (m->m_pkthdr.len < off + sizeof(*uhp))
@@ -780,18 +791,34 @@ udp6_ctlinput(cmd, sa, d)
 				 * create the corresponding routing entry.
 				 */
 				icmp6_mtudisc_update((struct ip6ctlparam *)d);
-				return;
 			}
 
 			/*
-			 * if we did not call icmp6_mtudisc_update(),
+			 * regardless of if we called icmp6_mtudisc_update(),
 			 * we need to call in6_pcbnotify(), to notify path
-			 * MTU change to the userland (2292bis-02).
+			 * MTU change to the userland (2292bis-02), because
+			 * some unconnected sockets may share the same
+			 * destination and want to know the path MTU.
 			 */
 		}
 
+		bzero(&sa6_src, sizeof(sa6_src));
+		sa6_src.sin6_family = AF_INET6;
+		sa6_src.sin6_len = sizeof(sa6_src);
+		sa6_src.sin6_addr = ip6->ip6_src;
+		sa6_src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+							 &ip6->ip6_src);
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(ip6cp->ip6c_finaldst, &sa6_src,
+				   NULL, NULL)) {
+			/* should be impossbile */
+			printf("udp6_ctlinput: in6_embedscope failed\n");
+			return;
+		}
+#endif
+
 		(void) in6_pcbnotify(&udbtable, (struct sockaddr *)&sa6,
-				     uh.uh_dport, &s,
+				     uh.uh_dport, &sa6_src.sin6_addr,
 				     uh.uh_sport, cmd, cmdarg, notify);
 	} else {
 		(void) in6_pcbnotify(&udbtable, (struct sockaddr *)&sa6, 0,
