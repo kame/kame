@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.24 2004/05/31 12:01:39 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.25 2004/05/31 12:03:47 suz Exp $
  */
 
 /*
@@ -151,6 +151,11 @@ SendQueryV2spec(arg)
     cbk_t          *cbk = (cbk_t *) arg;
     register struct uvif *v = &uvifs[cbk->mifi];
 
+    if ((v->uv_flags & VIFF_QUERIER) == 0 || (v->uv_flags & VIFF_NOLISTENER)) {
+    	log_msg(LOG_DEBUG, 0,
+		"don't send a GS/GSS Query due to a lack of querying right");
+	return;
+    }
     send_mld6v2(MLD_LISTENER_QUERY, 0, &v->uv_linklocal->pa_addr,
 		NULL, &cbk->g->al_addr, v->uv_ifindex,
 		MLD6_QUERY_RESPONSE_INTERVAL, 0, TRUE, SFLAGNO,
