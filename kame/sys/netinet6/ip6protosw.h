@@ -1,4 +1,4 @@
-/*	$KAME: ip6protosw.h,v 1.13 2000/10/18 18:14:49 itojun Exp $	*/
+/*	$KAME: ip6protosw.h,v 1.14 2000/10/18 18:15:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -81,6 +81,7 @@ struct socket;
 struct domain;
 struct proc;
 struct ip6_hdr;
+struct icmp6_hdr;
 struct in6_addr;
 #ifdef __FreeBSD__
 struct pr_usrreqs;
