@@ -124,10 +124,6 @@ static const char rcsid[] = "$OpenBSD: ifconfig.c,v 1.73 2003/03/16 05:20:27 mar
 #include <net/if_vlan_var.h>
 #endif
 
-#ifdef USE_VRRP
-#include <net/if_vrrp_var.h>
-#endif
-
 #include <ctype.h>
 #include <err.h>
 #include <errno.h>
@@ -216,10 +212,6 @@ void	unsetvlandev(char *, int);
 void	vlan_status ();
 #ifdef USE_ISATAP
 void	isatap_status();
-#endif
-#ifdef USE_VRRP
-void	setvrrpdev(const char *, const char *);
-void	unsetvrrpdev();
 #endif
 void	fixnsel(struct sockaddr_iso *);
 int	main(int, char *[]);
@@ -317,10 +309,6 @@ const struct	cmd {
 	{ "isataprtr",	NEXTARG,	0,		setisataprouter },
 	{ "deleteisataprtr", NEXTARG,	0,		deleteisataprouter },
 #endif
-#ifdef USE_VRRP
-	{ "vrrpdev",	NEXTARG2,	0,              setvrrpdev },
-	{ "-vrrpdev",	0,      	0,              unsetvrrpdev },
-#endif
 	{ "link0",	IFF_LINK0,	0,		setifflags } ,
 	{ "-link0",	-IFF_LINK0,	0,		setifflags } ,
 	{ "link1",	IFF_LINK1,	0,		setifflags } ,
@@ -381,9 +369,6 @@ void	ipx_getaddr(char *, int);
 void	iso_status(int);
 void	iso_getaddr(char *, int);
 void	ieee80211_status(void);
-#ifdef USE_VRRP
-void	vrrp_status(void);
-#endif
 
 /* Known address families */
 const struct afswtch {
@@ -1747,9 +1732,6 @@ status(link, sdl)
 #ifdef USE_ISATAP
 	isatap_status();
 #endif
-#ifdef USE_VRRP
-	vrrp_status();
-#endif
 
 	(void) memset(&ifmr, 0, sizeof(ifmr));
 	(void) strlcpy(ifmr.ifm_name, name, sizeof(ifmr.ifm_name));
@@ -2704,9 +2686,6 @@ usage()
 		"\t[ powersave | -powersave ] [ powersavesleep duration ]\n"
 		"\t[ [af] tunnel srcaddress dstaddress ] [ deletetunnel ]\n"
 		"\t[ vlan n vlandev interface ]\n"
-#ifdef USE_VRRP
-	        "\t[ vrrpdev parent_if lladdr ]\n"
-#endif
 		"\t[ arp | -arp ]\n"
 		"\t[ anycast | -anycast ] [ deprecated | -deprecated ]\n"
 		"\t[ tentative | -tentative ] [ pltime n ] [ vltime n ] [ eui64 ]\n"
@@ -2979,92 +2958,3 @@ deleteisataprouter(addr, param)
 	freeaddrinfo(rtrres);
 }
 #endif /* USE_ISATAP */
-
-#ifdef USE_VRRP
-void link_getaddr(addr, sa)
-	const char *addr;
-	struct sockaddr *sa;
-{
-	char *temp;
-	struct sockaddr_dl sdl;
-
-	if ((temp = malloc(strlen(addr) + 1)) == NULL)
-		errx(1, "malloc failed");
-	temp[0] = ':';
-	strcpy(temp + 1, addr);
-	sdl.sdl_len = sizeof(sdl);
-	link_addr(temp, &sdl);
-	free(temp);
-	if (sdl.sdl_alen > sizeof(sa->sa_data))
-		errx(1, "malformed link-level address");
-	sa->sa_family = AF_LINK;
-	sa->sa_len = sdl.sdl_alen;
-	bcopy(LLADDR(&sdl), sa->sa_data, sdl.sdl_alen);
-}
-
-void vrrp_status()
-{
-	char ifname[IF_NAMESIZE];
-	unsigned int ifindex = 0;
-
-	if (strncmp(ifr.ifr_name, "vrrp", 4) != 0 ||
-	    !isdigit(ifr.ifr_name[4]))
-		return;
-
-	ifr.ifr_data = (caddr_t)&ifindex;
-
-	if (ioctl(s, SIOCGETVRRP, (caddr_t)&ifr) == -1)
-		return;
-
-	printf("\tvrrp parent: %s\n",
-	    ifindex ? if_indextoname(ifindex, ifname) : "<none>");
-
-	return;
-}
-
-void setvrrpdev(parent, lladdr)
-	const char		*parent;
-	const char              *lladdr;
-{
-	struct vrrpreq vr;
-
-	if (strncmp(ifr.ifr_name, "vrrp", 4) != 0 ||
-	    !isdigit(ifr.ifr_name[4]))
-		return;
-
-	memset(&vr, 0, sizeof(vr));
-	ifr.ifr_data = (caddr_t)&vr;
-
-	if ((vr.vr_parent_index = if_nametoindex(parent)) == 0) {
-		warn("if_nametoindex");
-		return;
-	}
-
-	link_getaddr(lladdr, &vr.vr_lladdr);
-	
-	if (ioctl(s, SIOCSETVRRP, (caddr_t)&ifr) == -1)
-		err(1, "SIOCSETVRRP");
-
-	return;
-}
-
-void unsetvrrpdev()
-{
-	struct vrrpreq vr;
-
-	if (strncmp(ifr.ifr_name, "vrrp", 4) != 0 ||
-	    !isdigit(ifr.ifr_name[4]))
-		return;
-
-	memset(&vr, 0, sizeof(vr));
-
-	ifr.ifr_data = (caddr_t)&vr;
-	vr.vr_parent_index = 0;
-
-	if (ioctl(s, SIOCSETVRRP, (caddr_t)&ifr) == -1)
-		err(1, "SIOCSETVRRP");
-
-	return;
-}
-#endif
-

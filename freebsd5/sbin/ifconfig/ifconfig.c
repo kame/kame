@@ -271,10 +271,6 @@ struct	cmd {
 	{ "vlandev",	NEXTARG,	setvlandev },
 	{ "-vlandev",	NEXTARG,	unsetvlandev },
 #endif
-#ifdef USE_VRRPS
-	{ "vrrpdev",	NEXTARG2,	NULL, setvrrpdev },
-	{ "-vrrpdev",	0,	        unsetvrrpdev },
-#endif
 #if 0
 	/* XXX `create' special-cased below */
 	{"create",	0,		clone_create },
@@ -395,9 +391,6 @@ struct	afswtch {
 	{ "maclabel", AF_UNSPEC, maclabel_status, NULL, NULL, },
 #endif
 #endif
-#ifdef USE_VRRPS
-	{ "vrrp", AF_UNSPEC, vrrp_status, NULL, NULL, },  /* XXX not real!! */
-#endif	
 	{ 0,	0,	    0,		0 }
 };
 
@@ -1265,10 +1258,6 @@ status(const struct afswtch *afp, int addrcount, struct	sockaddr_dl *sdl,
 	if (iftype == IFT_L2VLAN && (allfamilies || afp->af_status == vlan_status))
 		vlan_status(s, NULL);
 #endif
-#ifdef USE_VRRPS
-	if (iftype == IFT_VRRP && (allfamilies || afp->af_status == vrrp_status))
-		vrrp_status(s, NULL);
-#endif
 #ifdef USE_ISATAP
 	if (iftype == IFT_STF && (allfamilies || afp->af_status == isatap_status))
 		isatap_status(s, NULL);
@@ -1289,9 +1278,6 @@ status(const struct afswtch *afp, int addrcount, struct	sockaddr_dl *sdl,
 	    afp->af_status != link_status
 #ifdef USE_VLANS
 	    && afp->af_status != vlan_status
-#endif
-#ifdef USE_VRRPS
-	    && afp->af_status != vrrp_status
 #endif
 		)
 		warnx("%s has no %s interface address!", name, afp->af_name);

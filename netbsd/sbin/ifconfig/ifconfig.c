@@ -95,9 +95,6 @@ __RCSID("$NetBSD: ifconfig.c,v 1.123 2002/05/06 20:14:36 thorpej Exp $");
 #include <net/if_ether.h>
 #include <net/if_ieee80211.h>
 #include <net/if_vlanvar.h>
-#ifdef USE_VRRP
-#include <net/if_vrrp_var.h>
-#endif
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #ifdef INET6
@@ -207,10 +204,6 @@ void	fixnsel __P((struct sockaddr_iso *));
 void	setvlan __P((const char *, int));
 void	setvlanif __P((const char *, int));
 void	unsetvlanif __P((const char *, int));
-#ifdef USE_VRRP
-void	setvrrpdev __P((const char *, const char *));
-void	unsetvrrpdev __P((const char *, int));
-#endif
 int	main __P((int, char *[]));
 
 /*
@@ -299,11 +292,6 @@ const struct cmd {
 	{ "isataprtr",	NEXTARG,	0,		setisataprouter },
 	{ "deleteisataprtr", NEXTARG,	0,		deleteisataprouter },
 #endif
-#ifdef USE_VRRP
-	{ "vrrpdev",	NEXTARG2,	0,              NULL,
-                                                        setvrrpdev },
-	{ "-vrrpdev",	0,      	0,              unsetvrrpdev },
-#endif
 #if 0
 	/* XXX `create' special-cased below */
 	{ "create",	0,		0,		clone_create } ,
@@ -389,9 +377,6 @@ void	tunnel_status __P((void));
 void	vlan_status __P((void));
 #ifdef USE_ISATAP
 void	isatap_status __P((void));
-#endif
-#ifdef USE_VRRP
-void	vrrp_status __P((void));
 #endif
 
 /* Known address families */
@@ -2019,9 +2004,6 @@ status(sdl)
 #ifdef USE_ISATAP
 	isatap_status();
 #endif
-#ifdef USE_VRRP
-	vrrp_status();
-#endif
 
 	if (sdl != NULL &&
 	    getnameinfo((struct sockaddr *)sdl, sdl->sdl_len,
@@ -2227,96 +2209,6 @@ isatap_status()
 			printf("\tisataprtr %s\n", rtraddr);
 		ptr += addr->sa_len;
 	}
-}
-#endif
-
-#ifdef USE_VRRP
-void link_getaddr(addr, sa)
-	const char *addr;
-	struct sockaddr *sa;
-{
-	char *temp;
-	struct sockaddr_dl sdl;
-
-	if ((temp = malloc(strlen(addr) + 1)) == NULL)
-		errx(1, "malloc failed");
-	temp[0] = ':';
-	strcpy(temp + 1, addr);
-	sdl.sdl_len = sizeof(sdl);
-	link_addr(temp, &sdl);
-	free(temp);
-	if (sdl.sdl_alen > sizeof(sa->sa_data))
-		errx(1, "malformed link-level address");
-	sa->sa_family = AF_LINK;
-	sa->sa_len = sdl.sdl_alen;
-	bcopy(LLADDR(&sdl), sa->sa_data, sdl.sdl_alen);
-}
-
-void vrrp_status()
-{
-	char ifname[IF_NAMESIZE];
-	unsigned int ifindex = 0;
-
-	if (strncmp(ifr.ifr_name, "vrrp", 4) != 0 ||
-	    !isdigit(ifr.ifr_name[4]))
-		return;
-
-	ifr.ifr_data = (caddr_t)&ifindex;
-
-	if (ioctl(s, SIOCGETVRRP, (caddr_t)&ifr) == -1)
-		return;
-
-	printf("\tvrrp parent: %s\n",
-	    ifindex ? if_indextoname(ifindex, ifname) : "<none>");
-
-	return;
-}
-
-void setvrrpdev(parent, lladdr)
-	const char		*parent;
-	const char              *lladdr;
-{
-	struct vrrpreq vr;
-
-	if (strncmp(ifr.ifr_name, "vrrp", 4) != 0 ||
-	    !isdigit(ifr.ifr_name[4]))
-		return;
-
-	memset(&vr, 0, sizeof(vr));
-	ifr.ifr_data = (caddr_t)&vr;
-
-	if ((vr.vr_parent_index = if_nametoindex(parent)) == 0) {
-		warn("if_nametoindex");
-		return;
-	}
-
-	link_getaddr(lladdr, &vr.vr_lladdr);
-	
-	if (ioctl(s, SIOCSETVRRP, (caddr_t)&ifr) == -1)
-		err(1, "SIOCSETVRRP");
-
-	return;
-}
-
-void unsetvrrpdev(val, d)
-	const char		*val;
-	int                      d;
-{
-	struct vrrpreq vr;
-
-	if (strncmp(ifr.ifr_name, "vrrp", 4) != 0 ||
-	    !isdigit(ifr.ifr_name[4]))
-		return;
-
-	memset(&vr, 0, sizeof(vr));
-
-	ifr.ifr_data = (caddr_t)&vr;
-	vr.vr_parent_index = 0;
-
-	if (ioctl(s, SIOCSETVRRP, (caddr_t)&ifr) == -1)
-		err(1, "SIOCSETVRRP");
-
-	return;
 }
 #endif
 
@@ -3114,9 +3006,6 @@ usage()
 		"\t[ media type ] [ mediaopt opts ] [ -mediaopt opts ] "
 		"[ instance minst ]\n"
 		"\t[ vlan n vlanif i ]\n"
-#ifdef USE_VRRP
-	        "\t[ vrrpdev parent_if lladdr ]\n"
-#endif
 		"\t[ anycast | -anycast ] [ deprecated | -deprecated ]\n"
 		"\t[ tentative | -tentative ] [ pltime n ] [ vltime n ]\n"
 		"\t[ link0 | -link0 ] [ link1 | -link1 ] [ link2 | -link2 ]\n"

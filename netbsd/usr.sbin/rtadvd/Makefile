@@ -4,7 +4,6 @@ PROG=	rtadvd
 SRCS=	rtadvd.c rrenum.c advcap.c if.c config.c timer.c dump.c
 
 CPPFLAGS+=-DINET6 -DROUTEINFO -DHAVE_POLL_H
-CPPFLAGS+=-DVRRP
 LDADD+=	-lutil
 DPADD+=	${LIBUTIL}
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \

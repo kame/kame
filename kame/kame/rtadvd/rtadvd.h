@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.h,v 1.25 2003/06/04 06:57:02 keiichi Exp $	*/
+/*	$KAME: rtadvd.h,v 1.26 2003/08/05 12:34:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -153,11 +153,6 @@ struct	rainfo {
 	int	pfxs;		/* number of prefixes */
 	long	clockskew;	/* used for consisitency check of lifetimes */
 
-#ifdef VRRP
-	int     vrrpflg;        /* vrrpflag */
-	int     vrrpindex;      /* vrrp parent index */
-#endif
-	
 #ifdef MIP6
 	u_short	hapref;		/* Home Agent Preference */
 	u_short	hatime;		/* Home Agent Lifetime */

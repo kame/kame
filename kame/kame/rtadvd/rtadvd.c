@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.81 2003/05/19 09:46:51 keiichi Exp $	*/
+/*	$KAME: rtadvd.c,v 1.82 2003/08/05 12:34:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -605,29 +605,6 @@ rtmsg_input()
 			break;
 		case RTM_IFINFO:
 			iflist[ifindex]->ifm_flags = get_ifm_flags(next);
-#ifdef VRRP
-			if ((rai->vrrpflg & VRRP_FLG_VRRPIF) != 0) {
-				rai->vrrpindex = if_getvrrp(rai->ifname);
-				if (rai->vrrpindex > 0) {
-					rai->vrrpflg |= VRRP_FLG_ACTIVE;
-					delete_prefix_from_kernel(rai);
-					if (rai->pfxs == 0)
-						get_prefix(rai);
-				}
-				else
-					rai->vrrpflg &= ~VRRP_FLG_ACTIVE;
-				if (rai->advlinkopt) {
-					free(rai->sdl);
-					if ((rai->sdl = if_nametosdl(rai->ifname)) == NULL) {
-						syslog(LOG_ERR,
-						    "<%s> can't get information of %s",
-						    __func__, rai->ifname);
-						exit(1);
-					}
-					rai->ifindex = rai->sdl->sdl_index;
-				}
-			}
-#endif
 			break;
 		default:
 			/* should not reach here */
