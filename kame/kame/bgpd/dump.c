@@ -63,6 +63,8 @@ struct bgproute_list {
 #define bgp_route_head(l) ((l)->next)
 #define bgp_route_isend(e,b) ((e) == (b))
 #define bgp_route_next(l) ((l)->next)
+#define bgp_route_prev(l) ((l)->prev)
+#define bgp_route_insert(new,post) insque((new), (post)->prev)
 
 static void
 dump_if_rtable(FILE *fp, struct rt_entry *base)
@@ -440,14 +442,13 @@ insert_bgp_route_entry(list, rte, bnp)
 		else if (cmp > 0) /* rte > orte */
 			continue;
 		else {
-			brl = brl->prev; /* XXX */
 			break;	/* insert new list and entry */
 		}
 	}
 	if ((newbrl = (struct bgproute_list *)malloc(sizeof(*newbrl))) == NULL)
 		fatalx("<insert_bgp_route_entry>: malloc failed"); /* XXX */
 	memset(newbrl, 0, sizeof(*newbrl));
-	insque(newbrl, brl);
+	bgp_route_insert(newbrl, brl);
 	brl = newbrl;
 	
   insert_entry:
@@ -530,9 +531,9 @@ show_bgp_route_entry(fp, bre)
 	char *indent = " ";
 
 	dump_bgp_rtentry(fp, bre->rte, indent);
-	fprintf(fp, "%sPeerInfo: Addr: %s,\n", indent, bgp_peerstr(bnp));
+	fprintf(fp, "%s  PeerInfo: Addr: %s,\n", indent, bgp_peerstr(bnp));
 	
-	fprintf(fp, "%s          ID: %s, Type: %s\n", indent,
+	fprintf(fp, "%s            ID: %s, Type: %s\n", indent,
 		inet_ntop(AF_INET, &bnp->rp_id, inetaddrstr, INET_ADDRSTRLEN),
 		(bnp->rp_mode & BGPO_IGP) ? "IBGP" : "EBGP");
 }
@@ -645,6 +646,20 @@ print_bgp_dump(FILE *fp)
 		fprintf(fp, "  His local addr: %s\n", bgp_peerstr(bnp));
 		fprintf(fp, "  Our addr: %s\n",
 			ip6str(&bnp->rp_myaddr.sin6_addr, 0));
+		fprintf(fp, "  Timers:");
+		if (bnp->rp_connect_timer)
+			fprintf(fp, " connect=%d:%d",
+				(int)(bnp->rp_connect_timer->tsk_timeval.tv_sec/60),
+				(int)(bnp->rp_connect_timer->tsk_timeval.tv_sec%60));
+		if (bnp->rp_hold_timer)
+			fprintf(fp, " hold=%d:%d",
+				(int)(bnp->rp_hold_timer->tsk_timeval.tv_sec/60),
+				(int)(bnp->rp_hold_timer->tsk_timeval.tv_sec%60));
+		if (bnp->rp_keepalive_timer)
+			fprintf(fp, " keepalive=%d:%d",
+				(int)(bnp->rp_keepalive_timer->tsk_timeval.tv_sec/60),
+				(int)(bnp->rp_keepalive_timer->tsk_timeval.tv_sec%60));
+		fputc('\n', fp);
 		if (bnp->rp_ebgp_as_prepends)
 			fprintf(fp, "  our own AS number will be prepended "
 				"to each advertised AS path %d time%s\n",
