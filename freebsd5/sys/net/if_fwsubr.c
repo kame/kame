@@ -169,10 +169,13 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 #ifdef INET6
 	case AF_INET6:
 		if (unicast) {
-			error = nd6_storelladdr(&fc->fc_if, rt, m, dst,
-			    (u_char *) destfw);
-			if (error)
-				return (error);
+			/*
+			 * XXX: nd6_storelladdr()'s return value has different 
+			 * meaning between FreeBSD and KAME.
+			 */
+			if (!nd6_storelladdr(&fc->fc_if, rt, m, dst,
+			    (u_char *) destfw))
+				return (EINVAL);	/* XXX */
 		}
 		type = ETHERTYPE_IPV6;
 		break;

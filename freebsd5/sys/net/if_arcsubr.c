@@ -169,9 +169,12 @@ arc_output(ifp, m, dst, rt0)
 #endif
 #ifdef INET6
 	case AF_INET6:
-		error = nd6_storelladdr(ifp, rt0, m, dst, (u_char *)&adst);
-		if (error)
-			return (error);
+		/*
+		 * XXX: nd6_storelladdr()'s return value has different 
+		 * meaning between FreeBSD and KAME.
+		 */
+		if (!nd6_storelladdr(ifp, rt0, m, dst, (u_char *)&adst))
+			return (EINVAL);	/* XXX */
 		atype = ARCTYPE_INET6;
 		break;
 #endif
