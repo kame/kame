@@ -1,6 +1,10 @@
-$Id: CHANGELOG,v 1.487 2000/01/26 15:03:00 itojun Exp $
+$Id: CHANGELOG,v 1.488 2000/01/26 15:30:35 itojun Exp $
 
 <200001>
+Thu Jan 27 00:29:51 JST 2000  itojun@iijlab.net
+	* kame/sys/netinet6/in6_pcb.c: make IPV6_PORTRANGE actually work.
+	  (netbsd/bsdi3/freebsd2)
+
 Wed Jan 26 23:00:30 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/ports/pchar, netbsd/pkgsrc/net/pchar,
 	  openbsd/ports/net/pchar: upgrade to 1.1.1.
