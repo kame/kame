@@ -4,7 +4,8 @@ PROG=	v6test
 SRCS=	v6test.c cksum.c testcap.c getconfig.c
 MAN=	v6test.1
 
-CFLAGS+=-I${SRCDIR} -Duint8_t=u_int8_t -Duint16_t=u_int16_t -Duint32_t=u_int32_t
+CPPFLAGS+=-I${SRCDIR} -DIPSEC
+CPPFLAGS+=-Duint8_t=u_int8_t -Duint16_t=u_int16_t -Duint32_t=u_int32_t
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
 DPADD+= ${.CURDIR}/../lib/libinet6/libinet6.a \
