@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.206 2001/09/29 12:20:49 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.207 2001/10/17 09:27:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2309,6 +2309,10 @@ nd6_storelladdr(ifp, rt, m, dst, desten)
 						 desten);
 			return(1);
 		case IFT_IEEE1394:
+			/*
+			 * netbsd can use if_broadcastaddr, but we don't do so
+			 * to reduce # of ifdef.
+			 */
 			for (i = 0; i < ifp->if_addrlen; i++)
 				desten[i] = ~0;
 			return(1);
