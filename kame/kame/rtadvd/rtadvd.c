@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.85 2003/10/16 14:39:13 t-momose Exp $	*/
+/*	$KAME: rtadvd.c,v 1.86 2003/10/16 17:10:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -858,7 +858,7 @@ rs_input(int len, struct nd_router_solicit *rs,
 	if (nd6_options((struct nd_opt_hdr *)(rs + 1),
 			len - sizeof(struct nd_router_solicit),
 			&ndopts, NDOPT_FLAG_SRCLINKADDR)) {
-		syslog(LOG_DEBUG,
+		syslog(LOG_INFO,
 		       "<%s> ND option check failed for an RS from %s on %s",
 		       __func__,
 		       inet_ntop(AF_INET6, &from->sin6_addr,
@@ -874,7 +874,7 @@ rs_input(int len, struct nd_router_solicit *rs,
 	 */
 	if (IN6_IS_ADDR_UNSPECIFIED(&from->sin6_addr) &&
 	    ndopts.nd_opts_src_lladdr) {
-		syslog(LOG_ERR,
+		syslog(LOG_INFO,
 		       "<%s> RS from unspecified src on %s has a link-layer"
 		       " address option",
 		       __func__,
@@ -1002,7 +1002,7 @@ ra_input(int len, struct nd_router_advert *ra,
 			len - sizeof(struct nd_router_advert),
 			&ndopts, NDOPT_FLAG_SRCLINKADDR |
 			NDOPT_FLAG_PREFIXINFO | NDOPT_FLAG_MTU)) {
-		syslog(LOG_ERR,
+		syslog(LOG_INFO,
 		       "<%s> ND option check failed for an RA from %s on %s",
 		       __func__,
 		       inet_ntop(AF_INET6, &from->sin6_addr,
@@ -1025,7 +1025,8 @@ ra_input(int len, struct nd_router_advert *ra,
 		goto done;
 	}
 	/* 
-	 * RA validity check according to draft-ietf-ngtrans-isatap-08.txt 5.2.2
+	 * RA validity check according to draft-ietf-ngtrans-isatap-08.txt
+	 * 5.2.2.
 	 */
 	if (is_isatap(rai) && !is_isatap_router(rai, &from->sin6_addr)) {
 		syslog(LOG_INFO,
