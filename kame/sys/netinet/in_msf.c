@@ -3870,8 +3870,12 @@ sa_cmp(struct sockaddr *a, struct sockaddr *b)
 		if (diff != 0)
 			return diff;
 	}
-	/* if everything is same, check sin6_scope_id (IPv6 only) */
-	if (a->sa_family == AF_INET6) {
+	/* 
+	 * if everything is same, check sin6_scope_id 
+	 * (IPv6 link-local only; other scope handling it a ToDo task)
+	 */
+	if (a->sa_family == AF_INET6 &&
+	    IN6_IS_SCOPE_LINKLOCAL(&((struct sockaddr_in6 *) a)->sin6_addr)) {
 		int scope_a = ((struct sockaddr_in6 *) a)->sin6_scope_id;
 		int scope_b = ((struct sockaddr_in6 *) b)->sin6_scope_id;
 
