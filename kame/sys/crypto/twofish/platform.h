@@ -68,7 +68,7 @@
 #endif
 
 /* XXX should use ALIGNBYTES, however, we cannot do that at runtime */
-#define ALIGN32		0
+#define ALIGN32		1
 
 /* Compile-time sanity checks: make sure that some platform was defined! */
 #ifndef LittleEndian
