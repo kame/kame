@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qop.c,v 1.1 2000/01/18 07:29:04 kjc Exp $
+ * $Id: qop.c,v 1.2 2000/02/22 05:53:47 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -325,6 +325,11 @@ qop_add_if(struct ifinfo **rp, const char *ifname, u_int bandwidth,
 {
 	struct ifinfo	*ifinfo;
 	int error;
+
+	if (ifname2ifinfo(ifname) != NULL) {
+		LOG(LOG_ERR, 0, "qop_add_if: %s already exists!\n", ifname);
+		return (QOPERR_BADIF);
+	}
 
 	if ((ifinfo = calloc(1, sizeof(struct ifinfo))) == NULL)
 		return (QOPERR_NOMEM);

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: qop_cdnr.c,v 1.2 2000/02/02 06:39:38 kjc Exp $
+ * $Id: qop_cdnr.c,v 1.3 2000/02/22 05:53:47 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -183,8 +183,10 @@ qcmd_cdnr_add_tbmeter(struct tc_action *rp, const char *ifname,
 		return (error);
 	}
 	
-	rp->tca_code = TCACODE_HANDLE;
-	rp->tca_handle = clinfo->handle;
+	if (rp != NULL) {
+		rp->tca_code = TCACODE_HANDLE;
+		rp->tca_handle = clinfo->handle;
+	}
 	return (0);
 }
 
@@ -246,8 +248,10 @@ qcmd_cdnr_add_tbrio(struct tc_action *rp, const char *ifname,
 		return (error);
 	}
 	
-	rp->tca_code = TCACODE_HANDLE;
-	rp->tca_handle = clinfo->handle;
+	if (rp != NULL) {
+		rp->tca_code = TCACODE_HANDLE;
+		rp->tca_handle = clinfo->handle;
+	}
 	return (0);
 }
 
