@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2661 2004/08/11 10:47:06 jinmei Exp $
+$KAME: CHANGELOG,v 1.2662 2004/08/12 03:56:47 keiichi Exp $
 
 <200408>
+Thu Aug 12 12:54:25 JST 2004	keiichi@iij.ad.jp
+	* kame/sys/netinet6/nd6.c,in6_src.c
+	made it possible to specify the address of the other side of
+	a p2p interface as nexthop when sending a packet with
+	the NEXTHOP pktoption.
+
 2004-08-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ndp/ndp.c (ifinfo): supported the "disabled" ndp flag
 	to view or modify the status of whether IPv6 operation is disabled
