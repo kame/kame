@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.55 2000/09/22 06:02:22 itojun Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.56 2000/09/22 06:28:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.55 2000/09/22 06:02:22 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.56 2000/09/22 06:28:28 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -298,7 +298,7 @@ isakmp_info_send_d2(iph2)
 		error = isakmp_info_send_common(iph1, payload,
 						ISAKMP_NPTYPE_D, 0);
 		vfree(payload);
-}
+	}
 
 	return error;
 }
