@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.308 2002/06/21 06:56:18 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.309 2002/07/01 16:00:12 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -725,7 +725,7 @@ sent from a user application as follows:
    This draft allows an implementation to add implementation-specific
    rules with higher precedence than the rule "Use longest matching
    prefix."  KAME's implementation has the following additional rules
-   (applied in the appeared order):
+   (that apply in the appeared order):
 
    - prefer addresses on alive interfaces, that is, interfaces with
      the UP flag being on.  This rule is particularly useful for
@@ -734,7 +734,7 @@ sent from a user application as follows:
 
    - prefer addresses on "preferred" interfaces.  "Preferred"
      interfaces can be specified by the ndp(8) command.  By default,
-     no interface is preferred, that is, this rule is not applied.
+     no interface is preferred, that is, this rule does not apply.
      Again, this rule is particularly useful for routers, since there
      is a convention, among router administrators, of assigning
      "stable" addresses on a particular interface (typically a
