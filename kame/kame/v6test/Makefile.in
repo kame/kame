@@ -1,4 +1,4 @@
-# Copyright (c) 1996 WIDE Project. All rights reserved.
+# Copyright (c) 1999 WIDE Project. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modifications, are permitted provided that the above copyright notice
@@ -12,32 +12,49 @@
 # LIMITATION, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
 # A PARTICULAR PURPOSE.
 
-.if exists(${.CURDIR}/../Makefile.opsys)
-.include "${.CURDIR}/../Makefile.opsys"
-.endif
+srcdir=	@srcdir@
+.PATH:	@srcdir@
 
-PROG	= v6test
-SRCS	= v6test.c cksum.c testcap.c getconfig.c
-CFLAGS += @DEFS@
-CFLAGS += @OPTFLAGS@
-LDADD  += @LIBFLAGS@
-.if (${OPSYS} != "NetBSD")
-MAN1	= v6test.1
-.else
-MAN	= v6test.1
-.endif
-CONFS = ext.conf ndp.conf synloop.conf
-CONFDIR = $(PREFIX)/share/v6test
+prefix=	@prefix@
+exec_prefix=@exec_prefix@
+libdir=	@libdir@
+mandir=	@mandir@
 
-#CFLAGS += -DDEFAUT_IF="ep0"
+CC=	@CC@
+CPP=	@CPP@
+INSTALL=@INSTALL@
+INSTALL_PROGRAM=@INSTALL_PROGRAM@
+INSTALL_DATA=@INSTALL_DATA@
+CONFDIR = ${prefix}/share/v6test
 
-.include <bsd.prog.mk>
+CPPFLAGS=@CPPFLAGS@
+CFLAGS=	@CFLAGS@ @DEFS@ @OPTFLAGS@ $(CPPFLAGS)
+LDFLAGS=@LDFLAGS@
+LIBS=@LIBS@
 
-distclean:	clean
-	rm -f config.log config.status config.cache Makefile
+PROG=	v6test
+OBJS=	getconfig.o cksum.o testcap.o v6test.o
+MAN1=	v6test.1
 
-afterinstall:
+$(PROG): $(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $(OBJS) $(LDFLAGS) $(LIBS)
+
+.c.o:
+	$(CC) $(CFLAGS) -c $<
+
+tag:
+	ctags -dtw $(srcdir)/*.[chly]
+
+install:
+	$(INSTALL) -s -o bin -g bin -m 555 v6test $(prefix)/bin
+	$(INSTALL) -o bin -g bin -m 444 v6test.1 $(mandir)/man1
 	[ -d $(CONFDIR) ] || mkdir -p $(CONFDIR); \
 	for i in $(CONFS); do \
 		cp conf/$$i $(CONFDIR); \
 	done
+
+clean:
+	/bin/rm -f $(PROG) *.o
+
+distclean: clean
+	/bin/rm -f Makefile config.log config.cache config.status

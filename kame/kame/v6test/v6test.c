@@ -28,7 +28,7 @@
  */
 
 #include "common.h"
-#ifdef HAVE_PCAP
+#ifdef HAVE_LIBPCAP
 #include <pcap.h>
 #endif 
 
@@ -126,7 +126,7 @@ bpf_open(char *iface)
 	int n = 0, fd;
 	char dev[16];
 	struct ifreq ifr;
-#ifdef HAVE_PCAP
+#ifdef HAVE_LIBPCAP
 	char pcaperrbuf[PCAP_ERRBUF_SIZE];
 #endif 
 	
@@ -146,11 +146,13 @@ bpf_open(char *iface)
 	}
 
 	bzero(&ifr, sizeof(ifr));
-#ifdef HAVE_PCAP
+#ifdef HAVE_LIBPCAP
 	if (iface == NULL &&
 	    (iface = pcap_lookupdev(pcaperrbuf)) == NULL) {
 		fprintf(stderr, "pcap_lookupdev: %s\n", pcaperrbuf);
+		exit(1);
 	}
+	fprintf(stderr, "outgoing interface is %s\n", iface);
 #else
 	if (iface == NULL)
 		fprintf(stderr, "interface must be specified\n");

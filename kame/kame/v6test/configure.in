@@ -1,7 +1,13 @@
+dnl Process this file with autoconf to produce a configure script.
 AC_INIT(v6test.c)
 
-AC_CANONICAL_HOST
+dnl Checks for programs.
+AC_PROG_CC
 AC_PROG_CPP
+AC_PROG_INSTALL
+AC_PROG_MAKE_SET
+
+AC_CANONICAL_HOST
 
 AC_SUBST(OPTFLAGS)
 AC_SUBST(LIBFLAGS)
@@ -89,5 +95,40 @@ AC_MSG_RESULT($ts_cv_ntop)
 if test "$ts_cv_ntop" = no; then
 	LIBFLAGS="-lresolv $LIBFLAGS"
 fi
+
+dnl
+dnl check for pcap library
+dnl LIBFLAGS=-L/usr/local/v6/lib
+AC_MSG_CHECKING(if --with-pcap option is specified)
+AC_ARG_WITH(pcap, [  --with-pcap=DIR       specify pcap directory],
+	[pcap_dir=$withval])
+AC_MSG_RESULT(${pcap_dir-"default"})
+
+AC_MSG_CHECKING(for libpcap)
+pcap_lib=no
+pcap_include=no
+for dir in $pcap_dir /usr/local/v6 /usr/local /usr/pkg /usr; do
+	if test -d $dir -a -f $dir/libpcap.a; then
+		pcap_lib="$dir"
+	else
+		if test -d $dir/lib -a -f $dir/lib/libpcap.a; then
+			pcap_lib="$dir/lib"
+		fi
+	fi
+	if test -d $dir -a -f $dir/pcap.h; then
+		pcap_include="$dir"
+	else
+		if test -d $dir/include -a -f $dir/include/pcap.h; then
+			pcap_include="$dir/include"
+		fi
+	fi
+	if test "$pcap_lib" != "no" -a "$pcap_include" != "no"; then
+		LDFLAGS="-L$pcap_lib $LDFLAGS"
+		CPPFLAGS="-I$pcap_include $CPPFLAGS"
+		AC_MSG_RESULT("$pcap_lib and $pcap_include")
+		AC_CHECK_LIB(pcap, pcap_lookupdev)
+		break;
+	fi
+done
 
 AC_OUTPUT(Makefile)
