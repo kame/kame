@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.104 2003/02/07 10:17:07 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.105 2003/02/08 19:20:05 kjc Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1035,7 +1035,9 @@ in_stf_input(m, va_alist)
 	struct ip *ip;
 	struct ip6_hdr *ip6;
 	u_int8_t otos, itos;
-#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+	int error;
+#else
 	int s;
 #endif
 	int isr;
@@ -1160,7 +1162,7 @@ in_stf_input(m, va_alist)
 	 * Queue message on interface, update output statistics if
 	 * successful, and start output if interface not yet active.
 	 */
-	IF_HANDOFF(&ifp->if_snd, m, ifp);
+	IFQ_HANDOFF(ifp, m, NULL, error);
 #else
 	if (IF_QFULL(ifq)) {
 		IF_DROP(ifq);	/* update statistics */
