@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.9 2000/06/05 00:14:31 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.10 2000/06/05 02:48:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -206,7 +206,7 @@ udp6_output(in6p, m, addr6, control)
 		 * which needs splnet and affects performance.
 		 * Since we saw no essential reason for calling in_pcbconnect,
 		 * we get rid of such kind of logic, and call in6_selectsrc
-		 * and In6_pcbsetport in order to fill in the local address
+		 * and in6_pcbsetport in order to fill in the local address
 		 * and the local port.
 		 */
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
