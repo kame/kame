@@ -369,7 +369,7 @@ udp_input(m, off, proto)
 		return;
 	}
 #ifdef IPSEC
-	if (inp != NULL && ipsec4_in_reject(m, inp)) {
+	if (ipsec4_in_reject(m, inp)) {
 		ipsecstat.in_polvio++;
 		goto bad;
 	}
