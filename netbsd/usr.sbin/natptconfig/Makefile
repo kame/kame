@@ -1,11 +1,11 @@
 SRCDIR=	${.CURDIR}/../../kame/natptconfig
 
 PROG=	natptconfig
-SRCS=	main.c natptconfig.y.c natptconfig.l.c misc.c show.c yylex.c showsubs.c
+SRCS=	main.c cfparse.y cftoken.l misc.c show.c yylex.c showsubs.c
 
 MAN=	natptconfig.8
 
-CPPFLAGS+=	-I. -I${SRCDIR} -DYYDEBUG -DreadKMEM
+CPPFLAGS+=	-I. -I${.CURDIR} -DYYDEBUG -DreadKMEM
 CFLAGS+=	-g -Wall
 CLEANFILES+=	natptconfig.y.c natptconfig.y.h natptconfig.l.c
 
@@ -19,19 +19,16 @@ DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \
 
 .PATH:	${SRCDIR}
 
+YFLAGS+=	-d
 
-YFLAGS= -d
+y.tab.h:	cfparse.y
+cfparse.h:	y.tab.h
+	cp y.tab.h cfparse.h
 
-natptconfig.y.c natptconfig.y.h:	natptconfig.y showvar.h
-		${YACC} ${YFLAGS} ${SRCDIR}/natptconfig.y
-		mv y.tab.c natptconfig.y.c
-		mv y.tab.h natptconfig.y.h
+main.o: cfparse.h
+show.o: cfparse.h
+showsubs.o: cfparse.h
 
-natptconfig.l.c:	natptconfig.l
-		${LEX} -t -L ${SRCDIR}/natptconfig.l > natptconfig.l.c
-
-main.o:	natptconfig.y.h
-misc.o:	natptconfig.y.h
-yylex.o:	natptconfig.y.h
+CLEANFILES+=	cfparse.h y.tab.h
 
 .include <bsd.prog.mk>
