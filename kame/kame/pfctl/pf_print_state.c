@@ -35,6 +35,9 @@
 #include <net/if.h>
 #define TCPSTATES
 #include <netinet/tcp_fsm.h>
+#ifdef __NetBSD__
+#include <netinet/in.h>
+#endif
 #include <net/pfvar.h>
 #include <arpa/inet.h>
 #include <netdb.h>

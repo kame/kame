@@ -34,6 +34,11 @@
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 
+#ifdef __NetBSD__
+#include <netinet/in.h>
+#include <limits.h>
+#endif
+
 #include <net/if.h>
 #include <net/pfvar.h>
 #include <arpa/inet.h>

@@ -34,6 +34,11 @@
  *
  */
 
+#ifdef _KERNEL_OPT
+#include "opt_inet.h"
+#include "opt_altq.h"
+#endif
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
@@ -43,7 +48,11 @@
 #include <sys/socketvar.h>
 #include <sys/kernel.h>
 #include <sys/time.h>
+#ifdef __OpenBSD__
 #include <sys/timeout.h>
+#else
+#include <sys/callout.h>
+#endif
 #include <sys/pool.h>
 #include <sys/malloc.h>
 
@@ -81,7 +90,11 @@ void			 pf_empty_pool(struct pf_palist *);
 int			 pfioctl(dev_t, u_long, caddr_t, int, struct proc *);
 void			 pf_tag_purge(void);
 
+#ifdef __OpenBSD__
 extern struct timeout	 pf_expire_to;
+#else
+extern struct callout	 pf_expire_to;
+#endif
 
 struct pf_rule		 pf_default_rule;
 
@@ -146,8 +159,14 @@ pfattach(int num)
 	timeout[PFTM_FRAG] = 30;			/* Fragment expire */
 	timeout[PFTM_INTERVAL] = 10;			/* Expire interval */
 
+#ifdef __OpenBSD__
 	timeout_set(&pf_expire_to, pf_purge_timeout, &pf_expire_to);
 	timeout_add(&pf_expire_to, timeout[PFTM_INTERVAL] * hz);
+#else
+	callout_init(&pf_expire_to);
+	callout_reset(&pf_expire_to, timeout[PFTM_INTERVAL] * hz,
+	    pf_purge_timeout, &pf_expire_to);
+#endif
 
 	pf_normalize_init();
 	pf_status.debug = PF_DEBUG_URGENT;
@@ -1326,11 +1345,16 @@ pfioctl(dev_t dev, u_long cmd, caddr_t addr, int flags, struct proc *p)
 			error = EINVAL;
 			goto fail;
 		}
+#ifdef __OpenBSD__
 		if (pool_sethardlimit(pf_pool_limits[pl->index].pp,
 		    pl->limit, NULL, 0) != 0) {
 			error = EBUSY;
 			goto fail;
 		}
+#else
+		(void)pool_sethardlimit(pf_pool_limits[pl->index].pp,
+		    pl->limit, NULL, 0);
+#endif
 		old_limit = pf_pool_limits[pl->index].limit;
 		pf_pool_limits[pl->index].limit = pl->limit;
 		pl->limit = old_limit;

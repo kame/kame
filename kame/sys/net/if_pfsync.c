@@ -26,6 +26,10 @@
  * THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef _KERNEL_OPT
+#include "opt_inet.h"
+#endif
+
 #include "bpfilter.h"
 #include "pfsync.h"
 
@@ -35,7 +39,11 @@
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/ioctl.h>
+#ifdef __OpenBSD__
 #include <sys/timeout.h>
+#else
+#include <sys/callout.h>
+#endif
 
 #include <net/if.h>
 #include <net/if_types.h>
@@ -101,12 +109,20 @@ pfsyncattach(int npfsync)
 	ifp->if_hdrlen = PFSYNC_HDRLEN;
 	ifp->if_baudrate = IF_Mbps(100);
 	pfsync_setmtu(&pfsyncif, MCLBYTES);
+#ifdef __OpenBSD__
 	timeout_set(&pfsyncif.sc_tmo, pfsync_timeout, &pfsyncif);
+#else
+	callout_init(&pfsyncif.sc_tmo);
+#endif
 	if_attach(ifp);
 	if_alloc_sadl(ifp);
 
 #if NBPFILTER > 0
+#ifdef __OpenBSD__
 	bpfattach(&pfsyncif.sc_if.if_bpf, ifp, DLT_PFSYNC, PFSYNC_HDRLEN);
+#else
+	bpfattach(ifp, DLT_PFSYNC, PFSYNC_HDRLEN);
+#endif
 #endif
 }
 
@@ -120,7 +136,11 @@ pfsyncstart(struct ifnet *ifp)
 	int s;
 
 	for (;;) {
+#ifdef __OpenBSD__
 		s = splimp();
+#else
+		s = splnet();
+#endif
 		IF_DROP(&ifp->if_snd);
 		IF_DEQUEUE(&ifp->if_snd, m);
 		splx(s);
@@ -223,7 +243,11 @@ pfsync_get_mbuf(sc, action)
 
 	sc->sc_mbuf = m;
 	sc->sc_ptr = (struct pf_state *)((char *)h + PFSYNC_HDRLEN);
+#ifdef __OpenBSD__
 	timeout_add(&sc->sc_tmo, hz);
+#else
+	callout_reset(&pfsyncif.sc_tmo, hz, pfsync_timeout, &pfsyncif);
+#endif
 
 	return (m);
 }
@@ -344,7 +368,11 @@ pfsync_sendout(sc)
 	struct ifnet *ifp = &sc->sc_if;
 	struct mbuf *m = sc->sc_mbuf;
 
+#ifdef __OpenBSD__
 	timeout_del(&sc->sc_tmo);
+#else
+	callout_stop(&sc->sc_tmo);
+#endif
 	sc->sc_mbuf = NULL;
 	sc->sc_ptr = NULL;
 

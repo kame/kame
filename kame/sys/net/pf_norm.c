@@ -25,6 +25,10 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifdef _KERNEL_OPT
+#include "opt_inet.h"
+#endif
+
 #include "pflog.h"
 
 #include <sys/param.h>
@@ -37,7 +41,11 @@
 #include <sys/time.h>
 #include <sys/pool.h>
 
+#ifdef __OpenBSD__
 #include <dev/rndvar.h>
+#else
+#include <sys/rnd.h>
+#endif
 #include <net/if.h>
 #include <net/if_types.h>
 #include <net/bpf.h>
@@ -604,7 +612,11 @@ pf_fragcache(struct mbuf **m0, struct ip *h, struct pf_fragment *frag, int mff,
 				 * than this mbuf magic.  For my next trick,
 				 * I'll pull a rabbit out of my laptop.
 				 */
+#ifdef __OpenBSD__
 				*m0 = m_copym2(m, 0, h->ip_hl << 2, M_NOWAIT);
+#else
+				*m0 = m_dup(m, 0, h->ip_hl << 2, M_NOWAIT);
+#endif
 				if (*m0 == NULL)
 					goto no_mem;
 				KASSERT((*m0)->m_next == NULL);
@@ -958,8 +970,13 @@ pf_normalize_ip(struct mbuf **m0, int dir, struct ifnet *ifp, u_short *reason)
 	if (r->min_ttl && h->ip_ttl < r->min_ttl)
 		h->ip_ttl = r->min_ttl;
 
-	if (r->rule_flag & PFRULE_RANDOMID)
+	if (r->rule_flag & PFRULE_RANDOMID) {
+#ifdef __OpenBSD__
 		h->ip_id = ip_randomid();
+#else
+		h->ip_id = htons(ip_id++);
+#endif
+	}
 
 	return (PF_PASS);
 

@@ -33,6 +33,10 @@
  * PURPOSE.
  */
 
+#ifdef _KERNEL_OPT
+#include "opt_inet.h"
+#endif
+
 #include "bpfilter.h"
 #include "pflog.h"
 
@@ -106,8 +110,12 @@ pflogattach(int npflog)
 		if_alloc_sadl(ifp);
 
 #if NBPFILTER > 0
+#ifdef __OpenBSD__
 		bpfattach(&pflogif[i].sc_if.if_bpf, ifp, DLT_PFLOG,
 			  PFLOG_HDRLEN);
+#else
+		bpfattach(ifp, DLT_PFLOG, PFLOG_HDRLEN);
+#endif
 #endif
 	}
 }
@@ -122,8 +130,11 @@ pflogstart(struct ifnet *ifp)
 	int s;
 
 	for (;;) {
+#ifdef __OpenBSD__
 		s = splimp();
+#else
 		IF_DROP(&ifp->if_snd);
+#endif
 		IF_DEQUEUE(&ifp->if_snd, m);
 		splx(s);
 

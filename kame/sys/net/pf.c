@@ -34,6 +34,11 @@
  *
  */
 
+#ifdef _KERNEL_OPT
+#include "opt_inet.h"
+#include "opt_altq.h"
+#endif
+
 #include "bpfilter.h"
 #include "pflog.h"
 #include "pfsync.h"
@@ -47,6 +52,9 @@
 #include <sys/kernel.h>
 #include <sys/time.h>
 #include <sys/pool.h>
+#ifdef __NetBSD__
+#include <sys/callout.h>
+#endif
 
 #include <net/if.h>
 #include <net/if_types.h>
@@ -68,14 +76,21 @@
 #include <netinet/udp_var.h>
 #include <netinet/icmp_var.h>
 
+#ifdef __OpenBSD__
 #include <dev/rndvar.h>
+#else
+#include <sys/rnd.h>
+#endif
 #include <net/pfvar.h>
 #include <net/if_pflog.h>
 #include <net/if_pfsync.h>
 
 #ifdef INET6
 #include <netinet/ip6.h>
-#include <netinet/in_pcb.h>
+#include <netinet6/ip6_var.h>
+#ifdef __NetBSD__
+#include <netinet6/in6_pcb.h>
+#endif
 #include <netinet/icmp6.h>
 #include <netinet6/nd6.h>
 #endif /* INET6 */
@@ -106,7 +121,11 @@ u_int32_t		 ticket_altqs_active;
 u_int32_t		 ticket_altqs_inactive;
 u_int32_t		 ticket_pabuf;
 
+#ifdef __OpenBSD__
 struct timeout		 pf_expire_to;			/* expire timeout */
+#else
+struct callout		 pf_expire_to;			/* expire timeout */
+#endif
 
 struct pool		 pf_tree_pl, pf_rule_pl, pf_addr_pl;
 struct pool		 pf_state_pl, pf_altq_pl, pf_pooladdr_pl;
@@ -434,7 +453,11 @@ pf_insert_state(struct pf_state *state)
 void
 pf_purge_timeout(void *arg)
 {
+#ifdef __OpenBSD__
 	struct timeout	*to = arg;
+#else
+	struct callout	*to = arg;
+#endif
 	int		 s;
 
 	s = splsoftnet();
@@ -442,7 +465,12 @@ pf_purge_timeout(void *arg)
 	pf_purge_expired_fragments();
 	splx(s);
 
+#ifdef __OpenBSD__
 	timeout_add(to, pf_default_rule.timeout[PFTM_INTERVAL] * hz);
+#else
+	callout_reset(to, pf_default_rule.timeout[PFTM_INTERVAL] * hz,
+	    pf_purge_timeout, to);
+#endif
 }
 
 u_int32_t
@@ -589,6 +617,7 @@ pf_dynaddr_setup(struct pf_addr_wrap *aw, sa_family_t af)
 	aw->p.dyn->addr = &aw->v.a.addr;
 	aw->p.dyn->af = af;
 	aw->p.dyn->undefined = 1;
+#ifdef __OpenBSD__
 	aw->p.dyn->hook_cookie = hook_establish(
 	    aw->p.dyn->ifp->if_addrhooks, 1,
 	    pf_dynaddr_update, aw->p.dyn);
@@ -597,8 +626,10 @@ pf_dynaddr_setup(struct pf_addr_wrap *aw, sa_family_t af)
 		aw->p.dyn = NULL;
 		return (1);
 	}
+#endif
 	pf_dynaddr_update(aw->p.dyn);
 	return (0);
+	return (1);
 }
 
 void
@@ -651,8 +682,10 @@ pf_dynaddr_remove(struct pf_addr_wrap *aw)
 {
 	if (aw->type != PF_ADDR_DYNIFTL || aw->p.dyn == NULL)
 		return;
+#ifdef __OpenBSD__
 	hook_disestablish(aw->p.dyn->ifp->if_addrhooks,
 	    aw->p.dyn->hook_cookie);
+#endif
 	pool_put(&pf_addr_pl, aw->p.dyn);
 	aw->p.dyn = NULL;
 }
@@ -1904,6 +1937,9 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 	u_int16_t		 sport, dport;
 	struct inpcbtable	*tb;
 	struct inpcb		*inp;
+#ifdef __NetBSD__
+	struct in6pcb		*in6p;
+#endif
 
 	*uid = UID_MAX;
 	*gid = GID_MAX;
@@ -1935,6 +1971,7 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 	}
 	switch(af) {
 	case AF_INET:
+#ifdef __OpenBSD__
 		inp = in_pcbhashlookup(tb, saddr->v4, sport, daddr->v4, dport);
 		if (inp == NULL) {
 			inp = in_pcblookup(tb, &saddr->v4, sport, &daddr->v4,
@@ -1942,9 +1979,19 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 			if (inp == NULL)
 				return (0);
 		}
+#else
+		inp = in_pcblookup_connect(&tcbtable, saddr->v4, sport,
+		    daddr->v4, dport);
+		if (inp == NULL) {
+			inp = in_pcblookup_bind(&tcbtable, daddr->v4, dport);
+			if (inp == NULL)
+				return (0);
+		}
+#endif
 		break;
 #ifdef INET6
 	case AF_INET6:
+#ifdef __OpenBSD__
 		inp = in6_pcbhashlookup(tb, &saddr->v6, sport, &daddr->v6,
 		    dport);
 		if (inp == NULL) {
@@ -1953,14 +2000,37 @@ pf_socket_lookup(uid_t *uid, gid_t *gid, int direction, sa_family_t af,
 			if (inp == NULL)
 				return (0);
 		}
+#else
+	{
+		struct sockaddr_in6 s, d;
+
+		bzero(&s, sizeof(s));
+		bzero(&d, sizeof(d));
+		s.sin6_len = d.sin6_len = sizeof(struct sockaddr_in6);
+		s.sin6_family = d.sin6_family = AF_INET6;
+		in6_recoverscope(&s, &saddr->v6, NULL);
+		in6_recoverscope(&d, &daddr->v6, NULL);
+		in6p = in6_pcblookup_connect(&tcb6, &s, sport, &d, dport, 0);
+		if (in6p == NULL) {
+			in6p = in6_pcblookup_bind(&tcb6, &d, dport, 0);
+			if (in6p == NULL)
+				return (0);
+		}
+	}
+#endif
 		break;
 #endif /* INET6 */
 
 	default:
 		return (0);
 	}
+#ifdef __OpenBSD__
 	*uid = inp->inp_socket->so_euid;
 	*gid = inp->inp_socket->so_egid;
+#else
+	*uid = -1;
+	*gid = -1;
+#endif
 	return (1);
 }
 
@@ -2063,7 +2133,11 @@ pf_calc_mss(struct pf_addr *addr, sa_family_t af, u_int16_t offer)
 		dst->sin_family = AF_INET;
 		dst->sin_len = sizeof(*dst);
 		dst->sin_addr = addr->v4;
+#ifdef __OpenBSD__
 		rtalloc_noclone(&ro, NO_CLONING);
+#else
+		rtalloc(&ro);
+#endif
 		rt = ro.ro_rt;
 		break;
 #endif /* INET */
@@ -2075,7 +2149,11 @@ pf_calc_mss(struct pf_addr *addr, sa_family_t af, u_int16_t offer)
 		dst6->sin6_family = AF_INET6;
 		dst6->sin6_len = sizeof(*dst6);
 		dst6->sin6_addr = addr->v6;
+#ifdef __OpenBSD__
 		rtalloc_noclone((struct route *)&ro6, NO_CLONING);
+#else
+		rtalloc((struct route *)&ro6);
+#endif
 		rt = ro6.ro_rt;
 		break;
 #endif /* INET6 */
@@ -4366,7 +4444,11 @@ pf_routable(struct pf_addr *addr, sa_family_t af)
 	dst->sin_family = af;
 	dst->sin_len = sizeof(*dst);
 	dst->sin_addr = addr->v4;
+#ifdef __OpenBSD__
 	rtalloc_noclone(&ro, NO_CLONING);
+#else
+	rtalloc(&ro);
+#endif
 
 	if (ro.ro_rt != NULL) {
 		ret = 1;
@@ -4381,7 +4463,11 @@ void
 pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
     struct pf_state *s)
 {
+#ifdef __OpenBSD__
 	struct mbuf		*m0, *m1;
+#else
+	struct mbuf		*m0;
+#endif
 	struct route		 iproute;
 	struct route		*ro;
 	struct sockaddr_in	*dst;
@@ -4404,7 +4490,11 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 				goto bad;
 			m_tag_prepend(m0, mtag);
 		}
+#ifdef __OpenBSD__
 		m0 = m_copym2(*m, 0, M_COPYALL, M_NOWAIT);
+#else
+		m0 = m_dup(*m, 0, M_COPYALL, M_NOWAIT);
+#endif
 		if (m0 == NULL)
 			return;
 	} else {
@@ -4485,6 +4575,7 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 	if (ip->ip_len <= ifp->if_mtu) {
 		ip->ip_len = htons((u_int16_t)ip->ip_len);
 		ip->ip_off = htons((u_int16_t)ip->ip_off);
+#ifdef __OpenBSD__
 		if ((ifp->if_capabilities & IFCAP_CSUM_IPv4) &&
 		    ifp->if_bridge == NULL) {
 			m0->m_pkthdr.csum |= M_IPV4_CSUM_OUT;
@@ -4498,6 +4589,10 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 			tcpstat.tcps_outhwcsum++;
 		else if (m0->m_pkthdr.csum & M_UDPV4_CSUM_OUT)
 			udpstat.udps_outhwcsum++;
+#else
+		ip->ip_sum = 0;
+		ip->ip_sum = in_cksum(m0, ip->ip_hl << 2);
+#endif
 		error = (*ifp->if_output)(ifp, m0, sintosa(dst), NULL);
 		goto done;
 	}
@@ -4516,6 +4611,7 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 			goto bad;
 	}
 
+#ifdef __OpenBSD__
 	m1 = m0;
 	error = ip_fragment(m0, ifp, ifp->if_mtu);
 	if (error == EMSGSIZE)
@@ -4533,6 +4629,10 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 
 	if (error == 0)
 		ipstat.ips_fragmented++;
+#else
+	/* we don't have ip_fragment() */
+	goto bad;
+#endif
 
 done:
 	if (r->rt != PF_DUPTO)
@@ -4554,8 +4654,13 @@ pf_route6(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 {
 	struct mbuf		*m0;
 	struct m_tag		*mtag;
+#ifdef NEW_STRUCT_ROUTE
+	struct route	 	ip6route;
+	struct route		*ro;
+#else
 	struct route_in6	 ip6route;
 	struct route_in6	*ro;
+#endif
 	struct sockaddr_in6	*dst;
 	struct ip6_hdr		*ip6;
 	struct ifnet		*ifp = NULL;
@@ -4575,7 +4680,11 @@ pf_route6(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 				goto bad;
 			m_tag_prepend(m0, mtag);
 		}
+#ifdef __OpenBSD__
 		m0 = m_copym2(*m, 0, M_COPYALL, M_NOWAIT);
+#else
+		m0 = m_dup(*m, 0, M_COPYALL, M_NOWAIT);
+#endif
 		if (m0 == NULL)
 			return;
 	} else {
@@ -4686,12 +4795,22 @@ pf_check_proto_cksum(struct mbuf *m, int off, int len, u_int8_t p, sa_family_t a
 
 	switch (p) {
 	case IPPROTO_TCP:
+#ifdef __OpenBSD__
 		flag_ok = M_TCP_CSUM_IN_OK;
 		flag_bad = M_TCP_CSUM_IN_BAD;
+#else
+		flag_ok = M_CSUM_TCPv4;
+		flag_bad = M_CSUM_TCP_UDP_BAD;
+#endif
 		break;
 	case IPPROTO_UDP:
+#ifdef __OpenBSD__
 		flag_ok = M_UDP_CSUM_IN_OK;
 		flag_bad = M_UDP_CSUM_IN_BAD;
+#else
+		flag_ok = M_CSUM_UDPv4;
+		flag_bad = M_CSUM_TCP_UDP_BAD;
+#endif
 		break;
 	case IPPROTO_ICMP:
 #ifdef INET6
@@ -4702,9 +4821,17 @@ pf_check_proto_cksum(struct mbuf *m, int off, int len, u_int8_t p, sa_family_t a
 	default:
 		return (1);
 	}
+#ifdef __OpenBSD__
 	if (m->m_pkthdr.csum & flag_ok)
+#else
+	if (m->m_pkthdr.csum_flags & flag_ok)
+#endif
 		return (0);
+#ifdef __OpenBSD__
 	if (m->m_pkthdr.csum & flag_bad)
+#else
+	if (m->m_pkthdr.csum_flags & flag_bad)
+#endif
 		return (1);
 	if (off < sizeof(struct ip) || len < sizeof(struct udphdr))
 		return (1);
@@ -4737,7 +4864,11 @@ pf_check_proto_cksum(struct mbuf *m, int off, int len, u_int8_t p, sa_family_t a
 		return (1);
 	}
 	if (sum) {
+#ifdef __OpenBSD__
 		m->m_pkthdr.csum |= flag_bad;
+#else
+		m->m_pkthdr.csum_flags |= flag_bad;
+#endif
 		switch (p) {
 		case IPPROTO_TCP:
 			tcpstat.tcps_rcvbadsum++;
@@ -4756,7 +4887,11 @@ pf_check_proto_cksum(struct mbuf *m, int off, int len, u_int8_t p, sa_family_t a
 		}
 		return (1);
 	}
+#ifdef __OpenBSD__
 	m->m_pkthdr.csum |= flag_ok;
+#else
+	m->m_pkthdr.csum_flags |= flag_ok;
+#endif
 	return (0);
 }
 
