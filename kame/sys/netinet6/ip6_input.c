@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.167 2001/02/06 04:08:18 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.168 2001/02/07 07:45:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2381,16 +2381,14 @@ pfctlinput2(cmd, sa, ctlparam)
 	struct domain *dp;
 	struct protosw *pr;
 
+	if (!sa)
+		return;
 	for (dp = domains; dp; dp = dp->dom_next) {
 		/*
-		 * XXX: as shown by the name, we should generalize this 
-		 * function to be domain-independent. However, we should keep
-		 * it IPv6-specific at this moment, because each ctlinput
-		 * function has its own assumption about the argument.
-		 * A new type of argument "ctlparam" might cause kernel panic
-		 * due to such assumptions.
+		 * the check must be made by xx_ctlinput() anyways.  it is
+		 * kept here for safety
 		 */
-		if (dp != &inet6domain)
+		if (dp->dom_family != sa->sa_family)
 			continue;
 
 		for (pr = dp->dom_protosw; pr < dp->dom_protoswNPROTOSW; pr++)
