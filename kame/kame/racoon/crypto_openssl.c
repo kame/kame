@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.51 2001/05/02 07:19:55 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.52 2001/07/11 10:32:53 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1282,70 +1282,6 @@ eay_cast_weakkey(key)
 {
 	return 0;	/* No known weak keys. */
 }
-
-/*
- * HMAC-SHA1
- */
-vchar_t *
-eay_hmacsha1_oneX(key, data, data2)
-	vchar_t *key, *data, *data2;
-{
-	vchar_t *res;
-	SHA_CTX c;
-	u_char k_ipad[65], k_opad[65];
-	u_char *nkey;
-	int nkeylen;
-	int i;
-	u_char tk[SHA_DIGEST_LENGTH];
-
-	/* initialize */
-	if ((res = vmalloc(SHA_DIGEST_LENGTH)) == 0)
-		return(0);
-
-	/* if key is longer than 64 bytes reset it to key=SHA1(key) */
-	nkey = key->v;
-	nkeylen = key->l;
-
-	if (nkeylen > 64) {
-		SHA_CTX      ctx;
-
-		SHA1_Init(&ctx);
-		SHA1_Update(&ctx, nkey, nkeylen);
-		SHA1_Final(tk, &ctx);
-
-		nkey = tk;
-		nkeylen = SHA_DIGEST_LENGTH;
-	}
-
-	/* start out by string key in pads */
-	memset(k_ipad, 0, sizeof(k_ipad));
-	memset(k_opad, 0, sizeof(k_opad));
-	memcpy(k_ipad, nkey, nkeylen);
-	memcpy(k_opad, nkey, nkeylen);
-
-	/* XOR key with ipad and opad values */
-	for (i=0; i<64; i++) {
-		k_ipad[i] ^= 0x36;
-		k_opad[i] ^= 0x5c;
-	}
-
-	/* key */
-	SHA1_Init(&c);
-	SHA1_Update(&c, k_ipad, 64);
-
-	/* finish up 1st pass */
-	SHA1_Update(&c, data->v, data->l);
-	SHA1_Update(&c, data2->v, data2->l);
-	SHA1_Final(res->v, &c);
-
-	/* perform outer SHA1 */
-	SHA1_Init(&c);
-	SHA1_Update(&c, k_opad, 64);
-	SHA1_Update(&c, res->v, SHA_DIGEST_LENGTH);
-	SHA1_Final(res->v, &c);
-
-	return(res);
-};
 
 /*
  * HMAC SHA1

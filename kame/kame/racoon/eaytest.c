@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.20 2001/04/03 15:51:55 thorpej Exp $	*/
+/*	$KAME: eaytest.c,v 1.21 2001/07/11 10:32:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -457,9 +457,6 @@ hmactest()
 	memcpy(data2->v, kr.v, kr.l);
 
 	printf("HMAC SHA1\n");
-	res = (vchar_t *)eay_hmacsha1_oneX(key, data, data2);
-	PVDUMP(res);
-	vfree(res);
 
 	vfree(key);
 }
