@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.89 2000/05/08 02:19:49 itojun Exp $	*/
+/*	$KAME: key.c,v 1.90 2000/05/08 02:32:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -428,7 +428,7 @@ static int key_setident __P((struct secashead *, caddr_t *));
 static struct sadb_msg *key_getmsgbuf_x1 __P((caddr_t *));
 static int key_delete __P((struct socket *, struct mbuf *,
 	struct sadb_msghdr *));
-static struct sadb_msg *key_get __P((caddr_t *));
+static int key_get __P((struct socket *, struct mbuf *, struct sadb_msghdr *));
 static int key_acquire __P((struct secasindex *, struct secpolicy *));
 static struct secacq *key_newacq __P((struct secasindex *));
 static struct secacq *key_getacq __P((struct secasindex *));
@@ -5118,11 +5118,12 @@ key_delete(so, m, mhp)
  * OUT:	NULL if fail.
  *	other if success, return pointer to the message to send.
  */
-static struct sadb_msg *
-key_get(mhp)
-	caddr_t *mhp;
+static int
+key_get(so, m, mhp)
+	struct socket *so;
+	struct mbuf *m;
+	struct sadb_msghdr *mhp;
 {
-	struct sadb_msg *msg0;
 	struct sadb_sa *sa0;
 	struct sadb_address *src0, *dst0;
 	struct secasindex saidx;
@@ -5131,43 +5132,47 @@ key_get(mhp)
 	u_int16_t proto;
 
 	/* sanity check */
-	if (mhp == NULL || mhp[0] == NULL)
+	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
 		panic("key_get: NULL pointer is passed.\n");
 
-	msg0 = (struct sadb_msg *)mhp[0];
-
 	/* map satype to proto */
-	if ((proto = key_satype2proto(msg0->sadb_msg_satype)) == 0) {
+	if ((proto = key_satype2proto(mhp->msg->sadb_msg_satype)) == 0) {
 #ifdef IPSEC_DEBUG
 		printf("key_get: invalid satype is passed.\n");
 #endif
-		msg0->sadb_msg_errno = EINVAL;
-		return NULL;
+		return key_senderror(so, m, EINVAL);
 	}
 
-	if (mhp[SADB_EXT_SA] == NULL
-	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
-	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
+	if (mhp->ext[SADB_EXT_SA] == NULL ||
+	    mhp->ext[SADB_EXT_ADDRESS_SRC] == NULL ||
+	    mhp->ext[SADB_EXT_ADDRESS_DST] == NULL) {
 #ifdef IPSEC_DEBUG
 		printf("key_get: invalid message is passed.\n");
 #endif
-		msg0->sadb_msg_errno = EINVAL;
-		return NULL;
+		return key_senderror(so, m, EINVAL);
 	}
-	sa0 = (struct sadb_sa *)mhp[SADB_EXT_SA];
-	src0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_SRC]);
-	dst0 = (struct sadb_address *)(mhp[SADB_EXT_ADDRESS_DST]);
+	if (mhp->extlen[SADB_EXT_SA] < sizeof(struct sadb_sa) ||
+	    mhp->extlen[SADB_EXT_ADDRESS_SRC] < sizeof(struct sadb_address) ||
+	    mhp->extlen[SADB_EXT_ADDRESS_DST] < sizeof(struct sadb_address)) {
+#ifdef IPSEC_DEBUG
+		printf("key_get: invalid message is passed.\n");
+#endif
+		return key_senderror(so, m, EINVAL);
+	}
+
+	sa0 = (struct sadb_sa *)mhp->ext[SADB_EXT_SA];
+	src0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_SRC];
+	dst0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_DST];
 
 	/* XXX boundary check against sa_len */
-	KEY_SETSECASIDX(proto, msg0, src0+1, dst0+1, &saidx);
+	KEY_SETSECASIDX(proto, mhp->msg, src0 + 1, dst0 + 1, &saidx);
 
 	/* get a SA header */
 	if ((sah = key_getsah(&saidx)) == NULL) {
 #ifdef IPSEC_DEBUG
 		printf("key_get: no SA found.\n");
 #endif
-		msg0->sadb_msg_errno = ENOENT;
-		return NULL;
+		return key_senderror(so, m, ENOENT);
 	}
 
 	/* get a SA with SPI. */
@@ -5176,12 +5181,11 @@ key_get(mhp)
 #ifdef IPSEC_DEBUG
 		printf("key_get: no SA with state of mature found.\n");
 #endif
-		msg0->sadb_msg_errno = ENOENT;
-		return NULL;
+		return key_senderror(so, m, ENOENT);
 	}
 
     {
-	struct sadb_msg *newmsg;
+	struct mbuf *n;
 	u_int len;
 	u_int8_t satype;
 
@@ -5190,27 +5194,36 @@ key_get(mhp)
 #ifdef IPSEC_DEBUG
 		printf("key_get: there was invalid proto in SAD.\n");
 #endif
-		msg0->sadb_msg_errno = EINVAL;
-		return NULL;
+		return key_senderror(so, m, EINVAL);
 	}
 
 	/* calculate a length of message buffer */
 	len = key_getmsglen(sav);
 
-	KMALLOC(newmsg, struct sadb_msg *, len);
-	if (newmsg == NULL) {
-#ifdef IPSEC_DEBUG
-		printf("key_get: No more memory.\n");
-#endif
-		msg0->sadb_msg_errno = ENOBUFS;
-		return NULL;
+	if (len > MCLBYTES)
+		return key_senderror(so, m, ENOBUFS);
+
+	MGETHDR(n, M_DONTWAIT, MT_DATA);
+	if (len > MHLEN) {
+		MCLGET(n, M_DONTWAIT);
+		if ((n->m_flags & M_EXT) == 0) {
+			m_freem(n);
+			n = NULL;
+		}
 	}
+	if (!n)
+		return key_senderror(so, m, ENOBUFS);
+
+	n->m_pkthdr.len = n->m_len = len;
+	n->m_next = NULL;
 
 	/* create new sadb_msg to reply. */
-	(void)key_setdumpsa(newmsg, sav, SADB_GET,
-	                    satype, msg0->sadb_msg_seq, msg0->sadb_msg_pid);
+	/* XXX rewrite */
+	(void)key_setdumpsa(mtod(n, struct sadb_msg *), sav, SADB_GET,
+	    satype, mhp->msg->sadb_msg_seq, mhp->msg->sadb_msg_pid);
 
-	return newmsg;
+	m_freem(m);
+	return key_sendup_mbuf(so, n, KEY_SENDUP_ONE);
     }
 }
 
@@ -6536,10 +6549,8 @@ key_parse(m, so)
 		return key_delete(so, m, &mh);
 		break;
 
-	case SADB_GET:
-		if ((newmsg = key_get((caddr_t *)mh.ext)) == NULL)
-			goto sendback;
-		break;
+	case SADB_GET:	/*almost done*/
+		return key_get(so, m, &mh);
 
 	case SADB_ACQUIRE:
 		if ((newmsg = key_acquire2((caddr_t *)mh.ext)) == NULL)
