@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.115 2000/12/02 07:30:36 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.116 2000/12/02 07:47:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1151,8 +1151,17 @@ in6_purgeif(ifp)
 {
 	struct ifaddr *ifa, *nifa;
 
-	for (ifa = TAILQ_FIRST(&ifp->if_addrlist); ifa != NULL; ifa = nifa) {
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	for (ifa = ifp->if_addrlist; ifa; ifa = nifa)
+#else
+	for (ifa = TAILQ_FIRST(&ifp->if_addrlist); ifa != NULL; ifa = nifa)
+#endif
+	{
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+		nifa = ifa->ifa_next;
+#else
 		nifa = TAILQ_NEXT(ifa, ifa_list);
+#endif
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
 		in6_purgeaddr(ifa, ifp);

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.82 2000/12/02 07:30:37 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.83 2000/12/02 07:47:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,8 +145,10 @@ static void nd6_slowtimo __P((void *));
 void (*mip6_expired_defrouter_hook)(struct nd_defrouter *dr) = 0;
 #endif
 
+#ifdef __NetBSD__
 struct callout nd6_slowtimo_ch;
 struct callout nd6_timer_ch;
+#endif
 
 void
 nd6_init()
