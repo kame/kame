@@ -1,4 +1,4 @@
-/*	$KAME: if_sec.c,v 1.11 2001/07/27 08:48:26 itojun Exp $	*/
+/*	$KAME: if_sec.c,v 1.12 2001/07/27 09:54:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -94,6 +94,8 @@ void secattach __P((void *));
 #else
 void secattach __P((int));
 #endif
+static struct ifnet *sec_create __P((int));
+static int sec_destroy __P((struct ifnet *));
 
 int sec_maxunit = -1;
 
@@ -115,7 +117,7 @@ secattach(dummy)
 	LIST_INIT(&ifchainhead);
 }
 
-struct ifnet *
+static struct ifnet *
 sec_create(unit)
 	int unit;
 {
@@ -158,17 +160,15 @@ sec_create(unit)
 PSEUDO_SET(secattach, if_sec);
 #endif
 
-int
+static int
 sec_destroy(ifp)
 	struct ifnet *ifp;
 {
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	struct ifchain *ifcp, *next;
-	struct sec_softc *sc;
 
 	for (ifcp = LIST_FIRST(&ifchainhead); ifcp; ifcp = next) {
 		next = LIST_NEXT(ifcp, chain);
-		sc = (struct sec_softc *)ifp;
 
 		if (ifp == ifcp->ifp) {
 			gif_delete_tunnel(ifp);
@@ -177,7 +177,7 @@ sec_destroy(ifp)
 			bpfdetach(ifp);
 #endif
 			if_detach(ifp);
-			free(sc, M_DEVBUF);
+			free(ifp, M_DEVBUF);
 
 			return 0;
 		}
@@ -187,6 +187,73 @@ sec_destroy(ifp)
 #else
 	return EOPNOTSUPP;
 #endif
+}
+
+/* must be splimp to call this */
+struct ifnet *
+sec_establish(psrc, pdst)
+	struct sockaddr *psrc;
+	struct sockaddr *pdst;
+{
+	struct ifchain *ifcp, *next;
+	struct gif_softc *gif;
+	struct ifnet *ifp;
+	int error;
+
+	for (ifcp = LIST_FIRST(&ifchainhead); ifcp; ifcp = next) {
+		next = LIST_NEXT(ifcp, chain);
+
+		gif = &((struct sec_softc *)ifcp->ifp)->sc_gif;
+
+		if (!gif->gif_pdst || !gif->gif_psrc)
+			continue;
+		if (gif->gif_pdst->sa_family != pdst->sa_family ||
+		    gif->gif_pdst->sa_len != pdst->sa_len ||
+		    gif->gif_psrc->sa_family != psrc->sa_family ||
+		    gif->gif_psrc->sa_len != psrc->sa_len)
+			continue;
+		if (bcmp(gif->gif_pdst, pdst, pdst->sa_len) == 0 &&
+		    bcmp(gif->gif_psrc, psrc, psrc->sa_len) == 0) {
+			break;
+		}
+	}
+
+	if (ifcp)
+		ifp = ifcp->ifp;
+	else {
+		ifp = sec_create(0);
+		if (!ifp)
+			return NULL;
+		error = gif_set_tunnel(ifp, psrc, pdst);
+		if (error) {
+			sec_destroy(ifp);
+			return NULL;
+		}
+	}
+
+	((struct sec_softc *)ifp)->sc_refcnt++;
+((struct sec_softc *)ifp)->sc_refcnt - 1,
+((struct sec_softc *)ifp)->sc_refcnt);
+	return ifp;
+}
+
+/* must be splimp to call this */
+int
+sec_demolish(ifp)
+	struct ifnet *ifp;
+{
+	struct sec_softc *sc = (struct sec_softc *)ifp;
+
+	/* if refcnt is already negative, punt */
+	if (sc->sc_refcnt <= 0)
+		return EINVAL;
+	if (--sc->sc_refcnt > 0)
+		return 0;
+
+	(void)gif_delete_tunnel(ifp);
+	if_down(ifp);
+	(void)sec_destroy(ifp);
+	return 0;
 }
 
 int
@@ -230,7 +297,7 @@ sec_reusable()
 		next = LIST_NEXT(ifcp, chain);
 		sc = (struct sec_softc *)ifcp->ifp;
 
-		if (!sc->gif_psrc)
+		if (!sc->gif_psrc && !sc->gif_pdst)
 			return ifcp->ifp;
 	}
 

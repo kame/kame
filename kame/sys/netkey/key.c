@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.200 2001/07/27 08:42:52 itojun Exp $	*/
+/*	$KAME: key.c,v 1.201 2001/07/27 09:54:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1158,14 +1158,8 @@ key_delsp(sp)
 		if (isr->tunifp) {
 			int s;
 
-			/*
-			 * XXX look at reference counter.  don't kill it if
-			 * it is shared with others.
-			 */
 			s = splimp();
-			(void)gif_delete_tunnel(isr->tunifp);
-			if_down(isr->tunifp);
-			(void)sec_destroy(isr->tunifp);
+			sec_demolish(isr->tunifp);
 			splx(s);
 
 			/* XXX more garbage-collection */
@@ -1834,24 +1828,26 @@ key_spdadd(so, m, mhp)
 
 	/*
 	 * bark if we have different address family on tunnel address
-	 * specification.
-	 * XXX the check has to be removed in the future
+	 * specification.  applies only if we decapsulate in RFC2401 IPsec
+	 * (implementation limitation).
 	 */
-	for (req = newsp->req; req; req = req->next) {
-		if (req->saidx.src.ss_family) {
-			struct sockaddr *sa;
-			sa = (struct sockaddr *)(src0 + 1);
-			if (sa->sa_family != req->saidx.src.ss_family) {
-				keydb_delsecpolicy(newsp);
-				return key_senderror(so, m, EINVAL);
+	if (!ipsec_tunnel_device) {
+		for (req = newsp->req; req; req = req->next) {
+			if (req->saidx.src.ss_family) {
+				struct sockaddr *sa;
+				sa = (struct sockaddr *)(src0 + 1);
+				if (sa->sa_family != req->saidx.src.ss_family) {
+					keydb_delsecpolicy(newsp);
+					return key_senderror(so, m, EINVAL);
+				}
 			}
-		}
-		if (req->saidx.dst.ss_family) {
-			struct sockaddr *sa;
-			sa = (struct sockaddr *)(dst0 + 1);
-			if (sa->sa_family != req->saidx.dst.ss_family) {
-				keydb_delsecpolicy(newsp);
-				return key_senderror(so, m, EINVAL);
+			if (req->saidx.dst.ss_family) {
+				struct sockaddr *sa;
+				sa = (struct sockaddr *)(dst0 + 1);
+				if (sa->sa_family != req->saidx.dst.ss_family) {
+					keydb_delsecpolicy(newsp);
+					return key_senderror(so, m, EINVAL);
+				}
 			}
 		}
 	}
@@ -1870,35 +1866,16 @@ key_spdadd(so, m, mhp)
 			if (req->saidx.mode != IPSEC_MODE_TUNNEL)
 				continue;
 
-			/* I don't care about the unit number */
-			ifp = sec_create(0);
+			s = splimp();
+			ifp = sec_establish((struct sockaddr *)&req->saidx.src,
+			    (struct sockaddr *)&req->saidx.dst);
+			splx(s);
 			if (!ifp) {
 				keydb_delsecpolicy(newsp);
 				return key_senderror(so, m, EINVAL);
 			}
 
-			s = splimp();
-			error = gif_set_tunnel(ifp,
-			    (struct sockaddr *)&req->saidx.src,
-			    (struct sockaddr *)&req->saidx.dst);
-			splx(s);
-			switch (error) {
-			case 0:
-				req->tunifp = ifp;
-				/* XXX reference count and such */
-				break;
-			case EEXIST:
-				/*
-				 * XXX find another tunnel for the same outer
-				 * pair.  share it with others.
-				 */
-			default:
-				s = splimp();
-				(void)sec_destroy(ifp);
-				splx(s);
-				keydb_delsecpolicy(newsp);
-				return key_senderror(so, m, EINVAL);
-			}
+			req->tunifp = ifp;
 		}
 	}
 #endif

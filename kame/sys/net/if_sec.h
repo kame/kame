@@ -1,4 +1,4 @@
-/*	$KAME: if_sec.h,v 1.2 2001/07/26 02:09:22 itojun Exp $	*/
+/*	$KAME: if_sec.h,v 1.3 2001/07/27 09:54:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -39,8 +39,8 @@ struct sec_softc {
 };
 
 /* Prototypes */
-struct ifnet *sec_create __P((int));
-int sec_destroy __P((struct ifnet *));
+struct ifnet *sec_establish __P((struct sockaddr *, struct sockaddr *));
+int sec_demolish __P((struct ifnet *));
 #if defined(__FreeBSD__) && __FreeBSD__ < 3
 int sec_ioctl __P((struct ifnet *, int, caddr_t));
 #else
