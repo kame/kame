@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1151 2000/07/25 10:45:19 jinmei Exp $
+$Id: CHANGELOG,v 1.1152 2000/07/26 02:04:51 itojun Exp $
 
 <200007>
+Wed Jul 26 11:01:41 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 2000/7/24 weekly snap
+	  from tcpdump.org.
+
 2000-07-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd3/usr.bin/telnet/commands.c (tn): set the source address
 	specfied by the -s option correctly.
