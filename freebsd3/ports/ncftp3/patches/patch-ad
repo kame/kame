@@ -1,0 +1,26 @@
+--- libncftp/linelist.c.orig	Mon Nov 17 08:23:24 1997
++++ libncftp/linelist.c	Sat Dec 13 17:22:39 1997
+@@ -277,7 +277,11 @@
+ 
+ 	fipa = (FileInfoPtr *) a;
+ 	fipb = (FileInfoPtr *) b;
++#ifdef HAVE_SETLOCALE
++	return (strcoll((**fipb).relname, (**fipa).relname));
++#else
+ 	return (strcmp((**fipb).relname, (**fipa).relname));
++#endif
+ }	/* ReverseNameCmp */
+ 
+ 
+@@ -290,7 +294,11 @@
+ 
+ 	fipa = (FileInfoPtr *) a;
+ 	fipb = (FileInfoPtr *) b;
++#ifdef HAVE_SETLOCALE
++	return (strcoll((**fipa).relname, (**fipb).relname));
++#else
+ 	return (strcmp((**fipa).relname, (**fipb).relname));
++#endif
+ }	/* NameCmp */
+ 
+ 

@@ -1,0 +1,6 @@
+mediator/mediator
+mediator/mdc
+mediator/dcsk.pl
+mediator/mediator.conf.sample
+mediator/gethostent.pl
+@dirrm mediator

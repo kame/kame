@@ -1,0 +1,29 @@
+--- conf/httpd.conf-dist.orig	Tue Jan 12 06:10:00 1999
++++ conf/httpd.conf-dist	Tue Jan 12 06:17:37 1999
+@@ -246,7 +246,7 @@
+ #  don't use Group #-1 on these systems!
+ #
+ User nobody
+-Group #-1
++Group nogroup
+ 
+ #
+ # ServerAdmin: Your address, where problems with the server should be
+@@ -464,7 +464,7 @@
+ # define per-<VirtualHost> access logfiles, transactions will be
+ # logged therein and *not* in this file.
+ #
+-CustomLog logs/access_log common
++#CustomLog logs/access_log common
+ 
+ #
+ # If you would like to have agent and referer logfiles, uncomment the
+@@ -477,7 +477,7 @@
+ # If you prefer a single logfile with access, agent, and referer information
+ # (Combined Logfile Format) you can use the following directive.
+ #
+-#CustomLog logs/access_log combined
++CustomLog logs/access_log combined
+ 
+ #
+ # Optionally add a line containing the server version and virtual host

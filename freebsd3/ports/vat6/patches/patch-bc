@@ -1,0 +1,9 @@
+--- configure.in.orig	Tue Jul 14 17:22:51 1998
++++ configure.in	Tue Jul 14 17:30:38 1998
+@@ -193,5 +193,6 @@
+ AC_SUBST(V_INCLUDE_AUDIO)
+ AC_SUBST(V_OBJ_AUDIO)
+ AC_SUBST(V_TABCC)
++AC_SUBST(V_LIB_V6)
+ 
+ builtin(include, configure.in.tail)

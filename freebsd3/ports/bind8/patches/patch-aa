@@ -1,0 +1,26 @@
+--- src/port/freebsd/Makefile.set.orig	Tue Jun  1 06:57:45 1999
++++ src/port/freebsd/Makefile.set	Tue Jun  1 06:58:36 1999
+@@ -1,10 +1,12 @@
+ 'CC=cc'
+-'CDEBUG=-O2 -g -DINET6 -Dss_family=__ss_family -Dss_len=__ss_len'
+-'DESTBIN=/usr/bin'
+-'DESTSBIN=/usr/sbin'
+-'DESTEXEC=/usr/libexec'
+-'DESTMAN=/usr/share/man'
+-'DESTHELP=/usr/share/misc'
++'CDEBUG=-O2 -DINET6 -Dss_family=__ss_family -Dss_len=__ss_len'
++'DESTBIN=${PREFIX}/bin'
++'DESTSBIN=${PREFIX}/sbin'
++'DESTEXEC=${PREFIX}/libexec'
++'DESTMAN=${PREFIX}/man'
++'DESTHELP=${PREFIX}/share/misc'
++'DESTINC=${PREFIX}/include/bind'
++'DESTLIB=${PREFIX}/lib'
+ 'DESTETC=/etc'
+ 'DESTRUN=/var/run'
+ 'LEX=lex -I'
+@@ -16,3 +18,4 @@
+ 'CATEXT=0'
+ 'PS=ps'
+ 'RANLIB=ranlib'
++'SH=${SH}'

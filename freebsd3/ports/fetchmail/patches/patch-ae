@@ -1,0 +1,16 @@
+--- driver.c.orig	Mon Jan  4 05:11:44 1999
++++ driver.c	Tue Jan  5 19:49:13 1999
+@@ -1476,10 +1476,11 @@
+ 	char buf[POPBUFSIZE+1], *realhost;
+ 	int len, num, count, new, bytes, deletions = 0, *msgsizes = NULL;
+ #if INET6
+-	int fetches, dispatches, oldphase;
++	int fetches, dispatches;
+ #else /* INET6 */
+-	int port, fetches, dispatches, oldphase;
++	int port, fetches, dispatches;
+ #endif /* INET6 */
++	int oldphase;
+ 	struct idlist *idp;
+ 
+ 	/* execute pre-initialization command, if any */

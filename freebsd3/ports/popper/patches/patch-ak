@@ -1,0 +1,19 @@
+*** popper.h.old	Sun Jun 28 12:58:15 1998
+--- popper.h	Sun Jun 28 11:56:10 1998
+***************
+*** 59,65 ****
+  #define MAXMSGLINELEN   MAXLINELEN
+  #define MAXCMDLEN       4
+  #define MAXPARMCOUNT    5
+! #define MAXPARMLEN      10
+  #define ALLOC_MSGS  20
+  
+  #ifndef OSF1
+--- 59,65 ----
+  #define MAXMSGLINELEN   MAXLINELEN
+  #define MAXCMDLEN       4
+  #define MAXPARMCOUNT    5
+! #define MAXPARMLEN      32      /*  Large enough for 32-byte APOP parm. */
+  #define ALLOC_MSGS  20
+  
+  #ifndef OSF1

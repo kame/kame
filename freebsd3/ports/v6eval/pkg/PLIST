@@ -1,0 +1,65 @@
+@cwd /usr/local/v6eval
+bin/autorun
+bin/checker
+bin/pktbuf
+bin/pktctl
+bin/pktlint
+bin/pktsend
+bin/pktrecv
+bin/clearnc.rmt
+bin/clearprefix.rmt
+bin/loginout.rmt
+bin/reboot.rmt
+bin/reboot_async.rmt
+etc/tn.def.sample
+etc/nut.def.sample
+include/std.def
+include/stdaddr.def
+include/stdpacket.def
+doc/00README
+doc/00README.v6eval
+doc/CHANGELOG
+doc/CHANGELOG.v6eval
+doc/COPYRIGHT
+doc/COPYRIGHT.jp
+doc/INSTALL
+doc/INSTALL.v6eval
+doc/TODO
+doc/TODO.v6eval
+@dirrm bin
+@dirrm include
+@unexec rmdir %D/etc 2>/dev/null || true
+@dirrm doc
+man/man1/pktctl.1.gz
+man/man1/pktsend.1.gz
+@dirrm man/cat1
+@dirrm man/cat2
+@dirrm man/cat3
+@dirrm man/cat4
+@dirrm man/cat5
+@dirrm man/cat6
+@dirrm man/cat7
+@dirrm man/cat8
+@dirrm man/cat9
+@dirrm man/catn
+@dirrm man/man1
+@dirrm man/man2
+@dirrm man/man3
+@dirrm man/man4
+@dirrm man/man5
+@dirrm man/man6
+@dirrm man/man7
+@dirrm man/man8
+@dirrm man/man9
+@dirrm man/mann
+@dirrm man
+@cwd /usr/local
+lib/perl5/site_perl/%%PERL_VER%%/i386-freebsd/auto/V6evalTool/.packlist
+lib/perl5/site_perl/%%PERL_VER%%/i386-freebsd/auto/V6evalCommon/.packlist
+lib/perl5/site_perl/%%PERL_VER%%/i386-freebsd/auto/V6evalRemote/.packlist
+lib/perl5/site_perl/%%PERL_VER%%/V6evalTool.pm
+lib/perl5/site_perl/%%PERL_VER%%/V6evalCommon.pm
+lib/perl5/site_perl/%%PERL_VER%%/V6evalRemote.pm
+@dirrm lib/perl5/site_perl/%%PERL_VER%%/i386-freebsd/auto/V6evalTool
+@dirrm lib/perl5/site_perl/%%PERL_VER%%/i386-freebsd/auto/V6evalRemote
+@dirrm lib/perl5/site_perl/%%PERL_VER%%/i386-freebsd/auto/V6evalCommon

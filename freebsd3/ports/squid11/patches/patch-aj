@@ -1,0 +1,23 @@
+--- configure.orig	Wed Mar 18 08:11:59 1998
++++ configure	Sat Jul  4 12:00:56 1998
+@@ -2506,6 +2506,11 @@
+   echo "$ac_t""no" 1>&6
+ fi
+ 
++case "$host" in
++	i386-*-freebsd*)
++		echo "skipping libresolv checks for $host"
++		;;
++	*)
+ echo $ac_n "checking for inet_aton in -lresolv""... $ac_c" 1>&6
+ echo "configure:2511: checking for inet_aton in -lresolv" >&5
+ ac_lib_var=`echo resolv'_'inet_aton | sed 'y%./+-%__p_%'`
+@@ -2635,6 +2640,8 @@
+   echo "$ac_t""no" 1>&6
+ fi
+ 
++		;;
++esac
+ echo $ac_n "checking for main in -lm""... $ac_c" 1>&6
+ echo "configure:2640: checking for main in -lm" >&5
+ ac_lib_var=`echo m'_'main | sed 'y%./+-%__p_%'`

@@ -1,0 +1,13 @@
+*** configure.in-dist	Wed Aug  4 21:36:34 1999
+--- configure.in	Wed Aug  4 21:47:21 1999
+***************
+*** 1432,1437 ****
+--- 1432,1439 ----
+  dnl This causes -lresolv to get used in subsequent tests,
+  dnl which causes failures on some systems such as HPUX 9.
+  dnl AC_CHECK_LIB(resolv, gethostbyname)
++ ac_inet6_LDFLAGS="$LDFLAGS" LDFLAGS="$LDFLAGS -L/usr/local/v6/lib"
++ AC_CHECK_LIB(inet6, getaddrinfo, , LDFLAGS="$ac_inet6_LDFLAGS")
+  
+  dnl FIXME replace main with a function we actually want from this library.
+  AC_CHECK_LIB(Xbsd, main, LD_SWITCH_X_SITE="$LD_SWITCH_X_SITE -lXbsd")

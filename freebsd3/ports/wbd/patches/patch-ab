@@ -1,0 +1,19 @@
+*** Makefile.in.orig	Tue Mar 16 15:38:28 1999
+--- Makefile.in		Tue Mar 16 15:34:30 1999
+***************
+*** 26,32 ****
+  
+  # tcl2c comes from Ron Frederick's (Xerox) nv distribution.
+  tcl2c: tcl2c.o
+! 	$(CC) $(CFLAGS) tcl2c.o $(LIBS) -o tcl2c
+  
+  # Tcl library files are turned into a single object file.
+  tcllibs.c: $(TCL_FILES) tcl2c
+--- 26,32 ----
+  
+  # tcl2c comes from Ron Frederick's (Xerox) nv distribution.
+  tcl2c: tcl2c.o
+! 	$(CC) $(CFLAGS) tcl2c.o $(LIBS) $(XLIBS) -o tcl2c
+  
+  # Tcl library files are turned into a single object file.
+  tcllibs.c: $(TCL_FILES) tcl2c

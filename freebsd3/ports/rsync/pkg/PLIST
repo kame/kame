@@ -1,0 +1,5 @@
+bin/rsync
+share/doc/rsync/README
+share/doc/rsync/COPYING
+share/doc/rsync/tech_report.tex
+@dirrm share/doc/rsync

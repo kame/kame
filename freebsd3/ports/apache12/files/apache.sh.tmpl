@@ -1,0 +1,25 @@
+#!/bin/sh
+#
+
+case "$1" in
+
+start)
+	if [ -x PREFIX/sbin/httpd ]
+	then
+		PREFIX/sbin/httpd && echo -n ' httpd'
+	fi
+	;;
+
+stop)
+	if [ -r /var/run/httpd.pid ]
+	then
+		kill -TERM `cat /var/run/httpd.pid` && echo -n ' httpd'
+	fi
+	;;
+
+*)
+	echo "usage: $0 {start|stop}" 1>&2
+	exit 64
+	;;
+
+esac
