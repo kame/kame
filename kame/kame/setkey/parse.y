@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: parse.y,v 1.17 2000/03/06 22:15:55 sakane Exp $ */
+/* KAME $Id: parse.y,v 1.18 2000/04/24 19:01:53 sakane Exp $ */
 
 %{
 #include <sys/types.h>
@@ -436,6 +436,14 @@ sp_selector_spec
 				if (_INPORTBYSA(p_src) != IPSEC_PORT_ANY
 				 || _INPORTBYSA(p_dst) != IPSEC_PORT_ANY) {
 					yyerror("port number must be \"any\".");
+					return -1;
+				}
+				if ((pp_addr->sa_family == AF_INET6
+				  && p_upper == IPPROTO_ICMP)
+				 || (pp_addr->sa_family == AF_INET
+				  && p_upper == IPPROTO_ICMPV6)) {
+					yyerror("upper layer protocol "
+						"mismatched.\n");
 					return -1;
 				}
 				break;
