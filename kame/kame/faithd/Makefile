@@ -20,8 +20,6 @@ BINDIR=	${PREFIX}/sbin
 PROG=	faithd
 SRCS=	faithd.c tcp.c ftp.c prefix.c
 
-#CFLAGS+= -DFAITH4
-
 .if (${OPSYS} != "NetBSD")
 CFLAGS+= -Wall
 .endif
