@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.129 2004/01/16 04:33:29 keiichi Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.130 2004/01/16 04:58:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -155,6 +155,7 @@ ip6_forward(m, srcrt)
 	u_int32_t dstzone;
 #ifdef IPSEC
 	struct secpolicy *sp = NULL;
+	int ipsecrt = 0;
 #endif
 #ifdef MIP6
 	int tunnel_out = 0;
@@ -394,16 +395,28 @@ ip6_forward(m, srcrt)
 		return;
 	}
 
-	/*
-	 * now tunnel mode headers are added.  we are originating packet
-	 * instead of forwarding the packet.  
-	 */
+	if (ip6 != mtod(m, struct ip6_hdr *)) {
+		/*
+		 * now tunnel mode headers are added.  we are originating
+		 * packet instead of forwarding the packet.  
+		 */
 #if defined(__FreeBSD__) && __FreeBSD_version >= 480000
-	ip6_output(m, NULL, NULL, IPV6_FORWARDING/*XXX*/, NULL, NULL, NULL);
+		ip6_output(m, NULL, NULL, IPV6_FORWARDING/*XXX*/, NULL, NULL, NULL);
 #else
-	ip6_output(m, NULL, NULL, IPV6_FORWARDING/*XXX*/, NULL, NULL);
+		ip6_output(m, NULL, NULL, IPV6_FORWARDING/*XXX*/, NULL, NULL);
 #endif
-	return;
+		return;
+	}
+
+	/* adjust pointer */
+	if (ip6_getpktaddrs(m, &sa6_src, &sa6_dst)) {
+		m_freem(m);
+		return;
+	}
+	dst = (struct sockaddr_in6 *)state.dst;
+	rt = state.ro ? state.ro->ro_rt : NULL;
+	if (dst != NULL && rt != NULL)
+		ipsecrt = 1;
     }
     skip_ipsec:
 #endif /* IPSEC */
@@ -469,6 +482,11 @@ ip6_forward(m, srcrt)
 		}
 	}
 #endif /* MIP6 && MIP6_HOME_AGENT */
+
+#ifdef IPSEC
+	if (ipsecrt)
+		goto skip_routing;
+#endif
 
 	dst = (struct sockaddr_in6 *)&ip6_forward_rt.ro_dst;
 	if (!srcrt) {
@@ -552,7 +570,11 @@ ip6_forward(m, srcrt)
 		m_freem(m);
 		return;
 	}
-	if (sa6_src.sin6_scope_id != dstzone) {
+	if (sa6_src.sin6_scope_id != dstzone
+#ifdef IPSEC
+	    && !ipsecrt
+#endif
+	    ) {
 		ip6stat.ip6s_cantforward++;
 		ip6stat.ip6s_badscope++;
 		in6_ifstat_inc(rt->rt_ifp, ifs6_in_discard);
@@ -643,6 +665,9 @@ ip6_forward(m, srcrt)
 	 * modified by a redirect.
 	 */
 	if (rt->rt_ifp == m->m_pkthdr.rcvif && !srcrt && ip6_sendredirects &&
+#ifdef IPSEC
+	    !ipsecrt &&
+#endif
 #ifdef MIP6
 	    !tunnel_out &&
 #endif
