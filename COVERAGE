@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.85 2000/12/02 09:36:40 itojun Exp $
+$KAME: COVERAGE,v 1.86 2000/12/02 17:54:18 itojun Exp $
 
 
 x: supported/integrated
@@ -8,13 +8,13 @@ x: supported/integrated
 
 
 		KAME
-		net5	open28	free228	free35	free42	bsdi31	bsdi41
+		net15	open28	free228	free35	free42	bsdi31	bsdi41
 		--	--	--	--	--	--	--
 TCP/UDP		see IMPLEMENTATION for details
 
 ALTQ		x	x	x	x	x	-	-
 
-IPsec		-	(*1)	x	x	x	x	x
+IPsec		x	(*1)	x	x	x	x	x
     (*1) OpenBSD IPsec is available for IPv4 IPsec.  no IPv6 IPsec.
 
 NAT/PT		-	(*1)	x	(*1)	?	(*1)	(*1)
@@ -44,6 +44,14 @@ IPv6 PMTUD DoS prevention
 	 table.  PMTUD does not work for other random protocols like ping6.
     (*2) validates ICMPv6 too big by presense of cloned route.  subject to
 	 local DoS.
+
+CMSG_ALIGN	sysctl	ALIGN	ALIGN	ALIGN	ALIGN	ALIGN	ALIGN
+			(*1)	(*1)	(*1)	(*2)	(*1)	(*1)
+    (*1) has namespace pollution bug, KAME PR 230.
+    (*2) requires separate inclusion of machine/param.h.
+    (all) backward binary compatibility for old code that uses old CMSG_xx
+	  is not provided (yet).
+
 
 
 
@@ -132,10 +140,6 @@ icmp6 beyondscope
 
 ping6 with short -s
 		x	x	x	-	-	-	-
-
-old/new mrt6msg (old: overlay with ip6 header, new: with MLD6 header)
-		new	(*1)	(*1)	(*1)	(*1)	(*1)	(*1)
-    (*1) supports both new/old mrt6msg, to provide binary backward compat
 
 CMSG_ALIGN	ALIGN	sysctl	ALIGN	ALIGN	sysctl	ALIGN	ALIGN
 		(*1)		(*1)	(*2)		(*1)	(*2)
