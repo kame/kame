@@ -98,7 +98,6 @@ void			 pf_init_ruleset(struct pf_ruleset *);
 void			 pf_mv_pool(struct pf_palist *, struct pf_palist *);
 void			 pf_empty_pool(struct pf_palist *);
 int			 pfioctl(dev_t, u_long, caddr_t, int, struct proc *);
-void			 pf_tag_purge(void);
 
 #ifdef __FreeBSD__
 #define splsoftnet()	splnet()
