@@ -1,12 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.283 1999/11/22 10:20:14 itojun Exp $
+$Id: CHANGELOG,v 1.284 1999/11/22 15:28:25 itojun Exp $
 
 <199911>
 Mon Nov 22 19:19:31 JST 1999  itojun@iijlab.net
 	* kame/sys/netinet6/*.h, */usr.bin/netstat: use u_quad_t for all
 	  IPv6/IPsec stat fields.
 	  NOTE: be sure to update /usr/include before userland recompilation.
+	  also be sure to update both kernel and netstat(1).
 
 Sun Nov 21 22:01:25 JST 1999  itojun@iijlab.net
 	* openbsd/sbin/ifconfig/ifconfig.c: support KAME scopeid hack.
