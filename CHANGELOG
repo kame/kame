@@ -1,14 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2601 2004/05/13 15:55:12 jinmei Exp $
+$KAME: CHANGELOG,v 1.2602 2004/05/14 02:31:45 jinmei Exp $
 
 <200405>
 2004-05-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: added a set of bug fixes and cleanups based on
-	comments from Hiro Muraji:
+	comments and patches from Hiro Muraji:
 	- avoided casting when pointers can be unnaturally aligned,
 	  for alignment sensitive architectures
 	- fixed the bug that IA_PD sub options were not correctly
 	  recognized when more than one option was provided
+	- fixed the bug that dhcp6s could crash when three or more
+	  domain-name(-servers) were specified in separate option statements.
 	- dropped DHCPv6 packets when IA_PD_PREFIX appears outside of
 	  IA_PD (this seems to be a saner behavior)
 	- corrected some log message formats
