@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.71 2003/10/06 02:28:15 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.72 2003/10/06 02:31:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -56,6 +56,7 @@
 #ifdef HAVE_POLL_H
 #include <poll.h>
 #endif
+#include <pwd.h>
 
 #include "rtsold.h"
 
