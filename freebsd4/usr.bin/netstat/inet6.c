@@ -512,8 +512,8 @@ ip6_stats(off, name)
 		}
 	}
 
-	p1(ip6s_forward_cachehit, "\t%qu forward cache hit\n");
-	p1(ip6s_forward_cachemiss, "\t%qu forward cache miss\n");
+	p1(ip6s_forward_cachehit, "\t%llu forward cache hit\n");
+	p1(ip6s_forward_cachemiss, "\t%llu forward cache miss\n");
 #undef p
 #undef p1
 }
