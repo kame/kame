@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.40 2000/06/04 09:01:06 itojun Exp $
+$Id: COVERAGE,v 1.41 2000/06/12 10:59:00 itojun Exp $
 
 
 x: supported/integrated
@@ -47,8 +47,8 @@ KAME IPv6 as of	latest	late	late	early	notyet	late	early
 	"late feb2000 - 2292bis".
 
 KAME IPsec as of
-		latest	late	-	early	notyet	-	early
-			jan00		nov99			nov99
+		latest	mid	-	early	notyet	-	early
+			june00		nov99			nov99
 
 TCP/UDP		see IMPLEMENTATION for details
 
