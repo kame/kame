@@ -1,4 +1,4 @@
-/*	$KAME: sctp_input.c,v 1.20 2004/01/19 03:52:07 itojun Exp $	*/
+/*	$KAME: sctp_input.c,v 1.21 2004/01/19 03:58:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -3456,7 +3456,7 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 #ifdef SCTP_TCP_MODEL_SUPPORT
 			} else if (inp->sctp_flags & SCTP_PCB_FLAGS_ACCEPTING) {
 				/* we are accepting so check limits for TCP */
-				if (inp->sctp_socket->so_qlen <=
+				if (inp->sctp_socket->so_qlen >
 				    inp->sctp_socket->so_qlimit) {
 					/* no space */
 					struct mbuf *oper;
@@ -3464,6 +3464,9 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 					oper = NULL;
 					MGETHDR(oper, M_DONTWAIT, MT_HEADER);
 					if (oper) {
+						oper->m_len =
+						    oper->m_pkthdr.len =
+						    sizeof(struct sctp_paramhdr);
 						phdr = mtod(oper,
 						    struct sctp_paramhdr *);
 						phdr->param_type =
