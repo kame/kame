@@ -1,4 +1,4 @@
-/*	$KAME: pfkey_dump.c,v 1.22 2000/09/12 07:10:53 itojun Exp $	*/
+/*	$KAME: pfkey_dump.c,v 1.23 2000/10/16 08:03:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -134,9 +134,15 @@ static struct val2str str_alg_auth[] = {
 	{ SADB_AALG_NONE, "none", },
 	{ SADB_AALG_MD5HMAC, "hmac-md5", },
 	{ SADB_AALG_SHA1HMAC, "hmac-sha1", },
+#ifdef SADB_X_AALG_MD5
 	{ SADB_X_AALG_MD5, "md5", },
+#endif
+#ifdef SADB_X_AALG_SHA
 	{ SADB_X_AALG_SHA, "sha", },
+#endif
+#ifdef SADB_X_AALG_NULL
 	{ SADB_X_AALG_NULL, "null", },
+#endif
 	{ -1, NULL, },
 };
 
@@ -148,8 +154,12 @@ static struct val2str str_alg_enc[] = {
 #ifdef SADB_X_EALG_RC5CBC
 	{ SADB_X_EALG_RC5CBC, "rc5-cbc", },
 #endif
+#ifdef SADB_X_EALG_CAST128CBC
 	{ SADB_X_EALG_CAST128CBC, "cast128-cbc", },
+#endif
+#ifdef SADB_X_EALG_BLOWFISHCBC
 	{ SADB_X_EALG_BLOWFISHCBC, "blowfish-cbc", },
+#endif
 #ifdef SADB_X_EALG_RIJNDAELCBC
 	{ SADB_X_EALG_RIJNDAELCBC, "rijndael-cbc", },
 #endif
