@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.613 2000/02/24 18:20:57 itojun Exp $
+$Id: CHANGELOG,v 1.614 2000/02/25 02:44:26 jinmei Exp $
 
 <200002>
+2000-02-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* {(net|open)bsd, freebsd3}/sys/netinet/tcp_input.c:
+	* kame/sys/netinet6/tcp6_input.c:
+	prevented from storing 2292bis IPv6 options in a listening
+	socket. It was meaningless and even harmful for applications.
+
 2000-02-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	RFC2292bis support:
 	* bsdi4/sys/netinet/tcp_output.c (tcp_output): 	
