@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.52 2001/07/24 08:06:37 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.53 2001/07/26 08:16:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -34,7 +34,13 @@
 
 /*
  * OS dependencies:
- *
+ * - RTFREE()
+ *   bsdi does not escape this macro using do-clause, so it is recommended
+ *   to escape the macro explicitly.
+ *   e.g.
+ *	if (rt) {		/* need the brace */
+ *		RTFREE();
+ *	}			/* need the brace */
  * - whether the IPv4 input routine convert the byte order of some fileds
  *   of the IP header (x: convert to the host byte order, s: strip the header
  *   length for possible reassembly)
