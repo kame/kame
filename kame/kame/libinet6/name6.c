@@ -1,4 +1,4 @@
-/* $Id: name6.c,v 1.11 2000/01/02 13:56:38 itojun Exp $ */
+/* $Id: name6.c,v 1.12 2000/01/17 04:38:18 itojun Exp $ */
 /*
  *	Atsushi Onoe <onoe@sm.sony.co.jp>
  */
@@ -16,7 +16,7 @@
 #endif
 
 #ifdef HAVE_CONFIG_H
-#include "config.h"
+#include <config.h>
 #endif 
 
 #include <sys/param.h>
