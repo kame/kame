@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.23 2004/05/23 15:37:59 suz Exp $
+ * $KAME: mld6v2_proto.c,v 1.24 2004/05/31 12:01:39 suz Exp $
  */
 
 /*
@@ -215,8 +215,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
     if (local_address(src) != NO_VIF)
 	return;
 
-    if ((vifi = find_vif_direct(src)) == NO_VIF)
-    {
+    if ((vifi = find_vif_direct(src)) == NO_VIF) {
 	IF_DEBUG(DEBUG_MLD)
 	    log_msg(LOG_INFO, 0, "accept_listenerv2_query: can't find a vif");
 	return;
@@ -226,8 +225,8 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 
     if ((v->uv_mld_version & MLDv2) == 0) {
 	log_msg(LOG_WARNING, 0,
-	    "Mif %s configured in MLDv1 received MLDv2 query (src %s),ignored",
-	    v->uv_name,sa6_fmt(src));
+	    "Mif %s configured in MLDv1 received MLDv2 query (src %s), ignored",
+	    v->uv_name, sa6_fmt(src));
 	return;
     }
 
@@ -250,37 +249,33 @@ accept_listenerV2_query(src, dst, query_message, datalen)
     IF_DEBUG(DEBUG_MLD)
 	log_msg(LOG_DEBUG, 0,
 	    "accepting multicast listener query V2 on %s: "
-	    "src %s, dst %s, grp %s\n\t     sflag : %s,robustness : %d,qqi : %d maxrd :%d",
+	    "src %s, dst %s, grp %s\n"
+	    "\t     sflag : %s,robustness : %d,qqi : %d maxrd :%d",
 	    v->uv_name, sa6_fmt(src), inet6_fmt(dst), inet6_fmt(group),
 	    sflag ? "YES" : "NO", qrv, qqi, tmo);
 
     /*
-     * According to rfc 2710 : when a query received from a router with a
-     * lower IPv6 address than me  :   - start other Querier present. 
-     *                       -pass (or stay in the Non Querier state .
+     * According to RFC2710 : when a query received from a router with a
+     * lower IPv6 address than me  : 
+     *   - start other Querier present. 
+     *   - pass (or stay in the Non Querier state) .
      */
 
-    if (inet6_lessthan(src, &v->uv_linklocal->pa_addr))
-    {
-	IF_DEBUG(DEBUG_MLD) if (!inet6_equal(src, &v->uv_querier->al_addr))
-	    log_msg(LOG_DEBUG, 0, "new querier %s (was %s) "
-		"on vif %d",
-		sa6_fmt(src), sa6_fmt(&v->uv_querier->al_addr), vifi);
+    if (inet6_lessthan(src, &v->uv_linklocal->pa_addr)) {
+	IF_DEBUG(DEBUG_MLD)
+	    if (!inet6_equal(src, &v->uv_querier->al_addr))
+	    	log_msg(LOG_DEBUG, 0, "new querier %s (was %s) on vif %d",
+			sa6_fmt(src), sa6_fmt(&v->uv_querier->al_addr), vifi);
 
-	/*
-	 * I'm not the querier anymore 
-	 */
+	/* I'm not the querier anymore */
 	v->uv_flags &= ~VIFF_QUERIER;
 	v->uv_querier->al_addr = *src;
-	SET_TIMER(v->uv_querier->al_timer,
-		  MLD6_OTHER_QUERIER_PRESENT_INTERVAL);
+	SET_TIMER(v->uv_querier->al_timer, MLD6_OTHER_QUERIER_PRESENT_INTERVAL);
 	time(&v->uv_querier->al_ctime);
     }
     /*
      * else nothing : the new router will receive a query one day... 
      */
-
-
 
     /*
      * Ignore the query if we're (still) the querier.
@@ -293,15 +288,13 @@ accept_listenerV2_query(src, dst, query_message, datalen)
      * routers adopt the most recent value of QRV and QQI unless 
      * this value is null
      */
-    if (qrv != 0)
-    {
+    if (qrv != 0) {
 	v->uv_mld_robustness = qrv;
 	IF_DEBUG(DEBUG_MLD)
 	    log_msg(LOG_DEBUG, 0, "New Qrv adopted : %d",
 		v->uv_mld_robustness);
     }
-    if (qqi != 0)
-    {
+    if (qqi != 0) {
 	v->uv_mld_query_interval = qqi;
 	IF_DEBUG(DEBUG_MLD)
 	    log_msg(LOG_DEBUG, 0, "New Qqi adopted : %d", v->uv_mld_query_interval);
