@@ -249,13 +249,14 @@ freeaddrinfo(ai)
 {
 	struct addrinfo *next;
 
-	do {
+	while (ai) {
 		next = ai->ai_next;
 		if (ai->ai_canonname)
 			free(ai->ai_canonname);
 		/* no need to free(ai->ai_addr) */
 		free(ai);
-	} while ((ai = next) != NULL);
+		ai = next;
+	}
 }
 
 static int
