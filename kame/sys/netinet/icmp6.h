@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.67 2002/01/11 18:57:26 jinmei Exp $	*/
+/*	$KAME: icmp6.h,v 1.68 2002/01/12 02:13:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -473,9 +473,11 @@ struct icmp6_nodeinfo {
 #if BYTE_ORDER == BIG_ENDIAN
 #define NI_SUPTYPE_FLAG_COMPRESS	0x1
 #define NI_FQDN_FLAG_VALIDTTL		0x1
+#define NI_NODENAME_FLAG_VALIDTTL	0x1
 #elif BYTE_ORDER == LITTLE_ENDIAN
 #define NI_SUPTYPE_FLAG_COMPRESS	0x0100
 #define NI_FQDN_FLAG_VALIDTTL		0x0100
+#define NI_NODENAME_FLAG_VALIDTTL	0x0100
 #endif
 
 #ifdef NAME_LOOKUPS_04
@@ -519,6 +521,10 @@ struct ni_reply_fqdn {
 	u_int8_t ni_fqdn_namelen; /* length in octets of the FQDN */
 	u_int8_t ni_fqdn_name[3]; /* XXX: alignment */
 } __attribute__((__packed__));
+#define ni_reply_nodename ni_reply_fqdn
+#define ni_nodename_ttl ni_fqdn_ttl
+#define ni_nodename_namelen ni_fqdn_namelen
+#define ni_nodename_name ni_fqdn_name
 
 /*
  * Router Renumbering. as router-renum-08.txt
