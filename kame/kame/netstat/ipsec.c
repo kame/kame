@@ -1,5 +1,5 @@
 /*	$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $	*/
-/*	$KAME: ipsec.c,v 1.25 2001/03/12 09:04:39 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.26 2001/08/05 20:23:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -97,6 +97,7 @@ __RCSID("$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $");
  */
 #ifdef __bsdi__
 #define plural(x)	PLURAL(x)
+#define plurales(x)	PLURALES(x)
 #endif
 /*
  * XXX see PORTABILITY for the twist
@@ -231,6 +232,8 @@ print_ipsecstats()
 {
 #define	p(f, m) if (ipsecstat.f || sflag <= 1) \
     printf(m, (CAST)ipsecstat.f, plural(ipsecstat.f))
+#define	pes(f, m) if (ipsecstat.f || sflag <= 1) \
+    printf(m, (CAST)ipsecstat.f, plurales(ipsecstat.f))
 #define hist(f, n, t) \
     ipsec_hist((f), sizeof(f)/sizeof(f[0]), (n), sizeof(n)/sizeof(n[0]), (t));
 
@@ -259,7 +262,10 @@ print_ipsecstats()
 	hist(ipsecstat.out_ahhist, ipsec_ahnames, "AH output");
 	hist(ipsecstat.out_esphist, ipsec_espnames, "ESP output");
 	hist(ipsecstat.out_comphist, ipsec_compnames, "IPComp output");
+	p(spdcachelookup, "\t" LLU " SPD cache lookup%s\n");
+	pes(spdcachemiss, "\t" LLU " SPD cache miss%s\n");
 #undef p
+#undef pes
 #undef hist
 }
 
