@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.31 2000/06/12 03:28:01 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.32 2001/01/15 05:42:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -76,6 +76,7 @@ const int niflags = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
 #else
 const int niflags = NI_NUMERICHOST | NI_NUMERICSERV;
 #endif
+int signo = 0;
 
 static void usage __P((void));
 static int config_dnsserv __P((const char *));
@@ -86,7 +87,7 @@ static int join __P((int, int, const char *));
 static int join0 __P((int, const struct addrinfo *));
 static int setif __P((int, int, const char *));
 static int iscanon __P((const char *));
-static RETSIGTYPE status __P((int));
+static RETSIGTYPE sighandler __P((int));
 
 int
 main(argc, argv)
@@ -276,7 +277,7 @@ main(argc, argv)
 	}
 	dprintf("hostname=\"%s\"\n", hostname);
 
-	signal(SIGUSR1, status);
+	signal(SIGUSR1, sighandler);
 
 	if (!fflag) {
 		daemon(0, 0);
@@ -711,12 +712,18 @@ ismyaddr(sa)
 	return ret;
 }
 
+static RETSIGTYPE
+sighandler(sig)
+	int sig;
+{
+	signo = sig;
+}
+
 /*
  * NOTE: ctime(3) appends \n to output
  */
-static RETSIGTYPE
-status(sig)
-	int sig;
+void
+status()
 {
 	FILE *fp;
 	time_t t;
