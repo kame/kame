@@ -1,4 +1,4 @@
-/*	$KAME: addrselect.c,v 1.4 2001/09/26 14:39:06 jinmei Exp $	*/
+/*	$KAME: addrselect.c,v 1.5 2001/09/26 14:39:30 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -487,7 +487,7 @@ find_policy(key)
 static void
 usage()
 {
-	fprintf(stderr, "usage: addrselect -c configfile\n");
+	fprintf(stderr, "usage: addrselect -c <configfile>\n");
 	fprintf(stderr, "       addrselect [show]\n");
 	fprintf(stderr, "       addrselect add "
 		"<prefix> <precedence> <label>\n");
