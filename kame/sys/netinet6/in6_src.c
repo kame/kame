@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.10 2000/03/28 09:02:23 k-sugyou Exp $	*/
+/*	$KAME: in6_src.c,v 1.11 2000/03/30 13:34:00 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -80,7 +80,9 @@
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #include <sys/ioctl.h>
+#endif
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <sys/proc.h>
