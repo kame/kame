@@ -74,6 +74,7 @@ __KERNEL_RCSID(0, "$NetBSD: in_proto.c,v 1.55 2002/03/04 13:24:12 sommerfeld Exp
 #include "opt_inet.h"
 #include "opt_ipsec.h"
 #include "opt_sctp.h"
+#include "opt_dccp.h"
 
 #include <sys/param.h>
 #include <sys/socket.h>
@@ -157,6 +158,11 @@ __KERNEL_RCSID(0, "$NetBSD: in_proto.c,v 1.55 2002/03/04 13:24:12 sommerfeld Exp
 #include <netinet/sctp_var.h>
 #endif /* SCTP */
 
+#ifdef DCCP
+#include <netinet/dccp.h>
+#include <netinet/dccp_var.h>
+#endif /* DCCP */
+
 extern	struct domain inetdomain;
 
 struct protosw inetsw[] = {
@@ -198,6 +204,14 @@ struct protosw inetsw[] = {
   0,		0,		0,		sctp_drain,	0
 },
 #endif /* SCTP */
+#ifdef DCCP
+{ SOCK_DGRAM,	&inetdomain,	IPPROTO_DCCP,
+	PR_CONNREQUIRED|PR_WANTRCVD|PR_ATOMIC|PR_LISTEN|PR_ABRTACPTDIS,
+  dccp_input,	0,		dccp_ctlinput,	dccp_ctloutput,
+  dccp_usrreq,
+  dccp_init,	0,              0,              0,		dccp_sysctl
+},
+#endif /* DCCP */
 { SOCK_RAW,	&inetdomain,	IPPROTO_RAW,	PR_ATOMIC|PR_ADDR,
   rip_input,	rip_output,	rip_ctlinput,	rip_ctloutput,
   rip_usrreq,
