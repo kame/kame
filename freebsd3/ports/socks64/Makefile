@@ -3,7 +3,7 @@
 # Date created:				24 Apr 1996
 # Whom:					pst
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:10:36 itojun Exp $
+# $Id: Makefile,v 1.2 1999/12/28 04:34:52 sumikawa Exp $
 #
 
 DISTNAME=	socks5-v1.0r8
@@ -40,21 +40,17 @@ CONFIGURE_ARGS=	--with-libconffile=${PREFIX}/etc/libsocks5.conf \
 MAN1=		runsocks.1 socks5.1 stopsocks.1 socks5_clients.1
 MAN5=		libsocks5.conf.5 socks5.conf.5
 
-pre-fetch:
-	@if [ ! -f ${DISTDIR}/${DISTNAME}${EXTRACT_SUFX} ]; then \
-	  ${ECHO} ""; \
-	  ${ECHO} "NEC requires that you grab the dist files from their"; \
-	  ${ECHO} "web site at http://www.socks.nec.com.  Please make sure"; \
-	  ${ECHO} "you have ${DISTNAME}${EXTRACT_SUFX} in ${DISTDIR}"; \
-	  ${ECHO} "and run make again."; \
-	  ${ECHO} ""; \
-	  exit 1;\
-	fi
+.include <bsd.port.pre.mk>
+
+.if !exists(${DISTDIR}/${DISTNAME}${EXTRACT_SUFX})
+IGNORE=		NEC requires that you grab the dist files from their \
+		web site at http://www.socks.nec.com.  Please make sure \
+		you have ${DISTNAME}${EXTRACT_SUFX} in ${DISTDIR} \
+		and run make again.
+.endif
 
 post-patch:
 	@(cd ${WRKDIR}; ${PATCH} ${PATCH_DIST_ARGS} < socks64.diff)
-
-.include <bsd.port.mk>
 
 # the following need to be included after bsd.port.mk, since OPSYS
 # ARCH are defined in bsd.port.mk
@@ -69,3 +65,5 @@ CONFIGURE_ENV=  LIBS=-lcrypt
 post-install:
 	ldconfig -m ${PREFIX}/lib
 .endif
+
+.include <bsd.port.post.mk>
