@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.44 2000/06/02 12:14:50 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.45 2000/06/05 00:41:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -278,10 +278,14 @@ in6_pcbbind(in6p, nam)
 			}
 		}
 		if (lport) {
+			int priv;
+#ifdef __NetBSD__
+			priv = (p && !suser(p->p_ucred, &p->p_acflag)) ? 1 : 0;
+#else
+			priv = (so->so_state & SS_PRIV) ? 1 : 0;
+#endif
 			/* GROSS */
-			if (ntohs(lport) < IPV6PORT_RESERVED &&
-			    (p == 0 ||
-			     (error = suser(p->p_ucred, &p->p_acflag))))
+			if (ntohs(lport) < IPV6PORT_RESERVED && !priv)
 				return(EACCES);
 
 			if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr)) {
