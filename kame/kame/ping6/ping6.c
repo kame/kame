@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.126 2001/05/17 03:39:08 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.127 2001/06/07 11:52:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -258,7 +258,7 @@ void	 onsignal __P((int));
 void	 retransmit __P((void));
 void	 onint __P((int));
 size_t	 pingerlen __P((void));
-void	 pinger __P((void));
+int	 pinger __P((void));
 const char *pr_addr __P((struct sockaddr *, int));
 void	 pr_icmph __P((struct icmp6_hdr *, u_char *));
 void	 pr_iph __P((struct ip6_hdr *));
@@ -975,7 +975,7 @@ main(argc, argv)
 	printf("%s\n", pr_addr((struct sockaddr *)&dst, sizeof(dst)));
 
 	while (preload--)		/* Fire off them quickies. */
-		pinger();
+		(void)pinger();
 
 	(void)signal(SIGINT, onsignal);
 #ifdef SIGINFO
@@ -1025,7 +1025,7 @@ main(argc, argv)
 #endif
 
 		if (options & F_FLOOD) {
-			pinger();
+			(void)pinger();
 			timeout.tv_sec = 0;
 			timeout.tv_usec = 10000;
 			tv = &timeout;
@@ -1120,10 +1120,8 @@ retransmit()
 {
 	struct itimerval itimer;
 
-	if (!npackets || ntransmitted < npackets) {
-		pinger();
+	if (pinger() == 0)
 		return;
-	}
 
 	/*
 	 * If we're not transmitting any more packets, change the timer
@@ -1172,7 +1170,7 @@ pingerlen()
 	return l;
 }
 
-void
+int
 pinger()
 {
 	struct icmp6_hdr *icp;
@@ -1180,6 +1178,9 @@ pinger()
 	int i, cc;
 	struct icmp6_nodeinfo *nip;
 	int seq;
+
+	if (npackets && ntransmitted >= npackets)
+		return(-1);	/* no more transmission */
 
 	icp = (struct icmp6_hdr *)outpack;
 	nip = (struct icmp6_nodeinfo *)outpack;
@@ -1275,6 +1276,8 @@ pinger()
 	}
 	if (!(options & F_QUIET) && options & F_FLOOD)
 		(void)write(STDOUT_FILENO, &DOT, 1);
+
+	return(0);
 }
 
 int
