@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.688 2000/03/13 05:20:04 itojun Exp $
+$Id: CHANGELOG,v 1.689 2000/03/13 10:38:27 sakane Exp $
 
 <200003>
+Mon Mar 13 19:36:55 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	Add "strict_address" in listen directive.  It requires all addresses
+	for ISAKMP to be bound.
+
 Mon Mar 13 14:09:54 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/{tcpdump,libpcap}, freebsd2/ports/{tcpdump,libpcap}:
 	  upgrade to 20000228.
