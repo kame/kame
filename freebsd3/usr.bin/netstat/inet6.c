@@ -847,6 +847,7 @@ icmp6_stats(off, name)
 
 #define	p(f, m) if (icmp6stat.f || sflag <= 1) \
     printf(m, icmp6stat.f, plural(icmp6stat.f))
+#define p_5(f, m) printf(m, icmp6stat.f)
 
 	p(icp6s_error, "\t%qu call%s to icmp6_error\n");
 	p(icp6s_canterror,
@@ -875,6 +876,21 @@ icmp6_stats(off, name)
 			printf("\t\t%s: %qu\n", icmp6names[i],
 				icmp6stat.icp6s_inhist[i]);
 		}
+	printf("\tHistgram of error messages to be generated:\n");
+	p_5(icp6s_odst_unreach_noroute, "\t\t%qu no route\n");
+	p_5(icp6s_odst_unreach_admin, "\t\t%qu administratively prohibited\n");
+	p_5(icp6s_odst_unreach_beyondscope, "\t\t%qu beyond scope\n");
+	p_5(icp6s_odst_unreach_addr, "\t\t%qu address unreachable\n");
+	p_5(icp6s_odst_unreach_noport, "\t\t%qu port unreachable\n");
+	p_5(icp6s_opacket_too_big, "\t\t%qu packet too big\n");
+	p_5(icp6s_otime_exceed_transit, "\t\t%qu time exceed transit\n");
+	p_5(icp6s_otime_exceed_reassembly, "\t\t%qu time exceed reassembly\n");
+	p_5(icp6s_oparamprob_header, "\t\t%qu erroneous header field\n");
+	p_5(icp6s_oparamprob_nextheader, "\t\t%qu unrecognized next header\n");
+	p_5(icp6s_oparamprob_option, "\t\t%qu unrecognized option\n");
+	p_5(icp6s_oredirect, "\t\t%qu redirect\n");
+	p_5(icp6s_ounknown, "\t\t%qu unknown\n");
+
 	p(icp6s_reflect, "\t%qu message response%s generated\n");
 #undef p
 #undef p_5
