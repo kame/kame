@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.73 2002/11/11 09:10:46 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.74 2002/11/11 10:43:39 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1279,6 +1279,8 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 	 */
 	if (query_type == MLD_V2_GENERAL_QUERY) {
 		timer_i = timer * PR_FASTHZ / MLD_TIMER_SCALE;
+		if (timer_i == 0)
+			timer_i = 1;
 		timer_i = MLD_RANDOM_DELAY(timer_i);
 		if (mld_interface_timers_are_running &&
 		    (rti->rt6i_timer2 != 0) && (rti->rt6i_timer2 < timer_i)) {
@@ -1295,6 +1297,8 @@ mld_set_timer(ifp, rti, mld, mldlen, query_type)
 		}
 	} else { /* G or SG query */
 		timer_g = timer * PR_FASTHZ / MLD_TIMER_SCALE;
+		if (timer_g == 0)
+			timer_g = 1;
 		timer_g = MLD_RANDOM_DELAY(timer_g);
 #ifdef MLDV2_DEBUG
 		printf("mld_set_timer: set group timer to %d\n", timer_g);
