@@ -139,7 +139,13 @@ main(argc, argv)
 	if (dflag == 0)
 		log_upto = LOG_NOTICE;
 	if (!fflag) {
-		openlog(argv0, LOG_NDELAY|LOG_PID, LOG_DAEMON);
+		char *ident;
+		ident = strrchr(argv0, '/');
+		if (!ident)
+			ident = argv0;
+		else
+			ident++;
+		openlog(ident, LOG_NDELAY|LOG_PID, LOG_DAEMON);
 		if (log_upto >= 0)
 			setlogmask(LOG_UPTO(log_upto));
 	}
