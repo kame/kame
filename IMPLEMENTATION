@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/07 06:19:45 $
+			$Date: 1999/10/08 01:33:22 $
 
 1. IPv6
 
@@ -25,7 +25,7 @@ RFC1639: FTP Operation Over Big Address Records (FOOBAR)
 RFC1886: DNS Extensions to support IPv6
 RFC1933: Transition Mechanisms for IPv6 Hosts and Routers
     * IPv4 compatible address is not supported.
-    * automatic tunnelling (4.3) is not supported.
+    * automatic tunneling (4.3) is not supported.
     * "gif" interface implements IPv[46]-over-IPv[46] tunnel in a generic way,
       and it covers "configured tunnel" described in the spec.
       See 1.5 in this document for details.
@@ -106,7 +106,7 @@ transmission command as admin tool.
 
 If DAD fails, the address will be marked "duplicated" and message will be
 generated to syslog (and usually to console).  The "duplicated" mark
-can be cheked with ifconfig.  It is administrators' responsibility to check
+can be checked with ifconfig.  It is administrators' responsibility to check
 for and recover from DAD failures.
 The behavior should be improved in the near future.
 
@@ -433,8 +433,8 @@ according to DNS.
 
 1.11 Kernel Internals
 
- (*) TCP/UDP part is handled differently between opeating system platforms.
-     See 1.12 for dteails.
+ (*) TCP/UDP part is handled differently between operating system platforms.
+     See 1.12 for details.
 
 The current KAME has escaped from the IPv4 netinet logic.  While
 ip_forward() calls ip_output(), ip6_forward() directly calls
@@ -503,7 +503,7 @@ of IPv6 wildcard bind socket (3.8).  The spec allows you to:
 - Accept IPv4 connections by AF_INET6 wildcard bind socket.
 but it may look complicated spec.
 
-We KAME team have 4 OS platforms right now, and behavior is silghtly
+We KAME team have 4 OS platforms right now, and behavior is slightly
 different between them.  To summarize:
 - All KAME implementations treat tcp/udp port number space separately
   between IPv4 and IPv6.
@@ -565,13 +565,13 @@ Applicsations should use proper socket for connections.  IPv4 connections
 must be made on AF_INET socket, and IPv6 connections must be made
 on AF_INET6 socket.  getaddrinfo() library helps you in writing
 AF-independent application, and managing sockets with different AFs.
-(some of the implementers think that we should totaly get rid of gethostby*
+(some of the implementers think that we should totally get rid of gethostby*
 family of the functions and migrate to get{addr,name}info, since
 it is very clean and helps you support new AFs in the future)
 
 1.12.2 KAME/FreeBSD3x
 
-The platform can be configued to support IPv4 mapped address/special AF_INET6
+The platform can be configured to support IPv4 mapped address/special AF_INET6
 wildcard bind (enabled by default).  If you disable it, it behaves as described
 in 1.12.1.
 
@@ -610,7 +610,7 @@ Here, wildcard bind on AF_INET is regarded as "more specific bind"
 than wildcard bind on AF_INET6.
 In other words, wildcard bind on AF_INET6 is the only thing that
 has special behavior.  It will not affect wildcard bind on AF_INET.
-If the folllowing events happen, IPv4 connection will be routed
+If the following events happen, IPv4 connection will be routed
 to application B, and IPv6 connection will be routed to application A.
 - application A perform wildcard bind on AF_INET6, port X
 - application B perform wildcard bind on AF_INET, port X
@@ -712,7 +712,7 @@ if you are using notebook computers and PCMCIA ethernet card.
 (**) There was some report says that, if you make sr driver up and down and
 then up, the kernel may hang up.  We have disabled frame-relay support from
 sr driver and after that this looks to be working fine.  If you need
-frame-relay support to come back, please contact KAME deverlopers.
+frame-relay support to come back, please contact KAME developers.
 
 2.2 BSD/OS
 
