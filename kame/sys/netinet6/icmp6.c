@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.173 2000/12/12 04:29:44 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.174 2000/12/12 04:31:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2552,7 +2552,9 @@ icmp6_redirect_input(m, off)
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		/*
 		 * do not install redirect route, if the number of entries
-		 * is too much (> hiwat).
+		 * is too much (> hiwat).  note that, the node (= host) will
+		 * work just fine even if we do not install redirect route
+		 * (there will be additional hops, though).
 		 */
 		rtcount = rt_timer_count(icmp6_redirect_timeout_q);
 		if (rtcount > icmp6_redirect_hiwat)
