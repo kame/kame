@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.h,v 1.5 2000/12/02 13:44:40 kjc Exp $	*/
+/*	$KAME: altq_cbq.h,v 1.6 2002/04/03 05:43:44 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -189,7 +189,7 @@ struct cbq_getstats {
 #define	DISABLE		0x00
 #define	ENABLE		0x01
 
-#define	CBQ_WATCHDOG    	(HZ / 20)
+#define	CBQ_WATCHDOG    	(hz / 20)
 #define	CBQ_TIMEOUT		10
 #define	CBQ_LS_TIMEOUT		(20 * hz / 1000)
 
