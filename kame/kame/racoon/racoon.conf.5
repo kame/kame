@@ -124,8 +124,6 @@ other configuration file can be included.
 .\"
 .Ss Identifier Specification
 .Bl -tag -width Ds -compact
-.It Ic identifier Ic vendor_id Ar string ;
-defines Vendor ID.
 .It Ic identifier Ic user_fqdn Ar string ;
 defines my USER_FQDN included ID payload.
 .It Ic identifier Ic fqdn Ar string ;
@@ -198,12 +196,6 @@ It must be stated.
 .It Ic situation Ic identity_only ;
 It must be stated.
 .\"
-.It Ic dh_group Ar group ;
-define the group of Diffie-Hellman exponentiations for aggressive mode.
-.Ar group
-are one of the following:
-.Ic modp768 , modp1024 , modp1536 .
-.\"
 .It Ic identifier Ar idtype ;
 specifies ID type to use phase 1 negotiation.
 .Ar idtype
@@ -260,6 +252,8 @@ define the group of Diffie-Hellman exponentiations.
 .Ar group
 is one of following:
 .Ic modp768 , modp1024 , modp1536 .
+When aggressive mode can be used, DH group must be defined and equal
+to each proposals's.
 .It Ic lifetime time Ar number Ar timeunit ;
 .It Ic lifetime byte Ar number Ar byteunit ;
 define lifetime of phase 1 SA eay proposal.
@@ -268,15 +262,21 @@ define lifetime of phase 1 SA eay proposal.
 .El
 .\"
 .Ss Policy Specifications 
+The policy directive is obsoleted, policies are now in the SPD.
+.\"
+.Ss Sainfo Specifications
 .Bl -tag -width Ds -compact
 .It Xo
-.Ic policy Ar address_range Ar direction Ar action
+.Ic sainfo ( Ar source_id destination_id \*(Ba Ic anonymous )
 .Ic { Ar statements Ic }
 .Xc
-definies a action of matched packet.
-.Ar address_range
-is 
-.Ar source_range Ar destination_range Ar protocol .
+definies the parameters of IKE phase 2 (IPSec-SA establishment).
+.Ar sainfo_ids
+are
+.Ic address Ar address [ /
+.Ar prefix ] [ Ar port ] Ar ul_proto
+or
+.Ar idtype Ar string .
 .Pp
 .Bl -tag -width Ds -compact
 .\"
@@ -286,70 +286,26 @@ define the group of Diffie-Hellman exponentiations.
 is one of following:
 .Ic modp768 , modp1024 , modp1536 .
 .\"
-.It Xo
-.Ic proposal
-.Ic { Ar sub-substatements Ic }
-.Xc
-.Bl -tag -width Ds -compact
+.It Ic lifetime time Ar number Ar timeunit ;
+.It Ic lifetime byte Ar number Ar byteunit ;
+define default lifetime of IPSec-SA.
 .\"
-.It Xo
-.Ic protocol Ar protocol
-.Ic { Ar sub-substatements Ic }
-.Xc
-.Ar protocol
-is one of followins:
-.Ic esp , ah
-or
-.Ic ipcomp .
-.Pp
-.Ic esp
-means
-.Do
-IP Encapsulating Security Payload
-.Dc ,
-RFC 2406.
-.Ic ah
-means
-.Do
-IP Authentication Header
-.Dc ,
-RFC 2402.
-.Ic ipcomp
-means
-.Do
-IP Payload Compression Protocol
-.Dc ,
-RFC 2393.
-.Pp
-.Bl -tag -width Ds -compact
+.It Ic identifier Ar idtype ;
+specifies ID type to use phase 2 negociation.
 .\"
-.It Ic encryption_algorithm Ar algorithm ;
+.It Ic encryption_algorithm Ar algorithms ;
 .Ic des , 3des , des_iv64 , des_iv32 ,
 .Ic rc5 , rc4 , idea , 3idea ,
 .Ic cast128 , blowfish , null_enc
 for esp.
 .\"
-.It Ic authentication_algorithm Ar algorithm ;
+.It Ic authentication_algorithm Ar algorithms ;
 .Ic hmac_md5, hmac_sha1, none
 for esp and ah.
 .\"
-.It Ic level Ar level ;
-.Ar level
-is one of following:
-.Ic use , require ;
-.\"
-.It Ic mode Ar mode Op address ;
-.Ar mode
-is one of following:
-.Ic tunnel , transport .
-.Ic tunnel
-must be with peer's address.
-.\"
-.It Ic lifetime Ar number Ar type ;
-Ar type is one of followings: second or KB.
-But in the case of oakley, KB is not supported now.
-.El
-.El
+.It Ic compression_algorithm Ar algorithms ;
+.Ic deflate
+for ipcomp.
 .El
 .El
 .\"
@@ -425,78 +381,6 @@ remote 172.168.2.2 [7000]
 		# they can be defined explicitly.
 		lifetime time 5 min;
 		lifetime byte 2 MB;
-	}
-}
-.Ed
-.Pp
-The following example shows how policy directives should be configured.
-.Bd -literal -offset
-# Fot example.
-# 10.1.1.0/24                  10.2.2.0/24
-#     --+--                      --+--
-#       |                          |
-#     +-+-+                      +-+-+
-#     | A |==========//==========| B |
-#     +---+                      +-+-+
-#       172.168.1.1      172.168.2.2
-# setting on gateway A:
-
-policy 10.1.1.0/24 10.2.2.0/24 any inout ipsec
-{
-	# "pfs_group" specifies to require PFS, and defines a DH group number.
-	# It is followed by either "modp768", "modp1024" or "modp1536".
-	pfs_group modp768;
-
-	# "proposal" defines proposal of IPsec-SA.
-
-	# This proposal means IP2|ESP|IP1|ULP.
-	proposal {
-		# "lifetime" specifies two type of lifetime of SA.
-		lifetime time 200 second;
-		lifetime byte 5000 KB;
-
-		# "protocol" defines some of trasnform.
-		protocol esp {
-			# "level" can be followed by either "require", "use" or
-			# "default".  "default" is used if there is no "level".
-			level require ;
-
-			# "mode" can be followed by either "tunnel" or "use".
-			# If tunnel mode is specified, peer's address must be
-			# specifyed carefully.
-			mode tunnel 172.168.2.2;
-
-			# algorithm for ESP encryption
-			encryption_algorithm 3des;
-			# algorithm for ESP authentication
-			authentication_algorithm hmac_sha1;
-		}
-	}
-
-	# This proposal means IP2|AH|ESP|IP1|ULP.
-	# The order of protocol is very important.  It means SA bundle or
-	# nested SAs.
-	proposal {
-		# "lifetime" specifies some lifetime of SA.
-		lifetime time 300 second;
-		lifetime byte 10000 KB;
-
-		protocol esp {
-			level require ;
-			mode tunnel 172.168.2.2;
-
-			# algorithm for ESP encryption
-			encryption_algorithm 3des;
-		}
-
-		# "ah" means AH.
-		protocol ah {
-			level require ;
-			mode transport ;	# NOTE: not tunnel.
-
-			# algorithm for AH
-			authentication_algorithm hmac_sha1;
-		}
 	}
 }
 .Ed
