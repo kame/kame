@@ -373,6 +373,8 @@ ip_stats(off, name)
 	p(ips_ofragments, "\t%lu fragment%s created\n");
 	p(ips_cantfrag, "\t%lu datagram%s that can't be fragmented\n");
 	p1(ips_rcvmemdrop, "\t%lu fragment floods\n");
+	p(ips_toolong, "\t%lu packet%s with ip length > max ip packet size\n");
+	p(ips_nogif, "\t%lu tunneling packet%s that can't find gif\n");
 #undef p
 #undef p1
 }
