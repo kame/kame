@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.169 2004/03/27 03:27:45 suz Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.170 2004/09/10 03:50:24 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -841,15 +841,14 @@ end:
 }
 
 /*
- * compare two prop_pair which is assumed to have same proposal number.
- * the case of bundle or single SA, NOT multi transforms.
- * a: a proposal that is multi protocols and single transform, usually replyed.
- * b: a proposal that is multi protocols and multi transform, usually sent.
+ * compare two prop_pairs if these are identical.
+ * a: a proposal is replyed from the responder.  it must not include multi
+ *    transforms in a protocol.
+ * b: a proposal is sent to the responder.
  * NOTE: this function is for initiator.
  * OUT
  *	0: equal
  *	1: not equal
- * XXX cannot understand the comment!
  */
 static int
 cmp_aproppair_i(a, b)
@@ -969,8 +968,8 @@ get_ph2approval(iph2, pair)
 }
 
 /*
- * compare my proposal and peers just one proposal.
- * set a approval.
+ * compare my proposals to a peers one.
+ * allocate a propo_pair if a suitable proposal is found.
  */
 static struct prop_pair *
 get_ph2approvalx(iph2, pp)

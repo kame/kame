@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_agg.c,v 1.60 2004/09/07 16:28:25 sakane Exp $	*/
+/*	$KAME: isakmp_agg.c,v 1.61 2004/09/10 03:50:24 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -342,7 +342,7 @@ agg_i2recv(iph1, msg)
 	/*
 	 * This check should take place after parsing SA payload because
 	 * payloads are different by a authentication method.  However,
-         * both rsa and rev are never supported, so it can be here.
+	 * both rsa and rev are never supported, so it can be here.
 	 */
 	if (iph1->dhpub_p == NULL ||
 	    iph1->nonce_p == NULL ||
@@ -685,7 +685,7 @@ agg_r1recv(iph1, msg)
 	/*
 	 * This check should take place after parsing SA payload because
 	 * payloads are different by a authentication method.  However,
-         * both rsa and rev are never supported, so it can be here.
+	 * both rsa and rev are never supported, so it can be here.
 	 */
 	if (iph1->dhpub_p == NULL ||
 	    iph1->nonce_p == NULL ||

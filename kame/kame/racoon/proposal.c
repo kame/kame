@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.50 2004/04/08 05:39:33 sakane Exp $	*/
+/*	$KAME: proposal.c,v 1.51 2004/09/10 03:50:24 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -173,14 +173,10 @@ inssatrns(pr, new)
 }
 
 /*
- * take a single match between saprop.  allocate a new proposal and return it
- * for future use (like picking single proposal from a bundle).
+ * compare my proposals to a peers one.
+ * allocate a new saprop if a suitable proposal is found.
  *	pp1: peer's proposal.
  *	pp2: my proposal.
- * NOTE: In the case of initiator, must be ensured that there is no
- * modification of the proposal by calling cmp_aproppair_i() before
- * this function.
- * XXX cannot understand the comment!
  */
 struct saprop *
 cmpsaprop_alloc(ph1, pp1, pp2, side)
