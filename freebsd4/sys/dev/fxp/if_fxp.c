@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.110.2.32 2004/01/17 23:04:26 rwatson Exp $
+ * $FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.110.2.34.2.2 2005/01/12 13:29:03 mux Exp $
  */
 
 /*
@@ -164,6 +164,7 @@ static struct fxp_ident fxp_ident_table[] = {
     { 0x103D,	-1,	"Intel 82801DB (ICH4) Pro/100 VE Ethernet" },
     { 0x103E,	-1,	"Intel 82801DB (ICH4) Pro/100 VM Ethernet" },
     { 0x1050,	-1,	"Intel 82801BA (D865) Pro/100 VE Ethernet" },
+    { 0x1051,	-1,	"Intel 82562ET (ICH5/ICH5R) Pro/100 VE Ethernet" },
     { 0x1059,	-1,	"Intel 82551QM Pro/100 M Mobile Connection" },
     { 0x1209,	-1,	"Intel 82559ER Embedded 10/100 Ethernet" },
     { 0x1229,	0x01,	"Intel 82557 Pro/100 Ethernet" },
@@ -510,8 +511,8 @@ fxp_attach(device_t dev)
 	 * Determine whether we must use the 503 serial interface.
 	 */
 	fxp_read_eeprom(sc, &data, 6, 1);
-	if ((data & FXP_PHY_DEVICE_MASK) != 0 &&
-	    (data & FXP_PHY_SERIAL_ONLY))
+	if (sc->revision <= FXP_REV_82557 && (data & FXP_PHY_DEVICE_MASK) != 0
+	    && (data & FXP_PHY_SERIAL_ONLY))
 		sc->flags |= FXP_FLAG_SERIAL_MEDIA;
 
 	/*
@@ -669,6 +670,12 @@ fxp_attach(device_t dev)
 	ifp->if_start = fxp_start;
 	ifp->if_watchdog = fxp_watchdog;
 	IFQ_SET_READY(&ifp->if_snd);
+
+#ifdef DEVICE_POLLING
+	/* Inform the world we support polling. */
+	ifp->if_capabilities |= IFCAP_POLLING;
+	ifp->if_capenable |= IFCAP_POLLING;
+#endif
 
 	/*
 	 * Attach the interface.
@@ -1195,6 +1202,10 @@ fxp_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
 	struct fxp_softc *sc = ifp->if_softc;
 	u_int8_t statack;
 
+	if (!(ifp->if_capenable & IFCAP_POLLING)) {
+		ether_poll_deregister(ifp);
+		cmd = POLL_DEREGISTER;
+	}
 	if (cmd == POLL_DEREGISTER) {	/* final call, enable interrupts */
 		CSR_WRITE_1(sc, FXP_CSR_SCB_INTRCNTL, 0);
 		return;
@@ -1231,7 +1242,8 @@ fxp_intr(void *xsc)
 
 	if (ifp->if_ipending & IFF_POLLING)
 		return;
-	if (ether_poll_register(fxp_poll, ifp)) {
+	if ((ifp->if_capenable & IFCAP_POLLING) &&
+	    ether_poll_register(fxp_poll, ifp)) {
 		/* disable interrupts */
 		CSR_WRITE_1(sc, FXP_CSR_SCB_INTRCNTL, FXP_SCB_INTR_DISABLE);
 		fxp_poll(ifp, 0, 1);
@@ -2061,6 +2073,10 @@ fxp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		} else {
                         error = ifmedia_ioctl(ifp, ifr, &sc->sc_media, command);
 		}
+		break;
+
+	case SIOCSIFCAP:
+		ifp->if_capenable = ifr->ifr_reqcap;
 		break;
 
 	default:

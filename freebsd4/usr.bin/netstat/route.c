@@ -36,7 +36,7 @@
 static char sccsid[] = "From: @(#)route.c	8.6 (Berkeley) 4/28/95";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/route.c,v 1.41.2.15 2003/11/30 02:58:44 bms Exp $";
+  "$FreeBSD: src/usr.bin/netstat/route.c,v 1.41.2.16 2004/08/05 06:51:24 glebius Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -668,9 +668,7 @@ fmt_sockaddr(struct sockaddr *sa, struct sockaddr *mask, int flags)
 			switch (sdl->sdl_type) {
 
 			case IFT_ETHER:
-#ifdef IFT_VRRP
-			case IFT_VRRP:
-#endif
+			case IFT_L2VLAN:
 				if (sdl->sdl_alen == ETHER_ADDR_LEN) {
 					cp = ether_ntoa((struct ether_addr *)
 					    (sdl->sdl_data + sdl->sdl_nlen));

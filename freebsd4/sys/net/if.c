@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.c	8.3 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/net/if.c,v 1.85.2.25 2003/11/28 15:09:03 ume Exp $
+ * $FreeBSD: src/sys/net/if.c,v 1.85.2.28 2004/12/12 20:12:50 brooks Exp $
  */
 
 #include "opt_compat.h"
@@ -203,6 +203,8 @@ if_attach(ifp)
 
 	ifindex2ifnet[if_index] = ifp;
 
+	ifp->if_data.ifi_datalen = sizeof(struct if_data);
+
 	/*
 	 * create a Link Level name for this device
 	 */
@@ -303,6 +305,8 @@ if_detach(ifp)
 	int s;
 	int i;
 	struct domain *dp;
+	struct ifnet *iter;
+	int found;
 
 	/*
 	 * Remove routes and flush queues.
@@ -365,9 +369,11 @@ if_detach(ifp)
 #endif
 
 	/* We can now free link ifaddr. */
-	ifa = TAILQ_FIRST(&ifp->if_addrhead);
-	TAILQ_REMOVE(&ifp->if_addrhead, ifa, ifa_link);
-	IFAFREE(ifa);
+	if (!TAILQ_EMPTY(&ifp->if_addrhead)) {
+		ifa = TAILQ_FIRST(&ifp->if_addrhead);
+		TAILQ_REMOVE(&ifp->if_addrhead, ifa, ifa_link);
+		IFAFREE(ifa);
+	}
 
 	/*
 	 * Delete all remaining routes using this interface
@@ -428,6 +434,16 @@ do { \
 #endif
 #undef IF_DETACH_QUEUES
 
+	ifindex2ifnet[ifp->if_index] = NULL;
+
+	found = 0;
+	TAILQ_FOREACH(iter, &ifnet, if_link)
+		if (iter == ifp) {
+			found = 1;
+			break;
+		}
+	if (found)
+		TAILQ_REMOVE(&ifnet, ifp, if_link);
 	splx(s);
 }
 

@@ -37,7 +37,7 @@
  *	@(#)procfs_status.c	8.4 (Berkeley) 6/15/94
  *
  * From:
- * $FreeBSD: src/sys/miscfs/procfs/procfs_status.c,v 1.20.2.5 2003/10/02 16:49:49 nectar Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_status.c,v 1.20.2.6 2004/12/01 21:33:57 cperciva Exp $
  */
 
 #include <sys/param.h>

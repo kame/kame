@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ata/ata-all.c,v 1.50.2.47 2003/09/05 18:27:38 dg Exp $
+ * $FreeBSD: src/sys/dev/ata/ata-all.c,v 1.50.2.47.6.1 2005/01/13 23:03:12 kensmith Exp $
  */
 
 #include "opt_ata.h"
@@ -1035,7 +1035,7 @@ ata_command(struct ata_device *atadev, u_int8_t command,
     }
 
     /* only use 48bit addressing if needed because of the overhead */
-    if ((lba > 268435455 || count > 256) && atadev->param &&
+    if ((lba >= 268435455 || count > 256) && atadev->param &&
 	atadev->param->support.address48) {
 	ATA_OUTB(atadev->channel->r_io, ATA_FEATURE, (feature>>8) & 0xff);
 	ATA_OUTB(atadev->channel->r_io, ATA_FEATURE, feature);

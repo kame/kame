@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.68.2.17 2003/08/10 21:51:40 silby Exp $
+ * $FreeBSD: src/sys/alpha/alpha/machdep.c,v 1.68.2.17.6.1 2004/12/27 18:50:59 wilko Exp $
  */
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -517,12 +517,18 @@ identifycpu(void)
 		"EV3",			/* 1 */
 		"EV4 (21064)",		/* 2 */
 		"Simulation",		/* 3 */
-		"LCA Family",		/* 4 */
+		"LCA (21066/21068)",	/* 4 */
 		"EV5 (21164)",		/* 5 */
 		"EV45 (21064A)",	/* 6 */
 		"EV56 (21164A)",	/* 7 */
 		"EV6 (21264)",		/* 8 */
-		"PCA56 (21164PC)"	/* 9 */
+		"PCA56 (21164PC)",	/* 9 */
+		"PCA57 (21164PC)",	/* 10 */
+		"EV67 (21264A)",	/* 11 */
+		"EV68CB (21264C)",	/* 12 */
+		"EV68AL (21264B)",	/* 13 */
+		"EV68CX (21264D)",	/* 14 */
+		"EV7 (21364)"		/* 15 */  
 	};
 
 	/*

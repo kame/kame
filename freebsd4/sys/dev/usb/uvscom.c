@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/uvscom.c,v 1.9.2.10 2004/04/16 18:12:58 julian Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/uvscom.c,v 1.9.2.11 2004/06/13 07:35:47 sanpei Exp $");
 
 /*
  * uvscom: SUNTAC Slipper U VS-10U driver.
@@ -217,6 +217,8 @@ struct ucom_callback uvscom_callback = {
 };
 
 static const struct usb_devno uvscom_devs [] = {
+	/* SUNTAC U-Cable type A4 */
+	{ USB_VENDOR_SUNTAC, USB_PRODUCT_SUNTAC_AS144L4 },
 	/* SUNTAC U-Cable type D2 */
 	{ USB_VENDOR_SUNTAC, USB_PRODUCT_SUNTAC_DS96L },
 	/* SUNTAC Ir-Trinity */

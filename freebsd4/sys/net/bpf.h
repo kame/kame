@@ -38,7 +38,7 @@
  *      @(#)bpf.h	8.1 (Berkeley) 6/10/93
  *	@(#)bpf.h	1.34 (LBL)     6/16/96
  *
- * $FreeBSD: src/sys/net/bpf.h,v 1.21.2.4 2002/07/05 14:40:00 fenner Exp $
+ * $FreeBSD: src/sys/net/bpf.h,v 1.21.2.5 2004/06/08 21:16:42 dwmalone Exp $
  */
 
 #ifndef _NET_BPF_H_
@@ -139,7 +139,7 @@ struct bpf_hdr {
 /*
  * Data-link level type codes.
  */
-#define DLT_NULL	0	/* no link-layer encapsulation */
+#define DLT_NULL	0	/* BSD loopback encapsulation */
 #define DLT_EN10MB	1	/* Ethernet (10Mb) */
 #define DLT_EN3MB	2	/* Experimental Ethernet (3Mb) */
 #define DLT_AX25	3	/* Amateur Radio AX.25 */

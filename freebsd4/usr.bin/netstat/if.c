@@ -490,9 +490,6 @@ intpr(int interval, u_long ifnetaddr, void (*pfunc)(char *))
 					switch (msa.dl.sdl_type) {
 					case IFT_ETHER:
 					case IFT_FDDI:
-#ifdef IFT_VRRP
-					case IFT_VRRP:
-#endif
 						fmt = ether_ntoa(
 							(struct ether_addr *)
 							LLADDR(&msa.dl));

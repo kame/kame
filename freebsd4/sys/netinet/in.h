@@ -62,7 +62,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in.h	8.3 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/in.h,v 1.48.2.11 2003/09/09 19:09:22 bms Exp $
+ * $FreeBSD: src/sys/netinet/in.h,v 1.48.2.12 2004/06/16 06:57:49 ru Exp $
  */
 
 #ifndef _NETINET_IN_H_
@@ -373,6 +373,12 @@ struct sockaddr_in {
 #define	MCAST_LEAVE_SOURCE_GROUP 75  /* group_source_req; */
 
 #define	IP_ONESBCAST		27   /* bool: send all-ones broadcast */
+
+#define	IP_FW_TABLE_ADD		40   /* add entry */
+#define	IP_FW_TABLE_DEL		41   /* delete entry */
+#define	IP_FW_TABLE_FLUSH	42   /* flush table */
+#define	IP_FW_TABLE_GETSIZE	43   /* get table size */
+#define	IP_FW_TABLE_LIST	44   /* list table contents */
 
 #define	IP_FW_ADD     		50   /* add a firewall rule to chain */
 #define	IP_FW_DEL    		51   /* delete a firewall rule from chain */

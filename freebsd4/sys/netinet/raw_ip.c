@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)raw_ip.c	8.7 (Berkeley) 5/15/95
- * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.64.2.18 2003/09/16 05:43:56 silby Exp $
+ * $FreeBSD: src/sys/netinet/raw_ip.c,v 1.64.2.19 2004/06/16 06:57:49 ru Exp $
  */
 
 #include "opt_inet6.h"
@@ -325,6 +325,8 @@ rip_ctloutput(struct socket *so, struct sockopt *sopt)
 
 		case IP_FW_ADD: /* ADD actually returns the body... */
 		case IP_FW_GET:
+		case IP_FW_TABLE_GETSIZE:
+		case IP_FW_TABLE_LIST:
 			if (IPFW_LOADED)
 				error = ip_fw_ctl_ptr(sopt);
 			else
@@ -378,6 +380,9 @@ rip_ctloutput(struct socket *so, struct sockopt *sopt)
 		case IP_FW_FLUSH:
 		case IP_FW_ZERO:
 		case IP_FW_RESETLOG:
+		case IP_FW_TABLE_ADD:
+		case IP_FW_TABLE_DEL:
+		case IP_FW_TABLE_FLUSH:
 			if (IPFW_LOADED)
 				error = ip_fw_ctl_ptr(sopt);
 			else

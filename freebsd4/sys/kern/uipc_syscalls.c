@@ -34,7 +34,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_syscalls.c	8.4 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/kern/uipc_syscalls.c,v 1.65.2.19 2004/02/19 11:55:42 truckman Exp $
+ * $FreeBSD: src/sys/kern/uipc_syscalls.c,v 1.65.2.21 2004/08/13 14:51:45 ume Exp $
  */
 
 #include "opt_compat.h"
@@ -1467,6 +1467,7 @@ sf_buf_alloc()
 	s = splimp();
 	while ((sf = SLIST_FIRST(&sf_freelist)) == NULL) {
 		sf_buf_alloc_want = 1;
+		mbstat.sf_allocwait++;
 		error = tsleep(&sf_freelist, PVM|PCATCH, "sfbufa", 0);
 		if (error)
 			break;
@@ -1474,6 +1475,8 @@ sf_buf_alloc()
 	if (sf != NULL) {
 		SLIST_REMOVE_HEAD(&sf_freelist, free_list);
 		sf->refcnt = 1;
+		nsfbufsused++;
+		nsfbufspeak = imax(nsfbufspeak, nsfbufsused);
 	}
 	splx(s);
 	return (sf);
@@ -1509,6 +1512,7 @@ sf_buf_free(caddr_t addr, u_int size)
 		panic("sf_buf_free: freeing free sf_buf");
 	sf->refcnt--;
 	if (sf->refcnt == 0) {
+		nsfbufsused--;
 		pmap_qremove((vm_offset_t)addr, 1);
 		m = sf->m;
 		s = splvm();
@@ -1764,6 +1768,7 @@ retry_lookup:
 				sbunlock(&so->so_snd);
 				goto done;
 			}
+			mbstat.sf_iocnt++;
 		}
 
 
@@ -1772,6 +1777,7 @@ retry_lookup:
 		 * but this wait can be interrupted.
 		 */
 		if ((sf = sf_buf_alloc()) == NULL) {
+			mbstat.sf_allocfail++;
 			s = splvm();
 			vm_page_unwire(pg, 0);
 			if (pg->wire_count == 0 && pg->object == NULL)

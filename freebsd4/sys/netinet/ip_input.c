@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_input.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_input.c,v 1.130.2.54 2003/10/06 18:25:59 sam Exp $
+ * $FreeBSD: src/sys/netinet/ip_input.c,v 1.130.2.54.6.1 2005/01/02 05:03:16 silby Exp $
  */
 
 #define	_IP_VHL
@@ -48,6 +48,8 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
+#include <sys/eventhandler.h>
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/domain.h>
@@ -193,6 +195,7 @@ SYSCTL_STRUCT(_net_inet_ip, IPCTL_STATS, stats, CTLFLAG_RW,
 	(((((x) & 0xF) | ((((x) >> 8) & 0xF) << 4)) ^ (y)) & IPREASS_HMASK)
 
 static struct ipq ipq[IPREASS_NHASH];
+struct callout ipport_tick_callout;
 const  int    ipintrq_present = 1;
 
 #ifdef IPCTL_DEFMTU
@@ -289,6 +292,12 @@ ip_init()
 	maxnipq = nmbclusters / 32;
 	maxfragsperpacket = 16;
 
+	/* Start ipport_tick. */
+	callout_init(&ipport_tick_callout);
+	ipport_tick(NULL);
+	EVENTHANDLER_REGISTER(shutdown_pre_sync, ip_fini, NULL,
+		SHUTDOWN_PRI_DEFAULT);
+
 #ifndef RANDOM_IP_ID
 	ip_id = time_second & 0xffff;
 #endif
@@ -296,6 +305,13 @@ ip_init()
 
 	register_netisr(NETISR_IP, ipintr);
 }
+
+void ip_fini(xtp)
+	void *xtp;
+{
+	callout_stop(&ipport_tick_callout);
+}
+
 
 /*
  * XXX watch out this one. It is perhaps used as a cache for

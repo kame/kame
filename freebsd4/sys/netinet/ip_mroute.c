@@ -17,7 +17,7 @@
  * and PIM-SMv2 and PIM-DM support, advanced API support,
  * bandwidth metering and signaling
  *
- * $FreeBSD: src/sys/netinet/ip_mroute.c,v 1.56.2.10 2003/08/24 21:37:34 hsu Exp $
+ * $FreeBSD: src/sys/netinet/ip_mroute.c,v 1.56.2.11 2004/12/11 08:58:15 hsu Exp $
  */
 
 #include "opt_mrouting.h"
@@ -2380,7 +2380,7 @@ del_bw_upcall(struct bw_upcall *req)
 
 	/* Find the bw_meter entry to delete */
 	for (prev = NULL, x = mfc->mfc_bw_meter; x != NULL;
-	     x = x->bm_mfc_next) {
+	     prev = x, x = x->bm_mfc_next) {
 	    if ((BW_TIMEVALCMP(&x->bm_threshold.b_time,
 			       &req->bu_threshold.b_time, ==)) &&
 		(x->bm_threshold.b_packets == req->bu_threshold.b_packets) &&
