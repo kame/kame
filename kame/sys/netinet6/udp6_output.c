@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.24 2001/05/21 05:37:50 jinmei Exp $	*/
+/*	$KAME: udp6_output.c,v 1.25 2001/05/21 05:43:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -251,7 +251,14 @@ udp6_output(in6p, m, addr6, control)
 #endif
 			{
 				/*
-				 * 
+				 * I believe we should explicitly discard the
+				 * packet when mapped addresses are disabled,
+				 * rather than send the packet as an IPv6 one.
+				 * If we chose the latter approach, the packet
+				 * might be sent out on the wire based on the
+				 * default route, the situation which we'd
+				 * probably want to avoid.
+				 * (20010421 jinmei@kame.net)
 				 */
 				error = EINVAL;
 				goto release;
