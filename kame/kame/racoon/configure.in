@@ -133,9 +133,16 @@ if test "$dmalloc_dir" != "no"; then
 	fi
 fi
 
-LIBOBJS="$LIBOBJS print-isakmp.o"
-AC_DEFINE(HAVE_PRINT_ISAKMP_C)
-CPPFLAGS="$CPPFLAGS -I$srcdir"
+tcpdump=
+AC_MSG_CHECKING(if --with-tcpdump option is specified)
+AC_ARG_WITH(tcpdump, [  --with-tcpdump          use tcpdump decoder on debugging],
+	[tcpdump=$withval], [tcpdump=no])
+AC_MSG_RESULT(${tcpdump})
+if test "$tcpdump" != "no"; then
+	LIBOBJS="$LIBOBJS print-isakmp.o"
+	AC_DEFINE(HAVE_PRINT_ISAKMP_C)
+	CPPFLAGS="$CPPFLAGS -I$(srcdir)"
+fi
 
 AC_MSG_CHECKING(if __func__ is available)
 AC_TRY_COMPILE(dnl
