@@ -32,6 +32,12 @@
 #include <sys/malloc.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
+#include <sys/kernel.h>
+#ifdef __bsdi__
+#include <crypto/md5.h>
+#else
+#include <sys/md5.h>
+#endif
 
 #include <net/if.h>
 #include <net/if_dl.h>
@@ -68,6 +74,7 @@ int found_first_ifid = 0;
 static char first_ifid[IFID_LEN];
 
 static int laddr_to_eui64 __P((u_int8_t *, u_int8_t *, size_t));
+static int gen_rand_eui64 __P((u_int8_t *));
 
 static int
 laddr_to_eui64(dst, src, len)
@@ -76,6 +83,12 @@ laddr_to_eui64(dst, src, len)
 	size_t len;
 {
 	switch (len) {
+	case 1:
+		bzero(dst, 7);
+		dst[7] = src[0];
+		/* raise u bit to indicate that this is not globally unique */
+		dst[0] |= 0x02;
+		break;
 	case 6:
 		dst[0] = src[0];
 		dst[1] = src[1];
@@ -92,6 +105,34 @@ laddr_to_eui64(dst, src, len)
 	default:
 		return EINVAL;
 	}
+
+	return 0;
+}
+
+/*
+ * Generate a last-resort interface identifier, when the machine has no
+ * IEEE802/EUI64 address sources.
+ * The address should be random, and should not change across reboot.
+ */
+static int
+gen_rand_eui64(dst)
+	u_int8_t *dst;
+{
+	MD5_CTX ctxt;
+	u_int8_t digest[16];
+
+	/* generate 8bytes of pseudo-random value. */
+	bzero(&ctxt, sizeof(ctxt));
+	MD5Init(&ctxt);
+	MD5Update(&ctxt, hostname, hostnamelen);
+	MD5Final(digest, &ctxt);
+
+	/* assumes sizeof(digest) > sizeof(first_ifid) */
+	bcopy(digest, dst, 8);
+
+	/* make sure to set "u" bit to local, and "g" bit to individual. */
+	dst[0] &= 0xfe;
+	dst[0] |= 0x02;		/* EUI64 "local" */
 
 	return 0;
 }
@@ -151,6 +192,13 @@ in6_ifattach_getifid(ifp0)
 				if ((addr[0] & 0x02) != 0)
 					break;
 				goto found;
+			case IFT_ARCNET:
+				/*
+				 * ARCnet interface token cannot be used as
+				 * globally unique identifier due to its 
+				 * small bitwidth.
+				 */
+				break;
 			default:
 				break;
 			}
@@ -190,7 +238,7 @@ found:
  * add link-local address to *pseudo* p2p interfaces.
  * get called when the first MAC address is made available in in6_ifattach().
  *
- * XXX I start feeling this as a bad idea. (itojun)
+ * XXX I start considering this loop as a bad idea. (itojun)
  */
 void
 in6_ifattach_p2p()
@@ -252,7 +300,27 @@ in6_ifattach(ifp, type, laddr, noloop)
 	if (type == IN6_IFT_P2P && found_first_ifid == 0) {
 		printf("%s: no ifid available for IPv6 link-local address\n",
 			if_name(ifp));
+#if 0
 		return;
+#else
+		/* last resort */
+		if (gen_rand_eui64(first_ifid) == 0) {
+			printf("%s: using random value as EUI64: "
+				"%02x:%02x:%02x:%02x:%02x:%02x:%02x:%02x\n",
+				if_name(ifp),
+				first_ifid[0] & 0xff, first_ifid[1] & 0xff,
+				first_ifid[2] & 0xff, first_ifid[3] & 0xff,
+				first_ifid[4] & 0xff, first_ifid[5] & 0xff,
+				first_ifid[6] & 0xff, first_ifid[7] & 0xff);
+			/*
+			 * invert u bit to convert EUI64 to RFC2373 interface
+			 * ID.
+			 */
+			first_ifid[0] ^= 0x02;
+
+			found_first_ifid = 1;
+		}
+#endif
 	}
 
 	if ((ifp->if_flags & IFF_MULTICAST) == 0) {
@@ -410,6 +478,19 @@ in6_ifattach(ifp, type, laddr, noloop)
 		bcopy((caddr_t)first_ifid,
 		      (caddr_t)&ia->ia_addr.sin6_addr.s6_addr8[8],
 		      IFID_LEN);
+		break;
+	case IN6_IFT_ARCNET:
+		ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
+		ia->ia_ifa.ifa_flags |= RTF_CLONING;
+		rtflag = RTF_CLONING;
+		if (laddr == NULL)
+			break;
+		if (laddr_to_eui64(&ia->ia_addr.sin6_addr.s6_addr8[8],
+				laddr, 1) != 0) {
+			break;
+		}
+		/* invert u bit to convert EUI64 to RFC2373 interface ID. */
+		ia->ia_addr.sin6_addr.s6_addr8[8] ^= 0x02;
 		break;
 	}
 
@@ -614,6 +695,7 @@ in6_ifattach(ifp, type, laddr, noloop)
 
 	/* mark the address TENTATIVE, if needed. */
 	switch (ifp->if_type) {
+	case IFT_ARCNET:
 	case IFT_ETHER:
 	case IFT_FDDI:
 #if 0
