@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.72 2003/01/22 04:53:32 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.73 2003/01/22 05:37:37 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -938,7 +938,13 @@ dhcp6_get_options(p, ep, optinfo)
 		case DH6OPT_PREFERENCE:
 			if (optlen != 1)
 				goto malformed;
-			optinfo->pref = (int)*(u_char *)cp;
+			dprintf(LOG_DEBUG, "  preference: %d",
+			    (int)*(u_char *)cp);
+			if (optinfo->pref != DH6OPT_PREF_UNDEF) {
+				dprintf(LOG_INFO, "%s"
+				    "duplicated preference option", FNAME);
+			} else
+				optinfo->pref = (int)*(u_char *)cp;
 			break;
 		case DH6OPT_ELAPSED_TIME:
 			if (optlen != 2)
@@ -947,7 +953,12 @@ dhcp6_get_options(p, ep, optinfo)
 			val16 = ntohs(val16);
 			dprintf(LOG_DEBUG, "  elapsed time: %lu",
 			    (u_int32_t)val16);
-			optinfo->elapsed_time = val16;
+			if (optinfo->elapsed_time !=
+			    DH6OPT_ELAPSED_TIME_UNDEF) {
+				dprintf(LOG_INFO, "%s"
+				    "duplicated elapsed time option", FNAME);
+			} else
+				optinfo->elapsed_time = val16;
 			break;
 		case DH6OPT_RAPID_COMMIT:
 			if (optlen != 0)
