@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.39 2000/10/23 04:24:22 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.40 2001/02/19 03:40:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -845,6 +845,19 @@ again:
 			p = mtod(n, u_char *);
 			i = sizeof(struct ip);
 			while (i < hlen) {
+				if (i + IPOPT_OPTVAL >= hlen) {
+					error = EINVAL;
+					goto fail;
+				}
+				if (p[i + IPOPT_OPTVAL] == IPOPT_EOL ||
+				    p[i + IPOPT_OPTVAL] == IPOPT_NOP ||
+				    i + IPOPT_OLEN < hlen)
+					;
+				else {
+					error = EINVAL;
+					goto fail;
+				}
+
 				skip = 1;
 				switch (p[i + IPOPT_OPTVAL]) {
 				case IPOPT_EOL:
@@ -871,8 +884,6 @@ again:
 					    "(type=%02x len=%02x)\n",
 					    p[i + IPOPT_OPTVAL],
 					    p[i + IPOPT_OLEN]));
-					m_free(n);
-					n = NULL;
 					error = EINVAL;
 					goto fail;
 				}
