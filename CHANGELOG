@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.89 1999/09/02 09:26:42 itojun Exp $
+$Id: CHANGELOG,v 1.90 1999/09/02 12:11:01 itojun Exp $
 
 
 <199909>
@@ -8,7 +8,7 @@ Thu Sep  2 17:35:13 JST 1999  itojun@iijlab.net
 	Fix alignment problem for routing socket on NetBSD/alpha.
 	* kame/ndp/ndp.c: Be more struct about alignment constraint in routing
 	  socket messages (is aligned to sizeof(long)).
-	* netbsd/sbin/route, kame/route6d, kame/bgpd:
+	* netbsd/sbin/route, kame/route6d, kame/bgpd, netbsd/usr.bin/netstat:
 	  Fix alignment constraint for routing socket messages. 
 
 1999-09-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
