@@ -1,5 +1,5 @@
---- Makefile.orig	Tue Jul 27 23:09:49 1999
-+++ Makefile	Tue Jul 27 23:10:48 1999
+--- Makefile.orig	Fri Feb 18 20:04:41 2000
++++ Makefile	Fri Feb 18 20:05:41 2000
 @@ -4,7 +4,7 @@
  
  # Where to install binary and manpage on "make install":
@@ -9,7 +9,18 @@
  BINDIR=$(PREFIX)/bin
  MANDIR=$(PREFIX)/man
  SECTION=1
-@@ -642,7 +642,7 @@
+@@ -12,8 +12,8 @@
+ # Enable the below line If your plathome support IPv6
+ #CFLAGS+= -DINET6
+ # Additional LIBDIR and libraries if exist
+-IPV6LIBDIR=
+-IPV6LIB=
++#IPV6LIBDIR=
++#IPV6LIB=
+ ### KAME stack
+ #IPV6LIBDIR=-L/usr/local/v6/lib
+ #IPV6LIB=-linet6
+@@ -643,7 +643,7 @@
  
  install:	prepared-for-install
  	strip mpg123
