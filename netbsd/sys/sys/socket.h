@@ -412,6 +412,9 @@ struct cmsghdr {
  * machine/param.h.
  */
 #define __CMSG_ALIGN(n)	(((n) + ALIGNBYTES) & ~ALIGNBYTES)
+#ifdef _KERNEL
+#define CMSG_ALIGN(n)	__CMSG_ALIGN(n)
+#endif
 
 /* given pointer to struct cmsghdr, return pointer to next cmsghdr */
 #define	CMSG_NXTHDR(mhdr, cmsg)	\
