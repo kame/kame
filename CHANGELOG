@@ -1,8 +1,24 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.969 2000/06/04 13:31:45 itojun Exp $
+$Id: CHANGELOG,v 1.970 2000/06/04 17:22:15 jinmei Exp $
 
 <200006>
+2000-06-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_src.c (in6_pcbsetport): supported FreeBSD
+	3 and later as a separate function, the code which was a part of
+	in6_pcbbind().
+
+2000-06-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/udp6_output.c (udp6_output): supported FreeBSD
+	3 and later.
+	* freebsd[34]/sys/netinet6/udp6_usrreq.c: removed original
+	udp6_output().
+
+2000-06-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd[34]/sys/netinet6/udp6_usrreq.c (udp6_send): added some
+	validation checks for the passed sockaddr. The previous code seemed
+	a bit naive.
+
 Sun Jun  4 22:28:30 JST 2000  itojun@iijlab.net
 	* libinet6/resolv/res_send.c: remove MULTICASTQUERY6 case.
 	  it is unnecessary since we have mdnsd, and it was mistake in BIND9
