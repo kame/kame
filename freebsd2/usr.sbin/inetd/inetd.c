@@ -1058,7 +1058,6 @@ void
 ipsecsetup(sep)
 	struct servtab *sep;
 {
-	int len;
 	char *buf;
 	char *policy_in = NULL;
 	char *policy_out = NULL;
