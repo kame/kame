@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.28 2002/06/08 21:42:38 itojun Exp $	*/
+/*	$KAME: if_hif.c,v 1.29 2002/08/28 13:36:19 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -155,6 +155,10 @@ extern struct mip6_prefix_list mip6_prefix_list;
 
 static int hif_subnet_list_update_withmpfx __P((struct hif_softc *, caddr_t));
 static int hif_ha_list_update_withioctl __P((struct hif_softc *, caddr_t));
+
+struct sockaddr_in6 hif_coa;
+struct hif_softc_list hif_softc_list;
+struct hif_coa_list hif_coa_list;
 
 #ifdef __FreeBSD__
 void hifattach __P((void *));

@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.12 2002/04/04 06:44:40 keiichi Exp $	*/
+/*	$KAME: if_hif.h,v 1.13 2002/08/28 13:36:19 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,12 +101,6 @@ struct hif_ifreq {
 	} ifr_ifru;
 };
 
-#ifdef _KERNEL
-
-TAILQ_HEAD(hif_softc_list, hif_softc) hif_softc_list;
-TAILQ_HEAD(hif_coa_list, hif_coa) hif_coa_list;
-struct sockaddr_in6 hif_coa;
-
 struct hif_subnet {
 	TAILQ_ENTRY(hif_subnet) hs_entry;
 	struct mip6_subnet      *hs_ms;
@@ -128,11 +122,20 @@ struct hif_softc {
 	u_int8_t               hif_hadiscov_count;
 	struct in6_addr        hif_ifid;
 };
+TAILQ_HEAD(hif_softc_list, hif_softc);
 
 struct hif_coa {
 	TAILQ_ENTRY(hif_coa) hcoa_entry;
 	struct ifnet         *hcoa_ifp;
 };
+TAILQ_HEAD(hif_coa_list, hif_coa);
+
+
+#ifdef _KERNEL
+
+extern struct sockaddr_in6 hif_coa;
+extern struct hif_softc_list hif_softc_list;
+extern struct hif_coa_list hif_coa_list;
 
 #if defined(__FreeBSD__) && __FreeBSD__ < 3
 int hif_ioctl				__P((struct ifnet *, int, caddr_t));
