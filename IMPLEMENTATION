@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.250 2001/07/24 02:16:06 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.251 2001/07/27 14:13:41 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -73,6 +73,10 @@ Table of Contents
 	4.5 Conformance to RFCs and IDs
 	4.6 ECN consideration on IPsec tunnels
 	4.7 Interoperability
+	4.8 Operations with IPsec tunnel mode
+	4.8.1 RFC2401 IPsec tunnel mode approach
+	4.8.2 draft-touch-ipsec-vpn approach
+	4.8.3 Heterogeneous approach
 	5. ALTQ
 	6. mobile-ip6
 	6.1 KAME node as correspondent node
@@ -1929,6 +1933,158 @@ VPNC (vpnc.org) provides IPsec conformance tests, using KAME and OpenBSD
 IPsec/IKE implementations.  Their test results are available at
 http://www.vpnc.org/conformance.html, and it may give you more idea
 about which implementation interoperates with KAME IPsec/IKE implementation.
+
+4.8 Operations with IPsec tunnel mode
+
+First of all, IPsec tunnels are very hairy thing.  It seems to do a neat thing
+like VPN configuration or secure remote accesses, however, it comes with lots
+of architectural twists.
+
+RFC2401 defines IPsec tunnel mode, within the context of IPsec.  RFC2401
+defines tunnel mode packet encapsulation/decapsulation on its own, and
+does not refer other tunnelling specifications.  Since RFC2401 advocates
+filter-based SPD database matches, it would be natural for us to implement
+IPsec IPsec tunnel mode as filters - not as pseudo interfaces.
+
+There are some people who are trying to separate IPsec "tunnel mode" from
+the IPsec itself.  They would like to implement IPsec transport mode only,
+and combine it with tunneling pseudo devices.  The prime example is found
+in draft-touch-ipsec-vpn-01.txt.  However, if you really define pseudo
+interfaces separately from IPsec, IKE daemons would need to negotiate
+transport mode SAs, instead of tunnel mode SAs.  Therefore, we cannot
+really mix RFC2401-based interpretation and draft-touch-ipsec-vpn-01.txt
+interpretation.
+
+The KAME stack implements can be configured in three ways.  You may need
+to recompile your kernel to switch the behavior.
+- RFC2401 IPsec tunnel mode appraoch (4.8.1)
+	"pseudo-device sec" must not be present in the kernel config file.
+- draft-touch-ipsec-vpn approach (4.8.2)
+	Works in all kernel configuration, but racoon(8) may not interoperate.
+- Heterogeneous approach (4.8.3)
+	The approach uses RFC2401-like approach on outbound, and
+	draft-touch-ipsec-vpn-like approach on inbound.
+	"pseudo-device sec" must be present in the kernel config file.
+
+There are pros and cons on these approaches:
+
+RFC2401 IPsec tunnel mode (filter-like) approach
+	PRO: SPD lookup fits nicely with packet filters (if you integrate them)
+	CON: cannot run routing daemons across IPsec tunnels
+	CON: it is very hard to control source address selection on originating
+		cases
+	???: IPv6 scope zone is kept the same
+draft-touch-ipsec-vpn (transportmode + Pseudo-interface) approach
+	PRO: run routing daemons across IPsec tunnels
+	PRO: source address selection can be done normally, by looking at
+		IPsec tunnel pseudo devices
+	CON: possibility of infinite loops and kernel stack overflows
+	CON: due to differences in encap/decap logic from RFC2401, it may not
+		interoperate with very pick RFC2401 implementations
+		(those who checks TOS bits, for example)
+	CON: cannot negotiate IKE with other IPsec tunnel-mode devices
+		(the other end has to implement 
+	???: IPv6 scope zone is likely to be different from the real ethernet
+		interface
+Heterogeneous approach
+	PRO: IKE can operate normally
+	PRO: run routing daemons across IPsec tunnels
+	PRO: no infinite possibility of infinite loops on outbound
+		(for inbound it is easier to avoid it)
+	CON: IPv6 scope zone is handled in a very strange way.  Packets can go
+		out of scope zone A and comes back from B.
+
+4.8.1 RFC2401 IPsec tunnel mode approach
+
+If you configure your kernel without "pseudo-device sec"
+To configure your device as RFC2401 IPsec tunnel mode endpoint, you will
+use "tunnel" keyword in setkey(8) "spdadd" directives.  Let us assume the
+following topology (A and B could be a network, like prefix/length):
+
+	((((((((((((The internet))))))))))))
+	  |			  |
+	  |C (global)		  |D
+	your device		peer's device
+	  |A (private)		  |B
+	==+===== VPN net	==+===== VPN net
+
+The policy configuration directive is like this.  You will need manual
+SAs, or IKE daemon, for actual encryption:
+
+	# setkey -c <<EOF
+	spdadd A B any -P out ipsec esp/tunnel/C-D/use;
+	spdadd A B any -P in ipsec esp/tunnel/D-C/use;
+	^D
+
+The inbound/outbound traffic is monitored/captured by SPD engine, which works
+just like packet filters.
+
+With this, forwarding case should work flawlessly.  However, troubles arise
+when you have one of the following requirements:
+- When you originate traffic from your VPN gateway device to VPN net on the
+  other end (like B), you want your source address to be A (private side)
+  so that the traffic would be protected by the policy.
+  With this approach, however, the source address selection logic follows
+  normal routing table, and C (global side) will be picked for any outgoing
+  traffic, even if the destination is B.  The resulting packet will be like
+  this:
+	IP[C -> B] payloda
+  and will not match the policy (= sent in clear).
+- When you want to run routing protocols on top of the IPsec tunnel, it is
+  not possible.  As there is no pseudo device that identifies the IPsec tunnel,
+  you cannot identify where the routing information came from.  As a result,
+  you can't run routing daemons.
+
+4.8.2 draft-touch-ipsec-vpn approach
+
+With this approach, you will configure gif(4) tunnel interfaces, as well as
+IPsec transport mode SAs.
+
+	# gifconfig gif0 C D
+	# ifconfig gif0 A B
+	# setkey -c <<EOF
+	spdadd A B any -P out ipsec esp/transport//use;
+	spdadd A B any -P in ipsec esp/transport//use;
+	^D
+
+Since we have a pseudo-interface "gif0", and it affects the routes and
+the source address selection logic, we can have source address A, for
+packets originated by the VPN gateway to B (and the VPN cloud).
+We can also exchange routing information over the tunnel (gif0), as the tunnel
+is represented as a pseudo interface (dynamic routes points to the
+pseudo interface).
+
+There is a big drawback, however; with this, you can use IKE if and only if
+the other end is using draft-touch-ipsec-vpn approach too.  Since racoon(8)
+grabs phase 2 IKE proposals from the kernel SPD database, you will be
+negotiating IPsec transport-mode SAs with the other end, not tunnel-mode SAs.
+
+4.8.3 Heterogeneous approach
+
+With this approach, the kernel will generate pseudo device like "sec0",
+just for inbound processing, for every tunnel-mode IPsec policies you specify.
+
+	# setkey -c <<EOF
+	spdadd A B any -P out ipsec esp/tunnel/C-D/use;
+	spdadd A B any -P in ipsec esp/tunnel/D-C/use;
+	^D
+
+Additionally, if you would like to control the source address selection, you
+can have addresses on to the tunnel:
+
+	# ifconfig sec0 A B
+
+With this approach, since the SPD entries have tunnel mode policies,
+racoon(8) IKE daemon can operate normally with other RFC2401-like devices.
+Outgoing traffic is captured by filters like RFC2401-like devices, and
+there's no fear of kernel stack overflow.  Incoming traffic will be
+decapsulated by "sec0" tunnel pseudo devices, so it is possible to have
+routing entries against them (routing daemons should work fine).
+
+One big drawback is that we will have a very strange behavior in terms of
+IPv6 scope address architecture - if we throw packet to the other end
+on scope zone X, responses will come back from different scope zone Y (for
+sec0 tunnel interface).
 
 5. ALTQ
 
