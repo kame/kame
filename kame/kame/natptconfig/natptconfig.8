@@ -1,4 +1,4 @@
-.\"	$KAME: natptconfig.8,v 1.22 2002/10/02 10:15:20 fujisawa Exp $
+.\"	$KAME: natptconfig.8,v 1.23 2002/10/04 07:09:37 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -222,11 +222,32 @@ table entry when this translator seems not to work.  See
 .Em TABLE FORMAT
 section below for more detail.
 .It Xo Sy variables
+.Op all | tslot | caddr
 .Xc
 Show variables that was set by
 .Sq set
-subcommand.  See
-.Xr natpt.conf 5 .
+subcommand.  If nothing is specified after
+.Sq variables ,
+this subcommand shows only variables to use usually.
+.Pp
+Meaning of words that can specify is as follows.
+.Bl -tag -width XX
+.It Xo Sy all
+.Xc
+Show all variables.
+.It Xo Sy tslot
+.Xc
+Show timer related variables.  You can change behavor of NAT-PT when
+you change a value of these variables.
+.It Xo Sy caddr
+.Xc
+Show start address of inner table.  These variables are read only, and
+are for debug.
+.El
+.Pp
+See
+.Xr natpt.conf 5
+for meaning of each indicated variables.
 .It Xo Sy mapping
 .Xc
 Show current translation status.  Status is displayed as
