@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2489 2003/10/13 06:27:29 itojun Exp $
+$KAME: CHANGELOG,v 1.2490 2003/10/15 00:17:58 jinmei Exp $
 
 <200310>
+2003-10-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6.c (in6_ifinit): tried rtinit() to a p2p
+	(or loopback) destination only when the route is not installed.
+	This change allows, e.g., duplicated attempts of 'ifconfig lo0
+	::1' like for IPv4.
+	Pointed out by Pavlin Radoslavov <pavlin@icir.org>.
+
 Mon Oct 13 15:24:46 JST 2003  itojun@iijlab.net
 	* sys/netinet6/nd6_rtr.c: revert previous change to nd6_rtmsg().
 	  it is freebsd sys/net/if.c which is incorrect, not nd6_rtmsg().
