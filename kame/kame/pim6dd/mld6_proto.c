@@ -62,7 +62,7 @@
  *  Questions concerning this software should be directed to 
  *  Kurt Windisch (kurtw@antc.uoregon.edu)
  *
- *  $Id: mld6_proto.c,v 1.3 2000/04/30 10:50:31 jinmei Exp $
+ *  $Id: mld6_proto.c,v 1.4 2000/05/05 12:38:30 jinmei Exp $
  */
 /*
  * Part of this program has been derived from PIM sparse-mode pimd.
@@ -154,7 +154,7 @@ accept_listener_query(src, dst, group, tmo)
 
 	v = &uvifs[mifi];
 
-	if (v->uv_querier == NULL || inet6_equal(&v->uv_querier->al_addr, src))
+	if (v->uv_querier == NULL || !inet6_equal(&v->uv_querier->al_addr, src))
 	{
 		/*
 		 * This might be:
