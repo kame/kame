@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.c,v 1.4 2000/03/25 07:23:34 sumikawa Exp $	*/
+/*	$KAME: net_osdep.c,v 1.5 2000/07/02 14:58:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -48,27 +48,6 @@
 #include <net/netisr.h>
 #include <net/route.h>
 #include <net/bpf.h>
-
-#if 0
-#ifdef	INET
-#include <netinet/in.h>
-#include <netinet/in_systm.h>
-#include <netinet/in_var.h>
-#include <netinet/ip.h>
-#include <netinet/in_gif.h>
-#endif	/* INET */
-
-#ifdef INET6
-#ifndef INET
-#include <netinet/in.h>
-#endif
-#include <netinet6/in6_var.h>
-#include <netinet/ip6.h>
-#include <netinet6/ip6_var.h>
-#include <netinet6/in6_gif.h>
-#include <netinet6/in6_ifattach.h>
-#endif /* INET6 */
-#endif
 
 #if !(defined(__NetBSD__) || defined(__OpenBSD__))
 const char *
