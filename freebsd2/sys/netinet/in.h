@@ -493,6 +493,7 @@ struct ip_mreq {
 /* INET6 stuff */
 #define __KAME_NETINET_IN_H_INCLUDED_
 #include <netinet6/in6.h>
+#undef __KAME_NETINET_IN_H_INCLUDED_
 
 #ifdef KERNEL
 struct ifnet; struct mbuf;	/* forward declarations for Standard C */
