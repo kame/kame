@@ -2,7 +2,7 @@
 
 			KAME Project
 
-			$Date: 1999/12/07 11:37:57 $
+			$Date: 1999/12/10 14:18:34 $
 
 <<<Project Overview>>>
 
@@ -40,7 +40,8 @@ The kit comes with BSD-like copyright.  In short, the code is FREELY
 available but with NO WARRANTY.  Even commercial use is OK.  Please
 refer to the COPYRIGHT file for more details.  The copyright holder is
 WIDE Project instead of KAME Project.  This is because KAME Project is
-to be terminated in March 2000.
+to be terminated in March 2000 (extension of the project is being discussed.
+There is rough agreement to do it for two more years - stay tuned).
 
 READ CAREFULLY: Several countries have legal enforcement for
 export/import/use of cryptographic software.  Check it before playing
@@ -71,7 +72,7 @@ We maintain users mailing list, called "snap-users".
 has archive of postings, how to subscribe, and some other information.
 Share your tips, experiences, comments with other users.
 
-If you have private comments, please drop a line to:
+If you have private comments to our developers, please drop a line to:
 	core@kame.net
 
 If you have questions about commercial usage or other administrative/political
@@ -100,14 +101,15 @@ HO Sonmyong, Masanari TSUBAI, Hiroshi URA, Craig Metz, Chris the Elder,
 UO Youjiro, Wayne Knowles, Hajimu UMEMOTO, Ichiro Fukuhara,
 David P. Wiggins, Martti Kuparinen, Tetsuya Isaki, Erik Bertelsen,
 Toshio Shimojou, Kazunori Fujiwara, Kimio Ishii, Masafumi OE,
-SUZUKI Shinsuke, Mickael Hoerdt, Arkadiusz Miskiewicz, 
+SUZUKI Shinsuke, Mickael Hoerdt, Arkadiusz Miskiewicz,
 Wolfgang Rupprecht, YASUOKA Masahiko, Nobumichi Ozoe,
 Frederic SOULIER, Koji Kondo, David PATE, Kenjiro Komaki, Satosi KOBAYASI,
 Takashi Tanaka, Heiko W. Rupp, Kazuto Ushioda, Masahiro Ishiyama,
 Bill Sommerfeld, Jason Thorpe, Yasunari Momoi, Chris P. Ross,
 Hideaki Imaizumi, Alexander Fung, Scott Mace, Peter Tattam,
-Hideaki YOSHIFUJI, Naoyasu Takenaka and Wada Keiji.
-(in no particular order).
+Hideaki YOSHIFUJI, Naoyasu Takenaka, Wada Keiji, Theo de Raadt,
+Niels Baggesen, Takahiro Yugawa, Laine Stump, Hans-Joachim Knobloch,
+Angelos D. Keromytis and KOIE Hidetaka (in no particular order).
 
 We also would like to thank BSDI (http://www.bsdi.com/) for donating
 BSD/OS licenses for development.
