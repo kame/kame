@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.8 2000/01/09 01:31:29 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.9 2000/01/10 16:33:46 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -1333,6 +1333,8 @@ pk_recvacquire(mhp)
 		 * then I get the acquire message in the 1st.
 		 * Delete old pst in order to keeping process.
 		 */
+		unbindph12(iph2);
+		remph2(iph2);
 		delph2(iph2);
 		iph2 = NULL;
 	}
