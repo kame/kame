@@ -1,4 +1,4 @@
-/*    $KAME: sctp_header.h,v 1.6 2003/03/10 05:58:12 itojun Exp $     */
+/*    $KAME: sctp_header.h,v 1.7 2003/04/23 10:26:51 itojun Exp $     */
 /*	Header: /home/sctpBsd/netinet/sctp_header.h,v 1.34 2002/04/03 21:10:19 lei Exp	*/
 
 #ifndef __sctp_header_h__
@@ -418,7 +418,7 @@ struct sctp_packet_drop {
 
 #define SCTP_MED_V4_OVERHEAD (sizeof(struct sctp_data_chunk) + \
 			      sizeof(struct sctphdr) + \
-  			      sizeof(struct ip))
+			      sizeof(struct ip))
 
 #define SCTP_MIN_V4_OVERHEAD (sizeof(struct ip) + \
                               sizeof(struct sctphdr))

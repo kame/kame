@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.83 2003/03/04 18:57:32 t-momose Exp $	*/
+/*	$KAME: icmp6.h,v 1.84 2003/04/23 10:26:51 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -677,11 +677,11 @@ struct rr_pco_use {		/* use prefix part */
 #define ICMP6_RR_PCOUSE_RAFLAGS_AUTO	0x40
 
 #if BYTE_ORDER == BIG_ENDIAN
-#define ICMP6_RR_PCOUSE_FLAGS_DECRVLTIME     0x80000000
-#define ICMP6_RR_PCOUSE_FLAGS_DECRPLTIME     0x40000000
+#define ICMP6_RR_PCOUSE_FLAGS_DECRVLTIME	0x80000000
+#define ICMP6_RR_PCOUSE_FLAGS_DECRPLTIME	0x40000000
 #elif BYTE_ORDER == LITTLE_ENDIAN
-#define ICMP6_RR_PCOUSE_FLAGS_DECRVLTIME     0x80
-#define ICMP6_RR_PCOUSE_FLAGS_DECRPLTIME     0x40
+#define ICMP6_RR_PCOUSE_FLAGS_DECRVLTIME	0x80
+#define ICMP6_RR_PCOUSE_FLAGS_DECRPLTIME	0x40
 #endif
 
 struct rr_result {		/* router renumbering result message */

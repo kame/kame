@@ -1,4 +1,4 @@
-/*	$KAME: sctp_callout.h,v 1.2 2002/05/20 05:50:02 itojun Exp $	*/
+/*	$KAME: sctp_callout.h,v 1.3 2003/04/23 10:26:51 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_callout.h,v 1.3 2002/04/04 16:35:21 randall Exp	*/
 
 #ifndef __SCTP_CALLOUT__
@@ -36,7 +36,7 @@
 #define _SCTP_NEEDS_CALLOUT_ 1
 
 struct callout {
-        TAILQ_ENTRY(callout) tqe;
+	TAILQ_ENTRY(callout) tqe;
 	int	c_time;				/* ticks to the event */
 	void	*c_arg;				/* function argument */
 	void	(*c_func) __P((void *));	/* function to call */

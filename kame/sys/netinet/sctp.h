@@ -1,4 +1,4 @@
-/*    $KAME: sctp.h,v 1.10 2003/03/10 05:58:12 itojun Exp $    */
+/*    $KAME: sctp.h,v 1.11 2003/04/23 10:26:51 itojun Exp $    */
 /*	Header: /home/sctpBsd/netinet/sctp.h,v 1.43 2002/04/02 15:34:44 lei Exp	*/
 
 
@@ -112,30 +112,30 @@ struct sctp_paramhdr {
 /* Blocking I/O is controled by the SS_NBIO flag on the
  * socket state so_state field.
  */
-#define SCTP_GET_SNDBUF_USE		 0x00008000
+#define SCTP_GET_SNDBUF_USE		0x00008000
 /* latter added read/write */
-#define SCTP_SET_ADAPTION_LAYER_BITS	 0x00010000
-#define SCTP_DISABLE_FRAGMENTS           0x00020000
+#define SCTP_SET_ADAPTION_LAYER_BITS	0x00010000
+#define SCTP_DISABLE_FRAGMENTS		0x00020000
 /* sctp_bindx() flags as socket options */
-#define SCTP_BINDX_ADD_ADDR		 0x00040000
-#define SCTP_BINDX_REM_ADDR		 0x00080000
+#define SCTP_BINDX_ADD_ADDR		0x00040000
+#define SCTP_BINDX_REM_ADDR		0x00080000
 /* return the total count in bytes needed to hold all local addresses bound */
-#define SCTP_GET_LOCAL_ADDR_SIZE	 0x00100000
+#define SCTP_GET_LOCAL_ADDR_SIZE	0x00100000
 /* Without this applied we will give V4 and V6 addresses on a V6 socket */
-#define SCTP_I_WANT_MAPPED_V4_ADDR	 0x00200000
+#define SCTP_I_WANT_MAPPED_V4_ADDR	0x00200000
 /* Return the total count in bytes needed to hold the remote address */
-#define SCTP_GET_REMOTE_ADDR_SIZE	 0x00400000
-#define SCTP_GET_PEGS			 0x00800000
-#define SCTP_DEFAULT_SEND_PARAM		 0x01000000
-#define SCTP_SET_DEBUG_LEVEL		 0x02000000
-#define SCTP_RTOINFO			 0x04000000
-#define SCTP_AUTO_ASCONF		 0x08000000
-#define SCTP_MAXBURST			 0x10000000
-#define SCTP_GET_CWND_LOG                0x20000000
+#define SCTP_GET_REMOTE_ADDR_SIZE	0x00400000
+#define SCTP_GET_PEGS			0x00800000
+#define SCTP_DEFAULT_SEND_PARAM		0x01000000
+#define SCTP_SET_DEBUG_LEVEL		0x02000000
+#define SCTP_RTOINFO			0x04000000
+#define SCTP_AUTO_ASCONF		0x08000000
+#define SCTP_MAXBURST			0x10000000
+#define SCTP_GET_CWND_LOG		0x20000000
 /* Test/debug get a route */
 
 /* Debug things that need to be purged */
-#define SCTP_SET_INITIAL_DBG_SEQ	 0x80000000
+#define SCTP_SET_INITIAL_DBG_SEQ	0x80000000
 
 /*
  * user state values
@@ -158,12 +158,12 @@ struct sctp_paramhdr {
 #define SCTP_ERROR_INVALID_STREAM	0x0001
 #define SCTP_ERROR_MISSING_PARAM	0x0002
 #define SCTP_ERROR_STALE_COOKIE		0x0003
-#define SCTP_ERROR_OUT_OF_RESOURCES 	0x0004
-#define SCTP_ERROR_UNRESOLVABLE_ADDR   	0x0005
-#define SCTP_ERROR_UNRECOG_CHUNK   	0x0006
+#define SCTP_ERROR_OUT_OF_RESOURCES	0x0004
+#define SCTP_ERROR_UNRESOLVABLE_ADDR	0x0005
+#define SCTP_ERROR_UNRECOG_CHUNK	0x0006
 #define SCTP_ERROR_INVALID_PARAM	0x0007
-#define SCTP_ERROR_UNRECOG_PARAM       	0x0008
-#define SCTP_ERROR_NO_USER_DATA    	0x0009
+#define SCTP_ERROR_UNRECOG_PARAM	0x0008
+#define SCTP_ERROR_NO_USER_DATA		0x0009
 #define SCTP_ERROR_COOKIE_IN_SHUTDOWN	0x000a
 /* draft-ietf-tsvwg-sctpimpguide */
 #define SCTP_ERROR_RESTART_NEWADDRS	0x000b

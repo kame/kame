@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.h,v 1.9 2003/04/21 06:26:11 itojun Exp $	*/
+/*	$KAME: sctp_pcb.h,v 1.10 2003/04/23 10:26:51 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.h,v 1.92 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_pcb_h__
@@ -91,8 +91,8 @@ LIST_HEAD(sctpvtaghead, sctp_tagblock);
 #define SCTP_PCB_FLAGS_RECVPEERERR	0x00002000
 #define SCTP_PCB_FLAGS_RECVSENDFAILEVNT	0x00004000
 #define SCTP_PCB_FLAGS_RECVSHUTDOWNEVNT	0x00008000
-#define SCTP_PCB_FLAGS_ADAPTIONEVNT     0x00010000
-#define SCTP_PCB_FLAGS_PDAPIEVNT        0x00020000
+#define SCTP_PCB_FLAGS_ADAPTIONEVNT	0x00010000
+#define SCTP_PCB_FLAGS_PDAPIEVNT	0x00020000
 #define SCTP_PCB_FLAGS_NO_FRAGMENT	0x00040000
 /* TCP model support */
 #define SCTP_PCB_FLAGS_CONNECTED	0x00080000
@@ -102,12 +102,12 @@ LIST_HEAD(sctpvtaghead, sctp_tagblock);
 #define SCTP_PCB_FLAGS_WAKEINPUT	0x00800000
 #define SCTP_PCB_FLAGS_BOUND_V6		0x01000000
 #define SCTP_PCB_FLAGS_NEEDS_MAPPED_V4	0x02000000
-#define SCTP_PCB_FLAGS_BLOCKING_IO      0x04000000
+#define SCTP_PCB_FLAGS_BLOCKING_IO	0x04000000
 #define SCTP_PCB_FLAGS_SOCKET_GONE	0x08000000
 #define SCTP_PCB_FLAGS_SOCKET_ALLGONE	0x10000000
 
 /* flags to copy to new PCB */
-#define SCTP_PCB_COPY_FLAGS             0x0707ff64
+#define SCTP_PCB_COPY_FLAGS		0x0707ff64
 
 #define SCTP_PCBHASH_ALLADDR(port, mask) (port & mask)
 
@@ -314,10 +314,10 @@ struct sctp_inpcb {
 #endif
 #ifndef __FreeBSD__
 #ifndef INP_IPV6
-#define INP_IPV6 0x1
+#define INP_IPV6	0x1
 #endif
 #ifndef INP_IPV4
-#define INP_IPV4 0x2
+#define INP_IPV4	0x2
 #endif
 	u_char inp_vflag;
 	u_char inp_ip_ttl;

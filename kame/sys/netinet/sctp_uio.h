@@ -1,4 +1,4 @@
-/*	$KAME: sctp_uio.h,v 1.5 2003/04/21 06:26:11 itojun Exp $	*/
+/*	$KAME: sctp_uio.h,v 1.6 2003/04/23 10:26:51 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_uio.h,v 1.40 2002/04/04 16:34:41 lei Exp	*/
 
 #ifndef __sctp_uio_h__
@@ -197,17 +197,17 @@ struct sctp_rcv_pdapi_event {
 };
 
 /* pdapi indications */
-#define SCTP_PARTIAL_DELIVERY_ABORTED  0x0001
+#define SCTP_PARTIAL_DELIVERY_ABORTED	0x0001
 
 
 /* notification types */
-#define SCTP_ASSOC_CHANGE	         0x0001
-#define SCTP_PEER_ADDR_CHANGE	         0x0002
-#define SCTP_REMOTE_ERROR	         0x0003
-#define SCTP_SEND_FAILED	         0x0004
-#define SCTP_SHUTDOWN_EVENT	         0x0005
-#define SCTP_ADAPTION_INDICATION         0x0006
-#define SCTP_PARTIAL_DELIVERY_EVENT      0x0007
+#define SCTP_ASSOC_CHANGE		0x0001
+#define SCTP_PEER_ADDR_CHANGE		0x0002
+#define SCTP_REMOTE_ERROR		0x0003
+#define SCTP_SEND_FAILED		0x0004
+#define SCTP_SHUTDOWN_EVENT		0x0005
+#define SCTP_ADAPTION_INDICATION	0x0006
+#define SCTP_PARTIAL_DELIVERY_EVENT	0x0007
 
 struct sctp_tlv {
 	u_int16_t sn_type;
