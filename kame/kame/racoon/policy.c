@@ -1,4 +1,4 @@
-/*	$KAME: policy.c,v 1.40 2001/06/27 15:55:57 sakane Exp $	*/
+/*	$KAME: policy.c,v 1.41 2001/08/16 14:37:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -413,7 +413,7 @@ spidx2str(spidx)
 	blen = sizeof(buf) - 1;
 	p = buf;
 
-	a = saddr2str((struct sockaddr *)&spidx->src);
+	a = saddr2str((const struct sockaddr *)&spidx->src);
 	for (b = a; *b != '\0'; b++)
 		if (*b == '[') {
 			*b = '\0';
@@ -424,7 +424,7 @@ spidx2str(spidx)
 	p += i;
 	blen -= i;
 
-	a = saddr2str((struct sockaddr *)&spidx->dst);
+	a = saddr2str((const struct sockaddr *)&spidx->dst);
 	for (b = a; *b != '\0'; b++)
 		if (*b == '[') {
 			*b = '\0';

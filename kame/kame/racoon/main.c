@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.39 2001/08/13 12:55:50 itojun Exp $	*/
+/*	$KAME: main.c,v 1.40 2001/08/16 14:37:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -197,7 +197,7 @@ main(ac, av)
 	if (f_foreground)
 		close(0);
 	else {
-		char *pid_file = _PATH_VARRUN "racoon.pid";
+		const char *pid_file = _PATH_VARRUN "racoon.pid";
 		pid_t pid;
 		FILE *fp;
 
@@ -246,7 +246,7 @@ main(ac, av)
 static void
 cleanup_pidfile()
 {
-	char *pid_file = _PATH_VARRUN "racoon.pid";
+	const char *pid_file = _PATH_VARRUN "racoon.pid";
 
 	(void) unlink(pid_file);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.155 2001/08/16 14:09:43 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.156 2001/08/16 14:37:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1259,13 +1259,13 @@ isakmp_pindex(index, msgid)
 	const u_int32_t msgid;
 {
 	static char buf[64];
-	u_char *p;
+	const u_char *p;
 	int i, j;
 
 	memset(buf, 0, sizeof(buf));
 
 	/* copy index */
-	p = (u_char *)index;
+	p = (const u_char *)index;
 	for (j = 0, i = 0; i < sizeof(isakmp_index); i++) {
 		snprintf((char *)&buf[j], sizeof(buf) - j, "%02x", p[i]);
 		j += 2;
@@ -1333,7 +1333,7 @@ isakmp_open()
 		switch (p->addr->sa_family) {
 		case AF_INET:
 			if (setsockopt(p->sock, IPPROTO_IP, IP_RECVDSTADDR,
-					(void *)&yes, sizeof(yes)) < 0) {
+					(const void *)&yes, sizeof(yes)) < 0) {
 				plog(LLV_ERROR, LOCATION, NULL,
 					"setsockopt (%s)\n", strerror(errno));
 				goto err_and_next;
@@ -1351,7 +1351,7 @@ isakmp_open()
 			pktinfo = IPV6_RECVDSTADDR;
 #endif
 			if (setsockopt(p->sock, IPPROTO_IPV6, pktinfo,
-					(void *)&yes, sizeof(yes)) < 0)
+					(const void *)&yes, sizeof(yes)) < 0)
 			{
 				plog(LLV_ERROR, LOCATION, NULL,
 					"setsockopt(%d): %s\n",
