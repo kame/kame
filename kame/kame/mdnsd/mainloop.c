@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.34 2000/05/31 17:35:14 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.35 2000/05/31 17:39:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -451,6 +451,7 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs, scoped)
 	struct sockaddr_in *sin;
 	struct sockaddr_in6 *sin6;
 	struct in6_addr in6;
+	int scopecnt;
 
 	p = replybuf + off;
 	*naddrs = 0;
@@ -458,6 +459,7 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs, scoped)
 	if (getifaddrs(&ifap) != 0)
 		goto fail;
 
+	scopecnt = 0;
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
 		switch (type) {
 		case T_A:
@@ -504,6 +506,7 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs, scoped)
 					continue;
 				if (strcmp(ifa->ifa_name, intface) != 0)
 					continue;
+				scopecnt++;
 			}
 			if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
 				if (!scoped)
@@ -516,6 +519,7 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs, scoped)
 					in6.s6_addr[2] = in6.s6_addr[3] = 0;
 				alen = sizeof(in6);
 				abuf = (char *)&in6;
+				scopecnt++;
 			} else {
 				alen = sizeof(sin6->sin6_addr);
 				abuf = (char *)&sin6->sin6_addr;
@@ -538,7 +542,7 @@ encode_myaddrs(n, type, class, replybuf, off, buflen, naddrs, scoped)
 		p += sizeof(u_int16_t);
 		*(u_int16_t *)p = htons(nclass);
 		p += sizeof(u_int16_t);
-		*(int32_t *)p = htonl(scoped ? 0 : 30);	/*TTL*/
+		*(int32_t *)p = htonl(scopecnt ? 0 : 30);	/*TTL*/
 		p += sizeof(int32_t);
 		*(u_int16_t *)p = htons(alen);
 		p += sizeof(u_int16_t);
