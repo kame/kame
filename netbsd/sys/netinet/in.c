@@ -918,8 +918,8 @@ bad:
 }
 
 #define rtinitflags(x) \
-	((((x)->ia_ifp->if_flags & (IFF_LOOPBACK | IFF_POINTOPOINT)) != 0) \
-		? RTF_HOST : 0)
+	(((((x)->ia_ifp->if_flags & (IFF_LOOPBACK | IFF_POINTOPOINT)) != 0) && \
+	  (x)->ia_dstaddr.sin_family == AF_INET) ? RTF_HOST : 0)
 
 /* (may) add a route to prefix ("connected route" in cisco terminology) */
 int
@@ -943,7 +943,7 @@ in_addprefix(target, flags)
 		if (mask.s_addr != ia->ia_sockmask.sin_addr.s_addr)
 			continue;
 
-		if (rtinitflags(ia) && ia->ia_dstaddr.sin_family == AF_INET)
+		if (rtinitflags(ia))
 			p = ia->ia_dstaddr.sin_addr;
 		else
 			p = ia->ia_addr.sin_addr;
@@ -979,7 +979,7 @@ in_scrubprefix(target)
 	if ((target->ia_flags & IFA_ROUTE) == 0)
 		return 0;
 
-	if (rtinitflags(target) && target->ia_dstaddr.sin_family == AF_INET)
+	if (rtinitflags(target))
 		prefix = target->ia_dstaddr.sin_addr;
 	else
 		prefix = target->ia_addr.sin_addr;
@@ -991,7 +991,7 @@ in_scrubprefix(target)
 		if (mask.s_addr != ia->ia_sockmask.sin_addr.s_addr)
 			continue;
 
-		if (rtinitflags(ia) && ia->ia_dstaddr.sin_family == AF_INET)
+		if (rtinitflags(ia))
 			p = ia->ia_dstaddr.sin_addr;
 		else
 			p = ia->ia_addr.sin_addr;
