@@ -482,6 +482,41 @@ pass:
 	if (rsvp_on && ip->ip_p==IPPROTO_RSVP) 
 		goto ours;
 
+#ifdef NATPT
+	/*
+	 * NATPT (Network Address Translation - Protocol Translation)
+	 */
+	if (ip6_protocol_tr) {
+		struct mbuf	*m1 = NULL;
+	    
+		switch (natpt_in4(m, &m1)) {
+		  case IPPROTO_IP:		/* this packet is not changed	*/
+			goto checkaddresses;
+
+		case IPPROTO_IPV4:
+			ip_forward(m1, 0);
+			break;
+
+		case IPPROTO_IPV6:
+			ip6_forward(m1, 1);
+			break;
+
+		case IPPROTO_DONE:			/* discard without free	*/
+			return;
+
+		case IPPROTO_MAX:			/* discard this packet	*/
+		default:
+			break;
+		}
+
+		if (m != m1)
+			m_freem(m);
+
+		return;
+	}
+checkaddresses:
+#endif
+
 	/*
 	 * Check our list of addresses, to see if the packet is for us.
 	 * If we don't have any addresses, assume any unicast packet
@@ -580,33 +615,6 @@ pass:
 	}
 #endif
 
-#ifdef NATPT
-	/*
-	 *
-	 */
-	if (ip6_protocol_tr)
-	{
-	    struct mbuf	*m1 = NULL;
-	    
-	    switch (natpt_in4(m, &m1))
-	    {
-	      case IPPROTO_IP:					goto forwarding;
-	      case IPPROTO_IPV4:	ip_forward(m1, 0);	break;
-	      case IPPROTO_IPV6:	ip6_forward(m1, 1);	break;
-	      case IPPROTO_MAX:			/* discard this packet	*/
-	      default:						break;
-
-	      case IPPROTO_DONE:		/* discard without free	*/
-		return;
-	    }
-
-	    if (m != m1)
-		m_freem(m);
-
-	    return;
-	}
-  forwarding:
-#endif
 	/*
 	 * Not for us; forward if possible and desirable.
 	 */
