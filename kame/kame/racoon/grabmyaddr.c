@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: grabmyaddr.c,v 1.8 2000/02/07 18:03:20 itojun Exp $ */
+/* YIPS @(#)$Id: grabmyaddr.c,v 1.9 2000/04/05 04:48:41 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -153,7 +153,8 @@ grab_myaddrs()
 
 	if ((s = socket(PF_INET, SOCK_DGRAM, 0)) < 0) {
 		plog(logp, LOCATION, NULL,
-			"socket(SOCK_DGRAM)\n");
+			"socket(SOCK_DGRAM) failed: %s\n",
+			strerror(errno));
 		exit(1);
 		/*NOTREACHED*/
 	}
@@ -162,7 +163,8 @@ grab_myaddrs()
 	ifconf.ifc_len = len;
 	if (ioctl(s, SIOCGIFCONF, &ifconf) < 0) {
 		plog(logp, LOCATION, NULL,
-			"ioctl(SIOCGIFCONF)\n");
+			"ioctl(SIOCGIFCONF) failed: %s\n",
+			strerror(errno));
 		exit(1);
 		/*NOTREACHED*/
 	}
@@ -203,7 +205,7 @@ grab_myaddrs()
 			}
 #endif
 #endif
-			YIPSDEBUG(DEBUG_MISC,
+			YIPSDEBUG(DEBUG_NET,
 				if (getnameinfo(p->addr, p->addr->sa_len,
 						_addr1_, sizeof(_addr1_),
 						NULL, 0,
@@ -240,7 +242,8 @@ update_myaddrs()
 	len = read(lcconf->rtsock, msg, sizeof(msg));
 	if (len < 0) {
 		plog(logp, LOCATION, NULL,
-			"read(PF_ROUTE) failed\n");
+			"read(PF_ROUTE) failed: %s\n",
+			strerror(errno));
 		return 0;
 	}
 	if (len < sizeof(*rtm)) {
@@ -263,13 +266,14 @@ update_myaddrs()
 	case RTM_IFINFO:
 		break;
 	default:
-		plog(logp, LOCATION, NULL,
-			"msg %d not interesting\n", rtm->rtm_type);
+		YIPSDEBUG(DEBUG_NET,
+			plog(logp, LOCATION, NULL,
+				"msg %d not interesting\n", rtm->rtm_type));
 		return 0;
 	}
 	/* XXX more filters here? */
 
-	YIPSDEBUG(DEBUG_MISC,
+	YIPSDEBUG(DEBUG_NET,
 		plog(logp, LOCATION, NULL,
 			"need update interface address list\n"));
 	return 1;
@@ -293,9 +297,8 @@ autoconf_myaddrsport()
 #endif
 	int n;
 
-	YIPSDEBUG(DEBUG_INFO,
-		plog(logp, LOCATION, NULL,
-			"configuring default isakmp port.\n"));
+	plog(logp, LOCATION, NULL,
+		"configuring default isakmp port.\n");
 	n = 0;
 	for (p = lcconf->myaddrs; p; p = p->next) {
 		switch (p->addr->sa_family) {
@@ -316,15 +319,13 @@ autoconf_myaddrsport()
 		}
 		n++;
 	}
-	YIPSDEBUG(DEBUG_MISC,
+	YIPSDEBUG(DEBUG_NET,
 		plog(logp, LOCATION, NULL,
 			"isakmp_autoconf success, %d addrs\n", n));
 
 	return 0;
 err:
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, NULL,
-			"isakmp_autoconf fail\n"));
+	plog(logp, LOCATION, NULL, "isakmp_autoconf fail\n");
 	return -1;
 }
 
@@ -358,7 +359,8 @@ newmyaddr()
 	new = CALLOC(sizeof(*new), struct myaddrs *);
 	if (new == NULL) {
 		plog(logp, LOCATION, NULL,
-			"%s\n", strerror(errno)); 
+			"failed to allocate buffer for myaddrs (%s)\n",
+			strerror(errno)); 
 		return NULL;
 	}
 
@@ -393,7 +395,8 @@ initmyaddr()
 	lcconf->rtsock = socket(PF_ROUTE, SOCK_RAW, PF_UNSPEC);
 	if (lcconf->rtsock < 0) {
 		plog(logp, LOCATION, NULL,
-			"socket(PF_ROUTE): %s", strerror(errno));
+			"socket(PF_ROUTE) failed: %s",
+			strerror(errno));
 		return -1;
 	}
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: debug.h,v 1.4 2000/02/16 10:58:16 sakane Exp $ */
+/* YIPS @(#)$Id: debug.h,v 1.5 2000/04/05 04:48:40 sakane Exp $ */
 
 #define DEBUG_INFO	0x00000002	/*XX*/
 #define DEBUG_NOTIFY	0x00000004	/*XX*/
@@ -45,7 +45,7 @@
 #define DEBUG_KEY	0x00200000	/*XX*/
 #define DEBUG_IPSEC	0x00100000	/*XX*/
 #define DEBUG_SA	0x00080000	/*XX*/
-#define DEBUG_NET	0x00040000	/*XX*/
+#define DEBUG_NET	0x00040000	/* network interface & packet dump */
 #define DEBUG_CERT	0x00001000	/* certificate */
 #define DEBUG_PCOMM	0x00000800	/*XX*/
 #define DEBUG_ADMIN	0x00000400	/*XX*/
