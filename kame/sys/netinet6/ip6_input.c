@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.265 2002/02/12 08:05:46 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.266 2002/02/14 05:20:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -307,18 +307,6 @@ ip6_init2(dummy)
 {
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
-#endif
-
-	/*
-	 * to route local address of p2p link to loopback,
-	 * assign loopback address first.
-	 */
-#ifdef __bsdi__
-	in6_ifattach(loifp, NULL);
-#elif defined(__OpenBSD__)
-	in6_ifattach(lo0ifp, NULL);
-#else
-	in6_ifattach(&loif[0], NULL);
 #endif
 
 	/* nd6_timer_init */
