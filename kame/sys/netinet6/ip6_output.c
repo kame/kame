@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.244 2001/12/07 07:27:04 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.245 2001/12/07 07:54:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1222,9 +1222,8 @@ skip_ipsec2:;
 		 * We eventually have sockaddr_in6 and use the sin6_scope_id
 		 * field of the structure here.
 		 * We rely on the consistency between two scope zone ids
-		 * of source add destination, which should already be assured
-		 * larger scopes than link will be supported in the near
-		 * future.
+		 * of source and destination, which should already be assured.
+		 * Larger scopes than link will be supported in the future. 
 		 */
 		origifp = NULL;
 		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src)) {
