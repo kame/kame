@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2096 2002/03/02 09:58:55 jinmei Exp $
+$KAME: CHANGELOG,v 1.2097 2002/03/02 16:56:14 keiichi Exp $
 
 <200203>
+Sun Mar  3 01:51:54 JST 2002 Keiichi SHIMA <keiichi@iij.ad.jp>
+	* kame/sys/netinet6/{in6.c|mip6.c|mip_var.h|nd6_rtr.c}
+	check the CoA when p2p address (like gif) is set.  this enables
+	you to use MIP6 with molec.
+
 2002-03-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_ctloutput, and related
 	functions):
