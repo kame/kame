@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.86 2001/11/07 03:30:53 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.87 2001/11/07 05:22:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -688,6 +688,7 @@ decode_edns0(hp, bufp, len)
 	buf++;
 	if (ntohs(*(u_int16_t *)&buf[0]) != T_OPT || buf[4] != NOERROR ||
 	    buf[5] != 0)
+		return -1;
 	if (ntohs(*(u_int16_t *)&buf[6]) != 0)	/*MBZ*/
 		return -1;
 	if (ntohs(*(u_int16_t *)&buf[8]) != 0)	/*RDLEN*/
