@@ -1,4 +1,4 @@
-/*	$KAME: natpt_usrreq.c,v 1.13 2001/03/03 12:15:59 fujisawa Exp $	*/
+/*	$KAME: natpt_usrreq.c,v 1.14 2001/03/23 07:51:29 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -141,6 +141,11 @@ struct pr_usrreqs natpt_usrreqs =
 };
 #endif	/* __FreeBSD__ >= 3 */
 #endif	/* __FreeBSD__      */
+
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+MALLOC_DECLARE(M_NATPT);
+#endif
 
 
 /*
@@ -577,12 +582,12 @@ _natptTestLog(caddr_t addr)
     char		*fragile;
     struct natpt_msgBox	*mbox = (struct natpt_msgBox *)addr;
 
-    MALLOC(fragile, char *, mbox->size, M_TEMP, M_WAITOK);
+    MALLOC(fragile, char *, mbox->size, M_NATPT, M_WAITOK);
     copyin(mbox->freight, fragile, mbox->size);
 
     natpt_logMsg(LOG_DEBUG, fragile, mbox->size);
 
-    FREE(fragile, M_TEMP);
+    FREE(fragile, M_NATPT);
     return (0);
 }
 

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.15 2001/03/03 12:17:11 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.16 2001/03/23 07:51:29 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -79,6 +79,13 @@ extern	int	toOneself4	__P((struct ifBox *, struct _cv *));
 extern	void	setMTU		__P((void));
 
 static	void	natpt_in4_len2mask	__P((struct in_addr *, int));
+
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+MALLOC_DECLARE(M_NATPT);
+#endif
+
+
 /*
  *
  */
@@ -411,7 +418,7 @@ _natptSetRule(caddr_t addr)
     if (mbx->flags == NATPT_FAITH)
 	return (_natptSetFaithRule(addr));
 
-    MALLOC(cst, struct _cSlot *, sizeof(struct _cSlot), M_TEMP, M_WAITOK);
+    MALLOC(cst, struct _cSlot *, sizeof(struct _cSlot), M_NATPT, M_WAITOK);
     copyin(mbx->freight, cst, sizeof(struct _cSlot));
 
     {
@@ -461,7 +468,7 @@ _natptSetFaithRule(caddr_t addr)
     struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
     struct _cSlot	*cst;
 
-    MALLOC(cst, struct _cSlot *, sizeof(struct _cSlot), M_TEMP, M_WAITOK);
+    MALLOC(cst, struct _cSlot *, sizeof(struct _cSlot), M_NATPT, M_WAITOK);
     copyin(mbx->freight, cst, sizeof(struct _cSlot));
 
     LST_hookup_list(&natptFaith, cst);
@@ -491,7 +498,7 @@ _natptSetPrefix(caddr_t addr)
     struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
     struct pAddr	*load;
 
-    MALLOC(load, struct pAddr *, sizeof(struct pAddr), M_TEMP, M_WAITOK);
+    MALLOC(load, struct pAddr *, sizeof(struct pAddr), M_NATPT, M_WAITOK);
     copyin(mbx->freight, load, SZSIN6 * 2);
 
     if (mbx->flags & PREFIX_FAITH)
@@ -511,7 +518,7 @@ _natptSetPrefix(caddr_t addr)
 	natpt_logIN6addr(LOG_INFO, "NATPT prefixmask: ", &natpt_prefixmask);
     }
 
-    FREE(load, M_TEMP);
+    FREE(load, M_NATPT);
     return (0);
 }
 
@@ -542,7 +549,7 @@ _flushPtrRules(struct _cell **anchor)
 	p0 = CDR(p0);
 
 	cslt = (struct _cSlot *)CAR(p1);
-	FREE(cslt, M_TEMP);
+	FREE(cslt, M_NATPT);
 	LST_free(p1);
     }
 

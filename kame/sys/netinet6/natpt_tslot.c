@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.15 2001/03/18 10:28:26 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.16 2001/03/23 07:51:29 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -264,7 +264,7 @@ internIncomingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
     struct pAddr	*local, *remote;
     struct _tSlot	*ats;
 
-    MALLOC(ats, struct _tSlot *, sizeof(struct _tSlot), M_TEMP, M_NOWAIT);
+    MALLOC(ats, struct _tSlot *, sizeof(struct _tSlot), M_NATPT, M_NOWAIT);
     if (ats == NULL)
     {
 	printf("ENOBUFS in internIncomingV4Hash %d\n", __LINE__);
@@ -360,7 +360,7 @@ internOutgoingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
     struct pAddr	*local, *remote;
     struct _tSlot	*ats;
 
-    MALLOC(ats, struct _tSlot *, sizeof(struct _tSlot), M_TEMP, M_NOWAIT);
+    MALLOC(ats, struct _tSlot *, sizeof(struct _tSlot), M_NATPT, M_NOWAIT);
     if (ats == NULL)
     {
 	printf("ENOBUFS in internOutgoingV4Hash %d\n", __LINE__);
@@ -372,7 +372,7 @@ internOutgoingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
     local = fillupOutgoing4local(acs, cv4, &ats->local);
     if ((remote = fillupOutgoing4Remote(acs, cv4, &ats->remote)) == NULL)
     {
-	FREE(ats, M_TEMP);
+	FREE(ats, M_NATPT);
 	return (NULL);
     }
 
@@ -404,7 +404,7 @@ internIncomingV6Hash(int sess, struct _cSlot *acs, struct _cv *cv6)
     struct pAddr	*local, *remote;
     struct _tSlot	*ats;
 
-    MALLOC(ats, struct _tSlot *, sizeof(struct _tSlot), M_TEMP, M_NOWAIT);
+    MALLOC(ats, struct _tSlot *, sizeof(struct _tSlot), M_NATPT, M_NOWAIT);
     if (ats == NULL)
     {
 	printf("ENOBUFS in internIncomingV6Hash %d\n", __LINE__);
@@ -465,7 +465,7 @@ internOutgoingV6Hash(int sess, struct _cSlot *acs, struct _cv *cv6)
 
     natpt_logIp6(LOG_DEBUG, cv6->_ip._ip6, NULL);
 
-    MALLOC(ats, struct _tSlot *, sizeof(struct _tSlot), M_TEMP, M_NOWAIT);
+    MALLOC(ats, struct _tSlot *, sizeof(struct _tSlot), M_NATPT, M_NOWAIT);
     if (ats == NULL)
     {
 	printf("ENOBUFS in internOutgoingV6Hash %d\n", __LINE__);
@@ -477,7 +477,7 @@ internOutgoingV6Hash(int sess, struct _cSlot *acs, struct _cv *cv6)
     local = fillupOutgoingV6local(acs, cv6, &ats->local);
     if ((remote = fillupOutgoingV6Remote(acs, cv6, &ats->remote)) == 0)
     {
-	FREE(ats, M_TEMP);
+	FREE(ats, M_NATPT);
 	return (NULL);
     }
 

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.18 2001/03/18 10:28:26 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.19 2001/03/23 07:51:29 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -994,7 +994,7 @@ natpt_initialize()
 	    if (((ifa->ifa_addr->sa_family) == AF_INET)
 		|| ((ifa->ifa_addr->sa_family) == AF_INET6))
 	    {
-		MALLOC(ibox, struct ifBox *, sizeof(struct ifBox), M_TEMP, M_WAITOK);
+		MALLOC(ibox, struct ifBox *, sizeof(struct ifBox), M_NATPT, M_WAITOK);
 #ifdef __NetBSD__
 		sprintf(ibox->ifName, "%s",  ifn->if_xname);
 #else
