@@ -1,4 +1,4 @@
-/*	$KAME: bf_skey.c,v 1.6 2001/09/10 04:03:56 itojun Exp $	*/
+/*	$KAME: bf_skey.c,v 1.7 2002/02/27 01:33:59 itojun Exp $	*/
 /*	$NetBSD: bf_skey.c,v 1.2 2000/11/06 14:11:40 itojun Exp $	*/
 
 /* crypto/bf/bf_skey.c */
@@ -110,14 +110,14 @@ BF_set_key(key, len, data)
 	in[0] = 0L;
 	in[1] = 0L;
 	for (i = 0; i < BF_ROUNDS + 2; i += 2) {
-		BF_encrypt(in, key, BF_ENCRYPT);
+		BF_encrypt(in, key);
 		p[i  ] = in[0];
 		p[i+1] = in[1];
 	}
 
 	p = key->S;
 	for (i = 0; i < 4 * 256; i += 2) {
-		BF_encrypt(in, key, BF_ENCRYPT);
+		BF_encrypt(in, key);
 		p[i  ] = in[0];
 		p[i+1] = in[1];
 	}
