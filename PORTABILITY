@@ -1,30 +1,31 @@
-Portability guideline
-KAME project
-$Id: PORTABILITY,v 1.9.2.1 1999/10/05 04:05:00 itojun Exp $
+	Portability guideline
+	KAME project
+	$Id: PORTABILITY,v 1.9.2.2 1999/10/07 03:10:22 kazu Exp $
 
 
-Source code in "kame" directory will be shared among operating systems
-and hardware platforms.  Here are several guidelines to be portable
-across those possibilities.
+Source code in the "kame" directory will be shared among operating
+systems and hardware platforms.  Here are several guidelines to be
+portable across those possibilities.
 
-- Developers MUST compile the code on two or more platforms, before committing
-  it to the repository (trivial changes or comment typos are okay).
+- Developers MUST compile the code on two or more platforms, before
+  committing it to the repository (trivial changes or comment typos
+  are okay).
 
 - Do not break paren-match.
   Always try to keep paren-match correctly, regardless of #ifdef.
   The following is WRONG example:
 	#if foo
-		if (hoge) {
+		if (bar) {
 	#else
-		if (hoge && hage) {
+		if (bar && baz) {
 	#endif
 			....
 		}
   It should be written like follows:
 	#if foo
-		if (hoge)
+		if (bar)
 	#else
-		if (hoge && hage)
+		if (bar && baz)
 	#endif
 		{
 			....
@@ -33,6 +34,8 @@ across those possibilities.
 - Follow NetBSD KNF.
   They are the most strict guys about source code formatting.
   If you obey NetBSD KNF, other platforms are happy.
+
+	http://www.netbsd.org/Documentation/kernel/programming.html
 
 - Pointer can be 64bit (for example, on alpha).
   When taking integer from pointer, use u_long, or long.
@@ -59,14 +62,15 @@ across those possibilities.
 
 - Packed structs must be used with care.
   Unaligned structure can cause problem on certain architectures.
-  You'll need to copy the return value to aligned structure before accessing.
+  You'll need to copy the return value to aligned structure before
+  accessing.
 
   Structure returned by SIOCGIFCONF falls into this category.
 
 - 2nd arg to ioctl() must be u_long, not int, on non-FreeBSD2 platforms.
 
 - If you define multi-statement #define, define that like:
-	#define foobaa (x, y) \
+	#define foobar (x, y) \
 	do { \
 		/*something*/ \
 	} while (0)
@@ -80,10 +84,10 @@ across those possibilities.
 	CFLAGS+=-I/usr/local/include
 	CFLAGS+=-g
 
-- To refer objects and machine-generated source code, FreeBSD needs to use
-  ${.OBJDIR}  This is because because FreeBSD completely separates "obj" tree
-  and "src" tree and has no symlink from ${.CURDIR}/obj to /usr/obj/foobaa.
-  On other platforms, ${.CURDIR}/obj should do.
+- To refer objects and machine-generated source code, FreeBSD needs to
+  use ${.OBJDIR} This is because because FreeBSD completely separates
+  "obj" tree and "src" tree and has no symlink from ${.CURDIR}/obj to
+  /usr/obj/foobar.  On other platforms, ${.CURDIR}/obj should do.
 
 - On manpage installation.
   for BSDI3, you need to set MAN[0-9] in Makefile like below.  MANDIR must
@@ -91,31 +95,31 @@ across those possibilities.
 	MANDIR=	/usr/local/v6/man/cat
 	MAN5=	foo.0
 	MAN8=	baz.0
-	MLINKS=	foo.5 baa.5
+	MLINKS=	foo.5 bar.5
   For NetBSD, you need to set MAN (not MAN[0-9]).  MANDIR needs to point to
   "man" directory right above "catN" or "manN" directory:
 	MANDIR=	/usr/local/v6/man
 	MAN=	foo.5 baz.8
-	MLINKS=	foo.5 baa.5
+	MLINKS=	foo.5 bar.5
 	MKPIC=	# if you do not want shlib, make it empty
   For OpenBSD, you need to set MAN (not MAN[0-9]).  MANDIR needs to point to
   "catN" directory, without "N":
 	MANDIR=	/usr/local/v6/man/cat
 	MAN=	foo.5 baz.8
-	MLINKS=	foo.5 baa.5
+	MLINKS=	foo.5 bar.5
 	NOPIC=	yes	# if you do not want shlib, define it
   For FreeBSD, you need to set MAN[0-9] like below.  MANDIR needs to point
   to "manN" directory, without "N":
 	MANDIR=	/usr/local/v6/man/man
 	MAN5=	foo.5
 	MAN8=	baz.8
-	MLINKS=	foo.5 baa.5
+	MLINKS=	foo.5 bar.5
 	# if you do not want shlib, do not define SHLIB_{MAJOR,MINOR}
 
 - BSDI3 /usr/bin/cc is gcc 1.42, and it does not support __FUNCTION__.
   If you need to use __FUNCTION__, you need to set CC to "gcc", or "shlicc2"
   explicitly.
-  __FUNCTION__ macro is not included in ANSI standard, so it is best to
+  __FUNCTION__ macro is not included in the ANSI standard, so it is best to
   avoid __FUNCTION__, or make it optional, for portability.
 
 - sys/queue.h are very different in each of *BSDs.  Most of macros found in
