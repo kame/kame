@@ -1,4 +1,4 @@
-.\"	$KAME: inet6.4,v 1.17 2000/11/24 08:48:22 itojun Exp $
+.\"	$KAME: inet6.4,v 1.18 2000/11/24 08:50:32 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -94,19 +94,6 @@ which is equal to IPv6 address
 to effect
 .Dq wildcard
 matching on incoming messages.
-The address in a
-.Xr connect 2
-or
-.Xr sendto 2
-call may be given as
-.Dq Dv ::
-to mean
-.Dq this host .
-.Dq Dv ::
-can be obtained by setting
-.Dv sin6_addr
-field into 0, or by using the address contained in variable
-.Dv in6addr_any .
 .Pp
 IPv6 specification defines scoped address,
 like link-local or site-local address.
