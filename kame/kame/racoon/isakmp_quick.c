@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.30 2000/05/30 01:58:47 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.31 2000/05/30 02:03:31 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1647,6 +1647,14 @@ get_sainfo_r(iph2)
 	return 0;
 }
 
+/*
+ * get remote's policy from SPD copied from kernel.
+ * If the type of ID payload is address or subnet type, then the index is
+ * made from the payload.  If there is no ID payload, or the type of ID
+ * payload is NOT address type, then the index is made from the address
+ * pair of phase 1.
+ * NOTE: This function is only for responder.
+ */
 static int
 get_proposal_r(iph2)
 	struct ph2handle *iph2;
@@ -1733,8 +1741,8 @@ get_proposal_r(iph2)
 				"get ipsec policy index from phase1 address "
 				"due to no ID payloads found.\n"));
 		KEY_SETSECSPIDX(IPSEC_DIR_INBOUND,
-				iph2->src,
 				iph2->dst,
+				iph2->src,
 				prefixlen,
 				prefixlen,
 				IPSEC_ULPROTO_ANY,
@@ -1745,8 +1753,8 @@ get_proposal_r(iph2)
 				"ID is not address type:%d. "
 				"peer's address is used.\n"));
 		KEY_SETSECSPIDX(IPSEC_DIR_INBOUND,
-				iph2->src,
 				iph2->dst,
+				iph2->src,
 				prefixlen,
 				prefixlen,
 				IPSEC_ULPROTO_ANY,
