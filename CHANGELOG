@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2083 2002/02/20 14:12:59 suz Exp $
+$KAME: CHANGELOG,v 1.2084 2002/02/21 14:50:51 sakane Exp $
 
 <200202>
+Thu Feb 21 23:48:38 JST 2002 sakane@kame.net
+	* kame/kame/racoon:
+	to specify the identifier in "sainfo" directive is deprecated.
+	the identifier should be always made from SPD.
+
 2002-02-20  SUZUKI, Shinsuke <suz@sdl.hitachi.co.jp>
 	* freebsd4/sys/net/if.c (): 
 	fixed a kernel crash that occurs when you enable IPv6 Multicast 
