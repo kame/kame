@@ -26,7 +26,12 @@ main(argc, argv)
 
 	ai.ai_flags |= AI_CANONNAME;
 	ai.ai_family = PF_UNSPEC;
+#if 0
 	ai.ai_socktype = SOCK_STREAM;
+#endif
+#if 0
+	ai.ai_flags = AI_PASSIVE;
+#endif
 		
 	p = *argv[1] ? argv[1] : NULL;
 	q = *argv[2] ? argv[2] : NULL;
@@ -46,7 +51,7 @@ main(argc, argv)
 		if (res->ai_canonname) printf("\t%s\n", res->ai_canonname);
 		error = getnameinfo(res->ai_addr, res->ai_addr->sa_len,
 				    host, sizeof(host), serv, sizeof(serv),
-				    NI_NUMERICHOST);
+				    NI_NUMERICHOST | NI_WITHSCOPEID);
 		if (error) {
 			printf("error %d\n", error);
 			exit(1);
