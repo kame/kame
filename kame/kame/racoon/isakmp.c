@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.166 2001/12/07 03:58:24 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.167 2001/12/07 08:39:39 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1438,7 +1438,6 @@ isakmp_send(iph1, buf)
 	struct sockaddr *sa;
 	int len = 0;
 	struct myaddrs *p, *lastresort = NULL;
-	int i;
 
 	sa = iph1->local;
 
@@ -1462,20 +1461,13 @@ isakmp_send(iph1, buf)
 		return -1;
 	}
 
-	for (i = 0; i < iph1->rmconf->count_persend; i++) {
-		len = sendfromto(p->sock, buf->v, buf->l,
-				iph1->local, iph1->remote);
-		if (len < 0) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"sendfromto failed\n");
-			return -1;
-		}
+	len = sendfromto(p->sock, buf->v, buf->l,
+			iph1->local, iph1->remote, lcconf->count_persend);
+	if (len == -1) {
+		plog(LLV_ERROR, LOCATION, NULL,
+			"sendfromto failed\n");
+		return -1;
 	}
-
-	plog(LLV_DEBUG, LOCATION, iph1->local,
-		"%d times of %d bytes message will be sent.\n",
-		iph1->rmconf->count_persend, len);
-	plogdump(LLV_DEBUG, buf->v, buf->l);
 
 	return 0;
 }

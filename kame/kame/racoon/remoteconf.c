@@ -1,4 +1,4 @@
-/*	$KAME: remoteconf.c,v 1.28 2001/10/02 03:46:41 sakane Exp $	*/
+/*	$KAME: remoteconf.c,v 1.29 2001/12/07 08:39:39 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -166,7 +166,6 @@ newrmconf()
 	new->gen_policy = FALSE;
 	new->retry_counter = lcconf->retry_counter;
 	new->retry_interval = lcconf->retry_interval;
-	new->count_persend = lcconf->count_persend;
 
 	return new;
 }

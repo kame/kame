@@ -1,4 +1,4 @@
-/*	$KAME: sockmisc.c,v 1.32 2001/11/13 12:38:50 jinmei Exp $	*/
+/*	$KAME: sockmisc.c,v 1.33 2001/12/07 08:39:39 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -394,8 +394,8 @@ recvfromto(s, buf, buflen, flags, from, fromlen, to, tolen)
 
 /* send packet, with fixing src/dst address pair. */
 int
-sendfromto(s, buf, buflen, src, dst)
-	int s;
+sendfromto(s, buf, buflen, src, dst, cnt)
+	int s, cnt;
 	const void *buf;
 	size_t buflen;
 	struct sockaddr *src;
@@ -403,6 +403,7 @@ sendfromto(s, buf, buflen, src, dst)
 {
 	struct sockaddr_storage ss;
 	int len;
+	int i;
 
 	if (src->sa_family != dst->sa_family) {
 		plog(LLV_ERROR, LOCATION, NULL,
@@ -486,12 +487,20 @@ sendfromto(s, buf, buflen, src, dst)
 			saddr2str((struct sockaddr *)&dst6),
 			dst6.sin6_scope_id);
 
-		len = sendmsg(s, &m, 0 /*MSG_DONTROUTE*/);
-		if (len < 0) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"sendmsg (%s)\n", strerror(errno));
-			return -1;
+		for (i = 0; i < cnt; i++) {
+			len = sendmsg(s, &m, 0 /*MSG_DONTROUTE*/);
+			if (len < 0) {
+				plog(LLV_ERROR, LOCATION, NULL,
+					"sendmsg (%s)\n", strerror(errno));
+				return -1;
+			}
+			plog(LLV_DEBUG, LOCATION, NULL,
+				"%d times of %d bytes message will be sent "
+				"to %s\n",
+				i, len, saddr2str(src));
 		}
+		plogdump(LLV_DEBUG, (char *)buf, buflen);
+
 		return len;
 	    }
 #endif
@@ -544,12 +553,19 @@ sendfromto(s, buf, buflen, src, dst)
 			needclose = 1;
 		}
 
-		len = sendto(sendsock, buf, buflen, 0, dst, dst->sa_len);
-		if (len < 0) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"sendto (%s)\n", strerror(errno));
-			return len;
+		for (i = 0; i < cnt; i++) {
+			len = sendto(sendsock, buf, buflen, 0, dst, dst->sa_len);
+			if (len < 0) {
+				plog(LLV_ERROR, LOCATION, NULL,
+					"sendto (%s)\n", strerror(errno));
+				return len;
+			}
+			plog(LLV_DEBUG, LOCATION, NULL,
+				"%d times of %d bytes message will be sent "
+				"to %s\n",
+				i, len, saddr2str(src));
 		}
+		plogdump(LLV_DEBUG, (char *)buf, buflen);
 
 		if (needclose)
 			close(sendsock);

@@ -1,4 +1,4 @@
-/*	$KAME: remoteconf.h,v 1.26 2001/09/26 05:30:35 sakane Exp $	*/
+/*	$KAME: remoteconf.h,v 1.27 2001/12/07 08:39:39 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,8 +76,7 @@ struct remoteconf {
 
 	int retry_counter;		/* times to retry. */
 	int retry_interval;		/* interval each retry. */
-	int count_persend;		/* the number of packets each retry. */
-				/* above 3 values are copied from localconf. */
+				/* above 2 values are copied from localconf. */
 
 	struct isakmpsa *proposal;	/* proposal list */
 	LIST_ENTRY(remoteconf) chain;	/* next remote conf */
