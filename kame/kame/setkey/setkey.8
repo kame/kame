@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.78 2003/05/27 07:11:47 jinmei Exp $
+.\"	$KAME: setkey.8,v 1.79 2003/06/27 07:17:50 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -182,6 +182,15 @@ on the command line achieves the same functionality.
 .Li ;
 .Xc
 Add an SPD entry.
+.\"
+.It Xo
+.Li spdadd tagged
+.Ar tag Ar policy
+.Li ;
+.Xc
+Add an SPD entry based on PF tag.
+.Ar tag
+must be a string surrounded by doublequote.
 .\"
 .It Xo
 .Li spddelete
