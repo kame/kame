@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2149 2002/05/09 09:42:27 itojun Exp $
+$KAME: CHANGELOG,v 1.2150 2002/05/09 13:48:19 jinmei Exp $
 
 <200205>
+2002-05-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: implemented a limited support of prefix
+	delegation based on draft-troan-dhcpv6-opt-prefix-delegation-01.txt.
+	A client sends a solicit with a rapid commit option and an option
+	request option specifying a prefix delegation option.  A server
+	responds to the solicit with a reply containing a prefix
+	delegation option.  The client accepts the reply and configure an
+	address on specified interfaces using the delegated prefix.
+
 Thu May  9 18:41:28 JST 2002  itojun@iijlab.net
 	* faithd: drop rsh/rlogin protocol support.
 
