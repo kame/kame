@@ -482,13 +482,9 @@ epic_freebsd_attach(dev)
 	ifp->if_watchdog = epic_ifwatchdog;
 	ifp->if_init = (if_init_f_t*)epic_init;
 	ifp->if_timer = 0;
-	ifp->if_output = ether_output;
-	IFQ_SET_MAXLEN(&ifp->if_snd, TX_RING_SIZE);
-	IFQ_SET_READY(&ifp->if_snd);
-
-	/* Get iobase or membase */
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = TX_RING_SIZE - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, TX_RING_SIZE - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* Enable ports, memory and busmastering */
 	command = pci_read_config(dev, PCIR_COMMAND, 4);
@@ -869,16 +865,6 @@ epic_ifstart(ifp)
 	register struct mbuf *m;
 	register int i;
 
-#if 0
-	/* If no link is established, simply free all mbufs in queue */
-	PHY_READ_2( sc, DP83840_BMSR );
-	if( !(BMSR_LINK_STATUS & PHY_READ_2( sc, DP83840_BMSR )) ){
-		IFQ_PURGE( &ifp->if_snd );
-		return;
-	}
-#endif
-
-	/* Link is OK, queue packets to NIC */
 	while( sc->pending_txs < TX_RING_SIZE  ){
 		buf = sc->tx_buffer + sc->cur_tx;
 		desc = sc->tx_desc + sc->cur_tx;

@@ -835,7 +835,6 @@ bridge_output(ifp, m, sa, rt)
 			sc->sc_if.if_obytes += len;
 			p->ifp->if_lastchange = time;
 			p->ifp->if_obytes += len;
-			IF_ENQUEUE(&p->ifp->if_snd, mc);
 			if ((p->ifp->if_flags & IFF_OACTIVE) == 0)
 				(*p->ifp->if_start)(p->ifp);
 		}
@@ -869,7 +868,6 @@ sendunicast:
 	sc->sc_if.if_obytes += len;
 	dst_if->if_lastchange = time;
 	dst_if->if_obytes += len;
-	IF_ENQUEUE(&dst_if->if_snd, m);
 	if ((dst_if->if_flags & IFF_OACTIVE) == 0)
 		(*dst_if->if_start)(dst_if);
 	splx(s);
@@ -1080,7 +1078,6 @@ bridgeintr_frame(sc, m)
 	sc->sc_if.if_obytes += len;
 	dst_if->if_lastchange = time;
 	dst_if->if_obytes += len;
-	IF_ENQUEUE(&dst_if->if_snd, m);
 	if ((dst_if->if_flags & IFF_OACTIVE) == 0)
 		(*dst_if->if_start)(dst_if);
 	splx(s);
