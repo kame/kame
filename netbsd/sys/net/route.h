@@ -56,12 +56,11 @@
 #if 1 /*def NEW_STRUCT_ROUTE*/
 struct route {
 	struct	rtentry *ro_rt;
-	union {
-		struct sockaddr_storage rou_dst_ss;
-		struct sockaddr ro_dst_sa;
-	} ro_u;
+	struct sockaddr ro_dst;
+	/* trailing pad to store at least IPv6 socket address safely */
+	u_int8_t ro_pad[28 > sizeof(struct sockaddr) ?
+	    (28 - sizeof(struct sockaddr)) : 0];
 };
-#define ro_dst ro_u.ro_dst_sa
 #else
 struct route {
 	struct	rtentry *ro_rt;
