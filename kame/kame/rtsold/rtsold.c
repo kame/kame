@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.63 2003/04/11 13:48:49 jinmei Exp $	*/
+/*	$KAME: rtsold.c,v 1.64 2003/04/14 04:48:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -206,7 +206,7 @@ main(argc, argv)
 	}
 
 #ifndef HAVE_ARC4RANDOM
-	/* random value initilization */
+	/* random value initialization */
 	srandom((u_long)time(NULL));
 #endif
 
