@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.48 2003/07/23 13:36:10 keiichi Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.49 2003/07/24 21:51:26 jinmei Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -149,7 +149,10 @@ configuration methods, and the medium router preference.
 .It Cm \&rltime
 (num) Router lifetime field
 .Pq unit: seconds .
-Its value must be no greater than 3600000.
+The value must be either zero or between
+the value of
+.Cm maxinterval
+and 9000.
 When
 .Nm rtadvd
 runs on a host, this value must explicitly set 0 on all the
