@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.72 2001/10/20 06:34:55 jinmei Exp $
+$KAME: FAQ,v 1.73 2001/11/22 10:28:11 itojun Exp $
 
 
 GENERAL
@@ -183,8 +183,8 @@ Q: Is anything special required for network interface card drivers?
 	in the driver, change that to MHLEN.  In this way you can avoid two
 	linked internal mbufs.
 
-	Multicast support is required for IPv6, since IPv6 uses
-	multicast for hardware address (MAC address) resolution.
+	(all operationg systems) Multicast support is required for IPv6,
+	since IPv6 uses multicast for hardware address (MAC address) resolution.
 	Therefore, your network driver has to have multicast support,
 	and have IFF_MULTICAST properly set.  Also be sure to check if
 	the driver handles multicast ioctls, like SIOCADDMULTI.
