@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2563 2004/03/12 12:12:08 jinmei Exp $
+$KAME: CHANGELOG,v 1.2564 2004/03/13 05:18:41 jinmei Exp $
 
 <200403>
+2004-03-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/mld6.c (mld_input): use a local sockaddr_in6
+	structure to match multicast addresses in order to handle
+	multicast scope correctly.
+	In response to a report from Kentarou.Oohara@jp.yokogawa.com.
+
 2004-03-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_output): fixed overkilling about
 	the "dst" argument to this function.  The caller side were fixed
