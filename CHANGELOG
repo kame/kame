@@ -1,11 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.260 1999/11/05 10:53:41 itojun Exp $
+$Id: CHANGELOG,v 1.261 1999/11/05 13:04:36 itojun Exp $
 
 <199911>
+Fri Nov  5 22:02:00 JST 1999  itojun@iijlab.net
+	* kame/sys/netinet6/{ip6_input,icmp6,route6}.c: clarify mbuf
+	  chain requirements.  add m_pulldown experimental code (#ifdef'ed).
+
 Fri Nov  5 19:52:28 JST 1999  itojun@iijlab.net	
 	* freebsd[23]/usr.bin/netstat/route.c: show MTU on netstat -rnl
-	  (you may need "-a" as well for displaying cached result of
+	  (you may need to specify "-a" as well to see cached result of
 	  path MTU discovery).
 
 Fri Nov  5 18:15:36 JST 1999  itojun@iijlab.net
@@ -18,7 +22,7 @@ Fri Nov  5 18:15:36 JST 1999  itojun@iijlab.net
 
 Fri Nov  5 10:41:26 JST 1999  itojun@iijlab.net
 	* netbsd/sys/dev/pcmcia/if_awi_pcmcia.c (and others):
-	  bring in awk driver for BayStack 650 card from NetBSD-currnt.
+	  bring in awi driver for BayStack 650 card from NetBSD-currnt.
 	  we need this for IETF washington DC:-)
 
 Fri Nov  5 01:22:42 JST 1999  itojun@iijlab.net
