@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.58 2002/04/24 14:31:32 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.59 2002/04/25 02:45:56 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -84,10 +84,13 @@ static struct msghdr rmh;
 static char rdatabuf[BUFSIZ];
 static int rmsgctllen;
 static char *rmsgctlbuf;
+static struct duid server_duid;
 
 #define LINK_LOCAL_PLEN 10
 #define SITE_LOCAL_PLEN 10
 #define GLOBAL_PLEN 3
+
+#define DUID_FILE "/etc/dhcp6s_duid"
 
 static void usage __P((void));
 static void server6_init __P((void));
@@ -187,6 +190,10 @@ server6_init()
 	ifidx = if_nametoindex(device);
 	if (ifidx == 0)
 		errx(1, "invalid interface %s", device);
+
+	/* get our DUID */
+	if (get_duid(DUID_FILE, &server_duid))
+		errx(1, "failed to get a DUID");
 
 	/* initialize send/receive buffer */
 	iov[0].iov_base = (caddr_t)rdatabuf;
@@ -383,7 +390,8 @@ server6_react_informreq(buf, siz, from, fromlen)
 	struct sockaddr_in6 dst;
 	struct addrinfo hints, *res;
 	int error;
-	struct dhcp6opt *opt;
+	struct dhcp6opt *opt, *eopt;
+	struct duid client_duid, request_duid;
 	char *ext, *ep, *p;
 
 	dprintf(LOG_DEBUG, "react_request");
@@ -394,6 +402,39 @@ server6_react_informreq(buf, siz, from, fromlen)
 	}
 	dh6r = (struct dhcp6 *)buf;
 
+	/*
+	 * parse and validate options in the request
+	 */
+	opt = (struct dhcp6opt *)(dh6r + 1);
+	eopt = (struct dhcp6opt *)(buf + siz);
+
+	/* record client information if included */
+	memset(&client_duid, 0, sizeof(client_duid));
+	if (get_dhcp6_option(opt, eopt, DH6OPT_CLIENTID, &client_duid) == 0 &&
+	    client_duid.duid_id == NULL) {
+		dprintf(LOG_INFO,
+			"server6_react_informreq: unexpected client DUID");
+		return(-1);
+	} else if (client_duid.duid_id == NULL)
+		dprintf(LOG_DEBUG, "server6_react_informreq: no client info");
+	else {
+		dprintf(LOG_DEBUG,
+			"server6_react_informreq: client info privided");
+	}
+
+	/* if a server information is included, it must match ours. */
+	if (get_dhcp6_option(opt, eopt, DH6OPT_SERVERID, &request_duid) == 0 &&
+	    (request_duid.duid_len != server_duid.duid_len ||
+	     memcmp(request_duid.duid_id, server_duid.duid_id,
+		    server_duid.duid_len))) {
+		dprintf(LOG_INFO,
+			"server6_react_informreq: server DUID mismatch");
+		return(-1);
+	}
+
+	/*
+	 * construct a reply message
+	 */
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET6;
 	hints.ai_socktype = SOCK_DGRAM;
@@ -421,11 +462,40 @@ server6_react_informreq(buf, siz, from, fromlen)
 	dh6p->dh6_msgtypexid = dh6r->dh6_msgtypexid;
 	dh6p->dh6_msgtype = DH6_REPLY;
 
-	/*
-	 * attach extensions.
-	 */
-	/* DNS server */
+	/* attach necessary options */
 	opt = (struct dhcp6opt *)ext;
+
+	/* server information option */
+	if ((char *)(opt + 1) + server_duid.duid_len > ep) {
+		dprintf(LOG_INFO, "server6_react_informreq: "
+			"short buffer for server info");
+		return(-1);
+	}
+	opt->dh6opt_type = htons(DH6OPT_SERVERID);
+	opt->dh6opt_len = htons(server_duid.duid_len);
+	p = (char *)(opt + 1);
+	memcpy(p, server_duid.duid_id, server_duid.duid_len);
+	opt = (struct dhcp6opt *)(p + server_duid.duid_len);
+	len += sizeof(*opt) + server_duid.duid_len;
+
+	/* copy client information back (if provided) */
+	if (client_duid.duid_id) {
+		if ((char *)(opt + 1) + client_duid.duid_len > ep) {
+			dprintf(LOG_INFO, "server6_react_informreq: "
+				"short buffer for client info");
+			return(-1);
+		}
+
+		opt->dh6opt_type = htons(DH6OPT_CLIENTID);
+		opt->dh6opt_len = htons(client_duid.duid_len);
+		p = (char *)(opt + 1);
+		memcpy(p, client_duid.duid_id, client_duid.duid_len);
+		opt = (struct dhcp6opt *)(p + client_duid.duid_len);
+		len += sizeof(*opt) + client_duid.duid_len;
+	}
+
+	/* attach additional options. */
+	/* DNS server */
 	if (ext + sizeof(*opt) + sizeof(struct in6_addr) <= ep &&
 	    TAILQ_FIRST(&dnslist)) {
 		struct dnslist *d;
