@@ -385,7 +385,7 @@ routename(sa)
 	char *ns_print();
 	char *ipx_print();
 #ifdef INET6
-	char ntop_buf[NI_MAXHOST];	/*for inet_ntop()*/
+	static char ntop_buf[NI_MAXHOST];	/*for inet_ntop()*/
 #endif
 
 	if (first) {
@@ -472,7 +472,7 @@ netname(sa)
 	char *ns_print();
 	char *ipx_print();
 #ifdef INET6
-	char ntop_buf[NI_MAXHOST];	/*for inet_ntop()*/
+	static char ntop_buf[NI_MAXHOST];	/*for inet_ntop()*/
 #endif
 
 	switch (sa->sa_family) {
