@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.827 2000/04/27 10:00:03 jinmei Exp $
+$Id: CHANGELOG,v 1.828 2000/04/27 15:42:11 itojun Exp $
 
 <200004>
+Fri Apr 28 00:41:36 JST 2000  itojun@iijlab.net
+	* sys/netinet6/in6_ifattach.c: correct in6_ifdetach().
+	  free oia, not ia.  there are more problems, Lennart says.
+	  From: Lennart Augustsson <augustss@augustsson.net>
+
 2000-04-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/netinet/udp_usrreq.c: removed udp6_output() to use a
 	shared version defined in netinet6/udp6_output().
