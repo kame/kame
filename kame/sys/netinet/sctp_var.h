@@ -1,4 +1,4 @@
-/*	$KAME: sctp_var.h,v 1.1 2000/12/27 05:55:07 itojun Exp $	*/
+/*	$KAME: sctp_var.h,v 1.2 2001/01/05 11:49:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -50,6 +50,9 @@ struct sctpcb {
 	/* cookie */
 	size_t sc_cookiesize;
 	u_int8_t *sc_cookie;
+
+	u_int32_t sc_litag;	/* local initiation tag */
+	u_int32_t sc_fitag;	/* foreign initiation tag */
 };
 
 #ifdef _KERNEL
@@ -57,9 +60,12 @@ struct sctpcb {
 #define	sotosctpcb(so)	(intosctpcb(sotoinpcb(so)))
 
 void sctp_init __P((void));
+#ifdef INET6
+int sctp6_input __P((struct mbuf **, int *, int));
+#endif
 void sctp_input __P((struct mbuf *, ...));
 void *sctp_ctlinput __P((int, struct sockaddr *, void *));
-int sctp_output __P((struct mbuf *, ...));
+int sctp_output __P((struct sctpcb *));
 struct sctpcb *sctp_newsctpcb __P((int, void *));
 int sctp_attach __P((struct socket *));
 struct sctpcb *sctp_close __P((struct sctpcb *));

@@ -96,8 +96,8 @@
 #include <netinet/sctp.h>
 #include <netinet/sctp_var.h>
 
-#ifdef INET6
 #include <netinet/ip6.h>
+#ifdef INET6
 #include <netinet/icmp6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_pcb.h>
@@ -131,14 +131,38 @@ int	scdbhashsize = SCDBHASHSIZE;
 struct pool sctpcb_pool;
 struct inpcbtable scdbtable;
 
+static u_int32_t sctp_itag;		/* XXX should be more random */
+
 void
 sctp_init()
 {
+#ifndef __OpenBSD__
+	struct timeval tv;
+#endif
 
 	pool_init(&sctpcb_pool, sizeof(struct sctpcb), 0, 0, 0, "sctpcbpl",
 	    0, NULL, NULL, M_PCB);
 	in_pcbinit(&scdbtable, scdbhashsize, scdbhashsize);
+
+#ifndef __OpenBSD__
+	microtime(&tv);
+	sctp_itag = random() ^ tv.tv_usec;
+#else
+	sctp_itag = arc4random();
+#endif
 }
+
+#ifdef INET6
+int
+sctp6_input(mp, offp, proto)
+	struct mbuf **mp;
+	int *offp, proto;
+{
+
+	sctp_input(*mp, *offp, proto);
+	return IPPROTO_DONE;
+}
+#endif
 
 void
 #if __STDC__
@@ -149,7 +173,110 @@ sctp_input(m, va_alist)
 	va_dcl
 #endif
 {
+	va_list ap;
+	int iphlen, proto;
+	int af;
+	struct ip *ip;
+#ifdef INET6
+	struct ip6_hdr *ip6;
+#endif
+	struct sctp_hdr *sctp;
+	struct sctpcb *sp;
+	struct inpcb *inp;
+	struct sctp_chunk *chunk;
 
+	va_start(ap, m);
+	iphlen = va_arg(ap, int);
+	proto = va_arg(ap, int);
+	va_end(ap);
+
+#ifdef DIAGNOSTIC
+	if (m->m_len < sizeof(*ip))
+		panic("m_len too short");
+#endif
+	ip = mtod(m, struct ip *);
+	ip6 = NULL;
+	switch (ip->ip_v) {
+	case 4:
+		af = AF_INET;
+
+		/* pedant */
+		if (IN_MULTICAST(ip->ip_dst.s_addr))
+			goto drop;
+		break;
+#ifdef INET6
+	case 6:
+		af = AF_INET6;
+		ip = NULL;
+#ifdef DIAGNOSTIC
+		if (m->m_len < sizeof(*ip6))
+			panic("m_len too short");
+#endif
+		ip6 = mtod(m, struct ip6_hdr *);
+		break;
+#endif
+	default:
+		/* EAFNOSUPPORT */
+		goto drop;
+	}
+
+	/* drop if too short.  check it in a cheap way */
+	if (m->m_pkthdr.len < iphlen + sizeof(*sctp) + sizeof(*chunk))
+		goto drop;
+	if (ip->ip_len < iphlen + sizeof(*sctp) + sizeof(*chunk))
+		goto drop;
+	if (ip->ip_len > m->m_pkthdr.len)
+		goto drop;
+
+	/* trim if the packet has trailing garbage */
+	if (ip->ip_len > m->m_pkthdr.len)
+		m_adj(m, ip->ip_len);
+
+	IP6_EXTHDR_GET(sctp, struct sctp_hdr *, m, iphlen, sizeof(*sctp));
+	if (sctp == NULL) {
+		/* m is already freed */
+		return;
+	}
+	IP6_EXTHDR_GET(chunk, struct sctp_chunk *, m, iphlen + sizeof(*sctp),
+	    sizeof(*chunk));
+	if (chunk == NULL) {
+		/* m is already freed */
+		return;
+	}
+
+	/*
+	 * find a relevant pcb.  we lookup pcb before checksum, based on
+	 * experience in netbsd tcp code (checksum is more expensive in
+	 * many cases).
+	 */
+	inp = NULL;
+	switch (af) {
+	case AF_INET:
+		inp = in_pcblookup_connect(&scdbtable, ip->ip_src,
+		    sctp->sh_sport, ip->ip_dst, sctp->sh_dport);
+		if (!inp)
+			inp = in_pcblookup_bind(&scdbtable, ip->ip_dst,
+			    sctp->sh_dport);
+		break;
+#ifdef INET6
+	case AF_INET6:
+#endif
+	default:
+		goto drop;
+	}
+
+	if (inp)
+		sp = intosctpcb(inp);
+	else
+		sp = NULL;
+
+	/* XXX test verification tag here */
+
+	/* XXX checksum here */
+
+	printf("got a sctp packet, sp=%p, chunk type=%u\n", sp, chunk->sc_type);
+
+drop:
 	m_freem(m);
 }
 
@@ -200,17 +327,122 @@ sctp_ctlinput(cmd, sa, v)
 }
 
 int
-#if __STDC__
-sctp_output(struct mbuf *m, ...)
-#else
-sctp_output(m, va_alist)
-	struct mbuf *m;
-	va_dcl
-#endif
+sctp_output(sp)
+	struct sctpcb *sp;
 {
+	struct mbuf *m;
+	int len;
+	int hlen;
+	int af = AF_INET;
+	struct sctp_chunk_init *init;
+	struct ip *ip;
+#ifdef INET6
+	struct ip6_hdr *ip6;
+#endif
+	struct sctp_hdr *sctp;
+	struct inpcb *inp;
+	u_int32_t vtag;
 
-	m_freem(m);
-	return 0;
+	inp = sp->sc_inpcb;
+
+	switch (af) {
+	case AF_INET:
+		hlen = sizeof(struct ip);
+		break;
+#ifdef INET6
+	case AF_INET6:
+		hlen = sizeof(struct ip6_hdr);
+		break;
+#endif
+	default:
+		return EAFNOSUPPORT;
+	}
+	hlen += sizeof(struct sctp_hdr);
+
+	switch (sp->sc_state) {
+	case SCTPS_COOKIE_WAIT:	/*connection attempt*/
+		len = sizeof(struct sctp_chunk_init);
+		MGETHDR(m, M_DONTWAIT, MT_HEADER);
+		if (m && max_linkhdr + hlen + len > MHLEN) {
+			MCLGET(m, M_DONTWAIT);
+			if ((m->m_flags & M_EXT) == 0) {
+				m_free(m);
+				m = NULL;
+			}
+		}
+		if (!m)
+			return ENOBUFS;
+		m->m_len = 0;
+		m->m_len = M_TRAILINGSPACE(m);
+		m->m_data += (max_linkhdr + hlen);
+		m->m_len -= (max_linkhdr + hlen);
+		if (m->m_len < len) {
+			m_free(m);
+			return ENOBUFS;
+		}
+		m->m_len = len;
+		m->m_pkthdr.len = len;
+
+		init = mtod(m, struct sctp_chunk_init *);
+		bzero(init, sizeof(*init));
+		init->sc_init_chunk.sc_type = SCTP_INIT;
+		init->sc_init_chunk.sc_len = htons(sizeof(init));
+		init->sc_init_itag = sp->sc_litag;
+		init->sc_init_arwnd = htonl(10);	/*XXX*/
+		init->sc_init_ostream = htons(1);
+		init->sc_init_istream = htons(1);
+		init->sc_init_tsn = sp->sc_litag;	/*XXX*/
+		vtag = htonl(0);
+		break;
+		
+	default:
+		return EINVAL;
+	}
+
+	/*
+	 * attach IP header
+	 */
+	M_PREPEND(m, hlen, M_DONTWAIT);
+	if (!m)
+		return ENOBUFS;
+	switch (af) {
+	case AF_INET:
+		ip = mtod(m, struct ip *);
+		sctp = (struct sctp_hdr *)(ip + 1);
+		bzero(ip, sizeof(*ip));
+		bzero(sctp, sizeof(*sctp));
+		ip->ip_src = inp->inp_laddr;
+		ip->ip_dst = inp->inp_faddr;
+		ip->ip_len = m->m_pkthdr.len;
+		ip->ip_ttl = inp->inp_ip.ip_ttl; /* XXX */
+		ip->ip_tos = inp->inp_ip.ip_tos; /* XXX */
+		ip->ip_p = IPPROTO_SCTP;
+		sctp->sh_sport = inp->inp_lport;
+		sctp->sh_dport = inp->inp_fport;
+		sctp->sh_vtag = vtag;
+		break;
+
+#ifdef INET6
+	case AF_INET6:
+		ip6 = mtod(m, struct ip6_hdr *);
+		sctp = (struct sctp_hdr *)(ip6 + 1);
+		m_freem(m);
+		return 0;
+#endif
+
+	default:
+		return EAFNOSUPPORT;
+	}
+
+	/* XXX sctp->sh_cksum */
+
+#ifdef IPSEC
+	ipsec_setsocket(m, inp->inp_socket);
+#endif
+
+	return ip_output(m, inp->inp_options, &inp->inp_route,
+	    inp->inp_socket->so_options & (SO_DONTROUTE | SO_BROADCAST),
+	    inp->inp_moptions);
 }
 
 int	sctp_sendspace = 9216;		/* really max datagram size */
@@ -366,14 +598,26 @@ sctp_usrreq(so, req, m, nam, control, p)
 	case PRU_LISTEN:
 		error = EOPNOTSUPP;
 		break;
+#endif
 
 	case PRU_CONNECT:
+		if (inp->inp_lport == 0) {
+			error = in_pcbbind(inp, (struct mbuf *)0,
+			    (struct proc *)0);
+			if (error)
+				break;
+		}
 		error = in_pcbconnect(inp, nam);
 		if (error)
 			break;
-		soisconnected(so);
+		soisconnecting(so);
+		/* XXX more initialization here */
+		sp->sc_litag = sctp_itag++;
+		sp->sc_state = SCTPS_COOKIE_WAIT;
+		error = sctp_output(sp);
 		break;
 
+#if 0
 	case PRU_CONNECT2:
 		error = EOPNOTSUPP;
 		break;
