@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$KAME: PORTABILITY,v 1.55 2000/11/15 16:44:47 itojun Exp $
+	$KAME: PORTABILITY,v 1.56 2000/11/22 08:10:06 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -54,6 +54,7 @@ across those possibilities.
   It is also advised to add extra comment to help paren match,
   if you need to write widow paren in string.  For example:
 	printf("(");		/* ) */
+  (note that there are opinions against it too - it depends)
 
 - Avoid use of "#if" as much as possible, stick to "#ifdef" or "#ifndef"
   if possible (Avoid "#if defined(foo)" if you only have single "foo").
@@ -109,6 +110,10 @@ across those possibilities.
 
   Structure returned by SIOCGIFCONF falls into this category.
 
+- When you define wire format as C struct, (1) avoid bitfield.  (2) use
+  __attribute__((__packed__)) to control member and overall alignment.
+  NOTE: (2) is not portable across platforms - it is a GCC-ism.
+
 - 2nd arg to ioctl() must be u_long, not int, on non-FreeBSD2 platforms.
 
 - If you define multi-statement #define, define that like:
@@ -123,7 +128,7 @@ across those possibilities.
   For NetBSD and OpenBSD, CFLAGS and CPPFLAGS are defined separately:
 	CPPFLAGS+=-I/usr/local/include
 	CFLAGS+=-g
-  CPPFLAGS contains -I and -D only (those who needs to be passed to cpp).
+  CPPFLAGS contains -I and -D only (items that needs to be passed to cpp).
   CFLAGS can contain other flags.
   For FreeBSD and BSDI, there's no distinction.
 	CFLAGS+=-I/usr/local/include
@@ -132,7 +137,10 @@ across those possibilities.
 - To refer objects and machine-generated source code, FreeBSD needs to use
   ${.OBJDIR}.  This is because because FreeBSD completely separates "obj" tree
   and "src" tree and has no symlink from ${.CURDIR}/obj to /usr/obj/foobar.
-  On other platforms, ${.CURDIR}/obj should do.
+
+  On NetBSD, "make print-objdir" is the right way to probe "obj" directory.
+
+  On other platforms, ${.CURDIR}/obj should do in most cases.
 
 - On manpage installation and shlib generation in Makefile.
   for BSDI3, you need to set MAN[0-9] in Makefile like below.  MANDIR must
@@ -176,6 +184,8 @@ across those possibilities.
 	SRCS+=y.tab.h
 	y.tab.h: foo.y
   Be sure to include y.tab.h, not foo.h, from *.l.
+
+  On NetBSD, YHEADER is quite useful.
 
 - BSDI3 /usr/bin/cc is gcc 1.42, and it does not support __FUNCTION__.
   If you need to use __FUNCTION__, you need to set CC to "gcc", or "shlicc2"
