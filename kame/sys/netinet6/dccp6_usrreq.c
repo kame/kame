@@ -1,4 +1,4 @@
-/*	$KAME: dccp6_usrreq.c,v 1.5 2003/11/18 04:55:43 ono Exp $	*/
+/*	$KAME: dccp6_usrreq.c,v 1.6 2004/02/11 20:11:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -126,7 +126,8 @@ dccp6_input(struct mbuf **mp, int *offp, int proto)
 void
 dccp6_ctlinput(int cmd, struct sockaddr *sa, void *d)
 {
-	if (sa->sa_family != AF_INET6 || sa->sa_len != sizeof(struct sockaddr_in6))
+	if (sa->sa_family != AF_INET6 ||
+	    sa->sa_len != sizeof(struct sockaddr_in6))
 		return;
 	
 	/* FIX LATER */
@@ -183,7 +184,7 @@ dccp6_bind(struct socket *so, struct mbuf *m, struct proc *td)
 #endif
 	sin6p = (struct sockaddr_in6 *)nam;
 	if (sin6p->sin6_family == AF_INET6 &&
-		IN6_IS_ADDR_MULTICAST(&sin6p->sin6_addr)) {
+	    IN6_IS_ADDR_MULTICAST(&sin6p->sin6_addr)) {
 		INP_INFO_WUNLOCK(&dccpbinfo);
 		splx(s);
 		return EAFNOSUPPORT;
@@ -266,7 +267,7 @@ dccp6_connect(struct socket *so, struct mbuf *m, struct proc *td)
 	if (in6p == 0) {
 		return EINVAL;
 	}
-	if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
+	if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_faddr)) {
 		return EISCONN;
 	}
 

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.28 2004/01/19 08:39:25 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.29 2004/02/11 20:11:51 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -284,7 +284,6 @@ dccp_input(struct mbuf *m, ...)
 	int isipv6 = 0;
 #ifdef INET6
 	struct ip6_hdr *ip6 = NULL;
-	struct sockaddr_in6 src_sa6, dst_sa6;
 #endif
 
 #ifndef __FreeBSD__
@@ -445,24 +444,24 @@ dccp_input(struct mbuf *m, ...)
 	 */
 #ifdef INET6
 	if (isipv6) {
-		if (ip6_getpktaddrs(m, &src_sa6, &dst_sa6))
-			goto badunlocked;
 #ifdef __FreeBSD__
-		inp = in6_pcblookup_hash(&dccpbinfo, &src_sa6, dh->dh_sport,
-		    &dst_sa6, dh->dh_dport, 1, m->m_pkthdr.rcvif);
+		inp = in6_pcblookup_hash(&dccpbinfo, &ip6->ip6_src,
+		    dh->dh_sport, &ip6->ip6_dst, dh->dh_dport, 1,
+		    m->m_pkthdr.rcvif);
 #elif defined(__NetBSD__)
-		in6p = in6_pcblookup_connect(&dccpb6, &src_sa6, dh->dh_sport,
-		    &dst_sa6, dh->dh_dport, 0);
+		in6p = in6_pcblookup_connect(&dccpb6, &ip6->ip6_src,
+		    dh->dh_sport, &ip6->ip6_dst, dh->dh_dport, 0);
 		if (in6p == 0) {
 			/* XXX stats increment? */
-			in6p = in6_pcblookup_bind(&dccpb6, &dst_sa6, dh->dh_dport, 0);
+			in6p = in6_pcblookup_bind(&dccpb6, &ip6->ip6_dst,
+			    dh->dh_dport, 0);
 		}
 #else /* OpenBSD */
-		inp = in6_pcbhashlookup(&dccpbtable, &src_sa6, dh->dh_sport,
-		    &dst_sa6, dh->dh_dport);
+		inp = in6_pcbhashlookup(&dccpbtable, &ip6->ip6_src,
+		    dh->dh_sport, &ip6->ip6_dst, dh->dh_dport);
 		if (inp == 0) {
-			inp = in_pcblookup(&dccpbtable, &src_sa6, dh->dh_sport,
-			    &dst_sa6, dh->dh_dport,
+			inp = in_pcblookup(&dccpbtable, &ip6->ip6_src,
+			    dh->dh_sport, &ip6->ip6_dst, dh->dh_dport,
 			    INPLOOKUP_WILDCARD | INPLOOKUP_IPV6);
 		}
 #endif
@@ -597,13 +596,13 @@ dccp_input(struct mbuf *m, ...)
 		if (isipv6) {
 #ifdef __NetBSD__
 			in6p = sotoin6pcb(so);
-			sa6_copy_addr(&dst_sa6, &in6p->in6p_lsa);
-			sa6_copy_addr(&src_sa6, &in6p->in6p_fsa);
+			in6p->in6p_laddr = ip6->ip6_dst;
+			in6p->in6p_faddr = ip6->ip6_src;
 			in6p->in6p_lport = dh->dh_dport;
 			in6p->in6p_fport = dh->dh_sport;
 #else
-			sa6_copy_addr(&dst_sa6, &inp->in6p_lsa);
-			sa6_copy_addr(&src_sa6, &inp->in6p_fsa);
+			in6p->in6p_laddr = ip6->ip6_dst;
+			in6p->in6p_faddr = ip6->ip6_src;
 			inp->inp_lport = dh->dh_dport;
 			inp->inp_fport = dh->dh_sport;
 #endif
@@ -1781,15 +1780,6 @@ again:
 	if (isipv6) {
 		DCCP_DEBUG((LOG_INFO, "Calling ip_output6, mbuf->m_len = %u, mbuf->m_pkthdr.len = %u\n", m->m_len, m->m_pkthdr.len));
 
-		/* attach the full sockaddr_in6 addresses to the packet. */
-#ifndef __NetBSD__
-		if (!ip6_setpktaddrs(m, &inp->in6p_lsa, &inp->in6p_fsa)) {
-#else
-		if (!ip6_setpktaddrs(m, &in6p->in6p_lsa, &in6p->in6p_fsa)) {
-#endif
-			error = ENOBUFS;
-			goto release;
-		}
 #ifdef __FreeBSD__
 		error = ip6_output(m, inp->in6p_outputopts, &inp->in6p_route,
 		    (inp->inp_socket->so_options & SO_DONTROUTE), NULL, NULL, inp);
@@ -3650,6 +3640,7 @@ dccp_usrreq(so, req, m, nam, control)
 		error = 0;
 		break;
 	default:
+		break;
 	}
 
  release:
