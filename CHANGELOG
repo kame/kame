@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.80 1999/08/30 13:04:39 jinmei Exp $
+$Id: CHANGELOG,v 1.81 1999/08/30 18:09:00 itojun Exp $
 
 <199908>
+Tue Aug 31 03:07:16 JST 1999  itojun@iijlab.net
+	* netbsd: Upgrade base version to 1.4.1.  There's not too many
+	  changes between NetBSD 1.4 and 1.4.1, so it should be okay to
+	  install KAME/NetBSD141 on top of NetBSD 1.4 installation.
+	  Updated files are:
+		sys sbin/ifconfig sbin/ping usr.bin/ftp libexec/tftpd
+
 1999-08-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6: changed to use nd6_output() instead of
 	ifp->if_output() when sending a packet to a link-layer in various
