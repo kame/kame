@@ -487,7 +487,7 @@ dump_vifs(fp)
 	    }
 #endif
 	    if (v->uv_flags & VIFF_NONBRS)
-		fprintf(fp, " %-12s", "NO-NBR");
+		fprintf(fp, " NO-NBR");
 
 	    fprintf(fp, "\n");
 	}
