@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.78 2000/11/06 04:45:08 itojun Exp $
+$KAME: COVERAGE,v 1.79 2000/11/11 00:29:05 itojun Exp $
 
 
 x: supported/integrated
@@ -51,10 +51,10 @@ IPv6 PMTUD DoS prevention
 (+): see above for KAME/*BSD differences
 
 		KAME	merged *-current	merged
-		*BSD	net	open	free	net15	open27	free41	bsdi42
+		*BSD	net	open	free	net15	open28	free41	bsdi42
 		--	--	--	--	--	--	--	---
-KAME IPv6 as of	latest	early	early	early	early	late	early
-			jun00	jun00	jul00	jun00	may00	jun00
+KAME IPv6 as of	latest	early	early	early	early	early	early
+			jun00	jun00	jul00	jun00	jun00	jun00
 
 KAME IPsec as of
 		latest	12jun00	-	early	12jun00	-	early
@@ -62,10 +62,10 @@ KAME IPsec as of
 
 IPv4 IPsec	KAME	KAME	openbsd	KAME	KAME	openbsd	KAME
 
-IPv6 IPsec	KAME	KAME	openbsd	KAME	KAME	-	KAME
-				(*1)
+IPv6 IPsec	KAME	KAME	openbsd	KAME	KAME	openbsd	KAME
+				(*1)			(*1)
     (*1) no extension header support yet (fragment header is supported),
-	hardware acceleration is available.
+	hardware acceleration is available.  tunnel mode may need more work.
 
 IPsec ESP, rc5-cbc
 		-	-	(*1)	x	-	(*1)	x
@@ -91,13 +91,13 @@ RFC2367 conformance: SADB_[EAC]ALG
 TCP/UDP		see IMPLEMENTATION for details
 
 TCP6 drops packets with unspecified IPv6 source
-		x	x	x	-	x	-	-
+		x	x	x	-	x	x	-
 
 ip6_forward rejects packets with unspecified IPv6 source
-		x	x	x	-	x	-	-
+		x	x	x	-	x	x	-
 
 ip6_mforward rejects packets with unspecified IPv6 source
-		x	x	x	-	x	-	-
+		x	x	x	-	x	x	-
 
 advanced API	2292bis	2292	2292	2292	2292	2292	2292
 		(*1)
@@ -105,7 +105,7 @@ advanced API	2292bis	2292	2292	2292	2292	2292	2292
 
 getifaddrs	x	x	x	x	x	x	x
 
-icmp6 nodeinfo	07	06	06	05	06	05-	05
+icmp6 nodeinfo	07	06	06	05	06	06	05
 			(*1/2)	(*1/2)	(*1/2)	(*1/2)	(*1/2)	(*1/2)
     (all) spec conformance is still low.  "05-" means 05/03 chimera.
     (*1) does not join NI group address
@@ -121,15 +121,14 @@ NUD on p2p	x	x	x	x	x	x	x
   (ndp -i)
 
 NUD on p2p only if real neighbor
-		x	x	x	x	x	(*1)	x
-     (*1) temporary workaround (no NUD on p2p by default)
+		x	x	x	x	x	x	x
 
 icmp6 beyondscope
-		x	x	x	x	x	(*1)	x
+		x	x	x	x	x	x	x
     (*1) supports it, but has bug in link-local address check.
 
 old/new mrt6msg (old: overlay with ip6 header, new: with MLD6 header)
-		new	(*1)	(*1)	(*1)	(*1)	old	(*1)
+		new	(*1)	(*1)	(*1)	(*1)	(*1)	(*1)
     (*1) supports both new/old mrt6msg, to provide binary backward compat
 
 CMSG_ALIGN	ALIGN	sysctl	ALIGN	ALIGN	sysctl	ALIGN	ALIGN
@@ -149,15 +148,15 @@ getaddrinfo supports AI_ADDRCONFIG (2553bis)
 		-	-	-	(*1)	-	-	(*1)
     (*1) enabled by default, cannot turn it off
 
-getaddrinfo returns official hostname (leftmost) in ai_canonname
-		(*1)	x	x	x	x	-	x
+getaddrinfo returns official hostname in hosts(5) (leftmost) in ai_canonname
+		(*1)	x	x	x	x	x	x
     (*1) netbsd, openbsd, freebsd4 are "x", others are "-"
 
 getnameinfo uses addr%numeric for scopeid > maxifindex
 		x	x	x	x	x	x	x
 
 getnameinfo, 2nd arg type is socklen_t
-		x	x	x	-	x	-	-
+		x	x	x	-	x	x	-
 
 getnameinfo uses EAI_xx as return value (2553bis)
 		x	x	x	x	x	x	x
@@ -176,7 +175,7 @@ NIS ipnodes map support for hostname lookup
 		-	x	-	-	-	-	-
 
 resolver support for IPv6 transport
-		(+)	(*1)	(*1)	x	(*1)	-	x
+		(+)	(*1)	(*1)	x	(*1)	(*1)	x
     (*1) libc resolver can handle IPv6 transport (IPv6 address in
 	/etc/resolv.conf), but not with userland tools like nslookup or dig.
 
@@ -184,27 +183,27 @@ scoped addr in /etc/hosts (getaddrinfo)
 		(+)	x	x	x	x	x	x
 
 scoped addr in /etc/resolv.conf "nameserver" line
-		(+)	x	-	x	x	-	x
+		(+)	x	x	x	x	x	x
 
 ipsec socket passing to ip{6,}_output
 		aux	aux	-	aux	aux	-	aux
 
 ipsec esp, encryption logic
-		new	new	old	old	old	old	old
+		new	new	-	old	old	-	old
     new: unified cbc logic, old: per-algorithm cbc logic
 
 ipsec esp, blowfish-cbc codebase (before/after aug28, 2000)
-		new	new	old	old	old	old	old
+		new	new	-	old	old	-	old
 
 ipsec esp, rijndael/twofish support
 		(*1)	-	-	-	-	-	-
     (*1) experimental, based on draft-ietf-ipsec-ciph-aes-cbc-00.txt
 
 router renumbering declaration does not use bitfield (sys/netinet/icmp6.h)
-		x	x	x	x	x	-	x
+		x	x	x	x	x	x	x
 
 source address selection
-		latest	may00	may00	may00	may00	feb00	may00
+		latest	may00	may00	may00	may00	may00	may00
 
 IPv6 PMTUD DoS prevention
 		(+)	(*1)	-	-	(*1)	-	-
@@ -233,15 +232,10 @@ syslogd		x	x	-	-	x	-	-
 lpr/lpd		x	x	-	-	x	-	-
 
 default sendmail is IPv6 ready
-		?	x	x	-	x	-	-
+		?	x	x	-	x	x	-
 
 default sendmail.cf is IPv6 ready
-		?	x	x	-	x	-	-
+		?	x	x	-	x	x	-
 
 racoon		latest	pkgsrc	-	ports
 			000730a		000718a
-
-
-CAVEATS:
-- openbsd27 has some bugs in IPv6 multicast API handling.  if you would like
-  to use IPv6, it is suggested to upgrade to openbsd 2.7-STABLE kernel.
