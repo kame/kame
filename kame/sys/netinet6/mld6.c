@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.32 2001/09/11 09:00:53 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.33 2001/09/11 09:10:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -232,7 +232,6 @@ mld6_input(m, off)
 		 * spec (RFC2710) does not explicitly
 		 * specify to discard the packet from a non link-local
 		 * source address. But we believe it's expected to do so.
-		 * XXX: do we have to allow :: as source?
 		 */
 		m_freem(m);
 		return;
