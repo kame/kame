@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.69 2003/10/05 00:14:43 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.70 2003/10/05 00:16:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -296,10 +296,6 @@ main(int argc, char **argv)
 		/*NOTREACHED*/
 	}
 
-	/* revoke privilege */
-	seteuid(getuid());
-	setuid(getuid());
-
 	/* dump the current pid */
 	if (!once) {
 		pid_t pid = getpid();
@@ -314,6 +310,10 @@ main(int argc, char **argv)
 			fclose(fp);
 		}
 	}
+
+	/* revoke privilege */
+	seteuid(getuid());
+	setuid(getuid());
 
 #ifndef HAVE_POLL_H
 	memset(fdsetp, 0, fdmasks);
