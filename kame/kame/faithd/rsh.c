@@ -1,4 +1,4 @@
-/*	$KAME: rsh.c,v 1.7 2001/09/05 01:10:30 itojun Exp $	*/
+/*	$KAME: rsh.c,v 1.8 2002/05/09 09:39:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -78,7 +78,7 @@ rsh_relay(int s_src, int s_dst)
 	}
 	write(s_dst, rshbuf, n);
 	tcp_relay(s_src, s_dst, "rsh");
-		/* NOTREACHED */
+	/* NOTREACHED */
 }
 
 static void
