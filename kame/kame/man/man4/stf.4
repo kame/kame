@@ -1,4 +1,4 @@
-.\"     $KAME: stf.4,v 1.29 2001/01/22 07:38:47 itojun Exp $
+.\"     $KAME: stf.4,v 1.30 2001/02/16 02:23:07 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -200,3 +200,17 @@ It emits 6to4 packet only for IPv6 destination 2002:0901::/32
 The
 .Nm
 device first appeared in WIDE/KAME IPv6 stack.
+.\"
+.Sh BUGS
+No more than one
+.Nm
+interface is allowed for a node,
+and no more than one IPv6 interface address is allowed for an
+.Nm
+interface.
+It is to avoid source address selection conflicts
+between IPv6 layer and IPv4 layer,
+and to cope with ingress filtering rule on the other side.
+This is a feature to make
+.Nm
+work right for all occasions.
