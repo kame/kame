@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.110 2001/07/03 12:59:43 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.111 2001/07/04 02:45:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -690,6 +690,12 @@ reorder(sentinel)
 	/* count the number of addrinfo elements for sorting. */
 	for (n = 0, ai = sentinel->ai_next; ai != NULL; ai = ai->ai_next, n++)
 		;
+
+	/*
+	 * If the number is small enough, we can skip the reordering process.
+	 */
+	if (n <= 1)
+		return;
 
 	/* allocate a temporary array for sort and initialize it. */
 	if ((aio = malloc(sizeof(*aio) * n)) == NULL)
