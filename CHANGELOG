@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2710 2005/01/01 01:46:53 suz Exp $
+$KAME: CHANGELOG,v 1.2711 2005/01/05 08:04:20 itojun Exp $
 
 <200501>
+Wed Jan  5 07:58:00 UTC 2005  itojun@iijlab.net
+	* switch NetBSD base version to 2.0.  todo: dccp, sctp, pf, altq
+
 2005-01-01  suz@crl.hitachi.co.jp
 	* kame/sys/netinet6/mldv2.c: fixed a kernel crash by an MLDv2
 	  Query (Multicast Address and Source Specific Query).
