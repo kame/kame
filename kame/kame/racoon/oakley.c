@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.1 2000/01/09 01:31:29 itojun Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.2 2000/01/09 22:59:37 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -81,6 +81,9 @@ do {                                                                           \
 } while(0);
 
 struct dhgroup dhgroup[MAXDHGROUP];
+
+static vchar_t *oakley_ph1hash_common __P((struct ph1handle *iph1, int sw));
+static vchar_t *oakley_ph1hash_base __P((struct ph1handle *iph1, int sw));
 
 static vchar_t oakley_prime768;
 static vchar_t oakley_prime1024;
@@ -709,13 +712,39 @@ end:
 }
 
 /*
- * compute HASH
- *   see seciton 5. Exchanges in isakmp-oakley-05.
- * HASH_I = prf(SKEYID, g^xi | g^xr | CKY-I | CKY-R | SAi_b | IDii_b )
- * HASH_R = prf(SKEYID, g^xr | g^xi | CKY-R | CKY-I | SAi_b | IDir_b )
+ * compute phase1 HASH
+ * main/aggressive
+ *   oakley_ph1hash_common();
+ * base:psk
+ *   oakley_ph1hash_base();
  */
 vchar_t *
 oakley_compute_hash(iph1, sw)
+	struct ph1handle *iph1;
+	int sw;
+{
+	switch (iph1->etype) {
+	case ISAKMP_ETYPE_AGG:
+	case ISAKMP_ETYPE_IDENT:
+		return oakley_ph1hash_common(iph1, sw);
+	case ISAKMP_ETYPE_BASE:
+		return oakley_ph1hash_base(iph1, sw);
+	default:
+		plog(logp, LOCATION, NULL,
+			"invalid exchange type %d\n", iph1->etype);
+		return NULL;
+	}
+	return NULL;
+}
+
+/*
+ * compute phase1 HASH
+ * main/aggressive
+ *   I-digest = prf(SKEYID, g^i | g^r | CKY-I | CKY-R | SAi_b | ID_i1_b)
+ *   R-digest = prf(SKEYID, g^r | g^i | CKY-R | CKY-I | SAi_b | ID_r1_b)
+ */
+static vchar_t *
+oakley_ph1hash_common(iph1, sw)
 	struct ph1handle *iph1;
 	int sw;
 {
@@ -794,6 +823,139 @@ end:
 }
 
 /*
+ * base:psk
+ *   HASH_I = prf(SKEYID, g^xi | CKY-I | CKY-R | SAi_b | IDii_b)
+ * base:sig
+ *   HASH_I = prf(hash(Ni_b | Nr_b), g^xi | CKY-I | CKY-R | SAi_b | IDii_b)
+ * base:rsa
+ *   HASH_I = prf(SKEYID, g^xi | CKY-I | CKY-R | SAi_b | IDii_b)
+ * base:
+ * HASH_R = prf(hash(Ni_b | Nr_b), g^xi | g^xr | CKY-I | CKY-R | SAi_b | IDii_b)
+ *
+ */
+static vchar_t *
+oakley_ph1hash_base(iph1, sw)
+	struct ph1handle *iph1;
+	int sw;
+{
+	vchar_t *buf = NULL, *res = NULL;
+	char *p;
+	int len;
+	int error = -1;
+
+	vchar_t *dhpub = (sw == GENERATE ? iph1->dhpub : iph1->dhpub_p);
+	vchar_t *dhpub_p = (sw == GENERATE ? iph1->dhpub_p : iph1->dhpub);
+	vchar_t *nonce = (sw == GENERATE ? iph1->nonce : iph1->nonce_p);
+	vchar_t *nonce_p = (sw == GENERATE ? iph1->nonce_p : iph1->nonce);
+	vchar_t *id = (sw == GENERATE ? iph1->id : iph1->id_p);
+	char *cki = (sw == GENERATE
+			? (char *)&iph1->index.i_ck
+			: (char *)&iph1->index.r_ck);
+	char *ckr = (sw == GENERATE
+			? (char *)&iph1->index.r_ck
+			: (char *)&iph1->index.i_ck);
+
+	if (iph1->approval->authmethod != OAKLEY_ATTR_AUTH_METHOD_PSKEY) {
+		plog(logp, LOCATION, NULL,
+			"not supported authentication method %d\n",
+			iph1->approval->authmethod);
+		return NULL;
+	}
+
+	/* XXX psk only */
+	if (iph1->side == INITIATOR) {
+		len = iph1->skeyid->l
+			+ dhpub->l
+			+ sizeof(cookie_t) * 2
+			+ iph1->sa->l
+			+ id->l;
+		buf = vmalloc(len);
+		if (buf == NULL) {
+			plog(logp, LOCATION, NULL,
+				"vmalloc (%s)\n", strerror(errno));
+			goto end;
+		}
+		p = buf->v;
+                memcpy(p, iph1->skeyid->v, iph1->skeyid->l);
+                p += iph1->skeyid->l;
+		memcpy(p, cki, sizeof(cookie_t));
+                p += sizeof(cookie_t);
+		memcpy(p, ckr, sizeof(cookie_t));
+                p += sizeof(cookie_t);
+                memcpy(p, iph1->sa->v, iph1->sa->l);
+                p += iph1->sa->l;
+                memcpy(p, id->v, id->l);
+                p += id->l;
+	} else {
+		vchar_t *hash;
+
+                len = nonce_p->l + nonce->l;
+                buf = vmalloc(len);
+                if (buf == NULL) {
+                        plog(logp, LOCATION, NULL,
+                                "vmalloc (%s)\n", strerror(errno));
+                        goto end;
+                }
+		p = buf->v;
+                memcpy(p, nonce_p->v, nonce_p->l);
+                p += nonce_p->l;
+                memcpy(p, nonce->v, nonce->l);
+                p += nonce->l;
+                hash = oakley_hash(buf, iph1);
+                if (hash == NULL)
+                        goto end;
+		vfree(buf);
+
+		len = hash->l
+			+ dhpub_p->l
+			+ dhpub->l
+			+ sizeof(cookie_t) * 2
+			+ iph1->sa->l
+			+ iph1->id_p->l;
+		buf = vmalloc(len);
+		if (buf == NULL) {
+			plog(logp, LOCATION, NULL,
+				"vmalloc (%s)\n", strerror(errno));
+			goto end;
+		}
+		p = buf->v;
+                memcpy(p, hash->v, hash->l);
+                p += hash->l;
+                memcpy(p, dhpub_p->v, dhpub_p->l);
+                p += dhpub_p->l;
+                memcpy(p, dhpub->v, dhpub->l);
+                p += dhpub->l;
+		memcpy(p, cki, sizeof(cookie_t));
+                p += sizeof(cookie_t);
+		memcpy(p, ckr, sizeof(cookie_t));
+                p += sizeof(cookie_t);
+                memcpy(p, iph1->sa->v, iph1->sa->l);
+                p += iph1->sa->l;
+                memcpy(p, id->v, id->l);
+                p += id->l;
+		vfree(hash);
+	}
+
+	YIPSDEBUG(DEBUG_DKEY, plog(logp, LOCATION, NULL, "HASH with:\n");
+		PVDUMP(buf));
+
+	/* compute HASH */
+	res = oakley_prf(iph1->skeyid, buf, iph1);
+	if (res == NULL)
+		goto end;
+
+	error = 0;
+
+	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "HASH computed: "));
+	YIPSDEBUG(DEBUG_DKEY, PVDUMP(res));
+
+end:
+	if (buf != NULL)
+		vfree(buf);
+	return res;
+}
+
+/*
  * compute each authentication method in phase 1.
  * OUT:
  *	0:	OK
@@ -813,7 +975,7 @@ oakley_validate_auth(iph1)
 		vchar_t *my_hash = NULL;
 		int result;
 
-		if (iph1->pl_id == NULL || iph1->pl_hash == NULL) {
+		if (iph1->id_p == NULL || iph1->pl_hash == NULL) {
 			plog(logp, LOCATION, iph1->remote,
 				"few isakmp message received.\n");
 			return -1;
@@ -853,7 +1015,7 @@ oakley_validate_auth(iph1)
 		int error;
 
 		/* validate SIG & CERT */
-		if (iph1->pl_id == NULL || iph1->pl_sig == NULL) {
+		if (iph1->id_p == NULL || iph1->pl_sig == NULL) {
 			plog(logp, LOCATION, iph1->remote,
 				"few isakmp message received.\n");
 			return -1;
@@ -953,7 +1115,7 @@ oakley_validate_auth(iph1)
 		break;
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
 	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
-		if (iph1->pl_id == NULL || iph1->pl_hash == NULL) {
+		if (iph1->id_p == NULL || iph1->pl_hash == NULL) {
 			plog(logp, LOCATION, iph1->remote,
 				"few isakmp message received.\n");
 			return -1;

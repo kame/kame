@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.13 2000/01/09 01:31:24 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.14 2000/01/09 22:59:35 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -80,6 +80,7 @@
 #include "policy.h"
 #include "isakmp_ident.h"
 #include "isakmp_agg.h"
+#include "isakmp_base.h"
 #include "isakmp_quick.h"
 #include "isakmp_inf.h"
 #include "isakmp_newg.h"
@@ -97,6 +98,12 @@ static int (*ph1exchange[][2][PHASE1ST_MAX])
   { NULL, agg_i1send, NULL, agg_i2recv, agg_i2send,
     NULL, NULL, NULL, NULL, NULL, },
   { NULL, agg_r1recv, agg_r1send, agg_r2recv, agg_r2send,
+    NULL, NULL, NULL, NULL, NULL, },
+ },
+ { /* Base exchange */
+  { NULL, base_i1send, NULL, base_i2recv, base_i2send,
+    base_i3recv, NULL, NULL, NULL, NULL, },
+  { NULL, base_r1recv, base_r1send, base_r2recv, base_r2send,
     NULL, NULL, NULL, NULL, NULL, },
  },
 };
@@ -1447,55 +1454,20 @@ end:
 }
 
 /*
- * save partner's id into isakmp status.
+ * save partner's(payload) data into phhandle.
  */
 int
-isakmp_id2isa(iph1, id)
-	struct ph1handle *iph1;
-	struct ipsecdoi_pl_id *id;
+isakmp_p2ph(buf, gen)
+	vchar_t *buf;
+	struct isakmp_gen *gen;
 {
-	/* save the body of the ID payload */
-	iph1->id_p = vmalloc(ntohs(id->h.len) - sizeof(struct isakmp_gen));
-	if (iph1->id_p == NULL) {
+	buf = vmalloc(ntohs(gen->len) - sizeof(*gen));
+	if (buf == NULL) {
 		plog(logp, LOCATION, NULL,
 			"vmalloc (%s)\n", strerror(errno));
 		return -1;
 	}
-	memcpy(iph1->id_p->v, (caddr_t)id + sizeof(struct isakmp_gen),
-		iph1->id_p->l);
-
-	return 0;
-}
-
-/*
- * save partner's ke and nonce into isakmp status.
- */
-int
-isakmp_kn2isa(iph1, ke, nonce)
-	struct ph1handle *iph1;
-	struct isakmp_pl_ke *ke;
-	struct isakmp_pl_nonce *nonce;
-{
-	/* save the body of the KE payload */
-	iph1->dhpub_p = vmalloc(ntohs(ke->h.len) - sizeof(*ke));
-	if (iph1->dhpub_p == NULL) {
-		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
-		return -1;
-	}
-	memcpy(iph1->dhpub_p->v, (caddr_t)ke + sizeof(*ke),
-		iph1->dhpub_p->l);
-
-	/* save the body of the NONCE payload */
-	iph1->nonce_p = vmalloc(ntohs(nonce->h.len) - sizeof(*nonce));
-	if (iph1->nonce_p == NULL) {
-		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
-		vfree(iph1->dhpub_p);
-		return -1;
-	}
-	memcpy(iph1->nonce_p->v, (caddr_t)nonce + sizeof(*nonce),
-		iph1->nonce_p->l);
+	memcpy(buf->v, gen + 1, buf->l);
 
 	return 0;
 }
@@ -1634,6 +1606,8 @@ etypesw(etype)
 		return 0;
 	case ISAKMP_ETYPE_AGG:
 		return 1;
+	case ISAKMP_ETYPE_BASE:
+		return 2;
 	case ISAKMP_ETYPE_QUICK:
 		return 0;
 	case ISAKMP_ETYPE_NEWGRP:

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.2 2000/01/09 01:31:23 itojun Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.3 2000/01/09 22:59:33 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -51,6 +51,19 @@
  *  3   1st msg sent	        1st msg sent
  *  4   1st valid msg received  2st valid msg received
  *  5   (---)                   (---)
+ *  6   (---)                   (---)
+ *  7   (---)                   (---)
+ *  8   (---)                   (---)
+ *  9   SA established          SA established
+ *
+ * base mode:
+ *      initiator               responder
+ *  0   (---)                   (---)
+ *  1   start                   start (1st msg received)
+ *  2   (---)                   1st valid msg received
+ *  3   1st msg sent	        1st msg sent
+ *  4   1st valid msg received  2st valid msg received
+ *  5   2nd msg sent            (---)
  *  6   (---)                   (---)
  *  7   (---)                   (---)
  *  8   (---)                   (---)
@@ -122,6 +135,8 @@ struct ph1handle {
 	vchar_t *hash;			/* HASH minus general header */
 	vchar_t *sig;			/* SIG minus general header */
 	vchar_t *cert;			/* CERT minus general header */
+	vchar_t *id;			/* ID minus gen header */
+	vchar_t *id_p;			/* partner's ID minus general header */
 	struct isakmp_ivm *ivm;		/* IVs */
 
 	vchar_t *sa;			/* whole SA payload to calculate HASH */
@@ -131,17 +146,11 @@ struct ph1handle {
 					/* NOT INCLUDING general header. */
 					/* NOTE: Should be release after use. */
 
-	struct isakmp_pl_nonce *pl_nonce; /* pointer to nonce payload */
-	struct isakmp_pl_ke *pl_ke;	/* pointer to nonce payload */
-	struct ipsecdoi_pl_id *pl_id;	/* pointer to id payload */
 	struct isakmp_pl_hash *pl_hash;	/* pointer to hash payload */
 	struct isakmp_pl_cert *pl_cert;	/* pointer to cert payload */
 	struct isakmp_pl_sig *pl_sig;	/* pointer to sig payload */
 			/* XXX save these values into my buffer respectively.
 			 * Need more cool method. */
-
-	vchar_t *id;			/* ID minus gen header */
-	vchar_t *id_p;			/* partner's ID minus general header */
 
 	time_t created;			/* timestamp for establish */
 
@@ -241,7 +250,7 @@ struct ph2handle {
 /* for parsing ISAKMP header. */
 struct isakmp_parse_t {
 	u_char type;		/* payload type of mine */
-	int len;
+	int len;		/* ntohs(ptr->len) */
 	struct isakmp_gen *ptr;
 };
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.1 2000/01/09 01:31:25 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.2 2000/01/09 22:59:35 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -104,14 +104,25 @@ base_i1send(iph1, msg)
 	memset(&iph1->index, 0, sizeof(iph1->index));
 	isakmp_newcookie((caddr_t)&iph1->index, iph1->remote, iph1->local);
 
+	/* make ID payload into isakmp status */
+	if (ipsecdoi_setid1(iph1) < 0)
+		goto end;
+
 	/* create SA payload for my proposal */
 	iph1->sa = ipsecdoi_setph1proposal(iph1->rmconf->proposal);
 	if (iph1->sa == NULL)
 		goto end;
 
+	/* generate NONCE value */
+	iph1->nonce = eay_set_random(iph1->rmconf->nonce_size);
+	if (iph1->nonce == NULL)
+		goto end;
+
 	/* create buffer to send isakmp payload */
 	tlen = sizeof(struct isakmp)
-		+ sizeof(*gen) + iph1->sa->l;
+		+ sizeof(*gen) + iph1->sa->l
+		+ sizeof(*gen) + iph1->id->l
+		+ sizeof(*gen) + iph1->nonce->l;
 
 	iph1->sendbuf = vmalloc(tlen);
 	if (iph1->sendbuf == NULL) {
@@ -126,7 +137,13 @@ base_i1send(iph1, msg)
 		goto end;
 
 	/* set SA payload to propose */
-	p = set_isakmp_payload(p, iph1->sa, ISAKMP_NPTYPE_NONE);
+	p = set_isakmp_payload(p, iph1->sa, ISAKMP_NPTYPE_ID);
+
+	/* create isakmp ID payload */
+	p = set_isakmp_payload(p, iph1->id, ISAKMP_NPTYPE_NONCE);
+
+	/* create isakmp NONCE payload */
+	p = set_isakmp_payload(p, iph1->nonce, ISAKMP_NPTYPE_NONE);
 
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 0);
@@ -138,7 +155,6 @@ base_i1send(iph1, msg)
 
 	iph1->status = PHASE1ST_MSG1SENT;
 
-	/* add to the schedule to resend, and seve back pointer. */
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
 			isakmp_ph1resend, iph1);
@@ -178,17 +194,9 @@ base_i2recv(iph1, msg)
 
 	/* validate the type of next payload */
 	/*
-	 * ISAKMP_ETYPE_IDENT, INITIATOR
+	 * ISAKMP_ETYPE_BASE, INITIATOR
 	 * ISAKMP_NPTYPE_SA,
 	 * (ISAKMP_NPTYPE_VID), ISAKMP_NPTYPE_NONE
-	 *
-	 * NOTE: RedCreek(as responder) attaches N[responder-lifetime] here,
-	 *	if proposal-lifetime > lifetime-redcreek-wants.
-	 *	(see doi-08 4.5.4)
-	 *	=> According to the seciton 4.6.3 in RFC 2407, This is illegal.
-	 * NOTE: we do not really care about ordering of VID and N.
-	 *	does it matters?
-	 * NOTE: even if there's multiple VID/N, we'll ignore them.
 	 */
 	pbuf = isakmp_parse(msg);
 	if (pbuf == NULL)
@@ -212,6 +220,14 @@ base_i2recv(iph1, msg)
 	     pa++) {
 
 		switch (pa->type) {
+		case ISAKMP_NPTYPE_NONCE:
+			if (isakmp_p2ph(iph1->nonce_p, pa->ptr) < 0)
+				goto end;
+			break;
+		case ISAKMP_NPTYPE_ID:
+			if (isakmp_p2ph(iph1->id_p, pa->ptr) < 0)
+				goto end;
+			break;
 		case ISAKMP_NPTYPE_VID:
 			plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n");
@@ -227,6 +243,12 @@ base_i2recv(iph1, msg)
 			vfree(pbuf);
 			goto end;
 		}
+	}
+
+	if (iph1->nonce_p == NULL || iph1->id_p == NULL) {
+		plog(logp, LOCATION, iph1->remote,
+			"few isakmp message received.\n");
+		goto end;
 	}
 
 	/* check SA payload and set approval SA for use */
@@ -283,9 +305,10 @@ base_i2send(iph1, msg)
 				&iph1->dhpub, &iph1->dhpriv) < 0)
 		goto end;
 
-	/* generate NONCE value */
-	iph1->nonce = eay_set_random(iph1->rmconf->nonce_size);
-	if (iph1->nonce == NULL)
+	/* generate HASH to send */
+	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "generate HASH_I\n"));
+	iph1->hash = oakley_compute_hash(iph1, GENERATE);
+	if (iph1->hash == NULL)
 		goto end;
 
 	/* create buffer to send isakmp payload */
@@ -295,7 +318,6 @@ base_i2send(iph1, msg)
 
 	iph1->status = PHASE1ST_MSG2SENT;
 
-	/* add to the schedule to resend, and seve back pointer. */
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
 			isakmp_ph1resend, iph1);
@@ -341,198 +363,22 @@ base_i3recv(iph1, msg)
 	if (pbuf == NULL)
 		goto end;
 
-	iph1->pl_ke = NULL;
-	iph1->pl_nonce = NULL;
-
 	for (pa = (struct isakmp_parse_t *)pbuf->v;
 	     pa->type != ISAKMP_NPTYPE_NONE;
 	     pa++) {
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_KE:
-			iph1->pl_ke = (struct isakmp_pl_ke *)pa->ptr;
-			break;
-		case ISAKMP_NPTYPE_NONCE:
-			iph1->pl_nonce = (struct isakmp_pl_nonce *)pa->ptr;
-			break;
-		case ISAKMP_NPTYPE_VID:
-			plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n");
-			isakmp_check_vendorid(pa->ptr, iph1->remote);
-			break;
-		default:
-			/* don't send information, see ident_r1recv() */
-			error = 0;
-			plog(logp, LOCATION, iph1->remote,
-				"ignore the packet, "
-				"received unexpecting payload type %d.\n",
-				pa->type);
-			vfree(pbuf);
-			goto end;
-		}
-	}
-
-	/* payload existency check */
-	if (iph1->pl_ke == NULL || iph1->pl_nonce == NULL) {
-		plog(logp, LOCATION, iph1->remote,
-			"short isakmp message received.\n");
-		goto end;
-	}
-
-	iph1->status = PHASE1ST_MSG3RECEIVED;
-
-	error = 0;
-
-end:
-	if (pbuf)
-		vfree(pbuf);
-	return error;
-}
-
-XXXXXXXXXXXXXXXXXXXX
-/*
- * send to responder
- * 	psk: HDR*, IDi1, HASH_I
- * 	sig: HDR*, IDi1, [ CERT, ] SIG_I
- * 	rsa: HDR*, HASH_I
- * 	rev: HDR*, HASH_I
- */
-int
-base_i3send(iph1, msg)
-	struct ph1handle *iph1;
-	vchar_t *msg;
-{
-	int error = -1;
-
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
-	/* validity check */
-	if (iph1->status != PHASE1ST_MSG3RECEIVED) {
-		plog(logp, LOCATION, NULL,
-			"status mismatched %d.\n", iph1->status);
-		goto end;
-	}
-
-	/* save responder's ke, nonce for use */
-	if (isakmp_kn2isa(iph1, iph1->pl_ke, iph1->pl_nonce) < 0)
-		goto end;
-
-	/* generate SKEYIDs & IV & final cipher key */
-	if (oakley_compute_skeyids(iph1) < 0)
-		goto end;
-	if (oakley_compute_enckey(iph1) < 0)
-		goto end;
-	if (oakley_newiv(iph1) < 0)
-		goto end;
-
-	/* make ID payload into isakmp status */
-	if (ipsecdoi_setid1(iph1) < 0)
-		goto end;
-
-	/* generate HASH to send */
-	iph1->hash = oakley_compute_hash(iph1, GENERATE);
-	if (iph1->hash == NULL)
-		goto end;
-
-	/* set encryption flag */
-	iph1->flags |= ISAKMP_FLAG_E;
-
-	/* create HDR;ID;HASH payload */
-	iph1->sendbuf = base_ir3sendmx(iph1);
-	if (iph1->sendbuf == NULL)
-		goto end;
-
-	iph1->status = PHASE1ST_MSG3SENT;
-
-	/* add to the schedule to resend, and seve back pointer. */
-	iph1->retry_counter = iph1->rmconf->retry_counter;
-	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-			isakmp_ph1resend, iph1);
-
-	error = 0;
-
-end:
-	return error;
-}
-
-XXXXXXXXXXXXXXXXXXXX
-/*
- * receive from responder
- * 	psk: HDR*, IDr1, HASH_R
- * 	sig: HDR*, IDr1, [ CERT, ] SIG_R
- * 	rsa: HDR*, HASH_R
- * 	rev: HDR*, HASH_R
- */
-int
-base_i4recv(iph1, msg0)
-	struct ph1handle *iph1;
-	vchar_t *msg0;
-{
-	vchar_t *pbuf = NULL;
-	struct isakmp_parse_t *pa;
-	vchar_t *msg = NULL;
-	int error = -1;
-
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
-	/* validity check */
-	if (iph1->status != PHASE1ST_MSG3SENT) {
-		plog(logp, LOCATION, NULL,
-			"status mismatched %d.\n", iph1->status);
-		goto end;
-	}
-
-	/* decrypting */
-	if (!ISSET(((struct isakmp *)msg0->v)->flags, ISAKMP_FLAG_E)) {
-		error = 0;
-		plog(logp, LOCATION, iph1->remote,
-			"ignore the packet, "
-			"expecting the packet encrypted.\n");
-		goto end;
-	}
-	msg = oakley_do_decrypt(iph1, msg0, iph1->ivm->iv, iph1->ivm->ive);
-	if (msg == NULL)
-		goto end;
-
-	/* validate the type of next payload */
-	/*
-	 * ISAKMP_ETYPE_IDENT, INITIATOR
-	 * ISAKMP_NPTYPE_ID, ISAKMP_NPTYPE_HASH, ISAKMP_NPTYPE_NONE
-	 * (ISAKMP_NPTYPE_VID), (ISAKMP_NPTYPE_N)
-	 */
-	pbuf = isakmp_parse(msg);
-	if (pbuf == NULL)
-		goto end;
-
-	iph1->pl_id = NULL;
-	iph1->pl_hash = NULL;
-
-	for (pa = (struct isakmp_parse_t *)pbuf->v;
-	     pa->type != ISAKMP_NPTYPE_NONE;
-	     pa++) {
-
-		switch (pa->type) {
-		case ISAKMP_NPTYPE_ID:
-			iph1->pl_id = (struct ipsecdoi_pl_id *)pa->ptr;
+			if (isakmp_p2ph(iph1->dhpub_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
-		case ISAKMP_NPTYPE_CERT:
-			iph1->pl_cert = (struct isakmp_pl_cert *)pa->ptr;
-			break;
-		case ISAKMP_NPTYPE_SIG:
-			iph1->pl_sig = (struct isakmp_pl_sig *)pa->ptr;
-			break;
 		case ISAKMP_NPTYPE_VID:
 			plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n");
 			isakmp_check_vendorid(pa->ptr, iph1->remote);
-			break;
-		case ISAKMP_NPTYPE_N:
-			plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Notify Message.\n");
-			isakmp_check_notify(pa->ptr, iph1);
 			break;
 		default:
 			/* don't send information, see ident_r1recv() */
@@ -547,41 +393,6 @@ base_i4recv(iph1, msg0)
 	}
 
 	/* payload existency check */
-    {
-	int ng = 0;
-
-	switch (iph1->approval->authmethod) {
-	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
-		if (iph1->pl_id == NULL || iph1->pl_hash == NULL)
-			ng++;
-		break;
-	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
-	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
-		if (iph1->pl_id == NULL || iph1->pl_sig == NULL)
-			ng++;
-		break;
-	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
-	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
-		if (iph1->pl_hash == NULL)
-			ng++;
-		break;
-	default:
-		plog(logp, LOCATION, iph1->remote,
-			"invalid authmethod %d why ?\n",
-			iph1->approval->authmethod);
-		goto end;
-	}
-	if (ng) {
-		plog(logp, LOCATION, iph1->remote,
-			"short isakmp message received.\n");
-		goto end;
-	}
-    }
-
-	/* save responder's id */
-	if (isakmp_id2isa(iph1, iph1->pl_id) < 0)
-		goto end;
-
 	/* validate authentication value */
     {
 	int type;
@@ -596,48 +407,13 @@ base_i4recv(iph1, msg0)
 	}
     }
 
-	/*
-	 * XXX: Should we do compare two addresses, ph1handle's and ID
-	 * payload's.
-	 */
-
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, iph1->remote, "ID ");
-		hexdump((caddr_t)(iph1->pl_id + 1),
-			ntohs(iph1->pl_id->h.len) - sizeof(*iph1->pl_id)));
-
-	iph1->status = PHASE1ST_MSG4RECEIVED;
-
-	error = 0;
-
-end:
-	if (pbuf)
-		vfree(pbuf);
-	if (msg != NULL)
-		vfree(msg);
-
-	return error;
-}
-
-XXXXXXXXXXXXXXXXXXXX
-/*
- * status update and establish isakmp sa.
- */
-int
-base_i4send(iph1, msg)
-	struct ph1handle *iph1;
-	vchar_t *msg;
-{
-	int error = -1;
-
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
-	/* validity check */
-	if (iph1->status != PHASE1ST_MSG4RECEIVED) {
-		plog(logp, LOCATION, NULL,
-			"status mismatched %d.\n", iph1->status);
+	/* generate SKEYIDs & IV & final cipher key */
+	if (oakley_compute_skeyids(iph1) < 0)
 		goto end;
-	}
+	if (oakley_compute_enckey(iph1) < 0)
+		goto end;
+	if (oakley_newiv(iph1) < 0)
+		goto end;
 
 	/* synchronization IV */
 	memcpy(iph1->ivm->ivd->v, iph1->ivm->ive->v, iph1->ivm->iv->l);
@@ -659,6 +435,8 @@ base_i4send(iph1, msg)
 	error = 0;
 
 end:
+	if (pbuf)
+		vfree(pbuf);
 	return error;
 }
 
@@ -690,7 +468,7 @@ base_r1recv(iph1, msg)
 
 	/* validate the type of next payload */
 	/*
-	 * ISAKMP_ETYPE_IDENT, RESPONDER, PHASE1_STATE_ESTABLISHED
+	 * ISAKMP_ETYPE_BASE, RESPONDER,
 	 * ISAKMP_NPTYPE_SA, (ISAKMP_NPTYPE_VID,) ISAKMP_NPTYPE_NONE
 	 *
 	 * NOTE: XXX even if multiple VID, we'll silently ignore those.
@@ -716,19 +494,21 @@ base_r1recv(iph1, msg)
 	     pa++) {
 
 		switch (pa->type) {
+		case ISAKMP_NPTYPE_NONCE:
+			if (isakmp_p2ph(iph1->nonce_p, pa->ptr) < 0)
+				goto end;
+			break;
+		case ISAKMP_NPTYPE_ID:
+			if (isakmp_p2ph(iph1->id_p, pa->ptr) < 0)
+				goto end;
+			break;
 		case ISAKMP_NPTYPE_VID:
 			plog(logp, LOCATION, iph1->remote,
 				"peer transmitted Vendor ID.\n");
 			isakmp_check_vendorid(pa->ptr, iph1->remote);
 			break;
 		default:
-			/*
-			 * We don't send information to the peer even
-			 * if we received malformed packet.  Because we
-			 * can't distinguish the malformed packet and
-			 * the re-sent packet.  And we do same behavior
-			 * when we expect encrypted packet.
-			 */
+			/* don't send information, see ident_r1recv() */
 			error = 0;
 			plog(logp, LOCATION, iph1->remote,
 				"ignore the packet, "
@@ -736,6 +516,12 @@ base_r1recv(iph1, msg)
 				pa->type);
 			goto end;
 		}
+	}
+
+	if (iph1->nonce_p == NULL || iph1->id_p == NULL) {
+		plog(logp, LOCATION, iph1->remote,
+			"few isakmp message received.\n");
+		goto end;
 	}
 
 	/* check SA payload and set approval SA for use */
@@ -797,9 +583,16 @@ base_r1send(iph1, msg)
 	/* set responder's cookie */
 	isakmp_newcookie((caddr_t)&iph1->index.r_ck, iph1->remote, iph1->local);
 
+	/* generate NONCE value */
+	iph1->nonce = eay_set_random(iph1->rmconf->nonce_size);
+	if (iph1->nonce == NULL)
+		goto end;
+
 	/* create buffer to send isakmp payload */
 	tlen = sizeof(struct isakmp)
-		+ sizeof(*gen) + iph1->sa_ret->l;
+		+ sizeof(*gen) + iph1->sa_ret->l
+		+ sizeof(*gen) + iph1->id->l
+		+ sizeof(*gen) + iph1->nonce->l;
 
 	iph1->sendbuf = vmalloc(tlen);
 	if (iph1->sendbuf == NULL) { 
@@ -816,6 +609,12 @@ base_r1send(iph1, msg)
 	/* set SA payload to reply */
 	p = set_isakmp_payload(p, iph1->sa_ret, ISAKMP_NPTYPE_NONE);
 
+	/* create isakmp ID payload */
+	p = set_isakmp_payload(p, iph1->id, ISAKMP_NPTYPE_NONCE);
+
+	/* create isakmp NONCE payload */
+	p = set_isakmp_payload(p, iph1->nonce, ISAKMP_NPTYPE_NONE);
+
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(iph1->sendbuf, iph1->local, iph1->remote, 0);
 #endif
@@ -826,7 +625,6 @@ base_r1send(iph1, msg)
 
 	iph1->status = PHASE1ST_MSG1SENT;
 
-	/* add to the schedule to resend, and seve back pointer. */
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
 			isakmp_ph1resend, iph1);
@@ -877,8 +675,7 @@ base_r2recv(iph1, msg)
 	if (pbuf == NULL)
 		goto end;
 
-	iph1->pl_ke = NULL;
-	iph1->pl_nonce = NULL;
+	iph1->pl_hash = NULL;
 
 	for (pa = (struct isakmp_parse_t *)pbuf->v;
 	     pa->type != ISAKMP_NPTYPE_NONE;
@@ -886,10 +683,11 @@ base_r2recv(iph1, msg)
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_KE:
-			iph1->pl_ke = (struct isakmp_pl_ke *)pa->ptr;
+			if (isakmp_p2ph(iph1->dhpub_p, pa->ptr) < 0)
+				goto end;
 			break;
-		case ISAKMP_NPTYPE_NONCE:
-			iph1->pl_nonce = (struct isakmp_pl_nonce *)pa->ptr;
+		case ISAKMP_NPTYPE_HASH:
+			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
 			break;
 		case ISAKMP_NPTYPE_VID:
 			plog(logp, LOCATION, iph1->remote,
@@ -908,11 +706,19 @@ base_r2recv(iph1, msg)
 	}
 
 	/* payload existency check */
-	if (iph1->pl_ke == NULL || iph1->pl_nonce == NULL) {
-		plog(logp, LOCATION, iph1->remote,
-			"short isakmp message received.\n");
+	/* validate authentication value */
+    {
+	int type;
+	type = oakley_validate_auth(iph1);
+	if (type != 0) {
+		if (type == -1) {
+			/* message printed inner oakley_validate_auth() */
+			goto end;
+		}
+		isakmp_info_send_n1(iph1, type, NULL);
 		goto end;
 	}
+    }
 
 	iph1->status = PHASE1ST_MSG2RECEIVED;
 
@@ -952,18 +758,15 @@ base_r2send(iph1, msg)
 				&iph1->dhpub, &iph1->dhpriv) < 0)
 		goto end;
 
-	/* generate NONCE value */
-	iph1->nonce = eay_set_random(iph1->rmconf->nonce_size);
-	if (iph1->nonce == NULL)
+	/* generate HASH to send */
+	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "generate HASH_I\n"));
+	iph1->hash = oakley_compute_hash(iph1, GENERATE);
+	if (iph1->hash == NULL)
 		goto end;
 
 	/* create HDR;KE;NONCE payload */
 	iph1->sendbuf = base_ir2sendmx(iph1);
 	if (iph1->sendbuf == NULL)
-		goto end;
-
-	/* save initiator's ke, nonce for use */
-	if (isakmp_kn2isa(iph1, iph1->pl_ke, iph1->pl_nonce) < 0)
 		goto end;
 
 	/* generate SKEYIDs & IV & final cipher key */
@@ -974,267 +777,27 @@ base_r2send(iph1, msg)
 	if (oakley_newiv(iph1) < 0)
 		goto end;
 
-	iph1->status = PHASE1ST_MSG2SENT;
-
-	/* add to the schedule to resend, and seve back pointer. */
-	iph1->retry_counter = iph1->rmconf->retry_counter;
-	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-			isakmp_ph1resend, iph1);
-
-	error = 0;
-
-end:
-	return error;
-}
-
-XXXXXXXXXXXXXXXx
-/*
- * receive from initiator
- * 	psk: HDR*, IDi1, HASH_I
- * 	sig: HDR*, IDi1, [ CERT, ] SIG_I
- * 	rsa: HDR*, HASH_I
- * 	rev: HDR*, HASH_I
- */
-int
-base_r3recv(iph1, msg0)
-	struct ph1handle *iph1;
-	vchar_t *msg0;
-{
-	vchar_t *msg = NULL;
-	vchar_t *pbuf = NULL;
-	struct isakmp_parse_t *pa;
-	int error = -1;
-
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
-	/* validity check */
-	if (iph1->status != PHASE1ST_MSG2SENT) {
-		plog(logp, LOCATION, NULL,
-			"status mismatched %d.\n", iph1->status);
-		goto end;
-	}
-
-	/* decrypting */
-	if (!ISSET(((struct isakmp *)msg0->v)->flags, ISAKMP_FLAG_E)) {
-		error = 0;
-		plog(logp, LOCATION, iph1->remote,
-			"ignore the packet, "
-			"expecting the packet encrypted.\n");
-		goto end;
-	}
-	msg = oakley_do_decrypt(iph1, msg0, iph1->ivm->iv, iph1->ivm->ive);
-	if (msg == NULL)
-		goto end;
-
-	/* validate the type of next payload */
-	/*
-	 * ISAKMP_ETYPE_IDENT, RESPONDER
-	 * ISAKMP_NPTYPE_ID, ISAKMP_NPTYPE_HASH, ISAKMP_NPTYPE_NONE
-	 * (ISAKMP_NPTYPE_VID), (ISAKMP_NPTYPE_N)
-	 */
-	pbuf = isakmp_parse(msg);
-	if (pbuf == NULL)
-		goto end;
-
-	iph1->pl_id = NULL;
-	iph1->pl_hash = NULL;
-
-	for (pa = (struct isakmp_parse_t *)pbuf->v;
-	     pa->type != ISAKMP_NPTYPE_NONE;
-	     pa++) {
-
-		switch (pa->type) {
-		case ISAKMP_NPTYPE_ID:
-			iph1->pl_id = (struct ipsecdoi_pl_id *)pa->ptr;
-			break;
-		case ISAKMP_NPTYPE_HASH:
-			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
-			break;
-		case ISAKMP_NPTYPE_CERT:
-			iph1->pl_cert = (struct isakmp_pl_cert *)pa->ptr;
-			break;
-		case ISAKMP_NPTYPE_SIG:
-			iph1->pl_sig = (struct isakmp_pl_sig *)pa->ptr;
-			break;
-		case ISAKMP_NPTYPE_VID:
-			plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Vendor ID.\n");
-			isakmp_check_vendorid(pa->ptr, iph1->remote);
-			break;
-		case ISAKMP_NPTYPE_N:
-			plog(logp, LOCATION, iph1->remote,
-				"peer transmitted Notify Message.\n");
-			isakmp_check_notify(pa->ptr, iph1);
-			break;
-		default:
-			/* don't send information, see ident_r1recv() */
-			error = 0;
-			plog(logp, LOCATION, iph1->remote,
-				"ignore the packet, "
-				"received unexpecting payload type %d.\n",
-				pa->type);
-			vfree(pbuf);
-			goto end;
-		}
-	}
-
-	/* payload existency check */
-	if (iph1->pl_id == NULL || iph1->pl_hash == NULL) {
-		plog(logp, LOCATION, iph1->remote,
-			"short isakmp message received.\n");
-		goto end;
-	}
-
-	/* payload existency check */
-	/* XXX same as ident_i4recv(), should be merged. */
-    {
-	int ng = 0;
-
-	switch (iph1->approval->authmethod) {
-	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
-		if (iph1->pl_id == NULL || iph1->pl_hash == NULL)
-			ng++;
-		break;
-	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
-	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
-		if (iph1->pl_id == NULL || iph1->pl_sig == NULL)
-			ng++;
-		break;
-	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
-	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
-		if (iph1->pl_hash == NULL)
-			ng++;
-		break;
-	default:
-		plog(logp, LOCATION, iph1->remote,
-			"invalid authmethod %d why ?\n",
-			iph1->approval->authmethod);
-		goto end;
-	}
-	if (ng) {
-		plog(logp, LOCATION, iph1->remote,
-			"short isakmp message received.\n");
-		goto end;
-	}
-    }
-
-	/* save initiator's id */
-	if (isakmp_id2isa(iph1, iph1->pl_id) < 0)
-		goto end;
-
-	/* validate authentication value */
-    {
-	int type;
-	type = oakley_validate_auth(iph1);
-	if (type != 0) {
-		if (type == -1) {
-			/* message printed inner oakley_validate_auth() */
-			goto end;
-		}
-		isakmp_info_send_n1(iph1, type, NULL);
-		goto end;
-	}
-    }
-
-	/*
-	 * XXX: Should we do compare two addresses, ph1handle's and ID
-	 * payload's.
-	 */
-
-	YIPSDEBUG(DEBUG_MISC,
-		plog(logp, LOCATION, iph1->remote, "ID ");
-		hexdump((caddr_t)(iph1->pl_id + 1),
-			ntohs(iph1->pl_id->h.len) - sizeof(*iph1->pl_id)));
-
-	iph1->status = PHASE1ST_MSG3RECEIVED;
-
-	error = 0;
-
-end:
-	if (pbuf)
-		vfree(pbuf);
-	if (msg != NULL)
-		vfree(msg);
-
-	return error;
-}
-
-XXXXXXXXXXXXXXXx
-/*
- * send to initiator
- * 	psk: HDR*, IDr1, HASH_R
- * 	sig: HDR*, IDr1, [ CERT, ] SIG_R
- * 	rsa: HDR*, HASH_R
- * 	rev: HDR*, HASH_R
- */
-int
-base_r3send(iph1, msg0)
-	struct ph1handle *iph1;
-	vchar_t *msg0;
-{
-	vchar_t *msg = NULL;
-	int error = -1;
-
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "begin.\n"));
-
-	/* validity check */
-	if (iph1->status != PHASE1ST_MSG3RECEIVED) {
-		plog(logp, LOCATION, NULL,
-			"status mismatched %d.\n", iph1->status);
-		goto end;
-	}
-
-	/* make ID payload into isakmp status */
-	if (ipsecdoi_setid1(iph1) < 0)
-		goto end;
-
-	/* generate HASH to send */
-	YIPSDEBUG(DEBUG_KEY, plog(logp, LOCATION, NULL, "generate HASH_R\n"));
-	iph1->hash = oakley_compute_hash(iph1, GENERATE);
-	if (iph1->hash == NULL)
-		goto end;
-
-	/* re-set encryption flag, for serurity. */
-	iph1->flags |= ISAKMP_FLAG_E;
-
-	/* create HDR;ID;HASH payload */
-	iph1->sendbuf = base_ir3sendmx(iph1);
-	if (iph1->sendbuf == NULL)
-		goto end;
-
 	iph1->status = PHASE1ST_ESTABLISHED;
 
-	/* save created date. */
-	(void)time(&iph1->created);
-
-#if 0 /* XXX: How resend ? */
-	/* add to the schedule to resend, and seve back pointer. */
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
 			isakmp_ph1resend, iph1);
-#endif
-	/* add to the schedule to expire, and seve back pointer. */
-	iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
-
-	plog(logp, LOCATION, iph1->remote,
-		"established ISAKMP-SA, %s.\n",
-		isakmp_pindex(&iph1->index, 0));
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
 
 	error = 0;
 
 end:
-	if (msg != NULL)
-		vfree(msg);
-
 	return error;
 }
 
 /*
  * create KE, NONCE payload with isakmp header.
  * This is used in main mode for:
- *	initiator's 3rd exchange
- *	responders 2nd exchnage
+ *	initiator's 2nd exchange
+ *	responders 3rd exchnage
+ *	psk: HDR, KE, HASH_I
+ *	sig: HDR, KE, [CERT,] SIG_I
+ *	rsa: HDR, KE, HASH_I
+ *	rev: HDR, <KE>Ke_i, HASH_I
  */
 static vchar_t *
 base_ir2sendmx(iph1)
@@ -1250,7 +813,7 @@ base_ir2sendmx(iph1)
 	/* create buffer */
 	tlen = sizeof(struct isakmp)
 	     + sizeof(*gen) + iph1->dhpub->l
-	     + sizeof(*gen) + iph1->nonce->l;
+	     + sizeof(*gen) + iph1->hash->l;
 	if (lcconf->vendorid) {
 		vidhash = oakley_hash(lcconf->vendorid, iph1);
 		tlen += sizeof(*gen) + vidhash->l;
@@ -1269,11 +832,11 @@ base_ir2sendmx(iph1)
 		goto end;
 
 	/* create isakmp KE payload */
-	p = set_isakmp_payload(p, iph1->dhpub, ISAKMP_NPTYPE_NONCE);
+	p = set_isakmp_payload(p, iph1->dhpub, ISAKMP_NPTYPE_HASH);
 
-	/* create isakmp NONCE payload */
-	p = set_isakmp_payload(p, iph1->nonce,
-		vidhash ? ISAKMP_NPTYPE_VID : ISAKMP_NPTYPE_NONE);
+	/* create isakmp HASH payload */
+	p = set_isakmp_payload(p, iph1->hash,
+		vidhash ? ISAKMP_NPTYPE_VID : ISAKMP_NPTYPE_HASH);
 
 	/* append vendor id, if needed */
 	if (vidhash)
@@ -1297,77 +860,6 @@ end:
 
 	if (vidhash != NULL)
 		vfree(vidhash);
-
-	return buf;
-}
-
-/*
- * create ID, HASH payload with isakmp header.
- * This is used in main mode for:
- *	initiator's 4th exchange
- *	responders 3rd exchnage
- */
-static vchar_t *
-base_ir3sendmx(iph1)
-	struct ph1handle *iph1;
-{
-	vchar_t *buf = NULL, *new = NULL;
-	char *p;
-	int tlen;
-	struct isakmp_gen *gen;
-	int error = -1;
-
-	/* create buffer */
-	tlen = sizeof(struct isakmp)
-	     + sizeof(*gen) + iph1->id->l
-	     + sizeof(*gen) + iph1->hash->l;
-
-	buf = vmalloc(tlen);
-	if (buf == NULL) {
-		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
-		goto end;
-	}
-
-	/* set isakmp header */
-	p = set_isakmp_header(buf, iph1, ISAKMP_NPTYPE_ID);
-	if (p == NULL)
-		goto end;
-
-	/* create isakmp ID payload */
-	p = set_isakmp_payload(p, iph1->id, ISAKMP_NPTYPE_HASH);
-
-	/* create isakmp HASH payload */
-	p = set_isakmp_payload(p, iph1->hash, ISAKMP_NPTYPE_NONE);
-
-#ifdef HAVE_PRINT_ISAKMP_C
-	isakmp_printpacket(buf, iph1->local, iph1->remote, 1);
-#endif
-
-	/* encoding */
-	new = oakley_do_encrypt(iph1, buf, iph1->ivm->ive, iph1->ivm->iv);
-	if (new == NULL)
-		goto end;
-
-	vfree(buf);
-
-	buf = new;
-
-	/* send HDR;ID;HASH to responder */
-	if (isakmp_send(iph1, buf) < 0)
-		goto end;
-
-	/* synchronization IV */
-	memcpy(iph1->ivm->ive->v, iph1->ivm->iv->v, iph1->ivm->iv->l);
-	memcpy(iph1->ivm->ivd->v, iph1->ivm->iv->v, iph1->ivm->iv->l);
-
-	error = 0;
-
-end:
-	if (error && buf != NULL) {
-		vfree(buf);
-		buf = NULL;
-	}
 
 	return buf;
 }

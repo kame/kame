@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.1 2000/01/09 01:31:25 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.2 2000/01/09 22:59:36 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -138,7 +138,6 @@ ident_i1send(iph1, msg)
 
 	iph1->status = PHASE1ST_MSG1SENT;
 
-	/* add to the schedule to resend, and seve back pointer. */
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
 			isakmp_ph1resend, iph1);
@@ -342,19 +341,18 @@ ident_i3recv(iph1, msg)
 	if (pbuf == NULL)
 		goto end;
 
-	iph1->pl_ke = NULL;
-	iph1->pl_nonce = NULL;
-
 	for (pa = (struct isakmp_parse_t *)pbuf->v;
 	     pa->type != ISAKMP_NPTYPE_NONE;
 	     pa++) {
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_KE:
-			iph1->pl_ke = (struct isakmp_pl_ke *)pa->ptr;
+			if (isakmp_p2ph(iph1->dhpub_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_NONCE:
-			iph1->pl_nonce = (struct isakmp_pl_nonce *)pa->ptr;
+			if (isakmp_p2ph(iph1->nonce_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_VID:
 			plog(logp, LOCATION, iph1->remote,
@@ -374,7 +372,7 @@ ident_i3recv(iph1, msg)
 	}
 
 	/* payload existency check */
-	if (iph1->pl_ke == NULL || iph1->pl_nonce == NULL) {
+	if (iph1->dhpub_p == NULL || iph1->nonce_p == NULL) {
 		plog(logp, LOCATION, iph1->remote,
 			"short isakmp message received.\n");
 		goto end;
@@ -413,10 +411,6 @@ ident_i3send(iph1, msg)
 		goto end;
 	}
 
-	/* save responder's ke, nonce for use */
-	if (isakmp_kn2isa(iph1, iph1->pl_ke, iph1->pl_nonce) < 0)
-		goto end;
-
 	/* generate SKEYIDs & IV & final cipher key */
 	if (oakley_compute_skeyids(iph1) < 0)
 		goto end;
@@ -444,7 +438,6 @@ ident_i3send(iph1, msg)
 
 	iph1->status = PHASE1ST_MSG3SENT;
 
-	/* add to the schedule to resend, and seve back pointer. */
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
 			isakmp_ph1resend, iph1);
@@ -503,7 +496,6 @@ ident_i4recv(iph1, msg0)
 	if (pbuf == NULL)
 		goto end;
 
-	iph1->pl_id = NULL;
 	iph1->pl_hash = NULL;
 
 	for (pa = (struct isakmp_parse_t *)pbuf->v;
@@ -512,7 +504,8 @@ ident_i4recv(iph1, msg0)
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_ID:
-			iph1->pl_id = (struct ipsecdoi_pl_id *)pa->ptr;
+			if (isakmp_p2ph(iph1->id_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
@@ -546,41 +539,6 @@ ident_i4recv(iph1, msg0)
 	}
 
 	/* payload existency check */
-    {
-	int ng = 0;
-
-	switch (iph1->approval->authmethod) {
-	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
-		if (iph1->pl_id == NULL || iph1->pl_hash == NULL)
-			ng++;
-		break;
-	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
-	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
-		if (iph1->pl_id == NULL || iph1->pl_sig == NULL)
-			ng++;
-		break;
-	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
-	case OAKLEY_ATTR_AUTH_METHOD_RSAREV:
-		if (iph1->pl_hash == NULL)
-			ng++;
-		break;
-	default:
-		plog(logp, LOCATION, iph1->remote,
-			"invalid authmethod %d why ?\n",
-			iph1->approval->authmethod);
-		goto end;
-	}
-	if (ng) {
-		plog(logp, LOCATION, iph1->remote,
-			"short isakmp message received.\n");
-		goto end;
-	}
-    }
-
-	/* save responder's id */
-	if (isakmp_id2isa(iph1, iph1->pl_id) < 0)
-		goto end;
-
 	/* validate authentication value */
     {
 	int type;
@@ -602,8 +560,7 @@ ident_i4recv(iph1, msg0)
 
 	YIPSDEBUG(DEBUG_MISC,
 		plog(logp, LOCATION, iph1->remote, "ID ");
-		hexdump((caddr_t)(iph1->pl_id + 1),
-			ntohs(iph1->pl_id->h.len) - sizeof(*iph1->pl_id)));
+		hexdump((caddr_t)iph1->id_p, iph1->id_p->l));
 
 	iph1->status = PHASE1ST_MSG4RECEIVED;
 
@@ -824,7 +781,6 @@ ident_r1send(iph1, msg)
 
 	iph1->status = PHASE1ST_MSG1SENT;
 
-	/* add to the schedule to resend, and seve back pointer. */
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
 			isakmp_ph1resend, iph1);
@@ -876,19 +832,18 @@ ident_r2recv(iph1, msg)
 	if (pbuf == NULL)
 		goto end;
 
-	iph1->pl_ke = NULL;
-	iph1->pl_nonce = NULL;
-
 	for (pa = (struct isakmp_parse_t *)pbuf->v;
 	     pa->type != ISAKMP_NPTYPE_NONE;
 	     pa++) {
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_KE:
-			iph1->pl_ke = (struct isakmp_pl_ke *)pa->ptr;
+			if (isakmp_p2ph(iph1->dhpub_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_NONCE:
-			iph1->pl_nonce = (struct isakmp_pl_nonce *)pa->ptr;
+			if (isakmp_p2ph(iph1->nonce_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_VID:
 			plog(logp, LOCATION, iph1->remote,
@@ -907,7 +862,7 @@ ident_r2recv(iph1, msg)
 	}
 
 	/* payload existency check */
-	if (iph1->pl_ke == NULL || iph1->pl_nonce == NULL) {
+	if (iph1->dhpub_p == NULL || iph1->nonce_p == NULL) {
 		plog(logp, LOCATION, iph1->remote,
 			"short isakmp message received.\n");
 		goto end;
@@ -961,10 +916,6 @@ ident_r2send(iph1, msg)
 	if (iph1->sendbuf == NULL)
 		goto end;
 
-	/* save initiator's ke, nonce for use */
-	if (isakmp_kn2isa(iph1, iph1->pl_ke, iph1->pl_nonce) < 0)
-		goto end;
-
 	/* generate SKEYIDs & IV & final cipher key */
 	if (oakley_compute_skeyids(iph1) < 0)
 		goto end;
@@ -975,7 +926,6 @@ ident_r2send(iph1, msg)
 
 	iph1->status = PHASE1ST_MSG2SENT;
 
-	/* add to the schedule to resend, and seve back pointer. */
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
 			isakmp_ph1resend, iph1);
@@ -1034,7 +984,6 @@ ident_r3recv(iph1, msg0)
 	if (pbuf == NULL)
 		goto end;
 
-	iph1->pl_id = NULL;
 	iph1->pl_hash = NULL;
 
 	for (pa = (struct isakmp_parse_t *)pbuf->v;
@@ -1043,7 +992,8 @@ ident_r3recv(iph1, msg0)
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_ID:
-			iph1->pl_id = (struct ipsecdoi_pl_id *)pa->ptr;
+			if (isakmp_p2ph(iph1->id_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
@@ -1077,25 +1027,18 @@ ident_r3recv(iph1, msg0)
 	}
 
 	/* payload existency check */
-	if (iph1->pl_id == NULL || iph1->pl_hash == NULL) {
-		plog(logp, LOCATION, iph1->remote,
-			"short isakmp message received.\n");
-		goto end;
-	}
-
-	/* payload existency check */
 	/* XXX same as ident_i4recv(), should be merged. */
     {
 	int ng = 0;
 
 	switch (iph1->approval->authmethod) {
 	case OAKLEY_ATTR_AUTH_METHOD_PSKEY:
-		if (iph1->pl_id == NULL || iph1->pl_hash == NULL)
+		if (iph1->id_p == NULL || iph1->pl_hash == NULL)
 			ng++;
 		break;
 	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
 	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
-		if (iph1->pl_id == NULL || iph1->pl_sig == NULL)
+		if (iph1->id_p == NULL || iph1->pl_sig == NULL)
 			ng++;
 		break;
 	case OAKLEY_ATTR_AUTH_METHOD_RSAENC:
@@ -1115,10 +1058,6 @@ ident_r3recv(iph1, msg0)
 		goto end;
 	}
     }
-
-	/* save initiator's id */
-	if (isakmp_id2isa(iph1, iph1->pl_id) < 0)
-		goto end;
 
 	/* validate authentication value */
     {
@@ -1141,8 +1080,7 @@ ident_r3recv(iph1, msg0)
 
 	YIPSDEBUG(DEBUG_MISC,
 		plog(logp, LOCATION, iph1->remote, "ID ");
-		hexdump((caddr_t)(iph1->pl_id + 1),
-			ntohs(iph1->pl_id->h.len) - sizeof(*iph1->pl_id)));
+		hexdump((caddr_t)iph1->id_p, iph1->id_p->l));
 
 	iph1->status = PHASE1ST_MSG3RECEIVED;
 

@@ -26,19 +26,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.h,v 1.1 2000/01/09 01:31:25 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_base.h,v 1.2 2000/01/09 22:59:36 sakane Exp $ */
 
 extern int base_i1send __P((struct ph1handle *iph1, vchar_t *msg));
 extern int base_i2recv __P((struct ph1handle *iph1, vchar_t *msg));
 extern int base_i2send __P((struct ph1handle *iph1, vchar_t *msg));
 extern int base_i3recv __P((struct ph1handle *iph1, vchar_t *msg));
-extern int base_i3send __P((struct ph1handle *iph1, vchar_t *msg));
-extern int base_i4recv __P((struct ph1handle *iph1, vchar_t *msg0));
-extern int base_i4send __P((struct ph1handle *iph1, vchar_t *msg));
 
 extern int base_r1recv __P((struct ph1handle *iph1, vchar_t *msg));
 extern int base_r1send __P((struct ph1handle *iph1, vchar_t *msg));
 extern int base_r2recv __P((struct ph1handle *iph1, vchar_t *msg));
 extern int base_r2send __P((struct ph1handle *iph1, vchar_t *msg));
-extern int base_r3recv __P((struct ph1handle *iph1, vchar_t *msg0));
-extern int base_r3send __P((struct ph1handle *iph1, vchar_t *msg0));

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.1 2000/01/09 01:31:25 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.2 2000/01/09 22:59:35 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -167,10 +167,8 @@ agg_i1send(iph1, msg)
 	if (isakmp_send(iph1, iph1->sendbuf) < 0)
 		goto end;
 
-	/* change status of isakmp status entry */
 	iph1->status = PHASE1ST_MSG1SENT;
 
-	/* add to the schedule to resend, and seve back pointer. */
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
 			isakmp_ph1resend, iph1);
@@ -219,9 +217,6 @@ agg_i2recv(iph1, msg)
 		goto end;
 	pa = (struct isakmp_parse_t *)pbuf->v;
 
-	iph1->pl_ke = NULL;
-	iph1->pl_nonce = NULL;
-	iph1->pl_id = NULL;
 	iph1->pl_hash = NULL;
 
 	/* SA paylad is fixed postion */
@@ -242,13 +237,16 @@ agg_i2recv(iph1, msg)
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_KE:
-			iph1->pl_ke = (struct isakmp_pl_ke *)pa->ptr;
+			if (isakmp_p2ph(iph1->dhpub_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_NONCE:
-			iph1->pl_nonce = (struct isakmp_pl_nonce *)pa->ptr;
+			if (isakmp_p2ph(iph1->nonce_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_ID:
-			iph1->pl_id = (struct ipsecdoi_pl_id *)pa->ptr;
+			if (isakmp_p2ph(iph1->id_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_HASH:
 			iph1->pl_hash = (struct isakmp_pl_hash *)pa->ptr;
@@ -265,14 +263,13 @@ agg_i2recv(iph1, msg)
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
-			vfree(pbuf);
 			goto end;
 		}
 	}
 
 	/* payload existency check */
-	if (iph1->pl_ke == NULL || iph1->pl_nonce == NULL
-	 || iph1->pl_id == NULL || iph1->pl_hash == NULL) {
+	if (iph1->dhpub_p == NULL || iph1->nonce_p == NULL
+	 || iph1->id_p == NULL || iph1->pl_hash == NULL) {
 		plog(logp, LOCATION, iph1->remote,
 			"short isakmp message received.\n");
 		goto end;
@@ -293,14 +290,6 @@ agg_i2recv(iph1, msg)
 	/* fix isakmp index */
 	memcpy(&iph1->index.r_ck, &((struct isakmp *)msg->v)->r_ck,
 		sizeof(cookie_t));
-
-	/* save responder's id */
-	if (isakmp_id2isa(iph1, iph1->pl_id) < 0)
-		goto end;
-
-	/* commit responder's ke, nonce for use */
-	if (isakmp_kn2isa(iph1, iph1->pl_ke, iph1->pl_nonce) < 0)
-		goto end;
 
 	/* generate SKEYIDs & IV & final cipher key */
 	if (oakley_compute_skeyids(iph1) < 0)
@@ -393,19 +382,16 @@ agg_i2send(iph1, msg)
 	if (isakmp_send(iph1, iph1->sendbuf) < 0)
 		goto end;
 
-	/* change status of isakmp status entry */
 	iph1->status = PHASE1ST_ESTABLISHED;
 
 	/* save created date. */
 	(void)time(&iph1->created);
 
 #if 0 /* XXX: How resend ? */
-	/* add to the schedule to resend, and seve back pointer. */
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
 			isakmp_ph1resend, iph1);
 #endif
-	/* add to the schedule to expire, and seve back pointer. */
 	iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
 
 	plog(logp, LOCATION, iph1->remote,
@@ -458,10 +444,6 @@ agg_r1recv(iph1, msg)
 		goto end;
 	pa = (struct isakmp_parse_t *)pbuf->v;
 
-	iph1->pl_ke = NULL;
-	iph1->pl_nonce = NULL;
-	iph1->pl_id = NULL;
-
 	/* SA paylad is fixed postion */
 	if (pa->type != ISAKMP_NPTYPE_SA) {
 		plog(logp, LOCATION, iph1->remote,
@@ -480,13 +462,16 @@ agg_r1recv(iph1, msg)
 
 		switch (pa->type) {
 		case ISAKMP_NPTYPE_KE:
-			iph1->pl_ke = (struct isakmp_pl_ke *)pa->ptr;
+			if (isakmp_p2ph(iph1->dhpub_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_NONCE:
-			iph1->pl_nonce = (struct isakmp_pl_nonce *)pa->ptr;
+			if (isakmp_p2ph(iph1->nonce_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_ID:
-			iph1->pl_id = (struct ipsecdoi_pl_id *)pa->ptr;
+			if (isakmp_p2ph(iph1->id_p, pa->ptr) < 0)
+				goto end;
 			break;
 		case ISAKMP_NPTYPE_VID:
 			plog(logp, LOCATION, iph1->remote,
@@ -506,8 +491,8 @@ agg_r1recv(iph1, msg)
 	}
 
 	/* payload existency check */
-	if (iph1->pl_ke == NULL || iph1->pl_nonce == NULL
-	 || iph1->pl_id == NULL) {
+	if (iph1->dhpub_p == NULL || iph1->nonce_p == NULL
+	 || iph1->id_p == NULL) {
 		plog(logp, LOCATION, iph1->remote,
 			"short isakmp message received.\n");
 		goto end;
@@ -573,10 +558,6 @@ agg_r1send(iph1, msg)
 	/* set responder's cookie */
 	isakmp_newcookie((caddr_t)&iph1->index.r_ck, iph1->remote, iph1->local);
 
-	/* save initiator's id */
-	if (isakmp_id2isa(iph1, iph1->pl_id) < 0)
-		goto end;
-
 	/* make ID payload into isakmp status */
 	if (ipsecdoi_setid1(iph1) < 0)
 		goto end;
@@ -589,10 +570,6 @@ agg_r1send(iph1, msg)
 	/* generate NONCE value */
 	iph1->nonce = eay_set_random(iph1->rmconf->nonce_size);
 	if (iph1->nonce == NULL)
-		goto end;
-
-	/* commit initiator's ke, nonce for use */
-	if (isakmp_kn2isa(iph1, iph1->pl_ke, iph1->pl_nonce) < 0)
 		goto end;
 
 	/* generate SKEYIDs & IV & final cipher key */
@@ -661,10 +638,8 @@ agg_r1send(iph1, msg)
 	if (isakmp_send(iph1, iph1->sendbuf) < 0)
 		goto end;
 
-	/* change status of isakmp status entry */
 	iph1->status = PHASE1ST_MSG1SENT;
 
-	/* add to the schedule to resend, and seve back pointer. */
 	iph1->retry_counter = iph1->rmconf->retry_counter;
 	iph1->scr = sched_new(iph1->rmconf->retry_interval,
 			isakmp_ph1resend, iph1);
@@ -812,7 +787,6 @@ agg_r2send(iph1, msg)
 	/* save created date. */
 	iph1->created = time(NULL);
 
-	/* add to the schedule to expire, and seve back pointer. */
 	iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
 
 	plog(logp, LOCATION, iph1->remote,

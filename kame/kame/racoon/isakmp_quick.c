@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.1 2000/01/09 01:31:26 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.2 2000/01/09 22:59:37 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -277,7 +277,6 @@ quick_i2recv(iph2, msg0)
 	vchar_t *pbuf = NULL;	/* for payload parsing */
 	struct isakmp_parse_t *pa;
 	struct isakmp *isakmp = (struct isakmp *)msg0->v;
-	struct isakmp_gen *gen;
 	struct isakmp_pl_hash *hash = NULL;
 	struct ipsecdoi_pl_sa *sa_tmp = NULL; /* SA payloads to parse. */
 	int f_id;
@@ -385,27 +384,13 @@ quick_i2recv(iph2, msg0)
 			break;
 
 		case ISAKMP_NPTYPE_NONCE:
-			iph2->nonce_p = vmalloc(pa->len - sizeof(*gen));
-			if (iph2->nonce_p == NULL) {
-				plog(logp, LOCATION, NULL,
-					"vmalloc (%s)\n", strerror(errno));
+			if (isakmp_p2ph(iph2->nonce_p, pa->ptr) < 0)
 				goto end;
-			}
-			memcpy(iph2->nonce_p->v,
-				(caddr_t)pa->ptr + sizeof(*gen),
-				iph2->nonce_p->l);
 			break;
 
 		case ISAKMP_NPTYPE_KE:
-			iph2->dhpub_p = vmalloc(pa->len - sizeof(*gen));
-			if (iph2->dhpub_p == NULL) {
-				plog(logp, LOCATION, NULL,
-					"vmalloc (%s)\n", strerror(errno));
+			if (isakmp_p2ph(iph2->dhpub_p, pa->ptr) < 0)
 				goto end;
-			}
-			memcpy(iph2->dhpub_p->v,
-				(caddr_t)pa->ptr + sizeof(*gen),
-				iph2->dhpub_p->l);
 			break;
 
 		case ISAKMP_NPTYPE_ID:
@@ -784,28 +769,13 @@ quick_r1recv(iph2, msg0)
 			break;
 
 		case ISAKMP_NPTYPE_NONCE:
-			iph2->nonce_p = vmalloc(pa->len - sizeof(struct isakmp_gen));
-			if (iph2->nonce_p == NULL) {
-				plog(logp, LOCATION, NULL,
-					"vmalloc (%s)\n",
-					strerror(errno));
-				goto err;
-			}
-			memcpy(iph2->nonce_p->v,
-				(caddr_t)pa->ptr + sizeof(struct isakmp_gen),
-				iph2->nonce_p->l);
+			if (isakmp_p2ph(iph2->nonce_p, pa->ptr) < 0)
+				goto end;
 			break;
 
 		case ISAKMP_NPTYPE_KE:
-			iph2->dhpub_p = vmalloc(pa->len - sizeof(struct isakmp_gen));
-			if (iph2->dhpub_p == NULL) {
-				plog(logp, LOCATION, NULL,
-					"vmalloc (%s)\n", strerror(errno));
-				goto err;
-			}
-			memcpy(iph2->dhpub_p->v,
-				(caddr_t)pa->ptr + sizeof(struct isakmp_gen),
-				iph2->dhpub_p->l);
+			if (isakmp_p2ph(iph2->dhpub_p, pa->ptr) < 0)
+				goto end;
 			break;
 
 		case ISAKMP_NPTYPE_ID:
@@ -813,16 +783,8 @@ quick_r1recv(iph2, msg0)
 				/* for IDci */
 				f_id_order++;
 
-				iph2->id_p = vmalloc(pa->len - sizeof(struct isakmp_gen));
-				if (iph2->id_p == NULL) {
-					plog(logp, LOCATION, NULL,
-						"vmalloc (%s)\n",
-						strerror(errno));
-					goto err;
-				}
-				memcpy(iph2->id_p->v,
-					(caddr_t)pa->ptr + sizeof(struct isakmp_gen),
-					iph2->id_p->l);
+				if (isakmp_p2ph(iph2->id_p, pa->ptr) < 0)
+					goto end;
 				YIPSDEBUG(DEBUG_KEY,
 					plog(logp, LOCATION, NULL,
 						"received IDci:");
@@ -838,16 +800,8 @@ quick_r1recv(iph2, msg0)
 					/* XXX we allowed in this case. */
 				}
 
-				iph2->id = vmalloc(pa->len - sizeof(struct isakmp_gen));
-				if (iph2->id == NULL) {
-					plog(logp, LOCATION, NULL,
-						"vmalloc (%s)\n",
-						strerror(errno));
-					goto err;
-				}
-				memcpy(iph2->id->v,
-					(caddr_t)pa->ptr + sizeof(struct isakmp_gen),
-					iph2->id->l);
+				if (isakmp_p2ph(iph2->id, pa->ptr) < 0)
+					goto end;
 				YIPSDEBUG(DEBUG_KEY,
 					plog(logp, LOCATION, NULL,
 						"received IDci:");
