@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.44 2000/11/11 06:57:22 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.45 2000/11/11 08:13:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1383,7 +1383,8 @@ sock_open()
 	}
 
 	/*
-	 * When attending router renumbering, join all-sites multicast group. 
+	 * When attending router renumbering, join all-routers site-local
+	 * multicast group. 
 	 */
 	if (accept_rr) {
 		if (inet_pton(AF_INET6, ALLROUTERS_SITE,
