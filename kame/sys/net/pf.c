@@ -39,7 +39,12 @@
 #include "opt_altq.h"
 #endif
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#include "bpf.h"
+#define NBPFILTER NBPF
+#else
 #include "bpfilter.h"
+#endif
 #include "pflog.h"
 #include "pfsync.h"
 
@@ -54,6 +59,11 @@
 #include <sys/pool.h>
 #ifdef __NetBSD__
 #include <sys/callout.h>
+#endif
+#ifdef __FreeBSD__
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
+#include <sys/malloc.h>
 #endif
 
 #include <net/if.h>
@@ -78,8 +88,10 @@
 
 #ifdef __OpenBSD__
 #include <dev/rndvar.h>
-#else
+#elif defined(__NetBSD__)
 #include <sys/rnd.h>
+#elif defined(__FreeBSD__)
+#include <sys/random.h>
 #endif
 #include <net/pfvar.h>
 #include <net/if_pflog.h>
@@ -97,6 +109,13 @@
 
 #ifdef ALTQ
 #include <altq/if_altq.h>
+#endif
+
+#ifdef __FreeBSD__
+#undef KASSERT
+#define KASSERT(x)
+
+MALLOC_DEFINE(M_PF, "pf", "PF packet filter");
 #endif
 
 
@@ -130,13 +149,6 @@ struct callout		 pf_expire_to;			/* expire timeout */
 struct pool		 pf_tree_pl, pf_rule_pl, pf_addr_pl;
 struct pool		 pf_state_pl, pf_altq_pl, pf_pooladdr_pl;
 
-void			 pf_addrcpy(struct pf_addr *, struct pf_addr *,
-			    sa_family_t);
-int			 pf_insert_state(struct pf_state *);
-struct pf_state		*pf_find_state(struct pf_state_tree *,
-			    struct pf_tree_node *);
-void			 pf_purge_expired_states(void);
-void			 pf_purge_timeout(void *);
 void			 pf_dynaddr_update(void *);
 void			 pf_print_host(struct pf_addr *, u_int16_t, u_int8_t);
 void			 pf_print_state(struct pf_state *);
@@ -199,9 +211,6 @@ int			 pf_test_state_icmp(struct pf_state **, int,
 			    void *, struct pf_pdesc *);
 int			 pf_test_state_other(struct pf_state **, int,
 			    struct ifnet *, struct pf_pdesc *);
-void			 pf_calc_skip_steps(struct pf_rulequeue *);
-void			 pf_rule_set_qid(struct pf_rulequeue *);
-u_int32_t		 pf_qname_to_qid(char *);
 struct pf_tag		*pf_get_tag(struct mbuf *);
 int			 pf_match_tag(struct mbuf *, struct pf_rule *,
 			     struct pf_rule *, struct pf_rule *,
@@ -236,8 +245,10 @@ u_int16_t		 pf_calc_mss(struct pf_addr *, sa_family_t,
 int			 pf_check_proto_cksum(struct mbuf *, int, int,
 			    u_int8_t, sa_family_t);
 
+#if defined(__NetBSD__) || defined(__OpenBSD_)
 struct pf_pool_limit pf_pool_limits[PF_LIMIT_MAX] =
     { { &pf_state_pl, PFSTATE_HIWAT }, { &pf_frent_pl, PFFRAG_FRENT_HIWAT } };
+#endif
 
 #define STATE_LOOKUP()							\
 	do {								\
@@ -377,7 +388,11 @@ pf_insert_state(struct pf_state *state)
 {
 	struct pf_tree_node	*keya, *keyb;
 
+#ifdef __FreeBSD__
+	keya = malloc(sizeof(struct pf_tree_node), M_PF, M_NOWAIT);
+#else
 	keya = pool_get(&pf_tree_pl, PR_NOWAIT);
+#endif
 	if (keya == NULL)
 		return (-1);
 	keya->state = state;
@@ -4793,6 +4808,7 @@ pf_check_proto_cksum(struct mbuf *m, int off, int len, u_int8_t p, sa_family_t a
 	u_int16_t flag_ok, flag_bad;
 	u_int16_t sum;
 
+#ifndef __FreeBSD__
 	switch (p) {
 	case IPPROTO_TCP:
 #ifdef __OpenBSD__
@@ -4833,6 +4849,7 @@ pf_check_proto_cksum(struct mbuf *m, int off, int len, u_int8_t p, sa_family_t a
 	if (m->m_pkthdr.csum_flags & flag_bad)
 #endif
 		return (1);
+#endif
 	if (off < sizeof(struct ip) || len < sizeof(struct udphdr))
 		return (1);
 	if (m->m_pkthdr.len < off + len)

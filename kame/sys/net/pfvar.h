@@ -43,6 +43,10 @@
 #endif
 #include <netinet/tcp_fsm.h>
 
+#ifdef __FreeBSD__
+MALLOC_DECLARE(M_PF);
+#endif
+
 #define	PF_TCPS_PROXY_SRC	((TCP_NSTATES)+0)
 #define	PF_TCPS_PROXY_DST	((TCP_NSTATES)+1)
 
