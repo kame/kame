@@ -1,4 +1,4 @@
-.\"	$KAME: pim6sd.8,v 1.7 2000/07/10 08:53:00 itojun Exp $
+.\"	$KAME: pim6sd.8,v 1.8 2000/09/25 15:21:06 itojun Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -151,4 +151,11 @@ daemon needs to run on the system.
 The kernel unicast routing table is periodically polled by
 .Nm
 in order to follow changes of existing unicast routes.
+.Pp
+.Nm
+must be used on an IPv6 router.
+Be sure to set
+.Li net.inet6.ip6.forwarding
+variable to 1 with
+.Xr sysctl 8 .
 .\"
