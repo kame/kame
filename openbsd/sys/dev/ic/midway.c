@@ -1788,7 +1788,7 @@ struct ifnet *ifp;
        *	[including AAL5 PDU, if AAL5]
        */
 
-      got = mlen - sizeof(struct atm_pseudohdr *);
+      got = mlen - sizeof(struct atm_pseudohdr);
       toadd = (aal == MID_TBD_AAL5) ? MID_PDU_SIZE : 0;	/* PDU */
       cellcnt = (got + toadd + (MID_ATMDATASZ - 1)) / MID_ATMDATASZ;
       need = cellcnt * MID_ATMDATASZ;
