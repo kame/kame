@@ -55,6 +55,7 @@
 #include <vm/vm_zone.h>
 
 #include <net/if.h>
+#include <net/if_types.h>
 #include <net/route.h>
 
 #include <netinet/in.h>
@@ -64,6 +65,8 @@
 #ifdef INET6
 #include <netinet6/ip6_var.h>
 #endif /* INET6 */
+
+#include "faith.h"
 
 #ifdef IPSEC
 #include <netinet6/ipsec.h>

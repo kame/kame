@@ -79,6 +79,7 @@
 #include <vm/vm_zone.h>
 
 #include <net/if.h>
+#include <net/if_types.h>
 #include <net/route.h>
 
 #include <netinet/in.h>
