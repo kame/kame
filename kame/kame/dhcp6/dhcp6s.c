@@ -80,6 +80,8 @@ int insock;	/* inbound udp port */
 int outsock;	/* outbound udp port */
 struct servtab *servtab;
 
+static struct sockaddr_storage ss_from;
+
 static void usage __P((void));
 static void mainloop __P((void));
 static void server6_init __P((void));
@@ -316,12 +318,11 @@ server6_recv(s, buf, siz)
 	size_t siz;
 {
 	ssize_t len;
-	struct sockaddr_storage from;
 	socklen_t fromlen;
 
-	fromlen = sizeof(from);
+	fromlen = sizeof(ss_from);
 	if ((len = recvfrom(s, buf, siz, 0,
-			(struct sockaddr *)&from, &fromlen)) < 0) {
+			(struct sockaddr *)&ss_from, &fromlen)) < 0) {
 		err(1, "recvfrom(inbound)");
 		/* NOTREACHED */
 	}
@@ -569,18 +570,8 @@ server6_react_request(agent, buf, siz)
 		}
 		hlim = 64;
 	} else {
-		/* XXX should use ip src on request */
-		dst.sin6_addr = dh6r->dh6req_cliaddr;
-		dst.sin6_scope_id = if_nametoindex(device);
-		if (inet_pton(AF_INET6, "fe80::", &target) != 1) {
-			errx(1, "inet_pton failed");
-			/* NOTREACHED */
-		}
-		if (getifaddr(&myaddr, device, &target, 10) != 0) {
-			errx(1, "no matching address on %s", device);
-			/* NOTREACHED */
-		}
-		hlim = 1;
+		dst.sin6_addr = ((struct sockaddr_in6 *)&ss_from)->sin6_addr;
+		hlim = 64;	/* XXX */
 	}
 #ifdef __KAME__
 	if (IN6_IS_ADDR_LINKLOCAL(&myaddr))
