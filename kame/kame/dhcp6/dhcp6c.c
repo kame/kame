@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.87 2002/05/23 08:51:23 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.88 2002/05/24 09:09:46 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -722,7 +722,7 @@ client6_send(ev)
 	/* server ID */
 	if (ev->state == DHCP6S_REQUEST) {
 		if (duidcpy(&optinfo.serverID,
-			&ifp->current_server->optinfo.serverID)) {
+		    &ifp->current_server->optinfo.serverID)) {
 			dprintf(LOG_ERR, "%s" "failed to copy server ID",
 			    FNAME);
 			goto end;
@@ -752,7 +752,7 @@ client6_send(ev)
 	if (ev->state == DHCP6S_REQUEST) {
 		/* do we have to check if we wanted prefixes? */
 		if (dhcp6_copy_list(&optinfo.prefix_list,
-			&ifp->current_server->optinfo.prefix_list)) {
+		    &ifp->current_server->optinfo.prefix_list)) {
 			dprintf(LOG_ERR, "%s" "failed to copy prefixes",
 			    FNAME);
 			goto end;

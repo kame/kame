@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.58 2002/05/23 03:30:08 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.59 2002/05/24 09:09:46 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -153,13 +153,13 @@ dhcp6_find_listval(head, val, type)
 			break;
 		case DHCP6_LISTVAL_ADDR6:
 			if (IN6_ARE_ADDR_EQUAL(&lv->val_addr6,
-				(struct in6_addr *)val)) {
+			    (struct in6_addr *)val)) {
 				return(lv);
 			}
 			break;
 		case DHCP6_LISTVAL_PREFIX6:
 			if (IN6_ARE_ADDR_EQUAL(&lv->val_prefix6.addr,
-				&((struct dhcp6_prefix *)val)->addr) &&
+			    &((struct dhcp6_prefix *)val)->addr) &&
 			    lv->val_prefix6.plen ==
 			    ((struct dhcp6_prefix *)val)->plen) {
 				return(lv);
@@ -839,7 +839,7 @@ dhcp6_get_options(p, ep, optinfo)
 			/* need to check duplication? */
 
 			if (dhcp6_add_listval(&optinfo->stcode_list,
-				&num, DHCP6_LISTVAL_NUM) == NULL) {
+			    &num, DHCP6_LISTVAL_NUM) == NULL) {
 				dprintf(LOG_ERR, "%s" "failed to copy "
 				    "status code", FNAME);
 				goto fail;
@@ -862,7 +862,7 @@ dhcp6_get_options(p, ep, optinfo)
 					dhcp6optstr(num));
 
 				if (dhcp6_find_listval(&optinfo->reqopt_list,
-					&num, DHCP6_LISTVAL_NUM)) {
+				    &num, DHCP6_LISTVAL_NUM)) {
 					dprintf(LOG_INFO, "%s" "duplicated "
 					    "option type (%s)", FNAME,
 					    dhcp6optstr(opttype));
@@ -870,7 +870,7 @@ dhcp6_get_options(p, ep, optinfo)
 				}
 
 				if (dhcp6_add_listval(&optinfo->reqopt_list,
-					&num, DHCP6_LISTVAL_NUM) == NULL) {
+				    &num, DHCP6_LISTVAL_NUM) == NULL) {
 					dprintf(LOG_ERR, "%s" "failed to copy "
 					    "requested option", FNAME);
 					goto fail;
@@ -894,7 +894,7 @@ dhcp6_get_options(p, ep, optinfo)
 			for (val = cp; val < cp + optlen;
 			     val += sizeof(struct in6_addr)) {
 				if (dhcp6_find_listval(&optinfo->dns_list,
-					&num, DHCP6_LISTVAL_ADDR6)) {
+				    &num, DHCP6_LISTVAL_ADDR6)) {
 					dprintf(LOG_INFO, "%s" "duplicated "
 					    "DNS address (%s)", FNAME,
 					    in6addr2str((struct in6_addr *)val,
@@ -903,7 +903,7 @@ dhcp6_get_options(p, ep, optinfo)
 				}
 
 				if (dhcp6_add_listval(&optinfo->dns_list,
-					val, DHCP6_LISTVAL_ADDR6) == NULL) {
+				    val, DHCP6_LISTVAL_ADDR6) == NULL) {
 					dprintf(LOG_ERR, "%s" "failed to copy "
 					    "DNS address", FNAME);
 					goto fail;
@@ -998,7 +998,7 @@ get_delegated_prefixes(p, ep, optinfo)
 			}
 
 			if (dhcp6_find_listval(&optinfo->prefix_list,
-				&prefix, DHCP6_LISTVAL_PREFIX6)) {
+			    &prefix, DHCP6_LISTVAL_PREFIX6)) {
 				dprintf(LOG_INFO, "%s" "duplicated "
 				    "prefix (%s/%d)", FNAME,
 				    in6addr2str(&prefix.addr, 0),
@@ -1007,7 +1007,7 @@ get_delegated_prefixes(p, ep, optinfo)
 			}
 
 			if (dhcp6_add_listval(&optinfo->prefix_list, &prefix,
-				DHCP6_LISTVAL_PREFIX6) == NULL) {
+			    DHCP6_LISTVAL_PREFIX6) == NULL) {
 				dprintf(LOG_ERR, "%s" "failed to copy a "
 				    "prefix", FNAME);
 				goto fail;

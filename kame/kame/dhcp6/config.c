@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.17 2002/05/23 11:08:57 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.18 2002/05/24 09:09:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -370,7 +370,7 @@ configure_global_option()
 	for (cl = cf_dns_list; cl; cl = cl->next) {
 		/* duplication check */
 		if (dhcp6_find_listval(&dnslist0, cl->ptr,
-			DHCP6_LISTVAL_ADDR6)) {
+		    DHCP6_LISTVAL_ADDR6)) {
 			dprintf(LOG_INFO, "%s"
 			    "%s:%d duplicated DNS server: %s", FNAME,
 			    configfilename, cl->line,
@@ -378,7 +378,7 @@ configure_global_option()
 			goto bad;
 		}
 		if (dhcp6_add_listval(&dnslist0, cl->ptr,
-			DHCP6_LISTVAL_ADDR6) == NULL) {
+		    DHCP6_LISTVAL_ADDR6) == NULL) {
 			dprintf(LOG_ERR, "%s" "failed to add a DNS server");
 			goto bad;
 		}

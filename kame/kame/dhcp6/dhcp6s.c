@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.86 2002/05/24 02:47:27 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.87 2002/05/24 09:09:46 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -723,7 +723,7 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 		dprintf(LOG_INFO, "%s" "unexpected unicast message from %s",
 		    FNAME, addr2str(from));
 		if (dhcp6_add_listval(&roptinfo.stcode_list, &stcode,
-			DHCP6_LISTVAL_NUM) == NULL) {
+		    DHCP6_LISTVAL_NUM) == NULL) {
 			dprintf(LOG_ERR, "%s" "failed to add a status code",
 			    FNAME);
 			goto fail;
@@ -854,7 +854,7 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 		dprintf(LOG_INFO, "%s" "unexpected unicast message from %s",
 		    FNAME, addr2str(from));
 		if (dhcp6_add_listval(&roptinfo.stcode_list, &stcode,
-			DHCP6_LISTVAL_NUM) == NULL) {
+		    DHCP6_LISTVAL_NUM) == NULL) {
 			dprintf(LOG_ERR, "%s" "failed to add a status code",
 			    FNAME);
 			goto fail;
@@ -891,7 +891,7 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 			int stcode = DH6OPT_STCODE_SUCCESS;
 
 			if (dhcp6_add_listval(&roptinfo.stcode_list,
-				&stcode, DHCP6_LISTVAL_NUM) == NULL) {
+			    &stcode, DHCP6_LISTVAL_NUM) == NULL) {
 				dprintf(LOG_ERR, "%s" "failed to add a "
 				    "status code", FNAME);
 			}
@@ -985,7 +985,7 @@ server6_react_rebind(ifp, dh6, optinfo, from, fromlen)
 
 		/* add the prefix */
 		if (dhcp6_add_listval(&roptinfo.prefix_list, binding->val,
-			DHCP6_LISTVAL_PREFIX6) == NULL) {
+		    DHCP6_LISTVAL_PREFIX6) == NULL) {
 			dprintf(LOG_ERR, "failed to add a rebound prefix",
 			    FNAME);
 			goto fail;
@@ -1152,8 +1152,8 @@ create_conflist(type, clientid, ret_list, conf_list, req_list, do_binding)
 			switch(type) {
 			case DHCP6_CONFINFO_PREFIX:
 				if (dhcp6_find_listval(req_list,
-					&clv->val_prefix6,
-					DHCP6_LISTVAL_PREFIX6) == NULL) {
+				    &clv->val_prefix6,
+				    DHCP6_LISTVAL_PREFIX6) == NULL) {
 					continue;
 				}
 				break;
