@@ -1,4 +1,4 @@
-/*	$KAME: qop.c,v 1.7 2001/08/06 10:46:26 itojun Exp $	*/
+/*	$KAME: qop.c,v 1.8 2001/08/16 04:31:41 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -1412,7 +1412,7 @@ open_module(const char *devname, int flags)
 	strlcpy(modname, "altq_", sizeof(modname));
 	if ((cp = strrchr(devname, '/')) == NULL)
 		return (-1);
-	strlcat(modname, cp + 1, modname);
+	strlcat(modname, cp + 1, sizeof(modname));
 
 	/* check if the kld module exists */
 	snprintf(filename, sizeof(filename), "/modules/%s.ko", modname);
