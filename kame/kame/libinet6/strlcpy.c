@@ -1,3 +1,4 @@
+/*	$KAME: strlcpy.c,v 1.2 2001/08/20 02:32:40 itojun Exp $	*/
 /*	$OpenBSD: strlcpy.c,v 1.4 1999/05/01 18:56:41 millert Exp $	*/
 
 /*

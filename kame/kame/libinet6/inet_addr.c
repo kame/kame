@@ -1,3 +1,5 @@
+/*	$KAME: inet_addr.c,v 1.5 2001/08/20 02:32:40 itojun Exp $	*/
+
 /*
  * Copyright (c) 1983, 1990, 1993
  *    The Regents of the University of California.  All rights reserved.
@@ -70,7 +72,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)inet_addr.c	8.1 (Berkeley) 6/17/93";
-static char rcsid[] = "$Id: inet_addr.c,v 1.4 2000/01/17 04:38:16 itojun Exp $";
+static char rcsid[] = "$Id: inet_addr.c,v 1.5 2001/08/20 02:32:40 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #ifdef HAVE_CONFIG_H

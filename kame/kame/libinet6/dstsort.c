@@ -1,3 +1,5 @@
+/*	$KAME: dstsort.c,v 1.3 2001/08/20 02:32:40 itojun Exp $	*/
+
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.

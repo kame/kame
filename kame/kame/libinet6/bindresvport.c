@@ -1,3 +1,5 @@
+/*	$KAME: bindresvport.c,v 1.4 2001/08/20 02:32:40 itojun Exp $	*/
+
 /*
  * Sun RPC is a product of Sun Microsystems, Inc. and is provided for
  * unrestricted use provided that this legend is included on all tape

@@ -1,3 +1,5 @@
+/*	$KAME: inet_pton.c,v 1.5 2001/08/20 02:32:40 itojun Exp $	*/
+
 /*
  * Copyright (c) 1996,1999 by Internet Software Consortium.
  *
@@ -16,7 +18,7 @@
  */
 
 #if defined(LIBC_SCCS) && !defined(lint)
-static char rcsid[] = "$Id: inet_pton.c,v 1.4 2000/01/17 04:38:17 itojun Exp $";
+static char rcsid[] = "$Id: inet_pton.c,v 1.5 2001/08/20 02:32:40 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 #ifdef HAVE_CONFIG_H

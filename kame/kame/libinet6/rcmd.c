@@ -1,3 +1,5 @@
+/*	$KAME: rcmd.c,v 1.16 2001/08/20 02:32:40 itojun Exp $	*/
+
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.

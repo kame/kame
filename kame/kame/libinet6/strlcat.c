@@ -1,3 +1,4 @@
+/*	$KAME: strlcat.c,v 1.3 2001/08/20 02:32:40 itojun Exp $	*/
 /*	$OpenBSD: strlcat.c,v 1.4 2001/01/12 22:55:23 millert Exp $	*/
 
 /*
