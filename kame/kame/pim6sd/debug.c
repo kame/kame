@@ -540,7 +540,6 @@ dump_mldqueriers(fp)
 {
 	struct uvif *v;
 	vifi_t vifi;
-	pim_nbr_entry_t *n;
 	time_t now;
 
 	fprintf(fp, "MLD Querier List\n");
@@ -554,9 +553,9 @@ dump_mldqueriers(fp)
 				(v->uv_flags & MIFF_REGISTER) ? "regist":
 				v->uv_name);
 
-			fprintf(fp, " %-40s %5u %15s\n",
+			fprintf(fp, " %-40s %5lu %15s\n",
 				inet6_fmt(&v->uv_querier->al_addr.sin6_addr),
-				v->uv_querier->al_timer,
+				(u_long)v->uv_querier->al_timer,
 				sec2str(now - v->uv_querier->al_ctime));
 		}
 	}
