@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.156 2000/09/21 04:10:52 itojun Exp $	*/
+/*	$KAME: key.c,v 1.157 2000/09/22 14:42:35 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1737,7 +1737,7 @@ key_spdadd(so, m, mhp)
 	if (mhp->msg->sadb_msg_type == SADB_X_SPDUPDATE) {
 		struct secspacq *spacq;
 		if ((spacq = key_getspacq(&spidx)) != NULL) {
-			/* reset counter in order to deletion by timehander. */
+			/* reset counter in order to deletion by timehandler. */
 			struct timeval tv;
 			microtime(&tv);
 			spacq->created = tv.tv_sec;
@@ -4532,7 +4532,9 @@ key_getspi(so, m, mhp)
 		struct secacq *acq;
 		if ((acq = key_getacqbyseq(mhp->msg->sadb_msg_seq)) != NULL) {
 			/* reset counter in order to deletion by timehander. */
-			acq->created = key_blockacq_lifetime;
+			struct timeval tv;
+			microtime(&tv);
+			acq->created = tv.tv_sec;
 			acq->count = 0;
 		}
     	}
@@ -5763,6 +5765,7 @@ key_newacq(saidx)
 	struct secasindex *saidx;
 {
 	struct secacq *newacq;
+	struct timeval tv;
 
 	/* get new entry */
 	KMALLOC(newacq, struct secacq *, sizeof(struct secacq));
@@ -5777,7 +5780,8 @@ key_newacq(saidx)
 	/* copy secindex */
 	bcopy(saidx, &newacq->saidx, sizeof(newacq->saidx));
 	newacq->seq = (acq_seq == ~0 ? 1 : ++acq_seq);
-	newacq->created = 0;
+	microtime(&tv);
+	newacq->created = tv.tv_sec;
 	newacq->count = 0;
 
 	return newacq;
@@ -5817,6 +5821,7 @@ key_newspacq(spidx)
 	struct secpolicyindex *spidx;
 {
 	struct secspacq *acq;
+	struct timeval tv;
 
 	/* get new entry */
 	KMALLOC(acq, struct secspacq *, sizeof(struct secspacq));
@@ -5830,7 +5835,8 @@ key_newspacq(spidx)
 
 	/* copy secindex */
 	bcopy(spidx, &acq->spidx, sizeof(acq->spidx));
-	acq->created = 0;
+	microtime(&tv);
+	acq->created = tv.tv_sec;
 	acq->count = 0;
 
 	return acq;
