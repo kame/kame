@@ -1,4 +1,4 @@
-.\"	$KAME: bindtest.1,v 1.16 2001/06/26 12:48:25 jinmei Exp $
+.\"	$KAME: bindtest.1,v 1.17 2001/06/26 17:43:36 itojun Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -148,12 +148,6 @@ option is specified, the address can be any valid IPv4 address in
 theory, but, for the testing purpose, the address is meaningful only
 when it is an IPv4 address assigned on the testing node itself.
 .Pp
-With
-.Fl s ,
-.Nm
-generates summarized output instead of verbose output.
-Here is a sample output, and the legends for summarized output.
-.Pp
 The
 .Fl l
 option is meaningful only when the corresponding socket is TCP.
@@ -168,6 +162,12 @@ Normally, the program calls the two calls for the first socket, and
 then calls them for the second socket.
 This option exists because there is an operating system that behaves
 differently for both cases.
+.Pp
+With
+.Fl s ,
+.Nm
+generates summarized output instead of verbose output.
+Here is a sample output, and the legends for summarized output.
 .Pp
 .Ds
 starting tests, socktype = SOCK_DGRAM
