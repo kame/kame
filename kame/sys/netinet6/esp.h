@@ -1,4 +1,4 @@
-/*	$KAME: esp.h,v 1.12 2000/08/28 05:24:03 itojun Exp $	*/
+/*	$KAME: esp.h,v 1.13 2000/08/28 08:29:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,6 +88,10 @@ struct esp_algorithm {
 		struct secasvar *, const struct esp_algorithm *, int));
 	/* not supposed to be called directly */
 	int (*schedule) __P((const struct esp_algorithm *, struct secasvar *));
+	int (*blockdecrypt) __P((const struct esp_algorithm *,
+		struct secasvar *, u_int8_t *, u_int8_t *));
+	int (*blockencrypt) __P((const struct esp_algorithm *,
+		struct secasvar *, u_int8_t *, u_int8_t *));
 };
 
 extern const struct esp_algorithm *esp_algorithm_lookup __P((int));
