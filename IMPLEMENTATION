@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/11/20 20:47:49 $
+			$Date: 1999/11/21 17:59:02 $
 
 1. IPv6
 
@@ -148,7 +148,8 @@ To avoid possible DoS attacks and infinite loops, KAME stack will accept
 only 10 options on ND packet.  Therefore, if you have 20 prefix options
 attached to RA, only the first 10 prefixes will be recognized.
 If this troubles you, please contact KAME team and/or modify
-sys/netinet6/nd6.c:nd6_options().
+nd6_maxndopt in sys/netinet6/nd6.c.  If there are high demands we may
+provide sysctl knob for the variable.
 
 1.3 Scope Index
 
@@ -201,7 +202,7 @@ trouble.
 To use this extension in your program, you'll need to use getaddrinfo(3),
 and getnameinfo(3) with NI_WITHSCOPEID.
 The implementation currently assumes 1-to-1 relationship between a link and an
-interface, which is stronger than specs assume.
+interface, which is stronger than what specs say.
 
 1.4 Plug and Play
 
@@ -279,6 +280,18 @@ or multi-interface host.  A misconfigured node can behave strange
 (KAME code allows nonconforming configuration, for those who would like
 to do some experiments).
 
+To summarize the sysctl knob:
+	accept_rtadv	forwarding	role of the node
+	---		---		---
+	0		0		host (to be manually configured)
+	0		1		router
+	1		0		autoconfigured host
+					(spec assumes that host has single
+					interface only, autoconfigred host with
+					multiple interface is out-of-scope)
+	1		1		invalid, or experimental
+					(out-of-scope of spec)
+
 RFC2462 has validation rule against incoming RA prefix information option,
 in 5.5.3 (e).  This is to protect hosts from malicious (or misconfigured)
 routers that advertise very short prefix lifetime.
@@ -289,15 +302,15 @@ See 1.2 in the document for relationship between DAD and autoconfiguration.
 
 1.4.3 DHCPv6
 
-DHCPv6 itself needs more work.  We supply a tiny DHCPv6 server/client in
-kame/dhcp6.  However, the implementation is very premature (for example,
-this does NOT implement address lease/release), and it is not in default
-compilation tree.  If you want to experiment, compile it on your own.
+We supply a tiny DHCPv6 server/client in kame/dhcp6.  However, the
+implementation is very premature (for example, this does NOT
+implement address lease/release), and it is not in default compilation
+tree.  If you want to do some experiment, compile it on your own.
 
 DHCPv6 and autoconfiguration also needs more work.  "Managed" and "Other"
 bits in RA have no special effect to stateful autoconfiguration procedure
-("Managed" bit actually prevents stateless autoconfiguration, but no special
-action will be taken for DHCPv6 client).
+in DHCPv6 client program ("Managed" bit actually prevents stateless
+autoconfiguration, but no special action will be taken for DHCPv6 client).
 
 1.5 Generic tunnel interface
 
@@ -317,6 +330,10 @@ of tunneling.  Please be warned.
 
 gif can be configured to be ECN-friendly.  See 4.5 for ECN-friendliness
 of tunnels, and gif(4) manpage for how to configure.
+
+If you would like to configure an IPv4-in-IPv6 tunnel with gif interface,
+read gif(4) carefully.  You will need to remove IPv6 link-local address
+automatically assigned to the gif interface.
 
 1.6 Source Address Selection
 
@@ -365,7 +382,9 @@ deprecated address will be used as a last resort.  If there are multiple
 choice of deprecated addresses, the above scope rule will be used to choose
 from those deprecated addreses.  If you would like to prohibit the use
 of deprecated address for some reason, configure net.inet6.ip6.use_deprecated
-to 0.  The issue related to deprecated address is described in RFC2462 5.5.4.
+to 0.  The issue related to deprecated address is described in RFC2462 5.5.4
+(NOTE: there is some debate underway in IETF ipngwg on how to use
+"deprecated" address).
 
 1.7 Jumbo Payload
 
@@ -518,7 +537,8 @@ of IPv6 wildcard bind socket (3.8).  The spec allows you to:
 - Transmit IPv4 packet over AF_INET6 socket by using special form of
   the address like ::ffff:10.1.1.1.
 - Accept IPv4 connections by AF_INET6 wildcard bind socket.
-but it may look complicated spec.
+but the spec itself is very complicated and does not specify how the
+socket layer should behave.
 
 We KAME team have 4 OS platforms right now, and behavior is slightly
 different between them.  To summarize:
@@ -562,6 +582,9 @@ Port number space and wildcard bind issues were discussed in detail
 on ipv6imp mailing list, in mid March 1999 and it looks that there's
 no concrete consensus (means, up to implementers).  You may want to
 check the mailing list archives.
+
+We supply a tool called "bindtest" that explores the behavior of
+kernel bind(2).  The tool will not be compiled by default.
 
 1.12.1 KAME/BSDI3 and KAME/FreeBSD228
 
