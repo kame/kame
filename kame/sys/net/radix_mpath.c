@@ -1,4 +1,4 @@
-/*	$KAME: radix_mpath.c,v 1.13 2002/10/28 21:05:59 itojun Exp $	*/
+/*	$KAME: radix_mpath.c,v 1.14 2004/04/24 20:01:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -270,7 +270,7 @@ rtalloc_mpath(ro, hash)
 }
 
 /*
- * HACK! the function is overloaded just to indicate that the addrss family
+ * HACK! the function is overloaded just to indicate that the address family
  * is capable of doing multipath
  */
 struct radix_node *
