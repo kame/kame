@@ -1,4 +1,4 @@
-/*	$KAME: mip6stat.c,v 1.18 2003/01/30 12:03:54 keiichi Exp $	*/
+/*	$KAME: mip6stat.c,v 1.19 2003/02/24 02:57:58 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -683,6 +683,8 @@ showdetail()
 	PS("seqno mismatch", mip6s_seqno);
 	PS("parameter problem for HAO", mip6s_paramprobhao);
 	PS("parameter problem for MH", mip6s_paramprobmh);
+	PS("Invalid Care-of address", mip6s_invalidcoa);
+	PS("Invalid mobility options", mip6s_invalidopt);
 
 	printf("Output:\n");
 	PS("Mobility Headers", mip6s_omobility);

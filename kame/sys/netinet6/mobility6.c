@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.19 2003/02/14 12:07:52 t-momose Exp $	*/
+/*	$KAME: mobility6.c,v 1.20 2003/02/24 02:57:58 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -185,6 +185,7 @@ mobility6_input(mp, offp, proto)
 		if (!MIP6_IS_MN)
 			break;
 		/* XXX */
+		mip6stat.mip6s_br++;
 		break;
 
 	case IP6M_BINDING_UPDATE:

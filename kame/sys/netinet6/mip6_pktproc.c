@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.108 2003/02/12 09:27:22 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.109 2003/02/24 02:57:58 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -640,7 +640,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 					       ip6mulen, &mopt))) {
 		/* discard. */
 		m_freem(m);
-		mip6stat.mip6s_rrauthfail++;
+		mip6stat.mip6s_invalidopt++;
 		return (EINVAL);
 	}
 #if 0
@@ -884,6 +884,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 					       sizeof(*ip6ma),
 					       ip6malen, &mopt))) {
 		m_freem(m);
+		mip6stat.mip6s_invalidopt++;
 		return (error);
 	}
 #ifdef __NetBSD__
