@@ -33,7 +33,8 @@ CFLAGS = -DINET6 -DKAME_SCOPEID -Wall -DDEFAULTPORT=\"33333\"
 CFLAGS+=-Werror
 .endif
 LIBS = -linet6
-TARGET = sender receiver accept connect
+TARGET = sender accept connect
+#TARGET+= receiver  # this program was obsoleted.
 LDFLAGS = -L/usr/local/v6/lib
 
 all: $(TARGET)
