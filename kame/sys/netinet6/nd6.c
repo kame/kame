@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.77 2000/11/08 16:51:16 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.78 2000/11/16 05:21:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1958,7 +1958,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 			/*
 			 * We skip link-layer address resolution and NUD
 			 * if the gateway is not a neighbor from ND point
-			 * of view, regardless the value of the value of
+			 * of view, regardless the value of the
 			 * nd_ifinfo.flags.
 			 * The second condition is a bit tricky: we skip
 			 * if the gateway is our own address, which is
