@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.20 2000/03/22 06:55:03 itojun Exp $
+$Id: COVERAGE,v 1.21 2000/03/28 00:23:25 itojun Exp $
 
 
 x: supported/integrated
@@ -34,8 +34,8 @@ getaddrinfo obeys configured resolv order
 		merged *-current	merged
 		net	open	free	net15	open27?	free40
 		--	--	--	--	--	--
-KAME IPv6 as of	late	late	early	notyet	notyet	notyet
-		dec99	dec99	nov99
+KAME IPv6 as of	late	late	early	notyet	notyet	early
+		dec99	dec99	nov99			nov99
 		(*1)	(*1)
      (*1) many of stabilization/fixes are imported, so we can safely call it
 	"late feb2000 - 2292bis".
@@ -56,9 +56,14 @@ nd6_proxyall	-	-	x	notyet	notyet	x
 
 ndp -s proxy	x	x	-	notyet	notyet	-
 
-ndp -I		x	x	?	notyet	notyet	?
+ndp -I		x	x	-	notyet	notyet	-
+
+ndp -i		-	-	-	notyet	notyet	-
 
 CMSG_ALIGN	sysctl	ALIGN	ALIGN	notyet	notyet	ALIGN
+			(*1)	(*2)			(*2)
+    (*1) has namespace pollution bug, KAME PR 230.
+    (*2) requires separate inclusion of machine/param.h.
 
 getaddrinfo obeys configured resolv order
 		x	x	-	notyet	notyet	-
@@ -86,12 +91,14 @@ scoped addr in /etc/resolv.conf "nameserver" line
 		-	-	-	notyet	notyet	-
 
 ipsec socket passing to ip{6,}_output
-		rcvif	-	rcvif	notyet	notyet	rcvif
+		aux	-	rcvif	notyet	notyet	rcvif
 				+ flags			+ flags
 
 source address selection
 		feb00	feb00	nov99	notyet	notyet	nov99
-				+ sitelocal?		+ sitelocal?
+				+ sitelocal		+ sitelocal
+
+6to4 intface	-	-	gifhack	notyet	notyet	gifhack
 
 basic userland	x	x	x	notyet	notyet	x
 
