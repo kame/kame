@@ -1,4 +1,4 @@
-/*	$KAME: in6_cksum.c,v 1.13 2002/10/10 06:19:58 itojun Exp $	*/
+/*	$KAME: in6_cksum.c,v 1.14 2002/12/06 06:16:44 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -126,6 +126,10 @@ in6_cksum(m, nxt, off, len)
 			m->m_pkthdr.len, off, len);
 	}
 
+	/* Skip pseudo-header if nxt == 0. */
+	if (nxt == 0)
+		goto skip_phdr;
+
 	bzero(&uph, sizeof(uph));
 
 	/*
@@ -168,6 +172,7 @@ in6_cksum(m, nxt, off, len)
 	if (dstifid)
 		ip6->ip6_dst.s6_addr16[1] = dstifid;
 #endif
+ skip_phdr:
 	/*
 	 * Secondly calculate a summary of the first mbuf excluding offset.
 	 */
