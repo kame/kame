@@ -29,7 +29,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-dhcp6.c,v 1.2 1999/09/11 16:45:37 itojun Exp $";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-dhcp6.c,v 1.3 1999/09/12 10:31:04 itojun Exp $";
 #endif
 
 #include <sys/param.h>
@@ -183,6 +183,10 @@ dhcp6ext_print(u_char *cp, u_char *ep)
 			if (len != p->len)
 				goto trunc;
 			break;
+		}
+		if (cp + 4 + len > ep) {
+			printf("[|%s]", p->name);
+			return;
 		}
 
 		printf("(%s, ", p->name);
