@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.36 2002/01/08 04:26:20 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.37 2002/01/09 12:53:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -366,8 +366,13 @@ mld6_input(m, off)
 		if (IN6_IS_ADDR_MC_LINKLOCAL(&mldh->mld_addr))
 			mldh->mld_addr.s6_addr16[1] = 0; /* XXX */
 		break;
-	default:		/* this is impossible */
+	default:
 #if 0
+		/*
+		 * this case should be impossible because of filtering in
+		 * icmp6_input().  But we explicitly disabled this part
+		 * just in case.
+		 */
 		log(LOG_ERR, "mld6_input: illegal type(%d)", mldh->mld_type);
 #endif
 		break;
