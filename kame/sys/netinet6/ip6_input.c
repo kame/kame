@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.70 2000/03/13 16:50:56 fujisawa Exp $	*/
+/*	$KAME: ip6_input.c,v 1.71 2000/03/21 09:19:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -432,7 +432,7 @@ ip6_input(m)
 		goto bad;
 	}
 #endif
-#if 1
+#if 0
 	/*
 	 * We don't support it, so it is strange to get this.
 	 */
