@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.898 2000/05/18 12:23:06 sumikawa Exp $
+$Id: CHANGELOG,v 1.899 2000/05/18 13:26:50 jinmei Exp $
 
 <200005>
+2000-05-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ndp/ndp.c (set): supported <link-local_addr>%<link ID>
+	for "ndp -s".
+
 Thu May 18 21:15:32 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/fetchmail: upgrade to 5.4.0
 	* freebsd3/ports/heimdal: upgrade to 0.2t.
