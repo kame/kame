@@ -1,8 +1,21 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.966 2000/06/03 16:13:35 sumikawa Exp $
+$Id: CHANGELOG,v 1.967 2000/06/04 03:32:45 itojun Exp $
 
 <200006>
+Sun Jun  4 12:29:41 JST 2000  itojun@iijlab.net
+	* sys/netinet6/mip6*: sync with latest MIPv6 patch from ericsson guys.
+	  - New addition to eager movement detection: now a second level
+	    provided to enhance handoff time a lot. As soon as a
+	    new prefix is heard the Mobile Node changes default
+	    router. Less stable, router reachability is not assured,
+	    but this can make handoff go in less than 0.5 sec. Also:
+	    nasty trick used is to run nd6_timer() five times per
+	    second. Use "mip6config -e 2" to test.
+	  - More consistent function of mip6config and mip6stat.
+	  - Fixed some bugs in mip6stat.
+	  - Code clean up.
+
 Sun Jun  4 01:12:52 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* {freebsd3/ports, netbsd/pkgsrc/net}/p5-Socket6: upgrade to 0.07.
 
