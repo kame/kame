@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.162 2001/08/31 05:13:41 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.163 2001/09/02 12:28:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1394,7 +1394,9 @@ prelist_update(new, dr, m)
 		 * lifetime to expiration at the evaluation time".  One might
 		 * be wondering if this interpretation is really conform to the
 		 * RFC, because the text can read that "Lifetimes" are never
-		 * decreased.  But, this is due to the wording of the text,
+		 * decreased, and our definition of the "storedlifetime" below
+		 * essentially reduces the "Valid Lifetime" advertised in the
+		 * previous RA.  But, this is due to the wording of the text,
 		 * and our interpretation is the same as an author's intention.
 		 * See the discussion in the IETF ipngwg ML in August 2001,
 		 * with the Subject "StoredLifetime in RFC 2462".
