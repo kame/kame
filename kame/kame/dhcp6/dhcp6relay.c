@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.37 2003/07/14 09:51:43 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.38 2003/07/16 13:11:03 suz Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -67,6 +67,7 @@ static int debug = 0;
 static char *device;
 static char *relaydevice;
 static char *boundaddr;
+static char *serveraddr = DH6ADDR_ALLSERVER;
 
 static char *rmsgctlbuf, *smsgctlbuf;
 static int rmsgctllen, smsgctllen;
@@ -104,7 +105,7 @@ usage()
 {
 	fprintf(stderr,
 	    "usage: dhcp6relay [-dDf] [-b boundaddr] [-H hoplim] "
-	    "[-r relay-IF] IF\n");
+	    "[-r relay-IF] [-s serveraddr] IF\n");
 	exit(0);
 }
 
@@ -122,7 +123,7 @@ main(argc, argv)
 	else
 		progname++;
 
-	while((ch = getopt(argc, argv, "b:dDfH:r:")) != -1) {
+	while((ch = getopt(argc, argv, "b:dDfH:r:s:")) != -1) {
 		switch(ch) {
 		case 'b':
 			boundaddr = optarg;
@@ -150,6 +151,9 @@ main(argc, argv)
 			break;
 		case 'r':
 			relaydevice = optarg;
+			break;
+		case 's':
+			serveraddr = optarg;
 			break;
 		default:
 			usage();
@@ -265,7 +269,7 @@ relay6_init()
 	hints.ai_socktype = SOCK_DGRAM;
 	hints.ai_protocol = IPPROTO_UDP;
 	hints.ai_flags = AI_PASSIVE;
-	error = getaddrinfo(DH6ADDR_ALLSERVER, DH6PORT_UPSTREAM, &hints, &res);
+	error = getaddrinfo(serveraddr, DH6PORT_UPSTREAM, &hints, &res);
 	if (error) {
 		dprintf(LOG_ERR, FNAME, "getaddrinfo: %s",
 		    gai_strerror(error));
@@ -279,6 +283,7 @@ relay6_init()
 		    strerror(errno));
 		goto failexit;
 	}
+	/* XXX: assume only one DHCPv6 server address */
 	memcpy(&sa6_all_servers, res->ai_addr, sizeof (sa6_all_servers));
 	freeaddrinfo(res);
 
@@ -434,19 +439,21 @@ relay6_init()
 	}
 	freeaddrinfo(res);
 
-	if (setsockopt(ssock, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &mhops,
-	    sizeof (mhops)) < 0) {
-		dprintf(LOG_ERR, FNAME,
-		    "setsockopt(ssock, IPV6_MULTICAST_HOPS(%d)): %s", mhops,
-		    strerror(errno));
-		goto failexit;
-	}
-	if (setsockopt(ssock, IPPROTO_IPV6, IPV6_MULTICAST_IF,
-	    &ifidx, sizeof (ifidx)) < 0) {
-		dprintf(LOG_ERR, FNAME,
-		    "setsockopt(IPV6_MULTICAST_IF, %d): %s",
-		    ifidx, strerror(errno));
-		goto failexit;
+	if (IN6_IS_ADDR_MULTICAST(&sa6_all_servers.sin6_addr)) {
+		if (setsockopt(ssock, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &mhops,
+		    sizeof (mhops)) < 0) {
+			dprintf(LOG_ERR, FNAME,
+			    "setsockopt(ssock, IPV6_MULTICAST_HOPS(%d)): %s",
+			    mhops, strerror(errno));
+			goto failexit;
+		}
+		if (setsockopt(ssock, IPPROTO_IPV6, IPV6_MULTICAST_IF,
+		    &ifidx, sizeof (ifidx)) < 0) {
+			dprintf(LOG_ERR, FNAME,
+			    "setsockopt(IPV6_MULTICAST_IF, %d): %s",
+			    ifidx, strerror(errno));
+			goto failexit;
+		}
 	}
 	on = 1;
 #ifdef IPV6_RECVPKTINFO

@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6relay.8,v 1.13 2003/07/14 09:59:16 jinmei Exp $
+.\"	$KAME: dhcp6relay.8,v 1.14 2003/07/16 13:11:03 suz Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -79,6 +79,9 @@ Specifies the interface on which messages to servers are sent.
 When omitted, the same interface as
 .Ar interface
 will be used.
+.It Fl s Ar serveraddr
+Specifies the DHCPv6 server address to relay packets to.
+If not specified,  packets are relayed to ff05::1:3 (All DHCPv6 servers).
 .El
 .\"
 .Sh SEE ALSO
