@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1901 2001/10/09 14:10:40 itojun Exp $
+$KAME: CHANGELOG,v 1.1902 2001/10/09 17:03:52 jinmei Exp $
 
 <200110>
+2001-10-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd/rtadvd.c (find_prefix, prefix_match): corrected
+	prefix calculation:
+	- avoid invalid pointer access when bytelen is a multiple of 8
+	- avoid using the right shift operator to make the code look safer
+
 2001-10-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/rtadvd/config.c (getconfig): made configuration parser
 	compatible with FreeBSD 4.4-RELEASE, in terms of the route
