@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/if_wireg.h,v 1.8.2.2 2001/08/25 00:48:25 nsayer Exp $
+ * $FreeBSD: src/sys/i386/isa/if_wireg.h,v 1.8.2.3 2002/03/04 20:03:57 brooks Exp $
  */
 
 struct wi_counters {
@@ -137,7 +137,7 @@ struct wi_softc	{
 	struct callout_handle	wi_stat_ch;
 	int			wi_prism2;
 	int			wi_prism2_ver;
- 	int			wi_bus_type;	/* Bus attachment type */
+	int			wi_bus_type;	/* Bus attachment type */
 };
 
 #define WI_DELAY	5
