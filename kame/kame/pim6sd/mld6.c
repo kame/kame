@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.29 2000/12/04 06:45:30 itojun Exp $	*/
+/*	$KAME: mld6.c,v 1.30 2001/03/21 23:03:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -261,7 +261,7 @@ mld6_read(i, rfd)
 {
     register int    mld6_recvlen;
 
-    mld6_recvlen = recvmsg(mld6_socket, &rcvmh, 0);
+    mld6_recvlen = recvmsg(i, &rcvmh, 0);
 
     if (mld6_recvlen < 0)
     {
