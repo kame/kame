@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.79 2001/09/26 06:13:02 keiichi Exp $	*/
+/*	$KAME: if_gif.c,v 1.80 2001/09/26 07:58:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1136,8 +1136,10 @@ gif_set_tunnel(ifp, src, dst)
 
  bad:
 #ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
-	if (sc->gif_si)
+	if (sc->gif_si) {
 		softintr_disestablish(sc->gif_si);
+		sc->gif_si = NULL;
+	}
 #endif
 	if (sc->gif_psrc && sc->gif_pdst)
 		ifp->if_flags |= IFF_RUNNING;
@@ -1162,8 +1164,10 @@ gif_delete_tunnel(ifp)
 #endif
 
 #ifdef __HAVE_GENERIC_SOFT_INTERRUPTS
-	if (sc->gif_si)
+	if (sc->gif_si) {
 		softintr_disestablish(sc->gif_si);
+		sc->gif_si = NULL;
+	}
 #endif
 	if (sc->gif_psrc) {
 		free((caddr_t)sc->gif_psrc, M_IFADDR);
