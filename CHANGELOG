@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.374 1999/12/26 18:44:12 sumikawa Exp $
+$Id: CHANGELOG,v 1.375 1999/12/27 02:16:04 sumikawa Exp $
 
 <199912>
+Mon Dec 27 11:15:26 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/python: Upgrade to 1.5.2.
+
 Mon Dec 27 03:42:38 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* {bsdi3,freebsd2}/sys/netinet/udp_usrreq.c: fix data corruption
 	  when multiple listening socket exists for udp multicast.
