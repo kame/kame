@@ -1,0 +1,8 @@
+$KAME: sandiego0009-result.en,v 1.1 2000/09/17 04:23:00 itojun Exp $
+Mon Sep 18 2000 - Fri Sep 22 2000
+Paradise Point Hotel, San Diego, CA
+
+
+Goals:
+- kernel IPsec: rijndael-cbc, twofish-cbc, blowfish-cbc
+- racoon: <TBD>
