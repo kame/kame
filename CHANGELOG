@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1432 2000/12/08 07:06:50 itojun Exp $
+$KAME: CHANGELOG,v 1.1433 2000/12/09 00:09:59 itojun Exp $
 
 <200012>
+Sat Dec  9 09:08:02 JST 2000  itojun@iijlab.net
+	* sys/netinet6/icmp6.c (netbsd/openbsd):
+	  implement high/low watermark on pmtud host route entries.
+	  create up to hiwat host route entries, if icmp6 too big messages is
+	  validated.  create up to lowat host route entries, if too big message
+	  is not validated (= traffic is from non-connected pcb).
+	  XXX hiwat/lowat default values
+
 Fri Dec  8 16:05:04 JST 2000  itojun@iijlab.net
 	* netbsd/sys/nfs: avoid IPv6 path MTU discovery if UDP is used as the
 	  transport layer.  TODO: make NFS aware of path MTU discovery.
