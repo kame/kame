@@ -1,4 +1,4 @@
-/*	$KAME: backupsa.c,v 1.4 2001/01/31 08:46:14 itojun Exp $	*/
+/*	$KAME: backupsa.c,v 1.5 2001/01/31 17:35:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -165,13 +165,11 @@ backupsa_to_file(satype, mode, src, dst, spi, reqid, wsize,
 		goto err;
 
 	/* open the file and write the SA parameter */
-	fp = fopen(lcconf->pathinfo[LC_PATHTYPE_BACKUPSA], "a");
-	if (fp == NULL
-	 || safefile(lcconf->pathinfo[LC_PATHTYPE_BACKUPSA], 1) != 0) {
+	if (safefile(lcconf->pathinfo[LC_PATHTYPE_BACKUPSA], 1) != 0 ||
+	    (fp = fopen(lcconf->pathinfo[LC_PATHTYPE_BACKUPSA], "a")) == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to open the backup file %s.\n",
 			lcconf->pathinfo[LC_PATHTYPE_BACKUPSA]);
-		fclose(fp);
 		return -1;
 	}
 	fprintf(fp, "%s\n", buf);
