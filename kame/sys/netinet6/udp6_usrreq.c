@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.84 2001/02/07 07:38:25 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.85 2001/05/21 09:04:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -551,8 +551,11 @@ udp6_ctlinput(cmd, sa, d)
 		 */
 
 		/* check if we can safely examine src and dst ports */
-		if (m->m_pkthdr.len < off + sizeof(*uhp))
+		if (m->m_pkthdr.len < off + sizeof(*uhp)) {
+			if (cmd == PRC_MSGSIZE)
+				icmp6_mtudisc_update((struct ip6ctlparam *)d, 0);
 			return;
+		}
 
 		bzero(&uh, sizeof(uh));
 		m_copydata(m, off, sizeof(*uhp), (caddr_t)&uh);

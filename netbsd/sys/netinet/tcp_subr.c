@@ -1201,8 +1201,11 @@ tcp6_ctlinput(cmd, sa, d)
 		 */
 
 		/* check if we can safely examine src and dst ports */
-		if (m->m_pkthdr.len < off + sizeof(th))
+		if (m->m_pkthdr.len < off + sizeof(th)) {
+			if (cmd == PRC_MSGSIZE)
+				icmp6_mtudisc_update((struct ip6ctlparam *)d, 0);
 			return;
+		}
 
 		bzero(&th, sizeof(th));
 		m_copydata(m, off, sizeof(th), (caddr_t)&th);
