@@ -1,11 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.598 2000/02/23 16:52:16 jinmei Exp $
+$Id: CHANGELOG,v 1.599 2000/02/23 16:54:14 itojun Exp $
 
 <200002>
 2000-02-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/usr.sbin/netstat/{main.c, inet6.c(added)}: printed KAME's
 	statistics for IPv6 and ICMPv6 instead of original ones.
+
+Thu Feb 24 JST 2000  itojun@iijlab.net
+	* libinet6/getifaddrs.c: bring in freeifaddrs().  this is in sync
+	  with bsdi4 change.  From: dab@bsdi.com
+	* bsdi4: enable kernel IPsec code by default.  it looks to be working
+	  fine now, thanks to jinmei's efforts.
 
 2000-02-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ah_input.c (ah4_input): prevented
