@@ -1,0 +1,15 @@
+TODOs for mobile-ip6
+KAME project
+$Id: TODO.mobile-ip6,v 1.1 2000/02/08 04:18:44 itojun Exp $
+
+
+- Nuke in6_control() calls from within the kernel.  it is not supposed to be
+  called.  Ericsson patch that allowed proc == NULL raises big security
+  problem.
+- Indentation.  mip6*.c is not consistent even within a files.  At least
+  rule should be consistent across the file.
+- KLD support for platforms that support it.
+- Remove MIP6_MN and MIP6_HA #ifdef.  Too many #ifdef will kill us, and it is
+  painful to reconfigure kernel every time we switch the operation.  ioctl
+  or sysctl should switch the behavior (it is okay to have one-way switch:
+  if can require reboot to go back to normal stationary node).
