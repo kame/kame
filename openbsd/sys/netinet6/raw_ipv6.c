@@ -228,21 +228,6 @@ rip6_input(mp, offp, proto)
 		goto ret;
 	}
 
-	/*
-	 * Be proactive about unspecified IPv6 address in source.
-	 * As we use all-zero to indicate unbounded/unconnected pcb,
-	 * unspecified IPv6 address can be used to confuse us.
-	 *
-	 * Note that packets with unspecified IPv6 destination is
-	 * already dropped in ip6_input.
-	 *
-	 * XXX not sure if we want this for raw IPv6 socket...
-	 */
-	if (IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src)) {
-		/* XXX stat */
-		goto ret;
-	}
-
 	bzero(&opts, sizeof(opts));
 	bzero(&srcsa, sizeof(struct sockaddr_in6));
 	srcsa.sin6_family = AF_INET6;
