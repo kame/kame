@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.37 2000/12/04 07:13:16 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.38 2000/12/22 05:54:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -387,6 +387,10 @@ main(argc, argv)
 		exit(5);
 	}
 
+	/* revoke privs */
+	seteuid(getuid());
+	setuid(getuid());
+
 	/* set a minimum set of socket options */
 	on = 1;
 	/* specify to tell receiving interface */
@@ -410,10 +414,6 @@ main(argc, argv)
 		       sizeof(on)) < 0)
 		err(1, "setsockopt(IPV6_HOPLIMIT)");
 #endif
-
-	/* revoke privs */
-	seteuid(getuid());
-	setuid(getuid());
 
 	seq = 0;
 	
