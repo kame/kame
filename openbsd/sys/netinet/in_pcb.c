@@ -592,8 +592,10 @@ in_setpeeraddr(inp, nam)
 	register struct sockaddr_in *sin;
 	
 #ifdef INET6
-	if (sotopf(inp->inp_socket) == PF_INET6)
+	if (sotopf(inp->inp_socket) == PF_INET6) {
 		in6_setpeeraddr(inp, nam);
+		return;
+	}
 #endif /* INET6 */
 
 	nam->m_len = sizeof (*sin);
