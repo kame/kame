@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.13 2000/01/11 21:01:03 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.14 2000/01/11 21:24:54 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -75,6 +75,7 @@
 #include "pfkey.h"
 #include "policy.h"
 #include "admin.h"
+#include "strnames.h"
 
 /* quick mode */
 static vchar_t *quick_ir1sendmx __P((struct ph2handle *, vchar_t *));
@@ -1186,7 +1187,6 @@ quick_r2send(iph2, msg)
 	vchar_t *body = NULL;
 	struct isakmp_gen *gen;
 	char *p;
-	vchar_t *sa;
 	int tlen;
 	int error = -1;
 	int pfsgroup;
@@ -1201,19 +1201,46 @@ quick_r2send(iph2, msg)
 	}
 
 	/* create SA payload for my proposal */
-	sa = ipsecdoi_setph2proposal(iph2, iph2->keys);
-	if (sa == NULL)
-		goto end;
-	memmove(sa->v, sa->v + sizeof(*gen), sa->l - sizeof(*gen));
-	sa->l -= sizeof(*gen);
-	if (iph2->sa_ret)
-		vfree(iph2->sa_ret);
-	iph2->sa_ret = vdup(sa);
-	if (iph2->sa_ret == NULL) { 
-		plog(logp, LOCATION, NULL,
-			"vmalloc (%s)\n", strerror(errno));
-		goto end;
+    {
+	struct isakmp_pl_p *prop;
+	vchar_t *pbuf = NULL;
+	struct isakmp_parse_t *pa;
+
+	pbuf = isakmp_parsewoh(ISAKMP_NPTYPE_P,
+		(struct isakmp_gen *)(iph2->sa_ret->v + sizeof(struct ipsecdoi_sa_b)),
+		iph2->sa_ret->l - sizeof(struct ipsecdoi_sa_b));
+
+	for (pa = (struct isakmp_parse_t *)pbuf->v;
+	     pa->type != ISAKMP_NPTYPE_NONE;
+	     pa++) {
+		/* check the value of next payload */
+		if (pa->type != ISAKMP_NPTYPE_P) {
+			plog(logp, LOCATION, NULL,
+				"Invalid payload type=%u\n", pa->type);
+			return NULL;
+		}
+
+		prop = (struct isakmp_pl_p *)pa->ptr;
+
+	    {
+		struct ipsecsakeys *k;
+		for (k = iph2->keys; k != NULL; k = k->next) {
+			if (prop->proto_id == k->proto_id) {
+				memcpy(prop + 1, &k->spi, sizeof(k->spi));
+				break;
+			}
+		}
+		if (k == NULL) {
+			plog(logp, LOCATION, NULL,
+				"no prop found for %s\n",
+				s_ipsecdoi_proto(prop->proto_id));
+			goto end;
+		}
+	    }
 	}
+	vfree(pbuf);
+	pbuf = NULL;
+    }
 
 	/* generate NONCE value */
 	iph2->nonce = eay_set_random(iph2->ph1->rmconf->nonce_size);
