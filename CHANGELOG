@@ -1,9 +1,9 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2020 2001/12/21 08:45:44 jinmei Exp $
+$KAME: CHANGELOG,v 1.2021 2001/12/22 05:03:15 jinmei Exp $
 
 <200112>
 2001-12-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* kame/kame/addrselect/: renamed the program to ip6addrctl so that
+	* kame/kame/addrselect: renamed the program to ip6addrctl so that
 	the name would describe its function well.
 
 2001-12-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
