@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.61 2002/06/27 09:25:47 itojun Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.62 2003/04/22 05:50:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,6 +41,7 @@
  *   sin6_scope_id is filled - standardization status?
  *   XXX breaks backward compat for code that expects no scopeid.
  *   beware on merge.
+ * - what should we do if we should do getservbyport("sctp")?
  */
 
 #ifdef HAVE_CONFIG_H
