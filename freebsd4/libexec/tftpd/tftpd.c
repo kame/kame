@@ -119,7 +119,7 @@ main(argc, argv)
 	register struct tftphdr *tp;
 	register int n;
 	int ch, on;
- 	struct sockaddr_storage me;
+	struct sockaddr_storage me;
 	int len;
 	char *chroot_dir = NULL;
 	struct passwd *nobody;
@@ -184,7 +184,7 @@ main(argc, argv)
 	 * The problem with tftpd running in "nowait" mode is that
 	 * inetd may get one or more successful "selects" on the
 	 * tftp port before we do our receive, so more than one
-	 * instance of tftpd may be started up.  Worse, if tftpd
+	 * instance of tftpd may be started up.	 Worse, if tftpd
 	 * break before doing the above "recvfrom", inetd would
 	 * spawn endless instances, clogging the system.
 	 */
@@ -245,36 +245,36 @@ main(argc, argv)
 	}
 
 	len = sizeof(me);
- 	if (getsockname(0, (struct sockaddr *)&me, &len) == 0) {
+	if (getsockname(0, (struct sockaddr *)&me, &len) == 0) {
 		switch (me.ss_family) {
- 		case AF_INET:
- 			((struct sockaddr_in *)&me)->sin_port = 0;
- 			break;
+		case AF_INET:
+			((struct sockaddr_in *)&me)->sin_port = 0;
+			break;
 		case AF_INET6:
- 			((struct sockaddr_in6 *)&me)->sin6_port = 0;
- 			break;
- 		default:
- 			/* unsupported */
- 			break;
- 		}
- 	} else {
- 		memset(&me, 0, sizeof(me));
- 		me.ss_family = from.ss_family;
- 		me.ss_len = from.ss_len;
-  	}
+			((struct sockaddr_in6 *)&me)->sin6_port = 0;
+			break;
+		default:
+			/* unsupported */
+			break;
+		}
+	} else {
+		memset(&me, 0, sizeof(me));
+		me.ss_family = from.ss_family;
+		me.ss_len = from.ss_len;
+	}
 	alarm(0);
 	close(0);
 	close(1);
- 	peer = socket(from.ss_family, SOCK_DGRAM, 0);
+	peer = socket(from.ss_family, SOCK_DGRAM, 0);
 	if (peer < 0) {
 		syslog(LOG_ERR, "socket: %m");
 		exit(1);
 	}
- 	if (bind(peer, (struct sockaddr *)&me, me.ss_len) < 0) {
+	if (bind(peer, (struct sockaddr *)&me, me.ss_len) < 0) {
 		syslog(LOG_ERR, "bind: %m");
 		exit(1);
 	}
- 	if (connect(peer, (struct sockaddr *)&from, from.ss_len) < 0) {
+	if (connect(peer, (struct sockaddr *)&from, from.ss_len) < 0) {
 		syslog(LOG_ERR, "connect: %m");
 		exit(1);
 	}
@@ -346,7 +346,7 @@ again:
 	}
 	ecode = (*pf->f_validate)(&filename, tp->th_opcode);
 	if (logging) {
-                syslog(LOG_INFO, "%s: %s request for %s: %s",
+		syslog(LOG_INFO, "%s: %s request for %s: %s",
 			verifyhost((struct sockaddr *)&from),
 			tp->th_opcode == WRQ ? "write" : "read",
 			filename, errtomsg(ecode));
@@ -696,8 +696,8 @@ static char *
 verifyhost(fromp)
 	struct sockaddr *fromp;
 {
-        static char hbuf[MAXHOSTNAMELEN];
+	static char hbuf[MAXHOSTNAMELEN];
 
-        getnameinfo(fromp, fromp->sa_len, hbuf, sizeof(hbuf), NULL, 0, 0);
-        return hbuf;
+	getnameinfo(fromp, fromp->sa_len, hbuf, sizeof(hbuf), NULL, 0, 0);
+	return hbuf;
 }
