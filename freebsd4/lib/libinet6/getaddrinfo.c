@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.19 2001/01/05 04:33:20 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.20 2001/01/05 16:00:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -758,23 +758,21 @@ free:
 }
 
 static int
-explore_copy(pai, src, res)
-	const struct addrinfo *pai;	/*seed*/
-	const struct addrinfo *src;	/*source*/
+explore_copy(pai, src0, res)
+	const struct addrinfo *pai;	/* seed */
+	const struct addrinfo *src0;	/* source */
 	struct addrinfo **res;
 {
 	int error;
-	struct addrinfo sentinel, *cur;
+	struct addrinfo sentinel, *cur, *src;
 
 	error = 0;
 	sentinel.ai_next = NULL;
 	cur = &sentinel;
 
-	while (cur && src) {
-		if (src->ai_family != pai->ai_family) {
-			src = src->ai_next;
+	for (src = (struct addrinfo *)src0; src != NULL; src = src->ai_next) {
+		if (src->ai_family != pai->ai_family)
 			continue;
-		}
 
 		cur->ai_next = copy_ai(src);
 		if (!cur->ai_next) {
@@ -784,10 +782,7 @@ explore_copy(pai, src, res)
 
 		cur->ai_next->ai_socktype = pai->ai_socktype;
 		cur->ai_next->ai_protocol = pai->ai_protocol;
-
-		src = src->ai_next;
-		while (cur && cur->ai_next)
-			cur = cur->ai_next;
+		cur = cur->ai_next;
 	}
 
 	*res = sentinel.ai_next;
