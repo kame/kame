@@ -1,4 +1,4 @@
-/*	$KAME: debugrm.h,v 1.1 2001/11/16 04:34:57 sakane Exp $	*/
+/*	$KAME: debugrm.h,v 1.2 2001/11/16 08:14:49 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,6 +28,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#define DRMDUMPFILE	"/var/tmp/debugrm.dump"
 
 #ifndef racoon_malloc
 #define	racoon_malloc(sz)	\

@@ -1,4 +1,4 @@
-/*	$KAME: debugrm.c,v 1.2 2001/11/16 07:58:31 sakane Exp $	*/
+/*	$KAME: debugrm.c,v 1.3 2001/11/16 08:14:49 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -69,7 +69,7 @@ DRM_dump()
 	FILE *fp;
 	int i;
 
-	fp = fopen("/var/tmp/debugrm.dump", "w");
+	fp = fopen(DRMDUMPFILE, "w");
 	if (fp == NULL)
 		err(1, "fopen");	/*XXX*/
 	fprintf(fp, "drm_illegal=%d\n", drm_illegal);
@@ -123,8 +123,8 @@ DRM_setmsg(buf, buflen, ptr, size, file, line, func)
 	tm = localtime(&t);
 	len = strftime(buf, buflen, "%Y/%m/%d:%T ", tm);
 
-	snprintf(buf + len, buflen - len, "%6d %p %s:%d:%s",
-		size, ptr, file , line, func);
+	snprintf(buf + len, buflen - len, "%p %6d %s:%d:%s",
+		ptr, size, file , line, func);
 }
 
 void *
@@ -174,7 +174,7 @@ DRM_realloc(file, line, func, ptr, size)
 	p = realloc(ptr, size);
 	if (p) {
 		char buf[1024];
-		if (p != ptr)
+		if (ptr && p != ptr)
 			DRM_del(ptr);
 		DRM_setmsg(buf, sizeof(buf), p, size, file, line, func);
 		DRM_add(p, buf);
