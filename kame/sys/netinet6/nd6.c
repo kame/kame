@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.172 2001/07/23 16:10:21 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.173 2001/07/23 16:18:44 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -707,14 +707,6 @@ nd6_timer(ignored_arg)
 		 * check prefix lifetime.
 		 * since pltime is just for autoconf, pltime processing for
 		 * prefix is not necessary.
-		 *
-		 * we offset expire time by NDPR_KEEP_EXPIRE, so that we
-		 * can use the old prefix information to validate the
-		 * next prefix information to come.  See prelist_update()
-		 * for actual validation.
-		 *
-		 * I don't think such an offset is necessary.
-		 * (jinmei@kame.net, 20010130).
 		 */
 		if (pr->ndpr_expire && pr->ndpr_expire < time_second) {
 			struct nd_prefix *t;
@@ -2175,6 +2167,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	 * response yet.  Replace the held mbuf (if any) with this
 	 * latest one.
 	 *
+	 * 
 	 * XXX Does the code conform to rate-limiting rule?
 	 * (RFC 2461 7.2.2)
 	 */
