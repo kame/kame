@@ -1,13 +1,8 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1380 2000/11/09 05:20:12 jinmei Exp $
+$KAME: CHANGELOG,v 1.1381 2000/11/09 05:20:31 jinmei Exp $
 
 <200011>
-2000-11-09  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* bsdi4/sys/netinet/tcp_input.c: drop incoming TCP connection towards
-	a deprecated address if the system is configured not to allow
-	using deprecated addresses for any type of new connections.
-
 Thu Nov  9 09:53:54 JST 2000  itojun@iijlab.net
 	* netbsd/libexec/{rshd,rlogind}: do not refer free'ed memory region.
 	  KAME PR 302 from ryo@iij.ad.jp
