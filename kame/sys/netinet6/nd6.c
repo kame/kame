@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.305 2002/10/10 06:19:59 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.306 2002/11/21 02:18:28 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1747,9 +1747,9 @@ nd6_ioctl(cmd, data, ifp)
 		nb_addr.sin6_family = AF_INET6;
 		nb_addr.sin6_len = sizeof(nb_addr);
 		nb_addr.sin6_addr = nbi->addr;
-		if ((error = in6_addr2zoneid(ifp, &nb_addr.sin6_addr,
-		    &nb_addr.sin6_scope_id)) != 0) {
-			return (error);
+		if (in6_addr2zoneid(ifp, &nb_addr.sin6_addr,
+		    &nb_addr.sin6_scope_id) != 0) {
+			return (EINVAL);
 		}
 		if ((error = in6_embedscope(&nb_addr.sin6_addr, &nb_addr))
 		    != 0) {
