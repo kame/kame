@@ -1,4 +1,4 @@
-.\"	$KAME: altq.9,v 1.3 2002/03/22 04:16:18 itojun Exp $
+.\"	$KAME: altq.9,v 1.4 2002/05/28 11:46:55 itojun Exp $
 .\"
 .\" Copyright (C) 2001
 .\" Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -62,7 +62,7 @@ The
 .Nm
 system is a framework to manage queueing disciplines on network
 interfaces.
-.Nm 
+.Nm
 introduces new macros to manipulate output queues.
 The output queue macros are used to abstract queue operations and not to
 touch the internal fields of the output queue structure.
@@ -234,7 +234,7 @@ queue a packet
 drop (and free) a packet if the enqueue operation fails
 .El
 If the enqueue operation fails,
-.Fa error 
+.Fa error
 is set to
 .Dv ENOBUFS .
 .Fa mbuf
