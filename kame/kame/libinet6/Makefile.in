@@ -18,7 +18,8 @@ CFLAGS=	@DEFS@ @CFLAGS@ $(CPPFLAGS)
 CPPFLAGS=@CPPFLAGS@
 LDFLAGS=@LDFLAGS@
 
-OBJS=	getaddrinfo.o getnameinfo.o ifname.o
+OBJS=	getaddrinfo.o getnameinfo.o
+OBJS+=	if_indextoname.o if_nameindex.o if_nametoindex.o
 OBJS+=	getifaddrs.o
 OBJS+=	@V6OBJS@
 
