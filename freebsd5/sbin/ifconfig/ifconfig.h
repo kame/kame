@@ -51,6 +51,10 @@ extern void setvlandev(const char *, int, int, const struct afswtch *rafp);
 extern void unsetvlandev(const char *, int, int, const struct afswtch *rafp);
 extern void vlan_status(int s, struct rt_addrinfo *);
 
+extern void setvrrpdev(const char *, int, int, const struct afswtch *rafp);
+extern void unsetvrrpdev(const char *, int, int, const struct afswtch *rafp);
+extern void vrrp_status(int s, struct rt_addrinfo *);
+
 extern void set80211ssid(const char *, int, int, const struct afswtch *rafp);
 extern void set80211stationname(const char *, int, int, const struct afswtch *rafp);
 extern void set80211channel(const char *, int, int, const struct afswtch *rafp);

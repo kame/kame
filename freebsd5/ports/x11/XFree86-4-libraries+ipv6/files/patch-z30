@@ -1,0 +1,13 @@
+--- lib/GL/mesa/src/drv/Imakefile.orig	Tue Dec  5 10:17:23 2000
++++ lib/GL/mesa/src/drv/Imakefile	Tue Dec  5 13:29:59 2000
+@@ -70,6 +70,10 @@
+ 
+ #endif /* GlxUseBuiltInDRIDriver */
+ 
++#if (defined(FreeBSDBuildXlib) && FreeBSDBuildXlib) || (defined(ModInstall) && !ModInstall)
++SUBDIRS = common
++#endif
++
+ MakeSubdirs($(SUBDIRS))
+ DependSubdirs($(SUBDIRS))
+ 

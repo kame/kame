@@ -9,6 +9,10 @@ SRCS+=	ifmedia.c
 CFLAGS+=-DUSE_IF_MEDIA
 CFLAGS+=-DINET6
 
+#comment out to exclude SIOC[GS]ETVRRP support
+SRCS+=	ifvrrp.c
+CFLAGS+=-DUSE_VRRPS
+
 #comment out to exclude SIOC[GS]ETVLAN support
 SRCS+=	ifvlan.c
 CFLAGS+=-DUSE_VLANS
@@ -21,6 +25,9 @@ CFLAGS+=-DUSE_IEEE80211
 SRCS+=	ifmac.c
 CFLAGS+=-DUSE_MAC
 
+#comment out to exclude ISATAP support
+CFLAGS+=-DUSE_ISATAP
+
 MAN=	ifconfig.8
 
 .if defined(RELEASE_CRUNCH)
@@ -32,6 +39,12 @@ LDADD=	-lipx
 
 CFLAGS+=-DNS -Wall -Wmissing-prototypes -Wcast-qual -Wwrite-strings \
 	-Wnested-externs -I..
+
+#link KAME libinet6
+LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
+	-L/usr/local/v6/lib -linet6
+DPADD+=	${.OBJDIR}/../../lib/libinet6/libinet6.a \
+	/usr/local/v6/lib/libinet6.a
 WARNS=	0
 
 .include <bsd.prog.mk>

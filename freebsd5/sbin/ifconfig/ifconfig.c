@@ -70,6 +70,10 @@ static const char rcsid[] =
 #include <netinet6/nd6.h>	/* Define ND6_INFINITE_LIFETIME */
 #endif
 
+#ifdef USE_ISATAP
+#include <net/if_stf.h>
+#endif
+
 #ifndef NO_IPX
 /* IPX */
 #define	IPXIP
@@ -154,6 +158,9 @@ void	status(const struct afswtch *afp, int addrcount,
 		    struct sockaddr_dl *sdl, struct if_msghdr *ifm,
 		    struct ifa_msghdr *ifam);
 void	tunnel_status(int s);
+#ifdef USE_ISATAP
+void	isatap_status(int s, struct rt_addrinfo *);
+#endif
 void	usage(void);
 void	ifmaybeload(char *name);
 
@@ -170,9 +177,15 @@ c_func	setatphase, setatrange;
 c_func	setifaddr, setifbroadaddr, setifdstaddr, setifnetmask;
 c_func2	settunnel;
 c_func	deletetunnel;
+#ifdef USE_ISATAP
+c_func	setisatapmode;
+c_func	setisataprouter;
+c_func	deleteisataprouter;
+#endif
 #ifdef INET6
 c_func	setifprefixlen;
 c_func	setip6flags;
+c_func	setip6deprecated;
 c_func  setip6pltime;
 c_func  setip6vltime;
 c_func2	setip6lifetime;
@@ -220,8 +233,8 @@ struct	cmd {
 	{ "anycast",	IN6_IFF_ANYCAST, setip6flags },
 	{ "tentative",	IN6_IFF_TENTATIVE, setip6flags },
 	{ "-tentative",	-IN6_IFF_TENTATIVE, setip6flags },
-	{ "deprecated",	IN6_IFF_DEPRECATED, setip6flags },
-	{ "-deprecated", -IN6_IFF_DEPRECATED, setip6flags },
+	{ "deprecated",	1, setip6deprecated },
+	{ "-deprecated", 0, setip6deprecated },
 	{ "autoconf",	IN6_IFF_AUTOCONF, setip6flags },
 	{ "-autoconf",	-IN6_IFF_AUTOCONF, setip6flags },
 	{ "pltime",     NEXTARG,        setip6pltime },
@@ -235,6 +248,11 @@ struct	cmd {
 	{ "ipdst",	NEXTARG,	setifipdst },
 	{ "tunnel",	NEXTARG2,	NULL,	settunnel },
 	{ "deletetunnel", 0,		deletetunnel },
+#ifdef USE_ISATAP
+	{ "isatapmode",	NEXTARG,	setisatapmode },
+	{ "isataprtr",	NEXTARG,	setisataprouter },
+	{ "deleteisataprtr", NEXTARG,	deleteisataprouter },
+#endif
 	{ "link0",	IFF_LINK0,	setifflags },
 	{ "-link0",	-IFF_LINK0,	setifflags },
 	{ "link1",	IFF_LINK1,	setifflags },
@@ -252,6 +270,10 @@ struct	cmd {
 	{ "vlan",	NEXTARG,	setvlantag },
 	{ "vlandev",	NEXTARG,	setvlandev },
 	{ "-vlandev",	NEXTARG,	unsetvlandev },
+#endif
+#ifdef USE_VRRPS
+	{ "vrrpdev",	NEXTARG,	setvrrpdev },
+	{ "-vrrpdev",	NEXTARG,	unsetvrrpdev },
 #endif
 #if 0
 	/* XXX `create' special-cased below */
@@ -373,6 +395,9 @@ struct	afswtch {
 	{ "maclabel", AF_UNSPEC, maclabel_status, NULL, NULL, },
 #endif
 #endif
+#ifdef USE_VRRPS
+	{ "vrrp", AF_UNSPEC, vrrp_status, NULL, NULL, },  /* XXX not real!! */
+#endif	
 	{ 0,	0,	    0,		0 }
 };
 
@@ -876,6 +901,97 @@ setip6flags(const char *dummyaddr __unused, int flag, int dummysoc __unused,
 		in6_addreq.ifra_flags |= flag;
 }
 
+#ifdef USE_ISATAP
+void
+setisatapmode(mode, param, s, afp)
+	const char *mode;
+	int param;
+	int s;
+	const struct afswtch *afp;
+{
+	int isatapmode;
+	if (strcasecmp(mode, "on") == 0)
+		isatapmode = STFM_ISATAP;
+	else if (strcasecmp(mode, "off") == 0)
+		isatapmode = STFM_6TO4;
+	else
+		err(1, "syntax error");
+
+	memcpy(&ifr.ifr_data, &isatapmode, sizeof(isatapmode));
+	if (ioctl(s, SIOCSSTFMODE, (caddr_t) &ifr) < 0)
+		err(1, "SIOCSSTFMODE");
+}
+
+void
+setisataprouter(addr, param, s, afp)
+	const char *addr;
+	int param;
+	int s;
+	const struct afswtch *afp;
+{
+	struct addrinfo hints, *rtrres;
+	struct ifreq ifreq;
+	int ecode;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = afp->af_af;
+	if ((ecode = getaddrinfo(addr, NULL, NULL, &rtrres)) != 0)
+		errx(1, "error in parsing address string: %s",
+		    gai_strerror(ecode));
+
+	if (rtrres->ai_addr->sa_family != AF_INET)
+		errx(1, "ISATAP router must be an IPv4 address");
+
+	memset(&ifreq, 0, sizeof(ifreq));
+	strncpy(ifreq.ifr_name, name, IFNAMSIZ);
+	memcpy(&ifreq.ifr_addr, rtrres->ai_addr, rtrres->ai_addr->sa_len);
+
+	if (ioctl(s, SIOCSISATAPRTR, &ifreq) < 0)
+		warn("SIOCSISATAPRTR");
+	freeaddrinfo(rtrres);
+}
+
+void
+deleteisataprouter(addr, param, s, afp)
+	const char *addr;
+	int param;
+	int s;
+	const struct afswtch *afp;
+{
+	struct addrinfo hints, *rtrres;
+	struct ifreq ifreq;
+	int ecode;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = afp->af_af;
+	if ((ecode = getaddrinfo(addr, NULL, NULL, &rtrres)) != 0)
+		errx(1, "error in parsing address string: %s",
+		    gai_strerror(ecode));
+
+	if (rtrres->ai_addr->sa_family != AF_INET)
+		errx(1, "ISATAP router must be an IPv4 address");
+
+	memset(&ifreq, 0, sizeof(ifreq));
+	strncpy(ifreq.ifr_name, name, IFNAMSIZ);
+	memcpy(&ifreq.ifr_addr, rtrres->ai_addr, rtrres->ai_addr->sa_len);
+
+	if (ioctl(s, SIOCDISATAPRTR, &ifreq) < 0)
+		warn("SIOCDISATAPRTR");
+	freeaddrinfo(rtrres);
+}
+#endif /* USE_ISATAP */
+
+void
+setip6deprecated(seconds, deprecated, s, afp)
+    	const char *seconds;
+	int deprecated;
+	int s;
+	const struct afswtch *afp;
+{
+	if (deprecated)
+		setip6lifetime("pltime", "0", s, afp);
+}
+
 void
 setip6pltime(const char *seconds, int dummy __unused, int s, 
     const struct afswtch *afp)
@@ -1082,6 +1198,7 @@ status(const struct afswtch *afp, int addrcount, struct	sockaddr_dl *sdl,
 	struct	rt_addrinfo info;
 	int allfamilies, s;
 	struct ifstat ifs;
+	u_char iftype;
 
 	if (afp == NULL) {
 		allfamilies = 1;
@@ -1102,6 +1219,7 @@ status(const struct afswtch *afp, int addrcount, struct	sockaddr_dl *sdl,
 	if (ifm->ifm_data.ifi_mtu)
 		printf(" mtu %ld", ifm->ifm_data.ifi_mtu);
 	putchar('\n');
+	iftype = ifm->ifm_data.ifi_type;
 
 	if (ioctl(s, SIOCGIFCAP, (caddr_t)&ifr) == 0) {
 		if (ifr.ifr_curcap != 0) {
@@ -1144,8 +1262,16 @@ status(const struct afswtch *afp, int addrcount, struct	sockaddr_dl *sdl,
 		media_status(s, NULL);
 #endif
 #ifdef USE_VLANS
-	if (allfamilies || afp->af_status == vlan_status)
+	if (iftype == IFT_L2VLAN && (allfamilies || afp->af_status == vlan_status))
 		vlan_status(s, NULL);
+#endif
+#ifdef USE_VRRPS
+	if (iftype == IFT_VRRP && (allfamilies || afp->af_status == vrrp_status))
+		vrrp_status(s, NULL);
+#endif
+#ifdef USE_ISATAP
+	if (iftype == IFT_STF && (allfamilies || afp->af_status == isatap_status))
+		isatap_status(s, NULL);
 #endif
 #ifdef USE_IEEE80211
 	if (allfamilies || afp->af_status == ieee80211_status)
@@ -1163,6 +1289,9 @@ status(const struct afswtch *afp, int addrcount, struct	sockaddr_dl *sdl,
 	    afp->af_status != link_status
 #ifdef USE_VLANS
 	    && afp->af_status != vlan_status
+#endif
+#ifdef USE_VRRPS
+	    && afp->af_status != vrrp_status
 #endif
 		)
 		warnx("%s has no %s interface address!", name, afp->af_name);
@@ -1282,6 +1411,54 @@ in6_fillscopeid(struct sockaddr_in6 *sin6)
 #endif
 }
 
+#ifdef USE_ISATAP
+void
+isatap_status(s, rt)
+	int s;
+	struct rt_addrinfo *rt __unused;
+{
+	char *buf, *ptr, *lim;
+	size_t needed;
+	int mib[4] = {CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_ISATAPRTR};
+
+	/* just skip if it is not an ISATAP interface */
+	if (ioctl(s, SIOCGSTFMODE, (caddr_t) &ifr) < 0)
+		return;
+	if ((int) ifr.ifr_data != STFM_ISATAP) {
+		printf("\tisatapmode off\n");
+		return;
+	}
+	printf("\tisatapmode on\n");
+
+	if (sysctl(mib, 4, NULL, &needed, NULL, 0) < 0)
+		return;
+	if (needed == 0)
+		return;
+	if ((buf = malloc(needed)) == NULL)
+		errx(1, "malloc");
+	if (sysctl(mib, 4, buf, &needed, NULL, 0) < 0)
+		errx(1, "actual retrieval of ISATAP router list");
+	
+	lim = buf + needed;
+	ptr = buf;
+	while (ptr < lim) {
+		char rtraddr[NI_MAXHOST];
+		struct sockaddr *addr = (struct sockaddr *) ptr;
+
+		if (addr->sa_family != AF_INET) {
+			warnx("invalid addr family (%d)", addr->sa_family);
+			continue;
+		}
+		rtraddr[0] = '\0';
+		getnameinfo(addr, addr->sa_len,
+			    rtraddr, sizeof(rtraddr), 0, 0, NI_NUMERICHOST);
+		if (rtraddr[0])
+			printf("\tisataprtr %s\n", rtraddr);
+		ptr += addr->sa_len;
+	}
+}
+#endif
+
 void
 in6_status(int s __unused, struct rt_addrinfo * info)
 {
@@ -1385,12 +1562,20 @@ in6_status(int s __unused, struct rt_addrinfo * info)
 		printf("duplicated ");
 	if ((flags6 & IN6_IFF_DETACHED) != 0)
 		printf("detached ");
-	if ((flags6 & IN6_IFF_DEPRECATED) != 0)
+	/*
+	 * XXX: we used to have a flag for deprecated addresses, but it was
+	 * obsolete except for compatibility purposes.
+	 */
+	if (lifetime.ia6t_pltime == 0)
 		printf("deprecated ");
 	if ((flags6 & IN6_IFF_AUTOCONF) != 0)
 		printf("autoconf ");
 	if ((flags6 & IN6_IFF_TEMPORARY) != 0)
 		printf("temporary ");
+#ifdef IN6_IFF_HOME
+	if ((flags6 & IN6_IFF_HOME) != 0)
+		printf("home ");
+#endif
 
         if (scopeid)
 		printf("scopeid 0x%x ", scopeid);
