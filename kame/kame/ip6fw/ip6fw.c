@@ -16,7 +16,7 @@
  *
  * NEW command line interface for IP firewall facility
  *
- * $Id: ip6fw.c,v 1.7 2001/01/24 01:25:33 itojun Exp $
+ * $Id: ip6fw.c,v 1.8 2001/03/18 18:46:33 itojun Exp $
  *
  */
 
@@ -473,7 +473,7 @@ show_usage(const char *fmt, ...)
 		va_end(args);
 		warnx("error: %s", buf);
 	}
-	fprintf(stderr, "usage: ipfw6 [options]\n"
+	fprintf(stderr, "usage: ip6fw [options]\n"
 "    flush\n"
 "    add [number] rule\n"
 "    delete number ...\n"
