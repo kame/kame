@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.266 2002/05/29 06:19:55 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.267 2002/05/29 07:44:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,8 +77,7 @@
 #include <netinet/if_ether.h>
 #ifdef __FreeBSD__
 #include <netinet/if_fddi.h>
-#endif
-#ifdef __bsdi__
+#else
 #include <net/if_fddi.h>
 #endif
 #ifdef __OpenBSD__
@@ -254,10 +253,10 @@ nd6_setmtu(ifp, ndi)
 		break;
 #ifdef IFT_FDDI
 	case IFT_FDDI:
-#if defined(__bsdi__) && _BSDI_VERSION >= 199802
-		ndi->maxmtu = MIN(FDDIMTU, ifp->if_mtu);
-#else
+#ifdef FDDIIPMTU
 		ndi->maxmtu = MIN(FDDIIPMTU, ifp->if_mtu);
+#else
+		ndi->maxmtu = MIN(FDDIMTU, ifp->if_mtu);
 #endif
 		break;
 #endif
