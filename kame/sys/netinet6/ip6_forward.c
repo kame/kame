@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.123 2003/07/01 05:59:18 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.124 2003/08/07 08:45:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -637,7 +637,7 @@ ip6_forward(m, srcrt)
 	 * Also, don't send redirect if forwarding using a route
 	 * modified by a redirect.
 	 */
-	if (rt->rt_ifp == m->m_pkthdr.rcvif && !srcrt &&
+	if (rt->rt_ifp == m->m_pkthdr.rcvif && !srcrt && ip6_sendredirects &&
 #ifdef IPSEC
 	    !ipsecrt &&
 #endif
