@@ -1,7 +1,7 @@
 SRCDIR=	${.CURDIR}/../../kame/vrrp6d
 
 PROG=	vrrp6d
-SRCS=	vrrp_misc.c vrrp_multicast.c vrrp_main.c vrrp_thread.c \
+SRCS=	vrrp_misc.c vrrp_multicast.c vrrp_main.c vrrp_timer.c \
 	vrrp_state.c vrrp_network.c vrrp_interface.c vrrp_conf.c \
 	vrrp_signal.c  
 
