@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.27 2000/04/12 16:11:19 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.28 2000/04/12 16:38:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -254,6 +254,7 @@ stf_encapcheck(m, off, proto, arg)
 	if (proto != IPPROTO_IPV6)
 		return 0;
 
+	/* LINTED const cast */
 	m_copydata((struct mbuf *)m, 0, sizeof(ip), (caddr_t)&ip);
 
 	if (ip.ip_v != 4)
