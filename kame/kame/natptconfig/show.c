@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: show.c,v 1.11 2000/05/05 16:49:00 itojun Exp $
+ *	$Id: show.c,v 1.12 2000/10/17 08:01:16 fujisawa Exp $
  */
 
 #include <sys/types.h>
@@ -73,6 +73,10 @@ kvm_t	*kd;
 
 static	struct nlist	nl[] =
 {
+    { "_cell_used" },
+    { "_cell_free" },
+    { "_tSlotEntryUsed" },
+    { "_tSlotEntryMax" },
     { "_natptStatic" },
     { "_natptDynamic" },
     { "_tSlotEntry" },
@@ -193,6 +197,18 @@ void
 showVariables()
 {
     u_int	value;
+
+    if (readNL((caddr_t)&value, sizeof(value), "_tSlotEntryUsed") > 0)
+	printf("%12s: 0x%08x (%d)\n", "tSlotEntryUsed", value, value);
+
+    if (readNL((caddr_t)&value, sizeof(value), "_tSlotEntryMax") > 0)
+	printf("%12s: 0x%08x (%d)\n", "tSlotEntryMax", value, value);
+
+    if (readNL((caddr_t)&value, sizeof(value), "_cell_used") > 0)
+	printf("%12s: 0x%08x (%d)\n", "cell_used", value, value);
+
+    if (readNL((caddr_t)&value, sizeof(value), "_cell_free") > 0)
+	printf("%12s: 0x%08x (%d)\n", "cell_free", value, value);
 
     if (readNL((caddr_t)&value, sizeof(value), "_ip6_protocol_tr") > 0)
 	printf("%12s: 0x%08x (%d)\n", "ipn6_protocol_tr", value, value);
