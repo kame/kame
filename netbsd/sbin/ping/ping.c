@@ -553,7 +553,7 @@ main(int argc, char *argv[])
 				err(1, "malloc");
 			if ((len = ipsec_set_policy(buf, len, policy_in)) < 0)
 				errx(1, ipsec_strerror());
-			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_IN,
+			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY,
 					buf, len) < 0) {
 				err(1, "ipsec policy cannot be configured");
 			}
@@ -566,7 +566,7 @@ main(int argc, char *argv[])
 				err(1, "malloc");
 			if ((len = ipsec_set_policy(buf, len, policy_out)) < 0)
 				errx(1, ipsec_strerror());
-			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY_IN,
+			if (setsockopt(s, IPPROTO_IP, IP_IPSEC_POLICY,
 					buf, len) < 0) {
 				err(1, "ipsec policy cannot be configured");
 			}
@@ -579,7 +579,7 @@ main(int argc, char *argv[])
 		err(1, "malloc");
 	if ((len = ipsec_set_policy(buf, len, "out bypass")) < 0)
 		errx(1, ipsec_strerror());
-	if (setsockopt(sloop, IPPROTO_IP, IP_IPSEC_POLICY_OUT, buf, len) < 0) {
+	if (setsockopt(sloop, IPPROTO_IP, IP_IPSEC_POLICY, buf, len) < 0) {
 #if 0
 		warnx("ipsec is not configured");
 #else

@@ -2345,7 +2345,7 @@ tn(argc, argv)
 			return 0;
 		}
 		level = res->ai_family == AF_INET ? IPPROTO_IP : IPPROTO_IPV6;
-		optname = res->ai_family == AF_INET ? IP_IPSEC_POLICY_IN : IPV6_IPSEC_POLICY_IN;
+		optname = res->ai_family == AF_INET ? IP_IPSEC_POLICY : IPV6_IPSEC_POLICY;
 		if (setsockopt(net, level, optname, buf, len) < 0){
 			perror("setsockopt");
 			return 0;
@@ -2366,7 +2366,7 @@ tn(argc, argv)
 			return 0;
 		}
 		level = res->ai_family == AF_INET ? IPPROTO_IP : IPPROTO_IPV6;
-		optname = res->ai_family == AF_INET ? IP_IPSEC_POLICY_OUT : IPV6_IPSEC_POLICY_OUT;
+		optname = res->ai_family == AF_INET ? IP_IPSEC_POLICY : IPV6_IPSEC_POLICY;
 		if (setsockopt(net, level, optname, buf, len) < 0){
 			perror("setsockopt");
 			return 0;
