@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2021 2001/12/22 05:03:15 jinmei Exp $
+$KAME: CHANGELOG,v 1.2022 2001/12/22 05:06:49 jinmei Exp $
 
 <200112>
+2001-12-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_src.c (in6_selectroute): corrected a
+	condition to getting a route to the next hop specified by the
+	IPV6_NEXTHOP option.  Statistics counter was also incremented in
+	this function.
+
 2001-12-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/addrselect: renamed the program to ip6addrctl so that
 	the name would describe its function well.
