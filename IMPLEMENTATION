@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.208 2001/04/25 02:28:08 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.209 2001/04/25 06:37:40 jinmei Exp $
 
 1. IPv6
 
@@ -274,7 +274,7 @@ IPv6 uses scoped addresses.  It is therefore very important to
 specify the scope zone index (link index for a link-local address, or
 site index for a site-local address) with an IPv6 address.  Without a
 zone index, a scoped IPv6 address is ambiguous to the kernel, and
-the kernel will not be able to determine the outbound link for a
+the kernel would not be able to determine the outbound link for a
 packet to the scoped address.  KAME code tries to address the issue in
 several ways.
 
@@ -331,14 +331,14 @@ These options are enough to disambiguate scoped addresses of an
 incoming packet, because we can uniquely identify the corresponding
 zone of the scoped address(es) by the incoming interface.  However,
 they are too strong for outgoing packets.  For example, consider a
-multi-sited node and suppose that one of the sites has more than one
-interface.  When we want to send a packet to the site (with multiple
-interfaces), we can only specify one of the interfaces for the
-outgoing packet with these options; we cannot just say "send the
-packet to (one of the interfaces of) the site."
+multi-sited node and suppose that more than one interface of the node
+belongs to a same site.  When we want to send a packet to the site,
+we can only specify one of the interfaces for the outgoing packet with
+these options; we cannot just say "send the packet to (one of the
+interfaces of) the site."
 
-Another kind of the candidates is to use the sin6_scope_id member in
-the sockaddr_in6 structure, defined in RFC2553 and
+Another kind of candidates is to use the sin6_scope_id member in the
+sockaddr_in6 structure, defined in RFC2553 and
 draft-ietf-ipngwg-rfc2553bis-xx.txt.  The KAME kernel interprets the
 sin6_scope_id field properly in order to disambiguate scoped
 addresses.  For example, if an application passes a sockaddr_in6
@@ -356,18 +356,18 @@ way to standardization.  Additionally, not so many operating systems
 support the behavior above at this moment.
 
 In summary,
-- if your target system is limited to KAME based ones (i.e. BSD
+- If your target system is limited to KAME based ones (i.e. BSD
   variants and KAME snaps), use the sin6_scope_id field assuming the
   kernel behavior described above.
 - Otherwise, (i.e. if your program should be portable on other systems
   than BSDs)
-  + use the advanced API to disambiguate scoped addresses of incoming
+  + Use the advanced API to disambiguate scoped addresses of incoming
     packets.
   + To disambiguate scoped addresses of outgoing packets,
     * if it is okay to just specify the outgoing interface, use the
       advanced API.  This would be the case, for example, when you
       should only consider link-local addresses and your system
-      assumes a 1-to-1 relationship between links and interfaces.
+      assumes 1-to-1 relationship between links and interfaces.
     * otherwise, sorry but you lose.  Please rush the IETF IPv6
       community into standardizing the semantics of the sin6_scope_id
       field.
@@ -383,11 +383,9 @@ anyway.
 getaddrinfo(3) and getnameinfo(3) support an extended numeric IPv6
 syntax, as documented in draft-ietf-ipngwg-rfc2553bis-xx.txt.  You can
 specify the outgoing link, by using the name of the outgoing interface
-as the outgoing link, like "fe80::1%ne0" (again, note that we assume
-there is a 1-to-1 relationship between links and interfaces.)  This
-way you will be able to specify a link-local scoped address without
-much trouble.  To use this extension in your program, you'll need to
-use getaddrinfo(3), and getnameinfo(3) with NI_WITHSCOPEID.
+as the link, like "fe80::1%ne0" (again, note that we assume there is
+1-to-1 relationship between links and interfaces.)  This way you will
+be able to specify a link-local scoped address without much trouble.
 
 Other APIs like inet_pton(3) and inet_ntop(3) are inherently
 unfriendly with scoped addresses, since they are unable to annotate
@@ -396,7 +394,7 @@ addresses with zone identifier.
 1.3.3 Interaction with users (command line)
 
 Most of user applications now support the extended numeric IPv6
-syntax, In this case, you can specify outgoing link, by using the name
+syntax.  In this case, you can specify outgoing link, by using the name
 of the outgoing interface like "fe80::1%ne0" (sorry for the duplicated
 notice, but please recall again that we assume 1-to-1 relationship
 between links and interfaces).  This is even the case for some
