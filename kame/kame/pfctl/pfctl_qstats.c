@@ -1,4 +1,4 @@
-/*	$OpenBSD: pfctl_qstats.c,v 1.23 2003/06/21 20:57:45 dhartmei Exp $ */
+/*	$OpenBSD: pfctl_qstats.c,v 1.24 2003/07/31 09:46:08 kjc Exp $ */
 
 /*
  * Copyright (c) Henning Brauer <henning@openbsd.org>
@@ -41,8 +41,10 @@
 
 union class_stats {
 	class_stats_t		cbq_stats;
+#ifdef __OpenBSD__	/* KAME snap is okay, but *bsd-current is not */
 	struct priq_classstats	priq_stats;
 	struct hfsc_classstats	hfsc_stats;
+#endif
 };
 
 #define AVGN_MAX	8
@@ -296,6 +298,7 @@ print_cbqstats(struct queue_stats cur)
 void
 print_priqstats(struct queue_stats cur)
 {
+#ifdef __OpenBSD__	/* KAME snap is okay, but *bsd-current is not */
 	printf("  [ pkts: %10llu  bytes: %10llu  "
 	    "dropped pkts: %6llu bytes: %6llu ]\n",
 	    cur.data.priq_stats.xmitcnt.packets,
@@ -311,11 +314,13 @@ print_priqstats(struct queue_stats cur)
 	printf("  [ measured: %7.1f packets/s, %s/s ]\n",
 	    cur.avg_packets / STAT_INTERVAL,
 	    rate2str((8 * cur.avg_bytes) / STAT_INTERVAL));
+#endif
 }
 
 void
 print_hfscstats(struct queue_stats cur)
 {
+#ifdef __OpenBSD__	/* KAME snap is okay, but *bsd-current is not */
 	printf("  [ pkts: %10llu  bytes: %10llu  "
 	    "dropped pkts: %6llu bytes: %6llu ]\n",
 	    cur.data.hfsc_stats.xmit_cnt.packets,
@@ -331,6 +336,7 @@ print_hfscstats(struct queue_stats cur)
 	printf("  [ measured: %7.1f packets/s, %s/s ]\n",
 	    cur.avg_packets / STAT_INTERVAL,
 	    rate2str((8 * cur.avg_bytes) / STAT_INTERVAL));
+#endif
 }
 
 void
@@ -365,6 +371,7 @@ update_avg(struct pf_altq_node *a)
 		b = qs->data.cbq_stats.xmit_cnt.bytes;
 		p = qs->data.cbq_stats.xmit_cnt.packets;
 		break;
+#ifdef __OpenBSD__	/* KAME snap is okay, but *bsd-current is not */
 	case ALTQT_PRIQ:
 		b = qs->data.priq_stats.xmitcnt.bytes;
 		p = qs->data.priq_stats.xmitcnt.packets;
@@ -373,6 +380,7 @@ update_avg(struct pf_altq_node *a)
 		b = qs->data.hfsc_stats.xmit_cnt.bytes;
 		p = qs->data.hfsc_stats.xmit_cnt.packets;
 		break;
+#endif
 	default:
 		b = 0;
 		p = 0;
