@@ -1,4 +1,4 @@
-.\"	$KAME: pdelegate.8,v 1.1 2001/09/07 09:25:50 itojun Exp $
+.\"	$KAME: pdelegate.8,v 1.2 2001/09/07 09:33:15 itojun Exp $
 .\"
 .\" Copyright (C) 2001 WIDE Project.  All rights reserved.
 .\"
@@ -29,35 +29,42 @@
 .Dd September 7, 2001
 .Dt PDELEGATE 8
 .Os KAME
+.\"
 .Sh NAME
 .Nm pdelegate
 .Nd prefix delegation client
+.\"
 .Sh SYNOPSIS
 .Nm
 .Op Fl dv
 .Op Fl l Ar prefixlen
 .Ar interface
 .Nm ""
+.\"
 .Sh DESCRIPTION
 .Nm
 requests an IPv6 prefix to a delegator on
 .Ar interface ,
 by using ICMPv6 prefix delegation protocol.
 .Pp
+.Bl -tag -width indent
+.It Fl d
+The flag puts the program into the debug mode.
+Specifically,
+.Fl d
+turns off ICMPv6 type-based filter.
+.It Fl l Ar prefixlen
 .Ar prefixlen
 specifies the prefix length to be requested to the delegator.
 The default value for
 .Ar prefixlen
 is 64.
-.Fl d
-puts the program into the debug mode.
-Specifically,
-.Fl d
-turns off ICMPv6 type-based filter.
-.Fl v
-lets
+.It Fl v
+The flag lets
 .Nm
 generate more verbose messages to the standard error device.
+.El
+.\"
 .Sh RETURN VALUES
 .Nm
 exits with
@@ -68,6 +75,7 @@ on successful prefix delegation, and
 .Pq 1
 on error or timeouts
 .Pq like when there is no delegator .
+.\"
 .Sh SEE ALSO
 .Rs
 .%A Brian Haberman 
@@ -80,3 +88,13 @@ on error or timeouts
 .\"
 .Sh BUGS
 There are numerious assumptions hardcoded into the program, which we should not.
+.Pp
+There is no official ICMPv6 type assigned for
+the ICMPv6 prefix delegation protocol.
+The program uses 150 and 151 by default.
+.Pp
+There is no IPv6 link-local multicast address assigned for the protocol.
+The program uses
+.Li ff02::2
+.Pq all-routers multicast address
+for now.
