@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.30 2002/03/13 17:03:52 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.31 2002/03/15 12:32:42 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -56,6 +56,19 @@
 					u_int32_t s = htonl(v);		\
 					bcopy(&s, (p), sizeof(s));	\
 				} while (0)
+
+/* Callout table for MIP6 structures */
+struct mip6_timeout {
+	LIST_ENTRY(mip6_timeout)	mto_entry;
+	time_t				mto_expire;
+	LIST_HEAD(, mip6_timeout_entry)	mto_timelist;
+};
+
+struct mip6_timeout_entry {
+	LIST_ENTRY(mip6_timeout_entry)	mtoe_entry;
+	caddr_t				mtoe_ptr;
+	struct mip6_timeout		*mtoe_timeout;
+};
 
 struct mip6_prefix {
 	LIST_ENTRY(mip6_prefix) mpfx_entry;
@@ -160,6 +173,9 @@ struct mip6_bc {
 	                                     /* valid only when BUF_HOME. */
 	const struct encaptab *mbc_encap;    /* encapsulation from MN */
 	void		      *mbc_dad;	     /* dad handler */
+#ifdef MIP6_CALLOUTTEST
+	struct mip6_timeout_entry *mbc_timeout;
+#endif /* MIP6_CALLOUTTEST */
 };
 LIST_HEAD(mip6_bc_list, mip6_bc);
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.100 2002/03/15 05:12:22 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.101 2002/03/15 12:32:42 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -95,6 +95,7 @@ extern struct protosw mip6_tunnel_protosw;
 extern struct mip6_prefix_list mip6_prefix_list;
 
 struct mip6_bc_list mip6_bc_list;
+LIST_HEAD(, mip6_timeout) mip6_bc_timeout_list;
 
 #ifndef MIP6_BC_HASH_SIZE
 #define MIP6_BC_HASH_SIZE 35			/* XXX */
@@ -148,6 +149,11 @@ static void mip6_bc_timeout __P((void *));
 static void mip6_bc_starttimer __P((void));
 static void mip6_bc_stoptimer __P((void));
 static int mip6_bc_encapcheck __P((const struct mbuf *, int, int, void *));
+
+#ifdef MIP6_CALLOUTTEST
+static struct mip6_timeout_entry *mip6_timeoutentry_insert __P((time_t, caddr_t));
+static void mip6_bc_timeoutentry_remove __P((struct mip6_timeout_entry *));
+#endif /* MIP6_CALLOUTTEST */
 
 static int mip6_process_hrbu __P((struct sockaddr_in6 *,
 				  struct sockaddr_in6 *,
@@ -3586,6 +3592,79 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 	return (mbc);
 }
 
+#ifdef MIP6_CALLOUTTEST
+static struct mip6_timeout_entry *
+mip6_timeoutentry_insert(expire, content)
+	time_t expire;
+	caddr_t content;
+{
+	struct mip6_timeout *mto, *newmto = NULL;
+	struct mip6_timeout_entry *mtoe = NULL;
+
+/* XXX splxxx ?? */
+	/* Search appropriate positon to insert a timeout slot */
+	for (mto = LIST_FIRST(&mip6_bc_timeout_list); mto && LIST_NEXT(mto, mto_entry);
+	     mto = LIST_NEXT(mto, mto_entry)) {
+		if (mto->mto_expire >= expire)
+			break;
+	}
+
+	/* Allocate a new timeout slot when a sutable slot is not found */
+	if (mto == NULL || mto->mto_expire != expire) {
+		MALLOC(newmto, struct mip6_timeout *,
+		       sizeof(struct mip6_timeout), M_TEMP, M_NOWAIT);
+		if (!newmto) {
+			mip6log((LOG_ERR,
+				 "%s:%d: memory allocation failed.\n",
+				 __FILE__, __LINE__));
+			return (NULL);
+		}
+		bzero(newmto, sizeof(struct mip6_timeout));
+		if (!mto) {
+			LIST_INSERT_HEAD(&mip6_bc_timeout_list, newmto, mto_entry);
+		} else if (mto->mto_expire > expire) {
+			LIST_INSERT_BEFORE(mto, newmto, mto_entry);
+		} else {
+			LIST_INSERT_AFTER(mto, newmto, mto_entry);
+		}
+		mto = newmto;
+	}
+
+	MALLOC(mtoe, struct mip6_timeout_entry *,
+	       sizeof(struct mip6_timeout_entry), M_TEMP, M_NOWAIT);
+	if (!mtoe) {
+		if (newmto)
+			FREE(newmto, M_TEMP);
+		mip6log((LOG_ERR,
+			 "%s:%d: memory allocation failed.\n",
+			 __FILE__, __LINE__));
+		return (NULL);
+	}
+	bzero(mtoe, sizeof(struct mip6_timeout_entry));
+	mtoe->mtoe_timeout = mto;
+	mtoe->mtoe_ptr = content;
+	LIST_INSERT_HEAD(&mto->mto_timelist, mtoe, mtoe_entry);
+
+	return (mtoe);
+}
+
+static void
+mip6_bc_timeoutentry_remove(mtoe)
+	struct mip6_timeout_entry *mtoe;
+{
+/* XXX splxxx ?? */
+	LIST_REMOVE(mtoe, mtoe_entry);
+	if (LIST_EMPTY(&mtoe->mtoe_timeout->mto_timelist)) {
+		LIST_REMOVE(mtoe->mtoe_timeout, mto_entry);
+		FREE(mtoe->mtoe_timeout, M_TEMP);
+	}
+	FREE(mtoe, M_TEMP);
+
+	mip6log((LOG_INFO, "%s:%d: Removed timeout entry.\n",
+		__FILE__, __LINE__));
+}
+#endif /* MIP6_CALLOUTTEST */
+
 static int
 mip6_bc_list_insert(mbc_list, mbc)
 	struct mip6_bc_list *mbc_list;
@@ -3599,6 +3678,11 @@ mip6_bc_list_insert(mbc_list, mbc)
 		LIST_INSERT_HEAD(mbc_list, mbc, mbc_entry);
 	}
 	mip6_bc_hash[id] = mbc;
+
+#ifdef MIP6_CALLOUTTEST
+	mbc->mbc_timeout = mip6_timeoutentry_insert(mbc->mbc_expire, (caddr_t)mbc); /* For BC expiration */
+	mip6_timeoutentry_insert(mbc->mbc_expire - mbc->mbc_lifetime / 4, (caddr_t)mbc); /* For BR */
+#endif
 
 	if (mip6_bc_count == 0) {
 		mip6log((LOG_INFO, "%s:%d: BC timer started.\n",
@@ -3632,6 +3716,11 @@ mip6_bc_list_remove(mbc_list, mbc)
 			mip6_bc_hash[id] = NULL;
 		}
 	}
+#ifdef MIP6_CALLOUTTEST
+	if (mbc->mbc_timeout) {
+		mip6_bc_timeoutentry_remove(mbc->mbc_timeout);
+	}
+#endif
 	LIST_REMOVE(mbc, mbc_entry);
 	if (mbc->mbc_flags & IP6_BUF_HOME) {
 		error = mip6_bc_proxy_control(&mbc->mbc_phaddr, NULL,
@@ -3696,7 +3785,13 @@ mip6_bc_timeout(dummy)
 	void *dummy;
 {
 	int s;
+#ifdef MIP6_CALLOUTTEST
+	struct mip6_bc *mbc;
+	struct mip6_timeout *mto, *mto_next;
+	struct mip6_timeout_entry *mtoe, *mtoe_next;
+#else
 	struct mip6_bc *mbc, *mbc_next;
+#endif /* MIP6_CALLOUTTEST */
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
@@ -3707,6 +3802,25 @@ mip6_bc_timeout(dummy)
 	s = splnet();
 #endif
 
+#ifdef MIP6_CALLOUTTEST
+	for (mto = LIST_FIRST(&mip6_bc_timeout_list); mto; mto = mto_next) {
+		mto_next = LIST_NEXT(mto, mto_entry);
+
+		if (mto->mto_expire > time_second)
+			break;
+		for (mtoe = LIST_FIRST(&mto->mto_timelist); mtoe; mtoe = mtoe_next) {
+			mtoe_next = LIST_NEXT(mtoe, mtoe_entry);
+			mbc = (struct mip6_bc *)mtoe->mtoe_ptr;
+			if (mbc->mbc_expire < time_second) {
+				mip6_bc_list_remove(&mip6_bc_list, (struct mip6_bc *)mtoe->mtoe_ptr);
+			} else if ((mbc->mbc_expire - time_second)
+			    < (mbc->mbc_lifetime / 4)) { /* XXX */
+				mbc->mbc_state |= MIP6_BC_STATE_BR_WAITSENT;
+				mip6_bc_timeoutentry_remove(mtoe);
+			}
+		}
+	}
+#else
 	for (mbc = LIST_FIRST(&mip6_bc_list); mbc; mbc = mbc_next) {
 		mbc_next = LIST_NEXT(mbc, mbc_entry);
 
@@ -3730,6 +3844,7 @@ mip6_bc_timeout(dummy)
 			
 		}
 	}
+#endif
 
 	mip6_bc_starttimer();
 
