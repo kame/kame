@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id: mip6makeconfig.sh,v 1.2 2002/12/04 05:39:05 keiichi Exp $
+# $Id: mip6makeconfig.sh,v 1.3 2003/01/31 10:19:46 keiichi Exp $
 
 cat=/bin/cat
 basename=/usr/bin/basename
@@ -11,6 +11,8 @@ fi
 if [ -r /etc/rc.conf ]; then
 	. /etc/rc.conf
 fi
+
+ipv6_mobile_config_dir=${ipv6_mobile_config_dir:-/usr/local/v6/etc/mobileip6}
 
 if [ $# -ne 1 ]; then
 	${cat} <<EOF
@@ -23,8 +25,6 @@ Usage: ${0} node_dir
 EOF
 	exit 1
 fi
-
-ipv6_mobile_config_dir=${ipv6_mobile_config_dir:-/usr/local/v6/etc/mobileip6}
 
 #
 # check node_dir
@@ -43,6 +43,15 @@ node_dir=${ipv6_mobile_config_dir}/${1}
 . ${node_dir}/config
 
 #
+# set other auto configurable parameters
+#
+if [ "X${transport_protocol}" = "Xah" ]; then
+	transport_algoarg='-A'
+else
+	transport_algoarg='-E'
+fi
+
+#
 # write security association configuration files
 #
 
@@ -51,9 +60,23 @@ node_dir=${ipv6_mobile_config_dir}/${1}
 #
 ${cat} << EOF > ${node_dir}/add
 add ${mobile_node} ${home_agent}
-	esp ${spi_mn_to_ha} -E ${algorithm} "${secret}";
+	${transport_protocol} ${transport_spi_mn_to_ha}
+	-m transport
+	${transport_algoarg} ${transport_algorithm} "${transport_secret}";
 add ${home_agent} ${mobile_node}
-	esp ${spi_ha_to_mn} -E ${algorithm} "${secret}";
+	${transport_protocol} ${transport_spi_ha_to_mn}
+	-m transport
+	${transport_algoarg} ${transport_algorithm} "${transport_secret}";
+add ${mobile_node} ${home_agent}
+	esp ${tunnel_spi_mn_to_ha}
+	-m tunnel
+	-u  ${tunnel_uid_mn_to_ha}
+	-E ${tunnel_algorithm} "${tunnel_secret}";
+add ${home_agent} ${mobile_node}
+	esp ${tunnel_spi_ha_to_mn}
+	-m tunnel
+	-u ${tunnel_uid_ha_to_mn}
+	-E ${tunnel_algorithm} "${tunnel_secret}";
 EOF
 
 #
@@ -61,9 +84,13 @@ EOF
 #
 ${cat} << EOF > ${node_dir}/delete
 delete ${mobile_node} ${home_agent}
-	esp ${spi_mn_to_ha};
+	${transport_protocol} ${transport_spi_mn_to_ha};
 delete ${home_agent} ${mobile_node}
-	esp ${spi_ha_to_mn};
+	${transport_protocol} ${transport_spi_ha_to_mn};
+delete ${mobile_node} ${home_agent}
+	esp ${tunnel_spi_mn_to_ha};
+delete ${home_agent} ${mobile_node}
+	esp ${tunnel_spi_ha_to_mn};
 EOF
 
 #
@@ -76,10 +103,10 @@ EOF
 ${cat} <<EOF > ${node_dir}/spdadd_home_agent
 spdadd ${home_agent} ${mobile_node}
 	62 -P out ipsec
-	esp/transport//require;
+	${transport_protocol}/transport//require;
 spdadd ${mobile_node} ${home_agent}
 	62 -P in ipsec
-	esp/transport//require;
+	${transport_protocol}/transport//require;
 EOF
 
 #
@@ -98,10 +125,10 @@ EOF
 ${cat} <<EOF >> ${node_dir}/spdadd_home_agent
 spdadd ::/0 ${mobile_node}
 	62 -P out ipsec
-	esp/tunnel/${home_agent}-${mobile_node}/require;
+	esp/tunnel/${home_agent}-${mobile_node}/unique:${tunnel_uid_ha_to_mn};
 spdadd ${mobile_node} ::/0
 	62 -P in ipsec
-	esp/tunnel/${mobile_node}-${home_agent}/require;
+	esp/tunnel/${mobile_node}-${home_agent}/unique:${tunnel_uid_mn_to_ha};
 EOF
 
 #
@@ -120,10 +147,10 @@ EOF
 ${cat} <<EOF > ${node_dir}/spdadd_mobile_node
 spdadd ${mobile_node} ${home_agent}
 	62 -P out ipsec
-	esp/transport//require;
+	${transport_protocol}/transport//require;
 spdadd ${home_agent} ${mobile_node}
 	62 -P in ipsec
-	esp/transport//require;
+	${transport_protocol}/transport//require;
 EOF
 
 #
@@ -142,10 +169,10 @@ EOF
 ${cat} <<EOF >> ${node_dir}/spdadd_mobile_node
 spdadd ${mobile_node} ::/0
 	62 -P out ipsec
-	esp/tunnel/${mobile_node}-${home_agent}/require;
+	esp/tunnel/${mobile_node}-${home_agent}/unique:${tunnel_uid_mn_to_ha};
 spdadd ::/0 ${mobile_node}
 	62 -P in ipsec
-	esp/tunnel/${home_agent}-${mobile_node}/use;
+	esp/tunnel/${home_agent}-${mobile_node}/unique:${tunnel_uid_ha_to_mn};
 EOF
 
 #
