@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.83 2001/10/25 12:22:59 jinmei Exp $	*/
+/*	$KAME: in6_gif.c,v 1.84 2001/11/08 07:33:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -214,6 +214,7 @@ in6_gif_output(ifp, family, m)
 #endif /* NBRIDGE */
 	/* See if out cached route is still valid */
 	if (sc->gif_ro6.ro_rt && (dst->sin6_family != sin6_dst->sin6_family ||
+				  !IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &sin6_dst->sin6_addr) ||
 				  sc->rtcache_expire == 0 ||
 				  time_second >= sc->rtcache_expire)) {
 		RTFREE(sc->gif_ro6.ro_rt);
@@ -324,13 +325,13 @@ in6_gif_output(ifp, family, m)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	time_second = time.tv_sec;
 #endif
-	if (sc->gif_ro6.ro_rt &&(!dst->sin6_family != sin6_dst->sin6_family ||
-				 sc->rtcache_expire == 0 ||
-				 time_second >= sc->rtcache_expire)) {
+	if (sc->gif_ro6.ro_rt && (dst->sin6_family != sin6_dst->sin6_family ||
+				  !IN6_ARE_ADDR_EQUAL(&dst->sin6_addr, &sin6_dst->sin6_addr) ||
+				  sc->rtcache_expire == 0 ||
+				  time_second >= sc->rtcache_expire)) {
 		/*
-		 * The address protocol family of the tunnel layer has changed
-		 * (can this really happen?) or the cached route has expired.
-		 * Clear the stale cache and let ip6_output make a new cached
+		 * If the cached route is not valid or has expired,
+		 * clear the stale cache and let ip6_output make a new cached
 		 * route.
 		 */
 		RTFREE(sc->gif_ro6.ro_rt);
