@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.25 2005/03/11 07:27:31 t-momose Exp $	*/
+/*	$KAME: fsm.c,v 1.26 2005/03/14 06:40:43 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -2348,7 +2348,7 @@ bul_fsm_back_preprocess(bul, fsmmsg)
 	 */
 	if ((bul->bul_flags & IP6_MH_BU_HOME) &&
 	    (bul->bul_flags & IP6_MH_BU_ROUTER)) {
-		if (ip6mhba->ip6mhba_flags != IP6_MH_BA_ROUTER) {
+		if (!(ip6mhba->ip6mhba_flags & IP6_MH_BA_ROUTER)) {
 			/* sending DHAAD again XXX */
 			if (send_haadreq(bul->bul_hoainfo, 64 /* XXX */, &bul->bul_coa) > 0)
 				/* how handle this */;
