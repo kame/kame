@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.243 2001/07/22 15:32:59 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.244 2001/07/22 15:57:29 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1980,7 +1980,6 @@ TODO:
 - L3: more clever hash/gw selection policy (-> RFC2991/2992)
 - L3: avoid faulty gateways/nonworking paths
 - L3: revisit issues with cached route on struct route/sendto(3)
-- L3: fix in_ifinit for multiple interface address case
 
 RADIX_MPATH kernel compilation option conflicts with RADIX_ART.
 
