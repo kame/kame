@@ -391,8 +391,7 @@ ether_output_frame(ifp, m)
 	}
 #endif
 #ifdef ALTQ
-	if (ALTQ_IS_ENABLED(&ifp->if_snd) &&
-	    ALTQ_NEEDS_CLASSIFY(&ifp->if_snd))
+	if (ALTQ_IS_ENABLED(&ifp->if_snd))
 		altq_etherclassify(&ifp->if_snd, m, &pktattr);
 #endif
 	mflags = m->m_flags;
@@ -953,7 +952,9 @@ altq_etherclassify(ifq, m, pktattr)
 	}
 	m->m_data += hlen;
 	m->m_len -= hlen;
-	pktattr->pattr_class = (*ifq->altq_classify)(ifq->altq_clfier, m, af);
+	if (ALTQ_NEEDS_CLASSIFY(ifq))
+		pktattr->pattr_class =
+		    (*ifq->altq_classify)(ifq->altq_clfier, m, af);
 	m->m_data -= hlen;
 	m->m_len += hlen;
 
