@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.40 2000/06/20 21:50:17 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.41 2000/07/04 12:54:11 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -527,10 +527,18 @@ delete:
 		return (1);
 	}
 	if (rtmsg(RTM_DELETE) == 0) {
-	       getnameinfo((struct sockaddr *)sin,
-			   sin->sin6_len, host_buf,
-			   sizeof(host_buf), NULL, 0,
-			   NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
+		struct sockaddr_in6 s6 = *sin; /* XXX: for safety */
+
+#ifdef __KAME__
+		if (IN6_IS_ADDR_LINKLOCAL(&s6.sin6_addr)) {
+			s6.sin6_scope_id = ntohs(*(u_int16_t *)&s6.sin6_addr.s6_addr[2]);
+			*(u_int16_t *)&s6.sin6_addr.s6_addr[2] = 0;
+		}
+#endif
+		getnameinfo((struct sockaddr *)&s6,
+			    s6.sin6_len, host_buf,
+			    sizeof(host_buf), NULL, 0,
+			    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
 		printf("%s (%s) deleted\n", host, host_buf);
 	}
 
