@@ -505,7 +505,6 @@ in6_setsockaddr(so, nam)
 	int s;
 	register struct inpcb *inp;
 	register struct sockaddr_in6 *sin6;
-	in_port_t port;
 
 	/*
 	 * Do the malloc first in case it blocks.
@@ -521,7 +520,7 @@ in6_setsockaddr(so, nam)
 		splx(s);
 		return EINVAL;
 	}
-	port = inp->inp_lport;
+	sin6->sin6_port = inp->inp_lport;
 	sa6_copy_addr(&inp->in6p_lsa, sin6);
 	splx(s);
 
@@ -541,7 +540,6 @@ in6_setpeeraddr(so, nam)
 	int s;
 	struct inpcb *inp;
 	struct sockaddr_in6 *sin6;
-	in_port_t port;
 
 	/*
 	 * Do the malloc first in case it blocks.
@@ -557,7 +555,7 @@ in6_setpeeraddr(so, nam)
 		splx(s);
 		return EINVAL;
 	}
-	port = inp->inp_fport;
+	sin6->sin6_port = inp->inp_fport;
  	sa6_copy_addr(&inp->in6p_fsa, sin6);
   	splx(s);
 
