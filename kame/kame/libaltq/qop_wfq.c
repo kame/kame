@@ -1,4 +1,4 @@
-/*	$KAME: qop_wfq.c,v 1.4 2001/08/16 07:43:17 itojun Exp $	*/
+/*	$KAME: qop_wfq.c,v 1.5 2001/08/16 10:39:15 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -119,7 +119,7 @@ wfq_interface_parser(const char *ifname, int argc, char **argv)
 					hash_policy = WFQ_HASH_SRCPORT;
 				else {
 					LOG(LOG_ERR, 0,
-					    "Unknown hash policy '%s'\n",
+					    "Unknown hash policy '%s'",
 					    argv);
 					return (0);
 				}
@@ -127,7 +127,7 @@ wfq_interface_parser(const char *ifname, int argc, char **argv)
 		} else if (EQUAL(*argv, "wfq")) {
 			/* just skip */
 		} else {
-			LOG(LOG_ERR, 0, "Unknown keyword '%s'\n", argv);
+			LOG(LOG_ERR, 0, "Unknown keyword '%s'", argv);
 			return (0);
 		}
 		argc--; argv++;
@@ -159,7 +159,7 @@ qcmd_wfq_add_if(const char *ifname, u_int bandwidth, int hash_policy,
 	error = qop_wfq_add_if(NULL, ifname, bandwidth,
 			       hash_policy, nqueues, qsize);
 	if (error != 0)
-		LOG(LOG_ERR, errno, "%s: can't add wfq on interface '%s'\n",
+		LOG(LOG_ERR, errno, "%s: can't add wfq on interface '%s'",
 		    qoperror(error), ifname);
 	return (error);
 }
@@ -206,7 +206,7 @@ wfq_attach(struct ifinfo *ifinfo)
 	if (wfq_fd < 0 &&
 	    (wfq_fd = open(WFQ_DEVICE, O_RDWR)) < 0 &&
 	    (wfq_fd = open_module(WFQ_DEVICE, O_RDWR)) < 0) {
-		LOG(LOG_ERR, errno, "WFQ open\n");
+		LOG(LOG_ERR, errno, "WFQ open");
 		return (QOPERR_SYSCALL);
 	}
 
@@ -227,12 +227,12 @@ wfq_attach(struct ifinfo *ifinfo)
 		conf.nqueues     = wfq_ifinfo->nqueues;
 		conf.qlimit      = wfq_ifinfo->qsize;
 		if (ioctl(wfq_fd, WFQ_CONFIG, &conf) < 0) {
-			LOG(LOG_ERR, errno, "WFQ_CONFIG\n");
+			LOG(LOG_ERR, errno, "WFQ_CONFIG");
 			return (QOPERR_SYSCALL);
 		}
 	}
 #if 1
-	LOG(LOG_INFO, 0, "wfq attached to %s\n", iface.wfq_ifacename);
+	LOG(LOG_INFO, 0, "wfq attached to %s", iface.wfq_ifacename);
 #endif
 	return (0);
 }

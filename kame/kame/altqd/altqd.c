@@ -1,4 +1,4 @@
-/*	$KAME: altqd.c,v 1.4 2001/08/16 07:43:13 itojun Exp $	*/
+/*	$KAME: altqd.c,v 1.5 2001/08/16 10:39:16 kjc Exp $	*/
 /*
  * Copyright (c) 2001 Theo de Raadt
  * All rights reserved.
@@ -180,7 +180,7 @@ main(int argc, char **argv)
 	 * open a unix domain socket for altqd clients
 	 */
 	if ((altqd_socket = socket(AF_LOCAL, SOCK_STREAM, 0)) < 0)
-		LOG(LOG_ERR, errno, "can't open unix domain socket\n");
+		LOG(LOG_ERR, errno, "can't open unix domain socket");
 	else {
 		struct sockaddr_un addr;
 
@@ -190,13 +190,13 @@ main(int argc, char **argv)
 		unlink(QUIP_PATH);
 		if (bind(altqd_socket, (struct sockaddr *)&addr,
 		    sizeof(addr)) < 0) {
-			LOG(LOG_ERR, errno, "can't bind to %s\n", QUIP_PATH);
+			LOG(LOG_ERR, errno, "can't bind to %s", QUIP_PATH);
 			close(altqd_socket);
 			altqd_socket = -1;
 		}
 		chmod(QUIP_PATH, 0666);
 		if (listen(altqd_socket, SOMAXCONN) < 0) {
-			LOG(LOG_ERR, errno, "can't listen to %s\n", QUIP_PATH);
+			LOG(LOG_ERR, errno, "can't listen to %s", QUIP_PATH);
 			close(altqd_socket);
 			altqd_socket = -1;
 		}
@@ -303,7 +303,7 @@ main(int argc, char **argv)
 					printf("\nEnter ? or command:\n");
 					FD_SET(fileno(infp), &fds);
 				} else {
-					LOG(LOG_INFO, 0, "Exiting.\n");
+					LOG(LOG_INFO, 0, "Exiting.");
 					(void) qcmd_destroyall();
 					exit(0);
 				}
@@ -319,7 +319,7 @@ main(int argc, char **argv)
 			int newsock = accept(altqd_socket, NULL, NULL);
 
 			if (newsock == -1) {
-				LOG(LOG_ERR, errno, "accept error\n");
+				LOG(LOG_ERR, errno, "accept");
 				continue;
 			}
 			FD_SET(newsock, &fds);

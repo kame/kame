@@ -1,4 +1,4 @@
-/*	$KAME: qop_fifoq.c,v 1.4 2001/08/16 07:43:16 itojun Exp $	*/
+/*	$KAME: qop_fifoq.c,v 1.5 2001/08/16 10:39:14 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -105,7 +105,7 @@ fifoq_interface_parser(const char *ifname, int argc, char **argv)
 		} else if (EQUAL(*argv, "fifoq")) {
 			/* just skip */
 		} else {
-			LOG(LOG_ERR, 0, "Unknown keyword '%s'\n", argv);
+			LOG(LOG_ERR, 0, "Unknown keyword '%s'", argv);
 			return (0);
 		}
 		argc--; argv++;
@@ -129,7 +129,7 @@ qcmd_fifoq_add_if(const char *ifname, u_int bandwidth, int qlimit)
 	
 	error = qop_fifoq_add_if(NULL, ifname, bandwidth, qlimit);
 	if (error != 0)
-		LOG(LOG_ERR, errno, "%s: can't add fifoq on interface '%s'\n",
+		LOG(LOG_ERR, errno, "%s: can't add fifoq on interface '%s'",
 		    qoperror(error), ifname);
 	return (error);
 }
@@ -174,7 +174,7 @@ fifoq_attach(struct ifinfo *ifinfo)
 	if (fifoq_fd < 0 &&
 	    (fifoq_fd = open(FIFOQ_DEVICE, O_RDWR)) < 0 &&
 	    (fifoq_fd = open_module(FIFOQ_DEVICE, O_RDWR)) < 0) {
-		LOG(LOG_ERR, errno, "FIFOQ open\n");
+		LOG(LOG_ERR, errno, "FIFOQ open");
 		return (QOPERR_SYSCALL);
 	}
 
@@ -195,7 +195,7 @@ fifoq_attach(struct ifinfo *ifinfo)
 			return (QOPERR_SYSCALL);
 	}
 #if 1
-	LOG(LOG_INFO, 0, "fifoq attached to %s\n", iface.fifoq_ifname);
+	LOG(LOG_INFO, 0, "fifoq attached to %s", iface.fifoq_ifname);
 #endif
 	return (0);
 }

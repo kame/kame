@@ -1,4 +1,4 @@
-/*	$KAME: qop_hfsc.c,v 1.5 2001/08/16 07:43:17 itojun Exp $	*/
+/*	$KAME: qop_hfsc.c,v 1.6 2001/08/16 10:39:14 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -122,7 +122,7 @@ hfsc_interface_parser(const char *ifname, int argc, char **argv)
 		} else if (EQUAL(*argv, "hfsc")) {
 			/* just skip */
 		} else {
-			LOG(LOG_ERR, 0, "Unknown keyword '%s'\n", argv);
+			LOG(LOG_ERR, 0, "Unknown keyword '%s'", argv);
 			return (0);
 		}
 		argc--; argv++;
@@ -150,7 +150,7 @@ hfsc_class_parser(const char *ifname, const char *class_name,
 		if (*argv[0] == '[') {
 			if (read_sc(&argc, &argv, &type, &m1, &d, &m2) != 0) {
 				LOG(LOG_ERR, 0,
-				    "Bad service curve in %s, line %d\n",
+				    "Bad service curve in %s, line %d",
 				    altqconfigfile, line_no);
 				return (0);
 			}
@@ -194,7 +194,7 @@ hfsc_class_parser(const char *ifname, const char *class_name,
 					/* nothing */
 				} else {
 					LOG(LOG_ERR, 0,
-					    "unknown admission type - %s, line %d\n",
+					    "unknown admission type - %s, line %d",
 					    *argv, line_no);
 					return (0);
 				}
@@ -209,7 +209,7 @@ hfsc_class_parser(const char *ifname, const char *class_name,
 			flags |= HFCF_CLEARDSCP;
 		} else {
 			LOG(LOG_ERR, 0,
-			    "Unknown keyword '%s' in %s, line %d\n",
+			    "Unknown keyword '%s' in %s, line %d",
 			    *argv, altqconfigfile, line_no);
 			return (0);
 		}
@@ -219,7 +219,7 @@ hfsc_class_parser(const char *ifname, const char *class_name,
 
 	if (type == 0) {
 		LOG(LOG_ERR, 0,
-		    "hfsc: service curve not specified in %s, line %d\n",
+		    "hfsc: service curve not specified in %s, line %d",
 		    altqconfigfile, line_no);
 		return (0);
 	}
@@ -257,7 +257,7 @@ hfsc_class_parser(const char *ifname, const char *class_name,
 
 		if (ifinfo->resv_class != NULL) {
 			LOG(LOG_ERR, 0,
-			    "more than one admission class specified: %s\n",
+			    "more than one admission class specified: %s",
 			    class_name);
 			return (0);
 		}
@@ -265,7 +265,7 @@ hfsc_class_parser(const char *ifname, const char *class_name,
 	}
 
 	if (error) {
-		LOG(LOG_ERR, errno, "hfsc_class_parser: %s\n",
+		LOG(LOG_ERR, errno, "hfsc_class_parser: %s",
 		    qoperror(error));
 		return (0);
 	}
@@ -324,7 +324,7 @@ qcmd_hfsc_add_if(const char *ifname, u_int bandwidth, int flags)
 	
 	error = qop_hfsc_add_if(NULL, ifname, bandwidth, flags);
 	if (error != 0)
-		LOG(LOG_ERR, errno, "%s: can't add hfsc on interface '%s'\n",
+		LOG(LOG_ERR, errno, "%s: can't add hfsc on interface '%s'",
 		    qoperror(error), ifname);
 	return (error);
 }
@@ -355,7 +355,7 @@ qcmd_hfsc_add_class(const char *ifname, const char *class_name,
 					   &sc, qlimit, flags);
 	if (error != 0)
 		LOG(LOG_ERR, errno,
-		    "hfsc: %s: can't add class '%s' on interface '%s'\n",
+		    "hfsc: %s: can't add class '%s' on interface '%s'",
 		    qoperror(error), class_name, ifname);
 	return (error);
 }
@@ -411,7 +411,7 @@ qop_hfsc_add_if(struct ifinfo **rp, const char *ifname,
 	if ((error = qop_hfsc_add_class(&hfsc_ifinfo->root_class, "root",
 					ifinfo, NULL, &sc, 0, 0)) != 0) {
 		LOG(LOG_ERR, errno,
-		    "hfsc: %s: can't create dummy root class on %s!\n",
+		    "hfsc: %s: can't create dummy root class on %s!",
 		    qoperror(error), ifname);
 		(void)qop_delete_if(ifinfo);
 		return (QOPERR_CLASS);
@@ -632,18 +632,19 @@ qop_hfsc_enable_hook(struct ifinfo *ifinfo)
 	
 	hfsc_ifinfo = ifinfo->private;
 	if (hfsc_ifinfo->default_class == NULL) {
-		LOG(LOG_ERR, 0, "hfsc: no default class on interface %s!\n",
+		LOG(LOG_ERR, 0, "hfsc: no default class on interface %s!",
 		    ifinfo->ifname);
 		return (QOPERR_CLASS);
 	} else if (hfsc_ifinfo->default_class->child != NULL) {
-		LOG(LOG_ERR, 0, "hfsc: default class on %s must be a leaf!\n",
+		LOG(LOG_ERR, 0, "hfsc: default class on %s must be a leaf!",
 		    ifinfo->ifname);
 		return (QOPERR_CLASS);
 	}
 
 	LIST_FOREACH(clinfo, &ifinfo->cllist, next) {
 		if (clinfo->child != NULL && !LIST_EMPTY(&clinfo->fltrlist)) {
-			LOG(LOG_ERR, 0, "hfsc: internal class \"%s\" should not have a filter!\n",
+			LOG(LOG_ERR, 0,
+			    "hfsc: internal class \"%s\" should not have a filter!",
 			    clinfo->clname);
 			return (QOPERR_CLASS);
 		}
@@ -657,7 +658,7 @@ validate_sc(struct service_curve *sc)
 {
 	/* the 1st segment of a concave curve must be zero */
 	if (sc->m1 < sc->m2 && sc->m1 != 0) {
-		LOG(LOG_ERR, 0, "m1 must be 0 for convex!\n");
+		LOG(LOG_ERR, 0, "m1 must be 0 for convex!");
 		return (-1);
 	}
 	return (0);
@@ -909,7 +910,7 @@ hfsc_attach(struct ifinfo *ifinfo)
 	if (hfsc_fd < 0 &&
 	    (hfsc_fd = open(HFSC_DEVICE, O_RDWR)) < 0 &&
 	    (hfsc_fd = open_module(HFSC_DEVICE, O_RDWR)) < 0) {
-		LOG(LOG_ERR, errno, "HFSC open\n");
+		LOG(LOG_ERR, errno, "HFSC open");
 		return (QOPERR_SYSCALL);
 	}
 

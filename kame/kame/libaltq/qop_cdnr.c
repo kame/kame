@@ -1,4 +1,4 @@
-/*	$KAME: qop_cdnr.c,v 1.8 2001/08/16 07:43:16 itojun Exp $	*/
+/*	$KAME: qop_cdnr.c,v 1.9 2001/08/16 10:39:14 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -125,7 +125,7 @@ cdnr_ifname2ifinfo(const char *ifname)
 	strlcpy(input_ifname+1, ifname, sizeof(input_ifname)-1);
 	if (qop_add_if(&ifinfo, input_ifname, 0, &cdnr_qdisc, NULL) != 0) {
 		LOG(LOG_ERR, errno,
-		    "cdnr_ifname2ifinfo: can't add a input interface %s\n",
+		    "cdnr_ifname2ifinfo: can't add a input interface %s",
 		    ifname);
 		return (NULL);
 	}
@@ -145,7 +145,7 @@ qcmd_cdnr_add_element(struct tc_action *rp, const char *ifname,
 
 	if ((error = qop_cdnr_add_element(&clinfo, cdnr_name, ifinfo,
 					  action)) != 0) {
-		LOG(LOG_ERR, errno, "%s: add element failed!\n",
+		LOG(LOG_ERR, errno, "%s: add element failed!",
 		    qoperror(error));
 		return (error);
 	}
@@ -175,7 +175,7 @@ qcmd_cdnr_add_tbmeter(struct tc_action *rp, const char *ifname,
 
 	if ((error = qop_cdnr_add_tbmeter(&clinfo, cdnr_name, ifinfo,
 				  profile, in_action, out_action)) != 0) {
-		LOG(LOG_ERR, errno, "%s: add tbmeter failed!\n",
+		LOG(LOG_ERR, errno, "%s: add tbmeter failed!",
 		    qoperror(error));
 		return (error);
 	}
@@ -210,7 +210,7 @@ qcmd_cdnr_add_trtcm(struct tc_action *rp, const char *ifname,
 			  cmtd_profile, peak_profile,
 			  green_action, yellow_action, red_action,
 	     		  coloraware)) != 0) {
-		LOG(LOG_ERR, errno, "%s: add trtcm failed!\n",
+		LOG(LOG_ERR, errno, "%s: add trtcm failed!",
 		    qoperror(error));
 		return (error);
 	}
@@ -239,7 +239,7 @@ qcmd_cdnr_add_tswtcm(struct tc_action *rp, const char *ifname,
 
 	if (cmtd_rate > peak_rate) {
 		LOG(LOG_ERR, 0,
-		    "add tswtcm: cmtd_rate larger than peak_rate!\n");
+		    "add tswtcm: cmtd_rate larger than peak_rate!");
 		return (QOPERR_INVAL);
 	}
 
@@ -247,7 +247,7 @@ qcmd_cdnr_add_tswtcm(struct tc_action *rp, const char *ifname,
 					cmtd_rate, peak_rate, avg_interval,
 					green_action, yellow_action,
 					red_action)) != 0) {
-		LOG(LOG_ERR, errno, "%s: add tswtcm failed!\n",
+		LOG(LOG_ERR, errno, "%s: add tswtcm failed!",
 		    qoperror(error));
 		return (error);
 	}
@@ -307,7 +307,7 @@ qop_add_cdnr(struct classinfo **rp, const char *cdnr_name,
 		if ((error = qop_add_class(&root, "cdnr_root",
 					   ifinfo, NULL, NULL)) != 0) {
 			LOG(LOG_ERR, errno,
-			    "cdnr: %s: can't create dummy root cdnr on %s!\n",
+			    "cdnr: %s: can't create dummy root cdnr on %s!",
 			    qoperror(error), ifinfo->ifname);
 			return (QOPERR_CLASS);
 		}
@@ -361,7 +361,7 @@ qop_delete_cdnr(struct classinfo *clinfo)
 	int error;
 
 	if ((root = get_rootclass(clinfo->ifinfo)) == NULL) {
-		LOG(LOG_ERR, 0, "qop_delete_cdnr: no root cdnr!\n");
+		LOG(LOG_ERR, 0, "qop_delete_cdnr: no root cdnr!");
 		return (QOPERR_CLASS);
 	}
 
@@ -670,7 +670,7 @@ cdnr_attach(struct ifinfo *ifinfo)
 	if (cdnr_fd < 0 &&
 	    (cdnr_fd = open(CDNR_DEVICE, O_RDWR)) < 0 &&
 	    (cdnr_fd = open_module(CDNR_DEVICE, O_RDWR)) < 0) {
-		LOG(LOG_ERR, errno, "CDNR open\n");
+		LOG(LOG_ERR, errno, "CDNR open");
 		return (QOPERR_SYSCALL);
 	}
 
@@ -681,7 +681,7 @@ cdnr_attach(struct ifinfo *ifinfo)
 	if (ioctl(cdnr_fd, CDNR_IF_ATTACH, &iface) < 0)
 		return (QOPERR_SYSCALL);
 #if 1
-	LOG(LOG_INFO, 0, "conditioner attached to %s\n", iface.cdnr_ifname);
+	LOG(LOG_INFO, 0, "conditioner attached to %s", iface.cdnr_ifname);
 #endif
 	return (0);
 }
@@ -923,7 +923,7 @@ verify_tbprofile(struct tb_profile *profile, const char *cdnr_name)
 {
 	if (profile->depth < 1500) {
 		LOG(LOG_WARNING, 0,
-		    "warning: token bucket depth for %s is too small (%d)\n",
+		    "warning: token bucket depth for %s is too small (%d)",
 		    cdnr_name, profile->depth);
 		return (-1);
 	}
