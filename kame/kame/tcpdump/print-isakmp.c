@@ -30,7 +30,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.1.1.1 1999/08/08 23:32:06 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.2 1999/09/01 08:26:19 jinmei Exp $ (LBL)";
 #endif
 
 #include <string.h>
@@ -247,6 +247,7 @@ cookie_sidecheck(int i, const u_char *bp2, int initiator)
 	struct ip6_hdr *ip6;
 	struct sockaddr_in6 *sin6;
 #endif
+	struct sockaddr *sa1, *sa2;
 
 	memset(&ss, 0, sizeof(ss));
 	ip = (struct ip *)bp2;
@@ -271,20 +272,19 @@ cookie_sidecheck(int i, const u_char *bp2, int initiator)
 	}
 
 	if (initiator) {
-		if (ss.__ss_family != cookiecache[i].iaddr.__ss_family)
-			return 0;
-		if (ss.__ss_len != cookiecache[i].iaddr.__ss_len)
-			return 0;
-		if (memcmp(&ss, &cookiecache[i].iaddr, ss.__ss_len) == 0)
-			return 1;
+		sa1 = (struct sockaddr *)&ss;
+		sa2 = (struct sockaddr *)&cookiecache[i].iaddr;
 	} else {
-		if (ss.__ss_family != cookiecache[i].raddr.__ss_family)
-			return 0;
-		if (ss.__ss_len != cookiecache[i].raddr.__ss_len)
-			return 0;
-		if (memcmp(&ss, &cookiecache[i].raddr, ss.__ss_len) == 0)
-			return 1;
+		sa1 = (struct sockaddr *)&ss;
+		sa2 = (struct sockaddr *)&cookiecache[i].raddr;
 	}
+
+	if (sa1->sa_family != sa2->sa_family)
+		return 0;
+	if (sa1->sa_len != sa2->sa_len)
+		return 0;
+	if (memcmp(sa1, sa2, sa1->sa_len) == 0)
+		return 1;
 	return 0;
 }
 
