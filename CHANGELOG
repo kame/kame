@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.561 2000/02/15 13:35:34 jinmei Exp $
+$Id: CHANGELOG,v 1.562 2000/02/16 03:18:21 itojun Exp $
 
 <200002>
+Wed Feb 16 12:17:05 JST 2000  itojun@iijlab.net
+	* libinet6/getaddrinfo.c: add experimental support for post-RFC2553
+	  getaddrinfo(AI_ADDRCONFIG).  the semantics of AI_ADDRCONFIG is
+	  still very vague so do not expect stable behavior.
+
 2000-02-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* {bsdi4, openbsd}/sys/netinet6/raw_ipv6.c (rip6_ctloutput):
 	prohibited the ICMP6_FILTER socket option unless the level is
