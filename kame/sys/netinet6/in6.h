@@ -418,8 +418,8 @@ struct route_in6 {
 #define IPV6_RECVHOPLIMIT	37 /* bool; recv hop limit */
 #define IPV6_RECVRTHDR		38 /* bool; recv routing header */
 #define IPV6_RECVHOPOPTS	39 /* bool; recv hop-by-hop option */
-#define IPV6_RECVDSTOPTS	40 /* bool; recv dst option befor rthdr */
-#define IPV6_RECVRTHDRDSTOPTS	41 /* bool; recv dst option after rthdr */
+#define IPV6_RECVDSTOPTS	40 /* bool; recv dst option after rthdr */
+#define IPV6_RECVRTHDRDSTOPTS	41 /* bool; recv dst option before rthdr */
 
 #define IPV6_USE_MIN_MTU	42 /* bool; send packets at the minimum MTU */
 #define IPV6_RECVPATHMTU	43 /* bool; notify an according MTU */

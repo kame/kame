@@ -1052,7 +1052,7 @@ ip6_savecontrol(in6p, mp, ip6, m)
 			 * XXX: We copy whole the header even if a jumbo
 			 * payload option is included, which option is to
 			 * be removed before returning in the RFC 2292.
-			 * But it's too painful operation...
+			 * Note: this constraint is removed in 2292bis. 
 			 */
 			*mp = sbcreatecontrol((caddr_t)hbh, hbhlen,
 					      IPV6_HOPOPTS, IPPROTO_IPV6);
@@ -1064,7 +1064,8 @@ ip6_savecontrol(in6p, mp, ip6, m)
 	/* IPV6_DSTOPTS and IPV6_RTHDR socket options */
 	if (in6p->in6p_flags & (IN6P_DSTOPTS | IN6P_RTHDR)) {
 		struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-		int nxt = ip6->ip6_nxt, off = sizeof(struct ip6_hdr);;
+		int nxt = ip6->ip6_nxt, off = sizeof(struct ip6_hdr);
+		int rthdr = 0;	/* flag if we've passed a routing header */
 
 		/*
 		 * Search for destination options headers or routing
@@ -1103,7 +1104,8 @@ ip6_savecontrol(in6p, mp, ip6, m)
 
 			switch(nxt) {
 		         case IPPROTO_DSTOPTS:
-				 if (!in6p->in6p_flags & IN6P_DSTOPTS)
+				 if ((in6p->in6p_flags &
+				      (IN6P_DSTOPTS | IN6P_RTHDRDSTOPTS)) == 0)
 					 break;
 
 				 /*
@@ -1114,14 +1116,40 @@ ip6_savecontrol(in6p, mp, ip6, m)
 				 if (!privileged)
 					 break;
 
-				 *mp = sbcreatecontrol((caddr_t)ip6e, elen,
-						       IPV6_DSTOPTS,
-						       IPPROTO_IPV6);
+				 /*
+				  * Save a dst opt header before a routing
+				  * header if the user wanted.
+				  * TODO: storing all the dst opt headers
+				  * before a routing header in a single
+				  * ancillary data object.
+				  */
+				 if (rthdr == 0 &&
+				     (in6p->in6p_flags & IN6P_RTHDRDSTOPTS)) {
+					 *mp = sbcreatecontrol((caddr_t)ip6e,
+							       elen,
+							       IPV6_RTHDRDSTOPTS,
+							       IPPROTO_IPV6);
+				 }
+				 /*
+				  * Save a dst opt header after a routing
+				  * header if the user wanted.
+				  * TODO: storing all the dst opt headers
+				  * after a routing header in a single
+				  * ancillary data object.
+				  */
+				 if (rthdr &&
+				     (in6p->in6p_flags & IN6P_DSTOPTS)) {
+					 *mp = sbcreatecontrol((caddr_t)ip6e,
+							       elen,
+							       IPV6_DSTOPTS,
+							       IPPROTO_IPV6);
+				 }
 				 if (*mp)
 					 mp = &(*mp)->m_next;
 				 break;
 
 			 case IPPROTO_ROUTING:
+				 rthdr++;
 				 if (!in6p->in6p_flags & IN6P_RTHDR)
 					 break;
 

@@ -1320,8 +1320,24 @@ ip6_ctloutput(op, so, level, optname, mp)
 						   m, so));
 #endif
 #endif
+			/*
+			 * Use of some Hop-by-Hop options or some
+			 * Destination options, might require special
+			 * privilege.  That is, normal applications
+			 * (without special privilege) might be forbidden
+			 * from setting certain options in outgoing packets,
+			 * and might never see certain options in received
+			 * packets. [RFC 2292 Section 6]
+			 * KAME specific note:
+			 *  KAME prevents non-privileged users from sending or
+			 *  receiving ANY hbh/dst options in order to avoid
+			 *  overhead of parsing options in the kernel. 
+			 */
 			case IPV6_HOPOPTS:
 			case IPV6_DSTOPTS:
+			case IPV6_RECVHOPOPTS:
+			case IPV6_RECVDSTOPTS:
+			case IPV6_RECVRTHDRDSTOPTS:
 				if (!privileged) {
 					error = EPERM;
 					break;
@@ -1336,6 +1352,16 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_RTHDR:
 			case IPV6_CHECKSUM:
 			case IPV6_FAITH:
+
+			case IPV6_RECVPKTINFO:
+			case IPV6_RECVHOPLIMIT:
+			case IPV6_RECVRTHDR:
+#ifdef notyet			/* To be implemented */
+			case IPV6_RTHDRDSTOPTS:
+			case IPV6_USE_MIN_MTU:
+			case IPV6_RECVPATHMTU:
+			case IPV6_REACHCONF:
+#endif 
 #ifdef MAPPED_ADDR_ENABLED
 			case IPV6_BINDV6ONLY:
 #endif /* MAPPED_ADDR_ENABLED */
@@ -1375,15 +1401,15 @@ ip6_ctloutput(op, so, level, optname, mp)
 #ifdef HAVE_NRL_INPCB
 #define OPTSET(bit) \
 	if (optval) \
-		inp->inp_flags |= bit; \
+		inp->inp_flags |= (bit); \
 	else \
-		inp->inp_flags &= ~bit;
+		inp->inp_flags &= ~(bit);
 #else
 #define OPTSET(bit) \
 	if (optval) \
-		in6p->in6p_flags |= bit; \
+		in6p->in6p_flags |= (bit); \
 	else \
-		in6p->in6p_flags &= ~bit;
+		in6p->in6p_flags &= ~(bit);
 #endif
 
 					case IPV6_RECVOPTS:
@@ -1399,22 +1425,32 @@ ip6_ctloutput(op, so, level, optname, mp)
 						break;
 
 					case IPV6_PKTINFO:
+					case IPV6_RECVPKTINFO:
 						OPTSET(IN6P_PKTINFO);
 						break;
 
 					case IPV6_HOPLIMIT:
+					case IPV6_RECVHOPLIMIT:
 						OPTSET(IN6P_HOPLIMIT);
 						break;
 
 					case IPV6_HOPOPTS:
+					case IPV6_RECVHOPOPTS:
 						OPTSET(IN6P_HOPOPTS);
 						break;
 
-					case IPV6_DSTOPTS:
+					case IPV6_RECVDSTOPTS:
 						OPTSET(IN6P_DSTOPTS);
+						break;
+					case IPV6_RECVRTHDRDSTOPTS:
+						OPTSET(IN6P_RTHDRDSTOPTS);
+						break;
+					case IPV6_DSTOPTS:
+						OPTSET(IN6P_DSTOPTS|IN6P_RTHDRDSTOPTS); /* XXX */
 						break;
 
 					case IPV6_RTHDR:
+					case IPV6_RECVRTHDR:
 						OPTSET(IN6P_RTHDR);
 						break;
 
@@ -1652,6 +1688,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 
 			case IPV6_HOPOPTS:
 			case IPV6_DSTOPTS:
+			case IPV6_RECVHOPOPTS:
+			case IPV6_RECVDSTOPTS:
+			case IPV6_RECVRTHDRDSTOPTS:
 				if (!privileged) {
 					error = EPERM;
 					break;
@@ -1665,6 +1704,17 @@ ip6_ctloutput(op, so, level, optname, mp)
 			case IPV6_HOPLIMIT:
 			case IPV6_RTHDR:
 			case IPV6_CHECKSUM:
+
+			case IPV6_RECVPKTINFO:
+			case IPV6_RECVHOPLIMIT:
+			case IPV6_RECVRTHDR:
+#ifdef notyet			/* To be implemented */
+			case IPV6_RTHDRDSTOPTS:
+			case IPV6_USE_MIN_MTU:
+			case IPV6_RECVPATHMTU:
+			case IPV6_REACHCONF:
+#endif 
+
 			case IPV6_FAITH:
 #ifdef MAPPED_ADDR_ENABLED
 			case IPV6_BINDV6ONLY:
@@ -1683,9 +1733,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 					break;
 
 #ifdef HAVE_NRL_INPCB
-#define OPTBIT(bit) (inp->inp_flags & bit ? 1 : 0)
+#define OPTBIT(bit) (inp->inp_flags & (bit) ? 1 : 0)
 #else
-#define OPTBIT(bit) (in6p->in6p_flags & bit ? 1 : 0)
+#define OPTBIT(bit) (in6p->in6p_flags & (bit) ? 1 : 0)
 #endif
 
 				case IPV6_RECVOPTS:
@@ -1701,19 +1751,28 @@ ip6_ctloutput(op, so, level, optname, mp)
 					break;
 
 				case IPV6_PKTINFO:
+				case IPV6_RECVPKTINFO:
 					optval = OPTBIT(IN6P_PKTINFO);
 					break;
 
 				case IPV6_HOPLIMIT:
+				case IPV6_RECVHOPLIMIT:
 					optval = OPTBIT(IN6P_HOPLIMIT);
 					break;
 
 				case IPV6_HOPOPTS:
+				case IPV6_RECVHOPOPTS:
 					optval = OPTBIT(IN6P_HOPOPTS);
 					break;
 
-				case IPV6_DSTOPTS:
+				case IPV6_RECVDSTOPTS:
 					optval = OPTBIT(IN6P_DSTOPTS);
+					break;
+				case IPV6_RECVRTHDRDSTOPTS:
+					optval = OPTBIT(IN6P_RTHDRDSTOPTS);
+					break;
+				case IPV6_DSTOPTS:
+					optval = OPTBIT(IN6P_DSTOPTS|IN6P_RTHDRDSTOPTS);
 					break;
 
 				case IPV6_RTHDR:
