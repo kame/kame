@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.253 1999/11/04 09:10:07 itojun Exp $
+$Id: CHANGELOG,v 1.254 1999/11/04 11:46:55 jinmei Exp $
 
 <199911>
+1999-11-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_redirect_output): do not
+	include target link-layer address option unless the address is
+	resolved.
+	Thanks to: the TAHI project for finding the problem.
+
 Thu Nov  4 18:08:00 JST 1999  itojun@iijlab.net
 	* kame/etc/rc.net6: install reject route for scoped address without
 	  scope identifiers.  this will raise icmp6 error on, say,
