@@ -26,14 +26,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.h,v 1.12 2000/06/08 15:46:53 sakane Exp $ */
+/* YIPS @(#)$Id: policy.h,v 1.13 2000/06/19 14:36:07 sakane Exp $ */
 
 #include <sys/queue.h>
 
 /* refs. ipsec.h */
 /*
  * Security Policy Index
- * NOTE: Encure to be same address family and upper layer protocol.
+ * NOTE: Ensure to be same address family and upper layer protocol.
  * NOTE: ul_proto, port number, uid, gid:
  *	ANY: reserved for waldcard.
  *	0 to (~0 - 1): is one of the number of each value.
