@@ -21,16 +21,28 @@ $bindtest -AP -6 -p $port
 $bindtest -t -p $port
 $bindtest -t -6 -p $port
 $bindtest -t -A -1 -p $port
+$bindtest -l -t -A -1 -p $port
 $bindtest -t -A -1 -6 -p $port
+$bindtest -l -t -A -1 -6 -p $port
 $bindtest -t -A -2 -p $port
+$bindtest -l -t -A -2 -p $port
 $bindtest -t -A -2 -6 -p $port
+$bindtest -l -t -A -2 -6 -p $port
 $bindtest -t -P -1 -p $port
+$bindtest -l -t -P -1 -p $port
 $bindtest -t -P -1 -6 -p $port
+$bindtest -l -t -P -1 -6 -p $port
 $bindtest -t -P -2 -p $port
+$bindtest -l -t -P -2 -p $port
 $bindtest -t -P -2 -6 -p $port
+$bindtest -l -t -P -2 -6 -p $port
 $bindtest -t -AP -1 -p $port
+$bindtest -l -t -AP -1 -p $port
 $bindtest -t -AP -1 -6 -p $port
+$bindtest -l -t -AP -1 -6 -p $port
 $bindtest -t -AP -2 -p $port
+$bindtest -l -t -AP -2 -p $port
 $bindtest -t -AP -2 -6 -p $port
+$bindtest -l -t -AP -2 -6 -p $port
 echo
 uname -a) > $platform
