@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.250 1999/11/04 00:44:44 sakane Exp $
+$Id: CHANGELOG,v 1.251 1999/11/04 02:19:29 sakane Exp $
 
 <199911>
 Thu Nov  4 09:40:08 JST 1999 sakane@ydc.co.jp
@@ -14,7 +14,7 @@ Thu Nov  4 09:40:08 JST 1999 sakane@ydc.co.jp
 	policy level followed by colon(:).  For example, "unique:1225".
 	The value is:
 		0 are reserved.
-		1 - 16383 are reserved for manual keying.
+		1 - 32767 are reserved for manual keying.
 		Others are for kernel use.
 	Note that this id doesn't identify a SA by only itself.
 	XXX To be implemented the inbound policy check by level of `unique'
