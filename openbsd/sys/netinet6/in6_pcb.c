@@ -97,6 +97,7 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet6/in6_var.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+#include <netinet6/scope6_var.h>
 
 /*
  * External globals
@@ -181,11 +182,17 @@ in6_pcbbind(inp, nam)
 		if (sin6->sin6_family != AF_INET6)
 			return EAFNOSUPPORT;
 
+		if (ip6_use_defzone && sin6->sin6_scope_id == 0) {
+			sin6->sin6_scope_id =
+				scope6_addr2default(&sin6->sin6_addr);
+		}
+#ifndef SCOPEDROUTING
 		/* KAME hack: embed scopeid */
 		if (in6_embedscope(&sin6->sin6_addr, sin6, inp, NULL) != 0)
 			return EINVAL;
 		/* this must be cleared for ifa_ifwithaddr() */
 		sin6->sin6_scope_id = 0;
+#endif
 
 		lport = sin6->sin6_port;
 
@@ -471,11 +478,17 @@ in6_pcbconnect(inp, nam)
 	tmp = *sin6;
 	sin6 = &tmp;
 
+	if (ip6_use_defzone && sin6->sin6_scope_id == 0) {
+		sin6->sin6_scope_id =
+			scope6_addr2default(&sin6->sin6_addr);
+	}
+#ifndef SCOPEDROUTING
 	/* KAME hack: embed scopeid */
 	if (in6_embedscope(&sin6->sin6_addr, sin6, inp, &ifp) != 0)
 		return EINVAL;
 	/* this must be cleared for ifa_ifwithaddr() */
 	sin6->sin6_scope_id = 0;
+#endif
 
 	/* Source address selection. */
 	if (IN6_IS_ADDR_V4MAPPED(&inp->inp_laddr6) &&
