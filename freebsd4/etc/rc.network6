@@ -154,6 +154,9 @@ network6_pass1() {
 	# 6to4 setup
 	network6_stf_setup
 
+	# mobile setup
+	network6_mobile_setup
+
 	# install the "default interface" to kernel, which will be used
 	# as the default route when there's no router.
 	network6_default_interface_setup
@@ -494,4 +497,30 @@ network6_getladdr() {
 			esac
 		esac
 	done
+}
+
+network6_mobile_setup() {
+	case ${ipv6_mobile_nodetype} in
+	[Mm][Oo][Bb][Ii][Ll][Ee][Nn][Oo][Dd][Ee])
+		case ${ipv6_mobile_home_prefixes} in
+		'')
+			;;
+		*)
+			for home_prefix in ${ipv6_mobile_home_prefixes}
+			do
+				prefix=`expr "${home_prefix}" : "\(.*\)/.*"`
+				prefixlen=`expr "${home_prefix}" : ".*/\(.*\)"`
+				mip6control -H ${prefix} -P ${prefixlen}
+			done
+			mip6control -m
+			rtsold -a -m
+			;;
+		esac
+		;;
+	[Hh][Oo][Mm][Ee][Aa][Gg][Ee][Nn][Tt])
+		mip6control -g
+		;;
+	*)
+		;;
+	esac
 }
