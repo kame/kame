@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.962 2000/05/31 19:58:55 sakane Exp $
+$Id: CHANGELOG,v 1.963 2000/06/02 12:10:58 itojun Exp $
 
-<200005>
+<200006>
+Fri Jun  2 21:08:22 JST 2000  itojun@iijlab.net
+	* freebsd2/ports/{libpcap,tcpdump}: use 2000/5/29 weekly snap.
+
 Thu Jun  1 04:47:42 JST 2000 sakane@kame.net
 	* kame/kame/racoon:
 	- You must explicitly specify the file name of certificate and
@@ -19,6 +22,7 @@ Thu Jun  1 02:43:31 JST 2000  itojun@iijlab.net
 	  still very low.
 	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 5/29 weekly snap.
 
+<200005>
 2000-05-31  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_mloopback): make a deep copy
 	of the IPv6 header only in an M_EXT case. Practically, we'll
