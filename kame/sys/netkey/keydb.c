@@ -1,4 +1,4 @@
-/*	$KAME: keydb.c,v 1.68 2003/06/28 22:47:52 itojun Exp $	*/
+/*	$KAME: keydb.c,v 1.69 2003/06/29 07:00:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -72,40 +72,44 @@ static void keydb_delsecasvar __P((struct secasvar *));
 struct secpolicy *
 keydb_newsecpolicy()
 {
-	struct secpolicy *p, *np;
+	struct secpolicy *p;
 
 	p = (struct secpolicy *)malloc(sizeof(*p), M_SECA, M_NOWAIT);
 	if (!p)
 		return p;
 	bzero(p, sizeof(*p));
+
+	return p;
+}
+
+u_int32_t
+keydb_newspid(id)
+	u_int32_t id;
+{
+	struct secpolicy *np;
+	u_int32_t newid = 0;
+
 #ifdef TAILQ_EMPTY
 	if (TAILQ_EMPTY(&sptailq))
 #else
 	if (TAILQ_FIRST(&sptailq) == NULL)
 #endif
 	{
-		p->id = 1;
-		TAILQ_INSERT_HEAD(&sptailq, p, tailq);
-		return p;
+		newid = IPSEC_MANUAL_POLICYID_MAX + 1;
 	} else if (TAILQ_LAST(&sptailq, _sptailq)->id < 0xffffffff) {
-		p->id = TAILQ_LAST(&sptailq, _sptailq)->id + 1;
-		TAILQ_INSERT_TAIL(&sptailq, p, tailq);
-		return p;
+		newid = TAILQ_LAST(&sptailq, _sptailq)->id + 1;
 	} else {
 		TAILQ_FOREACH(np, &sptailq, tailq) {
 			if (np->id + 1 != TAILQ_NEXT(np, tailq)->id) {
-				p->id = np->id + 1;
-				TAILQ_INSERT_AFTER(&sptailq, np, p, tailq);
+				newid = np->id + 1;
 				break;
 			}
 		}
-		if (!np) {
-			free(p, M_SECA);
-			return NULL;
-		}
+		if (!np)
+			newid = 0;
 	}
 
-	return p;
+	return newid;
 }
 
 void

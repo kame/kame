@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.283 2003/06/27 07:11:16 itojun Exp $	*/
+/*	$KAME: key.c,v 1.284 2003/06/29 07:00:53 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1330,16 +1330,42 @@ key_getspbyid(id)
 }
 
 struct secpolicy *
-key_newsp()
+key_newsp(id)
+	u_int32_t id;
 {
 	struct secpolicy *newsp = NULL;
+	u_int32_t newid;
+
+	if (id > IPSEC_MANUAL_POLICYID_MAX) {
+		ipseclog((LOG_DEBUG,
+		    "key_newsp: policy_id=%u range "
+		    "violation, updated by kernel.\n", id));
+		id = 0;
+	}
+
+	if (id == 0) {
+		if ((newid = keydb_newspid(id)) == 0) {
+			ipseclog((LOG_DEBUG, 
+			    "key_newsp: new policy_id allocation failed."));
+			return NULL;
+		}
+	} else {
+		if (key_getspbyid(id) != NULL) {
+			ipseclog((LOG_DEBUG,
+			    "key_newsp: policy_id(%u) has been used.\n", id));
+			return NULL;
+		}
+		newid = id;
+	}
 
 	newsp = keydb_newsecpolicy();
 	if (!newsp)
 		return newsp;
 
+	newsp->id = newid;
 	newsp->refcnt = 1;
 	newsp->req = NULL;
+	TAILQ_INSERT_TAIL(&sptailq, newsp, tailq);
 
 	return newsp;
 }
@@ -1368,7 +1394,7 @@ key_msg2sp(xpl0, len, error)
 		return NULL;
 	}
 
-	if ((newsp = key_newsp()) == NULL) {
+	if ((newsp = key_newsp(xpl0->sadb_x_policy_id)) == NULL) {
 		*error = ENOBUFS;
 		return NULL;
 	}
@@ -1852,7 +1878,9 @@ key_spdadd(so, m, mhp)
 	 * If the type is either SPDADD or SPDSETIDX AND a SP is found,
 	 * then error.
 	 */
-	if (mhp->ext[SADB_EXT_ADDRESS_SRC])
+	if (xpl0->sadb_x_policy_id != 0)
+		newsp = key_getspbyid(xpl0->sadb_x_policy_id);
+	else if (mhp->ext[SADB_EXT_ADDRESS_SRC])
 		newsp = key_getsp(&spidx, xpl0->sadb_x_policy_dir);
 	else {
 #if NPF > 0
@@ -7548,7 +7576,7 @@ key_init()
 
 	/* system default */
 #ifdef INET
-	ip4_def_policy = key_newsp();
+	ip4_def_policy = key_newsp(0);
 	if (!ip4_def_policy)
 		panic("could not initialize IPv4 default security policy");
 	ip4_def_policy->state = IPSEC_SPSTATE_ALIVE;
@@ -7557,7 +7585,7 @@ key_init()
 	ip4_def_policy->readonly = 1;
 #endif
 #ifdef INET6
-	ip6_def_policy = key_newsp();
+	ip6_def_policy = key_newsp(0);
 	if (!ip6_def_policy)
 		panic("could not initialize IPv6 default security policy");
 	ip6_def_policy->state = IPSEC_SPSTATE_ALIVE;

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.192 2003/06/27 08:37:51 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.193 2003/06/29 07:00:53 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1294,9 +1294,9 @@ ipsec_init_pcbpolicy(so, pcb_sp)
 		panic("ipsec_init_pcbpolicy: NULL pointer was passed.");
 
 	if (!initialized) {
-		if ((in = key_newsp()) == NULL)
+		if ((in = key_newsp(0)) == NULL)
 			return ENOBUFS;
-		if ((out = key_newsp()) == NULL) {
+		if ((out = key_newsp(0)) == NULL) {
 			key_freesp(in);
 			in = NULL;
 			return ENOBUFS;
@@ -1415,7 +1415,7 @@ ipsec_deepcopy_policy(src)
 	struct ipsecrequest *r;
 	struct secpolicy *dst;
 
-	dst = key_newsp();
+	dst = key_newsp(0);
 	if (src == NULL || dst == NULL)
 		return NULL;
 

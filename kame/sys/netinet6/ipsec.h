@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.65 2003/06/27 04:53:04 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.66 2003/06/29 07:00:53 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -83,7 +83,12 @@ struct secpolicy {
 	int refcnt;			/* reference count */
 	struct secpolicyindex *spidx;	/* selector - NULL if not valid */
 	u_int16_t tag;			/* PF tag */
-	u_int32_t id;			/* It's unique number on the system. */
+	u_int32_t id;			/* it identifies a policy in the SPD. */
+#define IPSEC_MANUAL_POLICYID_MAX	0x3fff
+				/*
+				 * 1 - 0x3fff are reserved for user operation.
+				 * 0 are reserved.  Others are for kernel use.
+				 */
 	u_int state;			/* 0: dead, others: alive */
 #define IPSEC_SPSTATE_DEAD	0
 #define IPSEC_SPSTATE_ALIVE	1
