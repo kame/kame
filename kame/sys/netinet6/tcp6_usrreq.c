@@ -547,7 +547,13 @@ tcp6_attach(so)
 		return (error);
 	in6p = sotoin6pcb(so);
 #ifdef IPSEC
-	if ((error = ipsec_init_policy(&in6p->in6p_sp)) != 0) {
+	error = ipsec_init_policy(&in6p->in6p_sp_in);
+	if (error) {
+		in6_pcbdetach(in6p);
+		return (error);
+	}
+	error = ipsec_init_policy(&in6p->in6p_sp_out);
+	if (error) {
 		in6_pcbdetach(in6p);
 		return (error);
 	}

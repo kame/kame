@@ -68,40 +68,40 @@
 
 #include <net/net_osdep.h>
 
-static int esp_null_mature __P((struct secas *));
-static int esp_null_ivlen __P((struct secas *));
+static int esp_null_mature __P((struct secasvar *));
+static int esp_null_ivlen __P((struct secasvar *));
 static int esp_null_decrypt __P((struct mbuf *, size_t,
-	struct secas *, struct esp_algorithm *, int));
+	struct secasvar *, struct esp_algorithm *, int));
 static int esp_null_encrypt __P((struct mbuf *, size_t, size_t,
-	struct secas *, struct esp_algorithm *, int));
-static int esp_descbc_mature __P((struct secas *));
-static int esp_descbc_ivlen __P((struct secas *));
+	struct secasvar *, struct esp_algorithm *, int));
+static int esp_descbc_mature __P((struct secasvar *));
+static int esp_descbc_ivlen __P((struct secasvar *));
 static int esp_descbc_decrypt __P((struct mbuf *, size_t,
-	struct secas *, struct esp_algorithm *, int));
+	struct secasvar *, struct esp_algorithm *, int));
 static int esp_descbc_encrypt __P((struct mbuf *, size_t, size_t,
-	struct secas *, struct esp_algorithm *, int));
-static int esp_cbc_mature __P((struct secas *));
+	struct secasvar *, struct esp_algorithm *, int));
+static int esp_cbc_mature __P((struct secasvar *));
 static int esp_blowfish_cbc_decrypt __P((struct mbuf *, size_t,
-	struct secas *, struct esp_algorithm *, int));
+	struct secasvar *, struct esp_algorithm *, int));
 static int esp_blowfish_cbc_encrypt __P((struct mbuf *, size_t,
-	size_t, struct secas *, struct esp_algorithm *, int));
-static int esp_blowfish_cbc_ivlen __P((struct secas *));
-static int esp_cast128cbc_ivlen __P((struct secas *));
+	size_t, struct secasvar *, struct esp_algorithm *, int));
+static int esp_blowfish_cbc_ivlen __P((struct secasvar *));
+static int esp_cast128cbc_ivlen __P((struct secasvar *));
 static int esp_cast128cbc_decrypt __P((struct mbuf *, size_t,
-	struct secas *, struct esp_algorithm *, int));
+	struct secasvar *, struct esp_algorithm *, int));
 static int esp_cast128cbc_encrypt __P((struct mbuf *, size_t, size_t,
-	struct secas *, struct esp_algorithm *, int));
-static int esp_3descbc_ivlen __P((struct secas *));
+	struct secasvar *, struct esp_algorithm *, int));
+static int esp_3descbc_ivlen __P((struct secasvar *));
 static int esp_3descbc_decrypt __P((struct mbuf *, size_t,
-	struct secas *, struct esp_algorithm *, int));
+	struct secasvar *, struct esp_algorithm *, int));
 static int esp_3descbc_encrypt __P((struct mbuf *, size_t, size_t,
-	struct secas *, struct esp_algorithm *, int));
-static int esp_rc5cbc_ivlen __P((struct secas *));
+	struct secasvar *, struct esp_algorithm *, int));
+static int esp_rc5cbc_ivlen __P((struct secasvar *));
 static int esp_rc5cbc_decrypt __P((struct mbuf *, size_t,
-	struct secas *, struct esp_algorithm *, int));
+	struct secasvar *, struct esp_algorithm *, int));
 static int esp_rc5cbc_encrypt __P((struct mbuf *, size_t, size_t,
-	struct secas *, struct esp_algorithm *, int));
-static void esp_increment_iv __P((struct secas *));
+	struct secasvar *, struct esp_algorithm *, int));
+static void esp_increment_iv __P((struct secasvar *));
 static caddr_t mbuf_find_offset __P((struct mbuf *, size_t, size_t));
 
 /* NOTE: The order depends on SADB_EALG_x in netkey/keyv2.h */
@@ -129,25 +129,25 @@ struct esp_algorithm esp_algorithms[] = {
  */
 
 static int
-esp_null_mature(sa)
-	struct secas *sa;
+esp_null_mature(sav)
+	struct secasvar *sav;
 {
 	/* anything is okay */
 	return 0;
 }
 
 static int
-esp_null_ivlen(sa)
-	struct secas *sa;
+esp_null_ivlen(sav)
+	struct secasvar *sav;
 {
 	return 0;
 }
 
 static int
-esp_null_decrypt(m, off, sa, algo, ivlen)
+esp_null_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;		/* offset to ESP header */
-	struct secas *sa;
+	struct secasvar *sav;
 	struct esp_algorithm *algo;
 	int ivlen;
 {
@@ -155,11 +155,11 @@ esp_null_decrypt(m, off, sa, algo, ivlen)
 }
 
 static int
-esp_null_encrypt(m, off, plen, sa, algo, ivlen)
+esp_null_encrypt(m, off, plen, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;	/* offset to ESP header */
 	size_t plen;	/* payload length (to be encrypted) */
-	struct secas *sa;
+	struct secasvar *sav;
 	struct esp_algorithm *algo;
 	int ivlen;
 {
@@ -167,30 +167,30 @@ esp_null_encrypt(m, off, plen, sa, algo, ivlen)
 }
 
 static int
-esp_descbc_mature(sa)
-	struct secas *sa;
+esp_descbc_mature(sav)
+	struct secasvar *sav;
 {
 	struct esp_algorithm *algo;
 
-	if (!(sa->flags & SADB_X_EXT_OLD) && (sa->flags & SADB_X_EXT_IV4B)) {
+	if (!(sav->flags & SADB_X_EXT_OLD) && (sav->flags & SADB_X_EXT_IV4B)) {
 		printf("esp_cbc_mature: algorithm incompatible with 4 octets IV length\n");
 		return 1;
 	}
 
-	if (!sa->key_enc) {
+	if (!sav->key_enc) {
 		printf("esp_descbc_mature: no key is given.\n");
 		return 1;
 	}
-	algo = &esp_algorithms[sa->alg_enc];
-	if (_KEYBITS(sa->key_enc) < algo->keymin
-	 || algo->keymax < _KEYBITS(sa->key_enc)) {
+	algo = &esp_algorithms[sav->alg_enc];
+	if (_KEYBITS(sav->key_enc) < algo->keymin
+	 || algo->keymax < _KEYBITS(sav->key_enc)) {
 		printf("esp_descbc_mature: invalid key length %d.\n",
-			_KEYBITS(sa->key_enc));
+			_KEYBITS(sav->key_enc));
 		return 1;
 	}
 
 	/* weak key check */
-	if (des_is_weak_key((C_Block *)_KEYBUF(sa->key_enc))) {
+	if (des_is_weak_key((C_Block *)_KEYBUF(sav->key_enc))) {
 		printf("esp_descbc_mature: weak key was passed.\n");
 		return 1;
 	}
@@ -199,23 +199,23 @@ esp_descbc_mature(sa)
 }
 
 static int
-esp_descbc_ivlen(sa)
-	struct secas *sa;
+esp_descbc_ivlen(sav)
+	struct secasvar *sav;
 {
-	if (sa && (sa->flags & SADB_X_EXT_OLD) && (sa->flags & SADB_X_EXT_IV4B))
+	if (sav && (sav->flags & SADB_X_EXT_OLD) && (sav->flags & SADB_X_EXT_IV4B))
 		return 4;
 
-	if (sa && !(sa->flags & SADB_X_EXT_OLD) && (sa->flags & SADB_X_EXT_DERIV))
+	if (sav && !(sav->flags & SADB_X_EXT_OLD) && (sav->flags & SADB_X_EXT_DERIV))
 		return 4;
 	else
 		return 8;
 }
 
 static int
-esp_descbc_decrypt(m, off, sa, algo, ivlen)
+esp_descbc_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;		/* offset to ESP header */
-	struct secas *sa;
+	struct secasvar *sav;
 	struct esp_algorithm *algo;
 	int ivlen;
 {
@@ -228,26 +228,26 @@ esp_descbc_decrypt(m, off, sa, algo, ivlen)
 
 	derived = 0;
 	/* sanity check */
-	if (ivlen != sa->ivlen) {
+	if (ivlen != sav->ivlen) {
 		printf("esp_descbc_decrypt: bad ivlen %d/%d\n",
-			ivlen, sa->ivlen);
+			ivlen, sav->ivlen);
 		return EINVAL;
 	}
-	if (_KEYBITS(sa->key_enc) < algo->keymin
-	 || algo->keymax < _KEYBITS(sa->key_enc)) {
+	if (_KEYBITS(sav->key_enc) < algo->keymin
+	 || algo->keymax < _KEYBITS(sav->key_enc)) {
 		printf("esp_descbc_decrypt: bad keylen %d\n",
-			_KEYBITS(sa->key_enc));
+			_KEYBITS(sav->key_enc));
 		return EINVAL;
 	}
 
-	if (sa->flags & SADB_X_EXT_OLD) {
+	if (sav->flags & SADB_X_EXT_OLD) {
 		/* RFC 1827 */
 		ivoff = off + sizeof(struct esp);
 		bodyoff = off + sizeof(struct esp) + ivlen;
 		derived = 0;
 	} else {
 		/* RFC 2406 */
-		if (sa->flags & SADB_X_EXT_DERIV) {
+		if (sav->flags & SADB_X_EXT_DERIV) {
 			/*
 			 * draft-ietf-ipsec-ciph-des-derived-00.txt
 			 * uses sequence number field as IV field.
@@ -296,7 +296,7 @@ esp_descbc_decrypt(m, off, sa, algo, ivlen)
 	int deserr;
 	des_key_schedule ks;
 
-	deserr = des_key_sched((C_Block *)_KEYBUF(sa->key_enc), ks);
+	deserr = des_key_sched((C_Block *)_KEYBUF(sav->key_enc), ks);
 	if (deserr != 0) {
 		printf("esp_descbc_decrypt: key error %d\n", deserr);
 		return EINVAL;
@@ -315,11 +315,11 @@ esp_descbc_decrypt(m, off, sa, algo, ivlen)
 }
 
 static int
-esp_descbc_encrypt(m, off, plen, sa, algo, ivlen)
+esp_descbc_encrypt(m, off, plen, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;	/* offset to ESP header */
 	size_t plen;	/* payload length (to be decrypted) */
-	struct secas *sa;
+	struct secasvar *sav;
 	struct esp_algorithm *algo;
 	int ivlen;
 {
@@ -337,19 +337,19 @@ esp_descbc_encrypt(m, off, plen, sa, algo, ivlen)
 			"payload length must be multiple of 8\n");
 		return EINVAL;
 	}
-	if (sa->ivlen != ivlen) {
+	if (sav->ivlen != ivlen) {
 		printf("esp_descbc_encrypt: bad ivlen %d/%d\n",
-			ivlen, sa->ivlen);
+			ivlen, sav->ivlen);
 		return EINVAL;
 	}
-	if (_KEYBITS(sa->key_enc) < algo->keymin
-	 || algo->keymax < _KEYBITS(sa->key_enc)) {
+	if (_KEYBITS(sav->key_enc) < algo->keymin
+	 || algo->keymax < _KEYBITS(sav->key_enc)) {
 		printf("esp_descbc_encrypt: bad keylen %d\n",
-			_KEYBITS(sa->key_enc));
+			_KEYBITS(sav->key_enc));
 		return EINVAL;
 	}
 
-	if (sa->flags & SADB_X_EXT_OLD) {
+	if (sav->flags & SADB_X_EXT_OLD) {
 		/* RFC 1827 */
 		/*
 		 * draft-ietf-ipsec-ciph-des-derived-00.txt
@@ -361,7 +361,7 @@ esp_descbc_encrypt(m, off, plen, sa, algo, ivlen)
 		derived = 0;
 	} else {
 		/* RFC 2406 */
-		if (sa->flags & SADB_X_EXT_DERIV) {
+		if (sav->flags & SADB_X_EXT_DERIV) {
 			/*
 			 * draft-ietf-ipsec-ciph-des-derived-00.txt
 			 * uses sequence number field as IV field.
@@ -385,8 +385,8 @@ esp_descbc_encrypt(m, off, plen, sa, algo, ivlen)
 		panic("assumption failed: bad mbuf chain");
 	if (ivlen == 4) {
 		if (!derived) {
-			bcopy(sa->iv, &tiv[0], 4);
-			bcopy(sa->iv, &tiv[4], 4);
+			bcopy(sav->iv, &tiv[0], 4);
+			bcopy(sav->iv, &tiv[4], 4);
 			tiv[4] ^= 0xff;
 			tiv[5] ^= 0xff;
 			tiv[6] ^= 0xff;
@@ -403,7 +403,7 @@ esp_descbc_encrypt(m, off, plen, sa, algo, ivlen)
 			iv = &tiv[0];
 		}
 	} else if (ivlen == 8)
-		bcopy((caddr_t)sa->iv, (caddr_t)iv, ivlen);
+		bcopy((caddr_t)sav->iv, (caddr_t)iv, ivlen);
 	else {
 		printf("esp_descbc_encrypt: unsupported ivlen %d\n", ivlen);
 		return EINVAL;
@@ -413,7 +413,7 @@ esp_descbc_encrypt(m, off, plen, sa, algo, ivlen)
 	int deserr;
 	des_key_schedule ks;
 
-	deserr = des_key_sched((C_Block *)_KEYBUF(sa->key_enc), ks);
+	deserr = des_key_sched((C_Block *)_KEYBUF(sav->key_enc), ks);
 	if (deserr != 0) {
 		printf("esp_descbc_encrypt: key error %d\n", deserr);
 		return EINVAL;
@@ -425,7 +425,7 @@ esp_descbc_encrypt(m, off, plen, sa, algo, ivlen)
 	bzero(&ks, sizeof(des_key_schedule));
     }
 
-	esp_increment_iv(sa);
+	esp_increment_iv(sav);
 
 	/* for safety */
 	bzero(&tiv[0], sizeof(tiv));
@@ -434,38 +434,38 @@ esp_descbc_encrypt(m, off, plen, sa, algo, ivlen)
 }
 
 static int
-esp_cbc_mature(sa)
-	struct secas *sa;
+esp_cbc_mature(sav)
+	struct secasvar *sav;
 {
 	int keylen;
 	struct esp_algorithm *algo;
 
-	if (sa->flags & SADB_X_EXT_OLD) {
+	if (sav->flags & SADB_X_EXT_OLD) {
 		printf("esp_cbc_mature: algorithm incompatible with esp-old\n");
 		return 1;
 	}
-	if (sa->flags & SADB_X_EXT_DERIV) {
+	if (sav->flags & SADB_X_EXT_DERIV) {
 		printf("esp_cbc_mature: algorithm incompatible with derived\n");
 		return 1;
 	}
 
-	if (!sa->key_enc) {
+	if (!sav->key_enc) {
 		printf("esp_cbc_mature: no key is given.\n");
 		return 1;
 	}
-	algo = &esp_algorithms[sa->alg_enc];
-	keylen = sa->key_enc->sadb_key_bits;
+	algo = &esp_algorithms[sav->alg_enc];
+	keylen = sav->key_enc->sadb_key_bits;
 	if (keylen < algo->keymin || algo->keymax < keylen) {
 		printf("esp_cbc_mature: invalid key length %d.\n",
-			sa->key_enc->sadb_key_bits);
+			sav->key_enc->sadb_key_bits);
 		return 1;
 	}
-	switch (sa->alg_enc) {
+	switch (sav->alg_enc) {
 	case SADB_EALG_3DESCBC:
 		/* weak key check */
-		if (des_is_weak_key((C_Block *)_KEYBUF(sa->key_enc))
-		 || des_is_weak_key((C_Block *)(_KEYBUF(sa->key_enc) + 8))
-		 || des_is_weak_key((C_Block *)(_KEYBUF(sa->key_enc) + 16))) {
+		if (des_is_weak_key((C_Block *)_KEYBUF(sav->key_enc))
+		 || des_is_weak_key((C_Block *)(_KEYBUF(sav->key_enc) + 8))
+		 || des_is_weak_key((C_Block *)(_KEYBUF(sav->key_enc) + 16))) {
 			printf("esp_cbc_mature: weak key was passed.\n");
 			return 1;
 		}
@@ -480,10 +480,10 @@ esp_cbc_mature(sa)
 }
 
 static int
-esp_blowfish_cbc_decrypt(m, off, sa, algo, ivlen)
+esp_blowfish_cbc_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;		/* offset to ESP header */
-	struct secas *sa;
+	struct secasvar *sav;
 	struct esp_algorithm *algo;
 	int ivlen;
 {
@@ -496,19 +496,19 @@ esp_blowfish_cbc_decrypt(m, off, sa, algo, ivlen)
 	int s;
 
 	/* sanity check */
-	if (sa->ivlen != ivlen) {
+	if (sav->ivlen != ivlen) {
 		printf("esp_blowfish_cbc_decrypt: bad ivlen %d/%d\n",
-			ivlen, sa->ivlen);
+			ivlen, sav->ivlen);
 		return EINVAL;
 	}
-	if (_KEYBITS(sa->key_enc) < algo->keymin
-	 || algo->keymax < _KEYBITS(sa->key_enc)) {
+	if (_KEYBITS(sav->key_enc) < algo->keymin
+	 || algo->keymax < _KEYBITS(sav->key_enc)) {
 		printf("esp_blowfish_cbc_decrypt: unsupported key length %d: "
-			"need %d to %d bits\n", _KEYBITS(sa->key_enc),
+			"need %d to %d bits\n", _KEYBITS(sav->key_enc),
 			algo->keymin, algo->keymax);
 		return EINVAL;
 	}
-	if (sa->flags & SADB_X_EXT_OLD) {
+	if (sav->flags & SADB_X_EXT_OLD) {
 		printf("esp_blowfish_cbc_decrypt: unsupported ESP version\n");
 		return EINVAL;
 	}
@@ -541,7 +541,7 @@ esp_blowfish_cbc_decrypt(m, off, sa, algo, ivlen)
 	s = splnet();	/* XXX correct? */
 #endif
 
-	BF_set_key(&key, _KEYBITS(sa->key_enc) / 8, _KEYBUF(sa->key_enc));
+	BF_set_key(&key, _KEYBITS(sav->key_enc) / 8, _KEYBUF(sav->key_enc));
 	BF_cbc_encrypt_m(m, bodyoff, plen, &key, iv, BF_DECRYPT);
 
 	/* for safety */
@@ -556,11 +556,11 @@ esp_blowfish_cbc_decrypt(m, off, sa, algo, ivlen)
 }
 
 static int
-esp_blowfish_cbc_encrypt(m, off, plen, sa, algo, ivlen)
+esp_blowfish_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;	/* offset to ESP header */
 	size_t plen;	/* payload length (to be decrypted) */
-	struct secas *sa;
+	struct secasvar *sav;
 	struct esp_algorithm *algo;
 	int ivlen;
 {
@@ -576,19 +576,19 @@ esp_blowfish_cbc_encrypt(m, off, plen, sa, algo, ivlen)
 			"payload length must be multiple of 8\n");
 		return EINVAL;
 	}
-	if (sa->ivlen != ivlen) {
+	if (sav->ivlen != ivlen) {
 		printf("esp_blowfish_cbc_encrypt: bad ivlen %d/%d\n",
-			ivlen, sa->ivlen);
+			ivlen, sav->ivlen);
 		return EINVAL;
 	}
-	if (_KEYBITS(sa->key_enc) < algo->keymin
-	 || algo->keymax < _KEYBITS(sa->key_enc)) {
+	if (_KEYBITS(sav->key_enc) < algo->keymin
+	 || algo->keymax < _KEYBITS(sav->key_enc)) {
 		printf("esp_blowfish_cbc_encrypt: unsupported key length %d: "
-			"need %d to %d bits\n", _KEYBITS(sa->key_enc),
+			"need %d to %d bits\n", _KEYBITS(sav->key_enc),
 			algo->keymin, algo->keymax);
 		return EINVAL;
 	}
-	if (sa->flags & SADB_X_EXT_OLD) {
+	if (sav->flags & SADB_X_EXT_OLD) {
 		printf("esp_blowfish_cbc_encrypt: unsupported ESP version\n");
 		return EINVAL;
 	}
@@ -607,7 +607,7 @@ esp_blowfish_cbc_encrypt(m, off, plen, sa, algo, ivlen)
 	if (!iv)
 		panic("assumption failed: bad mbuf chain");
 
-	bcopy((caddr_t)sa->iv, (caddr_t)iv, ivlen);
+	bcopy((caddr_t)sav->iv, (caddr_t)iv, ivlen);
 
 #ifdef __NetBSD__
 	s = splsoftnet();	/* XXX correct? */
@@ -615,7 +615,7 @@ esp_blowfish_cbc_encrypt(m, off, plen, sa, algo, ivlen)
 	s = splnet();	/* XXX correct? */
 #endif
 
-	BF_set_key(&key, _KEYBITS(sa->key_enc) / 8, _KEYBUF(sa->key_enc));
+	BF_set_key(&key, _KEYBITS(sav->key_enc) / 8, _KEYBUF(sav->key_enc));
 	BF_cbc_encrypt_m(m, bodyoff, plen, &key, iv, BF_ENCRYPT);
 
 	/* for safety */
@@ -623,30 +623,30 @@ esp_blowfish_cbc_encrypt(m, off, plen, sa, algo, ivlen)
 
 	splx(s);
 
-	esp_increment_iv(sa);
+	esp_increment_iv(sav);
 
 	return 0;
 }
 
 static int
-esp_blowfish_cbc_ivlen(sa)
-	struct secas *sa;
+esp_blowfish_cbc_ivlen(sav)
+	struct secasvar *sav;
 {
 	return 8;
 }
 
 static int
-esp_cast128cbc_ivlen(sa)
-	struct secas *sa;
+esp_cast128cbc_ivlen(sav)
+	struct secasvar *sav;
 {
 	return 8;
 }
 
 static int
-esp_cast128cbc_decrypt(m, off, sa, algo, ivlen)
+esp_cast128cbc_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;
-	struct secas *sa;
+	struct secasvar *sav;
 	struct esp_algorithm *algo;
 	int ivlen;
 {
@@ -656,19 +656,19 @@ esp_cast128cbc_decrypt(m, off, sa, algo, ivlen)
 	size_t plen;
 
 	/* sanity check */
-	if (ivlen != sa->ivlen) {
+	if (ivlen != sav->ivlen) {
 		printf("esp_cast128cbc_decrypt: bad ivlen %d/%d\n",
-			ivlen, sa->ivlen);
+			ivlen, sav->ivlen);
 		return EINVAL;
 	}
-	if (_KEYBITS(sa->key_enc) < algo->keymin
-	 || _KEYBITS(sa->key_enc) > algo->keymax) {
+	if (_KEYBITS(sav->key_enc) < algo->keymin
+	 || _KEYBITS(sav->key_enc) > algo->keymax) {
 		printf("esp_cast128cbc_decrypt: unsupported key length %d: "
-			"need %d to %d bits\n", _KEYBITS(sa->key_enc),
+			"need %d to %d bits\n", _KEYBITS(sav->key_enc),
 			algo->keymin, algo->keymax);
 		return EINVAL;
 	}
-	if (sa->flags & SADB_X_EXT_OLD) {
+	if (sav->flags & SADB_X_EXT_OLD) {
 		printf("esp_cast128cbc_decrypt: unsupported ESP version\n");
 		return EINVAL;
 	}
@@ -703,11 +703,11 @@ esp_cast128cbc_decrypt(m, off, sa, algo, ivlen)
 	u_int32_t subkey[32];
 
 	bzero(key, sizeof(key));
-	bcopy(_KEYBUF(sa->key_enc), key, _KEYLEN(sa->key_enc));
+	bcopy(_KEYBUF(sav->key_enc), key, _KEYLEN(sav->key_enc));
 
 	set_cast128_subkey(subkey, key);
 	cast128_cbc_process(m, bodyoff, plen, subkey, iv,
-				_KEYBITS(sa->key_enc) / 8, CAST128_DECRYPT);
+				_KEYBITS(sav->key_enc) / 8, CAST128_DECRYPT);
 
 	/* for safety */
 	bzero(subkey, sizeof(subkey));
@@ -718,11 +718,11 @@ esp_cast128cbc_decrypt(m, off, sa, algo, ivlen)
 }
 
 static int
-esp_cast128cbc_encrypt(m, off, plen, sa, algo, ivlen)
+esp_cast128cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;
 	size_t plen;
-	struct secas *sa;
+	struct secasvar *sav;
 	struct esp_algorithm *algo;
 	int ivlen;
 {
@@ -736,19 +736,19 @@ esp_cast128cbc_encrypt(m, off, plen, sa, algo, ivlen)
 			"payload length must be multiple of 8\n");
 		return EINVAL;
 	}
-	if (sa->ivlen != ivlen) {
+	if (sav->ivlen != ivlen) {
 		printf("esp_cast128cbc_encrypt: bad ivlen %d/%d\n",
-			ivlen, sa->ivlen);
+			ivlen, sav->ivlen);
 		return EINVAL;
 	}
-	if (_KEYBITS(sa->key_enc) < algo->keymin
-	 || _KEYBITS(sa->key_enc) > algo->keymax) {
+	if (_KEYBITS(sav->key_enc) < algo->keymin
+	 || _KEYBITS(sav->key_enc) > algo->keymax) {
 		printf("esp_cast128cbc_encrypt: unsupported key length %d: "
-			"needs %d to %d bits\n", _KEYBITS(sa->key_enc),
+			"needs %d to %d bits\n", _KEYBITS(sav->key_enc),
 			algo->keymin, algo->keymax);
 		return EINVAL;
 	}
-	if (sa->flags & SADB_X_EXT_OLD) {
+	if (sav->flags & SADB_X_EXT_OLD) {
 		printf("esp_cast128cbc_encrypt: unsupported ESP version\n");
 		return EINVAL;
 	}
@@ -767,7 +767,7 @@ esp_cast128cbc_encrypt(m, off, plen, sa, algo, ivlen)
 	if (!iv)
 		panic("assumption failed: bad mbuf chain");
 
-	bcopy(sa->iv, iv, ivlen);
+	bcopy(sav->iv, iv, ivlen);
 
 	/* encrypt */
     {
@@ -775,34 +775,34 @@ esp_cast128cbc_encrypt(m, off, plen, sa, algo, ivlen)
 	u_int32_t subkey[32];
 
 	bzero(key, sizeof(key));
-	bcopy(_KEYBUF(sa->key_enc), key, _KEYLEN(sa->key_enc));
+	bcopy(_KEYBUF(sav->key_enc), key, _KEYLEN(sav->key_enc));
 
 	set_cast128_subkey(subkey, key);
 	cast128_cbc_process(m, bodyoff, plen, subkey, iv,
-				_KEYBITS(sa->key_enc) / 8, CAST128_ENCRYPT);
+				_KEYBITS(sav->key_enc) / 8, CAST128_ENCRYPT);
 
 	/* for safety */
 	bzero(subkey, sizeof(subkey));
 	bzero(key, sizeof(key));
     }
 
-	esp_increment_iv(sa);
+	esp_increment_iv(sav);
  
 	return 0;
 }
 
 static int
-esp_3descbc_ivlen(sa)
-	struct secas *sa;
+esp_3descbc_ivlen(sav)
+	struct secasvar *sav;
 {
 	return 8;
 }
 
 static int
-esp_3descbc_decrypt(m, off, sa, algo, ivlen)
+esp_3descbc_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;
-	struct secas *sa;
+	struct secasvar *sav;
 	struct esp_algorithm *algo;
 	int ivlen;
 {
@@ -813,18 +813,18 @@ esp_3descbc_decrypt(m, off, sa, algo, ivlen)
 	u_int8_t tiv[8];
 
 	/* sanity check */
-	if (ivlen != sa->ivlen) {
+	if (ivlen != sav->ivlen) {
 		printf("esp_3descbc_decrypt: bad ivlen %d/%d\n",
-			ivlen, sa->ivlen);
+			ivlen, sav->ivlen);
 		return EINVAL;
 	}
-	if (_KEYBITS(sa->key_enc) < algo->keymin
-	 || algo->keymax < _KEYBITS(sa->key_enc)) {
+	if (_KEYBITS(sav->key_enc) < algo->keymin
+	 || algo->keymax < _KEYBITS(sav->key_enc)) {
 		printf("esp_3descbc_decrypt: bad keylen %d\n",
-			_KEYBITS(sa->key_enc));
+			_KEYBITS(sav->key_enc));
 		return EINVAL;
 	}
-	if (sa->flags & SADB_X_EXT_OLD) {
+	if (sav->flags & SADB_X_EXT_OLD) {
 		printf("esp_3descbc_decrypt: unsupported ESP version\n");
 		return EINVAL;
 	}
@@ -857,9 +857,9 @@ esp_3descbc_decrypt(m, off, sa, algo, ivlen)
 	int deserr[3];
 	des_key_schedule ks[3];
 
-	deserr[0] = des_key_sched((C_Block *)_KEYBUF(sa->key_enc),ks[0]);
-	deserr[1] = des_key_sched((C_Block *)(_KEYBUF(sa->key_enc) + 8), ks[1]);
-	deserr[2] = des_key_sched((C_Block *)(_KEYBUF(sa->key_enc) + 16), ks[2]);
+	deserr[0] = des_key_sched((C_Block *)_KEYBUF(sav->key_enc),ks[0]);
+	deserr[1] = des_key_sched((C_Block *)(_KEYBUF(sav->key_enc) + 8), ks[1]);
+	deserr[2] = des_key_sched((C_Block *)(_KEYBUF(sav->key_enc) + 16), ks[2]);
 	if ((deserr[0] != 0) || (deserr[1] != 0) || (deserr[2] != 0)) {
 		printf("esp_3descbc_decrypt: key error %d/%d/%d\n",
 			deserr[0], deserr[1], deserr[2]);
@@ -879,11 +879,11 @@ esp_3descbc_decrypt(m, off, sa, algo, ivlen)
 }
 
 static int
-esp_3descbc_encrypt(m, off, plen, sa, algo, ivlen)
+esp_3descbc_encrypt(m, off, plen, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;
 	size_t plen;
-	struct secas *sa;
+	struct secasvar *sav;
 	struct esp_algorithm *algo;
 	int ivlen;
 {
@@ -897,18 +897,18 @@ esp_3descbc_encrypt(m, off, plen, sa, algo, ivlen)
 			"payload length must be multiple of 8\n");
 		return EINVAL;
 	}
-	if (sa->ivlen != ivlen) {
+	if (sav->ivlen != ivlen) {
 		printf("esp_3descbc_encrypt: bad ivlen %d/%d\n",
-			ivlen, sa->ivlen);
+			ivlen, sav->ivlen);
 		return EINVAL;
 	}
-	if (_KEYBITS(sa->key_enc) < algo->keymin
-	 || algo->keymax < _KEYBITS(sa->key_enc)) {
+	if (_KEYBITS(sav->key_enc) < algo->keymin
+	 || algo->keymax < _KEYBITS(sav->key_enc)) {
 		printf("esp_3descbc_encrypt: bad keylen %d\n",
-			_KEYBITS(sa->key_enc));
+			_KEYBITS(sav->key_enc));
 		return EINVAL;
 	}
-	if (sa->flags & SADB_X_EXT_OLD) {
+	if (sav->flags & SADB_X_EXT_OLD) {
 		printf("esp_3descbc_encrypt: unsupported ESP version\n");
 		return EINVAL;
 	}
@@ -927,16 +927,16 @@ esp_3descbc_encrypt(m, off, plen, sa, algo, ivlen)
 	if (!iv)
 		panic("assumption failed: bad mbuf chain");
 
-	bcopy((caddr_t)sa->iv, (caddr_t)iv, ivlen);
+	bcopy((caddr_t)sav->iv, (caddr_t)iv, ivlen);
 
 	/* encrypt packet */
     {
 	int deserr[3];
 	des_key_schedule ks[3];
 
-	deserr[0] = des_key_sched((C_Block *)_KEYBUF(sa->key_enc),     ks[0]);
-	deserr[1] = des_key_sched((C_Block *)(_KEYBUF(sa->key_enc) + 8), ks[1]);
-	deserr[2] = des_key_sched((C_Block *)(_KEYBUF(sa->key_enc) + 16), ks[2]);
+	deserr[0] = des_key_sched((C_Block *)_KEYBUF(sav->key_enc),     ks[0]);
+	deserr[1] = des_key_sched((C_Block *)(_KEYBUF(sav->key_enc) + 8), ks[1]);
+	deserr[2] = des_key_sched((C_Block *)(_KEYBUF(sav->key_enc) + 16), ks[2]);
 	if ((deserr[0] != 0) || (deserr[1] != 0) || (deserr[2] != 0)) {
 		printf("esp_3descbc_encrypt: key error %d/%d/%d\n",
 			deserr[0], deserr[1], deserr[2]);
@@ -949,23 +949,23 @@ esp_3descbc_encrypt(m, off, plen, sa, algo, ivlen)
 	bzero(ks[0], sizeof(des_key_schedule)*3);
     }
 
-	esp_increment_iv(sa);
+	esp_increment_iv(sav);
 
 	return 0;
 }
 
 static int
-esp_rc5cbc_ivlen(sa)
-	struct secas *sa;
+esp_rc5cbc_ivlen(sav)
+	struct secasvar *sav;
 {
 	return 8;
 }
 
 static int
-esp_rc5cbc_decrypt(m, off, sa, algo, ivlen)
+esp_rc5cbc_decrypt(m, off, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;
-	struct secas *sa;
+	struct secasvar *sav;
 	struct esp_algorithm *algo;
 	int ivlen;
 {
@@ -975,17 +975,17 @@ esp_rc5cbc_decrypt(m, off, sa, algo, ivlen)
 	size_t plen;
 
 	/* sanity check */
-	if (sa->ivlen != ivlen) {
+	if (sav->ivlen != ivlen) {
 		printf("esp_rc5cbc_decrypt: bad ivlen %d/%d\n",
-			ivlen, sa->ivlen);
+			ivlen, sav->ivlen);
 		return EINVAL;
 	}
-	if ((_KEYBITS(sa->key_enc) < 40) || (_KEYBITS(sa->key_enc) > 2040)) {
+	if ((_KEYBITS(sav->key_enc) < 40) || (_KEYBITS(sav->key_enc) > 2040)) {
 		printf("esp_rc5cbc_decrypt: unsupported key length %d: "
-			"need 40 to 2040 bit\n", _KEYBITS(sa->key_enc));
+			"need 40 to 2040 bit\n", _KEYBITS(sav->key_enc));
 		return EINVAL;
 	}
-	if (sa->flags & SADB_X_EXT_OLD) {
+	if (sav->flags & SADB_X_EXT_OLD) {
 		printf("esp_rc5cbc_decrypt: unsupported ESP version\n");
 		return EINVAL;
 	}
@@ -1018,8 +1018,8 @@ esp_rc5cbc_decrypt(m, off, sa, algo, ivlen)
     {
 	RC5_WORD e_key[34];
 
-	set_rc5_expandkey(e_key, _KEYBUF(sa->key_enc),
-			_KEYBITS(sa->key_enc) / 8, 16);
+	set_rc5_expandkey(e_key, _KEYBUF(sav->key_enc),
+			_KEYBITS(sav->key_enc) / 8, 16);
 	rc5_cbc_process(m, bodyoff, plen, e_key, iv, RC5_DECRYPT);
 
 	/* for safety */
@@ -1030,11 +1030,11 @@ esp_rc5cbc_decrypt(m, off, sa, algo, ivlen)
 }
 
 static int
-esp_rc5cbc_encrypt(m, off, plen, sa, algo, ivlen)
+esp_rc5cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	struct mbuf *m;
 	size_t off;
 	size_t plen;
-	struct secas *sa;
+	struct secasvar *sav;
 	struct esp_algorithm *algo;
 	int ivlen;
 {
@@ -1048,19 +1048,19 @@ esp_rc5cbc_encrypt(m, off, plen, sa, algo, ivlen)
 			"payload length must be multiple of 8\n");
 		return EINVAL;
 	}
-	if (sa->ivlen != ivlen) {
+	if (sav->ivlen != ivlen) {
 		printf("esp_rc5cbc_encrypt: bad ivlen %d/%d\n",
-			ivlen, sa->ivlen);
+			ivlen, sav->ivlen);
 		return EINVAL;
 	}
-	if (_KEYBITS(sa->key_enc) < algo->keymin
-	 || _KEYBITS(sa->key_enc) > algo->keymax) {
+	if (_KEYBITS(sav->key_enc) < algo->keymin
+	 || _KEYBITS(sav->key_enc) > algo->keymax) {
 		printf("esp_rc5cbc_encrypt: unsupported key length %d: "
-			"need %d to %d bits\n", _KEYBITS(sa->key_enc),
+			"need %d to %d bits\n", _KEYBITS(sav->key_enc),
 			algo->keymin, algo->keymax);
 		return EINVAL;
 	}
-	if (sa->flags & SADB_X_EXT_OLD) {
+	if (sav->flags & SADB_X_EXT_OLD) {
 		printf("esp_rc5cbc_encrypt: unsupported ESP version\n");
 		return EINVAL;
 	}
@@ -1079,21 +1079,21 @@ esp_rc5cbc_encrypt(m, off, plen, sa, algo, ivlen)
 	if (!iv)
 		panic("assumption failed: bad mbuf chain");
 
-	bcopy(sa->iv, iv, ivlen);
+	bcopy(sav->iv, iv, ivlen);
 
 	/* encrypt */
     {
 	RC5_WORD e_key[34];
 
-	set_rc5_expandkey(e_key, _KEYBUF(sa->key_enc),
-			_KEYBITS(sa->key_enc) / 8, 16);
+	set_rc5_expandkey(e_key, _KEYBUF(sav->key_enc),
+			_KEYBITS(sav->key_enc) / 8, 16);
 	rc5_cbc_process(m, bodyoff, plen, e_key, iv, RC5_ENCRYPT);
 
 	/* for safety */
 	bzero(e_key, sizeof(e_key));
     }
 
-	esp_increment_iv(sa);
+	esp_increment_iv(sav);
 
 	return 0;
 }
@@ -1102,8 +1102,8 @@ esp_rc5cbc_encrypt(m, off, plen, sa, algo, ivlen)
  * increment iv.
  */
 static void
-esp_increment_iv(sa)
-	struct secas *sa;
+esp_increment_iv(sav)
+	struct secasvar *sav;
 {
 	u_int8_t *x;
 	u_int8_t y;
@@ -1115,8 +1115,8 @@ esp_increment_iv(sa)
 	y = time_second & 0xff;
 #endif
 	if (!y) y++;
-	x = (u_int8_t *)sa->iv;
-	for (i = 0; i < sa->ivlen; i++) {
+	x = (u_int8_t *)sav->iv;
+	for (i = 0; i < sav->ivlen; i++) {
 		*x = (*x + y) & 0xff;
 		x++;
 	}
@@ -1151,11 +1151,11 @@ mbuf_find_offset(m, off, len)
 /*------------------------------------------------------------*/
 
 int
-esp_auth(m0, skip, length, sa, sum)
+esp_auth(m0, skip, length, sav, sum)
 	struct mbuf *m0;
 	size_t skip;	/* offset to ESP header */
 	size_t length;	/* payload length */
-	struct secas *sa;
+	struct secasvar *sav;
 	u_char *sum;
 {
 	struct mbuf *m;
@@ -1182,20 +1182,20 @@ esp_auth(m0, skip, length, sa, sum)
 		printf("esp_auth: length is not multiple of 4\n");
 		return EINVAL;
 	}
-	if (!sa) {
+	if (!sav) {
 		printf("esp_auth: NULL SA passed\n");
 		return EINVAL;
 	}
-	if (!sa->alg_auth) {
-		printf("esp_auth: bad ESP auth algorithm passed: %d\n", sa->alg_auth);
+	if (!sav->alg_auth) {
+		printf("esp_auth: bad ESP auth algorithm passed: %d\n", sav->alg_auth);
 		return EINVAL;
 	}
 
 	m = m0;
 	off = 0;
 
-	algo = &ah_algorithms[sa->alg_auth];
-	siz = (((*algo->sumsiz)(sa) + 3) & ~(4 - 1));
+	algo = &ah_algorithms[sav->alg_auth];
+	siz = (((*algo->sumsiz)(sav) + 3) & ~(4 - 1));
 	if (sizeof(sumbuf) < siz) {
 		printf("esp_auth: AH_MAXSUMSIZE is too small: siz=%lu\n",
 		    (u_long)siz);
@@ -1216,7 +1216,7 @@ esp_auth(m0, skip, length, sa, sum)
 		}
 	}
 
-	(*algo->init)(&s, sa);
+	(*algo->init)(&s, sav);
 	while (0 < length) {
 		if (!m)
 			panic("mbuf chain?");

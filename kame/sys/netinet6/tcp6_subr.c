@@ -789,7 +789,7 @@ ipsec6_hdrsiz_tcp(t6p)
 	m->m_pkthdr.len = m->m_len = sizeof(struct ip6tcp);
 	bcopy(t6p->t_template, mtod(m, u_char *), sizeof(struct ip6tcp));
 
-	hdrsiz = ipsec6_hdrsiz(m, in6p);
+	hdrsiz = ipsec6_hdrsiz(m, IPSEC_DIR_OUTBOUND, in6p);	/* XXX dir !!*/
 
 	m_free(m);
 	return hdrsiz;

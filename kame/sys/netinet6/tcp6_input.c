@@ -687,12 +687,21 @@ findpcb:
 						ip6, m);
 			}
 #ifdef IPSEC
+			/* copy old policy into new socket's */
 		    {
 			struct secpolicy *sp;
-			sp = ipsec_copy_policy(sotoin6pcb(oso)->in6p_sp);
+
+			sp = ipsec_copy_policy(sotoin6pcb(oso)->in6p_sp_in);
 			if (sp) {
-				key_freesp(in6p->in6p_sp);
-				in6p->in6p_sp = sp;
+				key_freesp(in6p->in6p_sp_in);
+				in6p->in6p_sp_in = sp;
+			} else
+				printf("tcp6_input: could not copy policy\n");
+
+			sp = ipsec_copy_policy(sotoin6pcb(oso)->in6p_sp_out);
+			if (sp) {
+				key_freesp(in6p->in6p_sp_out);
+				in6p->in6p_sp_out = sp;
 			} else
 				printf("tcp6_input: could not copy policy\n");
 		    }
@@ -2509,10 +2518,16 @@ syn_cache_get6(so, m, off, len)
 #ifdef IPSEC
     {
 	struct secpolicy *sp;
-	sp = ipsec_copy_policy(sotoin6pcb(oso)->in6p_sp);
+	sp = ipsec_copy_policy(sotoin6pcb(oso)->in6p_sp_in);
 	if (sp) {
-		key_freesp(in6p->in6p_sp);
-		in6p->in6p_sp = sp;
+		key_freesp(in6p->in6p_sp_in);
+		in6p->in6p_sp_in = sp;
+	} else
+		printf("tcp6_input: could not copy policy\n");
+	sp = ipsec_copy_policy(sotoin6pcb(oso)->in6p_sp_out);
+	if (sp) {
+		key_freesp(in6p->in6p_sp_out);
+		in6p->in6p_sp_out = sp;
 	} else
 		printf("tcp6_input: could not copy policy\n");
     }

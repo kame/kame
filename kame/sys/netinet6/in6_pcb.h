@@ -103,8 +103,11 @@ struct	in6pcb {
 	LIST_ENTRY(in6pcb) in6p_hlist;	/* hash chain */
 	u_long	in6p_hash;		/* hash value */
 #if 1 /*IPSEC*/
-	struct secpolicy *in6p_sp;	/* security policy. It may not be
-					 * used according to policy selection.
+	struct secpolicy *in6p_sp_in;
+	struct secpolicy *in6p_sp_out;
+					/*
+					 * security policy. It may not be
+					 * used due to policy selection.
 					 */
 #endif
 	struct icmp6_filter *in6p_icmp6filt;

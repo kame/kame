@@ -230,9 +230,9 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #ifdef IPSEC
 	/* get a security policy for this packet */
 	if (so == NULL)
-		sp = ipsec6_getpolicybyaddr(m, 0, &error);
+		sp = ipsec6_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, 0, &error);
 	else
-		sp = ipsec6_getpolicybysock(m, so, &error);
+		sp = ipsec6_getpolicybysock(m, IPSEC_DIR_OUTBOUND, so, &error);
 
 	if (sp == NULL) {
 		ipsec6stat.out_inval++;
@@ -1455,10 +1455,12 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 
 #ifdef IPSEC
-			case IPV6_IPSEC_POLICY:
+			case IPV6_IPSEC_POLICY_IN:
+			case IPV6_IPSEC_POLICY_OUT:
 			    {
 				caddr_t req = NULL;
 				int len = 0;
+				struct secpolicy **spp = NULL;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				struct mbuf *m;
 #endif
@@ -1473,9 +1475,16 @@ ip6_ctloutput(op, so, level, optname, mp)
 					req = mtod(m, caddr_t);
 					len = m->m_len;
 				}
-				error = ipsec_set_policy(&in6p->in6p_sp,
-				                   optname, req, len,
-				                   privileged);
+				switch (optname) {
+				case IPV6_IPSEC_POLICY_IN:
+					spp = &in6p->in6p_sp_in;
+					break;
+				case IPV6_IPSEC_POLICY_OUT:
+					spp = &in6p->in6p_sp_out;
+					break;
+				}
+				error = ipsec_set_policy(spp, optname, req, len,
+				                         privileged);
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				m_freem(m);
 #endif
@@ -1704,16 +1713,26 @@ ip6_ctloutput(op, so, level, optname, mp)
 				break;
 
 #ifdef IPSEC
-			case IPV6_IPSEC_POLICY:
+			case IPV6_IPSEC_POLICY_IN:
+			case IPV6_IPSEC_POLICY_OUT:
 			  {
+				struct secpolicy *sp = NULL;
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				struct mbuf *m;
 				struct mbuf **mp = &m;
 #endif
-				error = ipsec_get_policy(in6p->in6p_sp, mp);
+				switch (optname) {
+				case IPV6_IPSEC_POLICY_IN:
+					sp = in6p->in6p_sp_in;
+					break;
+				case IPV6_IPSEC_POLICY_OUT:
+					sp = in6p->in6p_sp_out;
+					break;
+				}
+				error = ipsec_get_policy(sp, mp);
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				if (error == 0)
-					error = soopt_mcopyout(sopt, m); /* XXX */
+					error = soopt_mcopyout(sopt, m); /*XXX*/
 				m_freem(m);
 #endif
 				break;

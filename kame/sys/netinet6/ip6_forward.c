@@ -53,6 +53,12 @@
 #include <netinet6/icmp6.h>
 #include <netinet6/nd6.h>
 
+#ifdef notyet /*IPSEC*/
+#include <netinet6/ipsec.h>
+#include <netkey/key.h>
+#include <netkey/key_debug.h>
+#endif /* IPSEC */
+
 #ifdef IPV6FIREWALL
 #include <netinet6/ip6_fw.h>
 #endif
@@ -84,9 +90,27 @@ ip6_forward(m, srcrt)
 	register struct rtentry *rt;
 	int error, type = 0, code = 0;
 	struct mbuf *mcopy;
+#ifdef notyet /*IPSEC*/
+	struct secpolicy *sp = NULL;
+#endif
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
+
+#ifdef notyet /*IPSEC*/
+	/*
+	 * Check AH/ESP integrity.
+	 */
+	/*
+	 * Don't increment ip6s_cantforward because this is the check
+	 * before forwarding packet actually.
+	 */
+	if (ipsec6_in_reject(m, NULL)) {
+		ipsec6stat.in_polvio++;
+		m_freem(m);
+		return;
+	}
+#endif /*IPSEC*/
 
 	if (m->m_flags & (M_BCAST|M_MCAST) ||
 	   in6_canforward(&ip6->ip6_src, &ip6->ip6_dst) == 0) {
@@ -115,6 +139,121 @@ ip6_forward(m, srcrt)
 		return;
 	}
 	ip6->ip6_hlim -= IPV6_HLIMDEC;
+
+#ifdef notyet /*IPSEC*/
+	/* get a security policy for this packet */
+	sp = ipsec6_getpolicybyaddr(m, IPSEC_DIR_OUTBOUND, 0, &error);
+	if (sp == NULL) {
+		ipsec6stat.out_inval++;
+		ip6stat.ip6s_cantforward++;
+#if 0
+		/* XXX: what icmp ? */
+#else
+		m_freem(m);
+#endif
+		return;
+	}
+
+	error = 0;
+
+	/* check policy */
+	switch (sp->policy) {
+	case IPSEC_POLICY_DISCARD:
+		/*
+		 * This packet is just discarded.
+		 */
+		ipsec6stat.out_polvio++;
+		ip6stat.ip6s_cantforward++;
+		key_freesp(sp);
+#if 0
+		/* XXX: what icmp ? */
+#else
+		m_freem(m);
+#endif
+		return;
+
+	case IPSEC_POLICY_BYPASS:
+	case IPSEC_POLICY_NONE:
+		/* no need to do IPsec. */
+		key_freesp(sp);
+		goto skip_ipsec;
+	
+	case IPSEC_POLICY_IPSEC:
+		if (sp->req == NULL) {
+			/* XXX should be panic ? */
+			printf("ip6_forward: No IPsec request specified.\n");
+			ip6stat.ip6s_cantforward++;
+			key_freesp(sp);
+#if 0
+			/* XXX: what icmp ? */
+#else
+			m_freem(m);
+#endif
+			return;
+		}
+		/* do IPsec */
+		break;
+
+	case IPSEC_POLICY_ENTRUST:
+	default:
+		/* should be panic ?? */
+		printf("ip6_forward: Invalid policy found. %d\n", sp->policy);
+		key_freesp(sp);
+		goto skip_ipsec;
+	}
+
+    {
+	struct ipsec_output_state state;
+
+	/*
+	 * All the extension headers will become inaccessible
+	 * (since they can be encrypted).
+	 * Don't panic, we need no more updates to extension headers
+	 * on inner IPv6 packet (since they are now encapsulated).
+	 *
+	 * IPv6 [ESP|AH] IPv6 [extension headers] payload
+	 */
+	bzero(&state, sizeof(state));
+	state.m = m;
+	state.ro = NULL;	/* update at ipsec6_output_tunnel() */
+	state.dst = NULL;	/* update at ipsec6_output_tunnel() */
+
+	error = ipsec6_output_tunnel(&state, sp, 0);
+
+	m = state.m;
+	/* XXX allocate a route (ro, dst) again later */
+#if 0
+	ro = (struct route_in6 *)state.ro;
+	dst = (struct sockaddr_in6 *)state.dst;
+#endif
+	if (error) {
+		/* mbuf is already reclaimed in ipsec6_output_tunnel. */
+		switch (error) {
+		case EHOSTUNREACH:
+		case ENETUNREACH:
+		case EMSGSIZE:
+		case ENOBUFS:
+		case ENOMEM:
+			break;
+		default:
+			printf("ip6_output (ipsec): error code %d\n", error);
+			/*fall through*/
+		case ENOENT:
+			/* don't show these error codes to the user */
+			break;
+		}
+		ip6stat.ip6s_cantforward++;
+		key_freesp(sp);
+#if 0
+		/* XXX: what icmp ? */
+#else
+		m_freem(m);
+#endif
+		return;
+	}
+    }
+    skip_ipsec:
+#endif /* IPSEC */
 
 	dst = &ip6_forward_rt.ro_dst;
 	if (!srcrt) {
@@ -267,4 +406,5 @@ ip6_forward(m, srcrt)
 
  freecopy:
 	m_freem(mcopy);
+	return;
 }

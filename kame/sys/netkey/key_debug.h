@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: key_debug.h,v 1.1 1999/08/03 01:02:11 itojun Exp $ */
+/* $Id: key_debug.h,v 1.2 1999/09/01 05:27:42 sakane Exp $ */
 
 #ifndef _NETKEY_KEY_DEBUG_H_
 #define _NETKEY_KEY_DEBUG_H_
@@ -72,13 +72,15 @@ extern void kdebug_sadb_x_policy __P((struct sadb_ext *));
 
 #ifdef KERNEL
 struct secpolicy;
-struct secindex;
-struct secas;
+struct secpolicyindex;
+struct secasindex;
+struct secasvar;
 struct secreplay;
 struct mbuf;
-extern void kdebug_secindex __P((struct secindex *));
 extern void kdebug_secpolicy __P((struct secpolicy *));
-extern void kdebug_secas __P((struct secas *));
+extern void kdebug_secpolicyindex __P((struct secpolicyindex *));
+extern void kdebug_secasindex __P((struct secasindex *));
+extern void kdebug_secasv __P((struct secasvar *));
 extern void kdebug_mbufhdr __P((struct mbuf *));
 extern void kdebug_mbuf __P((struct mbuf *));
 #endif /*KERNEL*/

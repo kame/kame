@@ -85,7 +85,7 @@ size_t
 esp_hdrsiz(isr)
 	struct ipsecrequest *isr;
 {
-	struct secas *sa;
+	struct secasvar *sav;
 	struct esp_algorithm *algo;
 	size_t ivlen;
 	size_t authlen;
@@ -95,22 +95,22 @@ esp_hdrsiz(isr)
 	if (isr == NULL)
 		panic("esp_hdrsiz: NULL was passed.\n");
 
-	sa = isr->sa;
+	sav = isr->sav;
 
-	if (isr->proto != IPPROTO_ESP)
+	if (isr->saidx.proto != IPPROTO_ESP)
 		panic("unsupported mode passed to esp_hdrsiz");
 
-	if (sa == NULL)
+	if (sav == NULL)
 		goto contrive;
-	if (sa->state != SADB_SASTATE_MATURE
-	 && sa->state != SADB_SASTATE_DYING)
+	if (sav->state != SADB_SASTATE_MATURE
+	 && sav->state != SADB_SASTATE_DYING)
 		goto contrive;
 
 	/* we need transport mode ESP. */
-	algo = &esp_algorithms[sa->alg_enc];
+	algo = &esp_algorithms[sav->alg_enc];
 	if (!algo)
 		goto contrive;
-	ivlen = sa->ivlen;
+	ivlen = sav->ivlen;
 	if (ivlen < 0)
 		goto contrive;
 
@@ -121,13 +121,13 @@ esp_hdrsiz(isr)
 	 *
 	 * XXX variable size padding support
 	 */
-	if (sa->flags & SADB_X_EXT_OLD) {
+	if (sav->flags & SADB_X_EXT_OLD) {
 		/* RFC 1827 */
 		hdrsiz = sizeof(struct esp) + ivlen + 9;
 	} else {
 		/* RFC 2406 */
-		if (sa->replay && sa->alg_auth && sa->key_auth)
-			authlen = (*ah_algorithms[sa->alg_auth].sumsiz)(sa);
+		if (sav->replay && sav->alg_auth && sav->key_auth)
+			authlen = (*ah_algorithms[sav->alg_auth].sumsiz)(sav);
 		else
 			authlen = 0;
 		hdrsiz = sizeof(struct newesp) + ivlen + 9 + authlen;
@@ -179,7 +179,7 @@ esp_output(m, nexthdrp, md, isr, af)
 	struct mbuf *mprev;
 	struct esp *esp;
 	struct esptail *esptail;
-	struct secas *sa = isr->sa;
+	struct secasvar *sav = isr->sav;
 	struct esp_algorithm *algo;
 	u_int32_t spi;
 	u_int8_t nxt = 0;
@@ -207,7 +207,7 @@ esp_output(m, nexthdrp, md, isr, af)
 	}
 
 	/* some sanity check */
-	if ((sa->flags & SADB_X_EXT_OLD) == 0 && !sa->replay) {
+	if ((sav->flags & SADB_X_EXT_OLD) == 0 && !sav->replay) {
 		switch (af) {
 #ifdef INET
 		case AF_INET:
@@ -216,11 +216,11 @@ esp_output(m, nexthdrp, md, isr, af)
 
 			ip = mtod(m, struct ip *);
 			printf("esp4_output: internal error: "
-				"sa->replay is null: "
+				"sav->replay is null: "
 				"%x->%x, SPI=%u\n",
 				(u_int32_t)ntohl(ip->ip_src.s_addr),
 				(u_int32_t)ntohl(ip->ip_dst.s_addr),
-				(u_int32_t)ntohl(sa->spi));
+				(u_int32_t)ntohl(sav->spi));
 			ipsecstat.out_inval++;
 			m_freem(m);
 			return EINVAL;
@@ -233,8 +233,8 @@ esp_output(m, nexthdrp, md, isr, af)
 
 			ip6 = mtod(m, struct ip6_hdr *);
 			printf("esp6_output: internal error: "
-				"sa->replay is null: SPI=%u\n",
-				(u_int32_t)ntohl(sa->spi));
+				"sav->replay is null: SPI=%u\n",
+				(u_int32_t)ntohl(sav->spi));
 			ipsec6stat.out_inval++;
 			m_freem(m);
 			return EINVAL;
@@ -243,9 +243,9 @@ esp_output(m, nexthdrp, md, isr, af)
 		}
 	}
 
-	algo = &esp_algorithms[sa->alg_enc];	/*XXX*/
-	spi = sa->spi;
-	ivlen = sa->ivlen;
+	algo = &esp_algorithms[sav->alg_enc];	/*XXX*/
+	spi = sav->spi;
+	ivlen = sav->ivlen;
 	/* should be okey */
 	if (ivlen < 0) {
 		panic("invalid ivlen");
@@ -268,12 +268,12 @@ esp_output(m, nexthdrp, md, isr, af)
 	size_t esphlen;	/*sizeof(struct esp/newesp) + ivlen*/
 	size_t hlen = 0;	/*ip header len*/
 
-	if (sa->flags & SADB_X_EXT_OLD) {
+	if (sav->flags & SADB_X_EXT_OLD) {
 		/* RFC 1827 */
 		esplen = sizeof(struct esp);
 	} else {
 		/* RFC 2406 */
-		if (sa->flags & SADB_X_EXT_DERIV)
+		if (sav->flags & SADB_X_EXT_DERIV)
 			esplen = sizeof(struct esp);
 		else
 			esplen = sizeof(struct newesp);
@@ -372,15 +372,15 @@ esp_output(m, nexthdrp, md, isr, af)
 
 	/* initialize esp header. */
 	esp->esp_spi = spi;
-	if ((sa->flags & SADB_X_EXT_OLD) == 0) {
+	if ((sav->flags & SADB_X_EXT_OLD) == 0) {
 		struct newesp *nesp;
 		nesp = (struct newesp *)esp;
-		sa->replay->count++;
+		sav->replay->count++;
 		/*
 		 * XXX sequence number must not be cycled, if the SA is
 		 * installed by IKE daemon.
 		 */
-		nesp->esp_seq = htonl(sa->replay->count);
+		nesp->esp_seq = htonl(sav->replay->count);
 	}
 
     {
@@ -414,7 +414,7 @@ esp_output(m, nexthdrp, md, isr, af)
 	 * two consequtive TCP packets.
 	 */
 	if (!(n->m_flags & M_EXT) && extendsiz < M_TRAILINGSPACE(n)) {
-		switch (sa->flags & SADB_X_EXT_PMASK) {
+		switch (sav->flags & SADB_X_EXT_PMASK) {
 		case SADB_X_EXT_PRAND:
 			break;
 		case SADB_X_EXT_PZERO:
@@ -444,7 +444,7 @@ esp_output(m, nexthdrp, md, isr, af)
 			goto fail;
 		}
 		nn->m_len = extendsiz;
-		switch (sa->flags & SADB_X_EXT_PMASK) {
+		switch (sav->flags & SADB_X_EXT_PMASK) {
 		case SADB_X_EXT_PRAND:
 			break;
 		case SADB_X_EXT_PZERO:
@@ -502,7 +502,7 @@ esp_output(m, nexthdrp, md, isr, af)
 	 */
 	if (!algo->encrypt)
 		panic("internal error: no encrypt function");
-	if ((*algo->encrypt)(m, espoff, plen + extendsiz, sa, algo, ivlen)) {
+	if ((*algo->encrypt)(m, espoff, plen + extendsiz, sav, algo, ivlen)) {
 		printf("packet encryption failure\n");
 		m_freem(m);
 		switch (af) {
@@ -524,11 +524,11 @@ esp_output(m, nexthdrp, md, isr, af)
 	/*
 	 * calculate ICV if required.
 	 */
-	if (!sa->replay)
+	if (!sav->replay)
 		goto noantireplay;
-	if (!sa->key_auth)
+	if (!sav->key_auth)
 		goto noantireplay;
-	if (!sa->alg_auth)
+	if (!sav->alg_auth)
 		goto noantireplay;
     {
 	u_char authbuf[AH_MAXSUMSIZE];
@@ -537,11 +537,11 @@ esp_output(m, nexthdrp, md, isr, af)
 	size_t siz;
 	struct ip *ip;
 
-	siz = (((*ah_algorithms[sa->alg_auth].sumsiz)(sa) + 3) & ~(4 - 1));
+	siz = (((*ah_algorithms[sav->alg_auth].sumsiz)(sav) + 3) & ~(4 - 1));
 	if (AH_MAXSUMSIZE < siz)
 		panic("assertion failed for AH_MAXSUMSIZE");
 
-	if (esp_auth(m, espoff, m->m_pkthdr.len - espoff, sa, authbuf))
+	if (esp_auth(m, espoff, m->m_pkthdr.len - espoff, sav, authbuf))
 		goto noantireplay;
 
 	n = m;
@@ -615,16 +615,16 @@ noantireplay:
 	switch (af) {
 #ifdef INET
 	case AF_INET:
-		ipsecstat.out_esphist[sa->alg_enc]++;
+		ipsecstat.out_esphist[sav->alg_enc]++;
 		break;
 #endif
 #ifdef INET6
 	case AF_INET6:
-		ipsec6stat.out_esphist[sa->alg_enc]++;
+		ipsec6stat.out_esphist[sav->alg_enc]++;
 		break;
 #endif
 	}
-	key_sa_recordxfer(sa, m);
+	key_sa_recordxfer(sav, m);
 	return 0;
 
 fail:

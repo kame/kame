@@ -45,16 +45,35 @@
 
 #ifdef KERNEL
 
+/*
+ * Security Policy Index
+ * NOTE: Encure to be same address family and upper layer protocol.
+ * NOTE: ul_proto, port number, uid, gid:
+ *	ANY: reserved for waldcard.
+ *	0 to (~0 - 1): is one of the number of each value.
+ */
+struct secpolicyindex {
+	u_int8_t dir;			/* direction of packet flow, see blow */
+	struct sockaddr_storage src;	/* IP src address for SP */
+	struct sockaddr_storage dst;	/* IP dst address for SP */
+	u_int8_t prefs;			/* prefix length in bits for src */
+	u_int8_t prefd;			/* prefix length in bits for dst */
+	u_int16_t ul_proto;		/* upper layer Protocol */
+#ifdef notyet
+	uid_t uids;
+	uid_t uidd;
+	gid_t gids;
+	gid_t gidd;
+#endif
+};
+
 /* Security Policy Data Base */
 struct secpolicy {
-	struct secpolicy *next;
-	struct secpolicy *prev;
-	struct keytree *spt;	/* back pointer to the top of SPD */
+	LIST_ENTRY(secpolicy) chain;
 
-	struct secindex idx;	/* index */
-
-	int refcnt;		/* reference count */
-	u_int state;		/* 0: dead, others: alive */
+	int refcnt;			/* reference count */
+	struct secpolicyindex spidx;	/* selector */
+	u_int state;			/* 0: dead, others: alive */
 #define IPSEC_SPSTATE_DEAD	0
 #define IPSEC_SPSTATE_ALIVE	1
 
@@ -68,22 +87,36 @@ struct secpolicy {
 struct ipsecrequest {
 	struct ipsecrequest *next;
 				/* pointer to next structure */
-				/* If 0, it means end of chain. */
-
-	u_int proto;		/* IPPROTO_ESP or IPPROTO_AH */
-	u_int mode;		/* mode for security protocol, see below. */
+				/* If NULL, it means the end of chain. */
+	struct secasindex saidx;
 	u_int level;		/* IPsec level defined below. */
-	struct sockaddr *proxy;	/* Destination address in Outer IP header. */
-				/* If mode == TRANSPORT, it must be set NULL. */
-	struct secas *sa;	/* place holder for the security association */
 
+	struct secasvar *sav;	/* place holder of SA for use */
 	struct secpolicy *sp;	/* back pointer to SP */
 };
 
 #endif /*KERNEL*/
 
-#define	IPSEC_MODE_TRANSPORT	0
-#define	IPSEC_MODE_TUNNEL	1
+#define IPSEC_PORT_ANY		65535
+#define IPSEC_ULPROTO_ANY	255
+#define IPSEC_PROTO_ANY		65535
+
+/* mode of security protocol */
+/* NOTE: DON'T use IPSEC_MODE_ANY at SPD.  It's only use in SAD */
+#define	IPSEC_MODE_ANY		0	/* i.e. wildcard. */
+#define	IPSEC_MODE_TRANSPORT	1
+#define	IPSEC_MODE_TUNNEL	2
+
+/*
+ * Direction of security policy.
+ * NOTE: Since INVALID is used just as flag.
+ * The other are used for loop counter too.
+ */
+#define IPSEC_DIR_ANY		0
+#define IPSEC_DIR_INBOUND	1
+#define IPSEC_DIR_OUTBOUND	2
+#define IPSEC_DIR_MAX		3
+#define IPSEC_DIR_INVALID	4
 
 /* Policy level */
 /*
@@ -238,15 +271,15 @@ extern int ip6_ipsec_ecn;
 #endif
 
 extern struct secpolicy *ipsec4_getpolicybysock
-	__P((struct mbuf *, struct socket *, int *));
+	__P((struct mbuf *, u_int, struct socket *, int *));
 extern struct secpolicy *ipsec4_getpolicybyaddr
-	__P((struct mbuf *, int, int *));
+	__P((struct mbuf *, u_int, int, int *));
 
 #ifdef INET6
 extern struct secpolicy *ipsec6_getpolicybysock
-	__P((struct mbuf *, struct socket *, int *));
+	__P((struct mbuf *, u_int, struct socket *, int *));
 extern struct secpolicy *ipsec6_getpolicybyaddr
-	__P((struct mbuf *, int, int *));
+	__P((struct mbuf *, u_int, int, int *));
 #endif /*INET6*/
 
 struct inpcb;
@@ -282,10 +315,10 @@ extern int ipsec6_in_reject __P((struct mbuf *, struct in6pcb *));
 struct secas;
 struct tcpcb;
 struct tcp6cb;
-extern int ipsec_chkreplay __P((u_int32_t, struct secas *));
-extern int ipsec_updatereplay __P((u_int32_t, struct secas *));
+extern int ipsec_chkreplay __P((u_int32_t, struct secasvar *));
+extern int ipsec_updatereplay __P((u_int32_t, struct secasvar *));
 
-extern size_t ipsec4_hdrsiz __P((struct mbuf *, struct inpcb *));
+extern size_t ipsec4_hdrsiz __P((struct mbuf *, u_int, struct inpcb *));
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 extern size_t ipsec_hdrsiz_tcp __P((struct tcpcb *, int));
 #else
@@ -293,9 +326,9 @@ extern size_t ipsec4_hdrsiz_tcp __P((struct tcpcb *));
 #endif
 #ifdef INET6
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-extern size_t ipsec6_hdrsiz __P((struct mbuf *, struct inpcb *));
+extern size_t ipsec6_hdrsiz __P((struct mbuf *, u_int, struct inpcb *));
 #else
-extern size_t ipsec6_hdrsiz __P((struct mbuf *, struct in6pcb *));
+extern size_t ipsec6_hdrsiz __P((struct mbuf *, u_int, struct in6pcb *));
 #if defined(__NetBSD__) && !defined(TCP6)
 extern size_t ipsec6_hdrsiz_tcp __P((struct tcpcb *));
 #else
@@ -312,7 +345,7 @@ extern const char *ipsec4_logpacketstr __P((struct ip *, u_int32_t));
 #ifdef INET6
 extern const char *ipsec6_logpacketstr __P((struct ip6_hdr *, u_int32_t));
 #endif
-extern const char *ipsec_logsastr __P((struct secas *));
+extern const char *ipsec_logsastr __P((struct secasvar *));
 
 extern void ipsec_dumpmbuf __P((struct mbuf *));
 
@@ -324,10 +357,10 @@ extern int ipsec6_output_trans __P((struct ipsec_output_state *, u_char *,
 extern int ipsec6_output_tunnel __P((struct ipsec_output_state *,
 	struct secpolicy *, int));
 #endif
-extern int ipsec4_tunnel_validate __P((struct ip *, u_int, struct secas *));
+extern int ipsec4_tunnel_validate __P((struct ip *, u_int, struct secasvar *));
 #ifdef INET6
 extern int ipsec6_tunnel_validate __P((struct ip6_hdr *, u_int,
-	struct secas *));
+	struct secasvar *));
 #endif
 extern struct mbuf *ipsec_copypkt __P((struct mbuf *));
 
