@@ -80,6 +80,7 @@ void	ipsec_stats __P((u_long, char *));
 #endif
 
 #ifdef INET6
+struct sockaddr_in6;
 void	ip6protopr __P((u_long, char *));
 void	tcp6_stats __P((u_long, char *));
 void	tcp6_dump __P((u_long));
