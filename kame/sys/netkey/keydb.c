@@ -1,4 +1,4 @@
-/*	$KAME: keydb.c,v 1.77 2003/07/03 05:17:01 itojun Exp $	*/
+/*	$KAME: keydb.c,v 1.78 2003/07/03 05:21:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -87,7 +87,7 @@ keydb_newsecpolicy()
 	if (!p)
 		return p;
 	bzero(p, sizeof(*p));
-	TAILQ_INSERT_TAIL(&sptailq, newsp, tailq);
+	TAILQ_INSERT_TAIL(&sptailq, p, tailq);
 
 	return p;
 }
