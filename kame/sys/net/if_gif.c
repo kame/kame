@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.72 2001/08/16 17:10:44 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.73 2001/08/16 17:33:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -940,8 +940,12 @@ gif_set_tunnel(ifp, src, dst)
 	if (odst)
 		free((caddr_t)odst, M_IFADDR);
 
-	ifp->if_flags |= IFF_RUNNING;
+	if (sc->gif_psrc && sc->gif_pdst)
+		ifp->if_flags |= IFF_RUNNING;
+	else
+		ifp->if_flags &= ~IFF_RUNNING;
 	splx(s);
+
 	return 0;
 
  bad:
