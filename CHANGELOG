@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.609 2000/02/24 16:52:44 itojun Exp $
+$Id: CHANGELOG,v 1.610 2000/02/24 17:28:48 itojun Exp $
 
 <200002>
+Fri Feb 25 02:26:07 JST 2000  itojun@iijlab.net
+	* kame/rtadvd/rtadvd.c: on startup, transmit multicast RA.
+	  without this, reboot of a router will result in absense of router
+	  for unnecessarily long period of time.
+	  TODO: check spec carefully to confirm that it does not violate the
+	  spec.
+
 Fri Feb 25 01:49:00 JST 2000  itojun@iijlab.net
 	* */sys/net/rtsock.c: wrap BBN hack (honor ifp/ifa on RTM_ADD),
 	  into #ifdef BBNHACK.  it conflicts with proxy NDP and mobile-ip6.
