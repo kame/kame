@@ -23,7 +23,7 @@
  */
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/addrtoname.c,v 1.1.1.1 1999/08/08 23:31:54 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/addrtoname.c,v 1.2 1999/08/17 12:14:25 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/types.h>
@@ -185,39 +185,7 @@ getname(const u_char *ap)
 #ifndef LBL_ALIGN
 	addr = *(const u_int32_t *)ap;
 #else
-	/*
-	 * Extract 32 bits in network order, dealing with alignment.
-	 */
-	switch ((long)ap & 3) {
-
-	case 0:
-		addr = *(u_int32_t *)ap;
-		break;
-
-	case 2:
-#ifdef WORDS_BIGENDIAN
-		addr = ((u_int32_t)*(u_short *)ap << 16) |
-			(u_int32_t)*(u_short *)(ap + 2);
-#else
-		addr = ((u_int32_t)*(u_short *)(ap + 2) << 16) |
-			(u_int32_t)*(u_short *)ap;
-#endif
-		break;
-
-	default:
-#ifdef WORDS_BIGENDIAN
-		addr = ((u_int32_t)ap[0] << 24) |
-			((u_int32_t)ap[1] << 16) |
-			((u_int32_t)ap[2] << 8) |
-			(u_int32_t)ap[3];
-#else
-		addr = ((u_int32_t)ap[3] << 24) |
-			((u_int32_t)ap[2] << 16) |
-			((u_int32_t)ap[1] << 8) |
-			(u_int32_t)ap[0];
-#endif
-		break;
-	}
+	memcpy(&addr, ap, sizeof(addr));
 #endif
 	p = &hnametable[addr & (HASHNAMESIZE-1)];
 	for (; p->nxt; p = p->nxt) {
