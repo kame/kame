@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.232 2001/07/26 06:53:15 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.233 2001/07/26 08:44:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1315,8 +1315,9 @@ icmp6_mtudisc_update(ip6cp, validated)
 			rt->rt_rmx.rmx_mtu = mtu;
 		}
 	}
-	if (rt)
+	if (rt) { /* XXX: need braces to avoid conflict with else in RTFREE. */
 		RTFREE(rt);
+	}
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	/*
@@ -2286,7 +2287,9 @@ icmp6_reflect(m, off)
 	sa6_src.sin6_len = sizeof(sa6_src);
 	sa6_src.sin6_addr = ip6->ip6_dst;
 	in6_recoverscope(&sa6_src, &ip6->ip6_dst, m->m_pkthdr.rcvif);
-	in6_embedscope(&ip6->ip6_dst, &sa6_src, NULL, NULL);
+	in6_embedscope(&sa6_src.sin6_addr, &sa6_src, NULL, NULL);
+	ip6->ip6_dst = sa6_src.sin6_addr;
+
 	bzero(&sa6_dst, sizeof(sa6_dst));
 	sa6_dst.sin6_family = AF_INET6;
 	sa6_dst.sin6_len = sizeof(sa6_dst);
@@ -2330,8 +2333,9 @@ icmp6_reflect(m, off)
 		 */
 		bzero(&ro, sizeof(ro));
 		src = in6_selectsrc(&sa6_src, NULL, NULL, &ro, NULL, &e);
-		if (ro.ro_rt)
+		if (ro.ro_rt) { /* XXX: see comments in icmp6_mtudisc_update */
 			RTFREE(ro.ro_rt); /* XXX: we could use this */
+		}
 		if (src == NULL) {
 			nd6log((LOG_DEBUG,
 			    "icmp6_reflect: source can't be determined: "
