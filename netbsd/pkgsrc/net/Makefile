@@ -13,6 +13,7 @@
     SUBDIR += mrt
     SUBDIR += mtr
     SUBDIR += ncftp3
+    SUBDIR += netperf
     SUBDIR += newbie
     SUBDIR += pchar
     SUBDIR += rsync
