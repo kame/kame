@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.145 2001/05/31 01:01:25 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.146 2001/05/31 23:40:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1991,6 +1991,16 @@ fail:
 		}
 		break;
 	}
+
+	/*
+	 * When the link-layer address of a router changes, select the
+	 * best router again.  In particular, when the neighbor entry is newly
+	 * created, it might affect the selection policy.
+	 * Question: can we restrict the first condition to the "is_newentry"
+	 * case?
+	 */
+	if (do_update && ln->ln_router)
+		defrouter_select();
 
 	return rt;
 }
