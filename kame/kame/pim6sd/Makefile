@@ -58,7 +58,7 @@
 # Questions concerning this software should be directed to 
 # Kurt Windisch (kurtw@antc.uoregon.edu)
 #
-# $Id: Makefile,v 1.6 1999/10/29 09:33:04 jinmei Exp $
+# $Id: Makefile,v 1.7 1999/10/29 09:51:23 jinmei Exp $
 #
 #
 #Part of this program has been derived from PIM sparse-mode pimd.
@@ -105,6 +105,10 @@ LDADD+=	-L${.OBJDIR}/../libinet6 -L${.OBJDIR}/../libinet6/obj \
 DPADD+=	${.OBJDIR}/../libinet6/libinet6.a \
 	${.OBJDIR}/../libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
+
+.if (${OPSYS} == "FreeBSD")
+SRCS+= y.tab.h
+.endif
 
 .if (${OPSYS} != "NetBSD")
 MAN5=	pim6sd.conf.5
