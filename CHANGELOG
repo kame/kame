@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2440 2003/07/20 11:32:31 jinmei Exp $
+$KAME: CHANGELOG,v 1.2441 2003/07/24 07:13:37 keiichi Exp $
 
 <200307>
+Thu Jul 24 16:11:06 JST 2003	keiichi@iij.ad.jp
+	* mip6 related files.
+	simplify the prefix and advertising router list management
+	mechanism on a mobile node.
+
 2003-07-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/config.c (configure_duid): fixed a bug of
 	allocating short memory.  Upgrading is required if you configure
