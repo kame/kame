@@ -1,4 +1,4 @@
-/*	$KAME: qop_cbq.c,v 1.6 2001/12/03 08:20:55 kjc Exp $	*/
+/*	$KAME: qop_cbq.c,v 1.7 2002/05/31 06:03:35 kjc Exp $	*/
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
  *
@@ -341,6 +341,9 @@ qcmd_cbq_add_class(const char *ifname, const char *class_name,
 			/* reserve bandwidth for ctl_class */
 			ctl_bandwidth =
 				ifinfo->bandwidth / 100 * CTL_PBANDWIDTH;
+			if (bandwidth <= ctl_bandwidth)
+				LOG(LOG_ERR, 0,
+				    "bandwidth for default class too small!");
 			bandwidth -= ctl_bandwidth;
 		}
 	}
