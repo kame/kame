@@ -12,6 +12,9 @@ $TEST localhost http
 $TEST localhost echo
 $TEST localhost tftp
 
+$TEST -4 localhost http
+$TEST -6 localhost http
+
 $TEST '' http
 $TEST '' echo
 $TEST '' tftp
