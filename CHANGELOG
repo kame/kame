@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1063 2000/06/24 15:09:18 itojun Exp $
+$Id: CHANGELOG,v 1.1064 2000/06/25 12:12:40 sumikawa Exp $
 
 <200006>
+Sun Jun 25 21:11:19 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* start to support FreeBSD 3.5-RELEASE. 3.4-RELEASE is obsolete.
+
 Sat Jun 24 23:41:31 JST 2000  itojun@iijlab.net
 	* freebsd4/lib/libinet6/getnameinfo.c: correct NIS lookup.  from ume.
 
