@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.257 2002/01/20 11:56:29 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.258 2002/01/21 03:18:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1355,6 +1355,19 @@ ip6_setdstifaddr(m, ia6)
 	return n;	/* NULL if failed to set */
 }
 
+struct in6_ifaddr *
+ip6_getdstifaddr(m)
+	struct mbuf *m;
+{
+	struct mbuf *n;
+
+	n = ip6_findaux(m);
+	if (n)
+		return mtod(n, struct ip6aux *)->ip6a_dstia6;
+	else
+		return NULL;
+}
+
 struct mbuf *
 ip6_setpktaddrs(m, src, dst)
 	struct mbuf *m;
@@ -1371,17 +1384,23 @@ ip6_setpktaddrs(m, src, dst)
 	return(n);
 }
 
-struct in6_ifaddr *
-ip6_getdstifaddr(m)
+int
+ip6_getpktaddrs(m, src, dst)
 	struct mbuf *m;
+	struct sockaddr_in6 **src, **dst;
 {
 	struct mbuf *n;
 
-	n = ip6_findaux(m);
-	if (n)
-		return mtod(n, struct ip6aux *)->ip6a_dstia6;
-	else
-		return NULL;
+	if (src == NULL || dst == NULL)
+		return(-1);
+
+	if ((n = ip6_findaux(m)) == NULL)
+		return (-1);
+
+	*src = &mtod(n, struct ip6aux *)->ip6a_src;
+	*dst = &mtod(n, struct ip6aux *)->ip6a_dst;
+
+	return(0);
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.89 2002/01/20 11:36:56 jinmei Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.90 2002/01/21 03:18:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -172,7 +172,7 @@ ip6_forward(m, srcrt)
 	struct sockaddr_in6 *dst;
 	struct rtentry *rt;
 	int error, type = 0, code = 0;
-	struct mbuf *mcopy = NULL, *mx;
+	struct mbuf *mcopy = NULL;
 	struct ifnet *origifp;	/* maybe unnecessary */
 	struct sockaddr_in6 *sa6_src, *sa6_dst;
 	int64_t dstzone;
@@ -184,17 +184,15 @@ ip6_forward(m, srcrt)
 #endif
 
 	/* get source and destination addresses with full scope information. */
-	if ((mx = ip6_findaux(m)) == NULL) {
+	if (ip6_getpktaddrs(m, &sa6_src, &sa6_dst)) {
 		/*
 		 * we dare to log the fact here because this should be an
 		 * internal bug.
 		 */
-		log(LOG_ERR, "ip6_forward: can't find IPv6 aux\n");
+		log(LOG_ERR, "ip6_forward: can't find src/dst addresses\n");
 		m_freem(m);
 		return;
 	}
-	sa6_src = &mtod(mx, struct ip6aux *)->ip6a_src;
-	sa6_dst = &mtod(mx, struct ip6aux *)->ip6a_dst;
 
 #ifdef IPSEC
 	/*
