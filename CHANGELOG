@@ -1,7 +1,32 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2050 2002/01/20 10:25:19 suz Exp $
+$KAME: CHANGELOG,v 1.2051 2002/01/20 10:41:36 jinmei Exp $
 
 <200201>
+2002-01-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/udp6_output.c (udp6_output): corrected the
+	length argument to in_cksum (bsdi4 only).
+
+2002-01-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet/in_pcb.c (in_pcbladdr):
+	* {freebsd4, netbsd, openbsd}/sys/netinet/ip_output.c (ip_output):
+	* {netbsd, openbsd}/sys/netinet/in_pcb.c (in_selectsrc):
+	- check the address family of the destination cached in a PCB.
+	- clear the cached destination before getting another cached
+	  route.  Otherwise, garbage in the padding space (which might be
+	  filled in if it was used for IPv6) could annoy rtalloc.
+
+	Note for OpenBSD: though Openbsd actually does not need these
+	fixes since it does not support IPv4-mapped IPv6 addresses, the
+	fixes are at least not harmful and will avoid possible bugs in the
+	future if it will ever support mapped addresses.
+
+2002-01-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_src.c (in6_selectroute): checked the
+	address family of a cached destination, in case of sharing the
+	cache with IPv4.
+	In response to: a bug report from Vineet Goel in the snap-users
+	ML.
+
 2002-01-20 SUZUKI, Shinsuke <suz@sdl.hitachi.co.jp>
 	* kame/kame/pim6{dd,sd}/mld6.c:
 	fixed a bug that (*,G) entry diminishes due to a failure of
