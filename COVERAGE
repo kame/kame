@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.98 2001/02/16 16:39:14 itojun Exp $
+$KAME: COVERAGE,v 1.99 2001/02/22 02:22:18 itojun Exp $
 
 
 x: supported/integrated
@@ -239,7 +239,9 @@ IPv6 PMTUD DoS prevention
 
 6to4 intface	x	x	-	x	x	-	x	x
 
-basic userland	x	x	x	x	x	x	x	x
+basic userland	x	x	x	x	x	x	x	(*1)
+    (*1) ftpd is totally broken from standard conformance POV.  it does not
+	interoperate with any other clients.  we have informed bsdi about this.
 
 route6d		x	x	x	x	x	x	x	x
 hroute6d	x	-	-	-	-	-	-	x
