@@ -336,6 +336,16 @@ udp_input(m, va_alist)
 		srcsa.sin6.sin6_port = uh->uh_sport;
 		srcsa.sin6.sin6_flowinfo = htonl(0x0fffffff) & ipv6->ip6_flow;
 		srcsa.sin6.sin6_addr = ipv6->ip6_src;
+		if (IN6_IS_SCOPE_LINKLOCAL(&srcsa.sin6.sin6_addr))
+			srcsa.sin6.sin6_addr.s6_addr16[1] = 0;
+		if (m->m_pkthdr.rcvif) {
+			if (IN6_IS_SCOPE_LINKLOCAL(&srcsa.sin6.sin6_addr)) {
+				srcsa.sin6.sin6_scope_id =
+					m->m_pkthdr.rcvif->if_index;
+			} else
+				srcsa.sin6.sin6_scope_id = 0;
+		} else
+			srcsa.sin6.sin6_scope_id = 0;
 
 		bzero(&dstsa, sizeof(struct sockaddr_in6));
 		dstsa.sin6.sin6_len = sizeof(struct sockaddr_in6);
@@ -674,6 +684,17 @@ udp6_ctlinput(cmd, sa, ip6, m, off)
 	struct mbuf *m;
 	int off;
 {
+	struct sockaddr_in6 sa6;
+
+	if (sa->sa_family != AF_INET6)
+		return;
+
+	/* translate addresses into internal form */
+	sa6 = *(struct sockaddr_in6 *)sa;
+	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr))
+		sa6.sin6_addr.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
+	sa = (struct sockaddr *)&sa6;
+
 	(void)udp_ctlinput(cmd, sa, (void *)ip6);
 }
 #endif
@@ -746,6 +767,7 @@ udp_output(m, va_alist)
 	register struct in6_addr laddr6;
 	int v6packet = 0;
 	struct ifnet *forceif = NULL;
+	struct sockaddr_in6 *sin6 = mtod(addr, struct sockaddr_in6 *);
 #endif /* INET6 */
 	int pcbflags = 0;
 
@@ -771,7 +793,7 @@ udp_output(m, va_alist)
 #ifdef INET6
 	        if (inp->inp_flags & INP_IPV6)
 			laddr6 = inp->inp_laddr6;
-		else  
+		else
 #endif /* INET6 */
 			laddr = inp->inp_laddr;
 #ifdef INET6
@@ -849,14 +871,67 @@ udp_output(m, va_alist)
 		struct udphdr *uh = (struct udphdr *)(mtod(m, caddr_t) +
 		    sizeof(struct ip6_hdr));
 		int payload = sizeof(struct ip6_hdr);
+		struct in6_addr *faddr;
+		struct in6_addr *laddr;
 
 		ipv6->ip6_flow = htonl(0x60000000) |
 		    (inp->inp_ipv6.ip6_flow & htonl(0x0fffffff)); 
 	  
 		ipv6->ip6_hlim = inp->inp_ipv6.ip6_hlim;
 		ipv6->ip6_nxt = IPPROTO_UDP;
-		ipv6->ip6_src = inp->inp_laddr6;
 		ipv6->ip6_dst = inp->inp_faddr6;
+		/*
+		 * If the scope of the destination is link-local,
+		 * embed the interface
+		 * index in the address.
+		 *
+		 * XXX advanced-api value overrides sin6_scope_id 
+		 */
+		faddr = &ipv6->ip6_dst;
+		if (IN6_IS_ADDR_LINKLOCAL(faddr) ||
+		    IN6_IS_ADDR_MC_LINKLOCAL(faddr)) {
+			struct ip6_pktopts *optp = inp->inp_outputopts6;
+			struct in6_pktinfo *pi = NULL;
+			struct ifnet *oifp = NULL;
+			struct ip6_moptions *mopt = NULL;
+
+			/*
+			 * XXX Boundary check is assumed to be already done in
+			 * ip6_setpktoptions().
+			 */
+			if (optp && (pi = optp->ip6po_pktinfo) &&
+			    pi->ipi6_ifindex) {
+				faddr->s6_addr16[1] = htons(pi->ipi6_ifindex);
+				oifp = ifindex2ifnet[pi->ipi6_ifindex];
+			}
+			else if (IN6_IS_ADDR_MULTICAST(faddr) &&
+				 (mopt = inp->inp_moptions6) &&
+				 mopt->im6o_multicast_ifp) {
+				oifp = mopt->im6o_multicast_ifp;
+				faddr->s6_addr16[1] = oifp->if_index;
+			} else if (sin6->sin6_scope_id) {
+				/* boundary check */
+				if (sin6->sin6_scope_id < 0 
+				    || if_index < sin6->sin6_scope_id) {
+					error = ENXIO;  /* XXX EINVAL? */
+					goto release;
+				}
+				/* XXX */
+				faddr->s6_addr16[1] =
+					htons(sin6->sin6_scope_id & 0xffff);
+			}
+		}
+		laddr = in6_selectsrc(sin6, inp->inp_outputopts6,
+				      inp->inp_moptions6,
+				      &inp->inp_route6,
+				      &inp->inp_laddr6, &error);
+		if (laddr == NULL) {
+			if (error == 0)
+				error = EADDRNOTAVAIL;
+			goto release;
+		}
+		ipv6->ip6_src = *laddr;
+
 		ipv6->ip6_plen = (u_short)len + sizeof(struct udphdr);
 
 		uh->uh_sport = inp->inp_lport;
