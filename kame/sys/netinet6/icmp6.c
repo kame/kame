@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.165 2000/11/30 15:32:56 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.166 2000/11/30 16:11:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1118,7 +1118,7 @@ icmp6_notify_error(m, off, icmp6len, code)
 		if (finaldst == NULL)
 			icmp6dst.sin6_addr = eip6->ip6_dst;
 		else
-			icmp6dst.sin6_addr = finaldst;
+			icmp6dst.sin6_addr = *finaldst;
 		icmp6dst.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
 							  &icmp6dst.sin6_addr);
 #ifndef SCOPEDROUTING
