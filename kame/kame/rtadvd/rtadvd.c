@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.35 2000/10/08 07:03:24 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.36 2000/10/08 07:04:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -331,7 +331,7 @@ rtmsg_input()
 	int n, type, ifindex = 0, plen;
 	size_t len;
 	char msg[2048], *next, *lim;
-	u_char ifname[16];
+	u_char ifname[IF_NAMESIZE];
 	struct prefix *prefix;
 	struct rainfo *rai;
 	struct in6_addr *addr;
