@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.57 2001/06/04 09:04:03 keiichi Exp $	*/
+/*	$KAME: nd6.h,v 1.58 2001/06/27 09:08:40 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -327,17 +327,19 @@ extern u_int32_t ip6_temp_valid_lifetime; /* seconds */
 extern int ip6_temp_regen_advance; /* seconds */
 
 union nd_opts {
-	struct nd_opt_hdr *nd_opt_array[9];	/*max = home agent info*/
+	struct nd_opt_hdr *nd_opt_array[10];	/* max = target address list */
 	struct {
 		struct nd_opt_hdr *zero;
 		struct nd_opt_hdr *src_lladdr;
 		struct nd_opt_hdr *tgt_lladdr;
-		struct nd_opt_prefix_info *pi_beg;/* multiple opts, start */
+		struct nd_opt_prefix_info *pi_beg; /* multiple opts, start */
 		struct nd_opt_rd_hdr *rh;
 		struct nd_opt_mtu *mtu;
 		struct nd_opt_hdr *six;
 		struct nd_opt_advinterval *adv;
 		struct nd_opt_homeagent_info *hai;
+		struct nd_opt_hdr *src_addrlist;
+		struct nd_opt_hdr *tgt_addrlist;
 		struct nd_opt_hdr *search;	/* multiple opts */
 		struct nd_opt_hdr *last;	/* multiple opts */
 		int done;
@@ -352,6 +354,8 @@ union nd_opts {
 #define nd_opts_mtu		nd_opt_each.mtu
 #define nd_opts_adv		nd_opt_each.adv
 #define nd_opts_hai		nd_opt_each.hai
+#define nd_opts_src_addrlist	nd_opt_each.src_addrlist
+#define nd_opts_tgt_addrlist	nd_opt_each.tgt_addrlist
 #define nd_opts_search		nd_opt_each.search
 #define nd_opts_last		nd_opt_each.last
 #define nd_opts_done		nd_opt_each.done

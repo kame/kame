@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.151 2001/06/19 14:24:41 sumikawa Exp $	*/
+/*	$KAME: nd6.c,v 1.152 2001/06/27 09:08:39 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -432,6 +432,8 @@ nd6_options(ndopts)
 		case ND_OPT_MTU:
 		case ND_OPT_REDIRECTED_HEADER:
 		case ND_OPT_ADVINTERVAL:
+		case ND_OPT_SOURCE_ADDRLIST:
+		case ND_OPT_TARGET_ADDRLIST:
 			if (ndopts->nd_opt_array[nd_opt->nd_opt_type]) {
 				nd6log((LOG_INFO,
 				    "duplicated ND6 option found (type=%d)\n",
