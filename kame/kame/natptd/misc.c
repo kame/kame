@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: misc.c,v 1.1 2000/01/07 15:08:34 fujisawa Exp $
+ *	$Id: misc.c,v 1.2 2000/01/10 10:45:07 fujisawa Exp $
  */
 
 #include <stdio.h>
@@ -217,10 +217,10 @@ readQuery(int sockfd)
     if (isOff(daemon)
 	&& (isDebug(DEBUG_RESOLVER)))
     {
-	if (from.__ss_family == AF_INET)
+	if (from.ss_family == AF_INET)
 	    fprintf(stderr, "*** recvIPv4msg() from "),
 	    fprintf(stderr, "%s", displaySockaddr((struct sockaddr *)&from));
-	else if (from.__ss_family == AF_INET6)
+	else if (from.ss_family == AF_INET6)
 	    fprintf(stderr, "*** recvIPv6msg() from "),
 	    fprintf(stderr, "%s", displaySockaddr((struct sockaddr *)&from));
 	fprintf(stderr, " ***\n");
@@ -235,9 +235,9 @@ readQuery(int sockfd)
     gettimeofday(&atv, NULL);
     msg->tstamp = atv.tv_sec;
     msg->ifap = detectRecvInterface((struct sockaddr *)&from);
-    if (from.__ss_family == AF_INET)
+    if (from.ss_family == AF_INET)
 	msg->f.from4 = *(struct sockaddr_in *)&from;
-    else if (from.__ss_family == AF_INET6)
+    else if (from.ss_family == AF_INET6)
 	msg->f.from6 = *(struct sockaddr_in6 *)&from;
 
     msg->b.inout = isOutbound(msg->ifap);
@@ -379,10 +379,10 @@ readResponse(struct sdesc *desc)
     if (isOff(daemon)
 	&& (isDebug(DEBUG_RESOLVER)))
     {
-	if (from.__ss_family == AF_INET)
+	if (from.ss_family == AF_INET)
 	    fprintf(stderr, "*** recvResponse4() from "),
 	    fprintf(stderr, "%s", displaySockaddr((struct sockaddr *)&from));
-	else if (from.__ss_family == AF_INET6)
+	else if (from.ss_family == AF_INET6)
 	    fprintf(stderr, "*** recvResponse6() from "),
 	    fprintf(stderr, "%s", displaySockaddr((struct sockaddr *)&from));
 	fprintf(stderr, " ***\n");
