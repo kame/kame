@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.76 2000/08/14 08:22:36 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.77 2000/08/14 08:54:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1070,7 +1070,7 @@ pinger()
 		icp->icmp6_code = ICMP6_NI_SUBJ_FQDN;	/*empty*/
 		nip->ni_qtype = htons(NI_QTYPE_SUPTYPES);
 		/* we support compressed bitmap */
-		nip->ni_flags = htons(NI_SUPTYPE_FLAG_COMPRESS);
+		nip->ni_flags = NI_SUPTYPE_FLAG_COMPRESS;
 
 		memcpy(nip->icmp6_ni_nonce, nonce, sizeof(nip->icmp6_ni_nonce));
 		*(u_int16_t *)nip->icmp6_ni_nonce = ntohs(seq);
