@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/05/28 15:09:37 $
+			$Date: 2000/05/28 23:36:16 $
 
 1. IPv6
 
@@ -861,8 +861,8 @@ conditions are satisfied:
 - the AF_INET6 socket is configured to accept IPv4 traffic, i.e.
   getsockopt(IPV6_BINDV6ONLY) returns 0.
 
-We have a bug in bind(2) to AF_INET6 socket with IPv4 mapped address.
-The current code does not handle port number duplicate too well.
+You cannot bind(2) with IPv4 mapped address.  This is a workaround for port
+number duplicate and other twists.
 
 1.12.3.2 KAME/NetBSD, initiating side
 
