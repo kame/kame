@@ -44,7 +44,7 @@
 #include <unistd.h>
 #include <errno.h>
 
-#include "policy_parse.h"
+#include "y.tab.h"
 #define yylval __libyylval	/* XXX */
 %}
 
