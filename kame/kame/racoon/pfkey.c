@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.73 2000/08/31 10:21:22 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.74 2000/09/11 14:59:39 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -989,7 +989,7 @@ pk_sendupdate(iph2)
 				iph2->dst,
 				iph2->src,
 				pr->spi,
-				0,
+				pr->reqid,
 				4,	/* XXX static size of window */
 				pr->keymat->v,
 				e_type, e_keylen, a_type, a_keylen, flags,
@@ -1176,7 +1176,7 @@ pk_sendadd(iph2)
 				iph2->src,
 				iph2->dst,
 				pr->spi_p,
-				0,
+				pr->reqid,
 				4,	/* XXX static size of window */
 				pr->keymat_p->v,
 				e_type, e_keylen, a_type, a_keylen, flags,

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: proposal.c,v 1.12 2000/08/30 11:18:34 sakane Exp $ */
+/* YIPS @(#)$Id: proposal.c,v 1.13 2000/09/11 14:59:39 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -336,6 +336,7 @@ cmpsaprop_alloc(ph1, pp1, pp2)
 		newpr->encmode = pr1->encmode;
 		newpr->spi = pr2->spi;		/* copy my SPI */
 		newpr->spi_p = pr1->spi;	/* copy peer's SPI */
+		newpr->reqid = pr2->reqid;
 
 		newtr = newsatrns();
 		if (newtr == NULL) {
