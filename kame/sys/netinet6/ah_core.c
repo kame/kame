@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.42 2001/03/12 08:49:17 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.43 2001/03/12 11:17:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -791,7 +791,7 @@ ah_hmac_sha2_256_init(state, sav)
 	u_char *ipad;
 	u_char *opad;
 	SHA256_CTX *ctxt;
-	u_char tk[SHA256_BLOCK_LENGTH];
+	u_char tk[SHA256_DIGEST_LENGTH];
 	u_char *key;
 	size_t keylen;
 	size_t i;
@@ -811,12 +811,14 @@ ah_hmac_sha2_256_init(state, sav)
 
 	/* compress the key if necessery */
 	if (64 < _KEYLEN(state->sav->key_auth)) {
+		bzero(tk, sizeof(tk));
+		bzero(ctxt, sizeof(*ctxt));
 		SHA256_Init(ctxt);
 		SHA256_Update(ctxt, _KEYBUF(state->sav->key_auth),
-			_KEYLEN(state->sav->key_auth));
+		    _KEYLEN(state->sav->key_auth));
 		SHA256_Final(&tk[0], ctxt);
 		key = &tk[0];
-		keylen = SHA256_BLOCK_LENGTH;
+		keylen = sizeof(tk) < 64 ? sizeof(tk) : 64;
 	} else {
 		key = _KEYBUF(state->sav->key_auth);
 		keylen = _KEYLEN(state->sav->key_auth);
@@ -831,6 +833,7 @@ ah_hmac_sha2_256_init(state, sav)
 		opad[i] ^= 0x5c;
 	}
 
+	bzero(ctxt, sizeof(*ctxt));
 	SHA256_Init(ctxt);
 	SHA256_Update(ctxt, ipad, 64);
 
@@ -857,7 +860,7 @@ ah_hmac_sha2_256_result(state, addr)
 	struct ah_algorithm_state *state;
 	caddr_t addr;
 {
-	u_char digest[SHA256_BLOCK_LENGTH];
+	u_char digest[SHA256_DIGEST_LENGTH];
 	u_char *ipad;
 	u_char *opad;
 	SHA256_CTX *ctxt;
@@ -871,6 +874,7 @@ ah_hmac_sha2_256_result(state, addr)
 
 	SHA256_Final((caddr_t)&digest[0], ctxt);
 
+	bzero(ctxt, sizeof(*ctxt));
 	SHA256_Init(ctxt);
 	SHA256_Update(ctxt, opad, 64);
 	SHA256_Update(ctxt, (caddr_t)&digest[0], sizeof(digest));
@@ -919,7 +923,7 @@ ah_hmac_sha2_384_init(state, sav)
 	u_char *ipad;
 	u_char *opad;
 	SHA384_CTX *ctxt;
-	u_char tk[SHA384_BLOCK_LENGTH];
+	u_char tk[SHA384_DIGEST_LENGTH];
 	u_char *key;
 	size_t keylen;
 	size_t i;
@@ -932,6 +936,7 @@ ah_hmac_sha2_384_init(state, sav)
 	    M_TEMP, M_NOWAIT);
 	if (!state->foo)
 		return ENOBUFS;
+	bzero(state->foo, 64 + 64 + sizeof(SHA384_CTX));
 
 	ipad = (u_char *)state->foo;
 	opad = (u_char *)(ipad + 64);
@@ -939,12 +944,14 @@ ah_hmac_sha2_384_init(state, sav)
 
 	/* compress the key if necessery */
 	if (64 < _KEYLEN(state->sav->key_auth)) {
+		bzero(tk, sizeof(tk));
+		bzero(ctxt, sizeof(*ctxt));
 		SHA384_Init(ctxt);
 		SHA384_Update(ctxt, _KEYBUF(state->sav->key_auth),
-			_KEYLEN(state->sav->key_auth));
+		    _KEYLEN(state->sav->key_auth));
 		SHA384_Final(&tk[0], ctxt);
 		key = &tk[0];
-		keylen = SHA384_BLOCK_LENGTH;
+		keylen = sizeof(tk) < 64 ? sizeof(tk) : 64;
 	} else {
 		key = _KEYBUF(state->sav->key_auth);
 		keylen = _KEYLEN(state->sav->key_auth);
@@ -959,6 +966,7 @@ ah_hmac_sha2_384_init(state, sav)
 		opad[i] ^= 0x5c;
 	}
 
+	bzero(ctxt, sizeof(*ctxt));
 	SHA384_Init(ctxt);
 	SHA384_Update(ctxt, ipad, 64);
 
@@ -985,7 +993,7 @@ ah_hmac_sha2_384_result(state, addr)
 	struct ah_algorithm_state *state;
 	caddr_t addr;
 {
-	u_char digest[SHA384_BLOCK_LENGTH];
+	u_char digest[SHA384_DIGEST_LENGTH];
 	u_char *ipad;
 	u_char *opad;
 	SHA384_CTX *ctxt;
@@ -999,6 +1007,7 @@ ah_hmac_sha2_384_result(state, addr)
 
 	SHA384_Final((caddr_t)&digest[0], ctxt);
 
+	bzero(ctxt, sizeof(*ctxt));
 	SHA384_Init(ctxt);
 	SHA384_Update(ctxt, opad, 64);
 	SHA384_Update(ctxt, (caddr_t)&digest[0], sizeof(digest));
@@ -1047,7 +1056,7 @@ ah_hmac_sha2_512_init(state, sav)
 	u_char *ipad;
 	u_char *opad;
 	SHA512_CTX *ctxt;
-	u_char tk[SHA512_BLOCK_LENGTH];
+	u_char tk[SHA512_DIGEST_LENGTH];
 	u_char *key;
 	size_t keylen;
 	size_t i;
@@ -1060,6 +1069,7 @@ ah_hmac_sha2_512_init(state, sav)
 	    M_TEMP, M_NOWAIT);
 	if (!state->foo)
 		return ENOBUFS;
+	bzero(state->foo, 64 + 64 + sizeof(SHA512_CTX));
 
 	ipad = (u_char *)state->foo;
 	opad = (u_char *)(ipad + 64);
@@ -1067,12 +1077,14 @@ ah_hmac_sha2_512_init(state, sav)
 
 	/* compress the key if necessery */
 	if (64 < _KEYLEN(state->sav->key_auth)) {
+		bzero(tk, sizeof(tk));
+		bzero(ctxt, sizeof(*ctxt));
 		SHA512_Init(ctxt);
 		SHA512_Update(ctxt, _KEYBUF(state->sav->key_auth),
-			_KEYLEN(state->sav->key_auth));
+		    _KEYLEN(state->sav->key_auth));
 		SHA512_Final(&tk[0], ctxt);
 		key = &tk[0];
-		keylen = SHA512_BLOCK_LENGTH;
+		keylen = sizeof(tk) < 64 ? sizeof(tk) : 64;
 	} else {
 		key = _KEYBUF(state->sav->key_auth);
 		keylen = _KEYLEN(state->sav->key_auth);
@@ -1087,6 +1099,7 @@ ah_hmac_sha2_512_init(state, sav)
 		opad[i] ^= 0x5c;
 	}
 
+	bzero(ctxt, sizeof(*ctxt));
 	SHA512_Init(ctxt);
 	SHA512_Update(ctxt, ipad, 64);
 
@@ -1113,7 +1126,7 @@ ah_hmac_sha2_512_result(state, addr)
 	struct ah_algorithm_state *state;
 	caddr_t addr;
 {
-	u_char digest[SHA512_BLOCK_LENGTH];
+	u_char digest[SHA512_DIGEST_LENGTH];
 	u_char *ipad;
 	u_char *opad;
 	SHA512_CTX *ctxt;
@@ -1127,6 +1140,7 @@ ah_hmac_sha2_512_result(state, addr)
 
 	SHA512_Final((caddr_t)&digest[0], ctxt);
 
+	bzero(ctxt, sizeof(*ctxt));
 	SHA512_Init(ctxt);
 	SHA512_Update(ctxt, opad, 64);
 	SHA512_Update(ctxt, (caddr_t)&digest[0], sizeof(digest));
