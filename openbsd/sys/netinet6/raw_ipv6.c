@@ -521,6 +521,7 @@ rip6_output(m, so, dst, control)
   struct socket *so;
   struct sockaddr_in6 *dst;
   struct mbuf *control;
+  struct in6_addr *in6a;
 
   va_start(ap, m);
   so = va_arg(ap, struct socket *);
@@ -540,103 +541,125 @@ rip6_output(m, so, dst, control)
   } else
     optp = NULL;
 
-#if 0
-  if (inp->inp_flags & INP_HDRINCL)
-    {
-      flags |= IPV6_RAWOUTPUT;
-      ipv6stat.ips_rawout++;
-      /* Maybe m_pullup() ipv6 header here for ipv6_output(), which
-	 expects it to be contiguous. */
+  in6a = in6_selectsrc(dst, optp, inp->inp_moptions6,
+		       &inp->inp_route6, &inp->inp_laddr6, &error);
+  if (in6a == NULL) {
+    if (error == 0)
+      error = EADDRNOTAVAIL;
+    goto bad;
+  }
+
+  /*
+   * For an ICMPv6 packet, we should know its type and code
+   * to update statistics.
+   */
+  if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
+    struct icmp6_hdr *icmp6;
+    if (m->m_len < sizeof(struct icmp6_hdr) &&
+	(m = m_pullup(m, sizeof(struct icmp6_hdr))) == NULL) {
+      error = ENOBUFS;
+      goto bad;
     }
-  else
-#endif
-    {
-      struct in6_addr *in6a;
+    icmp6 = mtod(m, struct icmp6_hdr *);
+    type = icmp6->icmp6_type;
+    code = icmp6->icmp6_code;
+  }
 
-      in6a = in6_selectsrc(dst, optp, inp->inp_moptions6,
-		&inp->inp_route6, &inp->inp_laddr6, &error);
-      if (in6a == NULL) {
-	if (error == 0)
-	  error = EADDRNOTAVAIL;
-	goto bad;
-      }
+  M_PREPEND(m, sizeof(struct ip6_hdr), M_WAIT);
+  ip6 = mtod(m, struct ip6_hdr *);
+  ip6->ip6_flow = 0;  /* Or possibly user flow label, in host order. */
+  ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
+  ip6->ip6_vfc |= IPV6_VERSION;
+  ip6->ip6_nxt = inp->inp_ipv6.ip6_nxt;
+  ip6->ip6_dst = dst->sin6_addr;
+  /* ip6_src will be filled in later */
 
-      M_PREPEND(m, sizeof(struct ip6_hdr), M_WAIT);
-      ip6 = mtod(m, struct ip6_hdr *);
-      ip6->ip6_flow = 0;  /* Or possibly user flow label, in host order. */
-      ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
-      ip6->ip6_vfc |= IPV6_VERSION;
-      ip6->ip6_nxt = inp->inp_ipv6.ip6_nxt;
-      bcopy(in6a, &ip6->ip6_src, sizeof(*in6a));
-      ip6->ip6_dst = dst->sin6_addr;
-      /*
-       * Question:  How do I handle options?
-       *
-       * Answer:  I put them in here, but how?
-       */
-    }
-
-	/*
-	 * If the scope of the destination is link-local, embed the interface
-	 * index in the address.
-	 *
-	 * XXX advanced-api value overrides sin6_scope_id 
-	 */
-	if (IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst) ||
-	    IN6_IS_ADDR_MC_LINKLOCAL(&ip6->ip6_dst)) {
-		struct in6_pktinfo *pi;
+  /*
+   * If the scope of the destination is link-local, embed the interface
+   * index in the address.
+   *
+   * XXX advanced-api value overrides sin6_scope_id 
+   */
+  if (IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst) ||
+      IN6_IS_ADDR_MC_LINKLOCAL(&ip6->ip6_dst)) {
+    struct in6_pktinfo *pi;
 
 		/*
 		 * XXX Boundary check is assumed to be already done in
 		 * ip6_setpktoptions().
 		 */
-		if (optp && (pi = optp->ip6po_pktinfo) && pi->ipi6_ifindex) {
-			ip6->ip6_dst.s6_addr16[1] = htons(pi->ipi6_ifindex);
-			oifp = ifindex2ifnet[pi->ipi6_ifindex];
-		}
-		else if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) &&
-			 inp->inp_moptions6 &&
-			 inp->inp_moptions6->im6o_multicast_ifp) {
-			oifp = inp->inp_moptions6->im6o_multicast_ifp;
-			ip6->ip6_dst.s6_addr16[1] = htons(oifp->if_index);
-		} else if (dst->sin6_scope_id) {
-			/* boundary check */
-			if (dst->sin6_scope_id < 0 
-			 || if_index < dst->sin6_scope_id) {
-				error = ENXIO;  /* XXX EINVAL? */
-				goto bad;
-			}
-			ip6->ip6_dst.s6_addr16[1]
-				= htons(dst->sin6_scope_id & 0xffff);/*XXX*/
-		}
-	}
-
-	ip6->ip6_hlim = in6_selecthlim(inp, oifp);
-
-  {
-    int payload = sizeof(struct ip6_hdr);
-    int nexthdr = mtod(m, struct ip6_hdr *)->ip6_nxt;
-#if 0
-    int error;
-#endif
-
-    if (inp->inp_csumoffset >= 0) {
-      uint16_t *csum;
-
-      if (!(m = m_pullup2(m, payload + inp->inp_csumoffset))) {
-	DPRINTF(IDL_ERROR, ("rip6_output: m_pullup2(m, %d) failed\n", payload + inp->inp_csumoffset));
-	error = ENOBUFS;
+    if (optp && (pi = optp->ip6po_pktinfo) && pi->ipi6_ifindex) {
+      ip6->ip6_dst.s6_addr16[1] = htons(pi->ipi6_ifindex);
+      oifp = ifindex2ifnet[pi->ipi6_ifindex];
+    }
+    else if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) &&
+	     inp->inp_moptions6 &&
+	     inp->inp_moptions6->im6o_multicast_ifp) {
+      oifp = inp->inp_moptions6->im6o_multicast_ifp;
+      ip6->ip6_dst.s6_addr16[1] = htons(oifp->if_index);
+    } else if (dst->sin6_scope_id) {
+      /* boundary check */
+      if (dst->sin6_scope_id < 0 
+	  || if_index < dst->sin6_scope_id) {
+	error = ENXIO;  /* XXX EINVAL? */
 	goto bad;
-      };
+      }
+      ip6->ip6_dst.s6_addr16[1]
+	= htons(dst->sin6_scope_id & 0xffff);/*XXX*/
+    }
+  }
 
-      csum = (uint16_t *)(mtod(m, uint8_t *) + payload + inp->inp_csumoffset);
+  /* source address selection */
+  if ((in6a = in6_selectsrc(dstsock, optp, inp->inp_moptions6,
+			     &inp->inp_route6, &inp->inp_laddr6,
+			    &error)) == 0) {
+    if (error == 0)
+      error = EADDRNOTAVAIL;
+    goto bad;
+  }
+  ip6->ip6_src = *in6a;
+  if (inp->inp_route6.ro_rt)	/* what if oifp contradicts ? */
+    oifp = ifindex2ifnet[inp->inp_route6.ro_rt->rt_ifp->if_index];
 
-      *csum = 0;
-      *csum = in6_cksum(m, nexthdr, payload, m->m_pkthdr.len - payload);
-    };
-  };
+  ip6->ip6_hlim = in6_selecthlim(inp, oifp);
 
-  error = ip6_output(m, optp, &inp->inp_route6, flags, inp->inp_moptions6, &oifp);
+  if (so->so_proto->pr_protocol == IPPROTO_ICMPV6 ||
+      inp->inp_csumoffset != -1) {
+    struct mbuf *n;
+    int off;
+    u_int16_t *p;
+
+#define	offsetof(type, member)	((size_t)(&((type *)0)->member)) /* XXX */
+    /* compute checksum */
+    if (so->so_proto->pr_protocol == IPPROTO_ICMPV6)
+      off = offsetof(struct icmp6_hdr, icmp6_cksum);
+    else
+      off = inp->inp_csumoffset;
+    if (plen < off + 1) {
+      error = EINVAL;
+      goto bad;
+    }
+    off += sizeof(struct ip6_hdr);
+
+    n = m;
+    while (n && n->m_len <= off) {
+      off -= n->m_len;
+      n = n->m_next;
+    }
+    if (!n)
+      goto bad;
+    p = (u_int16_t *)(mtod(n, caddr_t) + off);
+    *p = 0;
+    *p = in6_cksum(m, ip6->ip6_nxt, sizeof(*ip6), plen);
+  }
+
+  error = ip6_output(m, optp, &inp->inp_route6, flags,
+		     inp->inp_moptions6, &oifp);
+  if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
+    if (oifp)
+      icmp6_ifoutstat_inc(oifp, type, code);
+    icmp6stat.icp6s_outhist[type]++;
+  }
 
   goto freectl;
 
