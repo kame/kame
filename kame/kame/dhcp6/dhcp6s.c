@@ -43,6 +43,7 @@
 # endif
 #endif
 #include <netinet/in.h>
+#include <arpa/inet.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -103,7 +104,7 @@ main(argc, argv)
 			debug++;
 			break;
 		case 'n':
-			if (inet_pton(AF_INET6, optarg, &a, sizeof(a)) != 1) {
+			if (inet_pton(AF_INET6, optarg, &a) != 1) {
 				errx(1, "invalid DNS server %s", optarg);
 				/*NOTREACHED*/
 			}
@@ -447,12 +448,12 @@ server6_react_solicit(agent, buf, siz)
 		memcpy(&dh6a->dh6adv_relayaddr, &dh6s->dh6sol_relayaddr,
 			sizeof(dh6s->dh6sol_relayaddr));
 		dst.sin6_addr = dh6a->dh6adv_relayaddr;
-		if (inet_pton(AF_INET6, "2000::", &target, sizeof(target)) != 1) {
+		if (inet_pton(AF_INET6, "2000::", &target) != 1) {
 			errx(1, "inet_pton failed");
 			/*NOTREACHED*/
 		}
 		if (getifaddr(&myaddr, device, &target, 3) != 0) {
-			if (inet_pton(AF_INET6, "fec0::", &target, sizeof(target)) != 1) {
+			if (inet_pton(AF_INET6, "fec0::", &target) != 1) {
 				errx(1, "inet_pton failed");
 				/*NOTREACHED*/
 			}
@@ -466,7 +467,7 @@ server6_react_solicit(agent, buf, siz)
 		dst.sin6_addr = dh6s->dh6sol_cliaddr;
 		dst.sin6_scope_id = if_nametoindex(device);
 		dh6a->dh6adv_flags = DH6ADV_SERVPRESENT;
-		if (inet_pton(AF_INET6, "fe80::", &target, sizeof(target)) != 1) {
+		if (inet_pton(AF_INET6, "fe80::", &target) != 1) {
 			errx(1, "inet_pton failed");
 			/*NOTREACHED*/
 		}
@@ -565,12 +566,12 @@ server6_react_request(agent, buf, siz)
 	dh6p->dh6rep_msgtype = DH6_REPLY;
 	if ((dh6r->dh6req_flags & DH6REQ_SERVPRESENT) != 0) {
 		dst.sin6_addr = dh6r->dh6req_relayaddr;
-		if (inet_pton(AF_INET6, "fec0::", &target, sizeof(target)) != 1) {
+		if (inet_pton(AF_INET6, "fec0::", &target) != 1) {
 			errx(1, "inet_pton failed");
 			/*NOTREACHED*/
 		}
 		if (getifaddr(&myaddr, device, &target, 10) != 0) {
-			if (inet_pton(AF_INET6, "2000::", &target, sizeof(target)) != 1) {
+			if (inet_pton(AF_INET6, "2000::", &target) != 1) {
 				errx(1, "inet_pton failed");
 				/*NOTREACHED*/
 			}
@@ -584,7 +585,7 @@ server6_react_request(agent, buf, siz)
 		/* XXX should use ip src on request */
 		dst.sin6_addr = dh6r->dh6req_cliaddr;
 		dst.sin6_scope_id = if_nametoindex(device);
-		if (inet_pton(AF_INET6, "fe80::", &target, sizeof(target)) != 1) {
+		if (inet_pton(AF_INET6, "fe80::", &target) != 1) {
 			errx(1, "inet_pton failed");
 			/*NOTREACHED*/
 		}
@@ -609,8 +610,7 @@ server6_react_request(agent, buf, siz)
 		extbuf.dh6e_type = htons(opt->code);
 		extbuf.dh6e_len = htons(sizeof(struct in6_addr));
 		memcpy(ext, &extbuf, sizeof(extbuf));
-		if (inet_pton(AF_INET6, dnsserv, ext + sizeof(extbuf),
-				sizeof(struct in6_addr)) != 1) {
+		if (inet_pton(AF_INET6, dnsserv, ext + sizeof(extbuf)) != 1) {
 			errx(1, "inet_pton failed");
 			/*NOTREACHED*/
 		}

@@ -43,12 +43,14 @@
 # endif
 #endif
 #include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <string.h>
 #include <err.h>
-#include <netdb.h>
 
 #include <dhcp6.h>
 #include <dhcp6opt.h>
@@ -485,7 +487,7 @@ client6_sendsolicit(s)
 	len = sizeof(*dh6s);
 	memset(dh6s, 0, sizeof(*dh6s));
 	dh6s->dh6sol_msgtype = DH6_SOLICIT;
-	if (inet_pton(AF_INET6, "fe80::", &target, sizeof(target)) != 1) {
+	if (inet_pton(AF_INET6, "fe80::", &target) != 1) {
 		errx(1, "inet_pton failed");
 		/*NOTREACHED*/
 	}
@@ -577,7 +579,7 @@ client6_sendrequest(s, p)
 	dh6r->dh6req_msgtype = DH6_REQUEST;
 	dh6r->dh6req_flags = DH6REQ_CLOSE | DH6REQ_REBOOT;
 	dh6r->dh6req_xid = p->st_xid;
-	if (inet_pton(AF_INET6, "fe80::", &target, sizeof(target)) != 1) {
+	if (inet_pton(AF_INET6, "fe80::", &target) != 1) {
 		errx(1, "inet_pton failed");
 		/*NOTREACHED*/
 	}
@@ -608,12 +610,12 @@ client6_sendrequest(s, p)
 
 		/* is it possible to transmit packets to offlink dst? */
 		offlink = 1;
-		if (inet_pton(AF_INET6, "2000::", &target, sizeof(target)) != 1) {
+		if (inet_pton(AF_INET6, "2000::", &target) != 1) {
 			errx(1, "inet_pton failed");
 			/*NOTREACHED*/
 		}
 		if (getifaddr(&myaddr, device, &target, 3) != 0) {
-			if (inet_pton(AF_INET6, "fec0::", &target, sizeof(target)) != 1) {
+			if (inet_pton(AF_INET6, "fec0::", &target) != 1) {
 				errx(1, "inet_pton failed");
 				/*NOTREACHED*/
 			}
@@ -625,7 +627,7 @@ client6_sendrequest(s, p)
 		offlinkserv = 0;
 	}
 	if (!offlink) {
-		if (inet_pton(AF_INET6, "fe80::", &target, sizeof(target)) != 1) {
+		if (inet_pton(AF_INET6, "fe80::", &target) != 1) {
 			errx(1, "inet_pton failed");
 			/*NOTREACHED*/
 		}
