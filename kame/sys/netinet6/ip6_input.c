@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.74 2000/03/28 14:11:59 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.75 2000/03/28 23:11:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -722,6 +722,10 @@ ip6_input(m)
 	 * Malicious party may be able to use IPv4 mapped addr to confuse
 	 * tcp/udp stack and bypass security checks (act as if it was from
 	 * 127.0.0.1 by using IPv6 src ::ffff:127.0.0.1).  Be cautious.
+	 *
+	 * For SIIT end node behavior, you may want to disable the check.
+	 * However, you will  become vulnerable to attacks using IPv4 mapped
+	 * source.
 	 */
 	if (IN6_IS_ADDR_V4MAPPED(&ip6->ip6_src) ||
 	    IN6_IS_ADDR_V4MAPPED(&ip6->ip6_dst)) {
