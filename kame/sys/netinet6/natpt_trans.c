@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.138 2002/07/31 04:40:44 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.139 2002/07/31 07:40:27 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -895,6 +895,7 @@ struct mbuf *
 natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 {
 	struct pcv	cv6;
+	struct pAddr    pad0;
 	struct mbuf	*m6;
 	struct ip	*ip4 = mtod(cv4->m, struct ip *);
 	struct ip6_hdr	*ip6;
@@ -915,8 +916,15 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 	cv6.fromto = cv4->fromto;
 	cv6.flags  = cv4->flags;
 
-	ip6->ip6_nxt  = IPPROTO_ICMPV6;
-	if ((frag6 = natpt_composeIPv6Hdr(cv4, pad, ip6)) != NULL)
+	/*
+	 * Translated IPv6 source address has IPv4 source address with
+	 * 96-bit NAT-PT prefix.
+	 */
+	bzero(&pad0, sizeof(struct pAddr));
+	pad0.in6src = pad->in6src;
+	pad0.in6dst = natpt_prefix;
+	pad0.in6dst.s6_addr32[3] = ip4->ip_src.s_addr;
+	if ((frag6 = natpt_composeIPv6Hdr(cv4, &pad0, ip6)) != NULL)
 		cv6.pyld.caddr += sizeof(struct ip6_frag);
 
 	icmp4 = cv4->pyld.icmp4;
