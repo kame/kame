@@ -426,6 +426,9 @@ conf_check(char *filename)
 	    struct rpcb   *asp = NULL;
 	    u_int16_t  easnum;
 
+	    i += strlen(sysatom[C_BGP]);
+	    SKIP_WHITE(i);
+
 	    if (strncasecmp(&buf[i], sysatom[C_AS], strlen(sysatom[C_AS]))
 		!= 0) {
 	      syslog(LOG_ERR, "%s:%d syntax error, missing \'%s\'",
