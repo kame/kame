@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.48 2001/06/28 02:47:27 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.49 2001/09/10 08:09:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -114,11 +114,11 @@ static int test __P((struct testitem *, struct testitem *));
 static void sendtest __P((int, int, struct addrinfo *));
 static void conntest __P((int, int, struct addrinfo *));
 
-static char *versionstr = "$KAME: bindtest.c,v 1.48 2001/06/28 02:47:27 jinmei Exp $"; 
+static char *versionstr = "$KAME: bindtest.c,v 1.49 2001/09/10 08:09:17 jinmei Exp $"; 
 static char *port = NULL;
 static char *otheraddr = NULL;
-static struct addrinfo *oai;
-static struct addrinfo *oai6;
+static char *bcastaddr = NULL;
+static struct addrinfo *oai, *oai6, *bai6;
 static int socktype = SOCK_DGRAM;
 static int v6only = 0;
 static int summary = 0;
@@ -136,9 +136,9 @@ main(argc, argv)
 	int ch;
 	extern char *optarg;
 	struct testitem *testi, *testj;
-	char otheraddr6[NI_MAXHOST];
+	char otheraddr6[NI_MAXHOST], bcastaddr6[NI_MAXHOST];;
 
-	while ((ch = getopt(argc, argv, "126Alo:Pp:stv")) != -1) {
+	while ((ch = getopt(argc, argv, "126Ab:lo:Pp:stv")) != -1) {
 		switch (ch) {
 		case '1':
 			connect1st = 1;
@@ -159,6 +159,9 @@ main(argc, argv)
 			fprintf(stderr, "SO_REUSEADDR is not supported\n");
 			exit(1);
 #endif
+			break;
+		case 'b':
+			bcastaddr = optarg;
 			break;
 		case 'l':
 			delayedlisten = 1;
@@ -191,6 +194,7 @@ main(argc, argv)
 		}
 	}
 
+	/* option consistency check */
 	if ((connect1st && connect2nd) || (connect1st && otheraddr) ||
 	    (connect2nd && otheraddr)){
 		fprintf(stderr, "-1, -2, and -o are exclusive.\n");
@@ -199,6 +203,16 @@ main(argc, argv)
 	if ((connect1st || connect2nd) && socktype != SOCK_STREAM) {
 		fprintf(stderr, "-1 or -2 must be specified with -t.\n");
 		exit(1);
+	}
+	if (bcastaddr) {
+		if (summary) {
+			fprintf(stderr, "-b and -s can't coexist.\n");
+			exit(1);
+		}
+		if (socktype != SOCK_DGRAM) {
+			fprintf(stderr, "-s can only allow for UDP.\n");
+			exit(1);
+		}
 	}
 
 #if 0
@@ -241,6 +255,21 @@ main(argc, argv)
 				fprintf(stderr, "getaddrinfo failed\n");
 				exit(1);
 			}
+		}
+	}
+	if (bcastaddr != NULL) {
+		if (strlen("::ffff:") + strlen(bcastaddr) + 1 >
+		    sizeof(bcastaddr6)) {
+			fprintf(stderr, "too long hostname %s",
+				bcastaddr);
+			exit(1);
+		}
+		strcpy(bcastaddr6, "::ffff:");
+		strcat(bcastaddr6, bcastaddr);
+		if ((bai6 = getres(AF_INET6, bcastaddr6, port, 0))
+		    == NULL) {
+			fprintf(stderr, "getaddrinfo failed\n");
+			exit(1);
 		}
 	}
 
@@ -286,8 +315,8 @@ main(argc, argv)
 static void
 usage()
 {
-	fprintf(stderr,
-		"usage: bindtest [-126APlstv] [-o IPv4address] -p port\n");
+	fprintf(stderr, "usage: bindtest [-126APlstv] "
+		"[-b IPv4 broadcast addr] [-o IPv4address] -p port\n");
 }
 
 static void
@@ -530,6 +559,8 @@ test(t1, t2)
 			sendtest(sa, sb, oai);
 		if (oai6 != NULL)
 			sendtest(sa, sb, oai6);
+		if (bai6 != NULL)
+			sendtest(sa, sb, bai6);
 		else if (summary)
 			putchar('-');
 	} else if (socktype == SOCK_STREAM &&
@@ -596,6 +627,16 @@ sendtest(sa, sb, ai)
 		} else
 			putchar('s');
 		goto done;
+	}
+	if (bcastaddr) {
+		int on = 1;
+
+		if (setsockopt(s, SOL_SOCKET, SO_BROADCAST, &on, sizeof(on))
+		    < 0) {
+			printf("\tfailed setsockopt(SO_BROADCAST) "
+				       "for %s, %s\n", printres(ai),
+				       strerror(errno));
+		}
 	}
 #ifdef IPV6_V6ONLY
 	if (v6only && ai->ai_family == AF_INET6) {
