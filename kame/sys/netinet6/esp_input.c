@@ -289,6 +289,13 @@ noreplaycheck:
 			esplen = sizeof(struct newesp);
 	}
 
+	if (m->m_pkthdr.len < off + esplen + ivlen + sizeof(esptail)) {
+		ipseclog((LOG_WARNING,
+		    "IPv4 ESP input: packet too short\n"));
+		ipsecstat.in_inval++;
+		goto bad;
+	}
+
 	if (m->m_len < off + esplen + ivlen) {
 		m = m_pullup(m, off + esplen + ivlen);
 		if (!m) {
@@ -538,7 +545,18 @@ esp6_input(mp, offp, proto)
 		goto bad;
 	}
 
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, ESPMAXLEN, IPPROTO_DONE);
 	ip6 = mtod(m, struct ip6_hdr *);
+	esp = (struct esp *)(((u_int8_t *)ip6) + off);
+#else
+	ip6 = mtod(m, struct ip6_hdr *);
+	IP6_EXTHDR_GET(esp, struct esp *, m, off, ESPMAXLEN);
+	if (esp == NULL) {
+		ipsec6stat.in_inval++;
+		return IPPROTO_DONE;
+	}
+#endif
 
 	if (ntohs(ip6->ip6_plen) == 0) {
 		ipseclog((LOG_ERR, "IPv6 ESP input: "
@@ -546,17 +564,6 @@ esp6_input(mp, offp, proto)
 		ipsec6stat.in_inval++;
 		goto bad;
 	}
-
-#ifndef PULLDOWN_TEST
-	IP6_EXTHDR_CHECK(m, off, ESPMAXLEN, IPPROTO_DONE);
-	esp = (struct esp *)(((u_int8_t *)ip6) + off);
-#else
-	IP6_EXTHDR_GET(esp, struct esp *, m, off, ESPMAXLEN);
-	if (esp == NULL) {
-		ipsec6stat.in_nomem++;
-		return IPPROTO_DONE;
-	}
-#endif
 
 	/* find the sassoc. */
 	spi = esp->esp_spi;
@@ -701,7 +708,25 @@ noreplaycheck:
 			esplen = sizeof(struct newesp);
 	}
 
-	IP6_EXTHDR_CHECK(m, off, esplen + ivlen, IPPROTO_DONE);	/*XXX*/
+	if (m->m_pkthdr.len < off + esplen + ivlen + sizeof(esptail)) {
+		ipseclog((LOG_WARNING,
+		    "IPv6 ESP input: packet too short\n"));
+		ipsecstat.in_inval++;
+		goto bad;
+	}
+
+#ifndef PULLDOWN_TEST
+	IP6_EXTHDR_CHECK(m, off, esplen + ivlen, IPPROTO_DONE);
+	ip6 = mtod(m, struct ip6_hdr *);
+	esp = (struct esp *)(((u_int8_t *)ip6) + off);
+#else
+	IP6_EXTHDR_GET(esp, struct esp *, m, off, esplen + ivlen);
+	if (esp == NULL) {
+		ipsec6stat.in_inval++;
+		m = NULL;
+		goto bad;
+	}
+#endif
 
 	/*
 	 * decrypt the packet.
@@ -821,7 +846,7 @@ noreplaycheck:
 			 * m_pullup is prohibited in KAME IPv6 input processing
 			 * but there's no other way!
 			 */
-#endif
+#else
 			/* okay to pullup in m_pulldown world. */
 #endif
 			m = m_pullup(m, sizeof(*ip6));
