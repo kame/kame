@@ -2,6 +2,7 @@
 
 ip6router=NO
 ip6mrouter=NO
+inet6d_enable=NO
 
 if [ X"${ip6router}" = X"YES" ]; then
 	#
