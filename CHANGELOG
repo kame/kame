@@ -1,11 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.120 1999/09/16 04:57:29 jinmei Exp $
+$Id: CHANGELOG,v 1.121 1999/09/16 04:57:58 jinmei Exp $
 
 
 <199909>
 1999-09-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* bsdi3/usr.bin/ppp/ppp_ipv6cp.c: was written not to use
+	* bsdi3/usr.bin/ppp/ppp_ipv6cp.c: was rewritten not to use
 	s6_addr{16, 32}, which might cause portability problems.
 
 1999-09-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
