@@ -1,7 +1,7 @@
 SRCDIR=	${.CURDIR}/../../kame/rtadvd
 
 PROG=	rtadvd
-SRCS=	rtadvd.c rrenum.c advcap.c if.c config.c timer.c
+SRCS=	rtadvd.c rrenum.c advcap.c if.c config.c timer.c dump.
 
 CPPFLAGS+=-DINET6 -DMIP6
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
