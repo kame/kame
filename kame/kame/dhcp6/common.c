@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.96 2004/01/20 23:23:37 suz Exp $	*/
+/*	$KAME: common.c,v 1.97 2004/03/21 14:40:51 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -874,6 +874,7 @@ dhcp6_init_options(optinfo)
 
 	optinfo->pref = DH6OPT_PREF_UNDEF;
 	optinfo->elapsed_time = DH6OPT_ELAPSED_TIME_UNDEF;
+	optinfo->lifetime = DH6OPT_LIFETIME_UNDEF;
 
 	TAILQ_INIT(&optinfo->iapd_list);
 	TAILQ_INIT(&optinfo->reqopt_list);
@@ -976,6 +977,7 @@ dhcp6_get_options(p, ep, optinfo)
 	u_int16_t num;
 	char *cp, *val;
 	u_int16_t val16;
+	u_int32_t val32;
 	struct dhcp6opt_ia optia;
 	struct dhcp6_ia ia;
 	struct dhcp6_list sublist;
@@ -1283,6 +1285,18 @@ dhcp6_get_options(p, ep, optinfo)
 		case DH6OPT_PREFIX_DELEGATION:
 			if (get_delegated_prefixes(cp, cp + optlen, optinfo))
 				goto fail;
+			break;
+		case DH6OPT_LIFETIME:
+			if (optlen != 4)
+				goto malformed;
+			memcpy(&val32, cp, sizeof(val32));
+			val32 = ntohl(val32);
+			dprintf(LOG_DEBUG, "", "   lifetime: %lu", val32);
+			if (optinfo->lifetime != DH6OPT_LIFETIME_UNDEF) {
+				dprintf(LOG_INFO, FNAME,
+				    "duplicated lifetime option");
+			} else
+				optinfo->lifetime = (int64_t)val32;
 			break;
 		default:
 			/* no option specific behavior */
@@ -1887,6 +1901,13 @@ dhcp6_set_options(bp, ep, optinfo)
 			    optinfo->ifidopt_id, p);
 	}
 
+	if (optinfo->lifetime != DH6OPT_LIFETIME_UNDEF) {
+		u_int32_t p32 = (u_int32_t)optinfo->lifetime;
+
+		p32 = htonl(p32);
+		COPY_OPTION(DH6OPT_LIFETIME, sizeof(p32), &p32, p);
+	}
+
 	return (len);
 
   fail:
@@ -2131,6 +2152,10 @@ dhcp6_reset_timer(ev)
 		 * MUST be delayed by a random amount of time between
 		 * 0 and SOL_MAX_DELAY.
 		 * [RFC3315 17.1.2]
+		 * XXX: a random delay is also necessary before the first
+		 * information-request message.  Fortunately, the parameters
+		 * and the algorithm for these two cases are same.
+		 * [RFC3315 18.1.5]
 		 */
 		ev->retrans = (random() % (SOL_MAX_DELAY));
 		break;
@@ -2267,6 +2292,8 @@ dhcp6optstr(type)
 		return ("IA_PD");
 	case DH6OPT_IA_PD_PREFIX:
 		return ("IA_PD prefix");
+	case DH6OPT_LIFETIME:
+		return ("Lifetime");
 	default:
 		snprintf(genstr, sizeof(genstr), "opt_%d", type);
 		return (genstr);

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.25 2004/01/20 07:24:44 suz Exp $	*/
+/*	$KAME: cfparse.y,v 1.26 2004/03/21 14:40:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -83,6 +83,7 @@ extern void yyerror __P((char *, ...))
 static struct cf_namelist *iflist_head, *hostlist_head, *iapdlist_head;
 struct cf_list *cf_dns_list, *cf_dns_name_list, *cf_ntp_list;
 struct cf_list *cf_sip_list, *cf_sip_name_list;
+long long cf_lifetime = -1;
 
 extern int yylex __P((void));
 static void cleanup __P((void));
@@ -95,7 +96,7 @@ static void cleanup_cflist __P((struct cf_list *));
 %token ID_ASSOC IA_PD IAID
 %token REQUEST SEND ALLOW PREFERENCE
 %token HOST HOSTNAME DUID
-%token OPTION RAPID_COMMIT IA_PD DNS_SERVERS DNS_NAME NTP_SERVERS
+%token OPTION RAPID_COMMIT IA_PD DNS_SERVERS DNS_NAME NTP_SERVERS LIFETIME
 %token SIP_SERVERS SIP_NAME
 %token INFO_ONLY
 %token SCRIPT
@@ -210,6 +211,23 @@ option_statement:
 			} else {
 				cf_sip_name_list->tail->next = l;
 				cf_sip_name_list->tail = l->next;
+			}
+		}
+	|	OPTION LIFETIME NUMBER EOS
+		{
+			if (cf_lifetime == -1) {
+				cf_lifetime = $3;
+				if (cf_lifetime < -1 ||
+				    cf_lifetime > 0xffffffff) {
+					/*
+					 * lifetime should not be negative
+					 * according to the lex definition,
+					 * but check it for safety.
+					 */
+					yyerror("lifetime is out of range");
+				}
+			} else {
+				yywarn("multiple lifetimes (ignored)");
 			}
 		}
 	;
@@ -430,11 +448,19 @@ dhcpoption:
 			/* currently no value */
 			$$ = l;
 		}
-	|	NTP_SERVERS	
+	|	NTP_SERVERS
 		{
 			struct cf_list *l;
 
 			MAKE_CFLIST(l, DHCPOPT_NTP, NULL, NULL);
+			/* currently no value */
+			$$ = l;
+		}
+	|	LIFETIME
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, DHCPOPT_LIFETIME, NULL, NULL);
 			/* currently no value */
 			$$ = l;
 		}

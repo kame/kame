@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.28 2004/01/20 07:24:44 suz Exp $	*/
+/*	$KAME: cftoken.l,v 1.29 2004/03/21 14:40:51 jinmei Exp $	*/
 
 %{
 /*
@@ -162,6 +162,7 @@ ecl		\}
 <S_CNF>sip-server-address { DECHO; return (SIP_SERVERS); }
 <S_CNF>sip-server-domain-name { DECHO; return (SIP_NAME); }
 <S_CNF>ntp-servers { DECHO; return (NTP_SERVERS); }
+<S_CNF>lifetime { DECHO; return (LIFETIME); }
 
 	/* generic options */
 <S_CNF>information-only { DECHO; return (INFO_ONLY); }

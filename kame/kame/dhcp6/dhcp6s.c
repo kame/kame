@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.115 2004/01/22 11:48:59 suz Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.116 2004/03/21 14:40:51 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -785,7 +785,8 @@ set_statelessinfo(optinfo)
 {
 	/* SIP server domain name */
 	if (dhcp6_copy_list(&optinfo->sipname_list, &sipnamelist)) {
-		dprintf(LOG_ERR, FNAME, "failed to copy SIP server domain list");
+		dprintf(LOG_ERR, FNAME,
+		    "failed to copy SIP server domain list");
 		return (-1);
 	}
 
@@ -812,6 +813,10 @@ set_statelessinfo(optinfo)
 		dprintf(LOG_ERR, FNAME, "failed to copy NTP servers");
 		return (-1);
 	}
+
+	/* Lifetime */
+	if (optlifetime != -1)
+		optinfo->lifetime = (int64_t)optlifetime;
 
 	return (0);
 }

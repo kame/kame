@@ -1,5 +1,5 @@
 #
-# $Id: Makefile.in,v 1.28 2003/11/25 03:52:05 jinmei Exp $
+# $Id: Makefile.in,v 1.29 2004/03/21 14:40:51 jinmei Exp $
 #
 
 srcdir=	@srcdir@
@@ -25,6 +25,7 @@ CFLAGS+= @DHCPOPT_DNS@ @DH6OPT_DNSNAME@ \
 	-DCONF_DH6OPT_PREFIX_INFORMATION=@dhcpopt_pinfo@ \
 	-DCONF_DH6OPT_PREFIX_REQUEST=@dhcpopt_preq@ \
 	-DCONF_DH6OPT_NTP=@dhcpopt_ntp@ \
+	-DCONF_DH6OPT_LIFETIME=@dhcpopt_lifetime@
 
 GENSRCS=cfparse.c cftoken.c
 CLIENTOBJS=	dhcp6c.o common.o config.o prefixconf.o dhcp6c_ia.o timer.o \

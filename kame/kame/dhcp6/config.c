@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.37 2004/01/20 07:24:45 suz Exp $	*/
+/*	$KAME: config.c,v 1.38 2004/03/21 14:40:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -51,11 +51,13 @@ extern int errno;
 
 struct prefix_ifconf *prefix_ifconflist;
 struct dhcp6_list siplist, sipnamelist, dnslist, dnsnamelist, ntplist;
+long long optlifetime = -1;
 
 static struct dhcp6_ifconf *dhcp6_ifconflist;
 struct ia_conflist ia_conflist0;
 static struct host_conf *host_conflist0, *host_conflist;
 static struct dhcp6_list siplist0, sipnamelist0, dnslist0, dnsnamelist0, ntplist0;
+static long long optlifetime0;
 
 enum { DHCPOPTCODE_SEND, DHCPOPTCODE_REQUEST, DHCPOPTCODE_ALLOW };
 
@@ -79,6 +81,7 @@ struct dhcp6_ifconf {
 
 extern struct cf_list *cf_dns_list, *cf_dns_name_list, *cf_ntp_list;
 extern struct cf_list *cf_sip_list, *cf_sip_name_list;
+extern long long cf_lifetime;
 extern char *configfilename;
 
 static int add_pd_pif __P((struct iapd_conf *, struct cf_list *));
@@ -617,6 +620,9 @@ configure_global_option()
 		}
 	}
 
+	/* Lifetime for stateless options */
+	optlifetime0 = cf_lifetime;
+
 	return (0);
 
   bad:
@@ -760,6 +766,7 @@ configure_cleanup()
 	TAILQ_INIT(&dnsnamelist0);
 	dhcp6_clear_list(&ntplist0);
 	TAILQ_INIT(&ntplist0);
+	optlifetime0 = -1;
 }
 
 void
@@ -827,6 +834,9 @@ configure_commit()
 	/* commit NTP addresses */
 	dhcp6_clear_list(&ntplist);
 	dhcp6_move_list(&ntplist, &ntplist0);
+
+	/* commit option lifetime */
+	optlifetime = optlifetime0;
 }
 
 static void
@@ -978,6 +988,7 @@ add_options(opcode, ifc, cfl0)
 		case DHCPOPT_DNS:
 		case DHCPOPT_DNSNAME:
 		case DHCPOPT_NTP:
+		case DHCPOPT_LIFETIME:
 			switch (cfl->type) {
 			case DHCPOPT_SIP:
 				opttype = DH6OPT_SIP_SERVER_A;
@@ -993,6 +1004,9 @@ add_options(opcode, ifc, cfl0)
 				break;
 			case DHCPOPT_NTP:
 				opttype = DH6OPT_NTP;
+				break;
+			case DHCPOPT_LIFETIME:
+				opttype = DH6OPT_LIFETIME;
 				break;
 			}
 			switch(opcode) {

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.46 2004/01/20 07:24:45 suz Exp $	*/
+/*	$KAME: dhcp6.h,v 1.47 2004/03/21 14:40:51 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -145,6 +145,7 @@ struct dhcp6_optinfo {
 	int rapidcommit;	/* bool */
 	int pref;		/* server preference */
 	int32_t elapsed_time;	/* elapsed time (from client to server only) */
+	int64_t lifetime;	/* lifetime for stateless options */
 
 	struct dhcp6_list iapd_list; /* list of IA_PD */
 	struct dhcp6_list reqopt_list; /* options in option request */
@@ -251,8 +252,10 @@ struct dhcp6_relay {
 #define DH6OPT_PREFIX_INFORMATION CONF_DH6OPT_PREFIX_INFORMATION
 #define DH6OPT_PREFIX_REQUEST CONF_DH6OPT_PREFIX_REQUEST
 
-/* The following one is KAME specific. */
+/* The followings are KAME specific. */
 #define DH6OPT_NTP CONF_DH6OPT_NTP
+#define DH6OPT_LIFETIME CONF_DH6OPT_LIFETIME
+#  define DH6OPT_LIFETIME_UNDEF -1
 
 struct dhcp6opt {
 	u_int16_t dh6opt_type;

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.127 2004/01/22 11:48:59 suz Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.128 2004/03/21 14:40:51 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -116,7 +116,9 @@ static int construct_reqdata __P((struct dhcp6_if *, struct dhcp6_optinfo *,
 static void destruct_iadata __P((struct dhcp6_eventdata *));
 static void tv_sub __P((struct timeval *, struct timeval *, struct timeval *));
 
+static struct dhcp6_timer *client6_expire_lifetime __P((void *));
 struct dhcp6_timer *client6_timo __P((void *));
+
 int client6_ifinit __P((struct dhcp6_if *));
 
 extern int client6_script __P((char *, int, struct dhcp6_optinfo *));
@@ -526,6 +528,20 @@ client6_mainloop()
 			client6_recv();
 		}
 	}
+}
+
+static struct dhcp6_timer *
+client6_expire_lifetime(arg)
+	void *arg;
+{
+	struct dhcp6_if *ifp = arg;
+
+	dprintf(LOG_INFO, FNAME, "lifetime on %s expired", ifp->ifname);
+
+	dhcp6_remove_timer(&ifp->timer);
+	client6_ifinit(ifp);
+
+	return (NULL);
 }
 
 struct dhcp6_timer *
@@ -1423,10 +1439,12 @@ client6_recvreply(ifp, dh6, len, optinfo)
 
 		for (d = TAILQ_FIRST(&optinfo->sipname_list); d;
 		     d = TAILQ_NEXT(d, link), i++) {
-			dprintf(LOG_DEBUG, FNAME, "SIP server domain name[%d] %s",
+			dprintf(LOG_DEBUG, FNAME,
+			    "SIP server domain name[%d] %s",
 			    i, d->val_vbuf.dv_buf);
 		}
 	}
+
 	/*
 	 * Call the configuration script, if specified, to handle various
 	 * configuration parameters.
@@ -1434,6 +1452,42 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	if (ifp->scriptpath != NULL && strlen(ifp->scriptpath) != 0) {
 		dprintf(LOG_DEBUG, FNAME, "executes %s", ifp->scriptpath);
 		client6_script(ifp->scriptpath, state, optinfo);
+	}
+
+	/*
+	 * Set timer if an option lifetime is specified in a reply to
+	 * information-request.  We do not use the value in the stateful
+	 * configuration case (the spec is not clear in such a case).
+	 */
+	if (optinfo->lifetime != DH6OPT_LIFETIME_UNDEF) {
+		if (state != DHCP6S_INFOREQ)
+			dprintf(LOG_DEBUG, FNAME, "ignore lifetime option");
+		else {
+			ifp->timer =
+			    dhcp6_add_timer(client6_expire_lifetime, ifp);
+			if (ifp->timer == NULL) {
+				dprintf(LOG_WARNING, FNAME,
+				    "failed to add timer for option lifetime");
+			} else {
+				struct timeval tv;
+
+				tv.tv_sec = (long)optinfo->lifetime;
+				tv.tv_usec = 0;
+
+				if (tv.tv_sec < 0) {
+					/*
+					 * XXX: tv_sec can overflow for an
+					 * unsigned 32bit value.
+					 */
+					dprintf(LOG_WARNING, FNAME,
+					    "lifetime is too large: %lu",
+					    (u_int32_t)optinfo->lifetime);
+					tv.tv_sec = 0x7fffffff;	/* XXX */
+				}
+
+				dhcp6_set_timer(&tv, ifp->timer);
+			}
+		}
 	}
 
 	/* update stateful configuration information */
