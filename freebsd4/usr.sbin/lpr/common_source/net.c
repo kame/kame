@@ -79,9 +79,7 @@ extern uid_t	uid, euid;
 int
 getport(const struct printer *pp, const char *rhost, int rport)
 {
-	struct hostent *hp;
-	struct servent *sp;
-	struct sockaddr_in sin;
+	struct addrinfo hints, *res, *ai;
 	int s, timo = 1, lport = IPPORT_RESERVED - 1;
 	int err;
 
@@ -90,35 +88,27 @@ getport(const struct printer *pp, const char *rhost, int rport)
 	 */
 	if (rhost == NULL)
 		fatal(pp, "no remote host to connect to");
-	bzero((char *)&sin, sizeof(sin));
-	sin.sin_len = sizeof sin;
-	sin.sin_family = AF_INET;
-	if (inet_aton(rhost, &sin.sin_addr) == 0) {
-		hp = gethostbyname2(rhost, AF_INET);
-		if (hp == NULL)
-			fatal(pp, "cannot resolve %s: %s", rhost, 
-			      hstrerror(h_errno));
-		/* XXX - should deal with more addresses */
-		sin.sin_addr = *(struct in_addr *)hp->h_addr_list[0];
-	}
-	if (rport == 0) {
-		sp = getservbyname("printer", "tcp");
-		if (sp == NULL)
-			fatal(pp, "printer/tcp: unknown service");
-		sin.sin_port = sp->s_port;
-	} else
-		sin.sin_port = htons(rport);
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = 0;
+	err = getaddrinfo(rhost, (rport == 0 ? "printer" : NULL), &hints, &res);
+	if (err)
+		fatal(pp, "%s\n", gai_strerror(err));
+	if (rport != 0)
+		((struct sockaddr_in *) res->ai_addr)->sin_port = htons(rport);
 
 	/*
 	 * Try connecting to the server.
 	 */
+	ai = res;
 retry:
 	seteuid(euid);
-	s = rresvport(&lport);
+	s = rresvport_af(&lport, ai->ai_family);
 	seteuid(uid);
 	if (s < 0)
 		return(-1);
-	if (connect(s, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
+	if (connect(s, ai->ai_addr, ai->ai_addrlen) < 0) {
 		err = errno;
 		(void) close(s);
 		errno = err;
@@ -136,8 +126,14 @@ retry:
 			timo *= 2;
 			goto retry;
 		}
+		if (ai->ai_next != NULL) {
+			ai = ai->ai_next;
+			goto retry;
+		}
+		freeaddrinfo(res);
 		return(-1);
 	}
+	freeaddrinfo(res);
 	return(s);
 }
 
@@ -170,7 +166,9 @@ checkremote(struct printer *pp)
 		/* get the addresses of the local host */
 		gethostname(name, sizeof(name));
 		name[sizeof(name) - 1] = '\0';
-		hp = gethostbyname2(name, AF_INET);
+		hp = gethostbyname2(name, AF_INET6);
+		if (hp == NULL)
+		    hp = gethostbyname2(name, AF_INET);
 		if (hp == (struct hostent *) NULL) {
 			asprintf(&err, "unable to get official name "
 				 "for local machine %s: %s",
@@ -190,6 +188,9 @@ checkremote(struct printer *pp)
 			localaddrs[i] = *(struct in_addr *)hp->h_addr_list[i];
 
 		/* get the official name of RM */
+		hp = gethostbyname2(pp->remote_host, AF_INET6);
+		if (hp == NULL)
+		    hp = gethostbyname2(pp->remote_host, AF_INET);
 		hp = gethostbyname2(pp->remote_host, AF_INET);
 		if (hp == (struct hostent *) NULL) {
 			asprintf(&err, "unable to get address list for "
