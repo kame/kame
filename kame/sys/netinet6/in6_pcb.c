@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.79 2000/12/03 00:53:59 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.80 2000/12/04 09:08:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -247,13 +247,13 @@ in6_pcbbind(in6p, nam)
 			/*
 			 * XXX: bind to an anycast address might accidentally
 			 * cause sending a packet with anycast source address.
+			 * We should allow to bind a deprecated address, since
+			 * the application dare to use it.
 			 */
 			if (ia &&
 			    ((struct in6_ifaddr *)ia)->ia6_flags &
-			    (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY|
-			     IN6_IFF_DETACHED|IN6_IFF_DEPRECATED)) {
+			    (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY|IN6_IFF_DETACHED))
 				return(EADDRNOTAVAIL);
-			}
 		}
 		if (lport) {
 #if !(defined(__NetBSD__) && !defined(IPNOPRIVPORTS))
