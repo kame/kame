@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.135 2004/02/13 02:52:09 keiichi Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.136 2004/03/10 09:32:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -592,15 +592,23 @@ ip6_forward(m, srcrt)
 	 * we need an explicit check because we may mistakenly forward the
 	 * packet to a different zone by (e.g.) a default route.
 	 */
-#if 0 /*XXX*/
-	if (in6_addr2zoneid(rt->rt_ifp, &ip6->ip6_dst, &dstzone) ||
-	    sa6_dst.sin6_scope_id != dstzone) {
+	bzero(&sin6, sizeof(sin6));
+	sin6.sin6_family = AF_INET6;
+	sin6.sin6_len = sizeof(struct sockaddr_in6);
+	if (in6_recoverscope(&sin6, &ip6->ip6_dst, m->m_pkthdr.rcvif) != 0) {
+		/* XXX: this should not happen */
 		ip6stat.ip6s_cantforward++;
 		ip6stat.ip6s_badscope++;
 		m_freem(m);
 		return;
 	}
-#endif
+	if (in6_addr2zoneid(rt->rt_ifp, &ip6->ip6_dst, &dstzone) ||
+	    sin6.sin6_scope_id != dstzone) {
+		ip6stat.ip6s_cantforward++;
+		ip6stat.ip6s_badscope++;
+		m_freem(m);
+		return;
+	}
 
 	if (m->m_pkthdr.len > IN6_LINKMTU(rt->rt_ifp)) {
 		in6_ifstat_inc(rt->rt_ifp, ifs6_in_toobig);
