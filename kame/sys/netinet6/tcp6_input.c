@@ -2042,11 +2042,7 @@ tcp6_rtlookup(in6p)
 		ro->ro_dst.sin6_len = sizeof(struct sockaddr_in6);
 		((struct sockaddr_in6 *) &ro->ro_dst)->sin6_addr =
 			in6p->in6p_faddr;
-#ifdef __FreeBSD__
-		rtcalloc((struct route *)ro);
-#else
 		rtalloc((struct route *)ro);
-#endif
 	}
 	return(ro->ro_rt);
 }

@@ -621,7 +621,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 						     ->ro_dst, 0);
 #endif /*__bsdi__*/
 			} else {
-				rtcalloc((struct route *)ro);
+				rtalloc((struct route *)ro);
 			}
 		}
 

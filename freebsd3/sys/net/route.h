@@ -334,9 +334,6 @@ int	 rt_setgate __P((struct rtentry *,
 	    struct sockaddr *, struct sockaddr *));
 void	 rtalloc __P((struct route *));
 void	 rtalloc_ign __P((struct route *, unsigned long));
-#if 1 /*for INET6*/
-void	 rtcalloc __P((struct route *));
-#endif
 struct rtentry *
 	 rtalloc1 __P((struct sockaddr *, int, unsigned long));
 void	 rtfree __P((struct rtentry *));

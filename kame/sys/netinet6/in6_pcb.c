@@ -639,13 +639,8 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 				ro->ro_rt = rtalloc1(&((struct route *)ro)
 						     ->ro_dst, 0);
 #endif /*__bsdi__*/
-			} else {
-#ifdef __FreeBSD__
-				rtcalloc((struct route *)ro);
-#else
+			} else
 				rtalloc((struct route *)ro);
-#endif
-			}
 		}
 
 		/*

@@ -569,7 +569,7 @@ skip_ipsec2:;
 		 * ifp must point it.
 		 */
 		if (ro->ro_rt == 0) {
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__) || defined(__FreeBSD__)
 			/*
 			 * NetBSD/OpenBSD always clones routes, if parent is
 			 * PRF_CLONING.
@@ -779,11 +779,7 @@ skip_ipsec2:;
 			sin6_fin->sin6_len = sizeof(struct sockaddr_in6);
 			sin6_fin->sin6_addr = finaldst;
 
-#ifdef __FreeBSD__
-			rtcalloc((struct route *)ro_pmtu);
-#else
 			rtalloc((struct route *)ro_pmtu);
-#endif
 		}
 	}
 	if (ro_pmtu->ro_rt != NULL) {
