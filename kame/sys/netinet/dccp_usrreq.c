@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.44 2005/01/21 09:00:07 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.45 2005/01/25 06:54:54 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -420,6 +420,9 @@ dccp_input(struct mbuf *m, ...)
 		if (in6_cksum(m, IPPROTO_DCCP, off, cslen) != 0) {
 			DCCP_DEBUG((LOG_INFO, "Bad checksum, not dropping packet!, dh->dh_sum = 0x%04x\n", dh->dh_sum));
 			dccpstat.dccps_badsum++;
+#if 0
+			goto badunlocked;
+#endif
 		} else {
 			DCCP_DEBUG((LOG_INFO, "Correct checksum, dh->dh_sum = 0x%04x off = %u, cslen = %u\n", dh->dh_sum, off, cslen));
 		}
@@ -431,9 +434,11 @@ dccp_input(struct mbuf *m, ...)
 		dh->dh_sum = in4_cksum(m, IPPROTO_DCCP, off, cslen);
 
 		if (dh->dh_sum) {
-			DCCP_DEBUG((LOG_INFO, "Bad checksum, dropping packet!, dh->dh_sum = 0x%04x\n", dh->dh_sum));
+			DCCP_DEBUG((LOG_INFO, "Bad checksum, not dropping packet!, dh->dh_sum = 0x%04x\n", dh->dh_sum));
 			dccpstat.dccps_badsum++;
+#if 0
 			goto badunlocked;
+#endif
 		} else {
 			DCCP_DEBUG((LOG_INFO, "Correct checksum, dh->dh_sum = 0x%04x\n", dh->dh_sum));
 		}
@@ -2867,6 +2872,7 @@ dccp_newdccpcb(struct inpcb *inp)
 	callout_init(&dp->close_timer, 0);
 	callout_init(&dp->timewait_timer, 0);
 #elif defined(__OpenBSD__)
+	/* nothing to be done here */
 #else
 	callout_init(&dp->connect_timer);
 	callout_init(&dp->retrans_timer);
