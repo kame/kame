@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.12 2001/06/21 04:18:58 itojun Exp $
+$KAME: FAQ,v 1.13 2001/06/21 04:23:56 itojun Exp $
 
 
 GENERAL
@@ -51,6 +51,18 @@ Which version of IPv6/IPsec does KAME support?
 Q: Why does KAME separate ping6 from ping (for IPv4), and traceroute6 from
    traceroute (for IPv4)?
 	TBD
+
+Q: Are there other documents/FAQ lists I may want to check?
+	- Depending on which BSD you are using, you will want to check the
+	  project webpages, like http://www.openbsd.org/,
+	  http://www.netbsd.org/, or http://www.freebsd.org/.
+	- If you are using KAME patch kit (like weekly snap, not the integrated
+	  *BSD releases), you really need to go through all the documents
+	  shipped in tar.gz.
+	- http://www.kame.net/ has links to a set of good documents.
+	- http://www.ipv6.org/, and http://www.jp.ipv6.org/ (if you can read
+	  Japanese texts).
+
 
 INSTALLATION
 ============
