@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.16 2003/07/24 07:11:18 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.17 2003/07/25 09:15:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -897,6 +897,8 @@ mip6_bc_list_insert(mbc_list, mbc)
 	}
 	mip6_bc_hash[id] = mbc;
 
+	mbc->mbc_refcnt++;
+
 #ifdef MIP6_CALLOUTTEST
 	mbc->mbc_timeout = mip6_timeoutentry_insert(mbc->mbc_expire, (caddr_t)mbc); /* For BC expiration */
 	mbc->mbc_brr_timeout = mip6_timeoutentry_insert(mbc->mbc_expire - mbc->mbc_lifetime / 4, (caddr_t)mbc); /* For BRR */
@@ -941,28 +943,39 @@ mip6_bc_list_remove(mbc_list, mbc)
 		mip6_timeoutentry_remove(mbc->mbc_timeout);
 	}
 #endif
+
+	mbc->mbc_refcnt--;
+	if (mbc->mbc_flags & IP6MU_CLONED) {
+		if (mbc->mbc_refcnt > 1)
+			return (0);
+	} else {
+		if (mbc->mbc_refcnt > 0)
+			return (0);
+	}
 	LIST_REMOVE(mbc, mbc_entry);
 #ifdef MIP6_HOME_AGENT
 	if (mbc->mbc_flags & IP6MU_HOME) {
-		error = mip6_bc_proxy_control(&mbc->mbc_phaddr, &mbc->mbc_addr,
-					      RTM_DELETE);
-		if (error) {
-			mip6log((LOG_ERR,
-				 "%s:%d: can't delete a proxy ND entry "
-				 "for %s.\n",
-				 __FILE__, __LINE__,
-				 ip6_sprintf(&mbc->mbc_phaddr.sin6_addr)));
-		}
-		error = mip6_tunnel_control(MIP6_TUNNEL_DELETE,
-				    mbc,
-				    mip6_bc_encapcheck,
-				    &mbc->mbc_encap);
-		if (error) {
-			mip6log((LOG_ERR,
-				 "%s:%d: tunnel control error (%d)"
-				 "for %s.\n",
-				 __FILE__, __LINE__, error,
-				 ip6_sprintf(&mbc->mbc_phaddr.sin6_addr)));
+		if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
+			mip6_dad_stop(mbc);
+		} else {
+			error = mip6_bc_proxy_control(&mbc->mbc_phaddr,
+			    &mbc->mbc_addr, RTM_DELETE);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "%s:%d: can't delete a proxy ND entry "
+				    "for %s.\n",
+				    __FILE__, __LINE__,
+				    ip6_sprintf(&mbc->mbc_phaddr.sin6_addr)));
+			}
+			error = mip6_tunnel_control(MIP6_TUNNEL_DELETE,
+			    mbc, mip6_bc_encapcheck, &mbc->mbc_encap);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "%s:%d: tunnel control error (%d)"
+				    "for %s.\n",
+				    __FILE__, __LINE__, error,
+				    ip6_sprintf(&mbc->mbc_phaddr.sin6_addr)));
+			}
 		}
 	}
 #endif /* MIP6_HOME_AGENT */
@@ -1166,8 +1179,7 @@ mip6_bc_timeout(dummy)
 #else
 	struct mip6_bc *mbc, *mbc_next;
 #ifdef MIP6_HOME_AGENT
-	struct mip6_bc *llmbc;
-	int error;
+	int error = 0;
 #endif /* MIP6_HOME_AGENT */
 #endif /* MIP6_CALLOUTTEST */
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -1202,33 +1214,18 @@ mip6_bc_timeout(dummy)
 #else
 	for (mbc = LIST_FIRST(&mip6_bc_list); mbc; mbc = mbc_next) {
 		mbc_next = LIST_NEXT(mbc, mbc_entry);
-
-#ifdef MIP6_HOME_AGENT
-		/*
-		 * a cloned entry must be removed only when the last
-		 * entry of original entries is removed.
-		 */
-		if ((mbc->mbc_flags & IP6MU_CLONED) != 0)
-			continue;
-#endif /* MIP6_HOME_AGENT */
-
 		/* expiration check. */
 		if (mbc->mbc_expire < time_second) {
 #ifdef MIP6_HOME_AGENT
-			llmbc = mbc->mbc_llmbc;
-			if (llmbc != NULL) {
-				llmbc->mbc_refcnt--;
-				if (llmbc->mbc_refcnt == 0) {
-					/* remove a cloned entry. */
-					error = mip6_bc_list_remove(
-					    &mip6_bc_list,
-					    llmbc);
-					if (error) {
-						mip6log((LOG_ERR,
-						    "%s:%d: failed to remove a cloned binding cache entry.\n",
-						    __FILE__, __LINE__));
-					}
-				}
+			if (mbc->mbc_llmbc)
+				/* remove a cloned entry. */
+				error = mip6_bc_list_remove(&mip6_bc_list,
+				    mbc->mbc_llmbc);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "%s:%d: failed to remove "
+				    "a cloned binding cache entry.\n",
+				    __FILE__, __LINE__));
 			}
 			/*
 			 * we must reset mbc_next.  since a removal of

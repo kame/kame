@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.5 2003/07/24 08:29:14 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.6 2003/07/25 09:15:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -83,7 +83,6 @@
 
 /* home registration processing. */
 static int mip6_dad_start(struct mip6_bc *);
-static int mip6_dad_stop(struct mip6_bc *);
 
 int
 mip6_process_hrbu(bi)
@@ -319,7 +318,7 @@ int
 mip6_process_hurbu(bi)
 	struct mip6_bc *bi;
 {
-	struct mip6_bc *llmbc, *mbc;
+	struct mip6_bc *mbc;
 	struct nd_prefix *pr;
 	struct ifnet *hifp = NULL;
 	int error = 0;
@@ -345,34 +344,25 @@ mip6_process_hurbu(bi)
 		return (0); /* XXX is 0 OK? */
 	}
 
+	/* remove a global unicast home binding cache entry. */
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &bi->mbc_phaddr);
 	if (mbc == NULL) {
 		/* XXX panic */
 		return (0);
 	}
-	if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
-		mip6_dad_stop(mbc);
-	} else {
-		/* remove rtable for proxy ND */
-		if (mip6_bc_proxy_control(&bi->mbc_phaddr, &bi->mbc_addr,
-			RTM_DELETE)) {
-			/* XXX UNSPECIFIED */
-			return (-1);
-		}
-
-		/* remove encapsulation entry */
-		if (mip6_tunnel_control(MIP6_TUNNEL_DELETE, mbc,
-			mip6_bc_encapcheck, &mbc->mbc_encap)) {
-			/* XXX UNSPECIFIED */
-			return (-1);
+	if ((bi->mbc_flags & IP6MU_LINK) &&  (mbc->mbc_llmbc != NULL)) {
+		/* remove a link-local binding cache entry. */
+		error = mip6_bc_list_remove(&mip6_bc_list, mbc->mbc_llmbc);
+		if (error) {
+			mip6log((LOG_ERR,
+			    "%s:%d: can't remove BC.\n",
+			    __FILE__, __LINE__));
+			bi->mbc_status = IP6MA_STATUS_UNSPECIFIED;
+			bi->mbc_send_ba = 1;
+			bi->mbc_lifetime = bi->mbc_refresh = 0;
+			return (error);
 		}
 	}
-
-	/* remove a BC entry. */
-	if (bi->mbc_flags & IP6MU_LINK)
-		llmbc = mbc->mbc_llmbc;
-	else
-		llmbc = NULL;
 	error = mip6_bc_list_remove(&mip6_bc_list, mbc);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -382,42 +372,6 @@ mip6_process_hurbu(bi)
 		bi->mbc_send_ba = 1;
 		bi->mbc_lifetime = bi->mbc_refresh = 0;
 		return (error);
-	}
-
-	if (llmbc != NULL) { /* 'L'=1 */
-		llmbc->mbc_refcnt--;
-		if (llmbc->mbc_refcnt == 0) {
-			if ((llmbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
-				mip6_dad_stop(llmbc);
-			} else {
-				/* remove rtable for proxy ND */
-				if (mip6_bc_proxy_control(&bi->mbc_phaddr,
-					&bi->mbc_addr, RTM_DELETE)) {
-					/* XXX UNSPECIFIED */
-					return (-1);
-				}
-
-				/* remove encapsulation entry */
-				if (mip6_tunnel_control(MIP6_TUNNEL_DELETE,
-					llmbc, mip6_bc_encapcheck,
-					&llmbc->mbc_encap)) {
-					/* XXX UNSPECIFIED */
-					return (-1);
-				}
-			}
-
-			/* remove a BC entry. */
-			error = mip6_bc_list_remove(&mip6_bc_list, llmbc);
-			if (error) {
-				mip6log((LOG_ERR,
-				    "%s:%d: can't remove BC.\n",
-				    __FILE__, __LINE__));
-				bi->mbc_status = IP6MA_STATUS_UNSPECIFIED;
-				bi->mbc_send_ba = 1;
-				bi->mbc_lifetime = bi->mbc_refresh = 0;
-				return (error);
-			}
-		}
 	}
 
 	/* return BA */
@@ -686,7 +640,7 @@ mip6_dad_start(mbc)
 	return (0);
 }
 
-static int
+int
 mip6_dad_stop(mbc)
 	struct  mip6_bc *mbc;
 {
@@ -807,7 +761,19 @@ mip6_dad_error(ifa, err)
 			tmpmbc_next = LIST_NEXT(tmpmbc, mbc_entry);
 			if (tmpmbc->mbc_llmbc == llmbc) {
 				tmpmbc->mbc_llmbc = NULL;
-				llmbc->mbc_refcnt--; /* just for safety. */
+				llmbc->mbc_refcnt--;
+				/* return a binding ack. */
+				mip6_bc_send_ba(&mbc->mbc_addr,
+				    &mbc->mbc_phaddr, &mbc->mbc_pcoa, err,
+				    mbc->mbc_seqno, 0, 0, NULL);
+				error = mip6_bc_list_remove(&mip6_bc_list,
+				    tmpmbc);
+				if (error) {
+					mip6log((LOG_ERR,
+					    "%s:%d: can't remove BC.\n",
+					    __FILE__, __LINE__));
+					/* what should I do? */
+				}
 			}
 		}
 		error = mip6_bc_list_remove(&mip6_bc_list, llmbc);
@@ -817,7 +783,6 @@ mip6_dad_error(ifa, err)
 			/* what should I do? */
 		}
 
-		/* no need to send an ack. */
 		return (0);
 	} else {
 		/*
@@ -825,26 +790,15 @@ mip6_dad_error(ifa, err)
 		 * binding cache entry, decrement the refcnt of the
 		 * entry.
 		 */
-		llmbc = mbc->mbc_llmbc;
-		if (llmbc != NULL) {
-			llmbc->mbc_refcnt--;
-			if (llmbc->mbc_refcnt == 0) {
-				if ((llmbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
-					mip6_dad_stop(llmbc);
-				} else {
-					if (mip6_bc_proxy_control(&llmbc->mbc_phaddr,
-					    &llmbc->mbc_addr, RTM_DELETE)) {
-						/* XXX */
-					}
-				}
-				error = mip6_bc_list_remove(&mip6_bc_list,
-				    llmbc);
-				if (error) {
-					mip6log((LOG_ERR,
-					    "%s:%d: can't remove BC.\n",
-					    __FILE__, __LINE__));
-					/* what should I do? */
-				}
+		if (mbc->mbc_llmbc != NULL) {
+			error = mip6_bc_list_remove(&mip6_bc_list,
+			    mbc->mbc_llmbc);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "%s:%d: can't remove "
+				    "a link-local binding cache entry.\n",
+				    __FILE__, __LINE__));
+				/* what should I do? */
 			}
 		}
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.h,v 1.1 2003/04/23 09:15:51 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.h,v 1.2 2003/07/25 09:15:12 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -49,6 +49,7 @@ int mip6_process_hurbu(struct mip6_bc *);
 int mip6_bc_proxy_control(struct sockaddr_in6 *, struct sockaddr_in6 *, int);
 int mip6_bc_encapcheck(const struct mbuf *, int, int, void *);
 struct ifaddr *mip6_dad_find(struct in6_addr *,	struct ifnet *);
+int mip6_dad_stop(struct mip6_bc *);
 int mip6_dad_success(struct ifaddr *);
 int mip6_dad_duplicated(struct ifaddr *);
 int mip6_dad_error(struct ifaddr *, int);
