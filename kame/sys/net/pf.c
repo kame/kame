@@ -136,8 +136,8 @@ MALLOC_DEFINE(M_PF, "pf", "PF packet filter");
 
 #define	MIN(a,b) (((a)<(b))?(a):(b))
 #define	MAX(a,b) (((a)>(b))?(a):(b))
-#endif
 
+#endif
 
 #define DPFPRINTF(n, x)	if (pf_status.debug >= (n)) printf x
 struct pf_state_tree;
@@ -165,10 +165,8 @@ struct timeout		 pf_expire_to;			/* expire timeout */
 struct callout		 pf_expire_to;			/* expire timeout */
 #endif
 
-#ifndef __FreeBSD__
-struct pool		 pf_tree_pl, pf_rule_pl, pf_addr_pl;
-struct pool		 pf_state_pl, pf_altq_pl, pf_pooladdr_pl;
-#endif
+pool_t			 pf_tree_pl, pf_rule_pl, pf_addr_pl;
+pool_t			 pf_state_pl, pf_altq_pl, pf_pooladdr_pl;
 
 void			 pf_dynaddr_update(void *);
 void			 pf_print_host(struct pf_addr *, u_int16_t, u_int8_t);
@@ -409,11 +407,7 @@ pf_insert_state(struct pf_state *state)
 {
 	struct pf_tree_node	*keya, *keyb;
 
-#ifdef __FreeBSD__
-	keya = malloc(sizeof(struct pf_tree_node), M_PF, M_NOWAIT);
-#else
 	keya = pool_get(&pf_tree_pl, PR_NOWAIT);
-#endif
 	if (keya == NULL)
 		return (-1);
 	keya->state = state;
@@ -439,27 +433,15 @@ pf_insert_state(struct pf_state *state)
 			    state->af);
 			printf("\n");
 		}
-#ifdef __FreeBSD__
-		free(keya, M_PF);
-#else
 		pool_put(&pf_tree_pl, keya);
-#endif
 		return (-1);
 	}
 
-#ifdef __FreeBSD__
-	keyb = malloc(sizeof(struct pf_tree_node), M_PF, M_NOWAIT);
-#else
 	keyb = pool_get(&pf_tree_pl, PR_NOWAIT);
-#endif
 	if (keyb == NULL) {
 		/* Need to pull out the other state */
 		RB_REMOVE(pf_state_tree, &tree_lan_ext, keya);
-#ifdef __FreeBSD__
-		free(keya, M_PF);
-#else
 		pool_put(&pf_tree_pl, keya);
-#endif
 		return (-1);
 	}
 	keyb->state = state;
@@ -485,13 +467,8 @@ pf_insert_state(struct pf_state *state)
 			printf("\n");
 		}
 		RB_REMOVE(pf_state_tree, &tree_lan_ext, keya);
-#ifdef __FreeBSD__
-		free(keya, M_PF);
-		free(keyb, M_PF);
-#else
 		pool_put(&pf_tree_pl, keya);
 		pool_put(&pf_tree_pl, keyb);
-#endif
 		return (-1);
 	}
 
@@ -630,15 +607,9 @@ pf_purge_expired_states(void)
 					pf_rm_rule(NULL,
 					    cur->state->anchor.ptr);
 			pf_normalize_tcp_cleanup(cur->state);
-#ifdef __FreeBSD__
-			free(cur->state, M_PF);
-			free(cur, M_PF);
-			free(peer, M_PF);
-#else
 			pool_put(&pf_state_pl, cur->state);
 			pool_put(&pf_tree_pl, cur);
 			pool_put(&pf_tree_pl, peer);
-#endif
 			pf_status.fcounters[FCNT_STATE_REMOVALS]++;
 			pf_status.states--;
 		}
@@ -678,21 +649,13 @@ pf_dynaddr_setup(struct pf_addr_wrap *aw, sa_family_t af)
 {
 	if (aw->type != PF_ADDR_DYNIFTL)
 		return (0);
-#ifdef __FreeBSD__
-	aw->p.dyn = malloc(sizeof(struct pf_addr_dyn), M_PF, M_NOWAIT);
-#else
 	aw->p.dyn = pool_get(&pf_addr_pl, PR_NOWAIT);
-#endif
 	if (aw->p.dyn == NULL)
 		return (1);
 	bcopy(aw->v.ifname, aw->p.dyn->ifname, sizeof(aw->p.dyn->ifname));
 	aw->p.dyn->ifp = ifunit(aw->p.dyn->ifname);
 	if (aw->p.dyn->ifp == NULL) {
-#ifdef __FreeBSD__
-		free(aw->p.dyn, M_PF);
-#else
 		pool_put(&pf_addr_pl, aw->p.dyn);
-#endif
 		aw->p.dyn = NULL;
 		return (1);
 	}
@@ -704,11 +667,7 @@ pf_dynaddr_setup(struct pf_addr_wrap *aw, sa_family_t af)
 	    aw->p.dyn->ifp->if_addrhooks, 1,
 	    pf_dynaddr_update, aw->p.dyn);
 	if (aw->p.dyn->hook_cookie == NULL) {
-#ifdef __FreeBSD__
-		free(aw->p.dyn, M_PF);
-#else
 		pool_put(&pf_addr_pl, aw->p.dyn);
-#endif
 		aw->p.dyn = NULL;
 		return (1);
 	}
@@ -771,11 +730,7 @@ pf_dynaddr_remove(struct pf_addr_wrap *aw)
 	hook_disestablish(aw->p.dyn->ifp->if_addrhooks,
 	    aw->p.dyn->hook_cookie);
 #endif
-#ifdef __FreeBSD__
-	free(aw->p.dyn, M_PF);
-#else
 	pool_put(&pf_addr_pl, aw->p.dyn);
-#endif
 	aw->p.dyn = NULL;
 }
 
@@ -2592,13 +2547,8 @@ pf_test_tcp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		struct pf_state	*s = NULL;
 
 		len = pd->tot_len - off - (th->th_off << 2);
-		if (!r->max_states || r->states < r->max_states) {
-#ifdef __FreeBSD__
-			s = malloc(sizeof(struct pf_state), M_PF, M_NOWAIT);
-#else
+		if (!r->max_states || r->states < r->max_states)
 			s = pool_get(&pf_state_pl, PR_NOWAIT);
-#endif
-		}
 		if (s == NULL) {
 			REASON_SET(&reason, PFRES_MEMORY);
 			return (PF_DROP);
@@ -2693,32 +2643,20 @@ pf_test_tcp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		if ((pd->flags & PFDESC_TCP_NORM) && pf_normalize_tcp_init(m,
 		    off, pd, th, &s->src, &s->dst)) {
 			REASON_SET(&reason, PFRES_MEMORY);
-#ifdef __FreeBSD__
-			free(s, M_PF);
-#else
 			pool_put(&pf_state_pl, s);
-#endif
 			return (PF_DROP);
 		}
 		if ((pd->flags & PFDESC_TCP_NORM) && s->src.scrub &&
 		    pf_normalize_tcp_stateful(m, off, pd, &reason, th, &s->src,
 		    &s->dst, &rewrite)) {
 			pf_normalize_tcp_cleanup(s);
-#ifdef __FreeBSD__
-			free(s, M_PF);
-#else
 			pool_put(&pf_state_pl, s);
-#endif
 			return (PF_DROP);
 		}
 		if (pf_insert_state(s)) {
 			pf_normalize_tcp_cleanup(s);
 			REASON_SET(&reason, PFRES_MEMORY);
-#ifdef __FreeBSD__
-			free(s, M_PF);
-#else
 			pool_put(&pf_state_pl, s);
-#endif
 			return (PF_DROP);
 		} else
 			*sm = s;
@@ -2917,13 +2855,8 @@ pf_test_udp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		/* create new state */
 		struct pf_state	*s = NULL;
 
-		if (!r->max_states || r->states < r->max_states) {
-#ifdef __FreeBSD__
-			s = malloc(sizeof(struct pf_state), M_PF, M_NOWAIT);
-#else
+		if (!r->max_states || r->states < r->max_states)
 			s = pool_get(&pf_state_pl, PR_NOWAIT);
-#endif
-		}
 		if (s == NULL) {
 			REASON_SET(&reason, PFRES_MEMORY);
 			return (PF_DROP);
@@ -2993,11 +2926,7 @@ pf_test_udp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		pf_set_rt_ifp(s, saddr);
 		if (pf_insert_state(s)) {
 			REASON_SET(&reason, PFRES_MEMORY);
-#ifdef __FreeBSD__
-			free(s, M_PF);
-#else
 			pool_put(&pf_state_pl, s);
-#endif
 			return (PF_DROP);
 		} else
 			*sm = s;
@@ -3194,11 +3123,7 @@ pf_test_icmp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		struct pf_state	*s = NULL;
 
 		if (!r->max_states || r->states < r->max_states)
-#ifdef __FreeBSD__
-			s = malloc(sizeof(struct pf_state), M_PF, M_NOWAIT);
-#else
 			s = pool_get(&pf_state_pl, PR_NOWAIT);
-#endif
 		if (s == NULL) {
 			REASON_SET(&reason, PFRES_MEMORY);
 			return (PF_DROP);
@@ -3264,11 +3189,7 @@ pf_test_icmp(struct pf_rule **rm, struct pf_state **sm, int direction,
 		pf_set_rt_ifp(s, saddr);
 		if (pf_insert_state(s)) {
 			REASON_SET(&reason, PFRES_MEMORY);
-#ifdef __FreeBSD__
-			free(s, M_PF);
-#else
 			pool_put(&pf_state_pl, s);
-#endif
 			return (PF_DROP);
 		} else
 			*sm = s;
@@ -3447,13 +3368,8 @@ pf_test_other(struct pf_rule **rm, struct pf_state **sm, int direction,
 		/* create new state */
 		struct pf_state	*s = NULL;
 
-		if (!r->max_states || r->states < r->max_states) {
-#ifdef __FreeBSD__
-			s = malloc(sizeof(struct pf_state), M_PF, M_NOWAIT);
-#else
+		if (!r->max_states || r->states < r->max_states)
 			s = pool_get(&pf_state_pl, PR_NOWAIT);
-#endif
-		}
 		if (s == NULL) {
 			REASON_SET(&reason, PFRES_MEMORY);
 			return (PF_DROP);
@@ -3522,11 +3438,7 @@ pf_test_other(struct pf_rule **rm, struct pf_state **sm, int direction,
 			if (r->log)
 				PFLOG_PACKET(ifp, h, m, af, direction, reason,
 				    r, a, ruleset);
-#ifdef __FreeBSD__
-			free(s, M_PF);
-#else
 			pool_put(&pf_state_pl, s);
-#endif
 			return (PF_DROP);
 		} else
 			*sm = s;

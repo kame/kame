@@ -126,10 +126,8 @@ struct pfr_walktree {
 
 #define senderr(e)	do { rv = (e); goto _bad; } while (0)
 
-#ifndef __FreeBSD__
-struct pool		 pfr_ktable_pl;
-struct pool		 pfr_kentry_pl;
-#endif
+pool_t			 pfr_ktable_pl;
+pool_t			 pfr_kentry_pl;
 struct sockaddr_in	 pfr_sin;
 struct sockaddr_in6	 pfr_sin6;
 union  sockaddr_union	 pfr_mask;
@@ -191,12 +189,10 @@ int			 pfr_ktable_cnt;
 void
 pfr_initialize(void)
 {
-#ifndef __FreeBSD__
 	pool_init(&pfr_ktable_pl, sizeof(struct pfr_ktable), 0, 0, 0,
 	    "pfrktable", NULL);
 	pool_init(&pfr_kentry_pl, sizeof(struct pfr_kentry), 0, 0, 0,
 	    "pfrkentry", NULL);
-#endif
 
 	pfr_sin.sin_len = sizeof(pfr_sin);
 	pfr_sin.sin_family = AF_INET;
@@ -779,11 +775,7 @@ pfr_create_kentry(struct pfr_addr *ad)
 {
 	struct pfr_kentry	*ke;
 
-#ifdef __FreeBSD__
-	ke = malloc(sizeof(struct pfr_kentry), M_PF, M_NOWAIT);
-#else
 	ke = pool_get(&pfr_kentry_pl, PR_NOWAIT);
-#endif
 	if (ke == NULL)
 		return (NULL);
 	bzero(ke, sizeof(*ke));
@@ -812,11 +804,7 @@ pfr_destroy_kentries(struct pfr_kentryworkq *workq)
 void
 pfr_destroy_kentry(struct pfr_kentry *ke)
 {
-#ifdef __FreeBSD__
-	free(ke, M_PF);
-#else
 	pool_put(&pfr_kentry_pl, ke);
-#endif
 }
 
 void
@@ -1766,11 +1754,7 @@ pfr_create_ktable(struct pfr_table *tbl, long tzero, int attachruleset)
 	struct pfr_ktable	*kt;
 	struct pf_ruleset	*rs;
 
-#ifdef __FreeBSD__
-	kt = malloc(sizeof(struct pfr_ktable), M_PF, M_NOWAIT);
-#else
 	kt = pool_get(&pfr_ktable_pl, PR_NOWAIT);
-#endif
 	if (kt == NULL)
 		return (NULL);
 	bzero(kt, sizeof(*kt));
@@ -1834,11 +1818,7 @@ pfr_destroy_ktable(struct pfr_ktable *kt, int flushaddr)
 			kt->pfrkt_rs->anchor->tables--;
 		pf_remove_if_empty_ruleset(kt->pfrkt_rs);
 	}
-#ifdef __FreeBSD__
-	free(kt, M_PF);
-#else
 	pool_put(&pfr_ktable_pl, kt);
-#endif
 }
 
 int

@@ -43,10 +43,18 @@
 #endif
 #include <netinet/tcp_fsm.h>
 
+typedef struct pool pool_t;
+
 #ifdef __FreeBSD__
 #ifdef _KERNEL
 #include <sys/malloc.h>
 MALLOC_DECLARE(M_PF);
+
+#define	pool_t			int
+#define	pool_get(pool, flags)	malloc(*(pool), M_PF, M_DONTWAIT)
+#define	pool_put(pool, item)	free(item, M_PF)
+#define	pool_init(pool, size, a, ao, f, m, p)	\
+	do { (*(pool)) = (size); } while (0)
 #endif
 #endif
 
@@ -1152,9 +1160,9 @@ extern void			 pf_calc_skip_steps(struct pf_rulequeue *);
 extern void			 pf_rule_set_qid(struct pf_rulequeue *);
 extern u_int32_t		 pf_qname_to_qid(char *);
 extern void			 pf_update_anchor_rules(void);
-extern struct pool		 pf_tree_pl, pf_rule_pl, pf_addr_pl;
-extern struct pool		 pf_state_pl, pf_altq_pl, pf_pooladdr_pl;
-extern struct pool		 pf_state_scrub_pl;
+extern pool_t			 pf_tree_pl, pf_rule_pl, pf_addr_pl;
+extern pool_t			 pf_state_pl, pf_altq_pl, pf_pooladdr_pl;
+extern pool_t			 pf_state_scrub_pl;
 extern void			 pf_purge_timeout(void *);
 extern void			 pf_purge_expired_states(void);
 extern int			 pf_insert_state(struct pf_state *);
@@ -1251,7 +1259,7 @@ void		pf_tag_unref(u_int16_t);
 int		pf_tag_packet(struct mbuf *, struct pf_tag *, int);
 
 extern struct pf_status	pf_status;
-extern struct pool	pf_frent_pl, pf_frag_pl;
+extern pool_t		pf_frent_pl, pf_frag_pl;
 
 struct pf_pool_limit {
 	void		*pp;
