@@ -154,6 +154,7 @@ extern void usage P((void));
  */
 char valid_opts[] = {
 	'd', ':', 'g', ':', 'h', 'k', 'n', 'S', ':', 'u', ':', 'U',
+	'4', '6',
 #ifdef	AUTHENTICATION
 	'a', ':', 'X', ':',
 #endif
@@ -174,6 +175,8 @@ char valid_opts[] = {
 #endif
 	'\0'
 };
+
+int family = AF_INET;
 
 	int
 main(argc, argv)
@@ -369,6 +372,14 @@ main(argc, argv)
 			break;
 #endif	/* AUTHENTICATION */
 
+		case '4':
+			family = AF_INET;
+			break;
+			
+		case '6':
+			family = AF_INET6;
+			break;
+			
 		default:
 			fprintf(stderr, "telnetd: %c: unknown option\n", ch);
 			/* FALLTHROUGH */
@@ -382,42 +393,37 @@ main(argc, argv)
 	argv += optind;
 
 	if (debug) {
-	    int s, ns, foo;
-	    struct servent *sp;
-	    static struct sockaddr_in sin = { AF_INET };
+	    int s, ns, foo, error;
+	    char *service = "telnet";
+	    struct addrinfo hints, *res;
 
 	    if (argc > 1) {
 		usage();
 		/* NOT REACHED */
-	    } else if (argc == 1) {
-		    if ((sp = getservbyname(*argv, "tcp"))) {
-			sin.sin_port = sp->s_port;
-		    } else {
-			sin.sin_port = atoi(*argv);
-			if ((int)sin.sin_port <= 0) {
-			    fprintf(stderr, "telnetd: %s: bad port #\n", *argv);
-			    usage();
-			    /* NOT REACHED */
-			}
-			sin.sin_port = htons((u_short)sin.sin_port);
-		   }
-	    } else {
-		sp = getservbyname("telnet", "tcp");
-		if (sp == 0) {
-		    fprintf(stderr, "telnetd: tcp/telnet: unknown service\n");
-		    exit(1);
-		}
-		sin.sin_port = sp->s_port;
+	    } else if (argc == 1)
+		service = *argv;
+
+	    memset(&hints, 0, sizeof(hints));
+	    hints.ai_flags = AI_PASSIVE;
+	    hints.ai_family = family;
+	    hints.ai_socktype = SOCK_STREAM;
+	    hints.ai_protocol = 0;
+	    error = getaddrinfo(NULL, service, &hints, &res);
+
+	    if (error) {
+		fprintf(stderr, "tcp/%s: %s\n", service, gai_strerror(error));
+		exit(1);
 	    }
 
-	    s = socket(AF_INET, SOCK_STREAM, 0);
+fprintf(stderr, "family=%d\n",res->ai_family);
+	    s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	    if (s < 0) {
-		    perror("telnetd: socket");;
-		    exit(1);
+		perror("telnetd: socket");
+		exit(1);
 	    }
 	    (void) setsockopt(s, SOL_SOCKET, SO_REUSEADDR,
 				(char *)&on, sizeof(on));
-	    if (bind(s, (struct sockaddr *)&sin, sizeof sin) < 0) {
+	    if (bind(s, res->ai_addr, res->ai_addrlen) < 0) {
 		perror("bind");
 		exit(1);
 	    }
@@ -425,8 +431,8 @@ main(argc, argv)
 		perror("listen");
 		exit(1);
 	    }
-	    foo = sizeof sin;
-	    ns = accept(s, (struct sockaddr *)&sin, &foo);
+	    foo = res->ai_addrlen;
+	    ns = accept(s, res->ai_addr, &foo);
 	    if (ns < 0) {
 		perror("accept");
 		exit(1);
