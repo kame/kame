@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.71 2000/08/18 15:13:07 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.72 2000/09/18 02:16:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1035,7 +1035,7 @@ ipsec6_setspidx_ipaddr(m, spidx)
 
 	/* sanity check 1 for minimum ip header length */
 	if (m == NULL)
-		panic("ipsec6_setspidx_in6pcb: m == 0 passed.\n");
+		panic("ipsec6_setspidx_ipaddr: m == 0 passed.\n");
 
 	if (m->m_pkthdr.len < sizeof(struct ip6_hdr)) {
 		KEYDEBUG(KEYDEBUG_IPSEC_DUMP,
@@ -1055,7 +1055,7 @@ ipsec6_setspidx_ipaddr(m, spidx)
 
 	if ((ip6->ip6_vfc & IPV6_VERSION_MASK) != IPV6_VERSION) {
 		KEYDEBUG(KEYDEBUG_IPSEC_DUMP,
-			printf("ipsec_setspidx_mbuf: "
+			printf("ipsec6_setspidx_ipaddr: "
 				"wrong ip version on packet "
 				"(expected IPv6), ignored.\n"));
 		return;
