@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: strnames.c,v 1.6 2000/01/18 23:06:59 sakane Exp $ */
+/* YIPS @(#)$Id: strnames.c,v 1.7 2000/03/13 10:30:49 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -448,6 +448,8 @@ static char *name_pfkey_type[] = {
 	"X_SPDACQUIRE",
 	"X_SPDDUMP",
 	"X_SPDFLUSH",
+	"X_SPDSETIDX",
+	"X_SPDEXPIRE",
 };
 
 char *
