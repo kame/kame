@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.107 2003/10/03 02:09:27 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.108 2003/10/22 02:12:54 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -161,6 +161,8 @@ struct mip6_bu {
 	struct hif_softc    *mbu_hif;       /* back pointer to hif */
 	const struct encaptab *mbu_encap;
 };
+LIST_HEAD(mip6_bu_list, mip6_bu);
+
 #define MIP6_BU_STATE_DISABLE     0x01
 #define MIP6_BU_STATE_FIREWALLED  0x80
 #define MIP6_BU_STATE_NEEDTUNNEL \

@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.183 2003/08/05 11:47:35 ono Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.184 2003/10/22 02:12:54 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,8 +30,8 @@
  */
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-#include "opt_mip6.h"
 #include "opt_inet6.h"
+#include "opt_mip6.h"
 #endif
 
 #include <sys/param.h>
@@ -80,6 +80,15 @@
 #include <netinet6/nd6.h>
 #include <netinet6/ip6_mroute.h>
 #include <netinet6/scope6_var.h>
+
+#ifdef MIP6
+#include <netinet6/mip6.h>
+#include <netinet6/mip6_var.h>
+#include <netinet6/mip6_cncore.h>
+#ifdef MIP6_MOBILE_NODE
+#include <netinet6/mip6_mncore.h>
+#endif
+#endif
 
 #include <net/net_osdep.h>
 
@@ -1150,6 +1159,11 @@ in6_ifdetach(ifp)
 		    rt->rt_gateway, rt_mask(rt), rt->rt_flags, 0);
 		rtfree(rt);
 	}
+
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
+	if (MIP6_IS_MN)
+		mip6_process_movement();
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 }
 #endif
 

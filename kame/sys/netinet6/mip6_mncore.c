@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.38 2003/10/21 10:53:33 keiichi Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.39 2003/10/22 02:12:54 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -658,6 +658,13 @@ mip6_process_pfxlist_status_change(sc)
 	struct sockaddr_in6 hif_coa;
 	int error = 0;
 
+	if (sc->hif_coa_ifa == NULL) {
+		mip6log((LOG_ERR,
+		    "mip6_process_pfxlist_status_change: "
+		    "no avaliable CoA.\n"));
+		sc->hif_location = HIF_LOCATION_UNKNOWN;
+		return (0);
+	}
 	hif_coa = sc->hif_coa_ifa->ia_addr;
 	if (in6_addr2zoneid(sc->hif_coa_ifa->ia_ifp,
 		&hif_coa.sin6_addr, &hif_coa.sin6_scope_id)) {
@@ -691,8 +698,7 @@ mip6_process_pfxlist_status_change(sc)
 	if (error) {
 		mip6log((LOG_ERR,
 		    "mip6_process_pfxlist_status_change: "
-		    "home address configuration error.\n",
-		     __FILE__, __LINE__));
+		    "home address configuration error.\n"));
 		return (error);
 	}
 
@@ -1419,6 +1425,22 @@ mip6_route_optimize(m)
 		return (0);
 	}
 
+	/* get current CoA and recover its scope information. */
+	if (sc->hif_coa_ifa == NULL) {
+		mip6log((LOG_ERR,
+		    "mip6_route_optimize: "
+		    "no available CoA.\n"));
+		return (0);
+	}
+	hif_coa = sc->hif_coa_ifa->ia_addr;
+	if (in6_addr2zoneid(sc->hif_coa_ifa->ia_ifp, &hif_coa.sin6_addr,
+		&hif_coa.sin6_scope_id)) {
+		/* must not happen. */
+	}
+	if (in6_embedscope(&hif_coa.sin6_addr, &hif_coa)) {
+		/* must not happen. */
+	}
+
 	/*
 	 * find a mip6_prefix which has a home address of received
 	 * packet.
@@ -1432,16 +1454,6 @@ mip6_route_optimize(m)
 		 * that is not a home address.
 		 */
 		return (0);
-	}
-
-	/* get current CoA and recover its scope information. */
-	hif_coa = sc->hif_coa_ifa->ia_addr;
-	if (in6_addr2zoneid(sc->hif_coa_ifa->ia_ifp, &hif_coa.sin6_addr,
-		&hif_coa.sin6_scope_id)) {
-		/* must not happen. */
-	}
-	if (in6_embedscope(&hif_coa.sin6_addr, &hif_coa)) {
-		/* must not happen. */
 	}
 
 	/*
@@ -1701,6 +1713,12 @@ mip6_home_registration(sc)
 	struct mip6_ha *mha;
 
 	/* get current CoA and recover its scope information. */
+	if (sc->hif_coa_ifa == NULL) {
+		mip6log((LOG_ERR,
+		    "mip6_home_registration: "
+		    "no avaliable CoA.\n"));
+		return (0);
+	}
 	hif_coa = sc->hif_coa_ifa->ia_addr;
 	if (in6_addr2zoneid(sc->hif_coa_ifa->ia_ifp, &hif_coa.sin6_addr,
 		&hif_coa.sin6_scope_id)) {
@@ -1829,6 +1847,12 @@ mip6_home_registration2(mbu)
 #endif
 
 	/* get current CoA and recover its scope information. */
+	if (mbu->mbu_hif->hif_coa_ifa == NULL) {
+		mip6log((LOG_ERR,
+		    "mip6_home_registration2: "
+		    "no available CoA.\n"));
+		return (0);
+	}
 	hif_coa = mbu->mbu_hif->hif_coa_ifa->ia_addr;
 	if (in6_addr2zoneid(mbu->mbu_hif->hif_coa_ifa->ia_ifp,
 	    &hif_coa.sin6_addr, &hif_coa.sin6_scope_id)) {
@@ -1957,6 +1981,12 @@ mip6_bu_list_notify_binding_change(sc, home)
 #endif
 
 	/* get current CoA and recover its scope information. */
+	if (sc->hif_coa_ifa == NULL) {
+		mip6log((LOG_ERR,
+		    "mip6_bu_list_notify_binding_change: "
+		    "no available CoA.\n"));
+		return (0);
+	}
 	hif_coa = sc->hif_coa_ifa->ia_addr;
 	if (in6_addr2zoneid(sc->hif_coa_ifa->ia_ifp, &hif_coa.sin6_addr,
 	    &hif_coa.sin6_scope_id)) {
@@ -2471,6 +2501,12 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 	}
 
 	/* get current CoA and recover its scope information. */
+	if (sc->hif_coa_ifa == NULL) {
+		mip6log((LOG_ERR,
+		    "mip6_haddr_destopt_create: "
+		    "no available CoA.\n"));
+		return (0);
+	}
 	hif_coa = sc->hif_coa_ifa->ia_addr;
 	if (in6_addr2zoneid(sc->hif_coa_ifa->ia_ifp, &hif_coa.sin6_addr,
 	    &hif_coa.sin6_scope_id)) {

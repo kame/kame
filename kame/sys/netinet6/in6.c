@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.353 2003/10/15 23:06:54 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.354 2003/10/22 02:12:54 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1542,6 +1542,19 @@ in6_purgeaddr(ifa)
 
 	/* stop DAD processing */
 	nd6_dad_stop(ifa);
+
+#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
+	if (MIP6_IS_MN) {
+		struct hif_softc *hif;
+		for (hif = LIST_FIRST(&hif_softc_list); hif;
+		    hif = LIST_NEXT(hif, hif_entry)) {
+			if (hif->hif_coa_ifa == ia) {
+				IFAFREE(&hif->hif_coa_ifa->ia_ifa);
+				hif->hif_coa_ifa = NULL;
+			}
+		}
+	}
+#endif /* MIP6 && MIP6_MOBILE_NODE */
 
 	/*
 	 * delete route to the destination of the address being purged.

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.83 2003/10/21 03:03:10 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.84 2003/10/22 02:12:54 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -601,6 +601,12 @@ mip6_icmp6_dhaad_req_output(sc)
 	}
 
 	/* get current CoA and recover its scope information. */
+	if (sc->hif_coa_ifa == NULL) {
+		mip6log((LOG_ERR,
+		    "mip6_icmp6_dhaad_req_output: "
+		    "no avaiable CoA.\n"));
+		return (0);
+	}
 	hif_coa = sc->hif_coa_ifa->ia_addr;
 	if (in6_addr2zoneid(sc->hif_coa_ifa->ia_ifp, &hif_coa.sin6_addr,
 	    &hif_coa.sin6_scope_id)) {

@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.h,v 1.25 2003/09/12 12:39:22 t-momose Exp $	*/
+/*	$KAME: if_hif.h,v 1.26 2003/10/22 02:12:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -100,11 +100,11 @@ LIST_HEAD(hif_site_prefix_list, hif_site_prefix);
 struct hif_softc {
 	struct ifnet hif_if;
 	LIST_ENTRY(hif_softc)  hif_entry;
-	int                    hif_location;             /* cur location */
-	int                    hif_location_prev; /* XXX */
+	int                    hif_location;            /* cur location */
+	int                    hif_location_prev;       /* XXX */
 	struct in6_ifaddr      *hif_coa_ifa;
 	struct hif_site_prefix_list hif_sp_list;
-	LIST_HEAD(mip6_bu_list, mip6_bu) hif_bu_list;    /* list of BUs */
+	struct mip6_bu_list    hif_bu_list;             /* list of BUs */
 	struct hif_prefix_list hif_prefix_list_home;
 	struct hif_prefix_list hif_prefix_list_foreign;
 	u_int16_t              hif_dhaad_id;
