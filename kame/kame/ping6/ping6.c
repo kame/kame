@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.100 2000/11/14 12:44:44 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.101 2000/11/24 11:00:59 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1169,25 +1169,21 @@ dnsdecode(sp, ep, base, buf, bufsiz)
 	u_char *buf;
 	size_t bufsiz;
 {
-	int i, l;
+	int i;
 	const u_char *cp;
-	char *q;
-	const char *eq;
 	char cresult[MAXDNAME + 1];
 	const u_char *comp;
 
 	cp = *sp;
-	q = buf;
-	eq = buf + bufsiz;
+	*buf = '\0';
 
 	if (cp >= ep)
 		return NULL;
 	while (cp < ep) {
 		i = *cp;
 		if (i == 0 || cp != *sp) {
-			if (q >= eq - 1)
+			if (strlcat(buf, ".", bufsiz) >= bufsiz)
 				return NULL;	/*result overrun*/
-			*q++ = '.';
 		}
 		if (i == 0)
 			break;
@@ -1202,31 +1198,25 @@ dnsdecode(sp, ep, base, buf, bufsiz)
 			if (dnsdecode(&comp, cp, base, cresult,
 			    sizeof(cresult)) == NULL)
 				return NULL;
-			if (eq - q < strlen(cresult) + 1)
+			if (strlcat(buf, cresult, bufsiz) >= bufsiz)
 				return NULL;	/*result overrun*/
-			strcpy(q, cresult);	/*XXX should be strlcpy*/
-			q += strlen(q);
 			break;
 		} else if ((i & 0x3f) == i) {
 			if (i > ep - cp)
 				return NULL;	/*source overrun*/
 			while (i-- > 0 && cp < ep) {
-				if (eq - q < (isprint(*cp) ? 2 : 5))
-					return NULL;	/*result overrun*/
-				l = snprintf(q, eq - q,
+				(void)snprintf(cresult, sizeof(cresult),
 				    isprint(*cp) ? "%c" : "\\%03o", *cp & 0xff);
+				if (strlcat(buf, cresult, bufsiz) >= bufsiz)
+					return NULL;	/*result overrun*/
 				cp++;
-				q += l;
 			}
 		} else
 			return NULL;	/*invalid label*/
 	}
-	if (q >= eq)
-		return NULL;	/*result overrun*/
 	if (i != 0)
 		return NULL;	/*not terminated*/
 	cp++;
-	*q = '\0';
 	*sp = cp;
 	return buf;
 }
