@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.391 2003/07/29 08:08:48 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.392 2003/08/09 17:06:40 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -4939,11 +4939,7 @@ ip6_splithdr(m, exthdrs)
 			m_freem(m);
 			return ENOBUFS;
 		}
-#if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ < 5)
 		M_MOVE_PKTHDR(mh, m);
-#else
-		M_COPY_PKTHDR(mh, m);
-#endif
 		MH_ALIGN(mh, sizeof(*ip6));
 		m->m_len -= sizeof(*ip6);
 		m->m_data += sizeof(*ip6);
@@ -5040,6 +5036,7 @@ in6_getmopt_ifargs(optname, ifp, ia_grp, index)
 #ifdef MLDV2_DEBUG
 			printf("invalid interface (#%d) specified", index);
 #endif
+
 			error = EINVAL;
 		}
 

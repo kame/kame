@@ -530,8 +530,10 @@ in6_pcbdetach(in6p)
 #ifdef IPSEC
 	ipsec6_delete_pcbpolicy(in6p);
 #endif /* IPSEC */
-	sotoin6pcb(so) = 0;
-	sofree(so);
+	if (so) {
+		sotoin6pcb(so) = 0;
+		sofree(so);
+	}
 
 	/* Free all received options. */
 	if (in6p->in6p_inputopts) {

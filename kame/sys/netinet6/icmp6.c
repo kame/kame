@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.354 2003/08/09 15:19:31 suz Exp $	*/
+/*	$KAME: icmp6.c,v 1.355 2003/08/09 17:06:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -776,11 +776,8 @@ icmp6_input(mp, offp, proto)
 				m = NULL;
 				goto deliverecho;
 			}
-#if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version < 500000)
 			M_MOVE_PKTHDR(n, n0);
-#else
-			M_COPY_PKTHDR(n, n0);
-#endif
+
 			/*
 			 * Copy IPv6 and ICMPv6 only.
 			 */
@@ -972,8 +969,8 @@ icmp6_input(mp, offp, proto)
 			noff = sizeof(struct ip6_hdr);
 #ifdef __OpenBSD__
 			M_DUP_PKTHDR(n, m); /* just for rcvif */
-#elif defined(__FreeBSD__) && __FreeBSD_version >= 480000 && __FreeBSD_version < 500000
-			m_dup_pkthdr(n, m, M_DONTWAIT);
+#elif defined(__FreeBSD__)
+			m_dup_pkthdr(n, m);
 #else
 			M_COPY_PKTHDR(n, m); /* just for rcvif */
 #endif
@@ -1759,8 +1756,8 @@ ni6_input(m, off)
 	}
 #ifdef __OpenBSD__
 	M_DUP_PKTHDR(n, m); /* just for rcvif */
-#elif defined(__FreeBSD__) && __FreeBSD_version >= 480000 && __FreeBSD_version < 500000
-	m_dup_pkthdr(n, m, M_DONTWAIT);
+#elif defined(__FreeBSD__)
+	m_dup_pkthdr(n, m);
 #else
 	M_COPY_PKTHDR(n, m); /* just for rcvif */
 #endif
@@ -2393,8 +2390,8 @@ icmp6_rip6_input(mp, off, src, dst)
 #ifdef __OpenBSD__
 					/* shouldn't this be M_DUP_PKTHDR? */
 					M_MOVE_PKTHDR(n, m);
-#elif defined(__FreeBSD__) && __FreeBSD_version >= 480000 && __FreeBSD_version < 500000
-					m_dup_pkthdr(n, m, M_DONTWAIT);
+#elif defined(__FreeBSD__)
+					m_dup_pkthdr(n, m);
 #else
 					M_COPY_PKTHDR(n, m);
 #endif
@@ -2439,8 +2436,8 @@ icmp6_rip6_input(mp, off, src, dst)
 #ifdef __OpenBSD__
 				/* shouldn't this be M_DUP_PKTHDR? */
 				M_MOVE_PKTHDR(n, m);
-#elif defined(__FreeBSD__) && __FreeBSD_version >= 480000 && __FreeBSD_version < 500000
-				m_dup_pkthdr(n, m, M_DONTWAIT);
+#elif defined(__FreeBSD__)
+				m_dup_pkthdr(n, m);
 #else
 				M_COPY_PKTHDR(n, m);
 #endif

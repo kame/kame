@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.330 2003/08/05 11:47:36 ono Exp $	*/
+/*	$KAME: nd6.c,v 1.331 2003/08/09 17:06:41 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -109,7 +109,9 @@
 #include <netinet6/mip6_hacore.h>
 #endif /* MIP6 */
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 501000)
+#include <sys/limits.h>
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <machine/limits.h>
 #endif
 

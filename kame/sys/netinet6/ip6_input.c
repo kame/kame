@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.322 2003/06/30 07:59:02 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.323 2003/08/09 17:06:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -195,7 +195,7 @@ extern struct ifnet *loifp;
 u_char ip6_protox[IPPROTO_MAX];
 static int ip6qmaxlen = IFQ_MAXLEN;
 struct in6_ifaddr *in6_ifaddr;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4 && __FreeBSD_version < 501000)
 struct ifqueue ip6intrq;
 #endif
 
@@ -275,7 +275,9 @@ ip6_init()
 		    pr->pr_protocol && pr->pr_protocol != IPPROTO_RAW)
 			ip6_protox[pr->pr_protocol] = pr - inet6sw;
 	ip6intrq.ifq_maxlen = ip6qmaxlen;
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 501000)
+	netisr_register(NETISR_IPV6, ip6_input, &ip6intrq);
+#elif (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	register_netisr(NETISR_IPV6, ip6intr);
 #endif
 #if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
@@ -501,8 +503,8 @@ ip6_input(m)
 		if (n != NULL) {
 #ifdef __OpenBSD__
 			M_DUP_PKTHDR(n, m);
-#elif defined(__FreeBSD__) && __FreeBSD_version >= 480000 && __FreeBSD_version < 500000
-			m_dup_pkthdr(n, m, M_DONTWAIT);
+#elif defined(__FreeBSD__)
+			m_dup_pkthdr(n, m);
 #else
 			M_COPY_PKTHDR(n, m);
 #endif

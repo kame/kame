@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.197 2003/07/07 11:23:44 keiichi Exp $	*/
+/*	$KAME: ipsec.c,v 1.198 2003/08/09 17:06:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3609,11 +3609,7 @@ ipsec4_splithdr(m)
 			m_freem(m);
 			return NULL;
 		}
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 480000 && __FreeBSD_version < 500000)
 		M_MOVE_PKTHDR(mh, m);
-#else
-		M_COPY_PKTHDR(mh, m);
-#endif
 		MH_ALIGN(mh, hlen);
 		m->m_len -= hlen;
 		m->m_data += hlen;
@@ -3649,11 +3645,7 @@ ipsec6_splithdr(m)
 			m_freem(m);
 			return NULL;
 		}
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 480000 && __FreeBSD_version < 500000)
 		M_MOVE_PKTHDR(mh, m);
-#else
-		M_COPY_PKTHDR(mh, m);
-#endif
 		MH_ALIGN(mh, hlen);
 		m->m_len -= hlen;
 		m->m_data += hlen;
@@ -3880,12 +3872,8 @@ ipsec_copypkt(m)
 						    0, M_COPYALL, M_DONTWAIT);
 					}
 #endif
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 480000 && __FreeBSD_version < 500000)
 					M_MOVE_PKTHDR(mnew, n);
-#else
-					M_COPY_PKTHDR(mnew, n);
 					mnew->m_flags = n->m_flags & M_COPYFLAGS;
-#endif
 				}
 				else {
 					MGET(mnew, M_DONTWAIT, MT_DATA);

@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.79 2003/08/01 01:25:42 jinmei Exp $	*/
+/*	$KAME: net_osdep.h,v 1.80 2003/08/09 17:06:39 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -336,7 +336,7 @@ extern const char *if_name __P((struct ifnet *));
 #define HAVE_RATECHECK
 #endif
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__FreeBSD__) && __FreeBSD_version >= 501000)
 #define HAVE_PPSRATECHECK
 #else
 int ppsratecheck __P((struct timeval *, int *, int));
@@ -351,7 +351,7 @@ int ppsratecheck __P((struct timeval *, int *, int));
 #endif
 
 /* sys/net/if.h */
-#ifndef __NetBSD__
+#if !defined(__NetBSD__) && !(defined(__FreeBSD__) && __FreeBSD_version >= 501000)
 #define IFAREF(ifa)	do { ++(ifa)->ifa_refcnt; } while (/*CONSTCOND*/ 0)
 #endif
 

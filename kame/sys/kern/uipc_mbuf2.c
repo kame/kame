@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.43 2003/04/09 09:28:15 suz Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.44 2003/08/09 17:06:38 suz Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -67,11 +67,18 @@
 
 /*#define PULLDOWN_DEBUG*/
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 501000
+#include "opt_mac.h"
+#endif
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <sys/kernel.h>
+#endif
+#if defined(__FreeBSD__) && __FreeBSD_version >= 501000
+#include <sys/lock.h>
+#include <sys/mac.h>
 #endif
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -371,10 +378,12 @@ m_dup1(m, off, len, wait)
 		return NULL;
 
 	if (copyhdr) {
-#if defined(__OpenBSD__) || defined(__FreeBSD__) && __FreeBSD_version >= 400000 && __FreeBSD_version < 500000
+#ifdef __OpenBSD__
 		M_MOVE_PKTHDR(n, m);
-#else
-		M_COPY_PKTHDR(n, m);
+#elif defined(__FreeBSD__)
+		if (!m_dup_pkthdr(n, m))
+			m_free(n);
+			return NULL;
 #endif
 	}
 	m_copydata(m, off, len, mtod(n, caddr_t));
@@ -409,6 +418,12 @@ m_tag_free(t)
 	struct m_tag *t;
 {
 
+#if defined(__FreeBSD__) && __FreeBSD_version > 501000
+#ifdef MAC
+	if (t->m_tag_id == PACKET_TAG_MACLABEL)
+		mac_destroy_mbuf_tag(t);
+#endif
+#endif
 	free(t, M_PACKET_TAGS);
 }
 
@@ -493,7 +508,25 @@ m_tag_copy(t)
 	p = m_tag_get(t->m_tag_id, t->m_tag_len, M_NOWAIT);
 	if (p == NULL)
 		return (NULL);
-	bcopy(t + 1, p + 1, t->m_tag_len); /* Copy the data */
+
+#if defined(__FreeBSD__) && __FreeBSD_version > 501000
+#ifdef MAC
+	/*
+	 * XXXMAC: we should probably pass off the initialization, and
+	 * copying here?  can we hide that PACKET_TAG_MACLABEL is
+	 * special from the mbuf code?
+	 */
+	if (t->m_tag_id == PACKET_TAG_MACLABEL) {
+		if (mac_init_mbuf_tag(p) != 0) {
+			m_tag_free(p);
+			return (NULL);
+		}
+		mac_copy_mbuf_tag(t, p);
+	} else
+#endif
+#endif
+
+		bcopy(t + 1, p + 1, t->m_tag_len); /* Copy the data */
 	return (p);
 }
 

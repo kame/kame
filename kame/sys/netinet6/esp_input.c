@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.83 2003/08/06 14:45:30 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.84 2003/08/09 17:06:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -942,7 +942,7 @@ noreplaycheck:
 			MGETHDR(n, M_DONTWAIT, MT_HEADER);
 			maxlen = MHLEN;
 			if (n)
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000 && __FreeBSD_version < 500000
+#ifdef __FreeBSD__
 				M_MOVE_PKTHDR(n, m);
 #else
 				M_COPY_PKTHDR(n, m);

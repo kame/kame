@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.344 2003/08/09 15:13:40 suz Exp $	*/
+/*	$KAME: in6.c,v 1.345 2003/08/09 17:06:40 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1152,7 +1152,7 @@ in6_update_ifa(ifp, ifra, ia)
 #else
 		TAILQ_INSERT_TAIL(&ifp->if_addrlist, &ia->ia_ifa, ifa_list);
 #endif
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD_version > 501000)
 		/* gain another refcnt for the link from if_addrlist */
 		IFAREF(&ia->ia_ifa);
 #endif

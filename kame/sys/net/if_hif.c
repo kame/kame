@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.54 2003/08/07 09:30:58 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.55 2003/08/09 17:06:39 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -803,8 +803,8 @@ hif_output(ifp, m, dst, rt)
 		MGETHDR(n, M_DONTWAIT, MT_HEADER);
 		maxlen = MHLEN;
 		if (n)
-#if defined(__FreeBSD__) && __FreeBSD_version >= 480000 && __FreeBSD_version < 500000
-			m_dup_pkthdr(n, m, M_DONTWAIT);
+#ifdef __FreeBSD__
+			m_dup_pkthdr(n, m);
 #else
 			M_COPY_PKTHDR(n, m);
 #endif
