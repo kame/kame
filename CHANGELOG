@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1996 2001/12/03 13:42:57 jinmei Exp $
+$KAME: CHANGELOG,v 1.1997 2001/12/03 13:47:10 jinmei Exp $
 
 <200112>
+2001-12-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* netbsd/sys/netinet/tcp_subr.c (ipsec4_hdrsiz_tcp): corrected
+	IP+TCP headers to calculate the header size.
+	This fix is very important, because without the fix the kernel
+	would bypass the path acquiring SAs even if the policy requires
+	IPsec.
+	All KAME netbsd users who use IPsec for TCP/IPv4 should apply this
+	fix.
+
 Mon Dec  3 21:24:25 JST 2001 keiichi@iij.ad.jp
 	* kame/sys/net/if_hif.c, kame/sys/netinet6/mip6*
 	- change the movement detection algorithm from prefix infomation
