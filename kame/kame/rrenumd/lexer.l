@@ -1,4 +1,4 @@
-/*	$KAME: lexer.l,v 1.5 2000/07/21 12:33:33 jinmei Exp $	*/
+/*	$KAME: lexer.l,v 1.6 2000/11/08 02:26:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,6 +30,8 @@
  */
 
 %{
+#define YY_NO_UNPUT
+
 #include <sys/param.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -247,9 +249,11 @@ off		{
 
 int parse(FILE **fp)
 {
+	extern int yyparse __P((void));
+
 	yyin = *fp;
 
-	if(yyparse())
+	if (yyparse())
 		return(-1);
 
 	return(0);

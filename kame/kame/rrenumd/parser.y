@@ -1,4 +1,4 @@
-/*	$KAME: parser.y,v 1.5 2000/11/08 02:17:25 jinmei Exp $	*/
+/*	$KAME: parser.y,v 1.6 2000/11/08 02:26:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -47,6 +47,7 @@
 
 #include <netdb.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "rrenumd.h"
 
@@ -191,8 +192,9 @@ dest_addr :
 			hints.ai_protocol = 0;
 			error = getaddrinfo($1.cp, 0, &hints, &res);
 			if (error) {
-				sprintf(errbuf, "name resolution failed for %s"
-				":%s", $1, gai_strerror(error));
+				snprintf(errbuf, sizeof(errbuf),
+				    "name resolution failed for %s:%s",
+				    $1, gai_strerror(error));
 				yyerror(errbuf);
 			}
 			ss = (struct sockaddr_storage *)malloc(sizeof(*ss));
@@ -273,8 +275,9 @@ rrenum_statement_with_seqnum:
 		SEQNUM_CMD seqnum
 		{
 			if (pllist_lookup($2)) {
-				sprintf(errbuf, "duplicate seqnum %d specified"
-					" at %d", $2, lineno);
+				snprintf(errbuf, sizeof(errbuf),
+				    "duplicate seqnum %d specified at %d",
+				    $2, lineno);
 				yyerror(errbuf);
 			}
 		}
@@ -293,9 +296,10 @@ seqnum:
 	|	decstring
 		{
 			if ($1 > MAX_SEQNUM) {
-				sprintf(errbuf, "seqnum %d is illegal for this"
-					" program. should be between 0 and %d",
-					$1, MAX_SEQNUM);
+				snprintf(errbuf, sizeof(errbuf),
+				    "seqnum %d is illegal for this  program. "
+				    "should be between 0 and %d",
+				    $1, MAX_SEQNUM);
 				yyerror(errbuf);
 			}
 			$$ = $1;
@@ -306,8 +310,9 @@ rrenum_statement_without_seqnum:
 		rrenum_statement EOS
 		{
 			if (pllist_lookup(0)) {
-				sprintf(errbuf, "duplicate seqnum %d specified"
-					" at %d", 0, lineno);
+				snprintf(errbuf, sizeof(errbuf),
+				    "duplicate seqnum %d specified  at %d",
+				    0, lineno);
 				yyerror(errbuf);
 			}
 			$1->pl_irr.rr_seqnum = 0;
@@ -652,15 +657,16 @@ static void
 pllist_enqueue(struct payload_list *pl_entry)
 {
 	struct payload_list *pl, *pl_last;
-	if (pl_head == NULL) {
-		pl_head = pl_entry;
-		return;
-	}
+
+	pl_last = NULL;
 	for (pl = pl_head;
 	     pl && pl->pl_irr.rr_seqnum < pl_entry->pl_irr.rr_seqnum;
 	     pl_last = pl, pl = pl->pl_next)
 		continue;
-	pl_last->pl_next = pl_entry;
+	if (pl_last)
+		pl_last->pl_next = pl_entry;
+	else
+		pl_head = pl_entry;
 
 	return;
 }
