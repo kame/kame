@@ -1,4 +1,4 @@
-/*	$KAME: session.c,v 1.17 2000/10/04 17:41:04 itojun Exp $	*/
+/*	$KAME: session.c,v 1.18 2000/11/07 15:58:35 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -183,7 +183,7 @@ session(void)
 					isakmp_open();
 				}
 			} else
-				(void)update_myaddrs();	/*dummy*/
+				(void)update_myaddrs(); /* just read rtsock */
 
 			/* initialize socket list again */
 			FD_ZERO(&mask0);
