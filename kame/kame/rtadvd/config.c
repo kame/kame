@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.34 2001/03/21 17:41:13 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.35 2001/03/21 17:44:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -179,6 +179,10 @@ getconfig(intface)
 #ifdef MIP6
 	if (mobileip6)
 		tmp->haflg = val & ND_RA_FLAG_HA;
+#endif
+#ifndef ND_RA_FLAG_RTPREF_MASK
+#define ND_RA_FLAG_RTPREF_MASK	0x18 /* 00011000 */
+#define ND_RA_FLAG_RTPREF_RSV	0x10 /* 00010000 */
 #endif
 	tmp->rtpref = val & ND_RA_FLAG_RTPREF_MASK;
 	if (tmp->rtpref == ND_RA_FLAG_RTPREF_RSV) {
