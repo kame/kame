@@ -1,6 +1,6 @@
 	USAGE
 	KAME Project
-	$KAME: USAGE,v 1.32 2000/11/15 16:57:10 itojun Exp $
+	$KAME: USAGE,v 1.33 2000/11/22 10:22:57 itojun Exp $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -37,22 +37,23 @@ interface identifier (lowermost 64bit of the address) from
 EUI64/IEEE802 sources, like ethernet cards.  Pseudo interfaces will be
 able to get an IPv6 link-local address, if you have other "real"
 interface configured beforehand.  If you have no EUI64/IEEE802 sources
-on the node, you may need to configure link-local address manually.
-Though we have last-resort code in the kernel, which generates
-interface identifier from MD5(hostname), it may not suitable for your
-usage (for example, if you configure same hostname on both sides of
-gif tunnel, you will be doomed).
+on the node, we have last-resort code in the kernel, which generates
+interface identifier from MD5(hostname).  MD5(hostname) may not be suitable
+for your usage (for example, if you configure same hostname on both sides of
+gif tunnel, you will be doomed), and if so, you may need to configure
+link-local address manually.
 See RFC2472 for more discussion on how to generate an interface ID for
 pseudo interfaces.
 
 If you have a router announcing Router Advertisement,
 global addresses will be assigned automatically.  So, neither
-"ifconfig" nor "prefix" is necessary for your *host*. (Please refer to
-"sysctl" section for configuring a host to accept Router Advertisement.)
+"ifconfig" nor "prefix" is necessary for your *host* (non-router node).
+(Please refer to "sysctl" section for configuring a host to accept
+Router Advertisement.)
 
 If you want to set up a router, you need to assign global addresses
-for two or more interfaces by "ifconfig" or "prefix". (prefix command
-is described at next section)
+for two or more interfaces by "ifconfig" or "prefix" (prefix command
+is described at next section).
 If you want to assign a global address by "ifconfig", don't forget to
 specify the "alias" argument to keep the link-local address.
 
@@ -80,16 +81,22 @@ The newly added "prefix" command enables user to just assign prefixes
 for interfaces, and let your system automatically generate IPv6
 addresses.  Prefixes added by the "prefix" command is maintained in
 the kernel consistently with prefixes assigned by Router
-Advertisement(in case of hosts) and with prefixes assigned by Router
-Renumbering(in case of routers).  Manual assignment of prefixes or
+Advertisement (in case of hosts) and with prefixes assigned by Router
+Renumbering (in case of routers).  Manual assignment of prefixes or
 change of prefix properties take precedence over ones assigned by
 Router Advertisement or Router Renumbering.
 
 prefix command works only on routers.
 
-If you want to assign a prefix(and consequently address) manually, do
+If you want to assign a prefix (and consequently address) manually, do
 as follows:
 
+# ifconfig de0
+de0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500
+        inet6 fe80::200:f8ff:fe01:6317%de0 prefixlen 64 scopeid 0x1
+        inet 163.221.202.12 netmask 0xffffff00 broadcast 163.221.202.255
+        ether 00:00:f8:01:63:17 
+        media: 100baseTX status: active
 # prefix de0 3ffe:501:808:1::
 # ifconfig de0
 de0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500
@@ -99,8 +106,8 @@ de0: flags=8843<UP,BROADCAST,RUNNING,SIMPLEX,MULTICAST> mtu 1500
         ether 00:00:f8:01:63:17 
         media: 100baseTX status: active
 
-To check assigned prefix, use the "ndp" command. (See description of
-ndp command about its usage)
+To check assigned prefix, use the "ndp" command (See description of
+ndp command about its usage).
 
 # ndp -p
 3ffe:501:808:1::/64 if=de0
@@ -173,8 +180,8 @@ See also "/usr/local/v6/etc/rc.net6".
 <<<route>>>
 
 If there is a router announcing Router Advertisement on a subnet,
-you need not to add a default route for your host by hand.
-(Please refer to "sysctl" section to accept Router Advertisement.)
+you need not to add a default route for your host by hand
+(Please refer to "sysctl" section to accept Router Advertisement).
 
 If you want to add a default route manually, do like:
 
@@ -251,15 +258,15 @@ Neighbor                      Linklayer Address   Netif Expire    St Flgs Prbs
 nr60.v6.kame.net              0:60:97:c2:80:bf      ed0  expired   S    R 
 3ffe:501:4819:2000:2c0:cff:fe 0:c0:c:10:3a:53       ed0  permanent R      
 paradise.v6.kame.net          52:54:0:dc:52:17      ed0  expired   S    R 
-fe80::200:eff:fe49:f929%ed0     0:0:e:49:f9:29      ed0  expired   S    R 
-fe80::200:86ff:fe05:80da%ed0    0:0:86:5:80:da      ed0  expired   S      
-fe80::200:86ff:fe05:c2d8%ed0    0:0:86:5:c2:d8      ed0  9s        R      
+fe80::200:eff:fe49:f929%ed0   0:0:e:49:f9:29        ed0  expired   S    R 
+fe80::200:86ff:fe05:80da%ed0  0:0:86:5:80:da        ed0  expired   S      
+fe80::200:86ff:fe05:c2d8%ed0  0:0:86:5:c2:d8        ed0  9s        R      
 
-To flush the all NDP cache, execute the following by root.
+To flush all of the NDP cache entries, execute the following as root.
 
 # ndp -c
 
-To display the prefix list.
+To display the prefix list:
 
 % ndp -p
 3ffe:501:4819:2000::/64 if=ed0
@@ -269,7 +276,7 @@ To display the prefix list.
     fe80::260:97ff:fec2:80bf%ed0 (reachable)
     fe80::200:eff:fe49:f929%ed0 (no neighbor state)
 
-To display the default router list.
+To display the default router list:
 
 % ndp -r
 fe80::260:97ff:fec2:80bf if=ed0, flags=, expire=29m55s
@@ -287,7 +294,6 @@ ef0: flags=8863<UP,BROADCAST,NOTRAILERS,RUNNING,SIMPLEX,MULTICAST>
         link type ether 0:a0:24:ab:83:9b mtu 1500 speed 10Mbps
         media 10baseT status active
         inet6 fe80::2a0:24ff:feab:839b%ef0 prefixlen 64 scopeid 0x2
-
 # rtsol ef0
 # ifconfig ef0
 ef0: flags=8863<UP,BROADCAST,NOTRAILERS,RUNNING,SIMPLEX,MULTICAST>
@@ -307,6 +313,7 @@ add -m option when invocation of rtsold.
 
 rtsold also supports multiple interfaces.  For example, you can
 invoke the daemon as follows:
+
 # rtsold -m ep0 cnw0
 
 
@@ -315,8 +322,9 @@ invoke the daemon as follows:
 To see routing table:
 	
 # netstat -nr
-# netstat -nrl (long format with Ref and Use. Note that bsdi4 does not
-  support the -l option. You should use the -O option instead)
+# netstat -nrl
+	long format with Ref and Use.  Note that bsdi4 does not support the
+	-l option.  You should use the -O option instead.
 
 
 <<<sysctl>>>
@@ -364,17 +372,18 @@ Note that it is so easy to make an infinite routing loop using gif
 interface, if you configure a tunnel using the same protocol family
 for inner and outer header (i.e. IPv4-over-IPv4).
 
+For OpenBSD, "ifconfig IF giftunnel" is equivalent to gifconfig(8).
+
 Refer to gifconfig(8) for more details.
 
 
 <<<6to4>>>
 
 WARNING: malicious party can abuse 6to4 relay routers/sites, read through
-http://playground.iijlab.net/i-d/draft-itojun-ipv6-transition-abuse-00.txt
-before configuring it.
+internet draft draft-itojun-ipv6-transition-abuse-xx.txt before configuring it.
 
 "stf" interface enables you to perform 6to4 IPv6-over-IPv4 encapsulation,
-as documented in draft-ietf-ngtrans-6to4-04.txt.  See stf(4) for details.
+as documented in draft-ietf-ngtrans-6to4-06.txt.  See stf(4) for details.
 
 
 <<<inetd/inet6d>>>
@@ -395,14 +404,11 @@ netbsd/INSTALL).
 
 <<<IPsec>>>
 
-The current KAME supports both transport mode and tunnel mode.
-However, tunnel mode comes with some restrictions.
-
 IPsec requires fairly complex configuration, so here we show transport
 mode only.  http://www.kame.net/newsletter/ has more comprehensive
 examples.
 
-Let's setup security association to deploy a secure channel between
+Let us setup security association to deploy a secure channel between
 HOST A (10.2.3.4) and HOST B (10.6.7.8).  Here we show a little
 complicated example.  From HOST A to HOST B, only old AH is used.
 From HOST B to HOST A, new AH and new ESP are combined.
@@ -417,7 +423,7 @@ length must be equal to 16 bytes for MD5, 20 for new-HMAC-SHA1,
 and 8 for new-DES-expIV.  Now we choose "MYSECRETMYSECRET",
 "KAMEKAMEKAMEKAMEKAME", "PASSWORD", respectively.
 
-OK, let's assign SPI (Security Parameter Index) for each protocol.
+OK, let us assign SPI (Security Parameter Index) for each protocol.
 Please note that we need 3 SPIs for this secure channel since three
 security headers are produced (one for from HOST A to HOST B, two for
 from HOST B to HOST A).  Please also note that SPI MUST be greater
@@ -450,7 +456,7 @@ than or equal to 256.  We choose, 1000, 2000, and 3000, respectively.
 		KEY=PASSWORD
 		SPI=3000
 
-Now, let's setup security association.  Execute "setkey" on both HOST
+Now, let us setup security association.  Execute "setkey" on both HOST
 A and B:
 
 # setkey -c
