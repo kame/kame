@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.55 2003/07/20 18:08:42 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.56 2003/07/22 03:14:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -96,6 +96,7 @@
 #else
 #include <crypto/md5.h>
 #endif
+#define MD5_RESULTLEN	16
 #ifdef HAVE_SHA1
 #include <sys/sha1.h>
 #define SHA1_RESULTLEN	20
@@ -394,7 +395,7 @@ ah_keyed_md5_result(state, addr, l)
 	u_int8_t *addr;
 	size_t l;
 {
-	u_char digest[16];
+	u_char digest[MD5_RESULTLEN];
 
 	if (!state)
 		panic("ah_keyed_md5_result: what?");
@@ -512,7 +513,7 @@ ah_hmac_md5_init(state, sav)
 {
 	u_char *ipad;
 	u_char *opad;
-	u_char tk[16];
+	u_char tk[MD5_RESULTLEN];
 	u_char *key;
 	size_t keylen;
 	size_t i;
@@ -578,7 +579,7 @@ ah_hmac_md5_result(state, addr, l)
 	u_int8_t *addr;
 	size_t l;
 {
-	u_char digest[16];
+	u_char digest[MD5_RESULTLEN];
 	u_char *ipad;
 	u_char *opad;
 	MD5_CTX *ctxt;
