@@ -1,5 +1,5 @@
 #! /bin/sh
-# $Id: rc.mobileip6,v 1.3 2002/12/02 12:34:17 keiichi Exp $
+# $Id: rc.mobileip6,v 1.4 2002/12/03 13:42:47 keiichi Exp $
 
 # Mobile IPv6 startup
 
@@ -7,12 +7,19 @@ mobileip6_pass1() {
 	echo -n 'Doing Mobile IPv6 network setup:'
 
 	case ${ipv6_mobile_nodetype} in
-	[Mm][Oo][Bb][Ii][Ll][Ee][Nn][Oo][Dd][Ee])
+	[Mm][Oo][Bb][Ii][Ll][Ee]_[Nn][Oo][Dd][Ee])
 		case ${ipv6_mobile_home_prefixes} in
 		'')
 			;;
 		*)
 			echo -n ' Mobile Node:'
+			# setup SPD/SA
+			echo -n ' security'
+			for config_dir in ${ipv6_mobile_config_dir}/[0-9][0-9][0-9][0-9][0-9]
+			do
+				setkey -f ${config_dir}/add
+				setkey -f ${config_dir}/spdadd_mobile_node
+			done
 			for home_prefix in ${ipv6_mobile_home_prefixes}
 			do
 				prefix=`expr "${home_prefix}" : "\(.*\)/.*"`
@@ -21,31 +28,27 @@ mobileip6_pass1() {
 			done
 			echo -n ' enable'
 			mip6control -m
-			echo -n ' setkey'
-			for secparam in ${ipv6_mobile_security_db}/*
-			do
-				setkey -f ${secparam}
-			done
 			echo -n ' rtsold'
 			rtsold -a -m
 			;;
 		esac
 		;;
-	[Hh][Oo][Mm][Ee][Aa][Gg][Ee][Nn][Tt])
+	[Hh][Oo][Mm][Ee]_[Aa][Gg][Ee][Nn][Tt])
 		case ${ipv6_mobile_home_link} in
 		'')
 			;;
 		*)
 			echo -n ' Home Agent:'
 			# setup SPD/SA
+			echo ' security'
+			for config_dir in ${ipv6_mobile_config_dir}/[0-9][0-9][0-9][0-9][0-9]
+			do
+				setkey -f ${config_dir}/add
+				setkey -f ${config_dir}/spdadd_home_agent
+			done
 			# mip6control -S 1
 			echo -n ' enable'
 			mip6control -g
-			echo -n ' setkey'
-			for secparam in ${ipv6_mobile_security_db}/*
-			do
-				setkey -f ${secparam}
-			done
 			echo -n ' rtadvd'
 			rtadvd -m ${ipv6_mobile_home_link}
 			echo -n ' had'
