@@ -1,4 +1,4 @@
-/*	$KAME: bindtest.c,v 1.27 2001/05/08 22:12:23 jinmei Exp $	*/
+/*	$KAME: bindtest.c,v 1.28 2001/05/08 22:13:01 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 USAGI/WIDE Project.
@@ -222,7 +222,7 @@ static void
 usage()
 {
 
-	fprintf(stderr, "usage: bindtest [-[1|2]6APst] -p port\n");
+	fprintf(stderr, "usage: bindtest [-[1|2]6APlst] -p port\n");
 }
 
 static struct addrinfo *
