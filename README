@@ -2,7 +2,7 @@
 
 			KAME Project
 
-			$Date: 1999/10/06 09:57:39 $
+			$Date: 1999/10/06 10:19:57 $
 
 <<<Project Overview>>>
 
@@ -46,16 +46,15 @@ with the kit.
 <<<What's Next?>>>
 
 To know the difference from the previous stable release, please refer
-to RELNOTES.
+to CHANGELOG and RELNOTES.
 
-To install this kit, please read INSTALL.
+To install this kit, please read INSTALL at top directory, and
+INSTALL under operating system directory (for example, netbsd/INSTALL).
 
 If you want to know what features are provided, please refer to
 IMPLEMENTATION. 
 
 Before you start using this kit, please take a look at USAGE. 
-
-Our plans are described in TODO.
 
 <<<Contact Points>>
 
@@ -64,7 +63,12 @@ If you want to know more about KAME Project, please visit:
 You can get snapshots as well as stable releases.  You are also able to
 send bug reports on this web page.
 
-If you have comments, please drop a line to:
+We maintain users mailing list, called "snap-users".
+	http://www.kame.net/snap-users/
+has archive of postings, how to subscribe, and some other information.
+Share your tips, experiences, comments with other users.
+
+If you have private comments, please drop a line to:
 	core@kame.net
 
 If you have questions about commercial usage, please send the
