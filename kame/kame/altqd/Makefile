@@ -2,7 +2,7 @@ PREFIX?=	/usr/local
 SYS_INCLUDES?=	-I/usr/src/sys-altq
 
 PROGS=		altqd
-ALTQD_OBJS= 	altqd.o if_nameindex.o ../libaltq/libaltq.a
+ALTQD_OBJS= 	altqd.o if_nameindex.o libaltq2.o ../libaltq/libaltq.a
 MAN5=		altq.conf.5
 MAN8=		altqd.8
 

@@ -5,7 +5,7 @@ PROG=		altqstat
 OBJS= 		altqstat.o quip_client.o qdisc_conf.o \
 		qdisc_cbq.o qdisc_hfsc.o qdisc_cdnr.o \
 		qdisc_wfq.o qdisc_fifoq.o \
-		qdisc_red.o qdisc_rio.o qdisc_blue.o 
+		qdisc_red.o qdisc_rio.o qdisc_blue.o qdisc_priq.o
 MAN1=		altqstat.1
 
 CFLAGS=		-g -Wall

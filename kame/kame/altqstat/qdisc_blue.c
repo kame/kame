@@ -1,5 +1,6 @@
+/*	$KAME: qdisc_blue.c,v 1.2 2000/10/18 09:15:16 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: qdisc_blue.c,v 1.1 2000/01/18 07:28:58 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -50,9 +49,8 @@ blue_stat_loop(int fd, const char *ifname, int count, int interval)
 {
 	struct blue_stats blue_stats;
 	struct timeval cur_time, last_time;
-	u_quad_t xmit_bytes, last_bytes;
-	int msec;
-	double kbps;
+	u_int64_t last_bytes;
+	double sec;
 	int cnt = count;
 
 	strcpy(blue_stats.iface.blue_ifname, ifname);
@@ -67,31 +65,25 @@ blue_stat_loop(int fd, const char *ifname, int count, int interval)
 			err(1, "ioctl BLUE_GETSTATS");
 
 		gettimeofday(&cur_time, NULL);
-		msec = (cur_time.tv_sec - last_time.tv_sec)*1000 +
-			(cur_time.tv_usec - last_time.tv_usec)/1000;
+		sec = calc_interval(&cur_time, &last_time);
 
-		/*
-		 * measure the throughput of this class
-		 */
-		xmit_bytes = blue_stats.xmit_bytes - last_bytes;
-		kbps = (double)xmit_bytes * 8.0 / (double)msec
-			* 1000.0 / 1000.0;
-		last_bytes = blue_stats.xmit_bytes;
-		last_time = cur_time;
-	
 		printf(" q_len:%d , q_limit:%d, q_pmark: %d\n",
 		       blue_stats.q_len,  blue_stats.q_limit,
 		       blue_stats.q_pmark);
-		printf(" xmit: %qd pkts, drop: %qd pkts (forced: %qd, early: %qd)\n",
-		       blue_stats.xmit_packets, blue_stats.drop_packets,
-		       blue_stats.drop_forced, blue_stats.drop_unforced);
+		printf(" xmit: %llu pkts, drop: %llu pkts (forced: %llu, early: %llu)\n",
+		       (ull)blue_stats.xmit_packets,
+		       (ull)blue_stats.drop_packets,
+		       (ull)blue_stats.drop_forced,
+		       (ull)blue_stats.drop_unforced);
 		if (blue_stats.marked_packets != 0)
-			printf(" marked: %qd\n", blue_stats.marked_packets);
-		if (kbps > 1000.0)
-			printf(" throughput: %.2f Mbps\n", kbps/1000.0);
-		else
-			printf(" throughput: %.2f Kbps\n", kbps);
+			printf(" marked: %llu\n",
+			       (ull)blue_stats.marked_packets);
+		printf(" throughput: %sbps\n",
+		       rate2str(calc_rate(blue_stats.xmit_bytes,
+					  last_bytes, sec)));
 
+		last_bytes = blue_stats.xmit_bytes;
+		last_time = cur_time;
 		sleep(interval);
 	}
 }

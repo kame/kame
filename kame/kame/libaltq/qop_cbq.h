@@ -1,4 +1,4 @@
-/* $Id: qop_cbq.h,v 1.1 2000/01/18 07:29:05 kjc Exp $ */
+/*	$KAME: qop_cbq.h,v 1.2 2000/10/18 09:15:18 kjc Exp $	*/
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
  *

@@ -1,5 +1,5 @@
 PROG=	altqd
-SRCS=	altqd.c
+SRCS=	altqd.c libaltq2.c
 
 MAN5=	altq.conf.5
 MAN8=	altqd.8

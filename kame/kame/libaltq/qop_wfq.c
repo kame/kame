@@ -1,5 +1,6 @@
+/*	$KAME: qop_wfq.c,v 1.3 2000/10/18 09:15:20 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: qop_wfq.c,v 1.2 2000/07/28 09:56:23 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -68,8 +67,6 @@ static struct qdisc_ops wfq_qdisc = {
 	NULL,			/* clear */
 	wfq_enable,
 	wfq_disable,
-	NULL,			/* acc enable */
-	NULL,			/* acc disable */
 	NULL,			/* add class */
 	NULL,			/* modify class */
 	NULL,			/* delete class */
@@ -85,7 +82,7 @@ static struct qdisc_ops wfq_qdisc = {
 int
 wfq_interface_parser(const char *ifname, int argc, char **argv)
 {
-	u_int  	bandwidth = 10000000;	/* 10Mbps */
+	u_int  	bandwidth = 100000000;	/* 100Mbps */
 	u_int	tbrsize = 0;
 	int	hash_policy = 0;	/* 0: use default */
 	int	nqueues = 0;		/* 0: use default */
@@ -216,7 +213,6 @@ wfq_attach(struct ifinfo *ifinfo)
 	wfq_refcount++;
 	memset(&iface, 0, sizeof(iface));
 	strncpy(iface.wfq_ifacename, ifinfo->ifname, IFNAMSIZ);
-	iface.wfq_ifacelen = strlen(iface.wfq_ifacename);
 
 	if (ioctl(wfq_fd, WFQ_IF_ATTACH, &iface) < 0)
 		return (QOPERR_SYSCALL);
@@ -227,7 +223,6 @@ wfq_attach(struct ifinfo *ifinfo)
 	    wfq_ifinfo->qsize != 0) {
 		memset(&conf, 0, sizeof(conf));
 		strncpy(conf.iface.wfq_ifacename, ifinfo->ifname, IFNAMSIZ);
-		conf.iface.wfq_ifacelen = strlen(iface.wfq_ifacename);
 		conf.hash_policy = wfq_ifinfo->hash_policy;
 		conf.nqueues     = wfq_ifinfo->nqueues;
 		conf.qlimit      = wfq_ifinfo->qsize;
@@ -249,7 +244,6 @@ wfq_detach(struct ifinfo *ifinfo)
 	
 	memset(&iface, 0, sizeof(iface));
 	strncpy(iface.wfq_ifacename, ifinfo->ifname, IFNAMSIZ);
-	iface.wfq_ifacelen = strlen(iface.wfq_ifacename);
 
 	if (ioctl(wfq_fd, WFQ_IF_DETACH, &iface) < 0)
 		return (QOPERR_SYSCALL);
@@ -268,7 +262,6 @@ wfq_enable(struct ifinfo *ifinfo)
 
 	memset(&iface, 0, sizeof(iface));
 	strncpy(iface.wfq_ifacename, ifinfo->ifname, IFNAMSIZ);
-	iface.wfq_ifacelen = strlen(iface.wfq_ifacename);
 
 	if (ioctl(wfq_fd, WFQ_ENABLE, &iface) < 0)
 		return (QOPERR_SYSCALL);
@@ -282,7 +275,6 @@ wfq_disable(struct ifinfo *ifinfo)
 
 	memset(&iface, 0, sizeof(iface));
 	strncpy(iface.wfq_ifacename, ifinfo->ifname, IFNAMSIZ);
-	iface.wfq_ifacelen = strlen(iface.wfq_ifacename);
 
 	if (ioctl(wfq_fd, WFQ_DISABLE, &iface) < 0)
 		return (QOPERR_SYSCALL);

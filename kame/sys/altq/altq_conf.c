@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.c,v 1.6 2000/07/25 10:12:29 kjc Exp $	*/
+/*	$KAME: altq_conf.c,v 1.7 2000/10/18 09:15:22 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_conf.c,v 1.6 2000/07/25 10:12:29 kjc Exp $
+ * $Id: altq_conf.c,v 1.7 2000/10/18 09:15:22 kjc Exp $
  */
 
 #ifdef ALTQ
@@ -56,35 +56,38 @@
 #include <altq/altq.h>
 #include <altq/altq_conf.h>
 
-#ifdef CBQ
+#ifdef ALTQ_CBQ
 altqdev_decl(cbq);
 #endif
-#ifdef WFQ
+#ifdef ALTQ_WFQ
 altqdev_decl(wfq);
 #endif
-#ifdef AFMAP
+#ifdef ALTQ_AFMAP
 altqdev_decl(afm);
 #endif
-#ifdef FIFOQ
+#ifdef ALTQ_FIFOQ
 altqdev_decl(fifoq);
 #endif
-#ifdef RED
+#ifdef ALTQ_RED
 altqdev_decl(red);
 #endif
-#ifdef RIO
+#ifdef ALTQ_RIO
 altqdev_decl(rio);
 #endif
-#ifdef LOCALQ
+#ifdef ALTQ_LOCALQ
 altqdev_decl(localq);
 #endif
-#ifdef HFSC
+#ifdef ALTQ_HFSC
 altqdev_decl(hfsc);
 #endif
-#ifdef CDNR
+#ifdef ALTQ_CDNR
 altqdev_decl(cdnr);
 #endif
-#ifdef BLUE
+#ifdef ALTQ_BLUE
 altqdev_decl(blue);
+#endif
+#ifdef ALTQ_PRIQ
+altqdev_decl(priq);
 #endif
 
 /*
@@ -92,55 +95,60 @@ altqdev_decl(blue);
  */
 static struct altqsw altqsw[] = {				/* minor */
 	{"noq",	noopen,		noclose,	noioctl},  /* 0 (reserved) */
-#ifdef CBQ
+#ifdef ALTQ_CBQ
 	{"cbq",	cbqopen,	cbqclose,	cbqioctl},	/* 1 */
 #else
 	{"noq",	noopen,		noclose,	noioctl},	/* 1 */
 #endif
-#ifdef WFQ
+#ifdef ALTQ_WFQ
 	{"wfq",	wfqopen,	wfqclose,	wfqioctl},	/* 2 */
 #else
 	{"noq",	noopen,		noclose,	noioctl},	/* 2 */
 #endif
-#ifdef AFMAP
+#ifdef ALTQ_AFMAP
 	{"afm",	afmopen,	afmclose,	afmioctl},	/* 3 */
 #else
 	{"noq",	noopen,		noclose,	noioctl},	/* 3 */
 #endif
-#ifdef FIFOQ
+#ifdef ALTQ_FIFOQ
 	{"fifoq", fifoqopen,	fifoqclose,	fifoqioctl},	/* 4 */
 #else
 	{"noq",	noopen,		noclose,	noioctl},	/* 4 */
 #endif
-#ifdef RED
+#ifdef ALTQ_RED
 	{"red", redopen,	redclose,	redioctl},	/* 5 */
 #else
 	{"noq",	noopen,		noclose,	noioctl},	/* 5 */
 #endif
-#ifdef RIO
+#ifdef ALTQ_RIO
 	{"rio", rioopen,	rioclose,	rioioctl},	/* 6 */
 #else
 	{"noq",	noopen,		noclose,	noioctl},	/* 6 */
 #endif
-#ifdef LOCALQ
+#ifdef ALTQ_LOCALQ
 	{"localq",localqopen,	localqclose,	localqioctl}, /* 7 (local use) */
 #else
 	{"noq",	noopen,		noclose,	noioctl},  /* 7 (local use) */
 #endif
-#ifdef HFSC
+#ifdef ALTQ_HFSC
 	{"hfsc",hfscopen,	hfscclose,	hfscioctl},	/* 8 */
 #else
 	{"noq",	noopen,		noclose,	noioctl},	/* 8 */
 #endif
-#ifdef CDNR
+#ifdef ALTQ_CDNR
 	{"cdnr",cdnropen,	cdnrclose,	cdnrioctl},	/* 9 */
 #else
 	{"noq",	noopen,		noclose,	noioctl},	/* 9 */
 #endif
-#ifdef BLUE
+#ifdef ALTQ_BLUE
 	{"blue",blueopen,	blueclose,	blueioctl},	/* 10 */
 #else
 	{"noq",	noopen,		noclose,	noioctl},	/* 10 */
+#endif
+#ifdef ALTQ_PRIQ
+	{"priq",priqopen,	priqclose,	priqioctl},	/* 11 */
+#else
+	{"noq",	noopen,		noclose,	noioctl},	/* 11 */
 #endif
 };
 
@@ -253,7 +261,7 @@ altqioctl(dev, cmd, addr, flag, p)
 
 	if (unit == 0) {
 		struct ifnet *ifp;
-		struct qtypereq *typereq;
+		struct altqreq *typereq;
 		struct tbrreq *tbrreq;
 		int error;
 
@@ -274,10 +282,10 @@ altqioctl(dev, cmd, addr, flag, p)
 
 		switch (cmd) {
 		case ALTQGTYPE:
-			typereq = (struct qtypereq *)addr;
+			typereq = (struct altqreq *)addr;
 			if ((ifp = ifunit(typereq->ifname)) == NULL)
 				return (EINVAL);
-			typereq->altqtype = ifp->if_snd.altq_type;
+			typereq->arg = (u_long)ifp->if_snd.altq_type;
 			return (0);
 		case ALTQTBRSET:
 			tbrreq = (struct tbrreq *)addr;

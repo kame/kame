@@ -75,7 +75,7 @@ defopt	TCP_COMPAT_42
 defopt	TCP_RECVSPACE
 defopt	TCP_SENDSPACE
 
-defopt	opt_altq.h	CBQ WFQ FIFOQ RED FLOWVALVE RIO CBQ_RED CBQ_RIO LOCALQ HFSC HFSC_RED HFSC_RIO ALTQ_ECN CDNR BLUE ALTQ_NOPCC ALTQ_DEBUG
+defopt	opt_altq.h	ALTQ_CBQ ALTQ_WFQ ALTQ_FIFOQ ALTQ_RED ALTQ_FLOWVALVE ALTQ_RIO ALTQ_LOCALQ ALTQ_HFSC ALTQ_CDNR ALTQ_BLUE ALTQ_PRIQ ALTQ_NOPCC ALTQ_DEBUG
 
 defopt	SB_MAX
 
@@ -436,6 +436,7 @@ file altq/altq_cdnr.c			altq
 file altq/altq_fifoq.c			altq
 file altq/altq_hfsc.c			altq
 file altq/altq_localq.c			altq
+file altq/altq_priq.c			altq
 file altq/altq_red.c			altq
 file altq/altq_rio.c			altq
 file altq/altq_rmclass.c		altq

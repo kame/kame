@@ -1,4 +1,4 @@
-/*	$KAME: altq.h,v 1.3 2000/07/25 10:12:29 kjc Exp $	*/
+/*	$KAME: altq.h,v 1.4 2000/10/18 09:15:21 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2000
@@ -25,13 +25,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq.h,v 1.3 2000/07/25 10:12:29 kjc Exp $
+ * $Id: altq.h,v 1.4 2000/10/18 09:15:21 kjc Exp $
  */
 #ifndef _ALTQ_ALTQ_H_
 #define	_ALTQ_ALTQ_H_
 
 #include <sys/param.h>
 #include <sys/ioccom.h>
+#include <sys/queue.h>
 #include <netinet/in.h>
 
 #ifndef IFNAMSIZ
@@ -50,15 +51,16 @@
 #define	ALTQT_HFSC		8	/* hfsc */
 #define	ALTQT_CDNR		9	/* traffic conditioner */
 #define	ALTQT_BLUE		10	/* blue */
-#define	ALTQT_MAX		10
+#define	ALTQT_PRIQ		11	/* priority queue */
+#define	ALTQT_MAX		11
 
-struct	qtypereq {
+struct	altqreq {
 	char	ifname[IFNAMSIZ];	/* if name, e.g. "en0" */
-	int	altqtype;		/* altq discipline type */
+	u_long	arg;			/* request-specific argument */
 };
 
 /* simple token backet meter profile */
-struct tb_profile {
+struct	tb_profile {
 	u_int	rate;	/* rate in bit-per-sec */
 	u_int	depth;	/* depth in bytes */
 };
@@ -140,11 +142,41 @@ struct flow_filter6 {
 #endif /* INET6 */
 
 /*
+ * generic packet counter
+ */
+struct pktcntr {
+	u_int64_t	packets;
+	u_int64_t	bytes;
+};
+
+#define	PKTCNTR_ADD(cntr, len)	\
+	do { (cntr)->packets++; (cntr)->bytes += len; } while (0)
+
+/*
  * altq related ioctls
  */
-#define	ALTQGTYPE	_IOWR('Q', 0, struct qtypereq)  /* get queue type */
-#define	ALTQTBRSET	_IOW('Q', 1, struct tbrreq)     /* set tb regulator */
-#define	ALTQTBRGET	_IOWR('Q', 2, struct tbrreq)    /* get tb regulator */
+#define	ALTQGTYPE	_IOWR('q', 0, struct altqreq)	/* get queue type */
+#if 0
+/*
+ * these ioctls are currently discipline-specific but could be shared
+ * in the future.
+ */
+#define	ALTQATTACH	_IOW('q', 1, struct altqreq)	/* attach discipline */
+#define	ALTQDETACH	_IOW('q', 2, struct altqreq)	/* detach discipline */
+#define	ALTQENABLE	_IOW('q', 3, struct altqreq)	/* enable discipline */
+#define	ALTQDISABLE	_IOW('q', 4, struct altqreq)	/* disable discipline*/
+#define	ALTQCLEAR	_IOW('q', 5, struct altqreq)	/* (re)initialize */
+#define	ALTQCONFIG	_IOWR('q', 6, struct altqreq)	/* set config params */
+#define	ALTQADDCLASS	_IOWR('q', 7, struct altqreq)	/* add a class */
+#define	ALTQMODCLASS	_IOWR('q', 8, struct altqreq)	/* modify a class */
+#define	ALTQDELCLASS	_IOWR('q', 9, struct altqreq)	/* delete a class */
+#define	ALTQADDFILTER	_IOWR('q', 10, struct altqreq)	/* add a filter */
+#define	ALTQDELFILTER	_IOWR('q', 11, struct altqreq)	/* delete a filter */
+#define	ALTQGETSTATS	_IOWR('q', 12, struct altqreq)	/* get statistics */
+#define	ALTQGETCNTR	_IOWR('q', 13, struct altqreq)	/* get a pkt counter */
+#endif /* 0 */
+#define	ALTQTBRSET	_IOW('q', 14, struct tbrreq)	/* set tb regulator */
+#define	ALTQTBRGET	_IOWR('q', 15, struct tbrreq)	/* get tb regulator */
 
 /* queue macros only in FreeBSD */
 #ifndef LIST_EMPTY

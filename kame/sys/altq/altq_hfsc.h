@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.h,v 1.4 2000/07/25 10:12:30 kjc Exp $	*/
+/*	$KAME: altq_hfsc.h,v 1.5 2000/10/18 09:15:23 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -32,7 +32,7 @@
  * and to grant Carnegie Mellon the rights to redistribute these
  * changes without encumbrance.
  *
- * $Id: altq_hfsc.h,v 1.4 2000/07/25 10:12:30 kjc Exp $
+ * $Id: altq_hfsc.h,v 1.5 2000/10/18 09:15:23 kjc Exp $
  */
 #ifndef _ALTQ_ALTQ_HFSC_H_
 #define	_ALTQ_ALTQ_HFSC_H_
@@ -126,8 +126,8 @@ struct class_stats {
 	u_int64_t		vt;		/* virtual time */
 
 	u_int			qlength;
-	u_int			npackets;
-	u_int			drops;
+	struct pktcntr		xmit_cnt;
+	struct pktcntr		drop_cnt;
 	u_int 			period;
 
 	/* red and rio related info */
@@ -149,15 +149,13 @@ struct hfsc_class_stats {
 #define	HFSC_IF_DETACH		_IOW('Q', 2, struct hfsc_interface)
 #define	HFSC_ENABLE		_IOW('Q', 3, struct hfsc_interface)
 #define	HFSC_DISABLE		_IOW('Q', 4, struct hfsc_interface)
-#define	HFSC_ACC_ENABLE		_IOW('Q', 5, struct hfsc_interface)
-#define	HFSC_ACC_DISABLE	_IOW('Q', 6, struct hfsc_interface)
+#define	HFSC_CLEAR_HIERARCHY	_IOW('Q', 5, struct hfsc_interface)
 #define	HFSC_ADD_CLASS		_IOWR('Q', 7, struct hfsc_add_class)
 #define	HFSC_DEL_CLASS		_IOW('Q', 8, struct hfsc_delete_class)
 #define	HFSC_MOD_CLASS		_IOW('Q', 9, struct hfsc_modify_class)
-#define	HFSC_CLEAR_HIERARCHY	_IOW('Q', 10, struct hfsc_interface)
-#define	HFSC_ADD_FILTER		_IOWR('Q', 11, struct hfsc_add_filter)
-#define	HFSC_DEL_FILTER		_IOW('Q', 12, struct hfsc_delete_filter)
-#define	HFSC_GETSTATS		_IOWR('Q', 13, struct hfsc_class_stats)
+#define	HFSC_ADD_FILTER		_IOWR('Q', 10, struct hfsc_add_filter)
+#define	HFSC_DEL_FILTER		_IOW('Q', 11, struct hfsc_delete_filter)
+#define	HFSC_GETSTATS		_IOWR('Q', 12, struct hfsc_class_stats)
 
 #ifdef _KERNEL
 /*
@@ -248,8 +246,8 @@ struct hfsc_class {
 	elentry_t	cl_ellist;	/* eligible list entry */
 
 	struct {
-		u_int npackets;
-		u_int drops;
+		struct pktcntr	xmit_cnt;
+		struct pktcntr	drop_cnt;
 		u_int period;
 	} cl_stats;
 };

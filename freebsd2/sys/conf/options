@@ -93,22 +93,20 @@ OPEN_MAX		opt_rlimit.h
 
 # Net stuff.
 
-CBQ			opt_altq.h
-WFQ			opt_altq.h
-AFMAP			opt_altq.h
-FIFOQ			opt_altq.h
-RED			opt_altq.h
-FLOWVALVE		opt_altq.h
-CBQ_RED			opt_altq.h
-RIO			opt_altq.h
-CBQ_RIO			opt_altq.h
-LOCALQ			opt_altq.h
+# altq stuff
+ALTQ_CBQ		opt_altq.h
+ALTQ_WFQ		opt_altq.h
+ALTQ_AFMAP		opt_altq.h
+ALTQ_FIFOQ		opt_altq.h
+ALTQ_RED		opt_altq.h
+ALTQ_FLOWVALVE		opt_altq.h
+ALTQ_RIO		opt_altq.h
 ALTQ_IPSEC		opt_altq.h
-HFSC			opt_altq.h
-HFSC_RED		opt_altq.h
-HFSC_RIO		opt_altq.h
-CDNR			opt_altq.h
-BLUE			opt_altq.h
+ALTQ_LOCALQ		opt_altq.h
+ALTQ_HFSC		opt_altq.h
+ALTQ_CDNR		opt_altq.h
+ALTQ_BLUE		opt_altq.h
+ALTQ_PRIQ		opt_altq.h
 ALTQ_NOPCC		opt_altq.h
 ALTQ_DEBUG		opt_altq.h
 

@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.h,v 1.3 2000/07/25 10:12:29 kjc Exp $	*/
+/*	$KAME: altq_cbq.h,v 1.4 2000/10/18 09:15:22 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -62,35 +62,9 @@ extern "C" {
  * IOCTL's such that the CBQ driver may find the appropriate CBQ module
  * associated with the network interface to be affected.
  */
-typedef struct cbq_interface {
+struct cbq_interface {
 	char	cbq_ifacename[IFNAMSIZ];
-	u_int	cbq_ifacelen;
-} cbq_iface_t;
-
-/* 
- * Define IOCTLs for CBQ.
- */
-#define	CBQ_ENABLE		_IOW('Q', 1, struct cbq_interface)
-#define	CBQ_DISABLE		_IOW('Q', 2, struct cbq_interface)
-
-#define	CBQ_ADD_FILTER		_IOWR('Q', 3, struct cbq_add_filter)
-
-struct cbq_add_filter {
-	cbq_iface_t		cbq_iface;
-	u_long			cbq_class_handle;
-	struct flow_filter	cbq_filter;
-
-	u_long			cbq_filter_handle;
 };
-
-#define	CBQ_DEL_FILTER		_IOW('Q', 4, struct cbq_delete_filter)
-
-struct cbq_delete_filter {
-	cbq_iface_t	cbq_iface;
-	u_long		cbq_filter_handle;
-};
-
-#define	CBQ_ADD_CLASS		_IOWR('Q', 5, struct cbq_add_class)
 
 typedef struct cbq_class_spec {
 	u_int		priority;
@@ -126,35 +100,47 @@ typedef struct cbq_class_spec {
 #define	CBQ_MAXQSIZE	200
 
 struct cbq_add_class {
-	cbq_iface_t		cbq_iface;
+	struct cbq_interface	cbq_iface;
 
 	cbq_class_spec_t	cbq_class;	
 	u_long			cbq_class_handle;
 };
 
-#define	CBQ_DEL_CLASS		_IOW('Q', 6, struct cbq_delete_class)
-
 struct cbq_delete_class {
-	cbq_iface_t	cbq_iface;
-	u_long		cbq_class_handle;
+	struct cbq_interface	cbq_iface;
+	u_long			cbq_class_handle;
 };
 
-#define	CBQ_CLEAR_HIERARCHY	_IOW('Q', 7, struct cbq_interface)
-#define	CBQ_ENABLE_STATS	_IOW('Q', 8, struct cbq_interface)
-#define	CBQ_DISABLE_STATS	_IOW('Q', 9, struct cbq_interface)
+struct cbq_modify_class {
+	struct cbq_interface	cbq_iface;
+
+	cbq_class_spec_t	cbq_class;	
+	u_long			cbq_class_handle;
+};
+
+struct cbq_add_filter {
+	struct cbq_interface		cbq_iface;
+	u_long			cbq_class_handle;
+	struct flow_filter	cbq_filter;
+
+	u_long			cbq_filter_handle;
+};
+
+struct cbq_delete_filter {
+	struct cbq_interface	cbq_iface;
+	u_long			cbq_filter_handle;
+};
 
 typedef struct _cbq_class_stats_ {
 	u_int		handle;
 	u_int		depth;
 
-	u_int		npackets;	/* packets sent in this class */
+	struct pktcntr	xmit_cnt;	/* packets sent in this class */
+	struct pktcntr	drop_cnt;	/* dropped packets */
 	u_int		over;		/* # times went over limit */
 	u_int		borrows;	/* # times tried to borrow */
-	u_int		drops;		/* # times dropped packets */
 	u_int		overactions;	/* # times invoked overlimit action */
 	u_int		delays;		/* # times invoked delay actions */
-	u_quad_t	nbytes;		/* bytes sent in this class */
-	u_quad_t	drop_bytes;	/* bytes dropped in this class */
 
 	/* other static class parameters useful for debugging */
 	int		priority;
@@ -173,29 +159,27 @@ typedef struct _cbq_class_stats_ {
 	struct redstats	red[3];
 } class_stats_t;
 
-struct cbq_getstats {
-	cbq_iface_t	iface;
-	int		nclasses;
-	class_stats_t	*stats;
-};
-
 /* number of classes are returned in nclasses field */
-#define	CBQ_GETSTATS		_IOWR('Q', 10, struct cbq_getstats)
-
-struct cbq_modify_class {
-	cbq_iface_t		cbq_iface;
-
-	cbq_class_spec_t	cbq_class;	
-	u_long			cbq_class_handle;
+struct cbq_getstats {
+	struct cbq_interface	iface;
+	int			nclasses;
+	class_stats_t		*stats;
 };
 
-#define	CBQ_MODIFY_CLASS	_IOWR('Q', 11, struct cbq_modify_class)
-
-#define	CBQ_IF_ATTACH		_IOW('Q', 16, struct cbq_interface)
-#define	CBQ_IF_DETACH		_IOW('Q', 17, struct cbq_interface)
-
-#define	CBQ_ACC_ENABLE		_IOW('Q', 18, struct cbq_interface)
-#define	CBQ_ACC_DISABLE		_IOW('Q', 19, struct cbq_interface)
+/* 
+ * Define IOCTLs for CBQ.
+ */
+#define	CBQ_IF_ATTACH		_IOW('Q', 1, struct cbq_interface)
+#define	CBQ_IF_DETACH		_IOW('Q', 2, struct cbq_interface)
+#define	CBQ_ENABLE		_IOW('Q', 3, struct cbq_interface)
+#define	CBQ_DISABLE		_IOW('Q', 4, struct cbq_interface)
+#define	CBQ_CLEAR_HIERARCHY	_IOW('Q', 5, struct cbq_interface)
+#define	CBQ_ADD_CLASS		_IOWR('Q', 7, struct cbq_add_class)
+#define	CBQ_DEL_CLASS		_IOW('Q', 8, struct cbq_delete_class)
+#define	CBQ_MODIFY_CLASS	_IOWR('Q', 9, struct cbq_modify_class)
+#define	CBQ_ADD_FILTER		_IOWR('Q', 10, struct cbq_add_filter)
+#define	CBQ_DEL_FILTER		_IOW('Q', 11, struct cbq_delete_filter)
+#define	CBQ_GETSTATS		_IOWR('Q', 12, struct cbq_getstats)
 
 #ifdef _KERNEL
 /*

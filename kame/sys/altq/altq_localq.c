@@ -1,10 +1,10 @@
-/*	$KAME: altq_localq.c,v 1.2 2000/02/22 14:00:33 itojun Exp $	*/
+/*	$KAME: altq_localq.c,v 1.3 2000/10/18 09:15:23 kjc Exp $	*/
 
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
 #endif /* __FreeBSD__ || __NetBSD__ */
-#ifdef LOCALQ	/* localq is enabled by LOCALQ option in opt_altq.h */
+#ifdef ALTQ_LOCALQ  /* localq is enabled by ALTQ_LOCALQ option in opt_altq.h */
 
 #include <sys/param.h>
 #include <sys/mbuf.h>
@@ -65,4 +65,4 @@ ALTQ_MODULE(altq_localq, ALTQT_LOCALQ, &localq_sw);
 
 #endif /* KLD_MODULE */
 
-#endif /* LOCALQ */
+#endif /* ALTQ_LOCALQ */

@@ -1,5 +1,6 @@
+/*	$KAME: quip_server.c,v 1.2 2000/10/18 09:15:21 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: quip_server.c,v 1.1 2000/01/18 07:29:08 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -101,33 +100,26 @@ quip_input(FILE *fp)
 
 		if (EQUAL(w, "list")) {
 			n = query_list(w, query, body);
-		}
-		else if (EQUAL(w, "handle-to-name")) {
+		} else if (EQUAL(w, "handle-to-name")) {
 			n = query_handle2name(w, query, body);
-		}
-		else if (EQUAL(w, "qdisc")) {
+		} else if (EQUAL(w, "qdisc")) {
 			n = query_qdisc(w, query, body);
-		}
-		else if (EQUAL(w, "filter")) {
+		} else if (EQUAL(w, "filter")) {
 			n = query_filterspec(w, query, body);
-		}
-		else {
+		} else {
 			sprintf(result, "400 Bad request\n");
 			goto done;
 		}
-	}
-	else {
+	} else {
 		sprintf(result, "400 Bad request\n");
 		goto done;
 	}
 
 	if (n == 0) {
 		sprintf(result, "204 No content\n");
-	}
-	else if (n < 0) {
+	} else if (n < 0) {
 		sprintf(result, "400 Bad request\n");
-	}
-	else {
+	} else {
 		sprintf(result, "200 OK\nContent-Length:%d\n", n);
 	}
 	
@@ -234,8 +226,7 @@ query_handle2name(const char *cmd, const char *arg, char *msg)
 			return (-1);
 
 		len = expand_filtername(fltrinfo, msg);
-	}
-	else {
+	} else {
 		if (sscanf(class_field, "%lx", &handle) != 1)
 			return (-1);
 		if ((ifinfo = ifname2ifinfo(ifname)) == NULL)
@@ -298,8 +289,7 @@ query_filterspec(const char *cmd, const char *arg, char *msg)
 		if (filt->ff_flow.fi_dst.s_addr == 0) {
 			sprintf(dst, "0");
 			dmask[0] = '\0';
-		}
-		else {
+		} else {
 			sprintf(dst, "%s", inet_ntoa(filt->ff_flow.fi_dst));
 			
 			if (filt->ff_mask.mask_dst.s_addr == 0xffffffff)
@@ -311,8 +301,7 @@ query_filterspec(const char *cmd, const char *arg, char *msg)
 		if (filt->ff_flow.fi_src.s_addr == 0) {
 			sprintf(src, "0");
 			smask[0] = '\0';
-		}
-		else {
+		} else {
 			sprintf(src, "%s", inet_ntoa(filt->ff_flow.fi_src));
 			
 			if (filt->ff_mask.mask_src.s_addr == 0xffffffff)
@@ -349,8 +338,7 @@ query_filterspec(const char *cmd, const char *arg, char *msg)
 		if (IN6_IS_ADDR_UNSPECIFIED(&filt6->ff_flow6.fi6_dst)) {
 			sprintf(dst6, "0");
 			dmask6[0] = '\0';
-		}
-		else {
+		} else {
 			inet_ntop(AF_INET6, &filt6->ff_flow6.fi6_dst,
 				  dst6, sizeof(dst6));
 			if (IN6_ARE_ADDR_EQUAL(&mask128,
@@ -366,8 +354,7 @@ query_filterspec(const char *cmd, const char *arg, char *msg)
 		if (IN6_IS_ADDR_UNSPECIFIED(&filt6->ff_flow6.fi6_src)) {
 			sprintf(src6, "0");
 			smask6[0] = '\0';
-		}
-		else {
+		} else {
 			inet_ntop(AF_INET6, &filt6->ff_flow6.fi6_src,
 				  src6, sizeof(src6));
 			if (IN6_ARE_ADDR_EQUAL(&mask128,
@@ -451,8 +438,7 @@ query_list(const char *cmd, const char *arg, char *msg)
 	if (arg == NULL) {
 		/* no arg, print all */
 		print_if = print_class = print_fltr = 1;
-	}
-	else {
+	} else {
 		print_if = print_class = print_fltr = 0;
 		if ((cp = strchr(arg, ':')) == NULL)
 			print_if = 1;

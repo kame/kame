@@ -1,4 +1,4 @@
-/*	$KAME: altq_wfq.c,v 1.5 2000/07/25 10:12:31 kjc Exp $	*/
+/*	$KAME: altq_wfq.c,v 1.6 2000/10/18 09:15:24 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_wfq.c,v 1.5 2000/07/25 10:12:31 kjc Exp $
+ * $Id: altq_wfq.c,v 1.6 2000/10/18 09:15:24 kjc Exp $
  */
 /*
  *  March 27, 1997.  Written by Hiroshi Kyusojin of Keio University
@@ -41,7 +41,7 @@
 #endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
-#ifdef WFQ
+#ifdef ALTQ_WFQ
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -296,8 +296,7 @@ wfq_ifenqueue(ifq, mp, pktattr)
 			queue->next = queue->prev = queue;
 			wfqp->rrp = queue;
 			WFQ_ADDQUOTA(queue);
-		}
-		else{
+		} else {
 			/* insert the queue at the tail of the active list */
 			queue->prev = wfqp->rrp->prev;
 			wfqp->rrp->prev->next = queue;
@@ -319,8 +318,7 @@ wfq_ifenqueue(ifq, mp, pktattr)
 		mp->m_nextpkt = NULL;
 		byte = mp->m_pkthdr.len;
 		drop_queue->bytes -= byte;
-		drop_queue->drop_packets++;
-		drop_queue->drop_bytes += byte;
+		PKTCNTR_ADD(&drop_queue->drop_cnt, byte);
 		wfqp->bytes -= byte;
 		m_freem(mp);
 		ifq->ifq_len--;
@@ -460,8 +458,7 @@ wfq_ifdequeue(ifq, op)
 					queue->next = queue->prev = NULL;
 					wfqp->rrp = NULL;
 					return NULL;
-				}
-				else {
+				} else {
 					queue->prev->next = queue->next;
 					queue->next->prev = queue->prev;
 					/* the round-robin pointer points
@@ -483,8 +480,7 @@ wfq_ifdequeue(ifq, op)
 				mp->m_nextpkt = NULL;
 				queue->quota -= byte;
 				queue->bytes -= byte;
-				queue->sent_packets++;
-				queue->sent_bytes += byte;
+				PKTCNTR_ADD(&queue->xmit_cnt, byte);
 				wfqp->bytes -= byte;
 				if (ALTQ_IS_ENABLED(ifq))
 					ifq->ifq_len--;
@@ -559,10 +555,8 @@ wfq_getstats(gsp)
 
 	stats->bytes		= queue->bytes;
 	stats->weight		= queue->weight;
-	stats->sent_packets	= queue->sent_packets;
-	stats->sent_bytes	= queue->sent_bytes;
-	stats->drop_packets	= queue->drop_packets;
-	stats->drop_bytes	= queue->drop_bytes;
+	stats->xmit_cnt		= queue->xmit_cnt;
+	stats->drop_cnt		= queue->drop_cnt;
 
 	return 0;
 }
@@ -672,7 +666,6 @@ wfqclose(dev, flag, fmt, p)
 		sprintf(iface.wfq_ifacename, "%s%d",
 			ifp->if_name, ifp->if_unit);
 #endif
-		iface.wfq_ifacelen = strlen(iface.wfq_ifacename);
 		wfq_ifdetach(&iface);
 	}
 	splx(s);
@@ -757,4 +750,4 @@ ALTQ_MODULE(altq_wfq, ALTQT_WFQ, &wfq_sw);
 
 #endif /* KLD_MODULE */
 
-#endif /* WFQ */
+#endif /* ALTQ_WFQ */

@@ -1,5 +1,6 @@
+/*	$KAME: qop.c,v 1.6 2000/10/18 09:15:18 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: qop.c,v 1.5 2000/07/28 09:56:22 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -134,8 +133,7 @@ qcmd_enable(const char *ifname)
 	if (error == 0) {
 		LOG(LOG_INFO, 0, "%s enabled on interface %s (mtu:%d)\n",
 		    ifinfo->qdisc->qname, ifname, ifinfo->ifmtu);
-	}
-	else
+	} else
 		LOG(LOG_ERR, errno, "%s: enable failed!\n", qoperror(error));
 	return (error);
 }
@@ -186,41 +184,6 @@ qcmd_disableall()
 }
 
 int
-qcmd_acc_enable(const char *ifname)
-{
-	struct ifinfo	*ifinfo;
-	int error = 0;
-
-	if ((ifinfo = ifname2ifinfo(ifname)) == NULL)
-		error = QOPERR_BADIF;
-
-	if (error == 0)
-		error = qop_acc_enable(ifinfo);
-	if (error != 0)
-		LOG(LOG_ERR, errno, "%s: acc enable failed!\n",
-		    qoperror(error));
-	return (error);
-}
-
-int
-qcmd_acc_disable(const char *ifname)
-{
-	struct ifinfo	*ifinfo;
-	int error = 0;
-	
-	if ((ifinfo = ifname2ifinfo(ifname)) == NULL)
-		error = QOPERR_BADIF;
-
-	if (error == 0)
-		qop_acc_disable(ifinfo);
-	if (error != 0)
-		LOG(LOG_ERR, errno, "%s: acc disable failed!\n",
-		    qoperror(error));
-	return (error);
-}
-
-
-int
 qcmd_clear(const char *ifname)
 {
 	struct ifinfo	*ifinfo;
@@ -242,6 +205,13 @@ qcmd_destroyall(void)
 	while (!LIST_EMPTY(&qop_iflist))
 		(void)qop_delete_if(LIST_FIRST(&qop_iflist));
 	return (0);
+}
+
+int
+qcmd_restart(void)
+{
+	qcmd_destroyall();
+	return qcmd_init();
 }
 
 int
@@ -374,13 +344,12 @@ qop_add_if(struct ifinfo **rp, const char *ifname, u_int bandwidth,
 	ifinfo->ifname = strdup(ifname);
 	ifinfo->bandwidth = bandwidth;
 	ifinfo->enabled = 0;
-	ifinfo->acc_enabled = 0;
 	if (ifname[0] == '_')
 		/* input interface */
 		ifname += 1;
 	ifinfo->ifindex = get_ifindex(ifname);
 	ifinfo->ifmtu = get_ifmtu(ifname);
-	if (Debug_mode)
+	if (qdisc_ops == NULL || Debug_mode)
 		ifinfo->qdisc = &nop_qdisc; /* replace syscalls by nops */
 	else
 		ifinfo->qdisc = qdisc_ops;
@@ -474,30 +443,6 @@ qop_disable(struct ifinfo *ifinfo)
 }
 
 int
-qop_acc_enable(struct ifinfo *ifinfo)
-{
-	int error;
-
-	if (ifinfo->qdisc->enable != NULL)
-		if ((error = (*ifinfo->qdisc->acc_enable)(ifinfo)) != 0)
-			return (error);
-	ifinfo->acc_enabled = 1;
-	return (0);
-}
-
-int
-qop_acc_disable(struct ifinfo *ifinfo)
-{
-	int error;
-
-	if (ifinfo->qdisc->disable != NULL)
-		if ((error = (*ifinfo->qdisc->acc_disable)(ifinfo)) != 0)
-			return (error);
-	ifinfo->acc_enabled = 0;
-	return (0);
-}
-
-int
 qop_clear(struct ifinfo *ifinfo)
 {
 	struct classinfo	*clinfo;
@@ -517,8 +462,7 @@ qop_clear(struct ifinfo *ifinfo)
 				break;
 			}
 		}
-	}
-	else {
+	} else {
 		/* input interface. delete from parents */
 		struct classinfo *root = get_rootclass(ifinfo);
 		
@@ -805,16 +749,6 @@ is_q_enabled(const char *ifname)
 	if ((ifinfo = ifname2ifinfo(ifname)) == NULL)
 		return (0);
 	return (ifinfo->enabled);
-}
-
-int
-is_q_acc_enabled(const char *ifname)
-{
-	struct ifinfo	*ifinfo;
-
-	if ((ifinfo = ifname2ifinfo(ifname)) == NULL)
-		return (0);
-	return (ifinfo->acc_enabled);
 }
 
 /*
@@ -1107,8 +1041,7 @@ add_filter_rule(struct ifinfo *ifinfo, struct fltrinfo *fltrinfo,
 			front = fp;
 			back = fltrinfo;
 			prev = fp;
-		}
-		else {
+		} else {
 			front = fltrinfo;
 			back = fp;
 		}
@@ -1313,16 +1246,14 @@ filt_subset(struct flow_filter *front, struct flow_filter *back)
 		if (front->ff_flow.fi_src.s_addr == 0) {
 			if (back->ff_flow.fi_src.s_addr != 0)
 				return (0);
-		}
-		else if (back->ff_flow.fi_src.s_addr != 0 &&
+		} else if (back->ff_flow.fi_src.s_addr != 0 &&
 			 (~front->ff_mask.mask_src.s_addr &
 			  back->ff_mask.mask_src.s_addr))
 			return (0);
 		if (front->ff_flow.fi_dst.s_addr == 0) {
 			if (back->ff_flow.fi_dst.s_addr != 0)
 				return (0);
-		}
-		else if (back->ff_flow.fi_dst.s_addr != 0 &&
+		} else if (back->ff_flow.fi_dst.s_addr != 0 &&
 			 (~front->ff_mask.mask_dst.s_addr &
 			  back->ff_mask.mask_dst.s_addr))
 			return (0);
@@ -1371,8 +1302,7 @@ filt_subset(struct flow_filter *front, struct flow_filter *back)
 		if (IN6_IS_ADDR_UNSPECIFIED(&front6->ff_flow6.fi6_src)) {
 			if (!IN6_IS_ADDR_UNSPECIFIED(&back6->ff_flow6.fi6_src))
 				return (0);
-		}
-		else if (!IN6_IS_ADDR_UNSPECIFIED(&back6->ff_flow6.fi6_src))
+		} else if (!IN6_IS_ADDR_UNSPECIFIED(&back6->ff_flow6.fi6_src))
 			for (i=0; i<4; i++)
 				if (~IN6ADDR32(&front6->ff_mask6.mask6_src, i) &
 				    IN6ADDR32(&back6->ff_mask6.mask6_src, i))
@@ -1380,8 +1310,7 @@ filt_subset(struct flow_filter *front, struct flow_filter *back)
 		if (IN6_IS_ADDR_UNSPECIFIED(&front6->ff_flow6.fi6_dst)) {
 			if (!IN6_IS_ADDR_UNSPECIFIED(&back6->ff_flow6.fi6_dst))
 				return (0);
-		}
-		else if (!IN6_IS_ADDR_UNSPECIFIED(&back6->ff_flow6.fi6_dst))
+		} else if (!IN6_IS_ADDR_UNSPECIFIED(&back6->ff_flow6.fi6_dst))
 			for (i=0; i<4; i++)
 				if (~IN6ADDR32(&front6->ff_mask6.mask6_dst, i) &
 				    IN6ADDR32(&back6->ff_mask6.mask6_dst, i))
@@ -1467,31 +1396,6 @@ qop_rio_set_defaults(struct redparams *params)
 	(void)close(fd);
 	return (0);
 }
-
-int
-qop_tbrio_setdef(int avg_pkt_size, int holdtime_pkts, int lowat)
-{
-	struct cdnr_tbrio_params params;
-	int fd;
-
-	if ((fd = open(CDNR_DEVICE, O_RDWR)) < 0) {
-		LOG(LOG_ERR, errno, "CDNR open\n");
-		return (QOPERR_SYSCALL);
-	}
-
-	params.avg_pkt_size = avg_pkt_size;
-	params.holdtime_pkts = holdtime_pkts;
-	params.lowat = lowat;
-
-	if (ioctl(fd, CDNR_TBRIO_SETDEFAULTS, &params) < 0) {
-		LOG(LOG_ERR, errno, "CDNR_TBRIO_SETDEFAULTS\n");
-		return (QOPERR_SYSCALL);
-	}
-
-	(void)close(fd);
-	return (0);
-}
-
 
 /*
  * try to load and open KLD module

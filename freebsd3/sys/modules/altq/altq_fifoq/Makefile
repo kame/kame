@@ -7,6 +7,7 @@ CFLAGS+= -DALTQ
 CLEANFILES+= opt_altq.h
 
 opt_altq.h:
-	echo "#define FIFOQ 1" > opt_altq.h
+	echo "#define ALTQ_FIFOQ 1" > opt_altq.h
 
 .include <bsd.kmod.mk>
+

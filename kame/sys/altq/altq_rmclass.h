@@ -1,4 +1,4 @@
-/*	$KAME: altq_rmclass.h,v 1.3 2000/07/25 10:12:31 kjc Exp $	*/
+/*	$KAME: altq_rmclass.h,v 1.4 2000/10/18 09:15:24 kjc Exp $	*/
 
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
@@ -123,14 +123,12 @@ typedef struct _rm_class_stats_ {
 	u_int		handle;
 	u_int		depth;
 
-	u_int		npackets;	/* packets sent in this class */
+	struct pktcntr	xmit_cnt;	/* packets sent in this class */
+	struct pktcntr	drop_cnt;	/* dropped packets */
 	u_int		over;		/* # times went over limit */
 	u_int		borrows;	/* # times tried to borrow */
-	u_int		drops;		/* # times dropped packets */
 	u_int		overactions;	/* # times invoked overlimit action */
 	u_int		delays;		/* # times invoked delay actions */
-	u_quad_t	nbytes;		/* bytes sent in this class */
-	u_quad_t	drop_bytes;	/* bytes dropped in this class */
 } rm_class_stats_t;
 
 /*

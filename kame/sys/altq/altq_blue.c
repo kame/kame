@@ -1,4 +1,4 @@
-/*	$KAME: altq_blue.c,v 1.5 2000/07/25 10:12:29 kjc Exp $	*/
+/*	$KAME: altq_blue.c,v 1.6 2000/10/18 09:15:22 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -58,7 +58,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_blue.c,v 1.5 2000/07/25 10:12:29 kjc Exp $
+ * $Id: altq_blue.c,v 1.6 2000/10/18 09:15:22 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
@@ -70,7 +70,7 @@
 #endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
-#ifdef BLUE	/* blue is enabled by BLUE option in opt_altq.h */
+#ifdef ALTQ_BLUE	/* blue is enabled by ALTQ_BLUE option in opt_altq.h */
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -115,7 +115,7 @@ static int blue_enqueue __P((struct ifaltq *, struct mbuf *,
 			     struct altq_pktattr *));
 static struct mbuf *blue_dequeue __P((struct ifaltq *, int));
 static int drop_early __P((blue_t *));
-static int mark_ecn __P((struct altq_pktattr *, int));
+static int mark_ecn __P((struct mbuf *, struct altq_pktattr *, int));
 static int blue_detach __P((blue_queue_t *));
 static int blue_request __P((struct ifaltq *, int, void *));
 
@@ -430,8 +430,7 @@ blue_addq(rp, q, m, pktattr)
 		if ( t > 1) {
 			rp->blue_pmark = 1;
 			microtime(&rp->blue_last);
-		}
-		else {
+		} else {
 			t = t * 1000000 + (now.tv_usec - rp->blue_last.tv_usec);
 			if (t > rp->blue_hold_time) {
 				rp->blue_pmark--;
@@ -446,13 +445,12 @@ blue_addq(rp, q, m, pktattr)
 	if (drop_early(rp) && qlen(q) > 1) {
 		/* mark or drop by blue */
 		if ((rp->blue_flags & BLUEF_ECN) &&
-		    mark_ecn(pktattr, rp->blue_flags)) {
+		    mark_ecn(m, pktattr, rp->blue_flags)) {
 			/* successfully marked.  do not drop. */
 #ifdef BLUE_STATS
 			rp->blue_stats.marked_packets++;
 #endif
-		}
-		else { 
+		} else { 
 			/* unforced drop by blue */
 			droptype = DTYPE_EARLY;
 		}
@@ -474,8 +472,7 @@ blue_addq(rp, q, m, pktattr)
 #ifdef BLUE_STATS
 			rp->blue_stats.drop_unforced++;
 #endif
-		}
-		else {
+		} else {
 			struct timeval now;
 			int t;
 			/* forced drop, select a victim packet in the queue. */
@@ -525,23 +522,57 @@ drop_early(rp)
  *    returns 1 if successfully marked, 0 otherwise.
  */
 static int
-mark_ecn(pktattr, flags)
+mark_ecn(m, pktattr, flags)
+	struct mbuf *m;
 	struct altq_pktattr *pktattr;
 	int flags;
 {
-	if (pktattr == NULL)
+	struct mbuf *m0;
+
+	if (pktattr == NULL ||
+	    (pktattr->pattr_af != AF_INET && pktattr->pattr_af != AF_INET6))
 		return (0);
+
+	/* verify that pattr_hdr is within the mbuf data */
+	for (m0 = m; m0 != NULL; m0 = m0->m_next)
+		if ((pktattr->pattr_hdr >= m0->m_data) &&
+		    (pktattr->pattr_hdr < m0->m_data + m0->m_len))
+			break;
+	if (m0 == NULL) {
+		/* ick, pattr_hdr is stale */
+		pktattr->pattr_af = AF_UNSPEC;
+		return (0);
+	}
 
 	switch (pktattr->pattr_af) {
 	case AF_INET:
 		if (flags & BLUEF_ECN4) {
 			struct ip *ip = (struct ip *)pktattr->pattr_hdr;
 	    
+			if (ip->ip_v != 4)
+				return (0);	/* version mismatch! */
 			if (ip->ip_tos & IPTOS_ECT) {
 				/* ECN-capable, mark ECN bit. */
 				if ((ip->ip_tos & IPTOS_CE) == 0) {
+#if (IPTOS_CE == 0x01)
+					u_short sum;
+
+					ip->ip_tos |= IPTOS_CE;
+					/*
+					 * optimized version when IPTOS_CE
+					 * is 0x01.
+					 *   HC' = HC -1   when HC > 0
+					 *       = 0xfffe  when HC = 0
+					 */
+					sum = ntohs(ip->ip_sum);
+					if (sum == 0)
+						sum = 0xfffe;
+					else
+						sum -= 1;
+					ip->ip_sum = htons(sum);
+#else /* IPTOS_CE != 0x01 */
 					long sum;
-		    
+
 					ip->ip_tos |= IPTOS_CE;
 					/*
 					 * update checksum (from RFC1624)
@@ -551,8 +582,9 @@ mark_ecn(pktattr, flags)
 					sum += 0xffff + IPTOS_CE;
 					sum = (sum >> 16) + (sum & 0xffff);
 					sum += (sum >> 16);  /* add carry */
-		
+
 					ip->ip_sum = htons(~sum & 0xffff);
+#endif /* IPTOS_CE != 0x01 */
 				}
 				return (1);
 			}
@@ -562,10 +594,15 @@ mark_ecn(pktattr, flags)
 	case AF_INET6:
 		if (flags & BLUEF_ECN6) {
 			struct ip6_hdr *ip6 = (struct ip6_hdr *)pktattr->pattr_hdr;
+			u_int32_t flowlabel;
 
-			if (ip6->ip6_flow & (IPTOS_ECT << 20)) {
+			flowlabel = ntohl(ip6->ip6_flow);
+			if ((flowlabel >> 28) != 6)
+				return (0);	/* version mismatch! */
+			if (flowlabel & (IPTOS_ECT << 20)) {
 				/* ECN-capable, mark ECN bit. */
-				ip6->ip6_flow |= (IPTOS_CE << 20);
+				flowlabel |= (IPTOS_CE << 20);
+				ip6->ip6_flow = htonl(flowlabel);
 				return (1);
 			}
 		}
@@ -652,4 +689,4 @@ ALTQ_MODULE(altq_blue, ALTQT_BLUE, &blue_sw);
 
 #endif /* KLD_MODULE */
 
-#endif /* BLUE */
+#endif /* ALTQ_BLUE */

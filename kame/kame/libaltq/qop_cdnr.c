@@ -1,5 +1,6 @@
+/*	$KAME: qop_cdnr.c,v 1.6 2000/10/18 09:15:19 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: qop_cdnr.c,v 1.5 2000/04/17 11:44:41 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -80,8 +79,6 @@ static struct qdisc_ops cdnr_qdisc = {
 	NULL,			/* clear */
 	cdnr_enable,
 	cdnr_disable,
-	NULL,			/* acc_enable */
-	NULL,			/* acc_disable */
 	cdnr_add_class,
 	cdnr_modify_class,
 	cdnr_delete_class,
@@ -214,36 +211,6 @@ qcmd_cdnr_add_trtcm(struct tc_action *rp, const char *ifname,
 			  green_action, yellow_action, red_action,
 	     		  coloraware)) != 0) {
 		LOG(LOG_ERR, errno, "%s: add trtcm failed!\n",
-		    qoperror(error));
-		return (error);
-	}
-	
-	if (rp != NULL) {
-		rp->tca_code = TCACODE_HANDLE;
-		rp->tca_handle = clinfo->handle;
-	}
-	return (0);
-}
-
-int
-qcmd_cdnr_add_tbrio(struct tc_action *rp, const char *ifname,
-		    const char *cdnr_name, 
-		    struct tb_profile *profile,
-		    struct tc_action *in_action,
-		    struct tc_action *out_action)
-{
-	struct ifinfo		*ifinfo;
-	struct classinfo	*clinfo;
-	int error;
-
-	if ((ifinfo = cdnr_ifname2ifinfo(ifname)) == NULL)
-		return (QOPERR_BADIF);
-
-	verify_tbprofile(profile, cdnr_name);
-
-	if ((error = qop_cdnr_add_tbrio(&clinfo, cdnr_name, ifinfo,
-				profile, in_action, out_action)) != 0) {
-		LOG(LOG_ERR, errno, "%s: add tbrio failed!\n",
 		    qoperror(error));
 		return (error);
 	}
@@ -461,8 +428,7 @@ qop_cdnr_add_element(struct classinfo **rp, const char *cdnr_name,
 			return (0);
 		}
 #endif
-	}
-	else
+	} else
 		clist[0] = NULL;
 
 	if ((cdnrinfo = calloc(1, sizeof(*cdnrinfo))) == NULL)
@@ -621,66 +587,6 @@ qop_cdnr_modify_trtcm(struct classinfo *clinfo,
 }
 
 int 
-qop_cdnr_add_tbrio(struct classinfo **rp, const char *cdnr_name,
-		   struct ifinfo *ifinfo,
-		   struct tb_profile *profile,
-		   struct tc_action *in_action,
-		   struct tc_action *out_action)
-{
-	struct classinfo *clinfo, *clist[3];
-	struct cdnrinfo *cdnrinfo = NULL;
-	int n, error;
-
-	n = 0;
-	if (in_action->tca_code == TCACODE_HANDLE) {
-		clist[n] = clhandle2clinfo(ifinfo, in_action->tca_handle);
-		if (clist[n] == NULL)
-			return (QOPERR_BADCLASS);
-		n++;
-	}
-	if (out_action->tca_code == TCACODE_HANDLE) {
-		clist[n] = clhandle2clinfo(ifinfo, out_action->tca_handle);
-		if (clist[n] == NULL)
-			return (QOPERR_BADCLASS);
-		n++;
-	}
-	clist[n] = NULL;
-
-	if ((cdnrinfo = calloc(1, sizeof(*cdnrinfo))) == NULL)
-		return (QOPERR_NOMEM);
-
-	cdnrinfo->tce_type = TCETYPE_TBRIO;
-	cdnrinfo->tce_un.tbrio.profile = *profile;
-	cdnrinfo->tce_un.tbrio.in_action = *in_action;
-	cdnrinfo->tce_un.tbrio.out_action = *out_action;
-
-	if ((error = qop_add_cdnr(&clinfo, cdnr_name, ifinfo, clist,
-				  cdnrinfo)) != 0)
-		goto err_ret;
-
-	if (rp != NULL)
-		*rp = clinfo;
-	return (0);
-
- err_ret:
-	if (cdnrinfo != NULL)
-		free(cdnrinfo);
-	return (error);
-}
-
-int 
-qop_cdnr_modify_tbrio(struct classinfo *clinfo, struct tb_profile *profile)
-{
-	struct cdnrinfo *cdnrinfo = clinfo->private;
-
-	if (cdnrinfo->tce_type != TCETYPE_TBRIO)
-		return (QOPERR_CLASS_INVAL);
-	cdnrinfo->tce_un.tbrio.profile = *profile;
-
-	return qop_modify_class(clinfo, NULL);
-}
-
-int 
 qop_cdnr_add_tswtcm(struct classinfo **rp, const char *cdnr_name,
 		    struct ifinfo *ifinfo, const u_int32_t cmtd_rate,
 		    const u_int32_t peak_rate, const u_int32_t avg_interval,
@@ -830,7 +736,6 @@ cdnr_add_class(struct classinfo *clinfo)
 	struct cdnr_add_element element_add;
 	struct cdnr_add_tbmeter tbmeter_add;
 	struct cdnr_add_trtcm   trtcm_add;
-	struct cdnr_add_tbrio   tbrio_add;
 	struct cdnr_add_tswtcm  tswtcm_add;
 	struct cdnrinfo *cdnrinfo;
 	
@@ -886,20 +791,6 @@ cdnr_add_class(struct classinfo *clinfo)
 		clinfo->handle = trtcm_add.cdnr_handle;
 		break;
 
-	case TCETYPE_TBRIO:
-		memset(&tbrio_add, 0, sizeof(tbrio_add));
-		strncpy(tbrio_add.iface.cdnr_ifname,
-			clinfo->ifinfo->ifname+1, IFNAMSIZ);
-		tbrio_add.profile = cdnrinfo->tce_un.tbrio.profile;
-		tbrio_add.in_action = cdnrinfo->tce_un.tbrio.in_action;
-		tbrio_add.out_action = cdnrinfo->tce_un.tbrio.out_action;
-		if (ioctl(cdnr_fd, CDNR_ADD_TBRIO, &tbrio_add) < 0) {
-			clinfo->handle = CDNR_NULL_HANDLE;
-			return (QOPERR_SYSCALL);
-		}
-		clinfo->handle = tbrio_add.cdnr_handle;
-		break;
-
 	case TCETYPE_TSWTCM:
 		memset(&tswtcm_add, 0, sizeof(tswtcm_add));
 		strncpy(tswtcm_add.iface.cdnr_ifname,
@@ -928,7 +819,6 @@ cdnr_modify_class(struct classinfo *clinfo, void *arg)
 {
 	struct cdnr_modify_tbmeter tbmeter_modify;
 	struct cdnr_modify_trtcm   trtcm_modify;
-	struct cdnr_modify_tbrio   tbrio_modify;
 	struct cdnr_modify_tswtcm  tswtcm_modify;
 	struct cdnrinfo *cdnrinfo;
 
@@ -956,16 +846,6 @@ cdnr_modify_class(struct classinfo *clinfo, void *arg)
 			cdnrinfo->tce_un.trtcm.peak_profile;
 		trtcm_modify.coloraware = cdnrinfo->tce_un.trtcm.coloraware;
 		if (ioctl(cdnr_fd, CDNR_MOD_TCM, &trtcm_modify) < 0)
-			return (QOPERR_SYSCALL);
-		break;
-
-	case TCETYPE_TBRIO:
-		memset(&tbrio_modify, 0, sizeof(tbrio_modify));
-		strncpy(tbrio_modify.iface.cdnr_ifname,
-			clinfo->ifinfo->ifname+1, IFNAMSIZ);
-		tbrio_modify.cdnr_handle = clinfo->handle;
-		tbrio_modify.profile = cdnrinfo->tce_un.tbmeter.profile;
-		if (ioctl(cdnr_fd, CDNR_MOD_TBRIO, &tbrio_modify) < 0)
 			return (QOPERR_SYSCALL);
 		break;
 

@@ -1,4 +1,4 @@
-/*	$KAME: altq_conf.h,v 1.3 2000/07/25 10:12:30 kjc Exp $	*/
+/*	$KAME: altq_conf.h,v 1.4 2000/10/18 09:15:22 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2000
@@ -25,16 +25,15 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_conf.h,v 1.3 2000/07/25 10:12:30 kjc Exp $
+ * $Id: altq_conf.h,v 1.4 2000/10/18 09:15:22 kjc Exp $
  */
 #ifndef _ALTQ_ALTQ_CONF_H_
 #define	_ALTQ_ALTQ_CONF_H_
 
-#include <sys/param.h>
-#include <sys/conf.h>
-
 #ifdef _KERNEL
 
+#include <sys/param.h>
+#include <sys/conf.h>
 #include <sys/kernel.h>
 
 #if (__FreeBSD_version > 300000)

@@ -1,5 +1,6 @@
+/*	$KAME: altq_qop.h,v 1.4 2000/10/18 09:15:18 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: altq_qop.h,v 1.3 2000/07/28 09:56:21 kjc Exp $
  */
 #ifndef _ALTQ_QOP_H_
 #define _ALTQ_QOP_H_
@@ -55,8 +54,6 @@ struct qdisc_ops {
 	int	(*clear)(struct ifinfo *);
 	int	(*enable)(struct ifinfo *);
 	int	(*disable)(struct ifinfo *);
-	int	(*acc_enable)(struct ifinfo *);
-	int	(*acc_disable)(struct ifinfo *);
 
 	/* class operations (optional) */
 	int	(*add_class)(struct classinfo *);
@@ -78,7 +75,6 @@ struct ifinfo {
 	u_int			ifmtu;		/* mtu of the interface */
 	u_int			ifindex;	/* interface index */
 	int			enabled;	/* hfsc on/off state */
-	int			acc_enabled;	/* hfsc account on/off state */
 	LIST_HEAD(, classinfo)	cllist;		/* class list */
 	LIST_HEAD(, fltrinfo)	fltr_rules;	/* filter rule list */
 
@@ -131,8 +127,6 @@ int DoCommand(char *infile, FILE *infp);
 
 int qcmd_enable(const char *ifname);
 int qcmd_disable(const char *ifname);
-int qcmd_acc_enable(const char *ifname);
-int qcmd_acc_disable(const char *ifname);
 int qcmd_delete_if(const char *ifname);
 int qcmd_clear_hierarchy(const char *ifname);
 int qcmd_enableall(void);
@@ -150,8 +144,6 @@ int qcmd_delete_filter(const char *ifname, const char *clname,
 int qcmd_tbr_register(const char *ifname, u_int rate, u_int size);
 int qop_enable(struct ifinfo *ifinfo);
 int qop_disable(struct ifinfo *ifinfo);
-int qop_acc_enable(struct ifinfo *ifinfo);
-int qop_acc_disable(struct ifinfo *ifinfo);
 int qop_delete_if(struct ifinfo *ifinfo);
 int qop_clear(struct ifinfo *ifinfo);
 
@@ -173,7 +165,6 @@ int qop_add_filter(struct fltrinfo **rp,
 int qop_delete_filter(struct fltrinfo *fltr);
 
 int is_q_enabled(const char *ifname);
-int is_q_acc_enabled(const char *ifname);
 struct ifinfo *ifname2ifinfo(const char *ifname);
 struct ifinfo *input_ifname2ifinfo(const char *ifname);
 struct classinfo *clname2clinfo(const struct ifinfo *ifinfo,
@@ -191,7 +182,6 @@ u_long atobps(const char *s);
 u_long atobytes(const char *s);
 int qop_red_set_defaults(int th_min, int th_max, int inv_pmax);
 int qop_rio_set_defaults(struct redparams *params);
-int qop_tbrio_setdef(int avg_pkt_size, int holdtime_pkts, int lowat);
 int open_module(const char *devname, int flags);
 int client_input(FILE *fp);
 
@@ -252,6 +242,8 @@ extern int	if_num;		/* number of phyints */
 extern int	m_debug;	/* Debug output control bits */
 extern int	l_debug;	/* Logging severity level */
 extern int	line_no;	/* current line number in config file */
+extern int	daemonize;	/* log_write uses stderr if daemonize is 0 */
+
 #endif /* !RSVPD */
 
 #ifdef INET6

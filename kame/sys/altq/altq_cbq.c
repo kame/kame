@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.c,v 1.6 2000/08/07 07:09:34 kjc Exp $	*/
+/*	$KAME: altq_cbq.c,v 1.7 2000/10/18 09:15:22 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -29,7 +29,7 @@
  *  
  * These notices must be retained in any copies of any part of this software.
  *
- * $Id: altq_cbq.c,v 1.6 2000/08/07 07:09:34 kjc Exp $
+ * $Id: altq_cbq.c,v 1.7 2000/10/18 09:15:22 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
@@ -41,7 +41,7 @@
 #endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
-#ifdef CBQ	/* cbq is enabled by CBQ option in opt_altq.h */
+#ifdef ALTQ_CBQ	/* cbq is enabled by ALTQ_CBQ option in opt_altq.h */
 
 /* #pragma ident "@(#)cbq.c  1.39     98/05/13 SMI" */
 
@@ -251,8 +251,7 @@ cbq_class_create(cbqp, acp, parent, borrow)
 			 spec->maxidle, spec->minidle, spec->offtime,
 			 spec->flags);
 		cl = cbqp->ifnp.root_;
-	}
-	else {
+	} else {
 		cl = rmc_newclass(spec->priority,
 				  &cbqp->ifnp, spec->nano_sec_per_byte,
 				  rmc_delay_action, spec->maxq, parent, borrow,
@@ -498,8 +497,7 @@ cbq_set_enable(ep, enable)
 			if (cbqp->ifnp.ctl_ == NULL)
 				printf("No Control Class for %s\n", ifacename);
 			error = EINVAL;
-		}
-		else if ((error = altq_enable(cbqp->ifnp.ifq_)) == 0) {
+		} else if ((error = altq_enable(cbqp->ifnp.ifq_)) == 0) {
 			cbqp->cbq_qlen = 0;
 		}
 		break;
@@ -517,12 +515,10 @@ get_class_stats(statsp, cl)
 	class_stats_t	*statsp;
 	struct rm_class	*cl;
 {
-	statsp->npackets 	= cl->stats_.npackets;
-	statsp->nbytes 		= cl->stats_.nbytes;
+	statsp->xmit_cnt 	= cl->stats_.xmit_cnt;
+	statsp->drop_cnt 	= cl->stats_.drop_cnt;
 	statsp->over		= cl->stats_.over;
 	statsp->borrows 	= cl->stats_.borrows;
-	statsp->drops 		= cl->stats_.drops;
-	statsp->drop_bytes 	= cl->stats_.drop_bytes;
 	statsp->overactions 	= cl->stats_.overactions;
 	statsp->delays 		= cl->stats_.delays;
 
@@ -538,11 +534,11 @@ get_class_stats(statsp, cl)
 	statsp->avgidle		= cl->avgidle_;
 
 	statsp->qtype		= qtype(cl->q_);
-#ifdef CBQ_RED
+#ifdef ALTQ_RED
 	if (q_is_red(cl->q_))
 		red_getstats(cl->red_, &statsp->red[0]);
 #endif
-#ifdef CBQ_RIO
+#ifdef ALTQ_RIO
 	if (q_is_rio(cl->q_))
 		rio_getstats((rio_t *)cl->red_, &statsp->red[0]);
 #endif
@@ -722,19 +718,23 @@ cbq_enqueue(ifq, m, pktattr)
 {
 	cbq_state_t *cbqp = (cbq_state_t *)ifq->altq_disc;
 	struct rm_class *cl;
+	int len;
 
 	/* grab class set by classifier */
 	if (pktattr == NULL || (cl = pktattr->pattr_class) == NULL)
 		cl = cbqp->ifnp.default_;
 	cl->pktattr_ = pktattr;  /* save proto hdr used by ECN */
 
-	if (rmc_queue_packet(cl, m) != 0)
+	len = m_pktlen(m);
+	if (rmc_queue_packet(cl, m) != 0) {
 		/* drop occurred.  some mbuf was freed in rmc_queue_packet. */
+		PKTCNTR_ADD(&cl->stats_.drop_cnt, len);
 		return (ENOBUFS);
+	}
 
 	/* successfully queued. */
 	++cbqp->cbq_qlen;
-	ifq->ifq_len++;
+	IFQ_INC_LEN(ifq);
 	return (0);
 }
 
@@ -750,7 +750,7 @@ cbq_dequeue(ifq, op)
 
 	if (m && op == ALTDQ_REMOVE) {
 		--cbqp->cbq_qlen;  /* decrement # of packets in cbq */
-		--ifq->ifq_len;
+		IFQ_DEC_LEN(ifq);
 
 		/* Update the class. */
 		rmc_update_class_util(&cbqp->ifnp);
@@ -832,8 +832,6 @@ cbqclose(dev, flag, fmt, p)
 		sprintf(iface.cbq_ifacename,
 			"%s%d", ifp->if_name, ifp->if_unit);
 #endif
-		iface.cbq_ifacelen = strlen(iface.cbq_ifacename);
-
 		err = cbq_ifdetach(&iface);
 		if (err != 0 && error == 0)
 			error = err;
@@ -951,11 +949,12 @@ static void cbq_class_dump(i)
 		       cl->maxidle_);
 		printf("minidle=%d, offtime=%d, sleeping=%d, leaf=%d\n",
 		       cl->minidle_, cl->offtime_, cl->sleeping_, cl->leaf_);
-		printf("handle=%d, depth=%d, npackets=%d, nbytes=%d\n",
-		       s->handle, s->depth, s->npackets, s->nbytes);
+		printf("handle=%d, depth=%d, packets=%d, bytes=%d\n",
+		       s->handle, s->depth,
+		       (int)s->xmit_cnt.packets, (int)s->xmit_cnt.bytes);
 		printf("over=%d\n, borrows=%d, drops=%d, overactions=%d, delays=%d\n",
-		       s->over, s->borrows, s->drops, s->overactions,
-		       s->delays);
+		       s->over, s->borrows, (int)s->drop_cnt.packets,
+		       s->overactions, s->delays);
 		printf("tail=%p, head=%p, qlen=%d, qlim=%d, qthresh=%d,qtype=%d\n",
 		       q->tail_, q->head_, q->qlen_, q->qlim_,
 		       q->qthresh_, q->qtype_);
@@ -972,4 +971,4 @@ ALTQ_MODULE(altq_cbq, ALTQT_CBQ, &cbq_sw);
 
 #endif /* KLD_MODULE */
 
-#endif /* CBQ */
+#endif /* ALTQ_CBQ */

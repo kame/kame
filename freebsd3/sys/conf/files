@@ -48,6 +48,7 @@ altq/altq_conf.c	optional altq
 altq/altq_fifoq.c	optional altq
 altq/altq_hfsc.c	optional altq
 altq/altq_localq.c	optional altq
+altq/altq_priq.c	optional altq
 altq/altq_red.c		optional altq
 altq/altq_rio.c		optional altq
 altq/altq_rmclass.c	optional altq

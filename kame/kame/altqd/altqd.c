@@ -1,5 +1,6 @@
+/*	$KAME: altqd.c,v 1.2 2000/10/18 09:15:15 kjc Exp $	*/
 /*
- * Copyright (C) 1997-1999
+ * Copyright (C) 1997-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: altqd.c,v 1.1 2000/01/18 07:28:54 kjc Exp $
  */
 /*******************************************************************
 
@@ -76,26 +75,11 @@
 #include "altq_qop.h"
 #include "quip_server.h"
 
-#ifdef __STDC__
-#include <stdarg.h>
-#else
-#include <varargs.h>
-#endif
-
-/* from rsvp_main.c */
-char *altqconfigfile = "/etc/altq.conf";
 #define  ALTQD_PID_FILE	  "/var/run/altqd.pid"
 
 static int altqd_socket = -1;
 #define MAX_CLIENT		10
 static FILE *client[MAX_CLIENT];
-
-/* from rsvp_global.h */
-int	if_num;		/* number of phyints */
-int	m_debug;	/* Debug output control bits */
-int	l_debug;	/* Logging severity level */
-
-int daemonize = 1;
 
 /* for command mode */
 int             T;  		/* Current Thread number */
@@ -246,8 +230,7 @@ int main(int argc, char **argv)
 		else
 			warn("can't open pid file: %s: %s",
 			     ALTQD_PID_FILE, strerror(errno));
-	}
-	else {
+	} else {
 		/* interactive mode */
 		if (infile) {
 			if (NULL == (infp = fopen(infile, "r"))) {
@@ -305,18 +288,15 @@ int main(int argc, char **argv)
 					infile = NULL;
 					printf("\nEnter ? or command:\n");	
 				FD_SET(fileno(infp), &fds);
-				}
-				else {
+				} else {
 					LOG(LOG_INFO, 0, "Exiting.\n");
 					(void) qcmd_destroyall();
 					exit(0);
 				}
-			}
-			else if (infp == stdin)
+			} else if (infp == stdin)
 				printf("altqd %s> ", cur_ifname());
 			fflush(stdout);
-		}
-		else if (altqd_socket >= 0 && FD_ISSET(altqd_socket, &t_fds)) {
+		} else if (altqd_socket >= 0 && FD_ISSET(altqd_socket, &t_fds)) {
 			/*
 			 * quip connection request from client via unix
 			 * domain socket; get a new socket for this
@@ -334,8 +314,7 @@ int main(int argc, char **argv)
 					break;
 				}
 			maxfd = MAX(maxfd, newsock + 1);
-		}
-		else {
+		} else {
 			/*
 			 * check input from a client via unix domain socket
 			 */
@@ -358,44 +337,3 @@ int main(int argc, char **argv)
 		}
 	}
 }
-
-/* taken from rsvp_debug.c and modified. */
-void
-log_write(int severity, int syserr, const char *format, ...)
-{
-	va_list ap;
-
-#ifdef __STDC__
-	va_start(ap, format);
-#else
-	va_start(ap);
-#endif
-
-	if (severity <= l_debug) {
-		if (!daemonize)
-			vfprintf(stderr, format, ap);
-		else
-			vsyslog(severity, format, ap);
-	}
-
-	va_end(ap);
-
-	if (syserr == 0) {
-		/* Do nothing for now */
-	} else if (syserr < sys_nerr) {
-		if (severity <= l_debug) {
-			if (!daemonize)
-				fprintf(stderr, ": %s\n", sys_errlist[syserr]);
-			else
-				syslog(severity, ": %s", sys_errlist[syserr]);
-		}
-	} else {
-		if (severity <= l_debug) {
-			if (!daemonize)
-				fprintf(stderr, ": errno %d\n", syserr);
-			else
-				syslog(severity, ": errno %d", syserr);
-		}
-	}
-}
-

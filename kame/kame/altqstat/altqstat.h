@@ -1,5 +1,6 @@
+/*	$KAME: altqstat.h,v 1.2 2000/10/18 09:15:16 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: altqstat.h,v 1.1 2000/01/18 07:28:58 kjc Exp $
  */
 
 typedef void (stat_loop_t)(int fd, const char *ifname,
@@ -35,6 +34,12 @@ struct qdisc_conf {
 	stat_loop_t	*stat_loop;
 };
 
+/*
+ * cast u_int64_t to ull for printf, since type of u_int64_t
+ * is architecture dependent
+ */
+typedef	unsigned long long	ull;
+
 stat_loop_t cbq_stat_loop;
 stat_loop_t hfsc_stat_loop;
 stat_loop_t cdnr_stat_loop;
@@ -43,9 +48,19 @@ stat_loop_t fifoq_stat_loop;
 stat_loop_t red_stat_loop;
 stat_loop_t rio_stat_loop;
 stat_loop_t blue_stat_loop;
+stat_loop_t priq_stat_loop;
+
+struct redstats;
 
 void chandle2name(const char *ifname, u_long handle, char *name);
 stat_loop_t *qdisc2stat_loop(const char *qdisc_name);
 int ifname2qdisc(const char *ifname, char *qname);
+double calc_interval(struct timeval *cur_time, struct timeval *last_time);
+double calc_rate(u_int64_t new_bytes, u_int64_t last_bytes, double interval);
+double calc_pps(u_int64_t new_pkts, u_int64_t last_pkts, double interval);
+char *rate2str(double rate);
+int print_redstats(struct redstats *rp);
+int print_riostats(struct redstats *rp);
+
 
 

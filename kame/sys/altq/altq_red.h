@@ -1,4 +1,4 @@
-/*	$KAME: altq_red.h,v 1.3 2000/07/25 10:12:31 kjc Exp $	*/
+/*	$KAME: altq_red.h,v 1.4 2000/10/18 09:15:23 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_red.h,v 1.3 2000/07/25 10:12:31 kjc Exp $
+ * $Id: altq_red.h,v 1.4 2000/10/18 09:15:23 kjc Exp $
  */
 
 #ifndef _ALTQ_ALTQ_RED_H_
@@ -42,13 +42,11 @@ struct red_stats {
 	int q_len;
 	int q_avg;
 
-	u_int		xmit_packets;
-	u_int		drop_packets;
+	struct pktcntr	xmit_cnt;
+	struct pktcntr	drop_cnt;
 	u_int		drop_forced;
 	u_int		drop_unforced;
 	u_int		marked_packets;
-	u_quad_t	xmit_bytes;
-	u_quad_t	drop_bytes;
 
 	/* static red parameters */
 	int q_limit;
@@ -94,28 +92,24 @@ struct redparams {
 
 struct redstats {
 	int		q_avg;
-	u_int		xmit_packets;
-	u_int		drop_packets;
+	struct pktcntr	xmit_cnt;
+	struct pktcntr	drop_cnt;
 	u_int		drop_forced;
 	u_int		drop_unforced;
 	u_int		marked_packets;
-	u_quad_t	xmit_bytes;
-	u_quad_t	drop_bytes;
 };
 
 
 /* 
  * IOCTLs for RED
  */
-#define	RED_ENABLE		_IOW('Q', 1, struct red_interface)
-#define	RED_DISABLE		_IOW('Q', 2, struct red_interface)
-#define	RED_IF_ATTACH		_IOW('Q', 3, struct red_interface)
-#define	RED_IF_DETACH		_IOW('Q', 4, struct red_interface)
-#define	RED_ACC_ENABLE		_IOW('Q', 5, struct red_interface)
-#define	RED_ACC_DISABLE		_IOW('Q', 6, struct red_interface)
-#define	RED_GETSTATS		_IOWR('Q', 7, struct red_stats)
-#define	RED_CONFIG		_IOWR('Q', 8, struct red_conf)
-#define	RED_SETDEFAULTS		_IOW('Q', 9, struct redparams)
+#define	RED_IF_ATTACH		_IOW('Q', 1, struct red_interface)
+#define	RED_IF_DETACH		_IOW('Q', 2, struct red_interface)
+#define	RED_ENABLE		_IOW('Q', 3, struct red_interface)
+#define	RED_DISABLE		_IOW('Q', 4, struct red_interface)
+#define	RED_CONFIG		_IOWR('Q', 6, struct red_conf)
+#define	RED_GETSTATS		_IOWR('Q', 12, struct red_stats)
+#define	RED_SETDEFAULTS		_IOW('Q', 30, struct redparams)
 
 #ifdef _KERNEL
 
@@ -158,13 +152,11 @@ typedef struct red {
 	struct flowvalve *red_flowvalve;	/* flowvalve state */
 
 	struct {
-		quad_t xmit_packets;
-		quad_t xmit_bytes;
-		quad_t drop_packets;
-		quad_t drop_bytes;
-		quad_t drop_forced;
-		quad_t drop_unforced;
-		quad_t marked_packets;
+		struct pktcntr	xmit_cnt;
+		struct pktcntr	drop_cnt;
+		u_int		drop_forced;
+		u_int		drop_unforced;
+		u_int		marked_packets;
 	} red_stats;
 } red_t;
 
@@ -189,7 +181,7 @@ extern int red_addq __P((red_t *, class_queue_t *, struct mbuf *,
 			 struct altq_pktattr *));
 extern struct mbuf *red_getq __P((red_t *, class_queue_t *));
 extern int drop_early __P((int, int, int));
-extern int mark_ecn __P((struct altq_pktattr *, int));
+extern int mark_ecn __P((struct mbuf *, struct altq_pktattr *, int));
 extern struct wtab *wtab_alloc __P((int));
 extern int wtab_destroy __P((struct wtab *));
 extern int32_t pow_w __P((struct wtab *, int));

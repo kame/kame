@@ -10,7 +10,7 @@ ALTQMOD_INET?=	1
 ALTQMOD_INET6?=	1
 
 opt_altq.h:
-	echo "#define BLUE 1" > opt_altq.h
+	echo "#define ALTQ_BLUE 1" > opt_altq.h
 
 opt_inet.h:
 	touch opt_inet.h

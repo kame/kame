@@ -1,5 +1,6 @@
+/*	$KAME: qop_hfsc.c,v 1.4 2000/10/18 09:15:19 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: qop_hfsc.c,v 1.3 2000/07/28 09:56:22 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -73,8 +72,6 @@ static int hfsc_detach(struct ifinfo *ifinfo);
 static int hfsc_clear(struct ifinfo *ifinfo);
 static int hfsc_enable(struct ifinfo *ifinfo);
 static int hfsc_disable(struct ifinfo *ifinfo);
-static int hfsc_acc_enable(struct ifinfo *ifinfo);
-static int hfsc_acc_disable(struct ifinfo *ifinfo);
 static int hfsc_add_class(struct classinfo *clinfo);
 static int hfsc_modify_class(struct classinfo *clinfo, void *arg);
 static int hfsc_delete_class(struct classinfo *clinfo);
@@ -94,8 +91,6 @@ static struct qdisc_ops hfsc_qdisc = {
 	hfsc_clear,
 	hfsc_enable,
 	hfsc_disable,
-	hfsc_acc_enable,
-	hfsc_acc_disable,
 	hfsc_add_class,
 	hfsc_modify_class,
 	hfsc_delete_class,
@@ -111,7 +106,7 @@ static struct qdisc_ops hfsc_qdisc = {
 int
 hfsc_interface_parser(const char *ifname, int argc, char **argv)
 {
-	u_int  	bandwidth = 0;
+	u_int  	bandwidth = 100000000;	/* 100Mbps */
 	u_int	tbrsize = 0;
 	int	flags = 0;
 
@@ -168,8 +163,7 @@ hfsc_class_parser(const char *ifname, const char *class_name,
 			if (type & HFSC_LINKSHARINGSC) {
 				fm1 = m1; fd = d; fm2 = m2;
 			}
-		}
-		else if (EQUAL(*argv, "pshare")) {
+		} else if (EQUAL(*argv, "pshare")) {
 			argc--; argv++;
 			if (argc > 0) {
 				struct ifinfo	*ifinfo;
@@ -181,23 +175,19 @@ hfsc_class_parser(const char *ifname, const char *class_name,
 					type |= HFSC_LINKSHARINGSC;
 				}
 			}
-		}
-		else if (EQUAL(*argv, "grate")) {
+		} else if (EQUAL(*argv, "grate")) {
 			argc--; argv++;
 			if (argc > 0) {
 				rm2 = atobps(*argv);
 				type |= HFSC_REALTIMESC;
 			}
-		}
-		else if (EQUAL(*argv, "qlimit")) {
+		} else if (EQUAL(*argv, "qlimit")) {
 			argc--; argv++;
 			if (argc > 0)
 				qlimit = strtoul(*argv, NULL, 0);
-		}
-		else if (EQUAL(*argv, "default")) {
+		} else if (EQUAL(*argv, "default")) {
 			flags |= HFCF_DEFAULTCLASS;
-		}
-		else if (EQUAL(*argv, "admission")) {
+		} else if (EQUAL(*argv, "admission")) {
 			argc--; argv++;
 			if (argc > 0) {
 				if (EQUAL(*argv, "guaranteed")
@@ -205,28 +195,22 @@ hfsc_class_parser(const char *ifname, const char *class_name,
 					admission = 1;
 				else if (EQUAL(*argv, "none")) {
 					/* nothing */
-				}
-				else {
+				} else {
 					LOG(LOG_ERR, 0,
 					    "unknown admission type - %s, line %d\n",
 					    *argv, line_no);
 					return (0);
 				}
 			}
-		}
-		else if (EQUAL(*argv, "red")) {
+		} else if (EQUAL(*argv, "red")) {
 			flags |= HFCF_RED;
-		}
-		else if (EQUAL(*argv, "ecn")) {
+		} else if (EQUAL(*argv, "ecn")) {
 			flags |= HFCF_ECN;
-		}
-		else if (EQUAL(*argv, "rio")) {
+		} else if (EQUAL(*argv, "rio")) {
 			flags |= HFCF_RIO;
-		}
-		else if (EQUAL(*argv, "cleardscp")) {
+		} else if (EQUAL(*argv, "cleardscp")) {
 			flags |= HFCF_CLEARDSCP;
-		}
-		else {
+		} else {
 			LOG(LOG_ERR, 0,
 			    "Unknown keyword '%s' in %s, line %d\n",
 			    *argv, altqconfigfile, line_no);
@@ -253,8 +237,7 @@ hfsc_class_parser(const char *ifname, const char *class_name,
 	 */
 	if (rm2 <= fm2) {
 		m1 = rm1; d = rd; m2 = rm2;
-	}
-	else {
+	} else {
 		m1 = fm1; d = fd; m2 = fm2;
 	}
 	error = qcmd_hfsc_add_class(ifname, class_name, parent_name,
@@ -263,8 +246,7 @@ hfsc_class_parser(const char *ifname, const char *class_name,
 	if (error == 0 && (rm1 != fm1 || rd != fd || rm2 != fm2)) {
 		if (rm2 <= fm2) {
 			m1 = fm1; d = fd; m2 = fm2; type = HFSC_LINKSHARINGSC;
-		}
-		else {
+		} else {
 			m1 = rm1; d = rd; m2 = rm2; type = HFSC_REALTIMESC;
 		}
 		error = qcmd_hfsc_modify_class(ifname, class_name,
@@ -656,8 +638,7 @@ qop_hfsc_enable_hook(struct ifinfo *ifinfo)
 		LOG(LOG_ERR, 0, "hfsc: no default class on interface %s!\n",
 		    ifinfo->ifname);
 		return (QOPERR_CLASS);
-	}
-	else if (hfsc_ifinfo->default_class->child != NULL) {
+	} else if (hfsc_ifinfo->default_class->child != NULL) {
 		LOG(LOG_ERR, 0, "hfsc: default class on %s must be a leaf!\n",
 		    ifinfo->ifname);
 		return (QOPERR_CLASS);
@@ -804,8 +785,7 @@ gsc_getentry(struct gen_sc *gsc, double x)
 		new->y = 0;
 		new->m = 0;
 		LIST_INSERT_HEAD(gsc, new, _next);
-	}
-	else {
+	} else {
 		/*
 		 * the start point intersects with the segment pointed by
 		 * prev.  divide prev into 2 segments
@@ -816,8 +796,7 @@ gsc_getentry(struct gen_sc *gsc, double x)
 				new->y = prev->y;
 			else
 				new->y = INFINITY;
-		}
-		else {
+		} else {
 			prev->d = x - prev->x;
 			new->y = prev->d * prev->m + prev->y;
 		}
@@ -895,8 +874,7 @@ gsc_compress(struct gen_sc *gsc)
 			LIST_REMOVE(s, _next);
 			free(s);
 			goto again;
-		}
-		else if (s->m == next->m) {
+		} else if (s->m == next->m) {
 			/* join the two entries */
 			if (s->d != INFINITY && next->d != INFINITY)
 				s->d += next->d;
@@ -1001,32 +979,6 @@ hfsc_disable(struct ifinfo *ifinfo)
 	strncpy(iface.hfsc_ifname, ifinfo->ifname, IFNAMSIZ);
 
 	if (ioctl(hfsc_fd, HFSC_DISABLE, &iface) < 0)
-		return (QOPERR_SYSCALL);
-	return (0);
-}
-
-static int
-hfsc_acc_enable(struct ifinfo *ifinfo)
-{
-	struct hfsc_interface iface;
-
-	memset(&iface, 0, sizeof(iface));
-	strncpy(iface.hfsc_ifname, ifinfo->ifname, IFNAMSIZ);
-
-	if (ioctl(hfsc_fd, HFSC_ACC_ENABLE, &iface) < 0)
-		return (QOPERR_SYSCALL);
-	return (0);
-}
-
-static int
-hfsc_acc_disable(struct ifinfo *ifinfo)
-{
-	struct hfsc_interface iface;
-
-	memset(&iface, 0, sizeof(iface));
-	strncpy(iface.hfsc_ifname, ifinfo->ifname, IFNAMSIZ);
-
-	if (ioctl(hfsc_fd, HFSC_ACC_DISABLE, &iface) < 0)
 		return (QOPERR_SYSCALL);
 	return (0);
 }

@@ -8,25 +8,22 @@ pseudo-device	faith	1	# dummy
 pseudo-device	altq		# altq pseudo-device
 
 # ALTQ options
-option		ALTQ		# alternate queueing
-option		CBQ		#class based queueing
-option		WFQ		#weighted fair queueing
-option		FIFOQ		#fifo queueing
-option		RED		#random early detection
-#option		FLOWVALVE	#flowvalve for RED (needs RED)
-option		RIO		#twin red for diffserv (needs RED)
-option		CBQ_RED		#red for cbq (needs CBQ and RED)
-option		CBQ_RIO		#rio for cbq (needs CBQ, RIO, RED, CBQ_RED)
-#option		LOCALQ		#local use
-option		HFSC		#hierarchical fair service curve
-option		HFSC_RED	#red for hfsc (needs HFSC and RED)
-option		HFSC_RIO	#rio for hfsc (needs HFSC, RIO, RED, HFSC_RED)
-option		ALTQ_ECN	#ecn extention to tcp
-option		ALTQ_IPSEC	#check ipsec in IPv4
-option		CDNR		#diffserv traffic conditioner
-#option		BLUE		#blue by wu-chang feng
-#option		ALTQ_NOPCC	#don't use processor cycle counter
-#option		ALTQ_DEBUG	#for debugging
+options 	ALTQ		#alternate queueing
+options 	ALTQ_CBQ	#class based queueing
+options 	ALTQ_WFQ	#weighted fair queueing
+options 	ALTQ_FIFOQ	#fifo queueing
+options 	ALTQ_RED	#random early detection
+#options 	ALTQ_FLOWVALVE	#flowvalve for RED (needs RED)
+options 	ALTQ_RIO	#triple red for diffserv (needs RED)
+#options 	ALTQ_LOCALQ	#local use
+options 	ALTQ_HFSC	#hierarchical fair service curve
+#options 	ALTQ_ECN	#ecn extention to tcp (needs RED)
+#options 	ALTQ_IPSEC	#check ipsec in IPv4
+options 	ALTQ_CDNR	#diffserv traffic conditioner
+#options 	ALTQ_BLUE	#blue by wu-chang feng
+options 	ALTQ_PRIQ	#priority queue
+#options 	ALTQ_NOPCC	#don't use processor cycle counter
+#options 	ALTQ_DEBUG	#for debugging
 
 # mobile-ip6 options
 #option		MIP6

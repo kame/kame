@@ -1,5 +1,6 @@
+/*	$KAME: qdisc_cbq.c,v 1.2 2000/10/18 09:15:16 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: qdisc_cbq.c,v 1.1 2000/01/18 07:28:58 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -55,59 +54,46 @@
 #define RM_POWER	(1 << RM_FILTER_GAIN)
 #endif
 
-static u_quad_t last_bytes[NCLASSES];
-static char clnames[NCLASSES][128];
-static u_long clhandles[NCLASSES];
-static int avg_scale = 4096;  /* default fixed-point scale for red */
-
 void
 cbq_stat_loop(int fd, const char *ifname, int count, int interval)
 {
+	class_stats_t stats1[NCLASSES], stats2[NCLASSES];
+	char clnames[NCLASSES][128];
+	u_long clhandles[NCLASSES];
 	struct cbq_getstats	get_stats;
-	class_stats_t		*sp, stats[NCLASSES];
+	class_stats_t		*sp, *lp, *new, *last, *tmp;
 	struct timeval		cur_time, last_time;
-	int			i, msec;
-	u_quad_t		xmit_bytes;
-	double			flow_kbps, kbps;
+	int			i;
+	double			flow_bps, sec;
 	int cnt = count;
+
+	strcpy(get_stats.iface.cbq_ifacename, ifname);
+	new = &stats1[0];
+	last = &stats2[0];
 
 	for (i = 0; i < NCLASSES; i++)
 	    clhandles[i] = NULL_CLASS_HANDLE;
 
-	strcpy(get_stats.iface.cbq_ifacename, ifname);
-	get_stats.iface.cbq_ifacelen = strlen(ifname);
-	get_stats.stats = stats;
-
 	while (count == 0 || cnt-- > 0) {
-	
 		get_stats.nclasses = NCLASSES;
-	
+		get_stats.stats = new;
 		if (ioctl(fd, CBQ_GETSTATS, &get_stats) < 0)
 			err(1, "ioctl CBQ_GETSTATS");
 
 		gettimeofday(&cur_time, NULL);
-		msec = (cur_time.tv_sec - last_time.tv_sec)*1000 +
-			(cur_time.tv_usec - last_time.tv_usec)/1000;
+		sec = calc_interval(&cur_time, &last_time);
 
 		for (i=0; i<get_stats.nclasses; i++) {
-			sp = &stats[i];
+			sp = &new[i];
+			lp = &last[i];
 
 			if (sp->handle != clhandles[i]) {
-				clhandles[i] = sp->handle;
 				quip_chandle2name(ifname, sp->handle,
 						  clnames[i]);
-				last_bytes[i] = sp->nbytes;
+				clhandles[i] = sp->handle;
 				continue;
 			}
 
-			/*
-			 * measure the throughput of this class
-			 */
-			xmit_bytes = sp->nbytes - last_bytes[i];
-			kbps = (double)xmit_bytes * 8.0 / (double)msec
-				* 1000.0 / 1000.0;
-			last_bytes[i] = sp->nbytes;
-	    
 			switch (sp->handle) {
 			case ROOT_CLASS_HANDLE:
 				printf("Root Class for Interface %s: %s\n",
@@ -127,53 +113,33 @@ cbq_stat_loop(int fd, const char *ifname, int count, int interval)
 				break;
 			}
 
-			flow_kbps = 8.0 / (double)sp->ns_per_byte
-				* 1000*1000*1000/1000;
+			flow_bps = 8.0 / (double)sp->ns_per_byte
+			    * 1000*1000*1000;
 
 			printf("\tpriority: %d depth: %d",
 			       sp->priority, sp->depth);
 			printf(" offtime: %d [us] wrr_allot: %d bytes\n",
 			       sp->offtime, sp->wrr_allot);
 			printf("\tnsPerByte: %d", sp->ns_per_byte);
-			if (flow_kbps > 1000.0)
-				printf("\t(%.2f Mbps),", flow_kbps/1000.0);
-			else
-				printf("\t(%.2f Kbps),", flow_kbps);
-
-			if (kbps > 1000.0)
-				printf("\tMeasured: %.2f [Mbps]\n",
-				       kbps/1000.0);
-			else
-				printf("\tMeasured: %.2f [Kbps]\n", kbps);
-	    
-			printf("\tpkts: %u,\tbytes: %qu\n",
-			       sp->npackets, sp->nbytes);
+			printf("\t(%s Mbps),", rate2str(flow_bps));
+			printf("\tMeasured: %s [Mbps]\n",
+			       rate2str(calc_rate(sp->xmit_cnt.bytes,
+						  lp->xmit_cnt.bytes, sec)));
+			printf("\tpkts: %llu,\tbytes: %llu\n",
+			       (ull)sp->xmit_cnt.packets,
+			       (ull)sp->xmit_cnt.bytes);
 			printf("\tovers: %u,\toveractions: %u\n",
 			       sp->over, sp->overactions);
 			printf("\tborrows: %u,\tdelays: %u\n",
 			       sp->borrows, sp->delays);
-			printf("\tdrops: %u,\tdrop_bytes: %qu\n",
-			       sp->drops, sp->drop_bytes);
-			if (sp->qtype == Q_RED) {
-				printf("    RED q_avg:%.2f xmit: %u (forced: %u, early: %u marked: %u)\n",
-				       ((double)sp->red[0].q_avg)/(double)avg_scale,
-				       sp->red[0].xmit_packets, 
-				       sp->red[0].drop_forced,
-				       sp->red[0].drop_unforced,
-				       sp->red[0].marked_packets);
-			}
-			else if (sp->qtype == Q_RIO) {
-				int dp;
+			printf("\tdrops: %llu,\tdrop_bytes: %llu\n",
+			       (ull)sp->drop_cnt.bytes,
+			       (ull)sp->drop_cnt.bytes);
+			if (sp->qtype == Q_RED)
+				print_redstats(sp->red);
+			else if (sp->qtype == Q_RIO)
+				print_riostats(sp->red);
 
-				for (dp = 0; dp < RIO_NDROPPREC; dp++)
-					printf("    RIO[%d] q_avg:%.2f xmit: %u (forced: %u, early: %u marked: %u)\n",
-					       dp,
-					       ((double)sp->red[dp].q_avg)/(double)avg_scale,
-					       sp->red[dp].xmit_packets, 
-					       sp->red[dp].drop_forced,
-					       sp->red[dp].drop_unforced,
-					       sp->red[dp].marked_packets);
-			}
 			printf("\tQCount: %d,\t(qmax: %d)\n",
 			       sp->qcnt, sp->qmax);
 			printf("\tAvgIdle: %d [us],\t(maxidle: %d minidle: %d [us])\n",
@@ -181,6 +147,11 @@ cbq_stat_loop(int fd, const char *ifname, int count, int interval)
 			       sp->maxidle >> RM_FILTER_GAIN,
 			       sp->minidle / RM_POWER);
 		}
+
+		/* swap the buffer pointers */
+		tmp = last;
+		last = new;
+		new = tmp;
 
 		last_time = cur_time;
 		sleep(interval);

@@ -1,4 +1,4 @@
-/*	$KAME: altq_cdnr.c,v 1.6 2000/07/25 10:12:29 kjc Exp $	*/
+/*	$KAME: altq_cdnr.c,v 1.7 2000/10/18 09:15:22 kjc Exp $	*/
 
 /*
  * Copyright (C) 1999-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_cdnr.c,v 1.6 2000/07/25 10:12:29 kjc Exp $
+ * $Id: altq_cdnr.c,v 1.7 2000/10/18 09:15:22 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
@@ -68,17 +68,11 @@
 
 int altq_cdnr_enabled = 0;
 
-/* traffic conditioner is enabled by CDNR option in opt_altq.h */
-#ifdef CDNR
+/* traffic conditioner is enabled by ALTQ_CDNR option in opt_altq.h */
+#ifdef ALTQ_CDNR
 
 /* cdnr_list keeps all cdnr's allocated. */
 static LIST_HEAD(, top_cdnr) tcb_list;
-
-/* default tbrio parameter values */
-static int tbrio_avg_pkt_size = 1024;	/* average packet size */
-static int tbrio_holdtime_pkts = 100;	/* hold time by packets */
-static int tbrio_lowat = 4096;	/* low watermark: should be larger than MTU */
-
 
 int cdnropen __P((dev_t, int, int, struct proc *));
 int cdnrclose __P((dev_t, int, int, struct proc *));
@@ -114,11 +108,6 @@ static struct trtcm *trtcm_create __P((struct top_cdnr *,
 static int trtcm_destroy __P((struct trtcm *));
 static struct tc_action *trtcm_input __P((struct cdnr_block *,
 					  struct cdnr_pktinfo *));
-static struct tbrio *tbrio_create __P((struct top_cdnr *, struct tb_profile *,
-			       struct tc_action *, struct tc_action *));
-static int tbrio_destroy __P((struct tbrio *));
-static struct tc_action *tbrio_input __P((struct cdnr_block *,
-					  struct cdnr_pktinfo *));
 static struct tswtcm *tswtcm_create __P((struct top_cdnr *,
 		  u_int32_t, u_int32_t, u_int32_t,
 		  struct tc_action *, struct tc_action *, struct tc_action *));
@@ -138,11 +127,6 @@ static int cdnrcmd_tbm_stats __P((struct cdnr_tbmeter_stats *));
 static int cdnrcmd_add_trtcm __P((struct cdnr_add_trtcm *));
 static int cdnrcmd_modify_trtcm __P((struct cdnr_modify_trtcm *));
 static int cdnrcmd_tcm_stats __P((struct cdnr_tcm_stats *));
-static int cdnrcmd_add_tbrio __P((struct cdnr_add_tbrio *));
-static int cdnrcmd_modify_tbrio __P((struct cdnr_modify_tbrio *));
-static int cdnrcmd_tbrio_stats __P((struct cdnr_tbrio_stats *));
-static int cdnrcmd_tbrio_getdef __P((struct cdnr_tbrio_params *));
-static int cdnrcmd_tbrio_setdef __P((struct cdnr_tbrio_params *));
 static int cdnrcmd_add_tswtcm __P((struct cdnr_add_tswtcm *));
 static int cdnrcmd_modify_tswtcm __P((struct cdnr_modify_tswtcm *));
 static int cdnrcmd_get_stats __P((struct cdnr_get_stats *));
@@ -192,8 +176,7 @@ altq_cdnr_input(m, af)
 		tca = &top->tc_block.cb_action;
 
 	while (1) {
-		top->tc_stats[tca->tca_code].packets++;
-		top->tc_stats[tca->tca_code].bytes += pktinfo.pkt_len;
+		PKTCNTR_ADD(&top->tc_cnts[tca->tca_code], pktinfo.pkt_len);
 		
 		switch (tca->tca_code) {
 		case TCACODE_PASS:
@@ -213,8 +196,7 @@ altq_cdnr_input(m, af)
 				flowlabel = (tca->tca_dscp << 20) |
 					(flowlabel & ~(DSCP_MASK << 20));
 				ip6->ip6_flow = htonl(flowlabel);
-			}
-			else
+			} else
 #endif
 				ip->ip_tos = tca->tca_dscp |
 					(ip->ip_tos & DSCP_CUMASK);
@@ -289,9 +271,6 @@ cdnr_cballoc(top, type, input_func)
 	case TCETYPE_TRTCM:
 		size = sizeof(struct trtcm);
 		break;
-	case TCETYPE_TBRIO:
-		size = sizeof(struct tbrio);
-		break;
 	case TCETYPE_TSWTCM:
 		size = sizeof(struct tswtcm);
 		break;
@@ -321,8 +300,7 @@ cdnr_cballoc(top, type, input_func)
 		cb->cb_action.tca_code = TCACODE_NEXT;
 		cb->cb_action.tca_next = cb;
 		cb->cb_input = input_func;
-	}
-	else
+	} else
 		cb->cb_action.tca_code = TCACODE_NONE;
 
 	/* if this isn't top, register the element to the top level cdnr */
@@ -369,9 +347,6 @@ generic_element_destroy(cb)
 		break;
 	case TCETYPE_TRTCM:
 		error = trtcm_destroy((struct trtcm *)cb);
-		break;
-	case TCETYPE_TBRIO:
-		error = tbrio_destroy((struct tbrio *)cb);
 		break;
 	case TCETYPE_TSWTCM:
 		error = tswtcm_destroy((struct tswtcm *)cb);
@@ -425,8 +400,7 @@ tca_import_action(ktca, utca)
 		ktca->tca_code = TCACODE_NEXT;
 		ktca->tca_next = cb;
 		cb->cb_ref++;
-	}
-	else if (ktca->tca_code == TCACODE_MARK) {
+	} else if (ktca->tca_code == TCACODE_MARK) {
 		ktca->tca_dscp &= DSCP_MASK;
 	}
 	return;
@@ -632,14 +606,12 @@ tbm_input(cb, pktinfo)
 	}
 	
 	if (tbm->tb.token < len) {
-		tbm->out_stats.packets++;
-		tbm->out_stats.bytes += pktinfo->pkt_len;
+		PKTCNTR_ADD(&tbm->out_cnt, pktinfo->pkt_len);
 		return (&tbm->out_action);
 	}
 
 	tbm->tb.token -= len;
-	tbm->in_stats.packets++;
-	tbm->in_stats.bytes += pktinfo->pkt_len;
+	PKTCNTR_ADD(&tbm->in_cnt, pktinfo->pkt_len);
 	return (&tbm->in_action);
 }
 
@@ -722,8 +694,7 @@ trtcm_input(cb, pktinfo)
 		color = pktinfo->pkt_dscp;
 		if (color != tcm->yellow_dscp && color != tcm->red_dscp)
 			color = tcm->green_dscp;
-	}
-	else {
+	} else {
 		/* if color-blind, precolor it as green */
 		color = tcm->green_dscp;
 	}
@@ -754,228 +725,22 @@ trtcm_input(cb, pktinfo)
 	
 	if (color == tcm->red_dscp || tcm->peak_tb.token < len) {
 		pktinfo->pkt_dscp = tcm->red_dscp;
-		tcm->red_stats.packets++;
-		tcm->red_stats.bytes += pktinfo->pkt_len;
+		PKTCNTR_ADD(&tcm->red_cnt, pktinfo->pkt_len);
 		return (&tcm->red_action);
 	}
 
 	if (color == tcm->yellow_dscp || tcm->cmtd_tb.token < len) {
 		pktinfo->pkt_dscp = tcm->yellow_dscp;
 		tcm->peak_tb.token -= len;
-		tcm->yellow_stats.packets++;
-		tcm->yellow_stats.bytes += pktinfo->pkt_len;
+		PKTCNTR_ADD(&tcm->yellow_cnt, pktinfo->pkt_len);
 		return (&tcm->yellow_action);
 	}
 
 	pktinfo->pkt_dscp = tcm->green_dscp;
 	tcm->cmtd_tb.token -= len;
 	tcm->peak_tb.token -= len;
-	tcm->green_stats.packets++;
-	tcm->green_stats.bytes += pktinfo->pkt_len;
+	PKTCNTR_ADD(&tcm->green_cnt, pktinfo->pkt_len);
 	return (&tcm->green_action);
-}
-
-/*
- * token bucket rio dropper
- */
-#define	TBRIOPROB_MAX	(128*1024)
-#define	TBRIOPROB_MIN	(TBRIOPROB_MAX * 5 / 1000)	/* 0.005 */
-
-static struct tbrio *
-tbrio_create(top, profile, pass_action, drop_action)
-	struct top_cdnr *top;
-	struct tb_profile *profile;
-	struct tc_action *pass_action, *drop_action;
-{
-	struct tbrio *tbrio = NULL;
-
-	if (tca_verify_action(pass_action) < 0
-	    || tca_verify_action(drop_action) < 0)
-		return (NULL);
-
-	if ((tbrio = cdnr_cballoc(top, TCETYPE_TBRIO,
-				tbrio_input)) == NULL)
-		return (NULL);
-
-	tb_import_profile(&tbrio->tb, profile);
-
-	tca_import_action(&tbrio->pass_action, pass_action);
-	tca_import_action(&tbrio->drop_action, drop_action);
-
-	/* set tbrio parameters */
-	tbrio->lowat = TB_SCALE(tbrio_lowat);
-	tbrio->prob = 0;
-	tbrio->bumps = 0;
-	tbrio->count = 0;
-	tbrio->hold_time = (u_int64_t)machclk_freq * tbrio_avg_pkt_size * 8
-		* tbrio_holdtime_pkts / profile->rate;
-	tbrio->last_update = read_machclk();
-
-	/* set default color values */
-	tbrio->green_dscp  = DSCP_AF11;
-	tbrio->yellow_dscp = DSCP_AF12;
-	tbrio->red_dscp    = DSCP_AF13;
-
-	return (tbrio);
-}
-
-static int
-tbrio_destroy(tbrio)
-	struct tbrio *tbrio;
-{
-	if (tbrio->cdnrblk.cb_ref > 0)
-		return (EBUSY);
-
-	tca_invalidate_action(&tbrio->pass_action);
-	tca_invalidate_action(&tbrio->drop_action);
-
-	cdnr_cbdestroy(tbrio);
-	return (0);
-}
-
-/*
- * drop probability is calculated as follows:
- *   prob = scaled_prob / PROB_MAX
- *   prob_a = prob / (2 - count*prob)
- * here prob_a increases as successive undrop count increases.
- * (prob_a starts from prob/2, becomes prob when (count == (1 / prob)),
- * becomes 1 when (count >= (2 / prob))).
- *
- * drop probability for different colors:
- *	green:  never dropped
- *	yellow: dropped with probability prob^2
- *	(when prob_a is small, yellow's drop prob is very small)
- *	red:    dropped with probability prob_a when prob < 0.2
- *		dropped with probability prob   when prob >= 0.2
- */
-static struct tc_action *
-tbrio_input(cb, pktinfo)
-	struct cdnr_block *cb;
-	struct cdnr_pktinfo *pktinfo;
-{
-	struct tbrio *tbrio = (struct tbrio *)cb;
-	u_int64_t	len;
-	u_int64_t	interval, now;
-	u_int8_t	color;
-	int		droptype, cindex;
-
-	len = TB_SCALE(pktinfo->pkt_len);
-	color = pktinfo->pkt_dscp;
-	if (color == tbrio->red_dscp)
-		cindex = TBRIO_CINDEX_RED;
-	else if (color == tbrio->yellow_dscp)
-		cindex = TBRIO_CINDEX_YELLOW;
-	else
-		cindex = TBRIO_CINDEX_GREEN;
-
-	/* calculate current token */
-	now = read_machclk();
-	interval = now - tbrio->tb.last;
-	if (interval >= tbrio->tb.filluptime)
-			tbrio->tb.token = tbrio->tb.depth;
-	else {
-		tbrio->tb.token += interval * tbrio->tb.rate;
-		if (tbrio->tb.token > tbrio->tb.depth)
-			tbrio->tb.token = tbrio->tb.depth;
-	}
-	tbrio->tb.last = now;
-
-	/*
-	 * bumps is incremented when the remaining token is less
-	 * than the low water mark, and decremented when the token is full.
-	 */
-	if (tbrio->tb.token < tbrio->lowat)
-		tbrio->bumps++;
-	else if (tbrio->tb.token == tbrio->tb.depth)
-		tbrio->bumps--;
-	
-	/*
-	 * update drop probability every hold time
-	 */
-	interval = now - tbrio->last_update;
-	if (interval >= tbrio->hold_time) {
-		interval -= tbrio->hold_time;
-
-		if (tbrio->bumps > 0) {
-			/* increase drop probability by 11% */
-			if (tbrio->prob == 0)
-				tbrio->prob = TBRIOPROB_MIN;
-			else
-				tbrio->prob += tbrio->prob / 8;
-			if (tbrio->prob > TBRIOPROB_MAX)
-				tbrio->prob = TBRIOPROB_MAX;
-		}
-		else if (tbrio->bumps < 0) {
-			/* decrease drop probability by 12% */
-			tbrio->prob -= tbrio->prob / 8;
-			if (tbrio->prob < TBRIOPROB_MIN)
-				tbrio->prob = 0;
-		}
-
-		/*
-		 * if interval is more than 2 hold_time,
-		 * adjust probability to reflect the idle period.
-		 */
-		while (tbrio->prob > 0 && interval >= tbrio->hold_time) {
-			interval -= tbrio->hold_time;
-			tbrio->prob -= tbrio->prob / 8;
-			if (tbrio->prob < TBRIOPROB_MIN)
-				tbrio->prob = 0;
-		}
-
-		tbrio->bumps = 0;
-		tbrio->last_update = now;
-	}
-
-	/*
-	 * drop the packet with the current drop probability.
-	 * don't drop if green or drop prob is zero.
-	 */
-	droptype = TBRIO_DTYPE_PASS;
-	if (cindex != TBRIO_CINDEX_GREEN && tbrio->prob != 0) {
-		int p;
-
-		p = tbrio->prob;
-		if (cindex == TBRIO_CINDEX_RED && p < (TBRIOPROB_MAX*20/100)) {
-			/*
-			 * if red packet and prob is less than 20%,
-			 * drop with prob_a in order to space drop interval.
-			 */
-			int d = p * tbrio->count;
-			if (d >= 2 * TBRIOPROB_MAX) {
-				/* count exceeds the hard limit */
-				droptype = TBRIO_DTYPE_DROP;
-			}
-			else {
-				d = 2 * TBRIOPROB_MAX - d;
-				if ((random() % d) < p)
-					droptype = TBRIO_DTYPE_DROP;
-			}
-		}
-		else {
-			/* if yellow, drop with prob (prob)^2 */
-			if (cindex == TBRIO_CINDEX_YELLOW)
-				p = (int64_t)p * p / TBRIOPROB_MAX;
-			if ((random() % TBRIOPROB_MAX) < p)
-				droptype = TBRIO_DTYPE_DROP;
-		}
-	}
-
-	/* update token (regardless of droptype) */
-	if (tbrio->tb.token > len)
-		tbrio->tb.token -= len;
-	else
-		tbrio->tb.token = 0;
-
-	tbrio->stats[cindex][droptype].packets++;
-	tbrio->stats[cindex][droptype].bytes += pktinfo->pkt_len;
-	
-	if (droptype == TBRIO_DTYPE_PASS) {
-		tbrio->count++;
-		return (&tbrio->pass_action);
-	}
-	tbrio->count = 0;
-	return (&tbrio->drop_action);
 }
 
 /*
@@ -1085,20 +850,16 @@ tswtcm_input(cb, pktinfo)
 			if (randval < avg_rate - tsw->peak_rate) {
 				/* mark red */
 				pktinfo->pkt_dscp = tsw->red_dscp;
-				tsw->red_stats.packets++;
-				tsw->red_stats.bytes += len;
+				PKTCNTR_ADD(&tsw->red_cnt, len);
 				return (&tsw->red_action);
-			}
-			else if (randval < avg_rate - tsw->cmtd_rate)
+			} else if (randval < avg_rate - tsw->cmtd_rate)
 				goto mark_yellow;
-		}
-		else {
+		} else {
 			/* peak_rate >= avg_rate > cmtd_rate */
 			if (randval < avg_rate - tsw->cmtd_rate) {
 			mark_yellow:
 				pktinfo->pkt_dscp = tsw->yellow_dscp;
-				tsw->yellow_stats.packets++;
-				tsw->yellow_stats.bytes += len;
+				PKTCNTR_ADD(&tsw->yellow_cnt, len);
 				return (&tsw->yellow_action);
 			}
 		}
@@ -1106,8 +867,7 @@ tswtcm_input(cb, pktinfo)
 
 	/* mark green */
 	pktinfo->pkt_dscp = tsw->green_dscp;
-	tsw->green_stats.packets++;
-	tsw->green_stats.bytes += len;
+	PKTCNTR_ADD(&tsw->green_cnt, len);
 	return (&tsw->green_action);
 }
 
@@ -1251,8 +1011,8 @@ cdnrcmd_tbm_stats(ap)
 	if ((tbm = (struct tbmeter *)cdnr_handle2cb(ap->cdnr_handle)) == NULL)
 		return (EINVAL);
 
-	ap->in_stats = tbm->in_stats;
-	ap->out_stats = tbm->out_stats;
+	ap->in_cnt = tbm->in_cnt;
+	ap->out_cnt = tbm->out_cnt;
 
 	return (0);
 }
@@ -1305,97 +1065,18 @@ cdnrcmd_tcm_stats(ap)
 	if (cb->cb_type == TCETYPE_TRTCM) {
 	    struct trtcm *tcm = (struct trtcm *)cb;
 	    
-	    ap->green_stats = tcm->green_stats;
-	    ap->yellow_stats = tcm->yellow_stats;
-	    ap->red_stats = tcm->red_stats;
-	}
-	else if (cb->cb_type == TCETYPE_TSWTCM) {
+	    ap->green_cnt = tcm->green_cnt;
+	    ap->yellow_cnt = tcm->yellow_cnt;
+	    ap->red_cnt = tcm->red_cnt;
+	} else if (cb->cb_type == TCETYPE_TSWTCM) {
 	    struct tswtcm *tsw = (struct tswtcm *)cb;
 	    
-	    ap->green_stats = tsw->green_stats;
-	    ap->yellow_stats = tsw->yellow_stats;
-	    ap->red_stats = tsw->red_stats;
-	}
-	else
+	    ap->green_cnt = tsw->green_cnt;
+	    ap->yellow_cnt = tsw->yellow_cnt;
+	    ap->red_cnt = tsw->red_cnt;
+	} else
 	    return (EINVAL);
 
-	return (0);
-}
-
-static int
-cdnrcmd_add_tbrio(ap)
-	struct cdnr_add_tbrio *ap;
-{
-	struct top_cdnr *top;
-	struct tbrio *tbrio;
-
-	if ((top = tcb_lookup(ap->iface.cdnr_ifname)) == NULL)
-		return (EBADF);
-
-	tbrio = tbrio_create(top, &ap->profile,
-			     &ap->in_action, &ap->out_action);
-	if (tbrio == NULL)
-		return (EINVAL);
-
-	/* return a class handle to the user */
-	ap->cdnr_handle = cdnr_cb2handle(&tbrio->cdnrblk);
-	return (0);
-}
-
-static int
-cdnrcmd_modify_tbrio(ap)
-	struct cdnr_modify_tbrio *ap;
-{
-	struct tbrio *tbrio;
-
-	if ((tbrio = (struct tbrio *)cdnr_handle2cb(ap->cdnr_handle)) == NULL)
-		return (EINVAL);
-
-	tb_import_profile(&tbrio->tb, &ap->profile);
-
-	return (0);
-}
-
-static int
-cdnrcmd_tbrio_stats(ap)
-	struct cdnr_tbrio_stats *ap;
-{
-	struct tbrio *tbrio;
-
-	if ((tbrio = (struct tbrio *)cdnr_handle2cb(ap->cdnr_handle)) == NULL)
-		return (EINVAL);
-
-	bcopy(tbrio->stats, ap->stats, sizeof(tbrio->stats));
-	return (0);
-}
-
-static int
-cdnrcmd_tbrio_getdef(ap)
-	struct cdnr_tbrio_params *ap;
-{
-	struct tbrio *tbrio;
-
-	if ((tbrio = (struct tbrio *)cdnr_handle2cb(ap->cdnr_handle)) == NULL)
-		return (EINVAL);
-
-	ap->avg_pkt_size = tbrio_avg_pkt_size;
-	ap->holdtime_pkts = tbrio_holdtime_pkts;
-	ap->lowat = tbrio_lowat;
-	return (0);
-}
-
-static int
-cdnrcmd_tbrio_setdef(ap)
-	struct cdnr_tbrio_params *ap;
-{
-	struct tbrio *tbrio;
-
-	if ((tbrio = (struct tbrio *)cdnr_handle2cb(ap->cdnr_handle)) == NULL)
-		return (EINVAL);
-
-	tbrio_avg_pkt_size = ap->avg_pkt_size;
-	tbrio_holdtime_pkts = ap->holdtime_pkts;
-	tbrio_lowat = ap->lowat;
 	return (0);
 }
 
@@ -1446,7 +1127,6 @@ cdnrcmd_modify_tswtcm(ap)
 	return (0);
 }
 
-
 static int
 cdnrcmd_get_stats(ap)
 	struct cdnr_get_stats *ap;
@@ -1455,7 +1135,6 @@ cdnrcmd_get_stats(ap)
 	struct cdnr_block *cb;
 	struct tbmeter *tbm;
 	struct trtcm *tcm;
-	struct tbrio *tbrio;
 	struct tswtcm *tsw;
 	struct tce_stats tce, *usp;
 	int error, n, nskip, nelements;
@@ -1464,7 +1143,7 @@ cdnrcmd_get_stats(ap)
 		return (EBADF);
 
 	/* copy action stats */
-	bcopy(top->tc_stats, ap->stats, sizeof(ap->stats));
+	bcopy(top->tc_cnts, ap->cnts, sizeof(ap->cnts));
 
 	/* stats for each element */
 	nelements = ap->nelements;
@@ -1486,28 +1165,20 @@ cdnrcmd_get_stats(ap)
 		switch (cb->cb_type) {
 		case TCETYPE_TBMETER:
 			tbm = (struct tbmeter *)cb;
-			tce.tce_stats[0] = tbm->in_stats;
-			tce.tce_stats[1] = tbm->out_stats;
+			tce.tce_cnts[0] = tbm->in_cnt;
+			tce.tce_cnts[1] = tbm->out_cnt;
 			break;
 		case TCETYPE_TRTCM:
 			tcm = (struct trtcm *)cb;
-			tce.tce_stats[0] = tcm->green_stats;
-			tce.tce_stats[1] = tcm->yellow_stats;
-			tce.tce_stats[2] = tcm->red_stats;
-			break;
-		case TCETYPE_TBRIO:
-			tbrio = (struct tbrio *)cb;
-			bcopy(tbrio->stats, tce.tce_stats, sizeof(tbrio->stats));
-#if 1
-			/* XXX return prob using drop count for green */
-			tce.tce_stats[1].packets = tbrio->prob;
-#endif
+			tce.tce_cnts[0] = tcm->green_cnt;
+			tce.tce_cnts[1] = tcm->yellow_cnt;
+			tce.tce_cnts[2] = tcm->red_cnt;
 			break;
 		case TCETYPE_TSWTCM:
 			tsw = (struct tswtcm *)cb;
-			tce.tce_stats[0] = tsw->green_stats;
-			tce.tce_stats[1] = tsw->yellow_stats;
-			tce.tce_stats[2] = tsw->red_stats;
+			tce.tce_cnts[0] = tsw->green_cnt;
+			tce.tce_cnts[1] = tsw->yellow_cnt;
+			tce.tce_cnts[2] = tsw->red_cnt;
 			break;
 		default:
 			continue;
@@ -1676,26 +1347,6 @@ cdnrioctl(dev, cmd, addr, flag, p)
 		error = cdnrcmd_get_stats((struct cdnr_get_stats *)addr);
 		break;
 
-	case CDNR_ADD_TBRIO:
-		error = cdnrcmd_add_tbrio((struct cdnr_add_tbrio *)addr);
-		break;
-
-	case CDNR_MOD_TBRIO:
-		error = cdnrcmd_modify_tbrio((struct cdnr_modify_tbrio *)addr);
-		break;
-
-	case CDNR_TBRIO_STATS:
-		error = cdnrcmd_tbrio_stats((struct cdnr_tbrio_stats *)addr);
-		break;
-
-	case CDNR_TBRIO_GETDEFAULTS:
-		error = cdnrcmd_tbrio_getdef((struct cdnr_tbrio_params *)addr);
-		break;
-
-	case CDNR_TBRIO_SETDEFAULTS:
-		error = cdnrcmd_tbrio_setdef((struct cdnr_tbrio_params *)addr);
-		break;
-
 	case CDNR_ADD_TSW:
 		error = cdnrcmd_add_tswtcm((struct cdnr_add_tswtcm *)addr);
 		break;
@@ -1722,4 +1373,4 @@ ALTQ_MODULE(altq_cdnr, ALTQT_CDNR, &cdnr_sw);
 
 #endif /* KLD_MODULE */
 
-#endif /* CDNR */
+#endif /* ALTQ_CDNR */

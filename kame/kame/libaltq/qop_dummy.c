@@ -1,5 +1,6 @@
+/*	$KAME: qop_dummy.c,v 1.2 2000/10/18 09:15:19 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,14 +23,13 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: qop_dummy.c,v 1.1 2000/01/18 07:29:06 kjc Exp $
  */
 
 #include <sys/param.h>
 #include <sys/socket.h>
 #include <net/if.h>
 #include <stdio.h>
+#include <errno.h>
 #include <syslog.h>
 
 #include <altq/altq.h>
@@ -38,13 +38,12 @@
 int null_interface_parser(const char *ifname, int argc, char **argv);
 int null_class_parser(const char *ifname, const char *class_name,
 		      const char *parent_name, int argc, char **argv);
+int qcmd_nop_add_if(const char *ifname);
 static int nop_attach(struct ifinfo *ifinfo);
 static int nop_detach(struct ifinfo *ifinfo);
 static int nop_clear(struct ifinfo *ifinfo);
 static int nop_enable(struct ifinfo *ifinfo);
 static int nop_disable(struct ifinfo *ifinfo);
-static int nop_acc_enable(struct ifinfo *ifinfo);
-static int nop_acc_disable(struct ifinfo *ifinfo);
 static int nop_add_class(struct classinfo *clinfo);
 static int nop_modify_class(struct classinfo *clinfo, void *arg);
 static int nop_delete_class(struct classinfo *clinfo);
@@ -59,8 +58,6 @@ struct qdisc_ops nop_qdisc = {
 	nop_clear,
 	nop_enable,
 	nop_disable,
-	nop_acc_enable,
-	nop_acc_disable,
 	nop_add_class,
 	nop_modify_class,
 	nop_delete_class,
@@ -68,22 +65,44 @@ struct qdisc_ops nop_qdisc = {
 	nop_delete_filter,
 };
 
+#define EQUAL(s1, s2)	(strcmp((s1), (s2)) == 0)
+
 /*
  * parser interface for null interface
  */
 int
 null_interface_parser(const char *ifname, int argc, char **argv)
 {
-	if (argc > 0) {
-		LOG(LOG_ERR, 0,
-		    "No discipline (e.g. cbq) specified in %s, line %d\n",
-		    altqconfigfile, line_no);
-		return (0);
+	u_int  	bandwidth = 0;
+	u_int	tbrsize = 0;
+
+	/*
+	 * process options
+	 */
+	while (argc > 0) {
+		if (EQUAL(*argv, "bandwidth")) {
+			argc--; argv++;
+			if (argc > 0)
+				bandwidth = atobps(*argv);
+		} else if (EQUAL(*argv, "tbrsize")) {
+			argc--; argv++;
+			if (argc > 0)
+				tbrsize = atobytes(*argv);
+		} else {
+			LOG(LOG_ERR, 0, "Unknown keyword '%s'\n", argv);
+			return (0);
+		}
+		argc--; argv++;
 	}
+
+	if (bandwidth != 0)
+		if (qcmd_tbr_register(ifname, bandwidth, tbrsize) != 0)
+			return (0);
+
 	/*
 	 * add a dummy interface since traffic conditioner might need it.
 	 */
-	if (qop_add_if(NULL, ifname, 0, &nop_qdisc, NULL) != 0)
+	if (qcmd_nop_add_if(ifname) != 0)
 		return (0);
 	return (1);
 }
@@ -98,6 +117,24 @@ null_class_parser(const char *ifname, const char *class_name,
 	return (0);
 }
 
+/*
+ * qcmd api
+ */
+int
+qcmd_nop_add_if(const char *ifname)
+{
+	int error;
+	
+	error = qop_add_if(NULL, ifname, 0, &nop_qdisc, NULL);
+	if (error != 0)
+		LOG(LOG_ERR, errno, "%s: can't add nop on interface '%s'\n",
+		    qoperror(error), ifname);
+	return (error);
+}
+
+/*
+ * qop api
+ */
 static int nop_attach(struct ifinfo *ifinfo)
 {
 	return (0);
@@ -119,16 +156,6 @@ static int nop_enable(struct ifinfo *ifinfo)
 }
 
 static int nop_disable(struct ifinfo *ifinfo)
-{
-	return (0);
-}
-
-static int nop_acc_enable(struct ifinfo *ifinfo)
-{
-	return (0);
-}
-
-static int nop_acc_disable(struct ifinfo *ifinfo)
 {
 	return (0);
 }

@@ -1,5 +1,6 @@
+/*	$KAME: qop_blue.c,v 1.3 2000/10/18 09:15:18 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: qop_blue.c,v 1.2 2000/07/28 09:56:22 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -54,8 +53,6 @@ static int blue_attach(struct ifinfo *ifinfo);
 static int blue_detach(struct ifinfo *ifinfo);
 static int blue_enable(struct ifinfo *ifinfo);
 static int blue_disable(struct ifinfo *ifinfo);
-static int blue_acc_enable(struct ifinfo *ifinfo);
-static int blue_acc_disable(struct ifinfo *ifinfo);
 
 #define BLUE_DEVICE	"/dev/altq/blue"
 
@@ -70,8 +67,6 @@ static struct qdisc_ops blue_qdisc = {
 	NULL,			/* clear */
 	blue_enable,
 	blue_disable,
-	blue_acc_enable,
-	blue_acc_disable,
 	NULL,			/* add class */
 	NULL,			/* modify class */
 	NULL,			/* delete class */
@@ -87,7 +82,7 @@ static struct qdisc_ops blue_qdisc = {
 int
 blue_interface_parser(const char *ifname, int argc, char **argv)
 {
-	u_int  	bandwidth = 10000000;	/* 10Mbps */
+	u_int  	bandwidth = 100000000;	/* 100Mbps */
 	u_int	tbrsize = 0;
 	int	max_pmark = 4000;
 	int	hold_time = 1000;
@@ -280,31 +275,3 @@ blue_disable(struct ifinfo *ifinfo)
 		return (QOPERR_SYSCALL);
 	return (0);
 }
-
-static int
-blue_acc_enable(struct ifinfo *ifinfo)
-{
-	struct blue_interface iface;
-
-	memset(&iface, 0, sizeof(iface));
-	strncpy(iface.blue_ifname, ifinfo->ifname, IFNAMSIZ);
-
-	if (ioctl(blue_fd, BLUE_ACC_ENABLE, &iface) < 0)
-		return (QOPERR_SYSCALL);
-	return (0);
-}
-
-static int
-blue_acc_disable(struct ifinfo *ifinfo)
-{
-	struct blue_interface iface;
-
-	memset(&iface, 0, sizeof(iface));
-	strncpy(iface.blue_ifname, ifinfo->ifname, IFNAMSIZ);
-
-	if (ioctl(blue_fd, BLUE_ACC_DISABLE, &iface) < 0)
-		return (QOPERR_SYSCALL);
-	return (0);
-}
-
-

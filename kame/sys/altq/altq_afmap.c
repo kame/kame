@@ -1,4 +1,4 @@
-/*	$KAME: altq_afmap.c,v 1.5 2000/07/25 10:12:29 kjc Exp $	*/
+/*	$KAME: altq_afmap.c,v 1.6 2000/10/18 09:15:22 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_afmap.c,v 1.5 2000/07/25 10:12:29 kjc Exp $
+ * $Id: altq_afmap.c,v 1.6 2000/10/18 09:15:22 kjc Exp $
  */
 
 /*
@@ -44,7 +44,7 @@
 #endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
-#ifdef AFMAP
+#ifdef ALTQ_AFMAP
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -410,4 +410,4 @@ afmioctl(dev, cmd, addr, flag, p)
 	return error;
 }
 
-#endif /* AFMAP */
+#endif /* ALTQ_AFMAP */

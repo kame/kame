@@ -1,4 +1,4 @@
-/*	$KAME: altq_rmclass.c,v 1.6 2000/07/25 10:12:31 kjc Exp $	*/
+/*	$KAME: altq_rmclass.c,v 1.7 2000/10/18 09:15:23 kjc Exp $	*/
 
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
@@ -35,7 +35,7 @@
  * LBL code modified by speer@eng.sun.com, May 1977.
  * For questions and/or comments, please send mail to cbq@ee.lbl.gov
  *
- * $Id: altq_rmclass.c,v 1.6 2000/07/25 10:12:31 kjc Exp $
+ * $Id: altq_rmclass.c,v 1.7 2000/10/18 09:15:23 kjc Exp $
  */
 
 #ident "@(#)rm_class.c  1.48     97/12/05 SMI"
@@ -49,7 +49,7 @@
 #endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
-#ifdef CBQ	/* cbq is enabled by CBQ option in opt_altq.h */
+#ifdef ALTQ_CBQ	/* cbq is enabled by ALTQ_CBQ option in opt_altq.h */
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -211,13 +211,13 @@ rmc_newclass(pri, ifd, nsecPerByte, action, maxq, parent, borrow,
 
 	if (pri >= RM_MAXPRIO)
 		return (NULL);
-#ifndef CBQ_RED
+#ifndef ALTQ_RED
 	if (flags & RMCF_RED) {
 		printf("rmc_newclass: RED not configured for CBQ!\n");
 		return (NULL);
 	}
 #endif
-#ifndef CBQ_RIO
+#ifndef ALTQ_RIO
 	if (flags & RMCF_RIO) {
 		printf("rmc_newclass: RIO not configured for CBQ!\n");
 		return (NULL);
@@ -278,7 +278,7 @@ rmc_newclass(pri, ifd, nsecPerByte, action, maxq, parent, borrow,
 #endif
 	cl->overlimit = action;
 
-#ifdef CBQ_RED
+#ifdef ALTQ_RED
 	if (flags & (RMCF_RED|RMCF_RIO)) {
 		int red_flags, red_pkttime;
 
@@ -287,7 +287,7 @@ rmc_newclass(pri, ifd, nsecPerByte, action, maxq, parent, borrow,
 			red_flags |= REDF_ECN;
 		if (flags & RMCF_FLOWVALVE)
 			red_flags |= REDF_FLOWVALVE;
-#ifdef CBQ_RIO
+#ifdef ALTQ_RIO
 		if (flags & RMCF_CLEARDSCP)
 			red_flags |= RIOF_CLEARDSCP;
 #endif
@@ -299,7 +299,7 @@ rmc_newclass(pri, ifd, nsecPerByte, action, maxq, parent, borrow,
 			if (cl->red_ != NULL)
 				qtype(cl->q_) = Q_RED;
 		}
-#ifdef CBQ_RIO
+#ifdef ALTQ_RIO
 		else {
 			cl->red_ = (red_t *)rio_alloc(0, NULL,
 						      red_flags, red_pkttime);
@@ -308,7 +308,7 @@ rmc_newclass(pri, ifd, nsecPerByte, action, maxq, parent, borrow,
 		}
 #endif
 	}
-#endif /* CBQ_RED */
+#endif /* ALTQ_RED */
 
 	/*
 	 * put the class into the class tree
@@ -320,8 +320,7 @@ rmc_newclass(pri, ifd, nsecPerByte, action, maxq, parent, borrow,
 		while (peer->peer_ != ifd->active_[pri])
 			peer = peer->peer_;
 		peer->peer_ = cl;
-	}
-	else {
+	} else {
 		ifd->active_[pri] = cl;
 		cl->peer_ = cl;
 	}
@@ -509,8 +508,7 @@ rmc_depth_recompute(rm_class_t *cl)
 	while (p != NULL) {
 		if ((t = p->children_) == NULL) {
 			p->depth_ = 0;
-		}
-		else {
+		} else {
 			int cdepth = 0;
 
 			while (t != NULL) {
@@ -646,16 +644,16 @@ rmc_delete_class(ifd, cl)
 	/*
 	 * Free the class structure.
 	 */
-#ifdef CBQ_RED
 	if (cl->red_ != NULL) {
-		if (q_is_red(cl->q_))
-			red_destroy(cl->red_);
-#ifdef CBQ_RIO
-		else if (q_is_rio(cl->q_))
+#ifdef ALTQ_RIO
+		if (q_is_rio(cl->q_))
 			rio_destroy((rio_t *)cl->red_);
 #endif
-	}
+#ifdef ALTQ_RED
+		if (q_is_red(cl->q_))
+			red_destroy(cl->red_);
 #endif
+	}
 	FREE(cl->q_, M_DEVBUF);
 	FREE(cl, M_DEVBUF);
 }
@@ -1123,8 +1121,7 @@ _rmc_wrr_dequeue_next(ifd, op)
 		ifd->now_[ifd->qi_] = now;
 		ifd->qi_ = (ifd->qi_ + 1) % ifd->maxqueued_;
 		ifd->queued_++;
-	}
-	else {
+	} else {
 		/* mode == ALTDQ_PPOLL */
 		m = _rmc_pollq(cl);
 		ifd->pollcache_ = cl;
@@ -1159,8 +1156,7 @@ _rmc_prr_dequeue_next(ifd, op)
 		cpri = cl->pri_;
 		ifd->pollcache_ = NULL;
 		goto _prr_out;
-	}
-	else {
+	} else {
 		/* mode == ALTDQ_POLL || pollcache == NULL */
 		ifd->pollcache_ = NULL;
 		ifd->borrowed_[ifd->qi_] = NULL;
@@ -1233,8 +1229,7 @@ _rmc_prr_dequeue_next(ifd, op)
 		ifd->now_[ifd->qi_] = now;
 		ifd->qi_ = (ifd->qi_ + 1) % ifd->maxqueued_;
 		ifd->queued_++;
-	}
-	else {
+	} else {
 		/* mode == ALTDQ_POLL */
 		m = _rmc_pollq(cl);
 		ifd->pollcache_ = cl;
@@ -1302,13 +1297,11 @@ rmc_update_class_util(ifd)
 	borrowed = ifd->borrowed_[ifd->qo_];
 	borrows = borrowed;
 
-	++cl->stats_.npackets;
-	cl->stats_.nbytes += pktlen;
+	PKTCNTR_ADD(&cl->stats_.xmit_cnt, pktlen);
 
 	/*
 	 * Run estimator on class and it's ancesstors.
 	 */
-
 	/*
 	 * rm_update_class_util is designed to be called when the
 	 * transfer is completed from a xmit complete interrupt,
@@ -1337,19 +1330,16 @@ rmc_update_class_util(ifd)
 		TV_DELTA(&ifd->ifnow_, nowp, iftime);
 		if (iftime+pkt_time < ifd->maxiftime_) {
 			TV_ADD_DELTA(&ifd->ifnow_, pkt_time, &ifd->ifnow_);
-		}
-		else {
+		} else {
 			TV_ADD_DELTA(nowp, ifd->maxiftime_, &ifd->ifnow_);
 		}
-	}
-	else {
+	} else {
 		TV_ADD_DELTA(nowp, pkt_time, &ifd->ifnow_);
 	}
 #else
 	if (TV_LT(nowp, &ifd->ifnow_)) {
 		TV_ADD_DELTA(&ifd->ifnow_, pkt_time, &ifd->ifnow_);
-	}
-	else {
+	} else {
 		TV_ADD_DELTA(nowp, pkt_time, &ifd->ifnow_);
 	}
 #endif
@@ -1415,8 +1405,7 @@ rmc_update_class_util(ifd)
 #if 1
 		if (cl->parent_ == NULL) {
 			/* take stats of root class */
-			++cl->stats_.npackets;
-			cl->stats_.nbytes += pktlen;
+			PKTCNTR_ADD(&cl->stats_.xmit_cnt, pktlen);
 		}
 #endif
 
@@ -1432,8 +1421,7 @@ rmc_update_class_util(ifd)
 		if ((qlen(cl->q_) <= 0) || TV_LT(nowp, &borrowed->undertime_)) {
 			rmc_tl_satisfied(ifd, nowp);
 			CBQTRACE(rmc_update_class_util, 'broe', ifd->cutoff_);
-		}
-		else { 
+		} else { 
 			ifd->cutoff_ = borrowed->depth_;
 			CBQTRACE(rmc_update_class_util, 'ffob', borrowed->depth_);
 		}
@@ -1444,8 +1432,7 @@ rmc_update_class_util(ifd)
 			rmc_tl_satisfied(ifd, &now);
 #endif
 			CBQTRACE(rmc_update_class_util, 'broe', ifd->cutoff_);
-		}
-		else { 
+		} else { 
 			ifd->cutoff_ = borrowed->depth_;
 			CBQTRACE(rmc_update_class_util, 'ffob', borrowed->depth_);
 		}
@@ -1579,8 +1566,7 @@ rmc_delay_action(cl, borrow)
 			/* other BSDs round down the tick */
 			t = hzto(&cl->undertime_) + 1;
 #endif
-		}
-		else
+		} else
 			t = 2;
 		TIMEOUT((timeout_t *)rmc_restart, (caddr_t)cl, t,
 			cl->callout_handle);
@@ -1650,28 +1636,17 @@ _rmc_addq(cl, m)
 	rm_class_t *cl;
 	mbuf_t *m;
 {
-#ifdef CBQ_RED
-	if (q_is_red_or_rio(cl->q_)) {
-		int rval = 0, len = m_pktlen(m);
-		
-		if (q_is_red(cl->q_)) 
-			rval = red_addq(cl->red_, cl->q_, m, cl->pktattr_);
-#ifdef CBQ_RIO
-		else
-			rval = rio_addq((rio_t *)cl->red_, cl->q_, m,
-					cl->pktattr_);
+#ifdef ALTQ_RIO
+	if (q_is_rio(cl->q_)) 
+		return rio_addq((rio_t *)cl->red_, cl->q_, m, cl->pktattr_);
 #endif
-		if (rval < 0) {
-			++cl->stats_.drops;
-			cl->stats_.drop_bytes += len;
-			return (-1);
-		}
-		return (0);
-	}
-#endif /* CBQ_RED */
+#ifdef ALTQ_RED
+	if (q_is_red(cl->q_)) 
+		return red_addq(cl->red_, cl->q_, m, cl->pktattr_);
+#endif /* ALTQ_RED */
 
 	if (cl->flags_ & RMCF_CLEARDSCP)
-		write_dsfield(cl->pktattr_, 0);
+		write_dsfield(m, cl->pktattr_, 0);
 
 	_addq(cl->q_, m);
 	return (0);
@@ -1684,27 +1659,23 @@ _rmc_dropq(cl)
 {
 	mbuf_t  *m;
 
-	if ((m = _getq(cl->q_)) != NULL) {
-		++cl->stats_.drops;
-		cl->stats_.drop_bytes += m_pktlen(m);
+	if ((m = _getq(cl->q_)) != NULL)
 		m_freem(m);
-	}
 }
 
 static mbuf_t *
 _rmc_getq(cl)
 	rm_class_t *cl;
 {
-#ifdef CBQ_RED
-	if (q_is_red(cl->q_))
-		return red_getq(cl->red_, cl->q_);
-#ifdef CBQ_RIO
-	else if (q_is_rio(cl->q_))
+#ifdef ALTQ_RIO
+	if (q_is_rio(cl->q_))
 		return rio_getq((rio_t *)cl->red_, cl->q_);
 #endif
-	else
+#ifdef ALTQ_RED
+	if (q_is_red(cl->q_))
+		return red_getq(cl->red_, cl->q_);
 #endif
-		return _getq(cl->q_);
+	return _getq(cl->q_);
 }
 
 static mbuf_t *
@@ -1776,9 +1747,9 @@ void cbqtrace_dump(counter)
 }
 #endif /* CBQ_TRACE */
 
-#endif /* CBQ */
+#endif /* ALTQ_CBQ */
 
-#if defined(CBQ) || defined(RED) || defined(RIO)
+#if defined(ALTQ_CBQ) || defined(ALTQ_RED) || defined(ALTQ_RIO) || defined(ALTQ_HFSC) || defined(ALTQ_PRIQ)
 #if !defined(__GNUC__) || defined(ALTQ_DEBUG)
 
 void 
@@ -1832,8 +1803,7 @@ _getq_tail(q)
 	if (prev == m)  {
 		ASSERT(qlen(q) == 1);
 		qtail(q) = NULL;
-	}
-	else
+	} else
 		qtail(q) = prev;
 	qlen(q)--;
 	return (m);
@@ -1852,8 +1822,7 @@ _getq_random(q)
 	if (m->m_nextpkt == m) {
 		ASSERT(qlen(q) == 1);
 		qtail(q) = NULL;
-	}
-	else {
+	} else {
 		struct mbuf *prev = NULL;
 		
 		n = random() % qlen(q) + 1;
@@ -1901,4 +1870,4 @@ _flushq(q)
 }
 
 #endif /* !__GNUC__ || ALTQ_DEBUG */
-#endif /* CBQ || RED || RIO */
+#endif /* ALTQ_CBQ || ALTQ_RED || ALTQ_RIO || ALTQ_HFSC || ALTQ_PRIQ */

@@ -1,4 +1,4 @@
-/*	$KAME: altq_afmap.h,v 1.3 2000/07/25 10:12:29 kjc Exp $	*/
+/*	$KAME: altq_afmap.h,v 1.4 2000/10/18 09:15:22 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_afmap.h,v 1.3 2000/07/25 10:12:29 kjc Exp $
+ * $Id: altq_afmap.h,v 1.4 2000/10/18 09:15:22 kjc Exp $
  */
 
 #ifndef _ALTQ_ALTQ_AFMAP_H_
@@ -56,10 +56,10 @@ struct atm_flowmap {
 };
 
 /* set or get flowmap */
-#define	AFM_ADDFMAP	_IOWR('F', 1, struct atm_flowmap)
-#define	AFM_DELFMAP	_IOWR('F', 2, struct atm_flowmap)
-#define	AFM_CLEANFMAP	_IOWR('F', 3, struct atm_flowmap)
-#define	AFM_GETFMAP	_IOWR('F', 4, struct atm_flowmap)
+#define	AFM_ADDFMAP	_IOWR('F', 30, struct atm_flowmap)
+#define	AFM_DELFMAP	_IOWR('F', 31, struct atm_flowmap)
+#define	AFM_CLEANFMAP	_IOWR('F', 32, struct atm_flowmap)
+#define	AFM_GETFMAP	_IOWR('F', 33, struct atm_flowmap)
 
 #ifdef _KERNEL
 

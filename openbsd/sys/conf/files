@@ -245,6 +245,7 @@ file altq/altq_conf.c			altq
 file altq/altq_fifoq.c			altq
 file altq/altq_hfsc.c			altq
 file altq/altq_localq.c			altq
+file altq/altq_priq.c			altq
 file altq/altq_red.c			altq
 file altq/altq_rio.c			altq
 file altq/altq_rmclass.c		altq

@@ -1,4 +1,4 @@
-/*	$KAME: altq_var.h,v 1.3 2000/07/25 10:12:31 kjc Exp $	*/
+/*	$KAME: altq_var.h,v 1.4 2000/10/18 09:15:24 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_var.h,v 1.3 2000/07/25 10:12:31 kjc Exp $
+ * $Id: altq_var.h,v 1.4 2000/10/18 09:15:24 kjc Exp $
  */
 #ifndef _ALTQ_ALTQ_VAR_H_
 #define	_ALTQ_ALTQ_VAR_H_
@@ -204,8 +204,8 @@ int acc_add_filter __P((struct acc_classifier *, struct flow_filter *,
 int acc_delete_filter __P((struct acc_classifier *, u_long));
 int acc_discard_filters __P((struct acc_classifier *, void *, int));
 void *acc_classify __P((void *, struct mbuf *, int));
-u_int8_t read_dsfield __P((struct altq_pktattr *));
-void write_dsfield __P((struct altq_pktattr *, u_int8_t));
+u_int8_t read_dsfield __P((struct mbuf *, struct altq_pktattr *));
+void write_dsfield __P((struct mbuf *, struct altq_pktattr *, u_int8_t));
 void altq_assert __P((const char *, int, const char *));
 int tbr_set __P((struct ifaltq *, struct tb_profile *));
 int tbr_get __P((struct ifaltq *, struct tb_profile *));

@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.c,v 1.6 2000/07/25 10:12:30 kjc Exp $	*/
+/*	$KAME: altq_hfsc.c,v 1.7 2000/10/18 09:15:23 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -32,7 +32,7 @@
  * and to grant Carnegie Mellon the rights to redistribute these
  * changes without encumbrance.
  *
- * $Id: altq_hfsc.c,v 1.6 2000/07/25 10:12:30 kjc Exp $
+ * $Id: altq_hfsc.c,v 1.7 2000/10/18 09:15:23 kjc Exp $
  */
 /*
  * H-FSC is described in Proceedings of SIGCOMM'97,
@@ -51,7 +51,7 @@
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
 
-#ifdef HFSC	/* hfsc is enabled by HFSC option in opt_altq.h */
+#ifdef ALTQ_HFSC  /* hfsc is enabled by ALTQ_HFSC option in opt_altq.h */
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -293,7 +293,7 @@ hfsc_class_create(hif, sc, parent, qlimit, flags)
 	struct hfsc_class *cl, *p;
 	int s;
 
-#ifndef HFSC_RED
+#ifndef ALTQ_RED
 	if (flags & HFCF_RED) {
 		printf("hfsc_class_create: RED not configured for HFSC!\n");
 		return (NULL);
@@ -322,14 +322,14 @@ hfsc_class_create(hif, sc, parent, qlimit, flags)
 	qtype(cl->cl_q) = Q_DROPTAIL;
 	qlen(cl->cl_q) = 0;
 	cl->cl_flags = flags;
-#ifdef HFSC_RED
+#ifdef ALTQ_RED
 	if (flags & (HFCF_RED|HFCF_RIO)) {
 		int red_flags, red_pkttime;
 
 		red_flags = 0;
 		if (flags & HFCF_ECN)
 			red_flags |= REDF_ECN;
-#ifdef HFSC_RIO
+#ifdef ALTQ_RIO
 		if (flags & HFCF_CLEARDSCP)
 			red_flags |= RIOF_CLEARDSCP;
 #endif
@@ -344,7 +344,7 @@ hfsc_class_create(hif, sc, parent, qlimit, flags)
 			if (cl->cl_red != NULL)
 				qtype(cl->cl_q) = Q_RED;
 		}
-#ifdef HFSC_RIO
+#ifdef ALTQ_RIO
 		else {
 			cl->cl_red = (red_t *)rio_alloc(0, NULL,
 						      red_flags, red_pkttime);
@@ -353,7 +353,7 @@ hfsc_class_create(hif, sc, parent, qlimit, flags)
 		}
 #endif
 	}
-#endif /* HFSC_RED */
+#endif /* ALTQ_RED */
 
 	if (sc != NULL && (sc->m1 != 0 || sc->m2 != 0)) {
 		MALLOC(cl->cl_rsc, struct internal_sc *,
@@ -402,16 +402,16 @@ hfsc_class_create(hif, sc, parent, qlimit, flags)
  err_ret:
 	if (cl->cl_actc != NULL)
 		actlist_destroy(cl->cl_actc);
-#ifdef HFSC_RED
 	if (cl->cl_red != NULL) {
-		if (q_is_red(cl->cl_q))
-			red_destroy(cl->cl_red);
-#ifdef HFSC_RIO
-		else if (q_is_rio(cl->cl_q))
+#ifdef ALTQ_RIO
+		if (q_is_rio(cl->cl_q))
 			rio_destroy((rio_t *)cl->cl_red);
 #endif
-	}
+#ifdef ALTQ_RED
+		if (q_is_red(cl->cl_q))
+			red_destroy(cl->cl_red);
 #endif
+	}
 	if (cl->cl_fsc != NULL)
 		FREE(cl->cl_fsc, M_DEVBUF);
 	if (cl->cl_rsc != NULL)
@@ -441,8 +441,7 @@ hfsc_class_destroy(cl)
 
 	if (cl->cl_parent == NULL) {
 		/* this is root class */
-	}
-	else {
+	} else {
 		struct hfsc_class *p = cl->cl_parent->cl_children;
 
 		if (p == cl)
@@ -459,16 +458,17 @@ hfsc_class_destroy(cl)
 	splx(s);
 
 	actlist_destroy(cl->cl_actc);
-#ifdef HFSC_RED
+
 	if (cl->cl_red != NULL) {
-		if (q_is_red(cl->cl_q))
-			red_destroy(cl->cl_red);
-#ifdef HFSC_RIO
-		else if (q_is_rio(cl->cl_q))
+#ifdef ALTQ_RIO
+		if (q_is_rio(cl->cl_q))
 			rio_destroy((rio_t *)cl->cl_red);
 #endif
-	}
+#ifdef ALTQ_RED
+		if (q_is_red(cl->cl_q))
+			red_destroy(cl->cl_red);
 #endif
+	}
 	if (cl->cl_fsc != NULL)
 		FREE(cl->cl_fsc, M_DEVBUF);
 	if (cl->cl_rsc != NULL)
@@ -497,8 +497,7 @@ hfsc_class_modify(cl, rsc, fsc)
 				FREE(cl->cl_rsc, M_DEVBUF);
 				cl->cl_rsc = NULL;
 			}
-		}
-		else {
+		} else {
 			if (cl->cl_rsc == NULL) {
 				MALLOC(tmp, struct internal_sc *,
 				       sizeof(struct internal_sc),
@@ -522,8 +521,7 @@ hfsc_class_modify(cl, rsc, fsc)
 				FREE(cl->cl_fsc, M_DEVBUF);
 				cl->cl_fsc = NULL;
 			}
-		}
-		else {
+		} else {
 			if (cl->cl_fsc == NULL) {
 				MALLOC(tmp, struct internal_sc *,
 				       sizeof(struct internal_sc),
@@ -581,17 +579,21 @@ hfsc_enqueue(ifq, m, pktattr)
 {
 	struct hfsc_if	*hif = (struct hfsc_if *)ifq->altq_disc;
 	struct hfsc_class *cl;
+	int len;
 
 	/* grab class set by classifier */
 	if (pktattr == NULL || (cl = pktattr->pattr_class) == NULL)
 		cl = hif->hif_defaultclass;
 	cl->cl_pktattr = pktattr;  /* save proto hdr used by ECN */
 
+	len = m_pktlen(m);
 	if (hfsc_addq(cl, m) != 0) {
 		/* drop occurred.  mbuf was freed in hfsc_addq. */
+		PKTCNTR_ADD(&cl->cl_stats.drop_cnt, len);
 		return (ENOBUFS);
 	}
-	ifq->ifq_len++;
+	IFQ_INC_LEN(ifq);
+	cl->cl_hif->hif_packets++;
 
 	/* successfully queued. */
 	if (qlen(cl->cl_q) == 1)
@@ -667,6 +669,9 @@ hfsc_dequeue(ifq, op)
 
 	m = hfsc_getq(cl);
 	len = m_pktlen(m);
+	cl->cl_hif->hif_packets--;
+	IFQ_DEC_LEN(ifq);
+	PKTCNTR_ADD(&cl->cl_stats.xmit_cnt, len);
 
 	update_v(cl, len);
 	if (realtime)
@@ -691,7 +696,6 @@ hfsc_dequeue(ifq, op)
 	/* put the logging_hook here */
 #endif
 
-	ifq->ifq_len--;
 	return (m);
 }
 
@@ -701,37 +705,24 @@ hfsc_addq(cl, m)
 	struct mbuf *m;
 {
 
-#ifdef HFSC_RED
-	if (q_is_red_or_rio(cl->cl_q)) {
-		int rval = 0;
-		
-		if (q_is_red(cl->cl_q))
-			rval = red_addq(cl->cl_red, cl->cl_q, m,
-					cl->cl_pktattr);
-#ifdef HFSC_RIO
-		else
-			rval = rio_addq((rio_t *)cl->cl_red, cl->cl_q,
-					m, cl->cl_pktattr);
+#ifdef ALTQ_RIO
+	if (q_is_rio(cl->cl_q))
+		return rio_addq((rio_t *)cl->cl_red, cl->cl_q,
+				m, cl->cl_pktattr);
 #endif
-		if (rval < 0) {
-			cl->cl_stats.drops++;
-			return (-1);
-		}
-		cl->cl_hif->hif_packets++;
-		return (0);
-	}
+#ifdef ALTQ_RED
+	if (q_is_red(cl->cl_q))
+		return red_addq(cl->cl_red, cl->cl_q, m, cl->cl_pktattr);
 #endif
 	if (qlen(cl->cl_q) >= qlimit(cl->cl_q)) {
 		m_freem(m);
-		cl->cl_stats.drops++;
 		return (-1);
 	}
 
 	if (cl->cl_flags & HFCF_CLEARDSCP)
-		write_dsfield(cl->cl_pktattr, 0);
+		write_dsfield(m, cl->cl_pktattr, 0);
 
 	_addq(cl->cl_q, m);
-	cl->cl_hif->hif_packets++;
 
 	return (0);
 }
@@ -740,23 +731,15 @@ static struct mbuf *
 hfsc_getq(cl)
 	struct hfsc_class *cl;
 {
-	struct mbuf *m;
-
-#ifdef HFSC_RED
+#ifdef ALTQ_RIO
+	if (q_is_rio(cl->cl_q))
+		return rio_getq((rio_t *)cl->cl_red, cl->cl_q);
+#endif
+#ifdef ALTQ_RED
 	if (q_is_red(cl->cl_q))
-		m = red_getq(cl->cl_red, cl->cl_q);
-#ifdef HFSC_RIO
-	else if (q_is_rio(cl->cl_q))
-		m = rio_getq((rio_t *)cl->cl_red, cl->cl_q);
+		return red_getq(cl->cl_red, cl->cl_q);
 #endif
-	else
-#endif
-		m = _getq(cl->cl_q);
-	if (m != NULL) {
-		cl->cl_hif->hif_packets--;
-		cl->cl_stats.npackets++;
-	}
-	return (m);
+	return _getq(cl->cl_q);
 }
 
 static struct mbuf *
@@ -776,8 +759,8 @@ hfsc_purgeq(cl)
 		return;
 
 	while ((m = _getq(cl->cl_q)) != NULL) {
+		PKTCNTR_ADD(&cl->cl_stats.drop_cnt, m_pktlen(m));
 		m_freem(m);
-		cl->cl_stats.drops++;
 	}
 	ASSERT(qlen(cl->cl_q) == 0);
 	
@@ -809,8 +792,7 @@ set_passive(cl)
 			if (--cl->cl_nactive == 0) {
 				/* remove this class from the vt list */
 				actlist_remove(cl);
-			}
-			else
+			} else
 				/* still has active children */
 				break;
 
@@ -1771,20 +1753,19 @@ static void get_class_stats(sp, cl)
 	sp->vt = cl->cl_vt;
 
 	sp->qlength = qlen(cl->cl_q);
-	sp->npackets = cl->cl_stats.npackets;
-	sp->drops = cl->cl_stats.drops;
+	sp->xmit_cnt = cl->cl_stats.xmit_cnt;
+	sp->drop_cnt = cl->cl_stats.drop_cnt;
 	sp->period = cl->cl_stats.period;
 
 	sp->qtype = qtype(cl->cl_q);
-#ifdef HFSC_RED
+#ifdef ALTQ_RED
 	if (q_is_red(cl->cl_q))
 		red_getstats(cl->cl_red, &sp->red[0]);
 #endif
-#ifdef HFSC_RIO
+#ifdef ALTQ_RIO
 	if (q_is_rio(cl->cl_q))
 		rio_getstats((rio_t *)cl->cl_red, &sp->red[0]);
 #endif
-
 }
 
 /* convert a class handle to the corresponding class pointer */
@@ -1828,4 +1809,4 @@ ALTQ_MODULE(altq_hfsc, ALTQT_HFSC, &hfsc_sw);
 
 #endif /* KLD_MODULE */
 
-#endif /* HFSC */
+#endif /* ALTQ_HFSC */

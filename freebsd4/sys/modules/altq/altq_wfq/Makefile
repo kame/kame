@@ -10,7 +10,7 @@ ALTQMOD_INET?=	1
 ALTQMOD_INET6?=	1
 
 opt_altq.h:
-	echo "#define WFQ 1" > opt_altq.h
+	echo "#define ALTQ_WFQ 1" > opt_altq.h
 
 opt_inet.h:
 	touch opt_inet.h

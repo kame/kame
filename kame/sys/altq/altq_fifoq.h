@@ -1,4 +1,4 @@
-/*	$KAME: altq_fifoq.h,v 1.4 2000/07/28 09:20:54 kjc Exp $	*/
+/*	$KAME: altq_fifoq.h,v 1.5 2000/10/18 09:15:23 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_fifoq.h,v 1.4 2000/07/28 09:20:54 kjc Exp $
+ * $Id: altq_fifoq.h,v 1.5 2000/10/18 09:15:23 kjc Exp $
  */
 
 #ifndef _ALTQ_ALTQ_FIFOQ_H_
@@ -42,10 +42,8 @@ typedef struct fifoq_state {
 
 	/* statistics */
 	struct {
-		u_int		xmit_packets;
-		u_int		drop_packets;
-		u_quad_t	xmit_bytes;
-		u_quad_t	drop_bytes;
+		struct pktcntr	xmit_cnt;
+		struct pktcntr	drop_cnt;
 		u_int		period;
 	} q_stats;
 } fifoq_state_t;
@@ -56,12 +54,10 @@ struct fifoq_interface {
 
 struct fifoq_getstats {
 	struct fifoq_interface iface;
-	int q_len;
-	int q_limit;
-	u_int		xmit_packets;
-	u_int		drop_packets;
-	u_quad_t	xmit_bytes;
-	u_quad_t	drop_bytes;
+	int		q_len;
+	int		q_limit;
+	struct pktcntr	xmit_cnt;
+	struct pktcntr	drop_cnt;
 	u_int		period;
 };
 
@@ -75,13 +71,11 @@ struct fifoq_conf {
 /* 
  * IOCTLs for FIFOQ
  */
-#define	FIFOQ_ENABLE		_IOW('Q', 1, struct fifoq_interface)
-#define	FIFOQ_DISABLE		_IOW('Q', 2, struct fifoq_interface)
-#define	FIFOQ_IF_ATTACH		_IOW('Q', 3, struct fifoq_interface)
-#define	FIFOQ_IF_DETACH		_IOW('Q', 4, struct fifoq_interface)
-#define	FIFOQ_ACC_ENABLE	_IOW('Q', 5, struct fifoq_interface)
-#define	FIFOQ_ACC_DISABLE	_IOW('Q', 6, struct fifoq_interface)
-#define	FIFOQ_GETSTATS		_IOWR('Q', 7, struct fifoq_getstats)
-#define	FIFOQ_CONFIG		_IOWR('Q', 8, struct fifoq_conf)
+#define	FIFOQ_IF_ATTACH		_IOW('Q', 1, struct fifoq_interface)
+#define	FIFOQ_IF_DETACH		_IOW('Q', 2, struct fifoq_interface)
+#define	FIFOQ_ENABLE		_IOW('Q', 3, struct fifoq_interface)
+#define	FIFOQ_DISABLE		_IOW('Q', 4, struct fifoq_interface)
+#define	FIFOQ_CONFIG		_IOWR('Q', 6, struct fifoq_conf)
+#define	FIFOQ_GETSTATS		_IOWR('Q', 12, struct fifoq_getstats)
 
 #endif /* _ALTQ_ALTQ_FIFOQ_H_ */

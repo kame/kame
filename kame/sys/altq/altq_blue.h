@@ -1,4 +1,4 @@
-/*	$KAME: altq_blue.h,v 1.3 2000/07/25 10:12:29 kjc Exp $	*/
+/*	$KAME: altq_blue.h,v 1.4 2000/10/18 09:15:22 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_blue.h,v 1.3 2000/07/25 10:12:29 kjc Exp $
+ * $Id: altq_blue.h,v 1.4 2000/10/18 09:15:22 kjc Exp $
  */
 
 #ifndef _ALTQ_ALTQ_BLUE_H_
@@ -42,13 +42,13 @@ struct blue_stats {
 	int q_len;
 	int q_limit;
 	int q_pmark;
-	quad_t xmit_packets;
-	quad_t xmit_bytes;
-	quad_t drop_packets;
-	quad_t drop_bytes;
-	quad_t drop_forced;
-	quad_t drop_unforced;
-	quad_t marked_packets;
+	u_quad_t xmit_packets;
+	u_quad_t xmit_bytes;
+	u_quad_t drop_packets;
+	u_quad_t drop_bytes;
+	u_quad_t drop_forced;
+	u_quad_t drop_unforced;
+	u_quad_t marked_packets;
 };
 
 struct blue_conf {
@@ -68,14 +68,12 @@ struct blue_conf {
 /* 
  * IOCTLs for BLUE
  */
-#define	BLUE_ENABLE		_IOW('Q', 1, struct blue_interface)
-#define	BLUE_DISABLE		_IOW('Q', 2, struct blue_interface)
-#define	BLUE_IF_ATTACH		_IOW('Q', 3, struct blue_interface)
-#define	BLUE_IF_DETACH		_IOW('Q', 4, struct blue_interface)
-#define	BLUE_ACC_ENABLE		_IOW('Q', 5, struct blue_interface)
-#define	BLUE_ACC_DISABLE	_IOW('Q', 6, struct blue_interface)
-#define	BLUE_GETSTATS		_IOWR('Q', 7, struct blue_stats)
-#define	BLUE_CONFIG		_IOWR('Q', 8, struct blue_conf)
+#define	BLUE_IF_ATTACH		_IOW('Q', 1, struct blue_interface)
+#define	BLUE_IF_DETACH		_IOW('Q', 2, struct blue_interface)
+#define	BLUE_ENABLE		_IOW('Q', 3, struct blue_interface)
+#define	BLUE_DISABLE		_IOW('Q', 4, struct blue_interface)
+#define	BLUE_CONFIG		_IOWR('Q', 6, struct blue_conf)
+#define	BLUE_GETSTATS		_IOWR('Q', 12, struct blue_stats)
 
 #ifdef _KERNEL
 
@@ -93,13 +91,13 @@ typedef struct blue {
 	struct timeval blue_last;  /* timestamp when the queue becomes idle */
 
 	struct {
-		quad_t xmit_packets;
-		quad_t xmit_bytes;
-		quad_t drop_packets;
-		quad_t drop_bytes;
-		quad_t drop_forced;
-		quad_t drop_unforced;
-		quad_t marked_packets;
+		u_quad_t xmit_packets;
+		u_quad_t xmit_bytes;
+		u_quad_t drop_packets;
+		u_quad_t drop_bytes;
+		u_quad_t drop_forced;
+		u_quad_t drop_unforced;
+		u_quad_t marked_packets;
 	} blue_stats;
 } blue_t;
 

@@ -1,5 +1,6 @@
+/*	$KAME: qdisc_wfq.c,v 1.2 2000/10/18 09:15:17 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: qdisc_wfq.c,v 1.1 2000/01/18 07:29:02 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -52,7 +51,7 @@ struct wfqinfo {
 	int qid;
 	queue_stats stats;
 	u_quad_t last_bytes;
-	double mbps;
+	double bps;
 };
 
 #define NTOP		10
@@ -63,13 +62,12 @@ wfq_stat_loop(int fd, const char *ifname, int count, int interval)
 {
 	struct wfq_getstats wfq_stats;
 	struct timeval cur_time, last_time;
-	u_quad_t xmit_bytes, last_bytes;
-	int msec, i, j, k, nqueues;
+	int i, j, k, nqueues;
+	double sec;
 	struct wfqinfo *qinfo, **top;
 	int cnt = count;
 
 	strcpy(wfq_stats.iface.wfq_ifacename, ifname);
-	wfq_stats.iface.wfq_ifacelen = strlen(wfq_stats.iface.wfq_ifacename);
 
 	/*
 	 * first, find out how many queues are available
@@ -95,7 +93,6 @@ wfq_stat_loop(int fd, const char *ifname, int count, int interval)
 
 	gettimeofday(&last_time, NULL);
 	last_time.tv_sec -= interval;
-	last_bytes = 0;
 
 	while (count == 0 || cnt-- > 0) {
 
@@ -112,29 +109,25 @@ wfq_stat_loop(int fd, const char *ifname, int count, int interval)
 		}
 
 		gettimeofday(&cur_time, NULL);
-		msec = (cur_time.tv_sec - last_time.tv_sec)*1000 +
-			(cur_time.tv_usec - last_time.tv_usec)/1000;
-		last_time = cur_time;
+		sec = calc_interval(&cur_time, &last_time);
 
 		/*
 		 * calculate the throughput of each queue
 		 */
 		for (i = 0; i < nqueues; i++) {
-			xmit_bytes = qinfo[i].stats.sent_bytes - 
-				qinfo[i].last_bytes;
-			qinfo[i].mbps = (double)xmit_bytes * 8.0
-				/ (double)msec * 1000.0 / 1000.0 / 1000.0;
-			qinfo[i].last_bytes = qinfo[i].stats.sent_bytes;
+			qinfo[i].bps = calc_rate(qinfo[i].stats.xmit_cnt.bytes,
+						 qinfo[i].last_bytes, sec);
+			qinfo[i].last_bytes = qinfo[i].stats.xmit_cnt.bytes;
 
 			for (j = 0; j < ntop; j++) {
 				if (top[j] == NULL) {
 					top[j] = &qinfo[i];
 					break;
 				}
-				if (top[j]->mbps < qinfo[i].mbps ||
-				    (top[j]->mbps == qinfo[i].mbps &&
-				     top[j]->stats.sent_packets <
-				     qinfo[i].stats.sent_packets)) {
+				if (top[j]->bps < qinfo[i].bps ||
+				    (top[j]->bps == qinfo[i].bps &&
+				     top[j]->stats.xmit_cnt.packets <
+				     qinfo[i].stats.xmit_cnt.packets)) {
 					for (k = ntop-1; k > j; k--)
 						top[k] = top[k-1];
 					top[j] = &qinfo[i];
@@ -146,19 +139,19 @@ wfq_stat_loop(int fd, const char *ifname, int count, int interval)
 		/*
 		 * display top
 		 */
-		printf("[QID] WEIGHT QSIZE(KB) SENT(pkts)     (KB)       DROP(pkts)     (KB)     Mbps\n");
+		printf("[QID] WEIGHT QSIZE(KB) SENT(pkts)     (KB)       DROP(pkts)     (KB)     bps\n\r");
 
 		for (j = 0; j < ntop; j++) {
 			if (top[j] != NULL)
-				printf("[%4d] %4d %4d %10u %14qu %10u %14qu %8.2f\n",
+				printf("[%4d] %4d %4d %10llu %14llu %10llu %14llu %9s\n\r",
 				       top[j]->qid,
 				       top[j]->stats.weight,
 				       top[j]->stats.bytes / 1024,
-				       top[j]->stats.sent_packets, 
-				       top[j]->stats.sent_bytes / 1024, 
-				       top[j]->stats.drop_packets, 
-				       top[j]->stats.drop_bytes / 1024,
-				       top[j]->mbps);
+				       (ull)top[j]->stats.xmit_cnt.packets, 
+				       (ull)top[j]->stats.xmit_cnt.bytes /1024,
+				       (ull)top[j]->stats.drop_cnt.packets,
+				       (ull)top[j]->stats.drop_cnt.bytes /1024,
+				       rate2str(top[j]->bps));
 			else
 				printf("\n");
 		}	
@@ -167,6 +160,7 @@ wfq_stat_loop(int fd, const char *ifname, int count, int interval)
 		mvcur(ntop+1, 0, 0, 0);
 #endif
 
+		last_time = cur_time;
 		sleep(interval);
 	}
 

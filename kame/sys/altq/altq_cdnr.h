@@ -1,4 +1,4 @@
-/*	$KAME: altq_cdnr.h,v 1.4 2000/07/25 10:12:29 kjc Exp $	*/
+/*	$KAME: altq_cdnr.h,v 1.5 2000/10/18 09:15:22 kjc Exp $	*/
 
 /*
  * Copyright (C) 1999-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_cdnr.h,v 1.4 2000/07/25 10:12:29 kjc Exp $
+ * $Id: altq_cdnr.h,v 1.5 2000/10/18 09:15:22 kjc Exp $
  */
 
 #ifndef _ALTQ_ALTQ_CDNR_H_
@@ -41,8 +41,7 @@
 #define	TCETYPE_ELEMENT		2	/* a simple tc element */
 #define	TCETYPE_TBMETER		3	/* token bucket meter */
 #define	TCETYPE_TRTCM		4	/* (two-rate) three color marker */
-#define	TCETYPE_TBRIO		5	/* token-bucket rio */
-#define	TCETYPE_TSWTCM		6	/* time sliding window 3-color maker */
+#define	TCETYPE_TSWTCM		5	/* time sliding window 3-color maker */
 
 /*
  * traffic conditioner action
@@ -79,12 +78,6 @@ struct cdnr_interface {
 	char	cdnr_ifname[IFNAMSIZ];  /* interface name (e.g., fxp0) */
 };
 
-/* conditioner statistics */
-struct cdnr_stats {
-	u_int		packets;
-	u_quad_t	bytes;
-};
-
 /* simple element operations */
 struct cdnr_add_element {
 	struct cdnr_interface	iface;
@@ -117,8 +110,8 @@ struct cdnr_modify_tbmeter {
 struct cdnr_tbmeter_stats {
 	struct cdnr_interface	iface;
 	u_long			cdnr_handle;
-	struct cdnr_stats	in_stats;
-	struct cdnr_stats	out_stats;
+	struct pktcntr		in_cnt;
+	struct pktcntr		out_cnt;
 };
 
 /* two-rate three-color marker operations */
@@ -145,50 +138,9 @@ struct cdnr_modify_trtcm {
 struct cdnr_tcm_stats {
 	struct cdnr_interface	iface;
 	u_long			cdnr_handle;
-	struct cdnr_stats	green_stats;
-	struct cdnr_stats	yellow_stats;
-	struct cdnr_stats	red_stats;
-};
-
-/* token-bucket rio operations */
-struct cdnr_add_tbrio {
-	struct cdnr_interface	iface;
-	struct tb_profile	profile;
-	struct tc_action	in_action;
-	struct tc_action	out_action;
-
-	u_long			cdnr_handle;	/* return value */
-};
-
-struct cdnr_modify_tbrio {
-	struct cdnr_interface	iface;
-	u_long			cdnr_handle;
-	struct tb_profile	profile;
-};
-
-/* tbrio color index values */
-#define	TBRIO_CINDEX_GREEN	0
-#define	TBRIO_CINDEX_YELLOW	1
-#define	TBRIO_CINDEX_RED	2
-#define	TBRIO_CINDEX_NUM	3	/* number of drop index values */
-
-/* tbrio drop types */
-#define	TBRIO_DTYPE_PASS	0	/* no drop */
-#define	TBRIO_DTYPE_DROP	1	/* drop */
-#define	TBRIO_DTYPE_NUM		2	/* number of drop types */
-
-struct cdnr_tbrio_stats {
-	struct cdnr_interface	iface;
-	u_long			cdnr_handle;
-	struct cdnr_stats	stats[TBRIO_CINDEX_NUM][TBRIO_DTYPE_NUM];
-};
-
-struct cdnr_tbrio_params {
-	struct cdnr_interface	iface;
-	u_long			cdnr_handle;
-	int	avg_pkt_size;	/* average packet size */
-	int	holdtime_pkts;	/* hold time by packets */
-	int	lowat;		/* low watermark: should be larger than MTU */
+	struct pktcntr		green_cnt;
+	struct pktcntr		yellow_cnt;
+	struct pktcntr		red_cnt;
 };
 
 /* time sliding window three-color marker operations */
@@ -228,12 +180,12 @@ struct cdnr_delete_filter {
 struct tce_stats {
 	u_long			tce_handle;	/* tc element handle */
 	int			tce_type;	/* e.g., TCETYPE_ELEMENT */
-	struct cdnr_stats	tce_stats[6];	/* tbrio returns 6 stats */
+	struct pktcntr		tce_cnts[3];	/* tcm returns 3 counters */
 };
 
 struct cdnr_get_stats {
 	struct cdnr_interface	iface;
-	struct cdnr_stats	stats[TCACODE_MAX+1];
+	struct pktcntr		cnts[TCACODE_MAX+1];
 
 	/* element stats */
 	int			nskip;		/* skip # of elements */
@@ -245,24 +197,19 @@ struct cdnr_get_stats {
 #define	CDNR_IF_DETACH		_IOW('Q', 2, struct cdnr_interface)
 #define	CDNR_ENABLE		_IOW('Q', 3, struct cdnr_interface)
 #define	CDNR_DISABLE		_IOW('Q', 4, struct cdnr_interface)
-#define	CDNR_ADD_ELEM		_IOWR('Q', 5, struct cdnr_add_element)
-#define	CDNR_DEL_ELEM		_IOW('Q', 6, struct cdnr_delete_element)
-#define	CDNR_ADD_TBM		_IOWR('Q', 7, struct cdnr_add_tbmeter)
-#define	CDNR_MOD_TBM		_IOW('Q', 8, struct cdnr_modify_tbmeter)
-#define	CDNR_TBM_STATS		_IOWR('Q', 9, struct cdnr_tbmeter_stats)
-#define	CDNR_ADD_TCM		_IOWR('Q', 10, struct cdnr_add_trtcm)
-#define	CDNR_MOD_TCM		_IOWR('Q', 11, struct cdnr_modify_trtcm)
-#define	CDNR_TCM_STATS		_IOWR('Q', 12, struct cdnr_tcm_stats)
-#define	CDNR_ADD_FILTER		_IOWR('Q', 13, struct cdnr_add_filter)
-#define	CDNR_DEL_FILTER		_IOW('Q', 14, struct cdnr_delete_filter)
-#define	CDNR_GETSTATS		_IOWR('Q', 15, struct cdnr_get_stats)
-#define	CDNR_ADD_TBRIO		_IOWR('Q', 16, struct cdnr_add_tbrio)
-#define	CDNR_MOD_TBRIO		_IOWR('Q', 17, struct cdnr_modify_tbrio)
-#define	CDNR_TBRIO_STATS	_IOWR('Q', 18, struct cdnr_tbrio_stats)
-#define	CDNR_TBRIO_GETDEFAULTS	_IOWR('Q', 19, struct cdnr_tbrio_params)
-#define	CDNR_TBRIO_SETDEFAULTS	_IOW('Q', 20, struct cdnr_tbrio_params)
-#define	CDNR_ADD_TSW		_IOWR('Q', 21, struct cdnr_add_tswtcm)
-#define	CDNR_MOD_TSW		_IOWR('Q', 22, struct cdnr_modify_tswtcm)
+#define	CDNR_ADD_FILTER		_IOWR('Q', 10, struct cdnr_add_filter)
+#define	CDNR_DEL_FILTER		_IOW('Q', 11, struct cdnr_delete_filter)
+#define	CDNR_GETSTATS		_IOWR('Q', 12, struct cdnr_get_stats)
+#define	CDNR_ADD_ELEM		_IOWR('Q', 30, struct cdnr_add_element)
+#define	CDNR_DEL_ELEM		_IOW('Q', 31, struct cdnr_delete_element)
+#define	CDNR_ADD_TBM		_IOWR('Q', 32, struct cdnr_add_tbmeter)
+#define	CDNR_MOD_TBM		_IOW('Q', 33, struct cdnr_modify_tbmeter)
+#define	CDNR_TBM_STATS		_IOWR('Q', 34, struct cdnr_tbmeter_stats)
+#define	CDNR_ADD_TCM		_IOWR('Q', 35, struct cdnr_add_trtcm)
+#define	CDNR_MOD_TCM		_IOWR('Q', 36, struct cdnr_modify_trtcm)
+#define	CDNR_TCM_STATS		_IOWR('Q', 37, struct cdnr_tcm_stats)
+#define	CDNR_ADD_TSW		_IOWR('Q', 38, struct cdnr_add_tswtcm)
+#define	CDNR_MOD_TSW		_IOWR('Q', 39, struct cdnr_modify_tswtcm)
 
 #ifndef DSCP_EF
 /* diffserve code points */
@@ -322,7 +269,7 @@ struct top_cdnr {
 	LIST_HEAD(, cdnr_block) tc_elements;
 	struct acc_classifier	tc_classifier;
 
-	struct cdnr_stats	tc_stats[TCACODE_MAX+1];
+	struct pktcntr		tc_cnts[TCACODE_MAX+1];
 };
 
 /* token bucket element */
@@ -341,8 +288,8 @@ struct tbmeter {
 	struct tbe		tb;		/* token bucket */
 	struct tc_action	in_action;	/* actions for IN/OUT */
 	struct tc_action	out_action;	/* actions for IN/OUT */
-	struct cdnr_stats	in_stats;	/* stattistics for IN/OUT */
-	struct cdnr_stats	out_stats;	/* stattistics for IN/OUT */
+	struct pktcntr		in_cnt;		/* statistics for IN/OUT */
+	struct pktcntr		out_cnt;	/* statistics for IN/OUT */
 };
 
 /* two-rate three-color marker structure */
@@ -357,31 +304,9 @@ struct trtcm {
 	u_int8_t		green_dscp;
 	u_int8_t		yellow_dscp;
 	u_int8_t		red_dscp;
-	struct cdnr_stats	green_stats;
-	struct cdnr_stats	yellow_stats;
-	struct cdnr_stats	red_stats;
-};
-
-/* tokeb bucket rio structure */
-struct tbrio {
-	struct cdnr_block	cdnrblk;	/* conditioner block */
-	struct tbe		tb;		/* token bucket */
-
-	/* tbrio parameters */
-	int		prob;		/* drop probability */
-	int		bumps;		/* prob feedback counter */
-	int		count;		/* packet count since the last drop */
-	u_int64_t	lowat;		/* low watermark */
-	u_int64_t	hold_time;	/* probability hold time */
-	u_int64_t	last_update;	/* timestamp of prob update */
-
-	struct tc_action	pass_action;
-	struct tc_action	drop_action;
-	u_int8_t		green_dscp;
-	u_int8_t		yellow_dscp;
-	u_int8_t		red_dscp;
-
-	struct cdnr_stats	stats[TBRIO_CINDEX_NUM][TBRIO_DTYPE_NUM];
+	struct pktcntr		green_cnt;
+	struct pktcntr		yellow_cnt;
+	struct pktcntr		red_cnt;
 };
 
 /* time sliding window three-color marker structure */
@@ -400,9 +325,9 @@ struct tswtcm {
 	u_int8_t		green_dscp;
 	u_int8_t		yellow_dscp;
 	u_int8_t		red_dscp;
-	struct cdnr_stats	green_stats;
-	struct cdnr_stats	yellow_stats;
-	struct cdnr_stats	red_stats;
+	struct pktcntr		green_cnt;
+	struct pktcntr		yellow_cnt;
+	struct pktcntr		red_cnt;
 };
 
 #endif /* _KERNEL */

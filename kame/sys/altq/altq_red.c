@@ -1,4 +1,4 @@
-/*	$KAME: altq_red.c,v 1.6 2000/08/14 08:03:01 kjc Exp $	*/
+/*	$KAME: altq_red.c,v 1.7 2000/10/18 09:15:23 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -58,7 +58,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_red.c,v 1.6 2000/08/14 08:03:01 kjc Exp $
+ * $Id: altq_red.c,v 1.7 2000/10/18 09:15:23 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
@@ -70,7 +70,7 @@
 #endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
-#ifdef RED	/* red is enabled by RED option in opt_altq.h */
+#ifdef ALTQ_RED	/* red is enabled by ALTQ_RED option in opt_altq.h */
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -81,7 +81,7 @@
 #include <sys/proc.h>
 #include <sys/errno.h>
 #include <sys/kernel.h>
-#ifdef FLOWVALVE
+#ifdef ALTQ_FLOWVALVE
 #include <sys/queue.h>
 #include <sys/time.h>
 #endif
@@ -99,7 +99,7 @@
 #include <altq/altq.h>
 #include <altq/altq_conf.h>
 #include <altq/altq_red.h>
-#ifdef FLOWVALVE
+#ifdef ALTQ_FLOWVALVE
 #include <altq/altq_flowvalve.h>
 #endif
 
@@ -168,7 +168,7 @@
  * to switch to the random-drop policy, define "RED_RANDOM_DROP".
  */
 
-#ifdef FLOWVALVE
+#ifdef ALTQ_FLOWVALVE
 /*
  * flow-valve is an extention to protect red from unresponsive flows
  * and to promote end-to-end congestion control.
@@ -181,7 +181,7 @@
 #ifdef RED_RANDOM_DROP
 #error "random-drop can't be used with flow-valve!"
 #endif
-#endif /* FLOWVALVE */
+#endif /* ALTQ_FLOWVALVE */
 
 /* red_list keeps all red_queue_t's allocated. */
 static red_queue_t *red_list = NULL;
@@ -198,7 +198,7 @@ static struct mbuf *red_dequeue __P((struct ifaltq *, int));
 static int red_request __P((struct ifaltq *, int, void *));
 static void red_purgeq __P((red_queue_t *));
 static int red_detach __P((red_queue_t *));
-#ifdef FLOWVALVE
+#ifdef ALTQ_FLOWVALVE
 static __inline struct fve *flowlist_lookup __P((struct flowvalve *,
 			 struct altq_pktattr *, struct timeval *));
 static __inline struct fve *flowlist_reclaim __P((struct flowvalve *,
@@ -377,10 +377,8 @@ redioctl(dev, cmd, addr, flag, p)
 
 			rp = rqp->rq_red;
 			q_stats->q_avg 	   = rp->red_avg >> rp->red_wshift;
-			q_stats->xmit_packets  = rp->red_stats.xmit_packets;
-			q_stats->xmit_bytes    = rp->red_stats.xmit_bytes;
-			q_stats->drop_packets  = rp->red_stats.drop_packets;
-			q_stats->drop_bytes    = rp->red_stats.drop_bytes;
+			q_stats->xmit_cnt  = rp->red_stats.xmit_cnt;
+			q_stats->drop_cnt  = rp->red_stats.drop_cnt;
 			q_stats->drop_forced   = rp->red_stats.drop_forced;
 			q_stats->drop_unforced = rp->red_stats.drop_unforced;
 			q_stats->marked_packets = rp->red_stats.marked_packets;
@@ -390,7 +388,7 @@ redioctl(dev, cmd, addr, flag, p)
 			q_stats->th_min		= rp->red_thmin;
 			q_stats->th_max		= rp->red_thmax;
 
-#ifdef FLOWVALVE
+#ifdef ALTQ_FLOWVALVE
 			if (rp->red_flowvalve != NULL) {
 				struct flowvalve *fv = rp->red_flowvalve;
 				q_stats->fv_flows    = fv->fv_flows;
@@ -398,17 +396,16 @@ redioctl(dev, cmd, addr, flag, p)
 				q_stats->fv_predrop  = fv->fv_stats.predrop;
 				q_stats->fv_alloc    = fv->fv_stats.alloc;
 				q_stats->fv_escape   = fv->fv_stats.escape;
-			}
-			else {
-#endif /* FLOWVALVE */
+			} else {
+#endif /* ALTQ_FLOWVALVE */
 				q_stats->fv_flows    = 0;
 				q_stats->fv_pass     = 0;
 				q_stats->fv_predrop  = 0;
 				q_stats->fv_alloc    = 0;
 				q_stats->fv_escape   = 0;
-#ifdef FLOWVALVE
+#ifdef ALTQ_FLOWVALVE
 			}
-#endif /* FLOWVALVE */
+#endif /* ALTQ_FLOWVALVE */
 		} while (0);
 		break;
 
@@ -559,8 +556,7 @@ red_alloc(weight, inv_pmax, th_min, th_max, flags, pkttime)
 		if (npkts_per_sec < 50) {
 			/* up to about 400Kbps */
 			rp->red_weight = W_WEIGHT_2;
-		}
-		else if (npkts_per_sec < 300) {
+		} else if (npkts_per_sec < 300) {
 			/* up to about 2.4Mbps */
 			rp->red_weight = W_WEIGHT_1;
 		}
@@ -596,7 +592,7 @@ red_alloc(weight, inv_pmax, th_min, th_max, flags, pkttime)
 	rp->red_wtab = wtab_alloc(rp->red_weight);
 
 	microtime(&rp->red_last);
-#ifdef FLOWVALVE
+#ifdef ALTQ_FLOWVALVE
 	if (flags & REDF_FLOWVALVE)
 		rp->red_flowvalve = fv_alloc(rp);
 	/* if fv_alloc failes, flowvalve is just disabled */
@@ -608,7 +604,7 @@ void
 red_destroy(rp)
 	red_t *rp;
 {
-#ifdef FLOWVALVE
+#ifdef ALTQ_FLOWVALVE
 	if (rp->red_flowvalve != NULL)
 		fv_destroy(rp->red_flowvalve);
 #endif
@@ -622,13 +618,11 @@ red_getstats(rp, sp)
 	struct redstats *sp;
 {
 	sp->q_avg 		= rp->red_avg >> rp->red_wshift;
-	sp->xmit_packets	= rp->red_stats.xmit_packets;
-	sp->drop_packets	= rp->red_stats.drop_packets;
+	sp->xmit_cnt		= rp->red_stats.xmit_cnt;
+	sp->drop_cnt		= rp->red_stats.drop_cnt;
 	sp->drop_forced		= rp->red_stats.drop_forced;
 	sp->drop_unforced	= rp->red_stats.drop_unforced;
 	sp->marked_packets	= rp->red_stats.marked_packets;
-	sp->xmit_bytes		= rp->red_stats.xmit_bytes;
-	sp->drop_bytes		= rp->red_stats.drop_bytes;
 }
 
 /*
@@ -660,7 +654,7 @@ red_addq(rp, q, m, pktattr)
 {
 	int avg, droptype;
 	int n;
-#ifdef FLOWVALVE
+#ifdef ALTQ_FLOWVALVE
 	struct fve *fve = NULL;
 
 	if (rp->red_flowvalve != NULL && rp->red_flowvalve->fv_flows > 0)
@@ -724,7 +718,7 @@ red_addq(rp, q, m, pktattr)
 				      rp->red_probd, rp->red_count)) {
 			/* mark or drop by red */
 			if ((rp->red_flags & REDF_ECN) &&
-			    mark_ecn(pktattr, rp->red_flags)) {
+			    mark_ecn(m, pktattr, rp->red_flags)) {
 				/* successfully marked.  do not drop. */
 				rp->red_count = 0;
 #ifdef RED_STATS
@@ -771,11 +765,10 @@ red_addq(rp, q, m, pktattr)
 #endif
 		}
 #ifdef RED_STATS
-		rp->red_stats.drop_packets++;
-		rp->red_stats.drop_bytes += m->m_pkthdr.len;
+		PKTCNTR_ADD(&rp->red_stats.drop_cnt, m_pktlen(m));
 #endif
 		rp->red_count = 0;
-#ifdef FLOWVALVE
+#ifdef ALTQ_FLOWVALVE
 		if (rp->red_flowvalve != NULL)
 			fv_dropbyred(rp->red_flowvalve, pktattr, fve);
 #endif
@@ -783,6 +776,9 @@ red_addq(rp, q, m, pktattr)
 		return (-1);
 	}
 	/* successfully queued */
+#ifdef RED_STATS
+	PKTCNTR_ADD(&rp->red_stats.xmit_cnt, m_pktlen(m));
+#endif
 	return (0);
 }
 
@@ -827,19 +823,35 @@ drop_early(fp_len, fp_probd, count)
  *    returns 1 if successfully marked, 0 otherwise.
  */
 int
-mark_ecn(pktattr, flags)
+mark_ecn(m, pktattr, flags)
+	struct mbuf *m;
 	struct altq_pktattr *pktattr;
 	int flags;
 {
+	struct mbuf *m0;
 
-	if (pktattr == NULL)
+	if (pktattr == NULL ||
+	    (pktattr->pattr_af != AF_INET && pktattr->pattr_af != AF_INET6))
 		return (0);
+
+	/* verify that pattr_hdr is within the mbuf data */
+	for (m0 = m; m0 != NULL; m0 = m0->m_next)
+		if ((pktattr->pattr_hdr >= m0->m_data) &&
+		    (pktattr->pattr_hdr < m0->m_data + m0->m_len))
+			break;
+	if (m0 == NULL) {
+		/* ick, pattr_hdr is stale */
+		pktattr->pattr_af = AF_UNSPEC;
+		return (0);
+	}
 
 	switch (pktattr->pattr_af) {
 	case AF_INET:
 		if (flags & REDF_ECN4) {
 			struct ip *ip = (struct ip *)pktattr->pattr_hdr;
 	    
+			if (ip->ip_v != 4)
+				return (0);	/* version mismatch! */
 			if (ip->ip_tos & IPTOS_ECT) {
 				/* ECN-capable, mark ECN bit. */
 				if ((ip->ip_tos & IPTOS_CE) == 0) {
@@ -886,6 +898,8 @@ mark_ecn(pktattr, flags)
 			u_int32_t flowlabel;
 
 			flowlabel = ntohl(ip6->ip6_flow);
+			if ((flowlabel >> 28) != 6)
+				return (0);	/* version mismatch! */
 			if (flowlabel & (IPTOS_ECT << 20)) {
 				/* ECN-capable, mark ECN bit. */
 				flowlabel |= (IPTOS_CE << 20);
@@ -943,10 +957,6 @@ red_getq(rp, q)
 	}
 
 	rp->red_idle = 0;
-#ifdef RED_STATS
-	rp->red_stats.xmit_packets++;
-	rp->red_stats.xmit_bytes += m->m_pkthdr.len;
-#endif
 	return (m);
 }
 
@@ -1067,7 +1077,7 @@ pow_w(w, n)
 	return (val);
 }
 
-#ifdef FLOWVALVE
+#ifdef ALTQ_FLOWVALVE
 
 #define	FV_PSHIFT	7	/* weight of average drop rate -- 1/128 */
 #define	FV_PSCALE(x)	((x) << FV_PSHIFT)
@@ -1395,8 +1405,7 @@ fv_checkflow(fv, pktattr, fcache)
 #ifdef FV_STATS
 			fv->fv_stats.escape++;
 #endif
-		}
-		else {
+		} else {
 			/* block this flow */
 			flowlist_move_to_head(fv, fve);
 			fve->fve_lastdrop = now;
@@ -1453,7 +1462,7 @@ static void fv_dropbyred(fv, pktattr, fcache)
 	fve->fve_lastdrop = now;
 }
 
-#endif /* FLOWVALVE */
+#endif /* ALTQ_FLOWVALVE */
 
 #ifdef KLD_MODULE
 
@@ -1464,4 +1473,4 @@ ALTQ_MODULE(altq_red, ALTQT_RED, &red_sw);
 
 #endif /* KLD_MODULE */
 
-#endif /* RED */
+#endif /* ALTQ_RED */

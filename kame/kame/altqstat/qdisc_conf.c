@@ -1,5 +1,6 @@
+/*	$KAME: qdisc_conf.c,v 1.3 2000/10/18 09:15:16 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: qdisc_conf.c,v 1.2 2000/01/19 07:50:07 itojun Exp $
  */
 
 #include <sys/param.h>
@@ -35,7 +34,6 @@
 #include <net/if.h>
 #include <netinet/in.h>
 #include <altq/altq.h>
-#include <altq/altq_conf.h>
 
 #include <stdio.h>
 #include <stdlib.h>
@@ -56,6 +54,7 @@ struct qdisc_conf qdisc_table[] = {
 	{"red",		ALTQT_RED,	red_stat_loop},
 	{"rio",		ALTQT_RIO,	rio_stat_loop},
 	{"blue",	ALTQT_BLUE,	blue_stat_loop},
+	{"priq",	ALTQT_PRIQ,	priq_stat_loop},
 	{NULL, 		0,		NULL}
 };
 
@@ -73,8 +72,8 @@ qdisc2stat_loop(const char *qdisc_name)
 int
 ifname2qdisc(const char *ifname, char *qname)
 {
-	struct qtypereq qtypereq;
-	int fd;
+	struct altqreq qtypereq;
+	int fd, qtype = 0;
 
 	if (ifname[0] == '_') {
 		/* input interface */
@@ -97,11 +96,12 @@ ifname2qdisc(const char *ifname, char *qname)
 	if (qname != NULL) {
 		struct qdisc_conf *stat;
 
+		qtype = qtypereq.arg;
 		for (stat = qdisc_table; stat->qdisc_name != NULL; stat++)
-			if (stat->altqtype == qtypereq.altqtype)
+			if (stat->altqtype == qtype)
 				strcpy(qname, stat->qdisc_name);
 	}
 		
-	return (qtypereq.altqtype);
+	return (qtype);
 }
 

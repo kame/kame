@@ -1,4 +1,4 @@
-/* $Id: qop_cbq.c,v 1.2 2000/07/28 09:56:22 kjc Exp $ */
+/*	$KAME: qop_cbq.c,v 1.3 2000/10/18 09:15:18 kjc Exp $	*/
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
  *
@@ -70,8 +70,6 @@ static int cbq_detach(struct ifinfo *ifinfo);
 static int cbq_clear(struct ifinfo *ifinfo);
 static int cbq_enable(struct ifinfo *ifinfo);
 static int cbq_disable(struct ifinfo *ifinfo);
-static int cbq_acc_enable(struct ifinfo *ifinfo);
-static int cbq_acc_disable(struct ifinfo *ifinfo);
 static int cbq_add_class(struct classinfo *clinfo);
 static int cbq_modify_class(struct classinfo *clinfo, void *arg);
 static int cbq_delete_class(struct classinfo *clinfo);
@@ -96,8 +94,6 @@ static struct qdisc_ops cbq_qdisc = {
 	cbq_clear,
 	cbq_enable,
 	cbq_disable,
-	cbq_acc_enable,
-	cbq_acc_disable,
 	cbq_add_class,
 	cbq_modify_class,
 	cbq_delete_class,
@@ -113,7 +109,7 @@ static struct qdisc_ops cbq_qdisc = {
 int
 cbq_interface_parser(const char *ifname, int argc, char **argv)
 {
-	u_int  	bandwidth = 0;
+	u_int  	bandwidth = 100000000;	/* 100Mbps */
 	u_int	tbrsize = 0;
 	u_int	is_efficient = 0;
 	u_int	is_wrr = 1;	/* weighted round-robin is default */
@@ -179,14 +175,11 @@ cbq_class_parser(const char *ifname, const char *class_name,
 			argc--; argv++;
 			if (argc > 0)
 				pri = strtoul(*argv, NULL, 0);
-		}
-		else if (EQUAL(*argv, "default")) {
+		} else if (EQUAL(*argv, "default")) {
 			flags |= CBQCLF_DEFCLASS;
-		}
-		else if (EQUAL(*argv, "control")) {
+		} else if (EQUAL(*argv, "control")) {
 			flags |= CBQCLF_CTLCLASS;
-		}
-		else if (EQUAL(*argv, "admission")) {
+		} else if (EQUAL(*argv, "admission")) {
 			argc--; argv++;
 			if (argc > 0) {
 				if (EQUAL(*argv, "guaranteed"))
@@ -206,13 +199,11 @@ cbq_class_parser(const char *ifname, const char *class_name,
 					return (0);
 				}
 			}
-		}
-		else if (EQUAL(*argv, "maxdelay")) {
+		} else if (EQUAL(*argv, "maxdelay")) {
 			argc--; argv++;
 			if (argc > 0)
 				maxdelay = strtoul(*argv, NULL, 0);
-		}
-		else if (EQUAL(*argv, "borrow")) {
+		} else if (EQUAL(*argv, "borrow")) {
 			borrow = parent_name;
 #if 1
 			/* support old style "borrow [parent]" */
@@ -222,8 +213,7 @@ cbq_class_parser(const char *ifname, const char *class_name,
 				argc--; argv++;
 			}
 #endif
-		}
-		else if (EQUAL(*argv, "pbandwidth")) {
+		} else if (EQUAL(*argv, "pbandwidth")) {
 			argc--; argv++;
 			if (argc > 0)
 				pbandwidth = strtoul(*argv, NULL, 0);
@@ -233,48 +223,37 @@ cbq_class_parser(const char *ifname, const char *class_name,
 				    pbandwidth, class_name);
 				return (0);
 			}
-		}
-		else if (EQUAL(*argv, "exactbandwidth")) {
+		} else if (EQUAL(*argv, "exactbandwidth")) {
 			argc--; argv++;
 			if (argc > 0)
 				bandwidth = atobps(*argv);
-		}
-		else if (EQUAL(*argv, "maxburst")) {
+		} else if (EQUAL(*argv, "maxburst")) {
 			argc--; argv++;
 			if (argc > 0)
 				maxburst = strtoul(*argv, NULL, 0);
-		}
-		else if (EQUAL(*argv, "minburst")) {
+		} else if (EQUAL(*argv, "minburst")) {
 			argc--; argv++;
 			if (argc > 0)
 				minburst = strtoul(*argv, NULL, 0);
-		}
-		else if (EQUAL(*argv, "packetsize")) {
+		} else if (EQUAL(*argv, "packetsize")) {
 			argc--; argv++;
 			if (argc > 0)
 				av_pkt_size = atobytes(*argv);
-		}
-		else if (EQUAL(*argv, "maxpacketsize")) {
+		} else if (EQUAL(*argv, "maxpacketsize")) {
 			argc--; argv++;
 			if (argc > 0)
 				max_pkt_size = atobytes(*argv);
-		}
-		else if (EQUAL(*argv, "red")) {
+		} else if (EQUAL(*argv, "red")) {
 			flags |= CBQCLF_RED;
-		}
-		else if (EQUAL(*argv, "ecn")) {
+		} else if (EQUAL(*argv, "ecn")) {
 			flags |= CBQCLF_ECN;
-		}
-		else if (EQUAL(*argv, "flowvalve")) {
+		} else if (EQUAL(*argv, "flowvalve")) {
 			flags |= CBQCLF_FLOWVALVE;
-		}
-		else if (EQUAL(*argv, "rio")) {
+		} else if (EQUAL(*argv, "rio")) {
 			flags |= CBQCLF_RIO;
-		}
-		else if (EQUAL(*argv, "cleardscp")) {
+		} else if (EQUAL(*argv, "cleardscp")) {
 			flags |= CBQCLF_CLEARDSCP;
-		}
-		else {
+		} else {
 			LOG(LOG_ERR, 0,
 			    "Unknown keyword '%s' in %s, line %d\n",
 			    *argv, altqconfigfile, line_no);
@@ -467,8 +446,8 @@ qcmd_cbq_add_ctl_filters(const char *ifname, const char *clname)
 		error = qcmd_add_filter(ifname, clname, NULL,
 					(struct flow_filter *)&sfilt6);
 		if (error) {
-			LOG(LOG_ERR, 0,
-			    "can't add ctl class filter on interface '%s'\n",
+			LOG(LOG_WARNING, 0,
+			    "can't add ctl class IPv6 filter on interface '%s'\n",
 			    ifname);
 			return (error);
 		}
@@ -580,8 +559,7 @@ qop_cbq_add_class(struct classinfo **rp, const char *class_name,
 		av_pkt_size = ifinfo->ifmtu;
 		if (av_pkt_size > MCLBYTES)	/* do what TCP does */
 			av_pkt_size &= ~MCLBYTES;
-	}
-	else if (av_pkt_size > ifinfo->ifmtu)
+	} else if (av_pkt_size > ifinfo->ifmtu)
 		av_pkt_size = ifinfo->ifmtu;
 
 	if (max_pkt_size == 0)	/* use default */
@@ -694,8 +672,7 @@ qop_cbq_modify_class(struct classinfo *clinfo, u_int pri, u_int bandwidth,
 			    parent_clinfo->bandwidth
 			    - parent_clinfo->allocated)
 				return (QOPERR_ADMISSION_NOBW);
-		}
-		else if (bandwidth < old_bandwidth) {
+		} else if (bandwidth < old_bandwidth) {
 			/* decrease bandwidth */
 			if (bandwidth < cbq_clinfo->allocated)
 				return (QOPERR_ADMISSION);
@@ -707,8 +684,7 @@ qop_cbq_modify_class(struct classinfo *clinfo, u_int pri, u_int bandwidth,
 		av_pkt_size = ifinfo->ifmtu;
 		if (av_pkt_size > MCLBYTES)	/* do what TCP does */
 			av_pkt_size &= ~MCLBYTES;
-	}
-	else if (av_pkt_size > ifinfo->ifmtu)
+	} else if (av_pkt_size > ifinfo->ifmtu)
 		av_pkt_size = ifinfo->ifmtu;
 
 	if (max_pkt_size == 0)	/* use default */
@@ -795,8 +771,7 @@ cbq_class_spec(struct ifinfo *ifinfo, u_long parent_class,
 		av_pkt_size = ifinfo->ifmtu;
 		if (av_pkt_size > MCLBYTES)	/* do what TCP does */
 			av_pkt_size &= ~MCLBYTES;
-	}
-	else if (av_pkt_size > ifinfo->ifmtu)
+	} else if (av_pkt_size > ifinfo->ifmtu)
 		av_pkt_size = ifinfo->ifmtu;
 	if (max_pkt_size == 0)	/* use default */
 		max_pkt_size = ifinfo->ifmtu;
@@ -883,8 +858,7 @@ cbq_class_spec(struct ifinfo *ifinfo, u_long parent_class,
 			maxq = 60.0;
 		else
 			maxq = 30.0;
-	}
-	else {
+	} else {
 		maxq = ((double) maxdelay * NS_PER_MS) / (nsPerByte * av_pkt_size);
 		if (maxq < 4) {
 			LOG(LOG_WARNING, 0,
@@ -952,7 +926,6 @@ cbq_attach(struct ifinfo *ifinfo)
 	cbq_refcount++;
 	memset(&iface, 0, sizeof(iface));
 	strncpy(iface.cbq_ifacename, ifinfo->ifname, IFNAMSIZ);
-	iface.cbq_ifacelen = strlen(ifinfo->ifname);
 
 	if (ioctl(cbq_fd, CBQ_IF_ATTACH, &iface) < 0)
 		return (QOPERR_SYSCALL);
@@ -966,7 +939,6 @@ cbq_detach(struct ifinfo *ifinfo)
 	
 	memset(&iface, 0, sizeof(iface));
 	strncpy(iface.cbq_ifacename, ifinfo->ifname, IFNAMSIZ);
-	iface.cbq_ifacelen = strlen(ifinfo->ifname);
 
 	if (ioctl(cbq_fd, CBQ_IF_DETACH, &iface) < 0)
 		return (QOPERR_SYSCALL);
@@ -985,7 +957,6 @@ cbq_clear(struct ifinfo *ifinfo)
 
 	memset(&iface, 0, sizeof(iface));
 	strncpy(iface.cbq_ifacename, ifinfo->ifname, IFNAMSIZ);
-	iface.cbq_ifacelen = strlen(ifinfo->ifname);
 
 	if (ioctl(cbq_fd, CBQ_CLEAR_HIERARCHY, &iface) < 0)
 		return (QOPERR_SYSCALL);
@@ -999,7 +970,6 @@ cbq_enable(struct ifinfo *ifinfo)
 
 	memset(&iface, 0, sizeof(iface));
 	strncpy(iface.cbq_ifacename, ifinfo->ifname, IFNAMSIZ);
-	iface.cbq_ifacelen = strlen(ifinfo->ifname);
 
 	if (ioctl(cbq_fd, CBQ_ENABLE, &iface) < 0)
 		return (QOPERR_SYSCALL);
@@ -1013,37 +983,8 @@ cbq_disable(struct ifinfo *ifinfo)
 
 	memset(&iface, 0, sizeof(iface));
 	strncpy(iface.cbq_ifacename, ifinfo->ifname, IFNAMSIZ);
-	iface.cbq_ifacelen = strlen(ifinfo->ifname);
 
 	if (ioctl(cbq_fd, CBQ_DISABLE, &iface) < 0)
-		return (QOPERR_SYSCALL);
-	return (0);
-}
-
-static int
-cbq_acc_enable(struct ifinfo *ifinfo)
-{
-	struct cbq_interface iface;
-
-	memset(&iface, 0, sizeof(iface));
-	strncpy(iface.cbq_ifacename, ifinfo->ifname, IFNAMSIZ);
-	iface.cbq_ifacelen = strlen(ifinfo->ifname);
-
-	if (ioctl(cbq_fd, CBQ_ACC_ENABLE, &iface) < 0)
-		return (QOPERR_SYSCALL);
-	return (0);
-}
-
-static int
-cbq_acc_disable(struct ifinfo *ifinfo)
-{
-	struct cbq_interface iface;
-
-	memset(&iface, 0, sizeof(iface));
-	strncpy(iface.cbq_ifacename, ifinfo->ifname, IFNAMSIZ);
-	iface.cbq_ifacelen = strlen(ifinfo->ifname);
-
-	if (ioctl(cbq_fd, CBQ_ACC_DISABLE, &iface) < 0)
 		return (QOPERR_SYSCALL);
 	return (0);
 }
@@ -1061,7 +1002,6 @@ cbq_add_class(struct classinfo *clinfo)
 	memset(&class_add, 0, sizeof(class_add));
 	strncpy(class_add.cbq_iface.cbq_ifacename,
 		clinfo->ifinfo->ifname, IFNAMSIZ);
-	class_add.cbq_iface.cbq_ifacelen = strlen(clinfo->ifinfo->ifname);
 
 	class_add.cbq_class = cbq_clinfo->class_spec;
 
@@ -1083,7 +1023,6 @@ cbq_modify_class(struct classinfo *clinfo, void *arg)
 	memset(&class_mod, 0, sizeof(class_mod));
 	strncpy(class_mod.cbq_iface.cbq_ifacename,
 		clinfo->ifinfo->ifname, IFNAMSIZ);
-	class_mod.cbq_iface.cbq_ifacelen = strlen(clinfo->ifinfo->ifname);
 	class_mod.cbq_class_handle = clinfo->handle;
 	class_mod.cbq_class = cbq_clinfo->class_spec;
 
@@ -1100,7 +1039,6 @@ cbq_delete_class(struct classinfo *clinfo)
 	memset(&class_delete, 0, sizeof(class_delete));
 	strncpy(class_delete.cbq_iface.cbq_ifacename,
 		clinfo->ifinfo->ifname, IFNAMSIZ);
-	class_delete.cbq_iface.cbq_ifacelen = strlen(clinfo->ifinfo->ifname);
 	class_delete.cbq_class_handle = clinfo->handle;
 
 	if (ioctl(cbq_fd, CBQ_DEL_CLASS, &class_delete) < 0)
@@ -1116,8 +1054,6 @@ cbq_add_filter(struct fltrinfo *fltrinfo)
 	memset(&fltr_add, 0, sizeof(fltr_add));
 	strncpy(fltr_add.cbq_iface.cbq_ifacename,
 		fltrinfo->clinfo->ifinfo->ifname, IFNAMSIZ);
-	fltr_add.cbq_iface.cbq_ifacelen =
-		strlen(fltrinfo->clinfo->ifinfo->ifname);
 	fltr_add.cbq_class_handle = fltrinfo->clinfo->handle;
 	fltr_add.cbq_filter = fltrinfo->fltr;
 
@@ -1135,8 +1071,6 @@ cbq_delete_filter(struct fltrinfo *fltrinfo)
 	memset(&fltr_del, 0, sizeof(fltr_del));
 	strncpy(fltr_del.cbq_iface.cbq_ifacename,
 		fltrinfo->clinfo->ifinfo->ifname, IFNAMSIZ);
-	fltr_del.cbq_iface.cbq_ifacelen =
-		strlen(fltrinfo->clinfo->ifinfo->ifname);
 	fltr_del.cbq_filter_handle = fltrinfo->handle;
 
 	if (ioctl(cbq_fd, CBQ_DEL_FILTER, &fltr_del) < 0)

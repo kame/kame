@@ -1,4 +1,4 @@
-/*	$KAME: altq_rio.h,v 1.3 2000/07/25 10:12:31 kjc Exp $	*/
+/*	$KAME: altq_rio.h,v 1.4 2000/10/18 09:15:23 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_rio.h,v 1.3 2000/07/25 10:12:31 kjc Exp $
+ * $Id: altq_rio.h,v 1.4 2000/10/18 09:15:23 kjc Exp $
  */
 
 #ifndef _ALTQ_ALTQ_RIO_H_
@@ -73,15 +73,13 @@ struct rio_conf {
 /* 
  * IOCTLs for RIO
  */
-#define	RIO_ENABLE		_IOW('Q', 1, struct rio_interface)
-#define	RIO_DISABLE		_IOW('Q', 2, struct rio_interface)
-#define	RIO_IF_ATTACH		_IOW('Q', 3, struct rio_interface)
-#define	RIO_IF_DETACH		_IOW('Q', 4, struct rio_interface)
-#define	RIO_ACC_ENABLE		_IOW('Q', 5, struct rio_interface)
-#define	RIO_ACC_DISABLE		_IOW('Q', 6, struct rio_interface)
-#define	RIO_GETSTATS		_IOWR('Q', 7, struct rio_stats)
-#define	RIO_CONFIG		_IOWR('Q', 8, struct rio_conf)
-#define	RIO_SETDEFAULTS		_IOW('Q', 9, struct redparams[RIO_NDROPPREC])
+#define	RIO_IF_ATTACH		_IOW('Q', 1, struct rio_interface)
+#define	RIO_IF_DETACH		_IOW('Q', 2, struct rio_interface)
+#define	RIO_ENABLE		_IOW('Q', 3, struct rio_interface)
+#define	RIO_DISABLE		_IOW('Q', 4, struct rio_interface)
+#define	RIO_CONFIG		_IOWR('Q', 6, struct rio_conf)
+#define	RIO_GETSTATS		_IOWR('Q', 12, struct rio_stats)
+#define	RIO_SETDEFAULTS		_IOW('Q', 30, struct redparams[RIO_NDROPPREC])
 
 #ifdef _KERNEL
 

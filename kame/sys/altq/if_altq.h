@@ -1,4 +1,4 @@
-/*	$KAME: if_altq.h,v 1.3 2000/07/25 10:12:31 kjc Exp $	*/
+/*	$KAME: if_altq.h,v 1.4 2000/10/18 09:15:24 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: if_altq.h,v 1.3 2000/07/25 10:12:31 kjc Exp $
+ * $Id: if_altq.h,v 1.4 2000/10/18 09:15:24 kjc Exp $
  */
 #ifndef _ALTQ_IF_ALTQ_H_
 #define	_ALTQ_IF_ALTQ_H_
@@ -35,17 +35,6 @@
 #define	_KERNEL
 #endif
 #endif
-
-/*
- * generic packet counter
- */
-struct pkt_counter {
-	u_int32_t	packets;
-	u_int64_t	bytes;
-};
-
-#define	PKTCOUNT_ADD(cntr, len)	\
-	do { (cntr)->packets++; (cntr)->bytes += len; } while (0)
 
 struct altq_pktattr; struct tb_regulator; struct top_cdnr;
 
@@ -89,11 +78,12 @@ struct	ifaltq {
  * packet attributes used by queueing disciplines.
  * pattr_class is a discipline-dependent scheduling class that is
  * set by a classifier.
- * pattr_hdr and pattr_af may be used by a discipline to access to
+ * pattr_hdr and pattr_af may be used by a discipline to access
  * the header within a mbuf.  (e.g. ECN needs to update the CE bit)
  * note that pattr_hdr could be stale after m_pullup, though link
  * layer output routines usually don't use m_pullup.  link-level
- * compression also invalidates these fields.
+ * compression also invalidates these fields.  thus, pattr_hdr needs
+ * to be verified when a discipline touches the header.
  */
 struct altq_pktattr {
 	void	*pattr_class;		/* sched class set by classifier */

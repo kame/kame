@@ -1,4 +1,4 @@
-/*	$KAME: altq_rio.c,v 1.6 2000/07/25 10:12:31 kjc Exp $	*/
+/*	$KAME: altq_rio.c,v 1.7 2000/10/18 09:15:23 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2000
@@ -57,7 +57,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_rio.c,v 1.6 2000/07/25 10:12:31 kjc Exp $
+ * $Id: altq_rio.c,v 1.7 2000/10/18 09:15:23 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
@@ -69,7 +69,7 @@
 #endif
 #endif
 #endif /* __FreeBSD__ || __NetBSD__ */
-#ifdef RIO	/* rio is enabled by RIO option in opt_altq.h */
+#ifdef ALTQ_RIO	/* rio is enabled by ALTQ_RIO option in opt_altq.h */
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -158,14 +158,12 @@
 		if (xxs < 0) { 					\
 			printf("rm_class: bogus time values");	\
 			delta = 60000000;			\
-		}						\
-		else if (xxs > 4)  {				\
+		} else if (xxs > 4)  {				\
 			if (xxs > 60)				\
 				delta = 60000000;		\
 			else					\
 				delta += xxs * 1000000;		\
-		}						\
-                else while (xxs > 0) {				\
+		} else while (xxs > 0) {			\
 			delta += 1000000;			\
 			xxs--;					\
 		}						\
@@ -523,8 +521,7 @@ rio_alloc(weight, params, flags, pkttime)
 		if (npkts_per_sec < 50) {
 			/* up to about 400Kbps */
 			rp->rio_weight = W_WEIGHT_2;
-		}
-		else if (npkts_per_sec < 300) {
+		} else if (npkts_per_sec < 300) {
 			/* up to about 2.4Mbps */
 			rp->rio_weight = W_WEIGHT_1;
 		}
@@ -670,7 +667,7 @@ rio_addq(rp, q, m, pktattr)
 	struct timeval now;
 	struct dropprec_state *prec;
 
-	dsfield = odsfield = read_dsfield(pktattr);
+	dsfield = odsfield = read_dsfield(m, pktattr);
 	dpindex = dscp2index(dsfield);
 
 	/*
@@ -718,19 +715,16 @@ rio_addq(rp, q, m, pktattr)
 		if (avg >= prec->th_max_s) {
 			/* avg >= th_max: forced drop */
 			droptype = DTYPE_FORCED;
-		}
-		else if (prec->old == 0) {
+		} else if (prec->old == 0) {
 			/* first exceeds th_min */
 			prec->count = 1;
 			prec->old = 1;
-		}
-		else if (drop_early((avg - prec->th_min_s) >> rp->rio_wshift,
-				    prec->probd, prec->count)) {
+		} else if (drop_early((avg - prec->th_min_s) >> rp->rio_wshift,
+				      prec->probd, prec->count)) {
 			/* unforced drop by red */
 			droptype = DTYPE_EARLY;
 		}
-	}
-	else {
+	} else {
 		/* avg < th_min */
 		prec->old = 0;
 	}
@@ -750,8 +744,7 @@ rio_addq(rp, q, m, pktattr)
 			rp->q_stats[dpindex].drop_unforced++;
 		else
 			rp->q_stats[dpindex].drop_forced++;
-		rp->q_stats[dpindex].drop_packets++;
-		rp->q_stats[dpindex].drop_bytes += m->m_pkthdr.len;
+		PKTCNTR_ADD(&rp->q_stats[dpindex].drop_cnt, m_pktlen(m));
 #endif
 		m_freem(m);
 		return (-1);
@@ -767,10 +760,13 @@ rio_addq(rp, q, m, pktattr)
 		dsfield &= ~DSCP_MASK;
 
 	if (dsfield != odsfield)
-		write_dsfield(pktattr, dsfield);
+		write_dsfield(m, pktattr, dsfield);
 
 	_addq(q, m);
 
+#ifdef RIO_STATS
+	PKTCNTR_ADD(&rp->q_stats[dpindex].xmit_cnt, m_pktlen(m));
+#endif
 	return (0);
 }
 
@@ -819,14 +815,9 @@ rio_getq(rp, q)
 			}
 		}
 	}
-
-#ifdef RIO_STATS
-	rp->q_stats[dpindex].xmit_packets++;
-	rp->q_stats[dpindex].xmit_bytes += m->m_pkthdr.len;
-#endif
-
 	return (m);
 }
+
 #ifdef KLD_MODULE
 
 static struct altqsw rio_sw =
@@ -836,4 +827,4 @@ ALTQ_MODULE(altq_rio, ALTQT_RIO, &rio_sw);
 
 #endif /* KLD_MODULE */
 
-#endif /* RIO */
+#endif /* ALTQ_RIO */

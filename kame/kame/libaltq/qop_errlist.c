@@ -1,5 +1,6 @@
+/*	$KAME: qop_errlist.c,v 1.2 2000/10/18 09:15:19 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: qop_errlist.c,v 1.1 2000/01/18 07:29:06 kjc Exp $
  */
 
 const char *qop_errlist[] = {
@@ -42,7 +41,7 @@ const char *qop_errlist[] = {
 	"bad filter value",				/* 12 */
 	"filter shadows an existing filter",		/* 13 */
 	"admission failure",				/* 14 */
-	"admission failure (no badnwidth)",		/* 15 */
+	"admission failure (no bandwidth)",		/* 15 */
 	"admission failure (delay)",			/* 16 */
 	"admission failure (no service)",		/* 17 */
 	"policy error",					/* 18 */

@@ -1,4 +1,4 @@
-/*	$KAME: altq_subr.c,v 1.5 2000/07/25 10:12:31 kjc Exp $	*/
+/*	$KAME: altq_subr.c,v 1.6 2000/10/18 09:15:24 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -25,7 +25,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_subr.c,v 1.5 2000/07/25 10:12:31 kjc Exp $
+ * $Id: altq_subr.c,v 1.6 2000/10/18 09:15:24 kjc Exp $
  */
 
 #ifdef ALTQ
@@ -358,9 +358,9 @@ tbr_timeout(arg)
 	void *arg;
 {
 	struct ifnet *ifp;
-	int i, s;
+	int active, s;
 
-	i = 0;
+	active = 0;
 	s = splimp();
 #ifdef __FreeBSD__
 #if (__FreeBSD_version < 300000)
@@ -374,18 +374,16 @@ tbr_timeout(arg)
 	{
 		if (!TBR_IS_ENABLED(&ifp->if_snd))
 			continue;
-		i++;
-		if (!IFQ_IS_EMPTY(&ifp->if_snd) &&
-		    ifp->if_snd.altq_tbr->tbr_token <= 0 &&
-		    ifp->if_start != NULL)
+		active++;
+		if (!IFQ_IS_EMPTY(&ifp->if_snd) && ifp->if_start != NULL)
 			(*ifp->if_start)(ifp);
 	}
 	splx(s);
-	if (i > 0)
+	if (active > 0)
 		timeout(tbr_timeout, (void *)0, 1);
 	else
 		tbr_timer = 0;	/* don't need tbr_timer anymore */
-#ifdef __alpha__
+#if defined(__alpha__) && !defined(ALTQ_NOPCC)
 	{
 		/*
 		 * XXX read out the machine dependent clock once a second
@@ -398,7 +396,7 @@ tbr_timeout(arg)
 			cnt = 0;
 		}
 	}
-#endif /* __alpha__ */
+#endif /* __alpha__ && !ALTQ_NOPCC */
 }
 
 /*
@@ -774,6 +772,12 @@ acc_add_filter(classifier, filter, class, phandle)
 		else if (filter4->ff_mask.mask_src.s_addr == 0)
 			filter4->ff_mask.mask_src.s_addr = 0xffffffff;
 
+		/* clear extra bits in addresses  */
+		   filter4->ff_flow.fi_dst.s_addr &=
+		       filter4->ff_mask.mask_dst.s_addr;
+		   filter4->ff_flow.fi_src.s_addr &=
+		       filter4->ff_mask.mask_src.s_addr;
+
 		/*
 		 * if dst address is a wildcard, use hash-entry
 		 * ACC_WILDCARD_INDEX.
@@ -802,6 +806,14 @@ acc_add_filter(classifier, filter, class, phandle)
 			filter6->ff_mask6.mask6_src = in6mask0;
 		else if (IN6_IS_ADDR_UNSPECIFIED(&filter6->ff_mask6.mask6_src))
 			filter6->ff_mask6.mask6_src = in6mask128;
+
+		/* clear extra bits in addresses  */
+		for (i = 0; i < 16; i++)
+			filter6->ff_flow6.fi6_dst.s6_addr[i] &=
+			    filter6->ff_mask6.mask6_dst.s6_addr[i];
+		for (i = 0; i < 16; i++)
+			filter6->ff_flow6.fi6_src.s6_addr[i] &=
+			    filter6->ff_mask6.mask6_src.s6_addr[i];
 		
 		if (filter6->ff_flow6.fi6_flowlabel == 0)
 			i = ACC_WILDCARD_INDEX;
@@ -930,8 +942,7 @@ acc_classify(clfier, m, af)
 						    &afp->f_filter, fp))
 					/* filter matched */
 					return (afp->f_class);
-		}
-		else {
+		} else {
 			/* get the filter hash entry from its dest address */
 			i = ACC_GET_HASH_INDEX(fp->fi_dst.s_addr);
 			do {
@@ -1072,6 +1083,8 @@ apply_filter6(fbmask, filt, pkt)
 	struct flow_filter6 *filt;
 	struct flowinfo_in6 *pkt;
 {
+	int i;
+
 	if (filt->ff_flow6.fi6_family != AF_INET6)
 		return (0);
 	if ((fbmask & FIMB6_FLABEL) &&
@@ -1087,40 +1100,18 @@ apply_filter6(fbmask, filt, pkt)
 	    filt->ff_flow6.fi6_dport != pkt->fi6_dport)
 		return (0);
 	if (fbmask & FIMB6_SADDR) {
-		if (filt->ff_flow6.fi6_src.s6_addr32[0] !=
-		    (pkt->fi6_src.s6_addr32[0] &
-		     filt->ff_mask6.mask6_src.s6_addr32[0]))
-			return (0);
-		if (filt->ff_flow6.fi6_src.s6_addr32[1] !=
-		    (pkt->fi6_src.s6_addr32[1] &
-		     filt->ff_mask6.mask6_src.s6_addr32[1]))
-			return (0);
-		if (filt->ff_flow6.fi6_src.s6_addr32[2] !=
-		    (pkt->fi6_src.s6_addr32[2] &
-		     filt->ff_mask6.mask6_src.s6_addr32[2]))
-			return (0);
-		if (filt->ff_flow6.fi6_src.s6_addr32[3] !=
-		    (pkt->fi6_src.s6_addr32[3] &
-		     filt->ff_mask6.mask6_src.s6_addr32[3]))
-			return (0);
+		for (i = 0; i < 4; i++)
+			if (filt->ff_flow6.fi6_src.s6_addr32[i] !=
+			    (pkt->fi6_src.s6_addr32[i] &
+			     filt->ff_mask6.mask6_src.s6_addr32[i]))
+				return (0);
 	}
 	if (fbmask & FIMB6_DADDR) {
-		if (filt->ff_flow6.fi6_dst.s6_addr32[0] !=
-		    (pkt->fi6_dst.s6_addr32[0] &
-		     filt->ff_mask6.mask6_dst.s6_addr32[0]))
-			return (0);
-		if (filt->ff_flow6.fi6_dst.s6_addr32[1] !=
-		    (pkt->fi6_dst.s6_addr32[1] &
-		     filt->ff_mask6.mask6_dst.s6_addr32[1]))
-			return (0);
-		if (filt->ff_flow6.fi6_dst.s6_addr32[2] !=
-		    (pkt->fi6_dst.s6_addr32[2] &
-		     filt->ff_mask6.mask6_dst.s6_addr32[2]))
-			return (0);
-		if (filt->ff_flow6.fi6_dst.s6_addr32[3] !=
-		    (pkt->fi6_dst.s6_addr32[3] &
-		     filt->ff_mask6.mask6_dst.s6_addr32[3]))
-			return (0);
+		for (i = 0; i < 4; i++)
+			if (filt->ff_flow6.fi6_dst.s6_addr32[i] !=
+			    (pkt->fi6_dst.s6_addr32[i] &
+			     filt->ff_mask6.mask6_dst.s6_addr32[i]))
+				return (0);
 	}
 	if ((fbmask & FIMB6_TCLASS) &&
 	    filt->ff_flow6.fi6_tclass !=
@@ -1254,7 +1245,7 @@ struct ip4_frag {
 
 static TAILQ_HEAD(ip4f_list, ip4_frag) ip4f_list; /* IPv4 fragment cache */
 
-#define	IP4F_TABSIZE		8	/* IPv4 fragment cache size */
+#define	IP4F_TABSIZE		16	/* IPv4 fragment cache size */
 
 
 static void
@@ -1322,8 +1313,10 @@ ip4f_init(void)
 		MALLOC(fp, struct ip4_frag *, sizeof(struct ip4_frag),
 		       M_DEVBUF, M_NOWAIT);
 		if (fp == NULL) {
-			printf("ip4f_initcache: can't alloc cache entry!\n");
-			return (-1);
+			printf("ip4f_init: can't alloc %dth entry!\n", i);
+			if (i == 0)
+				return (-1);
+			return (0);
 		}
 		fp->ip4f_valid = 0;
 		TAILQ_INSERT_TAIL(&ip4f_list, fp, ip4f_chain);
@@ -1357,43 +1350,85 @@ ip4f_free(fp)
  * read and write diffserv field in IPv4 or IPv6 header
  */
 u_int8_t
-read_dsfield(pktattr)
+read_dsfield(m, pktattr)
+	struct mbuf *m;
 	struct altq_pktattr *pktattr;
 {
-	u_int8_t ds_field;
+	struct mbuf *m0;
+	u_int8_t ds_field = 0;
 	
-	if (pktattr == NULL)
+	if (pktattr == NULL ||
+	    (pktattr->pattr_af != AF_INET && pktattr->pattr_af != AF_INET6))
 		return ((u_int8_t)0);
 
-	if (pktattr->pattr_af == AF_INET)
-		ds_field = ((struct ip *)pktattr->pattr_hdr)->ip_tos;
+	/* verify that pattr_hdr is within the mbuf data */
+	for (m0 = m; m0 != NULL; m0 = m0->m_next)
+		if ((pktattr->pattr_hdr >= m0->m_data) &&
+		    (pktattr->pattr_hdr < m0->m_data + m0->m_len))
+			break;
+	if (m0 == NULL) {
+		/* ick, pattr_hdr is stale */
+		pktattr->pattr_af = AF_UNSPEC;
+#ifdef ALTQ_DEBUG
+		printf("read_dsfield: can't locate header!\n");
+#endif
+		return ((u_int8_t)0);
+	}
+
+	if (pktattr->pattr_af == AF_INET) {
+		struct ip *ip = (struct ip *)pktattr->pattr_hdr;
+		
+		if (ip->ip_v != 4)
+			return ((u_int8_t)0);	/* version mismatch! */
+		ds_field = ip->ip_tos;
+	}
 #ifdef INET6
 	else if (pktattr->pattr_af == AF_INET6) {
+		struct ip6_hdr *ip6 = (struct ip6_hdr *)pktattr->pattr_hdr;
 		u_int32_t flowlabel;
 		
-		flowlabel = ((struct ip6_hdr *)pktattr->pattr_hdr)->ip6_flow;
-		ds_field = (ntohl(flowlabel) >> 20) & 0xff;
+		flowlabel = ntohl(ip6->ip6_flow);
+		if ((flowlabel >> 28) != 6)
+			return ((u_int8_t)0);	/* version mismatch! */
+		ds_field = (flowlabel >> 20) & 0xff;
 	}
 #endif
-	else
-		ds_field = 0; /* XXX */
-
 	return (ds_field);
 }
 
 void
-write_dsfield(pktattr, dsfield)
+write_dsfield(m, pktattr, dsfield)
+	struct mbuf *m;
 	struct altq_pktattr *pktattr;
 	u_int8_t dsfield;
 {
-	if (pktattr == NULL)
+	struct mbuf *m0;
+
+	if (pktattr == NULL ||
+	    (pktattr->pattr_af != AF_INET && pktattr->pattr_af != AF_INET6))
 		return;
+
+	/* verify that pattr_hdr is within the mbuf data */
+	for (m0 = m; m0 != NULL; m0 = m0->m_next)
+		if ((pktattr->pattr_hdr >= m0->m_data) &&
+		    (pktattr->pattr_hdr < m0->m_data + m0->m_len))
+			break;
+	if (m0 == NULL) {
+		/* ick, pattr_hdr is stale */
+		pktattr->pattr_af = AF_UNSPEC;
+#ifdef ALTQ_DEBUG
+		printf("write_dsfield: can't locate header!\n");
+#endif
+		return;
+	}
 
 	if (pktattr->pattr_af == AF_INET) {
 		struct ip *ip = (struct ip *)pktattr->pattr_hdr;
 		u_int8_t old;
 		int32_t sum;
-		
+
+		if (ip->ip_v != 4)
+			return;		/* version mismatch! */
 		old = ip->ip_tos;
 		dsfield |= old & 3;	/* leave CU bits */
 		if (old == dsfield)
@@ -1416,6 +1451,8 @@ write_dsfield(pktattr, dsfield)
 		u_int32_t flowlabel;
 
 		flowlabel = ntohl(ip6->ip6_flow);
+		if ((flowlabel >> 28) != 6)
+			return;		/* version mismatch! */
 		flowlabel = (flowlabel & 0xf03fffff) | (dsfield << 20);
 		ip6->ip6_flow = htonl(flowlabel);
 	}

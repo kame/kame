@@ -1,5 +1,6 @@
+/*	$KAME: qop_conf.c,v 1.2 2000/10/18 09:15:19 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: qop_conf.c,v 1.1 2000/01/18 07:29:06 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -49,6 +48,8 @@ extern interface_parser_t	rio_interface_parser;
 extern interface_parser_t	blue_interface_parser;
 extern interface_parser_t	wfq_interface_parser;
 extern interface_parser_t	fifoq_interface_parser;
+extern interface_parser_t	priq_interface_parser;
+extern class_parser_t		priq_class_parser;
 
 struct qdisc_parser qdisc_parser[] = {
 	{"null",	null_interface_parser,	null_class_parser},
@@ -59,6 +60,7 @@ struct qdisc_parser qdisc_parser[] = {
 	{"blue",	blue_interface_parser,	NULL},
 	{"wfq",		wfq_interface_parser,	NULL},
 	{"fifoq",	fifoq_interface_parser,	NULL},
+	{"priq",	priq_interface_parser,	priq_class_parser},
 	{NULL, NULL, NULL}
 };
 

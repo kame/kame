@@ -1,5 +1,6 @@
+/*	$KAME: altqstat.c,v 1.2 2000/10/18 09:15:16 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,11 +23,10 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: altqstat.c,v 1.1 2000/01/18 07:28:58 kjc Exp $
  */
 
 #include <sys/param.h>
+#include <sys/time.h>
 #include <sys/fcntl.h>
 
 #include <stdio.h>
@@ -166,4 +166,58 @@ main (int argc, char **argv)
 	/* never returns */
 
 	exit(0);
+}
+
+/* calculate interval in sec */
+double
+calc_interval(struct timeval *cur_time, struct timeval *last_time)
+{
+	double sec;
+
+	sec = (double)(cur_time->tv_sec - last_time->tv_sec) +
+	    (double)(cur_time->tv_usec - last_time->tv_usec) / 1000000;
+	return (sec);
+}
+
+
+/* calculate rate in bps */
+double
+calc_rate(u_int64_t new_bytes, u_int64_t last_bytes, double interval)
+{
+	double rate;
+
+	rate = (double)(new_bytes - last_bytes) * 8 / interval;
+	return (rate);
+}
+
+/* calculate packets in second */
+double
+calc_pps(u_int64_t new_pkts, u_int64_t last_pkts, double interval)
+{
+	double pps;
+
+	pps = (double)(new_pkts - last_pkts) / interval;
+	return (pps);
+}
+
+#define	R2S_BUFS	8
+
+char *
+rate2str(double rate)
+{
+	char *buf;
+	static char r2sbuf[R2S_BUFS][16];  /* ring bufer for up to R2S_BUFS */
+	static int idx = 0;
+
+	buf = r2sbuf[idx++];
+	if (idx == R2S_BUFS)
+		idx = 0;
+
+	if (rate == 0.0)
+		sprintf(buf, "0");
+	else if (rate >= 1000000.0)
+		sprintf(buf, "%.2fM", rate / 1000000.0);
+	else
+		sprintf(buf, "%.2fK", rate / 1000.0);
+	return (buf);
 }

@@ -1,4 +1,4 @@
-/* $Id: parser.c,v 1.4 2000/05/05 16:37:10 itojun Exp $ */
+/*	$KAME: parser.c,v 1.5 2000/10/18 09:15:18 kjc Exp $	*/
 /*******************************************************************
 
   Copyright (c) 1996 by the University of Southern California
@@ -82,7 +82,6 @@ static int ctl_parser(char *cmdbuf);
 static int delete_parser(char *cmdbuf);
 static int red_parser(char *cmdbuf);
 static int rio_parser(char *cmdbuf);
-static int tbrio_parser(char *cmdbuf);
 static int conditioner_parser(char *cmdbuf);
 static int tc_action_parser(char *ifname, char **cpp,
 			    struct tc_action *action);
@@ -115,7 +114,7 @@ enum op_codes {
 #ifdef INET6
 	OP_FILTER6,
 #endif
-	OP_RED,		OP_RIO,		OP_TBRIO,
+	OP_RED,		OP_RIO,
 	OP_CDNR,
         OP_NULL, 	OP_BUG
 };
@@ -134,14 +133,13 @@ struct cmds {
 	{ "interface",	OP_IFACE,	" interface if_name [bandwidth bps] [cbq|hfsc]\n" },
 	{ "class",	OP_CLASS,	" class discipline if_name class_name [parent]\n" },
 	{ "filter",	OP_FILTER,	" filter if_name class_name [name filt_name] dst [netmask #] dport src [netmask #] sport proto [tos # [tosmask #] [gpi #] [dontwarn]\n" },
-	{ "altq",	OP_ALTQ,	" disc if_name {enable|disable|acc enable|acc disable}\n" },
+	{ "altq",	OP_ALTQ,	" disc if_name {enable|disable}\n" },
 	{ "delete",	OP_DEL,		" delete if_name class_name\n" },
 #ifdef INET6
 	{ "filter6",	OP_FILTER6,	" filter6 if_name class_name [name filt_name] dst[/prefix] dport src[/prefix] sport proto [flowlabel #][tclass # [tclassmask #]][gpi #] [dontwarn]\n" },
 #endif
 	{ "red", 	OP_RED,		" red th_min th_max inv_pmax\n" },
 	{ "rio", 	OP_RIO,		" rio low_th_min low_th_max low_inv_pmax med_th_min med_th_max med_inv_pmax high_th_min high_th_max high_inv_pmax\n" },
-	{ "tbrio", 	OP_TBRIO,	" tbrio pktsize holdtime lowat\n" },
 	{ "conditioner", OP_CDNR,	" conditioner if_name cdnr_name <tc_action>\n" },
 	{ "bug",	OP_BUG,		" bug (On/Off)\n" },
 	{ "",		OP_NULL,	"" } /* MUST BE LAST IN CMD TABLE */
@@ -287,8 +285,7 @@ DoCommand(char *infile, FILE *infp)
 			(void) qcmd_destroyall();
 			(void) fclose(infp);
 			exit(1);
-		}	
-		else {
+		} else {
 			/* interactive mode */
 			printf("error: usage :");
 			show_help(cmdp->cmd_op);
@@ -381,9 +378,6 @@ do_cmd(int op, char *cmdbuf)
 	case OP_RIO:
 		rval = rio_parser(cmdbuf);
 		break;
-	case OP_TBRIO:
-		rval = tbrio_parser(cmdbuf);
-		break;
 	case OP_CDNR:
 		rval = conditioner_parser(cmdbuf);
 		break;
@@ -392,8 +386,7 @@ do_cmd(int op, char *cmdbuf)
 			/* turn off verbose */
 			l_debug = LOG_INFO;
 			m_debug &= ~DEBUG_ALTQ;
-		}
-		else {
+		} else {
 			/* turn on verbose */
 			l_debug = LOG_DEBUG;
 			m_debug |= DEBUG_ALTQ;
@@ -541,14 +534,12 @@ get_fltr_opts(char **cpp, char *fltr_name, int *ruleno)
 				return (0);
 			strcpy(fltr_name, w);
 			*cpp = ocp;
-		}
-		else if (EQUAL(w, "ruleno")) {
+		} else if (EQUAL(w, "ruleno")) {
 			if (!next_word(&ocp, w))
 				return (0);
 			*ruleno = (int)strtol(w, NULL, 0);
 			*cpp = ocp;
-		}
-		else
+		} else
 			break;
 	}
 	return (1);
@@ -639,8 +630,7 @@ class_parser(char *cmdbuf)
 	}
 	if (!EQUAL(parent_name, "null") && !EQUAL(parent_name, "NULL")) {
 		parent = parent_name;
-	}
-	else {
+	} else {
 		parent = NULL;
 	}
 
@@ -772,16 +762,14 @@ filter_parser(char *cmdbuf)
 			}
 			sfilt.ff_flow.fi_tos = tos; 
 			sfilt.ff_mask.mask_tos = tosmask; 
-		}
-		else if (EQUAL(w, "gpi")) {
+		} else if (EQUAL(w, "gpi")) {
 			if (next_word(&cp, w)) {
 				sfilt.ff_flow.fi_gpi =
 					(u_int32_t)strtoul(w, NULL, 0);
 				sfilt.ff_flow.fi_gpi =
 					htonl(sfilt.ff_flow.fi_gpi);
 			}
-		}
-		else if (EQUAL(w, "dontwarn"))
+		} else if (EQUAL(w, "dontwarn"))
 			dontwarn = 1;
 	}
 
@@ -912,24 +900,21 @@ filter6_parser(char *cmdbuf)
 			}
 			sfilt.ff_flow6.fi6_tclass = tclass; 
 			sfilt.ff_mask6.mask6_tclass = tclassmask; 
-		}
-		else if (EQUAL(w, "gpi")) {
+		} else if (EQUAL(w, "gpi")) {
 			if (next_word(&cp, w)) {
 				sfilt.ff_flow6.fi6_gpi =
 					(u_int32_t)strtoul(w, NULL, 0);
 				sfilt.ff_flow6.fi6_gpi =
 					htonl(sfilt.ff_flow6.fi6_gpi);
 			}
-		}
-		else if (EQUAL(w, "flowlabel")) {
+		} else if (EQUAL(w, "flowlabel")) {
 			if (next_word(&cp, w)) {
 				sfilt.ff_flow6.fi6_flowlabel =
 				   (u_int32_t)strtoul(w, NULL, 0) & 0x000fffff;
 				sfilt.ff_flow6.fi6_flowlabel =
 					htonl(sfilt.ff_flow6.fi6_flowlabel);
 			}
-		}
-		else if (EQUAL(w, "dontwarn"))
+		} else if (EQUAL(w, "dontwarn"))
 			dontwarn = 1;
 	}
 
@@ -993,8 +978,7 @@ get_ip6addr(char **cpp, struct in6_addr *addr, struct in6_addr *mask)
 		IN6ADDR32(addr, 1) &= IN6ADDR32(mask, 1);
 		IN6ADDR32(addr, 2) &= IN6ADDR32(mask, 2);
 		IN6ADDR32(addr, 3) &= IN6ADDR32(mask, 3);
-	}
-	else
+	} else
 		/* full mask */
 		memset(mask, 0xff, sizeof(struct in6_addr));
 
@@ -1008,7 +992,7 @@ ctl_parser(char *cmdbuf)
 {
 	char	w[128], *cp = cmdbuf;
 	char	*ifname;
-	int	state, acc_state;
+	int	state;
 	int	rval;
     
 	if (!get_ifname(&cp, &ifname)) {
@@ -1019,10 +1003,8 @@ ctl_parser(char *cmdbuf)
 
 	if (!next_word(&cp, w)) {
 		state = is_q_enabled(ifname);
-		acc_state = is_q_acc_enabled(ifname);
-		printf("altq %s (accounting %s) on %s\n",
-		       state ? "enabled" : "disabled",
-		       acc_state ? "enabled" : "disabled", ifname);
+		printf("altq %s on %s\n",
+		       state ? "enabled" : "disabled", ifname);
 		return (1);
 	}
 	
@@ -1030,35 +1012,15 @@ ctl_parser(char *cmdbuf)
 		rval = qcmd_enable(ifname);
 		printf("altq %s on %s\n",
 		       (rval == 0) ? "enabled" : "enable failed!", ifname);
-	}
-	else if (EQUAL(w, "disable")) {
+	} else if (EQUAL(w, "disable")) {
 		rval = qcmd_disable(ifname);
 		printf("altq %s on %s\n",
 		       (rval == 0) ? "disabled" : "disable failed!", ifname);
-	}
-	else if (EQUAL(w, "acc")) {
-		if (!next_word(&cp, w))
-			return (0);
-
-		if (EQUAL(w, "enable")) {
-			rval = qcmd_acc_enable(ifname);
-			printf("altq accounting %s on %s\n",
-			   (rval == 0) ? "enabled" : "enable failed!", ifname);
-		}
-		else if (EQUAL(w, "disable")) {
-			rval = qcmd_acc_disable(ifname);
-			printf("altq accounting %s on %s\n",
-			 (rval == 0) ? "disabled" : "disable failed!", ifname);
-		}
-		else
-			return (0);
-	}
-	else if (EQUAL(w, "reload")) {
+	} else if (EQUAL(w, "reload")) {
 		printf("reinitializing altq...\n");
 		qcmd_destroyall();
 		qcmd_init();
-	}
-	else
+	} else
 		return (0);
 	return (1);
 }
@@ -1161,38 +1123,6 @@ rio_parser(char *cmdbuf)
 }
 
 static int
-tbrio_parser(char *cmdbuf)
-{
-	char	w[128], *cp = cmdbuf;
-	int avg_pkt_size, holdtime_pkts, lowat;
-
-	if (!next_word(&cp, w))
-		goto bad;
-	avg_pkt_size = (int)strtol(w, NULL, 0);
-
-	if (!next_word(&cp, w))
-		goto bad;
-	holdtime_pkts = (int)strtol(w, NULL, 0);
-
-	if (!next_word(&cp, w))
-		goto bad;
-	lowat = (int)strtol(w, NULL, 0);
-
-	if (qop_tbrio_setdef(avg_pkt_size, holdtime_pkts, lowat) != 0) {
-		LOG(LOG_ERR, 0, "can't set tbrio default parameters\n");
-		return (0);
-	}
-
-	return (1);
-
- bad:
-	LOG(LOG_ERR, 0, "bad tbrio parameter in %s, line %d\n",
-	    altqconfigfile, line_no);
-	return (0);
-}
-
-
-static int
 conditioner_parser(char *cmdbuf)
 {
 	char	cdnr_name[128], *cp = cmdbuf;
@@ -1291,14 +1221,11 @@ tc_action_parser(char *ifname, char **cpp, struct tc_action *action)
 			    w, altqconfigfile, line_no);
 			return (0);
 		}
-	}
-	else if (EQUAL(type, "pass")) {
+	} else if (EQUAL(type, "pass")) {
 		action->tca_code = TCACODE_PASS;
-	}
-	else if (EQUAL(type, "drop")) {
+	} else if (EQUAL(type, "drop")) {
 		action->tca_code = TCACODE_DROP;
-	}
-	else if (EQUAL(type, "mark")) {
+	} else if (EQUAL(type, "mark")) {
 		if (!next_word(&cp, w)) {
 			LOG(LOG_ERR, 0, "missing dscp in %s, line %d\n",
 			    altqconfigfile, line_no);
@@ -1306,8 +1233,7 @@ tc_action_parser(char *ifname, char **cpp, struct tc_action *action)
 		}
 		action->tca_code = TCACODE_MARK;
 		action->tca_dscp = (u_int8_t)strtol(w, NULL, 0);
-	}
-	else if (EQUAL(type, "tbmeter")) {
+	} else if (EQUAL(type, "tbmeter")) {
 		if (!next_word(&cp, w)) {
 			LOG(LOG_ERR, 0, "missing tb profile in %s, line %d\n",
 			    altqconfigfile, line_no);
@@ -1328,8 +1254,7 @@ tc_action_parser(char *ifname, char **cpp, struct tc_action *action)
 		if (qcmd_cdnr_add_tbmeter(action, ifname, NULL, &profile[0],
 					  &action[1], &action[2]) != 0)
 			return (0);
-	}
-	else if (EQUAL(type, "trtcm")) {
+	} else if (EQUAL(type, "trtcm")) {
 		int coloraware = 0;	/* default is color-blind */
 
 		for (i=0; i<2; i++) {
@@ -1366,30 +1291,7 @@ tc_action_parser(char *ifname, char **cpp, struct tc_action *action)
 					&action[1], &action[2], &action[3],
 					coloraware) != 0)
 			return (0);
-	}
-	else if (EQUAL(type, "tbrio")) {
-		if (!next_word(&cp, w)) {
-			LOG(LOG_ERR, 0, "missing tb profile in %s, line %d\n",
-			    altqconfigfile, line_no);
-			return (0);
-		}
-		profile[0].rate = atobps(w);
-		if (!next_word(&cp, w)) {
-			LOG(LOG_ERR, 0, "missing tb profile in %s, line %d\n",
-			    altqconfigfile, line_no);
-			return (0);
-		}
-		profile[0].depth = atobytes(w);
-		if (tc_action_parser(ifname, &cp, &action[1]) == 0)
-			return (0);
-		if (tc_action_parser(ifname, &cp, &action[2]) == 0)
-			return (0);
-
-		if (qcmd_cdnr_add_tbrio(action, ifname, NULL, &profile[0],
-					&action[1], &action[2]) != 0)
-			return (0);
-	}
-	else if (EQUAL(type, "tswtcm")) {
+	} else if (EQUAL(type, "tswtcm")) {
 		u_int32_t cmtd_rate, peak_rate, avg_interval;
 		
 		if (!next_word(&cp, w)) {
@@ -1425,8 +1327,7 @@ tc_action_parser(char *ifname, char **cpp, struct tc_action *action)
 					 &action[1], &action[2], &action[3])
 		    != 0)
 			return (0);
-	}
-	else {
+	} else {
 		LOG(LOG_ERR, 0,
 		    "Unkown action type %s in %s, line %d\n",
 		    type, altqconfigfile, line_no);

@@ -1,5 +1,6 @@
+/*	$KAME: qop_cdnr.h,v 1.4 2000/10/18 09:15:19 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: qop_cdnr.h,v 1.3 2000/03/02 11:55:46 kjc Exp $
  */
 
 /*
@@ -51,11 +50,6 @@ struct cdnrinfo {
 			int			coloraware;
 		} trtcm;
 		struct {
-			struct tb_profile	profile;
-			struct tc_action	in_action;
-			struct tc_action	out_action;
-		} tbrio;
-		struct {
 			u_int32_t		cmtd_rate;
 			u_int32_t		peak_rate;
 			u_int32_t		avg_interval;
@@ -82,11 +76,6 @@ int qcmd_cdnr_add_trtcm(struct tc_action *rp, const char *ifname,
 			struct tc_action *green_action,
 			struct tc_action *yellow_action,
 			struct tc_action *red_action, int coloraware);
-int qcmd_cdnr_add_tbrio(struct tc_action *rp, const char *ifname,
-			const char *cdnr_name, 
-			struct tb_profile *profile,
-			struct tc_action *in_action,
-			struct tc_action *out_action);
 int qcmd_cdnr_add_tswtcm(struct tc_action *rp, const char *ifname,
 			 const char *cdnr_name, const u_int32_t cmtd_rate,
 			 const u_int32_t peak_rate,
@@ -95,6 +84,7 @@ int qcmd_cdnr_add_tswtcm(struct tc_action *rp, const char *ifname,
 			 struct tc_action *yellow_action,
 			 struct tc_action *red_action);
 int qcmd_cdnr_delete(const char *ifname, const char *cdnr_name);
+int qcmd_nop_add_if(const char *ifname);
 
 int qop_add_cdnr(struct classinfo **rp, const char *cdnr_name,
 		 struct ifinfo *ifinfo, struct classinfo **childlist,
@@ -110,9 +100,6 @@ int qop_cdnr_add_trtcm(struct classinfo **rp, const char *cdnr_name,
 	   struct tb_profile *cmtd_profile, struct tb_profile *peak_profile,
 	   struct tc_action *green_action, struct tc_action *yellow_action,
 	   struct tc_action *red_action, int colorware);
-int qop_cdnr_add_tbrio(struct classinfo **rp, const char *cdnr_name,
-		struct ifinfo *ifinfo, struct tb_profile *profile,
-		struct tc_action *in_action, struct tc_action *out_action);
 int qop_cdnr_add_tswtcm(struct classinfo **rp, const char *cdnr_name,
 			struct ifinfo *ifinfo, const u_int32_t cmtd_rate,
 			const u_int32_t peak_rate,
@@ -125,8 +112,6 @@ int qop_cdnr_modify_tbmeter(struct classinfo *clinfo,
 int qop_cdnr_modify_trtcm(struct classinfo *clinfo,
 			  struct tb_profile *cmtd_profile,
 			  struct tb_profile *peak_profile, int coloraware);
-int qop_cdnr_modify_tbrio(struct classinfo *clinfo,
-			    struct tb_profile *profile);
 int qop_cdnr_modify_tswtcm(struct classinfo *clinfo,
 			   const u_int32_t cmtd_rate,
 			   const u_int32_t peak_rate,

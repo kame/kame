@@ -1,5 +1,6 @@
+/*	$KAME: qdisc_fifoq.c,v 1.3 2000/10/18 09:15:16 kjc Exp $	*/
 /*
- * Copyright (C) 1999
+ * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -22,8 +23,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- *
- * $Id: qdisc_fifoq.c,v 1.2 2000/07/28 09:22:42 kjc Exp $
  */
 
 #include <sys/param.h>
@@ -49,21 +48,38 @@ void
 fifoq_stat_loop(int fd, const char *ifname, int count, int interval)
 {
 	struct fifoq_getstats get_stats;
+	struct timeval cur_time, last_time;
+	u_int64_t last_bytes;
+	double sec;
 	int cnt = count;
 
 	strcpy(get_stats.iface.fifoq_ifname, ifname);
+
+	gettimeofday(&last_time, NULL);
+	last_time.tv_sec -= interval;
+	last_bytes = 0;
 
 	while (count == 0 || cnt-- > 0) {
 	
 		if (ioctl(fd, FIFOQ_GETSTATS, &get_stats) < 0)
 			err(1, "ioctl FIFOQ_GETSTATS");
 
+		gettimeofday(&cur_time, NULL);
+		sec = calc_interval(&cur_time, &last_time);
+
 		printf(" q_len:%d q_limit:%d period:%u\n",
 		       get_stats.q_len, get_stats.q_limit, get_stats.period);
-		printf(" xmit:%u pkts (%qu bytes) drop:%u pkts (%qu bytes)\n",
-		       get_stats.xmit_packets, get_stats.xmit_bytes,
-		       get_stats.drop_packets, get_stats.drop_bytes);
-
+		printf(" xmit:%llu pkts (%llu bytes) drop:%llu pkts (%llu bytes)\n",
+		       (ull)get_stats.xmit_cnt.packets,
+		       (ull)get_stats.xmit_cnt.bytes,
+		       (ull)get_stats.drop_cnt.packets,
+		       (ull)get_stats.drop_cnt.bytes);
+		printf(" throughput: %sbps\n",
+		       rate2str(calc_rate(get_stats.xmit_cnt.bytes,
+					  last_bytes, sec)));
+		
+		last_bytes = get_stats.xmit_cnt.bytes;
+		last_time = cur_time;
 		sleep(interval);
 	}
 }

@@ -96,6 +96,7 @@ all)
 	sh MAKEDEV.altq hfsc
 	sh MAKEDEV.altq cdnr
 	sh MAKEDEV.altq blue
+	sh MAKEDEV.altq priq
 	;;
 
 altq)
@@ -183,6 +184,14 @@ blue)
 	mknod ${devpath}/altq/blue c $altqchr 10
 	chown root.wheel ${devpath}/altq/blue
 	chmod 644 ${devpath}/altq/blue
+	;;
+
+priq)
+	rm -f ${devpath}/blue
+	rm -f ${devpath}/altq/priq
+	mknod ${devpath}/altq/priq c $altqchr 11
+	chown root.wheel ${devpath}/altq/priq
+	chmod 644 ${devpath}/altq/priq
 	;;
 
 *)

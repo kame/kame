@@ -1,4 +1,4 @@
-/*	$KAME: altq_fifoq.c,v 1.5 2000/07/28 09:20:54 kjc Exp $	*/
+/*	$KAME: altq_fifoq.c,v 1.6 2000/10/18 09:15:22 kjc Exp $	*/
 
 /*
  * Copyright (C) 1997-2000
@@ -25,13 +25,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_fifoq.c,v 1.5 2000/07/28 09:20:54 kjc Exp $
+ * $Id: altq_fifoq.c,v 1.6 2000/10/18 09:15:22 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
 #include "opt_altq.h"
 #endif /* __FreeBSD__ || __NetBSD__ */
-#ifdef FIFOQ	/* fifoq is enabled by FIFOQ option in opt_altq.h */
+#ifdef ALTQ_FIFOQ  /* fifoq is enabled by ALTQ_FIFOQ option in opt_altq.h */
 
 /*
  * FIFOQ is an altq sample implementation.  There will be little
@@ -225,10 +225,8 @@ fifoqioctl(dev, cmd, addr, flag, p)
 
 			q_stats->q_len		= q->q_len;
 			q_stats->q_limit 	= q->q_limit;
-			q_stats->xmit_packets	= q->q_stats.xmit_packets;
-			q_stats->xmit_bytes   	= q->q_stats.xmit_bytes;
-			q_stats->drop_packets 	= q->q_stats.drop_packets;
-			q_stats->drop_bytes   	= q->q_stats.drop_bytes;
+			q_stats->xmit_cnt	= q->q_stats.xmit_cnt;
+			q_stats->drop_cnt 	= q->q_stats.drop_cnt;
 			q_stats->period   	= q->q_stats.period;
 		} while (0);
 		break;
@@ -280,8 +278,7 @@ fifoq_enqueue(ifq, m, pktattr)
 	/* if the queue is full, drop the incoming packet(drop-tail) */
 	if (q->q_len >= q->q_limit) {
 #ifdef FIFOQ_STATS
-		q->q_stats.drop_packets++;
-		q->q_stats.drop_bytes += m->m_pkthdr.len;
+		PKTCNTR_ADD(&q->q_stats.drop_cnt, m_pktlen(m));
 #endif
 		m_freem(m);
 		return (ENOBUFS);
@@ -334,8 +331,7 @@ fifoq_dequeue(ifq, op)
 	q->q_len--;
 	ifq->ifq_len--;
 #ifdef FIFOQ_STATS
-	q->q_stats.xmit_packets++;
-	q->q_stats.xmit_bytes += m->m_pkthdr.len;
+	PKTCNTR_ADD(&q->q_stats.xmit_cnt, m_pktlen(m));
 	if (q->q_len == 0)
 		q->q_stats.period++;
 #endif
@@ -417,4 +413,4 @@ ALTQ_MODULE(altq_fifoq, ALTQT_FIFOQ, &fifoq_sw);
 
 #endif /* KLD_MODULE */
 
-#endif /* FIFOQ */
+#endif /* ALTQ_FIFOQ */

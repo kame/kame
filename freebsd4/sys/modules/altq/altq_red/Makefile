@@ -6,14 +6,14 @@ SRCS=	altq_red.c opt_altq.h opt_inet.h opt_inet6.h
 CFLAGS+= -DALTQ
 CLEANFILES+= opt_altq.h opt_inet.h opt_inet6.h
 
-ALTQMOD_FLOWVALVE?=	1
+ALTQMOD_ALTQ_FLOWVALVE?=	1
 ALTQMOD_INET?=	1
 ALTQMOD_INET6?=	1
 
 opt_altq.h:
-	echo "#define RED 1" > opt_altq.h
-.if ${ALTQMOD_FLOWVALVE} > 0
-	echo "#define FLOWVALVE 1" >> opt_altq.h
+	echo "#define ALTQ_RED 1" > opt_altq.h
+.if ${ALTQMOD_ALTQ_FLOWVALVE} > 0
+	echo "#define ALTQ_FLOWVALVE 1" >> opt_altq.h
 .endif
 
 opt_inet.h:
