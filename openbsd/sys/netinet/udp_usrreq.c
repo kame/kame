@@ -231,7 +231,6 @@ udp_input(struct mbuf *m, ...)
 	struct in6_multi_mship *imm;
 #endif
 
-
 	va_start(ap, m);
 	iphlen = va_arg(ap, int);
 	va_end(ap);
@@ -323,6 +322,10 @@ udp_input(struct mbuf *m, ...)
 		/*
 		 * In IPv6, the UDP checksum is ALWAYS used.
 		 */
+		if (uh->uh_sum == 0) {
+			udpstat.udps_nosum++;
+			goto bad;
+		}
 		if ((uh->uh_sum = in6_cksum(m, IPPROTO_UDP, iphlen, len))) {
 			udpstat.udps_badsum++;
 			goto bad;
@@ -825,6 +828,7 @@ inp_found:
 			}
 #ifdef INET6
 			if (ip6) {
+				uh->uh_sum = savesum;
 				icmp6_error(m, ICMP6_DST_UNREACH,
 				    ICMP6_DST_UNREACH_NOPORT,0);
 			} else

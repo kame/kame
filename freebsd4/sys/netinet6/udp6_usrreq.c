@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.13 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.77 2004/02/06 10:35:00 suz Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.78 2004/03/31 07:59:00 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -200,9 +200,11 @@ udp6_input(mp, offp, proto)
 	/*
 	 * Checksum extended UDP header and data.
 	 */
-	if (uh->uh_sum == 0)
+	if (uh->uh_sum == 0) {
 		udpstat.udps_nosum++;
-	else if (in6_cksum(m, IPPROTO_UDP, off, ulen) != 0) {
+		goto bad;
+	}
+	if (in6_cksum(m, IPPROTO_UDP, off, ulen) != 0) {
 		udpstat.udps_badsum++;
 		goto bad;
 	}

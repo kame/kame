@@ -483,9 +483,11 @@ udp6_input(mp, offp, proto)
 	/*
 	 * Checksum extended UDP header and data.
 	 */
-	if (uh->uh_sum == 0)
+	if (uh->uh_sum == 0) {
 		udp6stat.udp6s_nosum++;
-	else if (in6_cksum(m, IPPROTO_UDP, off, ulen) != 0) {
+		goto bad;
+	}
+	if (in6_cksum(m, IPPROTO_UDP, off, ulen) != 0) {
 		udp6stat.udp6s_badsum++;
 		goto bad;
 	}
