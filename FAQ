@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.66 2001/09/26 09:09:23 itojun Exp $
+$KAME: FAQ,v 1.67 2001/09/26 09:11:13 itojun Exp $
 
 
 GENERAL
@@ -501,8 +501,8 @@ Q: I see a lot of messages like follows:
 	If you have time, send a note to the owner of the machine indicated
 	in FROM.
 
-	The message gets generated only with older KAME SNAP kit.  Kernel
-	upgrade is suggested if you see these messages.
+	The message gets generated only with older KAME SNAP kit, or *BSD
+	releases.  Kernel upgrade is suggested if you are using KAME SNAP kit.
 
 Q: I have problem dianosing IPsec issues.  Are there any good tools?
 	tcpdump and netstat -sn are your friend.  Always try to take packet
