@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.76 2002/02/09 06:49:45 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.77 2002/03/21 02:38:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -89,20 +89,6 @@ struct in6_addrlifetime {
 	u_int32_t ia6t_pltime;	/* prefix lifetime */
 };
 
-#ifdef MEASURE_PERFORMANCE
-/*
- * Structure for hashing "local" IPv6 addresses for lookup in IPv6 input.
- */
-struct in6hash {
-	struct	in6hash *in6h_next;
-	struct	in6_addr in6h_addr;
-	struct	in6_ifaddr *in6h_ifa;
-	int	in6h_flags;
-	int	in6h_hit;	/* number of hits for this entry */
-	int	in6h_miss;	/* number of failures for this entry */
-};
-#endif
-
 struct	in6_ifaddr {
 	struct	ifaddr ia_ifa;		/* protocol-independent info */
 #define	ia_ifp		ia_ifa.ifa_ifp
@@ -127,10 +113,6 @@ struct	in6_ifaddr {
 
 	/* back pointer to the ND prefix (for autoconfigured addresses only) */
 	struct nd_prefix *ia6_ndpr;
-
-#ifdef MEASURE_PERFORMANCE
-	struct in6hash ia6_hash;	/* hash for ia_addr */
-#endif
 
 	/* multicast addresses joined from the kernel */
 	LIST_HEAD(, in6_multi_mship) ia6_memberships;
@@ -725,13 +707,6 @@ int in6_recoverscope __P((struct sockaddr_in6 *, const struct in6_addr *,
 	struct ifnet *));
 void in6_clearscope __P((struct in6_addr *));
 int in6_src_ioctl __P((u_long, caddr_t));
-
-#ifdef MEASURE_PERFORMANCE
-void in6h_hashinit __P((void));
-void in6h_addifa __P((struct in6_ifaddr *));
-struct in6hash *in6h_lookup __P((const struct in6_addr *, struct ifnet *));
-void in6h_rebuild __P((int));
-#endif
 #endif /* _KERNEL */
 
 #endif /* _NETINET6_IN6_VAR_H_ */
