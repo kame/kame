@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.16 2002/01/08 02:40:55 k-sugyou Exp $	*/
+/*	$KAME: if_hif.c,v 1.17 2002/01/17 06:05:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -690,6 +690,9 @@ hif_ha_list_update_withioctl(sc, data)
 	struct mip6_ha *nmha = (struct mip6_ha *)data;
 	struct mip6_ha *mha;
 	int error = 0;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	if (hifr == NULL) {
 		return (EINVAL);
@@ -763,7 +766,7 @@ hif_ha_list_update_withioctl(sc, data)
 	mha->mha_flags = nmha->mha_flags;
 	mha->mha_pref = nmha->mha_pref;
 	mha->mha_lifetime = nmha->mha_lifetime;
-	mha->mha_remain = mha->mha_lifetime;
+	mha->mha_expire = time_second + mha->mha_lifetime;
 
 	return (0);
 }
@@ -814,6 +817,9 @@ hif_subnet_list_update_withmpfx(sc, data)
 	struct mip6_prefix *mpfx;
 	struct mip6_subnet_prefix *mspfx;
 	int error = 0;
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	long time_second = time.tv_sec;
+#endif
 
 	if (hifr == NULL) {
 		return (EINVAL);
@@ -911,9 +917,9 @@ hif_subnet_list_update_withmpfx(sc, data)
 				return (EINVAL);
 			}
 			mpfx->mpfx_vltime = nmpfx->mpfx_vltime;
-			mpfx->mpfx_vlremain = mpfx->mpfx_vltime;
+			mpfx->mpfx_vlexpire = time_second + mpfx->mpfx_vltime;
 			mpfx->mpfx_pltime = nmpfx->mpfx_pltime;
-			mpfx->mpfx_plremain = mpfx->mpfx_pltime;
+			mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
 		}
 		hs = hif_subnet_create(ms);
 		if (hs == NULL) {
@@ -946,9 +952,9 @@ hif_subnet_list_update_withmpfx(sc, data)
 			return (EINVAL);
 		}
 		mpfx->mpfx_vltime = nmpfx->mpfx_vltime;
-		mpfx->mpfx_vlremain = mpfx->mpfx_vltime;
+		mpfx->mpfx_vlexpire = time_second + mpfx->mpfx_vltime;
 		mpfx->mpfx_pltime = nmpfx->mpfx_pltime;
-		mpfx->mpfx_plremain = mpfx->mpfx_pltime;
+		mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
 	}
 	return (0);
 }
