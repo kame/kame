@@ -1,4 +1,4 @@
-/*	$KAME: ip_ecn.h,v 1.4 2000/03/25 07:23:37 sumikawa Exp $	*/
+/*	$KAME: ip_ecn.h,v 1.5 2000/03/27 04:58:38 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -28,7 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: ip_ecn.h,v 1.4 2000/03/25 07:23:37 sumikawa Exp $
  */
 /*
  * ECN consideration on tunnel ingress/egress operation.
