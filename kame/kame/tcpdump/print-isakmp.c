@@ -30,7 +30,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.14 2000/10/04 03:51:37 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-isakmp.c,v 1.15 2000/12/13 07:32:30 itojun Exp $ (LBL)";
 #endif
 
 #include <string.h>
@@ -378,6 +378,8 @@ isakmp_attrmap_print(u_char *p, u_char *ep, struct attrmap *map, size_t nmap)
 		return ep + 1;
 	}
 
+	t = ntohs(q[0]) & 0x7fff;
+
 	if (map) {
 		while (map->type) {
 			if (map->index == t)
@@ -389,7 +391,6 @@ isakmp_attrmap_print(u_char *p, u_char *ep, struct attrmap *map, size_t nmap)
 	}
 
 	printf("(");
-	t = ntohs(q[0]) & 0x7fff;
 	if (map && map->type)
 		printf("type=%s ", map->type);
 	else
