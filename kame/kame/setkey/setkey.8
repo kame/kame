@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.64 2001/08/17 06:55:44 itojun Exp $
+.\"	$KAME: setkey.8,v 1.65 2001/08/17 09:01:31 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -602,7 +602,7 @@ deflate		rfc2394
 add 3ffe:501:4819::1 3ffe:501:481d::1 esp 123457
 	-E des-cbc 0x3ffe05014819ffff ;
 
-add 3ffe:501:4819::1 3ffe:501:481d::1 ah 123456
+add -6 myhost.example.com yourhost.example.com ah 123456
 	-A hmac-sha1 "AH SA configuration!" ;
 
 add 10.0.11.41 10.0.11.33 esp 0x10001
