@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.5 2000/05/30 15:55:35 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.6 2000/05/30 16:03:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -51,7 +51,7 @@ const char *dstport = MDNS_PORT;
 const char *dnsserv = NULL;
 const char *intface = NULL;
 int insock;
-int af = AF_INET;
+int af = AF_INET6;
 static char hostnamebuf[MAXHOSTNAMELEN];
 const char *hostname = NULL;
 static int mcasthops = 1;
