@@ -999,7 +999,7 @@ nd6_rtrequest(req, rt, sa)
 			 * When req == RTM_RESOLVE, rt is created and
 			 * initialized in rtrequest(), so rt_expire is 0.
 			 */
-			ln->ln_state = ND6_LLINFO_INCOMPLETE;
+			ln->ln_state = ND6_LLINFO_NOSTATE;
 			ln->ln_expire = time_second;
 		}
 		rt->rt_flags |= RTF_LLINFO;
