@@ -7,8 +7,9 @@ CLEANFILES+= lex.yy.c y.tab.h y.tab.c
 MAN5=	bgpd.conf.5
 MAN8=	bgpd.8
 
-CFLAGS+=-I${.OBJDIR} -I${.CURDIR}/../../kame/bgpd
+CFLAGS+= -I${.OBJDIR} -I${.CURDIR}/../../kame/bgpd
 CFLAGS+= -DHAVE_STDARG_H -DADVANCEDAPI -DINET6 -DUSE_RFC2292BIS
+CFLAGS+= -DHAVE_GETIFADDRS
 
 LDADD+=	-L${.OBJDIR}/../../lib/libinet6 \
 	-L/usr/local/v6/lib -linet6 -lcompat
