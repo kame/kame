@@ -1,4 +1,4 @@
-/*    $KAME: sctp.h,v 1.14 2003/11/25 06:40:52 ono Exp $    */
+/*	$KAME: sctp.h,v 1.15 2004/01/16 09:56:00 itojun Exp $	*/
 
 #ifndef _NETINET_SCTP_H_
 #define _NETINET_SCTP_H_

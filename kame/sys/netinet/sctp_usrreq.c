@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.33 2003/12/17 02:20:02 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.34 2004/01/16 09:56:01 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -496,7 +496,7 @@ sctp_ctlinput(cmd, sa, vip)
 #endif
 		stcb = sctp_findassociation_addr_sa((struct sockaddr *)&from,
 						    (struct sockaddr *)&to,
-						    &inp, &netp);
+						    &inp, &netp, 1);
 		if (stcb != NULL && inp && (inp->sctp_socket != NULL)) {
 			if (cmd != PRC_MSGSIZE) {
 				int cm;
@@ -536,6 +536,8 @@ sctp_getcred(SYSCTL_HANDLER_ARGS)
 {
 	struct sockaddr_in addrs[2];
 	struct sctp_inpcb *inp;
+	struct sctp_nets *net;
+	struct sctp_tcb *tcb;
 	int error, s;
 
 #if __FreeBSD_version >= 500000
@@ -549,13 +551,11 @@ sctp_getcred(SYSCTL_HANDLER_ARGS)
 	if (error)
 		return (error);
 
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-	s = splsoftnet();
-#else
 	s = splnet();
-#endif
-	inp = sctp_pcb_findep((struct sockaddr *)&addrs[0]);
-	if (inp == NULL || inp->sctp_socket == NULL) {
+	tcb = sctp_findassociation_addr_sa(sintosa(&addrs[0]),
+					   sintosa(&addrs[1]),
+					   &inp, &net, 1);
+	if (tcb == NULL || inp == NULL || inp->sctp_socket == NULL) {
 		error = ENOENT;
 		goto out;
 	}
@@ -2829,7 +2829,7 @@ sctp_optsset(struct socket *so,
 			struct sctp_inpcb  *lep;
 
 			((struct sockaddr_in *)addrs->addr)->sin_port = inp->sctp_lport;
-			lep = sctp_pcb_findep(addrs->addr);
+			lep = sctp_pcb_findep(addrs->addr, 1);
 			if (lep == inp) {
 				/* already bound to it.. ok */
 				break;
@@ -3401,7 +3401,7 @@ sctp_ingetaddr(struct socket *so,
 	       )
 {
 	int s;
-	register struct sockaddr_in *sin;
+	struct sockaddr_in *sin;
 	struct sctp_inpcb *inp;
 	/*
 	 * Do the malloc first in case it blocks.
@@ -3505,7 +3505,7 @@ sctp_peeraddr(struct socket *so,
 	      )
 {
 	int s, fnd;
-	register struct sockaddr_in *sin, *sin_a;
+	struct sockaddr_in *sin, *sin_a;
 	struct sctp_inpcb *inp;
 	struct sctp_tcb *tcb;
 	struct sctp_nets *net;

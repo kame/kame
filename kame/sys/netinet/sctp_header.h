@@ -1,4 +1,4 @@
-/*    $KAME: sctp_header.h,v 1.9 2003/11/25 06:40:52 ono Exp $     */
+/*	$KAME: sctp_header.h,v 1.10 2004/01/16 09:56:00 itojun Exp $	*/
 
 #ifndef __sctp_header_h__
 #define __sctp_header_h__
@@ -73,10 +73,11 @@ struct sctp_heartbeat_info_param {
 	struct sctp_paramhdr ph;
 	u_int32_t time_value_1;
 	u_int32_t time_value_2;
-	u_int32_t random_value;
+	u_int32_t random_value1;
+	u_int32_t random_value2;
 	u_int16_t user_req;
-        u_int8_t addr_family;
-        u_int8_t addr_len;
+	u_int8_t addr_family;
+	u_int8_t addr_len;
 	char address[SCTP_ADDRMAX];
 };
 
@@ -138,25 +139,25 @@ struct sctp_init {
 /* state cookie header */
 struct sctp_state_cookie {		/* this is our definition... */
 	u_int32_t cookie_life;		/* life I will award this cookie */
-        u_int32_t tie_tag_my_vtag;	/* my tag in old association */
-        u_int32_t tie_tag_peer_vtag;    /* peers tag in old association */
-        u_int32_t peers_vtag;		/* peers tag in INIT (for quick ref) */
-        u_int32_t my_vtag;		/* my tag in INIT-ACK (for quick ref) */
+	u_int32_t tie_tag_my_vtag;	/* my tag in old association */
+	u_int32_t tie_tag_peer_vtag;	/* peers tag in old association */
+	u_int32_t peers_vtag;		/* peers tag in INIT (for quick ref) */
+	u_int32_t my_vtag;		/* my tag in INIT-ACK (for quick ref) */
 	struct timeval time_entered;	/* the time I built cookie */
 	u_int32_t address[4];		/* 4 ints/128 bits */
 	u_int32_t addr_type;		/* address type */
-	u_int32_t laddress[4];          /* my local from address */
-	u_int32_t laddr_type;           /* my local from address type */
+	u_int32_t laddress[4];		/* my local from address */
+	u_int32_t laddr_type;		/* my local from address type */
 	u_int32_t scope_id;		/* v6 scope id for link-locals */
 	u_int16_t peerport;		/* port address of the peer in the INIT */
 	u_int16_t myport;		/* my port address used in the INIT */
-        u_int8_t ipv4_addr_legal;	/* Are V4 addr legal? */
-        u_int8_t ipv6_addr_legal;	/* Are V6 addr legal? */
+	u_int8_t ipv4_addr_legal;	/* Are V4 addr legal? */
+	u_int8_t ipv6_addr_legal;	/* Are V6 addr legal? */
 	u_int8_t local_scope;		/* IPv6 local scope flag */
 	u_int8_t site_scope;		/* IPv6 site scope flag */
-        u_int8_t ipv4_scope;		/* IPv4 private addr scope */
-        u_int8_t loopback_scope;	/* loopback scope information */
-        u_int16_t reserved;
+	u_int8_t ipv4_scope;		/* IPv4 private addr scope */
+	u_int8_t loopback_scope;	/* loopback scope information */
+	u_int16_t reserved;
 	/*
 	 * at the end is tacked on the INIT chunk and the
 	 * INIT-ACK chunk (minus the cookie).
@@ -319,8 +320,8 @@ struct sctp_cookie_while_shutting_down {
 };
 
 struct sctp_shutdown_complete_msg {
-        struct sctphdr sh;
-        struct sctp_shutdown_complete_chunk shut_cmp;
+	struct sctphdr sh;
+	struct sctp_shutdown_complete_chunk shut_cmp;
 };
 
 /* draft-ietf-tsvwg-addip-sctp */
@@ -400,7 +401,7 @@ struct sctp_packet_drop {
 
 
 #define SCTP_MIN_OVERHEAD (sizeof(struct ip6_hdr) + \
-                           sizeof(struct sctphdr))
+			   sizeof(struct sctphdr))
 
 #else
 #define SCTP_MAX_OVERHEAD (sizeof(struct sctp_data_chunk) + \
@@ -415,7 +416,7 @@ struct sctp_packet_drop {
 
 
 #define SCTP_MIN_OVERHEAD (sizeof(struct ip) + \
-                           sizeof(struct sctphdr))
+			   sizeof(struct sctphdr))
 
 #endif /* AF_INET6 */
 #endif /* !SCTP_MAX_OVERHEAD */
@@ -425,6 +426,6 @@ struct sctp_packet_drop {
 			      sizeof(struct ip))
 
 #define SCTP_MIN_V4_OVERHEAD (sizeof(struct ip) + \
-                              sizeof(struct sctphdr))
+			      sizeof(struct sctphdr))
 
 #endif /* !__sctp_header_h__ */

@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.23 2003/12/17 02:20:03 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.24 2004/01/16 09:56:01 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -1461,8 +1461,8 @@ sctp_calculate_sum(m, pktlen, offset)
 	 * Note: if offset is greater than the total mbuf length,
 	 * checksum=1, pktlen=0 is returned (ie. no real error code)
 	 */
-	register int32_t tlen=0;
-	register struct mbuf *at;
+	int32_t tlen=0;
+	struct mbuf *at;
 
 	if (pktlen == NULL)
 		return (0);
@@ -1496,9 +1496,9 @@ sctp_calculate_sum(m, pktlen, offset)
 	 * Note: if offset is greater than the total mbuf length,
 	 * checksum=1, pktlen=0 is returned (ie. no real error code)
 	 */
-	register int32_t tlen=0;
-	register struct mbuf *at;
-	register uint32_t the_sum,retsum;
+	int32_t tlen=0;
+	struct mbuf *at;
+	uint32_t the_sum, retsum;
 
 	at = m;
 	while (at) {
@@ -1531,13 +1531,13 @@ sctp_calculate_sum(m, pktlen, offset)
 	 * Note: if offset is greater than the total mbuf length,
 	 * checksum=1, pktlen=0 is returned (ie. no real error code)
 	 */
-	register int32_t tlen=0;
+	int32_t tlen=0;
 #ifdef SCTP_USE_ADLER32
-	register unsigned int base = 1L;
+	unsigned int base = 1L;
 #else
-	register u_int32_t base = 0xffffffff;
+	u_int32_t base = 0xffffffff;
 #endif /* SCTP_USE_ADLER32 */
-	register struct mbuf *at;
+	struct mbuf *at;
 	at = m;
 	/* find the correct mbuf and offset into mbuf */
 	while ((at != NULL) && (offset > at->m_len)) {
@@ -2952,7 +2952,7 @@ sbappendaddr_nocheck(sb, asa, m0, control, tag, inp)
 	return (1);
 #endif
 #ifdef __FreeBSD__
-	register struct mbuf *m, *n;
+	struct mbuf *m, *n;
 	int cnt=0;
 
 	if (m0 && (m0->m_flags & M_PKTHDR) == 0)
@@ -2963,7 +2963,7 @@ sbappendaddr_nocheck(sb, asa, m0, control, tag, inp)
 		if (n->m_next == 0)	/* get pointer to last control buf */
 			break;
 	}
-#ifdef  SCTP_TCP_MODEL_SUPPORT
+#ifdef SCTP_TCP_MODEL_SUPPORT
 	if ((inp->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) ||
 	    (inp->sctp_flags & SCTP_PCB_FLAGS_IN_TCPPOOL)) {
 #endif
@@ -2986,7 +2986,7 @@ sbappendaddr_nocheck(sb, asa, m0, control, tag, inp)
 		m->m_len = asa->sa_len;
 		bcopy((caddr_t)asa, mtod(m, caddr_t), asa->sa_len);
 	}
-#ifdef  SCTP_TCP_MODEL_SUPPORT
+#ifdef SCTP_TCP_MODEL_SUPPORT
 	else {
 		m = NULL;
 	}
@@ -3014,7 +3014,7 @@ sbappendaddr_nocheck(sb, asa, m0, control, tag, inp)
 	return (1);
 #endif
 #ifdef __OpenBSD__
-	register struct mbuf *m, *n;
+	struct mbuf *m, *n;
 	int space = asa->sa_len;
 
 	if (m0 && (m0->m_flags & M_PKTHDR) == 0)
@@ -3053,664 +3053,15 @@ sbappendaddr_nocheck(sb, asa, m0, control, tag, inp)
 #endif
 }
 
-#ifdef SCTP_ALTERNATE_ROUTE
-
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-#define rn_offset rn_u.rn_node.rn_Off
-#define rn_bit rn_b
-#define rn_parent rn_p
-#define rn_left rn_u.rn_node.rn_L
-#endif
-
-static int
-sctp_is_interior_node(struct radix_node *node)
-{
-	if (node->rn_bit < 0) {
-		/*
-		 * Negative numbers are exterior/leaf nodes
-		 * i.e. the actual pointer to the info
-		 */
-		return (0);
-	} else {
-		/*
-		 * postive numbers are interior (tree structure) 
-		 * nodes.
-		 */
-	return (1);
-	}
-}
-
-
-
-static struct rtentry *
-rtfinalize_route(struct sockaddr *dst, struct rtentry *rt)
-{
-	/*
-	 * We handle cloning in this module (if needed). 
-	 * This could probably be put inline but I don't want
-	 * to clone it multiple times :>
-	 */
-	struct rt_addrinfo info;
-	struct rtentry *newrt;
-	int err;
-	if (rt->rt_flags & (RTF_CLONING
-#ifdef __FreeBSD__
-			    | RTF_PRCLONING
-#endif
-		)) {
-		newrt = rt;
-		bzero((caddr_t)&info, sizeof(info));
-		err = rtrequest(RTM_RESOLVE, dst, (struct sockaddr *)0,
-				(struct sockaddr *)0, 0, &newrt);
-		if (err) {
-			info.rti_info[RTAX_DST] = dst;
-			rt_missmsg(RTM_MISS, &info, 0, err);
-			rt->rt_refcnt++;
-			return (rt);
-		} else {
-			rt = newrt;
-			if (rt->rt_flags & RTF_XRESOLVE) {
-				info.rti_info[RTAX_DST] = dst;
-				rt_missmsg(RTM_RESOLVE, &info, 0, err);
-				return (rt);
-			}
-			/* Inform listeners of the new route */
-			info.rti_info[RTAX_DST] = rt_key(rt);
-			info.rti_info[RTAX_NETMASK] = rt_mask(rt);
-			info.rti_info[RTAX_GATEWAY] = rt->rt_gateway;
-		}
-	} else {
-		/* No cloning needed */
-		rt->rt_refcnt++;
-	}
-	return (rt);
-}
-
-static int
-sctp_rn_are_keys_same(struct radix_node *exist,
-		      struct radix_node *cmp)
-{
-	caddr_t e, c, cplim;
-	int len;
-	if (sctp_is_interior_node(exist) || sctp_is_interior_node(cmp)) {
-		/* can't compare interior nodes */
-		return (0);
-	}
-
-	if (exist->rn_key == cmp->rn_key) {
-		/* Mask holds same pointer. Must be same */
-		return (1);
-	}
-	if ((exist->rn_key == NULL) || (cmp->rn_key == NULL)) {
-		/*
-		 * One is null (host route) the other is not. Can't be same.
-		 */
-		return (0);
-	}
-	e = exist->rn_key;
-	c = cmp->rn_key;
-	len = (int)*((u_char *)e);
-	cplim = e + len;
-	while (e < cplim) {
-		if (*e != *c) {
-			return (0);
-		}
-		e++;
-		c++;
- 	}
-	/* so far the keys are the same */
-	if (exist->rn_mask != cmp->rn_mask) {
-		/* different masks */
-		return (0);
-	}
-	/* They are the same :-) */
-	return (1);
-}
-
-
-static int
-sctp_are_gw_the_same(struct rtentry *rt1, struct rtentry *rt2)
-{
-	if (!rt1 || !rt2)
-		return (0);
-
-	if (rt1 == rt2)
-		return (1);
-
-	if (rt1->rt_gateway == rt2->rt_gateway)
-		return (1);
-	if (rt1->rt_gateway->sa_len == rt2->rt_gateway->sa_len) {
-		/*
-		 * I think we don't actually need to do this
-		 * since I believe pointers would match first, but
-		 * to be cautious I will put this in for
-		 * now and we can rip it out later. This would
-		 * optimize the search if we remove the memcmp.
-		 */
-		int ret;
-		ret = memcmp(rt1->rt_gateway, rt2->rt_gateway,
-		    rt1->rt_gateway->sa_len);
-		if (ret == 0) {
-			return (1);
-		}
-	}
-	return (0);
-}
-
-static struct rtentry *
-sctp_rt_scan_dups(struct sockaddr *dst, struct rtentry *existing, int finalize)
-{
-	struct radix_node *exist, *cmp, *prev;
-	struct rtentry *dupped;
-	exist = (struct radix_node *)existing;
-
-	if (sctp_is_interior_node(exist)) {
-		/* Can't look at a interior node */
-		return (NULL);
-	}
-	/* get the dupedkey from this one */
-	cmp = exist->rn_dupedkey;
-	while (cmp != NULL) {
-		if (sctp_is_interior_node(cmp)) {
-			return (NULL);
-		}
-		dupped = (struct rtentry *)cmp;
-		if (dupped->rt_flags &  
-#ifdef __FreeBSD__
-		   RTF_WASCLONED
-#else
-		   RTF_CLONED
-#endif
-			) {
-			/* We don't consider a cloned route
-			 * as via-able. We use the base route
-			 * only and then finalize from that.
-			 */
- 			return (NULL);
-		}
-		if ((!sctp_are_gw_the_same(dupped, existing)) &&
-		    sctp_rn_are_keys_same(exist, cmp)) {
-			/* Keys are no longer the same */
-			if (finalize) {
-				dupped = rtfinalize_route(dst,(struct rtentry *)cmp);
-				return (dupped);
-			} else {
-				return ((struct rtentry *)cmp);
-			}
-		} else {
-			cmp = cmp->rn_dupedkey;
-		}
-	}
-	/* If we ran down to the end of the chain then
-	 * lets go from the beginning of the chain 
-	 * and run forward through the list.
-	 */
-	cmp = exist->rn_parent;
-	prev = exist;
-	while (cmp) {
-		/* We move back until we hit a interior node
-		 * or the RNF_ROOT flag (if we are on the default
-		 * chain). This gets us to the point where
-		 * prev points to the top of the chain.
-		 */
-		if (sctp_is_interior_node(cmp) ||
-		    (cmp->rn_flags & RNF_ROOT)) {
-			/* we expect this to break at the 
-			 * interior parent or in the case of
-			 * the default we will find a exterior
-			 * node marked as ROOT.
-			 */
-			break;
-		}
-		prev = cmp;
-		cmp = cmp->rn_parent;
-	}
-	if (cmp == NULL) {
-		return (NULL);
-	}
-	/* now set to prev one */
-	cmp = prev;
-	/* now move forward until we see exist */
-	while (cmp != exist) {
-		dupped = (struct rtentry *)cmp;
-		if (dupped->rt_flags &  
-#ifdef __FreeBSD__
-		   RTF_WASCLONED
-#else
-		   RTF_CLONED
-#endif
-			) {
-			/* We don't consider a cloned route
-			 * as via-able. We use the base route
-			 * only and then finalize from that.
-			 */
- 			return (NULL);
-		}
-		if ((!sctp_are_gw_the_same(dupped, existing)) &&
-		    sctp_rn_are_keys_same(exist, cmp)) {
-			/* Keys are no longer the same */
-			if (finalize) {
-				dupped = rtfinalize_route(dst,(struct rtentry *)cmp);
-				return (dupped);
-			} else {
-				return ((struct rtentry *)cmp);
-			}
-		} else {
-			cmp = cmp->rn_dupedkey;
-		}
-	}
-	return (NULL);
-}
-
-
-static struct rtentry *
-sctp_find_cloned_in(struct radix_node *entry, struct rtentry *rt)
-{
-
-	if (entry->rn_flags & RNF_ROOT) {
-		/* Huh, can't search root */
-		return (NULL);
-	}
-	if (sctp_is_interior_node(entry)) {
-		/* Here we hunt the left side only. Left is
-		 * 0 bit match and we need to get less specific
-		 * i.e. when at 10.1.1.1 we look for 10.1.1.0,
-		 * 10.1.0.0 and 10.0.0.0... we don't want to
-		 * find 10.1.3.0, which we would if we looked
-		 * right.
-		 */
-		if (entry->rn_left) {
-			struct rtentry *res;
-			res = sctp_find_cloned_in(entry->rn_left, rt);
-			if (res) {
-				return (res);
-			}
-		}
-	} else {
-		/* Exterior node, compare the gateways */
-		while (entry) {
-			if (((struct rtentry *)(entry))->rt_flags & 
-			    (RTF_CLONING
-#ifdef __FreeBSD__
-|RTF_PRCLONING
-#endif
-)
-				) {
-				/* only with these flags can it be a candidate */
-				if (sctp_are_gw_the_same(rt,((struct rtentry *)(entry)))) {
-					return (((struct rtentry *)(entry)));
-				}
-			}
-			entry = entry->rn_dupedkey;
-		}
-	}
-	return (NULL);
-}
-
-
-static struct rtentry *
-sctp_find_cloned_from(struct sockaddr *dst,
-		      struct rtentry *rt)
-{
-	/* This a very very tricky. We must hunt
-	 * the radix_node tree looking for where
-	 * we were cloned from. This must be a
-	 * node that has the RTF_CLONING or
-	 * RTF_PRCLONING flags set on it and
-	 * the corresponding gateway matches that
-	 * of rt.
-	 */
-	struct radix_node_head *rnh;
-	struct radix_node *base, *cmp, *prev, *top,*topleft,*def;
-	struct rtentry *result;
-
-	base = (struct radix_node *)rt;
-	if (sctp_is_interior_node(base)) {
-		return (NULL);
-	}
-	if ((base->rn_flags & RNF_ACTIVE) == 0) {
-		/* Our route is bad */
-		return (NULL);
-	}
-	/* First we must look from the table up. 
-	 * Most likely a clone of the default but
-	 * we don't optimize for that otherwise we
-	 * reverse the order of the tree :<
-	 */
-
-	prev = base;
-	cmp = base->rn_parent;
-	while (cmp &&
-	      (!sctp_is_interior_node(cmp))) {
-		/* find the first interior node up from my base */
-		prev = cmp;
-		cmp = cmp->rn_parent;
-	}
-	/* Now traverse the tree */
-	while (cmp && ((cmp->rn_flags & RNF_ROOT) == 0)) {
-		/* Here we hunt the left side only. Left is
-		 * 0 bit match and we need to get less specific
-		 * i.e. when at 10.1.1.1 we look for 10.1.1.0,
-		 * 10.1.0.0 and 10.0.0.0... we don't want to
-		 * find 10.1.3.0, which we would if we looked
-		 * right. Note that we optimize by verifying that
-		 * we are not looking at ourselve... i.e. if we
-		 * were cloned from the default, we may find that
-		 * there is nothing to the left but our node.
-		 */
-		if (prev != cmp->rn_left) {
-			result = sctp_find_cloned_in(cmp->rn_left, rt);
-			if (result) {
-				/* found him */
-				return (result);
-			}
-		}
-		/* We have now checked rt's parents left side, 
-		 * now we must go up looking for our cloning source
-		 * for rt.
-		 */
-
-		/* save were we looked in prev, so we don't
-		 * check where we already looked.
-		 */
-		prev = cmp;
-		/* move up to parent */
-		cmp = cmp->rn_parent;
-	}
-	/* 
-	 * Now lets go look at the default.
-	 */
-	def = NULL;
-	/* get the top of the tree */
-	rnh = rt_tables[dst->sa_family];
-	if (rnh) {
-		top = rnh->rnh_treetop;
-		/* valdiate that the top is an interior node */
-		if (sctp_is_interior_node(top)) {
-			/* move left as far as possible to
-			 * get to the ROOT node that is 
-			 * the default edge.
-			 */
-			topleft = top->rn_left;
-			while (topleft && sctp_is_interior_node(topleft)) {
-				topleft = topleft->rn_left;
-			}
-			if (topleft &&
-			    (topleft->rn_flags & RNF_ROOT) &&
-			    (sctp_is_interior_node(topleft) == 0)
-				) {
-				/* copy the dupedky .. it may be NULL. */
-				def = topleft->rn_dupedkey;
-			}
-		} else {
-			return (NULL);
-		}
-	}
-	if (def) {
-		/* we have a default, was it cloned from that? */
-		result = sctp_find_cloned_in(def, rt);
-		if (result) {
-			return (result);
-		}
-	}
-	return (NULL);
-}
-
-static struct rtentry *
-sctp_check_cloned_route(struct sockaddr *dst,
-			struct rtentry *rt)
-
-{
-    /* Given a cloned route, find the route that
-     * it was cloned from in the routing table and
-     * then use the base to scan for valid alternates.
-     */
-    struct rtentry *cloned_from,*ent,*sameone;
-    struct radix_node *base, *prev;	
-
-    /* Note: that cloned_from and rt SHOULD have
-     * the same gateway as the existing route
-     * or else we would have used an alternate
-     * and not gotten into checking the cloned
-     * routes.
-     */
-    cloned_from = sctp_find_cloned_from(dst, rt);
-    if (cloned_from) {
-	ent = sctp_rt_scan_dups(dst, cloned_from,0);
-	if (ent == NULL) {
-		return (ent);
-	}
-	/* if it does not require cloning just finalize */
-	if ((ent->rt_flags & (RTF_CLONING
-#ifdef __FreeBSD__
-			    | RTF_PRCLONING
-#endif
-		    )) == 0) {
-		ent->rt_refcnt++;
-		return (ent);
-	}
-	/* Ok if the route requires cloning we must 
-	 * validate that we have not already cloned it
-	 * to the original list in rt.. if so we return
-	 * that otherwise we proceed with cloning by calling
-	 * rtfinalize.
-	 */
-	base = ((struct radix_node *)rt)->rn_dupedkey;
-	while (base != NULL) {
-		if (sctp_is_interior_node(base)) {
-			/* Gak, a interior node? */
-			return (NULL);
-		}
-		sameone = (struct rtentry *)base;
-		if ((sctp_are_gw_the_same(sameone, ent)) &&
-		    sctp_rn_are_keys_same(((struct radix_node *)rt), base)) {
-			/* found it */
-			sameone->rt_refcnt++;
-			return (sameone);
-		} else {
-			base = base->rn_dupedkey;
-		}
-	}
-	/* Went to end now must go back to beginning */
-	base = ((struct radix_node *)rt)->rn_parent;
-	prev = (struct radix_node *)rt;
-	while (base) {
-		/* We move back until we hit a interior node
-		 * or the RNF_ROOT flag (if we are on the default
-		 * chain). This gets us to the point where
-		 * prev points to the top of the chain.
-		 */
-		if (sctp_is_interior_node(base) ||
-		    (base->rn_flags & RNF_ROOT)) {
-			/* we expect this to break at the 
-			 * interior parent or in the case of
-			 * the default we will find a exterior
-			 * node marked as ROOT.
-			 */
-			break;
-		}
-		prev = base;
-		base = base->rn_parent;
-	}
-	if (base == NULL) {
-		/* punt */
-		return (rtfinalize_route(dst, ent));
-	}
-
-	/* now set to prev one */
-	base = prev;
-	/* now move forward until we see exist */
-	while (base != (struct radix_node *)rt) {
-		if (sctp_is_interior_node(base)) {
-			/* Gak, a interior node? */
-			return (NULL);
-		}
-		sameone = (struct rtentry *)base;
-		if ((sctp_are_gw_the_same(sameone, ent)) &&
-		    sctp_rn_are_keys_same((struct radix_node *)rt, base)) {
-			/* found it */
-			sameone->rt_refcnt++;
-			return (sameone);
-		} else {
-			base = base->rn_dupedkey;
-		}
-	}
-	/* finalize what came back */
-	return (rtfinalize_route(dst, ent));
-    } else
-	return (NULL);
-}
-
-/*
- * Look up the route that matches the address given
- * Or, at least try.. Create a cloned route i, *tmp2;
+/*************HOLD THIS COMMENT FOR PATCH FILE OF
+ *************ALTERNATE ROUTING CODE
  */
-static struct rtentry *
-sctp_rtalloc_alternate(struct sockaddr *dst,
-		       struct rtentry *existing,
-		       int peer_dest_route)
-{
-	int cursalen, s;
-	struct rtentry *base_rt,*tmp2;
-	struct radix_node *base, *base_nxt;
-	struct sockaddr_storage s_store;
-	struct sockaddr *sa;
-	static void *my_xx1,*my_xx2;
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-	s = splsoftnet();
-#else
-	s = splnet();
-#endif
-	/* setup fence and boundary stuff */
-	memset(&s_store, 0, sizeof(s_store));
-	my_xx1 = &cursalen;
-	my_xx2 = &sa;
 
-	/* now on with the show */
-	if (existing == NULL) {
-		/* No existing route, we just to rtalloc1() */
-		goto noexisting;
-	}
-	if ((existing->rt_nodes[0].rn_flags & RNF_ACTIVE) == 0) {
-		goto noexisting;
-	}
+/*************HOLD THIS COMMENT FOR END OF PATCH FILE OF
+ *************ALTERNATE ROUTING CODE
+ */
 
 
-	/* We must do the following:
-	 *  - Using the existing route look at each duplicate that
-	 *    may be found on the duped list. If we find a different
-	 *    gateway, we are done.
-	 *  - For each cloned route that is in my current dupedkey
-	 *    chain (including existing) I must search back and
-	 *    find the route that was cloned, then look at its
-	 *    dupped chain. 
-	 */
-
-	/* 1: first look up and down the chain for alternates at our level
-	 *    note, that this will NOT find cloned routes, but will allow
-	 *    us to see added host routes at our level in the tree.
-	 */
-	tmp2 = sctp_rt_scan_dups(dst, existing, 1);
-	if (tmp2) {
-		 splx(s);
-		 return (tmp2);
-	 }
-	/* First step un-successful, so now lets re-examine each
-	 * route that scan_dups looked at and see if the WAS_CLONED
-	 * flag was set on the route. If so we must find the base
-	 * route and do a scan_dups on that as well.
-	 */
-	base_rt = existing;
-	while (base_rt) {
-	    if (base_rt->rt_flags &
-#ifdef __FreeBSD__
-		   RTF_WASCLONED
-#else
-		   RTF_CLONED
-#endif
-
-		) {
-		/* yep this one was cloned 
-		 * check it.
-		 */
-		tmp2 = sctp_check_cloned_route(dst, base_rt);
-		if (tmp2) {
-		    splx(s);
-		    return (tmp2);
-		}
-	    }
-	    /* now advance to next node */
-	    base = (struct radix_node *)base_rt;
-	    if (base->rn_dupedkey) {
-		/* check to make sure it is an exterior node */
-		if (sctp_is_interior_node(base->rn_dupedkey)) {
-		    break;
-		}
-	    }
-	    base_rt = (struct rtentry *)base->rn_dupedkey;
-	}
-	/* Now we must back UP from existing */
-	base = (struct radix_node *)existing;
-	/* get previous */
-	base_nxt = base->rn_parent;
-	while ((base_nxt != NULL) &&
-	      (sctp_is_interior_node(base_nxt) == 0) &&
-	      ((base_nxt->rn_flags & RNF_ROOT) == 0)) {
-	    base_rt = (struct rtentry *)base_nxt;
-	    if (base_rt->rt_flags &
-#ifdef __FreeBSD__
-		   RTF_WASCLONED
-#else
-		   RTF_CLONED
-#endif
-		) {
-		/* yep this one was cloned 
-		 * check it.
-		 */
-		tmp2 = sctp_check_cloned_route(dst, base_rt);
-		if (tmp2) {
-		    splx(s);
-		    return (tmp2);
-		}
-	    }
-	    /* back up again */
-	    base_nxt = base_nxt->rn_parent;
-	}
-	/* If we fall out here, we have checkd all and
-	 * failed, give them back a normal rtalloc1() which
-	 * will yeild the same result.
-	 */
-
- noexisting:
-#ifdef __FreeBSD__
-	tmp2 = rtalloc1(dst, 1, 0);
-#else
-	tmp2 = rtalloc1(dst, 1);
-#endif
-	splx(s);
-	return (tmp2);
-}
-
-#endif
-
-struct rtentry *
-rtalloc_alternate (struct sockaddr *dst, struct rtentry *old,
-		   int peer_dest_route)
-{
-#if defined(SCTP_ALTERNATE_ROUTE) && defined(RADIX_MPATH)
-	/* In order for this routine to work the KAME RADIX_MPATH option in
-	 * order for this to work. Right now this is only supported under
-	 * netbsd.
-	 */
-	return (sctp_rtalloc_alternate(dst, old, peer_dest_route));
-#else
-#ifdef __FreeBSD__
-	return (rtalloc1(dst, 1, 0UL));
-#else
-	return (rtalloc1(dst, 1));
-#endif
-#endif
-}
 
 struct mbuf *
 sctp_generate_invmanparam(int err)

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.33 2003/12/17 02:20:02 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.34 2004/01/16 09:56:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -86,7 +86,6 @@
 #include <sys/pool.h>
 #endif
 
-
 #include <net/if.h>
 #include <net/if_types.h>
 
@@ -107,7 +106,7 @@
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/scope6_var.h>
-
+#include <netinet6/nd6.h>
 
 #if defined(__FreeBSD__) || (__NetBSD__)
 #include <netinet6/in6_pcb.h>
@@ -156,47 +155,12 @@
 extern u_int32_t sctp_debug_on;
 #endif
 
-#ifdef SCTP_DO_NOT_DO_THIS
-/* This performance enhancment is risky according
- * to Itojun so we comment it out
- */
-
-static void
-sctp_mprepend(struct mbuf **mm, int plen, int how)
-{
-	int leading;
-	struct mbuf *m;
-
-	m = *mm;
-	if (m->m_flags & M_EXT)
-		leading = (m)->m_data - (m)->m_ext.ext_buf;
-	else if (m->m_flags & M_PKTHDR) 
-		leading = m->m_data - (m)->m_pktdat;
-	else
-		leading = (m)->m_data - (m)->m_dat;
-	if (leading >= plen) {
-		sctp_pegs[SCTP_PREPENDS_FAST]++;
-		m->m_data -= plen;
-		m->m_len += plen;
-		if (m->m_flags & M_PKTHDR) {
-			m->m_pkthdr.len += plen;
-		}
-	} else {
-		M_PREPEND(*mm, plen, how);
-	}
-}
-
-#endif
-
-
 static int
-sctp_find_cmsg(int c_type,
-	       void *data,
-	       struct mbuf *control,
-	       int cpsize)
+sctp_find_cmsg(int c_type, void *data, struct mbuf *control, int cpsize)
 {
 	struct cmsghdr cmh;
 	int tlen, at;
+
 	tlen = control->m_len;
 	at = 0;
 	/*
@@ -242,8 +206,7 @@ sctp_find_cmsg(int c_type,
 }
 
 static struct mbuf *
-sctp_add_addr_to_mbuf(struct mbuf *m,
-		      struct ifaddr *ifa)
+sctp_add_addr_to_mbuf(struct mbuf *m, struct ifaddr *ifa)
 {
 	struct sctp_paramhdr *parmh;
 	struct mbuf *mret;
@@ -284,29 +247,27 @@ sctp_add_addr_to_mbuf(struct mbuf *m,
 		parmh->param_length = htons(len);
 		ipv4p->addr = sin->sin_addr.s_addr;
 		mret->m_len += len;
-	} else {
+	} else if (ifa->ifa_addr->sa_family == AF_INET6) {
 		struct sctp_ipv6addr_param *ipv6p;
 		struct sockaddr_in6 *sin6;
 		sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
 		ipv6p = (struct sctp_ipv6addr_param *)parmh;
 		parmh->param_type = htons(SCTP_IPV6_ADDRESS);
 		parmh->param_length = htons(len);
-		memcpy(ipv6p->addr, sin6->sin6_addr.s6_addr8,
-		       sizeof(ipv6p->addr));
+		memcpy(ipv6p->addr, &sin6->sin6_addr,
+		    sizeof(ipv6p->addr));
 		/* clear embedded scope in the address */
 		in6_clearscope((struct in6_addr *)ipv6p->addr);
 		mret->m_len += len;
+	} else {
+		return (m);
 	}
 	return (mret);
 }
 
 static struct mbuf *
-sctp_add_cookie(struct sctp_inpcb *inp,
-		struct mbuf *init,
-		int iphlen,
-		struct mbuf *init_ack,
-		struct sctp_state_cookie *stc_in,
-		int init_sz)
+sctp_add_cookie(struct sctp_inpcb *inp, struct mbuf *init, int iphlen,
+    struct mbuf *init_ack, struct sctp_state_cookie *stc_in, int init_sz)
 {
 	struct mbuf *copy_init, *copy_initack, *m_at, *sig, *mret;
 	struct sctp_state_cookie *stc;
@@ -314,6 +275,7 @@ sctp_add_cookie(struct sctp_inpcb *inp,
 	u_int8_t *signature;
 	int reuse_mbuf;
 	u_short siz_of;
+
 	mret = NULL;
 
 	MGET(mret, M_DONTWAIT, MT_DATA);
@@ -321,14 +283,14 @@ sctp_add_cookie(struct sctp_inpcb *inp,
 		return (NULL);
 	}
 	copy_init = m_copym(init, (iphlen+sizeof(struct sctphdr)), init_sz,
-			    M_DONTWAIT);
+	    M_DONTWAIT);
 	if (copy_init == NULL) {
 		m_freem(mret);
 		return (NULL);
 	}
 
 	copy_initack = m_copym(init_ack, sizeof(struct sctphdr), M_COPYALL,
-			       M_DONTWAIT);
+	    M_DONTWAIT);
 	if (copy_initack == NULL) {
 		m_freem(mret);
 		m_freem(copy_init);
@@ -356,9 +318,9 @@ sctp_add_cookie(struct sctp_inpcb *inp,
 	/* easy side we just drop it on the end */
 	ph = mtod(mret, struct sctp_paramhdr *);
 	mret->m_len = sizeof(struct sctp_state_cookie) +
-		sizeof(struct sctp_paramhdr);
+	    sizeof(struct sctp_paramhdr);
 	stc = (struct sctp_state_cookie *)((caddr_t)ph +
-					   sizeof(struct sctp_paramhdr));
+	    sizeof(struct sctp_paramhdr));
 	ph->param_type = htons(SCTP_STATE_COOKIE);
 	ph->param_length = 0;	/* fill in at the end */
 	/* tack the INIT and then the INIT-ACK onto the chain */
@@ -416,20 +378,20 @@ sctp_add_cookie(struct sctp_inpcb *inp,
 	return (mret);
 }
 
+/*
+ * This treats the address list on the ep as a restricted list
+ * (negative list). If a the passed address is listed, then
+ * the address is NOT allowed on the association.
+ */
 int
-sctp_is_addr_restricted(register struct sctp_tcb *tcb,
-			struct sockaddr *addr)
+sctp_is_addr_restricted(struct sctp_tcb *tcb, struct sockaddr *addr)
 {
-	/*
-	 * This treats the address list on the ep as a restricted list
-	 * (negative list). If a the passed address is listed, then
-	 * the address is NOT allowed on the association.
-	 */
 	struct sctp_laddr *laddr;
 
-	if (tcb == NULL)
+	if (tcb == NULL) {
 		/* There are no restrictions, no TCB :-) */
 		return (0);
+	}
 
 	LIST_FOREACH(laddr, &tcb->asoc.sctp_local_addr_list, sctp_nxt_addr) {
 		if (laddr->ifa == NULL) {
@@ -446,9 +408,8 @@ sctp_is_addr_restricted(register struct sctp_tcb *tcb,
 		if (laddr->ifa->ifa_addr->sa_family != addr->sa_family) {
 			continue;
 		}
-		if (memcmp(addr->sa_data,
-			   laddr->ifa->ifa_addr->sa_data,
-			   addr->sa_len) == 0) {
+		if (memcmp(addr->sa_data, laddr->ifa->ifa_addr->sa_data,
+		    addr->sa_len) == 0) {
 			/* Yes it is restricted */
 			return (1);
 		}
@@ -457,10 +418,10 @@ sctp_is_addr_restricted(register struct sctp_tcb *tcb,
 }
 
 static int
-sctp_is_addr_in_ep(register struct sctp_inpcb *inp,
-		   struct sockaddr *addr)
+sctp_is_addr_in_ep(struct sctp_inpcb *inp, struct sockaddr *addr)
 {
 	struct sctp_laddr *laddr;
+
 	LIST_FOREACH(laddr, &inp->sctp_addr_list, sctp_nxt_addr) {
 		if (laddr->ifa == NULL) {
 #ifdef SCTP_DEBUG
@@ -476,9 +437,8 @@ sctp_is_addr_in_ep(register struct sctp_inpcb *inp,
 			/* skip non compatible address comparison */
 			continue;
 		}
-		if (memcmp(addr->sa_data,
-			   laddr->ifa->ifa_addr->sa_data,
-			   addr->sa_len) == 0) {
+		if (memcmp(addr->sa_data, laddr->ifa->ifa_addr->sa_data,
+		    addr->sa_len) == 0) {
 			/* Yes it is restricted */
 			return (1);
 		}
@@ -486,20 +446,18 @@ sctp_is_addr_in_ep(register struct sctp_inpcb *inp,
 	return (0);
 }
 
+/* tcb may be NULL */
 struct in_addr
-sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
-				   register struct sctp_tcb *tcb,
-				   struct sockaddr_in *to,
-				   struct route *rtp,
-				   struct sctp_nets *net,
-				   int non_asoc_addr_ok)
-     /* tcb may be NULL */
+sctp_ipv4_source_address_selection(struct sctp_inpcb *inp,
+    struct sctp_tcb *tcb, struct sockaddr_in *to, struct route *rtp,
+    struct sctp_nets *net, int non_asoc_addr_ok)
 {
 	struct in_addr ans;
 	struct rtentry *rt;
 	struct sctp_laddr *laddr;
 	struct sockaddr_in *out;
 	u_int8_t ipv4_scope, loopscope;
+
 	/*
 	 * Rules:
 	 * - Find the route if needed, cache if I can.
@@ -514,70 +472,14 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 	 */
 	if (rtp->ro_rt == NULL) {
 		/*
-		 * first look at the next one and see if it has a ro_rt
-		 * structure.
+		 * Need a route to cache.
+		 * 
 		 */
-		if (net) {
-			/*
-			 * There is a NET structure that may have next/prev
-			 * entries that may have a route already.  If so we
-			 * want to find a DIFFERENT route/interface if
-			 * possible. Now we prioritize the NEXT first since
-			 * net's are added to the head of the list so it is
-			 * more likely a next entry will have a route.
-			 */
-			struct sctp_nets *f_net;
-			struct rtentry *t_rt;
-			f_net = TAILQ_NEXT(net, sctp_next);
-			t_rt = NULL;
-			while (f_net) {
-				if (((struct sockaddr *)(&f_net->ra._l_addr))->sa_family != AF_INET) {
-					f_net = TAILQ_NEXT(f_net, sctp_next);
-					continue;
-				}
-				if (f_net->ra.ro_rt) {
-					t_rt = f_net->ra.ro_rt;
-					break;
-				}
-				f_net = TAILQ_NEXT(f_net, sctp_next);
-			}
-			if (t_rt == NULL) {
-				/* Forward search failed. */
-				f_net = TAILQ_PREV(net, sctpnetlisthead,
-						   sctp_next);
-				while (f_net) {
-					if (((struct sockaddr *)(&f_net->ra._l_addr))->sa_family != AF_INET) {
-						f_net = TAILQ_PREV(f_net, sctpnetlisthead, sctp_next);
-						continue;
-					}
-					if (f_net->ra.ro_rt) {
-						t_rt = f_net->ra.ro_rt;
-						break;
-					}
-					f_net = TAILQ_PREV(f_net, sctpnetlisthead, sctp_next);
-				}
-			}
-			/* Now get the route for this guy */
-#ifdef SCTP_ALTERNATE_ROUTE
-			rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst, NULL, 0);
-			/* is it the same as my kin network dest */
-			if (rtp->ro_rt && (rtp->ro_rt == t_rt)) {
-				/* Yep so we need to free this and try
-				 * for a more diverse route.
-				 */
-				RTFREE(rtp->ro_rt);
-				rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst, t_rt, 0);
-			}
-#else
 #ifdef __FreeBSD__
-			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1, 0UL);
+		rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1, 0UL);
 #else
-			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1);
+		rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1);
 #endif
-#endif
-		} else {
-			rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst, NULL, 0);
-		}
 	}
 	rt = rtp->ro_rt;
 	if (rt == NULL) {
@@ -609,7 +511,8 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 	}
 #endif
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUNDALL) {
-		/* When bound to all if the address list is set
+		/*
+		 * When bound to all if the address list is set
 		 * it is a negative list.
 		 */
 		struct ifnet *ifn;
@@ -633,7 +536,8 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 			printf("Ok, we will see what we come up with in rr\n");
 		}
 #endif
-		/* If cant_use got set we head for source address selection
+		/*
+		 * If cant_use got set we head for source address selection
 		 * via round robin. However we don't have a list as
 		 * in our specific binding case. So we just need to
 		 * rotate amongst the interfaces, choosing an address
@@ -642,50 +546,56 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 		if (inp->next_ifn_touse == NULL) {
 			inp->next_ifn_touse = TAILQ_FIRST(&ifnet);
 		}
-		/* Hunt for an address amongst the interfaces not on the
+		/*
+		 * Hunt for an address amongst the interfaces not on the
 		 * negative list and rotate amongst them.
 		 */
-		for (ifn = inp->next_ifn_touse; ifn; ifn = TAILQ_NEXT(ifn, if_list)) {
-			if ((loopscope == 0) && (ifn->if_type == IFT_LOOP)) {
+		for (ifn = inp->next_ifn_touse; ifn;
+		    ifn = TAILQ_NEXT(ifn, if_list)) {
+			if (loopscope == 0 && ifn->if_type == IFT_LOOP) {
 				/* wrong base scope */
 				continue;
 			}
 			TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 				if (ifa->ifa_addr->sa_family == AF_INET) {
 					struct sockaddr_in *ifa_a;
-					ifa_a = (struct sockaddr_in *)(ifa->ifa_addr);
-					if ((ipv4_scope == 0) &&
-					    (IN4_ISPRIVATE_ADDRESS(&ifa_a->sin_addr))) {
+					ifa_a = (struct sockaddr_in *)
+					    ifa->ifa_addr;
+					if (ipv4_scope == 0 &&
+					    IN4_ISPRIVATE_ADDRESS(&ifa_a->sin_addr)) {
 						/* wrong scope */
 						continue;
 					}
 					/* make sure it's not restricted */
-					if (sctp_is_addr_restricted(tcb, ifa->ifa_addr))
+					if (sctp_is_addr_restricted(tcb,
+					    ifa->ifa_addr))
 						continue;
 					/* we can use it !! */
 					/* set to start with next intf */
-					inp->next_ifn_touse = TAILQ_NEXT(ifn, if_list);
+					inp->next_ifn_touse =
+					    TAILQ_NEXT(ifn, if_list);
 					return (ifa_a->sin_addr);
 				}
 			}
 		}
-		/* Ok nothing turned up in the next_ifn_touse to the next
+		/*
+		 * Ok nothing turned up in the next_ifn_touse to the next
 		 * lets check the beginning up to next_ifn_touse.
 		 */
 		for (ifn = TAILQ_FIRST(&ifnet);
-		     (ifn && (ifn != inp->next_ifn_touse));
-		     ifn=TAILQ_NEXT(ifn, if_list)) {
-			if ((loopscope == 0) &&
-			    (ifn->if_type == IFT_LOOP)) {
+		    ifn && (ifn != inp->next_ifn_touse);
+		    ifn=TAILQ_NEXT(ifn, if_list)) {
+			if (loopscope == 0 && ifn->if_type == IFT_LOOP) {
 				/* wrong base scope */
 				continue;
 			}
 			TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 				if (ifa->ifa_addr->sa_family == AF_INET) {
 					struct sockaddr_in *ifa_a;
-					ifa_a = (struct sockaddr_in *)(ifa->ifa_addr);
-					if ((ipv4_scope == 0) &&
-					    (IN4_ISPRIVATE_ADDRESS(&ifa_a->sin_addr))) {
+					ifa_a = (struct sockaddr_in *)
+					    ifa->ifa_addr;
+					if (ipv4_scope == 0 &&
+					    IN4_ISPRIVATE_ADDRESS(&ifa_a->sin_addr)) {
 						/* wrong scope */
 						continue;
 					}
@@ -694,7 +604,8 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 						continue;
 					/* we can use it !! */
 					/* set to start with next intf */
-					inp->next_ifn_touse = TAILQ_NEXT(ifn, if_list);
+					inp->next_ifn_touse =
+					    TAILQ_NEXT(ifn, if_list);
 					return (ifa_a->sin_addr);
 				}
 			}
@@ -728,8 +639,8 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 	if (tcb) {
 		if (inp->sctp_flags & SCTP_PCB_FLAGS_DO_ASCONF) {
 			/* The list on the tcb is a negative list */
-			if ((!sctp_is_addr_restricted(tcb, rt->rt_ifa->ifa_addr)) &&
-			    (sctp_is_addr_in_ep(inp, rt->rt_ifa->ifa_addr))) {
+			if (!sctp_is_addr_restricted(tcb, rt->rt_ifa->ifa_addr) &&
+			    sctp_is_addr_in_ep(inp, rt->rt_ifa->ifa_addr)) {
 				/*
 				 * We can use it since it is not on the
 				 * negative list and it is on the positive
@@ -759,31 +670,36 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 				if (laddr->ifa->ifa_addr == NULL)
 					continue;
 
-				if (laddr->ifa->ifa_addr->sa_family != AF_INET)
+				if (laddr->ifa->ifa_addr->sa_family !=
+				    AF_INET) {
 					/* wrong type */
 					continue;
-				out = (struct sockaddr_in *)laddr->ifa->ifa_addr;
-				if ((ipv4_scope == 0) &&
-				    (IN4_ISPRIVATE_ADDRESS(&out->sin_addr))) {
+				}
+				out =
+				    (struct sockaddr_in *)laddr->ifa->ifa_addr;
+				if (ipv4_scope == 0 &&
+				    IN4_ISPRIVATE_ADDRESS(&out->sin_addr)) {
 					/* wrong scope */
 					continue;
 				}
-				if ((loopscope == 0) &&
-				    (IN4_ISLOOPBACK_ADDRESS(&out->sin_addr))) {
+				if (loopscope == 0 &&
+				    IN4_ISLOOPBACK_ADDRESS(&out->sin_addr)) {
 					/* wrong scope */
 					continue;
 				}
-				if (sctp_is_addr_restricted(tcb, laddr->ifa->ifa_addr)) {
+				if (sctp_is_addr_restricted(tcb,
+				    laddr->ifa->ifa_addr)) {
 					/* on the no-no list */
 					continue;
 				}
-				tcb->asoc.last_used_address = LIST_NEXT(laddr, sctp_nxt_addr);
+				tcb->asoc.last_used_address =
+				    LIST_NEXT(laddr, sctp_nxt_addr);
 				return (out->sin_addr);
 			}
 			/* didn't find one, so start from the top */
 			for (laddr = LIST_FIRST(&inp->sctp_addr_list);
-			     (laddr && (laddr != tcb->asoc.last_used_address));
-			     laddr = LIST_NEXT(laddr, sctp_nxt_addr)) {
+			    laddr && (laddr != tcb->asoc.last_used_address);
+			    laddr = LIST_NEXT(laddr, sctp_nxt_addr)) {
 				if (laddr->ifa == NULL) {
 #ifdef SCTP_DEBUG
 					if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
@@ -794,25 +710,29 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 				}
 				if (laddr->ifa->ifa_addr == NULL)
 					continue;
-				if (laddr->ifa->ifa_addr->sa_family != AF_INET)
+				if (laddr->ifa->ifa_addr->sa_family !=
+				    AF_INET) {
 					/* wrong type */
 					continue;
+				}
 				out = (struct sockaddr_in *)laddr->ifa->ifa_addr;
-				if ((ipv4_scope == 0) &&
-				    (IN4_ISPRIVATE_ADDRESS(&out->sin_addr))) {
+				if (ipv4_scope == 0 &&
+				    IN4_ISPRIVATE_ADDRESS(&out->sin_addr)) {
 					/* wrong scope */
 					continue;
 				}
-				if ((loopscope == 0) &&
-				    (IN4_ISLOOPBACK_ADDRESS(&out->sin_addr))) {
+				if (loopscope == 0 &&
+				    IN4_ISLOOPBACK_ADDRESS(&out->sin_addr)) {
 					/* wrong scope */
 					continue;
 				}
-				if (sctp_is_addr_restricted(tcb, laddr->ifa->ifa_addr)) {
+				if (sctp_is_addr_restricted(tcb,
+				    laddr->ifa->ifa_addr)) {
 					/* on the no-no list */
 					continue;
 				}
-				tcb->asoc.last_used_address = LIST_NEXT(laddr, sctp_nxt_addr);
+				tcb->asoc.last_used_address =
+				    LIST_NEXT(laddr, sctp_nxt_addr);
 				return (out->sin_addr);
 			}
 			/*
@@ -834,10 +754,12 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 				 * So we just need to return any asoc address
 				 * and hope things work.
 				 */
-				LIST_FOREACH(laddr, &inp->sctp_addr_list, sctp_nxt_addr) {
+				LIST_FOREACH(laddr, &inp->sctp_addr_list,
+				    sctp_nxt_addr) {
 					if (laddr->ifa == NULL) {
 #ifdef SCTP_DEBUG
-						if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
+						if (sctp_debug_on &
+						    SCTP_DEBUG_OUTPUT1) {
 							printf("Help I have fallen and I can't get up!\n");
 						}
 #endif
@@ -846,46 +768,54 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 					if (laddr->ifa->ifa_addr == NULL)
 						continue;
 
-					if (laddr->ifa->ifa_addr->sa_family != AF_INET)
+					if (laddr->ifa->ifa_addr->sa_family !=
+					    AF_INET)
 						/* wrong type */
 						continue;
-					out = (struct sockaddr_in *)laddr->ifa->ifa_addr;
-					if ((ipv4_scope == 0) &&
-					    (IN4_ISPRIVATE_ADDRESS(&out->sin_addr))) {
+					out = (struct sockaddr_in *)
+					    laddr->ifa->ifa_addr;
+					if (ipv4_scope == 0 &&
+					    IN4_ISPRIVATE_ADDRESS(&out->sin_addr)) {
 						/* wrong scope */
 						continue;
 					}
-					if ((loopscope == 0) &&
-					    (IN4_ISLOOPBACK_ADDRESS(&out->sin_addr))) {
+					if (loopscope == 0 &&
+					    IN4_ISLOOPBACK_ADDRESS(&out->sin_addr)) {
 						/* wrong scope */
 						continue;
 					}
 					/* Ok here it is */
-					tcb->asoc.last_used_address = LIST_NEXT(laddr, sctp_nxt_addr);
+					tcb->asoc.last_used_address =
+					    LIST_NEXT(laddr, sctp_nxt_addr);
 					return (out->sin_addr);
 				}
-				/* no address in scope.. egad.. I guess you
+				/*
+				 * no address in scope.. egad.. I guess you
 				 * will get the interface and we will abort.
 				 */
 			}
 		} else {
 			/* This list on the tcb is a positive list. */
-			if (sctp_is_addr_restricted(tcb, rt->rt_ifa->ifa_addr)) {
+			if (sctp_is_addr_restricted(tcb,
+			    rt->rt_ifa->ifa_addr)) {
 				/* usable since it IS on the negative list */
-				return (((struct sockaddr_in *)(rt->rt_ifa->ifa_addr))->sin_addr);
+				return (((struct sockaddr_in *)
+				    (rt->rt_ifa->ifa_addr))->sin_addr);
 			}
-			/* src address selection is in order, here
+			/*
+			 * src address selection is in order, here
 			 * we use the TCB list and rotate amongst them.
 			 */
 			if (tcb->asoc.last_used_address == NULL) {
-				tcb->asoc.last_used_address = LIST_FIRST(&tcb->asoc.sctp_local_addr_list);
+				tcb->asoc.last_used_address =
+				    LIST_FIRST(&tcb->asoc.sctp_local_addr_list);
 			}
 			for (laddr = tcb->asoc.last_used_address; laddr;
-			     laddr = LIST_NEXT(laddr, sctp_nxt_addr)) {
-
+			    laddr = LIST_NEXT(laddr, sctp_nxt_addr)) {
 				if (laddr->ifa == NULL) {
 #ifdef SCTP_DEBUG
-					if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
+					if (sctp_debug_on &
+					    SCTP_DEBUG_OUTPUT1) {
 						printf("Help I have fallen and I can't get up!\n");
 					}
 #endif
@@ -897,18 +827,19 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 				if (laddr->ifa->ifa_addr->sa_family != AF_INET)
 					continue;
 				out = (struct sockaddr_in *)laddr->ifa->ifa_addr;
-				if ((ipv4_scope == 0) &&
-				    (IN4_ISPRIVATE_ADDRESS(&out->sin_addr))) {
+				if (ipv4_scope == 0 &&
+				    IN4_ISPRIVATE_ADDRESS(&out->sin_addr)) {
 					/* wrong scope */
 					continue;
 				}
-				if ((loopscope == 0) &&
-				    (IN4_ISLOOPBACK_ADDRESS(&out->sin_addr))) {
+				if (loopscope == 0 &&
+				    IN4_ISLOOPBACK_ADDRESS(&out->sin_addr)) {
 					/* wrong scope */
 					continue;
 				}
 				/* Ok here it is */
-				tcb->asoc.last_used_address = LIST_NEXT(laddr, sctp_nxt_addr);
+				tcb->asoc.last_used_address =
+				    LIST_NEXT(laddr, sctp_nxt_addr);
 				return (out->sin_addr);
 			}
 			/* Ok, nothing to give out in the right scope? Punt! */
@@ -925,20 +856,21 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 			return (ans);
 		}
 	}
-	/* Only list we have to go on is in the EP, must be
+	/*
+	 * Only list we have to go on is in the EP, must be
 	 * an INIT going out since no TCB is formed.
 	 */
 	if (sctp_is_addr_in_ep(inp, rt->rt_ifa->ifa_addr)) {
 		/* We are good, the interface address IS bound to this ep */
 		return (((struct sockaddr_in *)
-			(rt->rt_ifa->ifa_addr))->sin_addr);
+		    (rt->rt_ifa->ifa_addr))->sin_addr);
 	}
 	/* Ok, not lucky, instead lets do src addr selection */
 	if (inp->next_addr_touse == NULL)
 		inp->next_addr_touse = LIST_FIRST(&inp->sctp_addr_list);
 
 	for (laddr = inp->next_addr_touse; laddr;
-	     laddr = LIST_NEXT(laddr, sctp_nxt_addr)) {
+	    laddr = LIST_NEXT(laddr, sctp_nxt_addr)) {
 		if (laddr->ifa == NULL) {
 #ifdef SCTP_DEBUG
 			if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
@@ -955,13 +887,13 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 			continue;
 		}
 		out = (struct sockaddr_in *)laddr->ifa->ifa_addr;
-		if ((ipv4_scope == 0) &&
-		    (IN4_ISPRIVATE_ADDRESS(&out->sin_addr))) {
+		if (ipv4_scope == 0 &&
+		    IN4_ISPRIVATE_ADDRESS(&out->sin_addr)) {
 			/* wrong scope */
 			continue;
 		}
-		if ((loopscope == 0) &&
-		    (IN4_ISLOOPBACK_ADDRESS(&out->sin_addr))) {
+		if (loopscope == 0 &&
+		    IN4_ISLOOPBACK_ADDRESS(&out->sin_addr)) {
 			/* wrong scope */
 			continue;
 		}
@@ -970,7 +902,7 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 	}
 	/* ok check the front end */
 	for (laddr = LIST_FIRST(&inp->sctp_addr_list);
-	     (laddr && (laddr != inp->next_addr_touse));
+	     laddr && (laddr != inp->next_addr_touse);
 	     laddr = LIST_NEXT(laddr, sctp_nxt_addr)) {
 		if (laddr->ifa == NULL) {
 #ifdef SCTP_DEBUG
@@ -988,13 +920,13 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 			continue;
 		}
 		out = (struct sockaddr_in *)laddr->ifa->ifa_addr;
-		if ((ipv4_scope == 0) &&
-		    (IN4_ISPRIVATE_ADDRESS(&out->sin_addr))) {
+		if (ipv4_scope == 0 &&
+		    IN4_ISPRIVATE_ADDRESS(&out->sin_addr)) {
 			/* wrong scope */
 			continue;
 		}
-		if ((loopscope == 0) &&
-		    (IN4_ISLOOPBACK_ADDRESS(&out->sin_addr))) {
+		if (loopscope == 0 &&
+		    IN4_ISLOOPBACK_ADDRESS(&out->sin_addr)) {
 			/* wrong scope */
 			continue;
 		}
@@ -1007,7 +939,8 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 	 * land where they may :>
 	 */
 	if (non_asoc_addr_ok) {
-		return (((struct sockaddr_in *)(rt->rt_ifa->ifa_addr))->sin_addr);
+		return (((struct sockaddr_in *)
+		    (rt->rt_ifa->ifa_addr))->sin_addr);
 	} else {
 		memset(&ans, 0, sizeof(ans));
 		return (ans);
@@ -1015,17 +948,16 @@ sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 }
 
 static struct sockaddr_in6 *
-sctp_choose_correctv6_scope(struct rtentry *rt,
-			    int site_scope, int loc_scope,
-			    struct sctp_tcb *tcb,
-			    struct sctp_inpcb *inp,
-			    int is_negative_list, int *are_done)
+sctp_choose_correctv6_scope(struct rtentry *rt, int site_scope, int loc_scope,
+    struct sctp_tcb *tcb, struct sctp_inpcb *inp, int is_negative_list,
+    int *are_done)
 {
 	struct ifnet *ifn;
 	struct sockaddr_in6 *sin6;
 	struct ifaddr *ifa;
 	struct in6_ifaddr *ifa6;
 	int ok;
+
 	sin6 = (struct sockaddr_in6 *)rt->rt_ifa->ifa_addr;
 	ok = 1;
 	if (sin6->sin6_family == AF_INET6) {
@@ -1040,14 +972,13 @@ sctp_choose_correctv6_scope(struct rtentry *rt,
 		ifa6 = (struct in6_ifaddr *)rt->rt_ifa;
 		/* ok to use deprecated addresses? */
 		if (!ip6_use_deprecated) {
-			if (ifa6->ia6_flags & IN6_IFF_DEPRECATED) {
+			if (IFA6_IS_DEPRECATED(ifa6)) {
 				/* can't use this type */
 				ok = 0;
 			}
 		}
-		if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
-				       IN6_IFF_NOTREADY |
-				       IN6_IFF_ANYCAST)) {
+		if (ifa6->ia6_flags &
+		    (IN6_IFF_DETACHED | IN6_IFF_NOTREADY | IN6_IFF_ANYCAST)) {
 			/* Can't use these types */
 			ok = 0;
 		}
@@ -1084,14 +1015,13 @@ sctp_choose_correctv6_scope(struct rtentry *rt,
 		ifa6 = (struct in6_ifaddr *)ifa;
 		/* ok to use deprecated addresses? */
 		if (!ip6_use_deprecated) {
-			if (ifa6->ia6_flags & IN6_IFF_DEPRECATED) {
+			if (IFA6_IS_DEPRECATED(ifa6)) {
 				/* can't use this type */
 				continue;
 			}
 		}
-		if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
-				       IN6_IFF_NOTREADY |
-				       IN6_IFF_ANYCAST)) {
+		if (ifa6->ia6_flags &
+		    (IN6_IFF_DETACHED | IN6_IFF_NOTREADY | IN6_IFF_ANYCAST)) {
 			/* Can't use these types */
 			continue;
 		}
@@ -1129,7 +1059,8 @@ sctp_choose_correctv6_scope(struct rtentry *rt,
 			}
 		}
 	}
-	/* Ok, if we fell out here, we will be hunting for
+	/*
+	 * Ok, if we fell out here, we will be hunting for
 	 * an alternative in the src addr selection. We
 	 * send back a default, i.e. one that is the right
 	 * scope.
@@ -1141,14 +1072,13 @@ sctp_choose_correctv6_scope(struct rtentry *rt,
 		ifa6 = (struct in6_ifaddr *)ifa;
 		/* ok to use deprecated addresses? */
 		if (!ip6_use_deprecated) {
-			if (ifa6->ia6_flags & IN6_IFF_DEPRECATED) {
+			if (IFA6_IS_DEPRECATED(ifa6)) {
 				/* can't use this type */
 				continue;
 			}
 		}
-		if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
-				       IN6_IFF_NOTREADY |
-				       IN6_IFF_ANYCAST)) {
+		if (ifa6->ia6_flags &
+		    (IN6_IFF_DETACHED | IN6_IFF_NOTREADY | IN6_IFF_ANYCAST)) {
 			/* Can't use these types */
 			continue;
 		}
@@ -1167,14 +1097,11 @@ sctp_choose_correctv6_scope(struct rtentry *rt,
 	return (sin6);
 }
 
-struct in6_addr
-sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
-				   register struct sctp_tcb *tcb,
-				   struct sockaddr_in6 *to,
-				   struct route *rtp,
-				   struct sctp_nets *net,
-				   int non_asoc_addr_ok)
 /* tcb may be NULL */
+struct in6_addr
+sctp_ipv6_source_address_selection(struct sctp_inpcb *inp, struct sctp_tcb *tcb,
+    struct sockaddr_in6 *to, struct route *rtp, struct sctp_nets *net,
+    int non_asoc_addr_ok)
 {
 	/*
 	 * This is quite tricky. We can't use the normal
@@ -1190,77 +1117,25 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 	struct in6_ifaddr *ifa6;
 	u_int8_t loc_scope, site_scope, loopscope;
 	int list_type, are_done;
+
 	/*
 	 * Rules:
 	 * - Find the route if needed, cache if I can.
-	 * - Look at interface address in route, Is it
-	 *   in the bound list. If so we have the best source.
+	 * - Look at interface address in route, Is it in the bound list.
+	 *   If so we have the best source.
 	 * - If not we must rotate amongst the addresses.
 	 */
 
 	/* Find the route */
 	if (rtp->ro_rt == NULL) {
 		/*
-		 * Not sure if I should clone a new route or not.
-		 * For now we won't.
+		 * Need a route to cache.
 		 */
-		if (net) {
-			/*
-			 * There is a NET structure that may have next/prev
-			 * entry's that may have a route already.
-			 * If so we want to find a DIFFERENT route/interface
-			 * if possible. Now we prioritize the NEXT first since
-			 * net's are added to the head of the list so it is
-			 * more likely a next entry will have a route.
-			 */
-			struct sctp_nets *f_net;
-			struct rtentry *t_rt;
-			f_net = TAILQ_NEXT(net, sctp_next);
-			t_rt = NULL;
-			while (f_net) {
-				if (((struct sockaddr *)(&f_net->ra._l_addr))->sa_family != AF_INET6) {
-					f_net = TAILQ_NEXT(f_net, sctp_next);
-					continue;
-				}
-				if (f_net->ra.ro_rt) {
-					t_rt = f_net->ra.ro_rt;
-					break;
-				}
-				f_net = TAILQ_NEXT(f_net, sctp_next);
-
-			}
-			if (t_rt == NULL) {
-				/* Forward search failed */
-				f_net = TAILQ_PREV(net, sctpnetlisthead, sctp_next);
-				while (f_net) {
-					if (((struct sockaddr *)(&f_net->ra._l_addr))->sa_family != AF_INET6) {
-						f_net = TAILQ_PREV(f_net, sctpnetlisthead, sctp_next);
-						continue;
-					}
-					if (f_net->ra.ro_rt) {
-						t_rt = f_net->ra.ro_rt;
-						break;
-					}
-					f_net = TAILQ_PREV(f_net, sctpnetlisthead, sctp_next);
-				}
-			}
-#ifdef SCTP_ALTERNATE_ROUTE
-			rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst, NULL, 0);
-			if (rtp->ro_rt && (rtp->ro_rt == t_rt)) {
-				/* Now we need a better route if one exits */
-				RTFREE(rtp->ro_rt);
-				rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst, t_rt, 0);
-			}
-#else
 #ifdef __FreeBSD__
-			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1, 0UL);
+		rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1, 0UL);
 #else
-			rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1);
+		rtp->ro_rt = rtalloc1(&rtp->ro_dst, 1);
 #endif
-#endif
-		} else {
-			rtp->ro_rt = rtalloc_alternate(&rtp->ro_dst, NULL, 0);
-		}
 	}
 	loc_scope = site_scope = loopscope = 0;
 	rt = rtp->ro_rt;
@@ -1306,7 +1181,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 	}
 	are_done = 0;
 	rt_addr = sctp_choose_correctv6_scope(rt, site_scope, loc_scope, tcb,
-					      inp, list_type, &are_done);
+	    inp, list_type, &are_done);
 	if (are_done) {
 		/* Short cut, the selector says we have it */
 		return (rt_addr->sin6_addr);
@@ -1326,16 +1201,17 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 		/* Hunt for an address amongst the interfaces not on the
 		 * negative list and rotate amongst them.
 		 */
-		for (ifn = inp->next_ifn_touse; ifn; ifn = TAILQ_NEXT(ifn, if_list)) {
-			if ((loopscope == 0) &&
-			    (ifn->if_type == IFT_LOOP)) {
+		for (ifn = inp->next_ifn_touse; ifn;
+		    ifn = TAILQ_NEXT(ifn, if_list)) {
+			if (loopscope == 0 && ifn->if_type == IFT_LOOP) {
 				/* wrong base scope */
 				continue;
 			}
 			TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 				if (ifa->ifa_addr->sa_family == AF_INET6) {
 					struct sockaddr_in6 *ifa_a;
-					ifa_a = (struct sockaddr_in6 *)(ifa->ifa_addr);
+					ifa_a = (struct sockaddr_in6 *)
+					    ifa->ifa_addr;
 					if (IN6_IS_ADDR_UNSPECIFIED(&ifa_a->sin6_addr)) {
 						/* skip unspecifed addresses */
 						continue;
@@ -1347,8 +1223,8 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 						if (!sctp_is_same_scope(ifa_a, to))
 							continue;
 					}
-					if ((site_scope == 0) &&
-					    (IN6_IS_ADDR_SITELOCAL(&ifa_a->sin6_addr))) {
+					if (site_scope == 0 &&
+					    IN6_IS_ADDR_SITELOCAL(&ifa_a->sin6_addr)) {
 						/* can't use it wrong scope */
 						continue;
 					}
@@ -1359,8 +1235,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 					ifa6 = (struct in6_ifaddr *)ifa;
 					/* ok to use deprecated addresses? */
 					if (!ip6_use_deprecated) {
-						if (ifa6->ia6_flags &
-						    IN6_IFF_DEPRECATED) {
+						if (IFA6_IS_DEPRECATED(ifa6)) {
 							continue;
 						}
 					}
@@ -1371,26 +1246,28 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 						continue;
 					/* we can use it !! */
 					/* set to start with next intf */
-					inp->next_ifn_touse = TAILQ_NEXT(ifn, if_list);
+					inp->next_ifn_touse =
+					    TAILQ_NEXT(ifn, if_list);
 					return (ifa_a->sin6_addr);
 				}
 			}
 		}
-		/* Ok nothing turned up in the next_ifn_touse to the next
+		/*
+		 * Ok nothing turned up in the next_ifn_touse to the next
 		 * lets check the beginning up to next_ifn_touse.
 		 */
 		for (ifn = TAILQ_FIRST(&ifnet);
-		     (ifn && (ifn != inp->next_ifn_touse));
+		     ifn && (ifn != inp->next_ifn_touse);
 		     ifn = TAILQ_NEXT(ifn, if_list)) {
-			if ((loopscope == 0) &&
-			    (ifn->if_type == IFT_LOOP)) {
+			if (loopscope == 0 && ifn->if_type == IFT_LOOP) {
 				/* wrong base scope */
 				continue;
 			}
 			TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 				if (ifa->ifa_addr->sa_family == AF_INET6) {
 					struct sockaddr_in6 *ifa_a;
-					ifa_a = (struct sockaddr_in6 *)(ifa->ifa_addr);
+					ifa_a = (struct sockaddr_in6 *)
+					    ifa->ifa_addr;
 					if (IN6_IS_ADDR_UNSPECIFIED(&ifa_a->sin6_addr)) {
 						/* skip unspecifed addresses */
 						continue;
@@ -1399,23 +1276,24 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 						if (loc_scope == 0)
 							/* link local scopes not allowed */
 							continue;
-						if (!sctp_is_same_scope(ifa_a, to))
+						if (!sctp_is_same_scope(ifa_a,
+						    to))
 							continue;
 					}
-					if ((site_scope == 0) &&
-					    (IN6_IS_ADDR_SITELOCAL(&ifa_a->sin6_addr))) {
+					if (site_scope == 0 &&
+					    IN6_IS_ADDR_SITELOCAL(&ifa_a->sin6_addr)) {
 						/* can't use it wrong scope */
 						continue;
 					}
 					/* make sure it is not restricted */
-					if (sctp_is_addr_restricted(tcb, ifa->ifa_addr))
+					if (sctp_is_addr_restricted(tcb,
+					    ifa->ifa_addr))
 						continue;
 					/* is the interface address valid */
 					ifa6 = (struct in6_ifaddr *)ifa;
 					/* ok to use deprecated addresses? */
 					if (!ip6_use_deprecated) {
-						if (ifa6->ia6_flags &
-						    IN6_IFF_DEPRECATED) {
+						if (IFA6_IS_DEPRECATED(ifa6)) {
 							continue;
 						}
 					}
@@ -1426,7 +1304,8 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 						continue;
 					/* we can use it !! */
 					/* set to start with next intf */
-					inp->next_ifn_touse = TAILQ_NEXT(ifn, if_list);
+					inp->next_ifn_touse =
+					    TAILQ_NEXT(ifn, if_list);
 					return (ifa_a->sin6_addr);
 				}
 			}
@@ -1436,20 +1315,21 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 			memset(&ans, 0, sizeof(ans));
 			return (ans);
 		}
-		/* see if we can just get an address of the right scope
+		/*
+		 * see if we can just get an address of the right scope
 		 * without worrying about restrictions.
 		 */
 		for (ifn = TAILQ_FIRST(&ifnet); ifn;
-		     ifn = TAILQ_NEXT(ifn, if_list)) {
-			if ((loopscope == 0) &&
-			    (ifn->if_type == IFT_LOOP)) {
+		    ifn = TAILQ_NEXT(ifn, if_list)) {
+			if (loopscope == 0 && ifn->if_type == IFT_LOOP) {
 				/* wrong base scope */
 				continue;
 			}
 			TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 				if (ifa->ifa_addr->sa_family == AF_INET6) {
 					struct sockaddr_in6 *ifa_a;
-					ifa_a = (struct sockaddr_in6 *)(ifa->ifa_addr);
+					ifa_a = (struct sockaddr_in6 *)
+					    ifa->ifa_addr;
 					if (IN6_IS_ADDR_UNSPECIFIED(&ifa_a->sin6_addr)) {
 						/* skip unspecifed addresses */
 						continue;
@@ -1461,8 +1341,8 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 						if (!sctp_is_same_scope(ifa_a, to))
 							continue;
 					}
-					if ((site_scope == 0) &&
-					    (IN6_IS_ADDR_SITELOCAL(&ifa_a->sin6_addr))) {
+					if (site_scope == 0 &&
+					    IN6_IS_ADDR_SITELOCAL(&ifa_a->sin6_addr)) {
 						/* can't use it wrong scope */
 						continue;
 					}
@@ -1470,8 +1350,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 					ifa6 = (struct in6_ifaddr *)ifa;
 					/* ok to use deprecated addresses? */
 					if (!ip6_use_deprecated) {
-						if (ifa6->ia6_flags &
-						    IN6_IFF_DEPRECATED) {
+						if (IFA6_IS_DEPRECATED(ifa6)) {
 							continue;
 						}
 					}
@@ -1482,29 +1361,31 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 						continue;
 					/* we can use it !! */
 					/* set to start with next intf */
-					inp->next_ifn_touse = TAILQ_NEXT(ifn, if_list);
+					inp->next_ifn_touse =
+					    TAILQ_NEXT(ifn, if_list);
 					return (ifa_a->sin6_addr);
 				}
 			}
 		}
 		/*
-		 * Can't find a single address of the right scope,
-		 * you get the address on the route...  This could
-		 * be due to bad scope OR it could be due to our
-		 * strange ASCONF case where we are doing the ADD/DEL
-		 * after a ifconfig that changed an address. Less likely
-		 * on IPv6 but always possible.
+		 * Can't find a single address of the right scope, you get
+		 * the address on the route...  This could be due to bad
+		 * scope OR it could be due to our strange ASCONF case where
+		 * we are doing the ADD/DEL after a ifconfig that changed
+		 * an address. Less likely on IPv6 but always possible.
 		 */
 		return (rt_addr->sin6_addr);
 	}
 	/* Now here we have specific BOUND addresses cases */
 	if (tcb) {
-		/* Ok, we have a local list on the association level
+		/*
+		 * Ok, we have a local list on the association level
 		 * If asconf is enabled then my list is a reverse composite
 		 * of the addresses allowed.
 		 */
 		if (inp->sctp_flags & SCTP_PCB_FLAGS_DO_ASCONF) {
-			/* first is the destination on the bound list for
+			/*
+			 * first is the destination on the bound list for
 			 * the ep but not restricted?
 			 */
 			if (tcb->asoc.last_used_address == NULL) {
@@ -1512,7 +1393,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 			}
 			/* search beginning with the last used address */
 			for (laddr = tcb->asoc.last_used_address; laddr;
-			     laddr = LIST_NEXT(laddr, sctp_nxt_addr)) {
+			    laddr = LIST_NEXT(laddr, sctp_nxt_addr)) {
 				if (laddr->ifa == NULL) {
 #ifdef SCTP_DEBUG
 					if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
@@ -1527,7 +1408,8 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 				if (laddr->ifa->ifa_addr->sa_family != AF_INET6)
 					/* wrong type */
 					continue;
-				out6 = (struct sockaddr_in6 *)laddr->ifa->ifa_addr;
+				out6 = (struct sockaddr_in6 *)
+				    laddr->ifa->ifa_addr;
 				if (IN6_IS_ADDR_UNSPECIFIED(&out6->sin6_addr)) {
 					/* we skip unspecifed addresses */
 					continue;
@@ -1539,13 +1421,13 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 					if (!sctp_is_same_scope(out6, to))
 						continue;
 				}
-				if ((site_scope == 0) &&
-				    (IN6_IS_ADDR_SITELOCAL(&out6->sin6_addr))) {
+				if (site_scope == 0 &&
+				    IN6_IS_ADDR_SITELOCAL(&out6->sin6_addr)) {
 					/* can't use it wrong scope */
 					continue;
 				}
-				if ((loopscope == 0) &&
-				    (IN6_IS_ADDR_LOOPBACK(&out6->sin6_addr))) {
+				if (loopscope == 0 &&
+				    IN6_IS_ADDR_LOOPBACK(&out6->sin6_addr)) {
 					continue;
 				}
 				if (sctp_is_addr_restricted(tcb, laddr->ifa->ifa_addr)) {
@@ -1556,17 +1438,17 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 				ifa6 = (struct in6_ifaddr *)laddr->ifa;
 				/* ok to use deprecated addresses? */
 				if (!ip6_use_deprecated) {
-					if (ifa6->ia6_flags &
-					    IN6_IFF_DEPRECATED) {
+					if (IFA6_IS_DEPRECATED(ifa6)) {
 						/* can't use this type */
 						continue;
 					}
 				}
-				if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
-						       IN6_IFF_ANYCAST |
-						       IN6_IFF_NOTREADY))
+				if (ifa6->ia6_flags &
+				    (IN6_IFF_DETACHED | IN6_IFF_ANYCAST |
+				     IN6_IFF_NOTREADY))
 					continue;
-				tcb->asoc.last_used_address = LIST_NEXT(laddr, sctp_nxt_addr);
+				tcb->asoc.last_used_address =
+				    LIST_NEXT(laddr, sctp_nxt_addr);
 				return (out6->sin6_addr);
 			}
 			/*
@@ -1574,8 +1456,8 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 			 * the top
 			 */
 			for (laddr = LIST_FIRST(&inp->sctp_addr_list);
-			     (laddr && (laddr != tcb->asoc.last_used_address));
-			     laddr = LIST_NEXT(laddr, sctp_nxt_addr)) {
+			    laddr && (laddr != tcb->asoc.last_used_address);
+			    laddr = LIST_NEXT(laddr, sctp_nxt_addr)) {
 				out6 = (struct sockaddr_in6 *)laddr->ifa->ifa_addr;
 				if (IN6_IS_ADDR_UNSPECIFIED(&out6->sin6_addr)) {
 					/* we skip unspecifed addresses */
@@ -1605,16 +1487,16 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 				ifa6 = (struct in6_ifaddr *)laddr->ifa;
 				/* ok to use deprecated addresses? */
 				if (!ip6_use_deprecated) {
-					if (ifa6->ia6_flags &
-					    IN6_IFF_DEPRECATED) {
+					if (IFA6_IS_DEPRECATED(ifa6)) {
 						continue;
 					}
 				}
-				if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
-						       IN6_IFF_ANYCAST |
-						       IN6_IFF_NOTREADY))
+				if (ifa6->ia6_flags &
+				    (IN6_IFF_DETACHED | IN6_IFF_ANYCAST |
+				     IN6_IFF_NOTREADY))
 					continue;
-				tcb->asoc.last_used_address = LIST_NEXT(laddr, sctp_nxt_addr);
+				tcb->asoc.last_used_address =
+				    LIST_NEXT(laddr, sctp_nxt_addr);
 				return (out6->sin6_addr);
 			}
 			/*
@@ -1636,10 +1518,12 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 				 * case of ASCONF.  So we just need to return
 				 * any asoc address and hope things work.
 				 */
-				LIST_FOREACH(laddr, &inp->sctp_addr_list, sctp_nxt_addr) {
+				LIST_FOREACH(laddr, &inp->sctp_addr_list,
+				    sctp_nxt_addr) {
 					if (laddr->ifa == NULL) {
 #ifdef SCTP_DEBUG
-						if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
+						if (sctp_debug_on &
+						    SCTP_DEBUG_OUTPUT1) {
 							printf("Help I have fallen and I can't get up!\n");
 						}
 #endif
@@ -1648,10 +1532,13 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 					if (laddr->ifa->ifa_addr == NULL)
 						continue;
 
-					if (laddr->ifa->ifa_addr->sa_family != AF_INET6)
+					if (laddr->ifa->ifa_addr->sa_family !=
+					    AF_INET6) {
 						/* wrong type */
 						continue;
-					out6 = (struct sockaddr_in6 *)laddr->ifa->ifa_addr;
+					}
+					out6 = (struct sockaddr_in6 *)
+					    laddr->ifa->ifa_addr;
 					if (IN6_IS_ADDR_UNSPECIFIED(&out6->sin6_addr)) {
 						/* skip unspecifed addresses */
 						continue;
@@ -1663,17 +1550,18 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 						if (!sctp_is_same_scope(out6, to))
 							continue;
 					}
-					if ((site_scope == 0) &&
-					    (IN6_IS_ADDR_SITELOCAL(&out6->sin6_addr))) {
+					if (site_scope == 0 &&
+					    IN6_IS_ADDR_SITELOCAL(&out6->sin6_addr)) {
 						/* can't use it wrong scope */
 						continue;
 					}
-					if ((loopscope == 0) &&
-					    (IN6_IS_ADDR_LOOPBACK(&out6->sin6_addr))) {
+					if (loopscope == 0 &&
+					    IN6_IS_ADDR_LOOPBACK(&out6->sin6_addr)) {
 						continue;
 					}
 					/* Ok here it is */
-					tcb->asoc.last_used_address = LIST_NEXT(laddr, sctp_nxt_addr);
+					tcb->asoc.last_used_address =
+					    LIST_NEXT(laddr, sctp_nxt_addr);
 					return (out6->sin6_addr);
 				}
 				/*
@@ -1688,7 +1576,8 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 			 */
 
 			/* Ok look on the list for one we can give out */
-			LIST_FOREACH(laddr, &tcb->asoc.sctp_local_addr_list, sctp_nxt_addr) {
+			LIST_FOREACH(laddr, &tcb->asoc.sctp_local_addr_list,
+			    sctp_nxt_addr) {
 				if (laddr->ifa == NULL) {
 #ifdef SCTP_DEBUG
 					if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
@@ -1700,10 +1589,13 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 				if (laddr->ifa->ifa_addr == NULL)
 					continue;
 
-				if (laddr->ifa->ifa_addr->sa_family != AF_INET6)
+				if (laddr->ifa->ifa_addr->sa_family !=
+				    AF_INET6) {
 					/* must be IPv6 */
 					continue;
-				out6 = (struct sockaddr_in6 *)(laddr->ifa->ifa_addr);
+				}
+				out6 = (struct sockaddr_in6 *)
+				    laddr->ifa->ifa_addr;
 				if (IN6_IS_ADDR_UNSPECIFIED(&out6->sin6_addr)) {
 					/* we skip unspecifed addresses */
 					continue;
@@ -1715,27 +1607,26 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 					if (!sctp_is_same_scope(out6, to))
 						continue;
 				}
-				if ((site_scope == 0) &&
-				    (IN6_IS_ADDR_SITELOCAL(&out6->sin6_addr))) {
+				if (site_scope == 0 &&
+				    IN6_IS_ADDR_SITELOCAL(&out6->sin6_addr)) {
 					/* can't use it wrong scope */
 					continue;
 				}
-				if ((loopscope == 0) &&
-				    (IN6_IS_ADDR_LOOPBACK(&out6->sin6_addr))) {
+				if (loopscope == 0 &&
+				    IN6_IS_ADDR_LOOPBACK(&out6->sin6_addr)) {
 					continue;
 				}
 				/* is the interface address valid */
 				ifa6 = (struct in6_ifaddr *)laddr->ifa;
 				/* ok to use deprecated addresses? */
 				if (!ip6_use_deprecated) {
-					if (ifa6->ia6_flags &
-					    IN6_IFF_DEPRECATED) {
+					if (IFA6_IS_DEPRECATED(ifa6)) {
 						continue;
 					}
 				}
-				if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
-						       IN6_IFF_ANYCAST |
-						       IN6_IFF_NOTREADY))
+				if (ifa6->ia6_flags &
+				    (IN6_IFF_DETACHED | IN6_IFF_ANYCAST |
+				     IN6_IFF_NOTREADY))
 					continue;
 				return (out6->sin6_addr);
 			}
@@ -1753,7 +1644,7 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 		inp->next_addr_touse = LIST_FIRST(&inp->sctp_addr_list);
 	}
 	for (laddr = inp->next_addr_touse; laddr;
-	     laddr = LIST_NEXT(laddr, sctp_nxt_addr)) {
+	    laddr = LIST_NEXT(laddr, sctp_nxt_addr)) {
 		if (laddr->ifa == NULL) {
 #ifdef SCTP_DEBUG
 			if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
@@ -1765,9 +1656,10 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 		if (laddr->ifa->ifa_addr == NULL)
 			continue;
 
-		if (laddr->ifa->ifa_addr->sa_family != AF_INET6)
+		if (laddr->ifa->ifa_addr->sa_family != AF_INET6) {
 			/* wrong type */
 			continue;
+		}
 		out6 = (struct sockaddr_in6 *)laddr->ifa->ifa_addr;
 		if (IN6_IS_ADDR_UNSPECIFIED(&out6->sin6_addr)) {
 			/* we skip unspecifed addresses */
@@ -1780,34 +1672,33 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 			if (!sctp_is_same_scope(out6, to))
 				continue;
 		}
-		if ((site_scope == 0) &&
-		    (IN6_IS_ADDR_SITELOCAL(&out6->sin6_addr))) {
+		if (site_scope == 0 &&
+		    IN6_IS_ADDR_SITELOCAL(&out6->sin6_addr)) {
 			/* can't use it wrong scope */
 			continue;
 		}
-		if ((loopscope == 0) &&
-		    (IN6_IS_ADDR_LOOPBACK(&out6->sin6_addr))) {
+		if (loopscope == 0 &&
+		    IN6_IS_ADDR_LOOPBACK(&out6->sin6_addr)) {
 			continue;
 		}
 		/* is the interface address valid */
 		ifa6 = (struct in6_ifaddr *)laddr->ifa;
 		/* ok to use deprecated addresses? */
 		if (!ip6_use_deprecated) {
-			if (ifa6->ia6_flags & IN6_IFF_DEPRECATED) {
+			if (IFA6_IS_DEPRECATED(ifa6)) {
 				continue;
 			}
 		}
-		if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
-				       IN6_IFF_ANYCAST |
-				       IN6_IFF_NOTREADY))
+		if (ifa6->ia6_flags &
+		    (IN6_IFF_DETACHED | IN6_IFF_ANYCAST | IN6_IFF_NOTREADY))
 			continue;
 		inp->next_addr_touse = LIST_NEXT(laddr, sctp_nxt_addr);
 		return (out6->sin6_addr);
 	}
 	/* Check the front part of the list */
 	for (laddr = LIST_FIRST(&inp->sctp_addr_list);
-	     (laddr && (laddr != inp->next_addr_touse));
-	     laddr = LIST_NEXT(laddr, sctp_nxt_addr)) {
+	    laddr && (laddr != inp->next_addr_touse);
+	    laddr = LIST_NEXT(laddr, sctp_nxt_addr)) {
 		if (laddr->ifa == NULL) {
 #ifdef SCTP_DEBUG
 			if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
@@ -1819,9 +1710,10 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 		if (laddr->ifa->ifa_addr == NULL)
 			continue;
 
-		if (laddr->ifa->ifa_addr->sa_family != AF_INET6)
+		if (laddr->ifa->ifa_addr->sa_family != AF_INET6) {
 			/* wrong type */
 			continue;
+		}
 		out6 = (struct sockaddr_in6 *)laddr->ifa->ifa_addr;
 		if (IN6_IS_ADDR_UNSPECIFIED(&out6->sin6_addr)) {
 			/* we skip unspecifed addresses */
@@ -1834,26 +1726,25 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 			if (!sctp_is_same_scope(out6, to))
 				continue;
 		}
-		if ((site_scope == 0) &&
-		    (IN6_IS_ADDR_SITELOCAL(&out6->sin6_addr))) {
+		if (site_scope == 0 &&
+		    IN6_IS_ADDR_SITELOCAL(&out6->sin6_addr)) {
 			/* can't use it wrong scope */
 			continue;
 		}
-		if ((loopscope == 0) &&
-		    (IN6_IS_ADDR_LOOPBACK(&out6->sin6_addr))) {
+		if (loopscope == 0 &&
+		    IN6_IS_ADDR_LOOPBACK(&out6->sin6_addr)) {
 			continue;
 		}
 		/* is the interface address valid */
 		ifa6 = (struct in6_ifaddr *)laddr->ifa;
 		/* ok to use deprecated addresses? */
 		if (!ip6_use_deprecated) {
-			if (ifa6->ia6_flags & IN6_IFF_DEPRECATED) {
+			if (IFA6_IS_DEPRECATED(ifa6)) {
 				continue;
 			}
 		}
-		if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
-				       IN6_IFF_ANYCAST |
-				       IN6_IFF_NOTREADY))
+		if (ifa6->ia6_flags &
+		    (IN6_IFF_DETACHED | IN6_IFF_ANYCAST | IN6_IFF_NOTREADY))
 			continue;
 		inp->next_addr_touse = LIST_NEXT(laddr, sctp_nxt_addr);
 		return (out6->sin6_addr);
@@ -1866,14 +1757,13 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 	return (rt_addr->sin6_addr);
 }
 
-#include <netinet6/nd6.h>
-
 static u_int8_t
 sctp_get_ect(struct sctp_tcb *tcb,
 	     struct sctp_tmit_chunk *chk)
 {
 	u_int8_t this_random;
-	if (((tcb->asoc.hb_random_idx == 3) && (tcb->asoc.hb_ect_randombit > 7)) ||
+	if (((tcb->asoc.hb_random_idx == 3) &&
+	     (tcb->asoc.hb_ect_randombit > 7)) ||
 	     (tcb->asoc.hb_random_idx > 3)) {
 		u_int32_t rndval;
 		rndval = sctp_select_initial_TSN(&tcb->sctp_ep->sctp_ep);
@@ -1906,8 +1796,8 @@ sctp_get_ect(struct sctp_tcb *tcb,
 }
 
 static int
-sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
-			   register struct sctp_tcb *tcb,    /* may be NULL */
+sctp_lowlevel_chunk_output(struct sctp_inpcb *inp,
+			   struct sctp_tcb *tcb,    /* may be NULL */
 			   struct sctp_nets *net,
 			   struct sockaddr *to,
 			   struct mbuf *m,
@@ -1955,11 +1845,7 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 	sctphdr->checksum = csum;
 	if (to->sa_family == AF_INET) {
 		struct ip *ip;
-#ifdef SCTP_DO_NOT_DO_THIS
-		sctp_mprepend(&m, sizeof(struct ip), M_DONTWAIT);
-#else
 		M_PREPEND(m, sizeof(struct ip), M_DONTWAIT);
-#endif
 		if (m == NULL) {
 			/* failed to prepend data, give up */
 			return (ENOMEM);
@@ -2161,11 +2047,7 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 		struct sockaddr_in6 *sin6, tmp, *lsa6, lsa6_tmp, lsa6_storage;
 		int error;
 
-#ifdef SCTP_DO_NOT_DO_THIS
-		sctp_mprepend(&m, sizeof(struct ip6_hdr), M_DONTWAIT);
-#else
 		M_PREPEND(m, sizeof(struct ip6_hdr), M_DONTWAIT);
-#endif
 		if (m == NULL) {
 			/* failed to prepend data, give up */
 			return (ENOMEM);
@@ -2192,12 +2074,16 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 		sin6 = (struct sockaddr_in6 *)to;
 		tmp = *sin6;
 		sin6 = &tmp;
-#ifdef SCTP_BASE_FREEBSD
-#else
+
 		/* KAME hack: embed scopeid */
+#ifdef SCTP_BASE_FREEBSD
+		if (in6_embedscope(&sin6->sin6_addr, sin6, 
+				   (struct in6pcb *)inp, NULL) != 0)
+			return (EINVAL);
+#else
 		if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
 			return (error);
-#endif
+#endif /* SCTP_BASE_FREEBSD */
 		if (tcb != NULL) {
 			if ((tcb->asoc.ecn_allowed) && ecn_ok) {
 				/* Enable ECN */
@@ -2227,10 +2113,8 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 		if (net) {
 			if (net->src_addr_selected == 0) {
 				/* Cache the source address */
-				((struct sockaddr_in6 *)&net->ra._s_addr)->sin6_addr = sctp_ipv6_source_address_selection(inp, tcb,
-													    (struct sockaddr_in6 *)to,
-															  rtp, net,
-															  out_of_asoc_ok);
+				((struct sockaddr_in6 *)&net->ra._s_addr)->sin6_addr =
+				    sctp_ipv6_source_address_selection(inp, tcb, (struct sockaddr_in6 *)to, rtp, net, out_of_asoc_ok);
 				net->src_addr_selected = 1;
 			}
 			lsa6->sin6_addr = ((struct sockaddr_in6 *)&net->ra._s_addr)->sin6_addr;
@@ -2282,7 +2166,8 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 		bzero(&lsa6_storage, sizeof(lsa6_storage));
 		lsa6_storage.sin6_family = AF_INET6;
 		lsa6_storage.sin6_len = sizeof(lsa6_storage);
-		if ((error = in6_recoverscope(&lsa6_storage, &lsa6->sin6_addr, NULL)) != 0) {
+		if ((error = in6_recoverscope(&lsa6_storage, &lsa6->sin6_addr,
+					      NULL)) != 0) {
 			m_freem(m);
 			return (error);
 		}
@@ -2308,13 +2193,14 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 			sin6->sin6_scope_id = ntohs(sin6->sin6_addr.s6_addr16[1]);
 		}
 #ifdef SCTP_BASE_FREEBSD
+		/* nothing needed here... */
 #else
 		/* attach the full sockaddr_in6 addresses to the packet */
 		if (!ip6_setpktaddrs(m, lsa6, sin6)) {
 			m_freem(m);
 			return (ENOBUFS);
 		}
-#endif
+#endif /* SCTP_BASE_FREEBSD */
 
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_OUTPUT3) {
@@ -2365,7 +2251,7 @@ sctp_lowlevel_chunk_output(register struct sctp_inpcb *inp,
 			} else if (ifp) {
 #ifdef SCTP_BASE_FREEBSD
 #define ND_IFINFO(ifp) (&nd_ifinfo[ifp->if_index])
-#endif
+#endif /* SCTP_BASE_FREEBSD */
 				if (ND_IFINFO(ifp)->linkmtu &&
 				    (tcb->asoc.smallest_mtu > ND_IFINFO(ifp)->linkmtu)) {
 					sctp_mtu_size_reset(inp,
@@ -2420,7 +2306,7 @@ int sctp_is_address_in_scope(struct ifaddr *ifa,
 		struct in6_ifaddr *ifa6;
 
 		ifa6 = (struct in6_ifaddr *)ifa;
-				/* ok to use deprecated addresses? */
+		/* ok to use deprecated addresses? */
 		if (!ip6_use_deprecated) {
 			if (ifa6->ia6_flags &
 			    IN6_IFF_DEPRECATED) {
@@ -2454,7 +2340,7 @@ int sctp_is_address_in_scope(struct ifaddr *ifa,
 
 void
 sctp_send_initiate(inp, tcb)
-     register struct sctp_inpcb *inp;
+     struct sctp_inpcb *inp;
      struct sctp_tcb *tcb;
 {
 	struct mbuf *m,*m_at,*m_last;
@@ -2510,7 +2396,7 @@ sctp_send_initiate(inp, tcb)
 	/* place in my tag */
 	initm->msg.init.initiate_tag = htonl(tcb->asoc.my_vtag);
 	/* set up some of the credits. */
-	initm->msg.init.a_rwnd = htonl(max(inp->sctp_socket->so_rcv.sb_hiwat,SCTP_MINIMAL_RWND));
+	initm->msg.init.a_rwnd = htonl(max(inp->sctp_socket->so_rcv.sb_hiwat, SCTP_MINIMAL_RWND));
 
 	initm->msg.init.num_outbound_streams = htons(tcb->asoc.pre_open_streams);
 	initm->msg.init.num_inbound_streams = htons(tcb->asoc.max_inbound_streams);
@@ -3088,7 +2974,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 		if (op_err) {
 			struct sctphdr *ohdr;
 			struct sctp_chunkhdr *ch;
-			/* get the initial mesage so we can get out peers vtag */
+			/* get the initial msg so we can get out peers vtag */
 			initm_in = (struct sctp_init_msg *)(mtod(in_initpkt, caddr_t) + iphlen);
 			/* prepend a header and size it too*/
 			M_PREPEND(op_err,
@@ -3097,7 +2983,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 			if (op_err == NULL) {
 				goto done_now;
 			}
-			ch = mtod(op_err,struct sctp_chunkhdr *);
+			ch = mtod(op_err, struct sctp_chunkhdr *);
 			ch->chunk_type = SCTP_OPERATION_ERROR;
 			ch->chunk_flags = 0;
 			ch->chunk_length = htons(op_err->m_pkthdr.len);
@@ -3108,10 +2994,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 				goto done_now;
 			ohdr = mtod(op_err, struct sctphdr *);
 			/* send the operr to the peer */
-			sctp_send_operr_to(in_initpkt, 
-					   iphlen, 
-					   op_err, 
-					   ohdr,
+			sctp_send_operr_to(in_initpkt, iphlen, op_err, ohdr,
 					   initm_in->msg.init.initiate_tag);
 		}
 	done_now:
@@ -3158,17 +3041,15 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 		stc.cookie_life = inp->sctp_ep.def_cookie_life;
 	}
 
-
 	sctphdr = (struct sctphdr *)(mtod(m, caddr_t) + iphlen);
-	/* cp in the ports for later check */
+	/* copy in the ports for later check */
 	stc.myport = sctphdr->dest_port;
 	stc.peerport = sctphdr->src_port;
 
-	/* If we wanted to honor cookie life extenstions
-	 * we would add to stc.cookie_life. For now
-	 * I think we should NOT honor any extension
+	/*
+	 * If we wanted to honor cookie life extentions, we would add
+	 * to stc.cookie_life. For now we should NOT honor any extension
 	 */
-	
 	stc.site_scope = stc.local_scope = stc.loopback_scope = 0;
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUND_V6) {
 		struct inpcb *in_inp;
@@ -3228,7 +3109,8 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 			/* local from address */
 			memset(&rt, 0, sizeof(rt));
 			memcpy(&rt.ro_dst, sin, sizeof(*sin));
-			addr = sctp_ipv4_source_address_selection(inp, NULL, sin, &rt,
+			addr = sctp_ipv4_source_address_selection(inp, NULL,
+								  sin, &rt,
 								  NULL, 0);
 			if (rt.ro_rt) {
 				RTFREE(rt.ro_rt);
@@ -3246,7 +3128,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 			}
 #else
 			stc.ipv4_scope = 1;
-#endif
+#endif /* SCTP_DONT_DO_PRIVADDR_SCOPE */
 			/* Must use the address in this case */
 			if (sctp_is_address_on_local_host((struct sockaddr *)sin)) {
 				stc.loopback_scope = 1;
@@ -3272,7 +3154,8 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 			/* local from address */
 			memset(&rt, 0, sizeof(rt));
 			memcpy(&rt.ro_dst, sin6, sizeof(*sin6));
-			addr = sctp_ipv6_source_address_selection(inp, NULL, sin6, &rt,
+			addr = sctp_ipv6_source_address_selection(inp, NULL,
+								  sin6, &rt,
 								  NULL, 0);
 			if (rt.ro_rt) {
 				RTFREE(rt.ro_rt);
@@ -3288,19 +3171,24 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 			} else if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
 				struct sockaddr_in6 src;
 				/*
-				 * If the new destination is a LINK_LOCAL we must have
-				 * common both site and local scope. Don't set local
-				 * scope though since we must depend on the source to
-				 * be added implicitly. We cannot assure just because
+				 * If the new destination is a LINK_LOCAL 
+				 * we must have common both site and local
+				 * scope. Don't set local scope though since
+				 * we must depend on the source to be added
+				 * implicitly. We cannot assure just because
 				 * we share one link that all links are common.
 				 */
 				stc.local_scope = 0;
 				stc.site_scope = 1;
+
+				/* pull out the scope_id from incoming pkt */
 #ifdef SCTP_BASE_FREEBSD
+				sin6->sin6_scope_id = stc.scope_id =
+					in6_addr2scopeid(in_initpkt->m_pkthdr.rcvif,
+							 &ip6->ip6_dst);
 #else
-				/* pull out the scope_id from the incoming packet */
 				if (ip6_getpktaddrs(in_initpkt, &src, NULL)) {
-					/* hmm... this is bad- can't get the scope! */
+					/* this is bad- can't get the scope! */
 #ifdef SCTP_DEBUG
 					if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
 						printf("send_initiate_ack: can't get scope of link-local addr\n");
@@ -3308,11 +3196,12 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 #endif /* SCTP_DEBUG */
 					return;	/* FIX: ??? send op_err? */
 				}
-#endif
 				sin6->sin6_scope_id = src.sin6_scope_id;
 				stc.scope_id = src.sin6_scope_id;
+#endif /* SCTP_BASE_FREEBSD */
 			} else if (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr)) {
-				/* If the new destination is SITE_LOCAL
+				/*
+				 * If the new destination is SITE_LOCAL
 				 * then we must have site scope in common.
 				 */
 				stc.site_scope = 1;
@@ -3338,11 +3227,9 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 				/* strange case here, the INIT
 				 * should have did the selection.
 				 */
-				((struct sockaddr_in *)&netp->ra._s_addr)->sin_addr = sctp_ipv4_source_address_selection(inp, 
-															tcb,
-															(struct sockaddr_in *)&netp->ra._l_addr,
-															(struct route *)&netp->ra,
-															netp, 0);
+				((struct sockaddr_in *)&netp->ra._s_addr)->sin_addr = sctp_ipv4_source_address_selection(inp, tcb,
+															 (struct sockaddr_in *)&netp->ra._l_addr,
+															 (struct route *)&netp->ra, netp, 0);
 				netp->src_addr_selected = 1;
 
 			}
@@ -3362,11 +3249,12 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 				/* strange case here, the INIT
 				 * should have did the selection.
 				 */
-				((struct sockaddr_in6 *)&netp->ra._s_addr)->sin6_addr = sctp_ipv6_source_address_selection(inp,
-															tcb,
-															(struct sockaddr_in6 *)&netp->ra._l_addr,
-															(struct route *)&netp->ra,
-															netp, 0);
+				((struct sockaddr_in6 *)&netp->ra._s_addr)->sin6_addr =
+				    sctp_ipv6_source_address_selection(inp,
+								       tcb,
+								       (struct sockaddr_in6 *)&netp->ra._l_addr,
+								       (struct route *)&netp->ra,
+								       netp, 0);
 				netp->src_addr_selected = 1;
 			}
 
@@ -3405,7 +3293,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 	stc.my_vtag = initack_mout->msg.init.initiate_tag;
 
 	/* set up some of the credits. */
-	initack_mout->msg.init.a_rwnd = htonl(max(inp->sctp_socket->so_rcv.sb_hiwat,SCTP_MINIMAL_RWND));
+	initack_mout->msg.init.a_rwnd = htonl(max(inp->sctp_socket->so_rcv.sb_hiwat, SCTP_MINIMAL_RWND));
 	/* set what I want */
 	his_limit = ntohs(initm_in->msg.init.num_inbound_streams);
 	/* choose what I want */
@@ -3724,7 +3612,7 @@ sctp_prune_prsctp(struct sctp_tcb *tcb,
 							cause = SCTP_RESPONSE_TO_USER_REQ|SCTP_NOTIFY_DATAGRAM_SENT;
 						else
 							cause = SCTP_RESPONSE_TO_USER_REQ|SCTP_NOTIFY_DATAGRAM_UNSENT;
-						ret_spc  = sctp_release_pr_sctp_chunk(tcb,chk,
+						ret_spc  = sctp_release_pr_sctp_chunk(tcb, chk,
 										      cause,
 										      &asoc->sent_queue);
 						freed_spc += ret_spc;
@@ -3750,7 +3638,7 @@ sctp_prune_prsctp(struct sctp_tcb *tcb,
 						 * mbuf is here
 						 */
 						int ret_spc;
-						ret_spc  = sctp_release_pr_sctp_chunk(tcb,chk,
+						ret_spc  = sctp_release_pr_sctp_chunk(tcb, chk,
 						    SCTP_RESPONSE_TO_USER_REQ|SCTP_NOTIFY_DATAGRAM_UNSENT,
 						    &asoc->send_queue);
 
@@ -4606,7 +4494,7 @@ sctp_clean_up_datalist(struct sctp_tcb *stcb,
 }
 
 static void
-sctp_clean_up_ctl(register struct sctp_association *asoc)
+sctp_clean_up_ctl(struct sctp_association *asoc)
 {
 	struct sctp_tmit_chunk *chk,*nchk;
 	for (chk = TAILQ_FIRST(&asoc->control_send_queue);
@@ -4676,7 +4564,7 @@ sctp_move_to_outqueue(struct sctp_tcb *tcb,
 			break;
 		}
 		if (orig != chk->data) {
-			/* A new mbuf was added  account for it */
+			/* A new mbuf was added, account for it */
 #ifdef  SCTP_TCP_MODEL_SUPPORT
 			if ((tcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) ||
 			    (tcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_IN_TCPPOOL)) {
@@ -4939,7 +4827,7 @@ sctp_med_chunk_output(struct sctp_inpcb *inp,
 	 *    chunks. Making sure to combine any control in the
 	 *    control chunk queue also.
 	 */
-	register struct sctp_nets *net;
+	struct sctp_nets *net;
 	struct mbuf *outchain;
 	struct sctp_tmit_chunk *chk,*nchk;
 	struct sctphdr *shdr;
@@ -4948,7 +4836,7 @@ sctp_med_chunk_output(struct sctp_inpcb *inp,
 	int no_fragmentflg, error;
 	int one_chunk, hbflag;
 	int asconf, cookie, no_out_cnt, r_mtu;
-	int mtu, bundle_at, ctl_cnt, no_data_chunks,cwnd_full_ind, omtu;
+	int mtu, bundle_at, ctl_cnt, no_data_chunks, cwnd_full_ind, omtu;
 
 	*num_out = 0;
 	cwnd_full_ind = 0;
@@ -5229,11 +5117,7 @@ sctp_med_chunk_output(struct sctp_inpcb *inp,
 						 */
 						outchain->m_len = sizeof(struct sctphdr);
 					} else {
-#ifdef SCTP_DO_NOT_DO_THIS
-						sctp_mprepend(&outchain, sizeof(struct sctphdr), M_DONTWAIT);
-#else
 						M_PREPEND(outchain, sizeof(struct sctphdr), M_DONTWAIT);
-#endif
 						if (outchain == NULL) {
 							/* no memory */
 							error = ENOBUFS;
@@ -5492,11 +5376,7 @@ sctp_med_chunk_output(struct sctp_inpcb *inp,
 				MH_ALIGN(outchain, sizeof(struct sctphdr));
 				outchain->m_len = sizeof(struct sctphdr);
 			} else {
-#ifdef SCTP_DO_NOT_DO_THIS
-				sctp_mprepend(&outchain, sizeof(struct sctphdr), M_DONTWAIT);
-#else
 				M_PREPEND(outchain, sizeof(struct sctphdr), M_DONTWAIT);
-#endif
 				if (outchain == NULL) {
 					/* out of mbufs */
 					error = ENOBUFS;
@@ -6768,7 +6648,7 @@ sctp_chunk_output(struct sctp_inpcb *inp,
 		if (error) {
 #ifdef SCTP_DEBUG
 			if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
-				printf("Error %d was returned from med-c-op\n",error);
+				printf("Error %d was returned from med-c-op\n", error);
 			}
 #endif
 
@@ -6825,7 +6705,7 @@ sctp_chunk_output(struct sctp_inpcb *inp,
 
 int
 sctp_output(inp, m, addr, control, p)
-     register struct sctp_inpcb *inp;
+     struct sctp_inpcb *inp;
      struct mbuf *m;
      struct sockaddr *addr;
      struct mbuf *control;
@@ -7301,13 +7181,14 @@ send_forward_tsn(struct sctp_tcb *stcb,
 		 * the strseq pointer.
 		 */
 		strseq = (struct sctp_strseq *)fwdtsn;
-		/* Now populate the strseq list. This is done
-		 * blindly without pullingout duplicate stream info.
-		 * This is inefficent but won't harm the process since
-		 * the peer will look at these in sequence and will thus
-		 * release anything. It could mean we exceed the PMTU and
-		 * chop off some that we could have included.. but this
-		 * is unlikely (aka 1432/4 would mean 300+ stream seq's would
+		/*
+		 * Now populate the strseq list. This is done blindly
+		 * without pulling out duplicate stream info. This is 
+		 * inefficent but won't harm the process since the peer
+		 * will look at these in sequence and will thus release
+		 * anything. It could mean we exceed the PMTU and chop
+		 * off some that we could have included.. but this is
+		 * unlikely (aka 1432/4 would mean 300+ stream seq's would
 		 * have to be reported in one FWD-TSN. With a bit of work
 		 * we can later FIX this to optimize and pull out duplcates..
 		 * but it does add more overhead. So for now... not!
@@ -7749,9 +7630,9 @@ sctp_send_shutdown_complete2_v6(struct mbuf *m,
 	/*
 	 * Formulate the abort message, and send it back down.
 	 */
-	register struct mbuf *mout;
+	struct mbuf *mout;
 	struct sctp_shutdown_complete_msg *comp_cp;
-	register struct ip6_hdr *iph6;
+	struct ip6_hdr *iph6;
 	struct sockaddr_in6 lsa6, fsa6;
 #ifdef NEW_STRUCT_ROUTE
 	struct route ro;
@@ -7796,6 +7677,9 @@ sctp_send_shutdown_complete2_v6(struct mbuf *m,
 	/* zap the rcvif, it should be null */
 	mout->m_pkthdr.rcvif = 0;
 
+#ifdef SCTP_BASE_FREEBSD
+	/* nothing needed... we swapped src and dest addrs above */
+#else
 	/* attach the full sockaddr_in6 addresses to the packet. */
 	bzero(&lsa6, sizeof(lsa6));
 	lsa6.sin6_family = AF_INET6;
@@ -7809,8 +7693,7 @@ sctp_send_shutdown_complete2_v6(struct mbuf *m,
 
 	if (IN6_IS_ADDR_LINKLOCAL(&oip->ip6_src)) {
 		struct sockaddr_in6 src, dst;
-#ifdef SCTP_BASE_FREEBSD
-#else
+
 		/* pull out the scope_id from the incoming packet */
 		if (ip6_getpktaddrs(m, &src, &dst)) {
 			/* hmm... this is bad- can't get the scope! */
@@ -7821,12 +7704,10 @@ sctp_send_shutdown_complete2_v6(struct mbuf *m,
 #endif /* SCTP_DEBUG */
 			return (0);	/* FIX: ??? send op_err? */
 		}
-#endif
 		lsa6.sin6_scope_id = dst.sin6_scope_id;
 		fsa6.sin6_scope_id = src.sin6_scope_id;
 	}
-#ifdef SCTP_BASE_FREEBSD
-#else
+
 	/* make sure scope is embedded */
 	if (scope6_check_id(&lsa6, ip6_use_defzone) != 0) {
 		m_freem(mout);
@@ -7841,7 +7722,8 @@ sctp_send_shutdown_complete2_v6(struct mbuf *m,
 		m_freem(mout);
 		return (0);
 	}
-#endif
+#endif /* SCTP_BASE_FREEBSD */
+
 	/* zap the stack pointer to the route */
 	bzero(&ro, sizeof ro);
 	/* out it goes */
@@ -8134,9 +8016,11 @@ sctp_send_hb(struct sctp_tcb *tcb, int user_req, struct sctp_nets *u_net)
 		/* we only take from the entropy pool if the address is
 		 * not confirmed.
 		 */
- 		net->heartbeat_random = hb->heartbeat.hb_info.random_value = sctp_select_initial_TSN(&tcb->sctp_ep->sctp_ep);
+ 		net->heartbeat_random1 = hb->heartbeat.hb_info.random_value1 = sctp_select_initial_TSN(&tcb->sctp_ep->sctp_ep);
+ 		net->heartbeat_random2 = hb->heartbeat.hb_info.random_value2 = sctp_select_initial_TSN(&tcb->sctp_ep->sctp_ep);
 	} else {
-		net->heartbeat_random = hb->heartbeat.hb_info.random_value = 0;
+		net->heartbeat_random1 = hb->heartbeat.hb_info.random_value1 = 0;
+		net->heartbeat_random2 = hb->heartbeat.hb_info.random_value2 = 0;
 	}
 	if (sin->sin_family == AF_INET) {
 		memcpy(hb->heartbeat.hb_info.address,&sin->sin_addr, sizeof(sin->sin_addr));
@@ -8289,7 +8173,7 @@ sctp_send_packet_dropped(struct sctp_tcb *tcb, struct sctp_nets *net,
 	struct sctp_packet_drop *drp;
 	struct sctp_tmit_chunk *chk;
 	u_int8_t *datap;
-	int len,small_one;
+	int len, small_one;
 	struct ip *iph;
 
 	long spc;
@@ -8312,7 +8196,7 @@ sctp_send_packet_dropped(struct sctp_tcb *tcb, struct sctp_nets *net,
 	sctppcbinfo.ipi_count_chunk++;
 	sctppcbinfo.ipi_gencnt_chunk++;
 
-	iph = mtod(m,struct ip *);
+	iph = mtod(m, struct ip *);
 	if (iph == NULL) {
 		return;
 	}
@@ -8326,7 +8210,7 @@ sctp_send_packet_dropped(struct sctp_tcb *tcb, struct sctp_nets *net,
 	} else {
 		struct ip6_hdr *ip6h;		
 		/* IPv6 */
-		ip6h = mtod(m,struct ip6_hdr *);
+		ip6h = mtod(m, struct ip6_hdr *);
 		len = chk->send_size = htons(ip6h->ip6_plen);
 	}
 	if ((len+iphlen) > m->m_pkthdr.len) {
@@ -8562,9 +8446,9 @@ sctp_send_abort(struct mbuf *m,
 	/*
 	 * Formulate the abort message, and send it back down.
 	 */
-	register struct mbuf *mout;
-	register struct sctp_abort_msg *abm;
-	register struct ip *iph;
+	struct mbuf *mout;
+	struct sctp_abort_msg *abm;
+	struct ip *iph;
 	struct route ro;
 	int abtlen;
 	unsigned int val;
@@ -8664,9 +8548,9 @@ sctp6_send_abort(struct mbuf *m,
 	/*
 	 * Formulate the abort message, and send it back down.
 	 */
-	register struct mbuf *mout;
-	register struct sctp_abort_msg *abm;
-	register struct ip6_hdr *iph6;
+	struct mbuf *mout;
+	struct sctp_abort_msg *abm;
+	struct ip6_hdr *iph6;
 	struct sockaddr_in6 lsa6, fsa6;
 #ifdef NEW_STRUCT_ROUTE
 	struct route ro;
@@ -8746,6 +8630,9 @@ sctp6_send_abort(struct mbuf *m,
 	/* zap the rcvif, it should be null */
 	mout->m_pkthdr.rcvif = 0;
 
+#ifdef SCTP_BASE_FREEBSD
+	/* nothing needed?... we swapped src and dest addrs above */
+#else
 	/* attach the full sockaddr_in6 addresses to the packet. */
 	bzero(&lsa6, sizeof(lsa6));
 	lsa6.sin6_family = AF_INET6;
@@ -8759,9 +8646,8 @@ sctp6_send_abort(struct mbuf *m,
 
 	if (IN6_IS_ADDR_LINKLOCAL(&oip->ip6_src)) {
 		struct sockaddr_in6 src, dst;
+
 		/* pull out the scope_id from the incoming packet */
-#ifdef SCTP_BASE_FREEBSD
-#else
 		if (ip6_getpktaddrs(m, &src, &dst)) {
 			/* hmm... this is bad- can't get the scope! */
 #ifdef SCTP_DEBUG
@@ -8771,12 +8657,9 @@ sctp6_send_abort(struct mbuf *m,
 #endif /* SCTP_DEBUG */
 			return;	/* FIX: ??? send op_err? */
 		}
-#endif
 		lsa6.sin6_scope_id = dst.sin6_scope_id;
 		fsa6.sin6_scope_id = src.sin6_scope_id;
 	}
-#ifdef SCTP_BASE_FREEBSD
-#else
 
 	/* make sure scope is embedded */
 	if (scope6_check_id(&lsa6, ip6_use_defzone) != 0) {
@@ -8792,7 +8675,7 @@ sctp6_send_abort(struct mbuf *m,
 		m_freem(mout);
 		return;
 	}
-#endif
+#endif /* SCTP_BASE_FREEBSD */
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_OUTPUT2) {
 		printf("sctp_abort calling ipv6 output:\n");
@@ -8916,7 +8799,7 @@ sctp_copy_one(struct mbuf *m, struct uio *uio, int cpsz, int resv_upfront, int *
 	}
 	m->m_len = 0;
 	if ((left+resv_upfront) > MHLEN) {
-		MCLGET(m,M_WAIT);
+		MCLGET(m, M_WAIT);
 		if (m == NULL) {
 			*mbcnt = 0;
 			return (ENOMEM);
@@ -8961,7 +8844,7 @@ sctp_copy_one(struct mbuf *m, struct uio *uio, int cpsz, int resv_upfront, int *
 			m->m_len = 0;
 			*mbcnt += MSIZE;
 			if (left > MHLEN) {
-				MCLGET(m,M_WAIT);
+				MCLGET(m, M_WAIT);
 				if (m == NULL) {
 					*mbcnt = 0;
 					return (ENOMEM);
@@ -9030,7 +8913,7 @@ sctp_copy_it_in(struct sctp_inpcb *inp,
 			/* I wonder about doing a MGET without a splnet set.. it is 
 			 * done that way in the sosend code so I guess it is ok :-0
 			 */
- 			MGETHDR(mm,M_WAIT, MT_DATA);
+ 			MGETHDR(mm, M_WAIT, MT_DATA);
 			if (mm) {
 				struct sctp_paramhdr *ph;
 
@@ -9041,7 +8924,7 @@ sctp_copy_it_in(struct sctp_inpcb *inp,
 						tot_demand = MCLBYTES;
 						tot_out = tot_demand - sizeof(struct sctp_paramhdr);
 					}
-					MCLGET(mm,M_WAIT);
+					MCLGET(mm, M_WAIT);
 					if ((mm->m_flags & M_EXT) == 0) {
 						/* truncate further */
 						tot_demand = MHLEN;

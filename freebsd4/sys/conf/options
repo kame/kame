@@ -343,7 +343,6 @@ SCTP			opt_sctp.h
 SCTP_DEBUG		opt_sctp.h
 SCTP_TCP_MODEL_SUPPORT	opt_sctp.h
 SCTP_USE_ADLER32	opt_sctp.h
-SCTP_ALTERNATE_ROUTE	opt_sctp.h
 SCTP_HIGH_SPEED		opt_sctp.h
 SCTP_STAT_LOGGING 	opt_sctp.h
 SCTP_CWND_LOGGING       opt_sctp.h

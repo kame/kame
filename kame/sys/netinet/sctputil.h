@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.h,v 1.10 2003/11/25 06:40:54 ono Exp $	*/
+/*	$KAME: sctputil.h,v 1.11 2004/01/16 09:56:01 itojun Exp $	*/
 
 #ifndef __sctputil_h__
 #define __sctputil_h__
@@ -99,9 +99,6 @@ void sctp_print_address(struct sockaddr *);
 int sbappendaddr_nocheck __P((struct sockbuf *, struct sockaddr *,
 	struct mbuf *, struct mbuf *, u_int32_t, struct sctp_inpcb *));
 
-struct rtentry *rtalloc_alternate __P((struct sockaddr *, struct rtentry *,
-	int));
-
 
 int
 sctp_release_pr_sctp_chunk(struct sctp_tcb *, struct sctp_tmit_chunk *, int,
@@ -110,37 +107,33 @@ sctp_release_pr_sctp_chunk(struct sctp_tcb *, struct sctp_tmit_chunk *, int,
 
 struct mbuf *sctp_generate_invmanparam(int);
 
-/* this is an evil layer violation that I think
+/*
+ * this is an evil layer violation that I think
  * is a hack.. but I stand alone on the tsvwg
  * in this thought... everyone else considers
  * it part of the sockets layer (along with
  * all of the peeloff code :<
  */
-u_int32_t
-sctp_get_last_vtag_from_sb(struct socket *so);
+u_int32_t sctp_get_last_vtag_from_sb(struct socket *);
 
 
 void sctp_grub_through_socket_buffer(struct sctp_inpcb *,
 	struct socket *, struct socket *, struct sctp_tcb *);
-
 
 void sctp_free_bufspace(struct sctp_tcb *, struct sctp_association *,
 	struct sctp_tmit_chunk *);
 
 #ifdef SCTP_STAT_LOGGING
 void
-sctp_log_strm_del_alt(u_int32_t tsn, u_int16_t sseq,
-	int from);
+sctp_log_strm_del_alt(u_int32_t, u_int16_t, int);
 
 void
-sctp_log_strm_del(struct sctp_tmit_chunk *chk, 
-	struct sctp_tmit_chunk *poschk,
-	int from);
+sctp_log_strm_del(struct sctp_tmit_chunk *, struct sctp_tmit_chunk *, int);
 void sctp_log_cwnd(struct sctp_nets *, int, uint8_t);
 void sctp_log_block(uint8_t, struct socket *, struct sctp_association *);
 int sctp_fill_stat_log(struct mbuf *);
-void sctp_log_fr(uint32_t biggest_tsn, uint32_t biggest_new_tsn, uint32_t tsn, int from);
-void sctp_log_map(uint32_t map, uint32_t cum, uint32_t high, int from);
+void sctp_log_fr(uint32_t, uint32_t, uint32_t, int);
+void sctp_log_map(uint32_t, uint32_t, uint32_t, int);
 
 void sctp_clr_stat_log(void);
 

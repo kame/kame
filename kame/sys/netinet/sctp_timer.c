@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.20 2003/12/17 02:20:02 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.21 2004/01/16 09:56:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -186,33 +186,12 @@ sctp_threshold_management(struct sctp_inpcb *ep, struct sctp_tcb *tcb,
 						(void *)net);
 			}
 		}
-#ifdef SCTP_ALTERNATE_ROUTE
-		if (net->error_count > 1) {
-			/* try to find a different route */
-			struct rtentry *rt;
-			static void *xx;
-			xx = (void *)&rt;
-			if (net->ra.ro_rt) {
-				rt = rtalloc_alternate((struct sockaddr *)
-				    &net->ra._l_addr, net->ra.ro_rt, 0);
-				if (rt != net->ra.ro_rt) {
-#ifdef SCTP_DEBUG
-					if (sctp_debug_on & SCTP_DEBUG_TIMER2) {
-						printf("Got a new route old:%p ifp:%p new:%p ifp:%p\n",
-						    net->ra.ro_rt,
-						    net->ra.ro_rt->rt_ifp,
-						    rt, rt->rt_ifp);
-					}
-#endif /* SCTP_DEBUG */
-					RTFREE(net->ra.ro_rt);
-					net->ra.ro_rt = rt;
-					net->src_addr_selected = 0;
-				} else {
-					RTFREE(rt);
-				}
-			}
-		}
-#endif
+		/*********HOLD THIS COMMENT FOR PATCH OF ALTERNATE
+		 *********ROUTING CODE
+		 */
+		/*********HOLD THIS COMMENT FOR END OF PATCH OF ALTERNATE
+		 *********ROUTING CODE
+		 */
 	}
 	if (tcb == NULL)
 		return (0);
@@ -284,8 +263,13 @@ sctp_find_alternate_net(struct sctp_tcb *tcb,
 			alt = TAILQ_FIRST(&tcb->asoc.nets);
 		}
 		if (alt->ra.ro_rt == NULL) {
-			alt->ra.ro_rt = rtalloc_alternate((struct sockaddr *)&alt->ra._l_addr,
-							  NULL, 0);
+#ifdef __FreeBSD__
+			alt->ra.ro_rt = rtalloc1((struct sockaddr *)&alt->ra._l_addr,
+						 1, 0UL);
+#else
+			alt->ra.ro_rt = rtalloc1((struct sockaddr *)&alt->ra._l_addr,
+						 1);
+#endif
 			alt->src_addr_selected = 0;
 		}
 		if (

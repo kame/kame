@@ -1,4 +1,4 @@
-/*	$KAME: sctp_structs.h,v 1.9 2003/11/25 06:40:54 ono Exp $	*/
+/*	$KAME: sctp_structs.h,v 1.10 2004/01/16 09:56:01 itojun Exp $	*/
 
 #ifndef __sctp_structs_h__
 #define __sctp_structs_h__
@@ -130,7 +130,8 @@ struct sctp_nets {
 	 * SCTP_ADDR_SWITCH_PRIMARY flag
 	 */
 	u_int32_t next_tsn_at_change;
-	u_int32_t heartbeat_random;
+	u_int32_t heartbeat_random1;
+	u_int32_t heartbeat_random2;
 
 	/* if this guy is ok or not ... status */
 	unsigned short dest_state;

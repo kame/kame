@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.24 2003/12/17 02:20:03 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.25 2004/01/16 09:56:01 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -185,16 +185,27 @@ sctp6_input(mp, offp, proto)
 	int length, mlen, offset, iphlen;
 	u_int8_t ecn_bits;
 	struct sctp_tcb *stcb;
-
 	int off = *offp;
 
-	iphlen = off;
-
+	ip6 = mtod(m, struct ip6_hdr *);
 #ifndef PULLDOWN_TEST
-	IP6_EXTHDR_CHECK(m, off, sizeof(struct sctphdr), IPPROTO_DONE);
+	IP6_EXTHDR_CHECK(m, off,
+			 sizeof(struct sctphdr) + sizeof(struct sctp_chunkhdr),
+			 IPPROTO_DONE);
+	sh = (struct sctphdr *)((caddr_t)ip6 + off);
+	ch = (struct sctp_chunkhdr *)((caddr_t)sh + sizeof(struct sctphdr));
+#else
+	IP6_EXTHDR_GET(sh, struct sctphdr *, m, off,
+		       sizeof(struct sctphdr) + sizeof(struct sctp_chunkhdr));
+	if (sh == NULL) {
+		sctp_pegs[SCTP_HDR_DROPS]++;
+		return IPPROTO_DONE;
+	}
+	ch = (struct sctp_chunkhdr *)((caddr_t)sh + sizeof(struct sctphdr));
 #endif
 
-	ip6 = mtod(m, struct ip6_hdr *);
+	iphlen = off;
+	offset = iphlen + sizeof(struct sctphdr) + sizeof(struct sctp_chunkhdr);
 
 #if defined(NFAITH) && NFAITH > 0
 #if defined(__FreeBSD_cc_version) && __FreeBSD_cc_version <= 430000
@@ -224,18 +235,6 @@ sctp6_input(mp, offp, proto)
 #endif /* NFAITH defined and > 0 */
 	sctp_pegs[SCTP_INPKTS]++;
 
-	offset = iphlen + sizeof(struct sctphdr) +
-		sizeof(struct sctp_chunkhdr);
-	if (m->m_len < offset) {
-		if ((m = m_pullup(m, offset)) == 0) {
-			sctp_pegs[SCTP_HDR_DROPS]++;
-			return IPPROTO_DONE;
-		}
-		ip6 = mtod(m, struct ip6_hdr *);
-	}
-	sh = (struct sctphdr *)((caddr_t)ip6 + iphlen);
-	ch = (struct sctp_chunkhdr *)((caddr_t)sh + sizeof(struct sctphdr));
-
 	if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
 		/* No multi-cast support in SCTP */
 		sctp_pegs[SCTP_IN_MCAST]++;
@@ -262,7 +261,7 @@ sctp6_input(mp, offp, proto)
 	stcb = sctp_findassociation_addr(m, iphlen, &in6p, &netp, sh->v_tag);
 	if (in6p == NULL) {
 		sctp_pegs[SCTP_NOPORTS]++;
-		sctp6_send_abort(m, ip6, sh, off, 0, NULL);
+		sctp6_send_abort(m, ip6, sh, iphlen, 0, NULL);
 		m_freem(m);
 		return IPPROTO_DONE;
 	}
@@ -539,7 +538,7 @@ sctp6_ctlinput(cmd, pktdst, d)
 #endif
 		stcb = sctp_findassociation_addr_sa((struct sockaddr *)ip6cp->ip6c_src,
 						    (struct sockaddr *)&final,
-						    &inp, &netp);
+						    &inp, &netp, 1);
 		if (stcb != NULL && inp && (inp->sctp_socket != NULL)) {
 			if (cmd == PRC_MSGSIZE) {
 				sctp6_notify_mbuf(inp,
@@ -582,6 +581,8 @@ sctp6_getcred(SYSCTL_HANDLER_ARGS)
 {
 	struct sockaddr_in6 addrs[2];
 	struct sctp_inpcb *inp;
+	struct sctp_nets *net;
+	struct sctp_tcb *tcb;
 	int error, s;
 
 #if __FreeBSD_version >= 500000
@@ -605,8 +606,10 @@ sctp6_getcred(SYSCTL_HANDLER_ARGS)
 	s = splnet();
 #endif
 
-	inp = sctp_pcb_findep((struct sockaddr *)&addrs[0]);
-	if (inp == NULL || inp->sctp_socket == NULL) {
+        tcb = sctp_findassociation_addr_sa(sin6tosa(&addrs[0]),
+                                           sin6tosa(&addrs[1]),
+                                           &inp, &net, 1);
+	if (tcb == NULL || inp == NULL || inp->sctp_socket == NULL) {
 		error = ENOENT;
 		goto out;
 	}
@@ -1225,7 +1228,7 @@ sctp6_getaddr(struct socket *so,
 #endif
 	      )
 {
-	register struct sockaddr_in6 *sin6;
+	struct sockaddr_in6 *sin6;
 	struct sctp_inpcb *inp;
 	/*
 	 * Do the malloc first in case it blocks.
@@ -1326,7 +1329,7 @@ sctp6_peeraddr(struct socket *so,
 	       )
 {
 	int fnd;
-	register struct sockaddr_in6 *sin6, *sin_a6;
+	struct sockaddr_in6 *sin6, *sin_a6;
 	struct sctp_inpcb *inp;
 	struct sctp_tcb *tcb;
 	struct sctp_nets *net;

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.h,v 1.13 2003/12/17 02:20:02 itojun Exp $	*/
+/*	$KAME: sctp_pcb.h,v 1.14 2004/01/16 09:56:00 itojun Exp $	*/
 
 #ifndef __sctp_pcb_h__
 #define __sctp_pcb_h__
@@ -376,7 +376,7 @@ void sctp_fill_pcbinfo(struct sctp_pcbinfo *);
 
 struct sctp_nets *sctp_findnet(struct sctp_tcb *, struct sockaddr *);
 
-struct sctp_inpcb *sctp_pcb_findep(struct sockaddr *);
+struct sctp_inpcb *sctp_pcb_findep(struct sockaddr *, int);
 
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 int sctp_inpcb_bind(struct socket *, struct sockaddr *, struct thread *);
@@ -388,7 +388,7 @@ struct sctp_tcb *sctp_findassociation_addr(struct mbuf *, int,
 	struct sctp_inpcb **, struct sctp_nets **, uint32_t vtag);
 
 struct sctp_tcb *sctp_findassociation_addr_sa(struct sockaddr *,
-	struct sockaddr *, struct sctp_inpcb **, struct sctp_nets **);
+	struct sockaddr *, struct sctp_inpcb **, struct sctp_nets **, int);
 
 #ifdef SCTP_TCP_MODEL_SUPPORT
 void sctp_move_pcb_and_assoc(struct sctp_inpcb *, struct sctp_inpcb *,

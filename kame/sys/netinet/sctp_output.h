@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.h,v 1.10 2003/12/17 02:20:02 itojun Exp $	*/
+/*	$KAME: sctp_output.h,v 1.11 2004/01/16 09:56:00 itojun Exp $	*/
 
 #ifndef __sctp_output_h__
 #define __sctp_output_h__
@@ -51,14 +51,14 @@ int sctp_send_cookie_ack(struct sctp_tcb *);
 void sctp_send_heartbeat_ack(struct sctp_tcb *, struct mbuf *, int, int,
 	struct sctp_nets *);
 
-int sctp_is_addr_restricted(register struct sctp_tcb *, struct sockaddr *);
+int sctp_is_addr_restricted(struct sctp_tcb *, struct sockaddr *);
 
-struct in_addr sctp_ipv4_source_address_selection(register struct sctp_inpcb *,
-	register struct sctp_tcb *, struct sockaddr_in *, struct route *,
+struct in_addr sctp_ipv4_source_address_selection(struct sctp_inpcb *,
+	struct sctp_tcb *, struct sockaddr_in *, struct route *,
 	struct sctp_nets *, int);
 
-struct in6_addr sctp_ipv6_source_address_selection(register struct sctp_inpcb *,
-	register struct sctp_tcb *, struct sockaddr_in6 *, struct route *,
+struct in6_addr sctp_ipv6_source_address_selection(struct sctp_inpcb *,
+	struct sctp_tcb *, struct sockaddr_in6 *, struct route *,
 	struct sctp_nets *, int);
 
 

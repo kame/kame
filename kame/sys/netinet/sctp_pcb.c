@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.28 2003/12/17 02:20:02 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.29 2004/01/16 09:56:00 itojun Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003 Cisco Systems, Inc.
@@ -657,7 +657,7 @@ sctp_endpoint_probe(struct sockaddr *nam,
 
 
 struct sctp_inpcb *
-sctp_pcb_findep(struct sockaddr *nam)
+sctp_pcb_findep(struct sockaddr *nam, int find_tcp_pool)
 {
 	/*
 	 * First we check the hash table to see if someone has this port
@@ -707,7 +707,7 @@ sctp_pcb_findep(struct sockaddr *nam)
 	 * may NOT be the correct one but the sctp_findassociation_ep_addr
 	 * has further code to look at all TCP models.
 	 */
-	if (ep == NULL) {
+	if (ep == NULL && find_tcp_pool) {
 		int i;
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_PCB1) {
@@ -748,18 +748,31 @@ sctp_pcb_findep(struct sockaddr *nam)
 struct sctp_tcb *
 sctp_findassociation_addr_sa(struct sockaddr *to, struct sockaddr *from,
 			     struct sctp_inpcb **inp,
-			     struct sctp_nets **netp)
+			     struct sctp_nets **netp,
+			     int find_tcp_pool)
 {
 	struct sctp_inpcb *ep;
+#ifdef SCTP_TCP_MODEL_SUPPORT
+	struct sctp_tcb *tcb;
 
-	ep = sctp_pcb_findep(to);
+	if (find_tcp_pool) {
+		if (inp != NULL) {
+			tcb = sctp_tcb_special_locate(inp, from, to, netp);
+		} else {
+			tcb = sctp_tcb_special_locate(&ep, from, to, netp);
+		}
+		if (tcb != NULL) {
+			return (tcb);
+		}
+	}
+#endif
+	ep = sctp_pcb_findep(to, 0);
 	if (inp != NULL) {
 		*inp = ep;
 	}
 	if (ep == NULL) {
 		return (NULL);
 	}
-
 
 	/*
 	 * ok, we have an endpoint, now lets find the assoc for it (if any)
@@ -936,9 +949,7 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 			  struct sctp_nets **netp,
 			  uint32_t vtag)
 {
-#ifdef SCTP_TCP_MODEL_SUPPORT
-	int to_tcp_pool;
-#endif
+	int find_tcp_pool;
 	struct ip *iph;
 	struct sctphdr *sh;
 	struct sctp_chunkhdr *chdr;
@@ -1003,38 +1014,28 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 		}
 	}
 
+	find_tcp_pool = 0;
+#ifdef SCTP_TCP_MODEL_SUPPORT
+	chdr = (struct sctp_chunkhdr *)((caddr_t)sh +
+					sizeof(struct sctphdr));
+	if ((chdr->chunk_type != SCTP_INITIATION) &&
+	    (chdr->chunk_type != SCTP_INITIATION_ACK) &&
+	    (chdr->chunk_type != SCTP_COOKIE_ACK) &&
+	    (chdr->chunk_type != SCTP_COOKIE_ECHO))
+		/* Other chunk types go to the tcp pool. */
+		find_tcp_pool = 1;
+#endif
 	if (inp) {
-		ret = sctp_findassociation_addr_sa(to, from, inp, netp);
+		ret = sctp_findassociation_addr_sa(to, from,
+						   inp, netp, find_tcp_pool);
 		linp = *inp;
 	} else {
-		ret = sctp_findassociation_addr_sa(to, from, &linp, netp);
+		ret = sctp_findassociation_addr_sa(to, from,
+						   &linp, netp, find_tcp_pool);
 	}
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
 		printf("ret:%p linp:%p\n", ret, linp);
-	}
-#endif
-#ifdef SCTP_TCP_MODEL_SUPPORT
-	chdr = (struct sctp_chunkhdr *)((caddr_t)sh +
-					sizeof(struct sctphdr));
-	if ((chdr->chunk_type == SCTP_INITIATION) ||
-	    (chdr->chunk_type == SCTP_INITIATION_ACK) ||
-	    (chdr->chunk_type == SCTP_COOKIE_ACK) ||
-	    (chdr->chunk_type == SCTP_COOKIE_ECHO)) {
-		/* These chunk types go back to the main
-		 * pool and can't go to the tcp pool.
-		 */
-		to_tcp_pool = 0;
-	} else {
-		to_tcp_pool = 1;
-	}
-	if (to_tcp_pool) {
-		if (ret == NULL) {
-			ret = sctp_tcb_special_locate(inp, from, to, netp);
-		}
-		if (ret && *inp) {
-			return (ret);
-		}
 	}
 #endif
 	if ((ret == NULL) && (linp)) {
@@ -1103,8 +1104,8 @@ sctp_inpcb_alloc(struct socket *so)
 	 * the EP.
 	 */
 	int i, error;
-	register struct sctp_inpcb *inp;
-	register struct sctp_pcb *m;
+	struct sctp_inpcb *inp;
+	struct sctp_pcb *m;
 
 	error = 0;
 #if defined(__FreeBSD__)
@@ -1568,16 +1569,20 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 				/* KAME hack: embed scopeid */
 #if defined(__FreeBSD__)
 #ifdef SCTP_BASE_FREEBSD
+				if (in6_embedscope(&sin6->sin6_addr, sin6,
+						   (struct in6pc6 *)ip_inp,
+						   NULL) != 0)
+					return (EINVAL);
 #else
 				error = scope6_check_id(sin6, ip6_use_defzone);
 				if (error != 0)
 					return (error);
-#endif
+#endif /* SCTP_BASE_FREEBSD */
 #else
 				if (in6_embedscope(&sin6->sin6_addr, sin6) != 0) {
 					return (EINVAL);
 				}
-#endif
+#endif /* __FreeBSD__ */
 			}
 #ifndef SCOPEDROUTING
 			/* this must be cleared for ifa_ifwithaddr() */
@@ -1610,20 +1615,9 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 		if (p == NULL)
 			return (error);
 
-
-
-		lep = sctp_pcb_findep(addr);
+		lep = sctp_pcb_findep(addr, 0);
 		if (lep != NULL) {
-			/* If it is NOT in the TCP pool then it exists */
-			if ((lep->sctp_flags & SCTP_PCB_FLAGS_IN_TCPPOOL) == 0) {
-				return (EADDRNOTAVAIL);
-			} else
-				/*
-				 * In this case it IS only found in the TCP
-				 * pool which means the main listner went away
-				 * so it is now ok to re-bind.
-				 */
-				lep = NULL;
+			return (EADDRNOTAVAIL);
 		}
 		if (bindall) {
 			/* verify that no lport is not used by a singleton */
@@ -2347,7 +2341,7 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 		netp->addr_is_local = in6_localaddr(&(((struct sockaddr_in6 *)newaddr)->sin6_addr));
 #else
 		netp->addr_is_local = in6_localaddr((struct sockaddr_in6 *)newaddr);
-#endif
+#endif /* SCTP_BASE_FREEBSD */
 	else
 		netp->addr_is_local = in_localaddr(((struct sockaddr_in *)newaddr)->sin_addr);
 #else
@@ -2381,10 +2375,13 @@ sctp_add_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *newaddr,
 	callout_init(&netp->rxt_timer.timer);
 #endif
 	/* Now generate a route for this guy */
-
-
-	netp->ra.ro_rt = rtalloc_alternate((struct sockaddr *)&netp->ra._l_addr,
-					   NULL, 0);
+#ifdef __FreeBSD__
+	netp->ra.ro_rt = rtalloc1((struct sockaddr *)&netp->ra._l_addr,
+				  1, 0UL);
+#else
+	netp->ra.ro_rt = rtalloc1((struct sockaddr *)&netp->ra._l_addr,
+				  1);
+#endif
 	if ((netp->ra.ro_rt) && 
 	    (netp->ra.ro_rt->rt_ifp)) {
 		netp->mtu = netp->ra.ro_rt->rt_ifp->if_mtu;
@@ -2760,8 +2757,8 @@ sctp_del_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *rem)
 	 * Note we do not allow it to be removed if there are no other
 	 * addresses.
 	 */
-	register struct sctp_association *asoc;
-	register struct sctp_nets *net, *net_tmp;
+	struct sctp_association *asoc;
+	struct sctp_nets *net, *net_tmp;
 	asoc = &tasoc->asoc;
 	if (asoc->numnets < 2) {
 		/* Must have at LEAST two remote addresses */
@@ -2874,9 +2871,9 @@ sctp_add_vtag_to_timewait(struct sctp_inpcb *m, u_int32_t tag)
 void
 sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 {
-	register struct sctp_association *asoc;
-	register struct sctp_nets *net, *prev;
-	register struct sctp_laddr *laddr;
+	struct sctp_association *asoc;
+	struct sctp_nets *net, *prev;
+	struct sctp_laddr *laddr;
 	struct sctp_tmit_chunk *chk;
 	struct sctp_asconf_addr *aparam;
 	struct sctp_socket_q_list *sq;
@@ -4384,8 +4381,8 @@ sctp_del_local_addr_ep_sa(struct sctp_inpcb *ep, struct sockaddr *sa)
 }
 
 static void
-sctp_drain_mbufs(register struct sctp_inpcb *inp,
-		 register struct sctp_tcb *tcb)
+sctp_drain_mbufs(struct sctp_inpcb *inp,
+		 struct sctp_tcb *tcb)
 {
 	/*
 	 * We must hunt this association for MBUF's past the cumack
@@ -4533,8 +4530,8 @@ sctp_drain()
 	 * is LOW on MBUF's and needs help. This is where reneging will
 	 * occur. We really hope this does NOT happen!
 	 */
-	register struct sctp_inpcb *inp;
-	register struct sctp_tcb *tcb;
+	struct sctp_inpcb *inp;
+	struct sctp_tcb *tcb;
 
 	printf("SCTP DRAIN called %d chunks out there\n",
 	       sctppcbinfo.ipi_count_chunk);

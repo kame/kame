@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.h,v 1.5 2003/11/25 06:40:53 ono Exp $	*/
+/*	$KAME: sctp_indata.h,v 1.6 2004/01/16 09:56:00 itojun Exp $	*/
 
 #ifndef __sctp_indata_h__
 #define __sctp_indata_h__
@@ -37,25 +37,23 @@
 void sctp_set_rwnd(struct sctp_tcb *, struct sctp_association *);
 
 void sctp_handle_sack(struct sctp_sack_chunk *, struct sctp_tcb *,
-	struct sctp_nets *, int *abort_now);
+	struct sctp_nets *, int *);
 
 /* draft-ietf-tsvwg-usctp */
 void sctp_handle_forward_tsn(struct sctp_tcb *,
 	struct sctp_forward_tsn_chunk *);
 
 struct sctp_tmit_chunk *
-sctp_try_advance_peer_ack_point(struct sctp_tcb *,struct sctp_association *);
+sctp_try_advance_peer_ack_point(struct sctp_tcb *, struct sctp_association *);
 
 void sctp_service_queues(struct sctp_tcb *, struct sctp_association *);
 
 void sctp_update_acked(struct sctp_tcb *, struct sctp_shutdown_chunk *,
-	struct sctp_nets *, int *abort_now);
+	struct sctp_nets *, int *);
 
 int sctp_process_data(struct mbuf **, struct sctp_inpcb *, struct sctp_tcb *,
 	struct sctp_nets *, int, int *, int *, u_int32_t *);
 
 void sctp_sack_check(struct sctp_tcb *, int, int);
-
-
 #endif
 #endif
