@@ -204,7 +204,7 @@ udp_input(m, off)
 	struct ip save_ip;
 	struct sockaddr *append_sa;
 #ifdef IGMPV3
-	u_int32_t src_h;
+	struct sockaddr_in src;
 	struct ip_moptions *imo;
 	struct sockaddr_in *sin;
 	struct sock_msf_source *msfsrc;
@@ -383,7 +383,10 @@ udp_input(m, off)
 				continue;
 			
 			imo = inp->inp_moptions;
-			src_h = ntohl(ip->ip_src.s_addr);
+			bzero(&src, sizeof(src));
+			src.sin_family = AF_INET;
+			src.sin_len = sizeof(src);
+			bcopy(&ip->ip_src, &src.sin_addr, sizeof(ip->ip_src));
 			for (i = 0; i < imo->imo_num_memberships; i++) {
 				if (imo->imo_membership[i]->inm_addr.s_addr
 				    != ip->ip_dst.s_addr)
@@ -406,9 +409,9 @@ udp_input(m, off)
 					sin = (struct sockaddr_in *)&msfsrc->src;
 					if (sin->sin_family != AF_INET)
 						continue;
-					if (sin->sin_addr.s_addr < src_h)
+					if (SS_CMP(sin, <, &src))
 						continue;
-					if (sin->sin_addr.s_addr > src_h) {
+					if (SS_CMP(sin, >, &src)) {
 						/* terminate search, as there
 						 * will be no match */
 						break;
@@ -428,9 +431,9 @@ udp_input(m, off)
 					sin = (struct sockaddr_in *)&msfsrc->src;
 					if (sin->sin_family != AF_INET)
 						continue;
-					if (sin->sin_addr.s_addr < src_h)
+					if (SS_CMP(sin, <, &src))
 						continue;
-					if (sin->sin_addr.s_addr == src_h) {
+					if (SS_CMP(sin, ==, &src)) {
 						/* blocks since the src matched
 						 * with block list */
 						break;
