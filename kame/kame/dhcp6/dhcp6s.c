@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.74 2002/05/09 12:38:11 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.75 2002/05/09 12:40:03 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -496,6 +496,10 @@ server6_react_solicit(ifp, buf, siz, optinfo, from, fromlen)
 	/* DNS server */
 	roptinfo.dnslist = dnslist;
 
+	/*
+	 * see if we have information for requested options, and if so,
+	 * configure corresponding options.
+	 */
 	for (opt = optinfo->requests; opt; opt = opt->next) {
 		switch(opt->type) {
 		case DH6OPT_PREFIX_DELEGATION:
