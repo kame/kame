@@ -206,6 +206,8 @@ u_int16_t	ip_id;
 
 struct ipqhead ipq;
 int	ipq_locked;
+int	ip_nfragpackets = 0;
+int	ip_maxfragpackets = -1;
 
 static __inline int ipq_lock_try __P((void));
 static __inline void ipq_unlock __P((void));
@@ -790,6 +792,17 @@ ip_reass(ipqe, fp)
 	 * If first fragment to arrive, create a reassembly queue.
 	 */
 	if (fp == 0) {
+		/*
+		 * Enforce upper bound on number of fragmented packets
+		 * for which we attempt reassembly;
+		 * If maxfrag is 0, never accept fragments.
+		 * If maxfrag is -1, accept all fragments without limitation.
+		 */
+		if (ip_maxfragpackets < 0)
+			;
+		else if (ip_nfragpackets >= ip_maxfragpackets)
+			goto dropfrag;
+		ip_nfragpackets++;
 		MALLOC(fp, struct ipq *, sizeof (struct ipq),
 		    M_FTABLE, M_NOWAIT);
 		if (fp == NULL)
@@ -905,6 +918,7 @@ insert:
 	ip->ip_dst = fp->ipq_dst;
 	LIST_REMOVE(fp, ipq_q);
 	FREE(fp, M_FTABLE);
+	ip_nfragpackets--;
 	m->m_len += (ip->ip_hl << 2);
 	m->m_data -= (ip->ip_hl << 2);
 	/* some debugging cruft by sklower, below, will go away soon */
@@ -943,6 +957,7 @@ ip_freef(fp)
 	}
 	LIST_REMOVE(fp, ipq_q);
 	FREE(fp, M_FTABLE);
+	ip_nfragpackets--;
 }
 
 /*
@@ -963,6 +978,17 @@ ip_slowtimo()
 			ipstat.ips_fragtimeout++;
 			ip_freef(fp);
 		}
+	}
+	/*
+	 * If we are over the maximum number of fragments
+	 * (due to the limit being lowered), drain off
+	 * enough to get down to the new limit.
+	 */
+	if (ip_maxfragpackets < 0)
+		;
+	else {
+		while (ip_nfragpackets > ip_maxfragpackets && ipq.lh_first)
+			ip_freef(ipq.lh_first);
 	}
 	IPQ_UNLOCK();
 #ifdef GATEWAY
