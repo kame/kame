@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.175 2002/07/31 06:58:38 itojun Exp $	*/
+/*	$KAME: isakmp.c,v 1.176 2002/08/28 04:08:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -176,8 +176,8 @@ isakmp_handler(so_isakmp)
 		goto end;
 	}
 
-	/* check isakmp header length */
-	if (len < sizeof(isakmp)) {
+	/* check isakmp header length, as well as sanity of header length */
+	if (len < sizeof(isakmp) || ntohl(isakmp.len) < sizeof(isakmp)) {
 		plog(LLV_ERROR, LOCATION, (struct sockaddr *)&remote,
 			"packet shorter than isakmp header size.\n");
 		/* dummy receive */
