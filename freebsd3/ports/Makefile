@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.20 2000/01/31 16:57:25 sumikawa Exp $
+# $Id: Makefile,v 1.21 2000/02/01 16:19:55 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -43,6 +43,7 @@ SUBDIR+=	popper
 SUBDIR+=	ppp
 SUBDIR+=	python
 SUBDIR+=	qmail
+SUBDIR+=	quake6
 SUBDIR+=	rev_v6_address
 SUBDIR+=	rsync
 SUBDIR+=	ruby
