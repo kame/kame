@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.154 2002/11/29 11:46:36 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.155 2002/12/04 09:50:25 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2119,6 +2119,9 @@ mip6_bc_init()
         callout_init(&mip6_bc_ch);
 #endif
 	bzero(&mip6_bc_hash, sizeof(mip6_bc_hash));
+#ifdef MIP6_CALLOUTTEST
+	TAILQ_INIT(&mip6_bc_timeout_list);
+#endif
 }
 
 int
@@ -2321,6 +2324,8 @@ mip6_timeoutentry_update(mtoe, newexpire)
 
 	mip6_timeoutentry_remove(mtoe);
 	mip6_timeoutentry_insert_with_mtoe(newexpire, mtoe);
+	mip6log((LOG_INFO, "%s:%d: A timeout entry is updated.\n",
+		__FILE__, __LINE__));
 }
 
 static void
@@ -2336,8 +2341,6 @@ mip6_timeoutentry_remove(mtoe)
 	/* Content of this timeout entry (mtoe_ptr) isn't cared in this function */
 	FREE(mtoe, M_TEMP);
 
-	mip6log((LOG_INFO, "%s:%d: Removed timeout entry.\n",
-		__FILE__, __LINE__));
 }
 #endif /* MIP6_CALLOUTTEST */
 
@@ -2397,6 +2400,8 @@ mip6_bc_list_remove(mbc_list, mbc)
 #ifdef MIP6_CALLOUTTEST
 	if (mbc->mbc_timeout) {
 		mip6_timeoutentry_remove(mbc->mbc_timeout);
+		mip6log((LOG_INFO, "%s:%d: Removed timeout entry.\n",
+			 __FILE__, __LINE__));
 	}
 #endif
 	LIST_REMOVE(mbc, mbc_entry);
