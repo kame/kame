@@ -216,6 +216,7 @@ server6_init()
 	ifidx = if_nametoindex(device);
 	if (ifidx == 0)
 		errx(1, "invalid interface %s", device);
+	TAILQ_INIT(&dnslist);
 
 	/* initialize constant variables */
 	if (inet_pton(AF_INET6, "fe80::", &link_local_prefix) != 1) {
