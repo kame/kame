@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 /*
- * $Id: libtest.c,v 1.7 1999/11/03 23:01:46 itojun Exp $
+ * $Id: libtest.c,v 1.8 2000/11/09 07:54:52 itojun Exp $
  */
 
 #include <sys/types.h>
@@ -96,6 +96,8 @@ test_pton()
 	struct in6_addr a;
 	int success = 0;
 
+	printf("%s: start\n", FUNCNAME);
+
 	/* test for broken inet_pton() (pre BIND82) */
 	if (inet_pton(AF_INET6, "0:1:2:3:4:5:6:7:", &a) != 1)
 		success++;
@@ -126,16 +128,36 @@ test_getnameinfo()
 #endif
 	struct sockaddr *sa;
 	struct sockaddr_in *sin;
+	struct sockaddr_in6 *sin6;
+	int failure;
+	u_int8_t in6[16] = {
+		0x10, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef,
+		0x10, 0x23, 0x45, 0x67, 0x89, 0xab, 0xcd, 0xef
+	};
 
+	failure = 0;
 	sa = (struct sockaddr *)&ss;
+
 	sin = (struct sockaddr_in *)&ss;
 	memset(sin, 0, sizeof(*sin));
 	sin->sin_len = sizeof(struct sockaddr_in);
 	sin->sin_family = AF_INET;
 	sin->sin_addr.s_addr = ntohl(0x7f000001);
 	sin->sin_port = ntohs(9876);
+	failure += test_getnameinfo0(sa, "127.0.0.1", "9876");
 
-	return test_getnameinfo0(sa, "127.0.0.1", "9876");
+	sin6 = (struct sockaddr_in6 *)&ss;
+	memset(sin6, 0, sizeof(*sin6));
+	sin6->sin6_len = sizeof(struct sockaddr_in6);
+	sin6->sin6_family = AF_INET6;
+	memcpy(&sin6->sin6_addr, &in6, sizeof(sin6->sin6_addr));
+	sin6->sin6_port = ntohs(9876);
+	failure += test_getnameinfo0(sa,
+	    "1023:4567:89ab:cdef:1023:4567:89ab:cdef", "9876");
+
+	/* the rest of get{addr,name}info tests are in libinet6/test.c */
+
+	return failure;
 }
 
 static int
@@ -149,6 +171,13 @@ test_getnameinfo0(sa, hans, pans)
 	int i, j, k, l;
 	int fail;
 	int ntest;
+#ifdef NI_WITHSCOPEID
+	const int niflag = NI_NUMERICHOST | NI_NUMERICSERV | NI_WITHSCOPEID;
+#else
+	const int niflag = NI_NUMERICHOST | NI_NUMERICSERV;
+#endif
+
+	printf("%s: start addr %s port %s\n", FUNCNAME, hans, pans);
 
 	fail = 0;
 	ntest = 0;
@@ -173,8 +202,7 @@ test_getnameinfo0(sa, hans, pans)
 		case 2:	p = NULL; pl = 0; break;
 		}
 		ntest++;
-		if (getnameinfo(sa, sa->sa_len, h, hl, p, pl,
-				NI_NUMERICHOST | NI_NUMERICSERV) != 0) {
+		if (getnameinfo(sa, sa->sa_len, h, hl, p, pl, niflag) != 0) {
 			printf("%s: test %d failed\n", FUNCNAME, ntest);
 			fail++;
 		}
@@ -186,7 +214,7 @@ test_getnameinfo0(sa, hans, pans)
 	memset(hbuf, 0, sizeof(hbuf));
 	memset(pbuf, 0, sizeof(pbuf));
 	if (getnameinfo(sa, sa->sa_len, hbuf, sizeof(hbuf), pbuf, sizeof(pbuf),
-			NI_NUMERICHOST | NI_NUMERICSERV) == 0) {
+	    niflag) == 0) {
 		if (strcmp(hans, hbuf) == 0 && strcmp(pans, pbuf) == 0) {
 			;
 		} else {
@@ -206,8 +234,7 @@ test_getnameinfo0(sa, hans, pans)
 	j = k = l = 0;
 	for (i = 1; i < strlen(hans); i++) {
 		memset(hbuf, 0, sizeof(hbuf));
-		if (getnameinfo(sa, sa->sa_len, hbuf, i, NULL, 0,
-				NI_NUMERICHOST) != 0) {
+		if (getnameinfo(sa, sa->sa_len, hbuf, i, NULL, 0, niflag) != 0) {
 			/* RFC2553 */
 			j++;
 		} else {
@@ -224,8 +251,7 @@ test_getnameinfo0(sa, hans, pans)
 	}
 	for (i = 1; i < strlen(pans); i++) {
 		memset(pbuf, 0, sizeof(pbuf));
-		if (getnameinfo(sa, sa->sa_len, NULL, 0, pbuf, i,
-				NI_NUMERICSERV) != 0) {
+		if (getnameinfo(sa, sa->sa_len, NULL, 0, pbuf, i, niflag) != 0) {
 			/* RFC2553 */
 			j++;
 		} else {
