@@ -1,4 +1,4 @@
-/*	$KAME: ip6protosw.h,v 1.18 2000/12/02 15:41:47 itojun Exp $	*/
+/*	$KAME: ip6protosw.h,v 1.19 2000/12/02 16:06:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -179,6 +179,10 @@ struct ip6protosw {
 	struct	pfil_head	pr_pfh;
 #endif
 };
+
+#ifdef __NetBSD__
+extern struct ip6protosw inet6sw[];
+#endif
 
 void pfctlinput2 __P((int, struct sockaddr *, void *));
 #endif /* !_NETINET6_IP6PROTOSW_H_ */
