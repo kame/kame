@@ -384,7 +384,7 @@ void
 make_rthdr(char *name)
 {
 	char rtbuf[BUFSIZ], area[BUFSIZ];
-	char hopstr[BUFSIZ];	/* XXX */
+	char hopstr[BUFSIZ];
 	char *bp = area, *addr;
 	struct ip6_rthdr *rthdr = (struct ip6_rthdr *)pbp;
 	struct new_ip6_rthdr0 *rthdr0;
@@ -418,7 +418,7 @@ make_rthdr(char *name)
 		rthdr0 = (struct new_ip6_rthdr0 *)rthdr;
 		rthdr0->ip6r0_reserved = 0;
 		for (i = 0; i < hops; i++) {
-			sprintf(hopstr, "hop%d", i);
+			snprintf(hopstr, sizeof(hopstr), "hop%d", i);
 			addr = tgetstr(hopstr, &bp, rtbuf);
 			if (addr == NULL) {
 				fprintf(stderr,
