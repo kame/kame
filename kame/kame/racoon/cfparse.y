@@ -551,28 +551,21 @@ secproto_spec
 					return -1;
 				}
 				prhead->spspec->algclass[algclass_ipsec_enc] = doi;
-				switch (doi) {
-				case IPSECDOI_ESP_CAST:
-					defklen = 128;
-					break;
-				case IPSECDOI_ESP_RC5:
-					defklen = 128;
-					break;
-				case IPSECDOI_ESP_BLOWFISH:
-					defklen = 128;
-					break;
-				default:
-					/* fixed length ciphers */
-					defklen = 0;
-					break;
-				}
-				if ($3) {
-					if (defklen == 0) {
+				defklen = default_keylen($1, $2);
+				if (defklen == 0) {
+					if ($3) {
 						yyerror("keylen not allowed");
 						return -1;
 					}
+				} else {
+					if ($3 && check_keylen($1, $2, $3) < 0) {
+						yyerror("invalid keylen %d", $3);
+						return -1;
+					}
+				}
+				if ($3)
 					prhead->spspec->encklen = $3;
-				} else
+				else
 					prhead->spspec->encklen = defklen;
 				break;
 			case algclass_ipsec_auth:

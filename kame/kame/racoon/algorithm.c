@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: algorithm.c,v 1.1 2000/01/09 01:31:20 itojun Exp $ */
+/* YIPS @(#)$Id: algorithm.c,v 1.2 2000/01/12 17:20:23 itojun Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -104,9 +104,47 @@ static int isakmpdh2doi[] = {
 };
 
 /*
+ * give the default key length
+ * OUT:	-1:		NG
+ *	0:		fixed key cipher, key length not allowed
+ *	positive:	default key length
+ */
+int
+default_keylen(class, type)
+	int class, type;
+{
+	switch (class) {
+	case algclass_isakmp_enc:
+		switch (type) {
+		case algtype_blowfish:
+		case algtype_rc5:
+		case algtype_cast128:
+			return 128;
+		default:
+			break;
+		}
+		break;
+	case algclass_ipsec_enc:
+		switch (type) {
+		case algtype_blowfish:
+		case algtype_rc5:
+		case algtype_cast128:
+			return 128;
+		default:
+			break;
+		}
+		break;
+	default:
+		break;
+	}
+
+	return 0;
+}
+
+/*
  * check key length
- * OUT: -1:	NG
- *       0:	OK
+ * OUT:	-1:	NG
+ *	0:	OK
  */
 int
 check_keylen(class, type, len)
@@ -120,17 +158,81 @@ check_keylen(class, type, len)
 		case algtype_cast128:
 			if (len % 8 != 0) {
 				plog(logp, LOCATION, NULL,
-					"key length %d is not multiple of 8",
+					"key length %d is not multiple of 8\n",
 					len);
 				return -1;
 			}
-			break;
+			if (type == algtype_blowfish) {
+				if (len < 40 || 448 < len) {
+					plog(logp, LOCATION, NULL,
+						"key length out of range\n");
+					return -1;
+				}
+			} else if (type == algtype_rc5) {
+				if (len < 40 || 2040 < len) {
+					plog(logp, LOCATION, NULL,
+						"key length out of range\n");
+					return -1;
+				}
+			} else if (type == algtype_cast128) {
+				if (len < 40 || 128 < len) {
+					plog(logp, LOCATION, NULL,
+						"key length out of range\n");
+					return -1;
+				}
+			}
+			return 0;
 		default:
+			if (len) {
+				plog(logp, LOCATION, NULL,
+					"key length is not allowed");
+				return -1;
+			}
+			break;
+		}
+		break;
+	case algclass_ipsec_enc:
+		switch (type) {
+		case algtype_blowfish:
+		case algtype_rc5:
+		case algtype_cast128:
+			if (len % 8 != 0) {
+				plog(logp, LOCATION, NULL,
+					"key length %d is not multiple of 8\n",
+					len);
+				return -1;
+			}
+			if (type == algtype_blowfish) {
+				if (len < 40 || 448 < len) {
+					plog(logp, LOCATION, NULL,
+						"key length out of range\n");
+					return -1;
+				}
+			} else if (type == algtype_rc5) {
+				if (len < 40 || 2040 < len) {
+					plog(logp, LOCATION, NULL,
+						"key length out of range\n");
+					return -1;
+				}
+			} else if (type == algtype_cast128) {
+				if (len < 40 || 128 < len) {
+					plog(logp, LOCATION, NULL,
+						"key length out of range\n");
+					return -1;
+				}
+			}
+			return 0;
+		default:
+			if (len) {
+				plog(logp, LOCATION, NULL,
+					"key length is not allowed\n");
+				return -1;
+			}
 			break;
 		}
 		break;
 	default:
-		break;
+		return -1;
 	}
 
 	return 0;

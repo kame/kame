@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: algorithm.h,v 1.2 2000/01/10 21:32:00 itojun Exp $ */
+/* YIPS @(#)$Id: algorithm.h,v 1.3 2000/01/12 17:20:24 itojun Exp $ */
 
 /* algorithm strength */
 enum {
@@ -102,6 +102,7 @@ enum {
 	algtype_rsaenc, algtype_rsarev,
 };
 
+extern int default_keylen __P((int class, int type));
 extern int check_keylen __P((int class, int type, int len));
 extern int algtype2doi __P((int class, int type));
 extern int algclass2doi __P((int class));
