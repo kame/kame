@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2657 2004/08/02 01:14:08 jinmei Exp $
+$KAME: CHANGELOG,v 1.2658 2004/08/11 07:52:15 jinmei Exp $
 
 <200408>
+2004-08-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6_rtr.c (prelist_update): applied
+	clarification on the prefix length check in rfc2462bis:
+	- any prefix length is now accepted for on-link determination
+	- determine the appropriate length based on the link type, rather
+	  than on the prefix value (visible behavior should be same
+	  though)
+
 2004-08-01  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/freebsd5/usr.sbin/dhcp6: builds DHCPv6 in FreeBSD5
 
