@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.300 1999/11/26 11:35:24 itojun Exp $
+$Id: CHANGELOG,v 1.301 1999/11/29 07:55:20 itojun Exp $
 
 <199911>
+Mon Nov 29 16:53:28 JST 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/mail/smtpfeed: add pkgsrc directory for smtpfeed 1.02.
+
 Fri Nov 26 19:50:19 JST 1999  itojun@iijlab.net
 	* KAME repository experienced a disk crash last night.  It was
 	  recovered by now.
