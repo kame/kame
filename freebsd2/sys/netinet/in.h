@@ -180,9 +180,6 @@
 #define	IPPROTO_PM		101		/* PM - Packet Management by SuMiRe */
 #endif
 #define IPPROTO_PIM		103		/* Protocol Independent Mcast */
-#if defined(PTR)
-#define	IPPROTO_PTR		104		/* Protocol Translator */
-#endif
 /* 255: Reserved */
 /* BSD Private, local use, namespace incursion */
 #define	IPPROTO_DIVERT		254		/* divert pseudo-protocol */

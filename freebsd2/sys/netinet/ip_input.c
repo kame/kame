@@ -167,14 +167,14 @@ SYSCTL_STRUCT(_net_inet_ip, IPCTL_STATS, stats, CTLFLAG_RD,
 	&ipstat , ipstat, "");
 
 /* Packet reassembly stuff */
-#define IPREASS_NHASH_LOG2      6
-#define IPREASS_NHASH           (1 << IPREASS_NHASH_LOG2)
-#define IPREASS_HMASK           (IPREASS_NHASH - 1)
+#define IPREASS_NHASH_LOG2	6
+#define IPREASS_NHASH		(1 << IPREASS_NHASH_LOG2)
+#define IPREASS_HMASK		(IPREASS_NHASH - 1)
 #define IPREASS_HASH(x,y) \
 	((((x) & 0xF | ((((x) >> 8) & 0xF) << 4)) ^ (y)) & IPREASS_HMASK)
 
 static struct ipq ipq[IPREASS_NHASH];
-static int    nipq = 0;         /* total # of reass queues */
+static int    nipq = 0;		/* total # of reass queues */
 static int    maxnipq;
 
 #ifdef IPCTL_DEFMTU
@@ -252,10 +252,10 @@ extern	int		 pm_in	    __P((struct ifnet *, struct ip *, struct mbuf *));
 extern	struct route	*pm_route   __P((struct mbuf *));
 #endif
 
-#if defined(PTR)
+#if defined(NATPT)
 extern	int		ip6_protocol_tr;
 
-int	 ptr_in4	__P((struct mbuf *, struct mbuf **));
+int	 natpt_in4	__P((struct mbuf *, struct mbuf **));
 void	 ip6_forward	__P((struct mbuf *, int));
 #endif
 
@@ -291,7 +291,7 @@ ip_init()
 	ip_fw_init();
 #endif
 #ifdef IPNAT
-        ip_nat_init(); 
+	ip_nat_init(); 
 #endif
 #ifdef DUMMYNET
 	ip_dn_init();
@@ -304,7 +304,7 @@ static struct	route ipforward_rt;
 
 /*
  * Ip input routine.  Checksum and byte swap header.  If fragmented
- * try to reassemble.  Process options.  Pass to next level.
+ * try to reassemble.  Process options.	 Pass to next level.
  */
 void
 ip_input(struct mbuf *m)
@@ -448,7 +448,7 @@ tooshort:
 	 * - Pipe: pass pkt through dummynet.
 	 * - Wrap: fake packet's addr/port <unimpl.>
 	 * - Encapsulate: put it in another IP and send out. <unimp.>
- 	 */
+	 */
 
 iphack:
 #ifdef COMPAT_IPFW
@@ -477,14 +477,14 @@ iphack:
 	    }
 	}
 
-        if (ip_nat_ptr && !(*ip_nat_ptr)(&ip, &m, m->m_pkthdr.rcvif, IP_NAT_IN))
+	if (ip_nat_ptr && !(*ip_nat_ptr)(&ip, &m, m->m_pkthdr.rcvif, IP_NAT_IN))
 		return;
 #endif
 
 #if defined(PM)
 	/*
 	 * Process ip-filter/NAT.
-	 * Return TRUE  if this packed is discarded.
+	 * Return TRUE	if this packed is discarded.
 	 * Return FALSE if this packed is accepted.
 	 */
 
@@ -492,21 +492,24 @@ iphack:
 	    return;
 #endif
 
-#if defined(PTR)
+#if defined(NATPT)
 	/*
-	 *
+	 * NAT-PT (Network Address Translation - Protocol Translation)
 	 */
 	if (ip6_protocol_tr)
 	{
 	    struct mbuf	*m1 = NULL;
 	    
-	    switch (ptr_in4(m, &m1))
+	    switch (natpt_in4(m, &m1))
 	    {
-	      case IPPROTO_IP:					goto dooptions;
+	      case IPPROTO_IP:					goto processoptions;
 	      case IPPROTO_IPV4:	ip_forward(m1, 0);	break;
 	      case IPPROTO_IPV6:	ip6_forward(m1, 1);	break;
 	      case IPPROTO_MAX:			/* discard this packet	*/
-	      default:
+	      default:						break;
+
+	      case IPPROTO_DONE:		/* discard without free */
+		return;
 	    }
 
 	    if (m != m1)
@@ -514,7 +517,7 @@ iphack:
 
 	    return;
 	}
-  dooptions:
+  processoptions:
 #endif
 
 	/*

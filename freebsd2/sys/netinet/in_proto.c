@@ -141,10 +141,10 @@ int	pm_usrreq	__P((struct socket *,
 			     int, struct mbuf *, struct mbuf *, struct mbuf *));
 #endif
 
-#if defined(PTR)
-void	ptr_init	__P((void));
-int	ptr_ctloutput	__P((int, struct socket *, int, int, struct mbuf **));
-struct pr_usrreqs ptr_usrreqs;
+#if defined(NATPT)
+void	natpt_init	__P((void));
+int	natpt_ctloutput	__P((int, struct socket *, int, int, struct mbuf **));
+struct pr_usrreqs natpt_usrreqs;
 #endif
 
 extern	struct domain inetdomain;
@@ -268,12 +268,12 @@ struct protosw inetsw[] = {
   pm_init,	0,		0,		0,
 },
 #endif
-#if defined(PTR)
-{ SOCK_RAW,	&inetdomain,	IPPROTO_PTR,	PR_ATOMIC|PR_ADDR,
+#if defined(NATPT)
+{ SOCK_RAW,	&inetdomain,	IPPROTO_AHIP,	PR_ATOMIC|PR_ADDR,
   0,		0,		0,		0,
   0,
-  ptr_init,	0,		0,		0,
- &ptr_usrreqs
+  natpt_init,	0,		0,		0,
+ &natpt_usrreqs
 },
 #endif
 	/* raw wildcard */
