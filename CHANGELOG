@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1055 2000/06/22 08:28:55 itojun Exp $
+$Id: CHANGELOG,v 1.1056 2000/06/22 08:40:39 sakane Exp $
 
 <200006>
+Thu Jun 22 17:40:37 JST 2000 sakane@ydc.co.jp
+	* kame/sys/netkey:
+	delete sadb_x_ident_id_addr.  don't send a pair of addresses
+	by including acquire message to a user.
+
+	* kame/kame/racoon/pfkey.c:
+	SADB_EXT_IDENTITY_{SRC,DST} is not required to parse SADB_ACQUIRE
+	message any more.
+
 Thu Jun 22 17:45:40 JST 2000  itojun@iijlab.net
 	* openbsd/sys/dev/ic/xl.c: disable multicast hash filer setup on 905B,
 	  since the code does not do the right thing. (sync with
