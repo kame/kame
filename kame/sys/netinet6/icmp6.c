@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.84 2000/05/09 17:25:58 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.85 2000/05/10 09:20:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -665,7 +665,7 @@ icmp6_input(mp, offp, proto)
 			bcopy(icmp6, nicmp6, sizeof(struct icmp6_hdr));
 			p = (u_char *)(nicmp6 + 1);
 			bzero(p, 4);
-			bcopy(hostname, p + 4, maxhlen);
+			bcopy(hostname, p + 4, maxhlen); /*meaningless TTL*/
 			noff = sizeof(struct ip6_hdr);
 			M_COPY_PKTHDR(n, m); /* just for recvif */
 			n->m_pkthdr.len = n->m_len = sizeof(struct ip6_hdr) +
@@ -1062,7 +1062,7 @@ icmp6_mtudisc_update(dst, icmp6, m)
  * - IPv6 Subject address handling
  * - FQDN Subject name handling (drop it if it's not for me)
  * - IPv4 Subject address handling support missing
- * - FQDN reply is not an DNS format, but plain string
+ * - FQDN reply is not an DNS format, but pascal string (03 draft)
  * - Supported Qtypes packet support missing
  */
 #ifdef __FreeBSD__
