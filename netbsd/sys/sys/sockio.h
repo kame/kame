@@ -129,6 +129,7 @@
 
 #define	SIOCSIFGENERIC	 _IOW('i', 57, struct ifreq)	/* generic IF set op */
 #define	SIOCGIFGENERIC	_IOWR('i', 58, struct ifreq)	/* generic IF get op */
+#define	SIOCDIFGENERIC	_IOWR('i', 59, struct ifreq)	/* generic IF del op */
 
 #define SIOCSIFPHYADDR	 _IOW('i', 70, struct ifaliasreq) /* set gif addres */
 #define	SIOCGIFPSRCADDR	_IOWR('i', 71, struct ifreq)	/* get gif psrc addr */
@@ -136,6 +137,8 @@
 #define SIOCDIFPHYADDR	 _IOW('i', 73, struct ifreq)	/* delete gif addrs */
 #define	SIOCSLIFPHYADDR	 _IOW('i', 74, struct if_laddrreq) /* set gif addrs */
 #define	SIOCGLIFPHYADDR	_IOWR('i', 75, struct if_laddrreq) /* get gif addrs */
+#define	SIOCGSTFMODE	_IOWR('i', 76, struct ifreq)	/* get stf mode */
+#define	SIOCSSTFMODE	 _IOW('i', 77, struct ifreq)	/* set stf mode */
 
 #define	SIOCSIFMTU	 _IOW('i', 127, struct ifreq)	/* set ifnet mtu */
 #define	SIOCGIFMTU	_IOWR('i', 126, struct ifreq)	/* get ifnet mtu */

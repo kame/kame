@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.97 2003/01/09 08:46:59 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.98 2003/01/09 11:16:38 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -84,6 +84,9 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+#include <sys/proc.h>
+#endif
 #include <sys/socket.h>
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
@@ -1184,6 +1187,9 @@ stf_ioctl(ifp, cmd, data)
 #endif
 	caddr_t data;
 {
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	struct proc *p = curproc;	/* XXX */
+#endif
 	struct ifaddr *ifa;
 	struct ifreq *ifr;
 	struct stf_softc *sc, *scp;
@@ -1233,6 +1239,11 @@ stf_ioctl(ifp, cmd, data)
 		break;
 		
 	case SIOCSSTFMODE:
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+			break;
+#endif
+
 		/* multiple ISATAP/6to4 interface can cause confusion */
 		LIST_FOREACH(scp, &stf_softc_list, sc_list) {
 			if (bcmp(&sc->sc_mode, &ifr->ifr_data,
@@ -1262,6 +1273,11 @@ stf_ioctl(ifp, cmd, data)
 		break;
 
 	case SIOCSISATAPRTR:
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+			break;
+#endif
+
 		if (!STF_IS_ISATAP(sc)) {
 			error = ENXIO;
 			break;
@@ -1300,6 +1316,11 @@ stf_ioctl(ifp, cmd, data)
 		break;
 
 	case SIOCDISATAPRTR:
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+		if ((error = suser(p->p_ucred, &p->p_acflag)) != 0)
+			break;
+#endif
+
 		if (!STF_IS_ISATAP(sc)) {
 			error = ENXIO;
 			break;
