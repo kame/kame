@@ -325,7 +325,7 @@ tcp_usr_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 
 	if ((error = tcp_connect(tp, nam, p)) != 0)
 		goto out;
-	tp->t_maxseg = tcp_mssdflt;
+	tp->t_maxseg = tp->t_maxopd = tcp_mssdflt;
 	error = tcp_output(tp);
 	COMMON_END(PRU_CONNECT);
 }
@@ -363,14 +363,14 @@ tcp6_usr_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		inp->inp_vflag &= ~INP_IPV6;
 		if ((error = tcp_connect(tp, (struct sockaddr *)&sin, p)) != 0)
 			goto out;
-		tp->t_maxseg = tcp_mssdflt;
+		tp->t_maxseg = tp->t_maxopd = tcp_mssdflt;
 		error = tcp_output(tp);
 		goto out;
 	}
 #endif /* MAPPED_ADDR_ENABLED */
 	if ((error = tcp6_connect(tp, nam, p)) != 0)
 		goto out;
-	tp->t_maxseg = tcp_v6mssdflt;
+	tp->t_maxseg = tp->t_maxopd = tcp_v6mssdflt;
 	error = tcp_output(tp);
 	if (error)
 		goto out;
@@ -421,7 +421,7 @@ tcp_usr_accept(struct socket *so, struct sockaddr **nam)
 
 	COMMON_START();
 	in_setpeeraddr(so, nam);
-	tp->t_maxseg = tcp_mssdflt;
+	tp->t_maxseg = tp->t_maxopd = tcp_mssdflt;
 	COMMON_END(PRU_ACCEPT);
 }
 
@@ -436,7 +436,7 @@ tcp6_usr_accept(struct socket *so, struct sockaddr **nam)
 
 	COMMON_START();
 	in6_mapped_peeraddr(so, nam);
-	tp->t_maxseg = tcp_v6mssdflt;
+	tp->t_maxseg = tp->t_maxopd = tcp_v6mssdflt;
 	COMMON_END(PRU_ACCEPT);
 }
 #endif /* INET6 */

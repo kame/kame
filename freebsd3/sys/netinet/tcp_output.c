@@ -73,6 +73,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/mbuf.h>
+#include <sys/domain.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -896,6 +897,14 @@ send:
 	struct rtentry *rt;
 #endif
 	ip->ip_len = m->m_pkthdr.len;
+#ifdef INET6
+	if (INP_CHECK_SOCKAF(so, AF_INET6))
+		ip->ip_ttl = in6_selecthlim(tp->t_inpcb,
+					    tp->t_inpcb->in6p_route.ro_rt ?
+					    tp->t_inpcb->in6p_route.ro_rt->rt_ifp
+					    : NULL);
+	else
+#endif /* INET6 */
 	ip->ip_ttl = tp->t_inpcb->inp_ip_ttl;	/* XXX */
 	ip->ip_tos = tp->t_inpcb->inp_ip_tos;	/* XXX */
 #ifdef ALTQ_ECN
