@@ -1,9 +1,9 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2157 2002/05/22 04:34:15 itojun Exp $
+$KAME: CHANGELOG,v 1.2158 2002/05/22 04:34:53 itojun Exp $
 
 <200205>
 Tue May 21 21:19:30 PDT 2002  itojun@iijlab.net
-	* openbsd: upgrade to 3.1.
+	* openbsd: upgrade to 3.1.  NOTE: sctp does not work yet.
 
 Mon May 20 14:48:02 JST 2002  itojun@iijlab.net
 	* sys/netinet/sctp_usrreq.c (and other sctp related code):
