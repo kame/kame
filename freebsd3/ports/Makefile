@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.30 2000/06/23 16:20:40 sumikawa Exp $
+# $Id: Makefile,v 1.31 2000/06/25 09:59:07 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -41,7 +41,6 @@ SUBDIR+=	newbie
 SUBDIR+=	openssh
 SUBDIR+=	p5-Socket6
 SUBDIR+=	pchar
-SUBDIR+=	perl5
 SUBDIR+=	pfs
 SUBDIR+=	pident6d
 SUBDIR+=	popper
