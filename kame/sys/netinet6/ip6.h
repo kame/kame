@@ -260,9 +260,9 @@ do {									\
 	int tmp;							\
 	t = m_pulldown((m), (off), (len), &tmp);			\
 	if (t) {							\
-		if ((t)->m_len < tmp + (len))				\
+		if (t->m_len < tmp + (len))				\
 			panic("m_pulldown malfunction");		\
-		(val) = (typ)(mtod((m), caddr_t) + tmp);		\
+		(val) = (typ)(mtod(t, caddr_t) + tmp);			\
 	} else								\
 		(val) = (typ)NULL;					\
 } while (0)
@@ -272,9 +272,9 @@ do {									\
 	struct mbuf *t;							\
 	t = m_pulldown((m), (off), (len), NULL);			\
 	if (t) {							\
-		if ((t)->m_len < (len))					\
+		if (t->m_len < (len))					\
 			panic("m_pulldown malfunction");		\
-		(val) = (typ)mtod((m), caddr_t);			\
+		(val) = (typ)mtod(t, caddr_t);				\
 	} else								\
 		(val) = (typ)NULL;					\
 } while (0)
