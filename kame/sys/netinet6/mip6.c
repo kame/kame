@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.74 2001/11/07 11:38:17 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.75 2001/11/15 10:09:44 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -130,6 +130,7 @@ static int mip6_babr_destopt_create __P((struct ip6_dest **,
 static void mip6_find_offset __P((struct mip6_buffer *));
 static void mip6_align_destopt __P((struct mip6_buffer *));
 static caddr_t mip6_add_opt2dh __P((caddr_t, struct mip6_buffer *));
+static int mip6_add_subopt2dh __P((u_int8_t *, struct mip6_buffer *));
 
 void
 mip6_init()
@@ -1054,17 +1055,13 @@ mip6_add_haddrs(sc, ifp)
 			ifra.ifra_lifetime.ia6t_pltime
 				= ND6_INFINITE_LIFETIME; /* XXX */
 #endif
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
-			if (in6_control(NULL, SIOCAIFADDR_IN6, (caddr_t)&ifra,
-					ifp, curproc))
-#else
-			if (in6_control(NULL, SIOCAIFADDR_IN6, (caddr_t)&ifra, ifp))
-#endif
-			{
+			error = in6_update_ifa(ifp, &ifra, NULL);
+			if (error) {
 				mip6log((LOG_ERR,
-					 "%s:%d: add address failed (%s)\n",
+					 "%s:%d: add address (%s) failed. errno = %d\n",
 					 __FILE__, __LINE__,
-					 ip6_sprintf(&ifra.ifra_addr.sin6_addr)));
+					 ip6_sprintf(&ifra.ifra_addr.sin6_addr),
+					 error));
 				return (error);
 			}
 		}
@@ -1089,17 +1086,51 @@ mip6_remove_addr(ifp, ia6)
 	bcopy(&ia6->ia_prefixmask, &ifra.ifra_prefixmask,
 	      sizeof(struct sockaddr_in6));
 
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
-	if (in6_control(NULL, SIOCDIFADDR_IN6, (caddr_t)&ifra, ifp, curproc))
-#else
-	if (in6_control(NULL, SIOCDIFADDR_IN6, (caddr_t)&ifra, ifp))
-#endif
+	/* address purging code is copyed from in6_control(). */
 	{
-		mip6log((LOG_ERR,
-			 "%s:%d: in6_control delete addr failed (%s)\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&ifra.ifra_addr.sin6_addr)));
-		error = -1;
+		int i = 0, purgeprefix = 0;
+		struct nd_prefix pr0, *pr = NULL;
+
+		/*
+		 * If the address being deleted is the only one that owns
+		 * the corresponding prefix, expire the prefix as well.
+		 * XXX: theoretically, we don't have to worry about such
+		 * relationship, since we separate the address management
+		 * and the prefix management.  We do this, however, to provide
+		 * as much backward compatibility as possible in terms of
+		 * the ioctl operation.
+		 */
+		bzero(&pr0, sizeof(pr0));
+		pr0.ndpr_ifp = ifp;
+		pr0.ndpr_plen = in6_mask2len(&ia6->ia_prefixmask.sin6_addr,
+					     NULL);
+		if (pr0.ndpr_plen == 128)
+			goto purgeaddr;
+		pr0.ndpr_prefix = ia6->ia_addr;
+		pr0.ndpr_mask = ia6->ia_prefixmask.sin6_addr;
+		for (i = 0; i < 4; i++) {
+			pr0.ndpr_prefix.sin6_addr.s6_addr32[i] &=
+				ia6->ia_prefixmask.sin6_addr.s6_addr32[i];
+		}
+		/*
+		 * The logic of the following condition is a bit complicated.
+		 * We expire the prefix when
+		 * 1. the address obeys autoconfiguration and it is the
+		 *    only owner of the associated prefix, or
+		 * 2. the address does not obey autoconf and there is no
+		 *    other owner of the prefix.
+		 */
+		if ((pr = nd6_prefix_lookup(&pr0)) != NULL &&
+		    (((ia6->ia6_flags & IN6_IFF_AUTOCONF) != 0 &&
+		      pr->ndpr_refcnt == 1) ||
+		     ((ia6->ia6_flags & IN6_IFF_AUTOCONF) == 0 &&
+		      pr->ndpr_refcnt == 0)))
+			purgeprefix = 1;
+
+	purgeaddr:
+		in6_purgeaddr(&ia6->ia_ifa);
+		if (pr && purgeprefix)
+			prelist_remove(pr);
 	}
 
 	return (error);
@@ -1419,7 +1450,9 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	struct ip6_pktopts *opts;
 	struct hif_softc *sc;
 {
-	struct ip6_opt_binding_update bu_opt;
+	struct ip6_opt_binding_update bu_opt, *bu_opt_pos;
+	int suboptlen;
+	struct mip6_subopt_authdata *authdata;
 	struct mip6_buffer optbuf;
 	struct mip6_bu *mbu;
 	struct mip6_bu *hrmbu;
@@ -1510,6 +1543,8 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		      sizeof(lifetime));
 		mbu->mbu_lifetime = lifetime;
 		mbu->mbu_remain = lifetime;
+		mbu->mbu_refresh = mbu->mbu_lifetime;
+		mbu->mbu_refremain = mbu->mbu_lifetime;
 	}
 #ifdef MIP6_DRAFT13
 	/* set the prefix length of this binding update. */
@@ -1533,7 +1568,7 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		mbu->mbu_seqno++;
 	}
 
-	/* XXX IPV6_MIMMTU is OK?? */
+	/* XXX MIP6_BUFFER_SIZE = IPV6_MIMMTU is OK?? */
 	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
 	if (optbuf.buf == NULL) {
 		return (ENOMEM);
@@ -1567,7 +1602,21 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	}
 
 	/* add BU option (and other user specified optiosn if any) */
-	mip6_add_opt2dh((u_int8_t *)&bu_opt, &optbuf);
+	bu_opt_pos = (struct ip6_opt_binding_update *)
+		mip6_add_opt2dh((u_int8_t *)&bu_opt, &optbuf);
+#ifndef MIP6_DRAFT13
+	authdata = mip6_calc_authdata(src, dst, &mbu->mbu_coa, bu_opt_pos);
+	if (authdata == NULL) {
+		mip6log((LOG_ERR,
+			 "%s:%d: failed to calc authdata\n",
+			 __FILE__, __LINE__));
+		return (EINVAL);
+	}
+	suboptlen = mip6_add_subopt2dh((u_int8_t *)authdata, &optbuf);
+	bu_opt_pos->ip6ou_len += suboptlen;
+	free(authdata, M_TEMP);
+#endif /* !MIP6_DRAFT13 */
+	
 	mip6_align_destopt(&optbuf);
 
 	*pktopt_mip6dest2 = (struct ip6_dest *)optbuf.buf;
@@ -1707,6 +1756,7 @@ mip6_babr_destopt_create(pktopt_mip6dest2, dst, opts)
 	}
 	
 	mip6_align_destopt(&optbuf);
+	*pktopt_mip6dest2 = (struct ip6_dest *)optbuf.buf;
 
 	return (error);
 }
@@ -2005,6 +2055,72 @@ mip6_add_opt2dh(opt, dh)
 			break;
 	}
 	return pos;
+}
+
+static int
+mip6_add_subopt2dh(subopt, dh)
+	u_int8_t *subopt; /* MIP6 sub-options */
+	struct mip6_buffer *dh; /* Buffer containing the IPv6 DH  */
+{
+	int suboptlen = 0;
+	u_int8_t type, len, padn, off;
+	int rest;
+
+	/* verify input */
+	if (subopt == NULL || dh == NULL)
+		return (0);
+	if (dh->off < 2) {
+		/* Illegal input. */
+		return (0);
+	}
+
+	/* Add sub-option to Destination option */
+	padn = IP6SUBOPT_PADN;
+	type = *subopt;
+	switch (type) {
+		case IP6SUBOPT_AUTHDATA:
+			/*
+			 * Authentication Data alignment requirement
+			 * (8n + 6)
+			 */
+			rest = dh->off % 8;
+			if (rest <= 4) {
+				/* Add a PADN option with length X */
+				len = 6 - rest - 2;
+				bzero((caddr_t)dh->buf + dh->off, len + 2);
+				bcopy(&padn, (caddr_t)dh->buf + dh->off, 1);
+				bcopy(&len, (caddr_t)dh->buf + dh->off + 1, 1);
+				dh->off += len + 2;
+				suboptlen += len + 2;
+			} else if (rest == 5) {
+				/* Add a PAD1 option */
+				bzero((caddr_t)dh->buf + dh->off, 1);
+				dh->off += 1;
+				suboptlen += 1;
+			} else if (rest == 7) {
+				/* Add a PADN option with length 5 */
+				len = 5;
+				bzero((caddr_t)dh->buf + dh->off, len + 2);
+				bcopy(&padn, (caddr_t)dh->buf + dh->off, 1);
+				bcopy(&len, (caddr_t)dh->buf + dh->off + 1, 1);
+				dh->off += len + 2;
+				suboptlen += len + 2;
+			}
+
+			/* Append sub-option to the destination option. */
+			len = 2 + *(subopt + 1);
+			off = dh->off;
+			bzero((caddr_t)dh->buf + off, len);
+			bcopy((caddr_t)subopt, (caddr_t)dh->buf + off, len);
+
+			suboptlen += len;
+
+			/* adjust offset. */
+			dh->off += len;
+			break;
+	}
+
+	return (suboptlen);
 }
 
 /*

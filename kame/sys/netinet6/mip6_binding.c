@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.32 2001/11/07 08:59:49 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.33 2001/11/15 10:09:44 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -717,6 +717,7 @@ mip6_validate_bu(m, opt)
 	struct mip6_bc *mbc;
 #ifndef MIP6_DRAFT13
 	int error = 0;
+	struct mip6_subopt_authdata *authdata = NULL;
 #endif /* !MIP6_DRAFT13 */
 
 	ip6 = mtod(m, struct ip6_hdr *);
@@ -737,16 +738,21 @@ mip6_validate_bu(m, opt)
 #endif /* IPSEC */
 #endif /* MIP6_DRAFT13 */
 
-	/* check if this packet contains an home address destopt. */
+	/* check if this packet contains a home address destopt. */
 	n = ip6_findaux(m);
 	if (!n) {
+		mip6log((LOG_NOTICE,
+			 "%s:%d: no Home Address option found "
+			 "in the binding update from host %s.\n",
+			 __FILE__, __LINE__,
+			 ip6_sprintf(&ip6->ip6_src)));
 		return (1);
 	}
 	ip6a = mtod(n, struct ip6aux *);
 	if ((ip6a == NULL) || (ip6a->ip6a_flags & IP6A_HASEEN) == 0) {
 		mip6log((LOG_NOTICE,
 			 "%s:%d: no Home Address option found "
-			 "for an BU from host %s.\n",
+			 "in the binding update from host %s.\n",
 			 __FILE__, __LINE__,
 			 ip6_sprintf(&ip6->ip6_src)));
 		return (1);
@@ -773,6 +779,58 @@ mip6_validate_bu(m, opt)
 		/* silently ignore */
 		return (1);
 	}
+
+	/* check sub-options. */
+	if (bu_opt->ip6ou_len > IP6OPT_BULEN) {
+		/* we have sub-option(s). */
+		int suboptlen = bu_opt->ip6ou_len - IP6OPT_BULEN;
+		u_int8_t *opt = (u_int8_t *)(bu_opt + 1);
+		int optlen;
+		for (optlen = 0;
+		     suboptlen > 0;
+		     suboptlen -= optlen, opt += optlen) {
+			if (*opt != IP6SUBOPT_PAD1 &&
+			    (suboptlen < 2 || *(opt + 1) + 2 > suboptlen)) {
+				mip6log((LOG_ERR,
+					 "%s:%d: "
+					 "sub-option too small\n",
+					 __FILE__, __LINE__));
+				return (-1);
+			}
+			switch (*opt) {
+			case IP6SUBOPT_PAD1:
+				optlen = 1;
+				break;
+			case IP6SUBOPT_ALTCOA:
+				/* XXX */
+				optlen = *(opt + 1) + 2;
+				break;
+#ifndef MIP6_DRAFT13
+			case IP6SUBOPT_AUTHDATA:
+				authdata = (struct mip6_subopt_authdata *)opt;
+				optlen = *(opt + 1) + 2;
+				break;
+#endif /* !MIP6_DRAFT13 */
+			default:
+				optlen = *(opt + 1) + 2;
+				break;
+			}
+		}
+	}
+#ifndef MIP6_DRAFT13
+	if (authdata == NULL) {
+		mip6log((LOG_ERR,
+			 "%s:%d: unprotected binding update from host %s\n",
+			 __FILE__, __LINE__,
+			 ip6_sprintf(&ip6->ip6_src)));
+	}
+	if (mip6_verify_authdata(m, bu_opt, authdata)) {
+		mip6log((LOG_ERR,
+			 "%s:%d: authenticate binding update failed from host %s\n",
+			 __FILE__, __LINE__,
+			 ip6_sprintf(&ip6->ip6_src)));
+	}
+#endif /* !MIP6_DRAFT13 */
 
 	/* The received BU sequence number > received seqno before. */
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &ip6a->ip6a_home);
@@ -1897,6 +1955,48 @@ mip6_process_ba(m, opt)
 	return (0);
 }
 
+static int
+mip6_verify_authdata(m, bu_opt, authdata)
+	struct mbuf *m;
+	struct ip6_opt_binding_update *bu_opt;
+	struct mip6_subopt_authdata *authdata;
+{
+	/* XXX: TODO */
+	return (0);
+}
+
+struct mip6_subopt_authdata *
+mip6_calc_authdata(src, dst, coa, bu_opt)
+	struct in6_addr *src;
+	struct in6_addr *dst;
+	struct in6_addr *coa;
+	struct ip6_opt_binding_update *bu_opt;
+{
+	struct mip6_subopt_authdata *authdata;
+	int size;
+	int authdata_size = 0;
+
+	/* XXX: TODO */
+	/* find SPI for this src, dst pair. */
+	/* determine authdata_size from the SPI found above. */
+	authdata_size = 0;
+	size = sizeof(*authdata) + authdata_size;
+	authdata = malloc(size, M_TEMP, M_NOWAIT);
+	if (authdata == NULL) {
+		mip6log((LOG_ERR,
+			 "%s:%d: failed to alloc memory.\n",
+			 __FILE__, __LINE__));
+		return (NULL);
+	}
+
+	bzero((caddr_t)authdata, size);
+	/* XXX: TODO */
+	/* calc authdata */
+	authdata->type = IP6SUBOPT_AUTHDATA;
+	authdata->len = size - 2;
+
+	return (authdata);
+}
 
 /*
  * binding request management functions
@@ -2139,7 +2239,7 @@ mip6_bc_timeout(dummy)
 
 		/* XXX set BR_WAITSENT when BC is going to expire */
 		if (mbc->mbc_remain < (mbc->mbc_lifetime / 4)) { /* XXX */
-			mbc->mbc_state &= MIP6_BC_STATE_BR_WAITSENT;
+			mbc->mbc_state |= MIP6_BC_STATE_BR_WAITSENT;
 		}
 
 		/* XXX send BA if BA_WAITSENT is remained not
