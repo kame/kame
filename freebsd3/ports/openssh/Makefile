@@ -3,28 +3,29 @@
 # Date created:		7 October 1999
 # Whom:			green
 #
-# $FreeBSD: ports/security/openssh/Makefile,v 1.34 2000/01/15 23:17:13 green Exp $
+# $FreeBSD: ports/security/openssh/Makefile,v 1.42 2000/02/09 03:28:47 sumikawa Exp $
 #
 
 DISTNAME=	src/usr.bin/ssh
-PKGNAME=	OpenSSH-1.2.1
+PKGNAME=	OpenSSH-1.2.2
+#CATEGORIES=	security net ipv6
 CATEGORIES=	security net
 # ${MASTER_SITES} is only for if CVS won't work, period.
 MASTER_SITES=	ftp://internat.FreeBSD.org/pub/Crypto/OpenSSH/
 
-MAINTAINER=	green@FreeBSD.org
-MAINTAINER+=	sumikawa@FreeBSD.org
-
-RESTRICTED=	"One file calls external cryptographic routines."
+MAINTAINER=	sumikawa@kame.net
 
 LIB_DEPENDS=	crypto.1:${PORTSDIR}/security/openssl
 
 .include <bsd.port.pre.mk>
 CAT?=		/bin/cat
-DISTFILES!=	${CAT} ${FILESDIR}/distfiles
+SED?=		/usr/bin/sed
+DISTFILES!=	${SED} 's:^\(.*\)$$:${PKGNAME}/\1:g' ${FILESDIR}/distfiles
+IGNOREFILES!=	${SED} 's:^\(.*\)$$:${PKGNAME}/\1:g' ${FILESDIR}/ignorefiles
+DISTFILES+=	${IGNOREFILES}
 
 CVS_CMD?=	cvs -z3
-CVS_DATE=	Fri Jan  7 01:25:49 JST 2000
+CVS_DATE=	Tue Feb  1 02:19:07 EST 2000
 SED?=		/usr/bin/sed
 CVS_DATE_!=	${ECHO} -n "${CVS_DATE}" | ${SED} 's/[ \t:]/_/g'
 CVS_SITES=	anoncvs@anoncvs1.ca.openbsd.org:/cvs \
@@ -35,8 +36,10 @@ CRYPTOLIBS+=	-lRSAglue -lrsaref
 .endif
 # Here, MANDIR is concetenated to DESTDIR which all forms the man install dir...
 MAKE_ENV=	DESTDIR=${PREFIX} MANDIR=/man/man CRYPTOLIBS="${CRYPTOLIBS}"
-#.if defined(USE_INET6)
-MAKE_ENV+=	USET_INET6=yes
+#.if ${OSVERSION} < 400014
+#MAKE_ENV+=	COMPAT_GETADDRINFO=yes
+#.else
+MAKE_ENV+=	INET6FLAGS=-DINET6
 MAKE_ENV+=	LDADD="-L/usr/local/v6/lib -linet6"
 #.endif
 .if !exists(/usr/include/tcpd.h)
@@ -80,7 +83,7 @@ do-fetch:
 			${ECHO_MSG} ">> Attempting to CVS checkout from $${CVS_SITE}."; \
 			if ${CVS_CMD} -d $${CVS_SITE} co -D "${CVS_DATE}" \
 			    ${DISTNAME}; then \
-				${ECHO} -n ${CVS_DATE} > ${STAMPFILE}; \
+				${ECHO} -n "${CVS_DATE}" > ${STAMPFILE}; \
 				exit; \
 			fi \
 		done; \
@@ -118,10 +121,10 @@ do-extract:
 	@${MKDIR} ${WRKDIR}
 	@${CP} -r ${DISTDIR}/${PKGNAME}/${DISTNAME} ${WRKDIR}
 	@${CP} ${FILESDIR}/strlcat.c ${FILESDIR}/strlcpy.c ${WRKSRC}/lib/
-#.if !defined(USE_INET6)
+#.if ${OSVERSION} < 400014
 #	@${CP} ${FILESDIR}/getaddrinfo.c  ${FILESDIR}/name6.c ${WRKSRC}/lib/
 #	@${CP} ${FILESDIR}/bindresvport.c ${FILESDIR}/rcmd.c ${WRKSRC}/lib/
-#	@${CP} ${FILESDIR}/getnameinfo.c ${FILESDIR}/rcmd.c ${WRKSRC}/lib/
+#	@${CP} ${FILESDIR}/getnameinfo.c ${WRKSRC}/lib/
 #	@${CP} ${FILESDIR}/netdb.h ${WRKSRC}/
 #.endif
 	@${MKDIR} ${WRKSRC}/pam_ssh
