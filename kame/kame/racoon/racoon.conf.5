@@ -113,6 +113,12 @@ and
 and
 .Ar key
 are separated by any number of blanks and/or tab characters.
+The
+.Ar file
+must be owned by the user ID running
+.Xr racoon 8
+.Pq usually privileged user ,
+and must not be accessible by others.
 .It Ic path certificate Ar path ;
 racoon will search this directory if the certificate or certificate request
 is received.
