@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.86 2002/06/09 16:29:54 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.87 2002/07/14 21:07:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -345,6 +345,7 @@ in_gif_output(ifp, family, m)
 	}
 
 	if (sc->gif_ro.ro_rt == NULL) {
+		bzero(dst, sizeof(*dst));
 		dst->sin_family = sin_dst->sin_family;
 		dst->sin_len = sizeof(struct sockaddr_in);
 		dst->sin_addr = sin_dst->sin_addr;
