@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.196 2001/07/18 08:32:51 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.197 2001/07/18 08:37:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1937,7 +1937,7 @@ in6_restoremkludge(ia, ifp)
 /*
  * Allocate space for the kludge at interface initialization time.
  * Formerly, we dynamically allocated the space in in6_savemkludge() with
- * malloc(M_WAITOK).  However, it was wrong since the function can be called
+ * malloc(M_WAITOK).  However, it was wrong since the function could be called
  * under an interrupt context (software timer on address lifetime expiration).
  * Also, we cannot just give up allocating the strucutre, since the group
  * membership structure is very complex and we need to keep it anyway.
