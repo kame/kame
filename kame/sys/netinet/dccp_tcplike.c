@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tcplike.c,v 1.8 2003/10/30 07:36:53 ono Exp $	*/
+/*	$KAME: dccp_tcplike.c,v 1.9 2003/10/31 08:47:11 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Magnus Erixzon
@@ -129,7 +129,7 @@ void tcplike_rto_timeout(void *ccb)
 	cb->ssthresh = cb->cwnd >>1;
 	cb->cwnd = 1; /* allowing 1 packet to be sent */
 	cb->outstanding = 0; /* is this correct? */
-	cb->rto_timer_callout = NULL;
+	cb->rto_timer_callout = 0;
 	cb->rto = cb->rto << 1;
 	TIMEOUT_DEBUG((LOG_INFO, "RTO Timeout. New RTO = %u\n", cb->rto));
 	

@@ -1,4 +1,4 @@
-/*	$KAME: dccp_var.h,v 1.8 2003/10/30 07:36:53 ono Exp $	*/
+/*	$KAME: dccp_var.h,v 1.9 2003/10/31 08:47:12 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -225,6 +225,19 @@ const char *dccpstates[] = {
 }
 
 #ifdef _KERNEL
+
+#if defined(DCCP_DEBUG_ON)
+#define DCCP_DEBUG(args) log args
+#else
+#define DCCP_DEBUG(args)
+#endif
+
+#ifdef ACKDEBUG
+#define ACK_DEBUG(args) log args
+#else
+#define ACK_DEBUG(args)
+#endif
+
 #ifdef __FreeBSD__
 SYSCTL_DECL(_net_inet_dccp);
 #endif
@@ -250,7 +263,8 @@ void*	dccp_ctlinput(int, struct sockaddr *, void *);
 int	dccp_ctloutput(int , struct socket *, int, int, struct mbuf **);
 int	dccp_sysctl(int *, u_int, void *, size_t *, void *, size_t);
 #ifdef __NetBSD__
-int	dccp_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *);
+int	dccp_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *); 
+int	dccp6_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *);
 #else /* OpenBSD */
 int	dccp_usrreq(struct socket *, int, struct mbuf *, struct mbuf *, struct mbuf *);
 #endif
@@ -270,10 +284,40 @@ struct dccpcb *
 	dccp_newdccpcb(int, void *);
 #endif
 int	dccp_shutdown(struct socket *);
-
 int	dccp_output(struct dccpcb *, u_int8_t);
-
+#ifdef __FreeBSD__
+#if __FreeBSD_version >= 500000
+int	dccp_doconnect(struct socket *, struct sockaddr *, struct thread *, int);
+#else
+int	dccp_doconnect(struct socket *, struct sockaddr *, struct proc *, int);
+#endif
+#else
+int	dccp_doconnect(struct socket *, struct mbuf *, struct proc *, int);
+#endif
 int	dccp_add_option(struct dccpcb *, u_int8_t, char *, u_int8_t);
+int	dccp_add_feature(struct dccpcb *, u_int8_t, u_int8_t,  char *, u_int8_t);
+int	dccp_detach(struct socket *);
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+int	dccp_attach(struct socket *, int, struct thread *);
+#else
+int	dccp_attach(struct socket *, int, struct proc *);
+#endif
+int	dccp_abort(struct socket *);
+int	dccp_disconnect(struct socket *);
+#ifdef __FreeBSD__
+int	dccp_send(struct socket *, int, struct mbuf *, struct sockaddr *,
+		  struct mbuf *, 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+		  struct thread *);
+#else
+		  struct proc *);
+#endif
+#else
+int	dccp_send(struct socket *, int, struct mbuf *, struct mbuf *,
+		  struct mbuf *, struct proc *);
+#endif
+void	dccp_retrans_t(void *);
+void	dccp_connect_t(void *);
 
 /* No cc functions */
 void* dccp_nocc_init(struct dccpcb *);

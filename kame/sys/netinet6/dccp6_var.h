@@ -1,4 +1,4 @@
-/*	$KAME: dccp6_var.h,v 1.5 2003/10/23 05:44:35 ono Exp $	*/
+/*	$KAME: dccp6_var.h,v 1.1 2003/10/31 08:47:12 ono Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark
@@ -39,9 +39,16 @@ SYSCTL_DECL(_net_inet6_dccp6);
 #endif
 
 extern struct	pr_usrreqs dccp6_usrreqs;
+extern struct	in6pcb dccpb6;
 
 void	dccp6_ctlinput(int, struct sockaddr *, void *);
 int	dccp6_input(struct mbuf **, int *, int);
+#ifdef __NetBSD__
+int	dccp6_bind(struct socket *, struct mbuf *, struct proc *);
+int	dccp6_listen(struct socket *, struct proc *);
+int	dccp6_connect(struct socket *, struct mbuf *, struct proc *);
+int	dccp6_accept(struct socket *, struct mbuf *);
+#endif
 
 #endif
 #endif
