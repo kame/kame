@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.243 2001/09/12 16:52:37 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.244 2001/10/03 07:50:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -456,6 +456,14 @@ icmp6_error(m, type, code, param)
 	nip6 = mtod(m, struct ip6_hdr *);
 	nip6->ip6_src  = oip6->ip6_src;
 	nip6->ip6_dst  = oip6->ip6_dst;
+
+	/*
+	 * XXX should revert home/care-of address swap if IP6A_HASEEN|IP6A_SWAP
+	 * are set.  see sys/netinet6/dest6.c.
+	 * (or, we should avoid swapping these in dest6.c)
+	 * nip6->nip6_dst should be the home address, so it should be done
+	 * after the address copies above.
+	 */
 
 	if (IN6_IS_SCOPE_LINKLOCAL(&oip6->ip6_src))
 		oip6->ip6_src.s6_addr16[1] = 0;
