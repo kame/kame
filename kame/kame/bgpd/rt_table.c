@@ -71,7 +71,6 @@ krt_init()
     fatal("<krt_init>: routing socket");
 
   /* force Routing socket write-only */
-
   if (shutdown(rtsock, 0) < 0)
     fatal("<krt_init>: shutdown");
 
@@ -82,7 +81,6 @@ krt_init()
   }
   free(buf);
 }
-
 
 /*
  *   krt_entry()
@@ -123,8 +121,6 @@ krt_entry(rtm)
 #endif /* __NetBSD__ || __OpenBSD__ */
       )
     return;             /* not interested in the link route */
-
-
 
   rtmp = (char *)(rtm + 1);
   /* Destination */
@@ -253,13 +249,8 @@ krt_entry(rtm)
     insque(rte, ife->ifi_rte);
     return;
   }
-
-
-
   /*  End of krt_entry()  */
 }
-
-
 
 /*
  *    find_rte()
