@@ -1209,7 +1209,11 @@ ip6_mforward(ip6, ifp, m)
 
 			/* insert new entry at head of hash chain */
 			bzero(rt, sizeof(*rt));
+			rt->mf6c_origin.sin6_family = AF_INET6;
+			rt->mf6c_origin.sin6_len = sizeof(struct sockaddr_in6);
 			rt->mf6c_origin.sin6_addr = ip6->ip6_src;
+			rt->mf6c_mcastgrp.sin6_family = AF_INET6;
+			rt->mf6c_mcastgrp.sin6_len = sizeof(struct sockaddr_in6);
 			rt->mf6c_mcastgrp.sin6_addr = ip6->ip6_dst;
 			rt->mf6c_expire = UPCALL_EXPIRE;
 			nexpire[hash]++;
