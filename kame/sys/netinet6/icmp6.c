@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.155 2000/10/18 22:09:10 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.156 2000/10/19 19:21:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -267,7 +267,7 @@ icmp6_errcount(stat, type, code)
 	stat->icp6errs_unknown++;
 }
 
-#if defined(__NetBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 /*
  * Register a Path MTU Discovery callback.
  */
@@ -937,7 +937,7 @@ icmp6_input(mp, offp, proto)
 			sizeof(struct ip6_hdr);
 		struct ip6ctlparam ip6cp;
 		struct in6_addr *finaldst = NULL;
-#ifndef __NetBSD__
+#if !(defined(__NetBSD__) || defined(__OpenBSD__))
 		int icmp6type = icmp6->icmp6_type;
 #endif
 		struct ip6_frag *fh;
@@ -1087,7 +1087,7 @@ icmp6_input(mp, offp, proto)
 		ip6cp.ip6c_off = eoff;
 		ip6cp.ip6c_finaldst = finaldst;
 
-#ifndef __NetBSD__
+#if !(defined(__NetBSD__) || defined(__OpenBSD__))
 		if (icmp6type == ICMP6_PACKET_TOO_BIG)
 			icmp6_mtudisc_update(&ip6cp);
 #endif
@@ -1125,7 +1125,7 @@ void
 icmp6_mtudisc_update(ip6cp)
 	struct ip6ctlparam *ip6cp;
 {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	struct icmp6_mtudisc_callback *mc;
 #endif
 	struct in6_addr *dst = ip6cp->ip6c_finaldst;
@@ -1190,7 +1190,7 @@ icmp6_mtudisc_update(ip6cp)
 	if (rt)
 		RTFREE(rt);
 
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 	/*
 	 * Notify protocols that the MTU for this destination
 	 * has changed.

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.25 2000/10/18 22:09:09 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.26 2000/10/19 19:21:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -644,7 +644,7 @@ int	icmp6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 
 struct	ip6ctlparam;
 void	icmp6_mtudisc_update __P((struct ip6ctlparam *));
-#if defined(__NetBSD__)
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 void	icmp6_mtudisc_callback_register __P((void (*)(struct in6_addr *)));
 #endif
 

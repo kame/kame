@@ -123,6 +123,11 @@ int	tcbhashsize = TCBHASHSIZE;
 extern int ip6_defhlim;
 #endif /* INET6 */
 
+#if defined(INET6) && !defined(TCP6)
+void	tcp6_mtudisc_callback __P((struct in6_addr *));
+void	tcp6_mtudisc __P((struct inpcb *, int));
+#endif
+
 /*
  * Tcp initialization
  */
@@ -147,6 +152,10 @@ tcp_init()
 	    MHLEN)
 		panic("tcp_init");
 #endif /* INET6 */
+
+#if defined(INET6) && !defined(TCP6)
+	icmp6_mtudisc_callback_register(tcp6_mtudisc_callback);
+#endif
 }
 
 /*
@@ -706,25 +715,34 @@ tcp6_ctlinput(cmd, sa, d)
 	struct sockaddr *sa;
 	void *d;
 {
-	register struct tcphdr *thp;
 	struct tcphdr th;
 	void (*notify) __P((struct inpcb *, int)) = tcp_notify;
 	struct sockaddr_in6 sa6;
-	struct mbuf *m;
 	struct ip6_hdr *ip6;
+	struct mbuf *m;
 	int off;
-	
+	struct in6_addr finaldst;
+	struct in6_addr s;
+	struct {
+		u_int16_t th_sport;
+		u_int16_t th_dport;
+	} *thp;
+
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
 		return;
-	if (cmd == PRC_QUENCH)
+	if ((unsigned)cmd >= PRC_NCMDS)
+		return;
+	else if (cmd == PRC_QUENCH) {
+		/* XXX there's no PRC_QUENCH in IPv6 */
 		notify = tcp_quench;
-#if 0
+	} else if (PRC_IS_REDIRECT(cmd))
+		notify = in_rtchange, d = NULL;
 	else if (cmd == PRC_MSGSIZE)
-		notify = tcp_mtudisc;
-#endif
-	else if (!PRC_IS_REDIRECT(cmd) &&
-		 ((unsigned)cmd > PRC_NCMDS || inet6ctlerrmap[cmd] == 0))
+		; /* special code is present, see below */
+	else if (cmd == PRC_HOSTDEAD)
+		d = NULL;
+	else if (inet6ctlerrmap[cmd] == 0)
 		return;
 
 	/* if the parameter is from icmp6, decode it. */
@@ -733,6 +751,16 @@ tcp6_ctlinput(cmd, sa, d)
 		m = ip6cp->ip6c_m;
 		ip6 = ip6cp->ip6c_ip6;
 		off = ip6cp->ip6c_off;
+
+		/* translate addresses into internal form */
+		bcopy(ip6cp->ip6c_finaldst, &finaldst, sizeof(finaldst));
+		if (IN6_IS_ADDR_LINKLOCAL(&finaldst)) {
+			finaldst.s6_addr16[1] =
+			    htons(m->m_pkthdr.rcvif->if_index);
+		}
+		bcopy(&ip6->ip6_src, &s, sizeof(s));
+		if (IN6_IS_ADDR_LINKLOCAL(&s))
+			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 	} else {
 		m = NULL;
 		ip6 = NULL;
@@ -742,41 +770,61 @@ tcp6_ctlinput(cmd, sa, d)
 	sa6 = *(struct sockaddr_in6 *)sa;
 	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr) && m && m->m_pkthdr.rcvif)
 		sa6.sin6_addr.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
+
 	if (ip6) {
 		/*
-		 * XXX: We assume that when IPV6 is non NULL,
+		 * XXX: We assume that when ip6 is non NULL,
 		 * M and OFF are valid.
 		 */
-		struct ip6_hdr ip6_tmp;
+		struct in6_addr s;
 
 		/* translate addresses into internal form */
-		ip6_tmp = *ip6;
-		if (IN6_IS_ADDR_LINKLOCAL(&ip6_tmp.ip6_src))
-			ip6_tmp.ip6_src.s6_addr16[1] =
-				htons(m->m_pkthdr.rcvif->if_index);
-		if (IN6_IS_ADDR_LINKLOCAL(&ip6_tmp.ip6_dst))
-			ip6_tmp.ip6_dst.s6_addr16[1] =
-				htons(m->m_pkthdr.rcvif->if_index);
+		bcopy(&ip6->ip6_src, &s, sizeof(s));
+		if (IN6_IS_ADDR_LINKLOCAL(&s))
+			s.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 
 		/* check if we can safely examine src and dst ports */
-		if (m->m_pkthdr.len < off + sizeof(th))
+		if (m->m_pkthdr.len < off + sizeof(*thp))
 			return;
 
-		if (m->m_len < off + sizeof(th)) {
+		bzero(&th, sizeof(th));
+#ifdef DIAGNOSTIC
+		if (sizeof(*thp) > sizeof(th))
+			panic("assumption failed in tcp6_ctlinput");
+#endif
+		m_copydata(m, off, sizeof(*thp), (caddr_t)&th);
+
+		if (cmd == PRC_MSGSIZE) {
 			/*
-			 * this should be rare case,
-			 * so we compromise on this copy...
+			 * Check to see if we have a valid TCP connection
+			 * corresponding to the address in the ICMPv6 message
+			 * payload.
 			 */
-			m_copydata(m, off, sizeof(th), (caddr_t)&th);
-			thp = &th;
-		} else
-			thp = (struct tcphdr *)(mtod(m, caddr_t) + off);
-		(void)in6_pcbnotify(&tcbtable, (struct sockaddr *)&sa6,
-				    thp->th_dport, &ip6_tmp.ip6_src,
-				    thp->th_sport, cmd, notify);
+			if (in6_pcbhashlookup(&tcbtable, &finaldst,
+			    th.th_dport, &s, th.th_sport))
+				;
+			else if (in_pcblookup(&tcbtable, &finaldst, th.th_dport,
+			    &s, th.th_sport, INPLOOKUP_IPV6))
+				;
+			else
+				return;
+
+			/*
+			 * Now that we've validated that we are actually
+			 * communicating with the host indicated in the ICMPv6
+			 * message, recalculate the new MTU, and create the
+			 * corresponding routing entry.
+			 */
+			icmp6_mtudisc_update((struct ip6ctlparam *)d);
+
+			return;
+		}
+
+		(void) in6_pcbnotify(&tcbtable, (struct sockaddr *)&sa6,
+		    th.th_dport, &s, th.th_sport, cmd, notify);
 	} else {
-		(void)in6_pcbnotify(&tcbtable, (struct sockaddr *)&sa6, 0,
-				    &zeroin6_addr, 0, cmd, notify);
+		(void) in6_pcbnotify(&tcbtable, (struct sockaddr *)&sa6, 0,
+		    &zeroin6_addr, 0, cmd, notify);
 	}
 }
 #endif
@@ -832,6 +880,68 @@ tcp_quench(inp, errno)
 	if (tp)
 		tp->snd_cwnd = tp->t_maxseg;
 }
+
+#if defined(INET6) && !defined(TCP6)
+/*
+ * Path MTU Discovery handlers.
+ */
+void
+tcp6_mtudisc_callback(faddr)
+	struct in6_addr *faddr;
+{
+	struct sockaddr_in6 sin6;
+
+	bzero(&sin6, sizeof(sin6));
+	sin6.sin6_family = AF_INET6;
+	sin6.sin6_len = sizeof(struct sockaddr_in6);
+	sin6.sin6_addr = *faddr;
+	(void) in6_pcbnotify(&tcbtable, (struct sockaddr *)&sin6, 0,
+	    &zeroin6_addr, 0, EMSGSIZE, tcp6_mtudisc);
+}
+
+void
+tcp6_mtudisc(inp, errno)
+	struct inpcb *inp;
+	int errno;
+{
+	struct tcpcb *tp = intotcpcb(inp);
+	struct rtentry *rt = inp->inp_route.ro_rt;
+
+	if (tp != 0) {
+		if (rt != 0) {
+			/*
+			 * If this was not a host route, remove and realloc.
+			 */
+			if ((rt->rt_flags & RTF_HOST) == 0) {
+				in_rtchange(inp, errno);
+				if ((rt = inp->inp_route.ro_rt) == 0)
+					return;
+			}
+
+#if 0
+			/*
+			 * Slow start out of the error condition.  We
+			 * use the MTU because we know it's smaller
+			 * than the previously transmitted segment.
+			 *
+			 * Note: This is more conservative than the
+			 * suggestion in draft-floyd-incr-init-win-03.
+			 */
+			if (rt->rt_rmx.rmx_mtu != 0)
+				tp->snd_cwnd =
+				    TCP_INITIAL_WINDOW(tcp_init_win,
+				    rt->rt_rmx.rmx_mtu);
+#endif
+		}
+
+		/*
+		 * Resend unacknowledged packets.
+		 */
+		tp->snd_nxt = tp->snd_una;
+		tcp_output(tp);
+	}
+}
+#endif /* INET6 && !TCP6 */
 
 #ifdef TCP_SIGNATURE
 int
