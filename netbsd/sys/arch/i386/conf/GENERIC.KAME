@@ -59,4 +59,4 @@ options 	RADIX_MPATH
 # Virtual Router Redundancy Protocol(VRRP)
 #pseudo-device  vrrp    2
 
-options 	PF			# PF packet filter
+pseudo-device 	pf			# PF packet filter
