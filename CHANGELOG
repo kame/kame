@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2038 2002/01/10 12:01:10 jinmei Exp $
+$KAME: CHANGELOG,v 1.2039 2002/01/10 13:08:06 jinmei Exp $
 
 <200201>
+2002-01-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_clearpktopts): avoided NULL
+	pointer reference.  The reference should have occurred in very
+	rare cases, but it is recommended to upgrade the kernel the
+	20011231 snap and later.
+
 2002-01-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_input.c (ip6_savecontrol): do not compare
 	the previous value of each option to decide if the option should
