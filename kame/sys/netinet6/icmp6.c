@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.203 2001/03/08 00:17:54 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.204 2001/03/20 02:44:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -772,6 +772,9 @@ icmp6_input(mp, offp, proto)
 			u_char *p;
 			int maxlen, maxhlen;
 
+			if ((icmp6_nodeinfo & 1) == 0)
+				break;
+
 			if (code != 0)
 				goto badcode;
 			maxlen = sizeof(*nip6) + sizeof(*nicmp6) + 4;
@@ -1484,6 +1487,18 @@ ni6_input(m, off)
 		default:
 			goto bad;
 		}
+		break;
+	}
+
+	/* refuse based on configuration.  XXX ICMP6_NI_REFUSED? */
+	switch (qtype) {
+	case NI_QTYPE_FQDN:
+		if ((icmp6_nodeinfo & 1) == 0)
+			goto bad;
+		break;
+	case NI_QTYPE_NODEADDR:
+		if ((icmp6_nodeinfo & 2) == 0)
+			goto bad;
 		break;
 	}
 

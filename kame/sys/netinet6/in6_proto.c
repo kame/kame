@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.87 2001/03/01 09:10:23 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.88 2001/03/20 02:44:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -567,7 +567,7 @@ u_long	rip6_recvspace = RIPV6RCVQ;
 int	icmp6_rediraccept = 1;		/* accept and process redirects */
 int	icmp6_redirtimeout = 10 * 60;	/* 10 minutes */
 int	icmp6errppslim = 100;		/* 100pps */
-int	icmp6_nodeinfo = 1;		/* enable/disable NI response */
+int	icmp6_nodeinfo = 3;		/* enable/disable NI response */
 
 #ifdef TCP6
 /* TCP on IP6 parameters */
