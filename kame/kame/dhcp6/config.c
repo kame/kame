@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.33 2003/08/01 01:20:05 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.34 2003/08/06 19:53:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -152,6 +152,12 @@ configure_interface(iflist)
 
 	for (ifp = iflist; ifp; ifp = ifp->next) {
 		struct cf_list *cfl;
+
+		if (if_nametoindex(ifp->name) == 0) {
+			dprintf(LOG_ERR, FNAME, "invalid interface(%s): %s",
+			    ifp->name, strerror(errno));
+			goto bad;
+		}
 
 		if ((ifc = malloc(sizeof(*ifc))) == NULL) {
 			dprintf(LOG_ERR, FNAME,
