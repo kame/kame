@@ -1,4 +1,4 @@
-/*	$KAME: mpsend.c,v 1.4 2000/12/05 09:08:54 itojun Exp $	*/
+/*	$KAME: mpsend.c,v 1.5 2001/03/12 04:57:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -85,14 +85,14 @@ main(argc, argv)
 			break;
 		default:
 			usage();
-			exit(-1);
+			exit(1);
 		}
 	argc -= optind;
 	argv += optind;
 
 	if (maddr == NULL) {
 		fprintf(stderr, "need to specify destination address\n");
-		exit(-1);
+		exit(1);
 	}
 	if (size < sizeof(struct mping))
 		size = sizeof(struct mping);
@@ -112,7 +112,7 @@ main(argc, argv)
 
 	if (interval < 1.0 && getuid() != 0) {
 		fprintf(stderr, "Only superuser can specify interval smaller than 1 second\n");
-		exit(-1);
+		exit(1);
 	}
 
 	memset(&hints, 0, sizeof(hints));
@@ -147,7 +147,7 @@ main(argc, argv)
 
 		if (ifname == NULL) {
 			fprintf(stderr, "need to specify ifname for multicast\n");
-			exit(-1);
+			exit(1);
 		}
 		ifindex = if_nametoindex(ifname);
 		if (verbose)

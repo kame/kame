@@ -1,4 +1,4 @@
-/*	$KAME: mprecv.c,v 1.4 2000/12/05 09:08:54 itojun Exp $	*/
+/*	$KAME: mprecv.c,v 1.5 2001/03/12 04:57:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -150,7 +150,7 @@ main(argc, argv)
 
 	if (daemonize && getuid() != 0) {
 		fprintf(stderr, "Only superuser can specify daemon mode\n");
-		exit(-1);
+		exit(1);
 	}
 
 	memset(&hints, 0, sizeof(hints));
@@ -192,7 +192,7 @@ main(argc, argv)
 
 		if (ifname == NULL) {
 			fprintf(stderr, "ifname is required for multicast\n");
-			exit(-1);
+			exit(1);
 		}
 
 		if ((mreq6.ipv6mr_interface = if_nametoindex(ifname)) == 0)
