@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.43 2001/11/09 02:34:37 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.44 2001/11/15 09:27:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -767,9 +767,10 @@ sig_child(int sig)
 	int status;
 	pid_t pid;
 
-	pid = wait3(&status, WNOHANG, (struct rusage *)0);
-	if (pid && WEXITSTATUS(status))
-		syslog(LOG_WARNING, "child %d exit status 0x%x", pid, status);
+	while ((pid = wait3(&status, WNOHANG, (struct rusage *)0)) > 0)
+		if (WEXITSTATUS(status))
+			syslog(LOG_WARNING, "child %d exit status 0x%x",
+			    pid, status);
 }
 
 void
