@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.25 2000/07/06 12:00:45 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.26 2000/07/18 14:44:33 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -295,6 +295,7 @@ struct policyindex;
 extern struct ph1handle *getph1byindex __P((isakmp_index *));
 extern struct ph1handle *getph1byindex0 __P((isakmp_index *));
 extern struct ph1handle *getph1byaddr __P((struct sockaddr *));
+extern void purgeph1 __P((struct ph1handle *));
 extern vchar_t *dumpph1 __P((void));
 extern struct ph1handle *newph1 __P((void));
 extern void delph1 __P((struct ph1handle *));

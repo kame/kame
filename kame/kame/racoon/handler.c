@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.29 2000/07/14 11:22:37 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.30 2000/07/18 14:44:33 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -114,6 +114,31 @@ getph1byaddr(remote)
 	}
 
 	return NULL;
+}
+
+void
+purgeph1(iph1)
+	struct ph1handle *iph1;
+{
+	struct ph1handle *p;
+
+	LIST_FOREACH(p, &ph1tree, chain) {
+		if (cmpsaddrwop(iph1->remote, p->remote))
+			continue;
+		/* don't delete current phase 1 SA */
+		if (memcmp(&p->index, &iph1->index, sizeof(isakmp_index)) == 0)
+			continue;	/* don't delete current phase 1 SA */
+
+		YIPSDEBUG(DEBUG_SA,
+			plog(logp, LOCATION, NULL,
+				"proto_id ISAKMP purging spi:%s.\n",
+				isakmp_pindex(&iph1->index, 0)));
+
+		if (iph1->sce)
+			SCHED_KILL(iph1->sce);
+		iph1->status = PHASE1ST_EXPIRED;
+		iph1->sce = sched_new(1, isakmp_ph1delete, iph1);
+	}
 }
 
 /*

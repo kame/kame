@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.43 2000/07/18 06:03:16 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.44 2000/07/18 14:44:33 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -89,7 +89,7 @@ static int isakmp_info_recv_n __P((struct ph1handle *, vchar_t *));
 static int isakmp_info_recv_d __P((struct ph1handle *, vchar_t *));
 
 static void purge_ipsec_spi __P((struct sockaddr *, int, u_int32_t *, size_t));
-static void info_recv_initialcontact __P((struct sockaddr *));
+static void info_recv_initialcontact __P((struct ph1handle *));
 
 /* %%%
  * Information Exchange
@@ -746,7 +746,7 @@ isakmp_info_recv_n(iph1, msg)
 		/* do something */
 		break;
 	case ISAKMP_NTYPE_INITIAL_CONTACT:
-		info_recv_initialcontact(iph1->remote);
+		info_recv_initialcontact(iph1);
 		break;
 	default:
 	    {
@@ -806,7 +806,7 @@ purge_isakmp_spi(proto, spi, n)
 
 	for (i = 0; i < n; i++) {
 		iph1 = getph1byindex(&spi[i]);
-		if (!iph1 || iph1->status == PHASE1ST_EXPIRED)
+		if (!iph1)
 			continue;
 
 		YIPSDEBUG(DEBUG_SA,
@@ -929,8 +929,8 @@ purge_ipsec_spi(dst0, proto, spi, n)
  * delete all IKE/IPSEC-SA relatived to remote address.
  */
 static void
-info_recv_initialcontact(remote)
-	struct sockaddr *remote;
+info_recv_initialcontact(iph1)
+	struct ph1handle *iph1;
 {
 	vchar_t *buf = NULL;
 	struct sadb_msg *msg, *next, *end;
@@ -938,7 +938,6 @@ info_recv_initialcontact(remote)
 	struct sockaddr *src, *dst;
 	caddr_t mhp[SADB_EXT_MAX + 1];
 	int proto_id;
-	struct ph1handle *iph1;
 	struct ph2handle *iph2;
 
 	/* purge IPsec-SA(s) */
@@ -987,7 +986,8 @@ info_recv_initialcontact(remote)
 		 * If the remote address matchs with src or dst of SA,
 		 * then delete the SA.
 		 */
-		if (cmpsaddrwop(remote, src) && cmpsaddrwop(remote, dst)) {
+		if (cmpsaddrwop(iph1->remote, src)
+		 && cmpsaddrwop(iph1->remote, dst)) {
 			msg = next;
 			continue;
 		}
@@ -1018,22 +1018,7 @@ info_recv_initialcontact(remote)
 	if (buf)
 		vfree(buf);
 
-	/* purge ISAKMP-SA(s) */
-	while ((iph1 = getph1byaddr(remote)) != NULL) {
-		if (!cmpsaddrwop(remote, iph1->remote))
-			continue;	/* XXX to be used campsaddr() */
-		if (iph1->status == PHASE1ST_EXPIRED)
-			continue;
-		YIPSDEBUG(DEBUG_SA,
-			plog(logp, LOCATION, NULL,
-				"proto_id ISAKMP purging spi:%s.\n",
-				isakmp_pindex(&iph1->index, 0)));
-
-		if (iph1->sce)
-			SCHED_KILL(iph1->sce);
-		iph1->status = PHASE1ST_EXPIRED;
-		iph1->sce = sched_new(1, isakmp_ph1delete, iph1);
-	}
+	purgeph1(iph1);
 }
 
 /*
