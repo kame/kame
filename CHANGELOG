@@ -1,9 +1,9 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2340 2003/02/07 12:23:16 jinmei Exp $
+$KAME: CHANGELOG,v 1.2341 2003/02/07 12:24:02 jinmei Exp $
 
 <200302>
 2003-02-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* kame/kame/dhcp6/dhcp6c: obsoleted 'prefix-delegation' as an
+	* kame/kame/dhcp6/dhcp6c: obsoleted 'prefix-delegation' as a
 	DHCPv6 option name.
 
 2003-02-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
