@@ -294,8 +294,13 @@ tcp_respond(tp, iph, th, m, ack, seq, flags, isipv6)
 	struct tcpiphdr *ti = iph;
 	struct tcphdr *nth;
 #ifdef INET6
+#ifdef NEW_STRUCT_ROUTE
+	struct route *ro6 = 0;
+	struct route sro6;
+#else
 	struct route_in6 *ro6 = 0;
 	struct route_in6 sro6;
+#endif
 	struct ip6_hdr *ip6 = iph;
 	struct tcpip6hdr *ti6 = iph;
 #endif /* INET6 */
@@ -1130,7 +1135,11 @@ struct rtentry *
 tcp_rtlookup6(inp)
 	struct inpcb *inp;
 {
+#ifdef NEW_STRUCT_ROUTE
+	struct route *ro6;
+#else
 	struct route_in6 *ro6;
+#endif
 	struct rtentry *rt;
 
 	ro6 = &inp->in6p_route;

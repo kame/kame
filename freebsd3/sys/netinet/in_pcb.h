@@ -137,7 +137,11 @@ struct inpcb {
 	union {
 		/* placeholder for routing entry */
 		struct route inp4_route;
+#ifdef NEW_STRUCT_ROUTE
+		struct route inp6_route;
+#else
 		struct route_in6 inp6_route;
+#endif
 	} inp_dependroute;
 	struct {
 		/* type of service proto */

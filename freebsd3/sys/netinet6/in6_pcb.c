@@ -348,7 +348,11 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	struct sockaddr_in6 *dstsock;
 	struct ip6_pktopts *opts;
 	struct ip6_moptions *mopts;
+#ifdef NEW_STRUCT_ROUTE
+	struct route *ro;
+#else
 	struct route_in6 *ro;
+#endif
 	struct in6_addr *laddr;
 	int *errorp;
 {
