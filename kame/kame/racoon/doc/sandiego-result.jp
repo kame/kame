@@ -72,6 +72,10 @@ vs radguard
 		phase 1: pre-shared/3des/sha1/dh2
 		phase 2: esp tun(自分自身)/3des/sha1/dh2
 
+	base mode やろうよって言ったら持って来てないから、
+	うちのテストサイト www.ip-sec.com でテストしてみてって言われる。
+	見たけど base mode のかけらもないぞ。
+
 vs network associates
 	base mode:
 		initiator/responder: psk
