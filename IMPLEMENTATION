@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.190 2001/02/16 03:09:32 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.191 2001/02/19 09:58:32 itojun Exp $
 
 1. IPv6
 
@@ -1794,7 +1794,7 @@ See kame/mip6config/{QUICKSTART,README_MIP6.txt} for more details.
 The Ericsson code implements revision 09 of the mobile-ip6 draft.  There
 are other implementations available:
 	NEC: http://www.6bone.nec.co.jp/mipv6/internal-dist/ (-13 draft)
-	SFC: no URL yet (-13 draft)
+	SFC: http://neo.sfc.wide.ad.jp/~mip6/ (-13 draft)
 
 7. Coding style
 
