@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.64 2002/07/31 04:40:44 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.65 2002/08/09 11:28:12 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -229,6 +229,16 @@ natpt_in4(struct mbuf *m4, struct mbuf **m6)
 	if (isFragment(&cv4)) {
 		struct cSlot	*acs;
 		struct fragment	*frg;
+
+		/*
+		 * Drop fragmented ICMPv4 packet.
+		 * We can not re-calculate ICMP checksum because
+		 * *translator does not re-assemble this fragmented
+		 * *packet so we can not get an ICMP length
+		 * information.
+		 */
+		if (cv4.ip_p == IPPROTO_ICMP)
+			return (IPPROTO_MAX);
 
 		/* fragmented packet */
 		if (isFirstFragment(&cv4)) {
