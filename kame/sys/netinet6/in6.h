@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.45 2000/06/08 20:40:23 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.46 2000/06/14 17:31:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -650,6 +650,7 @@ struct in6_pktinfo {
 #define	M_DECRYPTED	M_PROTO3
 #define	M_LOOP		M_PROTO4
 #define	M_AUTHIPDGM	M_PROTO5
+#define M_MIP6TUNNEL	M_PROTO6
 #endif
 
 #ifdef _KERNEL
