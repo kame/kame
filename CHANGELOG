@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.840 2000/04/29 07:36:40 jinmei Exp $
+$Id: CHANGELOG,v 1.841 2000/04/29 07:39:22 jinmei Exp $
 
 <200004>
 2000-04-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -117,7 +117,7 @@ Tue Apr 25 03:54:32 JST 2000 sakane@kame.net
 	XXX AS before, racoon can NOT negotiate the socket based SA.
 
 2000-04-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* bsdi4/sys/net/if.c (ifa_ifwithnet): reverted a changed on
+	* bsdi4/sys/net/if.c (ifa_ifwithnet): reverted a change on
 	2000-02-25, since the logic is not related with our latest code.
 
 Mon Apr 24 22:13:09 JST 2000  itojun@iijlab.net
