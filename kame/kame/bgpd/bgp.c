@@ -1243,12 +1243,13 @@ bgp_process_update(struct rpcb *bnp)
 
 	if (!IN6_IS_ADDR_ROUTABLE(&rte->rt_ripinfo.rip6_dest)) {
 	  syslog(LOG_NOTICE,
-		 "<%s>: Invalid prefix in NLRI (ignored)", __FUNCTION__);
+		 "<%s>: Invalid prefix(%s/%d) in NLRI (ignored) from %s",
+		 __FUNCTION__,
+		 ip6str(&rte->rt_ripinfo.rip6_dest, 0),
+		 rte->rt_ripinfo.rip6_plen, bgp_peerstr(bnp));
 	  free(rte);
 	  continue;  /* to next rte */
 	}
-
-
 	
 	if (rte->rt_ripinfo.rip6_plen == 128) {
 	  ife = ifentry;
