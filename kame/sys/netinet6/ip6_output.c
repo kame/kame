@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.368 2003/06/03 11:17:20 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.369 2003/06/06 05:57:11 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -911,9 +911,9 @@ skip_ipsec2:;
 				 goto bad;
 			 }
 			 ip6->ip6_dst = sa.sin6_addr;
-			 bcopy((caddr_t)(addr + 1), (caddr_t)addr,
+			 bcopy(&addr[1], &addr[0],
 			     sizeof(struct in6_addr) * (rh0->ip6r0_segleft - 1));
-			 *(addr + rh0->ip6r0_segleft - 1) = finaldst;
+			 addr[rh0->ip6r0_segleft - 1] = finaldst;
 			 /* XXX */
 			 in6_clearscope(addr + rh0->ip6r0_segleft - 1);
 
