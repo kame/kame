@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.46 2001/01/22 09:59:19 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.47 2001/01/23 15:44:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -442,6 +442,9 @@ struct	in6_rrenumreq {
 #define IN6_IFF_DEPRECATED	0x10	/* deprecated address */
 #define IN6_IFF_NODAD		0x20	/* don't perform DAD on this address
 					 * (used only at first SIOC* call)
+					 */
+#define IN6_IFF_NOPFX		0x40	/* skip kerne prefix management.
+					 * XXX: this should be temporary.
 					 */
 
 /* do not input/output */

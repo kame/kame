@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.150 2001/01/23 15:41:49 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.151 2001/01/23 15:44:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1028,7 +1028,8 @@ in6_update_ifa(ifp, ifra, ia)
 		goto unlink;
 
 	/* update prefix list */
-	if (hostIsNew) {
+	if (hostIsNew &&
+	    (ifra->ifra_flags & IN6_IFF_NOPFX) == 0) { /* XXX */
 		int iilen;
 
 		iilen = (sizeof(ia->ia_prefixmask.sin6_addr) << 3) - plen;

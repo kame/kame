@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.68 2001/01/23 15:32:41 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.69 2001/01/23 15:44:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -81,7 +81,8 @@ static struct nd_defrouter *defrtrlist_update __P((struct nd_defrouter *));
 static int prelist_add __P((struct nd_prefix *, struct nd_defrouter *));
 /* static struct nd_prefix *prefix_lookup __P((struct nd_prefix *)); XXXYYY */
 static struct in6_ifaddr *in6_ifadd __P((struct ifnet *, struct in6_addr *,
-			  struct in6_addr *, int));
+					 struct in6_addr *, int, int,
+					 u_int32_t, u_int32_t));
 /*static struct nd_pfxrouter *pfxrtr_lookup __P((struct nd_prefix *,
   struct nd_defrouter *)); XXXYYYY */
 static void pfxrtr_add __P((struct nd_prefix *, struct nd_defrouter *));
@@ -1052,8 +1053,11 @@ prelist_update(new, dr, m)
 			 * Add an address based on RFC 2462 5.5.3 (d).
 			 */
 			ia6 = in6_ifadd(pr->ndpr_ifp,
-				&pr->ndpr_prefix.sin6_addr, &pr->ndpr_addr,
-				new->ndpr_plen);
+					&pr->ndpr_prefix.sin6_addr,
+					&pr->ndpr_addr, new->ndpr_plen,
+					new->ndpr_raf_onlink,
+					new->ndpr_vltime,
+					new->ndpr_pltime);
 			if (!ia6) {
 				error = EADDRNOTAVAIL;
 				log(LOG_ERR, "prelist_update: failed to add a "
@@ -1175,7 +1179,9 @@ prelist_update(new, dr, m)
 			goto noautoconf2;
 
 		ia6 = in6_ifadd(new->ndpr_ifp, &new->ndpr_prefix.sin6_addr,
-			  &new->ndpr_addr, new->ndpr_plen);
+				&new->ndpr_addr, new->ndpr_plen,
+				new->ndpr_raf_onlink,
+				new->ndpr_vltime, new->ndpr_pltime);
 		if (!ia6) {
 			error = EADDRNOTAVAIL;
 			log(LOG_ERR, "prelist_update: "
@@ -1415,15 +1421,18 @@ nd6_attach_prefix(pr)
 }
 
 static struct in6_ifaddr *
-in6_ifadd(ifp, in6, addr, prefixlen)
+in6_ifadd(ifp, in6, addr, prefixlen, onlink, vltime, pltime)
 	struct ifnet *ifp;
 	struct in6_addr *in6;
 	struct in6_addr *addr;
 	int prefixlen;	/* prefix len of the new prefix in "in6" */
+	int onlink;
+	u_int32_t vltime, pltime;
 {
 	struct ifaddr *ifa;
-	struct in6_ifaddr *ia, *ib, *oia;
-	int s, error, plen0;
+	struct in6_aliasreq ifra;
+	struct in6_ifaddr *ia, *ib;
+	int error, plen0;
 	struct in6_addr mask;
 
 	in6_len2mask(&mask, prefixlen);
@@ -1472,149 +1481,76 @@ in6_ifadd(ifp, in6, addr, prefixlen)
 	}
 
 	/* make ifaddr */
-	ia = (struct in6_ifaddr *)malloc(sizeof(*ia), M_IFADDR, M_DONTWAIT);
-	if (ia == NULL) {
-		printf("ENOBUFS in in6_ifadd %d\n", __LINE__);
-		return NULL;
-	}
 
-	bzero((caddr_t)ia, sizeof(*ia));
-	ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
-	if (ifp->if_flags & IFF_POINTOPOINT)
-		ia->ia_ifa.ifa_dstaddr = (struct sockaddr *)&ia->ia_dstaddr;
-	else
-		ia->ia_ifa.ifa_dstaddr = NULL;
-	ia->ia_ifa.ifa_netmask = (struct sockaddr *)&ia->ia_prefixmask;
-	ia->ia_ifp = ifp;
-
-	/* link to in6_ifaddr */
-	if ((oia = in6_ifaddr) != NULL) {
-		for( ; oia->ia_next; oia = oia->ia_next)
-			continue;
-		oia->ia_next = ia;
-	} else {
-		/*
-		 * This should be impossible, since we have at least one
-		 * link-local address (see the beginning of this function).
-		 * XXX: should we rather panic here?
-		 */
-		printf("in6_ifadd: in6_ifaddr is NULL (impossible!)\n");
-		in6_ifaddr = ia;
-	}
-	/* gain a refcnt for the link from in6_ifaddr */
-#ifdef __NetBSD__
-	IFAREF(&ia->ia_ifa);
-#endif
-
-	/* link to if_addrlist */
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	if ((ifa = ifp->if_addrlist) != NULL) {
-		for ( ; ifa->ifa_next; ifa = ifa->ifa_next)
-			continue;
-		ifa->ifa_next = (struct ifaddr *)ia;
-	} else {
-		/* This should be impossible (see the above comment). */
-		printf("in6_ifadd: if_addrlist on %s is NULL (impossible!)\n",
-		       if_name(ifp));
-		ifp->if_addrlist = (struct ifaddr *)ia;
-	}
-#else
-	TAILQ_INSERT_TAIL(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
-#endif
-
-	/* gain another refcnt for the link from if_addrlist */
-#ifdef __NetBSD__
-	IFAREF(&ia->ia_ifa);
-#endif
-
-	/* new address */
-	ia->ia_addr.sin6_len = sizeof(struct sockaddr_in6);
-	ia->ia_addr.sin6_family = AF_INET6;
+	bzero(&ifra, sizeof(ifra));
+	/*
+	 * in6_update_ifa() does not use ifra_name, but we accurately set it
+	 * for safety.
+	 */
+	strncpy(ifra.ifra_name, if_name(ifp), sizeof(ifra.ifra_name));
+	ifra.ifra_addr.sin6_family = AF_INET6;
+	ifra.ifra_addr.sin6_len = sizeof(struct sockaddr_in6);
 	/* prefix */
-	bcopy(in6, &ia->ia_addr.sin6_addr, sizeof(ia->ia_addr.sin6_addr));
-	ia->ia_addr.sin6_addr.s6_addr32[0] &= mask.s6_addr32[0];
-	ia->ia_addr.sin6_addr.s6_addr32[1] &= mask.s6_addr32[1];
-	ia->ia_addr.sin6_addr.s6_addr32[2] &= mask.s6_addr32[2];
-	ia->ia_addr.sin6_addr.s6_addr32[3] &= mask.s6_addr32[3];
+	bcopy(in6, &ifra.ifra_addr.sin6_addr,
+	      sizeof(ifra.ifra_addr.sin6_addr));
+	ifra.ifra_addr.sin6_addr.s6_addr32[0] &= mask.s6_addr32[0];
+	ifra.ifra_addr.sin6_addr.s6_addr32[1] &= mask.s6_addr32[1];
+	ifra.ifra_addr.sin6_addr.s6_addr32[2] &= mask.s6_addr32[2];
+	ifra.ifra_addr.sin6_addr.s6_addr32[3] &= mask.s6_addr32[3];
 	/* interface ID */
-	ia->ia_addr.sin6_addr.s6_addr32[0]
+	ifra.ifra_addr.sin6_addr.s6_addr32[0]
 		|= (ib->ia_addr.sin6_addr.s6_addr32[0] & ~mask.s6_addr32[0]);
-	ia->ia_addr.sin6_addr.s6_addr32[1]
+	ifra.ifra_addr.sin6_addr.s6_addr32[1]
 		|= (ib->ia_addr.sin6_addr.s6_addr32[1] & ~mask.s6_addr32[1]);
-	ia->ia_addr.sin6_addr.s6_addr32[2]
+	ifra.ifra_addr.sin6_addr.s6_addr32[2]
 		|= (ib->ia_addr.sin6_addr.s6_addr32[2] & ~mask.s6_addr32[2]);
-	ia->ia_addr.sin6_addr.s6_addr32[3]
+	ifra.ifra_addr.sin6_addr.s6_addr32[3]
 		|= (ib->ia_addr.sin6_addr.s6_addr32[3] & ~mask.s6_addr32[3]);
 
-	/* new prefix */
-	ia->ia_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
-	ia->ia_prefixmask.sin6_family = AF_INET6;
-	bcopy(&mask, &ia->ia_prefixmask.sin6_addr,
-		sizeof(ia->ia_prefixmask.sin6_addr));
-
-#ifdef MEASURE_PERFORMANCE
-	{
-		int s = splnet();
-
-		in6h_addifa(ia);
-
-		splx(s);
-	}
-#endif
-
-	/* same routine */
-	ia->ia_ifa.ifa_rtrequest =
-		(ifp->if_type == IFT_PPP) ? nd6_p2p_rtrequest : nd6_rtrequest;
-	ia->ia_ifa.ifa_flags |= RTF_CLONING;
-	ia->ia_ifa.ifa_metric = ifp->if_metric;
-
-	/* add interface route */
-	if ((error = rtinit(&(ia->ia_ifa), (int)RTM_ADD, RTF_UP|RTF_CLONING))) {
-		log(LOG_NOTICE, "in6_ifadd: failed to add an interface route "
-		    "for %s/%d on %s, errno = %d\n",
-		    ip6_sprintf(&ia->ia_addr.sin6_addr), prefixlen,
-		    if_name(ifp), error);
+	/*
+	 * new prefix mask. if the onlink flag is not set, we use the "all-1"
+	 * mask to skip creating an interface route. 
+	 */
+	ifra.ifra_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
+	ifra.ifra_prefixmask.sin6_family = AF_INET6;
+	if (onlink != 0) {
+		bcopy(&mask, &ifra.ifra_prefixmask.sin6_addr,
+		      sizeof(ifra.ifra_prefixmask.sin6_addr));
 	} else
-		ia->ia_flags |= IFA_ROUTE;
-
-	*addr = ia->ia_addr.sin6_addr;
-
-	if (ifp->if_flags & IFF_MULTICAST) {
-		int error;	/* not used */
-		struct in6_addr sol6;
-
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-		/* Restore saved multicast addresses(if any). */
-		in6_restoremkludge(ia, ifp);
-#endif
-
-		/* join solicited node multicast address */
-		bzero(&sol6, sizeof(sol6));
-		sol6.s6_addr16[0] = htons(0xff02);
-		sol6.s6_addr16[1] = htons(ifp->if_index);
-		sol6.s6_addr32[1] = 0;
-		sol6.s6_addr32[2] = htonl(1);
-		sol6.s6_addr32[3] = ia->ia_addr.sin6_addr.s6_addr32[3];
-		sol6.s6_addr8[12] = 0xff;
-		(void)in6_addmulti(&sol6, ifp, &error);
-	}
-
-	ia->ia6_flags |= IN6_IFF_TENTATIVE;
+		ifra.ifra_prefixmask.sin6_addr = in6mask128;
 
 	/*
-	 * To make the interface up. Only AF_INET6 in ia is used...
+	 * lifetime.
+	 * XXX: in6_init_address_ltimes would override these valueslater.
+	 * We should reconsider this logic. 
 	 */
-	s = splimp();
-	if (ifp->if_ioctl && (*ifp->if_ioctl)(ifp, SIOCSIFADDR, (caddr_t)ia)) {
-		splx(s);
-		return NULL;
+	ifra.ifra_lifetime.ia6t_vltime = vltime;
+	ifra.ifra_lifetime.ia6t_pltime = pltime;
+
+	/* XXX: scope zone ID? */
+
+	/*
+	 * temporarily set the nopfx flag to avoid conflict.
+	 * XXX: we should reconsider the entire mechanism about prefix
+	 * manipulation.
+	 */
+	ifra.ifra_flags |= IN6_IFF_NOPFX;
+
+	/* keep the new address, regardless of the result of in6_update_ifa */
+	*addr = ifra.ifra_addr.sin6_addr;
+
+	/* allocate ifaddr structure, link into chain, etc. */
+	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0) {
+		log(LOG_ERR,
+		    "in6_ifadd: failed to make ifaddr %s on %s (errno=%d)\n",
+		    ip6_sprintf(&ifra.ifra_addr.sin6_addr), if_name(ifp),
+		    error);
+		return(NULL);	/* ifaddr must not have been allocated. */
 	}
-	splx(s);
 
-	/* Perform DAD, if needed. */
-	nd6_dad_start((struct ifaddr *)ia, NULL);
+	ia = in6ifa_ifpwithaddr(ifp, &ifra.ifra_addr.sin6_addr);
 
-	return ia;
+	return(ia);		/* this must NOT be NULL. */
 }
 
 int
