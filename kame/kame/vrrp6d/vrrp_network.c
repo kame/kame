@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_network.c,v 1.6 2003/02/19 10:10:01 ono Exp $	*/
+/*	$KAME: vrrp_network.c,v 1.7 2003/02/24 11:15:46 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -301,7 +301,7 @@ vrrp_network_send_icmp_packet(char *p, int len, int ifindex)
     struct iovec iov[2];
     static struct sockaddr_in6 sin6_buf, *sin6 = 0;
     int sd;
-    u_int hlim = 255;
+    u_int hlim = 255, loop = 0;
     int ret;
 
     sd = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6);
@@ -310,6 +310,10 @@ vrrp_network_send_icmp_packet(char *p, int len, int ifindex)
 	return -1;
     }
 
+    if (setsockopt(sd, IPPROTO_IPV6, IPV6_MULTICAST_LOOP, &loop, sizeof(loop)) == -1) {
+	syslog(LOG_ERR, "setsockopt(IPV6_MULTICAST_LOOP)");
+	return -1;
+    }
     if (setsockopt(sd, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &hlim, sizeof(hlim)) == -1) {
 	syslog(LOG_ERR, "setsockopt(IPV6_MULTICAST_HOPS)");
 	return -1;
