@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.73 2001/07/09 09:13:35 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.74 2001/07/09 09:35:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -1639,6 +1639,8 @@ relay_icmp6(sd, buf, len, from)
 	struct addrinfo hints, *res;
 	char icmp6buf[RECVBUFSIZ];
 	u_int16_t qtype, qclass;
+	struct sockaddr_storage ss;
+	struct sockaddr *sa;
 
 	if (sizeof(*hp) > len)
 		return -1;
@@ -1710,23 +1712,24 @@ relay_icmp6(sd, buf, len, from)
 		hints.ai_protocol = IPPROTO_ICMPV6;
 		if (getaddrinfo("ff02::1", NULL, &hints, &res))
 			return -1;
-		if (res->ai_next || res->ai_family != AF_INET6) {
+		if (res->ai_next || res->ai_family != AF_INET6 ||
+		    res->ai_addrlen > sizeof(ss)) {
 			freeaddrinfo(res);
 			return -1;
 		}
+		memcpy(&ss, res->ai_addr, res->ai_addrlen);
+		freeaddrinfo(res);
 
 		/* multicast outgoing interface is already configured */
 		sent = 0;
-		if (sendto(sd->s, icmp6buf, len, 0, res->ai_addr,
-		    res->ai_addrlen) == len) {
+		sa = (struct sockaddr *)&ss;
+		if (sendto(sd->s, icmp6buf, len, 0, sa, sa->sa_len) == len) {
 #if 0
 			dprintf("sock %d sent\n", i);
 #endif
 			sent++;
 			gettimeofday(&ns->lasttx, NULL);
 		}
-
-		freeaddrinfo(res);
 
 		if (sent == 0) {
 			dprintf("no matching socket, not sent\n");
