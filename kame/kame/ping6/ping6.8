@@ -1,4 +1,4 @@
-.\"	$KAME: ping6.8,v 1.31 2000/11/11 00:40:56 itojun Exp $
+.\"	$KAME: ping6.8,v 1.32 2001/02/07 03:14:36 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -194,7 +194,7 @@ will ask the kernel to fragment packet to fit into minimum IPv6 MTU.
 will suppress the behavior.
 .It Fl n
 Numeric output only.
-No attempt will be made to lookup symbolic names for host addresses.
+No attempt will be made to lookup symbolic names from addresses in the reply.
 .It Fl N
 Probe node information multicast group
 .Pq Li ff02::2:xxxx:xxxx .
