@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.33 2000/05/24 05:18:34 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.34 2000/05/31 19:46:05 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -108,10 +108,6 @@ static struct cipher_algorithm cipher[] = {
 };
 
 static int oakley_compute_keymat_x __P((struct ph2handle *iph2, int side, int sa_dir));
-#ifdef HAVE_SIGNING_C
-static char *oakley_getidstr __P((struct ipsecdoi_id_b *id, int len));
-static char *getdirnamebyid __P((int identtype));
-#endif
 
 int
 oakley_get_defaultlifetime()
@@ -1114,7 +1110,6 @@ oakley_validate_auth(iph1)
 	case OAKLEY_ATTR_AUTH_METHOD_DSSSIG:
 	case OAKLEY_ATTR_AUTH_METHOD_RSASIG:
 	    {
-		char *idstr = NULL;
 		int error;
 
 		/* validate SIG & CERT */
@@ -1132,25 +1127,17 @@ oakley_validate_auth(iph1)
 			plog(logp, LOCATION, NULL, "SIGN passed:\n"));
 		YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->sig_p));
 
-		idstr = oakley_getidstr((struct ipsecdoi_id_b *)iph1->id_p->v, iph1->id_p->l);
-		if (idstr == NULL) {
-			plog(logp, LOCATION, NULL,
-				"failed to get idstr name\n");
-			return -1;
-		}
-
 		/* get peer's certificate if no there */
-		if (iph1->cert_p == NULL) {
+		if (iph1->cert_p == NULL && iph1->rmconf->peerscertfile != NULL) {
 			char path[MAXPATHLEN];
 			vchar_t *cert;
 
 			switch (iph1->rmconf->certtype) {
 			case ISAKMP_CERT_X509SIGN:
 				/* make public file name */
-				snprintf(path, sizeof(path), "%s/%s/%s/%s",
+				snprintf(path, sizeof(path), "%s/%s",
 					lcconf->pathinfo[LC_PATHTYPE_CERT],
-					getdirnamebyid(iph1->rmconf->identtype),
-					idstr, CERTFILE);
+					iph1->rmconf->peerscertfile);
 				YIPSDEBUG(DEBUG_CERT,
 					plog(logp, LOCATION, NULL,
 						"filename: %s\n", path));
@@ -1162,10 +1149,9 @@ oakley_validate_auth(iph1)
 				int len;
 
 				/* make public file name */
-				snprintf(path, sizeof(path), "%s/%s/%s/%s",
+				snprintf(path, sizeof(path), "%s/%s",
 					lcconf->pathinfo[LC_PATHTYPE_CERT],
-					getdirnamebyid(iph1->rmconf->identtype),
-					idstr, CERTFILE);
+					iph1->rmconf->peerscertfile);
 				YIPSDEBUG(DEBUG_CERT,
 					plog(logp, LOCATION, NULL,
 						"filename: %s\n", path));
@@ -1204,14 +1190,12 @@ oakley_validate_auth(iph1)
 				plog(logp, LOCATION, NULL,
 					"not supported certtype %d\n",
 					iph1->rmconf->certtype);
-				free(idstr);
 				return -1;
 			}
 
 			if (cert == NULL) {
 				plog(logp, LOCATION, NULL,
 					"failed to get peer's CERT.\n");
-				free(idstr);
 				return -1;
 			}
 
@@ -1219,7 +1203,6 @@ oakley_validate_auth(iph1)
 			if (iph1->cert_p == NULL) {
 				plog(logp, LOCATION, NULL,
 					"failed to get cert buffer\n");
-				free(idstr);
 				vfree(cert);
 				return -1;
 			}
@@ -1230,18 +1213,12 @@ oakley_validate_auth(iph1)
 				plog(logp, LOCATION, NULL,
 					"get peer's CERT from cache:\n"));
 			YIPSDEBUG(DEBUG_CERT, PVDUMP(iph1->cert_p));
-		} else {
-			/* check signer of certificate */
-			error = eay_check_x509cert(idstr,
-					iph1->cert_p->v[0],
-					iph1->cert_p->v + 1,
-					iph1->cert_p->l - 1);
-			if (error != 0) {
-				plog(logp, LOCATION, NULL, "CERT mismatch.\n");
-				return ISAKMP_NTYPE_INVALID_CERTIFICATE;
-			}
-			/* XXX should be cache ? */
 		}
+
+		/* to be checked signer of certificate */
+
+		/* don't cache the certificate passed. */
+
 		YIPSDEBUG(DEBUG_CERT,
 			plog(logp, LOCATION, NULL,
 				"Certificate Authenticated\n"));
@@ -1284,7 +1261,6 @@ oakley_validate_auth(iph1)
 		}
 
 		vfree(my_hash);
-		free(idstr);
 		if (error != 0) {
 			plog(logp, LOCATION, NULL, "SIG mismatch.\n");
 			return ISAKMP_NTYPE_INVALID_SIGNATURE;
@@ -1323,74 +1299,27 @@ oakley_getmycert(iph1)
 	struct ph1handle *iph1;
 {
 	char path[MAXPATHLEN];
-	char *idstr = NULL;
 	vchar_t *cert = NULL;
 	int error = -1;
 
-	idstr = oakley_getidstr((struct ipsecdoi_id_b *)iph1->id->v, iph1->id->l);
-	if (idstr == NULL) {
-		plog(logp, LOCATION, NULL, "failed to get idstr name\n");
-		return -1;
-	}
-	YIPSDEBUG(DEBUG_CERT, plog(logp, LOCATION, NULL, "get idstr:"));
-	YIPSDEBUG(DEBUG_CERT, hexdump(idstr, strlen(idstr)));
-
 	switch (iph1->rmconf->certtype) {
 	case ISAKMP_CERT_X509SIGN:
+		if (iph1->rmconf->mycertfile == NULL) {
+			plog(logp, LOCATION, NULL, "no cert defined.\n");
+			goto end;
+		}
+
 		/* make public file name */
-		snprintf(path, sizeof(path), "%s/%s/%s/%s",
+		snprintf(path, sizeof(path), "%s/%s",
 			lcconf->pathinfo[LC_PATHTYPE_CERT],
-			getdirnamebyid(iph1->rmconf->identtype),
-			idstr, CERTFILE);
+			iph1->rmconf->mycertfile);
 		YIPSDEBUG(DEBUG_CERT,
-			plog(logp, LOCATION, NULL, "filename: %s\n", path));
+			plog(logp, LOCATION, NULL, "cert file: %s\n", path));
 		cert = eay_get_x509cert(path);
-		break;
-	case ISAKMP_CERT_PKCS7:
-	{
-		FILE *fp;
-		int len;
-
-		/* make public file name */
-		snprintf(path, sizeof(path), "%s/%s/%s/%s",
-			lcconf->pathinfo[LC_PATHTYPE_CERT],
-			getdirnamebyid(iph1->rmconf->identtype),
-			idstr, CERTFILE);
-		YIPSDEBUG(DEBUG_CERT,
-			plog(logp, LOCATION, NULL, "filename: %s\n", path));
-
-		len = getfsize(path);
-		if (len == -1) {
-			plog(logp, LOCATION, NULL,
-				"failed to get file size: %s\n", path);
-			goto end;
-		}
-		cert = vmalloc(len);
-		if (cert == NULL) {
-			plog(logp, LOCATION, NULL,
-				"failed to get cert buffer\n");
-			goto end;
-		}
-		fp = fopen(path, "r");
-		if (fp == NULL) {
-			plog(logp, LOCATION, NULL,
-				"%s fopen (%s)\n",
-				path, strerror(errno));
-		}
-		len = fread(cert->v, 1, cert->l, fp);
-		fclose(fp);
-		if (len != cert->l) {
-			plog(logp, LOCATION, NULL,
-				"failed to read file: %s\n", path);
-			goto end;
-		}
-		/* XXX should be checked whether PKCS7 or not. */
-		/* So they should be into crypto_openssl.c */
-	}
 		break;
 	default:
 		plog(logp, LOCATION, NULL,
-			"no supported certtype %d\n",
+			"not supported certtype %d\n",
 			iph1->rmconf->certtype);
 		goto end;
 	}
@@ -1417,8 +1346,6 @@ oakley_getmycert(iph1)
 end:
 	if (cert != NULL)
 		vfree(cert);
-	if (idstr != NULL)
-		free(idstr);
 
 	return error;
 }
@@ -1429,25 +1356,20 @@ oakley_getsign(iph1)
 	struct ph1handle *iph1;
 {
 	char path[MAXPATHLEN];
-	char *idstr = NULL;
 	vchar_t *privkey = NULL;
 	int error = -1;
 
-	idstr = oakley_getidstr((struct ipsecdoi_id_b *)iph1->id->v, iph1->id->l);
-	if (idstr == NULL) {
-		plog(logp, LOCATION, NULL, "failed to get idstr name\n");
-		return -1;
-	}
-	YIPSDEBUG(DEBUG_CERT, plog(logp, LOCATION, NULL, "get idstr:"));
-	YIPSDEBUG(DEBUG_CERT, hexdump(idstr, strlen(idstr)));
-
 	switch (iph1->rmconf->certtype) {
 	case ISAKMP_CERT_X509SIGN:
+		if (iph1->rmconf->myprivfile == NULL) {
+			plog(logp, LOCATION, NULL, "no cert defined.\n");
+			goto end;
+		}
+
 		/* make private file name */
-		snprintf(path, sizeof(path), "%s/%s/%s/%s",
+		snprintf(path, sizeof(path), "%s/%s",
 			lcconf->pathinfo[LC_PATHTYPE_CERT],
-			getdirnamebyid(iph1->rmconf->identtype),
-			idstr, PRIVKEYFILE);
+			iph1->rmconf->myprivfile);
 		YIPSDEBUG(DEBUG_CERT,
 			plog(logp, LOCATION, NULL, "filename: %s\n", path));
 		privkey = eay_get_pkcs1privkey(path);
@@ -1479,68 +1401,8 @@ oakley_getsign(iph1)
 end:
 	if (privkey != NULL)
 		vfree(privkey);
-	if (idstr != NULL)
-		free(idstr);
 
 	return error;
-}
-
-/* get idstr name from ID payload */
-static char *
-oakley_getidstr(id, len)
-	struct ipsecdoi_id_b *id;
-	int len;
-{
-	char *idstr, *idsrc;
-	int idstrlen;
-
-	if (len < sizeof(struct ipsecdoi_id_b)) {
-		plog(logp, LOCATION, NULL, "Invalid ID payload length\n");
-		return NULL;
-	}
-
-	switch (id->type) {
-	case IPSECDOI_ID_IPV4_ADDR:
-	case IPSECDOI_ID_IPV6_ADDR:
-	{
-		struct sockaddr_storage sa;
-		char addr[NI_MAXHOST];
-
-		memcpy(&sa, id, len);
-		sa.ss_family = id->type == IPSECDOI_ID_IPV4_ADDR
-				? AF_INET : AF_INET6;
-		sa.ss_len = id->type == IPSECDOI_ID_IPV4_ADDR
-				? 16 : 28;
-
-		if (getnameinfo((struct sockaddr *)&sa, sa.ss_len, addr, sizeof(addr), NULL, 0,
-                        NI_NUMERICHOST) != 0) {
-			plog(logp, LOCATION, NULL, "failed to getnameinfo\n");
-		}
-		idstrlen = strlen(addr);
-		idsrc = addr;
-	}
-		break;
-	case IPSECDOI_ID_FQDN:
-	case IPSECDOI_ID_USER_FQDN:
-		idstrlen = len - sizeof(*id);
-		idsrc = (char *)(id + 1);
-		break;
-	default:
-		plog(logp, LOCATION, NULL,
-			"not supported id type %d\n", id->type);
-		return NULL;
-	}
-
-	idstr = malloc(idstrlen + 1);
-	if (idstr == NULL) {
-		plog(logp, LOCATION, NULL,
-			"failed to get ID buffer\n");
-		return NULL;
-	}
-	memcpy(idstr, idsrc, idstrlen);
-	idstr[idstrlen] = '\0';
-
-	return idstr;
 }
 #endif
 
@@ -1600,34 +1462,6 @@ oakley_savecert(iph1, gen)
 
 	return 0;
 }
-
-#ifdef HAVE_SIGNING_C
-static char *
-getdirnamebyid(identtype)
-	int identtype;
-{
-	switch (identtype) {
-	case IPSECDOI_ID_FQDN:
-		return "FQDN";
-	case IPSECDOI_ID_USER_FQDN:
-		return "UserFQDN";
-	case IPSECDOI_ID_IPV4_ADDR:
-	case IPSECDOI_ID_IPV6_ADDR:
-		return "IPaddress";
-	case IPSECDOI_ID_IPV4_ADDR_SUBNET:
-	case IPSECDOI_ID_IPV6_ADDR_SUBNET:
-	case IPSECDOI_ID_IPV4_ADDR_RANGE:
-	case IPSECDOI_ID_IPV6_ADDR_RANGE:
-	case IPSECDOI_ID_DER_ASN1_DN:
-	case IPSECDOI_ID_DER_ASN1_GN:
-	case IPSECDOI_ID_KEY_ID:
-	default:
-		return "misc";
-	}
-	/* NOTREACHED */
-	return NULL;
-}
-#endif
 
 /*
  * compute SKEYID
