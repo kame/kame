@@ -28,7 +28,7 @@
  *
  *	from: @(#)svc.h 1.20 88/02/08 SMI
  *	from: @(#)svc.h	2.2 88/07/29 4.0 RPCSRC
- *	$Id: svc.h,v 1.14 1998/09/21 02:43:30 bde Exp $
+ * $FreeBSD: src/include/rpc/svc.h,v 1.14.2.1 1999/08/29 14:39:07 peter Exp $
  */
 
 /*

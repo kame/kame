@@ -50,7 +50,7 @@
 
 /*
  *	From: Id: nameser.h,v 8.16 1998/02/06 00:35:58 halley Exp
- *	$Id: nameser.h,v 1.12 1998/06/11 08:55:15 peter Exp $
+ * $FreeBSD: src/include/arpa/nameser.h,v 1.12.2.1 1999/08/29 14:39:00 peter Exp $
  */
 
 #ifndef _ARPA_NAMESER_H_

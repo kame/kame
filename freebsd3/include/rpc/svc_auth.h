@@ -28,7 +28,7 @@
  *
  *	from: @(#)svc_auth.h 1.6 86/07/16 SMI
  *	from: @(#)svc_auth.h	2.1 88/07/29 4.0 RPCSRC
- *	$Id: svc_auth.h,v 1.11 1998/01/16 11:47:51 bde Exp $
+ * $FreeBSD: src/include/rpc/svc_auth.h,v 1.11.2.1 1999/08/29 14:39:08 peter Exp $
  */
 
 /*

@@ -29,7 +29,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: ypxfrd.x,v 1.6 1998/01/16 12:17:55 bde Exp $
+ * $FreeBSD: src/include/rpcsvc/ypxfrd.x,v 1.6.2.1 1999/08/29 14:39:22 peter Exp $
  */
 
 /*
@@ -68,7 +68,7 @@
 
 #ifndef RPC_HDR
 %#ifndef lint
-%static const char rcsid[] = "$Id: ypxfrd.x,v 1.6 1998/01/16 12:17:55 bde Exp $";
+%static const char rcsid[] = "$FreeBSD: src/include/rpcsvc/ypxfrd.x,v 1.6.2.1 1999/08/29 14:39:22 peter Exp $";
 %#endif /* not lint */
 #endif
 

@@ -28,7 +28,7 @@
  *
  *	from: @(#)pmap_rmt.h 1.2 88/02/08 SMI
  *	from: @(#)pmap_rmt.h	2.1 88/07/29 4.0 RPCSRC
- *	$Id: pmap_rmt.h,v 1.9 1997/05/28 04:45:12 wpaul Exp $
+ * $FreeBSD: src/include/rpc/pmap_rmt.h,v 1.9.2.1 1999/08/29 14:39:06 peter Exp $
  */
 
 /*

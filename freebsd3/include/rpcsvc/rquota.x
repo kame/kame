@@ -7,7 +7,7 @@
 %#ifndef lint
 %/*static char sccsid[] = "from: @(#)rquota.x 1.2 87/09/20 Copyr 1987 Sun Micro";*/
 %/*static char sccsid[] = "from: @(#)rquota.x	2.1 88/08/01 4.0 RPCSRC";*/
-%static const char rcsid[] = "$Id: rquota.x,v 1.5 1998/12/06 08:15:08 archie Exp $";
+%static const char rcsid[] = "$FreeBSD: src/include/rpcsvc/rquota.x,v 1.5.2.1 1999/08/29 14:39:17 peter Exp $";
 %#endif /* not lint */
 #endif
 

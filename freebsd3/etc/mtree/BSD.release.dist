@@ -1,4 +1,4 @@
-#	$Id: BSD.release.dist,v 1.4 1997/02/23 09:21:05 peter Exp $
+# $FreeBSD: src/etc/mtree/BSD.release.dist,v 1.4.2.1 1999/08/29 14:19:25 peter Exp $
 #
 
 /set type=dir uname=root gname=wheel mode=0755
