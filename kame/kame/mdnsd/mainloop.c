@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.81 2001/09/03 09:52:38 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.82 2001/09/03 10:08:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -74,6 +74,13 @@
  *   it is okay to query normal (unicast) DNS server for outside of local.arpa.
  * - normal name server devices must not listen to multicast queries.
  * - more security section.
+ *
+ * draft-ietf-dnsext-mdns-00 -> draft-ietf-dnsext-mdns-03 differences:
+ * - sender behavior change.
+ *   00: repetition < 5 times, interval > 0.1 second.  exponential backoff.
+ *   03: repetition < 3 times, interval > 1 second.  random interval.
+ * - NXRRSET rule.  00: cache 5 second, 03: no text
+ * - conflict detection.  00: query, 03: dynamic update
  */
 
 #include <sys/types.h>
