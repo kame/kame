@@ -1,4 +1,4 @@
-/*	$KAME: altq_jobs.c,v 1.4 2002/10/25 07:42:33 kjc Exp $	*/
+/*	$KAME: altq_jobs.c,v 1.5 2002/11/08 06:23:00 kjc Exp $	*/
 /*
  * Copyright (c) 2001, the Rector and Board of Visitors of the
  * University of Virginia.
@@ -163,9 +163,11 @@ jobs_attach(ifq, bandwidth, qlimit, separate)
 	jif->jif_bandwidth = bandwidth;
 	jif->jif_qlimit = qlimit;
 	jif->jif_separate = separate;
+#ifdef ALTQ_DEBUG
 	printf("JoBS bandwidth = %d bps\n", (int)bandwidth);
 	printf("JoBS buffer size = %d pkts [%s]\n",
 	       (int)qlimit, separate?"separate buffers":"shared buffer");
+#endif
 	jif->jif_maxpri = -1;
 	jif->jif_ifq = ifq;
 
