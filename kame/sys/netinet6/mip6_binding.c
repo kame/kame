@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.76 2002/01/31 14:14:53 jinmei Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.77 2002/02/01 01:32:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2154,7 +2154,7 @@ mip6_bc_proxy_control(target, local, cmd)
 					    &daddr.sin6_scope_id)) {
 				/* XXX: should not happen */
 				mip6log((LOG_ERR,
-					 "%s:%d: in6_addr2zoneid failed\n"
+					 "%s:%d: in6_addr2zoneid failed\n",
 					 __FILE__, __LINE__));
 				error = EIO; /* XXX */
 			} else {
@@ -2643,7 +2643,7 @@ success:
 					    &daddr.sin6_scope_id)) {
 				/* XXX: should not happen */
 				mip6log((LOG_ERR,
-					 "%s:%d: in6_addr2zoneid failed\n"
+					 "%s:%d: in6_addr2zoneid failed\n",
 					 __FILE__, __LINE__));
 				return(EIO);
 			}
@@ -2651,7 +2651,7 @@ success:
 						    &daddr))) {
 				/* XXX: should not happen */
 				mip6log((LOG_ERR,
-					 "%s:%d: in6_embedscope failed\n"
+					 "%s:%d: in6_embedscope failed\n",
 					 __FILE__, __LINE__));
 				return(error);
 			}
