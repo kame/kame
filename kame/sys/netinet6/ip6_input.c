@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.169 2001/02/07 07:47:24 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.170 2001/02/07 07:50:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -854,10 +854,10 @@ ip6_input(m)
 			goto hbhcheck;
 		} else {
 			/* address is not ready, so discard the packet. */
-			log(LOG_INFO,
+			nd6log((LOG_INFO,
 			    "ip6_input: packet to an unready address %s->%s\n",
 			    ip6_sprintf(&ip6->ip6_src),
-			    ip6_sprintf(&ip6->ip6_dst));
+			    ip6_sprintf(&ip6->ip6_dst)));
 
 			goto bad;
 		}
