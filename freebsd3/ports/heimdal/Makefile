@@ -1,19 +1,19 @@
 # Ports collection Makefile for:	heimdal
-# Version required:			0.2l
+# Version required:			0.2t
 # Date created:				10/23/1999
 # Whom:					nectar@FreeBSD.ORG
 #
 # $FreeBSD: ports/security/heimdal/Makefile,v 1.11 2000/02/23 15:28:57 nectar Exp $
 #
 
-DISTNAME=		heimdal-0.2q
+DISTNAME=		heimdal-0.2t
 CATEGORIES=		security #ipv6
 MASTER_SITES=		ftp://ftp.pdc.kth.se/pub/heimdal/src/ \
 			ftp://ftp.replay.com/pub/replay/crypto/APPS/kerberos/heimdal/ \
 			ftp://ftp.tuniv.szczecin.pl/dsk4/ftp.replay.com/pub/crypto/APPS/kerberos/heimdal/ \
 			ftp://ftp.hacktic.nl/pub/replay/crypto/APPS/kerberos/heimdal/
 
-MAINTAINER=		nectar@FreeBSD.ORG
+MAINTAINER=		sumikawa@kame.net
 
 RESTRICTED=             "Crypto; export-controlled"
 
