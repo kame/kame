@@ -27,18 +27,6 @@ iface="ed0"
 
 #----------
 
-# inet6d configuration
-# inet46d:
-#	KAME/FreeBSD3.2: AF_INET{,6} dual stack support with wildcard
-#		bind on AF_INET6 socket. Also with IPsec support
-# inet6d: AF_INET6 only.  Also with IPsec support
-
-if [ -x /usr/local/v6/sbin/inet46d ]; then
-	inet6d=/usr/local/v6/sbin/inet46d
-else
-	inet6d=/usr/local/v6/sbin/inet6d #use only AF_INET6 sockets
-fi
-
 # tool locations
 ifconfig=/usr/local/v6/sbin/ifconfig
 prefixconfig=/usr/local/v6/sbin/prefix
@@ -134,8 +122,11 @@ fi
 
 echo -n "Starting standard IPv6 daemons:"
 
-if [ "X${inet6d_enable}" != X"NO" ]; then
-        echo -n ' inet6d';       $inet6d $inet6d_flags
+# inet46d configuration
+#	KAME/FreeBSD3.2: AF_INET{,6} dual stack support with wildcard
+#		bind on AF_INET6 socket. Also with IPsec support
+if [ -x /usr/local/v6/sbin/inet46d ] && [ "X${inet6d_enable}" != X"NO" ]; then
+	echo -n ' inet46d';	/usr/local/v6/sbin/inet46d $inet6d_flags
 fi
 
 # for each valid dir in $local_startup, search for init scripts matching *.sh
