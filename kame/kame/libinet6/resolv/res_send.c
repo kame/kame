@@ -55,7 +55,7 @@
 
 #if defined(LIBC_SCCS) && !defined(lint)
 static char sccsid[] = "@(#)res_send.c	8.1 (Berkeley) 6/4/93";
-static char rcsid[] = "$Id: res_send.c,v 1.8 2000/05/30 11:31:50 itojun Exp $";
+static char rcsid[] = "$Id: res_send.c,v 1.9 2000/05/30 11:55:48 itojun Exp $";
 #endif /* LIBC_SCCS and not lint */
 
 	/* change this to "0"
@@ -248,6 +248,16 @@ res_isourserver(inp)
 				ret++;
 				break;
 			}
+#ifdef MULTICASTQUERY6
+			/* XXX scopeid check is questionable */
+			if (srv6->sin6_family == in6p->sin6_family &&
+			    srv6->sin6_port == in6p->sin6_port &&
+			    srv6->sin6_scope_id == in6p->sin6_scope_id &&
+			    IN6_IS_ADDR_MULTICAST(&srv6->sin6_addr)) {
+				ret++;
+				break;
+			}
+#endif
 		}
 		break;
 #endif
@@ -459,8 +469,7 @@ res_send(buf, buflen, ans, anssiz)
 #endif
 				}
 				errno = 0;
-				if (connect(s, (struct sockaddr *)nsap,
-					    nsap->sa_len) < 0) {
+				if (connect(s, nsap, nsap->sa_len) < 0) {
 					terrno = errno;
 					Aerror(stderr, "connect/vc",
 					       errno, nsap);
@@ -635,14 +644,20 @@ read_len:
 			 * as we wish to receive answers from the first
 			 * server to respond.
 			 */
-			if (_res.nscount == 1 || (try == 0 && ns == 0)) {
+#ifndef MULTICASTQUERY6
+			if (_res.nscount == 1 || (try == 0 && ns == 0))
+#else
+			if ((_res.nscount == 1 || (try == 0 && ns == 0)) &&
+			    nsap->sa_family == AF_INET6 &&
+			    !IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6 *)nsap)->sin6_addr))
+#endif
+			{
 				/*
 				 * Connect only if we are sure we won't
 				 * receive a response from another server.
 				 */
 				if (!connected) {
-					if (connect(s, (struct sockaddr *)nsap,
-						    nsap->sa_len) < 0) {
+					if (connect(s, nsap, nsap->sa_len) < 0) {
 						Aerror(stderr,
 						       "connect(dg)",
 						       errno, nsap);
@@ -698,8 +713,7 @@ read_len:
 					errno = 0;
 				}
 				if (sendto(s, (char*)buf, buflen, 0,
-					   (struct sockaddr *)nsap,
-					   nsap->sa_len) != buflen) {
+					   nsap, nsap->sa_len) != buflen) {
 					Aerror(stderr, "sendto", errno, nsap);
 					badns |= (1 << ns);
 					res_close();
