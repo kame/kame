@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/09/05 03:19:47 $
+			$Date: 1999/09/05 03:40:32 $
 
 1. IPv6
 
@@ -116,18 +116,18 @@ fragment in "heuristics" section is not spec conformant).
 
 Neighbor Discovery specification (RFC2461) does not talk about neighbor
 cache handling in the following cases:
-(1) there was no neighbor cache entry, and unsolicited RS/NS/NA/redirect
-    packet, without link-layer address was received
+(1) when there was no neighbor cache entry, node received unsolicited
+    RS/NS/NA/redirect packet without link-layer address
 (2) neighbor cache handling on medium without link-layer address
     (we need a neighbor cache entry for IsRouter bit)
 For (1), we implemented workaround based on discussions on IETF ipngwg mailing
 list.  For more details, see the comments in the source code and email
 thread started from (IPng 7155), dated Feb 6 1999.
 
-IPv6 adderss autoconfiguration assumes that a host has only single network
-interface (single non-loopback interface).  This is because the spec assumes
-that there's no routing table on IPv6 host (an IPv6 host has default router
-list and prefix list only).
+IPv6 address autoconfiguration assumes that a host has only single network
+interface (more precisely, single non-loopback interface).  This is because
+the spec assumes that there's no routing table on IPv6 host (an IPv6 host
+has default router list and prefix list only).
 Because of this, if you accept RAs on a node with multiple network interfaces,
 the node will not behave as you might expect.  RFC2461 Appendix A talks
 little bit about this issue.
@@ -166,8 +166,8 @@ For example, you may see something like:
 	fe80:1::200:f8ff:fe01:6317
 in the routing table and interface address structure (struct
 in6_ifaddr).  The address above is a link-local unicast address
-which belongs to a network interface whose interface identifier is
-1.  The embedded index enables us to identify IPv6 link local
+which belongs to a network interface whose interface identifier is 1.
+The embedded index enables us to identify IPv6 link local
 addresses over multiple interfaces effectively and with only a
 little code change.
 Routing daemons and configuration programs, like route6d and
@@ -232,15 +232,21 @@ node-local multicast group ff01::1.
 
 1.4.2 Stateless address autoconfiguration on hosts
 
-In IPv6 specification, node can be separated into two categories:
-routers and hosts.  Routers forard packets addressed to others, hosts does
+In IPv6 specification, nodes are separated into two categories:
+routers and hosts.  Routers forward packets addressed to others, hosts does
 not forward the packets.  net.inet6.ip6.forwarding defines whether this
 node is router or host (router if it is 1, host if it is 0).
 
-When a host hears Router Advertisement from the router, default route
-and network address prefix (usually global address prefix) are added.
-To generate a Router Solicitation packet at any time, use the "rtsol" command.
-Also, "rtsold" daemon is available.  It generates Router Solicitation
+When a host hears Router Advertisement from the router, a host may
+autoconfigure itself by stateless address autoconfiguration.
+This behavior can be controlled by net.inet6.ip6.accept_rtadv
+(host autoconfigures itself if it is set to 1).
+By autoconfiguration, network address prefix for the receiving interface
+(usually global address prefix) is added.  Default route is also configured.
+Routers periodically generate Router Advertisement packets.  To request
+an adjacent router to generate RA packet, a host can transmit Router
+Solicitation.  To generate a RS packet at any time, use the "rtsol" command.
+"rtsold" daemon is also available.  "rtsold" generates Router Solicitation
 whenever necessary, and it works great for nomadic usage (notebooks/laptops).
 If one wishes to ignore Router Advertisements, use sysctl to set
 net.inet6.ip6.accept_rtadv to 0.
@@ -253,8 +259,8 @@ cases are left unspecified:
 - Hosts have single network interface (except loopback)
 Therefore, this is unwise to enable net.inet6.ip6.accept_rtadv on routers,
 or multi-interface host.  A misconfigured node can behave strange
-(the behavior is not prohibited, for those who would like to do some
-experiments).
+(KAME code does not prohibit nonconforming configuration, for those who
+would like to do some experiments).
 
 RFC2462 has validation rule against incoming RA prefix information option,
 in 5.5.3 (e).  This is to protect hosts from malicious (or misconfigured)
@@ -311,8 +317,9 @@ by the following rule:
        This is the last resort, which may cause scope violation.
 
 For instance, ::1 is selected for ff01::1, fe80:1::200:f8ff:fe01:6317
-for fe80:1::2a0:24ff:feab:839b (note that embedded interface index - described
-in 1.3 - helps us choose the right source address).
+for fe80:1::2a0:24ff:feab:839b (note that embedded interface index -
+described in 1.3 - helps us choose the right source address.  Those
+embedded indices will not be on the wire).
 If the outgoing interface has multiple address for the scope,
 a source is selected longest match basis (rule 3).  Suppose
 3ffe:501:808:1:200:f8ff:fe01:6317 and 3ffe:2001:9:124:200:f8ff:fe01:6317
@@ -650,7 +657,7 @@ KAME requires three items to be added into the standard drivers:
     interface, that interface has to be patched.
 
 To avoid troubles, we suggest you to comment out the device drivers
-for unsupported/unnecessary cards, from the configuration file.
+for unsupported/unnecessary cards, from the kernel configuration file.
 If you accidentally enable unsupported drivers, some of the userland
 tools may not work correctly (routing daemons are typical example).
 
