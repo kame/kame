@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.37 1999/08/19 23:39:30 itojun Exp $
+$Id: CHANGELOG,v 1.38 1999/08/20 00:01:34 itojun Exp $
 
 <199908>
+Fri Aug 20 08:57:01 JST 1999  itojun@iijlab.net
+	* sys/netinet6/in6.h: remove, or hide nonstandard macros/struct defs
+	  from the userland programmers.  if your code breaks with this change,
+	  your programs assumes something outside of RFC2553.
+
 Fri Aug 20 04:16:11 JST 1999  sumikawa@ebina.hitachi.co.jp
 	* freebsd[23]/ports/newbie, netbsd/pkgsrc/net/newbie: update to 0.22.
 
