@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.46 2002/08/06 11:00:54 k-sugyou Exp $	*/
+/*	$KAME: dest6.c,v 1.47 2002/08/07 10:13:26 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -101,7 +101,7 @@ dest6_input(mp, offp, proto)
 	struct ip6aux *ip6a = NULL;
 	struct ip6_hdr *ip6;
 	struct mip6_bc *mbc;
-	int verified;
+	int verified = 0;
 
 	ip6 = mtod(m, struct ip6_hdr *);
 #endif
@@ -299,7 +299,7 @@ dest6_nextopt(m, off, ip6o)
 	default:
 		if (m->m_pkthdr.len < off + 2)
 			return -1;
-		m_copydata(m, off, sizeof(ip6o), (caddr_t)&ip6o);
+		m_copydata(m, off, sizeof(ip6o), (caddr_t)ip6o);
 		if (m->m_pkthdr.len < off + 2 + ip6o->ip6o_len)
 			return -1;
 		return off;
@@ -320,8 +320,6 @@ int mhoff, nxt;
 	struct ip6_mobility mh;
 	int newoff, off, proto, swap;
 
-	if (!MIP6_IS_MN)
-		return (0);
 	if ((nxt == IPPROTO_HOPOPTS) || (nxt == IPPROTO_DSTOPTS)) {
 		return (0);
 	}
@@ -333,20 +331,19 @@ int mhoff, nxt;
 	if ((ip6a->ip6a_flags & (IP6A_HASEEN | IP6A_SWAP)) != IP6A_HASEEN)
 		return (0);
 
-
 	ip6 = mtod(m, struct ip6_hdr *);
 	/* find home address */
+	off = 0;
 	proto = IPPROTO_IPV6;
 	while (1) {
 		int nxt;
 		newoff = ip6_nexthdr(m, off, proto, &nxt);
 		if (newoff < 0 || newoff < off)
 			return (0);	/* XXX */
-		if (nxt == IPPROTO_DSTOPTS)
-			break;
-
 		off = newoff;
 		proto = nxt;
+		if (proto == IPPROTO_DSTOPTS)
+			break;
 	}
 	ip6o.ip6o_type = IP6OPT_PADN;
 	ip6o.ip6o_len = 0;
@@ -354,9 +351,9 @@ int mhoff, nxt;
 		newoff = dest6_nextopt(m, off, &ip6o);
 		if (newoff < 0)
 			return (0);	/* XXX */
+		off = newoff;
 		if (ip6o.ip6o_type == IP6OPT_HOME_ADDRESS)
 			break;
-		off = newoff;
 	}
 	m_copydata(m, off, sizeof(haopt), (caddr_t)&haopt);
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.115 2002/08/05 11:49:17 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.116 2002/08/07 10:13:26 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -875,7 +875,7 @@ mip6_process_hurbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 	struct sockaddr_in6 *coa;
 	u_int8_t flags;
 	u_int16_t seqno;
-	u_int16_t lifetime;
+	u_int32_t lifetime;
 	struct sockaddr_in6 *haaddr;
 {
 	struct mip6_bc *mbc, *mbc_next;
@@ -1081,7 +1081,7 @@ mip6_process_hrbu(haddr0, coa, flags, seqno, lifetime, haaddr)
 	struct sockaddr_in6 *coa;
 	u_int8_t flags;
 	u_int16_t seqno;
-	u_int16_t lifetime;
+	u_int32_t lifetime;
 	struct sockaddr_in6 *haaddr;
 {
 	struct nd_prefix *pr;
@@ -1860,7 +1860,7 @@ mip6_bc_register(hoa_sa, coa_sa, dst_sa, flags, seqno, lifetime)
 	struct sockaddr_in6 *dst_sa;
 	u_int16_t flags;
 	u_int16_t seqno;
-	u_int16_t lifetime;
+	u_int32_t lifetime;
 {
 	struct mip6_bc *mbc;
 
@@ -1884,7 +1884,7 @@ mip6_bc_update(mbc, coa_sa, dst_sa, flags, seqno, lifetime)
 	struct sockaddr_in6 *dst_sa;
 	u_int16_t flags;
 	u_int16_t seqno;
-	u_int16_t lifetime;
+	u_int32_t lifetime;
 {
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;

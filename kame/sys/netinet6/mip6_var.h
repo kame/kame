@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.46 2002/08/06 01:23:17 k-sugyou Exp $	*/
+/*	$KAME: mip6_var.h,v 1.47 2002/08/07 10:13:26 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -321,8 +321,8 @@ int mip6_ip6ma_create			__P((struct ip6_mobility **,
 					     struct sockaddr_in6 *,
 					     u_int8_t,
 					     u_int16_t,
-					     u_int16_t,
-					     u_int16_t));
+					     u_int32_t,
+					     u_int32_t));
 int mip6_ip6me_create			__P((struct ip6_mobility **,
 					     struct sockaddr_in6 *,
 					     struct sockaddr_in6 *,
@@ -330,11 +330,11 @@ int mip6_ip6me_create			__P((struct ip6_mobility **,
 					     struct sockaddr_in6 *));
 int mip6_process_hrbu __P((struct sockaddr_in6 *,
 			   struct sockaddr_in6 *,
-			   u_int8_t, u_int16_t, u_int16_t,
+			   u_int8_t, u_int16_t, u_int32_t,
 			   struct sockaddr_in6 *));
 int mip6_process_hurbu __P((struct sockaddr_in6 *,
 			    struct sockaddr_in6 *,
-			    u_int8_t, u_int16_t, u_int16_t,
+			    u_int8_t, u_int16_t, u_int32_t,
 			    struct sockaddr_in6 *));
 int mip6_bu_destopt_create		__P((struct ip6_dest **,
 					     struct sockaddr_in6 *,
@@ -539,11 +539,11 @@ void mip6_bc_init			__P((void));
 int mip6_bc_register			__P((struct sockaddr_in6 *,
 					     struct sockaddr_in6 *,
 					     struct sockaddr_in6 *,
-					     u_int16_t, u_int16_t, u_int16_t));
+					     u_int16_t, u_int16_t, u_int32_t));
 int mip6_bc_update			__P((struct mip6_bc *,
 					     struct sockaddr_in6 *,
 					     struct sockaddr_in6 *,
-					     u_int16_t, u_int16_t, u_int16_t));
+					     u_int16_t, u_int16_t, u_int32_t));
 int mip6_bc_delete			__P((struct mip6_bc *));
 int mip6_bc_list_remove			__P((struct mip6_bc_list *,
 					     struct mip6_bc *));
@@ -555,7 +555,7 @@ struct mip6_bc *mip6_bc_list_find_withpcoa
 					     struct sockaddr_in6 *));
 int mip6_bc_send_ba __P((struct sockaddr_in6 *, struct sockaddr_in6 *,
 			 struct sockaddr_in6 *, u_int8_t, u_int16_t,
-			 u_int16_t, u_int16_t));
+			 u_int32_t, u_int32_t));
 int mip6_bc_send_bm			__P((struct mbuf *,
 					     struct in6_addr *));
 int mip6_dad_success			__P((struct ifaddr *));

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.39 2002/08/06 12:47:52 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.40 2002/08/07 10:13:26 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -482,7 +482,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	u_int8_t haseen;
 	struct mip6_bc *mbc;
 	u_int16_t seqno;
-	u_int16_t lifetime;
+	u_int32_t lifetime;
 
 	int error = 0;
 	u_int8_t bu_safe = 0;	/* To accept bu always without authentication, this value is set to non-zero */
@@ -593,7 +593,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		coa_sa.sin6_addr = mopt.mopt_altcoa;
 
 	seqno = ntohs(ip6mu->ip6mu_seqno);
-	lifetime = ntohs(ip6mu->ip6mu_lifetime);
+	lifetime = ntohs(ip6mu->ip6mu_lifetime) << 2;	/* units of 4secs */
 
 	/* ip6_src and HAO has been already swapped at this point. */
 	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &hoa_sa);
@@ -732,7 +732,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
 	u_int16_t seqno;
-	u_int16_t lifetime;
+	u_int32_t lifetime;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
@@ -866,7 +866,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	mbu->mbu_state &= ~MIP6_BU_STATE_WAITACK;
 
 	/* update lifetime and refresh time. */
-	lifetime = htons(ip6ma->ip6ma_lifetime);
+	lifetime = htons(ip6ma->ip6ma_lifetime) >> 2;	/* units of 4 secs */
 	if (lifetime < mbu->mbu_lifetime) {
 		mbu->mbu_expire -= (mbu->mbu_lifetime - lifetime);
 		if (mbu->mbu_expire < time_second)
@@ -1161,8 +1161,8 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 	struct sockaddr_in6 *dstcoa;
 	u_int8_t status;
 	u_int16_t seqno;
-	u_int16_t lifetime;
-	u_int16_t refresh;
+	u_int32_t lifetime;
+	u_int32_t refresh;
 {
 	struct mbuf *m;
 	struct ip6_pktopts opt;
@@ -1458,11 +1458,12 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 				lifetime = sa_lifetime;
 		}
 #endif /* MIP6_SYNC_SA_LIFETIME */
-		mbu->mbu_lifetime = (u_int16_t)lifetime;
+		mbu->mbu_lifetime = lifetime;
 		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 		mbu->mbu_refresh = mbu->mbu_lifetime;
 		mbu->mbu_refexpire = time_second + mbu->mbu_refresh;
-		ip6mu->ip6mu_lifetime = htons(mbu->mbu_lifetime);
+		ip6mu->ip6mu_lifetime =
+		    htons((u_int16_t)(mbu->mbu_lifetime >> 2));	/* units 4 secs */
 	}
 
 	if (need_rr) {
@@ -1545,8 +1546,8 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh)
 	struct sockaddr_in6 *dst;
 	u_int8_t status;
 	u_int16_t seqno;
-	u_int16_t lifetime;
-	u_int16_t refresh;
+	u_int32_t lifetime;
+	u_int32_t refresh;
 {
 	struct ip6m_binding_ack *ip6ma;
 	int ip6ma_size, pad;
@@ -1568,7 +1569,8 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh)
 	ip6ma->ip6ma_type = IP6M_BINDING_ACK;
 	ip6ma->ip6ma_status = status;
 	ip6ma->ip6ma_seqno = htons(seqno);
-	ip6ma->ip6ma_lifetime = htons(lifetime);
+	ip6ma->ip6ma_lifetime =
+		htons((u_int16_t)(lifetime >> 2));	/* units of 4 secs */
 
 	/* XXX binding refresh advice option */
 
