@@ -1,4 +1,4 @@
-/*	$KAME: timer.c,v 1.22 2003/09/02 09:48:46 suz Exp $	*/
+/*	$KAME: timer.c,v 1.23 2004/07/09 14:51:53 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -234,6 +234,12 @@ age_vifs()
 	    IF_TIMEOUT(v->uv_querier->al_timer) {
 		v->uv_querier_timo++; /* count statistics */
 
+		/* act as a querier by myself */
+		v->uv_flags |= VIFF_QUERIER;
+		v->uv_querier->al_addr = v->uv_linklocal->pa_addr;
+		v->uv_querier->al_timer = MLD6_OTHER_QUERIER_PRESENT_INTERVAL;
+		time(&v->uv_querier->al_ctime); /* reset timestamp */
+
 		/* send gen. query, start gen. q timer */
 #ifdef MLDV2_LISTENER_REPORT
 		if (v->uv_mld_version & MLDv2)
@@ -243,11 +249,6 @@ age_vifs()
 		if (v->uv_mld_version & MLDv1)
 			query_groups(v);
 
-		/* act as a querier by myself */
-		v->uv_flags |= VIFF_QUERIER;
-		v->uv_querier->al_addr = v->uv_linklocal->pa_addr;
-		v->uv_querier->al_timer = MLD6_OTHER_QUERIER_PRESENT_INTERVAL;
-		time(&v->uv_querier->al_ctime); /* reset timestamp */
 	    }
 	} else {
 		/* We are in Querier state */
