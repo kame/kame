@@ -201,7 +201,7 @@ struct sioc_mif_req6 {
 	u_long obytes;		/* Output byte count on mif		*/
 };
 
-#ifdef _KERNEL
+#if defined(_KERNEL) || defined(KERNEL)
 /*
  * The kernel's multicast-interface structure.
  */

@@ -46,6 +46,12 @@
 #include "opt_inet.h"
 #endif
 
+#ifndef _KERNEL
+# ifdef KERNEL
+#  define _KERNEL
+# endif
+#endif
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
