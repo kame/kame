@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.24 2001/02/21 16:12:35 itojun Exp $	*/
+/*	$KAME: dest6.c,v 1.25 2001/02/22 01:39:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -110,7 +110,8 @@ dest6_input(mp, offp, proto)
 
 	/* search header for all options. */
 	for (optlen = 0; dstoptlen > 0; dstoptlen -= optlen, opt += optlen) {
-		if (*opt != IP6OPT_PAD1 && dstoptlen < IP6OPT_MINLEN) {
+		if (*opt != IP6OPT_PAD1 &&
+		    (dstoptlen < IP6OPT_MINLEN || *(opt + 1) + 2 > dstoptlen)) {
 			ip6stat.ip6s_toosmall++;
 			goto bad;
 		}
