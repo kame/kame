@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.312 2003/04/23 09:15:50 keiichi Exp $	*/
+/*	$KAME: ip6_input.c,v 1.313 2003/04/24 12:47:42 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1219,15 +1219,16 @@ ip6_input(m)
 			goto bad;
 		}
 #endif
-#if defined(MIP6) && defined(MIP6_MOBILE_NODE)
+#ifdef MIP6
+		if (dest6_mip6_hao(m, off, nxt) < 0)
+			goto bad;
+#ifdef MIP6_MOBILE_NODE
 		/*
 		 * XXX
 		 * check if the packet was tunneled after all extention
 		 * headers have been processed.  get from Ericsson
 		 * code.  need more consideration.
 		 */
-		if (dest6_mip6_hao(m, off, nxt) < 0)
-			goto bad;
 		if ((nxt != IPPROTO_HOPOPTS) && (nxt != IPPROTO_DSTOPTS) &&
 		    (nxt != IPPROTO_ROUTING) && (nxt != IPPROTO_FRAGMENT) &&
 		    (nxt != IPPROTO_ESP) && (nxt != IPPROTO_AH) &&
@@ -1235,7 +1236,8 @@ ip6_input(m)
 			if (mip6_route_optimize(m))
 				goto bad;
 		}
-#endif /* MIP6 && MIP6_MOBILE_NODE */
+#endif /* MIP6_MOBILE_NODE */
+#endif /* MIP6 */
 		nxt = (*inet6sw[ip6_protox[nxt]].pr_input)(&m, &off, nxt);
 	}
 	return;
