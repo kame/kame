@@ -98,13 +98,6 @@
 #include <netinet/if_ether.h>
 #endif
 
-#ifdef INET6
-#ifndef INET
-#include <netinet/in.h>
-#endif
-#include <netinet6/in6_ifattach.h>
-#endif
-
 /* IPX code is not tested.  FIXME.  */
 #ifdef IPX
 #include <netipx/ipx.h>
@@ -383,11 +376,6 @@ feinit(struct pccard_devinfo *devi)
 #endif
 	if (fe_attach(&devi->isahd) == 0)
 		return (ENXIO);
-
-#ifdef INET6
-	in6_ifattach(&sc->arpcom.ac_if, IN6_IFT_802,
-		     (caddr_t)sc->arpcom.ac_enaddr, 0);
-#endif /* INET6 */
 
 	return (0);
 }
