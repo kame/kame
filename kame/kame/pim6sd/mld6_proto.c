@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.32 2003/01/30 06:52:19 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.33 2003/02/05 15:29:59 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -119,9 +119,6 @@
 #include "timer.h"
 
 #include "mld6_proto.h"
-
-extern struct in6_addr in6addr_any;
-
 
 /*
  * Forward declarations.
