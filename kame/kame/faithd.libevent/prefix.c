@@ -1,4 +1,4 @@
-/*	$KAME: prefix.c,v 1.1 2002/06/11 04:15:58 itojun Exp $	*/
+/*	$KAME: prefix.c,v 1.2 2002/06/13 06:35:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -279,8 +279,6 @@ config_load(configfile)
 
 	config_list = NULL;
 
-	if (!configfile)
-		configfile = _PATH_PREFIX_CONF;
 	fp = fopen(configfile, "r");
 	if (fp == NULL)
 		return -1;

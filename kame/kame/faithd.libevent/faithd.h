@@ -1,4 +1,4 @@
-/*	$KAME: faithd.h,v 1.1 2002/06/11 04:15:57 itojun Exp $	*/
+/*	$KAME: faithd.h,v 1.2 2002/06/13 06:35:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -29,40 +29,3 @@
  * SUCH DAMAGE.
  */
 
-extern char logname[];
-extern int dflag;
-
-extern void tcp_relay __P((int, int, const char *));
-extern void ftp_relay __P((int, int));
-extern int ftp_active __P((int, int, int *, int *));
-extern int ftp_passive __P((int, int, int *, int *));
-extern void exit_success __P((const char *, ...))
-	__attribute__((__format__(__printf__, 1, 2)));
-extern void exit_failure __P((const char *, ...))
-	__attribute__((__format__(__printf__, 1, 2)));
-
-#define DEFAULT_PORT_NAME	"telnet"
-#define DEFAULT_DIR	"/usr/libexec"
-#define DEFAULT_NAME	"telnetd"
-#define DEFAULT_PATH	(DEFAULT_DIR "/" DEFAULT_NAME)
-
-#define FTP_PORT	21
-#define RLOGIN_PORT	513
-#define RSH_PORT	514
-
-#define RETURN_SUCCESS	0
-#define RETURN_FAILURE	1
-
-#define YES	1
-#define NO	0
-
-#define MSS	2048
-#define MAXARGV	20
-
-#define NUMPRT	0
-#define NUMPRG	1
-#define NUMARG	2
-
-#define UC(b)	(((int)b)&0xff)
-
-#define FAITH_TIMEOUT	(30 * 60)	/*second*/
