@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.37 2000/06/17 20:34:25 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.38 2000/07/24 13:27:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -50,6 +50,7 @@
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/ioctl.h>
 #endif
+#include <sys/queue.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <sys/malloc.h>

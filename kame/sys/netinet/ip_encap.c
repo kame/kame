@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.37 2000/07/12 02:20:11 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.38 2000/07/24 13:27:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -72,6 +72,7 @@
 #include <sys/mbuf.h>
 #include <sys/errno.h>
 #include <sys/protosw.h>
+#include <sys/queue.h>
 
 #include <net/if.h>
 #include <net/route.h>
