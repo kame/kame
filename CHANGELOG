@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1770 2001/07/15 04:25:39 jinmei Exp $
+$KAME: CHANGELOG,v 1.1771 2001/07/15 04:27:25 jinmei Exp $
 
 <200107>
 2001-07-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_update_ifa): do not call malloc
-	with M_WAITOK, since this function can be called under splnet().
+	with M_WAITOK, since in6_update_ifa() can be called under splnet().
 	Based on a FreeBSD PR 28927 by From Garrett Wollman
 	<wollman@lcs.mit.edu> via ume.
 
