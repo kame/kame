@@ -13,5 +13,10 @@ vs racoon
 	などのいじめをしているが、おおむね快調。
 	たまにphase 2の失敗がある(pingしてると10秒くらい穴があく)。
 
+	chargenとかも並行して試しているが問題なし。
+
+	kernel codeにmemory leakはほとんどない模様。
+	racoon内にmemory leakがある模様。動かしてると太る。
+
 vs ashley laurent
 	phase 1 keyid supportいれてよんと言われた。今回間に合うのかな。
