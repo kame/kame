@@ -1,4 +1,4 @@
-/*	$KAME: crypto_openssl.c,v 1.66 2001/08/17 10:48:26 sakane Exp $	*/
+/*	$KAME: crypto_openssl.c,v 1.67 2001/08/17 17:29:59 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -930,7 +930,7 @@ end:
 	return pkey;
 }
 #endif
-  
+
 /*
  * get error string
  * MUST load ERR_load_crypto_strings() first.
