@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.782 2000/04/17 17:41:07 sakane Exp $
+$Id: CHANGELOG,v 1.783 2000/04/17 18:11:17 sumikawa Exp $
 
 <200003>
+Tue Apr 18 03:10:01 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/mmosaic: multicast Mosaic.
+
 Tue Apr 18 02:35:54 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	- use getifaddrs to get addresses.
