@@ -1,7 +1,7 @@
 
 .PATH:	${.CURDIR}/../../../altq
 KMOD=	altq_cbq
-SRCS=	altq_cbq.c altq_rmclass.c opt_altq.h opt_inet.h
+SRCS=	altq_cbq.c altq_rmclass.c opt_altq.h opt_inet.h opt_inet6.h
 KMODDEPS=	altq_red altq_rio
 
 CFLAGS+= -DALTQ
@@ -34,7 +34,7 @@ opt_inet.h:
 .endif
 
 opt_inet6.h:
-	touch opt_ine6t.h
+	touch opt_inet6.h
 .if ${ALTQMOD_INET6} > 0
 	echo "#define INET6 1" > opt_inet6.h
 .endif
