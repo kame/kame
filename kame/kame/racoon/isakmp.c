@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.131 2001/03/15 09:39:24 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.132 2001/03/15 10:34:35 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1526,12 +1526,14 @@ isakmp_ph2expire(iph2)
 	free(src);
 	free(dst);
 
-	iph2->sce = sched_new(10, isakmp_ph2delete_stub, iph2);
+	iph2->status = PHASE2ST_EXPIRED;
+
+	iph2->sce = sched_new(1, isakmp_ph2delete_stub, iph2);
 
 	return;
 }
 
-/* called from scheduler. */
+/* called from scheduler */
 void
 isakmp_ph2delete_stub(p)
 	void *p;

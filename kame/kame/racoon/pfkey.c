@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.105 2001/03/05 18:37:07 thorpej Exp $	*/
+/*	$KAME: pfkey.c,v 1.106 2001/03/15 10:34:35 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1479,8 +1479,6 @@ pk_recvacquire(mhp)
 	 *    2. its state is equal to PHASE2ST_ESTABLISHED, then racoon
 	 *       has to prcesss such a acquire message becuase racoon may
 	 *       lost the expire message.
-	 *    3. its state is equal to PHASE2ST_EXPIRED, then it must be
-	 *       something error.
 	 */
 	iph2[0] = getph2byspid(xpl->sadb_x_policy_id);
 	if (iph2[0] != NULL) {
@@ -1489,11 +1487,9 @@ pk_recvacquire(mhp)
 				"ignore the acquire becuase ph2 found\n");
 			return -1;
 		}
-		if (iph2[0]->status == PHASE2ST_EXPIRED) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"why ph2 is expired ?.\n");
-			return -1;
-		}
+		if (iph2[0]->status == PHASE2ST_EXPIRED)
+			iph2[0] = NULL;
+		/*FALLTHROUGH*/
 	}
 
 	/* search for proper policyindex */
