@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.134 2001/03/23 01:19:08 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.135 2001/03/23 03:58:40 thorpej Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -344,9 +344,17 @@ isakmp_main(msg, remote, local)
 	if (iph1 != NULL) {
 		/* must be same addresses in one stream of a phase at least. */
 		if (cmpsaddrwild(iph1->remote, remote) != 0) {
+			char *saddr_db, *saddr_act;
+
+			saddr_db = strdup(saddr2str(iph1->remote));
+			saddr_act = strdup(saddr2str(remote));
+
 			plog(LLV_ERROR, LOCATION, remote,
-				"remote address mismatched. db=%s\n",
-				saddr2str(iph1->remote));
+				"remote address mismatched. db=%s, act=%s\n",
+				saddr_db, saddr_act);
+
+			free(saddr_db);
+			free(saddr_act);
 		}
 		/*
 		 * don't check of exchange type here because other type will be
