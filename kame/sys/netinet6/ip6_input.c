@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.149 2001/01/23 09:52:40 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.150 2001/01/23 10:50:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -423,8 +423,10 @@ ip6_input(m)
 	u_int32_t rtalert = ~0;
 	int nxt, ours = 0;
 	struct ifnet *deliverifp = NULL;
+#if 0
 	struct mbuf *mhist;	/*onion peeling history*/
 	caddr_t hist;
+#endif
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
 #endif
@@ -1125,6 +1127,7 @@ ip6_input(m)
 			goto bad;
 		}
 
+#if 0
 		/*
 		 * do we need to do it for every header?  yeah, other
 		 * functions can play with it (like re-allocate and copy).
@@ -1138,6 +1141,7 @@ ip6_input(m)
 			ip6stat.ip6s_toomanyhdr++;
 			goto bad;
 		}
+#endif
 		
 #ifdef MIP6
 		if ((nxt != IPPROTO_HOPOPTS) && (nxt != IPPROTO_DSTOPTS) &&
