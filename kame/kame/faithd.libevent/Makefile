@@ -31,11 +31,10 @@ CPPFLAGS+= -I${.CURDIR} -DHAVE_SELECT
 .endif
 LDADD+=	-lutil
 DPADD+=	${LIBUTIL}
-NOMAN=yes
-#.if (${OPSYS} != "NetBSD")
-#MAN8=	faithd.8
-#.else
-#MAN=	faithd.8
-#.endif
+.if (${OPSYS} != "NetBSD")
+MAN8=	faithd.8
+.else
+MAN=	faithd.8
+.endif
 
 .include <bsd.prog.mk>
