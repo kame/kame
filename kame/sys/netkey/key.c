@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.87 2000/05/07 16:41:01 itojun Exp $	*/
+/*	$KAME: key.c,v 1.88 2000/05/07 16:42:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -346,7 +346,8 @@ static int key_spddelete __P((struct socket *, struct mbuf *,
 	struct sadb_msghdr *));
 static int key_spddelete2 __P((struct socket *, struct mbuf *,
 	struct sadb_msghdr *));
-static int key_spdget __P((caddr_t *, struct socket *, int));
+static int key_spdget __P((struct socket *, struct mbuf *,
+	struct sadb_msghdr *));
 static int key_spdflush __P((struct socket *, struct mbuf *,
 	struct sadb_msghdr *));
 static int key_spddump __P((struct socket *, struct mbuf *,
@@ -1893,44 +1894,43 @@ key_spddelete2(so, m, mhp)
  *	0 if fail.
  */
 static int
-key_spdget(mhp, so, target)
-	caddr_t *mhp;
+key_spdget(so, m, mhp)
 	struct socket *so;
-	int target;
+	struct mbuf *m;
+	struct sadb_msghdr *mhp;
 {
-	struct sadb_msg *msg0;
 	u_int32_t id;
 	struct secpolicy *sp;
-	struct mbuf *m;
+	struct mbuf *n;
 
 	/* sanity check */
-	if (mhp == NULL || mhp[0] == NULL)
+	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
 		panic("key_spdget: NULL pointer is passed.\n");
 
-	msg0 = (struct sadb_msg *)mhp[0];
-
-	if (mhp[SADB_X_EXT_POLICY] == NULL) {
+	if (mhp->ext[SADB_X_EXT_POLICY] == NULL ||
+	    mhp->extlen[SADB_X_EXT_POLICY] < sizeof(struct sadb_x_policy)) {
 #ifdef IPSEC_DEBUG
 		printf("key_spdget: invalid message is passed.\n");
 #endif
-		return EINVAL;
+		return key_senderror(so, m, EINVAL);
 	}
 
-	id = ((struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY])->sadb_x_policy_id;
+	id = ((struct sadb_x_policy *)mhp->ext[SADB_X_EXT_POLICY])->sadb_x_policy_id;
 
 	/* Is there SP in SPD ? */
 	if ((sp = key_getspbyid(id)) == NULL) {
 #ifdef IPSEC_DEBUG
 		printf("key_spdget: no SP found id:%u.\n", id);
 #endif
-		return ENOENT;
+		return key_senderror(so, m, ENOENT);
 	}
 
-	m = key_setdumpsp(sp, SADB_X_SPDGET, 0, msg0->sadb_msg_pid);
-	if (m != NULL)
-		key_sendup_mbuf(so, m, target);
-
-	return 0;
+	n = key_setdumpsp(sp, SADB_X_SPDGET, 0, mhp->msg->sadb_msg_pid);
+	if (n != NULL) {
+		m_freem(m);
+		return key_sendup_mbuf(so, n, KEY_SENDUP_ONE);
+	} else
+		return key_senderror(so, m, ENOBUFS);
 }
 
 /*
@@ -6599,15 +6599,8 @@ key_parse(m, so)
 	case SADB_X_SPDDELETE2:	/*done*/
 		return key_spddelete2(so, m, &mh);
 
-	case SADB_X_SPDGET:
-		/* key_spdget will call key_sendup() on her own */
-		error = key_spdget((caddr_t *)mh.ext, so, KEY_SENDUP_ONE);
-		if (error)
-			goto senderror;
-		else {
-			m_freem(m);
-			return 0;
-		}
+	case SADB_X_SPDGET:	/*almost done*/
+		return key_spdget(so, m, &mh);
 
 	case SADB_X_SPDDUMP:	/*almost done*/
 		return error = key_spddump(so, m, &mh);
