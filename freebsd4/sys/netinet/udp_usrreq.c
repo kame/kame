@@ -577,10 +577,9 @@ udp_input(m, off)
 		if (inp->inp_vflag & INP_IPV6) {
 			int savedflags;
 
-			ip_2_ip6_hdr(&udp_ip6.uip6_ip6, ip);
 			savedflags = inp->inp_flags;
 			inp->inp_flags &= ~INP_UNMAPPABLEOPTS;
- 			ip6_savecontrol(inp, &udp_ip6.uip6_ip6, m, &opts6);
+ 			ip6_savecontrol(inp, m, &opts6);
 			inp->inp_flags = savedflags;
 		} else
 #endif
@@ -651,13 +650,9 @@ udp_append(last, ip, n, off)
 		if (last->inp_vflag & INP_IPV6) {
 			int savedflags;
 
-			if (udp_ip6.uip6_init_done == 0) {
-				ip_2_ip6_hdr(&udp_ip6.uip6_ip6, ip);
-				udp_ip6.uip6_init_done = 1;
-			}
 			savedflags = last->inp_flags;
 			last->inp_flags &= ~INP_UNMAPPABLEOPTS;
- 			ip6_savecontrol(last, &udp_ip6.uip6_ip6, n, &opts6);
+ 			ip6_savecontrol(last, n, &opts6);
 			last->inp_flags = savedflags;
 		} else
 #endif
