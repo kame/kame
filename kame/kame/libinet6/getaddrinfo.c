@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.170 2004/04/14 04:42:56 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.171 2004/04/15 14:29:46 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1204,6 +1204,8 @@ fail:
  * hostname == NULL.
  * passive socket -> anyaddr (0.0.0.0 or ::)
  * non-passive socket -> localhost (127.0.0.1 or ::1)
+ * The AI_CANONNAME flag is only meaningful when nodename is non NULL
+ * (RFC3493), so we don't have to worry about it in this function. 
  */
 static int
 explore_null(pai, servname, res)
@@ -1232,15 +1234,9 @@ explore_null(pai, servname, res)
 
 	if (pai->ai_flags & AI_PASSIVE) {
 		GET_AI(cur->ai_next, afd, afd->a_addrany);
-		/* xxx meaningless?
-		 * GET_CANONNAME(cur->ai_next, "anyaddr");
-		 */
 		GET_PORT(cur->ai_next, servname);
 	} else {
 		GET_AI(cur->ai_next, afd, afd->a_loopback);
-		/* xxx meaningless?
-		 * GET_CANONNAME(cur->ai_next, "localhost");
-		 */
 		GET_PORT(cur->ai_next, servname);
 	}
 	cur = cur->ai_next;
@@ -1291,7 +1287,7 @@ explore_numeric(pai, hostname, servname, res, canonname)
 					/*
 					 * Set the numeric address itself as
 					 * the canonical name, based on a
-					 * clarification in rfc2553bis-03.
+					 * clarification in RFC3493.
 					 */
 					GET_CANONNAME(cur->ai_next, canonname);
 				}
@@ -1312,7 +1308,7 @@ explore_numeric(pai, hostname, servname, res, canonname)
 					/*
 					 * Set the numeric address itself as
 					 * the canonical name, based on a
-					 * clarification in rfc2553bis-03.
+					 * clarification in RFC3493.
 					 */
 					GET_CANONNAME(cur->ai_next, canonname);
 				}
