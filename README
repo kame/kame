@@ -1,6 +1,6 @@
 	README of KAME kit
 	KAME Project
-	$KAME: README,v 1.51 2001/02/13 09:46:59 sumikawa Exp $
+	$KAME: README,v 1.52 2001/03/25 09:59:48 itojun Exp $
 
 <<<Project Overview>>>
 
@@ -196,8 +196,8 @@ Benoit Hilt, Noriaki Takamiya, Olivier TOGNI, Greg Troxel, Bill
 Fenner, Goeran Bengtson, Tomio Narita, Conny Larsson, Ryuji Somegawa,
 Akira Kato, Ronald van der Pol, Graham Wheeler, Kris Kennaway, Kazuo Horikawa,
 larry baird, rimi guyomarch, Makoto MATSUSHITA, Kevin Lahey
-SHIMIZU Ryo, Shigeyuki Fukushima, Toshiaki Nakatsu, Florent Parent and
-SHIRASAKI Yasuhiro.(in no particular order).
+SHIMIZU Ryo, Shigeyuki Fukushima, Toshiaki Nakatsu, Florent Parent,
+SHIRASAKI Yasuhiro and Constantine Sapuntzakis (in no particular order).
 
 We would also like to thank BSDI (http://www.bsdi.com/) for donating
 BSD/OS licenses for development.
