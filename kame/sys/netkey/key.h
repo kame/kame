@@ -1,4 +1,4 @@
-/*	$KAME: key.h,v 1.22 2002/01/31 07:03:20 itojun Exp $	*/
+/*	$KAME: key.h,v 1.23 2002/06/12 03:38:04 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -53,7 +53,6 @@ extern int key_checkrequest
 extern struct secasvar *key_allocsa __P((u_int, caddr_t, caddr_t,
 					u_int, u_int32_t));
 extern void key_freesp __P((struct secpolicy *));
-extern void key_freeso __P((struct socket *));
 extern void key_freesav __P((struct secasvar *));
 extern struct secpolicy *key_newsp __P((void));
 extern struct secpolicy *key_msg2sp __P((struct sadb_x_policy *,
