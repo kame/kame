@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.47 2003/09/02 09:48:45 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.48 2004/01/26 09:39:29 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -392,9 +392,14 @@ int recvlen;
 	}
 
 	/* source address check */
-	if (!IN6_IS_ADDR_LINKLOCAL(&src->sin6_addr) &&
-	    !IN6_IS_ADDR_UNSPECIFIED(&src->sin6_addr))
-	{
+	if (!IN6_IS_ADDR_LINKLOCAL(&src->sin6_addr)) {
+		/*
+		 * RFC3590 allows the IPv6 unspecified address as the source
+		 * address of MLD report and done messages.  However, as this
+		 * same document says, this special rule is for snooping
+		 * switches and the RFC requires routers to discard MLD packets
+		 * with the unspecified source address.
+		 */
 		log_msg(LOG_INFO, 0,
 		    "RECV %s from a non link local address: %s",
 		    packet_kind(IPPROTO_ICMPV6, mldh->mld_type,
