@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.268 2002/02/19 13:09:57 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.269 2002/02/19 13:11:27 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -311,9 +311,9 @@ ip6_init2(dummy)
 
 	/*
 	 * XXX: we need the nd_ifinfo structure for lo0 to send packets to
-	 * an address of our own.  The strucutre should typically be initialized
-	 * during the bootstrap procedure, but we intentionally make it sure
-	 * just in case.
+	 * an address of our own.  The strucutre should typically be
+	 * initialized during the bootstrap procedure, but we intentionally
+	 * make it sure just in case.
 	 */
 #ifdef __bsdi__
 	nd6_ifattach(loifp);
