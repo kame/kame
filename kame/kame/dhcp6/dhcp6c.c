@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.156 2005/03/02 08:32:27 suz Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.157 2005/03/20 06:46:09 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1588,8 +1588,8 @@ client6_recvadvert(ifp, dh6, len, optinfo)
 			stcodestr = "NoPrefixAvail";
 			break;
 		case DHCP6_EVDATA_IANA:
-			stcode = DH6OPT_STCODE_NOADDRAVAIL;
-			stcodestr = "NoAddrAvail";
+			stcode = DH6OPT_STCODE_NOADDRSAVAIL;
+			stcodestr = "NoAddrsAvail";
 			break;
 		default:
 			continue;

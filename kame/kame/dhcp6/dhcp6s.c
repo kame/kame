@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.146 2005/03/20 06:37:19 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.147 2005/03/20 06:46:09 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1255,7 +1255,7 @@ react_solicit(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 		dhcp6_clear_list(&conflist);
 
 		if (!found) {
-			u_int16_t stcode = DH6OPT_STCODE_NOADDRAVAIL;
+			u_int16_t stcode = DH6OPT_STCODE_NOADDRSAVAIL;
 
 			if (dhcp6_add_listval(&roptinfo.stcode_list,
 			    DHCP6_LISTVAL_STCODE, &stcode, NULL) == NULL)
@@ -1414,7 +1414,7 @@ react_request(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 			    client_conf, 1) == 0) {
 				/*
 				 * We could not find any prefixes for the IA.
-				 * RFC3315 specifies to include NoAddrAvail
+				 * RFC3315 specifies to include NoAddrsAvail
 				 * for the IA in the address configuration
 				 * case (Section 18.2.1).  We follow the same
 				 * logic for prefix delegation as well.
@@ -1459,7 +1459,7 @@ react_request(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 			    client_conf, 1) == 0) {
 				if (make_ia_stcode(DHCP6_LISTVAL_IANA,
 				    iana->val_ia.iaid,
-				    DH6OPT_STCODE_NOADDRAVAIL,
+				    DH6OPT_STCODE_NOADDRSAVAIL,
 				    &roptinfo.iana_list)) {
 					dprintf(LOG_NOTICE, FNAME,
 					    "failed to make an option list");

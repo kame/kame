@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.55 2005/03/02 07:20:14 suz Exp $	*/
+/*	$KAME: dhcp6.h,v 1.56 2005/03/20 06:46:09 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -249,7 +249,7 @@ struct dhcp6_relay {
 #define DH6OPT_STATUS_CODE 13
 #  define DH6OPT_STCODE_SUCCESS 0
 #  define DH6OPT_STCODE_UNSPECFAIL 1
-#  define DH6OPT_STCODE_NOADDRAVAIL 2
+#  define DH6OPT_STCODE_NOADDRSAVAIL 2
 #  define DH6OPT_STCODE_NOBINDING 3
 #  define DH6OPT_STCODE_NOTONLINK 4
 #  define DH6OPT_STCODE_USEMULTICAST 5

@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.124 2005/03/02 07:20:13 suz Exp $	*/
+/*	$KAME: common.c,v 1.125 2005/03/20 06:46:09 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -3024,7 +3024,7 @@ dhcp6_stcodestr(code)
 		return ("success");
 	case DH6OPT_STCODE_UNSPECFAIL:
 		return ("unspec failure");
-	case DH6OPT_STCODE_NOADDRAVAIL:
+	case DH6OPT_STCODE_NOADDRSAVAIL:
 		return ("no addresses");
 	case DH6OPT_STCODE_NOBINDING:
 		return ("no binding");
