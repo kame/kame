@@ -51,7 +51,7 @@ COPTS?=		${DEFCOPTS}
 DBG=		# might contain unwanted -Ofoo
 DEFWARNINGS?=	yes
 .if (${DEFWARNINGS} == "yes")
-CWARNFLAGS+=	-Werror -Wall -Wno-main -Wno-format-zero-length -Wno-strict-aliasing
+CWARNFLAGS+=	-Wall -Wno-main -Wno-format-zero-length -Wno-strict-aliasing
 WEAK_POINTERS?=	no
 .if !(${WEAK_POINTERS} == "yes")
 CWARNFLAGS+=	-Wpointer-arith
