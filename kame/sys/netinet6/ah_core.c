@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.52 2003/04/22 10:08:29 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.53 2003/07/19 10:42:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -85,6 +85,7 @@
 
 #include <netinet6/ipsec.h>
 #include <netinet6/ah.h>
+#include <netinet6/ah_aesxcbcmac.h>
 #ifdef IPSEC_ESP
 #include <netinet6/esp.h>
 #endif
@@ -105,10 +106,9 @@
 
 #include <net/net_osdep.h>
 
-#define	HMACSIZE	16
-
 static int ah_sumsiz_1216 __P((struct secasvar *));
 static int ah_sumsiz_zero __P((struct secasvar *));
+static int ah_common_mature __P((struct secasvar *));
 static int ah_none_mature __P((struct secasvar *));
 static int ah_none_init __P((struct ah_algorithm_state *, struct secasvar *));
 static void ah_none_loop __P((struct ah_algorithm_state *, u_int8_t *, size_t));
@@ -119,37 +119,31 @@ static int ah_keyed_md5_init __P((struct ah_algorithm_state *,
 static void ah_keyed_md5_loop __P((struct ah_algorithm_state *, u_int8_t *,
 	size_t));
 static void ah_keyed_md5_result __P((struct ah_algorithm_state *, u_int8_t *));
-static int ah_keyed_sha1_mature __P((struct secasvar *));
 static int ah_keyed_sha1_init __P((struct ah_algorithm_state *,
 	struct secasvar *));
 static void ah_keyed_sha1_loop __P((struct ah_algorithm_state *, u_int8_t *,
 	size_t));
 static void ah_keyed_sha1_result __P((struct ah_algorithm_state *, u_int8_t *));
-static int ah_hmac_md5_mature __P((struct secasvar *));
 static int ah_hmac_md5_init __P((struct ah_algorithm_state *,
 	struct secasvar *));
 static void ah_hmac_md5_loop __P((struct ah_algorithm_state *, u_int8_t *,
 	size_t));
 static void ah_hmac_md5_result __P((struct ah_algorithm_state *, u_int8_t *));
-static int ah_hmac_sha1_mature __P((struct secasvar *));
 static int ah_hmac_sha1_init __P((struct ah_algorithm_state *,
 	struct secasvar *));
 static void ah_hmac_sha1_loop __P((struct ah_algorithm_state *, u_int8_t *,
 	size_t));
 static void ah_hmac_sha1_result __P((struct ah_algorithm_state *, u_int8_t *));
-static int ah_hmac_sha2_256_mature __P((struct secasvar *));
 static int ah_hmac_sha2_256_init __P((struct ah_algorithm_state *,
 	struct secasvar *));
 static void ah_hmac_sha2_256_loop __P((struct ah_algorithm_state *, u_int8_t *,
 	size_t));
 static void ah_hmac_sha2_256_result __P((struct ah_algorithm_state *, u_int8_t *));
-static int ah_hmac_sha2_384_mature __P((struct secasvar *));
 static int ah_hmac_sha2_384_init __P((struct ah_algorithm_state *,
 	struct secasvar *));
 static void ah_hmac_sha2_384_loop __P((struct ah_algorithm_state *, u_int8_t *,
 	size_t));
 static void ah_hmac_sha2_384_result __P((struct ah_algorithm_state *, u_int8_t *));
-static int ah_hmac_sha2_512_mature __P((struct secasvar *));
 static int ah_hmac_sha2_512_init __P((struct ah_algorithm_state *,
 	struct secasvar *));
 static void ah_hmac_sha2_512_loop __P((struct ah_algorithm_state *, u_int8_t *,
@@ -165,32 +159,36 @@ ah_algorithm_lookup(idx)
 {
 	/* checksum algorithms */
 	static struct ah_algorithm ah_algorithms[] = {
-		{ ah_sumsiz_1216, ah_hmac_md5_mature, 128, 128, "hmac-md5",
+		{ ah_sumsiz_1216, ah_common_mature, 128, 128, "hmac-md5",
 			ah_hmac_md5_init, ah_hmac_md5_loop,
 			ah_hmac_md5_result, },
-		{ ah_sumsiz_1216, ah_hmac_sha1_mature, 160, 160, "hmac-sha1",
+		{ ah_sumsiz_1216, ah_common_mature, 160, 160, "hmac-sha1",
 			ah_hmac_sha1_init, ah_hmac_sha1_loop,
 			ah_hmac_sha1_result, },
 		{ ah_sumsiz_1216, ah_keyed_md5_mature, 128, 128, "keyed-md5",
 			ah_keyed_md5_init, ah_keyed_md5_loop,
 			ah_keyed_md5_result, },
-		{ ah_sumsiz_1216, ah_keyed_sha1_mature, 160, 160, "keyed-sha1",
+		{ ah_sumsiz_1216, ah_common_mature, 160, 160, "keyed-sha1",
 			ah_keyed_sha1_init, ah_keyed_sha1_loop,
 			ah_keyed_sha1_result, },
 		{ ah_sumsiz_zero, ah_none_mature, 0, 2048, "none",
 			ah_none_init, ah_none_loop, ah_none_result, },
-		{ ah_sumsiz_1216, ah_hmac_sha2_256_mature, 256, 256,
+		{ ah_sumsiz_1216, ah_common_mature, 256, 256,
 			"hmac-sha2-256",
 			ah_hmac_sha2_256_init, ah_hmac_sha2_256_loop,
 			ah_hmac_sha2_256_result, },
-		{ ah_sumsiz_1216, ah_hmac_sha2_384_mature, 384, 384,
+		{ ah_sumsiz_1216, ah_common_mature, 384, 384,
 			"hmac-sha2-384",
 			ah_hmac_sha2_384_init, ah_hmac_sha2_384_loop,
 			ah_hmac_sha2_384_result, },
-		{ ah_sumsiz_1216, ah_hmac_sha2_512_mature, 512, 512,
+		{ ah_sumsiz_1216, ah_common_mature, 512, 512,
 			"hmac-sha2-512",
 			ah_hmac_sha2_512_init, ah_hmac_sha2_512_loop,
 			ah_hmac_sha2_512_result, },
+		{ ah_sumsiz_1216, ah_common_mature, 128, 128,
+			"aes-xcbc-mac",
+			ah_aes_xcbc_mac_init, ah_aes_xcbc_mac_loop,
+			ah_aes_xcbc_mac_result, },
 	};
 
 	switch (idx) {
@@ -210,6 +208,8 @@ ah_algorithm_lookup(idx)
 		return &ah_algorithms[6];
 	case SADB_X_AALG_SHA2_512:
 		return &ah_algorithms[7];
+	case SADB_X_AALG_AES_XCBC_MAC:
+		return &ah_algorithms[8];
 	default:
 		return NULL;
 	}
@@ -234,6 +234,34 @@ ah_sumsiz_zero(sav)
 {
 	if (!sav)
 		panic("ah_sumsiz_zero: null pointer is passed");
+	return 0;
+}
+
+static int
+ah_common_mature(sav)
+	struct secasvar *sav;
+{
+	const struct ah_algorithm *algo;
+
+	if (!sav->key_auth) {
+		ipseclog((LOG_ERR, "ah_common_mature: no key is given.\n"));
+		return 1;
+	}
+
+	algo = ah_algorithm_lookup(sav->alg_auth);
+	if (!algo) {
+		ipseclog((LOG_ERR, "ah_common_mature: unsupported algorithm.\n"));
+		return 1;
+	}
+
+	if (sav->key_auth->sadb_key_bits < algo->keymin
+	 || algo->keymax < sav->key_auth->sadb_key_bits) {
+		ipseclog((LOG_ERR,
+		    "ah_common_mature: invalid key length %d for %s.\n",
+		    sav->key_auth->sadb_key_bits, algo->name));
+		return 1;
+	}
+
 	return 0;
 }
 
@@ -372,34 +400,6 @@ ah_keyed_md5_result(state, addr)
 }
 
 static int
-ah_keyed_sha1_mature(sav)
-	struct secasvar *sav;
-{
-	const struct ah_algorithm *algo;
-
-	if (!sav->key_auth) {
-		ipseclog((LOG_ERR, "ah_keyed_sha1_mature: no key is given.\n"));
-		return 1;
-	}
-
-	algo = ah_algorithm_lookup(sav->alg_auth);
-	if (!algo) {
-		ipseclog((LOG_ERR, "ah_keyed_sha1_mature: unsupported algorithm.\n"));
-		return 1;
-	}
-
-	if (sav->key_auth->sadb_key_bits < algo->keymin
-	 || algo->keymax < sav->key_auth->sadb_key_bits) {
-		ipseclog((LOG_ERR,
-		    "ah_keyed_sha1_mature: invalid key length %d.\n",
-		    sav->key_auth->sadb_key_bits));
-		return 1;
-	}
-
-	return 0;
-}
-
-static int
 ah_keyed_sha1_init(state, sav)
 	struct ah_algorithm_state *state;
 	struct secasvar *sav;
@@ -492,34 +492,6 @@ ah_keyed_sha1_result(state, addr)
 	bcopy(&digest[0], (void *)addr, HMACSIZE);
 
 	free(state->foo, M_TEMP);
-}
-
-static int
-ah_hmac_md5_mature(sav)
-	struct secasvar *sav;
-{
-	const struct ah_algorithm *algo;
-
-	if (!sav->key_auth) {
-		ipseclog((LOG_ERR, "ah_hmac_md5_mature: no key is given.\n"));
-		return 1;
-	}
-
-	algo = ah_algorithm_lookup(sav->alg_auth);
-	if (!algo) {
-		ipseclog((LOG_ERR, "ah_hmac_md5_mature: unsupported algorithm.\n"));
-		return 1;
-	}
-
-	if (sav->key_auth->sadb_key_bits < algo->keymin
-	 || algo->keymax < sav->key_auth->sadb_key_bits) {
-		ipseclog((LOG_ERR,
-		    "ah_hmac_md5_mature: invalid key length %d.\n",
-		    sav->key_auth->sadb_key_bits));
-		return 1;
-	}
-
-	return 0;
 }
 
 static int
@@ -619,34 +591,6 @@ ah_hmac_md5_result(state, addr)
 }
 
 static int
-ah_hmac_sha1_mature(sav)
-	struct secasvar *sav;
-{
-	const struct ah_algorithm *algo;
-
-	if (!sav->key_auth) {
-		ipseclog((LOG_ERR, "ah_hmac_sha1_mature: no key is given.\n"));
-		return 1;
-	}
-
-	algo = ah_algorithm_lookup(sav->alg_auth);
-	if (!algo) {
-		ipseclog((LOG_ERR, "ah_hmac_sha1_mature: unsupported algorithm.\n"));
-		return 1;
-	}
-
-	if (sav->key_auth->sadb_key_bits < algo->keymin
-	 || algo->keymax < sav->key_auth->sadb_key_bits) {
-		ipseclog((LOG_ERR,
-		    "ah_hmac_sha1_mature: invalid key length %d.\n",
-		    sav->key_auth->sadb_key_bits));
-		return 1;
-	}
-
-	return 0;
-}
-
-static int
 ah_hmac_sha1_init(state, sav)
 	struct ah_algorithm_state *state;
 	struct secasvar *sav;
@@ -742,36 +686,6 @@ ah_hmac_sha1_result(state, addr)
 	bcopy(&digest[0], (void *)addr, HMACSIZE);
 
 	free(state->foo, M_TEMP);
-}
-
-static int
-ah_hmac_sha2_256_mature(sav)
-	struct secasvar *sav;
-{
-	const struct ah_algorithm *algo;
-
-	if (!sav->key_auth) {
-		ipseclog((LOG_ERR,
-		    "ah_hmac_sha2_256_mature: no key is given.\n"));
-		return 1;
-	}
-
-	algo = ah_algorithm_lookup(sav->alg_auth);
-	if (!algo) {
-		ipseclog((LOG_ERR,
-		    "ah_hmac_sha2_256_mature: unsupported algorithm.\n"));
-		return 1;
-	}
-
-	if (sav->key_auth->sadb_key_bits < algo->keymin ||
-	    algo->keymax < sav->key_auth->sadb_key_bits) {
-		ipseclog((LOG_ERR,
-		    "ah_hmac_sha2_256_mature: invalid key length %d.\n",
-		    sav->key_auth->sadb_key_bits));
-		return 1;
-	}
-
-	return 0;
 }
 
 static int
@@ -877,36 +791,6 @@ ah_hmac_sha2_256_result(state, addr)
 }
 
 static int
-ah_hmac_sha2_384_mature(sav)
-	struct secasvar *sav;
-{
-	const struct ah_algorithm *algo;
-
-	if (!sav->key_auth) {
-		ipseclog((LOG_ERR,
-		    "ah_hmac_sha2_384_mature: no key is given.\n"));
-		return 1;
-	}
-
-	algo = ah_algorithm_lookup(sav->alg_auth);
-	if (!algo) {
-		ipseclog((LOG_ERR,
-		    "ah_hmac_sha2_384_mature: unsupported algorithm.\n"));
-		return 1;
-	}
-
-	if (sav->key_auth->sadb_key_bits < algo->keymin ||
-	    algo->keymax < sav->key_auth->sadb_key_bits) {
-		ipseclog((LOG_ERR,
-		    "ah_hmac_sha2_384_mature: invalid key length %d.\n",
-		    sav->key_auth->sadb_key_bits));
-		return 1;
-	}
-
-	return 0;
-}
-
-static int
 ah_hmac_sha2_384_init(state, sav)
 	struct ah_algorithm_state *state;
 	struct secasvar *sav;
@@ -1007,36 +891,6 @@ ah_hmac_sha2_384_result(state, addr)
 	bcopy(&digest[0], (void *)addr, HMACSIZE);
 
 	free(state->foo, M_TEMP);
-}
-
-static int
-ah_hmac_sha2_512_mature(sav)
-	struct secasvar *sav;
-{
-	const struct ah_algorithm *algo;
-
-	if (!sav->key_auth) {
-		ipseclog((LOG_ERR,
-		    "ah_hmac_sha2_512_mature: no key is given.\n"));
-		return 1;
-	}
-
-	algo = ah_algorithm_lookup(sav->alg_auth);
-	if (!algo) {
-		ipseclog((LOG_ERR,
-		    "ah_hmac_sha2_512_mature: unsupported algorithm.\n"));
-		return 1;
-	}
-
-	if (sav->key_auth->sadb_key_bits < algo->keymin ||
-	    algo->keymax < sav->key_auth->sadb_key_bits) {
-		ipseclog((LOG_ERR,
-		    "ah_hmac_sha2_512_mature: invalid key length %d.\n",
-		    sav->key_auth->sadb_key_bits));
-		return 1;
-	}
-
-	return 0;
 }
 
 static int

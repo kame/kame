@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.31 2003/06/27 06:45:41 itojun Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.32 2003/07/19 10:42:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -310,7 +310,7 @@ struct sadb_x_tag {
 #define SADB_AALG_NONE		0
 #define SADB_AALG_MD5HMAC	2
 #define SADB_AALG_SHA1HMAC	3
-#define SADB_AALG_MAX		251
+#define SADB_AALG_MAX		252
 /* private allocations - based on RFC2407/IANA assignment */
 #define SADB_X_AALG_SHA2_256	5
 #define SADB_X_AALG_SHA2_384	6
@@ -319,6 +319,7 @@ struct sadb_x_tag {
 #define SADB_X_AALG_MD5		249	/* Keyed MD5 */
 #define SADB_X_AALG_SHA		250	/* Keyed SHA */
 #define SADB_X_AALG_NULL	251	/* null authentication */
+#define SADB_X_AALG_AES_XCBC_MAC 252	/* draft-ietf-ipsec-ciph-aes-xcbc-mac-03 */
 
 /* RFC2367 numbers - meets RFC2407 */
 #define SADB_EALG_NONE		0
@@ -332,6 +333,7 @@ struct sadb_x_tag {
 #define SADB_X_EALG_RIJNDAELCBC	12
 #define SADB_X_EALG_AES		12
 /* private allocations should use 249-255 (RFC2407) */
+#define SADB_X_EALG_AESCTR	249	/* draft-ietf-ipsec-ciph-aes-ctr-03 */
 #define SADB_X_EALG_TWOFISHCBC	253	/* draft-ietf-ipsec-ciph-aes-cbc-00 */
 
 #if 1	/*nonstandard */

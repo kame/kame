@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.60 2003/01/20 00:55:27 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.61 2003/07/19 10:42:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -55,21 +55,16 @@
 #include <net/route.h>
 
 #include <netinet/in.h>
-#include <netinet/in_var.h>
-#ifdef INET6
-#include <netinet/ip6.h>
-#include <netinet6/ip6_var.h>
-#include <netinet/icmp6.h>
-#endif
 
 #include <netinet6/ipsec.h>
 #include <netinet6/ah.h>
 #include <netinet6/esp.h>
 #include <netinet6/esp_twofish.h>
 #include <netinet6/esp_rijndael.h>
+#include <netinet6/esp_aesctr.h>
 #include <net/pfkeyv2.h>
-#include <netkey/keydb.h>
 #include <netkey/key.h>
+
 #include <crypto/des/des.h>
 #include <crypto/blowfish/blowfish.h>
 #include <crypto/cast128/cast128.h>
@@ -133,7 +128,7 @@ static const struct esp_algorithm esp_algorithms[] = {
 		esp_common_ivlen, esp_cbc_decrypt,
 		esp_cbc_encrypt, esp_3des_schedule,
 		esp_3des_blockdecrypt, esp_3des_blockencrypt, },
-	{ 1, 0, esp_null_mature, 0, 2048, 0, "null",
+	{ 1, 0, esp_null_mature, 0, 2048, NULL, "null",
 		esp_common_ivlen, esp_null_decrypt,
 		esp_null_encrypt, NULL, },
 	{ 8, 8, esp_cbc_mature, 40, 448, esp_blowfish_schedlen, "blowfish-cbc",
@@ -155,6 +150,9 @@ static const struct esp_algorithm esp_algorithms[] = {
 		esp_common_ivlen, esp_cbc_decrypt,
 		esp_cbc_encrypt, esp_twofish_schedule,
 		esp_twofish_blockdecrypt, esp_twofish_blockencrypt },
+	{ 16, 8, esp_aesctr_mature, 160, 288, esp_aesctr_schedlen, "aes-ctr",
+		esp_common_ivlen, esp_aesctr_decrypt,
+		esp_aesctr_encrypt, esp_aesctr_schedule },
 };
 
 const struct esp_algorithm *
@@ -177,6 +175,8 @@ esp_algorithm_lookup(idx)
 		return &esp_algorithms[5];
 	case SADB_X_EALG_TWOFISHCBC:
 		return &esp_algorithms[6];
+	case SADB_X_EALG_AESCTR:
+		return &esp_algorithms[7];
 	default:
 		return NULL;
 	}
@@ -454,6 +454,7 @@ esp_cbc_mature(sav)
 	case SADB_X_EALG_TWOFISHCBC:
 		break;
 	case SADB_X_EALG_RIJNDAELCBC:
+	case SADB_X_EALG_AESCTR:
 		/* allows specific key sizes only */
 		if (!(keylen == 128 || keylen == 192 || keylen == 256)) {
 			ipseclog((LOG_ERR,

@@ -1,4 +1,4 @@
-/*	$KAME: esp_twofish.c,v 1.6 2003/06/26 07:34:23 itojun Exp $	*/
+/*	$KAME: esp_twofish.c,v 1.7 2003/07/19 10:42:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,14 +28,6 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-#include "opt_inet.h"
-#include "opt_inet6.h"
-#endif
-#ifdef __NetBSD__
-#include "opt_inet.h"
-#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>

@@ -1,4 +1,4 @@
-/*	$KAME: esp_rijndael.c,v 1.12 2003/07/15 17:38:24 itojun Exp $	*/
+/*	$KAME: esp_rijndael.c,v 1.13 2003/07/19 10:42:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,14 +29,6 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-#include "opt_inet.h"
-#include "opt_inet6.h"
-#endif
-#ifdef __NetBSD__
-#include "opt_inet.h"
-#endif
-
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/socket.h>
@@ -56,7 +48,6 @@
 #include <net/net_osdep.h>
 
 /* as rijndael uses asymmetric scheduled keys, we need to do it twice. */
-
 typedef struct {
 	u_int32_t	r_ek[(RIJNDAEL_MAXNR+1)*4];
 	u_int32_t	r_dk[(RIJNDAEL_MAXNR+1)*4];
@@ -67,6 +58,7 @@ size_t
 esp_rijndael_schedlen(algo)
 	const struct esp_algorithm *algo;
 {
+
 	return sizeof(rijndael_ctx);
 }
 

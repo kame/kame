@@ -1219,10 +1219,12 @@ file	netinet/tcp_subr.c		inet | inet6
 file	netinet/tcp_timer.c		inet | inet6
 file	netinet/tcp_usrreq.c		inet | inet6
 file	netinet/udp_usrreq.c		inet | inet6
+file	netinet6/ah_aesxcbcmac.c	ipsec
 file	netinet6/ah_core.c		ipsec
 file	netinet6/ah_input.c		ipsec
 file	netinet6/ah_output.c		ipsec
 file	netinet6/dest6.c		inet6
+file	netinet6/esp_aesctr.c		ipsec & ipsec_esp
 file	netinet6/esp_core.c		ipsec & ipsec_esp
 file	netinet6/esp_output.c		ipsec & ipsec_esp
 file	netinet6/esp_input.c		ipsec & ipsec_esp
