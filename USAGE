@@ -1,6 +1,6 @@
 	USAGE
 	KAME Project
-	$KAME: USAGE,v 1.29 2000/11/15 16:52:32 itojun Exp $
+	$KAME: USAGE,v 1.30 2000/11/15 16:55:04 itojun Exp $
 
 This is a introduction of how to use the commands provided in the KAME
 kit.  For more information, please refer to each man page to be
@@ -184,9 +184,9 @@ If you want to add a default route manually, do like:
 is assumed for "prefixlen" to get along with the aggregatable address.
 
 Note that, in IPv6, a link-local address should be used as gateway
-("fe80::200:a2ff:fe0e:7543%ed0" in the above). If you use global addresses,
+("fe80::200:a2ff:fe0e:7543%ed0" in the above).  If you use global addresses,
 ICMPv6 redirect will not work properly.  Also note that we use a special form
-of link-local address as gateway. See Section 1.3 of IMPLEMENTATION for
+of link-local address as gateway.  See Section 1.3 of IMPLEMENTATION for
 more details.
 For ease of configuration we recommend you to avoid static routes and run
 a routing daemon (route6d for example) instead.
