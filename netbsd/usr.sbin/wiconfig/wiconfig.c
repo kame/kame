@@ -225,6 +225,9 @@ void wi_setword(iface, code, word)
 {
 	struct wi_req		wreq;
 
+	if (iface == NULL)
+		errx(1, "must specify interface name");
+
 	bzero((char *)&wreq, sizeof(wreq));
 
 	wreq.wi_type = code;
@@ -471,6 +474,9 @@ static void wi_dumpinfo(iface)
 	struct wi_req		wreq;
 	int			i, has_wep;
 	struct wi_table		*w;
+
+	if (iface == NULL)
+		errx(1, "must specify interface name");
 
 	bzero((char *)&wreq, sizeof(wreq));
 
