@@ -373,6 +373,8 @@ dump_stat()
 	fprintf(fp, "\t%qu kernel cache deletions\n", pim6dstat.kern_del_cache);
 	fprintf(fp, "\t%qu kernel cache deletion failures\n",
 		pim6dstat.kern_del_cache_fail);
+	fprintf(fp, "\t%qu failures of getting kernel cache\n",
+		pim6dstat.kern_sgcnt_fail);
 
 	fclose(fp);
 }
