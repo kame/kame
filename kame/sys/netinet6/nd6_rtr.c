@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.80 2001/02/02 04:39:40 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.81 2001/02/02 04:44:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1578,7 +1578,7 @@ nd6_prefix_onlink(pr)
 						      IN6_IFF_NOTREADY|
 						      IN6_IFF_ANYCAST);
 	if (ifa == NULL) {
-		/* XXX: freebsd(4?) does not have ifa_ifwithaf */
+		/* XXX: freebsd does not have ifa_ifwithaf */
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
 		for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 4
@@ -1592,7 +1592,6 @@ nd6_prefix_onlink(pr)
 			if (ifa->ifa_addr->sa_family == AF_INET6)
 				break;
 		}
-		/* ifa = ifa_ifwithaf(AF_INET6); */
 		/* should we care about ia6_flags? */
 	}
 	if (ifa == NULL) {
