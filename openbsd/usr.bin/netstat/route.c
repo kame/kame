@@ -169,7 +169,7 @@ routepr(rtree)
 				pr_family(i);
 				do_rtent = 1;
 				if (i != PF_KEY)
-					pr_rthdr(af);
+					pr_rthdr(i);
 				else
 					pr_encaphdr();
 				p_tree(head.rnh_treetop);
