@@ -502,7 +502,9 @@ explore_fqdn(pai, hostname, servname, res)
 	const char *servname;
 	struct addrinfo **res;
 {
+#if 0
 	int s;
+#endif
 	struct hostent *hp;
 	int h_error;
 	int af;
