@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.42 2000/07/31 19:01:23 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.43 2000/08/10 01:02:40 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -68,7 +68,6 @@
 #include "crypto_openssl.h"
 #include "sockmisc.h"
 #include "strnames.h"
-#include "signing.h"
 
 #define OUTBOUND_SA	0
 #define INBOUND_SA	1
