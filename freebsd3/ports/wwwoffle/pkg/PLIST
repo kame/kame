@@ -8,9 +8,6 @@ bin/wwwoffle-write
 etc/rc.d/wwwoffle.sh
 etc/wwwoffle/wwwoffle.conf.default
 @exec if [ ! -f %D/etc/wwwoffle/wwwoffle.conf ]; then cp -p %D/etc/wwwoffle/wwwoffle.conf.default %D/etc/wwwoffle/wwwoffle.conf; fi
-man/man1/wwwoffle.1
-man/man5/wwwoffle.conf.5
-man/man8/wwwoffled.8
 sbin/wwwoffled
 share/doc/wwwoffle/CHANGES.CONF
 share/doc/wwwoffle/CONVERT
