@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.22 2001/09/06 06:11:13 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.23 2001/09/11 06:57:38 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -86,12 +86,20 @@ natpt_lookForRule6(struct pcv *cv6)
 	for (acs = TAILQ_FIRST(&csl_head);
 	     acs;
 	     acs = TAILQ_NEXT(acs, csl_list)) {
-		if ((acs->proto != 0)
-		    && (acs->proto != cv6->ip_p))
-			continue;
-
 		if (acs->local.sa_family != AF_INET6)
 			continue;
+
+		if (acs->proto != 0) {
+		    if ((cv6->ip_p == IPPROTO_ICMPV6)
+			&& ((acs->proto & NATPT_ICMP) == 0))
+			    continue;
+		    if ((cv6->ip_p == IPPROTO_TCP)
+			&& ((acs->proto & NATPT_TCP) == 0))
+			    continue;
+		    if ((cv6->ip_p == IPPROTO_UDP)
+			&& ((acs->proto & NATPT_UDP) == 0))
+			    continue;
+		}
 
 		if (natpt_matchIn6addr(cv6, &acs->local) != 0) {
 			if (isDump(D_MATCHINGRULE6))
@@ -115,12 +123,20 @@ natpt_lookForRule4(struct pcv *cv4)
 	for (csl = TAILQ_FIRST(&csl_head);
 	     csl;
 	     csl = TAILQ_NEXT(csl, csl_list)) {
-		if ((csl->proto != 0)
-		    && (csl->proto != cv4->ip_p))
-			continue;
-
 		if (csl->local.sa_family != AF_INET)
 			continue;
+
+		if (csl->proto != 0) {
+		    if ((cv4->ip_p == IPPROTO_ICMP)
+			&& ((csl->proto & NATPT_ICMP) == 0))
+			    continue;
+		    if ((cv4->ip_p == IPPROTO_TCP)
+			&& ((csl->proto & NATPT_TCP) == 0))
+			    continue;
+		    if ((cv4->ip_p == IPPROTO_UDP)
+			&& ((csl->proto & NATPT_UDP) == 0))
+			    continue;
+		}
 
 		if (natpt_matchIn4addr(cv4, &csl->local) != 0) {
 			if (isDump(D_MATCHINGRULE4))
