@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.350 1999/12/19 12:18:19 itojun Exp $
+$Id: CHANGELOG,v 1.351 1999/12/19 15:15:34 itojun Exp $
 
 <199912>
+Mon Dec 20 00:16:49 JST 1999  itojun@iijlab.net
+	* kame/faithd/faithd.c: handle connetion to IPv4 mapped address
+	  correctly.  the bug can allow DoS attack.
+	  From: Feico Dillema
+	  NetBSD PR: 8640
+
 Sun Dec 19 21:19:09 JST 1999  itojun@iijlab.net
 	* share/man/man4/ip6.4: manpage for IPv6 layer.
 
