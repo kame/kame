@@ -21,7 +21,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-pim.c,v 1.4 1999/11/17 14:49:49 jinmei Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-pim.c,v 1.5 1999/12/16 04:42:25 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -31,34 +31,25 @@ static const char rcsid[] =
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-#include <netinet/ip_var.h>
-#include <netinet/udp.h>
-#include <netinet/udp_var.h>
-#include <netinet/tcp.h>
 
 /*
  * XXX: We consider a case where IPv6 is not ready yet for portability,
  * but PIM dependent defintions should be independent of IPv6...
  */
-#ifdef INET6
-#include <netinet6/pim6.h>
-#else
+
 struct pim {
-#if defined(BYTE_ORDER) && (BYTE_ORDER == LITTLE_ENDIAN)
-	u_char	pim_type:4, /* the PIM message type, currently they are:
-			    * Hello, Register, Register-Stop, Join/Prune,
-			    * Bootstrap, Assert, Graft (PIM-DM only),
-			    * Graft-Ack (PIM-DM only), C-RP-Adv
-			    */
-		pim_ver:4;  /* PIM version number; 2 for PIMv2 */
-#else
-	u_char	pim_ver:4,	/* PIM version */
-		pim_type:4;	/* PIM type    */
-#endif
+	u_int8_t pim_typever;
+			/* upper 4bit: the PIM message type, currently they are:
+			 * Hello, Register, Register-Stop, Join/Prune,
+			 * Bootstrap, Assert, Graft (PIM-DM only),
+			 * Graft-Ack (PIM-DM only), C-RP-Adv
+			 */
+			/* lower 4bit: PIM version number; 2 for PIMv2 */
+#define PIM_TYPE(x)	(((x) & 0xf0) >> 4)
+#define PIM_VER(x)	((x) & 0x0f)
 	u_char  pim_rsv;	/* Reserved */
 	u_short	pim_cksum;	/* IP style check sum */
 };
-#endif 
 
 
 #include <stdio.h>
@@ -138,13 +129,13 @@ pim_print(register const u_char *bp, register u_int len)
 	TCHECK(pim->pim_rsv);
 #endif
 
-	switch(pim->pim_ver) {
+	switch(PIM_VER(pim->pim_typever)) {
 	 case 2:		/* avoid hardcoding? */
 		(void)printf("v2");
 		pimv2_print(bp, len);
 		break;
 	 default:
-		(void)printf("v%d", pim->pim_ver);
+		(void)printf("v%d", PIM_VER(pim->pim_typever));
 		break;
 	}
 	return;
@@ -269,7 +260,7 @@ pimv2_print(register const u_char *bp, register u_int len)
 	TCHECK(pim->pim_rsv);
 #endif
 
-	switch (pim->pim_type) {
+	switch (PIM_TYPE(pim->pim_typever)) {
 	 case 0:
 	    {
 		u_int16_t otype, olen;
@@ -357,7 +348,7 @@ pimv2_print(register const u_char *bp, register u_int len)
 		u_int16_t nprune;
 		int i, j;
 
-		switch (pim->pim_type) {
+		switch (PIM_TYPE(pim->pim_typever)) {
 		 case 3:
 			(void)printf(" Join/Prune");
 			break;
@@ -369,7 +360,7 @@ pimv2_print(register const u_char *bp, register u_int len)
 			break;
 		}
 		bp += 4; len -= 4;
-		if (pim->pim_type != 7) {	/*not for Graft-ACK*/
+		if (PIM_TYPE(pim->pim_typever) != 7) {	/*not for Graft-ACK*/
 			if (bp >= ep)
 				break;
 			(void)printf(" upstream-neighbor=");
@@ -384,7 +375,7 @@ pimv2_print(register const u_char *bp, register u_int len)
 		ngroup = bp[1];
 		holdtime = ntohs(*(u_int16_t *)(bp + 2));
 		(void)printf(" groups=%u", ngroup);
-		if (pim->pim_type != 7) {	/*not for Graft-ACK*/
+		if (PIM_TYPE(pim->pim_typever) != 7) {	/*not for Graft-ACK*/
 			(void)printf(" holdtime=");
 			if (holdtime == 0xffff)
 				(void)printf("infty");
@@ -579,7 +570,7 @@ pimv2_print(register const u_char *bp, register u_int len)
 	 }
 
 	 default:
-		(void)printf(" [type %d]", pim->pim_type);
+		(void)printf(" [type %d]", PIM_TYPE(pim->pim_typever));
 		break;
 	}
 
