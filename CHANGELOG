@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.956 2000/05/30 14:59:00 itojun Exp $
+$Id: CHANGELOG,v 1.957 2000/05/30 16:11:08 itojun Exp $
 
 <200005>
 Tue May 30 23:56:04 JST 2000  itojun@iiljab.net
@@ -9,15 +9,19 @@ Tue May 30 23:56:04 JST 2000  itojun@iiljab.net
 
 Tue May 30 20:54:23 JST 2000  itojun@iijlab.net
 	* libinet6/resolv/res_send.c: with #define MULTICASTQUERY6, allow
-	  multicast address into /etc/resolv.conf "nameserver" line.
-		nameserver ff02::1%wi0
-	  will reach nameserver(s) on the link.
-	  The behavior change has two parts:
-	  - do not check src/dst pair match if we have multicast address in
-	    resolv.conf.
-	  - do not use connected udp socket for multicast query.
+	  multicast address in /etc/resolv.conf "nameserver" line.  By
+	  configuring resolv.conf(5) like below:
+		nameserver ff02::1%3
+	  DNS queries will reach all nodes on the link with link ID "3".
+	  With the change, the resolver code changes some of its behaviors:
+	  - the resolver code does not check src/dst pair match, if we have
+	    multicast address in resolv.conf.  It may or may not raise security
+	    issue.
+	  - the resolver code does not use connected udp socket for multicast
+	    query.
 
-	  highly experimental - this is NOT multicast DNS as drafted in
+	  highly experimental - note that this change DOES NOT attempt to
+	  support multicast DNS queries, as drafted in
 	  draft-aboba-dnsext-mdns-00.
 
 2000-05-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
