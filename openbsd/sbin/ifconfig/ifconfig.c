@@ -539,8 +539,9 @@ printif(ifrm, ifaliases)
 	char *inbuf = NULL;
 	struct ifconf ifc;
 	struct ifreq ifreq, *ifrp;
-	int i, len = 8192;
+	int i, siz, len = 8192;
 	int count = 0, noinet = 1;
+	char ifrbuf[8192];
 
 	getsock(af);
 	if (s < 0)
@@ -560,9 +561,17 @@ printif(ifrm, ifaliases)
 	ifreq.ifr_name[0] = '\0';
 	for (i = 0; i < ifc.ifc_len; ) {
 		ifrp = (struct ifreq *)((caddr_t)ifc.ifc_req + i);
-		i += sizeof(ifrp->ifr_name) +
-		    (ifrp->ifr_addr.sa_len > sizeof(struct sockaddr) ?
-		    ifrp->ifr_addr.sa_len : sizeof(struct sockaddr));
+		memcpy(ifrbuf, ifrp, sizeof(*ifrp));
+		siz = ((struct ifreq *)ifrbuf)->ifr_addr.sa_len;
+		if (siz < sizeof(ifrp->ifr_addr))
+			siz = sizeof(ifrp->ifr_addr);
+		siz += sizeof(ifrp->ifr_name);
+		i += siz;
+		/* avoid alignment issue */
+		if (sizeof(ifrbuf) < siz)
+			errx(1, "ifr too big");
+		memcpy(ifrbuf, ifrp, siz);
+		ifrp = (struct ifreq *)ifrbuf;
 
 		if (ifrm && strncmp(ifrm->ifr_name, ifrp->ifr_name,
 		    sizeof(ifrp->ifr_name)))
