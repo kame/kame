@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.3 2000/01/10 01:23:28 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.4 2000/01/10 18:03:37 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -1212,7 +1212,7 @@ ident_ir2sendmx(iph1)
 
 	/* append vendor id, if needed */
 	if (vidhash)
-		p = set_isakmp_payload(p, vidhash, ISAKMP_NPTYPE_NONCE);
+		p = set_isakmp_payload(p, vidhash, ISAKMP_NPTYPE_NONE);
 
 #ifdef HAVE_PRINT_ISAKMP_C
 	isakmp_printpacket(buf, iph1->local, iph1->remote, 0);
