@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.104 2003/06/25 07:43:20 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.105 2003/06/25 07:44:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -79,10 +79,7 @@ struct	llinfo_nd6 {
 #define ND6_LLINFO_PROBE	4
 
 #define ND6_IS_LLINFO_PROBREACH(n) ((n)->ln_state > ND6_LLINFO_INCOMPLETE)
-
-#ifdef _KERNEL
 #define ND6_LLINFO_PERMANENT(n)	((n)->ln_expire == 0)
-#endif
 
 struct nd_ifinfo {
 	u_int32_t linkmtu;		/* LinkMTU */
