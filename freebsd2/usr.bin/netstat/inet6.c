@@ -600,7 +600,7 @@ ip6_stats(off, name)
 			       ip6stat.ip6s_nxthist[i]);
 		}
 	printf("\tMbuf statistics:\n");
-	p("\t\t%qu one mbuf%s\n", ip6s_m1);
+	p(ip6s_m1, "\t\t%qu one mbuf%s\n");
 	for (first = 1, i = 0; i < 32; i++) {
 		char ifbuf[IFNAMSIZ];
 		if (ip6stat.ip6s_m2m[i] != 0) {		
