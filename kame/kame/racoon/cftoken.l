@@ -277,7 +277,7 @@ octetstring	{octet}({dot}{octet})+
 
 		incstack[incstackp].lineno += yycf_count_nl(yytext);
 
-		yylval.val = vmalloc(yyleng);
+		yylval.val = vmalloc(yyleng + 1);
 		if (yylval.val == NULL) {
 			yyerror("vmalloc failed: %s\n");
 			return -1;
@@ -380,7 +380,7 @@ hour|hours		{ YYD; yylval.num = CF_UNITTYPE_H; return(UNITTYPE); }
 			char *p;
 
 			YYD; 
-			yylval.val = vmalloc(yyleng + (yyleng & 1));
+			yylval.val = vmalloc(yyleng + (yyleng & 1) + 1);
 			if (yylval.val == NULL) {
 				yyerror("vmalloc failed: %s\n");
 				return -1;
@@ -393,7 +393,7 @@ hour|hours		{ YYD; yylval.num = CF_UNITTYPE_H; return(UNITTYPE); }
 			/* fixed string if length is odd. */
 			if (yyleng & 1)
 				*p++ = '0';
-			memcpy(p, &yytext[2], yyleng - 2);
+			memcpy(p, &yytext[2], yyleng - 1);
 
 			return(HEXSTRING);
 		}
@@ -406,7 +406,7 @@ hour|hours		{ YYD; yylval.num = CF_UNITTYPE_H; return(UNITTYPE); }
 			*p = NULL;
 			yytext++;
 
-			yylval.val = vmalloc(yyleng-2);
+			yylval.val = vmalloc(yyleng - 1);
 			if (yylval.val == NULL) {
 				yyerror("vmalloc failed: %s\n");
 				return -1;
@@ -419,7 +419,7 @@ hour|hours		{ YYD; yylval.num = CF_UNITTYPE_H; return(UNITTYPE); }
 {addrstring}	{
 			YYD;
 
-			yylval.val = vmalloc(yyleng);
+			yylval.val = vmalloc(yyleng + 1);
 			if (yylval.val == NULL) {
 				yyerror("vmalloc failed: %s\n");
 				return -1;
