@@ -1,7 +1,44 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1978 2001/11/12 06:09:17 jinmei Exp $
+$KAME: CHANGELOG,v 1.1979 2001/11/13 16:00:13 jinmei Exp $
 
 <200111>
+2001-11-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/(many files): removed all references to
+	NI_WITHSCOPEID.
+
+2001-11-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* *bsd/lib/libinet6/Makefile: added scope.c to SRCS in order to
+	deal with scope zone IDs.  The library functions defined in the
+	file are KAME specific, and not standard ones.
+
+2001-11-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtsold/rtsold.c (ifconfig): got a proper link ID for
+	each interface.
+	* kame/kame/rtsold/rtsol.c (sendpacket):
+	* kame/kame/rtsold/probe.c (sendprobe):
+	set the link ID for the outgoing link-local packet.
+
+2001-11-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtsold/rtsol.c (sockopen): initialize the family and
+	the length members of a sockaddr_in6 structure correctly.
+
+2001-11-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/raw_ip6.c (rip6_usrreq):
+	* freebsd4/sys/netinet6/raw_ip6.c (rip6_send):
+	validated the length and the address family of the destination for
+	the send operation.  This fix is correct per se, but breaks
+	backward compatibility to old rtsol(d) due to a bug of the
+	application(s).
+
+2001-11-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/(many files): changed the way of qualifying
+	the zone of address scope.  The current code basically assumes the
+	application sets the scope zone correctly, and only uses the
+	default zone value as the last resort (if configured so).
+	However, a workaround was provided for backward compatibility; the
+	kernel also tries to disambiguate the scope zone after selecting
+	the source address and the outgoing interface.
+
 2001-11-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ping6/ping6.c (main): used a pair of the
 	IPV6_UNICAST_HOPS and IPV6_MULTICAST_HOPS socket options
