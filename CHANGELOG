@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2363 2003/03/25 11:08:16 suz Exp $
+$KAME: CHANGELOG,v 1.2364 2003/03/26 10:45:13 suz Exp $
 
 <200303>
+Wed Mar 26 19:43:16 JST 2003	suz@crl.hitachi.co.jp
+	* freebsd[45]/sys/conf/options:
+	supported LARGE_LOMTU kernel configuration option for 
+	Jumbogram testing.
 
 Tue Mar 25 19:07:53 JST 2003	suz@crl.hitachi.co.jp
 	* kame/sys/netinet6/in6_msf.c
