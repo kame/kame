@@ -1,0 +1,43 @@
+--- net-ipv6.cc-	Wed Dec  8 13:26:09 1999
++++ net-ipv6.cc	Wed Dec  8 13:26:45 1999
+@@ -76,7 +76,7 @@
+ 	IP6Address() { text_ = new char[INET6_ADDRSTRLEN]; };
+ 	virtual int operator=(const char*);
+ 	int operator=(const struct in6_addr& addr);
+-	int operator=(uint32_t);
++	int operator=(u_int32_t);
+ 
+ 	virtual Address* copy() const;
+ 	virtual size_t length() const { return sizeof(addr_);}
+@@ -85,11 +85,11 @@
+ 	operator struct in6_addr() const { return addr_; }
+ 	operator const struct in6_addr&() const { return addr_; }
+ 	
+-	uint32_t scope() { return scope_; }
++	u_int32_t scope() { return scope_; }
+ 
+   protected:
+ 	struct in6_addr addr_;
+-	uint32_t scope_;
++	u_int32_t scope_;
+ };
+ 
+ 
+@@ -97,7 +97,7 @@
+ public:
+   virtual Address* resolve(const char* name) {
+   struct in6_addr addr;
+-  uint32_t scope;
++  u_int32_t scope;
+     IP6Address * result = 0;
+     if (inet6_LookupHostAddr(&addr, &scope, name) >= 0) {
+       result = new IP6Address;
+@@ -155,7 +155,7 @@
+ 	  (0) : (1));
+ }
+ 
+-int IP6Address::operator=(uint32_t scope) {
++int IP6Address::operator=(u_int32_t scope) {
+   scope_ = scope;
+   return 1;
+ }

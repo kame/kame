@@ -1,0 +1,20 @@
+--- inet6.c-	Wed Dec  8 13:22:50 1999
++++ inet6.c	Wed Dec  8 13:23:28 1999
+@@ -43,7 +43,7 @@
+ #include "inet6.h"
+ 
+ int
+-inet6_LookupHostAddr(struct in6_addr *addr, uint32_t *scope, const char* str)
++inet6_LookupHostAddr(struct in6_addr *addr, u_int32_t *scope, const char* str)
+ {
+ 	struct addrinfo h, *res;
+ 	int i;
+@@ -63,7 +63,7 @@
+ inet6_LookupLocalAddr(struct in6_addr *addr) {
+   static int once = 0;
+   struct in6_addr local_addr;
+-  uint32_t local_scope;
++  u_int32_t local_scope;
+ 
+   if (!once) {
+     char name[MAXHOSTNAMELEN];

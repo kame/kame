@@ -1,0 +1,11 @@
+--- inet6.h-	Wed Dec  8 13:22:47 1999
++++ inet6.h	Wed Dec  8 13:23:00 1999
+@@ -77,7 +77,7 @@
+ #endif
+ extern int inet6_LookupHostName(char* name, struct in6_addr *addr);
+ extern int inet6_LookupLocalAddr(struct in6_addr *addr);
+-extern int inet6_LookupHostAddr(struct in6_addr*, uint32_t*, const char* host);
++extern int inet6_LookupHostAddr(struct in6_addr*, u_int32_t*, const char* host);
+ #ifdef __cplusplus
+ }
+ #endif
