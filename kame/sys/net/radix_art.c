@@ -1,4 +1,4 @@
-/*	$KAME: radix_art.c,v 1.8 2001/07/13 03:27:03 itojun Exp $	*/
+/*	$KAME: radix_art.c,v 1.9 2001/07/13 03:44:46 itojun Exp $	*/
 /*	$NetBSD: radix.c,v 1.14 2000/03/30 09:45:38 augustss Exp $	*/
 
 /*
@@ -149,12 +149,23 @@
  *   For AF_INET, we'd need the following in ip_init():
  *	rt_tables[AF_INET]->rnh_addrsize = sizeof(struct in_addr);
  *   (the initialization should probably be integrated into struct domain)
+ * - You need to be careful selecting ART_BITLEN.  If you make it smaller,
+ *   you will have more number of subtables, but are smaller (= more memory
+ *   accesses, less memory footprint).  If you make it larger, you will have
+ *   less number of subtables, but are larger (= less memory accesses, more
+ *   memory footprint).  You can use variable-length ART_BITLEN if you wish,
+ *   but to do that, you need to change some calls to art_newtable().
+ * - Due to limitation in kernel memory allocator, struct art_table must be
+ *   smaller or equal to 2Kbytes on netbsd (and probably openbsd).
+ *   You need to use ART_BITLEN <= 8.  if you set ART_BITLEN to 8, you also
+ *   need to use ART_BITLEN_CONSTANT.
  *
  * TODO:
- * - memory starvation situations
- * - handle art_limit right
- * - regression test
- * - sometimes returns different result from radix.c - need investigation
+ * - Memory starvation situations
+ * - Handle art_limit right
+ * - Regression test
+ * - Sometimes returns different result from radix.c - need investigation
+ * - Non-continuous masks (sin6_scope_id...)
  */
 
 /* resolve, and compare result with radix.c */
