@@ -652,7 +652,7 @@ in_multientry(mc)
 
 	if (multi.inm_rti != NULL) {
 		KREAD(multi.inm_rti, &rti, struct router_info);
-		printf("\t\t");
+		printf("\t\t\t");
 		switch (rti.rti_type) {
 		case IGMP_v1_ROUTER:
 			printf("igmpv1");
@@ -669,7 +669,6 @@ in_multientry(mc)
 			printf("igmpv?(%d)", rti.rti_type);
 			break;
 		}
-		printf("\n");
 	}
 
 #ifdef HAVE_IGMPV3
@@ -679,7 +678,7 @@ in_multientry(mc)
 	}
 
 	KREAD(multi.inm_source, &src, struct in_multi_source);
-	printf("\tmode=%s\tgroup join=%d\n",
+	printf(" mode=%s grpjoin=%d\n",
 		src.ims_mode == MCAST_INCLUDE ? "include" :
 		src.ims_mode == MCAST_EXCLUDE ? "exclude" :
 		"???",
