@@ -1,4 +1,4 @@
-/*	$KAME: gifconfig.c,v 1.11 2000/05/22 03:01:43 itojun Exp $	*/
+/*	$KAME: gifconfig.c,v 1.12 2000/05/22 05:50:43 itojun Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -228,8 +228,10 @@ main(argc, argv)
 	if (argc < 2) {
 		fprintf(stderr,
 		    "usage: gifconfig interface [af] [physsrc physdst]\n");
+#ifdef SIOCDIFPHYADDR
 		fprintf(stderr,
 		    "       gifconfig interface delete\n");
+#endif
 		fprintf(stderr,
 		    "       gifconfig -a\n");
 		exit(1);
