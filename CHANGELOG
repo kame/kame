@@ -1,8 +1,21 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.414 2000/01/07 15:08:45 sumikawa Exp $
+$Id: CHANGELOG,v 1.415 2000/01/07 16:23:34 fujisawa Exp $
 
 <200001>
+Sat Jan  8 00:37:28 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* kame/sys/netinet6/natpt*.[ch]: NAT-PT translator. 
+	* kame/kame/{natptconfig,natptd,natptlog}: translator configulation
+	  command and natpt related commands.
+
+	- These NAT-PT translator and commands are now under development.
+	  It's user interface and overall functionality are subjects to
+	  future improvements and changes.  So, please be careful when you
+	  try it.
+
+	- At this time, this translator works on FreeBSD228 only.  Please
+	  wait a while to works on other platforms.
+
 Sat Jan  8 00:09:44 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/openssh: upgrade to current source of OpenBSD,
 	  which support IPv6 in default.  Any additional patches does not
