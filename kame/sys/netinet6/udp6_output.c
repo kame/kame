@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.74 2004/02/03 07:25:23 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.75 2004/02/04 03:14:07 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -164,7 +164,7 @@ udp6_output(in6p, m, addr6, control)
 	struct ip6_hdr *ip6;
 	struct udphdr *udp6;
 	struct in6_addr *laddr6 = NULL, *faddr6 = NULL;
-	struct sockaddr_in6 *fsa6;
+	struct sockaddr_in6 *fsa6 = NULL;
 	struct ifnet *oifp = NULL;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	struct sockaddr_in6 lsa6_mapped; /* XXX ugly */
