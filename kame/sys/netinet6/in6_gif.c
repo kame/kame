@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.51 2001/06/08 10:10:52 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.52 2001/07/24 13:04:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -275,10 +275,8 @@ in6_gif_output(ifp, family, m, rt)
 	M_PREPEND(m, sizeof(struct ip6_hdr), M_DONTWAIT);
 	if (m && m->m_len < sizeof(struct ip6_hdr))
 		m = m_pullup(m, sizeof(struct ip6_hdr));
-	if (m == NULL) {
-		printf("ENOBUFS in in6_gif_output %d\n", __LINE__);
+	if (m == NULL)
 		return ENOBUFS;
-	}
 
 	ip6 = mtod(m, struct ip6_hdr *);
 	ip6->ip6_flow	= 0;

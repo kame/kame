@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.53 2001/06/15 03:59:31 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.54 2001/07/24 13:04:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -873,10 +873,8 @@ gif_eon_encap(struct mbuf **m)
 	M_PREPEND(*m, sizeof(*ehdr), M_DONTWAIT);
 	if (*m && (*m)->m_len < sizeof(*ehdr))
 		*m = m_pullup(*m, sizeof(*ehdr));
-	if (*m == NULL) {
-		printf("ENOBUFS in gif_eon_encap %d\n", __LINE__);
+	if (*m == NULL)
 		return ENOBUFS;
-	}
 	ehdr = mtod(*m, struct eonhdr *);
 	ehdr->version = 1;
 	ehdr->class = 0;		/* always unicast */

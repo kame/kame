@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.56 2001/06/08 10:10:52 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.57 2001/07/24 13:04:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -295,10 +295,8 @@ in_gif_output(ifp, family, m, rt)
 	M_PREPEND(m, sizeof(struct ip), M_DONTWAIT);
 	if (m && m->m_len < sizeof(struct ip))
 		m = m_pullup(m, sizeof(struct ip));
-	if (m == NULL) {
-		printf("ENOBUFS in in_gif_output %d\n", __LINE__);
+	if (m == NULL)
 		return ENOBUFS;
-	}
 	bcopy(&iphdr, mtod(m, struct ip *), sizeof(struct ip));
 
 	if (dst->sin_family != sin_dst->sin_family ||
