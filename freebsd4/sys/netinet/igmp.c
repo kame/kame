@@ -1394,7 +1394,7 @@ igmp_send_current_state_report(m0, buflenp, inm)
 	    SET_REPORTHDR(*m0, numsrc);
 	    if (error != 0) {
 #ifdef IGMPV3_DEBUG
-		printf("igmp_send_current_state_report: error preparing new report header 1.\n");
+		printf("igmp_send_current_state_report: error preparing new report header.\n");
 #endif
 		return error;
 	    }
@@ -1412,7 +1412,7 @@ igmp_send_current_state_report(m0, buflenp, inm)
 		SET_REPORTHDR(*m0, numsrc);
 		if (error != 0) {
 #ifdef IGMPV3_DEBUG
-		    printf("igmp_send_current_state_report: error preparing new report header 2.\n");
+		    printf("igmp_send_current_state_report: error preparing new report header.\n");
 #endif
 		    return error;
 		}
