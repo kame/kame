@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.100 2000/05/17 12:35:58 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.101 2000/05/17 15:28:10 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -875,6 +875,8 @@ skip_ipsec2:;
 			origifp = ifindex2ifnet[ntohs(ip6->ip6_src.s6_addr16[1])];
 		else if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
 			origifp = ifindex2ifnet[ntohs(ip6->ip6_dst.s6_addr16[1])];
+		else
+			origifp = ifp;
 	}
 	else
 		origifp = ifp;
