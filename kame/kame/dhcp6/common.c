@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.69 2003/01/05 17:12:12 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.70 2003/01/15 13:47:32 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1597,11 +1597,10 @@ dhcp6_reset_timer(ev)
 		/*
 		 * The first Solicit message from the client on the interface
 		 * MUST be delayed by a random amount of time between
-		 * MIN_SOL_DELAY and MAX_SOL_DELAY.
+		 * 0 and SOL_MAX_DELAY.
 		 * [dhcpv6-28 17.1.2]
 		 */
-		ev->retrans = (random() % (MAX_SOL_DELAY - MIN_SOL_DELAY)) +
-			MIN_SOL_DELAY;
+		ev->retrans = (random() % (SOL_MAX_DELAY));
 		break;
 	default:
 		if (ev->state == DHCP6S_SOLICIT && ev->timeouts == 0) {

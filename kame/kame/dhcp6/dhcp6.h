@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.34 2003/01/05 17:12:13 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.35 2003/01/15 13:47:32 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -57,13 +57,12 @@
 /* Protocol constants */
 
 /* timer parameters (msec, unless explicitly commented) */
-#define MIN_SOL_DELAY	1000
-#define MAX_SOL_DELAY	5000
-#define SOL_TIMEOUT	500
-#define SOL_MAX_RT	30000
-#define INF_TIMEOUT	500
-#define INF_MAX_RT	30000
-#define REQ_TIMEOUT	250
+#define SOL_MAX_DELAY	1000
+#define SOL_TIMEOUT	1000
+#define SOL_MAX_RT	120000
+#define INF_TIMEOUT	1000
+#define INF_MAX_RT	120000
+#define REQ_TIMEOUT	1000
 #define REQ_MAX_RT	30000
 #define REQ_MAX_RC	10	/* Max Request retry attempts */
 #define REN_TIMEOUT	10000	/* 10secs */
