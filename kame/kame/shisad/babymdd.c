@@ -1,4 +1,4 @@
-/*      $Id: babymdd.c,v 1.3 2005/03/01 17:24:22 ryuji Exp $  */
+/*      $Id: babymdd.c,v 1.4 2005/03/01 17:34:01 ryuji Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -232,8 +232,9 @@ main (argc, argv)
 		struct ifaddrs *ifa, *ifap;
 
 		if (getifaddrs(&ifap) != 0) {
-			syslog(LOG_ERR, "getifaddrs failed: %s\n", strerror(errno));
-			return;
+			syslog(LOG_ERR, "getifaddrs failed: %s\n", 
+				strerror(errno));
+			exit(-1);
 		}
 
 		for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
@@ -924,6 +925,7 @@ baby_initif() {
 	struct if_info *ifinfo, *ifinfo_next;
 
 	/* Sorting by priority  */
+again:
 	for (ifinfo = LIST_FIRST(&babyinfo.ifinfo_head); ifinfo; 
 	     ifinfo = ifinfo_next) {
 		ifinfo_next = LIST_NEXT(ifinfo, ifinfo_entry);
@@ -931,10 +933,11 @@ baby_initif() {
 		if (ifinfo_next == NULL) 
 			break;
 		
-		if (ifinfo->priority < ifinfo_next->priority) {
+		if (ifinfo->priority > ifinfo_next->priority) {
 			LIST_REMOVE(ifinfo_next, ifinfo_entry);
-			LIST_INSERT_AFTER(ifinfo, ifinfo_next, ifinfo_entry);
+			LIST_INSERT_BEFORE(ifinfo, ifinfo_next, ifinfo_entry);
 			ifinfo_next = ifinfo;
+			goto again;
 		}
 	}
 
