@@ -103,10 +103,10 @@ struct tcpcb {
 #define	TF_LASTIDLE	0x40000		/* connection was previously idle */
 #define TF_RXWIN0SENT	0x80000		/* sent a receiver win 0 in response */
 #ifdef TCP_ECN
-#define TF_ECN_PERMIT	0x00040000	/* other side said I could ECN */
-#define TF_RCVD_CE	0x00080000	/* send ECE in subsequent segs */
-#define TF_SEND_CWR	0x00100000	/* send CWR in next seg */
-#define TF_DISABLE_ECN	0x00200000	/* disable ECN for this connection */
+#define TF_ECN_PERMIT	0x00100000	/* other side said I could ECN */
+#define TF_RCVD_CE	0x00200000	/* send ECE in subsequent segs */
+#define TF_SEND_CWR	0x00400000	/* send CWR in next seg */
+#define TF_DISABLE_ECN	0x00800000	/* disable ECN for this connection */
 #endif
 	int	t_force;		/* 1 if forcing out a byte */
 
@@ -224,6 +224,7 @@ struct syncache {
 #define SCF_CC		0x08			/* negotiated CC */
 #define SCF_UNREACH	0x10			/* icmp unreachable received */
 #define SCF_KEEPROUTE	0x20			/* keep cloned route */
+#define	SCF_ECN		0x40			/* peer will do ecn */
 	TAILQ_ENTRY(syncache)	sc_hash;
 	TAILQ_ENTRY(syncache)	sc_timerq;
 };

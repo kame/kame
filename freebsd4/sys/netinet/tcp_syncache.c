@@ -686,6 +686,12 @@ syncache_socket(sc, lso)
 		tp->cc_send = sc->sc_cc_send;
 		tp->cc_recv = sc->sc_cc_recv;
 	}
+#ifdef TCP_ECN
+	if (sc->sc_flags & SCF_ECN) {
+		tp->t_flags |= TF_ECN_PERMIT;
+		tcpstat.tcps_ecn_accepts++;
+	}
+#endif
 
 	tcp_mss(tp, sc->sc_peer_mss);
 
@@ -942,6 +948,14 @@ syncache_add(inc, to, th, sop, m)
 			sc->sc_flags |= SCF_CC;
 		}
 	}
+#ifdef TCP_ECN
+	/*
+	 * if both ECE and CWR flag bits are set, peer is ECN capable.
+	 */
+	if (tcp_do_ecn &&
+	    (th->th_flags & (TH_ECE|TH_CWR)) == (TH_ECE|TH_CWR))
+		sc->sc_flags |= SCF_ECN;
+#endif
 	if (tp->t_flags & TF_NOOPT)
 		sc->sc_flags = SCF_NOOPT;
 
@@ -1119,6 +1133,11 @@ syncache_respond(sc, m)
 	th->th_off = (sizeof(struct tcphdr) + optlen) >> 2;
 	th->th_x2 = 0;
 	th->th_flags = TH_SYN|TH_ACK;
+#ifdef TCP_ECN
+	/* if peer is ECN-capable, use ECN */
+	if (tcp_do_ecn && (sc->sc_flags & SCF_ECN))
+		th->th_flags |= TH_ECE;
+#endif
 	th->th_win = htons(sc->sc_wnd);
 	th->th_urp = 0;
 
