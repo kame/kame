@@ -26,7 +26,7 @@
  * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_vlan_var.h,v 1.5 1999/12/29 04:38:36 peter Exp $
+ * $FreeBSD: src/sys/net/if_vlan_var.h,v 1.5.2.2 2001/08/01 00:47:50 fenner Exp $
  */
 
 #ifndef _NET_IF_VLAN_VAR_H_
@@ -63,9 +63,6 @@ struct	ether_vlan_header {
 #define	EVL_VLANOFTAG(tag) ((tag) & 4095)
 #define	EVL_PRIOFTAG(tag) (((tag) >> 13) & 7)
 #define	EVL_ENCAPLEN	4	/* length in octets of encapsulation */
-
-/* When these sorts of interfaces get their own identifier... */
-#define	IFT_8021_VLAN	IFT_PROPVIRTUAL
 
 /* sysctl(3) tags, for compatibility purposes */
 #define	VLANCTL_PROTO	1

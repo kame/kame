@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)rtsock.c	8.5 (Berkeley) 11/2/94
- * $FreeBSD: src/sys/net/rtsock.c,v 1.44.2.2 2000/08/03 00:09:34 ps Exp $
+ * $FreeBSD: src/sys/net/rtsock.c,v 1.44.2.4 2001/07/11 09:37:37 ume Exp $
  */
 
 
@@ -482,13 +482,19 @@ flush:
 	}
 	if (rtm) {
 		m_copyback(m, 0, rtm->rtm_msglen, (caddr_t)rtm);
+		if (m->m_pkthdr.len < rtm->rtm_msglen) {
+			m_freem(m);
+			m = NULL;
+		} else if (m->m_pkthdr.len > rtm->rtm_msglen)
+			m_adj(m, rtm->rtm_msglen - m->m_pkthdr.len);
 		Free(rtm);
 	}
 	if (rp)
 		rp->rcb_proto.sp_family = 0; /* Avoid us */
 	if (dst)
 		route_proto.sp_protocol = dst->sa_family;
-	raw_input(m, &route_proto, &route_src, &route_dst);
+	if (m)
+		raw_input(m, &route_proto, &route_src, &route_dst);
 	if (rp)
 		rp->rcb_proto.sp_family = PF_ROUTE;
     }
@@ -572,9 +578,6 @@ rt_msg1(type, rtinfo)
 	register struct sockaddr *sa;
 	int len, dlen;
 
-	m = m_gethdr(M_DONTWAIT, MT_DATA);
-	if (m == 0)
-		return (m);
 	switch (type) {
 
 	case RTM_DELADDR:
@@ -594,8 +597,18 @@ rt_msg1(type, rtinfo)
 	default:
 		len = sizeof(struct rt_msghdr);
 	}
-	if (len > MHLEN)
+	if (len > MCLBYTES)
 		panic("rt_msg1");
+	m = m_gethdr(M_DONTWAIT, MT_DATA);
+	if (m && len > MHLEN) {
+		MCLGET(m, M_DONTWAIT);
+		if ((m->m_flags & M_EXT) == 0) {
+			m_free(m);
+			m = NULL;
+		}
+	}
+	if (m == 0)
+		return (m);
 	m->m_pkthdr.len = m->m_len = len;
 	m->m_pkthdr.rcvif = 0;
 	rtm = mtod(m, struct rt_msghdr *);

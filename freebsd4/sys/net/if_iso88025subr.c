@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_iso88025subr.c,v 1.7.2.3 2000/10/14 20:01:06 lile Exp $
+ * $FreeBSD: src/sys/net/if_iso88025subr.c,v 1.7.2.4 2001/07/25 17:27:56 jlemon Exp $
  *
  */
 
@@ -408,6 +408,10 @@ iso88025_input(struct ifnet *ifp, struct iso88025_header *th, struct mbuf *m)
 		break;
 
 	case ETHERTYPE_ARP:
+		if (ifp->if_flags & IFF_NOARP) {
+			m_freem(m);
+			return;
+		}
 		schednetisr(NETISR_ARP);
 		inq = &arpintrq;
                 break;

@@ -24,7 +24,7 @@
  * OBLIGATION TO PROVIDE MAINTENANCE, SUPPORT, UPDATES, ENHANCEMENTS,
  * OR MODIFICATIONS.
  *
- * $FreeBSD: src/sys/net/ppp_defs.h,v 1.6 1999/08/28 00:48:26 peter Exp $
+ * $FreeBSD: src/sys/net/ppp_defs.h,v 1.6.2.1 2001/07/03 11:01:41 ume Exp $
  */
 
 #ifndef _PPP_DEFS_H_
@@ -69,6 +69,8 @@
 #define PPP_LQR		0xc025	/* Link Quality Report protocol */
 #define PPP_CHAP	0xc223	/* Cryptographic Handshake Auth. Protocol */
 #define PPP_CBCP	0xc029	/* Callback Control Protocol */
+#define PPP_IPV6	0x57	/* Internet Protocol version 6*/
+#define PPP_IPV6CP	0x8057	/* IPv6 Control Protocol */
 
 /*
  * Values for FCS calculations.

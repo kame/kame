@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	from: if_ethersubr.c,v 1.5 1994/12/13 22:31:45 wollman Exp
- * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.41.2.5 2001/03/11 06:35:37 bmilekic Exp $
+ * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.41.2.6 2001/07/25 17:27:56 jlemon Exp $
  */
 
 #include "opt_atalk.h"
@@ -459,14 +459,11 @@ fddi_input(ifp, fh, m)
 			break;
 
 		case ETHERTYPE_ARP:
-#if !defined(__bsdi__) || _BSDI_VERSION >= 199401
+			if (ifp->if_flags & IFF_NOARP)
+				goto dropanyway;
 			schednetisr(NETISR_ARP);
 			inq = &arpintrq;
 			break;
-#else
-			arpinput((struct arpcom *)ifp, m);
-			return;
-#endif
 #endif
 #ifdef INET6
 		case ETHERTYPE_IPV6:

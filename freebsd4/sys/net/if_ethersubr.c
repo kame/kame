@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ethersubr.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.70.2.15 2001/03/13 22:00:32 luigi Exp $
+ * $FreeBSD: src/sys/net/if_ethersubr.c,v 1.70.2.17 2001/08/01 00:47:49 fenner Exp $
  */
 
 #include "opt_atalk.h"
@@ -551,6 +551,11 @@ ether_demux(ifp, eh, m)
 		break;
 
 	case ETHERTYPE_ARP:
+		if (ifp->if_flags & IFF_NOARP) {
+			/* Discard packet if ARP is disabled on interface */
+			m_freem(m);
+			return;
+		}
 		schednetisr(NETISR_ARP);
 		inq = &arpintrq;
 		break;
@@ -846,14 +851,12 @@ ether_resolvemulti(ifp, llsa, sa)
 		if (!IN_MULTICAST(ntohl(sin->sin_addr.s_addr)))
 			return EADDRNOTAVAIL;
 		MALLOC(sdl, struct sockaddr_dl *, sizeof *sdl, M_IFMADDR,
-		       M_WAITOK);
+		       M_WAITOK|M_ZERO);
 		sdl->sdl_len = sizeof *sdl;
 		sdl->sdl_family = AF_LINK;
 		sdl->sdl_index = ifp->if_index;
 		sdl->sdl_type = IFT_ETHER;
-		sdl->sdl_nlen = 0;
 		sdl->sdl_alen = ETHER_ADDR_LEN;
-		sdl->sdl_slen = 0;
 		e_addr = LLADDR(sdl);
 		ETHER_MAP_IP_MULTICAST(&sin->sin_addr, e_addr);
 		*llsa = (struct sockaddr *)sdl;
@@ -875,14 +878,12 @@ ether_resolvemulti(ifp, llsa, sa)
 		if (!IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr))
 			return EADDRNOTAVAIL;
 		MALLOC(sdl, struct sockaddr_dl *, sizeof *sdl, M_IFMADDR,
-		       M_WAITOK);
+		       M_WAITOK|M_ZERO);
 		sdl->sdl_len = sizeof *sdl;
 		sdl->sdl_family = AF_LINK;
 		sdl->sdl_index = ifp->if_index;
 		sdl->sdl_type = IFT_ETHER;
-		sdl->sdl_nlen = 0;
 		sdl->sdl_alen = ETHER_ADDR_LEN;
-		sdl->sdl_slen = 0;
 		e_addr = LLADDR(sdl);
 		ETHER_MAP_IPV6_MULTICAST(&sin6->sin6_addr, e_addr);
 		*llsa = (struct sockaddr *)sdl;

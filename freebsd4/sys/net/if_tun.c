@@ -13,7 +13,7 @@
  * UCL. This driver is based much more on read/write/poll mode of
  * operation though.
  *
- * $FreeBSD: src/sys/net/if_tun.c,v 1.74.2.3 2001/03/06 00:42:44 obrien Exp $
+ * $FreeBSD: src/sys/net/if_tun.c,v 1.74.2.5 2001/08/08 13:07:00 fenner Exp $
  */
 
 #include "opt_inet.h"
@@ -293,6 +293,7 @@ tunifioctl(ifp, cmd, data)
 		TUNDEBUG("%s%d: mtu set\n",
 			 ifp->if_name, ifp->if_unit);
 		break;
+	case SIOCSIFFLAGS:
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
 		break;
@@ -572,15 +573,14 @@ tunread(dev, uio, flag)
 
 	while (m0 && uio->uio_resid > 0 && error == 0) {
 		len = min(uio->uio_resid, m0->m_len);
-		if (len == 0)
-			break;
-		error = uiomove(mtod(m0, caddr_t), len, uio);
+		if (len != 0)
+			error = uiomove(mtod(m0, caddr_t), len, uio);
 		MFREE(m0, m);
 		m0 = m;
 	}
 
 	if (m0) {
-		TUNDEBUG("Dropping mbuf\n");
+		TUNDEBUG("%s%d: Dropping mbuf\n", ifp->if_name, ifp->if_unit);
 		m_freem(m0);
 	}
 	return error;
