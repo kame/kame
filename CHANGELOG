@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2265 2002/10/29 09:43:27 jinmei Exp $
+$KAME: CHANGELOG,v 1.2266 2002/10/30 06:29:02 suz Exp $
 
 <200210>
+Wed Oct 30 15:27:31 JST 2002	suz@crl.hitachi.co.jp
+	* kame/kame/pim6sd/mld6*.[ch], vif.h: implements MLDv1-compat-mode
+	for router side.
+
 2002-10-29  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_forward.c: added a destination scope
 	check: if a packet is going to break the scope zone of packet's
