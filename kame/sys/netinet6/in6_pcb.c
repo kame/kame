@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.68 2000/11/07 15:10:57 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.69 2000/11/18 11:08:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -597,9 +597,6 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, cmdarg, notify)
 			dst6 = (struct sockaddr_in6 *)&in6p->in6p_route.ro_dst;
 			if (IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr, &faddr6))
 				in6_rtchange(in6p, errno);
-
-			if (notify == in6_rtchange)
-				continue; /* there's nothing to do any more */
 		}
 
 		/*
@@ -619,6 +616,11 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, cmdarg, notify)
 			ip6_notify_pmtu(in6p, (struct sockaddr_in6 *)dst,
 					(u_int32_t *)cmdarg);
 		}
+
+
+		/* we've already handled this case */
+		if (notify == in6_rtchange)
+			continue;
 
 		/* at this point, we can assume that NOTIFY is not NULL. */
 
