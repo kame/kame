@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.373 2003/06/19 07:48:44 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.374 2003/06/19 07:56:23 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -393,8 +393,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			/*
 			 * Destination options header(1st part)
 			 * This only makes sence with a routing header.
-			 * See Section 9.2 of
-			 * draft-ietf-ipngwg-rfc2292bis-02.txt.
+			 * See Section 9.2 of RFC 3542.
 			 * Disabling this part just for MIP6 convenience is
 			 * a bad idea.  We need to think carefully about a
 			 * way to make the advanced API coexist with MIP6
@@ -1319,7 +1318,7 @@ skip_ipsec2:;
 	 * including unicast ones will be sent at the minimum MTU.  Multicast
 	 * packets will always be sent at the minimum MTU unless
 	 * IP6PO_MINMTU_DISABLE is explicitly specified.
-	 * See rfc2292bis (07 and later) for more details.
+	 * See RFC 3542 for more details.
 	 */
 	if (mtu > IPV6_MMTU) {
 		if ((flags & IPV6_MINMTU))
@@ -4523,7 +4522,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		 * An application can clear any sticky IPV6_PKTINFO option by
 		 * doing a "regular" setsockopt with ipi6_addr being
 		 * in6addr_any and ipi6_ifindex being zero.
-		 * [rfc2292bis-02, Section 6]
+		 * [RFC 3542, Section 6]
 		 */
 		if (optname == IPV6_PKTINFO && opt->ip6po_pktinfo) {
 			if (pktinfo->ipi6_ifindex == 0 &&
@@ -4580,7 +4579,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		int *hlimp;
 
 		/*
-		 * rfc2292bis-03 obsoleted the usage of sticky IPV6_HOPLIMIT
+		 * RFC 3542 obsoleted the usage of sticky IPV6_HOPLIMIT
 		 * to simplify the ordering among hoplimit options.
 		 */
 		if (optname == IPV6_HOPLIMIT && sticky)

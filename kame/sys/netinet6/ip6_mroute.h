@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.h,v 1.19 2001/06/14 06:12:55 suz Exp $	*/
+/*	$KAME: ip6_mroute.h,v 1.20 2003/06/19 07:56:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -165,7 +165,7 @@ struct omrt6msg {
  * like igmpmsg{} used for IPv4 implementation). This is because this
  * structure will be passed via an IPv6 raw socket, on which an application
  * will only receive the payload i.e. the data after the IPv6 header and all
- * the extension headers. (see Section 3 of draft-ietf-ipngwg-2292bis-01)
+ * the extension headers. (see Section 3 of RFC 3542)
  */
 struct mrt6msg {
 #define MRT6MSG_NOCACHE		1

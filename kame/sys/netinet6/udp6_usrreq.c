@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.112 2003/06/02 06:43:28 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.113 2003/06/19 07:56:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -570,7 +570,7 @@ udp6_ctlinput(cmd, sa, d)
 			/*
 			 * regardless of if we called icmp6_mtudisc_update(),
 			 * we need to call in6_pcbnotify(), to notify path
-			 * MTU change to the userland (2292bis-02), because
+			 * MTU change to the userland (RFC 3542), because
 			 * some unconnected sockets may share the same
 			 * destination and want to know the path MTU.
 			 */
