@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.42 2004/06/15 09:51:58 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.43 2004/06/15 09:55:43 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -277,7 +277,6 @@ accept_listener_query(src, dst, group, tmo)
 		log_msg(LOG_DEBUG, 0,
 		    "timer for grp %s on mif %d set to %ld",
 		    inet6_fmt(group), mifi, g->al_timer);
-		break;
 }
 
 /*
