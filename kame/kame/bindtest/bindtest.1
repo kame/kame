@@ -1,4 +1,4 @@
-.\"	$KAME: bindtest.1,v 1.12 2001/06/25 17:51:25 itojun Exp $
+.\"	$KAME: bindtest.1,v 1.13 2001/06/26 04:57:53 jinmei Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -181,12 +181,15 @@ or
 .Li 0.0.0.0
 .Pc
 and no attempts were made to test send/recv behavior.
+.It 0
+None of the sockets received the packet.
 .It 1
 The first socket received the packet.
 .It 2
 The second socket received the packet.
 .It b
-Both sockets received the packet.
+Both sockets received the packet.  This result is not supposed to
+happen, but exists just in case.
 .El
 .It x
 .Xr bind 2
