@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.209 2001/07/24 09:08:10 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.210 2001/07/24 09:12:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1291,13 +1291,6 @@ in6_update_ifa(ifp, ifra, ia)
 	return(error);
 
   cleanup:
-	/*
-	 * leave from multicast groups we have joined for the interface
-	 */
-	while ((imm = ia->ia6_memberships.lh_first) != NULL) {
-		LIST_REMOVE(imm, i6mm_chain);
-		in6_leavegroup(imm);
-	}
 	in6_purgeaddr(&ia->ia_ifa);
 	return error;
 }
