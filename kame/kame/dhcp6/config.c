@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.22 2002/12/29 00:22:56 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.23 2002/12/29 00:36:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -394,10 +394,10 @@ configure_global_option()
 		}
 	}
 
-	return 0;
+	return (0);
 
   bad:
-	return -1;
+	return (-1);
 }
 
 static int
@@ -464,13 +464,13 @@ get_default_ifid(pif)
 
 	if (pif->ifid_len < 64) {
 		dprintf(LOG_NOTICE, "%s" "ID length too short", FNAME);
-		return -1;
+		return (-1);
 	}
 
 	if (getifaddrs(&ifap) < 0) {
 		dprintf(LOG_ERR, "%s" "getifaddrs failed: %s",
 			FNAME, strerror(errno));
-		return -1;
+		return (-1);
 	}
 	
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {

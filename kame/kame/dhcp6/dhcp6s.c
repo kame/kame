@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.91 2002/09/24 14:20:50 itojun Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.92 2002/12/29 00:36:31 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -485,7 +485,7 @@ server6_recv(s)
 
 	if ((len = recvmsg(insock, &mhdr, 0)) < 0) {
 		dprintf(LOG_ERR, "%s" "recvmsg: %s", FNAME, strerror(errno));
-		return -1;
+		return (-1);
 	}
 	fromlen = mhdr.msg_namelen;
 
@@ -499,17 +499,17 @@ server6_recv(s)
 	}
 	if (pi == NULL) {
 		dprintf(LOG_NOTICE, "%s" "failed to get packet info", FNAME);
-		return -1;
+		return (-1);
 	}
 	if ((ifp = find_ifconfbyid((unsigned int)pi->ipi6_ifindex)) == NULL) {
 		dprintf(LOG_INFO, "%s" "unexpected interface (%d)", FNAME,
 		    (unsigned int)pi->ipi6_ifindex);
-		return -1;
+		return (-1);
 	}
 
 	if (len < sizeof(*dh6)) {
 		dprintf(LOG_INFO, "%s" "short packet", FNAME);
-		return -1;
+		return (-1);
 	}
 	
 	dh6 = (struct dhcp6 *)rdatabuf;
@@ -525,7 +525,7 @@ server6_recv(s)
 	if (dhcp6_get_options((struct dhcp6opt *)(dh6 + 1),
 	    (struct dhcp6opt *)(rdatabuf + len), &optinfo) < 0) {
 		dprintf(LOG_INFO, "%s" "failed to parse options", FNAME);
-		return -1;
+		return (-1);
 	}
 
 	switch (dh6->dh6_msgtype) {
@@ -557,7 +557,7 @@ server6_recv(s)
 
 	dhcp6_clear_options(&optinfo);
 
-	return 0;
+	return (0);
 }
 
 static int
@@ -659,7 +659,7 @@ server6_react_solicit(ifp, dh6, optinfo, from, fromlen)
 
   fail:
 	dhcp6_clear_options(&roptinfo);
-	return -1;
+	return (-1);
 }
 
 static int
@@ -679,17 +679,17 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 	/* the message must include a Server Identifier option */
 	if (optinfo->serverID.duid_len == 0) {
 		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
-		return -1;
+		return (-1);
 	}
 	/* the contents of the Server Identifier option must match ours */
 	if (duidcmp(&optinfo->serverID, &server_duid)) {
 		dprintf(LOG_INFO, "%s" "server ID mismatch", FNAME);
-		return -1;
+		return (-1);
 	}
 	/* the message must include a Client Identifier option */
 	if (optinfo->clientID.duid_len == 0) {
 		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
-		return -1;
+		return (-1);
 	}
 
 	/*
@@ -785,11 +785,11 @@ server6_react_request(ifp, pi, dh6, optinfo, from, fromlen)
 
   end:
 	dhcp6_clear_options(&roptinfo);
-	return 0;
+	return (0);
 
   fail:
 	dhcp6_clear_options(&roptinfo);
-	return -1;
+	return (-1);
 }
 
 static int
@@ -811,17 +811,17 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 	/* the message must include a Server Identifier option */
 	if (optinfo->serverID.duid_len == 0) {
 		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
-		return -1;
+		return (-1);
 	}
 	/* the contents of the Server Identifier option must match ours */
 	if (duidcmp(&optinfo->serverID, &server_duid)) {
 		dprintf(LOG_INFO, "%s" "server ID mismatch", FNAME);
-		return -1;
+		return (-1);
 	}
 	/* the message must include a Client Identifier option */
 	if (optinfo->clientID.duid_len == 0) {
 		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
-		return -1;
+		return (-1);
 	}
 
 	/*
@@ -914,11 +914,11 @@ server6_react_renew(ifp, pi, dh6, optinfo, from, fromlen)
 
   end:
 	dhcp6_clear_options(&roptinfo);
-	return 0;
+	return (0);
 
   fail:
 	dhcp6_clear_options(&roptinfo);
-	return -1;
+	return (-1);
 }
 
 static int
@@ -938,14 +938,14 @@ server6_react_rebind(ifp, dh6, optinfo, from, fromlen)
 	/* the message must include a Client Identifier option */
 	if (optinfo->clientID.duid_len == 0) {
 		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
-		return -1;
+		return (-1);
 	}
 
 	/* the message must not include a server Identifier option */
 	if (optinfo->serverID.duid_len) {
 		dprintf(LOG_INFO, "%s" "server ID option is included in "
 		    "a rebind message", FNAME);
-		return -1;
+		return (-1);
 	}
 
 	/*
@@ -1007,11 +1007,11 @@ server6_react_rebind(ifp, dh6, optinfo, from, fromlen)
 			   &roptinfo);
 
 	dhcp6_clear_options(&roptinfo);
-	return 0;
+	return (0);
 
   fail:
 	dhcp6_clear_options(&roptinfo);
-	return -1;
+	return (-1);
 }
 
 static int
@@ -1064,7 +1064,7 @@ server6_react_informreq(ifp, dh6, optinfo, from, fromlen)
 
   fail:
 	dhcp6_clear_options(&roptinfo);
-	return -1;
+	return (-1);
 }
 
 static int
@@ -1117,7 +1117,7 @@ server6_send(type, ifp, origmsg, optinfo, from, fromlen, roptinfo)
 	dprintf(LOG_DEBUG, "%s" "transmit %s to %s", FNAME,
 		dhcp6msgstr(type), addr2str((struct sockaddr *)&dst));
 
-	return 0;
+	return (0);
 }
 
 static int
@@ -1132,7 +1132,7 @@ create_conflist(type, clientid, ret_list, conf_list, req_list, do_binding)
 	void *val;
 
 	if (conf_list == NULL)
-		return 0;
+		return (0);
 
 	/* sanity check about type */
 	switch(type) {
@@ -1202,7 +1202,7 @@ create_conflist(type, clientid, ret_list, conf_list, req_list, do_binding)
 		TAILQ_INSERT_TAIL(ret_list, dl, link);
 	}
 
-	return 0;
+	return (0);
 }
 
 static struct dhcp6_binding *
@@ -1370,7 +1370,7 @@ binding_timo(arg)
 
 	remove_binding(binding);
 
-	return NULL;
+	return (NULL);
 }
 
 static char *

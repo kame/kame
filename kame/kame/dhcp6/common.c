@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.66 2002/12/29 00:22:55 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.67 2002/12/29 00:36:31 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -103,11 +103,11 @@ dhcp6_copy_list(dst, src)
 		TAILQ_INSERT_TAIL(dst, dent, link);
 	}
 
-	return 0;
+	return (0);
 
   fail:
 	dhcp6_clear_list(dst);
-	return -1;
+	return (-1);
 }
 
 void
@@ -134,7 +134,7 @@ dhcp6_count_list(head)
 	for (i = 0, v = TAILQ_FIRST(head); v; v = TAILQ_NEXT(v, link))
 		i++;
 
-	return i;
+	return (i);
 }
 
 struct dhcp6_listval *
@@ -261,7 +261,7 @@ if_maxindex()
 			max = p->if_index;
 	}
 	if_freenameindex(p0);
-	return max;
+	return (max);
 }
 #endif
 
@@ -421,7 +421,7 @@ random_between(x, y)
 	ratio = 1 << 16;
 	while ((y - x) * ratio < (y - x))
 		ratio = ratio / 2;
-	return x + ((y - x) * (ratio - 1) / random() & (ratio - 1));
+	return (x + ((y - x) * (ratio - 1) / random() & (ratio - 1)));
 }
 
 int
@@ -506,13 +506,13 @@ in6_scope(addr)
 
 		switch (scope) {
 		case 0x80:
-			return 2; /* link-local */
+			return (2); /* link-local */
 			break;
 		case 0xc0:
-			return 5; /* site-local */
+			return (5); /* site-local */
 			break;
 		default:
-			return 14; /* global: just in case */
+			return (14); /* global: just in case */
 			break;
 		}
 	}
@@ -523,12 +523,12 @@ in6_scope(addr)
 
 	if (bcmp(&in6addr_loopback, addr, sizeof(addr) - 1) == 0) {
 		if (addr->s6_addr[15] == 1) /* loopback */
-			return 1;
+			return (1);
 		if (addr->s6_addr[15] == 0) /* unspecified */
-			return 0; /* XXX: good value? */
+			return (0); /* XXX: good value? */
 	}
 
-	return 14;		/* global */
+	return (14);		/* global */
 }
 
 static int
@@ -669,7 +669,7 @@ gethwid(buf, len, ifname, hwtypep)
 	ssize_t l;
 
 	if (getifaddrs(&ifap) < 0)
-		return -1;
+		return (-1);
 
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
 		if (ifname && strcmp(ifa->ifa_name, ifname) != 0)
@@ -699,12 +699,12 @@ gethwid(buf, len, ifname, hwtypep)
 		memcpy(buf, LLADDR(sdl), sdl->sdl_alen);
 		l = sdl->sdl_alen; /* sdl will soon be freed */
 		freeifaddrs(ifap);
-		return l;
+		return (l);
 	}
 
   fail:
 	freeifaddrs(ifap);
-	return -1;
+	return (-1);
 }
 
 void
@@ -757,12 +757,12 @@ dhcp6_copy_options(dst, src)
 		goto fail;
 	dst->pref = src->pref;
 
-	return 0;
+	return (0);
 
   fail:
 	/* cleanup temporary resources */
 	dhcp6_clear_options(dst);
-	return -1;
+	return (-1);
 }
 
 int
@@ -796,7 +796,7 @@ dhcp6_get_options(p, ep, optinfo)
 		if (np > ep) {
 			dprintf(LOG_INFO,
 			    "%s" "malformed DHCP options", FNAME);
-			return -1;
+			return (-1);
 		}
 
 		switch (opt) {
@@ -954,7 +954,7 @@ get_delegated_prefixes(p, ep, optinfo)
 		if (np > ep) {
 			dprintf(LOG_INFO, "%s" "malformed DHCP options",
 			    FNAME);
-			return -1;
+			return (-1);
 		}
 
 		switch(opt) {
@@ -1314,27 +1314,27 @@ dhcp6optstr(type)
 	static char genstr[sizeof("opt_65535") + 1]; /* XXX thread unsafe */
 
 	if (type > 65535)
-		return "INVALID option";
+		return ("INVALID option");
 
 	switch(type) {
 	case DH6OPT_CLIENTID:
-		return "client ID";
+		return ("client ID");
 	case DH6OPT_SERVERID:
-		return "server ID";
+		return ("server ID");
 	case DH6OPT_ORO:
-		return "option request";
+		return ("option request");
 	case DH6OPT_PREFERENCE:
-		return "preference";
+		return ("preference");
 	case DH6OPT_STATUS_CODE:
-		return "status code";
+		return ("status code");
 	case DH6OPT_RAPID_COMMIT:
-		return "rapid commit";
+		return ("rapid commit");
 	case DH6OPT_DNS:
-		return "DNS";
+		return ("DNS");
 	case DH6OPT_PREFIX_DELEGATION:
-		return "prefix delegation";
+		return ("prefix delegation");
 	case DH6OPT_PREFIX_INFORMATION:
-		return "prefix information";
+		return ("prefix information");
 	default:
 		sprintf(genstr, "opt_%d", type);
 		return (genstr);
@@ -1348,23 +1348,23 @@ dhcp6msgstr(type)
 	static char genstr[sizeof("msg255") + 1]; /* XXX thread unsafe */
 
 	if (type > 255)
-		return "INVALID msg";
+		return ("INVALID msg");
 
 	switch(type) {
 	case DH6_SOLICIT:
-		return "solicit";
+		return ("solicit");
 	case DH6_ADVERTISE:
-		return "advertise";
+		return ("advertise");
 	case DH6_RENEW:
-		return "renew";
+		return ("renew");
 	case DH6_REBIND:
-		return "rebind";
+		return ("rebind");
 	case DH6_REQUEST:
-		return "request";
+		return ("request");
 	case DH6_REPLY:
-		return "reply";
+		return ("reply");
 	case DH6_INFORM_REQ:
-		return "information request";
+		return ("information request");
 	default:
 		sprintf(genstr, "msg%d", type);
 		return (genstr);
@@ -1378,27 +1378,27 @@ dhcp6_stcodestr(code)
 	static char genstr[sizeof("code255") + 1]; /* XXX thread unsafe */
 
 	if (code > 255)
-		return "INVALID code";
+		return ("INVALID code");
 
 	switch(code) {
 	case DH6OPT_STCODE_SUCCESS:
-		return "success";
+		return ("success");
 	case DH6OPT_STCODE_UNSPECFAIL:
-		return "unspec failure";
+		return ("unspec failure");
 	case DH6OPT_STCODE_AUTHFAILED:
-		return "auth fail";
+		return ("auth fail");
 	case DH6OPT_STCODE_ADDRUNAVAIL:
-		return "address unavailable";
+		return ("address unavailable");
 	case DH6OPT_STCODE_NOADDRAVAIL:
-		return "no addresses";
+		return ("no addresses");
 	case DH6OPT_STCODE_NOBINDING:
-		return "no binding";
+		return ("no binding");
 	case DH6OPT_STCODE_CONFNOMATCH:
-		return "confirm no match";
+		return ("confirm no match");
 	case DH6OPT_STCODE_NOTONLINK:
-		return "not on-link";
+		return ("not on-link");
 	case DH6OPT_STCODE_USEMULTICAST:
-		return "use multicast";
+		return ("use multicast");
 	default:
 		sprintf(genstr, "code%d", code);
 		return (genstr);

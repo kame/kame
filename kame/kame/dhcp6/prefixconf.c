@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.9 2002/12/12 09:47:26 suz Exp $	*/
+/*	$KAME: prefixconf.c,v 1.10 2002/12/29 00:36:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -122,19 +122,19 @@ prefix6_add(ifp, prefix, serverid)
 	if (prefix->duration == 0) {
 		dprintf(LOG_INFO, "%s" "zero duration for %s/%d",
 			in6addr2str(&prefix->addr, 0), prefix->plen);
-		return 0;
+		return (0);
 	}
 
 	if ((sp = find_siteprefix6(prefix)) != NULL) {
 		dprintf(LOG_INFO, "%s" "duplicated delegated prefix: %s/%d",
 		    FNAME, in6addr2str(&prefix->addr, 0), prefix->plen);
-		return -1;
+		return (-1);
 	}
 
 	if ((sp = malloc(sizeof(*sp))) == NULL) {
 		dprintf(LOG_ERR, "%s" "failed to allocate memory"
 			" for a prefix", FNAME);
-		return -1;
+		return (-1);
 	}
 	memset(sp, 0, sizeof(*sp));
 	TAILQ_INIT(&sp->ifprefix_list);
@@ -179,14 +179,14 @@ prefix6_add(ifp, prefix, serverid)
 
 	TAILQ_INSERT_TAIL(&siteprefix_listhead, sp, link);
 
-	return 0;
+	return (0);
 
   fail:
 	if (sp) {
 		duidfree(&sp->serverid);
 		free(sp);
 	}
-	return -1;
+	return (-1);
 }
 
 static void
@@ -277,7 +277,7 @@ prefix6_update(ev, prefix_list, serverid)
 		free(evd);
 	}
 
-	return 0;
+	return (0);
 }
 
 static int
@@ -305,7 +305,7 @@ update(sp, prefix, serverid)
 	switch(sp->prefix.duration) {
 	case 0:
 		prefix6_remove(sp);
-		return 0;
+		return (0);
 	case DHCP6_DURATITION_INFINITE:
 		if (sp->timer)
 			dhcp6_remove_timer(&sp->timer);
@@ -317,7 +317,7 @@ update(sp, prefix, serverid)
 				dprintf(LOG_ERR, "%s" "failed to add prefix "
 				    "timer", FNAME);
 				prefix6_remove(sp); /* XXX */
-				return -1;
+				return (-1);
 			}
 		}
 		/* update the timer */
@@ -333,13 +333,13 @@ update(sp, prefix, serverid)
 		if (duidcpy(&sp->serverid, serverid)) {
 			dprintf(LOG_ERR, "%s" "failed to copy server ID");
 			prefix6_remove(sp); /* XXX */
-			return -1;
+			return (-1);
 		}
 	}
 
 	sp->state = PREFIX6S_ACTIVE;
 
-	return 0;
+	return (0);
 }
 
 static struct dhcp6_siteprefix *
@@ -479,7 +479,7 @@ add_ifprefix(siteprefix, prefix, pconf)
 	if ((ifpfx = malloc(sizeof(*ifpfx))) == NULL) {
 		dprintf(LOG_ERR, FNAME
 		    "failed to allocate memory for ifprefix");
-		return -1;
+		return (-1);
 	}
 	memset(ifpfx, 0, sizeof(*ifpfx));
 
@@ -529,12 +529,12 @@ add_ifprefix(siteprefix, prefix, pconf)
 
 	TAILQ_INSERT_TAIL(&siteprefix->ifprefix_list, ifpfx, plink);
 
-	return 0;
+	return (0);
 
   bad:
 	if (ifpfx)
 		free(ifpfx);
-	return -1;
+	return (-1);
 }
 
 static int

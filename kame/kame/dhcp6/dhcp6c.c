@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.97 2002/09/24 14:20:49 itojun Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.98 2002/12/29 00:36:31 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1075,19 +1075,19 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	ev = find_event_withid(ifp, ntohl(dh6->dh6_xid) & DH6_XIDMASK);
 	if (ev == NULL) {
 		dprintf(LOG_INFO, "%s" "XID mismatch", FNAME);
-		return -1;
+		return (-1);
 	}
 
 	if (ev->state != DHCP6S_SOLICIT ||
 	    (ifp->send_flags & DHCIFF_RAPID_COMMIT)) {
 		dprintf(LOG_INFO, "%s" "unexpected advertise", FNAME);
-		return -1;
+		return (-1);
 	}
 
 	/* packet validation based on Section 15.3 of dhcpv6-26. */
 	if (optinfo0->serverID.duid_len == 0) {
 		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
-		return -1;
+		return (-1);
 	} else {
 		dprintf(LOG_DEBUG, "%s" "server ID: %s, pref=%d", FNAME,
 			duidstr(&optinfo0->serverID),
@@ -1095,11 +1095,11 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	}
 	if (optinfo0->clientID.duid_len == 0) {
 		dprintf(LOG_INFO, "%s" "no client ID option", FNAME);
-		return -1;
+		return (-1);
 	}
 	if (duidcmp(&optinfo0->clientID, &client_duid)) {
 		dprintf(LOG_INFO, "%s" "client DUID mismatch", FNAME);
-		return -1;
+		return (-1);
 	}
 
 	/*
@@ -1114,21 +1114,21 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 	if (find_server(ifp, &optinfo0->serverID)) {
 		dprintf(LOG_INFO, "%s" "duplicated server (ID: %s)",
 			FNAME, duidstr(&optinfo0->serverID));
-		return -1;
+		return (-1);
 	}
 
 	/* keep the server */
 	if ((newserver = malloc(sizeof(*newserver))) == NULL) {
 		dprintf(LOG_ERR, "%s" "memory allocation failed for server",
 			FNAME);
-		return -1;
+		return (-1);
 	}
 	memset(newserver, 0, sizeof(*newserver));
 	dhcp6_init_options(&newserver->optinfo);
 	if (dhcp6_copy_options(&newserver->optinfo, optinfo0)) {
 		dprintf(LOG_ERR, "%s" "failed to copy options", FNAME);
 		free(newserver);
-		return -1;
+		return (-1);
 	}
 	if (optinfo0->pref != DH6OPT_PREF_UNDEF)
 		newserver->pref = optinfo0->pref;
@@ -1179,7 +1179,7 @@ client6_recvadvert(ifp, dh6, len, optinfo0)
 		dhcp6_set_timer(&timo, ev->timer);
 	}
 
-	return 0;
+	return (0);
 }
 
 static struct dhcp6_serverinfo *
@@ -1211,7 +1211,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	ev = find_event_withid(ifp, ntohl(dh6->dh6_xid) & DH6_XIDMASK);
 	if (ev == NULL) {
 		dprintf(LOG_INFO, "%s" "XID mismatch", FNAME);
-		return -1;
+		return (-1);
 	}
 
 	if (ev->state != DHCP6S_INFOREQ &&
@@ -1221,13 +1221,13 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	    (ev->state != DHCP6S_SOLICIT ||
 	     !(ifp->send_flags & DHCIFF_RAPID_COMMIT))) {
 		dprintf(LOG_INFO, "%s" "unexpected reply", FNAME);
-		return -1;
+		return (-1);
 	}
 
 	/* A Reply message must contain a Server ID option */
 	if (optinfo->serverID.duid_len == 0) {
 		dprintf(LOG_INFO, "%s" "no server ID option", FNAME);
-		return -1;
+		return (-1);
 	}
 
 	/*
@@ -1236,11 +1236,11 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	 */
 	if (optinfo->clientID.duid_len == 0) {
 		dprintf(LOG_INFO, "%s" "no client ID option", FNAME);
-		return -1;
+		return (-1);
 	}
 	if (duidcmp(&optinfo->clientID, &client_duid)) {
 		dprintf(LOG_INFO, "%s" "client DUID mismatch", FNAME);
-		return -1;
+		return (-1);
 	}
 
 	/*
@@ -1282,7 +1282,7 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	dhcp6_remove_event(ev);
 	dprintf(LOG_DEBUG, "%s" "got an expected reply, sleeping.", FNAME);
 
-	return 0;
+	return (0);
 }
 
 static struct dhcp6_event *
