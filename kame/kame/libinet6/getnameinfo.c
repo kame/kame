@@ -32,6 +32,9 @@
  * - Thread safe-ness must be checked
  * - Return values.  There seems to be no standard for return value (RFC2553)
  *   but INRIA implementation returns EAI_xxx defined for getaddrinfo().
+ * - RFC2553 says that we should raise error on short buffer.  X/Open says
+ *   we need to truncate the result.  We obey RFC2553 (and X/Open should be
+ *   modified).
  */
 
 #ifdef HAVE_CONFIG_H

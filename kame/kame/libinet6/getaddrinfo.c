@@ -930,6 +930,7 @@ get_portmatch(ai, servname)
 	const struct addrinfo *ai;
 	const char *servname;
 {
+
 	/* get_port does not touch first argument. when matchonly == 1. */
 	return get_port((struct addrinfo *)ai, servname, 1);
 }
