@@ -500,8 +500,13 @@ tcp_newtcpcb(inp)
 						    inp->in6p_route.ro_rt ?
 						    inp->in6p_route.ro_rt->rt_ifp :
 						    NULL);
-	else
 #endif
+	/*
+	 * IPv4 TTL initialization is necessary for an IPv6 socket as well,
+	 * because the socket may be bound to an IPv6 wildcard address,
+	 * which may match an IPv4-mapped IPv6 address.
+	 * XXX: is there a better approach?
+	 */
 	inp->inp_ip_ttl = ip_defttl;
 	inp->inp_ppcb = (caddr_t)tp;
 	return (tp);		/* XXX */
