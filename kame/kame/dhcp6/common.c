@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.64 2002/09/24 14:20:49 itojun Exp $	*/
+/*	$KAME: common.c,v 1.65 2002/12/06 01:41:29 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1464,13 +1464,17 @@ dprintf(int level, const char *fmt, ...)
 	if (foreground && debug_thresh >= level) {
 		time_t now;
 		struct tm *tm_now;
+		const char *month[] = {
+			"Jan", "Feb", "Mar", "Apr", "May", "Jun",
+			"Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+		};
 
 		if ((now = time(NULL)) < 0)
 			exit(1); /* XXX */
 		tm_now = localtime(&now);
-		fprintf(stderr, "%04d/%02d/%02d %02d:%02d:%02d %s\n",
-			tm_now->tm_year + 1900, tm_now->tm_mon,
-			tm_now->tm_mday,
+		fprintf(stderr, "%03s/%02d/%04d %02d:%02d:%02d %s\n",
+			month[tm_now->tm_mon], tm_now->tm_mday,
+			tm_now->tm_year + 1900,
 			tm_now->tm_hour, tm_now->tm_min, tm_now->tm_sec,
 			logbuf);
 	} else
