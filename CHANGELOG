@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1661 2001/05/01 17:02:15 itojun Exp $
+$KAME: CHANGELOG,v 1.1662 2001/05/01 21:28:29 jinmei Exp $
 
 <200105>
+2001-05-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/net/if.c (if_detach): reversed the order of
+	in6_ifdetach and rnh_walktree(if_rtdel).  Since IPv6 interface direct
+	routes are expected to be removed by the IPv6-specific kernel API,
+	the old order would cause some inconsistency between the routing
+	entries and IPv6 specific data structures.
+
 Wed May  2 02:01:25 JST 2001  itojun@iijlab.net
 	* sys/netkey/key.c: correct varaible initialization in inbound
 	  tunnel policy checking.  From: Gunther Schadow
