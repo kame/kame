@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.34 2003/08/27 06:38:22 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.35 2003/09/06 09:13:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -63,6 +63,10 @@
 #include <sys/proc.h>
 #include <sys/syslog.h>
 
+#if defined(__FreeBSD__) || defined(__NetBSD__) || defined(__OpenBSD__)
+#include <sys/sysctl.h>
+#endif
+
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 #include <sys/callout.h>
 #elif defined(__OpenBSD__)
@@ -120,40 +124,6 @@
 #include <netinet6/mip6_mncore.h>
 #endif /* MIP6_MOBILE_NODE */
 
-#ifndef MIP6_CONFIG_DEBUG
-#ifdef MIP6_DEBUG
-#define MIP6_CONFIG_DEBUG 1
-#else /* MIP6_DEBUG */
-#define MIP6_CONFIG_DEBUG 0
-#endif /* MIP6_DEBUG */
-#endif /* !MIP6_CONFIG_DEBUG */
-
-#ifndef MIP6_CONFIG_USE_IPSEC
-#define MIP6_CONFIG_USE_IPSEC 0
-#endif /* !MIP6_CONFIG_USE_IPSEC */
-
-#ifndef MIP6_CONFIG_BC_LIFETIME_LIMIT
-#define MIP6_CONFIG_BC_LIFETIME_LIMIT 420
-#endif /* !MIP6_CONFIG_BC_LIFETIME_LIMIT */
-
-#ifndef MIP6_CONFIG_HRBC_LIFETIME_LIMIT
-#define MIP6_CONFIG_HRBC_LIFETIME_LIMIT 420
-#endif /* !MIP6_CONFIG_HRBC_LIFETIME_LIMIT */
-
-#ifndef MIP6_CONFIG_BU_MAXLIFETIME
-#define MIP6_CONFIG_BU_MAXLIFETIME 420
-#endif /* !MIP6_CONFIG_BU_MAXLIFETIME */
-
-#ifndef MIP6_CONFIG_HRBU_MAXLIFETIME
-#define MIP6_CONFIG_HRBU_MAXLIFETIME 420
-#endif /* !MIP6_CONFIG_HRBU_MAXLIFETIME */
-
-#if 1 /* #ifndef MIP6_CONFIG_BU_USE_SINGLE */
-#define MIP6_CONFIG_BU_USE_SINGLE 1
-#else
-#define MIP6_CONFIG_BU_USE_SINGLE 0
-#endif /* !MIP6_CONFIG_BU_USE_SINGLE */
-
 struct mip6_bc_list mip6_bc_list;
 #ifdef __NetBSD__
 struct callout mip6_bc_ch = CALLOUT_INITIALIZER;
@@ -183,7 +153,21 @@ struct callout mip6_nonce_upd_ch = CALLOUT_INITIALIZER;
 struct callout mip6_nonce_upd_ch;
 #endif
 
-struct mip6_config mip6_config;
+/*
+ * configuration knobs.
+ */
+int mip6ctl_nodetype = 0;
+int mip6ctl_use_ipsec = 1;
+#ifdef MIP6_DEBUG
+int mip6ctl_debug = 1;
+#else
+int mip6ctl_debug = 0;
+#endif
+u_int32_t mip6ctl_bc_maxlifetime = 420;
+u_int32_t mip6ctl_hrbc_maxlifetime = 420;
+u_int32_t mip6ctl_bu_maxlifetime = 420;
+u_int32_t mip6ctl_hrbu_maxlifetime = 420;
+
 struct mip6stat mip6stat;
 
 static int mip6_bc_count = 0;
@@ -229,15 +213,6 @@ static int mip6_update_ipsecdb(struct sockaddr_in6 *,
 void
 mip6_init()
 {
-	bzero(&mip6_config, sizeof(mip6_config));
-	mip6_config.mcfg_type = 0;
-	mip6_config.mcfg_use_ipsec = MIP6_CONFIG_USE_IPSEC;
-	mip6_config.mcfg_debug = MIP6_CONFIG_DEBUG;
-	mip6_config.mcfg_bc_lifetime_limit = MIP6_CONFIG_BC_LIFETIME_LIMIT;
-	mip6_config.mcfg_hrbc_lifetime_limit = MIP6_CONFIG_HRBC_LIFETIME_LIMIT;
-	mip6_config.mcfg_bu_maxlifetime = MIP6_CONFIG_BU_MAXLIFETIME;
-	mip6_config.mcfg_hrbu_maxlifetime = MIP6_CONFIG_HRBU_MAXLIFETIME;
-
 	/* initialization as a correspondent node. */
 	mip6_bc_init(); /* binding cache routine initailize */
 
@@ -307,7 +282,7 @@ mip6_ioctl(cmd, data)
 			mip6log((LOG_INFO,
 				 "%s:%d: MN function enabled\n",
 				 __FILE__, __LINE__));
-			mip6_config.mcfg_type = MIP6_CONFIG_TYPE_MOBILENODE;
+			mip6ctl_nodetype = MIP6_NODETYPE_MOBILE_NODE;
 			mip6_process_movement();
 			break;
 
@@ -341,7 +316,7 @@ mip6_ioctl(cmd, data)
 			while (!TAILQ_EMPTY(&mip6_ha_list))
 				mip6_ha_list_remove(&mip6_ha_list,
 				    TAILQ_FIRST(&mip6_ha_list));
-			mip6_config.mcfg_type = 0;
+			mip6ctl_nodetype = MIP6_NODETYPE_CORRESPONDENT_NODE;
 			break;
 #endif /* MIP6_MOBILE_NODE */
 
@@ -350,7 +325,7 @@ mip6_ioctl(cmd, data)
 			mip6log((LOG_INFO,
 				 "%s:%d: HA function enabled\n",
 				 __FILE__, __LINE__));
-			mip6_config.mcfg_type = MIP6_CONFIG_TYPE_HOMEAGENT;
+			mip6ctl_nodetype = MIP6_NODETYPE_HOME_AGENT;
 			break;
 #endif /* MIP6_HOME_AGENT */
 
@@ -358,28 +333,28 @@ mip6_ioctl(cmd, data)
 			mip6log((LOG_INFO,
 				 "%s:%d: IPsec protection enabled\n",
 				 __FILE__, __LINE__));
-			mip6_config.mcfg_use_ipsec = 1;
+			mip6ctl_use_ipsec = 1;
 			break;
 
 		case SIOCSMIP6CFG_DISABLEIPSEC:
 			mip6log((LOG_INFO,
 				 "%s:%d: IPsec protection disabled\n",
 				 __FILE__, __LINE__));
-			mip6_config.mcfg_use_ipsec = 0;
+			mip6ctl_use_ipsec = 0;
 			break;
 
 		case SIOCSMIP6CFG_ENABLEDEBUG:
 			mip6log((LOG_INFO,
 				 "%s:%d: debug message enabled\n",
 				 __FILE__, __LINE__));
-			mip6_config.mcfg_debug = 1;
+			mip6ctl_debug = 1;
 			break;
 
 		case SIOCSMIP6CFG_DISABLEDEBUG:
 			mip6log((LOG_INFO,
 				 "%s:%d: debug message disabled\n",
 				 __FILE__, __LINE__));
-			mip6_config.mcfg_debug = 0;
+			mip6ctl_debug = 0;
 			break;
 
 		default:
@@ -1938,7 +1913,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		bi.mbc_pcoa.sin6_addr = ip6a->ip6a_coa;
 	}
 
-	if (!mip6_config.mcfg_use_ipsec && (bi.mbc_flags & IP6MU_HOME)) {
+	if (!mip6ctl_use_ipsec && (bi.mbc_flags & IP6MU_HOME)) {
 		bu_safe = 1;
 		goto accept_binding_update;
 	}
@@ -2082,9 +2057,9 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 
 #ifdef MIP6_HOME_AGENT
 		/* limit the max duration of bindings. */
-		if (mip6_config.mcfg_hrbc_lifetime_limit > 0 &&
-		    bi.mbc_lifetime > mip6_config.mcfg_hrbc_lifetime_limit)
-			bi.mbc_lifetime = mip6_config.mcfg_hrbc_lifetime_limit;
+		if (mip6ctl_hrbc_maxlifetime > 0 &&
+		    bi.mbc_lifetime > mip6ctl_hrbc_maxlifetime)
+			bi.mbc_lifetime = mip6ctl_hrbc_maxlifetime;
 
 		if (IS_REQUEST_TO_CACHE(bi.mbc_lifetime, &bi.mbc_phaddr, &bi.mbc_pcoa)) {
 			if (mbc != NULL && (mbc->mbc_flags & IP6MU_CLONED)) {
@@ -2825,3 +2800,59 @@ mip6_update_ipsecdb(haddr, ocoa, ncoa, haaddr)
 #endif /* !MIP6_NOHAIPSEC */
 
 #endif /* MIP6_HOME_AGENT || MIP6_MOBILE_NODE */
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+int
+mip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
+	int *name;
+	u_int namelen;
+	void *oldp;
+	size_t *oldlenp;
+	void *newp;
+	size_t newlen;
+{
+	/* All sysctl names at this level are terminal. */
+	if (namelen != 1)
+		return ENOTDIR;
+
+	switch (name[0]) {
+	case MIP6CTL_DEBUG:
+		return sysctl_int(oldp, oldlenp, newp, newlen, &mip6ctl_debug);
+	case MIP6CTL_USE_IPSEC:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &mip6ctl_use_ipsec);
+	case MIP6CTL_BC_MAXLIFETIME:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &mip6ctl_bc_maxlifetime);
+	case MIP6CTL_HRBC_MAXLIFETIME:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &mip6ctl_hrbc_maxlifetime);
+	case MIP6CTL_BU_MAXLIFETIME:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &mip6ctl_bu_maxlifetime);
+	case MIP6CTL_HRBU_MAXLIFETIME:
+		return sysctl_int(oldp, oldlenp, newp, newlen,
+		    &mip6ctl_hrbu_maxlifetime);
+	default:
+		return (EOPNOTSUPP);
+	}
+	/* NOTREACHED */
+}
+#endif /* __NetBSD__ || __OpenBSD__ */
+
+#ifdef __FreeBSD__
+SYSCTL_DECL(_net_inet6_mip6);
+
+SYSCTL_INT(_net_inet6_mip6, MIP6CTL_DEBUG, debug, CTLFLAG_RW,
+    &mip6ctl_debug, 0, "");
+SYSCTL_INT(_net_inet6_mip6, MIP6CTL_USE_IPSEC, use_ipsec, CTLFLAG_RW,
+    &mip6ctl_use_ipsec, 0, "");
+SYSCTL_INT(_net_inet6_mip6, MIP6CTL_BC_MAXLIFETIME, bc_maxlifetime, CTLFLAG_RW,
+    &mip6ctl_bc_maxlifetime, 0, "");
+SYSCTL_INT(_net_inet6_mip6, MIP6CTL_HRBC_MAXLIFETIME, hrbc_maxlifetime,
+    CTLFLAG_RW, &mip6ctl_hrbc_maxlifetime, 0, "");
+SYSCTL_INT(_net_inet6_mip6, MIP6CTL_BU_MAXLIFETIME, bu_maxlifetime, CTLFLAG_RW,
+    &mip6ctl_bu_maxlifetime, 0, "");
+SYSCTL_INT(_net_inet6_mip6, MIP6CTL_HRBU_MAXLIFETIME, hrbu_maxlifetime,
+    CTLFLAG_RW, &mip6ctl_hrbu_maxlifetime, 0, "");
+#endif /* __FreeBSD__ */

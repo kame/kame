@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.36 2003/09/05 09:53:41 t-momose Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.37 2003/09/06 09:13:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1421,9 +1421,9 @@ mip6_route_optimize(m)
 		} else {
 			mbu->mbu_lifetime = mpfx->mpfx_vltime;
 		}
-		if (mip6_config.mcfg_bu_maxlifetime > 0 &&
-		    mbu->mbu_lifetime > mip6_config.mcfg_bu_maxlifetime)
-			mbu->mbu_lifetime = mip6_config.mcfg_bu_maxlifetime;
+		if (mip6ctl_bu_maxlifetime > 0 &&
+		    mbu->mbu_lifetime > mip6ctl_bu_maxlifetime)
+			mbu->mbu_lifetime = mip6ctl_bu_maxlifetime;
 		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 		/* sanity check for overflow */
 		if (mbu->mbu_expire < time_second)
@@ -1488,9 +1488,9 @@ mip6_bu_create(paddr, mpfx, coa, flags, sc)
 	} else {
 		mbu->mbu_lifetime = mpfx->mpfx_vltime;
 	}
-	if (mip6_config.mcfg_bu_maxlifetime > 0 &&
-	    mbu->mbu_lifetime > mip6_config.mcfg_bu_maxlifetime)
-		mbu->mbu_lifetime = mip6_config.mcfg_bu_maxlifetime;
+	if (mip6ctl_bu_maxlifetime > 0 &&
+	    mbu->mbu_lifetime > mip6ctl_bu_maxlifetime)
+		mbu->mbu_lifetime = mip6ctl_bu_maxlifetime;
 	mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 	/* sanity check for overflow */
 	if (mbu->mbu_expire < time_second)
@@ -1939,9 +1939,9 @@ mip6_bu_list_notify_binding_change(sc, home)
 		} else {
 			mbu->mbu_lifetime = mpfx->mpfx_vltime;
 		}
-		if (mip6_config.mcfg_bu_maxlifetime > 0 &&
-		    mbu->mbu_lifetime > mip6_config.mcfg_bu_maxlifetime)
-			mbu->mbu_lifetime = mip6_config.mcfg_bu_maxlifetime;
+		if (mip6ctl_bu_maxlifetime > 0 &&
+		    mbu->mbu_lifetime > mip6ctl_bu_maxlifetime)
+			mbu->mbu_lifetime = mip6ctl_bu_maxlifetime;
 		mbu->mbu_expire = time_second + mbu->mbu_lifetime;
 		/* sanity check for overflow */
 		if (mbu->mbu_expire < time_second)
@@ -2989,12 +2989,12 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 			goto accept_binding_ack;
 	}
 
-	if (!mip6_config.mcfg_use_ipsec && (mbu->mbu_flags & IP6MU_HOME)) {
+	if (!mip6ctl_use_ipsec && (mbu->mbu_flags & IP6MU_HOME)) {
 		ba_safe = 1;
 		goto accept_binding_ack;
 	}
 
-	if (mip6_config.mcfg_use_ipsec
+	if (mip6ctl_use_ipsec
 	    && (mbu->mbu_flags & IP6MU_HOME) != 0
 	    && ba_safe == 1)
 		goto accept_binding_ack;
@@ -3683,13 +3683,13 @@ printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_siz
 		lifetime = haddr_lifetime < coa_lifetime ?
 			haddr_lifetime : coa_lifetime;
 		if ((mbu->mbu_flags & IP6MU_HOME) == 0) {
-			if (mip6_config.mcfg_bu_maxlifetime > 0 &&
-			    lifetime > mip6_config.mcfg_bu_maxlifetime)
-				lifetime = mip6_config.mcfg_bu_maxlifetime;
+			if (mip6ctl_bu_maxlifetime > 0 &&
+			    lifetime > mip6ctl_bu_maxlifetime)
+				lifetime = mip6ctl_bu_maxlifetime;
 		} else {
-			if (mip6_config.mcfg_hrbu_maxlifetime > 0 &&
-			    lifetime > mip6_config.mcfg_hrbu_maxlifetime)
-				lifetime = mip6_config.mcfg_hrbu_maxlifetime;
+			if (mip6ctl_hrbu_maxlifetime > 0 &&
+			    lifetime > mip6ctl_hrbu_maxlifetime)
+				lifetime = mip6ctl_hrbu_maxlifetime;
 		}
 		mbu->mbu_lifetime = lifetime;
 		mbu->mbu_expire = time_second + mbu->mbu_lifetime;

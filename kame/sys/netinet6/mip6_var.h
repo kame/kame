@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.104 2003/09/03 03:29:46 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.105 2003/09/06 09:13:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -308,22 +308,22 @@ struct mip6_mobility_options {
 #define MOPT_AUTH_LEN(mopts)	(int)(*((mopts)->mopt_auth + 1))
 
 /*
- * Mobile IPv6 configuration knobs.
+ * configuration knobs.  defined in mip6_cncore.c.
  */
-struct mip6_config {
-	u_int8_t mcfg_type;
-	u_int8_t mcfg_use_ipsec;
-	u_int8_t mcfg_debug;
-	u_int32_t mcfg_bc_lifetime_limit;
-	u_int32_t mcfg_hrbc_lifetime_limit;
-	u_int32_t mcfg_bu_maxlifetime;
-	u_int32_t mcfg_hrbu_maxlifetime;
-};
-#define MIP6_CONFIG_TYPE_MOBILENODE 1
-#define MIP6_CONFIG_TYPE_HOMEAGENT 2
+extern int mip6ctl_nodetype;
+extern int mip6ctl_use_ipsec;
+extern int mip6ctl_debug;
+extern u_int32_t mip6ctl_bc_lifetime_limit;
+extern u_int32_t mip6ctl_hrbc_lifetime_limit;
+extern u_int32_t mip6ctl_bu_maxlifetime;
+extern u_int32_t mip6ctl_hrbu_maxlifetime;
 
-#define MIP6_IS_MN (mip6_config.mcfg_type == MIP6_CONFIG_TYPE_MOBILENODE)
-#define MIP6_IS_HA (mip6_config.mcfg_type == MIP6_CONFIG_TYPE_HOMEAGENT)
+#define MIP6_NODETYPE_CORRESPONDENT_NODE 0
+#define MIP6_NODETYPE_MOBILE_NODE 1
+#define MIP6_NODETYPE_HOME_AGENT 2
+
+#define MIP6_IS_MN (mip6ctl_nodetype == MIP6_NODETYPE_MOBILE_NODE)
+#define MIP6_IS_HA (mip6ctl_nodetype == MIP6_NODETYPE_HOME_AGENT)
 
 /*
  * Mobile IPv6 related statistics.

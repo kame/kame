@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.60 2003/08/14 06:33:07 t-momose Exp $	*/
+/*	$KAME: mip6.h,v 1.61 2003/09/06 09:13:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -42,5 +42,25 @@
 #define MIP6_BU_MAX_BACKOFF        7
 #define MIP6_MAX_MOB_PFX_ADV_INTERVAL	86400
 #define MIP6_MIN_MOB_PFX_ADV_INTERVAL	  600
+
+/*
+ * Names for Mobile IPv6 sysctl objects
+ */
+#define MIP6CTL_DEBUG			1
+#define MIP6CTL_USE_IPSEC		2
+#define MIP6CTL_BC_MAXLIFETIME		3
+#define MIP6CTL_HRBC_MAXLIFETIME	4
+#define MIP6CTL_BU_MAXLIFETIME		5
+#define MIP6CTL_HRBU_MAXLIFETIME	6
+#define MIP6CTL_MAXID			7
+
+#define MIP6CTL_NAMES {				\
+	{ "debug", CTLTYPE_INT },		\
+	{ "use_ipsec", CTLTYPE_INT },		\
+	{ "bc_maxlifetime", CTLTYPE_INT},	\
+	{ "hrbc_maxlifetime", CTLTYPE_INT},	\
+	{ "bu_maxlifetime", CTLTYPE_INT},	\
+	{ "hrbu_maxlifetime", CTLTYPE_INT},	\
+}
 
 #endif /* !_MIP6_H_ */

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.h,v 1.6 2003/09/02 04:57:10 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.h,v 1.7 2003/09/06 09:13:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -125,10 +125,14 @@ int mip6_tunnel_control(int, void *,
     int (*)(const struct mbuf *, int, int, void *), const struct encaptab **);
 #endif /* MIP6_HOME_AGENT || MIP6_MOBILE_NODE */
 
+#ifndef __FreeBSD__
+int mip6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
+#endif
+
 /* for diagnostics. */
-#define mip6log(arg) do {		\
-	if (mip6_config.mcfg_debug)	\
-	    log arg;			\
+#define mip6log(arg) do {	\
+	if (mip6ctl_debug)	\
+	    log arg;		\
 } while (/*CONSTCOND*/ 0)
 
 #ifdef RR_DBG
