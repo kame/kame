@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.61 2000/10/07 13:07:30 itojun Exp $
+	$KAME: RELNOTES,v 1.62 2000/10/08 04:27:45 itojun Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -30,6 +30,13 @@ abnormal program termination and other things:
 
 The caveat does not apply to KAME code merged into *BSD - merged code
 will maintain the backward compatibility policy decided by *BSD team.
+
+SECURITY FIXES
+==============
+Note that the KAME tree MAY NOT include all the security fixes from
+*BSD, or some other advisories.  So, some portion of KAME code may
+be vulnerable to attacks.  Please let developers know if you notice
+any issues.
 
 KNOWN BUGS/TWISTS
 =================
