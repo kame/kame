@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.214 2001/07/24 09:28:42 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.215 2001/07/24 09:31:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -525,8 +525,6 @@ in6_control(so, cmd, data, ifp)
 	 * on a single interface, we almost always look and check the
 	 * presense of ifra_addr, and reject invalid ones here.
 	 * It also decreases duplicated code among SIOC*_IN6 operations.
-	 *
-	 * XXX is it safe to touch in6_ifreq as ifra?
 	 */
 	if (cmd == SIOCAIFADDR_IN6 || cmd == SIOCSIFPHYADDR_IN6)
 		sa6 = &ifra->ifra_addr;
