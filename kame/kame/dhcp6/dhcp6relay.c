@@ -92,8 +92,6 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
-	extern int optind;
-	extern char *optarg;
 	int ch;
 
 	while((ch = getopt(argc, argv, "dhH:")) != EOF) {
