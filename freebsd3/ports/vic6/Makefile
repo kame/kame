@@ -3,7 +3,7 @@
 # Date created:		1999/8/7
 # Whom:			ichiro
 #
-# $Id: Makefile,v 1.2 1999/08/20 12:31:48 itojun Exp $
+# $Id: Makefile,v 1.3 1999/09/26 03:06:46 itojun Exp $
 #
 
 DISTNAME=	vic-2.8v6
@@ -13,7 +13,7 @@ MASTER_SITES=	http://irl.cs.ucla.edu/software/IPv6/
 DISTFILES=	vic-2.8v6.tar.gz
 
 PATCH_SITES=            http://www.v6.csi2.net/setup/mcast/patch/
-PATCHFILES=             vic-2.8v6-kame-19990118.patch
+PATCHFILES=             vic-2.8v6-kame-19990925.patch
 PATCH_DIST_STRIP=       -p1
 
 MAINTAINER=	ichiro@ichiro.org
