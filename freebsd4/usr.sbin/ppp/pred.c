@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/pred.c,v 1.29 1999/12/20 20:29:46 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/pred.c,v 1.32 2001/07/03 22:20:19 brian Exp $
  */
 
 #include <sys/types.h>
@@ -139,13 +139,15 @@ Pred1ResetInput(void *v)
   log_Printf(LogCCP, "Predictor1: Input channel reset\n");
 }
 
-static void
+static int
 Pred1ResetOutput(void *v)
 {
   struct pred1_state *state = (struct pred1_state *)v;
   state->hash = 0;
   memset(state->dict, '\0', sizeof state->dict);
   log_Printf(LogCCP, "Predictor1: Output channel reset\n");
+
+  return 1;		/* Ask FSM to ACK */
 }
 
 static void *
@@ -304,7 +306,7 @@ Pred1InitOptsOutput(struct lcp_opt *o, const struct ccp_config *cfg)
 }
 
 static int
-Pred1SetOptsOutput(struct lcp_opt *o)
+Pred1SetOptsOutput(struct lcp_opt *o, const struct ccp_config *cfg)
 {
   if (o->len != 2) {
     o->len = 2;
@@ -316,13 +318,19 @@ Pred1SetOptsOutput(struct lcp_opt *o)
 static int
 Pred1SetOptsInput(struct lcp_opt *o, const struct ccp_config *cfg)
 {
-  return Pred1SetOptsOutput(o);
+  if (o->len != 2) {
+    o->len = 2;
+    return MODE_NAK;
+  }
+  return MODE_ACK;
 }
 
 const struct ccp_algorithm Pred1Algorithm = {
   TY_PRED1,
   CCP_NEG_PRED1,
   Pred1DispOpts,
+  ccp_DefaultUsable,
+  ccp_DefaultRequired,
   {
     Pred1SetOptsInput,
     Pred1InitInput,
@@ -332,6 +340,7 @@ const struct ccp_algorithm Pred1Algorithm = {
     Pred1DictSetup
   },
   {
+    0,
     Pred1InitOptsOutput,
     Pred1SetOptsOutput,
     Pred1InitOutput,

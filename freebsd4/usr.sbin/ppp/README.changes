@@ -1,4 +1,29 @@
-$FreeBSD: src/usr.sbin/ppp/README.changes,v 1.16.2.3 2000/08/19 09:29:59 brian Exp $
+Copyright (c) 2001 Brian Somers <brian@Awfulhak.org>
+              based on work by Eivind Eklund <perhaps@yes.no>,
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions
+are met:
+1. Redistributions of source code must retain the above copyright
+   notice, this list of conditions and the following disclaimer.
+2. Redistributions in binary form must reproduce the above copyright
+   notice, this list of conditions and the following disclaimer in the
+   documentation and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+SUCH DAMAGE.
+
+$FreeBSD: src/usr.sbin/ppp/README.changes,v 1.23 2001/06/04 14:38:28 brian Exp $
 
 This file summarises changes made to ppp that effect
 its configuration.
@@ -106,3 +131,10 @@ o The ``!'' at the start of chat scripts and authkey can be made literal
   (rather than meaning execute) by doubling it to ``!!''.
 o MP autoload throughput measurements are now based on the maximum of input
   and output averages rather than on the total.
+o When only one link is open in MP mode, MP link level compression is not
+  open and the peer MRU >= the peer MRRU, ppp sends outbound traffic as
+  PROTO_IP traffic rather than PROTO_MP.
+o MSCHAPv2 is now accepted by default.  If you don't wish to negotiate
+  this, you must explicitly deny it.
+o MPPE is enabled and accepted by default (although deflate and predictor1
+  are preferred.

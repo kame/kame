@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/radius.h,v 1.3.2.1 2000/03/21 10:23:16 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/radius.h,v 1.7 2001/04/01 22:39:17 brian Exp $
  */
 
 struct radius {
@@ -41,8 +41,18 @@ struct radius {
   unsigned long mtu;            /* FRAMED MTU */
   struct sticky_route *routes;  /* FRAMED Routes */
   struct {
-    char file[MAXPATHLEN];	/* Radius config file */
+    char file[PATH_MAX];	/* Radius config file */
   } cfg;
+};
+
+struct radacct {
+  struct radius *rad_parent;	/* "Parent" struct radius stored in bundle */
+  char user_name[AUTHLEN];	/* Session User-Name */
+  char session_id[256];		/* Unique session ID */
+  char multi_session_id[51];	/* Unique MP session ID */
+  int  authentic;		/* How the session has been authenticated */
+  struct in_addr ip;
+  struct in_addr mask;
 };
 
 #define descriptor2radius(d) \
@@ -55,4 +65,14 @@ extern void radius_Destroy(struct radius *);
 
 extern void radius_Show(struct radius *, struct prompt *);
 extern void radius_Authenticate(struct radius *, struct authinfo *,
-                                const char *, const char *, const char *);
+                                const char *, const char *, int,
+                                const char *, int);
+extern void radius_Account(struct radius *, struct radacct *, 
+                           struct datalink *, int, struct in_addr *,
+                           struct in_addr *, struct pppThroughput *);
+
+/* An (int) parameter to radius_Account, from radlib.h */
+#if !defined(RAD_START)
+#define RAD_START	1
+#define RAD_STOP	2
+#endif

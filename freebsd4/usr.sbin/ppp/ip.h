@@ -1,24 +1,31 @@
-/*
- *			User Process PPP
+/*-
+ * Copyright (c) 1996 - 2001 Brian Somers <brian@Awfulhak.org>
+ *          based on work by Toshiharu OHNO <tony-o@iij.ad.jp>
+ *                           Internet Initiative Japan, Inc (IIJ)
+ * All rights reserved.
  *
- *	    Written by Toshiharu OHNO (tony-o@iij.ad.jp)
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- *   Copyright (C) 1993, Internet Initiative Japan, Inc. All rights reserverd.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that the above copyright notice and this paragraph are
- * duplicated in all such forms and that any documentation,
- * advertising materials, and other materials related to such
- * distribution and use acknowledge that the software was developed
- * by the Internet Initiative Japan, Inc.  The name of the
- * IIJ may not be used to endorse or promote products derived
- * from this software without specific prior written permission.
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
- * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
- *
- * $FreeBSD: src/usr.sbin/ppp/ip.h,v 1.14.2.1 2000/08/19 09:30:03 brian Exp $
- *
+ * $FreeBSD: src/usr.sbin/ppp/ip.h,v 1.18 2001/08/14 16:05:51 brian Exp $
  */
 
 struct mbuf;
@@ -27,9 +34,11 @@ struct link;
 struct bundle;
 
 extern int ip_PushPacket(struct link *, struct bundle *);
-extern int PacketCheck(struct bundle *, unsigned char *, int, struct filter *,
-                       const char *, unsigned *secs);
-extern void ip_Enqueue(struct ipcp *, int, char *, int);
-extern struct mbuf *ip_Input(struct bundle *, struct link *, struct mbuf *);
-extern void ip_DeleteQueue(struct ipcp *);
-extern size_t ip_QueueLen(struct ipcp *);
+extern int PacketCheck(struct bundle *, u_int32_t, const unsigned char *, int,
+                          struct filter *, const char *, unsigned *secs);
+extern int FilterCheck(const unsigned char *, u_int32_t, const struct filter *,
+                       unsigned *);
+extern struct mbuf *ipv4_Input(struct bundle *, struct link *, struct mbuf *);
+#ifndef NOINET6
+extern struct mbuf *ipv6_Input(struct bundle *, struct link *, struct mbuf *);
+#endif

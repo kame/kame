@@ -16,7 +16,7 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * $FreeBSD: src/usr.sbin/ppp/physical.c,v 1.34.2.3 2000/08/19 09:30:05 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/physical.c,v 1.47 2001/08/14 16:05:51 brian Exp $
  *
  */
 
@@ -24,6 +24,7 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
+#include <sys/socket.h>
 #include <sys/un.h>
 
 #include <errno.h>
@@ -69,6 +70,8 @@
 #include "async.h"
 #include "iplist.h"
 #include "slcompress.h"
+#include "ncpaddr.h"
+#include "ip.h"
 #include "ipcp.h"
 #include "filter.h"
 #include "descriptor.h"
@@ -79,6 +82,8 @@
 #ifndef NORADIUS
 #include "radius.h"
 #endif
+#include "ipv6cp.h"
+#include "ncp.h"
 #include "bundle.h"
 #include "prompt.h"
 #include "chat.h"
@@ -96,7 +101,10 @@
 #ifndef NONETGRAPH
 #include "ether.h"
 #endif
-
+#ifndef NOATM
+#include "atm.h"
+#endif
+#include "tcpmss.h"
 
 #define PPPOTCPLINE "ppp"
 
@@ -116,12 +124,23 @@ struct {
   int (*DeviceSize)(void);
 } devices[] = {
 #ifndef NOI4B
+  /*
+   * This must come before ``tty'' so that the probe routine is
+   * able to identify it as a more specific type of terminal device.
+   */
   { i4b_Create, i4b_iov2device, i4b_DeviceSize },
 #endif
   { tty_Create, tty_iov2device, tty_DeviceSize },
 #ifndef NONETGRAPH
-  /* This must come before ``udp'' & ``tcp'' */
+  /*
+   * This must come before ``udp'' so that the probe routine is
+   * able to identify it as a more specific type of SOCK_DGRAM.
+   */
   { ether_Create, ether_iov2device, ether_DeviceSize },
+#endif
+#ifndef NOATM
+  /* Ditto for ATM devices */
+  { atm_Create, atm_iov2device, atm_DeviceSize },
 #endif
   { tcp_Create, tcp_iov2device, tcp_DeviceSize },
   { udp_Create, udp_iov2device, udp_DeviceSize },
@@ -307,17 +326,17 @@ physical_Lock(struct physical *p)
 static void
 physical_Unlock(struct physical *p)
 {
-  char fn[MAXPATHLEN];
   if (*p->name.full == '/' && p->type != PHYS_DIRECT &&
       ID0uu_unlock(p->name.base) == -1)
-    log_Printf(LogALERT, "%s: Can't uu_unlock %s\n", p->link.name, fn);
+    log_Printf(LogALERT, "%s: Can't uu_unlock %s\n", p->link.name,
+               p->name.base);
 }
 
 void
 physical_Close(struct physical *p)
 {
   int newsid;
-  char fn[MAXPATHLEN];
+  char fn[PATH_MAX];
 
   if (p->fd < 0)
     return;
@@ -402,12 +421,13 @@ physical_DescriptorWrite(struct fdescriptor *d, struct bundle *bundle,
 	p->out = m_free(p->out);
       result = 1;
     } else if (nw < 0) {
-      if (errno != EAGAIN) {
+      if (errno == EAGAIN)
+        result = 1;
+      else if (errno != ENOBUFS) {
 	log_Printf(LogPHASE, "%s: write (%d): %s\n", p->link.name,
                    p->fd, strerror(errno));
         datalink_Down(p->dl, CLOSE_NORMAL);
       }
-      result = 1;
     }
     /* else we shouldn't really have been called !  select() is broken ! */
   }
@@ -743,6 +763,12 @@ physical_IsSync(struct physical *p)
    return p->cfg.speed == 0;
 }
 
+u_short
+physical_DeviceMTU(struct physical *p)
+{
+  return p->handler ? p->handler->mtu : 0;
+}
+
 const char *physical_GetDevice(struct physical *p)
 {
    return p->name.full;
@@ -942,7 +968,7 @@ static void
 physical_Found(struct physical *p)
 {
   FILE *lockfile;
-  char fn[MAXPATHLEN];
+  char fn[PATH_MAX];
 
   if (*p->name.full == '/') {
     snprintf(fn, sizeof fn, "%s%s.if", _PATH_VARRUN, p->name.base);
@@ -1045,6 +1071,7 @@ physical_SetupStack(struct physical *p, const char *who, int how)
   link_Stack(&p->link, &lqrlayer);
   link_Stack(&p->link, &ccplayer);
   link_Stack(&p->link, &vjlayer);
+  link_Stack(&p->link, &tcpmsslayer);
 #ifndef NONAT
   link_Stack(&p->link, &natlayer);
 #endif

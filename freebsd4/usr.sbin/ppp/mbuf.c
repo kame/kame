@@ -1,25 +1,33 @@
-/*
- *	      PPP Memory handling module
+/*-
+ * Copyright (c) 1996 - 2001 Brian Somers <brian@Awfulhak.org>
+ *          based on work by Toshiharu OHNO <tony-o@iij.ad.jp>
+ *                           Internet Initiative Japan, Inc (IIJ)
+ * All rights reserved.
  *
- *	    Written by Toshiharu OHNO (tony-o@iij.ad.jp)
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- *   Copyright (C) 1993, Internet Initiative Japan, Inc. All rights reserverd.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that the above copyright notice and this paragraph are
- * duplicated in all such forms and that any documentation,
- * advertising materials, and other materials related to such
- * distribution and use acknowledge that the software was developed
- * by the Internet Initiative Japan, Inc.  The name of the
- * IIJ may not be used to endorse or promote products derived
- * from this software without specific prior written permission.
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
- * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
- *
- * $FreeBSD: src/usr.sbin/ppp/mbuf.c,v 1.36.2.2 2000/05/07 10:09:24 brian Exp $
- *
+ * $FreeBSD: src/usr.sbin/ppp/mbuf.c,v 1.42 2001/08/14 16:05:51 brian Exp $
  */
+
 #include <sys/types.h>
 
 #include <stdio.h>
@@ -75,6 +83,22 @@ m_length(struct mbuf *bp)
   return len;
 }
 
+static const char *
+mbuftype(int type)
+{
+  static const char * const mbufdesc[MB_MAX] = { 
+    "ip in", "ip out", "ipv6 in", "ipv6 out", "nat in", "nat out",
+    "mp in", "mp out", "vj in", "vj out", "icompd in", "icompd out",
+    "compd in", "compd out", "lqr in", "lqr out", "echo in", "echo out",
+    "proto in", "proto out", "acf in", "acf out", "sync in", "sync out",
+    "hdlc in", "hdlc out", "async in", "async out", "cbcp in", "cbcp out",
+    "chap in", "chap out", "pap in", "pap out", "ccp in", "ccp out",
+    "ipcp in", "ipcp out", "ipv6cp in", "ipv6cp out", "lcp in", "lcp out"
+  };
+
+  return type < 0 || type >= MB_MAX ? "unknown" : mbufdesc[type];
+}
+
 struct mbuf *
 m_get(size_t m_len, int type)
 {
@@ -88,7 +112,8 @@ m_get(size_t m_len, int type)
   }
   
   if (m_len > M_MAXLEN || m_len == 0) {
-    log_Printf(LogERROR, "Request for mbuf size %lu denied\n", (u_long)m_len);
+    log_Printf(LogERROR, "Request for mbuf size %lu (\"%s\") denied !\n",
+               (u_long)m_len, mbuftype(type));
     AbortProgram(EX_OSERR);
   }
 
@@ -293,27 +318,18 @@ int
 mbuf_Show(struct cmdargs const *arg)
 {
   int i;
-  static const char * const mbuftype[] = { 
-    "ip in", "ip out", "nat in", "nat out", "mp in", "mp out",
-    "vj in", "vj out", "icompd in", "icompd out", "compd in", "compd out",
-    "lqr in", "lqr out", "echo in", "echo out", "proto in", "proto out",
-    "acf in", "acf out", "sync in", "sync out", "hdlc in", "hdlc out",
-    "async in", "async out", "cbcp in", "cbcp out", "chap in", "chap out",
-    "pap in", "pap out", "ccp in", "ccp out", "ipcp in", "ipcp out",
-    "lcp in", "lcp out", "unknown"
-  };
 
   prompt_Printf(arg->prompt, "Fragments (octets) in use:\n");
   for (i = 0; i < MB_MAX; i += 2)
     prompt_Printf(arg->prompt, "%10.10s: %04lu (%06lu)\t"
                   "%10.10s: %04lu (%06lu)\n",
-	          mbuftype[i], (u_long)MemMap[i].fragments,
-                  (u_long)MemMap[i].octets, mbuftype[i+1],
+	          mbuftype(i), (u_long)MemMap[i].fragments,
+                  (u_long)MemMap[i].octets, mbuftype(i+1),
                   (u_long)MemMap[i+1].fragments, (u_long)MemMap[i+1].octets);
 
   if (i == MB_MAX)
     prompt_Printf(arg->prompt, "%10.10s: %04lu (%06lu)\n",
-                  mbuftype[i], (u_long)MemMap[i].fragments,
+                  mbuftype(i), (u_long)MemMap[i].fragments,
                   (u_long)MemMap[i].octets);
 
   prompt_Printf(arg->prompt, "Mallocs: %llu,   Frees: %llu\n",

@@ -23,12 +23,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/link.c,v 1.16.2.1 2000/08/19 09:30:04 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/link.c,v 1.18 2001/08/14 16:05:51 brian Exp $
  *
  */
 
 #include <sys/types.h>
 #include <netinet/in_systm.h>
+#include <sys/socket.h>
 #include <sys/un.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
@@ -57,8 +58,10 @@
 #include "mp.h"
 #include "iplist.h"
 #include "slcompress.h"
-#include "ipcp.h"
+#include "ncpaddr.h"
 #include "ip.h"
+#include "ipcp.h"
+#include "ipv6cp.h"
 #include "auth.h"
 #include "pap.h"
 #include "chap.h"
@@ -317,10 +320,16 @@ static const struct {
   u_short proto;
   struct mbuf *(*fn)(struct bundle *, struct link *, struct mbuf *);
 } despatcher[] = {
-  { PROTO_IP, ip_Input },
+  { PROTO_IP, ipv4_Input },
+#ifndef NOINET6
+  { PROTO_IPV6, ipv6_Input },
+#endif
   { PROTO_MP, mp_Input },
   { PROTO_LCP, lcp_Input },
   { PROTO_IPCP, ipcp_Input },
+#ifndef NOINET6
+  { PROTO_IPV6CP, ipv6cp_Input },
+#endif
   { PROTO_PAP, pap_Input },
   { PROTO_CHAP, chap_Input },
   { PROTO_CCP, ccp_Input },

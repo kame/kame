@@ -23,14 +23,20 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/probe.c,v 1.3 1999/08/28 01:18:40 peter Exp $
+ * $FreeBSD: src/usr.sbin/ppp/probe.c,v 1.5 2001/08/16 16:58:12 brian Exp $
  */
 
 #include <sys/time.h>
+#include <sys/socket.h>
+
+#include <stdio.h>
 #include <unistd.h>
 
 #include "probe.h"
 #include "log.h"
+#include "id.h"
+
+struct probe probe;
 
 /* Does select() alter the passed time value ? */
 static int
@@ -44,10 +50,29 @@ select_changes_time(void)
   return t.tv_usec != 100000;
 }
 
-void
-probe_Init(struct probe *p)
+#ifndef NOINET6
+static int
+ipv6_available(void)
 {
-  p->select_changes_time = select_changes_time() ? 1 : 0;
+  int s;
+
+  if ((s = ID0socket(AF_INET6, SOCK_DGRAM, 0)) == -1)
+    return 0;
+
+  close(s);
+  return 1;
+}
+#endif
+
+void
+probe_Init()
+{
+  probe.select_changes_time = select_changes_time() ? 1 : 0;
   log_Printf(LogDEBUG, "Select changes time: %s\n",
-             p->select_changes_time ? "yes" : "no");
+             probe.select_changes_time ? "yes" : "no");
+#ifndef NOINET6
+  probe.ipv6_available = ipv6_available() ? 1 : 0;
+  log_Printf(LogDEBUG, "IPv6 available: %s\n",
+             probe.ipv6_available ? "yes" : "no");
+#endif
 }

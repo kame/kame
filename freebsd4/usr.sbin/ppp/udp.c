@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/udp.c,v 1.10 1999/11/26 22:44:33 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/udp.c,v 1.13 2001/06/18 14:59:36 brian Exp $
  */
 
 #include <sys/types.h>
@@ -37,6 +37,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sysexits.h>
+#include <sys/stat.h>
 #include <sys/uio.h>
 #include <termios.h>
 #include <unistd.h>
@@ -59,10 +60,15 @@
 #include "main.h"
 #include "udp.h"
 
+
+#define UDP_CONNECTED		1
+#define UDP_UNCONNECTED		2
+#define UDP_MAYBEUNCONNECTED	3
+
 struct udpdevice {
   struct device dev;		/* What struct physical knows about */
   struct sockaddr_in sock;	/* peer address */
-  unsigned connected : 1;	/* Have we connect()d ? */
+  unsigned connected : 2;	/* Have we connect()d ? */
 };
 
 #define device2udp(d) ((d)->type == UDP_DEVICE ? (struct udpdevice *)d : NULL)
@@ -77,12 +83,28 @@ static ssize_t
 udp_Sendto(struct physical *p, const void *v, size_t n)
 {
   struct udpdevice *dev = device2udp(p->handler);
+  int ret;
 
-  if (dev->connected)
-    return write(p->fd, v, n);
+  switch (dev->connected) {
+    case UDP_CONNECTED:
+      ret = write(p->fd, v, n);
+      break;
 
-  return sendto(p->fd, v, n, 0, (struct sockaddr *)&dev->sock,
-                sizeof dev->sock);
+    case UDP_UNCONNECTED:
+    default:
+      ret = sendto(p->fd, v, n, 0, (struct sockaddr *)&dev->sock,
+                   sizeof dev->sock);
+      break;
+  }
+  if (dev->connected == UDP_MAYBEUNCONNECTED) {
+    if (ret == -1 && errno == EISCONN) {
+      dev->connected = UDP_CONNECTED;
+      ret = write(p->fd, v, n);
+    } else
+      dev->connected = UDP_UNCONNECTED;
+  }
+
+  return ret;
 }
 
 static ssize_t
@@ -91,7 +113,7 @@ udp_Recvfrom(struct physical *p, void *v, size_t n)
   struct udpdevice *dev = device2udp(p->handler);
   int sz, ret;
 
-  if (dev->connected)
+  if (dev->connected == UDP_CONNECTED)
     return read(p->fd, v, n);
 
   sz = sizeof dev->sock;
@@ -132,6 +154,7 @@ udp_device2iov(struct device *d, struct iovec *iov, int *niov,
 static const struct device baseudpdevice = {
   UDP_DEVICE,
   "udp",
+  0,
   { CD_NOTREQUIRED, 0 },
   NULL,
   NULL,
@@ -211,7 +234,7 @@ udp_CreateDevice(struct physical *p, char *host, char *port)
     log_Printf(LogDEBUG, "%s: Opened udp socket %s\n", p->link.name,
                p->name.full);
     if (connect(p->fd, (struct sockaddr *)&dev->sock, sizeof dev->sock) == 0) {
-      dev->connected = 1;
+      dev->connected = UDP_CONNECTED;
       return dev;
     } else
       log_Printf(LogWARN, "%s: connect: %s\n", p->name.full, strerror(errno));
@@ -256,26 +279,36 @@ udp_Create(struct physical *p)
     }
   } else {
     /* See if we're a connected udp socket */
-    int type, sz, err;
+    struct stat st;
 
-    sz = sizeof type;
-    if ((err = getsockopt(p->fd, SOL_SOCKET, SO_TYPE, &type, &sz)) == 0 &&
-        sz == sizeof type && type == SOCK_DGRAM) {
-      if ((dev = malloc(sizeof *dev)) == NULL) {
-        log_Printf(LogWARN, "%s: Cannot allocate a udp device: %s\n",
-                   p->link.name, strerror(errno));
+    if (fstat(p->fd, &st) != -1 && (st.st_mode & S_IFSOCK)) {
+      int type, sz;
+
+      sz = sizeof type;
+      if (getsockopt(p->fd, SOL_SOCKET, SO_TYPE, &type, &sz) == -1) {
+        log_Printf(LogPHASE, "%s: Link is a closed socket !\n", p->link.name);
+        close(p->fd);
+        p->fd = -1;
         return NULL;
       }
 
-      /* We can't getpeername().... hence we stay un-connect()ed */
-      dev->connected = 0;
+      if (sz == sizeof type && type == SOCK_DGRAM) {
+        if ((dev = malloc(sizeof *dev)) == NULL) {
+          log_Printf(LogWARN, "%s: Cannot allocate a udp device: %s\n",
+                     p->link.name, strerror(errno));
+          return NULL;
+        }
 
-      log_Printf(LogPHASE, "%s: Link is a udp socket\n", p->link.name);
+        /* We can't getpeername().... */
+        dev->connected = UDP_MAYBEUNCONNECTED;
 
-      if (p->link.lcp.cfg.openmode != OPEN_PASSIVE) {
-        log_Printf(LogPHASE, "%s:   Changing openmode to PASSIVE\n",
-                   p->link.name);
-        p->link.lcp.cfg.openmode = OPEN_PASSIVE;
+        log_Printf(LogPHASE, "%s: Link is a udp socket\n", p->link.name);
+
+        if (p->link.lcp.cfg.openmode != OPEN_PASSIVE) {
+          log_Printf(LogPHASE, "%s:   Changing openmode to PASSIVE\n",
+                     p->link.name);
+          p->link.lcp.cfg.openmode = OPEN_PASSIVE;
+        }
       }
     }
   }

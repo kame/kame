@@ -1,23 +1,31 @@
-/*
- *	    Written by Toshiharu OHNO (tony-o@iij.ad.jp)
+/*-
+ * Copyright (c) 1996 - 2001 Brian Somers <brian@Awfulhak.org>
+ *          based on work by Toshiharu OHNO <tony-o@iij.ad.jp>
+ *                           Internet Initiative Japan, Inc (IIJ)
+ * All rights reserved.
  *
- *   Copyright (C) 1993, Internet Initiative Japan, Inc. All rights reserverd.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that the above copyright notice and this paragraph are
- * duplicated in all such forms and that any documentation,
- * advertising materials, and other materials related to such
- * distribution and use acknowledge that the software was developed
- * by the Internet Initiative Japan.  The name of the
- * IIJ may not be used to endorse or promote products derived
- * from this software without specific prior written permission.
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
- * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/mbuf.h,v 1.24 2000/01/03 20:09:22 brian Exp $
- *
- *	TODO:
+ * $FreeBSD: src/usr.sbin/ppp/mbuf.h,v 1.27 2001/08/14 16:05:51 brian Exp $
  */
 
 struct mbuf {
@@ -44,46 +52,50 @@ struct mqueue {
 
 #define MB_IPIN		0
 #define MB_IPOUT	1
-#define MB_NATIN	2
-#define MB_NATOUT	3
-#define MB_MPIN		4
-#define MB_MPOUT	5
-#define MB_VJIN		6
-#define MB_VJOUT	7
-#define MB_ICOMPDIN	8
-#define MB_ICOMPDOUT	9
-#define MB_COMPDIN	10
-#define MB_COMPDOUT	11
-#define MB_LQRIN	12
-#define MB_LQROUT	13
-#define MB_ECHOIN	14
-#define MB_ECHOOUT	15
-#define MB_PROTOIN	16
-#define MB_PROTOOUT	17
-#define MB_ACFIN	18
-#define MB_ACFOUT	19
-#define MB_SYNCIN	20
-#define MB_SYNCOUT	21
-#define MB_HDLCIN	22
-#define MB_HDLCOUT	23
-#define MB_ASYNCIN	24
-#define MB_ASYNCOUT	25
-#define MB_CBCPIN	26
-#define MB_CBCPOUT	27
-#define MB_CHAPIN	28
-#define MB_CHAPOUT	29
-#define MB_PAPIN	30
-#define MB_PAPOUT	31
-#define MB_CCPIN	32
-#define MB_CCPOUT	33
-#define MB_IPCPIN	34
-#define MB_IPCPOUT	35
-#define MB_LCPIN	36
-#define MB_LCPOUT	37
-#define MB_UNKNOWN	38
+#define MB_IPV6IN	2
+#define MB_IPV6OUT	3
+#define MB_NATIN	4
+#define MB_NATOUT	5
+#define MB_MPIN		6
+#define MB_MPOUT	7
+#define MB_VJIN		8
+#define MB_VJOUT	9
+#define MB_ICOMPDIN	10
+#define MB_ICOMPDOUT	11
+#define MB_COMPDIN	12
+#define MB_COMPDOUT	13
+#define MB_LQRIN	14
+#define MB_LQROUT	15
+#define MB_ECHOIN	16
+#define MB_ECHOOUT	17
+#define MB_PROTOIN	18
+#define MB_PROTOOUT	19
+#define MB_ACFIN	20
+#define MB_ACFOUT	21
+#define MB_SYNCIN	22
+#define MB_SYNCOUT	23
+#define MB_HDLCIN	24
+#define MB_HDLCOUT	25
+#define MB_ASYNCIN	26
+#define MB_ASYNCOUT	27
+#define MB_CBCPIN	28
+#define MB_CBCPOUT	29
+#define MB_CHAPIN	30
+#define MB_CHAPOUT	31
+#define MB_PAPIN	32
+#define MB_PAPOUT	33
+#define MB_CCPIN	34
+#define MB_CCPOUT	35
+#define MB_IPCPIN	36
+#define MB_IPCPOUT	37
+#define MB_IPV6CPIN	38
+#define MB_IPV6CPOUT	39
+#define MB_LCPIN	40
+#define MB_LCPOUT	41
+#define MB_UNKNOWN	42
 #define MB_MAX		MB_UNKNOWN
 
-#define M_MAXLEN	(4096 - sizeof(struct mbuf))
+#define M_MAXLEN	(4352 - sizeof(struct mbuf))	/* > HDLCSIZE */
 
 struct cmdargs;
 

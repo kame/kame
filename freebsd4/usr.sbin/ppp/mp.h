@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/mp.h,v 1.9.2.1 2000/03/21 10:23:12 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/mp.h,v 1.11 2001/08/14 16:05:51 brian Exp $
  */
 
 struct mbuf;
@@ -84,6 +84,7 @@ struct mp {
   struct {
     u_int32_t seq;		/* next outgoing seq */
     int link;			/* Next link to send on */
+    int af;			/* Next address family to send */
   } out;
 
   struct {
@@ -133,13 +134,13 @@ extern void mp_linkInit(struct mp_link *);
 extern int mp_Up(struct mp *, struct datalink *);
 extern void mp_Down(struct mp *);
 extern struct mbuf *mp_Input(struct bundle *, struct link *, struct mbuf *);
-extern int mp_FillQueues(struct bundle *);
+extern int mp_FillPhysicalQueues(struct bundle *);
 extern int mp_SetDatalinkBandwidth(struct cmdargs const *);
 extern int mp_ShowStatus(struct cmdargs const *);
 extern const char *mp_Enddisc(u_char, const char *, int);
 extern int mp_SetEnddisc(struct cmdargs const *);
 extern void mp_LinkLost(struct mp *, struct datalink *);
-extern void mp_DeleteQueue(struct mp *);
 extern void mp_RestartAutoloadTimer(struct mp *);
 extern void mp_CheckAutoloadTimer(struct mp *);
 extern void mp_StopAutoloadTimer(struct mp *);
+extern size_t mp_QueueLen(struct mp *);

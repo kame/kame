@@ -23,13 +23,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/datalink.c,v 1.57.2.4 2000/08/19 09:30:00 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/datalink.c,v 1.67 2001/08/14 16:05:50 brian Exp $
  */
 
 #include <sys/param.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
+#include <sys/socket.h>
 #include <sys/un.h>
 
 #include <ctype.h>
@@ -56,12 +57,16 @@
 #include "physical.h"
 #include "iplist.h"
 #include "slcompress.h"
+#include "ncpaddr.h"
+#include "ip.h"
 #include "ipcp.h"
 #include "filter.h"
 #include "mp.h"
 #ifndef NORADIUS
 #include "radius.h"
 #endif
+#include "ipv6cp.h"
+#include "ncp.h"
 #include "bundle.h"
 #include "chat.h"
 #include "auth.h"
@@ -93,19 +98,16 @@ datalink_StartDialTimer(struct datalink *dl, int Timeout)
 
   timer_Stop(&dl->dial.timer);
   if (Timeout) {
-    if (Timeout > 0)
-      dl->dial.timer.load = Timeout * SECTICKS;
-    else {
+    if (Timeout < 0)
       result = (random() % DIAL_TIMEOUT) + 1;
-      dl->dial.timer.load = result * SECTICKS;
-    }
+    dl->dial.timer.load = result * SECTICKS;
     dl->dial.timer.func = datalink_OpenTimeout;
     dl->dial.timer.name = "dial";
     dl->dial.timer.arg = dl;
     timer_Start(&dl->dial.timer);
     if (dl->state == DATALINK_OPENING)
       log_Printf(LogPHASE, "%s: Enter pause (%d) for redialing.\n",
-                dl->name, Timeout);
+                dl->name, result);
   }
   return result;
 }
@@ -474,7 +476,8 @@ datalink_Read(struct fdescriptor *d, struct bundle *bundle, const fd_set *fdset)
 }
 
 static int
-datalink_Write(struct fdescriptor *d, struct bundle *bundle, const fd_set *fdset)
+datalink_Write(struct fdescriptor *d, struct bundle *bundle,
+               const fd_set *fdset)
 {
   struct datalink *dl = descriptor2datalink(d);
   int result = 0;
@@ -509,15 +512,17 @@ datalink_Write(struct fdescriptor *d, struct bundle *bundle, const fd_set *fdset
 static void
 datalink_ComeDown(struct datalink *dl, int how)
 {
-  if (how != CLOSE_NORMAL) {
-    dl->dial.tries = -1;
-    dl->reconnect_tries = 0;
-    if (dl->state >= DATALINK_READY && how == CLOSE_LCP)
-      dl->stayonline = 1;
-  }
+  int stayonline;
 
-  if (dl->state >= DATALINK_READY && dl->stayonline) {
-    dl->stayonline = 0;
+  if (how == CLOSE_LCP)
+    datalink_DontHangup(dl);
+  else if (how == CLOSE_STAYDOWN)
+    datalink_StayDown(dl);
+
+  stayonline = dl->stayonline;
+  dl->stayonline = 0;
+
+  if (dl->state >= DATALINK_READY && stayonline) {
     physical_StopDeviceTimer(dl->physical);
     datalink_NewState(dl, DATALINK_READY);
   } else if (dl->state != DATALINK_CLOSED && dl->state != DATALINK_HANGUP) {
@@ -570,7 +575,8 @@ datalink_LayerUp(void *v, struct fsm *fp)
         auth_StartReq(&dl->chap.auth);
     } else
       datalink_AuthOk(dl);
-  }
+  } else if (fp->proto == PROTO_CCP)
+    (*dl->parent->LayerUp)(dl->parent->object, &dl->physical->link.ccp.fsm);
 }
 
 static void
@@ -621,7 +627,7 @@ datalink_NCPUp(struct datalink *dl)
     return;
   } else {
     dl->bundle->ncp.mp.peer = dl->peer;
-    ipcp_SetLink(&dl->bundle->ncp.ipcp, &dl->physical->link);
+    ncp_SetLink(&dl->bundle->ncp, &dl->physical->link);
     auth_Select(dl->bundle, dl->peer.authname);
   }
 
@@ -992,13 +998,11 @@ datalink_Close(struct datalink *dl, int how)
     case DATALINK_AUTH:
     case DATALINK_LCP:
       datalink_AuthReInit(dl);
+      if (how == CLOSE_LCP)
+        datalink_DontHangup(dl);
+      else if (how == CLOSE_STAYDOWN)
+        datalink_StayDown(dl);
       fsm_Close(&dl->physical->link.lcp.fsm);
-      if (how != CLOSE_NORMAL) {
-        dl->dial.tries = -1;
-        dl->reconnect_tries = 0;
-        if (how == CLOSE_LCP)
-          dl->stayonline = 1;
-      }
       break;
 
     default:
@@ -1032,14 +1036,17 @@ datalink_Down(struct datalink *dl, int how)
 void
 datalink_StayDown(struct datalink *dl)
 {
+  dl->dial.tries = -1;
   dl->reconnect_tries = 0;
+  dl->stayonline = 0;
 }
 
 void
 datalink_DontHangup(struct datalink *dl)
 {
-  if (dl->state >= DATALINK_LCP)
-    dl->stayonline = 1;
+  dl->dial.tries = -1;
+  dl->reconnect_tries = 0;
+  dl->stayonline = dl->state >= DATALINK_LCP ? 1 : 0;
 }
 
 int

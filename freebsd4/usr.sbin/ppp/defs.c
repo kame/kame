@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/defs.c,v 1.31.2.8 2000/11/01 00:19:25 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/defs.c,v 1.42 2001/06/15 13:58:06 brian Exp $
  */
 
 
@@ -301,7 +301,7 @@ MakeArgs(char *script, char **pvect, int maxargs, int flags)
   nargs = 0;
   while (*script) {
     script += strspn(script, " \t");
-    if (*script == '#' && flags & PARSE_NOHASH) {
+    if (*script == '#' && !(flags & PARSE_NOHASH)) {
       *script = '\0';
       break;
     }
@@ -313,10 +313,9 @@ MakeArgs(char *script, char **pvect, int maxargs, int flags)
       script = findblank(script, flags);
       if (script == NULL)
         return -1;
-      else if (!(flags & PARSE_NOHASH) && *script == '#') {
+      else if (!(flags & PARSE_NOHASH) && *script == '#')
         *script = '\0';
-        nargs--;
-      } else if (*script)
+      else if (*script)
         *script++ = '\0';
     }
   }

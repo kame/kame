@@ -23,13 +23,14 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/prompt.c,v 1.20.2.2 2000/08/19 09:30:06 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/prompt.c,v 1.26 2001/08/14 16:05:52 brian Exp $
  */
 
 #include <sys/param.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
+#include <sys/socket.h>
 #include <sys/un.h>
 
 #include <errno.h>
@@ -57,6 +58,8 @@
 #include "lqr.h"
 #include "hdlc.h"
 #include "lcp.h"
+#include "ncpaddr.h"
+#include "ip.h"
 #include "ipcp.h"
 #include "filter.h"
 #include "async.h"
@@ -67,6 +70,8 @@
 #ifndef NORADIUS
 #include "radius.h"
 #endif
+#include "ipv6cp.h"
+#include "ncp.h"
 #include "bundle.h"
 #include "chat.h"
 #include "chap.h"
@@ -109,7 +114,7 @@ prompt_Display(struct prompt *p)
   if (*shostname == '\0') {
     char *dot;
 
-    if (gethostname(shostname, sizeof shostname))
+    if (gethostname(shostname, sizeof shostname) || *shostname == '\0')
       strcpy(shostname, "localhost");
     else if ((dot = strchr(shostname, '.')))
       *dot = '\0';
@@ -330,7 +335,7 @@ prompt_Create(struct server *s, struct bundle *bundle, int fd)
       p->fd_in = p->fd_out = fd;
       p->Term = fdopen(fd, "a+");
       p->owner = s;
-      p->auth = *s->passwd ? LOCAL_NO_AUTH : LOCAL_AUTH;
+      p->auth = *s->cfg.passwd ? LOCAL_NO_AUTH : LOCAL_AUTH;
       p->src.type = "unknown";
       *p->src.from = '\0';
     }
@@ -518,7 +523,7 @@ PasswdCommand(struct cmdargs const *arg)
   else
     pass = arg->argv[arg->argn];
 
-  if (!strcmp(arg->prompt->owner->passwd, pass))
+  if (!strcmp(arg->prompt->owner->cfg.passwd, pass))
     arg->prompt->auth = LOCAL_AUTH;
   else
     arg->prompt->auth = LOCAL_NO_AUTH;

@@ -1,24 +1,31 @@
-/*
- *	      PPP Routing related Module
+/*-
+ * Copyright (c) 1996 - 2001 Brian Somers <brian@Awfulhak.org>
+ *          based on work by Toshiharu OHNO <tony-o@iij.ad.jp>
+ *                           Internet Initiative Japan, Inc (IIJ)
+ * All rights reserved.
  *
- *	    Written by Toshiharu OHNO (tony-o@iij.ad.jp)
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- *   Copyright (C) 1994, Internet Initiative Japan, Inc. All rights reserverd.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that the above copyright notice and this paragraph are
- * duplicated in all such forms and that any documentation,
- * advertising materials, and other materials related to such
- * distribution and use acknowledge that the software was developed
- * by the Internet Initiative Japan, Inc.  The name of the
- * IIJ may not be used to endorse or promote products derived
- * from this software without specific prior written permission.
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
- * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
- *
- * $FreeBSD: src/usr.sbin/ppp/route.c,v 1.60.2.3 2000/08/19 09:30:08 brian Exp $
- *
+ * $FreeBSD: src/usr.sbin/ppp/route.c,v 1.76 2001/08/20 00:46:33 brian Exp $
  */
 
 #include <sys/param.h>
@@ -40,6 +47,7 @@
 #include <string.h>
 #include <sys/sysctl.h>
 #include <termios.h>
+#include <unistd.h>
 
 #include "layer.h"
 #include "defs.h"
@@ -56,6 +64,8 @@
 #include "ccp.h"
 #include "link.h"
 #include "slcompress.h"
+#include "ncpaddr.h"
+#include "ip.h"
 #include "ipcp.h"
 #include "filter.h"
 #include "descriptor.h"
@@ -63,19 +73,21 @@
 #ifndef NORADIUS
 #include "radius.h"
 #endif
+#include "ipv6cp.h"
+#include "ncp.h"
 #include "bundle.h"
 #include "route.h"
 #include "prompt.h"
 #include "iface.h"
+#include "id.h"
 
 
 static void
 p_sockaddr(struct prompt *prompt, struct sockaddr *phost,
            struct sockaddr *pmask, int width)
 {
+  struct ncprange range;
   char buf[29];
-  struct sockaddr_in *ihost4 = (struct sockaddr_in *)phost;
-  struct sockaddr_in *mask4 = (struct sockaddr_in *)pmask;
   struct sockaddr_dl *dl = (struct sockaddr_dl *)phost;
 
   if (log_IsKept(LogDEBUG)) {
@@ -94,39 +106,15 @@ p_sockaddr(struct prompt *prompt, struct sockaddr *phost,
 
   switch (phost->sa_family) {
   case AF_INET:
-    if (!phost)
-      buf[0] = '\0';
-    else if (ihost4->sin_addr.s_addr == INADDR_ANY)
-      strcpy(buf, "default");
-    else if (!pmask) 
-      strcpy(buf, inet_ntoa(ihost4->sin_addr));
-    else {
-      u_int32_t msk = ntohl(mask4->sin_addr.s_addr);
-      u_int32_t tst;
-      int bits;
-      int len;
-      struct sockaddr_in net;
-
-      for (tst = 1, bits = 32; tst; tst <<= 1, bits--)
-        if (msk & tst)
-          break;
-
-      for (tst <<= 1; tst; tst <<= 1)
-        if (!(msk & tst))
-          break;
-
-      net.sin_addr.s_addr = ihost4->sin_addr.s_addr & mask4->sin_addr.s_addr;
-      strcpy(buf, inet_ntoa(net.sin_addr));
-      for (len = strlen(buf); len > 3; buf[len -= 2] = '\0')
-        if (strcmp(buf + len - 2, ".0"))
-          break;
-
-      if (tst)    /* non-contiguous :-( */
-        sprintf(buf + strlen(buf),"&0x%08lx", (u_long)msk);
-      else
-        sprintf(buf + strlen(buf), "/%d", bits);
-    }
-    break;
+#ifndef NOINET6
+  case AF_INET6:
+#endif
+    ncprange_setsa(&range, phost, pmask);
+    if (ncprange_isdefault(&range))
+      prompt_Printf(prompt, "%-*s ", width - 1, "default");
+    else
+      prompt_Printf(prompt, "%-*s ", width - 1, ncprange_ntoa(&range));
+    return;
 
   case AF_LINK:
     if (dl->sdl_nlen)
@@ -142,7 +130,7 @@ p_sockaddr(struct prompt *prompt, struct sockaddr *phost,
             sprintf(buf+f*3, "%02x:", MAC[f]);
           buf[f*3-1] = '\0';
         } else
-	  strcpy(buf, "??:??:??:??:??:??");
+          strcpy(buf, "??:??:??:??:??:??");
       } else
         sprintf(buf, "<IFT type %d>", dl->sdl_type);
     }  else if (dl->sdl_slen)
@@ -150,55 +138,6 @@ p_sockaddr(struct prompt *prompt, struct sockaddr *phost,
     else
       sprintf(buf, "link#%d", dl->sdl_index);
     break;
-
-#ifndef NOINET6
-  case AF_INET6:
-    if (!phost)
-      buf[0] = '\0';
-    else {
-      const u_char masks[] = { 0x00, 0x80, 0xc0, 0xe0, 0xf0, 0xf8, 0xfc, 0xfe };
-      struct sockaddr_in6 *ihost6 = (struct sockaddr_in6 *)phost;
-      struct sockaddr_in6 *mask6 = (struct sockaddr_in6 *)pmask;
-      int masklen, len;
-      const u_char *c;
-
-      /* XXX: ?????!?!?!!!!!  This is horrible ! */
-      if (IN6_IS_ADDR_LINKLOCAL(&ihost6->sin6_addr) ||
-          IN6_IS_ADDR_MC_LINKLOCAL(&ihost6->sin6_addr)) {
-        ihost6->sin6_scope_id =
-          ntohs(*(u_short *)&ihost6->sin6_addr.s6_addr[2]);
-        *(u_short *)&ihost6->sin6_addr.s6_addr[2] = 0;
-      }
-
-      if (mask6) {
-        const u_char *p, *end;
-
-        p = (const u_char *)&mask6->sin6_addr;
-        end = p + 16;
-        for (masklen = 0, end = p + 16; p < end && *p == 0xff; p++)
-          masklen += 8;
-
-        if (p < end) {
-          for (c = masks; c < masks + sizeof masks; c++)
-            if (*c == *p) {
-              masklen += c - masks;
-              break;
-            }
-        }
-      } else
-        masklen = 128;
-
-      if (masklen == 0 && IN6_IS_ADDR_UNSPECIFIED(&ihost6->sin6_addr))
-        snprintf(buf, sizeof buf, "default");
-      else {
-        getnameinfo(phost, ihost6->sin6_len, buf, sizeof buf,
-                    NULL, 0, NI_WITHSCOPEID | NI_NUMERICHOST);
-        if (mask6 && (len = strlen(buf)) < sizeof buf - 1)
-          snprintf(buf + len, sizeof buf - len, "/%d", masklen);
-      }
-    }
-    break;
-#endif
 
   default:
     sprintf(buf, "<AF type %d>", phost->sa_family);
@@ -439,16 +378,13 @@ route_IfDelete(struct bundle *bundle, int all)
 {
   struct rt_msghdr *rtm;
   struct sockaddr *sa[RTAX_MAX];
-  struct sockaddr_in **in;
-  struct in_addr sa_none;
+  struct ncprange range;
   int pass;
   size_t needed;
   char *sp, *cp, *ep;
   int mib[6];
 
   log_Printf(LogDEBUG, "route_IfDelete (%d)\n", bundle->iface->index);
-  sa_none.s_addr = INADDR_ANY;
-  in = (struct sockaddr_in **)sa;
 
   mib[0] = CTL_NET;
   mib[1] = PF_ROUTE;
@@ -458,7 +394,7 @@ route_IfDelete(struct bundle *bundle, int all)
   mib[5] = 0;
   if (sysctl(mib, 6, NULL, &needed, NULL, 0) < 0) {
     log_Printf(LogERROR, "route_IfDelete: sysctl: estimate: %s\n",
-	      strerror(errno));
+              strerror(errno));
     return;
   }
 
@@ -468,7 +404,7 @@ route_IfDelete(struct bundle *bundle, int all)
 
   if (sysctl(mib, 6, sp, &needed, NULL, 0) < 0) {
     log_Printf(LogERROR, "route_IfDelete: sysctl: getroute: %s\n",
-	      strerror(errno));
+              strerror(errno));
     free(sp);
     return;
   }
@@ -488,31 +424,102 @@ route_IfDelete(struct bundle *bundle, int all)
     for (cp = sp; cp < ep; cp += rtm->rtm_msglen) {
       rtm = (struct rt_msghdr *)cp;
       route_ParseHdr(rtm, sa);
-      if (sa[RTAX_DST] && sa[RTAX_DST]->sa_family == AF_INET) {
-        log_Printf(LogDEBUG, "route_IfDelete: addrs: %x, Netif: %d (%s),"
-                  " flags: %x, dst: %s ?\n", rtm->rtm_addrs, rtm->rtm_index,
-                  Index2Nam(rtm->rtm_index), rtm->rtm_flags,
-	          inet_ntoa(((struct sockaddr_in *)sa[RTAX_DST])->sin_addr));
-        if (sa[RTAX_GATEWAY] && rtm->rtm_index == bundle->iface->index &&
-	    (all || (rtm->rtm_flags & RTF_GATEWAY))) {
-          if (sa[RTAX_GATEWAY]->sa_family == AF_INET ||
-              sa[RTAX_GATEWAY]->sa_family == AF_LINK) {
-            if ((pass == 0 && (rtm->rtm_flags & RTF_WASCLONED)) ||
-                (pass == 1 && !(rtm->rtm_flags & RTF_WASCLONED))) {
-              log_Printf(LogDEBUG, "route_IfDelete: Remove it (pass %d)\n",
-                         pass);
-              bundle_SetRoute(bundle, RTM_DELETE, in[RTAX_DST]->sin_addr,
-                              sa_none, sa_none, 0, 0);
-            } else
-              log_Printf(LogDEBUG, "route_IfDelete: Skip it (pass %d)\n", pass);
-          } else
-            log_Printf(LogDEBUG,
-                      "route_IfDelete: Can't remove routes of %d family !\n",
-                      sa[RTAX_GATEWAY]->sa_family);
+      if (rtm->rtm_index == bundle->iface->index &&
+          sa[RTAX_DST] && sa[RTAX_GATEWAY] &&
+          (sa[RTAX_DST]->sa_family == AF_INET
+#ifndef NOINET6
+           || sa[RTAX_DST]->sa_family == AF_INET6
+#endif
+           ) &&
+          (all || (rtm->rtm_flags & RTF_GATEWAY))) {
+        if (log_IsKept(LogDEBUG)) {
+          char gwstr[41];
+          struct ncpaddr gw;
+          ncprange_setsa(&range, sa[RTAX_DST], sa[RTAX_NETMASK]);
+          ncpaddr_setsa(&gw, sa[RTAX_GATEWAY]);
+          snprintf(gwstr, sizeof gwstr, "%s", ncpaddr_ntoa(&gw));
+          log_Printf(LogDEBUG, "Found %s %s\n", ncprange_ntoa(&range), gwstr);
         }
+        if (sa[RTAX_GATEWAY]->sa_family == AF_INET ||
+#ifndef NOINET6
+            sa[RTAX_GATEWAY]->sa_family == AF_INET6 ||
+#endif
+            sa[RTAX_GATEWAY]->sa_family == AF_LINK) {
+          if ((pass == 0 && (rtm->rtm_flags & RTF_WASCLONED)) ||
+              (pass == 1 && !(rtm->rtm_flags & RTF_WASCLONED))) {
+            ncprange_setsa(&range, sa[RTAX_DST], sa[RTAX_NETMASK]);
+            rt_Set(bundle, RTM_DELETE, &range, NULL, 0, 0);
+          } else
+            log_Printf(LogDEBUG, "route_IfDelete: Skip it (pass %d)\n", pass);
+        } else
+          log_Printf(LogDEBUG,
+                    "route_IfDelete: Can't remove routes for family %d\n",
+                    sa[RTAX_GATEWAY]->sa_family);
       }
     }
   }
+  free(sp);
+}
+
+
+/*
+ *  Update the MTU on all routes for the given interface
+ */
+void
+route_UpdateMTU(struct bundle *bundle)
+{
+  struct rt_msghdr *rtm;
+  struct sockaddr *sa[RTAX_MAX];
+  struct ncprange dst;
+  size_t needed;
+  char *sp, *cp, *ep;
+  int mib[6];
+
+  log_Printf(LogDEBUG, "route_UpdateMTU (%d)\n", bundle->iface->index);
+
+  mib[0] = CTL_NET;
+  mib[1] = PF_ROUTE;
+  mib[2] = 0;
+  mib[3] = 0;
+  mib[4] = NET_RT_DUMP;
+  mib[5] = 0;
+  if (sysctl(mib, 6, NULL, &needed, NULL, 0) < 0) {
+    log_Printf(LogERROR, "route_IfDelete: sysctl: estimate: %s\n",
+              strerror(errno));
+    return;
+  }
+
+  sp = malloc(needed);
+  if (sp == NULL)
+    return;
+
+  if (sysctl(mib, 6, sp, &needed, NULL, 0) < 0) {
+    log_Printf(LogERROR, "route_IfDelete: sysctl: getroute: %s\n",
+              strerror(errno));
+    free(sp);
+    return;
+  }
+  ep = sp + needed;
+
+  for (cp = sp; cp < ep; cp += rtm->rtm_msglen) {
+    rtm = (struct rt_msghdr *)cp;
+    route_ParseHdr(rtm, sa);
+    if (sa[RTAX_DST] && (sa[RTAX_DST]->sa_family == AF_INET
+#ifndef NOINET6
+                         || sa[RTAX_DST]->sa_family == AF_INET6
+#endif
+                        ) &&
+        sa[RTAX_GATEWAY] && rtm->rtm_index == bundle->iface->index) {
+      if (log_IsKept(LogTCPIP)) {
+        ncprange_setsa(&dst, sa[RTAX_DST], sa[RTAX_NETMASK]);
+        log_Printf(LogTCPIP, "route_UpdateMTU: Netif: %d (%s), dst %s,"
+                   " mtu %d\n", rtm->rtm_index, Index2Nam(rtm->rtm_index),
+                   ncprange_ntoa(&dst), bundle->iface->mtu);
+      }
+      rt_Update(bundle, sa[RTAX_DST], sa[RTAX_GATEWAY], sa[RTAX_NETMASK]);
+    }
+  }
+
   free(sp);
 }
 
@@ -533,45 +540,60 @@ GetIfIndex(char *name)
 
 void
 route_Change(struct bundle *bundle, struct sticky_route *r,
-             struct in_addr me, struct in_addr peer, struct in_addr dns[2])
+             const struct ncpaddr *me, const struct ncpaddr *peer)
 {
-  struct in_addr none, del;
+  struct ncpaddr dst;
 
-  none.s_addr = INADDR_ANY;
   for (; r; r = r->next) {
-    if ((r->type & ROUTE_DSTMYADDR) && r->dst.s_addr != me.s_addr) {
-      del.s_addr = r->dst.s_addr & r->mask.s_addr;
-      bundle_SetRoute(bundle, RTM_DELETE, del, none, none, 1, 0);
-      r->dst = me;
-      if (r->type & ROUTE_GWHISADDR)
-        r->gw = peer;
-    } else if ((r->type & ROUTE_DSTHISADDR) && r->dst.s_addr != peer.s_addr) {
-      del.s_addr = r->dst.s_addr & r->mask.s_addr;
-      bundle_SetRoute(bundle, RTM_DELETE, del, none, none, 1, 0);
-      r->dst = peer;
-      if (r->type & ROUTE_GWHISADDR)
-        r->gw = peer;
-    } else if ((r->type & ROUTE_DSTDNS0) && r->dst.s_addr != peer.s_addr) {
-      del.s_addr = r->dst.s_addr & r->mask.s_addr;
-      bundle_SetRoute(bundle, RTM_DELETE, del, none, none, 1, 0);
-      r->dst = dns[0];
-      if (r->type & ROUTE_GWHISADDR)
-        r->gw = peer;
-    } else if ((r->type & ROUTE_DSTDNS1) && r->dst.s_addr != peer.s_addr) {
-      del.s_addr = r->dst.s_addr & r->mask.s_addr;
-      bundle_SetRoute(bundle, RTM_DELETE, del, none, none, 1, 0);
-      r->dst = dns[1];
-      if (r->type & ROUTE_GWHISADDR)
-        r->gw = peer;
-    } else if ((r->type & ROUTE_GWHISADDR) && r->gw.s_addr != peer.s_addr)
-      r->gw = peer;
-    bundle_SetRoute(bundle, RTM_ADD, r->dst, r->gw, r->mask, 1, 0);
+    ncprange_getaddr(&r->dst, &dst);
+    if (ncpaddr_family(me) == AF_INET) {
+      if ((r->type & ROUTE_DSTMYADDR) && !ncpaddr_equal(&dst, me)) {
+        rt_Set(bundle, RTM_DELETE, &r->dst, NULL, 1, 0);
+        ncprange_sethost(&r->dst, me);
+        if (r->type & ROUTE_GWHISADDR)
+          ncpaddr_copy(&r->gw, peer);
+      } else if ((r->type & ROUTE_DSTHISADDR) && !ncpaddr_equal(&dst, peer)) {
+        rt_Set(bundle, RTM_DELETE, &r->dst, NULL, 1, 0);
+        ncprange_sethost(&r->dst, peer);
+        if (r->type & ROUTE_GWHISADDR)
+          ncpaddr_copy(&r->gw, peer);
+      } else if ((r->type & ROUTE_DSTDNS0) && !ncpaddr_equal(&dst, peer)) {
+        if (bundle->ncp.ipcp.ns.dns[0].s_addr == INADDR_NONE)
+          continue;
+        rt_Set(bundle, RTM_DELETE, &r->dst, NULL, 1, 0);
+        if (r->type & ROUTE_GWHISADDR)
+          ncpaddr_copy(&r->gw, peer);
+      } else if ((r->type & ROUTE_DSTDNS1) && !ncpaddr_equal(&dst, peer)) {
+        if (bundle->ncp.ipcp.ns.dns[1].s_addr == INADDR_NONE)
+          continue;
+        rt_Set(bundle, RTM_DELETE, &r->dst, NULL, 1, 0);
+        if (r->type & ROUTE_GWHISADDR)
+          ncpaddr_copy(&r->gw, peer);
+      } else if ((r->type & ROUTE_GWHISADDR) && !ncpaddr_equal(&r->gw, peer))
+        ncpaddr_copy(&r->gw, peer);
+#ifndef NOINET6
+    } else if (ncpaddr_family(me) == AF_INET6) {
+      if ((r->type & ROUTE_DSTMYADDR6) && !ncpaddr_equal(&dst, me)) {
+        rt_Set(bundle, RTM_DELETE, &r->dst, NULL, 1, 0);
+        ncprange_sethost(&r->dst, me);
+        if (r->type & ROUTE_GWHISADDR)
+          ncpaddr_copy(&r->gw, peer);
+      } else if ((r->type & ROUTE_DSTHISADDR6) && !ncpaddr_equal(&dst, peer)) {
+        rt_Set(bundle, RTM_DELETE, &r->dst, NULL, 1, 0);
+        ncprange_sethost(&r->dst, peer);
+        if (r->type & ROUTE_GWHISADDR)
+          ncpaddr_copy(&r->gw, peer);
+      } else if ((r->type & ROUTE_GWHISADDR6) && !ncpaddr_equal(&r->gw, peer))
+        ncpaddr_copy(&r->gw, peer);
+#endif
+    }
+    rt_Set(bundle, RTM_ADD, &r->dst, &r->gw, 1, 0);
   }
 }
 
 void
-route_Add(struct sticky_route **rp, int type, struct in_addr dst,
-          struct in_addr mask, struct in_addr gw)
+route_Add(struct sticky_route **rp, int type, const struct ncprange *dst,
+          const struct ncpaddr *gw)
 {
   struct sticky_route *r;
   int dsttype = type & ROUTE_DSTANY;
@@ -579,7 +601,7 @@ route_Add(struct sticky_route **rp, int type, struct in_addr dst,
   r = NULL;
   while (*rp) {
     if ((dsttype && dsttype == ((*rp)->type & ROUTE_DSTANY)) ||
-        (!dsttype && (*rp)->dst.s_addr == dst.s_addr)) {
+        (!dsttype && ncprange_equal(&(*rp)->dst, dst))) {
       /* Oops, we already have this route - unlink it */
       free(r);			/* impossible really  */
       r = *rp;
@@ -592,21 +614,20 @@ route_Add(struct sticky_route **rp, int type, struct in_addr dst,
     r = (struct sticky_route *)malloc(sizeof(struct sticky_route));
   r->type = type;
   r->next = NULL;
-  r->dst = dst;
-  r->mask = mask;
-  r->gw = gw;
+  ncprange_copy(&r->dst, dst);
+  ncpaddr_copy(&r->gw, gw);
   *rp = r;
 }
 
 void
-route_Delete(struct sticky_route **rp, int type, struct in_addr dst)
+route_Delete(struct sticky_route **rp, int type, const struct ncprange *dst)
 {
   struct sticky_route *r;
   int dsttype = type & ROUTE_DSTANY;
 
   for (; *rp; rp = &(*rp)->next) {
     if ((dsttype && dsttype == ((*rp)->type & ROUTE_DSTANY)) ||
-        (!dsttype && dst.s_addr == ((*rp)->dst.s_addr & (*rp)->mask.s_addr))) {
+        (!dsttype && ncprange_equal(dst, &(*rp)->dst))) {
       r = *rp;
       *rp = r->next;
       free(r);
@@ -631,7 +652,6 @@ void
 route_ShowSticky(struct prompt *p, struct sticky_route *r, const char *tag,
                  int indent)
 {
-  int def;
   int tlen = strlen(tag);
 
   if (tlen + 2 > indent)
@@ -640,29 +660,250 @@ route_ShowSticky(struct prompt *p, struct sticky_route *r, const char *tag,
     prompt_Printf(p, "%s:%*s", tag, indent - tlen - 1, "");
 
   for (; r; r = r->next) {
-    def = r->dst.s_addr == INADDR_ANY && r->mask.s_addr == INADDR_ANY;
-
     prompt_Printf(p, "%*sadd ", tlen ? 0 : indent, "");
     tlen = 0;
     if (r->type & ROUTE_DSTMYADDR)
       prompt_Printf(p, "MYADDR");
+    else if (r->type & ROUTE_DSTMYADDR6)
+      prompt_Printf(p, "MYADDR6");
     else if (r->type & ROUTE_DSTHISADDR)
       prompt_Printf(p, "HISADDR");
+    else if (r->type & ROUTE_DSTHISADDR6)
+      prompt_Printf(p, "HISADDR6");
     else if (r->type & ROUTE_DSTDNS0)
       prompt_Printf(p, "DNS0");
     else if (r->type & ROUTE_DSTDNS1)
       prompt_Printf(p, "DNS1");
-    else if (!def)
-      prompt_Printf(p, "%s", inet_ntoa(r->dst));
-
-    if (def)
-      prompt_Printf(p, "default ");
+    else if (ncprange_isdefault(&r->dst))
+      prompt_Printf(p, "default");
     else
-      prompt_Printf(p, " %s ", inet_ntoa(r->mask));
+      prompt_Printf(p, "%s", ncprange_ntoa(&r->dst));
 
     if (r->type & ROUTE_GWHISADDR)
-      prompt_Printf(p, "HISADDR\n");
+      prompt_Printf(p, " HISADDR\n");
+    else if (r->type & ROUTE_GWHISADDR6)
+      prompt_Printf(p, " HISADDR6\n");
     else
-      prompt_Printf(p, "%s\n", inet_ntoa(r->gw));
+      prompt_Printf(p, " %s\n", ncpaddr_ntoa(&r->gw));
   }
+}
+
+struct rtmsg {
+  struct rt_msghdr m_rtm;
+  char m_space[256];
+};
+
+int
+rt_Set(struct bundle *bundle, int cmd, const struct ncprange *dst,
+       const struct ncpaddr *gw, int bang, int quiet)
+{
+  struct rtmsg rtmes;
+  int domask, s, nb, wb, width;
+  char *cp;
+  const char *cmdstr;
+  struct sockaddr_storage sadst, samask, sagw;
+  int result = 1;
+
+  if (bang)
+    cmdstr = (cmd == RTM_ADD ? "Add!" : "Delete!");
+  else
+    cmdstr = (cmd == RTM_ADD ? "Add" : "Delete");
+  s = ID0socket(PF_ROUTE, SOCK_RAW, 0);
+  if (s < 0) {
+    log_Printf(LogERROR, "rt_Set: socket(): %s\n", strerror(errno));
+    return result;
+  }
+  memset(&rtmes, '\0', sizeof rtmes);
+  rtmes.m_rtm.rtm_version = RTM_VERSION;
+  rtmes.m_rtm.rtm_type = cmd;
+  rtmes.m_rtm.rtm_addrs = RTA_DST;
+  rtmes.m_rtm.rtm_seq = ++bundle->routing_seq;
+  rtmes.m_rtm.rtm_pid = getpid();
+  rtmes.m_rtm.rtm_flags = RTF_UP | RTF_GATEWAY | RTF_STATIC;
+
+  if (cmd == RTM_ADD) {
+    if (bundle->ncp.cfg.sendpipe > 0) {
+      rtmes.m_rtm.rtm_rmx.rmx_sendpipe = bundle->ncp.cfg.sendpipe;
+      rtmes.m_rtm.rtm_inits |= RTV_SPIPE;
+    }
+    if (bundle->ncp.cfg.recvpipe > 0) {
+      rtmes.m_rtm.rtm_rmx.rmx_recvpipe = bundle->ncp.cfg.recvpipe;
+      rtmes.m_rtm.rtm_inits |= RTV_RPIPE;
+    }
+  }
+
+  ncprange_getsa(dst, &sadst, &samask);
+
+  cp = rtmes.m_space;
+  memcpy(cp, &sadst, sadst.ss_len);
+  cp += sadst.ss_len;
+  if (cmd == RTM_ADD) {
+    if (gw == NULL) {
+      log_Printf(LogERROR, "rt_Set: Program error\n");
+      close(s);
+      return result;
+    }
+    ncpaddr_getsa(gw, &sagw);
+    if (ncpaddr_isdefault(gw)) {
+      if (!quiet)
+        log_Printf(LogERROR, "rt_Set: Cannot add a route with"
+                   " destination 0.0.0.0\n");
+      close(s);
+      return result;
+    } else {
+      memcpy(cp, &sagw, sagw.ss_len);
+      cp += sagw.ss_len;
+      rtmes.m_rtm.rtm_addrs |= RTA_GATEWAY;
+    }
+  }
+
+  domask = 1;
+  if (ncprange_family(dst) == AF_INET) {
+    ncprange_getwidth(dst, &width);
+    if (width == 32)
+      domask = 0;
+  }
+  if (domask) {
+    memcpy(cp, &samask, samask.ss_len);
+    cp += samask.ss_len;
+    rtmes.m_rtm.rtm_addrs |= RTA_NETMASK;
+  }
+
+  nb = cp - (char *)&rtmes;
+  rtmes.m_rtm.rtm_msglen = nb;
+  wb = ID0write(s, &rtmes, nb);
+  if (wb < 0) {
+    log_Printf(LogTCPIP, "rt_Set failure:\n");
+    log_Printf(LogTCPIP, "rt_Set:  Cmd = %s\n", cmdstr);
+    log_Printf(LogTCPIP, "rt_Set:  Dst = %s\n", ncprange_ntoa(dst));
+    if (gw != NULL)
+      log_Printf(LogTCPIP, "rt_Set:  Gateway = %s\n", ncpaddr_ntoa(gw));
+failed:
+    if (cmd == RTM_ADD && (rtmes.m_rtm.rtm_errno == EEXIST ||
+                           (rtmes.m_rtm.rtm_errno == 0 && errno == EEXIST))) {
+      if (!bang) {
+        log_Printf(LogWARN, "Add route failed: %s already exists\n",
+		   ncprange_ntoa(dst));
+        result = 0;	/* Don't add to our dynamic list */
+      } else {
+        rtmes.m_rtm.rtm_type = cmd = RTM_CHANGE;
+        if ((wb = ID0write(s, &rtmes, nb)) < 0)
+          goto failed;
+      }
+    } else if (cmd == RTM_DELETE &&
+             (rtmes.m_rtm.rtm_errno == ESRCH ||
+              (rtmes.m_rtm.rtm_errno == 0 && errno == ESRCH))) {
+      if (!bang)
+        log_Printf(LogWARN, "Del route failed: %s: Non-existent\n",
+                  ncprange_ntoa(dst));
+    } else if (rtmes.m_rtm.rtm_errno == 0) {
+      if (!quiet || errno != ENETUNREACH)
+        log_Printf(LogWARN, "%s route failed: %s: errno: %s\n", cmdstr,
+                   ncprange_ntoa(dst), strerror(errno));
+    } else
+      log_Printf(LogWARN, "%s route failed: %s: %s\n",
+		 cmdstr, ncprange_ntoa(dst), strerror(rtmes.m_rtm.rtm_errno));
+  }
+
+  if (log_IsKept(LogDEBUG)) {
+    char gwstr[40];
+
+    if (gw)
+      snprintf(gwstr, sizeof gwstr, "%s", ncpaddr_ntoa(gw));
+    else
+      snprintf(gwstr, sizeof gwstr, "<none>");
+    log_Printf(LogDEBUG, "wrote %d: cmd = %s, dst = %s, gateway = %s\n",
+               wb, cmdstr, ncprange_ntoa(dst), gwstr);
+  }
+  close(s);
+
+  return result;
+}
+
+void
+rt_Update(struct bundle *bundle, const struct sockaddr *dst,
+          const struct sockaddr *gw, const struct sockaddr *mask)
+{
+  struct ncprange ncpdst;
+  struct rtmsg rtmes;
+  char *p;
+  int s, wb;
+
+  s = ID0socket(PF_ROUTE, SOCK_RAW, 0);
+  if (s < 0) {
+    log_Printf(LogERROR, "rt_Update: socket(): %s\n", strerror(errno));
+    return;
+  }
+
+  memset(&rtmes, '\0', sizeof rtmes);
+  rtmes.m_rtm.rtm_version = RTM_VERSION;
+  rtmes.m_rtm.rtm_type = RTM_CHANGE;
+  rtmes.m_rtm.rtm_addrs = 0;
+  rtmes.m_rtm.rtm_seq = ++bundle->routing_seq;
+  rtmes.m_rtm.rtm_pid = getpid();
+  rtmes.m_rtm.rtm_flags = RTF_UP | RTF_GATEWAY | RTF_STATIC;
+
+  if (bundle->ncp.cfg.sendpipe > 0) {
+    rtmes.m_rtm.rtm_rmx.rmx_sendpipe = bundle->ncp.cfg.sendpipe;
+    rtmes.m_rtm.rtm_inits |= RTV_SPIPE;
+  }
+
+  if (bundle->ncp.cfg.recvpipe > 0) {
+    rtmes.m_rtm.rtm_rmx.rmx_recvpipe = bundle->ncp.cfg.recvpipe;
+    rtmes.m_rtm.rtm_inits |= RTV_RPIPE;
+  }
+
+  rtmes.m_rtm.rtm_rmx.rmx_mtu = bundle->iface->mtu;
+  rtmes.m_rtm.rtm_inits |= RTV_MTU;
+  p = rtmes.m_space;
+
+  if (dst) {
+    rtmes.m_rtm.rtm_addrs |= RTA_DST;
+    memcpy(p, dst, dst->sa_len);
+    p += dst->sa_len;
+  }
+
+#ifdef __FreeBSD__
+  /*
+   * In order to update the default route under FreeBSD, only the destination
+   * address should be specified.  If the (empty) mask or the gateway
+   * address are used, the update fails...
+   * Conversely, if the gateway and mask are omitted under OpenBSD, the
+   * update will fail.
+   */
+  if (dst)
+    ncprange_setsa(&ncpdst, dst, mask);
+  else
+    ncprange_init(&ncpdst);
+
+  if (!ncprange_isdefault(&ncpdst))
+#endif
+  {
+    rtmes.m_rtm.rtm_addrs |= RTA_GATEWAY;
+    memcpy(p, gw, gw->sa_len);
+    p += gw->sa_len;
+    if (mask) {
+      rtmes.m_rtm.rtm_addrs |= RTA_NETMASK;
+      memcpy(p, mask, mask->sa_len);
+      p += mask->sa_len;
+    }
+  }
+
+  rtmes.m_rtm.rtm_msglen = p - (char *)&rtmes;
+
+  wb = ID0write(s, &rtmes, rtmes.m_rtm.rtm_msglen);
+  if (wb < 0) {
+    ncprange_setsa(&ncpdst, dst, mask);
+
+    log_Printf(LogTCPIP, "rt_Update failure:\n");
+    log_Printf(LogTCPIP, "rt_Update:  Dst = %s\n", ncprange_ntoa(&ncpdst));
+
+    if (rtmes.m_rtm.rtm_errno == 0)
+      log_Printf(LogWARN, "%s: Change route failed: errno: %s\n",
+                 ncprange_ntoa(&ncpdst), strerror(errno));
+    else
+      log_Printf(LogWARN, "%s: Change route failed: %s\n",
+		 ncprange_ntoa(&ncpdst), strerror(rtmes.m_rtm.rtm_errno));
+  }
+  close(s);
 }

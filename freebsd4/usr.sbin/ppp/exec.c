@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/exec.c,v 1.18.2.4 2000/08/19 09:30:03 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/exec.c,v 1.26 2001/06/18 14:59:33 brian Exp $
  */
 
 #include <sys/param.h>
@@ -68,6 +68,7 @@
 static struct device execdevice = {
   EXEC_DEVICE,
   "exec",
+  0,
   { CD_NOTREQUIRED, 0 },
   NULL,
   NULL,

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/ether.c,v 1.9.2.3 2000/11/01 00:19:25 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/ether.c,v 1.22 2001/08/24 14:52:53 brian Exp $
  */
 
 #include <sys/param.h>
@@ -34,6 +34,8 @@
 #include <netdb.h>
 #include <netgraph.h>
 #include <net/ethernet.h>
+#include <net/if.h>
+#include <net/route.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netgraph/ng_ether.h>
@@ -51,6 +53,7 @@
 #include <sys/linker.h>
 #include <sys/module.h>
 #endif
+#include <sys/stat.h>
 #include <sys/uio.h>
 #include <termios.h>
 #include <sys/time.h>
@@ -80,13 +83,18 @@
 #include "datalink.h"
 #include "slcompress.h"
 #include "iplist.h"
+#include "ncpaddr.h"
+#include "ip.h"
 #include "ipcp.h"
 #include "filter.h"
 #ifndef NORADIUS
 #include "radius.h"
 #endif
+#include "ipv6cp.h"
+#include "ncp.h"
 #include "bundle.h"
 #include "id.h"
+#include "iface.h"
 #include "ether.h"
 
 
@@ -222,7 +230,7 @@ ether_MessageIn(struct etherdevice *dev)
   if (ret <= 0)
     return;
 
-  if (NgRecvMsg(dev->cs, rep, sizeof msgbuf, NULL) < 0)
+  if (NgRecvMsg(dev->cs, rep, sizeof msgbuf, NULL) <= 0)
     return;
 
   if (rep->header.version != NG_VERSION) {
@@ -281,6 +289,7 @@ ether_AwaitCarrier(struct physical *p)
 static const struct device baseetherdevice = {
   ETHER_DEVICE,
   "ether",
+  1492,
   { CD_REQUIRED, DEF_ETHERCDDELAY },
   ether_AwaitCarrier,
   ether_RemoveFromSet,
@@ -398,9 +407,12 @@ ether_Create(struct physical *p)
   struct ng_mesg *resp;
   const struct hooklist *hlist;
   const struct nodeinfo *ninfo;
-  int f;
+  char *path;
+  int ifacelen, f;
 
   dev = NULL;
+  path = NULL;
+  ifacelen = 0;
   if (p->fd < 0 && !strncasecmp(p->name.full, NG_PPPOE_NODE_TYPE,
                                 PPPOE_NODE_TYPE_LEN) &&
       p->name.full[PPPOE_NODE_TYPE_LEN] == ':') {
@@ -409,15 +421,15 @@ ether_Create(struct physical *p)
     struct ngm_mkpeer mkp;
     struct ngm_connect ngc;
     const char *iface, *provider;
-    char *path, etherid[12];
-    int ifacelen, providerlen;
+    char etherid[12];
+    int providerlen;
     char connectpath[sizeof dev->hook + 2];	/* .:<hook> */
 
     p->fd--;				/* We own the device - change fd */
 
 #if defined(__FreeBSD__) && !defined(NOKLDLOAD)
-    if (modfind("netgraph") == -1) {
-      log_Printf(LogWARN, "Netgraph is not built into the kernel\n");
+    if (modfind("netgraph") == -1 && ID0kldload("netgraph") == -1) {
+      log_Printf(LogWARN, "kldload: netgraph: %s\n", strerror(errno));
       return NULL;
     }
 
@@ -427,6 +439,11 @@ ether_Create(struct physical *p)
        * built in as part of the netgraph node itself.
        */
       log_Printf(LogWARN, "kldload: ng_ether: %s\n", strerror(errno));
+
+    if (modfind("ng_pppoe") == -1 && ID0kldload("ng_pppoe") == -1) {
+      log_Printf(LogWARN, "kldload: ng_pppoe: %s\n", strerror(errno));
+      return NULL;
+    }
 
     if (modfind("ng_socket") == -1 && ID0kldload("ng_socket") == -1) {
       log_Printf(LogWARN, "kldload: ng_socket: %s\n", strerror(errno));
@@ -494,7 +511,7 @@ ether_Create(struct physical *p)
 
     /* Get our list back */
     resp = (struct ng_mesg *)rbuf;
-    if (NgRecvMsg(dev->cs, resp, sizeof rbuf, NULL) < 0) {
+    if (NgRecvMsg(dev->cs, resp, sizeof rbuf, NULL) <= 0) {
       log_Printf(LogWARN, "Cannot get netgraph response: %s\n",
                  strerror(errno));
       return ether_Abandon(dev, p);
@@ -582,12 +599,17 @@ ether_Create(struct physical *p)
       return ether_Abandon(dev, p);
     }
 
+    /* Bring the Ethernet interface up */
+    path[ifacelen] = '\0';	/* Remove the trailing ':' */
+    if (!iface_SetFlags(path, IFF_UP))
+      log_Printf(LogWARN, "%s: Failed to set the IFF_UP flag on %s\n",
+                 p->link.name, path);
+
     /* And finally, request a connection to the given provider */
 
-    data = (struct ngpppoe_init_data *)alloca(sizeof *data + providerlen + 1);
-
+    data = (struct ngpppoe_init_data *)alloca(sizeof *data + providerlen);
     snprintf(data->hook, sizeof data->hook, "%s", dev->hook);
-    strcpy(data->data, provider);
+    memcpy(data->data, provider, providerlen);
     data->data_len = providerlen;
 
     snprintf(connectpath, sizeof connectpath, ".:%s", dev->hook);
@@ -624,45 +646,45 @@ ether_Create(struct physical *p)
 
   } else {
     /* See if we're a netgraph socket */
-    struct sockaddr_ng ngsock;
-    struct sockaddr *sock = (struct sockaddr *)&ngsock;
-    int sz;
+    struct stat st;
 
-    sz = sizeof ngsock;
-    if (getsockname(p->fd, sock, &sz) != -1 && sock->sa_family == AF_NETGRAPH) {
-      /*
-       * It's a netgraph node... We can't determine hook names etc, so we
-       * stay pretty impartial....
-       */
-      log_Printf(LogPHASE, "%s: Link is a netgraph node\n", p->link.name);
+    if (fstat(p->fd, &st) != -1 && (st.st_mode & S_IFSOCK)) {
+      struct sockaddr_storage ssock;
+      struct sockaddr *sock = (struct sockaddr *)&ssock;
+      int sz;
 
-      if ((dev = malloc(sizeof *dev)) == NULL) {
-        log_Printf(LogWARN, "%s: Cannot allocate an ether device: %s\n",
-                   p->link.name, strerror(errno));
+      sz = sizeof ssock;
+      if (getsockname(p->fd, sock, &sz) == -1) {
+        log_Printf(LogPHASE, "%s: Link is a closed socket !\n", p->link.name);
+        close(p->fd);
+        p->fd = -1;
         return NULL;
       }
 
-      memcpy(&dev->dev, &baseetherdevice, sizeof dev->dev);
-      dev->cs = -1;
-      dev->timeout = 0;
-      dev->connected = CARRIER_OK;
-      *dev->hook = '\0';
+      if (sock->sa_family == AF_NETGRAPH) {
+        /*
+         * It's a netgraph node... We can't determine hook names etc, so we
+         * stay pretty impartial....
+         */
+        log_Printf(LogPHASE, "%s: Link is a netgraph node\n", p->link.name);
+
+        if ((dev = malloc(sizeof *dev)) == NULL) {
+          log_Printf(LogWARN, "%s: Cannot allocate an ether device: %s\n",
+                     p->link.name, strerror(errno));
+          return NULL;
+        }
+
+        memcpy(&dev->dev, &baseetherdevice, sizeof dev->dev);
+        dev->cs = -1;
+        dev->timeout = 0;
+        dev->connected = CARRIER_OK;
+        *dev->hook = '\0';
+      }
     }
   }
 
   if (dev) {
     physical_SetupStack(p, dev->dev.name, PHYSICAL_FORCE_SYNCNOACF);
-
-    /* Moan about (and fix) invalid LCP configurations */
-    if (p->link.lcp.cfg.mru > 1492) {
-      log_Printf(LogWARN, "%s: Reducing MRU to 1492\n", p->link.name);
-      p->link.lcp.cfg.mru = 1492;
-    }
-    if (p->dl->bundle->cfg.mtu > 1492) {
-      log_Printf(LogWARN, "%s: Reducing MTU to 1492\n", p->link.name);
-      p->dl->bundle->cfg.mtu = 1492;
-    }
-
     return &dev->dev;
   }
 

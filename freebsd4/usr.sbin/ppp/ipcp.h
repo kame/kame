@@ -1,23 +1,31 @@
-/*
- *	    Written by Toshiharu OHNO (tony-o@iij.ad.jp)
+/*-
+ * Copyright (c) 1996 - 2001 Brian Somers <brian@Awfulhak.org>
+ *          based on work by Toshiharu OHNO <tony-o@iij.ad.jp>
+ *                           Internet Initiative Japan, Inc (IIJ)
+ * All rights reserved.
  *
- *   Copyright (C) 1993, Internet Initiative Japan, Inc. All rights reserverd.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that the above copyright notice and this paragraph are
- * duplicated in all such forms and that any documentation,
- * advertising materials, and other materials related to such
- * distribution and use acknowledge that the software was developed
- * by the Internet Initiative Japan.  The name of the
- * IIJ may not be used to endorse or promote products derived
- * from this software without specific prior written permission.
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
- * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/ipcp.h,v 1.30.2.2 2000/06/15 17:08:28 brian Exp $
- *
- *	TODO:
+ * $FreeBSD: src/usr.sbin/ppp/ipcp.h,v 1.35 2001/08/14 16:05:51 brian Exp $
  */
 
 #define	IPCP_MAXCODE	CODE_CODEREJ
@@ -34,20 +42,6 @@
 #define TY_SECONDARY_NBNS	132
 #define TY_ADJUST_NS		119 /* subtract from NS val for REJECT bit */
 
-struct sticky_route;
-
-struct in_range {
-  struct in_addr ipaddr;
-  struct in_addr mask;
-  int width;
-};
-
-struct port_range {
-  unsigned nports;		/* How many ports */
-  unsigned maxports;		/* How many allocated (malloc) ports */
-  u_short *port;		/* The actual ports */
-};
-
 struct ipcp {
   struct fsm fsm;			/* The finite state machine */
 
@@ -58,13 +52,10 @@ struct ipcp {
       unsigned neg : 2;			/* VJ negotiation */
     } vj;
 
-    struct in_range  my_range;		/* MYADDR spec */
+    struct ncprange  my_range;		/* MYADDR spec */
     struct in_addr   netmask;		/* Iface netmask (unused by most OSs) */
-    struct in_range  peer_range;	/* HISADDR spec */
+    struct ncprange  peer_range;	/* HISADDR spec */
     struct iplist    peer_list;		/* Ranges of HISADDR values */
-
-    u_long sendpipe;			/* route sendpipe size */
-    u_long recvpipe;			/* route recvpipe size */
 
     struct in_addr   TriggerAddress;	/* Address to suggest in REQ */
     unsigned HaveTriggerAddress : 1;	/* Trigger address specified */
@@ -75,12 +66,7 @@ struct ipcp {
       struct in_addr nbns[2];		/* NetBIOS NS addresses offered */
     } ns;
 
-    struct {
-      struct port_range tcp, udp;	/* The range of urgent ports */
-      unsigned tos : 1;			/* Urgent IPTOS_LOWDELAY packets ? */
-    } urgent;
-
-    struct fsm_retry fsm;	/* How often/frequently to resend requests */
+    struct fsm_retry fsm;		/* frequency to resend requests */
   } cfg;
 
   struct {
@@ -96,10 +82,9 @@ struct ipcp {
     char *resolv_nons;			/* Contents of resolv.conf without ns */
   } ns;
 
-  struct sticky_route *route;		/* List of dynamic routes */
-
   unsigned heis1172 : 1;		/* True if he is speaking rfc1172 */
 
+  unsigned peer_req : 1;		/* Any TY_IPADDR REQs from the peer ? */
   struct in_addr peer_ip;		/* IP address he's willing to use */
   u_int32_t peer_compproto;		/* VJ params he's willing to use */
 
@@ -107,8 +92,6 @@ struct ipcp {
 
   struct in_addr my_ip;			/* IP address I'm willing to use */
   u_int32_t my_compproto;		/* VJ params I'm willing to use */
-
-  struct in_addr dns[2];		/* DNSs to REQ/ACK */
 
   u_int32_t peer_reject;		/* Request codes rejected by peer */
   u_int32_t my_reject;			/* Request codes I have rejected */
@@ -123,6 +106,7 @@ struct ipcp {
 struct bundle;
 struct link;
 struct cmdargs;
+struct iface_addr;
 
 extern void ipcp_Init(struct ipcp *, struct bundle *, struct link *,
                       const struct fsm_parent *);
@@ -137,32 +121,12 @@ extern void ipcp_AddOutOctets(struct ipcp *, int);
 extern int  ipcp_UseHisIPaddr(struct bundle *, struct in_addr);
 extern int  ipcp_UseHisaddr(struct bundle *, const char *, int);
 extern int  ipcp_vjset(struct cmdargs const *);
-extern void ipcp_CleanInterface(struct ipcp *);
+extern void ipcp_IfaceAddrAdded(struct ipcp *, const struct iface_addr *);
+extern void ipcp_IfaceAddrDeleted(struct ipcp *, const struct iface_addr *);
 extern int  ipcp_InterfaceUp(struct ipcp *);
-extern int  ipcp_IsUrgentPort(struct port_range *, u_short, u_short);
-extern void ipcp_AddUrgentPort(struct port_range *, u_short);
-extern void ipcp_RemoveUrgentPort(struct port_range *, u_short);
-extern void ipcp_ClearUrgentPorts(struct port_range *);
 extern struct in_addr addr2mask(struct in_addr);
 extern int ipcp_WriteDNS(struct ipcp *);
 extern void ipcp_RestoreDNS(struct ipcp *);
 extern void ipcp_LoadDNS(struct ipcp *);
-
-#define ipcp_IsUrgentTcpPort(ipcp, p1, p2) \
-          ipcp_IsUrgentPort(&(ipcp)->cfg.urgent.tcp, p1, p2)
-#define ipcp_IsUrgentUdpPort(ipcp, p1, p2) \
-          ipcp_IsUrgentPort(&(ipcp)->cfg.urgent.udp, p1, p2)
-#define ipcp_AddUrgentTcpPort(ipcp, p) \
-          ipcp_AddUrgentPort(&(ipcp)->cfg.urgent.tcp, p)
-#define ipcp_AddUrgentUdpPort(ipcp, p) \
-          ipcp_AddUrgentPort(&(ipcp)->cfg.urgent.udp, p)
-#define ipcp_RemoveUrgentTcpPort(ipcp, p) \
-          ipcp_RemoveUrgentPort(&(ipcp)->cfg.urgent.tcp, p)
-#define ipcp_RemoveUrgentUdpPort(ipcp, p) \
-          ipcp_RemoveUrgentPort(&(ipcp)->cfg.urgent.udp, p)
-#define ipcp_ClearUrgentTcpPorts(ipcp) \
-          ipcp_ClearUrgentPorts(&(ipcp)->cfg.urgent.tcp)
-#define ipcp_ClearUrgentUdpPorts(ipcp) \
-          ipcp_ClearUrgentPorts(&(ipcp)->cfg.urgent.udp)
-#define ipcp_ClearUrgentTOS(ipcp) (ipcp)->cfg.urgent.tos = 0;
-#define ipcp_SetUrgentTOS(ipcp) (ipcp)->cfg.urgent.tos = 1;
+extern size_t ipcp_QueueLen(struct ipcp *);
+extern int ipcp_PushPacket(struct ipcp *, struct link *);

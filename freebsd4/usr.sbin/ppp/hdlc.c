@@ -1,26 +1,33 @@
-/*
- *	     PPP High Level Link Control (HDLC) Module
+/*-
+ * Copyright (c) 1996 - 2001 Brian Somers <brian@Awfulhak.org>
+ *          based on work by Toshiharu OHNO <tony-o@iij.ad.jp>
+ *                           Internet Initiative Japan, Inc (IIJ)
+ * All rights reserved.
  *
- *	    Written by Toshiharu OHNO (tony-o@iij.ad.jp)
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- *   Copyright (C) 1993, Internet Initiative Japan, Inc. All rights reserverd.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that the above copyright notice and this paragraph are
- * duplicated in all such forms and that any documentation,
- * advertising materials, and other materials related to such
- * distribution and use acknowledge that the software was developed
- * by the Internet Initiative Japan, Inc.  The name of the
- * IIJ may not be used to endorse or promote products derived
- * from this software without specific prior written permission.
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
- * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
- *
- * $FreeBSD: src/usr.sbin/ppp/hdlc.c,v 1.46 1999/12/20 20:29:42 brian Exp $
- *
- *	TODO:
+ * $FreeBSD: src/usr.sbin/ppp/hdlc.c,v 1.48 2001/08/14 16:05:50 brian Exp $
  */
+
 #include <sys/param.h>
 #include <sys/un.h>
 
@@ -202,6 +209,7 @@ static struct {
   { 0x0051, 0x0051, "KNX Bridging Data" },
   { 0x0053, 0x0053, "Encryption" },
   { 0x0055, 0x0055, "Individual Link Encryption" },
+  { 0x0057, 0x0057, "Internet Protocol V6" },
   { 0x006f, 0x006f, "Stampede Bridging" },
   { 0x0071, 0x0071, "BAP Bandwidth Allocation Protocol" },
   { 0x0073, 0x0073, "MP+ Protocol" },
@@ -252,6 +260,7 @@ static struct {
   { 0x8051, 0x8051, "KNX Bridging Control Protocol" },
   { 0x8053, 0x8053, "Encryption Control Protocol" },
   { 0x8055, 0x8055, "Individual Link Encryption Control Protocol" },
+  { 0x8057, 0x8057, "Internet Protocol V6 Control Protocol" },
   { 0x806f, 0x806f, "Stampede Bridging Control Protocol" },
   { 0x8073, 0x8073, "MP+ Control Protocol" },
   { 0x8071, 0x8071, "BACP Bandwidth Allocation Control Protocol" },

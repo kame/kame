@@ -16,7 +16,7 @@
  * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
  * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
  *
- * $FreeBSD: src/usr.sbin/ppp/physical.h,v 1.20.2.1 2000/03/21 10:23:14 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/physical.h,v 1.24 2001/06/18 14:59:35 brian Exp $
  *
  */
 
@@ -35,6 +35,7 @@ struct cmdargs;
 #define UDP_DEVICE	4
 #define ETHER_DEVICE	5
 #define EXEC_DEVICE	6
+#define ATM_DEVICE	7
 
 /* Returns from awaitcarrier() */
 #define CARRIER_PENDING	1
@@ -55,6 +56,7 @@ struct cd {
 struct device {
   int type;
   const char *name;
+  u_short mtu;
   struct cd cd;
 
   int (*awaitcarrier)(struct physical *);
@@ -142,6 +144,7 @@ extern const char *physical_LockedDevice(struct physical *);
 extern void physical_ChangedPid(struct physical *, pid_t);
 
 extern int physical_IsSync(struct physical *);
+extern u_short physical_DeviceMTU(struct physical *);
 extern const char *physical_GetDevice(struct physical *);
 extern void physical_SetDeviceList(struct physical *, int, const char *const *);
 extern void physical_SetDevice(struct physical *, const char *);

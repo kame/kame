@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/link.h,v 1.9.2.1 2000/08/19 09:30:04 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/link.h,v 1.10 2000/08/15 00:59:21 brian Exp $
  *
  */
 

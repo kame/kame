@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/mp.c,v 1.36.2.4 2000/08/19 09:30:05 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/mp.c,v 1.47 2001/08/18 22:43:11 brian Exp $
  */
 
 #include <sys/param.h>
@@ -61,6 +61,8 @@
 #include "slcompress.h"
 #include "lqr.h"
 #include "hdlc.h"
+#include "ncpaddr.h"
+#include "ip.h"
 #include "ipcp.h"
 #include "auth.h"
 #include "lcp.h"
@@ -79,8 +81,9 @@
 #ifndef NORADIUS
 #include "radius.h"
 #endif
+#include "ipv6cp.h"
+#include "ncp.h"
 #include "bundle.h"
-#include "ip.h"
 #include "prompt.h"
 #include "id.h"
 #include "arp.h"
@@ -167,6 +170,8 @@ static void
 mp_LayerUp(void *v, struct fsm *fp)
 {
   /* The given fsm (ccp) is now up */
+
+  bundle_CalculateBandwidth(fp->bundle);	/* Against ccp_MTUOverhead */
 }
 
 static void
@@ -241,6 +246,7 @@ mp_Init(struct mp *mp, struct bundle *bundle)
 
   mp->out.seq = 0;
   mp->out.link = 0;
+  mp->out.af = AF_INET;
   mp->seq.min_in = 0;
   mp->seq.next_in = 0;
   mp->inbufs = NULL;
@@ -334,6 +340,7 @@ mp_Up(struct mp *mp, struct datalink *dl)
 
     mp->out.seq = 0;
     mp->out.link = 0;
+    mp->out.af = AF_INET;
     mp->seq.min_in = 0;
     mp->seq.next_in = 0;
 
@@ -353,8 +360,8 @@ mp_Up(struct mp *mp, struct datalink *dl)
       log_Printf(LogPHASE, "mp: Listening on %s\n", mp->server.socket.sun_path);
       log_Printf(LogPHASE, "    First link: %s\n", dl->name);
 
-      /* Re-point our IPCP layer at our MP link */
-      ipcp_SetLink(&mp->bundle->ncp.ipcp, &mp->link);
+      /* Re-point our NCP layers at our MP link */
+      ncp_SetLink(&mp->bundle->ncp, &mp->link);
 
       /* Our lcp's already up 'cos of the NULL parent */
       if (ccp_SetOpenMode(&mp->link.ccp)) {
@@ -646,11 +653,16 @@ mp_Output(struct mp *mp, struct bundle *bundle, struct link *l,
                mp->out.seq, m_length(m), l->name);
   mp->out.seq = inc_seq(mp->peer_is12bit, mp->out.seq);
 
+  if (l->ccp.fsm.state != ST_OPENED && ccp_Required(&l->ccp)) {
+    log_Printf(LogPHASE, "%s: Not transmitting... waiting for CCP\n", l->name);
+    return;
+  }
+
   link_PushPacket(l, m, bundle, LINK_QUEUES(l) - 1, PROTO_MP);
 }
 
 int
-mp_FillQueues(struct bundle *bundle)
+mp_FillPhysicalQueues(struct bundle *bundle)
 {
   struct mp *mp = &bundle->ncp.mp;
   struct datalink *dl, *fdl;
@@ -658,6 +670,7 @@ mp_FillQueues(struct bundle *bundle)
   int thislink, nlinks;
   u_int32_t begin, end;
   struct mbuf *m, *mo;
+  struct link *bestlink;
 
   thislink = nlinks = 0;
   for (fdl = NULL, dl = bundle->links; dl; dl = dl->next) {
@@ -693,45 +706,92 @@ mp_FillQueues(struct bundle *bundle)
       continue;
 
     add = link_QueueLen(&dl->physical->link);
-    total += add;
-    if (add)
+    if (add) {
       /* this link has got stuff already queued.  Let it continue */
+      total += add;
       continue;
+    }
 
-    if (!link_QueueLen(&mp->link) && !ip_PushPacket(&mp->link, bundle))
-      /* Nothing else to send */
-      break;
+    if (!mp_QueueLen(mp)) {
+      struct datalink *other;
+      int mrutoosmall;
 
-    m = link_Dequeue(&mp->link);
-    len = m_length(m);
-    begin = 1;
-    end = 0;
+      /*
+       * If there's only a single open link in our bundle and we haven't got
+       * MP level link compression, queue outbound traffic directly via that
+       * link's protocol stack rather than using the MP link.  This results
+       * in the outbound traffic going out as PROTO_IP or PROTO_IPV6 rather
+       * than PROTO_MP.
+       */
+      for (other = dl->next; other; other = other->next)
+        if (other->state == DATALINK_OPEN)
+          break;
 
-    while (!end) {
-      if (dl->state == DATALINK_OPEN) {
-        /* Write at most his_mru bytes to the physical link */
-        if (len <= dl->physical->link.lcp.his_mru) {
-          mo = m;
-          end = 1;
-          m_settype(mo, MB_MPOUT);
-        } else {
-          /* It's > his_mru, chop the packet (`m') into bits */
-          mo = m_get(dl->physical->link.lcp.his_mru, MB_MPOUT);
-          len -= mo->m_len;
-          m = mbuf_Read(m, MBUF_CTOP(mo), mo->m_len);
+      mrutoosmall = 0;
+      if (!other) {
+        if (dl->physical->link.lcp.his_mru < mp->peer_mrru) {
+          /*
+           * Actually, forget it.  This test is done against the MRRU rather
+           * than the packet size so that we don't end up sending some data
+           * in MP fragments and some data in PROTO_IP packets.  That's just
+           * too likely to upset some ppp implementations.
+           */
+          mrutoosmall = 1;
+          other = dl;
         }
-        mp_Output(mp, bundle, &dl->physical->link, mo, begin, end);
-        begin = 0;
       }
 
-      if (!end) {
-        nlinks--;
-        dl = dl->next;
-        if (!dl) {
-          dl = bundle->links;
-          thislink = 0;
-        } else
-          thislink++;
+      bestlink = other ? &mp->link : &dl->physical->link;
+      if (!ncp_PushPacket(&bundle->ncp, &mp->out.af, bestlink))
+        break;	/* Nothing else to send */
+
+      if (mrutoosmall)
+        log_Printf(LogDEBUG, "Don't send data as PROTO_IP, MRU < MRRU\n");
+      else if (!other)
+        log_Printf(LogDEBUG, "Sending data as PROTO_IP, not PROTO_MP\n");
+
+      if (!other) {
+        add = link_QueueLen(&dl->physical->link);
+        if (add) {
+          /* this link has got stuff already queued.  Let it continue */
+          total += add;
+          continue;
+        }
+      }
+    }
+
+    m = link_Dequeue(&mp->link);
+    if (m) {
+      len = m_length(m);
+      begin = 1;
+      end = 0;
+
+      while (!end) {
+        if (dl->state == DATALINK_OPEN) {
+          /* Write at most his_mru bytes to the physical link */
+          if (len <= dl->physical->link.lcp.his_mru) {
+            mo = m;
+            end = 1;
+            m_settype(mo, MB_MPOUT);
+          } else {
+            /* It's > his_mru, chop the packet (`m') into bits */
+            mo = m_get(dl->physical->link.lcp.his_mru, MB_MPOUT);
+            len -= mo->m_len;
+            m = mbuf_Read(m, MBUF_CTOP(mo), mo->m_len);
+          }
+          mp_Output(mp, bundle, &dl->physical->link, mo, begin, end);
+          begin = 0;
+        }
+
+        if (!end) {
+          nlinks--;
+          dl = dl->next;
+          if (!dl) {
+            dl = bundle->links;
+            thislink = 0;
+          } else
+            thislink++;
+        }
       }
     }
   }
@@ -925,7 +985,7 @@ mp_SetEnddisc(struct cmdargs const *arg)
       mp->cfg.enddisc.len = strlen(mp->cfg.enddisc.address);
     } else if (!strcasecmp(arg->argv[arg->argn], "ip")) {
       if (arg->bundle->ncp.ipcp.my_ip.s_addr == INADDR_ANY)
-        addr = arg->bundle->ncp.ipcp.cfg.my_range.ipaddr;
+        ncprange_getip4addr(&arg->bundle->ncp.ipcp.cfg.my_range, &addr);
       else
         addr = arg->bundle->ncp.ipcp.my_ip;
       memcpy(mp->cfg.enddisc.address, &addr.s_addr, sizeof addr.s_addr);
@@ -936,7 +996,7 @@ mp_SetEnddisc(struct cmdargs const *arg)
       int s;
 
       if (arg->bundle->ncp.ipcp.my_ip.s_addr == INADDR_ANY)
-        addr = arg->bundle->ncp.ipcp.cfg.my_range.ipaddr;
+        ncprange_getip4addr(&arg->bundle->ncp.ipcp.cfg.my_range, &addr);
       else
         addr = arg->bundle->ncp.ipcp.my_ip;
 
@@ -945,7 +1005,7 @@ mp_SetEnddisc(struct cmdargs const *arg)
         log_Printf(LogERROR, "set enddisc: socket(): %s\n", strerror(errno));
         return 2;
       }
-      if (get_ether_addr(s, addr, &hwaddr)) {
+      if (arp_EtherAddr(s, addr, &hwaddr, 1)) {
         mp->cfg.enddisc.class = ENDDISC_MAC;
         memcpy(mp->cfg.enddisc.address, hwaddr.sdl_data + hwaddr.sdl_nlen,
                hwaddr.sdl_alen);
@@ -1030,7 +1090,8 @@ mpserver_Read(struct fdescriptor *d, struct bundle *bundle, const fd_set *fdset)
 }
 
 static int
-mpserver_Write(struct fdescriptor *d, struct bundle *bundle, const fd_set *fdset)
+mpserver_Write(struct fdescriptor *d, struct bundle *bundle,
+               const fd_set *fdset)
 {
   /* We never want to write here ! */
   log_Printf(LogALERT, "mpserver_Write: Internal error: Bad call !\n");
@@ -1063,6 +1124,10 @@ mpserver_Open(struct mpserver *s, struct peerid *peer)
 
   l = snprintf(s->socket.sun_path, sizeof s->socket.sun_path, "%sppp-%s-%02x-",
                _PATH_VARRUN, peer->authname, peer->enddisc.class);
+  if (l < 0) {
+    log_Printf(LogERROR, "mpserver: snprintf(): %s\n", strerror(errno));
+    return MPSERVER_FAILED;
+  }
 
   for (f = 0; f < peer->enddisc.len && l < sizeof s->socket.sun_path - 2; f++) {
     snprintf(s->socket.sun_path + l, sizeof s->socket.sun_path - l,
@@ -1141,8 +1206,8 @@ mp_LinkLost(struct mp *mp, struct datalink *dl)
     mp_Assemble(mp, NULL, NULL);
 }
 
-void
-mp_DeleteQueue(struct mp *mp)
+size_t
+mp_QueueLen(struct mp *mp)
 {
-  link_DeleteQueue(&mp->link);
+  return link_QueueLen(&mp->link);
 }

@@ -1,31 +1,38 @@
-/*
- *		PPP Finite State Machine for LCP/IPCP
+/*-
+ * Copyright (c) 1996 - 2001 Brian Somers <brian@Awfulhak.org>
+ *          based on work by Toshiharu OHNO <tony-o@iij.ad.jp>
+ *                           Internet Initiative Japan, Inc (IIJ)
+ * All rights reserved.
  *
- *	    Written by Toshiharu OHNO (tony-o@iij.ad.jp)
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- *   Copyright (C) 1993, Internet Initiative Japan, Inc. All rights reserverd.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that the above copyright notice and this paragraph are
- * duplicated in all such forms and that any documentation,
- * advertising materials, and other materials related to such
- * distribution and use acknowledge that the software was developed
- * by the Internet Initiative Japan, Inc.  The name of the
- * IIJ may not be used to endorse or promote products derived
- * from this software without specific prior written permission.
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
- * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
- *
- * $FreeBSD: src/usr.sbin/ppp/fsm.c,v 1.52.2.3 2000/08/19 09:30:03 brian Exp $
- *
- *  TODO:
+ * $FreeBSD: src/usr.sbin/ppp/fsm.c,v 1.61 2001/08/18 19:07:13 brian Exp $
  */
 
 #include <sys/param.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
+#include <sys/socket.h>
 #include <sys/un.h>
 
 #include <string.h>
@@ -43,6 +50,8 @@
 #include "hdlc.h"
 #include "throughput.h"
 #include "slcompress.h"
+#include "ncpaddr.h"
+#include "ip.h"
 #include "ipcp.h"
 #include "filter.h"
 #include "descriptor.h"
@@ -53,6 +62,8 @@
 #ifndef NORADIUS
 #include "radius.h"
 #endif
+#include "ipv6cp.h"
+#include "ncp.h"
 #include "bundle.h"
 #include "async.h"
 #include "physical.h"
@@ -349,10 +360,12 @@ fsm_Close(struct fsm *fp)
     break;
   case ST_OPENED:
     (*fp->fn->LayerDown)(fp);
-    FsmInitRestartCounter(fp, FSM_TRM_TIMER);
-    FsmSendTerminateReq(fp);
-    NewState(fp, ST_CLOSING);
-    (*fp->parent->LayerDown)(fp->parent->object, fp);
+    if (fp->state == ST_OPENED) {
+      FsmInitRestartCounter(fp, FSM_TRM_TIMER);
+      FsmSendTerminateReq(fp);
+      NewState(fp, ST_CLOSING);
+      (*fp->parent->LayerDown)(fp->parent->object, fp);
+    }
     break;
   case ST_REQSENT:
   case ST_ACKRCVD:
@@ -500,7 +513,6 @@ FsmRecvConfigReq(struct fsm *fp, struct fsmheader *lhp, struct mbuf *bp)
     return;
   case ST_OPENED:
     (*fp->fn->LayerDown)(fp);
-    (*fp->parent->LayerDown)(fp->parent->object, fp);
     break;
   }
 
@@ -551,6 +563,7 @@ FsmRecvConfigReq(struct fsm *fp, struct fsmheader *lhp, struct mbuf *bp)
       NewState(fp, ST_ACKSENT);
     else
       NewState(fp, ST_REQSENT);
+    (*fp->parent->LayerDown)(fp->parent->object, fp);
     break;
   case ST_REQSENT:
     if (ackaction)
@@ -881,6 +894,15 @@ FsmRecvProtoRej(struct fsm *fp, struct fsmheader *lhp, struct mbuf *bp)
       fsm_Close(&fp->bundle->ncp.ipcp.fsm);
     }
     break;
+#ifndef NOINET6
+  case PROTO_IPV6CP:
+    if (fp->proto == PROTO_LCP) {
+      log_Printf(LogPHASE, "%s: IPV6CP protocol reject closes IPV6CP !\n",
+                fp->link->name);
+      fsm_Close(&fp->bundle->ncp.ipv6cp.fsm);
+    }
+    break;
+#endif
   case PROTO_MP:
     if (fp->proto == PROTO_LCP) {
       struct lcp *lcp = fsm2lcp(fp);
@@ -970,14 +992,15 @@ FsmRecvTimeRemain(struct fsm *fp, struct fsmheader *lhp, struct mbuf *bp)
 static void
 FsmRecvResetReq(struct fsm *fp, struct fsmheader *lhp, struct mbuf *bp)
 {
-  (*fp->fn->RecvResetReq)(fp);
-  /*
-   * All sendable compressed packets are queued in the first (lowest
-   * priority) modem output queue.... dump 'em to the priority queue
-   * so that they arrive at the peer before our ResetAck.
-   */
-  link_SequenceQueue(fp->link);
-  fsm_Output(fp, CODE_RESETACK, lhp->id, NULL, 0, MB_CCPOUT);
+  if ((*fp->fn->RecvResetReq)(fp)) {
+    /*
+     * All sendable compressed packets are queued in the first (lowest
+     * priority) modem output queue.... dump 'em to the priority queue
+     * so that they arrive at the peer before our ResetAck.
+     */
+    link_SequenceQueue(fp->link);
+    fsm_Output(fp, CODE_RESETACK, lhp->id, NULL, 0, MB_CCPOUT);
+  }
   m_freem(bp);
 }
 
@@ -1042,11 +1065,12 @@ fsm_Input(struct fsm *fp, struct mbuf *bp)
   (*codep->recv)(fp, &lh, bp);
 }
 
-void
+int
 fsm_NullRecvResetReq(struct fsm *fp)
 {
   log_Printf(fp->LogLevel, "%s: Oops - received unexpected reset req\n",
             fp->link->name);
+  return 1;
 }
 
 void

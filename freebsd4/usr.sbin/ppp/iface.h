@@ -23,43 +23,43 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/iface.h,v 1.3.2.1 2000/03/21 10:23:07 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/iface.h,v 1.7 2001/08/14 16:05:50 brian Exp $
  */
 
 struct ifa_msghdr;
 
 struct iface_addr {
-  struct in_addr ifa;		/* local address */
-  struct in_addr mask;		/* netmask */
-  int bits;			/* netmask bits - -1 if not contiguous */
-  struct in_addr brd;		/* peer address */
+  unsigned system : 1;		/* System alias ? */
+  struct ncprange ifa;		/* local address/mask */
+  struct ncpaddr peer;		/* peer address */
 };
 
 struct iface {
   char *name;			/* Interface name (malloc'd) */
   int index;			/* Interface index */
   int flags;			/* Interface flags (IFF_*) */
+  int mtu;			/* struct tuninfo MTU */
 
-  int in_addrs;			/* How many in_addr's */
-  struct iface_addr *in_addr;	/* Array of addresses (malloc'd) */
+  int addrs;			/* How many in_addr's */
+  struct iface_addr *addr;	/* Array of addresses (malloc'd) */
 };
 
 #define IFACE_CLEAR_ALL		0	/* Nuke 'em all */
-#define IFACE_CLEAR_ALIASES	1	/* Leave the IPCP address */
+#define IFACE_CLEAR_ALIASES	1	/* Leave the NCP address */
 
 #define IFACE_ADD_LAST		0	/* Just another alias */
 #define IFACE_ADD_FIRST		1	/* The IPCP address */
 #define IFACE_FORCE_ADD		2	/* OR'd with IFACE_ADD_{FIRST,LAST} */
 
-#define iface_Clear iface_inClear	/* Same for now */
+#define IFACE_SYSTEM		4	/* Set/clear SYSTEM entries */
 
 extern struct iface *iface_Create(const char *name);
-extern void iface_inClear(struct iface *, int);
-extern int iface_inAdd(struct iface *, struct in_addr, struct in_addr,
-                     struct in_addr, int);
-extern int iface_inDelete(struct iface *, struct in_addr);
+extern void iface_Clear(struct iface *, struct ncp *, int, int);
+extern int iface_Add(struct iface *, struct ncp *, const struct ncprange *,
+                     const struct ncpaddr *, int);
+extern int iface_Delete(struct iface *, struct ncp *, const struct ncpaddr *);
 extern int iface_Show(struct cmdargs const *);
-extern int iface_SetFlags(struct iface *, int);
-extern int iface_ClearFlags(struct iface *, int);
+extern int iface_SetFlags(const char *, int);
+extern int iface_ClearFlags(const char *, int);
 extern void iface_Destroy(struct iface *);
 extern void iface_ParseHdr(struct ifa_msghdr *, struct sockaddr *[RTAX_MAX]);

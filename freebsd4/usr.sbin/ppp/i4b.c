@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/i4b.c,v 1.8.2.1 2000/08/19 09:30:03 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/i4b.c,v 1.11 2001/06/18 14:59:34 brian Exp $
  */
 
 #include <sys/param.h>
@@ -293,6 +293,7 @@ i4b_device2iov(struct device *d, struct iovec *iov, int *niov,
 static struct device basei4bdevice = {
   I4B_DEVICE,
   "i4b",
+  0,
   { CD_REQUIRED, DEF_I4BCDDELAY },
   i4b_AwaitCarrier,
   NULL,

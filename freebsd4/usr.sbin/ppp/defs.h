@@ -1,23 +1,31 @@
-/*
- *	    Written by Toshiharu OHNO (tony-o@iij.ad.jp)
+/*-
+ * Copyright (c) 1996 - 2001 Brian Somers <brian@Awfulhak.org>
+ *          based on work by Toshiharu OHNO <tony-o@iij.ad.jp>
+ *                           Internet Initiative Japan, Inc (IIJ)
+ * All rights reserved.
  *
- *   Copyright (C) 1993, Internet Initiative Japan, Inc. All rights reserverd.
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that the above copyright notice and this paragraph are
- * duplicated in all such forms and that any documentation,
- * advertising materials, and other materials related to such
- * distribution and use acknowledge that the software was developed
- * by the Internet Initiative Japan.  The name of the
- * IIJ may not be used to endorse or promote products derived
- * from this software without specific prior written permission.
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
- * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/defs.h,v 1.52.2.6 2000/11/01 00:19:25 brian Exp $
- *
- *	TODO:
+ * $FreeBSD: src/usr.sbin/ppp/defs.h,v 1.63 2001/06/13 21:52:16 brian Exp $
  */
 
 /* Check the following definitions for your machine environment */
@@ -32,7 +40,9 @@
 #endif
 #define NMODEMS		2
 
-#define _PATH_PPP	"/etc/ppp"
+#ifndef PPP_CONFDIR
+#define PPP_CONFDIR	"/etc/ppp"
+#endif
 
 #define TUN_NAME	"tun"
 #define TUN_PREFIX	(_PATH_DEV TUN_NAME)	/* /dev/tun */
@@ -49,13 +59,14 @@
 #define AUTHLEN 100 		/* Size of authname/authkey */
 #define CHAPDIGESTLEN 100	/* Maximum chap digest */
 #define CHAPCHALLENGELEN 48	/* Maximum chap challenge */
+#define CHAPAUTHRESPONSELEN 48	/* Maximum chap authresponse (chap81) */
 #define MAXARGS 40		/* How many args per config line */
 #define NCP_IDLE_TIMEOUT 180	/* Drop all links */
 #define CHOKED_TIMEOUT 120	/* Delete queued packets w/ blocked tun */
 
-#define MIN_LQRPERIOD 2		/* Minimum LQR frequency */
+#define MIN_LQRPERIOD 1		/* Minimum LQR frequency */
 #define DEF_LQRPERIOD 30	/* Default LQR frequency */
-#define MIN_FSMRETRY 3		/* Minimum FSM retry frequency */
+#define MIN_FSMRETRY 1		/* Minimum FSM retry frequency */
 #define DEF_FSMRETRY 3		/* FSM retry frequency */
 #define DEF_FSMTRIES 5		/* Default max retries */
 #define DEF_FSMAUTHTRIES 3	/* Default max auth retries */

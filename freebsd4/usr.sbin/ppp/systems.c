@@ -1,26 +1,33 @@
-/*
- *	          System configuration routines
+/*-
+ * Copyright (c) 1996 - 2001 Brian Somers <brian@Awfulhak.org>
+ *          based on work by Toshiharu OHNO <tony-o@iij.ad.jp>
+ *                           Internet Initiative Japan, Inc (IIJ)
+ * All rights reserved.
  *
- *	    Written by Toshiharu OHNO (tony-o@iij.ad.jp)
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
  *
- *   Copyright (C) 1993, Internet Initiative Japan, Inc. All rights reserverd.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  *
- * Redistribution and use in source and binary forms are permitted
- * provided that the above copyright notice and this paragraph are
- * duplicated in all such forms and that any documentation,
- * advertising materials, and other materials related to such
- * distribution and use acknowledge that the software was developed
- * by the Internet Initiative Japan, Inc.  The name of the
- * IIJ may not be used to endorse or promote products derived
- * from this software without specific prior written permission.
- * THIS SOFTWARE IS PROVIDED ``AS IS'' AND WITHOUT ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, WITHOUT LIMITATION, THE IMPLIED
- * WARRANTIES OF MERCHANTIBILITY AND FITNESS FOR A PARTICULAR PURPOSE.
- *
- * $FreeBSD: src/usr.sbin/ppp/systems.c,v 1.58.2.4 2000/08/19 09:30:08 brian Exp $
- *
- *  TODO:
+ * $FreeBSD: src/usr.sbin/ppp/systems.c,v 1.65 2001/06/13 21:52:19 brian Exp $
  */
+
 #include <sys/param.h>
 
 #include <ctype.h>
@@ -45,7 +52,7 @@ OpenSecret(const char *file)
   FILE *fp;
   char line[100];
 
-  snprintf(line, sizeof line, "%s/%s", _PATH_PPP, file);
+  snprintf(line, sizeof line, "%s/%s", PPP_CONFDIR, file);
   fp = ID0fopen(line, "r");
   if (fp == NULL)
     log_Printf(LogWARN, "OpenSecret: Can't open %s.\n", line);
@@ -313,7 +320,7 @@ ReadSystem(struct bundle *bundle, const char *name, const char *file,
   char *cp;
   int n, len;
   char line[LINE_LEN];
-  char filename[MAXPATHLEN];
+  char filename[PATH_MAX];
   int linenum;
   int argc;
   char *argv[MAXARGS];
@@ -325,7 +332,7 @@ ReadSystem(struct bundle *bundle, const char *name, const char *file,
   if (*file == '/')
     snprintf(filename, sizeof filename, "%s", file);
   else
-    snprintf(filename, sizeof filename, "%s/%s", _PATH_PPP, file);
+    snprintf(filename, sizeof filename, "%s/%s", PPP_CONFDIR, file);
   fp = ID0fopen(filename, "r");
   if (fp == NULL) {
     log_Printf(LogDEBUG, "ReadSystem: Can't open %s.\n", filename);
@@ -448,7 +455,7 @@ system_IsValid(const char *name, struct prompt *prompt, int mode)
       return "Configuration label not found";
 
     if (rs == -2)
-      return _PATH_PPP "/" CONFFILE ": File not found";
+      return PPP_CONFDIR "/" CONFFILE " : File not found";
   }
 
   if (userok == -1)

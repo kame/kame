@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/log.c,v 1.44.2.2 2000/09/16 23:09:04 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/log.c,v 1.50 2001/08/14 16:05:51 brian Exp $
  */
 
 #include <sys/types.h>
@@ -42,7 +42,7 @@
 #include "descriptor.h"
 #include "prompt.h"
 
-static const char * const LogNames[] = {
+static const char *const LogNames[] = {
   "Async",
   "CBCP",
   "CCP",
@@ -55,6 +55,7 @@ static const char * const LogNames[] = {
   "HDLC",
   "ID0",
   "IPCP",
+  "IPV6CP",
   "LCP",
   "LQM",
   "Phase",
@@ -306,10 +307,10 @@ log_Printf(int lev, const char *fmt,...)
   va_list ap;
   struct prompt *prompt;
 
-  va_start(ap, fmt);
   if (log_IsKept(lev)) {
     char nfmt[200];
 
+    va_start(ap, fmt);
     if (promptlist && (log_IsKept(lev) & LOG_KEPT_LOCAL)) {
       if ((log_IsKept(LogTUN) & LOG_KEPT_LOCAL) && LogTunno != -1)
         snprintf(nfmt, sizeof nfmt, "%s%d: %s: %s", TUN_NAME,
@@ -324,7 +325,9 @@ log_Printf(int lev, const char *fmt,...)
         if (lev > LogMAXCONF || (prompt->logmask & MSK(lev)))
           prompt_vPrintf(prompt, nfmt, ap);
     }
+    va_end(ap);
 
+    va_start(ap, fmt);
     if ((log_IsKept(lev) & LOG_KEPT_SYSLOG) &&
         (lev != LogWARN || !log_PromptContext)) {
       if ((log_IsKept(LogTUN) & LOG_KEPT_SYSLOG) && LogTunno != -1)
@@ -334,8 +337,8 @@ log_Printf(int lev, const char *fmt,...)
         snprintf(nfmt, sizeof nfmt, "%s: %s", log_Name(lev), fmt);
       vsyslog(syslogLevel(lev), nfmt, ap);
     }
+    va_end(ap);
   }
-  va_end(ap);
 }
 
 void
@@ -435,7 +438,8 @@ log_SetLevel(struct cmdargs const *arg)
     local = 0;
   else {
     if (arg->prompt == NULL) {
-      log_Printf(LogWARN, "set log local: Only available on the command line\n");
+      log_Printf(LogWARN, "set log local: Only available on the"
+                 " command line\n");
       return 1;
     }
     argc--;
@@ -452,6 +456,24 @@ log_SetLevel(struct cmdargs const *arg)
 
   while (argc--) {
     argp = **argv == '+' || **argv == '-' ? *argv + 1 : *argv;
+    /* Special case 'all' */
+    if (strcasecmp(argp, "all") == 0) {
+        if (**argv == '-') {
+          if (local)
+            for (i = LogMIN; i <= LogMAX; i++)
+              log_DiscardLocal(i, &arg->prompt->logmask);
+          else
+            for (i = LogMIN; i <= LogMAX; i++)
+              log_Discard(i);
+        } else if (local)
+          for (i = LogMIN; i <= LogMAX; i++)
+            log_KeepLocal(i, &arg->prompt->logmask);
+        else
+          for (i = LogMIN; i <= LogMAX; i++)
+            log_Keep(i);
+        argv++;
+        continue;
+    }
     for (i = LogMIN; i <= LogMAX; i++)
       if (strcasecmp(argp, log_Name(i)) == 0) {
 	if (**argv == '-') {

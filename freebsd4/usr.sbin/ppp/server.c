@@ -23,10 +23,11 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/server.c,v 1.28.2.2 2000/06/03 02:53:15 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/server.c,v 1.38 2001/08/19 22:23:28 brian Exp $
  */
 
-#include <sys/types.h>
+#include <sys/param.h>
+
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -44,6 +45,8 @@
 #include "server.h"
 #include "id.h"
 #include "prompt.h"
+#include "ncpaddr.h"
+#include "probe.h"
 
 static int
 server_UpdateSet(struct fdescriptor *d, fd_set *r, fd_set *w, fd_set *e, int *n)
@@ -83,24 +86,28 @@ server_IsSet(struct fdescriptor *d, const fd_set *fdset)
   return 0;
 }
 
-#define IN_SIZE sizeof(struct sockaddr_in)
-#define UN_SIZE sizeof(struct sockaddr_un)
-#define ADDRSZ (IN_SIZE > UN_SIZE ? IN_SIZE : UN_SIZE)
-
 static void
 server_Read(struct fdescriptor *d, struct bundle *bundle, const fd_set *fdset)
 {
   struct server *s = descriptor2server(d);
-  char hisaddr[ADDRSZ];
-  struct sockaddr *sa = (struct sockaddr *)hisaddr;
-  struct sockaddr_in *in = (struct sockaddr_in *)hisaddr;
-  int ssize = ADDRSZ, wfd;
+  struct sockaddr_storage ss;
+  struct sockaddr *sa = (struct sockaddr *)&ss;
+  struct sockaddr_in *sin = (struct sockaddr_in *)&ss;
+#ifndef NOINET6
+  struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&ss;
+#endif
+  int ssize = sizeof ss, wfd;
   struct prompt *p;
+  struct ncpaddr addr;
 
   if (s->fd >= 0 && FD_ISSET(s->fd, fdset)) {
     wfd = accept(s->fd, sa, &ssize);
     if (wfd < 0)
       log_Printf(LogERROR, "server_Read: accept(): %s\n", strerror(errno));
+    else if (sa->sa_len == 0) {
+      close(wfd);
+      wfd = -1;
+    }
   } else
     wfd = -1;
 
@@ -111,17 +118,34 @@ server_Read(struct fdescriptor *d, struct bundle *bundle, const fd_set *fdset)
         break;
 
       case AF_INET:
-        if (ntohs(in->sin_port) < 1024) {
+        ncpaddr_setsa(&addr, sa);
+        if (ntohs(sin->sin_port) < 1024) {
           log_Printf(LogALERT, "Rejected client connection from %s:%u"
                     "(invalid port number) !\n",
-                    inet_ntoa(in->sin_addr), ntohs(in->sin_port));
+                    ncpaddr_ntoa(&addr), ntohs(sin->sin_port));
           close(wfd);
           wfd = -1;
           break;
         }
         log_Printf(LogPHASE, "Connected to client from %s:%u\n",
-                  inet_ntoa(in->sin_addr), in->sin_port);
+                  ncpaddr_ntoa(&addr), ntohs(sin->sin_port));
         break;
+
+#ifndef NOINET6
+      case AF_INET6:
+        ncpaddr_setsa(&addr, sa);
+        if (ntohs(sin6->sin6_port) < 1024) {
+          log_Printf(LogALERT, "Rejected client connection from %s:%u"
+                    "(invalid port number) !\n",
+                    ncpaddr_ntoa(&addr), ntohs(sin6->sin6_port));
+          close(wfd);
+          wfd = -1;
+          break;
+        }
+        log_Printf(LogPHASE, "Connected to client from %s:%u\n",
+                  ncpaddr_ntoa(&addr), ntohs(sin6->sin6_port));
+        break;
+#endif
 
       default:
         write(wfd, "Unrecognised access !\n", 22);
@@ -138,14 +162,21 @@ server_Read(struct fdescriptor *d, struct bundle *bundle, const fd_set *fdset)
       switch (sa->sa_family) {
         case AF_LOCAL:
           p->src.type = "local";
-          strncpy(p->src.from, s->rm, sizeof p->src.from - 1);
+          strncpy(p->src.from, s->cfg.sockname, sizeof p->src.from - 1);
           p->src.from[sizeof p->src.from - 1] = '\0';
           break;
         case AF_INET:
-          p->src.type = "tcp";
+          p->src.type = "ip";
           snprintf(p->src.from, sizeof p->src.from, "%s:%u",
-                   inet_ntoa(in->sin_addr), in->sin_port);
+                   ncpaddr_ntoa(&addr), ntohs(sin->sin_port));
           break;
+#ifndef NOINET6
+        case AF_INET6:
+          p->src.type = "ip6";
+          snprintf(p->src.from, sizeof p->src.from, "%s:%u",
+                   ncpaddr_ntoa(&addr), ntohs(sin6->sin6_port));
+          break;
+#endif
       }
       prompt_TtyCommandMode(p);
       prompt_Required(p);
@@ -180,112 +211,204 @@ struct server server = {
   -1
 };
 
-int
+enum server_stat
+server_Reopen(struct bundle *bundle)
+{
+  char name[sizeof server.cfg.sockname];
+  struct stat st;
+  u_short port;
+  mode_t mask;
+  enum server_stat ret;
+
+  if (server.cfg.sockname[0] != '\0') {
+    strcpy(name, server.cfg.sockname);
+    mask = server.cfg.mask;
+    server_Close(bundle);
+    if (server.cfg.sockname[0] != '\0' && stat(server.cfg.sockname, &st) == 0)
+      if (!(st.st_mode & S_IFSOCK) || unlink(server.cfg.sockname) != 0)
+        return SERVER_FAILED;
+    ret = server_LocalOpen(bundle, name, mask);
+  } else if (server.cfg.port != 0) {
+    port = server.cfg.port;
+    server_Close(bundle);
+    ret = server_TcpOpen(bundle, port);
+  } else
+    ret = SERVER_UNSET;
+
+  return ret;
+}
+
+enum server_stat
 server_LocalOpen(struct bundle *bundle, const char *name, mode_t mask)
 {
+  struct sockaddr_un ifsun;
+  mode_t oldmask;
   int s;
 
-  if (server.rm && !strcmp(server.rm, name)) {
-    if (chmod(server.rm, 0777 & ~mask))
-      log_Printf(LogERROR, "Local: chmod: %s\n", strerror(errno));
-    return 0;
-  }
+  oldmask = (mode_t)-1;		/* Silence compiler */
 
-  memset(&server.ifsun, '\0', sizeof server.ifsun);
-  server.ifsun.sun_len = strlen(name);
-  if (server.ifsun.sun_len > sizeof server.ifsun.sun_path - 1) {
+  if (server.cfg.sockname && !strcmp(server.cfg.sockname, name))
+    server_Close(bundle);
+
+  memset(&ifsun, '\0', sizeof ifsun);
+  ifsun.sun_len = strlen(name);
+  if (ifsun.sun_len > sizeof ifsun.sun_path - 1) {
     log_Printf(LogERROR, "Local: %s: Path too long\n", name);
-    return 2;
+    return SERVER_INVALID;
   }
-  server.ifsun.sun_family = AF_LOCAL;
-  strcpy(server.ifsun.sun_path, name);
+  ifsun.sun_family = AF_LOCAL;
+  strcpy(ifsun.sun_path, name);
 
-  s = ID0socket(PF_LOCAL, SOCK_STREAM, 0);
+  s = socket(PF_LOCAL, SOCK_STREAM, 0);
   if (s < 0) {
     log_Printf(LogERROR, "Local: socket: %s\n", strerror(errno));
-    return 3;
+    goto failed;
   }
   setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &s, sizeof s);
   if (mask != (mode_t)-1)
-    mask = umask(mask);
-  if (bind(s, (struct sockaddr *)&server.ifsun, sizeof server.ifsun) < 0) {
+    oldmask = umask(mask);
+  if (bind(s, (struct sockaddr *)&ifsun, sizeof ifsun) < 0) {
     if (mask != (mode_t)-1)
-      umask(mask);
+      umask(oldmask);
     log_Printf(LogWARN, "Local: bind: %s\n", strerror(errno));
     close(s);
-    return 4;
+    goto failed;
   }
   if (mask != (mode_t)-1)
-    umask(mask);
+    umask(oldmask);
   if (listen(s, 5) != 0) {
-    log_Printf(LogERROR, "Local: Unable to listen to socket - BUNDLE overload?\n");
+    log_Printf(LogERROR, "Local: Unable to listen to socket -"
+               " BUNDLE overload?\n");
     close(s);
-    ID0unlink(name);
-    return 5;
+    unlink(name);
+    goto failed;
   }
   server_Close(bundle);
   server.fd = s;
-  server.rm = server.ifsun.sun_path;
+  server.cfg.port = 0;
+  strncpy(server.cfg.sockname, ifsun.sun_path, sizeof server.cfg.sockname - 1);
+  server.cfg.sockname[sizeof server.cfg.sockname - 1] = '\0';
+  server.cfg.mask = mask;
   log_Printf(LogPHASE, "Listening at local socket %s.\n", name);
-  return 0;
+
+  return SERVER_OK;
+
+failed:
+  if (server.fd == -1) {
+    server.fd = -1;
+    server.cfg.port = 0;
+    strncpy(server.cfg.sockname, ifsun.sun_path,
+            sizeof server.cfg.sockname - 1);
+    server.cfg.sockname[sizeof server.cfg.sockname - 1] = '\0';
+    server.cfg.mask = mask;
+  }
+  return SERVER_FAILED;
 }
 
-int
-server_TcpOpen(struct bundle *bundle, int port)
+enum server_stat
+server_TcpOpen(struct bundle *bundle, u_short port)
 {
-  struct sockaddr_in ifsin;
-  int s;
+  struct sockaddr_storage ss;
+  struct sockaddr_in *sin = (struct sockaddr_in *)&ss;
+#ifndef NOINET6
+  struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)&ss;
+#endif
+  int s, sz;
 
-  if (server.port == port)
-    return 0;
+  if (server.cfg.port == port)
+    server_Close(bundle);
 
-  s = ID0socket(PF_INET, SOCK_STREAM, 0);
+  if (port == 0)
+    return SERVER_INVALID;
+
+  memset(&ss, '\0', sizeof ss);
+#ifndef NOINET6
+  if (probe.ipv6_available) {
+    sin6->sin6_family = AF_INET6;
+    sin6->sin6_port = htons(port);
+    sin6->sin6_len = (u_int8_t)sizeof ss;
+    sz = sizeof *sin6;
+    s = socket(PF_INET6, SOCK_STREAM, 0);
+  } else
+#endif
+  {
+    sin->sin_family = AF_INET;
+    sin->sin_port = htons(port);
+    sin->sin_len = (u_int8_t)sizeof ss;
+    sin->sin_addr.s_addr = INADDR_ANY;
+    sz = sizeof *sin;
+    s = socket(PF_INET, SOCK_STREAM, 0);
+  }
+
   if (s < 0) {
     log_Printf(LogERROR, "Tcp: socket: %s\n", strerror(errno));
-    return 7;
+    goto failed;
   }
-  memset(&ifsin, '\0', sizeof ifsin);
-  ifsin.sin_family = AF_INET;
-  ifsin.sin_addr.s_addr = INADDR_ANY;
-  ifsin.sin_port = htons(port);
+
   setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &s, sizeof s);
-  if (bind(s, (struct sockaddr *)&ifsin, sizeof ifsin) < 0) {
+  if (bind(s, (struct sockaddr *)&ss, sz) < 0) {
     log_Printf(LogWARN, "Tcp: bind: %s\n", strerror(errno));
     close(s);
-    return 8;
+    goto failed;
   }
   if (listen(s, 5) != 0) {
     log_Printf(LogERROR, "Tcp: Unable to listen to socket: %s\n",
                strerror(errno));
     close(s);
-    return 9;
+    goto failed;
   }
   server_Close(bundle);
   server.fd = s;
-  server.port = port;
+  server.cfg.port = port;
+  *server.cfg.sockname = '\0';
+  server.cfg.mask = 0;
   log_Printf(LogPHASE, "Listening at port %d.\n", port);
-  return 0;
+  return SERVER_OK;
+
+failed:
+  if (server.fd == -1) {
+    server.fd = -1;
+    server.cfg.port = port;
+    *server.cfg.sockname = '\0';
+    server.cfg.mask = 0;
+  }
+  return SERVER_FAILED;
 }
 
 int
 server_Close(struct bundle *bundle)
 {
   if (server.fd >= 0) {
-    if (server.rm) {
+    if (*server.cfg.sockname != '\0') {
       struct sockaddr_un un;
       int sz = sizeof un;
 
       if (getsockname(server.fd, (struct sockaddr *)&un, &sz) == 0 &&
           un.sun_family == AF_LOCAL && sz == sizeof un)
-        ID0unlink(un.sun_path);
-      server.rm = NULL;
+        unlink(un.sun_path);
     }
     close(server.fd);
     server.fd = -1;
-    server.port = 0;
     /* Drop associated prompts */
     log_DestroyPrompts(&server);
+
     return 1;
   }
+
   return 0;
+}
+
+int
+server_Clear(struct bundle *bundle)
+{
+  int ret;
+
+  ret = server_Close(bundle);
+
+  server.fd = -1;
+  server.cfg.port = 0;
+  *server.cfg.sockname = '\0';
+  server.cfg.mask = 0;
+
+  return ret;
 }

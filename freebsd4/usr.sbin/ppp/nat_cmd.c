@@ -1,8 +1,30 @@
 /*-
- * The code in this file was written by Eivind Eklund <perhaps@yes.no>,
- * who places it in the public domain without restriction.
+ * Copyright (c) 2001 Charles Mott <cmott@scientech.com>
+ *                    Brian Somers <brian@Awfulhak.org>
+ * All rights reserved.
  *
- * $FreeBSD: src/usr.sbin/ppp/nat_cmd.c,v 1.35.2.8 2000/10/30 18:02:28 brian Exp $
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
+ *
+ * $FreeBSD: src/usr.sbin/ppp/nat_cmd.c,v 1.56 2001/08/14 16:05:51 brian Exp $
  */
 
 #include <sys/param.h>
@@ -12,6 +34,7 @@
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
 #include <netinet/ip.h>
+#include <sys/socket.h>
 #include <sys/un.h>
 
 #include <stdio.h>
@@ -41,7 +64,10 @@
 #include "mbuf.h"
 #include "lqr.h"
 #include "hdlc.h"
+#include "ncpaddr.h"
+#include "ip.h"
 #include "ipcp.h"
+#include "ipv6cp.h"
 #include "lcp.h"
 #include "ccp.h"
 #include "link.h"
@@ -50,7 +76,7 @@
 #ifndef NORADIUS
 #include "radius.h"
 #endif
-#include "ip.h"
+#include "ncp.h"
 #include "bundle.h"
 
 
@@ -207,6 +233,74 @@ nat_RedirectAddr(struct cmdargs const *arg)
 }
 
 
+int
+nat_RedirectProto(struct cmdargs const *arg)
+{
+  if (!arg->bundle->NatEnabled) {
+    prompt_Printf(arg->prompt, "nat not enabled\n");
+    return 1;
+  } else if (arg->argc >= arg->argn + 2 && arg->argc <= arg->argn + 4) {
+    struct in_addr localIP, publicIP, remoteIP;
+    struct alias_link *link;
+    struct protoent *pe;
+    int error, len;
+
+    len = strlen(arg->argv[arg->argn]);
+    if (len == 0) {
+      prompt_Printf(arg->prompt, "proto redirect: invalid protocol\n");
+      return 1;
+    }
+    if (strspn(arg->argv[arg->argn], "01234567") == len)
+      pe = getprotobynumber(atoi(arg->argv[arg->argn]));
+    else
+      pe = getprotobyname(arg->argv[arg->argn]);
+    if (pe == NULL) {
+      prompt_Printf(arg->prompt, "proto redirect: invalid protocol\n");
+      return 1;
+    }
+
+    error = StrToAddr(arg->argv[arg->argn + 1], &localIP);
+    if (error) {
+      prompt_Printf(arg->prompt, "proto redirect: invalid src address\n");
+      return 1;
+    }
+
+    if (arg->argc >= arg->argn + 3) {
+      error = StrToAddr(arg->argv[arg->argn + 2], &publicIP);
+      if (error) {
+        prompt_Printf(arg->prompt, "proto redirect: invalid alias address\n");
+        prompt_Printf(arg->prompt, "Usage: nat %s %s\n", arg->cmd->name,
+                      arg->cmd->syntax);
+        return 1;
+      }
+    } else
+      publicIP.s_addr = INADDR_ANY;
+
+    if (arg->argc == arg->argn + 4) {
+      error = StrToAddr(arg->argv[arg->argn + 2], &remoteIP);
+      if (error) {
+        prompt_Printf(arg->prompt, "proto redirect: invalid dst address\n");
+        prompt_Printf(arg->prompt, "Usage: nat %s %s\n", arg->cmd->name,
+                      arg->cmd->syntax);
+        return 1;
+      }
+    } else
+      remoteIP.s_addr = INADDR_ANY;
+
+    link = PacketAliasRedirectProto(localIP, remoteIP, publicIP, pe->p_proto);
+    if (link == NULL) {
+      prompt_Printf(arg->prompt, "proto redirect: packet aliasing"
+                    " engine error\n");
+      prompt_Printf(arg->prompt, "Usage: nat %s %s\n", arg->cmd->name,
+                    arg->cmd->syntax);
+    }
+  } else
+    return -1;
+
+  return 0;
+}
+
+
 static int
 StrToAddr(const char *str, struct in_addr *addr)
 {
@@ -304,9 +398,9 @@ nat_ProxyRule(struct cmdargs const *arg)
 
   for (f = arg->argn, pos = 0; f < arg->argc; f++) {
     len = strlen(arg->argv[f]);
-    if (sizeof cmd - pos < len + (f ? 1 : 0))
+    if (sizeof cmd - pos < len + (len ? 1 : 0))
       break;
-    if (f)
+    if (len)
       cmd[pos++] = ' ';
     strcpy(cmd + pos, arg->argv[f]);
     pos += len;
@@ -344,6 +438,36 @@ nat_SetTarget(struct cmdargs const *arg)
   PacketAliasSetTarget(addr);
   return 0;
 }
+
+#ifndef NO_FW_PUNCH
+int
+nat_PunchFW(struct cmdargs const *arg)
+{
+  char *end;
+  long base, count;
+
+  if (arg->argc == arg->argn) {
+    PacketAliasSetMode(0, PKT_ALIAS_PUNCH_FW);
+    return 0;
+  }
+
+  if (arg->argc != arg->argn + 2)
+    return -1;
+
+  base = strtol(arg->argv[arg->argn], &end, 10);
+  if (*end != '\0' || base < 0)
+    return -1;
+
+  count = strtol(arg->argv[arg->argn + 1], &end, 10);
+  if (*end != '\0' || count < 0)
+    return -1;
+
+  PacketAliasSetFWBase(base, count);
+  PacketAliasSetMode(PKT_ALIAS_PUNCH_FW, PKT_ALIAS_PUNCH_FW);
+
+  return 0;
+}
+#endif
 
 static struct mbuf *
 nat_LayerPush(struct bundle *bundle, struct link *l, struct mbuf *bp,
@@ -427,7 +551,8 @@ nat_LayerPull(struct bundle *bundle, struct link *l, struct mbuf *bp,
         bp = NULL;
       } else if (log_IsKept(LogTCPIP)) {
         log_Printf(LogTCPIP, "NAT engine ignored data:\n");
-        PacketCheck(bundle, MBUF_CTOP(bp), bp->m_len, NULL, NULL, NULL);
+        PacketCheck(bundle, AF_INET, MBUF_CTOP(bp), bp->m_len, NULL,
+                    NULL, NULL);
       }
       break;
 

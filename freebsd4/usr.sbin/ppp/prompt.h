@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/prompt.h,v 1.5.2.1 2000/03/21 10:23:15 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/prompt.h,v 1.7 2001/07/02 12:27:49 kris Exp $
  */
 
 #define LOCAL_AUTH	0x01
@@ -75,7 +75,12 @@ extern void prompt_Printf(struct prompt *, const char *, ...)
 #else
 extern void prompt_Printf(struct prompt *, const char *, ...);
 #endif
+#ifdef __GNUC__
+extern void prompt_vPrintf(struct prompt *, const char *, _BSD_VA_LIST_)
+			   __attribute__ ((format (printf, 2, 0)));
+#else
 extern void prompt_vPrintf(struct prompt *, const char *, _BSD_VA_LIST_);
+#endif
 #define PROMPT_DONT_WANT_INT 1
 #define PROMPT_WANT_INT 0
 extern void prompt_TtyInit(struct prompt *);

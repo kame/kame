@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/deflate.c,v 1.18.2.1 2000/08/19 09:30:03 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/deflate.c,v 1.22 2001/07/03 22:20:18 brian Exp $
  */
 
 #include <sys/types.h>
@@ -57,7 +57,7 @@ static u_char EMPTY_BLOCK[4] = { 0x00, 0x00, 0xff, 0xff };
 
 #define DEFLATE_CHUNK_LEN (1536 - sizeof(struct mbuf))
 
-static void
+static int
 DeflateResetOutput(void *v)
 {
   struct deflate_state *state = (struct deflate_state *)v;
@@ -66,6 +66,8 @@ DeflateResetOutput(void *v)
   state->uncomp_rec = 0;
   deflateReset(&state->cx);
   log_Printf(LogCCP, "Deflate: Output channel reset\n");
+
+  return 1;		/* Ask FSM to ACK */
 }
 
 static struct mbuf *
@@ -451,7 +453,7 @@ DeflateInitOptsOutput(struct lcp_opt *o, const struct ccp_config *cfg)
 }
 
 static int
-DeflateSetOptsOutput(struct lcp_opt *o)
+DeflateSetOptsOutput(struct lcp_opt *o, const struct ccp_config *cfg)
 {
   if (o->len != 4 || (o->data[0] & 15) != 8 || o->data[1] != '\0')
     return MODE_REJ;
@@ -551,9 +553,11 @@ DeflateTermOutput(void *v)
 }
 
 const struct ccp_algorithm PppdDeflateAlgorithm = {
-  TY_PPPD_DEFLATE,	/* pppd (wrongly) expects this ``type'' field */
+  TY_PPPD_DEFLATE,	/* Older versions of pppd expected this ``type'' */
   CCP_NEG_DEFLATE24,
   DeflateDispOpts,
+  ccp_DefaultUsable,
+  ccp_DefaultRequired,
   {
     DeflateSetOptsInput,
     DeflateInitInput,
@@ -563,6 +567,7 @@ const struct ccp_algorithm PppdDeflateAlgorithm = {
     DeflateDictSetup
   },
   {
+    0,
     DeflateInitOptsOutput,
     DeflateSetOptsOutput,
     DeflateInitOutput,
@@ -576,6 +581,8 @@ const struct ccp_algorithm DeflateAlgorithm = {
   TY_DEFLATE,		/* rfc 1979 */
   CCP_NEG_DEFLATE,
   DeflateDispOpts,
+  ccp_DefaultUsable,
+  ccp_DefaultRequired,
   {
     DeflateSetOptsInput,
     DeflateInitInput,
@@ -585,6 +592,7 @@ const struct ccp_algorithm DeflateAlgorithm = {
     DeflateDictSetup
   },
   {
+    0,
     DeflateInitOptsOutput,
     DeflateSetOptsOutput,
     DeflateInitOutput,

@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.sbin/ppp/tun.h,v 1.8.2.1 2000/08/19 09:30:08 brian Exp $
+ * $FreeBSD: src/usr.sbin/ppp/tun.h,v 1.10 2000/11/28 13:18:35 brian Exp $
  */
 
 struct tun_data {
@@ -36,4 +36,4 @@ struct tun_data {
 
 struct bundle;
 
-extern void tun_configure(struct bundle *, int);
+extern void tun_configure(struct bundle *);
