@@ -9,8 +9,6 @@ SRCS=	cmds.c cmdtab.c complete.c domacro.c fetch.c ftp.c main.c ruserpass.c \
 #
 #CPPFLAGS+=-DGATE_SERVER=\"ftp-gw.host\" # -DGATE_PORT=21
 
-CPPFLAGS+=	-DNO_EDITCOMPLETE -DNO_QUAD
-
 LDADD+=	-ledit -ltermcap -lutil
 DPADD+=	${LIBEDIT} ${LIBTERMCAP} ${LIBUTIL}
 
