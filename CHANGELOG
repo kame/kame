@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.589 2000/02/23 05:09:53 jinmei Exp $
+$Id: CHANGELOG,v 1.590 2000/02/23 05:12:08 itojun Exp $
 
 <200002>
 2000-02-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -13,6 +13,13 @@ $Id: CHANGELOG,v 1.589 2000/02/23 05:09:53 jinmei Exp $
 	* kame/kame/bgpd/if.c (ifconfig): use getifaddrs (if available)
 	instead of SIOCGIFCONF, since the former interface is more
 	friendly and safer.
+
+Wed Feb 23 JST 2000  itojun@iijlab.net
+	* libinet6/getifaddrs.c: bring in getifaddrs(3) from BSDI4 (it is
+	  under redistributable Berkeley license).  SIOCGIFCONF very hard to
+	  use correctly, due to (1) alignment constraints (2) try-and-error
+	  memory allocation since there's no way to estimate required buffer
+	  size beforehand.  We hope to bring this function into *BSD.
 
 Tue Feb 22 14:56:59 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd2/ports/openssh: upgrade to 1.2.2 and mark as broken. we
