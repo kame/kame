@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.21 2000/02/26 11:26:12 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.22 2000/03/21 05:14:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -390,8 +390,8 @@ noreplaycheck:
 	} else {
 		/*
 		 * strip off ESP header and IV.
-		 * We do deep-copy since KAME requires packet to be placed
-		 * in a single mbuf.
+		 * even in m_pulldown case, we need to strip off ESP so that
+		 * we can always compute checksum for AH correctly.
 		 */
 		size_t stripsiz;
 
@@ -733,8 +733,8 @@ noreplaycheck:
 	} else {
 		/*
 		 * strip off ESP header and IV.
-		 * We do deep-copy since KAME requires packet to be placed
-		 * in a single mbuf.
+		 * even in m_pulldown case, we need to strip off ESP so that
+		 * we can always compute checksum for AH correctly.
 		 */
 		size_t stripsiz;
 		char *prvnxtp;
