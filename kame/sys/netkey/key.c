@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.162 2000/10/01 12:37:21 itojun Exp $	*/
+/*	$KAME: key.c,v 1.163 2000/10/04 11:13:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -259,11 +259,18 @@ SYSCTL_INT(_net_key, KEYCTL_BLOCKACQ_COUNT,	blockacq_count,	CTLFLAG_RW, \
 SYSCTL_INT(_net_key, KEYCTL_BLOCKACQ_LIFETIME,	blockacq_lifetime, CTLFLAG_RW, \
 	&key_blockacq_lifetime,	0,	"");
 
+/* minimum ESP key length */
+SYSCTL_INT(_net_key, KEYCTL_ESP_KEYMIN,	esp_keymin, CTLFLAG_RW, \
+	&ipsec_esp_keymin,	0,	"");
+
+/* minimum AH key length */
+SYSCTL_INT(_net_key, KEYCTL_AH_KEYMIN,	ah_keymin, CTLFLAG_RW, \
+	&ipsec_ah_keymin,	0,	"");
 #endif /* __FreeBSD__ */
 
-static const int ipsec_esp_keymin = 256;
-static const int ipsec_esp_auth = 0;
-static const int ipsec_ah_keymin = 128;
+static int ipsec_esp_keymin = 256;
+static int ipsec_esp_auth = 0;
+static int ipsec_ah_keymin = 128;
 
 #ifndef LIST_FOREACH
 #define LIST_FOREACH(elm, head, field)                                     \
