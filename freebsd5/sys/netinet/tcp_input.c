@@ -804,10 +804,7 @@ findpcb:
 		tcp_savetcp = *th;
 	}
 #endif
-	/* skip if this isn't a listen socket */
-	if ((so->so_options & SO_ACCEPTCONN) == 0)
-		goto after_listen;
-	{
+	if (so->so_options & SO_ACCEPTCONN) {
 		struct in_conninfo inc;
 
 		bzero(&inc, sizeof(inc));
@@ -943,8 +940,8 @@ findpcb:
 		 */
 		if (th->th_dport == th->th_sport) {
 			if (isipv6) {
-				if (IN6_ARE_ADDR_EQUAL(&ip6->ip6_src,
-						       &ip6->ip6_dst))
+				if (IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
+						       &ip6->ip6_src))
 					goto drop;
 			} else {
 				if (ip->ip_dst.s_addr == ip->ip_src.s_addr)
