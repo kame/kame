@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.27 2000/05/29 03:20:46 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.28 2000/05/30 10:05:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.27 2000/05/29 03:20:46 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.28 2000/05/30 10:05:23 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -617,7 +617,7 @@ ripflush(ifcp, sin)
 		for (i = 0; i < nrt; i++, np++) {
 			if (np->rip6_metric == NEXTHOP_METRIC) {
 				if (IN6_IS_ADDR_UNSPECIFIED(&np->rip6_dest))
-						trace(2, "    NextHop reset");
+					trace(2, "    NextHop reset");
 				else {
 					trace(2, "    NextHop %s",
 						inet6_n2p(&np->rip6_dest));
@@ -1044,6 +1044,12 @@ riprecv()
 			np->rip6_plen, np->rip6_metric);
 		if (np->rip6_tag)
 			trace(2, "  tag=0x%04x", ntohs(np->rip6_tag) & 0xffff);
+		if (dflag >= 2) {
+			ia = np->rip6_dest;
+			applyplen(&ia, np->rip6_plen);
+			if (!IN6_ARE_ADDR_EQUAL(&ia, &np->rip6_dest))
+				trace(2, " [junk outside prefix]");
+		}
 
 		/* Listen-only filter */
 		ok = 1;		/* if there's no L filter, it is ok */
