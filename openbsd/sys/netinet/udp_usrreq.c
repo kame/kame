@@ -875,6 +875,7 @@ udp_output(m, va_alist)
 		struct in6_addr *faddr;
 		struct in6_addr *laddr;
 		struct ifnet *oifp = NULL;
+		int flags;
 
 		ipv6->ip6_flow = htonl(0x60000000) |
 		    (inp->inp_ipv6.ip6_flow & htonl(0x0fffffff)); 
@@ -944,6 +945,10 @@ udp_output(m, va_alist)
 		uh->uh_ulen = htons(ipv6->ip6_plen);
 		uh->uh_sum = 0;
 
+		flags = 0;
+		if (inp->inp_flags & IN6P_MINMTU)
+			flags |= IPV6_MINMTU;
+
 		/* 
 		 * Always calculate udp checksum for IPv6 datagrams
 		 */
@@ -952,7 +957,7 @@ udp_output(m, va_alist)
 			uh->uh_sum = 0xffff;
 
 		error = ip6_output(m, inp->inp_outputopts6, &inp->inp_route6, 
-		    inp->inp_socket->so_options & SO_DONTROUTE,
+		    flags,
 		    (inp->inp_flags & INP_IPV6_MCAST)?inp->inp_moptions6:NULL,
 		    NULL);
 	} else
