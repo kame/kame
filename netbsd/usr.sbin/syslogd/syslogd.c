@@ -1,3 +1,5 @@
+/*	$NetBSD: syslogd.c,v 1.34.4.4 2001/03/22 02:48:58 he Exp $	*/
+
 /*
  * Copyright (c) 1983, 1988, 1993, 1994
  *	The Regents of the University of California.  All rights reserved.
@@ -41,7 +43,7 @@ __COPYRIGHT("@(#) Copyright (c) 1983, 1988, 1993, 1994\n\
 #if 0
 static char sccsid[] = "@(#)syslogd.c	8.3 (Berkeley) 4/4/94";
 #else
-__RCSID("$NetBSD: syslogd.c,v 1.26 1999/02/28 11:46:26 tron Exp $");
+__RCSID("$NetBSD: syslogd.c,v 1.34.4.4 2001/03/22 02:48:58 he Exp $");
 #endif
 #endif /* not lint */
 
@@ -108,7 +110,6 @@ __RCSID("$NetBSD: syslogd.c,v 1.26 1999/02/28 11:46:26 tron Exp $");
 #include <sys/syslog.h>
 
 char	*ConfFile = _PATH_LOGCONF;
-char	*PidFile = _PATH_LOGPID;
 char	ctty[] = _PATH_CONSOLE;
 
 #define FDMASK(fd)	(1 << (fd))
@@ -141,7 +142,7 @@ struct filed {
 		char	f_uname[MAXUNAMES][UT_NAMESIZE+1];
 		struct {
 			char	f_hname[MAXHOSTNAMELEN+1];
-			struct sockaddr_in	f_addr;
+			struct	addrinfo *f_addr;
 		} f_forw;		/* forwarding address */
 		char	f_fname[MAXPATHLEN];
 	} f_un;
@@ -186,22 +187,22 @@ struct	filed consfile;
 int	Debug;			/* debug flag */
 char	LocalHostName[MAXHOSTNAMELEN+1];	/* our hostname */
 char	*LocalDomain;		/* our local domain name */
-int	InetInuse = 0;		/* non-zero if INET sockets are being used */
-int	finet;			/* Internet datagram socket */
-int	LogPort;		/* port number for INET connections */
+int	*finet = NULL;			/* Internet datagram sockets */
 int	Initialized = 0;	/* set when we have initialized ourselves */
 int	MarkInterval = 20 * 60;	/* interval between marks in seconds */
 int	MarkSeq = 0;		/* mark sequence number */
-int	SecureMode = 0;		/* when true, speak only unix domain socks */
+int	SecureMode = 0;		/* listen only on unix domain socks */
+int	NumForwards = 0;	/* number of forwarding actions in conf file */
 char	**LogPaths;		/* array of pathnames to read messages from */
 
 void	cfline __P((char *, struct filed *));
-char   *cvthname __P((struct sockaddr_in *));
+char   *cvthname __P((struct sockaddr_storage *));
 int	decode __P((const char *, CODE *));
 void	die __P((int));
 void	domark __P((int));
 void	fprintlog __P((struct filed *, int, char *));
 int	getmsgbufsize __P((void));
+int*	socksetup __P((int));
 void	init __P((int));
 void	logerror __P((char *));
 void	logmsg __P((int, char *, char *, int));
@@ -220,11 +221,10 @@ main(argc, argv)
 	char *argv[];
 {
 	int ch, *funix, i, j, fklog, len, linesize;
-	int nfinetix, nfklogix, nfunixbaseix, nfds;
+	int *nfinetix, nfklogix, nfunixbaseix, nfds;
 	int funixsize = 0, funixmaxsize = 0;
 	struct sockaddr_un sunx, fromunix;
-	struct sockaddr_in sin, frominet;
-	FILE *fp;
+	struct sockaddr_storage frominet;
 	char *p, *line, **pp;
 	struct pollfd *readfds;
 
@@ -247,7 +247,7 @@ main(argc, argv)
 			logpath_fileadd(&LogPaths, &funixsize, 
 			    &funixmaxsize, optarg);
 			break;
-		case 's':		/* no network mode */
+		case 's':		/* no network listen mode */
 			SecureMode++;
 			break;
 		case '?':
@@ -299,6 +299,7 @@ main(argc, argv)
 		die(0);
 	}
 	for (j = 0, pp = LogPaths; *pp; pp++, j++) {
+		dprintf("making unix dgram socket %s\n", *pp);
 		unlink(*pp);
 		memset(&sunx, 0, sizeof(sunx));
 		sunx.sun_family = AF_LOCAL;
@@ -307,41 +308,20 @@ main(argc, argv)
 		if (funix[j] < 0 || bind(funix[j],
 		    (struct sockaddr *)&sunx, SUN_LEN(&sunx)) < 0 ||
 		    chmod(*pp, 0666) < 0) {
+			int serrno = errno;
 			(void)snprintf(line, sizeof line,
 			    "cannot create %s", *pp);
+			errno = serrno;
 			logerror(line);
+			errno = serrno;
 			dprintf("cannot create %s (%d)\n", *pp, errno);
 			die(0);
 		}
 		dprintf("listening on unix dgram socket %s\n", *pp);
 	}
 
-	if (!SecureMode)
-		finet = socket(AF_INET, SOCK_DGRAM, 0);
-	else
-		finet = -1;
+	init(0);
 
-	if (finet >= 0) {
-		struct servent *sp;
-
-		sp = getservbyname("syslog", "udp");
-		if (sp == NULL) {
-			errno = 0;
-			logerror("syslog/udp: unknown service");
-			die(0);
-		}
-		memset(&sin, 0, sizeof(sin));
-		sin.sin_family = AF_INET;
-		sin.sin_port = LogPort = sp->s_port;
-		if (bind(finet, (struct sockaddr *)&sin, sizeof(sin)) < 0) {
-			logerror("bind");
-			if (!Debug)
-				die(0);
-		} else {
-			InetInuse = 1;
-		}
-		dprintf("listening on inet socket\n");
-	}
 	if ((fklog = open(_PATH_KLOG, O_RDONLY, 0)) < 0) {
 		dprintf("can't open %s (%d)\n", _PATH_KLOG, errno);
 	} else {
@@ -349,22 +329,16 @@ main(argc, argv)
 	}
 
 	/* tuck my process id away, if i'm not in debug mode */
-	if (Debug == 0) {
-		fp = fopen(PidFile, "w");
-		if (fp != NULL) {
-			fprintf(fp, "%d\n", getpid());
-			(void) fclose(fp);
-		}
-	}
+	if (Debug == 0)
+		pidfile(NULL);
 
 	dprintf("off & running....\n");
 
-	init(0);
 	(void)signal(SIGHUP, init);
 
 	/* setup pollfd set. */
 	readfds = (struct pollfd *)malloc(sizeof(struct pollfd) *
-					  (funixsize + 2));
+			(funixsize + (finet ? *finet : 0) + 1));
 	if (readfds == NULL) {
 		logerror("couldn't allocate pollfds");
 		die(0);
@@ -375,10 +349,13 @@ main(argc, argv)
 		readfds[nfklogix].fd = fklog;
 		readfds[nfklogix].events = POLLIN | POLLPRI;
 	}
-	if (finet >= 0) {
-		nfinetix = nfds++;
-		readfds[nfinetix].fd = finet;
-		readfds[nfinetix].events = POLLIN | POLLPRI;
+	if (finet && !SecureMode) {
+		nfinetix = malloc(*finet * sizeof(*nfinetix));
+		for (j = 0; j < *finet; j++) {
+			nfinetix[j] = nfds++;
+			readfds[nfinetix[j]].fd = finet[j+1];
+			readfds[nfinetix[j]].events = POLLIN | POLLPRI;
+		}
 	}
 	nfunixbaseix = nfds;
 	for (j = 0, pp = LogPaths; *pp; pp++) {
@@ -424,23 +401,31 @@ main(argc, argv)
 				printline(LocalHostName, line);
 			} else if (i < 0 && errno != EINTR) {
 				char buf[MAXPATHLEN];
+				int serrno = errno;
 
 				(void)snprintf(buf, sizeof buf,
 				    "recvfrom unix %s", *pp);
+				errno = serrno;
 				logerror(buf);
 			}
 		}
-		if (finet >= 0 &&
-		    (readfds[nfinetix].revents & (POLLIN | POLLPRI))) {
-			dprintf("inet socket active\n");
-			len = sizeof(frominet);
-			i = recvfrom(finet, line, MAXLINE, 0,
-			    (struct sockaddr *)&frominet, &len);
-			if (i > 0) {
-				line[i] = '\0';
-				printline(cvthname(&frominet), line);
-			} else if (i < 0 && errno != EINTR)
-				logerror("recvfrom inet");
+		if (finet && !SecureMode) {
+			for (j = 0; j < *finet; j++) {
+		    		if (readfds[nfinetix[j]].revents &
+				    (POLLIN | POLLPRI)) {
+					dprintf("inet socket active\n");
+					len = sizeof(frominet);
+					i = recvfrom(finet[j+1], line, MAXLINE,
+					    0, (struct sockaddr *)&frominet,
+					    &len);
+					if (i > 0) {
+						line[i] = '\0';
+						printline(cvthname(&frominet),
+						    line);
+					} else if (i < 0 && errno != EINTR)
+						logerror("recvfrom inet");
+				}
+			}
 		}
 	}
 }
@@ -448,9 +433,11 @@ main(argc, argv)
 void
 usage()
 {
+	extern char *__progname;
 
 	(void)fprintf(stderr,
-	    "usage: syslogd [-f conffile] [-m markinterval] [-p logpath1] [-p logpath2 ..]\n");
+"usage: %s [-ds] [-f conffile] [-m markinterval] [-P logpathfile] [-p logpath1] [-p logpath2 ..]\n",
+	    __progname);
 	exit(1);
 }
 
@@ -467,6 +454,7 @@ logpath_add(lp, szp, maxszp, new)
 	char *new;
 {
 
+	dprintf("adding %s to the %p logpath list\n", new, *lp);
 	if (*szp == *maxszp) {
 		if (*maxszp == 0) {
 			*maxszp = 4;	/* start of with enough for now */
@@ -498,7 +486,10 @@ logpath_fileadd(lp, szp, maxszp, file)
 
 	fp = fopen(file, "r");
 	if (fp == NULL) {
+		int serrno = errno;
+
 		dprintf("can't open %s (%d)\n", file, errno);
+		errno = serrno;
 		logerror("could not open socket file list");
 		die(0);
 	}
@@ -542,7 +533,7 @@ printline(hname, msg)
 	q = line;
 
 	while ((c = *p++ & 0177) != '\0' &&
-	    q < &line[sizeof(line) - 1])
+	    q < &line[sizeof(line) - 2])
 		if (iscntrl(c))
 			if (c == '\n')
 				*q++ = ' ';
@@ -718,7 +709,8 @@ fprintlog(f, flags, msg)
 {
 	struct iovec iov[6];
 	struct iovec *v;
-	int l;
+	struct addrinfo *r;
+	int j, l, lsent;
 	char line[MAXLINE + 1], repbuf[80], greetings[200];
 
 	v = iov;
@@ -769,7 +761,10 @@ fprintlog(f, flags, msg)
 
 	case F_FORW:
 		dprintf(" %s\n", f->f_un.f_forw.f_hname);
-		/* check for local vs remote messages (from FreeBSD PR#bin/7055) */
+			/*
+			 * check for local vs remote messages
+			 * (from FreeBSD PR#bin/7055)
+			 */
 		if (strcmp(f->f_prevhost, LocalHostName)) {
 			l = snprintf(line, sizeof(line) - 1,
 				     "<%d>%.15s [%s]: %s",
@@ -782,14 +777,27 @@ fprintlog(f, flags, msg)
 		}
 		if (l > MAXLINE)
 			l = MAXLINE;
-		if ((finet >= 0) &&
-		     (sendto(finet, line, l, 0,
-			     (struct sockaddr *)&f->f_un.f_forw.f_addr,
-			     sizeof(f->f_un.f_forw.f_addr)) != l)) {
-			int e = errno;
-			f->f_type = F_UNUSED;
-			errno = e;
-			logerror("sendto");
+		if (finet) {
+			for (r = f->f_un.f_forw.f_addr; r; r = r->ai_next) {
+				for (j = 0; j < *finet; j++) {
+#if 0 
+					/*
+					 * should we check AF first, or just
+					 * trial and error? FWD
+					 */
+					if (r->ai_family ==
+					    address_family_of(finet[j+1])) 
+#endif
+					lsent = sendto(finet[j+1], line, l, 0,
+					    r->ai_addr, r->ai_addrlen);
+					if (lsent == l) 
+						break;
+				}
+			}
+			if (lsent != l) {
+				f->f_type = F_UNUSED;
+				logerror("sendto");
+			}
 		}
 		break;
 
@@ -917,27 +925,36 @@ reapchild(signo)
  */
 char *
 cvthname(f)
-	struct sockaddr_in *f;
+	struct sockaddr_storage *f;
 {
-	struct hostent *hp;
+	int error;
 	char *p;
+#ifdef KAME_SCOPEID
+	const int niflag = NI_DGRAM | NI_WITHSCOPEID;
+#else
+	const int niflag = NI_DGRAM;
+#endif
+	static char host[NI_MAXHOST], ip[NI_MAXHOST];
 
-	dprintf("cvthname(%s)\n", inet_ntoa(f->sin_addr));
+	error = getnameinfo((struct sockaddr*)f, ((struct sockaddr*)f)->sa_len,
+			ip, sizeof ip, NULL, 0, NI_NUMERICHOST|niflag);
 
-	if (f->sin_family != AF_INET) {
-		dprintf("Malformed from address\n");
+	dprintf("cvthname(%s)\n", ip);
+
+	if (error) {
+		dprintf("Malformed from address %s\n", gai_strerror(error));
 		return ("???");
 	}
-	hp = gethostbyaddr((char *)&f->sin_addr,
-	    sizeof(struct in_addr), f->sin_family);
-	if (hp == 0) {
-		dprintf("Host name for your address (%s) unknown\n",
-			inet_ntoa(f->sin_addr));
-		return (inet_ntoa(f->sin_addr));
+
+	error = getnameinfo((struct sockaddr*)f, ((struct sockaddr*)f)->sa_len,
+			host, sizeof host, NULL, 0, niflag);
+	if (error) {
+		dprintf("Host name for your address (%s) unknown\n", ip);
+		return (ip);
 	}
-	if ((p = strchr(hp->h_name, '.')) && strcmp(p + 1, LocalDomain) == 0)
+	if ((p = strchr(host, '.')) && strcmp(p + 1, LocalDomain) == 0)
 		*p = '\0';
-	return (hp->h_name);
+	return (host);
 }
 
 void
@@ -1037,12 +1054,35 @@ init(signo)
 		case F_CONSOLE:
 			(void)close(f->f_file);
 			break;
+		case F_FORW:
+			if (f->f_un.f_forw.f_addr)
+				freeaddrinfo(f->f_un.f_forw.f_addr);
+			break;
 		}
 		next = f->f_next;
 		free((char *)f);
 	}
 	Files = NULL;
 	nextp = &Files;
+
+	/*
+	 *  Close all open sockets
+	 */
+
+	if (finet) {
+		for (i = 0; i < *finet; i++) {
+			if (close(finet[i+1]) < 0) {
+				logerror("close");
+				die(0);
+			}
+		}
+	}
+
+	/*
+	 *  Reset counter of forwarding actions
+	 */
+
+	NumForwards=0;
 
 	/* open the configuration file */
 	if ((cf = fopen(ConfFile, "r")) == NULL) {
@@ -1102,12 +1142,27 @@ init(signo)
 				break;
 
 			case F_USERS:
-				for (i = 0; i < MAXUNAMES && *f->f_un.f_uname[i]; i++)
+				for (i = 0;
+				    i < MAXUNAMES && *f->f_un.f_uname[i]; i++)
 					printf("%s, ", f->f_un.f_uname[i]);
 				break;
 			}
 			printf("\n");
 		}
+	}
+
+	finet = socksetup(PF_UNSPEC);
+	if (finet) {
+		if (SecureMode) {
+			for (i = 0; i < *finet; i++) {
+				if (shutdown(finet[i+1], SHUT_RD) < 0) {
+					logerror("shutdown");
+					die(0);
+				}
+			}
+		} else
+			dprintf("listening on inet and/or inet6 socket\n");
+		dprintf("sending on inet and/or inet6 socket\n");
 	}
 
 	logmsg(LOG_SYSLOG|LOG_INFO, "syslogd: restart", LocalHostName, ADDDATE);
@@ -1122,10 +1177,10 @@ cfline(line, f)
 	char *line;
 	struct filed *f;
 {
-	struct hostent *hp;
-	int i, pri;
-	char *bp, *p, *q;
-	char buf[MAXLINE], ebuf[100];
+	struct addrinfo hints, *res;
+	int    error, i, pri;
+	char   *bp, *p, *q;
+	char   buf[MAXLINE], ebuf[100];
 
 	dprintf("cfline(%s)\n", line);
 
@@ -1198,22 +1253,20 @@ cfline(line, f)
 	switch (*p)
 	{
 	case '@':
-		if (!InetInuse)
-			break;
 		(void)strcpy(f->f_un.f_forw.f_hname, ++p);
-		hp = gethostbyname(p);
-		if (hp == NULL) {
-			extern int h_errno;
-
-			logerror((char *)hstrerror(h_errno));
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = AF_UNSPEC;
+		hints.ai_socktype = SOCK_DGRAM;
+		hints.ai_protocol = 0;
+		error = getaddrinfo(f->f_un.f_forw.f_hname, "syslog", &hints,
+		    &res);
+		if (error) {
+			logerror(gai_strerror(error));
 			break;
 		}
-		memset(&f->f_un.f_forw.f_addr, 0,
-			 sizeof(f->f_un.f_forw.f_addr));
-		f->f_un.f_forw.f_addr.sin_family = AF_INET;
-		f->f_un.f_forw.f_addr.sin_port = LogPort;
-		memmove(&f->f_un.f_forw.f_addr.sin_addr, hp->h_addr, hp->h_length);
+		f->f_un.f_forw.f_addr = res;
 		f->f_type = F_FORW;
+		NumForwards++;
 		break;
 
 	case '/':
@@ -1299,4 +1352,65 @@ getmsgbufsize()
 		return (0);
 	}
 	return (msgbufsize);
+}
+
+int *
+socksetup(af)
+	int af;
+{
+	struct addrinfo hints, *res, *r;
+	int error, maxs, *s, *socks;
+
+	if(SecureMode && !NumForwards)
+		return(NULL);
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_flags = AI_PASSIVE;
+	hints.ai_family = af;
+	hints.ai_socktype = SOCK_DGRAM;
+	error = getaddrinfo(NULL, "syslog", &hints, &res);
+	if (error) {
+		logerror(gai_strerror(error));
+		errno = 0;
+		die(0);
+	}
+
+	/* Count max number of sockets we may open */
+	for (maxs = 0, r = res; r; r = r->ai_next, maxs++)
+		continue;
+	socks = malloc ((maxs+1) * sizeof(int));
+	if (!socks) {
+		logerror("couldn't allocate memory for sockets");
+		die(0);
+	}
+
+	*socks = 0;   /* num of sockets counter at start of array */
+	s = socks+1;
+	for (r = res; r; r = r->ai_next) {
+		*s = socket(r->ai_family, r->ai_socktype, r->ai_protocol);
+		if (*s < 0) {
+			logerror("socket");
+			continue;
+		}
+		if (!SecureMode && bind(*s, r->ai_addr, r->ai_addrlen) < 0) {
+			close (*s);
+			logerror("bind");
+			continue;
+		}
+
+		*socks = *socks + 1;
+		s++;
+	}
+
+	if (*socks == 0) {
+		free (socks);
+		if(Debug)
+			return(NULL);
+		else
+			die(0);
+	}
+	if (res)
+		freeaddrinfo(res);
+
+	return(socks);
 }

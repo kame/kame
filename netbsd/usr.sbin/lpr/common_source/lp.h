@@ -1,4 +1,4 @@
-/*	$NetBSD: lp.h,v 1.12 1998/07/07 03:36:53 mrg Exp $	*/
+/*	$NetBSD: lp.h,v 1.14.4.1 2000/10/17 19:50:22 tv Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -90,6 +90,7 @@ extern char	host[MAXHOSTNAMELEN + 1];
 extern char	*from;		/* client's machine name */
 extern int	remote;		/* true if sending files to a remote host */
 extern char	*printcapdb[];  /* printcap database array */
+extern int	wait_time;	/* time to wait for remote responses */
 /*
  * Structure used for building a sorted list of control files.
  */
@@ -108,14 +109,15 @@ char	*checkremote __P((void));
 int      chk __P((char *));
 void     displayq __P((int));
 void     dump __P((char *, char *, int));
-void	 fatal __P((const char *, ...));
+void	 fatal __P((const char *, ...))
+	__attribute__((__format__(__printf__, 1, 2)));
 int	 getline __P((FILE *));
 int	 getport __P((char *, int));
 int	 getq __P((struct queue *(*[])));
 void     header __P((void));
 void     inform __P((char *));
 int      inlist __P((char *, char *));
-int      iscf __P((struct dirent *));
+int      iscf __P((const struct dirent *));
 int      isowner __P((char *, char *));
 void     ldump __P((char *, char *, int));
 int      lockchk __P((char *));

@@ -1,4 +1,4 @@
-/*	$NetBSD: lpq.c,v 1.8 1998/07/06 07:03:28 mrg Exp $	*/
+/*	$NetBSD: lpq.c,v 1.10 2000/04/14 06:26:53 simonb Exp $	*/
 
 /*
  * Copyright (c) 1983, 1993
@@ -41,7 +41,7 @@ __COPYRIGHT("@(#) Copyright (c) 1983, 1993\n\
 #if 0
 static char sccsid[] = "@(#)lpq.c	8.3 (Berkeley) 5/10/95";
 #else
-__RCSID("$NetBSD: lpq.c,v 1.8 1998/07/06 07:03:28 mrg Exp $");
+__RCSID("$NetBSD: lpq.c,v 1.10 2000/04/14 06:26:53 simonb Exp $");
 #endif
 #endif /* not lint */
 
@@ -84,8 +84,6 @@ main(argc, argv)
 	int	argc;
 	char	**argv;
 {
-	extern char	*optarg;
-	extern int	optind;
 	int	ch, aflag, lflag;
 	char	*buf, *cp;
 
@@ -99,7 +97,7 @@ main(argc, argv)
 	openlog("lpd", 0, LOG_LPR);
 
 	aflag = lflag = 0;
-	while ((ch = getopt(argc, argv, "alP:")) != -1)
+	while ((ch = getopt(argc, argv, "alP:w:")) != -1)
 		switch((char)ch) {
 		case 'a':
 			++aflag;
@@ -109,6 +107,14 @@ main(argc, argv)
 			break;
 		case 'P':		/* printer name */
 			printer = optarg;
+			break;
+		case 'w':
+			wait_time = atoi(optarg);
+			if (wait_time < 0)
+				errx(1, "wait time must be postive: %s",
+				    optarg);
+			if (wait_time < 30)
+			    warnx("warning: wait time less than 30 seconds");
 			break;
 		case '?':
 		default:
