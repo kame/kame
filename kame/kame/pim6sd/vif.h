@@ -1,4 +1,4 @@
-/*	$KAME: vif.h,v 1.24 2002/12/15 04:23:23 suz Exp $	*/
+/*	$KAME: vif.h,v 1.25 2003/01/22 06:47:02 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -77,7 +77,8 @@ extern mifi_t reg_vif_num;
 #define VIFF_NONBRS		0x080000
 #define VIFF_PIM_NBR            0x200000
 #define VIFF_POINT_TO_POINT	0x400000	
-#define VIFF_ENABLED       	0x800000
+#define VIFF_NOLISTENER         0x800000       /* no listener on the link   */
+#define VIFF_ENABLED       	0x1000000
 #define NBRTYPE 		u_long
 #define NBRBITS			sizeof(NBRTYPE) *8
 
@@ -250,7 +251,6 @@ struct phaddr {
 
 
 /* The Access Control List (list with scoped addresses) member */
-#define VIFF_NOLISTENER         0x800000       /* no listener on the link   */
 
 struct vif_acl {
 	struct vif_acl 			*acl_next;
