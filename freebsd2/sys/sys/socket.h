@@ -156,8 +156,10 @@ struct	linger {
 #define	pseudo_AF_KEY	27		/* Internal key-management function */
 #define	AF_INET6	28		/* IPv6 */
 #define	AF_NATM		29		/* native ATM access */
-
-#define	AF_MAX		30
+#define	pseudo_AF_HDRCMPLT 30		/* Used by BPF to not rewrite hdrs
+					 * in interface output routine
+					 */
+#define	AF_MAX		31
 
 /*
  * Structure used by kernel to store most

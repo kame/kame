@@ -165,8 +165,8 @@ fddi_output(ifp, m0, dst, rt0)
 	struct rtentry *rt0;
 {
 	u_int16_t type;
-	int s, error = 0;
- 	u_char edst[6];
+	int s, error = 0, hdrcmplt = 0;
+ 	u_char esrc[6], edst[6];
 	register struct mbuf *m = m0;
 	register struct rtentry *rt;
 	register struct fddi_header *fh;
@@ -387,6 +387,15 @@ fddi_output(ifp, m0, dst, rt0)
 		} break;
 #endif /* LLC */	
 
+	case pseudo_AF_HDRCMPLT:
+	{
+		struct ether_header *eh;
+		hdrcmplt = 1;
+		eh = (struct ether_header *)dst->sa_data;
+ 		(void)memcpy((caddr_t)esrc, (caddr_t)eh->ether_shost, sizeof (esrc));
+		/* FALLTHROUGH */
+	}
+
 	case AF_UNSPEC:
 	{
 		struct ether_header *eh;
@@ -465,8 +474,12 @@ fddi_output(ifp, m0, dst, rt0)
 	fh->fddi_fc = FDDIFC_LLC_ASYNC|FDDIFC_LLC_PRIO4;
  	(void)memcpy((caddr_t)fh->fddi_dhost, (caddr_t)edst, sizeof (edst));
   queue_it:
- 	(void)memcpy((caddr_t)fh->fddi_shost, (caddr_t)ac->ac_enaddr,
-	    sizeof(fh->fddi_shost));
+	if (hdrcmplt)
+		(void)memcpy((caddr_t)fh->fddi_shost, (caddr_t)esrc,
+			sizeof(fh->fddi_shost));
+	else
+		(void)memcpy((caddr_t)fh->fddi_shost, (caddr_t)ac->ac_enaddr,
+			sizeof(fh->fddi_shost));
 	s = splimp();
 	/*
 	 * Queue message on interface, and start output if interface

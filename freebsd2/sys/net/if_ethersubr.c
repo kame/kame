@@ -164,11 +164,8 @@ ether_output(ifp, m0, dst, rt0)
 	struct rtentry *rt0;
 {
 	short type;
-	int s, error = 0;
- 	u_char *cp, edst[6];
-#ifdef TAHI
-	u_char esrc[6];
-#endif
+	int s, error = 0, hdrcmplt = 0;
+ 	u_char *cp, esrc[6], edst[6];
 	register struct mbuf *m2, *m = m0;
 	register struct rtentry *rt;
 	struct mbuf *mcopy = (struct mbuf *)0;
@@ -181,10 +178,6 @@ ether_output(ifp, m0, dst, rt0)
 #endif NETATALK
 #ifdef ALTQ
 	struct pr_hdr pr_hdr;
-#endif
-
-#ifdef TAHI
-	bzero(esrc, sizeof(esrc));
 #endif
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
@@ -472,12 +465,15 @@ ether_output(ifp, m0, dst, rt0)
 		} break;
 #endif /* LLC */
 
+	case pseudo_AF_HDRCMPLT:
+		hdrcmplt = 1;
+		eh = (struct ether_header *)dst->sa_data;
+		(void)memcpy(esrc, eh->ether_shost, sizeof (esrc));
+		/* FALLTHROUGH */
+
 	case AF_UNSPEC:
 		eh = (struct ether_header *)dst->sa_data;
  		(void)memcpy(edst, eh->ether_dhost, sizeof (edst));
-#ifdef TAHI
-		(void)memcpy(esrc, eh->ether_shost, sizeof (esrc));
-#endif
 		type = eh->ether_type;
 		break;
 
@@ -501,19 +497,12 @@ ether_output(ifp, m0, dst, rt0)
 	(void)memcpy(&eh->ether_type, &type,
 		sizeof(eh->ether_type));
  	(void)memcpy(eh->ether_dhost, edst, sizeof (edst));
-
-#ifndef TAHI
- 	(void)memcpy(eh->ether_shost, ac->ac_enaddr, sizeof(eh->ether_shost));
-#else
- 	if (dst->sa_family == AF_UNSPEC &&
- 	   !(esrc[0] == 0 && esrc[1] == 0 && esrc[2] == 0 &&
- 	     esrc[3] == 0 && esrc[4] == 0 && esrc[5] == 0)) {
-		(void)memcpy(eh->ether_shost, esrc, sizeof (esrc));
-        } else {
+	if (hdrcmplt)
+		(void)memcpy(eh->ether_shost, esrc,
+			sizeof(eh->ether_shost));
+	else
 		(void)memcpy(eh->ether_shost, ac->ac_enaddr,
 			sizeof(eh->ether_shost));
-	}
-#endif
 #ifdef BRIDGE
 	if (do_bridge) {
 	    struct ifnet *old_ifp = ifp ;
