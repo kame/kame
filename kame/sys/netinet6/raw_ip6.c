@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.122 2002/06/07 20:48:43 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.123 2002/06/07 20:52:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -331,8 +331,8 @@ rip6_input(mp, offp, proto)
 			char *prvnxtp = ip6_get_prevhdr(m, *offp); /* XXX */
 			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_protounknown);
 			icmp6_error(m, ICMP6_PARAM_PROB,
-				    ICMP6_PARAMPROB_NEXTHEADER,
-				    prvnxtp - mtod(m, char *));
+			    ICMP6_PARAMPROB_NEXTHEADER,
+			    prvnxtp - mtod(m, char *));
 		}
 		ip6stat.ip6s_delivered--;
 	}
@@ -857,8 +857,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 #ifndef SCOPEDROUTING
 		addr->sin6_scope_id = lzone;
 #endif
-		if (ia &&
-		    ((struct in6_ifaddr *)ia)->ia6_flags &
+		if (ia && ((struct in6_ifaddr *)ia)->ia6_flags &
 		    (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY|
 		     IN6_IFF_DETACHED|IN6_IFF_DEPRECATED)) {
 			error = EADDRNOTAVAIL;
