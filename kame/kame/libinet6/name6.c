@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.22 2000/05/01 08:19:08 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.23 2000/05/08 13:41:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -1155,35 +1155,19 @@ typedef union {
 } querybuf;
 
 static struct hostent *getanswer __P((const querybuf *, int, const char *,
-	int, struct hostent *));
-
-#define BOUNDED_INCR(x) \
-	do { \
-		cp += x; \
-		if (cp > eom) { \
-			h_errno = NO_RECOVERY; \
-			return (NULL); \
-		} \
-	} while (0)
-
-#define BOUNDS_CHECK(ptr, count) \
-	do { \
-		if ((ptr) + (count) > eom) { \
-			h_errno = NO_RECOVERY; \
-			return (NULL); \
-		} \
-	} while (0)
+	int, struct hostent *, int *));
 
 /*
  * we don't need to take care about sorting, nor IPv4 mapped address here.
  */
 static struct hostent *
-getanswer(answer, anslen, qname, qtype, template)
+getanswer(answer, anslen, qname, qtype, template, errp)
 	const querybuf *answer;
 	int anslen;
 	const char *qname;
 	int qtype;
 	struct hostent *template;
+	int *errp;
 {
 	register const HEADER *hp;
 	register const u_char *cp;
@@ -1195,10 +1179,26 @@ getanswer(answer, anslen, qname, qtype, template)
 	char tbuf[MAXDNAME];
 	const char *tname;
 	int (*name_ok) __P((const char *));
-#define host	(*template)
 	static char *h_addr_ptrs[MAXADDRS + 1];
 	static char *host_aliases[MAXALIASES];
 	static char hostbuf[8*1024];
+
+#define BOUNDED_INCR(x) \
+	do { \
+		cp += x; \
+		if (cp > eom) { \
+			*errp = NO_RECOVERY; \
+			return (NULL); \
+		} \
+	} while (0)
+
+#define BOUNDS_CHECK(ptr, count) \
+	do { \
+		if ((ptr) + (count) > eom) { \
+			*errp = NO_RECOVERY; \
+			return (NULL); \
+		} \
+	} while (0)
 
 #define DNS_ASSERT(x) \
 	do {				\
@@ -1217,7 +1217,7 @@ getanswer(answer, anslen, qname, qtype, template)
 	} while (0)
 
 	tname = qname;
-	host.h_name = NULL;
+	template->h_name = NULL;
 	eom = answer->buf + anslen;
 	switch (qtype) {
 	case T_A:
@@ -1241,12 +1241,12 @@ getanswer(answer, anslen, qname, qtype, template)
 	cp = answer->buf;
 	BOUNDED_INCR(HFIXEDSZ);
 	if (qdcount != 1) {
-		h_errno = NO_RECOVERY;
+		*errp = NO_RECOVERY;
 		return (NULL);
 	}
 	n = dn_expand(answer->buf, eom, cp, bp, buflen);
 	if ((n < 0) || !(*name_ok)(bp)) {
-		h_errno = NO_RECOVERY;
+		*errp = NO_RECOVERY;
 		return (NULL);
 	}
 	BOUNDED_INCR(n + QFIXEDSZ);
@@ -1257,21 +1257,21 @@ getanswer(answer, anslen, qname, qtype, template)
 		 */
 		n = strlen(bp) + 1;		/* for the \0 */
 		if (n >= MAXHOSTNAMELEN) {
-			h_errno = NO_RECOVERY;
+			*errp = NO_RECOVERY;
 			return (NULL);
 		}
-		host.h_name = bp;
+		template->h_name = bp;
 		bp += n;
 		buflen -= n;
 		/* The qname can be abbreviated, but h_name is now absolute. */
-		qname = host.h_name;
+		qname = template->h_name;
 	}
 	ap = host_aliases;
 	*ap = NULL;
-	host.h_aliases = host_aliases;
+	template->h_aliases = host_aliases;
 	hap = h_addr_ptrs;
 	*hap = NULL;
-	host.h_addr_list = h_addr_ptrs;
+	template->h_addr_list = h_addr_ptrs;
 	haveanswer = 0;
 	had_error = 0;
 	while (ancount-- > 0 && cp < eom && !had_error) {
@@ -1297,7 +1297,7 @@ getanswer(answer, anslen, qname, qtype, template)
 			DNS_FATAL((*name_ok)(tbuf));
 			cp += n;
 			if (cp != erdata) {
-				h_errno = NO_RECOVERY;
+				*errp = NO_RECOVERY;
 				return (NULL);
 			}
 			/* Store alias. */
@@ -1311,7 +1311,7 @@ getanswer(answer, anslen, qname, qtype, template)
 			DNS_FATAL(n <= buflen);
 			DNS_FATAL(n < MAXHOSTNAMELEN);
 			strcpy(bp, tbuf);
-			host.h_name = bp;
+			template->h_name = bp;
 			bp += n;
 			buflen -= n;
 			continue;
@@ -1324,7 +1324,7 @@ getanswer(answer, anslen, qname, qtype, template)
 			}
 			cp += n;
 			if (cp != erdata) {
-				h_errno = NO_RECOVERY;
+				*errp = NO_RECOVERY;
 				return (NULL);
 			}
 			/* Get canonical name. */
@@ -1349,11 +1349,11 @@ getanswer(answer, anslen, qname, qtype, template)
 #if MULTI_PTRS_ARE_ALIASES
 			cp += n;
 			if (cp != erdata) {
-				h_errno = NO_RECOVERY;
+				*errp = NO_RECOVERY;
 				return (NULL);
 			}
 			if (!haveanswer)
-				host.h_name = bp;
+				template->h_name = bp;
 			else if (ap < &host_aliases[MAXALIASES-1])
 				*ap++ = bp;
 			else
@@ -1369,18 +1369,18 @@ getanswer(answer, anslen, qname, qtype, template)
 			}
 			break;
 #else
-			host.h_name = bp;
-			h_errno = NETDB_SUCCESS;
-			return (&host);
+			template->h_name = bp;
+			*errp = NETDB_SUCCESS;
+			return (template);
 #endif
 		case T_A:
 		case T_AAAA:
-			DNS_ASSERT(strcasecmp(host.h_name, bp) == 0);
-			DNS_ASSERT(n == host.h_length);
+			DNS_ASSERT(strcasecmp(template->h_name, bp) == 0);
+			DNS_ASSERT(n == template->h_length);
 			if (!haveanswer) {
 				register int nn;
 
-				host.h_name = bp;
+				template->h_name = bp;
 				nn = strlen(bp) + 1;	/* for the \0 */
 				bp += nn;
 				buflen -= nn;
@@ -1401,7 +1401,7 @@ getanswer(answer, anslen, qname, qtype, template)
 			buflen -= n;
 			cp += n;
 			if (cp != erdata) {
-				h_errno = NO_RECOVERY;
+				*errp = NO_RECOVERY;
 				return (NULL);
 			}
 			break;
@@ -1414,22 +1414,24 @@ getanswer(answer, anslen, qname, qtype, template)
 	if (haveanswer) {
 		*ap = NULL;
 		*hap = NULL;
-		if (!host.h_name) {
+		if (!template->h_name) {
 			n = strlen(qname) + 1;	/* for the \0 */
 			if (n > buflen || n >= MAXHOSTNAMELEN)
 				goto no_recovery;
 			strcpy(bp, qname);
-			host.h_name = bp;
+			template->h_name = bp;
 			bp += n;
 			buflen -= n;
 		}
-		h_errno = NETDB_SUCCESS;
-		return (&host);
+		*errp = NETDB_SUCCESS;
+		return (template);
 	}
  no_recovery:
-	h_errno = NO_RECOVERY;
+	*errp = NO_RECOVERY;
 	return (NULL);
 
+#undef BOUNDED_INCR
+#undef BOUNDS_CHECK
 #undef DNS_ASSERT
 #undef DNS_FATAL
 }
@@ -1471,7 +1473,7 @@ _dns_ghbyname(const char *name, int af, int *errp)
 		*errp = h_errno;
 		return NULL;
 	}
-	hp = getanswer(&buf, n, name, qtype, &hbuf);
+	hp = getanswer(&buf, n, name, qtype, &hbuf, errp);
 	return _hpcopy(&hbuf, errp);
 }
 
@@ -1545,7 +1547,7 @@ _dns_ghbyaddr(const void *addr, int addrlen, int af, int *errp)
 		*errp = h_errno;
 		return NULL;
 	}
-	hp = getanswer(&buf, n, qbuf, T_PTR, &hbuf);
+	hp = getanswer(&buf, n, qbuf, T_PTR, &hbuf, errp);
 	hbuf.h_addrtype = af;
 	hbuf.h_length = addrlen;
 	hbuf.h_addr_list = hlist;
