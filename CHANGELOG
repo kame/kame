@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2593 2004/04/18 11:41:32 jinmei Exp $
+$KAME: CHANGELOG,v 1.2594 2004/04/18 15:16:58 suz Exp $
 
 <200404>
+2004-04-18  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/kame/pim6sd/{vif.c, mld6.[ch]}, kame/sys/netinet6/in6.h:
+	All MLDv2-capable routers multicast address has been officially assigned
+	as "ff02::16"
+
 2004-04-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c (explore_numeric): re-enabled
 	the special case for AF_INET (use inet_aton instead of inet_pton)
