@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.73 2002/11/19 04:17:49 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.74 2002/12/09 06:28:12 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -646,10 +646,8 @@ natpt_testLog(caddr_t addr)
 
 
 int
-natpt_break()
+natpt_break(const char *fn)
 {
-	const char	*fn = __FUNCTION__;
-
-	printf("%s(): break", fn);
+	printf("%s(): break\n", fn);
 	return (0);
 }

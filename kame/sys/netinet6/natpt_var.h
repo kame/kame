@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.37 2002/12/06 04:41:44 fujisawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.38 2002/12/09 06:28:12 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -53,7 +53,7 @@ int		 natpt_setPrefix	__P((caddr_t));
 int		 natpt_setValue		__P((caddr_t));
 int		 natpt_getValue		__P((caddr_t));
 int		 natpt_testLog		__P((caddr_t));
-int		 natpt_break		__P((void));
+int		 natpt_break		__P((const char *));
 
 
 /*  natpt_log.c */
