@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.8 2000/05/22 22:04:37 itojun Exp $	*/
+/*	$KAME: if.c,v 1.9 2000/05/27 11:30:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -588,5 +588,4 @@ init_iflist()
 
 	/* make list of pointers to each if_msghdr */
 	parse_iflist(&iflist, ifblock, ifblock_size);
-		
 }

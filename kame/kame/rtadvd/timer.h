@@ -1,4 +1,4 @@
-/*	$KAME: timer.h,v 1.2 2000/05/16 13:34:14 itojun Exp $	*/
+/*	$KAME: timer.h,v 1.3 2000/05/27 11:30:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -55,6 +55,7 @@ void rtadvd_timer_init __P((void));
 struct rtadvd_timer *rtadvd_add_timer __P((void (*) __P((void *)),
 		void (*) __P((void *, struct timeval *)), void *, void *));
 void rtadvd_set_timer __P((struct timeval *, struct rtadvd_timer *));
+void rtadvd_remove_timer __P((struct rtadvd_timer **));
 struct timeval * rtadvd_check_timer __P((void));
 struct timeval * rtadvd_timer_rest __P((struct rtadvd_timer *));
 void TIMEVAL_ADD __P((struct timeval *, struct timeval *,
