@@ -1,4 +1,4 @@
-/*	$KAME: algorithm.c,v 1.20 2001/08/16 06:17:12 sakane Exp $	*/
+/*	$KAME: algorithm.c,v 1.21 2001/10/05 02:42:55 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -460,8 +460,8 @@ alg_oakley_encdef_decrypt(doi, buf, key, iv)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_NOTICE, "%s(%s size=%d): %8.6f", __FUNCTION__,
-		f->name, buf->l, timedelta(&start, &end));
+	syslog(LOG_NOTICE, "%s(%s klen=%d size=%d): %8.6f", __FUNCTION__,
+		f->name, key->l << 3, buf->l, timedelta(&start, &end));
 #endif
 	return res;
 }
@@ -489,8 +489,8 @@ alg_oakley_encdef_encrypt(doi, buf, key, iv)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_NOTICE, "%s(%s size=%d): %8.6f", __FUNCTION__,
-		f->name, buf->l, timedelta(&start, &end));
+	syslog(LOG_NOTICE, "%s(%s klen=%d size=%d): %8.6f", __FUNCTION__,
+		f->name, key->l << 3, buf->l, timedelta(&start, &end));
 #endif
 	return res;
 }
