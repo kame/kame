@@ -1468,8 +1468,12 @@ void
 xsl_add(StringList *sl, char *i)
 {
 
+#if 0
 	if (sl_add(sl, i) == -1)
 		err(1, "Unable to add `%s' to stringlist", i);
+#else
+	sl_add(sl, i);
+#endif
 }
 
 /*
