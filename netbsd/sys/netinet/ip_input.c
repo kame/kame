@@ -322,6 +322,9 @@ ip_init()
 #ifdef GATEWAY
 	ipflow_init();
 #endif
+#ifdef RADIX_ART
+	rt_tables[AF_INET]->rnh_addrsize = sizeof(struct in_addr);
+#endif
 }
 
 struct	sockaddr_in ipaddr = { sizeof(ipaddr), AF_INET };
