@@ -44,6 +44,10 @@
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
 #include <sys/errno.h>
+#ifdef __FreeBSD__
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
+#endif
 #if !defined(__FreeBSD__) || __FreeBSD__ < 3
 #include <sys/ioctl.h>
 #endif
@@ -80,6 +84,10 @@
 int ip_gif_ttl = GIF_TTL;
 #else
 int ip_gif_ttl = 0;
+#endif
+#ifdef __FreeBSD__
+SYSCTL_INT(_net_inet_ip, IPCTL_GIF_TTL, gifttl, CTLFLAG_RW,
+	&ip_gif_ttl,	0, "");
 #endif
 
 int
