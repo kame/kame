@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.344 2004/02/13 02:52:11 keiichi Exp $	*/
+/*	$KAME: nd6.c,v 1.345 2004/02/13 11:28:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -601,15 +601,6 @@ nd6_llinfo_timer(arg)
 #endif
 			if (m) {
 				ln->ln_hold = NULL;
-				/*
-				 * Fake rcvif to make the ICMP error
-				 * more helpful in diagnosing for the
-				 * receiver.
-				 * XXX: should we consider
-				 * older rcvif?
-				 */
-				m->m_pkthdr.rcvif = rt->rt_ifp;
-
 				icmp6_error(m, ICMP6_DST_UNREACH,
 				    ICMP6_DST_UNREACH_ADDR, 0);
 			}
