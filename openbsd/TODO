@@ -1,6 +1,6 @@
 TODOs for KAME/OpenBSD
 Jun-ichiro Hagino, KAME project
-$Id: TODO,v 1.13 1999/10/05 08:16:34 itojun Exp $
+$Id: TODO,v 1.14 1999/10/05 12:40:50 itojun Exp $
 
 
 Things we can do with the current code:
@@ -33,3 +33,4 @@ Cleanup todo:
   platforms (after kame/openbsd is stabilized enough)
 - nuke unnecessary #ifdef NRL tcp/udp layer, for more readability
 	(is it okay to do it?)
+- security auditing :-)
