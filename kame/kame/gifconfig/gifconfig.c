@@ -634,12 +634,13 @@ in6_status(force)
 	int force;
 {
 	struct sockaddr_in6 *sin, null_sin;
-#if 0
-	char *inet_ntop();
-#endif
-	
+	char hostname[NI_MAXHOST];
+	int niflags = NI_NUMERICHOST;
 
 	memset(&null_sin, 0, sizeof(null_sin));
+#ifdef __KAME__
+	niflags |= NI_WITHSCOPEID;
+#endif
 
 	sin = (struct sockaddr_in6 *)info.rti_info[RTAX_IFA];
 	if (!sin || sin->sin6_family != AF_INET6) {
@@ -648,8 +649,17 @@ in6_status(force)
 		/* warnx("%s has no AF_INET6 IFA address!", name); */
 		sin = &null_sin;
 	}
-	printf("\tinet6 %s ", inet_ntop(AF_INET6, &sin->sin6_addr,
-				ntop_buf, sizeof(ntop_buf)));
+#ifdef __KAME__
+	if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr)) {
+		sin->sin6_scope_id =
+			ntohs(*(u_int16_t *)&sin->sin6_addr.s6_addr[2]);
+		sin->sin6_addr.s6_addr[2] = 0;
+		sin->sin6_addr.s6_addr[3] = 0;
+	}
+#endif
+	getnameinfo((struct sockaddr *)sin, sin->sin6_len,
+		    hostname, NI_MAXHOST, 0, 0, niflags);
+	printf("\tinet6 %s ", hostname);
 
 	if (flags & IFF_POINTOPOINT) {
 		/* note RTAX_BRD overlap with IFF_BROADCAST */
@@ -659,10 +669,17 @@ in6_status(force)
 		 * address.
 		 */
 		if (sin->sin6_family == AF_INET6) {
-			if (!sin)
-				sin = &null_sin;
-			printf("--> %s ", inet_ntop(AF_INET6, &sin->sin6_addr,
-						ntop_buf, sizeof(ntop_buf)));
+#ifdef __KAME__
+			if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr)) {
+				sin->sin6_scope_id =
+					ntohs(*(u_int16_t *)&sin->sin6_addr.s6_addr[2]);
+				sin->sin6_addr.s6_addr[2] = 0;
+				sin->sin6_addr.s6_addr[3] = 0;
+			}
+#endif
+			getnameinfo((struct sockaddr *)sin, sin->sin6_len,
+				    hostname, NI_MAXHOST, 0, 0, flags);
+			printf("--> %s ", hostname);
 		}
 	}
 
