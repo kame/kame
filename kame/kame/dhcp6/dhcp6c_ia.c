@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.22 2004/08/16 04:05:43 sumikawa Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.23 2004/09/03 10:52:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -530,7 +530,7 @@ remove_ia(ia)
 
 	free(ia);
 
-	(void)client6_ifinit(ifp);
+	(void)client6_start(ifp);
 }
 
 static struct dhcp6_timer *

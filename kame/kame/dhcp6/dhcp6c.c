@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.141 2004/07/30 16:45:04 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.142 2004/09/03 10:52:35 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -83,8 +83,6 @@ static u_long sig_flags = 0;
 
 const dhcp6_mode_t dhcp6_mode = DHCP6_MODE_CLIENT;
 
-char *device = NULL;
-
 int insock;	/* inbound udp port */
 int outsock;	/* outbound udp port */
 int rtsock;	/* routing socket */
@@ -95,7 +93,8 @@ static char *pid_file = DHCP6C_PIDFILE;
 
 static void usage __P((void));
 static void client6_init __P((void));
-static void ifinit_all __P((void));
+static int client6_ifinit __P((struct dhcp6_if *));
+static void client6_startall __P((void));
 static void free_resources __P((void));
 static void client6_mainloop __P((void));
 static void check_exit __P((void));
@@ -122,7 +121,7 @@ static int process_auth __P((struct authparam *, struct dhcp6 *dh6, ssize_t,
 static int set_auth __P((struct dhcp6_event *, struct dhcp6_optinfo *));
 
 struct dhcp6_timer *client6_timo __P((void *));
-int client6_ifinit __P((struct dhcp6_if *));
+int client6_start __P((struct dhcp6_if *));
 
 extern int client6_script __P((char *, int, struct dhcp6_optinfo *));
 
@@ -136,6 +135,7 @@ main(argc, argv)
 	int ch, pid;
 	char *progname, *conffile = DHCP6C_CONF;
 	FILE *pidfp;
+	struct dhcp6_if *ifp;
 
 #ifndef HAVE_ARC4RANDOM
 	srandom(time(NULL) & getpid());
@@ -175,14 +175,18 @@ main(argc, argv)
 		usage();
 		exit(0);
 	}
-	device = argv[0];
 
 	if (foreground == 0)
 		openlog(progname, LOG_NDELAY|LOG_PID, LOG_DAEMON);
 
 	setloglevel(debug);
 
-	ifinit(device);
+	client6_init();
+	while (argc-- > 0) { 
+		ifp = ifinit(argv[0]);
+		client6_ifinit(ifp);
+		argv++;
+	}
 
 	if ((cfparse(conffile)) != 0) {
 		dprintf(LOG_ERR, FNAME, "failed to parse configuration file");
@@ -201,9 +205,7 @@ main(argc, argv)
 		fclose(pidfp);
 	}
 
-	client6_init();
-	ifinit_all();
-
+	client6_startall();
 	client6_mainloop();
 	exit(0);
 }
@@ -224,14 +226,6 @@ client6_init()
 	struct addrinfo hints, *res;
 	static struct sockaddr_in6 sa6_allagent_storage;
 	int error, on = 1;
-	struct dhcp6_if *ifp;
-	int ifidx;
-
-	ifidx = if_nametoindex(device);
-	if (ifidx == 0) {
-		dprintf(LOG_ERR, FNAME, "if_nametoindex(%s)", device);
-		exit(1);
-	}
 
 	/* get our DUID */
 	if (get_duid(DUID_FILE, &client_duid)) {
@@ -300,13 +294,6 @@ client6_init()
 	outsock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
 	if (outsock < 0) {
 		dprintf(LOG_ERR, FNAME, "socket(outbound): %s",
-		    strerror(errno));
-		exit(1);
-	}
-	if (setsockopt(outsock, IPPROTO_IPV6, IPV6_MULTICAST_IF,
-			&ifidx, sizeof(ifidx)) < 0) {
-		dprintf(LOG_ERR, FNAME,
-		    "setsockopt(outbound, IPV6_MULTICAST_IF): %s",
 		    strerror(errno));
 		exit(1);
 	}
@@ -381,13 +368,6 @@ client6_init()
 	sa6_allagent = (const struct sockaddr_in6 *)&sa6_allagent_storage;
 	freeaddrinfo(res);
 
-	/* client interface configuration */
-	if ((ifp = find_ifconfbyname(device)) == NULL) {
-		dprintf(LOG_ERR, FNAME, "interface %s not configured", device);
-		exit(1);
-	}
-	ifp->outsock = outsock;
-
 	if (signal(SIGHUP, client6_signal) == SIG_ERR) {
 		dprintf(LOG_WARNING, FNAME, "failed to set signal: %s",
 		    strerror(errno));
@@ -400,8 +380,27 @@ client6_init()
 	}
 }
 
-int
+static int
 client6_ifinit(ifp)
+	struct dhcp6_if *ifp;
+{
+	int ifidx;
+
+	ifidx = ifp->ifid;
+
+	if (setsockopt(outsock, IPPROTO_IPV6, IPV6_MULTICAST_IF,
+	    &ifidx, sizeof(ifidx)) < 0) {
+		dprintf(LOG_ERR, FNAME,
+		    "setsockopt(outbound, IPV6_MULTICAST_IF): %s",
+		    strerror(errno));
+		return (-1);
+	}
+
+	return (0);
+}
+
+int
+client6_start(ifp)
 	struct dhcp6_if *ifp;
 {
 	struct dhcp6_event *ev;
@@ -437,12 +436,12 @@ client6_ifinit(ifp)
 }
 
 static void
-ifinit_all()
+client6_startall()
 {
 	struct dhcp6_if *ifp;
 
 	for (ifp = dhcp6_if; ifp; ifp = ifp->next) {
-		if (client6_ifinit(ifp))
+		if (client6_start(ifp))
 			exit(1); /* initialization failure.  we give up. */
 	}
 }
@@ -508,7 +507,7 @@ process_signals()
 	if ((sig_flags & SIGF_HUP)) {
 		dprintf(LOG_INFO, FNAME, "restarting");
 		free_resources();
-		ifinit_all();
+		client6_startall();
 	}
 
 	sig_flags = 0;
@@ -557,7 +556,7 @@ client6_expire_lifetime(arg)
 	dprintf(LOG_DEBUG, FNAME, "lifetime on %s expired", ifp->ifname);
 
 	dhcp6_remove_timer(&ifp->timer);
-	client6_ifinit(ifp);
+	client6_start(ifp);
 
 	return (NULL);
 }
@@ -1057,7 +1056,7 @@ client6_send(ev)
 	dst = *sa6_allagent;
 	dst.sin6_scope_id = ifp->linkid;
 
-	if (sendto(ifp->outsock, buf, len, 0, (struct sockaddr *)&dst,
+	if (sendto(outsock, buf, len, 0, (struct sockaddr *)&dst,
 	    ((struct sockaddr *)&dst)->sa_len) == -1) {
 		dprintf(LOG_ERR, FNAME,
 		    "transmit failed: %s", strerror(errno));

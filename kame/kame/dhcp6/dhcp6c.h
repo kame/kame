@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.h,v 1.3 2004/07/29 23:39:26 jinmei Exp $	*/
+/*	$KAME: dhcp6c.h,v 1.4 2004/09/03 10:52:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -33,5 +33,5 @@
 #define DUID_FILE LOCALDBDIR "/dhcp6c_duid"
 
 extern struct dhcp6_timer *client6_timo __P((void *));
-extern int client6_ifinit __P((struct dhcp6_if *));
+extern int client6_start __P((struct dhcp6_if *));
 extern void client6_send __P((struct dhcp6_event *));
