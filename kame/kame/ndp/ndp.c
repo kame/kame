@@ -574,7 +574,6 @@ again:;
 		       if_indextoname(sdl->sdl_index, ifix_buf));
 
 		/* Print neighbor discovery specific informations */
-		putchar(' ');
 		nbi = getnbrinfo(&sin->sin6_addr, sdl->sdl_index);
 		if (nbi) {
 			if (nbi->expire > time.tv_sec) {
