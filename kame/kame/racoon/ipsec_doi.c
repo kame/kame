@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.163 2003/10/22 02:50:17 itojun Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.164 2003/10/23 07:22:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2671,13 +2671,8 @@ setph2proposal0(iph2, pp, pr)
 			 * with no authentication transform.
 			 */
 			if (tr->trns_id == IPSECDOI_ESP_NULL &&
-			    tr->authtype == IPSECDOI_ATTR_AUTH_NONE) {
-				plog(LLV_ERROR, LOCATION, NULL,
-				    "attr AUTH must be present "
-				    "for ESP NULL encryption.\n");
-				vfree(p);
-				return NULL;
-			}
+			    tr->authtype == IPSECDOI_ATTR_AUTH_NONE)
+				continue;
 			break;
 		}
 
