@@ -61,7 +61,7 @@ test: test.o libinet6.a
 	$(CC) $(LDFLAGS) -o test test.o -L${.CURDIR} -linet6
 
 clean:
-	/bin/rm -f libinet6.a *.o
+	/bin/rm -f libinet6.a *.o test
 
 distclean: clean
 	/bin/rm -f Makefile config.log config.cache config.status
