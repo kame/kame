@@ -85,6 +85,16 @@ else
 	AC_MSG_RESULT("no")
 fi
 
+AC_MSG_CHECKING(for mld_hdr)
+AC_CACHE_VAL(ts1_cv_mld_hdr, [dnl
+AC_TRY_COMPILE([#include <sys/types.h>
+#include <netinet/in.h>
+#include <netinet/icmp6.h>],
+        [struct mld_hdr mldhdr;],
+        [ts1_cv_mld_hdr="yes"
+        AC_DEFINE(HAVE_MLD_HDR)], [ts1_cv_mld_hdr="no"])])
+AC_MSG_RESULT($ts1_cv_mld_hdr)
+
 AC_MSG_CHECKING(for libresolv)
 AC_CACHE_VAL(ts_cv_ntop, [dnl
 AC_TRY_LINK([#include <sys/types.h>
