@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.16 2000/04/24 07:37:44 sakane Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.17 2000/04/24 07:41:01 itojun Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -64,7 +64,7 @@ getsp(spidx)
 {
 	struct secpolicy *p;
 
-	TAILQ_FOREACH(p, &sptree, chain) {
+	for (p = TAILQ_FIRST(&sptree); p; p = TAILQ_NEXT(p, chain)) {
 		if (!cmpspidx(spidx, &p->spidx))
 			return p;
 	}
@@ -85,7 +85,7 @@ getsp_r(spidx)
 {
 	struct secpolicy *p;
 
-	TAILQ_FOREACH(p, &sptree, chain) {
+	for (p = TAILQ_FIRST(&sptree); p; p = TAILQ_NEXT(p, chain)) {
 		if (!cmpspidx_wild(&p->spidx, spidx))
 			return p;
 	}
@@ -127,7 +127,7 @@ getsp_r(spidx, iph2)
 	YIPSDEBUG(DEBUG_MISC,
 		plog(logp, LOCATION, NULL, "looks to be transport mode\n"););
 
-	TAILQ_FOREACH(p, &sptree, chain) {
+	for (p = TAILQ_FIRST(&sptree); p; p = TAILQ_NEXT(p, chain)) {
 		if (!cmpspidx_wild(&p->spidx, spidx))
 			return p;
 	}
