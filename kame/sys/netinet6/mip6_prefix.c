@@ -1,4 +1,4 @@
-/*	$KAME: mip6_prefix.c,v 1.9 2001/10/03 08:19:17 keiichi Exp $	*/
+/*	$KAME: mip6_prefix.c,v 1.10 2001/10/11 12:58:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -235,7 +235,7 @@ mip6_prefix_list_find_withhaddr(mpfx_list, haddr)
 {
 	struct mip6_prefix *mpfx;
 
-	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
+	for (mpfx = LIST_FIRST(mpfx_list); mpfx;
 	     mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
 		if (IN6_ARE_ADDR_EQUAL(haddr,
 				       &mpfx->mpfx_haddr)) {

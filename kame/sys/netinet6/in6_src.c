@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.84 2001/10/01 12:53:04 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.85 2001/10/11 12:58:20 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -188,6 +188,13 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	int clone;
 	int dst_scope = -1, best_scope = -1, best_matchlen = -1;
 	struct in6_addrpolicy *dst_policy = NULL, *best_policy = NULL;
+#ifdef MIP6
+	struct hif_softc *sc;
+#ifdef MIP6_ALLOW_COA_FALLBACK
+	struct mip6_bu *mbu_dst;
+	u_int8_t coafallback = 0;
+#endif
+#endif
 
 	dst = &dstsock->sin6_addr;
 	*errorp = 0;
@@ -203,67 +210,6 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	}
 	if (laddr && !IN6_IS_ADDR_UNSPECIFIED(laddr))
 		return(laddr);
-
-#ifdef MIP6_OLD_ADDRSELECT
-	/*
-	 * XXX
-	 * how to select a src address when we want to use home
-	 * address when we are out and using mobile ip functionality.
-	 *
-	 * these code should be merged into the src addr selection
-	 * code below.
-	 */
-	{
-		struct hif_softc *sc;
-		struct hif_subnet *hs;
-		struct mip6_subnet *ms;
-		struct mip6_subnet_prefix *mspfx;
-		struct mip6_prefix *mpfx;
-		struct mip6_bu *mbu;
-		
-		/* find the address that is currently at home. */
-		for (sc = TAILQ_FIRST(&hif_softc_list);
-		     sc;
-		     sc = TAILQ_NEXT(sc, hif_entry)) {
-			if (sc->hif_location != HIF_LOCATION_HOME)
-				continue;
-
-			hs = TAILQ_FIRST(&sc->hif_hs_list_home);
-			if ((hs == NULL) || ((ms = hs->hs_ms) == NULL)) {
-				/* must not happen. */
-				continue;
-			}
-			mspfx = TAILQ_FIRST(&ms->ms_mspfx_list);
-			if ((mspfx == NULL)
-			    || ((mpfx = mspfx->mspfx_mpfx) == NULL)) {
-				/* must not happen. */
-				continue;
-			}
-			/*
-			 * found a home address that is currently at home.
-			 */
-			return (&mpfx->mpfx_haddr);
-		}
-
-		/*
-		 * find a home address that has been registered to its
-		 * home agent.
-		 */
-		for (sc = TAILQ_FIRST(&hif_softc_list);
-		     sc;
-		     sc = TAILQ_NEXT(sc, hif_entry)) {
-			LIST_FOREACH(mbu, &sc->hif_bu_list, mbu_entry) {
-				if (mbu->mbu_reg_state
-				    == MIP6_BU_REG_STATE_REG) {
-					return (&mbu->mbu_haddr);
-				}
-			}
-		}
-		/*
-		 * there is no home address suitable. fall through...
-		 */
-	}
-#endif /* MIP6 */
 	/*
 	 * If the address is not specified, choose the best one based on
 	 * the outgoing interface and the destination address.
@@ -283,6 +229,18 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	 */
 	if (rt && rt->rt_ifa && rt->rt_ifa->ifa_ifp)
 		ifp = rt->rt_ifa->ifa_ifp;
+
+#ifdef MIP6
+#ifdef MIP6_ALLOW_COA_FALLBACK
+	for (sc = TAILQ_FIRST(&hif_softc_list);
+	     sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
+		mbu_dst = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst);
+		if (mbu_dst != NULL)
+			coafallback = mbu_dst->mbu_coafallback;
+	}
+#endif /* MIP6_ALLOW_COA_FALLBACK */
+#endif /* MIP6 */
 
 #ifdef DIAGNOSTIC
 	if (ifp == NULL)	/* this should not happen */
@@ -360,11 +318,10 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 		 * If SA is simultaneously a home address and care-of address
 		 * and SB is not, then prefer SA. Similarly, if SB is
 		 * simultaneously a home address and care-of address and SA is
-		 * not, then prefer SB. 
+		 * not, then prefer SB.
 		 */
 		{
 			struct mip6_bu *mbu_ia_best = NULL, *mbu_ia = NULL;
-			struct hif_softc *sc;
 
 			if (ia_best->ia6_flags & IN6_IFF_HOME) {
 				/*
@@ -373,7 +330,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 				for (sc = TAILQ_FIRST(&hif_softc_list);
 				     sc;
 				     sc = TAILQ_NEXT(sc, hif_entry)) {
-					mbu_ia_best = mip6_bu_list_find_withhaddr(
+					mbu_ia_best = mip6_bu_list_find_home_registration(
 						&sc->hif_bu_list,
 						&ia->ia_addr.sin6_addr);
 					if (mbu_ia_best)
@@ -387,12 +344,11 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 				for (sc = TAILQ_FIRST(&hif_softc_list);
 				     sc;
 				     sc = TAILQ_NEXT(sc, hif_entry)) {
-					mbu_ia = mip6_bu_list_find_withhaddr(
+					mbu_ia = mip6_bu_list_find_home_registration(
 						&sc->hif_bu_list,
 						&ia->ia_addr.sin6_addr);
 					if (mbu_ia)
 						break;
-					
 				}
 			}
 			/*
@@ -420,18 +376,47 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 				REPLACE(4);
 			}
 		}
-		/*
-		 * If SA is just a home address and SB is just a care-of
-		 * address, then prefer SA. Similarly, if SB is just a home
-		 * address and SA is just a care-of address, then prefer SB. 
-		 */
-		if ((ia_best->ia6_flags & IN6_IFF_HOME) != 0 &&
-		    (ia->ia6_flags & IN6_IFF_HOME) == 0) {
-			NEXT(4);
-		}
-		if ((ia_best->ia6_flags & IN6_IFF_HOME) == 0 &&
-		    (ia->ia6_flags & IN6_IFF_HOME) != 0) {
-			REPLACE(4);
+#ifdef MIP6_ALLOW_COA_FALLBACK
+		if (coafallback) {
+			/*
+			 * if the peer doesn't recognize a home
+			 * address destination option, we will use a
+			 * CoA as a source address instead of a home
+			 * address we have registered before.  Though
+			 * this behavior may arouse a mip6 beleiver's
+			 * anger, is very useful in the current
+			 * transition period that many hosts don't
+			 * recognize a home address destination
+			 * option...
+			 */
+			if ((ia_best->ia6_flags & IN6_IFF_HOME) == 0 &&
+			    (ia->ia6_flags & IN6_IFF_HOME) != 0) {
+				/* XXX will break stat! */
+				NEXT(0);
+			}
+			if ((ia_best->ia6_flags & IN6_IFF_HOME) != 0 &&
+			    (ia->ia6_flags & IN6_IFF_HOME) == 0) {
+				/* XXX will break stat! */
+				REPLACE(0);
+			}
+		} else
+#endif
+		{
+			/*
+			 * If SA is just a home address and SB is just
+			 * a care-of address, then prefer
+			 * SA. Similarly, if SB is just a home address
+			 * and SA is just a care-of address, then
+			 * prefer SB.
+			 */
+			if ((ia_best->ia6_flags & IN6_IFF_HOME) != 0 &&
+			    (ia->ia6_flags & IN6_IFF_HOME) == 0) {
+				NEXT(4);
+			}
+			if ((ia_best->ia6_flags & IN6_IFF_HOME) == 0 &&
+			    (ia->ia6_flags & IN6_IFF_HOME) != 0) {
+				REPLACE(4);
+			}
 		}
 #endif /* MIP6 */
 

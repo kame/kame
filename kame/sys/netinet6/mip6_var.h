@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.6 2001/10/05 06:50:09 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.7 2001/10/11 12:58:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -102,6 +102,7 @@ struct mip6_bu {
 	u_int8_t            mbu_state;
 	struct hif_softc    *mbu_hif;       /* back pointer to hif */
 	u_int8_t            mbu_dontsend;   /* peer doesn't support mip6 */
+	u_int8_t            mbu_coafallback; /* peer doesn't support HA DH */
 	u_int8_t            mbu_reg_state;  /* registration status */
 	const struct encaptab *mbu_encap;
 };

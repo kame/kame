@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.15 2001/09/20 11:40:18 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.16 2001/10/11 12:58:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -156,6 +156,11 @@ mip6_icmp6_input(m, off, icmp6len)
 		}
 		break;
 
+	case ICMP6_MOBILEPREFIX_SOLICIT:
+	case ICMP6_MOBILEPREFIX_ADVERT:
+		/* XXX TODO */
+		break;
+
 	case ICMP6_PARAM_PROB:
 		if (!MIP6_IS_MN)
 			break;
@@ -179,7 +184,8 @@ mip6_icmp6_input(m, off, icmp6len)
 			 * we shold avoid further sending of BU to that node.
 			 * (draft-13 10.14)
 			 */
-			for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+			for (sc = TAILQ_FIRST(&hif_softc_list);
+			     sc;
 			     sc = TAILQ_NEXT(sc, hif_entry)) {
 				mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
 								  paddr);
@@ -199,10 +205,21 @@ mip6_icmp6_input(m, off, icmp6len)
 			mip6_icmp6_find_addr((caddr_t)icmp6, icmp6len,
 					     &laddr, &paddr);
 			mip6log((LOG_NOTICE,
-				 "%s: a node (%s) doesn't support "
-				 "a home address destopt.\n",
+				 "%s: a node (%s) doesn't support a home address destopt.\n",
 				 __FUNCTION__,
 				 ip6_sprintf(paddr)));
+#ifdef MIP6_ALLOW_COA_FALLBACK
+			for (sc = TAILQ_FIRST(&hif_softc_list);
+			     sc;
+			     sc = TAILQ_NEXT(sc, hif_entry)) {
+				mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
+								  paddr);
+				if (mbu) {
+					mbu->mbu_dontsend = 1;
+					mbu->mbu_coafallback = 1;
+				}
+			}
+#endif
 			break;
 		}
 		break;

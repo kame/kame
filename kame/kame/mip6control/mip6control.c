@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.1 2001/08/27 08:12:14 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.2 2001/10/11 12:58:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -60,8 +60,8 @@ static const char *pfx_desc[] = {
 	"prefix\t\t\t\tplen\tlifetim\tltrem\thaddr\n"
 };
 static const char *bu_desc[] = {
-	"paddr\t\thaddr\t\tcoa\t\tlifetim\tltrem\trefresh\trefrem\tacktimo\tackrem\tseqno\tflags\trstate\tstate\tdontsnd\n",
-	"paddr\t\t\t\thaddr\t\t\t\tcoa\t\t\t\tlifetim\tltrem\trefresh\trefrem\tacktimo\tackrem\tseqno\tflags\trstate\tstate\tdontsnd\n"
+	"paddr\t\thaddr\t\tcoa\t\tlifetim\tltrem\trefresh\trefrem\tacktimo\tackrem\tseqno\tflags\trstate\tstate\tdontsnd\tcoafb\n",
+	"paddr\t\t\t\thaddr\t\t\t\tcoa\t\t\t\tlifetim\tltrem\trefresh\trefrem\tacktimo\tackrem\tseqno\tflags\trstate\tstate\tdontsnd\tcoafb\n"
 };
 static const char *ha_desc[] = {
 	"lladdr\t\tgaddr\t\tflags\tpref\tlifetim\tltrem\n",
@@ -320,7 +320,7 @@ main(argc, argv)
 			       ip6_sprintf(&mbu->mbu_haddr));
 			printf(ipaddr_fmt[longdisp],
 			       ip6_sprintf(&mbu->mbu_coa));
-			printf("%7u %7qd %7u %7qd %7u %7qd %7u %7x %7x %7x %7u\n",
+			printf("%7u %7qd %7u %7qd %7u %7qd %7u %7x %7x %7x %7u %7u\n",
 			       mbu->mbu_lifetime,
 			       mbu->mbu_remain,
 			       mbu->mbu_refresh,
@@ -331,7 +331,8 @@ main(argc, argv)
 			       mbu->mbu_flags,
 			       mbu->mbu_reg_state,
 			       mbu->mbu_state,
-			       mbu->mbu_dontsend);
+			       mbu->mbu_dontsend,
+			       mbu->mbu_coafallback);
 			mbu++;
 		}
 	}

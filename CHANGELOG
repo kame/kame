@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1906 2001/10/10 08:41:37 sakane Exp $
+$KAME: CHANGELOG,v 1.1907 2001/10/11 12:59:52 keiichi Exp $
 
 <200110>
+Thu Oct 11 21:57:50 JST 2001 keiichi@iij.ad.jp
+	mip6
+	* fix BU list management function.
+	* introduce MIP6_ALLOW_COA_FALLBACK kernel option.
+	  this allows you to use a coa as a src address if the peer
+	  doesn't recognize a home address destination option.
+	  may arouse a mip6 believe's anger, but very useful.
+
 Wed Oct 10 17:38:05 JST 2001 sakane@kame.net
 	* kame/kame/racoon:
 	Fixed racoon crash when uni-directional policy is defined.

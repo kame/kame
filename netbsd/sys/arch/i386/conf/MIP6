@@ -49,4 +49,5 @@ options 	RADIX_MPATH
 
 options 	MIP6
 options 	MIP6_DEBUG
+options		MIP6_ALLOW_COA_FALLBACK
 pseudo-device	hif		1

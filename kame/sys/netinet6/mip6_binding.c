@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.17 2001/10/03 08:19:17 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.18 2001/10/11 12:58:21 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -174,7 +174,7 @@ mip6_bu_list_find_withpaddr(bu_list, paddr)
 }
 
 struct mip6_bu *
-mip6_bu_list_find_withhaddr(bu_list, haddr)
+mip6_bu_list_find_home_registration(bu_list, haddr)
      struct mip6_bu_list *bu_list;
      struct in6_addr *haddr;
 {
@@ -182,7 +182,8 @@ mip6_bu_list_find_withhaddr(bu_list, haddr)
 
 	for (mbu = LIST_FIRST(bu_list); mbu;
 	     mbu = LIST_NEXT(mbu, mbu_entry)) {
-		if (IN6_ARE_ADDR_EQUAL(&mbu->mbu_haddr, haddr))
+		if (IN6_ARE_ADDR_EQUAL(&mbu->mbu_haddr, haddr) &&
+		    (mbu->mbu_flags & IP6_BUF_HOME) != 0)
 			break;
 	}
 	return (mbu);
@@ -675,10 +676,6 @@ mip6_bu_timeout(arg)
 			if (mbu->mbu_state & MIP6_BU_STATE_WAITACK)
 				mbu->mbu_ackremain -= MIP6_BU_TIMEOUT_INTERVAL;
 
-			/* check if the peer supports BU */
-			if (mbu->mbu_dontsend)
-				continue;
-
 			/* check expiration */
 			if (mbu->mbu_remain < 0) {
 				mip6log((LOG_INFO,
@@ -694,6 +691,16 @@ mip6_bu_timeout(arg)
 				}
 				continue;
 			}
+
+			/* check if the peer supports BU */
+			if (mbu->mbu_dontsend)
+				continue;
+
+#ifdef MIP6_ALLOW_COA_FALLBACK
+			/* check if the peer supports HA destopt */
+			if (mbu->mbu_coafallback)
+				continue;
+#endif
 
 			/* check ack status */
 			if ((mbu->mbu_flags & IP6_BUF_ACK)
@@ -1662,8 +1669,9 @@ mip6_ifa_need_dad(ia)
 
 	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
 	     sc = TAILQ_NEXT(sc, hif_entry)) {
-		mbu = mip6_bu_list_find_withhaddr(&sc->hif_bu_list,
-						  &ia->ia_addr.sin6_addr);
+		mbu = mip6_bu_list_find_home_registration(
+			&sc->hif_bu_list,
+			&ia->ia_addr.sin6_addr);
 		if (mbu != NULL)
 			break;
 	}
