@@ -30,7 +30,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet/ip_divert.c,v 1.42 2000/01/08 12:53:48 shin Exp $
+ * $FreeBSD: src/sys/netinet/ip_divert.c,v 1.42.2.3 2001/02/27 09:41:15 phk Exp $
  */
 
 #include "opt_inet.h"
@@ -43,11 +43,13 @@
 #endif
 
 #include <sys/param.h>
+#include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/protosw.h>
 #include <sys/socketvar.h>
+#include <sys/sysctl.h>
 #include <sys/systm.h>
 #include <sys/proc.h>
 
@@ -173,8 +175,7 @@ divert_packet(struct mbuf *m, int incoming, int port)
 		KASSERT((m->m_flags & M_PKTHDR), ("%s: !PKTHDR", __FUNCTION__));
 
 		/* Find IP address for receive interface */
-		for (ifa = m->m_pkthdr.rcvif->if_addrhead.tqh_first;
-		    ifa != NULL; ifa = ifa->ifa_link.tqe_next) {
+		TAILQ_FOREACH(ifa, &m->m_pkthdr.rcvif->if_addrhead, ifa_link) {
 			if (ifa->ifa_addr == NULL)
 				continue;
 			if (ifa->ifa_addr->sa_family != AF_INET)
@@ -215,7 +216,7 @@ divert_packet(struct mbuf *m, int incoming, int port)
 	/* Put packet on socket queue, if any */
 	sa = NULL;
 	nport = htons((u_int16_t)port);
-	for (inp = divcb.lh_first; inp != NULL; inp = inp->inp_list.le_next) {
+	LIST_FOREACH(inp, &divcb, inp_list) {
 		if (inp->inp_lport == nport)
 			sa = inp->inp_socket;
 	}
@@ -356,17 +357,11 @@ div_attach(struct socket *so, int proto, struct proc *p)
 		return error;
 	inp = (struct inpcb *)so->so_pcb;
 	inp->inp_ip_p = proto;
+	inp->inp_vflag |= INP_IPV4;
 	inp->inp_flags |= INP_HDRINCL;
 	/* The socket is always "connected" because
 	   we always know "where" to send the packet */
 	so->so_state |= SS_ISCONNECTED;
-#ifdef IPSEC
-	error = ipsec_init_policy(so, &inp->inp_sp);
-	if (error != 0) {
-		in_pcbdetach(inp);
-		return error;
-	}
-#endif /*IPSEC*/
 	return 0;
 }
 
@@ -406,9 +401,21 @@ div_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 
 	s = splnet();
 	inp = sotoinpcb(so);
-	error = in_pcbbind(inp, nam, p);
+	/* in_pcbbind assumes that the socket is a sockaddr_in
+	* and in_pcbbind requires a valid address. Since divert
+	* sockets don't we need to make sure the address is
+	* filled in properly.
+	* XXX -- divert should not be abusing in_pcbind
+	* and should probably have its own family.
+	*/
+	if (nam->sa_family != AF_INET) {
+		error = EAFNOSUPPORT;
+	} else {
+               ((struct sockaddr_in *)nam)->sin_addr.s_addr = INADDR_ANY;
+		error = in_pcbbind(inp, nam, p);
+	}
 	splx(s);
-	return 0;
+	return error;
 }
 
 static int
@@ -433,6 +440,93 @@ div_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 	/* Send packet */
 	return div_output(so, m, nam, control);
 }
+
+static int
+div_pcblist(SYSCTL_HANDLER_ARGS)
+{
+	int error, i, n, s;
+	struct inpcb *inp, **inp_list;
+	inp_gen_t gencnt;
+	struct xinpgen xig;
+
+	/*
+	 * The process of preparing the TCB list is too time-consuming and
+	 * resource-intensive to repeat twice on every request.
+	 */
+	if (req->oldptr == 0) {
+		n = divcbinfo.ipi_count;
+		req->oldidx = 2 * (sizeof xig)
+			+ (n + n/8) * sizeof(struct xinpcb);
+		return 0;
+	}
+
+	if (req->newptr != 0)
+		return EPERM;
+
+	/*
+	 * OK, now we're committed to doing something.
+	 */
+	s = splnet();
+	gencnt = divcbinfo.ipi_gencnt;
+	n = divcbinfo.ipi_count;
+	splx(s);
+
+	xig.xig_len = sizeof xig;
+	xig.xig_count = n;
+	xig.xig_gen = gencnt;
+	xig.xig_sogen = so_gencnt;
+	error = SYSCTL_OUT(req, &xig, sizeof xig);
+	if (error)
+		return error;
+
+	inp_list = malloc(n * sizeof *inp_list, M_TEMP, M_WAITOK);
+	if (inp_list == 0)
+		return ENOMEM;
+	
+	s = splnet();
+	for (inp = LIST_FIRST(divcbinfo.listhead), i = 0; inp && i < n;
+	     inp = LIST_NEXT(inp, inp_list)) {
+		if (inp->inp_gencnt <= gencnt && !prison_xinpcb(req->p, inp))
+			inp_list[i++] = inp;
+	}
+	splx(s);
+	n = i;
+
+	error = 0;
+	for (i = 0; i < n; i++) {
+		inp = inp_list[i];
+		if (inp->inp_gencnt <= gencnt) {
+			struct xinpcb xi;
+			xi.xi_len = sizeof xi;
+			/* XXX should avoid extra copy */
+			bcopy(inp, &xi.xi_inp, sizeof *inp);
+			if (inp->inp_socket)
+				sotoxsocket(inp->inp_socket, &xi.xi_socket);
+			error = SYSCTL_OUT(req, &xi, sizeof xi);
+		}
+	}
+	if (!error) {
+		/*
+		 * Give the user an updated idea of our state.
+		 * If the generation differs from what we told
+		 * her before, she knows that something happened
+		 * while we were processing this request, and it
+		 * might be necessary to retry.
+		 */
+		s = splnet();
+		xig.xig_gen = divcbinfo.ipi_gencnt;
+		xig.xig_sogen = so_gencnt;
+		xig.xig_count = divcbinfo.ipi_count;
+		splx(s);
+		error = SYSCTL_OUT(req, &xig, sizeof xig);
+	}
+	free(inp_list, M_TEMP);
+	return error;
+}
+
+SYSCTL_DECL(_net_inet_divert);
+SYSCTL_PROC(_net_inet_divert, OID_AUTO, pcblist, CTLFLAG_RD, 0, 0,
+	    div_pcblist, "S,xinpcb", "List of active divert sockets");
 
 struct pr_usrreqs div_usrreqs = {
 	div_abort, pru_accept_notsupp, div_attach, div_bind,

@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.4 2000/10/31 19:07:09 ume Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.33 2001/07/25 09:24:24 suz Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.34 2001/07/25 16:44:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -559,13 +559,6 @@ udp6_attach(struct socket *so, int proto, struct proc *p)
 	 */
 	inp->inp_ip_ttl = ip_defttl;
 #endif
-#ifdef IPSEC
-	error = ipsec_init_policy(so, &inp->in6p_sp);
-	if (error != 0) {
-		in6_pcbdetach(inp);
-		return (error);
-	}
-#endif /* IPSEC */
 	return 0;
 }
 
