@@ -1451,7 +1451,8 @@ nextline:
 			if (pai->ai_flags & AI_CANONNAME)
 				(void)get_canonname(pai, res, canonname);
 		}
-	}
+	} else
+		res0 = NULL;
 	if (res0) {
 		cur->ai_next = res0;
 		while (cur && cur->ai_next)
