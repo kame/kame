@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.95 2000/04/13 16:00:03 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.96 2000/05/01 09:23:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -867,6 +867,7 @@ skip_ipsec2:;
 	 */
 	if (ip6_fw_chk_ptr) {
 		u_short port = 0;
+		m->m_pkthdr.rcvif = NULL;	/*XXX*/
 		/* If ipfw says divert, we have to just drop packet */
 		if ((*ip6_fw_chk_ptr)(&ip6, ifp, &port, &m)) {
 			m_freem(m);
