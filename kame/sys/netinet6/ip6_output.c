@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.224 2001/09/20 06:55:40 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.225 2001/10/09 05:43:29 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1504,6 +1504,11 @@ done:
 	if (sp != NULL)
 		key_freesp(sp);
 #endif /* IPSEC */
+
+#ifdef MIP6
+	mip6_destopt_discard(pktopt_mip6rthdr, pktopt_haddr,
+			     pktopt_mip6dest2);
+#endif /* MIP6 */
 
 	return(error);
 
