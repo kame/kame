@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.26 2001/08/15 12:08:11 itojun Exp $
+$KAME: helsinki-result.jp,v 1.27 2001/08/15 13:05:17 sakane Exp $
 
 
 generic
@@ -297,7 +297,13 @@ SSH
 		solarisはstatic cache entry入れるコマンドがないらしい。
 		一旦ping6してcacheを作った気になってもNSを出そうとする。
 	原因調査するから再戦してねと言われる。
+	再戦. 問題なし
 
+	沢山のphase2 proposal(43440BのUDPパケット)を受けると
+	racoon までパケットが上がって来ない。
+
+	500 proposalを投げてくる。proposal#は1byteなので弾くべき。
+	racoonは最初に全部パースしてるみたい。
 
 freeswan
 	IPv4, IPComp + ESP, transport mode
