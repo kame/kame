@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.23 2000/12/11 18:57:41 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.24 2001/01/15 15:39:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -142,6 +142,8 @@ mld6_init()
 	ip6_opts.ip6po_hbh = hbh;
 	/* We will specify the hoplimit by a multicast option. */
 	ip6_opts.ip6po_hlim = -1;
+	/* Use default interface mtu */
+	ip6_opts.ip6po_mtu = -1;
 }
 
 void
