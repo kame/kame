@@ -90,6 +90,13 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
  *	More statistics could always be gathered.
  *	This program has to run SUID to ROOT to access the ICMP socket.
  */
+/*
+ * NOTE:
+ * USE_SIN6_SCOPE_ID assumes that sin6_scope_id has the same semantics
+ * as IPV6_PKTINFO.  Some objects it (sin6_scope_id specifies *link* while
+ * IPV6_PKTINFO specifies *interface*.  Link is defined as collection of
+ * network attached to 1 or more interfaces)
+ */
 
 #include <sys/param.h>
 #include <sys/uio.h>
@@ -544,7 +551,7 @@ main(argc, argv)
 		errx(1, "record route not available in this implementation");
 
 	/* Outgoing interface */
-#ifndef SIN6_IFINDEX
+#ifndef USE_SIN6_SCOPE_ID
 	if (options & F_INTERFACE)
 		ip6optlen += CMSG_SPACE(sizeof(struct in6_pktinfo));
 #endif
@@ -561,7 +568,7 @@ main(argc, argv)
 		scmsgp = (struct cmsghdr *)scmsg;
 	}
 	if (options & F_INTERFACE) {
-#ifndef SIN6_IFINDEX
+#ifndef USE_SIN6_SCOPE_ID
 		struct in6_pktinfo *pktinfo =
 			(struct in6_pktinfo *)(CMSG_DATA(scmsgp));
 
@@ -574,7 +581,7 @@ main(argc, argv)
 
 		scmsgp = CMSG_NXTHDR(&smsghdr, scmsgp);
 #else
-		if ((dst.sin6_ifindex = if_nametoindex(ifname)) == 0)
+		if ((dst.sin6_scope_id = if_nametoindex(ifname)) == 0)
 			errx(1, "%s: invalid interface name", ifname);
 #endif
 	}
@@ -628,14 +635,14 @@ main(argc, argv)
 		src.sin6_port = ntohs(DUMMY_PORT);
 		src.sin6_scope_id = dst.sin6_scope_id;
 
-#ifndef SIN6_IFINDEX
+#ifndef USE_SIN6_SCOPE_ID
 		if (setsockopt(dummy, IPPROTO_IPV6, IPV6_PKTOPTIONS,
 			       (void *)smsghdr.msg_control,
 			       smsghdr.msg_controllen)) {
 			err(1, "UDP setsockopt");
 		}
 #else
-		src.sin6_ifindex = dst.sin6_ifindex;
+		src.sin6_scope_id = dst.sin6_scope_id;
 #endif
 				
 		if (connect(dummy, (struct sockaddr *)&src, len) < 0)
@@ -673,7 +680,7 @@ main(argc, argv)
 #endif
 
 	optval = 1;
-#ifndef SIN6_IFINDEX
+#ifndef USE_SIN6_SCOPE_ID
 	setsockopt(s, IPPROTO_IPV6, IPV6_PKTINFO, &optval, sizeof(optval));
 #endif
 	setsockopt(s, IPPROTO_IPV6, IPV6_HOPLIMIT, &optval, sizeof(optval));
