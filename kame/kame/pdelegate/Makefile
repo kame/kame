@@ -1,5 +1,5 @@
 OPSYS!=	uname -s
 
-SUBDIR=	client 
+SUBDIR=	client server
 
 .include <bsd.subdir.mk>

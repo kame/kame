@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.3 2001/03/05 12:37:03 itojun Exp $	*/
+/*	$KAME: main.c,v 1.4 2001/03/05 12:41:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -62,6 +62,7 @@ main(argc, argv)
 {
 	char c;
 	unsigned int ifindex;
+	struct ipv6_mreq mreq;
 
 	while ((c = getopt(argc, argv, "d")) != EOF) {
 		switch (c) {
@@ -92,6 +93,14 @@ main(argc, argv)
 	if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_IF, &ifindex,
 	    sizeof(ifindex)) < 0) {
 		err(1, "setsockopt(IPV6_MULTICAST_IF)");
+		/*NOTREACHED*/
+	}
+	memset(&mreq, 0, sizeof(mreq));
+	inet_pton(AF_INET6, ALLDELEGATORS, &mreq.ipv6mr_multiaddr);
+	mreq.ipv6mr_interface = ifindex;
+	if (setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP, &mreq,
+	    sizeof(mreq)) < 0) {
+		err(1, "setsockopt(IPV6_JOIN_GROUP)");
 		/*NOTREACHED*/
 	}
 	if (!dflag) {

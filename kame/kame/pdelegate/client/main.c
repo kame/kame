@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.3 2001/03/05 12:37:03 itojun Exp $	*/
+/*	$KAME: main.c,v 1.4 2001/03/05 12:41:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -290,7 +290,7 @@ send_discover(s)
 		snprintf(dest, sizeof(dest), "ff02::1%%%s", iface);	/*XXX*/
 	else {
 		/* XXX local agreement */
-		snprintf(dest, sizeof(dest), "ff02::20%%%s", iface);
+		snprintf(dest, sizeof(dest), "%s%%%s", ALLDELEGATORS, iface);
 	}
 
 	memset(&hints, 0, sizeof(hints));
