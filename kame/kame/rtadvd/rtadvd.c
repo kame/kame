@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.72 2002/06/29 13:02:55 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.73 2002/07/01 04:14:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -269,6 +269,7 @@ main(argc, argv)
 	sock_open();
 
 	/* record the current PID */
+#if 0
 #if (defined(__NetBSD__) && __NetBSD_Version__ >= 106010000) || defined(__OpenBSD__)
 	if (pidfile(NULL) < 0) {
 		syslog(LOG_ERR,
@@ -287,6 +288,7 @@ main(argc, argv)
 		fprintf(pidfp, "%d\n", pid);
 		fclose(pidfp);
 	}
+#endif
 #endif
 
 	maxfd = sock;

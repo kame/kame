@@ -1,4 +1,4 @@
-/*	$KAME: altqd.c,v 1.10 2002/02/20 10:42:26 kjc Exp $	*/
+/*	$KAME: altqd.c,v 1.11 2002/07/01 04:14:06 itojun Exp $	*/
 /*
  * Copyright (c) 2001 Theo de Raadt
  * All rights reserved.
@@ -191,6 +191,7 @@ main(int argc, char **argv)
 	if (daemonize) {
 		daemon(0, 0);
 
+#if 0
 		/* save pid to the pid file (/var/tmp/altqd.pid) */
 #ifdef __FreeBSD__
 		{
@@ -204,6 +205,7 @@ main(int argc, char **argv)
 		}
 #else
 		pidfile(NULL);
+#endif
 #endif
 	} else {
 		/* interactive mode */

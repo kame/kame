@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.86 2002/06/09 02:46:16 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.87 2002/07/01 04:14:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.86 2002/06/09 02:46:16 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.87 2002/07/01 04:14:07 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -396,6 +396,7 @@ main(argc, argv)
 	if (dflag)
 		ifrtdump(0);
 
+#if 0
 #if defined(__OpenBSD__) || defined(__NetBSD__)
 	pidfile(NULL);
 #else
@@ -404,6 +405,7 @@ main(argc, argv)
 		fprintf(pidfile, "%d\n", pid);
 		fclose(pidfile);
 	}
+#endif
 #endif
 
 	if ((ripbuf = (struct rip6 *)malloc(RIP6_MAXMTU)) == NULL) {

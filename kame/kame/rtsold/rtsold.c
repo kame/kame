@@ -1,4 +1,4 @@
-/*	$KAME: rtsold.c,v 1.53 2002/06/10 20:00:36 itojun Exp $	*/
+/*	$KAME: rtsold.c,v 1.54 2002/07/01 04:14:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -265,6 +265,7 @@ main(argc, argv)
 
 	/* dump the current pid */
 	if (!once) {
+#if 0
 #if (defined(__NetBSD__) && __NetBSD_Version__ >= 106010000) || defined(__OpenBSD__)
 		if (pidfile(NULL) < 0) {
 			warnmsg(LOG_ERR, __func__,
@@ -283,6 +284,7 @@ main(argc, argv)
 			fprintf(fp, "%d\n", pid);
 			fclose(fp);
 		}
+#endif
 #endif
 	}
 
