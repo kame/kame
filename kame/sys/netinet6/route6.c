@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.27 2001/09/21 08:46:49 keiichi Exp $	*/
+/*	$KAME: route6.c,v 1.28 2001/09/21 08:50:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -162,7 +162,7 @@ ip6_rthdr0(m, ip6, rh0)
 	{
 		struct hif_softc *sc;
 		struct mip6_bu *mbu;
-		int lastindex, optim = 0;
+		int lastindex;
 		struct in6_addr *prevhop;
 		struct mbuf *n;
 		struct ip6aux *ip6a;
