@@ -7,6 +7,7 @@ SRCS=	if.c inet.c inet6.c main.c mbuf.c mroute.c ipx.c route.c \
 CFLAGS+=-Wall -I${.CURDIR}
 CFLAGS+=-DIPSEC
 CFLAGS+=-DINET6
+CFLAGS+=-DDCCP
 
 BINGRP=	kmem
 BINMODE=2555

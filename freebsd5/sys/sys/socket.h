@@ -100,6 +100,7 @@ typedef	__uid_t		uid_t;
 #define	SOCK_RDM	4		/* reliably-delivered message */
 #endif
 #define	SOCK_SEQPACKET	5		/* sequenced packet stream */
+#define	SOCK_DCCP	6
 
 /*
  * Option flags per-socket.

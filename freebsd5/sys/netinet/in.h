@@ -85,6 +85,7 @@
 #define	IPPROTO_ICMP		1		/* control message protocol */
 #define	IPPROTO_TCP		6		/* tcp */
 #define	IPPROTO_UDP		17		/* user datagram protocol */
+#define	IPPROTO_DCCP		33		/* Datagram congestion Control Protocol */
 
 #define	INADDR_ANY		(u_int32_t)0x00000000
 #define	INADDR_BROADCAST	(u_int32_t)0xffffffff	/* must be masked */

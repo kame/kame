@@ -397,6 +397,7 @@ SCTP_TCP_MODEL_SUPPORT	opt_sctp.h
 SCTP_USE_ADLER32	opt_sctp.h
 SCTP_ALTERNATE_ROUTE	opt_sctp.h
 SLIP_IFF_OPTS		opt_slip.h
+DCCP			opt_dccp.h
 TCPDEBUG
 TCP_DROP_SYNFIN		opt_tcp_input.h
 TCP_ECN			opt_global.h

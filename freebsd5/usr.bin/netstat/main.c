@@ -159,6 +159,10 @@ struct protox {
 	  tcp_stats,	NULL,		"tcp",	IPPROTO_TCP },
 	{ -1,		-1,		1,	protopr,
 	  udp_stats,	NULL,		"udp",	IPPROTO_UDP },
+#ifdef DCCP
+	{ -1,		-1,		1,	protopr,
+	  dccp_stats,	NULL,		"dccp",	IPPROTO_DCCP },
+#endif /* DCCP */
 	{ -1,		-1,		1,	protopr,
 	  NULL,		NULL,		"divert",IPPROTO_DIVERT },
 	{ -1,		-1,		1,	protopr,
@@ -183,6 +187,10 @@ struct protox ip6protox[] = {
 	  tcp_stats,	NULL,		"tcp",	IPPROTO_TCP },
 	{ -1,		-1,		1,	protopr,
 	  udp_stats,	NULL,		"udp",	IPPROTO_UDP },
+#ifdef DCCP
+	{ -1,		-1,		1,	protopr,
+	  dccp_stats,	NULL,		"dccp",	IPPROTO_DCCP },
+#endif /* DCCP */
 	{ -1,		N_IP6STAT,	1,	protopr,
 	  ip6_stats,	ip6_ifstats,	"ip6",	IPPROTO_RAW },
 	{ -1,		N_ICMP6STAT,	1,	protopr,
