@@ -1,4 +1,4 @@
-/*	$KAME: mfc.c,v 1.4 2004/01/29 15:20:30 suz Exp $	*/
+/*	$KAME: mfc.c,v 1.5 2004/02/02 04:48:55 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -193,7 +193,7 @@ add_mfc4(struct sockaddr *src, struct sockaddr *dst, mifi_t in,
 	      sizeof(mfc.mfcc_mcastgrp));
 	mfc.mfcc_parent = in;
 	for (i = 0; i < MAXVIFS; i++) {
-		if (IF_SET(i, out))
+		if (IF_ISSET(i, out))
 			mfc.mfcc_ttls[i] = 32;
 		else
 			mfc.mfcc_ttls[i] = 0;
