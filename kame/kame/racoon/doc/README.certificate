@@ -1,4 +1,4 @@
-$Id: README.certificate,v 1.4 2000/03/06 20:01:44 sakane Exp $
+$Id: README.certificate,v 1.5 2000/04/06 05:49:24 sakane Exp $
 
 Description how to use RSA signature authentication method with racoon.
 
@@ -51,7 +51,7 @@ TO GET YOUR CERT
 
   % openssl genrsa -out privkey.pem 1024
 
-- Make a request to be signed your public key.
+- Make a PKCS#10 request to be signed your public key.
   For example, signature algorithm is SHA1 with RSA 1024bits.
 
   % openssl req -new -nodes -newkey rsa:1024 -sha1 -keyform PEM -keyout privkey.pem -outform PEM
@@ -96,6 +96,11 @@ TO GET YOUR CERT
 - Be signed your public key.
   http://isakmp-test.ssh.fi/cgi-bin/nph-real-cert/cert.pem
   Don't forget to input your subject alt name.
+
+  Alternatively, you can sign your certificate by yourself.
+  reqest.pem is a file stored a PKCS#10 request by PEM format.
+
+  % openssl x509 -req -in reqest.pem -signkey privkey.pem -out cert.pem
 
 - Save your certificate into "cert.pem" in the directory.
   Also your private key into "privkey.pem".
