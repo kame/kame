@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.344 2004/05/26 09:41:05 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.345 2004/06/01 01:54:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1443,31 +1443,7 @@ ip6_savecontrol(in6p, m, mp)
 #ifdef HAVE_NRL_INPCB
 # define in6p_flags	inp_flags
 #endif
-#if defined(__NetBSD__) || defined(__FreeBSD__)
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	struct thread *p = curthread;	/* XXX */
-#else
-	struct proc *p = curproc;	/* XXX */
-#endif
-#endif
-	int privileged = 0;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
-
-#if defined(__NetBSD__)
-	if (p && !suser(p->p_ucred, &p->p_acflag))
-		privileged++;
-#elif defined(__FreeBSD__)
-	if (p && !suser(p))
-		privileged++;
-#else
-#ifdef HAVE_NRL_INPCB
-	if ((in6p->inp_socket->so_state & SS_PRIV) != 0)
-		privileged++;
-#else
-	if ((in6p->in6p_socket->so_state & SS_PRIV) != 0)
-		privileged++;
-#endif
-#endif
 
 #ifdef SO_TIMESTAMP
 	if ((in6p->in6p_socket->so_options & SO_TIMESTAMP) != 0) {
@@ -1525,16 +1501,13 @@ ip6_savecontrol(in6p, m, mp)
 	}
 
 	/*
-	 * IPV6_HOPOPTS socket option. We require super-user privilege
-	 * for the option, but it might be too strict, since there might
-	 * be some hop-by-hop options which can be returned to normal user.
-	 * See RFC 2292 section 6.
+	 * IPV6_HOPOPTS socket option.  Recall that we require super-user
+	 * privilege for the option (see ip6_ctloutput), but it might be too
+	 * strict, since there might be some hop-by-hop options which can be
+	 * returned to normal user.
+	 * See also RFC 2292 section 6 (or RFC 3542 section 8).
 	 */
 	if ((in6p->in6p_flags & IN6P_HOPOPTS) != 0) {
-#ifdef DIAGNOSTIC
-		if (!privileged)
-			panic("IN6P_HOPOPTS is set for unprivileged socket");
-#endif
 		/*
 		 * Check if a hop-by-hop options header is contatined in the
 		 * received packet, and if so, store the options as ancillary
@@ -1649,13 +1622,6 @@ ip6_savecontrol(in6p, m, mp)
 			switch (nxt) {
 			case IPPROTO_DSTOPTS:
 				if (!(in6p->in6p_flags & IN6P_DSTOPTS))
-					break;
-
-				/*
-				 * We also require super-user privilege for
-				 * the option.  See comments on IN6_HOPOPTS.
-				 */
-				if (!privileged)
 					break;
 
 				*mp = sbcreatecontrol((caddr_t)ip6e, elen,
