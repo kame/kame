@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.281 2002/06/08 20:15:04 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.282 2002/06/08 20:16:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -925,7 +925,7 @@ nd6_lookup(addr6, create, ifp)
 				return(NULL);
 			if (rt->rt_llinfo) {
 				struct llinfo_nd6 *ln =
-					(struct llinfo_nd6 *)rt->rt_llinfo;
+				    (struct llinfo_nd6 *)rt->rt_llinfo;
 				ln->ln_state = ND6_LLINFO_NOSTATE;
 			}
 		} else
