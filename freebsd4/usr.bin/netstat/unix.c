@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)unix.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/unix.c,v 1.12.2.1 2001/03/22 13:48:44 des Exp $";
+  "$FreeBSD: src/usr.bin/netstat/unix.c,v 1.12.2.2 2001/08/10 09:07:09 ru Exp $";
 #endif /* not lint */
 
 /*
@@ -62,13 +62,13 @@ static const char rcsid[] =
 #include <kvm.h>
 #include "netstat.h"
 
-static	void unixdomainpr __P((struct xunpcb *, struct xsocket *));
+static	void unixdomainpr (struct xunpcb *, struct xsocket *);
 
 static	const char *const socktype[] =
     { "#0", "stream", "dgram", "raw", "rdm", "seqpacket" };
 
 void
-unixpr()
+unixpr(void)
 {
 	char 	*buf;
 	int	type;
@@ -126,9 +126,7 @@ unixpr()
 }
 
 static void
-unixdomainpr(xunp, so)
-	struct xunpcb *xunp;
-	struct xsocket *so;
+unixdomainpr(struct xunpcb *xunp, struct xsocket *so)
 {
 	struct unpcb *unp;
 	struct sockaddr_un *sa;

@@ -31,7 +31,7 @@
  * THIS SOFTWARE, EVEN IF WHISTLE COMMUNICATIONS IS ADVISED OF THE POSSIBILITY
  * OF SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.bin/netstat/netgraph.c,v 1.3.2.1 2001/03/22 13:48:42 des Exp $
+ * $FreeBSD: src/usr.bin/netstat/netgraph.c,v 1.3.2.2 2001/08/10 09:07:09 ru Exp $
  */
 
 #ifndef lint
@@ -65,7 +65,7 @@ static	int first = 1;
 static	int csock = -1;
 
 void
-netgraphprotopr(u_long off, char *name)
+netgraphprotopr(u_long off, char *name, int af __unused)
 {
 	struct ngpcb *this, *next;
 	struct ngpcb ngpcb;

@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)ns.c	8.1 (Berkeley) 6/6/93";
 */
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/ipx.c,v 1.13 1999/10/21 07:08:56 julian Exp $";
+  "$FreeBSD: src/usr.bin/netstat/ipx.c,v 1.13.2.1 2001/08/10 09:07:09 ru Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -71,7 +71,7 @@ struct	ipxpcb ipxpcb;
 struct	spxpcb spxpcb;
 struct	socket sockb;
 
-static char *ipx_prpr __P((struct ipx_addr *));
+static char *ipx_prpr (struct ipx_addr *);
 
 static	int first = 1;
 
@@ -83,9 +83,7 @@ static	int first = 1;
  */
 
 void
-ipxprotopr(off, name)
-	u_long off;
-	char *name;
+ipxprotopr(u_long off, char *name, int af __unused)
 {
 	struct ipxpcb cb;
 	register struct ipxpcb *prev, *next;
@@ -161,9 +159,7 @@ ipxprotopr(off, name)
  * Dump SPX statistics structure.
  */
 void
-spx_stats(off, name)
-	u_long off;
-	char *name;
+spx_stats(u_long off, char *name, int af __unused)
 {
 	struct spx_istat spx_istat;
 #define spxstat spx_istat.newstats
@@ -239,9 +235,7 @@ spx_stats(off, name)
  * Dump IPX statistics structure.
  */
 void
-ipx_stats(off, name)
-	u_long off;
-	char *name;
+ipx_stats(u_long off, char *name, int af __unused)
 {
 	struct ipxstat ipxstat;
 
@@ -284,9 +278,7 @@ static	struct {
  */
 /*ARGSUSED*/
 void
-ipxerr_stats(off, name)
-	u_long off;
-	char *name;
+ipxerr_stats(u_long off, char *name, int af __unused)
 {
 	struct ipx_errstat ipx_errstat;
 	register int j;
@@ -326,8 +318,7 @@ ipxerr_stats(off, name)
 }
 
 static void
-ipx_erputil(z, c)
-	int z, c;
+ipx_erputil(int z, int c)
 {
 	int j;
 	char codebuf[30];
@@ -355,8 +346,7 @@ ipx_erputil(z, c)
 static struct sockaddr_ipx ssipx = {AF_IPX};
 
 static
-char *ipx_prpr(x)
-	struct ipx_addr *x;
+char *ipx_prpr(struct ipx_addr *x)
 {
 	struct sockaddr_ipx *sipx = &ssipx;
 

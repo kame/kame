@@ -31,7 +31,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/usr.bin/netstat/inet6.c,v 1.3.2.4 2001/03/22 13:48:42 des Exp $
+ * $FreeBSD: src/usr.bin/netstat/inet6.c,v 1.3.2.9 2001/08/10 09:07:09 ru Exp $
  */
 
 #ifndef lint
@@ -47,6 +47,7 @@ static char sccsid[] = "@(#)inet6.c	8.4 (Berkeley) 4/20/94";
 #include <sys/ioctl.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
+#include <sys/sysctl.h>
 
 #include <net/route.h>
 #include <net/if.h>
@@ -59,6 +60,7 @@ static char sccsid[] = "@(#)inet6.c	8.4 (Berkeley) 4/20/94";
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/pim6_var.h>
+#include <netinet6/raw_ip6.h>
 
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -70,8 +72,8 @@ static char sccsid[] = "@(#)inet6.c	8.4 (Berkeley) 4/20/94";
 
 struct	socket sockb;
 
-char	*inet6name __P((struct in6_addr *));
-void	inet6print __P((struct in6_addr *, int, char *, int));
+char	*inet6name (struct in6_addr *);
+void	inet6print (struct in6_addr *, int, char *, int);
 
 static char ntop_buf[INET6_ADDRSTRLEN];
 
@@ -338,17 +340,21 @@ static	char *ip6nh[] = {
  * Dump IP6 statistics structure.
  */
 void
-ip6_stats(off, name)
-	u_long off;
-	char *name;
+ip6_stats(u_long off __unused, char *name, int af __unused)
 {
 	struct ip6stat ip6stat;
 	int first, i;
+	int mib[4];
+	size_t len;
 
-	if (off == 0)
-		return;
+	mib[0] = CTL_NET;
+	mib[1] = PF_INET6;
+	mib[2] = IPPROTO_IPV6;
+	mib[3] = IPV6CTL_STATS;
 
-	if (kread(off, (char *)&ip6stat, sizeof (ip6stat)))
+	len = sizeof ip6stat;
+	memset(&ip6stat, 0, len);
+	if (sysctl(mib, 4, &ip6stat, &len, (void *)0, 0) < 0)
 		return;
 	printf("%s:\n", name);
 
@@ -492,8 +498,7 @@ ip6_stats(off, name)
  * Dump IPv6 per-interface statistics based on RFC 2465.
  */
 void
-ip6_ifstats(ifname)
-	char *ifname;
+ip6_ifstats(char *ifname)
 {
 	struct in6_ifreq ifr;
 	int s;
@@ -680,15 +685,15 @@ static	char *icmp6names[] = {
 	"multicast listener report",
 	"multicast listener done",
 	"router solicitation",
-	"router advertisment",
+	"router advertisement",
 	"neighbor solicitation",
-	"neighbor advertisment",
+	"neighbor advertisement",
 	"redirect",
 	"router renumbering",
 	"node information request",
 	"node information reply",
-	"#141",
-	"#142",
+	"inverse neighbor solicitation",
+	"inverse neighbor advertisement",
 	"#143",
 	"#144",
 	"#145",
@@ -808,16 +813,22 @@ static	char *icmp6names[] = {
  * Dump ICMP6 statistics.
  */
 void
-icmp6_stats(off, name)
-	u_long off;
-	char *name;
+icmp6_stats(u_long off __unused, char *name, int af __unused)
 {
 	struct icmp6stat icmp6stat;
 	register int i, first;
+	int mib[4];
+	size_t len;
 
-	if (off == 0)
+	mib[0] = CTL_NET;
+	mib[1] = PF_INET6;
+	mib[2] = IPPROTO_ICMPV6;
+	mib[3] = ICMPV6CTL_STATS;
+
+	len = sizeof icmp6stat;
+	memset(&icmp6stat, 0, len);
+	if (sysctl(mib, 4, &icmp6stat, &len, (void *)0, 0) < 0)
 		return;
-	kread(off, (char *)&icmp6stat, sizeof (icmp6stat));
 	printf("%s:\n", name);
 
 #define	p(f, m) if (icmp6stat.f || sflag <= 1) \
@@ -829,7 +840,8 @@ icmp6_stats(off, name)
 	    "\t%llu error%s not generated because old message was icmp error or so\n");
 	p(icp6s_toofreq,
 	  "\t%llu error%s not generated because rate limitation\n");
-	for (first = 1, i = 0; i < 256; i++)
+#define NELEM (sizeof(icmp6stat.icp6s_outhist)/sizeof(icmp6stat.icp6s_outhist[0]))
+	for (first = 1, i = 0; i < NELEM; i++)
 		if (icmp6stat.icp6s_outhist[i] != 0) {
 			if (first) {
 				printf("\tOutput histogram:\n");
@@ -838,11 +850,13 @@ icmp6_stats(off, name)
 			printf("\t\t%s: %llu\n", icmp6names[i],
 			    (unsigned long long)icmp6stat.icp6s_outhist[i]);
 		}
+#undef NELEM
 	p(icp6s_badcode, "\t%llu message%s with bad code fields\n");
 	p(icp6s_tooshort, "\t%llu message%s < minimum length\n");
 	p(icp6s_checksum, "\t%llu bad checksum%s\n");
 	p(icp6s_badlen, "\t%llu message%s with bad length\n");
-	for (first = 1, i = 0; i < ICMP6_MAXTYPE; i++)
+#define NELEM (sizeof(icmp6stat.icp6s_inhist)/sizeof(icmp6stat.icp6s_inhist[0]))
+	for (first = 1, i = 0; i < NELEM; i++)
 		if (icmp6stat.icp6s_inhist[i] != 0) {
 			if (first) {
 				printf("\tInput histogram:\n");
@@ -851,7 +865,8 @@ icmp6_stats(off, name)
 			printf("\t\t%s: %llu\n", icmp6names[i],
 			    (unsigned long long)icmp6stat.icp6s_inhist[i]);
 		}
-	printf("\tHistgram of error messages to be generated:\n");
+#undef NELEM
+	printf("\tHistogram of error messages to be generated:\n");
 	p_5(icp6s_odst_unreach_noroute, "\t\t%llu no route\n");
 	p_5(icp6s_odst_unreach_admin, "\t\t%llu administratively prohibited\n");
 	p_5(icp6s_odst_unreach_beyondscope, "\t\t%llu beyond scope\n");
@@ -868,6 +883,13 @@ icmp6_stats(off, name)
 
 	p(icp6s_reflect, "\t%llu message response%s generated\n");
 	p(icp6s_nd_toomanyopt, "\t%llu message%s with too many ND options\n");
+	p(icp6s_nd_badopt, "\t%qu message%s with bad ND options\n");
+	p(icp6s_badns, "\t%qu bad neighbor solicitation message%s\n");
+	p(icp6s_badna, "\t%qu bad neighbor advertisement message%s\n");
+	p(icp6s_badrs, "\t%qu bad router solicitation message%s\n");
+	p(icp6s_badra, "\t%qu bad router advertisement message%s\n");
+	p(icp6s_badredirect, "\t%qu bad redirect message%s\n");
+	p(icp6s_pmtuchg, "\t%llu path MTU change%s\n");
 #undef p
 #undef p_5
 }
@@ -876,8 +898,7 @@ icmp6_stats(off, name)
  * Dump ICMPv6 per-interface statistics based on RFC 2466.
  */
 void
-icmp6_ifstats(ifname)
-	char *ifname;
+icmp6_ifstats(char *ifname)
 {
 	struct in6_ifreq ifr;
 	int s;
@@ -942,9 +963,7 @@ icmp6_ifstats(ifname)
  * Dump PIM statistics structure.
  */
 void
-pim6_stats(off, name)
-	u_long off;
-	char *name;
+pim6_stats(u_long off __unused, char *name, int af __unused)
 {
 	struct pim6stat pim6stat;
 
@@ -966,6 +985,50 @@ pim6_stats(off, name)
 }
 
 /*
+ * Dump raw ip6 statistics structure.
+ */
+void
+rip6_stats(u_long off __unused, char *name, int af __unused)
+{
+	struct rip6stat rip6stat;
+	u_quad_t delivered;
+	int mib[4];
+	size_t l;
+
+	mib[0] = CTL_NET;
+	mib[1] = PF_INET6;
+	mib[2] = IPPROTO_IPV6;
+	mib[3] = IPV6CTL_RIP6STATS;
+	l = sizeof(rip6stat);
+	if (sysctl(mib, 4, &rip6stat, &l, NULL, 0) < 0) {
+		perror("Warning: sysctl(net.inet6.ip6.rip6stats)");
+		return;
+	}
+
+	printf("%s:\n", name);
+
+#define	p(f, m) if (rip6stat.f || sflag <= 1) \
+    printf(m, (unsigned long long)rip6stat.f, plural(rip6stat.f))
+	p(rip6s_ipackets, "\t%llu message%s received\n");
+	p(rip6s_isum, "\t%llu checksum calcuration%s on inbound\n");
+	p(rip6s_badsum, "\t%llu message%s with bad checksum\n");
+	p(rip6s_nosock, "\t%llu message%s dropped due to no socket\n");
+	p(rip6s_nosockmcast,
+	    "\t%llu multicast message%s dropped due to no socket\n");
+	p(rip6s_fullsock,
+	    "\t%llu message%s dropped due to full socket buffers\n");
+	delivered = rip6stat.rip6s_ipackets -
+		    rip6stat.rip6s_badsum -
+		    rip6stat.rip6s_nosock -
+		    rip6stat.rip6s_nosockmcast -
+		    rip6stat.rip6s_fullsock;
+	if (delivered || sflag <= 1)
+		printf("\t%llu delivered\n", (unsigned long long)delivered);
+	p(rip6s_opackets, "\t%llu datagram%s output\n");
+#undef p
+}
+
+/*
  * Pretty print an Internet address (net address + port).
  * If the nflag was specified, use numbers instead of names.
  */
@@ -980,11 +1043,7 @@ pim6_stats(off, name)
 };
 
 void
-inet6print(in6, port, proto, numeric)
-	register struct in6_addr *in6;
-	int port;
-	char *proto;
-	int numeric;
+inet6print(struct in6_addr *in6, int port, char *proto, int numeric)
 {
 	struct servent *sp = 0;
 	char line[80], *cp;
@@ -1010,8 +1069,7 @@ inet6print(in6, port, proto, numeric)
  */
 
 char *
-inet6name(in6p)
-	struct in6_addr *in6p;
+inet6name(struct in6_addr *in6p)
 {
 	register char *cp;
 	static char line[50];

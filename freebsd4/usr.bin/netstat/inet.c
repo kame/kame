@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)inet.c	8.5 (Berkeley) 5/24/95";
 */
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/inet.c,v 1.37.2.2 2001/03/22 13:48:42 des Exp $";
+  "$FreeBSD: src/usr.bin/netstat/inet.c,v 1.37.2.4 2001/08/10 09:07:09 ru Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -80,10 +80,10 @@ static const char rcsid[] =
 #include <unistd.h>
 #include "netstat.h"
 
-char	*inetname __P((struct in_addr *));
-void	inetprint __P((struct in_addr *, int, char *, int));
+char	*inetname (struct in_addr *);
+void	inetprint (struct in_addr *, int, char *, int);
 #ifdef INET6
-extern void	inet6print __P((struct in6_addr *, int, char *, int));
+extern void	inet6print (struct in6_addr *, int, char *, int);
 static int udp_done, tcp_done;
 #endif /* INET6 */
 
@@ -94,10 +94,8 @@ static int udp_done, tcp_done;
  * -a (all) flag is specified.
  */
 void
-protopr(proto, name, af)
-	u_long proto;		/* for sysctl version we pass proto # */
-	char *name;
-	int af;
+protopr(u_long proto,		/* for sysctl version we pass proto # */
+	char *name, int af)
 {
 	int istcp;
 	static int first = 1;
@@ -167,7 +165,7 @@ protopr(proto, name, af)
 		}
 
 		/* Ignore sockets for protocols other than the desired one. */
-		if (so->xso_protocol != proto)
+		if (so->xso_protocol != (int)proto)
 			continue;
 
 		/* Ignore PCBs which were freed during copyout. */
@@ -348,9 +346,7 @@ protopr(proto, name, af)
  * Dump TCP statistics structure.
  */
 void
-tcp_stats(off, name)
-	u_long off;
-	char *name;
+tcp_stats(u_long off __unused, char *name, int af __unused)
 {
 	struct tcpstat tcpstat;
 	size_t len = sizeof tcpstat;
@@ -448,9 +444,7 @@ tcp_stats(off, name)
  * Dump UDP statistics structure.
  */
 void
-udp_stats(off, name)
-	u_long off;
-	char *name;
+udp_stats(u_long off __unused, char *name, int af __unused)
 {
 	struct udpstat udpstat;
 	size_t len = sizeof udpstat;
@@ -501,9 +495,7 @@ udp_stats(off, name)
  * Dump IP statistics structure.
  */
 void
-ip_stats(off, name)
-	u_long off;
-	char *name;
+ip_stats(u_long off __unused, char *name, int af __unused)
 {
 	struct ipstat ipstat;
 	size_t len = sizeof ipstat;
@@ -552,6 +544,7 @@ ip_stats(off, name)
 	p(ips_ofragments, "\t%lu fragment%s created\n");
 	p(ips_cantfrag, "\t%lu datagram%s that can't be fragmented\n");
 	p(ips_nogif, "\t%lu tunneling packet%s that can't find gif\n");
+	p(ips_badaddr, "\t%lu datagram%s with bad address in header\n");
 #undef p
 #undef p1a
 }
@@ -582,9 +575,7 @@ static	char *icmpnames[] = {
  * Dump ICMP statistics.
  */
 void
-icmp_stats(off, name)
-	u_long off;
-	char *name;
+icmp_stats(u_long off __unused, char *name, int af __unused)
 {
 	struct icmpstat icmpstat;
 	int i, first;
@@ -650,9 +641,7 @@ icmp_stats(off, name)
  * Dump IGMP statistics structure.
  */
 void
-igmp_stats(off, name)
-	u_long off;
-	char *name;
+igmp_stats(u_long off __unused, char *name, int af __unused)
 {
 	struct igmpstat igmpstat;
 	size_t len = sizeof igmpstat;
@@ -685,11 +674,7 @@ igmp_stats(off, name)
  * Pretty print an Internet address (net address + port).
  */
 void
-inetprint(in, port, proto,numeric)
-	register struct in_addr *in;
-	int port;
-	char *proto;
-	int numeric;
+inetprint(struct in_addr *in, int port, char *proto, int numeric_port)
 {
 	struct servent *sp = 0;
 	char line[80], *cp;
@@ -698,9 +683,9 @@ inetprint(in, port, proto,numeric)
 	if (Wflag)
 	    sprintf(line, "%s.", inetname(in));
 	else
-	    sprintf(line, "%.*s.", (Aflag && !numeric) ? 12 : 16, inetname(in));
+	    sprintf(line, "%.*s.", (Aflag && !numeric_port) ? 12 : 16, inetname(in));
 	cp = index(line, '\0');
-	if (!numeric && port)
+	if (!numeric_port && port)
 		sp = getservbyport((int)port, proto);
 	if (sp || port == 0)
 		sprintf(cp, "%.15s ", sp ? sp->s_name : "*");
@@ -719,8 +704,7 @@ inetprint(in, port, proto,numeric)
  * numeric value, otherwise try for symbolic name.
  */
 char *
-inetname(inp)
-	struct in_addr *inp;
+inetname(struct in_addr *inp)
 {
 	register char *cp;
 	static char line[MAXHOSTNAMELEN];

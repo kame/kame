@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)wall.c	8.2 (Berkeley) 11/16/93";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/wall/wall.c,v 1.13.2.3 2001/02/18 02:28:31 kris Exp $";
+  "$FreeBSD: src/usr.bin/wall/wall.c,v 1.13.2.4 2001/05/08 11:12:59 kris Exp $";
 #endif /* not lint */
 
 /*
@@ -147,6 +147,7 @@ makemsg(fname)
 	int fd;
 	char *p, *tty, hostname[MAXHOSTNAMELEN], lbuf[256], tmpname[64];
 	const char *whom;
+	gid_t egid;
 
 	(void)snprintf(tmpname, sizeof(tmpname), "%s/wall.XXXXXX", _PATH_TMP);
 	if ((fd = mkstemp(tmpname)) == -1 || !(fp = fdopen(fd, "r+")))
@@ -183,8 +184,13 @@ makemsg(fname)
 	}
 	(void)fprintf(fp, "%79s\r\n", " ");
 
-	if (fname && !(freopen(fname, "r", stdin)))
-		err(1, "can't read %s", fname);
+	if (fname) {
+		egid = getegid();
+		setegid(getgid());
+	       	if (freopen(fname, "r", stdin) == NULL)
+			err(1, "can't read %s", fname);
+		setegid(egid);
+	}
 	while (fgets(lbuf, sizeof(lbuf), stdin))
 		for (cnt = 0, p = lbuf; (ch = *p) != '\0'; ++p, ++cnt) {
 			if (ch == '\r') {
