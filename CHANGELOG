@@ -1,8 +1,27 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.963 2000/06/02 12:10:58 itojun Exp $
+$Id: CHANGELOG,v 1.964 2000/06/02 12:31:28 jinmei Exp $
 
 <200006>
+2000-06-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/netinet/tcp_subr.c (tcp6_ctlinput): separated from
+	tcp_ctlinput. We believe a separated function would make sense
+	in this case.
+	Additionaly, the new function now calls syn_cache_unreach().
+	IMO, there's been no special reason not to call it.
+
+	* openbsd/sys/netinet/tcp_subr.c (tcp6_ctlinput): applied the same
+	fix as bsdi4.
+	Also, the ctlinput function now calls in6_pcbnotify(), which was
+	unintentionally (IMO) prohibited.
+
+2000-06-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* {bsdi4, freebsd[34], openbsd}/sys/netinet6/in6_pcb.c
+	  (in6_pcbnotify):
+	* kame/sys/netinet6/in6_pcb.c (in6_pcbnotify):
+	corrected the algorithm to detect whether in6_rtchage() should
+	be called.
+	
 Fri Jun  2 21:08:22 JST 2000  itojun@iijlab.net
 	* freebsd2/ports/{libpcap,tcpdump}: use 2000/5/29 weekly snap.
 
