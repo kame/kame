@@ -1,4 +1,4 @@
-/*	$KAME: rrenumd.c,v 1.19 2000/11/08 02:09:03 jinmei Exp $	*/
+/*	$KAME: rrenumd.c,v 1.20 2000/11/08 02:40:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -93,7 +93,30 @@ int with_v4dest, with_v6dest;
 struct in6_addr prefix; /* ADHOC */
 int prefixlen = 64; /* ADHOC */
 
-extern int parse(FILE **fp);
+extern int parse __P((FILE **));
+
+static void show_usage __P((void));
+static void init_sin6 __P((struct sockaddr_in6 *, const char *));
+#if 0
+static void join_multi __P((const char *));
+#endif
+static void init_globals __P((void));
+static void config __P((FILE **));
+#ifdef IPSEC_POLICY_IPSEC
+static void sock6_open __P((struct flags *, char *));
+static void sock4_open __P((struct flags *, char *));
+#else
+static void sock6_open __P((struct flags *));
+static void sock4_open __P((struct flags *));
+#endif
+static void rrenum_output __P((struct payload_list *, struct dst_list *));
+static void rrenum_snd_eachdst __P((struct payload_list *));
+#if 0
+static void rrenum_snd_fullsequence __P((void));
+#endif
+static void rrenum_input __P((int));
+int main __P((int, char *[]));
+
 
 /* Print usage. Don't call this after daemonized. */
 static void
@@ -111,7 +134,7 @@ show_usage()
 	exit(1);
 }
 
-void
+static void
 init_sin6(struct sockaddr_in6 *sin6, const char *addr_ascii)
 {
 	memset(sin6, 0, sizeof(*sin6));
@@ -122,7 +145,7 @@ init_sin6(struct sockaddr_in6 *sin6, const char *addr_ascii)
 }
 
 #if 0  /* XXX: not necessary ?? */
-void
+static void
 join_multi(const char *addrname)
 {
 	struct ipv6_mreq mreq;
@@ -151,7 +174,7 @@ join_multi(const char *addrname)
 }
 #endif
 
-void
+static void
 init_globals()
 {
 	static struct iovec rcviov;
@@ -193,7 +216,7 @@ init_globals()
 	sndmhdr.msg_controllen = sndcmsglen;
 }
 
-void
+static void
 config(FILE **fpp)
 {
 	struct payload_list *pl;
@@ -236,7 +259,7 @@ config(FILE **fpp)
 	}
 }
 
-void
+static void
 sock6_open(struct flags *flags
 #ifdef IPSEC_POLICY_IPSEC
 	   , char *policy
@@ -306,7 +329,7 @@ sock6_open(struct flags *flags
 		/* XXX should handle in/out bound policy. */
 		if (setsockopt(s6, IPPROTO_IPV6, IPV6_IPSEC_POLICY,
 				buf, ipsec_get_policylen(buf)) < 0)
-			err(1, NULL);
+			err(1, "setsockopt(IPV6_IPSEC_POLICY)");
 		free(buf);
 	}
 #else /* IPSEC_POLICY_IPSEC */
@@ -334,7 +357,7 @@ sock6_open(struct flags *flags
 	return;
 }
 
-void
+static void
 sock4_open(struct flags *flags
 #ifdef IPSEC_POLICY_IPSEC
 	   , char *policy
@@ -372,7 +395,7 @@ sock4_open(struct flags *flags
 		/* XXX should handle in/out bound policy. */
 		if (setsockopt(s4, IPPROTO_IP, IP_IPSEC_POLICY,
 				buf, ipsec_get_policylen(buf)) < 0)
-			err(1, NULL);
+			err(1, "setsockopt(IP_IPSEC_POLICY)");
 		free(buf);
 	}
 #else /* IPSEC_POLICY_IPSEC */
@@ -400,7 +423,7 @@ sock4_open(struct flags *flags
 	return;
 }
 
-void
+static void
 rrenum_output(struct payload_list *pl, struct dst_list *dl)
 {
 	int i, msglen = 0;
@@ -447,7 +470,7 @@ rrenum_output(struct payload_list *pl, struct dst_list *dl)
 		       strerror(errno));
 }
 
-void
+static void
 rrenum_snd_eachdst(struct payload_list *pl)
 {
 	struct dst_list *dl;
@@ -457,7 +480,8 @@ rrenum_snd_eachdst(struct payload_list *pl)
 	}
 }
 
-void
+#if 0
+static void
 rrenum_snd_fullsequence()
 {
 	struct payload_list *pl;
@@ -466,8 +490,9 @@ rrenum_snd_fullsequence()
 		rrenum_snd_eachdst(pl);
 	}
 }
+#endif
 
-void
+static void
 rrenum_input(int s)
 {
 	int i;

@@ -1,4 +1,4 @@
-/*	$KAME: parser.y,v 1.6 2000/11/08 02:26:10 itojun Exp $	*/
+/*	$KAME: parser.y,v 1.7 2000/11/08 02:40:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -62,6 +62,7 @@ char errbuf[LINE_MAX];
 
 extern int lineno;
 extern void yyerror __P((const char *s));
+extern int yylex __P((void));
 static struct payload_list * pllist_lookup __P((int seqnum));
 static void pllist_enqueue __P((struct payload_list *pl_entry));
 
@@ -194,7 +195,7 @@ dest_addr :
 			if (error) {
 				snprintf(errbuf, sizeof(errbuf),
 				    "name resolution failed for %s:%s",
-				    $1, gai_strerror(error));
+				    $1.cp, gai_strerror(error));
 				yyerror(errbuf);
 			}
 			ss = (struct sockaddr_storage *)malloc(sizeof(*ss));
@@ -276,7 +277,7 @@ rrenum_statement_with_seqnum:
 		{
 			if (pllist_lookup($2)) {
 				snprintf(errbuf, sizeof(errbuf),
-				    "duplicate seqnum %d specified at %d",
+				    "duplicate seqnum %ld specified at %d",
 				    $2, lineno);
 				yyerror(errbuf);
 			}
@@ -297,7 +298,7 @@ seqnum:
 		{
 			if ($1 > MAX_SEQNUM) {
 				snprintf(errbuf, sizeof(errbuf),
-				    "seqnum %d is illegal for this  program. "
+				    "seqnum %ld is illegal for this  program. "
 				    "should be between 0 and %d",
 				    $1, MAX_SEQNUM);
 				yyerror(errbuf);
