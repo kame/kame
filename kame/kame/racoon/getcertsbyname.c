@@ -1,4 +1,4 @@
-/*	$KAME: getcertsbyname.c,v 1.5 2001/08/07 09:13:28 itojun Exp $	*/
+/*	$KAME: getcertsbyname.c,v 1.6 2001/08/07 09:17:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -104,7 +104,7 @@ freecertinfo(ci)
 #ifdef HAVE_LWRES_GETRRSETBYNAME
 #define getrrsetbyname lwres_getrrsetbyname
 #define freerrset lwres_freerrset
-#define hstreerror lwres_hstreerror
+#define hstrerror lwres_hstrerror
 #endif
 #if defined(HAVE_LWRES_GETRRSETBYNAME) || defined(AHVE_GETRRSETBYNAME)
 int
