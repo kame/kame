@@ -781,7 +781,7 @@ nd6_free(rt)
 	struct nd_defrouter *dr;
 
 	/*
-	 * Clear all distination cache entries for the neighbor.
+	 * Clear all destination cache entries for the neighbor.
 	 * XXX: is it better to restrict this to hosts?
 	 */
 	pfctlinput(PRC_HOSTDEAD, rt_key(rt));
