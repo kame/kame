@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.40 2000/05/11 03:02:54 itojun Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.41 2000/05/22 07:38:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -354,7 +354,7 @@ ip6_parsenumeric(sa, addr, host, hostlen, flags)
 			/* ip6_sa2str never fails */
 			scopelen = ip6_sa2str((const struct sockaddr_in6 *)sa,
 					      scopebuf, sizeof(scopebuf),
-					      0);
+					      flags);
 			if (scopelen + 1 + numaddrlen + 1 > hostlen)
 				return ENI_MEMORY;
 #if 0
@@ -398,7 +398,7 @@ ip6_sa2str(sa6, buf, bufsiz, flags)
 	unsigned int ifindex = (unsigned int)sa6->sin6_scope_id;
 	const struct in6_addr *a6 = &sa6->sin6_addr;
 
-#ifdef notyet
+#ifdef NI_NUMERICSCOPE
 	if (flags & NI_NUMERICSCOPE) {
 		return(snprintf(buf, bufsiz, "%d", sa6->sin6_scope_id));
 	}
