@@ -66,30 +66,30 @@
 #define ETHER_MAP_IP_MULTICAST(ipaddr, enaddr) \
 	/* struct in_addr *ipaddr; */ \
 	/* u_char enaddr[ETHER_ADDR_LEN];	   */ \
-{ \
+do { \
 	(enaddr)[0] = 0x01; \
 	(enaddr)[1] = 0x00; \
 	(enaddr)[2] = 0x5e; \
 	(enaddr)[3] = ((u_char *)ipaddr)[1] & 0x7f; \
 	(enaddr)[4] = ((u_char *)ipaddr)[2]; \
 	(enaddr)[5] = ((u_char *)ipaddr)[3]; \
-}
+} while (0)
 /*
  * Macro to map an IP6 multicast address to an Ethernet multicast address.
  * The high-order 16 bits of the Ethernet address are statically assigned,
  * and the low-order 32 bits are taken from the low end of the IP6 address.
  */
 #define ETHER_MAP_IPV6_MULTICAST(ip6addr, enaddr)			\
-/* struct in6_addr *ip6addr; */					\
+/* struct in6_addr *ip6addr; */						\
 /* u_char enaddr[ETHER_ADDR_LEN]; */					\
-{                                                                       \
+do {									\
 	(enaddr)[0] = 0x33;						\
 	(enaddr)[1] = 0x33;						\
 	(enaddr)[2] = ((u_char *)ip6addr)[12];				\
 	(enaddr)[3] = ((u_char *)ip6addr)[13];				\
 	(enaddr)[4] = ((u_char *)ip6addr)[14];				\
 	(enaddr)[5] = ((u_char *)ip6addr)[15];				\
-}
+} while (0)
 #endif
 
 /*
@@ -190,13 +190,13 @@ struct ether_multistep {
 	/* u_char addrhi[ETHER_ADDR_LEN]; */ \
 	/* struct arpcom *ac; */ \
 	/* struct ether_multi *enm; */ \
-{ \
+do { \
 	for ((enm) = (ac)->ac_multiaddrs; \
 	    (enm) != NULL && \
 	    (bcmp((enm)->enm_addrlo, (addrlo), ETHER_ADDR_LEN) != 0 || \
 	     bcmp((enm)->enm_addrhi, (addrhi), ETHER_ADDR_LEN) != 0); \
 		(enm) = (enm)->enm_next); \
-}
+} while (0)
 
 /*
  * Macro to step through all of the ether_multi records, one at a time.
@@ -208,19 +208,19 @@ struct ether_multistep {
 #define ETHER_NEXT_MULTI(step, enm) \
 	/* struct ether_multistep step; */  \
 	/* struct ether_multi *enm; */  \
-{ \
+do { \
 	if (((enm) = (step).e_enm) != NULL) \
 		(step).e_enm = (enm)->enm_next; \
-}
+} while (0)
 
 #define ETHER_FIRST_MULTI(step, ac, enm) \
 	/* struct ether_multistep step; */ \
 	/* struct arpcom *ac; */ \
 	/* struct ether_multi *enm; */ \
-{ \
+do { \
 	(step).e_enm = (ac)->ac_multiaddrs; \
 	ETHER_NEXT_MULTI((step), (enm)); \
-}
+} while (0)
 
 #endif
 
