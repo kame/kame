@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.244 2001/10/25 08:25:29 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.245 2001/11/06 08:40:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1181,6 +1181,23 @@ in6_update_ifa(ifp, ifra, ia)
 		ia->ia_dstaddr = dst6;
 	}
 
+	/*
+	 * Set lifetimes.  We do not refer to ia6t_expire and ia6t_preferred
+	 * to see if the address is deprecated or invalidated, but initialize
+	 * these members for applications.
+	 */
+	ia->ia6_lifetime = ifra->ifra_lifetime;
+	if (ia->ia6_lifetime.ia6t_vltime != ND6_INFINITE_LIFETIME) {
+		ia->ia6_lifetime.ia6t_expire =
+			time_second + ia->ia6_lifetime.ia6t_vltime;
+	} else
+		ia->ia6_lifetime.ia6t_expire = 0;
+	if (ia->ia6_lifetime.ia6t_pltime != ND6_INFINITE_LIFETIME) {
+		ia->ia6_lifetime.ia6t_preferred =
+			time_second + ia->ia6_lifetime.ia6t_pltime;
+	} else
+		ia->ia6_lifetime.ia6t_preferred = 0;
+
 	/* reset the interface and routing table appropriately. */
 	if ((error = in6_ifinit(ifp, ia, &ifra->ifra_addr, hostIsNew)) != 0)
 		goto unlink;
@@ -1392,19 +1409,6 @@ in6_update_ifa(ifp, ifra, ia)
 			goto cleanup;
 		}
 	}
-
-	ia->ia6_lifetime = ifra->ifra_lifetime;
-	/* for sanity */
-	if (ia->ia6_lifetime.ia6t_vltime != ND6_INFINITE_LIFETIME) {
-		ia->ia6_lifetime.ia6t_expire =
-			time_second + ia->ia6_lifetime.ia6t_vltime;
-	} else
-		ia->ia6_lifetime.ia6t_expire = 0;
-	if (ia->ia6_lifetime.ia6t_pltime != ND6_INFINITE_LIFETIME) {
-		ia->ia6_lifetime.ia6t_preferred =
-			time_second + ia->ia6_lifetime.ia6t_pltime;
-	} else
-		ia->ia6_lifetime.ia6t_preferred = 0;
 
 #ifdef MEASURE_PERFORMANCE
 	{
