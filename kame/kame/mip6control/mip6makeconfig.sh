@@ -1,6 +1,6 @@
 #!/bin/sh
 #
-# $Id: mip6makeconfig.sh,v 1.9 2004/02/10 12:44:54 t-momose Exp $
+# $Id: mip6makeconfig.sh,v 1.10 2004/06/29 16:17:03 keiichi Exp $
 
 cat=/bin/cat
 basename=/usr/bin/basename
@@ -165,9 +165,9 @@ EOF
 #
 ${cat} <<EOF > ${node_dir}/spddelete_home_agent
 spddelete ${home_agent} ${mobile_node}
-	135 -P out ipsec;
+	135 -P out;
 spddelete ${mobile_node} ${home_agent}
-	135 -P in ipsec;
+	135 -P in;
 EOF
 
 #
@@ -187,9 +187,9 @@ EOF
 #
 ${cat} <<EOF >> ${node_dir}/spddelete_home_agent
 spddelete ::/0 ${mobile_node}
-	${tunnel_upperspec} -P out ipsec;
+	${tunnel_upperspec} -P out;
 spddelete ${mobile_node} ::/0
-	${tunnel_upperspec} -P in ipsec;
+	${tunnel_upperspec} -P in;
 EOF
 
 #
@@ -209,9 +209,9 @@ EOF
 #
 ${cat} <<EOF > ${node_dir}/spddelete_mobile_node
 spddelete ${mobile_node} ${home_agent}
-	135 -P out ipsec;
+	135 -P out;
 spddelete ${home_agent} ${mobile_node}
-	135 -P in ipsec;
+	135 -P in;
 EOF
 
 #
@@ -231,7 +231,7 @@ EOF
 #
 ${cat} <<EOF >> ${node_dir}/spddelete_mobile_node
 spddelete ${mobile_node} ::/0
-	135 -P out ipsec;
+	135 -P out;
 spddelete ::/0 ${mobile_node}
-	135 -P in ipsec;
+	135 -P in;
 EOF
