@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.106 2003/07/31 22:24:23 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.107 2003/07/31 22:41:49 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1434,31 +1434,48 @@ make_binding_ia(msgtype, iapd, retlist, optinfo)
 	if ((binding = find_binding(&optinfo->clientID, DHCP6_BINDING_IA,
 	    iapd->type, iapd->val_ia.iaid)) == NULL) {
 		/*
-		 * If the delegating router cannot find a binding for
-		 * the requesting router's IA_PD the delegating router
-		 * returns the IA_PD containing no prefixes with a
-		 * Status Code option set to NoBinding in the Reply
-		 * message.
-		 * [dhcpv6-opt-prefix-delegation-01 Section 11.2]
-		 * See also: [RFC3315 Section 18.2.3, 18.2.4]
-		 * XXXXXX: need to be revisited.
-		 *
-		 * Additional note: according to the spec author, the behavior
-		 * should be different between renew and rebind.  For the case
-		 * of renew, the message is only sent to this node, so we
-		 * should always return a NoBinding error.  For the case of
-		 * rebind, the message is delivered to all possible servers.
-		 * In this case, we should not include the error unless we have
-		 * an explicit knowledge that the binding has been invalidated.
+		 * Behavior in the case where the delegating router cannot
+		 * find a binding for the requesting router's IA_PD
+		 * (dhcpv6-opt-prefix-delegation-04 Section 12.2):
 		 */
 		dprintf(LOG_INFO, FNAME, "no binding found for %s",
 		    duidstr(&optinfo->clientID));
 
-		if (msgtype == DH6_RENEW &&
-		    make_ia_stcode(iapd->type, iapd->val_ia.iaid,
-		    DH6OPT_STCODE_NOBINDING, retlist)) {
-			dprintf(LOG_NOTICE, FNAME,
-			    "failed to make an option list");
+		switch (msgtype) {
+		case DH6_RENEW:
+			/*
+			 * If the delegating router cannot find a binding for
+			 * the requesting router's IA_PD the delegating router
+			 * returns the IA_PD containing no prefixes with a
+			 * Status Code option set to NoBinding in the Reply
+			 * message.
+			 */
+			if (make_ia_stcode(iapd->type, iapd->val_ia.iaid,
+			    DH6OPT_STCODE_NOBINDING, retlist)) {
+				dprintf(LOG_NOTICE, FNAME,
+				    "failed to make an option list");
+				return (-1);
+			}
+			break;
+		case DH6_REBIND:
+			/*
+			 * If it can be determined the prefixes are not
+			 * appropriate from the delegating router's explicit
+			 * configuration, it MAY send a Reply message to
+			 * the requesting router containing the IA_PD with the
+			 * lifetimes of the prefixes in the IA_PD set to zero.
+			 *
+			 * If unable to determine, the Rebind message is
+			 * discarded.
+			 *
+			 * XXX: it is not very clear what the explicit
+			 * configuration means.  Thus, we always discard the
+			 * message.
+			 */
+			return (-1);
+		default:	/* XXX: should be a bug */
+			dprintf(LOG_ERR, FNAME, "impossible message type %s",
+			    dhcp6msgstr(msgtype));
 			return (-1);
 		}
 	} else {	/* we found a binding */
