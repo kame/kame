@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.202 2001/07/23 05:17:48 sumikawa Exp $	*/
+/*	$KAME: ip6_input.c,v 1.203 2001/07/23 06:40:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1068,7 +1068,7 @@ ip6_input(m)
 		ip6 = mtod(m, struct ip6_hdr *);
 
 		/*
-		 * if the payload length field is 0 and the next header field  
+		 * if the payload length field is 0 and the next header field
 		 * indicates Hop-by-Hop Options header, then a Jumbo Payload
 		 * option MUST be included.
 		 */
