@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.351 2004/12/09 02:19:06 t-momose Exp $	*/
+/*	$KAME: ip6_input.c,v 1.352 2004/12/17 05:46:43 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2189,7 +2189,7 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 		    &ip6_use_defzone);
 	case IPV6CTL_MAXFRAGS:
 		return sysctl_int(oldp, oldlenp, newp, newlen, &ip6_maxfrags);
-#ifdef IFT_IST
+#if defined(IFT_IST) && NIST > 0
 	case IPV6CTL_ISATAPRTR:
 		return fill_isatap_rtrlist(oldp, oldlenp,
 					   oldlenp ? *oldlenp : 0);
