@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.58 2003/09/12 12:44:13 t-momose Exp $	*/
+/*	$KAME: mip6control.c,v 1.59 2004/01/22 11:19:15 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,6 +76,7 @@ static const char *bcstate_sprintf(u_int8_t);
 static struct hif_softc *get_hif_softc(char *);
 static void kread(u_long, void *, int);
 static int parse_address_port(char *, struct in6_addr *, uint16_t *);
+static void show_nonce_info(void);
 
 static const char *pfx_desc[] = {
 	"prefix\t\tplen\tvltime\tvlexp\tpltime\tplexp\texp\thaddr\n",
@@ -111,6 +112,12 @@ struct nlist nl[] = {
 #define N_MIP6_UNUSE_HOA 6
 	{ "_mip6_preferred_ifnames" },
 #define N_MIP6_PREFERRED_IFNAMES 7
+	{ "_mip6_nonce" },
+#define N_MIP6_NONCE 8
+	{ "_nonce_head" },
+#define N_NONCE_HEAD 9
+	{ "_nonce_index" },
+#define N_NONCE_INDEX 10
 	{ "" },
 };
 
@@ -170,6 +177,7 @@ main(argc, argv)
 	char *ifidarg = NULL;
 	int ifnames = 0;
 	char *ifname_list = NULL;
+	int nonceinfo = 0;
 
 	__progname = strrchr(argv[0], '/');
 	if (__progname == NULL)
@@ -177,7 +185,7 @@ main(argc, argv)
 	else
 		__progname++;
 
-	while ((ch = getopt(argc, argv, "nli:mMgH:hP:O:A:abcC:u:v:wD:S:T:I:F:")) != -1) {
+	while ((ch = getopt(argc, argv, "nli:mMgH:hP:O:A:abcC:u:v:wD:S:T:I:F:N")) != -1) {
 		switch(ch) {
 		case 'm':
 			enablemn = 1;
@@ -255,6 +263,9 @@ main(argc, argv)
 		case 'F':
 			ifnames = 1;
 			ifname_list = optarg;
+			break;
+		case 'N':
+			nonceinfo = 1;
 			break;
 		default:
 			usage();
@@ -723,6 +734,10 @@ main(argc, argv)
 			exit(1);
 		}
 	}
+
+	if (nonceinfo) {
+		show_nonce_info();
+	}
 	
 	exit(0);
 }
@@ -948,6 +963,30 @@ get_hif_softc(ifname)
 	}
 
 	return sc;
+}
+
+static void
+show_nonce_info()
+{
+	int i, j, offset;
+	int16_t nonce_index;
+	void *nonce_head;
+	mip6_nonce_t mip6_nonce[MIP6_NONCE_HISTORY];
+
+	KREAD(nl[N_MIP6_NONCE].n_value, mip6_nonce, mip6_nonce);
+	KREAD(nl[N_NONCE_HEAD].n_value, &nonce_head, nonce_head);
+	KREAD(nl[N_NONCE_INDEX].n_value, &nonce_index, nonce_index);
+
+	offset = (nonce_head - (void *)nl[N_MIP6_NONCE].n_value) / sizeof(mip6_nonce_t);
+	for (i = 0; i < sizeof(mip6_nonce) / sizeof(mip6_nonce_t) && nonce_index >= 0; i++) {
+		printf("%d: ", nonce_index--);
+		for (j = 0; j < sizeof(mip6_nonce_t); j++) {
+			printf("%02x", *((unsigned char *)&mip6_nonce[offset] + j));
+		}
+		printf("\n");
+		if (--offset < 0)
+			offset = MIP6_NONCE_HISTORY - 1;
+	}
 }
 
 static void
