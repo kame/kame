@@ -1,6 +1,6 @@
 Portability guideline
 KAME project
-$Id: PORTABILITY,v 1.13 1999/10/15 11:57:55 itojun Exp $
+$Id: PORTABILITY,v 1.14 1999/10/20 08:18:30 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -117,6 +117,15 @@ across those possibilities.
 	MAN8=	baz.8
 	MLINKS=	foo.5 bar.5
 	# if you do not want shlib, do not define SHLIB_{MAJOR,MINOR}
+
+- If you use yacc/lex, be aware that FreeBSD bsd.prog.mk behaves very
+  strange with yacc's -o option (non-trivial .if statement is placed).
+  You may need to add the following into Makefile for code sharing.
+  The following fragment will force the build to generate y.tab.h, instead
+  of foo.h.
+	SRCS+=y.tab.h
+	y.tab.h: foo.y
+  Be sure to include y.tab.h, not foo.h, from *.l.
 
 - BSDI3 /usr/bin/cc is gcc 1.42, and it does not support __FUNCTION__.
   If you need to use __FUNCTION__, you need to set CC to "gcc", or "shlicc2"
