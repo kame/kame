@@ -198,9 +198,10 @@ struct protox ip6protox[] = {
 
 struct protox atalkprotox[] = {
 	{ N_DDPCB,	N_DDPSTAT,	1,	atalkprotopr,
-	  ddp_stats,	NULL,		"ddp" ,
+	  ddp_stats,	NULL,		"ddp" , 0 },
 	{ -1,		-1,		0,	0,
-	  0,		NULL,		0 }};
+	  0,		NULL,		0,	0 }
+};
 
 struct protox ipxprotox[] = {
 	{ N_IPX,	N_IPXSTAT,	1,	ipxprotopr,
