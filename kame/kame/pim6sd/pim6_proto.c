@@ -1704,7 +1704,14 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 			    if (my_action == PIM_ACTION_JOIN)
 			    {
 				/* Override the Prune by scheduling a Join */
-				jp_value = (RANDOM() % 11) / (10 * PIM_RANDOM_DELAY_JOIN_TIMEOUT);
+
+				/*
+				 * make a random delay between 0 to
+				 * PIM_RANDOM_DELAY_JOIN_TIMEOUT.
+				 * Note that the default value of the random
+				 * delay is 4.5, thus we need to multiply 10.
+				 */
+				jp_value = (random() % (int)(10 * PIM_RANDOM_DELAY_JOIN_TIMEOUT)) / 10;
 				/* TODO: XXX: TIMER implem. dependency! */
 				if (mrtentry_rp->jp_timer > jp_value)
 				    SET_TIMER(mrtentry_rp->jp_timer, jp_value);
