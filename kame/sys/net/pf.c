@@ -5056,9 +5056,9 @@ pf_route6(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 			goto bad;
 		m_tag_prepend(m0, mtag);
 #ifdef __FreeBSD__
-		ip6_output(m0, NULL, NULL, NULL, NULL, NULL, NULL);
+		ip6_output(m0, NULL, NULL, 0, NULL, NULL, NULL);
 #else
-		ip6_output(m0, NULL, NULL, NULL, NULL, NULL);
+		ip6_output(m0, NULL, NULL, 0, NULL, NULL);
 #endif
 		return;
 	}
