@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.50 2001/06/04 12:03:42 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.51 2001/06/08 10:10:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -373,6 +373,8 @@ int in6_gif_input(mp, offp, proto)
 
 #ifdef __OpenBSD__
 	m->m_pkthdr.rcvif = gifp;
+	gifp->if_ipackets++;
+	gifp->if_ibytes += m->m_pkthdr.len;
 	ipip_input(m, *offp);
 	return IPPROTO_DONE;
 #else

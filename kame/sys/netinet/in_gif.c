@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.55 2001/06/04 12:03:42 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.56 2001/06/08 10:10:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -379,6 +379,8 @@ in_gif_input(m, va_alist)
 
 #ifdef __OpenBSD__
 	m->m_pkthdr.rcvif = gifp;
+	gifp->if_ipackets++;
+	gifp->if_ibytes += m->m_pkthdr.len;
 	ipip_input(m, off); /* We have a configured GIF */
 	return;
 #else
