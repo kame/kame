@@ -124,10 +124,6 @@ __RCSID("$NetBSD: ifconfig.c,v 1.123 2002/05/06 20:14:36 thorpej Exp $");
 #include <unistd.h>
 #include <ifaddrs.h>
 
-#ifdef USE_ISATAP
-#include <net/if_stf.h>
-#endif
-
 struct	ifreq		ifr, ridreq;
 struct	ifaliasreq	addreq __attribute__((aligned(4)));
 struct	in_aliasreq	in_addreq;
@@ -181,11 +177,6 @@ void	setatrange __P((const char *, int));
 void	setatphase __P((const char *, int));
 void	settunnel __P((const char *, const char *));
 void	deletetunnel __P((const char *, int));
-#ifdef USE_ISATAP
-void	setisatapmode __P((const char *, int));;
-void	setisataprouter __P((const char *, int));;
-void	deleteisataprouter __P((const char *, int));;
-#endif
 #ifdef INET6
 void 	setia6flags __P((const char *, int));
 void	setia6deprecated __P((const char *, int));
@@ -287,11 +278,6 @@ const struct cmd {
 	{ "vlan",	NEXTARG,	0,		setvlan } ,
 	{ "vlanif",	NEXTARG,	0,		setvlanif } ,
 	{ "-vlanif",	0,		0,		unsetvlanif } ,
-#ifdef USE_ISATAP
-	{ "isatapmode",	NEXTARG,	0,		setisatapmode },
-	{ "isataprtr",	NEXTARG,	0,		setisataprouter },
-	{ "deleteisataprtr", NEXTARG,	0,		deleteisataprouter },
-#endif
 #if 0
 	/* XXX `create' special-cased below */
 	{ "create",	0,		0,		clone_create } ,
@@ -375,9 +361,6 @@ void 	iso_getaddr __P((const char *, int));
 void	ieee80211_status __P((void));
 void	tunnel_status __P((void));
 void	vlan_status __P((void));
-#ifdef USE_ISATAP
-void	isatap_status __P((void));
-#endif
 
 /* Known address families */
 struct afswtch {
@@ -1079,79 +1062,6 @@ void unsetvlanif(val, d)
 		err(EXIT_FAILURE, "SIOCSETVLAN");
 }
 
-#ifdef USE_ISATAP
-void
-setisatapmode(mode, param)
-	const char *mode;
-	int param;
-{
-	int isatapmode;
-	if (strcasecmp(mode, "on") == 0)
-		isatapmode = STFM_ISATAP;
-	else if (strcasecmp(mode, "off") == 0)
-		isatapmode = STFM_6TO4;
-	else
-		err(1, "syntax error");
-
-	memcpy(&ifr.ifr_data, &isatapmode, sizeof(isatapmode));
-	if (ioctl(s, SIOCSSTFMODE, (caddr_t) &ifr) < 0)
-		err(1, "SIOCSSTFMODE");
-}
-
-void
-setisataprouter(addr, param)
-	const char *addr;
-	int param;
-{
-	struct addrinfo hints, *rtrres;
-	struct ifreq ifreq;
-	int ecode;
-
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = afp->af_af;
-	if ((ecode = getaddrinfo(addr, NULL, NULL, &rtrres)) != 0)
-		errx(1, "error in parsing address string: %s",
-		    gai_strerror(ecode));
-
-	if (rtrres->ai_addr->sa_family != AF_INET)
-		errx(1, "ISATAP router must be an IPv4 address");
-
-	memset(&ifreq, 0, sizeof(ifreq));
-	strncpy(ifreq.ifr_name, name, IFNAMSIZ);
-	memcpy(&ifreq.ifr_addr, rtrres->ai_addr, rtrres->ai_addr->sa_len);
-
-	if (ioctl(s, SIOCSISATAPRTR, &ifreq) < 0)
-		warn("SIOCSISATAPRTR");
-	freeaddrinfo(rtrres);
-}
-
-void
-deleteisataprouter(addr, param)
-	const char *addr;
-	int param;
-{
-	struct addrinfo hints, *rtrres;
-	struct ifreq ifreq;
-	int ecode;
-
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = afp->af_af;
-	if ((ecode = getaddrinfo(addr, NULL, NULL, &rtrres)) != 0)
-		errx(1, "error in parsing address string: %s",
-		    gai_strerror(ecode));
-
-	if (rtrres->ai_addr->sa_family != AF_INET)
-		errx(1, "ISATAP router must be an IPv4 address");
-
-	memset(&ifreq, 0, sizeof(ifreq));
-	strncpy(ifreq.ifr_name, name, IFNAMSIZ);
-	memcpy(&ifreq.ifr_addr, rtrres->ai_addr, rtrres->ai_addr->sa_len);
-
-	if (ioctl(s, SIOCDISATAPRTR, &ifreq) < 0)
-		warn("SIOCDISATAPRTR");
-	freeaddrinfo(rtrres);
-}
-#endif /* USE_ISATAP */
 void
 setifnetmask(addr, d)
 	const char *addr;
@@ -2001,9 +1911,6 @@ status(sdl)
 	ieee80211_status();
 	vlan_status();
 	tunnel_status();
-#ifdef USE_ISATAP
-	isatap_status();
-#endif
 
 	if (sdl != NULL &&
 	    getnameinfo((struct sockaddr *)sdl, sdl->sdl_len,
@@ -2165,52 +2072,6 @@ vlan_status()
 		    vlr.vlr_tag, vlr.vlr_parent[0] == '\0' ?
 		    "<none>" : vlr.vlr_parent);
 }
-
-#ifdef USE_ISATAP
-void
-isatap_status()
-{
-	char *buf, *ptr, *lim;
-	size_t needed;
-	int mib[4] = {CTL_NET, PF_INET6, IPPROTO_IPV6, IPV6CTL_ISATAPRTR};
-
-	/* just skip if it is not an ISATAP interface */
-	if (ioctl(s, SIOCGSTFMODE, (caddr_t) &ifr) < 0)
-		return;
-	if ((int) ifr.ifr_data != STFM_ISATAP) {
-		printf("\tisatapmode off\n");
-		return;
-	}
-	printf("\tisatapmode on\n");
-
-	if (sysctl(mib, 4, NULL, &needed, NULL, 0) < 0)
-		return;
-	if (needed == 0)
-		return;
-	if ((buf = malloc(needed)) == NULL)
-		errx(1, "malloc");
-	if (sysctl(mib, 4, buf, &needed, NULL, 0) < 0)
-		errx(1, "actual retrieval of ISATAP router list");
-	
-	lim = buf + needed;
-	ptr = buf;
-	while (ptr < lim) {
-		char rtraddr[NI_MAXHOST];
-		struct sockaddr *addr = (struct sockaddr *) ptr;
-
-		if (addr->sa_family != AF_INET) {
-			warnx("invalid addr family (%d)", addr->sa_family);
-			continue;
-		}
-		rtraddr[0] = '\0';
-		getnameinfo(addr, addr->sa_len,
-			    rtraddr, sizeof(rtraddr), 0, 0, NI_NUMERICHOST);
-		if (rtraddr[0])
-			printf("\tisataprtr %s\n", rtraddr);
-		ptr += addr->sa_len;
-	}
-}
-#endif
 
 void
 in_alias(creq)
