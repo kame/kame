@@ -16,7 +16,7 @@
  *
  * NEW command line interface for IP firewall facility
  *
- * $Id: ip6fw.c,v 1.6 2001/01/22 18:48:30 itojun Exp $
+ * $Id: ip6fw.c,v 1.7 2001/01/24 01:25:33 itojun Exp $
  *
  */
 
@@ -363,7 +363,7 @@ show_ip6fw(struct ip6_fw *chain)
 		if (chain->fw_ip6nopt & IPV6_FW_IP6OPT_OPTS)   PRINTOPT("!opts");
 	} 
 
-	if (chain->fw_tcpf & IPV6_FW_TCPF_ESTAB) 
+	if (chain->fw_ipflg & IPV6_FW_IF_TCPEST)
 		printf(" established");
 	else if (chain->fw_tcpf == IPV6_FW_TCPF_SYN &&
 	    chain->fw_tcpnf == IPV6_FW_TCPF_ACK)
@@ -1052,7 +1052,7 @@ badviacombo:
 		}
 		if (rule.fw_prot == IPPROTO_TCP) {
 			if (!strncmp(*av,"established",strlen(*av))) { 
-				rule.fw_tcpf  |= IPV6_FW_TCPF_ESTAB;
+				rule.fw_ipflg |= IPV6_FW_IF_TCPEST;
 				av++; ac--; continue;
 			}
 			if (!strncmp(*av,"setup",strlen(*av))) { 
