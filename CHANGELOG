@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.732 2000/03/28 12:48:42 sumikawa Exp $
+$Id: CHANGELOG,v 1.733 2000/03/28 14:12:19 itojun Exp $
 
 <200003>
+Tue Mar 28 23:09:59 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ip6_input.c: SIIT assumes that routers forward native
+	  IPv6 packet with IPv4 mapped address just like for normal packets.
+	  move IPv4 mapped address src/dst check downwards.
+	* sys/net/if_stf.c: make IPv4 ingress filtering rule more strict.
+	  drop packet if there's no route found for IPv4 source, or
+	  IPv4 compatible IPv6 source.
+
 Tue Mar 28 21:45:54 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd2/ports/ncftp3: upgrade to 3.0.0.
 
