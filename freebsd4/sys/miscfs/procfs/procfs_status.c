@@ -37,7 +37,7 @@
  *	@(#)procfs_status.c	8.4 (Berkeley) 6/15/94
  *
  * From:
- * $FreeBSD: src/sys/miscfs/procfs/procfs_status.c,v 1.20 1999/12/27 16:03:38 peter Exp $
+ * $FreeBSD: src/sys/miscfs/procfs/procfs_status.c,v 1.20.2.5 2003/10/02 16:49:49 nectar Exp $
  */
 
 #include <sys/param.h>
@@ -55,6 +55,7 @@
 #include <vm/vm_param.h>
 #include <sys/exec.h>
 
+#define DOCHECK() do { if (ps >= psbuf+sizeof(psbuf)) goto bailout; } while (0)
 int
 procfs_dostatus(curp, p, pfs, uio)
 	struct proc *curp;
@@ -71,7 +72,7 @@ procfs_dostatus(curp, p, pfs, uio)
 	int i;
 	int xlen;
 	int error;
-	char psbuf[256];		/* XXX - conservative */
+	char psbuf[256];	/* XXX - conservative */
 
 	if (uio->uio_rw != UIO_READ)
 		return (EOPNOTSUPP);
@@ -85,73 +86,91 @@ procfs_dostatus(curp, p, pfs, uio)
 /* comm pid ppid pgid sid maj,min ctty,sldr start ut st wmsg 
                                 euid ruid rgid,egid,groups[1 .. NGROUPS]
 */
+	KASSERT(sizeof(psbuf) > MAXCOMLEN,
+			("Too short buffer for new MAXCOMLEN"));
+
 	ps = psbuf;
 	bcopy(p->p_comm, ps, MAXCOMLEN);
 	ps[MAXCOMLEN] = '\0';
 	ps += strlen(ps);
-	ps += sprintf(ps, " %d %d %d %d ", pid, ppid, pgid, sid);
-
+	DOCHECK();
+	ps += snprintf(ps, psbuf + sizeof(psbuf) - ps,
+	    " %d %d %d %d ", pid, ppid, pgid, sid);
+	DOCHECK();
 	if ((p->p_flag&P_CONTROLT) && (tp = sess->s_ttyp))
-		ps += sprintf(ps, "%d,%d ", major(tp->t_dev), minor(tp->t_dev));
+		ps += snprintf(ps, psbuf + sizeof(psbuf) - ps,
+		    "%d,%d ", major(tp->t_dev), minor(tp->t_dev));
 	else
-		ps += sprintf(ps, "%d,%d ", -1, -1);
+		ps += snprintf(ps, psbuf + sizeof(psbuf) - ps,
+		    "%d,%d ", -1, -1);
+	DOCHECK();
 
 	sep = "";
 	if (sess->s_ttyvp) {
-		ps += sprintf(ps, "%sctty", sep);
+		ps += snprintf(ps, psbuf + sizeof(psbuf) - ps, "%sctty", sep);
 		sep = ",";
+		DOCHECK();
 	}
 	if (SESS_LEADER(p)) {
-		ps += sprintf(ps, "%ssldr", sep);
+		ps += snprintf(ps, psbuf + sizeof(psbuf) - ps, "%ssldr", sep);
 		sep = ",";
+		DOCHECK();
 	}
-	if (*sep != ',')
-		ps += sprintf(ps, "noflags");
+	if (*sep != ',') {
+		ps += snprintf(ps, psbuf + sizeof(psbuf) - ps, "noflags");
+		DOCHECK();
+	}
 
 	if (p->p_flag & P_INMEM) {
 		struct timeval ut, st;
 
 		calcru(p, &ut, &st, (struct timeval *) NULL);
-		ps += sprintf(ps, " %ld,%ld %ld,%ld %ld,%ld",
+		ps += snprintf(ps, psbuf + sizeof(psbuf) - ps,
+		    " %ld,%ld %ld,%ld %ld,%ld",
 		    p->p_stats->p_start.tv_sec,
 		    p->p_stats->p_start.tv_usec,
 		    ut.tv_sec, ut.tv_usec,
 		    st.tv_sec, st.tv_usec);
 	} else
-		ps += sprintf(ps, " -1,-1 -1,-1 -1,-1");
+		ps += snprintf(ps, psbuf + sizeof(psbuf) - ps,
+		    " -1,-1 -1,-1 -1,-1");
+	DOCHECK();
 
-	ps += sprintf(ps, " %s",
+	ps += snprintf(ps, psbuf + sizeof(psbuf) - ps, " %s",
 		(p->p_wchan && p->p_wmesg) ? p->p_wmesg : "nochan");
+	DOCHECK();
 
 	cr = p->p_ucred;
 
-	ps += sprintf(ps, " %lu %lu %lu", 
+	ps += snprintf(ps, psbuf + sizeof(psbuf) - ps, " %lu %lu %lu", 
 		(u_long)cr->cr_uid,
 		(u_long)p->p_cred->p_ruid,
 		(u_long)p->p_cred->p_rgid);
+	DOCHECK();
 
 	/* egid (p->p_cred->p_svgid) is equal to cr_ngroups[0] 
 	   see also getegid(2) in /sys/kern/kern_prot.c */
 
-	for (i = 0; i < cr->cr_ngroups; i++)
-		ps += sprintf(ps, ",%lu", (u_long)cr->cr_groups[i]);
+	for (i = 0; i < cr->cr_ngroups; i++) {
+		ps += snprintf(ps, psbuf + sizeof(psbuf) - ps,
+		    ",%lu", (u_long)cr->cr_groups[i]);
+		DOCHECK();
+	}
 
 	if (p->p_prison)
-		ps += sprintf(ps, " %s", p->p_prison->pr_host);
+		ps += snprintf(ps, psbuf + sizeof(psbuf) - ps,
+		    " %s", p->p_prison->pr_host);
 	else
-		ps += sprintf(ps, " -");
-	ps += sprintf(ps, "\n");
+		ps += snprintf(ps, psbuf + sizeof(psbuf) - ps, " -");
+	DOCHECK();
+	ps += snprintf(ps, psbuf + sizeof(psbuf) - ps, "\n");
+	DOCHECK();
 
-	xlen = ps - psbuf;
-	xlen -= uio->uio_offset;
-	ps = psbuf + uio->uio_offset;
-	xlen = imin(xlen, uio->uio_resid);
-	if (xlen <= 0)
-		error = 0;
-	else
-		error = uiomove(ps, xlen, uio);
-
+	error = uiomove_frombuf(psbuf, ps - psbuf, uio);
 	return (error);
+
+bailout:
+	return (ENOMEM);
 }
 
 int
@@ -167,6 +186,7 @@ procfs_docmdline(curp, p, pfs, uio)
 	char *buf, *bp;
 	int buflen;
 	struct ps_strings pstr;
+	char **ps_argvstr;
 	int i;
 	size_t bytes_left, done;
 
@@ -183,7 +203,10 @@ procfs_docmdline(curp, p, pfs, uio)
 	 * Linux behaviour is to return zero-length in this case.
 	 */
 
-	if (p->p_args && (ps_argsopen ||!p_trespass(curp, p))) {
+	if (p->p_args &&
+	    (ps_argsopen || (CHECKIO(curp, p) &&
+			     (p->p_flag & P_INEXEC) == 0 &&
+			     !p_trespass(curp, p)))) {
 		bp = p->p_args->ar_args;
 		buflen = p->p_args->ar_length;
 		buf = 0;
@@ -201,9 +224,22 @@ procfs_docmdline(curp, p, pfs, uio)
 			FREE(buf, M_TEMP);
 			return (error);
 		}
+		if (pstr.ps_nargvstr > ARG_MAX) {
+			FREE(buf, M_TEMP);
+			return (E2BIG);
+		}
+		MALLOC(ps_argvstr, char **, pstr.ps_nargvstr * sizeof(char *),
+		    M_TEMP, M_WAITOK);
+		error = copyin((void *)pstr.ps_argvstr, ps_argvstr,
+		    pstr.ps_nargvstr * sizeof(char *));
+		if (error) {
+			FREE(ps_argvstr, M_TEMP);
+			FREE(buf, M_TEMP);
+			return (error);
+		}
 		bytes_left = buflen;
 		for (i = 0; bytes_left && (i < pstr.ps_nargvstr); i++) {
-			error = copyinstr(pstr.ps_argvstr[i], ps,
+			error = copyinstr(ps_argvstr[i], ps,
 					  bytes_left, &done);
 			/* If too long or malformed, just truncate */
 			if (error) {
@@ -214,15 +250,10 @@ procfs_docmdline(curp, p, pfs, uio)
 			bytes_left -= done;
 		}
 		buflen = ps - buf;
+		FREE(ps_argvstr, M_TEMP);
 	}
 
-	buflen -= uio->uio_offset;
-	ps = bp + uio->uio_offset;
-	xlen = min(buflen, uio->uio_resid);
-	if (xlen <= 0)
-		error = 0;
-	else
-		error = uiomove(ps, xlen, uio);
+	error = uiomove_frombuf(bp, buflen, uio);
 	if (buf)
 		FREE(buf, M_TEMP);
 	return (error);

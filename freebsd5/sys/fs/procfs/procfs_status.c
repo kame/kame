@@ -14,10 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -38,10 +34,11 @@
  *
  * From:
  *	$Id: procfs_status.c,v 3.1 1993/12/15 09:40:17 jsp Exp $
- * $FreeBSD: src/sys/fs/procfs/procfs_status.c,v 1.45 2002/09/21 22:07:16 jake Exp $
+ * $FreeBSD: src/sys/fs/procfs/procfs_status.c,v 1.52 2004/04/07 20:46:02 imp Exp $
  */
 
 #include <sys/param.h>
+#include <sys/kernel.h>
 #include <sys/systm.h>
 #include <sys/exec.h>
 #include <sys/lock.h>
@@ -70,6 +67,7 @@ procfs_doprocstatus(PFS_FILL_ARGS)
 	struct thread *tdfirst;
 	struct tty *tp;
 	struct ucred *cr;
+	const char *wmesg;
 	char *pc;
 	char *sep;
 	int pid, ppid, pgid, sid;
@@ -83,8 +81,8 @@ procfs_doprocstatus(PFS_FILL_ARGS)
 	SESS_LOCK(sess);
 	sid = sess->s_leader ? sess->s_leader->p_pid : 0;
 
-/* comm pid ppid pgid sid maj,min ctty,sldr start ut st wmsg 
-                                euid ruid rgid,egid,groups[1 .. NGROUPS]
+/* comm pid ppid pgid sid maj,min ctty,sldr start ut st wmsg
+				euid ruid rgid,egid,groups[1 .. NGROUPS]
 */
 
 	pc = p->p_comm;
@@ -95,7 +93,7 @@ procfs_doprocstatus(PFS_FILL_ARGS)
 			sbuf_putc(sb, *pc);
 	} while (*++pc);
 	sbuf_printf(sb, " %d %d %d %d ", pid, ppid, pgid, sid);
-	if ((p->p_flag&P_CONTROLT) && (tp = sess->s_ttyp))
+	if ((p->p_flag & P_CONTROLT) && (tp = sess->s_ttyp))
 		sbuf_printf(sb, "%d,%d ", major(tp->t_dev), minor(tp->t_dev));
 	else
 		sbuf_printf(sb, "%d,%d ", -1, -1);
@@ -115,14 +113,27 @@ procfs_doprocstatus(PFS_FILL_ARGS)
 	}
 
 	mtx_lock_spin(&sched_lock);
+	if (p->p_flag & P_SA)
+		wmesg = "-kse- ";
+	else {
+		tdfirst = FIRST_THREAD_IN_PROC(p);
+		if (tdfirst->td_wchan != NULL) {
+			KASSERT(tdfirst->td_wmesg != NULL,
+			    ("wchan %p has no wmesg", tdfirst->td_wchan));
+			wmesg = tdfirst->td_wmesg;
+		} else
+			wmesg = "nochan";
+	}
+
 	if (p->p_sflag & PS_INMEM) {
-		struct timeval ut, st;
+		struct timeval start, ut, st;
 
 		calcru(p, &ut, &st, (struct timeval *) NULL);
 		mtx_unlock_spin(&sched_lock);
-		sbuf_printf(sb, " %lld,%ld %ld,%ld %ld,%ld",
-		    (long long)p->p_stats->p_start.tv_sec,
-		    p->p_stats->p_start.tv_usec,
+		start = p->p_stats->p_start;
+		timevaladd(&start, &boottime);
+		sbuf_printf(sb, " %ld,%ld %ld,%ld %ld,%ld",
+		    start.tv_sec, start.tv_usec,
 		    ut.tv_sec, ut.tv_usec,
 		    st.tv_sec, st.tv_usec);
 	} else {
@@ -130,14 +141,7 @@ procfs_doprocstatus(PFS_FILL_ARGS)
 		sbuf_printf(sb, " -1,-1 -1,-1 -1,-1");
 	}
 
-	if (p->p_flag & P_KSES)
-		sbuf_printf(sb, " %s", "-kse- ");
-	else {
-		tdfirst = FIRST_THREAD_IN_PROC(p);	/* XXX diff from td? */
-		sbuf_printf(sb, " %s",
-		    (tdfirst->td_wchan && tdfirst->td_wmesg) ?
-		    tdfirst->td_wmesg : "nochan");
-	}
+	sbuf_printf(sb, " %s", wmesg);
 
 	cr = p->p_ucred;
 
@@ -146,7 +150,7 @@ procfs_doprocstatus(PFS_FILL_ARGS)
 		(u_long)cr->cr_ruid,
 		(u_long)cr->cr_rgid);
 
-	/* egid (cr->cr_svgid) is equal to cr_ngroups[0] 
+	/* egid (cr->cr_svgid) is equal to cr_ngroups[0]
 	   see also getegid(2) in /sys/kern/kern_prot.c */
 
 	for (i = 0; i < cr->cr_ngroups; i++) {
@@ -170,6 +174,7 @@ int
 procfs_doproccmdline(PFS_FILL_ARGS)
 {
 	struct ps_strings pstr;
+	char **ps_argvstr;
 	int error, i;
 
 	/*
@@ -183,7 +188,7 @@ procfs_doproccmdline(PFS_FILL_ARGS)
 	 */
 
 	PROC_LOCK(p);
-	if (p->p_args && (ps_argsopen || !p_cansee(td, p))) {
+	if (p->p_args && p_cansee(td, p) == 0) {
 		sbuf_bcpy(sb, p->p_args->ar_args, p->p_args->ar_length);
 		PROC_UNLOCK(p);
 		return (0);
@@ -196,10 +201,21 @@ procfs_doproccmdline(PFS_FILL_ARGS)
 		    sizeof(pstr));
 		if (error)
 			return (error);
+		if (pstr.ps_nargvstr > ARG_MAX)
+			return (E2BIG);
+		ps_argvstr = malloc(pstr.ps_nargvstr * sizeof(char *),
+		    M_TEMP, M_WAITOK);
+		error = copyin((void *)pstr.ps_argvstr, ps_argvstr,
+		    pstr.ps_nargvstr * sizeof(char *));
+		if (error) {
+			free(ps_argvstr, M_TEMP);
+			return (error);
+		}
 		for (i = 0; i < pstr.ps_nargvstr; i++) {
-			sbuf_copyin(sb, pstr.ps_argvstr[i], 0);
+			sbuf_copyin(sb, ps_argvstr[i], 0);
 			sbuf_printf(sb, "%c", '\0');
 		}
+		free(ps_argvstr, M_TEMP);
 	}
 
 	return (0);

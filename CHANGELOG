@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2695 2004/12/02 06:22:58 jinmei Exp $
+$KAME: CHANGELOG,v 1.2696 2004/12/02 09:51:52 suz Exp $
 
 <200412>
+2004-12-01 SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* freebsd4/sys/miscfs/procfs/procfs_status.c,
+	  freebsd5/sys/fs/procfs/procfs_status.c,
+	  freebsd5/sys/compat/linprofcs/linprocfs.c:
+	FreeBSD Security Advisory: FreeBSD-SA-04:17.procfs
+
 2004-12-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *bsd/sys/netinet/tcp_subr.c (tcp[6]_notify):  implemented quick
 	fall-back optimization as described in
