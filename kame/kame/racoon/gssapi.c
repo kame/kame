@@ -1,4 +1,4 @@
-/*	$KAME: gssapi.c,v 1.11 2001/01/29 17:55:39 thorpej Exp $	*/
+/*	$KAME: gssapi.c,v 1.12 2001/01/29 18:30:30 thorpej Exp $	*/
 
 /*
  * Copyright 2000 Wasabi Systems, Inc.
@@ -111,11 +111,16 @@ gssapi_get_default_name(struct ph1handle *iph1, int remote, gss_name_t *service)
 	    "%s@%s", GSSAPI_DEF_NAME, name);  
 	maj_stat = gss_import_name(&min_stat, &name_token,
 	    GSS_C_NT_HOSTBASED_SERVICE, service);
-	free(name_token.value);
 	if (GSS_ERROR(maj_stat)) {
 		gssapi_error(maj_stat, LOCATION, "import name\n");
+		maj_stat = gss_release_buffer(&min_stat, &name_token);
+		if (GSS_ERROR(maj_stat))
+			gssapi_error(maj_stat, LOCATION, "release name_token");
 		return -1;
 	}
+	maj_stat = gss_release_buffer(&min_stat, &name_token);
+	if (GSS_ERROR(maj_stat))
+		gssapi_error(maj_stat, LOCATION, "release name_token");
 
 	return 0;
 }
@@ -179,6 +184,9 @@ gssapi_init(struct ph1handle *iph1)
 
 	plog(LLV_DEBUG, LOCATION, NULL, "will try to acquire '%*s' creds\n",
 	    cred->length, cred->value);
+	maj_stat = gss_release_buffer(&min_stat, cred);
+	if (GSS_ERROR(maj_stat))
+		gssapi_error(maj_stat, LOCATION, "release cred buffer\n");
 
 	maj_stat = gss_acquire_cred(&min_stat, canon_princ, GSS_C_INDEFINITE,
 	    GSS_C_NO_OID_SET, GSS_C_BOTH, &gps->gss_cred, NULL, NULL);
