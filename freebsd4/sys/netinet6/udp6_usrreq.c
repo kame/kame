@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.4 2000/10/31 19:07:09 ume Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.29 2001/07/25 04:47:34 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.30 2001/07/25 04:56:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -240,6 +240,10 @@ udp6_input(mp, offp, proto)
 				continue;
 			if (in6p->in6p_lport != uh->uh_dport)
 				continue;
+			/*
+			 * XXX: in6_mcmatch() below exists just for a
+			 * historical reason, and should be removed.
+			 */
 			if (!IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
 				if (!IN6_ARE_ADDR_EQUAL(&in6p->in6p_laddr,
 							&ip6->ip6_dst) &&
