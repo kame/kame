@@ -902,9 +902,8 @@ unprefer_prefix(struct rr_prefix *rpp)
 }
 
 int
-delete_each_prefix(struct socket *so, struct rr_prefix *rpp, u_char origin)
+delete_each_prefix(struct rr_prefix *rpp, u_char origin)
 {
-	struct in6_aliasreq ifra;
 	int error = 0;
 
 	if (rpp->rp_origin > origin)
@@ -930,26 +929,7 @@ delete_each_prefix(struct socket *so, struct rr_prefix *rpp, u_char origin)
 		}
 		rap->ra_addr->ia6_ifpr = NULL;
 
-		bzero(&ifra, sizeof(ifra));
-		strncpy(ifra.ifra_name, if_name(rpp->rp_ifp),
-			sizeof(ifra.ifra_name));
-		ifra.ifra_addr = rap->ra_addr->ia_addr;
-		ifra.ifra_dstaddr = rap->ra_addr->ia_dstaddr;
-		ifra.ifra_prefixmask = rap->ra_addr->ia_prefixmask;
-
-		error = in6_control(so, SIOCDIFADDR_IN6, (caddr_t)&ifra,
-				    rpp->rp_ifp
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
-				    , curproc
-#endif
-				    );
-		if (error != 0)
-			log(LOG_ERR, "in6_prefix.c: delete_each_prefix:"
-			    "deletion of an addr %s/%d failed because"
-			    "in6_control failed for error %d\n",
-			    ip6_sprintf(&ifra.ifra_addr.sin6_addr),
-			    rpp->rp_plen, error);
-
+		in6_purgeaddr(&rap->ra_addr->ia_ifa, rpp->rp_ifp);
 		free(rap, M_RR_ADDR);
 	}
 	rp_remove(rpp);
@@ -958,7 +938,7 @@ delete_each_prefix(struct socket *so, struct rr_prefix *rpp, u_char origin)
 }
 
 static void
-delete_prefixes(struct socket *so, struct ifnet *ifp, u_char origin)
+delete_prefixes(struct ifnet *ifp, u_char origin)
 {
 	struct ifprefix *ifpr, *nextifpr;
 
@@ -969,7 +949,7 @@ delete_prefixes(struct socket *so, struct ifnet *ifp, u_char origin)
 		    ifpr->ifpr_type != IN6_PREFIX_RR)
  			continue;
 		if (ifpr2rp(ifpr)->rp_statef_delmark)
-			(void)delete_each_prefix(so, ifpr2rp(ifpr), origin);
+			(void)delete_each_prefix(ifpr2rp(ifpr), origin);
 	}
 }
 
@@ -1015,6 +995,7 @@ link_stray_ia6s(struct rr_prefix *rpp)
 	return 0;
 }
 
+/* XXX assumes that permission is already checked by the caller */
 int
 in6_prefix_ioctl(struct socket *so, u_long cmd, caddr_t data,
 		 struct ifnet *ifp)
@@ -1054,7 +1035,7 @@ in6_prefix_ioctl(struct socket *so, u_long cmd, caddr_t data,
 				    != 0)
 					goto failed;
 			if (cmd != SIOCAIFPREFIX_IN6)
-				delete_prefixes(so, ifp, irr->irr_origin);
+				delete_prefixes(ifp, irr->irr_origin);
 		} else
 			return (EADDRNOTAVAIL);
 	failed:
@@ -1127,7 +1108,7 @@ in6_prefix_ioctl(struct socket *so, u_long cmd, caddr_t data,
 		if (rpp == NULL || ifp != rpp->rp_ifp)
 			return (EADDRNOTAVAIL);
 
-		error = delete_each_prefix(so, rpp, ipr->ipr_origin);
+		error = delete_each_prefix(rpp, ipr->ipr_origin);
 		break;
 	}
 	return error;
@@ -1154,16 +1135,9 @@ in6_rr_timer(void *ignored_arg)
 	while (rpp) {
 		if (rpp->rp_expire && rpp->rp_expire < time_second) {
 			struct rr_prefix *next_rpp;
-			struct socket so;
-
-			/* XXX: init dummy so */
-			bzero(&so, sizeof(so));
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__NetBSD__)
-			so.so_state |= SS_PRIV;
-#endif
 
 			next_rpp = LIST_NEXT(rpp, rp_entry);
-			delete_each_prefix(&so, rpp, PR_ORIG_KERNEL);
+			delete_each_prefix(rpp, PR_ORIG_KERNEL);
 			rpp = next_rpp;
 			continue;
 		}
