@@ -1,10 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.687 2000/03/13 05:10:41 itojun Exp $
+$Id: CHANGELOG,v 1.688 2000/03/13 05:20:04 itojun Exp $
 
 <200003>
 Mon Mar 13 14:09:54 JST 2000  itojun@iijlab.net
-	* netbsd/pkgsrc/net/{tcpdump,libpcap}: upgrade to 20000228.
+	* netbsd/pkgsrc/net/{tcpdump,libpcap}, freebsd2/ports/{tcpdump,libpcap}:
+	  upgrade to 20000228.
 
 Sun Mar 12 13:58:34 JST 2000  itojun@iijlab.net
 	* {openbsd,netbsd}/sys/netinet/in.c: undo interface address addition
