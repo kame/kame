@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.3 1999/08/19 15:09:41 itojun Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.4 1999/09/06 18:10:29 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -54,7 +54,7 @@
 #endif
 
 #if !defined(HAVE_GETADDRINFO) || !defined(HAVE_GETNAMEINFO)
-#include "missing/getaddrinfo.h"
+#include "addrinfo.h"
 #endif
 
 #include "var.h"
