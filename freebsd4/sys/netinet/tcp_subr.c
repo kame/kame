@@ -1318,7 +1318,7 @@ tcp_rtlookup6(inp)
 
 			dst6 = (struct sockaddr_in6 *)&ro6->ro_dst;
 			dst6->sin6_family = AF_INET6;
-			dst6->sin6_len = sizeof(sizeof(*dst6));
+			dst6->sin6_len = sizeof(*dst6);
 			dst6->sin6_addr = inp->in6p_faddr;
 			rtalloc((struct route *)ro6);
 			rt = ro6->ro_rt;
