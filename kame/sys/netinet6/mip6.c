@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.159 2002/08/26 12:59:13 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.160 2002/08/27 03:31:39 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2659,7 +2659,7 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa)
 	mip6_nodekey_t home_nodekey, coa_nodekey;
 	mip6_home_cookie_t home_cookie;
 	mip6_careof_cookie_t careof_cookie;
-	u_int8_t key_bu[SHA1_RESULTLEN]; /* Stated as 'Kbu' in the spec */
+	u_int8_t key_bu[MIP6_KBU_LEN]; /* Stated as 'Kbu' in the spec */
 	u_int8_t authdata[SHA1_RESULTLEN];
 	u_int16_t cksum_backup;
 	HMAC_CTX hmac_ctx;
@@ -2748,13 +2748,14 @@ mip6_hexdump("CN: Auth: ", sizeof(ip6->ip6_dst), &ip6->ip6_dst);
 #ifdef RR_DBG
 mip6_hexdump("CN: Auth: ", (u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu, ip6mu);
 #endif
-	restlen = ip6mulen - (((u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu) + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len + 2);
+
+	/* Must exclude authentication option */
+	restlen = ip6mulen - (((u_int8_t *)mopt->mopt_auth - (u_int8_t *)ip6mu) + MOPT_AUTH_LEN(mopt) + 2);
 	if (restlen > 0) {
 	    hmac_loop(&hmac_ctx,
-		      mopt->mopt_auth
-		      + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len + 2, restlen); 
+		      mopt->mopt_auth + MOPT_AUTH_LEN(mopt) + 2, restlen);
 #ifdef RR_DBG
-mip6_hexdump("CN: Auth: ", restlen, mopt->mopt_auth + ((struct ip6m_opt_authdata *)mopt->mopt_auth)->ip6moau_len + 2);
+mip6_hexdump("CN: Auth: ", restlen, mopt->mopt_auth + MOPT_AUTH_LEN(mopt) + 2);
 #endif
 	}
 	bzero(authdata, sizeof(authdata));
@@ -2764,7 +2765,7 @@ mip6_hexdump("CN: Auth Data: ", sizeof(authdata), authdata);
 #endif
 	ip6mu->ip6mu_cksum = cksum_backup;
 
-	return (bcmp(mopt->mopt_auth + 2, authdata, sizeof(authdata)));
+	return (bcmp(mopt->mopt_auth + 2, authdata, MOPT_AUTH_LEN(mopt)));
 }
 
 int
@@ -2866,10 +2867,13 @@ mip6_calculate_kbu(home_cookie, careof_cookie, key_bu)
 	u_int8_t *key_bu;	/* needs at least SHA1_RESULTLEN bytes */
 {
 	SHA1_CTX sha1_ctx;
+	u_int8_t result[SHA1_RESULTLEN];
 
 	SHA1Init(&sha1_ctx);
 	SHA1Update(&sha1_ctx, (caddr_t)home_cookie, sizeof(*home_cookie));
 	SHA1Update(&sha1_ctx, (caddr_t)careof_cookie, sizeof(*careof_cookie));
-	SHA1Final(key_bu, &sha1_ctx);
+	SHA1Final(result, &sha1_ctx);
+	/* First 96 bit */
+	bcopy(result, key_bu, MIP6_KBU_LEN);
 }
 #endif /* MIP6_DRAFT18 */

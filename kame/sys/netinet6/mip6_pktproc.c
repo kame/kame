@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.43 2002/08/26 12:59:13 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.44 2002/08/27 03:31:39 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1354,7 +1354,7 @@ mip6_ip6mci_create(pktopt_mobility, mbu)
 	return (0);
 }
 
-#define AUTH_SIZE	(sizeof(struct ip6m_opt_authdata) + SHA1_RESULTLEN)
+#define AUTH_SIZE	(sizeof(struct ip6m_opt_authdata) + MIP6_KBU_LEN)
 
 int
 mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
@@ -1370,7 +1370,8 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 	struct mip6_bu *mbu, *hrmbu;
 	int need_rr = 0;
 	HMAC_CTX hmac_ctx;
-	u_int8_t key_bu[SHA1_RESULTLEN]; /* Stated as 'Kbu' in the spec */
+	u_int8_t key_bu[MIP6_KBU_LEN]; /* Stated as 'Kbu' in the spec */
+	u_int8_t result[SHA1_RESULTLEN];
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
@@ -1575,7 +1576,8 @@ mip6_hexdump("MN: Auth: ", bu_size + nonce_size, ip6mu);
 mip6_hexdump("MN: Auth: ", auth_size - AUTH_SIZE, (u_int8_t *)ip6mu + bu_size + nonce_size + AUTH_SIZE);
 #endif
 		}
-		hmac_result(&hmac_ctx, (u_int8_t *)(mopt_auth + 1));
+		hmac_result(&hmac_ctx, result);
+		bcopy(result, (u_int8_t *)(mopt_auth + 1), MIP6_KBU_LEN);
 #ifdef RR_DBG
 mip6_hexdump("MN: Authdata: ", SHA1_RESULTLEN, (u_int8_t *)(mopt_auth + 1));
 #endif

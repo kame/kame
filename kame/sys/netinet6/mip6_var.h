@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.49 2002/08/26 12:59:13 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.50 2002/08/27 03:31:39 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -64,7 +64,7 @@ typedef u_int8_t mip6_nodekey_t[MIP6_NODEKEY_SIZE];
 typedef u_int8_t mip6_cookie_t[MIP6_COOKIE_SIZE];
 typedef u_int8_t mip6_home_cookie_t[HOME_COOKIE_SIZE];
 typedef u_int8_t mip6_careof_cookie_t[CAREOF_COOKIE_SIZE];
-
+#define MIP6_KBU_LEN		16
 
 /* Callout table for MIP6 structures */
 struct mip6_timeout {
@@ -270,6 +270,8 @@ struct mip6_mobility_options {
 #define MOPT_NONCE_IDX	0x0004
 #define MOPT_AUTHDATA	0x0008
 #define MOPT_REFRESH	0x0010
+
+#define MOPT_AUTH_LEN(mopt)	(int)(*(mopt->mopt_auth + 1))
 
 /*
  * the list entry to hold the destination addresses which do not use a
