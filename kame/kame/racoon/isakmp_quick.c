@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.56 2000/09/19 02:03:44 itojun Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.57 2000/09/19 17:05:50 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.56 2000/09/19 02:03:44 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.57 2000/09/19 17:05:50 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1232,16 +1232,18 @@ quick_r2send(iph2, msg)
 	}
 
 	/*
-	 * XXX RESPONDER-LIFETIME is only one payload in a IKE message even
-	 * in the case of SA bundle case is ?
+	 * XXX Is there only single RESPONDER-LIFETIME payload in a IKE message
+	 * in the case of SA bundle ?
 	 */
-	for (pr = pp->head; pr; pr = pr->next) {
-		body = isakmp_add_pl_n(body, &np_p,
-				ISAKMP_NTYPE_RESPONDER_LIFETIME, pr, data);
-		if (!body)
-			return error;	/* XXX */
+	if (data) {
+		for (pr = pp->head; pr; pr = pr->next) {
+			body = isakmp_add_pl_n(body, &np_p,
+					ISAKMP_NTYPE_RESPONDER_LIFETIME, pr, data);
+			if (!body)
+				return error;	/* XXX */
+		}
+		vfree(data);
 	}
-	vfree(data);
     }
 
 	/* generate HASH(2) */
