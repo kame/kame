@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.2 2001/08/03 13:01:52 itojun Exp $	*/
+/*	$KAME: if_hif.c,v 1.3 2001/08/07 08:06:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -273,13 +273,16 @@ hif_ioctl(ifp, cmd, data)
 			int i;
 
 			i = 0;
-			TAILQ_FOREACH(hs, &sc->hif_hs_list_home, hs_entry) {
+			for (hs = TAILQ_FIRST(&sc->hif_hs_list_home);
+			     hs;
+			     hs = TAILQ_NEXT(hs, hs_entry)) {
 				ms = hs->hs_ms;
 				if (ms == NULL) {
 					return (EINVAL);
 				}
-				TAILQ_FOREACH(mspfx, &ms->ms_mspfx_list,
-					      mspfx_entry) {
+				for (mspfx = TAILQ_FIRST(&ms->ms_mspfx_list);
+				     mspfx;
+				     mspfx = TAILQ_NEXT(mspfx, mspfx_entry)) {
 					if (mspfx->mspfx_mpfx == NULL) {
 						return (EINVAL);
 					}
@@ -311,9 +314,12 @@ hif_ioctl(ifp, cmd, data)
 
 			i = 0;
 			hs_list = &sc->hif_hs_list_home;
-			TAILQ_FOREACH(hs, hs_list, hs_entry) {
+			for (hs = TAILQ_FIRST(hs_list); hs;
+			     hs = TAILQ_NEXT(hs, hs_entry)) {
 				ms = hs->hs_ms;
-				TAILQ_FOREACH(msha, &ms->ms_msha_list, msha_entry) {
+				for (msha = TAILQ_FIRST(&ms->ms_msha_list);
+				     msha;
+				     msha = TAILQ_NEXT(msha, msha_entry)) {
 					*mha = *msha->msha_mha;
 					i++;
 					if (i > ifr->ifr_count)
@@ -322,9 +328,12 @@ hif_ioctl(ifp, cmd, data)
 				}
 			}
 			hs_list = &sc->hif_hs_list_foreign;
-			TAILQ_FOREACH(hs, hs_list, hs_entry) {
+			for (hs = TAILQ_FIRST(hs_list); hs;
+			     hs = TAILQ_NEXT(hs, hs_entry)) {
 				ms = hs->hs_ms;
-				TAILQ_FOREACH(msha, &ms->ms_msha_list, msha_entry) {
+				for (msha = TAILQ_FIRST(&ms->ms_msha_list);
+				     msha;
+				     msha = TAILQ_NEXT(msha, msha_entry)) {
 					*mha = *msha->msha_mha;
 					i++;
 					if (i > ifr->ifr_count)
@@ -344,7 +353,9 @@ hif_ioctl(ifp, cmd, data)
 			int i;
 
 			i = 0;
-			LIST_FOREACH(tmpmbu, &sc->hif_bu_list, mbu_entry) {
+			for (tmpmbu = LIST_FIRST(&sc->hif_bu_list);
+			     tmpmbu;
+			     tmpmbu = LIST_NEXT(tmpmbu, mbu_entry)) {
 				*mbu = *tmpmbu;
 				i++;
 				if (i > ifr->ifr_count)
@@ -450,7 +461,7 @@ hif_subnet_list_find_withprefix(hs_list, prefix, prefixlen)
 	 * member of hif_subnet as a pointer) if it contains specified
 	 * prefix or not.
 	 */
-	TAILQ_FOREACH(hs, hs_list, hs_entry) {
+	for (hs = TAILQ_FIRST(hs_list); hs; hs = TAILQ_NEXT(hs, hs_entry)) {
 		if ((ms = hs->hs_ms) == NULL) {
 			/* this must not happen. */
 			mip6log((LOG_ERR,
@@ -482,7 +493,7 @@ hif_subnet_list_find_withhaaddr(hs_list, haaddr)
 		return (NULL);
 	}
 
-	TAILQ_FOREACH(hs, hs_list, hs_entry) {
+	for (hs = TAILQ_FIRST(hs_list); hs; hs = TAILQ_NEXT(hs, hs_entry)) {
 		ms = hs->hs_ms;
 		if (ms == NULL) {
 			/* must not happen. */
@@ -657,7 +668,8 @@ hif_coa_list_find_withifp(hcoa_list, ifp)
 	if (ifp == NULL)
 		return (NULL);
 
-	TAILQ_FOREACH(hcoa, hcoa_list, hcoa_entry) {
+	for (hcoa = TAILQ_FIRST(hcoa_list); hcoa;
+	     hcoa = TAILQ_NEXT(hcoa, hcoa_entry)) {
 		if (hcoa && (hcoa->hcoa_ifp == ifp))
 			break;
 	}
@@ -701,7 +713,8 @@ hif_ha_list_remove_withmha(hha_list, mha)
 {
 	struct hif_ha *hha;
 
-	LIST_FOREACH(hha, hha_list, hha_entry) {
+	for (hha = LIST_FIRST(hha_list); hha;
+	     hha = LIST_NEXT(hha, hha_entry)) {
 		if (hha->hha_mha == mha)
 			break;
 	}
@@ -720,7 +733,8 @@ hif_ha_list_isonhomelink(hha_list, rtaddr)
 	struct hif_ha *hha;
 	int onhomelink = 0;
 
-	LIST_FOREACH(hha, hha_list, hha_entry) {
+	for (hha = LIST_FIRST(hha_list); hha;
+	     hha = LIST_NEXT(hha, hha_entry)) {
 		if ((hha->hha_onhomelink)
 		    && (IN6_ARE_ADDR_EQUAL(&hha->hha_mha->mha_lladdr,
 					   rtaddr)
@@ -740,7 +754,8 @@ hif_ha_list_find_onhomelink(hha_list)
 {
 	struct hif_ha *hha;
 
-	LIST_FOREACH(hha, hha_list, hha_entry) {
+	for (hha = LIST_FIRST(hha_list); hha;
+	     hha = LIST_NEXT(hha, hha_entry)) {
 		if (hha->hha_onhomelink)
 			break;
 	}
@@ -755,7 +770,8 @@ hif_ha_list_find_preferable(hha_list)
 	struct hif_ha *hha, *best;
 
 	best = LIST_FIRST(hha_list);
-	LIST_FOREACH(hha, hha_list, hha_entry) {
+	for (hha = LIST_FIRST(hha_list); hha;
+	     hha = LIST_NEXT(hha, hha_entry)) {
 		if ((best) && (best->hha_mha)
 		    && (hha) && (hha->hha_mha)) {
 			if (best->hha_mha->mha_pref < hha->hha_mha->mha_pref)
@@ -773,7 +789,9 @@ hif_ha_list_find_withaddr(hha_list, rtaddr)
 {
 	struct hif_ha *hha;
 
-	LIST_FOREACH(hha, hha_list, hha_entry) {
+	for (hha = LIST_FIRST(hha_list);
+	     hha;
+	     hha = LIST_NEXT(hha, hha_entry)) {
 		if (IN6_ARE_ADDR_EQUAL(&hha->hha_mha->mha_lladdr, rtaddr)
 		    || IN6_ARE_ADDR_EQUAL(&hha->hha_mha->mha_gaddr, rtaddr))
 			break;
@@ -882,11 +900,14 @@ hif_list_find_withhaddr(haddr)
 	struct mip6_subnet_prefix *mspfx;
 	struct mip6_prefix *mpfx;
 
-	TAILQ_FOREACH(sc, &hif_softc_list, hif_entry) {
-		TAILQ_FOREACH(hs, &sc->hif_hs_list_home, hs_entry) {
+	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
+		for (hs = TAILQ_FIRST(&sc->hif_hs_list_home); hs;
+		     hs = TAILQ_NEXT(hs, hs_entry)) {
 			if ((ms = hs->hs_ms) == NULL)
 				continue;
-			TAILQ_FOREACH(mspfx, &ms->ms_mspfx_list, mspfx_entry) {
+			for (mspfx = TAILQ_FIRST(&ms->ms_mspfx_list); mspfx;
+			     mspfx = TAILQ_NEXT(mspfx, mspfx_entry)) {
 				if((mpfx = mspfx->mspfx_mpfx) == NULL)
 					continue;
 				if (IN6_ARE_ADDR_EQUAL(haddr,
@@ -980,7 +1001,8 @@ hif_subnet_list_update_withmpfx(sc, data)
 			 * add this newly created mip6_subnet into the
 			 * other hif interface's foreign subnet list.
 			 */
-			TAILQ_FOREACH(othersc, &hif_softc_list, hif_entry) {
+			for (othersc = TAILQ_FIRST(&hif_softc_list); othersc;
+			     othersc = TAILQ_NEXT(othersc, hif_entry)) {
 				if (othersc == sc)
 					continue;
 				hs = hif_subnet_create(ms);
