@@ -1,5 +1,5 @@
 /*	$NetBSD: inet.c,v 1.35.2.1 1999/04/29 14:57:08 perry Exp $	*/
-/*	$KAME: ipsec.c,v 1.29 2002/06/02 15:28:43 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.30 2002/06/02 15:30:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -130,9 +130,6 @@ static struct val2str ipsec_espnames[] = {
 	{ SADB_EALG_DESCBC, "des-cbc", },
 	{ SADB_EALG_3DESCBC, "3des-cbc", },
 	{ SADB_EALG_NULL, "null", },
-#ifdef SADB_X_EALG_RC5CBC
-	{ SADB_X_EALG_RC5CBC, "rc5-cbc", },
-#endif
 	{ SADB_X_EALG_CAST128CBC, "cast128-cbc", },
 	{ SADB_X_EALG_BLOWFISHCBC, "blowfish-cbc", },
 #ifdef SADB_X_EALG_RIJNDAELCBC
