@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.43 2001/02/20 13:50:53 itojun Exp $	*/
+/*	$OpenBSD: if.c,v 1.49 2001/06/29 22:46:05 fgsch Exp $	*/
 /*	$NetBSD: if.c,v 1.35 1996/05/07 05:26:04 thorpej Exp $	*/
 
 /*
@@ -69,8 +69,8 @@
 #include "bridge.h"
 
 #include <sys/param.h>
-#include <sys/mbuf.h>
 #include <sys/systm.h>
+#include <sys/mbuf.h>
 #include <sys/proc.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
@@ -80,9 +80,6 @@
 
 #include <net/if.h>
 #include <net/if_dl.h>
-#include <net/if_types.h>
-#include <net/radix.h>
-
 #include <net/route.h>
 
 #ifdef INET
@@ -100,13 +97,6 @@
 #include <netinet/in.h>
 #endif
 #include <netinet6/in6_ifattach.h>
-#include <netinet6/in6_var.h>
-#endif
-
-#ifdef IPFILTER
-#include <netinet/ip_fil_compat.h>
-#include <netinet/ip_fil.h>
-#include <netinet/ip_nat.h>
 #endif
 
 #if NBPFILTER > 0
@@ -145,12 +135,7 @@ extern void nd6_setmtu __P((struct ifnet *));
 void
 ifinit()
 {
-	struct ifnet *ifp;
 	static struct timeout if_slowtim;
-
-	for (ifp = ifnet.tqh_first; ifp != 0; ifp = ifp->if_list.tqe_next)
-		if (ifp->if_snd.ifq_maxlen == 0)
-			ifp->if_snd.ifq_maxlen = ifqmaxlen;
 
 	timeout_set(&if_slowtim, if_slowtimo, &if_slowtim);
 
@@ -212,6 +197,9 @@ if_attachsetup(ifp)
 	}
 
 	ifindex2ifnet[if_index] = ifp;
+
+	if (ifp->if_snd.ifq_maxlen == 0)
+		ifp->if_snd.ifq_maxlen = ifqmaxlen;
 
 	/*
 	 * create a Link Level name for this device
@@ -393,11 +381,6 @@ if_detach(ifp)
 
 	/* Remove the interface from the list of all interfaces.  */
 	TAILQ_REMOVE(&ifnet, ifp, if_list);
-
-#ifdef IPFILTER
-	/* XXX More ipf & ipnat cleanup needed.  */
-	nat_clearlist();
-#endif
 
 	/* Deallocate private resources.  */
 	for (ifa = TAILQ_FIRST(&ifp->if_addrlist); ifa;
@@ -641,7 +624,7 @@ if_up(ifp)
 #ifdef notyet
 	/* this has no effect on IP, and will kill all ISO connections XXX */
 	for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;
-	     ifa = ifa->ifa_list.tqe_next)
+	    ifa = ifa->ifa_list.tqe_next)
 		pfctlinput(PRC_IFUP, ifa->ifa_addr);
 #endif
 	rt_ifmsg(ifp);
@@ -1027,4 +1010,44 @@ void
 if_detached_watchdog(struct ifnet *ifp)
 {
 	/* nothing */
+}
+
+/*
+ * Set/clear promiscuous mode on interface ifp based on the truth value
+ * of pswitch.  The calls are reference counted so that only the first
+ * "on" request actually has an effect, as does the final "off" request.
+ * Results are undefined if the "off" and "on" requests are not matched.
+ */
+int
+ifpromisc(ifp, pswitch)
+	struct ifnet *ifp;
+	int pswitch;
+{
+	struct ifreq ifr;
+
+	if (pswitch) {
+		/*
+		 * If the device is not configured up, we cannot put it in
+		 * promiscuous mode.
+		 */
+		if ((ifp->if_flags & IFF_UP) == 0)
+			return (ENETDOWN);
+		if (ifp->if_pcount++ != 0)
+			return (0);
+		ifp->if_flags |= IFF_PROMISC;
+	} else {
+		if (--ifp->if_pcount > 0)
+			return (0);
+		ifp->if_flags &= ~IFF_PROMISC;
+		/*
+		 * If the device is not configured up, we should not need to
+		 * turn off promiscuous mode (device should have turned it
+		 * off when interface went down; and will look at IFF_PROMISC
+		 * again next time interface comes up).
+		 */
+		if ((ifp->if_flags & IFF_UP) == 0)
+			return (0);
+	}
+	ifr.ifr_flags = ifp->if_flags;
+	return ((*ifp->if_ioctl)(ifp, SIOCSIFFLAGS, (caddr_t)&ifr));
 }

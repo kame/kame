@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_de.c,v 1.44 2001/02/03 06:10:17 mickey Exp $	*/
+/*	$OpenBSD: if_de.c,v 1.51 2001/09/21 17:55:43 miod Exp $	*/
 /*	$NetBSD: if_de.c,v 1.45 1997/06/09 00:34:18 thorpej Exp $	*/
 
 /*-
@@ -91,8 +91,6 @@
 #endif
 
 #include <vm/vm.h>
-#include <vm/vm_param.h>
-#include <vm/vm_kern.h>
 
 #if defined(__FreeBSD__)
 #include <vm/pmap.h>
@@ -4158,7 +4156,7 @@ tulip_txput(
     do {
 	int len = m0->m_len;
 	caddr_t addr = mtod(m0, caddr_t);
-	unsigned clsize = CLBYTES - (((u_long) addr) & (CLBYTES-1));
+	unsigned clsize = PAGE_SIZE - (((u_long) addr) & PAGE_MASK);
 
 	while (len > 0) {
 	    unsigned slen = min(len, clsize);
@@ -4251,7 +4249,7 @@ tulip_txput(
 	    if (partial)
 		continue;
 #endif
-	    clsize = CLBYTES;
+	    clsize = PAGE_SIZE;
 	}
     } while ((m0 = m0->m_next) != NULL);
 
@@ -5473,10 +5471,10 @@ tulip_pci_attach(
     csr_base = 0;
 
     ioh_valid = (pci_mapreg_map(pa, PCI_CBIO, PCI_MAPREG_TYPE_IO, 0,
-		 &iot, &ioh, NULL, NULL) == 0);
+		 &iot, &ioh, NULL, NULL, 0) == 0);
     memh_valid = (pci_mapreg_map(pa, PCI_CBMA,
 		  PCI_MAPREG_TYPE_MEM | PCI_MAPREG_MEM_TYPE_32BIT, 0,
-		  &memt, &memh, NULL, NULL) == 0);
+		  &memt, &memh, NULL, NULL, 0) == 0);
 #endif
 
 #if defined(__OpenBSD__) || defined(__NetBSD__)
@@ -5539,8 +5537,7 @@ tulip_pci_attach(
 	    pci_intr_handle_t intrhandle;
 	    const char *intrstr;
 
-	    if (pci_intr_map(pa->pa_pc, pa->pa_intrtag, pa->pa_intrpin,
-			     pa->pa_intrline, &intrhandle)) {
+	    if (pci_intr_map(pa, &intrhandle)) {
 		printf(", couldn't map interrupt\n");
 		return;
 	    }
@@ -5548,8 +5545,7 @@ tulip_pci_attach(
 	    sc->tulip_ih = pci_intr_establish(pa->pa_pc, intrhandle, IPL_NET,
 					      intr_rtn, sc, self->dv_xname);
 	    if (sc->tulip_ih == NULL) {
-		printf(", couldn't establish interrupt",
-		       sc->tulip_dev.dv_xname);
+		printf(", couldn't establish interrupt");
 		if (intrstr != NULL)
 		    printf(" at %s", intrstr);
 		printf("\n");

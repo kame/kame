@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_strip.c,v 1.13 2000/12/30 01:02:55 angelos Exp $	*/
+/*	$OpenBSD: if_strip.c,v 1.15 2001/06/27 06:07:44 kjc Exp $	*/
 /*	$NetBSD: if_strip.c,v 1.2.4.3 1996/08/03 00:58:32 jtc Exp $	*/
 /*	from: NetBSD: if_sl.c,v 1.38 1996/02/13 22:00:23 christos Exp $	*/
 
@@ -716,9 +716,7 @@ stripoutput(ifp, m, dst, rt)
 	register u_char *dldst;		/* link-level next-hop */
 	int s;
 	u_char dl_addrbuf[STARMODE_ADDR_LEN+1];
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	/*
 	 * Verify tty line is up and alive.
@@ -790,7 +788,7 @@ stripoutput(ifp, m, dst, rt)
 	}
 	if ((ip->ip_tos & IPTOS_LOWDELAY)
 #ifdef ALTQ
-	    && !ALTQ_IS_ENABLED(&sc->sc_if.if_snd)
+	    && ALTQ_IS_ENABLED(&sc->sc_if.if_snd) == 0
 #endif
 		)
 		ifq = &sc->sc_fastq;
@@ -859,13 +857,8 @@ stripoutput(ifp, m, dst, rt)
 			IF_ENQUEUE(ifq, m);
 			error = 0;
 		}
-	} else {
-#ifdef ALTQ
+	} else
 		IFQ_ENQUEUE(&sc->sc_if.if_snd, m, &pktattr, error);
-#else
-		IFQ_ENQUEUE(&sc->sc_if.if_snd, m, error);
-#endif
-	}
 	if (error) {
 		splx(s);
 		sc->sc_if.if_oerrors++;

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_vr.c,v 1.14 2001/03/25 06:34:51 csapuntz Exp $	*/
+/*	$OpenBSD: if_vr.c,v 1.20 2001/08/25 10:13:29 art Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998
@@ -88,7 +88,6 @@
 #endif
 
 #include <vm/vm.h>              /* for vtophys */
-#include <vm/pmap.h>            /* for vtophys */
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
@@ -682,8 +681,7 @@ vr_attach(parent, self, aux)
 #endif
 
 	/* Allocate interrupt */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-			 pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": couldn't map interrupt\n");
 		goto fail;
 	}
@@ -698,6 +696,13 @@ vr_attach(parent, self, aux)
 		goto fail;
 	}
 	printf(": %s", intrstr);
+
+	/*
+	 * Windows may put the chip in suspend mode when it
+	 * shuts down. Be sure to kick it in the head to wake it
+	 * up again.
+	 */
+	VR_CLRBIT(sc, VR_STICKHW, (VR_STICKHW_DS0|VR_STICKHW_DS1));
 
 	/* Reset the adapter. */
 	vr_reset(sc);
@@ -911,7 +916,6 @@ void
 vr_rxeof(sc)
 	struct vr_softc		*sc;
 {
-        struct ether_header	*eh;
         struct mbuf		*m;
         struct ifnet		*ifp;
 	struct vr_chain_onefrag	*cur_rx;
@@ -990,7 +994,6 @@ vr_rxeof(sc)
 		m = m0;
 
 		ifp->if_ipackets++;
-		eh = mtod(m, struct ether_header *);
 
 #if NBPFILTER > 0
 		/*
@@ -999,9 +1002,8 @@ vr_rxeof(sc)
 		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m);
 #endif
-		/* Remove header from mbuf and pass it on. */
-		m_adj(m, sizeof(struct ether_header));
-		ether_input(ifp, eh, m);
+		/* pass it on. */
+		ether_input_mbuf(ifp, m);
 	}
 
 	return;
@@ -1345,7 +1347,7 @@ vr_init(xsc)
 	struct vr_softc		*sc = xsc;
 	struct ifnet		*ifp = &sc->arpcom.ac_if;
 	struct mii_data		*mii = &sc->sc_mii;
-	int			s;
+	int			s, i;
 
 	s = splimp();
 
@@ -1354,6 +1356,12 @@ vr_init(xsc)
 	 */
 	vr_stop(sc);
 	vr_reset(sc);
+
+	/*
+	 * Set our station address.
+	 */
+	for (i = 0; i < ETHER_ADDR_LEN; i++)
+		CSR_WRITE_1(sc, VR_PAR0 + i, sc->arpcom.ac_enaddr[i]);
 
 	VR_CLRBIT(sc, VR_RXCFG, VR_RXCFG_RX_THRESH);
 	VR_SETBIT(sc, VR_RXCFG, VR_RXTHRESH_STORENFWD);

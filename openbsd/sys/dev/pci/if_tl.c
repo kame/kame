@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_tl.c,v 1.19 2001/04/05 02:03:12 jason Exp $	*/
+/*	$OpenBSD: if_tl.c,v 1.23 2001/08/25 10:13:29 art Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998
@@ -210,7 +210,6 @@
 #endif
 
 #include <vm/vm.h>              /* for vtophys */
-#include <vm/pmap.h>            /* for vtophys */
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
@@ -1154,6 +1153,7 @@ int tl_intvec_rxeof(xsc, type)
 				continue;
 		}
 
+		m->m_pkthdr.len = m->m_len = total_len;
 #if NBPFILTER > 0
 		/*
 	 	 * Handle BPF listeners. Let the BPF user see the packet, but
@@ -1164,15 +1164,11 @@ int tl_intvec_rxeof(xsc, type)
 	 	 * since it can be used again later.
 	 	 */
 		if (ifp->if_bpf) {
-			m->m_pkthdr.len = m->m_len = total_len;
 			bpf_mtap(ifp->if_bpf, m);
 		}
 #endif
-		/* Remove header from mbuf and pass it on. */
-		m->m_pkthdr.len = m->m_len =
-				total_len - sizeof(struct ether_header);
-		m->m_data += sizeof(struct ether_header);
-		ether_input(ifp, eh, m);
+		/* pass it on. */
+		ether_input_mbuf(ifp, m);
 	}
 
 	return(r);
@@ -2054,8 +2050,7 @@ tl_attach(parent, self, aux)
 	/*
 	 * Allocate our interrupt.
 	 */
-	if (pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if (pci_intr_map(pa, &ih)) {
 		printf(": couldn't map interrupt\n");
 		return;
 	}

@@ -5,26 +5,5 @@ include	"arch/i386/conf/GENERIC"
 #pseudo-device	dummy	1	# dummy
 #pseudo-device	stf		# 6to4 interface
 
-# a pseudo device needed for ALTQ
-pseudo-device	altq		# altq pseudo-device
-
-# ALTQ options
-option		ALTQ		#alternate queueing
-option		ALTQ_CBQ	#class based queueing
-option		ALTQ_WFQ	#weighted fair queueing
-option		ALTQ_FIFOQ	#fifo queueing
-option		ALTQ_RED	#random early detection
-#option		ALTQ_FLOWVALVE	#flowvalve for RED (needs RED)
-option		ALTQ_RIO	#triple red for diffserv (needs RED)
-#option		ALTQ_LOCALQ	#local use
-option		ALTQ_HFSC	#hierarchical fair service curve
-#option		ALTQ_ECN	#ecn extention to tcp (needs RED)
-#option		ALTQ_IPSEC	#check ipsec in IPv4
-option		ALTQ_CDNR	#diffserv traffic conditioner
-#option		ALTQ_BLUE	#blue by wu-chang feng
-option		ALTQ_PRIQ	#priority queue
-#option		ALTQ_NOPCC	#don't use processor cycle counter
-#option		ALTQ_DEBUG	#for debugging
-
 # ART routing table lookup algorithm (inet/inet6)
 #option		RADIX_ART

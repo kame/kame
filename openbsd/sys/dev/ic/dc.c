@@ -1,4 +1,4 @@
-/*	$OpenBSD: dc.c,v 1.27 2001/04/13 15:56:10 aaron Exp $	*/
+/*	$OpenBSD: dc.c,v 1.33 2001/08/22 16:38:38 aaron Exp $	*/
 
 /*
  * Copyright (c) 1997, 1998, 1999
@@ -123,13 +123,11 @@
 #endif
 
 #include <vm/vm.h>		/* for vtophys */
-#include <vm/pmap.h>		/* for vtophys */
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
 
-#include <dev/pci/pcireg.h>
-#include <dev/pci/pcivar.h>
+#include <machine/bus.h>
 #include <dev/pci/pcidevs.h>
 
 #define DC_USEIOSPACE
@@ -1615,8 +1613,8 @@ void dc_attach(sc)
 		break;
 	case DC_TYPE_AL981:
 	case DC_TYPE_AN983:
-		dc_read_eeprom(sc, (caddr_t)&sc->arpcom.ac_enaddr,
-		    DC_AL_EE_NODEADDR, 3, 0);
+		bcopy(&sc->dc_srom[DC_AL_EE_NODEADDR], &sc->arpcom.ac_enaddr,
+		    ETHER_ADDR_LEN);
 		break;
 	case DC_TYPE_XIRCOM:
 		break;
@@ -1653,6 +1651,10 @@ void dc_attach(sc)
 	IFQ_SET_MAXLEN(&ifp->if_snd, DC_TX_LIST_CNT - 1);
 	IFQ_SET_READY(&ifp->if_snd);
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
+
+#if NVLAN > 0
+	ifp->if_capabilities = IFCAP_VLAN_MTU;
+#endif
 
 	/* Do MII setup. If this is a 21143, check for a PHY on the
 	 * MII bus after applying any necessary fixups to twiddle the
@@ -2021,7 +2023,6 @@ int dc_rx_resync(sc)
 void dc_rxeof(sc)
 	struct dc_softc		*sc;
 {
-	struct ether_header	*eh;
 	struct mbuf		*m;
 	struct ifnet		*ifp;
 	struct dc_desc		*cur_rx;
@@ -2100,16 +2101,12 @@ void dc_rxeof(sc)
 		m = m0;
 
 		ifp->if_ipackets++;
-		eh = mtod(m, struct ether_header *);
 
 #if NBPFILTER > 0
 		if (ifp->if_bpf)
 			bpf_mtap(ifp->if_bpf, m);
 #endif
-
-		/* Remove header from mbuf and pass it on. */
-		m_adj(m, sizeof(struct ether_header));
-		ether_input(ifp, eh, m);
+		ether_input_mbuf(ifp, m);
 	}
 
 	sc->dc_cdata.dc_rx_prod = i;
@@ -2284,7 +2281,7 @@ void dc_tick(xsc)
 		if (mii->mii_media_status & IFM_ACTIVE &&
 		    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE) {
 			sc->dc_link++;
-			if (!IFQ_IS_EMPTY(&ifp->if_snd))
+			if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 				dc_start(ifp);
 		}
 	}
@@ -2394,7 +2391,7 @@ int dc_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, DC_IMR, DC_INTRS);
 
-	if (!IFQ_IS_EMPTY(&ifp->if_snd))
+	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		dc_start(ifp);
 
 	return (claimed);
@@ -2911,7 +2908,7 @@ void dc_watchdog(ifp)
 	dc_reset(sc);
 	dc_init(sc);
 
-	if (!IFQ_IS_EMPTY(&ifp->if_snd))
+	if (IFQ_IS_EMPTY(&ifp->if_snd) == 0)
 		dc_start(ifp);
 
 	return;

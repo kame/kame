@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ppp.c,v 1.16 2000/03/21 23:31:27 mickey Exp $	*/
+/*	$OpenBSD: if_ppp.c,v 1.25 2001/09/16 00:42:44 millert Exp $	*/
 /*	$NetBSD: if_ppp.c,v 1.39 1997/05/17 21:11:59 christos Exp $	*/
 
 /*
@@ -186,6 +186,7 @@ struct compressor *ppp_compressors[8] = {
 void
 pppattach()
 {
+    extern int ifqmaxlen;
     register struct ppp_softc *sc;
     register int i = 0;
 
@@ -199,10 +200,10 @@ pppattach()
 	sc->sc_if.if_hdrlen = PPP_HDRLEN;
 	sc->sc_if.if_ioctl = pppsioctl;
 	sc->sc_if.if_output = pppoutput;
-	IFQ_SET_MAXLEN(&sc->sc_if.if_snd, IFQ_MAXLEN);
-	sc->sc_inq.ifq_maxlen = IFQ_MAXLEN;
-	sc->sc_fastq.ifq_maxlen = IFQ_MAXLEN;
-	sc->sc_rawq.ifq_maxlen = IFQ_MAXLEN;
+	IFQ_SET_MAXLEN(&sc->sc_if.if_snd, ifqmaxlen);
+	sc->sc_inq.ifq_maxlen = ifqmaxlen;
+	sc->sc_fastq.ifq_maxlen = ifqmaxlen;
+	sc->sc_rawq.ifq_maxlen = ifqmaxlen;
 	IFQ_SET_READY(&sc->sc_if.if_snd);
 	if_attach(&sc->sc_if);
 #if NBPFILTER > 0
@@ -328,7 +329,8 @@ pppioctl(sc, cmd, data, flag, p)
     int flag;
     struct proc *p;
 {
-    int s, error, flags, mru, nb, npx;
+    int s, error, flags, mru, npx;
+    u_int nb;
     struct ppp_option_data *odp;
     struct compressor **cp;
     struct npioctl *npi;
@@ -499,9 +501,6 @@ pppioctl(sc, cmd, data, flag, p)
 	newcodelen = nbp->bf_len * sizeof(struct bpf_insn);
 	if (newcodelen != 0) {
 	    MALLOC(newcode, struct bpf_insn *, newcodelen, M_DEVBUF, M_WAITOK);
-	    if (newcode == 0) {
-		return EINVAL;		/* or sumpin */
-	    }
 	    if ((error = copyin((caddr_t)nbp->bf_insns, (caddr_t)newcode,
 			       newcodelen)) != 0) {
 		FREE(newcode, M_DEVBUF);
@@ -640,9 +639,7 @@ pppoutput(ifp, m0, dst, rtp)
     enum NPmode mode;
     int len;
     struct mbuf *m;
-#ifdef ALTQ
-    struct altq_pktattr pktattr;
-#endif
+    ALTQ_DECL(struct altq_pktattr pktattr;)
 
     if (sc->sc_devp == NULL || (ifp->if_flags & IFF_RUNNING) == 0
 	|| ((ifp->if_flags & IFF_UP) == 0 && dst->sa_family != AF_UNSPEC)) {
@@ -650,9 +647,8 @@ pppoutput(ifp, m0, dst, rtp)
 	goto bad;
     }
 
-#ifdef ALTQ
     IFQ_CLASSIFY(&ifp->if_snd, m0, dst->sa_family, &pktattr);
-#endif
+
     /*
      * Compute PPP header.
      */
@@ -771,7 +767,7 @@ pppoutput(ifp, m0, dst, rtp)
     } else {
 	if ((m0->m_flags & M_HIGHPRI)
 #ifdef ALTQ
-	    && !ALTQ_IS_ENABLED(&sc->sc_if.if_snd)
+	    && ALTQ_IS_ENABLED(&sc->sc_if.if_snd) == 0
 #endif
 	    ) {
 	    ifq = &sc->sc_fastq;
@@ -784,13 +780,8 @@ pppoutput(ifp, m0, dst, rtp)
 		IF_ENQUEUE(ifq, m0);
 		error = 0;
 	    }
-	} else {
-#ifdef ALTQ
+	} else
 	    IFQ_ENQUEUE(&sc->sc_if.if_snd, m0, &pktattr, error);
-#else
-	    IFQ_ENQUEUE(&sc->sc_if.if_snd, m0, error);
-#endif
-	}
 	if (error) {
 	    splx(s);
 	    sc->sc_if.if_oerrors++;
@@ -842,7 +833,7 @@ ppp_requeue(sc)
 	    m->m_nextpkt = NULL;
 	    if ((m->m_flags & M_HIGHPRI)
 #ifdef ALTQ
-		&& !ALTQ_IS_ENABLED(&sc->sc_if.if_snd)
+		&& ALTQ_IS_ENABLED(&sc->sc_if.if_snd) == 0
 #endif
 		) {
 		ifq = &sc->sc_fastq;
@@ -855,13 +846,8 @@ ppp_requeue(sc)
 		    IF_ENQUEUE(ifq, m);
 		    error = 0;
 		}
-	    } else {
-#ifdef ALTQ
+	    } else
 		IFQ_ENQUEUE(&sc->sc_if.if_snd, m, NULL, error);
-#else
-		IFQ_ENQUEUE(&sc->sc_if.if_snd, m, error);
-#endif
-	    }
 	    if (error) {
 		sc->sc_if.if_oerrors++;
 		sc->sc_stats.ppp_oerrors++;
@@ -1043,7 +1029,7 @@ pppintr()
     s = splsoftnet();
     for (i = 0; i < NPPP; ++i, ++sc) {
 	if (!(sc->sc_flags & SC_TBUSY)
-	    && (!IFQ_IS_EMPTY(&sc->sc_if.if_snd) || sc->sc_fastq.ifq_head)) {
+	    && (IFQ_IS_EMPTY(&sc->sc_if.if_snd) == 0 || sc->sc_fastq.ifq_head)) {
 	    s2 = splimp();
 	    sc->sc_flags |= SC_TBUSY;
 	    splx(s2);
@@ -1335,6 +1321,8 @@ ppp_inproc(sc, m)
 		goto bad;	/* lose if big headers and no clusters */
 	    }
 	}
+	if (m->m_flags & M_PKTHDR)
+		M_MOVE_HDR(mp, m);
 	cp = mtod(mp, u_char *);
 	cp[0] = adrs;
 	cp[1] = ctrl;

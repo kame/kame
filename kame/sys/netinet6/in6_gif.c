@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.86 2001/11/08 08:54:43 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.87 2001/11/28 11:08:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -201,7 +201,7 @@ in6_gif_output(ifp, family, m)
 
 	/* encapsulate into IPv6 packet */
 	mp = NULL;
-	error = ipip_output(m, &tdb, &mp, hlen, poff, NULL);
+	error = ipip_output(m, &tdb, &mp, hlen, poff);
 	if (error)
 	        return error;
 	else if (mp == NULL)
@@ -407,7 +407,7 @@ int in6_gif_input(mp, offp, proto)
 	m->m_pkthdr.rcvif = gifp;
 	gifp->if_ipackets++;
 	gifp->if_ibytes += m->m_pkthdr.len;
-	ipip_input(m, *offp);
+	ipip_input(m, *offp, gifp);
 	return IPPROTO_DONE;
 #else
 	otos = ip6->ip6_flow;

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.232 2001/11/26 08:34:12 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.233 2001/11/28 11:08:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,6 +77,9 @@
 #ifdef __NetBSD__
 #include "opt_inet.h"
 #include "opt_ipsec.h"
+#endif
+#ifdef __OpenBSD__
+#include "pf.h"
 #endif
 
 #include <sys/param.h>
@@ -159,6 +162,12 @@
 #ifdef MIP6
 #include <netinet6/mip6.h>
 #endif /* MIP6 */
+
+#ifdef __OpenBSD__
+#if NPF > 0
+#include <net/pfvar.h>
+#endif
+#endif
 
 #include <net/net_osdep.h>
 
@@ -519,8 +528,13 @@ ip6_input(m)
 		struct mbuf *n;
 
 		MGETHDR(n, M_DONTWAIT, MT_HEADER);
-		if (n != NULL)
+		if (n != NULL) {
+#ifdef __OpenBSD__
+			M_MOVE_PKTHDR(n, m);
+#else
 			M_COPY_PKTHDR(n, m);
+#endif
+		}
 		if (n != NULL && m->m_pkthdr.len > MHLEN) {
 			MCLGET(n, M_DONTWAIT);
 			if ((n->m_flags & M_EXT) == 0) {
@@ -539,6 +553,14 @@ ip6_input(m)
 		m = n;
 	}
 	IP6_EXTHDR_CHECK(m, 0, sizeof(struct ip6_hdr), /* nothing */);
+#endif
+
+#if defined(__OpenBSD__) && NPF > 0 
+	/*
+	 * Packet filter
+	 */
+	if (pf_test6(PF_IN, m->m_pkthdr.rcvif, &m) != PF_PASS)
+		goto bad;
 #endif
 
 	if (m->m_len < sizeof(struct ip6_hdr)) {

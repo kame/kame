@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.h,v 1.22 2001/02/06 00:22:22 mickey Exp $	*/
+/*	$OpenBSD: if.h,v 1.31 2001/07/05 08:34:46 angelos Exp $	*/
 /*	$NetBSD: if.h,v 1.23 1996/05/07 02:40:27 thorpej Exp $	*/
 
 /*
@@ -36,10 +36,18 @@
  *	@(#)if.h	8.1 (Berkeley) 6/10/93
  */
 
+#ifndef _NET_IF_H_
+#define _NET_IF_H_
+
 #include <sys/queue.h>
-#if 1 /* ALTQ */
+
+/*
+ * Always include ALTQ glue here -- we use the ALTQ interface queue
+ * structure even when ALTQ is not configured into the kernel so that
+ * the size of struct ifnet does not changed based on the option.  The
+ * ALTQ queue structure is API-compatible with the legacy ifqueue.
+ */
 #include <altq/if_altq.h>
-#endif
 
 /*
  * Structures defining a network interface, providing a packet
@@ -147,8 +155,10 @@ struct ifnet {				/* and the entries */
 	u_short	if_index;		/* numeric abbreviation for this if */
 	short	if_timer;		/* time 'til if_watchdog called */
 	short	if_flags;		/* up/down, broadcast, etc. */
-	struct	if_data if_data;	/* statistics and other data about if */
-/* procedure handles */
+	struct	if_data if_data;	/* stats and other data about if */
+	int	if_capabilities;	/* interface capabilities */
+
+	/* procedure handles */
 	int	(*if_output)		/* output routine (enqueue) */
 		__P((struct ifnet *, struct mbuf *, struct sockaddr *,
 		     struct rtentry *));
@@ -160,11 +170,7 @@ struct ifnet {				/* and the entries */
 		__P((struct ifnet *));
 	void	(*if_watchdog)		/* timer routine */
 		__P((struct ifnet *));
-#if 1 /* ALTQ */
 	struct	ifaltq if_snd;		/* output queue (includes altq) */
-#else
-	struct	ifqueue if_snd;		/* output queue */
-#endif
 	struct ifprefix *if_prefixlist; /* linked list of prefixes per if */
 };
 #define	if_mtu		if_data.ifi_mtu
@@ -211,11 +217,19 @@ struct ifnet {				/* and the entries */
 
 /*
  * Some convenience macros used for setting ifi_baudrate.
- * XXX 1000 vs. 1024? --thorpej@netbsd.org
  */
 #define	IF_Kbps(x)	((x) * 1000)		/* kilobits/sec. */
 #define	IF_Mbps(x)	(IF_Kbps((x) * 1000))	/* megabits/sec. */
 #define	IF_Gbps(x)	(IF_Mbps((x) * 1000))	/* gigabits/sec. */
+
+/* Capabilities that interfaces can advertise. */
+#define	IFCAP_CSUM_IPv4		0x00000001	/* can do IPv4 header csum */
+#define	IFCAP_CSUM_TCPv4	0x00000002	/* can do IPv4/TCP csum */
+#define	IFCAP_CSUM_UDPv4	0x00000004	/* can do IPv4/UDP csum */
+#define	IFCAP_IPSEC		0x00000008	/* can do IPsec */
+#define	IFCAP_VLAN_MTU		0x00000010	/* VLAN-compatible MTU */
+#define	IFCAP_VLAN_HWTAGGING	0x00000020	/* hardware VLAN tag support */
+#define	IFCAP_IPCOMP		0x00000040	/* can do IPcomp */
 
 /*
  * Output queues (ifp->if_snd) and internetwork datagram level (pup level 1)
@@ -252,14 +266,17 @@ struct ifnet {				/* and the entries */
 }
 #define	IF_POLL(ifq, m)		((m) = (ifq)->ifq_head)
 #define	IF_PURGE(ifq)							\
-while (1) {								\
-	struct mbuf *m0;						\
-	IF_DEQUEUE((ifq), m0);						\
-	if (m0 == NULL)							\
-		break;							\
-	else								\
-		m_freem(m0);						\
-}
+do {									\
+	struct mbuf *__m0;						\
+									\
+	for (;;) {							\
+		IF_DEQUEUE((ifq), __m0);				\
+		if (__m0 == NULL)					\
+			break;						\
+		else							\
+			m_freem(__m0);					\
+	}								\
+} while (0)
 #define	IF_IS_EMPTY(ifq)	((ifq)->ifq_len == 0)
 
 #define	IFQ_MAXLEN	50
@@ -427,6 +444,7 @@ do { \
 } while (0)
 
 #ifdef ALTQ
+#define	ALTQ_DECL(x)		x
 
 #define	IFQ_ENQUEUE(ifq, m, pattr, err)					\
 do {									\
@@ -488,8 +506,9 @@ do {									\
 } while (0)
 
 #else /* !ALTQ */
+#define	ALTQ_DECL(x)		/* nothing */
 
-#define	IFQ_ENQUEUE(ifq, m, err)					\
+#define	IFQ_ENQUEUE(ifq, m, pattr, err)					\
 do {									\
 	if (IF_QFULL((ifq))) {						\
 		m_freem((m));						\
@@ -506,20 +525,13 @@ do {									\
 
 #define	IFQ_POLL(ifq, m)	IF_POLL((ifq), (m))
 
-#define	IFQ_PURGE(ifq)							\
-while (1) {								\
-	struct mbuf *m0;						\
-	IF_DEQUEUE((ifq), m0);						\
-	if (m0 == NULL)							\
-		break;							\
-	else								\
-		m_freem(m0);						\
-}
+#define	IFQ_PURGE(ifq)		IF_PURGE((ifq))
 
-#define	IFQ_SET_READY(ifq)		((void)0)
-#define	IFQ_CLASSIFY(ifq, m, af, pa)	((void)0)
+#define	IFQ_SET_READY(ifq)	/* nothing */
 
-#endif /* !ALTQ */
+#define	IFQ_CLASSIFY(ifq, m, af, pa) /* nothing */
+
+#endif /* ALTQ */
 
 #define	IFQ_IS_EMPTY(ifq)		((ifq)->ifq_len == 0)
 #define	IFQ_INC_LEN(ifq)		((ifq)->ifq_len++)
@@ -535,6 +547,7 @@ int if_index;
 void	ether_ifattach __P((struct ifnet *));
 void	ether_ifdetach __P((struct ifnet *));
 int	ether_ioctl __P((struct ifnet *, struct arpcom *, u_long, caddr_t));
+void	ether_input_mbuf __P((struct ifnet *, struct mbuf *));
 void	ether_input __P((struct ifnet *, struct ether_header *, struct mbuf *));
 int	ether_output __P((struct ifnet *,
 	   struct mbuf *, struct sockaddr *, struct rtentry *));
@@ -570,3 +583,4 @@ int	looutput __P((struct ifnet *,
 	   struct mbuf *, struct sockaddr *, struct rtentry *));
 void	lortrequest __P((int, struct rtentry *, struct rt_addrinfo *));
 #endif /* _KERNEL */
+#endif /* _NET_IF_H_ */

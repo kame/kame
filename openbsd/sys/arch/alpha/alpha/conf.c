@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.23 2001/03/08 02:36:01 ericj Exp $	*/
+/*	$OpenBSD: conf.c,v 1.32 2001/09/28 03:33:39 mickey Exp $	*/
 /*	$NetBSD: conf.c,v 1.16 1996/10/18 21:26:57 cgd Exp $	*/
 
 /*-
@@ -46,7 +46,6 @@
 
 #include "wd.h"
 bdev_decl(wd);
-bdev_decl(sw);
 #include "st.h"
 #include "cd.h"
 #include "sd.h"
@@ -54,10 +53,8 @@ bdev_decl(sw);
 #include "uk.h"
 #include "vnd.h"
 #include "raid.h"
-bdev_decl(raid);
 #include "ccd.h"
 #include "rd.h"
-bdev_decl(rd);
 
 struct bdevsw	bdevsw[] =
 {
@@ -90,16 +87,15 @@ int	nblkdev = sizeof (bdevsw) / sizeof (bdevsw[0]);
 #define	mmread  mmrw
 #define	mmwrite mmrw
 cdev_decl(mm);
-cdev_decl(sw);
 #include "pty.h"
 #include "tun.h"
 dev_type_open(filedescopen);
 #include "bpfilter.h"
+#include "iop.h"
 #include "ch.h"
 #include "scc.h"
 cdev_decl(scc);
 #include "audio.h"
-cdev_decl(audio);
 #include "com.h"
 cdev_decl(com);
 #include "wsdisplay.h"
@@ -107,13 +103,6 @@ cdev_decl(com);
 #include "wsmouse.h"
 #include "lpt.h"
 cdev_decl(lpt);
-cdev_decl(rd);
-cdev_decl(raid);
-#ifdef IPFILTER
-#define NIPF 1
-#else
-#define NIPF 0
-#endif
 cdev_decl(prom);			/* XXX XXX XXX */
 cdev_decl(wd);
 #include "cy.h"
@@ -138,6 +127,13 @@ cdev_decl(ulpt);
 cdev_decl(ucom);
 #include "ugen.h"
 cdev_decl(ugen);
+#include "pf.h"
+#ifdef USER_PCICONF
+#include "pci.h"
+cdev_decl(pci);
+#endif
+
+#include <altq/altqconf.h>
 
 struct cdevsw	cdevsw[] =
 {
@@ -176,7 +172,7 @@ struct cdevsw	cdevsw[] =
 	cdev_scanner_init(NSS,ss),	/* 32: SCSI scanner */
 	cdev_uk_init(NUK,uk),		/* 33: SCSI unknown */
 	cdev_random_init(1,random),	/* 34: random data source */
-	cdev_gen_ipf(NIPF,ipl),		/* 35: IP filter log */
+	cdev_pf_init(NPF, pf),		/* 35: packet filter */
 	cdev_disk_init(NWD,wd), 	/* 36: ST506/ESDI/IDE disk */
 	cdev_notdef(),			/* 37 */
         cdev_tty_init(NCY,cy),          /* 38: Cyclom serial port */
@@ -197,9 +193,13 @@ struct cdevsw	cdevsw[] =
 #else
 	cdev_notdef(),			/* 51 */
 #endif
-#ifdef ALTQ
-	cdev_notdef(),			/* 52: ALTQ */
+#ifdef USER_PCICONF
+	cdev_pci_init(NPCI,pci),	/* 52: PCI user */
+#else
+	cdev_notdef(),
 #endif
+	cdev_notdef(),			/* 52: ALTQ */
+	cdev_iop_init(NIOP, iop),	/* 54: I2O IOP control interface */
 };
 int	nchrdev = sizeof (cdevsw) / sizeof (cdevsw[0]);
 

@@ -1,5 +1,5 @@
-/*	$OpenBSD: intr.c,v 1.6 1999/12/08 06:50:15 itojun Exp $	*/
-/*	$NetBSD: intr.c,v 1.2 1997/05/01 16:24:26 thorpej Exp $	*/
+/*	$OpenBSD: intr.c,v 1.8 2001/06/27 04:05:45 art Exp $	*/
+/*	$NetBSD: intr.c,v 1.5 1998/02/16 20:58:30 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1996, 1997 The NetBSD Foundation, Inc.
@@ -27,8 +27,8 @@
  * THIS SOFTWARE IS PROVIDED BY THE NETBSD FOUNDATION, INC. AND CONTRIBUTORS
  * ``AS IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
  * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
- * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL THE FOUNDATION OR CONTRIBUTORS
+ * BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
  * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
  * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
  * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
@@ -47,6 +47,9 @@
 #include <sys/systm.h>
 #include <sys/malloc.h>
 #include <sys/vmmeter.h>
+
+#include <vm/vm.h>
+#include <uvm/uvm_extern.h>
 
 #include <net/netisr.h>
 #include "ppp.h"
@@ -258,7 +261,7 @@ intr_dispatch(evec)
 	ipl = vec - ISRLOC;
 
 	intrcnt[ipl]++;
-	cnt.v_intr++;
+	uvmexp.intrs++;
 
 	list = &isr_list[ipl];
 	if (list->lh_first == NULL) {

@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.79 2001/10/25 12:22:58 jinmei Exp $	*/
+/*	$KAME: in_gif.c,v 1.80 2001/11/28 11:08:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -210,7 +210,7 @@ in_gif_output(ifp, family, m)
 
 	/* encapsulate into IPv4 packet */
 	mp = NULL;
-	error = ipip_output(m, &tdb, &mp, hlen, poff, NULL);
+	error = ipip_output(m, &tdb, &mp, hlen, poff);
 	if (error)
 		return error;
 	else if (mp == NULL)
@@ -440,7 +440,7 @@ in_gif_input(m, va_alist)
 	m->m_pkthdr.rcvif = gifp;
 	gifp->if_ipackets++;
 	gifp->if_ibytes += m->m_pkthdr.len;
-	ipip_input(m, off); /* We have a configured GIF */
+	ipip_input(m, off, gifp); /* We have a configured GIF */
 	return;
 #else
 	otos = ip->ip_tos;

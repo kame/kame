@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_tx.c,v 1.14 2001/03/22 01:38:54 angelos Exp $	*/
+/*	$OpenBSD: if_tx.c,v 1.20 2001/09/20 17:02:31 mpech Exp $	*/
 /* $FreeBSD: src/sys/pci/if_tx.c,v 1.45 2001/02/07 20:11:02 semenu Exp $ */
 
 /*-
@@ -116,7 +116,6 @@
 #endif
 
 #include <vm/vm.h>
-#include <vm/pmap.h>
 
 #include <dev/mii/mii.h>
 #include <dev/mii/miivar.h>
@@ -243,13 +242,13 @@ epic_openbsd_attach(
 
 	if (command & PCI_COMMAND_MEM_ENABLE) {
 		if (pci_mapreg_map(pa, PCI_BASEMEM, PCI_MAPREG_TYPE_MEM, 0,
-		    &sc->sc_st, &sc->sc_sh, NULL, &iosize)) {
+		    &sc->sc_st, &sc->sc_sh, NULL, &iosize, 0)) {
 			printf(": can't map mem space\n");
 			return;
 		}
 	} else {
 		if (pci_mapreg_map(pa, PCI_BASEIO, PCI_MAPREG_TYPE_IO, 0,
-		    &sc->sc_st, &sc->sc_sh, NULL, &iosize)) {
+		    &sc->sc_st, &sc->sc_sh, NULL, &iosize, 0)) {
 			printf(": can't map i/o space\n");
 			return;
 		}
@@ -271,8 +270,7 @@ epic_openbsd_attach(
 	if( epic_common_attach(sc) ) return;
 
 	/* Map interrupt */
-	if( pci_intr_map(pc, pa->pa_intrtag, pa->pa_intrpin,
-	    pa->pa_intrline, &ih)) {
+	if( pci_intr_map(pa, &ih)) {
 		printf(": can't map interrupt\n");
 		return;
 	}
@@ -891,7 +889,6 @@ epic_rx_done(sc)
 	struct epic_rx_buffer *buf;
 	struct epic_rx_desc *desc;
 	struct mbuf *m;
-	struct ether_header *eh;
 
 	while( !(sc->rx_desc[sc->cur_rx].status & 0x8000) ) { 
 		buf = sc->rx_buffer + sc->cur_rx;
@@ -932,7 +929,6 @@ epic_rx_done(sc)
 		 * First mbuf in packet holds the ethernet and
 		 * packet headers.
 		 */
-		eh = mtod( m, struct ether_header * );
 		m->m_pkthdr.rcvif = &(sc->sc_if);
 		m->m_pkthdr.len = m->m_len = len;
 
@@ -944,12 +940,8 @@ epic_rx_done(sc)
 #endif /* NBPFILTER > 0 */
 #endif /* !__FreeBSD__ */
 
-		/* Second mbuf holds packet ifself */
-		m->m_pkthdr.len = m->m_len = len - sizeof(struct ether_header);
-		m->m_data += sizeof( struct ether_header );
-
 		/* Give mbuf to OS */
-		ether_input(&sc->sc_if, eh, m);
+		ether_input_mbuf(&sc->sc_if, m);
 
 		/* Successfuly received frame */
 		sc->sc_if.if_ipackets++;
@@ -1048,7 +1040,7 @@ epic_intr(arg)
 		      INTSTAT_APE|INTSTAT_DPE|INTSTAT_TXU|INTSTAT_RXE) ){
     	    if( status & (INTSTAT_FATAL|INTSTAT_PMA|INTSTAT_PTA|
 			  INTSTAT_APE|INTSTAT_DPE) ){
-		printf(EPIC_FORMAT ": PCI fatal error occured (%s%s%s%s)\n",
+		printf(EPIC_FORMAT ": PCI fatal error occurred (%s%s%s%s)\n",
     		    EPIC_ARGS(sc),
 		    (status&INTSTAT_PMA)?"PMA":"",
 		    (status&INTSTAT_PTA)?" PTA":"",

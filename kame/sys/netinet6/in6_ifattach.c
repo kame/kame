@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.147 2001/11/06 08:14:16 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.148 2001/11/28 11:08:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -940,7 +940,7 @@ in6_ifattach(ifp, altifp)
 #endif
 #ifdef IFT_PFLOG
 	case IFT_PFLOG:
-		break;
+		return;
 #endif
 	}
 

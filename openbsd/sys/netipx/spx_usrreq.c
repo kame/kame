@@ -1,4 +1,4 @@
-/*	$OpenBSD: spx_usrreq.c,v 1.12 2000/01/15 19:05:30 fgsch Exp $	*/
+/*	$OpenBSD: spx_usrreq.c,v 1.17 2001/09/23 10:22:13 mickey Exp $	*/
 
 /*-
  *
@@ -271,9 +271,9 @@ spx_input(struct mbuf *m, ...)
 	m->m_pkthdr.len -= sizeof(struct ipx);
 	m->m_data += sizeof(struct ipx);
 
-	if (spx_reass(cb, si)) {
-		(void) m_freem(m);
-	}
+	if (spx_reass(cb, m))
+		m_freem(m);
+
 	if (cb->s_force || (cb->s_flags & (SF_ACKNOW|SF_WIN|SF_RXT)))
 		(void) spx_output(cb, (struct mbuf *)0);
 	cb->s_flags &= ~(SF_WIN|SF_RXT);
@@ -285,7 +285,7 @@ dropwithreset:
 	si->si_seq = ntohs(si->si_seq);
 	si->si_ack = ntohs(si->si_ack);
 	si->si_alo = ntohs(si->si_alo);
-	m_freem(dtom(si));
+	m_freem(m);
 	if (cb->s_ipxpcb->ipxp_socket->so_options & SO_DEBUG || traceallspxs)
 		spx_trace(SA_DROP, (u_char)ostate, cb, &spx_savesi, 0);
 	return;
@@ -306,12 +306,13 @@ int spxrexmtthresh = 3;
  * packets up, and suppresses duplicates.
  */
 int
-spx_reass(cb, si)
+spx_reass(cb, m0)
 	register struct spxpcb *cb;
-	register struct spx *si;
+	register struct mbuf	*m0;
 {
 	register struct spx_q	*q;
 	register struct mbuf	*m;
+	register struct spx	*si = mtod(m0, struct spx *);
 	register struct socket	*so = cb->s_ipxpcb->ipxp_socket;
 	char	packetp = cb->s_flags & SF_HI;
 	int	incr;
@@ -463,18 +464,18 @@ update_window:
 			spxstat.spxs_rcvpackafterwin++;
 		if (si->si_cc & SPX_OB) {
 			if (SSEQ_GT(si->si_seq, cb->s_alo + 60)) {
-				m_freem(dtom(si));
+				m_freem(m0);
 				return (0);
 			} /* else queue this packet; */
 		} else {
 			/*register struct socket *so = cb->s_ipxpcb->ipxp_socket;
 			if (so->so_state && SS_NOFDREF) {
-				m_freem(dtom(si));
+				m_freem(m0);
 				(void)spx_close(cb);
 			} else
 				       would crash system*/
 			spx_istat.notyet++;
-			m_freem(dtom(si));
+			m_freem(m0);
 			return (0);
 		}
 	}
@@ -499,7 +500,7 @@ update_window:
 	 * Loop through all packets queued up to insert in
 	 * appropriate sequence.
 	 */
-	for (q = cb->spxp_queue.tqh_first; q != NULL; q = q->list.tqe_next) {
+	TAILQ_FOREACH(q, &cb->spxp_queue, list) {
 		if (si->si_seq == SI(q)->si_seq) {
 			spxstat.spxs_rcvduppack++;
 			return (1);
@@ -509,11 +510,13 @@ update_window:
 			break;
 		}
 	}
+
+	/* XXX what if q == NULL ??? */
 	{
 		register struct spx_q	*p;
 		if ((p = malloc(sizeof(*p),M_DEVBUF,M_NOWAIT)) != NULL)
 		{
-			p->data = (caddr_t)si;
+			p->m = m0;
 			TAILQ_INSERT_AFTER(&cb->spxp_queue, q, p, list);
 		} else
 			return 1;
@@ -534,10 +537,10 @@ present:
 	 * number, and present all acknowledged data to user;
 	 * If in packet interface mode, show packet headers.
 	 */
-	for (q = cb->spxp_queue.tqh_first; q != NULL; q = q->list.tqe_next) {
+	TAILQ_FOREACH(q, &cb->spxp_queue, list) {
 		  if (SI(q)->si_seq == cb->s_ack) {
 			cb->s_ack++;
-			m = dtom(q);
+			m = q->m;
 			if (SI(q)->si_cc & SPX_OB) {
 				cb->s_oobflags &= ~SF_IOOB;
 				if (so->so_rcv.sb_cc)
@@ -706,7 +709,7 @@ spx_output(cb, m0)
 {
 	struct socket *so = cb->s_ipxpcb->ipxp_socket;
 	register struct mbuf *m;
-	register struct spx *si = (struct spx *) 0;
+	register struct spx *si = NULL;
 	register struct sockbuf *sb = &so->so_snd;
 	int len = 0, win, rcv_win;
 	short span, off, recordp = 0;
@@ -795,6 +798,7 @@ spx_output(cb, m0)
 		 * Fill in mbuf with extended SP header
 		 * and addresses and length put into network format.
 		 */
+		M_MOVE_HDR(m, m0);
 		MH_ALIGN(m, sizeof(struct spx));
 		m->m_len = sizeof(struct spx);
 		m->m_next = m0;
@@ -952,7 +956,7 @@ send:
 	/*
 	 * Find requested packet.
 	 */
-	si = 0;
+	si = NULL;
 	if (len > 0) {
 		cb->s_want = cb->s_snxt;
 		for (m = sb->sb_mb; m; m = m->m_act) {
@@ -965,7 +969,7 @@ send:
 			if (si->si_seq == cb->s_snxt)
 					cb->s_snxt++;
 				else
-					spxstat.spxs_sndvoid++, si = 0;
+					spxstat.spxs_sndvoid++, si = NULL;
 		}
 	}
 	/*
@@ -982,10 +986,9 @@ send:
 		 * must make a copy of this packet for
 		 * ipx_output to monkey with
 		 */
-		m = m_copy(dtom(si), 0, (int)M_COPYALL);
-		if (m == NULL) {
+		m = m_copy(m, 0, M_COPYALL);
+		if (m == NULL)
 			return (ENOBUFS);
-		}
 		si = mtod(m, struct spx *);
 		if (SSEQ_LT(si->si_seq, cb->s_smax))
 			spxstat.spxs_sndrexmitpack++;
@@ -1273,7 +1276,7 @@ spx_usrreq(so, req, m, nam, controlp)
 	register struct sockbuf *sb;
 
 	if (req == PRU_CONTROL)
-                return (ipx_control(so, (int)m, (caddr_t)nam,
+                return (ipx_control(so, (long)m, (caddr_t)nam,
 			(struct ifnet *)controlp));
 	if (ipxp == NULL) {
 		if (req != PRU_ATTACH) {
@@ -1478,8 +1481,8 @@ spx_usrreq(so, req, m, nam, controlp)
 		break;
 
 	case PRU_SLOWTIMO:
-		cb = spx_timers(cb, (int)nam);
-		req |= ((int)nam) << 8;
+		cb = spx_timers(cb, (long)nam);
+		req |= ((long)nam) << 8;
 		break;
 
 	case PRU_FASTTIMO:
@@ -1559,23 +1562,20 @@ spx_close(cb)
 	register struct spx_q *s;
 	struct ipxpcb *ipxp = cb->s_ipxpcb;
 	struct socket *so = ipxp->ipxp_socket;
-	register struct mbuf *m;
 
-	s = cb->spxp_queue.tqh_first;
-	while (s != NULL) {
-		m = dtom(s->data);
-		s = s->list.tqe_next;
+	for (s = TAILQ_FIRST(&cb->spxp_queue); s != NULL;
+	     s = TAILQ_FIRST(&cb->spxp_queue)) {
+		TAILQ_REMOVE(&cb->spxp_queue, s, list);
+		m_freem(s->m);
 		free(s, M_DEVBUF);
-		m_freem(m);
 	}
-	TAILQ_INIT(&cb->spxp_queue);
-	(void) m_free(dtom(cb->s_ipx));
-	(void) m_free(dtom(cb));
+	free(cb->s_ipx, M_PCB);
+	free(cb, M_PCB);
 	ipxp->ipxp_ppcb = 0;
 	soisdisconnected(so);
 	ipx_pcbdetach(ipxp);
 	spxstat.spxs_closed++;
-	return ((struct spxpcb *)0);
+	return (NULL);
 }
 /*
  *	Someday we may do level 3 handshaking
@@ -1683,8 +1683,8 @@ spx_slowtimo()
 		for (i = 0; i < SPXT_NTIMERS; i++) {
 			if (cb->s_timer[i] && --cb->s_timer[i] == 0) {
 				(void) spx_usrreq(cb->s_ipxpcb->ipxp_socket,
-				    PRU_SLOWTIMO, (struct mbuf *)0,
-				    (struct mbuf *)i, (struct mbuf *)0);
+				    PRU_SLOWTIMO, NULL,
+				    (struct mbuf *)(long)i, NULL);
 				if (ipxnxt->ipxp_queue.cqe_prev != ipx)
 					goto tpgone;
 			}

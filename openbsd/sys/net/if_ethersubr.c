@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ethersubr.c,v 1.44 2001/03/23 02:15:23 jason Exp $	*/
+/*	$OpenBSD: if_ethersubr.c,v 1.58 2001/10/03 11:34:38 art Exp $	*/
 /*	$NetBSD: if_ethersubr.c,v 1.19 1996/05/07 02:40:30 thorpej Exp $	*/
 
 /*
@@ -105,6 +105,7 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/in_var.h>
 #endif
 #include <netinet/if_ether.h>
+#include <netinet/ip_ipsp.h>
 
 #if NBPFILTER > 0
 #include <net/bpf.h>
@@ -245,17 +246,15 @@ ether_output(ifp, m0, dst, rt0)
 	struct rtentry *rt0;
 {
 	u_int16_t etype;
-	int s, len, error = 0;
- 	u_char edst[6];
+	int s, len, error = 0, hdrcmplt = 0;
+ 	u_char edst[6], esrc[6];
 	register struct mbuf *m = m0;
 	register struct rtentry *rt;
 	struct mbuf *mcopy = (struct mbuf *)0;
 	register struct ether_header *eh;
 	struct arpcom *ac = (struct arpcom *)ifp;
 	short mflags;
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
@@ -281,13 +280,13 @@ ether_output(ifp, m0, dst, rt0)
 			    time.tv_sec < rt->rt_rmx.rmx_expire)
 				senderr(rt == rt0 ? EHOSTDOWN : EHOSTUNREACH);
 	}
-#ifdef ALTQ
+
 	/*
 	 * if the queueing discipline needs packet classification,
 	 * do it before prepending link headers.
 	 */
 	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
-#endif
+
 	switch (dst->sa_family) {
 
 #ifdef INET
@@ -378,11 +377,12 @@ ether_output(ifp, m0, dst, rt0)
 		 * passed to us by value, we m_copy() the first mbuf,
 		 * and use it for our llc header.
 		 */
-		if ( aa->aa_flags & AFA_PHASE2 ) {
+		if (aa->aa_flags & AFA_PHASE2) {
 			struct llc llc;
 
-			/* XXX Really this should use netisr too */
-			M_PREPEND(m, AT_LLC_SIZE, M_WAIT);
+			M_PREPEND(m, AT_LLC_SIZE, M_DONTWAIT);
+			if (m == NULL)
+				return (0);
 			/*
 			 * FreeBSD doesn't count the LLC len in
 			 * ifp->obytes, so they increment a length
@@ -483,6 +483,12 @@ ether_output(ifp, m0, dst, rt0)
 #endif /* LLC_DEBUG */
 		} break;
 
+	case pseudo_AF_HDRCMPLT:
+		hdrcmplt = 1;
+		eh = (struct ether_header *)dst->sa_data;
+		bcopy((caddr_t)eh->ether_shost, (caddr_t)esrc, sizeof (esrc));
+		/* FALLTHROUGH */
+
 	case AF_UNSPEC:
 		eh = (struct ether_header *)dst->sa_data;
  		bcopy((caddr_t)eh->ether_dhost, (caddr_t)edst, sizeof (edst));
@@ -496,6 +502,7 @@ ether_output(ifp, m0, dst, rt0)
 		senderr(EAFNOSUPPORT);
 	}
 
+	/* XXX Should we feed-back an unencrypted IPsec packet ? */
 	if (mcopy)
 		(void) looutput(ifp, mcopy, dst, rt);
 
@@ -510,8 +517,12 @@ ether_output(ifp, m0, dst, rt0)
 	bcopy((caddr_t)&etype,(caddr_t)&eh->ether_type,
 		sizeof(eh->ether_type));
  	bcopy((caddr_t)edst, (caddr_t)eh->ether_dhost, sizeof (edst));
- 	bcopy((caddr_t)ac->ac_enaddr, (caddr_t)eh->ether_shost,
-	    sizeof(eh->ether_shost));
+	if (hdrcmplt)
+	 	bcopy((caddr_t)esrc, (caddr_t)eh->ether_shost,
+		    sizeof(eh->ether_shost));
+	else
+	 	bcopy((caddr_t)ac->ac_enaddr, (caddr_t)eh->ether_shost,
+		    sizeof(eh->ether_shost));
 
 #if NBRIDGE > 0
 	/*
@@ -519,8 +530,38 @@ ether_output(ifp, m0, dst, rt0)
 	 * for output.
 	 */
 	if (ifp->if_bridge) {
-		bridge_output(ifp, m, NULL, NULL);
-		return (error);
+		struct m_tag *mtag;
+
+		/*
+		 * Check if this packet has already been sent out through
+		 * this bridge, in which case we simply send it out
+		 * without further bridge processing.
+		 */
+		for (mtag = m_tag_find(m, PACKET_TAG_BRIDGE, NULL); mtag;
+		    mtag = m_tag_find(m, PACKET_TAG_BRIDGE, mtag)) {
+#ifdef DEBUG
+			/* Check that the information is there */
+			if (mtag->m_tag_len != sizeof(caddr_t)) {
+				error = EINVAL;
+				goto bad;
+			}
+#endif
+			if (!bcmp(&ifp->if_bridge, mtag + 1, sizeof(caddr_t)))
+				break;
+		}
+		if (mtag == NULL) {
+			/* Attach a tag so we can detect loops */
+			mtag = m_tag_get(PACKET_TAG_BRIDGE, sizeof(caddr_t),
+			    M_NOWAIT);
+			if (mtag == NULL) {
+				error = ENOBUFS;
+				goto bad;
+			}
+			bcopy(&ifp->if_bridge, mtag + 1, sizeof(caddr_t));
+			m_tag_prepend(m, mtag);
+			bridge_output(ifp, m, NULL, NULL);
+			return (error);
+		}
 	}
 #endif
 
@@ -531,11 +572,7 @@ ether_output(ifp, m0, dst, rt0)
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-#ifdef ALTQ
 	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
-#else
-	IFQ_ENQUEUE(&ifp->if_snd, m, error);
-#endif
 	if (error) {
 		/* mbuf is already freed */
 		splx(s);
@@ -555,6 +592,110 @@ bad:
 	return (error);
 }
 
+#ifdef ALTQ
+/*
+ * This routine is a slight hack to allow a packet to be classified
+ * if the Ethernet headers are present.  It will go away when ALTQ's
+ * classification engine understands link headers.
+ */
+void
+altq_etherclassify(struct ifaltq *ifq, struct mbuf *m,
+    struct altq_pktattr *pktattr)
+{
+	struct ether_header *eh;
+	u_int16_t ether_type;
+	int hlen, af, hdrsize;
+	caddr_t hdr;
+
+	hlen = ETHER_HDR_LEN;
+	eh = mtod(m, struct ether_header *);
+
+	ether_type = htons(eh->ether_type);
+
+	if (ether_type < ETHERMTU) {
+		/* LLC/SNAP */
+		struct llc *llc = (struct llc *)(eh + 1);
+		hlen += 8;
+
+		if (m->m_len < hlen ||
+		    llc->llc_dsap != LLC_SNAP_LSAP ||
+		    llc->llc_ssap != LLC_SNAP_LSAP ||
+		    llc->llc_control != LLC_UI) {
+			/* Not SNAP. */
+			goto bad;
+		}
+
+		ether_type = htons(llc->llc_un.type_snap.ether_type);
+	}
+
+	switch (ether_type) {
+	case ETHERTYPE_IP:
+		af = AF_INET;
+		hdrsize = 20;		/* sizeof(struct ip) */
+		break;
+
+	case ETHERTYPE_IPV6:
+		af = AF_INET6;
+		hdrsize = 40;		/* sizeof(struct ip6_hdr) */
+		break;
+
+	default:
+		af = AF_UNSPEC;
+		hdrsize = 0;
+		break;
+	}
+
+	if (m->m_len < (hlen + hdrsize)) {
+		/*
+		 * Ethernet and protocol header not in a single
+		 * mbuf.  We can't cope with this situation right
+		 * now (but it shouldn't ever happen, really, anyhow).
+		 * XXX Should use m_pulldown().
+		 */
+		printf("altq_etherclassify: headers span multiple mbufs: "
+		    "%d < %d\n", m->m_len, (hlen + hdrsize));
+		goto bad;
+	}
+
+	m->m_data += hlen;
+	m->m_len -= hlen;
+
+	hdr = mtod(m, caddr_t);
+
+	if (ALTQ_NEEDS_CLASSIFY(ifq))
+		pktattr->pattr_class =
+		    (*ifq->altq_classify)(ifq->altq_clfier, m, af);
+	pktattr->pattr_af = af;
+	pktattr->pattr_hdr = hdr;
+
+	m->m_data -= hlen;
+	m->m_len += hlen;
+
+	return;
+
+ bad:
+	pktattr->pattr_class = NULL;
+	pktattr->pattr_hdr = NULL;
+	pktattr->pattr_af = AF_UNSPEC;
+}
+#endif /* ALTQ */
+
+/*
+ * Temporary function to migrate while
+ * removing ether_header * from ether_input().
+ */
+void
+ether_input_mbuf(ifp, m)
+	struct ifnet *ifp;
+	struct mbuf *m;
+{
+	struct ether_header *eh;
+
+	eh = mtod(m, struct ether_header *);
+	m_adj(m, ETHER_HDR_LEN);
+	ether_input(ifp, eh, m);
+}
+
 /*
  * Process a received Ethernet packet;
  * the packet is in the mbuf chain m without
@@ -570,13 +711,13 @@ ether_input(ifp, eh, m)
 	u_int16_t etype;
 	int s, llcfound = 0;
 	register struct llc *l;
-	struct arpcom *ac = (struct arpcom *)ifp;
+	struct arpcom *ac;
 
 	if ((ifp->if_flags & IFF_UP) == 0) {
 		m_freem(m);
 		return;
 	}
-	if (eh->ether_dhost[0] & 1) {
+	if (ETHER_IS_MULTICAST(eh->ether_dhost)) {
 		if ((ifp->if_flags & IFF_SIMPLEX) == 0) {
 			struct ifaddr *ifa;
 			struct sockaddr_dl *sdl = NULL;
@@ -633,10 +774,12 @@ ether_input(ifp, eh, m)
 #if NVLAN > 0
 	if (etype == ETHERTYPE_8021Q) {
 		if (vlan_input(eh, m) < 0)
-			ifp->if_data.ifi_noproto++;
+			ifp->if_noproto++;
 		return;
        }
 #endif /* NVLAN > 0 */
+
+	ac = (struct arpcom *)ifp;
 
 	/*
 	 * If packet is unicast and we're in promiscuous mode, make sure it
@@ -899,7 +1042,12 @@ ether_ifattach(ifp)
 		((struct arpcom *)ifp)->ac_enaddr[2] = 0xe1;
 		((struct arpcom *)ifp)->ac_enaddr[3] = 0xba;
 		((struct arpcom *)ifp)->ac_enaddr[4] = 0xd0;
-		((struct arpcom *)ifp)->ac_enaddr[5] = (u_char)arc4random();
+		/*
+		 * XXX use of random() by anything except the scheduler is
+		 * normally invalid, but this is boot time, so pre-scheduler,
+		 * and the random subsystem is not alive yet
+		 */
+		((struct arpcom *)ifp)->ac_enaddr[5] = (u_char)random() & 0xff;
 	}
 		
 	ifp->if_type = IFT_ETHER;
@@ -907,8 +1055,7 @@ ether_ifattach(ifp)
 	ifp->if_hdrlen = 14;
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_output = ether_output;
-	for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;
-	    ifa = ifa->ifa_list.tqe_next)
+	TAILQ_FOREACH(ifa, &ifp->if_addrlist, ifa_list) {
 		if ((sdl = (struct sockaddr_dl *)ifa->ifa_addr) &&
 		    sdl->sdl_family == AF_LINK) {
 			sdl->sdl_type = IFT_ETHER;
@@ -917,6 +1064,7 @@ ether_ifattach(ifp)
 			    LLADDR(sdl), ifp->if_addrlen);
 			break;
 		}
+	}
 	LIST_INIT(&((struct arpcom *)ifp)->ac_multiaddrs);
 #if NBPFILTER > 0
 	bpfattach(&ifp->if_bpf, ifp, DLT_EN10MB, sizeof(struct ether_header));
@@ -930,7 +1078,8 @@ ether_ifdetach(ifp)
 	struct arpcom *ac = (struct arpcom *)ifp;
 	struct ether_multi *enm;
 
-	for (enm = LIST_FIRST(&ac->ac_multiaddrs); enm;
+	for (enm = LIST_FIRST(&ac->ac_multiaddrs);
+	    enm != LIST_END(&ac->ac_multiaddrs);
 	    enm = LIST_FIRST(&ac->ac_multiaddrs)) {
 		LIST_REMOVE(enm, enm_list);
 		free(enm, M_IFMADDR);
@@ -955,7 +1104,9 @@ ether_addmulti(ifr, ac)
 	register struct arpcom *ac;
 {
 	register struct ether_multi *enm;
+#ifdef INET
 	struct sockaddr_in *sin;
+#endif
 #ifdef INET6
 	struct sockaddr_in6 *sin6;
 #endif /* INET6 */
@@ -1063,7 +1214,9 @@ ether_delmulti(ifr, ac)
 	register struct arpcom *ac;
 {
 	register struct ether_multi *enm;
+#ifdef INET
 	struct sockaddr_in *sin;
+#endif
 #ifdef INET6
 	struct sockaddr_in6 *sin6;
 #endif /* INET6 */

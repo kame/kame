@@ -1,4 +1,4 @@
-/*	$OpenBSD: conf.c,v 1.67 2001/03/14 06:18:47 millert Exp $	*/
+/*	$OpenBSD: conf.c,v 1.81 2001/10/04 21:46:03 gluk Exp $	*/
 /*	$NetBSD: conf.c,v 1.75 1996/05/03 19:40:20 christos Exp $	*/
 
 /*
@@ -41,9 +41,10 @@
 
 #include <machine/conf.h>
 
+#include "inet.h"
+
 #include "wd.h"
 bdev_decl(wd);
-bdev_decl(sw);
 #include "fdc.h"
 #include "fd.h"
 bdev_decl(fd);
@@ -115,6 +116,13 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 	(dev_type_stop((*))) enodev, 0, seltrue, \
 	(dev_type_mmap((*))) enodev }
 
+/* open, close, ioctl -- XXX should be a generic device */
+#define cdev_oci_init(c,n) { \
+        dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
+        (dev_type_write((*))) enodev, dev_init(c,n,ioctl), \
+        (dev_type_stop((*))) enodev, 0,  seltrue, \
+        (dev_type_mmap((*))) enodev, 0 }
+
 /* open, close, ioctl, select -- XXX should be a generic device */
 #define cdev_ocis_init(c,n) { \
         dev_init(c,n,open), dev_init(c,n,close), (dev_type_read((*))) enodev, \
@@ -140,7 +148,7 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 #define	mmwrite	mmrw
 cdev_decl(mm);
 cdev_decl(wd);
-cdev_decl(sw);
+cdev_decl(crypto);
 #include "pty.h"
 #include "com.h"
 #include "pccom.h"
@@ -149,7 +157,6 @@ cdev_decl(fd);
 cdev_decl(wt);
 cdev_decl(scd);
 #include "pc.h"
-#include "vt.h"
 cdev_decl(pc);
 #include "ss.h"
 #include "lpt.h"
@@ -186,6 +193,7 @@ cdev_decl(svr4_net);
 #include "apm.h"
 #include "pctr.h"
 #include "bios.h"
+#include "iop.h"
 #ifdef XFS
 #include <xfs/nxfs.h>
 cdev_decl(xfs_dev);
@@ -208,19 +216,14 @@ cdev_decl(ulpt);
 cdev_decl(urio);
 #include "ucom.h"
 cdev_decl(ucom);
-
-#ifdef IPFILTER
-#define NIPF 1
-#else
-#define NIPF 0
-#endif
+#include "cz.h"
+cdev_decl(cztty);
+#include "radio.h"
+cdev_decl(radio);
 
 /* XXX -- this needs to be supported by config(8)! */
 #if (NCOM > 0) && (NPCCOM > 0)
 #error com and pccom are mutually exclusive.  Sorry.
-#endif
-#if (NVT > 0) && (NPC > 0)
-#error vt and pc are mutually exclusive.  Sorry.
 #endif
 
 #include "wsdisplay.h"
@@ -228,6 +231,13 @@ cdev_decl(ucom);
 #include "wsmouse.h"
 #include "wsmux.h"
 cdev_decl(wsmux);
+
+#ifdef USER_PCICONF
+#include "pci.h"
+cdev_decl(pci);
+#endif
+
+#include "pf.h"
 
 struct cdevsw	cdevsw[] =
 {
@@ -247,11 +257,12 @@ struct cdevsw	cdevsw[] =
 	cdev_disk_init(NFD,fd),		/* 9: floppy disk */
 	cdev_tape_init(NWT,wt),		/* 10: QIC-02/QIC-36 tape */
 	cdev_disk_init(NSCD,scd),	/* 11: Sony CD-ROM */
-#if 0
-	cdev_pc_init(NPC + NVT,pc),	/* 12: PC console */
-#endif
+#if NPC > 0
+	cdev_pc_init(NPC,pc),		/* 12: PC console */
+#else
 	cdev_wsdisplay_init(NWSDISPLAY,	/* 12: frame buffers, etc. */
 	    wsdisplay),
+#endif
 	cdev_disk_init(NSD,sd),		/* 13: SCSI disk */
 	cdev_tape_init(NST,st),		/* 14: SCSI tape */
 	cdev_disk_init(NCD,cd),		/* 15: SCSI CD-ROM */
@@ -260,7 +271,7 @@ struct cdevsw	cdevsw[] =
 	cdev_disk_init(NCCD,ccd),	/* 18: concatenated disk driver */
 	cdev_ss_init(NSS,ss),           /* 19: SCSI scanner */
 	cdev_uk_init(NUK,uk),		/* 20: unknown SCSI */
-	cdev_ocis_init(NAPM,apm),	/* 21: Advancded Power Management */
+	cdev_apm_init(NAPM,apm),	/* 21: Advancded Power Management */
 	cdev_fd_init(1,filedesc),	/* 22: file descriptor pseudo-device */
 	cdev_bpftun_init(NBPFILTER,bpf),/* 23: Berkeley packet filter */
 	cdev_ses_init(NSES,ses),	/* 24: SES/SAF-TE SCSI */
@@ -291,7 +302,7 @@ struct cdevsw	cdevsw[] =
 #else
 	cdev_notdef(),			/* 43 */
 #endif
-	cdev_gen_ipf(NIPF,ipl),         /* 44: ip filtering */
+	cdev_notdef(),			/* 44 */
 	cdev_random_init(1,random),	/* 45: random data source */
 	cdev_ocis_init(NPCTR,pctr),	/* 46: pentium performance counters */
 	cdev_disk_init(NRD,rd),		/* 47: ram disk driver */
@@ -324,9 +335,17 @@ struct cdevsw	cdevsw[] =
 	cdev_mouse_init(NWSMOUSE,	/* 68: mice */
 	    wsmouse),
 	cdev_mouse_init(NWSMUX, wsmux),	/* 69: ws multiplexor */
-#ifdef ALTQ
-	cdev_notdef(),			/* 70: ALTQ */
+	cdev_crypto_init(NCRYPTO,crypto), /* 70: /dev/crypto */
+	cdev_tty_init(NCZ,cztty),	/* 71: Cyclades-Z serial port */
+#ifdef USER_PCICONF
+	cdev_pci_init(NPCI,pci),        /* 72: PCI user */
+#else
+	cdev_notdef(),
 #endif
+	cdev_pf_init(NPF,pf),		/* 73: packet filter */
+	cdev_notdef(),			/* 74: ALTQ control interface */
+	cdev_iop_init(NIOP,iop),	/* 75: I2O IOP control interface */
+	cdev_radio_init(NRADIO, radio), /* 76: generic radio I/O */
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
 
@@ -514,7 +533,7 @@ struct	consdev constab[] = {
 #if NWSDISPLAY > 0
 	cons_init(ws),
 #endif
-#if NPC + NVT > 0
+#if NPC > 0
 	cons_init(pc),
 #endif
 #if NCOM + NPCCOM > 0

@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_pcb.c,v 1.50 2001/03/28 20:03:02 angelos Exp $	*/
+/*	$OpenBSD: in_pcb.c,v 1.56 2001/07/05 16:45:54 jjbg Exp $	*/
 /*	$NetBSD: in_pcb.c,v 1.25 1996/02/13 23:41:53 christos Exp $	*/
 
 /*
@@ -33,31 +33,51 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)in_pcb.c	8.2 (Berkeley) 1/4/94
+ *	@(#)COPYRIGHT	1.1 (NRL) 17 January 1995
+ * 
+ * NRL grants permission for redistribution and use in source and binary
+ * forms, with or without modification, of the software and documentation
+ * created at NRL provided that the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgements:
+ * 	This product includes software developed by the University of
+ * 	California, Berkeley and its contributors.
+ * 	This product includes software developed at the Information
+ * 	Technology Division, US Naval Research Laboratory.
+ * 4. Neither the name of the NRL nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THE SOFTWARE PROVIDED BY NRL IS PROVIDED BY NRL AND CONTRIBUTORS ``AS
+ * IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL NRL OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * official policies, either expressed or implied, of the US Naval
+ * Research Laboratory (NRL).
  */
-
-/*
-%%% portions-copyright-nrl-95
-Portions of this software are Copyright 1995-1998 by Randall Atkinson,
-Ronald Lee, Daniel McDonald, Bao Phan, and Chris Winters. All Rights
-Reserved. All rights under this copyright have been assigned to the US
-Naval Research Laboratory (NRL). The NRL Copyright Notice and License
-Agreement Version 1.1 (January 17, 1995) applies to these portions of the
-software.
-You should have received a copy of the license with this software. If you
-didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
-*/
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-#include <sys/ioctl.h>
-#include <sys/errno.h>
-#include <sys/time.h>
 #include <sys/proc.h>
 #include <sys/domain.h>
 
@@ -76,21 +96,12 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet6/ip6_var.h>
 #endif /* INET6 */
 
-#ifdef IPSEC
-#include <netinet/ip_ipsp.h>
-#endif
-
-#if 0 /*KAME IPSEC*/
-#include <netinet6/ipsec.h>
-#include <netkey/key.h>
-#include <netkey/key_debug.h>
-#endif /* IPSEC */
-
 struct	in_addr zeroin_addr;
 
 extern int ipsec_auth_default_level;
 extern int ipsec_esp_trans_default_level;
 extern int ipsec_esp_network_default_level;
+extern int ipsec_ipcomp_default_level;
 
 /*
  * These configure the range of local port addresses assigned to
@@ -163,6 +174,7 @@ in_pcballoc(so, v)
 	inp->inp_seclevel[SL_AUTH] = ipsec_auth_default_level;
 	inp->inp_seclevel[SL_ESP_TRANS] = ipsec_esp_trans_default_level;
 	inp->inp_seclevel[SL_ESP_NETWORK] = ipsec_esp_network_default_level;
+	inp->inp_seclevel[SL_IPCOMP] = ipsec_ipcomp_default_level;
 	s = splnet();
 	CIRCLEQ_INSERT_HEAD(&table->inpt_queue, inp, inp_queue);
 	LIST_INSERT_HEAD(INPCBHASH(table, &inp->inp_faddr, inp->inp_fport,
@@ -573,6 +585,18 @@ in_pcbdetach(v)
 	if (inp->inp_tdb_out)
 	        TAILQ_REMOVE(&inp->inp_tdb_out->tdb_inp_out, inp,
 			     inp_tdb_out_next);
+	if (inp->inp_ipsec_localid)
+		ipsp_reffree(inp->inp_ipsec_localid);
+	if (inp->inp_ipsec_remoteid)
+		ipsp_reffree(inp->inp_ipsec_remoteid);
+	if (inp->inp_ipsec_localcred)
+		ipsp_reffree(inp->inp_ipsec_localcred);
+	if (inp->inp_ipsec_remotecred)
+		ipsp_reffree(inp->inp_ipsec_remotecred);
+	if (inp->inp_ipsec_localauth)
+		ipsp_reffree(inp->inp_ipsec_localauth);
+	if (inp->inp_ipsec_remoteauth)
+		ipsp_reffree(inp->inp_ipsec_remoteauth);
 	splx(s);
 #endif
 	s = splnet();

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_types.h,v 1.8 2001/03/26 19:00:58 jason Exp $	*/
+/*	$OpenBSD: if_types.h,v 1.10 2001/06/25 23:02:20 provos Exp $	*/
 /*	$NetBSD: if_types.h,v 1.7 1995/02/27 09:10:24 glass Exp $	*/
 
 /*
@@ -35,6 +35,9 @@
  *
  *	@(#)if_types.h	8.2 (Berkeley) 4/20/94
  */
+
+#ifndef _NET_IF_TYPES_H_
+#define _NET_IF_TYPES_H_
 
 /*
  * Interface types for benefit of parsing media address headers.
@@ -96,7 +99,8 @@
 #define	IFT_SMDSICIP	0x34		/* SMDS InterCarrier Interface */
 #define	IFT_PROPVIRTUAL	0x35		/* Proprietary Virtual/internal */
 #define	IFT_PROPMUX	0x36		/* Proprietary Multiplexing */
-#define IFT_ENC		0x37		/* Encapsulation */
+#define	IFT_ENC		0x37		/* Encapsulation */
+#define	IFT_PFLOG	0x38		/* Packet filter logging */
 
 #define IFT_IEEE1394	0x90		/* IEEE1394 High Performance SerialBus*/
 
@@ -108,3 +112,5 @@
 #define IFT_FAITH	0xf3
 #define IFT_STF		0xf4
 #define IFT_HIF		0xf5
+
+#endif /* _NET_IF_TYPES_H_ */

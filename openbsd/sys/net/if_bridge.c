@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_bridge.c,v 1.54 2001/03/22 02:00:36 jason Exp $	*/
+/*	$OpenBSD: if_bridge.c,v 1.76 2001/08/21 15:18:20 jason Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 Jason L. Wright (jason@thought.net)
@@ -33,6 +33,7 @@
 
 #include "bpfilter.h"
 #include "gif.h"
+#include "pf.h"
 
 #include <sys/param.h>
 #include <sys/proc.h>
@@ -60,10 +61,15 @@
 #include <netinet/ip_ipsp.h>
 
 #include <net/if_enc.h>
-#ifdef IPFILTER
-#include <netinet/ip_fil_compat.h>
-#include <netinet/ip_fil.h>
 #endif
+
+#if NPF > 0
+#include <net/pfvar.h>
+#define	BRIDGE_IN	PF_IN
+#define	BRIDGE_OUT	PF_OUT
+#else
+#define	BRIDGE_IN	0
+#define	BRIDGE_OUT	1
 #endif
 
 #if NBPFILTER > 0
@@ -133,13 +139,9 @@ int		bridge_addrule __P((struct bridge_iflist *,
 int		bridge_flushrule __P((struct bridge_iflist *));
 int	bridge_brlconf __P((struct bridge_softc *, struct ifbrlconf *));
 u_int8_t bridge_filterrule __P((struct brl_head *, struct ether_header *));
-
-#ifdef ALTQ
-/*
- * ALTQ support in ethernet bridging is only on the enqueue side.
- */
-static int altq_etherclassify __P((struct ifaltq *, struct mbuf *,
-				   struct altq_pktattr *));
+#if NPF > 0
+struct mbuf *bridge_filter __P((struct bridge_softc *, int, struct ifnet *,
+    struct ether_header *, struct mbuf *m));
 #endif
 
 #define	ETHERADDR_IS_IP_MCAST(a) \
@@ -148,14 +150,6 @@ static int altq_etherclassify __P((struct ifaltq *, struct mbuf *,
 	 (a)->ether_addr_octet[1] == 0x00 &&			\
 	 (a)->ether_addr_octet[2] == 0x5e)
 
-
-#if defined(INET) && (defined(IPFILTER) || defined(IPFILTER_LKM))
-/*
- * Filter hooks
- */
-struct mbuf *bridge_filter __P((struct bridge_softc *, struct ifnet *,
-    struct ether_header *, struct mbuf *m));
-#endif
 
 void
 bridgeattach(n)
@@ -276,7 +270,7 @@ bridge_ioctl(ifp, cmd, data)
 		}
 #if NGIF > 0
 		else if (ifs->if_type == IFT_GIF) {
-		        /* Nothing needed */
+			/* Nothing needed */
 		}
 #endif /* NGIF */
 		else {
@@ -704,7 +698,7 @@ bridge_init(sc)
 		for (i = 0; i < BRIDGE_RTABLE_SIZE; i++) {
 			LIST_INIT(&sc->sc_rts[i]);
 		}
-		get_random_bytes(&sc->sc_hashkey, sizeof(sc->sc_hashkey));
+		sc->sc_hashkey = arc4random();
 	}
 	ifp->if_flags |= IFF_RUNNING;
 
@@ -751,9 +745,10 @@ bridge_output(ifp, m, sa, rt)
 	struct bridge_softc *sc;
 	int s, error, len;
 	short mflags;
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
+#ifdef IPSEC
+	struct m_tag *mtag;
+#endif /* IPSEC */
 
 	if (m->m_len < sizeof(*eh)) {
 		m = m_pullup(m, sizeof(*eh));
@@ -782,17 +777,40 @@ bridge_output(ifp, m, sa, rt)
 	 * get there, send to all interfaces.
 	 */
 	dst_if = bridge_rtlookup(sc, dst);
-	if (dst_if == NULL || eh->ether_dhost[0] & 1) {
+	if (dst_if == NULL || ETHER_IS_MULTICAST(eh->ether_dhost)) {
 		struct bridge_iflist *p;
 		struct mbuf *mc;
 		int used = 0;
+
+#ifdef IPSEC
+		/*
+		 * Don't send out the packet if IPsec is needed, and
+		 * notify IPsec to do its own crypto for now.
+		 */
+		if ((mtag = m_tag_find(m, PACKET_TAG_IPSEC_OUT_CRYPTO_NEEDED,
+		    NULL)) != NULL) {
+			ipsp_skipcrypto_unmark((struct tdb_ident *)(mtag + 1));
+			m_freem(m);
+			splx(s);
+			return (0);
+		}
+#endif /* IPSEC */
+
+		/* Catch packets that need TCP/UDP/IP hardware checksumming */
+		if (m->m_pkthdr.csum & M_IPV4_CSUM_OUT ||
+		    m->m_pkthdr.csum & M_TCPV4_CSUM_OUT ||
+		    m->m_pkthdr.csum & M_UDPV4_CSUM_OUT) {
+			m_freem(m);
+			splx(s);
+			return (0);
+		}
 
 		LIST_FOREACH(p, &sc->sc_iflist, next) {
 			dst_if = p->ifp;
 			if ((dst_if->if_flags & IFF_RUNNING) == 0)
 				continue;
 #ifdef ALTQ
-			if (!ALTQ_IS_ENABLED(&dst_if->if_snd))
+			if (ALTQ_IS_ENABLED(&dst_if->if_snd) == 0)
 #endif
 			if (IF_QFULL(&dst_if->if_snd)) {
 				IF_DROP(&dst_if->if_snd);
@@ -814,10 +832,8 @@ bridge_output(ifp, m, sa, rt)
 #ifdef ALTQ
 			if (ALTQ_IS_ENABLED(&dst_if->if_snd))
 				altq_etherclassify(&dst_if->if_snd, mc, &pktattr);
-			IFQ_ENQUEUE(&dst_if->if_snd, mc, &pktattr, error);
-#else
-			IFQ_ENQUEUE(&dst_if->if_snd, mc, error);
 #endif
+			IFQ_ENQUEUE(&dst_if->if_snd, mc, &pktattr, error);
 			if (error) {
 				sc->sc_if.if_oerrors++;
 				continue;
@@ -847,10 +863,8 @@ sendunicast:
 #ifdef ALTQ
 	if (ALTQ_IS_ENABLED(&dst_if->if_snd))
 		altq_etherclassify(&dst_if->if_snd, m, &pktattr);
-	IFQ_ENQUEUE(&dst_if->if_snd, m, &pktattr, error);
-#else
-	IFQ_ENQUEUE(&dst_if->if_snd, m, error);
 #endif
+	IFQ_ENQUEUE(&dst_if->if_snd, m, &pktattr, error);
 	if (error) {
 		sc->sc_if.if_oerrors++;
 		splx(s);
@@ -913,9 +927,7 @@ bridgeintr_frame(sc, m)
 	struct ether_addr *dst, *src;
 	struct ether_header eh;
 	short mflags;
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	if ((sc->sc_if.if_flags & IFF_RUNNING) == 0) {
 		m_freem(m);
@@ -942,9 +954,9 @@ bridgeintr_frame(sc, m)
 	}
 
 	if ((ifl->bif_flags & IFBIF_STP) &&
-	    ((ifl->bif_state == BSTP_IFSTATE_BLOCKING) ||
-	     (ifl->bif_state == BSTP_IFSTATE_LISTENING) ||
-	     (ifl->bif_state == BSTP_IFSTATE_DISABLED))) {
+	    (ifl->bif_state == BSTP_IFSTATE_BLOCKING ||
+	    ifl->bif_state == BSTP_IFSTATE_LISTENING ||
+	    ifl->bif_state == BSTP_IFSTATE_DISABLED)) {
 		m_freem(m);
 		return;
 	}
@@ -963,12 +975,9 @@ bridgeintr_frame(sc, m)
 	 */
 	if ((ifl->bif_flags & IFBIF_LEARNING) &&
 	    (eh.ether_shost[0] & 1) == 0 &&
-	    !(eh.ether_shost[0] == 0 &&
-	      eh.ether_shost[1] == 0 &&
-	      eh.ether_shost[2] == 0 &&
-	      eh.ether_shost[3] == 0 &&
-	      eh.ether_shost[4] == 0 &&
-	      eh.ether_shost[5] == 0))
+	    !(eh.ether_shost[0] == 0 && eh.ether_shost[1] == 0 &&
+	    eh.ether_shost[2] == 0 && eh.ether_shost[3] == 0 &&
+	    eh.ether_shost[4] == 0 && eh.ether_shost[5] == 0))
 		bridge_rtupdate(sc, src, src_if, 0, IFBAF_DYNAMIC);
 
 	if ((ifl->bif_flags & IFBIF_STP) &&
@@ -1034,13 +1043,11 @@ bridgeintr_frame(sc, m)
 		m_freem(m);
 		return;
 	}
-
-#if defined(INET) && (defined(IPFILTER) || defined(IPFILTER_LKM))
-	m = bridge_filter(sc, src_if, &eh, m);
+#if NPF > 0
+	m = bridge_filter(sc, BRIDGE_IN, src_if, &eh, m);
 	if (m == NULL)
 		return;
 #endif
-
 	/*
 	 * If the packet is a multicast or broadcast OR if we don't
 	 * know any better, forward it to all interfaces.
@@ -1071,7 +1078,7 @@ bridgeintr_frame(sc, m)
 	}
 	if ((ifl->bif_flags & IFBIF_STP) &&
 	    (ifl->bif_state == BSTP_IFSTATE_DISABLED ||
-	     ifl->bif_state == BSTP_IFSTATE_BLOCKING)) {
+	    ifl->bif_state == BSTP_IFSTATE_BLOCKING)) {
 		m_freem(m);
 		return;
 	}
@@ -1079,6 +1086,12 @@ bridgeintr_frame(sc, m)
 		m_freem(m);
 		return;
 	}
+#if NPF > 0
+	m = bridge_filter(sc, BRIDGE_OUT, dst_if, &eh, m);
+	if (m == NULL)
+		return;
+#endif
+
 #ifdef ALTQ
 	if (ALTQ_IS_ENABLED(&dst_if->if_snd))
 		altq_etherclassify(&dst_if->if_snd, m, &pktattr);
@@ -1086,11 +1099,7 @@ bridgeintr_frame(sc, m)
 	len = m->m_pkthdr.len;
 	mflags = m->m_flags;
 	s = splimp();
-#ifdef ALTQ
 	IFQ_ENQUEUE(&dst_if->if_snd, m, &pktattr, error);
-#else
-	IFQ_ENQUEUE(&dst_if->if_snd, m, error);
-#endif
 	if (error) {
 		sc->sc_if.if_oerrors++;
 		splx(s);
@@ -1158,8 +1167,8 @@ bridge_input(ifp, eh, m)
 		 */
 		if ((ifl->bif_flags & IFBIF_STP) &&
 		    ((ifl->bif_state == BSTP_IFSTATE_BLOCKING) ||
-		     (ifl->bif_state == BSTP_IFSTATE_LISTENING) ||
-		     (ifl->bif_state == BSTP_IFSTATE_DISABLED)))
+		    (ifl->bif_state == BSTP_IFSTATE_LISTENING) ||
+		    (ifl->bif_state == BSTP_IFSTATE_DISABLED)))
 			return (m);
 
 		/*
@@ -1204,8 +1213,8 @@ bridge_input(ifp, eh, m)
 	 */
 	if ((ifl->bif_flags & IFBIF_STP) &&
 	    ((ifl->bif_state == BSTP_IFSTATE_BLOCKING) ||
-	     (ifl->bif_state == BSTP_IFSTATE_LISTENING) ||
-	     (ifl->bif_state == BSTP_IFSTATE_DISABLED)))
+	    (ifl->bif_state == BSTP_IFSTATE_LISTENING) ||
+	    (ifl->bif_state == BSTP_IFSTATE_DISABLED)))
 		return (m);
 
 
@@ -1267,9 +1276,7 @@ bridge_broadcast(sc, ifp, eh, m)
 	struct ifnet *dst_if;
 	int error, len, used = 0;
 	short mflags;
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	LIST_FOREACH(p, &sc->sc_iflist, next) {
 		/*
@@ -1282,7 +1289,7 @@ bridge_broadcast(sc, ifp, eh, m)
 
 		if ((p->bif_flags & IFBIF_STP) &&
 		    (p->bif_state == BSTP_IFSTATE_BLOCKING ||
-		     p->bif_state == BSTP_IFSTATE_DISABLED))
+		    p->bif_state == BSTP_IFSTATE_DISABLED))
 			continue;
 
 		if ((p->bif_flags & IFBIF_DISCOVER) == 0 &&
@@ -1293,13 +1300,18 @@ bridge_broadcast(sc, ifp, eh, m)
 			continue;
 
 #ifdef ALTQ
-		if (!ALTQ_IS_ENABLED(&dst_if->if_snd))
+		if (ALTQ_IS_ENABLED(&dst_if->if_snd) == 0)
 #endif
 		if (IF_QFULL(&dst_if->if_snd)) {
 			IF_DROP(&dst_if->if_snd);
 			sc->sc_if.if_oerrors++;
 			continue;
 		}
+
+		/* Drop non-IP frames if the appropriate flag is set. */
+		if (p->bif_flags & IFBIF_BLOCKNONIP &&
+		    bridge_blocknonip(eh, m))
+			continue;
 
 		if (bridge_filterrule(&p->bif_brlout, eh) == BRL_ACTION_BLOCK)
 			continue;
@@ -1316,21 +1328,17 @@ bridge_broadcast(sc, ifp, eh, m)
 			}
 		}
 
-		if (p->bif_flags & IFBIF_BLOCKNONIP &&
-		    bridge_blocknonip(eh, mc)) {
-			m_freem(mc);
+#if NPF > 0
+		mc = bridge_filter(sc, BRIDGE_OUT, dst_if, eh, mc);
+		if (mc == NULL)
 			continue;
-		}
+#endif
 
-		len = mc->m_pkthdr.len;
-		mflags = mc->m_flags;
 #ifdef ALTQ
 		if (ALTQ_IS_ENABLED(&dst_if->if_snd))
 			altq_etherclassify(&dst_if->if_snd, mc, &pktattr);
-		IFQ_ENQUEUE(&dst_if->if_snd, mc, &pktattr, error);
-#else
-		IFQ_ENQUEUE(&dst_if->if_snd, mc, error);
 #endif
+		IFQ_ENQUEUE(&dst_if->if_snd, mc, &pktattr, error);
 		if (error) {
 			sc->sc_if.if_oerrors++;
 			continue;
@@ -1371,7 +1379,7 @@ bridge_rtupdate(sc, ea, ifp, setflags, flags)
 			for (h = 0; h < BRIDGE_RTABLE_SIZE; h++) {
 				LIST_INIT(&sc->sc_rts[h]);
 			}
-			get_random_bytes(&sc->sc_hashkey, sizeof(sc->sc_hashkey));
+			sc->sc_hashkey = arc4random();
 		} else
 			goto done;
 	}
@@ -1816,10 +1824,8 @@ bridge_blocknonip(eh, m)
 	    llc.llc_snap.org_code[0] == 0 &&
 	    llc.llc_snap.org_code[1] == 0 &&
 	    llc.llc_snap.org_code[2] == 0 &&
-	    (etype == ETHERTYPE_ARP ||
-	     etype == ETHERTYPE_REVARP ||
-	     etype == ETHERTYPE_IP ||
-	     etype == ETHERTYPE_IPV6)) {
+	    (etype == ETHERTYPE_ARP || etype == ETHERTYPE_REVARP ||
+	    etype == ETHERTYPE_IP || etype == ETHERTYPE_IPV6)) {
 		return (0);
 	}
 
@@ -1899,14 +1905,13 @@ bridge_flushrule(bif)
 	}
 	while (!SIMPLEQ_EMPTY(&bif->bif_brlout)) {
 		p = SIMPLEQ_FIRST(&bif->bif_brlout);
-		SIMPLEQ_REMOVE_HEAD(&bif->bif_brlin, p, brl_next);
+		SIMPLEQ_REMOVE_HEAD(&bif->bif_brlout, p, brl_next);
 		free(p, M_DEVBUF);
 	}
 	return (0);
 }
 
-#if defined(INET) && (defined(IPFILTER) || defined(IPFILTER_LKM))
-
+#if NPF > 0
 /*
  * Filter IP packets by peeking into the ethernet frame.  This violates
  * the ISO model, but allows us to act as a IP filter at the data link
@@ -1914,19 +1919,20 @@ bridge_flushrule(bif)
  * who've read net/if_ethersubr.c and netinet/ip_input.c
  */
 struct mbuf *
-bridge_filter(sc, ifp, eh, m)
+bridge_filter(sc, dir, ifp, eh, m)
 	struct bridge_softc *sc;
+	int dir;
 	struct ifnet *ifp;
 	struct ether_header *eh;
 	struct mbuf *m;
 {
+#if NPF == 0
+	return (m);
+#else
 	struct llc llc;
 	int hassnap = 0;
 	struct ip *ip;
 	int hlen;
-
-	if (fr_checkp == NULL)
-		return (m);
 
 	if (eh->ether_type != htons(ETHERTYPE_IP)) {
 		if (eh->ether_type > ETHERMTU ||
@@ -1968,7 +1974,7 @@ bridge_filter(sc, ifp, eh, m)
 	if (hlen < sizeof(struct ip))
 		goto dropit;
 	if (hlen > m->m_len) {
-		if ((m = m_pullup(m, sizeof(struct ip))) == NULL)
+		if ((m = m_pullup(m, hlen)) == NULL)
 			return (NULL);
 		ip = mtod(m, struct ip *);
 	}
@@ -1993,8 +1999,9 @@ bridge_filter(sc, ifp, eh, m)
 	}
 
 	/* Finally, we get to filter the packet! */
-	if (fr_checkp && (*fr_checkp)(ip, hlen, ifp, 0, &m))
-		return (NULL);
+	m->m_pkthdr.rcvif = ifp;
+	if (pf_test(dir, ifp, &m) != PF_PASS)
+		goto dropit;
 
 	/* Rebuild the IP header */
 	if (m->m_len < hlen && ((m = m_pullup(m, hlen)) == NULL))
@@ -2028,82 +2035,6 @@ dropit:
 	if (m != NULL)
 		m_freem(m);
 	return (NULL);
+#endif /* NPF == 0 */
 }
 #endif
-
-#ifdef ALTQ
-/*
- * find the size of ethernet header, and call classifier
- */
-static int
-altq_etherclassify(ifq, m, pktattr)
-	struct ifaltq *ifq;
-	struct mbuf *m;
-	struct altq_pktattr *pktattr;
-{
-	struct ether_header *eh;
-	u_short	ether_type;
-	int	hlen, af, hdrsize;
-	caddr_t hdr;
-
-	hlen = sizeof(struct ether_header);
-	eh = mtod(m, struct ether_header *);
-
-	ether_type = ntohs(eh->ether_type);
-	if (ether_type < ETHERMTU) {
-		/* ick! LLC/SNAP */
-		struct llc *llc = (struct llc *)(eh + 1);
-		hlen += 8;
-
-		if (m->m_len < hlen ||
-		    llc->llc_dsap != LLC_SNAP_LSAP ||
-		    llc->llc_ssap != LLC_SNAP_LSAP ||
-		    llc->llc_control != LLC_UI)
-			goto bad;  /* not snap! */
-
-		ether_type = ntohs(llc->llc_un.type_snap.ether_type);
-	}
-
-	if (ether_type == ETHERTYPE_IP) {
-		af = AF_INET;
-		hdrsize = 20;  /* sizeof(struct ip) */
-#ifdef INET6
-	} else if (ether_type == ETHERTYPE_IPV6) {
-		af = AF_INET6;
-		hdrsize = 40;  /* sizeof(struct ip6_hdr) */
-#endif
-	} else
-		goto bad;
-
-	while (m->m_len <= hlen) {
-		hlen -= m->m_len;
-		m = m->m_next;
-	}
-	hdr = m->m_data + hlen;
-	if (m->m_len < hlen + hdrsize) {
-		/*
-		 * ip header is not in a single mbuf.  this should not
-		 * happen in the current code.
-		 * (todo: use m_pulldown in the future)
-		 */
-		goto bad;
-	}
-	m->m_data += hlen;
-	m->m_len -= hlen;
-	if (ALTQ_NEEDS_CLASSIFY(ifq))
-		pktattr->pattr_class =
-		    (*ifq->altq_classify)(ifq->altq_clfier, m, af);
-	m->m_data -= hlen;
-	m->m_len += hlen;
-
-	pktattr->pattr_af = af;
-	pktattr->pattr_hdr = hdr;
-	return (1);
-
-bad:
-	pktattr->pattr_class = NULL;
-	pktattr->pattr_hdr = NULL;
-	pktattr->pattr_af = AF_UNSPEC;
-	return (0);
-}
-#endif /* ALTQ */

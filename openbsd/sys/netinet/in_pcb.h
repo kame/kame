@@ -1,4 +1,4 @@
-/*	$OpenBSD: in_pcb.h,v 1.33 2001/03/28 20:03:02 angelos Exp $	*/
+/*	$OpenBSD: in_pcb.h,v 1.38 2001/07/05 08:31:47 jjbg Exp $	*/
 /*	$NetBSD: in_pcb.h,v 1.14 1996/02/13 23:42:00 christos Exp $	*/
 
 /*
@@ -65,6 +65,9 @@
  *	@(#)in_pcb.h	8.1 (Berkeley) 6/10/93
  */
 
+#ifndef _NETINET_IN_PCB_H_
+#define _NETINET_IN_PCB_H_
+
 #include <sys/queue.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
@@ -127,10 +130,11 @@ struct inpcb {
 	} inp_mou;
 #define inp_moptions inp_mou.mou_mo
 #define inp_moptions6 inp_mou.mou_mo6
-	u_char	  inp_seclevel[3];
+	u_char	  inp_seclevel[4];
 #define SL_AUTH           0             /* Authentication level */
 #define SL_ESP_TRANS      1             /* ESP transport level */
 #define SL_ESP_NETWORK    2             /* ESP network (encapsulation) level */
+#define SL_IPCOMP         3             /* Compression level */
 	u_int8_t  inp_secrequire:4,     /* Condensed State from above */
 	          inp_secresult:4;	/* Result from Key Management */
 #define SR_FAILED         1             /* Negotiation failed permanently */
@@ -138,6 +142,12 @@ struct inpcb {
 #define SR_WAIT           3             /* Waiting for SA */
 	TAILQ_ENTRY(inpcb) inp_tdb_in_next, inp_tdb_out_next;
 	struct tdb     *inp_tdb_in, *inp_tdb_out;
+	struct ipsec_ref *inp_ipsec_localid;
+	struct ipsec_ref *inp_ipsec_remoteid;
+	struct ipsec_ref *inp_ipsec_localcred;
+	struct ipsec_ref *inp_ipsec_remotecred;
+	struct ipsec_ref *inp_ipsec_localauth;
+	struct ipsec_ref *inp_ipsec_remoteauth;
 #define	inp_flowinfo	inp_hu.hu_ipv6.ip6_flow
 
 	int	in6p_cksum;
@@ -296,4 +306,5 @@ int in6_selectroute __P((struct sockaddr_in6 *, struct ip6_pktopts *,
 #endif
 int	in6_selecthlim __P((struct inpcb *, struct ifnet *));
 int	in6_pcbsetport __P((struct in6_addr *, struct inpcb *));
-#endif
+#endif /* _KERNEL */
+#endif /* _NETINET_IN_PCB_H_ */

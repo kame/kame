@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.263 2001/11/20 03:23:50 k-sugyou Exp $	*/
+/*	$KAME: icmp6.c,v 1.264 2001/11/28 11:08:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -736,7 +736,11 @@ icmp6_input(mp, offp, proto)
 				m = NULL;
 				goto deliverecho;
 			}
+#ifdef __OpenBSD__
+			M_MOVE_PKTHDR(n, n0);
+#else
 			M_COPY_PKTHDR(n, n0);
+#endif
 			/*
 			 * Copy IPv6 and ICMPv6 only.
 			 */
@@ -906,7 +910,11 @@ icmp6_input(mp, offp, proto)
 			bzero(p, 4);
 			bcopy(hostname, p + 4, maxhlen); /* meaningless TTL */
 			noff = sizeof(struct ip6_hdr);
+#ifdef __OpenBSD__
+			M_MOVE_PKTHDR(n, m); /* just for recvif */
+#else
 			M_COPY_PKTHDR(n, m); /* just for recvif */
+#endif
 			n->m_pkthdr.len = n->m_len = sizeof(struct ip6_hdr) +
 				sizeof(struct icmp6_hdr) + 4 + maxhlen;
 			nicmp6->icmp6_type = ICMP6_WRUREPLY;
@@ -1656,7 +1664,11 @@ ni6_input(m, off)
 		m_freem(m);
 		return(NULL);
 	}
+#ifdef __OpenBSD__
+	M_MOVE_PKTHDR(n, m); /* just for recvif */
+#else
 	M_COPY_PKTHDR(n, m); /* just for recvif */
+#endif
 	if (replylen > MHLEN) {
 		if (replylen > MCLBYTES) {
 			/*

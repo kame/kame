@@ -1,4 +1,4 @@
-/*      $OpenBSD: if_atmsubr.c,v 1.13 2000/09/12 04:09:11 itojun Exp $       */
+/*      $OpenBSD: if_atmsubr.c,v 1.16 2001/06/27 06:07:38 kjc Exp $       */
 
 /*
  *
@@ -114,9 +114,7 @@ atm_output(ifp, m0, dst, rt0)
 	struct atmllc *atmllc;
 	struct atmllc *llc_hdr = NULL;
 	u_int32_t atm_flags;
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		senderr(ENETDOWN);
@@ -128,7 +126,7 @@ atm_output(ifp, m0, dst, rt0)
 	 */
 	IFQ_CLASSIFY(&ifp->if_snd, m,
 		     (dst != NULL ? dst->sa_family : AF_UNSPEC), &pktattr);
-#endif
+
 	/*
 	 * check route
 	 */
@@ -172,14 +170,6 @@ atm_output(ifp, m0, dst, rt0)
 				etype = ETHERTYPE_IP;
 			else
 				etype = ETHERTYPE_IPV6;
-# ifdef ATM_PVCEXT
-			if (ifp->if_flags & IFF_POINTOPOINT) {
-				/* pvc subinterface */
-				struct pvcsif *pvcsif = (struct pvcsif *)ifp;
-				atmdst = pvcsif->sif_aph;
-				break;
-			}
-# endif
 			if (!atmresolve(rt, m, dst, &atmdst)) {
 				m = NULL; 
 				/* XXX: atmresolve already free'd it */
@@ -258,11 +248,7 @@ atm_output(ifp, m0, dst, rt0)
 	 */
 	len = m->m_pkthdr.len;
 	s = splimp();
-#ifdef ALTQ
 	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
-#else
-	IFQ_ENQUEUE(&ifp->if_snd, m, error);
-#endif
 	if (error) {
 		splx(s);
 		return (error);
@@ -320,7 +306,8 @@ atm_input(ifp, ah, m, rxhand)
 	   */
 	  if (ATM_PH_FLAGS(ah) & ATM_PH_LLCSNAP) {
 	    struct atmllc *alc;
-	    if (m->m_len < sizeof(*alc) && (m = m_pullup(m, sizeof(*alc))) == 0)
+	    if (m->m_len < sizeof(*alc) &&
+		(m = m_pullup(m, sizeof(*alc))) == NULL)
 		  return; /* failed */
 	    alc = mtod(m, struct atmllc *);
 	    if (bcmp(alc, ATMLLC_HDR, 6)) {

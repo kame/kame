@@ -1,4 +1,4 @@
-/*	$OpenBSD: ip_var.h,v 1.15 2001/03/03 01:00:19 itojun Exp $	*/
+/*	$OpenBSD: ip_var.h,v 1.20 2001/06/23 05:54:50 angelos Exp $	*/
 /*	$NetBSD: ip_var.h,v 1.16 1996/02/13 23:43:20 christos Exp $	*/
 
 /*
@@ -36,6 +36,9 @@
  *	@(#)ip_var.h	8.1 (Berkeley) 6/10/93
  */
 
+#ifndef _NETINET_IP_VAR_H_
+#define _NETINET_IP_VAR_H_
+
 #include <sys/queue.h>
 
 /*
@@ -67,15 +70,11 @@ struct ipqent {
 		struct ip	*_ip;
 		struct tcphdr	*_tcp;
 	} _ipqe_u1;
-	union {
-		u_int8_t	_mff;	/* for IP fragmentation */
-		struct mbuf	*_m;	/* XXX for TCP; see above */
-	} _ipqe_u2;
+	struct mbuf	*ipqe_m;	/* mbuf contains packet */
+	u_int8_t	ipqe_mff;	/* for IP fragmentation */
 };
 #define	ipqe_ip		_ipqe_u1._ip
 #define	ipqe_tcp	_ipqe_u1._tcp
-#define	ipqe_mff	_ipqe_u2._mff
-#define	ipqe_m		_ipqe_u2._m
 
 /*
  * Ip reassembly queue structure.  Each fragment
@@ -148,6 +147,8 @@ struct	ipstat {
 	u_long	ips_toolong;		/* ip length > max ip packet size */
 	u_long	ips_nogif;		/* no match gif found */
 	u_long	ips_badaddr;		/* invalid address on header */
+	u_long	ips_inhwcsum;		/* hardware checksummed on input */
+	u_long	ips_outhwcsum;		/* hardware checksummed on output */
 };
 
 #ifdef _KERNEL
@@ -157,7 +158,6 @@ struct	ipstat {
 #define	IP_ROUTETOIF		SO_DONTROUTE	/* bypass routing tables */
 #define	IP_ALLOWBROADCAST	SO_BROADCAST	/* can send broadcast packets */
 #define	IP_MTUDISC		0x0400		/* pmtu discovery, set DF */
-#define	IP_ENCAPSULATED		0x0800		/* encapsulated already */
 
 struct	  ipstat ipstat;
 LIST_HEAD(ipqhead, ipq)	ipq;		/* ip reass. queue */
@@ -180,7 +180,7 @@ int	 ip_mforward __P((struct mbuf *, struct ifnet *));
 int	 ip_optcopy __P((struct ip *, struct ip *));
 int	 ip_output __P((struct mbuf *, ...));
 int	 ip_pcbopts __P((struct mbuf **, struct mbuf *));
-struct ip *
+struct mbuf *
 	 ip_reass __P((struct ipqent *, struct ipq *));
 struct in_ifaddr *
 	 in_iawithaddr __P((struct in_addr, struct mbuf *));
@@ -195,11 +195,12 @@ struct mbuf *
 void	 ip_stripoptions __P((struct mbuf *, struct mbuf *));
 int	 ip_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 void	 ipintr __P((void));
-void	 ipv4_input __P((struct mbuf *, ...));
+void	 ipv4_input __P((struct mbuf *));
 int	 rip_ctloutput __P((int, struct socket *, int, int, struct mbuf **));
 void	 rip_init __P((void));
 void	 rip_input __P((struct mbuf *, ...));
 int	 rip_output __P((struct mbuf *, ...));
 int	 rip_usrreq __P((struct socket *,
 	    int, struct mbuf *, struct mbuf *, struct mbuf *));
-#endif
+#endif /* _KERNEL */
+#endif /* _NETINET_IP_VAR_H_ */

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.85 2001/10/24 06:12:46 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.86 2001/11/28 11:08:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -41,6 +41,9 @@
 #ifdef __NetBSD__
 #include "opt_ipsec.h"
 #endif
+#ifdef __OpenBSD__
+#include "pf.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -73,6 +76,12 @@
 #endif
 #if !((defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802))
 #include <netinet6/in6_pcb.h>
+#endif
+
+#ifdef __OpenBSD__
+#if NPF > 0
+#include <net/pfvar.h>
+#endif
 #endif
 
 #ifdef __OpenBSD__ /* KAME IPSEC */
@@ -667,6 +676,14 @@ ip6_forward(m, srcrt)
     }
 #endif /* PFIL_HOOKS */
 
+#if defined(__OpenBSD__) && NPF > 0
+	if (pf_test6(PF_OUT, rt->rt_ifp, &m) != PF_PASS) {
+		m_freem(m);
+		goto senderr;
+	}
+	ip6 = mtod(m, struct ip6_hdr *);
+#endif
+
 	error = nd6_output(rt->rt_ifp, origifp, m, dst, rt);
 	if (error) {
 		in6_ifstat_inc(rt->rt_ifp, ifs6_out_discard);
@@ -682,7 +699,7 @@ ip6_forward(m, srcrt)
 		}
 	}
 
-#if defined(__NetBSD__) && defined(PFIL_HOOKS)
+#if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || (defined(__OpenBSD__) && NPF > 0)
  senderr:
 #endif
 	if (mcopy == NULL)

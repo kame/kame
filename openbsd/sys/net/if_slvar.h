@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_slvar.h,v 1.5 2001/03/13 05:16:07 mickey Exp $	*/
+/*	$OpenBSD: if_slvar.h,v 1.9 2001/06/15 03:38:34 itojun Exp $	*/
 /*	$NetBSD: if_slvar.h,v 1.16 1996/05/07 02:40:46 thorpej Exp $	*/
 
 /*-
@@ -36,6 +36,9 @@
  *	@(#)if_slvar.h	8.3 (Berkeley) 2/1/94
  */
 
+#ifndef _NET_IF_SLVAR_H_
+#define _NET_IF_SLVAR_H_
+
 /*
  * Definitions for SLIP interface data structures
  * 
@@ -49,7 +52,8 @@ struct sl_softc {
 	struct	tty *sc_ttyp;		/* pointer to tty structure */
 	u_char	*sc_mp;			/* pointer to next available buf char */
 	u_char	*sc_ep;			/* pointer to last available buf char */
-	u_char	*sc_buf;		/* input buffer */
+	u_char	*sc_pktstart;		/* pointer to beginning of packet */
+	struct mbuf *sc_mbuf;		/* input buffer */
 	u_int	sc_flags;		/* see below */
 	u_int	sc_escape;	/* =1 if last char input was FRAME_ESCAPE */
 	long	sc_lasttime;		/* last time a char arrived */
@@ -68,6 +72,37 @@ struct sl_softc {
 	struct timeval sc_lastpacket;	/* for watchdog */
 };
 
+/*
+ * Statistics.
+ */
+struct slstat	{
+	u_int	sl_ibytes;	/* bytes received */
+	u_int	sl_ipackets;	/* packets received */
+	u_int	sl_obytes;	/* bytes sent */
+	u_int	sl_opackets;	/* packets sent */
+};
+
+struct vjstat {
+	u_int	vjs_packets;	/* outbound packets */
+	u_int	vjs_compressed;	/* outbound compressed packets */
+	u_int	vjs_searches;	/* searches for connection state */
+	u_int	vjs_misses;	/* times couldn't find conn. state */
+	u_int	vjs_uncompressedin; /* inbound uncompressed packets */
+	u_int	vjs_compressedin;   /* inbound compressed packets */
+	u_int	vjs_errorin;	/* inbound unknown type packets */
+	u_int	vjs_tossed;	/* inbound packets tossed because of error */
+};
+
+struct sl_stats {
+	struct slstat	sl;	/* basic PPP statistics */
+	struct vjstat	vj;	/* VJ header compression statistics */
+};
+
+struct ifslstatsreq {
+	char ifr_name[IFNAMSIZ];
+	struct sl_stats stats;
+};
+
 /* internal flags */
 #define	SC_ERROR	0x0001		/* had an input error */
 
@@ -75,6 +110,12 @@ struct sl_softc {
 #define	SC_COMPRESS	IFF_LINK0	/* compress TCP traffic */
 #define	SC_NOICMP	IFF_LINK1	/* supress ICMP traffic */
 #define	SC_AUTOCOMP	IFF_LINK2	/* auto-enable TCP compression */
+
+/*
+ * These two are interface ioctls so that pppstats can do them on
+ * a socket without having to open the serial device.
+ */
+#define SIOCGSLSTATS	_IOWR('i', 123, struct ifslstatsreq)
 
 #ifdef _KERNEL
 void	slattach __P((int));
@@ -87,3 +128,4 @@ int	sloutput __P((struct ifnet *,
 void	slstart __P((struct tty *));
 int	sltioctl __P((struct tty *, u_long, caddr_t, int));
 #endif /* _KERNEL */
+#endif /* _NET_IF_SLVAR_H_ */

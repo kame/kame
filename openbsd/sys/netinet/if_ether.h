@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_ether.h,v 1.14 2001/01/19 06:37:38 itojun Exp $	*/
+/*	$OpenBSD: if_ether.h,v 1.17 2001/06/27 06:07:47 kjc Exp $	*/
 /*	$NetBSD: if_ether.h,v 1.22 1996/05/11 13:00:00 mycroft Exp $	*/
 
 /*
@@ -36,6 +36,9 @@
  *	@(#)if_ether.h	8.1 (Berkeley) 6/10/93
  */
 
+#ifndef _NETINET_IF_ETHER_H_
+#define _NETINET_IF_ETHER_H_
+
 /*
  * Ethernet address - 6 octets
  * this is only used by the ethers(3) functions.
@@ -45,24 +48,18 @@ struct ether_addr {
 };
 
 /*
- * Structure of a Ethernet header.
+ * Some Ethernet constants.
  */
-#define	ETHER_ADDR_LEN	6
-
-/*
- * The number of bytes in the type field.
- */
-#define ETHER_TYPE_LEN	2
-
-/*
- * The number of bytes in the trailing CRC field.
- */
-#define ETHER_CRC_LEN	4
+#define	ETHER_ADDR_LEN	6	/* Ethernet address length		*/
+#define ETHER_TYPE_LEN	2	/* Ethernet type field length		*/
+#define ETHER_CRC_LEN	4	/* Ethernet CRC lenght			*/
+#define ETHER_HDR_LEN	((ETHER_ADDR_LEN * 2) + ETHER_TYPE_LEN)
+#define ETHER_MIN_LEN	64	/* Minimum frame length, CRC included	*/
+#define ETHER_MAX_LEN	1518	/* Maximum frame length, CRC included	*/
 
 /*
  * The length of the combined header.
  */
-#define ETHER_HDR_LEN	(ETHER_ADDR_LEN*2+ETHER_TYPE_LEN)
 
 struct	ether_header {
 	u_int8_t  ether_dhost[ETHER_ADDR_LEN];
@@ -90,8 +87,8 @@ struct	ether_header {
 
 #define	ETHER_IS_MULTICAST(addr) (*(addr) & 0x01) /* is address mcast/bcast? */
 
-#define	ETHERMTU	1500
-#define	ETHERMIN	(60-14)
+#define	ETHERMTU	(ETHER_MAX_LEN - ETHER_HDR_LEN - ETHER_CRC_LEN)
+#define	ETHERMIN	(ETHER_MIN_LEN - ETHER_HDR_LEN - ETHER_CRC_LEN)
 
 #ifdef _KERNEL
 /*
@@ -288,6 +285,9 @@ void revarprequest __P((struct ifnet *));
 int revarpwhoarewe __P((struct ifnet *, struct in_addr *, struct in_addr *));
 int revarpwhoami __P((struct in_addr *, struct ifnet *));
 int db_show_arptab __P((void));
+#ifdef ALTQ
+void altq_etherclassify(struct ifaltq *, struct mbuf *, struct altq_pktattr *);
+#endif /* ALTQ */
 
 #else
 
@@ -297,4 +297,5 @@ int ether_ntohost __P((char *, struct ether_addr *));
 int ether_hostton __P((char *, struct ether_addr *));
 int ether_line __P((char *, struct ether_addr *, char *));
 
-#endif
+#endif /* _KERNEL */
+#endif /* _NETINET_IF_ETHER_H_ */

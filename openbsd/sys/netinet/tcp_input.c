@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_input.c,v 1.84 2001/04/04 05:42:57 itojun Exp $	*/
+/*	$OpenBSD: tcp_input.c,v 1.100 2001/07/07 22:22:04 provos Exp $	*/
 /*	$NetBSD: tcp_input.c,v 1.23 1996/02/13 23:43:44 christos Exp $	*/
 
 /*
@@ -33,31 +33,52 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)tcp_input.c	8.5 (Berkeley) 4/10/94
+ *	@(#)COPYRIGHT	1.1 (NRL) 17 January 1995
+ * 
+ * NRL grants permission for redistribution and use in source and binary
+ * forms, with or without modification, of the software and documentation
+ * created at NRL provided that the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgements:
+ * 	This product includes software developed by the University of
+ * 	California, Berkeley and its contributors.
+ * 	This product includes software developed at the Information
+ * 	Technology Division, US Naval Research Laboratory.
+ * 4. Neither the name of the NRL nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THE SOFTWARE PROVIDED BY NRL IS PROVIDED BY NRL AND CONTRIBUTORS ``AS
+ * IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL NRL OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * official policies, either expressed or implied, of the US Naval
+ * Research Laboratory (NRL).
  */
-
-/*
-%%% portions-copyright-nrl-95
-Portions of this software are Copyright 1995-1998 by Randall Atkinson,
-Ronald Lee, Daniel McDonald, Bao Phan, and Chris Winters. All Rights
-Reserved. All rights under this copyright have been assigned to the US
-Naval Research Laboratory (NRL). The NRL Copyright Notice and License
-Agreement Version 1.1 (January 17, 1995) applies to these portions of the
-software.
-You should have received a copy of the license with this software. If you
-didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
-*/
 
 #ifndef TUBA_INCLUDE
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-#include <sys/errno.h>
-#include <sys/domain.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -74,23 +95,12 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/tcp_var.h>
 #include <netinet/tcpip.h>
 #include <netinet/tcp_debug.h>
-#include <dev/rndvar.h>
-#include <machine/stdarg.h>
-#include <sys/md5k.h>
-
-#ifdef IPSEC
-#include <netinet/ip_ipsp.h>
-#endif /* IPSEC */
 
 #ifdef INET6
 #ifndef INET
 #include <netinet/in.h>
 #endif
 #include <netinet6/in6_var.h>
-#include <netinet/ip6.h>
-#include <netinet6/ip6_var.h>
-#include <netinet6/tcpipv6.h>
-#include <netinet/icmp6.h>
 #include <netinet6/nd6.h>
 
 #include "faith.h"
@@ -391,6 +401,7 @@ tcp_input(m, va_alist)
 	struct ip6_hdr *ipv6 = NULL;
 #endif /* INET6 */
 #ifdef IPSEC
+	struct m_tag *mtag;
 	struct tdb_ident *tdbi;
 	struct tdb *tdb;
 	int error, s;
@@ -438,7 +449,6 @@ tcp_input(m, va_alist)
 			ip_stripoptions(m, (struct mbuf *)0);
 			iphlen = sizeof(struct ip);
 #else
-			printf("extension headers are not allowed\n");
 			m_freem(m);
 			return;
 #endif
@@ -457,7 +467,6 @@ tcp_input(m, va_alist)
 			ipv6_stripoptions(m, iphlen);
 			iphlen = sizeof(struct ip6_hdr);
 #else
-			printf("extension headers are not allowed\n");
 			m_freem(m);
 			return;
 #endif
@@ -471,7 +480,7 @@ tcp_input(m, va_alist)
 
 	if (m->m_len < iphlen + sizeof(struct tcphdr)) {
 		m = m_pullup2(m, iphlen + sizeof(struct tcphdr));
-		if (m == 0) {
+		if (m == NULL) {
 			tcpstat.tcps_rcvshort++;
 			return;
 		}
@@ -501,9 +510,19 @@ tcp_input(m, va_alist)
 		bzero(ti->ti_x1, sizeof ti->ti_x1);
 		ti->ti_len = (u_int16_t)tlen;
 		HTONS(ti->ti_len);
-		if ((ti->ti_sum = in_cksum(m, len)) != 0) {
-			tcpstat.tcps_rcvbadsum++;
-			goto drop;
+		if ((m->m_pkthdr.csum & M_TCP_CSUM_IN_OK) == 0) {
+			if (m->m_pkthdr.csum & M_TCP_CSUM_IN_BAD) {
+				tcpstat.tcps_inhwcsum++;
+				tcpstat.tcps_rcvbadsum++;
+				goto drop;
+			}
+			if ((ti->ti_sum = in_cksum(m, len)) != 0) {
+				tcpstat.tcps_rcvbadsum++;
+				goto drop;
+			}
+		} else {
+			m->m_pkthdr.csum &= ~M_TCP_CSUM_IN_OK;
+			tcpstat.tcps_inhwcsum++;
 		}
 		break;
 	    }
@@ -558,7 +577,7 @@ tcp_input(m, va_alist)
 	tlen -= off;
 	if (off > sizeof(struct tcphdr)) {
 		if (m->m_len < iphlen + off) {
-			if ((m = m_pullup2(m, iphlen + off)) == 0) {
+			if ((m = m_pullup2(m, iphlen + off)) == NULL) {
 				tcpstat.tcps_rcvshort++;
 				return;
 			}
@@ -765,13 +784,40 @@ findpcb:
 #ifdef IPSEC
 			/* 
 			 * We need to copy the required security levels
-			 * from the old pcb.
+			 * from the old pcb. Ditto for any other
+			 * IPsec-related information.
 			 */
 			{
 			  struct inpcb *newinp = (struct inpcb *)so->so_pcb;
 			  bcopy(inp->inp_seclevel, newinp->inp_seclevel,
 				sizeof(inp->inp_seclevel));
 			  newinp->inp_secrequire = inp->inp_secrequire;
+			  if (inp->inp_ipsec_localid != NULL) {
+			  	newinp->inp_ipsec_localid = inp->inp_ipsec_localid;
+				inp->inp_ipsec_localid->ref_count++;
+			  }
+			  if (inp->inp_ipsec_remoteid != NULL) {
+			  	newinp->inp_ipsec_remoteid = inp->inp_ipsec_remoteid;
+				inp->inp_ipsec_remoteid->ref_count++;
+			  }
+			  if (inp->inp_ipsec_localcred != NULL) {
+			  	newinp->inp_ipsec_localcred = inp->inp_ipsec_localcred;
+				inp->inp_ipsec_localcred->ref_count++;
+			  }
+			  if (inp->inp_ipsec_remotecred != NULL) {
+			  	newinp->inp_ipsec_remotecred = inp->inp_ipsec_remotecred;
+				inp->inp_ipsec_remotecred->ref_count++;
+			  }
+			  if (inp->inp_ipsec_localauth != NULL) {
+			  	newinp->inp_ipsec_localauth
+				  = inp->inp_ipsec_localauth;
+				inp->inp_ipsec_localauth->ref_count++;
+			  }
+			  if (inp->inp_ipsec_remoteauth != NULL) {
+			  	newinp->inp_ipsec_remoteauth
+				  = inp->inp_ipsec_remoteauth;
+				inp->inp_ipsec_remoteauth->ref_count++;
+			  }
 			}
 #endif /* IPSEC */
 #ifdef INET6
@@ -849,21 +895,39 @@ findpcb:
 #endif
 
 #ifdef IPSEC
+	/* Find most recent IPsec tag */
+	mtag = m_tag_find(m, PACKET_TAG_IPSEC_IN_DONE, NULL);
         s = splnet();
-	tdbi = (struct tdb_ident *) m->m_pkthdr.tdbi;
-        if (tdbi == NULL)
-                tdb = NULL;
-        else
+	if (mtag != NULL) {
+		tdbi = (struct tdb_ident *)(mtag + 1);
 	        tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
-
+	} else
+		tdb = NULL;
 	ipsp_spd_lookup(m, af, iphlen, &error, IPSP_DIRECTION_IN,
-			tdb, inp);
+	    tdb, inp);
 
 	/* Latch SA */
 	if (inp->inp_tdb_in != tdb) {
-		if (tdb)
+		if (tdb) {
 		        tdb_add_inp(tdb, inp, 1);
-		else { /* Just reset */
+			if (inp->inp_ipsec_remoteid == NULL &&
+			    tdb->tdb_srcid != NULL) {
+				inp->inp_ipsec_remoteid = tdb->tdb_srcid;
+				tdb->tdb_srcid->ref_count++;
+			}
+			if (inp->inp_ipsec_remotecred == NULL &&
+			    tdb->tdb_remote_cred != NULL) {
+				inp->inp_ipsec_remotecred =
+				    tdb->tdb_remote_cred;
+				tdb->tdb_remote_cred->ref_count++;
+			}
+			if (inp->inp_ipsec_remoteauth == NULL &&
+			    tdb->tdb_remote_auth != NULL) {
+				inp->inp_ipsec_remoteauth =
+				    tdb->tdb_remote_auth;
+				tdb->tdb_remote_auth->ref_count++;
+			}
+		} else { /* Just reset */
 		        TAILQ_REMOVE(&inp->inp_tdb_in->tdb_inp_in, inp,
 				     inp_tdb_in_next);
 			inp->inp_tdb_in = NULL;
@@ -2695,7 +2759,7 @@ tcp_sack_partialack(tp, th)
 	}
 	return 0;
 }
-#endif TCP_SACK
+#endif /* TCP_SACK */
 
 /*
  * Pull out of band byte out of a segment so
@@ -2931,7 +2995,7 @@ tcp_mss(tp, offer)
 	 * If we compute a larger value, return it for use in sending
 	 * a max seg size option, but don't store it for use
 	 * unless we received an offer at least that large from peer.
-	 * However, do not accept offers under 32 bytes.
+	 * However, do not accept offers under 64 bytes.
 	 */
 	if (offer > 0)
 		tp->t_peermss = offer;
@@ -2976,7 +3040,7 @@ tcp_mss(tp, offer)
  * We are passed the TCPCB for the actual connection.  If we
  * are the server, we are called by the compressed state engine
  * when the 3-way handshake is complete.  If we are the client,
- * we are called when we recieve the SYN,ACK from the server.
+ * we are called when we receive the SYN,ACK from the server.
  *
  * NOTE: The t_maxseg value must be initialized in the TCPCB
  * before this routine is called!

@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_loop.c,v 1.17 2001/02/06 03:34:59 mickey Exp $	*/
+/*	$OpenBSD: if_loop.c,v 1.20 2001/07/04 23:14:54 espie Exp $	*/
 /*	$NetBSD: if_loop.c,v 1.15 1996/05/07 02:40:33 thorpej Exp $	*/
 
 /*
@@ -297,7 +297,7 @@ looutput(ifp, m, dst, rt)
 		ifq = &atintrq2;
 		isr = NETISR_ATALK;
 		break;
-#endif NETATALK
+#endif /* NETATALK */
 	default:
 		printf("%s: can't handle af%d\n", ifp->if_xname,
 			dst->sa_family);
@@ -377,7 +377,7 @@ lo_altqstart(ifp)
 			ifq = &atintrq2;
 			isr = NETISR_ATALK;
 			break;
-#endif NETATALK
+#endif /* NETATALK */
 		default:
 			printf("lo_altqstart: can't handle af%d\n", af);
 			m_freem(m);

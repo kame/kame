@@ -1,4 +1,4 @@
-/*	$OpenBSD: udp_var.h,v 1.10 2000/06/18 17:32:48 itojun Exp $	*/
+/*	$OpenBSD: udp_var.h,v 1.12 2001/06/23 06:03:14 angelos Exp $	*/
 /*	$NetBSD: udp_var.h,v 1.12 1996/02/13 23:44:41 christos Exp $	*/
 
 /*
@@ -36,6 +36,9 @@
  *	@(#)udp_var.h	8.1 (Berkeley) 6/10/93
  */
 
+#ifndef _NETINET_UDP_VAR_H_
+#define _NETINET_UDP_VAR_H_
+
 /*
  * UDP kernel structures and variables.
  */
@@ -65,8 +68,10 @@ struct	udpstat {
 	u_long	udps_nosec;		/* dropped for lack of ipsec */
 	u_long	udps_fullsock;		/* not delivered, input socket full */
 	u_long	udps_pcbhashmiss;	/* input packets missing pcb hash */
+	u_long	udps_inhwcsum;		/* input hardware-csummed packets */
 				/* output statistics: */
 	u_long	udps_opackets;		/* total output packets */
+	u_long	udps_outhwcsum;		/* output hardware-csummed packets */
 };
 
 /*
@@ -95,16 +100,17 @@ void	udp6_ctlinput __P((int, struct sockaddr *, void *));
 int	udp6_input __P((struct mbuf **, int *, int));
 int	udp6_usrreq __P((struct socket *,
 	    int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *));
-#endif
+#endif /* INET6 && !TCP6 */
 void	 *udp_ctlinput __P((int, struct sockaddr *, void *));
 void	 udp_init __P((void));
 void	 udp_input __P((struct mbuf *, ...));
 #ifdef INET6
 int	 udp6_output __P((struct inpcb *, struct mbuf *, struct mbuf *,
 	struct mbuf *));
-#endif
+#endif /* INET6 */
 int	 udp_output __P((struct mbuf *, ...));
 int	 udp_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 int	 udp_usrreq __P((struct socket *,
 	    int, struct mbuf *, struct mbuf *, struct mbuf *));
-#endif
+#endif /* _KERNEL */
+#endif /* _NETINET_UDP_VAR_H_ */

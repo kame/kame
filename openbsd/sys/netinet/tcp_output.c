@@ -1,4 +1,4 @@
-/*	$OpenBSD: tcp_output.c,v 1.34 2000/09/25 09:41:03 provos Exp $	*/
+/*	$OpenBSD: tcp_output.c,v 1.43 2001/06/25 01:59:29 angelos Exp $	*/
 /*	$NetBSD: tcp_output.c,v 1.16 1997/06/03 16:17:09 kml Exp $	*/
 
 /*
@@ -33,32 +33,54 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	@(#)tcp_output.c	8.3 (Berkeley) 12/30/93
+ *	@(#)COPYRIGHT	1.1 (NRL) 17 January 1995
+ * 
+ * NRL grants permission for redistribution and use in source and binary
+ * forms, with or without modification, of the software and documentation
+ * created at NRL provided that the following conditions are met:
+ * 
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. All advertising materials mentioning features or use of this software
+ *    must display the following acknowledgements:
+ * 	This product includes software developed by the University of
+ * 	California, Berkeley and its contributors.
+ * 	This product includes software developed at the Information
+ * 	Technology Division, US Naval Research Laboratory.
+ * 4. Neither the name of the NRL nor the names of its contributors
+ *    may be used to endorse or promote products derived from this software
+ *    without specific prior written permission.
+ * 
+ * THE SOFTWARE PROVIDED BY NRL IS PROVIDED BY NRL AND CONTRIBUTORS ``AS
+ * IS'' AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+ * TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+ * PARTICULAR PURPOSE ARE DISCLAIMED.  IN NO EVENT SHALL NRL OR
+ * CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+ * EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+ * PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+ * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+ * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+ * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * 
+ * The views and conclusions contained in the software and documentation
+ * are those of the authors and should not be interpreted as representing
+ * official policies, either expressed or implied, of the US Naval
+ * Research Laboratory (NRL).
  */
-
-/*
-%%% portions-copyright-nrl-95
-Portions of this software are Copyright 1995-1998 by Randall Atkinson,
-Ronald Lee, Daniel McDonald, Bao Phan, and Chris Winters. All Rights
-Reserved. All rights under this copyright have been assigned to the US
-Naval Research Laboratory (NRL). The NRL Copyright Notice and License
-Agreement Version 1.1 (January 17, 1995) applies to these portions of the
-software.
-You should have received a copy of the license with this software. If you
-didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
-*/
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-#include <sys/errno.h>
-#include <sys/domain.h>
 
 #include <net/route.h>
+#include <net/if.h>
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -346,15 +368,18 @@ again:
 		 * but we haven't been called to retransmit,
 		 * len will be -1.  Otherwise, window shrank
 		 * after we sent into it.  If window shrank to 0,
-		 * cancel pending retransmit and pull snd_nxt
-		 * back to (closed) window.  We will enter persist
-		 * state below.  If the window didn't close completely,
-		 * just wait for an ACK.
+		 * cancel pending retransmit, pull snd_nxt back
+		 * to (closed) window, and set the persist timer
+		 * if it isn't already going.  If the window didn't
+		 * close completely, just wait for an ACK.
 		 */
 		len = 0;
 		if (win == 0) {
 			tp->t_timer[TCPT_REXMT] = 0;
+			tp->t_rxtshift = 0;
 			tp->snd_nxt = tp->snd_una;
+			if (tp->t_timer[TCPT_PERSIST] == 0)
+				tcp_setpersist(tp);
 		}
 	}
 	if (len > tp->t_maxseg) {
@@ -822,22 +847,6 @@ send:
 		 */
 		tp->snd_up = tp->snd_una;		/* drag it along */
 
-	/* Put TCP length in pseudo-header */
-	switch (tp->pf) {
-	case 0:	/*default to PF_INET*/
-#ifdef INET
-	case AF_INET:
-		if (len + optlen)
-			mtod(m, struct ipovly *)->ih_len = htons((u_int16_t)(
-				sizeof (struct tcphdr) + optlen + len));
-		break;
-#endif /* INET */
-#ifdef INET6
-	case AF_INET6:
-		break;
-#endif /* INET6 */
-	}
-
 #ifdef TCP_SIGNATURE
 	if (tp->t_flags & TF_SIGNATURE) {
 		MD5_CTX ctx;
@@ -886,7 +895,8 @@ send:
 				ippseudo.ippseudo_dst = ipovly->ih_dst;
 				ippseudo.ippseudo_pad = 0;
 				ippseudo.ippseudo_p   = IPPROTO_TCP;
-				ippseudo.ippseudo_len = ipovly->ih_len;
+				ippseudo.ippseudo_len = ipovly->ih_len + len +
+				    optlen;
 				MD5Update(&ctx, (char *)&ippseudo,
 					sizeof(struct ippseudo));
 				MD5Update(&ctx, mtod(m, caddr_t) +
@@ -927,7 +937,11 @@ send:
 	case 0:	/*default to PF_INET*/
 #ifdef INET
 	case AF_INET:
-		th->th_sum = in_cksum(m, (int)(hdrlen + len));
+		/* Defer checksumming until later (ip_output() or hardware) */
+		m->m_pkthdr.csum |= M_TCPV4_CSUM_OUT;
+		if (len + optlen)
+			th->th_sum = in_cksum_addword(th->th_sum,
+			    htons((u_int16_t)(len + optlen)));
 		break;
 #endif /* INET */
 #ifdef INET6
@@ -1081,6 +1095,16 @@ send:
 out:
 		if (error == ENOBUFS) {
 			tcp_quench(tp->t_inpcb, 0);
+			return (0);
+		}
+		if (error == EMSGSIZE) {
+			/*
+			 * ip_output() will have already fixed the route
+			 * for us.  tcp_mtudisc() will, as its last action,
+			 * initiate retransmission, so it is important to
+			 * not do so here.
+			 */
+			tcp_mtudisc(tp->t_inpcb, 0);
 			return (0);
 		}
 		if ((error == EHOSTUNREACH || error == ENETDOWN)

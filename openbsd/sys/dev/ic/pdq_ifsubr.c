@@ -1,4 +1,4 @@
-/*	$OpenBSD: pdq_ifsubr.c,v 1.6 1996/10/31 01:01:37 niklas Exp $	*/
+/*	$OpenBSD: pdq_ifsubr.c,v 1.9 2001/09/11 20:05:25 miod Exp $	*/
 /*	$NetBSD: pdq_ifsubr.c,v 1.5 1996/05/20 00:26:21 thorpej Exp $	*/
 
 /*-
@@ -84,8 +84,6 @@
 #endif
 
 #include <vm/vm.h>
-#include <vm/vm_kern.h>
-#include <vm/vm_param.h>
 
 #include "pdqvar.h"
 #include "pdqreg.h"

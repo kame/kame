@@ -1,3 +1,4 @@
+/*	$OpenBSD: awi.c,v 1.9 2001/06/27 06:34:40 kjc Exp $	*/
 /*	$NetBSD: awi.c,v 1.26 2000/07/21 04:48:55 onoe Exp $	*/
 
 /*-
@@ -339,7 +340,6 @@ awi_attach(sc)
 #endif
 #elif defined(__NetBSD__)
 	ether_ifattach(ifp, sc->sc_mib_addr.aMAC_Address);
-#endif
 #endif
 
 #ifdef IFM_IEEE80211
@@ -1160,19 +1160,20 @@ awi_fix_rxhdr(sc, m0)
 		/* XXX: we loose to estimate the type of encapsulation */
 		struct mbuf *n, *n0, **np;
 		caddr_t newdata;
-		int off;
+		int off, oldmlen;
 
 		n0 = NULL;
 		np = &n0;
 		off = 0;
-		while (m0->m_pkthdr.len > off) {
+		oldmlen = m0->m_pkthdr.len;
+		while (oldmlen > off) {
 			if (n0 == NULL) {
 				MGETHDR(n, M_DONTWAIT, MT_DATA);
 				if (n == NULL) {
 					m_freem(m0);
 					return NULL;
 				}
-				M_COPY_PKTHDR(n, m0);
+				M_MOVE_PKTHDR(n, m0);
 				n->m_len = MHLEN;
 			} else {
 				MGET(n, M_DONTWAIT, MT_DATA);
@@ -1183,7 +1184,7 @@ awi_fix_rxhdr(sc, m0)
 				}
 				n->m_len = MLEN;
 			}
-			if (m0->m_pkthdr.len - off >= MINCLSIZE) {
+			if (oldmlen - off >= MINCLSIZE) {
 				MCLGET(n, M_DONTWAIT);
 				if (n->m_flags & M_EXT)
 					n->m_len = n->m_ext.ext_size;
@@ -1196,8 +1197,8 @@ awi_fix_rxhdr(sc, m0)
 				n->m_len -= newdata - n->m_data;
 				n->m_data = newdata;
 			}
-			if (n->m_len > m0->m_pkthdr.len - off)
-				n->m_len = m0->m_pkthdr.len - off;
+			if (n->m_len > oldmlen - off)
+				n->m_len = oldmlen - off;
 			m_copydata(m0, off, n->m_len, mtod(n, caddr_t));
 			off += n->m_len;
 			*np = n;
@@ -1218,9 +1219,6 @@ awi_input(sc, m, rxts, rssi)
 {
 	struct ifnet *ifp = sc->sc_ifp;
 	struct ieee80211_frame *wh;
-#ifndef __NetBSD__
-	struct ether_header *eh;
-#endif
 
 	/* trim CRC here for WEP can find its own CRC at the end of packet. */
 	m_adj(m, -ETHER_CRC_LEN);
@@ -1281,9 +1279,7 @@ awi_input(sc, m, rxts, rssi)
 #ifdef __NetBSD__
 		(*ifp->if_input)(ifp, m);
 #else
-		eh = mtod(m, struct ether_header *);
-		m_adj(m, sizeof(*eh));
-		ether_input(ifp, eh, m);
+		ether_input_mbuf(ifp, m);
 #endif
 		break;
 	case IEEE80211_FC0_TYPE_MGT:

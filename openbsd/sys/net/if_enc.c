@@ -1,5 +1,4 @@
-/*	$OpenBSD: if_enc.c,v 1.33 2001/04/06 04:42:07 csapuntz Exp $	*/
-
+/*	$OpenBSD: if_enc.c,v 1.36 2001/06/27 02:00:30 provos Exp $	*/
 /*
  * The authors of this code are John Ioannidis (ji@tla.org),
  * Angelos D. Keromytis (kermit@csd.uch.gr) and 
@@ -16,8 +15,9 @@
  *
  * Copyright (C) 1995, 1996, 1997, 1998 by John Ioannidis, Angelos D. Keromytis
  * and Niels Provos.
- *	
- * Permission to use, copy, and modify this software without fee
+ * Copyright (c) 2001, Angelos D. Keromytis.
+ *
+ * Permission to use, copy, and modify this software with or without fee
  * is hereby granted, provided that this entire notice is included in
  * all copies of any software which is or includes a copy or
  * modification of this software. 
@@ -39,38 +39,26 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/kernel.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
-#include <sys/errno.h>
 #include <sys/ioctl.h>
-#include <sys/proc.h>
-
-#include <machine/cpu.h>
 
 #include <net/if.h>
 #include <net/if_types.h>
-#include <net/netisr.h>
 #include <net/route.h>
 #include <net/bpf.h>
 
-#include <netinet/ip_ipsp.h>
 #include <net/if_enc.h>
 
 #ifdef	INET
 #include <netinet/in.h>
-#include <netinet/in_systm.h>
 #include <netinet/in_var.h>
-#include <netinet/ip_var.h>
-#include <netinet/ip.h>
 #endif
 
 #ifdef INET6
 #ifndef INET
 #include <netinet/in.h>
 #endif
-#include <netinet/ip6.h>
-#include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
 #endif /* INET6 */
 
@@ -165,7 +153,7 @@ struct sockaddr *dst;
 register struct rtentry *rt;
 {
     m_freem(m);
-    return 0;
+    return (0);
 }
 
 /* ARGSUSED */
@@ -199,7 +187,7 @@ caddr_t data;
 	    break;
 
 	default:
-	    return EINVAL;
+	    return (EINVAL);
     }
 
     return 0;

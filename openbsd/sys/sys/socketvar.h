@@ -1,4 +1,4 @@
-/*	$OpenBSD: socketvar.h,v 1.20 2001/03/01 20:54:35 provos Exp $	*/
+/*	$OpenBSD: socketvar.h,v 1.23 2001/07/05 08:10:31 art Exp $	*/
 /*	$NetBSD: socketvar.h,v 1.18 1996/02/09 18:25:38 christos Exp $	*/
 
 /*-
@@ -157,8 +157,7 @@ struct socket {
     ((sbspace(&(so)->so_snd) >= (so)->so_snd.sb_lowat && \
 	(((so)->so_state&SS_ISCONNECTED) || \
 	  ((so)->so_proto->pr_flags&PR_CONNREQUIRED)==0)) || \
-     ((so)->so_state & SS_CANTSENDMORE) || \
-     (so)->so_error)
+    ((so)->so_state & SS_CANTSENDMORE) || (so)->so_error)
 
 /* adjust counters in sb reflecting allocation of m */
 #define	sballoc(sb, m) { \
@@ -203,9 +202,7 @@ struct socket {
 
 #ifdef _KERNEL
 u_long	sb_max;
-/* to catch callers missing new second argument to sonewconn: */
-#define	sonewconn(head, connstatus)	sonewconn1((head), (connstatus))
-struct	socket *sonewconn1 __P((struct socket *head, int connstatus));
+struct	socket *sonewconn __P((struct socket *head, int connstatus));
 
 /* strings for sleep message: */
 extern	char netio[], netcon[], netcls[];
@@ -221,15 +218,15 @@ struct knote;
  * File operations on sockets.
  */
 int	soo_read __P((struct file *fp, off_t *, struct uio *uio, 
-            struct ucred *cred));
+	    struct ucred *cred));
 int	soo_write __P((struct file *fp, off_t *, struct uio *uio,
-            struct ucred *cred));
+	    struct ucred *cred));
 int	soo_ioctl __P((struct file *fp, u_long cmd, caddr_t data,
 	    struct proc *p));
 int	soo_select __P((struct file *fp, int which, struct proc *p));
 int	soo_kqfilter __P((struct file *fp, struct knote *kn));
 int 	soo_close __P((struct file *fp, struct proc *p));
-int	soo_stat __P((struct socket *, struct stat *));
+int	soo_stat __P((struct file *, struct stat *, struct proc *));
 int	uipc_usrreq __P((struct socket *, int , struct mbuf *,
 			 struct mbuf *, struct mbuf *));
 void	sbappend __P((struct sockbuf *sb, struct mbuf *m));
@@ -269,12 +266,11 @@ void	soisconnecting __P((struct socket *so));
 void	soisdisconnected __P((struct socket *so));
 void	soisdisconnecting __P((struct socket *so));
 int	solisten __P((struct socket *so, int backlog));
-struct socket *
-	sonewconn1 __P((struct socket *head, int connstatus));
+struct socket *sonewconn __P((struct socket *head, int connstatus));
 void	soqinsque __P((struct socket *head, struct socket *so, int q));
 int	soqremque __P((struct socket *so, int q));
 int	soreceive __P((struct socket *so, struct mbuf **paddr, struct uio *uio,
-		       struct mbuf **mp0, struct mbuf **controlp, int *flagsp));
+	    struct mbuf **mp0, struct mbuf **controlp, int *flagsp));
 int	soreserve __P((struct socket *so, u_long sndcc, u_long rcvcc));
 void	sorflush __P((struct socket *so));
 int	sosend __P((struct socket *so, struct mbuf *addr, struct uio *uio,

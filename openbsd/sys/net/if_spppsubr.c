@@ -1,4 +1,4 @@
-/*	$OpenBSD: if_spppsubr.c,v 1.8 2001/03/25 02:56:18 csapuntz Exp $	*/
+/*	$OpenBSD: if_spppsubr.c,v 1.10 2001/07/10 11:09:07 espie Exp $	*/
 /*
  * Synchronous PPP/Cisco link level subroutines.
  * Keepalive protocol implemented in both Cisco and PPP modes.
@@ -641,9 +641,7 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 	struct ppp_header *h;
 	struct ifqueue *ifq = NULL;
 	int s, len, rv = 0;
-#ifdef ALTQ
-	struct altq_pktattr pktattr;
-#endif
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	s = splimp();
 
@@ -665,13 +663,12 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 		s = splimp();
 	}
 
-#ifdef ALTQ
 	/*
 	 * if the queueing discipline needs packet classification,
 	 * do it before prepending link headers.
 	 */
 	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
-#endif
+
 #ifdef INET
 	/*
 	 * Put low delay, telnet, rlogin and ftp control packets
@@ -794,7 +791,7 @@ nosupport:
 	len = m->m_pkthdr.len;
 	if (ifq != NULL
 #ifdef ALTQ
-	    && !ALTQ_IS_ENABLED(&ifp->if_snd)
+	    && ALTQ_IS_ENABLED(&ifp->if_snd) == 0
 #endif
 		) {
 		if (IF_QFULL (ifq)) {
@@ -805,13 +802,8 @@ nosupport:
 		}
 		IF_ENQUEUE (ifq, m);
 	}
-	else {
-#ifdef ALTQ
+	else
 		IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, rv);
-#else
-		IFQ_ENQUEUE(&ifp->if_snd, m, rv);
-#endif
-	}
 	if (rv != 0) {
 		++ifp->if_oerrors;
 		splx (s);
@@ -1632,6 +1624,7 @@ sppp_up_event(const struct cp *cp, struct sppp *sp)
 		/* printf(SPP_FMT "%s illegal up in state %s\n",
 		       SPP_ARGS(ifp), cp->name,
 		       sppp_state_name(sp->state[cp->protoidx])); */
+		break;
 	}
 }
 
@@ -1668,6 +1661,7 @@ sppp_down_event(const struct cp *cp, struct sppp *sp)
 		/* printf(SPP_FMT "%s illegal down in state %s\n",
 		       SPP_ARGS(ifp), cp->name,
 		       sppp_state_name(sp->state[cp->protoidx])); */
+		break;
 	}
 }
 
@@ -3982,7 +3976,7 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 		return EFAULT;
 
 	switch (spr.cmd) {
-	case SPPPIOGDEFS:
+	case (int)SPPPIOGDEFS:
 		if (cmd != SIOCGIFGENERIC)
 			return EINVAL;
 		/*
@@ -3999,7 +3993,7 @@ sppp_params(struct sppp *sp, u_long cmd, void *data)
 		bzero(spr.defs.hisauth.challenge, AUTHKEYLEN);
 		return copyout(&spr, (caddr_t)ifr->ifr_data, sizeof spr);
 
-	case SPPPIOSDEFS:
+	case (int)SPPPIOSDEFS:
 		if (cmd != SIOCSIFGENERIC)
 			return EINVAL;
 		/*

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.242 2001/11/26 11:31:49 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.243 2001/11/28 11:08:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -77,6 +77,9 @@
 #include "opt_inet.h"
 #include "opt_ipsec.h"
 #endif
+#ifdef __OpenBSD__
+#include "pf.h"
+#endif
 
 #include <sys/param.h>
 #include <sys/malloc.h>
@@ -119,6 +122,12 @@
 #include <netinet6/ip6protosw.h>
 #include <netinet6/scope6_var.h>
 
+#ifdef __OpenBSD__
+#if NPF > 0
+#include <net/pfvar.h>
+#endif
+#endif
+
 #ifdef IPSEC
 #ifdef __OpenBSD__
 #include <netinet/ip_ah.h>
@@ -132,6 +141,7 @@ extern u_int8_t get_sa_require  __P((struct inpcb *));
 extern int ipsec_auth_default_level;
 extern int ipsec_esp_trans_default_level;
 extern int ipsec_esp_network_default_level;
+extern int ipsec_ipcomp_default_level;
 #else
 #include <netinet6/ipsec.h>
 #include <netkey/key.h>
@@ -266,7 +276,9 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #endif /* MIP6 */
 #ifdef IPSEC
 #ifdef __OpenBSD__
+	struct m_tag *mtag;
 	union sockaddr_union sdst;
+	struct tdb_ident *tdbi;
 	u_int32_t sspi;
 	struct inpcb *inp;
 	struct tdb *tdb;
@@ -377,10 +389,6 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 
 #ifdef IPSEC
 #ifdef __OpenBSD__
-	/* Disallow nested IPsec for now */
-	if (flags & IPV6_ENCAPSULATED)
-		goto done_spd;
-
 	/*
 	 * splnet is chosen over spltdb because we are not allowed to
 	 * lower the level, and udp6_output calls us in splnet(). XXX check
@@ -392,15 +400,24 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	 * from a transport protocol.
 	 */
 	ip6 = mtod(m, struct ip6_hdr *);
-	if (inp && inp->inp_tdb_out &&
-	    inp->inp_tdb_out->tdb_dst.sa.sa_family == AF_INET6 &&
-	    IN6_ARE_ADDR_EQUAL(&inp->inp_tdb_out->tdb_dst.sin6.sin6_addr,
-		  &ip6->ip6_dst)) {
-	        tdb = inp->inp_tdb_out;
-	} else {
-	        tdb = ipsp_spd_lookup(m, AF_INET6, sizeof(struct ip6_hdr),
-	            &error, IPSP_DIRECTION_OUT, NULL, NULL);
+
+	/* Do we have any pending SAs to apply ? */
+	mtag = m_tag_find(m, PACKET_TAG_IPSEC_PENDING_TDB, NULL);
+	if (mtag != NULL) {
+#ifdef DIAGNOSTIC
+		if (mtag->m_tag_len != sizeof (struct tdb_ident))
+			panic("ip6_output: tag of length %d (should be %d",
+			    mtag->m_tag_len, sizeof (struct tdb_ident));
+#endif
+		tdbi = (struct tdb_ident *)(mtag + 1);
+		tdb = gettdb(tdbi->spi, &tdbi->dst, tdbi->proto);
+		if (tdb == NULL)
+			error = -EINVAL;
+		m_tag_delete(m, mtag);
 	}
+	else
+		tdb = ipsp_spd_lookup(m, AF_INET6, sizeof(struct ip6_hdr),
+		    &error, IPSP_DIRECTION_OUT, NULL, inp);
 
 	if (tdb == NULL) {
 	        splx(s);
@@ -425,28 +442,29 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			goto freehdrs;
 		}
 	} else {
+		/* Loop detection */
+		for (mtag = m_tag_first(m); mtag != NULL;
+		    mtag = m_tag_next(m, mtag)) {
+			if (mtag->m_tag_id != PACKET_TAG_IPSEC_OUT_DONE &&
+			    mtag->m_tag_id !=
+			    PACKET_TAG_IPSEC_OUT_CRYPTO_NEEDED)
+				continue;
+			tdbi = (struct tdb_ident *)(mtag + 1);
+			if (tdbi->spi == tdb->tdb_spi &&
+			    tdbi->proto == tdb->tdb_sproto &&
+			    !bcmp(&tdbi->dst, &tdb->tdb_dst,
+			    sizeof(union sockaddr_union))) {
+				splx(s);
+				sproto = 0; /* mark as no-IPsec-needed */
+				goto done_spd;
+			}
+		}
+
 	        /* We need to do IPsec */
 	        bcopy(&tdb->tdb_dst, &sdst, sizeof(sdst));
 		sspi = tdb->tdb_spi;
 		sproto = tdb->tdb_sproto;
 	        splx(s);
-
-		/*
-		 * If the socket has set the bypass flags and SA destination
-		 * matches the IP destination, skip IPsec. This allows
-		 * IKE packets to travel through IPsec tunnels.
-		 */
-		if (inp != NULL && 
-		    inp->inp_seclevel[SL_AUTH] == IPSEC_LEVEL_BYPASS &&
-		    inp->inp_seclevel[SL_ESP_TRANS] == IPSEC_LEVEL_BYPASS &&
-		    inp->inp_seclevel[SL_ESP_NETWORK] == IPSEC_LEVEL_BYPASS &&
-		    sdst.sa.sa_family == AF_INET6 &&
-		    IN6_ARE_ADDR_EQUAL(&sdst.sin6.sin6_addr, &ip6->ip6_dst)) {
-		        sproto = 0; /* mark as no-IPsec-needed */
-			goto done_spd;
-		}
-
-		/* XXX Take into consideration socket requirements ? */
 
 #if 1 /* XXX */
 		/* if we have any extension header, we cannot perform IPsec */
@@ -834,7 +852,7 @@ skip_ipsec2:;
 		m->m_flags &= ~(M_BCAST | M_MCAST);	/* just in case */
 
 		/* Callee frees mbuf */
-		error = ipsp_process_packet(m, tdb, AF_INET6, 0, NULL);
+		error = ipsp_process_packet(m, tdb, AF_INET6, 0);
 		splx(s);
 
 		return error;  /* Nothing more to be done */
@@ -1331,6 +1349,16 @@ skip_ipsec2:;
 			ip6 = mtod(m, struct ip6_hdr *);
 		}
 #endif /* PFIL_HOOKS */
+
+#if defined(__OpenBSD__) && NPF > 0
+	if (pf_test6(PF_OUT, ifp, &m) != PF_PASS) {
+		error = EHOSTUNREACH;
+		m_freem(m);
+		goto done;
+	}
+	ip6 = mtod(m, struct ip6_hdr *);
+#endif 
+
 	/*
 	 * Send the packet to the outgoing interface.
 	 * If necessary, do IPv6 fragmentation before sending.
@@ -2398,6 +2426,7 @@ do { \
 			case IPV6_AUTH_LEVEL:
 			case IPV6_ESP_TRANS_LEVEL:
 			case IPV6_ESP_NETWORK_LEVEL:
+			case IPV6_IPCOMP_LEVEL:
 #ifndef IPSEC
 				error = EINVAL;
 #else
@@ -2414,7 +2443,7 @@ do { \
 				}
 					
 				switch (optname) {
-				case IP_AUTH_LEVEL:
+				case IPV6_AUTH_LEVEL:
 				        if (optval < ipsec_auth_default_level &&
 					    suser(p->p_ucred, &p->p_acflag)) {
 						error = EACCES;
@@ -2423,7 +2452,7 @@ do { \
 					inp->inp_seclevel[SL_AUTH] = optval;
 					break;
 
-				case IP_ESP_TRANS_LEVEL:
+				case IPV6_ESP_TRANS_LEVEL:
 				        if (optval < ipsec_esp_trans_default_level &&
 					    suser(p->p_ucred, &p->p_acflag)) {
 						error = EACCES;
@@ -2432,13 +2461,22 @@ do { \
 					inp->inp_seclevel[SL_ESP_TRANS] = optval;
 					break;
 
-				case IP_ESP_NETWORK_LEVEL:
+				case IPV6_ESP_NETWORK_LEVEL:
 				        if (optval < ipsec_esp_network_default_level &&
 					    suser(p->p_ucred, &p->p_acflag)) {
 						error = EACCES;
 						break;
 					}
 					inp->inp_seclevel[SL_ESP_NETWORK] = optval;
+					break;
+
+				case IPV6_IPCOMP_LEVEL:
+				        if (optval < ipsec_ipcomp_default_level &&
+					    suser(p->p_ucred, &p->p_acflag)) {
+						error = EACCES;
+						break;
+					}
+					inp->inp_seclevel[SL_IPCOMP] = optval;
 					break;
 				}
 				if (!error)
@@ -2848,24 +2886,30 @@ do { \
 			case IPV6_AUTH_LEVEL:
 			case IPV6_ESP_TRANS_LEVEL:
 			case IPV6_ESP_NETWORK_LEVEL:
+			case IPV6_IPCOMP_LEVEL:
 #ifndef IPSEC
 				m->m_len = sizeof(int);
 				*mtod(m, int *) = IPSEC_LEVEL_NONE;
 #else
 				m->m_len = sizeof(int);
 				switch (optname) {
-				case IP_AUTH_LEVEL:
+				case IPV6_AUTH_LEVEL:
 					optval = inp->inp_seclevel[SL_AUTH];
 					break;
 
-				case IP_ESP_TRANS_LEVEL:
+				case IPV6_ESP_TRANS_LEVEL:
 					optval =
 					    inp->inp_seclevel[SL_ESP_TRANS];
 					break;
 
-				case IP_ESP_NETWORK_LEVEL:
+				case IPV6_ESP_NETWORK_LEVEL:
 					optval =
 					    inp->inp_seclevel[SL_ESP_NETWORK];
+					break;
+
+				case IP_IPCOMP_LEVEL:
+					optval =
+					    inp->inp_seclevel[SL_IPCOMP];
 					break;
 				}
 				*mtod(m, int *) = optval;
@@ -4201,7 +4245,11 @@ ip6_splithdr(m, exthdrs)
 			m_freem(m);
 			return ENOBUFS;
 		}
+#ifdef __OpenBSD__
+		M_MOVE_PKTHDR(mh, m);
+#else
 		M_COPY_PKTHDR(mh, m);
+#endif
 		MH_ALIGN(mh, sizeof(*ip6));
 		m->m_flags &= ~M_PKTHDR;
 		m->m_len -= sizeof(*ip6);
