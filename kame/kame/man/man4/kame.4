@@ -1,4 +1,4 @@
-.\"	$KAME: kame.4,v 1.8 2000/04/17 12:21:57 itojun Exp $
+.\"	$KAME: kame.4,v 1.9 2000/11/24 08:56:02 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998 and 1999 WIDE Project.
 .\" All rights reserved.
@@ -87,7 +87,7 @@ Two IPv4 to IPv6 transition tools are available.
 TCP relay translator, FAITH
 .Po
 .Xr faithd 8
-.Pc .
+.Pc ,
 and NAT-PT IPv6-to-v4 header translator implementation
 .Po
 .Xr natptconfig 8
@@ -135,13 +135,6 @@ Dozen of existing daemons are modified for IPv6/IPsec support, like
 .Xr ftpd 8
 and/or
 .Xr telnetd 8 .
-.\"
-.Ss Miscellaneous
-SuMiRe IPv4 NAT
-.Po
-.Xr pma 8
-.Pc
-is available in addition to OS-supplied IPv4 NAT.
 .\"
 .Sh DOCUMENTATION
 Although some of documentations have not modified yet, program itself
