@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1100 2000/07/05 02:03:42 itojun Exp $
+$Id: CHANGELOG,v 1.1101 2000/07/05 02:32:46 itojun Exp $
 
 <200006>
+Wed Jul  5 11:30:39 JST 2000  itojun@iiljab.net
+	* {netbsd,openbsd,freebsd4}/lib/libinet6/getaddrinfo.c,
+	  kame/libinet6/getaddrinfo.c:
+	  return EAI_NODATA, instead of EAI_NONAME, on name resolution errors.
+	  EAI_NODATA does not make sense in these situations
+	  From: enami
+
 Wed Jul  5 11:02:03 JST 2000  itojun@iijlab.net
 	* freebsd4: add netstat -sn -f pfkey.
 
