@@ -1,4 +1,4 @@
-.\"	$KAME: pim6sd.conf.5,v 1.16 2002/04/03 05:35:21 itojun Exp $
+.\"	$KAME: pim6sd.conf.5,v 1.17 2002/10/04 10:44:48 suz Exp $
 .\"
 .\" Copyright (C) 1999 WIDE Project.
 .\" All rights reserved.
@@ -148,7 +148,11 @@ and
 .Ic query_interval
 corresponds to query-response-interval and query-interval in MLDv2 Query 
 message, and their default value is 10000ms (query_rsp_interval), and
-125ms (query_interval).
+125s (query_interval).
+.Ic mld_version
+is used to specify the acceptable version of MLD.  For example if it is configured
+as 1, then only MLDv1 packet is permitted on this interface.  Its default value is
+1.
 .\"
 .It Xo
 .Ic default_source_preference Ar preference;
@@ -302,7 +306,7 @@ specifies the priority of the BSR.
 The default value is 0, which means the lowest priority.
 Hash mask length can also be specified by the
 .Ic masklen
-parametr. Its value,
+parameter. Its value,
 .Ar masklen ,
 must be no less than 0 and no greater than 128.
 .\"
