@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.44 2001/11/07 01:48:51 sakane Exp $	*/
+/*	$KAME: proposal.c,v 1.45 2001/11/16 04:08:10 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -31,6 +31,7 @@
 
 #include <sys/param.h>
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <sys/queue.h>
 
 #include <netkey/key_var.h>

@@ -1,4 +1,4 @@
-/*	$KAME: backupsa.c,v 1.14 2001/10/26 05:01:37 sakane Exp $	*/
+/*	$KAME: backupsa.c,v 1.15 2001/11/16 04:08:10 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -31,6 +31,7 @@
 
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/socket.h>
 
 #include <stdlib.h>
 #include <stdio.h>

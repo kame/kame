@@ -1,4 +1,4 @@
-/*	$KAME: strnames.c,v 1.21 2001/08/14 14:55:27 sakane Exp $	*/
+/*	$KAME: strnames.c,v 1.22 2001/11/16 04:12:59 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -31,10 +31,12 @@
 
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/socket.h>
 
-#include <stdio.h>
 #include <netinet6/ipsec.h>
 #include <netinet/in.h>
+
+#include <stdio.h>
 
 #include "var.h"
 #include "misc.h"

@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.37 2001/09/11 13:24:12 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.38 2001/11/16 04:12:59 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -31,6 +31,8 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <sys/socket.h>
+
 #include <netinet/in.h>
 
 #include <stdlib.h>

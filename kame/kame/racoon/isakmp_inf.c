@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.75 2001/11/16 03:25:46 sakane Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.76 2001/11/16 04:08:10 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -31,6 +31,7 @@
 
 #include <sys/types.h>
 #include <sys/param.h>
+#include <sys/socket.h>
 
 #include <net/pfkeyv2.h>
 #include <netkey/keydb.h>
