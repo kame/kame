@@ -164,7 +164,7 @@ static char *ai_errlist[] = {
 	"ai_family not supported",			/* EAI_FAMILY     */
 	"Memory allocation failure", 			/* EAI_MEMORY     */
 	"No address associated with hostname", 		/* EAI_NODATA     */
-	"hostname nor servname provided, or not known",/* EAI_NONAME     */
+	"hostname nor servname provided, or not known",	/* EAI_NONAME     */
 	"servname not supported for ai_socktype",	/* EAI_SERVICE    */
 	"ai_socktype not supported", 			/* EAI_SOCKTYPE   */
 	"System error returned in errno", 		/* EAI_SYSTEM     */
@@ -249,11 +249,9 @@ getaddrinfo(hostname, servname, hints, res)
 
 	if (firsttime) {
 		/* translator hack */
-		{
-			char *q = getenv("GAI");
-			if (q && inet_pton(AF_INET6, q, &faith_prefix) == 1)
-				translate = YES;
-		}
+		char *q = getenv("GAI");
+		if (q && inet_pton(AF_INET6, q, &faith_prefix) == 1)
+			translate = YES;
 		firsttime = 0;
 	}
 #endif
