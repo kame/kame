@@ -5,7 +5,7 @@ SRCS=	main.c list.c message.c misc.c
 
 MAN=	natptd.8
 
-CPPFLAGS+= -g -Wall
+CFLAGS+= -g -Wall
 CLEANFILES+= natptd.cat8
 
 LDADD+=	-lutil
