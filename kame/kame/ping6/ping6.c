@@ -1021,6 +1021,7 @@ pr_pack(buf, cc, mhdr)
 	int cc;
 	struct msghdr *mhdr;
 {
+#define safeputc(c)	printf((isprint((c)) ? "%c" : "\\%03o"), c)
 	struct icmp6_hdr *icp;
 	int i;
 	int hoplim;
@@ -1031,6 +1032,7 @@ pr_pack(buf, cc, mhdr)
 	double triptime = 0;
 	int dupflag;
 	size_t off;
+	int oldfqdn;
 
 	(void)gettimeofday(&tv, NULL);
 
@@ -1131,55 +1133,79 @@ pr_pack(buf, cc, mhdr)
 			 break;
 		 case NI_QTYPE_FQDN:
 		 default:	/* XXX: for backward compatibility */
-			 cp = (u_char *)ni + ICMP6_NIRLEN + 1;
-			 while (cp < end) {
-				 if (isprint(*cp))
-					 putchar(*cp);
-				 else
-					 printf("\\%03o", *cp & 0xff);
-				 cp++;
-			 }
-			 if (options & F_VERBOSE) {
-				 long ttl;
+			cp = (u_char *)ni + ICMP6_NIRLEN;
+			if (buf[off + ICMP6_NIRLEN] ==
+			    cc - off - ICMP6_NIRLEN - 1)
+				oldfqdn = 1;
+			else
+				oldfqdn = 0;
+			if (oldfqdn) {
+				cp++;
+				while (cp < end) {
+					safeputc(*cp & 0xff);
+					cp++;
+				}
+			} else {
+				while (cp < end) {
+					i = *cp++;
+					if (i) {
+						if (i > end - cp) {
+							printf("???");
+							break;
+						}
+						while (i-- && cp < end) {
+							safeputc(*cp & 0xff);
+							cp++;
+						}
+						if (cp + 1 < end && *cp)
+							printf(".");
+					} else {
+						/* terminating dot */
+						printf(".");
+					}
+				}
+			}
+			if (options & F_VERBOSE) {
+				long ttl;
 
-				 (void)printf(" (");
+				(void)printf(" (");
 
-				 switch(ni->ni_code) {
-				  case ICMP6_NI_REFUSED:
-					  (void)printf("refused,");
-					  break;
-				  case ICMP6_NI_UNKNOWN:
-					  (void)printf("unknwon qtype,");
-					  break;
-				 }
+				switch(ni->ni_code) {
+				 case ICMP6_NI_REFUSED:
+					 (void)printf("refused,");
+					 break;
+				 case ICMP6_NI_UNKNOWN:
+					 (void)printf("unknwon qtype,");
+					 break;
+				}
 
-				 if ((end - (u_char *)ni) < ICMP6_NIRLEN) {
-					 /* case of refusion, unkown */
-					 goto fqdnend;
-				 }
-				 ttl = ntohl(*(u_long *)&buf[off+ICMP6ECHOLEN+8]);
-				 if (!(ni->ni_flags & NI_FQDN_FLAG_VALIDTTL))
-					 (void)printf("TTL=%d:meaningless",
-						      (int)ttl);
-				 else {
-					 if (ttl < 0)
-						 (void)printf("TTL=%d:invalid",
-							      (int)ttl);
-					 else
-						 (void)printf("TTL=%d",
-							      (int)ttl);
-				 }
+				if ((end - (u_char *)ni) < ICMP6_NIRLEN) {
+					/* case of refusion, unkown */
+					goto fqdnend;
+				}
+				ttl = ntohl(*(u_long *)&buf[off+ICMP6ECHOLEN+8]);
+				if (!(ni->ni_flags & NI_FQDN_FLAG_VALIDTTL))
+					(void)printf("TTL=%d:meaningless",
+						     (int)ttl);
+				else {
+					if (ttl < 0)
+						(void)printf("TTL=%d:invalid",
+							     (int)ttl);
+					else
+						(void)printf("TTL=%d",
+							     (int)ttl);
+				}
 
-				 if (buf[off + ICMP6_NIRLEN] !=
-				     cc - off - ICMP6_NIRLEN - 1) {
-					 (void)printf(",invalid namelen:%d/%lu",
-						      buf[off + ICMP6_NIRLEN],
-						      (u_long)cc - off - ICMP6_NIRLEN - 1);
-				 }
-				 putchar(')');
-			 }
-		  fqdnend:
-			 ;
+				if (buf[off + ICMP6_NIRLEN] !=
+				    cc - off - ICMP6_NIRLEN - 1 && oldfqdn) {
+					(void)printf(",invalid namelen:%d/%lu",
+						     buf[off + ICMP6_NIRLEN],
+						     (u_long)cc - off - ICMP6_NIRLEN - 1);
+				}
+				putchar(')');
+			}
+		 fqdnend:
+			;
 		}
 	} else {
 		/* We've got something other than an ECHOREPLY */
@@ -1196,6 +1222,7 @@ pr_pack(buf, cc, mhdr)
 			pr_exthdrs(mhdr);
 		(void)fflush(stdout);
 	}
+#undef safeputc
 }
 
 void
