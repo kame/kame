@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2067 2002/02/02 12:38:51 jinmei Exp $
+$KAME: CHANGELOG,v 1.2068 2002/02/02 12:40:55 jinmei Exp $
 
 <200202>
+2002-02-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet/tcp_subr.c (tcp_respond): correctly reset
+	returned IPv6 header.  This is essential when the original packet
+	contains an IPv6 extension header.
+
 2002-02-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/usr.sbin/netstat/inet.c (ipsec6_stats): supported printing
 	statistics for IPsec over IPv6.
