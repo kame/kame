@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.174 2001/10/31 07:12:23 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.175 2001/10/31 10:14:42 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -799,16 +799,25 @@ defrouter_reset()
 }
 
 /*
- * Default Router Selection according to Section 6.3.6 of RFC 2461:
- * 1) Routers that are reachable or probably reachable should be
- *    preferred.
+ * Default Router Selection according to Section 6.3.6 of RFC 2461 and
+ * draft-ietf-ipngwg-router-selection:
+ * 1) Routers that are reachable or probably reachable should be preferred.
+ *    If we have more than one (probably) reachable router, prefer ones
+ *    with the highest router preference.
  * 2) When no routers on the list are known to be reachable or
  *    probably reachable, routers SHOULD be selected in a round-robin
- *    fashion.
+ *    fashion, regardless of router preference values.
  * 3) If the Default Router List is empty, assume that all
  *    destinations are on-link.
  *
  * We assume nd_defrouter is sorted by router preference value.
+ * Since the code below covers both with and without router preference cases,
+ * we do not need to classify the cases by ifdef.
+ *
+ * At this moment, we do not try to install more than one default router,
+ * even when the multipath routing is available, because we're not sure about
+ * the benefits for stub hosts comparing to the risk of making the code
+ * complicated and the possibility of introducing bugs.
  */
 void
 defrouter_select()
@@ -818,10 +827,9 @@ defrouter_select()
 #else
 	int s = splnet();
 #endif
-	struct nd_defrouter *dr;
+	struct nd_defrouter *dr, *selected_dr = NULL, *installed_dr = NULL;
 	struct rtentry *rt = NULL;
 	struct llinfo_nd6 *ln = NULL;
-	int installedpref, installcount, install;
 
 	/*
 	 * This function should be called only when acting as an autoconfigured
@@ -836,8 +844,6 @@ defrouter_select()
 		splx(s);
 		return;
 	}
-
-	installcount = 0;
 
 	/*
 	 * Let's handle easy case (3) first:
@@ -889,55 +895,41 @@ defrouter_select()
 
 	/*
 	 * Search for a (probably) reachable router from the list.
+	 * We just pick up the first reachable one (if any), assuming that
+	 * the ordering rule of the list described in defrtrlist_update().
 	 */
-	installedpref = RTPREF_INVALID;
 	for (dr = TAILQ_FIRST(&nd_defrouter); dr;
 	     dr = TAILQ_NEXT(dr, dr_entry)) {
-		install = 0;
-
-		if ((rt = nd6_lookup(&dr->rtaddr, 0, dr->ifp)) &&
+		if (!selected_dr &&
+		    (rt = nd6_lookup(&dr->rtaddr, 0, dr->ifp)) &&
 		    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
 		    ND6_IS_LLINFO_PROBREACH(ln)) {
-			/*
-			 * The router looks reachable.
-			 * If it is a fresh default router, or it has the
-			 * same preference as the previously installed one,
-			 * we install it.
-			 */
-			if (installedpref == RTPREF_INVALID) {
-				installedpref = rtpref(dr);
-				install++;
-			} else if (installedpref == rtpref(dr))
-				install++;
+			selected_dr = dr;
 		}
-
-		if (install && !dr->installed)
-			defrouter_addreq(dr);
-		else if (!install && dr->installed)
-			defrouter_delreq(dr);
-
-		if (dr->installed)
-			installcount++;
+		if (dr->installed && !installed_dr)
+			installed_dr = dr;
+	}
+	/*
+	 * If none of the default routers was found to be reachable,
+	 * round-robin the list regardless of preference.
+	 */
+	if (!selected_dr) {
+		if (!installed_dr ||
+		    installed_dr == TAILQ_LAST(&nd_defrouter, nd_drhead))
+			selected_dr = TAILQ_FIRST(&nd_defrouter);
+		else
+ 			selected_dr = TAILQ_NEXT(installed_dr, dr_entry);
 	}
 
-	if (installcount == 0) {
-		/*
-		 * None of the default routers was found to be reachable.
-		 * Install all routers with the highest preference.
-		 */
-		installedpref = rtpref(TAILQ_FIRST(&nd_defrouter));
-		for (dr = TAILQ_FIRST(&nd_defrouter); dr;
-		     dr = TAILQ_NEXT(dr, dr_entry)) {
-			if (installedpref != rtpref(dr))
-				break;
-
-			if (!dr->installed)
-				defrouter_addreq(dr);
-			/* no need to defrouter_delreq(), it's already done */
-
-			if (dr->installed)
-				installcount++;
-		}
+	/*
+	 * If the selected router is different than the installed one,
+	 * remove the installed router and install the selected one.
+	 * Note that the selected router is never NULL here.
+	 */
+	if (installed_dr != selected_dr) {
+		if (installed_dr)
+			defrouter_delreq(installed_dr);
+		defrouter_addreq(selected_dr);
 	}
 
 	splx(s);
