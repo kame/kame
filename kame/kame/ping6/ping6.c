@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.124 2001/05/09 04:33:55 sakane Exp $	*/
+/*	$KAME: ping6.c,v 1.125 2001/05/09 11:17:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1029,11 +1029,12 @@ main(argc, argv)
 		cc = select(s + 1, fdmaskp, NULL, NULL, tv);
 		if (cc < 0) {
 			if (errno != EINTR) {
-				warn("recvmsg");
+				warn("select");
 				sleep(1);
 			}
 			continue;
-		}
+		} else if (cc == 0)
+			continue;
 
 		fromlen = sizeof(from);
 		m.msg_name = (caddr_t)&from;
