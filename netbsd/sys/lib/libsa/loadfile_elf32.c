@@ -275,7 +275,7 @@ ELFNAMEEND(loadfile)(fd, elf, marks, flags)
 	size_t sz;
 	int first;
 	paddr_t minp = ~0, maxp = 0, pos = 0;
-	paddr_t offset = marks[MARK_START], shpp, elfp = NULL;
+	paddr_t offset = marks[MARK_START], shpp, elfp = 0;
 
 	/* some ports dont use the offset */
 	offset = offset;
