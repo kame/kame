@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.89 2004/06/14 05:35:59 itojun Exp $	*/
+/*	$KAME: config.c,v 1.90 2004/10/12 05:38:57 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -55,7 +55,9 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
-#if defined(__NetBSD__) || defined(__OpenBSD__)
+#if defined(__FreeBSD__) && __FreeBSD_version < 500000
+#include <sys/queue.h>
+#else
 #include <search.h>
 #endif
 #include <unistd.h>
