@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.22 2001/02/16 08:38:12 itojun Exp $	*/
+/*	$KAME: udp6_output.c,v 1.23 2001/05/16 12:21:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -75,6 +75,9 @@
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#include <sys/sysctl.h>
+#endif
 #include <sys/errno.h>
 #include <sys/stat.h>
 #include <sys/systm.h>
