@@ -1,4 +1,4 @@
-/*	$KAME: rp.c,v 1.17 2001/08/09 08:46:58 suz Exp $	*/
+/*	$KAME: rp.c,v 1.18 2001/08/28 08:42:31 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -692,6 +692,7 @@ delete_rp_list(used_cand_rp_list, used_grp_mask_list)
 	    }
 	    free(rp_grp_entry_ptr);
 	}
+	free(cand_rp_ptr);
 	cand_rp_ptr = cand_rp_next;
     }
     *used_cand_rp_list = (cand_rp_t *) NULL;
@@ -806,6 +807,7 @@ delete_grp_mask_entry(used_cand_rp_list, used_grp_mask_list, grp_mask_delete)
 	}
 	free(grp_rp_entry_ptr);
     }
+    free(grp_mask_delete);
 }
 
 /*
