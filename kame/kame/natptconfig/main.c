@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.10 2002/02/01 06:25:40 fujisawa Exp $	*/
+/*	$KAME: main.c,v 1.11 2002/02/01 07:15:31 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -45,6 +45,8 @@
 #include "showvar.h"
 
 int		 u_debug;
+
+extern int	 verbose;
 
 
 char		*parseArgument		__P((int, char *[]));
@@ -103,8 +105,9 @@ main(int argc, char *argv[])
 	clean_misc();
 	clean_show();
 
-	if (yyerrno)
+	if (yyerrno && verbose)
 		fprintf(stderr, "%d error(s) detected.\n", yyerrno);
+
 	return (yyerrno);
 }
 
@@ -118,7 +121,7 @@ parseArgument(int argc, char *argv[])
 	extern int	 optind;
 	extern char	*optarg;
 
-	while ((ch = getopt(argc, argv, "d:f:")) != -1) {
+	while ((ch = getopt(argc, argv, "d:f:q")) != -1) {
 		switch (ch) {
 		case 'd':
 			u_debug = strtoul(optarg, NULL, 0);
@@ -135,6 +138,10 @@ parseArgument(int argc, char *argv[])
 
 		case 'f':
 			fname = optarg;
+			break;
+
+		case 'q':
+			verbose = 0;
 			break;
 
 		default:
@@ -265,5 +272,7 @@ printTestHelp()
 void
 init_main()
 {
+	verbose = 1;
+
 	init_misc();
 }

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.23 2002/02/01 06:25:40 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.24 2002/02/01 07:15:30 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -52,24 +52,38 @@
 
 char		*yykeyword = NULL;
 char		*yyfilename;
- int		 yyerrno;
+int		 yyerrno;
 int		 yylineno;
 struct ruletab	 ruletab;
+int		 verbose;
 
 int		 yylex		__P((void));
 
 static void
 yyerror(char *msg, ...)
 {
+	int	wowl, l;
+	char	wow[BUFSIZ], *wowp;
 	va_list ap;
 
+	wowl = BUFSIZ;
+	wowp = wow;
+
+	l = snprintf(wowp, wowl, "%s:%d: ", yyfilename, yylineno);
+	wowp += l;
+	wowl -= l;
+	if (yykeyword) {
+		l = snprintf(wowp, wowl, "in parsing %s: ", yykeyword);
+		wowp += l;
+		wowl -= l;
+	}
+
 	va_start(ap, msg);
-	fprintf(stderr, "%s:%d: ", yyfilename, yylineno);
-	if (yykeyword)
-		fprintf(stderr, "in parsing %s: ", yykeyword);
-	vfprintf(stderr, msg, ap);
-	fprintf(stderr, "\n");
+	l = vsnprintf(wowp, wowl, msg, ap);
 	va_end(ap);
+
+	if (verbose)
+		fprintf(stderr, "%s\n", wow);
 
 	yyerrno++;
 }
