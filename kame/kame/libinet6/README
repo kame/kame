@@ -1,6 +1,6 @@
 libinet6 - plugin library kit for new socket APIs
 KAME projecdt
-$KAME: README,v 1.1 2000/03/27 01:27:59 itojun Exp $
+$KAME: README,v 1.2 2000/03/27 02:06:16 itojun Exp $
 
 
 Introduction
@@ -57,4 +57,9 @@ How to use
 Spec non-conformance
 	getaddrinfo is a name resolution function, and it should obey
 	whatever records defined in DNS.  However, getaddrinfo in libinet6
-	cannot return AAAA records when it was compiled for IPv4-only nodes.
+	cannot return AAAA records when it was compiled for IPv4-only nodes
+	(this is basically because of the lack of sockaddr_in6).
+
+TODO
+	- supply declaration for sockaddr_storage
+	- autoconf guidelines
