@@ -1,9 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.111 1999/09/13 11:52:51 itojun Exp $
+$Id: CHANGELOG,v 1.112 1999/09/13 16:39:10 itojun Exp $
 
 
 <199909>
+Tue Sep 14 01:37:37 JST 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/net/zebra, freebsd[23]/ports/zebra:
+	  upgrade to 0.79.
+
 Mon Sep 13 20:42:07 JST 1999  itojun@iijlab.net
 	* kame/sys/netinet6/in6_ifattach.c: do not use IEEE802/EUI64 addr
 	  with u bit != 0, as source of interface id for pseudo interfaces.
