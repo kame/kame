@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.53 2002/01/11 08:26:52 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.54 2002/06/04 05:05:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -175,8 +175,12 @@ main(argc, argv)
 		/*NOTREACHED*/
 	}
 
+#ifdef HAVE_ARC4RADOM
+	dnsid = arc4random() & 0xffff;
+#else
 	srandom(time(NULL) ^ getpid());
 	dnsid = random() & 0xffff;
+#endif
 
 	if (!hostname) {
 		if (gethostname(hostnamebuf, sizeof(hostnamebuf)) != 0) {

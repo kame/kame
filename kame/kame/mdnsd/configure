@@ -527,7 +527,7 @@ fi
 
 
 ac_aux_dir=
-for ac_dir in $srcdir $srcdir/.. $srcdir/../..; do
+for ac_dir in ${GNUSYSTEM_AUX_DIR} $srcdir $srcdir/.. $srcdir/../..; do
   if test -f $ac_dir/install-sh; then
     ac_aux_dir=$ac_dir
     ac_install_sh="$ac_aux_dir/install-sh -c"
@@ -1191,7 +1191,7 @@ fi
 done
 
 
-for ac_func in if_nametoindex
+for ac_func in if_nametoindex arc4random
 do
 echo $ac_n "checking for $ac_func""... $ac_c" 1>&6
 echo "configure:1198: checking for $ac_func" >&5
