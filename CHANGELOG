@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1339 2000/10/17 10:52:18 kjc Exp $
+$KAME: CHANGELOG,v 1.1340 2000/10/17 14:37:39 fujisawa Exp $
 
 <200010>
+2000-10-17  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* NAT-PT can translate fragmented IPv4 packet to IPv4.        
+	  You need to write 'options NATPT_NAT' and 'options NATPT_FRAGMENT'
+	  into kernel configuration file, and recompile kernel.
+	  This function is experimental, and tested only FreeBSD 3.5.
+
 2000/10/17 19:47:21 JST kjc@csl.sony.co.jp
 	* freebsd4/sys/alpha/alpha exception.s:
 	* freebsd4/sys/alpha/include asm.h:
