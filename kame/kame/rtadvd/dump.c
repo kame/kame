@@ -1,4 +1,4 @@
-/*	$KAME: dump.c,v 1.9 2000/05/16 13:34:13 itojun Exp $	*/
+/*	$KAME: dump.c,v 1.10 2000/05/23 11:31:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -54,6 +54,7 @@
 
 #include "rtadvd.h"
 #include "timer.h"
+#include "dump.h"
 
 static FILE *fp;
 

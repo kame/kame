@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.25 2000/05/22 22:23:07 itojun Exp $	*/
+/*	$KAME: rtadvd.c,v 1.26 2000/05/23 11:31:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -59,6 +59,7 @@
 #include "timer.h"
 #include "if.h"
 #include "config.h"
+#include "dump.h"
 
 struct msghdr rcvmhdr;
 static u_char *rcvcmsgbuf;
@@ -137,8 +138,6 @@ static void rtmsg_input __P((void));
 static void rtadvd_set_dump_file __P((void));
 
 struct prefix *find_prefix __P((struct rainfo *, struct in6_addr *, int));
-
-extern void rtadvd_dump_file __P((char *));
 
 int
 main(argc, argv)
