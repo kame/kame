@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.173 2001/10/31 06:31:19 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.174 2001/10/31 07:12:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -881,8 +881,9 @@ defrouter_select()
 	}
 
 	/*
-	 * Make sure we do not have a default route for default
-	 * interface, we have one from default router list entries
+	 * If we have a default route for the default interface, delete it.
+	 * Note that the existence of the route is checked in the delete
+	 * function.
 	 */
 	defrouter_delifreq();
 
@@ -899,8 +900,8 @@ defrouter_select()
 		    ND6_IS_LLINFO_PROBREACH(ln)) {
 			/*
 			 * The router looks reachable.
-			 * If it is the fresh default router, or it has the
-			 * same preference as the previously instaled one,
+			 * If it is a fresh default router, or it has the
+			 * same preference as the previously installed one,
 			 * we install it.
 			 */
 			if (installedpref == RTPREF_INVALID) {
