@@ -176,7 +176,7 @@ octetstring	{octet}({dot}{octet})+
 <S_ALGCL>high		{ YYD; yylval.num = algstrength_high; return(STRENGTHTYPE); }
 <S_ALGCL>normal		{ YYD; yylval.num = algstrength_normal; return(STRENGTHTYPE); }
 <S_ALGCL>nothing	{ YYD; yylval.num = algtype_nothing; return(ALGORITHMTYPE); }
-<S_ALGCL>{comma}	{ /* XXX ignored, but to be handled. */ ; }
+<S_ALGCL>{comma}	{ YYD; /* XXX ignored, but to be handled. */ ; }
 <S_ALGCL>{ecl}		{ BEGIN S_ALGST; return(EOC); }
 
 	/* policy */
@@ -228,7 +228,7 @@ octetstring	{octet}({dot}{octet})+
 <S_RMT>{bcl}		{ BEGIN S_RMTS; return(BOC); }
 <S_RMTS>{ecl}		{ BEGIN S_INI; return(EOC); }
 <S_RMTS>exchange_mode	{ YYD; return(EXCHANGE_MODE); }
-<S_RMTS>{comma}		{ /* XXX ignored, but to be handled. */ ; }
+<S_RMTS>{comma}		{ YYD; /* XXX ignored, but to be handled. */ ; }
 <S_RMTS>base		{ YYD; yylval.num = ISAKMP_ETYPE_BASE; return(EXCHANGETYPE); }
 <S_RMTS>main		{ YYD; yylval.num = ISAKMP_ETYPE_IDENT; return(EXCHANGETYPE); }
 <S_RMTS>aggressive	{ YYD; yylval.num = ISAKMP_ETYPE_AGG; return(EXCHANGETYPE); }
