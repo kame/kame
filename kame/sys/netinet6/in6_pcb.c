@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.87 2001/03/14 05:18:43 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.88 2001/04/20 14:43:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -919,6 +919,8 @@ in6_pcblookup_bind(head, laddr6, lport_arg, faith)
 		 * against wildcard match.
 		 */
 		if (faith && (in6p->in6p_flags & IN6P_FAITH) == 0)
+			continue;
+		if (!faith && (in6p->in6p_flags & IN6P_FAITH) != 0)
 			continue;
 		if (in6p->in6p_fport != 0)
 			continue;
