@@ -6,7 +6,7 @@ SRCS=	ifconfig.c
 
 #comment out to exclude SIOC[GS]IFMEDIA support
 SRCS+=	ifmedia.c
-CFLAGS+=-DUSE_IF_MEDIA
+CFLAGS+=-DUSE_IF_MEDIA -DINET6
 
 MAN8=	ifconfig.8
 DPADD=	${LIBIPX}
