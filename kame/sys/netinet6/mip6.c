@@ -1,4 +1,4 @@
-/*	$Id: mip6.c,v 1.213 2005/02/03 14:16:25 mitsuya Exp $	*/
+/*	$Id: mip6.c,v 1.214 2005/02/16 03:40:19 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -212,7 +212,7 @@ SYSCTL_SETUP(sysctl_net_inet6_mip6_setup, "sysctl net.inet6.mip6 subtree setup")
                        SYSCTL_DESCR("Enable ipsec of mip6"),
                        NULL, 0, &mip6ctl_use_ipsec, 0,
                        CTL_NET, PF_INET6, IPPROTO_MH,
-                       mip6ctl_use_ipsec, CTL_EOL);
+                       MIP6CTL_USE_IPSEC, CTL_EOL);
          sysctl_createv(clog, 0, NULL, NULL,
                        CTLFLAG_PERMANENT|CTLFLAG_READWRITE,
                        CTLTYPE_INT, "rr_hint_ppslimit",
