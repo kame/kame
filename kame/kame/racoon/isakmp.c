@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.47 2000/01/18 09:54:49 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.48 2000/01/18 10:01:57 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -430,13 +430,21 @@ isakmp_main(msg, remote, local)
 		 * exchange in phase 1.
 		 * NOTE: We think such informational exchange should be ignored.
 		 */
-		if (iph1 == NULL
-		 && (iph1 = getph1byindex0(index)) == NULL) {
-			YIPSDEBUG(DEBUG_NOTIFY,
+		if (iph1 == NULL) {
+			iph1 = getph1byindex0(index);
+			if (iph1 == NULL) {
+				YIPSDEBUG(DEBUG_NOTIFY,
+					plog(logp, LOCATION, remote,
+						"unknown Informationnal "
+						"exchange received.\n"));
+				return -1;
+			}
+			if (cmpsaddr(iph1->remote, remote) != 0) {
 				plog(logp, LOCATION, remote,
-					"unknown Informationnal exchange "
-					"received.\n"));
-			return -1;
+					"WARNING: remote address mismatched. "
+					"db=%s\n",
+					saddr2str(iph1->remote));
+			}
 		}
 
 		if (isakmp_info_recv(iph1, msg) < 0)
