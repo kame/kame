@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.620 2000/02/25 18:06:02 itojun Exp $
+$Id: CHANGELOG,v 1.621 2000/02/26 05:01:10 jinmei Exp $
 
 <200002>
+2000-02-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/v6test/getconfig.c (make_ip6): made ipv6 version and
+	traffic class fields configurable.
+	* kame/kame/v6test/conf/ext.conf: added new tests "badver" and
+	"tclass" to aset non-default values to version and traffic class
+	fields, respectively.
+
 Sat Feb 26 03:03:21 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/security/heimdal: upgrade to 0.2q.
 	* openbsd: sys tree was broken for 4 days since "m->m_pkthdr.aux"
