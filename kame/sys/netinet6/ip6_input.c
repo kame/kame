@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.271 2002/02/19 17:07:42 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.272 2002/04/17 04:32:22 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -469,7 +469,7 @@ ip6_input(m)
 	ip6stat.ip6s_total++;
 
 #ifndef PULLDOWN_TEST
-	/* 
+	/*
 	 * L2 bridge code and some other code can return mbuf chain
 	 * that does not conform to KAME requirement.  too bad.
 	 * XXX: fails to join if interface MTU > MCLBYTES.  jumbogram?
