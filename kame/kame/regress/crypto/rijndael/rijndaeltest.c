@@ -1,4 +1,4 @@
-/*	$KAME: rijndaeltest.c,v 1.3 2000/11/01 14:37:18 itojun Exp $	*/
+/*	$KAME: rijndaeltest.c,v 1.4 2000/11/01 14:38:24 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -144,7 +144,7 @@ main(argc, argv)
 		}
 
 		if (memcmp(output, answer, sizeof(output)) != 0) {
-			printf("result mismatch failed for %s %d\n", test, i);
+			printf("result mismatch for %s %d\n", test, i);
 			error++;
 		}
 
@@ -184,7 +184,7 @@ next1:;
 		}
 
 		if (memcmp(output, answer, sizeof(output)) != 0) {
-			printf("result mismatch failed for %s %d\n", test, i);
+			printf("result mismatch for %s %d\n", test, i);
 			error++;
 			continue;
 		}
