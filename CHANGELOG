@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.62 1999/08/25 02:28:14 itojun Exp $
+$Id: CHANGELOG,v 1.63 1999/08/25 07:46:08 jinmei Exp $
 
 <199908>
+1999-08-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ah_core.c (ah6_calccksum): corrected the
+	length parameter for auth. data calculation at the end of
+	IPPROTO_HOPOPTS and IPPROTO_DSTOPTS cases.
+	Problem reported by the TAHI project(http://www.tahi.org/).
+
 Wed Aug 25 11:24:43 JST 1999  itojun@iijlab.net
 	* kame/racoon: Fix compilation on NetBSD/alpha.
 	  Fix portability issue with ssleay/openssl.  However, we cast
