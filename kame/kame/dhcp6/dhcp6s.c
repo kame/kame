@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.152 2005/03/27 03:07:49 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.153 2005/03/27 03:50:09 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1970,8 +1970,10 @@ make_binding_ia(msgtype, iap, retlist, optinfo)
 	    iap->type, iap->val_ia.iaid)) == NULL) {
 		/*
 		 * Behavior in the case where the delegating router cannot
-		 * find a binding for the requesting router's IA_PD
-		 * (dhcpv6-opt-prefix-delegation-04 Section 12.2):
+		 * find a binding for the requesting router's IA_PD as
+		 * described in RFC3633 Section 12.2.  It is derived from
+		 * Sections 18.2.3 and 18.2.4 of RFC3315, and the two sets
+		 * of behavior are identical.
 		 */
 		dprintf(LOG_INFO, FNAME, "no binding found for %s",
 		    duidstr(&optinfo->clientID));
