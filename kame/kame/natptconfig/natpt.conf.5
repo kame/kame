@@ -1,4 +1,4 @@
-.\"	$KAME: natpt.conf.5,v 1.15 2002/01/25 03:23:36 fujisawa Exp $
+.\"	$KAME: natpt.conf.5,v 1.16 2002/02/17 14:15:39 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -58,11 +58,9 @@ are comments.  Blank line is ignored.
 Each rule processed by this translater is added in the kernel internal
 list if there is no parsing problems.  When more than one rule is
 described, rule that has an error is not added, but the rule that has
-no error is added to this list.  Rules are added to the end of the
-internal lists using
-.Qq map
-directive, matching the
-order in which they appear when given in natptconfig.
+no error is added to this list.
+.Pp
+
 .\"
 .Sh DIRECTIVES
 Keywords and special characters that the parser expects exactly are
@@ -80,19 +78,35 @@ vertical bar
 is used to indicate a choice between optional
 parameters.
 .Pp
+You can put all directives into file and process using
+.Fl f
+option
+.Po see
+.Xr natptconfig 8
+.Pc ,
+here we describe directives mainly executed from command line.
 The following directives are available in the configuration file.
 .Bl -tag -width Ds
 .\"
-.It Xo Sy prefix
+.It Xo Sy prefix Ar prefix
 .Xc
 Set NAT-PT prefix.  Packet addressed to this prefix is subject to
 translate.  Prefix length is always assumed as 96 bits.
 .\"
-.It Xo Sy map from ...
+.It Xo Sy map Op Ar number
+.Sy from ...
 .Xc
 Add translation rule into the kernel internal list.  The rules for
-returning packet is not appear in this map list.  The following
-formats are available.
+returning packet is not appear in this map list. Rule is arranged with
+ascending order according to this number.
+.Ar number
+is number of translation rule.  This is a non negative integer and it
+is supposed to be 65535 when omitted.  See the
+.Em RULE NUMBER
+section below for more information.
+.Pp
+The following formats are available.  With this following examples,
+all the rule number is omitted.
 .Bl -tag -compact -width XXX
 .Pp
 .\"	map from any6               to 202.249.11.250 port 28672 - 32767
@@ -281,9 +295,26 @@ However, you cannot set all of the variables which can appear with
 subcommand.
 .El
 .\"
+.Sh RULE NUMBER
+Here are some important points to consider when attatching rule
+number:
+.Bl -bullet
+.It
+Rule is arranged with ascending order according to this number.  This
+rule number is a non negative integer and it is supposed to be 65535
+when omitted.  You can use an integer greater than 65535 as a rule
+number.
+.It
+If rule having the same number exists in the kernel, new rule is
+appended to the last of rule having the same number.
+.It
+Number 0 is an exception of above.  The rule having this number is
+always added at the beginning of rule list.
+.El
+.\"
 .Sh EXAMPLES
-The following example is typical NAT-PT configuration.
-IPv6 packets which has the prefix
+The following example is typical NAT-PT configuration.  IPv6 packets
+which has the prefix
 .Em 3ffe:ffff:ffff:ffff::/96
 are translated into IPv4 packet.
 Source address of the translated IPv4 packets are set to
