@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.175 2002/10/29 09:59:36 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.176 2002/11/05 03:48:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -115,7 +115,7 @@ static int in6_ifattach_loopback __P((struct ifnet *));
 
 #define EUI64_GBIT	0x01
 #define EUI64_UBIT	0x02
-#define EUI64_TO_IFID(in6)	do {(in6)->s6_addr[8] ^= EUI64_UBIT; } while (0)
+#define EUI64_TO_IFID(in6)	do {(in6)->s6_addr[8] ^= EUI64_UBIT; } while (/*CONSTCOND*/ 0)
 #define EUI64_GROUP(in6)	((in6)->s6_addr[8] & EUI64_GBIT)
 #define EUI64_INDIVIDUAL(in6)	(!EUI64_GROUP(in6))
 #define EUI64_LOCAL(in6)	((in6)->s6_addr[8] & EUI64_UBIT)

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.h,v 1.10 2002/06/09 14:43:59 itojun Exp $	*/
+/*	$KAME: ip6_fw.h,v 1.11 2002/11/05 03:48:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -111,12 +111,12 @@ struct ip6_fw {
 #define IPV6_FW_SETNSRCP(rule, n)		do {				\
 					  (rule)->fw_nports &= ~0x0f;	\
 					  (rule)->fw_nports |= (n);	\
-					} while (0)
+					} while (/*CONSTCOND*/ 0)
 #define IPV6_FW_GETNDSTP(rule)		((rule)->fw_nports >> 4)
 #define IPV6_FW_SETNDSTP(rule, n)		do {				\
 					  (rule)->fw_nports &= ~0xf0;	\
 					  (rule)->fw_nports |= (n) << 4;\
-					} while (0)
+					} while (/*CONSTCOND*/ 0)
 
 #define fw_divert_port	fw_un.fu_divert_port
 #define fw_skipto_rule	fw_un.fu_skipto_rule

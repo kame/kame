@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.63 2002/10/27 04:26:52 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.64 2002/11/05 03:48:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -375,7 +375,7 @@ extern int ip6_ipsec_ecn;
 extern int ip6_esp_randpad;
 #endif
 
-#define ipseclog(x)	do { if (ipsec_debug) log x; } while (0)
+#define ipseclog(x)	do { if (ipsec_debug) log x; } while (/*CONSTCOND*/ 0)
 
 extern int ipsec_pcbconn __P((struct inpcbpolicy *));
 extern int ipsec_pcbdisconn __P((struct inpcbpolicy *));

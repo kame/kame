@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.178 2002/10/25 05:11:05 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.179 2002/11/05 03:48:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -220,7 +220,7 @@ static void mip6_update_nonce_nodekey(void *);
 			printf("%s", (m));	\
 			ipsec_hexdump((caddr_t)(a),(l)); \
 			printf("\n");		\
-		} while (0)
+		} while (/*CONSTCOND*/ 0)
 #endif
 #if defined(IPSEC) && !defined(__OpenBSD__)
 struct ipsecrequest *mip6_getipsecrequest __P((struct sockaddr_in6 *,

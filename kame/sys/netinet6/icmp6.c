@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.328 2002/11/01 10:10:09 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.329 2002/11/05 03:48:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3400,7 +3400,7 @@ icmp6_ctloutput(op, so, level, optname, mp)
 			(vvp)->tv_sec--;				\
 			(vvp)->tv_usec += 1000000;			\
 		}							\
-	} while (0)
+	} while (/*CONSTCOND*/ 0)
 #endif
 
 /*

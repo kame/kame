@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.37 2002/11/01 11:09:50 keiichi Exp $	*/
+/*	$KAME: ip6.h,v 1.38 2002/11/05 03:48:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -495,7 +495,7 @@ do {									\
 		return ret;						\
 	}								\
     }									\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #ifdef PULLDOWN_STAT
 #define IP6_EXTHDR_STAT(x)	x
@@ -531,7 +531,7 @@ do {									\
 			(m) = NULL;					\
 		}							\
 	}								\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define IP6_EXTHDR_GET0(val, typ, m, off, len) \
 do {									\
@@ -550,7 +550,7 @@ do {									\
 			(m) = NULL;					\
 		}							\
 	}								\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 #endif /*_KERNEL*/
 
 #endif /* not _NETINET_IP6_H_ */

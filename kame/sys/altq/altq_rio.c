@@ -1,4 +1,4 @@
-/*	$KAME: altq_rio.c,v 1.10 2002/09/25 11:41:20 itojun Exp $	*/
+/*	$KAME: altq_rio.c,v 1.11 2002/11/05 03:48:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998-2002
@@ -365,7 +365,7 @@ rioioctl(dev, cmd, addr, flag, p)
 				q_stats->q_params[i].th_max
 					= rp->rio_precstate[i].th_max;
 			}
-		} while (0);
+		} while (/*CONSTCOND*/ 0);
 		break;
 
 	case RIO_CONFIG:
@@ -414,7 +414,7 @@ rioioctl(dev, cmd, addr, flag, p)
 				fc->q_params[i].th_max =
 					rqp->rq_rio->rio_precstate[i].th_max;
 			}
-		} while (0);
+		} while (/*CONSTCOND*/ 0);
 		break;
 
 	case RIO_SETDEFAULTS:
@@ -425,7 +425,7 @@ rioioctl(dev, cmd, addr, flag, p)
 			rp = (struct redparams *)addr;
 			for (i = 0; i < RIO_NDROPPREC; i++)
 				default_rio_params[i] = rp[i];
-		} while (0);
+		} while (/*CONSTCOND*/ 0);
 		break;
 
 	default:
@@ -649,7 +649,7 @@ dscp2index(u_int8_t dscp)
  * use m_pkthdr.rcvif to pass this info.
  */
 #define	RIOM_SET_PRECINDEX(m, idx)	\
-	do { (m)->m_pkthdr.rcvif = (struct ifnet *)((long)(idx)); } while (0)
+	do { (m)->m_pkthdr.rcvif = (struct ifnet *)((long)(idx)); } while (/*CONSTCOND*/ 0)
 #define	RIOM_GET_PRECINDEX(m)	\
 	({ long idx; idx = (long)((m)->m_pkthdr.rcvif); \
 	(m)->m_pkthdr.rcvif = NULL; idx; })

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_fw.c,v 1.31 2002/09/11 02:34:17 itojun Exp $	*/
+/*	$KAME: ip6_fw.c,v 1.32 2002/11/05 03:48:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998, 1999, 2000 and 2001 WIDE Project.
@@ -154,7 +154,7 @@ SYSCTL_INT(_net_inet6_ip6_fw, OID_AUTO, verbose_limit, CTLFLAG_RW, &fw6_verbose_
 #define dprintf(a)	do {						\
 				if (fw6_debug)				\
 					printf a;			\
-			} while (0)
+			} while (/*CONSTCOND*/ 0)
 #define SNPARGS(buf, len) buf + len, sizeof(buf) > len ? sizeof(buf) - len : 0
 
 static int	add_entry6 __P((struct ip6_fw_head *chainptr, struct ip6_fw *frwl));
@@ -648,7 +648,7 @@ ip6_fw_chk(struct ip6_hdr **pip6,
 				    goto dropit;			\
 			    }						\
 			    *pip6 = ip6 = mtod(*m, struct ip6_hdr *);	\
-			} while (0)
+			} while (/*CONSTCOND*/ 0)
 
 		/* Protocol specific checks */
 		switch (nxt) {

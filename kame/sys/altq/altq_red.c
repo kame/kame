@@ -1,4 +1,4 @@
-/*	$KAME: altq_red.c,v 1.11 2002/09/25 11:41:19 itojun Exp $	*/
+/*	$KAME: altq_red.c,v 1.12 2002/11/05 03:48:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -402,7 +402,7 @@ redioctl(dev, cmd, addr, flag, p)
 #ifdef ALTQ_FLOWVALVE
 			}
 #endif /* ALTQ_FLOWVALVE */
-		} while (0);
+		} while (/*CONSTCOND*/ 0);
 		break;
 
 	case RED_CONFIG:
@@ -451,7 +451,7 @@ redioctl(dev, cmd, addr, flag, p)
 			fc->red_thmin = rqp->rq_red->red_thmin;
 			fc->red_thmax = rqp->rq_red->red_thmax;
 
-		} while (0);
+		} while (/*CONSTCOND*/ 0);
 		break;
 
 	case RED_SETDEFAULTS:
@@ -463,7 +463,7 @@ redioctl(dev, cmd, addr, flag, p)
 			default_th_min = rp->th_min;
 			default_th_max = rp->th_max;
 			default_inv_pmax = rp->inv_pmax;
-		} while (0);
+		} while (/*CONSTCOND*/ 0);
 		break;
 		
 	default:

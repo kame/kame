@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.85 2002/10/10 03:04:00 suz Exp $	*/
+/*	$KAME: in6_var.h,v 1.86 2002/11/05 03:48:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -481,7 +481,7 @@ extern struct icmp6stat icmp6stat;
 do {								\
 	if (ifp)						\
 		((struct in6_ifextra *)((ifp)->if_afdata[AF_INET6]))->in6_ifstat->tag++; \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 extern struct ifqueue ip6intrq;		/* IP6 packet input queue */
 extern struct in6_addr zeroin6_addr;
@@ -511,7 +511,7 @@ do {									\
 			break;						\
 	}								\
 	(ia) = (struct in6_ifaddr *)ifa;				\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #else
 
@@ -527,7 +527,7 @@ do {									\
 			break;						\
 	}								\
 	(ia) = (struct in6_ifaddr *)ifa;				\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 #endif
 
 #endif /* _KERNEL */
@@ -652,7 +652,7 @@ do {								\
 		     !SA6_ARE_ADDR_EQUAL(&(in6m)->in6m_sa, (addr));	\
 		     (in6m) = in6m->in6m_entry.le_next)		\
 			continue;				\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 /*
  * Macro to step through all of the in6_multi records, one at a time.
@@ -676,7 +676,7 @@ do {									\
 				break;					\
 			}						\
 		}							\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define IN6_FIRST_MULTI(step, in6m)		\
 /* struct in6_multistep step; */		\
@@ -685,7 +685,7 @@ do {						\
 	(step).i_ia = in6_ifaddr;		\
 	(step).i_in6m = NULL;			\
 	IN6_NEXT_MULTI((step), (in6m));		\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #endif /* not FreeBSD3 */
 

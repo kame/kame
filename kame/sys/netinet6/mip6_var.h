@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.69 2002/11/01 10:10:09 keiichi Exp $	*/
+/*	$KAME: mip6_var.h,v 1.70 2002/11/05 03:48:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -45,11 +45,11 @@
 #define SET_NETVAL_S(p, v)	do {					\
 					u_int16_t s = htons(v);		\
 					bcopy(&s, (p), sizeof(s));	\
-				} while (0)
+				} while (/*CONSTCOND*/ 0)
 #define SET_NETVAL_L(p, v)	do {					\
 					u_int32_t s = htonl(v);		\
 					bcopy(&s, (p), sizeof(s));	\
-				} while (0)
+				} while (/*CONSTCOND*/ 0)
 
 #define MIP6_COOKIE_MAX_LIFE	240
 #define MIP6_COOKIE_SIZE	8
@@ -651,7 +651,7 @@ int mip6_dad_duplicated			__P((struct ifaddr *));
 int mip6_dad_error			__P((struct ifaddr *, int));
 struct ifaddr *mip6_dad_find		__P((struct in6_addr *, struct ifnet *));
 
-#define mip6log(arg) do { if (mip6_config.mcfg_debug) log arg;} while (0)
+#define mip6log(arg) do { if (mip6_config.mcfg_debug) log arg;} while (/*CONSTCOND*/ 0)
 void mip6_ha_print __P((struct mip6_ha *));
 
 int mip6_setpktaddrs __P((struct mbuf *));

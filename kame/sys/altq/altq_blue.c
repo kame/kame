@@ -1,4 +1,4 @@
-/*	$KAME: altq_blue.c,v 1.9 2002/04/03 05:38:50 kjc Exp $	*/
+/*	$KAME: altq_blue.c,v 1.10 2002/11/05 03:48:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -276,7 +276,7 @@ blueioctl(dev, cmd, addr, flag, p)
 			q_stats->drop_unforced = rp->blue_stats.drop_unforced;
 			q_stats->marked_packets = rp->blue_stats.marked_packets;
 
-		} while (0);
+		} while (/*CONSTCOND*/ 0);
 		break;
 
 	case BLUE_CONFIG:
@@ -305,7 +305,7 @@ blueioctl(dev, cmd, addr, flag, p)
 				  rqp->rq_blue->blue_pkttime,
 				  rqp->rq_blue->blue_max_pmark,
 				  rqp->rq_blue->blue_hold_time);
-		} while (0);
+		} while (/*CONSTCOND*/ 0);
 		break;
 
 	default:

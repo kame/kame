@@ -1,4 +1,4 @@
-/*	$KAME: altq_var.h,v 1.10 2002/05/31 06:04:42 kjc Exp $	*/
+/*	$KAME: altq_var.h,v 1.11 2002/11/05 03:48:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998-2002
@@ -198,10 +198,10 @@ typedef u_long ioctlcmd_t;
 struct callout {
 	struct timeout	c_to;
 };
-#define	CALLOUT_INIT(c)		do { bzero((c), sizeof(*(c))); } while (0)
+#define	CALLOUT_INIT(c)		do { bzero((c), sizeof(*(c))); } while (/*CONSTCOND*/ 0)
 #define	CALLOUT_RESET(c,t,f,a)	do { if (!timeout_initialized(&(c)->c_to))  \
 					 timeout_set(&(c)->c_to, (f), (a)); \
-				     timeout_add(&(c)->c_to, (t)); } while (0)
+				     timeout_add(&(c)->c_to, (t)); } while (/*CONSTCOND*/ 0)
 #define	CALLOUT_STOP(c)		timeout_del(&(c)->c_to)
 #define	CALLOUT_INITIALIZER	{ { { NULL }, NULL, NULL, 0, 0 } }
 #else
@@ -211,10 +211,10 @@ struct callout {
 	void		*c_arg;			/* function argument */
 	void		(*c_func)(void *);	/* functiuon to call */
 };
-#define	CALLOUT_INIT(c)		do { bzero((c), sizeof(*(c))); } while (0)
+#define	CALLOUT_INIT(c)		do { bzero((c), sizeof(*(c))); } while (/*CONSTCOND*/ 0)
 #define	CALLOUT_RESET(c,t,f,a)	do {	(c)->c_arg = (a);	\
 					(c)->c_func = (f);	\
-					timeout((f),(a),(t)); } while (0)
+					timeout((f),(a),(t)); } while (/*CONSTCOND*/ 0)
 #define	CALLOUT_STOP(c)		untimeout((c)->c_func,(c)->c_arg)
 #define	CALLOUT_INITIALIZER	{ NULL, NULL }
 #endif

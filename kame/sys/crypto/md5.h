@@ -1,4 +1,4 @@
-/*	$KAME: md5.h,v 1.4 2000/03/27 04:36:22 sumikawa Exp $	*/
+/*	$KAME: md5.h,v 1.5 2002/11/05 03:48:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -70,6 +70,6 @@ extern void md5_result __P((u_int8_t *, md5_ctxt *));
 do {				\
 	md5_pad((y));		\
 	md5_result((x), (y));	\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #endif /* ! _NETINET6_MD5_H_*/

@@ -94,7 +94,7 @@ static int in_copy_msf_source_list(struct in_addr_slist *,
 	}								\
 	LIST_INIT((iasl)->head);					\
 	(iasl)->numsrc = 0;						\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define	INM_SOURCE_LIST(mode)						\
 	(((mode) == MCAST_INCLUDE) ? inm->inm_source->ims_in		\

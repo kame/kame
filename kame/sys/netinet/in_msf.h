@@ -1,4 +1,4 @@
-/* $KAME: in_msf.h,v 1.6 2002/11/04 06:26:36 suz Exp $	*/
+/* $KAME: in_msf.h,v 1.7 2002/11/05 03:48:31 itojun Exp $	*/
 /*
  * Copyright (C) 1998 WIDE Project.
  * All rights reserved.
@@ -186,7 +186,7 @@ struct in_multi_source {
 	LIST_INIT((msf)->msf_blkhead);				\
 	(msf)->msf_blknumsrc = 0;				\
 	(msf)->msf_grpjoin = 0;					\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define	IMO_MSF_FREE(msf) {					\
 	if ((msf)->msf_head != NULL)				\

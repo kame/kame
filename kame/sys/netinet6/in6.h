@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.134 2002/10/17 14:14:35 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.135 2002/11/05 03:48:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -260,7 +260,7 @@ extern const struct in6_addr in6addr_linklocal_allv2routers;
 #define sa6_copy_addr(s, d) do { \
 	(d)->sin6_addr = (s)->sin6_addr; \
 	(d)->sin6_scope_id = (s)->sin6_scope_id; \
-	} while (0)
+	} while (/*CONSTCOND*/ 0)
 #endif
 
 /*

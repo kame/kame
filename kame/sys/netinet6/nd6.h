@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.97 2002/07/15 14:22:04 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.98 2002/11/05 03:48:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -337,7 +337,7 @@ extern struct nd_drhead nd_defrouter;
 extern struct nd_prhead nd_prefix;
 extern int nd6_debug;
 
-#define nd6log(x)	do { if (nd6_debug) log x; } while (0)
+#define nd6log(x)	do { if (nd6_debug) log x; } while (/*CONSTCOND*/ 0)
 
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
 extern struct callout nd6_timer_ch;

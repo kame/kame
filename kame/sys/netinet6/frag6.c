@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.46 2002/09/25 11:41:23 itojun Exp $	*/
+/*	$KAME: frag6.c,v 1.47 2002/11/05 03:48:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -137,14 +137,14 @@ do {									\
 		printf("%s:%d: ip6q already locked\n", __FILE__, __LINE__); \
 		panic("ip6q_lock");					\
 	}								\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 #define	IP6Q_LOCK_CHECK()						\
 do {									\
 	if (ip6q_locked == 0) {						\
 		printf("%s:%d: ip6q lock not held\n", __FILE__, __LINE__); \
 		panic("ip6q lock check");				\
 	}								\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 #else
 #define	IP6Q_LOCK()		(void) ip6q_lock_try()
 #define	IP6Q_LOCK_CHECK()	/* nothing */

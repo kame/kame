@@ -1,4 +1,4 @@
-/*	$KAME: altq_jobs.h,v 1.4 2002/10/25 07:42:33 kjc Exp $	*/
+/*	$KAME: altq_jobs.h,v 1.5 2002/11/05 03:48:30 itojun Exp $	*/
 /*
  * Copyright (c) 2001, Rector and Visitors of the University of 
  * Virginia.
@@ -118,12 +118,12 @@ typedef struct _tsentry {
 #define PKTCNTR_SUB(cntr, len) do {                                     \
         (cntr)->packets--;                                              \
         (cntr)->bytes -= len;                                           \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define PKTCNTR_RESET(cntr) do {                                        \
         (cntr)->packets = 0;                                            \
         (cntr)->bytes = 0;                                              \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 struct jobs_interface {
 	char	jobs_ifname[IFNAMSIZ];	/* interface name (e.g., fxp0) */

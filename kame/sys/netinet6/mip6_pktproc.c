@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.78 2002/11/01 11:09:51 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.79 2002/11/05 03:48:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1459,7 +1459,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 			printf("%s", (m));	\
 			ipsec_hexdump((caddr_t)(a),(l)); \
 			printf("\n");		\
-		} while (0)
+		} while (/*CONSTCOND*/ 0)
 #endif
 
 	*pktopt_mobility = NULL;

@@ -1,4 +1,4 @@
-/*	$KAME: radix_art.h,v 1.4 2001/07/23 12:32:08 itojun Exp $	*/
+/*	$KAME: radix_art.h,v 1.5 2002/11/05 03:48:31 itojun Exp $	*/
 /*	$NetBSD: radix.h,v 1.10 2000/11/06 11:07:37 itojun Exp $	*/
 
 /*
@@ -110,19 +110,19 @@ typedef	u_int16_t artidx_t;	/* must hold 2 ^ (ART_BITLEN + 1) */
 #define art_count(t)	((u_long)art_get((t), ART_COUNTIDX))
 
 #define art_setradix(t, v, n) \
-	do { (t)->art_table[(v)] = (n); } while (0)
+	do { (t)->art_table[(v)] = (n); } while (/*CONSTCOND*/ 0)
 #define art_settable(t, v, n) \
 	do {								\
 		(t)->art_table[(v)] = (void *)((u_long)(n) | 1);	\
-	} while (0)
+	} while (/*CONSTCOND*/ 0)
 #define art_inccount(t) \
 	do {								\
 		(t)->art_table[ART_COUNTIDX] = (void *)(art_count((t)) + 1); \
-	} while (0)
+	} while (/*CONSTCOND*/ 0)
 #define art_deccount(t) \
 	do {								\
 		(t)->art_table[ART_COUNTIDX] = (void *)(art_count((t)) - 1); \
-	} while (0)
+	} while (/*CONSTCOND*/ 0)
 
 #define art_maxindex(t)	(2 << art_bitlen((t)))
 #define art_leaf(t, v)	((v) >= (1 << art_bitlen((t))) && v < art_maxindex((t)))

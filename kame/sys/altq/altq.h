@@ -1,4 +1,4 @@
-/*	$KAME: altq.h,v 1.8 2002/10/24 09:17:52 suz Exp $	*/
+/*	$KAME: altq.h,v 1.9 2002/11/05 03:48:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998-2002
@@ -149,7 +149,7 @@ struct pktcntr {
 };
 
 #define	PKTCNTR_ADD(cntr, len)	\
-	do { (cntr)->packets++; (cntr)->bytes += len; } while (0)
+	do { (cntr)->packets++; (cntr)->bytes += len; } while (/*CONSTCOND*/ 0)
 
 /*
  * altq related ioctls

@@ -1,4 +1,4 @@
-/*	$KAME: altq_fifoq.c,v 1.8 2002/04/03 05:38:50 kjc Exp $	*/
+/*	$KAME: altq_fifoq.c,v 1.9 2002/11/05 03:48:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997-2002
@@ -226,7 +226,7 @@ fifoqioctl(dev, cmd, addr, flag, p)
 			q_stats->xmit_cnt	= q->q_stats.xmit_cnt;
 			q_stats->drop_cnt 	= q->q_stats.drop_cnt;
 			q_stats->period   	= q->q_stats.period;
-		} while (0);
+		} while (/*CONSTCOND*/ 0);
 		break;
 
 	case FIFOQ_CONFIG:
@@ -245,7 +245,7 @@ fifoqioctl(dev, cmd, addr, flag, p)
 				limit = 0;
 			q->q_limit = limit;
 			fc->fifoq_limit = limit;
-		} while (0);
+		} while (/*CONSTCOND*/ 0);
 		break;
 
 	default:

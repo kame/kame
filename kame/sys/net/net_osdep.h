@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.73 2002/09/25 11:41:21 itojun Exp $	*/
+/*	$KAME: net_osdep.h,v 1.74 2002/11/05 03:48:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -346,7 +346,7 @@ extern const char *if_name __P((struct ifnet *));
 
 /* sys/net/if.h */
 #ifndef __NetBSD__
-#define IFAREF(ifa)	do { ++(ifa)->ifa_refcnt; } while (0)
+#define IFAREF(ifa)	do { ++(ifa)->ifa_refcnt; } while (/*CONSTCOND*/ 0)
 #endif
 
 #if defined(__bsdi__) || defined(__FreeBSD__) || defined(__OpenBSD__)

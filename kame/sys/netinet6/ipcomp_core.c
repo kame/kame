@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_core.c,v 1.26 2002/03/14 05:18:50 itojun Exp $	*/
+/*	$KAME: ipcomp_core.c,v 1.27 2002/11/05 03:48:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -168,7 +168,7 @@ do { \
 								\
 	zs.next_out = mtod(n, u_int8_t *);			\
 	zs.avail_out = n->m_len;				\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 	for (mprev = m; mprev && mprev->m_next != md; mprev = mprev->m_next)
 		;

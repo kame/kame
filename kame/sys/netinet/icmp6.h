@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.78 2002/11/01 10:10:08 keiichi Exp $	*/
+/*	$KAME: icmp6.h,v 1.79 2002/11/05 03:48:31 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -712,7 +712,7 @@ do {								\
 	p = (u_char *)filterp;					\
 	for (i = 0; i < sizeof(struct icmp6_filter); i++)	\
 		p[i] = 0xff;					\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 #define	ICMP6_FILTER_SETBLOCKALL(filterp) \
 	bzero(filterp, sizeof(struct icmp6_filter))
 #else /* _KERNEL */
@@ -920,7 +920,7 @@ void	icmp6_mtudisc_callback_register __P((void (*)(struct in6_addr *)));
 do {								\
 	if (ifp)						\
 		((struct in6_ifextra *)((ifp)->if_afdata[AF_INET6]))->icmp6_ifstat->tag++; \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define icmp6_ifoutstat_inc(ifp, type, code) \
 do { \
@@ -972,7 +972,7 @@ do { \
 			 icmp6_ifstat_inc(ifp, ifs6_out_redirect); \
 			 break; \
 		} \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 extern int	icmp6_rediraccept;	/* accept/process redirects */
 extern int	icmp6_redirtimeout;	/* cache time for redirect routes */

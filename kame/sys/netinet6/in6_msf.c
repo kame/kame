@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.10 2002/10/22 01:58:06 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.11 2002/11/05 03:48:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -123,7 +123,7 @@
 	}								\
 	LIST_INIT((iasl)->head);					\
 	(iasl)->numsrc = 0;						\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define	IN6M_SOURCE_LIST(mode)						\
 	(((mode) == MCAST_INCLUDE) ? in6m->in6m_source->i6ms_in		\

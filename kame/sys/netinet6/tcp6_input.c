@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.60 2002/09/11 02:34:18 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.61 2002/11/05 03:48:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -166,7 +166,7 @@ static int  tcp6_mss_round __P((int));
 do { \
 	if (t6p && t6p->t_in6pcb && t6p->t_in6pcb->in6p_route.ro_rt) \
 		nd6_nud_hint(t6p->t_in6pcb->in6p_route.ro_rt, NULL, 0); \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 /*
  * TCP6 SYN caching information
@@ -198,7 +198,7 @@ do {									\
 	}								\
 	(scp)->sch_length--;						\
 	syn_cache_count6--;						\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #if defined(__FreeBSD__) || defined(__bsdi__)
 #define sb_notify(x)	((x)->sb_flags & SB_NOTIFY)

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.83 2002/10/10 06:19:58 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.84 2002/11/05 03:48:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -217,7 +217,7 @@ static int pim6;
 	if (rt == NULL) { \
 		mrt6stat.mrt6s_mfc_misses++; \
 	} \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 /*
  * Macros to compute elapsed time efficiently
@@ -239,7 +239,7 @@ static int pim6;
 			  delta += (1000000 * xxs); \
 	       } \
 	    } \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 #define TV_LT(a, b) (((a).tv_usec < (b).tv_usec && \
 	      (a).tv_sec <= (b).tv_sec) || (a).tv_sec < (b).tv_sec)
@@ -1484,7 +1484,7 @@ ip6_mdq(m, ifp, rt)
 		    register_send((ip6), (mifp), (m), (s), (d));\
 		else						\
 		    phyint_send((ip6), (mifp), (m), (s), (d));	\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 	/*
 	 * Don't forward if it didn't arrive from the parent mif

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.346 2002/11/04 07:10:09 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.347 2002/11/05 03:48:32 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -340,7 +340,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		if (error)						\
 			goto freehdrs;					\
 	}								\
-    } while (0)
+    } while (/*CONSTCOND*/ 0)
 
 	bzero(&exthdrs, sizeof(exthdrs));
 
@@ -694,7 +694,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 		(mp)->m_next = (m);\
 		(mp) = (m);\
 	}\
-    } while (0)
+    } while (/*CONSTCOND*/ 0)
 		/*
 		 * result: IPv6 hbh dest1 rthdr dest2 payload
 		 * m will point to IPv6 header.  mprev will point to the
@@ -2094,7 +2094,7 @@ do { \
 		in6p->in6p_flags |= (bit); \
 	else \
 		in6p->in6p_flags &= ~(bit); \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 #define OPTSET2292(bit) \
 do { \
 	in6p->in6p_flags |= IN6P_RFC2292; \
@@ -2102,7 +2102,7 @@ do { \
 		in6p->in6p_flags |= (bit); \
 	else \
 		in6p->in6p_flags &= ~(bit); \
-} while (0)
+} while (/*CONSTCOND*/ 0)
 #define OPTBIT(bit) (in6p->in6p_flags & (bit) ? 1 : 0)
 
 				case IPV6_RECVPKTINFO:
@@ -3448,7 +3448,7 @@ do {\
 			goto bad;\
 		bcopy(src->type, dst->type, hlen);\
 	}\
-} while (0)
+} while (/*CONSTCOND*/ 0)
 
 struct ip6_pktopts *
 ip6_copypktopts(src, canwait)
