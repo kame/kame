@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.32 2001/01/31 09:31:42 jinmei Exp $	*/
+/*	$KAME: net_osdep.h,v 1.33 2001/01/31 09:36:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -54,7 +54,11 @@
  *	FreeBSD[234]: delete all protocol-cloned routes underneath the route.
  *		      note that cloned routes from an interface direct route
  *		      still remain.
- *	NetBSD, OpenBSD: no side effects.
+ *	NetBSD: official release versions (the latest is 1.5 as of Jan. 2001)
+ *              have no side effects.  KAME for NetBSD has the same effects
+ *              as of BSDI.
+ *      OpenBSD: no side effects.
+ *
  * - privileged process
  *	NetBSD, FreeBSD 3
  *		struct proc *p;
