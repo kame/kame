@@ -1,35 +1,22 @@
-SRCDIR=	${.CURDIR}/../../kame/traceroute
+#	$NetBSD: Makefile,v 1.11 2000/04/13 07:53:29 itojun Exp $	
 
 PROG=	traceroute
-SRCS=	traceroute.c ifaddrlist.c savestr.c version.c
+MAN=	traceroute.8 
 
-DEFS =  -DHAVE_MALLOC_H=1 -DHAVE_SYS_SELECT_H=1 -DHAVE_SYS_SOCKIO_H=1 -DHAVE_STRERROR=1 -DHAVE_SETLINEBUF=1 -DHAVE_RAW_OPTIONS=1 -DHAVE_SOCKADDR_SA_LEN=1 -DIPSEC -DHAVE_GETIFADDRS -DHAVE_IFADDRS_H -DHAVE_FREEIFADDRS
-CFLAGS+=-I${SRCDIR} -O2
-CPPFLAGS+=${DEFS}
-# workaround for gnuc.h - should be revisited
-CPPFLAGS+=-I${SRCDIR}/lbl
+CPPFLAGS+=-DHAVE_MALLOC_H=1 -DHAVE_SYS_SELECT_H=1 -DHAVE_SYS_SOCKIO_H=1
+CPPFLAGS+=-DHAVE_STRERROR=1 -DHAVE_SETLINEBUF=1 -DHAVE_SOCKADDR_SA_LEN=1 
+CPPFLAGS+=-DHAVE_RAW_OPTIONS=1 -DHAVE_IFADDRS_H
 
-LDADD+= -L${.CURDIR}/../../lib/libipsec -L${.CURDIR}/../../lib/libipsec/obj \
-	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
-	-L/usr/local/v6/lib -lipsec -linet6
-DPADD+=	${.CURDIR}/../../lib/libipsec/libipsec.a \
-	${.CURDIR}/../../lib/libipsec/obj/libipsec.a \
-	/usr/local/v6/lib/libipsec.a
-DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
-	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
-	/usr/local/v6/lib/libinet6.a
+CPPFLAGS+=-DIPSEC
+LDADD+=	-lipsec
+DPADD+=	${LIBIPSEC}
 
-BINOWN=	root
+BINOWN= root
 BINMODE=4555
 
-MAN=	traceroute.8
+SRCS=	traceroute.c savestr.c ifaddrlist.c 
+SRCS+= version.c
 
-version.c: VERSION
-	@rm -f $@
-	sed -e 's/.*/char version[] = "&";/' $> > $@
-
-.PATH: ${SRCDIR}
+AWKS=	median.awk mean.awk 
 
 .include <bsd.prog.mk>
-
-CLEANFILES+=	version.c
