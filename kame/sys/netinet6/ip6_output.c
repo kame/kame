@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.356 2003/02/05 01:29:03 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.357 2003/02/07 09:34:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -272,7 +272,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #endif
 	struct rtentry *rt = NULL;
 	struct sockaddr_in6 *dst;
-	struct sockaddr_in6 *src_sa, *dst_sa, finaldst_sa;
+	struct sockaddr_in6 src_sa, dst_sa, finaldst_sa;
 	int error = 0;
 	struct in6_ifaddr *ia = NULL;
 	u_long mtu;
@@ -848,7 +848,7 @@ skip_ipsec2:;
 			 /* extract the final destination from the packet */
 			 if (ip6_getpktaddrs(m, NULL, &dst_sa))
 				 goto bad; /* XXX: impossible */
-			 finaldst_sa = *dst_sa;
+			 finaldst_sa = dst_sa;
 
 			 /*
 			  * construct a sockaddr_in6 form of the first hop.
@@ -920,7 +920,7 @@ skip_ipsec2:;
 		goto bad;
 	}
 	if (finaldst_sa.sin6_family == AF_UNSPEC)
-		finaldst_sa = *dst_sa;
+		finaldst_sa = dst_sa;
 
 	/* initialize cached route */
 	if (ro == 0) {
@@ -1080,7 +1080,7 @@ skip_ipsec2:;
 		clone = 1;
 #endif
 
-	if ((error = in6_selectroute(dst_sa, opt, im6o, ro,
+	if ((error = in6_selectroute(&dst_sa, opt, im6o, ro,
 				     &ifp, &rt, clone)) != 0) {
 		switch (error) {
 		case EHOSTUNREACH:
@@ -1099,7 +1099,7 @@ skip_ipsec2:;
 		 * If in6_selectroute() does not return a route entry,
 		 * dst may not have been updated.
 		 */
-		*dst = *dst_sa;	/* XXX */
+		*dst = dst_sa;	/* XXX */
 	}
 
 	/*
@@ -1127,23 +1127,23 @@ skip_ipsec2:;
 		origifp = ia->ia_ifp;
 	else
 		origifp = ifp;
-	if (in6_addr2zoneid(origifp, &src_sa->sin6_addr, &zone) ||
-	    zone != src_sa->sin6_scope_id) {
+	if (in6_addr2zoneid(origifp, &src_sa.sin6_addr, &zone) ||
+	    zone != src_sa.sin6_scope_id) {
 #ifdef SCOPEDEBUG		/* will be removed shortly */
 		printf("ip6 output: bad source scope %s%%%d for %s%%%d on %s\n",
-		    ip6_sprintf(&src_sa->sin6_addr),
-		    src_sa->sin6_scope_id,
-		    ip6_sprintf(&dst_sa->sin6_addr),
-		    dst_sa->sin6_scope_id, if_name(origifp));
+		    ip6_sprintf(&src_sa.sin6_addr),
+		    src_sa.sin6_scope_id,
+		    ip6_sprintf(&dst_sa.sin6_addr),
+		    dst_sa.sin6_scope_id, if_name(origifp));
 #endif
 		goto badscope;
 	}
-	if (in6_addr2zoneid(origifp, &dst_sa->sin6_addr, &zone) ||
-	    zone != dst_sa->sin6_scope_id) {
+	if (in6_addr2zoneid(origifp, &dst_sa.sin6_addr, &zone) ||
+	    zone != dst_sa.sin6_scope_id) {
 #ifdef SCOPEDEBUG		/* will be removed shortly */
 		printf("ip6 output: bad dst scope %s%%%d on %s\n",
-		    ip6_sprintf(&dst_sa->sin6_addr),
-		    dst_sa->sin6_scope_id, if_name(origifp));
+		    ip6_sprintf(&dst_sa.sin6_addr),
+		    dst_sa.sin6_scope_id, if_name(origifp));
 #endif
 		goto badscope;
 	}
@@ -1190,7 +1190,7 @@ skip_ipsec2:;
 			error = ENETUNREACH;
 			goto bad;
 		}
-		IN6_LOOKUP_MULTI(dst_sa, ifp, in6m);
+		IN6_LOOKUP_MULTI(&dst_sa, ifp, in6m);
 		if (in6m != NULL &&
 		   (im6o == NULL || im6o->im6o_multicast_loop)) {
 			/*
@@ -1543,7 +1543,7 @@ skip_ipsec2:;
 			m->m_data += max_linkhdr;
 			mhip6 = mtod(m, struct ip6_hdr *);
 			*mhip6 = *ip6;
-			if (!ip6_setpktaddrs(m, src_sa, dst_sa)) {
+			if (!ip6_setpktaddrs(m, &src_sa, &dst_sa)) {
 				error = ENOBUFS;
 				ip6stat.ip6s_odropped++;
 				goto sendorfree;

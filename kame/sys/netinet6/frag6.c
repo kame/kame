@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.47 2002/11/05 03:48:32 itojun Exp $	*/
+/*	$KAME: frag6.c,v 1.48 2003/02/07 09:34:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -232,7 +232,7 @@ frag6_input(mp, offp, proto)
 	struct ip6q *q6;
 	struct ip6asfrag *af6, *ip6af, *af6dwn;
 	struct in6_ifaddr *ia;
-	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct sockaddr_in6 src_sa, dst_sa;
 	int offset = *offp, nxt, i, next;
 	int first_frag = 0;
 	int fragoff, frgpartlen;	/* must be larger than u_int16_t */
@@ -307,8 +307,8 @@ frag6_input(mp, offp, proto)
 
 	for (q6 = ip6q.ip6q_next; q6 != &ip6q; q6 = q6->ip6q_next)
 		if (ip6f->ip6f_ident == q6->ip6q_ident &&
-		    SA6_ARE_ADDR_EQUAL(src_sa, &q6->ip6q_src) &&
-		    SA6_ARE_ADDR_EQUAL(dst_sa, &q6->ip6q_dst))
+		    SA6_ARE_ADDR_EQUAL(&src_sa, &q6->ip6q_src) &&
+		    SA6_ARE_ADDR_EQUAL(&dst_sa, &q6->ip6q_dst))
 			break;
 
 	if (q6 == &ip6q) {
@@ -345,8 +345,8 @@ frag6_input(mp, offp, proto)
 		q6->ip6q_ident	= ip6f->ip6f_ident;
 		q6->ip6q_arrive = 0; /* Is it used anywhere? */
 		q6->ip6q_ttl 	= IPV6_FRAGTTL;
-		q6->ip6q_src	= *src_sa;
-		q6->ip6q_dst	= *dst_sa;
+		q6->ip6q_src	= src_sa;
+		q6->ip6q_dst	= dst_sa;
 		q6->ip6q_unfrglen = -1;	/* The 1st fragment has not arrived. */
 
 		q6->ip6q_nfrag = 0;

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_icmp6.c,v 1.59 2002/11/29 12:31:56 keiichi Exp $	*/
+/*	$KAME: mip6_icmp6.c,v 1.60 2003/02/07 09:34:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -287,7 +287,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	struct mbuf *n;
 	struct ip6_hdr *ip6, *otip6, oip6, *nip6;
 	int otip6off, nxt;
-	struct sockaddr_in6 *dst_sa, oip6src_sa, oip6dst_sa;
+	struct sockaddr_in6 dst_sa, oip6src_sa, oip6dst_sa;
 	struct icmp6_hdr *icmp6, *nicmp6;
 	struct mip6_bc *mbc;
 	int error = 0;
@@ -412,7 +412,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 		/* continue. */
 		return (0);
 	}
-	if (!ip6_setpktaddrs(n, dst_sa, &oip6src_sa)) {
+	if (!ip6_setpktaddrs(n, &dst_sa, &oip6src_sa)) {
 		m_freem(n);
 		return (0);
 	}
@@ -424,7 +424,7 @@ mip6_icmp6_tunnel_input(m, off, icmp6len)
 	nip6->ip6_plen = htons(n->m_pkthdr.len - sizeof(struct ip6_hdr));
 	nip6->ip6_nxt = IPPROTO_ICMPV6;
 	nip6->ip6_hlim = ip6_defhlim;
-	nip6->ip6_src = dst_sa->sin6_addr;
+	nip6->ip6_src = dst_sa.sin6_addr;
 	in6_clearscope(&nip6->ip6_src);
 	nip6->ip6_dst = oip6src_sa.sin6_addr;
 	in6_clearscope(&nip6->ip6_dst);
@@ -566,7 +566,7 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	int icmp6len;
 {
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *sin6src, *sin6dst;
+	struct sockaddr_in6 sin6src;
 	struct dhaad_rep *hdrep;
 	u_int16_t hdrep_id;
 	struct mip6_ha *mha, *mha_prefered = NULL;
@@ -577,7 +577,7 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 	struct mip6_bu *mbu;
 
 	ip6 = mtod(m, struct ip6_hdr *);
-	if (ip6_getpktaddrs(m, &sin6src, &sin6dst)) {
+	if (ip6_getpktaddrs(m, &sin6src, NULL)) {
 		m_freem(m);
 		return (EINVAL);
 	}
@@ -652,7 +652,7 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 		 * how do we make the HA specified in the ip src field
 		 * as a most preferable one ?
 		 */
-		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, sin6src);
+		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, &sin6src);
 		if (mha) {
 			/*
 			 * if this home agent already exists in the list,
@@ -682,10 +682,10 @@ mip6_icmp6_dhaad_rep_input(m, off, icmp6len)
 			lladdr.sin6_len = sizeof(lladdr);
 			lladdr.sin6_family = AF_INET6;
 			mip6_icmp6_create_linklocal(&lladdr.sin6_addr,
-						    &sin6src->sin6_addr);
+						    &sin6src.sin6_addr);
 			in6_addr2zoneid(m->m_pkthdr.rcvif, &lladdr.sin6_addr,
 					&lladdr.sin6_scope_id); /* XXX */
-			mha = mip6_ha_create(&lladdr, sin6src,
+			mha = mip6_ha_create(&lladdr, &sin6src,
 					     ND_RA_FLAG_HOME_AGENT,
 					     0, MIP6_HA_DEFAULT_LIFETIME);
 			if (mha == NULL) {

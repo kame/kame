@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.105 2003/02/05 12:41:22 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.106 2003/02/07 09:34:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -98,7 +98,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 	struct ip6m_home_test_init *ip6mhi;
 	int ip6mhilen;
 {
-	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct sockaddr_in6 src_sa, dst_sa;
 	struct mbuf *m;
 	struct m_tag *n;
 	struct ip6aux *ip6a;
@@ -120,7 +120,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 			 "from host %s.\n",
 			 __FILE__, __LINE__,
 			 ip6mhilen,
-			 ip6_sprintf(&src_sa->sin6_addr)));
+			 ip6_sprintf(&src_sa.sin6_addr)));
 		/* discard */
 		m_freem(m0);
 		ip6stat.ip6s_toosmall++;
@@ -144,7 +144,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 
 	init_ip6pktopts(&opt);
 
-	m = mip6_create_ip6hdr(dst_sa, src_sa, IPPROTO_NONE, 0);
+	m = mip6_create_ip6hdr(&dst_sa, &src_sa, IPPROTO_NONE, 0);
 	if (m == NULL) {
 		mip6log((LOG_ERR,
 		    "%s:%d: creating ip6hdr failed.\n",
@@ -152,7 +152,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
  		goto free_ip6pktopts;
 	}
 
-	error = mip6_ip6mh_create(&opt.ip6po_mobility, dst_sa, src_sa,
+	error = mip6_ip6mh_create(&opt.ip6po_mobility, &dst_sa, &src_sa,
 	    ip6mhi->ip6mhi_cookie);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -226,7 +226,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 	struct ip6m_careof_test_init *ip6mci;
 	int ip6mcilen;
 {
-	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct sockaddr_in6 src_sa, dst_sa;
 	struct mbuf *m;
 	struct m_tag *n;
 	struct ip6aux *ip6a;
@@ -241,8 +241,8 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 		return (EINVAL);
 	}
 
-	if (IN6_IS_ADDR_UNSPECIFIED(&src_sa->sin6_addr) ||
-	    IN6_IS_ADDR_LOOPBACK(&src_sa->sin6_addr)) {
+	if (IN6_IS_ADDR_UNSPECIFIED(&src_sa.sin6_addr) ||
+	    IN6_IS_ADDR_LOOPBACK(&src_sa.sin6_addr)) {
 		m_freem(m0);
 		return (EINVAL);
 	}
@@ -254,7 +254,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 			 "from host %s.\n",
 			 __FILE__, __LINE__,
 			 ip6mcilen,
-			 ip6_sprintf(&src_sa->sin6_addr)));
+			 ip6_sprintf(&src_sa.sin6_addr)));
 		/* discard */
 		m_freem(m0);
 		ip6stat.ip6s_toosmall++;
@@ -278,7 +278,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 
 	init_ip6pktopts(&opt);
 
-	m = mip6_create_ip6hdr(dst_sa, src_sa, IPPROTO_NONE, 0);
+	m = mip6_create_ip6hdr(&dst_sa, &src_sa, IPPROTO_NONE, 0);
 	if (m == NULL) {
 		mip6log((LOG_ERR,
 		    "%s:%d: creating ip6hdr failed.\n",
@@ -286,7 +286,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
  		goto free_ip6pktopts;
 	}
 
-	error = mip6_ip6mc_create(&opt.ip6po_mobility, dst_sa, src_sa,
+	error = mip6_ip6mc_create(&opt.ip6po_mobility, &dst_sa, &src_sa,
 	    ip6mci->ip6mci_cookie);
 	if (error) {
 		mip6log((LOG_ERR,
@@ -361,7 +361,7 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 	struct ip6m_home_test *ip6mh;
 	int ip6mhlen;
 {
-	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct sockaddr_in6 src_sa, dst_sa;
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
 	int error = 0;
@@ -381,29 +381,29 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 			 "from host %s.\n",
 			 __FILE__, __LINE__,
 			 ip6mhlen,
-			 ip6_sprintf(&src_sa->sin6_addr)));
+			 ip6_sprintf(&src_sa.sin6_addr)));
 		/* discard */
 		m_freem(m);
 		ip6stat.ip6s_toosmall++;
 		return (EINVAL);
 	}
 
-	sc = hif_list_find_withhaddr(dst_sa);
+	sc = hif_list_find_withhaddr(&dst_sa);
 	if (sc == NULL) {
                 mip6log((LOG_NOTICE,
 		    "%s:%d: no related hif interface found with this HoT "
 		    "for %s.\n",
-		    __FILE__, __LINE__, ip6_sprintf(&dst_sa->sin6_addr)));
+		    __FILE__, __LINE__, ip6_sprintf(&dst_sa.sin6_addr)));
 		m_freem(m);
 		mip6stat.mip6s_nohif++;
                 return (EINVAL);
 	}
-	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, src_sa, dst_sa);
+	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &src_sa, &dst_sa);
 	if (mbu == NULL) {
 		mip6log((LOG_NOTICE,
 		    "%s:%d: no related binding update entry found with "
 		    "this HoT for %s.\n",
-		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
+		    __FILE__, __LINE__, ip6_sprintf(&src_sa.sin6_addr)));
 		m_freem(m);
 		mip6stat.mip6s_nobue++;
 		return (EINVAL);
@@ -414,7 +414,7 @@ mip6_ip6mh_input(m, ip6mh, ip6mhlen)
 	    sizeof(ip6mh->ip6mh_cookie)) != 0) {
 		mip6log((LOG_INFO,
 		    "%s:%d: home init cookie mismatch from %s.\n",
-		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
+		    __FILE__, __LINE__, ip6_sprintf(&src_sa.sin6_addr)));
 		m_freem(m);
 		mip6stat.mip6s_hinitcookie++;
 		return (EINVAL);
@@ -443,7 +443,7 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 	struct ip6m_careof_test *ip6mc;
 	int ip6mclen;
 {
-	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct sockaddr_in6 src_sa, dst_sa;
 	struct hif_softc *sc;
 	struct mip6_bu *mbu = NULL;
 	int error = 0;
@@ -456,8 +456,8 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 		return (EINVAL);
 	}
 
-	if (IN6_IS_ADDR_UNSPECIFIED(&src_sa->sin6_addr) ||
-	    IN6_IS_ADDR_LOOPBACK(&src_sa->sin6_addr)) {
+	if (IN6_IS_ADDR_UNSPECIFIED(&src_sa.sin6_addr) ||
+	    IN6_IS_ADDR_LOOPBACK(&src_sa.sin6_addr)) {
 		m_freem(m);
 		return (EINVAL);
 	}
@@ -469,7 +469,7 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 			 "from host %s.\n",
 			 __FILE__, __LINE__,
 			 ip6mclen,
-			 ip6_sprintf(&src_sa->sin6_addr)));
+			 ip6_sprintf(&src_sa.sin6_addr)));
 		/* discard */
 		m_freem(m);
 		ip6stat.ip6s_toosmall++;
@@ -483,8 +483,8 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 		for (mbu = LIST_FIRST(&sc->hif_bu_list);
 		     mbu;
 		     mbu = LIST_NEXT(mbu, mbu_entry)) {
-			if (SA6_ARE_ADDR_EQUAL(dst_sa, &mbu->mbu_coa) &&
-			    SA6_ARE_ADDR_EQUAL(src_sa, &mbu->mbu_paddr))
+			if (SA6_ARE_ADDR_EQUAL(&dst_sa, &mbu->mbu_coa) &&
+			    SA6_ARE_ADDR_EQUAL(&src_sa, &mbu->mbu_paddr))
 				break;
 		}
 	}
@@ -492,7 +492,7 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 		mip6log((LOG_NOTICE,
 		    "%s:%d: no related binding update entry found with "
 		    "this CoT for %s.\n",
-		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
+		    __FILE__, __LINE__, ip6_sprintf(&src_sa.sin6_addr)));
 		m_freem(m);
 		mip6stat.mip6s_nobue++;
 		return (EINVAL);
@@ -503,7 +503,7 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 	    sizeof(ip6mc->ip6mc_cookie)) != 0) {
 		mip6log((LOG_INFO,
 		    "%s:%d: careof init cookie mismatch from %s.\n",
-		    __FILE__, __LINE__, ip6_sprintf(&src_sa->sin6_addr)));
+		    __FILE__, __LINE__, ip6_sprintf(&src_sa.sin6_addr)));
 		m_freem(m);
 		mip6stat.mip6s_cinitcookie++;
 		return (EINVAL);
@@ -533,7 +533,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	int ip6mulen;
 {
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct sockaddr_in6 src_sa, dst_sa;
 	struct m_tag *n;
 	struct ip6aux *ip6a = NULL;
 	u_int8_t isprotected = 0;
@@ -573,7 +573,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		m_freem(m);
 		return (EINVAL);
 	}
-	bi.mbc_addr = *dst_sa;
+	bi.mbc_addr = dst_sa;
 
 	/* packet length check. */
 	if (ip6mulen < sizeof(struct ip6m_binding_update)) {
@@ -582,7 +582,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			 "from host %s.\n",
 			 __FILE__, __LINE__,
 			 ip6mulen,
-			 ip6_sprintf(&src_sa->sin6_addr)));
+			 ip6_sprintf(&src_sa.sin6_addr)));
 		/* discard */
 		m_freem(m);
 		ip6stat.ip6s_toosmall++;
@@ -596,7 +596,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		isprotected = 1;
 	}
 
-	bi.mbc_pcoa = *src_sa;
+	bi.mbc_pcoa = src_sa;
 	n = ip6_findaux(m);
 	if (n == NULL) {
 		m_freem(m);
@@ -629,7 +629,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
  accept_binding_update:
 
 	/* get home address. */
-	bi.mbc_phaddr = *src_sa;
+	bi.mbc_phaddr = src_sa;
 
 	if ((error = mip6_get_mobility_options((struct ip6_mobility *)ip6mu,
 					       sizeof(*ip6mu),
@@ -826,7 +826,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 	int ip6malen;
 {
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct sockaddr_in6 src_sa, dst_sa;
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
 	u_int16_t seqno;
@@ -865,7 +865,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 			 "from host %s.\n",
 			 __FILE__, __LINE__,
 			 ip6malen,
-			 ip6_sprintf(&src_sa->sin6_addr)));
+			 ip6_sprintf(&src_sa.sin6_addr)));
 		/* discard */
 		m_freem(m);
 		ip6stat.ip6s_toosmall++;
@@ -904,7 +904,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
          * check if the sequence number of the binding update sent ==
          * the sequence number of the binding ack received.
          */
-	sc = hif_list_find_withhaddr(dst_sa);
+	sc = hif_list_find_withhaddr(&dst_sa);
 	if (sc == NULL) {
                 /*
                  * if we receive a binding ack before sending binding
@@ -917,7 +917,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
 		m_freem(m);
                 return (EINVAL);
 	}
-	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, src_sa, dst_sa);
+	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &src_sa, &dst_sa);
 	if (mbu == NULL) {
 		mip6log((LOG_NOTICE,
                          "%s:%d: no matching binding update entry found.\n",
@@ -1832,7 +1832,7 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 	struct ip6m_binding_error *ip6me;
 	int ip6melen;
 {
-	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct sockaddr_in6 src_sa;
 	struct sockaddr_in6 hoa;
 	u_int32_t hoazone;
 	struct hif_softc *sc;
@@ -1841,8 +1841,8 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 
 	mip6stat.mip6s_be++;
 
-	/* get packet source and destination addrresses. */
-	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
+	/* get packet source and destination addresses. */
+	if (ip6_getpktaddrs(m, &src_sa, NULL)) {
 		/* must not happen. */
 		goto bad;
 	}
@@ -1853,7 +1853,7 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 		    "%s:%d: too short binding error (len = %d) "
 		    "from host %s.\n",
 		    __FILE__, __LINE__,
-		    ip6melen, ip6_sprintf(&src_sa->sin6_addr)));
+		    ip6melen, ip6_sprintf(&src_sa.sin6_addr)));
 		/* discard. */
 		ip6stat.ip6s_toosmall++;
 		goto bad;
@@ -1889,7 +1889,7 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 	case IP6ME_STATUS_NO_BINDING:
 	case IP6ME_STATUS_UNKNOWN_MH_TYPE:
 		mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
-		    src_sa, &hoa);
+		    &src_sa, &hoa);
 		if (mbu == NULL) {
 			/* we have no binding update entry for the CN. */
 			goto bad;
@@ -1901,7 +1901,7 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 		    "%s:%d: unknown BE status code (status = %u) "
 		    "from host %s.\n",
 		    __FILE__, __LINE__,
-		    ip6me->ip6me_status, ip6_sprintf(&src_sa->sin6_addr)));
+		    ip6me->ip6me_status, ip6_sprintf(&src_sa.sin6_addr)));
 		goto bad;
 		break;
 	}
@@ -1938,7 +1938,7 @@ mip6_ip6me_input(m, ip6me, ip6melen)
 		    "%s:%d: unknown BE status code (status = %u) "
 		    "from host %s.\n",
 		    __FILE__, __LINE__,
-		    ip6me->ip6me_status, ip6_sprintf(&src_sa->sin6_addr)));
+		    ip6me->ip6me_status, ip6_sprintf(&src_sa.sin6_addr)));
 
 		/* XXX what to do? */
 	}

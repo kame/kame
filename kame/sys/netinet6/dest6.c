@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.54 2003/01/22 00:34:07 suz Exp $	*/
+/*	$KAME: dest6.c,v 1.55 2003/02/07 09:34:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -93,7 +93,7 @@ dest6_input(mp, offp, proto)
 	u_int8_t *opt;
 #ifdef MIP6
 	struct m_tag *n;
-	struct sockaddr_in6 *src_sa, *dst_sa, home_sa;
+	struct sockaddr_in6 src_sa, home_sa;
 	struct ip6_opt_home_address *haopt = NULL;
 	struct ip6aux *ip6a = NULL;
 	struct ip6_hdr *ip6;
@@ -165,7 +165,7 @@ dest6_input(mp, offp, proto)
 
 			/* XXX check header ordering */
 
-			if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
+			if (ip6_getpktaddrs(m, &src_sa, NULL)) {
 				/* must not happen. */
 				goto bad;
 			}
@@ -204,7 +204,8 @@ dest6_input(mp, offp, proto)
 				 * cache entry for the home address
 				 * includes in this HAO.
 				 */
-				if (SA6_ARE_ADDR_EQUAL(&mbc->mbc_pcoa, src_sa))
+				if (SA6_ARE_ADDR_EQUAL(&mbc->mbc_pcoa,
+				    &src_sa))
 					verified = 1;
 			}
 			/*

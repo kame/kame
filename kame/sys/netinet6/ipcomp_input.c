@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_input.c,v 1.31 2002/09/11 02:40:49 itojun Exp $	*/
+/*	$KAME: ipcomp_input.c,v 1.32 2003/02/07 09:34:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -277,7 +277,7 @@ ipcomp6_input(mp, offp, proto)
 	struct mbuf *m, *md;
 	int off;
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct sockaddr_in6 src_sa, dst_sa;
 	struct ipcomp *ipcomp;
 	const struct ipcomp_algorithm *algo;
 	u_int16_t cpi;	/* host order */
@@ -309,7 +309,7 @@ ipcomp6_input(mp, offp, proto)
 	cpi = ntohs(ipcomp->comp_cpi);
 
 	if (cpi >= IPCOMP_CPI_NEGOTIATE_MIN) {
-		sav = key_allocsa(AF_INET6, (caddr_t)src_sa, (caddr_t)dst_sa,
+		sav = key_allocsa(AF_INET6, (caddr_t)&src_sa, (caddr_t)&dst_sa,
 				  IPPROTO_IPCOMP, htonl(cpi));
 		if (sav != NULL
 		 && (sav->state == SADB_SASTATE_MATURE

@@ -1,4 +1,4 @@
-/*	$KAME: esp_input.c,v 1.75 2003/01/20 01:01:18 itojun Exp $	*/
+/*	$KAME: esp_input.c,v 1.76 2003/02/07 09:34:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -564,7 +564,7 @@ esp6_input(mp, offp, proto)
 	struct mbuf *m = *mp;
 	int off = *offp;
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct sockaddr_in6 src_sa, dst_sa;
 	struct esp *esp;
 	struct esptail esptail;
 	u_int32_t spi;
@@ -610,7 +610,7 @@ esp6_input(mp, offp, proto)
 	/* find the sassoc. */
 	spi = esp->esp_spi;
 
-	if ((sav = key_allocsa(AF_INET6, (caddr_t)src_sa, (caddr_t)dst_sa,
+	if ((sav = key_allocsa(AF_INET6, (caddr_t)&src_sa, (caddr_t)&dst_sa,
 			       IPPROTO_ESP, spi)) == 0) {
 		ipseclog((LOG_WARNING,
 		    "IPv6 ESP input: no key association found for spi %u\n",
@@ -838,8 +838,8 @@ noreplaycheck:
 			ipsec6stat.in_inval++;
 			goto bad;
 		}
-		if (!key_checktunnelsanity(sav, AF_INET6, (caddr_t)src_sa,
-					   (caddr_t)dst_sa)) {
+		if (!key_checktunnelsanity(sav, AF_INET6, (caddr_t)&src_sa,
+					   (caddr_t)&dst_sa)) {
 			ipseclog((LOG_ERR, "ipsec tunnel address mismatch "
 			    "in IPv6 ESP input: %s %s\n",
 			    ipsec6_logpacketstr(ip6, spi),

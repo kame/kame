@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.101 2002/12/17 10:32:18 t-momose Exp $	*/
+/*	$KAME: in6_gif.c,v 1.102 2003/02/07 09:34:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -485,7 +485,7 @@ gif_validate6(m, sc, ifp)
 	struct gif_softc *sc;
 	struct ifnet *ifp;
 {
-	struct sockaddr_in6 *gsrc, *gdst, *psrc, *pdst;
+	struct sockaddr_in6 *gsrc, *gdst, psrc, pdst;
 
 	if (ip6_getpktaddrs((struct mbuf *)m, &psrc, &pdst))
 		return 0;
@@ -498,7 +498,8 @@ gif_validate6(m, sc, ifp)
 	 * packet.  We should compare the *source* address in our configuration
 	 * and the *destination* address of the packet, and vice versa.
 	 */
-	if (!SA6_ARE_ADDR_EQUAL(gsrc, pdst) || !SA6_ARE_ADDR_EQUAL(gdst, psrc))
+	if (!SA6_ARE_ADDR_EQUAL(gsrc, &pdst) ||
+	    !SA6_ARE_ADDR_EQUAL(gdst, &psrc))
 		return 0;
 
 	/* martian filters on outer source - done in ip6_input */
@@ -511,7 +512,7 @@ gif_validate6(m, sc, ifp)
 		bzero(&sin6, sizeof(sin6));
 		sin6.sin6_family = AF_INET6;
 		sin6.sin6_len = sizeof(struct sockaddr_in6);
-		sa6_copy_addr(psrc, &sin6);
+		sa6_copy_addr(&psrc, &sin6);
 #ifndef SCOPEDROUTING
 		sin6.sin6_scope_id = 0; /* XXX */
 #endif

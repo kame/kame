@@ -1,4 +1,4 @@
-/*	$KAME: route6.c,v 1.41 2003/01/21 06:33:04 itojun Exp $	*/
+/*	$KAME: route6.c,v 1.42 2003/02/07 09:34:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -311,7 +311,7 @@ ip6_rthdr2(m, ip6, rh2)
 	struct ip6_rthdr2 *rh2;
 {
 	int rh2_has_hoa;
-	struct sockaddr_in6 *src_sa, *dst_sa, next_sa;
+	struct sockaddr_in6 dst_sa, next_sa;
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
 	struct in6_addr *nextaddr, tmpaddr;
@@ -320,7 +320,7 @@ ip6_rthdr2(m, ip6, rh2)
 	rh2_has_hoa = 0;
 
 	/* get ip src and dst addrs. */
-	if (ip6_getpktaddrs(m, &src_sa, &dst_sa))
+	if (ip6_getpktaddrs(m, NULL, &dst_sa))
 		goto bad;
 
 	/*
@@ -369,7 +369,7 @@ ip6_rthdr2(m, ip6, rh2)
 				 * if segleft == 0, ip6_dst must be
 				 * one of our home addresses.
 				 */
-				if (!SA6_ARE_ADDR_EQUAL(dst_sa,
+				if (!SA6_ARE_ADDR_EQUAL(&dst_sa,
 							&mbu->mbu_haddr))
 					continue;
 

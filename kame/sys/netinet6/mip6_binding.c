@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.169 2003/02/05 10:23:33 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.170 2003/02/07 09:34:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1867,7 +1867,7 @@ mip6_process_br(m, opt)
 	u_int8_t *opt;
 {
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *sin6src, *sin6dst;
+	struct sockaddr_in6 sin6src, sin6dst;
 	struct ip6_opt_binding_request *br_opt;
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
@@ -1888,7 +1888,8 @@ mip6_process_br(m, opt)
 		return (0);
 	}
 
-	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, sin6src, sin6dst);
+	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
+	    &sin6src, &sin6dst);
 	if (mbu == NULL) {
 		/* XXX there is no BU for this peer.  create? */
 		return (0);
@@ -2494,7 +2495,7 @@ mip6_bu_encapcheck(m, off, proto, arg)
 	struct mip6_subnet *ms;
 	struct mip6_subnet_prefix *mspfx;
 	struct mip6_prefix *mpfx;
-	struct sockaddr_in6 *encap_src, *encap_dst;
+	struct sockaddr_in6 encap_src, encap_dst;
 	struct sockaddr_in6 *haaddr, *myaddr, *mycoa;
 
 	if (mbu == NULL) {
@@ -2521,9 +2522,9 @@ mip6_bu_encapcheck(m, off, proto, arg)
 	 * is, our home agent) to the CoA or the HoA the mobile node
 	 * has registered before.
 	 */
-	if (!SA6_ARE_ADDR_EQUAL(encap_src, haaddr) ||
-	    !(SA6_ARE_ADDR_EQUAL(encap_dst, mycoa) ||
-	      SA6_ARE_ADDR_EQUAL(encap_dst, myaddr))) {
+	if (!SA6_ARE_ADDR_EQUAL(&encap_src, haaddr) ||
+	    !(SA6_ARE_ADDR_EQUAL(&encap_dst, mycoa) ||
+	      SA6_ARE_ADDR_EQUAL(&encap_dst, myaddr))) {
 		return (0);
 	}
 
@@ -2592,7 +2593,7 @@ mip6_bc_encapcheck(m, off, proto, arg)
 {
 	struct ip6_hdr *ip6;
 	struct mip6_bc *mbc = (struct mip6_bc *)arg;
-	struct sockaddr_in6 *encap_src, *encap_dst;
+	struct sockaddr_in6 encap_src;
 	struct sockaddr_in6 *mnaddr;
 
 	if (mbc == NULL) {
@@ -2601,13 +2602,13 @@ mip6_bc_encapcheck(m, off, proto, arg)
 
 	ip6 = mtod(m, struct ip6_hdr*);
 	if (!ip6_findaux((struct mbuf *)m) ||
-	    ip6_getpktaddrs((struct mbuf *)m, &encap_src, &encap_dst))
+	    ip6_getpktaddrs((struct mbuf *)m, &encap_src, NULL))
 		return (0);
 
 	mnaddr = &mbc->mbc_pcoa;
 
 	/* check mn addr */
-	if (!SA6_ARE_ADDR_EQUAL(encap_src, mnaddr)) {
+	if (!SA6_ARE_ADDR_EQUAL(&encap_src, mnaddr)) {
 		return (0);
 	}
 
@@ -2818,7 +2819,7 @@ mip6_route_optimize(m)
 	struct in6_ifaddr *ia;
 	struct ip6aux *ip6a;
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *sin6src, *sin6dst;
+	struct sockaddr_in6 sin6src, sin6dst;
 	struct mip6_prefix *mpfx;
 	struct mip6_bu *mbu;
 	struct hif_softc *sc;
@@ -2833,19 +2834,20 @@ mip6_route_optimize(m)
 	if (ip6_getpktaddrs(m, &sin6src, &sin6dst))
 		return (EINVAL);
 
-	if (IN6_IS_ADDR_LINKLOCAL(&sin6src->sin6_addr) ||
-	    IN6_IS_ADDR_SITELOCAL(&sin6src->sin6_addr)) {	/* XXX */
+	if (IN6_IS_ADDR_LINKLOCAL(&sin6src.sin6_addr) ||
+	    IN6_IS_ADDR_SITELOCAL(&sin6src.sin6_addr)) {	/* XXX */
 		return (0);
 	}
 	/* Quick check */
-	if (IN6_IS_ADDR_LINKLOCAL(&sin6dst->sin6_addr) ||
-	    IN6_IS_ADDR_SITELOCAL(&sin6dst->sin6_addr) ||	/* XXX */
-	    IN6_IS_ADDR_MULTICAST(&sin6dst->sin6_addr)) {
+	if (IN6_IS_ADDR_LINKLOCAL(&sin6dst.sin6_addr) ||
+	    IN6_IS_ADDR_SITELOCAL(&sin6dst.sin6_addr) ||	/* XXX */
+	    IN6_IS_ADDR_MULTICAST(&sin6dst.sin6_addr)) {
 		return (0);
 	}
 
 	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
-		if (IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr, &sin6src->sin6_addr)) {
+		if (IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr,
+		    &sin6src.sin6_addr)) {
 			return (0);
 		}
 	}
@@ -2864,7 +2866,7 @@ mip6_route_optimize(m)
 	 */
 
 	/* check if we are home. */
-	sc = hif_list_find_withhaddr(sin6dst);
+	sc = hif_list_find_withhaddr(&sin6dst);
 	if (sc == NULL) {
 		/* this dst addr is not one of our home addresses. */
 		return (0);
@@ -2879,7 +2881,7 @@ mip6_route_optimize(m)
 	 * packet.
 	 */
 	mpfx = mip6_prefix_list_find_withhaddr(&mip6_prefix_list,
-					       sin6dst);
+					       &sin6dst);
 	if (mpfx == NULL) {
 		/*
 		 * no related prefix found.  this packet is
@@ -2894,15 +2896,14 @@ mip6_route_optimize(m)
 	 * peer sending this un-optimized packet.
 	 */
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
-					  sin6src,
-					  sin6dst);
+					  &sin6src, &sin6dst);
 	if (mbu == NULL) {
 		/*
 		 * if no binding update entry is found, this is a
 		 * first packet from the peer.  create a new binding
 		 * update entry for this peer.
 		 */
-		mbu = mip6_bu_create(sin6src,
+		mbu = mip6_bu_create(&sin6src,
 				     mpfx,
 				     &hif_coa,
 				     0, sc);

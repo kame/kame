@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.78 2002/10/27 04:26:51 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.79 2003/02/07 09:34:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -675,7 +675,7 @@ ah6_input(mp, offp, proto)
 	struct mbuf *m = *mp;
 	int off = *offp;
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct sockaddr_in6 src_sa, dst_sa;
 	struct ah *ah;
 	u_int32_t spi;
 	const struct ah_algorithm *algo;
@@ -715,7 +715,7 @@ ah6_input(mp, offp, proto)
 		goto fail;
 	}
 
-	if ((sav = key_allocsa(AF_INET6, (caddr_t)src_sa, (caddr_t)dst_sa,
+	if ((sav = key_allocsa(AF_INET6, (caddr_t)&src_sa, (caddr_t)&dst_sa,
 			       IPPROTO_AH, spi)) == 0) {
 		ipseclog((LOG_WARNING,
 		    "IPv6 AH input: no key association found for spi %u\n",
@@ -936,8 +936,8 @@ ah6_input(mp, offp, proto)
 			ipsec6stat.in_inval++;
 			goto fail;
 		}
-		if (!key_checktunnelsanity(sav, AF_INET6, (caddr_t)src_sa,
-					   (caddr_t)dst_sa)) {
+		if (!key_checktunnelsanity(sav, AF_INET6, (caddr_t)&src_sa,
+					   (caddr_t)&dst_sa)) {
 			ipseclog((LOG_NOTICE, "ipsec tunnel address mismatch "
 			    "in IPv6 AH input: %s %s\n",
 			    ipsec6_logpacketstr(ip6, spi),

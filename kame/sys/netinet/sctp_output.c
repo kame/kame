@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.17 2002/11/07 03:23:48 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.18 2003/02/07 09:34:37 jinmei Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c, v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -2994,7 +2994,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 			stc.site_scope = 1;
 			stc.ipv4_scope = 1;
 		} else if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
-			struct sockaddr_in6 *src, *dst;
+			struct sockaddr_in6 src;
 			/*
 			 * If the new destination is a LINK_LOCAL we must have
 			 * common both site and local scope. Don't set local
@@ -3005,7 +3005,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 			stc.local_scope = 0;
 			stc.site_scope = 1;
 			/* pull out the scope_id from the incoming packet */
-			if (ip6_getpktaddrs(in_initpkt, &src, &dst)) {
+			if (ip6_getpktaddrs(in_initpkt, src, NULL)) {
 				/* hmm... this is bad- can't get the scope! */
 #ifdef SCTP_DEBUG
 				if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
@@ -3014,8 +3014,8 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 #endif /* SCTP_DEBUG */
 				return;	/* FIX: ??? send op_err? */
 			}
-			sin6->sin6_scope_id = src->sin6_scope_id;
-			stc.scope_id = src->sin6_scope_id;
+			sin6->sin6_scope_id = src.sin6_scope_id;
+			stc.scope_id = src.sin6_scope_id;
 		} else if (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr)) {
 			/* If the new destination is SITE_LOCAL
 			 * then we must have site scope in common.
@@ -7506,7 +7506,7 @@ sctp6_send_abort(struct mbuf *m,
 	fsa6.sin6_addr = oip->ip6_src;
 
 	if (IN6_IS_ADDR_LINKLOCAL(&oip->ip6_src)) {
-		struct sockaddr_in6 *src, *dst;
+		struct sockaddr_in6 src, dst;
 		/* pull out the scope_id from the incoming packet */
 		if (ip6_getpktaddrs(m, &src, &dst)) {
 			/* hmm... this is bad- can't get the scope! */
@@ -7517,8 +7517,8 @@ sctp6_send_abort(struct mbuf *m,
 #endif /* SCTP_DEBUG */
 			return;	/* FIX: ??? send op_err? */
 		}
-		lsa6.sin6_scope_id = src->sin6_scope_id;
-		fsa6.sin6_scope_id = src->sin6_scope_id;
+		lsa6.sin6_scope_id = dst.sin6_scope_id;
+		fsa6.sin6_scope_id = src.sin6_scope_id;
 	}
 
 	/* make sure scope is embedded */

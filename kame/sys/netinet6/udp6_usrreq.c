@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.110 2003/02/05 05:39:23 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.111 2003/02/07 09:34:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -143,7 +143,7 @@ udp6_input(mp, offp, proto)
 	int off = *offp;
 	u_int32_t plen, ulen;
 	struct ip6_recvpktopts opts;
-	struct sockaddr_in6 *src, *dst, src_storage, dst_storage, fromsa;
+	struct sockaddr_in6 src, dst, fromsa;
 
 	bzero(&opts, sizeof(opts));
 	ip6 = mtod(m, struct ip6_hdr *);
@@ -173,24 +173,18 @@ udp6_input(mp, offp, proto)
 
 	/*
 	 * extract full sockaddr structures for the src/dst addresses,
-	 * and make local copies of them.  The copies are necessary
-	 * because the memory that stores src and dst may be freed during
-	 * the process below.
+	 * and make local copies of them.
 	 */
 	if (ip6_getpktaddrs(m, &src, &dst)) {
 		m_freem(m);
 		goto bad;
 	}
-	src_storage = *src;
-	dst_storage = *dst;
-	src = &src_storage;
-	dst = &dst_storage;
 
 	/*
 	 * XXX: the address may have embedded scope zone ID, which should be
 	 * hidden from applications.
 	 */
-	fromsa = *src;
+	fromsa = src;
 #ifndef SCOPEDROUTING
 	in6_clearscope(&fromsa.sin6_addr);
 #endif
@@ -279,12 +273,12 @@ udp6_input(mp, offp, proto)
 			if (in6p->in6p_lport != uh->uh_dport)
 				continue;
 			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa)) {
-				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst))
+				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, &dst))
 					continue;
 			}
 			if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
 				if (!SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa,
-							src) ||
+							&src) ||
 				    in6p->in6p_fport != uh->uh_sport)
 					continue;
 			}
@@ -388,10 +382,10 @@ udp6_input(mp, offp, proto)
 	in6p = udp6_last_in6pcb;
 	if (in6p->in6p_lport != uh->uh_dport ||
 	   in6p->in6p_fport != uh->uh_sport ||
-	   !SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, src) ||
-	   !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst)) {
-		in6p = in6_pcblookup(&udb6, src, uh->uh_sport,
-				     dst, uh->uh_dport, IN6PLOOKUP_WILDCARD);
+	   !SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, &src) ||
+	   !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, &dst)) {
+		in6p = in6_pcblookup(&udb6, &src, uh->uh_sport,
+				     &dst, uh->uh_dport, IN6PLOOKUP_WILDCARD);
 		if (in6p)
 			udp6_last_in6pcb = in6p;
 		udp6stat.udp6ps_pcbcachemiss++;

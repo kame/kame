@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.61 2002/11/05 03:48:33 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.62 2003/02/07 09:34:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -473,7 +473,7 @@ tcp6_input(mp, offp, proto)
 #if 0
 	struct sockaddr_in6 lsa6;
 #endif
-	struct sockaddr_in6 *src_sa6, *dst_sa6;
+	struct sockaddr_in6 src_sa6, dst_sa6;
 	int dropsocket = 0;
 	int iss = 0;
 	u_long thwin;
@@ -573,13 +573,13 @@ findpcb:
 	in6p = tcp6_last_in6pcb;
 	if (in6p->in6p_lport != th->th_dport ||
 	    in6p->in6p_fport != th->th_sport ||
-	    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, src_sa6) ||
-	    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, dst_sa6)) {
-		if ((in6p = tcp6_conn_lookup(src_sa6, th->th_sport,
-					     dst_sa6, th->th_dport))
+	    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_fsa, &src_sa6) ||
+	    !SA6_ARE_ADDR_EQUAL(&in6p->in6p_lsa, &dst_sa6)) {
+		if ((in6p = tcp6_conn_lookup(&src_sa6, th->th_sport,
+					     &dst_sa6, th->th_dport))
 		    == NULL &&
 		    ((thflags & (TH_SYN|TH_ACK)) == TH_SYN || syn_cache_count6)) {
-			in6p = tcp6_listen_lookup(dst_sa6, th->th_dport);
+			in6p = tcp6_listen_lookup(&dst_sa6, th->th_dport);
 		}
 		if (in6p)
 			tcp6_last_in6pcb = in6p;
@@ -658,10 +658,11 @@ findpcb:
 			 */
 			if ((thflags & (TH_RST|TH_ACK|TH_SYN)) != TH_SYN) {
 				if (thflags & TH_RST)
-					syn_cache_reset6(th, src_sa6, dst_sa6);
+					syn_cache_reset6(th, &src_sa6,
+					    &dst_sa6);
 				else if (thflags & TH_ACK) {
 					so = syn_cache_get6(so, m, off, len,
-							    src_sa6, dst_sa6);
+					    &src_sa6, &dst_sa6);
 					if (so == NULL) {
 						tcp6stat.tcp6s_badsyn++;
 						t6p = NULL;
@@ -744,7 +745,7 @@ findpcb:
 			 */
 			dropsocket++;
 			in6p = sotoin6pcb(so);
-			sa6_copy_addr(dst_sa6, &in6p->in6p_lsa);
+			sa6_copy_addr(&dst_sa6, &in6p->in6p_lsa);
 			in6p->in6p_lport = th->th_dport;
 
 			/* Inherit socket options from the listening socket. */
@@ -947,8 +948,8 @@ after_listen:
 		 * local address is always set here.
 		 */
 		if (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa))
-			sa6_copy_addr(dst_sa6, &in6p->in6p_lsa);
-		sa6_copy_addr(src_sa6, &in6p->in6p_fsa);
+			sa6_copy_addr(&dst_sa6, &in6p->in6p_lsa);
+		sa6_copy_addr(&src_sa6, &in6p->in6p_fsa);
 		in6p->in6p_fport = th->th_sport;
 #else
 		struct sockaddr_in6 sin6;
@@ -961,14 +962,14 @@ after_listen:
 		sin6.sin6_port = th->th_sport;
 		lsa6 = in6p->in6p_lsa6;
 		if (SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_lsa))
-			sa6_copy_addr(dst_sa6, &in6p->in6p_lsa);
+			sa6_copy_addr(&dst_sa6, &in6p->in6p_lsa);
 		if (in6_pcbconnectok(in6p, &sin6)) {
 			sa6_copy_addr(&lsa6, &in6p->in6p_lsa);
 			goto drop;
 		}
 #endif
-		in6p->in6p_hash = IN6_HASH(src_sa6, th->th_sport,
-					   dst_sa6, th->th_dport);
+		in6p->in6p_hash = IN6_HASH(&src_sa6, th->th_sport,
+					   &dst_sa6, th->th_dport);
 		LIST_INSERT_HEAD(&tcp6_conn_hash[in6p->in6p_hash %
 		    tcp6_conn_hash_size], in6p, in6p_hlist);
 		t6p->t_template = tcp6_template(t6p);
@@ -2681,7 +2682,7 @@ syn_cache_add6(so, m, off, optp, optlen, oi)
 	long win;
 	struct syn_cache6 *sc, **sc_prev;
 	struct syn_cache_head6 *scp;
-	struct sockaddr_in6 *src, *dst;
+	struct sockaddr_in6 src, dst;
 
 	if (tcp6_syn_cache_limit == 0)		/* see if it is disabled */
 		return (0);
@@ -2713,10 +2714,10 @@ syn_cache_add6(so, m, off, optp, optlen, oi)
 	/*
 	 * See if we already have an entry for this connection.
 	 */
-	if ((sc = syn_cache_lookup6(th, &sc_prev, &scp, src, dst)) != NULL) {
+	if ((sc = syn_cache_lookup6(th, &sc_prev, &scp, &src, &dst)) != NULL) {
 		tcp6stat.tcp6s_sc_dupesyn++;
 		if (syn_cache_respond6(sc, m, ip6, th, win,
-				       tb.ts_recent, dst) == 0) {
+				       tb.ts_recent, &dst) == 0) {
 			tcp6stat.tcp6s_sndacks++;
 			tcp6stat.tcp6s_sndtotal++;
 		}
@@ -2730,8 +2731,8 @@ syn_cache_add6(so, m, off, optp, optlen, oi)
 	 * Fill in the cache, and put the necessary TCP6
 	 * options into the reply.
 	 */
-	sc->sc_src = *src;
-	sc->sc_dst = *dst;
+	sc->sc_src = src;
+	sc->sc_dst = dst;
 	sc->sc_sport = th->th_sport;
 	sc->sc_dport = th->th_dport;
 	sc->sc_irs = th->th_seq;
@@ -2750,7 +2751,7 @@ syn_cache_add6(so, m, off, optp, optlen, oi)
 		sc->sc_requested_s_scale = 15;
 		sc->sc_request_r_scale = 15;
 	}
-	if (syn_cache_respond6(sc, m, ip6, th, win, tb.ts_recent, dst)
+	if (syn_cache_respond6(sc, m, ip6, th, win, tb.ts_recent, &dst)
 	    == 0) {
 		syn_cache_insert6(sc, &sc_prev, &scp);
 		tcp6stat.tcp6s_sndacks++;

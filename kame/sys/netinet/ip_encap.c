@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.87 2003/01/21 06:33:03 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.88 2003/02/07 09:34:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -499,7 +499,7 @@ encap6_input(mp, offp, proto)
 	struct mbuf *m = *mp;
 	const struct ip6protosw *psw;
 	struct encaptab *match;
-	struct sockaddr_in6 *src, *dst;
+	struct sockaddr_in6 src, dst;
 
 	if (ip6_getpktaddrs(m, &src, &dst)) {
 		/* XXX: impossible */
@@ -507,7 +507,7 @@ encap6_input(mp, offp, proto)
 		return IPPROTO_DONE;
 	}
 
-	match = encap6_lookup(m, *offp, proto, src, dst, INBOUND);
+	match = encap6_lookup(m, *offp, proto, &src, &dst, INBOUND);
 
 	if (match) {
 		/* found a match */

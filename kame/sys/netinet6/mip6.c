@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.197 2003/01/30 08:54:16 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.198 2003/02/07 09:34:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1669,8 +1669,8 @@ mip6_exthdr_create(m, opt, mip6opt)
 	struct mip6_pktopts *mip6opt;
 {
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *src;
-	struct sockaddr_in6 *dst;
+	struct sockaddr_in6 src;
+	struct sockaddr_in6 dst;
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
 	int s, error = 0, need_hao = 0;
@@ -1726,7 +1726,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 	 * exists a valid binding cache entry for this destination
 	 * node.
 	 */
-	error = mip6_rthdr_create_withdst(&mip6opt->mip6po_rthdr2, dst, opt);
+	error = mip6_rthdr_create_withdst(&mip6opt->mip6po_rthdr2, &dst, opt);
 	if (error) {
 		mip6log((LOG_ERR,
 		    "%s:%d: rthdr creation failed.\n",
@@ -1744,7 +1744,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 	 * find hif that has a home address that is the same
 	 * to the source address of this sending ip packet
 	 */
-	sc = hif_list_find_withhaddr(src);
+	sc = hif_list_find_withhaddr(&src);
 	if (sc == NULL) {
 		/*
 		 * this source addrss is not one of our home addresses.
@@ -1754,7 +1754,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 	}
 
 	/* check registration status */
-	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst, src);
+	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &dst, &src);
 	if (mbu == NULL) {
 		/* no registration action started yet. */
 		goto noneed;
@@ -1771,7 +1771,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 	else if (ip6->ip6_nxt == IPPROTO_NONE) {
 		/* create a binding update mobility header. */
 		error = mip6_ip6mu_create(&mip6opt->mip6po_mobility,
-				  	src, dst, sc);
+				  	&src, &dst, sc);
 		if (error) {
 			mip6log((LOG_ERR,
 			 	"%s:%d: a binding update mobility header "
@@ -1796,7 +1796,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 	}
 	/* create haddr destopt. */
 	error = mip6_haddr_destopt_create(&mip6opt->mip6po_haddr,
-					  src, dst, sc);
+					  &src, &dst, sc);
 	if (error) {
 		mip6log((LOG_ERR,
 			 "%s:%d: homeaddress insertion failed.\n",

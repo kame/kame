@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.45 2002/09/11 02:34:19 itojun Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.46 2003/02/07 09:34:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -238,7 +238,7 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 #endif
 	struct in6pcb *in6p = NULL;
 	struct ifnet *oifp = NULL;
-	struct sockaddr_in6 nsrc6, ndst6, *src6, *dst6;
+	struct sockaddr_in6 nsrc6, ndst6, src6, dst6;
 	int ip6oflags;
 
 	if (t6p) {
@@ -264,8 +264,8 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 		*nth = *th;
 		flags = TH_ACK;
 
-		src6 = &t6p->t_in6pcb->in6p_lsa;
-		dst6 = &t6p->t_in6pcb->in6p_fsa;
+		src6 = t6p->t_in6pcb->in6p_lsa;
+		dst6 = t6p->t_in6pcb->in6p_fsa;
 	} else {
 		if (ip6_getpktaddrs(m, &src6, &dst6)) {
 			m_freem(m); /* XXX: should not happen */
@@ -278,10 +278,10 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 		nip6 = ip6;
 		nth = (struct tcp6hdr *)(nip6 + 1);
 		tlen = 0;
-		nsrc6 = *dst6;
-		ndst6 = *src6;
-		src6 = &nsrc6;
-		dst6 = &ndst6;
+		nsrc6 = dst6;
+		ndst6 = src6;
+		src6 = nsrc6;
+		dst6 = ndst6;
 #define xchg(a,b,type) { type t; t=a; a=b; b=t; }
 		xchg(ip6->ip6_dst, ip6->ip6_src, struct in6_addr);
 		if (th != nth) {
@@ -332,7 +332,7 @@ tcp6_respond(t6p, ip6, th, m, ack, seq, flags)
 	     IP6PO_MINMTU_ALL)) {
 		ip6oflags |= IPV6_MINMTU;
 	}
-	if (!ip6_setpktaddrs(m, src6, dst6)) {
+	if (!ip6_setpktaddrs(m, &src6, &dst6)) {
 		m_freem(m);
 		return ENOBUFS;
 	}

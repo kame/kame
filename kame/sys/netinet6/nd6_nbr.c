@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.118 2003/01/06 21:49:50 sumikawa Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.119 2003/02/07 09:34:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -120,7 +120,7 @@ nd6_ns_input(m, off, icmp6len)
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	struct nd_neighbor_solicit *nd_ns;
-	struct sockaddr_in6 *saddr6, *daddr6, taddr6;
+	struct sockaddr_in6 saddr6, daddr6, taddr6;
 	char *lladdr = NULL;
 	struct ifaddr *ifa;
 	int lladdrlen = 0;
@@ -161,12 +161,12 @@ nd6_ns_input(m, off, icmp6len)
 		goto bad;
 	}
 
-	if (SA6_IS_ADDR_UNSPECIFIED(saddr6)) {
+	if (SA6_IS_ADDR_UNSPECIFIED(&saddr6)) {
 		/* dst has to be a solicited node multicast address. */
-		if (daddr6->sin6_addr.s6_addr16[0] == IPV6_ADDR_INT16_MLL &&
-		    daddr6->sin6_addr.s6_addr32[1] == 0 &&
-		    daddr6->sin6_addr.s6_addr32[2] == IPV6_ADDR_INT32_ONE &&
-		    daddr6->sin6_addr.s6_addr8[12] == 0xff) {
+		if (daddr6.sin6_addr.s6_addr16[0] == IPV6_ADDR_INT16_MLL &&
+		    daddr6.sin6_addr.s6_addr32[1] == 0 &&
+		    daddr6.sin6_addr.s6_addr32[2] == IPV6_ADDR_INT32_ONE &&
+		    daddr6.sin6_addr.s6_addr8[12] == 0xff) {
 			; /* good */
 		} else {
 			nd6log((LOG_INFO, "nd6_ns_input: bad DAD packet "
@@ -216,7 +216,7 @@ nd6_ns_input(m, off, icmp6len)
 		tlladdr = 0;
 	else
 #endif
-	if (!IN6_IS_ADDR_MULTICAST(&daddr6->sin6_addr))
+	if (!IN6_IS_ADDR_MULTICAST(&daddr6.sin6_addr))
 		tlladdr = 0;
 	else
 		tlladdr = 1;
@@ -287,9 +287,10 @@ nd6_ns_input(m, off, icmp6len)
 		goto bad;
 	}
 
-	if (SA6_ARE_ADDR_EQUAL(&((struct in6_ifaddr *)ifa)->ia_addr, saddr6)) {
+	if (SA6_ARE_ADDR_EQUAL(&((struct in6_ifaddr *)ifa)->ia_addr,
+	    &saddr6)) {
 		nd6log((LOG_INFO, "nd6_ns_input: duplicate IP6 address %s\n",
-		    ip6_sprintf(&saddr6->sin6_addr)));
+		    ip6_sprintf(&saddr6.sin6_addr)));
 		goto freeit;
 	}
 
@@ -313,7 +314,7 @@ nd6_ns_input(m, off, icmp6len)
 		 * If not, the packet is for addess resolution;
 		 * silently ignore it.
 		 */
-		if (SA6_IS_ADDR_UNSPECIFIED(saddr6))
+		if (SA6_IS_ADDR_UNSPECIFIED(&saddr6))
 			nd6_dad_ns_input(ifa);
 
 		goto freeit;
@@ -327,7 +328,7 @@ nd6_ns_input(m, off, icmp6len)
 	 * the address.
 	 * S bit ("solicited") must be zero.
 	 */
-	if (SA6_IS_ADDR_UNSPECIFIED(saddr6)) {
+	if (SA6_IS_ADDR_UNSPECIFIED(&saddr6)) {
 		struct sockaddr_in6 sa6_all;
 
 		bzero(&sa6_all, sizeof(sa6_all));
@@ -346,10 +347,10 @@ nd6_ns_input(m, off, icmp6len)
 		goto freeit;
 	}
 
-	nd6_cache_lladdr(ifp, saddr6, lladdr, lladdrlen,
+	nd6_cache_lladdr(ifp, &saddr6, lladdr, lladdrlen,
 	    ND_NEIGHBOR_SOLICIT, 0);
 
-	nd6_na_output(ifp, saddr6, &taddr6,
+	nd6_na_output(ifp, &saddr6, &taddr6,
 	    ((anycast || proxy || !tlladdr) ? 0 : ND_NA_FLAG_OVERRIDE) |
 	    (router ? ND_NA_FLAG_ROUTER : 0) | ND_NA_FLAG_SOLICITED,
 	    tlladdr, (struct sockaddr *)proxydl);
@@ -359,9 +360,9 @@ nd6_ns_input(m, off, icmp6len)
 
  bad:
 	nd6log((LOG_ERR, "nd6_ns_input: src=%s\n",
-	    ip6_sprintf(&saddr6->sin6_addr)));
+	    ip6_sprintf(&saddr6.sin6_addr)));
 	nd6log((LOG_ERR, "nd6_ns_input: dst=%s\n",
-	    ip6_sprintf(&daddr6->sin6_addr)));
+	    ip6_sprintf(&daddr6.sin6_addr)));
 	nd6log((LOG_ERR, "nd6_ns_input: tgt=%s\n",
 	    ip6_sprintf(&taddr6.sin6_addr)));
 	icmp6stat.icp6s_badns++;
@@ -551,12 +552,13 @@ nd6_ns_output(ifp, daddr0, taddr0, ln, dad)
 		 * Otherwise, we perform the source address selection as usual.
 		 */
 		struct ip6_hdr *hip6;		/* hold ip6 */
-		struct sockaddr_in6 *hsrc = NULL;
+		struct sockaddr_in6 hsrc0, *hsrc = NULL;
 
 		if (ln && ln->ln_hold) {
 			hip6 = mtod(ln->ln_hold, struct ip6_hdr *);
-			if (ip6_getpktaddrs(ln->ln_hold, &hsrc, NULL))
+			if (ip6_getpktaddrs(ln->ln_hold, &hsrc0, NULL))
 				goto bad; /* XXX: impossible */
+			hsrc = &hsrc0;
 		}
 		if (hsrc && in6ifa_ifpwithaddr(ifp, &hsrc->sin6_addr))
 			src_sa = *hsrc;
@@ -688,8 +690,7 @@ nd6_na_input(m, off, icmp6len)
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	struct nd_neighbor_advert *nd_na;
-	struct sockaddr_in6 *saddr6;
-	struct sockaddr_in6 taddr6;
+	struct sockaddr_in6 saddr6, taddr6;
 	int flags;
 	int is_router;
 	int is_solicited;
@@ -955,7 +956,7 @@ nd6_na_input(m, off, icmp6len)
 				 * (e.g. redirect case). So we must
 				 * call rt6_flush explicitly.
 				 */
-				rt6_flush(saddr6, rt->rt_ifp);
+				rt6_flush(&saddr6, rt->rt_ifp);
 			}
 			splx(s);
 		}

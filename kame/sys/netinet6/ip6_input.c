@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.303 2003/01/22 00:34:42 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.304 2003/02/07 09:34:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1286,7 +1286,7 @@ ip6_setpktaddrs(m, src, dst)
 int
 ip6_getpktaddrs(m, src, dst)
 	struct mbuf *m;
-	struct sockaddr_in6 **src, **dst;
+	struct sockaddr_in6 *src, *dst;
 {
 	struct m_tag *mtag;
 
@@ -1308,9 +1308,9 @@ ip6_getpktaddrs(m, src, dst)
 	}
 
 	if (src)
-		*src = &((struct ip6aux *)(mtag + 1))->ip6a_src;
+		*src = ((struct ip6aux *)(mtag + 1))->ip6a_src;
 	if (dst)
-		*dst = &((struct ip6aux *)(mtag + 1))->ip6a_dst;
+		*dst = ((struct ip6aux *)(mtag + 1))->ip6a_dst;
 
 	return (0);
 }

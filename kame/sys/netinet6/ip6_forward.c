@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.114 2003/02/05 01:29:03 keiichi Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.115 2003/02/07 09:34:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,7 +145,7 @@ ip6_forward(m, srcrt)
 	int error, type = 0, code = 0;
 	struct mbuf *mcopy = NULL;
 	struct ifnet *origifp;	/* maybe unnecessary */
-	struct sockaddr_in6 *sa6_src, *sa6_dst;
+	struct sockaddr_in6 sa6_src, sa6_dst;
 	u_int32_t dstzone;
 #ifdef IPSEC
 	struct secpolicy *sp = NULL;
@@ -492,16 +492,16 @@ ip6_forward(m, srcrt)
 	} else if ((rt = ip6_forward_rt.ro_rt) == 0 ||
 		    !(ip6_forward_rt.ro_rt->rt_flags & RTF_UP) ||
 #ifdef SCOPEDROUTING
-		   !SA6_ARE_ADDR_EQUAL(sa6_dst, dst)
+		   !SA6_ARE_ADDR_EQUAL(&sa6_dst, dst)
 #else
-		   !IN6_ARE_ADDR_EQUAL(&sa6_dst->sin6_addr, &dst->sin6_addr)
+		   !IN6_ARE_ADDR_EQUAL(&sa6_dst.sin6_addr, &dst->sin6_addr)
 #endif
 		) {
 		if (ip6_forward_rt.ro_rt) {
 			RTFREE(ip6_forward_rt.ro_rt);
 			ip6_forward_rt.ro_rt = 0;
 		}
-		*dst = *sa6_dst;
+		*dst = sa6_dst;
 #ifndef SCOPEDROUTING
 		dst->sin6_scope_id = 0;	/* XXX */
 #endif
@@ -541,7 +541,7 @@ ip6_forward(m, srcrt)
 		m_freem(m);
 		return;
 	}
-	if (sa6_src->sin6_scope_id != dstzone) {
+	if (sa6_src.sin6_scope_id != dstzone) {
 		ip6stat.ip6s_cantforward++;
 		ip6stat.ip6s_badscope++;
 		in6_ifstat_inc(rt->rt_ifp, ifs6_in_discard);
@@ -571,7 +571,7 @@ ip6_forward(m, srcrt)
 	 * packet to a different zone by (e.g.) a default route.
 	 */
 	if (in6_addr2zoneid(rt->rt_ifp, &ip6->ip6_dst, &dstzone) ||
-	    sa6_dst->sin6_scope_id != dstzone) {
+	    sa6_dst.sin6_scope_id != dstzone) {
 		ip6stat.ip6s_cantforward++;
 		ip6stat.ip6s_badscope++;
 		m_freem(m);
@@ -640,7 +640,7 @@ ip6_forward(m, srcrt)
 #endif
 	    (rt->rt_flags & (RTF_DYNAMIC|RTF_MODIFIED)) == 0) {
 		if ((rt->rt_ifp->if_flags & IFF_POINTOPOINT) &&
-		    nd6_is_addr_neighbor(sa6_dst, rt->rt_ifp)) {
+		    nd6_is_addr_neighbor(&sa6_dst, rt->rt_ifp)) {
 			/*
 			 * If the incoming interface is equal to the outgoing
 			 * one, the link attached to the interface is

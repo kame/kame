@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.88 2003/01/21 23:30:56 suz Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.89 2003/02/07 09:34:38 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1510,7 +1510,7 @@ ip6_mdq(m, ifp, rt)
 	mifi_t mifi, iif;
 	struct mif6 *mifp;
 	int plen = m->m_pkthdr.len;
-	struct sockaddr_in6 src_sa, dst_sa, *s0, *d0;
+	struct sockaddr_in6 src_sa, dst_sa, s0, d0;
 
 /*
  * Macro to send packet on mif.  Since RSVP packets don't get counted on
@@ -1645,8 +1645,8 @@ ip6_mdq(m, ifp, rt)
 	if (ip6_getpktaddrs(m, &s0, &d0))
 		return (-1);	/* XXX: impossible */
 	/* make a local copies to reuse */
-	src_sa = *s0;
-	dst_sa = *d0;
+	src_sa = s0;
+	dst_sa = d0;
 	for (mifp = mif6table, mifi = 0; mifi < nummifs; mifp++, mifi++) {
 		if (IF_ISSET(mifi, &rt->mf6c_ifset)) {
 			u_int32_t dscopeout, sscopeout;

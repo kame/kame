@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.311 2003/02/03 03:33:07 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.312 2003/02/07 09:34:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2089,7 +2089,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 
 #ifdef MIP6
 	struct hif_softc *sc;
-	struct sockaddr_in6 *src;
+	struct sockaddr_in6 src;
 #endif /* MIP6 */
 
 #ifdef MIP6
@@ -2097,7 +2097,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		error = EIO;
 		goto bad;
 	}
-	sc = hif_list_find_withhaddr(src);
+	sc = hif_list_find_withhaddr(&src);
 	if (sc && sc->hif_location == HIF_LOCATION_FOREIGN) {
 		return ((*sc->hif_if.if_output)((struct ifnet *)sc, m,
 		    (struct sockaddr *)dst, rt));

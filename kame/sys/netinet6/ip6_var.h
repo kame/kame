@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.106 2003/02/03 08:28:25 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.107 2003/02/07 09:34:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -398,8 +398,8 @@ void	ip6_delaux __P((struct mbuf *));
 struct m_tag *ip6_setpktaddrs __P((struct mbuf *, struct sockaddr_in6 *,
 				  struct sockaddr_in6 *));
 
-int	ip6_getpktaddrs __P((struct mbuf *, struct sockaddr_in6 **,
-			     struct sockaddr_in6 **));
+int	ip6_getpktaddrs __P((struct mbuf *, struct sockaddr_in6 *,
+			     struct sockaddr_in6 *));
 int	ip6_mforward __P((struct ip6_hdr *, struct ifnet *, struct mbuf *));
 int	ip6_process_hopopts __P((struct mbuf *, u_int8_t *, int, u_int32_t *,
 				 u_int32_t *));
