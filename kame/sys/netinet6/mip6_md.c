@@ -1,4 +1,4 @@
-/*	$KAME: mip6_md.c,v 1.27 2001/02/08 10:32:03 jinmei Exp $	*/
+/*	$KAME: mip6_md.c,v 1.28 2001/03/29 02:57:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -75,7 +75,9 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <netinet/in_pcb.h>
 #endif
+#if !defined(__OpenBSD__) && !defined(__bsdi__)
 #include <netinet6/in6_pcb.h>
+#endif
 #include <netinet6/mip6.h>
 
 #ifdef IPSEC
