@@ -1,4 +1,4 @@
-/*	$KAME: haadisc.c,v 1.14 2003/12/05 01:35:14 keiichi Exp $	*/
+/*	$KAME: haadisc.c,v 1.15 2004/01/20 04:18:20 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: haadisc.c,v 1.14 2003/12/05 01:35:14 keiichi Exp $
+ * $Id: haadisc.c,v 1.15 2004/01/20 04:18:20 t-momose Exp $
  */
 
 /*
@@ -177,7 +177,7 @@ char *__progname;
 void
 usage()
 {
-	(void) fprintf(stderr, "usage: %s [-Df] interface ...\n", __progname);
+	(void) fprintf(stderr, "usage: %s [-Dfp] interface ...\n", __progname);
 	exit(1);
 }
 

@@ -1,4 +1,4 @@
-/*	$KAME: mpa.c,v 1.8 2003/12/05 01:35:14 keiichi Exp $	*/
+/*	$KAME: mpa.c,v 1.9 2004/01/20 04:18:20 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 /*
- * $Id: mpa.c,v 1.8 2003/12/05 01:35:14 keiichi Exp $
+ * $Id: mpa.c,v 1.9 2004/01/20 04:18:20 t-momose Exp $
  */
 
 #include <sys/param.h>
@@ -216,34 +216,6 @@ mpi_advert_output(dst, src, haif, id)
         goto err;
     }
 err:
-}
-
-/* 
- * Send Mobile Prefix Advertisement message to every addresses in the list 
- */
-void
-mpi_advert_output_All(src, haif)
-    struct in6_addr *src;
-    struct hagent_ifinfo *haif;
-{
-    struct sockin6_addr_list addr_list;
-    struct sockin6_addr *addrp;
-  
-    if (kvmd == NULL)
-	return;
-
-    /* pick CoAs */
-    LIST_INIT(&addr_list);
-    if (reg_coa_pick(&addr_list) != 0)
-	return;
-
-    for (addrp = LIST_FIRST(&addr_list);
-         addrp;
-	 addrp = LIST_FIRST(&addr_list)) {
-	mpi_advert_output(&(addrp->addr), src, haif, 0/*XXX*/);
-	LIST_REMOVE(addrp, sockin6_entry);
-	free(addrp);
-    }
 }
 
 /*
@@ -529,6 +501,8 @@ examine_mpaexp_bc()
 	rand_adv_delay = MIP6_MIN_MOB_PFX_ADV_INTERVAL
 			 + (random() % abs(max_sched_delay - MIP6_MIN_MOB_PFX_ADV_INTERVAL));
 	mip6_bc.mbc_mpa_exp = time_second + rand_adv_delay;
+
+	/* DANGER! DANGER! DANGER! */
 	KWRITE(&mbc->mbc_mpa_exp, mip6_bc.mbc_mpa_exp, mip6_bc.mbc_mpa_exp);
     }
 }
