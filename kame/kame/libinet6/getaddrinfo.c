@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.100 2001/01/26 07:37:28 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.101 2001/01/28 15:32:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -244,15 +244,16 @@ static int explore_fqdn __P((const struct addrinfo *, const char *,
 #endif
 
 #ifndef __OpenBSD__
+/* items marked with "-" are obsoleted in 2553bis-02 */
 static const char *ai_errlist[] = {
 	"Success",
-	"EAI_ADDRFAMILY (obsoleted)",			/* EAI_ADDRFAMILY */
+	"Address family for hostname not supported",	/* -EAI_ADDRFAMILY */
 	"Temporary failure in name resolution",		/* EAI_AGAIN      */
 	"Invalid value for ai_flags",		       	/* EAI_BADFLAGS   */
 	"Non-recoverable failure in name resolution", 	/* EAI_FAIL       */
 	"ai_family not supported",			/* EAI_FAMILY     */
 	"Memory allocation failure", 			/* EAI_MEMORY     */
-	"EAI_NODATA (obsoleted)", 			/* EAI_NODATA     */
+	"No address associated with hostname", 		/* -EAI_NODATA     */
 	"hostname nor servname provided, or not known",	/* EAI_NONAME     */
 	"servname not supported for ai_socktype",	/* EAI_SERVICE    */
 	"ai_socktype not supported", 			/* EAI_SOCKTYPE   */
