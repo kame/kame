@@ -1,4 +1,4 @@
-/*	$OpenBSD: if.c,v 1.17 1998/02/27 12:07:32 deraadt Exp $	*/
+/*	$OpenBSD: if.c,v 1.20 2000/02/05 18:46:50 itojun Exp $	*/
 /*	$NetBSD: if.c,v 1.16.4.2 1996/06/07 21:46:46 thorpej Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)if.c	8.2 (Berkeley) 2/21/94";
 #else
-static char *rcsid = "$OpenBSD: if.c,v 1.17 1998/02/27 12:07:32 deraadt Exp $";
+static char *rcsid = "$OpenBSD: if.c,v 1.20 2000/02/05 18:46:50 itojun Exp $";
 #endif
 #endif /* not lint */
 
@@ -88,6 +88,9 @@ intpr(interval, ifnetaddr)
 	union {
 		struct ifaddr ifa;
 		struct in_ifaddr in;
+#ifdef INET6
+		struct in6_ifaddr in6;
+#endif
 		struct ns_ifaddr ns;
 		struct ipx_ifaddr ipx;
 		struct iso_ifaddr iso;
@@ -96,6 +99,7 @@ intpr(interval, ifnetaddr)
 	struct sockaddr *sa;
 	struct ifnet_head ifhead;	/* TAILQ_HEAD */
 	char name[IFNAMSIZ];
+	int n;
 
 	if (ifnetaddr == 0) {
 		printf("ifnet: symbol not defined\n");
@@ -127,6 +131,9 @@ intpr(interval, ifnetaddr)
 	ifaddraddr = 0;
 	while (ifnetaddr || ifaddraddr) {
 		struct sockaddr_in *sin;
+#ifdef INET6
+		struct sockaddr_in6 *sin6;
+#endif
 		register char *cp;
 		int n, m;
 
@@ -169,15 +176,23 @@ intpr(interval, ifnetaddr)
 				 */
 				in = inet_makeaddr(ifaddr.in.ia_subnet,
 					INADDR_ANY);
-				printf("%-11.11s ", netname(in.s_addr,
-				    ifaddr.in.ia_subnetmask));
+				cp = netname(in.s_addr,
+			    	    ifaddr.in.ia_subnetmask);
 #else
-				printf("%-11.11s ",
-				    netname(ifaddr.in.ia_subnet,
-				    ifaddr.in.ia_subnetmask));
+				cp = netname(ifaddr.in.ia_subnet,
+				    ifaddr.in.ia_subnetmask);
 #endif
-				printf("%-17.17s ",
-				    routename(sin->sin_addr.s_addr));
+				if (vflag)
+					n = strlen(cp) < 11 ? 11 : strlen(cp);
+				else
+					n = 11;
+				printf("%-*.*s ", n, n, cp);
+				cp = routename(sin->sin_addr.s_addr);
+				if (vflag)
+					n = strlen(cp) < 17 ? 17 : strlen(cp);
+				else
+					n = 17;
+				printf("%-*.*s ", n, n, cp);
 
 				if (aflag) {
 					u_long multiaddr;
@@ -187,12 +202,62 @@ intpr(interval, ifnetaddr)
 					while (multiaddr != 0) {
 						kread(multiaddr, (char *)&inm,
 						    sizeof inm);
-						printf("\n%23s %-17.17s ", "",
+						printf("\n%25s %-17.17s ", "",
 						    routename(inm.inm_addr.s_addr));
 						multiaddr = (u_long)inm.inm_list.le_next;
 					}
 				}
 				break;
+#ifdef INET6
+			case AF_INET6:
+				sin6 = (struct sockaddr_in6 *)sa;
+#ifdef KAME_SCOPEID
+				if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
+					sin6->sin6_scope_id =
+						ntohs(*(u_int16_t *)
+						  &sin6->sin6_addr.s6_addr[2]);
+					/* too little width */
+					if (!vflag)
+						sin6->sin6_scope_id = 0;
+					sin6->sin6_addr.s6_addr[2] = 0;
+					sin6->sin6_addr.s6_addr[3] = 0;
+				}
+#endif
+				cp = netname6(&ifaddr.in6.ia_addr,
+					&ifaddr.in6.ia_prefixmask.sin6_addr);
+				if (vflag)
+					n = strlen(cp) < 11 ? 11 : strlen(cp);
+				else
+					n = 11;
+				printf("%-*.*s ", n, n, cp);
+				cp = routename6(sin6);
+				if (vflag)
+					n = strlen(cp) < 17 ? 17 : strlen(cp);
+				else
+					n = 17;
+				printf("%-*.*s ", n, n, cp);
+				if (aflag) {
+					u_long multiaddr;
+					struct in6_multi inm;
+					char hbuf[INET6_ADDRSTRLEN];
+		
+					multiaddr = (u_long)ifaddr.in6.ia6_multiaddrs.lh_first;
+					while (multiaddr != 0) {
+						kread(multiaddr, (char *)&inm,
+						    sizeof inm);
+						inet_ntop(AF_INET6, &inm.in6m_addr,
+							hbuf, sizeof(hbuf));
+						if (vflag)
+							n = strlen(hbuf) < 17 ? 17 : strlen(hbuf);
+						else
+							n = 17;
+						printf("\n%25s %-*.*s ", "",
+						    n, n, hbuf);
+						multiaddr = (u_long)inm.in6m_entry.le_next;
+					}
+				}
+				break;
+#endif
 			case AF_IPX:
 				{
 				struct sockaddr_ipx *sipx =
