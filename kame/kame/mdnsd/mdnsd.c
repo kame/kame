@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.48 2001/11/19 05:53:36 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.49 2001/11/19 06:24:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -63,8 +63,10 @@ const char *intface = NULL;
 int family = PF_UNSPEC;
 static char hostnamebuf[MAXHOSTNAMELEN];
 const char *hostname = NULL;
-static int mcasthops = 1;
-static int mcastloop = 0;
+static int mcasthops6 = 1;
+static int mcastloop6 = 0;
+static unsigned char mcasthops4 = 1;
+static unsigned char mcastloop4 = 0;
 int dflag = 0;
 int fflag = 0;
 int lflag = 0;
@@ -143,7 +145,8 @@ main(argc, argv)
 			break;
 		case 'P':
 			dstport = optarg;
-			mcastloop = 1;
+			mcastloop4 = 1;
+			mcastloop6 = 1;
 			break;
 		default:
 			usage();
@@ -385,8 +388,9 @@ getsock0(ai)
 	}
 #ifdef IPV6_V6ONLY
 	if (ai->ai_family == AF_INET6) {
-		(void)setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY,
-		    &yes, sizeof(yes));
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_V6ONLY,
+		    &yes, sizeof(yes)) < 0)
+			err(1, "setsockopt(IPV6_V6ONLY)");
 	}
 #endif
 	if (ai->ai_socktype == SOCK_STREAM || ai->ai_socktype == SOCK_DGRAM)
@@ -402,24 +406,30 @@ getsock0(ai)
 
 	switch (ai->ai_family) {
 	case AF_INET6:
-		(void)setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
-		    &mcasthops, sizeof(mcasthops));
-		(void)setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP,
-		    &mcastloop, sizeof(mcastloop));
-		(void)setsockopt(s, IPPROTO_IPV6, SO_REUSEPORT,
-		    &yes, sizeof(yes));
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS,
+		    &mcasthops6, sizeof(mcasthops6)) < 0)
+			err(1, "setsockopt(IPV6_MULTICAST_HOPS)");
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_LOOP,
+		    &mcastloop6, sizeof(mcastloop6)) < 0)
+			err(1, "setsockopt(IPV6_MULTICAST_LOOP)");
+		if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT,
+		    &yes, sizeof(yes)) < 0)
+			err(1, "setsockopt(SO_REUSEPORT)");
 #ifdef IPV6_USE_MIN_MTU
 		(void)setsockopt(s, IPPROTO_IPV6, IPV6_USE_MIN_MTU,
 		    &yes, sizeof(yes));
 #endif
 		break;
 	case AF_INET:
-		(void)setsockopt(s, IPPROTO_IP, IP_MULTICAST_TTL,
-		    &mcasthops, sizeof(mcasthops));
-		(void)setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP,
-		    &mcastloop, sizeof(mcastloop));
-		(void)setsockopt(s, IPPROTO_IP, SO_REUSEPORT,
-		    &yes, sizeof(yes));
+		if (setsockopt(s, IPPROTO_IP, IP_MULTICAST_TTL,
+		    &mcasthops4, sizeof(mcasthops4)) < 0)
+			err(1, "setsockopt(IP_MULTICAST_TTL)");
+		if (setsockopt(s, IPPROTO_IP, IP_MULTICAST_LOOP,
+		    &mcastloop4, sizeof(mcastloop4)) < 0)
+			err(1, "setsockopt(IP_MULTICAST_LOOP)");
+		if (setsockopt(s, SOL_SOCKET, SO_REUSEPORT,
+		    &yes, sizeof(yes)) < 0)
+			err(1, "setsockopt(SO_REUSEPORT)");
 		break;
 	}
 
