@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1075 2000/06/29 02:16:45 itojun Exp $
+$Id: CHANGELOG,v 1.1076 2000/06/29 07:29:21 itojun Exp $
 
 <200006>
+Thu Jun 29 16:24:35 JST 2000  itojun@iijlab.net
+	* */sys/netinet/in.c, kame/sys/netinet6/in6.c:
+	  inhibit EEXIST from in{,6}_ifinit().  history: (1) 4.4BSD ignores
+	  return value from in_ifinit() completely.  (2) previous kame code
+	  tried to handle error case better, the change raised bogus EEXIST
+	  to the userland on two-address-from-same-prefix assignment.
+
 Thu Jun 29 10:14:47 JST 2000  itojun@iijlab.net
 	* faithd/faithd.c, natptd/main.c, natptlog/natptlog.c: be more careful
 	  about arg to syslog(3), to prevent possible buffer overrun.
