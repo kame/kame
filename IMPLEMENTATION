@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/02/24 04:38:17 $
+			$Date: 2000/02/24 16:53:19 $
 
 1. IPv6
 
@@ -180,8 +180,6 @@ There are certain limitations, though:
 - RFC2461 is unclear about if it is legal for a host to perform proxy ND.
   We do not prohibit hosts from doing proxy ND, but there will be very limited
   use in it.
-Due to a bug in sys/net/rtsock.c, it may not be abailable on your platform.
-Check CHANGELOG entry for this (Feb 17 2000).
 
 1.3 Scope Index
 
