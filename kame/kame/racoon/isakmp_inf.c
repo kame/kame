@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.53 2000/09/13 04:50:26 itojun Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.54 2000/09/20 21:52:14 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.53 2000/09/13 04:50:26 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.54 2000/09/20 21:52:14 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -498,7 +498,7 @@ isakmp_info_send_n2(iph2, type, data)
 	n->proto_id = pr->proto_id;		/* IPSEC AH/ESP/whatever*/
 	n->spi_size = pr->spisize;
 	n->type = htons(type);
-	*(u_int32_t *)(n + 1) = (u_int32_t)htonl(pr->spi);
+	*(u_int32_t *)(n + 1) = pr->spi;
 	if (data)
 		memcpy((caddr_t)(n + 1) + pr->spisize, data->v, data->l);
 
@@ -743,7 +743,7 @@ isakmp_add_pl_n(buf0, np_p, type, pr, data)
 	n->proto_id = pr->proto_id;		/* IPSEC AH/ESP/whatever*/
 	n->spi_size = pr->spisize;
 	n->type = htons(type);
-	*(u_int32_t *)(n + 1) = (u_int32_t)htonl(pr->spi);	/* XXX */
+	*(u_int32_t *)(n + 1) = pr->spi;	/* XXX */
 	if (data)
 		memcpy((caddr_t)(n + 1) + pr->spisize, data->v, data->l);
 
