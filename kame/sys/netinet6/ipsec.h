@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.30 2000/04/21 10:35:13 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.31 2000/05/18 12:32:32 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -36,9 +36,15 @@
 #ifndef _NETINET6_IPSEC_H_
 #define _NETINET6_IPSEC_H_
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
 #if defined(_KERNEL) && !defined(_LKM)
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include "opt_inet.h"
+#include "opt_inet6.h"
+#include "opt_ipsec.h"
+#endif
+#if defined(__NetBSD__)
+#include "opt_inet.h"
+#include "opt_ipsec.h"
 #endif
 #endif
 
