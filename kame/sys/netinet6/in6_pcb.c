@@ -180,6 +180,7 @@ in6_pcbbind(in6p, nam)
 #endif
 	u_int16_t lport = 0;
 	int wild = 0, reuseport = (so->so_options & SO_REUSEPORT);
+	int error;
 
 	if (in6p->in6p_lport || !IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
 		return(EINVAL);
