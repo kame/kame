@@ -1,6 +1,6 @@
 TODO list for the new advanced API (aka rfc2292bis)
 KAME project
-$Id: TODO.2292bis,v 1.8 2000/01/04 14:18:48 jinmei Exp $
+$Id: TODO.2292bis,v 1.9 2000/01/04 16:16:05 jinmei Exp $
 
 new socket options or ancillary data types:
 - IPV6_RTHDRDSTOPTS	done/20000102	jinmei
@@ -57,7 +57,7 @@ Application	Status		Date		Commiter
 - route6d	recvcode	19991221	jinmei
 - rtadvd	recvcode	19991221	jinmei
 - rtsol[d]	recvcode	19991221	jinmei
-- traceroute6	recvcode	19991221	jinmei
+- traceroute6	done		20000105	jinmei
 - telnet(rthdr)
 - ports/packages...
 - maybe more...
