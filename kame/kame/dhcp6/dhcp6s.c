@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.67 2002/05/01 15:20:30 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.68 2002/05/08 07:38:22 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -565,7 +565,7 @@ server6_send_reply(ifp, origmsg, optinfo, from, fromlen)
 	if (ns) {
 		roptinfo.dns.n = ns;
 		if ((dnsbuf = malloc(sizeof(struct in6_addr) * ns)) == NULL) {
-			dprintf(LOG_WARNING, "server6_react_informreq: "
+			dprintf(LOG_WARNING, "server6_send_reply: "
 				"malloc failed for DNS list");
 			goto end;
 		}
@@ -582,7 +582,7 @@ server6_send_reply(ifp, origmsg, optinfo, from, fromlen)
 					(struct dhcp6opt *)(replybuf +
 							    sizeof(replybuf)),
 					&roptinfo)) < 0) {
-		dprintf(LOG_INFO, "server6_react_informreq: "
+		dprintf(LOG_INFO, "server6_send_reply: "
 			"failed to construct reply options");
 		goto end;
 	}
