@@ -1,8 +1,17 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.186 1999/10/14 08:28:14 itojun Exp $
+$Id: CHANGELOG,v 1.187 1999/10/15 08:01:46 itojun Exp $
 
 <199910>
+Fri Oct 15 16:53:20 JST 1999  itojun@iijlab.net
+	* kame/tcpdump/print-{tcp,udp}.c: print IP address properly when
+	  intermediate headers or IP option is present.
+	* kame/sys/netinet/in_cksum4.c: more clever IPv4 pseudo header
+	  checksum routine.
+	* netbsd/sys: experimental use of m_pulldown() in tcp and udp.
+	  m_pulldown() guarantees contiguous allocation of intermediate
+	  headers (like tcp header) on mbuf chain.
+
 Thu Oct 14 17:27:26 JST 1999  itojun@iijlab.net
 	* kame/tcpdump: fix endian-ness problem in big endian machines.
 	  From: KOIE Hidetaka <hide@koie.org>
