@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1129 2000/07/13 17:18:14 itojun Exp $
+$Id: CHANGELOG,v 1.1130 2000/07/15 04:54:21 itojun Exp $
 
 <200006>
+Sat Jul 15 13:51:59 JST 2000  itojun@iijlab.net
+	* kame/route6d: if a routing entry exists for aggregate prefix (-A),
+	  do not overwrite it (exit with error).  it should be a safer behavir.
+
 Thu Jul 13 22:27:18 JST 2000  itojun@iijlab.net
 	* openbsd/sys/netinet6/raw_ipv6.c: enable IPv6 multicast routing
 	  related setsockopt.
