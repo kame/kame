@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.23 2004/05/26 07:41:31 itojun Exp $	*/
+/*	$KAME: mldv2.c,v 1.24 2004/06/14 07:30:54 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2844,7 +2844,7 @@ in6_addmulti2(maddr6, ifp, errorp, numsrc, src, mode, init)
 	*errorp = if_addmulti(ifp, (struct sockaddr *)&sa6, &ifma);
 	if (*errorp) {
 		splx(s);
-		return 0;
+		return NULL;
 	}
 
 	/*
