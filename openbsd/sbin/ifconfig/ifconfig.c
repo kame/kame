@@ -1,4 +1,4 @@
-/*	$OpenBSD: ifconfig.c,v 1.73 2003/03/16 05:20:27 margarida Exp $	*/
+/*	$OpenBSD: ifconfig.c,v 1.78 2003/07/30 01:42:47 pvalchev Exp $	*/
 /*	$NetBSD: ifconfig.c,v 1.40 1997/10/01 02:19:43 enami Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -81,7 +77,7 @@ static const char copyright[] =
 #if 0
 static const char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #else
-static const char rcsid[] = "$OpenBSD: ifconfig.c,v 1.73 2003/03/16 05:20:27 margarida Exp $";
+static const char rcsid[] = "$OpenBSD: ifconfig.c,v 1.78 2003/07/30 01:42:47 pvalchev Exp $";
 #endif
 #endif /* not lint */
 
@@ -147,7 +143,7 @@ struct	iso_aliasreq	iso_addreq;
 struct	sockaddr_in	netmask;
 struct  netrange	at_nr;		/* AppleTalk net range */
 
-int	ipx_type = ETHERTYPE_II;
+int	ipx_type = IPX_ETHERTYPE_II;
 char	name[IFNAMSIZ];
 int	flags, setaddr, setipdst, doalias;
 u_long	metric, mtu;
@@ -162,44 +158,44 @@ int	explicit_prefix = 0;
 int	Lflag = 1;
 #endif
 
-void	notealias(char *, int);
-void	notrailers(char *, int);
-void	setifaddr(char *, int);
-void	setifdstaddr(char *, int);
-void	setifflags(char *, int);
-void	setifbroadaddr(char *);
-void	setifipdst(char *);
-void	setifmetric(char *);
-void	setifmtu(char *, int);
+void	notealias(const char *, int);
+void	notrailers(const char *, int);
+void	setifaddr(const char *, int);
+void	setifdstaddr(const char *, int);
+void	setifflags(const char *, int);
+void	setifbroadaddr(const char *, int);
+void	setifipdst(const char *, int);
+void	setifmetric(const char *, int);
+void	setifmtu(const char *, int);
 void	setifnwid(const char *, int);
 void	setifnwkey(const char *, int);
 void	setifpowersave(const char *, int);
 void	setifpowersavesleep(const char *, int);
-void	setifnetmask(char *);
-void	setifprefixlen(char *, int);
-void	setnsellength(char *);
-void	setsnpaoffset(char *);
-void	setipxframetype(char *, int);
-void    setatrange(char *, int);
-void    setatphase(char *, int);
-void    settunnel(char *, char *);
-void    deletetunnel(void);
+void	setifnetmask(const char *, int);
+void	setifprefixlen(const char *, int);
+void	setnsellength(const char *, int);
+void	setsnpaoffset(const char *, int);
+void	setipxframetype(const char *, int);
+void	setatrange(const char *, int);
+void	setatphase(const char *, int);
+void	settunnel(const char *, const char *);
+void	deletetunnel(const char *, int);
 #ifdef INET6
-void	setia6flags(char *, int);
-void	setia6pltime(char *, int);
-void	setia6vltime(char *, int);
-void	setia6lifetime(char *, char *);
+void	setia6flags(const char *, int);
+void	setia6pltime(const char *, int);
+void	setia6vltime(const char *, int);
+void	setia6lifetime(const char *, const char *);
 void	setia6eui64(const char *, int);
 #endif
-void    checkatrange(struct sockaddr_at *);
-void	setmedia(char *, int);
-void	setmediaopt(char *, int);
-void	unsetmediaopt(char *, int);
-void	setmediainst(char *, int);
-void	setvlantag(char *, int);
-void	setvlandev(char *, int);
-void	unsetvlandev(char *, int);
-void	vlan_status ();
+void	checkatrange(struct sockaddr_at *);
+void	setmedia(const char *, int);
+void	setmediaopt(const char *, int);
+void	unsetmediaopt(const char *, int);
+void	setmediainst(const char *, int);
+void	setvlantag(const char *, int);
+void	setvlandev(const char *, int);
+void	unsetvlandev(const char *, int);
+void	vlan_status(void);
 void	fixnsel(struct sockaddr_iso *);
 int	main(int, char *[]);
 int	prefix(void *val, int);
@@ -230,7 +226,8 @@ const struct	cmd {
 	char	*c_name;
 	int	c_parameter;		/* NEXTARG means next argv */
 	int	c_action;		/* defered action */
-	void	(*c_func)();
+	void	(*c_func)(const char *, int);
+	void	(*c_func2)(const char *, const char *);
 } cmds[] = {
 	{ "up",		IFF_UP,		0,		setifflags } ,
 	{ "down",	-IFF_UP,	0,		setifflags },
@@ -274,18 +271,18 @@ const struct	cmd {
 	{ "phase",	NEXTARG,	0,		setatphase },
 	{ "snpaoffset",	NEXTARG,	0,		setsnpaoffset },
 	{ "nsellength",	NEXTARG,	0,		setnsellength },
-	{ "802.2",	ETHERTYPE_8022,	0,		setipxframetype },
-	{ "802.2tr",	ETHERTYPE_8022TR, 0,		setipxframetype },
-	{ "802.3",	ETHERTYPE_8023,	0,		setipxframetype },
-	{ "snap",	ETHERTYPE_SNAP,	0,		setipxframetype },
-	{ "EtherII",	ETHERTYPE_II,	0,		setipxframetype },
+	{ "802.2",	IPX_ETHERTYPE_8022,	0,	setipxframetype },
+	{ "802.2tr",	IPX_ETHERTYPE_8022TR, 0,	setipxframetype },
+	{ "802.3",	IPX_ETHERTYPE_8023,	0,	setipxframetype },
+	{ "snap",	IPX_ETHERTYPE_SNAP,	0,	setipxframetype },
+	{ "EtherII",	IPX_ETHERTYPE_II,	0,	setipxframetype },
 	{ "vlan",	NEXTARG,	0,		setvlantag },
 	{ "vlandev",	NEXTARG,	0,		setvlandev },
 	{ "-vlandev",	1,		0,		unsetvlandev },
 #endif	/* INET_ONLY */
 	/* giftunnel is for backward compat */
-	{ "giftunnel",  NEXTARG2,	0,		settunnel } ,
-	{ "tunnel",	NEXTARG2,	0,		settunnel } ,
+	{ "giftunnel",  NEXTARG2,	0,		NULL, settunnel } ,
+	{ "tunnel",	NEXTARG2,	0,		NULL, settunnel } ,
 	{ "deletetunnel",  0,   	0,		deletetunnel } ,
 	{ "link0",	IFF_LINK0,	0,		setifflags } ,
 	{ "-link0",	-IFF_LINK0,	0,		setifflags } ,
@@ -303,13 +300,13 @@ const struct	cmd {
 	{ NULL, /*illegal*/0,		0,		NULL },
 };
 
-void	adjust_nsellength();
+void	adjust_nsellength(void);
 int	getinfo(struct ifreq *);
 void	getsock(int);
 void	printif(struct ifreq *, int);
 void	printb(char *, unsigned short, char *);
 void	status(int, struct sockaddr_dl *);
-void	usage();
+void	usage(void);
 const char *get_string(const char *, const char *, u_int8_t *, int *);
 void	print_string(const u_int8_t *, int);
 char	*sec2str(time_t);
@@ -329,32 +326,32 @@ void	init_current_media(void);
  * Maryland principally by James O'Toole and Chris Torek.
  */
 void	in_status(int);
-void	in_getaddr(char *, int);
-void	in_getprefix(char *, int);
+void	in_getaddr(const char *, int);
+void	in_getprefix(const char *, int);
 #ifdef INET6
 void	in6_fillscopeid(struct sockaddr_in6 *sin6);
 void	in6_alias(struct in6_ifreq *);
 void	in6_status(int);
-void	in6_getaddr(char *, int);
-void	in6_getprefix(char *, int);
+void	in6_getaddr(const char *, int);
+void	in6_getprefix(const char *, int);
 #endif
 void    at_status(int);
-void    at_getaddr(char *, int);
+void    at_getaddr(const char *, int);
 void	xns_status(int);
-void	xns_getaddr(char *, int);
+void	xns_getaddr(const char *, int);
 void	ipx_status(int);
-void	ipx_getaddr(char *, int);
+void	ipx_getaddr(const char *, int);
 void	iso_status(int);
-void	iso_getaddr(char *, int);
+void	iso_getaddr(const char *, int);
 void	ieee80211_status(void);
 
 /* Known address families */
 const struct afswtch {
 	char *af_name;
 	short af_af;
-	void (*af_status)();
-	void (*af_getaddr)();
-	void (*af_getprefix)();
+	void (*af_status)(int);
+	void (*af_getaddr)(const char *, int);
+	void (*af_getprefix)(const char *, int);
 	u_long af_difaddr;
 	u_long af_aifaddr;
 	caddr_t af_ridreq;
@@ -383,9 +380,7 @@ const struct afswtch {
 const struct afswtch *afp;	/*the address family being set or asked about*/
 
 int
-main(argc, argv)
-	int argc;
-	char *argv[];
+main(int argc, char *argv[])
 {
 	const struct afswtch *rafp = NULL;
 	int aflag = 0;
@@ -400,17 +395,14 @@ main(argc, argv)
 	else if (!strcmp(*argv, "-A")) {
 		aflag = 1;
 		ifaliases = 1;
-	}
-	else if (!strcmp(*argv, "-ma") || !strcmp(*argv, "-am")) {
+	} else if (!strcmp(*argv, "-ma") || !strcmp(*argv, "-am")) {
 		aflag = 1;
 		mflag = 1;
-	}
-	else if (!strcmp(*argv, "-mA") || !strcmp(*argv, "-Am")) {
+	} else if (!strcmp(*argv, "-mA") || !strcmp(*argv, "-Am")) {
 		aflag = 1;
 		ifaliases = 1;
 		mflag = 1;
-	}
-	else if (!strcmp(*argv, "-m")) {
+	} else if (!strcmp(*argv, "-m")) {
 		mflag = 1;
 		argc--, argv++;
 		if (argc < 1)
@@ -457,22 +449,22 @@ main(argc, argv)
 		if (p->c_name == 0 && setaddr)
 			for (i = setaddr; i > 0; i--) {
 				p++;
-				if (p->c_func == NULL)
+				if (p->c_func == NULL && p->c_func2)
 					errx(1, "extra address not accepted");
 			}
-		if (p->c_func) {
+		if (p->c_func || p->c_func2) {
 			if (p->c_parameter == NEXTARG) {
 				if (argv[1] == NULL)
 					errx(1, "'%s' requires argument",
 					    p->c_name);
-				(*p->c_func)(argv[1]);
+				(*p->c_func)(argv[1], 0);
 				argc--, argv++;
 			} else if (p->c_parameter == NEXTARG2) {
 				if ((argv[1] == NULL) ||
 				    (argv[2] == NULL))
 					errx(1, "'%s' requires 2 arguments",
 					    p->c_name);
-				(*p->c_func)(argv[1], argv[2]);
+				(*p->c_func2)(argv[1], argv[2]);
 				argc -= 2;
 				argv += 2;
 			} else
@@ -538,20 +530,19 @@ main(argc, argv)
 			if (errno == EADDRNOTAVAIL && (doalias >= 0)) {
 				/* means no previous address for interface */
 			} else
-				warn("SIOCDIFADDR");
+				err(1, "SIOCDIFADDR");
 		}
 	}
 	if (newaddr) {
 		(void) strlcpy(rafp->af_addreq, name, sizeof(ifr.ifr_name));
 		if (ioctl(s, rafp->af_aifaddr, rafp->af_addreq) < 0)
-			warn("SIOCAIFADDR");
+			err(1, "SIOCAIFADDR");
 	}
 	exit(0);
 }
 
 void
-getsock(naf)
-	int naf;
+getsock(int naf)
 {
 	static int oaf = -1;
 
@@ -567,8 +558,7 @@ getsock(naf)
 }
 
 int
-getinfo(ifr)
-	struct ifreq *ifr;
+getinfo(struct ifreq *ifr)
 {
 
 	getsock(af);
@@ -592,8 +582,7 @@ getinfo(ifr)
 }
 
 void
-printif(ifrm, ifaliases)
-	struct ifreq *ifrm;
+printif(struct ifreq *ifrm, int ifaliases)
 {
 #ifdef HAVE_IFADDRS_H
 	struct ifaddrs *ifap, *ifa;
@@ -760,9 +749,7 @@ printif(ifrm, ifaliases)
 
 /*ARGSUSED*/
 void
-setifaddr(addr, param)
-	char *addr;
-	int param;
+setifaddr(const char *addr, int param)
 {
 	/*
 	 * Delay the ioctl to set the interface addr until flags are all set.
@@ -777,9 +764,7 @@ setifaddr(addr, param)
 }
 
 void
-settunnel(src, dst)
-	char *src;
-	char *dst;
+settunnel(const char *src, const char *dst)
 {
 	struct addrinfo hints, *srcres, *dstres;
 	int ecode;
@@ -817,7 +802,7 @@ settunnel(src, dst)
 }
 
 void
-deletetunnel()
+deletetunnel(const char *ignored, int alsoignored)
 {
 	if (ioctl(s, SIOCDIFPHYADDR, &ifr) < 0)
 		warn("SIOCDIFPHYADDR");
@@ -825,22 +810,19 @@ deletetunnel()
 
 
 void
-setifnetmask(addr)
-	char *addr;
+setifnetmask(const char *addr, int ignored)
 {
 	(*afp->af_getaddr)(addr, MASK);
 }
 
 void
-setifbroadaddr(addr)
-	char *addr;
+setifbroadaddr(const char *addr, int ignored)
 {
 	(*afp->af_getaddr)(addr, DSTADDR);
 }
 
 void
-setifipdst(addr)
-	char *addr;
+setifipdst(const char *addr, int ignored)
 {
 	in_getaddr(addr, DSTADDR);
 	setipdst++;
@@ -851,9 +833,7 @@ setifipdst(addr)
 #define rqtosa(x) (&(((struct ifreq *)(afp->x))->ifr_addr))
 /*ARGSUSED*/
 void
-notealias(addr, param)
-	char *addr;
-	int param;
+notealias(const char *addr, int param)
 {
 	if (setaddr && doalias == 0 && param < 0)
 		memcpy(rqtosa(af_ridreq), rqtosa(af_addreq),
@@ -868,18 +848,14 @@ notealias(addr, param)
 
 /*ARGSUSED*/
 void
-notrailers(vname, value)
-	char *vname;
-	int value;
+notrailers(const char *vname, int value)
 {
 	printf("Note: trailers are no longer sent, but always received\n");
 }
 
 /*ARGSUSED*/
 void
-setifdstaddr(addr, param)
-	char *addr;
-	int param;
+setifdstaddr(const char *addr, int param)
 {
 	setaddr++;
 	(*afp->af_getaddr)(addr, DSTADDR);
@@ -891,9 +867,7 @@ setifdstaddr(addr, param)
  * Make a private copy so we can avoid that.
  */
 void
-setifflags(vname, value)
-	char *vname;
-	int value;
+setifflags(const char *vname, int value)
 {
 	struct ifreq my_ifr;
 
@@ -916,9 +890,7 @@ setifflags(vname, value)
 
 #ifdef INET6
 void
-setia6flags(vname, value)
-	char *vname;
-	int value;
+setia6flags(const char *vname, int value)
 {
 
 	if (value < 0) {
@@ -929,27 +901,21 @@ setia6flags(vname, value)
 }
 
 void
-setia6pltime(val, d)
-	char *val;
-	int d;
+setia6pltime(const char *val, int d)
 {
 
 	setia6lifetime("pltime", val);
 }
 
 void
-setia6vltime(val, d)
-	char *val;
-	int d;
+setia6vltime(const char *val, int d)
 {
 
 	setia6lifetime("vltime", val);
 }
 
 void
-setia6lifetime(cmd, val)
-	char *cmd;
-	char *val;
+setia6lifetime(const char *cmd, const char *val)
 {
 	time_t newval, t;
 	char *ep;
@@ -970,9 +936,7 @@ setia6lifetime(cmd, val)
 }
 
 void
-setia6eui64(cmd, val)
-	const char *cmd;
-	int val;
+setia6eui64(const char *cmd, int val)
 {
 	struct ifaddrs *ifap, *ifa;
 	const struct sockaddr_in6 *sin6 = NULL;
@@ -1006,8 +970,7 @@ setia6eui64(cmd, val)
 #endif
 
 void
-setifmetric(val)
-	char *val;
+setifmetric(const char *val, int ignored)
 {
 	char *ep = NULL;
 
@@ -1020,9 +983,7 @@ setifmetric(val)
 }
 
 void
-setifmtu(val, d)
-	char *val;
-	int d;
+setifmtu(const char *val, int d)
 {
 	char *ep = NULL;
 
@@ -1035,10 +996,7 @@ setifmtu(val, d)
 }
 
 const char *
-get_string(val, sep, buf, lenp)
-	const char *val, *sep;
-	u_int8_t *buf;
-	int *lenp;
+get_string(const char *val, const char *sep, u_int8_t *buf, int *lenp)
 {
 	int len;
 	int hexstr;
@@ -1091,9 +1049,7 @@ get_string(val, sep, buf, lenp)
 }
 
 void
-print_string(buf, len)
-	const u_int8_t *buf;
-	int len;
+print_string(const u_int8_t *buf, int len)
 {
 	int i;
 	int hasspc;
@@ -1122,9 +1078,7 @@ print_string(buf, len)
 }
 
 void
-setifnwid(val, d)
-	const char *val;
-	int d;
+setifnwid(const char *val, int d)
 {
 	struct ieee80211_nwid nwid;
 	int len;
@@ -1140,9 +1094,7 @@ setifnwid(val, d)
 }
 
 void
-setifnwkey(val, d)
-	const char *val;
-	int d;
+setifnwkey(const char *val, int d)
 {
 	int i, len;
 	char *cp = NULL;
@@ -1205,9 +1157,7 @@ setifnwkey(val, d)
 }
 
 void
-setifpowersave(val, d)
-	const char *val;
-	int d;
+setifpowersave(const char *val, int d)
 {
 	struct ieee80211_power power;
 
@@ -1223,9 +1173,7 @@ setifpowersave(val, d)
 }
 
 void
-setifpowersavesleep(val, d)
-	const char *val;
-	int d;
+setifpowersavesleep(const char *val, int d)
 {
 	struct ieee80211_power power;
 
@@ -1241,7 +1189,7 @@ setifpowersavesleep(val, d)
 }
 
 void
-ieee80211_status()
+ieee80211_status(void)
 {
 	int len, i, nwkey_verbose;
 	struct ieee80211_nwid nwid;
@@ -1329,7 +1277,7 @@ ieee80211_status()
 }
 
 void
-init_current_media()
+init_current_media(void)
 {
 	struct ifmediareq ifmr;
 
@@ -1359,7 +1307,7 @@ init_current_media()
 }
 
 void
-process_media_commands()
+process_media_commands(void)
 {
 
 	if ((actions & (A_MEDIA|A_MEDIAOPT)) == 0) {
@@ -1382,9 +1330,7 @@ process_media_commands()
 }
 
 void
-setmedia(val, d)
-	char *val;
-	int d;
+setmedia(const char *val, int d)
 {
 	int type, subtype, inst;
 
@@ -1416,9 +1362,7 @@ setmedia(val, d)
 }
 
 void
-setmediaopt(val, d)
-	char *val;
-	int d;
+setmediaopt(const char *val, int d)
 {
 
 	init_current_media();
@@ -1437,9 +1381,7 @@ setmediaopt(val, d)
 }
 
 void
-unsetmediaopt(val, d)
-	char *val;
-	int d;
+unsetmediaopt(const char *val, int d)
 {
 
 	init_current_media();
@@ -1463,9 +1405,7 @@ unsetmediaopt(val, d)
 }
 
 void
-setmediainst(val, d)
-	char *val;
-	int d;
+setmediainst(const char *val, int d)
 {
 	int type, subtype, options, inst;
 
@@ -1502,8 +1442,7 @@ const struct ifmedia_description ifm_option_descriptions[] =
     IFM_OPTION_DESCRIPTIONS;
 
 const char *
-get_media_type_string(mword)
-	int mword;
+get_media_type_string(int mword)
 {
 	const struct ifmedia_description *desc;
 
@@ -1516,8 +1455,7 @@ get_media_type_string(mword)
 }
 
 const char *
-get_media_subtype_string(mword)
-	int mword;
+get_media_subtype_string(int mword)
 {
 	const struct ifmedia_description *desc;
 
@@ -1531,9 +1469,7 @@ get_media_subtype_string(mword)
 }
 
 int
-get_media_subtype(type, val)
-	int type;
-	const char *val;
+get_media_subtype(int type, const char *val)
 {
 	int rval;
 
@@ -1546,9 +1482,7 @@ get_media_subtype(type, val)
 }
 
 int
-get_media_options(type, val)
-	int type;
-	const char *val;
+get_media_options(int type, const char *val)
 {
 	char *optlist, *str;
 	int option, rval = 0;
@@ -1575,10 +1509,8 @@ get_media_options(type, val)
 }
 
 int
-lookup_media_word(desc, type, val)
-	const struct ifmedia_description *desc;
-	int type;
-	const char *val;
+lookup_media_word(const struct ifmedia_description *desc, int type,
+    const char *val)
 {
 
 	for (; desc->ifmt_string != NULL; desc++) {
@@ -1590,8 +1522,7 @@ lookup_media_word(desc, type, val)
 }
 
 void
-print_media_word(ifmw, print_type, as_syntax)
-	int ifmw, print_type, as_syntax;
+print_media_word(int ifmw, int print_type, int as_syntax)
 {
 	const struct ifmedia_description *desc;
 	int seen_option = 0;
@@ -1623,8 +1554,7 @@ print_media_word(ifmw, print_type, as_syntax)
 \11PROMISC\12ALLMULTI\13OACTIVE\14SIMPLEX\15LINK0\16LINK1\17LINK2\20MULTICAST"
 
 static void
-phys_status(force)
-	int force;
+phys_status(int force)
 {
 	char psrcaddr[NI_MAXHOST];
 	char pdstaddr[NI_MAXHOST];
@@ -1674,9 +1604,7 @@ const struct ifmedia_status_description ifm_status_descriptions[] =
  * specified, show it and it only; otherwise, show them all.
  */
 void
-status(link, sdl)
-	int link;
-	struct sockaddr_dl *sdl;
+status(int link, struct sockaddr_dl *sdl)
 {
 	const struct afswtch *p = afp;
 	struct ifmediareq ifmr;
@@ -1797,11 +1725,9 @@ status(link, sdl)
 
 
 void
-in_status(force)
-	int force;
+in_status(int force)
 {
 	struct sockaddr_in *sin, sin2;
-	char *inet_ntoa();
 
 	getsock(AF_INET);
 	if (s < 0) {
@@ -1859,9 +1785,7 @@ in_status(force)
 }
 
 void
-setifprefixlen(addr, d)
-	char *addr;
-	int d;
+setifprefixlen(const char *addr, int d)
 {
 	if (*afp->af_getprefix)
 		(*afp->af_getprefix)(addr, MASK);
@@ -1870,8 +1794,7 @@ setifprefixlen(addr, d)
 
 #ifdef INET6
 void
-in6_fillscopeid(sin6)
-	struct sockaddr_in6 *sin6;
+in6_fillscopeid(struct sockaddr_in6 *sin6)
 {
 #if defined(__KAME__) && defined(KAME_SCOPEID)
 	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
@@ -1884,8 +1807,7 @@ in6_fillscopeid(sin6)
 
 /* XXX not really an alias */
 void
-in6_alias(creq)
-	struct in6_ifreq *creq;
+in6_alias(struct in6_ifreq *creq)
 {
 	struct sockaddr_in6 *sin6;
 	struct	in6_ifreq ifr6;		/* shadows file static variable */
@@ -2000,8 +1922,7 @@ in6_alias(creq)
 }
 
 void
-in6_status(force)
-	int force;
+in6_status(int force)
 {
 	in6_alias((struct in6_ifreq *)&ifr6);
 }
@@ -2010,8 +1931,7 @@ in6_status(force)
 #ifndef INET_ONLY
 
 void
-at_status(force)
-	int force;
+at_status(int force)
 {
 	struct sockaddr_at *sat, null_sat;
 	struct netrange *nr;
@@ -2067,8 +1987,7 @@ at_status(force)
 }
 
 void
-xns_status(force)
-	int force;
+xns_status(int force)
 {
 	struct sockaddr_ns *sns;
 
@@ -2106,9 +2025,7 @@ xns_status(force)
 }
 
 void
-setipxframetype(vname, type)
-	char	*vname;
-	int	type;
+setipxframetype(const char *vname, int type)
 {
 	struct  sockaddr_ipx	*sipx;
 
@@ -2126,8 +2043,7 @@ setipxframetype(vname, type)
 }
 
 void
-ipx_status(force)
-	int force;
+ipx_status(int force)
 {
 	struct sockaddr_ipx *sipx;
 
@@ -2166,11 +2082,11 @@ ipx_status(force)
 			int	type;
 			char	*name;
 		} *p, frames[] = {
-			{ ETHERTYPE_8022, "802.2" },
-			{ ETHERTYPE_8022TR, "802.2tr" },
-			{ ETHERTYPE_8023, "802.3" },
-			{ ETHERTYPE_SNAP, "SNAP" },
-			{ ETHERTYPE_II,  "EtherII" },
+			{ IPX_ETHERTYPE_8022, "802.2" },
+			{ IPX_ETHERTYPE_8022TR, "802.2tr" },
+			{ IPX_ETHERTYPE_8023, "802.3" },
+			{ IPX_ETHERTYPE_SNAP, "SNAP" },
+			{ IPX_ETHERTYPE_II,  "EtherII" },
 			{ 0, NULL }
 		};
 		for (p = frames; p->name && p->type != sipx->sipx_type; p++);
@@ -2181,8 +2097,7 @@ ipx_status(force)
 }
 
 void
-iso_status(force)
-	int force;
+iso_status(int force)
 {
 	struct sockaddr_iso *siso;
 	struct iso_ifreq ifr;
@@ -2230,17 +2145,13 @@ iso_status(force)
 
 #endif	/* INET_ONLY */
 
-struct	in_addr inet_makeaddr();
-
 #define SIN(x) ((struct sockaddr_in *) &(x))
 struct sockaddr_in *sintab[] = {
 SIN(ridreq.ifr_addr), SIN(in_addreq.ifra_addr),
 SIN(in_addreq.ifra_mask), SIN(in_addreq.ifra_broadaddr)};
 
 void
-in_getaddr(s, which)
-	char *s;
-	int which;
+in_getaddr(const char *s, int which)
 {
 	struct sockaddr_in *sin = sintab[which];
 	struct hostent *hp;
@@ -2261,9 +2172,7 @@ in_getaddr(s, which)
 }
 
 void
-in_getprefix(plen, which)
-	char *plen;
-	int which;
+in_getprefix(const char *plen, int which)
 {
 	struct sockaddr_in *sin = sintab[which];
 	u_char *cp;
@@ -2289,10 +2198,7 @@ in_getprefix(plen, which)
  * Print a value a la the %b format of the kernel's printf
  */
 void
-printb(s, v, bits)
-	char *s;
-	char *bits;
-	unsigned short v;
+printb(char *s, unsigned short v, char *bits)
 {
 	int i, any = 0;
 	char c;
@@ -2326,9 +2232,7 @@ SIN6(in6_ridreq.ifr_addr), SIN6(in6_addreq.ifra_addr),
 SIN6(in6_addreq.ifra_prefixmask), SIN6(in6_addreq.ifra_dstaddr)};
 
 void
-in6_getaddr(s, which)
-	char *s;
-	int which;
+in6_getaddr(const char *s, int which)
 {
 #ifndef KAME_SCOPEID
 	struct sockaddr_in6 *sin6 = sin6tab[which];
@@ -2367,9 +2271,7 @@ in6_getaddr(s, which)
 }
 
 void
-in6_getprefix(plen, which)
-	char *plen;
-	int which;
+in6_getprefix(const char *plen, int which)
 {
 	struct sockaddr_in6 *sin6 = sin6tab[which];
 	u_char *cp;
@@ -2392,9 +2294,7 @@ in6_getprefix(plen, which)
 }
 
 int
-prefix(val, size)
-	void *val;
-	int size;
+prefix(void *val, int size)
 {
 	u_char *name = (u_char *)val;
 	int byte, bit, plen = 0;
@@ -2420,9 +2320,7 @@ prefix(val, size)
 
 #ifndef INET_ONLY
 void
-at_getaddr(addr, which)
-	char *addr;
-	int which;
+at_getaddr(const char *addr, int which)
 {
 	struct sockaddr_at *sat = (struct sockaddr_at *) &addreq.ifra_addr;
 	u_int net, node;
@@ -2439,9 +2337,7 @@ at_getaddr(addr, which)
 }
 
 void
-setatrange(range, d)
-	char *range;
-	int d;
+setatrange(const char *range, int d)
 {
 	u_short first = 123, last = 123;
 
@@ -2454,9 +2350,7 @@ setatrange(range, d)
 }
 
 void
-setatphase(phase, d)
-	char *phase;
-	int d;
+setatphase(const char *phase, int d)
 {
 	if (!strcmp(phase, "1"))
 		at_nr.nr_phase = 1;
@@ -2467,8 +2361,7 @@ setatphase(phase, d)
 }
 
 void
-checkatrange(sat)
-	struct sockaddr_at *sat;
+checkatrange(struct sockaddr_at *sat)
 {
 	if (at_nr.nr_phase == 0)
 		at_nr.nr_phase = 2;	/* Default phase 2 */
@@ -2491,12 +2384,9 @@ SNS(ridreq.ifr_addr), SNS(addreq.ifra_addr),
 SNS(addreq.ifra_mask), SNS(addreq.ifra_broadaddr)};
 
 void
-xns_getaddr(addr, which)
-	char *addr;
-	int which;
+xns_getaddr(const char *addr, int which)
 {
 	struct sockaddr_ns *sns = snstab[which];
-	struct ns_addr ns_addr();
 
 	sns->sns_family = AF_NS;
 	sns->sns_len = sizeof(*sns);
@@ -2511,12 +2401,9 @@ SIPX(ridreq.ifr_addr), SIPX(addreq.ifra_addr),
 SIPX(addreq.ifra_mask), SIPX(addreq.ifra_broadaddr)};
 
 void
-ipx_getaddr(addr, which)
-	char *addr;
-	int which;
+ipx_getaddr(const char *addr, int which)
 {
 	struct sockaddr_ipx *sipx = sipxtab[which];
-	struct ipx_addr ipx_addr();
 
 	sipx->sipx_family = AF_IPX;
 	sipx->sipx_len  = sizeof(*sipx);
@@ -2532,12 +2419,9 @@ SISO(iso_ridreq.ifr_Addr), SISO(iso_addreq.ifra_addr),
 SISO(iso_addreq.ifra_mask), SISO(iso_addreq.ifra_dstaddr)};
 
 void
-iso_getaddr(addr, which)
-	char *addr;
-	int which;
+iso_getaddr(const char *addr, int which)
 {
 	struct sockaddr_iso *siso = sisotab[which];
-	struct iso_addr *iso_addr();
 	siso->siso_addr = *iso_addr(addr);
 
 	if (which == MASK) {
@@ -2550,15 +2434,13 @@ iso_getaddr(addr, which)
 }
 
 void
-setsnpaoffset(val)
-	char *val;
+setsnpaoffset(const char *val, int ignored)
 {
 	iso_addreq.ifra_snpaoffset = atoi(val);
 }
 
 void
-setnsellength(val)
-	char *val;
+setnsellength(const char *val, int ignored)
 {
 	nsellength = atoi(val);
 	if (nsellength < 0)
@@ -2568,8 +2450,7 @@ setnsellength(val)
 }
 
 void
-fixnsel(s)
-	struct sockaddr_iso *s;
+fixnsel(struct sockaddr_iso *s)
 {
 	if (s->siso_family == 0)
 		return;
@@ -2577,7 +2458,7 @@ fixnsel(s)
 }
 
 void
-adjust_nsellength()
+adjust_nsellength(void)
 {
 	fixnsel(sisotab[RIDADDR]);
 	fixnsel(sisotab[ADDR]);
@@ -2587,7 +2468,7 @@ adjust_nsellength()
 #endif	/* INET_ONLY */
 
 void
-usage()
+usage(void)
 {
 	fprintf(stderr, "usage: ifconfig [ -m ] [ -a ] [ -A ] [ interface ]\n"
 		"\t[ [af] [ address [ dest_addr ] ] [ up ] [ down ] "
@@ -2614,7 +2495,8 @@ usage()
 static int __tag = 0;
 static int __have_tag = 0;
 
-void vlan_status()
+void
+vlan_status(void)
 {
 	struct vlanreq vreq;
 
@@ -2632,9 +2514,8 @@ void vlan_status()
 	return;
 }
 
-void setvlantag(val, d)
-	char *val;
-	int d;
+void
+setvlantag(const char *val, int d)
 {
 	u_int16_t tag;
 	struct vlanreq vreq;
@@ -2656,9 +2537,8 @@ void setvlantag(val, d)
 	return;
 }
 
-void setvlandev(val, d)
-	char *val;
-	int d;
+void
+setvlandev(const char *val, int d)
 {
 	struct vlanreq vreq;
 
@@ -2680,9 +2560,8 @@ void setvlandev(val, d)
 	return;
 }
 
-void unsetvlandev(val, d)
-	char *val;
-	int d;
+void
+unsetvlandev(const char *val, int d)
 {
 	struct vlanreq vreq;
 
@@ -2705,8 +2584,7 @@ void unsetvlandev(val, d)
 
 #ifdef INET6
 char *
-sec2str(total)
-	time_t total;
+sec2str(time_t total)
 {
 	static char result[256];
 	int days, hours, mins, secs;

@@ -1,4 +1,4 @@
-.\"	$OpenBSD: ping.8,v 1.26 2003/02/11 07:26:20 jmc Exp $
+.\"	$OpenBSD: ping.8,v 1.28 2003/06/03 13:16:08 jmc Exp $
 .\"	$NetBSD: ping.8,v 1.10 1995/12/31 04:55:35 ghudson Exp $
 .\"
 .\" Copyright (c) 1985, 1991, 1993
@@ -12,11 +12,7 @@
 .\" 2. Redistributions in binary form must reproduce the above copyright
 .\"    notice, this list of conditions and the following disclaimer in the
 .\"    documentation and/or other materials provided with the distribution.
-.\" 3. All advertising materials mentioning features or use of this software
-.\"    must display the following acknowledgement:
-.\"	This product includes software developed by the University of
-.\"	California, Berkeley and its contributors.
-.\" 4. Neither the name of the University nor the names of its contributors
+.\" 3. Neither the name of the University nor the names of its contributors
 .\"    may be used to endorse or promote products derived from this software
 .\"    without specific prior written permission.
 .\"
@@ -350,8 +346,7 @@ Set it to 255; this is what current Berkeley Unix systems do.
 In this case the
 .Tn TTL
 value in the received packet will be 255 minus the
-number of routers in the path
-.Xr from
+number of routers in the path from
 the remote system to the pinging host.
 .It
 Set it to some other value.
@@ -362,6 +357,16 @@ packets that they use for
 packets, for example either 30 or 60.
 Others may use completely wild values.
 .El
+.Sh SEE ALSO
+.Xr netstat 1 ,
+.Xr ifconfig 8 ,
+.Xr routed 8 ,
+.Xr spray 8
+.Sh HISTORY
+The
+.Nm
+command appeared in
+.Bx 4.3 .
 .Sh BUGS
 Many hosts and gateways ignore the
 .Tn RECORD_ROUTE
@@ -375,13 +380,3 @@ There's not much that can be done about this, however.
 .Pp
 Flood pinging is not recommended in general, and flood pinging the
 broadcast address should only be done under very controlled conditions.
-.Sh SEE ALSO
-.Xr netstat 1 ,
-.Xr ifconfig 8 ,
-.Xr routed 8 ,
-.Xr spray 8
-.Sh HISTORY
-The
-.Nm
-command appeared in
-.Bx 4.3 .

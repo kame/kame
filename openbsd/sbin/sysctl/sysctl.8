@@ -1,4 +1,4 @@
-.\"	$OpenBSD: sysctl.8,v 1.97 2003/03/21 23:06:42 jason Exp $
+.\"	$OpenBSD: sysctl.8,v 1.107 2003/09/09 11:55:05 jmc Exp $
 .\"	$NetBSD: sysctl.8,v 1.4 1995/09/30 07:12:49 thorpej Exp $
 .\"
 .\" Copyright (c) 1993
@@ -12,11 +12,7 @@
 .\" 2. Redistributions in binary form must reproduce the above copyright
 .\"    notice, this list of conditions and the following disclaimer in the
 .\"    documentation and/or other materials provided with the distribution.
-.\" 3. All advertising materials mentioning features or use of this software
-.\"    must display the following acknowledgement:
-.\"	This product includes software developed by the University of
-.\"	California, Berkeley and its contributors.
-.\" 4. Neither the name of the University nor the names of its contributors
+.\" 3. Neither the name of the University nor the names of its contributors
 .\"    may be used to endorse or promote products derived from this software
 .\"    without specific prior written permission.
 .\"
@@ -43,22 +39,23 @@
 .Sh SYNOPSIS
 .Nm sysctl
 .Op Fl n
-.Ar name ...
+.Ar variable ...
 .Nm sysctl
-.Op Fl n
+.Op Fl nq
 .Fl w
-.Ar name=value ...
+.Ar variable Ns = Ns Ar value ...
 .Nm sysctl
-.Op Fl n
 .Fl aA
+.Op Fl n
 .Sh DESCRIPTION
 The
 .Nm
 utility retrieves kernel state and allows processes with
 appropriate privilege to set kernel state.
 The state to be retrieved or set is described using a
-``Management Information Base'' (``MIB'') style name,
-described as a dotted set of components.
+.Dq Management Information Base
+.Pq MIB
+style name, described as a dotted set of components.
 .Pp
 The options are as follows:
 .Bl -tag -width xxx
@@ -72,11 +69,14 @@ flag; for the table values, the name of the utility to retrieve them is given.
 .It Fl n
 Suppress printing of the field name, only output the field value.
 Useful for setting shell variables.
-.Bd -literal
-Example:
-      Set the psize shell variable to the pagesize of the hardware
-    # set psize=`sysctl -n hw.pagesize`
-.Ed
+For example, to set the psize shell variable to the pagesize of the hardware:
+.Pp
+.Dl # set psize=`sysctl -n hw.pagesize`
+.Pp
+.It Fl q
+Suppress all output when setting a variable.
+This option overrides the behaviour of
+.Fl n .
 .It Fl w
 Required to set a variable.
 The MIB name should be followed by an equal sign and the new value.
@@ -169,6 +169,8 @@ privilege can change the value.
 .It kern.shminfo.shmall	integer	yes
 .It kern.watchdog.period	integer	yes
 .It kern.watchdog.auto	integer	yes
+.It kern.emul.nemuls	integer	no
+.It kern.emul.other	integer	yes
 .It vm.vmmeter	struct	no
 .It vm.loadavg	struct	no
 .It vm.psstrings	struct	no
@@ -293,6 +295,7 @@ privilege can change the value.
 .It hw.diskstats	struct	no
 .It hw.disknames	string	no
 .It hw.diskcount	integer	no
+.It hw.sensors	struct	no
 .It machdep.console_device	dev_t	no
 .It machdep.unaligned_print	integer	yes (alpha only)
 .It machdep.unaligned_fix	integer	yes (alpha only)
@@ -300,6 +303,7 @@ privilege can change the value.
 .It machdep.apmwarn	integer	yes (i386 only)
 .It machdep.apmhalt	integer	yes (i386 only)
 .It machdep.kbdreset	integer	yes (i386 only)
+.It machdep.userldt	integer	yes (i386 only)
 .It machdep.allowaperture	integer	yes (XFree86)
 .It machdep.led_blink	integer	yes (sparc/sparc64)
 .It machdep.ceccerrs	integer	no (sparc64)
@@ -330,6 +334,7 @@ privilege can change the value.
 .It ddb.tab_stop_width	integer	yes
 .It ddb.panic	integer	yes
 .It ddb.console	integer	yes
+.It ddb.log	integer	yes
 .It vfs.mounts.*	struct	no
 .It vfs.ffs.doclusterread	integer	yes
 .It vfs.ffs.doclusterwrite	integer	yes
@@ -355,58 +360,90 @@ The
 program can get or set debugging variables
 that have been identified for its display.
 This information can be obtained by using the command:
-.Bd -literal -offset indent
-$ sysctl debug
-.Ed
+.Pp
+.Dl $ sysctl debug
 .Pp
 In addition,
 .Nm
 can extract information about the filesystems that have been compiled
 into the running system.
 This information can be obtained by using the command:
-.Bd -literal -offset indent
-$ sysctl vfs.mounts
-.Ed
+.Pp
+.Dl $ sysctl vfs.mounts
 .Pp
 By default, only filesystems that are actively being used are listed.
 Use of the
 .Fl A
 flag lists all the filesystems compiled into the running kernel.
+.Sh FILES
+.Bl -tag -width <uvm/uvm_swap_encrypt.h> -compact
+.It Aq Pa sys/sysctl.h
+definitions for top level identifiers, second level kernel and hardware
+identifiers, and user level identifiers
+.It Aq Pa dev/rndvar.h
+definitions for
+.Xr random 4
+device's statistics structure
+.It Aq Pa sys/socket.h
+definitions for second level network identifiers
+.It Aq Pa sys/gmon.h
+definitions for third level profiling identifiers
+.It Aq Pa uvm/uvm_param.h
+definitions for second level virtual memory identifiers
+.It Aq Pa uvm/uvm_swap_encrypt.h
+definitions for third level virtual memory identifiers
+.It Aq Pa netinet/in.h
+definitions for third level IPv4/v6 identifiers and
+fourth level IPv4/v6 identifiers
+.It Aq Pa netinet/icmp_var.h
+definitions for fourth level ICMP identifiers
+.It Aq Pa netinet6/icmp6.h
+definitions for fourth level ICMPv6 identifiers
+.It Aq Pa netinet/tcp_var.h
+definitions for fourth level TCP identifiers
+.It Aq Pa netinet/udp_var.h
+definitions for fourth level UDP identifiers
+.It Aq Pa netipx/ipx_var.h
+definitions for third level IPX identifiers and
+fourth level IPX identifiers
+.It Aq Pa ddb/db_var.h
+definitions for second level ddb identifiers
+.It Aq Pa sys/mount.h
+definitions for second level vfs identifiers
+.It Aq Pa nfs/nfs.h
+definitions for third level NFS identifiers
+.It Aq Pa ufs/ffs/ffs_extern.h
+definitions for third level FFS identifiers
+.El
 .Sh EXAMPLES
 To retrieve the maximum number of processes allowed
 in the system:
-.Bd -literal -offset indent
-$ sysctl kern.maxproc
-.Ed
+.Pp
+.Dl $ sysctl kern.maxproc
 .Pp
 To set the maximum number of processes allowed
 in the system to 1000:
-.Bd -literal -offset indent
-# sysctl -w kern.maxproc=1000
-.Ed
+.Pp
+.Dl # sysctl -w kern.maxproc=1000
 .Pp
 To retrieve information about the system clock rate:
-.Bd -literal -offset indent
-$ sysctl kern.clockrate
-.Ed
+.Pp
+.Dl $ sysctl kern.clockrate
 .Pp
 To retrieve information about the load average history:
-.Bd -literal -offset indent
-$ sysctl vm.loadavg
-.Ed
+.Pp
+.Dl $ sysctl vm.loadavg
 .Pp
 To make the
 .Xr chown 2
 system call use traditional BSD semantics (don't clear setuid/setgid bits):
-.Bd -literal -offset indent
-# sysctl -w fs.posix.setuid=0
-.Ed
+.Pp
+.Dl # sysctl -w fs.posix.setuid=0
 .Pp
 To set the list of reserved TCP ports that should not be allocated
 by the kernel dynamically:
-.Bd -literal -offset indent
-# sysctl -w net.inet.tcp.baddynamic=749,750,751,760,761,871
-.Ed
+.Pp
+.Dl # sysctl -w net.inet.tcp.baddynamic=749,750,751,760,761,871
 .Pp
 This can be used to keep daemons
 from stealing a specific port that another program needs to function.
@@ -422,9 +459,8 @@ To adjust the number of kernel
 .Nm nfsio
 threads used to service asynchronous
 I/O requests on an NFS client machine:
-.Bd -literal -offset indent
-# sysctl -w vfs.nfs.iothreads=4
-.Ed
+.Pp
+.Dl # sysctl -w vfs.nfs.iothreads=4
 .Pp
 The number of 4 is the default, 20 is the maximum.
 See
@@ -435,50 +471,10 @@ for further discussion.
 .Pp
 To set the amount of shared memory available in the system and
 the maximum number of shared memory segments:
-.Bd -literal noffset indent
+.Bd -literal -offset indent
 # sysctl -w kern.shminfo.shmmax=33554432
 # sysctl -w kern.shminfo.shmseg=32
 .Ed
-.Sh FILES
-.Bl -tag -width <ufs/ffs/ffs_extern.h> -compact
-.It Pa <sys/sysctl.h>
-definitions for top level identifiers, second level kernel and hardware
-identifiers, and user level identifiers
-.It Pa <dev/rndvar.h>
-definitions for
-.Xr random 4
-device's statistics structure
-.It Pa <sys/socket.h>
-definitions for second level network identifiers
-.It Pa <sys/gmon.h>
-definitions for third level profiling identifiers
-.It Pa <uvm/uvm_param.h>
-definitions for second level virtual memory identifiers
-.It Pa <uvm/uvm_swap_encrypt.h>
-definitions for third level virtual memory identifiers
-.It Pa <netinet/in.h>
-definitions for third level IPv4/v6 identifiers and
-fourth level IPv4/v6 identifiers
-.It Pa <netinet/icmp_var.h>
-definitions for fourth level ICMP identifiers
-.It Pa <netinet6/icmp6.h>
-definitions for fourth level ICMPv6 identifiers
-.It Pa <netinet/tcp_var.h>
-definitions for fourth level TCP identifiers
-.It Pa <netinet/udp_var.h>
-definitions for fourth level UDP identifiers
-.It Pa <netipx/ipx_var.h>
-definitions for third level IPX identifiers and
-fourth level IPX identifiers
-.It Pa <ddb/db_var.h>
-definitions for second level ddb identifiers
-.It Pa <sys/mount.h>
-definitions for second level vfs identifiers
-.It Pa <nfs/nfs.h>
-definitions for third level NFS identifiers
-.It Pa <ufs/ffs/ffs_extern.h>
-definitions for third level FFS identifiers
-.El
 .Sh SEE ALSO
 .Xr sysctl 3 ,
 .Xr sysctl.conf 5

@@ -1,4 +1,4 @@
-/*	$OpenBSD: sysctl.c,v 1.86 2003/01/21 16:59:23 markus Exp $	*/
+/*	$OpenBSD: sysctl.c,v 1.98 2003/09/09 11:55:05 jmc Exp $	*/
 /*	$NetBSD: sysctl.c,v 1.9 1995/09/30 07:12:50 thorpej Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -44,7 +40,7 @@ static const char copyright[] =
 #if 0
 static const char sccsid[] = "@(#)sysctl.c	8.5 (Berkeley) 5/9/95";
 #else
-static char *rcsid = "$OpenBSD: sysctl.c,v 1.86 2003/01/21 16:59:23 markus Exp $";
+static char *rcsid = "$OpenBSD: sysctl.c,v 1.98 2003/09/09 11:55:05 jmc Exp $";
 #endif
 #endif /* not lint */
 
@@ -61,6 +57,7 @@ static char *rcsid = "$OpenBSD: sysctl.c,v 1.86 2003/01/21 16:59:23 markus Exp $
 #include <sys/uio.h>
 #include <sys/tty.h>
 #include <sys/namei.h>
+#include <sys/sensors.h>
 #include <machine/cpu.h>
 #include <net/route.h>
 
@@ -164,7 +161,7 @@ struct list secondlevel[] = {
 	{ 0, 0 },			/* CTL_VFS */
 };
 
-int	Aflag, aflag, nflag, wflag;
+int	Aflag, aflag, nflag, qflag, wflag;
 
 /*
  * Variables requiring special processing.
@@ -181,7 +178,8 @@ int	Aflag, aflag, nflag, wflag;
 #define	UNSIGNED	0x00000200
 #define	KMEMBUCKETS	0x00000400
 #define	LONGARRAY	0x00000800
-#define KMEMSTATS	0x00001000
+#define	KMEMSTATS	0x00001000
+#define	SENSORS		0x00002000
 
 /* prototypes */
 void debuginit(void);
@@ -207,6 +205,8 @@ int sysctl_malloc(char *, char **, int *, int, int *);
 int sysctl_seminfo(char *, char **, int *, int, int *);
 int sysctl_shminfo(char *, char **, int *, int, int *);
 int sysctl_watchdog(char *, char **, int *, int, int *);
+int sysctl_sensors(char *, char **, int *, int, int *);
+int sysctl_emul(char *, char *, int);
 #ifdef CPU_CHIPSET
 int sysctl_chipset(char *, char **, int *, int, int *);
 #endif
@@ -217,7 +217,7 @@ main(int argc, char *argv[])
 {
 	int ch, lvl1;
 
-	while ((ch = getopt(argc, argv, "Aanw")) != -1) {
+	while ((ch = getopt(argc, argv, "Aanqw")) != -1) {
 		switch (ch) {
 
 		case 'A':
@@ -230,6 +230,10 @@ main(int argc, char *argv[])
 
 		case 'n':
 			nflag = 1;
+			break;
+
+		case 'q':
+			qflag = 1;
 			break;
 
 		case 'w':
@@ -427,6 +431,9 @@ parse(char *string, int flags)
 			if (len < 0)
 				return;
 			break;
+		case KERN_EMUL:
+			sysctl_emul(string, newval, flags);
+			return;
 		}
 		break;
 
@@ -441,6 +448,12 @@ parse(char *string, int flags)
 				warnx("use vmstat to view %s information",
 				    string);
 			return;
+		case HW_SENSORS:
+			special |= SENSORS;
+			len = sysctl_sensors(string, &bufp, mib, flags, &type);
+			if (len < 0)
+				return;
+			break;
 		}
 		break;
 
@@ -580,6 +593,11 @@ parse(char *string, int flags)
 			break;
 		}
 #endif
+#ifdef CPU_LONGRUN
+		if (mib[1] == CPU_LONGRUN)
+			return;
+#endif
+
 		break;
 
 	case CTL_FS:
@@ -778,10 +796,12 @@ parse(char *string, int flags)
 				(void)printf("%s = ", string);
 			(void)printf("%u\n", *(u_int *)buf);
 		} else {
-			if (!nflag)
-				(void)printf("%s: %u -> ", string,
-				    *(u_int *)buf);
-			(void)printf("%u\n", *(u_int *)newval);
+			if (!qflag) {
+				if (!nflag)
+					(void)printf("%s: %u -> ", string,
+					    *(u_int *)buf);
+				(void)printf("%u\n", *(u_int *)newval);
+			}
 		}
 		return;
 	}
@@ -825,19 +845,10 @@ parse(char *string, int flags)
 		in_port_t port, lastport;
 		u_int32_t *baddynamic = (u_int32_t *)buf;
 
-		if (!nflag)
-			(void)printf("%s%s", string, newsize ? ": " : " = ");
-		lastport = 0;
-		for (port = IPPORT_RESERVED/2; port < IPPORT_RESERVED; port++)
-			if (DP_ISSET(baddynamic, port)) {
-				(void)printf("%s%hd", lastport ? "," : "",
-				    port);
-				lastport = port;
-			}
-		if (newsize != 0) {
+		if (!qflag) {
 			if (!nflag)
-				fputs(" -> ", stdout);
-			baddynamic = (u_int32_t *)newval;
+				(void)printf("%s%s", string,
+				    newsize ? ": " : " = ");
 			lastport = 0;
 			for (port = IPPORT_RESERVED/2; port < IPPORT_RESERVED;
 			    port++)
@@ -846,8 +857,21 @@ parse(char *string, int flags)
 					    lastport ? "," : "", port);
 					lastport = port;
 				}
+			if (newsize != 0) {
+				if (!nflag)
+					fputs(" -> ", stdout);
+				baddynamic = (u_int32_t *)newval;
+				lastport = 0;
+				for (port = IPPORT_RESERVED/2;
+				    port < IPPORT_RESERVED; port++)
+					if (DP_ISSET(baddynamic, port)) {
+						(void)printf("%s%hd",
+						    lastport ? "," : "", port);
+						lastport = port;
+					}
+			}
+			(void)putchar('\n');
 		}
-		(void)putchar('\n');
 		return;
 	}
 	if (special & LONGARRAY) {
@@ -859,6 +883,35 @@ parse(char *string, int flags)
 		putchar('\n');
 		return;
 	}
+	if (special & SENSORS) {
+		struct sensor *s = (struct sensor *)buf;
+
+		if (size > 0) {
+			if (!nflag)
+				printf("%s = ", string);
+			printf("%s, %s, ", s->device, s->desc);
+			switch (s->type) {
+			case SENSOR_TEMP:
+				printf("temp, %.2f degC / %.2f degF",
+				    (s->value / 1000000.0) - 273.16,
+				    ((s->value / 1000000.0) - 273.16) * 9 / 5 +
+				    32);
+				break;
+			case SENSOR_FANRPM:
+				printf("fanrpm, %lld RPM", s->value);
+				break;
+			case SENSOR_VOLTS_DC:
+				printf("volts_dc, %.2f V",
+				    s->value / 1000000.0);
+				break;
+			default:
+				printf("unknown");
+			}
+			printf("\n");
+		}
+		return;
+	}
+
 	switch (type) {
 	case CTLTYPE_INT:
 		if (newsize == 0) {
@@ -866,10 +919,12 @@ parse(char *string, int flags)
 				(void)printf("%s = ", string);
 			(void)printf("%d\n", *(int *)buf);
 		} else {
-			if (!nflag)
-				(void)printf("%s: %d -> ", string,
-				    *(int *)buf);
-			(void)printf("%d\n", *(int *)newval);
+			if (!qflag) {
+				if (!nflag)
+					(void)printf("%s: %d -> ", string,
+					    *(int *)buf);
+				(void)printf("%d\n", *(int *)newval);
+			}
 		}
 		return;
 
@@ -879,9 +934,11 @@ parse(char *string, int flags)
 				(void)printf("%s = ", string);
 			(void)puts(buf);
 		} else {
-			if (!nflag)
-				(void)printf("%s: %s -> ", string, buf);
-			(void)puts((char *)newval);
+			if (!qflag) {
+				if (!nflag)
+					(void)printf("%s: %s -> ", string, buf);
+				(void)puts((char *)newval);
+			}
 		}
 		return;
 
@@ -895,10 +952,13 @@ parse(char *string, int flags)
 		} else {
 			long long tmp = *(quad_t *)buf;
 
-			if (!nflag)
-				(void)printf("%s: %lld -> ", string, tmp);
-			tmp = *(quad_t *)newval;
-			(void)printf("%qd\n", tmp);
+			if (!qflag) {
+				if (!nflag)
+					(void)printf("%s: %lld -> ",
+					    string, tmp);
+				tmp = *(quad_t *)newval;
+				(void)printf("%qd\n", tmp);
+			}
 		}
 		return;
 
@@ -1046,7 +1106,7 @@ vfsinit(void)
 			vfsvars[cnt].size = NFS_MAXID;
 		}
 		vfs_typenums[cnt] = vfc.vfc_typenum;
-		strcat(&names[loc], vfc.vfc_name);
+		strlcat(&names[loc], vfc.vfc_name, sizeof names - loc);
 		vfsname[cnt].ctl_name = &names[loc];
 		vfsname[cnt].ctl_type = CTLTYPE_NODE;
 		size = strlen(vfc.vfc_name) + 1;
@@ -1109,7 +1169,7 @@ sysctl_vfs(char *string, char **bufpp, int mib[], int flags, int *typep)
 	if (lp->list == NULL) {
 		if (flags)
 			warnx("No variables defined for file system %s", string);
-		return(-1);
+		return (-1);
 	}
 	if (*bufpp == NULL) {
 		listall(string, lp);
@@ -1137,13 +1197,13 @@ sysctl_fs(char *string, char **bufpp, int mib[], int flags, int *typep)
 
 	if (*bufpp == NULL) {
 		listall(string, &fslist);
-		return(-1);
+		return (-1);
 	}
 	if ((indx = findname(string, "third", bufpp, &fslist)) == -1)
-		return(-1);
+		return (-1);
 	mib[2] = indx;
 	*typep = fslist.list[indx].ctl_type;
-	return(3);
+	return (3);
 }
 
 #ifdef CPU_BIOS
@@ -1161,10 +1221,10 @@ sysctl_bios(char *string, char **bufpp, int mib[], int flags, int *typep)
 
 	if (*bufpp == NULL) {
 		listall(string, &bioslist);
-		return(-1);
+		return (-1);
 	}
 	if ((indx = findname(string, "third", bufpp, &bioslist)) == -1)
-		return(-1);
+		return (-1);
 	mib[2] = indx;
 	if (indx == BIOS_DISKINFO) {
 		if (*bufpp == NULL) {
@@ -1176,18 +1236,18 @@ sysctl_bios(char *string, char **bufpp, int mib[], int flags, int *typep)
 					 string, indx);
 				parse(name, 1);
 			}
-			return(-1);
+			return (-1);
 		}
 		if ((name = strsep(bufpp, ".")) == NULL) {
 			warnx("%s: incomplete specification", string);
-			return(-1);
+			return (-1);
 		}
 		mib[3] = atoi(name);
 		*typep = CTLTYPE_STRUCT;
-		return(4);
+		return (4);
 	} else {
 		*typep = bioslist.list[indx].ctl_type;
-		return(3);
+		return (3);
 	}
 }
 #endif
@@ -1205,13 +1265,13 @@ sysctl_swpenc(char *string, char **bufpp, int mib[], int flags, int *typep)
 
 	if (*bufpp == NULL) {
 		listall(string, &swpenclist);
-		return(-1);
+		return (-1);
 	}
 	if ((indx = findname(string, "third", bufpp, &swpenclist)) == -1)
-		return(-1);
+		return (-1);
 	mib[2] = indx;
 	*typep = swpenclist.list[indx].ctl_type;
-	return(3);
+	return (3);
 }
 
 struct ctlname inetname[] = CTL_IPPROTO_NAMES;
@@ -1361,19 +1421,19 @@ sysctl_nchstats(char *string, char **bufpp, int mib[], int flags, int *typep)
 	if (*bufpp == NULL) {
 		bzero(&nch, sizeof(struct nchstats));
 		listall(string, &nchstatslist);
-		return(-1);
+		return (-1);
 	}
 	if ((indx = findname(string, "third", bufpp, &nchstatslist)) == -1)
-		return(-1);
+		return (-1);
 	mib[2] = indx;
 	if (*bufpp != NULL) {
 		warnx("fourth level name in %s is invalid", string);
-		return(-1);
+		return (-1);
 	}
 	if (keepvalue == 0) {
 		size = sizeof(struct nchstats);
 		if (sysctl(mib, 2, &nch, &size, NULL, 0) < 0)
-			return(-1);
+			return (-1);
 		keepvalue = 1;
 	}
 	if (!nflag)
@@ -1404,7 +1464,7 @@ sysctl_nchstats(char *string, char **bufpp, int mib[], int flags, int *typep)
 		(void)printf("%ld\n", nch.ncs_2passes);
 		break;
 	}
-	return(-1);
+	return (-1);
 }
 
 /*
@@ -1417,13 +1477,13 @@ sysctl_tty(char *string, char **bufpp, int mib[], int flags, int *typep)
 
 	if (*bufpp == NULL) {
 		listall(string, &ttylist);
-		return(-1);
+		return (-1);
 	}
 	if ((indx = findname(string, "third", bufpp, &ttylist)) == -1)
-		return(-1);
+		return (-1);
 	mib[2] = indx;
 	*typep = CTLTYPE_QUAD;
-	return(3);
+	return (3);
 }
 
 /*
@@ -1440,18 +1500,18 @@ sysctl_forkstat(char *string, char **bufpp, int mib[], int flags, int *typep)
 	if (*bufpp == NULL) {
 		bzero(&fks, sizeof(struct forkstat));
 		listall(string, &forkstatlist);
-		return(-1);
+		return (-1);
 	}
 	if ((indx = findname(string, "third", bufpp, &forkstatlist)) == -1)
-		return(-1);
+		return (-1);
 	if (*bufpp != NULL) {
 		warnx("fourth level name in %s is invalid", string);
-		return(-1);
+		return (-1);
 	}
 	if (keepvalue == 0) {
 		size = sizeof(struct forkstat);
 		if (sysctl(mib, 2, &fks, &size, NULL, 0) < 0)
-			return(-1);
+			return (-1);
 		keepvalue = 1;
 	}
 	if (!nflag)
@@ -1482,7 +1542,7 @@ sysctl_forkstat(char *string, char **bufpp, int mib[], int flags, int *typep)
 		(void)printf("%d\n", fks.sizkthread);
 		break;
 	}
-	return(-1);
+	return (-1);
 }
 
 /*
@@ -1498,10 +1558,10 @@ sysctl_malloc(char *string, char **bufpp, int mib[], int flags, int *typep)
 
 	if (*bufpp == NULL) {
 		listall(string, &kernmalloclist);
-		return(-1);
+		return (-1);
 	}
 	if ((indx = findname(string, "third", bufpp, &kernmalloclist)) == -1)
-		return(-1);
+		return (-1);
 	mib[2] = indx;
 	if (mib[2] == KERN_MALLOC_BUCKET) {
 		if ((name = strsep(bufpp, ".")) == NULL) {
@@ -1510,14 +1570,14 @@ sysctl_malloc(char *string, char **bufpp, int mib[], int flags, int *typep)
 			mib[2] = KERN_MALLOC_BUCKETS;
 			buf = bufp;
 			if (sysctl(mib, 3, buf, &size, NULL, 0) < 0)
-				return(-1);
+				return (-1);
 			mib[2] = stor;
 			for (stor = 0, i = 0; i < size; i++)
 				if (buf[i] == ',')
 					stor++;
 			lp.list = calloc(stor + 2, sizeof(struct ctlname));
 			if (lp.list == NULL)
-				return(-1);
+				return (-1);
 			lp.size = stor + 2;
 			for (i = 1;
 			    (lp.list[i].ctl_name = strsep(&buf, ",")) != NULL;
@@ -1528,20 +1588,20 @@ sysctl_malloc(char *string, char **bufpp, int mib[], int flags, int *typep)
 			lp.list[i].ctl_type = CTLTYPE_STRUCT;
 			listall(string, &lp);
 			free(lp.list);
-			return(-1);
+			return (-1);
 		}
 		mib[3] = atoi(name);
-		return(4);
+		return (4);
 	} else if (mib[2] == KERN_MALLOC_BUCKETS) {
 		*typep = CTLTYPE_STRING;
-		return(3);
+		return (3);
 	} else if (mib[2] == KERN_MALLOC_KMEMSTATS) {
 		size = BUFSIZ;
 		stor = mib[2];
 		mib[2] = KERN_MALLOC_KMEMNAMES;
 		buf = bufp;
 		if (sysctl(mib, 3, buf, &size, NULL, 0) < 0)
-			return(-1);
+			return (-1);
 		mib[2] = stor;
 		if ((name = strsep(bufpp, ".")) == NULL) {
 			for (stor = 0, i = 0; i < size; i++)
@@ -1549,9 +1609,10 @@ sysctl_malloc(char *string, char **bufpp, int mib[], int flags, int *typep)
 					stor++;
 			lp.list = calloc(stor + 2, sizeof(struct ctlname));
 			if (lp.list == NULL)
-				return(-1);
+				return (-1);
 			lp.size = stor + 2;
-			for (i = 1; (lp.list[i].ctl_name = strsep(&buf, ",")) != NULL; i++) {
+			for (i = 1;
+			    (lp.list[i].ctl_name = strsep(&buf, ",")) != NULL; i++) {
 				if (lp.list[i].ctl_name[0] == '\0') {
 					i--;
 					continue;
@@ -1562,14 +1623,14 @@ sysctl_malloc(char *string, char **bufpp, int mib[], int flags, int *typep)
 			lp.list[i].ctl_type = CTLTYPE_STRUCT;
 			listall(string, &lp);
 			free(lp.list);
-			return(-1);
+			return (-1);
 		}
 		ptr = strstr(buf, name);
  tryagain:
 		if (ptr == NULL) {
 		       warnx("fourth level name %s in %s is invalid", name,
 			     string);
-		       return(-1);
+		       return (-1);
 		}
 		if ((*(ptr + strlen(name)) != ',') &&
 		    (*(ptr + strlen(name)) != '\0')) {
@@ -1584,12 +1645,12 @@ sysctl_malloc(char *string, char **bufpp, int mib[], int flags, int *typep)
 			if (buf[i] == ',')
 				stor++;
 		mib[3] = stor;
-		return(4);
+		return (4);
 	} else if (mib[2] == KERN_MALLOC_KMEMNAMES) {
 		*typep = CTLTYPE_STRING;
-		return(3);
+		return (3);
 	}
-	return(-1);
+	return (-1);
 }
 
 #ifdef CPU_CHIPSET
@@ -1612,7 +1673,7 @@ sysctl_chipset(char *string, char **bufpp, int mib[], int flags, int *typep)
 		return (-1);
 	}
 	if ((indx = findname(string, "third", bufpp, &chipsetlist)) == -1)
-		return(-1);
+		return (-1);
 	mib[2] = indx;
 	if (!nflag)
 		printf("%s = ", string);
@@ -1658,28 +1719,28 @@ sysctl_inet(char *string, char **bufpp, int mib[], int flags, int *typep)
 
 	if (*bufpp == NULL) {
 		listall(string, &inetlist);
-		return(-1);
+		return (-1);
 	}
 	if ((indx = findname(string, "third", bufpp, &inetlist)) == -1)
-		return(-1);
+		return (-1);
 	mib[2] = indx;
 	if (indx < IPPROTO_MAXID && inetvars[indx].list != NULL)
 		lp = &inetvars[indx];
 	else if (!flags)
-		return(-1);
+		return (-1);
 	else {
 		warnx("%s: no variables defined for this protocol", string);
-		return(-1);
+		return (-1);
 	}
 	if (*bufpp == NULL) {
 		listall(string, lp);
-		return(-1);
+		return (-1);
 	}
 	if ((indx = findname(string, "fourth", bufpp, lp)) == -1)
-		return(-1);
+		return (-1);
 	mib[3] = indx;
 	*typep = lp->list[indx].ctl_type;
-	return(4);
+	return (4);
 }
 
 #ifdef INET6
@@ -1738,28 +1799,28 @@ sysctl_inet6(char *string, char **bufpp, int mib[], int flags, int *typep)
 
 	if (*bufpp == NULL) {
 		listall(string, &inet6list);
-		return(-1);
+		return (-1);
 	}
 	if ((indx = findname(string, "third", bufpp, &inet6list)) == -1)
-		return(-1);
+		return (-1);
 	mib[2] = indx;
 	if (indx < IPV6PROTO_MAXID && inet6vars[indx].list != NULL)
 		lp = &inet6vars[indx];
 	else if (!flags)
-		return(-1);
+		return (-1);
 	else {
 		warnx("%s: no variables defined for this protocol", string);
-		return(-1);
+		return (-1);
 	}
 	if (*bufpp == NULL) {
 		listall(string, lp);
-		return(-1);
+		return (-1);
 	}
 	if ((indx = findname(string, "fourth", bufpp, lp)) == -1)
-		return(-1);
+		return (-1);
 	mib[3] = indx;
 	*typep = lp->list[indx].ctl_type;
-	return(4);
+	return (4);
 }
 #endif
 
@@ -1787,28 +1848,28 @@ sysctl_ipx(char *string, char **bufpp, int mib[], int flags, int *typep)
 
 	if (*bufpp == NULL) {
 		listall(string, &ipxlist);
-		return(-1);
+		return (-1);
 	}
 	if ((indx = findname(string, "third", bufpp, &ipxlist)) == -1)
-		return(-1);
+		return (-1);
 	mib[2] = indx;
 	if (indx <= IPXPROTO_SPX && ipxvars[indx].list != NULL)
 		lp = &ipxvars[indx];
 	else if (!flags)
-		return(-1);
+		return (-1);
 	else {
 		warnx("%s: no variables defined for this protocol", string);
-		return(-1);
+		return (-1);
 	}
 	if (*bufpp == NULL) {
 		listall(string, lp);
-		return(-1);
+		return (-1);
 	}
 	if ((indx = findname(string, "fourth", bufpp, lp)) == -1)
-		return(-1);
+		return (-1);
 	mib[3] = indx;
 	*typep = lp->list[indx].ctl_type;
-	return(4);
+	return (4);
 }
 
 /*
@@ -1826,13 +1887,13 @@ sysctl_seminfo(string, bufpp, mib, flags, typep)
 
 	if (*bufpp == NULL) {
 		listall(string, &semlist);
-		return(-1);
+		return (-1);
 	}
 	if ((indx = findname(string, "third", bufpp, &semlist)) == -1)
-		return(-1);
+		return (-1);
 	mib[2] = indx;
 	*typep = CTLTYPE_INT;
-	return(3);
+	return (3);
 }
 
 /*
@@ -1850,13 +1911,13 @@ sysctl_shminfo(string, bufpp, mib, flags, typep)
 
 	if (*bufpp == NULL) {
 		listall(string, &shmlist);
-		return(-1);
+		return (-1);
 	}
 	if ((indx = findname(string, "third", bufpp, &shmlist)) == -1)
-		return(-1);
+		return (-1);
 	mib[2] = indx;
 	*typep = CTLTYPE_INT;
-	return(3);
+	return (3);
 }
 
 /*
@@ -1870,13 +1931,186 @@ sysctl_watchdog(char *string, char **bufpp, int mib[], int flags,
 
 	if (*bufpp == NULL) {
 		listall(string, &watchdoglist);
-		return(-1);
+		return (-1);
 	}
 	if ((indx = findname(string, "third", bufpp, &watchdoglist)) == -1)
-		return(-1);
+		return (-1);
 	mib[2] = indx;
 	*typep = watchdoglist.list[indx].ctl_type;
-	return(3);
+	return (3);
+}
+
+/*
+ * Handle hardware monitoring sensors support
+ */
+int
+sysctl_sensors(char *string, char **bufpp, int mib[], int flags, int *typep)
+{
+	char *name;
+	int indx;
+
+	if (*bufpp == NULL) {
+		char name[BUFSIZ];
+
+		/* scan all sensors */
+		for (indx = 0; indx < 256; indx++) {
+			snprintf(name, sizeof(name), "%s.%u", string, indx);
+			parse(name, 0);
+		}
+		return (-1);
+	}
+	if ((name = strsep(bufpp, ".")) == NULL) {
+		warnx("%s: incomplete specification", string);
+		return (-1);
+	}
+	mib[2] = atoi(name);
+	*typep = CTLTYPE_STRUCT;
+	return (3);
+}
+
+char	**emul_names;
+int	emul_num, nemuls;
+void	emul_init(void);
+
+int
+sysctl_emul(char *string, char *newval, int flags)
+{
+	int mib[4], enabled, i, old, print, found = 0;
+	char *head, *target;
+	size_t len;
+
+	emul_init();
+
+	mib[0] = CTL_KERN;
+	mib[1] = KERN_EMUL;
+	mib[3] = KERN_EMUL_ENABLED;
+	head = "kern.emul.";
+
+	if (aflag || strcmp(string, "kern.emul") == 0) {
+		if (strcmp(string, "kern.emul") == 0 && wflag) {
+			warnx("%s: specification is incomplete", string);
+			return (1);
+		}
+		if (nflag)
+			printf("%d\n", nemuls);
+		else
+			printf("%snemuls = %d\n", head, nemuls);
+		for (i = 0; i < emul_num; i++) {
+			if (emul_names[i] == NULL)
+				continue;
+			mib[2] = i + 1;
+			len = sizeof(int);
+			if (sysctl(mib, 4, &enabled, &len, NULL, 0) == -1) {
+				warn("%s", string);
+				continue;
+			}
+			if (nflag)
+				printf("%d\n", enabled);
+			else
+				printf("%s%s = %d\n", head, emul_names[i],
+				    enabled);
+		}
+		return (0);
+	}
+	/* User specified a third level name */
+	target = strrchr(string, '.');
+	target++;
+	if (strcmp(string, "nemuls") == 0) {
+		if (newval) {
+			warnx("Operation not permitted");
+			return (1);
+		}
+		if (nflag)
+			printf("%d\n", nemuls);
+		else
+			printf("%snemuls = %d\n", head, nemuls);
+		return (0);
+	}
+	for (i = 0; i < emul_num; i++) {
+		print = 1;
+		if (!emul_names[i]) {
+			print = 0;
+			if (strcmp(target, emul_names[i-1]))
+				continue;
+		} else if (strcmp(target, emul_names[i]))
+			continue;
+		found = 1;
+		mib[2] = i + 1;
+		len = sizeof(int);
+		if (newval) {
+			enabled = atoi(newval);
+			if (sysctl(mib, 4, &old, &len, &enabled, len) == -1) {
+				warn("%s", string);
+				continue;
+			}
+			if (print) {
+				if (nflag)
+					printf("%d\n", enabled);
+				else
+					printf("%s%s: %d -> %d\n", head,
+					    target, old, enabled);
+			}
+		} else {
+			if (sysctl(mib, 4, &enabled, &len, NULL, 0) == -1) {
+				warn("%s", string);
+				continue;
+			}
+			if (print) {
+				if (nflag)
+					printf("%d\n", enabled);
+				else
+					printf("%s%s = %d\n", head, target,
+					    enabled);
+			}
+		}
+	}
+	if (!found)
+		warnx("third level name %s in kern.emul is invalid",
+		    string);
+	return (0);
+
+
+}
+
+void
+emul_init(void)
+{
+	static int done;
+	char string[16];
+	int mib[4], i;
+	size_t len;
+
+	if (done)
+		return;
+	done = 1;
+
+	mib[0] = CTL_KERN;
+	mib[1] = KERN_EMUL;
+	mib[2] = KERN_EMUL_NUM;
+	len = sizeof(int);
+	if (sysctl(mib, 3, &emul_num, &len, NULL, 0) == -1)
+		return;
+
+	emul_names = calloc(emul_num, sizeof(char *));
+	if (emul_names == NULL) {
+		warn("emul_init");
+		return;
+	}
+
+	nemuls = emul_num;
+	for (i = 0; i < emul_num; i++) {
+		mib[2] = i + 1;
+		mib[3] = KERN_EMUL_NAME;
+		len = sizeof(string);
+		if (sysctl(mib, 4, string, &len, NULL, 0) == -1)
+			break;
+		if (i > 0 && emul_names[i - 1] &&
+		    strcmp(string, emul_names[i - 1]) == 0) {
+			nemuls--;
+			continue;
+		}
+		emul_names[i] = strdup(string);
+	}
 }
 
 /*
@@ -1890,7 +2124,7 @@ findname(char *string, char *level, char **bufp, struct list *namelist)
 
 	if (namelist->list == 0 || (name = strsep(bufp, ".")) == NULL) {
 		warnx("%s: incomplete specification", string);
-		return(-1);
+		return (-1);
 	}
 	for (i = 0; i < namelist->size; i++)
 		if (namelist->list[i].ctl_name != NULL &&
@@ -1898,17 +2132,17 @@ findname(char *string, char *level, char **bufp, struct list *namelist)
 			break;
 	if (i == namelist->size) {
 		warnx("%s level name %s in %s is invalid", level, name, string);
-		return(-1);
+		return (-1);
 	}
-	return(i);
+	return (i);
 }
 
 void
 usage(void)
 {
 
-	(void)fprintf(stderr, "usage:\t%s\n\t%s\n\t%s\n\t%s\n",
-	    "sysctl [-n] variable ...", "sysctl [-n] -w variable=value ...",
-	    "sysctl [-n] -a", "sysctl [-n] -A");
+	(void)fprintf(stderr, "usage:\t%s\n\t%s\n\t%s\n",
+	    "sysctl [-n] variable ...", "sysctl [-nq] -w variable=value ...",
+	    "sysctl -aA [-n]");
 	exit(1);
 }

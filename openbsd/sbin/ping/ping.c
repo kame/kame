@@ -1,4 +1,4 @@
-/*	$OpenBSD: ping.c,v 1.57 2002/09/06 21:17:39 deraadt Exp $	*/
+/*	$OpenBSD: ping.c,v 1.63 2003/07/24 03:10:04 deraadt Exp $	*/
 /*	$NetBSD: ping.c,v 1.20 1995/08/11 22:37:58 cgd Exp $	*/
 
 /*
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -47,7 +43,7 @@ static char copyright[] =
 #if 0
 static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #else
-static char rcsid[] = "$OpenBSD: ping.c,v 1.57 2002/09/06 21:17:39 deraadt Exp $";
+static char rcsid[] = "$OpenBSD: ping.c,v 1.63 2003/07/24 03:10:04 deraadt Exp $";
 #endif
 #endif /* not lint */
 
@@ -181,6 +177,7 @@ void pr_icmph(struct icmp *);
 void pr_pack(char *, int, struct sockaddr_in *);
 void pr_retip(struct ip *);
 quad_t qsqrt(quad_t);
+void pr_iph(struct ip *);
 void usage(void);
 
 int
@@ -288,7 +285,7 @@ main(int argc, char *argv[])
 			break;
 		case 's':		/* size of packet to send */
 			datalen = strtol(optarg, NULL, 0);
-			if (datalen <= 0)
+			if (datalen < 0)
 				errx(1, "bad packet size: %s", optarg);
 			if (datalen > MAXPAYLOAD)
 				errx(1, "packet size too large: %s", optarg);
@@ -593,7 +590,7 @@ pinger(void)
 	icp->icmp_type = ICMP_ECHO;
 	icp->icmp_code = 0;
 	icp->icmp_cksum = 0;
-	icp->icmp_seq = htons(ntransmitted++);
+	icp->icmp_seq = htons(ntransmitted);
 	icp->icmp_id = ident;			/* ID */
 
 	CLR(ntohs(icp->icmp_seq) % mx_dup_ck);
@@ -634,6 +631,8 @@ pinger(void)
 	}
 	if (!(options & F_QUIET) && options & F_FLOOD)
 		(void)write(STDOUT_FILENO, &DOT, 1);
+
+	ntransmitted++;
 }
 
 /*
@@ -926,8 +925,8 @@ summary(int header, int sig)
 			snprintf(buft, sizeof buft,
 			    "-- somebody's duplicating packets!");
 		else
-			snprintf(buft, sizeof buft, "%d%% packet loss",
-			    (int) (((ntransmitted - nreceived) * 100) /
+			snprintf(buft, sizeof buft, "%.1lf%% packet loss",
+			    ((((double)ntransmitted - nreceived) * 100) /
 			    ntransmitted));
 		strlcat(buf, buft, sizeof buf);
 	}
@@ -1227,8 +1226,7 @@ pr_iph(struct ip *ip)
  * a hostname.
  */
 char *
-pr_addr(a)
-	in_addr_t a;
+pr_addr(in_addr_t a)
 {
 	struct hostent *hp;
 	struct in_addr in;
