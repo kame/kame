@@ -974,7 +974,7 @@ getaddr(which, s, hpp)
 #ifndef SMALL
 #ifdef INET6
 	case AF_INET6:
-		if (inet_pton(AF_INET6, s, (void *)&su->sin6.sin6_addr) == -1) {
+		if (inet_pton(AF_INET6, s, (void *)&su->sin6.sin6_addr) != 1) {
 			(void) fprintf(stderr, "%s: bad value\n", s);
 			exit(1);
 		}
