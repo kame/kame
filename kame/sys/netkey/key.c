@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.173 2000/12/01 16:01:03 sakane Exp $	*/
+/*	$KAME: key.c,v 1.174 2000/12/02 07:35:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -50,6 +50,9 @@
 #include <sys/types.h>
 #include <sys/param.h>
 #include <sys/systm.h>
+#ifdef __NetBSD__
+#include <sys/callout.h>
+#endif
 #include <sys/kernel.h>
 #include <sys/mbuf.h>
 #include <sys/domain.h>
@@ -497,6 +500,9 @@ static const char *key_getuserfqdn __P((void));
 #endif
 static void key_sa_chgstate __P((struct secasvar *, u_int8_t));
 static struct mbuf *key_alloc_mbuf __P((int));
+#ifdef __NetBSD__
+struct callout key_timehandler_ch;
+#endif
 
 /* %%% IPsec policy management */
 /*
@@ -4239,7 +4245,12 @@ key_timehandler(void)
 
 #ifndef IPSEC_DEBUG2
 	/* do exchange to tick time !! */
+#ifdef __NetBSD__
+	callout_reset(&key_timehandler_ch, hz,
+	    (void *)key_timehandler, (void *)0);
+#else
 	(void)timeout((void *)key_timehandler, (void *)0, hz);
+#endif
 #endif /* IPSEC_DEBUG2 */
 
 	splx(s);
@@ -7101,6 +7112,10 @@ key_init()
 
 	bzero((caddr_t)&key_cb, sizeof(key_cb));
 
+#ifdef __NetBSD__
+	callout_init(&key_timehandler_ch);
+#endif
+
 	for (i = 0; i < IPSEC_DIR_MAX; i++) {
 		LIST_INIT(&sptree[i]);
 	}
@@ -7127,7 +7142,12 @@ key_init()
 #endif
 
 #ifndef IPSEC_DEBUG2
+#ifdef __NetBSD__
+	callout_reset(&key_timehandler_ch, hz,
+	    (void *)key_timehandler, (void *)0);
+#else
 	timeout((void *)key_timehandler, (void *)0, hz);
+#endif
 #endif /*IPSEC_DEBUG2*/
 
 	/* initialize key statistics */
