@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.104 2004/06/08 07:27:59 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.105 2004/06/08 11:05:35 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2559,11 +2559,11 @@ dprintf(int level, const char *fname, const char *fmt, ...)
 		if ((now = time(NULL)) < 0)
 			exit(1); /* XXX */
 		tm_now = localtime(&now);
-		fprintf(stderr, "%s%s%3s/%02d/%04d %02d:%02d:%02d %s\n",
-		    fname, printfname ? ": " : "",
+		fprintf(stderr, "%3s/%02d/%04d %02d:%02d:%02d: %s%s%s\n",
 		    month[tm_now->tm_mon], tm_now->tm_mday,
 		    tm_now->tm_year + 1900,
 		    tm_now->tm_hour, tm_now->tm_min, tm_now->tm_sec,
+		    fname, printfname ? ": " : "",
 		    logbuf);
 	} else
 		syslog(level, "%s%s%s", fname, printfname ? ": " : "", logbuf);
