@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.140 2000/12/02 15:41:47 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.141 2000/12/02 15:42:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -284,7 +284,7 @@ ip6_init()
 
 #ifdef DIAGNOSTIC
 	if (sizeof(struct protosw) != sizeof(struct ip6protosw))
-		panic("sizeof(protosw) != sizeof(ip6protosw));
+		panic("sizeof(protosw) != sizeof(ip6protosw)");
 #endif
 	pr = (struct ip6protosw *)pffindproto(PF_INET6, IPPROTO_RAW, SOCK_RAW);
 	if (pr == 0)
