@@ -1,4 +1,4 @@
-/*	$KAME: nd6_nbr.c,v 1.139 2004/02/10 21:40:40 itojun Exp $	*/
+/*	$KAME: nd6_nbr.c,v 1.140 2004/02/10 21:42:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -653,7 +653,7 @@ nd6_na_input(m, off, icmp6len)
 	struct ifnet *ifp = m->m_pkthdr.rcvif;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 	struct nd_neighbor_advert *nd_na;
-	struct in6_addr saddr6, taddr6;
+	struct in6_addr taddr6;
 	struct sockaddr_in6 taddr6sa;
 	int flags;
 	int is_router;
@@ -685,8 +685,6 @@ nd6_na_input(m, off, icmp6len)
 		return;
 	}
 #endif
-
-	saddr6 = ip6->ip6_src;
 
 	flags = nd_na->nd_na_flags_reserved;
 	is_router = ((flags & ND_NA_FLAG_ROUTER) != 0);
@@ -920,7 +918,7 @@ nd6_na_input(m, off, icmp6len)
 				 * (e.g. redirect case). So we must
 				 * call rt6_flush explicitly.
 				 */
-				rt6_flush(&saddr6, rt->rt_ifp);
+				rt6_flush(&ip6->ip6_src, rt->rt_ifp);
 			}
 			splx(s);
 		}
