@@ -1,14 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.275 1999/11/18 13:33:50 itojun Exp $
+$Id: CHANGELOG,v 1.276 1999/11/18 14:36:33 itojun Exp $
 
 <199911>
 Thu Nov 18 06:45:45 GMT 1999  itojun@iijlab.net
 	* openbsd: upgrade base version to OpenBSD 2.6.
 
 Thu Nov 18 12:20:02 JST 1999  itojun@iijlab.net
-	* netbsd/pkgsrc/net/ucd-snmp, freebsd[23]/ports/ucd-snmp:
-	  upgrade to latest IPv6 patch.  tcp/udp MIB number is fixed.
+	* netbsd/pkgsrc/net/ucd-snmp, freebsd[23]/ports/ucd-snmp,
+	  openbsd/ports/net/ucd-snmp: upgrade to latest IPv6 patch.
+	  tcp/udp MIB number is fixed.
 	  From: Niels Baggesen <Niels.Baggesen@uni-c.dk>
 
 1999-11-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
