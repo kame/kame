@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1184 2000/08/11 03:37:15 suz Exp $
+$KAME: CHANGELOG,v 1.1185 2000/08/11 04:27:56 jinmei Exp $
 
 <200007>
+2000-08-11  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ping6/ping6.c (pr_pack): printed multple sets of
+	bitmaps for NI supported QTYPEs.
+	(from Hideaki YOSHIFUJI <yoshfuji@ecei.tohoku.ac.jp>)
+
 Fri Aug 11 12:00:47 JST 2000	suz@kame.net
 	* bsdi3/sys/netiso: if NEW_STRUCT_ROUTE is defined, just use
 	`struct route' instead of struct route_iso.
