@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.6 2003/07/25 09:15:12 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.7 2003/07/28 03:23:39 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -734,7 +734,7 @@ mip6_dad_error(ifa, err)
 	int err;
 {
 	struct mip6_bc *mbc = NULL, *llmbc = NULL;
-	struct mip6_bc *tmpmbc = NULL, *tmpmbc_next = NULL;
+	struct mip6_bc *gmbc = NULL, *gmbc_next = NULL;
 	int error;
 
 	for (mbc = LIST_FIRST(&mip6_bc_list);
@@ -755,34 +755,53 @@ mip6_dad_error(ifa, err)
 		 * references from other binding caches.
 		 */
 		llmbc = mbc;
-		for (tmpmbc = LIST_FIRST(&mip6_bc_list);
-		    tmpmbc;
-		    tmpmbc = tmpmbc_next) {
-			tmpmbc_next = LIST_NEXT(tmpmbc, mbc_entry);
-			if (tmpmbc->mbc_llmbc == llmbc) {
-				tmpmbc->mbc_llmbc = NULL;
-				llmbc->mbc_refcnt--;
-				/* return a binding ack. */
-				mip6_bc_send_ba(&mbc->mbc_addr,
-				    &mbc->mbc_phaddr, &mbc->mbc_pcoa, err,
-				    mbc->mbc_seqno, 0, 0, NULL);
-				error = mip6_bc_list_remove(&mip6_bc_list,
-				    tmpmbc);
-				if (error) {
-					mip6log((LOG_ERR,
-					    "%s:%d: can't remove BC.\n",
-					    __FILE__, __LINE__));
-					/* what should I do? */
+		for (gmbc = LIST_FIRST(&mip6_bc_list);
+		    gmbc;
+		    gmbc = gmbc_next) {
+			gmbc_next = LIST_NEXT(gmbc, mbc_entry);
+			if (((gmbc->mbc_flags & IP6MU_LINK) != 0)
+			    && ((gmbc->mbc_flags & IP6MU_CLONED) == 0)
+			    && (gmbc->mbc_llmbc == llmbc)) {
+				gmbc_next = LIST_NEXT(gmbc, mbc_entry);
+				if ((gmbc->mbc_state
+					& MIP6_BC_STATE_DAD_WAIT) != 0) {
+					gmbc->mbc_dad = NULL;
+					error = mip6_bc_list_remove(
+					    &mip6_bc_list, llmbc);
+					if (error) {
+						mip6log((LOG_ERR,
+						    "%s:%d: can't remove a binding cache entry.\n",
+						    __FILE__, __LINE__));
+						/* what should I do? */
+					}
+
+					/* return a binding ack. */
+					mip6_bc_send_ba(&gmbc->mbc_addr,
+					    &gmbc->mbc_phaddr, &gmbc->mbc_pcoa,
+					    err, gmbc->mbc_seqno, 0, 0, NULL);
+
+					/*
+					 * update gmbc_next, beacuse removing
+					 * llmbc may invalidate gmbc_next.
+					 */
+					gmbc_next = LIST_NEXT(gmbc, mbc_entry);
+					error = mip6_bc_list_remove(
+					    &mip6_bc_list, gmbc);
+					if (error) {
+						mip6log((LOG_ERR,
+						    "%s:%d: can't remove a binding cache entry.\n",
+						    __FILE__, __LINE__));
+						/* what should I do? */
+					}
+				} else {
+					/*
+					 * DAD for a lladdr failed, but
+					 * a related BC's DAD had been
+					 * succeeded.  does this happen?
+					 */
 				}
 			}
 		}
-		error = mip6_bc_list_remove(&mip6_bc_list, llmbc);
-		if (error) {
-			mip6log((LOG_ERR, "%s:%d: can't remove BC.\n",
-				 __FILE__, __LINE__));
-			/* what should I do? */
-		}
-
 		return (0);
 	} else {
 		/*
