@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.76 2004/02/09 18:55:33 t-momose Exp $	*/
+/*	$KAME: udp6_output.c,v 1.77 2004/04/09 09:54:06 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -219,9 +219,6 @@ udp6_output(in6p, m, addr6, control)
 		fsa6 = &tmp;
 
 		if ((error = scope6_check_id(fsa6, ip6_use_defzone)) != 0)
-			return (error);
-
-		if ((error = in6_embedscope(&fsa6->sin6_addr, fsa6)) != 0)
 			return (error);
 	}
 
