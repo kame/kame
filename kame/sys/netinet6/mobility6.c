@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.6 2002/07/10 09:08:04 k-sugyou Exp $	*/
+/*	$KAME: mobility6.c,v 1.7 2002/07/26 12:48:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -161,7 +161,9 @@ mobility6_input(mp, offp, proto)
 		break;
 
 	case IP6M_BINDING_ERROR:
-		/* XXX */
+		if (mip6_ip6me_input(m, (struct ip6m_binding_error *)mh6,
+		    mh6len) != 0)
+			return (IPPROTO_DONE);
 		break;
 
 	default:

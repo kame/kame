@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.42 2002/07/26 11:51:46 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.43 2002/07/26 12:48:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -516,6 +516,9 @@ int mip6_ip6mu_input			__P((struct mbuf *,
 					     int));
 int mip6_ip6ma_input			__P((struct mbuf *,
 					     struct ip6m_binding_ack *,
+					     int));
+int mip6_ip6me_input			__P((struct mbuf *,
+					     struct ip6m_binding_error *,
 					     int));
 int mip6_ip6mhti_input			__P((struct mbuf *,
 					     struct ip6m_home_test_init *,

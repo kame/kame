@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.5 2002/06/18 06:02:05 k-sugyou Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.6 2002/07/26 12:48:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -94,7 +94,7 @@ mip6_bu_fsm(mbu, event, data)
 	mbu_fsm_state = &mbu->mbu_fsm_state;
 
 #ifdef MIP6_DEBUG
-	printf("st=%d:ev=%d =>", *mbu_fsm_state, event);
+	mip6log((LOG_INFO, "st=%d:ev=%d =>", *mbu_fsm_state, event));
 #endif
 
 	switch (*mbu_fsm_state)
@@ -107,7 +107,7 @@ mip6_bu_fsm(mbu, event, data)
 			 * failure timers.
 			 */
 
-			/* XXX */
+			/* XXX error handling */
 			mip6_bu_send_hoti(mbu);
 			mip6_bu_send_coti(mbu);
 
@@ -577,7 +577,9 @@ mip6_bu_fsm(mbu, event, data)
 			 * timers.
 			 */
 
-			/* XXX */
+			/* XXX error handling */
+			mip6_bu_send_hoti(mbu);
+			mip6_bu_send_coti(mbu);
 
 			*mbu_fsm_state = MIP6_BU_FSM_STATE_WAITHC;
 			break;
@@ -586,7 +588,7 @@ mip6_bu_fsm(mbu, event, data)
 	}
 
 #ifdef MIP6_DEBUG
-	printf("st=%d:ev=%d\n", *mbu_fsm_state, event);
+	mip6log((LOG_INFO, "st=%d:ev=%d\n", *mbu_fsm_state, event));
 #endif
 
 	return(0);

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.30 2002/07/26 11:51:46 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.31 2002/07/26 12:48:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1666,6 +1666,119 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh)
 	*pktopt_mobility = (struct ip6_mobility *)ip6ma;
 
 	return (0);
+}
+
+
+int
+mip6_ip6me_input(m, ip6me, ip6melen)
+	struct mbuf *m;
+	struct ip6m_binding_error *ip6me;
+	int ip6melen;
+{
+	struct ip6_hdr *ip6;
+	struct sockaddr_in6 *src_sa, *dst_sa;
+	struct sockaddr_in6 hoa;
+	u_int32_t hoazone;
+	struct hif_softc *sc;
+	struct mip6_bu *mbu;
+	int error = 0;
+
+	/* get packet source and destination addrresses. */
+	if (ip6_getpktaddrs(m, &src_sa, &dst_sa)) {
+		/* must not happen. */
+		goto bad;
+	}
+
+	/* packet length check. */
+	if (ip6melen < sizeof (struct ip6m_binding_error)) {
+		mip6log((LOG_NOTICE,
+		    "%s:%d: too short binding error (len = %d) "
+		    "from host %s.\n",
+		    __FILE__, __LINE__,
+		    ip6melen, ip6_sprintf(&src_sa->sin6_addr)));
+		/* discard. */
+		goto bad;
+	}
+
+	/* extract the home address of the sending node. */
+	bzero (&hoa, sizeof (hoa));
+	hoa.sin6_len = sizeof (hoa);
+	hoa.sin6_family = AF_INET6;
+	bcopy(&ip6me->ip6me_addr, &hoa.sin6_addr,
+	    sizeof(struct in6_addr));
+	if (in6_addr2zoneid(m->m_pkthdr.rcvif, &hoa.sin6_addr, &hoazone)) {
+		ip6stat.ip6s_badscope++;
+		goto bad;
+	}
+	hoa.sin6_scope_id = hoazone;
+	if (in6_embedscope(&hoa.sin6_addr, &hoa)) {
+		ip6stat.ip6s_badscope++;
+		goto bad;
+	}
+
+	/* find hif corresponding to the home address. */
+	sc = hif_list_find_withhaddr(&hoa);
+	if (sc == NULL) {
+		/* we have no such home address. */
+		goto bad;
+	}
+
+	/* find the corresponding binding update entry. */
+	switch (ip6me->ip6me_status) {
+	case IP6ME_UNVERIFIED_HAO:
+	case IP6ME_UNKNOWN_TYPE:
+		mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list,
+		    &src_sa, &hoa);
+		if (mbu == NULL) {
+			/* we have no binding update entry for the CN. */
+			goto bad;
+		}
+
+		break;
+	}
+
+	switch (ip6me->ip6me_status) {
+	case IP6ME_UNVERIFIED_HAO:
+		/* the CN doesn't have a binding cache entry.  start RR. */
+		error = mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_BE_1_RECEIVED,
+		    ip6me);
+		if (error) {
+			mip6log((LOG_ERR,
+			    "%s:%d: state transition failed. (%d)\n",
+			    __FILE__, __LINE__, error));
+			goto bad;
+		}
+
+		break;
+
+	case IP6ME_UNKNOWN_TYPE:
+		/* XXX future extension? */
+		error = mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_BE_2_RECEIVED,
+		    ip6me);
+		if (error) {
+			mip6log((LOG_ERR,
+			    "%s:%d: state transition failed. (%d)\n",
+			    __FILE__, __LINE__, error));
+			goto bad;
+		}
+
+		break;
+
+	default:
+		mip6log((LOG_INFO,
+		    "%s:%d: unknown BE status code (status = %u) "
+		    "from host %s.\n",
+		    __FILE__, __LINE__,
+		    ip6me->ip6me_status, ip6_sprintf(&src_sa->sin6_addr)));
+
+		/* XXX what to do? */
+	}
+
+	return (0);
+
+ bad:
+	m_freem(m);
+	return (EINVAL);
 }
 
 int
