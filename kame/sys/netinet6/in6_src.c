@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.19 2000/06/08 23:47:06 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.20 2000/06/08 23:52:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -631,6 +631,10 @@ in6_embedscope(in6, sin6, in6p)
 #endif
 {
 	*in6 = sin6->sin6_addr;
+	/*
+	 * don't try to read sin6->sin6_addr beyond here, since the caller may
+	 * ask us to overwrite existing sockaddr_in6
+	 */
 
 	if (IN6_IS_SCOPE_LINKLOCAL(in6)) {
 		/*
@@ -677,12 +681,17 @@ in6_recoverscope(sin6, in6)
 	u_int32_t scopeid;
 
 	sin6->sin6_addr = *in6;
+	/*
+	 * don't try to read *in6 beyond here, since the caller may
+	 * ask us to overwrite existing sockaddr_in6
+	 */
+
 	sin6->sin6_scope_id = 0;
 	if (IN6_IS_SCOPE_LINKLOCAL(in6)) {
 		/*
 		 * KAME assumption: link id == interface id
 		 */
-		scopeid = ntohs(in6->s6_addr16[1]);
+		scopeid = ntohs(sin6->sin6_addr.s6_addr16[1]);
 		if (scopeid) {
 			/* sanity check */
 			if (scopeid < 0 || if_index < scopeid)
