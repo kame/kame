@@ -132,9 +132,14 @@ struct igmpstat {
  * We conveniently use the IGMP message type for the proper
  * membership report to keep this state.
  */
-#define IGMP_v1_ROUTER				IGMP_V1_MEMBERSHIP_REPORT
-#define IGMP_v2_ROUTER				IGMP_V2_MEMBERSHIP_REPORT
-#define	IGMP_v3_ROUTER				IGMP_V3_MEMBERSHIP_REPORT
+#define IGMP_v1_ROUTER		IGMP_V1_MEMBERSHIP_REPORT
+#define IGMP_v2_ROUTER		IGMP_V2_MEMBERSHIP_REPORT
+#define	IGMP_v3_ROUTER		IGMP_V3_MEMBERSHIP_REPORT
+
+/* backward compatibility for old FreeBSDs */
+#define IGMP_V1_ROUTER		IGMP_v1_ROUTER
+#define IGMP_V2_ROUTER		IGMP_v2_ROUTER
+#define	IGMP_V3_ROUTER		IGMP_v3_ROUTER
 
 /*
  * IGMP Query version

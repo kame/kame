@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_timer.c	8.2 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_timer.c,v 1.59 2003/03/08 22:06:20 jlemon Exp $
+ * $FreeBSD: src/sys/netinet/tcp_timer.c,v 1.63 2003/11/20 20:07:38 andre Exp $
  */
 
 #include "opt_inet6.h"
@@ -160,9 +160,9 @@ int	tcp_syn_backoff[TCP_MAXRXTSHIFT + 1] =
     { 1, 1, 1, 1, 1, 2, 4, 8, 16, 32, 64, 64, 64 };
 
 int	tcp_backoff[TCP_MAXRXTSHIFT + 1] =
-    { 1, 2, 4, 8, 16, 32, 64, 64, 64, 64, 64, 64, 64 };
+    { 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 512, 512, 512 };
 
-static int tcp_totbackoff = 511;	/* sum of tcp_backoff[] */
+static int tcp_totbackoff = 2559;	/* sum of tcp_backoff[] */
 
 /*
  * TCP timer processing.
@@ -353,8 +353,7 @@ tcp_timer_keep(xtp)
 	tcpstat.tcps_keeptimeo++;
 	if (tp->t_state < TCPS_ESTABLISHED)
 		goto dropit;
-	if ((always_keepalive ||
-	     tp->t_inpcb->inp_socket->so_options & SO_KEEPALIVE) &&
+	if ((always_keepalive || inp->inp_socket->so_options & SO_KEEPALIVE) &&
 	    tp->t_state <= TCPS_CLOSING) {
 		if ((ticks - tp->t_rcvtime) >= tcp_keepidle + tcp_maxidle)
 			goto dropit;
@@ -383,7 +382,7 @@ tcp_timer_keep(xtp)
 		callout_reset(tp->tt_keep, tcp_keepidle, tcp_timer_keep, tp);
 
 #ifdef TCPDEBUG
-	if (tp->t_inpcb->inp_socket->so_options & SO_DEBUG)
+	if (inp->inp_socket->so_options & SO_DEBUG)
 		tcp_trace(TA_USER, ostate, tp, (void *)0, (struct tcphdr *)0,
 			  PRU_SLOWTIMO);
 #endif
@@ -528,7 +527,11 @@ tcp_timer_rexmt(xtp)
 		 */
 		tp->snd_cwnd_prev = tp->snd_cwnd;
 		tp->snd_ssthresh_prev = tp->snd_ssthresh;
-		tp->snd_high_prev = tp->snd_high;
+		tp->snd_recover_prev = tp->snd_recover;
+		if (IN_FASTRECOVERY(tp))
+		  tp->t_flags |= TF_WASFRECOVERY;
+		else
+		  tp->t_flags &= ~TF_WASFRECOVERY;
 		tp->t_badrxtwin = ticks + (tp->t_srtt >> (TCP_RTT_SHIFT + 1));
 	}
 	tcpstat.tcps_rexmttimeo++;
@@ -558,10 +561,8 @@ tcp_timer_rexmt(xtp)
 		tp->t_flags |= TF_DISABLE_ECN;
 #endif
 	/*
-	 * If losing, let the lower level know and try for
-	 * a better route.  Also, if we backed off this far,
-	 * our srtt estimate is probably bogus.  Clobber it
-	 * so we'll take the next rtt measurement as our srtt;
+	 * If we backed off this far, our srtt estimate is probably bogus.
+	 * Clobber it so we'll take the next rtt measurement as our srtt;
 	 * move the current srtt into rttvar to keep the current
 	 * retransmit times until then.
 	 */
@@ -571,7 +572,6 @@ tcp_timer_rexmt(xtp)
 			in6_losing(tp->t_inpcb);
 		else
 #endif
-		in_losing(tp->t_inpcb);
 		tp->t_rttvar += (tp->t_srtt >> TCP_RTT_SHIFT);
 		tp->t_srtt = 0;
 	}
@@ -581,7 +581,6 @@ tcp_timer_rexmt(xtp)
 	 * snd_last variable described in RFC 2582
 	 */
 	tp->snd_recover = tp->snd_max;
-	tp->snd_high = tp->snd_max;
 #ifdef TCP_ECN
 	tp->t_flags |= TF_SEND_CWR;
 #endif
@@ -628,6 +627,7 @@ tcp_timer_rexmt(xtp)
 		tp->snd_ssthresh = win * tp->t_maxseg;
 		tp->t_dupacks = 0;
 	}
+	EXIT_FASTRECOVERY(tp);
 	(void) tcp_output(tp);
 
 out:

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)udp_usrreq.c	8.6 (Berkeley) 5/23/95
- * $FreeBSD: src/sys/netinet/udp_usrreq.c,v 1.133 2003/02/19 05:47:34 imp Exp $
+ * $FreeBSD: src/sys/netinet/udp_usrreq.c,v 1.143 2003/11/26 01:40:43 sam Exp $
  */
 
 /*
@@ -148,6 +148,10 @@ SYSCTL_INT(_net_inet_udp, OID_AUTO, log_in_vain, CTLFLAG_RW,
 static int	blackhole = 0;
 SYSCTL_INT(_net_inet_udp, OID_AUTO, blackhole, CTLFLAG_RW,
 	&blackhole, 0, "Do not send port unreachables for refused connects");
+
+static int	strict_mcast_mship = 0;
+SYSCTL_INT(_net_inet_udp, OID_AUTO, strict_mcast_mship, CTLFLAG_RW,
+	&strict_mcast_mship, 0, "Only send multicast to member sockets");
 
 struct	inpcbhead udb;		/* from udp_var.h */
 #define	udb6	udb  /* for KAME src sync over BSD*'s */
@@ -356,6 +360,32 @@ udp_input(m, off)
 				    inp->inp_fport != uh->uh_sport)
 					goto docontinue;
 			}
+
+			/*
+			 * Check multicast packets to make sure they are only
+			 * sent to sockets with multicast memberships for the
+			 * packet's destination address and arrival interface
+			 */
+#define MSHIP(_inp, n) ((_inp)->inp_moptions->imo_membership[(n)])
+#define NMSHIPS(_inp) ((_inp)->inp_moptions->imo_num_memberships)
+			if (strict_mcast_mship && inp->inp_moptions != NULL) {
+				int mship, foundmship = 0;
+
+				for (mship = 0; mship < NMSHIPS(inp); mship++) {
+					if (MSHIP(inp, mship)->inm_addr.s_addr
+					    == ip->ip_dst.s_addr &&
+					    MSHIP(inp, mship)->inm_ifp
+					    == m->m_pkthdr.rcvif) {
+						foundmship = 1;
+						break;
+					}
+				}
+				if (foundmship == 0)
+					goto docontinue;
+			}
+#undef NMSHIPS
+#undef MSHIP
+
 #ifdef IGMPV3
 			/*
 			 * Receive multicast data which fits MSF condition.
@@ -364,6 +394,7 @@ udp_input(m, off)
 			    &ip->ip_dst) == 0)
 				goto docontinue;
 #endif
+
 			if (last != NULL) {
 				struct mbuf *n;
 #ifdef IPSEC
@@ -510,7 +541,7 @@ udp_append(last, ip, n, off)
 	}
 #endif /*FAST_IPSEC*/
 #ifdef MAC
-	if (mac_check_socket_deliver(last->inp_socket, n) != 0) {
+	if (mac_check_inpcb_deliver(last, n) != 0) {
 		m_freem(n);
 		return;
 	}
@@ -523,7 +554,7 @@ udp_append(last, ip, n, off)
 
 			savedflags = last->inp_flags;
 			last->inp_flags &= ~INP_UNMAPPABLEOPTS;
- 			ip6_savecontrol(last, n, &opts);
+			ip6_savecontrol(last, n, &opts);
 			last->inp_flags = savedflags;
 		} else
 #endif
@@ -581,10 +612,17 @@ udp_ctlinput(cmd, sa, vip)
 	if (sa->sa_family != AF_INET || faddr.s_addr == INADDR_ANY)
         	return;
 
-	if (PRC_IS_REDIRECT(cmd)) {
-		ip = 0;
-		notify = in_rtchange;
-	} else if (cmd == PRC_HOSTDEAD)
+	/*
+	 * Redirects don't need to be handled up here.
+	 */
+	if (PRC_IS_REDIRECT(cmd))
+		return;
+	/*
+	 * Hostdead is ugly because it goes linearly through all PCBs.
+	 * XXX: We never get this from ICMP, otherwise it makes an
+	 * excellent DoS attack on machines with many connections.
+	 */
+	if (cmd == PRC_HOSTDEAD)
 		ip = 0;
 	else if ((unsigned)cmd >= PRC_NCMDS || inetctlerrmap[cmd] == 0)
 		return;
@@ -758,8 +796,10 @@ udp_output(inp, m, addr, control, td)
 	struct cmsghdr *cm;
 	struct sockaddr_in *sin, src;
 	int error = 0;
+	int ipflags;
 	u_short fport, lport;
 
+	INP_LOCK_ASSERT(inp);
 #ifdef MAC
 	mac_create_mbuf_from_socket(inp->inp_socket, m);
 #endif
@@ -886,11 +926,17 @@ udp_output(inp, m, addr, control, td)
 	ui->ui_dport = fport;
 	ui->ui_ulen = htons((u_short)len + sizeof(struct udphdr));
 
+	ipflags = inp->inp_socket->so_options & (SO_DONTROUTE | SO_BROADCAST);
+	if (inp->inp_flags & INP_ONESBCAST)
+		ipflags |= IP_SENDONES;
+
 	/*
 	 * Set up checksum and output datagram.
 	 */
 	if (udpcksum) {
-        	ui->ui_sum = in_pseudo(ui->ui_src.s_addr, ui->ui_dst.s_addr,
+		if (inp->inp_flags & INP_ONESBCAST)
+			faddr.s_addr = INADDR_BROADCAST;
+		ui->ui_sum = in_pseudo(ui->ui_src.s_addr, faddr.s_addr,
 		    htons((u_short)len + sizeof(struct udphdr) + IPPROTO_UDP));
 		m->m_pkthdr.csum_flags = CSUM_UDP;
 		m->m_pkthdr.csum_data = offsetof(struct udphdr, uh_sum);
@@ -902,8 +948,7 @@ udp_output(inp, m, addr, control, td)
 	((struct ip *)ui)->ip_tos = inp->inp_ip_tos;	/* XXX */
 	udpstat.udps_opackets++;
 
-	error = ip_output(m, inp->inp_options, &inp->inp_route,
-	    (inp->inp_socket->so_options & (SO_DONTROUTE | SO_BROADCAST)),
+	error = ip_output(m, inp->inp_options, NULL, ipflags,
 	    inp->inp_moptions, inp);
 	return (error);
 
@@ -966,10 +1011,12 @@ udp_attach(struct socket *so, int proto, struct thread *td)
 		return error;
 	}
 	s = splnet();
-	error = in_pcballoc(so, &udbinfo, td);
+	error = in_pcballoc(so, &udbinfo, td, "udpinp");
 	splx(s);
-	if (error)
+	if (error) {
+		INP_INFO_WUNLOCK(&udbinfo);
 		return error;
+	}
 
 	inp = (struct inpcb *)so->so_pcb;
 	INP_LOCK(inp);
@@ -1147,5 +1194,5 @@ struct pr_usrreqs udp_usrreqs = {
 	pru_connect2_notsupp, in_control, udp_detach, udp_disconnect, 
 	pru_listen_notsupp, udp_peeraddr, pru_rcvd_notsupp, 
 	pru_rcvoob_notsupp, udp_send, pru_sense_null, udp_shutdown,
-	udp_sockaddr, sosend, soreceive, sopoll
+	udp_sockaddr, sosend, soreceive, sopoll, in_pcbsosetlabel
 };

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_var.h	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.89 2003/05/07 05:26:27 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/tcp_var.h,v 1.93.2.1 2004/01/09 12:32:36 andre Exp $
  */
 
 #ifndef _NETINET_TCP_VAR_H_
@@ -83,32 +83,34 @@ struct tcpcb {
 	struct	inpcb *t_inpcb;		/* back pointer to internet pcb */
 	int	t_state;		/* state of this connection */
 	u_int	t_flags;
-#define	TF_ACKNOW	0x00001		/* ack peer immediately */
-#define	TF_DELACK	0x00002		/* ack, but try to delay it */
-#define	TF_NODELAY	0x00004		/* don't delay packets to coalesce */
-#define	TF_NOOPT	0x00008		/* don't use tcp options */
-#define	TF_SENTFIN	0x00010		/* have sent FIN */
-#define	TF_REQ_SCALE	0x00020		/* have/will request window scaling */
-#define	TF_RCVD_SCALE	0x00040		/* other side has requested scaling */
-#define	TF_REQ_TSTMP	0x00080		/* have/will request timestamps */
-#define	TF_RCVD_TSTMP	0x00100		/* a timestamp was received in SYN */
-#define	TF_SACK_PERMIT	0x00200		/* other side said I could SACK */
-#define	TF_NEEDSYN	0x00400		/* send SYN (implicit state) */
-#define	TF_NEEDFIN	0x00800		/* send FIN (implicit state) */
-#define	TF_NOPUSH	0x01000		/* don't push */
-#define	TF_REQ_CC	0x02000		/* have/will request CC */
-#define	TF_RCVD_CC	0x04000		/* a CC was received in SYN */
-#define	TF_SENDCCNEW	0x08000		/* send CCnew instead of CC in SYN */
-#define	TF_MORETOCOME	0x10000		/* More data to be appended to sock */
-#define	TF_LQ_OVERFLOW	0x20000		/* listen queue overflow */
-#define	TF_LASTIDLE	0x40000		/* connection was previously idle */
-#define TF_RXWIN0SENT	0x80000		/* sent a receiver win 0 in response */
+#define	TF_ACKNOW	0x000001	/* ack peer immediately */
+#define	TF_DELACK	0x000002	/* ack, but try to delay it */
+#define	TF_NODELAY	0x000004	/* don't delay packets to coalesce */
+#define	TF_NOOPT	0x000008	/* don't use tcp options */
+#define	TF_SENTFIN	0x000010	/* have sent FIN */
+#define	TF_REQ_SCALE	0x000020	/* have/will request window scaling */
+#define	TF_RCVD_SCALE	0x000040	/* other side has requested scaling */
+#define	TF_REQ_TSTMP	0x000080	/* have/will request timestamps */
+#define	TF_RCVD_TSTMP	0x000100	/* a timestamp was received in SYN */
+#define	TF_SACK_PERMIT	0x000200	/* other side said I could SACK */
+#define	TF_NEEDSYN	0x000400	/* send SYN (implicit state) */
+#define	TF_NEEDFIN	0x000800	/* send FIN (implicit state) */
+#define	TF_NOPUSH	0x001000	/* don't push */
+#define	TF_REQ_CC	0x002000	/* have/will request CC */
+#define	TF_RCVD_CC	0x004000	/* a CC was received in SYN */
+#define	TF_SENDCCNEW	0x008000	/* send CCnew instead of CC in SYN */
+#define	TF_MORETOCOME	0x010000	/* More data to be appended to sock */
+#define	TF_LQ_OVERFLOW	0x020000	/* listen queue overflow */
+#define	TF_LASTIDLE	0x040000	/* connection was previously idle */
+#define	TF_RXWIN0SENT	0x080000	/* sent a receiver win 0 in response */
 #ifdef TCP_ECN
 #define TF_ECN_PERMIT	0x00100000	/* other side said I could ECN */
 #define TF_RCVD_CE	0x00200000	/* send ECE in subsequent segs */
 #define TF_SEND_CWR	0x00400000	/* send CWR in next seg */
 #define TF_DISABLE_ECN	0x00800000	/* disable ECN for this connection */
 #endif
+#define	TF_FASTRECOVERY	0x100000	/* in NewReno Fast Recovery */
+#define	TF_WASFRECOVERY	0x200000	/* was in NewReno Fast Recovery */
 	int	t_force;		/* 1 if forcing out a byte */
 
 	tcp_seq	snd_una;		/* send unacknowledged */
@@ -137,7 +139,6 @@ struct tcpcb {
 					 */
 	u_long	snd_bandwidth;		/* calculated bandwidth or 0 */
 	tcp_seq	snd_recover;		/* for use in NewReno Fast Recovery */
-	tcp_seq snd_high;		/* for use in NewReno Fast Recovery */
 
 	u_int	t_maxopd;		/* mss plus options */
 
@@ -181,10 +182,18 @@ struct tcpcb {
 /* experimental */
 	u_long	snd_cwnd_prev;		/* cwnd prior to retransmit */
 	u_long	snd_ssthresh_prev;	/* ssthresh prior to retransmit */
-	tcp_seq	snd_high_prev;		/* snd_high prior to retransmit */
+	tcp_seq	snd_recover_prev;	/* snd_recover prior to retransmit */
 	u_long	t_badrxtwin;		/* window for retransmit recovery */
 	u_char	snd_limited;		/* segments limited transmitted */
+/* anti DoS counters */
+	u_long	rcv_second;		/* start of interval second */
+	u_long	rcv_pps;		/* received packets per second */
+	u_long	rcv_byps;		/* received bytes per second */
 };
+
+#define IN_FASTRECOVERY(tp)	(tp->t_flags & TF_FASTRECOVERY)
+#define ENTER_FASTRECOVERY(tp)	tp->t_flags |= TF_FASTRECOVERY
+#define EXIT_FASTRECOVERY(tp)	tp->t_flags &= ~TF_FASTRECOVERY
 
 /*
  * Structure to hold TCP options that are only used during segment
@@ -214,8 +223,8 @@ struct syncache {
 	struct 		tcpcb *sc_tp;		/* tcb for listening socket */
 	struct		mbuf *sc_ipopts;	/* source route */
 	struct 		in_conninfo sc_inc;	/* addresses */
-#define sc_route	sc_inc.inc_route
-#define sc_route6	sc_inc.inc6_route
+#define	sc_route	sc_inc.inc_route
+#define	sc_route6	sc_inc.inc6_route
 	u_int32_t	sc_tsrecent;
 	tcp_cc		sc_cc_send;		/* holds CC or CCnew */
 	tcp_cc		sc_cc_recv;
@@ -244,10 +253,23 @@ struct syncache_head {
 	u_int		sch_length;
 };
 
+struct hc_metrics_lite {	/* must stay in sync with hc_metrics */
+	u_long	rmx_mtu;	/* MTU for this path */
+	u_long	rmx_ssthresh;	/* outbound gateway buffer limit */
+	u_long	rmx_rtt;	/* estimated round trip time */
+	u_long	rmx_rttvar;	/* estimated rtt variance */
+	u_long	rmx_bandwidth;	/* estimated bandwidth */
+	u_long	rmx_cwnd;	/* congestion window */
+	u_long	rmx_sendpipe;   /* outbound delay-bandwidth product */
+	u_long	rmx_recvpipe;   /* inbound delay-bandwidth product */
+};
+
 struct tcptw {
 	struct inpcb	*tw_inpcb;	/* XXX back pointer to internet pcb */
 	tcp_seq		snd_nxt;
 	tcp_seq		rcv_nxt;
+	tcp_seq		iss;
+	tcp_seq		irs;
 	tcp_cc		cc_recv;
 	tcp_cc		cc_send;
 	u_short		last_win;	/* cached window value */
@@ -260,8 +282,7 @@ struct tcptw {
 };
  
 /*
- * The TAO cache entry which is stored in the protocol family specific
- * portion of the route metrics.
+ * The TAO cache entry which is stored in the tcp hostcache.
  */
 struct rmxp_tao {
 	tcp_cc	tao_cc;			/* latest CC in valid SYN */
@@ -274,7 +295,6 @@ struct rmxp_tao {
 #define	TAOF_UNDEF	0		/* we don't know yet */
 #endif /* notyet */
 };
-#define rmx_taop(r)	((struct rmxp_tao *)(r).rmx_filler)
 
 #define	intotcpcb(ip)	((struct tcpcb *)(ip)->inp_ppcb)
 #define	intotw(ip)	((struct tcptw *)(ip)->inp_ppcb)
@@ -326,6 +346,7 @@ struct	tcpstat {
 	u_long	tcps_connects;		/* connections established */
 	u_long	tcps_drops;		/* connections dropped */
 	u_long	tcps_conndrops;		/* embryonic connections dropped */
+	u_long	tcps_minmssdrops;	/* average minmss too low drops */
 	u_long	tcps_closed;		/* conn. closed (includes drops) */
 	u_long	tcps_segstimed;		/* segs where we tried to get rtt */
 	u_long	tcps_rttupdated;	/* times we succeeded */
@@ -400,6 +421,8 @@ struct	tcpstat {
 	u_long	tcps_sc_zonefail;	/* zalloc() failed */
 	u_long	tcps_sc_sendcookie;	/* SYN cookie sent */
 	u_long	tcps_sc_recvcookie;	/* SYN cookie received */
+	u_long	tcps_hc_added;		/* entry added to hostcache */
+	u_long	tcps_hc_bucketoverflow;	/* hostcache per bucket limit hit */
 
 	/* ECN stats */
 	u_long tcps_ecn_accepts;	/* ecn connections accepted */
@@ -462,6 +485,7 @@ struct	xtcpcb {
 	{ "pcblist", CTLTYPE_STRUCT }, \
 	{ "delacktime", CTLTYPE_INT }, \
 	{ "v6mssdflt", CTLTYPE_INT }, \
+	{ "maxid", CTLTYPE_INT }, \
 }
 
 
@@ -474,6 +498,8 @@ extern	struct inpcbhead tcb;		/* head of queue of active tcpcb's */
 extern	struct inpcbinfo tcbinfo;
 extern	struct tcpstat tcpstat;	/* tcp statistics */
 extern	int tcp_mssdflt;	/* XXX */
+extern	int tcp_minmss;
+extern	int tcp_minmssoverload;
 extern	int tcp_delack_enabled;
 extern	int tcp_do_newreno;
 extern	int tcp_do_ecn;		/* RFC3168 ECN enabled/disabled? */
@@ -485,6 +511,7 @@ void	 tcp_canceltimers(struct tcpcb *);
 struct tcpcb *
 	 tcp_close(struct tcpcb *);
 void	 tcp_twstart(struct tcpcb *);
+int	 tcp_twrecycleable(struct tcptw *tw);
 struct tcptw *
 	 tcp_twclose(struct tcptw *_tw, int _reuse);
 void	 tcp_ctlinput(int, struct sockaddr *, void *);
@@ -493,12 +520,12 @@ struct tcpcb *
 	 tcp_drop(struct tcpcb *, int);
 void	 tcp_drain(void);
 void	 tcp_fasttimo(void);
-struct rmxp_tao *
-	 tcp_gettaocache(struct in_conninfo *);
 void	 tcp_init(void);
 void	 tcp_input(struct mbuf *, int);
+u_long	 tcp_maxmtu(struct in_conninfo *);
+u_long	 tcp_maxmtu6(struct in_conninfo *);
 void	 tcp_mss(struct tcpcb *, int);
-int	 tcp_mssopt(struct tcpcb *);
+int	 tcp_mssopt(struct in_conninfo *);
 struct inpcb *	 
 	 tcp_drop_syn_sent(struct inpcb *, int);
 struct inpcb *
@@ -511,8 +538,6 @@ struct inpcb *
 void	 tcp_respond(struct tcpcb *, void *,
 	    struct tcphdr *, struct mbuf *, tcp_seq, tcp_seq, int);
 int	 tcp_twrespond(struct tcptw *, struct socket *, struct mbuf *, int);
-struct rtentry *
-	 tcp_rtlookup(struct in_conninfo *);
 void	 tcp_setpersist(struct tcpcb *);
 void	 tcp_slowtimo(void);
 struct tcptemp *
@@ -530,6 +555,20 @@ int	 syncache_add(struct in_conninfo *, struct tcpopt *,
 	     struct tcphdr *, struct socket **, struct mbuf *);
 void	 syncache_chkrst(struct in_conninfo *, struct tcphdr *);
 void	 syncache_badack(struct in_conninfo *);
+/*
+ * All tcp_hc_* functions are IPv4 and IPv6 (via in_conninfo)
+ */
+void	 tcp_hc_init(void);
+void	 tcp_hc_get(struct in_conninfo *, struct hc_metrics_lite *);
+u_long	 tcp_hc_getmtu(struct in_conninfo *);
+void	 tcp_hc_gettao(struct in_conninfo *, struct rmxp_tao *);
+void	 tcp_hc_updatemtu(struct in_conninfo *, u_long);
+void	 tcp_hc_update(struct in_conninfo *, struct hc_metrics_lite *);
+void	 tcp_hc_updatetao(struct in_conninfo *, int, tcp_cc, u_short);
+/* update which tao field */
+#define	TCP_HC_TAO_CC		0x1
+#define TCP_HC_TAO_CCSENT	0x2
+#define TCP_HC_TAO_MSSOPT	0x3
 
 extern	struct pr_usrreqs tcp_usrreqs;
 extern	u_long tcp_sendspace;

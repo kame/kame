@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in.c	8.4 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/in.c,v 1.71 2003/02/19 05:47:33 imp Exp $
+ * $FreeBSD: src/sys/netinet/in.c,v 1.72 2003/11/03 03:22:39 sam Exp $
  */
 
 /*
@@ -461,7 +461,7 @@ in_control(so, cmd, data, ifp, td)
 		 * XXX horrible hack to detect that we are being called
 		 * from if_detach()
 		 */
-		if (ifaddr_byindex(ifp->if_index) != NULL) {
+		if (ifaddr_byindex(ifp->if_index) == NULL) {
 			in_pcbpurgeif0(&ripcbinfo, ifp);
 			in_pcbpurgeif0(&udbinfo, ifp);
 		}

@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)igmp.c	8.1 (Berkeley) 7/19/93
- * $FreeBSD: src/sys/netinet/igmp.c,v 1.41 2003/02/19 05:47:33 imp Exp $
+ * $FreeBSD: src/sys/netinet/igmp.c,v 1.44 2003/08/28 22:15:05 rwatson Exp $
  */
 
 /*
@@ -117,16 +117,16 @@
 static MALLOC_DEFINE(M_IGMP, "igmp", "igmp state");
 MALLOC_DEFINE(M_MSFILTER, "msfilter", "multicast source filter");
 
-static struct router_info *
-		find_rti(struct ifnet *ifp);
+static struct router_info	*find_rti(struct ifnet *ifp);
+static void	igmp_sendpkt(struct in_multi *, int, unsigned long);
 
 static struct igmpstat igmpstat;
 int igmpmaxsrcfilter = IP_MAX_SOURCE_FILTER;
 int igmpsomaxsrc = SO_MAX_SOURCE_FILTER;
 int igmpalways_v3 = 0;
 
-SYSCTL_STRUCT(_net_inet_igmp, IGMPCTL_STATS, stats, CTLFLAG_RW,
-	&igmpstat, igmpstat, "");
+SYSCTL_STRUCT(_net_inet_igmp, IGMPCTL_STATS, stats, CTLFLAG_RW, &igmpstat,
+    igmpstat, "");
 SYSCTL_INT(_net_inet_igmp, IGMPCTL_MAXSRCFILTER, maxsrcfilter, CTLFLAG_RW,
 	&igmpmaxsrcfilter, IP_MAX_SOURCE_FILTER, "");
 SYSCTL_INT(_net_inet_igmp, IGMPCTL_SOMAXSRC, somaxsrc, CTLFLAG_RW,
@@ -134,6 +134,7 @@ SYSCTL_INT(_net_inet_igmp, IGMPCTL_SOMAXSRC, somaxsrc, CTLFLAG_RW,
 SYSCTL_INT(_net_inet_igmp, IGMPCTL_ALWAYS_V3, always_v3, CTLFLAG_RW,
 	&igmpalways_v3, 0, "");
 
+static SLIST_HEAD(, router_info) router_info_head;
 static int igmp_timers_are_running;
 static int interface_timers_are_running;
 static int state_change_timers_are_running;
@@ -200,7 +201,6 @@ static int addrlen = sizeof(struct in_addr);
 	(m)->m_pkthdr.rcvif = (struct ifnet *)0; \
 } while(0)
  
-static void igmp_sendpkt(struct in_multi *, int, unsigned long);
 int igmp_set_timer(struct ifnet *, struct router_info *, struct igmp *,
 			int, u_int8_t);
 void igmp_set_hostcompat(struct ifnet *, struct router_info *, int);
@@ -215,9 +215,16 @@ static u_long igmp_all_hosts_group;
 static u_long igmp_all_rtrs_group;
 static struct mbuf *router_alert;
 struct router_info *Head;
+static struct route igmprt;
+
+#ifdef IGMP_DEBUG
+#define	IGMP_PRINTF(x)	printf(x)
+#else
+#define	IGMP_PRINTF(x)
+#endif
 
 void
-igmp_init()
+igmp_init(void)
 {
 	struct ipoption *ra;
 
@@ -243,7 +250,7 @@ igmp_init()
 	ra->ipopt_list[3] = 0x00;
 	router_alert->m_len = sizeof(ra->ipopt_dst) + ra->ipopt_list[1];
 
-	Head = (struct router_info *) 0;
+	SLIST_INIT(&router_info_head);
 }
 
 struct router_info *
@@ -269,36 +276,29 @@ rti_init(ifp)
 	rti->rti_qri = IGMP_DEF_QRI / IGMP_TIMER_SCALE;
 	rti->rti_type = IGMP_v3_ROUTER;
 #endif
-	rti->rti_next = Head;
-	Head = rti;
+	SLIST_INSERT_HEAD(&router_info_head, rti, rti_list);
 	return (rti);
 }
 
 
 static struct router_info *
-find_rti(ifp)
-	struct ifnet *ifp;
+find_rti(struct ifnet *ifp)
 {
-        register struct router_info *rti = Head;
+	struct router_info *rti;
 
-#ifdef IGMP_DEBUG
-	printf("[igmp.c, _find_rti] --> entering \n");
-#endif
-        while (rti) {
-                if (rti->rti_ifp == ifp) {
-#ifdef IGMP_DEBUG
-			printf("[igmp.c, _find_rti] --> found old entry \n");
-#endif
-                        return rti;
-                }
-                rti = rti->rti_next;
-        }
+	IGMP_PRINTF("[igmp.c, _find_rti] --> entering \n");
+	SLIST_FOREACH(rti, &router_info_head, rti_list) {
+		if (rti->rti_ifp == ifp) {
+			IGMP_PRINTF(
+			    "[igmp.c, _find_rti] --> found old entry \n");
+			return rti;
+		}
+	}
 	if ((rti = rti_init(ifp)) == NULL)
 		return NULL;
-#ifdef IGMP_DEBUG
-	printf("[igmp.c, _find_rti] --> created an entry \n");
-#endif
-        return rti;
+
+	IGMP_PRINTF("[igmp.c, _find_rti] --> created an entry \n");
+	return rti;
 }
 
  
@@ -376,9 +376,7 @@ igmp_get_router_alert(m)
 }
   
 void
-igmp_input(m, off)
-	register struct mbuf *m;
-	int off;
+igmp_input(register struct mbuf *m, int off)
 {
 	register int iphlen = off;
 	register struct igmp *igmp;
@@ -391,7 +389,6 @@ igmp_input(m, off)
 	register struct in_ifaddr *ia;
 	struct in_multistep step;
 	struct router_info *rti;
-	
 	int timer; /** timer value in the igmp query header **/
 
 	ip = mtod(m, struct ip *);
@@ -450,7 +447,6 @@ igmp_input(m, off)
 	 * if I sent the last report.
 	 */
 	switch (igmp->igmp_type) {
-
 	case IGMP_MEMBERSHIP_QUERY:
 		/*
 		 * "Tentative" IGMP version check.
@@ -697,8 +693,7 @@ igmpv3_query:
 }
 
 void
-igmp_joingroup(inm)
-	struct in_multi *inm;
+igmp_joingroup(struct in_multi *inm)
 {
 	int s = splnet();
 
@@ -718,9 +713,9 @@ igmp_joingroup(inm)
 }
 
 void
-igmp_leavegroup(inm)
-	struct in_multi *inm;
+igmp_leavegroup(struct in_multi *inm)
 {
+
 	if (inm->inm_state == IGMP_IREPORTEDLAST &&
 	    inm->inm_addr.s_addr != igmp_all_hosts_group &&
 	    !(inm->inm_ifp->if_flags & IFF_LOOPBACK) &&
@@ -729,7 +724,7 @@ igmp_leavegroup(inm)
 }
 
 void
-igmp_fasttimo()
+igmp_fasttimo(void)
 {
 	register struct in_multi *inm;
 	struct in_multistep step;
@@ -857,22 +852,19 @@ igmp_fasttimo()
 }
 
 void
-igmp_slowtimo()
+igmp_slowtimo(void)
 {
 	int s = splnet();
-	register struct router_info *rti =  Head;
+	struct router_info *rti;
 
-#ifdef IGMP_DEBUG
-	printf("[igmp.c,_slowtimo] -- > entering \n");
-#endif
-	while (rti) {
+	IGMP_PRINTF("[igmp.c,_slowtimo] -- > entering \n");
+	SLIST_FOREACH(rti, &router_info_head, rti_list) {
 #ifndef IGMPV3
-	    if (rti->rti_type == IGMP_v1_ROUTER) {
-		rti->rti_time++;
-		if (rti->rti_time >= IGMP_AGE_THRESHOLD) {
-			rti->rti_type = IGMP_v2_ROUTER;
+		if (rti->rti_type == IGMP_V1_ROUTER) {
+			rti->rti_time++;
+			if (rti->rti_time >= IGMP_AGE_THRESHOLD)
+				rti->rti_type = IGMP_V2_ROUTER;
 		}
-	    }
 #else
 		if ((rti->rti_timer1 == 0) && (rti->rti_timer2 == 0)) {
 			if (rti->rti_type != IGMP_v3_ROUTER)
@@ -887,32 +879,24 @@ igmp_slowtimo()
 				rti->rti_timer2 = 0;
 		}
 #endif
-	    rti = rti->rti_next;
 	}
-#ifdef IGMP_DEBUG	
-	printf("[igmp.c,_slowtimo] -- > exiting \n");
-#endif
+	IGMP_PRINTF("[igmp.c,_slowtimo] -- > exiting \n");
 	splx(s);
 }
 
-static struct route igmprt;
-
 static void
-igmp_sendpkt(inm, type, addr)
-	struct in_multi *inm;
-	int type;
-	unsigned long addr;
+igmp_sendpkt(struct in_multi *inm, int type, unsigned long addr)
 {
-        struct mbuf *m;
-        struct igmp *igmp;
-        struct ip *ip;
-        struct ip_moptions imo;
+	struct mbuf *m;
+	struct igmp *igmp;
+	struct ip *ip;
+	struct ip_moptions imo;
 
 	if (type < 0)
 		return;
-        MGETHDR(m, M_DONTWAIT, MT_HEADER);
-        if (m == NULL)
-                return;
+	MGETHDR(m, M_DONTWAIT, MT_HEADER);
+	if (m == NULL)
+		return;
 
 	m->m_pkthdr.rcvif = loif;
 #ifdef MAC
@@ -921,38 +905,38 @@ igmp_sendpkt(inm, type, addr)
 	m->m_pkthdr.len = sizeof(struct ip) + IGMP_MINLEN;
 	MH_ALIGN(m, IGMP_MINLEN + sizeof(struct ip));
 	m->m_data += sizeof(struct ip);
-        m->m_len = IGMP_MINLEN;
-        igmp = mtod(m, struct igmp *);
-        igmp->igmp_type   = type;
-        igmp->igmp_code   = 0;
-        igmp->igmp_group  = inm->inm_addr;
-        igmp->igmp_cksum  = 0;
-        igmp->igmp_cksum  = in_cksum(m, IGMP_MINLEN);
+	m->m_len = IGMP_MINLEN;
+	igmp = mtod(m, struct igmp *);
+	igmp->igmp_type = type;
+	igmp->igmp_code = 0;
+	igmp->igmp_group = inm->inm_addr;
+	igmp->igmp_cksum = 0;
+	igmp->igmp_cksum = in_cksum(m, IGMP_MINLEN);
 
-        m->m_data -= sizeof(struct ip);
-        m->m_len += sizeof(struct ip);
-        ip = mtod(m, struct ip *);
-        ip->ip_tos        = 0;
-        ip->ip_len        = sizeof(struct ip) + IGMP_MINLEN;
-        ip->ip_off        = 0;
-        ip->ip_p          = IPPROTO_IGMP;
-        ip->ip_src.s_addr = INADDR_ANY;
-        ip->ip_dst.s_addr = addr ? addr : igmp->igmp_group.s_addr;
+	m->m_data -= sizeof(struct ip);
+	m->m_len += sizeof(struct ip);
+	ip = mtod(m, struct ip *);
+	ip->ip_tos = 0;
+	ip->ip_len = sizeof(struct ip) + IGMP_MINLEN;
+	ip->ip_off = 0;
+	ip->ip_p = IPPROTO_IGMP;
+	ip->ip_src.s_addr = INADDR_ANY;
+	ip->ip_dst.s_addr = addr ? addr : igmp->igmp_group.s_addr;
 
-        imo.imo_multicast_ifp  = inm->inm_ifp;
-        imo.imo_multicast_ttl  = 1;
+	imo.imo_multicast_ifp  = inm->inm_ifp;
+	imo.imo_multicast_ttl  = 1;
 	imo.imo_multicast_vif  = -1;
-        /*
-         * Request loopback of the report if we are acting as a multicast
-         * router, so that the process-level routing daemon can hear it.
-         */
-        imo.imo_multicast_loop = (ip_mrouter != NULL);
+	/*
+	 * Request loopback of the report if we are acting as a multicast
+	 * router, so that the process-level routing daemon can hear it.
+	 */
+	imo.imo_multicast_loop = (ip_mrouter != NULL);
 
 	/*
 	 * XXX
 	 * Do we have to worry about reentrancy here?  Don't think so.
 	 */
-        ip_output(m, router_alert, &igmprt, 0, &imo, NULL);
+	ip_output(m, router_alert, &igmprt, 0, &imo, NULL);
 
 	++igmpstat.igps_snd_v1v2_reports;
 }

@@ -68,17 +68,13 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_var.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/ip_var.h,v 1.73 2003/04/02 20:14:44 mdodd Exp $
+ * $FreeBSD: src/sys/netinet/ip_var.h,v 1.81 2003/11/15 01:45:56 andre Exp $
  */
 
 #ifndef _NETINET_IP_VAR_H_
 #define	_NETINET_IP_VAR_H_
 
 #include <sys/queue.h>
-
-#ifdef _KERNEL
-#include <sys/_label.h>
-#endif
 
 /*
  * Overlay for ip header used by other protocols (tcp, udp).
@@ -108,7 +104,7 @@ struct ipq {
 	u_char	ipq_nfrags;		/* # frags in this packet */
 	u_int32_t ipq_div_info;		/* ipfw divert port & flags */
 	u_int16_t ipq_div_cookie;	/* ipfw divert cookie */
-	struct label ipq_label;		/* MAC label */
+	struct label *ipq_label;		/* MAC label */
 };
 #endif /* _KERNEL */
 
@@ -197,6 +193,7 @@ struct	ipstat {
 /* flags passed to ip_output as last parameter */
 #define	IP_FORWARDING		0x1		/* most of ip header exists */
 #define	IP_RAWOUTPUT		0x2		/* raw ip header exists */
+#define	IP_SENDONES		0x4		/* send all-ones broadcast */
 #define	IP_ROUTETOIF		SO_DONTROUTE	/* bypass routing tables */
 #define	IP_ALLOWBROADCAST	SO_BROADCAST	/* can send broadcast packets */
 
@@ -211,7 +208,9 @@ extern u_short	ip_id;				/* ip packet ctr, for ids */
 #endif
 extern int	ip_defttl;			/* default IP ttl */
 extern int	ipforwarding;			/* ip forwarding */
-extern struct route ipforward_rt;		/* ip forwarding cached route */
+#ifdef IPSTEALTH
+extern int	ipstealth;			/* stealth forwarding */
+#endif
 extern u_char	ip_protox[];
 extern struct socket *ip_rsvpd;	/* reservation protocol daemon */
 extern struct socket *ip_mrouter; /* multicast routing daemon */
@@ -224,6 +223,8 @@ extern int	igmpsomaxsrc;		/* maximum num .of msf per socket */
 
 int	 ip_ctloutput(struct socket *, struct sockopt *sopt);
 void	 ip_drain(void);
+int	 ip_fragment(struct ip *ip, struct mbuf **m_frag, int mtu,
+	    u_long if_hwassist_flags, int sw_csum);
 void	 ip_freemoptions(struct ip_moptions *);
 void	 ip_init(void);
 extern int	 (*ip_mforward)(struct ip *, struct ifnet *, struct mbuf *,
@@ -231,9 +232,8 @@ extern int	 (*ip_mforward)(struct ip *, struct ifnet *, struct mbuf *,
 int	 ip_output(struct mbuf *,
 	    struct mbuf *, struct route *, int, struct ip_moptions *,
 	    struct inpcb *);
-int	ip_fragment(struct mbuf *, struct ifnet *, u_long);
 struct in_ifaddr *
-	 ip_rtaddr(struct in_addr, struct route *);
+	 ip_rtaddr(struct in_addr);
 void	 ip_savecontrol(struct inpcb *, struct mbuf **, struct ip *,
 		struct mbuf *);
 void	 ip_slowtimo(void);
@@ -266,8 +266,13 @@ extern void	(*rsvp_input_p)(struct mbuf *m, int off);
 #ifdef IPDIVERT
 void	div_init(void);
 void	div_input(struct mbuf *, int);
+void	div_ctlinput(int, struct sockaddr *, void *);
 void	divert_packet(struct mbuf *m, int incoming, int port, int rule);
 extern struct pr_usrreqs div_usrreqs;
+#endif
+
+#ifdef PFIL_HOOKS
+extern	struct pfil_head inet_pfil_hook;
 #endif
 
 void	in_delayed_cksum(struct mbuf *m);

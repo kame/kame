@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_ether.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/if_ether.c,v 1.104 2003/03/04 23:19:52 jlemon Exp $
+ * $FreeBSD: src/sys/netinet/if_ether.c,v 1.115 2003/11/08 23:36:31 sam Exp $
  */
 
 /*
@@ -105,11 +105,13 @@ struct llinfo_arp {
 static	LIST_HEAD(, llinfo_arp) llinfo_arp;
 
 static struct	ifqueue arpintrq;
-static int	arp_inuse, arp_allocated, arpinit_done;
+static int	arp_allocated;
+static int	arpinit_done;
 
 static int	arp_maxtries = 5;
 static int	useloopback = 1; /* use loopback interface for local traffic */
 static int	arp_proxyall = 0;
+static struct callout arp_callout;
 
 SYSCTL_INT(_net_link_ether_inet, OID_AUTO, maxtries, CTLFLAG_RW,
 	   &arp_maxtries, 0, "");
@@ -141,7 +143,6 @@ arptimer(ignored_arg)
 	void *ignored_arg;
 {
 	struct llinfo_arp *la, *ola;
-	int s = splnet();
 
 	RADIX_NODE_HEAD_LOCK(rt_tables[AF_INET]);
 	la = LIST_FIRST(&llinfo_arp);
@@ -153,8 +154,8 @@ arptimer(ignored_arg)
 			arptfree(ola);		/* timer has expired, clear */
 	}
 	RADIX_NODE_HEAD_UNLOCK(rt_tables[AF_INET]);
-	splx(s);
-	timeout(arptimer, NULL, arpt_prune * hz);
+
+	callout_reset(&arp_callout, arpt_prune * hz, arptimer, NULL);
 }
 
 /*
@@ -166,17 +167,21 @@ arp_rtrequest(req, rt, info)
 	register struct rtentry *rt;
 	struct rt_addrinfo *info;
 {
-	register struct sockaddr *gate = rt->rt_gateway;
-	register struct llinfo_arp *la = (struct llinfo_arp *)rt->rt_llinfo;
+	register struct sockaddr *gate;
+	register struct llinfo_arp *la;
 	static struct sockaddr_dl null_sdl = {sizeof(null_sdl), AF_LINK};
 	int mine = 0;
 
+	RT_LOCK_ASSERT(rt);
+
 	if (!arpinit_done) {
 		arpinit_done = 1;
-		timeout(arptimer, (caddr_t)0, hz);
+		callout_reset(&arp_callout, hz, arptimer, NULL);
 	}
 	if (rt->rt_flags & RTF_GATEWAY)
 		return;
+	gate = rt->rt_gateway;
+	la = (struct llinfo_arp *)rt->rt_llinfo;
 	switch (req) {
 
 	case RTM_ADD:
@@ -210,7 +215,10 @@ arp_rtrequest(req, rt, info)
 	case RTM_RESOLVE:
 		if (gate->sa_family != AF_LINK ||
 		    gate->sa_len < sizeof(null_sdl)) {
-			log(LOG_DEBUG, "arp_rtrequest: bad gateway value\n");
+			log(LOG_DEBUG, "%s: bad gateway %s%s\n", __func__,
+			    inet_ntoa(SIN(rt_key(rt))->sin_addr),
+			    (gate->sa_family != AF_LINK) ?
+			    " (!AF_LINK)": "");
 			break;
 		}
 		SDL(gate)->sdl_type = rt->rt_ifp->if_type;
@@ -221,14 +229,13 @@ arp_rtrequest(req, rt, info)
 		 * Case 2:  This route may come from cloning, or a manual route
 		 * add with a LL address.
 		 */
-		R_Malloc(la, struct llinfo_arp *, sizeof(*la));
+		R_Zalloc(la, struct llinfo_arp *, sizeof(*la));
 		rt->rt_llinfo = (caddr_t)la;
 		if (la == 0) {
-			log(LOG_DEBUG, "arp_rtrequest: malloc failed\n");
+			log(LOG_DEBUG, "%s: malloc failed\n", __func__);
 			break;
 		}
-		arp_inuse++, arp_allocated++;
-		Bzero(la, sizeof(*la));
+		arp_allocated++;
 		la->la_rt = rt;
 		rt->rt_flags |= RTF_LLINFO;
 		RADIX_NODE_HEAD_LOCK_ASSERT(rt_tables[AF_INET]);
@@ -288,7 +295,6 @@ arp_rtrequest(req, rt, info)
 	case RTM_DELETE:
 		if (la == 0)
 			break;
-		arp_inuse--;
 		RADIX_NODE_HEAD_LOCK_ASSERT(rt_tables[AF_INET]);
 		LIST_REMOVE(la, la_le);
 		rt->rt_llinfo = 0;
@@ -495,12 +501,12 @@ arpresolve(ifp, rt, m, dst, desten, rt0)
 		return 1;
 	}
 	/*
-	 * If ARP is disabled on this interface, stop.
+	 * If ARP is disabled or static on this interface, stop.
 	 * XXX
 	 * Probably should not allocate empty llinfo struct if we are
 	 * not going to be sending out an arp request.
 	 */
-	if (ifp->if_flags & IFF_NOARP) {
+	if (ifp->if_flags & (IFF_NOARP | IFF_STATICARP)) {
 		m_freem(m);
 		return (0);
 	}
@@ -513,6 +519,7 @@ arpresolve(ifp, rt, m, dst, desten, rt0)
 		m_freem(la->la_hold);
 	la->la_hold = m;
 	if (rt->rt_expire) {
+		RT_LOCK(rt);
 		rt->rt_flags &= ~RTF_REJECT;
 		if (la->la_asked == 0 || rt->rt_expire != time_second) {
 			rt->rt_expire = time_second;
@@ -529,6 +536,7 @@ arpresolve(ifp, rt, m, dst, desten, rt0)
 			}
 
 		}
+		RT_UNLOCK(rt);
 	}
 	return (0);
 }
@@ -543,8 +551,9 @@ arpintr(struct mbuf *m)
 	struct arphdr *ar;
 
 	if (!arpinit_done) {
+		/* NB: this race should not matter */
 		arpinit_done = 1;
-		timeout(arptimer, (caddr_t)0, hz);
+		callout_reset(&arp_callout, hz, arptimer, NULL);
 	}
 	if (m->m_len < sizeof(struct arphdr) &&
 	    ((m = m_pullup(m, sizeof(struct arphdr))) == NULL)) {
@@ -691,32 +700,34 @@ match:
 		itaddr = myaddr;
 		goto reply;
 	}
+	if (ifp->if_flags & IFF_STATICARP)
+		goto reply;
 	la = arplookup(isaddr.s_addr, itaddr.s_addr == myaddr.s_addr, 0);
 	if (la && (rt = la->la_rt) && (sdl = SDL(rt->rt_gateway))) {
 		/* the following is not an error when doing bridging */
 		if (!BRIDGE_TEST && rt->rt_ifp != ifp) {
 			if (log_arp_wrong_iface)
-				log(LOG_ERR, "arp: %s is on %s%d but got reply from %*D on %s%d\n",
+				log(LOG_ERR, "arp: %s is on %s but got reply from %*D on %s\n",
 				    inet_ntoa(isaddr),
-				    rt->rt_ifp->if_name, rt->rt_ifp->if_unit,
+				    rt->rt_ifp->if_xname,
 				    ifp->if_addrlen, (u_char *)ar_sha(ah), ":",
-				    ifp->if_name, ifp->if_unit);
+				    ifp->if_xname);
 			goto reply;
 		}
 		if (sdl->sdl_alen &&
 		    bcmp(ar_sha(ah), LLADDR(sdl), sdl->sdl_alen)) {
 			if (rt->rt_expire) {
 			    if (log_arp_movements)
-			        log(LOG_INFO, "arp: %s moved from %*D to %*D on %s%d\n",
+			        log(LOG_INFO, "arp: %s moved from %*D to %*D on %s\n",
 				    inet_ntoa(isaddr),
 				    ifp->if_addrlen, (u_char *)LLADDR(sdl), ":",
 				    ifp->if_addrlen, (u_char *)ar_sha(ah), ":",
-				    ifp->if_name, ifp->if_unit);
+				    ifp->if_xname);
 			} else {
 			    log(LOG_ERR,
-				"arp: %*D attempts to modify permanent entry for %s on %s%d\n",
+				"arp: %*D attempts to modify permanent entry for %s on %s\n",
 				ifp->if_addrlen, (u_char *)ar_sha(ah), ":",
-				inet_ntoa(isaddr), ifp->if_name, ifp->if_unit);
+				inet_ntoa(isaddr), ifp->if_xname);
 			    goto reply;
 			}
 		}
@@ -772,9 +783,11 @@ match:
 			m->m_pkthdr.len += 8;
 			th->rcf = trld->trld_rcf;
 		}
+		RT_LOCK(rt);
 		if (rt->rt_expire)
 			rt->rt_expire = time_second + arpt_keep;
 		rt->rt_flags &= ~RTF_REJECT;
+		RT_UNLOCK(rt);
 		la->la_asked = 0;
 		la->la_preempt = arp_maxtries;
 		if (la->la_hold) {
@@ -841,10 +854,9 @@ reply:
 			}
 			if (rt->rt_ifp != ifp) {
 				log(LOG_INFO, "arp_proxy: ignoring request"
-				    " from %s via %s%d, expecting %s%d\n",
-				    inet_ntoa(isaddr), ifp->if_name,
-				    ifp->if_unit, rt->rt_ifp->if_name,
-				    rt->rt_ifp->if_unit);
+				    " from %s via %s, expecting %s\n",
+				    inet_ntoa(isaddr), ifp->if_xname,
+				    rt->rt_ifp->if_xname);
 				rtfree(rt);
 				m_freem(m);
 				return;
@@ -921,13 +933,16 @@ arptfree(la)
 {
 	register struct rtentry *rt = la->la_rt;
 	register struct sockaddr_dl *sdl;
+
 	if (rt == 0)
 		panic("arptfree");
 	if (rt->rt_refcnt > 0 && (sdl = SDL(rt->rt_gateway)) &&
 	    sdl->sdl_family == AF_LINK) {
 		sdl->sdl_alen = 0;
 		la->la_preempt = la->la_asked = 0;
+		RT_LOCK(rt);		/* XXX needed or move higher? */
 		rt->rt_flags &= ~RTF_REJECT;
+		RT_UNLOCK(rt);
 		return;
 	}
 	rtrequest(RTM_DELETE, rt_key(rt), (struct sockaddr *)0, rt_mask(rt),
@@ -942,15 +957,18 @@ arplookup(addr, create, proxy)
 	int create, proxy;
 {
 	register struct rtentry *rt;
-	static struct sockaddr_inarp sin = {sizeof(sin), AF_INET };
+	struct sockaddr_inarp sin;
 	const char *why = 0;
 
+	bzero(&sin, sizeof(sin));
+	sin.sin_len = sizeof(sin);
+	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = addr;
-	sin.sin_other = proxy ? SIN_PROXY : 0;
+	if (proxy)
+		sin.sin_other = SIN_PROXY;
 	rt = rtalloc1((struct sockaddr *)&sin, create, 0UL);
 	if (rt == 0)
 		return (0);
-	rt->rt_refcnt--;
 
 	if (rt->rt_flags & RTF_GATEWAY)
 		why = "host is not on local network";
@@ -959,14 +977,28 @@ arplookup(addr, create, proxy)
 	else if (rt->rt_gateway->sa_family != AF_LINK)
 		why = "gateway route is not ours";
 
-	if (why && create) {
-		log(LOG_DEBUG, "arplookup %s failed: %s\n",
-		    inet_ntoa(sin.sin_addr), why);
-		return 0;
-	} else if (why) {
-		return 0;
+	if (why) {
+#define	ISDYNCLONE(_rt) \
+	(((_rt)->rt_flags & (RTF_STATIC | RTF_WASCLONED)) == RTF_WASCLONED)
+		if (create)
+			log(LOG_DEBUG, "arplookup %s failed: %s\n",
+			    inet_ntoa(sin.sin_addr), why);
+		/*
+		 * If there are no references to this Layer 2 route,
+		 * and it is a cloned route, and not static, and
+		 * arplookup() is creating the route, then purge
+		 * it from the routing table as it is probably bogus.
+		 */
+		if (rt->rt_refcnt == 1 && ISDYNCLONE(rt))
+			rtexpunge(rt);
+		RTFREE_LOCKED(rt);
+		return (0);
+#undef ISDYNCLONE
+	} else {
+		RT_REMREF(rt);
+		RT_UNLOCK(rt);
+		return ((struct llinfo_arp *)rt->rt_llinfo);
 	}
-	return ((struct llinfo_arp *)rt->rt_llinfo);
 }
 
 void
@@ -988,7 +1020,7 @@ arp_init(void)
 	arpintrq.ifq_maxlen = 50;
 	mtx_init(&arpintrq.ifq_mtx, "arp_inq", NULL, MTX_DEF);
 	LIST_INIT(&llinfo_arp);
-	netisr_register(NETISR_ARP, arpintr, &arpintrq);
+	callout_init(&arp_callout, CALLOUT_MPSAFE);
+	netisr_register(NETISR_ARP, arpintr, &arpintrq, NETISR_MPSAFE);
 }
-
 SYSINIT(arp, SI_SUB_PROTO_DOMAIN, SI_ORDER_ANY, arp_init, 0);

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_subr.c	8.2 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_subr.c,v 1.160 2003/05/07 05:26:27 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/tcp_subr.c,v 1.169.2.3 2004/02/23 15:32:55 pjd Exp $
  */
 
 #include "opt_compat.h"
@@ -61,6 +61,7 @@
 
 #include <net/route.h>
 #include <net/if.h>
+#include <net/pfil.h>
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
@@ -77,6 +78,7 @@
 #ifdef INET6
 #include <netinet6/ip6_var.h>
 #include <netinet6/scope6_var.h>
+#include <netinet6/nd6.h>
 #endif
 #include <netinet/tcp.h>
 #include <netinet/tcp_fsm.h>
@@ -118,6 +120,30 @@ SYSCTL_INT(_net_inet_tcp, TCPCTL_V6MSSDFLT, v6mssdflt,
 	"Default TCP Maximum Segment Size for IPv6");
 #endif
 
+/*
+ * Minimum MSS we accept and use. This prevents DoS attacks where
+ * we are forced to a ridiculous low MSS like 20 and send hundreds
+ * of packets instead of one. The effect scales with the available
+ * bandwidth and quickly saturates the CPU and network interface
+ * with packet generation and sending. Set to zero to disable MINMSS
+ * checking. This setting prevents us from sending too small packets.
+ */
+int	tcp_minmss = TCP_MINMSS;
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, minmss, CTLFLAG_RW,
+    &tcp_minmss , 0, "Minmum TCP Maximum Segment Size");
+/*
+ * Number of TCP segments per second we accept from remote host
+ * before we start to calculate average segment size. If average
+ * segment size drops below the minimum TCP MSS we assume a DoS
+ * attack and reset+drop the connection. Care has to be taken not to
+ * set this value too small to not kill interactive type connections
+ * (telnet, SSH) which send many small packets.
+ */
+int     tcp_minmssoverload = TCP_MINMSSOVERLOAD;
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, minmssoverload, CTLFLAG_RW,
+    &tcp_minmssoverload , 0, "Number of TCP Segments per Second allowed to"
+    "be under the MINMSS Size");
+
 #if 0
 static int 	tcp_rttdflt = TCPTV_SRTTDFLT / PR_SLOWHZ;
 SYSCTL_INT(_net_inet_tcp, TCPCTL_RTTDFLT, rttdflt, CTLFLAG_RW, 
@@ -133,7 +159,7 @@ SYSCTL_INT(_net_inet_tcp, TCPCTL_DO_RFC1644, rfc1644, CTLFLAG_RW,
     &tcp_do_rfc1644 , 0, "Enable rfc1644 (TTCP) extensions");
 
 static int	tcp_tcbhashsize = 0;
-SYSCTL_INT(_net_inet_tcp, OID_AUTO, tcbhashsize, CTLFLAG_RD,
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, tcbhashsize, CTLFLAG_RDTUN,
      &tcp_tcbhashsize, 0, "Size of TCP control-block hashtable");
 
 static int	do_tcpdrain = 1;
@@ -175,7 +201,6 @@ static int	tcp_inflight_stab = 20;
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, inflight_stab, CTLFLAG_RW,
     &tcp_inflight_stab, 0, "Inflight Algorithm Stabilization 20 = 2 packets");
 
-static void	tcp_cleartaocache(void);
 static struct inpcb *tcp_notify(struct inpcb *, int);
 static void	tcp_discardcb(struct tcpcb *);
 
@@ -213,7 +238,6 @@ tcp_init()
 	int hashsize = TCBHASHSIZE;
 	
 	tcp_ccgen = 1;
-	tcp_cleartaocache();
 
 	tcp_delacktime = TCPTV_DELACK;
 	tcp_keepinit = TCPTV_KEEP_INIT;
@@ -257,9 +281,10 @@ tcp_init()
 	uma_zone_set_max(tcpcb_zone, maxsockets);
 	tcptw_zone = uma_zcreate("tcptw", sizeof(struct tcptw), 
 	    NULL, NULL, NULL, NULL, UMA_ALIGN_PTR, UMA_ZONE_NOFREE);
-	uma_zone_set_max(tcptw_zone, maxsockets);
+	uma_zone_set_max(tcptw_zone, maxsockets / 5);
 	tcp_timer_init();
 	syncache_init();
+	tcp_hc_init();
 }
 
 /*
@@ -365,8 +390,6 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 {
 	register int tlen;
 	int win = 0;
-	struct route *ro = 0;
-	struct route sro;
 	struct ip *ip;
 	struct tcphdr *nth;
 #ifdef INET6
@@ -381,6 +404,7 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 	int isipv6;
 #endif /* INET6 */
 	int ipflags = 0;
+	struct inpcb *inp = NULL;
 
 	KASSERT(tp != NULL || m != NULL, ("tcp_respond: tp and m both NULL"));
 
@@ -391,28 +415,15 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 	ip = ipgen;
 
 	if (tp) {
+		inp = tp->t_inpcb;
+		KASSERT(inp != NULL, ("tcp control block w/o inpcb"));
+		INP_INFO_WLOCK_ASSERT(&tcbinfo);
+		INP_LOCK_ASSERT(inp);
 		if (!(flags & TH_RST)) {
-			win = sbspace(&tp->t_inpcb->inp_socket->so_rcv);
+			win = sbspace(&inp->inp_socket->so_rcv);
 			if (win > (long)TCP_MAXWIN << tp->rcv_scale)
 				win = (long)TCP_MAXWIN << tp->rcv_scale;
 		}
-#ifdef INET6
-		if (isipv6)
-			ro6 = &tp->t_inpcb->in6p_route;
-		else
-#endif /* INET6 */
-		ro = &tp->t_inpcb->inp_route;
-	} else {
-#ifdef INET6
-		if (isipv6) {
-			ro6 = &sro6;
-			bzero(ro6, sizeof *ro6);
-		} else
-#endif /* INET6 */
-	      {
-		ro = &sro;
-		bzero(ro, sizeof *ro);
-	      }
 	}
 	if (m == 0) {
 		m = m_gethdr(M_DONTWAIT, MT_HEADER);
@@ -478,23 +489,25 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 	tlen += sizeof (struct tcpiphdr);
 	ip->ip_len = tlen;
 	ip->ip_ttl = ip_defttl;
+	if (path_mtu_discovery)
+		ip->ip_off |= IP_DF;
       }
 	m->m_len = tlen;
 	m->m_pkthdr.len = tlen;
 	m->m_pkthdr.rcvif = (struct ifnet *) 0;
 #ifdef MAC
-	if (tp != NULL && tp->t_inpcb != NULL) {
+	if (inp != NULL) {
 		/*
 		 * Packet is associated with a socket, so allow the
 		 * label of the response to reflect the socket label.
 		 */
-		mac_create_mbuf_from_socket(tp->t_inpcb->inp_socket, m);
+		mac_create_mbuf_from_socket(inp->inp_socket, m);
 	} else {
 		/*
-		 * XXXMAC: This will need to call a mac function that
-		 * modifies the mbuf label in place for TCP datagrams
-		 * not associated with a PCB.
+		 * Packet is not associated with a socket, so possibly
+		 * update the label in place.
 		 */
+		mac_reflect_mbuf_tcp(m);
 	}
 #endif
 	nth->th_seq = htonl(seq);
@@ -513,10 +526,7 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 		nth->th_sum = in6_cksum(m, IPPROTO_TCP,
 					sizeof(struct ip6_hdr),
 					tlen - sizeof(struct ip6_hdr));
-		ip6->ip6_hlim = in6_selecthlim(tp ? tp->t_inpcb : NULL,
-					       ro6 && ro6->ro_rt ?
-					       ro6->ro_rt->rt_ifp :
-					       NULL);
+		ip6->ip6_hlim = in6_selecthlim(tp ? tp->t_inpcb : NULL, NULL);
 	} else
 #endif /* INET6 */
       {
@@ -526,7 +536,7 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
         m->m_pkthdr.csum_data = offsetof(struct tcphdr, th_sum);
       }
 #ifdef TCPDEBUG
-	if (tp == NULL || (tp->t_inpcb->inp_socket->so_options & SO_DEBUG))
+	if (tp == NULL || (inp->inp_socket->so_options & SO_DEBUG))
 		tcp_trace(TA_OUTPUT, 0, tp, mtod(m, void *), th, 0);
 #endif
 #ifdef INET6
@@ -536,21 +546,14 @@ tcp_respond(tp, ipgen, th, m, ack, seq, flags)
 		     IP6PO_MINMTU_ALL)) {
  			ipflags |= IPV6_MINMTU;
 		}
-		(void)ip6_output(m, NULL, ro6, ipflags, NULL, NULL,
-			tp ? tp->t_inpcb : NULL);
+		(void) ip6_output(m, NULL, NULL, ipflags, NULL, NULL, inp);
 		if (ro6 == &sro6 && ro6->ro_rt) {
 			RTFREE(ro6->ro_rt);
 			ro6->ro_rt = NULL;
 		}
 	} else
 #endif /* INET6 */
-      {
-	(void) ip_output(m, NULL, ro, ipflags, NULL, tp ? tp->t_inpcb : NULL);
-	if (ro == &sro && ro->ro_rt) {
-		RTFREE(ro->ro_rt);
-		ro->ro_rt = NULL;
-	}
-      }
+	(void) ip_output(m, NULL, NULL, ipflags, NULL, inp);
 }
 
 /*
@@ -650,8 +653,6 @@ tcp_discardcb(tp)
 #ifdef INET6
 	int isipv6 = (inp->inp_vflag & INP_IPV6) != 0;
 #endif /* INET6 */
-	struct rtentry *rt;
-	int dosavessthresh;
 
 	/*
 	 * Make sure that all of our timers are stopped before we
@@ -666,89 +667,34 @@ tcp_discardcb(tp)
 	/*
 	 * If we got enough samples through the srtt filter,
 	 * save the rtt and rttvar in the routing entry.
-	 * 'Enough' is arbitrarily defined as the 16 samples.
-	 * 16 samples is enough for the srtt filter to converge
-	 * to within 5% of the correct value; fewer samples and
-	 * we could save a very bogus rtt.
-	 *
-	 * Don't update the default route's characteristics and don't
-	 * update anything that the user "locked".
+	 * 'Enough' is arbitrarily defined as 4 rtt samples.
+	 * 4 samples is enough for the srtt filter to converge
+	 * to within enough % of the correct value; fewer samples
+	 * and we could save a bogus rtt. The danger is not high
+	 * as tcp quickly recovers from everything.
+	 * XXX: Works very well but needs some more statistics!
 	 */
-	if (tp->t_rttupdated >= 16) {
-		register u_long i = 0;
-#ifdef INET6
-		if (isipv6) {
-			struct sockaddr_in6 *sin6;
+	if (tp->t_rttupdated >= 4) {
+		struct hc_metrics_lite metrics;
+		u_long ssthresh;
 
-			if ((rt = inp->in6p_route.ro_rt) == NULL)
-				goto no_valid_rt;
-			sin6 = (struct sockaddr_in6 *)rt_key(rt);
-			if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr))
-				goto no_valid_rt;
-		}
-		else
-#endif /* INET6 */		
-		if ((rt = inp->inp_route.ro_rt) == NULL ||
-		    ((struct sockaddr_in *)rt_key(rt))->sin_addr.s_addr
-		    == INADDR_ANY)
-			goto no_valid_rt;
-
-		if ((rt->rt_rmx.rmx_locks & RTV_RTT) == 0) {
-			i = tp->t_srtt *
-			    (RTM_RTTUNIT / (hz * TCP_RTT_SCALE));
-			if (rt->rt_rmx.rmx_rtt && i)
-				/*
-				 * filter this update to half the old & half
-				 * the new values, converting scale.
-				 * See route.h and tcp_var.h for a
-				 * description of the scaling constants.
-				 */
-				rt->rt_rmx.rmx_rtt =
-				    (rt->rt_rmx.rmx_rtt + i) / 2;
-			else
-				rt->rt_rmx.rmx_rtt = i;
-			tcpstat.tcps_cachedrtt++;
-		}
-		if ((rt->rt_rmx.rmx_locks & RTV_RTTVAR) == 0) {
-			i = tp->t_rttvar *
-			    (RTM_RTTUNIT / (hz * TCP_RTTVAR_SCALE));
-			if (rt->rt_rmx.rmx_rttvar && i)
-				rt->rt_rmx.rmx_rttvar =
-				    (rt->rt_rmx.rmx_rttvar + i) / 2;
-			else
-				rt->rt_rmx.rmx_rttvar = i;
-			tcpstat.tcps_cachedrttvar++;
-		}
+		bzero(&metrics, sizeof(metrics));
 		/*
-		 * The old comment here said:
-		 * update the pipelimit (ssthresh) if it has been updated
-		 * already or if a pipesize was specified & the threshhold
-		 * got below half the pipesize.  I.e., wait for bad news
-		 * before we start updating, then update on both good
-		 * and bad news.
-		 *
-		 * But we want to save the ssthresh even if no pipesize is
-		 * specified explicitly in the route, because such
-		 * connections still have an implicit pipesize specified
-		 * by the global tcp_sendspace.  In the absence of a reliable
-		 * way to calculate the pipesize, it will have to do.
+		 * Update the ssthresh always when the conditions below
+		 * are satisfied. This gives us better new start value
+		 * for the congestion avoidance for new connections.
+		 * ssthresh is only set if packet loss occured on a session.
 		 */
-		i = tp->snd_ssthresh;
-		if (rt->rt_rmx.rmx_sendpipe != 0)
-			dosavessthresh = (i < rt->rt_rmx.rmx_sendpipe / 2);
-		else
-			dosavessthresh = (i < so->so_snd.sb_hiwat / 2);
-		if (((rt->rt_rmx.rmx_locks & RTV_SSTHRESH) == 0 &&
-		     i != 0 && rt->rt_rmx.rmx_ssthresh != 0)
-		    || dosavessthresh) {
+		ssthresh = tp->snd_ssthresh;
+		if (ssthresh != 0 && ssthresh < so->so_snd.sb_hiwat / 2) {
 			/*
 			 * convert the limit from user data bytes to
 			 * packets then to packet data bytes.
 			 */
-			i = (i + tp->t_maxseg / 2) / tp->t_maxseg;
-			if (i < 2)
-				i = 2;
-			i *= (u_long)(tp->t_maxseg +
+			ssthresh = (ssthresh + tp->t_maxseg / 2) / tp->t_maxseg;
+			if (ssthresh < 2)
+				ssthresh = 2;
+			ssthresh *= (u_long)(tp->t_maxseg +
 #ifdef INET6
 				      (isipv6 ? sizeof (struct ip6_hdr) +
 					       sizeof (struct tcphdr) :
@@ -758,15 +704,21 @@ tcp_discardcb(tp)
 				       )
 #endif
 				      );
-			if (rt->rt_rmx.rmx_ssthresh)
-				rt->rt_rmx.rmx_ssthresh =
-				    (rt->rt_rmx.rmx_ssthresh + i) / 2;
-			else
-				rt->rt_rmx.rmx_ssthresh = i;
-			tcpstat.tcps_cachedssthresh++;
-		}
+		} else
+			ssthresh = 0;
+		metrics.rmx_ssthresh = ssthresh;
+
+		metrics.rmx_rtt = tp->t_srtt;
+		metrics.rmx_rttvar = tp->t_rttvar;
+		/* XXX: This wraps if the pipe is more than 4 Gbit per second */
+		metrics.rmx_bandwidth = tp->snd_bandwidth;
+		metrics.rmx_cwnd = tp->snd_cwnd;
+		metrics.rmx_sendpipe = 0; 
+		metrics.rmx_recvpipe = 0;
+
+		tcp_hc_update(&inp->inp_inc, &metrics);
 	}
-    no_valid_rt:
+
 	/* free the reassembly queue, if any */
 	while ((q = LIST_FIRST(&tp->t_segq)) != NULL) {
 		LIST_REMOVE(q, tqe_q);
@@ -1145,12 +1097,19 @@ tcp_ctlinput(cmd, sa, vip)
 		notify = tcp_drop_syn_sent;
 	else if (cmd == PRC_MSGSIZE)
 		notify = tcp_mtudisc;
-	else if (PRC_IS_REDIRECT(cmd)) {
+	/*
+	 * Redirects don't need to be handled up here.
+	 */
+	else if (PRC_IS_REDIRECT(cmd))
+		return;
+	/*
+	 * Hostdead is ugly because it goes linearly through all PCBs.
+	 * XXX: We never get this from ICMP, otherwise it makes an
+	 * excellent DoS attack on machines with many connections.
+	 */
+	else if (cmd == PRC_HOSTDEAD)
 		ip = 0;
-		notify = in_rtchange;
-	} else if (cmd == PRC_HOSTDEAD)
-		ip = 0;
-	else if ((unsigned)cmd > PRC_NCMDS || inetctlerrmap[cmd] == 0)
+	else if ((unsigned)cmd >= PRC_NCMDS || inetctlerrmap[cmd] == 0)
 		return;
 	if (ip) {
 		s = splnet();
@@ -1217,7 +1176,7 @@ tcp6_ctlinput(cmd, sa, d)
 	else if (cmd == PRC_MSGSIZE)
 		notify = tcp_mtudisc;
 	else if (!PRC_IS_REDIRECT(cmd) &&
-		 ((unsigned)cmd > PRC_NCMDS || inet6ctlerrmap[cmd] == 0))
+		 ((unsigned)cmd >= PRC_NCMDS || inet6ctlerrmap[cmd] == 0))
 		return;
 
 	/* if the parameter is from icmp6, decode it. */
@@ -1388,23 +1347,28 @@ tcp_mtudisc(inp, errno)
 	int errno;
 {
 	struct tcpcb *tp = intotcpcb(inp);
-	struct rtentry *rt;
-	struct rmxp_tao *taop;
+	struct rmxp_tao tao;
 	struct socket *so = inp->inp_socket;
-	int offered;
+	u_int maxmtu;
+	u_int romtu;
 	int mss;
 #ifdef INET6
 	int isipv6 = (tp->t_inpcb->inp_vflag & INP_IPV6) != 0;
 #endif /* INET6 */
+	bzero(&tao, sizeof(tao));
 
 	if (tp) {
+		maxmtu = tcp_hc_getmtu(&inp->inp_inc); /* IPv4 and IPv6 */
+		romtu =
 #ifdef INET6
-		if (isipv6)
-			rt = tcp_rtlookup6(&inp->inp_inc);
-		else
+		    isipv6 ? tcp_maxmtu6(&inp->inp_inc) :
 #endif /* INET6 */
-		rt = tcp_rtlookup(&inp->inp_inc);
-		if (!rt || !rt->rt_rmx.rmx_mtu) {
+		    tcp_maxmtu(&inp->inp_inc);
+		if (!maxmtu)
+			maxmtu = romtu;
+		else
+			maxmtu = min(maxmtu, romtu);
+		if (!maxmtu) {
 			tp->t_maxopd = tp->t_maxseg =
 #ifdef INET6
 				isipv6 ? tcp_v6mssdflt :
@@ -1412,9 +1376,7 @@ tcp_mtudisc(inp, errno)
 				tcp_mssdflt;
 			return inp;
 		}
-		taop = rmx_taop(rt->rt_rmx);
-		offered = taop->tao_mssopt;
-		mss = rt->rt_rmx.rmx_mtu -
+		mss = maxmtu -
 #ifdef INET6
 			(isipv6 ?
 			 sizeof(struct ip6_hdr) + sizeof(struct tcphdr) :
@@ -1425,8 +1387,11 @@ tcp_mtudisc(inp, errno)
 #endif /* INET6 */
 			;
 
-		if (offered)
-			mss = min(mss, offered);
+		if (tcp_do_rfc1644) {
+			tcp_hc_gettao(&inp->inp_inc, &tao);
+			if (tao.tao_mssopt)
+				mss = min(mss, tao.tao_mssopt);
+		}
 		/*
 		 * XXX - The above conditional probably violates the TCP
 		 * spec.  The problem is that, since we don't know the
@@ -1480,58 +1445,77 @@ tcp_mtudisc(inp, errno)
  * is called by TCP routines that access the rmx structure and by tcp_mss
  * to get the interface MTU.
  */
-struct rtentry *
-tcp_rtlookup(inc)
+u_long 
+tcp_maxmtu(inc)
 	struct in_conninfo *inc;
 {
-	struct route *ro;
-	struct rtentry *rt;
+	struct route sro;
+	struct sockaddr_in *dst;
+	struct ifnet *ifp;
+	u_long maxmtu = 0;
 
-	ro = &inc->inc_route;
-	rt = ro->ro_rt;
-	if (rt == NULL || !(rt->rt_flags & RTF_UP)) {
-		/* No route yet, so try to acquire one */
-		if (inc->inc_faddr.s_addr != INADDR_ANY) {
-			ro->ro_dst.sa_family = AF_INET;
-			ro->ro_dst.sa_len = sizeof(struct sockaddr_in);
-			((struct sockaddr_in *) &ro->ro_dst)->sin_addr =
-			    inc->inc_faddr;
-			rtalloc(ro);
-			rt = ro->ro_rt;
-		}
+	KASSERT(inc != NULL, ("tcp_maxmtu with NULL in_conninfo pointer"));
+
+	bzero(&sro, sizeof(sro));
+	if (inc->inc_faddr.s_addr != INADDR_ANY) {
+	        dst = (struct sockaddr_in *)&sro.ro_dst;
+		dst->sin_family = AF_INET;
+		dst->sin_len = sizeof(*dst);
+		dst->sin_addr = inc->inc_faddr;
+		rtalloc_ign(&sro, RTF_CLONING);
 	}
-	return rt;
+	if (sro.ro_rt != NULL) {
+		ifp = sro.ro_rt->rt_ifp;
+		if (sro.ro_rt->rt_rmx.rmx_mtu == 0)
+			maxmtu = ifp->if_mtu;
+		else
+			maxmtu = min(sro.ro_rt->rt_rmx.rmx_mtu, ifp->if_mtu);
+		RTFREE(sro.ro_rt);
+	}
+	return (maxmtu);
 }
 
 #ifdef INET6
-struct rtentry *
-tcp_rtlookup6(inc)
+u_long
+tcp_maxmtu6(inc)
 	struct in_conninfo *inc;
 {
 #ifdef NEW_STRUCT_ROUTE
-	struct route *ro6;
+	struct route sro6;
 #else
-	struct route_in6 *ro6;
+	struct route_in6 sro6;
 #endif
-	struct rtentry *rt;
+	struct ifnet *ifp;
+	u_long maxmtu = 0;
 
-	ro6 = &inc->inc6_route;
-	rt = ro6->ro_rt;
-	if (rt == NULL || !(rt->rt_flags & RTF_UP)) {
-		/* No route yet, so try to acquire one */
-		if (!IN6_IS_ADDR_UNSPECIFIED(&inc->inc6_faddr)) {
-			struct sockaddr_in6 *dst6;
+	KASSERT(inc != NULL, ("tcp_maxmtu6 with NULL in_conninfo pointer"));
 
-			dst6 = (struct sockaddr_in6 *)&ro6->ro_dst;
-			dst6->sin6_family = AF_INET6;
-			dst6->sin6_len = sizeof(*dst6);
-			dst6->sin6_addr = inc->inc6_faddr;
-			dst6->sin6_scope_id = 0; /* XXX */
-			rtalloc((struct route *)ro6);
-			rt = ro6->ro_rt;
-		}
+	bzero(&sro6, sizeof(sro6));
+	if (!IN6_IS_ADDR_UNSPECIFIED(&inc->inc6_faddr)) {
+#ifdef NEW_STRUCT_ROUTE
+		struct sockaddr_in6 *ro_dst;
+		ro_dst = (struct sockaddr_in6 *) &sro6.ro_dst;
+		ro_dst->sin6_family = AF_INET6;
+		ro_dst->sin6_len = sizeof(struct sockaddr_in6);
+		ro_dst->sin6_addr = inc->inc6_faddr;
+#else
+		sro6.ro_dst.sin6_family = AF_INET6;
+		sro6.ro_dst.sin6_len = sizeof(struct sockaddr_in6);
+		sro6.ro_dst.sin6_addr = inc->inc6_faddr;
+#endif
+		rtalloc_ign((struct route *)&sro6, RTF_CLONING);
 	}
-	return rt;
+	if (sro6.ro_rt != NULL) {
+		ifp = sro6.ro_rt->rt_ifp;
+		if (sro6.ro_rt->rt_rmx.rmx_mtu == 0)
+			maxmtu = IN6_LINKMTU(sro6.ro_rt->rt_ifp);
+		else
+			maxmtu = min(sro6.ro_rt->rt_rmx.rmx_mtu,
+				     IN6_LINKMTU(sro6.ro_rt->rt_ifp));
+		RTFREE(sro6.ro_rt);
+	}
+
+	return (maxmtu);
 }
 #endif /* INET6 */
 
@@ -1580,45 +1564,6 @@ ipsec_hdrsiz_tcp(tp)
 #endif /*IPSEC*/
 
 /*
- * Return a pointer to the cached information about the remote host.
- * The cached information is stored in the protocol specific part of
- * the route metrics.
- */
-struct rmxp_tao *
-tcp_gettaocache(inc)
-	struct in_conninfo *inc;
-{
-	struct rtentry *rt;
-
-#ifdef INET6
-	if (inc->inc_isipv6)
-		rt = tcp_rtlookup6(inc);
-	else
-#endif /* INET6 */
-	rt = tcp_rtlookup(inc);
-
-	/* Make sure this is a host route and is up. */
-	if (rt == NULL ||
-	    (rt->rt_flags & (RTF_UP|RTF_HOST)) != (RTF_UP|RTF_HOST))
-		return NULL;
-
-	return rmx_taop(rt->rt_rmx);
-}
-
-/*
- * Clear all the TAO cache entries, called from tcp_init.
- *
- * XXX
- * This routine is just an empty one, because we assume that the routing
- * routing tables are initialized at the same time when TCP, so there is
- * nothing in the cache left over.
- */
-static void
-tcp_cleartaocache()
-{
-}
-
-/*
  * Move a TCP connection into TIME_WAIT state.
  *    tcbinfo is unlocked.
  *    inp is locked, and is unlocked before returning.
@@ -1659,6 +1604,8 @@ tcp_twstart(tp)
 
 	tw->snd_nxt = tp->snd_nxt;
 	tw->rcv_nxt = tp->rcv_nxt;
+	tw->iss     = tp->iss;
+	tw->irs     = tp->irs;
 	tw->cc_recv = tp->cc_recv;
 	tw->cc_send = tp->cc_send;
 	tw->t_starttime = tp->t_starttime;
@@ -1693,6 +1640,36 @@ tcp_twstart(tp)
 	INP_UNLOCK(inp);
 }
 
+/*
+ * The appromixate rate of ISN increase of Microsoft TCP stacks;
+ * the actual rate is slightly higher due to the addition of
+ * random positive increments.
+ *
+ * Most other new OSes use semi-randomized ISN values, so we
+ * do not need to worry about them.
+ */
+#define MS_ISN_BYTES_PER_SECOND		250000
+
+/*
+ * Determine if the ISN we will generate has advanced beyond the last
+ * sequence number used by the previous connection.  If so, indicate
+ * that it is safe to recycle this tw socket by returning 1.
+ */
+int
+tcp_twrecycleable(struct tcptw *tw)
+{
+	tcp_seq new_iss = tw->iss;
+	tcp_seq new_irs = tw->irs;
+
+	new_iss += (ticks - tw->t_starttime) * (ISN_BYTES_PER_SECOND / hz);
+	new_irs += (ticks - tw->t_starttime) * (MS_ISN_BYTES_PER_SECOND / hz);
+	
+	if (SEQ_GT(new_iss, tw->snd_nxt) && SEQ_GT(new_irs, tw->rcv_nxt))
+		return 1;
+	else
+		return 0;
+}
+
 struct tcptw *
 tcp_twclose(struct tcptw *tw, int reuse)
 {
@@ -1709,6 +1686,8 @@ tcp_twclose(struct tcptw *tw, int reuse)
 #endif
 		in_pcbdetach(inp);
 	tcpstat.tcps_closed++;
+	crfree(tw->tw_cred);
+	tw->tw_cred = NULL;
 	if (reuse)
 		return (tw);
 	uma_zfree(tcptw_zone, tw);
@@ -1807,9 +1786,8 @@ tcp_twrespond(struct tcptw *tw, struct socket *so, struct mbuf *msrc,
 	if (isipv6) {
 		th->th_sum = in6_cksum(m, IPPROTO_TCP, sizeof(struct ip6_hdr),
 		    sizeof(struct tcphdr) + optlen);
-		ip6->ip6_hlim = in6_selecthlim(inp, inp->in6p_route.ro_rt ?
-		    inp->in6p_route.ro_rt->rt_ifp : NULL);
-		error = ip6_output(m, inp->in6p_outputopts, &inp->in6p_route,
+		ip6->ip6_hlim = in6_selecthlim(inp, NULL);
+		error = ip6_output(m, inp->in6p_outputopts, NULL,
 		    (tw->tw_so_options & SO_DONTROUTE), NULL, NULL, inp);
 	} else
 #endif
@@ -1819,7 +1797,9 @@ tcp_twrespond(struct tcptw *tw, struct socket *so, struct mbuf *msrc,
 		m->m_pkthdr.csum_flags = CSUM_TCP;
 		m->m_pkthdr.csum_data = offsetof(struct tcphdr, th_sum);
 		ip->ip_len = m->m_pkthdr.len;
-		error = ip_output(m, inp->inp_options, &inp->inp_route,
+		if (path_mtu_discovery)
+			ip->ip_off |= IP_DF;
+		error = ip_output(m, inp->inp_options, NULL,
 		    (tw->tw_so_options & SO_DONTROUTE), NULL, inp);
 	}
 	if (flags & TH_ACK)

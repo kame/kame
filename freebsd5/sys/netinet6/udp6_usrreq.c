@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.33 2003/02/19 22:32:43 jlemon Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.40 2003/11/26 01:40:44 sam Exp $	*/
 /*	$KAME: udp6_usrreq.c,v 1.27 2001/05/21 05:45:10 jinmei Exp $	*/
 
 /*
@@ -87,6 +87,9 @@
 
 #include <net/if.h>
 #include <net/if_types.h>
+#if defined(__FreeBSD__) && __FreeBSD_version > 502000
+#include <net/pfil.h>
+#endif
 #include <net/route.h>
 
 #include <netinet/in.h>
@@ -219,7 +222,7 @@ udp6_input(mp, offp, proto)
 		/*
 		 * Construct sockaddr format source address.
 		 */
-		init_sin6(&fromsa, m);
+		init_sin6(&fromsa, m); /* general init */
 		fromsa.sin6_port = uh->uh_sport;
 		/*
 		 * KAME note: traditionally we dropped udpiphdr from mbuf here.
@@ -264,7 +267,7 @@ udp6_input(mp, offp, proto)
 				/*
 				 * Check AH/ESP integrity.
 				 */
-				if (ipsec6_in_reject(m, last))
+				if (ipsec6_in_reject_so(m, last->inp_socket))
 					ipsec6stat.in_polvio++;
 					/* do not inject data into pcb */
 				else
@@ -291,7 +294,7 @@ udp6_input(mp, offp, proto)
 
 					m_adj(n, off + sizeof(struct udphdr));
 					if (sbappendaddr(&last->in6p_socket->so_rcv,
-							(struct sockaddr *)&fromsa,
+							 (struct sockaddr *)&fromsa,
 							n, opts) == 0) {
 						m_freem(n);
 						if (opts)
@@ -330,7 +333,7 @@ udp6_input(mp, offp, proto)
 		/*
 		 * Check AH/ESP integrity.
 		 */
-		if (ipsec6_in_reject(m, last)) {
+		if (ipsec6_in_reject_so(m, last->inp_socket)) {
 			ipsec6stat.in_polvio++;
 			goto bad;
 		}
@@ -349,7 +352,8 @@ udp6_input(mp, offp, proto)
 
 		m_adj(m, off + sizeof(struct udphdr));
 		if (sbappendaddr(&last->in6p_socket->so_rcv,
-				(struct sockaddr *)&fromsa, m, opts) == 0) {
+				(struct sockaddr *)&fromsa,
+				m, opts) == 0) {
 			udpstat.udps_fullsock++;
 			goto bad;
 		}
@@ -385,7 +389,7 @@ udp6_input(mp, offp, proto)
 	/*
 	 * Check AH/ESP integrity.
 	 */
-	if (ipsec6_in_reject(m, in6p)) {
+	if (ipsec6_in_reject_so(m, in6p->inp_socket)) {
 		ipsec6stat.in_polvio++;
 		goto bad;
 	}
@@ -403,13 +407,15 @@ udp6_input(mp, offp, proto)
 	 * Construct sockaddr format source address.
 	 * Stuff source address and datagram in user buffer.
 	 */
+	init_sin6(&fromsa, m); /* general init */
 	fromsa.sin6_port = uh->uh_sport;
 	if (in6p->in6p_flags & IN6P_CONTROLOPTS
 	    || in6p->in6p_socket->so_options & SO_TIMESTAMP)
 		ip6_savecontrol(in6p, m, &opts);
 	m_adj(m, off + sizeof(struct udphdr));
 	if (sbappendaddr(&in6p->in6p_socket->so_rcv,
-			(struct sockaddr *)&fromsa, m, opts) == 0) {
+			(struct sockaddr *)&fromsa,
+			m, opts) == 0) {
 		udpstat.udps_fullsock++;
 		goto bad;
 	}
@@ -568,7 +574,7 @@ udp6_attach(struct socket *so, int proto, struct thread *td)
 			return error;
 	}
 	s = splnet();
-	error = in_pcballoc(so, &udbinfo, td);
+	error = in_pcballoc(so, &udbinfo, td, "udp6inp");
 	splx(s);
 	if (error)
 		return error;
@@ -790,7 +796,7 @@ udp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 
   bad:
 	m_freem(m);
-	return(error);
+	return (error);
 }
 
 struct pr_usrreqs udp6_usrreqs = {
@@ -798,5 +804,5 @@ struct pr_usrreqs udp6_usrreqs = {
 	pru_connect2_notsupp, in6_control, udp6_detach, udp6_disconnect,
 	pru_listen_notsupp, in6_mapped_peeraddr, pru_rcvd_notsupp,
 	pru_rcvoob_notsupp, udp6_send, pru_sense_null, udp_shutdown,
-	in6_mapped_sockaddr, sosend, soreceive, sopoll
+	in6_mapped_sockaddr, sosend, soreceive, sopoll, in_pcbsosetlabel
 };

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/netinet6/raw_ip6.c,v 1.26 2003/02/19 22:32:43 jlemon Exp $
+ * $FreeBSD: src/sys/netinet6/raw_ip6.c,v 1.36 2003/11/26 01:40:44 sam Exp $
  */
 
 /*
@@ -83,6 +83,9 @@
 
 #include <net/if.h>
 #include <net/if_types.h>
+#if defined(__FreeBSD__) && __FreeBSD_version > 502000
+#include <net/pfil.h>
+#endif
 #include <net/route.h>
 
 #include <netinet/in.h>
@@ -182,7 +185,7 @@ rip6_input(mp, offp, proto)
 			/*
 			 * Check AH/ESP integrity.
 			 */
-			if (n && ipsec6_in_reject(n, last)) {
+			if (n && ipsec6_in_reject_so(n, last->inp_socket)) {
 				m_freem(n);
 				ipsec6stat.in_polvio++;
 				/* do not inject data into pcb */
@@ -221,7 +224,7 @@ rip6_input(mp, offp, proto)
 	/*
 	 * Check AH/ESP integrity.
 	 */
-	if (last && ipsec6_in_reject(m, last)) {
+	if (last && ipsec6_in_reject_so(m, last->inp_socket)) {
 		m_freem(m);
 		ipsec6stat.in_polvio++;
 		ip6stat.ip6s_delivered--;
@@ -460,7 +463,7 @@ rip6_output(m, va_alist)
 		in6p->in6p_outputopts = stickyopt;
 		m_freem(control);
 	}
-	return(error);
+	return (error);
 }
 
 /*
@@ -478,7 +481,7 @@ rip6_ctloutput(so, sopt)
 		 * XXX: is it better to call icmp6_ctloutput() directly
 		 * from protosw?
 		 */
-		return(icmp6_ctloutput(so, sopt));
+		return (icmp6_ctloutput(so, sopt));
 	else if (sopt->sopt_level != IPPROTO_IPV6)
 		return (EINVAL);
 
@@ -545,7 +548,7 @@ rip6_attach(struct socket *so, int proto, struct thread *td)
 	if (error)
 		return error;
 	s = splnet();
-	error = in_pcballoc(so, &ripcbinfo, td);
+	error = in_pcballoc(so, &ripcbinfo, td, "raw6inp");
 	splx(s);
 	if (error)
 		return error;
@@ -628,7 +631,7 @@ rip6_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 	    ((struct in6_ifaddr *)ia)->ia6_flags &
 	    (IN6_IFF_ANYCAST|IN6_IFF_NOTREADY|
 	     IN6_IFF_DETACHED|IN6_IFF_DEPRECATED)) {
-		return(EADDRNOTAVAIL);
+		return (EADDRNOTAVAIL);
 	}
 #ifndef SCOPEDROUTING
 	addr->sin6_scope_id = lzone;
@@ -657,8 +660,8 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 
 	/* Source address selection. XXX: need pcblookup? */
 	in6a = in6_selectsrc(addr, inp->in6p_outputopts,
-			    inp->in6p_moptions, &inp->in6p_route,
-			    &inp->in6p_laddr, &ifp, &error);
+			     inp->in6p_moptions, &inp->in6p_route,
+			     &inp->in6p_laddr, &ifp, &error);
 	if (in6a == NULL)
 		return (error ? error : EADDRNOTAVAIL);
 
@@ -740,5 +743,5 @@ struct pr_usrreqs rip6_usrreqs = {
 	pru_connect2_notsupp, in6_control, rip6_detach, rip6_disconnect,
 	pru_listen_notsupp, in6_setpeeraddr, pru_rcvd_notsupp,
 	pru_rcvoob_notsupp, rip6_send, pru_sense_null, rip6_shutdown,
-	in6_setsockaddr, sosend, soreceive, sopoll
+	in6_setsockaddr, sosend, soreceive, sopoll, pru_sosetlabel_null
 };

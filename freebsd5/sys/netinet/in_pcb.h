@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.61 2003/04/29 21:36:18 mdodd Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.h,v 1.68 2003/11/26 01:40:43 sam Exp $
  */
 
 #ifndef _NETINET_IN_PCB_H_
@@ -98,15 +98,13 @@ struct in_endpoints {
 
 /*
  * XXX
- * At some point struct route should possibly change to:
- *   struct rtentry *rt
- *   struct in_endpoints *ie; 
+ * the defines for inc_* are hacks and should be changed to direct references
  */
 struct in_conninfo {
 	u_int8_t	inc_flags;
 	u_int8_t	inc_len;
 	u_int16_t	inc_pad;	/* XXX alignment for in_endpoints */
-	/* protocol dependent part; cached route */
+	/* protocol dependent part */
 	struct	in_endpoints inc_ie;
 	union {
 		/* placeholder for routing entry */
@@ -123,8 +121,8 @@ struct in_conninfo {
 #define	inc_lport	inc_ie.ie_lport
 #define	inc_faddr	inc_ie.ie_faddr
 #define	inc_laddr	inc_ie.ie_laddr
-#define inc6_faddr	inc_ie.ie6_faddr
-#define inc6_laddr	inc_ie.ie6_laddr
+#define	inc6_faddr	inc_ie.ie6_faddr
+#define	inc6_laddr	inc_ie.ie6_laddr
 #define	inc_route	inc_dependroute.inc4_route
 #define	inc6_route	inc_dependroute.inc6_route
 
@@ -142,6 +140,7 @@ struct inpcb {
 	struct	inpcbinfo *inp_pcbinfo;	/* PCB list info */
 	struct	socket *inp_socket;	/* back pointer to socket */
 					/* list for this PCB's local port */
+	struct	label *inp_label;	/* MAC label */
 	int	inp_flags;		/* generic IP/datagram flags */
 
 	struct	inpcbpolicy *inp_sp; /* for IPSEC */
@@ -150,6 +149,7 @@ struct inpcb {
 #define	INP_IPV6	0x2
 #define INP_IPV6PROTO	0x4		/* opened under IPv6 protocol */
 #define INP_TIMEWAIT	0x8		/* .. probably doesn't go here */
+#define	INP_ONESBCAST	0x10		/* send all-ones broadcast */
 	u_char	inp_ip_ttl;		/* time to live proto */
 	u_char	inp_ip_p;		/* protocol proto */
 
@@ -163,7 +163,6 @@ struct inpcb {
 #define inp_lport	inp_inc.inc_lport
 #define	inp_faddr	inp_inc.inc_faddr
 #define	inp_laddr	inp_inc.inc_laddr
-#define	inp_route	inp_inc.inc_route
 #define	inp_ip_tos	inp_depend4.inp4_ip_tos
 #define	inp_options	inp_depend4.inp4_options
 #define	inp_moptions	inp_depend4.inp4_moptions
@@ -255,11 +254,21 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 	struct	mtx ipi_mtx;
 };
 
-#define INP_LOCK_INIT(inp, d) \
-	mtx_init(&(inp)->inp_mtx, (d), NULL, MTX_DEF | MTX_RECURSE | MTX_DUPOK)
+/*
+ * NB: We cannot enable assertions when IPv6 is configured as
+ *     this code is shared by both IPv4 and IPv6 and IPv6 is
+ *     not properly locked.
+ */
+#define INP_LOCK_INIT(inp, d, t) \
+	mtx_init(&(inp)->inp_mtx, (d), (t), MTX_DEF | MTX_RECURSE | MTX_DUPOK)
 #define INP_LOCK_DESTROY(inp)	mtx_destroy(&(inp)->inp_mtx)
 #define INP_LOCK(inp)		mtx_lock(&(inp)->inp_mtx)
 #define INP_UNLOCK(inp)		mtx_unlock(&(inp)->inp_mtx)
+#ifndef INET6
+#define INP_LOCK_ASSERT(inp)	mtx_assert(&(inp)->inp_mtx, MA_OWNED)
+#else
+#define INP_LOCK_ASSERT(inp)
+#endif
 
 #define INP_INFO_LOCK_INIT(ipi, d) \
 	mtx_init(&(ipi)->ipi_mtx, (d), NULL, MTX_DEF | MTX_RECURSE)
@@ -267,6 +276,13 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 #define INP_INFO_WLOCK(ipi)	mtx_lock(&(ipi)->ipi_mtx)
 #define INP_INFO_RUNLOCK(ipi)	mtx_unlock(&(ipi)->ipi_mtx)
 #define INP_INFO_WUNLOCK(ipi)	mtx_unlock(&(ipi)->ipi_mtx)
+#ifndef INET6
+#define INP_INFO_RLOCK_ASSERT(ipi)	mtx_assert(&(ipi)->ipi_mtx, MA_OWNED)
+#define INP_INFO_WLOCK_ASSERT(ipi)	mtx_assert(&(ipi)->ipi_mtx, MA_OWNED)
+#else
+#define INP_INFO_RLOCK_ASSERT(ipi)
+#define INP_INFO_WLOCK_ASSERT(ipi)
+#endif
 
 #define INP_PCBHASH(faddr, lport, fport, mask) \
 	(((faddr) ^ ((faddr) >> 16) ^ ntohs((lport) ^ (fport))) & (mask))
@@ -294,19 +310,10 @@ struct inpcbinfo {		/* XXX documentation, prefixes */
 #define	IN6P_DSTOPTS		0x080000 /* receive dst options after rthdr */
 #define	IN6P_RTHDR		0x100000 /* receive routing header */
 #define	IN6P_RTHDRDSTOPTS	0x200000 /* receive dstoptions before rthdr */
-#define IN6P_TCLASS		0x400000 /* receive traffic class value */
-#define IN6P_AUTOFLOWLABEL	0x800000 /* attach flowlabel automatically */
-#if 0
-/*
- * IN6P_BINDV6ONLY should be obsoleted by IN6P_IPV6_V6ONLY.
- * Once we are sure that this macro is not referred from anywhere, we should
- * completely delete the definition.
- * jinmei@kame.net, 20010625.
- */
-#define	IN6P_BINDV6ONLY		0x10000000 /* do not grab IPv4 traffic */
-#endif
-#define IN6P_RFC2292		0x40000000 /* used RFC2292 API on the socket */
-#define IN6P_MTU                0x80000000 /* receive path MTU */
+#define	IN6P_TCLASS		0x400000 /* receive traffic class value */
+#define	IN6P_AUTOFLOWLABEL	0x800000 /* attach flowlabel automatically */
+#define	IN6P_RFC2292		0x40000000 /* used RFC2292 API on the socket */
+#define	IN6P_MTU		0x80000000 /* receive path MTU */
 
 #define	INP_CONTROLOPTS		(INP_RECVOPTS|INP_RECVRETOPTS|INP_RECVDSTADDR|\
 				 INP_RECVIF|INP_RECVTTL|\
@@ -347,10 +354,8 @@ extern int	ipport_hifirstauto;
 extern int	ipport_hilastauto;
 
 void	in_pcbpurgeif0(struct inpcbinfo *, struct ifnet *);
-void	in_losing(struct inpcb *);
-struct inpcb *
-	in_rtchange(struct inpcb *, int);
-int	in_pcballoc(struct socket *, struct inpcbinfo *, struct thread *);
+int	in_pcballoc(struct socket *, struct inpcbinfo *, struct thread *,
+	    const char *);
 int	in_pcbbind(struct inpcb *, struct sockaddr *, struct thread *);
 int	in_pcbbind_setup(struct inpcb *, struct sockaddr *, in_addr_t *,
 	    u_short *, struct thread *);
@@ -370,10 +375,12 @@ struct inpcb *
 void	in_pcbnotifyall(struct inpcbinfo *pcbinfo, struct in_addr,
 	    int, struct inpcb *(*)(struct inpcb *, int));
 void	in_pcbrehash(struct inpcb *);
+void	in_pcbsetsolabel(struct socket *so);
 int	in_setpeeraddr(struct socket *so, struct sockaddr **nam, struct inpcbinfo *pcbinfo);
 int	in_setsockaddr(struct socket *so, struct sockaddr **nam, struct inpcbinfo *pcbinfo);;
 struct sockaddr *
 	in_sockaddr(in_port_t port, struct in_addr *addr);
+void	in_pcbsosetlabel(struct socket *so);
 void	in_pcbremlists(struct inpcb *inp);
 int	prison_xinpcb(struct thread *td, struct inpcb *inp);
 #endif /* _KERNEL */

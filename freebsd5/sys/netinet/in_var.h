@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_var.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/in_var.h,v 1.46 2003/03/04 23:19:52 jlemon Exp $
+ * $FreeBSD: src/sys/netinet/in_var.h,v 1.48 2003/11/14 21:02:21 andre Exp $
  */
 
 /*
@@ -177,14 +177,14 @@ extern	u_long in_ifaddrhmask;			/* mask for hash table */
 struct router_info {
 	struct ifnet *rti_ifp;
 	int    rti_type; /* type of router which is querier on this interface */
-	u_int	rti_time;	/* # of slow timeouts since last old query */
+	int    rti_time; /* # of slow timeouts since last old query */
 	u_int	rti_timer1;	/* IGMPv1 Querier Present timer */
 	u_int	rti_timer2;	/* IGMPv2 Querier Present timer */
 	u_int	rti_timer3;	/* IGMPv3 General Query (interface) timer */
 	u_int	rti_qrv;	/* Querier Robustness Variable */
 	u_int	rti_qqi;	/* Querier Interval Variable */
 	u_int	rti_qri;	/* Querier Response Interval */
-	struct router_info *rti_next;
+	SLIST_ENTRY(router_info) rti_list;
 };
 
 /*
@@ -286,9 +286,7 @@ void	in_rtqdrain(void);
 void	ip_input(struct mbuf *);
 int	in_ifadown(struct ifaddr *ifa, int);
 void	in_ifscrub(struct ifnet *, struct in_ifaddr *);
-int	ipflow_fastforward(struct mbuf *);
-void	ipflow_create(const struct route *, struct mbuf *);
-void	ipflow_slowtimo(void);
+int	ip_fastforward(struct mbuf *);
 
 #endif /* _KERNEL */
 

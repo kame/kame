@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_icmp.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.78 2003/03/21 15:43:06 mdodd Exp $
+ * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.85.2.1 2004/01/09 12:32:36 andre Exp $
  */
 
 #include "opt_ipsec.h"
@@ -52,11 +52,15 @@
 #include <net/route.h>
 
 #include <netinet/in.h>
+#include <netinet/in_pcb.h>
 #include <netinet/in_systm.h>
 #include <netinet/in_var.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
 #include <netinet/ip_var.h>
+#include <netinet/tcp.h>
+#include <netinet/tcp_var.h>
+#include <netinet/tcpip.h>
 #include <netinet/icmp_var.h>
 
 #ifdef IPSEC
@@ -120,7 +124,7 @@ int	icmpprintfs = 0;
 #endif
 
 static void	icmp_reflect(struct mbuf *);
-static void	icmp_send(struct mbuf *, struct mbuf *, struct route *);
+static void	icmp_send(struct mbuf *, struct mbuf *);
 static int	ip_next_mtu(int, int);
 
 extern	struct protosw inetsw[];
@@ -233,26 +237,22 @@ freeit:
 	m_freem(n);
 }
 
-static struct sockaddr_in icmpsrc = { sizeof (struct sockaddr_in), AF_INET };
-static struct sockaddr_in icmpdst = { sizeof (struct sockaddr_in), AF_INET };
-static struct sockaddr_in icmpgw = { sizeof (struct sockaddr_in), AF_INET };
-
 /*
  * Process a received ICMP message.
  */
 void
 icmp_input(m, off)
-	register struct mbuf *m;
+	struct mbuf *m;
 	int off;
 {
-	int hlen = off;
-	register struct icmp *icp;
-	register struct ip *ip = mtod(m, struct ip *);
-	int icmplen = ip->ip_len;
-	register int i;
+	struct icmp *icp;
 	struct in_ifaddr *ia;
+	struct ip *ip = mtod(m, struct ip *);
+	struct sockaddr_in icmpsrc, icmpdst, icmpgw;
+	int hlen = off;
+	int icmplen = ip->ip_len;
+	int i, code;
 	void (*ctlfunc)(int, struct sockaddr *, void *);
-	int code;
 
 	/*
 	 * Locate icmp structure in mbuf, and check
@@ -310,6 +310,18 @@ icmp_input(m, off)
 	 */
 	if (icp->icmp_type > ICMP_MAXTYPE)
 		goto raw;
+
+	/* Initialize */
+	bzero(&icmpsrc, sizeof(icmpsrc));
+	icmpsrc.sin_len = sizeof(struct sockaddr_in);
+	icmpsrc.sin_family = AF_INET;
+	bzero(&icmpdst, sizeof(icmpdst));
+	icmpdst.sin_len = sizeof(struct sockaddr_in);
+	icmpdst.sin_family = AF_INET;
+	bzero(&icmpgw, sizeof(icmpgw));
+	icmpgw.sin_len = sizeof(struct sockaddr_in);
+	icmpgw.sin_family = AF_INET;
+
 	icmpstat.icps_inhist[icp->icmp_type]++;
 	code = icp->icmp_code;
 	switch (icp->icmp_type) {
@@ -387,7 +399,7 @@ icmp_input(m, off)
 			printf("deliver to protocol %d\n", icp->icmp_ip.ip_p);
 #endif
 		icmpsrc.sin_addr = icp->icmp_ip.ip_dst;
-#if 1
+
 		/*
 		 * MTU discovery:
 		 * If we got a needfrag and there is a host route to the
@@ -397,40 +409,39 @@ icmp_input(m, off)
 		 * notice that the MTU has changed and adapt accordingly.
 		 * If no new MTU was suggested, then we guess a new one
 		 * less than the current value.  If the new MTU is 
-		 * unreasonably small (arbitrarily set at 296), then
-		 * we reset the MTU to the interface value and enable the
-		 * lock bit, indicating that we are no longer doing MTU
-		 * discovery.
+		 * unreasonably small (defined by sysctl tcp_minmss), then
+		 * we don't update the MTU value.
+		 *
+		 * XXX: All this should be done in tcp_mtudisc() because
+		 * the way we do it now, everyone can send us bogus ICMP
+		 * MSGSIZE packets for any destination. By doing this far
+		 * higher in the chain we have a matching tcp connection.
+		 * Thus spoofing is much harder. However there is no easy
+		 * non-hackish way to pass the new MTU up to tcp_mtudisc().
+		 * Also see next XXX regarding IPv4 AH TCP.
 		 */
 		if (code == PRC_MSGSIZE) {
-			struct rtentry *rt;
 			int mtu;
+			struct in_conninfo inc;
 
-			rt = rtalloc1((struct sockaddr *)&icmpsrc, 0,
-				      RTF_CLONING | RTF_PRCLONING);
-			if (rt && (rt->rt_flags & RTF_HOST)
-			    && !(rt->rt_rmx.rmx_locks & RTV_MTU)) {
-				mtu = ntohs(icp->icmp_nextmtu);
-				if (!mtu)
-					mtu = ip_next_mtu(rt->rt_rmx.rmx_mtu,
-							  1);
+			bzero(&inc, sizeof(inc));
+			inc.inc_flags = 0; /* IPv4 */
+			inc.inc_faddr = icmpsrc.sin_addr;
+
+			mtu = ntohs(icp->icmp_nextmtu);
+			if (!mtu)
+				mtu = ip_next_mtu(mtu, 1);
+
+			if (mtu >= max(296, (tcp_minmss +
+					sizeof(struct tcpiphdr))))
+				tcp_hc_updatemtu(&inc, mtu);
+
 #ifdef DEBUG_MTUDISC
-				printf("MTU for %s reduced to %d\n",
-					inet_ntoa(icmpsrc.sin_addr), mtu);
+			printf("MTU for %s reduced to %d\n",
+				inet_ntoa(icmpsrc.sin_addr), mtu);
 #endif
-				if (mtu < 296) {
-					/* rt->rt_rmx.rmx_mtu =
-						rt->rt_ifp->if_mtu; */
-					rt->rt_rmx.rmx_locks |= RTV_MTU;
-				} else if (rt->rt_rmx.rmx_mtu > mtu) {
-					rt->rt_rmx.rmx_mtu = mtu;
-				}
-			}
-			if (rt)
-				RTFREE(rt);
 		}
 
-#endif
 		/*
 		 * XXX if the packet contains [IPv4 AH TCP], we can't make a
 		 * notification to TCP layer.
@@ -565,7 +576,7 @@ reflect:
 		rtredirect((struct sockaddr *)&icmpsrc,
 		  (struct sockaddr *)&icmpdst,
 		  (struct sockaddr *)0, RTF_GATEWAY | RTF_HOST,
-		  (struct sockaddr *)&icmpgw, (struct rtentry **)0);
+		  (struct sockaddr *)&icmpgw);
 		pfctlinput(PRC_REDIRECT_HOST, (struct sockaddr *)&icmpsrc);
 #ifdef IPSEC
 		key_sa_routechange((struct sockaddr *)&icmpsrc);
@@ -607,7 +618,6 @@ icmp_reflect(m)
 	struct in_addr t;
 	struct mbuf *opts = 0;
 	int optlen = (ip->ip_hl << 2) - sizeof(struct ip);
-	struct route *ro = NULL, rt;
 
 	if (!in_canforward(ip->ip_src) &&
 	    ((ntohl(ip->ip_src.s_addr) & IN_CLASSA_NET) !=
@@ -618,8 +628,6 @@ icmp_reflect(m)
 	}
 	t = ip->ip_dst;
 	ip->ip_dst = ip->ip_src;
-	ro = &rt;
-	bzero(ro, sizeof(*ro));
 	/*
 	 * If the incoming packet was addressed directly to us,
 	 * use dst as the src for the reply.  Otherwise (broadcast
@@ -640,7 +648,7 @@ icmp_reflect(m)
 				goto match;
 		}
 	}
-	ia = ip_rtaddr(ip->ip_dst, ro);
+	ia = ip_rtaddr(ip->ip_dst);
 	/* We need a route to do anything useful. */
 	if (ia == NULL) {
 		m_freem(m);
@@ -648,6 +656,9 @@ icmp_reflect(m)
 		goto done;
 	}
 match:
+#ifdef MAC
+	mac_reflect_mbuf_icmp(m);
+#endif
 	t = IA_SIN(ia)->sin_addr;
 	ip->ip_src = t;
 	ip->ip_ttl = ip_defttl;
@@ -725,13 +736,12 @@ match:
 		bcopy((caddr_t)ip + optlen, (caddr_t)(ip + 1),
 			 (unsigned)(m->m_len - sizeof(struct ip)));
 	}
+	m_tag_delete_nonpersistent(m);
 	m->m_flags &= ~(M_BCAST|M_MCAST);
-	icmp_send(m, opts, ro);
+	icmp_send(m, opts);
 done:
 	if (opts)
 		(void)m_free(opts);
-	if (ro && ro->ro_rt)
-		RTFREE(ro->ro_rt);
 }
 
 /*
@@ -739,10 +749,9 @@ done:
  * after supplying a checksum.
  */
 static void
-icmp_send(m, opts, rt)
+icmp_send(m, opts)
 	register struct mbuf *m;
 	struct mbuf *opts;
-	struct route *rt;
 {
 	register struct ip *ip = mtod(m, struct ip *);
 	register int hlen;
@@ -765,7 +774,7 @@ icmp_send(m, opts, rt)
 		       buf, inet_ntoa(ip->ip_src));
 	}
 #endif
-	(void) ip_output(m, opts, rt, 0, NULL, NULL);
+	(void) ip_output(m, opts, NULL, 0, NULL, NULL);
 }
 
 n_time
@@ -779,7 +788,6 @@ iptime()
 	return (htonl(t));
 }
 
-#if 1
 /*
  * Return the next larger or smaller MTU plateau (table from RFC 1191)
  * given current value MTU.  If DIR is less than zero, a larger plateau
@@ -817,7 +825,6 @@ ip_next_mtu(mtu, dir)
 		}
 	}
 }
-#endif
 
 
 /*
