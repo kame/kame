@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS $Id: crypto_openssl.c,v 1.24 2000/02/23 12:24:28 sakane Exp $ */
+/* YIPS $Id: crypto_openssl.c,v 1.25 2000/02/23 13:56:19 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -184,7 +184,6 @@ eay_get_x509sign(source, privkey, cert)
 	u_char *bp;
 	vchar_t *sig = NULL;
 	int len;
-	char xbuf[4096];	/* XXX */
 
 	bp = privkey->v;
 
@@ -195,18 +194,20 @@ eay_get_x509sign(source, privkey, cert)
 
 	/* XXX: to be handled EVP_dss() */
 	/* XXX: Where can I get such parameters ?  From my cert ? */
-	/* XXX: How can I get encrypted buffer length ? */
 
-	len = RSA_private_encrypt(source->l, source->v, xbuf,
-				evp->pkey.rsa, RSA_PKCS1_PADDING);
-	EVP_PKEY_free(evp);
-	if (len == 0)
-		return NULL;
+	len = RSA_size(evp->pkey.rsa);
 
 	sig = vmalloc(len);
 	if (sig == NULL)
 		return NULL;
-	memcpy(sig->v, xbuf, sig->l);
+
+	len = RSA_private_encrypt(source->l, source->v, sig->v,
+				evp->pkey.rsa, RSA_PKCS1_PADDING);
+	EVP_PKEY_free(evp);
+	if (len == 0 || len != sig->l) {
+		vfree(sig);
+		sig = NULL;
+	}
 
 	return sig;
 }
@@ -227,8 +228,8 @@ eay_check_x509sign(source, sig, cert)
 	X509 *x509;
 	EVP_PKEY *evp;
 	u_char *bp;
+	vchar_t *xbuf;
 	int error, len;
-	char xbuf[4096];	/* XXX */
 
 	bp = cert->v;
 
@@ -244,15 +245,27 @@ eay_check_x509sign(source, sig, cert)
 	/* Verify the signature */
 	/* XXX: to be handled EVP_dss() */
 
-	len = RSA_public_decrypt(sig->l, sig->v, xbuf,
+	len = RSA_size(evp->pkey.rsa);
+
+	xbuf = vmalloc(len);
+	if (xbuf == NULL) {
+		EVP_PKEY_free(evp);
+		return -1;
+	}
+
+	len = RSA_public_decrypt(sig->l, sig->v, xbuf->v,
 				evp->pkey.rsa, RSA_PKCS1_PADDING);
 	EVP_PKEY_free(evp);
-	if (len == 0 || len != source->l)
-		return NULL;
-
-	error = memcmp(source->v, xbuf, len);
-	if (error != 0)
+	if (len == 0 || len != source->l) {
+		vfree(xbuf);
 		return -1;
+	}
+
+	error = memcmp(source->v, xbuf->v, source->l);
+	if (error != 0) {
+		vfree(xbuf);
+		return -1;
+	}
 
 	return 0;
 }
