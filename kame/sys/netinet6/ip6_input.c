@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.114 2000/08/15 07:37:55 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.115 2000/08/15 08:06:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -378,6 +378,11 @@ NETISR_SET(NETISR_IPV6, ip6intr);
 extern struct	route ip6_forward_rt;
 #else
 extern struct	route_in6 ip6_forward_rt;
+
+/* NetBSD requires NEW_STRUCT_ROUTE */
+#ifdef __NetBSD__
+#error NEW_STRUCT_ROUTE is required
+#endif
 #endif
 
 void
