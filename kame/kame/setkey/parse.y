@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.84 2004/06/18 17:38:24 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.85 2005/01/26 07:45:26 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -549,7 +549,7 @@ spddelete_command
 
 			/* fixed port fields if ulp is icmpv6 */
 			if ($10.buf != NULL) {
-				if ($9 != IPPROTO_ICMPV6)
+				if (($9 != IPPROTO_ICMPV6) && ($9 != IPPROTO_MH))
 					return -1;
 				free($5.buf);
 				free($8.buf);

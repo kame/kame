@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.228 2004/12/27 05:41:18 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.229 2005/01/26 07:45:26 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,6 +88,9 @@
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>
+#endif
+#ifdef MIP6
+#include <netinet/ip6mh.h>
 #endif
 
 #include <netinet6/ipsec.h>
@@ -1312,6 +1315,9 @@ ipsec6_get_ulp(m, spidx, needport)
 	struct tcphdr th;
 	struct udphdr uh;
 	struct icmp6_hdr ih;
+#ifdef MIP6
+	struct ip6_mh mh;
+#endif /* MIP6 */
 
 	/* sanity check */
 	if (m == NULL)
@@ -1361,6 +1367,16 @@ ipsec6_get_ulp(m, spidx, needport)
 		((struct sockaddr_in6 *)&spidx->dst)->sin6_port =
 			htons((u_int16_t)ih.icmp6_code);
 		break;
+#ifdef MIP6
+	case IPPROTO_MH:
+		spidx->ul_proto = nxt;
+		if (off + sizeof(struct ip6_mh) > m->m_pkthdr.len)
+			break;
+		m_copydata(m, off, sizeof(mh), (caddr_t)&mh);
+		((struct sockaddr_in6 *)&spidx->src)->sin6_port =
+			htons((u_int16_t)mh.ip6mh_type);
+		break;
+#endif /* MIP6 */
 	default:
 		/* XXX intermediate headers??? */
 		spidx->ul_proto = nxt;
