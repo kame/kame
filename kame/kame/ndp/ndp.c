@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.97 2002/06/03 03:31:25 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.98 2002/06/03 04:30:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -859,7 +859,7 @@ usage()
 	printf("usage: ndp hostname\n");
 	printf("       ndp [-nt] -a\n");
 	printf("       ndp [-nt] -A wait\n");
-	printf("       ndp [-nt]- c\n");
+	printf("       ndp [-nt] -c\n");
 	printf("       ndp [-nt] -d hostname\n");
 	printf("       ndp [-nt] -f filename\n");
 	printf("       ndp -i interface [flags...]\n");
