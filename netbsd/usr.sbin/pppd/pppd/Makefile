@@ -21,10 +21,11 @@ CPPFLAGS+= -I. -DHAVE_PATHS_H
 CPPFLAGS+= -DCBCP_SUPPORT -DCHAPMS -DUSE_CRYPT -DMSLANMAN
 CPPFLAGS+= -DINET6
 
-LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
+LDADD+=	-L${.CURDIR}/../../../lib/libinet6 \
+	-L${.CURDIR}/../../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
-DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \
-	${.CURDIR}/../../lib/libinet6/obj/libinet6.a \
+DPADD+= ${.CURDIR}/../../../lib/libinet6/libinet6.a \
+	${.CURDIR}/../../../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
 .include <bsd.prog.mk>
