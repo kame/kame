@@ -4,7 +4,7 @@ PROG=	rrenumd
 SRCS=	rrenumd.c  parser.y lexer.l
 YFLAGS+=	-d
 
-CPPFLAGS+= -DINET6 -DIPSEC -I${SRCDIR}
+CPPFLAGS+= -DINET6 -DIPSEC -I${SRCDIR} -I${.CURDIR}
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6 -lcompat
 DPADD+=	${.CURDIR}/../../lib/libinet6/libinet6.a \
@@ -28,3 +28,5 @@ YFLAGS+= -t -v
 .PATH:	${SRCDIR}
 
 .include <bsd.prog.mk>
+
+CLEANFILES+=	y.tab.h
