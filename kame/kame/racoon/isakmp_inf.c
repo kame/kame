@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_inf.c,v 1.67 2001/03/08 22:07:44 thorpej Exp $	*/
+/*	$KAME: isakmp_inf.c,v 1.68 2001/03/21 15:57:59 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -922,7 +922,7 @@ purge_ipsec_spi(dst0, proto, spi, n)
 			}
 
 			plog(LLV_INFO, LOCATION, NULL,
-				"proto_id %s purging spi:%d.\n",
+				"proto_id %s purging spi:%u.\n",
 				s_ipsecdoi_proto(proto),
 				ntohl(spi[i]));
 		}
