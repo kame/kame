@@ -62,7 +62,8 @@
 
 /* Protocol constants */
 #define ADV_CLIENT_WAIT		2	/* sec */
-#define DEFAULT_SOLICIT_HOPCOUNT	4
+#define DEFAULT_SOLICIT_HOPCOUNT	16 /* undefined in 15-spec:
+					      this is implmentation default */
 #define SERVER_MIN_ADV_DELAY	100	/* msec */
 #define SERVER_MAX_ADV_DELAY	1000	/* msec */
 #define REPLY_MSG_TIMEOUT	250	/* msec */
