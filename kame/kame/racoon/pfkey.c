@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.56 2000/06/28 07:56:02 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.57 2000/06/28 10:18:29 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -856,6 +856,9 @@ pk_recvgetspi(mhp)
 	}
 
 	if (allspiok) {
+		/* turn off the timer for calling pfkey_timeover() */
+		SCHED_KILL(iph2->sce);
+	
 		/* update status */
 		iph2->status = PHASE2ST_GETSPIDONE;
 		if (isakmp_post_getspi(iph2) < 0) {
@@ -1022,17 +1025,6 @@ pk_recvupdate(mhp)
 	if (incomplete)
 		return 0;
 
-	/* turn off schedule */
-	if (iph2->sce == NULL) {
-		plog(logp, LOCATION, NULL,
-			"no buffer found as sendbuf\n"); 
-		unbindph12(iph2);
-		remph2(iph2);
-		delph2(iph2);
-		return -1;
-	}
-	SCHED_KILL(iph2->sce);
-	
 	/* update status */
 	iph2->status = PHASE2ST_ESTABLISHED;
 
@@ -1233,6 +1225,7 @@ pk_recvexpire(mhp)
 		return 0;
 	}
 
+	/* turn off the timer for calling isakmp_ph2expire() */ 
 	SCHED_KILL(iph2->sce);
 
 	plog(logp, LOCATION, NULL,
