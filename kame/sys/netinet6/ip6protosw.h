@@ -1,4 +1,4 @@
-/*	$KAME: ip6protosw.h,v 1.8 2000/03/25 07:23:48 sumikawa Exp $	*/
+/*	$KAME: ip6protosw.h,v 1.9 2000/03/29 17:47:30 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -99,7 +99,7 @@ struct ip6protosw {
 #if (defined(__FreeBSD__) && __FreeBSD__ < 3) || defined(__OpenBSD__)
 	short 	pr_type;		/* socket type used for */
 #else
-	int 	pr_type;		/* socket type used for */
+	int	pr_type;		/* socket type used for */
 #endif
 	struct	domain *pr_domain;	/* domain protocol a member of */
 	short	pr_protocol;		/* protocol number */
@@ -116,8 +116,13 @@ struct ip6protosw {
 #endif
 	void	(*pr_ctlinput)		/* control input (from below) */
 			__P((int, struct sockaddr *, void *));
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+	int	(*pr_ctloutput)		/* control output (from above) */
+			__P((struct socket *, struct sockopt *));
+#else
 	int	(*pr_ctloutput)		/* control output (from above) */
 			__P((int, struct socket *, int, int, struct mbuf **));
+#endif
 
 /* user-protocol hook */
 #if !(defined(__FreeBSD__) && __FreeBSD__ < 3) && !defined(__bsdi__)
@@ -141,7 +146,7 @@ struct ip6protosw {
 	void	(*pr_drain)		/* flush any excess space possible */
 			__P((void));
 #ifdef __FreeBSD__
-	struct  pr_usrreqs *pr_usrreqs;	/* supersedes pr_usrreq() */
+	struct	pr_usrreqs *pr_usrreqs;	/* supersedes pr_usrreq() */
 #else
 	int	(*pr_sysctl)		/* sysctl for protocol */
 			__P((int *, u_int, void *, size_t *, void *, size_t));
