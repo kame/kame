@@ -814,14 +814,14 @@ sbcreatecontrol(p, size, type, level)
 	register struct cmsghdr *cp;
 	struct mbuf *m;
 
-	if (size + sizeof(*cp) > MCLBYTES) {
+	if (CMSG_SPACE(size) > MCLBYTES) {
 		printf("sbcreatecontrol: message too large %d\n", size);
 		return NULL;
 	}
 
 	if ((m = m_get(M_DONTWAIT, MT_CONTROL)) == NULL)
 		return ((struct mbuf *) NULL);
-	if (size + sizeof(*cp) > MLEN) {
+	if (CMSG_SPACE(size) > MLEN) {
 		MCLGET(m, M_DONTWAIT);
 		if ((m->m_flags & M_EXT) == 0) {
 			m_free(m);
@@ -831,9 +831,8 @@ sbcreatecontrol(p, size, type, level)
 	cp = mtod(m, struct cmsghdr *);
 	/* XXX check size? */
 	(void)memcpy(CMSG_DATA(cp), p, size);
-	size += sizeof(*cp);
-	m->m_len = size;
-	cp->cmsg_len = size;
+	m->m_len = CMSG_SPACE(size);
+	cp->cmsg_len = CMSG_LEN(size);
 	cp->cmsg_level = level;
 	cp->cmsg_type = type;
 	return (m);
