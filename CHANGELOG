@@ -1,6 +1,10 @@
-$Id: CHANGELOG,v 1.500.2.1 2000/02/02 04:05:55 itojun Exp $
+$Id: CHANGELOG,v 1.500.2.2 2000/02/02 07:18:09 itojun Exp $
 
 <200002>
+Wed Feb  2 16:16:01 JST 2000  itojun@iijlab.net
+	* bsdi4/sys: fix ifindex manipulation to be compatible with KAME.
+	  from kato@wide.ad.jp.  (in NAT, ppp and ATM code)
+
 Wed Feb  2 12:55:44 JST 2000  itojun@iijlab.net
 	* kame/rtadvd: router renumbering input needs to be explicitly
 	  enabled with command line option (-R).  this is for security issue
