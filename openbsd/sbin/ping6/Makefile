@@ -7,6 +7,8 @@ BINOWN=	root
 BINGRP=	bin
 BINMODE=4555
 
+LDADD+=	-lm
+DPADD+=	${LIBM}
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
 DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \
