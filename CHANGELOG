@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.728 2000/03/26 19:17:17 sumikawa Exp $
+$Id: CHANGELOG,v 1.729 2000/03/27 15:42:33 itojun Exp $
 
 <200003>
+Tue Mar 28 00:40:38 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/security/isakmpd: OpenBSD isakmpd snapshot as of
+	  2000/2/20.
+
 Sun Mar 26 20:05:55 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/mail/fetchmail: upgrade to 5.3.4.
 
