@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.147 2001/01/23 06:47:50 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.148 2001/01/23 06:50:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1151,7 +1151,7 @@ ip6_setdstifaddr(m, ia6)
 	n = ip6_addaux(m);
 	if (n)
 		mtod(n, struct ip6aux *)->ip6a_dstia6 = ia6;
-	return n;	/*NULL if failed to set*/
+	return n;	/* NULL if failed to set */
 }
 
 struct in6_ifaddr *
