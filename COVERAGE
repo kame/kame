@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.17 2000/02/29 01:23:39 itojun Exp $
+$Id: COVERAGE,v 1.18 2000/03/02 03:15:15 itojun Exp $
 
 
 x: supported/integrated
@@ -75,7 +75,7 @@ NAT/PT		-	-	-	notyet	notyet	notyet
 mobile-ip6	-	-	-	notyet	notyet	notyet
 
 resolver support for IPv6 transport
-		(*1)	-	x	notyet	notyet	notyet
+		(*1)	-	-	notyet	notyet	notyet
     (*1) libc resolver can handle IPv6 transport (IPv6 address in
 	/etc/resolv.conf), but not with userland tools like nslookup or dig.
 
