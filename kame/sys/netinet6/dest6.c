@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.59 2003/07/11 13:21:16 t-momose Exp $	*/
+/*	$KAME: dest6.c,v 1.60 2003/09/24 11:04:51 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -184,8 +184,6 @@ dest6_input(mp, offp, proto)
 			    IN6_IS_ADDR_UNSPECIFIED(&home_sa.sin6_addr) ||
 			    IN6_IS_ADDR_LOOPBACK(&home_sa.sin6_addr)) {
 				ip6stat.ip6s_badscope++;
-				mobility6_send_be(&ip6a->ip6a_dst, &ip6a->ip6a_src,
-				    IP6ME_STATUS_UNKNOWN_BINDING, &home_sa);
 				goto bad;
 			}
 
