@@ -1,4 +1,4 @@
-/*	$KAME: udp6.h,v 1.3 2000/03/25 07:24:03 sumikawa Exp $	*/
+/*	$KAME: udp6.h,v 1.4 2001/02/10 00:57:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -35,4 +35,3 @@
 #include <netinet/udp.h>
 
 #endif /*_NETINET6_UDP6_H_*/
-
