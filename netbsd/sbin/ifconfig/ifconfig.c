@@ -2291,7 +2291,7 @@ in6_alias(creq)
 	if (scopeid)
 		printf(" scopeid 0x%x", scopeid);
 
-	else if (Lflag && lifetime &&
+	if (Lflag && lifetime &&
 	    (lifetime->ia6t_preferred || lifetime->ia6t_expire)) {
 		time_t t = time(NULL);
 		printf(" pltime ");
