@@ -1,11 +1,10 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.30 1999/08/19 06:18:00 itojun Exp $
+$Id: CHANGELOG,v 1.31 1999/08/19 07:47:14 itojun Exp $
 
 <199908>
 Thu Aug 19 15:02:35 JST 1999  itojun@iijlab.net
-	* {freebsd2,netbsd}/lib/libinet6:
-	  compile inet_pton() into libinet6.  The code
+	* lib/libinet6: compile inet_pton() into libinet6.  The code
 	  is from ISC BIND821.  This is to avoid bugs in OS-supplied
 	  inet_pton() (the source of bug is BIND version < 8.2).
 
