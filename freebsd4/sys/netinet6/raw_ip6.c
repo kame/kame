@@ -643,6 +643,13 @@ rip6_bind(struct socket *so, struct sockaddr *nam, struct proc *p)
 		addr->sin6_scope_id = scope6_addr2default(&addr->sin6_addr);
 	}
 #endif
+	/* KAME hack: embed scopeid */
+	if (in6_embedscope(&addr->sin6_addr, addr, inp, NULL) != 0)
+		return EINVAL;
+#ifndef SCOPEDROUTING
+	addr->sin6_scope_id = 0; /* for ifa_ifwithaddr */
+#endif
+
 	if (!IN6_IS_ADDR_UNSPECIFIED(&addr->sin6_addr) &&
 	    (ia = ifa_ifwithaddr((struct sockaddr *)addr)) == 0)
 		return EADDRNOTAVAIL;
@@ -681,6 +688,10 @@ rip6_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		addr->sin6_scope_id = scope6_addr2default(&addr->sin6_addr);
 	}
 #endif
+	/* KAME hack: embed scopeid */
+	if (in6_embedscope(&addr->sin6_addr, addr, inp, NULL) != 0)
+		return EINVAL;
+
 	/* Source address selection. XXX: need pcblookup? */
 	in6a = in6_selectsrc(addr, inp->in6p_outputopts,
 			     inp->in6p_moptions, &inp->in6p_route,
