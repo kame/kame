@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.50 2000/08/09 19:08:30 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.51 2000/08/09 19:37:10 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -700,25 +700,33 @@ err:
 /*
  * add a notify payload to buffer by reallocating buffer.
  * If buf == NULL, the function only create a notify payload.
+ *
+ * XXX Which is SPI to be included, inbound or outbound ?
  */
 vchar_t *
-isakmp_add_pl_n(buf0, pr, type, data)
+isakmp_add_pl_n(buf0, np_p, type, pr, data)
 	vchar_t *buf0;
-	struct saproto *pr;
+	u_int8_t **np_p;
 	int type;
+	struct saproto *pr;
 	vchar_t *data;
 {
 	vchar_t *buf = NULL;
 	struct isakmp_pl_n *n;
 	int tlen;
+	int oldlen = 0;
 
-	/* XXX must be get proper spi */
+	if (*np_p)
+		**np_p = ISAKMP_NPTYPE_N;
+
 	tlen = sizeof(*n) + pr->spisize;
+
 	if (data)
 		tlen += data->l;
-	if (buf0)
+	if (buf0) {
+		oldlen = buf0->l;
 		buf = vrealloc(buf0, buf0->l + tlen);
-	else
+	} else
 		buf = vmalloc(tlen);
 	if (!buf) {
 		plog(logp, LOCATION, NULL,
@@ -726,7 +734,7 @@ isakmp_add_pl_n(buf0, pr, type, data)
 		return NULL;
 	}
 
-	n = (struct isakmp_pl_n *)(buf->v + (buf0 ? buf0->l : 0));
+	n = (struct isakmp_pl_n *)(buf->v + oldlen);
 	n->h.np = ISAKMP_NPTYPE_NONE;
 	n->h.len = htons(tlen);
 	n->doi = htonl(IPSEC_DOI);		/* IPSEC DOI (1) */
@@ -736,6 +744,9 @@ isakmp_add_pl_n(buf0, pr, type, data)
 	*(u_int32_t *)(n + 1) = (u_int32_t)htonl(pr->spi);	/* XXX */
 	if (data)
 		memcpy((caddr_t)(n + 1) + pr->spisize, data->v, data->l);
+
+	/* save the pointer of next payload type */
+	*np_p = &n->h.np;
 
 	return buf;
 }
