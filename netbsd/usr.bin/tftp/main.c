@@ -257,7 +257,7 @@ setpeer(argc, argv)
 		printf("usage: %s host-name [port]\n", argv[0]);
 		return;
 	}
-	if (argc == 3)
+	if (argc == 2)
 		setpeer0(argv[1], NULL);
 	else
 		setpeer0(argv[1], argv[2]);
