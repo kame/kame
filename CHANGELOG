@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.55 1999/08/24 12:56:36 jinmei Exp $
+$Id: CHANGELOG,v 1.56 1999/08/24 14:43:23 jinmei Exp $
 
 <199908>
 1999-08-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -138,7 +138,7 @@ Wed Aug 18 22:02:14 JST 1999  itojun@iijlab.net
 1999-08-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/libinet6/ip6opt.c (inet6_option_append, inet6_option_alloc): 
 	adjust pad length to avoid unnecessary pad.
-	Thanks to Frederic SOULIER to pointed it out.
+	Thanks to Frederic SOULIER for pointing it out.
 
 Tue Aug 17 19:46:52 JST 1999  itojun@iijlab.net
 	* sys/netinet6/in6.h: make IN6_IS_SCOPE_LINKLOCAL() invisible from
@@ -210,7 +210,7 @@ Fri Aug 13 19:39:33 JST 1999 sakane@ydc.co.jp
 
 1999-08-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/bgpd: made sure to transit an optional transitive path
-	attribute even if it's unrecognized(not tested)
+	attribute even if it's unrecognized.
 
 Fri Aug 13 11:40:55 JST 1999  itojun@iijlab.net
 	* freebsd2/ports/{ct,v6eval}: upgrade to 0.3.  from ftp.tahi.org.
