@@ -1,4 +1,4 @@
-/*	$KAME: fsm.c,v 1.9 2005/01/27 05:10:26 keiichi Exp $	*/
+/*	$KAME: fsm.c,v 1.10 2005/01/27 05:18:40 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
@@ -401,7 +401,7 @@ bul_reg_fsm(bul, event, data)
 					
 					/* set retrans timer */
 					bul->bul_retrans_time
-					    = INITIAL_BINDACK_TIMEOUT;
+					    = INITIAL_DHAAD_TIMEOUT;
 					bul_set_retrans_timer(bul,
 					    bul->bul_retrans_time);
 
