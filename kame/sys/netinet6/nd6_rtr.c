@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.260 2004/08/11 07:17:37 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.261 2004/08/11 07:47:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -88,6 +88,7 @@
 
 static int rtpref __P((struct nd_defrouter *));
 static struct nd_defrouter *defrtrlist_update __P((struct nd_defrouter *));
+static int if2idlen __P((struct ifnet *));
 static int prelist_update __P((struct nd_prefixctl *, struct nd_defrouter *,
     struct mbuf *, int));
 static struct in6_ifaddr *in6_ifadd __P((struct nd_prefixctl *, int));
@@ -392,17 +393,6 @@ nd6_ra_input(m, off, icmp6len)
 				nd6log((LOG_INFO,
 				    "nd6_ra_input: invalid prefix "
 				    "%s, ignored\n",
-				    ip6_sprintf(&pi->nd_opt_pi_prefix)));
-				continue;
-			}
-
-			/* aggregatable unicast address, rfc2374 */
-			if ((pi->nd_opt_pi_prefix.s6_addr8[0] & 0xe0) == 0x20 &&
-			    pi->nd_opt_pi_prefix_len != 64) {
-				nd6log((LOG_INFO,
-				    "nd6_ra_input: invalid prefixlen "
-				    "%d for rfc2374 prefix %s, ignored\n",
-				    pi->nd_opt_pi_prefix_len,
 				    ip6_sprintf(&pi->nd_opt_pi_prefix)));
 				continue;
 			}
@@ -1283,6 +1273,45 @@ prelist_remove(pr)
 	pfxlist_onlink_check();
 }
 
+/*
+ * Provide the length of interface identifiers to be used for the link attached
+ * to the given interface.  The length should be defined in "IPv6 over
+ * xxx-link" document.  Note that address architecture might also define
+ * the length for a particular set of address prefixes, regardless of the
+ * link type.  As clarified in rfc2462bis, those two definitions should be
+ * consistent, and those really are as of August 2004.
+ */
+static int
+if2idlen(ifp)
+	struct ifnet *ifp;
+{
+	switch (ifp->if_type) {
+	case IFT_ETHER:		/* RFC2464 */
+#ifdef IFT_PROPVIRTUAL
+	case IFT_PROPVIRTUAL:	/* XXX: no RFC. treat it as ether */
+#endif
+#ifdef IFT_L2VLAN
+	case IFT_L2VLAN:	/* ditto */
+#endif
+#ifdef IFT_IEEE80211
+	case IFT_IEEE80211:	/* ditto */
+#endif
+		return (64);
+	case IFT_FDDI:		/* RFC2467 */
+		return (64);
+	case IFT_ISO88025:	/* RFC2470 (IPv6 over Token Ring) */
+		return (64);
+	case IFT_ARCNET:	/* RFC2497 */
+		return (64);
+	case IFT_FRELAY:	/* RFC2590 */
+		return (64);
+	case IFT_IEEE1394:	/* RFC3146 */
+		return (64);
+	default:
+		return (-1);	/* unknown link type */
+	}
+}
+
 static int
 prelist_update(new, dr, m, mcast)
 	struct nd_prefixctl *new;
@@ -1426,7 +1455,8 @@ prelist_update(new, dr, m, mcast)
 	 * 5.5.3 (d).  If the prefix advertised is not equal to the prefix of
 	 * an address configured by stateless autoconfiguration already in the
 	 * list of addresses associated with the interface, and the Valid
-	 * Lifetime is not 0, form an address.
+	 * Lifetime is not 0, form an address.  We first check if we have
+	 * a matching prefix.
 	 * Note: we apply a clarification in rfc2462bis-02 here.  We only
 	 * consider autoconfigured addresses while RFC2462 simply said
 	 * "address".
@@ -1559,10 +1589,37 @@ prelist_update(new, dr, m, mcast)
 		ifa6->ia6_updatetime = time_second;
 	}
 	if (ia6_match == NULL && new->ndpr_vltime) {
+		int ifidlen;
+
 		/*
+		 * 5.5.3 (d) (continued)
 		 * No address matched and the valid lifetime is non-zero.
 		 * Create a new address.
 		 */
+
+		/*
+		 * Prefix Length check:
+		 * If the sum of the prefix length and interface identifier
+		 * length does not equal 128 bits, the Prefix Information
+		 * option MUST be ignored.  The length of the interface
+		 * identifier is defined in a separate link-type specific
+		 * document.
+		 */
+		ifidlen = if2idlen(ifp);
+		if (ifidlen < 0) {
+			/* this should not happen, so we always log it. */
+			log(LOG_ERR, "prelist_update: IFID undefined (%s)\n",
+			    if_name(ifp));
+			goto end;
+		}
+		if (ifidlen + pr->ndpr_plen != 128) {
+			nd6log((LOG_INFO,
+			    "prelist_update: invalid prefixlen "
+			    "%d for %s, ignored\n",
+			    pr->ndpr_plen, if_name(ifp)));
+			goto end;
+		}
+
 		if ((ia6 = in6_ifadd(new, mcast)) != NULL) {
 			/*
 			 * note that we should use pr (not new) for reference.
