@@ -1,8 +1,8 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2538 2004/02/02 13:19:39 suz Exp $
+$KAME: CHANGELOG,v 1.2539 2004/02/02 15:24:34 suz Exp $
 
 <200402>
-2003-01-20  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+2004-02-02  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/netinet6/in6_msf.[ch], ip6_output.c: sync with 
 	mldv2-20031021 to prohibit improper MSF delta-API call.
 
@@ -80,7 +80,7 @@ Sat Jan 24 18:15:08 JST 2004	keiichi@iij.ad.jp
 	isn't set. The problem is found and discussed at
 	the 5th TAHI introp test event.
 
-2003-01-20  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+2004-01-20  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/kame/dhcp6
 	supported DHCPv6 option for SIP servers (RFC3319).
 
