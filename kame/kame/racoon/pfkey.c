@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.10 2000/01/11 04:59:31 itojun Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.11 2000/01/11 17:16:11 itojun Exp $ */
 
 #define _PFKEY_C_
 
@@ -1324,6 +1324,19 @@ pk_recvacquire(mhp)
 
 	/* search for proper policyindex */
 	spidx = getspidx(&spidxtmp);
+	if (spidx == NULL) {
+		/* make a dummy SA for getspidx_r */
+		struct ph2handle iph2_dummy;
+		memset(&iph2_dummy, 0, sizeof(iph2_dummy));
+		/* NOTE: dst/src are flipped as it is inbound */
+		iph2_dummy.dst =
+			dupsaddr(PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]));
+		iph2_dummy.src =
+			dupsaddr(PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]));
+		spidx = getspidx_r(&spidxtmp, &iph2_dummy);
+		free(iph2_dummy.src);
+		free(iph2_dummy.dst);
+	}
 	if (spidx == NULL) {
 		plog(logp, LOCATION, NULL,
 			"no policy found %s.\n", spidx2str(&spidxtmp));

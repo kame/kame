@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.6 2000/01/11 12:22:48 itojun Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.7 2000/01/11 17:16:12 itojun Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -89,9 +89,22 @@ getspidx_r(spidx, iph2)
 		plog(logp, LOCATION, NULL, "checking for transport mode\n"););
 
 	/* is it transport mode SA negotiation? */
+	YIPSDEBUG(DEBUG_MISC,
+		plog(logp, LOCATION, NULL, "src1: %s\n",
+			saddr2str(iph2->src)););
+	YIPSDEBUG(DEBUG_MISC,
+		plog(logp, LOCATION, NULL, "dst1 %s\n",
+			saddr2str((struct sockaddr *)&spidx->src)););
 	if (cmpsaddrwop(iph2->src, (struct sockaddr *)&spidx->src)
 	 || spidx->prefs != _INALENBYAF(spidx->src.ss_family) * 8)
 		return NULL;
+
+	YIPSDEBUG(DEBUG_MISC,
+		plog(logp, LOCATION, NULL, "dst1: %s\n",
+			saddr2str(iph2->dst)););
+	YIPSDEBUG(DEBUG_MISC,
+		plog(logp, LOCATION, NULL, "dst2 %s\n",
+			saddr2str((struct sockaddr *)&spidx->dst)););
 	if (cmpsaddrwop(iph2->dst, (struct sockaddr *)&spidx->dst)
 	 || spidx->prefd != _INALENBYAF(spidx->dst.ss_family) * 8)
 		return NULL;
