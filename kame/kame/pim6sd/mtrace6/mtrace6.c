@@ -1,4 +1,4 @@
-/*	$KAME: mtrace6.c,v 1.20 2002/06/26 12:43:01 jinmei Exp $	*/
+/*	$KAME: mtrace6.c,v 1.21 2003/09/23 11:03:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -482,13 +482,13 @@ get_my_sockaddr(family, addrp)
 	}
 
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-		if (ifa->ifa_addr->sa_family == family) {
-			switch(family) {
-			case AF_INET6:
-				if (ip6_validaddr(ifa->ifa_name,
-						  (struct sockaddr_in6 *)ifa->ifa_addr))
-					goto found;
-			}
+		if (ifa->ifa_addr->sa_family != family)
+			continue;
+		switch(family) {
+		case AF_INET6:
+			if (ip6_validaddr(ifa->ifa_name,
+			    (struct sockaddr_in6 *)ifa->ifa_addr))
+				goto found;
 		}
 	}
 
