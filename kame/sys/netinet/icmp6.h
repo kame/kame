@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.28 2000/12/08 23:28:02 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.29 2000/12/10 17:04:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -583,7 +583,9 @@ struct icmp6stat {
 #define ICMPV6CTL_NODEINFO	13
 #define ICMPV6CTL_ERRPPSLIMIT	14	/* ICMPv6 error pps limitation */
 #define ICMPV6CTL_ND6_MAXNUDHINT	15
-#define ICMPV6CTL_MAXID		16
+#define ICMPV6CTL_MTUDISC_HIWAT	16
+#define ICMPV6CTL_MTUDISC_LOWAT	17
+#define ICMPV6CTL_MAXID		18
 
 #define ICMPV6CTL_NAMES { \
 	{ 0, 0 }, \
@@ -602,6 +604,8 @@ struct icmp6stat {
 	{ "nodeinfo", CTLTYPE_INT }, \
 	{ "errppslimit", CTLTYPE_INT }, \
 	{ "nd6_maxnudhint", CTLTYPE_INT }, \
+	{ "mtudisc_hiwat", CTLTYPE_INT }, \
+	{ "mtudisc_lowat", CTLTYPE_INT }, \
 }
 
 #ifdef __bsdi__
@@ -622,6 +626,8 @@ struct icmp6stat {
 	&icmp6_nodeinfo, \
 	&icmp6errppslim, \
 	&nd6_maxnudhint, \
+	0, \
+	0, \
 }
 #endif
 
