@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.34 2004/11/28 10:48:38 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.35 2005/01/12 06:06:11 suz Exp $	*/
 
 %{
 /*
@@ -144,6 +144,8 @@ ecl		\}
 	return (DUID_ID);
 }
 
+<S_CNF>address { DECHO; return (ADDRESS); }
+
 <S_CNF>prefix { DECHO; return (PREFIX); }
 
 <S_CNF>preference { DECHO; return (PREFERENCE); }
@@ -163,6 +165,7 @@ ecl		\}
 
 <S_CNF>rapid-commit { DECHO; return (RAPID_COMMIT); }
 <S_CNF>ia-pd { DECHO; return (IA_PD); }
+<S_CNF>ia-na { DECHO; return (IA_NA); }
 <S_CNF>domain-name-servers { DECHO; return (DNS_SERVERS); }
 <S_CNF>domain-name { DECHO; return (DNS_NAME); }
 <S_CNF>sip-server-address { DECHO; return (SIP_SERVERS); }
@@ -178,6 +181,7 @@ ecl		\}
 	/* identity association */
 <S_CNF>id-assoc { DECHO; BEGIN S_IA; return(ID_ASSOC); }
 <S_IA>pd { DECHO; return(IA_PD); }
+<S_IA>na { DECHO; return(IA_NA); }
 <S_IA>{number} { DECHO; yylval.str = strdup(yytext); return(IAID); }
 <S_IA>{bcl} { DP("begin of closure"); BEGIN S_CNF; return (BCL); }
 

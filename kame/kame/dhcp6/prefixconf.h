@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.h,v 1.4 2003/01/05 17:12:13 jinmei Exp $	*/
+/*	$KAME: prefixconf.h,v 1.5 2005/01/12 06:06:12 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -35,6 +35,8 @@ typedef enum { PREFIX6S_ACTIVE, PREFIX6S_RENEW,
 extern int update_prefix __P((struct ia *, struct dhcp6_prefix *,
     struct pifc_list *, struct dhcp6_if *, struct iactl **,
     void (*)__P((struct ia *))));
+extern int update_address __P((struct ia *, struct dhcp6_prefix *,
+    struct dhcp6_if *, struct iactl **, void (*)__P((struct ia *))));
 extern int prefix6_add __P((struct dhcp6_if *, struct dhcp6_prefix *,
 			       struct duid *));
 extern int prefix6_update __P((struct dhcp6_event *, struct dhcp6_list *,

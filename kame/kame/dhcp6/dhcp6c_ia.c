@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_ia.c,v 1.25 2004/09/04 09:26:38 jinmei Exp $	*/
+/*	$KAME: dhcp6c_ia.c,v 1.26 2005/01/12 06:06:11 suz Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -100,6 +100,7 @@ update_ia(iatype, ialist, ifp, serverid, authparam)
 	struct ia *ia;
 	struct ia_conf *iac;
 	struct iapd_conf *iapdc;
+	struct iana_conf *ianac;
 	struct dhcp6_listval *iav, *siav;
 	struct timeval timo;
 
@@ -154,7 +155,8 @@ update_ia(iatype, ialist, ifp, serverid, authparam)
 				    &iapdc->iapd_pif_list, ifp, &ia->ctl,
 				    callback)) {
 					dprintf(LOG_NOTICE, FNAME,
-					    "failed to update a prefix %s/%d",
+					    "failed to update a prefix"
+					    "%s/%d",
 					    in6addr2str(&siav->val_prefix6.addr, 0),
 					    siav->val_prefix6.plen);
 				}
@@ -183,6 +185,16 @@ update_ia(iatype, ialist, ifp, serverid, authparam)
 					    ia->conf->iaid);
 					reestablish_ia(ia);
 					goto nextia;
+				}
+				break;
+			case DHCP6_LISTVAL_STATEFULADDR6:
+				ianac = (struct iana_conf *)iac;
+				if (update_address(ia, &siav->val_prefix6, ifp,
+				    &ia->ctl, callback)) {
+					dprintf(LOG_NOTICE, FNAME,
+					    "failed to update"
+					    "an address %s",
+					    in6addr2str(&siav->val_prefix6.addr, 0));
 				}
 				break;
 			default:
@@ -740,6 +752,8 @@ iastr(type)
 	switch (type) {
 	case IATYPE_PD:
 		return ("PD");
+	case IATYPE_NA:
+		return ("NA");
 	default:
 		return ("???");	/* should be a bug */
 	}

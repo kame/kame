@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.150 2004/11/28 11:59:37 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.151 2005/01/12 06:06:11 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -995,6 +995,27 @@ construct_confdata(ifp, ev)
 			evd->destructor = destruct_iadata;
 			TAILQ_INSERT_TAIL(&ev->data_list, evd, link);
 			break;
+		case IATYPE_NA:
+			ial = NULL;
+			if ((ial = malloc(sizeof(*ial))) == NULL)
+				goto fail;
+			TAILQ_INIT(ial);
+
+			TAILQ_INIT(&pl);
+			dhcp6_copy_list(&pl,
+			    &((struct iana_conf *)iac)->iana_address_list);
+			if (dhcp6_add_listval(ial, DHCP6_LISTVAL_IANA,
+			    &iaparam, &pl) == NULL) {
+				goto fail;
+			}
+			dhcp6_clear_list(&pl);
+
+			evd->type = DHCP6_EVDATA_IANA;
+			evd->data = ial;
+			evd->event = ev;
+			evd->destructor = destruct_iadata;
+			TAILQ_INSERT_TAIL(&ev->data_list, evd, link);
+			break;
 		default:
 			dprintf(LOG_ERR, FNAME, "internal error");
 			exit(1);
@@ -1068,6 +1089,29 @@ construct_reqdata(ifp, optinfo, ev)
 			evd->destructor = destruct_iadata;
 			TAILQ_INSERT_TAIL(&ev->data_list, evd, link);
 			break;
+		case IATYPE_NA:
+			if ((v = dhcp6_find_listval(&optinfo->iana_list,
+			    DHCP6_LISTVAL_IANA, &iaparam, 0)) == NULL)
+				continue;
+
+			if ((ial = malloc(sizeof(*ial))) == NULL)
+				goto fail;
+
+			TAILQ_INIT(ial);
+			if (dhcp6_add_listval(ial, DHCP6_LISTVAL_IANA,
+			    &iaparam, &v->sublist) == NULL) {
+				goto fail;
+			}
+
+			if ((evd = malloc(sizeof(*evd))) == NULL)
+				goto fail;
+			memset(evd, 0, sizeof(*evd));
+			evd->type = DHCP6_EVDATA_IANA;
+			evd->data = ial;
+			evd->event = ev;
+			evd->destructor = destruct_iadata;
+			TAILQ_INSERT_TAIL(&ev->data_list, evd, link);
+			break;
 		default:
 			dprintf(LOG_ERR, FNAME, "internal error");
 			exit(1);
@@ -1092,8 +1136,8 @@ destruct_iadata(evd)
 {
 	struct dhcp6_list *ial;
 
-	if (evd->type != DHCP6_EVDATA_IAPD) {
-		dprintf(LOG_ERR, FNAME, "assumption failure");
+	if (evd->type != DHCP6_EVDATA_IAPD && evd->type != DHCP6_EVDATA_IANA) {
+		dprintf(LOG_ERR, FNAME, "assumption failure %d", evd->type);
 		exit(1);
 	}
 
@@ -1277,6 +1321,14 @@ client6_send(ev)
 		switch(evd->type) {
 		case DHCP6_EVDATA_IAPD:
 			if (dhcp6_copy_list(&optinfo.iapd_list,
+			    (struct dhcp6_list *)evd->data)) {
+				dprintf(LOG_NOTICE, FNAME,
+				    "failed to add an IAPD");
+				goto end;
+			}
+			break;
+		case DHCP6_EVDATA_IANA:
+			if (dhcp6_copy_list(&optinfo.iana_list,
 			    (struct dhcp6_list *)evd->data)) {
 				dprintf(LOG_NOTICE, FNAME,
 				    "failed to add an IAPD");
@@ -1518,14 +1570,23 @@ client6_recvadvert(ifp, dh6, len, optinfo)
 	    evd = TAILQ_NEXT(evd, link)) {
 		if (evd->type == DHCP6_EVDATA_IAPD)
 			break;
+		if (evd->type == DHCP6_EVDATA_IANA)
+			break;
 	}
 	if (evd) {
-		u_int16_t stcode = DH6OPT_STCODE_NOPREFIXAVAIL;
-
+		u_int16_t stcode;
+		
+		if (evd->type == DHCP6_EVDATA_IAPD) {
+			stcode = DH6OPT_STCODE_NOPREFIXAVAIL;
+		} else {
+			stcode = DH6OPT_STCODE_NOADDRAVAIL;
+		}
 		if (dhcp6_find_listval(&optinfo->stcode_list,
 		    DHCP6_LISTVAL_STCODE, &stcode, 0)) {
 			dprintf(LOG_INFO, FNAME,
-			    "advertise contains NoPrefixAvail status");
+			    "advertise contains %s status",
+			    evd->type == DHCP6_EVDATA_IAPD ?
+			        "NoPrefixAvail" : "NoAddrAvail");
 			return (-1);
 		}
 	}
@@ -1872,6 +1933,8 @@ client6_recvreply(ifp, dh6, len, optinfo)
 	/* update stateful configuration information */
 	if (state != DHCP6S_RELEASE) {
 		update_ia(IATYPE_PD, &optinfo->iapd_list, ifp,
+		    &optinfo->serverID, ev->authparam);
+		update_ia(IATYPE_NA, &optinfo->iana_list, ifp,
 		    &optinfo->serverID, ev->authparam);
 	}
 

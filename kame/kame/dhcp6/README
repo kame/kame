@@ -1,4 +1,4 @@
-$KAME: README,v 1.2 2004/07/29 22:15:21 jinmei Exp $
+$KAME: README,v 1.3 2005/01/12 06:06:10 suz Exp $
 
 kame-dhcp6
 
@@ -24,12 +24,8 @@ kame-dhcp6
 	  Information-request, Relay-forward and Relay-reply.
 
 	Note that the current implementation does not support IPv6
-	address allocation by DHCPv6, and there is no plan to
-	implement that feature at the moment.  The main purpose of
-	this implementation is to provide a way of IPv6 prefix
-	delegation (RFC3633) and to provide some "stateless"
-	configuration information such as DNS recursive server
-	addresses.
+	temporary address allocation by DHCPv6, and there is no plan to
+	implement that feature at the moment.
 
 Bug Reports and Mailing Lists
 

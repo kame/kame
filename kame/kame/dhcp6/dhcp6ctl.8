@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6ctl.8,v 1.2 2004/11/22 03:04:07 jinmei Exp $
+.\"	$KAME: dhcp6ctl.8,v 1.3 2005/01/12 06:06:11 suz Exp $
 .\"
 .\" Copyright (C) 2004 WIDE Project.
 .\" All rights reserved.
@@ -139,9 +139,11 @@ This specifies the server to remove a run-time object
 specified by
 .Ar arguments
 from the server.
-Currently only possible object is one particular IA_PD binding,
+Currently only possible object is one particular IA_PD or IA_NA binding,
 which is specified as
 .Ic IA Ic IA_PD Ar IAID Ar DUID
+or
+.Ic IA Ic IA_NA Ar IAID Ar DUID
 where
 .Ar IAID
 is a decimal number specifying the ID of identity association (IA),

@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.37 2004/11/28 10:48:38 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.38 2005/01/12 06:06:11 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -111,7 +111,7 @@ struct dhcp6_event {
 	TAILQ_HEAD(, dhcp6_eventdata) data_list;
 };
 
-typedef enum { DHCP6_EVDATA_IAPD } dhcp6_eventdata_t;
+typedef enum { DHCP6_EVDATA_IAPD, DHCP6_EVDATA_IANA } dhcp6_eventdata_t;
 
 struct dhcp6_eventdata {
 	TAILQ_ENTRY(dhcp6_eventdata) link;
@@ -155,7 +155,7 @@ struct prefix_ifconf {
 #define IFID_LEN_DEFAULT 64
 #define SLA_LEN_DEFAULT 16
 
-typedef enum { IATYPE_PD } iatype_t;
+typedef enum { IATYPE_PD, IATYPE_NA } iatype_t;
 struct ia_conf {
 	TAILQ_ENTRY(ia_conf) link;
 	/*struct ia_conf *next;*/
@@ -178,6 +178,14 @@ struct iapd_conf {
 #define iapd_type iapd_ia.type
 #define iapd_id iapd_ia.iaid
 
+struct iana_conf {
+	struct ia_conf iana_ia;
+
+	/* type dependent values follow */
+	struct dhcp6_list iana_address_list;
+};
+#define iana_next iana_ia.next
+
 /* per-host configuration */
 struct host_conf {
 	struct host_conf *next;
@@ -196,6 +204,9 @@ struct host_conf {
 	/* previous replay detection value from the client */
 	int saw_previous_rd;	/* if we remember the previous value */
 	u_int64_t previous_rd;
+
+	/* address binding for the host */
+	struct dhcp6_list addr_list;
 };
 
 /* DHCPv6 authentication information */
@@ -233,13 +244,14 @@ struct cf_list {
 
 enum { DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY, DECL_REQUEST, DECL_DUID,
        DECL_PREFIX, DECL_PREFERENCE, DECL_SCRIPT, DECL_DELAYEDKEY,
+       DECL_ADDRESS,
        IFPARAM_SLA_ID, IFPARAM_SLA_LEN,
        DHCPOPT_RAPID_COMMIT, DHCPOPT_AUTHINFO,
        DHCPOPT_DNS, DHCPOPT_DNSNAME,
-       DHCPOPT_IA_PD, DHCPOPT_NTP,
+       DHCPOPT_IA_PD, DHCPOPT_IA_NA, DHCPOPT_NTP,
        DHCPOPT_REFRESHTIME,
        CFLISTENT_GENERIC,
-       IACONF_PIF, IACONF_PREFIX,
+       IACONF_PIF, IACONF_PREFIX, IACONF_ADDR,
        DHCPOPT_SIP, DHCPOPT_SIPNAME,
        AUTHPARAM_PROTO, AUTHPARAM_ALG, AUTHPARAM_RDM, AUTHPARAM_KEY,
        KEYPARAM_REALM, KEYPARAM_KEYID, KEYPARAM_SECRET, KEYPARAM_EXPIRE };

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.53 2004/11/28 11:59:37 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.54 2005/01/12 06:06:11 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -115,6 +115,7 @@ struct dhcp6_prefix {
 typedef enum { DHCP6_LISTVAL_NUM = 1,
 	       DHCP6_LISTVAL_STCODE, DHCP6_LISTVAL_ADDR6,
 	       DHCP6_LISTVAL_IAPD, DHCP6_LISTVAL_PREFIX6,
+	       DHCP6_LISTVAL_IANA, DHCP6_LISTVAL_STATEFULADDR6,
 	       DHCP6_LISTVAL_VBUF
 } dhcp6_listval_type_t;
 TAILQ_HEAD(dhcp6_list, dhcp6_listval);
@@ -151,6 +152,7 @@ struct dhcp6_optinfo {
 	int64_t refreshtime;	/* info refresh time for stateless options */
 
 	struct dhcp6_list iapd_list; /* list of IA_PD */
+	struct dhcp6_list iana_list; /* list of IA_NA */
 	struct dhcp6_list reqopt_list; /* options in option request */
 	struct dhcp6_list stcode_list; /* status code */
 	struct dhcp6_list sip_list; /* SIP server list */
@@ -220,9 +222,9 @@ struct dhcp6_relay {
 /* options */
 #define DH6OPT_CLIENTID	1
 #define DH6OPT_SERVERID	2
-#define DH6OPT_IA 3
-#define DH6OPT_IA_TMP 4
-#define DH6OPT_IADDR 5
+#define DH6OPT_IA_NA 3
+#define DH6OPT_IA_TA 4
+#define DH6OPT_IAADDR 5
 #define DH6OPT_ORO 6
 #define DH6OPT_PREFERENCE 7
 #  define DH6OPT_PREF_UNDEF -1
@@ -329,7 +331,7 @@ struct dhcp6opt_prefix_info {
 /*
  * General format of Identity Association.
  * This format applies to Prefix Delegation (IA_PD) and Non-temporary Addresses
- * (IA_NA), while our implementation only supports the former.
+ * (IA_NA)
  */
 struct dhcp6opt_ia {
 	u_int16_t dh6_ia_type;
@@ -338,6 +340,15 @@ struct dhcp6opt_ia {
 	u_int32_t dh6_ia_t1;
 	u_int32_t dh6_ia_t2;
 	/* sub options follow */
+} __attribute__ ((__packed__));
+
+/* IA Addr */
+struct dhcp6opt_ia_addr {
+	u_int16_t dh6_ia_addr_type;
+	u_int16_t dh6_ia_addr_len;
+	struct in6_addr dh6_ia_addr_addr;
+	u_int32_t dh6_ia_addr_preferred_time;
+	u_int32_t dh6_ia_addr_valid_time;
 } __attribute__ ((__packed__));
 
 /* IA_PD Prefix */

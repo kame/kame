@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6s.conf.5,v 1.17 2004/11/28 13:49:14 jinmei Exp $
+.\"	$KAME: dhcp6s.conf.5,v 1.18 2005/01/12 06:06:12 suz Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -219,6 +219,11 @@ statement.
 In that case,
 all or some of the specified prefixes will be delegated to the client,
 based on required parameters by the client.
+.It Ic address Ar ipv6-address pltime Op Ar vltime ;
+This statement specifies an IPv6 address to be assigned to the client.
+Everything is same as 
+.Ar prefix
+option, except that you do not need specify prefix length.
 .It Ic delayedkey Ar keyname ;
 This statement specifies a secret key shared with the client for the DHCPv6
 delayed authentication protocol.

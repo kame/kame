@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.122 2004/12/03 05:48:08 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.123 2005/01/12 06:06:11 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -214,7 +214,14 @@ dhcp6_find_listval(head, type, val, option)
 				return (lv);
 			}
 			break;
+		case DHCP6_LISTVAL_STATEFULADDR6:
+			if (IN6_ARE_ADDR_EQUAL(&lv->val_prefix6.addr,
+			    &((struct dhcp6_prefix *)val)->addr)) {
+				return (lv);
+			}
+			break;
 		case DHCP6_LISTVAL_IAPD:
+		case DHCP6_LISTVAL_IANA:
 			if (lv->val_ia.iaid ==
 			    ((struct dhcp6_ia *)val)->iaid) {
 				return (lv);
@@ -260,9 +267,11 @@ dhcp6_add_listval(head, type, val, sublist)
 		lv->val_addr6 = *(struct in6_addr *)val;
 		break;
 	case DHCP6_LISTVAL_PREFIX6:
+	case DHCP6_LISTVAL_STATEFULADDR6:
 		lv->val_prefix6 = *(struct dhcp6_prefix *)val;
 		break;
 	case DHCP6_LISTVAL_IAPD:
+	case DHCP6_LISTVAL_IANA:
 		lv->val_ia = *(struct dhcp6_ia *)val;
 		break;
 	case DHCP6_LISTVAL_VBUF:
@@ -934,6 +943,7 @@ dhcp6_init_options(optinfo)
 	optinfo->refreshtime = DH6OPT_REFRESHTIME_UNDEF;
 
 	TAILQ_INIT(&optinfo->iapd_list);
+	TAILQ_INIT(&optinfo->iana_list);
 	TAILQ_INIT(&optinfo->reqopt_list);
 	TAILQ_INIT(&optinfo->stcode_list);
 	TAILQ_INIT(&optinfo->sip_list);
@@ -964,6 +974,7 @@ dhcp6_clear_options(optinfo)
 	duidfree(&optinfo->serverID);
 
 	dhcp6_clear_list(&optinfo->iapd_list);
+	dhcp6_clear_list(&optinfo->iana_list);
 	dhcp6_clear_list(&optinfo->reqopt_list);
 	dhcp6_clear_list(&optinfo->stcode_list);
 	dhcp6_clear_list(&optinfo->sip_list);
@@ -993,6 +1004,8 @@ dhcp6_copy_options(dst, src)
 	dst->rapidcommit = src->rapidcommit;
 
 	if (dhcp6_copy_list(&dst->iapd_list, &src->iapd_list))
+		goto fail;
+	if (dhcp6_copy_list(&dst->iana_list, &src->iana_list))
 		goto fail;
 	if (dhcp6_copy_list(&dst->reqopt_list, &src->reqopt_list))
 		goto fail;
@@ -1501,6 +1514,44 @@ dhcp6_get_options(p, ep, optinfo)
 #else
 			val32 = val32; /* XXX deceive compiler */
 #endif
+		case DH6OPT_IA_NA:
+			if (optlen + sizeof(struct dhcp6opt) <
+			    sizeof(optia))
+				goto malformed;
+			memcpy(&optia, p, sizeof(optia));
+			ia.iaid = ntohl(optia.dh6_ia_iaid);
+			ia.t1 = ntohl(optia.dh6_ia_t1);
+			ia.t2 = ntohl(optia.dh6_ia_t2);
+
+			dprintf(LOG_DEBUG, "",
+			    "  IA_NA: ID=%lu, T1=%lu, T2=%lu",
+			    ia.iaid, ia.t1, ia.t2);
+
+			/* duplication check */
+			if (dhcp6_find_listval(&optinfo->iapd_list,
+			    DHCP6_LISTVAL_IANA, &ia, 0)) {
+				dprintf(LOG_INFO, FNAME,
+				    "duplicated IA_NA %lu", ia.iaid);
+				break; /* ignore this IA_NA */
+			}
+
+			/* take care of sub-options */
+			TAILQ_INIT(&sublist);
+			if (copyin_option(opt,
+			    (struct dhcp6opt *)((char *)p + sizeof(optia)),
+			    (struct dhcp6opt *)(cp + optlen), &sublist)) {
+				goto fail;
+			}
+
+			/* link this option set */
+			if (dhcp6_add_listval(&optinfo->iana_list,
+			    DHCP6_LISTVAL_IANA, &ia, &sublist) == NULL) {
+				dhcp6_clear_list(&sublist);
+				goto fail;
+			}
+			dhcp6_clear_list(&sublist);
+
+			break;
 		default:
 			/* no option specific behavior */
 			dprintf(LOG_INFO, FNAME,
@@ -1582,6 +1633,8 @@ copyin_option(type, p, ep, list)
 	struct dhcp6opt_stcode opt_stcode;
 	struct dhcp6opt_ia_pd_prefix opt_iapd_prefix;
 	struct dhcp6_prefix iapd_prefix;
+	struct dhcp6opt_ia_addr opt_ia_addr;
+	struct dhcp6_prefix ia_addr;
 	struct dhcp6_list sublist;
 
 	TAILQ_INIT(&sublist);
@@ -1665,10 +1718,61 @@ copyin_option(type, p, ep, list)
 			}
 			dhcp6_clear_list(&sublist);
 			break;
+		case DH6OPT_IAADDR:
+			/* check option context */
+			if (type != DH6OPT_IA_NA) {
+				dprintf(LOG_INFO, FNAME,
+				    "%s is an invalid position for %s",
+				    dhcp6optstr(type), dhcp6optstr(opt));
+				goto fail;
+			}
+			/* check option length */
+			if (optlen + sizeof(opth) < sizeof(opt_ia_addr))
+				goto malformed;
+
+			/* copy and convert option values */
+			memcpy(&opt_ia_addr, p, sizeof(opt_ia_addr));
+			ia_addr.pltime = ntohl(opt_ia_addr.dh6_ia_addr_preferred_time);
+			ia_addr.vltime = ntohl(opt_ia_addr.dh6_ia_addr_valid_time);
+			memcpy(&ia_addr.addr, &opt_ia_addr.dh6_ia_addr_addr,
+			    sizeof(ia_addr.addr));
+
+			dprintf(LOG_DEBUG, FNAME, "  IA_NA address: "
+			    "%s pltime=%lu vltime=%lu",
+			    in6addr2str(&ia_addr.addr, 0),
+			    ia_addr.pltime, ia_addr.vltime);
+
+			if (dhcp6_find_listval(list,
+			    DHCP6_LISTVAL_STATEFULADDR6, &ia_addr, 0)) {
+				dprintf(LOG_INFO, FNAME, 
+				    "duplicated IA_NA address"
+				    "%s pltime=%lu vltime=%lu",
+				    in6addr2str(&ia_addr.addr, 0),
+				    ia_addr.pltime, ia_addr.vltime);
+				goto nextoption;
+			}
+
+			/* take care of sub-options */
+			TAILQ_INIT(&sublist);
+			if (copyin_option(opt,
+			    (struct dhcp6opt *)((char *)p +
+			    sizeof(opt_ia_addr)), np, &sublist)) {
+				goto fail;
+			}
+
+			if (dhcp6_add_listval(list, DHCP6_LISTVAL_STATEFULADDR6,
+			    &ia_addr, &sublist) == NULL) {
+				dhcp6_clear_list(&sublist);
+				goto fail;
+			}
+			dhcp6_clear_list(&sublist);
+			break;
 		case DH6OPT_STATUS_CODE:
 			/* check option context */
 			if (type != DH6OPT_IA_PD &&
-			    type != DH6OPT_IA_PD_PREFIX) {
+			    type != DH6OPT_IA_PD_PREFIX &&
+			    type != DH6OPT_IA_NA &&
+			    type != DH6OPT_IAADDR) {
 				dprintf(LOG_INFO, FNAME,
 				    "%s is an invalid position for %s",
 				    dhcp6optstr(type), dhcp6optstr(opt));
@@ -1933,6 +2037,36 @@ dhcp6_set_options(type, optbp, optep, optinfo)
 		    optinfo->serverID.duid_id, &p, optep, &len) != 0) {
 			goto fail;
 		}
+	}
+
+	for (op = TAILQ_FIRST(&optinfo->iana_list); op;
+	    op = TAILQ_NEXT(op, link)) {
+		int optlen;
+
+		tmpbuf = NULL;
+		if ((optlen = copyout_option(NULL, NULL, op)) < 0) {
+			dprintf(LOG_INFO, FNAME,
+			    "failed to count option length");
+			goto fail;
+		}
+		if ((void *)optep - (void *)p < optlen) {
+			dprintf(LOG_INFO, FNAME, "short buffer");
+			goto fail;
+		}
+		if ((tmpbuf = malloc(optlen)) == NULL) {
+			dprintf(LOG_NOTICE, FNAME,
+			    "memory allocation failed for IA_NA options");
+			goto fail;
+		}
+		if (copyout_option(tmpbuf, tmpbuf + optlen, op) < 0) {
+			dprintf(LOG_ERR, FNAME,
+			    "failed to construct an IA_NA option");
+			goto fail;
+		}
+		memcpy(p, tmpbuf, optlen);
+		free(tmpbuf);
+		p = (struct dhcp6opt *)((char *)p + optlen);
+		len += optlen;
 	}
 
 	if (optinfo->rapidcommit) {
@@ -2431,6 +2565,7 @@ copyout_option(p, ep, optval)
 	struct dhcp6opt_stcode stcodeopt;
 	struct dhcp6opt_ia ia;
 	struct dhcp6opt_ia_pd_prefix pd_prefix;
+	struct dhcp6opt_ia_addr ia_addr;
 	char *subp;
 	struct dhcp6_listval *subov;
 	int optlen, headlen, sublen, opttype;
@@ -2447,11 +2582,29 @@ copyout_option(p, ep, optval)
 		opttype = DH6OPT_IA_PD;
 		opt = (struct dhcp6opt *)(void *)&ia;
 		break;
+	case DHCP6_LISTVAL_IANA:
+		memset(&ia, 0, sizeof(ia));
+		headlen = sizeof(ia);
+		opttype = DH6OPT_IA_NA;
+		opt = (struct dhcp6opt *)(void *)&ia;
+		break;
+	case DHCP6_LISTVAL_ADDR6:
+		memset(&pd_prefix, 0, sizeof(pd_prefix));
+		headlen = sizeof(pd_prefix);
+		opttype = DH6OPT_IA_PD_PREFIX;
+		opt = (struct dhcp6opt *)&pd_prefix;
+		break;
 	case DHCP6_LISTVAL_PREFIX6:
 		memset(&pd_prefix, 0, sizeof(pd_prefix));
 		headlen = sizeof(pd_prefix);
 		opttype = DH6OPT_IA_PD_PREFIX;
 		opt = (struct dhcp6opt *)&pd_prefix;
+		break;
+	case DHCP6_LISTVAL_STATEFULADDR6:
+		memset(&ia_addr, 0, sizeof(ia_addr));
+		headlen = sizeof(ia_addr);
+		opttype = DH6OPT_IAADDR;
+		opt = (struct dhcp6opt *)&ia_addr;
 		break;
 	case DHCP6_LISTVAL_STCODE:
 		memset(&stcodeopt, 0, sizeof(stcodeopt));
@@ -2505,6 +2658,11 @@ copyout_option(p, ep, optval)
 		ia.dh6_ia_t1 = htonl(optval->val_ia.t1);
 		ia.dh6_ia_t2 = htonl(optval->val_ia.t2);
 		break;
+	case DHCP6_LISTVAL_IANA:
+		ia.dh6_ia_iaid = htonl(optval->val_ia.iaid);
+		ia.dh6_ia_t1 = htonl(optval->val_ia.t1);
+		ia.dh6_ia_t2 = htonl(optval->val_ia.t2);
+		break;
 	case DHCP6_LISTVAL_PREFIX6:
 		pd_prefix.dh6_iapd_prefix_preferred_time =
 		    htonl(optval->val_prefix6.pltime);
@@ -2515,6 +2673,13 @@ copyout_option(p, ep, optval)
 		/* XXX: prefix_addr is badly aligned, so we need memcpy */
 		memcpy(&pd_prefix.dh6_iapd_prefix_prefix_addr,
 		    &optval->val_prefix6.addr, sizeof(struct in6_addr));
+		break;
+	case DHCP6_LISTVAL_STATEFULADDR6:
+		ia_addr.dh6_ia_addr_preferred_time =
+		    htonl(optval->val_prefix6.pltime);
+		ia_addr.dh6_ia_addr_valid_time =
+		    htonl(optval->val_prefix6.vltime);
+		ia_addr.dh6_ia_addr_addr = optval->val_prefix6.addr;
 		break;
 	case DHCP6_LISTVAL_STCODE:
 		stcodeopt.dh6_stcode_code = htons(optval->val_num16);
@@ -2741,11 +2906,11 @@ dhcp6optstr(type)
 		return ("client ID");
 	case DH6OPT_SERVERID:
 		return ("server ID");
-	case DH6OPT_IA:
+	case DH6OPT_IA_NA:
 		return ("identity association");
-	case DH6OPT_IA_TMP:
+	case DH6OPT_IA_TA:
 		return ("IA for temporary");
-	case DH6OPT_IADDR:
+	case DH6OPT_IAADDR:
 		return ("IA address");
 	case DH6OPT_ORO:
 		return ("option request");

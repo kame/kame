@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6_ctlclient.c,v 1.4 2004/09/07 04:56:15 jinmei Exp $	*/
+/*	$KAME: dhcp6_ctlclient.c,v 1.5 2005/01/12 06:06:11 suz Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -605,6 +605,8 @@ make_ia_object(argc, argv, bpp, lenp)
 
 	if (strcmp(argv[0], "IA_PD") == 0)
 		iaspec.type = htonl(DHCP6CTL_IA_PD);
+	else if (strcmp(argv[0], "IA_NA") == 0)
+		iaspec.type = htonl(DHCP6CTL_IA_NA);
 	else {
 		warnx("IA type not supported: %s", argv[0]);
 		return (-1);

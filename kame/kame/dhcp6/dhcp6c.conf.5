@@ -1,4 +1,4 @@
-.\"	$KAME: dhcp6c.conf.5,v 1.26 2004/11/28 13:54:54 jinmei Exp $
+.\"	$KAME: dhcp6c.conf.5,v 1.27 2005/01/12 06:06:11 suz Exp $
 .\"
 .\" Copyright (C) 2002 WIDE Project.
 .\" All rights reserved.
@@ -97,6 +97,13 @@ option.
 .Ar ID
 is a decimal number of the IAID
 .Pq see below about identity associations .
+.It Ic ia-na Ar ID
+means an IA_PD
+.Pq Identity Association for Non-temporary Addresses
+option.
+.Ar ID
+is a decimal number of the IAID
+.Pq see below about identity associations .
 .It Ic rapid-commit
 means a rapid-commit option.
 .It Ic authentication Ar authname
@@ -149,6 +156,7 @@ is specified,
 .Nm dhcp6c
 will include a rapid-commit option in solicit messages and wait for
 an immediate reply instead of advertisements.
+.Pp
 When
 .Ic ia-pd
 is specified,
@@ -157,7 +165,17 @@ will initiate prefix delegation as a requesting router by
 including an IA_PD option with the specified
 .Ar ID
 in solicit messages.
-In this case, a corresponding identity association statement
+.Pp
+When
+.Ic ia-na
+is specified,
+.Nm dhcp6c
+will initiate stateful address assignment by 
+including an IA_NA option with the specified
+.Ar ID
+in solicit messages.
+.Pp
+In either case, a corresponding identity association statement
 must exist with the same
 .Ar ID .
 .It Ic request Ar request-options ;
@@ -248,8 +266,8 @@ Its format is as follows:
 .Ar type
 is a string for the type of this IA.
 The current implementation only supports
-.Ic pd
-as the type, which means prefix delegation.
+.Ic pd 
+(prefix delegation) as the type.
 .Ar ID
 is a decimal number of IAID.
 If omitted, the value 0 will be used by default.
@@ -545,6 +563,12 @@ interface ppp0 {
 
 authentication kame {
 	protocol delayed;
+};
+.Ed
+.Pp
+.Bd -literal -offset
+interface fxp0 {
+        send ia-na 0;
 };
 .Ed
 .Sh SEE ALSO

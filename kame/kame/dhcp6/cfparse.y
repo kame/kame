@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.34 2004/11/28 11:03:15 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.35 2005/01/12 06:06:10 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -84,6 +84,7 @@ extern void yyerror __P((char *, ...))
 
 static struct cf_namelist *iflist_head, *hostlist_head, *iapdlist_head;
 static struct cf_namelist *authinfolist_head, *keylist_head;
+static struct cf_namelist *ianalist_head;
 struct cf_list *cf_dns_list, *cf_dns_name_list, *cf_ntp_list;
 struct cf_list *cf_sip_list, *cf_sip_name_list;
 long long cf_refreshtime = -1;
@@ -97,7 +98,8 @@ static void cleanup_cflist __P((struct cf_list *));
 
 %token INTERFACE IFNAME
 %token PREFIX_INTERFACE SLA_ID SLA_LEN DUID_ID
-%token ID_ASSOC IA_PD IAID
+%token ID_ASSOC IA_PD IAID IA_NA
+%token ADDRESS
 %token REQUEST SEND ALLOW PREFERENCE
 %token HOST HOSTNAME DUID
 %token OPTION RAPID_COMMIT IA_PD DNS_SERVERS DNS_NAME NTP_SERVERS REFRESHTIME
@@ -122,7 +124,8 @@ static void cleanup_cflist __P((struct cf_list *));
 %type <num> NUMBER duration authproto authalg authrdm
 %type <list> declaration declarations dhcpoption ifparam ifparams
 %type <list> address_list address_list_ent dhcpoption_list
-%type <list> iaconf_list iaconf prefix_interface
+%type <list> iapdconf_list iapdconf prefix_interface
+%type <list> ianaconf_list ianaconf
 %type <list> authparam_list authparam
 %type <list> keyparam_list keyparam
 %type <prefix> prefixparam
@@ -253,7 +256,7 @@ option_statement:
 	;
 
 ia_statement:
-		ID_ASSOC IA_PD IAID BCL iaconf_list ECL EOS
+		ID_ASSOC IA_PD IAID BCL iapdconf_list ECL EOS
 		{
 			struct cf_namelist *iapd;
 
@@ -262,7 +265,7 @@ ia_statement:
 			if (add_namelist(iapd, &iapdlist_head))
 				return (-1);
 		}
-	|	ID_ASSOC IA_PD BCL iaconf_list ECL EOS
+	|	ID_ASSOC IA_PD BCL iapdconf_list ECL EOS
 		{
 			struct cf_namelist *iapd;
 			char *zero;
@@ -274,6 +277,29 @@ ia_statement:
 			MAKE_NAMELIST(iapd, zero, $4);
 
 			if (add_namelist(iapd, &iapdlist_head))
+				return (-1);
+		}
+	|	ID_ASSOC IA_NA IAID BCL ianaconf_list ECL EOS
+		{
+			struct cf_namelist *iana;
+
+			MAKE_NAMELIST(iana, $3, $5);
+
+			if (add_namelist(iana, &ianalist_head))
+				return (-1);
+		}
+	|	ID_ASSOC IA_NA BCL ianaconf_list ECL EOS
+		{
+			struct cf_namelist *iana;
+			char *zero;
+
+			if ((zero = strdup("0")) == NULL) {
+				yywarn("can't allocate memory");
+				return (-1);
+			}
+			MAKE_NAMELIST(iana, zero, $4);
+
+			if (add_namelist(iana, &ianalist_head))
 				return (-1);
 		}
 	;
@@ -403,6 +429,15 @@ declaration:
 
 			$$ = l;
 		}
+	|	ADDRESS prefixparam EOS
+		{
+			struct cf_list *l;
+
+			$2->plen = 128;	/* XXX */
+			MAKE_CFLIST(l, DECL_ADDRESS, $2,NULL);
+
+			$$ = l;
+		}
 	|	PREFIX prefixparam EOS
 		{
 			struct cf_list *l;
@@ -473,6 +508,14 @@ dhcpoption:
 			struct cf_list *l;
 
 			MAKE_CFLIST(l, DHCPOPT_IA_PD, NULL, NULL);
+			l->num = $2;
+			$$ = l;
+		}
+	|       IA_NA NUMBER
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, DHCPOPT_IA_NA, NULL, NULL);
 			l->num = $2;
 			$$ = l;
 		}
@@ -596,9 +639,9 @@ duration:
 		}
 	;
 
-iaconf_list:
+iapdconf_list:
 		{ $$ = NULL; }
-	|	iaconf_list iaconf
+	|	iapdconf_list iapdconf
 		{
 			struct cf_list *head;
 
@@ -615,7 +658,7 @@ iaconf_list:
 		}
 	;
 
-iaconf:
+iapdconf:
 		prefix_interface { $$ = $1; }
 	|	PREFIX prefixparam EOS
 		{
@@ -671,6 +714,36 @@ ifparam:
 
 			MAKE_CFLIST(l, IFPARAM_SLA_LEN, NULL, NULL);
 			l->num = $2;
+			$$ = l;
+		}
+	;
+
+ianaconf_list:
+		{ $$ = NULL; }
+	|	ianaconf_list ianaconf
+		{
+			struct cf_list *head;
+
+			if ((head = $1) == NULL) {
+				$2->next = NULL;
+				$2->tail = $2;
+				head = $2;
+			} else {
+				head->tail->next = $2;
+				head->tail = $2->tail;
+			}
+
+			$$ = head;
+		}
+	;
+
+ianaconf:
+	 	ADDRESS prefixparam EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, IACONF_ADDR, $2, NULL);
+
 			$$ = l;
 		}
 	;
@@ -830,6 +903,8 @@ cleanup()
 	hostlist_head = NULL;
 	cleanup_namelist(iapdlist_head);
 	iapdlist_head = NULL;
+	cleanup_namelist(ianalist_head);
+	ianalist_head = NULL;
 	cleanup_namelist(authinfolist_head);
 	authinfolist_head = NULL;
 	cleanup_namelist(keylist_head);
@@ -893,6 +968,9 @@ cf_post_config()
 		config_fail();
 
 	if (configure_ia(iapdlist_head, IATYPE_PD))
+		config_fail();
+
+	if (configure_ia(ianalist_head, IATYPE_NA))
 		config_fail();
 
 	if (configure_interface(iflist_head))

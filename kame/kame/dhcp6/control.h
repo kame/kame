@@ -1,4 +1,4 @@
-/*	$KAME: control.h,v 1.6 2004/09/07 05:03:02 jinmei Exp $	*/
+/*	$KAME: control.h,v 1.7 2005/01/12 06:06:11 suz Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -51,6 +51,7 @@
 #define DHCP6CTL_BINDING_IA 2
 #define DHCP6CTL_IA_PD 3
 #define DHCP6CTL_INTERFACE 4
+#define DHCP6CTL_IA_NA 5
 
 /*
  * Hash protocol/algorithm types.  Use same values for DHCPv6 protocol

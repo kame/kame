@@ -1,4 +1,4 @@
-/*	$KAME: prefixconf.c,v 1.26 2004/05/13 13:27:51 jinmei Exp $	*/
+/*	$KAME: prefixconf.c,v 1.27 2005/01/12 06:06:12 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -101,12 +101,14 @@ struct dhcp6_ifprefix {
 typedef enum { IFADDRCONF_ADD, IFADDRCONF_REMOVE } ifaddrconf_cmd_t;
 
 static struct siteprefix *find_siteprefix __P((struct siteprefix_list *,
-    struct dhcp6_prefix *));
+    struct dhcp6_prefix *, int));
 static void remove_siteprefix __P((struct siteprefix *));
 static int isvalid __P((struct iactl *));
 static u_int32_t duration __P((struct iactl *));
 static void cleanup __P((struct iactl *));
-static int renew_data __P((struct iactl *, struct dhcp6_ia *,
+static int renew_prefix __P((struct iactl *, struct dhcp6_ia *,
+    struct dhcp6_eventdata **, struct dhcp6_eventdata *));
+static int renew_addr __P((struct iactl *, struct dhcp6_ia *,
     struct dhcp6_eventdata **, struct dhcp6_eventdata *));
 static void renew_data_free __P((struct dhcp6_eventdata *));
 
@@ -115,6 +117,7 @@ static struct dhcp6_timer *siteprefix_timo __P((void *));
 static int ifaddrconf __P((ifaddrconf_cmd_t, struct dhcp6_ifprefix *));
 static int add_ifprefix __P((struct siteprefix *,
     struct dhcp6_prefix *, struct prefix_ifconf *));
+static int add_ifaddr __P((struct siteprefix *, struct dhcp6_prefix *, char *));
 
 extern struct dhcp6_timer *client6_timo __P((void *));
 
@@ -162,7 +165,7 @@ update_prefix(ia, pinfo, pifc, dhcpifp, ctlp, callback)
 		iac_pd->iacpd_renew_data =
 		    iac_pd->iacpd_rebind_data =
 		    iac_pd->iacpd_release_data =
-		    iac_pd->iacpd_reestablish_data = renew_data;
+		    iac_pd->iacpd_reestablish_data = renew_prefix;
 
 		iac_pd->pifc_head = pifc;
 		TAILQ_INIT(&iac_pd->siteprefix_head);
@@ -170,7 +173,7 @@ update_prefix(ia, pinfo, pifc, dhcpifp, ctlp, callback)
 	}
 
 	/* search for the given prefix, and make a new one if it fails */
-	if ((sp = find_siteprefix(&iac_pd->siteprefix_head, pinfo)) == NULL) {
+	if ((sp = find_siteprefix(&iac_pd->siteprefix_head, pinfo, 1)) == NULL) {
 		if ((sp = malloc(sizeof(*sp))) == NULL) {
 			dprintf(LOG_NOTICE, FNAME, "memory allocation failed");
 			return (-1);
@@ -252,16 +255,130 @@ update_prefix(ia, pinfo, pifc, dhcpifp, ctlp, callback)
 	return (0);
 }
 
+int
+update_address(ia, pinfo, dhcpifp, ctlp, callback)
+	struct ia *ia;
+	struct dhcp6_prefix *pinfo;
+	struct dhcp6_if *dhcpifp;
+	struct iactl **ctlp;
+	void (*callback)__P((struct ia *));
+{
+	struct iactl_pd *iac_na = (struct iactl_pd *)*ctlp;
+	struct siteprefix *sp;
+	int spcreate = 0;
+	struct timeval timo;
+
+	/*
+	 * A client discards any addresses for which the preferred
+         * lifetime is greater than the valid lifetime.
+	 * [RFC3315 22.6] 
+	 */
+	if (pinfo->vltime != DHCP6_DURATITION_INFINITE &&
+	    (pinfo->pltime == DHCP6_DURATITION_INFINITE ||
+	    pinfo->pltime > pinfo->vltime)) {
+		dprintf(LOG_INFO, FNAME, "invalid address %s: "
+		    "pltime (%lu) is larger than vltime (%lu)",
+		    in6addr2str(&pinfo->addr, 0),
+		    pinfo->pltime, pinfo->vltime);
+		return (-1);
+	}
+
+	if (iac_na == NULL) {
+		if ((iac_na = malloc(sizeof(*iac_na))) == NULL) {
+			dprintf(LOG_NOTICE, FNAME, "memory allocation failed");
+			return (-1);
+		}
+		memset(iac_na, 0, sizeof(*iac_na));
+		iac_na->iacpd_ia = ia;
+		iac_na->iacpd_callback = callback;
+		iac_na->iacpd_isvalid = isvalid;
+		iac_na->iacpd_duration = duration;
+		iac_na->iacpd_cleanup = cleanup;
+		iac_na->iacpd_renew_data =
+		    iac_na->iacpd_rebind_data =
+		    iac_na->iacpd_release_data =
+		    iac_na->iacpd_reestablish_data = renew_addr;
+
+		iac_na->pifc_head = NULL;
+		TAILQ_INIT(&iac_na->siteprefix_head);
+		*ctlp = (struct iactl *)iac_na;
+	}
+
+	/* search for the given prefix, and make a new one if it fails */
+	if ((sp = find_siteprefix(&iac_na->siteprefix_head, pinfo, 0)) == NULL) {
+		if ((sp = malloc(sizeof(*sp))) == NULL) {
+			dprintf(LOG_NOTICE, FNAME, "memory allocation failed");
+			return (-1);
+		}
+		memset(sp, 0, sizeof(*sp));
+		sp->prefix.addr = pinfo->addr;
+		sp->ctl = iac_na;
+		TAILQ_INIT(&sp->ifprefix_list);
+
+		TAILQ_INSERT_TAIL(&iac_na->siteprefix_head, sp, link);
+
+		spcreate = 1;
+	}
+
+	/* update the timestamp of update */
+	sp->updatetime = time(NULL);
+
+	/* update the prefix according to pinfo */
+	sp->prefix.pltime = pinfo->pltime;
+	sp->prefix.vltime = pinfo->vltime;
+	dprintf(LOG_DEBUG, FNAME, "%s a address %s pltime=%lu, vltime=%lu",
+	    spcreate ? "create" : "update",
+	    in6addr2str(&pinfo->addr, 0), pinfo->pltime, pinfo->vltime);
+
+	if (sp->prefix.vltime != 0 && spcreate) {
+		add_ifaddr(sp, pinfo, dhcpifp->ifname);
+	}
+
+	/*
+	 * If the new vltime is 0, this address immediatly expires.
+	 * Otherwise, set up or update the associated timer.
+	 */
+	switch (sp->prefix.vltime) {
+	case 0:
+		remove_siteprefix(sp);
+		break;
+	case DHCP6_DURATITION_INFINITE:
+		if (sp->timer)
+			dhcp6_remove_timer(&sp->timer);
+		break;
+	default:
+		if (sp->timer == NULL) {
+			sp->timer = dhcp6_add_timer(siteprefix_timo, sp);
+			if (sp->timer == NULL) {
+				dprintf(LOG_NOTICE, FNAME,
+				    "failed to add stateful addr timer");
+				remove_siteprefix(sp); /* XXX */
+				return (-1);
+			}
+		}
+		/* update the timer */
+		timo.tv_sec = sp->prefix.vltime;
+		timo.tv_usec = 0;
+
+		dhcp6_set_timer(&timo, sp->timer);
+		break;
+	}
+
+	return (0);
+}
+
 static struct siteprefix *
-find_siteprefix(head, prefix)
+find_siteprefix(head, prefix, match_plen)
 	struct siteprefix_list *head;
 	struct dhcp6_prefix *prefix;
+	int match_plen;
 {
 	struct siteprefix *sp;
 
 	for (sp = TAILQ_FIRST(head); sp; sp = TAILQ_NEXT(sp, link)) {
-		if (IN6_ARE_ADDR_EQUAL(&sp->prefix.addr, &prefix->addr) &&
-		    sp->prefix.plen == prefix->plen)
+		if (!IN6_ARE_ADDR_EQUAL(&sp->prefix.addr, &prefix->addr))
+			continue;
+		if (match_plen == 0 || sp->prefix.plen == prefix->plen)
 			return (sp);
 	}
 
@@ -343,7 +460,7 @@ cleanup(iac)
 }
 
 static int
-renew_data(iac, iaparam, evdp, evd)
+renew_prefix(iac, iaparam, evdp, evd)
 	struct iactl *iac;
 	struct dhcp6_ia *iaparam;
 	struct dhcp6_eventdata **evdp, *evd;
@@ -381,13 +498,52 @@ renew_data(iac, iaparam, evdp, evd)
 	return (-1);
 }
 
+static int
+renew_addr(iac, iaparam, evdp, evd)
+	struct iactl *iac;
+	struct dhcp6_ia *iaparam;
+	struct dhcp6_eventdata **evdp, *evd;
+{
+	struct iactl_pd *iac_na = (struct iactl_pd *)iac;
+	struct siteprefix *sp;
+	struct dhcp6_list *ial = NULL, pl;
+
+	TAILQ_INIT(&pl);
+	for (sp = TAILQ_FIRST(&iac_na->siteprefix_head); sp;
+	    sp = TAILQ_NEXT(sp, link)) {
+		if (dhcp6_add_listval(&pl, DHCP6_LISTVAL_STATEFULADDR6,
+		    &sp->prefix, NULL) == NULL)
+			goto fail;
+	}
+
+	if ((ial = malloc(sizeof(*ial))) == NULL)
+		goto fail;
+	TAILQ_INIT(ial);
+	if (dhcp6_add_listval(ial, DHCP6_LISTVAL_IANA, iaparam, &pl) == NULL)
+		goto fail;
+	dhcp6_clear_list(&pl);
+
+	evd->type = DHCP6_EVDATA_IANA;
+	evd->data = (void *)ial;
+	evd->privdata = (void *)evdp;
+	evd->destructor = renew_data_free;
+
+	return (0);
+
+  fail:
+	dhcp6_clear_list(&pl);
+	if (ial)
+		free(ial);
+	return (-1);
+}
+
 static void
 renew_data_free(evd)
 	struct dhcp6_eventdata *evd;
 {
 	struct dhcp6_list *ial;
 
-	if (evd->type != DHCP6_EVDATA_IAPD) {
+	if (evd->type != DHCP6_EVDATA_IAPD && evd->type != DHCP6_EVDATA_IANA) {
 		dprintf(LOG_ERR, FNAME, "assumption failure");
 		exit(1);
 	}
@@ -497,6 +653,48 @@ add_ifprefix(siteprefix, prefix, pconf)
 }
 
 static int
+add_ifaddr(siteprefix, prefix, ifname)
+	struct siteprefix *siteprefix;
+	struct dhcp6_prefix *prefix;
+	char *ifname;
+{
+	struct dhcp6_ifprefix *ifpfx = NULL;
+	struct prefix_ifconf *pconf = NULL;
+
+	if ((ifpfx = malloc(sizeof(*ifpfx))) == NULL) {
+		dprintf(LOG_NOTICE, FNAME,
+		    "failed to allocate memory for ifprefix");
+		return (-1);
+	}
+	memset(ifpfx, 0, sizeof(*ifpfx));
+	if ((pconf = malloc(sizeof(*pconf))) == NULL) {
+		dprintf(LOG_NOTICE, FNAME,
+		    "failed to allocate memory for pconf");
+		return (-1);
+	}
+	memset(pconf, 0, sizeof(*pconf));
+
+	ifpfx->ifaddr.sin6_family = AF_INET6;
+	ifpfx->ifaddr.sin6_len = sizeof(struct sockaddr_in6);
+	ifpfx->ifaddr.sin6_addr = prefix->addr;
+	ifpfx->ifconf = pconf;
+	ifpfx->ifconf->ifname = ifname;
+	if (ifaddrconf(IFADDRCONF_ADD, ifpfx))
+		goto bad;
+
+	/* TODO: send a control message for other processes */
+
+	TAILQ_INSERT_TAIL(&siteprefix->ifprefix_list, ifpfx, plink);
+
+	return (0);
+
+  bad:
+	if (ifpfx)
+		free(ifpfx);
+	return (-1);
+}
+
+static int
 ifaddrconf(cmd, ifpfx)
 	ifaddrconf_cmd_t cmd;
 	struct dhcp6_ifprefix *ifpfx;
@@ -506,6 +704,7 @@ ifaddrconf(cmd, ifpfx)
 	unsigned long ioctl_cmd;
 	char *cmdstr;
 	int s;			/* XXX overhead */
+	int plen;
 
 	switch(cmd) {
 	case IFADDRCONF_ADD:
@@ -529,7 +728,10 @@ ifaddrconf(cmd, ifpfx)
 	memset(&req, 0, sizeof(req));
 	memcpy(req.ifra_name, pconf->ifname, sizeof(req.ifra_name));
 	req.ifra_addr = ifpfx->ifaddr;
-	(void)sa6_plen2mask(&req.ifra_prefixmask, ifpfx->plen);
+	plen = ifpfx->plen;
+	if (plen == 0)
+		plen = 64;
+	(void)sa6_plen2mask(&req.ifra_prefixmask, plen);
 	/* XXX: should lifetimes be calculated based on the lease duration? */
 	req.ifra_lifetime.ia6t_vltime = ND6_INFINITE_LIFETIME;
 	req.ifra_lifetime.ia6t_pltime = ND6_INFINITE_LIFETIME;

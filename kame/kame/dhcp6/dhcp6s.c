@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.142 2004/11/28 11:36:38 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.143 2005/01/12 06:06:11 suz Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -717,7 +717,8 @@ server6_do_ctlcommand(buf, len)
 
 		if (get_val(&bp, &commandlen, &iaspec, sizeof(iaspec)))
 			return (DHCP6CTL_R_FAILURE);
-		if (ntohl(iaspec.type) != DHCP6CTL_IA_PD) {
+		if (ntohl(iaspec.type) != DHCP6CTL_IA_PD &&
+		    ntohl(iaspec.type) != DHCP6CTL_IA_NA) {
 			dprintf(LOG_INFO, FNAME, "unknown IA type: %ul",
 			    ntohl(iaspec.type));
 			return (DHCP6CTL_R_FAILURE);
@@ -736,8 +737,12 @@ server6_do_ctlcommand(buf, len)
 		binding = find_binding(&duid, DHCP6_BINDING_IA,
 		    DHCP6_LISTVAL_IAPD, iaid);
 		if (binding == NULL) {
-			dprintf(LOG_INFO, FNAME, "no such binding");
-			return (DHCP6CTL_R_FAILURE);
+			binding = find_binding(&duid, DHCP6_BINDING_IA,
+			    DHCP6_LISTVAL_IANA, iaid);
+			if (binding == NULL) {
+				dprintf(LOG_INFO, FNAME, "no such binding");
+				return (DHCP6CTL_R_FAILURE);
+			}
 		}
 		remove_binding(binding);
 		    
@@ -1221,6 +1226,45 @@ react_solicit(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 		}
 	}
 
+	if (!TAILQ_EMPTY(&optinfo->iana_list)) {
+		int found = 0;
+		struct dhcp6_list conflist;
+		struct dhcp6_listval *iana;
+
+		TAILQ_INIT(&conflist);
+
+		/* make a local copy of the configured addresses */
+		if (client_conf &&
+		    dhcp6_copy_list(&conflist, &client_conf->addr_list)) {
+			dprintf(LOG_NOTICE, FNAME,
+			    "failed to make local data");
+			goto fail;
+		}
+
+		for (iana = TAILQ_FIRST(&optinfo->iana_list); iana;
+		    iana = TAILQ_NEXT(iana, link)) {
+			/*
+			 * find an appropriate address for each IA_NA,
+			 * removing the adopted addresses from the list.
+			 * (dhcp6s cannot create IAs without client config)
+			 */
+			if (client_conf &&
+			    make_ia(iana, &conflist, &roptinfo.iana_list,
+			    client_conf, do_binding) > 0)
+				found = 1;
+		}
+
+		dhcp6_clear_list(&conflist);
+
+		if (!found) {
+			u_int16_t stcode = DH6OPT_STCODE_NOADDRAVAIL;
+
+			if (dhcp6_add_listval(&roptinfo.stcode_list,
+			    DHCP6_LISTVAL_STCODE, &stcode, NULL) == NULL)
+				goto fail;
+		}
+	}
+
 	if (optinfo->rapidcommit && (ifp->allow_flags & DHCIFF_RAPID_COMMIT)) {
 		/*
 		 * If the client has included a Rapid Commit option and the
@@ -1393,6 +1437,44 @@ react_request(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 		dhcp6_clear_list(&conflist);
 	}
 
+	if (!TAILQ_EMPTY(&optinfo->iana_list)) {
+		struct dhcp6_list conflist;
+		struct dhcp6_listval *iana;
+
+		TAILQ_INIT(&conflist);
+
+		/* make a local copy of the configured prefixes */
+		if (client_conf &&
+		    dhcp6_copy_list(&conflist, &client_conf->addr_list)) {
+			dprintf(LOG_NOTICE, FNAME,
+			    "failed to make local data");
+			goto fail;
+		}
+
+		for (iana = TAILQ_FIRST(&optinfo->iana_list); iana;
+		    iana = TAILQ_NEXT(iana, link)) {
+			/*
+			 * Find an appropriate address for each IA_NA,
+			 * removing the adopted addresses from the list.
+			 * The addresses will be bound to the client.
+			 */
+			if (make_ia(iana, &conflist, &roptinfo.iana_list,
+			    client_conf, 1) == 0) {
+				if (make_ia_stcode(DHCP6_LISTVAL_IANA,
+				    iana->val_ia.iaid,
+				    DH6OPT_STCODE_NOADDRAVAIL,
+				    &roptinfo.iana_list)) {
+					dprintf(LOG_NOTICE, FNAME,
+					    "failed to make an option list");
+					dhcp6_clear_list(&conflist);
+					goto fail;
+				}
+			}
+		}
+
+		dhcp6_clear_list(&conflist);
+	}
+
 	/*
 	 * If the Request message contained an Option Request option, the
 	 * server MUST include options in the Reply message for any options in
@@ -1445,7 +1527,7 @@ react_renew(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	struct relayinfolist *relayinfohead;
 {
 	struct dhcp6_optinfo roptinfo;
-	struct dhcp6_listval *iapd;
+	struct dhcp6_listval *ia;
 	struct host_conf *client_conf;
 
 	/* message validation according to Section 15.6 of RFC3315 */
@@ -1527,9 +1609,16 @@ react_renew(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	 * from the client matches the information stored for that client.
 	 * (Note that our implementation does not assign addresses (nor will)).
 	 */
-	for (iapd = TAILQ_FIRST(&optinfo->iapd_list); iapd;
-	    iapd = TAILQ_NEXT(iapd, link)) {
-		if (make_binding_ia(DH6_RENEW, iapd, &roptinfo.iapd_list,
+	for (ia = TAILQ_FIRST(&optinfo->iapd_list); ia;
+	    ia = TAILQ_NEXT(ia, link)) {
+		if (make_binding_ia(DH6_RENEW, ia, &roptinfo.iapd_list,
+		    optinfo)) {
+			goto fail;
+		}
+	}
+	for (ia = TAILQ_FIRST(&optinfo->iana_list); ia;
+	    ia = TAILQ_NEXT(ia, link)) {
+		if (make_binding_ia(DH6_RENEW, ia, &roptinfo.iana_list,
 		    optinfo)) {
 			goto fail;
 		}
@@ -1565,7 +1654,7 @@ react_rebind(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 	struct relayinfolist *relayinfohead;
 {
 	struct dhcp6_optinfo roptinfo;
-	struct dhcp6_listval *iapd;
+	struct dhcp6_listval *ia;
 	struct host_conf *client_conf;
 
 	/* message validation according to Section 15.7 of RFC3315 */
@@ -1617,13 +1706,21 @@ react_rebind(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 	 * Locates the client's binding and verifies that the information
 	 * from the client matches the information stored for that client.
 	 */
-	for (iapd = TAILQ_FIRST(&optinfo->iapd_list); iapd;
-	    iapd = TAILQ_NEXT(iapd, link)) {
-		if (make_binding_ia(DH6_REBIND, iapd, &roptinfo.iapd_list,
+	for (ia = TAILQ_FIRST(&optinfo->iapd_list); ia;
+	    ia = TAILQ_NEXT(ia, link)) {
+		if (make_binding_ia(DH6_REBIND, ia, &roptinfo.iapd_list,
 		    optinfo)) {
 			goto fail;
 		}
 	}
+	for (ia = TAILQ_FIRST(&optinfo->iana_list); ia;
+	    ia = TAILQ_NEXT(ia, link)) {
+		if (make_binding_ia(DH6_REBIND, ia, &roptinfo.iana_list,
+		    optinfo)) {
+			goto fail;
+		}
+	}
+
 	/*
 	 * If the returned iapd_list is empty, we do not have an explicit
 	 * knowledge about validity nor invalidity for any IA_PD information
@@ -1668,7 +1765,7 @@ react_release(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	struct relayinfolist *relayinfohead;
 {
 	struct dhcp6_optinfo roptinfo;
-	struct dhcp6_listval *iapd;
+	struct dhcp6_listval *ia;
 	struct host_conf *client_conf;
 	u_int16_t stcode;
 
@@ -1751,9 +1848,14 @@ react_release(ifp, pi, dh6, len, optinfo, from, fromlen, relayinfohead)
 	 * from the client matches the information stored for that client.
 	 * (Note that our implementation does not assign addresses (nor will)).
 	 */
-	for (iapd = TAILQ_FIRST(&optinfo->iapd_list); iapd;
-	    iapd = TAILQ_NEXT(iapd, link)) {
-		if (release_binding_ia(iapd, &roptinfo.iapd_list, optinfo))
+	for (ia = TAILQ_FIRST(&optinfo->iapd_list); ia;
+	    ia = TAILQ_NEXT(ia, link)) {
+		if (release_binding_ia(ia, &roptinfo.iapd_list, optinfo))
+			goto fail;
+	}
+	for (ia = TAILQ_FIRST(&optinfo->iana_list); ia;
+	    ia = TAILQ_NEXT(ia, link)) {
+		if (release_binding_ia(ia, &roptinfo.iana_list, optinfo))
 			goto fail;
 	}
 
@@ -1804,6 +1906,11 @@ react_informreq(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 		    "information request contains an IA_PD option");
 		return (-1);
 	}
+	if (!TAILQ_EMPTY(&optinfo->iana_list)) {
+		dprintf(LOG_INFO, FNAME,
+		    "information request contains an IA_NA option");
+		return (-1);
+	}
 
 	/* if a server information is included, it must match ours. */
 	if (optinfo->serverID.duid_len &&
@@ -1849,9 +1956,9 @@ react_informreq(ifp, dh6, len, optinfo, from, fromlen, relayinfohead)
 }
 
 static int
-make_binding_ia(msgtype, iapd, retlist, optinfo)
+make_binding_ia(msgtype, iap, retlist, optinfo)
 	int msgtype;
-	struct dhcp6_listval *iapd;
+	struct dhcp6_listval *iap;
 	struct dhcp6_list *retlist;
 	struct dhcp6_optinfo *optinfo;
 {
@@ -1865,7 +1972,7 @@ make_binding_ia(msgtype, iapd, retlist, optinfo)
 	}
 
 	if ((binding = find_binding(&optinfo->clientID, DHCP6_BINDING_IA,
-	    iapd->type, iapd->val_ia.iaid)) == NULL) {
+	    iap->type, iap->val_ia.iaid)) == NULL) {
 		/*
 		 * Behavior in the case where the delegating router cannot
 		 * find a binding for the requesting router's IA_PD
@@ -1883,7 +1990,7 @@ make_binding_ia(msgtype, iapd, retlist, optinfo)
 			 * Status Code option set to NoBinding in the Reply
 			 * message.
 			 */
-			if (make_ia_stcode(iapd->type, iapd->val_ia.iaid,
+			if (make_ia_stcode(iap->type, iap->val_ia.iaid,
 			    DH6OPT_STCODE_NOBINDING, retlist)) {
 				dprintf(LOG_NOTICE, FNAME,
 				    "failed to make an option list");
@@ -1921,11 +2028,11 @@ make_binding_ia(msgtype, iapd, retlist, optinfo)
 		update_binding(binding);
 
 		/* see if each information to be renewed is still valid. */
-		for (lv = TAILQ_FIRST(&iapd->sublist); lv;
+		for (lv = TAILQ_FIRST(&iap->sublist); lv;
 		    lv = TAILQ_NEXT(lv, link)) {
 			struct dhcp6_listval *blv;
 
-			switch (iapd->type) {
+			switch (iap->type) {
 			case DHCP6_LISTVAL_IAPD:
 				if (lv->type != DHCP6_LISTVAL_PREFIX6)
 					continue;
@@ -1956,6 +2063,36 @@ make_binding_ia(msgtype, iapd, retlist, optinfo)
 					return (-1);
 				}
 				break;
+			case DHCP6_LISTVAL_IANA:
+				if (lv->type != DHCP6_LISTVAL_STATEFULADDR6)
+					continue;
+
+				prefix = lv->val_prefix6;
+				blv = dhcp6_find_listval(&binding->val_list,
+				    DHCP6_LISTVAL_STATEFULADDR6, &prefix, 0);
+				if (blv == NULL) {
+					dprintf(LOG_DEBUG, FNAME,
+					    "%s is not found in %s",
+					    in6addr2str(&prefix.addr, 0),
+					    bindingstr(binding));
+					prefix.pltime = 0;
+					prefix.vltime = 0;
+				} else {
+					prefix.pltime =
+					    blv->val_prefix6.pltime;
+					prefix.vltime =
+					    blv->val_prefix6.vltime;
+				}
+
+				if (dhcp6_add_listval(&ialist,
+				    DHCP6_LISTVAL_STATEFULADDR6, &prefix, NULL)
+				    == NULL) {
+					dprintf(LOG_NOTICE, FNAME,
+					    "failed  to copy binding info");
+					dhcp6_clear_list(&ialist);
+					return (-1);
+				}
+				break;
 			default:
 				dprintf(LOG_ERR, FNAME, "unsupported IA type");
 				return (-1); /* XXX */
@@ -1967,7 +2104,7 @@ make_binding_ia(msgtype, iapd, retlist, optinfo)
 		/* determine appropriate T1 and T2 */
 		calc_ia_timo(&ia, &ialist, client_conf);
 
-		if (dhcp6_add_listval(retlist, iapd->type,
+		if (dhcp6_add_listval(retlist, iap->type,
 		    &ia, &ialist) == NULL) {
 			dhcp6_clear_list(&ialist);
 			return (-1);
@@ -1979,22 +2116,22 @@ make_binding_ia(msgtype, iapd, retlist, optinfo)
 }
 
 static int
-release_binding_ia(iapd, retlist, optinfo)
-	struct dhcp6_listval *iapd;
+release_binding_ia(iap, retlist, optinfo)
+	struct dhcp6_listval *iap;
 	struct dhcp6_list *retlist;
 	struct dhcp6_optinfo *optinfo;
 {
 	struct dhcp6_binding *binding;
 
 	if ((binding = find_binding(&optinfo->clientID, DHCP6_BINDING_IA,
-	    iapd->type, iapd->val_ia.iaid)) == NULL) {
+	    iap->type, iap->val_ia.iaid)) == NULL) {
 		/*
 		 * For each IA in the Release message for which the server has
 		 * no binding information, the server adds an IA option using
 		 * the IAID from the Release message and includes a Status Code
 		 * option with the value NoBinding in the IA option.
 		 */
-		if (make_ia_stcode(iapd->type, iapd->val_ia.iaid,
+		if (make_ia_stcode(iap->type, iap->val_ia.iaid,
 		    DH6OPT_STCODE_NOBINDING, retlist)) {
 			dprintf(LOG_NOTICE, FNAME,
 			    "failed to make an option list");
@@ -2013,7 +2150,7 @@ release_binding_ia(iapd, retlist, optinfo)
 		 * (Though we do not support address assignment, we apply the
 		 * same logic to prefixes)
 		 */
-		for (lv = TAILQ_FIRST(&iapd->sublist); lv;
+		for (lv = TAILQ_FIRST(&iap->sublist); lv;
 		    lv = TAILQ_NEXT(lv, link)) {
 			if ((lvia = find_binding_ia(lv, binding)) != NULL) {
 				switch (binding->iatype) {
@@ -2024,6 +2161,13 @@ release_binding_ia(iapd, retlist, optinfo)
 						    in6addr2str(&lvia->val_prefix6.addr,
 						    0),
 						    lvia->val_prefix6.plen);
+						break;
+					case DHCP6_LISTVAL_IANA:
+						dprintf(LOG_DEBUG, FNAME,
+						    "bound address %s "
+						    "has been released",
+						    in6addr2str(&lvia->val_prefix6.addr,
+						    0));
 						break;
 				}
 
@@ -2321,6 +2465,10 @@ make_match_ia(spec, conflist, retlist)
 			match = dhcp6_find_listval(conflist, spec->type,
 			    &spec->uv, MATCHLIST_PREFIXLEN);
 			break;
+		case DHCP6_LISTVAL_STATEFULADDR6:
+			match = dhcp6_find_listval(conflist, spec->type,
+			    &spec->uv, 0);
+			break;
 		default:
 			dprintf(LOG_ERR, FNAME, "unsupported IA type");
 			return (0); /* XXX */
@@ -2362,6 +2510,7 @@ calc_ia_timo(ia, ialist, client_conf)
 		}
 		switch (iatype) {
 		case DHCP6_LISTVAL_PREFIX6:
+		case DHCP6_LISTVAL_STATEFULADDR6:
 			if (base == DHCP6_DURATITION_INFINITE ||
 			    iav->val_prefix6.pltime < base)
 				base = iav->val_prefix6.pltime;
@@ -2371,6 +2520,7 @@ calc_ia_timo(ia, ialist, client_conf)
 
 	switch (iatype) {
 	case DHCP6_LISTVAL_PREFIX6:
+	case DHCP6_LISTVAL_STATEFULADDR6:
 		/*
 		 * Configure the timeout parameters as recommended in
 		 * Section 8 of dhcpv6-opt-prefix-delegation-01.
@@ -2414,6 +2564,7 @@ update_binding_duration(binding)
 
 			switch (binding->iatype) {
 			case DHCP6_LISTVAL_IAPD:
+			case DHCP6_LISTVAL_IANA:
 				lifetime = iav->val_prefix6.vltime;
 				break;
 			default:
@@ -2614,6 +2765,7 @@ binding_timo(arg)
 
 			switch (binding->iatype) {
 			case DHCP6_LISTVAL_IAPD:
+			case DHCP6_LISTVAL_IANA:
 				lifetime = iav->val_prefix6.vltime;
 				break;
 			default:
@@ -2691,6 +2843,9 @@ bindingstr(binding)
 		switch (binding->iatype) {
 		case DHCP6_LISTVAL_IAPD:
 			iatype = "PD";
+			break;
+		case DHCP6_LISTVAL_IANA:
+			iatype = "NA";
 			break;
 		}
 

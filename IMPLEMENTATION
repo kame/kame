@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.380 2004/12/09 12:28:11 t-momose Exp $
+	$KAME: IMPLEMENTATION,v 1.381 2005/01/12 06:06:10 suz Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -193,9 +193,9 @@ RFC3152: Delegation of IP6.ARPA
       lookups.
 RFC3315: Dynamic Host Configuration Protocol for IPv6 (DHCPv6)
     * the implementation is quite compliant to the specification for prefix
-      delegation and stateless services.  However, it intentionally
-      drops the support of one very essential feature in the
-      specification: address assignment.
+      delegation, stateless services, and non-temporary address assignment.
+      However, it intentionally drops the support of temporary address 
+      assignment.
 RFC3319: Dynamic Host Configuration Protocol (DHCPv6) Options 
          for Session Initiation Protocol (SIP) Servers
 RFC3376: Internet Group Management Protocol, Version 3
@@ -699,7 +699,7 @@ See 1.2 in the document for relationship between DAD and autoconfiguration.
 We supply an "incomplete" implementation of DHCPv6 server, client, and
 relay agent in kame/dhcp6.  While the implementation supports many
 features of the DHCPv6 standard, it is still called "incomplete"
-because it does NOT implement address lease/release.
+because it does not implement temporary address lease/release.
 
 DHCPv6 and autoconfiguration also needs more work.  The "Managed" bit
 in RA has no special effect to the stateful autoconfiguration

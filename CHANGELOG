@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2713 2005/01/10 12:12:07 suz Exp $
+$KAME: CHANGELOG,v 1.2714 2005/01/12 06:06:09 suz Exp $
 
 <200501>
+2005-01-12  suz@crl.hitachi.co.jp
+	* kame/kame/dhcp6: implemented stateful non-temporary address 
+	  assignment.
+
 2005-01-10  suz@crl.hitachi.co.jp
 	* kame/sys/netkey/key.c: fixed an unexpected addr/port matching failure
 	  in SA management.
