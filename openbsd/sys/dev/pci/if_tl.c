@@ -2154,7 +2154,7 @@ tl_attach(parent, self, aux)
 	ifp->if_start = tl_start;
 	ifp->if_watchdog = tl_watchdog;
 	ifp->if_baudrate = 10000000;
-	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
+	IFQ_SET_MAXLEN(&ifp->if_snd, TL_TX_LIST_CNT - 1);
 	IFQ_SET_READY(&ifp->if_snd);
 	bcopy(sc->sc_dev.dv_xname, ifp->if_xname, IFNAMSIZ);
 
