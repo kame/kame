@@ -448,8 +448,8 @@ udp_input(m, va_alist)
 					opts = NULL;
 #ifdef INET6
 					if (ipv6 && (inp->inp_flags & IN6P_CONTROLOPTS)) {
-						ip6_savecontrol(inp, ipv6, n,
-								&opts6, NULL);
+						ip6_savecontrol(inp, ipv6,
+								n, &opts6);
 						opts = opts6.head;
 					}
 #endif /* INET6 */
@@ -494,7 +494,7 @@ udp_input(m, va_alist)
 		opts = NULL;
 #ifdef INET6
 		if (ipv6 && (inp->inp_flags & IN6P_CONTROLOPTS)) {
-			ip6_savecontrol(inp, ipv6, m, &opts6, NULL);
+			ip6_savecontrol(inp, ipv6, m, &opts6);
 			opts = opts6.head;
 		}
 #endif /* INET6 */
@@ -601,7 +601,7 @@ udp_input(m, va_alist)
 	opts = NULL;
 #ifdef INET6
 	if (ipv6 && (inp->inp_flags & IN6P_CONTROLOPTS)) {
-		ip6_savecontrol(inp, ipv6, m, &opts6, NULL);
+		ip6_savecontrol(inp, ipv6, m, &opts6);
 		opts = opts6.head;
 	}
 #endif /* INET6 */

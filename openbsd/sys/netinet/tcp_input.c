@@ -719,7 +719,7 @@ findpcb:
 			inp->inp_options = 0;
 		}
 #if 0
-		ip6_savecontrol(inp, &inp->inp_options, ipv6, m);
+		ip6_savecontrol(inp, &inp->inp_options, ipv6);
 #endif
 	}
 #endif
@@ -905,7 +905,7 @@ findpcb:
 		struct ip6_recvpktopts opts;
 
 		bzero(&opts, sizeof(opts));
-		ip6_savecontrol(inp, ipv6, m, &opts, &inp->inp_inputopts6);
+		ip6_savecontrol(inp, ipv6, m, &opts);
 		if (inp->inp_inputopts6)
 			ip6_update_recvpcbopt(inp->inp_inputopts6, &opts);
 		if (opts.head) {
