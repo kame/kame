@@ -464,7 +464,7 @@ main(argc, argv)
 			if (af == AF_INET || af == AF_UNSPEC)
 				mroutepr(nl[N_MFCTABLE].n_value,
 					 nl[N_VIFTABLE].n_value);
-			else if (af == AF_INET6 || af == AF_UNSPEC)
+			if (af == AF_INET6 || af == AF_UNSPEC)
 				mroute6pr(nl[N_MF6CTABLE].n_value,
 					  nl[N_MIF6TABLE].n_value);
 		}
