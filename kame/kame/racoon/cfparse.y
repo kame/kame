@@ -664,9 +664,24 @@ remote_statement
 
 			/* DH group settting if aggressive mode is there. */
 			if (check_etypeok(cur_rmconf, ISAKMP_ETYPE_AGG) != NULL) {
+				struct isakmpsa *p;
+				int b = 0;
+
+				/* DH group */
+				for (p = cur_rmconf->proposal; p; p = p->next) {
+					if (b == 0 || (b && b == p->dh_group)) {
+						b = p->dh_group;
+						continue;
+					}
+					yyerror("DH group must be equal "
+						"to each proposals's "
+						"when aggressive mode.\n");
+					return -1;
+				}
+				cur_rmconf->dh_group = b;
+
 				if (cur_rmconf->dh_group == 0) {
-					yyerror("DH group must be required "
-						"in aggressive mode.\n");
+					yyerror("DH group must be required.\n");
 					return -1;
 				}
 
@@ -714,7 +729,12 @@ remote_spec
 			cur_rmconf->identtype = idtype2doi($2);
 		}
 	|	NONCE_SIZE NUMBER EOS { cur_rmconf->nonce_size = $2; }
-	|	DH_GROUP dh_group_num EOS { cur_rmconf->dh_group = $2; }
+	|	DH_GROUP
+		{
+			yyerror("dh_group cannot be defined here.");
+			return -1;
+		}
+		dh_group_num EOS
 	|	KEEPALIVE EOS { cur_rmconf->keepalive = TRUE; }
 	|	LIFETIME LIFETYPE NUMBER UNITTYPE EOS
 		{
@@ -1207,10 +1227,6 @@ set_isakmp_proposal(rmconf, prspec)
 	int trns_no = 1;
 	u_int32_t types[MAXALGCLASS];
 
-	/*
-	 * XXX When aggressive mode, all DH type in each proposal MUST be
-	 * checked whether equal
-	 */
 	p = prspec;
 	if (p->next != 0) {
 		plog(logp, LOCATION, NULL,
@@ -1218,8 +1234,19 @@ set_isakmp_proposal(rmconf, prspec)
 		return -1;
 	}
 
+	/* mandatory check */
+	for (s = p->spspec; s != NULL; s = s->next) {
+		/* XXX need more to check */
+		if (s->algclass[algclass_isakmp_dh] == 0) {
+			yyerror("DH group required.");
+			return -1;
+		}
+	}
+
+	/* skip to last part */
 	for (s = p->spspec; s->next != NULL; s = s->next)
 		;
+
 	while (s != NULL) {
 		YIPSDEBUG(DEBUG_CONF,
 			printf("lifetime = %ld\n", (long)
