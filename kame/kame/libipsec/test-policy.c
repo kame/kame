@@ -83,6 +83,7 @@ int test1 __P((void));
 int test1sub1 __P((struct req_t *req));
 int test1sub2 __P((char *buf, int family));
 int test2 __P((void));
+int test2sub __P((int so));
 
 int
 main(ac, av)
@@ -217,15 +218,21 @@ int
 test2()
 {
 	int so;
-	char *pol;
-	int len;
+	char *pol1 = "out ipsec";
+	char *pol2 = "out ipsec ah/transport//use";
+	char *sp1, *sp2;
+	int splen1, splen2;
+	int spid;
+	struct sadb_msg *m;
 
 	printf("TEST2\n");
 	if (getuid() != 0)
 		errx(1, "root privilege required.\n");
 
-	pol = ipsec_set_policy(reqs[0].str, strlen(reqs[0].str));
-	len = ipsec_get_policylen(pol);
+	sp1 = ipsec_set_policy(pol1, strlen(pol1));
+	splen1 = ipsec_get_policylen(sp1);
+	sp2 = ipsec_set_policy(pol2, strlen(pol2));
+	splen2 = ipsec_get_policylen(sp2);
 
 	if ((so = pfkey_open()) < 0)
 		errx(1, "ERROR: %s\n", ipsec_strerror());
@@ -233,44 +240,75 @@ test2()
 	printf("spdflush()\n");
 	if (pfkey_send_spdflush(so) < 0)
 		errx(1, "ERROR: %s\n", ipsec_strerror());
-
+	m = pfkey_recv(so);
+	free(m);
+	
 	printf("spdsetidx()\n");
 	if (pfkey_send_spdsetidx(so, (struct sockaddr *)addr, 128,
 				(struct sockaddr *)addr, 128,
-				255, pol, len, 0) < 0)
+				255, sp1, splen1, 0) < 0)
 		errx(1, "ERROR: %s\n", ipsec_strerror());
-
-	printf("spdget()\n");
-	if (pfkey_send_spdupdate(so, (struct sockaddr *)addr, 128,
-				(struct sockaddr *)addr, 128,
-				255, pol, len, 0) < 0)
-		errx(1, "ERROR: %s\n", ipsec_strerror());
-
+	m = pfkey_recv(so);
+	free(m);
+	
 	printf("spdupdate()\n");
 	if (pfkey_send_spdupdate(so, (struct sockaddr *)addr, 128,
 				(struct sockaddr *)addr, 128,
-				255, pol, len, 0) < 0)
+				255, sp2, splen2, 0) < 0)
 		errx(1, "ERROR: %s\n", ipsec_strerror());
-
-	printf("spdget()\n");
-	if (pfkey_send_spdupdate(so, (struct sockaddr *)addr, 128,
-				(struct sockaddr *)addr, 128,
-				255, pol, len, 0) < 0)
-		errx(1, "ERROR: %s\n", ipsec_strerror());
+	m = pfkey_recv(so);
+	free(m);
 
 	printf("spddelete()\n");
 	if (pfkey_send_spddelete(so, (struct sockaddr *)addr, 128,
 				(struct sockaddr *)addr, 128,
-				255, pol, len, 0) < 0)
+				255, sp1, splen1, 0) < 0)
 		errx(1, "ERROR: %s\n", ipsec_strerror());
+	m = pfkey_recv(so);
+	free(m);
+
+	printf("spdadd()\n");
+	if (pfkey_send_spdadd(so, (struct sockaddr *)addr, 128,
+				(struct sockaddr *)addr, 128,
+				255, sp2, splen2, 0) < 0)
+		errx(1, "ERROR: %s\n", ipsec_strerror());
+	spid = test2sub(so);
+
+	printf("spdget(%u)\n", spid);
+	if (pfkey_send_spdget(so, spid) < 0)
+		errx(1, "ERROR: %s\n", ipsec_strerror());
+	m = pfkey_recv(so);
+	free(m);
+
+	printf("spddelete2()\n");
+	if (pfkey_send_spddelete2(so, spid) < 0)
+		errx(1, "ERROR: %s\n", ipsec_strerror());
+	m = pfkey_recv(so);
+	free(m);
 
 	/* expecting failure */
 	printf("spdupdate()\n");
 	if (pfkey_send_spdupdate(so, (struct sockaddr *)addr, 128,
 				(struct sockaddr *)addr, 128,
-				255, pol, len, 0) == 0) {
+				255, sp2, splen2, 0) == 0) {
 		errx(1, "ERROR: expecting failure.\n");
 	}
 
 	return 0;
 }
+
+int
+test2sub(so)
+	int so;
+{
+	struct sadb_msg *msg;
+	caddr_t mhp[SADB_EXT_MAX + 1];
+
+	if ((msg = pfkey_recv(so)) == NULL)
+		errx(1, "ERROR: pfkey_recv failure.\n");
+	if (pfkey_align(msg, mhp) < 0)
+		errx(1, "ERROR: pfkey_align failure.\n");
+
+	return ((struct sadb_x_policy *)mhp[SADB_X_EXT_POLICY])->sadb_x_policy_id;
+}
+
