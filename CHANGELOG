@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.659 2000/03/07 02:25:23 jinmei Exp $
+$Id: CHANGELOG,v 1.660 2000/03/07 02:36:50 sakane Exp $
 
 <200003>
+Tue Mar  7 11:36:03 JST 2000 sakane@ydc.co.jp
+	* kame/sys/netkey/key.c:
+	enable SADB_X_SPDSETIDX.  It can set a policy index into SPD.
+
 2000-03-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6dd/pim6.c (init_pim6): corrected the initilization
 	process so that pim6dd does not access to NULL pointers.
