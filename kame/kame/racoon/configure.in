@@ -142,6 +142,68 @@ if test "$ac_cv_pfkey" = yes; then
         OPTFLAG="-DHAVE_PFKEYV2 $OPTFLAG"
 fi
 
+ipsectype=unknown
+ipseclib=none
+ipsectrylibc=no
+ipseclibdir=none
+AC_MSG_CHECKING([ipsec library path])
+for i in inria kame; do
+	case $i in
+	inria)
+		dnl http://www.kame.net/
+		AC_EGREP_CPP(yes, [dnl
+#include <netinet/in.h>
+#ifdef IPV6_INRIA_VERSION
+yes
+#endif],
+			[ipsectype=$i;
+			ipseclib=ipsec;
+			ipseclibdir=/usr/lib])
+		;;
+	kame)
+		dnl http://www.kame.net/
+		AC_EGREP_CPP(yes, [dnl
+#include <netinet/in.h>
+#ifdef __KAME__
+yes
+#endif],
+			[ipsectype=$i;
+			ipseclib=ipsec;
+			ipseclibdir=/usr/local/v6/lib])
+		;;
+	esac
+	if test "$ipsectype" != "unknown"; then
+		break
+	fi
+done
+AC_MSG_RESULT($ipseclibdir)
+
+dnl this is gross, but we need to invoke either AC_CHECK LIB or AC_CHECK_FUNCS.
+if test "$ipseclib" != "none"; then
+	if test "$ipseclibdir" != "none"; then
+		echo "using lib$ipseclib"
+		dnl don't check items that require get{addr,name}info
+		AC_CHECK_LIB($ipseclib, ipsec_strerror,
+			[LIBS="$LIBS -L$ipseclibdir -l$ipseclib"],
+			[echo "Fatal: no ipsec library found."; exit 1],
+			[-L$ipseclibdir])
+	else
+		if test "$ipsectrylibc" = "yes"; then
+			echo 'using libc'
+			AC_CHECK_FUNCS(ipsec_strerror, [],
+				[echo "Fatal: no ipsec library found."; exit 1])
+		else
+			echo "Fatal: no $ipseclib library found.  "
+			echo "cannot continue.  You need to fetch lib$ipseclib.a "
+			echo "from appropriate ipsec kit and compile beforehand."
+			exit 1
+		fi
+	fi
+else
+	AC_CHECK_FUNCS(ipsec_strerror, [],
+		[echo "Fatal: no ipsec library found."; exit 1])
+fi
+
 AC_MSG_CHECKING([whether to enable ipv6])
 AC_ARG_ENABLE(ipv6,
 [  --enable-ipv6           Enable ipv6 (with ipv4) support
@@ -180,8 +242,8 @@ main()
 
 ipv6type=unknown
 ipv6lib=none
-ipseclib=none
 ipv6trylibc=no
+ipv6libdir=none
 
 if test "$ipv6" = "yes"; then
 	AC_MSG_CHECKING([ipv6 stack type])
@@ -196,7 +258,6 @@ yes
 #endif],
 				[ipv6type=$i;
 				ipv6lib=inet6;
-				ipseclib=ipsec;
 				ipv6libdir=/usr/lib;
 				ipv6trylibc=yes
 				CPPFLAGS="-DINET6 $CPPFLAGS"])
@@ -210,7 +271,6 @@ yes
 #endif],
 				[ipv6type=$i;
 				ipv6lib=inet6;
-				ipseclib=ipsec;
 				ipv6libdir=/usr/local/v6/lib;
 				ipv6trylibc=yes
 				CPPFLAGS="-DINET6 $CPPFLAGS"])
@@ -220,7 +280,6 @@ yes
 			if test -d /usr/inet6; then
 				ipv6type=$i
 				ipv6lib=inet6
-				ipseclib=ipsec
 				ipv6libdir=/usr/inet6/lib
 				CPPFLAGS="-DINET6 -I/usr/inet6/include $CPPFLAGS"
 			fi
@@ -233,7 +292,6 @@ yes
 #endif],
 				[ipv6type=$i;
 				ipv6lib=inet6;
-				ipseclib=ipsec;
 				ipv6libdir=/usr/local/v6/lib;
 				CPPFLAGS="-DINET6 $CPPFLAGS"])
 			;;
@@ -245,7 +303,6 @@ yes
 #endif],
 				[ipv6type=$i;
 				ipv6lib=v6;
-				ipseclib=ipsec;
 				ipv6libdir=/usr/local/v6/lib;
 				CPPFLAGS="-I/usr/local/v6/include $CPPFLAGS"])
 			;;
@@ -257,7 +314,6 @@ yes
 #endif],
 				[ipv6type=$i;
 				ipv6lib=inet6;
-				ipseclib=ipsec;
 				ipv6libdir=/usr/local/v6/lib;
 				CPPFLAGS="-DINET6 $CPPFLAGS"])
 			;;
@@ -270,14 +326,6 @@ yes
 fi
 
 if test "$ipv6" = "yes" -a "$ipv6lib" != "none"; then
-	if test -d $ipv6libdir -a -f $ipv6libdir/lib$ipseclib.a; then
-		LIBS="$LIBS -L$ipv6libdir -l$ipseclib"
-	else
-		echo "Fatal: no $ipseclib library found.  "
-		echo "cannot continue.  You need to fetch lib$ipv6lib.a "
-		echo "from appropriate ipv6 kit and compile beforehand."
-		exit 1
-	fi
 	if test -d $ipv6libdir -a -f $ipv6libdir/lib$ipv6lib.a; then
 		echo "using lib$ipv6lib for getaddrinfo"
 		LIBS="$LIBS -L$ipv6libdir -l$ipv6lib"
