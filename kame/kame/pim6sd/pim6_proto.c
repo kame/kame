@@ -3873,13 +3873,16 @@ receive_pim6_cand_rp_adv(src, dst, pim_message, datalen)
     pim6_encod_grp_addr_t 	encod_grp_addr;
     u_int8         		*data_ptr;
     struct in6_addr         	grp_mask;
-	struct sockaddr_in6		group_,
-							rpp_;
+    struct sockaddr_in6		group_, rpp_;
 
     /* if I am not the bootstrap RP, then do not accept the message */
     if ((cand_bsr_flag != FALSE) && 
 	!inet6_equal(&curr_bsr_address, &my_bsr_address))
     {
+	log(LOG_NOTICE, 0,
+	    "receive_pim6_cand_rp_adv: receive cand_RP from %s "
+	    "but I'm not the BSR",
+	    inet6_fmt(&src->sin6_addr));
 	return (FALSE);
     }
 
@@ -3949,22 +3952,17 @@ send_pim6_cand_rp_adv()
     struct in6_addr  		grp_mask;
     pim6_encod_grp_addr_t 	encod_grp_addr;
     u_int8         		*data_ptr;
-	struct sockaddr_in6		group_;
-
-
+    struct sockaddr_in6		group_;
 
     if (!inet6_valid_host(&curr_bsr_address))
 	return (FALSE);		/* No BSR yet */
 
     if( inet6_equal(&curr_bsr_address, &my_bsr_address))
     {
-
 	/* I am the BSR and have to include my own group_prefix stuff */
 	prefix_cnt = *cand_rp_adv_message.prefix_cnt_ptr;
 	if (prefix_cnt == 0)
 	{
-
-
 	    /* The default ff00:: and masklen of 8 */
 	    MASKLEN_TO_MASK6(ALL_MCAST_GROUPS_LENGTH, grp_mask);
 	    add_rp_grp_entry(&cand_rp_list, &grp_mask_list,
