@@ -1,0 +1,7 @@
+#!/bin/sh
+#
+# $FreeBSD: ports/irc/irc/scripts/pre-configure,v 1.3 1999/08/29 11:32:37 peter Exp $
+#
+
+mv ${WRKSRC}/support/config.h.dist ${WRKSRC}/support/config.h.dist.bak.2
+sed <${WRKSRC}/support/config.h.dist.bak.2 >${WRKSRC}/support/config.h.dist s+!!SYSLOG_FACILITY!!+$SYSLOG_FACILITY+g
