@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.224 2001/09/26 06:13:02 keiichi Exp $	*/
+/*	$KAME: ip6_input.c,v 1.225 2001/10/16 05:09:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -661,7 +661,7 @@ ip6_input(m)
 	 * The following check is not documented in specs.  A malicious
 	 * party may be able to use IPv4 mapped addr to confuse tcp/udp stack
 	 * and bypass security checks (act as if it was from 127.0.0.1 by using
-	 * IPv6 src ::ffff:127.0.0.1).	Be cautious.
+	 * IPv6 src ::ffff:127.0.0.1).  Be cautious.
 	 *
 	 * This check chokes if we are in an SIIT cloud.  As none of BSDs
 	 * support IPv4-less kernel compilation, we cannot support SIIT
