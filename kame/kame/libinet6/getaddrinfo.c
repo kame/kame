@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.134 2002/06/29 12:19:44 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.135 2002/07/01 07:22:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -273,7 +273,7 @@ static int addrconfig __P((int));
 static void set_source __P((struct ai_order *, struct policyhead *));
 static int comp_dst __P((const void *, const void *));
 #ifdef INET6
-static int ip6_str2scopeid __P((char *, struct sockaddr_in6 *));
+static u_int32_t ip6_str2scopeid __P((char *, struct sockaddr_in6 *));
 #endif
 static int gai_addr2scopetype __P((struct sockaddr *));
 
@@ -423,7 +423,7 @@ str_isnumber(p)
 		return NO;
 	ep = NULL;
 	(void)strtoul(p, &ep, 10);
-	if (ep && *ep == '\0')
+	if (errno == 0 && ep && *ep == '\0')
 		return YES;
 	else
 		return NO;
@@ -1485,7 +1485,7 @@ explore_numeric_scope(pai, hostname, servname, res)
 
 	error = explore_numeric(pai, addr, servname, res);
 	if (error == 0) {
-		int scopeid;
+		u_int32_t scopeid;
 
 		for (cur = *res; cur; cur = cur->ai_next) {
 			if (cur->ai_family != AF_INET6)
@@ -1718,12 +1718,13 @@ addrconfig(af)
 
 #ifdef INET6
 /* convert a string to a scope identifier. XXX: IPv6 specific */
-static int
+static u_int32_t
 ip6_str2scopeid(scope, sin6)
 	char *scope;
 	struct sockaddr_in6 *sin6;
 {
-	int scopeid;
+	u_int32_t scopeid;
+	u_long lscopeid;
 	struct in6_addr *a6 = &sin6->sin6_addr;
 	char *ep;
 
@@ -1754,8 +1755,9 @@ ip6_str2scopeid(scope, sin6)
 
 	/* try to convert to a numeric id as a last resort */
 trynumeric:
-	scopeid = (int)strtoul(scope, &ep, 10);
-	if (*ep == '\0')
+	lscopeid = strtoul(scope, &ep, 10);
+	scopeid = lscopeid & 0xffffffff;
+	if (errno == 0 && ep && *ep == '\0' && scopeid == lscopeid)
 		return scopeid;
 	else
 		return -1;
