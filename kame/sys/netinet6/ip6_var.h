@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.109 2003/04/09 09:28:19 suz Exp $	*/
+/*	$KAME: ip6_var.h,v 1.110 2003/06/19 07:48:45 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -185,8 +185,8 @@ struct	ip6_pktopts {
 #define IP6PO_TEMPADDR_PREFER	 1 /* prefer temporary address */
 
 	int ip6po_flags;
-#define IP6PO_REACHCONF	0x01	/* upper-layer reachability confirmation */
-#if 0				/* obsoleted; do not reuse the value */
+#if 0	/* parameters in this block is obsolete. do not reuse the values. */
+#define IP6PO_REACHCONF	0x01	/* upper-layer reachability confirmation. */
 #define IP6PO_MINMTU	0x02	/* use minimum MTU (IPV6_USE_MIN_MTU) */
 #endif
 #define IP6PO_DONTFRAG	0x04	/* disable fragmentation (IPV6_DONTFRAG) */

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.372 2003/06/17 11:11:15 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.373 2003/06/19 07:48:44 jinmei Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1303,12 +1303,6 @@ skip_ipsec2:;
 	 */
 	if (ifpp)
 		*ifpp = origifp;
-
-	/*
-	 * Upper-layer reachability confirmation
-	 */
-	if (opt && (opt->ip6po_flags & IP6PO_REACHCONF))
-		nd6_nud_hint(rt, NULL, 0);
 
 	/* Determine path MTU. */
 	if ((error = ip6_getpmtu(ro_pmtu, ro, ifp, &finaldst_sa, &mtu,
@@ -4504,7 +4498,6 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		case IPV6_DSTOPTS:
 		case IPV6_RTHDRDSTOPTS:
 		case IPV6_RTHDR:
-		case IPV6_REACHCONF:
 		case IPV6_USE_MIN_MTU:
 		case IPV6_DONTFRAG:
 		case IPV6_OTCLASS:
@@ -4820,29 +4813,6 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		break;
 	}
 
-	case IPV6_REACHCONF:
-		if (!cmsg)
-			return (ENOPROTOOPT);
-
-#if 0
-		/*
-		 * it looks dangerous to allow IPV6_REACHCONF to
-		 * normal user.  it affects the ND state (system state)
-		 * and can affect communication by others - jinmei
-		 */
-		if (!priv)
-			return (EPERM);
-#else
-		/*
-		 * we limit max # of subsequent userland reachability
-		 * conformation by using ln->ln_byhint.
-		 */
-#endif
-		if (len)
-			return (EINVAL);
-		opt->ip6po_flags |= IP6PO_REACHCONF;
-		break;
-
 	case IPV6_USE_MIN_MTU:
 		if (len != sizeof(int))
 			return (EINVAL);
@@ -4881,6 +4851,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg, uproto)
 		opt->ip6po_prefer_tempaddr = preftemp;
 		break;
 
+	case IPV6_REACHCONF:	/* obsolete */
 	default:
 		return (ENOPROTOOPT);
 	} /* end of switch */
