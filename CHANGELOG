@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1580 2001/03/01 23:55:27 itojun Exp $
+$KAME: CHANGELOG,v 1.1581 2001/03/02 07:12:46 itojun Exp $
 
 <200103>
+Fri Mar  2 16:11:17 JST 2001  itojun@iijlab.net
+	* sys/crypto/{twofish,rijndael}: change key initialization API to
+	  pass binary keys instead of hexadecimal string keys.
+
 Fri Mar  2 01:48:24 JST 2001  itojun@iijlab.net
 	* sys/netinet/ip_input.c (all *bsd): drop packets from outside
 	  if these contain 127/8 in ip_src or ip_dst.
