@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.72 2002/09/17 06:58:20 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.73 2002/11/19 04:17:49 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -165,7 +165,11 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
 		}
 	} else {
 		/* in case of regular packet */
-		if ((cv6.ats = natpt_lookForHash6(&cv6)) == NULL) {
+		cv6.ats = natpt_lookForHash6(&cv6);
+		if ((cv6.ats == NULL)
+		    && (cv6.ip_p == IPPROTO_ICMPV6)
+		    && (cv6.pyld.icmp6->icmp6_type != ICMP6_ECHO_REQUEST)
+		    && (cv6.pyld.icmp6->icmp6_type != ICMP6_ECHO_REPLY)) {
 			cv6.ats = natpt_checkICMP6return(&cv6);
 		}
 
@@ -351,7 +355,17 @@ natpt_config6(struct mbuf *m, struct pcv *cv6)
 		cv6->ip_p = proto;
 		cv6->pyld.caddr = tcpudp;
 		cv6->poff = offset;
-		cv6->plen = (caddr_t)m->m_data + m->m_len - cv6->pyld.caddr;
+
+		/*
+		 * There is a case m->m_len is greater than real packet size
+		 * calculated from ipv6 header.
+		 *
+		 * cv6->plen = (caddr_t)m->m_data + m->m_len - cv6->pyld.caddr;
+		 */
+
+		cv6->plen = htons(cv6->ip.ip6->ip6_plen) -
+			(cv6->pyld.caddr - (caddr_t)m->m_data - sizeof(struct ip6_hdr));
+
 		return (proto);
 	}
 
