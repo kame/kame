@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.28 2000/02/18 16:58:17 itojun Exp $
+	$Id: PORTABILITY,v 1.29 2000/02/19 13:49:28 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -226,6 +226,15 @@ across those possibilities.
 	for use from sysctl(8).
   BSDI: similar to OpenBSD/NetBSD, but sysctl_int_arr() makes xx_sysctl()
 	code much easier for simple integer leaf nodes.
+
+- Under BSD make tree (bsd.prog.mk), you can't use relative path against
+  include files, like the following example:
+	#include "../foo/foo.h"		/*THIS DOES NOT WORK*/
+  If you are in baa/Makefile, and if you do "make obj", you will be in
+  baa/obj when you build the tree.  ../foo/foo.h will not be reachable
+  (it will be interpreted as baa/obj/../foo/foo.h = baa/foo/foo.h)
+
+  Solution: use -I${.CURDIR}/../foo.
 
 - Developers are advised to use pedantic compilation options (like -Wall
   -Werror).  To configure default make settings, /etc/make.conf (freebsd),
