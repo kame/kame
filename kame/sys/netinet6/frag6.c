@@ -1,4 +1,4 @@
-/*	$KAME: frag6.c,v 1.41 2002/05/28 10:24:24 itojun Exp $	*/
+/*	$KAME: frag6.c,v 1.42 2002/05/30 04:08:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -157,12 +157,14 @@ frag6_init()
 {
 #ifdef __bsdi__
 	struct timeval tv;
+#endif
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 	ip6_maxfragpackets = nmbclusters / 4;
 	ip6_maxfrags = nmbclusters / 4;
 #endif
 
+#ifdef __bsdi__
 	/*
 	 * in many cases, random() here does NOT return random number
 	 * as initialization during bootstrap time occur in fixed order.
