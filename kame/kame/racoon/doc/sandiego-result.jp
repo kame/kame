@@ -41,6 +41,10 @@ vs ericsson
 	delete payloadを受けてもこっちはphase 1を保持しつづけているが、
 	あっちはphase 1もきれたと思ってる。
 
+vs ibm
+	先方で試したところ、agressive modeにinterop issueがあるらしい。
+	13日にv4/v6ともテスト予定。
+
 テストするには
 	psk.txtにエントリ追加。
 	samples/Makefileに相手のentryを追加、生成。
