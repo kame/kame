@@ -16,7 +16,7 @@
  *
  * NEW command line interface for IP firewall facility
  *
- * $Id: ip6fw.c,v 1.2 1999/08/10 00:19:15 itojun Exp $
+ * $Id: ip6fw.c,v 1.3 1999/08/17 12:27:04 itojun Exp $
  *
  */
 
@@ -524,6 +524,7 @@ fill_ip6(ipno, mask, acp, avp)
 	int ac = *acp;
 	char **av = *avp;
 	char *p = 0, md = 0;
+	int i;
 
 	if (ac && !strncmp(*av,"any",strlen(*av))) {
 		*ipno = *mask = in6addr_any; av++; ac--;
@@ -550,10 +551,8 @@ fill_ip6(ipno, mask, acp, avp)
 				*mask = *(plen2mask(128));
 				break;
 		}
-		ipno->s6_addr32[0] &= mask->s6_addr32[0];
-		ipno->s6_addr32[1] &= mask->s6_addr32[1];
-		ipno->s6_addr32[2] &= mask->s6_addr32[2];
-		ipno->s6_addr32[3] &= mask->s6_addr32[3];
+		for (i = 0; i < sizeof(*ipno); i++)
+			ipno->s6_addr[i] &= mask->s6_addr[i];
 		av++;
 		ac--;
 	}

@@ -799,7 +799,7 @@ ftp_copycommand(int src, int dst, enum state *state)
 		sin6->sin6_len = sizeof(*sin6);
 		sin6->sin6_family = AF_INET6;
 		for (n = 0; n < 16; n++)
-			sin6->sin6_addr.s6_addr8[n] = ho[n];
+			sin6->sin6_addr.s6_addr[n] = ho[n];
 		sin6->sin6_port = htons(((po[0] & 0xff) << 8) | (po[1] & 0xff));
 
 sendport:

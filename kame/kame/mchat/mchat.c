@@ -590,7 +590,10 @@ cmd_secret(buf, sa)
 #ifdef __KAME__	/*should use advapi*/
 	switch (res->ai_family) {
 	case AF_INET6:
-		if (IN6_IS_ADDR_LINKLOCAL(&((struct sockaddr_in6 *)res->ai_addr)->sin6_addr)) {
+	    {
+		struct sockaddr_in6 *sin6;
+		sin6 = (struct sockaddr_in6 *)res->ai_addr;
+		if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
 			int ifindex;
 
 			if (!ifname) {
@@ -605,9 +608,11 @@ cmd_secret(buf, sa)
 					"if_nametoindex(%s) failed\n", ifname);
 				return 0;
 			}
-			((struct sockaddr_in6 *)res->ai_addr)->sin6_addr.s6_addr16[1] = htons(ifindex);
+			*(u_int16_t *)&sin6->sin6_addr.s6_addr[2] =
+				htons(ifindex);
 		}
 		break;
+	    }
 	}
 #endif
 

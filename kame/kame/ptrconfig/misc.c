@@ -28,7 +28,7 @@
 //# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 //# SUCH DAMAGE.
 //#
-//#	$Id: misc.c,v 1.1 1999/08/08 23:31:15 itojun Exp $
+//#	$Id: misc.c,v 1.2 1999/08/17 12:27:05 itojun Exp $
 //#
 //#------------------------------------------------------------------------
 */
@@ -286,7 +286,7 @@ in6_mask2len(struct in6_addr *mask)
 
     for (x = 0; x < sizeof(*mask); x++)
     {
-	if (mask->s6_addr8[x] != 0xff)
+	if (mask->s6_addr[x] != 0xff)
 	    break;
     }
     y = 0;
@@ -294,7 +294,7 @@ in6_mask2len(struct in6_addr *mask)
     {
 	for (y = 0; y < 8; y++)
 	{
-	    if ((mask->s6_addr8[x] & (0x80 >> y)) == 0)
+	    if ((mask->s6_addr[x] & (0x80 >> y)) == 0)
 		break;
 	}
     }
@@ -310,9 +310,9 @@ in6_len2mask(int len)
 
     bzero(&mask, sizeof(mask));
     for (i = 0; i < len / 8; i++)
-	mask.s6_addr8[i] = 0xff;
+	mask.s6_addr[i] = 0xff;
     if (len % 8)
-	mask.s6_addr8[i] = (0xff00 >> (len % 8)) & 0xff;
+	mask.s6_addr[i] = (0xff00 >> (len % 8)) & 0xff;
 
     return (&mask);
 }

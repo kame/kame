@@ -495,10 +495,10 @@ faith_prefix(struct sockaddr *dst)
 	if (sysctl(mib, 4, &faith_prefix, &size, NULL, 0) < 0)
 		exit_error("sysctl: %s", ERRSTR);
 
-	if (dst->sin6_addr.s6_addr32[0] == faith_prefix.s6_addr32[0]
-	 && dst->sin6_addr.s6_addr32[1] == faith_prefix.s6_addr32[1]
-	 && dst->sin6_addr.s6_addr32[2] == faith_prefix.s6_addr32[2])
+	if (memcmp(dst, &faith_prefix,
+			sizeof(struct in6_addr) - sizeof(struct in_addr) == 0) {
 		return 1;
+	}
 	return 0;
 #else
 	struct myaddrs *p;
@@ -540,7 +540,8 @@ map6to4(struct sockaddr_in6 *dst6, struct sockaddr_in *dst4)
 	dst4->sin_len = sizeof(*dst4);
 	dst4->sin_family = AF_INET;
 	dst4->sin_port = dst6->sin6_port;
-	dst4->sin_addr.s_addr = dst6->sin6_addr.s6_addr32[3];
+	memcpy(&dst4->sin_addr, &dst6->sin6_addr.s6_addr[12],
+		sizeof(dst4->sin_addr));
 
 	if (dst4->sin_addr.s_addr == INADDR_ANY
 	 || dst4->sin_addr.s_addr == INADDR_BROADCAST
@@ -724,8 +725,9 @@ grab_myaddrs()
 				if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)
 				 || IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr)) {
 					sin6->sin6_scope_id =
-						ntohs(sin6->sin6_addr.s6_addr16[1]);
-					sin6->sin6_addr.s6_addr16[1] = 0;
+						ntohs(*(u_int16_t *)&sin6->sin6_addr.s6_addr[2]);
+					sin6->sin6_addr.s6_addr[2] = 0;
+					sin6->sin6_addr.s6_addr[3] = 0;
 				}
 			}
 #endif
