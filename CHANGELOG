@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.362 1999/12/22 08:17:26 sakane Exp $
+$Id: CHANGELOG,v 1.363 1999/12/22 08:40:32 itojun Exp $
 
 <199912>
+Wed Dec 22 17:42:43 JST 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/mail/fetchmail: upgrade to 5.2.1.
+
 Wed Dec 22 17:16:21 JST 1999 sakane@ydc.co.jp
 	* kame/kame/setkey:
 	By default of manual keying, cyclic sequence number is allowed.
