@@ -79,8 +79,13 @@ $route add -inet6 fec0:: -prefixlen 10 ::1 -reject
 $route add -inet6 ::ffff:0.0.0.0 -prefixlen 96 ::1 -reject
 $route add -inet6 ::0.0.0.0 -prefixlen 96 ::1 -reject
 
-# disallow 6to4 destinations that map to IPv4 multicast destinations
+# disallow 6to4 destinations that result in invalid/suspicious IPv4 traffic
+# multicast
 $route add -inet6 2002:e000:: -prefixlen 20 ::1 -reject
+# unspecified
+$route add -inet6 2002:0000:0000:: -prefixlen 48 ::1 -reject
+# loopback - you may want to enable it for testing
+$route add -inet6 2002:7f00:0000:: -prefixlen 24 ::1 -reject
 
 if [ X"${ip6router}" = X"YES" ]; then
 	# act as a router
