@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.22 2004/02/06 07:29:07 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.23 2004/02/06 10:34:24 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2707,6 +2707,127 @@ in6_freemopt_source_list(msf, msf_head, msf_blkhead)
 	struct msf_head *msf_blkhead;
 {
 	in_freemopt_source_list(msf, msf_head, msf_blkhead);
+}
+
+/*
+ * check if the given IP address matches with the MSF (per-interface
+ * source filter). return 1/0 if matches/not matches, respectively.
+ */
+int
+match_msf6_per_if(in6m, src, dst)
+	struct in6_multi *in6m;
+	struct in6_addr *src;
+	struct in6_addr *dst;
+{
+	struct in6_multi_source *in6ms;
+	struct in6_addr_source *i6as;
+
+	in6ms = in6m->in6m_source;
+	/* in6ms is NULL only in case of ff02::1 and ffx{0,1}:: */
+	if (in6ms == NULL) {
+		/* assumes ffx{0,1} case has already been eliminated */
+		if (IN6_IS_LOCAL_GROUP(dst))
+			return 1;
+		mldlog((LOG_DEBUG, "grp found, but src is NULL. impossible"));
+		return 0;
+	}
+	if (in6ms->i6ms_grpjoin > 0)
+		return 1;
+
+	if (in6ms->i6ms_cur == NULL || in6ms->i6ms_cur->head == NULL)
+		return 0;
+
+	LIST_FOREACH(i6as, in6ms->i6ms_cur->head, i6as_list) {
+		if (i6as->i6as_addr.sin6_family != AF_INET6)
+			continue;
+
+		/* matching src address found */
+		if (SS_CMP(&i6as->i6as_addr.sin6_addr, ==, src)) {
+			if (in6ms->i6ms_mode == MCAST_INCLUDE)
+				return 1;
+			return 0;
+		}
+		/* matching src address not found */
+		if (SS_CMP(&i6as->i6as_addr.sin6_addr, >, src)) {
+			if (in6ms->i6ms_mode == MCAST_INCLUDE)
+				return 0;
+			return 1;
+		}
+	}
+	
+	/* no source-filter matched */
+	if (in6ms->i6ms_mode == MCAST_INCLUDE)
+		return 0;
+	return 1;
+}
+
+/*
+ * check if the given IP address matches with the MSF (per-socket
+ * source filter).  return 1/0 if matches/not matches, respectively.
+ */
+int
+match_msf6_per_socket(in6p, src, dst)
+	struct in6pcb *in6p;
+	struct in6_addr *src;
+	struct in6_addr *dst;
+{
+	struct sock_msf *msf;
+	struct ip6_moptions *im6o;
+	struct in6_multi_mship *imm;
+	struct sock_msf_source *msfsrc;
+	
+	if ((im6o = in6p->in6p_moptions) == NULL)
+		return 0;
+
+	for (imm = LIST_FIRST(&im6o->im6o_memberships); imm != NULL;
+	     imm = LIST_NEXT(imm, i6mm_chain)) {
+		if (SS_CMP(&imm->i6mm_maddr->in6m_addr, !=, dst))
+			continue;
+
+		msf = imm->i6mm_msf;
+		if (msf == NULL)
+			continue;
+
+		/* receive data from any source */
+		if (msf->msf_grpjoin != 0 && msf->msf_blknumsrc == 0)
+			return 1;
+
+		/* 1. search allow-list */
+		if (msf->msf_numsrc == 0)
+			goto search_block_list;
+		LIST_FOREACH(msfsrc, msf->msf_head, list) {
+			if (msfsrc->src.ss_family != AF_INET6)
+				continue;
+			if (SS_CMP(SIN6_ADDR(&msfsrc->src), <, src))
+				continue;
+			/* no match is expected by further lookup */
+			if (SS_CMP(SIN6_ADDR(&msfsrc->src), >, src))
+				break;
+			return 1;
+		}
+
+		/* 2. search_block_list */
+	search_block_list:
+		if (msf->msf_blknumsrc == 0)
+			goto end_of_search;
+		LIST_FOREACH(msfsrc, msf->msf_blkhead, list) {
+			if (msfsrc->src.ss_family != AF_INET6)
+				continue;
+			if (SS_CMP(&msfsrc->src, <, src))
+				continue;
+			/* no match is expected by further lookup */
+			if (SS_CMP(&msfsrc->src, >, src))
+				break;
+			return 0;
+		}
+		return 1;
+
+	end_of_search:
+		;
+	}
+
+	/* no group address matched */
+	return 0;
 }
 
 #ifdef __FreeBSD__

@@ -1,4 +1,4 @@
-/* $KAME: in6_msf.h,v 1.5 2004/02/02 13:11:39 suz Exp $	*/
+/* $KAME: in6_msf.h,v 1.6 2004/02/06 10:34:25 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -132,5 +132,9 @@ void	in6_freemopt_source_list(struct sock_msf *, struct msf_head *, struct msf_h
 void	in6_cleanmopt_source_addr(struct sock_msf *, int);
 void	in6_undomopt_source_addr(struct sock_msf *, int);
 void	in6_undomopt_source_list(struct sock_msf *, u_int);
+int	match_msf6_per_if(struct in6_multi *, struct in6_addr *,
+			  struct in6_addr *);
+int	match_msf6_per_socket(struct in6pcb *, struct in6_addr *,
+			      struct in6_addr *);
 #endif /* _KERNEL */
 #endif /* _NETINET6_IN6MSF_H_ */
