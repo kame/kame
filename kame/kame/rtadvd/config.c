@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.56 2001/10/30 04:50:07 sumikawa Exp $	*/
+/*	$KAME: config.c,v 1.57 2001/11/16 09:33:20 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -47,9 +47,6 @@
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
-#ifdef MIP6
-#include <netinet6/mip6.h>
-#endif
 
 #include <arpa/inet.h>
 
