@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.40 2003/10/16 08:50:46 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.41 2003/10/16 08:54:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1414,11 +1414,15 @@ mip6_get_nodekey(index, nodekey)
 	mip6_nodekey_t *nodekey_head;
 
 	offset = index - nonce_index;
-	if (offset > 0)
+	if (offset > 0) {
+		/* nonce_index was wrapped. */
 		offset = offset - 0xffff;
+	}
 
-	if (offset < -MIP6_NONCE_HISTORY)
+	if (offset < -MIP6_NONCE_HISTORY) {
+		/* too old index. */
 		return (-1);
+	}
 		
 	if (nonce_head + offset < mip6_nonce)
 		offset = nonce_head - mip6_nonce - offset;
