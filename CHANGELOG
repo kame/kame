@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1609 2001/03/20 02:57:25 itojun Exp $
+$KAME: CHANGELOG,v 1.1610 2001/03/20 13:11:52 fujisawa Exp $
 
 <200103>
+2001-03-20  Shin'ichi Fujisawa  <shin@loquat.rant.net>
+	* Put IPPROTO_UDP into IPv6 header.
+	  Because conversion of IP header part is shared with TCP, default
+	  protocol was set as TCP.
+	* Calculate UDP checksum which was converted to IPv6.
+	  I forgot to re-calculate it.
+
 Tue Mar 20 11:56:08 JST 2001  itojun@iijlab.net
 	* sys/netinet6/icmp6.c: change interpretation of
 	  net.inet6.icmp6.nodeinfo from true/false to bitmap.
