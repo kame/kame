@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.88 2000/07/15 04:55:49 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.89 2000/07/15 09:02:42 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -694,7 +694,7 @@ ipsecdoi_checkph2proposal(iph2)
 	if (cmp_aproppair(rpair[n], spair[n])) {
 		YIPSDEBUG(DEBUG_SA,
 			plog(logp, LOCATION, NULL,
-			"ERROR: no proposal mismathed.\n"));
+			"ERROR: proposal mismathed.\n"));
 		goto end;
 	}
 
