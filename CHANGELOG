@@ -1,7 +1,18 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2002 2001/12/11 21:55:55 jinmei Exp $
+$KAME: CHANGELOG,v 1.2003 2001/12/12 13:22:41 fujisawa Exp $
 
 <200112>
+2001-12-12 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_{dispatch,tslot,var}.[ch]:
+	- Support translation from ICMPv6 that occurred with IPv6 host
+	  into ICMPv4 in "IPv4->IPv6" translation.
+
+	  This translation is done even if there is no "IPv6->IPv4"
+	  translation rule, but only this ICMPv6 packet is a target of
+	  translation.  Because translator examines whether this is
+	  ICMP of return more first than translation rule, eventually
+	  "IPv6->IPv4" translation rule is not adapted to.
+
 2001-12-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c: implemented more rules for
 	destination addr ordering; matching label, higher precedence, and
