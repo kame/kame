@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/08/20 13:01:24 $
+			$Date: 1999/08/20 13:03:36 $
 
 1. IPv6
 
@@ -766,7 +766,7 @@ the connection will be relayed toward IPv4 destination 163.221.202.12.
 
 faithd must be invoked on FAITH-relay dual stack node.
 
-For more details, consult kit/src/faithd/README.
+For more details, consult kame/kame/faithd/README.
 
 3.2 IPv6-to-IPv4 header translator
 
@@ -845,7 +845,7 @@ The key management code implemented in this kit (sys/netkey) is a
 home-brew PFKEY v2 implementation.  This conforms to RFC2367.
 
 The home-brew IKE daemon, "racoon" is included in the kit
-(kit/src/racoon).  It can perform key exchanges in some limited
+(kame/kame/racoon).  It can perform key exchanges in some limited
 conditions, however, it may take some more time to be stabilized.
 
 4.3 AH and ESP handling
