@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.114 2002/05/10 11:34:21 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.115 2002/05/10 11:47:49 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -486,17 +486,17 @@ natpt_icmp6MimicPayload(struct pcv *cv6, struct pcv *cv4, struct pAddr *pad)
 #ifdef _IP_VHL
 	icmpip4->ip_vhl = IP_MAKE_VHL(IPVERSION, sizeof(struct ip) >> 2);
 #else
-	icmpip4->ip_v   = IPVERSION;
-	icmpip4->ip_hl  = sizeof(struct ip) >> 2;
+	icmpip4->ip_v	= IPVERSION;
+	icmpip4->ip_hl	= sizeof(struct ip) >> 2;
 #endif
 	icmpip4->ip_tos = 0;
 	icmpip4->ip_len = htons(ntohs(icmpip6->ip6_plen) + sizeof(struct ip));
-	icmpip4->ip_id  = 0;
+	icmpip4->ip_id	= 0;
 	icmpip4->ip_off = 0;
 	icmpip4->ip_off |= IP_DF;
 	HTONS(icmpip4->ip_off);
 	icmpip4->ip_ttl = icmpip6->ip6_hlim;
-	icmpip4->ip_p   = icmpip6->ip6_nxt;
+	icmpip4->ip_p	= icmpip6->ip6_nxt;
 #if	0
 	icmpip4->ip_src = pad->in4dst;
 	icmpip4->ip_dst = pad->in4src;
@@ -951,7 +951,7 @@ natpt_icmp4Informational(struct pcv *cv4, struct pcv *cv6)
 	struct icmp6_hdr *icmp6 = cv6->pyld.icmp6;
 
 	icmp6->icmp6_code = 0;
-	icmp6->icmp6_id  = icmp4->icmp_id;
+	icmp6->icmp6_id	 = icmp4->icmp_id;
 	icmp6->icmp6_seq = icmp4->icmp_seq;
 
 	dlen = icmp4len - ICMP_MINLEN;
@@ -1086,15 +1086,15 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 		}
 		break;
 
-		case ICMP_PARAMPROB:
+	case ICMP_PARAMPROB:
 		icmp4 = cv4->pyld.icmp4;
 		icmp6 = cv6->pyld.icmp6;
 		icmp6->icmp6_pptr
-			= (icmp4->icmp_pptr == 0) ? 0   /* version */
-			: (icmp4->icmp_pptr == 2) ? 4   /* payload length */
-			: (icmp4->icmp_pptr == 8) ? 7   /* hop limit */
-			: (icmp4->icmp_pptr == 9) ? 6   /* next header */
-			: (icmp4->icmp_pptr == 12) ? 8  /* source address */
+			= (icmp4->icmp_pptr == 0) ? 0	/* version */
+			: (icmp4->icmp_pptr == 2) ? 4	/* payload length */
+			: (icmp4->icmp_pptr == 8) ? 7	/* hop limit */
+			: (icmp4->icmp_pptr == 9) ? 6	/* next header */
+			: (icmp4->icmp_pptr == 12) ? 8	/* source address */
 			: (icmp4->icmp_pptr == 16) ? 24 /* destination address */
 			: 0xffffffff; /* XXX */
 
@@ -1118,7 +1118,7 @@ natpt_translatePing4to66(struct pcv *cv4, struct pcv *cv6, int icmp6len)
 
 	icmp4 = cv4->pyld.icmp4;
 	icmp6 = cv6->pyld.icmp6;
-	icmp6->icmp6_id  = icmp4->icmp_id;
+	icmp6->icmp6_id	 = icmp4->icmp_id;
 	icmp6->icmp6_seq = icmp4->icmp_seq;
 
 	typecode4 = htons((icmp4->icmp_type << 8) + icmp4->icmp_code);

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_soctl.h,v 1.18 2002/02/22 16:54:38 sumikawa Exp $	*/
+/*	$KAME: natpt_soctl.h,v 1.19 2002/05/10 11:47:49 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -50,7 +50,7 @@
 #define NATPT_SETVALUE	_IOW ('n', 10, struct natpt_msgBox) /* Set value */
 #define NATPT_GETVALUE	_IOWR('n', 11, struct natpt_msgBox) /* Get value */
 #define NATPT_TESTLOG	_IOW ('n', 12, struct natpt_msgBox) /* Test log */
-#define NATPT_BREAK	_IO  ('n', 255)		        /* stop */
+#define NATPT_BREAK	_IO  ('n', 255)			/* stop */
 
 /*
  *

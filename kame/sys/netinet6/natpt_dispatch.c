@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.53 2002/05/08 08:06:34 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.54 2002/05/10 11:47:49 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -138,7 +138,7 @@ natpt_in6(struct mbuf *m6, struct mbuf **m4)
 		icmp6_error(m6, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER, natpt_param);
 		return (IPPROTO_DONE);	/* discard packet without free */
 	}
-	
+
 	if (cv6.ip.ip6->ip6_hlim <= IPV6_HLIMDEC) {
 		icmp6_error(m6, ICMP6_TIME_EXCEEDED, ICMP6_TIME_EXCEED_TRANSIT, 0);
 		return (IPPROTO_DONE);	/* discard this packet without free */

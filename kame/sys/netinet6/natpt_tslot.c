@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.43 2002/04/19 06:55:35 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.44 2002/05/10 11:47:49 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -839,7 +839,7 @@ natpt_hashSin4(struct sockaddr_in *sin4)
 
 
 /*
- * CAUTION: This hash routine is byte order sensitive.  Be Careful.
+ * CAUTION: This hash routine is byte order sensitive.	Be Careful.
  */
 
 static int

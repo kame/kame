@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.45 2002/02/22 15:02:05 sumikawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.46 2002/05/10 11:47:49 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -422,7 +422,7 @@ natpt_rmRules(caddr_t addr)
 		csl = csln;
 	}
 	splx(s);
-		
+
 	return (0);
 }
 
