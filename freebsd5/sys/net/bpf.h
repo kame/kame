@@ -169,6 +169,8 @@ struct bpf_hdr {
 #define DLT_SLIP_BSDOS	15	/* BSD/OS Serial Line IP */
 #define DLT_PPP_BSDOS	16	/* BSD/OS Point-to-point Protocol */
 
+#define DLT_PFSYNC	18	/* Packet filter state syncing */
+
 #define DLT_ATM_CLIP	19	/* Linux Classical-IP over ATM */
 
 /*

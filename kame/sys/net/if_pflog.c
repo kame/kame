@@ -72,6 +72,10 @@
 #include <netinet/ip.h>
 #endif
 
+#ifdef __FreeBSD__
+#include <machine/in_cksum.h>
+#endif
+
 #ifdef INET6
 #ifndef INET
 #include <netinet/in.h>
@@ -170,8 +174,15 @@ pflogstart(struct ifnet *ifp)
 #else
 		s = splnet();
 #endif
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+		IFQ_LOCK(&ifp->if_snd);
+#else
 		IF_DROP(&ifp->if_snd);
+#endif
 		IF_DEQUEUE(&ifp->if_snd, m);
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+		IFQ_UNLOCK(&ifp->if_snd);
+#endif
 		splx(s);
 
 		if (m == NULL)

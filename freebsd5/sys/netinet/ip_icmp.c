@@ -78,7 +78,7 @@
  * host table maintenance routines.
  */
 
-static struct	icmpstat icmpstat;
+struct	icmpstat icmpstat;
 SYSCTL_STRUCT(_net_inet_icmp, ICMPCTL_STATS, stats, CTLFLAG_RW,
 	&icmpstat, icmpstat, "");
 

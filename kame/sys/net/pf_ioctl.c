@@ -195,6 +195,10 @@ pfattach(int num)
 #ifdef __OpenBSD__
 	timeout_set(&pf_expire_to, pf_purge_timeout, &pf_expire_to);
 	timeout_add(&pf_expire_to, timeout[PFTM_INTERVAL] * hz);
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 5
+	callout_init(&pf_expire_to, 0);
+	callout_reset(&pf_expire_to, timeout[PFTM_INTERVAL] * hz,
+	    pf_purge_timeout, &pf_expire_to);
 #else
 	callout_init(&pf_expire_to);
 	callout_reset(&pf_expire_to, timeout[PFTM_INTERVAL] * hz,

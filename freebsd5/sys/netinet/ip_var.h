@@ -230,6 +230,7 @@ extern int	 (*ip_mforward)(struct ip *, struct ifnet *, struct mbuf *,
 int	 ip_output(struct mbuf *,
 	    struct mbuf *, struct route *, int, struct ip_moptions *,
 	    struct inpcb *);
+int	ip_fragment(struct mbuf *, struct ifnet *, u_long);
 struct in_ifaddr *
 	 ip_rtaddr(struct in_addr, struct route *);
 void	 ip_savecontrol(struct inpcb *, struct mbuf **, struct ip *,

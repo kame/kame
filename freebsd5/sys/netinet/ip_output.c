@@ -109,6 +109,11 @@
 
 #include <machine/in_cksum.h>
 
+#include "pf.h"
+#if NPF > 0
+#include <net/pfvar.h>
+#endif
+
 MALLOC_DEFINE(M_IPMOPTS, "ip_moptions", "internet multicast options");
 
 #ifdef IPSEC
@@ -180,7 +185,7 @@ ip_output(m0, opt, ro, flags, imo, inp)
 	struct ip_moptions *imo;
 	struct inpcb *inp;
 {
-	struct ip *ip, *mhip;
+	struct ip *ip;
 	struct ifnet *ifp = NULL;	/* keep compiler happy */
 	struct mbuf *m;
 	int hlen = sizeof (struct ip);
@@ -803,8 +808,21 @@ spd_done:
 			if (m == NULL)
 				goto done;
 			ip = mtod(m, struct ip *);
+			hlen = ip->ip_hl << 2;
 		}
 #endif /* PFIL_HOOKS */
+#if NPF > 0
+	if (pf_test(PF_OUT, ifp, &m) != PF_PASS) {
+		error = EHOSTUNREACH;
+		m_freem(m);
+		goto done;
+	}
+	if (m == NULL)
+		goto done;
+
+	ip = mtod(m, struct ip *);
+	hlen = ip->ip_hl << 2;
+#endif
 
 	/*
 	 * Check with the firewall...
@@ -1108,11 +1126,85 @@ pass:
 		ipstat.ips_cantfrag++;
 		goto bad;
 	}
-	len = (ifp->if_mtu - hlen) &~ 7;
-	if (len < 8) {
-		error = EMSGSIZE;
+
+	/*
+	 * Recover all the flag bits in pkthdr.csum_flags for ip_fragment to
+	 * calculate checksum correctly.  pkthdr.csum will be fixed again
+	 * in ip_fragment.
+	 */
+	m->m_pkthdr.csum_flags |= sw_csum;
+	error = ip_fragment(m, ifp, ifp->if_mtu);
+	if (error == EMSGSIZE)
 		goto bad;
+
+	for (m = m0; m; m = m0) {
+		m0 = m->m_nextpkt;
+		m->m_nextpkt = 0;
+#ifdef IPSEC
+		/* clean ipsec history once it goes out of the node */
+		ipsec_delaux(m);
+#endif
+		if (error == 0) {
+			/* Record statistics for this interface address. */
+			if (ia != NULL) {
+				ia->ia_ifa.if_opackets++;
+				ia->ia_ifa.if_obytes += m->m_pkthdr.len;
+			}
+			
+			error = (*ifp->if_output)(ifp, m,
+			    (struct sockaddr *)dst, ro->ro_rt);
+		} else
+			m_freem(m);
 	}
+
+	if (error == 0)
+		ipstat.ips_fragmented++;
+done:
+#ifdef IPSEC
+	if (ro == &iproute && ro->ro_rt) {
+		RTFREE(ro->ro_rt);
+		ro->ro_rt = NULL;
+	}
+	if (sp != NULL) {
+		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
+			printf("DP ip_output call free SP:%p\n", sp));
+		key_freesp(sp);
+	}
+#endif /* IPSEC */
+#ifdef FAST_IPSEC
+	if (ro == &iproute && ro->ro_rt) {
+		RTFREE(ro->ro_rt);
+		ro->ro_rt = NULL;
+	}
+	if (sp != NULL)
+		KEY_FREESP(&sp);
+#endif /* FAST_IPSEC */
+	return (error);
+bad:
+	m_freem(m);
+	goto done;
+}
+
+int
+ip_fragment(struct mbuf *m, struct ifnet *ifp, u_long mtu)
+{
+	struct ip *ip, *mhip;
+	struct mbuf *m0;
+	int len, hlen, off;
+	int mhlen, firstlen;
+	struct mbuf **mnext;
+	int error = 0;
+	int sw_csum;
+	int nfrags = 1;
+
+        ip = mtod(m, struct ip *);
+	hlen = ip->ip_hl << 2;
+	sw_csum = m->m_pkthdr.csum_flags & ~ifp->if_hwassist;
+	m->m_pkthdr.csum_flags &= ifp->if_hwassist;
+
+	len = (ifp->if_mtu - hlen) &~ 7;
+	if (len < 8)
+		return (EMSGSIZE);
 
 	/*
 	 * if the interface will not calculate checksums on
@@ -1164,17 +1256,12 @@ smart_frag_failure:
 		off = hlen + len;
 	}
 
-
-
-    {
-	int mhlen, firstlen = off - hlen;
-	struct mbuf **mnext = &m->m_nextpkt;
-	int nfrags = 1;
-
 	/*
 	 * Loop through length of segment after first fragment,
 	 * make new header and copy data of each part and link onto chain.
 	 */
+	firstlen = off - hlen;
+	mnext = &m->m_nextpkt;
 	m0 = m;
 	mhlen = sizeof (struct ip);
 	for (; off < (u_short)ip->ip_len; off += len) {
@@ -1242,53 +1329,7 @@ smart_frag_failure:
 	if (sw_csum & CSUM_DELAY_IP)
 		ip->ip_sum = in_cksum(m, hlen);
 sendorfree:
-	for (m = m0; m; m = m0) {
-		m0 = m->m_nextpkt;
-		m->m_nextpkt = 0;
-#ifdef IPSEC
-		/* clean ipsec history once it goes out of the node */
-		ipsec_delaux(m);
-#endif
-		if (error == 0) {
-			/* Record statistics for this interface address. */
-			if (ia != NULL) {
-				ia->ia_ifa.if_opackets++;
-				ia->ia_ifa.if_obytes += m->m_pkthdr.len;
-			}
-			
-			error = (*ifp->if_output)(ifp, m,
-			    (struct sockaddr *)dst, ro->ro_rt);
-		} else
-			m_freem(m);
-	}
-
-	if (error == 0)
-		ipstat.ips_fragmented++;
-    }
-done:
-#ifdef IPSEC
-	if (ro == &iproute && ro->ro_rt) {
-		RTFREE(ro->ro_rt);
-		ro->ro_rt = NULL;
-	}
-	if (sp != NULL) {
-		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
-			printf("DP ip_output call free SP:%p\n", sp));
-		key_freesp(sp);
-	}
-#endif /* IPSEC */
-#ifdef FAST_IPSEC
-	if (ro == &iproute && ro->ro_rt) {
-		RTFREE(ro->ro_rt);
-		ro->ro_rt = NULL;
-	}
-	if (sp != NULL)
-		KEY_FREESP(&sp);
-#endif /* FAST_IPSEC */
 	return (error);
-bad:
-	m_freem(m);
-	goto done;
 }
 
 void

@@ -182,6 +182,8 @@ struct icmp {
 #ifdef _KERNEL
 void	icmp_error(struct mbuf *, int, int, n_long, struct ifnet *);
 void	icmp_input(struct mbuf *, int);
+
+extern struct icmpstat icmpstat;
 #endif
 
 #endif

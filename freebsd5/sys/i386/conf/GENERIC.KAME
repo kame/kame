@@ -260,8 +260,9 @@ device		kue		# Kawasaki LSI USB ethernet
 
 # KAME extensions
 #
-options 	IPSEC			#IP security
-options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
+# IPSEC does not work due to FAST_IPSEC changes
+#options 	IPSEC			#IP security
+#options 	IPSEC_ESP		#IP security (crypto; define w/ IPSEC)
 #options 	IPSEC_DEBUG		#debug for IP security
 #options 	NATM			#native mode ATM
 #options 	ENABLE_DEFAULT_SCOPE
@@ -328,3 +329,7 @@ device		stf	1
 #options 	MIP6_MOBILE_NODE
 #device		hif	1
 #options 	MIP6_DEBUG
+
+device		pf	1
+device		pflog	1
+device		pfsync	1

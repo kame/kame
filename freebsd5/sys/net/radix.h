@@ -165,6 +165,6 @@ struct radix_node
 	 *rn_lookup (void *v_arg, void *m_arg,
 		        struct radix_node_head *head),
 	 *rn_match(void *, struct radix_node_head *);
-
+int rn_walktree(struct radix_node_head *, walktree_f_t *, void *);
 
 #endif /* _RADIX_H_ */

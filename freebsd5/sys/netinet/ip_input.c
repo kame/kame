@@ -134,6 +134,11 @@
 #include <netipsec/key.h>
 #endif
 
+#include "pf.h"
+#if NPF > 0
+#include <net/pfvar.h>
+#endif
+
 int rsvp_on = 0;
 
 int	ipforwarding = 0;
@@ -519,8 +524,22 @@ iphack:
 			if (m == NULL)
 				return;
 			ip = mtod(m, struct ip *);
+			hlen = ip->ip_hl << 2;
 		}
 #endif /* PFIL_HOOKS */
+#if NPF > 0
+	/*
+	 * Packet filter
+	 * XXX pfrdr
+	 */
+	if (pf_test(PF_IN, m->m_pkthdr.rcvif, &m) != PF_PASS)
+		goto bad;
+	if (m == NULL)
+		return;
+
+	ip = mtod(m, struct ip *);
+	hlen = ip->ip_hl << 2;
+#endif
 
 	if (fw_enable && IPFW_LOADED) {
 		/*

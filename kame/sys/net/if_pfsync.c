@@ -148,6 +148,8 @@ pfsyncattach(int npfsync)
 	pfsync_setmtu(&pfsyncif, MCLBYTES);
 #ifdef __OpenBSD__
 	timeout_set(&pfsyncif.sc_tmo, pfsync_timeout, &pfsyncif);
+#elif defined(__FreeBSD__) && __FreeBSD__ >= 5
+	callout_init(&pfsyncif.sc_tmo, 0);
 #else
 	callout_init(&pfsyncif.sc_tmo);
 #endif
@@ -180,8 +182,15 @@ pfsyncstart(struct ifnet *ifp)
 #else
 		s = splnet();
 #endif
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+		IFQ_LOCK(&ifp->if_snd);
+#else
 		IF_DROP(&ifp->if_snd);
+#endif
 		IF_DEQUEUE(&ifp->if_snd, m);
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
+		IFQ_UNLOCK(&ifp->if_snd);
+#endif
 		splx(s);
 
 		if (m == NULL)

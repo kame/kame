@@ -539,8 +539,13 @@ struct	mbuf	*m_split(struct mbuf *, int, int);
 #define	PACKET_TAG_IPFORWARD			18 /* ipforward info */
 #define PACKET_TAG_INET6			19 /* IPv6 info */
 #define PACKET_TAG_ESP				20 /* ESP information */
+#define PACKET_TAG_PF_GENERATED			21 /* PF generated, pass always */
+#define PACKET_TAG_PF_ROUTED			22 /* PF routed, no route loops */
+#define PACKET_TAG_PF_FRAGCACHE			23 /* PF fragment cached */
+#define PACKET_TAG_PF_QID			24 /* PF queue id */
+#define PACKET_TAG_PF_TAG			25 /* PF tags */
 
-#define	PACKET_TAG_MAX				22
+#define	PACKET_TAG_MAX				26
 
 /* Packet tag routines */
 struct	m_tag 	*m_tag_alloc(u_int32_t, int, int, int);
