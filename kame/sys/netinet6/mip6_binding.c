@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.27 2001/10/26 13:25:57 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.28 2001/10/29 11:32:06 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1740,8 +1740,7 @@ mip6_process_ba(m, opt)
 	if (mbu->mbu_flags & IP6_BUF_HOME) {
 		/* this is from our home agent */
 
-		if ((mbu->mbu_reg_state == MIP6_BU_REG_STATE_REG)
-		    || (mbu->mbu_reg_state == MIP6_BU_REG_STATE_DEREGWAITACK)) {
+		if (mbu->mbu_reg_state == MIP6_BU_REG_STATE_DEREGWAITACK) {
 			/* home unregsitration has completed. */
 
 			/* notify all the CNs that we are home. */
@@ -1781,7 +1780,11 @@ mip6_process_ba(m, opt)
 					 __FILE__, __LINE__));
 				return (error);
 			}
-		} else {
+
+			/* for safty. */
+			mbu->mbu_reg_state = MIP6_BU_REG_STATE_NOTREG;
+		}
+		else if (mbu->mbu_reg_state == MIP6_BU_REG_STATE_REGWAITACK) {
 			/* home registration completed */
 			mbu->mbu_reg_state = MIP6_BU_REG_STATE_REG;
 
@@ -1805,6 +1808,10 @@ mip6_process_ba(m, opt)
 					 __FILE__, __LINE__));
 				return (error);
 			}
+		} else {
+			mip6log((LOG_NOTICE,
+				 "%s:%d: unexpected condition.\n",
+				 __FILE__, __LINE__));
 		}
 	}
 
@@ -1820,7 +1827,8 @@ mip6_validate_br(m, opt)
 	struct mbuf *m;
 	u_int8_t *opt;
 {
-	/* XXX */
+	/* XXX: no need to validate. */
+
 	return (0);
 }
 
@@ -1854,6 +1862,9 @@ mip6_process_br(m, opt)
 	mpfx = mip6_prefix_list_find_withhaddr(&mip6_prefix_list,
 					       &mbu->mbu_haddr);
 	if (mpfx == NULL) {
+		/*
+		 * there are no prefixes associated to the home address.
+		 */
 		/* XXX */
 		return (0);
 	}
@@ -1865,7 +1876,11 @@ mip6_process_br(m, opt)
 	mbu->mbu_remain = mbu->mbu_lifetime;
 	mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
 
-	/* XXX unique id processing */
+	/*
+	 * TOXO: XXX
+	 *
+	 * unique ideintifier suboption processing.
+	 */
 
 	return (0);
 }
