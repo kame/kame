@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.109 2001/11/13 10:15:51 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.110 2001/11/13 16:10:36 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -905,6 +905,10 @@ extern int inet6_rth_segments __P((const void *));
 extern struct in6_addr *inet6_rth_getaddr __P((const void *, int));
 
 /* the followings two are experimental.  should not merge them to *BSD. */
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+struct sockaddr;		/* XXX */
+#endif
+
 extern int addr2scopetype __P((struct sockaddr *));
 extern int inet_zoneid __P((int, int, char *, u_int32_t *));
 __END_DECLS
