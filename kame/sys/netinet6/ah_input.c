@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.49 2001/01/23 15:23:35 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.50 2001/02/07 04:58:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1148,10 +1148,11 @@ ah6_ctlinput(cmd, sa, d)
 			/* XXX Further validation? */
 
 			/*
-			 * Now that we've validated that we are actually
-			 * communicating with the host indicated in the ICMPv6
-			 * message, recalculate the new MTU, and create the
-			 * corresponding routing entry.
+			 * Depending on the value of "valid" and routing table
+			 * size (mtudisc_{hi,lo}wat), we will:
+			 * - recalcurate the new MTU and create the
+			 *   corresponding routing entry, or
+			 * - ignore the MTU change notification.
 			 */
 			icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
 

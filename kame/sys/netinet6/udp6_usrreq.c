@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.82 2000/12/08 23:28:02 itojun Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.83 2001/02/07 04:58:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -584,10 +584,11 @@ udp6_ctlinput(cmd, sa, d)
 #endif
 
 			/*
-			 * Now that we've validated that we are actually
-			 * communicating with the host indicated in the
-			 * ICMPv6 message, recalculate the new MTU, and
-			 * create the corresponding routing entry.
+			 * Depending on the value of "valid" and routing table
+			 * size (mtudisc_{hi,lo}wat), we will:
+			 * - recalcurate the new MTU and create the
+			 *   corresponding routing entry, or
+			 * - ignore the MTU change notification.
 			 */
 			icmp6_mtudisc_update((struct ip6ctlparam *)d, valid);
 
