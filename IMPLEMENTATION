@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.253 2001/07/27 15:21:05 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.254 2001/07/29 10:40:20 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -2044,8 +2044,8 @@ IPsec transport mode SAs.
 	# gifconfig gif0 C D
 	# ifconfig gif0 A B
 	# setkey -c <<EOF
-	spdadd A B any -P out ipsec esp/transport//use;
-	spdadd A B any -P in ipsec esp/transport//use;
+	spdadd C D any -P out ipsec esp/transport//use;
+	spdadd D C any -P in ipsec esp/transport//use;
 	^D
 
 Since we have a pseudo-interface "gif0", and it affects the routes and
@@ -2181,7 +2181,8 @@ and the first route is returned if it is not specified.
 
 IPv4 and IPv6 output logic will pick a route out of multiple
 gateways, based on Modulo-N Hash (RFC2991) using lowermost 32bits
-from (ip{,6}_src ^ ip{,6}_dst).  For example, it is likely that packets
+from ip_src ^ ip_dst (IPv6 case uses ip6_dst only due to some codepath
+differences).  For example, it is likely that packets
 to 3ffe::1 and 3ffe::2 (or 10.0.0.1 and 10.0.0.2) will go through a different
 gateway.
 
