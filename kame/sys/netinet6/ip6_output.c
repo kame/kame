@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.169 2001/03/13 03:10:12 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.170 2001/03/17 18:12:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1726,6 +1726,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 				/* fall through */
 			case IPV6_UNICAST_HOPS:
 			case IPV6_HOPLIMIT:
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+			case IPV6_CHECKSUM:
+#endif
 			case IPV6_FAITH:
 
 			case IPV6_RECVPKTINFO:
@@ -1895,6 +1898,16 @@ do { \
 					if (OPTBIT(IN6P_RTHDR) == 0)
 						ip6_reset_rcvopt(rcvopts, IPV6_RECVRTHDR);
 					break;
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				case IPV6_CHECKSUM:
+#ifdef HAVE_NRL_INPCB
+					inp->in6p_cksum = optval;
+#else
+					in6p->in6p_cksum = optval;
+#endif
+					break;
+#endif
 
 				case IPV6_FAITH:
 					OPTSET(IN6P_FAITH);
@@ -2315,7 +2328,9 @@ do { \
 				}
 				/* fall through */
 			case IPV6_UNICAST_HOPS:
-
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+			case IPV6_CHECKSUM:
+#endif
 			case IPV6_RECVPKTINFO:
 			case IPV6_RECVHOPLIMIT:
 			case IPV6_RECVRTHDR:
@@ -2358,6 +2373,16 @@ do { \
 				case IPV6_RECVRTHDRDSTOPTS:
 					optval = OPTBIT(IN6P_RTHDRDSTOPTS);
 					break;
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				case IPV6_CHECKSUM:
+#ifdef HAVE_NRL_INPCB
+					optval = inp->in6p_cksum;
+#else
+					optval = in6p->in6p_cksum;
+#endif
+					break;
+#endif
 
 				case IPV6_USE_MIN_MTU:
 					optval = OPTBIT(IN6P_MINMTU);
