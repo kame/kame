@@ -1,8 +1,22 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.574 2000/02/18 17:53:36 itojun Exp $
+$Id: CHANGELOG,v 1.575 2000/02/19 02:47:05 fujisawa Exp $
 
 <200002>
+Sat Feb 19 11:40:58 2000  Shin'ichi Fujisawa  <fujisawa@kame.net>
+	* Now, this translator can handle connection from outside v4 (global)
+	  to inside v6 (private).  This translation is done when packet is
+	  coming toward particular address and port, so you must know this
+	  particular port number before making connection.
+
+	- kernel:
+		many changes in netinet6/natpt_*.[ch]
+		add in4_len2mask() in netinet/in.c to call in_len2mask().
+
+	- userland:
+		slightly changed natptconfig command syntax.
+		can log ipv4, ipv6 and mbuf.
+
 Sat Feb 19 02:52:09 JST 2000  itojun@iijlab.net
 	* {openbsd,netbsd,bsdi4}/sys/sys/socket.h: fix 64bit alignment issue
 	  in 64bit architecture.
