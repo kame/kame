@@ -1,4 +1,4 @@
-#	$KAME: Makefile.in,v 1.38 2002/06/10 19:58:29 itojun Exp $
+#	$KAME: Makefile.in,v 1.39 2002/09/27 06:04:59 itojun Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -97,7 +97,7 @@ install:
 	done
 
 clean:
-	-rm -f $(PROG) *.o *.core y.tab.h
+	-rm -f $(PROG) *.o *.core y.tab.h cftoken.c cfparse.c cftoken.h cfparse.h
 
 distclean: clean
 	-rm -f Makefile config.cache config.status config.log
