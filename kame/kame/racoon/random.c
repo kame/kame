@@ -1,4 +1,4 @@
-/*	$KAME: random.c,v 1.4 2000/10/06 13:11:39 itojun Exp $	*/
+/*	$KAME: random.c,v 1.5 2000/11/06 08:43:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -60,6 +60,7 @@ random()
 	long v;
 
 	read(fd, &v, sizeof(v));
+	v &= ((~0UL) >> 1);
 	return v;
 }
 
