@@ -351,6 +351,10 @@ rip6_input(mp, offp, proto)
 #endif /* __NetBSD__ || __OpenBSD__ */
 #endif /* __FreeBSD__ */
   {
+#ifdef INET6
+    if (!(inp->inp_flags & INP_IPV6))
+      continue;
+#endif
     if (inp->inp_ipv6.ip6_nxt && inp->inp_ipv6.ip6_nxt != nexthdr)
       continue;
     if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6) && 

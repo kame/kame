@@ -1,4 +1,4 @@
-/*	$OpenBSD: raw_ip.c,v 1.15 1999/01/11 02:01:34 deraadt Exp $	*/
+/*	$OpenBSD: raw_ip.c,v 1.19 1999/09/23 07:20:35 deraadt Exp $	*/
 /*	$NetBSD: raw_ip.c,v 1.25 1996/02/18 18:58:33 christos Exp $	*/
 
 /*
@@ -63,10 +63,11 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-#include <netinet/ip_var.h>
 #include <netinet/ip_mroute.h>
+#include <netinet/ip_var.h>
 #include <netinet/in_pcb.h>
 #include <netinet/in_var.h>
+#include <netinet/ip_icmp.h>
 
 #ifdef IPSEC
 extern int     	check_ipsec_policy  __P((struct inpcb *, u_int32_t));
@@ -120,6 +121,10 @@ rip_input(m, va_alist)
 	for (inp = rawcbtable.inpt_queue.cqh_first;
 	    inp != (struct inpcb *)&rawcbtable.inpt_queue;
 	    inp = inp->inp_queue.cqe_next) {
+#ifdef INET6
+		if (inp->inp_flags & INP_IPV6)
+			continue;
+#endif
 		if (inp->inp_ip.ip_p && inp->inp_ip.ip_p != ip->ip_p)
 			continue;
 		if (inp->inp_laddr.s_addr &&
@@ -149,8 +154,10 @@ rip_input(m, va_alist)
 		else
 			sorwakeup(last);
 	} else {
-		m_freem(m);
-		/* Perhaps should send an ICMP protocol unreachable here. */
+		if (ip->ip_p != IPPROTO_ICMP)
+			icmp_error(m, ICMP_UNREACH, ICMP_UNREACH_PROTOCOL, 0, 0);
+		else
+			m_freem(m);
 		ipstat.ips_noproto++;
 		ipstat.ips_delivered--;
 	}

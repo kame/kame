@@ -391,12 +391,17 @@ udp_input(m, va_alist)
 		for (inp = udbtable.inpt_queue.cqh_first;
 		    inp != (struct inpcb *)&udbtable.inpt_queue;
 		    inp = inp->inp_queue.cqe_next) {
+#ifdef INET6
+			/* don't accept it if AF does not match */
+			if (ipv6 && !(inp->inp_flags & INP_IPV6))
+				continue;
+			if (!ipv6 && (inp->inp_flags & INP_IPV6))
+				continue;
+#endif
 			if (inp->inp_lport != uh->uh_dport)
 				continue;
 #ifdef INET6
 			if (ipv6) {
-				if (!(inp->inp_flags & INP_IPV6))
-					continue;
 				if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6))
 					if (!IN6_ARE_ADDR_EQUAL(&inp->inp_laddr6,
 					    &ipv6->ip6_dst))

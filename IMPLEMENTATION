@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/12/17 06:49:58 $
+			$Date: 1999/12/19 04:11:07 $
 
 1. IPv6
 
@@ -75,8 +75,8 @@ RFC2553: Basic Socket Interface Extensions for IPv6
       socket (3.8) are,
 	- supported on KAME/FreeBSD3x,
 	- supported on KAME/NetBSD,
-	- supported on KAME/OpenBSD and KAME/BSDI4,
-	- not supported on KAME/FreeBSD228 and KAME/BSDI3.
+	- supported on KAME/BSDI4,
+	- not supported on KAME/FreeBSD228, KAME/OpenBSD and KAME/BSDI3.
       see 1.12 in this document for details.
 RFC2675: IPv6 Jumbograms
     * See 1.7 in this document for details.
@@ -552,14 +552,14 @@ We KAME team have 4 OS platforms right now, and behavior is slightly
 different between them.  To summarize:
 - All KAME implementations treat tcp/udp port number space separately
   between IPv4 and IPv6.
-- KAME/BSDI3 and KAME/FreeBSD228 does not support IPv4 mapped address,
-  nor special wildcard bind on AF_INET6.
+- KAME/BSDI3, KAME/OpenBSD and KAME/FreeBSD228 does not support IPv4 mapped
+  address, nor special wildcard bind on AF_INET6.
 - KAME/FreeBSD3x supports IPv4 mapped address, and special wildcard bind on
   AF_INET6.  It is enabled by default.  You can disable those two by runtime
   and kernel compile configuration.
   (you can't enable only one of them: they come together)
 - KAME/NetBSD supports both.  This is always enabled.
-- KAME/OpenBSD and KAME/BSDI4 supports both.  This is always enabled.
+- KAME/BSDI4 supports both.  This is always enabled.
 
 The following sections will give you the details, and how you can
 configure the behavior.
@@ -687,9 +687,9 @@ while KAME/FreeBSD3x uses merged inpcb structure.
 Supports for IPv4 mapped address/special AF_INET6 wildcard bind are
 enabled by default.  At this moment there is no way to disable it.
 
-1.12.5 KAME/OpenBSD and KAME/BSDI4
+1.12.5 KAME/BSDI4
 
-KAME/OpenBSD and KAME/BSDI4 use NRL-based TCP/UDP stack and inpcb source code,
+KAME/BSDI4 uses NRL-based TCP/UDP stack and inpcb source code,
 which was derived from NRL IPv6/IPsec stack.  I guess it supports IPv4 mapped
 address and speical AF_INET6 wildcard bind.  The implementation is, again,
 different from other KAME/*BSDs.
@@ -702,7 +702,17 @@ namely:
   both will success.  However, all IPv4 traffic (and IPv6 traffic) will be
   captured by IPv6 wildcard socket.
 
-1.12.6 configuration and implementation
+1.12.6 KAME/OpenBSD
+
+KAME/OpenBSD uses NRL-based TCP/UDP stack and inpcb source code,
+which was derived from NRL IPv6/IPsec stack.  However, KAME/OpenBSD
+disables AF_INET6 wildcard bind for security reasons (if AF_INET6 wildcard
+bind is allowed, access control will become much harder) unlike
+KAME/BSDI4.
+As a result the behavior is similar to KAME/BSDI3 and KAME/FreeBSD228
+(see 1.12.1 for more detail).
+
+1.12.7 configuration and implementation
 
 On KAME/FreeBSD3x, the behavior is configurable by following procedure.
 To enable it:

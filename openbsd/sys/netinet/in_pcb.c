@@ -808,6 +808,11 @@ in_pcblookup(table, faddrp, fport_arg, laddrp, lport_arg, flags)
 		} else
 #endif /* INET6 */
 		{
+#ifdef INET6
+		        if (inp->inp_flags & INP_IPV6)
+			        continue;
+#endif /* INET6 */
+
 			if (inp->inp_faddr.s_addr != INADDR_ANY) {
 				if (faddr.s_addr == INADDR_ANY)
 					wildcard++;
@@ -973,6 +978,10 @@ in_pcbhashlookup(table, faddr, fport_arg, laddr, lport_arg)
 
 	head = INPCBHASH(table, &faddr, fport, &laddr, lport);
 	for (inp = head->lh_first; inp != NULL; inp = inp->inp_hash.le_next) {
+#ifdef INET6
+		if (inp->inp_flags & INP_IPV6)
+			continue;	/*XXX*/
+#endif
 		if (inp->inp_faddr.s_addr == faddr.s_addr &&
 		    inp->inp_fport == fport &&
 		    inp->inp_lport == lport &&
