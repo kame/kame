@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.246 2001/12/17 12:06:11 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.247 2001/12/18 02:23:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -975,7 +975,7 @@ skip_ipsec2:;
 
 		if ((error = in6_selectroute(&dst0, opt, im6o, ro,
 					     &ifp, &rt, clone)) != 0) {
-			switch(error) {
+			switch (error) {
 			case EHOSTUNREACH:
 				ip6stat.ip6s_noroute++;
 				break;
@@ -3766,7 +3766,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 	 *
 	 */
 	if (!cmsg) {
-		switch(optname) {
+		switch (optname) {
 		case IPV6_2292PKTINFO:
 		case IPV6_2292HOPLIMIT:
 		case IPV6_2292NEXTHOP:
@@ -3778,7 +3778,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		}
 	}
 	if (sticky && cmsg) {
-		switch(optname) {
+		switch (optname) {
 		case IPV6_PKTINFO:
 		case IPV6_HOPLIMIT:
 		case IPV6_NEXTHOP:
@@ -3928,7 +3928,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		} else if (len < sizeof(struct sockaddr) || len < *buf)
 			return(EINVAL);
 
-		switch(((struct sockaddr *)buf)->sa_family) {
+		switch (((struct sockaddr *)buf)->sa_family) {
 		case AF_INET6:
 		{
 			struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)buf;
@@ -4044,7 +4044,7 @@ ip6_setpktoption(optname, buf, len, opt, priv, sticky, cmsg)
 		 * Determine the position that the destination options header
 		 * should be inserted; before or after the routing header.
 		 */
-		switch(optname) {
+		switch (optname) {
 		case IPV6_2292DSTOPTS:
 			/*
 			 * The old advacned API is ambiguous on this point.

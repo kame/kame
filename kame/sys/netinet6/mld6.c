@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.34 2001/12/18 02:19:17 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.35 2001/12/18 02:23:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -248,7 +248,7 @@ mld6_input(m, off)
 	 * we have heard a report from another member, or MLD6_IREPORTEDLAST
 	 * if we sent the last report.
 	 */
-	switch(mldh->mld_type) {
+	switch (mldh->mld_type) {
 	case MLD_LISTENER_QUERY:
 		if (ifp->if_flags & IFF_LOOPBACK)
 			break;

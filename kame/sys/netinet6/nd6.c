@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.220 2001/12/18 02:21:08 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.221 2001/12/18 02:23:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2436,7 +2436,7 @@ nd6_sysctl(name, oldp, oldlenp, newp, newlen)
 		return EINVAL;
 	ol = oldlenp ? *oldlenp : 0;
 
-	switch(name) {
+	switch (name) {
 #ifdef ICMPV6CTL_ND6_DRLIST
 	case ICMPV6CTL_ND6_DRLIST:
 		error = fill_drlist(oldp, oldlenp, ol);

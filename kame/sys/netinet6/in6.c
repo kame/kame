@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.253 2001/12/14 09:18:49 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.254 2001/12/18 02:23:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -509,7 +509,7 @@ in6_control(so, cmd, data, ifp)
 		return(EOPNOTSUPP);
 	}
 
-	switch(cmd) {
+	switch (cmd) {
 	case SIOCSSCOPE6:
 		if (!privileged)
 			return(EPERM);

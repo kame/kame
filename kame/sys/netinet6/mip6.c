@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.93 2001/12/17 12:06:10 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.94 2001/12/18 02:23:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -553,7 +553,7 @@ mip6_haddr_config(sc)
 {
 	int error = 0;
 
-	switch(sc->hif_location) {
+	switch (sc->hif_location) {
 	case HIF_LOCATION_HOME:
 		/*
 		 * remove all home addresses attached to hif.
@@ -594,7 +594,7 @@ mip6_process_movement(void)
 	for (sc = TAILQ_FIRST(&hif_softc_list);
 	     sc;
 	     sc = TAILQ_NEXT(sc, hif_entry)) {
-		switch(sc->hif_location) {
+		switch (sc->hif_location) {
 		case HIF_LOCATION_HOME:
 			/*
 			 * we moved to home.  unregister our home
@@ -2280,7 +2280,7 @@ mip6_process_destopt(m, dstopts, opt, dstoptlen)
 {
 	int error = 0;
 
-	switch(*opt) {
+	switch (*opt) {
 	case IP6OPT_BINDING_UPDATE:
 		if ((opt - (u_int8_t *)dstopts) % 4 != 2) {
 			ip6stat.ip6s_badoptions++;

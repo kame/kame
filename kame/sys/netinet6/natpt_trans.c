@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.71 2001/12/18 02:19:17 jinmei Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.72 2001/12/18 02:23:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1706,7 +1706,7 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 		return (0);
 
 	ts = cv4->ats->suit.tcps;
-	switch(ftp6.cmd) {
+	switch (ftp6.cmd) {
 #ifdef NATPT_NAT
 	case FTP4_PORT:
 		{

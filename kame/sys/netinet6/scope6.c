@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.26 2001/11/13 07:23:28 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.27 2001/12/18 02:23:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -297,7 +297,7 @@ in6_addr2zoneid(ifp, addr)
 	scope = in6_addrscope(addr);
 
 #define SID scope6_ids[ifp->if_index]
-	switch(scope) {
+	switch (scope) {
 	case IPV6_ADDR_SCOPE_INTFACELOCAL: /* should be interface index */
 		return(SID.s6id_list[IPV6_ADDR_SCOPE_INTFACELOCAL]);
 
