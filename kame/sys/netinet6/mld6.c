@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.56 2002/09/06 03:31:13 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.57 2002/09/06 05:11:17 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -226,8 +226,7 @@ SYSCTL_INT(_net_inet6_icmp6, ICMPV6CTL_MLD_ALWAYSV2, mld_alwaysv2, CTLFLAG_RW,
 static void mld6_sendpkt(struct in6_multi *, int, const struct sockaddr_in6 *);
 
 static struct mld_hdr * mld_allocbuf(struct mbuf **, int, struct in6_multi *,
-				     int, const struct sockaddr_in6 *, 
-				     struct ifnet *, struct in6_ifaddr *);
+				     int);
 #ifdef MLDV2
 static struct router6_info *find_rt6i(struct ifnet *);
 void mld_sendbuf(struct mbuf *, struct ifnet *);
@@ -907,9 +906,11 @@ mld6_sendpkt(in6m, type, dst)
 {
 	struct mbuf *mh;
 	struct mld_hdr *mldh;
+	struct ip6_hdr *ip6 = NULL;
 	struct ip6_moptions im6o;
 	struct ifnet *ifp = in6m->in6m_ifp;
 	struct in6_ifaddr *ia = NULL;
+	struct sockaddr_in6 src_sa, dst_sa;
 
 #ifdef IFT_VRRP
 	if (ifp->if_type == IFT_VRRP) {
@@ -918,9 +919,49 @@ mld6_sendpkt(in6m, type, dst)
 			return;
 	}
 #endif
-	mldh = mld_allocbuf(&mh, MLD_MINLEN, in6m, type, dst, ifp, ia);
+
+	/*
+	 * At first, find a link local address on the outgoing interface
+	 * to use as the source address of the MLD packet.
+	 * We do not reject tentative addresses for MLD report to deal with
+	 * the case where we first join a link-local address.
+	 */
+	if ((ia = in6ifa_ifpforlinklocal(ifp, ignflags)) == NULL)
+		return;
+	if ((ia->ia6_flags & IN6_IFF_TENTATIVE))
+		ia = NULL;
+
+	/* Allocate two mbufs to store IPv6 header and MLD header */
+	mldh = mld_allocbuf(&mh, MLD_MINLEN, in6m, type);
 	if (mldh == NULL)
 		return;
+
+	/* fill src/dst here */
+	ip6 = mtod(mh, struct ip6_hdr *);
+	ip6->ip6_src = ia ? ia->ia_addr.sin6_addr : in6addr_any;
+	ip6->ip6_dst = dst ? dst->sin6_addr : in6m->in6m_sa.sin6_addr;
+
+	/* set packet addresses in a full sockaddr_in6 form */
+	bzero(&src_sa, sizeof(src_sa));
+	bzero(&dst_sa, sizeof(dst_sa));
+	src_sa.sin6_family = dst_sa.sin6_family = AF_INET6;
+	src_sa.sin6_len = dst_sa.sin6_len = sizeof(struct sockaddr_in6);
+	src_sa.sin6_addr = ip6->ip6_src;
+	dst_sa.sin6_addr = ip6->ip6_dst;
+	/* 
+	 * in6_addr2zoneid() and ip6_setpktaddrs() are called at actual
+	 * advertisement time 
+	 */
+	if (in6_addr2zoneid(ifp, &src_sa.sin6_addr, &src_sa.sin6_scope_id) ||
+	    in6_addr2zoneid(ifp, &dst_sa.sin6_addr, &dst_sa.sin6_scope_id)) {
+		/* XXX: impossible */
+		m_free(mh);
+		return;
+	}
+	if (!ip6_setpktaddrs(mh, &src_sa, &dst_sa)) {
+		m_free(mh);
+		return;
+	}
 
 	mldh->mld_addr = in6m->in6m_sa.sin6_addr;
 	in6_clearscope(&mldh->mld_addr); /* XXX */
@@ -959,38 +1000,15 @@ mld6_sendpkt(in6m, type, dst)
 }
 
 static struct mld_hdr *
-mld_allocbuf(mh, len, in6m, type, dst, ifp, ia)
+mld_allocbuf(mh, len, in6m, type)
 	struct mbuf **mh;
 	int len;
 	struct in6_multi *in6m;
 	int type;
-	const struct sockaddr_in6 *dst;
-	struct ifnet *ifp;
-	struct in6_ifaddr *ia;
 {
 	struct mbuf *md;
 	struct mld_hdr *mldh;
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 src_sa, dst_sa;
-
-#ifdef IFT_VRRP
-	if (ifp->if_type == IFT_VRRP) {
-		ifp = ((struct ifvrrp *)ifp->if_softc)->ifv_p;
-		if (ifp == NULL)
-		    return NULL;
-	}
-#endif
-
-	/*
-	 * At first, find a link local address on the outgoing interface
-	 * to use as the source address of the MLD packet.
-	 * We do not reject tentative addresses for MLD report to deal with
-	 * the case where we first join a link-local address.
-	 */
-	if ((ia = in6ifa_ifpforlinklocal(ifp, ignflags)) == NULL)
-		return NULL;
-	if ((ia->ia6_flags & IN6_IFF_TENTATIVE))
-		ia = NULL;
 
 	/*
 	 * Allocate mbufs to store ip6 header and MLD header.
@@ -1034,30 +1052,9 @@ mld_allocbuf(mh, len, in6m, type, dst, ifp, ia)
 	/* ip6_plen will be set later */
 	ip6->ip6_nxt = IPPROTO_ICMPV6;
 	/* ip6_hlim will be set by im6o.im6o_multicast_hlim */
-	ip6->ip6_src = ia ? ia->ia_addr.sin6_addr : in6addr_any;
-	ip6->ip6_dst = dst ? dst->sin6_addr : in6m->in6m_sa.sin6_addr;
+	/* ip6_src/dst will be set by mld_sendpkt() or mld_sendbuf() */
 
-	/* set packet addresses in a full sockaddr_in6 form */
-	bzero(&src_sa, sizeof(src_sa));
-	bzero(&dst_sa, sizeof(dst_sa));
-	src_sa.sin6_family = dst_sa.sin6_family = AF_INET6;
-	src_sa.sin6_len = dst_sa.sin6_len = sizeof(struct sockaddr_in6);
-	src_sa.sin6_addr = ip6->ip6_src;
-	dst_sa.sin6_addr = ip6->ip6_dst;
-	if (in6_addr2zoneid(ifp, &src_sa.sin6_addr, &src_sa.sin6_scope_id) ||
-	    in6_addr2zoneid(ifp, &dst_sa.sin6_addr, &dst_sa.sin6_scope_id)) {
-		/* XXX: impossible */
-		m_free(*mh);
-		*mh = NULL;
-		return NULL;
-	}
-	if (!ip6_setpktaddrs(*mh, &src_sa, &dst_sa)) {
-		m_free(*mh);
-		*mh = NULL;
-		return NULL;
-	}
-
-	/* fill in the MLD header */
+	/* fill in the MLD header as much as possible */
 	md->m_len = len;
 	mldh = mtod(md, struct mld_hdr *);
 	bzero(mldh, len);
@@ -1071,13 +1068,15 @@ mld_sendbuf(mh, ifp)
 	struct mbuf *mh;
 	struct ifnet *ifp;
 {
+	struct ip6_hdr *ip6;
 	struct mld_report_hdr *mld_rhdr;
 	struct mld_group_record_hdr *mld_ghdr;
 	int len;
 	u_int16_t i;
 	struct ip6_moptions im6o;
-	struct mbuf *m;
+	struct mbuf *md;
 	struct in6_ifaddr *ia = NULL;
+	struct sockaddr_in6 src_sa, dst_sa;
  
 #ifdef IFT_VRRP
 	if (ifp->if_type == IFT_VRRP) {
@@ -1087,17 +1086,54 @@ mld_sendbuf(mh, ifp)
 	}
 #endif
 
+	/*
+	 * At first, find a link local address on the outgoing interface
+	 * to use as the source address of the MLD packet.
+	 * We do not reject tentative addresses for MLD report to deal with
+	 * the case where we first join a link-local address.
+	 */
+	if ((ia = in6ifa_ifpforlinklocal(ifp, ignflags)) == NULL)
+		return;
+	if ((ia->ia6_flags & IN6_IFF_TENTATIVE))
+		ia = NULL;
+
+	/* 
+	 * assumes IPv6 header and MLD header are located in the 1st and
+	 * 2nd mbuf respecitively. (done in mld_allocbuf())
+	 */
 	if (mh == NULL) {
 #ifdef MLDV2_DEBUG
 		printf("mld_sendbuf: mbuf is NULL\n");
 #endif
 		return;
 	}
+	md = mh->m_next;
 
-	/* assumes MLD header is located in the 2nd mbuf */
-	m = mh->m_next;
+	/* fill src/dst here */
+	ip6 = mtod(mh, struct ip6_hdr *);
+	ip6->ip6_src = ia ? ia->ia_addr.sin6_addr : in6addr_any;
+	ip6->ip6_dst = all_v2routers_linklocal->sin6_addr;
 
-	mld_rhdr = mtod(m, struct mld_report_hdr *);
+	/* set packet addresses in a full sockaddr_in6 form */
+	bzero(&src_sa, sizeof(src_sa));
+	bzero(&dst_sa, sizeof(dst_sa));
+	src_sa.sin6_family = dst_sa.sin6_family = AF_INET6;
+	src_sa.sin6_len = dst_sa.sin6_len = sizeof(struct sockaddr_in6);
+	src_sa.sin6_addr = ip6->ip6_src;
+	dst_sa.sin6_addr = ip6->ip6_dst;
+	/* 
+	 * in6_addr2zoneid() and ip6_setpktaddrs() are called at actual
+	 * advertisement time 
+	 */
+	if (in6_addr2zoneid(ifp, &src_sa.sin6_addr, &src_sa.sin6_scope_id) ||
+	    in6_addr2zoneid(ifp, &dst_sa.sin6_addr, &dst_sa.sin6_scope_id))
+		/* XXX: impossible */
+		return;
+
+	if (!ip6_setpktaddrs(mh, &src_sa, &dst_sa))
+		return;
+
+	mld_rhdr = mtod(md, struct mld_report_hdr *);
 	len = sizeof(struct mld_report_hdr);
 	for (i = 0; i < mld_rhdr->mld_grpnum; i++) {
 		mld_ghdr = (struct mld_group_record_hdr *)
@@ -1110,22 +1146,6 @@ mld_sendbuf(mh, ifp)
 
 	mld_rhdr->mld_cksum = in6_cksum(mh, IPPROTO_ICMPV6,
 					sizeof(struct ip6_hdr), len);
-
-	/*
-	 * At first, find a link local address on the outgoing interface
-	 * to use as the source address of the MLD packet.
-	 * We do not reject tentative addresses for MLD report to deal with
-	 * the case where we first join a link-local address.
-	 */
-	if ((ia = in6ifa_ifpforlinklocal(ifp, ignflags)) == NULL) {
-#ifdef MLDV2_DEBUG
-		printf("mld_sendbuf(): cannot send pkt due to a lack of linklocal address at link#%d", ifp->if_index);
-#endif
-		return;
-	}
-	if ((ia->ia6_flags & IN6_IFF_TENTATIVE))
-		ia = NULL;
-
 	im6o.im6o_multicast_ifp = ifp;
 	im6o.im6o_multicast_hlim = ip6_defmcasthlim;
 	im6o.im6o_multicast_loop = (ip6_mrouter != NULL);
@@ -1489,7 +1509,6 @@ mld_send_current_state_report(m0, buflenp, in6m)
 	u_int16_t numsrc = 0, src_once, src_done = 0;
 	u_int8_t type = 0;
 	int error = 0;
-	struct in6_ifaddr *ia = NULL;
 
 	if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa) ||
 		(in6m->in6m_ifp->if_flags & IFF_LOOPBACK) != 0)
@@ -1530,8 +1549,7 @@ mld_send_current_state_report(m0, buflenp, in6m)
 	}
 
 	if (m == NULL) {
-		mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT,
-			     all_v2routers_linklocal, in6m->in6m_ifp, ia);
+		mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
 		if (error != 0) {
 #ifdef MLDV2_DEBUG
 			printf("mld_send_current_state_report: error preparing new report header 1.\n");
@@ -1549,8 +1567,7 @@ mld_send_current_state_report(m0, buflenp, in6m)
 			 */
 			mld_sendbuf(m, in6m->in6m_ifp);
 			m = NULL;
-			mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT,
-			     all_v2routers_linklocal, in6m->in6m_ifp, ia);
+			mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
 			if (error != 0) {
 #ifdef MLDV2_DEBUG
 				printf("mld_send_current_state_report: error preparing new report header 2.\n");
@@ -1592,8 +1609,7 @@ mld_send_current_state_report(m0, buflenp, in6m)
 			 */
 			 mld_sendbuf(m, in6m->in6m_ifp);
 			 m = NULL;
-			 mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT,
-			     all_v2routers_linklocal, in6m->in6m_ifp, ia);
+			 mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
 			if (error != 0) {
 #ifdef MLDV2_DEBUG
 				printf("mld_send_current_state_report: error preparing additional report header.\n");
@@ -1639,7 +1655,6 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 	u_int16_t max_len;
 	u_int16_t numsrc = 0, src_once, src_done = 0;
 	int error = 0;
-	struct in6_ifaddr *ia = NULL;
 
 	if (SS_IS_LOCAL_GROUP(&in6m->in6m_sa) ||
 		(in6m->in6m_ifp->if_flags & IFF_LOOPBACK) != 0)
@@ -1722,8 +1737,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 	}
 
 	if (m == NULL) {
-		mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT,
-		    all_v2routers_linklocal, in6m->in6m_ifp, ia);
+		mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
 		if (error != 0) {
 #ifdef MLDV2_DEBUG
 			printf("mld_send_state_change_report: error preparing new report header.\n");
@@ -1742,8 +1756,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 			 */
 			 mld_sendbuf(m, in6m->in6m_ifp);
 			 m = NULL;
-			 mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT,
-			     all_v2routers_linklocal, in6m->in6m_ifp, ia);
+			 mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
 			if (error != 0) {
 #ifdef MLDV2_DEBUG
 				printf("mld_send_state_change_report: error preparing new report header.\n");
@@ -1815,8 +1828,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 
 			mld_sendbuf(m, in6m->in6m_ifp);
 			m = NULL;
-			mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT,
-			     all_v2routers_linklocal, in6m->in6m_ifp, ia);
+			mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
 			if (error != 0) {
 #ifdef MLDV2_DEBUG
 				printf("mld_send_state_change_report: error preparing additional report header.\n");
@@ -1887,8 +1899,7 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 		if (numsrc > src_done) {
 			mld_sendbuf(m, in6m->in6m_ifp);
 			m = NULL;
-			mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT,
-			    all_v2routers_linklocal, in6m->in6m_ifp, ia);
+			mld_allocbuf(m0, rhdrlen, in6m, MLDV2_LISTENER_REPORT);
 			if (error != 0) {
 #ifdef MLDV2_DEBUG
 				printf("mld_send_state_change_report: error preparing additional report header.\n");
