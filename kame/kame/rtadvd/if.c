@@ -1,4 +1,4 @@
-/*	$KAME: if.c,v 1.7 2000/05/16 13:34:13 itojun Exp $	*/
+/*	$KAME: if.c,v 1.8 2000/05/22 22:04:37 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -148,7 +148,7 @@ if_nametosdl(char *name)
 int
 if_getmtu(char *name)
 {
-#if defined(__FreeBSD__) || defined(__NetBSD__)
+#ifndef __bsdi__
 	struct ifreq ifr;
 	int s;
 
@@ -165,8 +165,7 @@ if_getmtu(char *name)
 	close(s);
 
 	return(ifr.ifr_mtu);
-#endif
-#ifdef __bsdi__
+#else
 	struct ifaddrs *ifap, *ifa;
 	struct if_data *ifd;
 
@@ -185,8 +184,6 @@ if_getmtu(char *name)
 	freeifaddrs(ifap);
 	return 0;
 #endif
-	/* last resort */
-	return 0;
 }
 
 /* give interface index and its old flags, then new flags returned */
