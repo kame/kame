@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.50 2000/08/29 02:32:17 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.51 2000/08/29 03:28:08 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1061,7 +1061,12 @@ prelist_update(new, dr, m)
 			lt6 = &ia6->ia6_lifetime;
 
 #if 0	/* RFC 2462 5.5.3 (e) */
+#if 0
 			storedlifetime = lt6->ia6t_vltime;
+#else
+			storedlifetime = lt6->ia6t_expire > time_second ?
+				lt6->ia6t_expire - time_second : 0;
+#endif
 			lt6->ia6t_pltime = new->ndpr_pltime;
 			if (TWOHOUR < new->ndpr_vltime ||
 			    storedlifetime < new->ndpr_vltime) {
