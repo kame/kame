@@ -1,4 +1,4 @@
-/*	$KAME: dccp6_usrreq.c,v 1.1 2003/10/31 08:47:12 ono Exp $	*/
+/*	$KAME: dccp6_usrreq.c,v 1.2 2003/11/04 10:34:52 ono Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -208,10 +208,14 @@ dccp6_connect(struct socket *so, struct sockaddr *nam, struct proc *td)
 dccp6_connect(struct socket *so, struct mbuf *m, struct proc *td)
 #endif
 {
+#ifdef __FreeBSD__
 	struct inpcb *inp;
+#else
+	struct in6pcb *in6p;
+#endif
 	struct dccpcb *dp;
 	int s, error;
-	struct sockaddr_in *sin;
+	struct sockaddr_in6 *sin6;
 #ifndef __FreeBSD__
 	struct sockaddr *nam;
 #endif
@@ -221,6 +225,7 @@ dccp6_connect(struct socket *so, struct mbuf *m, struct proc *td)
 
 	s = splnet();
 
+#ifdef __FreeBSD__
 	INP_INFO_WLOCK(&dccpbinfo);
 	inp = sotoinpcb(so);
 	if (inp == 0) {
@@ -235,7 +240,17 @@ dccp6_connect(struct socket *so, struct mbuf *m, struct proc *td)
 	}
 
 	dp = (struct dccpcb *)inp->inp_ppcb;
+#else
+	in6p = sotoin6pcb(so);
+	if (in6p == 0) {
+		return EINVAL;
+	}
+	if (!SA6_IS_ADDR_UNSPECIFIED(&in6p->in6p_fsa)) {
+		return EISCONN;
+	}
 
+	dp = (struct dccpcb *)in6p->in6p_ppcb;
+#endif
 	if (dp->state == DCCPS_ESTAB) {
 		DCCP_DEBUG((LOG_INFO, "Why are we in connect when we already have a established connection?\n"));
 	}
@@ -243,9 +258,12 @@ dccp6_connect(struct socket *so, struct mbuf *m, struct proc *td)
 	dp->who = DCCP_CLIENT;
 	dp->seq_snd = arc4random() % 16777216;
 
-	sin = (struct sockaddr_in *)nam;
-	if (sin->sin_family == AF_INET
-	    && IN_MULTICAST(ntohl(sin->sin_addr.s_addr))) {
+#ifndef __FreeBSD__
+	nam = mtod(m, struct sockaddr *);
+#endif
+	sin6 = (struct sockaddr_in6 *)nam;
+	if (sin6->sin6_family == AF_INET6
+	    && IN6_IS_ADDR_MULTICAST(&sin6->sin6_addr)) {
 		splx(s);
 		error = EAFNOSUPPORT;
 		goto bad;
@@ -335,7 +353,7 @@ dccp6_listen(struct socket *so, struct proc *td)
 		return EINVAL;
 	}
 	dp = in6todccpcb(in6p);
-	DCCP_DEBUG((LOG_INFO, "Checking inp->inp_lport!\n"));
+	DCCP_DEBUG((LOG_INFO, "Checking in6p->in6p_lport!\n"));
 	if (in6p->in6p_lport == 0) {
 		error = in6_pcbbind(in6p, (struct mbuf *)0, td);
 	}
