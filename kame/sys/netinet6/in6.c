@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.278 2002/05/28 05:11:39 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.279 2002/06/07 03:50:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -593,9 +593,9 @@ in6_control(so, cmd, data, ifp)
 			if (sa6->sin6_addr.s6_addr16[1] == 0) {
 				/* link ID is not embedded by the user */
 				sa6->sin6_addr.s6_addr16[1] =
-					htons(ifp->if_index);
+				    htons(ifp->if_index);
 			} else if (sa6->sin6_addr.s6_addr16[1] !=
-				    htons(ifp->if_index)) {
+			    htons(ifp->if_index)) {
 				return(EINVAL);	/* link ID contradicts */
 			}
 			if (sa6->sin6_scope_id) {
