@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.98 2003/01/20 07:29:51 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.99 2003/01/22 00:34:08 suz Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -100,7 +100,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 {
 	struct sockaddr_in6 *src_sa, *dst_sa;
 	struct mbuf *m;
-	struct mbuf *n;
+	struct m_tag *n;
 	struct ip6aux *ip6a;
 	struct ip6_pktopts opt;
 	int error = 0;
@@ -130,7 +130,7 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 	/* a home address destination option must not exist. */
 	n = ip6_findaux(m0);
 	if (n) {
-		ip6a = mtod(n, struct ip6aux *);
+		ip6a = (struct ip6aux *) (n + 1);
 		if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
 			mip6log((LOG_NOTICE,
 			    "%s:%d: recieved a home test init with "
@@ -228,7 +228,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 {
 	struct sockaddr_in6 *src_sa, *dst_sa;
 	struct mbuf *m;
-	struct mbuf *n;
+	struct m_tag *n;
 	struct ip6aux *ip6a;
 	struct ip6_pktopts opt;
 	int error = 0;
@@ -264,7 +264,7 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 	/* a home address destination option must not exist. */
 	n = ip6_findaux(m0);
 	if (n) {
-		ip6a = mtod(n, struct ip6aux *);
+		ip6a = (struct ip6aux *) (n + 1);
 		if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
 			mip6log((LOG_NOTICE,
 			    "%s:%d: recieved a care-of test init with "
@@ -534,7 +534,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 {
 	struct ip6_hdr *ip6;
 	struct sockaddr_in6 *src_sa, *dst_sa;
-	struct mbuf *n;
+	struct m_tag *n;
 	struct ip6aux *ip6a = NULL;
 	u_int8_t isprotected = 0;
 	u_int8_t haseen = 0;
@@ -598,7 +598,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 		m_freem(m);
 		return (EINVAL);
 	}
-	ip6a = mtod(n, struct ip6aux *);
+	ip6a = (struct ip6aux *) (n + 1);
 	if ((ip6a->ip6a_flags & IP6A_HASEEN) == 0) {
 		m_freem(m);
 		return (EINVAL);

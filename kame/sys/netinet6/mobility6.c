@@ -1,4 +1,4 @@
-/*	$KAME: mobility6.c,v 1.17 2002/12/02 15:14:27 keiichi Exp $	*/
+/*	$KAME: mobility6.c,v 1.18 2003/01/22 00:34:08 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -86,7 +86,7 @@ mobility6_input(mp, offp, proto)
 	int *offp, proto;
 {
 	struct mbuf *m = *mp;
-	struct mbuf *n; /* for ip6aux */
+	struct m_tag *n; /* for ip6aux */
 	struct ip6_hdr *ip6;
 	struct ip6_mobility *mh6;
 	int off = *offp, mh6len;
@@ -213,7 +213,7 @@ mobility6_input(mp, offp, proto)
 			struct sockaddr_in6 src_sa;
 			struct sockaddr_in6 *home_sa, sin6;
 
-			ip6a = mtod(n, struct ip6aux *);
+			ip6a = (struct ip6aux *) (n + 1);
 			src_sa = ip6a->ip6a_src;
 			home_sa = &ip6a->ip6a_src;
 			if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {

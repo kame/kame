@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.53 2002/10/09 13:07:07 keiichi Exp $	*/
+/*	$KAME: dest6.c,v 1.54 2003/01/22 00:34:07 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -92,7 +92,7 @@ dest6_input(mp, offp, proto)
 	struct ip6_dest *dstopts;
 	u_int8_t *opt;
 #ifdef MIP6
-	struct mbuf *n;
+	struct m_tag *n;
 	struct sockaddr_in6 *src_sa, *dst_sa, home_sa;
 	struct ip6_opt_home_address *haopt = NULL;
 	struct ip6aux *ip6a = NULL;
@@ -149,7 +149,7 @@ dest6_input(mp, offp, proto)
 				/* not enough core */
 				goto bad;
 			}
-			ip6a = mtod(n, struct ip6aux *);
+			ip6a = (struct ip6aux *) (n + 1);
 			if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
 				/* XXX icmp6 paramprob? */
 				goto bad;
@@ -312,7 +312,7 @@ dest6_mip6_hao(m, mhoff, nxt)
 	struct ip6_hdr *ip6;
 	struct ip6aux *ip6a;
 	struct ip6_opt ip6o;
-	struct mbuf *n;
+	struct m_tag *n;
 	struct sockaddr_in6 home_sa;
 	struct ip6_opt_home_address haopt;
 	struct ip6_mobility mh;
@@ -326,7 +326,7 @@ dest6_mip6_hao(m, mhoff, nxt)
 	n = ip6_findaux(m);
 	if (!n)
 		return (0);
-	ip6a = mtod(n, struct ip6aux *);
+	ip6a = (struct ip6aux *) (n + 1);
 
 	if ((ip6a->ip6a_flags & (IP6A_HASEEN | IP6A_SWAP)) != IP6A_HASEEN)
 		return (0);

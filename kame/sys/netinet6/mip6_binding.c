@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.164 2003/01/17 10:26:21 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.165 2003/01/22 00:34:08 suz Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2963,7 +2963,7 @@ int
 mip6_route_optimize(m)
 	struct mbuf *m;
 {
-	struct mbuf *n;
+	struct m_tag *n;
 	struct in6_ifaddr *ia;
 	struct ip6aux *ip6a;
 	struct ip6_hdr *ip6;
@@ -3001,7 +3001,7 @@ mip6_route_optimize(m)
 
 	n = ip6_findaux(m);
 	if (n) {
-		ip6a = mtod(n, struct ip6aux *);
+		ip6a = (struct ip6aux *) (n + 1);
 		if (ip6a->ip6a_flags & IP6A_ROUTEOPTIMIZED) {
 			/* no need to optimize route. */
 			return (0);

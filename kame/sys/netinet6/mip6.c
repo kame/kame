@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.193 2003/01/21 05:45:58 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.194 2003/01/22 00:34:07 suz Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2393,7 +2393,7 @@ mip6_addr_exchange(m, dstm)
 	struct in6_addr ip6_src;
 	u_int8_t *opt;
 	int ii, dstoptlen;
-	struct mbuf *n;
+	struct m_tag *n;
 
 	/* sanity check */
 	if (!MIP6_IS_MN) {
@@ -2449,7 +2449,7 @@ mip6_addr_exchange(m, dstm)
 	n = ip6_findaux(m);
 	if (n) {
 		struct ip6aux *ip6a;
-		ip6a = mtod(n, struct ip6aux *);
+		ip6a = (struct ip6aux *) (n + 1);
 		/* XXX scope */
 		bcopy(haopt->ip6oh_addr, &ip6a->ip6a_src.sin6_addr,
 		      sizeof(haopt->ip6oh_addr));
