@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.137 2002/05/30 06:51:38 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.138 2002/05/30 15:05:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3615,7 +3615,12 @@ ipsec_copypkt(m)
 			 * references to the cluster.
 			 * XXX: is this approach effective?
 			 */
-			if (M_READONLY(n)) {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+			if (!M_WRITABLE(n))
+#else
+			if (M_READONLY(n))
+#endif
+			{
 				int remain, copied;
 				struct mbuf *mm;
 

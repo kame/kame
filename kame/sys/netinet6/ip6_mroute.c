@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.69 2002/05/30 06:52:31 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.70 2002/05/30 15:05:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -104,6 +104,10 @@
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 static MALLOC_DEFINE(M_MRTABLE, "mf6c", "multicast forwarding cache entry");
+#endif
+
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#define M_READONLY(x)	(!M_WRITABLE(x))
 #endif
 
 static int ip6_mdq __P((struct mbuf *, struct ifnet *, struct mf6c *));

@@ -1,4 +1,4 @@
-/*	$KAME: uipc_mbuf2.c,v 1.35 2002/05/30 06:52:10 itojun Exp $	*/
+/*	$KAME: uipc_mbuf2.c,v 1.36 2002/05/30 15:05:46 itojun Exp $	*/
 /*	$NetBSD: uipc_mbuf.c,v 1.40 1999/04/01 00:23:25 thorpej Exp $	*/
 
 /*
@@ -200,7 +200,11 @@ m_pulldown(m, off, len, offp)
 		return NULL;	/* mbuf chain too short */
 	}
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+	sharedcluster = !M_WRITABLE(n);
+#else
 	sharedcluster = M_READONLY(n);
+#endif
 
 	/*
 	 * the target data is on <n, off>.
