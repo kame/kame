@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.41 2004/08/17 04:06:20 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.42 2004/08/17 06:28:02 t-momose Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -1113,13 +1113,13 @@ sctp_fill_up_addresses(struct sctp_inpcb *inp,
 	}
 
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUNDALL) {
-		TAILQ_FOREACH(ifn, &ifnet, if_link) {
+		TAILQ_FOREACH(ifn, &ifnet, if_list) {
 			if ((loopback_scope == 0) &&
 			    (ifn->if_type == IFT_LOOP)) {
 				/* Skip loopback if loopback_scope not set */
 				continue;
 			}
-			TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+			TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 				if (stcb) {
 				/*
 				 * For the BOUND-ALL case, the list
@@ -1276,8 +1276,8 @@ sctp_count_max_addresses(struct sctp_inpcb *inp)
 		struct ifnet *ifn;
 		struct ifaddr *ifa;
 
-		TAILQ_FOREACH(ifn, &ifnet, if_link) {
-			TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+		TAILQ_FOREACH(ifn, &ifnet, if_list) {
+			TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 				/* Count them if they are the right type */
 				if (ifa->ifa_addr->sa_family == AF_INET) {
 					if (inp->sctp_flags & SCTP_I_WANT_MAPPED_V4_ADDR) 
@@ -3875,7 +3875,7 @@ sctp_usrreq(so, req, m, nam, control)
 		struct ifnet *ifn;
 		struct ifaddr *ifa;
 		ifn = (struct ifnet *)control;
-		TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+		TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 			if (ifa->ifa_addr->sa_family == family) {
 				sctp_delete_ip_address(ifa);
 			}

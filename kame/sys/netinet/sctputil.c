@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.31 2004/08/17 04:06:21 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.32 2004/08/17 06:28:02 t-momose Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -3469,9 +3469,9 @@ sctp_find_ifa_by_addr(struct sockaddr *sa)
 	struct ifaddr *ifa;
 
 	/* go through all our known interfaces */
-	TAILQ_FOREACH(ifn, &ifnet, if_link) {
+	TAILQ_FOREACH(ifn, &ifnet, if_list) {
 		/* go through each interface addresses */
-		TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+		TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 			/* correct family? */
 			if (ifa->ifa_addr->sa_family != sa->sa_family)
 				continue;

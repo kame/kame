@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.c,v 1.22 2004/08/17 04:06:15 itojun Exp $	*/
+/*	$KAME: sctp_asconf.c,v 1.23 2004/08/17 06:28:01 t-momose Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -2137,12 +2137,12 @@ sctp_find_valid_localaddr(struct sctp_tcb *stcb)
 	struct ifnet *ifn;
 	struct ifaddr *ifa;
 
-	TAILQ_FOREACH(ifn, &ifnet, if_link) {
+	TAILQ_FOREACH(ifn, &ifnet, if_list) {
 		if (stcb->asoc.loopback_scope == 0 && ifn->if_type == IFT_LOOP) {
 			/* Skip if loopback_scope not set */
 			continue;
 		}
-		TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+		TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 			if (ifa->ifa_addr->sa_family == AF_INET &&
 			    stcb->asoc.ipv4_addr_legal) {
 				struct sockaddr_in *sin;
@@ -2795,14 +2795,14 @@ sctp_check_address_list_all(struct sctp_tcb *stcb, struct mbuf *m, int offset,
 	struct ifaddr *ifa;
 
 	/* go through all our known interfaces */
-	TAILQ_FOREACH(ifn, &ifnet, if_link) {
+	TAILQ_FOREACH(ifn, &ifnet, if_list) {
 		if (loopback_scope == 0 && ifn->if_type == IFT_LOOP) {
 			/* skip loopback interface */
 			continue;
 		}
 
 		/* go through each interface address */
-		TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+		TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 			/* do i have it implicitly? */
 			if (sctp_cmpaddr(ifa->ifa_addr, init_addr)) {
 #ifdef SCTP_DEBUG

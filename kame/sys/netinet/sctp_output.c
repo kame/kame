@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.43 2004/08/17 04:06:18 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.44 2004/08/17 06:28:02 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003, 2004 Cisco Systems Inc,
@@ -517,12 +517,12 @@ sctp_ipv4_source_address_selection(struct sctp_inpcb *inp,
 		 * negative list and rotate amongst them.
 		 */
 		for (ifn = inp->next_ifn_touse; ifn;
-		    ifn = TAILQ_NEXT(ifn, if_link)) {
+		    ifn = TAILQ_NEXT(ifn, if_list)) {
 			if (loopscope == 0 && ifn->if_type == IFT_LOOP) {
 				/* wrong base scope */
 				continue;
 			}
-			TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+			TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 				if (ifa->ifa_addr->sa_family == AF_INET) {
 					struct sockaddr_in *ifa_a;
 					ifa_a = (struct sockaddr_in *)
@@ -539,7 +539,7 @@ sctp_ipv4_source_address_selection(struct sctp_inpcb *inp,
 					/* we can use it !! */
 					/* set to start with next intf */
 					inp->next_ifn_touse =
-					    TAILQ_NEXT(ifn, if_link);
+					    TAILQ_NEXT(ifn, if_list);
 					return (ifa_a->sin_addr);
 				}
 			}
@@ -550,12 +550,12 @@ sctp_ipv4_source_address_selection(struct sctp_inpcb *inp,
 		 */
 		for (ifn = TAILQ_FIRST(&ifnet);
 		    ifn && (ifn != inp->next_ifn_touse);
-		    ifn=TAILQ_NEXT(ifn, if_link)) {
+		    ifn=TAILQ_NEXT(ifn, if_list)) {
 			if (loopscope == 0 && ifn->if_type == IFT_LOOP) {
 				/* wrong base scope */
 				continue;
 			}
-			TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+			TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 				if (ifa->ifa_addr->sa_family == AF_INET) {
 					struct sockaddr_in *ifa_a;
 					ifa_a = (struct sockaddr_in *)
@@ -571,7 +571,7 @@ sctp_ipv4_source_address_selection(struct sctp_inpcb *inp,
 					/* we can use it !! */
 					/* set to start with next intf */
 					inp->next_ifn_touse =
-					    TAILQ_NEXT(ifn, if_link);
+					    TAILQ_NEXT(ifn, if_list);
 					return (ifa_a->sin_addr);
 				}
 			}
@@ -982,7 +982,7 @@ sctp_choose_correctv6_scope(struct rtentry *rt, int site_scope, int loc_scope, i
 	if (ifn == NULL) {
 		return (sin6);
 	}
-	TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+	TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 		if (ifa->ifa_addr->sa_family != AF_INET6) {
 			continue;
 		}
@@ -1043,7 +1043,7 @@ sctp_choose_correctv6_scope(struct rtentry *rt, int site_scope, int loc_scope, i
 	 * send back a default, i.e. one that is the right
 	 * scope.
 	 */
-	TAILQ_FOREACH(ifa,&ifn->if_addrhead, ifa_link) {
+	TAILQ_FOREACH(ifa,&ifn->if_addrlist, ifa_list) {
 		if (ifa->ifa_addr->sa_family != AF_INET6) {
 			continue;
 		}
@@ -1194,12 +1194,12 @@ sctp_ipv6_source_address_selection(struct sctp_inpcb *inp, struct sctp_tcb *stcb
 		 * negative list and rotate amongst them.
 		 */
 		for (ifn = inp->next_ifn_touse; ifn;
-		    ifn = TAILQ_NEXT(ifn, if_link)) {
+		    ifn = TAILQ_NEXT(ifn, if_list)) {
 			if (loopscope == 0 && ifn->if_type == IFT_LOOP) {
 				/* wrong base scope */
 				continue;
 			}
-			TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+			TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 				if (ifa->ifa_addr->sa_family == AF_INET6) {
 					struct sockaddr_in6 *ifa_a;
 					ifa_a = (struct sockaddr_in6 *)
@@ -1242,7 +1242,7 @@ sctp_ipv6_source_address_selection(struct sctp_inpcb *inp, struct sctp_tcb *stcb
 					/* we can use it !! */
 					/* set to start with next intf */
 					inp->next_ifn_touse =
-					    TAILQ_NEXT(ifn, if_link);
+					    TAILQ_NEXT(ifn, if_list);
 					return (ifa_a->sin6_addr);
 				}
 			}
@@ -1253,12 +1253,12 @@ sctp_ipv6_source_address_selection(struct sctp_inpcb *inp, struct sctp_tcb *stcb
 		 */
 		for (ifn = TAILQ_FIRST(&ifnet);
 		     ifn && (ifn != inp->next_ifn_touse);
-		     ifn = TAILQ_NEXT(ifn, if_link)) {
+		     ifn = TAILQ_NEXT(ifn, if_list)) {
 			if (loopscope == 0 && ifn->if_type == IFT_LOOP) {
 				/* wrong base scope */
 				continue;
 			}
-			TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+			TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 				if (ifa->ifa_addr->sa_family == AF_INET6) {
 					struct sockaddr_in6 *ifa_a;
 					ifa_a = (struct sockaddr_in6 *)
@@ -1303,7 +1303,7 @@ sctp_ipv6_source_address_selection(struct sctp_inpcb *inp, struct sctp_tcb *stcb
 					/* we can use it !! */
 					/* set to start with next intf */
 					inp->next_ifn_touse =
-					    TAILQ_NEXT(ifn, if_link);
+					    TAILQ_NEXT(ifn, if_list);
 					return (ifa_a->sin6_addr);
 				}
 			}
@@ -1318,12 +1318,12 @@ sctp_ipv6_source_address_selection(struct sctp_inpcb *inp, struct sctp_tcb *stcb
 		 * without worrying about restrictions.
 		 */
 		for (ifn = TAILQ_FIRST(&ifnet); ifn;
-		    ifn = TAILQ_NEXT(ifn, if_link)) {
+		    ifn = TAILQ_NEXT(ifn, if_list)) {
 			if (loopscope == 0 && ifn->if_type == IFT_LOOP) {
 				/* wrong base scope */
 				continue;
 			}
-			TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+			TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 				if (ifa->ifa_addr->sa_family == AF_INET6) {
 					struct sockaddr_in6 *ifa_a;
 					ifa_a = (struct sockaddr_in6 *)
@@ -1363,7 +1363,7 @@ sctp_ipv6_source_address_selection(struct sctp_inpcb *inp, struct sctp_tcb *stcb
 					/* we can use it !! */
 					/* set to start with next intf */
 					inp->next_ifn_touse =
-					    TAILQ_NEXT(ifn, if_link);
+					    TAILQ_NEXT(ifn, if_list);
 					return (ifa_a->sin6_addr);
 				}
 			}
@@ -2524,7 +2524,7 @@ sctp_send_initiate(struct sctp_inpcb *inp, struct sctp_tcb *stcb)
 		int cnt;
 
 		cnt = 0;
- 		TAILQ_FOREACH(ifn,&ifnet, if_link) {
+ 		TAILQ_FOREACH(ifn,&ifnet, if_list) {
 			if ((stcb->asoc.loopback_scope == 0) &&
 			    (ifn->if_type == IFT_LOOP)) {
 				/*
@@ -2533,7 +2533,7 @@ sctp_send_initiate(struct sctp_inpcb *inp, struct sctp_tcb *stcb)
 				 */
 				continue;
 			}
-			TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+			TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 				if (sctp_is_address_in_scope(ifa,
 				    stcb->asoc.ipv4_addr_legal,
 				    stcb->asoc.ipv6_addr_legal,
@@ -2547,7 +2547,7 @@ sctp_send_initiate(struct sctp_inpcb *inp, struct sctp_tcb *stcb)
 			}
 		}
 		if (cnt > 1) {
-			TAILQ_FOREACH(ifn,&ifnet, if_link) {
+			TAILQ_FOREACH(ifn,&ifnet, if_list) {
 				if ((stcb->asoc.loopback_scope == 0) &&
 				    (ifn->if_type == IFT_LOOP)) {
 					/*
@@ -2556,7 +2556,7 @@ sctp_send_initiate(struct sctp_inpcb *inp, struct sctp_tcb *stcb)
 					 */
 					continue;
 				}
-				TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+				TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 					if (sctp_is_address_in_scope(ifa,
 					    stcb->asoc.ipv4_addr_legal,
 					    stcb->asoc.ipv6_addr_legal,
@@ -3424,7 +3424,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 		struct ifaddr *ifa;
 		int cnt = 0;
 
-		TAILQ_FOREACH(ifn,&ifnet, if_link) {
+		TAILQ_FOREACH(ifn,&ifnet, if_list) {
 			if ((stc.loopback_scope == 0) &&
 			    (ifn->if_type == IFT_LOOP)) {
 				/*
@@ -3433,7 +3433,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 				 */
 				continue;
 			}
-			TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+			TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 				if (sctp_is_address_in_scope(ifa,
 				    stc.ipv4_addr_legal, stc.ipv6_addr_legal,
 				    stc.loopback_scope, stc.ipv4_scope,
@@ -3444,7 +3444,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 			}
 		}
 		if (cnt > 1) {
-			TAILQ_FOREACH(ifn, &ifnet, if_link) {
+			TAILQ_FOREACH(ifn, &ifnet, if_list) {
 				if ((stc.loopback_scope == 0) &&
 				    (ifn->if_type == IFT_LOOP)) {
 					/*
@@ -3453,7 +3453,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp, struct sctp_tcb *stcb,
 					 */
 					continue;
 				}
-				TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+				TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 					if (sctp_is_address_in_scope(ifa,
 					    stc.ipv4_addr_legal,
 					    stc.ipv6_addr_legal,

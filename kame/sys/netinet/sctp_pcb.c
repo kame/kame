@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.36 2004/08/17 04:06:18 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.37 2004/08/17 06:28:02 t-momose Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -1397,7 +1397,7 @@ sctp_inpcb_alloc(struct socket *so)
 		ranm = ranp + SCTP_SIGNATURE_ALOC_SIZE;
 		if ((u_long)ranp % 4) {
 			/* not a even boundary? */
-			ranp = (u_int32_t *)SCTP_SIZE32(ranp);
+			ranp = (u_int32_t *)SCTP_SIZE32((u_long)ranp);
 		}
 		while (ranp < ranm) {
 			*ranp = random();
@@ -2218,8 +2218,8 @@ sctp_is_address_on_local_host(struct sockaddr *addr)
 {
 	struct ifnet *ifn;
 	struct ifaddr *ifa;
-	TAILQ_FOREACH(ifn, &ifnet, if_link) {
-		TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+	TAILQ_FOREACH(ifn, &ifnet, if_list) {
+		TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 			if (addr->sa_family == ifa->ifa_addr->sa_family) {
 				/* same family */
 				if (addr->sa_family == AF_INET) {

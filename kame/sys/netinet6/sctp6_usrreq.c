@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.34 2004/08/17 04:06:22 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.35 2004/08/17 06:28:03 t-momose Exp $	*/
 
 /*
  * Copyright (c) 2001, 2002, 2003, 2004 Cisco Systems, Inc.
@@ -1614,7 +1614,7 @@ sctp6_usrreq(so, req, m, nam, control, p)
 		struct ifnet *ifn;
 		struct ifaddr *ifa;
 		ifn = (struct ifnet *)control;
-		TAILQ_FOREACH(ifa, &ifn->if_addrhead, ifa_link) {
+		TAILQ_FOREACH(ifa, &ifn->if_addrlist, ifa_list) {
 			if (ifa->ifa_addr->sa_family == family) {
 				sctp_delete_ip_address(ifa);
 			}
