@@ -3,7 +3,7 @@
 # Date created:         28 Jan 1998
 # Whom:                 itojun@itojun.org
 #
-# $Id: Makefile,v 1.1 1999/08/08 23:59:34 itojun Exp $
+# $Id: Makefile,v 1.2 1999/12/08 04:27:10 itojun Exp $
 #
 
 DISTNAME=       tcpd-v6-0.0-980106
@@ -13,6 +13,8 @@ MASTER_SITES=   http://www.rcac.tdi.co.jp/fujiwara/
 
 MAINTAINER=     itojun@itojun.org
 
+BROKEN=		"insufficient sync with netbsd make(1)"
+
 WRKSRC=		${WRKDIR}/tcpd
 
 pre-install:
@@ -21,4 +23,4 @@ pre-install:
 	${MKDIR} ${PREFIX}/v6/lib
 	${MKDIR} ${PREFIX}/v6/libexec
 
-.include <bsd.port.mk>
+.include "../../mk/bsd.pkg.mk"
