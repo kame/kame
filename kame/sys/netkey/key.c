@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.248 2002/06/12 17:55:32 itojun Exp $	*/
+/*	$KAME: key.c,v 1.249 2002/06/14 14:46:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -7350,14 +7350,18 @@ key_init()
 	ip4_def_policy = key_newsp();
 	if (!ip4_def_policy)
 		panic("could not initialize IPv4 default security policy");
+	ip4_def_policy->state = IPSEC_SPSTATE_ALIVE;
 	ip4_def_policy->policy = IPSEC_POLICY_NONE;
+	ip4_def_policy->dir = IPSEC_DIR_ANY;
 	ip4_def_policy->readonly = 1;
 #endif
 #ifdef INET6
 	ip6_def_policy = key_newsp();
 	if (!ip6_def_policy)
 		panic("could not initialize IPv6 default security policy");
+	ip6_def_policy->state = IPSEC_SPSTATE_ALIVE;
 	ip6_def_policy->policy = IPSEC_POLICY_NONE;
+	ip6_def_policy->dir = IPSEC_DIR_ANY;
 	ip6_def_policy->readonly = 1;
 #endif
 
