@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.726 2000/03/25 05:53:12 sumikawa Exp $
+$Id: CHANGELOG,v 1.727 2000/03/26 11:07:20 itojun Exp $
 
 <200003>
+Sun Mar 26 20:05:55 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/mail/fetchmail: upgrade to 5.3.4.
+
 Sat Mar 25 14:52:06 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd[23]/ports/socks64: upgrade to latest patch.
 
