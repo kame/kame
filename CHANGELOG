@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1816 2001/07/25 12:25:52 jinmei Exp $
+$KAME: CHANGELOG,v 1.1817 2001/07/25 17:13:43 itojun Exp $
 
 <200107>
+Thu Jul 26 02:12:04 JST 2001  itojun@iijlab.net
+	* *bsd*/sys/netinet*/in*_pcb.c: call ipsec_init_policy() from
+	  within in*_pcballoc(), not from PRU_ATTACH logic.  it is to make
+	  the allocation of ipsec policy struct prior to making inpcb available
+	  to the world (don't show incomplete inpcb to others).
+	  can lead to panic(), as reported on stable@freebsd.
+
 Wed Jul 25 18:15:37 JST 2001	suz@sdl.hitachi.co.jp
 	* kame/sys/netinet6/udp6_output.c, freebsd4/sys/netinet6/udp_usrreq.c:
 	rejects IPv6 packet toward IPv4-mapped address if its source
