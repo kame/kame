@@ -59,7 +59,7 @@
 #include <sys/signalvar.h>
 
 #include <machine/frame.h>
-#include <machine/random.h>
+#include <sys/random.h>
 #include <machine/psl.h>
 #include <machine/specialreg.h>
 #include <i386/isa/intr_machdep.h>
