@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.22 2001/10/22 09:27:53 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.23 2001/10/23 07:49:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2192,7 +2192,7 @@ mip6_bc_timeout(dummy)
 
 		/* XXX set BR_WAITSENT when BC is going to expire */
 		if (mbc->mbc_remain < (mbc->mbc_lifetime / 4)) { /* XXX */
-			mbc->mbc_flags &= MIP6_BC_STATE_BR_WAITSENT;
+			mbc->mbc_state &= MIP6_BC_STATE_BR_WAITSENT;
 		}
 
 		/* XXX send BA if BA_WAITSENT is remained not
