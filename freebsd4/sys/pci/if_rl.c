@@ -1357,19 +1357,23 @@ static void rl_start(ifp)
 {
 	struct rl_softc		*sc;
 	struct mbuf		*m_head = NULL;
+	int			pkts = 0;
 
 	sc = ifp->if_softc;
 
 	while(RL_CUR_TXMBUF(sc) == NULL) {
-		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		if (rl_encap(sc, m_head)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		/* now we are committed to transmit the packet */
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
+		pkts++;
 
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
@@ -1389,6 +1393,8 @@ static void rl_start(ifp)
 
 		RL_INC(sc->rl_cdata.cur_tx);
 	}
+	if (pkts == 0)
+		return;
 
 	/*
 	 * We broke out of the loop because all our TX slots are

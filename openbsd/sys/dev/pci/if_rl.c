@@ -929,6 +929,7 @@ void rl_start(ifp)
 {
 	struct rl_softc		*sc;
 	struct mbuf		*m_head = NULL;
+	int			pkts = 0;
 
 	sc = ifp->if_softc;
 
@@ -939,6 +940,7 @@ void rl_start(ifp)
 
 		/* Pack the data into the descriptor. */
 		rl_encap(sc, m_head);
+		pkts++;
 
 #if NBPFILTER > 0
 		/*
@@ -959,6 +961,8 @@ void rl_start(ifp)
 
 		RL_INC(sc->rl_cdata.cur_tx);
 	}
+	if (pkts == 0)
+		return;
 
 	/*
 	 * We broke out of the loop because all our TX slots are

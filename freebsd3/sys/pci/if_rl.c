@@ -1633,6 +1633,7 @@ static void rl_start(ifp)
 {
 	struct rl_softc		*sc;
 	struct mbuf		*m_head = NULL;
+	int			pkts = 0;
 
 	sc = ifp->if_softc;
 
@@ -1647,6 +1648,7 @@ static void rl_start(ifp)
 			break;
 
 		rl_encap(sc, m_head);
+		pkts++;
 
 #if NBPFILTER > 0
 		/*
@@ -1667,6 +1669,8 @@ static void rl_start(ifp)
 
 		RL_INC(sc->rl_cdata.cur_tx);
 	}
+	if (pkts == 0)
+		return;
 
 	/*
 	 * We broke out of the loop because all our TX slots are
