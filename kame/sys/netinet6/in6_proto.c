@@ -352,7 +352,7 @@ struct ip6protosw inet6sw[] = {
 },
 #ifdef INET6
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
-  in6_gif_input, rip6_output,	 0,	rip6_ctloutput,
+  encap6_input, rip6_output,	 0,	rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
 #else
