@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.196 2001/02/26 09:29:05 itojun Exp $
+	$KAME: IMPLEMENTATION,v 1.197 2001/02/28 14:33:51 itojun Exp $
 
 1. IPv6
 
@@ -1570,6 +1570,16 @@ we do it incrementally.  As a result, we get crypto checksums like below:
 	AH1 has checksum against "IP AH1' AH2 AH3 payload",
 Also note that AH3 has the smallest sequence number, and AH1 has the largest
 sequence number.
+
+To avoid traffic analysis on shorter packets, ESP output logic supports
+random length padding.  By setting net.inet.ipsec.esp_randpad (or
+net.inet6.ipsec6.esp_randpad) to positive value N, you can ask the kernel
+to randomly pad packets shorter than N bytes, to random length smaller than
+or equal to N.  Note that N does not include ESP authentication data length.
+Also note that the random padding is not included in TCP segment
+size computation.  Negative value will turn off the functionality.
+Recommeded value for N is like 128, or 256.  If you use a too big number
+as N, you may experience inefficiency due to fragmented packtes.
 
 4.4 IPComp handling
 
