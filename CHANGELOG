@@ -1,7 +1,41 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2533 2004/01/24 09:22:01 keiichi Exp $
+$KAME: CHANGELOG,v 1.2534 2004/01/26 06:54:34 itojun Exp $
 
 <200401>
+Jan 2004  itojun@iijlab.net
+	* sctp patch #17
+
+	1) Changes the hb random number to 64 bit value.
+	2) Expands the protection of when a peer sends a ACK
+	   for a TSN we have not sent we abort. This used to
+	   only be the cum-ack. It now expands to include out
+	   of order segments.
+	3) Reverse the order of test for shutdown-rcv vs shutdown_pending.
+	   M Tuexen found that we would get a shutdown, the app close the
+	   socket, and then we would send SHUTDOWN instead of SHUTDOWN-ACK when
+	   the queue cleared.
+	4) TCP model enhancment to obey so_qlimit - found by Marko Lindholm
+	5) IN_MULTICAST in Open and Net BSD do NOT need ntohl() - found by
+	   Marko Lindholm
+	6) More enhancment of base freebsd port for the effort to get to M
+	   Tuexen something
+	   that can get into Max X
+	7) Alternate route is deleted and becomes a patch from the sctp.org web
+	   site.
+	8) Kozuka-san's enhancment to TCP model association lookup.
+	9) SOme more FreeBSD version 5 stuff.
+
+	* sctp: fix misuse of "int" where "u_int32_t" is required
+	* sctp: portability issue w/ freebsd (timersub/add/cmp)
+
+	* sctp patch #18
+
+	1) Add (in addtion to your changes) the htonl()
+	2) Missed patch you have not gotten to with same int/u_int32_t issue
+	3) Patches from peter adding to BASE_FREEBSD port code.
+	4) Patches for OpenBSD ... a compile issue with 3.4 caught by
+	   Kozuka-san
+
 Sat Jan 24 18:18:27 JST 2004	keiichi@iij.ad.jp
 	* kame/sys/net/if_hif.[hc], kame/sys/netinet6/mip6_icmp6.c
 	made a mobile node send a mobile prefix solicitation message
