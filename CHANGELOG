@@ -1,9 +1,9 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1862 2001/09/05 03:20:55 jinmei Exp $
+$KAME: CHANGELOG,v 1.1863 2001/09/05 03:21:47 jinmei Exp $
 
 <200109>
 2001-09-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* kame/sys/netinet6/ip6_input.c (ip6_sysctl): made
+	* kame/sys/netinet6/ip6_input.c (ip6_sysctl): (bsdi only) made
 	net.inet[6].ip6.v6only modifiable.
 
 Wed Sep  5 12:05:14 JST 2001  itojun@iijlab.net
