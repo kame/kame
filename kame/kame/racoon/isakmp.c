@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.35 2000/01/11 19:29:41 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.36 2000/01/11 21:55:51 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -359,6 +359,12 @@ isakmp_main(msg, remote, local)
 
 		/* receive */
 		YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
+		if (ph1exchange[etypesw(iph1->etype)]
+		                [iph1->side]
+		                [iph1->status] == NULL) {
+			/* ignore it */
+			return -1;
+		}
 		if ((ph1exchange[etypesw(iph1->etype)]
 		                [iph1->side]
 		                [iph1->status])(iph1, msg) < 0) {
