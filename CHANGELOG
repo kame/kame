@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2413 2003/06/19 07:50:38 jinmei Exp $
+$KAME: CHANGELOG,v 1.2414 2003/06/19 07:57:16 jinmei Exp $
 
 <200306>
 2003-06-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -26,7 +26,6 @@ Mon Jun 16 18:49:02 JST 2003	keiichi@iij.ad.jp
 	address instead of its care-of address.
 	reported by Yukiyo Akisada <Yukiyo.Akisada@jp.yokogawa.com>.
 
->>>>>>> 1.2412
 2003-06-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/net/if.c (if_detach): be sure to free the link
 	ifaddr at the end of the function.  (A supplement fix to another
