@@ -1,7 +1,18 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2318 2003/01/23 00:32:38 suz Exp $
+$KAME: CHANGELOG,v 1.2319 2003/01/23 03:29:30 jinmei Exp $
 
 <200301>
+2003-01-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: supported a new substatement "prefix" for the
+	id-assoc statement, which allows the client to require a
+	particular prefix(es) as a subotion of the IA_PD option in Solicit
+	messages.
+
+2003-01-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6s.c (make_binding_ia): used local values
+	for the pltime and vltime of a prefix to be renewed/rebound, not
+	values in the renew/rebind message.
+
 Thu Jan 23 09:26:35 JST 2003	suz@crl.hitachi.co.jp
 	* kame/kame/pim6sd: 
 	- fixed MLD query advertisement failure
