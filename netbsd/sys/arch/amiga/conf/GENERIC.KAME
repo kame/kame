@@ -1,5 +1,3 @@
 include	"arch/amiga/conf/GENERIC"
 
 # INET6 and IPSEC items are defined in GENERIC
-
-options 	NEW_STRUCT_ROUTE		# mandatory

@@ -2,8 +2,6 @@ include	"arch/macppc/conf/GENERIC"
 
 # INET6 and IPSEC items are defined in GENERIC
 
-options 	NEW_STRUCT_ROUTE		# mandatory
-
 # Mobile IPv6
 #options	MIP6			# required for all node types
 #options	MIP6_HOME_AGENT		# required for a home agent
