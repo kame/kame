@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.185 2001/12/04 10:36:57 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.186 2001/12/12 01:55:44 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -393,7 +393,7 @@ nd6_ra_input(m, off, icmp6len)
 				continue; /* prefix lifetime init failed */
 #ifdef MIP6
 			if (MIP6_IS_MN) {
-				if (mip6_process_pinfo(&saddr6, &pr, dr, m)) {
+				if (mip6_prefix_list_update(&saddr6, &pr, dr, m)) {
 					mip6log((LOG_ERR,
 						 "%s:%d: "
 						 "prefix info processing "
