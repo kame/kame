@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.133 2001/03/21 20:27:27 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.134 2001/03/23 01:19:08 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -256,7 +256,7 @@ isakmp_handler(so_isakmp)
 			"(valid as UDP but not with IKE)\n");
 		goto end;
 	}
-	if (cmpsaddr((struct sockaddr *)&local,
+	if (cmpsaddrwild((struct sockaddr *)&local,
 			(struct sockaddr *)&remote) == 0) {
 		plog(LLV_ERROR, LOCATION, (struct sockaddr *)&remote,
 			"possible attack: "
@@ -343,7 +343,7 @@ isakmp_main(msg, remote, local)
 	iph1 = getph1byindex(index);
 	if (iph1 != NULL) {
 		/* must be same addresses in one stream of a phase at least. */
-		if (cmpsaddr(iph1->remote, remote) != 0) {
+		if (cmpsaddrwild(iph1->remote, remote) != 0) {
 			plog(LLV_ERROR, LOCATION, remote,
 				"remote address mismatched. db=%s\n",
 				saddr2str(iph1->remote));
@@ -456,7 +456,7 @@ isakmp_main(msg, remote, local)
 					"exchange received.\n");
 				return -1;
 			}
-			if (cmpsaddr(iph1->remote, remote) != 0) {
+			if (cmpsaddrwild(iph1->remote, remote) != 0) {
 				plog(LLV_WARNING, LOCATION, remote,
 					"remote address mismatched. "
 					"db=%s\n",

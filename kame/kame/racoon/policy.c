@@ -1,4 +1,4 @@
-/*	$KAME: policy.c,v 1.37 2001/03/23 00:28:41 sakane Exp $	*/
+/*	$KAME: policy.c,v 1.38 2001/03/23 01:19:08 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -189,10 +189,10 @@ cmpspidx(a, b)
 	 || a->ul_proto != b->ul_proto)
 		return 1;
 
-	if (cmpsaddr((struct sockaddr *)&a->src,
+	if (cmpsaddrwild((struct sockaddr *)&a->src,
 			   (struct sockaddr *)&b->src))
 		return 1;
-	if (cmpsaddr((struct sockaddr *)&a->dst,
+	if (cmpsaddrwild((struct sockaddr *)&a->dst,
 			   (struct sockaddr *)&b->dst))
 		return 1;
 
@@ -274,7 +274,7 @@ cmpspidxwild(a, b)
 		a, b->prefs, saddr2str((struct sockaddr *)&sa1));
 	plog(LLV_DEBUG, LOCATION, NULL, "%p masked with /%d: %s\n",
 		b, b->prefs, saddr2str((struct sockaddr *)&sa2));
-	if (cmpsaddr((struct sockaddr *)&sa1, (struct sockaddr *)&sa2))
+	if (cmpsaddrwild((struct sockaddr *)&sa1, (struct sockaddr *)&sa2))
 		return 1;
 
 	/* compare dst address */
@@ -290,7 +290,7 @@ cmpspidxwild(a, b)
 		a, b->prefd, saddr2str((struct sockaddr *)&sa1));
 	plog(LLV_DEBUG, LOCATION, NULL, "%p masked with /%d: %s\n",
 		b, b->prefd, saddr2str((struct sockaddr *)&sa2));
-	if (cmpsaddr((struct sockaddr *)&sa1, (struct sockaddr *)&sa2))
+	if (cmpsaddrwild((struct sockaddr *)&sa1, (struct sockaddr *)&sa2))
 		return 1;
 
 	return 0;

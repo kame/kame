@@ -1,4 +1,4 @@
-/*	$KAME: handler.c,v 1.45 2001/03/06 20:41:02 thorpej Exp $	*/
+/*	$KAME: handler.c,v 1.46 2001/03/23 01:19:08 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -648,7 +648,7 @@ getcontacted(remote)
 	struct contacted *p;
 
 	LIST_FOREACH(p, &ctdtree, chain) {
-		if (cmpsaddr(remote, p->remote) == 0)
+		if (cmpsaddrwild(remote, p->remote) == 0)
 			return p;
 	}
 

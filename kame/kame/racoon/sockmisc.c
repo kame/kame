@@ -1,4 +1,4 @@
-/*	$KAME: sockmisc.c,v 1.25 2001/03/22 23:53:16 thorpej Exp $	*/
+/*	$KAME: sockmisc.c,v 1.26 2001/03/23 01:19:08 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -110,12 +110,12 @@ cmpsaddrwop(addr1, addr2)
 }
 
 /*
- * compare two sockaddr with port.
+ * compare two sockaddr with port, taking care wildcard.
  * OUT:	0: equal.
  *	1: not equal.
  */
 int
-cmpsaddr(addr1, addr2)
+cmpsaddrwild(addr1, addr2)
 	struct sockaddr *addr1;
 	struct sockaddr *addr2;
 {
