@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.25 2000/05/05 11:00:57 sumikawa Exp $	*/
+/*	$KAME: ah_input.c,v 1.26 2000/05/08 08:04:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -84,7 +84,12 @@
 #define IPLEN_FLIPPED
 
 #ifdef INET
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#include <netinet/ipprotosw.h>
+extern struct ipprotosw inetsw[];
+#else
 extern struct protosw inetsw[];
+#endif
 #if defined(__bsdi__) || defined(__NetBSD__)
 extern u_char ip_protox[];
 #endif

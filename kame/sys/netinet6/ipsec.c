@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.61 2000/05/07 03:51:18 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.62 2000/05/08 08:04:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -133,6 +133,13 @@ struct secpolicy ip4_def_policy;
 int ip4_ipsec_ecn = 0;		/* ECN ignore(-1)/forbidden(0)/allowed(1) */
 
 #ifdef __FreeBSD__
+#ifdef SYSCTL_DECL
+SYSCTL_DECL(_net_inet_ipsec);
+#ifdef INET6
+SYSCTL_DECL(_net_inet6_ipsec6);
+#endif
+#endif
+
 /* net.inet.ipsec */
 SYSCTL_STRUCT(_net_inet_ipsec, IPSECCTL_STATS,
 	stats, CTLFLAG_RD,	&ipsecstat,	ipsecstat, "");
@@ -1105,7 +1112,11 @@ ipsec_init_policy(so, pcb_sp)
 	else
 		new->priv = 0;
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 3
+#if __FreeBSD__ >= 4
+	if (so->so_cred != 0 && so->so_cred->cr_uid == 0)
+#else
 	if (so->so_cred != 0 && so->so_cred->pc_ucred->cr_uid == 0)
+#endif
 		new->priv = 1;
 	else
 		new->priv = 0;
