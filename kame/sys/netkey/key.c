@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.270 2003/02/19 03:15:46 keiichi Exp $	*/
+/*	$KAME: key.c,v 1.271 2003/05/01 13:35:29 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -7937,9 +7937,20 @@ key_mip6_find_sp(dir, src, dst)
 		if ((spidx = sp->spidx) == NULL)
 			continue;
 
-		/* we only modify IPPROTO_MOBILITY related entires. */
+#if XXX
+		/*
+		 * we modify the CoA of a mobile node in all matched
+		 * SPD entries listed in the kernel SPD entry list.
+		 * this is needed if we want to encrypt all the
+		 * tunneled traffic between mobile nodes and a home
+		 * agent.
+		 *
+		 * does this create any harmful things?
+		 */
+		/* before this XXX, we have the following line. */
 		if (spidx->ul_proto != IPPROTO_MOBILITY)
 			continue;
+#endif
 
 		/* check addresses. */
 		if (!SA6_ARE_ADDR_EQUAL(src,
