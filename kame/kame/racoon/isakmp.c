@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.96 2000/09/04 07:48:54 itojun Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.97 2000/09/05 15:31:05 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -723,7 +723,6 @@ isakmp_ph1begin_i(rmconf, remote)
 	struct sockaddr *remote;
 {
 	struct ph1handle *iph1;
-	struct etypes *e;
 #ifdef YIPS_DEBUG
 	char h1[NI_MAXHOST], h2[NI_MAXHOST];
 	char s1[NI_MAXSERV], s2[NI_MAXSERV];
@@ -763,30 +762,25 @@ isakmp_ph1begin_i(rmconf, remote)
 
 	(void)insph1(iph1);
 
-	/* try each exchange type until success 1st exchange. */
-	for (e = rmconf->etypes; e != NULL; e = e->next) {
-		iph1->etype = e->type;
+	/* start phase 1 exchange */
+	iph1->etype = rmconf->etypes->type;
 
-		YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
-		YIPSDEBUG(DEBUG_NOTIFY,
-			plog(logp, LOCATION, NULL,
-				"begin %s mode.\n",
-				s_isakmp_etype(iph1->etype)));
+	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
+	YIPSDEBUG(DEBUG_NOTIFY,
+		plog(logp, LOCATION, NULL,
+			"begin %s mode.\n",
+			s_isakmp_etype(iph1->etype)));
 
-		/* start exchange */
-		if ((ph1exchange[etypesw1(iph1->etype)]
-		                [iph1->side]
-		                [iph1->status])(iph1, NULL) == 0) {
-			/* success */
-			return 0;
-			/* NOTREACHED */
-		}
-
-		/* try next exchange type. */
+	/* start exchange */
+	if ((ph1exchange[etypesw1(iph1->etype)]
+			[iph1->side]
+			[iph1->status])(iph1, NULL) == 0) {
+		/* success */
+		return 0;
+		/* NOTREACHED */
 	}
 
 	/* failed to start phase 1 negotiation */
-
 	remph1(iph1);
 	delph1(iph1);
 
