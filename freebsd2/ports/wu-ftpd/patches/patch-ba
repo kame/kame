@@ -1,0 +1,10 @@
+--- src/config/config.fbs-	Wed Oct  4 01:55:12 2000
++++ src/config/config.fbs	Wed Oct  4 01:55:29 2000
+@@ -86,3 +86,7 @@
+ #ifdef SKEY
+ #define SKEY_NAME
+ #endif
++
++#define INET6
++#define KAME
++#define HAVE_GETADDRINFO

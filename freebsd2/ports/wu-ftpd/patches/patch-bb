@@ -1,0 +1,86 @@
+*** src/access.c.bak	Tue Mar 13 13:41:33 2001
+--- src/access.c	Tue Mar 13 13:42:21 2001
+***************
+*** 202,215 ****
+      int match = 0;
+      int i, a[4], m[4], r[4], cidr;
+  #ifdef INET6
+!     uint16_t octet[8],remote_addr_octet[8];
+!     uint32_t addr_int[4],remote_int[4];
+      struct sockaddr_in6 in6_addr,remote_in6_addr;
+      char inet6addr[INET6_ADDRSTRLEN+1];
+      char colon[3]="::",slash[2]="/";
+      char *point,*delim;
+      int bits_shift;
+!     uint32_t mask_v;
+  #endif
+  
+      if (addr == NULL)
+--- 202,215 ----
+      int match = 0;
+      int i, a[4], m[4], r[4], cidr;
+  #ifdef INET6
+!     u_int16_t octet[8],remote_addr_octet[8];
+!     u_int32_t addr_int[4],remote_int[4];
+      struct sockaddr_in6 in6_addr,remote_in6_addr;
+      char inet6addr[INET6_ADDRSTRLEN+1];
+      char colon[3]="::",slash[2]="/";
+      char *point,*delim;
+      int bits_shift;
+!     u_int32_t mask_v;
+  #endif
+  
+      if (addr == NULL)
+***************
+*** 337,343 ****
+              return not_found;
+          }
+          
+!         if (memcmp(octet,remote_addr_octet,sizeof(uint16_t)*8))
+              return not_found;
+          return found;
+      }
+--- 337,343 ----
+              return not_found;
+          }
+          
+!         if (memcmp(octet,remote_addr_octet,sizeof(u_int16_t)*8))
+              return not_found;
+          return found;
+      }
+***************
+*** 359,366 ****
+              memcpy(inet6addr,addr,delim-addr);
+              inet_pton(AF_INET6,inet6addr,in6_addr.sin6_addr.s6_addr);
+              inet_pton(AF_INET6,remoteaddr,remote_in6_addr.sin6_addr.s6_addr);
+!             memcpy(addr_int,in6_addr.sin6_addr.s6_addr,sizeof(uint32_t)*4);
+!             memcpy(remote_int,remote_in6_addr.sin6_addr.s6_addr,sizeof(uint32_t)*4);
+              for (i =0;i<4;i++){
+                  addr_int[i]=ntohl(addr_int[i]);
+                  remote_int[i]=ntohl(remote_int[i]);
+--- 359,366 ----
+              memcpy(inet6addr,addr,delim-addr);
+              inet_pton(AF_INET6,inet6addr,in6_addr.sin6_addr.s6_addr);
+              inet_pton(AF_INET6,remoteaddr,remote_in6_addr.sin6_addr.s6_addr);
+!             memcpy(addr_int,in6_addr.sin6_addr.s6_addr,sizeof(u_int32_t)*4);
+!             memcpy(remote_int,remote_in6_addr.sin6_addr.s6_addr,sizeof(u_int32_t)*4);
+              for (i =0;i<4;i++){
+                  addr_int[i]=ntohl(addr_int[i]);
+                  remote_int[i]=ntohl(remote_int[i]);
+***************
+*** 385,391 ****
+              } else {
+                  return not_found;
+              }
+!             if (memcmp(addr_int,remote_int,sizeof(uint32_t)*4)){
+                  return not_found;
+              }
+              return found;
+--- 385,391 ----
+              } else {
+                  return not_found;
+              }
+!             if (memcmp(addr_int,remote_int,sizeof(u_int32_t)*4)){
+                  return not_found;
+              }
+              return found;
