@@ -1,6 +1,6 @@
 Portability guideline
 KAME project
-$Id: PORTABILITY,v 1.14 1999/10/20 08:18:30 itojun Exp $
+$Id: PORTABILITY,v 1.15 1999/10/20 14:26:37 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -20,6 +20,13 @@ across those possibilities.
 	#endif
 			....
 		}
+
+		baa(this, that,
+	#if foo
+			something);
+	#else
+			something, anything);
+	#endif
   It should be written like follows:
 	#if foo
 		if (foo)
@@ -29,6 +36,20 @@ across those possibilities.
 		{
 			....
 		}
+
+	#ifdef foo
+		baa(this, that, something);
+	#else
+		baa(this, that, something, anything);
+	#endif
+
+		/* latter part can also be like follows... */
+		baa(this, that,
+			something
+	#ifndef foo
+			, anything
+	#endif
+			);
 
   It is also advised to add extra comment to help paren match,
   if you need to write widow paren in string.  For example:
@@ -91,7 +112,7 @@ across those possibilities.
   and "src" tree and has no symlink from ${.CURDIR}/obj to /usr/obj/foobar.
   On other platforms, ${.CURDIR}/obj should do.
 
-- On manpage installation.
+- On manpage installation and shlib generation in Makefile.
   for BSDI3, you need to set MAN[0-9] in Makefile like below.  MANDIR must
   point to "catN" directory, not "manN", without "N":
 	MANDIR=	/usr/local/v6/man/cat
