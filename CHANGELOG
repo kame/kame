@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1704 2001/06/02 08:21:48 jinmei Exp $
+$KAME: CHANGELOG,v 1.1705 2001/06/02 18:52:38 jinmei Exp $
 
 <200106>
+2001-06-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/rtadvd/config.c (getconfig): forced users to specify
+	router lifetimes explicitly.  "rtltimeN" must now explicitly be
+	specified.
+
 2001-06-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ndp/ndp.c (dump): skip routes with the LINK flag and
 	a non AF_LINK gateway to suppress bark in getnbrinfo().
