@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.51 2000/06/19 07:44:58 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.52 2000/06/19 07:55:32 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -81,9 +81,6 @@
 #include "strnames.h"
 
 /* prototype */
-static int pfkey_setspidxbymsg __P((caddr_t *, struct policyindex *));
-static int pfkey_spidxinfo __P((struct sadb_ident *, struct sockaddr *,
-	u_int8_t *, u_int16_t *)); 
 static u_int ipsecdoi2pfkey_aalg __P((u_int));
 static u_int ipsecdoi2pfkey_ealg __P((u_int));
 static u_int ipsecdoi2pfkey_calg __P((u_int));
@@ -216,53 +213,6 @@ end:
 	if (msg)
 		free(msg);
 	return(error);
-}
-
-static int
-pfkey_setspidxbymsg(mhp, spidx)
-	caddr_t *mhp;
-	struct policyindex *spidx;
-{
-	memset(spidx, 0, sizeof(*spidx));
-
-	if (pfkey_spidxinfo((struct sadb_ident *)mhp[SADB_EXT_IDENTITY_SRC],
-			(struct sockaddr *)&spidx->src,
-			&spidx->prefs, &spidx->ul_proto) < 0)
-		return -1;
-
-	if (pfkey_spidxinfo((struct sadb_ident *)mhp[SADB_EXT_IDENTITY_DST],
-			(struct sockaddr *)&spidx->dst,
-			&spidx->prefd, &spidx->ul_proto) < 0)
-		return -1;
-
-	spidx->dir = IPSEC_DIR_OUTBOUND;
-
-	return 0;
-}
-
-static int
-pfkey_spidxinfo(id, saddr, pref, ul_proto)
-	struct sadb_ident *id;
-	struct sockaddr *saddr;
-	u_int8_t *pref;
-	u_int16_t *ul_proto;
-{
-	union sadb_x_ident_id *aid;
-
-	if (id->sadb_ident_type != SADB_X_IDENTTYPE_ADDR) {
-		plog(logp, LOCATION, NULL,
-			"not supported id type %d\n",
-				id->sadb_ident_type);
-		return -1;
-	}
-
-	aid = (union sadb_x_ident_id *)&id->sadb_ident_id;
-
-	*pref = aid->sadb_x_ident_id_addr.prefix;
-	*ul_proto = aid->sadb_x_ident_id_addr.ul_proto;
-	memcpy(saddr, id + 1, ((struct sockaddr *)(id + 1))->sa_len);
-
-	return 0;
 }
 
 /*
@@ -1341,7 +1291,6 @@ pk_recvacquire(mhp)
 {
 	struct sadb_msg *msg;
 	struct sadb_x_policy *xpl;
-	struct policyindex spidxtmp;
 	struct secpolicy *sp;
 #define MAXNESTEDSA	5	/* XXX */
 	struct ph2handle *iph2[MAXNESTEDSA];
@@ -1357,8 +1306,6 @@ pk_recvacquire(mhp)
 	if (mhp[0] == NULL
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL
-	 || mhp[SADB_EXT_IDENTITY_SRC] == NULL
-	 || mhp[SADB_EXT_IDENTITY_DST] == NULL
 	 || mhp[SADB_X_EXT_POLICY] == NULL) {
 		plog(logp, LOCATION, NULL,
 			"inappropriate sadb acquire message passed.\n");
@@ -1383,23 +1330,16 @@ pk_recvacquire(mhp)
 		return -1;
 	}
 
-	/* set index of policyindex */
-	if (pfkey_setspidxbymsg(mhp, &spidxtmp) < 0) {
-		plog(logp, LOCATION, NULL,
-			"failed to get policy index.\n");
-		return -1;
-	}
-
 	/* search for proper policyindex */
-	sp = getsp(&spidxtmp);
+	sp = getspbyspid(xpl->sadb_x_policy_id);
 	if (sp == NULL) {
 		plog(logp, LOCATION, NULL,
-			"no policy found %s.\n", spidx2str(&spidxtmp));
+			"no policy found %s.\n", spidx2str(&sp->spidx));
 		return -1;
 	}
 	YIPSDEBUG(DEBUG_PFKEY,
 		plog(logp, LOCATION, NULL,
-			"policy found: %s.\n", spidx2str(&spidxtmp)));
+			"policy found: %s.\n", spidx2str(&sp->spidx)));
 
 	memset(iph2, 0, MAXNESTEDSA);
 
