@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_state.c,v 1.9 2003/05/13 07:06:30 ono Exp $	*/
+/*	$KAME: vrrp_state.c,v 1.10 2003/05/26 07:06:30 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -344,7 +344,12 @@ vrrp_state_backup_expire(void *data)
 #ifdef VRRP_DEBUG
 	printf("backup expire %s\n", vr->vrrpif_name);
 #endif
-	vrrp_state_set_master(vr);
+
+	if (vrrp_state_set_master(vr) < 0) {
+		vr->tm = vrrp_add_timer(vrrp_state_backup_expire,
+		    NULL, vr, NULL);
+		vrrp_set_timer(VRRP_MASTER_RETRY_INTERVAL, vr->tm);
+	}
 
 	return NULL;
 }

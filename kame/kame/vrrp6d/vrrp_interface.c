@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_interface.c,v 1.8 2003/05/13 07:06:29 ono Exp $	*/
+/*	$KAME: vrrp_interface.c,v 1.9 2003/05/26 07:06:29 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -65,15 +65,14 @@
 void 
 vrrp_interface_owner_verify(struct vrrp_vr * vr)
 {
-	int             cpt, cpt2;
+	int             cpt2;
 
-	for (cpt = 0; cpt < vr->cnt_ip; cpt++)
-		for (cpt2 = 0; cpt2 < vr->vr_if->nb_ip; cpt2++)
-			if (memcmp(&vr->vr_ip[cpt].addr, &vr->vr_if->ip_addrs[cpt2], sizeof(struct in6_addr)) == 0) {
-				vr->vr_ip[cpt].owner = VRRP_INTERFACE_IPADDR_OWNER;
-				strncpy(vr->vrrpif_name, vr->vr_if->if_name, sizeof vr->vrrpif_name);
-				vr->vrrpif_index = vr->vr_if->if_index;
-			}
+	for (cpt2 = 0; cpt2 < vr->vr_if->nb_ip; cpt2++)
+		if (memcmp(&vr->vr_ip[0].addr, &vr->vr_if->ip_addrs[cpt2], sizeof(struct in6_addr)) == 0) {
+			vr->vr_ip[0].owner = VRRP_INTERFACE_IPADDR_OWNER;
+			strncpy(vr->vrrpif_name, vr->vr_if->if_name, sizeof vr->vrrpif_name);
+			vr->vrrpif_index = vr->vr_if->if_index;
+		}
 
 	return;
 }
@@ -132,9 +131,9 @@ vrrp_interface_vrrif_set(char *if_name, u_int parent_index, struct ether_addr *l
 	bcopy(lladdr, vrreq.vr_lladdr.sa_data, ETHER_ADDR_LEN);
 	
 	if (ioctl(sd, SIOCSETVRRP, (caddr_t) &ifr) == -1) {
-		syslog(LOG_ERR, "cannot set vrrp parent interface %s (ioctl): %m", if_name);
+		syslog(LOG_WARNING, "cannot set vrrp parent interface %s (ioctl): %m", if_name);
 		close(sd);
-		exit(1);
+		return -1;
 	}
 
 	close(sd);
@@ -260,23 +259,25 @@ vrrp_interface_ipaddr_delete(char *if_name, struct in6_addr *addr, int verbose)
 int
 vrrp_interface_vripaddr_set(struct vrrp_vr * vr)
 {
-	int             cpt;
 	char buf[NI_MAXHOST];
 	struct in6_addr mask;
 
-	for (cpt = 0; cpt < vr->cnt_ip; cpt++) {
-		if (vr->vr_ip[cpt].owner != VRRP_INTERFACE_IPADDR_OWNER) {
-			vrrp_interface_vrrif_set(vr->vrrpif_name,vr->vr_if->if_index, &vr->ethaddr);
-			vrrp_interface_compute_netmask(vr->vr_netmask[cpt],&mask);
-			if (vrrp_interface_ipaddr_set(vr->vrrpif_name, &vr->vr_ip[cpt].addr, &mask) == -1) {
-				if (errno != EEXIST) {
-					syslog(LOG_ERR, "an error occured during setting virtual router ip address %s", 
-					       inet_ntop(AF_INET6, &vr->vr_ip[cpt].addr, buf, sizeof(buf)) ? buf : "");
-					return -1;
-				}
+	if (vr->vr_ip[0].owner != VRRP_INTERFACE_IPADDR_OWNER) {
+		if (vrrp_interface_vrrif_set(vr->vrrpif_name,vr->vr_if->if_index, &vr->ethaddr) < 0) {
+			return -1;
+		}
+		vrrp_interface_compute_netmask(vr->vr_netmask[0],&mask);
+		if (vrrp_interface_ipaddr_set(vr->vrrpif_name, &vr->vr_ip[0].addr, &mask) == -1) {
+			if (errno != EEXIST) {
+				syslog(LOG_ERR, "an error occured during setting virtual router ip address %s", 
+				    inet_ntop(AF_INET6, &vr->vr_ip[0].addr, buf, sizeof(buf)) ? buf : "");
+				return -1;
 			}
-		} else {
-			vrrp_interface_ethaddr_set(vr->vr_if->if_name, &vr->ethaddr);
+		}
+	} else {
+		if (vrrp_interface_ethaddr_set(vr->vr_if->if_name, &vr->ethaddr) < 0) {
+			syslog(LOG_WARNING, "vrrp_interface_ethaddr_set failed (%s)", vr->vr_if->if_name);
+			return -1;
 		}
 	}
 
@@ -286,23 +287,20 @@ vrrp_interface_vripaddr_set(struct vrrp_vr * vr)
 int
 vrrp_interface_vripaddr_delete(struct vrrp_vr * vr)
 {
-	int             cpt;
 	char buf[NI_MAXHOST];
 
-	for (cpt = 0; cpt < vr->cnt_ip; cpt++) {
-		if (vr->vr_ip[cpt].owner != VRRP_INTERFACE_IPADDR_OWNER) {
-			if (vrrp_interface_ipaddr_delete(vr->vrrpif_name, &vr->vr_ip[cpt].addr, 0) == -1) {
-				if (errno != EADDRNOTAVAIL) {
-					syslog(LOG_ERR, "an error occured during deleting virtual router ip address %s",
-					       inet_ntop(AF_INET6, &vr->vr_ip[cpt].addr, buf, sizeof(buf)) ? buf : "");
-					return -1;
-				}
+	if (vr->vr_ip[0].owner != VRRP_INTERFACE_IPADDR_OWNER) {
+		if (vrrp_interface_ipaddr_delete(vr->vrrpif_name, &vr->vr_ip[0].addr, 0) == -1) {
+			if (errno != EADDRNOTAVAIL) {
+				syslog(LOG_ERR, "an error occured during deleting virtual router ip address %s",
+				    inet_ntop(AF_INET6, &vr->vr_ip[0].addr, buf, sizeof(buf)) ? buf : "");
+				return -1;
 			}
-			vrrp_network_delete_local_route(&vr->vr_ip[cpt].addr);
-			vrrp_interface_vrrif_delete(vr->vrrpif_name);
-		} else {
-			vrrp_interface_ethaddr_set(vr->vr_if->if_name, &vr->vr_if->ethaddr);
 		}
+		vrrp_network_delete_local_route(&vr->vr_ip[0].addr);
+		vrrp_interface_vrrif_delete(vr->vrrpif_name);
+	} else {
+		vrrp_interface_ethaddr_set(vr->vr_if->if_name, &vr->vr_if->ethaddr);
 	}
 
 	return 0;

@@ -1,5 +1,5 @@
 #
-#	$KAME: README.VRRP6D,v 1.4 2003/02/19 10:10:00 ono Exp $
+#	$KAME: README.VRRP6D,v 1.5 2003/05/26 07:06:29 ono Exp $
 #
 
 USAGE:
@@ -49,6 +49,3 @@ TODO:
           MAC. (not promiscous mode).
 	* Change MTU of vrrp interface if MTU of parent interface is changed.
 	* More debug messages.
-	* rtadvd: enable to get advertising prefixes from parent
-          interfaces. (Now, you must specify it manually)
-	* Porting to other *BSD. (FreeBSD5, OpenBSD, BSD/OS?, ...)

@@ -1,4 +1,4 @@
-/*	$KAME: vrrp_define.h,v 1.4 2002/07/10 07:41:45 ono Exp $	*/
+/*	$KAME: vrrp_define.h,v 1.5 2003/05/26 07:06:29 ono Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -83,6 +83,7 @@
 #define VRRP_CONF_MAX_ARGS 255
 #define VRRP_DEFAULT_ADV_INT 1
 #define VRRP_PROTOCOL_MAX_VRID 255
+#define VRRP_MASTER_RETRY_INTERVAL 1
 #ifndef VRRP_CONF_FILE_NAME
 #define VRRP_CONF_FILE_NAME "/usr/local/etc/vrrp6d.conf"
 #endif
