@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"     $Id: setkey.8,v 1.11 1999/10/07 06:14:43 itojun Exp $
+.\"     $Id: setkey.8,v 1.12 1999/10/07 06:17:49 itojun Exp $
 .\"
 .Dd May 17, 1998
 .Dt SETKEY 8
@@ -433,15 +433,17 @@ means that kernel use a SA if it's available,
 otherwise kernel keeps normal operation.
 .Li require
 means SA is required whenever kernel deals with the packet.
-Note that there is a bit difference of specification from
+Note that
+.Dq Li discard
+and
+.Dq Li none
+are not in the syntax described in
 .Xr ipsec_set_policy 3 .
-Both discard and none are not used in
-.Xr ipsec_set_policy 3 .
-See to
+There are little differences in the syntax.
+See
 .Xr ipsec_set_policy 3
 for detail.
 .Pp
-
 .El
 .Pp
 .\"
