@@ -184,7 +184,7 @@ octetstring	{octet}({dot}{octet})+
 	/* policy */
 <S_INI>policy		{ BEGIN S_PLCY; YYDB; return(POLICY); }
 <S_PLCY>any		{ YYD; return(ANY); }
-<S_PLCY>{bcl}any{ecl}	{ YYD; return(PORTANY); }
+<S_PLCY>{blcl}any{elcl}	{ YYD; return(PORTANY); }
 <S_PLCY>in		{ YYD; yylval.num = IPSEC_DIR_INBOUND; return(DIRTYPE); }
 <S_PLCY>out		{ YYD; yylval.num = IPSEC_DIR_OUTBOUND; return(DIRTYPE); }
 <S_PLCY>inout		{ YYD; /* XXX */ yylval.num = IPSEC_DIR_ANY; return(DIRTYPE); }
@@ -226,7 +226,8 @@ octetstring	{octet}({dot}{octet})+
 	/* sainfo */
 <S_INI>sainfo		{ BEGIN S_SAINF; YYDB; return(SAINFO); }
 <S_SAINF>anonymous	{ YYD; return(ANONYMOUS); }
-<S_SAINF>{bcl}any{ecl}	{ YYD; return(PORTANY); }
+<S_SAINF>{blcl}any{elcl}	{ YYD; return(PORTANY); }
+<S_SAINF>any		{ YYD; return(ANY); }
 	/* sainfo spec */
 <S_SAINF>{bcl}		{ BEGIN S_SAINFS; return(BOC); }
 <S_SAINF>{semi}		{ BEGIN S_INI; return(EOS); }
