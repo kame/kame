@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.93 2003/01/10 08:53:13 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.94 2003/01/17 11:42:19 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -100,6 +100,8 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 {
 	struct sockaddr_in6 *src_sa, *dst_sa;
 	struct mbuf *m;
+	struct mbuf *n;
+	struct ip6aux *ip6a;
 	struct ip6_pktopts opt;
 	int error = 0;
 
@@ -123,6 +125,21 @@ mip6_ip6mhi_input(m0, ip6mhi, ip6mhilen)
 		m_freem(m0);
 		ip6stat.ip6s_toosmall++;
 		return (EINVAL);
+	}
+
+	/* a home address destination option must not exist. */
+	n = ip6_findaux(m0);
+	if (n) {
+		ip6a = mtod(n, struct ip6aux *);
+		if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
+			mip6log((LOG_NOTICE,
+			    "%s:%d: recieved a home test init with "
+			    " a home address destination option.\n",
+			    __FILE__, __LINE__));
+			m_freem(m0);
+			/* stat? */
+			return (EINVAL);
+		}
 	}
 
 	init_ip6pktopts(&opt);
@@ -211,6 +228,8 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 {
 	struct sockaddr_in6 *src_sa, *dst_sa;
 	struct mbuf *m;
+	struct mbuf *n;
+	struct ip6aux *ip6a;
 	struct ip6_pktopts opt;
 	int error = 0;
 
@@ -240,6 +259,21 @@ mip6_ip6mci_input(m0, ip6mci, ip6mcilen)
 		m_freem(m0);
 		ip6stat.ip6s_toosmall++;
 		return (EINVAL);
+	}
+
+	/* a home address destination option must not exist. */
+	n = ip6_findaux(m0);
+	if (n) {
+		ip6a = mtod(n, struct ip6aux *);
+		if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0) {
+			mip6log((LOG_NOTICE,
+			    "%s:%d: recieved a home test init with "
+			    " a home address destination option.\n",
+			    __FILE__, __LINE__));
+			m_freem(m0);
+			/* stat? */
+			return (EINVAL);
+		}
 	}
 
 	init_ip6pktopts(&opt);
