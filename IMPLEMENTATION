@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.185 2001/02/04 17:43:52 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.186 2001/02/04 17:47:20 jinmei Exp $
 
 1. IPv6
 
@@ -521,7 +521,7 @@ For a given set of addresses A,
   DEP(A): the set of deprecated addresses in A.
   nonDEP(A): A - DEP(A).
 
-For a given sset of addresses A,
+For a given set of addresses A,
   tmp(A): the set of preferred temporary-autoconfigured or
           manually-configure addresses in A.
 
