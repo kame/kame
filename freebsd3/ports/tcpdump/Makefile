@@ -8,13 +8,13 @@
 
 DISTNAME=	tcpdump-2000_01_25
 PKGNAME=	tcpdump-20000125
-
 CATEGORIES=	net
 MASTER_SITES=	http://www.tcpdump.org/weekly/
 
-LIB_DEPENDS=	pcap:../libpcap
-
 MAINTAINER=	sumikawa@kame.net
+
+BUILD_DEPENDS=	${LOCALBASE}/lib/libpcap.a:../libpcap
+
 HOMEPAGE=	http://www.tcpdump.org/
 
 GNU_CONFIGURE=	yes
