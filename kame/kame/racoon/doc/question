@@ -1,21 +1,22 @@
-$Id: question,v 1.13 2000/08/09 19:39:59 sakane Exp $
+$Id: question,v 1.14 2000/09/19 21:00:24 itojun Exp $
 
 HOW DO I DO ?
 Q. ID payload handling in phase 2 besides IPSECDOI_ID_IP*.
    e.g. IPSECDOI_ID_DER_ASN1_DN.  Well, are these used in phase 2 ?
 Q. What should I do when HARD expiration has come ?
-Q. When node has multi address, I check only destination address on phase 2.
-	Must be check both with src and dst ?
+Q. When a node has multi address, I check only destination address on phase 2.
+	Should we check both src and dst?
 Q. replay prevention
 	limited number of session
 	limited session per peer
 	number of proposal
 	....
 Q. how to support multi interfaces ?
-	connect to dummy, like ping6.
+	perform a dummy connect(2), like ping6.
 	bind multi address, like named.
-   now is former.
+   now racoon uses the former way.
 Q. The padding for data attribute.
+	in particular, variable-length attribute like ID-userfqdn.
 Q. vendorid's hash algorithm
 	For aggressive mode ?.
 	In mail mode, should I use negotiated algorithm ?
@@ -24,7 +25,6 @@ Q. vendorid's hash algorithm
 Q. encryption during aggressive mode.
 	when receive encrypted packet of 1st exchange from responder,
 	it can be decoded.  When we are responder, should we send encrypted ?
-Q. packet padding ? in particular, variable attribute.
 Q. What is the perpose of exchange of DH attribute on quick mode ?
 	-> pfs
 Q. Should I do acceptable check of phase 2 pfs group ?.
@@ -90,7 +90,9 @@ Q. What kind of policy configuration is desired?
      if we respect our configuration, non-tcp traffic will be dropped on
      the peer.
 
-Q. Waht's msgid of informational exchange for error notify message during
+   -> the question is obsoleted by configuration language change.
+
+Q. What's msgid of informational exchange for error notify message during
    phase2 ?  Is it same as msgid of phase2 negotiation caused error ?
    Or new msgid created ?  If later case, spi must be conveyed.
 	-> new msgid should be used
@@ -104,3 +106,295 @@ Q. How many certificate payload in a packet are sent ?
 Q. What should we do if nonce size is greater than size of RSA modulus
    in authentication with public key encryption, also size of body of
    ID payload ?
+
+Q. For IKE negotiation of IPComp, how should we encode CPI (2 byte) into SPI
+   field of proposal payload (for AH/ESP, normally 4 bytes)?
+   Options are as follows:
+   (1) put it as 4 byte value, set SPI size to 4
+                          1                   2                   3
+      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     ! Next Payload  !   RESERVED    !         Payload Length        !
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     !  Proposal #   !ProtID = ipcomp!    SPI Size(4)!# of Transforms!
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     !                        SPI = 0x0000XXXX                       !
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   (2) put it as 2 byte value, set SPI size to 2.  No padding must be made.
+                          1                   2                   3
+      0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1 2 3 4 5 6 7 8 9 0 1
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     ! Next Payload  !   RESERVED    !         Payload Length        !
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     !  Proposal #   !ProtID = ipcomp!    SPI Size(2)!# of Transforms!
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+     !       SPI = 0xXXXX            !   ... transform ...
+     +-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+
+
+   IRE did (1), IIRC. (Jan 2000)
+
+   SSH does (2), and rejects (1). (Sep 2000)
+
+   The following email suggests (2) for normal case, and allow (1) for backward
+   compatibility (responder case I bet).
+	To: ipsec@lists.tislabs.com
+	From: Joern Sierwald <joern.sierwald@datafellows.com>
+	Subject: Re: issues from the bakeoff
+	Date: Wed, 16 Jun 1999 11:02:16 +0300
+	Message-Id: <3.0.5.32.19990616110216.00b77880@smtp.datafellows.com>
+
+A: (2) for normal case, and allow (1) for backward compatibility
+   (responder case I bet).  <draft-shacham-ippcp-rfc2393bis-05.txt>
+
+Q. INITIAL-CONTACT message.
+   When should we issue an INITIAL-CONTACT message?
+	-> see jenkins rekey draft
+
+   We must ignore unencrypted INITIAL-CONTACT message.
+
+   If we have two nodes and they issue the first packet of phase 1 at the same
+   time, both may try to transmit INITIAL-CONTACT message, and effectively
+   kills both connection attempt.
+
+	node 1			node 2
+	  |			  |
+	  |----------\  /---------| phase 1 first packet
+	  |	      \/	  |
+	  |	      /\	  |
+	  |<---------/  \-------->|
+	  |----------\  /---------| INITIAL-CONTACT
+	  |	      \/	  |
+	  |	      /\	  |
+	  |<---------/  \-------->|
+
+   Options are as follows:
+   (1) don't throw INITIAL-CONTACT message.
+   (2) don't delete old phase 1 information, even if we get INITIAL-CONTACT
+       message..
+   (3) don't delete phase 1 information, if it is very new.  delete phase 1
+       information only if they are old.
+   (4) implement tie-breaker rule.  for example, compare IP address and remove
+       phase 1 initiated by the one who has larger IP address.
+
+Q: IPv6 neighbor discovery.
+	When a security policy is set to "all packet require IPsec", it will
+	cover IPv6 ND packets as well.  The node will try to secure ND, and
+	we will have chicken-and-egg problem (without ND we cannot send IKE
+	packets, without IKE negotiation we cannot send ND).
+
+	What can we do?
+	- always bypass IPsec policy lookup if a packet is for ND.
+	- Security policy should have more detail rules to filter
+	  such packet, like icmp6 type/code filters.
+
+Q: When there are no ID payloads in phase 2 ?
+	Guess from the pair of address of IKE peer.
+
+Q: Which SPI should I carry on Delete notify ?
+	There is no documentation.
+
+	An initiator should send a set of SPI of inbound SAs.
+	A responder should delete a set of outbound SAs which are sent by
+	an initiator.
+
+	When an IKE node deletes old SAs, it will send DELETE notify to
+	a peer.
+
+	When does a node send DELETE notify ?
+		when a IKE node deletes old SAs expilicitly.
+		when a SA expires (hard lifetime reached).
+			It may not be necessary.
+
+	When a DELETE notify packet is dropped, SA will get inconsistent
+	between peers.
+		We can prevent from it by using "heartbeat".
+
+Q: "heartbeat"
+	It means a signal of "I'm alive".
+	It is exchanged in phase 1.5.
+	When a responder dies/reboots, we can know it by using "heartbeat".
+	Is INITIAL-CONTACT message useless ?
+		We don't know.
+
+Q: responder's action in a normal case.
+	A responder should never initiate both phase 1 and phase 2 at anytime.
+	Once we have decided which side we are (initiator/responder), the
+	relationship will never change.  (sakane)
+
+	On phase 1, it is good for a responder not to initiate. (watanabe)
+
+Q: only the byte type of lifetime on phase 2, not exist the type of time.
+	No ducumentation states explicitly.
+	We can choose to use default lifetime (28800).
+	We can reject it accortding to a policy.
+
+Q: lifetime negotiation
+	what should we do if we got lifetime value that does not match our
+	policy?
+	- reject it
+	- RESPONDER LIFETIME
+	- during negotiation obey the initiator.  install SA lifetime based
+	  on the lifetime we have decided (not from the negotiation).
+
+	短いlifetimeを採用した時は、自分がinitiateしてもいいかもしんない。
+	ほんと？
+		- remoteがserverにつなぐ。
+		- tcpで通信。
+		- phase1が消える。
+		- serverはtcpの戻りのパケットで initiateしない方がいい？
+	RFC2407 4.5.4 Lifetime Notificationを読む
+		phase[12]のどっちの時かはっきりしない
+		phase1だとして 2)番の時は多分困る。
+	phase1での responder lifetimeは適当じゃないかもしれない。
+		1st exchangeのresponder sideだけをfakeして悪戯できる。
+
+Q: responder should not modify phase 2 attributes
+	even for phase 1, we should not modify attributes.
+	for lifetime attributes, it is okay to switch between V/B format.
+
+	draft-ietf-ipsec-ike-01.txt Appendix A:
+	If this is the case, an
+	attribute offered as variable (or basic) by the initiator of this
+	protocol MAY be returned to the initiator as a basic (or variable).
+
+Q: check if reserved field is zero, reject if 
+	we should do this (sakane)
+	i don't think so, it will kill future protocol enhancements (itojun)
+
+Q: commit bit (optional)
+	racoon will do this	XXX
+
+Q: order of proposals in IKE phase 2 packet, and IPsec processing order
+	IKE: esp+ah, or ah+esp
+		-> is it safe to consider both as IP|AH|ESP|ULP?
+	proposalは AH/ESPが好ましいかも…
+	IKE: ah+ah?
+		reject?
+
+Q: what should we do if phase 1 SA expires, during phase2 SA negotiation?
+	restart phase 2 negotiation from scratch
+
+Q: what kind of notification message a node should send on decode failure?
+	ISAKMP_NTYPE_INVALID_PAYLOAD_TYPE
+		iked
+	ISAKMP_NTYPE_UNEQUAL_PAYLOAD_LENGTHS
+		racoon
+	ISAKMP_NTYPE_PAYLOAD_MALFORMED
+		sanity check would be hairy
+
+Q: where to attach CR?
+	obey draft-ietf-ipsec-pki-req-05.txt
+	what should we put inside CR?
+		my own signer?
+		RFC2408
+    o  Certificate Authority (variable length) - Contains an encoding of
+       an acceptable certificate authority for the type of certificate
+       requested.  As an example, for an X.509 certificate this field
+       would contain the Distinguished Name encoding of the Issuer Name
+       of an X.509 certificate authority acceptable to the sender of
+       this payload.  This would be included to assist the responder in
+       determining how much of the certificate chain would need to be
+       sent in response to this request.  If there is no specific
+       certificate authority requested, this field SHOULD not be
+       included.
+
+再送
+	phase1の最後が落ちたら？
+		再送すべき。
+			racoonは再送してないっす。
+		自分が期待してないメッセージを再送された時
+			捨てる。
+		処理したはずのメッセージを...
+			再送。
+	under the following situation we will see retransmisson of phase 1 3rd
+	packet (prior to the last packet) from the peer, even if we already
+	have started phase 2 negotiaiton:
+	- initiator have transmitted the last (5th) packet of phase 1 exchange.
+	  the initiator believes that phase 1 is done.
+	- the last (5th) packet in phase 1 exchange was lost
+	responder retransmits phase 1 N-1 packet
+		main mode
+	FW-1 transmits the last packet in phase 1/2 exchange, 3 times.
+
+ESP+AH
+	ESPとAHを別々に設定すると…
+		どっちを先にパケットに適用していいか分からなくなるのでなしだろう。
+	proposalをどう投げるか
+		昨日やった	
+		ah+espのtunnelのときは？
+			ah/transport + esp/tunnel (sakane)
+			optionでなんでもあり。(watanabe)
+			ah/tunnel + esp/tunnel (cisco?)
+				IP2|AH|IP1|ESP|IP0|ULP (sakane)
+				これはおかしい。(kimura)
+
+Q: retransmission timer?
+	should we manage it in per-peer basis?
+		yup.  we may need to
+	RFC2408: change retransmission timer dynamically
+		gets harder to debug...
+
+Q: checks against retransmission
+	check ISAKPM header only (watanabe)
+	check MD5(msg)
+
+	pedants may need to worry about the following case:
+
+            initiator          responder
+		|                  |
+		|-------(1)------->|
+		|                  |
+		|    +--(2)--------|
+		|    |             |
+		|-------(1)--+     |
+		|    |       |     |
+		|<---+       |     |
+		|            |     |
+		|-------(3)------->|
+		|            |     |
+		|<------(4)--------|
+		|            |     |
+		|            +---->|
+		|                  |
+		:                  :
+
+		Sender: owner-ipsec@lists.tislabs.com
+		Message-Id: <200007170936.e6H9a2J113489@thunk.east.sun.com>
+		Subject: Re: simplifying rekeying [draft-jenkins-ipsec-rekeying-06.txt]
+		From: Bill Sommerfeld <sommerfeld@East.Sun.COM>
+
+Q: Nonce size
+	a size of value MUST be 4 - 252 (RFC2409)
+	reject if the value is out-of-range
+
+Q: phase2 KE payload
+	KE付けられたら返す。
+	PFS の設定をしてない時に敵が送って来たら？
+		はねる。
+		まぁ受けてもいい。
+
+Q: subjectAltName and ID
+	IDとsubjectAltNameが等しいかをチェックする。
+		IDがDNだったら -> subject
+			DNの書く順序は？
+			FW-1は厳しいかもしれない？
+		IDがDN以外 -> subjectAltName
+	win2KのCAにsubjectaltnameを設定してサインしてもらう方法がわからない。
+	sshはWEBから subjectaltnameを入れられる。
+
+Q: commit bit
+	who will set the commit bit?  when?
+
+	no action.  if the other end sets it to 1, we should do that too
+	(sakane)
+	responder should set it to 1.  or it may leave it as is (watanabe)
+
+	should revisit rekey draft.
+
+Q: what happens if we have multiple phase 1 SAs for the same src/dst pair?
+
+Q: phase 1 ID payload
+	RSA signature and pre-shared key
+	same ID value.
+	must include the ID into subject alt name.
