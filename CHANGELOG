@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2522 2003/12/20 08:47:53 jinmei Exp $
+$KAME: CHANGELOG,v 1.2523 2003/12/24 10:23:03 suz Exp $
 
 <200312>
+2003-12-24  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/kame/pim6[sd]d/pim6_proto.c: fixed a bug that pim6[sd]d cannot
+	interpret PIM hello options following an unknown ones.
+
 2003-12-20  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (nd6_setdefaultiface): allowed the
 	case of ifindex is 0 for 'ndp -I delete'.
