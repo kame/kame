@@ -1128,8 +1128,8 @@ tcp6_ctlinput(cmd, sa, d)
 
 		inc.inc_fport = th.th_dport;
 		inc.inc_lport = th.th_sport;
-		inc.inc6_faddr = ((struct sockaddr_in6 *)sa)->sin6_addr;
-		inc.inc6_laddr = ip6cp->ip6c_src->sin6_addr;
+		sa6_copy_addr((struct sockaddr_in6 *)sa, &inc.inc6_fsa);
+		sa6_copy_addr(ip6cp->ip6c_src, &inc.inc6_lsa);
 		inc.inc_isipv6 = 1;
 		syncache_unreach(&inc, &th);
 	} else
@@ -1406,13 +1406,16 @@ tcp_rtlookup6(inc)
 	rt = ro6->ro_rt;
 	if (rt == NULL || !(rt->rt_flags & RTF_UP)) {
 		/* No route yet, so try to acquire one */
-		if (!SA6_IS_ADDR_UNSPECIFIED(&inc->inc_ie.ie_dependfaddr.ie6_foreign)) {
+		if (!SA6_IS_ADDR_UNSPECIFIED(&inc->inc6_fsa)) {
 			struct sockaddr_in6 *dst6;
 
 			dst6 = (struct sockaddr_in6 *)&ro6->ro_dst;
 			dst6->sin6_family = AF_INET6;
 			dst6->sin6_len = sizeof(*dst6);
-			dst6->sin6_addr = inc->inc6_faddr;
+			sa6_copy_addr(&inc->inc6_fsa, dst6);
+#ifndef SCOPEDROUTING
+			dst6->sin6_scope_id = 0; /* XXX */
+#endif
 			rtalloc((struct route *)ro6);
 			rt = ro6->ro_rt;
 		}

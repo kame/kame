@@ -157,7 +157,7 @@ tcp_output(tp)
 		 */      
 		if (
 #ifdef INET6
-		    (isipv6 && in6_localaddr(&tp->t_inpcb->in6p_faddr)) ||
+		    (isipv6 && in6_localaddr(&tp->t_inpcb->in6p_fsa)) ||
 		    (!isipv6 &&
 #endif
 		     in_localaddr(tp->t_inpcb->inp_faddr)

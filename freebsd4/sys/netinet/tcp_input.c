@@ -353,11 +353,9 @@ tcp_input(m, off0)
 	register int thflags;
 	struct socket *so = 0;
 	int todrop, acked, ourfinisacked, needoutput = 0;
-	struct in_addr laddr;
 #ifdef INET6
 	struct sockaddr_in6 *src_sa6, *dst_sa6;
 #endif
-	int dropsocket = 0;
 	int iss = 0;
 	u_long tiwin;
 	struct tcpopt to;		/* options in this segment */
@@ -689,11 +687,17 @@ findpcb:
 		/* skip if this isn't a listen socket */
 		if ((so->so_options & SO_ACCEPTCONN) == 0)
 			goto after_listen;
+
+		bzero(&inc, sizeof(inc));
 #ifdef INET6
 		inc.inc_isipv6 = isipv6;
 		if (isipv6) {
-			inc.inc6_faddr = ip6->ip6_src;
-			inc.inc6_laddr = ip6->ip6_dst;
+			inc.inc6_lsa.sin6_family =
+				inc.inc6_fsa.sin6_family = AF_INET6;
+			inc.inc6_lsa.sin6_len = inc.inc6_fsa.sin6_len =
+				sizeof(struct sockaddr_in6);
+			sa6_copy_addr(src_sa6, &inc.inc6_fsa);
+			sa6_copy_addr(dst_sa6, &inc.inc6_lsa);
 			inc.inc6_route.ro_rt = NULL;		/* XXX */
 
 		} else
@@ -823,8 +827,7 @@ findpcb:
 		if (th->th_dport == th->th_sport) {
 #ifdef INET6
 			if (isipv6) {
-				if (IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst,
-						       &ip6->ip6_src))
+				if (SA6_ARE_ADDR_EQUAL(src_sa6, dst_sa6))
 					goto drop;
 			} else
 #endif /* INET6 */
@@ -860,21 +863,12 @@ findpcb:
 			tcp_dooptions(&to, optp, optlen, 1);
 			if (!syncache_add(&inc, &to, th, &so, m))
 				goto drop;
-			if (so == NULL) {
+			if (so == NULL)
 				/*
 				 * Entry added to syncache, mbuf used to
 				 * send SYN,ACK packet.
 				 */
-#ifdef INET6
-				if (isipv6) {
-					sa6_copy_addr(&sa6_any,
-						      &inp->in6p_lsa);
-				} else
-#endif /* INET6 */
-				inp->inp_laddr.s_addr = INADDR_ANY;
-				inp->inp_lport = 0;
-				goto drop;
-			}
+				return;
 			/*
 			 * Segment passed TAO tests.
 			 */
@@ -894,7 +888,7 @@ findpcb:
 			if (DELAY_ACK(tp) && ((thflags & TH_FIN) ||
 			    (tlen != 0 &&
 #ifdef INET6
-			      ((isipv6 && in6_localaddr(&inp->in6p_faddr))
+			      ((isipv6 && in6_localaddr(&inp->in6p_fsa))
 			      ||
 			      (!isipv6 &&
 #endif
@@ -2694,7 +2688,7 @@ tcp_mss(tp, offer)
 			- min_protoh;
 #ifdef INET6
 		if (isipv6) {
-			if (!in6_localaddr(&inp->in6p_faddr))
+			if (!in6_localaddr(&inp->in6p_fsa))
 				mss = min(mss, tcp_v6mssdflt);
 		} else
 #endif
@@ -2769,7 +2763,7 @@ tcp_mss(tp, offer)
 	 */
 	if (
 #ifdef INET6
-	    (isipv6 && in6_localaddr(&inp->in6p_faddr)) ||
+	    (isipv6 && in6_localaddr(&inp->in6p_fsa)) ||
 	    (!isipv6 &&
 #endif
 	     in_localaddr(inp->inp_faddr)
