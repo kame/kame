@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.151 2002/06/13 05:31:37 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.152 2002/06/13 09:08:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -155,8 +155,10 @@ SYSCTL_DECL(_net_inet6_ipsec6);
 /* net.inet.ipsec */
 SYSCTL_STRUCT(_net_inet_ipsec, IPSECCTL_STATS,
 	stats, CTLFLAG_RD,	&ipsecstat,	ipsecstat, "");
+#if 0
 SYSCTL_INT(_net_inet_ipsec, IPSECCTL_DEF_POLICY,
 	def_policy, CTLFLAG_RW,	&ip4_def_policy->policy,	0, "");
+#endif
 SYSCTL_INT(_net_inet_ipsec, IPSECCTL_DEF_ESP_TRANSLEV, esp_trans_deflev,
 	CTLFLAG_RW, &ip4_esp_trans_deflev,	0, "");
 SYSCTL_INT(_net_inet_ipsec, IPSECCTL_DEF_ESP_NETLEV, esp_net_deflev,
@@ -193,8 +195,10 @@ int ip6_esp_randpad = -1;
 /* net.inet6.ipsec6 */
 SYSCTL_STRUCT(_net_inet6_ipsec6, IPSECCTL_STATS,
 	stats, CTLFLAG_RD, &ipsec6stat, ipsecstat, "");
+#if 0
 SYSCTL_INT(_net_inet6_ipsec6, IPSECCTL_DEF_POLICY,
 	def_policy, CTLFLAG_RW,	&ip6_def_policy->policy,	0, "");
+#endif
 SYSCTL_INT(_net_inet6_ipsec6, IPSECCTL_DEF_ESP_TRANSLEV, esp_trans_deflev,
 	CTLFLAG_RW, &ip6_esp_trans_deflev,	0, "");
 SYSCTL_INT(_net_inet6_ipsec6, IPSECCTL_DEF_ESP_NETLEV, esp_net_deflev,
