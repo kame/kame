@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.53 2001/08/17 11:01:22 itojun Exp $
+$KAME: FAQ,v 1.54 2001/08/17 11:02:31 itojun Exp $
 
 
 GENERAL
@@ -448,7 +448,7 @@ whether a security association exists between the local host and a
 remote host)?
 	At this moment there's no API to tell if the traffic (packet) was
 	encrypted or not, from the kernel to userland.  It is a bit difficult
-	API to implement/design, as the granuality is different between IP
+	API to implement/design, as the granularity is different between IP
 	packet and sockets (TCP stream), and it is unclear what to tell the
 	userland (per-packet, or per-stream?).
 
