@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.201 2003/03/28 08:22:20 suz Exp $	*/
+/*	$KAME: mip6.c,v 1.202 2003/03/31 02:19:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -179,6 +179,8 @@ struct callout mip6_nonce_upd_ch = CALLOUT_INITIALIZER;
 struct callout mip6_nonce_upd_ch;
 #endif
 
+static int mip6_prelist_update_sub(struct hif_softc *, struct sockaddr_in6 *,
+    union nd_opts *, struct nd_defrouter *, struct mbuf *);
 static int mip6_prefix_list_update_sub(struct hif_softc *,
     struct sockaddr_in6 *, struct nd_prefixctl *, struct nd_defrouter *);
 static int mip6_register_current_location(void);
@@ -271,22 +273,27 @@ mip6_init()
 }
 
 /*
- * we heard a router advertisement.
- * from the advertised prefix, we can find our current location.
+ * we have heard a new router advertisement.  process if it contains
+ * prefix information options for updating prefix and home agent
+ * lists.
  */
 int
-mip6_prefix_list_update(saddr, ndpr, dr, m)
-	struct sockaddr_in6 *saddr;
-	struct nd_prefixctl *ndpr;
-	struct nd_defrouter *dr;
-	struct mbuf *m;
+mip6_prelist_update(saddr, ndopts, dr, m)
+	struct sockaddr_in6 *saddr; /* the addr that sent this RA. */
+	union nd_opts *ndopts;
+	struct nd_defrouter *dr; /* NULL in case of a router shutdown. */
+	struct mbuf *m; /* the received router adv. packet. */
 {
+	struct mip6_ha *mha;
 	struct hif_softc *sc;
 	int error = 0;
 
+	/* sanity check. */
+	if (saddr == NULL)
+		return (EINVAL);
+
+	/* advertizing router is shutting down. */
 	if (dr == NULL) {
-		struct mip6_ha *mha;
-		/* advertizing router is shutting down. */
 		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, saddr);
 		if (mha) {
 			error = mip6_ha_list_remove(&mip6_ha_list, mha);
@@ -294,102 +301,122 @@ mip6_prefix_list_update(saddr, ndpr, dr, m)
 		return (error);
 	}
 
-	for (sc = TAILQ_FIRST(&hif_softc_list); sc;
-	     sc = TAILQ_NEXT(sc, hif_entry)) {
-		/*
-		 * determine the current location from the advertised
-		 * prefix and router information.
-		 */
-		error = mip6_prefix_list_update_sub(sc, saddr, ndpr, dr);
-		if (error) {
-			mip6log((LOG_ERR,
-				 "%s:%d: error while determining location.\n",
-				 __FILE__, __LINE__));
-			return (error);
-		}
+	/* if no prefix information is included, we have nothing to do. */
+	if ((ndopts == NULL) || (ndopts->nd_opts_pi == NULL)) {
+		return (0);
+	}
 
-#if 0
-		/*
-		 * configure home addresses according to the home
-		 * prefixes and the current location determined above.
-		 */
-		error = mip6_haddr_config(sc, ndpr->ndpr_ifp);
+	for (sc = TAILQ_FIRST(&hif_softc_list);
+	     sc;
+	     sc = TAILQ_NEXT(sc, hif_entry)) {
+		/* reorganize subnet groups. */
+		error = mip6_prelist_update_sub(sc, saddr, ndopts, dr, m);
 		if (error) {
 			mip6log((LOG_ERR,
-				"%s:%d: home address configuration error.\n",
-				 __FILE__, __LINE__));
+			    "%s:%d: failed to reorganize subnet groups.\n",
+			    __FILE__, __LINE__));
 			return (error);
 		}
-#endif
 	}
 
 	return (0);
 }
 
-/*
- * check the recieved prefix information and associate it with the
- * existing prefix/homeagent list.
- *
- * if (ndpr == homepr) {
- *   we are home
- * }
- * if (ndpr != homepr && ra == one of home ha) {
- *   we are home
- *   ndpr is a new homepr
- * }
- * if (ndpr != homepr && ra != one of home ha) {
- *   we are foreign
- * }
- */
-static int
-mip6_prefix_list_update_sub(sc, rtaddr, ndpr, dr)
+int
+mip6_prelist_update_sub(sc, rtaddr, ndopts, dr, m)
 	struct hif_softc *sc;
 	struct sockaddr_in6 *rtaddr;
-	struct nd_prefixctl *ndpr;
+	union nd_opts *ndopts;
 	struct nd_defrouter *dr;
+	struct mbuf *m;
 {
-	struct hif_subnet *hs, *hsbypfx, *hsbyha;
-	struct mip6_subnet *ms;
+	int location;
+	struct nd_opt_hdr *ndopt;
+	struct nd_opt_prefix_info *ndopt_pi;
+	struct sockaddr_in6 prefix_sa;
+	struct hif_subnet *hs;
+	int is_home;
+	int mha_is_new, mpfx_is_new;
+	struct mip6_ha *mha;
+	struct mip6_prefix tmpmpfx, *mpfx;
 	struct mip6_subnet_prefix *mspfx = NULL;
 	struct mip6_subnet_ha *msha = NULL;
-	struct mip6_prefix tmpmpfx, *mpfx;
-	struct mip6_ha *mha;
-	int mpfx_is_new, mha_is_new;
-	int location;
+	struct mip6_subnet *ms = NULL;
 	int error = 0;
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
 
-	location = HIF_LOCATION_UNKNOWN;
+	/* sanity check. */
+	if ((sc == NULL) || (rtaddr == NULL) || (dr == NULL)
+	    || (ndopts == NULL) || (ndopts->nd_opts_pi == NULL))
+		return (EINVAL);
+
+	/* a router advertisement must be sent from a link-local address. */
 	if (!IN6_IS_ADDR_LINKLOCAL(&rtaddr->sin6_addr)) {
 		mip6log((LOG_NOTICE,
-			 "%s:%d: RA from a non-linklocal router (%s).\n",
-			 __FILE__, __LINE__, ip6_sprintf(&rtaddr->sin6_addr)));
-		return (0);
+		    "%s:%d: the source address of a router advertisement "
+		    "is not a link-local address(%s).\n",
+		    __FILE__, __LINE__, ip6_sprintf(&rtaddr->sin6_addr)));
+		    /* ignore. */
+		    return (0);
 	}
-#if 0
-	lladdr = *rtaddr;
-	/* XXX: KAME link-local hack; remove ifindex */
-	lladdr.s6_addr16[1] = 0;
-#endif
 
-	mip6log((LOG_INFO,
-		 "%s:%d: prefix %s from %s\n",
-		 __FILE__, __LINE__,
-		 ip6_sprintf(&ndpr->ndpr_prefix.sin6_addr),
-		 ip6_sprintf(&rtaddr->sin6_addr)));
+	location = HIF_LOCATION_UNKNOWN;
+	is_home = 0;
 
-	hsbypfx = hif_subnet_list_find_withprefix(&sc->hif_hs_list_home,
-						  &ndpr->ndpr_prefix,
-						  ndpr->ndpr_plen);
-	hsbyha =  hif_subnet_list_find_withhaaddr(&sc->hif_hs_list_home,
-						  rtaddr);
+	for (ndopt = (struct nd_opt_hdr *)ndopts->nd_opts_pi;
+	     ndopt <= (struct nd_opt_hdr *)ndopts->nd_opts_pi_end;
+	     ndopt = (struct nd_opt_hdr *)((caddr_t)ndopt
+		 + (ndopt->nd_opt_len << 3))) {
+		if (ndopt->nd_opt_type != ND_OPT_PREFIX_INFORMATION)
+			continue;
+		ndopt_pi = (struct nd_opt_prefix_info *)ndopt;
 
-	if (hsbypfx) {
-		/* we are home. */
-		location = HIF_LOCATION_HOME;
-	} else if ((hsbypfx == NULL) && hsbyha) {
+		/* sanity check of prefix information. */
+		if (ndopt_pi->nd_opt_pi_len != 4) {
+			nd6log((LOG_INFO,
+			    "nd6_ra_input: invalid option "
+			    "len %d for prefix information option, "
+			    "ignored\n", ndopt_pi->nd_opt_pi_len));
+		}
+		if (128 < ndopt_pi->nd_opt_pi_prefix_len) {
+			nd6log((LOG_INFO,
+			    "nd6_ra_input: invalid prefix "
+			    "len %d for prefix information option, "
+			    "ignored\n", ndopt_pi->nd_opt_pi_prefix_len));
+			continue;
+		}
+		if (IN6_IS_ADDR_MULTICAST(&ndopt_pi->nd_opt_pi_prefix)
+		    || IN6_IS_ADDR_LINKLOCAL(&ndopt_pi->nd_opt_pi_prefix)) {
+			nd6log((LOG_INFO,
+			    "nd6_ra_input: invalid prefix "
+			    "%s, ignored\n",
+			    ip6_sprintf(&ndopt_pi->nd_opt_pi_prefix)));
+			continue;
+		}
+		/* aggregatable unicast address, rfc2374 */
+		if ((ndopt_pi->nd_opt_pi_prefix.s6_addr8[0] & 0xe0) == 0x20
+		    && ndopt_pi->nd_opt_pi_prefix_len != 64) {
+			nd6log((LOG_INFO,
+			    "nd6_ra_input: invalid prefixlen "
+			    "%d for rfc2374 prefix %s, ignored\n",
+			    ndopt_pi->nd_opt_pi_prefix_len,
+			    ip6_sprintf(&ndopt_pi->nd_opt_pi_prefix)));
+			continue;
+		}
+
+		bzero(&prefix_sa, sizeof(prefix_sa));
+		prefix_sa.sin6_family = AF_INET6;
+		prefix_sa.sin6_len = sizeof(prefix_sa);
+		prefix_sa.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
+		hs = hif_subnet_list_find_withprefix(&sc->hif_hs_list_home,
+		    &prefix_sa, ndopt_pi->nd_opt_pi_prefix_len);
+		if (hs != NULL)
+			is_home++;
+	}
+
+	/* check is the router is on our home agent list. */
+	hs = hif_subnet_list_find_withhaaddr(&sc->hif_hs_list_home, rtaddr);
+
+	if ((is_home != 0) || (hs != NULL)) {
 		/* we are home. */
 		location = HIF_LOCATION_HOME;
 	} else {
@@ -397,218 +424,280 @@ mip6_prefix_list_update_sub(sc, rtaddr, ndpr, dr)
 		location = HIF_LOCATION_FOREIGN;
 	}
 
-	/* update mip6_prefix_list. */
-	bzero(&tmpmpfx, sizeof(tmpmpfx));
-	tmpmpfx.mpfx_prefix = ndpr->ndpr_prefix;
-	tmpmpfx.mpfx_prefixlen = ndpr->ndpr_plen;
-	mpfx_is_new = 0;
-	mpfx = mip6_prefix_list_find(&tmpmpfx);
-	if (mpfx) {
-		/* found an existing entry.  just update it. */
-		mpfx->mpfx_vltime = ndpr->ndpr_vltime;
-		mpfx->mpfx_vlexpire = time_second + mpfx->mpfx_vltime;
-		mpfx->mpfx_pltime = ndpr->ndpr_pltime;
-		mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
-		/* XXX mpfx->mpfx_haddr; */
-	} else {
-		/* this is a new prefix. */
-		mpfx_is_new = 1;
-		mpfx = mip6_prefix_create(&ndpr->ndpr_prefix,
-					  ndpr->ndpr_plen,
-					  ndpr->ndpr_vltime,
-					  ndpr->ndpr_pltime);
-		if (mpfx == NULL) {
-			mip6log((LOG_ERR,
-				 "%s:%d: "
-				 "mip6_prefix memory allocation failed.\n",
-				 __FILE__, __LINE__));
-			return (ENOMEM);
-		}
-		error = mip6_prefix_list_insert(&mip6_prefix_list,
-						mpfx);
-		if (error) {
-			return (error);
-		}
-		mip6log((LOG_INFO,
-			 "%s:%d: receive a new prefix %s\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&ndpr->ndpr_prefix.sin6_addr)));
-	}
+	for (ndopt = (struct nd_opt_hdr *)ndopts->nd_opts_pi;
+	     ndopt <= (struct nd_opt_hdr *)ndopts->nd_opts_pi_end;
+	     ndopt = (struct nd_opt_hdr *)((caddr_t)ndopt
+		 + (ndopt->nd_opt_len << 3))) {
+		if (ndopt->nd_opt_type != ND_OPT_PREFIX_INFORMATION)
+			continue;
+		ndopt_pi = (struct nd_opt_prefix_info *)ndopt;
 
-	/* update mip6_ha_list. */
-	mha_is_new = 0;
-	mha = mip6_ha_list_find_withaddr(&mip6_ha_list, rtaddr);
-	if (mha) {
-		/* an entry exists.  update information. */
-		if (ndpr->ndpr_raf_router) {
-			mha->mha_gaddr = ndpr->ndpr_prefix;
+#if 0 /* we can skip these checks because we have already done above. */
+		/* sanity check of prefix information. */
+		if (ndopt_pi->nd_opt_pi_len != 4) {
+			nd6log((LOG_INFO,
+			    "nd6_ra_input: invalid option "
+			    "len %d for prefix information option, "
+			    "ignored\n", ndopt_pi->nd_opt_pi_len));
 		}
-		mha->mha_flags = dr->flags;
-	} else {
-		/* this is a new ha. */
-		mha_is_new = 1;
+		if (128 < ndopt_pi->nd_opt_pi_prefix_len) {
+			nd6log((LOG_INFO,
+			    "nd6_ra_input: invalid prefix "
+			    "len %d for prefix information option, "
+			    "ignored\n", ndopt_pi->nd_opt_pi_prefix_len));
+			continue;
+		}
+		if (IN6_IS_ADDR_MULTICAST(&ndopt_pi->nd_opt_pi_prefix)
+		    || IN6_IS_ADDR_LINKLOCAL(&ndopt_pi->nd_opt_pi_prefix)) {
+			nd6log((LOG_INFO,
+			    "nd6_ra_input: invalid prefix "
+			    "%s, ignored\n",
+			    ip6_sprintf(&ndopt_pi->nd_opt_pi_prefix)));
+			continue;
+		}
+		/* aggregatable unicast address, rfc2374 */
+		if ((ndopt_pi->nd_opt_pi_prefix.s6_addr8[0] & 0xe0) == 0x20
+		    && ndopt_pi->nd_opt_pi_prefix_len != 64) {
+			nd6log((LOG_INFO,
+			    "nd6_ra_input: invalid prefixlen "
+			    "%d for rfc2374 prefix %s, ignored\n",
+			    ndopt_pi->nd_opt_pi_prefix_len,
+			    ip6_sprintf(&ndopt_pi->nd_opt_pi_prefix)));
+			continue;
+		}
+#endif
 
-		mha = mip6_ha_create(rtaddr,
-				     ndpr->ndpr_raf_router ?
-				     &ndpr->ndpr_prefix : NULL,
-				     dr->flags, 0, dr->rtlifetime);
-		if (mha == NULL) {
-			mip6log((LOG_ERR,
-				 "%s:%d mip6_ha memory allcation failed.\n",
-				 __FILE__, __LINE__));
-			return (ENOMEM);
-		}
-		error = mip6_ha_list_insert(&mip6_ha_list, mha);
-		if (error) {
-			return (error);
-		}
-		mip6log((LOG_INFO,
-			 "%s:%d: found a new router %s(%s)\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&rtaddr->sin6_addr),
-			 ip6_sprintf(&ndpr->ndpr_prefix.sin6_addr)));
-	}
+		bzero(&prefix_sa, sizeof(prefix_sa));
+		prefix_sa.sin6_family = AF_INET6;
+		prefix_sa.sin6_len = sizeof(prefix_sa);
+		prefix_sa.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
 
-	/* create mip6_subnet_prefix if mpfx is newly created. */
-	if (mpfx_is_new) {
-		mspfx = mip6_subnet_prefix_create(mpfx);
-		if (mspfx == NULL) {
-			mip6log((LOG_ERR,
-				 "%s:%d: mip6_subnet_prefix "
-				 "memory allocation failed.\n",
-				 __FILE__, __LINE__));
-			return (ENOMEM);
-		}
-	}
-
-	/* create mip6_subnet_ha if mha is newly created. */
-	if (mha_is_new) {
-		msha = mip6_subnet_ha_create(mha);
-		if (msha == NULL) {
-			mip6log((LOG_ERR,
-				 "%s:%d: mip6_subnet_ha "
-				 "memory allocation failed.\n",
-				 __FILE__, __LINE__));
-			return (ENOMEM);
-		}
-	}
-
-	/*
-	 * there is an mip6_subnet which has a mha advertising this
-	 * ndpr.  we add newly created mip6_prefix (mip6_subnet_prefix)
-	 * to that mip6_subnet.
-	 */
-	if (mpfx_is_new && (mha_is_new == 0)) {
-		ms = mip6_subnet_list_find_withhaaddr(&mip6_subnet_list,
-						      rtaddr);
-		if (ms == NULL) {
-			/* must not happen. */
-			mip6log((LOG_ERR,
-				 "%s:%d: mha_is_new == 0, "
-				 "mip6_subnet should be exist!\n",
-				 __FILE__, __LINE__));
-			return (EINVAL);
-		}
-		error = mip6_subnet_prefix_list_insert(&ms->ms_mspfx_list,
-						       mspfx);
-		if (error) {
-			return (error);
-		}
-	}
-
-	/*
-	 * there is an mip6_subnet which has a mpfx advertised by this
-	 * ndpr.  we add newly created mip6_ha (mip6_subnet_ha) to that
-	 * mip6_subnet.
-	 */
-	if ((mpfx_is_new == 0) && mha_is_new) {
-		ms = mip6_subnet_list_find_withprefix(&mip6_subnet_list,
-						      &ndpr->ndpr_prefix,
-						      ndpr->ndpr_plen);
-		if (ms == NULL) {
-			/* must not happen. */
-			mip6log((LOG_ERR,
-				 "%s:%d: mip6_determine_location_withndpr: "
-				 "mpfx_is_new == 0, "
-				 "mip6_subnet should be exist!\n",
-				 __FILE__, __LINE__));
-			return (EINVAL);
-		}
-		error = mip6_subnet_ha_list_insert(&ms->ms_msha_list,
-						   msha);
-		if (error) {
-			return (error);
-		}
-	}
-
-	/*
-	 * we have no mip6_subnet which has a prefix or ha advertised
-	 * by this ndpr.  so, we create a new mip6_subnet.
-	 */
-	if (mpfx_is_new && mha_is_new) {
-		ms = mip6_subnet_create();
-		if (ms == NULL) {
-			mip6log((LOG_ERR,
-				 "%s:%d: mip6_determine_location_withndpr: "
-				 "mip6_subnet memory allcation failed.\n",
-				 __FILE__, __LINE__));
-			return (ENOMEM);
-		}
-		error = mip6_subnet_list_insert(&mip6_subnet_list, ms);
-		if (error) {
-			return (error);
-		}
-
-		error = mip6_subnet_prefix_list_insert(&ms->ms_mspfx_list,
-						       mspfx);
-		if (error) {
-			return (error);
-		}
-
-		error = mip6_subnet_ha_list_insert(&ms->ms_msha_list,
-						   msha);
-		if (error) {
-			return (error);
-		}
-
-		/* add this newly created mip6_subnet to hif_subnet_list. */
-		hs = hif_subnet_create(ms);
-		if (hs == NULL) {
-			mip6log((LOG_ERR,
-				 "%s:%d: mip6_determine_location_withndpr: "
-				 "hif_subnet memory allocation failed.\n",
-				 __FILE__, __LINE__));
-			return (ENOMEM);
-		}
-		if (location == HIF_LOCATION_HOME) {
-			error = hif_subnet_list_insert(&sc->hif_hs_list_home,
-						       hs);
-			if (error) {
-				return (error);
-			}
+		/* update mip6_prefix_list. */
+		bzero(&tmpmpfx, sizeof(tmpmpfx));
+		tmpmpfx.mpfx_prefix.sin6_family = AF_INET6;
+		tmpmpfx.mpfx_prefix.sin6_len = sizeof(tmpmpfx.mpfx_prefix);
+		tmpmpfx.mpfx_prefix.sin6_addr = ndopt_pi->nd_opt_pi_prefix;
+		tmpmpfx.mpfx_prefixlen = ndopt_pi->nd_opt_pi_prefix_len;
+		mpfx_is_new = 0;
+		mpfx = mip6_prefix_list_find(&tmpmpfx);
+		if (mpfx) {
+			/* found an existing entry.  just update it. */
+			mpfx->mpfx_vltime = ndopt_pi->nd_opt_pi_valid_time;
+			mpfx->mpfx_vlexpire = time_second + mpfx->mpfx_vltime;
+			mpfx->mpfx_pltime = ndopt_pi->nd_opt_pi_preferred_time;
+			mpfx->mpfx_plexpire = time_second + mpfx->mpfx_pltime;
+			/* XXX mpfx->mpfx_haddr; */
 		} else {
-			error = hif_subnet_list_insert(&sc->hif_hs_list_foreign,
-						       hs);
+			/* this is a new prefix. */
+			mpfx = mip6_prefix_create(&tmpmpfx.mpfx_prefix,
+			    tmpmpfx.mpfx_prefixlen,
+			    ndopt_pi->nd_opt_pi_valid_time,
+			    ndopt_pi->nd_opt_pi_preferred_time);
+			if (mpfx == NULL) {
+				mip6log((LOG_ERR,
+				    "%s:%d: "
+				    "mip6_prefix memory allocation failed.\n",
+				    __FILE__, __LINE__));
+				goto skip_prefix_update;
+			}
+			error = mip6_prefix_list_insert(&mip6_prefix_list,
+			    mpfx);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "%s:%d: "
+				    "mip6_prefix_insert_failed(%d).\n",
+				    __FILE__, __LINE__, error));
+				goto skip_prefix_update;
+			}
+
+			mpfx_is_new = 1;
+			mip6log((LOG_INFO,
+			    "%s:%d: receive a new prefix %s\n",
+			    __FILE__, __LINE__,
+			    ip6_sprintf(&ndopt_pi->nd_opt_pi_prefix)));
+		}
+	skip_prefix_update:
+
+		/* create mip6_subnet_prefix if mpfx is newly created. */
+		if (mpfx_is_new) {
+			mspfx = mip6_subnet_prefix_create(mpfx);
+			if (mspfx == NULL) {
+				(void)mip6_prefix_list_remove(
+				    &mip6_prefix_list, mpfx);
+				mpfx_is_new = 0;
+				mip6log((LOG_ERR,
+				    "%s:%d: mip6_subnet_prefix "
+				    "memory allocation failed.\n",
+				    __FILE__, __LINE__));
+				/* continue, anyway. */
+			}
+		}
+
+		/* update mip6_ha_list. */
+		mha_is_new = 0;
+		mha = mip6_ha_list_find_withaddr(&mip6_ha_list, rtaddr);
+		if (mha) {
+			/* the entry for rtaddr exists.  update information. */
+			if (ndopt_pi->nd_opt_pi_flags_reserved
+			    & ND_OPT_PI_FLAG_ROUTER) {
+				/*
+				 * if prefix information has a router flag,
+				 * that entry includes a global address
+				 * of a home agent.
+				 */
+				mha->mha_gaddr = tmpmpfx.mpfx_prefix;
+			}
+			mha->mha_flags = dr->flags;
+		} else {
+			/* this is a new ha or a router. */
+			mha = mip6_ha_create(rtaddr,
+			    (ndopt_pi->nd_opt_pi_flags_reserved
+			    & ND_OPT_PI_FLAG_ROUTER)
+			    ? &tmpmpfx.mpfx_prefix : NULL,
+			    dr->flags, 0, dr->rtlifetime);
+			if (mha == NULL) {
+				mip6log((LOG_ERR,
+				    "%s:%d mip6_ha memory allcation failed.\n",
+				    __FILE__, __LINE__));
+				goto skip_ha_update;
+			}
+			error = mip6_ha_list_insert(&mip6_ha_list, mha);
+			if (error) {
+				mip6log((LOG_ERR,
+				    "%s:%d "
+				    "mip6_ha_list_insert failed(%d).\n",
+				    __FILE__, __LINE__, error));
+				goto skip_ha_update;
+			}
+
+			mha_is_new = 1;
+			mip6log((LOG_INFO,
+			    "%s:%d: found a new router %s(%s)\n",
+			    __FILE__, __LINE__,
+			    ip6_sprintf(&rtaddr->sin6_addr),
+			    ip6_sprintf(&tmpmpfx.mpfx_prefix.sin6_addr)));
+		}
+	skip_ha_update:
+
+		/* create mip6_subnet_ha if mha is newly created. */
+		if (mha_is_new) {
+			msha = mip6_subnet_ha_create(mha);
+			if (msha == NULL) {
+				(void)mip6_ha_list_remove(&mip6_ha_list, mha);
+				mha_is_new = 0;
+				mip6log((LOG_ERR,
+				    "%s:%d: mip6_subnet_ha "
+				    "memory allocation failed.\n",
+				    __FILE__, __LINE__));
+				/* continue, anyway. */
+			}
+		}
+
+		/*
+		 * there is an mip6_subnet which has a mha advertising
+		 * this ndpr.  we add newly created mip6_prefix
+		 * (mip6_subnet_prefix) to that mip6_subnet.
+		 */
+		if (mpfx_is_new && (mha_is_new == 0)) {
+			ms = mip6_subnet_list_find_withhaaddr(&mip6_subnet_list,
+			    rtaddr);
+			if (ms == NULL) {
+				/* must not happen. */
+				mip6log((LOG_ERR,
+				    "%s:%d: mha_is_new == 0, "
+				    "mip6_subnet should be exist!\n",
+				    __FILE__, __LINE__));
+				return (EINVAL);
+			}
+			error = mip6_subnet_prefix_list_insert(&ms->ms_mspfx_list,
+			    mspfx);
 			if (error) {
 				return (error);
 			}
 		}
-	}
 
-#if XXX
-	/* determine current hif_subnet. */
-	sc->hif_hs_current
-		= hif_subnet_list_find_withprefix(&sc->hif_hs_list_home,
-						  &ndpr->ndpr_prefix.sin6_addr,
-						  ndpr->ndpr_plen);
-	if (sc->hif_hs_current == NULL) {
-		sc->hif_hs_current =
-			hif_subnet_list_find_withprefix(&sc->hif_hs_list_foreign,
-							&ndpr->ndpr_prefix.sin6_addr,
-							ndpr->ndpr_plen);
-	}
-#endif /* XXX */
+		/*
+		 * there is an mip6_subnet which has a mpfx advertised
+		 * by this ndpr.  we add newly created mip6_ha
+		 * (mip6_subnet_ha) to that mip6_subnet.
+		 */
+		if ((mpfx_is_new == 0) && mha_is_new) {
+			ms = mip6_subnet_list_find_withprefix(&mip6_subnet_list,
+			    &tmpmpfx.mpfx_prefix, tmpmpfx.mpfx_prefixlen);
+			if (ms == NULL) {
+				/* must not happen. */
+				mip6log((LOG_ERR,
+				    "%s:%d: mip6_determine_location_withndpr: "
+				    "mpfx_is_new == 0, "
+				    "mip6_subnet should be exist!\n",
+				    __FILE__, __LINE__));
+				return (EINVAL);
+			}
+			error = mip6_subnet_ha_list_insert(&ms->ms_msha_list,
+			    msha);
+			if (error) {
+				return (error);
+			}
+		}
 
+		/*
+		 * we have no mip6_subnet which has a prefix or ha
+		 * advertised by this ndpr.  so, we create a new
+		 * mip6_subnet.
+		 */
+		if (mpfx_is_new && mha_is_new) {
+			ms = mip6_subnet_create();
+			if (ms == NULL) {
+				mip6log((LOG_ERR,
+				    "%s:%d: mip6_subnet memory allcation "
+				    "failed.\n",
+				    __FILE__, __LINE__));
+				return (ENOMEM);
+			}
+			error = mip6_subnet_list_insert(&mip6_subnet_list, ms);
+			if (error) {
+				return (error);
+			}
+
+			error = mip6_subnet_prefix_list_insert(&ms->ms_mspfx_list,
+			    mspfx);
+			if (error) {
+				return (error);
+			}
+
+			error = mip6_subnet_ha_list_insert(&ms->ms_msha_list,
+			    msha);
+			if (error) {
+				return (error);
+			}
+
+			/*
+			 * add this newly created mip6_subnet to
+			 * hif_subnet_list.
+			 */
+			hs = hif_subnet_create(ms);
+			if (hs == NULL) {
+				mip6log((LOG_ERR,
+				    "%s:%d: hif_subnet memory allocation "
+				    "failed.\n",
+				    __FILE__, __LINE__));
+				return (ENOMEM);
+			}
+			if (location == HIF_LOCATION_HOME) {
+				error = hif_subnet_list_insert(&sc->hif_hs_list_home,
+				    hs);
+				if (error) {
+					return (error);
+				}
+			} else {
+				error = hif_subnet_list_insert(&sc->hif_hs_list_foreign,
+				    hs);
+				if (error) {
+					return (error);
+				}
+			}
+		}
+	}
 	return (0);
 }
 
@@ -1773,22 +1862,6 @@ mip6_exthdr_create(m, opt, mip6opt)
 		    opt->ip6po_mobility->ip6m_type == IP6M_CAREOF_TEST_INIT)
 			goto noneed;
 	}
-#if 0 /* we do not send a null packet for a BU creation. */
-	else if (ip6->ip6_nxt == IPPROTO_NONE) {
-		/* create a binding update mobility header. */
-		error = mip6_ip6mu_create(&mip6opt->mip6po_mobility,
-				  	&src, &dst, sc);
-		if (error) {
-			mip6log((LOG_ERR,
-			 	"%s:%d: a binding update mobility header "
-			 	"insertion failed.\n",
-			 	__FILE__, __LINE__));
-			goto bad;
-		}
-		if (mip6opt->mip6po_mobility != NULL)
-			need_hao = 1;
-	}
-#endif
 	if ((mbu->mbu_flags & IP6MU_HOME) != 0) {
 		/* to my home agent. */
 		if (!need_hao &&
@@ -2038,140 +2111,6 @@ mip6_destopt_discard(mip6opt)
 	return;
 }
 
-#if defined(IPSEC) && !defined(__OpenBSD__)
-struct ipsecrequest *
-mip6_getipsecrequest(src, dst, sp)
-	struct sockaddr_in6 *src;
-	struct sockaddr_in6 *dst;
-	struct secpolicy *sp;
-{
-	struct ipsecrequest *isr = NULL;
-	struct secasindex saidx;
-	struct sockaddr_in6 *sin6;
-
-	for (isr = sp->req; isr; isr = isr->next) {
-#if 0
-		if (isr->saidx.mode == IPSEC_MODE_TUNNEL) {
-			/* the rest will be handled by ipsec6_output_tunnel() */
-			break;
-		}
-#endif /* 0 */
-
-		/* make SA index for search proper SA */
-		bcopy(&isr->saidx, &saidx, sizeof(saidx));
-		saidx.mode = isr->saidx.mode;
-		saidx.reqid = isr->saidx.reqid;
-		sin6 = (struct sockaddr_in6 *)&saidx.src;
-		if (sin6->sin6_len == 0) {
-			*sin6 = *src;
-			sin6->sin6_port = IPSEC_PORT_ANY;
-			if (IN6_IS_SCOPE_LINKLOCAL(&src->sin6_addr)) {
-				/* fix scope id for comparing SPD */
-				sin6->sin6_addr.s6_addr16[1] = 0;
-			}
-		}
-		sin6 = (struct sockaddr_in6 *)&saidx.dst;
-		if (sin6->sin6_len == 0) {
-			*sin6 = *dst;
-			sin6->sin6_port = IPSEC_PORT_ANY;
-			if (IN6_IS_SCOPE_LINKLOCAL(&dst->sin6_addr)) {
-				/* fix scope id for comparing SPD */
-				sin6->sin6_addr.s6_addr16[1] = 0;
-			}
-		}
-
-		if (key_checkrequest(isr, &saidx) == ENOENT) {
-			/*
-			 * IPsec processing is required, but no SA found.
-			 * I assume that key_acquire() had been called
-			 * to get/establish the SA. Here I discard
-			 * this packet because it is responsibility for
-			 * upper layer to retransmit the packet.
-			 */
-#if 0
-			ipsec6stat.out_nosa++;
-			error = ENOENT;
-
-			/*
-			 * Notify the fact that the packet is discarded
-			 * to ourselves. I believe this is better than
-			 * just silently discarding. (jinmei@kame.net)
-			 * XXX: should we restrict the error to TCP packets?
-			 * XXX: should we directly notify sockets via
-			 *      pfctlinputs?
-			 *
-			 * Noone have initialized rcvif until this point,
-			 * so clear it.
-			 */
-			if ((state->m->m_flags & M_PKTHDR) != 0)
-				state->m->m_pkthdr.rcvif = NULL;
-			icmp6_error(state->m, ICMP6_DST_UNREACH,
-				    ICMP6_DST_UNREACH_ADMIN, 0);
-			state->m = NULL; /* icmp6_error freed the mbuf */
-			goto bad;
-#endif /* 0 */
-			return (NULL);
-		}
-
-		/* validity check */
-		if (isr->sav == NULL) {
-#if 0
-			switch (ipsec_get_reqlevel(isr)) {
-			case IPSEC_LEVEL_USE:
-				continue;
-			case IPSEC_LEVEL_REQUIRE:
-				/* must be not reached here. */
-				panic("ipsec6_output_trans: no SA found, but required.");
-			}
-#endif /* 0 */
-			return (NULL);
-		}
-
-		/*
-		 * If there is no valid SA, we give up to process.
-		 * see same place at ipsec4_output().
-		 */
-		if (isr->sav->state != SADB_SASTATE_MATURE
-		 && isr->sav->state != SADB_SASTATE_DYING) {
-#if 0
-			ipsec6stat.out_nosa++;
-			error = EINVAL;
-			goto bad;
-#endif /* 0 */
-			return (NULL);
-		}
-		break;
-	}
-	return (isr);
-}
-
-struct secpolicy *
-mip6_getpolicybyaddr(src, dst, dir)
-	struct sockaddr_in6 *src;
-	struct sockaddr_in6 *dst;
-	u_int dir;
-{
-	struct secpolicy *sp = NULL;
-	struct secpolicyindex spidx;
-
-	if (src == NULL || dst == NULL)
-		return (NULL);
-
-	bzero(&spidx, sizeof(spidx));
-
-	*(struct sockaddr_in6 *)&spidx.src = *src;
-	spidx.prefs = sizeof(struct in6_addr) << 3;
-	*(struct sockaddr_in6 *)&spidx.dst = *dst;
-	spidx.prefs = sizeof(struct in6_addr) << 3;
-	spidx.ul_proto = IPPROTO_DSTOPTS; /* XXX */
-
-	sp = key_allocsp(&spidx, dir);
-
-	/* return value may be NULL. */
-	return (sp);
-}
-#endif /* IPSEC && !__OpenBSD__ */
-
 /*
  ******************************************************************************
  * Function:    mip6_find_offset
@@ -2312,75 +2251,6 @@ mip6_add_opt2dh(opt, dh)
 	}
 	return pos;
 }
-
-#if 0
-#if defined(IPSEC) && !defined(__OpenBSD__)
-caddr_t
-mip6_add_subopt2dh(subopt, opt, dh)
-	u_int8_t *subopt; /* MIP6 sub-options */
-	u_int8_t *opt; /* MIP6 destination option */
-	struct mip6_buffer *dh; /* Buffer containing the IPv6 DH */
-{
-	int suboptlen = 0;
-	caddr_t subopt_pos = NULL;
-	u_int8_t type;
-	u_int8_t len;
-	int rest;
-
-	/* verify input */
-	if (subopt == NULL || dh == NULL)
-		return (0);
-	if (dh->off < 2) {
-		/* Illegal input. */
-		return (0);
-	}
-
-	/* Add sub-option to Destination option */
-	type = *subopt;
-	switch (type) {
-		case MIP6OPT_AUTHDATA:
-			/*
-			 * Authentication Data alignment requirement
-			 * (8n + 6)
-			 */
-			rest = dh->off % 8;
-			suboptlen = 0;
-			if (rest <= 4) {
-				/* Add a PADN option with length X */
-				len = 6 - rest - 2;
-				bzero((caddr_t)dh->buf + dh->off, len + 2);
-				*(u_int8_t *)((caddr_t)dh->buf + dh->off) = MIP6OPT_PADN;
-				*(u_int8_t *)((caddr_t)dh->buf + dh->off + 1) = len;
-				suboptlen = len + 2;
-			} else if (rest == 5) {
-				/* Add a PAD1 option */
-				bzero((caddr_t)dh->buf + dh->off, 1);
-				suboptlen = 1;
-			} else if (rest == 7) {
-				/* Add a PADN option with length 5 */
-				bzero((caddr_t)dh->buf + dh->off, 5/*len*/ + 2);
-				*(u_int8_t *)((caddr_t)dh->buf + dh->off) = MIP6OPT_PADN;
-				*(u_int8_t *)((caddr_t)dh->buf + dh->off + 1) = 5;
-				suboptlen = 5 + 2;
-			}
-			dh->off += suboptlen;
-			((struct ip6_opt *)opt)->ip6o_len += suboptlen;
-
-			/* Append sub-option to the destination option. */
-			suboptlen = 2 + *(subopt + 1);
-			subopt_pos = (caddr_t)dh->buf + dh->off;
-			bcopy((caddr_t)subopt, subopt_pos, suboptlen);
-
-			/* adjust offset. */
-			dh->off += suboptlen;
-			((struct ip6_opt *)opt)->ip6o_len += suboptlen;
-			break;
-	}
-
-	return (subopt_pos);
-}
-#endif /* IPSEC && !__OpenBSD__ */
-#endif
 
 /*
  ******************************************************************************

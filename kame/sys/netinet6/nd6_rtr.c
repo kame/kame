@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.228 2003/03/22 09:03:15 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.229 2003/03/31 02:19:26 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -338,6 +338,17 @@ nd6_ra_input(m, off, icmp6len)
 		ndi->chlim = nd_ra->nd_ra_curhoplimit;
 	dr = defrtrlist_update(&dr0);
 
+#ifdef MIP6
+	if (MIP6_IS_MN) {
+		if (mip6_prelist_update(&src_sa6, &ndopts, dr, m)) {
+			mip6log((LOG_ERR,
+			    "%s:%d: failed to update mip6_prefixes.\n",
+			    __FILE__, __LINE__));
+			/* waht should we do? */
+		}
+	}
+#endif
+
 	/*
 	 * prefix
 	 */
@@ -415,17 +426,6 @@ nd6_ra_input(m, off, icmp6len)
 			if (in6_init_prefix_ltimes(&pr))
 				continue; /* prefix lifetime init failed */
 #endif
-#ifdef MIP6
-			if (MIP6_IS_MN) {
-				if (mip6_prefix_list_update(&src_sa6,
-				    &pr, dr, m)) {
-					mip6log((LOG_ERR, "%s:%d: "
-					    "prefix info processing failed\n",
-					    __FILE__, __LINE__));
-					goto freeit;
-				}
-			}
-#endif /* MIP6 */
 			(void)prelist_update(&pr, dr, m);
 		}
 	}
