@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.58 2000/07/16 09:15:38 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.59 2000/08/03 15:16:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -181,7 +181,8 @@ static char sccsid[] = "@(#)ping.c	8.1 (Berkeley) 6/5/93";
 #define F_HOSTNAME	0x10000
 #define F_FQDNOLD	0x20000
 #define F_NIGROUP	0x40000
-#define F_NOUSERDATA	(F_NODEADDR | F_FQDN | F_FQDNOLD)
+#define F_SUPTYPES	0x80000
+#define F_NOUSERDATA	(F_NODEADDR | F_FQDN | F_FQDNOLD | F_SUPTYPES)
 u_int options;
 
 #define IN6LEN		sizeof(struct in6_addr)
@@ -296,12 +297,12 @@ main(argc, argv)
 	preload = 0;
 	datap = &outpack[ICMP6ECHOLEN + ICMP6ECHOTMLEN];
 #ifndef IPSEC
-	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:nNp:qRS:s:vwW")) != EOF)
+	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:nNp:qRS:s:tvwW")) != EOF)
 #else
 #ifdef IPSEC_POLICY_IPSEC
-	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:nNp:qRS:s:vwWP:")) != EOF)
+	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:nNp:qRS:s:tvwWP:")) != EOF)
 #else
-	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:nNp:qRS:s:vwWAE")) != EOF)
+	while ((ch = getopt(argc, argv, "a:b:c:dfHh:I:i:l:nNp:qRS:s:tvwWAE")) != EOF)
 #endif /*IPSEC_POLICY_IPSEC*/
 #endif
 	{
@@ -436,6 +437,10 @@ main(argc, argv)
 				    "datalen value too large, maximum is %d",
 				    MAXDATALEN);
 			}
+			break;
+		case 't':
+			options &= ~F_NOUSERDATA;
+			options |= F_SUPTYPES;
 			break;
 		case 'v':
 			options |= F_VERBOSE;
@@ -603,7 +608,7 @@ main(argc, argv)
 	if (!(options & F_VERBOSE)) {
 		ICMP6_FILTER_SETBLOCKALL(&filt);
 		if ((options & F_FQDN) || (options & F_FQDNOLD) ||
-		    (options & F_NODEADDR))
+		    (options & F_NODEADDR) || (options & F_SUPTYPES))
 			ICMP6_FILTER_SETPASS(ICMP6_NI_REPLY, &filt);
 		else
 			ICMP6_FILTER_SETPASS(ICMP6_ECHO_REPLY, &filt);
@@ -1035,6 +1040,16 @@ pinger()
 		    sizeof(dst.sin6_addr));
 		cc = ICMP6_NIQLEN + sizeof(dst.sin6_addr);
 		datalen = 0;
+	} else if (options & F_SUPTYPES) {
+		icp->icmp6_type = ICMP6_NI_QUERY;
+		icp->icmp6_code = ICMP6_NI_SUBJ_FQDN;	/*empty*/
+		nip->ni_qtype = htons(NI_QTYPE_SUPTYPES);
+		nip->ni_flags = 0;	/* do not support compressed bitmap */
+
+		memcpy(nip->icmp6_ni_nonce, nonce, sizeof(nip->icmp6_ni_nonce));
+		*(u_int16_t *)nip->icmp6_ni_nonce = ntohs(seq);
+		cc = ICMP6_NIQLEN;
+		datalen = 0;
 	} else {
 		icp->icmp6_type = ICMP6_ECHO_REQUEST;
 		icp->icmp6_code = 0;
@@ -1215,6 +1230,16 @@ pr_pack(buf, cc, mhdr)
 			 break;
 		 case NI_QTYPE_SUPTYPES:
 			 printf("NodeInfo Supported Qtypes");
+			 if (ntohs(ni->ni_flags) & 0x0001) {
+				printf(", compressed bitmap");
+				break;
+			 }
+			 cp = (u_char *)(ni + 1);
+			 if (cp + 4 != end) {
+				printf(", invalid length");
+				break;
+			 }
+			 printf(", bitmap = 0x%08x", ntohl(*(u_int32_t *)cp));
 			 break;
 		 case NI_QTYPE_NODEADDR:
 			 pr_nodeaddr(ni, end - (u_char *)ni);
