@@ -1,5 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2631 2004/06/30 02:12:42 jinmei Exp $
+$KAME: CHANGELOG,v 1.2632 2004/07/03 07:15:49 jinmei Exp $
+
+<200407>
+2004-07-03  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_ctloutput): fixed the use of
+	an uninitialized pointer for the IPV6_IPSEC_POLICY socket option
+	on FreeBSD.  All FreeBSD users using IPv6 IPsec must apply this
+	fix.  Snaps since 20040524 are affected.
 
 <200406>
 2004-06-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
