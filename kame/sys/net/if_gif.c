@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.56 2001/07/24 13:56:14 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.57 2001/07/24 14:24:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -590,7 +590,9 @@ gif_ioctl(ifp, cmd, data)
 		break;
 #endif /* SIOCSIFMTU */
 
+#ifdef INET
 	case SIOCSIFPHYADDR:
+#endif
 #ifdef INET6
 	case SIOCSIFPHYADDR_IN6:
 #endif /* INET6 */
@@ -617,6 +619,8 @@ gif_ioctl(ifp, cmd, data)
 				&(((struct if_laddrreq *)data)->addr);
 			dst = (struct sockaddr *)
 				&(((struct if_laddrreq *)data)->dstaddr);
+		default:
+			return EINVAL;
 		}
 
 		/* sa_family must be equal */
