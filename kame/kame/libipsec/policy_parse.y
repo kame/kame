@@ -1,5 +1,5 @@
 /*	$NetBSD: policy_parse.y,v 1.14 2003/11/23 08:33:13 itojun Exp $	*/
-/*	$KAME: policy_parse.y,v 1.24 2004/06/19 21:17:31 itojun Exp $	*/
+/*	$KAME: policy_parse.y,v 1.25 2004/07/02 08:02:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -136,6 +136,8 @@ policy_spec
 				__ipsec_errcode = EIPSEC_INVAL_ARGUMENT;
 				return (-1);
 			}
+			if (init_x_policy($1, $2))
+				return (-1);
 		}
 	|	DIR
 		{
