@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2604 2004/05/16 05:57:29 jinmei Exp $
+$KAME: CHANGELOG,v 1.2605 2004/05/18 09:51:12 jinmei Exp $
 
 <200405>
+2004-05-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* {net,open}bsd/include/netdb.h (AI_ADDRCONFIG): defined the flag.
+
 2004-05-16  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *bsd/include/netdb.h: added a new error code EAI_OVERFLOW
 	defined in RFC3493.
