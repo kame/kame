@@ -799,7 +799,7 @@ m_copym(m, off0, len, wait)
 		if (n == 0)
 			goto nospace;
 		if (copyhdr) {
-			if (!m_dup_pkthdr(n, m, wait))
+			if (!m_dup_pkthdr(n, m))
 				goto nospace;
 			if (len == M_COPYALL)
 				n->m_pkthdr.len -= off0;
@@ -861,7 +861,7 @@ m_copypacket(m, how)
 	if (!n)
 		goto nospace;
 
-	if (!m_dup_pkthdr(n, m, how))
+	if (!m_dup_pkthdr(n, m))
 		goto nospace;
 	n->m_len = m->m_len;
 	if (m->m_flags & M_EXT) {
@@ -982,7 +982,7 @@ m_dup(m, how)
 		if (n == NULL)
 			goto nospace;
 		if (top == NULL) {		/* first one, must be PKTHDR */
-			if (!m_dup_pkthdr(n, m, how))
+			if (!m_dup_pkthdr(n, m))
 				goto nospace;
 			nsize = MHLEN;
 		} else				/* not the first one */
@@ -1433,7 +1433,7 @@ m_move_pkthdr(struct mbuf *to, struct mbuf *from)
  * In particular, this does a deep copy of the packet tags.
  */
 int
-m_dup_pkthdr(struct mbuf *to, struct mbuf *from, int how)
+m_dup_pkthdr(struct mbuf *to, struct mbuf *from)
 {
 	KASSERT((to->m_flags & M_EXT) == 0, ("m_dup_pkthdr: to has cluster"));
 

@@ -1945,7 +1945,7 @@ ip_forward(struct mbuf *m, int srcrt, struct sockaddr_in *next_hop)
 	 * data in a cluster may change before we reach icmp_error().
 	 */
 	MGET(mcopy, M_DONTWAIT, m->m_type);
-	if (mcopy != NULL && !m_dup_pkthdr(mcopy, m, M_DONTWAIT)) {
+	if (mcopy != NULL && !m_dup_pkthdr(mcopy, m)) {
 		/*
 		 * It's probably ok if the pkthdr dup fails (because
 		 * the deep copy of the tag chain failed), but for now

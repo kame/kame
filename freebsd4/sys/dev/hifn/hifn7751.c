@@ -1672,7 +1672,7 @@ hifn_crypto(
 			if (cmd->src_m->m_flags & M_PKTHDR) {
 				len = MHLEN;
 				MGETHDR(m0, M_DONTWAIT, MT_DATA);
-				if (m0 && !m_dup_pkthdr(m0, cmd->src_m, M_DONTWAIT)) {
+				if (m0 && !m_dup_pkthdr(m0, cmd->src_m)) {
 					m_free(m0);
 					m0 = NULL;
 				}
