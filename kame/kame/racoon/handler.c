@@ -1,4 +1,4 @@
-/*	$KAME: handler.c,v 1.54 2001/12/13 17:13:02 sakane Exp $	*/
+/*	$KAME: handler.c,v 1.55 2002/01/02 08:09:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -672,7 +672,7 @@ initctdtree()
  * OUT:
  *	 0:	the packet is received at the first time.
  *	 1:	the packet was processed before.
- *	 2:	the packet was processed before, but the address mismatchs.
+ *	 2:	the packet was processed before, but the address mismatches.
  *	-1:	error happened.
  */
 int
@@ -705,7 +705,9 @@ check_recvdpkt(remote, local, rbuf)
 	if (r == NULL)
 		return 0;
 
-	/* the packet was processed before, but the remote address mismatchs. */
+	/*
+	 * the packet was processed before, but the remote address mismatches.
+	 */
 	if (cmpsaddrstrict(remote, r->remote) != 0)
 		return 2;
 
