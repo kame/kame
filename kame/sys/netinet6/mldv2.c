@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.32 2004/12/31 20:00:13 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.33 2004/12/31 20:06:24 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1391,7 +1391,7 @@ mld_record_queried_source(in6m, mld, mldlen)
 	src.sin6_family = AF_INET6;
 	src.sin6_len = sizeof(src);
 	for (i = 0; i < numsrc && mldlen >= addrlen; i++, mldlen -= addrlen) {
-		bcopy(&mldh->mld_src[i], &src, sizeof(mldh->mld_src[i]));
+		bcopy(&mldh->mld_src[i], &src.sin6_addr, sizeof(src.sin6_addr));
 		if (in6mm_src->i6ms_grpjoin > 0) {
 			ref_count = in6_merge_msf_source_addr(in6mm_src->i6ms_rec, &src, IMS_ADD_SOURCE);
 			if (ref_count < 0) {
