@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.88 2000/11/08 17:15:03 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.89 2000/11/08 17:56:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1407,7 +1407,7 @@ pk_recvacquire(mhp)
 	struct sockaddr *sa = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]);
 
 	if ((sa->sa_family == AF_INET
-	  && IN_MULTICAST(htonl(((struct sockaddr_in *)sa)->sin_addr.s_addr)))
+	  && IN_MULTICAST(ntohl(((struct sockaddr_in *)sa)->sin_addr.s_addr)))
 #ifdef INET6
 	 || (sa->sa_family == AF_INET6
 	  && IN6_IS_ADDR_MULTICAST(&((struct sockaddr_in6 *)sa)->sin6_addr))
