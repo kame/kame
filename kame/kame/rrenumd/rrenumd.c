@@ -272,7 +272,9 @@ sock6_open(struct flags *flags
 			err(1, "malloc");
 		if ((len = ipsec_set_policy(buf, len, policy)) < 0)
 			errx(1, ipsec_strerror());
-		if (setsockopt(s6, IPPROTO_IPV6, IPV6_IPSEC_POLICY, buf, len) < 0)
+		/* XXX should handle in/out bound policy. */
+		if (setsockopt(s6, IPPROTO_IPV6, IPV6_IPSEC_POLICY_OUT,
+				buf, len) < 0)
 			err(1, NULL);
 		free(buf);
 	}
@@ -336,7 +338,9 @@ sock4_open(struct flags *flags
 			err(1, "malloc");
 		if ((len = ipsec_set_policy(buf, len, policy)) < 0)
 			errx(1, ipsec_strerror());
-		if (setsockopt(s4, IPPROTO_IP, IP_IPSEC_POLICY, buf, len) < 0)
+		/* XXX should handle in/out bound policy. */
+		if (setsockopt(s4, IPPROTO_IP, IP_IPSEC_POLICY_OUT, 
+				buf, len) < 0)
 			err(1, NULL);
 		free(buf);
 	}
