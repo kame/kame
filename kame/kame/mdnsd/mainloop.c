@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.94 2002/09/19 01:43:34 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.95 2003/02/28 10:43:12 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -2406,7 +2406,7 @@ serve(sd, buf, len, from, fromlen)
 	} else
 		scoped = 0;
 	if (from->sa_family == AF_INET &&
-	    ((struct sockaddr_in *)from)->sin_addr.s_addr == INADDR_LOOPBACK) {
+	    ntohl(((struct sockaddr_in *)from)->sin_addr.s_addr) == INADDR_LOOPBACK) {
 		loopback = 1;
 	} else if (from->sa_family == AF_INET6 &&
 	    IN6_IS_ADDR_LOOPBACK(&((struct sockaddr_in6 *)from)->sin6_addr)) {
