@@ -1,9 +1,21 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.131 1999/09/23 06:28:05 sumikawa Exp $
+$Id: CHANGELOG,v 1.132 1999/09/23 15:40:16 itojun Exp $
 
 
 <199909>
+Fri Sep 24 00:36:05 JST 1999  itojun@iijlab.net
+	* kame/sys/netinet6/in6_ifattach.c: do not allow all-zero EUI64/
+	  IEEE802 to be used as interface id source for pseudo interfaces.
+	  without this, all-zero IEEE802 address will be mistakingly used as
+	  interface id source, on bsdi/wildboar pcmcia device driver
+	  (when in6_ifattach_getifid is get called from ether_ifattach).
+
+Fri Sep 24 JST 1999  itojun@iijlab.net
+	* kame/sys/netinet6/ip6_output.c: append destination header 2 to the
+	  outgoing packet.  the code was broken a long time ago.
+	  From: Conny Larsson <conny@verkstad.net>
+
 Thu Sep 23 15:24:45 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/sys/i386/if_wi.c: WaveLAN/IEEE speaks IPv6. It is new
 	  official supported device.
