@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.51 2000/02/16 05:55:19 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.52 2000/02/17 00:27:39 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -373,7 +373,7 @@ get_ph1approvalx(p, proposal)
 			plog(logp, LOCATION, NULL,
 				"DB hashtype = %s\n",
 				s_oakley_attr_v(OAKLEY_ATTR_HASH_ALG,
-						s->authmethod));
+						s->hashtype));
 			plog(logp, LOCATION, NULL,
 				"DB authmethod = %s\n",
 				s_oakley_attr_v(OAKLEY_ATTR_AUTH_METHOD,
@@ -381,7 +381,7 @@ get_ph1approvalx(p, proposal)
 			plog(logp, LOCATION, NULL,
 				"DB dh_group = %s\n",
 				s_oakley_attr_v(OAKLEY_ATTR_GRP_DESC,
-						s->authmethod));
+						s->dh_group));
 		);
 #if 0
 		/* XXX to be considered */
