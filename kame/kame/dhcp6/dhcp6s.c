@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.94 2003/01/05 17:12:13 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.95 2003/01/06 06:34:41 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -552,7 +552,7 @@ server6_recv(s)
 	    dh6->dh6_msgtype == DH6_CONFIRM ||
 	    dh6->dh6_msgtype == DH6_REBIND ||
 	    dh6->dh6_msgtype == DH6_INFORM_REQ)) {
-		dprintf(LOG_INFO, "%s" "invalid multicast message", FNAME);
+		dprintf(LOG_INFO, "%s" "invalid unicast message", FNAME);
 		return (-1);
 	}
 
