@@ -1,12 +1,19 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2613 2004/05/28 12:52:55 suz Exp $
+$KAME: CHANGELOG,v 1.2614 2004/06/01 02:07:41 jinmei Exp $
+
+<200406>
+2004-06-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_input.c (ip6_savecontrol): do not check
+	the current process or thread in the input path.  It is
+	unnecessary and can even prohibit a legitimate process from
+	getting the information.
 
 <200405>
 2004-05-28  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
 	* freebsd[45]/sys: FreeBSD Security Advisory: FreeBSD-SA-04:11.msync
 
 Thu May 27 17:55:28 JST 2004  itojun@iijlab.net
-	* openbsd: switch to 3.5.  there are a lot more work to do (ALTQ, PF,
+	* openbsd: switch to 3.5.  there is a lot more work to do (ALTQ, PF,
 	  CARP, PFSYNC)
 
 Wed May 26 11:58:56 JST 2004  itojun@iijlab.net
