@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/01/18 09:51:48 $
+			$Date: 2000/01/18 11:32:54 $
 
 1. IPv6
 
@@ -1245,9 +1245,9 @@ in the past, in no particular order.
 
 5. ALTQ
 
-KAME kit includes ALTQ 2.0 code, which supports FreeBSD2, FreeBSD3 and
-NetBSD.  For other BSDs, ALTQ does not work.
-ALTQ in KAME supports (or tries to support) IPv6.  ALTQ-related userland
-tools must be built manually, using ports/altq or pkgsrc/net/altq.
+KAME kit includes ALTQ 2.1 code, which supports FreeBSD2, FreeBSD3,
+NetBSD and OpenBSD.  For BSD/OS, ALTQ does not work.
+ALTQ in KAME supports (or tries to support) IPv6.
+(actually, ALTQ is developed on KAME repository since ALTQ 2.1 - Jan 2000)
 
 						 <end of IMPLEMENTATION>
