@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1150 2000/07/25 10:27:38 kjc Exp $
+$Id: CHANGELOG,v 1.1151 2000/07/25 10:45:19 jinmei Exp $
 
 <200007>
+2000-07-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd3/usr.bin/telnet/commands.c (tn): set the source address
+	specfied by the -s option correctly.
+	KAME PR sys/272.
+
 Tue 25 Jul 19:12:42 JST 2000  kjc@csl.sony.co.jp
 	* the first round of ALTQ interface mega cleanup:
 	  - cleanup the system interface to the rest of the kernel.
