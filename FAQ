@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.42 2001/07/26 00:00:16 itojun Exp $
+$KAME: FAQ,v 1.43 2001/07/26 03:14:55 jinmei Exp $
 
 
 GENERAL
@@ -254,7 +254,7 @@ Q: When I invoke ifconfig or netstat, garbled output is generated.
 	or such.  You can of course add /usr/local/v6/bin to your
 	command search path.  Consult the manpage for your shell.
 
-Q: How can I restrict RIPng route announcement for some of the interfaces?
+Q: How can I restrict RIPng route announcement for some particular interfaces?
 	First of all, you should choose appropriate routing daemon.
 
 	route6d (by Akira Kato) is designed to be simple and easy,
