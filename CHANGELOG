@@ -1,12 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1942 2001/10/25 09:47:21 jinmei Exp $
+$KAME: CHANGELOG,v 1.1943 2001/10/25 09:47:39 jinmei Exp $
 
 <200110>
 2001-10-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.h: removed the ndpr_addr member from the
 	nd_prefix structure, which was effectively not used anywhere.  The
-	structure is kernel-internal, so there should be no c
-	compatibility issue to existing applications.
+	structure is kernel-internal, so there should be no compatibility
+	issue to existing applications.
 
 2001-10-25 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/kame/natptconfig/{cfparse.y,defs.h,yylex.c}:
