@@ -1,4 +1,4 @@
-/*	$KAME: session.c,v 1.18 2000/11/07 15:58:35 sakane Exp $	*/
+/*	$KAME: session.c,v 1.19 2000/11/07 17:11:54 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,6 +78,8 @@
 #include "localconf.h"
 #include "remoteconf.h"
 
+static void check_rtsock __P((void *));
+static void initfds __P((void));
 static void init_signal __P((void));
 static int set_signal __P((int sig, RETSIGTYPE (*func) __P((int))));
 static void check_sigreq __P((void));
@@ -85,13 +87,13 @@ static void check_flushsa_stub __P((void *));
 static void check_flushsa __P((void));
 static int close_sockets __P((void));
 
+static fd_set mask0;
+static int nfds = 0;
 static int sigreq = 0;
 
 int
 session(void)
 {
-	static fd_set mask0;
-	int nfds = 0;
 	fd_set rfds;
 	struct timeval *timeout;
 	int error;
@@ -110,24 +112,7 @@ session(void)
 	if (isakmp_init() < 0)
 		exit(1);
 
-	FD_ZERO(&mask0);
-
-#ifdef ENABLE_ADMINPORT
-	FD_SET(lcconf->sock_admin, &mask0);
-	nfds = (nfds > lcconf->sock_admin ? nfds : lcconf->sock_admin);
-#endif
-	FD_SET(lcconf->sock_pfkey, &mask0);
-	nfds = (nfds > lcconf->sock_pfkey ? nfds : lcconf->sock_pfkey);
-	FD_SET(lcconf->rtsock, &mask0);
-	nfds = (nfds > lcconf->rtsock ? nfds : lcconf->rtsock);
-
-	for (p = lcconf->myaddrs; p; p = p->next) {
-		if (!p->addr)
-			continue;
-		FD_SET(p->sock, &mask0);
-		nfds = (nfds > p->sock ? nfds : p->sock);
-	}
-	nfds++;
+	initfds();
 
 	/* initialize schedular */
 	sched_init();
@@ -175,41 +160,51 @@ session(void)
 			pfkey_handler();
 
 		if (FD_ISSET(lcconf->rtsock, &rfds)) {
-			if (lcconf->autograbaddr) {
-				if (update_myaddrs()) {
-					isakmp_close();
-					grab_myaddrs();
-					autoconf_myaddrsport();
-					isakmp_open();
-				}
-			} else
-				(void)update_myaddrs(); /* just read rtsock */
-
-			/* initialize socket list again */
-			FD_ZERO(&mask0);
-			nfds = 0;
-
-#ifdef ENABLE_ADMINPORT
-			FD_SET(lcconf->sock_admin, &mask0);
-			nfds = (nfds > lcconf->sock_admin
-				? nfds : lcconf->sock_admin);
-#endif
-			FD_SET(lcconf->sock_pfkey, &mask0);
-			nfds = (nfds > lcconf->sock_pfkey
-				? nfds : lcconf->sock_pfkey);
-			FD_SET(lcconf->rtsock, &mask0);
-			nfds = (nfds > lcconf->rtsock
-				? nfds : lcconf->rtsock);
-
-			for (p = lcconf->myaddrs; p; p = p->next) {
-				if (!p->addr)
-					continue;
-				FD_SET(p->sock, &mask0);
-				nfds = (nfds > p->sock ? nfds : p->sock);
-			}
-			nfds++;
+			if (update_myaddrs() && lcconf->autograbaddr)
+				sched_new(5, check_rtsock, NULL);
+			initfds();
 		}
 	}
+}
+
+static void
+check_rtsock(p)
+	void *p;
+{
+	isakmp_close();
+	grab_myaddrs();
+	autoconf_myaddrsport();
+	isakmp_open();
+
+	/* initialize socket list again */
+	initfds();
+}
+
+static void
+initfds()
+{
+	struct myaddrs *p;
+
+	nfds = 0;
+
+	FD_ZERO(&mask0);
+
+#ifdef ENABLE_ADMINPORT
+	FD_SET(lcconf->sock_admin, &mask0);
+	nfds = (nfds > lcconf->sock_admin ? nfds : lcconf->sock_admin);
+#endif
+	FD_SET(lcconf->sock_pfkey, &mask0);
+	nfds = (nfds > lcconf->sock_pfkey ? nfds : lcconf->sock_pfkey);
+	FD_SET(lcconf->rtsock, &mask0);
+	nfds = (nfds > lcconf->rtsock ? nfds : lcconf->rtsock);
+
+	for (p = lcconf->myaddrs; p; p = p->next) {
+		if (!p->addr)
+			continue;
+		FD_SET(p->sock, &mask0);
+		nfds = (nfds > p->sock ? nfds : p->sock);
+	}
+	nfds++;
 }
 
 static int signals[] = {
