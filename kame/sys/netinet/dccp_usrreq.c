@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.34 2004/12/07 05:12:25 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.35 2004/12/13 03:19:06 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -387,9 +387,9 @@ dccp_input(struct mbuf *m, ...)
 	}
 
 	if (len < sizeof(struct dccphdr)) {
-			DCCP_DEBUG((LOG_INFO, "Dropping DCCP packet!\n"));
-			dccpstat.dccps_badlen++;
-			goto badunlocked;
+		DCCP_DEBUG((LOG_INFO, "Dropping DCCP packet!\n"));
+		dccpstat.dccps_badlen++;
+		goto badunlocked;
 	}
 	/*
 	 * Save a copy of the IP header in case we want restore it
@@ -430,10 +430,11 @@ dccp_input(struct mbuf *m, ...)
 		dh->dh_sum = in_cksum(m, cslen + sizeof (struct ip));
 
 		if (dh->dh_sum) {
-			/* DCCP_DEBUG((LOG_INFO, "Bad checksum, not dropping packet!, dh->dh_sum = 0x%04x\n", dh->dh_sum)); */
 			DCCP_DEBUG((LOG_INFO, "Bad checksum, dropping packet!, dh->dh_sum = 0x%04x\n", dh->dh_sum));
 			dccpstat.dccps_badsum++;
 			goto badunlocked;
+		} else {
+			DCCP_DEBUG((LOG_INFO, "Correct checksum, dh->dh_sum = 0x%04x\n", dh->dh_sum));
 		}
 	}
 
@@ -484,8 +485,9 @@ dccp_input(struct mbuf *m, ...)
 			inp = in_pcblookup_bind(&dccpbtable, ip->ip_dst, dh->dh_dport);
 		}
 #else /* OpenBSD */
-		inp = in_pcblookup(&dccpbtable, &ip->ip_src, dh->dh_sport,
-		    &ip->ip_dst, dh->dh_dport, INPLOOKUP_WILDCARD);
+		inp = in_pcblookup(&dccpbtable, &ip->ip_src,
+		    ntohs(dh->dh_sport), &ip->ip_dst, ntohs(dh->dh_dport),
+		    INPLOOKUP_WILDCARD);
 #endif
 	}
 
@@ -1847,7 +1849,7 @@ again:
 	}
 
 	if (error) {
-		DCCP_DEBUG((LOG_INFO, "IP output failed!\n"));
+		DCCP_DEBUG((LOG_INFO, "IP output failed! %d\n", error));
 		return (error);
 	}
 
