@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.62 2001/03/21 15:26:32 itojun Exp $	*/
+/*	$KAME: ndp.c,v 1.63 2001/03/22 02:47:37 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -164,6 +164,13 @@ static void setdefif __P((char *));
 static char *sec2str __P((time_t t));
 static char *ether_str __P((struct sockaddr_dl *sdl));
 static void ts_print __P((const struct timeval *));
+
+static char *rtpref_str[] = {
+	"medium",		/* 00 */
+	"high",			/* 01 */
+	"rsv",			/* 10 */
+	"low"			/* 11 */
+};
 
 int
 main(argc, argv)
@@ -965,6 +972,10 @@ ifinfo(argc, argv)
 	close(s);
 }
 
+#ifndef ND_RA_FLAG_RTPREF_MASK	/* XXX: just for compilation on *BSD release */
+#define ND_RA_FLAG_RTPREF_MASK	0x18 /* 00011000 */
+#endif
+
 void
 rtrlist()
 {
@@ -991,6 +1002,8 @@ rtrlist()
 
 	ep = (struct in6_defrouter *)(buf + l);
 	for (p = (struct in6_defrouter *)buf; p < ep; p++) {
+		int rtpref;
+
 		if (getnameinfo((struct sockaddr *)&p->rtaddr,
 		    p->rtaddr.sin6_len, host_buf, sizeof(host_buf), NULL, 0,
 		    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0)) != 0)
@@ -1001,6 +1014,9 @@ rtrlist()
 		printf(", flags=%s%s",
 		       p->flags & ND_RA_FLAG_MANAGED ? "M" : "",
 		       p->flags & ND_RA_FLAG_OTHER   ? "O" : "");
+		rtpref = ((p->flags & ND_RA_FLAG_RTPREF_MASK) >> 3) & 0xff;
+		printf(", pref=%s", rtpref_str[rtpref]);
+		
 		gettimeofday(&time, 0);
 		if (p->expire == 0)
 			printf(", expire=Never\n");
