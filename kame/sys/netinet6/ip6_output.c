@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.286 2002/02/09 11:36:01 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.287 2002/02/19 14:30:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3598,12 +3598,29 @@ ip6_setmoptions(optname, im6op, m)
 #endif
 
 		/* Fill in the scope zone ID */
-		if (in6_addr2zoneid(ifp, &sa6_mc.sin6_addr,
-				    &sa6_mc.sin6_scope_id)) {
-			error = ENXIO; /* XXX: should not happen */
-			break;
+		if (ifp) {
+			if (in6_addr2zoneid(ifp, &sa6_mc.sin6_addr,
+					    &sa6_mc.sin6_scope_id)) {
+				error = ENXIO; /* XXX: should not happen */
+				break;
+			}
+			in6_embedscope(&sa6_mc.sin6_addr, &sa6_mc); /* XXX */
+		} else {
+			/*
+			 * The API spec says as follows:
+			 *  If the interface index is specified as 0, the
+			 *  system may choose a multicast group membership to
+			 *  drop by matching the multicast address only.
+			 * On the other hand, we cannot disambiguate the scope
+			 * zone unless an interface is provided.  Thus, we
+			 * check if there's ambiguity with the default scope
+			 * zone as the last resort.
+			 */
+			if ((error = scope6_check_id(&sa6_mc,
+						     ip6_use_defzone)) != 0) {
+				break;
+			}
 		}
-		in6_embedscope(&sa6_mc.sin6_addr, &sa6_mc); /* XXX */
 
 		/*
 		 * Find the membership in the membership list.
