@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2586 2004/04/06 12:20:32 suz Exp $
+$KAME: CHANGELOG,v 1.2587 2004/04/08 05:43:38 sakane Exp $
 
 <200404>
+Thu Apr  8 14:41:22 JST 2004 sakane@kame.net
+	* kame/kame/racoon/proposal.c:
+	fixed the EXACT mode to compare the proposals.  the lifetime in phase2
+	did not work in the case of EXACT mode.
+
 2004-04-06  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/netinet6/ip6_output.c, kame/sys/netinet/ip6.h
 	  FreeBSD Security Advisory: FreeBSD-SA-04:06.ipv6
