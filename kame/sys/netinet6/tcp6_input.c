@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.45 2002/01/10 12:21:33 jinmei Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.46 2002/01/10 13:13:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -772,22 +772,6 @@ findpcb:
 	}
 
 after_listen:
-	/* save packet options if user wanted */
-	if (in6p->in6p_flags & IN6P_CONTROLOPTS) {
-		struct ip6_recvpktopts opts;
-
-		bzero(&opts, sizeof(opts));
-		ip6_savecontrol(in6p, ip6, m, &opts);
-		if (in6p->in6p_inputopts)
-			ip6_update_recvpcbopt(in6p->in6p_inputopts, &opts);
-		if (opts.head) {
-			if (sbappendcontrol(&in6p->in6p_socket->so_rcv,
-					    NULL, opts.head)
-			    == 0)
-				m_freem(opts.head);
-		}
-	}
-
 	/*
 	 * Segment received on connection.
 	 * Reset idle time and keep-alive timer.
@@ -2561,15 +2545,6 @@ syn_cache_get6(so, m, off, len)
 	in6p->in6p_lport = sc->sc_dport;
 	in6p->in6p_faddr = sc->sc_src;
 	in6p->in6p_fport = sc->sc_sport;
-	if (in6p->in6p_flags & IN6P_CONTROLOPTS) {
-		ip6_savecontrol(in6p, ip6, m, &opts);
-		if (in6p->in6p_inputopts)
-			ip6_update_recvpcbopt(in6p->in6p_inputopts, &opts);
-		if (opts.head) {
-			if (sbappendcontrol(&so->so_rcv, NULL, opts.head) == 0)
-				m_freem(opts.head);
-		}
-	}
 #ifdef IPSEC
 	/* copy old policy into new socket's */
 	if (ipsec_copy_policy(sotoin6pcb(oso)->in6p_sp, in6p->in6p_sp))
