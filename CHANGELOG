@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.669 2000/03/09 08:49:08 sakane Exp $
+$Id: CHANGELOG,v 1.670 2000/03/09 09:10:04 itojun Exp $
 
 <200003>
+Thu Mar  9 18:06:30 JST 2000  itojun@iijlab.net
+	* sys/netinet6/ah_output.c: avoid mbuf memory leak, or unauthenticated
+	  packet transmission, on IPv6 AH checksum failure.
+
 Thu Mar  9 17:48:58 JST 2000 sakane@ydc.co.jp
 	* kame/freebsd3/sys/netinet/ip_output.c
 	* kame/kame/sys/netinet6/ip6_output.c:
