@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.115 2001/02/08 11:50:49 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.116 2001/02/08 11:52:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1833,7 +1833,7 @@ nd6_cache_lladdr(ifp, from, lladdr, lladdrlen, type, code)
 		return NULL;
 	if ((rt->rt_flags & (RTF_GATEWAY | RTF_LLINFO)) != RTF_LLINFO) {
 fail:
-		nd6_free(rt);
+		(void)nd6_free(rt);
 		return NULL;
 	}
 	ln = (struct llinfo_nd6 *)rt->rt_llinfo;
