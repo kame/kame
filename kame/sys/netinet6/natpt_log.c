@@ -1,4 +1,4 @@
-/*	$KAME: natpt_log.c,v 1.15 2002/05/28 09:09:28 itojun Exp $	*/
+/*	$KAME: natpt_log.c,v 1.16 2002/08/09 11:27:10 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -250,7 +250,7 @@ natpt_lbuf(int type, int priorities, size_t size)
  */
 
 void
-natpt_logAccess(int priorities, struct tSlot *tsl)
+natpt_logTSlot(int priorities, struct tSlot *tsl, char dir)
 {
 	int		 wl, rv;
 	u_char		*pr;
@@ -262,24 +262,32 @@ natpt_logAccess(int priorities, struct tSlot *tsl)
 
 	wl = SZWOW;
 	wp = wow;
-	switch (tsl->ip_p) {
-	case IPPROTO_ICMP:	pr = "icmp";	break;
-	case IPPROTO_TCP:	pr = "tcp";	break;
-	case IPPROTO_UDP:	pr = "udp";	break;
-	case IPPROTO_ICMPV6:	pr = "icmp6";	break;
-	default:		pr = "unknown";	break;
-	}
-	rv = snprintf(wp, wl, "proto=%s", pr);
+
+	rv = snprintf(wp, wl, "%ctSlot=%p", dir, tsl);
 	wp += rv;
 	wl -= rv;
 
-	rv = natpt_logpAddr(", from=", &tsl->local,  &wp, &wl);
-	rv = natpt_logpAddr(", to=", &tsl->remote, &wp, &wl);
-	wp += rv;
+	if (dir == '+') {
+		switch (tsl->ip_p) {
+		case IPPROTO_ICMP:	pr = "icmp";	break;
+		case IPPROTO_TCP:	pr = "tcp";	break;
+		case IPPROTO_UDP:	pr = "udp";	break;
+		case IPPROTO_ICMPV6:	pr = "icmp6";	break;
+		default:		pr = "unknown";	break;
+		}
+		rv = snprintf(wp, wl, ", proto=%s", pr);
+		wp += rv;
+		wl -= rv;
+
+		rv = natpt_logpAddr(", from=", &tsl->local,  &wp, &wl);
+		rv = natpt_logpAddr(", to=", &tsl->remote, &wp, &wl);
+		wp += rv;
+	}
 
 	rv = wp - wow;
 	if (natpt_uselog) {
-		natpt_log(LOG_MSG, priorities, (void *)wow, rv);
+		wow[rv] = '\0';
+		natpt_log(LOG_MSG, priorities, (void *)wow, rv+1);
 	}
 	if (natpt_usesyslog) {
 		wow[rv] = '\n';
