@@ -1,10 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1477 2001/01/15 04:01:17 inoue Exp $
+$KAME: CHANGELOG,v 1.1478 2001/01/15 07:54:50 inoue Exp $
 
 <200101>
 Mon Jan 15 12:53:37 JST 2001  yu-inoue@jp.fujitsu.com
-	* route6d: when interface down, route vanishes
+	* route6d:
+	when interface down, route vanishes(like router).
+	If machine can get route on direct interface from other gateway,
+	can select other gateway.
+	NOTE: when all interface down assiged global address,
+	this machine cannot access from off link.
 
 Sat Jan 13 12:45:56 JST 2001  itojun@iijlab.net
 	* sys/netinet/ip_output.c: allow interface index to be specified with
