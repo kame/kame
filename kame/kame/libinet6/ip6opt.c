@@ -126,6 +126,7 @@ inet6_option_append(cmsg, typep, multx, plusy)
 	padlen = (((off % multx) + (multx - 1)) & ~(multx - 1)) -
 		(off % multx);
 	padlen += plusy;
+	padlen %= multx;	/* keep the pad as short as possible */
 	/* insert padding */
 	inet6_insert_padopt(bp, padlen);
 	cmsg->cmsg_len += padlen;
@@ -199,6 +200,7 @@ inet6_option_alloc(cmsg, datalen, multx, plusy)
 	padlen = (((off % multx) + (multx - 1)) & ~(multx - 1)) -
 		(off % multx);
 	padlen += plusy;
+	padlen %= multx;	/* keep the pad as short as possible */
 	/* insert padding */
 	inet6_insert_padopt(bp, padlen);
 	cmsg->cmsg_len += padlen;
