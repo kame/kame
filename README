@@ -1,6 +1,6 @@
 	README of KAME kit
 	KAME Project
-	$KAME: README,v 1.62 2001/09/07 17:46:10 itojun Exp $
+	$KAME: README,v 1.63 2001/09/07 17:48:12 itojun Exp $
 
 <<<Project Overview>>>
 
@@ -115,10 +115,11 @@ When you report bugs, please be sure to include the following information:
 - (if necessary) packet trace taken by "tcpdump" command.
 - (if necessary) IPv6/v4 connectivity status in your network
 
-Before sending question, make sure you have checked all available documents,
-including release notes and manual pages.  Also make sure that you have the
-latest code with you (normally we are unable to help you if you are using
-ancient version of KAME kit).
+Before sending questions, or you are uncertain if it is really a bug or not,
+make sure you have checked all available documents, including release notes
+and manual pages.  Also make sure that you have the latest code with you
+(normally we are unable to help you if you are using ancient version of
+KAME kit).
 
 Don't try to *describe* your settings, just paste command output itself
 onto the report instead.  A bad example is "I assigned a global address on
@@ -146,8 +147,14 @@ submit it to snap-users mailing list.
 	bug database: http://www.kame.net/, or /usr/local/v6/bin/kame-send-pr
 	snap-users mailing list: http://www.kame.net/snap-users/
 
-Use public mailing list whenever possible, as questions/answers may be able
-to help other people as well.
+If you try to send an email for bug report or questions, use public mailing
+list whenever possible, as the discussions may be able to help other people
+as well.  The following lists the public mailing lists popular among our
+community.
+	snap-users@kame.net
+		see http://www.kame.net/ for subscription guideline
+	users@ipv6.org
+		see http://www.ipv6.org/ for subscription guideline
 
 Thanks for your feedback!
 
