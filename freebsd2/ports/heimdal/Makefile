@@ -1,36 +1,42 @@
-# New ports collection makefile for:	heimdal
-# Version required:	0.1c
-# Date created:		Fri Jun 19 15:07:04 JST 1998
-# Whom:			itojun@itojun.org
+# Ports collection Makefile for:	heimdal
+# Version required:			0.2f
+# Date created:				10/23/1999
+# Whom:					nectar@FreeBSD.ORG
 #
-# $Id: Makefile,v 1.1 1999/08/09 01:37:03 itojun Exp $
+# $FreeBSD: ports/security/heimdal/Makefile,v 1.5 1999/11/07 09:58:40 markm Exp $
+# $Id: Makefile,v 1.2 1999/12/13 02:33:50 sumikawa Exp $
 #
 
-DISTNAME=	heimdal-0.1c
-CATEGORIES=	security
-MASTER_SITES=	ftp://ftp.pdc.kth.se/pub/heimdal/src/
+DISTNAME=		heimdal-0.2f
+CATEGORIES=		security
+MASTER_SITES=		ftp://ftp.pdc.kth.se/pub/heimdal/src/ \
+			ftp://ftp.replay.com/pub/replay/crypto/APPS/kerberos/heimdal/ \
+			ftp://ftp.tuniv.szczecin.pl/dsk4/ftp.replay.com/pub/crypto/APPS/kerberos/heimdal/ \
+			ftp://ftp.hacktic.nl/pub/replay/crypto/APPS/kerberos/heimdal/
 
-MAINTAINER=	itojun@itojun.org
+MAINTAINER=		itojun@itojun.org
 
-GNU_CONFIGURE=	yes
+RESTRICTED=             "Crypto; export-controlled"
 
-MAN3=	krb5_warn.3 krb5_openlog.3 krb5_425_conv_principal.3 \
-	krb5_build_principal.3 krb5_free_principal.3 \
-	krb5_parse_name.3 krb5_sname_to_principal.3 \
-	krb5_unparse_name.3
-MAN5=	krb5.conf.5
-MAN1=	kinit.1 klist.1 kdestroy.1 kpasswd.1
-MAN8=	kdc.8 kstash.8 hprop.8 hpropd.8 ktutil.8 kpasswdd.8
+MAN1=			kdestroy.1 kgetcred.1 kinit.1 klist.1 kpasswd.1
+MAN3=			editline.3 krb5_425_conv_principal.3 \
+			krb5_build_principal.3 krb5_free_principal.3 \
+			krb5_openlog.3 krb5_parse_name.3 \
+			krb5_sname_to_principal.3 krb5_unparse_name.3 \
+			krb5_warn.3
+MAN5=			krb5.conf.5
+MAN8=			hprop.8 hpropd.8 kdc.8 kpasswdd.8 kstash.8 ktutil.8 \
+			push.8
+
+USE_LIBTOOL=		YES
+USE_GMAKE=		YES
+CONFIGURE_ARGS=		--prefix=${PREFIX}
+
+.if !defined(KRB5_KRB4_COMPAT) || ${KRB5_KRB4_COMPAT} == "NO"
+CONFIGURE_ARGS+=	--without-krb4
+.endif
 
 post-install:
-	${MKDIR} ${PREFIX}/share/heimdal/examples
-	${INSTALL_DATA} ${WRKSRC}/krb5.conf \
-		${PREFIX}/share/heimdal/examples/krb5.conf.sample
-	${INSTALL_DATA} ${FILESDIR}/inetd.conf \
-		${PREFIX}/share/heimdal/examples/inetd.conf.sample
-	${INSTALL_DATA} ${FILESDIR}/services \
-		${PREFIX}/share/heimdal/examples/services.sample
-	# working dir
-	${MKDIR} /var/heimdal
+	${SETENV} OBJFORMAT="${PORTOBJFORMAT}" ${LDCONFIG} -m ${PREFIX}/lib
 
 .include <bsd.port.mk>
