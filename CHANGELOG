@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.366 1999/12/22 16:54:15 jinmei Exp $
+$Id: CHANGELOG,v 1.367 1999/12/22 16:56:51 jinmei Exp $
 
 <199912>
+1999-12-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ping6/ping6.c: when the -v option is given, recevied
+	HbH/Dst options headers and routing headers are printed using
+	rfc2292bis.
+
 1999-12-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/{ip6opt.c, rthdr.c}: some new library
 	functions were added according to rfc2292bis-01.
