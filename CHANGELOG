@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1758 2001/07/05 07:50:31 jinmei Exp $
+$KAME: CHANGELOG,v 1.1759 2001/07/05 23:34:54 itojun Exp $
 
 <200107>
+Fri Jul  6 08:33:30 JST 2001  itojun@iijlab.net
+	* sys/netinet/ip6.h: IP6_EXTHRD_GET0() did not check the mbuf length,
+	  when off == 0.  noone was using this macro.
+
 2001-07-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/net/if_tun.c (tunifioctl): returned EAFNOSUPPORT if
 	the SIOCSIFADDR command is issued for an unsupported address
