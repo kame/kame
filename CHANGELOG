@@ -1,7 +1,17 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2078 2002/02/18 12:30:19 jinmei Exp $
+$KAME: CHANGELOG,v 1.2079 2002/02/19 07:50:02 kjc Exp $
 
 <200202>
+2002/02/19 16:05:42 JST	kjc@csl.sony.co.jp
+	* reduce differences from netbsd-current and openbsd-3.0:
+	 - use ALTQ_DECL() for altq only variables.
+	 - make IFQ_ENQUEUE() take 4 args even for the non-altq case
+	 - the return type of altq_etherclassify() is changed from
+	   int to void.
+	   the function prototype is moved to if_altq.h.
+	* add more altq supported drivers and link types.
+	  most of the remaining drivers are supported by now.
+
 2002-02-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.h: stopped defining the route_in6{}
 	structure for bsdi4 regardless of local configuration options.
