@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.73 2001/06/11 13:51:46 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.74 2001/06/12 23:54:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -641,7 +641,9 @@ ip6_forward(m, srcrt)
 		}
 	}
 
+#if defined(__NetBSD__) && defined(PFIL_HOOKS)
  senderr:
+#endif
 	if (mcopy == NULL)
 		return;
 	switch (error) {
