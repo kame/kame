@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2102 2002/03/16 18:34:07 jinmei Exp $
+$KAME: CHANGELOG,v 1.2103 2002/03/17 19:51:29 jinmei Exp $
 
 <200203>
+2002-03-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_output): do not update the
+	"dst" address, which is the next-hop address, for multicast
+	destinations.  Otherwise, the layer 2 destination address would be
+	bogus.
+
 2002-03-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/netinet6/udp6_usrreq.c (udp6_input): corrected
 	address matching rules for incoming multicast packets, as
