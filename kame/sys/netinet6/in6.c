@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.160 2001/02/03 20:08:19 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.161 2001/02/04 02:04:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -930,11 +930,11 @@ in6_update_ifa(ifp, ifra, ia)
 	    ifra->ifra_dstaddr.sin6_family != AF_UNSPEC)
 		return(EAFNOSUPPORT);
 	/*
-	 * The prefixmask must have a family of AF_UNSPEC or AF_INET6.
+	 * validate ifra_prefixmask.  don't check sin6_family, netmask
+	 * does not carry fields other than sin6_len.
 	 */
-	if (ifra->ifra_prefixmask.sin6_family != AF_INET6 &&
-	    ifra->ifra_prefixmask.sin6_family != AF_UNSPEC)
-		return(EAFNOSUPPORT);
+	if (ifra->ifra_prefixmask.sin6_len > sizoef(struct sockaddr_in6))
+		return(EINVAL);
 	/*
 	 * Because the IPv6 address architecture is classless, we require
 	 * users to specify a (non 0) prefix length (mask) for a new address.
@@ -1563,7 +1563,6 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 			}
 		}
 
-		ifra.ifra_prefixmask.sin6_family = AF_INET6;
 		ifra.ifra_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
 		in6_len2mask(&ifra.ifra_prefixmask.sin6_addr, prefixlen);
 

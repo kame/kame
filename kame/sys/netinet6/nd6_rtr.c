@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.90 2001/02/03 18:33:08 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.91 2001/02/04 02:04:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1611,7 +1611,6 @@ nd6_prefix_onlink(pr)
 	ifa->ifa_rtrequest = nd6_rtrequest;
 
 	bzero(&mask6, sizeof(mask6));
-	mask6.sin6_family = AF_INET6;
 	mask6.sin6_len = sizeof(mask6);
 	mask6.sin6_addr = pr->ndpr_mask;
 	rtflags = ifa->ifa_flags | RTF_CLONING | RTF_UP;
