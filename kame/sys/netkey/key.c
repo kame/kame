@@ -4654,6 +4654,8 @@ key_timehandler(arg)
     {
 	struct secashead *sah, *nextsah;
 	struct secasvar *sav, *nextsav;
+	int havesav;
+	u_int stateidx, state;
 
 	for (sah = LIST_FIRST(&sahtree);
 	     sah != NULL;
@@ -4813,6 +4815,23 @@ key_timehandler(arg)
 			 * shows other references to sav
 			 * (such as from SPD).
 			 */
+		}
+
+		/* move SA header to DEAD if there's no SA */
+		havesav = 0;
+		for (stateidx = 0;
+		     stateidx < _ARRAYLEN(saorder_state_alive);
+		     stateidx++) {
+			state = saorder_state_alive[stateidx];
+			if (LIST_FIRST(&sah->savtree[state])) {
+				havesav++;
+				break;
+			}
+		}
+		if (havesav == 0) {
+			ipseclog((LOG_DEBUG, "key_timehandler: "
+			       "move sah %p to DEAD (no more SAs)\n", sah));
+			sah->state = SADB_SASTATE_DEAD;
 		}
 	}
     }
