@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.85 2002/05/25 17:24:20 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.86 2002/05/26 06:22:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -311,9 +311,6 @@ struct inet6_ndpr_msghdr {
 
 #define prm_rrf_decrvalid	prm_flags.prf_rr.decrvalid
 #define prm_rrf_decrprefd	prm_flags.prf_rr.decrprefd
-
-#define ifpr2ndpr(ifpr)	((struct nd_prefix *)(ifpr))
-#define ndpr2ifpr(ndpr)	((struct ifprefix *)(ndpr))
 
 struct nd_pfxrouter {
 	LIST_ENTRY(nd_pfxrouter) pfr_entry;
