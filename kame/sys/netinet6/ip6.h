@@ -233,6 +233,13 @@ do {									\
 		}							\
 	}								\
     }									\
+    else {								\
+	if ((m)->m_len < (off) + (hlen)) {				\
+		ip6stat.ip6s_toosmall++;				\
+		m_freem(m);						\
+		return ret;						\
+	}								\
+    }									\
 } while (0)
 
 #endif /* not _NETINET_IPV6_H_ */
