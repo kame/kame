@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.278 1999/11/19 12:44:46 jinmei Exp $
+$Id: CHANGELOG,v 1.279 1999/11/20 12:45:10 itojun Exp $
 
 <199911>
+Sat Nov 20 21:43:26 JST 1999  itojun@iijlab.net
+	* openbsd/sys/netinet/udp_usrreq.c: fix panic on interface down
+	  in udp6_ctlinput().  fixes KAME PR 175.
+	* kame/sys/netinet6/ip6protosw.h: fix panic on big endian openbsd
+	  machines (short/int mismatch with struct protosw).
+
 1999-11-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/pim6sd/config.c (config_vifs_from_kernel): considers
 	loopback and non multicast-capable interfaces, since some routers
