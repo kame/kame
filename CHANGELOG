@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.385 1999/12/28 06:20:18 itojun Exp $
+$Id: CHANGELOG,v 1.386 1999/12/28 07:13:00 itojun Exp $
 
 <199912>
+Tue Dec 28 16:11:42 JST 1999  itojun@iijlab.net
+	* openbsd/sys/igmp.c, kame/sys/in_gif.c: remove kame patches that
+	  does not fit openbsd well.  openbsd ip_input() uses different args
+	  from other kame/*BSD so live with that (for ipsec?).
+	  This should fix behavior of gif tunnel.  Before the fix gif tunnel
+	  would fail to capture any IPv6-over-IPv4 packets.
+
 Tue Dec 28 14:24:08 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/sendmail.beta: add sendmail 8.10.0beta10.
 
