@@ -1,6 +1,6 @@
 Platforms and base versions
 KAME project
-$KAME: VERSION,v 1.33 2002/10/24 10:15:00 suz Exp $
+$KAME: VERSION,v 1.34 2002/11/05 06:03:35 itojun Exp $
 
 
 platform	base version			webpage
@@ -12,6 +12,6 @@ bsdi3		BSDI BSD/OS			http://www.bsdi.com/
 		userland: BSD/OS 3.0 patchlevel 0
 		include: BSD/OS 3.0 patchlevel 0 + ISC BIND 4.9.7
 freebsd3	FreeBSD 3.5-RELEASE		http://www.freebsd.org/
-openbsd		OpenBSD 3.1			http://www.openbsd.org/
+openbsd		OpenBSD 3.2			http://www.openbsd.org/
 bsdi4		BSDI BSD/OS 4.3 patchlevel 0	http://www.bsdi.com/
 freebsd4	FreeBSD 4.7-RELEASE		http://www.freebsd.org/
