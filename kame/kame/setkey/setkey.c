@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: setkey.c,v 1.2 1999/09/01 05:34:07 sakane Exp $ */
+/* KAME $Id: setkey.c,v 1.3 1999/09/13 14:43:04 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -117,8 +117,8 @@ main(ac, av)
 		case 'f':
 			f_mode = MODE_SCRIPT;
 			if ((fp = fopen(optarg, "r")) == NULL) {
-				perror("fopen");
-				exit(-1);
+				err(-1, "fopen");
+				/*NOTREACHED*/
 			}
 			break;
 		case 'D':
@@ -165,8 +165,8 @@ main(ac, av)
 		break;
 	case MODE_SCRIPT:
 		if (get_supported() < 0) {
-			printf("%s\n", ipsec_strerror());
-			exit(-1);
+			errx(-1, "%s", ipsec_strerror());
+			/*NOTREACHED*/
 		}
 		parse(&fp);
 		break;
@@ -182,8 +182,10 @@ get_supported()
 {
 	int so;
 
-	if ((so = pfkey_open()) < 0)
+	if ((so = pfkey_open()) < 0) {
+		perror("pfkey_open");
 		return -1;
+	}
 
 	/* debug mode ? */
 	if (f_debug)
@@ -303,8 +305,10 @@ sendkeymsg()
 	int len;
 	struct sadb_msg *msg;
 
-	if ((so = pfkey_open()) < 0)
+	if ((so = pfkey_open()) < 0) {
+		perror("pfkey_open");
 		return -1;
+	}
 
     {
 	struct timeval tv;
@@ -335,7 +339,7 @@ again:
 		}
 
 		if (PFKEY_UNUNIT64(msg->sadb_msg_len) != len) {
-			fprintf(stderr, "invalid keymsg length\n");
+			warnx("invalid keymsg length");
 			break;
 		}
 
