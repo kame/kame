@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.223 2002/01/30 06:34:47 jinmei Exp $	*/
+/*	$KAME: key.c,v 1.224 2002/01/31 06:27:03 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1721,6 +1721,7 @@ key_gather_mbuf(m, mhp, ndeep, nitem, va_alist)
 	return result;
 
 fail:
+	va_end(ap);
 	m_freem(result);
 	return NULL;
 }
