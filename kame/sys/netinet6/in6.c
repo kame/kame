@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.227 2001/08/16 12:19:15 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.228 2001/08/21 06:31:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -913,6 +913,7 @@ in6_update_ifa(ifp, ifra, ia)
 #ifdef MEASURE_PERFORMANCE
 	int new_ifa = 0;
 #endif
+	struct rtentry *rt;
 
 	/* Validate parameters */
 	if (ifp == NULL || ifra == NULL) /* this maybe redundant */
@@ -1161,7 +1162,6 @@ in6_update_ifa(ifp, ifra, ia)
 
 	if ((ifp->if_flags & IFF_MULTICAST) != 0) {
 		struct sockaddr_in6 mltaddr, mltmask;
-		struct in6_multi *in6m;
 
 		if (hostIsNew) {
 			/*
@@ -1204,8 +1204,21 @@ in6_update_ifa(ifp, ifra, ia)
 		mltaddr.sin6_addr = in6addr_linklocal_allnodes;
 		mltaddr.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
 
-		IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
-		if (in6m == NULL) {
+#ifdef __FreeBSD__
+		rt = rtalloc1((struct sockaddr *)&mltaddr, 0, 0UL);
+#else
+		rt = rtalloc1((struct sockaddr *)&mltaddr, 0);
+#endif
+		if (rt) {
+			/* 32bit came from "mltmask" */
+			if (memcmp(&mltaddr.sin6_addr,
+			    &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
+			    32 / 8)) {
+				RTFREE(rt);
+				rt = NULL;
+			}
+		}
+		if (!rt) {
 #if (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 			struct rt_addrinfo info;
 
@@ -1230,6 +1243,8 @@ in6_update_ifa(ifp, ifra, ia)
 #endif
 			if (error)
 				goto cleanup;
+		} else {
+			RTFREE(rt);
 		}
 		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
 		if (imm) {
@@ -1275,8 +1290,21 @@ in6_update_ifa(ifp, ifra, ia)
 		 */
 		mltaddr.sin6_addr = in6addr_nodelocal_allnodes;
 		mltaddr.sin6_addr.s6_addr16[1] = htons(ifp->if_index);
-		IN6_LOOKUP_MULTI(mltaddr.sin6_addr, ifp, in6m);
-		if (!in6m) {
+#ifdef __FreeBSD__
+		rt = rtalloc1((struct sockaddr *)&mltaddr, 0, 0UL);
+#else
+		rt = rtalloc1((struct sockaddr *)&mltaddr, 0);
+#endif
+		if (rt) {
+			/* 32bit came from "mltmask" */
+			if (memcmp(&mltaddr.sin6_addr,
+			    &((struct sockaddr_in6 *)rt_key(rt))->sin6_addr,
+			    32 / 8)) {
+				RTFREE(rt);
+				rt = NULL;
+			}
+		}
+		if (!rt) {
 #if (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 			struct rt_addrinfo info;
 
@@ -1300,6 +1328,8 @@ in6_update_ifa(ifp, ifra, ia)
 #endif
 			if (error)
 				goto cleanup;
+		} else {
+			RTFREE(rt);
 		}
 
 		imm = in6_joingroup(ifp, &mltaddr.sin6_addr, &error);
