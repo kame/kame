@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2287 2002/12/06 06:23:42 suz Exp $
+$KAME: CHANGELOG,v 1.2288 2002/12/08 13:46:16 jinmei Exp $
 
 <200212>
+2002-12-08  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/raw_ip6.c (rip6_input): cleared link zone
+	identifiers embedded in "from" addresses.  Without this fix,
+	applications would see the embedded values when calling recvfrom()
+	or recvmsg() on an IPv6 raw socket.  This would also prevent
+	pim6sd from working correctly.
+
 Fri Dec  6 15:18:08 JST 2002	suz@crl.hitachi.co.jp
 	* kame/kame/pim6sd: introduced a configuration option 
 	"default_phyint_status" to disable multicast routing on all
