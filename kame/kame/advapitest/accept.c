@@ -1,4 +1,4 @@
-/*	$KAME: accept.c,v 1.16 2001/08/04 01:28:29 jinmei Exp $ */
+/*	$KAME: accept.c,v 1.17 2001/09/18 02:29:53 jinmei Exp $ */
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -60,13 +60,14 @@ main(argc, argv)
 {
 	int ch, s, s0, remotelen, on, proto, error;
 	char *portstr = DEFAULTPORT;
+	char *protostr = NULL, *addrstr = NULL;
 	struct sockaddr_in6 remote;
 	struct msghdr rcvmh;
 	struct iovec iov[2];
 	char recvbuf[1024];	/* xxx hardcoding */
 	struct addrinfo hints, *res;
 
-	while ((ch = getopt(argc, argv, "adDhilp:ru")) != -1)
+	while ((ch = getopt(argc, argv, "adDhilP:p:ru")) != -1)
 		switch(ch) {
 		case 'a':
 			aflag++;
@@ -89,6 +90,9 @@ main(argc, argv)
 		case 'p':
 			portstr = optarg;
 			break;
+		case 'P':
+			protostr = optarg;
+			break;
 		case 'r':
 			rflag++;
 			break;
@@ -105,14 +109,39 @@ main(argc, argv)
 	    (rcvmsgbuf = (u_char *)malloc(rcvmsglen)) == NULL)
 		errx(1, "malloc failed");
 
-	proto = uflag ? IPPROTO_UDP : IPPROTO_TCP;
+	if (uflag && protostr)
+		errx(1, "-u and -P options are exclusive");
+
+	if (protostr) {
+		struct protoent *ent;
+
+		if ((ent = getprotobyname(protostr)) == NULL &&
+		    (ent = getprotobynumber(protostr)) == NULL) {
+			proto = atoi(protostr); /* XXX: last resort */
+		} else
+			proto = ent->p_proto;
+	} else
+		proto = uflag ? IPPROTO_UDP : IPPROTO_TCP;
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_INET6;
-	hints.ai_socktype = uflag ? SOCK_DGRAM : SOCK_STREAM;
+	switch(proto) {
+	case IPPROTO_TCP:
+		hints.ai_socktype = SOCK_STREAM;
+		break;
+	case IPPROTO_UDP:
+		hints.ai_socktype = SOCK_DGRAM;
+		break;
+	default:
+		hints.ai_socktype = SOCK_RAW;
+		/* XXX */
+		portstr = NULL;
+		addrstr = "::";
+		break;
+	}
 	hints.ai_protocol = proto;
 	hints.ai_flags = AI_PASSIVE;
 
-	error = getaddrinfo(NULL, portstr, &hints, &res);
+	error = getaddrinfo(addrstr, portstr, &hints, &res);
 	if (error)
 		errx(1, "getaddrinfo: %s", gai_strerror(error));
 
@@ -210,6 +239,6 @@ main(argc, argv)
 void
 usage()
 {
-	fprintf(stderr, "usage: accept [-adDhilru] [-p port]\n");
+	fprintf(stderr, "usage: accept [-adDhilru] [-p port] [-P protocol]\n");
 	exit(1);
 }
