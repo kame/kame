@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.c,v 1.1 2002/04/15 08:34:07 itojun Exp $	*/
+/*	$KAME: sctputil.c,v 1.2 2002/05/01 06:31:11 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.c,v 1.153 2002/04/04 16:59:01 randall Exp	*/
 
 /*
@@ -1207,27 +1207,23 @@ sctp_notify_assoc_change(u_int32_t event, struct sctp_tcb *stcb,
 	struct sctp_assoc_change *sac;
 	struct sockaddr *to;
 	struct sockaddr_in6 sin6, lsa6;
+#ifdef SCTP_TCP_MODEL_SUPPORT
+	/*
+	 * For TCP model AND UDP connected sockets we will send
+	 * an error up when an ABORT comes in. */
+	if (((stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) ||
+	     (stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_IN_TCPPOOL))
+	    && (event == SCTP_COMM_LOST)) {
+	  stcb->sctp_socket->so_error = ECONNRESET;
+	  /* Wake ANY sleepers */
+	  sowwakeup(stcb->sctp_socket);
+	  sorwakeup(stcb->sctp_socket);
+	}
+#endif /* SCTP_TCP_MODEL_SUPPORT */
 	if (!(stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_RECVASSOCEVNT)) {
 		/* event not enabled */
-#ifdef SCTP_TCP_MODEL_SUPPORT
-		/*******Don't think we need anything here***********/
-		/*	  if (event == SHUTDOWN_COMPLETE)             */ 
-		/*	    stcb->sctp_socket->so_error = ECONNRESET;*/
-		/***************************************************/
-
-		/*
-		 * For TCP model AND UDP connected sockets we will send
-		 * an error up when an ABORT comes in. */
-		if (((stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_TCPTYPE) ||
-		     (stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_IN_TCPPOOL))
-		    && (event == SCTP_COMM_LOST)) {
-			stcb->sctp_socket->so_error = ECONNRESET;
-		}
-#endif /* SCTP_TCP_MODEL_SUPPORT */
 		return;
-		
 	}
-
 	MGETHDR(m_notify, M_DONTWAIT, MT_DATA);
 	if (m_notify == NULL)
 		/* no space left */
@@ -1259,15 +1255,20 @@ sctp_notify_assoc_change(u_int32_t event, struct sctp_tcb *stcb,
 	/* check and strip embedded scope junk */
 	to = (struct sockaddr *)sctp_recover_scope((struct sockaddr_in6 *)to,
 						   &lsa6);
-	if (sctp_sbspace(&stcb->sctp_socket->so_rcv) < m_notify->m_len) {
-		m_freem(m_notify);
-		return;
+	/*
+	  We need to always notify comm changes.
+ 	if (sctp_sbspace(&stcb->sctp_socket->so_rcv) < m_notify->m_len) {
+	 	m_freem(m_notify);
+ 		return;
 	}
+	*/
 	if (sbappendaddr_nocheck(&stcb->sctp_socket->so_rcv, 
 				 to, m_notify, NULL) == 0)
 		/* not enough room */
 		return;
+	/* Wake up any sleeper */
 	sctp_sorwakeup(stcb->sctp_ep,stcb->sctp_socket);
+	sctp_sowwakeup(stcb->sctp_ep,stcb->sctp_socket);
 }
 
 static void
@@ -2093,8 +2094,117 @@ sbappendaddr_nocheck(sb, asa, m0, control)
 	struct sockaddr *asa;
 	struct mbuf *m0, *control;
 {
+#ifdef __NetBSD__
+	struct mbuf *m, *n;
+	int space = asa->sa_len;
 
-	/* XXX compress m0 here */
-	return sbappendaddr(sb, asa, m0, control);
+if (m0 && (m0->m_flags & M_PKTHDR) == 0)
+panic("sbappendaddr");
+	if (m0)
+		space += m0->m_pkthdr.len;
+	for (n = control; n; n = n->m_next) {
+		space += n->m_len;
+		if (n->m_next == 0)	/* keep pointer to last control buf */
+			break;
+	}
+	MGET(m, M_DONTWAIT, MT_SONAME);
+	if (m == 0)
+		return (0);
+	if (asa->sa_len > MLEN) {
+		MEXTMALLOC(m, asa->sa_len, M_NOWAIT);
+		if ((m->m_flags & M_EXT) == 0) {
+			m_free(m);
+			return (0);
+		}
+	}
+	m->m_len = asa->sa_len;
+	memcpy(mtod(m, caddr_t), (caddr_t)asa, asa->sa_len);
+	if (n)
+		n->m_next = m0;		/* concatenate data to control */
+	else
+		control = m0;
+	m->m_next = control;
+	for (n = m; n; n = n->m_next)
+		sballoc(sb, n);
+	if ((n = sb->sb_mb) != NULL) {
+		while (n->m_nextpkt)
+			n = n->m_nextpkt;
+		n->m_nextpkt = m;
+	} else
+		sb->sb_mb = m;
+	return (1);
+#endif
+#ifdef __FreeBSD__
+	register struct mbuf *m, *n;
+	int space = asa->sa_len;
+
+if (m0 && (m0->m_flags & M_PKTHDR) == 0)
+panic("sbappendaddr");
+	if (m0)
+		space += m0->m_pkthdr.len;
+	for (n = control; n; n = n->m_next) {
+		space += n->m_len;
+		if (n->m_next == 0)	/* keep pointer to last control buf */
+			break;
+	}
+	if (asa->sa_len > MLEN)
+		return (0);
+	MGET(m, M_DONTWAIT, MT_SONAME);
+	if (m == 0)
+		return (0);
+	m->m_len = asa->sa_len;
+	bcopy((caddr_t)asa, mtod(m, caddr_t), asa->sa_len);
+	if (n)
+		n->m_next = m0;		/* concatenate data to control */
+	else
+		control = m0;
+	m->m_next = control;
+	for (n = m; n; n = n->m_next)
+		sballoc(sb, n);
+	n = sb->sb_mb;
+	if (n) {
+		while (n->m_nextpkt)
+			n = n->m_nextpkt;
+		n->m_nextpkt = m;
+	} else
+		sb->sb_mb = m;
+	return (1);
+#endif
+#ifdef __OpenBSD__
+	register struct mbuf *m, *n;
+	int space = asa->sa_len;
+
+	if (m0 && (m0->m_flags & M_PKTHDR) == 0)
+		panic("sbappendaddr");
+	if (m0)
+		space += m0->m_pkthdr.len;
+	for (n = control; n; n = n->m_next) {
+		space += n->m_len;
+		if (n->m_next == 0)	/* keep pointer to last control buf */
+			break;
+	}
+	if (asa->sa_len > MLEN)
+		return (0);
+	MGET(m, M_DONTWAIT, MT_SONAME);
+	if (m == 0)
+		return (0);
+	m->m_len = asa->sa_len;
+	bcopy((caddr_t)asa, mtod(m, caddr_t), asa->sa_len);
+	if (n)
+		n->m_next = m0;		/* concatenate data to control */
+	else
+		control = m0;
+	m->m_next = control;
+	for (n = m; n; n = n->m_next)
+		sballoc(sb, n);
+	if ((n = sb->sb_mb) != NULL) {
+		while (n->m_nextpkt)
+			n = n->m_nextpkt;
+		n->m_nextpkt = m;
+	} else
+		sb->sb_mb = m;
+	return (1);
+#endif
 }
+
 

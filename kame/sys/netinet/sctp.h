@@ -1,4 +1,4 @@
-/*	$KAME: sctp.h,v 1.2 2002/04/15 08:34:06 itojun Exp $	*/
+/*	$KAME: sctp.h,v 1.3 2002/05/01 06:31:11 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp.h,v 1.43 2002/04/02 15:34:44 lei Exp	*/
 
 #ifndef _NETINET_SCTP_H_
@@ -96,18 +96,21 @@ struct sctp_paramhdr {
  * Blocking I/O is enabled on any TCP type socket by default.
  * For the UDP model if this is turned on then the socket buffer is
  * shared for send resources amongst all associations. The default
- * for the UDP model is this is off. Which means all associations
+ * for the UDP model is that is SS_NBIO is set. Which means all associations
  * have a seperate send limit BUT they will NOT ever BLOCK instead
- * you will get an error back E2BIG if you try to send to much. If
+ * you will get an error back EAGAIN if you try to send to much. If
  * you want the blocking symantics you set this option at the cost
  * of sharing one socket send buffer size amongst all associations.
- * Peeled off sockets turn this option on... but since both TCP and
+ * Peeled off sockets turn this option off and block... but since both TCP and
  * peeled off sockets have only one assoc per socket this is fine.
- * It probably does NOT make sense to set this off on a TCP model OR
- * peeled off UDP model, but we do allow you to do so. You just will
- * no longer EVER block.
+ * It probably does NOT make sense to set this  on SS_NBIO on a TCP model OR
+ * peeled off UDP model, but we do allow you to do so. You just use
+ * the normal syscall to toggle SS_NBIO the way you want.
  */
-#define SCTP_SET_BLOCKING_IO		 0x00008000
+/* Blocking I/O is controled by the SS_NBIO flag on the
+ * socket state so_state field. 
+ */
+
 /* latter added read/write */
 #define SCTP_SET_ADAPTION_LAYER_BITS	 0x00010000
 #define SCTP_DISABLE_FRAGMENTS           0x00020000

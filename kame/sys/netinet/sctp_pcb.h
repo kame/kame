@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.h,v 1.1 2002/04/15 08:34:07 itojun Exp $	*/
+/*	$KAME: sctp_pcb.h,v 1.2 2002/05/01 06:31:11 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.h,v 1.92 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_pcb_h__
@@ -301,6 +301,8 @@ struct sctp_inpcb {
 	struct sctpasochead sctp_asoc_list;
 	/* queue of TCB's waiting to stuff data up the socket */
 	struct sctpsocketq sctp_queue_list;
+	void *sctp_tcb_at_block;
+	int  error_on_block;
 
 #ifndef SCTP_VTAG_TIMEWAIT_PER_STACK
 	struct sctpvtaghead vtag_timewait[SCTP_NUMBER_IN_VTAG_BLOCK];

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_structs.h,v 1.1 2002/04/15 08:34:07 itojun Exp $	*/
+/*	$KAME: sctp_structs.h,v 1.2 2002/05/01 06:31:11 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_structs.h,v 1.67 2002/04/03 21:10:19 lei Exp	*/
 
 #ifndef __sctp_structs_h__
@@ -396,6 +396,7 @@ struct sctp_association {
 
 	/* stream arrays */
 	long total_output_queue_size;
+	long total_output_mbuf_queue_size;
 	struct sctpwheel_listhead out_wheel;
 	struct sctpwheelunrel_listhead unrel_wheel;
 	struct sctp_stream_in  *strmin;

@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.2 2002/04/15 10:00:51 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.3 2002/05/01 06:31:11 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c,v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -145,7 +145,9 @@
 extern u_int32_t sctp_debug_on;
 #endif
 
-
+#ifdef SCTP_ALTERNATE_ROUTE
+struct rtentry * rtalloc_alternate __P((struct sockaddr *,struct rtentry *));
+#endif
 
 static int
 sctp_find_cmsg(int c_type,
@@ -3212,47 +3214,121 @@ sctp_msg_append(struct sctp_tcb *tcb,
   for(n=m;n;n=n->m_next){
     dataout += n->m_len;
   }
-  if(sbspace(&tcb->sctp_socket->so_snd) < 
-     (dataout + asoc->total_output_queue_size)){
+  if(dataout > tcb->sctp_socket->so_snd.sb_hiwat){
+    /* It will NEVER fit */
+    return(EMSGSIZE);
+  }
+  if((sbspace(&tcb->sctp_socket->so_snd) < 
+     (dataout + asoc->total_output_queue_size)) ||
+     (asoc->total_output_mbuf_queue_size > 
+      tcb->sctp_socket->so_snd.sb_mbmax)
+     ){
     /* XXX Buffer space hunt for data to skip */
-    TAILQ_FOREACH(chk,&asoc->sent_queue,sctp_next){
-      /* Look for chunks marked with the PR_SCTP flag AND
-       * the buffer space flag. If the one being sent is
-       * equal or greater priority then purge the old
-       * one and free some space.
-       */
-      if((chk->flags & (SCTP_PR_SCTP_ENABLED|SCTP_PR_SCTP_BUFFER)) ==
-	 (SCTP_PR_SCTP_ENABLED|SCTP_PR_SCTP_BUFFER)){
-	/* This one is PR-SCTP AND buffer space limited type */
-	if(chk->rec.data.timetodrop.tv_sec >= srcv->sinfo_timetolive){
-	  /* Lower numbers equates to higher priority so if the one
-	   * we are looking at has a larger or equal priority we
-	   * want to drop the data and NOT retransmit it.
-	   */
-	  if(chk->data){
-	    /* We release the book_size if the mbuf is here */
-	    asoc->total_output_queue_size -= chk->book_size;
-	    if(tcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_BLOCKING_IO){
-	      if(chk->book_size < tcb->sctp_socket->so_snd.sb_cc)
-		tcb->sctp_socket->so_snd.sb_cc -= chk->book_size;
-	      else
-		/* This should NOT happen */
-		tcb->sctp_socket->so_snd.sb_cc = 0;
+    if(asoc->peer_supports_usctp){
+      TAILQ_FOREACH(chk,&asoc->sent_queue,sctp_next){
+	/* Look for chunks marked with the PR_SCTP flag AND
+	 * the buffer space flag. If the one being sent is
+	 * equal or greater priority then purge the old
+	 * one and free some space.
+	 */
+	if((chk->flags & (SCTP_PR_SCTP_ENABLED|SCTP_PR_SCTP_BUFFER)) ==
+	   (SCTP_PR_SCTP_ENABLED|SCTP_PR_SCTP_BUFFER)){
+	  /* This one is PR-SCTP AND buffer space limited type */
+	  if(chk->rec.data.timetodrop.tv_sec >= srcv->sinfo_timetolive){
+	    /* Lower numbers equates to higher priority so if the one
+	     * we are looking at has a larger or equal priority we
+	     * want to drop the data and NOT retransmit it.
+	     */
+	    if(chk->data){
+	      /* We release the book_size if the mbuf is here */
+	      asoc->total_output_queue_size -= chk->book_size;
+	      /* Now free the mbuf */
+	      asoc->total_output_mbuf_queue_size -= MSIZE;
+	      if (chk->data->m_flags & M_EXT)
+		asoc->total_output_mbuf_queue_size -= chk->data->m_ext.ext_size;
+
+
+	      m_freem(chk->data);
+	      sctp_sowwakeup(tcb->sctp_ep,tcb->sctp_socket);
 	    }
-	    /* Now free the mbuf */
-	    m_freem(chk->data);
+	    chk->data = NULL;
 	  }
-	  chk->data = NULL;
 	}
       }
     }
-    if(sbspace(&tcb->sctp_socket->so_snd) < 
-       (dataout + asoc->total_output_queue_size)){
+    if((sbspace(&tcb->sctp_socket->so_snd) < 
+       (dataout + asoc->total_output_queue_size)) ||
+       (asoc->total_output_mbuf_queue_size > 
+	tcb->sctp_socket->so_snd.sb_mbmax)){
       /* Now did we free up enough room? */
-      if(m)
-	/* nope */
-	m_freem(m);
-      return(E2BIG);
+       if((tcb->sctp_socket->so_state & SS_NBIO) == 0){
+	 struct socket *so;
+	 struct sctp_inpcb *inp;
+	 /* We store off a pointer to the endpoint. Since
+	  * on return from this we must check to see if a
+	  * so_error is set. If so we may have been reset
+	  * and our tcb destroyed. Returning an error
+	  * will cause the correct error return through
+	  * and fix this all.
+	  */
+	 so = tcb->sctp_socket;
+	 inp = tcb->sctp_ep;
+	 while((sbspace(&tcb->sctp_socket->so_snd) < 
+		(dataout + asoc->total_output_queue_size)) ||
+	       (asoc->total_output_mbuf_queue_size > 
+		tcb->sctp_socket->so_snd.sb_mbmax)){
+	   int err,ret;
+	   /* Not sure how else to do this since the level
+	    * we suspended at is not known deep down where
+	    * we are. I will drop to spl0() so that 
+	    * others can get in.
+	    */
+	   ret = err = 0;
+	   inp->sctp_tcb_at_block = (void *)tcb;
+	   inp->error_on_block = 0;
+	   sbunlock(&so->so_snd);
+	   err = sbwait(&tcb->sctp_socket->so_snd);
+	   /* XXX: This is ugly but I have recreated most
+	    * of what goes on to block in the sb. UGHH
+	    * May want to add the bit about being no longer
+	    * connected.. but this then further dooms the
+	    * UDP model NOT to allow this.
+	    */
+	   inp->sctp_tcb_at_block = 0;
+	   if(inp->error_on_block){
+	     err = inp->error_on_block;
+	     goto out;
+	   }
+	   if(so->so_error){
+	     ret = so->so_error;
+	   }else if(err){
+	   out:
+	     ret = err;
+	   }
+	   if(so->so_error || err){
+	     if(m)
+	       m_freem(m);
+	     return(err);
+	   }
+	   err = sblock(&so->so_snd,M_WAITOK);
+	   if(err)
+	     goto out;
+	   /* Otherwise we cycle back and recheck the space */
+	   if (so->so_state & SS_CANTSENDMORE){
+	     err = EPIPE;
+	     goto out;
+	   }
+	   if (so->so_error){
+	     err = so->so_error;
+	     goto out;
+	   }
+	 }
+       }else{
+	 if(m)
+	   /* nope */
+	   m_freem(m);
+	 return(EAGAIN);
+       }
     }
   }
   /* If we have a packet header fix it */
@@ -3274,7 +3350,15 @@ sctp_msg_append(struct sctp_tcb *tcb,
     bzero(&template,sizeof(template));
     template.sent = SCTP_DATAGRAM_UNSENT;
     if((tcb->asoc.peer_supports_usctp) &&
-       (srcv->sinfo_flags & MSG_PR_SCTP)){
+       (srcv->sinfo_flags & MSG_PR_SCTP) &&
+       (srcv->sinfo_timetolive > 0)
+       ){
+      /* If:
+       *	Peer supports PR-SCTP
+       * 	The flags is set against this send for PR-SCTP
+       * 	And timetolive is a postive value, zero is reserved
+       *	 to mean a reliable send for both buffer/time related one.
+       */
       if(srcv->sinfo_flags & MSG_PR_BUFFER){
 	/* Time to live is a priority stored in tv_sec when
 	 * doing the buffer drop thing.
@@ -3339,11 +3423,17 @@ sctp_msg_append(struct sctp_tcb *tcb,
     template.flags = 0;
     /* PR sctp flags */
     if(tcb->asoc.peer_supports_usctp){
-      if(srcv->sinfo_flags & MSG_PR_SCTP){
-	template.flags |= SCTP_PR_SCTP_ENABLED;
-      }
-      if(srcv->sinfo_flags & MSG_PR_BUFFER){
-	template.flags |= SCTP_PR_SCTP_BUFFER;
+      if(srcv->sinfo_timetolive > 0){
+	/* We only set the flag if timetolive (or priority) was
+	 * set to a positive number. Zero is reserved specifically
+	 * to be EXCLUDED and sent reliable.
+	 */
+	if(srcv->sinfo_flags & MSG_PR_SCTP){
+	  template.flags |= SCTP_PR_SCTP_ENABLED;
+	}
+	if(srcv->sinfo_flags & MSG_PR_BUFFER){
+	  template.flags |= SCTP_PR_SCTP_BUFFER;
+	}
       }
     }
     template.asoc = asoc;
@@ -3387,6 +3477,10 @@ sctp_msg_append(struct sctp_tcb *tcb,
       *chk = template;
       chk->whoTo->ref_count++;
       chk->data = n;
+      asoc->total_output_mbuf_queue_size += MSIZE;
+      if (chk->data->m_flags & M_EXT)
+	asoc->total_output_mbuf_queue_size += chk->data->m_ext.ext_size;
+
       /* fix up the send_size if it is not present */
       if(chk->data->m_flags & M_PKTHDR){
 	chk->send_size = chk->data->m_pkthdr.len; 
@@ -3479,9 +3573,6 @@ sctp_msg_append(struct sctp_tcb *tcb,
     }
   }
   asoc->total_output_queue_size += dataout;
-  if(tcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_BLOCKING_IO){
-    tcb->sctp_socket->so_snd.sb_cc += dataout;
-  }
   return(0);
  no_membad:
   n = m;
@@ -5554,6 +5645,7 @@ sctp_output(inp, m, addr, control, p)
     if(control){
       /* see if a init structure exists in cmsg headers */
       struct sctp_initmsg initm;
+      int i;
       if(sctp_find_cmsg(SCTP_INIT,(void *)&initm,control,sizeof(initm))){
 	/* ok we have an INIT override of the default. */
 	if(initm.sinit_max_attempts)
@@ -5564,6 +5656,37 @@ sctp_output(inp, m, addr, control, p)
 	  asoc->max_inbound_streams = initm.sinit_max_instreams;
 	if(initm.sinit_max_init_timeo)
 	  asoc->initial_init_rto_max = initm.sinit_max_init_timeo;
+      }
+      if(asoc->streamoutcnt < asoc->pre_open_streams){
+	/* Default is NOT correct */
+#ifdef SCTP_DEBUG
+	if(sctp_debug_on & SCTP_DEBUG_OUTPUT1){
+	  printf("Ok, defout:%d pre_open:%d\n",
+		 asoc->streamoutcnt,asoc->pre_open_streams);
+	}
+#endif
+	free(asoc->strmout, M_PCB);
+	asoc->strmout = NULL;
+	asoc->streamoutcnt = asoc->pre_open_streams;
+	asoc->strmout = malloc((asoc->streamoutcnt *
+				sizeof(struct sctp_stream_out)),
+			       M_PCB,
+			       M_WAIT);
+	for (i=0; i<asoc->streamoutcnt; i++) {
+	  /*
+	   * inbound side must be set to 0xffff,
+	   * also NOTE when we get the INIT-ACK back (for INIT sender)
+	   * we MUST reduce the count (streamoutcnt) but first check
+	   * if we sent to any of the upper streams that were dropped
+	   * (if some were). Those that were dropped must be notified
+	   * to the upper layer as failed to send.
+	   */
+	  asoc->strmout[i].next_sequence_sent = 0x0; 
+	  TAILQ_INIT(&asoc->strmout[i].outqueue);
+	  asoc->strmout[i].stream_no = i;
+	  asoc->strmout[i].next_spoke.tqe_next = 0;
+	  asoc->strmout[i].next_spoke.tqe_prev = 0;
+	}
       }
     }
     sctp_send_initiate(inp,tcb);

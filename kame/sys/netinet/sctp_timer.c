@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.2 2002/04/15 10:00:51 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.3 2002/05/01 06:31:11 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_timer.c,v 1.60 2002/04/04 17:47:19 randall Exp	*/
 
 /*
@@ -114,6 +114,11 @@
 #include <netinet/sctp_header.h>
 #include <netinet/sctp_indata.h>
 #include <netinet/sctp_asconf.h>
+
+#ifdef SCTP_ALTERNATE_ROUTE
+struct rtentry * rtalloc_alternate __P((struct sockaddr *,struct rtentry *));
+#endif
+
 
 #ifdef SCTP_DEBUG
 extern u_int32_t sctp_debug_on;

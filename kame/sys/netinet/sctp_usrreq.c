@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.10 2002/04/15 10:24:54 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.11 2002/05/01 06:31:11 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
 
 /*
@@ -718,27 +718,43 @@ sctp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 {
 	struct sctp_inpcb *inp;
 	int error;
-
-	/* Got to have a to address */
-	if (!addr) {
-		error = EDESTADDRREQ;
+	inp = (struct sctp_inpcb *)so->so_pcb;
+	if (inp == 0) {
+		if(control){
+		  m_freem(control);
+		  control = NULL;
+		}
 		m_freem(m);
-		return(error);
+		return EINVAL;
+	}
+	/* Got to have an to address if we are NOT a connected socket */
+	if(((inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) == SCTP_PCB_FLAGS_CONNECTED) &&
+	   (addr == NULL)){
+
+	  return sctp_output(inp, m, addr, control, p);
+
+	}else if(addr == NULL){
+           error = EDESTADDRREQ;
+	   m_freem(m);
+	   if(control){
+	     m_freem(control);
+	     control = NULL;
+	   }
+	   return(error);
 	}
 #ifdef INET6
 	if (addr->sa_family != AF_INET) {
 		/* must be a v4 address! */
 		m_freem(m);
+		if(control){
+		  m_freem(control);
+		  control = NULL;
+		}
 		error = EDESTADDRREQ;
 		return EINVAL;
 	}
 #endif /* INET6 */
 
-	inp = (struct sctp_inpcb *)so->so_pcb;
-	if (inp == 0) {
-		m_freem(m);
-		return EINVAL;
-	}
 	return sctp_output(inp, m, addr, control, p);
 }
 
@@ -753,7 +769,6 @@ sctp_disconnect(struct socket *so)
 #else
 	s = splsoftnet();
 #endif
-
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == NULL) {
 		return(ENOTCONN);
@@ -858,6 +873,13 @@ sctp_shutdown(struct socket *so)
 		socantsendmore(so);
 
 		tcb = LIST_FIRST(&inp->sctp_asoc_list);
+		if(tcb == NULL){
+		  /* Ok we hit the case that the shutdown
+		   * call was made after an abort or something.
+		   * Nothing to do now.
+		   */
+		  return(0);
+		}
 		asoc = &tcb->asoc;
 
 		if (!TAILQ_EMPTY(&asoc->out_wheel)) {
@@ -1153,7 +1175,6 @@ sctp_optsget(struct socket *so,
 #endif /* SCTP_DEBUG */
 
 	switch(opt) {
-	case SCTP_SET_BLOCKING_IO:
 	case SCTP_NODELAY:
 	case SCTP_AUTOCLOSE:
 	case SCTP_DISABLE_FRAGMENTS:
@@ -1166,9 +1187,6 @@ sctp_optsget(struct socket *so,
 		switch(opt) {
 		case SCTP_DISABLE_FRAGMENTS:
 			optval = inp->sctp_flags & SCTP_PCB_FLAGS_NO_FRAGMENT;
-			break;
-		case SCTP_SET_BLOCKING_IO:
-			optval = inp->sctp_flags & SCTP_PCB_FLAGS_BLOCKING_IO;
 			break;
 		case SCTP_I_WANT_MAPPED_V4_ADDR:
 			optval = inp->sctp_flags & SCTP_I_WANT_MAPPED_V4_ADDR;
@@ -1876,7 +1894,6 @@ sctp_optsset(struct socket *so,
 
 	error = 0;
 	switch(opt) {
-	case SCTP_SET_BLOCKING_IO:
 	case SCTP_NODELAY:
 	case SCTP_AUTOCLOSE:
 	case SCTP_DISABLE_FRAGMENTS:
@@ -1899,16 +1916,6 @@ sctp_optsset(struct socket *so,
 				set_opt = SCTP_PCB_FLAGS_NEEDS_MAPPED_V4;
 			} else {
 				return(EINVAL);
-			}
-			break;
-		case SCTP_SET_BLOCKING_IO:
-			set_opt = SCTP_PCB_FLAGS_BLOCKING_IO;
-			if (*mopt) {
-				/*
-				 * Turning it on set the cc to 0 to start
-				 * an initial count.
-				 */
-				inp->sctp_socket->so_snd.sb_cc = 0;
 			}
 			break;
 		case SCTP_NODELAY:
@@ -2673,6 +2680,14 @@ sctp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	struct sctp_inpcb *inp;
 	struct sctp_tcb *tcb;
 
+#ifdef SCTP_DEBUG
+	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
+	        printf("Connect called in SCTP to ");
+		sctp_print_address(nam);
+                printf("Port %d\n",ntohs(((struct sockaddr_in *)nam)->sin_port));
+	}
+#endif /* SCTP_DEBUG */
+	
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == 0) {
 		splx(s);
@@ -2693,7 +2708,7 @@ sctp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 		memset(&sin, 0, sizeof(sin));
 		sin.sin_len = sizeof(sin);
 		sin.sin_family = AF_INET;
-		error = sctp_inpcb_bind(so, nam, p);
+		error = sctp_inpcb_bind(so, (struct sockaddr *)&sin, p);
 		if (error) {
 			splx(s); 
 			return(error);
@@ -2726,6 +2741,7 @@ sctp_connect(struct socket *so, struct sockaddr *nam, struct proc *p)
 	if (tcb == NULL) {
 		/* Gak! no memory */
 		splx(s);
+		printf("Can't allocate a TCB?\n");
 		return(ENOMEM);
 	}
 #ifdef SCTP_TCP_MODEL_SUPPORT

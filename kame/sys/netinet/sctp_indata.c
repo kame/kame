@@ -1,4 +1,4 @@
-/*	$KAME: sctp_indata.c,v 1.1 2002/04/15 08:34:07 itojun Exp $	*/
+/*	$KAME: sctp_indata.c,v 1.2 2002/05/01 06:31:11 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_indata.c,v 1.124 2002/04/04 18:48:39 randall Exp	*/
 
 /*
@@ -2037,15 +2037,13 @@ sctp_try_advance_peer_ack_point(struct sctp_tcb *stcb,
       if(tp1->data){
 	/* We release the book_size if the mbuf is here */
 	asoc->total_output_queue_size -= tp1->book_size;
-	if(stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_BLOCKING_IO){
-	  if(tp1->book_size < stcb->sctp_socket->so_snd.sb_cc)
-	    stcb->sctp_socket->so_snd.sb_cc -= tp1->book_size;
-	  else
-	    /* This should NOT happen */
-	    stcb->sctp_socket->so_snd.sb_cc = 0;
-	}
 	/* Now free the mbuf */
+	asoc->total_output_mbuf_queue_size -= MSIZE;
+	if (tp1->data->m_flags & M_EXT)
+	  asoc->total_output_mbuf_queue_size -= tp1->data->m_ext.ext_size;
+
 	m_freem(tp1->data);
+	sctp_sowwakeup(stcb->sctp_ep,stcb->sctp_socket);
       }
       tp1->data = NULL;
       asoc->sent_queue_cnt--;
@@ -2344,12 +2342,11 @@ sctp_handle_sack(struct sctp_sack_chunk *ch, struct sctp_tcb *stcb,
     tp2 = TAILQ_NEXT(tp1,sctp_next);
     TAILQ_REMOVE(&asoc->sent_queue,tp1,sctp_next);
     asoc->total_output_queue_size -= tp1->book_size;
-    if(stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_BLOCKING_IO){
-      if(tp1->book_size < stcb->sctp_socket->so_snd.sb_cc)
-	stcb->sctp_socket->so_snd.sb_cc -= tp1->book_size;
-      else
-	stcb->sctp_socket->so_snd.sb_cc = 0;
-    }
+    asoc->total_output_mbuf_queue_size -= MSIZE;
+    if (tp1->data->m_flags & M_EXT)
+      asoc->total_output_mbuf_queue_size -= tp1->data->m_ext.ext_size;
+
+    sctp_sowwakeup(stcb->sctp_ep,stcb->sctp_socket);
     if(tp1->data)
       m_freem(tp1->data);
     tp1->data = NULL;

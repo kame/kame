@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.2 2002/04/15 10:24:54 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.3 2002/05/01 06:31:12 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -837,7 +837,7 @@ sctp6_disconnect(struct socket *so)
 			splx(s);
 			return(0);
 		}
-	}else{
+	} else {
 		/* UDP model does not support this */
 		splx(s);
 		return EOPNOTSUPP;
@@ -857,10 +857,33 @@ sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == 0) {
+	        if (control) {
+			m_freem(control);
+			control = NULL;
+		}
 		m_freem(m);
 		return EINVAL;
 	}
 	in_inp = (struct inpcb *)inp;
+
+#ifdef SCTP_TCP_MODEL_SUPPORT
+	/* For the TCP model we may get a NULL addr, if we
+	 * are a connected socket thats ok.
+	 */
+	if ((inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) &&
+	    (addr == NULL)) {
+ 	        return sctp_output(inp, m, addr, control, p);
+	}
+#endif
+	if (addr == NULL) {
+		m_freem(m);
+		if (control) {
+			m_freem(control);
+			control = NULL;
+		}
+		return(EDESTADDRREQ);
+	}
+
 #ifdef INET
 	sin6 = (struct sockaddr_in6 *)addr;
 	if (
