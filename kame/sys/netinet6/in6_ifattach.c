@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.82 2001/01/22 14:56:26 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.83 2001/01/22 18:03:52 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -76,7 +76,9 @@ static int get_hostid_ifid __P((struct ifnet *, struct in6_addr *));
 static int get_rand_ifid __P((struct ifnet *, struct in6_addr *));
 static int get_hw_ifid __P((struct ifnet *, struct in6_addr *));
 static int get_ifid __P((struct ifnet *, struct ifnet *, struct in6_addr *));
+#if 0				/* will soon be removed */
 static int in6_ifattach_addaddr __P((struct ifnet *, struct in6_ifaddr *));
+#endif
 static int in6_ifattach_linklocal __P((struct ifnet *, struct ifnet *));
 static int in6_ifattach_loopback __P((struct ifnet *));
 static int nigroup __P((struct ifnet *, const char *, int, struct in6_addr *));
@@ -410,6 +412,7 @@ success:
 /*
  * configure IPv6 interface address.  XXX code duplicated with in.c
  */
+#if 0				/* WILL BE REMOVED */
 static int
 in6_ifattach_addaddr(ifp, ia)
 	struct ifnet *ifp;
@@ -614,6 +617,7 @@ in6_ifattach_addaddr(ifp, ia)
 
 	return 0;
 }
+#endif
 
 static int
 in6_ifattach_linklocal(ifp, altifp)
@@ -627,11 +631,13 @@ in6_ifattach_linklocal(ifp, altifp)
 	 * configure link-local address.
 	 */
 	bzero(&ifra, sizeof(ifra));
+
 	/*
 	 * in6_update_ifa() does not use ifra_name, but we accurately set it
 	 * for safety.
 	 */
 	strncpy(ifra.ifra_name, if_name(ifp), sizeof(ifra.ifra_name));
+
 	ifra.ifra_addr.sin6_family = AF_INET6;
 	ifra.ifra_addr.sin6_len = sizeof(struct sockaddr_in6);
 	ifra.ifra_addr.sin6_addr.s6_addr16[0] = htons(0xfe80);
@@ -683,6 +689,11 @@ in6_ifattach_linklocal(ifp, altifp)
 	 * we know there's no other link-local address on the interface.
 	 */
 	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0) {
+		/*
+		 * XXX: When the interface does not support IPv6, this call
+		 * would fail in the SIOCSIFADDR ioctl. Do we have to treat
+		 * EAFNOSUPPORT as a special case? Or suppress the log?
+		 */
 		log(LOG_ERR, "in6_ifattach_linklocal: failed to configure "
 		    "a link-local address on %s (errno=%d)\n",
 		    if_name(ifp), error);
@@ -696,47 +707,57 @@ static int
 in6_ifattach_loopback(ifp)
 	struct ifnet *ifp;	/* must be IFT_LOOP */
 {
-	struct in6_ifaddr *ia;
+	struct in6_aliasreq ifra;
+	int error;
 
 	/*
 	 * configure link-local address
 	 */
-	ia = (struct in6_ifaddr *)malloc(sizeof(*ia), M_IFADDR, M_WAITOK);
-	bzero((caddr_t)ia, sizeof(*ia));
-	ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
-	ia->ia_ifa.ifa_dstaddr = (struct sockaddr *)&ia->ia_dstaddr;
-	ia->ia_ifa.ifa_netmask = (struct sockaddr *)&ia->ia_prefixmask;
-	ia->ia_ifp = ifp;
+	bzero(&ifra, sizeof(ifra));
 
-	bzero(&ia->ia_prefixmask, sizeof(ia->ia_prefixmask));
-	ia->ia_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
-	ia->ia_prefixmask.sin6_family = AF_INET6;
-	ia->ia_prefixmask.sin6_addr = in6mask128;
+	/*
+	 * in6_update_ifa() does not use ifra_name, but we accurately set it
+	 * for safety.
+	 */
+	strncpy(ifra.ifra_name, if_name(ifp), sizeof(ifra.ifra_name));
+
+	ifra.ifra_prefixmask.sin6_len = sizeof(struct sockaddr_in6);
+	ifra.ifra_prefixmask.sin6_family = AF_INET6;
+	ifra.ifra_prefixmask.sin6_addr = in6mask128;
 
 	/*
 	 * Always initialize ia_dstaddr (= broadcast address) to loopback
-	 * address, to make getifaddr happier.
+	 * address, to make getifaddr(s?) happier.
 	 *
-	 * For BSDI, it is mandatory.  The BSDI version of
+	 * For BSDI, it is mandatory.  The BSDI (prior to 4.2) version of
 	 * ifa_ifwithroute() rejects to add a route to the loopback
 	 * interface.  Even for other systems, loopback looks somewhat
 	 * special.
 	 */
-	bzero(&ia->ia_dstaddr, sizeof(ia->ia_dstaddr));
-	ia->ia_dstaddr.sin6_len = sizeof(struct sockaddr_in6);
-	ia->ia_dstaddr.sin6_family = AF_INET6;
-	ia->ia_dstaddr.sin6_addr = in6addr_loopback;
+	ifra.ifra_dstaddr.sin6_len = sizeof(struct sockaddr_in6);
+	ifra.ifra_dstaddr.sin6_family = AF_INET6;
+	ifra.ifra_dstaddr.sin6_addr = in6addr_loopback;
 
-	bzero(&ia->ia_addr, sizeof(ia->ia_addr));
-	ia->ia_addr.sin6_len = sizeof(struct sockaddr_in6);
-	ia->ia_addr.sin6_family = AF_INET6;
-	ia->ia_addr.sin6_addr = in6addr_loopback;
+	ifra.ifra_addr.sin6_len = sizeof(struct sockaddr_in6);
+	ifra.ifra_addr.sin6_family = AF_INET6;
+	ifra.ifra_addr.sin6_addr = in6addr_loopback;
 
-	ia->ia_ifa.ifa_metric = ifp->if_metric;
+	/* the loopback  address should NEVER expire. */
+	ifra.ifra_lifetime.ia6t_vltime = ND6_INFINITE_LIFETIME;
+	ifra.ifra_lifetime.ia6t_pltime = ND6_INFINITE_LIFETIME;
 
-	if (in6_ifattach_addaddr(ifp, ia) != 0) {
-		/* ia will be freed on failure */
-		return -1;
+	/* we don't need to perfrom DAD on loopback interfaces. */
+	ifra.ifra_flags |= IN6_IFF_NODAD;
+
+	/*
+	 * We can set NULL to the 3rd arg. See comments in
+	 * in6_ifattach_linklocal().
+	 */
+	if ((error = in6_update_ifa(ifp, &ifra, NULL)) != 0) {
+		log(LOG_ERR, "in6_ifattach_linklocal: failed to configure "
+		    "a link-local address on %s (errno=%d)\n",
+		    if_name(ifp), error);
+		return(-1);
 	}
 
 	return 0;
