@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.95 2000/08/30 11:18:33 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.96 2000/09/04 07:48:54 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1196,7 +1196,7 @@ isakmp_pindex(index, msgid)
 int
 isakmp_open()
 {
-	int tmp = 1;
+	const int yes = 1;
 	struct myaddrs *p;
 
 	for (p = lcconf->myaddrs; p; p = p->next) {
@@ -1231,7 +1231,7 @@ isakmp_open()
 		}
 
 		if (setsockopt(p->sock, SOL_SOCKET, SO_REUSEPORT,
-		               (void *)&tmp, sizeof(tmp)) < 0) {
+		               (void *)&yes, sizeof(yes)) < 0) {
 			plog(logp, LOCATION, NULL,
 				"setsockopt (%s)\n", strerror(errno));
 			goto err_and_next;
@@ -1241,7 +1241,7 @@ isakmp_open()
 		switch (p->addr->sa_family) {
 		case AF_INET:
 			if (setsockopt(p->sock, IPPROTO_IP, IP_RECVDSTADDR,
-					(void *)&tmp, sizeof(tmp)) < 0) {
+					(void *)&yes, sizeof(yes)) < 0) {
 				plog(logp, LOCATION, NULL,
 					"setsockopt (%s)\n", strerror(errno));
 				goto err_and_next;
@@ -1252,14 +1252,14 @@ isakmp_open()
 #ifdef ADVAPI
 #ifdef IPV6_RECVPKTINFO
 			if (setsockopt(p->sock, IPPROTO_IPV6, IPV6_RECVPKTINFO,
-					(void *)&tmp, sizeof(tmp)) < 0)
+					(void *)&yes, sizeof(yes)) < 0)
 #else  /* old adv. API */
 			if (setsockopt(p->sock, IPPROTO_IPV6, IPV6_PKTINFO,
-					(void *)&tmp, sizeof(tmp)) < 0)
+					(void *)&yes, sizeof(yes)) < 0)
 #endif /* IPV6_RECVPKTINFO */
 #else
 			if (setsockopt(p->sock, IPPROTO_IPV6, IPV6_RECVDSTADDR,
-					(void *)&tmp, sizeof(tmp)) < 0)
+					(void *)&yes, sizeof(yes)) < 0)
 #endif
 			{
 				plog(logp, LOCATION, NULL,
@@ -1269,6 +1269,16 @@ isakmp_open()
 			break;
 #endif
 		}
+
+#ifdef IPV6_USE_MIN_MTU
+		if (p->addr->sa_family == AF_INET6 &&
+		    setsockopt(p->sock, IPPROTO_IPV6, IPV6_USE_MIN_MTU,
+		    (void *)&yes, sizeof(yes)) < 0) {
+			plog(logp, LOCATION, NULL,
+			    "setsockopt (%s)\n", strerror(errno));
+			return -1;
+		}
+#endif
 
 		if (setsockopt_bypass(p->sock, p->addr->sa_family) < 0)
 			goto err_and_next;

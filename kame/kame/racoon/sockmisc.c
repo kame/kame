@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sockmisc.c,v 1.15 2000/07/28 03:34:24 sakane Exp $ */
+/* YIPS @(#)$Id: sockmisc.c,v 1.16 2000/09/04 07:48:54 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -464,7 +464,15 @@ sendfromto(s, buf, buflen, src, dst)
 					"setsockopt (%s)\n", strerror(errno));
 				return -1;
 			}
-
+#ifdef IPV6_USE_MIN_MTU
+			if (src->sa_family == AF_INET6 &&
+			    setsockopt(sendsock, IPPROTO_IPV6, IPV6_USE_MIN_MTU,
+			    (void *)&yes, sizeof(yes)) < 0) {
+				plog(logp, LOCATION, NULL,
+					"setsockopt (%s)\n", strerror(errno));
+				return -1;
+			}
+#endif
 			if (setsockopt_bypass(sendsock, src->sa_family) < 0)
 				return -1;
 
