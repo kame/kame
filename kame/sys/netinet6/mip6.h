@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.46 2002/01/21 11:37:50 keiichi Exp $	*/
+/*	$KAME: mip6.h,v 1.47 2002/01/28 07:57:07 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -89,7 +89,7 @@ struct mip6_subopt_altcoa {
 struct mip6_subopt_authdata {
 	u_int8_t type; /* 0x04 */
 	u_int8_t len;
-	u_int32_t spi; /* security parameter index */
+	u_int8_t spi[4]; /* security parameter index */
 	/* followed by authentication data (variable length) */
 } __attribute__ ((__packed__));
 

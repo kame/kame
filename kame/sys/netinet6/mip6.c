@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.108 2002/01/26 04:45:23 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.109 2002/01/28 07:57:05 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2716,7 +2716,7 @@ mip6_addr_exchange(m, dstm)
 
 	if (haopt == NULL) {
 		mip6log((LOG_INFO,
-			 "%s:d: haddr dest opt not found.\n",
+			 "%s:%d: haddr dest opt not found.\n",
 			 __FILE__, __LINE__));
 		return (0);
 	}
@@ -2751,21 +2751,28 @@ mip6_process_destopt(m, dstopts, opt, dstoptlen)
 		error = mip6_validate_bu(m, opt);
 		if (error == -1) {
 			mip6log((LOG_ERR,
-				 "%s:%d: invalid BU received.\n",
+				 "%s:%d: "
+				 "an invalid binding update received.\n",
 				 __FILE__, __LINE__));
 			goto bad;
 		}
 		if (error == 1) {
-			/* invalid BU.  we ignore this silently */
+			/*
+			 * a invalid binding update received.  we
+			 * ignore this silently.
+			 */
 			mip6log((LOG_NOTICE,
-				 "%s:d: invalid BU received.  ignore this.\n",
+				 "%s:%d: "
+				 "an invalid binding update received.  "
+				 "ignore this.\n",
 				 __FILE__, __LINE__));
 			return (0);
 		}
 
 		if (mip6_process_bu(m, opt) != 0) {
 			mip6log((LOG_ERR,
-				 "%s:d: processing BU failed\n",
+				 "%s:%d: "
+				 "a binding update processing failed.\n",
 				 __FILE__, __LINE__));
 			goto bad;
 		}
@@ -2785,21 +2792,28 @@ mip6_process_destopt(m, dstopts, opt, dstoptlen)
 		error = mip6_validate_ba(m, opt);
 		if (error == -1) {
 			mip6log((LOG_ERR,
-				 "%s:%d: invalid BA received.\n",
+				 "%s:%d: "
+				 "an invalid binding ack received.\n",
 				 __FILE__, __LINE__));
 			goto bad;
 		}
 		if (error == 1) {
-			/* invalid BA.  we ignore this silently */
+			/*
+			 * invalid binding ack received.  we ignore
+			 * this silently.
+			 */
 			mip6log((LOG_NOTICE,
-				 "%s:%d: invalid BA received.  ignore this.\n",
+				 "%s:%d: "
+				 "an invalid binding ack received.  "
+				 "ignore this.\n",
 				 __FILE__, __LINE__));
 			return (0);
 		}
 
 		if (mip6_process_ba(m, opt) != 0) {
 			mip6log((LOG_ERR,
-				 "%s:%d: processing BA failed\n",
+				 "%s:%d: "
+				 "a binding ack processing failed.\n",
 				 __FILE__, __LINE__));
 			goto bad;
 		}
@@ -2812,21 +2826,28 @@ mip6_process_destopt(m, dstopts, opt, dstoptlen)
 		error = mip6_validate_br(m, opt);
 		if (error == -1) {
 			mip6log((LOG_ERR,
-				 "%s:%d: invalid BR received\n",
+				 "%s:%d: "
+				 "an invalid binding request received.\n",
 				 __FILE__, __LINE__));
 			goto bad;
 		}
 		if (error == 1) {
-			/* invalid BR.  we ignore this silently */
+			/*
+			 * an invalid binding rqeuest received.  we
+			 * ignore this silently.
+			 */
 			mip6log((LOG_NOTICE,
-				 "%s:%d: invalid BR received.  ignore this.\n",
+				 "%s:%d: "
+				 "an invalid binding request received.  "
+				 "ignore this.\n",
 				 __FILE__, __LINE__));
 			return (0);
 		}
 
 		if (mip6_process_br(m, opt) != 0) {
 			mip6log((LOG_ERR,
-				 "%s:%d: processing BR failed\n",
+				 "%s:%d: "
+				 "a binding request processing failed.\n",
 				 __FILE__, __LINE__));
 			goto bad;
 		}

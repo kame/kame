@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.73 2002/01/26 03:05:09 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.74 2002/01/28 07:57:06 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -980,8 +980,8 @@ mip6_validate_bu(m, opt)
 					 "from host %s\n",
 					 __FILE__, __LINE__,
 					 ip6_sprintf(&ip6->ip6_src)));
-				/* discard. */
-				/* XXX */
+				/* siliently ignore. */
+				return (1);
 			}
 			/* verified. */
 		}
@@ -2390,7 +2390,7 @@ mip6_validate_ba(m, opt)
 				 __FILE__, __LINE__,
 				 ip6_sprintf(&ip6->ip6_src)));
 			if (mip6_config.mcfg_use_ipsec != 0) {
-				/* silently ignore */
+				/* silently ignore. */
 				return (1);
 			}
 		} else {
@@ -2409,8 +2409,8 @@ mip6_validate_ba(m, opt)
 					 "failed from host %s\n",
 					 __FILE__, __LINE__,
 					 ip6_sprintf(&ip6->ip6_src)));
-				/* discard. */
-				/* XXX */
+				/* silently ignore. */
+				return (1);
 			}
 			/* verified. */
 		}			
@@ -2814,7 +2814,7 @@ mip6_authdata_create(sav)
 	/* fill the authentication data sub-option. */
 	authdata->type = MIP6SUBOPT_AUTHDATA;
 	authdata->len = authdata_size - 2;
-	authdata->spi = sav->spi;
+	bcopy((caddr_t)&sav->spi, (caddr_t)&authdata->spi, sizeof(u_int32_t));
 
 	/* checksum calculation will be done after. */
 
