@@ -3,6 +3,5 @@ SUBDIR+=bgpd dtcp faithd gifconfig hroute6d icmp6dump ifmcstat inetd lpr \
 	rrenumd rtadvd rtsold setkey traceroute traceroute6 trpt
 SUBDIR+=altqd natptconfig natptd natptlog pvcbridge pvcsif pvctxctl tbrconfig
 #SUBDIR+=inet6d
-SUBDIR+=mip6config mip6stat
 
 .include <bsd.subdir.mk>
