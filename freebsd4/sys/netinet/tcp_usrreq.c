@@ -798,6 +798,9 @@ tcp6_connect(tp, nam, p)
 	struct rmxp_tao tao_noncached;
 	int error;
 
+	if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
+		return(error);
+
 	if (inp->inp_lport == 0) {
 		error = in6_pcbbind(inp, (struct sockaddr *)0, p);
 		if (error)
