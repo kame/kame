@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.h,v 1.50 2001/07/31 13:33:24 itojun Exp $	*/
+/*	$KAME: ipsec.h,v 1.51 2001/08/05 04:52:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -129,7 +129,10 @@ struct inpcbpolicy {
 	/* cached policy */
 	/* XXX 3 == IPSEC_DIR_MAX */
 	struct secpolicy *cache[3];
+	struct secpolicyindex cacheidx[3];
 	int cachegen[3]; 	/* cache generation #, the time we filled it */
+	int cacheflags;	
+#define IPSEC_PCBSP_CONNECTED	1
 };
 
 /* SP acquiring list table. */
@@ -233,6 +236,9 @@ struct ipsecstat {
 	u_quad_t out_esphist[256];
 	u_quad_t out_ahhist[256];
 	u_quad_t out_comphist[256];
+
+	u_quad_t spdcachelookup;
+	u_quad_t spdcachemiss;
 };
 
 /*
@@ -370,6 +376,8 @@ extern int ip6_esp_randpad;
 
 #define ipseclog(x)	do { if (ipsec_debug) log x; } while (0)
 
+extern int ipsec_pcbconn __P((struct inpcbpolicy *));
+extern int ipsec_pcbdisconn __P((struct inpcbpolicy *));
 extern int ipsec_invalpcbcacheall __P((void));
 
 extern struct secpolicy *ipsec4_getpolicybysock

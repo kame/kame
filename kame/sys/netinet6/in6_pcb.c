@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.104 2001/07/25 16:51:55 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.105 2001/07/26 06:53:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -460,6 +460,10 @@ in6_pcbconnect(in6p, nam)
 	if (in6p->in6p_flags & IN6P_AUTOFLOWLABEL)
 		in6p->in6p_flowinfo |=
 		    (htonl(ip6_flow_seq++) & IPV6_FLOWLABEL_MASK);
+#ifdef IPSEC
+	if (in6p->in6p_socket->so_type == SOCK_STREAM)
+		ipsec_pcbconn(in6p->in6p_sp);
+#endif
 	return(0);
 }
 
@@ -473,6 +477,9 @@ in6_pcbdisconnect(in6p)
 	in6p->in6p_flowinfo &= ~IPV6_FLOWLABEL_MASK;
 	if (in6p->in6p_socket->so_state & SS_NOFDREF)
 		in6_pcbdetach(in6p);
+#ifdef IPSEC
+	ipsec_pcbdisconn(in6p->in6p_sp);
+#endif
 }
 
 void
