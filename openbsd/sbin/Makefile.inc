@@ -3,5 +3,6 @@
 
 BINDIR?=	/usr/local/v6/sbin
 MANDIR=	/usr/local/v6/man/cat
+CFLAGS+=-DHAVE_SCOPELIB
 
 LDADD+=	-static
