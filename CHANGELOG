@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1908 2001/10/14 17:25:29 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1909 2001/10/15 12:27:17 keiichi Exp $
 
 <200110>
+Mon Oct 15 21:25:29 JST 2001 keiichi@iij.ad.jp
+	* icmp6.c
+	swap the ip6_src and the address in the homeaddress destopt
+	(if exists) in icmp6_error() routine.
+
 2001-10-15 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_{defs.h,trans.c}
 	- Fix a bug to miscalculate when compute a checksum in

@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.246 2001/10/15 10:52:58 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.247 2001/10/15 12:25:52 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -220,6 +220,7 @@ static int ni6_addrs __P((struct icmp6_nodeinfo *, struct mbuf *,
 static int ni6_store_addrs __P((struct icmp6_nodeinfo *, struct icmp6_nodeinfo *,
 				struct ifnet *, int));
 static int icmp6_notify_error __P((struct mbuf *, int, int, int));
+static int icmp6_recover_src __P((struct mbuf *));
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 static struct rtentry *icmp6_mtudisc_clone __P((struct sockaddr *));
 static void icmp6_mtudisc_timeout __P((struct rtentry *, struct rttimer *));
@@ -329,6 +330,9 @@ icmp6_error(m, type, code, param)
 {
 	struct ip6_hdr *oip6, *nip6;
 	struct icmp6_hdr *icmp6;
+	struct mbuf *n;
+	struct ip6aux *ip6a;
+	struct in6_addr nip6_src, *nip6_srcp;
 	u_int preplen;
 	int off;
 	int nxt;
@@ -441,6 +445,28 @@ icmp6_error(m, type, code, param)
 	 * OK, ICMP6 can be generated.
 	 */
 
+	/*
+	 * Recover the original ip6_src if the src and the homeaddr
+	 * have been swapped while dest6 processing (see dest6.c).  To
+	 * avoid m_pulldown, we had better to swap addresses before
+	 * m_prepend below.
+	 */
+	nip6_srcp = &oip6->ip6_src;
+	n = ip6_findaux(m);
+	if (n != NULL) {
+		ip6a = mtod(n, struct ip6aux *);
+		if ((ip6a->ip6a_flags & IP6A_HASEEN) != 0 &&
+		    (ip6a->ip6a_flags & IP6A_SWAP) != 0) {
+			nip6_src = oip6->ip6_src;
+			nip6_srcp = &nip6_src;
+			if (icmp6_recover_src(m)) {
+				/* mbuf is freed in icmp6_recover_src */
+				return;
+			}
+			oip6 = mtod(m, struct ip6_hdr *); /* adjust pointer */
+		}
+	}
+
 	if (m->m_pkthdr.len >= ICMPV6_PLD_MAXLEN)
 		m_adj(m, ICMPV6_PLD_MAXLEN - m->m_pkthdr.len);
 
@@ -454,16 +480,8 @@ icmp6_error(m, type, code, param)
 	}
 
 	nip6 = mtod(m, struct ip6_hdr *);
-	nip6->ip6_src  = oip6->ip6_src;
+	nip6->ip6_src  = *nip6_srcp;
 	nip6->ip6_dst  = oip6->ip6_dst;
-
-	/*
-	 * XXX should revert home/care-of address swap if IP6A_HASEEN|IP6A_SWAP
-	 * are set.  see sys/netinet6/dest6.c.
-	 * (or, we should avoid swapping these in dest6.c)
-	 * nip6->nip6_dst should be the home address, so it should be done
-	 * after the address copies above.
-	 */
 
 	if (IN6_IS_SCOPE_LINKLOCAL(&oip6->ip6_src))
 		oip6->ip6_src.s6_addr16[1] = 0;
@@ -758,6 +776,13 @@ icmp6_input(mp, offp, proto)
 #ifdef MIP6
 	case ICMP6_HADISCOV_REQUEST:
 	case ICMP6_HADISCOV_REPLY:
+		if (code != 0)
+			goto badcode;
+		if (mip6_icmp6_input(m, off, icmp6len))
+			goto freeit;
+		break;
+	case ICMP6_MOBILEPREFIX_SOLICIT:
+	case ICMP6_MOBILEPREFIX_ADVERT:
 		if (code != 0)
 			goto badcode;
 		if (mip6_icmp6_input(m, off, icmp6len))
@@ -3232,6 +3257,151 @@ icmp6_ratelimit(dst, type, code)
 	}
 
 	return ret;
+}
+
+/*
+ * Swap ip6_src and the address in the homeaddress destination option.
+ * Since the dest6 processing routine swaps ip6_src and homeaddr (if
+ * any), we must swap them again when we send back the ip datagram to
+ * the sender (ex. icmp6_error).
+ *
+ * returns 0 if succeeded.
+ */
+static int
+icmp6_recover_src(m)
+	struct mbuf *m; /* original ip6 packet */
+{
+	int off, nxt, finished = 0;
+	struct ip6_hdr *oip6;
+	struct ip6_ext *exts;
+	struct ip6_dest *dstopts;
+	int dstoptlen;
+	u_int8_t *opt;
+	int optlen;
+	struct ip6_opt_home_address *haopt;
+	struct in6_addr t;
+	int error = 0;
+
+#ifndef PULLDOWN_TEST 
+	IP6_EXTHDR_CHECK(m, 0, sizeof(struct ip6_hdr), ENOBUFS);
+	oip6 = mtod(m, struct ip6_hdr *);
+#else
+	IP6_EXTHDR_GET(oip6, struct ip6_hdr *, m, 0, sizeof(*oip6));
+	if (oip6 == NULL) {
+		error = ENOBUFS;
+		goto bad;
+	}
+#endif
+
+	off = sizeof(struct ip6_hdr);
+	nxt = oip6->ip6_nxt;
+	while (off + 2 < m->m_pkthdr.len) {
+		switch (nxt) {
+		case IPPROTO_DSTOPTS:
+#ifndef PULLDOWN_TEST 
+			IP6_EXTHDR_CHECK(m, off, sizeof(struct ip6_dest),
+					 ENOBUFS);
+			dstopts = (struct ip6_dest *)(mtod(m, caddr_t) + off);
+#else
+			IP6_EXTHDR_GET(dstopts, struct ip6_dest *,
+				       m, off, sizeof(*dstopts));
+			if (dstopts == NULL) {
+				error = ENOBUFS;
+				goto bad;
+			}
+#endif
+
+			dstoptlen = (dstopts->ip6d_len + 1) << 3;
+#ifndef PULLDOWN_TEST 
+			IP6_EXTHDR_CHECK(m, off, dstoptlen, ENOBUFS);
+			dstopts = (struct ip6_dest *)(mtod(m, caddr_t) + off);
+#else
+			IP6_EXTHDR_GET(dstopts, struct ip6_dest *,
+				       m, off, dstoptlen);
+			if (dstopts == NULL) {
+				error = ENOBUFS;
+				goto bad;
+			}
+#endif
+			off += dstoptlen;
+			nxt = dstopts->ip6d_nxt;
+
+			/* find homeaddress dstopt */
+			dstoptlen -= sizeof(struct ip6_dest);
+			opt = (u_int8_t *)dstopts + sizeof(struct ip6_dest);
+			for (optlen = 0; (dstoptlen > 0 && finished == 0);
+			     dstoptlen -= optlen, opt += optlen) {
+				if ((*opt != IP6OPT_PAD1) &&
+				    (dstoptlen < IP6OPT_MINLEN || *(opt + 1) + 2 > dstoptlen)) {
+					error = EINVAL;
+					goto bad;
+				    }
+				    switch (*opt) {
+				    case IP6OPT_PAD1:
+					    optlen = 1;
+					    break;
+				    case IP6OPT_PADN:
+					    optlen = *(opt + 1) + 2;
+					    break;
+				    case IP6OPT_HOME_ADDRESS:
+					    haopt = (struct ip6_opt_home_address *)opt;
+					    optlen = haopt->ip6oh_len + 2;
+					    if (optlen < sizeof(*haopt)) {
+						    error = EINVAL;
+						    goto bad;
+					    }
+
+					    /* swap */
+					    bcopy(&haopt->ip6oh_addr,
+						  &t,
+						  sizeof(haopt->ip6oh_addr));
+					    bcopy(&oip6->ip6_src,
+						  &haopt->ip6oh_addr,
+						  sizeof(oip6->ip6_src));
+					    bcopy(&t,
+						  &oip6->ip6_src,
+						  sizeof(t));
+					    finished = 1;
+					    break;
+				    default:
+					    optlen = ip6_unknown_opt(opt, m,
+						opt - mtod(m, u_int8_t *));
+					    if (optlen == -1) {
+						    error = EINVAL;
+						    goto bad;
+					    }
+					    optlen += 2;
+					    break;
+				    }
+			}
+			break;
+
+		default:
+#ifndef PULLDOWN_TEST 
+			IP6_EXTHDR_CHECK(m, off, sizeof(struct ip6_ext),
+					 ENOBUFS);
+			exts = (struct ip6_ext *)(mtod(m, caddr_t) + off);
+#else
+			IP6_EXTHDR_GET(exts, struct ip6_ext *,
+				       m, off, sizeof(*exts));
+			if (exts == NULL) {
+				error = ENOBUFS;
+				goto bad;
+			}
+#endif
+			nxt = exts->ip6e_nxt;
+			off += (exts->ip6e_len + 1) << 3;
+			break;
+		}
+		if (finished)
+			break;
+	}
+
+	return (0);
+ bad:
+	ip6_delaux(m);
+	m_freem(m);
+	return (error);
 }
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
