@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.310 2002/06/07 21:23:18 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.311 2002/06/07 21:23:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3054,6 +3054,7 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 			*mtod(m, int *) = optval;
 #endif /* FreeBSD3 */
 			break;
+
 		default:
 			error = EINVAL;
 			break;
