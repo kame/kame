@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6_ha.c,v 1.4 2000/02/09 09:56:19 jinmei Exp $
+ * $Id: mip6_ha.c,v 1.5 2000/02/19 13:11:40 itojun Exp $
  *
  */
 
@@ -41,7 +41,7 @@
 #include "opt_inet.h"
 #endif
 
-#if defined(MIP6_HA)
+#ifdef MIP6_HA
 /*
  * Mobile IPv6 Home Agent
  */
@@ -683,6 +683,7 @@ int                  icmp6len;  /* Length of icmp6 message */
             pq = mip6_prefix_find(&pi->nd_opt_pi_prefix,
                                   pi->nd_opt_pi_prefix_len);
             if (pq == NULL) {
+		int error;
                 pq = mip6_prefix_create(ifp, &pi->nd_opt_pi_prefix,
                                         pi->nd_opt_pi_prefix_len,
                                         pi->nd_opt_pi_valid_time);
@@ -694,9 +695,13 @@ int                  icmp6len;  /* Length of icmp6 message */
                 mip6_build_ha_anycast(&anycast_addr,
                                       &pi->nd_opt_pi_prefix,
                                       pi->nd_opt_pi_prefix_len);
-                mip6_add_ifaddr(&anycast_addr, ifp,
-                                pi->nd_opt_pi_prefix_len,
-                                IN6_IFF_ANYCAST);
+                error = mip6_add_ifaddr(&anycast_addr, ifp,
+                                        pi->nd_opt_pi_prefix_len,
+                                        IN6_IFF_ANYCAST);
+		if (error)
+			printf("%s: address assignment error (errno = %d).\n",
+			       __FUNCTION__, error);
+
             } else
                 pq->valid_time = ntohl(pi->nd_opt_pi_valid_time);
 

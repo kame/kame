@@ -33,7 +33,7 @@
  *
  * Author:  Mattias Pettersson <mattias.pettersson@era.ericsson.se>
  *
- * $Id: mip6_md.c,v 1.7 2000/02/12 07:35:40 itojun Exp $
+ * $Id: mip6_md.c,v 1.8 2000/02/19 13:11:41 itojun Exp $
  *
  */
 
@@ -41,7 +41,7 @@
 #include "opt_inet.h"
 #endif
 
-#if defined(MIP6_MN)
+#ifdef MIP6_MN
 /*
  * Mobile IPv6 Movement Detection for Mobile Nodes
  */
@@ -105,8 +105,8 @@ mip6_md_init()
 	struct nd_defrouter     *dr;
 	struct in6_ifaddr       *ia;
 	struct mip6_esm         *esp; /* Entry in the Event State machine list */
-	int                     i, s;
-    
+	int                     i, s, error;
+
  	for (esp = mip6_esmq; esp; esp = esp->next) {
         
         /* Add the home prefix statically to the prefix list. */
@@ -179,8 +179,12 @@ mip6_md_init()
                 if (!IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr)) {
                     ia = in6ifa_ifpwithaddr(pr->ndpr_ifp, &pr->ndpr_addr);
                     if (ia) {
-                        mip6_delete_ifaddr(&ia->ia_addr.sin6_addr, 
-                                           pr->ndpr_ifp);
+			    error = mip6_delete_ifaddr(&ia->ia_addr.sin6_addr,
+						       pr->ndpr_ifp);
+			    if (error)
+				    printf("%s: address assignment error "
+					   "(errno = %d).\n",
+					   __FUNCTION__, error);
                     }
                 }
             }
@@ -201,16 +205,20 @@ mip6_md_init()
 #endif
         }
         mip6_home_prefix = pr;
-        
+
         dr = TAILQ_FIRST(&nd_defrouter);
 /* XXXYYY Add check for probably reachable router here as well. Mattias */
         if (pr->ndpr_advrtrs.lh_first && dr && 
             pfxrtr_lookup(pr, dr)) {
             /* If we have home pfxrtrs and defrtr is one of these, then 
                we're home. */
-            mip6_md_state = MIP6_MD_HOME;
-            mip6_add_ifaddr(&pr->ndpr_addr, pr->ndpr_ifp, 64, IN6_IFF_NODAD);
-            mip6_route_state = MIP6_ROUTE_NET;
+	    mip6_md_state = MIP6_MD_HOME;
+	    /* XXX BUG ALERT: missing curly brace? */
+	    if ((error = mip6_add_ifaddr(&pr->ndpr_addr, pr->ndpr_ifp, 64, 
+					 IN6_IFF_NODAD)) != 0)
+		    printf("%s: address assignment error (errno = %d).\n",
+			   __FUNCTION__, error);
+		    mip6_route_state = MIP6_ROUTE_NET;
             mip6_primary_prefix = mip6_home_prefix;
             
 #ifdef MIP6_DEBUG
@@ -226,8 +234,10 @@ mip6_md_init()
         else {
             if (dr) {
                 mip6_md_state = MIP6_MD_FOREIGN;
-                mip6_add_ifaddr(&pr->ndpr_addr, pr->ndpr_ifp, 128,
-								IN6_IFF_NODAD);
+                if ((error = mip6_add_ifaddr(&pr->ndpr_addr, pr->ndpr_ifp, 128,
+					     IN6_IFF_NODAD)) != 0)
+			printf("%s: address assignment error (errno = %d).\n",
+			       __FUNCTION__, error);
                 mip6_route_state = MIP6_ROUTE_HOST;
                 
                 for (pr = nd_prefix.lh_first; pr; pr = pr->ndpr_next) {
@@ -262,8 +272,10 @@ mip6_md_init()
             else {
               undefined:
                 mip6_md_state = MIP6_MD_UNDEFINED;
-                mip6_add_ifaddr(&pr->ndpr_addr, pr->ndpr_ifp, 64,
-								IN6_IFF_NODAD);
+                if ((error = mip6_add_ifaddr(&pr->ndpr_addr, pr->ndpr_ifp, 64,
+					     IN6_IFF_NODAD)) != 0)
+			printf("%s: address assignment error (errno = %d).\n",
+			       __FUNCTION__, error);
                 mip6_route_state = MIP6_ROUTE_NET;
                 mip6_primary_prefix = NULL;
                 
@@ -300,10 +312,10 @@ mip6_select_defrtr()
 {
 	struct nd_prefix    *pr = NULL, *prev_primary_prefix;
 	struct nd_defrouter *dr, anydr, *prev_primary_dr;
-    struct nd_pfxrouter *pfxrtr;
+	struct nd_pfxrouter *pfxrtr;
 	struct rtentry      *rt = NULL;
 	struct llinfo_nd6   *ln = NULL;
-    int s = splnet();
+	int s = splnet(), error;
 
     prev_primary_prefix = mip6_primary_prefix;
     prev_primary_dr = TAILQ_FIRST(&nd_defrouter); /* Only for sanity check */
@@ -487,14 +499,20 @@ mip6_select_defrtr()
 
 	if ((mip6_md_state == MIP6_MD_HOME || mip6_md_state == MIP6_MD_UNDEFINED) 
         && mip6_route_state == MIP6_ROUTE_HOST) {
-		mip6_add_ifaddr(&mip6_home_prefix->ndpr_addr, 
-                        mip6_home_prefix->ndpr_ifp, 64, IN6_IFF_NODAD);
-		mip6_route_state = MIP6_ROUTE_NET;
+		error = mip6_add_ifaddr(&mip6_home_prefix->ndpr_addr, 
+			mip6_home_prefix->ndpr_ifp, 64, IN6_IFF_NODAD);
+		if (error)
+			printf("%s: address assignment error (errno = %d).\n",
+			       __FUNCTION__, error);
+ 		mip6_route_state = MIP6_ROUTE_NET;
 	}
 	else if (mip6_md_state == MIP6_MD_FOREIGN && 
              mip6_route_state == MIP6_ROUTE_NET) {
-		mip6_add_ifaddr(&mip6_home_prefix->ndpr_addr,
+		error = mip6_add_ifaddr(&mip6_home_prefix->ndpr_addr,
                         mip6_home_prefix->ndpr_ifp, 128, IN6_IFF_NODAD);
+		if (error)
+			printf("%s: address assignment error (errno = %d).\n",
+			       __FUNCTION__, error);
 		mip6_route_state = MIP6_ROUTE_HOST;
 	}
 
@@ -898,6 +916,126 @@ mip6_store_advint(struct nd_opt_advint *ai,
  * Ret value:   -
  ******************************************************************************
  */
+int
+mip6_delete_ifaddr(struct in6_addr *addr,
+                   struct ifnet *ifp)
+{
+	struct in6_aliasreq  *ifra, dummy;
+	struct sockaddr_in6 *sa6;
+	struct	in6_ifaddr *ia, *oia;
+	int s;
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	struct ifaddr *ifa;
+#endif
+	
+	bzero(&dummy, sizeof(dummy));
+	ifra = &dummy;
+
+	ifra->ifra_addr.sin6_len = sizeof(ifra->ifra_addr);
+	ifra->ifra_addr.sin6_family = AF_INET6;
+	ifra->ifra_addr.sin6_addr = *addr;
+    
+	sa6 = &ifra->ifra_addr;
+
+	if (ifp == 0)
+		return(EOPNOTSUPP);
+
+	s = splnet();
+	
+	/*
+	 * Code recycled from in6_control().
+	 */
+
+	/*
+	 * Find address for this interface, if it exists.
+	 */
+	if (IN6_IS_ADDR_LINKLOCAL(&sa6->sin6_addr)) {
+		if (sa6->sin6_addr.s6_addr16[1] == 0) {
+				/* interface ID is not embedded by the user */
+			sa6->sin6_addr.s6_addr16[1] =
+				htons(ifp->if_index);
+		}	
+		else if (sa6->sin6_addr.s6_addr16[1] !=
+			 htons(ifp->if_index)) {
+			splx(s);
+			return(EINVAL);	/* ifid is contradict */
+		}
+		if (sa6->sin6_scope_id) {
+			if (sa6->sin6_scope_id !=
+			    (u_int32_t)ifp->if_index) {
+				splx(s);
+				return(EINVAL);
+			}
+			sa6->sin6_scope_id = 0; /* XXX: good way? */
+		}
+	}
+ 	ia = in6ifa_ifpwithaddr(ifp, &ifra->ifra_addr.sin6_addr);
+
+	/*
+	 * for IPv4, we look for existing in6_ifaddr here to allow
+	 * "ifconfig if0 delete" to remove first IPv4 address on the
+	 * interface.  For IPv6, as the spec allow multiple interface
+	 * address from the day one, we consider "remove the first one"
+	 * semantics to be not preferrable.
+	 */
+	if (ia == 0) {
+		splx(s);
+		return(EADDRNOTAVAIL);
+	}
+	/* FALLTHROUGH */
+
+	if (ia == 0) {
+		ia = (struct in6_ifaddr *)
+			malloc(sizeof(*ia), M_IFADDR, M_WAITOK);
+		if (ia == NULL) {
+			splx(s);
+			return (ENOBUFS);
+		}
+		bzero((caddr_t)ia, sizeof(*ia));
+		ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
+		ia->ia_ifa.ifa_dstaddr
+			= (struct sockaddr *)&ia->ia_dstaddr;
+		ia->ia_ifa.ifa_netmask
+			= (struct sockaddr *)&ia->ia_prefixmask;
+
+		ia->ia_ifp = ifp;
+		if ((oia = in6_ifaddr) != NULL) {
+			for ( ; oia->ia_next; oia = oia->ia_next)
+				continue;
+			oia->ia_next = ia;
+		} else
+			in6_ifaddr = ia;
+		ia->ia_ifa.ifa_refcnt++;
+
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+		if ((ifa = ifp->if_addrlist) != NULL) {
+			for ( ; ifa->ifa_next; ifa = ifa->ifa_next)
+				continue;
+			ifa->ifa_next = &ia->ia_ifa;
+		} else
+			ifp->if_addrlist = &ia->ia_ifa;
+#else
+		TAILQ_INSERT_TAIL(&ifp->if_addrhead, &ia->ia_ifa,
+				  ifa_link);
+#endif
+		ia->ia_ifa.ifa_refcnt++;
+	}
+
+	in6_purgeaddr(&ia->ia_ifa, ifp);
+
+	splx(s);
+	return(0);
+}
+
+
+#if 0
+/*
+ ******************************************************************************
+ * Function:    mip6_delete_ifaddr
+ * Description: Similar to "ifconfig <ifp> <addr> delete".
+ * Ret value:   -
+ ******************************************************************************
+ */
 void
 mip6_delete_ifaddr(struct in6_addr *addr,
                    struct ifnet *ifp)
@@ -924,7 +1062,7 @@ mip6_delete_ifaddr(struct in6_addr *addr,
 #endif
     }
 }
-
+#endif /* 0 */
 
 struct nd_prefix *
 mip6_get_home_prefix(void)

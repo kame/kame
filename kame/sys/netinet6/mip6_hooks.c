@@ -34,7 +34,7 @@
  * Author: Hesham Soliman <hesham.soliman@ericsson.com.au>
  *         Martti Kuparinen <martti.kuparinen@ericsson.com>
  *
- * $Id: mip6_hooks.c,v 1.1 2000/02/07 17:22:54 itojun Exp $
+ * $Id: mip6_hooks.c,v 1.2 2000/02/19 13:11:41 itojun Exp $
  *
  */
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
@@ -79,7 +79,7 @@ extern int  (*mip6_enable_func_ha_hook)(u_long, caddr_t);
 extern void (*mip6_icmp6_output_hook)(struct mbuf *);
 
 /* Mobile Node-specific hooks */
-extern int  (*mip6_rec_tunneled_packet_hook)(struct mbuf *);
+extern int  (*mip6_route_optimize_hook)(struct mbuf *);
 extern void (*mip6_select_defrtr_hook)(void);
 extern struct nd_prefix * (*mip6_get_home_prefix_hook)(void);
 extern void (*mip6_prelist_update_hook)(struct nd_prefix *,
@@ -96,7 +96,6 @@ extern int  (*mip6_write_config_data_mn_hook)(u_long, void *);
 extern int  (*mip6_clear_config_data_mn_hook)(u_long, caddr_t);
 extern int  (*mip6_enable_func_mn_hook)(u_long, caddr_t);
 extern void (*mip6_minus_a_case_hook)(struct nd_prefix *);
-extern int  (*mip6_check_packet_hook)(struct mbuf *);
 extern struct mip6_esm * (*mip6_esm_find_hook)(struct in6_addr *);
 
 
@@ -113,9 +112,8 @@ mip6_minus_a_case(struct nd_prefix *pr)
     }
 
 	addr = in6addr_any;
-    mip6_esm_create(pr->ndpr_ifp, NULL, NULL, &addr,
-					&pr->ndpr_addr, pr->ndpr_plen,
-                    MIP6_STATE_UNDEF, PERMANENT, 0xFFFF);
+    mip6_esm_create(pr->ndpr_ifp, NULL, &addr, &pr->ndpr_addr,
+		    pr->ndpr_plen, MIP6_STATE_UNDEF, PERMANENT, 0xFFFF);
 #ifdef MIP6_DEBUG
     mip6_debug("Late Home Address %s found for autoconfig'd case. Starting Mobile "
           "IPv6. Hook deactivated.\n", ip6_sprintf(&pr->ndpr_addr));
@@ -219,7 +217,7 @@ mip6_enable_hooks(int scope)
         /* Activate Mobile Node-specific hooks */
 #if (defined(MIP6_MN) || defined(MIP6_MODULES))    
         if (MIP6_IS_MN_ACTIVE) {
-            mip6_rec_tunneled_packet_hook = mip6_rec_tunneled_packet;
+            mip6_route_optimize_hook = mip6_route_optimize;
             mip6_rec_ra_hook = mip6_rec_ramn;   
             mip6_select_defrtr_hook = mip6_select_defrtr;
             mip6_get_home_prefix_hook = mip6_get_home_prefix;
@@ -231,7 +229,6 @@ mip6_enable_hooks(int scope)
             mip6_rec_ba_hook = mip6_rec_ba;
             mip6_rec_br_hook = mip6_rec_bu;
             mip6_stop_bu_hook = mip6_stop_bu;
-            mip6_check_packet_hook = mip6_check_packet;
             mip6_esm_find_hook = mip6_esm_find;
         }
 #endif
@@ -277,7 +274,7 @@ mip6_disable_hooks(int scope)
             /* De-activate Mobile Node-specific hooks */
 #if (defined(MIP6_MN) || defined(MIP6_MODULES))    
         if (MIP6_IS_MN_ACTIVE) {
-            mip6_rec_tunneled_packet_hook = 0;
+            mip6_route_optimize_hook = 0;
             mip6_rec_ra_hook = 0;
             mip6_select_defrtr_hook = 0;
             mip6_get_home_prefix_hook = 0;
@@ -292,7 +289,6 @@ mip6_disable_hooks(int scope)
             mip6_write_config_data_mn_hook = 0;
             mip6_clear_config_data_mn_hook = 0;
             mip6_enable_func_mn_hook = 0;
-            mip6_check_packet_hook = 0;
             mip6_esm_find_hook = 0;
             mip6_minus_a_case_hook = 0;
         }
@@ -312,7 +308,7 @@ mip6_attach(void)
   
   #if (defined(MIP6_MN) || defined (MIP6_HA) || defined(MIP6_MODULES))
 */
-#if defined(MIP6_MN)
+#ifdef MIP6_MN
     if (MIP6_IS_MN_ACTIVE) {
         if(mip6_get_home_prefix_hook)       /* Test arbitrary hook */
             return 0;
@@ -328,7 +324,7 @@ mip6_attach(void)
             
             addr = in6addr_any;
             if ((pr = mip6_find_auto_home_addr()) != NULL) {
-                mip6_esm_create(pr->ndpr_ifp, NULL, &addr, &addr,
+                mip6_esm_create(pr->ndpr_ifp, &addr, &addr,
                                 &pr->ndpr_addr,pr->ndpr_plen,
                                 MIP6_STATE_UNDEF, PERMANENT, 0xFFFF);
                 mip6_enable_hooks(MIP6_SPECIFIC_HOOKS);
@@ -344,7 +340,7 @@ mip6_attach(void)
         }
     }
 #endif
-#if defined(MIP6_HA)    
+#ifdef MIP6_HA
     if (MIP6_IS_HA_ACTIVE) {
         /* XXXYYY Build anycast or is it done? */
         mip6_enable_hooks(MIP6_SPECIFIC_HOOKS);
@@ -361,14 +357,14 @@ mip6_release(void)
     /* Disable the hooks */
     mip6_disable_hooks(MIP6_SPECIFIC_HOOKS);
 
-#if defined(MIP6_MN)
+#ifdef MIP6_MN
     if (MIP6_IS_MN_ACTIVE) {
         mip6_mn_exit();
         mip6_md_exit();
     }
 #endif
 
-#if defined(MIP6_HA)
+#ifdef MIP6_HA
     if (MIP6_IS_HA_ACTIVE)
         mip6_ha_exit();
 #endif

@@ -53,9 +53,6 @@
 static int ip6_rthdr0 __P((struct mbuf *, struct ip6_hdr *,
     struct ip6_rthdr0 *));
 
-#ifdef MIP6
-int (*mip6_rec_tunneled_packet_hook)(struct mbuf *m) = 0;
-#endif
 
 int
 route6_input(mp, offp, proto)
@@ -105,20 +102,7 @@ route6_input(mp, offp, proto)
 		 icmp6_error(m, ICMP6_PARAM_PROB, ICMP6_PARAMPROB_HEADER,
 			     (caddr_t)&rh->ip6r_type - (caddr_t)ip6);
 		 return(IPPROTO_DONE);
-	}
-	
-#ifdef MIP6
-	/*
-	 * Mobile IPv6
-	 *
-	 * If the packet is being tunnelled a Binding Update must be sent to
-	 * the sender of the packet. 
-	 */
-	if (m->m_pkthdr.rcvif && (m->m_pkthdr.rcvif->if_type == IFT_GIF) &&
-	    (mip6_indatap->flag & MIP6_IN_TUN_RH) != 0)
-		if (mip6_rec_tunneled_packet_hook)
-			(*mip6_rec_tunneled_packet_hook)(m);
-#endif
+	}	
 	
 	*offp += rhlen;
 	return(rh->ip6r_nxt);

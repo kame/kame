@@ -161,6 +161,10 @@
 #include <netinet6/in6_gif.h>
 #endif
 
+#ifdef MIP6
+#include <netinet6/mip6.h>
+#endif
+
 #include <net/net_osdep.h>
 
 #define	offsetof(type, member)	((size_t)(&((type *)0)->member))
@@ -406,6 +410,22 @@ struct ip6protosw in6_gif_protosw =
 #endif
 };
 #endif /*NGIF*/
+
+#ifdef MIP6
+struct ip6protosw mip6_tunnel_protosw =
+{ SOCK_RAW,	&inet6domain,	0/*IPPROTO_IPV[46]*/,	PR_ATOMIC|PR_ADDR,
+  mip6_tunnel_input, rip6_output,	0,		rip6_ctloutput,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  0,
+#else
+  rip6_usrreq,
+#endif
+  0,            0,              0,              0,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  &rip6_usrreqs
+#endif
+};
+#endif /* MIP6 */
 
 #ifdef __FreeBSD__
 extern int in6_inithead __P((void **, int));

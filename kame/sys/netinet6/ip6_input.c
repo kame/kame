@@ -193,7 +193,8 @@ extern void ip_forward	__P((struct mbuf *, int));
 
 #ifdef MIP6
 int (*mip6_new_packet_hook)(struct mbuf *m) = 0;
-#endif /* MIP6 */
+int (*mip6_route_optimize_hook)(struct mbuf *m) = 0;
+#endif
 
 /*
  * IP6 initialization: fill in IP6 protocol switch table.
@@ -242,7 +243,7 @@ ip6_init()
 #ifdef MIP6
 	/* Initialize the Mobile IPv6 code */
 	mip6_init();
-#endif /* MIP6 */
+#endif
 }
 
 static void
@@ -759,7 +760,15 @@ ip6_input(m)
 			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_truncated);
 			goto bad;
 		}
-
+		
+#ifdef MIP6
+		if ((nxt != IPPROTO_HOPOPTS) && (nxt != IPPROTO_DSTOPTS) &&
+		    (nxt != IPPROTO_ROUTING) && (nxt != IPPROTO_FRAGMENT) &&
+		    (nxt != IPPROTO_ESP) && (nxt != IPPROTO_AH)) {
+			if (mip6_route_optimize_hook)
+				(*mip6_route_optimize_hook)(m);
+		}
+#endif
 		nxt = (*inet6sw[ip6_protox[nxt]].pr_input)(&m, &off, nxt);
 	}
 	return;

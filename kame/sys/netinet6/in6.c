@@ -355,7 +355,7 @@ in6_ifproxy_request(int cmd, struct in6_ifaddr *ia)
 	return error;
 }
 
-static int
+int
 in6_ifaddproxy(struct in6_ifaddr *ia)
 {
 	return(in6_ifproxy_request(1, ia));
@@ -463,15 +463,8 @@ in6_control(so, cmd, data, ifp)
 
 	privileged = 0;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-#if 0
-	/* ericsson patch includes this - it is VERY troublesome */
-	if ((p && !suser(p->p_ucred, &p->p_acflag)) || p == NULL)
-#else
 	if (p && !suser(p->p_ucred, &p->p_acflag))
-#endif
-	{
 		privileged++;
-	}
 #else
 	if ((so->so_state & SS_PRIV) != 0)
 		privileged++;
@@ -2288,18 +2281,26 @@ in6_ifawithifp(ifp, dst)
 	dep[0] = dep[1] = NULL;
 
 #ifdef MIP6
-	if (mip6_get_home_prefix_hook) {
+	/*
+	 * This is needed to assure that the Home Address is used for
+	 * outgoing packets when not at home. We can't choose any other
+	 * address if we want to keep connections up during movement.
+	 */
+	if (mip6_get_home_prefix_hook) {	/* Only Mobile Node */
 		struct nd_prefix *pr;
-		if ((pr = (*mip6_get_home_prefix_hook)()) != NULL &&
-			!IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr))
+		if ((pr = (*mip6_get_home_prefix_hook)()) && 
+		    !IN6_IS_ADDR_UNSPECIFIED(&pr->ndpr_addr))
 		{
 			if (dst_scope == in6_addrscope(&pr->ndpr_addr)) {
-				printf("%s: Local address %s is chosen for "
-				    "pcb to dest %s.\n",
-				    __FUNCTION__,
-				    ip6_sprintf(&pr->ndpr_addr),
-				    ip6_sprintf(dst));
-				return (in6ifa_ifpwithaddr(ifp, &pr->ndpr_addr));
+#ifdef MIP6_DEBUG
+				/* Noisy but useful */
+				mip6_debug("%s: Local address %s is chosen "
+					   "for pcb to dest %s.\n",
+					   __FUNCTION__,
+					   ip6_sprintf(&pr->ndpr_addr),
+					   ip6_sprintf(dst));
+#endif
+				return(in6ifa_ifpwithaddr(ifp, &pr->ndpr_addr));
 			}
 		}
 	}

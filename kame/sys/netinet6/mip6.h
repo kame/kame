@@ -28,7 +28,7 @@
  */
 
 /*
- *  $Id: mip6.h,v 1.4 2000/02/16 11:52:48 itojun Exp $
+ *  $Id: mip6.h,v 1.5 2000/02/19 13:11:40 itojun Exp $
  */
 
 
@@ -74,6 +74,11 @@ struct ifnet;
 #define MIP6_HA_MODULE    0x02
 
 
+/* Type of node calling mip6_tunnel */
+#define MIP6_NODE_MN    0x01
+#define MIP6_NODE_HA    0x02
+
+
 /* Movement Detection default values */
 #define MIP6_MAX_LOST_ADVINTS   3
 
@@ -84,16 +89,10 @@ struct ifnet;
 #define MIP6_CONFIG_HOOKS      0x03
 
 
-
-/* Bit mask for mip6_indata->flag. */
-#define MIP6_IN_TUN_RH  0x80  /* Tunneled packet processed by route6_input */
-#define MIP6_IN_TUN_DH  0x40  /* Tunneled packet processed by dest6_input */
-
-
-/* Definition of states for GIF tunnels set up by the Home Agent and the MN. */
-#define MIP6_GIFADD   0
-#define MIP6_GIFMOVE  1
-#define MIP6_GIFDEL   2
+/* Definition of states for tunnels set up by the Home Agent and the MN. */
+#define MIP6_TUNNEL_ADD   0
+#define MIP6_TUNNEL_MOVE  1
+#define MIP6_TUNNEL_DEL   2
 
 
 /* Definition of length for different destination options */
@@ -106,14 +105,11 @@ struct ifnet;
 #define IP6OPT_COALEN     16   /* Length of Alternate COA sub-option */
 
 
-/* Definition of minimum length of MIPv6 destination options */
-                         /* Min len for BA incl opt Type and Length */
+/* Definition of minimum length of MIPv6 destination options.
+   Length includes option Type and Length. */
 #define IP6OPT_BAMINLEN  (IP6OPT_MINLEN + IP6OPT_BALEN)
-                         /* Min len for BR incl opt Type and Length */
 #define IP6OPT_BRMINLEN  (IP6OPT_MINLEN + IP6OPT_BRLEN)
-                         /* Min len for BU incl opt Type and Length */
 #define IP6OPT_BUMINLEN  (IP6OPT_MINLEN + IP6OPT_BULEN)
-                         /* Min len for HA incl opt Type and Length */
 #define IP6OPT_HAMINLEN  (IP6OPT_MINLEN + IP6OPT_HALEN)
 
 
@@ -129,8 +125,8 @@ struct ifnet;
 #define MIP6_BU_RFLAG       0x20   /* BU MN is Router flag present */
 
 
-/* Definition of flags used for indication of options present in a destination
-   header (mip6_indata->optflag) */
+/* Definition of flags used for indication of options present in a
+   destination header (mip6_indata->optflag) */
 #define MIP6_DSTOPT_BU      0x80   /* BU Option present */
 #define MIP6_DSTOPT_BA      0x40   /* BA Option present */
 #define MIP6_DSTOPT_BR      0x20   /* BR Option present */
@@ -142,8 +138,8 @@ struct ifnet;
 
 #if 0
 /* Definition of flags for Home Agent */
-#define ND_RA_FLAG_HA         0x20	/* RA indicates that router works as HA */
-#define ND_OPT_PI_FLAG_RADDR  0x20	/* Prefix Information option incl. global
+#define ND_RA_FLAG_HA         0x20  /* RA indicates that router works as HA */
+#define ND_OPT_PI_FLAG_RADDR  0x20  /* Prefix Information option incl. global
                                        IP address */
 #endif
 
@@ -375,8 +371,7 @@ struct mip6_hafn {
 struct mip6_esm {
     struct mip6_esm  *next;       /* Ptr to next entry in the list */
     struct ifnet     *ifp;        /* I/f where home address is applied */
-    struct ifnet     *gif_ifp;    /* Tunnel interface used by the MN to
-                                     receive incoming tunneled packets */
+    const struct encaptab *ep;	  /* Encapsulation attach (MN -> HA) */
     int               state;      /* State for the home address */
     enum esm_type     type;       /* Type of event-state machine */
     struct in6_addr   home_addr;  /* Home address */
@@ -411,7 +406,7 @@ struct mip6_bc {
     u_int16_t        seqno;       /* Maximum value of the sequence number */
     struct bc_info   info;        /* Usage info for cache replacement policy */
     time_t           lasttime;    /* The time at which a BR was last sent */
-    struct ifnet    *gif_ifp;     /* Tunnel i/f used by the HA to the MN */
+    const struct encaptab *ep;	  /* Encapsulation attach (HA -> MN) */
 };
 
 
@@ -496,15 +491,15 @@ struct mip6_na
 struct mip6_indata {
     u_int8_t                flag;     /* How to handle tunneled packets */
     u_int8_t                optflag;  /* Dest options and sub-options flag */
-    struct in6_addr         ip6_src;  /* Source address from IPv6 header */
-    struct in6_addr         ip6_dst;  /* Dest address from IPv6 header */
-    struct mip6_opt_bu     *bu_opt;  /* BU option present */
-    struct mip6_opt_ba     *ba_opt;  /* BA option present */
-    struct mip6_opt_br     *br_opt;  /* BR option present */
-    struct mip6_opt_ha     *ha_opt;  /* HA option present */
-    struct mip6_subopt_id  *uid;     /* Sub-option Unique ID present */
-    struct mip6_subopt_coa *coa;     /* Sub-option alt coa present */
-    struct mip6_subopt_hal *hal;     /* Sub-option HAs List present */
+    struct in6_addr         ip6_src;  /* Orig src addr from IPv6 header */
+    struct in6_addr         ip6_dst;  /* Orig dst addr from IPv6 header */
+    struct mip6_opt_bu     *bu_opt;   /* BU option present */
+    struct mip6_opt_ba     *ba_opt;   /* BA option present */
+    struct mip6_opt_br     *br_opt;   /* BR option present */
+    struct mip6_opt_ha     *ha_opt;   /* HA option present */
+    struct mip6_subopt_id  *uid;      /* Sub-option Unique ID present */
+    struct mip6_subopt_coa *coa;      /* Sub-option alt coa present */
+    struct mip6_subopt_hal *hal;      /* Sub-option HAs List present */
 };
 
 
@@ -646,16 +641,14 @@ extern void mip6_build_in6addr
 	__P((struct in6_addr *, struct in6_addr *, const struct in6_addr *, int));
 extern void mip6_build_ha_anycast
 	__P((struct in6_addr *, const struct in6_addr *, int));
-extern void mip6_add_ifaddr
+extern int mip6_add_ifaddr
 	__P((struct in6_addr *addr, struct ifnet *ifp, int plen, int flags));
-extern int mip6_gifconfig
-	__P((struct in6_addr *, struct in6_addr *, struct ifnet *));
-extern int mip6_ifconfig
-	__P((struct in6_addr *, struct in6_addr *, struct ifnet *));
+extern int mip6_tunnel_output
+	__P((struct mbuf **, struct mip6_bc *));
+extern int mip6_tunnel_input
+	__P((struct mbuf **, int *, int));
 extern int mip6_tunnel
-	__P((struct in6_addr *, struct mip6_bc *, int));
-struct gif_softc *mip6_find_freegif
-	__P((void));
+	__P((struct in6_addr *, struct in6_addr *, int, int, void *));
 extern struct mip6_bc *mip6_bc_find
 	__P((struct in6_addr *));
 extern struct mip6_bc *mip6_bc_create
@@ -710,7 +703,7 @@ extern void mip6_probe_pfxrtrs
 	__P((void));
 extern void mip6_store_advint
 	__P((struct nd_opt_advint *, struct nd_defrouter *));
-extern void mip6_delete_ifaddr
+extern int mip6_delete_ifaddr
 	__P((struct in6_addr *addr, struct ifnet *ifp));
 extern struct nd_prefix *mip6_get_home_prefix
 	__P((void));
@@ -735,15 +728,13 @@ extern int mip6_rec_hal
 	__P((struct in6_addr *, struct in6_addr *, struct mip6_subopt_hal *));
 extern int mip6_rec_ramn
 	__P((struct mbuf *, int));
-extern int mip6_check_packet
-	__P((struct mbuf *));
-extern int mip6_rec_tunneled_packet
+extern int mip6_route_optimize
 	__P((struct mbuf *));
 extern int mip6_send_bu
 	__P((struct mip6_bul *, struct mip6_bu_data *, struct mip6_subbuf *));
 extern void mip6_send_bu2fn
 	__P((struct in6_addr *, struct mip6_hafn *, struct in6_addr *,
-        struct ifnet *, struct ifnet *, u_int32_t));
+        struct ifnet *, u_int32_t));
 extern void mip6_update_cns
 	__P((struct in6_addr *, struct in6_addr *, u_int8_t, u_int32_t));
 extern void mip6_queue_bu
@@ -771,9 +762,8 @@ extern struct mip6_bul *mip6_bul_delete
 extern struct mip6_esm *mip6_esm_find
 	__P((struct in6_addr *));
 extern struct mip6_esm *mip6_esm_create
-	__P((struct ifnet *, struct ifnet *, struct in6_addr	*, struct in6_addr *,
-        struct in6_addr *, u_int8_t, int, enum esm_type,
-        u_int16_t));
+	__P((struct ifnet *, struct in6_addr        *, struct in6_addr *,
+	struct in6_addr *, u_int8_t, int, enum esm_type, u_int16_t));
 extern struct mip6_esm *mip6_esm_delete
 	__P((struct mip6_esm *));
 extern int mip6_outq_create

@@ -628,6 +628,7 @@ struct	in6_multi *in6_addmulti __P((struct in6_addr *, struct ifnet *,
 				     int *));
 void	in6_delmulti __P((struct in6_multi *));
 void	in6_ifscrub __P((struct ifnet *, struct in6_ifaddr *));
+extern int in6_ifaddproxy __P((struct in6_ifaddr *));  /* XXXXYYY Added */
 extern int in6_ifindex2scopeid __P((int));
 extern int in6_mask2len __P((struct in6_addr *));
 extern void in6_len2mask __P((struct in6_addr *, int));

@@ -31,13 +31,26 @@
 #define _NETINET_IP_ENCAP_H_
 
 #ifdef _KERNEL
+
+struct encaptab {
+	LIST_ENTRY(encaptab) chain;
+	int af;
+	int proto;			/* -1: don't care, I'll check myself */
+	struct sockaddr_storage src;	/* my addr */
+	struct sockaddr_storage srcmask;
+	struct sockaddr_storage dst;	/* remote addr */
+	struct sockaddr_storage dstmask;
+	const struct protosw *psw;	/* only pr_input will be used */
+	void *arg;			/* passed via m->m_pkthdr.aux */
+};
+
 void	encap_init __P((void));
 void	encap4_input __P((struct mbuf *, ...));
 int	encap6_input __P((struct mbuf **, int *, int));
-void	*encap_attach __P((int, int, const struct sockaddr *,
+const struct encaptab *encap_attach __P((int, int, const struct sockaddr *,
 		const struct sockaddr *, const struct sockaddr *,
 		const struct sockaddr *, const struct protosw *, void *));
-int	encap_detach __P((void *));
+int	encap_detach __P((const struct encaptab *));
 #endif
 
 #endif /*_NETINET_IP_ENCAP_H_*/

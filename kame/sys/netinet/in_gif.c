@@ -399,7 +399,7 @@ in_gif_ioctl(ifp, cmd, data)
 	struct ifreq     *ifr = (struct ifreq*)data;
 	int error = 0, size;
 	struct sockaddr *sa, *dst, *src;
-	void *p;
+	const struct encaptab *p;
 	struct sockaddr_in smask4, dmask4;
 		
 	switch (cmd) {

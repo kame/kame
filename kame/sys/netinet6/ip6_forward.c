@@ -69,6 +69,10 @@
 #include <netinet6/ip6_fw.h>
 #endif
 
+#ifdef MIP6
+#include <netinet6/mip6.h>
+#endif
+
 #include <net/net_osdep.h>
 
 struct	route_in6 ip6_forward_rt;
@@ -281,7 +285,24 @@ ip6_forward(m, srcrt)
     }
     skip_ipsec:
 #endif /* IPSEC_IPV6FWD */
+	
+#ifdef MIP6
+	{
+		struct   mip6_bc   *bc;
 
+		bc = mip6_bc_find(&ip6->ip6_dst);
+		if ((bc != NULL) && (bc->hr_flag)) {
+			if (mip6_tunnel_output(&m, bc) != 0) {
+				ip6stat.ip6s_cantforward++;
+				if (mcopy)
+					m_freem(mcopy);
+				m_freem(m);
+				return;
+			}
+		}
+	}
+#endif
+	
 	dst = &ip6_forward_rt.ro_dst;
 	if (!srcrt) {
 		/*

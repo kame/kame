@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6.c,v 1.8 2000/02/17 05:10:01 itojun Exp $
+ * $Id: mip6.c,v 1.9 2000/02/19 13:11:40 itojun Exp $
  *
  */
 
@@ -60,19 +60,24 @@
 #include <sys/ioccom.h>
 
 #include <net/if.h>
+#include <net/if_types.h>
 #include <net/route.h>
 #include <net/if_gif.h>
+#include <net/netisr.h>
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>
-#include "netinet/ip6.h"
-#include <netinet6/ip6_var.h>
+#include <netinet/in.h>
+#include <netinet/ip6.h>
+#include <netinet/ip_encap.h>
 #include <netinet/icmp6.h>
+#include <netinet6/ip6_var.h>
+#include <netinet6/ip6protosw.h>
 
 #include <netinet6/mip6.h>
 #include <netinet6/mip6_common.h>
 
-#if defined(MIP6_DEBUG)
+#ifdef MIP6_DEBUG
 #include <sys/param.h>
 #include <sys/proc.h>
 #include <sys/systm.h>
@@ -112,13 +117,16 @@ struct mip6_link_list  *mip6_llq = NULL;  /* List of links receiving RA's */
 
 
 
-#if defined(MIP6_HA)
+#ifdef MIP6_HA
 u_int8_t mip6_module = MIP6_HA_MODULE;  /* Info about loaded modules (HA) */
 #elif defined(MIP6_MN)
 u_int8_t mip6_module = MIP6_MN_MODULE;  /* Info about loaded modules (MN) */
 #else
 u_int8_t mip6_module = 0;               /* Info about loaded modules (CN) */
 #endif
+
+
+extern struct ip6protosw mip6_tunnel_protosw;
 
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
@@ -202,11 +210,11 @@ mip6_init(void)
     mip6_enable_hooks(MIP6_GENERIC_HOOKS);
     mip6_enable_hooks(MIP6_CONFIG_HOOKS);
 
-#if defined(MIP6_HA)
+#ifdef MIP6_HA
     mip6_ha_init();
 #endif
 
-#if defined(MIP6_MN)
+#ifdef MIP6_MN
     mip6_mn_init();
 #endif
 
@@ -613,7 +621,10 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 #endif
 
     /* Shall Dynamic Home Agent Address Discovery be performed? */
-#if (defined(MIP6_HA) || defined(MIP6_MODULES))    
+#if (defined(MIP6_HA) || defined(MIP6_MODULES))
+    src_addr = NULL;
+    hal = NULL;
+    
     if (MIP6_IS_HA_ACTIVE) {
         if ((mip6_indatap->ip6_dst.s6_addr8[15] & 0x7f) ==
             MIP6_ADDR_ANYCAST_HA) {
@@ -721,8 +732,9 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 
             /* The HA shall act as a proxy for the MN while it is at a FN. */
             /* Create a new or move an existing tunnel to the MN. */
-            error = mip6_tunnel(&mip6_indatap->ip6_dst, bc_entry,
-                                MIP6_GIFMOVE);
+            error = mip6_tunnel(&mip6_indatap->ip6_dst, &bc_entry->coa,
+                                MIP6_TUNNEL_MOVE, MIP6_NODE_HA,
+				(void *)bc_entry);
             if (error)
                 return IPPROTO_DONE;
 
@@ -851,7 +863,8 @@ struct mbuf  *m;  /* The entire IPv6 packet */
     mip6_debug("\nReceived Home Address Option\n");
     mip6_debug("Type/Length:  %x / %u\n", mip6_indatap->ha_opt->type,
           mip6_indatap->ha_opt->len);
-    mip6_debug("Home Address: %s\n", ip6_sprintf(&mip6_indatap->ha_opt->home_addr));
+    mip6_debug("Home Address: %s\n",
+	       ip6_sprintf(&mip6_indatap->ha_opt->home_addr));
 #endif
 
     /* Copy the Home Address option address to the Source Address */
@@ -1478,6 +1491,278 @@ int                    prefix_len; /* Prefix length (bits) */
  ******************************************************************************
  * Function:    mip6_add_ifaddr
  * Description: Similar to "ifconfig <ifp> <addr> prefixlen <plen>".
+ * Ret value:   Standard error codes.
+ ******************************************************************************
+ */
+int
+mip6_add_ifaddr(struct in6_addr *addr,
+		struct ifnet *ifp,
+		int plen,
+		int flags) /* Note: IN6_IFF_NODAD available flag */
+{
+	struct	in6_aliasreq *ifra, dummy;
+	struct	sockaddr_in6 *sa6;
+	struct	sockaddr_in6 oldaddr;
+	struct	in6_ifaddr *ia, *oia;
+	struct in6_addrlifetime *lt;
+	int	error = 0, hostIsNew, prefixIsNew;
+	int	s;
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+	struct ifaddr *ifa;
+#endif
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+	time_t time_second = (time_t)time.tv_sec;
+#endif
+
+	bzero(&dummy, sizeof(dummy));
+	ifra = &dummy;
+
+	ifra->ifra_addr.sin6_len = sizeof(ifra->ifra_addr);
+	ifra->ifra_addr.sin6_family = AF_INET6;
+	ifra->ifra_addr.sin6_addr = *addr;
+	
+	if (plen != 0) {
+		ifra->ifra_prefixmask.sin6_len =
+			sizeof(ifra->ifra_prefixmask);
+		ifra->ifra_prefixmask.sin6_family = AF_INET6;
+		in6_prefixlen2mask(&ifra->ifra_prefixmask.sin6_addr, plen);
+		/* XXXYYY Should the prefix also change its prefixmask? */
+	}
+
+	ifra->ifra_flags = flags;
+	ifra->ifra_lifetime.ia6t_vltime = ND6_INFINITE_LIFETIME;
+	ifra->ifra_lifetime.ia6t_pltime = ND6_INFINITE_LIFETIME;
+
+	sa6 = &ifra->ifra_addr;
+
+
+	/* "ifconfig ifp inet6 Home_Address prefixlen 64/128 (alias?)" */ 
+
+	if (ifp == 0)
+		return(EOPNOTSUPP);
+
+	s = splnet();
+
+	
+	/*
+	 * Code recycled from in6_control().
+	 */
+
+	/*
+	 * Find address for this interface, if it exists.
+	 */
+	if (IN6_IS_ADDR_LINKLOCAL(&sa6->sin6_addr)) {
+		if (sa6->sin6_addr.s6_addr16[1] == 0) {
+			/* interface ID is not embedded by the user */
+			sa6->sin6_addr.s6_addr16[1] =
+				htons(ifp->if_index);
+		}	
+		else if (sa6->sin6_addr.s6_addr16[1] !=
+			 htons(ifp->if_index)) {
+			splx(s);
+			return(EINVAL);	/* ifid is contradict */
+		}
+		if (sa6->sin6_scope_id) {
+			if (sa6->sin6_scope_id !=
+			    (u_int32_t)ifp->if_index) {
+				splx(s);
+				return(EINVAL);
+			}
+			sa6->sin6_scope_id = 0; /* XXX: good way? */
+		}
+	}
+ 	ia = in6ifa_ifpwithaddr(ifp, &sa6->sin6_addr);
+
+	if (ia == 0) {
+		ia = (struct in6_ifaddr *)
+			malloc(sizeof(*ia), M_IFADDR, M_WAITOK);
+		if (ia == NULL) {
+			splx(s);
+			return (ENOBUFS);
+		}
+		bzero((caddr_t)ia, sizeof(*ia));
+		ia->ia_ifa.ifa_addr = (struct sockaddr *)&ia->ia_addr;
+		ia->ia_ifa.ifa_dstaddr
+			= (struct sockaddr *)&ia->ia_dstaddr;
+		ia->ia_ifa.ifa_netmask
+			= (struct sockaddr *)&ia->ia_prefixmask;
+
+		ia->ia_ifp = ifp;
+		if ((oia = in6_ifaddr) != NULL) {
+			for ( ; oia->ia_next; oia = oia->ia_next)
+				continue;
+			oia->ia_next = ia;
+		} else
+			in6_ifaddr = ia;
+		ia->ia_ifa.ifa_refcnt++;
+
+#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
+		if ((ifa = ifp->if_addrlist) != NULL) {
+			for ( ; ifa->ifa_next; ifa = ifa->ifa_next)
+				continue;
+			ifa->ifa_next = &ia->ia_ifa;
+		} else
+			ifp->if_addrlist = &ia->ia_ifa;
+#else
+		TAILQ_INSERT_TAIL(&ifp->if_addrhead, &ia->ia_ifa,
+				  ifa_link);
+#endif
+		ia->ia_ifa.ifa_refcnt++;
+	}
+
+	/* sanity for overflow - beware unsigned */
+	lt = &ifra->ifra_lifetime;
+	if (lt->ia6t_vltime != ND6_INFINITE_LIFETIME
+	    && lt->ia6t_vltime + time_second < time_second) {
+		splx(s);
+		return EINVAL;
+	}
+	if (lt->ia6t_pltime != ND6_INFINITE_LIFETIME
+	    && lt->ia6t_pltime + time_second < time_second) {
+		splx(s);
+		return EINVAL;
+	}
+	prefixIsNew = 0;
+	hostIsNew = 1;
+	
+	if (ifra->ifra_addr.sin6_len == 0) {
+		ifra->ifra_addr = ia->ia_addr;
+		hostIsNew = 0;
+	} else if (IN6_ARE_ADDR_EQUAL(&ifra->ifra_addr.sin6_addr,
+				      &ia->ia_addr.sin6_addr))
+		hostIsNew = 0;
+
+	if (ifra->ifra_prefixmask.sin6_len) {
+		in6_ifscrub(ifp, ia);
+		ia->ia_prefixmask = ifra->ifra_prefixmask;
+		prefixIsNew = 1;
+	}
+	if ((ifp->if_flags & IFF_POINTOPOINT) &&
+	    (ifra->ifra_dstaddr.sin6_family == AF_INET6)) {
+		in6_ifscrub(ifp, ia);
+		oldaddr = ia->ia_dstaddr;
+		ia->ia_dstaddr = ifra->ifra_dstaddr;
+		/* link-local index check: should be a separate function? */
+		if (IN6_IS_ADDR_LINKLOCAL(&ia->ia_dstaddr.sin6_addr)) {
+			if (ia->ia_dstaddr.sin6_addr.s6_addr16[1] == 0) {
+				/*
+				 * interface ID is not embedded by
+				 * the user
+				 */
+				ia->ia_dstaddr.sin6_addr.s6_addr16[1]
+					= htons(ifp->if_index);
+			} else if (ia->ia_dstaddr.sin6_addr.s6_addr16[1] !=
+				   htons(ifp->if_index)) {
+				ia->ia_dstaddr = oldaddr;
+				splx(s);
+				return(EINVAL);	/* ifid is contradict */
+			}
+		}
+		prefixIsNew = 1; /* We lie; but effect's the same */
+	}
+	if (ifra->ifra_addr.sin6_family == AF_INET6 &&
+	    (hostIsNew || prefixIsNew))
+		{
+			error = in6_ifinit(ifp, ia, &ifra->ifra_addr, 0);
+		}        
+	if (ifra->ifra_addr.sin6_family == AF_INET6
+	    && hostIsNew && (ifp->if_flags & IFF_MULTICAST)) {
+		int error_local = 0;
+		
+		/*
+		 * join solicited multicast addr for new host id
+		 */
+		struct in6_addr llsol;
+		bzero(&llsol, sizeof(struct in6_addr));
+		llsol.s6_addr16[0] = htons(0xff02);
+		llsol.s6_addr16[1] = htons(ifp->if_index);
+		llsol.s6_addr32[1] = 0;
+		llsol.s6_addr32[2] = htonl(1);
+		llsol.s6_addr32[3] =
+			ifra->ifra_addr.sin6_addr.s6_addr32[3];
+		llsol.s6_addr8[12] = 0xff;
+		(void)in6_addmulti(&llsol, ifp, &error_local);
+		if (error == 0)
+			error = error_local;
+	}
+	/* Join dstaddr's solicited multicast if necessary. */
+	if (nd6_proxyall && hostIsNew) {
+		int error_local;
+		
+		error_local = in6_ifaddproxy(ia);
+		if (error == 0)
+			error = error_local;
+	}
+
+	ia->ia6_flags = ifra->ifra_flags;
+	ia->ia6_flags &= ~IN6_IFF_DUPLICATED;	/*safety*/
+	ia->ia6_flags &= ~IN6_IFF_NODAD;	/* Mobile IPv6 */
+
+	ia->ia6_lifetime = ifra->ifra_lifetime;
+	/* for sanity */
+	if (ia->ia6_lifetime.ia6t_vltime != ND6_INFINITE_LIFETIME) {
+		ia->ia6_lifetime.ia6t_expire =
+			time_second + ia->ia6_lifetime.ia6t_vltime;
+	} else
+		ia->ia6_lifetime.ia6t_expire = 0;
+	if (ia->ia6_lifetime.ia6t_pltime != ND6_INFINITE_LIFETIME) {
+		ia->ia6_lifetime.ia6t_preferred =
+			time_second + ia->ia6_lifetime.ia6t_pltime;
+	} else
+		ia->ia6_lifetime.ia6t_preferred = 0;
+
+	/*
+	 * Perform DAD, if needed.
+	 * XXX It may be of use, if we can administratively
+	 * disable DAD.
+	 */
+	switch (ifp->if_type) {
+	case IFT_ARCNET:
+	case IFT_ETHER:
+	case IFT_FDDI:
+#if 0
+	case IFT_ATM:
+	case IFT_SLIP:
+	case IFT_PPP:
+#endif
+		/* Mobile IPv6 modification */
+		if ((ifra->ifra_flags & IN6_IFF_NODAD) == 0) {
+			ia->ia6_flags |= IN6_IFF_TENTATIVE;
+			nd6_dad_start((struct ifaddr *)ia, NULL);
+		}
+		break;
+	case IFT_DUMMY:
+	case IFT_FAITH:
+	case IFT_GIF:
+	case IFT_LOOP:
+	default:
+		break;
+	}
+
+	if (hostIsNew) {
+		int iilen;
+		int error_local = 0;
+
+		iilen = (sizeof(ia->ia_prefixmask.sin6_addr) << 3) -
+			in6_mask2len(&ia->ia_prefixmask.sin6_addr);
+		error_local = in6_prefix_add_ifid(iilen, ia);
+		if (error == 0)
+			error = error_local;
+	}
+
+    splx(s);
+    return error;
+
+
+}
+
+
+
+#if 0
+/*
+ ******************************************************************************
+ * Function:    mip6_add_ifaddr
+ * Description: Similar to "ifconfig <ifp> <addr> prefixlen <plen>".
  * Ret value:   -
  ******************************************************************************
  */
@@ -1524,168 +1809,159 @@ mip6_add_ifaddr(struct in6_addr *addr,
     splx(s);
     return;
 }
+#endif
 
 
 
 /*
  ******************************************************************************
- * Function:    mip6_gifconfig
- * Description: Function to set the physical addresses of a tunnel (i.e. the
- *              outer header addresses). To create, move or remove the tunnel. 
- *              The tunnel will be initialized/started by calling this
- *              function. To set the logical addresses of the tunnel, use
- *              mip6_ifconfig(), preferrably (?) after calling this function.
- * Note 1:      Setting the physical addresses will set the gif-i/f flags to
- *              UP & RUNNING.
- * Note 2:      One tunnel should always be created on the MN in order to be
- *              able to receive incoming tunneled packets. It should go from
- *              the MN's COA to the UNSPECIFIED address.
- * Arguments:   psrc    - ptr to the global address of the HA on which the
- *                        BU arrived (or the COA if this is the mobile). Set
- *                        to NULL to remove the tunnel.
- *              pdst    - ptr to global care-of address of the MN (or to Home
- *                        Agent or previous default router if this is the MN).
- *                        Set to NULL to remove the tunnel.
- *              ifp     - ptr to the GIF interface in question. ifp must be
- *                        (al)located before calling this function. ifp can be
- *                        UP and RUNNING; or !UP (i.e. down, not in use yet).
- * Ret value:   Standard error codes.
+ * Function:    mip6_tunnel_output
+ * Description: 
+ * Ret value:   <>0 if failure. It's up to the caller to free the mbuf chain.
  ******************************************************************************
  */
 int
-mip6_gifconfig(struct in6_addr *psrc,
-               struct in6_addr *pdst,
-               struct ifnet    *ifp)
+mip6_tunnel_output(mp, bc)
+	struct mbuf **mp;
+	struct mip6_bc *bc;
 {
-    struct in6_aliasreq  in6_addreq;
-    int                  s, error = 0;
+	struct sockaddr_in6 dst;
+	const struct encaptab *ep = bc->ep;
+	struct mbuf *m = *mp;
+	struct sockaddr_in6 *sin6_src = (struct sockaddr_in6 *)&ep->src;
+	struct sockaddr_in6 *sin6_dst = (struct sockaddr_in6 *)&ep->dst;
+	struct ip6_hdr *ip6;
+	u_int8_t itos;
 
-    if (psrc == NULL || pdst == NULL) {
-        /* Remove tunnel. */
-        s = splnet();
-        /* XXX
-           This code causes the MN to crash when it returns to its home
-           network. We would like to remove the psrc and pdst to make
-           the "gifconfig -a" printout to look good. However, this is
-           not possible at the moment.
-        if (sc->gif_psrc != NULL)
-            free((caddr_t)sc->gif_psrc, M_IFADDR);
-        if (sc->gif_pdst != NULL)
-            free((caddr_t)sc->gif_pdst, M_IFADDR);
-        */
-        ifp->if_flags &= ~IFF_UP;
-        /* XXX if_down(ifp); */
-        splx(s);
-        
-#ifdef MIP6_DEBUG
-        mip6_debug("\nRemove physical tunnel for interface %s\n",
-              if_name(ifp));
-#endif
-        return 0;
-    }
+	bzero(&dst, sizeof(dst));
+	dst.sin6_len = sizeof(struct sockaddr_in6);
+	dst.sin6_family = AF_INET6;
+	dst.sin6_addr = bc->coa;
 
-    /* Create or move the tunnel. */
-    bzero(&in6_addreq, sizeof(in6_addreq));
+	if (ep->af != AF_INET6 || ep->dst.ss_len != dst.sin6_len ||
+	    bcmp(&ep->dst, &dst, dst.sin6_len) != 0 )
+		return EFAULT;
 
-    in6_addreq.ifra_addr.sin6_len = sizeof(in6_addreq.ifra_addr);
-    in6_addreq.ifra_addr.sin6_family = AF_INET6;
-    in6_addreq.ifra_addr.sin6_addr = *psrc;
+	m->m_flags &= ~(M_BCAST|M_MCAST);
 
-    in6_addreq.ifra_dstaddr.sin6_len = sizeof(in6_addreq.ifra_dstaddr);
-    in6_addreq.ifra_dstaddr.sin6_family = AF_INET6;
-    in6_addreq.ifra_dstaddr.sin6_addr = *pdst;
+	/* Recursion problems? */
 
-    /* "gifconfig (gifX, inet6, HA_Global_Addr, MN_Care-of_Addr)" */
-    s = splnet();
-    error = in6_control(NULL, SIOCSIFPHYADDR_IN6,
-                        (caddr_t)&in6_addreq, ifp
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
-			, NULL	/*XXXX security problem*/
-#endif
-			);
-    splx(s);
-    
-#ifdef MIP6_DEBUG
-    if (error)
-        mip6_debug("\nSet physical tunnel for interface %s failed\n",
-              if_name(ifp));
-    else
-        mip6_debug("\nSet physical tunnel for interface %s succeded\n",
-              if_name(ifp));
-    mip6_debug("Physical Src Address : %s\n", ip6_sprintf(psrc));
-    mip6_debug("Physical Dst Address : %s\n", ip6_sprintf(pdst));
-#endif
-    return error;
+	if (IN6_IS_ADDR_UNSPECIFIED(&sin6_src->sin6_addr)) {
+		return EFAULT;
+	}
+
+	if (m->m_len < sizeof(*ip6)) {
+		m = m_pullup(m, sizeof(*ip6));
+		if (!m)
+			return ENOBUFS;
+	}
+	ip6 = mtod(m, struct ip6_hdr *);
+	itos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
+
+	
+	/* prepend new IP header */
+	M_PREPEND(m, sizeof(struct ip6_hdr), M_DONTWAIT);
+	if (m && m->m_len < sizeof(struct ip6_hdr))
+		m = m_pullup(m, sizeof(struct ip6_hdr));
+	if (m == NULL) {
+		printf("ENOBUFS in mip6_tunnel_output %d\n", __LINE__);
+		return ENOBUFS;
+	}
+
+	ip6 = mtod(m, struct ip6_hdr *);
+	ip6->ip6_flow	= 0;
+	ip6->ip6_vfc	&= ~IPV6_VERSION_MASK;
+	ip6->ip6_vfc	|= IPV6_VERSION;
+	ip6->ip6_plen	= htons((u_short)m->m_pkthdr.len);
+	ip6->ip6_nxt	= IPPROTO_IPV6;
+	ip6->ip6_hlim	= ip6_gif_hlim;   /* Same? */
+	ip6->ip6_src	= sin6_src->sin6_addr;
+
+	/* bidirectional configured tunnel mode */
+	if (!IN6_IS_ADDR_UNSPECIFIED(&sin6_dst->sin6_addr))
+		ip6->ip6_dst = sin6_dst->sin6_addr;
+	else
+		return ENETUNREACH;
+	
+	mp = &m;
+	return 0;
 }
 
 
 
 /*
-******************************************************************************
- * Function:    mip6_ifconfig
- * Description: Function to set the logical addresses of a tunnel (i.e. the
- *              inner header addresses) or to remove them. This won't 
- *              initialize/start the tunnel interface (use mip6_gifxonfig()
- *              for that).
- *              Implicitly sets an interface which has an address whose prefix
- *              equals the mn_homeaddr's prefix to be a proxy for the
- *              mn_homeaddr.
- *              Replies to NSs for mn_homeaddr and intercepts packets on behalf
- *              of mn_homeaddr. Does not send gratuitious NA though.
- *              Sets up host route to the mn_homeaddr via the tunnel interface.
- * Arguments:   ha_addr      - ptr to the global address of the HA on which the
- *                             BU arrived.
- *              mn_home_addr - ptr to global care-of address of the MN. Set
- *                             this to NULL to remove the address pair (to
- *                             remove the tunnel).
- *              ifp          - ptr to the GIF interface in question. ifp must 
- *                             be (al)located before calling this function. 
- *                             ifp can be UP and RUNNING; or !UP (i.e. down,
- *                             not in use yet).
- * Ret value:   Standard error codes.
+ ******************************************************************************
+ * Function:    mip6_tunnel_input
+ * Description: similar to gif_input() and in6_gif_input().
+ * Ret value:	standard error codes.
  ******************************************************************************
  */
 int
-mip6_ifconfig(struct in6_addr *ha_addr,
-              struct in6_addr *mn_home_addr,
-              struct ifnet    *ifp)
+mip6_tunnel_input(mp, offp, proto)
+	struct mbuf **mp;
+	int *offp, proto;
 {
-    struct in6_aliasreq  in6_addreq;
-    int s;
+	struct mbuf *m = *mp;
+	struct ip6_hdr *ip6;
+	int s, af = 0;
+	u_int32_t otos;
+	struct mip6_esm *esm;
 
-    bzero(&in6_addreq, sizeof(in6_addreq));
-    in6_addreq.ifra_addr.sin6_len = sizeof(in6_addreq.ifra_addr);
-    in6_addreq.ifra_addr.sin6_family = AF_INET6;
-    in6_addreq.ifra_addr.sin6_addr = *ha_addr;
+	ip6 = mtod(m, struct ip6_hdr *);
 
-    nd6_proxyall = 1;   /* Allow ND proxying */
+/*
+ * XXXYYY
+ * Can this be used for checking on tunnelled packets from HA?
+ */
+	esm = m->m_pkthdr.aux;
+	m->m_pkthdr.aux = NULL;
 
-    if (mn_home_addr != NULL) {
-        /* Set up the tunnel. */
-        in6_addreq.ifra_dstaddr.sin6_len = sizeof(in6_addreq.ifra_dstaddr);
-        in6_addreq.ifra_dstaddr.sin6_family = AF_INET6;
-        in6_addreq.ifra_dstaddr.sin6_addr = *mn_home_addr;
-
-        /* "ifconfig gifX inet6 HA_Global_Addr MN_Home_Addr" */
-        s = splnet();
-        return in6_control(NULL, SIOCAIFADDR_IN6,
-                           (caddr_t)&in6_addreq, ifp
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
-			   , NULL	/*XXXX security problem*/
+	if (esm == NULL) {
+		m_freem(m);
+#ifdef MIP6_DEBUG
+		mip6_debug("%s: no esm found.\n", __FUNCTION__);
 #endif
-			   );
-        splx(s);
-    }
-    else {
-        s = splnet();
-        return in6_control(NULL, SIOCDIFADDR_IN6,
-                           (caddr_t)&in6_addreq, ifp
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
-			   , NULL	/*XXXX security problem*/
+		return IPPROTO_DONE;
+	}
+
+	otos = ip6->ip6_flow;
+	m_adj(m, *offp);
+
+	switch (proto) {
+	case IPPROTO_IPV6:
+	{
+		struct ip6_hdr *ip6;
+		af = AF_INET6;
+		if (m->m_len < sizeof(*ip6)) {
+			m = m_pullup(m, sizeof(*ip6));
+			if (!m)
+				return IPPROTO_DONE;
+		}
+		ip6 = mtod(m, struct ip6_hdr *);
+		
+		s = splimp();
+		if (IF_QFULL(&ip6intrq)) {
+			IF_DROP(&ip6intrq);	/* update statistics */
+			m_freem(m);
+			splx(s);
+			return IPPROTO_DONE;
+		}
+		IF_ENQUEUE(&ip6intrq, m);
+		/* we need schednetisr since the address family may change */
+		schednetisr(NETISR_IPV6);
+		splx(s);
+		break;
+	}
+	default:
+#ifdef MIP6_DEBUG
+		mip6_debug("%s: protocol %d not supported.\n", __FUNCTION__,
+			   proto);
 #endif
-			   );
-        splx(s);
-    }
+		m_freem(m);
+		return IPPROTO_DONE;
+	}
+		
+	return IPPROTO_DONE;
 }
 
 
@@ -1693,75 +1969,84 @@ mip6_ifconfig(struct in6_addr *ha_addr,
 /*
  ******************************************************************************
  * Function:    mip6_tunnel
- * Description: Create, move or delete a tunnel from the Home Agent to the MN.
+ * Description: Create, move or delete a tunnel from the Home Agent to the MN
+ *              or from the Mobile Node to the Home Agent.
  * Ret value:   Standard error codes.
  ******************************************************************************
  */
 int
-mip6_tunnel(ha_addr, bc_entry, action)
-struct in6_addr  *ha_addr;   /* Home Agent address. */
-struct mip6_bc   *bc_entry;  /* Binding Cache entry */
-int              action;     /* Action: MIP6_GIF{ADD,MOVE,DEL} */
+mip6_tunnel(ip6_src, ip6_dst, action, start, entry)
+struct in6_addr  *ip6_src;   /* Tunnel start point */
+struct in6_addr  *ip6_dst;   /* Tunnel end point */
+int               action;    /* Action: MIP6_TUNNEL_{ADD,MOVE,DEL} */
+int               start;     /* Either the Home Agent or the Mobile Node */
+void             *entry;     /* BC or ESM depending on start variable */
 {
-    struct gif_softc *gif_ifp;   /* Tunnel interface */
-    int              res;
+	const struct encaptab *ep;	/* Encapsulation entry */
+	const struct encaptab **ep_store; /* Where to store encap reference */
+	struct ifaddr       *if_addr;	/* Interface address */
+	struct sockaddr_in6  src, *srcm;
+	struct sockaddr_in6  dst, *dstm;
 
-    if (action == MIP6_GIFDEL) {
-        /* Moving to Home network. Remove tunnel. */
-        mip6_gifconfig(NULL, NULL, bc_entry->gif_ifp);
-        mip6_ifconfig(ha_addr, NULL, bc_entry->gif_ifp);
-        return 0;
-    }
+	ep_store = NULL;
+	if ((start == MIP6_NODE_MN) && (entry != NULL))
+		ep_store = &((struct mip6_esm *)entry)->ep;
+	else if ((start == MIP6_NODE_HA) && (entry != NULL))
+		ep_store = &((struct mip6_bc *)entry)->ep;
+	else {
+		printf("%s: Tunnel not modified\n", __FUNCTION__);
+		return 0;
+	}
+	
+	if (action == MIP6_TUNNEL_DEL) {
+		/* Moving to Home network. Remove tunnel. */
+		if (ep_store && *ep_store) {
+			encap_detach(*ep_store);
+			*ep_store = NULL;
+		}
+		return 0;
+	}
 
-    if (action == MIP6_GIFADD || bc_entry->gif_ifp == NULL) {
-        /* This is the first time the Home Agent receives a BU from this MN. */
-        /* Find a gif interface not being used. */
-        gif_ifp = mip6_find_freegif();
-        if (gif_ifp == NULL)
-            return 1;
+	if ((action == MIP6_TUNNEL_ADD) || (action == MIP6_TUNNEL_MOVE)) {
+		if (action == MIP6_TUNNEL_MOVE && ep_store && *ep_store) {
+			/* Remove the old encapsulation entry first. */
+			encap_detach(*ep_store);
+			*ep_store = NULL;
+		}
 
-        /* Create a tunnel to the MN. */
-        res = mip6_gifconfig(ha_addr, &bc_entry->coa, (struct ifnet *)gif_ifp);
-        if (res != 0)
-            return res;
+		bzero(&src, sizeof(src));
+		src.sin6_family = AF_INET6;
+		src.sin6_len = sizeof(struct sockaddr_in6);
+		src.sin6_addr = *ip6_src;
 
-        res = mip6_ifconfig(ha_addr, &bc_entry->home_addr,
-                            (struct ifnet *)gif_ifp);
-        if (res != 0)
-            return res;
+		if_addr = ifa_ifwithaddr((struct sockaddr *)&src);
+		if (if_addr == NULL)
+			return EINVAL;
+		srcm = (struct sockaddr_in6 *)if_addr->ifa_netmask;
 
-        bc_entry->gif_ifp = (struct ifnet *)gif_ifp;
-        return 0;
-    } else {
-        /* Move the tunnel */
-        mip6_gifconfig(ha_addr, &bc_entry->coa, bc_entry->gif_ifp);
-        return 0;
-    }
-}
+		bzero(&dst, sizeof(dst));
+		dst.sin6_family = AF_INET6;
+		dst.sin6_len = sizeof(struct sockaddr_in6);
+		dst.sin6_addr = *ip6_dst;
 
+		if_addr = ifa_ifwithaddr((struct sockaddr *)&dst);
+		if (if_addr == NULL)
+			return EINVAL;
+		dstm = (struct sockaddr_in6 *)if_addr->ifa_netmask;
 
-
-/*
- ******************************************************************************
- * Function:    mip6_find_freegif
- * Description: Search the list of gif interfaces and return the first one not
- *              being used.
- * Ret value:   Gif interface or NULL if no free gif interface found.
- ******************************************************************************
- */
-struct gif_softc *
-mip6_find_freegif()
-{
-    struct gif_softc  *sc;
-    int               ii;
-
-    for (sc = gif, ii = 0; ii < ngif; sc++, ii++) {
-        if (sc->gif_if.if_flags & IFF_UP)
-            continue;
-        else
-            return sc;
-    }
-    return NULL;
+		ep = encap_attach(AF_INET6, -1,
+				  (struct sockaddr *)&src,
+				  (struct sockaddr *)srcm,
+				  (struct sockaddr *)&dst,
+				  (struct sockaddr *)dstm,
+				  (struct protosw *)&mip6_tunnel_protosw,
+				  NULL);
+		if (ep == NULL)
+			return EINVAL;
+		*ep_store = ep;
+		return 0;
+	}
+	return EINVAL;
 }
 
 
@@ -1842,7 +2127,7 @@ u_int16_t        seqno;       /* Sequence number in the received BU */
     bcp->prefix_len = prefix_len;
     bcp->seqno = seqno;
     bcp->lasttime = 0;
-    bcp->gif_ifp = NULL;
+    bcp->ep = NULL;
 
     if (bcp->hr_flag)
         bcp->rtr_flag = rtr;
@@ -1973,8 +2258,6 @@ struct mip6_bc *bcp_del;  /* Pointer to BC entry to delete */
     struct mip6_bc       *bcp;       /* Current entry in the BC list */
     struct mip6_bc       *bcp_prev;  /* Previous entry in the BC list */
     struct mip6_bc       *bcp_next;  /* Next entry in the BC list */
-    struct gif_softc     *gif_ifp;   /* Interface of gif type */
-    struct sockaddr_in6  *gif_psrc;  /* IP source address for GIF i/f */
     int    s;
 
     s = splnet();
@@ -1987,13 +2270,11 @@ struct mip6_bc *bcp_del;  /* Pointer to BC entry to delete */
                 mip6_bcq = bcp->next;
             else
                 bcp_prev->next = bcp->next;
-            if (bcp->gif_ifp) {
-                /* The Home Agent shall stop acting as a proxy for the MN. */
-                /* Delete the existing tunnel to the MN. */
-                gif_ifp = (struct gif_softc *)bcp->gif_ifp;
-                gif_psrc = (struct sockaddr_in6 *)gif_ifp->gif_psrc;
-                mip6_tunnel(&gif_psrc->sin6_addr, bcp, MIP6_GIFDEL);
-            }
+
+            /* The Home Agent shall stop acting as a proxy for the MN. */
+            /* Delete the existing tunnel to the MN. */
+	    mip6_tunnel(NULL, NULL, MIP6_TUNNEL_DEL, MIP6_NODE_HA,
+			(void *)bcp);
             
 #ifdef MIP6_DEBUG
             mip6_debug("\nBinding Cache Entry deleted (0x%x)\n", bcp);
@@ -2606,7 +2887,7 @@ mip6_ioctl(so, cmd, data, ifp)
  * Ret value:   -
  ******************************************************************************
  */
-#if defined(MIP6_DEBUG)
+#ifdef MIP6_DEBUG
 void mip6_debug(char *fmt, ...)
 {
 #ifndef __bsdi__

@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6_io.c,v 1.2 2000/02/10 03:50:57 itojun Exp $
+ * $Id: mip6_io.c,v 1.3 2000/02/19 13:11:41 itojun Exp $
  *
  */
 
@@ -63,10 +63,8 @@
 
 
 void (*mip6_icmp6_output_hook)(struct mbuf *) = 0;
-int  (*mip6_check_packet_hook)(struct mbuf *) = 0;
 struct mip6_esm * (*mip6_esm_find_hook)(struct in6_addr *) = 0;
 
-extern int  (*mip6_rec_tunneled_packet_hook)(struct mbuf *);
 
 /* Declaration of Global variables. */
 struct mip6_indata  *mip6_indatap = NULL;
@@ -90,8 +88,6 @@ struct mip6_output  *mip6_outq = NULL;
  * Description: Called once when a new IPv6 packet is received. Resets the
  *              mip6_indatap variable needed later when options in the dest-
  *              ination header are validated.
- *              Check whether the packet was tunneled to a MN and if a BU
- *              have to be sent to the source of the incoming packet.
  * Ret value:   0 if OK. Otherwise IPPROTO_DONE.
  * Note:        A prerequisite for this function is that the AH or ESP header
  *              is included in the same IPv6 packet as the destination header,
@@ -102,8 +98,6 @@ int
 mip6_new_packet(m)
 struct mbuf  *m;   /* Mbuf containing IPv6 header */
 {
-    int  res;
-
     /* If memory for global variable mip6_indata already allocated,
        discard it. */
     if (mip6_indatap != NULL) {
@@ -134,17 +128,6 @@ struct mbuf  *m;   /* Mbuf containing IPv6 header */
 
     /* If we are acting as a MN we have to check if a BU shall be sent
        to the source of the incoming packet. */
-    res = 0;
-#if (defined(MIP6_MN) || defined(MIP6_MODULES))    
-    if (MIP6_IS_MN_ACTIVE) {
-        if (m->m_pkthdr.rcvif && m->m_pkthdr.rcvif->if_type == IFT_GIF) {
-            if (mip6_check_packet_hook)
-                res = (*mip6_check_packet_hook)(m);
-            if (res)
-                return res;
-        }
-    }
-#endif
     return 0;
 }
 
@@ -165,9 +148,7 @@ u_int8_t     off;     /* Offset from beginning of mbuf to end of dest header */
 u_int8_t     dstlen;  /* Remaining length of Destination header */
 {
     u_int8_t type;    /* Destination option type */
-    int      error;
 
-    error = 0;
     type = *opt;
     if (type == IP6OPT_BINDING_UPDATE) {
         if (dstlen < IP6OPT_BUMINLEN) {
@@ -203,16 +184,7 @@ u_int8_t     dstlen;  /* Remaining length of Destination header */
             return IPPROTO_DONE;
     }
 
-#if (defined(MIP6_MN) || defined(MIP6_MODULES))    
-    if (MIP6_IS_MN_ACTIVE) {
-        if (m->m_pkthdr.rcvif && (m->m_pkthdr.rcvif->if_type == IFT_GIF) &&
-            (mip6_indatap->flag & MIP6_IN_TUN_DH)) {
-            if (mip6_rec_tunneled_packet_hook)
-                error = (*mip6_rec_tunneled_packet_hook)(m);
-        }
-    }
-#endif
-    return error;
+    return 0;
 }
 
 

@@ -97,18 +97,6 @@
 MALLOC_DEFINE(M_NETADDR, "Export Host", "Export host address structure");
 #endif
 
-struct encaptab {
-	LIST_ENTRY(encaptab) chain;
-	int af;
-	int proto;			/* -1: don't care, I'll check myself */
-	struct sockaddr_storage src;	/* my addr */
-	struct sockaddr_storage srcmask;
-	struct sockaddr_storage dst;	/* remote addr */
-	struct sockaddr_storage dstmask;
-	const struct protosw *psw;	/* only pr_input will be used */
-	void *arg;			/* passed via m->m_pkthdr.aux */
-};
-
 static int mask_match __P((const struct encaptab *, const struct sockaddr *,
 		const struct sockaddr *));
 
@@ -245,7 +233,7 @@ encap6_input(mp, offp, proto)
  * length of mask (sm and dm) is assumed to be same as sp/dp.
  * Return value will be necessary as input (cookie) for encap_detach().
  */
-void *
+const struct encaptab *
 encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 	int af;
 	int proto;
@@ -326,7 +314,7 @@ encap_attach(af, proto, sp, sm, dp, dm, psw, arg)
 	LIST_INSERT_HEAD(&encaptab, ep, chain);
 	error = 0;
 	splx(s);
-	return (void *)ep;
+	return ep;
 
 fail:
 	splx(s);
@@ -335,9 +323,9 @@ fail:
 
 int
 encap_detach(cookie)
-	void *cookie;
+	const struct encaptab *cookie;
 {
-	struct encaptab *ep = (struct encaptab *)cookie;
+	const struct encaptab *ep = cookie;
 	struct encaptab *p;
 
 	for (p = LIST_FIRST(&encaptab); p; p = LIST_NEXT(p, chain)) {

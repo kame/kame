@@ -44,6 +44,8 @@
 #include <netinet/in.h>
 /* xxx sigh, why route have struct route instead of pointer? */
 
+struct encaptab;
+
 struct gif_softc {
 	struct ifnet	gif_if;	   /* common area */
 	struct sockaddr	*gif_psrc; /* Physical src addr */
@@ -55,7 +57,7 @@ struct gif_softc {
 #endif
 	} gifsc_gifscr;
 	int		gif_flags;
-	void		*encap_cookie;
+	const struct encaptab *encap_cookie;
 	short		gif_oflags;	/* copy of ifp->if_flags */
 };
 
