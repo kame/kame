@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.146 2002/06/12 01:30:18 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.147 2002/06/12 01:31:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1671,8 +1671,6 @@ ipsec_get_reqlevel(isr, af)
 		panic("key_get_reqlevel: Unknown family. %d\n",
 			((struct sockaddr *)&isr->sp->spidx->src)->sa_family);
 	}
-
-#undef IPSEC_CHECK_DEFAULT
 
 	/* set level */
 	switch (isr->level) {
