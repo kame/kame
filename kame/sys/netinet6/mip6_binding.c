@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.72 2002/01/24 07:32:58 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.73 2002/01/26 03:05:09 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2865,6 +2865,7 @@ mip6_bu_authdata_calc(sav, src, dst, coa, bu_opt, authdata, sumbuf)
 	suboptlen = (caddr_t)authdata - (caddr_t)(bu_opt + 1);
 	(algo->update)(&algos, (caddr_t)(bu_opt + 1), suboptlen);
 	(algo->update)(&algos, (caddr_t)&authdata->type, 1);
+	(algo->update)(&algos, (caddr_t)&authdata->len, 1);
 	(algo->update)(&algos, (caddr_t)&authdata->spi, 4);
 	/* calculate the result. */
 	(algo->result)(&algos, sumbuf);
@@ -2915,6 +2916,7 @@ mip6_ba_authdata_calc(sav, src, dst, ba_opt, authdata, sumbuf)
 	suboptlen = (caddr_t)authdata - (caddr_t)(ba_opt + 1);
 	(algo->update)(&algos, (caddr_t)(ba_opt + 1), suboptlen);
 	(algo->update)(&algos, (caddr_t)&authdata->type, 1);
+	(algo->update)(&algos, (caddr_t)&authdata->len, 1);
 	(algo->update)(&algos, (caddr_t)&authdata->spi, 4);
 	/* calculate the result. */
 	(algo->result)(&algos, sumbuf);
