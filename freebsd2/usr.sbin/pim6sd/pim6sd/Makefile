@@ -29,16 +29,19 @@ SRCDIR=	${.CURDIR}/../../../kame/pim6sd
 PROG=	pim6sd
 SRCS=	mld6.c mld6_proto.c\
 	inet6.c kern.c main.c config.c debug.c routesock.c vers.c callout.c\
-	route.c vif.c timer.c mrt.c pim6.c pim6_proto.c rp.c crc.c trace.c
-
+	route.c vif.c timer.c mrt.c pim6.c pim6_proto.c rp.c crc.c trace.c\
+	cfparse.y cftoken.l
+CLEANFILES+= lex.yy.c y.tab.h y.tab.c
 CFLAGS+= -g
 CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -I${SRCDIR}
+CFLAGS+=-DHAVE_STDARG_H
 LDADD+=	-L${.CURDIR}/../../../lib/libinet6 \
 	-L${.CURDIR}/../../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
 DPADD+=	${.CURDIR}/../../../lib/libinet6/libinet6.a \
 	-L${.CURDIR}/../../../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
+LDADD+=-ly -ll
 
 MAN5=	pim6sd.conf.5
 MAN8=	pim6sd.8
