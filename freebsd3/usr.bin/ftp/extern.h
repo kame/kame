@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/*	$Id: extern.h,v 1.7 1998/07/26 18:49:36 imp Exp $	*/
+/* $FreeBSD: src/usr.bin/ftp/extern.h,v 1.7.2.1 1999/08/29 15:28:11 peter Exp $	*/
 /*	$NetBSD: extern.h,v 1.17.2.1 1997/11/18 00:59:50 mellon Exp $	*/
 
 /*-
@@ -102,7 +102,7 @@ int	getreply __P((int));
 int	globulize __P((char **));
 char   *gunique __P((const char *));
 void	help __P((int, char **));
-char   *hookup __P((const char *, char *));
+char   *hookup __P((char *, char *));
 void	idle __P((int, char **));
 int     initconn __P((void));
 void	intr __P((void));

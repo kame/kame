@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/*	$Id: cmds.c,v 1.14 1998/02/14 15:38:29 steve Exp $	*/
+/* $FreeBSD: src/usr.bin/ftp/cmds.c,v 1.14.2.2 1999/08/29 15:28:08 peter Exp $	*/
 /*	$NetBSD: cmds.c,v 1.30.2.1 1997/11/18 00:58:26 mellon Exp $	*/
 
 /*
@@ -68,7 +68,7 @@
 #if 0
 static char sccsid[] = "@(#)cmds.c	8.6 (Berkeley) 10/9/94";
 #else
-__RCSID("$Id: cmds.c,v 1.14 1998/02/14 15:38:29 steve Exp $");
+__RCSID("$FreeBSD: src/usr.bin/ftp/cmds.c,v 1.14.2.2 1999/08/29 15:28:08 peter Exp $");
 __RCSID_SOURCE("$NetBSD: cmds.c,v 1.30.2.1 1997/11/18 00:58:26 mellon Exp $");
 #endif
 #endif /* not lint */
@@ -955,7 +955,7 @@ setglob(argc, argv)
 }
 
 /*
- * Toggle preserving modification times on retreived files.
+ * Toggle preserving modification times on retrieved files.
  */
 /*VARARGS*/
 void

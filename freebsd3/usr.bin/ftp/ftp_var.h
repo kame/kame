@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/*	$Id: ftp_var.h,v 1.6 1997/12/13 20:38:18 pst Exp $	*/
+/* $FreeBSD: src/usr.bin/ftp/ftp_var.h,v 1.6.2.2 1999/08/29 15:28:13 peter Exp $	*/
 /*	$NetBSD: ftp_var.h,v 1.20.2.1 1997/11/18 01:01:37 mellon Exp $	*/
 
 /*
@@ -70,8 +70,10 @@
  */
 
 #include <sys/param.h>
+#include <sys/socket.h>
 #include <setjmp.h>
 #include <stringlist.h>
+#include <netinet/in.h>
 
 #ifndef SMALL
 #include <histedit.h>
@@ -166,15 +168,12 @@ char   *hostname;		/* name of host connected to */
 int	unix_server;		/* server is unix, can use binary for ascii */
 int	unix_proxy;		/* proxy is unix, can use binary for ascii */
 
-#if 0
-u_int16_t	ftpport;	/* port number to use for ftp connections */
-u_int16_t	httpport;	/* port number to use for http connections */
-u_int16_t	gateport;	/* port number to use for gateftp connections */
-#else
 char *ftpport;			/* port number to use for ftp connections */
 char *httpport;			/* port number to use for http connections */
 char *gateport;			/* port number to use for gateftp connections */
-#endif
+
+int	dobind;			/* bind to specific address */
+struct sockaddr_storage bindto;	/* address to bind to */
 
 jmp_buf	toplevel;		/* non-local goto stuff for cmd scanner */
 

@@ -1,4 +1,4 @@
-/*	$Id: util.c,v 1.6 1998/07/19 00:01:24 jmz Exp $	*/
+/* $FreeBSD: src/usr.bin/ftp/util.c,v 1.6.2.2 1999/08/29 15:28:15 peter Exp $	*/
 /*	$NetBSD: util.c,v 1.16.2.1 1997/11/18 01:02:33 mellon Exp $	*/
 
 /*
@@ -36,7 +36,7 @@
 
 #include <sys/cdefs.h>
 #ifndef lint
-__RCSID("$Id: util.c,v 1.6 1998/07/19 00:01:24 jmz Exp $");
+__RCSID("$FreeBSD: src/usr.bin/ftp/util.c,v 1.6.2.2 1999/08/29 15:28:15 peter Exp $");
 __RCSID_SOURCE("$NetBSD: util.c,v 1.16.2.1 1997/11/18 01:02:33 mellon Exp $");
 #endif /* not lint */
 
@@ -102,7 +102,7 @@ setpeer(argc, argv)
 
 		nport = strtol(argv[2], &ep, 10);
 		if (nport < 1 || nport > 0xffff || *ep != '\0') {
-			printf("%s: bad port number '%s'.\n", argv[1], argv[2]);
+			printf("%s: bad port number '%s'.\n", argv[0], argv[2]);
 			printf("usage: %s host-name [port]\n", argv[0]);
 			code = -1;
 			return;

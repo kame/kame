@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/*	$Id: ftp.c,v 1.15 1998/12/09 20:49:20 eivind Exp $	*/
+/* $FreeBSD: src/usr.bin/ftp/ftp.c,v 1.15.2.2 1999/08/29 15:28:13 peter Exp $	*/
 /*	$NetBSD: ftp.c,v 1.29.2.1 1997/11/18 01:01:04 mellon Exp $	*/
 
 /*
@@ -68,7 +68,7 @@
 #if 0
 static char sccsid[] = "@(#)ftp.c	8.6 (Berkeley) 10/27/94";
 #else
-__RCSID("$Id: ftp.c,v 1.15 1998/12/09 20:49:20 eivind Exp $");
+__RCSID("$FreeBSD: src/usr.bin/ftp/ftp.c,v 1.15.2.2 1999/08/29 15:28:13 peter Exp $");
 __RCSID_SOURCE("$NetBSD: ftp.c,v 1.29.2.1 1997/11/18 01:01:04 mellon Exp $");
 #endif
 #endif /* not lint */
@@ -128,44 +128,56 @@ union sockunion myctladdr, hisctladdr, data_addr;
  
 char *
 hookup(host, port)
-	const char *host;
+	char *host;
 	char *port;
 {
 	int s, len, error;
-	struct addrinfo hints, *res;
+	struct addrinfo hints, *res, *res0;
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_flags = AI_CANONNAME;
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = 0;
-	error = getaddrinfo(host, port, &hints, &res);
+	error = getaddrinfo(host, port, &hints, &res0);
 	if (error) {
 		warnx("%s: %s", host, gai_strerror(error));
 		code = -1;
 		return (0);
 	}
 
+	res = res0;
 	if (res->ai_canonname)
 		hostname = res->ai_canonname;
 	else
 		hostname = host;
-	
-	s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-	if (s < 0) {
-		warn("socket");
-		code = -1;
-		return (0);
-	}
-	while (connect(s, res->ai_addr, res->ai_addrlen) < 0) {
-		res = res->ai_next;
-		if (res) {
-			s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-			if (s < 0) {
-				warn("socket");
-				code = -1;
-				return (0);
-			}
+	while (1) {
+		s = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+		if (s < 0) {
+			warn("socket");
+			code = -1;
+			return (0);
+		}
+		if (dobind && bind(s, (struct sockaddr *)&bindto,
+				   bindto.__ss_len) == -1) {
+			warn("bind");
+			goto next;
+		}
+		if (connect(s, res->ai_addr, res->ai_addrlen) == 0)
+			break;
+	next:
+		if (res->ai_next) {
+			char hname[INET6_ADDRSTRLEN];
+			getnameinfo(res->ai_addr, res->ai_addrlen,
+				    hname, sizeof(hname), NULL, 0,
+				    NI_NUMERICHOST);
+			warn("connect to address %s", hname);
+			res = res->ai_next;
+			getnameinfo(res->ai_addr, res->ai_addrlen,
+				    hname, sizeof(hname), NULL, 0,
+				    NI_NUMERICHOST);
+			printf("Trying %s...\n", hname);
+			(void)close(s);
 			continue;
 		}
 		warn("connect");
@@ -1145,6 +1157,11 @@ initconn()
 		if (data < 0) {
 			warn("socket");
 			return (1);
+		}
+		if (dobind && bind(data, (struct sockaddr *)&bindto,
+				bindto.__ss_len) == -1) {
+			warn("bind");
+			goto bad;
 		}
 		if ((options & SO_DEBUG) &&
 		    setsockopt(data, SOL_SOCKET, SO_DEBUG, (char *)&on,
