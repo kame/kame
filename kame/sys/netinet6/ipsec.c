@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.149 2002/06/12 17:55:32 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.150 2002/06/13 05:09:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1345,7 +1345,8 @@ ipsec_deepcopy_policy(src)
 	}
 
 	if (src->spidx)
-		keydb_setsecpolicyindex(dst, src->spidx);
+		if (keydb_setsecpolicyindex(dst, src->spidx) != 0)
+			goto fail;
 
 	dst->req = newchain;
 	dst->state = src->state;
