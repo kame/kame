@@ -5,6 +5,7 @@
 .include "../mk/bsd.prefs.mk"
 
     SUBDIR += heimdal
+    SUBDIR += openssl
     SUBDIR += ssh
     SUBDIR += tcp_wrapper
     SUBDIR += tcpd6

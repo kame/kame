@@ -1,0 +1,27 @@
+$NetBSD$
+
+Date: Thu, 10 Feb 2000 13:11:12 +0900 (JST)
+From: Shoichi Sakane <sakane@ydc.co.jp>
+To: snap-users@kame.net
+Subject: (KAME-snap 1845) openssl0.9.4 ASN.1 routine.
+
+In OpenSSL0.9.4, ASN.1 routine may have a bug or a problem.
+This patch is from a lady of WIDE project, and is sent to openssl-bugs.
+Use this patch until new version of OpenSSL will be released.
+
+Regards,
+
+/Shoichi `NE' Sakane @ KAME project/
+
+*** crypto/asn1/asn1.h.orig	Thu Feb 10 13:02:10 2000
+--- crypto/asn1/asn1.h	Wed Feb  9 17:16:20 2000
+***************
+*** 339,344 ****
+--- 339,345 ----
+  		pp,a->type,V_ASN1_UNIVERSAL)
+  #define M_d2i_ASN1_PRINTABLE(a,pp,l) \
+  		d2i_ASN1_type_bytes((ASN1_STRING **)a,pp,l, \
++ 			B_ASN1_UTF8STRING| \
+  			B_ASN1_PRINTABLESTRING| \
+  			B_ASN1_T61STRING| \
+  			B_ASN1_IA5STRING| \
