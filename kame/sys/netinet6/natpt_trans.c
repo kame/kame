@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.134 2002/07/05 06:27:13 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.135 2002/07/12 05:39:09 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -1355,7 +1355,8 @@ natpt_translateUDPv4To6(struct pcv *cv4, struct pAddr *pad)
 		ph->ip_len = udp4->uh_ulen;
 
 		udp4->uh_sum = 0;
-		udp4->uh_sum = in_cksum(cv4->m, ph->ip_len + sizeof(struct pseudohdr));
+		udp4->uh_sum = in_cksum(cv4->m,
+					ntohs(ph->ip_len) + sizeof(struct pseudohdr));
 		m4->m_data -= dlen;
 		m4->m_len  += dlen;
 		bcopy(&savedip, cv4->ip.ip4, hlen);
