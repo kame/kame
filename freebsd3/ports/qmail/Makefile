@@ -1,13 +1,14 @@
 # New ports collection makefile for:	qmail
-# Version required:	1.03 + IPv6 980618
+# Version required:	1.03
 # Date created:		25 May 1998
 # Whom:			Mario S F Ferreira <lioux@gns.com.br> et al.
 #
 # $FreeBSD: ports/mail/qmail/Makefile,v 1.12 1999/10/07 03:01:45 cpiazza Exp $
-# $Id: Makefile,v 1.2 1999/12/07 08:18:10 sumikawa Exp $
+# $Id: Makefile,v 1.3 2000/05/16 12:34:33 sumikawa Exp $
 #
 
 DISTNAME=	qmail-1.03
+PKGNAME=	qmail-1.03
 CATEGORIES=	mail
 MASTER_SITES=	ftp://ftp.net.ohio-state.edu/pub/networking/mail/qmail/ \
 		ftp://ftp.ntnu.no/pub/unix/mail/qmail/ \
@@ -24,7 +25,7 @@ MASTER_SITES=	ftp://ftp.net.ohio-state.edu/pub/networking/mail/qmail/ \
 # groundzero. qmail being RFC compliant need to be "fixed" to work with those
 PATCH_SITES=	http://www.ckdhr.com/ckd/ \
 		http://www.rcac.tdi.co.jp/fujiwara/
-PATCHFILES=	qmail-103.patch qmail-1.03-v6-980618.diff
+PATCHFILES=	qmail-103.patch qmail-1.03-v6-20000417.diff
 PATCH_DIST_STRIP+=	-p1
 
 MAINTAINER=	sumikawa@kame.net
@@ -96,7 +97,7 @@ NO_MTREE=	yes
 do-configure:
 	@# Create/Check the necessary groups/users
 	@PKG_PREFIX=${PREFIX} ${PERL5} ${PKGDIR}/INSTALL
-	@${ECHO} ${CC} ${CFLAGS} > ${WRKSRC}/conf-cc
+	@${ECHO} ${CC} ${CFLAGS} "-DINET6" > ${WRKSRC}/conf-cc
 	@${ECHO} ${PREFIX} > ${WRKSRC}/conf-qmail
 
 post-patch: thereal-post-patch
