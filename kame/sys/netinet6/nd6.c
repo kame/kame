@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.320 2003/06/19 03:58:01 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.321 2003/06/20 13:23:40 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2320,12 +2320,6 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	/*
 	 * If there has been no NS for the neighbor after entering the
 	 * INCOMPLETE state, send the first solicitation.
-	 * Technically this can be against the rate-limiting rule described in
-	 * Section 7.2.2 of RFC 2461 because the interval to the next scheduled
-	 * solicitation issued in nd6_timer() may be less than the specified
-	 * retransmission time.  This should not be a problem from a practical
-	 * point of view, because we'll typically see an immediate response
-	 * from the neighbor, which suppresses the succeeding solicitations.
 	 */
 	if (ln->ln_expire && ln->ln_asked == 0) {
 		ln->ln_asked++;
