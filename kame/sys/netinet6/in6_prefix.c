@@ -463,10 +463,13 @@ add_each_addr(struct socket *so, struct rr_prefix *rpp, struct rp_addr *rap)
 	struct in6_ifaddr *ia6;
 	struct in6_aliasreq ifra;
 	int error;
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+	extern struct proc *curproc;	/*XXX*/
+#endif
 
 	/* init ifra */
 	bzero(&ifra, sizeof(ifra));
-	bcopy(if_name(rpp->rp_ifp), ifra.ifra_name, sizeof(ifra.ifra_name));
+	strncpy(ifra.ifra_name, if_name(rpp->rp_ifp), sizeof(ifra.ifra_name));
 	ifra.ifra_addr.sin6_family = ifra.ifra_prefixmask.sin6_family =
 		AF_INET6;
 	ifra.ifra_addr.sin6_len = ifra.ifra_prefixmask.sin6_len =
@@ -515,7 +518,7 @@ add_each_addr(struct socket *so, struct rr_prefix *rpp, struct rp_addr *rap)
 	}
 	error = in6_control(so, SIOCAIFADDR_IN6, (caddr_t)&ifra, rpp->rp_ifp
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
-			    , 0
+			    , curproc
 #endif
 			    );
 	if (error != 0)
@@ -844,6 +847,9 @@ delete_each_prefix(struct socket *so, struct rr_prefix *rpp, u_char origin)
 {
 	struct in6_aliasreq ifra;
 	int error = 0;
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
+	extern struct proc *curproc;	/*XXX*/
+#endif
 
 	if (rpp->rp_origin > origin)
 		return(EPERM);
@@ -870,8 +876,8 @@ delete_each_prefix(struct socket *so, struct rr_prefix *rpp, u_char origin)
 		rap->ra_addr->ia6_ifpr = NULL;
 
 		bzero(&ifra, sizeof(ifra));
-		bcopy(if_name(rpp->rp_ifp), ifra.ifra_name,
-		      sizeof(ifra.ifra_name));
+		strncpy(ifra.ifra_name, if_name(rpp->rp_ifp),
+			sizeof(ifra.ifra_name));
 		ifra.ifra_addr = rap->ra_addr->ia_addr;
 		ifra.ifra_dstaddr = rap->ra_addr->ia_dstaddr;
 		ifra.ifra_prefixmask = rap->ra_addr->ia_prefixmask;
@@ -879,7 +885,7 @@ delete_each_prefix(struct socket *so, struct rr_prefix *rpp, u_char origin)
 		error = in6_control(so, SIOCDIFADDR_IN6, (caddr_t)&ifra,
 				    rpp->rp_ifp
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__NetBSD__)
-				    , 0
+				    , curproc
 #endif
 				    );
 		if (error != 0)
