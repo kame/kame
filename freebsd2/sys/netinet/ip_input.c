@@ -1598,7 +1598,7 @@ ip_forward(m, srcrt)
 	 */
 	mcopy = m_copym(m, 0, imin((int)ip->ip_len, 64), M_DONTWAIT);
 	if (mcopy)
-		mcopy = m_pullup(mcopy, ip->ip_hl << 2);
+		mcopy = m_pullup(mcopy, IP_VHL_HL(ip->ip_vhl) << 2);
 
 	/*
 	 * If forwarding packet using same interface that it came in on,
