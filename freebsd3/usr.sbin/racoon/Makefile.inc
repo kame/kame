@@ -36,7 +36,8 @@ CFLAGS+=-I/usr/local/ssl/include
 
 LDADD+=	-ly -ll
 DPADD+=	${LIBY} ${LIBL}
-LDADD+=	-L${.OBJDIR}/../../../lib/libipsec -L${.OBJDIR}/../../../lib/libinet6 \
+LDADD+=	-L${.OBJDIR}/../../../lib/libipsec \
+	-L${.OBJDIR}/../../../lib/libinet6 \
 	-L/usr/local/v6/lib -lipsec -linet6
 DPADD+=	${.OBJDIR}/../../../lib/libipsec/libipsec.a \
 	/usr/local/v6/lib/libipsec.a
