@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.171 2001/02/08 10:57:00 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.172 2001/02/08 11:18:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -373,6 +373,7 @@ ip6_init2(dummy)
 #else
 	timeout(nd6_timer, (caddr_t)0, hz);
 #endif
+
 	/* router renumbering prefix list maintenance */
 #ifdef __NetBSD__
 	callout_init(&in6_rr_timer_ch);
