@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.54 2004/02/13 02:52:08 keiichi Exp $	*/
+/*	$KAME: ip6.h,v 1.55 2004/04/06 12:19:54 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -291,6 +291,7 @@ struct ip6_frag {
 
 #define IPV6_MMTU	1280	/* minimal MTU and reassembly. 1024 + 256 */
 #define IPV6_MAXPACKET	65535	/* ip6 max packet size without Jumbo payload*/
+#define IPV6_MAXOPTHDR	2048	/* max option header size, 256 64-bit words */
 
 #ifdef _KERNEL
 /*
