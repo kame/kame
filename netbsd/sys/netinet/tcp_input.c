@@ -3305,6 +3305,10 @@ syn_cache_respond(sc, m)
 	 */
 	if (m)
 		m_freem(m);
+#ifdef DIAGNOSTIC
+	if (max_linkhdr + tlen > MCLBYTES)
+		return (ENOBUFS);
+#endif
 	MGETHDR(m, M_DONTWAIT, MT_DATA);
 	if (m && tlen > MHLEN) {
 		MCLGET(m, M_DONTWAIT);
