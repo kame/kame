@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2126 2002/04/19 07:11:24 suz Exp $
+$KAME: CHANGELOG,v 1.2127 2002/04/19 07:35:00 jinmei Exp $
 
 <200204>
+2002-04-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c: changed the policy about
+	performing path MTU discovery; from now on multicast packets will
+	be sent at the IPv6 minimum link MTU by default.  The semantics of
+	IPV6_USE_MIN_MTU was changed accordingly, as will be described in
+	the forthcoming rfc2292bis-07.
+
 2002-04-19  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/kame/pim6sd/mld6.c
 	does not log warning againt MLD message from ::.
