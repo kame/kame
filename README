@@ -1,6 +1,6 @@
 	README of KAME kit
 	KAME Project
-	$KAME: README,v 1.58 2001/07/23 15:04:33 itojun Exp $
+	$KAME: README,v 1.59 2001/08/07 06:31:01 itojun Exp $
 
 <<<Project Overview>>>
 
@@ -60,6 +60,7 @@ kame/bsdi[34]: some of the modules are BSDi copyrighted.  for those modules
 	we ship diffs instead of full source.
 kame/kame/kame/pim6[sd]d: see LICENCE.{pimd,mrouted}.
 kame/sys/netinet6/in6_rmx.c: specifies "without fee" (affects kame/freebsd[234])
+kame/kame/kame/libaltq/parser.c
 
 
 <<<What's Next?>>>
