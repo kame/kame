@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.51 2002/06/09 14:44:02 itojun Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.52 2002/06/13 07:22:39 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -376,7 +376,7 @@ natpt_checkICMP6return(struct pcv *cv6)
 	struct ip6_hdr		*icmp6ip;
 	struct tcp6hdr		*icmp6tcp = NULL;
 	struct sockaddr_in6	 src, dst;
-	struct tslhash		*thr;
+	struct tslhash		*thr, *thl;
 	struct tSlot		*ats;
 
 	if (cv6->ip_p != IPPROTO_ICMPV6)
@@ -396,8 +396,8 @@ natpt_checkICMP6return(struct pcv *cv6)
 	}
 
 	hvr = ((natpt_hashSin6(&src) + natpt_hashSin6(&dst)) % NATPTHASHSZ);
-	thr = &tslhashr[hvr];
 
+	thr = &tslhashr[hvr];
 	for (ats = TAILQ_FIRST(&thr->tslhead); ats; ats = TAILQ_NEXT(ats, tsl_hashr)) {
 		struct pAddr	*pad = &ats->remote;
 
@@ -414,6 +414,30 @@ natpt_checkICMP6return(struct pcv *cv6)
 			if (icmp6tcp->th_dport != pad->port[0])
 				continue;
 		}
+
+		cv6->fromto = NATPT_TO;
+		return (ats);
+	}
+
+	thl = &tslhashl[hvr];
+	for (ats = TAILQ_FIRST(&thl->tslhead); ats; ats = TAILQ_NEXT(ats, tsl_hashr)) {
+		struct pAddr	*pad = &ats->local;
+
+		if (pad->sa_family != AF_INET6)
+			continue;
+		if (!IN6_ARE_ADDR_EQUAL(&icmp6ip->ip6_src, &pad->in6dst))
+			continue;
+		if (!IN6_ARE_ADDR_EQUAL(&icmp6ip->ip6_dst, &pad->in6src))
+			continue;
+
+		if (icmp6tcp) {
+			if (icmp6tcp->th_sport != pad->port[1])
+				continue;
+			if (icmp6tcp->th_dport != pad->port[0])
+				continue;
+		}
+
+		cv6->fromto = NATPT_FROM;
 		return (ats);
 	}
 
