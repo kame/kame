@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.97 2000/07/04 10:49:57 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.98 2000/07/07 03:00:42 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1111,7 +1111,7 @@ in6_unlink_ifa(ia, ifp)
 
 /*
  * SIOC[GAD]LIFADDR.
- *	SIOCGLIFADDR: get first address. (???)
+ *	SIOCGLIFADDR: get first address. (?)
  *	SIOCGLIFADDR with IFLR_PREFIX:
  *		get first address that matches the specified prefix.
  *	SIOCALIFADDR: add the specified address.
