@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.305 2003/02/07 10:17:09 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.306 2003/02/07 12:42:47 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -432,7 +432,7 @@ ip6_input(m)
 #if defined(__bsdi__) && _BSDI_VERSION < 199802
 	struct ifnet *loifp = &loif;
 #endif
-#ifdef  PFIL_HOOKS
+#if defined(PFIL_HOOKS) && (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	struct packet_filter_hook *pfh;
 	struct mbuf *m0;
 	int rv;

@@ -1,4 +1,4 @@
-/*	$KAME: if_hif.c,v 1.40 2003/01/23 06:23:10 keiichi Exp $	*/
+/*	$KAME: if_hif.c,v 1.41 2003/02/07 12:42:47 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1102,7 +1102,7 @@ hif_output(ifp, m, dst, rt)
 		struct hif_softc *hif = (struct hif_softc *)ifp;
 		struct ip6_hdr *ip6;
 
-		if (ip6_getpktaddrs(m, &src_sa, &dst_sa))
+		if (ip6_getpktaddrs(m, src_sa, dst_sa))
 			goto done;
 
 		if (IN6_IS_ADDR_LINKLOCAL(&src_sa->sin6_addr)

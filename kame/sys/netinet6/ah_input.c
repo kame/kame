@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.80 2003/02/07 10:17:08 suz Exp $	*/
+/*	$KAME: ah_input.c,v 1.81 2003/02/07 12:42:47 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -697,7 +697,7 @@ ah6_input(mp, offp, proto)
 	u_int8_t cksum[AH_MAXSUMSIZE];
 	struct secasvar *sav = NULL;
 	u_int16_t nxt;
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	int s;
 #endif
 	size_t stripsiz = 0;
@@ -979,7 +979,7 @@ ah6_input(mp, offp, proto)
 
 #ifdef __NetBSD__
 		s = splnet();
-#elif defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#elif !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 		s = splimp();
 #endif
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
@@ -998,7 +998,7 @@ ah6_input(mp, offp, proto)
 #endif
 		m = NULL;
 		schednetisr(NETISR_IPV6); /* can be skipped but to make sure */
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 		splx(s);
 #endif
 		nxt = IPPROTO_DONE;
