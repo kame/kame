@@ -1,4 +1,4 @@
-/*	$OpenBSD: sysctl.c,v 1.39 1999/04/11 19:41:41 niklas Exp $	*/
+/*	$OpenBSD: sysctl.c,v 1.41 1999/09/02 22:04:38 pjanzen Exp $	*/
 /*	$NetBSD: sysctl.c,v 1.9 1995/09/30 07:12:50 thorpej Exp $	*/
 
 /*
@@ -44,7 +44,7 @@ static char copyright[] =
 #if 0
 static char sccsid[] = "@(#)sysctl.c	8.5 (Berkeley) 5/9/95";
 #else
-static char *rcsid = "$OpenBSD: sysctl.c,v 1.39 1999/04/11 19:41:41 niklas Exp $";
+static char *rcsid = "$OpenBSD: sysctl.c,v 1.41 1999/09/02 22:04:38 pjanzen Exp $";
 #endif
 #endif /* not lint */
 
@@ -146,11 +146,12 @@ int	Aflag, aflag, nflag, wflag;
 #define	BOOTTIME	0x00000002
 #define	CHRDEV		0x00000004
 #define	BLKDEV		0x00000008
-#define RNDSTATS	0x00000010
-#define BADDYNAMIC	0x00000020
-#define BIOSGEO		0x00000040
-#define BIOSDEV		0x00000080
+#define	RNDSTATS	0x00000010
+#define	BADDYNAMIC	0x00000020
+#define	BIOSGEO		0x00000040
+#define	BIOSDEV		0x00000080
 #define	MAJ2DEV		0x00000100
+#define	UNSIGNED	0x00000200
 
 /* prototypes */
 void debuginit __P((void));
@@ -338,6 +339,10 @@ parse(string, flags)
 		case KERN_RND:
 			special |= RNDSTATS;
 			break;
+		case KERN_HOSTID:
+		case KERN_ARND:
+			special |= UNSIGNED;
+			break;
 		}
 		break;
 
@@ -504,7 +509,21 @@ parse(string, flags)
 	if (newsize > 0) {
 		switch (type) {
 		case CTLTYPE_INT:
-			intval = atoi(newval);
+			errno = 0;
+			if (special & UNSIGNED)
+				intval = strtoul(newval, &cp, 10);
+			else
+				intval = strtol(newval, &cp, 10);
+			if (*cp != '\0') {
+				warnx("%s: illegal value: %s", string,
+				    (char *)newval);
+				return;
+			}
+			if (errno == ERANGE) {
+				warnx("%s: value %s out of range", string,
+				    (char *)newval);
+				return;
+			}
 			newval = &intval;
 			newsize = sizeof(intval);
 			break;
@@ -600,6 +619,19 @@ parse(string, flags)
 		return;
 	}
 #endif
+	if (special & UNSIGNED) {
+		if (newsize == 0) {
+			if (!nflag)
+				(void)printf("%s = ", string);
+			(void)printf("%u\n", *(u_int *)buf);
+		} else {
+			if (!nflag)
+				(void)printf("%s: %u -> ", string,
+				    *(u_int *)buf);
+			(void)printf("%u\n", *(u_int *)newval);
+		}
+		return;
+	}
 	if (special & RNDSTATS) {
 		struct rndstats *rndstats = (struct rndstats *)buf;
 
