@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.22 1999/08/17 08:46:33 itojun Exp $
+$Id: CHANGELOG,v 1.23 1999/08/17 10:50:40 itojun Exp $
 
 <199908>
+Tue Aug 17 19:46:52 JST 1999  itojun@iijlab.net
+	* sys/netinet6/in6.h: make IN6_IS_SCOPE_LINKLOCAL() invisible from
+	  userland.
+	  We will gradually remove nonstandard (and uncommon) defs as much as
+	  possible from netinet/in.h.  Some of your userland apps may
+	  fail to compile during the process.  Please stick to standard
+	  defines (see RFC2553 and RFC2292).
+
 Tue Aug 17 13:01:50 JST 1999  itojun@iijlab.net
 	* kame/ndp: fix cases when no link-layer address information is
 	  cached in the kernel.
