@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.158 2004/07/22 05:20:24 itojun Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.159 2004/07/22 08:09:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -544,6 +544,7 @@ rip6_output(m, va_alist)
 		struct mbuf *n;
 		int off;
 		u_int16_t *sump;
+		int sumoff;
 
 #ifndef offsetof
 #define	offsetof(type, member)	((size_t)(&((type *)0)->member)) /* XXX */
