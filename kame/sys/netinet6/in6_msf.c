@@ -1,4 +1,4 @@
-/*	$KAME: in6_msf.c,v 1.12 2002/11/06 07:43:55 suz Exp $	*/
+/*	$KAME: in6_msf.c,v 1.13 2002/11/06 08:28:40 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -89,6 +89,7 @@
 #include <sys/syslog.h>
 
 #include <net/if.h>
+#include <net/route.h>
 
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
@@ -102,7 +103,15 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/mld6_var.h>
 #include <netinet6/in6_msf.h>
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #include <netinet6/in6_pcb.h>
+#endif
+#include <net/net_osdep.h>
+
+#ifdef HAVE_NRL_INPCB
+#define in6pcb		inpcb
+#define in6p_moptions	inp_moptions6
+#endif
 
 #ifdef MLDV2
 
