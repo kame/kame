@@ -496,6 +496,13 @@ slash		\/
 <S_LOG>{semi} { DP("end logging"); BEGIN S_CNF; return(EOS); }
 <S_LOG>{string} { yywarn("unknown log type: %s (ignored)", yytext); }
 
+	/* yes-or-no */
+[yY][eE][sS] { YYD_ECHO; return(YES); }
+[nN][oO] { YYD_ECHO; return(NO); }
+
+	/* reverselookup */
+<S_CNF>reverselookup { YYD_ECHO; return(REVERSELOOKUP); }
+
 	/* phyint */
 <S_CNF>phyint { DP("begin phyint"); BEGIN S_PHYINT; return(PHYINT); }
 <S_PHYINT>{string} {

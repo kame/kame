@@ -48,6 +48,8 @@
 #define INET6_H
 #include "vif.h"
 
+extern int numerichost;
+
 extern int  inet6_equal __P((struct sockaddr_in6 *sa1,
                      struct sockaddr_in6 *sa2)); 
 extern int  inet6_lessthan  __P((struct sockaddr_in6 *sa1,

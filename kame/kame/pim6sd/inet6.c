@@ -46,9 +46,13 @@
 #include <stdio.h>
 #include <netdb.h>
 #include <string.h>
+#include "defs.h"
 #include "vif.h"
 #include "inet6.h"
 #include <arpa/inet.h>
+
+/* flag if address to hostname resolution should be perfomed */
+int numerichost = TRUE;
 
 int
 inet6_uvif2scopeid(struct sockaddr_in6 * sa, struct uvif * v)
@@ -183,29 +187,27 @@ inet6_match_prefix(sa1, sa2, mask)
 char           *
 inet6_fmt(struct in6_addr * addr)
 {
-    static char     ip6buf[8][INET6_ADDRSTRLEN];
+    static char     ip6buf[8][MAXHOSTNAMELEN];
     static int      ip6round = 0;
-    struct hostent *hp;
     char           *cp;
+    struct sockaddr_in6 sa6;
+    int flags = NI_WITHSCOPEID;
 
     ip6round = (ip6round + 1) & 7;
     cp = ip6buf[ip6round];
-    hp = NULL;
 
-#if 0
-    hp = gethostbyaddr((char *)addr, sizeof(struct in6_addr), AF_INET6);
-    if (!hp)
-    {
-#endif
-	    inet_ntop(AF_INET6, addr, cp, INET6_ADDRSTRLEN);
-	    return (cp);
-#if 0
-    }
-    else {
-	    strncpy(cp, hp->h_name, INET6_ADDRSTRLEN);
-	    return(cp);
-    }
-#endif
+    memset(&sa6, 0, sizeof(sa6));
+    sa6.sin6_len = sizeof(sa6);
+    sa6.sin6_family = AF_INET6;
+    sa6.sin6_addr = *addr;
+    sa6.sin6_scope_id = 0;	/* XXX */
+
+    if (numerichost)
+	    flags |= NI_NUMERICHOST;
+    getnameinfo((struct sockaddr *)&sa6, sa6.sin6_len, cp, MAXHOSTNAMELEN,
+		NULL, 0, flags);
+
+    return(cp);
 }
 
 char           *

@@ -96,6 +96,8 @@ static int debugonly;
 
 %token EOS
 %token LOGGING LOGLEV NOLOGLEV
+%token YES NO
+%token REVERSELOOKUP
 %token PHYINT IFNAME DISABLE PREFERENCE METRIC NOLISTENER
 %token GRPPFX
 %token CANDRP CANDBSR TIME PRIORITY
@@ -118,6 +120,7 @@ statements:
 
 statement:
 		logging_statement
+	|	reverselookup_statement
 	|	phyint_statement
 	|	candrp_statement
 	|	candbsr_statement
@@ -136,6 +139,12 @@ log_specs:
 		/* empty */
 	|	log_specs LOGLEV {debug |= $2;}
 	|	log_specs NOLOGLEV {debug &= ~($2);}
+	;
+
+/* reverselookup */
+reverselookup_statement:
+		REVERSELOOKUP YES EOS { numerichost = FALSE; }
+	|	REVERSELOOKUP NO EOS { numerichost = TRUE; }
 	;
 
 /* phyint */
@@ -892,7 +901,8 @@ cf_post_config()
 	if (grp_prefix)		/* this must be called after rp_config() */
 		grp_prefix_config();
 
-	regthres_config();
+	if (cand_rp_flag == TRUE)
+		regthres_config();
 
 	datathres_config();
 
