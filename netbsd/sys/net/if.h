@@ -402,10 +402,12 @@ struct if_laddrreq {
 
 #ifdef _KERNEL
 #define	IFAFREE(ifa) \
+do { \
 	if ((ifa)->ifa_refcnt <= 0) \
 		ifafree(ifa); \
 	else \
-		(ifa)->ifa_refcnt--;
+		(ifa)->ifa_refcnt--; \
+} while (0)
 
 struct ifnet_head ifnet;
 struct ifnet **ifindex2ifnet;
