@@ -1,9 +1,14 @@
-$Id: CHANGELOG,v 1.511 2000/02/02 13:53:54 itojun Exp $
+$Id: CHANGELOG,v 1.512 2000/02/02 17:23:28 itojun Exp $
 
 <200002>
+Thu Feb  3 02:22:03 JST 2000  itojun@iijlab.net
+	* improve multicast kludge list management.  clear dangling pointer,
+	  update ifnet refcnt correctly.
+
 Wed Feb  2 22:53:03 JST 2000  itojun@iijlab.net
 	* sys/netinet6/in6_ifattach.c: improve in6_ifdetach().  remove
 	  static route to linklocal allnode multicast (ff02:x::/32).
+	  remove multicast kludge entries as well, if exists.
 
 Wed Feb  2 16:16:01 JST 2000  itojun@iijlab.net
 	* bsdi4/sys: fix ifindex manipulation to be compatible with KAME.
