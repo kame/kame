@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.106 2002/04/25 10:18:18 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.107 2002/05/09 08:08:06 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -552,13 +552,30 @@ natpt_icmp6MimicPayload(struct pcv *cv6, struct pcv *cv4, struct pAddr *pad)
 	icmpip4->ip_hl  = sizeof(struct ip) >> 2;
 #endif
 	icmpip4->ip_tos = 0;
-	icmpip4->ip_len = ntohs(icmpip6->ip6_plen) + sizeof(struct ip);
+	icmpip4->ip_len = htons(ntohs(icmpip6->ip6_plen) + sizeof(struct ip));
 	icmpip4->ip_id  = 0;
 	icmpip4->ip_off = 0;
+	icmpip4->ip_off |= IP_DF;
+	HTONS(icmpip4->ip_off);
 	icmpip4->ip_ttl = icmpip6->ip6_hlim;
 	icmpip4->ip_p   = icmpip6->ip6_nxt;
+#if	0
 	icmpip4->ip_src = pad->in4dst;
 	icmpip4->ip_dst = pad->in4src;
+#else
+	icmpip4->ip_src = pad->in4src;
+	icmpip4->ip_dst = pad->in4dst;
+#endif
+
+	{
+		int		off = (caddr_t)icmpip4 - (caddr_t)cv4->m->m_data;
+		struct mbuf	*m = cv4->m;
+
+		m->m_data += off;
+		m->m_pkthdr.len = m->m_len = sizeof(struct ip);
+		icmpip4->ip_sum = in_cksum(m, sizeof(struct ip));
+		m->m_data -= off;
+	}
 
 	ip4->ip_len = sizeof(struct ip) + ICMP_MINLEN + sizeof(struct ip) + dgramlen;
 	cv4->m->m_pkthdr.len = cv4->m->m_len = ip4->ip_len;
