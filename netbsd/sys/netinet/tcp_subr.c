@@ -1091,11 +1091,6 @@ tcp6_ctlinput(cmd, sa, d)
 	else if (inet6ctlerrmap[cmd] == 0)
 		return;
 
-	/* translate addresses into internal form */
-	sa6 = *(struct sockaddr_in6 *)sa;
-	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr))
-		sa6.sin6_addr.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
-
 	/* if the parameter is from icmp6, decode it. */
 	if (d != NULL) {
 		struct ip6ctlparam *ip6cp = (struct ip6ctlparam *)d;
@@ -1106,6 +1101,11 @@ tcp6_ctlinput(cmd, sa, d)
 		m = NULL;
 		ip6 = NULL;
 	}
+
+	/* translate addresses into internal form */
+	sa6 = *(struct sockaddr_in6 *)sa;
+	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr) && m && m->m_pkthdr.rcvif)
+		sa6.sin6_addr.s6_addr16[1] = htons(m->m_pkthdr.rcvif->if_index);
 
 	if (ip6) {
 		/*
