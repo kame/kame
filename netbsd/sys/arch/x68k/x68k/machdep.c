@@ -1,4 +1,4 @@
-/*	$NetBSD: machdep.c,v 1.60.2.7 2000/01/17 18:24:30 he Exp $	*/
+/*	$NetBSD: machdep.c,v 1.82.2.1 2000/08/31 14:57:24 minoura Exp $	*/
 
 /*
  * Copyright (c) 1988 University of Utah.
@@ -42,7 +42,6 @@
  *	@(#)machdep.c	8.10 (Berkeley) 4/20/94
  */
 
-#include "opt_bufcache.h"
 #include "opt_ddb.h"
 #include "opt_inet.h"
 #include "opt_atalk.h"
@@ -51,14 +50,15 @@
 #include "opt_ns.h"
 #include "opt_compat_hpux.h"
 #include "opt_compat_netbsd.h"
+#include "opt_m680x0.h"
 #include "opt_fpuemulate.h"
 #include "opt_m060sp.h"
 #include "opt_panicbutton.h"
-#include "opt_sysv.h"
 #include "opt_extmem.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/callout.h>
 #include <sys/signalvar.h>
 #include <sys/kernel.h>
 #include <sys/map.h>
@@ -68,7 +68,6 @@
 #include <sys/conf.h>
 #include <sys/file.h>
 #include <sys/clist.h>
-#include <sys/callout.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/msgbuf.h>
@@ -81,15 +80,6 @@
 #include <sys/syscallargs.h>
 #include <sys/core.h>
 #include <sys/kcore.h>
-#ifdef SYSVMSG
-#include <sys/msg.h>
-#endif
-#ifdef SYSVSEM
-#include <sys/sem.h>
-#endif
-#ifdef SYSVSHM
-#include <sys/shm.h>
-#endif
 
 #include <machine/db_machdep.h>
 #include <ddb/db_sym.h>
@@ -104,7 +94,7 @@
 #include <net/netisr.h>
 #include <dev/cons.h>
 
-#define	MAXMEM	64*1024*CLSIZE	/* XXX - from cmap.h */
+#define	MAXMEM	64*1024	/* XXX - from cmap.h */
 #include <vm/vm.h>
 #include <vm/vm_kern.h>
 #include <vm/vm_page.h>
@@ -128,32 +118,15 @@ int badbaddr __P((caddr_t));
 /* the following is used externally (sysctl_hw) */
 char	machine[] = MACHINE;	/* from <machine/param.h> */
 
+/* Our exported CPU info; we can have only one. */  
+struct cpu_info cpu_info_store;
+
 vm_map_t exec_map = NULL;  
 vm_map_t mb_map = NULL;
 vm_map_t phys_map = NULL;
 
 extern paddr_t avail_start, avail_end;
 extern vaddr_t virtual_avail;
-
-/*
- * Declare these as initialized data so we can patch them.
- */
-int	nswbuf = 0;
-#ifdef	NBUF
-int	nbuf = NBUF;
-#else
-int	nbuf = 0;
-#endif
-#ifdef	BUFPAGES
-int	bufpages = BUFPAGES;
-#else
-int	bufpages = 0;
-#endif
-#ifdef BUFCACHE
-int	bufcache = BUFCACHE;	/* % of RAM to use for buffer cache */
-#else
-int	bufcache = 0;		/* fallback to old algorithm */
-#endif
 
 caddr_t	msgbufaddr;
 int	maxmem;			/* max memory per process */
@@ -257,10 +230,11 @@ void
 cpu_startup()
 {
 	unsigned i;
-	caddr_t v, firstaddr;
+	caddr_t v;
 	int base, residual;
 	vaddr_t minaddr, maxaddr;
 	vsize_t size;
+	char pbuf[9];
 #ifdef DEBUG
 	extern int pmapdebug;
 	int opmapdebug = pmapdebug;
@@ -277,8 +251,8 @@ cpu_startup()
 	 */
 	for (i = 0; i < btoc(MSGBUFSIZE); i++)
 		pmap_enter(pmap_kernel(), (vaddr_t)msgbufaddr + i * NBPG,
-		    avail_end + i * NBPG, VM_PROT_READ|VM_PROT_WRITE, TRUE,
-		    VM_PROT_READ|VM_PROT_WRITE);
+		    avail_end + i * NBPG, VM_PROT_READ|VM_PROT_WRITE,
+		    VM_PROT_READ|VM_PROT_WRITE|PMAP_WIRED);
 	initmsgbuf(msgbufaddr, m68k_round_page(MSGBUFSIZE));
 
 	/*
@@ -291,111 +265,19 @@ cpu_startup()
 	 */
 	printf(version);
 	identifycpu();
-	printf("real mem  = %d\n", ctob(physmem));
+	format_bytes(pbuf, sizeof(pbuf), ctob(physmem));
+	printf("total memory = %s\n", pbuf);
 
 	/*
-	 * Allocate space for system data structures.
-	 * The first available real memory address is in "firstaddr".
-	 * The first available kernel virtual address is in "v".
-	 * As pages of kernel virtual memory are allocated, "v" is incremented.
-	 * As pages of memory are allocated and cleared,
-	 * "firstaddr" is incremented.
-	 * An index into the kernel page table corresponding to the
-	 * virtual memory address maintained in "v" is kept in "mapaddr".
+	 * Find out how much space we need, allocate it,
+	 * and then give everything true virtual addresses.
 	 */
-	/*
-	 * Make two passes.  The first pass calculates how much memory is
-	 * needed and allocates it.  The second pass assigns virtual
-	 * addresses to the various data structures.
-	 */
-	firstaddr = 0;
-again:
-	v = (caddr_t)firstaddr;
-
-#define	valloc(name, type, num) \
-	    (name) = (type *)v; v = (caddr_t)((name)+(num))
-#define	valloclim(name, type, num, lim) \
-	    (name) = (type *)v; v = (caddr_t)((lim) = ((name)+(num)))
-#ifdef REAL_CLISTS
-	valloc(cfree, struct cblock, nclist);
-#endif
-	valloc(callout, struct callout, ncallout);
-#ifdef SYSVSHM
-	valloc(shmsegs, struct shmid_ds, shminfo.shmmni);
-#endif
-#ifdef SYSVSEM
-	valloc(sema, struct semid_ds, seminfo.semmni);
-	valloc(sem, struct sem, seminfo.semmns);
-	/* This is pretty disgusting! */
-	valloc(semu, int, (seminfo.semmnu * seminfo.semusz) / sizeof(int));
-#endif
-#ifdef SYSVMSG
-	valloc(msgpool, char, msginfo.msgmax);
-	valloc(msgmaps, struct msgmap, msginfo.msgseg);
-	valloc(msghdrs, struct msg, msginfo.msgtql);
-	valloc(msqids, struct msqid_ds, msginfo.msgmni);
-#endif
-	
-	if (bufpages == 0) {
-		if (bufcache == 0) {		/* use old algorithm */
-			/*
-			 * Determine how many buffers to allocate.
-			 * Since an x68k tends to be long on memory and short
-			 * on disk speed, we allocate more buffer space than
-			 * the BSD standard of use 10% of memory for the first
-			 * 2 Meg, 5% of remaining.
-			 * We just allocate a flat 10%.  Insure a minimum of 16
-			 * buffers.
-			 * We allocate 1/2 as many swap buffer headers as file
-			 * i/o buffers.
-			 */
-			bufpages = physmem / 10 / CLSIZE;
-			if (physmem < btoc(2 * 1024 * 1024))
-				bufpages = physmem / 10 / CLSIZE;
-			else
-				bufpages = (btoc(2 * 1024 * 1024) + physmem) /
-				    (20 * CLSIZE);
-		} else {
-			/*
-			 * Set size of buffer cache to physmem/bufcache * 100
-			 * (i.e., bufcache % of physmem).
-			 */
-			if (bufcache < 5 || bufcache > 95) {
-				printf(
-		"warning: unable to set bufcache to %d%% of RAM, using 10%%",
-				    bufcache);
-				bufcache = 10;
-			}
-			bufpages= physmem / (CLSIZE * 100) * bufcache;
-		}
-	}
-
-	if (nbuf == 0) {
-		nbuf = bufpages;
-		if (nbuf < 16)
-			nbuf = 16;
-	}
-	if (nswbuf == 0) {
-		nswbuf = (nbuf / 2) &~ 1;	/* force even */
-		if (nswbuf > 256)
-			nswbuf = 256;		/* sanity */
-	}
-	valloc(buf, struct buf, nbuf);
-	/*
-	 * End of first pass, size has been calculated so allocate memory
-	 */
-	if (firstaddr == 0) {
-		size = (vsize_t)(v - firstaddr);
-		firstaddr = (caddr_t) uvm_km_zalloc(kernel_map, round_page(size));
-		if (firstaddr == 0)
-			panic("startup: no room for tables");
-		goto again;
-	}
-	/*
-	 * End of second pass, addresses have been assigned
-	 */
-	if ((vsize_t)(v - firstaddr) != size)
+	size = (vm_size_t)allocsys(NULL, NULL);
+	if ((v = (caddr_t)uvm_km_zalloc(kernel_map, round_page(size))) == 0)
+		panic("startup: no room for tables");
+	if (allocsys(v, NULL) - v != size)
 		panic("startup: table size inconsistency");
+
 	/*
 	 * Now allocate buffers proper.  They are different than the above
 	 * in that they usually occupy more virtual memory than physical.
@@ -427,20 +309,15 @@ again:
 		 * "base" pages for the rest.
 		 */
 		curbuf = (vsize_t) buffers + (i * MAXBSIZE);
-		curbufsize = CLBYTES * ((i < residual) ? (base+1) : base);
+		curbufsize = NBPG * ((i < residual) ? (base+1) : base);
 
 		while (curbufsize) {
 			pg = uvm_pagealloc(NULL, 0, NULL, 0);
 			if (pg == NULL) 
 				panic("cpu_startup: not enough memory for "
 				    "buffer cache");
-#if defined(PMAP_NEW)
-			pmap_kenter_pgs(curbuf, &pg, 1);
-#else
-			pmap_enter(kernel_map->pmap, curbuf,
-			    VM_PAGE_TO_PHYS(pg), VM_PROT_READ|VM_PROT_WRITE,
-			    TRUE, VM_PROT_READ|VM_PROT_WRITE);
-#endif
+			pmap_kenter_pa(curbuf, VM_PAGE_TO_PHYS(pg),
+				       VM_PROT_READ|VM_PROT_WRITE);
 			curbuf += PAGE_SIZE;
 			curbufsize -= PAGE_SIZE;
 		}
@@ -450,34 +327,29 @@ again:
 	 * limits the number of processes exec'ing at any time.
 	 */
 	exec_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				   16*NCARGS, TRUE, FALSE, NULL);
+				   16*NCARGS, VM_MAP_PAGEABLE, FALSE, NULL);
 
 	/*
 	 * Allocate a submap for physio
 	 */
 	phys_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				   VM_PHYS_SIZE, TRUE, FALSE, NULL);
+				   VM_PHYS_SIZE, 0, FALSE, NULL);
 
 	/*
 	 * Finally, allocate mbuf cluster submap.
 	 */
 	mb_map = uvm_km_suballoc(kernel_map, &minaddr, &maxaddr,
-				 VM_MBUF_SIZE, FALSE, FALSE, NULL);
-
-	/*
-	 * Initialize callouts
-	 */
-	callfree = callout;
-	for (i = 1; i < ncallout; i++)
-		callout[i-1].c_next = &callout[i];
-	callout[i-1].c_next = NULL;
+				 nmbclusters * mclbytes, VM_MAP_INTRSAFE,
+				 FALSE, NULL);
 
 #ifdef DEBUG
 	pmapdebug = opmapdebug;
 #endif
-	printf("avail mem = %ld\n", ptoa(uvmexp.free));
-	printf("using %d buffers containing %d bytes of memory\n",
-		nbuf, bufpages * CLBYTES);
+	format_bytes(pbuf, sizeof(pbuf), ptoa(uvmexp.free));
+	printf("avail memory = %s\n", pbuf);
+	format_bytes(pbuf, sizeof(pbuf), bufpages * NBPG);
+	printf("using %d buffers containing %s of memory\n", nbuf, pbuf);
+
 	/*
 	 * Set up CPU-specific registers, cache, etc.
 	 */
@@ -529,7 +401,6 @@ setregs(p, pack, stack)
  * Info for CTL_HW
  */
 char	cpu_model[96];		/* max 85 chars */
-extern	char version[];
 static char *fpu_descr[] = {
 #ifdef	FPU_EMULATE
 	", emulator FPU", 	/* 0 */
@@ -607,7 +478,6 @@ identifycpu()
 		mmu = ", unknown MMU";
 		break;
 	}
-	fputype = fpu_probe();
 	if (fputype >= 0 && fputype < sizeof(fpu_descr)/sizeof(fpu_descr[0]))
 		fpu = fpu_descr[fputype];
 	else
@@ -832,7 +702,7 @@ long	dumplo = 0;		/* blocks */
 
 /*
  * This is called by main to set dumplo and dumpsize.
- * Dumps always skip the first CLBYTES of disk space in
+ * Dumps always skip the first NBPG of disk space in
  * case there might be a disk label stored there.  If there
  * is extra space, put dump at the end to reduce the chance
  * that swapping trashes it.
@@ -863,7 +733,7 @@ cpu_dumpconf()
 		dumpsize += btoc(m->ram_segs[i].size);
 	/*
 	 * Check to see if we will fit.  Note we always skip the
-	 * first CLBYTES in case there is a disk label there.
+	 * first NBPG in case there is a disk label there.
 	 */
 	if (nblks < (ctod(dumpsize) + chdrsize + ctod(1))) {
 		dumpsize = 0;
@@ -894,9 +764,6 @@ dumpsys()
 	seg = 0;
 	maddr = m->ram_segs[seg].start;
 	pg = 0;
-
-	/* Don't put dump messages in msgbuf. */
-	msgbufenabled = 0;
 
 	/* Make sure dump device is valid. */
 	if (dumpdev == NODEV)
@@ -946,7 +813,7 @@ dumpsys()
 			maddr = m->ram_segs[seg].start;
 		}
 		pmap_enter(pmap_kernel(), (vaddr_t)vmmap, maddr,
-		    VM_PROT_READ, TRUE, VM_PROT_READ);
+		    VM_PROT_READ, VM_PROT_READ|PMAP_WIRED);
 
 		error = (*dump)(dumpdev, blkno, vmmap, NBPG);
  bad:
@@ -1102,56 +969,17 @@ void	pppintr __P((void));
 void
 netintr()
 {
-#ifdef INET
-#include "arp.h"
-#if NARP > 0
-	if (netisr & (1 << NETISR_ARP)) {
-		netisr &= ~(1 << NETISR_ARP);
-		arpintr();
-	}
-#endif
-	if (netisr & (1 << NETISR_IP)) {
-		netisr &= ~(1 << NETISR_IP);
-		ipintr();
-	}
-#endif
-#ifdef INET6
-	if (netisr & (1 << NETISR_IPV6)) {
-		netisr &= ~(1 << NETISR_IPV6);
-		ip6intr();
-	}
-#endif
-#ifdef NETATALK
-	if (netisr & (1 << NETISR_ATALK)) {
-		netisr &= ~(1 << NETISR_ATALK);
-		atintr();
-	}
-#endif
-#ifdef NS
-	if (netisr & (1 << NETISR_NS)) {
-		netisr &= ~(1 << NETISR_NS);
-		nsintr();
-	}
-#endif
-#ifdef ISO
-	if (netisr & (1 << NETISR_ISO)) {
-		netisr &= ~(1 << NETISR_ISO);
-		clnlintr();
-	}
-#endif
-#ifdef CCITT
-	if (netisr & (1 << NETISR_CCITT)) {
-		netisr &= ~(1 << NETISR_CCITT);
-		ccittintr();
-	}
-#endif
-#include "ppp.h"
-#if NPPP > 0
-	if (netisr & (1 << NETISR_PPP)) {
-		netisr &= ~(1 << NETISR_PPP);
-		pppintr();
-	}
-#endif
+
+#define DONETISR(bit, fn) do {		\
+	if (netisr & (1 << bit)) {	\
+		netisr &= ~(1 << bit);	\
+		fn();			\
+	}				\
+} while (0)
+
+#include <net/netisr_dispatch.h>
+
+#undef DONETISR
 }
 
 void
@@ -1170,6 +998,8 @@ int panicbutton = 1;	/* non-zero if panic buttons are enabled */
 int crashandburn = 0;
 int candbdelay = 50;	/* give em half a second */
 void candbtimer __P((void *));
+
+static struct callout candbtimer_ch = CALLOUT_INITIALIZER;
 
 void
 candbtimer(arg)
@@ -1212,7 +1042,8 @@ nmihand(frame)
 				      "forced crash, nosync" : "forced crash");
 			}
 			crashandburn++;
-			timeout(candbtimer, (void *)0, candbdelay);
+			callout_reset(&candbtimer_ch, candbdelay,
+			    candbtimer, NULL);
 		}
 #endif /* DDB */
 #endif /* PANICBUTTON */
@@ -1312,14 +1143,14 @@ mem_exists(mem, basemax)
 	DPRINTF (("Enter mem_exists(%p, %x)\n", mem, basemax));
 	DPRINTF ((" pmap_enter(%p, %p) for target... ", mem_v, mem));
 	pmap_enter(pmap_kernel(), mem_v, (paddr_t)mem,
-		   VM_PROT_READ|VM_PROT_WRITE, TRUE, VM_PROT_READ);
+		   VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|PMAP_WIRED);
 	DPRINTF ((" done.\n"));
 
 	/* only 24bits are significant on normal X680x0 systems */
 	base = (caddr_t)((u_long)mem & 0x00FFFFFF);
 	DPRINTF ((" pmap_enter(%p, %p) for shadow... ", base_v, base));
 	pmap_enter(pmap_kernel(), base_v, (paddr_t)base,
-		   VM_PROT_READ|VM_PROT_WRITE, TRUE, VM_PROT_READ);
+		   VM_PROT_READ|VM_PROT_WRITE, VM_PROT_READ|PMAP_WIRED);
 	DPRINTF ((" done.\n"));
 
 	m = (void*)mem_v;
@@ -1407,9 +1238,9 @@ setmemrange(void)
 {
 	int i;
 	psize_t s, min, max;
-	int basemax = ctob(physmem);
 	struct memlist *mlist = memlist;
 	u_long h;
+	int basemax = ctob(physmem);
 
 	/*
 	 * VM system is not started yet.  Use the first and second avalable

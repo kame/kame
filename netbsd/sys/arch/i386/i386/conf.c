@@ -1,4 +1,4 @@
-/*	$NetBSD: conf.c,v 1.112.2.1 1999/04/09 17:09:25 drochner Exp $	*/
+/*	$NetBSD: conf.c,v 1.127.2.1 2000/07/30 17:56:52 bouyer Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -71,6 +71,8 @@ bdev_decl(ccd);
 bdev_decl(raid);
 #include "md.h"
 bdev_decl(md);
+#include "ca.h"
+bdev_decl(ca);
 
 struct bdevsw	bdevsw[] =
 {
@@ -93,6 +95,7 @@ struct bdevsw	bdevsw[] =
 	bdev_disk_init(NCCD,ccd),	/* 16: concatenated disk driver */
 	bdev_disk_init(NMD,md),		/* 17: memory disk driver */
 	bdev_disk_init(NRAID,raid),	/* 18: RAIDframe disk driver */
+	bdev_disk_init(NCA,ca),		/* 19: Compaq array */
 };
 int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 
@@ -130,6 +133,9 @@ int	nblkdev = sizeof(bdevsw) / sizeof(bdevsw[0]);
 	(dev_type_stop((*))) enodev, 0, dev_init(c,n,poll), \
 	(dev_type_mmap((*))) enodev }
 
+#include "sysmon.h"
+cdev_decl(sysmon);
+
 cdev_decl(cn);
 cdev_decl(ctty);
 #define	mmread	mmrw
@@ -151,10 +157,11 @@ cdev_decl(fd);
 cdev_decl(wt);
 cdev_decl(scd);
 #include "pc.h"
-#include "vt.h"
 cdev_decl(pc);
 cdev_decl(sd);
 cdev_decl(st);
+#include "ses.h"
+cdev_decl(ses);
 #include "ss.h"
 cdev_decl(ss);
 #include "uk.h"
@@ -178,6 +185,8 @@ cdev_decl(lms);
 cdev_decl(pms);
 #include "cy.h"
 cdev_decl(cy);
+#include "cz.h"
+cdev_decl(cztty);
 cdev_decl(mcd);
 #include "tun.h"
 cdev_decl(tun);
@@ -191,6 +200,7 @@ cdev_decl(music);
 cdev_decl(svr4_net);
 cdev_decl(ccd);
 cdev_decl(raid);
+cdev_decl(ca);
 #include "joy.h"
 cdev_decl(joy);
 #include "apm.h"
@@ -203,6 +213,10 @@ cdev_decl(uhid);
 cdev_decl(ugen);
 #include "ulpt.h"
 cdev_decl(ulpt);
+#include "ucom.h"
+cdev_decl(ucom);
+#include "urio.h"
+cdev_decl(urio);
 #include "vcoda.h"
 cdev_decl(vc_nb_);
 
@@ -218,10 +232,13 @@ cdev_decl(wsdisplay);
 cdev_decl(wskbd);
 #include "wsmouse.h"
 cdev_decl(wsmouse);
+#include "wsmux.h"
+cdev_decl(wsmux);
 #include "esh.h"
 cdev_decl(esh_fp);
 #include "scsibus.h"
 cdev_decl(scsibus);
+#include "bktr.h"
 
 #ifdef __I4B_IS_INTEGRATED
 /* open, close, ioctl */
@@ -271,6 +288,15 @@ cdev_decl(i4brbch);
 cdev_decl(i4btel);
 #endif
 
+/* open, close, read, write, ioctl, mmap */
+#define cdev_vmegen_init(c,n) { \
+	dev_init(c,n,open), dev_init(c,n,close), dev_init(c,n,read), \
+	dev_init(c,n,write), dev_init(c,n,ioctl), (dev_type_stop((*))) enodev, \
+	0, (dev_type_poll((*))) enodev, dev_init(c,n,mmap) }
+
+#include "vmegeneric.h"
+cdev_decl(vmegeneric);
+
 struct cdevsw	cdevsw[] =
 {
 	cdev_cn_init(1,cn),		/* 0: virtual console */
@@ -285,7 +311,7 @@ struct cdevsw	cdevsw[] =
 	cdev_disk_init(NFDC,fd),	/* 9: floppy disk */
 	cdev_tape_init(NWT,wt),		/* 10: QIC-02/QIC-36 tape */
 	cdev_disk_init(NSCD,scd),	/* 11: Sony CD-ROM */
-	cdev_pc_init(NPC + NVT,pc),	/* 12: PC console */
+	cdev_pc_init(NPC,pc),		/* 12: PC console */
 	cdev_disk_init(NSD,sd),		/* 13: SCSI disk */
 	cdev_tape_init(NST,st),		/* 14: SCSI tape */
 	cdev_disk_init(NCD,cd),		/* 15: SCSI CD-ROM */
@@ -354,8 +380,18 @@ struct cdevsw	cdevsw[] =
 	cdev_disk_init(NRAID,raid),	/* 62: RAIDframe disk driver */
 	cdev_esh_init(NESH, esh_fp),	/* 63: HIPPI (esh) raw device */
 	cdev_ugen_init(NUGEN,ugen),	/* 64: USB generic driver */
+	cdev_mouse_init(NWSMUX,	wsmux), /* 65: ws multiplexor */
+	cdev_tty_init(NUCOM, ucom),	/* 66: USB tty */
+	cdev_sysmon_init(NSYSMON, sysmon),/* 67: System Monitor */
+	cdev_vmegen_init(NVMEGENERIC, vmegeneric), /* 68: generic VME access */
+	cdev_disk_init(NCA, ca),	/* 69: Compaq array */
+	cdev_usbdev_init(NURIO,urio),	/* 70: Diamond Rio 500 */
+	cdev_bktr_init(NBKTR, bktr),    /* 71: Bt848 video capture device */
+	cdev_notdef(),			/* 72 */
+	cdev_tty_init(NCZ,cztty),	/* 73: Cyclades-Z serial port */
+	cdev_ses_init(NSES,ses),	/* 74: SCSI SES/SAF-TE */
 #ifdef ALTQ
-	cdev_notdef(),			/* 65: ALTQ */
+	cdev_notdef(),			/* 75: ALTQ */
 #endif
 };
 int	nchrdev = sizeof(cdevsw) / sizeof(cdevsw[0]);
@@ -463,6 +499,16 @@ static int chrtoblktbl[] = {
 	/* 62 */	18,
 	/* 63 */	NODEV,
 	/* 64 */	NODEV,
+	/* 65 */	NODEV,
+	/* 66 */	NODEV,
+	/* 67 */	NODEV,
+	/* 68 */	NODEV,
+	/* 69 */	19,
+	/* 70 */	NODEV,
+	/* 71 */	NODEV,
+	/* 72 */	NODEV,
+	/* 73 */	NODEV,
+	/* 74 */	NODEV,
 };
 
 /*

@@ -1,4 +1,4 @@
-/*	$NetBSD: intr.c,v 1.13 1999/02/17 03:54:46 mrg Exp $ */
+/*	$NetBSD: intr.c,v 1.25.2.1 2000/07/18 16:23:26 mrg Exp $ */
 
 /*
  * Copyright (c) 1992, 1993
@@ -30,7 +30,7 @@
  *    without specific prior written permission.
  *
  * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT OT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
  * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
  * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
@@ -50,12 +50,14 @@
 #include "opt_ns.h"
 #include "opt_ccitt.h"
 #include "opt_natm.h"
+#include "opt_ddb.h"
 #include "ppp.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
 #include <sys/socket.h>
+#include <sys/malloc.h>
 
 #include <vm/vm.h>
 
@@ -105,31 +107,45 @@
  */
 struct intrhand *intrlev[MAXINTNUM];
 
-void	strayintr __P((const struct trapframe *));
-int	soft01intr __P((void *));
+void	strayintr __P((const struct trapframe64 *, int));
+int	softintr __P((void *));
+int	softnet __P((void *));
+int	send_softclock __P((void *));
+int	intr_list_handler __P((void *, void *));
 
 /*
  * Stray interrupt handler.  Clear it if possible.
  * If not, and if we get 10 interrupts in 10 seconds, panic.
  */
+int ignore_stray = 1;
+int straycnt[16];
+
 void
-strayintr(fp)
-	const struct trapframe *fp;
+strayintr(fp, vectored)
+	const struct trapframe64 *fp;
+	int vectored;
 {
 	static int straytime, nstray;
 	int timesince;
+	char buf[256];
 #if 0
 	extern int swallow_zsintrs;
 #endif
 
-	return;
+	if (fp->tf_pil < 16)
+		straycnt[(int)fp->tf_pil]++;
+
+	if (ignore_stray)
+		return;
 
 	/* If we're in polled mode ignore spurious interrupts */
 	if ((fp->tf_pil == PIL_SER) /* && swallow_zsintrs */) return;
 
-	printf("stray interrupt ipl %u pc=%lx npc=%lx pstate=%lb\n",
-		fp->tf_pil, fp->tf_pc, fp->tf_npc, 
-	       (unsigned long)(fp->tf_tstate>>TSTATE_PSTATE_SHIFT), PSTATE_BITS);
+	printf("stray interrupt ipl %u pc=%lx npc=%lx pstate=%s vecttored=%d\n",
+	    fp->tf_pil, fp->tf_pc, fp->tf_npc, 
+	    bitmask_snprintf((fp->tf_tstate>>TSTATE_PSTATE_SHIFT),
+	      PSTATE_BITS, buf, sizeof(buf)), vectored);
+
 	timesince = time.tv_sec - straytime;
 	if (timesince <= 10) {
 		if (++nstray > 500)
@@ -138,81 +154,75 @@ strayintr(fp)
 		straytime = time.tv_sec;
 		nstray = 1;
 	}
+#ifdef DDB
+	Debugger();
+#endif
 }
+
+#include "arp.h"
 
 /*
  * Level 1 software interrupt (could also be Sbus level 1 interrupt).
  * Three possible reasons:
- *	ROM console input needed
  *	Network software interrupt
  *	Soft clock interrupt
  */
 int
-soft01intr(fp)
+softintr(fp)
 	void *fp;
 {
-	extern int rom_console_input;
 
-	if (rom_console_input && cnrom())
-		cnrint();
-	if (sir.sir_any) {
-		/*
-		 * XXX	this is bogus: should just have a list of
-		 *	routines to call, a la timeouts.  Mods to
-		 *	netisr are not atomic and must be protected (gah).
-		 */
-		if (sir.sir_which[SIR_NET]) {
-			int n, s;
-
-			s = splhigh();
-			n = netisr;
-			netisr = 0;
-			splx(s);
-			sir.sir_which[SIR_NET] = 0;
-#ifdef INET
-			if (n & (1 << NETISR_ARP))
-				arpintr();
-			if (n & (1 << NETISR_IP))
-				ipintr();
-#endif
-#ifdef INET6
-			if (n & (1 << NETISR_IPV6))
-				ip6intr();
-#endif
-#ifdef NETATALK
-			if (n & (1 << NETISR_ATALK))
-				atintr();
-#endif
-#ifdef NS
-			if (n & (1 << NETISR_NS))
-				nsintr();
-#endif
-#ifdef ISO
-			if (n & (1 << NETISR_ISO))
-				clnlintr();
-#endif
-#ifdef NATM
-			if (n & (1 << NETISR_NATM))
-				natmintr();
-#endif
-#ifdef CCITT
-			if (n & (1 << NETISR_CCITT))
-				ccittintr();
-#endif
-#if NPPP > 0
-			if (n & (1 << NETISR_PPP))
-				pppintr();
-#endif
-		}
-		if (sir.sir_which[SIR_CLOCK]) {
-			sir.sir_which[SIR_CLOCK] = 0;
-			softclock();
-		}
-	}
 	return (1);
 }
 
-struct intrhand level01 = { soft01intr, NULL, 1 };
+int
+softnet(fp)
+	void *fp;
+{
+	int n, s;
+	
+	s = splhigh();
+	n = netisr;
+	netisr = 0;
+	splx(s);
+	
+#define DONETISR(bit, fn) do {		\
+	if (n & (1 << bit))		\
+		fn();			\
+} while (0)
+#include <net/netisr_dispatch.h>
+#undef DONETISR
+}
+
+/* 
+ * Damn softclock doesn't return a value.
+ */
+int
+send_softclock(fp)
+	void *fp;
+{
+	softclock();
+	return 1;
+}
+
+struct intrhand soft01intr = { softintr, NULL, 1 };
+struct intrhand soft01net = { softnet, NULL, 1 };
+struct intrhand soft01clock = { send_softclock, NULL, 1 };
+
+#if 1
+void 
+setsoftint() {
+	send_softint(-1, IPL_SOFTINT, &soft01intr);
+}
+void 
+setsoftnet() {
+	send_softint(-1, IPL_SOFTNET, &soft01net);
+}
+void 
+setsoftclock() {
+	send_softint(-1, IPL_SOFTCLOCK, &soft01clock);
+}
+#endif
 
 /*
  * Level 15 interrupts are special, and not vectored here.
@@ -221,7 +231,7 @@ struct intrhand level01 = { soft01intr, NULL, 1 };
  */
 struct intrhand *intrhand[15] = {
 	NULL,			/*  0 = error */
-	&level01,		/*  1 = software level 1 + Sbus */
+	&soft01intr,		/*  1 = software level 1 + Sbus */
 	NULL,	 		/*  2 = Sbus level 2 (4m: Sbus L1) */
 	NULL,			/*  3 = SCSI + DMA + Sbus level 3 (4m: L2,lpt)*/
 	NULL,			/*  4 = software level 4 (tty softint) (scsi) */
@@ -238,9 +248,36 @@ struct intrhand *intrhand[15] = {
 };
 
 int fastvec = 0;
-#ifdef DIAGNOSTIC
-extern int sparc_interrupt[];
+
+/*
+ * PCI devices can share interrupts so we need to have
+ * a handler to hand out interrupts.
+ */
+int
+intr_list_handler(arg, vec)
+	void * arg;
+	void * vec;
+{
+	int claimed = 0;
+	struct intrhand *ih = (struct intrhand *)arg;
+
+	if (!arg) panic("intr_list_handler: no handlers!");
+	while (ih && !claimed) {
+		claimed = (*ih->ih_fun)(ih->ih_arg);
+#ifdef DEBUG
+		{
+			extern int intrdebug;
+			if (intrdebug & 1)
+				printf("intr %p %x arg %p vec %p %s\n",
+					ih, ih->ih_number, ih->ih_arg, vec,
+					claimed ? "claimed" : "");
+		}
 #endif
+		ih = ih->ih_next;
+	}
+	return (claimed);
+}
+
 
 /*
  * Attach an interrupt handler to the vector chain for the given level.
@@ -260,6 +297,7 @@ intr_establish(level, ih)
 	 * and we do want to preserve order.
 	 */
 	ih->ih_pil = level; /* XXXX caller should have done this before */
+	ih->ih_pending = 0; /* XXXX caller should have done this before */
 	ih->ih_next = NULL;
 	for (p = &intrhand[level]; (q = *p) != NULL; p = &q->ih_next)
 		;
@@ -274,65 +312,71 @@ intr_establish(level, ih)
 		Debugger();
 	}
 #endif
-	if (ih->ih_number < MAXINTNUM || ih->ih_number <= 0) {
-		if (intrlev[ih->ih_number]) 
-			panic("intr_establish: intr reused %d", ih->ih_number);
-		intrlev[ih->ih_number] = ih;
+	if (ih->ih_number < MAXINTNUM && ih->ih_number >= 0) {
+		if ((q = intrlev[ih->ih_number])) {
+			struct intrhand *nih;
+			/*
+			 * Interrupt is already there.  We need to create a
+			 * new interrupt handler and interpose it.
+			 */
+			printf("intr_establish: intr reused %d\n", ih->ih_number);
+
+			if (q->ih_fun != intr_list_handler) {
+				nih = (struct intrhand *)
+					malloc(sizeof(struct intrhand),
+						M_DEVBUF, M_NOWAIT);
+				/* Point the old IH at the new handler */
+				*nih = *q;
+				q->ih_fun = intr_list_handler;
+				q->ih_arg = (void *)nih;
+				nih->ih_next = NULL;
+			}
+			/* Add the ih to the head of the list */
+			ih->ih_next = (struct intrhand *)q->ih_arg;
+			q->ih_arg = (void *)ih;
+		}
+		else
+			intrlev[ih->ih_number] = ih;
 #ifdef NOT_DEBUG
-		printf("\nintr_establish: vector %x ipl mask %x clrintr %p fun %p arg %p\n",
-		       ih->ih_number, ih->ih_pil, (long)ih->ih_clr, ih->ih_fun, ih->ih_arg);
-		Debugger();
+		printf("\nintr_establish: vector %x pil %x mapintr %p clrintr %p fun %p arg %p\n",
+		       ih->ih_number, ih->ih_pil, (long)ih->ih_map, (long)ih->ih_clr, ih->ih_fun, ih->ih_arg);
+		/*Debugger();*/
 #endif
 	} else
 		panic("intr_establish: bad intr number %d", ih->ih_number);
 	splx(s);
 }
 
-/*
- * Like intr_establish, but wires a fast trap vector.  Only one such fast
- * trap is legal for any interrupt, and it must be a hardware interrupt.
- */
-void
-intr_fasttrap(level, vec)
-	int level;
-	void (*vec) __P((void));
+void *
+softintr_establish(level, fun, arg)
+	int level; 
+	int (*fun) __P((void *));
+	void *arg;
 {
-	register struct trapvec *tv;
-	register u_long hi22, lo10;
-#ifdef DIAGNOSTIC
-	register int displ;	/* suspenders, belt, and buttons too */
-#endif
-	int s;
+	struct intrhand *ih;
 
-	printf("trying to establish a level %d fast interrupt!", level);
-	panic("intr_fasttrap");
+	ih = malloc(sizeof(*ih), M_DEVBUF, 0);
+	bzero(ih, sizeof(*ih));
+	ih->ih_fun = fun;
+	ih->ih_arg = arg;
+	ih->ih_pil = level;
+	ih->ih_pending = 0;
+	ih->ih_clr = NULL;
+	return (void *)ih;
+}
 
-	tv = &trapbase[T_L1INT - 1 + level];
-	hi22 = ((u_long)vec) >> 10;
-	lo10 = ((u_long)vec) & 0x3ff;
-	s = splhigh();
-	if ((fastvec & (1 << level)) != 0 || intrhand[level] != NULL)
-		panic("intr_fasttrap: already handling level %d interrupts",
-		    level);
-#ifdef DIAGNOSTIC
-	displ = &sparc_interrupt[0] - &tv->tv_instr[1];
+void
+softintr_disestablish(cookie)
+	void *cookie;
+{
+	free(cookie, M_DEVBUF);
+}
 
-	/* has to be `mov level,%l3; ba _sparc_interrupt; rdpsr %l0' */
-	if (tv->tv_instr[0] != I_MOVi(I_L3, level) ||
-	    tv->tv_instr[1] != I_BA(0, displ) ||
-	    tv->tv_instr[2] != I_RDPSR(I_L0))
-		panic("intr_fasttrap(%d, %p)\n%x %x %x != %x %x %x",
-		    level, vec,
-		    tv->tv_instr[0], tv->tv_instr[1], tv->tv_instr[2],
-		    I_MOVi(I_L3, level), I_BA(0, displ), I_RDPSR(I_L0));
-#endif
-	/* kernel text is write protected -- let us in for a moment */
-	pmap_changeprot(pmap_kernel(), (vaddr_t)tv,
-	    VM_PROT_READ|VM_PROT_WRITE, 1);
-	tv->tv_instr[0] = I_SETHI(I_L3, hi22);	/* sethi %hi(vec),%l3 */
-	tv->tv_instr[1] = I_JMPLri(I_G0, I_L3, lo10);/* jmpl %l3+%lo(vec),%g0 */
-	tv->tv_instr[2] = I_RDPSR(I_L0);	/* mov %psr, %l0 */
-	pmap_changeprot(pmap_kernel(), (vaddr_t)tv, VM_PROT_READ, 1);
-	fastvec |= 1 << level;
-	splx(s);
+void
+softintr_schedule(cookie)
+	void *cookie;
+{
+	struct intrhand *ih = (struct intrhand *)cookie;
+
+	send_softint(-1, ih->ih_pil, ih);
 }
