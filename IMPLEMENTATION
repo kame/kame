@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.230 2001/07/17 15:20:24 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.231 2001/07/18 05:30:47 itojun Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -147,7 +147,8 @@ draft-ietf-dnsext-mdns-00.txt: Multicast DNS
     * kame/mdnsd has test implementation, which will not be built in
       default compilation.  The draft will experience a major change in the
       near future, so don't rely upon it.
-draft-ietf-ipngwg-p2p-pingpong-00.txt: avoid packet ping-pong on a p2p link.
+draft-ietf-ipngwg-p2p-pingpong-00.txt:
+	Avoiding ping-pong packets on point-to-point links
 draft-itojun-ipv6-tcp-to-anycast-00.txt:
 	Disconnecting TCP connection toward IPv6 anycast address
 draft-itojun-ipv6-transition-abuse-02.txt:
