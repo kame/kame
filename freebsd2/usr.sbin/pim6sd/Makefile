@@ -58,7 +58,7 @@
 # Questions concerning this software should be directed to 
 # Kurt Windisch (kurtw@antc.uoregon.edu)
 #
-# $Id: Makefile,v 1.1 1999/08/06 11:32:29 itojun Exp $
+# $Id: Makefile,v 1.2 1999/09/02 16:36:25 jinmei Exp $
 #
 #
 #Part of this program has been derived from PIM sparse-mode pimd.
@@ -79,7 +79,7 @@ SRCDIR=	${.CURDIR}/../../kame/pim6sd
 PROG=	pim6sd
 SRCS=	mld6.c mld6_proto.c\
 	inet6.c kern.c main.c config.c debug.c routesock.c vers.c callout.c\
-	route.c vif.c timer.c mrt.c pim6.c pim6_proto.c rp.c crc.c
+	route.c vif.c timer.c mrt.c pim6.c pim6_proto.c rp.c crc.c trace.c
 
 CFLAGS+=	-g
 CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -I${SRCDIR}
