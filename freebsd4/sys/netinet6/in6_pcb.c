@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.9 2003/01/24 05:11:35 sam Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.64 2004/02/09 18:55:32 t-momose Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.65 2004/02/13 12:38:52 jinmei Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -546,9 +546,10 @@ in6_mapped_peeraddr(struct socket *so, struct sockaddr **nam)
 		error = in_setpeeraddr(so, nam);
 		if (error == 0)
 			in6_sin_2_v4mapsin6_in_sock(nam);
-	} else
-	/* scope issues will be handled in in6_setpeeraddr(). */
-	error = in6_setpeeraddr(so, nam);
+	} else {
+		/* scope issues will be handled in in6_setpeeraddr(). */
+		error = in6_setpeeraddr(so, nam);
+	}
 
 	return error;
 }
