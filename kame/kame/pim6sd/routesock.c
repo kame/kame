@@ -1,4 +1,4 @@
-/*	$KAME: routesock.c,v 1.13 2001/08/09 08:46:58 suz Exp $	*/
+/*	$KAME: routesock.c,v 1.14 2002/05/28 12:24:22 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -188,6 +188,7 @@ k_req_incoming(source, rpfp)
 #endif				/* HAVE_SA_LEN */
 
     /* initialize */
+    memset(&rpfinfo, 0, sizeof(rpfinfo));
     memset(&rpfp->rpfneighbor, 0, sizeof(rpfp->rpfneighbor));
     rpfp->source = *source;
 
