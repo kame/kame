@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.587 2000/02/21 16:02:45 itojun Exp $
+$Id: CHANGELOG,v 1.588 2000/02/22 12:31:58 sumikawa Exp $
 
 <200002>
+Tue Feb 22 14:56:59 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd2/ports/openssh: upgrade to 1.2.2 and mark as broken. we
+	  need volunteers to make buildable this port.
+
 Tue Feb 22 00:59:54 JST 2000  itojun@iijlab.net
 	* sys/kern/uipc_mbuf{,2}.c, sys/sys/mbuf.h: allow mbuf attachment to
 	  m->m_pkthdr.aux.  this would be useful to pass around extra
