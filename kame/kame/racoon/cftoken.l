@@ -262,7 +262,7 @@ octetstring	{octet}({dot}{octet})+
 <S_RMTP>encryption_algorithm { YYD; yylval.num = algclass_isakmp_enc; return(ALGORITHM_CLASS); }
 <S_RMTP>authentication_method { YYD; yylval.num = algclass_isakmp_ameth; return(ALGORITHM_CLASS); }
 <S_RMTP>hash_algorithm	{ YYD; yylval.num = algclass_isakmp_hash; return(ALGORITHM_CLASS); }
-<S_RMTP>dh_group	{ YYD; yylval.num = algclass_isakmp_dh; return(ALGORITHM_CLASS); }
+<S_RMTP>dh_group	{ YYD; return(DH_GROUP); }
 
 	/* static sa */
 <S_INI>static_sa	{ BEGIN S_SA; YYDB; return(STATICSA); }

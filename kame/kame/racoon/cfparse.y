@@ -65,6 +65,15 @@ struct secprotospec {
 	struct proposalspec *back;
 };
 
+static int num2dhgroup[] = {
+	0,
+	OAKLEY_ATTR_GRP_DESC_MODP768,
+	OAKLEY_ATTR_GRP_DESC_MODP1024,
+	OAKLEY_ATTR_GRP_DESC_EC2N155,
+	OAKLEY_ATTR_GRP_DESC_EC2N185,
+	OAKLEY_ATTR_GRP_DESC_MODP1536,
+};
+
 static int cur_algclass;
 static struct policyindex *cur_spidx;
 static struct remoteconf *cur_rmconf;
@@ -147,7 +156,7 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 
 %type <num> NUMBER SWITCH keylength
 %type <num> PATHTYPE IDENTIFIERTYPE LOGLEV 
-%type <num> ALGORITHM_CLASS algorithm_types algorithm_type
+%type <num> ALGORITHM_CLASS algorithm_types algorithm_type dh_group_num
 %type <num> ALGORITHMTYPE STRENGTHTYPE
 %type <num> PREFIX prefix PORT port ike_port DIRTYPE ACTION PLADDRTYPE WHICHSIDE
 %type <num> ul_proto UL_PROTO secproto
@@ -470,7 +479,7 @@ policy_specs
 	|	policy_specs policy_spec
 	;
 policy_spec
-	:	PFS_GROUP ALGORITHMTYPE EOS
+	:	PFS_GROUP dh_group_num EOS
 		{
 			int doi;
 
@@ -713,17 +722,7 @@ remote_spec
 			cur_rmconf->identtype = idtype2doi($2);
 		}
 	|	NONCE_SIZE NUMBER EOS { cur_rmconf->nonce_size = $2; }
-	|	DH_GROUP ALGORITHMTYPE EOS
-		{
-			int doi;
-
-			doi = algtype2doi(algclass_isakmp_dh, $2);
-			if (doi == -1) {
-				yyerror("must be DH group");
-				return -1;
-			}
-			cur_rmconf->dh_group = doi;
-		}
+	|	DH_GROUP dh_group_num EOS { cur_rmconf->dh_group = $2; }
 	|	KEEPALIVE EOS { cur_rmconf->keepalive = TRUE; }
 	|	LIFETIME LIFETYPE NUMBER UNITTYPE EOS
 		{
@@ -774,6 +773,25 @@ exchange_types
 			}
 		}
 	;
+dh_group_num
+	:	ALGORITHMTYPE
+		{
+			$$ = algtype2doi(algclass_isakmp_dh, $1);
+			if ($$ == -1) {
+				yyerror("must be DH group");
+				return -1;
+			}
+		}
+	|	NUMBER
+		{
+			if (ARRAYLEN(num2dhgroup) > $1 && num2dhgroup[$1] != 0) {
+				$$ = num2dhgroup[$1];
+			} else {
+				yyerror("must be DH group");
+				return -1;
+			}
+		}
+	;
 isakmpproposal_specs
 	:	/* nothing */
 	|	isakmpproposal_specs isakmpproposal_spec
@@ -794,6 +812,10 @@ isakmpproposal_spec
 				prhead->spspec->lifebyte /= 1024;
 			}
 		}
+	|	DH_GROUP dh_group_num EOS
+		{
+			prhead->spspec->algclass[algclass_isakmp_dh] = $2;
+		}
 	|	ALGORITHM_CLASS ALGORITHMTYPE keylength EOS
 		{
 			int doi;
@@ -812,9 +834,6 @@ isakmpproposal_spec
 				break;
 			case algclass_isakmp_hash:
 				prhead->spspec->algclass[algclass_isakmp_hash] = doi;
-				break;
-			case algclass_isakmp_dh:
-				prhead->spspec->algclass[algclass_isakmp_dh] = doi;
 				break;
 			case algclass_isakmp_ameth:
 				prhead->spspec->algclass[algclass_isakmp_ameth] = doi;
