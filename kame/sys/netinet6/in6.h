@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.114 2001/12/24 10:39:29 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.115 2002/01/02 06:43:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -466,7 +466,9 @@ struct route_in6 {
 #define IPV6_RECVRTHDR		38 /* bool; recv routing header */
 #define IPV6_RECVHOPOPTS	39 /* bool; recv hop-by-hop option */
 #define IPV6_RECVDSTOPTS	40 /* bool; recv dst option after rthdr */
+#ifdef _KERNEL
 #define IPV6_RECVRTHDRDSTOPTS	41 /* bool; recv dst option before rthdr */
+#endif
 
 #define IPV6_USE_MIN_MTU	42 /* bool; send packets at the minimum MTU */
 #define IPV6_RECVPATHMTU	43 /* bool; notify an according MTU */
