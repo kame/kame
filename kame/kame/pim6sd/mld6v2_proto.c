@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2_proto.c,v 1.10 2002/04/03 02:47:04 itojun Exp $
+ * $KAME: mld6v2_proto.c,v 1.11 2002/06/26 10:24:48 jinmei Exp $
  */
 
 /*
@@ -366,9 +366,7 @@ accept_listenerV2_query(src, dst, query_message, datalen)
 			    "timer for grp %s src %s on vif %d "
 			    "set to %ld",
 			    inet6_fmt(group),
-			    inet6_fmt(&source_sa.sin6_addr), vifi,
-			    s->al_timer);
-
+			    sa6_fmt(&source_sa), vifi, s->al_timer);
 		}
 	    }
 	}
@@ -456,7 +454,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 		log(LOG_DEBUG, 0,
 		    "accept_listenerV2_report: group(%s) has the "
 		    "link-local scope. discard",
-		    inet6_fmt(&group_sa.sin6_addr));
+		    sa6_fmt(&group_sa));
 	    continue;
 	}
 
@@ -477,8 +475,7 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 
 		IF_DEBUG(DEBUG_MLD)
 		    log(LOG_DEBUG, 0, "processing source %s group %s",
-			inet6_fmt(&source_sa.sin6_addr),
-			inet6_fmt(&group_sa.sin6_addr));
+			sa6_fmt(&source_sa), sa6_fmt(&group_sa));
 
 		if ((s =
 		     check_multicastV2_listener(v, &group_sa, &g,
@@ -569,8 +566,8 @@ accept_listenerV2_report(src, dst, report_message, datalen)
 		    IF_DEBUG(DEBUG_MLD)
 			log(LOG_DEBUG, 0,
 			    "*** notify routing daemon *** : group(%s),source(%s) should be forwarded on %s",
-			    inet6_fmt(&g->al_addr.sin6_addr),
-			    inet6_fmt(&s->al_addr.sin6_addr), v->uv_name);
+			    sa6_fmt(&g->al_addr),
+			    sa6_fmt(&s->al_addr), v->uv_name);
 
 		    add_leaf(vifi, &source_sa, &group_sa);
 		}
@@ -677,8 +674,7 @@ DelVifV2(arg)
     IF_DEBUG(DEBUG_MLD)
 	log(LOG_DEBUG, 0,
 	    "*** notify routing daemon ***: group(%s),source(%s) has no more listeners on %s",
-	    inet6_fmt(&g->al_addr.sin6_addr),
-	    inet6_fmt(&s->al_addr.sin6_addr), v->uv_name);
+	    sa6_fmt(&g->al_addr), sa6_fmt(&s->al_addr), v->uv_name);
 
     delete_leaf(vifi, &s->al_addr, &g->al_addr);
 

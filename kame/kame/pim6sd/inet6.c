@@ -1,4 +1,4 @@
-/*	$KAME: inet6.c,v 1.14 2002/06/19 17:05:36 itojun Exp $	*/
+/*	$KAME: inet6.c,v 1.15 2002/06/26 10:24:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -216,7 +216,23 @@ sa6_fmt(struct sockaddr_in6 *sa6)
     static char     ip6buf[8][MAXHOSTNAMELEN];
     static int      ip6round = 0;
     int flags = 0;
-    char           *cp;    
+    char           *cp;
+    struct sockaddr_in6 sa6_tmp; /* local copy for overriding */
+
+    sa6_tmp = *sa6;
+    sa6 = &sa6_tmp;
+
+    /*
+     * construct sin6_scope_id for link-scope addresses from  embedded link
+     * IDs.
+     * XXX: this should be hidden from applications.
+     */
+    if (IN6_IS_ADDR_LINKLOCAL(&sa6->sin6_addr) ||
+	IN6_IS_ADDR_MC_LINKLOCAL(&sa6->sin6_addr)) {
+	    sa6->sin6_scope_id = sa6->sin6_addr.s6_addr[2] << 8 |
+		sa6->sin6_addr.s6_addr[3];
+	    sa6->sin6_addr.s6_addr[2] = sa6->sin6_addr.s6_addr[3] = 0;
+    }
 
     ip6round = (ip6round + 1) & 7;
     cp = ip6buf[ip6round];
@@ -229,6 +245,11 @@ sa6_fmt(struct sockaddr_in6 *sa6)
     return(cp);
 }
 
+/*
+ * convert a 128bit IPv6 address into a text string.
+ * please DO NOT use this function only when a corresponding sockaddr_in6 is
+ * available.  use sa6_fmt instead.
+ */
 char *
 inet6_fmt(struct in6_addr * addr)
 {
@@ -238,10 +259,6 @@ inet6_fmt(struct in6_addr * addr)
     sa6.sin6_len = sizeof(sa6);
     sa6.sin6_family = AF_INET6;
     sa6.sin6_addr = *addr;
-    if (IN6_IS_ADDR_LINKLOCAL(addr) || IN6_IS_ADDR_MC_LINKLOCAL(addr)) {
-	sa6.sin6_scope_id = addr->s6_addr[2] << 8 | addr->s6_addr[3];
-	sa6.sin6_addr.s6_addr[2] = sa6.sin6_addr.s6_addr[3] = 0;
-    }
 
     return(sa6_fmt(&sa6));
 }

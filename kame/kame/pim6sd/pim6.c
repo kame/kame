@@ -1,4 +1,4 @@
-/*	$KAME: pim6.c,v 1.21 2001/11/27 07:26:20 suz Exp $	*/
+/*	$KAME: pim6.c,v 1.22 2002/06/26 10:24:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -281,7 +281,7 @@ accept_pim6(pimlen)
     if (pimlen < sizeof(*pim)) {
         log(LOG_WARNING, 0,
             "data field too short (%u bytes) for PIM header, from %s",
-            pimlen, inet6_fmt(&src->sin6_addr));
+            pimlen, sa6_fmt(src));
         return;
     }
     pim = (struct pim *)rcvmhpim.msg_iov[0].iov_base;
@@ -318,7 +318,7 @@ accept_pim6(pimlen)
         IF_DEBUG(DEBUG_PIM) {
             log(LOG_DEBUG, 0, "Receiving %s from %s",
                 packet_kind(IPPROTO_PIM, pim->pim_type, 0),
-                inet6_fmt(&src->sin6_addr));
+                sa6_fmt(src));
         }
     }
 #endif /* NOSUCHDEF */
@@ -355,13 +355,13 @@ accept_pim6(pimlen)
 	 pim6dstat.in_pim6_graft++;
          log(LOG_INFO, 0, "ignore %s from %s",
              packet_kind(IPPROTO_PIM, pim->pim_type, 0),
-             inet6_fmt(&src->sin6_addr));
+             sa6_fmt(src));
          break;
      case PIM_GRAFT_ACK:
 	 pim6dstat.in_pim6_graft_ack++;
          log(LOG_INFO, 0, "ignore %s from %s",
              packet_kind(IPPROTO_PIM, pim->pim_type, 0),
-             inet6_fmt(&src->sin6_addr));
+             sa6_fmt(src));
          break;
      case PIM_CAND_RP_ADV:
          receive_pim6_cand_rp_adv(src, &dst, (char *)(pim), pimlen);
@@ -369,8 +369,7 @@ accept_pim6(pimlen)
      default:
          log(LOG_INFO, 0,
              "ignore unknown PIM message code %u from %s",
-             pim->pim_type,
-             inet6_fmt(&src->sin6_addr));
+             pim->pim_type, sa6_fmt(src));
          break;
     }
 }   
@@ -415,7 +414,7 @@ send_pim6(char *buf, struct sockaddr_in6 *src,
 			log(LOG_WARNING, 0,
 			    "trying to send pim multicast packet "
 			    "with non linklocal src(%s), ignoring",
-			    inet6_fmt(&src->sin6_addr));
+			    sa6_fmt(src));
 			return;
 		}
 		sndmhpim.msg_control=NULL;
@@ -447,8 +446,7 @@ send_pim6(char *buf, struct sockaddr_in6 *src,
 			check_vif_state();
 		else {
 			log(LOG_WARNING, errno, "sendmsg from %s to %s",
-			    inet6_fmt(&src->sin6_addr),
-			    inet6_fmt(&dst->sin6_addr));
+			    sa6_fmt(src), sa6_fmt(dst));
 		}
 	}
 

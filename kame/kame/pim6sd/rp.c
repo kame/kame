@@ -1,4 +1,4 @@
-/*	$KAME: rp.c,v 1.18 2001/08/28 08:42:31 suz Exp $	*/
+/*	$KAME: rp.c,v 1.19 2002/06/26 10:24:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -1107,8 +1107,8 @@ rp_grp_match(group)
 
     IF_DEBUG(DEBUG_PIM_CAND_RP)
 	log(LOG_DEBUG,0,"Rp_grp_match found %s for group %s",
-	    inet6_fmt(&best_entry->rp->rpentry->address.sin6_addr),
-	    inet6_fmt(&group->sin6_addr));
+	    sa6_fmt(&best_entry->rp->rpentry->address),
+	    sa6_fmt(group));
 
     return (best_entry);
 }

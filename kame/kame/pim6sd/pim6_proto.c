@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.53 2002/03/05 02:07:19 suz Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.54 2002/06/26 10:24:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -197,7 +197,7 @@ receive_pim6_hello(src, pim_message, datalen)
 
 	if (local_address(src) == NO_VIF)
 	    log(LOG_INFO, 0, "Ignoring PIM_HELLO from non-neighbor router %s",
-		inet6_fmt(&src->sin6_addr));
+		sa6_fmt(src));
 	return (FALSE);
     }
 
@@ -217,7 +217,7 @@ receive_pim6_hello(src, pim_message, datalen)
     holdtime = hopts.holdtime;
     IF_DEBUG(DEBUG_PIM_HELLO | DEBUG_PIM_TIMER)
 	log(LOG_DEBUG, 0, "PIM HELLO holdtime from %s is %u",
-	    inet6_fmt(&src->sin6_addr), holdtime);
+	    sa6_fmt(src), holdtime);
 
     for (prev_nbr = (pim_nbr_entry_t *) NULL, nbr = v->uv_pim_neighbors;
 	 nbr != (pim_nbr_entry_t *) NULL;
@@ -243,7 +243,7 @@ receive_pim6_hello(src, pim_message, datalen)
 		 * and see you again!
 		 */
 		log(LOG_INFO, 0, "PIM HELLO received: neighbor %s going down",
-		    inet6_fmt(&src->sin6_addr));
+		    sa6_fmt(src));
 		delete_pim6_nbr(nbr);
 		goto end;
 	    }
@@ -345,7 +345,7 @@ receive_pim6_hello(src, pim_message, datalen)
      */
     IF_DEBUG(DEBUG_PIM_HELLO)
 	log(LOG_DEBUG, 0, "I've got a new neighbor %s on vif %s",
-	    inet6_fmt(&src->sin6_addr), v->uv_name);
+	    sa6_fmt(src), v->uv_name);
 
  end:
     /* free all temporary option data and return */
@@ -818,7 +818,7 @@ receive_pim6_register(reg_src, reg_dst, pim_message, datalen)
 	IF_DEBUG(DEBUG_PIM_REGISTER)
 	    log(LOG_DEBUG, 0,
 		"No routing entry for source %s and/or group %s",
-		inet6_fmt(&inner_src.sin6_addr), inet6_fmt(&inner_grp.sin6_addr));
+		sa6_fmt(&inner_src), sa6_fmt(&inner_grp));
 
 	/* TODO: XXX: shouldn't be inner_src=IN6ADDR_ANY? Not in the spec. */
 
@@ -1217,7 +1217,7 @@ receive_pim6_register_stop(reg_src, reg_dst, pim_message, datalen)
 			    log(LOG_WARNING,0,
 				"Received PIM_REGISTER_STOP from RP %s for a non "
 				"direct-connect source %s",
-				inet6_fmt(&reg_src->sin6_addr),
+				sa6_fmt(reg_src),
 				inet6_fmt(&encod_unisrc.unicast_addr));
 		    }
 	    return FALSE;
@@ -1236,8 +1236,7 @@ receive_pim6_register_stop(reg_src, reg_dst, pim_message, datalen)
 		log(LOG_DEBUG, 0,
 		    "Received PIM_REGISTER_STOP from RP %s to %s "
 		    "source : %s group : %s",
-		    inet6_fmt(&reg_src->sin6_addr),
-		    inet6_fmt(&reg_dst->sin6_addr),
+		    sa6_fmt(reg_src), sa6_fmt(reg_dst),
 		    inet6_fmt(&encod_unisrc.unicast_addr),
 		    inet6_fmt(&encod_grp.mcast_addr));
 	}
@@ -1472,7 +1471,7 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 	if (local_address(src) == NO_VIF)
 	    log(LOG_INFO, 0,
 		"Ignoring PIM_JOIN_PRUNE from non-neighbor router %s",
-		inet6_fmt(&src->sin6_addr));
+		sa6_fmt(src));
 	return (FALSE);
     }
 
@@ -1489,7 +1488,7 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 	    log(LOG_NOTICE, 0,
 		"receive_pim6_join_prune: Join/Prune message size(%u) is"
 		" too short from %s on %s",
-		datalen, inet6_fmt(&src->sin6_addr), v->uv_name);
+		datalen, sa6_fmt(src), v->uv_name);
 	    return(FALSE);
     }
     datalen -= PIM6_JOIN_PRUNE_MINLEN;
@@ -1518,7 +1517,7 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 	    log(LOG_NOTICE, 0,
 		"receive_pim6_join_prune: Join/Prune message from %s on %s is"
 		" too short to contain enough data",
-		inet6_fmt(&src->sin6_addr), v->uv_name);
+		sa6_fmt(src), v->uv_name);
 	    return(FALSE);
 	}
 	datalen -= (PIM6_ENCODE_GRP_ADDR_LEN + sizeof(u_int32_t));
@@ -1531,8 +1530,7 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 	if (datalen < srclen) {
 	    log(LOG_NOTICE, 0,
 		"receive_pim6_join_prune: Join/Prune message from %s on %s is"
-		" too short to contain enough data",
-		inet6_fmt(&src->sin6_addr), v->uv_name);
+		" too short to contain enough data", sa6_fmt(src), v->uv_name);
 	    return(FALSE);
 	}
 	datalen -= srclen;
@@ -2089,7 +2087,7 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
 	}
 
 	IF_DEBUG(DEBUG_PIM_JOIN_PRUNE)
-		log(LOG_DEBUG,0,"The rp for this JOIN/PRUNE is %s",inet6_fmt(&rpentry_ptr->address.sin6_addr));
+		log(LOG_DEBUG,0,"The rp for this JOIN/PRUNE is %s",sa6_fmt(&rpentry_ptr->address));
 
 bypass_rp:
 	data_ptr_group_j_start = data_ptr;
@@ -3184,7 +3182,7 @@ receive_pim6_assert(src, dst, pim_message, datalen)
 	if (local_address(src) == NO_VIF)
 	    log(LOG_INFO, 0,
 		"Ignoring PIM_ASSERT from non-neighbor router %s",
-		inet6_fmt(&src->sin6_addr));
+		sa6_fmt(src));
 	return (FALSE);
     }
 
@@ -3625,7 +3623,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	if (local_address(src) == NO_VIF)
 	    log(LOG_INFO, 0,
 		"Ignoring PIM_BOOTSTRAP from non-neighbor router %s",
-		inet6_fmt(&src->sin6_addr));
+		sa6_fmt(src));
 	return (FALSE);
     }
 
@@ -3634,7 +3632,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	    log(LOG_NOTICE, 0,
 		"receive_pim6_bootstrap: Bootstrap message size(%u) is"
 		" too short from %s",
-		datalen, inet6_fmt(&src->sin6_addr));
+		datalen, sa6_fmt(src));
 	    return(FALSE);
     }
 
@@ -3671,7 +3669,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	IF_DEBUG(DEBUG_RPF | DEBUG_PIM_BOOTSTRAP)
 	    log(LOG_DEBUG, 0,
 		"receive_pim6_bootstrap: Bootstrap from myself(%s), ignored.",
-		inet6_fmt(&new_bsr_address.sin6_addr));
+		sa6_fmt(&new_bsr_address));
 	return (FALSE);		/* The new BSR is one of my local addresses */
     }
 
@@ -3693,8 +3691,8 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	log(LOG_DEBUG, 0,
 	    "receive_pim6_bootstrap: BSR(%s, prio=%d) is less preferred"
 	    " than the current BSR(%s, prio=%d)",
-	    inet6_fmt(&new_bsr_address.sin6_addr), new_bsr_priority,
-	    inet6_fmt(&curr_bsr_address.sin6_addr), curr_bsr_priority);
+	    sa6_fmt(&new_bsr_address), new_bsr_priority,
+	    sa6_fmt(&curr_bsr_address), curr_bsr_priority);
 	return (FALSE);		/* Ignore the received BSR message */
     }
 
@@ -3708,7 +3706,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	    /* coudn't find a route to the BSR */
 	    log(LOG_NOTICE, 0,
 		"receive_pim6_bootstrap: can't find a route to the BSR(%s)",
-		inet6_fmt(&new_bsr_address.sin6_addr));
+		sa6_fmt(&new_bsr_address));
 	    return (FALSE);
 	}
 
@@ -3738,7 +3736,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	    log(LOG_NOTICE, 0,
 		"receive_pim6_bootstrap: Bootstrap from an unrecognized "
 		"neighbor(%s) on %s",
-		inet6_fmt(&neighbor_addr.sin6_addr), uvifs[incoming].uv_name);
+		sa6_fmt(&neighbor_addr), uvifs[incoming].uv_name);
 	    return (FALSE);	/* No neighbor toward BSR found */
 	}
 
@@ -3762,7 +3760,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 	     */
 	    log(LOG_NOTICE, 0,
 		"receive_pim6_bootstrap: Bootstrap with an invalid dst(%s)",
-		inet6_fmt(&dst->sin6_addr));
+		sa6_fmt(dst));
 	    return (FALSE);
 	}
 
@@ -3796,7 +3794,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 		log(LOG_DEBUG, 0,
 		    "Unicast boostrap message from %s to %s ignored: "
 		    "cannot find iif",
-		    inet6_fmt(&src->sin6_addr), inet6_fmt(&dst->sin6_addr));
+		    sa6_fmt(src), sa6_fmt(dst));
 	    return (FALSE);
 	}
 	/*
@@ -3895,7 +3893,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 		    log(LOG_NOTICE, 0,
 			"receive_pim6_bootstrap: Bootstrap from %s on %s " 
 			"does not have enough length to contatin RP information",
-			inet6_fmt(&src->sin6_addr), v->uv_name);
+			sa6_fmt(src), v->uv_name);
 
 		    /*
 		     * Ignore the rest of the message.
@@ -3921,7 +3919,7 @@ receive_pim6_bootstrap(src, dst, pim_message, datalen)
 		    IN6_IS_ADDR_SITELOCAL(&rpp_.sin6_addr)) {
 			log(LOG_WARNING, 0,
 			    "receive_pim6_bootstrap: invalid RP address: %s",
-			    inet6_fmt(&rpp_.sin6_addr));
+			    sa6_fmt(&rpp_));
 			continue;
 		}
     		rpp_.sin6_scope_id = 0;
@@ -4155,8 +4153,7 @@ receive_pim6_cand_rp_adv(src, dst, pim_message, datalen)
     {
 	log(LOG_NOTICE, 0,
 	    "receive_pim6_cand_rp_adv: receive cand_RP from %s "
-	    "but I'm not the BSR",
-	    inet6_fmt(&src->sin6_addr));
+	    "but I'm not the BSR", sa6_fmt(src));
 	return (FALSE);
     }
 
@@ -4164,8 +4161,7 @@ receive_pim6_cand_rp_adv(src, dst, pim_message, datalen)
     if (datalen < PIM6_CAND_RP_ADV_MINLEN) {
 	    log(LOG_NOTICE, 0,
 		"receive_pim6_cand_rp_adv: cand_RP message size(%u) is"
-		" too short from %s",
-		datalen, inet6_fmt(&src->sin6_addr));
+		" too short from %s", datalen, sa6_fmt(src));
 	    return(FALSE);
     }
     datalen -= PIM6_CAND_RP_ADV_MINLEN;
@@ -4217,8 +4213,7 @@ receive_pim6_cand_rp_adv(src, dst, pim_message, datalen)
 	    if (datalen < PIM6_ENCODE_GRP_ADDR_LEN) {
 		    log(LOG_NOTICE, 0,
 			"receive_pim6_cand_rp_adv: cand_RP message from %s is"
-			" too short to contain enough groups",
-			inet6_fmt(&src->sin6_addr));
+			" too short to contain enough groups", sa6_fmt(src));
 		    return(FALSE);
 	    }
 	    datalen -= PIM6_ENCODE_GRP_ADDR_LEN;

@@ -1,4 +1,4 @@
-/*	$KAME: route.c,v 1.19 2002/02/22 15:18:53 suz Exp $	*/
+/*	$KAME: route.c,v 1.20 2002/06/26 10:24:48 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -198,8 +198,7 @@ set_incoming(srcentry_ptr, srctype)
 	{
 	    /* couldn't find a route */
 	    IF_DEBUG(DEBUG_PIM_MRT | DEBUG_RPF)
-		log(LOG_DEBUG, 0, "NO ROUTE found for %s",
-		    inet6_fmt(&source.sin6_addr));
+		log(LOG_DEBUG, 0, "NO ROUTE found for %s", sa6_fmt(&source));
 	    return (FALSE);
 	}
 	srcentry_ptr->incoming = rpfc.iif;
@@ -266,8 +265,7 @@ set_incoming(srcentry_ptr, srctype)
     /* TODO: control the number of messages! */
     log(LOG_INFO, 0,
 	"For src %s, iif is %d, next hop router is %s: NOT A PIM ROUTER",
-	inet6_fmt(&source.sin6_addr), srcentry_ptr->incoming,
-	inet6_fmt(&neighbor_addr.sin6_addr));
+	sa6_fmt(&source), srcentry_ptr->incoming, sa6_fmt(&neighbor_addr));
 
     srcentry_ptr->upstream = (pim_nbr_entry_t *) NULL;
 
@@ -322,8 +320,7 @@ add_leaf(vifi, source, group)
 	return;
 
     IF_DEBUG(DEBUG_MRT)
-	log(LOG_DEBUG, 0, "Adding vif %d for group %s", vifi,
-	    inet6_fmt(&group->sin6_addr));
+	log(LOG_DEBUG, 0, "Adding vif %d for group %s", vifi, sa6_fmt(group));
 
     if (IF_ISSET(vifi, &mrtentry_ptr->leaves))
 	return;			/* Already a leaf */
@@ -964,13 +961,13 @@ process_cache_miss(im)
     {
 	IF_DEBUG(DEBUG_MFC)
 		log(LOG_DEBUG,0,"SSM Cache miss src %s dst %s, iif %d",
-	    inet6_fmt(&source.sin6_addr), inet6_fmt(&group.sin6_addr), iif);
+	    sa6_fmt(&source), sa6_fmt(&group), iif);
 	return;
     }
 
     IF_DEBUG(DEBUG_MFC)
 	log(LOG_DEBUG, 0, "Cache miss, src %s, dst %s, iif %d",
-	    inet6_fmt(&source.sin6_addr), inet6_fmt(&group.sin6_addr), iif);
+	    sa6_fmt(&source), sa6_fmt(&group), iif);
 
     /*
      * TODO: XXX: check whether the kernel generates cache miss for the LAN

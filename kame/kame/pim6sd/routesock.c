@@ -1,4 +1,4 @@
-/*	$KAME: routesock.c,v 1.16 2002/06/19 17:05:36 itojun Exp $	*/
+/*	$KAME: routesock.c,v 1.17 2002/06/26 10:24:48 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -297,7 +297,7 @@ getmsg(rtm, msglen, rpfinfop)
 
     sin6 = (struct sockaddr_in6 *) & so_dst;
     IF_DEBUG(DEBUG_RPF)
-	log(LOG_DEBUG, 0, "route to: %s", inet6_fmt(&sin6->sin6_addr));
+	log(LOG_DEBUG, 0, "route to: %s", sa6_fmt(sin6));
     cp = ((char *) (rtm + 1));
     if (rtm->rtm_addrs)
 	for (i = 1; i; i <<= 1)
@@ -337,8 +337,7 @@ getmsg(rtm, msglen, rpfinfop)
     {				/* No incoming interface */
 	IF_DEBUG(DEBUG_RPF)
 	    log(LOG_DEBUG, 0,
-		"No incoming interface for destination %s",
-		inet6_fmt(&sin6->sin6_addr));
+		"No incoming interface for destination %s", sa6_fmt(sin6));
 	return (FALSE);
     }
     if (dst && mask)
@@ -347,15 +346,14 @@ getmsg(rtm, msglen, rpfinfop)
     {
 	sin6 = (struct sockaddr_in6 *) dst;
 	IF_DEBUG(DEBUG_RPF)
-	    log(LOG_DEBUG, 0, " destination is: %s",
-		inet6_fmt(&sin6->sin6_addr));
+	    log(LOG_DEBUG, 0, " destination is: %s", sa6_fmt(sin6));
     }
 
     if (gate)
     {
 	sin6 = (struct sockaddr_in6 *) gate;
 	IF_DEBUG(DEBUG_RPF)
-	    log(LOG_DEBUG, 0, " gateway is: %s", inet6_fmt(&sin6->sin6_addr));
+	    log(LOG_DEBUG, 0, " gateway is: %s", sa6_fmt(sin6));
 
     	/* RPF for static interface routes for P2P interface */
 	if (!(rtm->rtm_flags & RTF_GATEWAY)) 
@@ -378,7 +376,7 @@ getmsg(rtm, msglen, rpfinfop)
 	    *sin6 = uvifs[p2pif].uv_pim_neighbors->address;
 	    IF_DEBUG(DEBUG_RPF)
 		log(LOG_DEBUG, 0, " RPF neighbor is finally %s",
-		    inet6_fmt(&sin6->sin6_addr));
+		    sa6_fmt(sin6));
 	}
 		
 	rpfinfop->rpfneighbor = *sin6;
@@ -415,7 +413,7 @@ getmsg(rtm, msglen, rpfinfop)
 	IF_DEBUG(DEBUG_RPF)
 	    log(LOG_DEBUG, 0,
 		"Invalid incoming interface for destination %s, because of invalid virtual interface",
-		inet6_fmt(&sin6->sin6_addr));
+		sa6_fmt(sin6));
 	return (FALSE);		/* invalid iif */
     }
 

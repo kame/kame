@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.42 2002/04/19 07:11:24 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.43 2002/06/26 10:24:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -360,7 +360,7 @@ int recvlen;
 		log(LOG_DEBUG, 0, "RECV %s from %s to %s",
 		    packet_kind(IPPROTO_ICMPV6,
 				mldh->mld_type, mldh->mld_code),
-		    inet6_fmt(&src->sin6_addr), inet6_fmt(dst));
+		    sa6_fmt(src), inet6_fmt(dst));
 #endif				/* NOSUCHDEF */
 
 	/* for an mtrace message, we don't need strict checks */
@@ -377,7 +377,7 @@ int recvlen;
 	{
 		log(LOG_WARNING, 0,
 		    "received an MLD6 message with illegal hop limit(%d) from %s",
-		    *hlimp, inet6_fmt(&src->sin6_addr));
+		    *hlimp, sa6_fmt(src));
 		/* but accept the packet */
 	}
 	if (ifindex == 0)
@@ -391,8 +391,7 @@ int recvlen;
 	{
 		log(LOG_INFO, 0,
 		    "RECV with an invalid scope: %s from %s",
-		    inet6_fmt(&mldh->mld_addr),
-		    inet6_fmt(&src->sin6_addr));
+		    inet6_fmt(&mldh->mld_addr), sa6_fmt(src));
 		return;			/* discard */
 	}
 
@@ -403,8 +402,7 @@ int recvlen;
 		log(LOG_INFO, 0,
 		    "RECV %s from a non link local address: %s",
 		    packet_kind(IPPROTO_ICMPV6, mldh->mld_type,
-				mldh->mld_code),
-		    inet6_fmt(&src->sin6_addr));
+				mldh->mld_code), sa6_fmt(src));
 		return;
 	}
 
@@ -438,8 +436,7 @@ int recvlen;
 		/* This must be impossible since we set a type filter */
 		log(LOG_INFO, 0,
 		    "ignoring unknown ICMPV6 message type %x from %s to %s",
-		    mldh->mld_type, inet6_fmt(&src->sin6_addr),
-		    inet6_fmt(dst));
+		    mldh->mld_type, sa6_fmt(src), inet6_fmt(dst));
 		return;
 	}
 }
@@ -597,8 +594,7 @@ send_mld6(type, code, src, dst, group, index, delay, datalen, alert)
 	else
 	    log(log_level(IPPROTO_ICMPV6, type, 0), errno,
 		"sendmsg to %s with src %s on %s",
-		inet6_fmt(&dstp->sin6_addr),
-		src ? inet6_fmt(&src->sin6_addr) : "(unspec)",
+		sa6_fmt(dstp), src ? sa6_fmt(src) : "(unspec)",
 		ifindex2str(index));
 
 	return;
@@ -607,6 +603,5 @@ send_mld6(type, code, src, dst, group, index, delay, datalen, alert)
     IF_DEBUG(DEBUG_PKT|debug_kind(IPPROTO_IGMP, type, 0))
 	log(LOG_DEBUG, 0, "SENT %s from %-15s to %s",
 	    packet_kind(IPPROTO_ICMPV6, type, 0),
-	    src ? inet6_fmt(&src->sin6_addr) : "unspec",
-	    inet6_fmt(&dstp->sin6_addr));
+	    src ? sa6_fmt(src) : "unspec", sa6_fmt(dstp));
 }

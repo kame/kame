@@ -1,4 +1,4 @@
-/*	$KAME: mrt.c,v 1.10 2001/12/12 05:37:45 suz Exp $	*/
+/*	$KAME: mrt.c,v 1.11 2002/06/26 10:24:48 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -757,7 +757,7 @@ create_srcentry(source)
     if (srcentry_ptr == (srcentry_t *) NULL)
     {
 	log(LOG_WARNING, 0, "Memory allocation error for srcentry %s",
-	    inet6_fmt(&source->sin6_addr));
+	    sa6_fmt(source));
 	return (srcentry_t *) NULL;
     }
 
@@ -782,8 +782,7 @@ create_srcentry(source)
 	srcentry_ptr->next->prev = srcentry_ptr;
 
     IF_DEBUG(DEBUG_MFC)
-	log(LOG_DEBUG, 0, "create source entry, source %s",
-	    inet6_fmt(&source->sin6_addr));
+	log(LOG_DEBUG, 0, "create source entry, source %s", sa6_fmt(source));
     return (srcentry_ptr);
 }
 
@@ -803,7 +802,7 @@ create_grpentry(group)
     if (grpentry_ptr == (grpentry_t *) NULL)
     {
 	log(LOG_WARNING, 0, "Memory allocation error for grpentry %s",
-	    inet6_fmt(&group->sin6_addr));
+	    sa6_fmt(group));
 	return (grpentry_t *) NULL;
     }
 
@@ -833,7 +832,7 @@ create_grpentry(group)
 	grpentry_ptr->next->prev = grpentry_ptr;
 
     IF_DEBUG(DEBUG_MFC)
-	log(LOG_DEBUG, 0, "create group entry, group %s", inet6_fmt(&group->sin6_addr));
+	log(LOG_DEBUG, 0, "create group entry, group %s", sa6_fmt(group));
     return (grpentry_ptr);
 }
 
@@ -1089,7 +1088,7 @@ create_mrtentry(srcentry_ptr, grpentry_ptr, flags)
 	     */
 
 	    log(LOG_ERR, 0, "MRT inconsistency for src %s and grp %s\n",
-		inet6_fmt(&source->sin6_addr), inet6_fmt(&group->sin6_addr));
+		sa6_fmt(source), sa6_fmt(group));
 	    /* not reached but to make lint happy */
 	    return (mrtentry_t *) NULL;
 	}
@@ -1109,8 +1108,7 @@ create_mrtentry(srcentry_ptr, grpentry_ptr, flags)
 
 	IF_DEBUG(DEBUG_MFC)
 	    log(LOG_DEBUG, 0, "create SG entry, source %s, group %s",
-		inet6_fmt(&source->sin6_addr),
-		inet6_fmt(&group->sin6_addr));
+		sa6_fmt(source), sa6_fmt(group));
 
 	return (r_new);
     }
@@ -1196,8 +1194,8 @@ delete_single_kernel_cache(mrtentry_ptr, kernel_cache_ptr)
 	kernel_cache_ptr->next->prev = kernel_cache_ptr->prev;
     IF_DEBUG(DEBUG_MFC)
 	log(LOG_DEBUG, 0, "Deleting MFC entry for source %s and group %s",
-	    inet6_fmt(&kernel_cache_ptr->source.sin6_addr),
-	    inet6_fmt(&kernel_cache_ptr->source.sin6_addr));
+	    sa6_fmt(&kernel_cache_ptr->source),
+	    sa6_fmt(&kernel_cache_ptr->source));
     k_del_mfc(mld6_socket, &kernel_cache_ptr->source,
 	      &kernel_cache_ptr->group);
     free((char *) kernel_cache_ptr);
@@ -1249,8 +1247,8 @@ delete_single_kernel_cache_addr(mrtentry_ptr, source, group)
 	kernel_cache_ptr->next->prev = kernel_cache_ptr->prev;
     IF_DEBUG(DEBUG_MFC)
 	log(LOG_DEBUG, 0, "Deleting MFC entry for source %s and group %s",
-	    inet6_fmt(&kernel_cache_ptr->source.sin6_addr),
-	    inet6_fmt(&kernel_cache_ptr->group.sin6_addr));
+	    sa6_fmt(&kernel_cache_ptr->source),
+	    sa6_fmt(&kernel_cache_ptr->group));
     k_del_mfc(mld6_socket, &kernel_cache_ptr->source,
 	      &kernel_cache_ptr->group);
     free((char *) kernel_cache_ptr);

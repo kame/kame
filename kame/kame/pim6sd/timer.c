@@ -1,4 +1,4 @@
-/*	$KAME: timer.c,v 1.19 2002/04/03 02:47:04 itojun Exp $	*/
+/*	$KAME: timer.c,v 1.20 2002/06/26 10:24:48 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -291,7 +291,7 @@ age_vifs()
 	    IF_DEBUG(DEBUG_PIM_HELLO)
 		log(LOG_DEBUG, 0,
 		    "%s on %s is dead , delete it",
-		    inet6_fmt(&curr_nbr->address.sin6_addr),
+		    sa6_fmt(&curr_nbr->address),
 		    uvifs[curr_nbr->vifi].uv_name);
 	    delete_pim6_nbr(curr_nbr);
 	}

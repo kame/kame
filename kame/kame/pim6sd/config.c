@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.28 2002/05/29 12:02:11 suz Exp $	*/
+/*	$KAME: config.c,v 1.29 2002/06/26 10:24:47 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -162,14 +162,13 @@ config_vifs_from_kernel()
 		ifr6.ifr_addr = *(struct sockaddr_in6 *)ifa->ifa_addr;
 		if (ioctl(udp_socket, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
 			log(LOG_ERR, errno, "ioctl SIOCGIFAFLAG_IN6 for %s",
-			    inet6_fmt(&ifr6.ifr_addr.sin6_addr));
+			    sa6_fmt(&ifr6.ifr_addr));
 		}
 		else {
 			if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_ANYCAST) {
 				log(LOG_DEBUG, 0, "config_vifs_from_kernel: "
 				    "%s on %s is an anycast address, ignored",
-				    inet6_fmt(&ifr6.ifr_addr.sin6_addr),
-				    ifa->ifa_name);
+				    sa6_fmt(&ifr6.ifr_addr), ifa->ifa_name);
 				continue;
 			}
 		}
@@ -267,7 +266,7 @@ config_vifs_from_kernel()
 			log(LOG_DEBUG,0,
 			    "Installing %s (%s on subnet %s) ,"
 			    "as vif #%u - rate = %d",
-			    v->uv_name,inet6_fmt(&addr.sin6_addr),
+			    v->uv_name, sa6_fmt(&addr),
 			    net6name(&v->uv_prefix.sin6_addr,&mask),
 			    numvifs,v->uv_rate_limit);
 
@@ -374,7 +373,7 @@ config_vifs_from_kernel()
 		ifr6.ifr_addr = *(struct sockaddr_in6 *)&ifrp->ifr_addr;
 		if(ioctl(udp_socket, SIOCGIFNETMASK_IN6, (char *)&ifr6) <0)
 			log(LOG_ERR, errno, "ioctl SIOCGIFNETMASK_IN6 for %s",
-			    inet6_fmt(&ifr6.ifr_addr.sin6_addr));
+			    sa6_fmt(&ifr6.ifr_addr));
 		memcpy(&mask,&ifr6.ifr_addr.sin6_addr,sizeof(mask));
 
 		/*
@@ -385,13 +384,13 @@ config_vifs_from_kernel()
 		ifr6.ifr_addr = *(struct sockaddr_in6 *)&ifrp->ifr_addr;
 		if (ioctl(udp_socket, SIOCGIFAFLAG_IN6, &ifr6) < 0) {
 			log(LOG_ERR, errno, "ioctl SIOCGIFAFLAG_IN6 for %s",
-			    inet6_fmt(&ifr6.ifr_addr.sin6_addr));
+			    sa6_fmt(&ifr6.ifr_addr));
 		}
 		else {
 			if (ifr6.ifr_ifru.ifru_flags6 & IN6_IFF_ANYCAST) {
 				log(LOG_DEBUG, 0, "config_vifs_from_kernel: "
 				    "%s on %s is an anycast address, ignored",
-				    inet6_fmt(&ifr6.ifr_addr.sin6_addr),
+				    sa6_fmt(&ifr6.ifr_addr),
 				    ifr.ifr_name);
 				continue;
 			}
@@ -475,7 +474,7 @@ config_vifs_from_kernel()
 			log(LOG_DEBUG,0,
 			    "Installing %s (%s on subnet %s) ,"
 			    "as vif #%u - rate = %d",
-			    v->uv_name,inet6_fmt(&addr.sin6_addr),
+			    v->uv_name, sa6_fmt(&addr),
 			    net6name(&v->uv_prefix.sin6_addr,&mask),
 			    numvifs,v->uv_rate_limit);
 

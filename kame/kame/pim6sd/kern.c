@@ -1,4 +1,4 @@
-/*	$KAME: kern.c,v 1.9 2001/08/09 08:46:56 suz Exp $	*/
+/*	$KAME: kern.c,v 1.10 2002/06/26 10:24:47 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -297,8 +297,8 @@ k_del_mfc(int socket, struct sockaddr_in6 * source, struct sockaddr_in6 * group)
 	return FALSE;
     }
 
-    syslog(LOG_DEBUG, "Deleted MFC entry : src %s ,grp %s", inet6_fmt(&source->sin6_addr),
-	   inet6_fmt(&group->sin6_addr));
+    syslog(LOG_DEBUG, "Deleted MFC entry : src %s ,grp %s", sa6_fmt(source),
+	   sa6_fmt(group));
 
     return TRUE;
 }
@@ -346,7 +346,7 @@ k_chg_mfc(socket, source, group, iif, oifs, rp_addr)
 	pim6dstat.kern_add_cache_fail++;
 	log(LOG_WARNING, errno,
 	    "setsockopt MRT_ADD_MFC for source %s and group %s",
-	    inet6_fmt(&source->sin6_addr), inet6_fmt(&group->sin6_addr));
+	    sa6_fmt(source), sa6_fmt(group));
 	return (FALSE);
     }
     return (TRUE);
@@ -405,7 +405,7 @@ k_get_sg_cnt(socket, source, group, retval)
     {
 	pim6dstat.kern_sgcnt_fail++;
 	log(LOG_WARNING, errno, "SIOCGETSGCNT_IN6 on (%s %s)",
-	    inet6_fmt(&source->sin6_addr), inet6_fmt(&group->sin6_addr));
+	    sa6_fmt(source), sa6_fmt(group));
 	retval->pktcnt = retval->bytecnt = retval->wrong_if = ~0;	/* XXX */
 	return (1);
     }

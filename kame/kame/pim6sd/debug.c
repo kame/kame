@@ -1,4 +1,4 @@
-/*	$KAME: debug.c,v 1.50 2002/04/03 02:47:04 itojun Exp $	*/
+/*	$KAME: debug.c,v 1.51 2002/06/26 10:24:47 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -713,9 +713,9 @@ dump_pim_mrt(fp)
 	    /* Print the (*,G) routing info */
 	    fprintf(fp, "---------------------------(*,G)----------------------------\n");
 	    fprintf(fp, " %-15s", "IN6ADDR_ANY");
-	    fprintf(fp, " %-15s", inet6_fmt(&g->group.sin6_addr));
+	    fprintf(fp, " %-15s", sa6_fmt(&g->group));
 	    fprintf(fp, " %-15s",
-	    g->active_rp_grp ? inet6_fmt(&g->rpaddr.sin6_addr) : "NULL");
+	    g->active_rp_grp ? sa6_fmt(&g->rpaddr) : "NULL");
 
 	    for (vifi = 0; vifi < numvifs; vifi++)
 	    {
@@ -772,7 +772,7 @@ dump_pim_mrt(fp)
 	    fprintf(fp, "Incoming     : %-20s\n", incoming_iif);
 	
 	    fprintf(fp, "Upstream nbr: %s\n",
-		    r->upstream ? inet6_fmt(&r->upstream->address.sin6_addr) : "NONE");
+		    r->upstream ? sa6_fmt(&r->upstream->address) : "NONE");
 
 	    fprintf(fp, "\nTIMERS: Entry=%d JP=%d RS=%d Assert=%d\n",
 		    r->timer, r->jp_timer, r->rs_timer, r->assert_timer);
@@ -797,10 +797,10 @@ dump_pim_mrt(fp)
 		number_of_cache_mirrors++;
 
 	    /* Print the routing info */
-	    fprintf(fp, " %-15s", inet6_fmt(&r->source->address.sin6_addr));
-	    fprintf(fp, " %-15s", inet6_fmt(&g->group.sin6_addr));
+	    fprintf(fp, " %-15s", sa6_fmt(&r->source->address));
+	    fprintf(fp, " %-15s", sa6_fmt(&g->group));
 	    fprintf(fp, " %-15s",
-	       g->active_rp_grp ? inet6_fmt(&g->rpaddr.sin6_addr) : "NULL");
+	       g->active_rp_grp ? sa6_fmt(&g->rpaddr) : "NULL");
 
 	    for (vifi = 0; vifi < numvifs; vifi++)
 	    {
@@ -857,7 +857,7 @@ dump_pim_mrt(fp)
 	    fprintf(fp, "Incoming     : %-20s\n", incoming_iif);
 
 	    fprintf(fp, "Upstream nbr: %s\n",
-		    r->upstream ? inet6_fmt(&r->upstream->address.sin6_addr) : "NONE");
+		    r->upstream ? sa6_fmt(&r->upstream->address) : "NONE");
 
 	    fprintf(fp, "\nTIMERS: Entry=%d JP=%d RS=%d Assert=%d\n",
 		    r->timer, r->jp_timer, r->rs_timer, r->assert_timer);
@@ -889,7 +889,7 @@ dump_pim_mrt(fp)
 	    }
 
 	    /* Print the (*,*,RP) routing info */
-	    fprintf(fp, " RP = %-15s", inet6_fmt(&r->source->address.sin6_addr));
+	    fprintf(fp, " RP = %-15s", sa6_fmt(&r->source->address));
 	    fprintf(fp, " %-15s", "IN6ADDR_ANY");
 
 	    for (vifi = 0; vifi < numvifs; vifi++)
@@ -981,7 +981,7 @@ dump_rp_set(fp)
 
     fprintf(fp, "---------------------------RP-Set----------------------------\n");
     fprintf(fp, "Current BSR address: %s Prio: %d Timeout: %d\n",
-	    inet6_fmt(&curr_bsr_address.sin6_addr), curr_bsr_priority,
+	    sa6_fmt(&curr_bsr_address), curr_bsr_priority,
 	    pim_bootstrap_timer);
     fprintf(fp, "%-40s %-3s Group prefix     Prio Hold Age\n",
 	    "RP-address/Upstream", "IN");
@@ -993,7 +993,7 @@ dump_rp_set(fp)
 	print_upstream = 0;
 
 	fprintf(fp, "%-40s %-3d ",
-		inet6_fmt(&rp->rpentry->address.sin6_addr),
+		sa6_fmt(&rp->rpentry->address),
 		rp->rpentry->incoming);
 	if ((rp_grp_entry = rp->rp_grp_next) != (rp_grp_entry_t *) NULL)
 	{

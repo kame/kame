@@ -1,4 +1,4 @@
-/*	$KAME: trace.c,v 1.15 2001/12/18 03:10:43 jinmei Exp $	*/
+/*	$KAME: trace.c,v 1.16 2002/06/26 10:24:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -148,7 +148,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 		IF_DEBUG(DEBUG_TRACE)
 			log(LOG_DEBUG, 0, "Initial traceroute query rcvd "
 			    "from %s to %s",
-			    inet6_fmt(&src->sin6_addr),
+			    sa6_fmt(src),
 			    inet6_fmt(dst));
 	}
 	else if ((datalen - QLEN) % RLEN == 0) {
@@ -156,8 +156,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 		IF_DEBUG(DEBUG_TRACE)
 			log(LOG_DEBUG, 0, "In-transit traceroute query rcvd "
 			    "from %s to %s",
-			    inet6_fmt(&src->sin6_addr),
-			    inet6_fmt(dst));
+			    sa6_fmt(src), inet6_fmt(dst));
 		if (IN6_IS_ADDR_MULTICAST(dst)) {
 			IF_DEBUG(DEBUG_TRACE)
 				log(LOG_DEBUG, 0, "Dropping multicast response");
@@ -167,7 +166,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 	else {
 		log(LOG_WARNING, 0, "%s from %s to %s",
 		    "Non decipherable traceroute request recieved",
-		    inet6_fmt(&src->sin6_addr), inet6_fmt(dst));
+		    sa6_fmt(src), inet6_fmt(dst));
 		return;
 	}
 
@@ -514,8 +513,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 				IF_DEBUG(DEBUG_TRACE)
 					log(LOG_DEBUG, 0,
 					    "Sending reply to %s from %s",
-					    inet6_fmt(dst),
-					    inet6_fmt(&sa6->sin6_addr));
+					    inet6_fmt(dst), sa6_fmt(sa6));
 				ifindex = uvifs[phys_vif].uv_ifindex;
 			}
 			else {
@@ -543,7 +541,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 			    resptype == MLD_MTRACE_RESP ?
 			    "reply" : "request on",
 			    inet6_fmt(dst),
-			    sa6 ? inet6_fmt(&sa6->sin6_addr) : "unspecified");
+			    sa6 ? sa6_fmt(sa6) : "unspecified");
 	
 		send_mld6(resptype, no, sa6, &resp_sa6, group, ifindex,
 			  0, datalen, 0);

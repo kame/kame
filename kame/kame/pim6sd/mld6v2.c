@@ -1,5 +1,5 @@
 /*
- * $KAME: mld6v2.c,v 1.10 2002/04/03 02:47:04 itojun Exp $
+ * $KAME: mld6v2.c,v 1.11 2002/06/26 10:24:48 jinmei Exp $
  */
 
 /*
@@ -364,8 +364,7 @@ send_mld6v2(int type, int code, struct sockaddr_in6 *src,
 	else
 	    log(log_level(IPPROTO_ICMPV6, type, 0), errno,
 		"sendmsg to %s with src %s on %s",
-		inet6_fmt(&dstp->sin6_addr),
-		src ? inet6_fmt(&src->sin6_addr) : "(unspec)",
+		sa6_fmt(dstp), src ? sa6_fmt(src) : "(unspec)",
 		ifindex2str(index));
 
 	return;
@@ -373,8 +372,7 @@ send_mld6v2(int type, int code, struct sockaddr_in6 *src,
     IF_DEBUG(DEBUG_PKT)
 	log(LOG_DEBUG, 0, "SENT %s from %-15s to %s",
 	    packet_kind(IPPROTO_ICMPV6, type, 0),
-	    src ? inet6_fmt(&src->sin6_addr) : "unspec",
-	    inet6_fmt(&dstp->sin6_addr));
+	    src ? sa6_fmt(src) : "unspec", sa6_fmt(dstp));
 }
 
 

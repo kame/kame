@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.24 2001/12/18 03:10:42 jinmei Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.25 2002/06/26 10:24:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -187,8 +187,7 @@ accept_listener_query(src, dst, group, tmo)
 		    "accepting multicast listener query on %s: "
 		    "src %s, dst %s, grp %s",
 		    v->uv_name,
-		    inet6_fmt(&src->sin6_addr), inet6_fmt(dst),
-		    inet6_fmt(group));
+		    sa6_fmt(src), inet6_fmt(dst), inet6_fmt(group));
 	v->uv_in_mld_query++;
 
 	if (!inet6_equal(&v->uv_querier->al_addr, src)) {
@@ -205,9 +204,9 @@ accept_listener_query(src, dst, group, tmo)
 			IF_DEBUG(DEBUG_MLD)
 				log(LOG_DEBUG, 0, "new querier %s (was %s) "
 				    "on mif %d",
-				    inet6_fmt(&src->sin6_addr),
+				    sa6_fmt(src),
 				    v->uv_querier ?
-				    inet6_fmt(&v->uv_querier->al_addr.sin6_addr) :
+				    sa6_fmt(&v->uv_querier->al_addr) :
 				    "me", mifi);
 
 			v->uv_flags &= ~VIFF_QUERIER;
@@ -240,8 +239,7 @@ accept_listener_query(src, dst, group, tmo)
 			log(LOG_DEBUG, 0,
 			    "%s for %s from %s on mif %d, timer %d",
 			    "Group-specific membership query",
-			    inet6_fmt(group),
-			    inet6_fmt(&src->sin6_addr), mifi, tmo);
+			    inet6_fmt(group), sa6_fmt(src), mifi, tmo);
 
 		group_sa.sin6_addr = *group;
 		group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
@@ -319,8 +317,7 @@ accept_listener_report(src, dst, group)
 		log(LOG_DEBUG, 0,
 		    "accepting multicast listener report: "
 		    "src %s,dst %s, grp %s",
-		    inet6_fmt(&src->sin6_addr),inet6_fmt(dst),
-		    inet6_fmt(group));
+		    sa6_fmt(src),inet6_fmt(dst), inet6_fmt(group));
 
 	v->uv_in_mld_report++;
 
@@ -436,8 +433,7 @@ accept_listener_done(src, dst, group)
 	IF_DEBUG(DEBUG_MLD)
 		log(LOG_INFO, 0,
 		    "accepting listener done message: src %s, dst %s, grp %s",
-		    inet6_fmt(&src->sin6_addr),
-		    inet6_fmt(dst), inet6_fmt(group));
+		    sa6_fmt(src), inet6_fmt(dst), inet6_fmt(group));
 	v->uv_in_mld_done++;
 
 	if (!(v->uv_flags & (VIFF_QUERIER | VIFF_DR)))
