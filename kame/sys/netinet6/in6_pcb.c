@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.69 2000/11/18 11:08:15 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.70 2000/11/28 13:24:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -617,9 +617,8 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, cmdarg, notify)
 					(u_int32_t *)cmdarg);
 		}
 
-
 		/* we've already handled this case */
-		if (notify == in6_rtchange)
+		if (do_rtchange)
 			continue;
 
 		/* at this point, we can assume that NOTIFY is not NULL. */
