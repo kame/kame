@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.76 2003/01/08 05:28:07 suz Exp $	*/
+/*	$KAME: rtadvd.c,v 1.77 2003/03/13 17:09:28 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1333,7 +1333,7 @@ nd6_options(struct nd_opt_hdr *hdr, int limit,
 		hdr = (struct nd_opt_hdr *)((caddr_t)hdr + optlen);
 		optlen = hdr->nd_opt_len << 3;
 		if (hdr->nd_opt_len == 0) {
-			syslog(LOG_ERR,
+			syslog(LOG_INFO,
 			    "<%s> bad ND option length(0) (type = %d)",
 			    __func__, hdr->nd_opt_type);
 			goto bad;
