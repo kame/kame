@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.52 2000/03/09 00:46:12 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.53 2000/03/09 13:02:05 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1219,7 +1219,7 @@ ipsec_set_policy(pcb_sp, optname, request, len, priv)
 	int error;
 
 	/* sanity check. */
-	if (pcb_sp == NULL || *pcb_sp == NULL || xpl == NULL)
+	if (pcb_sp == NULL || *pcb_sp == NULL || request == NULL)
 		return EINVAL;
 	if (len < sizeof(*xpl))
 		return EINVAL;
@@ -1331,7 +1331,9 @@ ipsec4_get_policy(inp, request, len, mp)
 	/* sanity check. */
 	if (inp == NULL || request == NULL || mp == NULL)
 		return EINVAL;
-	if (len != sizeof(*xpl))
+	if (inp->inp_sp == NULL)
+		panic("policy in PCB is NULL\n");
+	if (len < sizeof(*xpl))
 		return EINVAL;
 	xpl = (struct sadb_x_policy *)request;
 
@@ -1344,7 +1346,7 @@ ipsec4_get_policy(inp, request, len, mp)
 		pcb_sp = inp->inp_sp->sp_out;
 		break;
 	default:
-		ipseclog((LOG_ERR, "ipsec6_set_policy: invalid direction=%u\n",
+		ipseclog((LOG_ERR, "ipsec4_set_policy: invalid direction=%u\n",
 			xpl->sadb_x_policy_dir));
 		return EINVAL;
 	}
@@ -1426,7 +1428,9 @@ ipsec6_get_policy(in6p, request, len, mp)
 	/* sanity check. */
 	if (in6p == NULL || request == NULL || mp == NULL)
 		return EINVAL;
-	if (len != sizeof(*xpl))
+	if (in6p->in6p_sp == NULL)
+		panic("policy in PCB is NULL\n");
+	if (len < sizeof(*xpl))
 		return EINVAL;
 	xpl = (struct sadb_x_policy *)request;
 
