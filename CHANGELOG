@@ -1,7 +1,13 @@
-$Id: CHANGELOG,v 1.460 2000/01/18 12:27:58 itojun Exp $
+$Id: CHANGELOG,v 1.461 2000/01/18 13:49:33 itojun Exp $
 
 
 <200001>
+Tue Jan 18 22:48:35 JST 2000  itojun@iijlab.net
+	* kame/libinet6/rresvport_af.c: preserve old rresvport() behavior.
+	  it needs to honor parameter (*port) if given.  previous behavior
+	  was broken.
+	  From: Markus Friedl <Markus.Friedl@informatik.uni-erlangen.de>
+
 Tue Jan 18 16:30:05 JST 2000 kjc@csl.sony.co.jp
 	update ALTQ from 2.0 to 2.1.
 	this version supports openbsd in addition to freebsd2, freebsd3
@@ -31,7 +37,8 @@ Tue Jan 18 16:30:05 JST 2000 kjc@csl.sony.co.jp
 Tue Jan 18 13:57:28 JST 2000  itojun@iijlab.net
 	* freebsd3/sys/netinet6/udp6_usrreq.c: fix panic on udp6_ctlinput.
 	  from: ume@mahoroba.org
-	* kame/rtadvd: obey RFC2461 6.2.5 on SIGTERM.
+	* kame/rtadvd: obey RFC2461 6.2.5 when rtadvd dies with SIGTERM.
+	  read manpage for more details.
 
 Tue Jan 18 12:36:24 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3: good bye __ss_{len,family}, hello ss_{len,family}.
