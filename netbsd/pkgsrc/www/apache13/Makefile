@@ -3,17 +3,17 @@
 # Date created:         Fri Aug 25 16:42:36 CDT 1995
 # Whom:                 ache@nagual.pp.ru
 #
-# $Id: Makefile,v 1.1.1.1 1999/08/08 23:59:35 itojun Exp $
+# $Id: Makefile,v 1.1.1.2 1999/08/10 09:14:59 itojun Exp $
 #
 
-DISTNAME=	apache_1.3.3
-PKGNAME=	apache-1.3.3
+DISTNAME=	apache_1.3.6
+PKGNAME=	apache-1.3.6
 CATEGORIES=	www
-MASTER_SITES=	ftp://www.apache.org/apache/dist/
+MASTER_SITES=	ftp://www.apache.org/dist/
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/ \
-		ftp://www.apache.org/apache/dist/patches/apply_to_1.3.3/
-PATCHFILES=	apache-133-v6-981224.diff.gz
+		ftp://ftp.v6.kame.net/pub/kame/misc/
+PATCHFILES=	apache-136-v6-19990724.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@kame.net
@@ -22,9 +22,11 @@ MAINTAINER=	itojun@kame.net
 # Set APACHE_PERF_TUNING env. variable to YES to get maximum performance
 #
 
-GNU_CONFIGURE=  yes
-CONFIGURE_SCRIPT=	configure.kame-v6
+HAS_CONFIGURE=  yes
+CONFIGURE_SCRIPT=	configure.v6
 CONFIGURE_ARGS= \
+		 --prefix=${PREFIX} \
+		 --sbindir=${PREFIX}/sbin \
 		 --sysconfdir=${PREFIX}/etc/apache \
 		 --includedir=${PREFIX}/include/apache \
 		 --logfiledir=/var/log \
@@ -52,8 +54,8 @@ CFLAGS+= -O6 -fomit-frame-pointer
 
 CONFIGURE_ENV= OPTIM='${OPTIM}'
 
-MAN1=   ab.1 apachectl.1 dbmmanage.1 htdigest.1 htpasswd.1
-MAN8=   apxs.8 httpd.8 logresolve.8 rotatelogs.8
+MAN1=   htdigest.1 htpasswd.1
+MAN8=   apachectl.8 ab.8 apxs.8 httpd.8 logresolve.8 rotatelogs.8
 
 post-patch:
 	chmod +x ${WRKSRC}/${CONFIGURE_SCRIPT}
@@ -62,8 +64,8 @@ post-install:
 	@if [ ! -f ${PREFIX}/etc/rc.d/apache.sh ]; then \
 		${ECHO} "Installing ${PREFIX}/etc/rc.d/apache.sh startup file."; \
 		${ECHO} "#!/bin/sh" > ${PREFIX}/etc/rc.d/apache.sh; \
-		${ECHO} "[ -x /usr/local/sbin/apachectl ] && /usr/local/sbin/apachectl start > /dev/null && echo -n ' apache'" >> ${PREFIX}/etc/rc.d/apache.sh; \
+		${ECHO} "[ -x ${PREFIX}/bin/apachectl ] && ${PREFIX}/bin/apachectl start > /dev/null && echo -n ' apache'" >> ${PREFIX}/etc/rc.d/apache.sh; \
 		chmod 751 ${PREFIX}/etc/rc.d/apache.sh; \
 	fi
 
-.include <bsd.port.mk>
+.include "../../mk/bsd.pkg.mk"
