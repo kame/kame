@@ -1,4 +1,4 @@
-/*	$KAME: altq_hfsc.h,v 1.11 2003/09/17 14:23:25 kjc Exp $	*/
+/*	$KAME: altq_hfsc.h,v 1.12 2003/12/05 05:40:46 kjc Exp $	*/
 
 /*
  * Copyright (c) 1997-1999 Carnegie Mellon University. All Rights Reserved.
@@ -7,10 +7,7 @@
  * its documentation is hereby granted (including for commercial or
  * for-profit use), provided that both the copyright notice and this
  * permission notice appear in all copies of the software, derivative
- * works, or modified versions, and any portions thereof, and that
- * both notices appear in supporting documentation, and that credit
- * is given to Carnegie Mellon University in all publications reporting
- * on direct or indirect use of this code or its derivatives.
+ * works, or modified versions, and any portions thereof.
  *
  * THIS SOFTWARE IS EXPERIMENTAL AND IS KNOWN TO HAVE BUGS, SOME OF
  * WHICH MAY HAVE SERIOUS CONSEQUENCES.  CARNEGIE MELLON PROVIDES THIS
