@@ -1120,7 +1120,8 @@ rip6_stats(off, name)
 	p(rip6s_nosock, "\t%llu message%s dropped due to no socket\n");
 	p(rip6s_nosockmcast,
 	    "\t%llu multicast message%s dropped due to no socket\n");
-	p(rip6s_fullsock, "\t%llu dropped due to full socket buffers\n");
+	p(rip6s_fullsock,
+	    "\t%llu message%s dropped due to full socket buffers\n");
 	delivered = rip6stat.rip6s_ipackets -
 		    rip6stat.rip6s_badsum -
 		    rip6stat.rip6s_nosock -
