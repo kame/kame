@@ -26,13 +26,14 @@
 
 SRCDIR=	${.CURDIR}/../../../kame/dhcp6
 
-PROG=	dhcp6s
-SRCS=	dhcp6s.c common.c config.c if.c timer.c cfparse.y cftoken.l
-CLEANFILES+= lex.yy.c y.tab.h y.tab.c
-CFLAGS+= -g -Wall -Werror
-CFLAGS+= -I${.OBJDIR} -I${SRCDIR}
-CFLAGS+= -DINET6=1 -DHAVE_GETIFADDRS=1 -DHAVE_IFADDRS_H=1 -DHAVE_STDARG_H=1
-CFLAGS+= -DCONF_DH6OPT_PREFIX_DELEGATION=30 \
+PROG=	dhcp6lc
+SRCS=	dhcp6lc.c common.c if.c timer.c dhcp6c_script.c
+CFLAGS+=-g
+CPPFLAGS+=-I.
+CPPFLAGS+=-Wall -Werror
+CPPFLAGS+=-I${SRCDIR}
+CPPFLAGS+=-DINET6=1 -DHAVE_GETIFADDRS=1 -DHAVE_IFADDRS_H=1 -DHAVE_STDARG_H=1
+CPPFLAGS+=-DCONF_DH6OPT_PREFIX_DELEGATION=30 \
 	-DCONF_DH6OPT_PREFIX_INFORMATION=31 \
 	-DCONF_DH6OPT_PREFIX_REQUEST=32 \
 	-DCONF_DH6OPT_IA_PD=33 \
@@ -40,18 +41,14 @@ CFLAGS+= -DCONF_DH6OPT_PREFIX_DELEGATION=30 \
 	-DCONF_DH6OPT_STCODE_NOPREFIXAVAIL=6 \
 	-DCONF_DH6OPT_NTP=35
 
-LDADD+=	-L${.OBJDIR}/../../../lib/libinet6 \
+LDADD+=-L${.CURDIR}/../../../lib/libinet6 \
+	-L${.CURDIR}/../../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
-DPADD+=	${.OBJDIR}/../../../lib/libinet6/libinet6.a \
+DPADD+=${.CURDIR}/../../../lib/libinet6/libinet6.a \
+	${.CURDIR}/../../../lib/libinet6/obj/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
-LDADD+=	-ll -ly
-DPADD+=	${LIBL} ${LIBY}
 
-MAN5=	dhcp6s.conf.5
-MAN8=	dhcp6s.8
-
-# FreeBSD special
-SRCS+=y.tab.h
+MAN=	dhcp6lc.8
 
 .PATH:	${SRCDIR}
 
