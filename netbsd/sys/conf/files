@@ -1184,7 +1184,7 @@ file	netinet/if_atm.c		atm
 file	netinet/igmp.c			inet
 file	netinet/in.c			inet
 file	netinet/in_gif.c		gif & inet
-file	netinet/in_msf.c		inet & (igmpv3 | mldv2)
+file	netinet/in_msf.c		igmpv3 | mldv2
 file	netinet/in_pcb.c		inet
 file	netinet/in_proto.c		inet
 file	netinet/ip_auth.c		ipfilter		needs-flag

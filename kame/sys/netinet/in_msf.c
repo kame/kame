@@ -36,6 +36,9 @@
 
 #if !defined(__OpenBSD__) && !defined(__bsdi__)
 #include "opt_inet.h"
+#ifdef __FreeBSD__
+#include "opt_inet6.h"
+#endif
 #include "opt_mrouting.h"
 #endif
 
@@ -63,6 +66,7 @@
 #include <netinet/ip_mroute.h>
 #include <netinet/igmp.h>
 #include <netinet/igmp_var.h>
+#include <netinet/in_msf.h>
 
 #if defined(IGMPV3) || defined(MLDV2)
 

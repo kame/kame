@@ -921,7 +921,7 @@ file net/net_osdep.c
 file netinet/ip_ecn.c			inet | inet6
 file netinet/ip_encap.c			inet | inet6
 file netinet/in_gif.c			gif & inet
-file netinet/in_msf.c			inet & igmpv3
+file netinet/in_msf.c			igmpv3 | mldv2
 file netinet6/in6_gif.c			gif & inet6
 file netinet6/in6.c			inet6
 file netinet6/in6_ifattach.c		inet6
