@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.24 2000/03/13 17:21:44 sumikawa Exp $
+# $Id: Makefile,v 1.25 2000/04/17 18:09:55 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -27,6 +27,7 @@ SUBDIR+=	libident6
 SUBDIR+=	libpcap
 SUBDIR+=	lynx
 SUBDIR+=	mediator
+SUBDIR+=	mmosaic
 SUBDIR+=	mozilla
 SUBDIR+=	mpg123
 SUBDIR+=	mrt
