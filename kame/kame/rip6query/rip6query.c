@@ -1,4 +1,4 @@
-/*	$KAME: rip6query.c,v 1.14 2001/11/14 03:51:19 onoe Exp $	*/
+/*	$KAME: rip6query.c,v 1.15 2001/11/16 07:01:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -53,8 +53,6 @@
 #include <netdb.h>
 
 #include "route6d.h"
-
-/* wrapper for KAME-special getnameinfo() */
 
 #define	DEFAULT_WAIT	5
 
