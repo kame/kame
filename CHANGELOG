@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1283 2000/09/19 18:14:36 itojun Exp $
+$KAME: CHANGELOG,v 1.1284 2000/09/20 18:19:31 itojun Exp $
 
 <200009>
+Thu Sep 21 03:18:11 JST 2000  itojun@iijlab.net
+	* sys/netinet6/esp_core.c: make it possible to use rijndael and twofish
+	  at the same time.  this obsoletes kernel compile option
+	  IPSEC_ESP_TWOFIHS.
+
 Wed Sep 20 03:10:09 JST 2000  itojun@iijlab.net
 	* sys/netkey/key.c: make proposal/combination payload on SADB_ACQUIRE
 	  message (kernel -> userland) optional, to support ipcomp ACQUIRE
