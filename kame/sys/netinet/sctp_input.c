@@ -1,4 +1,4 @@
-/*	$KAME: sctp_input.c,v 1.7 2002/09/11 02:34:15 itojun Exp $	*/
+/*	$KAME: sctp_input.c,v 1.8 2002/09/18 01:00:25 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_input.c,v 1.189 2002/04/04 18:37:12 randall Exp	*/
 
 /*
@@ -136,21 +136,6 @@ struct sctp_ip6 {
 } sctp_ip6;
 #endif /* INET6 */
 
-static struct mbuf *
-sctp_generate_invmanparam(int err)
-{
-	/* Return a MBUF with a invalid mandatory parameter */
-	struct mbuf *m;
-	MGET(m,M_DONTWAIT,MT_DATA);
-	if (m) {
-		struct sctp_paramhdr *ph;
-		m->m_len = sizeof(struct sctp_paramhdr);
-		ph = mtod(m,struct sctp_paramhdr *);
-		ph->param_length = htons(sizeof(struct sctp_paramhdr));
-		ph->param_type = htons(err);
-	}
-	return (m);
-}
 
 /* INIT handler */
 static void
@@ -793,6 +778,16 @@ sctp_handle_error(struct sctp_chunkhdr *ch,
 		/* Process an Error Cause */
 		error_type = ntohs(phdr->param_type);
 		error_len = ntohs(phdr->param_length);
+		if ((error_len > chklen) || (error_len == 0)) {
+			/* invalid param length for this param */
+#ifdef SCTP_DEBUG
+			if (sctp_debug_on & SCTP_DEBUG_INPUT1) {
+				printf("Bogus length in error param- chunk left:%d errorlen:%d\n",
+				       chklen, error_len);
+			}
+#endif /* SCTP_DEBUG */
+			return;
+		}
 		switch(error_type) {
 		case SCTP_CAUSE_INV_STRM:
 		case SCTP_CAUSE_MISS_PARAM:
@@ -827,14 +822,16 @@ sctp_handle_error(struct sctp_chunkhdr *ch,
 			}
 			break;
 		case SCTP_CAUSE_UNRESOLV_ADDR:
-			/* Nothing we can do here, we don't do hostname addresses
-			 * so if the peer does not like my IPv6 (or IPv4 for that
-			 * matter) it does not matter. If they don't support that
-			 * type of address, they can NOT possibly get that packet
-			 * type... i.e. with no IPv6 you can't recieve a IPv6 packet.
-			 * so we can safely ignore this one. If we ever added
-			 * support for HOSTNAME Addresses, then we would need
-			 * to do something here.
+			/*
+			 * Nothing we can do here, we don't do hostname
+			 * addresses so if the peer does not like my IPv6 (or
+			 * IPv4 for that matter) it does not matter. If they
+			 * don't support that type of address, they can NOT
+			 * possibly get that packet type... i.e. with no IPv6
+			 * you can't recieve a IPv6 packet. so we can safely
+			 * ignore this one. If we ever added support for 
+			 * HOSTNAME Addresses, then we would need to do
+			 * something here.
 			 */
 			break;
 		case SCTP_CAUSE_UNRECOG_CHUNK:
@@ -844,11 +841,11 @@ sctp_handle_error(struct sctp_chunkhdr *ch,
 			sctp_process_unrecog_param(tcb,phdr);
 			break;
 		case SCTP_CAUSE_COOKIE_IN_SHUTDOWN:
-			/* We ignore this since the timer will drive
-			 * out a new cookie anyway and there timer
-			 * will drive us to send a SHUTDOWN_COMPLETE. We
-			 * can't send one here since we don't have their
-			 * tag.
+			/*
+			 * We ignore this since the timer will drive out a new
+			 * cookie anyway and there timer will drive us to send
+			 * a SHUTDOWN_COMPLETE. We can't send one here since
+			 * we don't have their tag.
 			 */
 			break;
 		case SCTP_CAUSE_DELETEING_LAST_ADDR:
@@ -870,7 +867,14 @@ sctp_handle_error(struct sctp_chunkhdr *ch,
 			 * abort instead of in a OP-ERROR.
 			 */
 			break;
-		default:
+	 	default:
+#ifdef SCTP_DEBUG
+			if (sctp_debug_on & SCTP_DEBUG_INPUT1) {
+				/* don't know what this error cause is... */
+				printf("sctp_handle_error: unknown error type = 0x%xh\n",
+				       error_type);
+			}
+#endif /* SCTP_DEBUG */
 			break;
 		}
 		adjust = SCTP_SIZE32(error_len);
@@ -892,7 +896,6 @@ sctp_unpack_usctp_streams(struct sctp_tcb *stcb,
 	struct sctp_paramhdr *phdr,phold;
 	int len,augment,at;
 	int my_len;
-
 
 	phdr = (struct sctp_paramhdr *)((caddr_t)initack_cp + sizeof(struct sctp_init_chunk));
 	len = ntohs(initack_cp->ch.chunk_length) - sizeof(struct sctp_init_chunk);
@@ -1000,7 +1003,8 @@ sctp_handle_init_ack(struct mbuf *m, struct sctp_init_ack_chunk *cp,
 		}
 #endif
 		if (*state & SCTP_STATE_SHUTDOWN_PENDING) {
-			*state = SCTP_STATE_COOKIE_ECHOED | SCTP_STATE_SHUTDOWN_PENDING;
+			*state = SCTP_STATE_COOKIE_ECHOED |
+				SCTP_STATE_SHUTDOWN_PENDING;
 		} else {
 			*state = SCTP_STATE_COOKIE_ECHOED;
 		}
@@ -1121,7 +1125,8 @@ sctp_process_cookie_existing(struct mbuf *m, int offset, int iphlen,
 #endif /* SCTP_DEBUG */
 		return (NULL);
 	}
-	sz_of_init = (unsigned int)(ntohs(init_cp->ch.chunk_length) + init_offset);
+	sz_of_init = (unsigned int)(ntohs(init_cp->ch.chunk_length) +
+				    init_offset);
 
 	/*
 	 * find and validate the INIT-ACK chunk in the cookie (my info)
@@ -1172,25 +1177,33 @@ sctp_process_cookie_existing(struct mbuf *m, int offset, int iphlen,
 
 		case SCTP_STATE_COOKIE_ECHOED:
 			/* Duplicate INIT case */
-			/* Here we have already processed the INIT so no problem */
-			sctp_timer_stop(SCTP_TIMER_TYPE_HEARTBEAT, inp, stcb, netp);
-			sctp_timer_stop(SCTP_TIMER_TYPE_PATHMTURAISE, inp, stcb, netp);
+			/* we have already processed the INIT so no problem */
+			sctp_timer_stop(SCTP_TIMER_TYPE_HEARTBEAT, inp, stcb,
+					netp);
+			sctp_timer_stop(SCTP_TIMER_TYPE_PATHMTURAISE, inp,
+					stcb, netp);
 			sctp_timer_stop(SCTP_TIMER_TYPE_INIT, inp, stcb, netp);
-			sctp_timer_stop(SCTP_TIMER_TYPE_COOKIE, inp, stcb, netp);
+			sctp_timer_stop(SCTP_TIMER_TYPE_COOKIE, inp, stcb,
+					netp);
 			/* update current state */
 			if (assoc->state & SCTP_STATE_SHUTDOWN_PENDING) {
-				assoc->state = SCTP_STATE_OPEN | SCTP_STATE_SHUTDOWN_PENDING;
-			} else {
+				assoc->state = SCTP_STATE_OPEN |
+					SCTP_STATE_SHUTDOWN_PENDING;
+			} else if ((assoc->state & SCTP_STATE_SHUTDOWN_SENT) ==0) {
+				/* if ok, move to OPEN state */
 				assoc->state = SCTP_STATE_OPEN;
 			}
 			/* notify upper layer */
 			*notification = SCTP_NOTIFY_ASSOC_UP;
 			/* start the path MTU raise and heartbeat timers */
-			sctp_timer_start(SCTP_TIMER_TYPE_PATHMTURAISE, inp, stcb, netp);
-			sctp_timer_start(SCTP_TIMER_TYPE_HEARTBEAT, inp, stcb, netp);
+			sctp_timer_start(SCTP_TIMER_TYPE_PATHMTURAISE, inp,
+					 stcb, netp);
+			sctp_timer_start(SCTP_TIMER_TYPE_HEARTBEAT, inp, stcb,
+					 netp);
 			if (stcb->asoc.sctp_autoclose_ticks &&
 			   (inp->sctp_flags & SCTP_PCB_FLAGS_AUTOCLOSE)) {
-				sctp_timer_start(SCTP_TIMER_TYPE_AUTOCLOSE, inp, stcb, NULL);
+				sctp_timer_start(SCTP_TIMER_TYPE_AUTOCLOSE,
+						 inp, stcb, NULL);
 			}
 			break;
 		default:
@@ -1221,7 +1234,7 @@ sctp_process_cookie_existing(struct mbuf *m, int offset, int iphlen,
 			/* Yes, we must set all the streams that we told him
 			 * about in the INIT-ACK.
 			 */
-			sctp_unpack_usctp_streams(stcb, initack_cp,m,offset);
+			sctp_unpack_usctp_streams(stcb, initack_cp, m, offset);
 		}
 		/* respond with a COOKIE-ACK */
 		sctp_send_cookie_ack(stcb);
@@ -1254,7 +1267,8 @@ sctp_process_cookie_existing(struct mbuf *m, int offset, int iphlen,
 		sctp_timer_start(SCTP_TIMER_TYPE_HEARTBEAT, inp, stcb, netp);
 		if (stcb->asoc.sctp_autoclose_ticks &&
 		   (inp->sctp_flags & SCTP_PCB_FLAGS_AUTOCLOSE)) {
-			sctp_timer_start(SCTP_TIMER_TYPE_AUTOCLOSE, inp, stcb, NULL);
+			sctp_timer_start(SCTP_TIMER_TYPE_AUTOCLOSE, inp, stcb,
+					 NULL);
 		}
 		assoc->my_rwnd = ntohl(initack_cp->init.a_rwnd);
 		assoc->pre_open_streams = ntohs(initack_cp->init.num_outbound_streams);
@@ -1300,7 +1314,8 @@ sctp_process_cookie_existing(struct mbuf *m, int offset, int iphlen,
 			*notification = SCTP_NOTIFY_ASSOC_UP;
 		}
 		if (assoc->state & SCTP_STATE_SHUTDOWN_PENDING) {
-			assoc->state = SCTP_STATE_OPEN | SCTP_STATE_SHUTDOWN_PENDING;
+			assoc->state = SCTP_STATE_OPEN |
+				SCTP_STATE_SHUTDOWN_PENDING;
 		} else {
 			assoc->state = SCTP_STATE_OPEN;
 		}
@@ -1354,10 +1369,9 @@ sctp_process_cookie_existing(struct mbuf *m, int offset, int iphlen,
 		sctp_timer_start(SCTP_TIMER_TYPE_PATHMTURAISE, inp, stcb, netp);
 		sctp_timer_start(SCTP_TIMER_TYPE_HEARTBEAT, inp, stcb, netp);
 
-		if (sctp_load_addresses_from_init(stcb,
-						 m, iphlen,
+		if (sctp_load_addresses_from_init(stcb, m, iphlen,
 						 (init_offset + sizeof(struct sctp_init_chunk)),
-						 to,sz_of_init)) {
+						 to, sz_of_init)) {
 #ifdef SCTP_DEBUG
 			if (sctp_debug_on & SCTP_DEBUG_INPUT1) {
 				printf("Weird cookie load_address failure on cookie existing - 3\n");
@@ -1371,11 +1385,13 @@ sctp_process_cookie_existing(struct mbuf *m, int offset, int iphlen,
 			/* Yes, we must set all the streams that we told him
 			 * about in the INIT-ACK.
 			 */
-			sctp_unpack_usctp_streams(stcb, initack_cp,m, offset);
+			sctp_unpack_usctp_streams(stcb, initack_cp, m, offset);
 		}
 		if (assoc->state & SCTP_STATE_SHUTDOWN_PENDING) {
-			assoc->state = SCTP_STATE_OPEN | SCTP_STATE_SHUTDOWN_PENDING;
-		} else {
+			assoc->state = SCTP_STATE_OPEN |
+				SCTP_STATE_SHUTDOWN_PENDING;
+		} else if (!(assoc->state & SCTP_STATE_SHUTDOWN_SENT)) {
+			/* move to OPEN state, if not in SHUTDOWN_SENT */
 			assoc->state = SCTP_STATE_OPEN;
 		}
 		/* respond with a COOKIE-ACK */
@@ -1519,7 +1535,8 @@ sctp_process_cookie_new(struct mbuf *m, int offset, int iphlen,
 		}
 #endif /* SCTP_DEBUG */
 		op_err = sctp_generate_invmanparam(SCTP_CAUSE_OUT_OF_RESC);
-		sctp_abort_association(inp, (struct sctp_tcb *)NULL, m, iphlen,op_err);
+		sctp_abort_association(inp, (struct sctp_tcb *)NULL, m, iphlen,
+				       op_err);
 		return (NULL);
 	}
 	/* get the correct sctp_nets */
@@ -1531,7 +1548,6 @@ sctp_process_cookie_new(struct mbuf *m, int offset, int iphlen,
 	assoc->local_scope = cookie->local_scope;
 	assoc->loopback_scope = cookie->loopback_scope;
 
-
 	if ((assoc->ipv4_addr_legal != cookie->ipv4_addr_legal) ||
 	    (assoc->ipv6_addr_legal != cookie->ipv6_addr_legal)) {
 		struct mbuf *op_err;
@@ -1540,7 +1556,8 @@ sctp_process_cookie_new(struct mbuf *m, int offset, int iphlen,
 		 * was in flight. Only recourse is to abort the association.
 		 */
 		op_err = sctp_generate_invmanparam(SCTP_CAUSE_OUT_OF_RESC);
-		sctp_abort_association(inp, (struct sctp_tcb *)NULL, m, iphlen,op_err);
+		sctp_abort_association(inp, (struct sctp_tcb *)NULL, m, iphlen,
+				       op_err);
 		return (NULL);
 	}
 
@@ -1631,11 +1648,29 @@ sctp_process_cookie_new(struct mbuf *m, int offset, int iphlen,
 	addrlen = offset + length -
 		(initack_offset + sizeof(struct sctp_init_ack_chunk));
 	offset = initack_offset + sizeof(struct sctp_init_ack_chunk);
-	sctp_check_address_list(stcb, m, offset, addrlen, to,
-				cookie->local_scope,
-				cookie->site_scope,
-				cookie->ipv4_scope,
-				cookie->loopback_scope);
+
+	/* warning, we re-use sin, sin6, sa_store here! */
+	/* pull in local_address (our "from" address) */
+	memset((caddr_t)&sa_store, 0, sizeof(sa_store));
+	sin = (struct sockaddr_in *)&sa_store;
+	sin6 = (struct sockaddr_in6 *)&sa_store;
+	if (cookie->laddr_type == SCTP_IPV4_ADDRESS) {
+		/* source addr is IPv4 */
+		sin->sin_family = AF_INET;
+		sin->sin_len = sizeof(struct sockaddr_in);
+		sin->sin_addr.s_addr = cookie->laddress[0];
+	} else {
+		/* source addr is IPv6 */
+		sin6->sin6_family = AF_INET6;
+		sin6->sin6_len = sizeof(struct sockaddr_in6);
+		sin6->sin6_scope_id = cookie->scope_id;
+		memcpy(&sin6->sin6_addr, cookie->laddress,
+		       sizeof(sin6->sin6_addr));
+	}
+	sctp_check_address_list(stcb, m, offset, addrlen,
+				(struct sockaddr *)&sa_store,
+				cookie->local_scope, cookie->site_scope,
+				cookie->ipv4_scope, cookie->loopback_scope);
 
 	/* set up to notify upper layer */
 	*notification = SCTP_NOTIFY_ASSOC_UP;
@@ -2513,7 +2548,7 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 				printf("SCTP_INIT\n");
 			}
 #endif /* SCTP_DEBUG */
-			if (stcb && (stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE)) {
+			if (inp->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE) {
 				/* We are not interested anymore */
 				*length = 0;
 				return (NULL);
@@ -2535,7 +2570,7 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 				printf("SCTP_INIT-ACK\n");
 			}
 #endif /* SCTP_DEBUG */
-			if (stcb && (stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE)) {
+			if (inp->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE) {
 				/* We are not interested anymore */
 				*length = 0;
 				return (NULL);
@@ -2644,7 +2679,7 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 				printf("SCTP_COOKIE-ECHO stcb is %x\n",(u_int)stcb);
 			}
 #endif /* SCTP_DEBUG */
-			if (stcb &&(stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE)) {
+			if (inp->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE) {
 				/* We are not interested anymore */
 				*length = 0;
 				return (NULL);
@@ -2690,7 +2725,7 @@ sctp_process_control(struct mbuf *m, struct sctp_inpcb *inp,
 				printf("SCTP_COOKIE-ACK\n");
 			}
 #endif /* SCTP_DEBUG */
-			if (stcb && (stcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE)) {
+			if (inp->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE) {
 				/* We are not interested anymore */
 				*length = 0;
 				return (NULL);

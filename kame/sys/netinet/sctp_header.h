@@ -1,4 +1,4 @@
-/*    $KAME: sctp_header.h,v 1.4 2002/07/30 04:12:34 itojun Exp $     */
+/*    $KAME: sctp_header.h,v 1.5 2002/09/18 01:00:25 itojun Exp $     */
 /*	Header: /home/sctpBsd/netinet/sctp_header.h,v 1.34 2002/04/03 21:10:19 lei Exp	*/
 
 #ifndef __sctp_header_h__
@@ -150,6 +150,8 @@ struct sctp_state_cookie {		/* this is our definition... */
 	struct timeval time_entered;	/* the time I built cookie */
 	u_int32_t address[4];		/* 4 ints/128 bits */
 	u_int32_t addr_type;		/* address type */
+	u_int32_t laddress[4];          /* my local from address */
+	u_int32_t laddr_type;           /* my local from address type */
 	u_int32_t scope_id;		/* v6 scope id for link-locals */
         u_int8_t ipv4_addr_legal;	/* Are V4 addr legal? */
         u_int8_t ipv6_addr_legal;	/* Are V6 addr legal? */

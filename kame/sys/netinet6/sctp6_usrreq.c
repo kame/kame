@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.9 2002/07/30 04:12:36 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.10 2002/09/18 01:00:26 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -202,7 +202,7 @@ sctp6_input(mp, offp, proto)
 		return IPPROTO_DONE;
 	}
 #else
-	if (faithprefix(&ip6->ip6_dst)){
+	if (faithprefix(&ip6->ip6_dst)) {
 		m_freem(m);
 		return IPPROTO_DONE;
 	}
@@ -238,7 +238,7 @@ sctp6_input(mp, offp, proto)
 		goto out_of;
 	}
 	/* destination port of 0 is illegal, based on RFC2960. */
-	if (sh->dest_port == 0){
+	if (sh->dest_port == 0) {
 		goto out_of;
 	}
 	/*
@@ -676,7 +676,7 @@ sctp6_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 #else
 	     (inp6->inp_flags & IN6P_IPV6_V6ONLY)
 #endif
-	     == 0){
+	     == 0) {
 		if (addr->sa_family == AF_INET) {
 			/* binding v4 addr to v6 socket, so reset flags */
 #if defined(__FreeBSD__)
@@ -695,7 +695,7 @@ sctp6_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 			struct sockaddr_in6 *sin6_p;
 			sin6_p = (struct sockaddr_in6 *)addr;
 
-			if (IN6_IS_ADDR_UNSPECIFIED(&sin6_p->sin6_addr)){
+			if (IN6_IS_ADDR_UNSPECIFIED(&sin6_p->sin6_addr)) {
 #if defined(__FreeBSD__)
 			  inp6->inp_vflag |= INP_IPV4;
 #else
@@ -797,7 +797,7 @@ sctp6_disconnect(struct socket *so)
 				/* Check to see if some data queued */
 				struct sctp_stream_out *outs;
 				TAILQ_FOREACH(outs, &asoc->out_wheel,
-					      next_spoke){
+					      next_spoke) {
 					if (!TAILQ_EMPTY(&outs->outqueue)) {
 						some_on_streamwheel = 1;
 						break;
@@ -892,7 +892,7 @@ sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 #else
 	    (in_inp->inp_flags & IN6P_IPV6_V6ONLY)
 #endif
-	    ){
+	    ) {
 		/*
 		 * if IPV6_V6ONLY flag, we discard datagrams
 		 * destined to a v4 addr or v4-mapped addr
@@ -1061,7 +1061,42 @@ sctp6_getaddr(struct socket *so,
 	sin6->sin6_port = inp->sctp_lport;
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUNDALL) {
 		/* For the bound all case you get back 0 */
+	    if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) {
+		struct sctp_tcb *tcb;
+		struct sockaddr_in6 *sin_a6;
+		struct sctp_nets *net;
+		struct route *rtp;
+		int fnd;
+
+		tcb = LIST_FIRST(&inp->sctp_asoc_list);
+		if (tcb == NULL) {
+		    goto notConn6;
+		}
+		fnd = 0;
+		sin_a6 = NULL;
+		TAILQ_FOREACH(net, &tcb->asoc.nets, sctp_next) {
+		    sin_a6 = (struct sockaddr_in6 *)&net->ra._l_addr;
+		    if (sin_a6->sin6_family == AF_INET6) {
+			fnd = 1;
+			break;
+		    }
+		}
+		if ((!fnd) || (sin_a6 == NULL)) {
+		    /* punt */
+		    goto notConn6;
+		}
+		rtp = (struct route *)&net->ra;
+		sin6->sin6_addr = sctp_ipv6_source_address_selection(inp,
+								     tcb,
+								     sin_a6,
+								     rtp,
+								     net,
+								     0);
+	    }else{
+		/* For the bound all case you get back 0 */
+	    notConn6:
 		memset(&sin6->sin6_addr, 0, sizeof(sin6->sin6_addr));
+	    }
 	} else {
 		/* Take the first IPv6 address in the list */
 		struct sctp_laddr *laddr;
@@ -1135,7 +1170,7 @@ sctp6_peeraddr(struct socket *so,
 		return ECONNRESET;
 	}
 	tcb = LIST_FIRST(&inp->sctp_asoc_list);
-	if (tcb == NULL){
+	if (tcb == NULL) {
 #ifdef __FreeBSD__
 		free(sin6, M_SONAME);
 #endif
@@ -1191,7 +1226,7 @@ sctp6_in6getaddr(struct socket *so,
 	if (error) {
 		/* try v4 next if v6 failed */
 		error = sctp_ingetaddr(so, nam);
-		if (error){
+		if (error) {
 			splx(s);
 			return (error);
 		}
@@ -1239,7 +1274,7 @@ sctp6_getpeeraddr(struct socket *so,
 	if (error) {
 		/* try v4 next if v6 failed */
 		error = sctp_peeraddr(so, nam);
-		if (error){
+		if (error) {
 			splx(s);
 			return (error);
 		}

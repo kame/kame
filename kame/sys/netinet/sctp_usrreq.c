@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.18 2002/09/11 02:34:16 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.19 2002/09/18 01:00:26 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
 
 /*
@@ -606,6 +606,7 @@ sctp_abort(struct socket *so)
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == 0)
 		return EINVAL;	/* ??? possible? panic instead? */
+
 	soisdisconnected(so);
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
@@ -697,7 +698,6 @@ sctp_detach(struct socket *so)
 {
 	struct sctp_inpcb *inp;
 	int s;
-
 	inp = (struct sctp_inpcb *)so->so_pcb;
 	if (inp == 0)
 		return EINVAL;
@@ -706,7 +706,12 @@ sctp_detach(struct socket *so)
 #else
 	s = splnet();
 #endif
-	sctp_inpcb_free(inp,0);
+	if (((so->so_options & SO_LINGER) && (so->so_linger == 0)) ||
+	    (so->so_rcv.sb_cc > 0)) {
+		sctp_inpcb_free(inp,1);
+	} else {
+		sctp_inpcb_free(inp,0);
+	}
 	splx(s);
 	return 0;
 }
@@ -3085,8 +3090,42 @@ sctp_ingetaddr(struct socket *so,
 	}
 	sin->sin_port = inp->sctp_lport;
 	if (inp->sctp_flags & SCTP_PCB_FLAGS_BOUNDALL) {
+	    if (inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) {
+		struct sctp_tcb *tcb;
+		struct sockaddr_in *sin_a;
+		struct route *rtp;
+		struct sctp_nets *net;
+		int fnd;
+
+		tcb = LIST_FIRST(&inp->sctp_asoc_list);
+		if (tcb == NULL) {
+		    goto notConn;
+		}
+		fnd = 0;
+		sin_a = NULL;
+		TAILQ_FOREACH(net, &tcb->asoc.nets, sctp_next) {
+		    sin_a = (struct sockaddr_in *)&net->ra._l_addr;
+		    if (sin_a->sin_family == AF_INET) {
+			fnd = 1;
+			break;
+		    }
+		}
+		if ((!fnd) || (sin_a == NULL)) {
+		    /* punt */
+		    goto notConn;
+		}
+		rtp = (struct route *)&net->ra;
+		sin->sin_addr = sctp_ipv4_source_address_selection(inp,
+								   tcb,
+								   sin_a,
+								   rtp,
+								   net,
+								   0);
+	    }else{
 		/* For the bound all case you get back 0 */
+	    notConn:
 		sin->sin_addr.s_addr = 0;
+	    }
 	} else {
 		/* Take the first IPv4 address in the list */
 		struct sctp_laddr *laddr;

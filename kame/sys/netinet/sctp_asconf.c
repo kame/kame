@@ -1,4 +1,4 @@
-/*	$KAME: sctp_asconf.c,v 1.7 2002/09/11 02:34:15 itojun Exp $	*/
+/*	$KAME: sctp_asconf.c,v 1.8 2002/09/18 01:00:25 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_asconf.c,v 1.72 2002/04/04 15:40:35 randall Exp	*/
 
 /*
@@ -51,6 +51,8 @@
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#include <sys/kernel.h>
+#include <sys/sysctl.h>
 
 #include <net/if.h>
 #include <net/if_types.h>
@@ -76,6 +78,7 @@
 
 #include <netinet/in_pcb.h>
 
+#include <netinet/sctp_var.h>
 #include <netinet/sctp_pcb.h>
 #include <netinet/sctp_header.h>
 #include <netinet/sctputil.h>
@@ -84,15 +87,14 @@
 
 extern struct sctp_epinfo sctppcbinfo;
 
-#ifdef SCTP_DEBUG
-extern u_int32_t sctp_debug_on;
-#endif /* SCTP_DEBUG */
-
 /*
  * debug flags:
  *   SCTP_DEBUG_ASCONF1: protocol info, general info and errors
  *   SCTP_DEBUG_ASCONF2: detailed info
  */
+#ifdef SCTP_DEBUG
+extern u_int32_t sctp_debug_on;
+#endif /* SCTP_DEBUG */
 
 /*
  * draft-ietf-tsvwg-addip-sctp
@@ -907,7 +909,7 @@ sctp_asconf_cleanup(struct sctp_tcb *tcb, struct sctp_nets *netp) {
 /*
  * process an ADD/DELETE IP ack from peer
  * ifa:  corresponding ifaddr to the address being added/deleted
- * type: SCTP_ADD_IP_ADDRESS or SCTP_DELETE_IP_ADDRESS
+ * type: SCTP_ADD_IP_ADDRESS or SCTP_DEL_IP_ADDRESS
  * flag: 1=success, 0=failure
  */
 static void
@@ -1333,7 +1335,6 @@ sctp_asconf_process_param_ack(struct sctp_tcb *stcb,
 		break;
 	default:
 		/* should NEVER happen */
-		printf("process_param_ack: unknown type=%xh\n", param_type);
 		break;
 	} /* switch */
 
@@ -1488,8 +1489,6 @@ sizeof(struct sctp_asconf_paramhdr), aparam_buf);
 			sctp_asconf_process_param_ack(stcb, ap, 1);
 			break;
 		default:
-			printf("handle_asconf_ack: invalid type=%xh\n",
-			       param_type);
 			break;
 		} /* switch */
 
@@ -1949,6 +1948,9 @@ sctp_addr_mgmt(struct ifaddr *ifa, uint16_t type) {
 		if (ep->sctp_flags & SCTP_PCB_FLAGS_AUTO_ASCONF) {
 			sctp_addr_mgmt_ep(ep, ifa, type);
 		} else {
+			/* this address is going away anyways... */
+			if (type == SCTP_DEL_IP_ADDRESS)
+				return;
 			/* (temporarily) restrict this address */
 			sctp_addr_mgmt_restrict_ep(ep, ifa);
 		}
@@ -1991,7 +1993,7 @@ sctp_delete_ip_address(struct ifaddr *ifa) {
 	/* go through all our PCB's */
 	LIST_FOREACH(ep, &sctppcbinfo.listhead, sctp_list) {
 		struct sctp_tcb *tcb;
-		struct sctp_laddr *laddr;
+		struct sctp_laddr *laddr, *laddr_next;
 		/* process for all associations for this endpoint */
 		LIST_FOREACH(tcb, &ep->sctp_asoc_list, sctp_tcblist) {
 			struct sctp_nets *net;
@@ -2001,26 +2003,31 @@ sctp_delete_ip_address(struct ifaddr *ifa) {
 				/* delete this address if cached */
 				rt = net->ra.ro_rt;
 				if ((rt != NULL) && (rt->rt_ifa == ifa)) {
-					RTFREE(rt);
+/*					RTFREE(rt);*/
 					net->ra.ro_rt = NULL;
 				}
 			} /* for each net */
 			/* process through the assoc "pending" list */
-			LIST_FOREACH(laddr, &tcb->asoc.sctp_local_addr_list,
-				     sctp_nxt_addr) {
+			laddr = LIST_FIRST(&tcb->asoc.sctp_local_addr_list);
+			while (laddr != NULL) {
+				laddr_next = LIST_NEXT(laddr, sctp_nxt_addr);
 				/* remove if in use */
 				if (laddr->ifa == ifa) {
 					sctp_remove_laddr(laddr);
 				}
-			} /* for each laddr */
+				laddr = laddr_next;
+			} /* while */
 		} /* for each tcb */
 		/* process through the ep bound addr list */
-		LIST_FOREACH(laddr, &ep->sctp_addr_list, sctp_nxt_addr) {
+		laddr = LIST_FIRST(&ep->sctp_addr_list);
+		while (laddr != NULL) {
+			laddr_next = LIST_NEXT(laddr, sctp_nxt_addr);
 			/* remove if in use */
 			if (laddr->ifa == ifa) {
 				sctp_remove_laddr(laddr);
 			}
-		} /* for each laddr */
+			laddr = laddr_next;
+		} /* while */
 	} /* for each ep */
 }
 
@@ -2749,7 +2756,7 @@ sctp_check_address_list_all(struct sctp_tcb *stcb,
  * list changes for source address selection
  * m, offset: points to the start of the address list in an init-ack chunk
  * length: total length of the address params only
- * init_addr: address where the INIT came from/INIT-ACK went to
+ * init_addr: address where my INIT-ACK was sent from
  */
 void
 sctp_check_address_list(struct sctp_tcb *stcb,

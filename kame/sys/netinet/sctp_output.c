@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.13 2002/09/11 02:34:15 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.14 2002/09/18 01:00:25 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.c,v 1.308 2002/04/04 18:47:03 randall Exp	*/
 
 /*
@@ -117,7 +117,6 @@
 #endif
 #endif
 
-
 #include "faith.h"
 
 #include <netinet/sctp_pcb.h>
@@ -144,7 +143,6 @@
 #ifdef SCTP_DEBUG
 extern u_int32_t sctp_debug_on;
 #endif
-
 
 static int
 sctp_find_cmsg(int c_type,
@@ -444,7 +442,7 @@ sctp_is_addr_in_ep(register struct sctp_inpcb *inp,
 	return (0);
 }
 
-static struct in_addr
+struct in_addr
 sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
 				   register struct sctp_tcb *tcb,
 				   struct sockaddr_in *to,
@@ -976,9 +974,15 @@ sctp_choose_correctv6_scope(struct rtentry *rt,
 			ok = 0;
 		}
 		ifa6 = (struct in6_ifaddr *)rt->rt_ifa;
+		/* ok to use deprecated addresses? */
+		if (!ip6_use_deprecated) {
+			if (ifa6->ia6_flags & IN6_IFF_DEPRECATED) {
+				/* can't use this type */
+				ok = 0;
+			}
+		}
 		if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
 				       IN6_IFF_NOTREADY |
-				       IN6_IFF_DEPRECATED |
 				       IN6_IFF_ANYCAST)) {
 			/* Can't use these types */
 			ok = 0;
@@ -997,9 +1001,15 @@ sctp_choose_correctv6_scope(struct rtentry *rt,
 			continue;
 		}
 		ifa6 = (struct in6_ifaddr *)ifa;
+		/* ok to use deprecated addresses? */
+		if (!ip6_use_deprecated) {
+			if (ifa6->ia6_flags & IN6_IFF_DEPRECATED) {
+				/* can't use this type */
+				continue;
+			}
+		}
 		if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
 				       IN6_IFF_NOTREADY |
-				       IN6_IFF_DEPRECATED |
 				       IN6_IFF_ANYCAST)) {
 			/* Can't use these types */
 			continue;
@@ -1047,9 +1057,15 @@ sctp_choose_correctv6_scope(struct rtentry *rt,
 			continue;
 		}
 		ifa6 = (struct in6_ifaddr *)ifa;
+		/* ok to use deprecated addresses? */
+		if (!ip6_use_deprecated) {
+			if (ifa6->ia6_flags & IN6_IFF_DEPRECATED) {
+				/* can't use this type */
+				continue;
+			}
+		}
 		if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
 				       IN6_IFF_NOTREADY |
-				       IN6_IFF_DEPRECATED |
 				       IN6_IFF_ANYCAST)) {
 			/* Can't use these types */
 			continue;
@@ -1069,7 +1085,7 @@ sctp_choose_correctv6_scope(struct rtentry *rt,
 	return (sin6);
 }
 
-static struct in6_addr
+struct in6_addr
 sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 				   register struct sctp_tcb *tcb,
 				   struct sockaddr_in6 *to,
@@ -1259,10 +1275,17 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 						continue;
 					/* is the interface address valid */
 					ifa6 = (struct in6_ifaddr *)ifa;
-					if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
-							       IN6_IFF_ANYCAST |
-							       IN6_IFF_DEPRECATED |
-							       IN6_IFF_NOTREADY))
+					/* ok to use deprecated addresses? */
+					if (!ip6_use_deprecated) {
+						if (ifa6->ia6_flags &
+						    IN6_IFF_DEPRECATED) {
+							continue;
+						}
+					}
+					if (ifa6->ia6_flags &
+					    (IN6_IFF_DETACHED |
+					     IN6_IFF_ANYCAST |
+					     IN6_IFF_NOTREADY))
 						continue;
 					/* we can use it !! */
 					/* set to start with next intf */
@@ -1307,10 +1330,17 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 						continue;
 					/* is the interface address valid */
 					ifa6 = (struct in6_ifaddr *)ifa;
-					if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
-							       IN6_IFF_DEPRECATED |
-							       IN6_IFF_ANYCAST |
-							       IN6_IFF_NOTREADY))
+					/* ok to use deprecated addresses? */
+					if (!ip6_use_deprecated) {
+						if (ifa6->ia6_flags &
+						    IN6_IFF_DEPRECATED) {
+							continue;
+						}
+					}
+					if (ifa6->ia6_flags &
+					    (IN6_IFF_DETACHED |
+					     IN6_IFF_ANYCAST |
+					     IN6_IFF_NOTREADY))
 						continue;
 					/* we can use it !! */
 					/* set to start with next intf */
@@ -1356,10 +1386,17 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 					}
 					/* is the interface address valid */
 					ifa6 = (struct in6_ifaddr *)ifa;
-					if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
-							       IN6_IFF_ANYCAST |
-							       IN6_IFF_DEPRECATED |
-							       IN6_IFF_NOTREADY))
+					/* ok to use deprecated addresses? */
+					if (!ip6_use_deprecated) {
+						if (ifa6->ia6_flags &
+						    IN6_IFF_DEPRECATED) {
+							continue;
+						}
+					}
+					if (ifa6->ia6_flags &
+					    (IN6_IFF_DETACHED |
+					     IN6_IFF_ANYCAST |
+					     IN6_IFF_NOTREADY))
 						continue;
 					/* we can use it !! */
 					/* set to start with next intf */
@@ -1435,9 +1472,16 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 				}
 				/* is the interface address valid */
 				ifa6 = (struct in6_ifaddr *)laddr->ifa;
+				/* ok to use deprecated addresses? */
+				if (!ip6_use_deprecated) {
+					if (ifa6->ia6_flags &
+					    IN6_IFF_DEPRECATED) {
+				                /* can't use this type */
+						continue;
+					}
+				}
 				if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
 						       IN6_IFF_ANYCAST |
-						       IN6_IFF_DEPRECATED |
 						       IN6_IFF_NOTREADY))
 					continue;
 				tcb->asoc.last_used_address = LIST_NEXT(laddr, sctp_nxt_addr);
@@ -1477,9 +1521,15 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 				}
 				/* is the interface address valid */
 				ifa6 = (struct in6_ifaddr *)laddr->ifa;
+				/* ok to use deprecated addresses? */
+				if (!ip6_use_deprecated) {
+					if (ifa6->ia6_flags &
+					    IN6_IFF_DEPRECATED) {
+						continue;
+					}
+				}
 				if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
 						       IN6_IFF_ANYCAST |
-						       IN6_IFF_DEPRECATED |
 						       IN6_IFF_NOTREADY))
 					continue;
 				tcb->asoc.last_used_address = LIST_NEXT(laddr, sctp_nxt_addr);
@@ -1594,9 +1644,15 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 				}
 				/* is the interface address valid */
 				ifa6 = (struct in6_ifaddr *)laddr->ifa;
+				/* ok to use deprecated addresses? */
+				if (!ip6_use_deprecated) {
+					if (ifa6->ia6_flags &
+					    IN6_IFF_DEPRECATED) {
+						continue;
+					}
+				}
 				if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
 						       IN6_IFF_ANYCAST |
-						       IN6_IFF_DEPRECATED |
 						       IN6_IFF_NOTREADY))
 					continue;
 				return (out6->sin6_addr);
@@ -1653,8 +1709,13 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 		}
 		/* is the interface address valid */
 		ifa6 = (struct in6_ifaddr *)laddr->ifa;
+	        /* ok to use deprecated addresses? */
+		if (!ip6_use_deprecated) {
+			if (ifa6->ia6_flags & IN6_IFF_DEPRECATED) {
+				continue;
+			}
+		}
 		if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
-				       IN6_IFF_DEPRECATED |
 				       IN6_IFF_ANYCAST |
 				       IN6_IFF_NOTREADY))
 			continue;
@@ -1702,8 +1763,13 @@ sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
 		}
 		/* is the interface address valid */
 		ifa6 = (struct in6_ifaddr *)laddr->ifa;
+		/* ok to use deprecated addresses? */
+		if (!ip6_use_deprecated) {
+			if (ifa6->ia6_flags & IN6_IFF_DEPRECATED) {
+				continue;
+			}
+		}
 		if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
-				       IN6_IFF_DEPRECATED |
 				       IN6_IFF_ANYCAST |
 				       IN6_IFF_NOTREADY))
 			continue;
@@ -1725,21 +1791,23 @@ sctp_get_ect(struct sctp_tcb *tcb,
 	     struct sctp_tmit_chunk *chk)
 {
 	u_int8_t this_random;
-	if (tcb->asoc.hb_random_values[0] == 4) {
+	if (((tcb->asoc.hb_random_idx == 3) && (tcb->asoc.hb_ect_randombit > 7)) ||
+	     (tcb->asoc.hb_random_idx > 3)
+	     ){
 		u_int32_t rndval;
 		rndval = sctp_select_initial_TSN(&tcb->sctp_ep->sctp_ep);
 		memcpy(tcb->asoc.hb_random_values,&rndval,
 		       sizeof(tcb->asoc.hb_random_values));
 		this_random = tcb->asoc.hb_random_values[0];
-		tcb->asoc.hb_random_values[0] = 1;
+		tcb->asoc.hb_random_idx = 0;
 		tcb->asoc.hb_ect_randombit = 0;
 	} else {
-		int indx;
-		indx = tcb->asoc.hb_random_values[0];
-		this_random = tcb->asoc.hb_random_values[indx];
+		if (tcb->asoc.hb_ect_randombit > 7){
+		  tcb->asoc.hb_ect_randombit = 0;
+		  tcb->asoc.hb_random_idx++;
+		}
+		this_random = tcb->asoc.hb_random_values[tcb->asoc.hb_random_idx];
 		tcb->asoc.hb_ect_randombit++;
-		if (tcb->asoc.hb_ect_randombit > 7)
-			tcb->asoc.hb_ect_randombit = 0;
 	}
 	if ((this_random >> tcb->asoc.hb_ect_randombit) & 0x01) {
 		if (chk != NULL)
@@ -2298,10 +2366,17 @@ sctp_send_initiate(inp,tcb)
 					struct in6_ifaddr *ifa6;
 
 					ifa6 = (struct in6_ifaddr *)ifa;
-					if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
-							       IN6_IFF_ANYCAST |
-							       IN6_IFF_DEPRECATED |
-							       IN6_IFF_NOTREADY)) {
+				        /* ok to use deprecated addresses? */
+					if (!ip6_use_deprecated) {
+						if (ifa6->ia6_flags &
+						    IN6_IFF_DEPRECATED) {
+							continue;
+						}
+					}
+					if (ifa6->ia6_flags &
+					    (IN6_IFF_DETACHED |
+					     IN6_IFF_ANYCAST |
+					     IN6_IFF_NOTREADY)) {
 						continue;
 					}
 
@@ -2819,6 +2894,9 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 	to = (struct sockaddr *)&store;
 	iph = mtod(in_initpkt, struct ip *);
 	if (iph->ip_v == IPVERSION) {
+		struct in_addr addr;
+		struct route rt;
+
 		sin->sin_family = AF_INET;
 		sin->sin_len = sizeof(struct sockaddr_in);
 		sin->sin_port = initm_in->sh.src_port;
@@ -2828,8 +2906,20 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 		stc.address[1] = 0;
 		stc.address[2] = 0;
 		stc.address[3] = 0;
-		/* address type */
 		stc.addr_type = SCTP_IPV4_ADDRESS;
+		/* local from address */
+		memset(&rt, 0, sizeof(rt));
+		memcpy(&rt.ro_dst, sin, sizeof(*sin));
+		addr = sctp_ipv4_source_address_selection(inp, NULL, sin, &rt,
+							  NULL, 0);
+		if (rt.ro_rt) {
+			RTFREE(rt.ro_rt);
+		}
+		stc.laddress[0] = addr.s_addr;
+		stc.laddress[1] = 0;
+		stc.laddress[2] = 0;
+		stc.laddress[3] = 0;
+		stc.laddr_type = SCTP_IPV4_ADDRESS;
 		/* scope_id is only for v6 */
 		stc.scope_id = 0;
 #ifndef SCTP_DONT_DO_PRIVADDR_SCOPE
@@ -2847,18 +2937,31 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 			stc.local_scope = 1;
 		}
 	} else {
+		struct in6_addr addr;
+		struct route rt;
+
 		ip6 = mtod(in_initpkt, struct ip6_hdr *);
 		sin6->sin6_family = AF_INET6;
 		sin6->sin6_len = sizeof(struct sockaddr_in6);
 		sin6->sin6_port = initm_in->sh.src_port;
 		sin6->sin6_addr = ip6->ip6_src;
 		/* lookup address */
-		memcpy((caddr_t)stc.address,
-		       (caddr_t)&sin6->sin6_addr,sizeof(struct in6_addr));
+		memcpy((caddr_t)stc.address, (caddr_t)&sin6->sin6_addr,
+		       sizeof(struct in6_addr));
 		sin6->sin6_scope_id = 0;
-		/* address type */
 		stc.addr_type = SCTP_IPV6_ADDRESS;
 		stc.scope_id = 0;
+		/* local from address */
+		memset(&rt, 0, sizeof(rt));
+		memcpy(&rt.ro_dst, sin6, sizeof(*sin6));
+		addr = sctp_ipv6_source_address_selection(inp, NULL, sin6, &rt,
+							  NULL, 0);
+		if (rt.ro_rt) {
+			RTFREE(rt.ro_rt);
+		}
+		memcpy((caddr_t)stc.laddress, (caddr_t)&addr,
+		       sizeof(struct in6_addr));
+		stc.laddr_type = SCTP_IPV6_ADDRESS;
 		if (IN6_IS_ADDR_LOOPBACK(&sin6->sin6_addr)) {
 			stc.loopback_scope = 1;
 			stc.local_scope = 1;
@@ -3019,11 +3122,17 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 					struct in6_ifaddr *ifa6;
 
 					ifa6 = (struct in6_ifaddr *)ifa;
-
-					if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
-							       IN6_IFF_ANYCAST |
-							       IN6_IFF_DEPRECATED |
-							       IN6_IFF_NOTREADY))
+				        /* ok to use deprecated addresses? */
+					if (!ip6_use_deprecated) {
+						if (ifa6->ia6_flags &
+						    IN6_IFF_DEPRECATED) {
+							continue;
+						}
+					}
+					if (ifa6->ia6_flags &
+					    (IN6_IFF_DETACHED |
+					     IN6_IFF_ANYCAST |
+					     IN6_IFF_NOTREADY))
 						continue;
 					sin6 = (struct sockaddr_in6 *)ifa->ifa_addr;
 					if (IN6_IS_ADDR_UNSPECIFIED(&sin6->sin6_addr)) {
@@ -3275,6 +3384,12 @@ sctp_msg_append(struct sctp_tcb *tcb,
 		/* It will NEVER fit */
 		return (EMSGSIZE);
 	}
+	if ((srcv->sinfo_flags & MSG_EOF) &&
+	    (tcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_UDPTYPE) &&
+	    (dataout == 0)
+	    ) {
+	  goto zap_by_it_all;
+	}
 	if ((sbspace(&tcb->sctp_socket->so_snd) <
 	    (dataout + asoc->total_output_queue_size)) ||
 	   (asoc->total_output_mbuf_queue_size >
@@ -3459,24 +3574,31 @@ sctp_msg_append(struct sctp_tcb *tcb,
 		   (srcv->sinfo_flags & MSG_PR_SCTP) &&
 		   (srcv->sinfo_timetolive > 0)
 			) {
+		        chk->flags = SCTP_PR_SCTP_ENABLED;
 			if (srcv->sinfo_flags & MSG_PR_BUFFER) {
 				/*
 				 * Time to live is a priority stored in tv_sec
 				 * when doing the buffer drop thing.
 				 */
+			        chk->flags |= SCTP_PR_SCTP_BUFFER;
 				asoc->sent_queue_cnt_removeable++;
 				chk->rec.data.timetodrop.tv_sec = srcv->sinfo_timetolive;
 			} else {
-				SCTP_GETTIME_TIMEVAL(&template.rec.data.timetodrop);
-				chk->rec.data.timetodrop.tv_sec += (srcv->sinfo_timetolive/1000);
-				/* Add in the micro seconds */
-				chk->rec.data.timetodrop.tv_usec += ((srcv->sinfo_timetolive%1000) * 1000);
-				if (chk->rec.data.timetodrop.tv_usec > 1000000) {
-				        /* add in the carry over */
-					template.rec.data.timetodrop.tv_usec -= 1000000;
-					template.rec.data.timetodrop.tv_usec++;
-				}
+			  int sec,usec;
+			  SCTP_GETTIME_TIMEVAL(&chk->rec.data.timetodrop);
+			  sec = (srcv->sinfo_timetolive/1000000);
+			  chk->rec.data.timetodrop.tv_sec += sec;
+			  /* Add in the micro seconds */
+			  usec = (srcv->sinfo_timetolive % 1000000);
+			  chk->rec.data.timetodrop.tv_usec += usec;
+			  if (chk->rec.data.timetodrop.tv_usec > 1000000) {
+			        /* add in the carry over */
+			    chk->rec.data.timetodrop.tv_usec -= 1000000;
+			    chk->rec.data.timetodrop.tv_usec++;
+			  }
 			}
+		}else{
+		  chk->flags = 0;
 		}
 		chk->rec.data.stream_seq = strq->next_sequence_sent;
 		chk->rec.data.TSN_seq = 0;	/* not yet assigned */
@@ -3504,8 +3626,8 @@ sctp_msg_append(struct sctp_tcb *tcb,
 			chk->rec.data.rcv_flags = (SCTP_DATA_FIRST_FRAG|
 						   SCTP_DATA_LAST_FRAG);
 		}
+
 		/* no flags yet, FRAGMENT_OK goes here */
-		chk->flags = 0;
 		sctppcbinfo.ipi_count_chunk++;
 		sctppcbinfo.ipi_gencnt_chunk++;
 		chk->whoTo->ref_count++;
@@ -3565,10 +3687,13 @@ sctp_msg_append(struct sctp_tcb *tcb,
 				 */
 				template.rec.data.timetodrop.tv_sec = srcv->sinfo_timetolive;
 			} else {
+				u_int32_t sec,usec;
 				SCTP_GETTIME_TIMEVAL(&template.rec.data.timetodrop);
-				template.rec.data.timetodrop.tv_sec += (srcv->sinfo_timetolive/1000);
+				sec = (srcv->sinfo_timetolive/1000000);
+				template.rec.data.timetodrop.tv_sec += sec;
 				/* Add in the micro seconds */
-				template.rec.data.timetodrop.tv_usec += ((srcv->sinfo_timetolive%1000) * 1000);
+				usec = (srcv->sinfo_timetolive % 1000000);
+				template.rec.data.timetodrop.tv_usec += usec;
 				if (template.rec.data.timetodrop.tv_usec > 1000000) {
 					/* add in the carry over */
 					template.rec.data.timetodrop.tv_usec -= 1000000;
@@ -3745,9 +3870,12 @@ sctp_msg_append(struct sctp_tcb *tcb,
 		m = NULL;
 	}
 	/* has a SHUTDOWN been (also) requested by the user on this assoc? */
+ zap_by_it_all:
 	if ((srcv->sinfo_flags & MSG_EOF) &&
 	    (tcb->sctp_ep->sctp_flags & SCTP_PCB_FLAGS_UDPTYPE)) {
+	  
 		int some_on_streamwheel = 0;
+
 		if (!TAILQ_EMPTY(&asoc->out_wheel)) {
 			/* Check to see if some data queued */
 			struct sctp_stream_out *outs;
@@ -6187,7 +6315,9 @@ send_forward_tsn(struct sctp_tcb *stcb,
 			/* ok we must trim down the chunk by lowering
 			 * the advance peer ack point.
 			 */
-			cnt_of_skipped = (cnt_of_space-sizeof(struct sctp_forward_tsn_chunk))/sizeof(struct sctp_strseq);
+			cnt_of_skipped = (cnt_of_space-
+					  ((sizeof(struct sctp_forward_tsn_chunk))/
+ 					    sizeof(struct sctp_strseq)));
 			/* Go through and find the TSN that
 			 * will be the one we report.
 			 */
@@ -6199,7 +6329,9 @@ send_forward_tsn(struct sctp_tcb *stcb,
 			last = at;
 			/* last now points to last one I can report, update peer ack point */
 			asoc->advanced_peer_ack_point = last->rec.data.TSN_seq;
+			space_needed -= (cnt_of_skipped * sizeof(struct sctp_strseq));
 		}
+		chk->send_size = space_needed;
 		/* Setup the chunk */
 		fwdtsn = mtod(chk->data,struct sctp_forward_tsn_chunk *);
 		fwdtsn->ch.chunk_length = htons(chk->send_size);
@@ -6259,7 +6391,6 @@ sctp_send_sack(struct sctp_tcb *stcb)
 	asoc = &stcb->asoc;
 	if (asoc->last_data_chunk_from == NULL) {
 		/* Hmm we never received anything */
-		printf("Hmm, can't send a SACK if I never received anything!\n");
 		return;
 	}
 	sctp_set_rwnd(stcb,asoc);

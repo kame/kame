@@ -1,4 +1,4 @@
-/*	$KAME: sctp_structs.h,v 1.5 2002/07/30 04:12:35 itojun Exp $	*/
+/*	$KAME: sctp_structs.h,v 1.6 2002/09/18 01:00:26 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_structs.h,v 1.67 2002/04/03 21:10:19 lei Exp	*/
 
 #ifndef __sctp_structs_h__
@@ -458,6 +458,7 @@ struct sctp_association {
 	u_int8_t fragmented_delivery_inprogress;
 	u_int8_t fragment_flags;
 	u_int8_t hb_ect_randombit;
+        u_int8_t hb_random_idx;
 	u_int8_t nonce_sum_in;
 	/*
 	 * This value, plus all other ack'd but above cum-ack is added

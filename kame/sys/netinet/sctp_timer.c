@@ -1,4 +1,4 @@
-/*	$KAME: sctp_timer.c,v 1.9 2002/09/11 02:34:16 itojun Exp $	*/
+/*	$KAME: sctp_timer.c,v 1.10 2002/09/18 01:00:26 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_timer.c,v 1.60 2002/04/04 17:47:19 randall Exp	*/
 
 /*
@@ -178,7 +178,7 @@ sctp_threshold_management(struct sctp_inpcb *ep,
 #ifdef SCTP_ALTERNATE_ROUTE
 		if (net->error_count > 1) {
 			/* try to find a different route */
-			struct rtentry *rt;
+ 		        struct rtentry *rt;
 			if (net->ra.ro_rt) {
 				rt = rtalloc_alternate((struct sockaddr *)&net->ra._l_addr,
 						       net->ra.ro_rt, 0);
@@ -215,10 +215,15 @@ sctp_threshold_management(struct sctp_inpcb *ep,
 
 	if (tcb->asoc.overall_error_count > threshold) {
 		/* Abort notification sends a ULP notify */
-		printf("Aborting association overall:%d > thresh:%d\n",
-		       tcb->asoc.overall_error_count, threshold);
 		sctp_abort_an_association(ep, tcb, SCTP_FAILED_THRESHOLD,
 					  NULL);
+		if (ep->sctp_flags & SCTP_PCB_FLAGS_SOCKET_GONE){
+		    /* Yes, so can we purge ourself now */
+		    if (LIST_FIRST(&ep->sctp_asoc_list) == NULL) {
+			/* finish the job now */
+			sctp_inpcb_free(ep,1);
+		    }
+		}
 		return (1);
 	}
 	return (0);
@@ -584,7 +589,7 @@ sctp_t1init_timer(struct sctp_inpcb *ep,
 		  struct sctp_nets *net)
 {
 	/* bump the thresholds */
-	if (sctp_threshold_management(ep, tcb, NULL,
+	if (sctp_threshold_management(ep, tcb, net,
 				      tcb->asoc.max_init_times)) {
 		/* Association was destroyed */
 		return;
@@ -753,8 +758,11 @@ sctp_shutdown_timer(struct sctp_inpcb *ep,
 	alt = sctp_find_alternate_net(tcb, net);
 
 	/* third generate a shutdown into the queue for out net */
-	sctp_send_shutdown(tcb,alt);
-
+	if (alt) {
+	  sctp_send_shutdown(tcb,alt);
+	} else {
+	  return;
+	}
 	/* fourth restart timer */
 	sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWN, ep, tcb, alt);
 }

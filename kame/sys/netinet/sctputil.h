@@ -1,4 +1,4 @@
-/*	$KAME: sctputil.h,v 1.5 2002/07/30 04:12:35 itojun Exp $	*/
+/*	$KAME: sctputil.h,v 1.6 2002/09/18 01:00:26 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctputil.h,v 1.36 2002/04/01 21:59:20 randall Exp	*/
 
 #ifndef __sctputil_h__
@@ -138,6 +138,10 @@ int sbappendaddr_nocheck __P((struct sockbuf *sb, struct sockaddr *asa,
 
 struct rtentry *rtalloc_alternate __P((struct sockaddr *,struct rtentry *,
 	int));
+
+
+struct mbuf *
+sctp_generate_invmanparam(int err);
 
 #endif /* KERNEL */
 #endif

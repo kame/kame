@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.c,v 1.12 2002/09/11 02:34:16 itojun Exp $	*/
+/*	$KAME: sctp_pcb.c,v 1.13 2002/09/18 01:00:26 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.c,v 1.207 2002/04/04 16:53:46 randall Exp	*/
 
 /*
@@ -922,7 +922,6 @@ sctp_findassociation_addr(struct mbuf *pkt, int iphlen,
 #ifdef SCTP_TCP_MODEL_SUPPORT
 	chdr = (struct sctp_chunkhdr *)((caddr_t)sh +
 					sizeof(struct sctphdr));
-
 	if ((chdr->chunk_type == SCTP_INITIATION) ||
 	    (chdr->chunk_type == SCTP_INITIATION_ACK) ||
 	    (chdr->chunk_type == SCTP_COOKIE_ACK) ||
@@ -1565,8 +1564,13 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 	if (bindall) {
 		/* binding to all addresses, so just set in the proper flags */
 		ep->sctp_flags |= (SCTP_PCB_FLAGS_BOUNDALL |
-				   SCTP_PCB_FLAGS_DO_ASCONF |
-				   SCTP_PCB_FLAGS_AUTO_ASCONF);
+				   SCTP_PCB_FLAGS_DO_ASCONF);
+		/* set the automatic addr changes from kernel flag */
+		if (sctp_auto_asconf == 0) {
+			ep->sctp_flags &= ~SCTP_PCB_FLAGS_AUTO_ASCONF;
+		} else {
+			ep->sctp_flags |= SCTP_PCB_FLAGS_AUTO_ASCONF;
+		}
 	} else {
 		/*
 		 * bind specific, make sure flags is off and add a new address
@@ -1578,7 +1582,6 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 		 * too (before adding).
 		 */
 		struct ifaddr *ifa;
-		struct sctp_laddr *laddr;
 
 		/*
 		 * first find the interface with the bound address
@@ -1610,42 +1613,34 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 		if (addr->sa_family == AF_INET6) {
 			struct in6_ifaddr *ifa6;
 			ifa6 = (struct in6_ifaddr *)ifa;
+			/*
+			 * allow binding of deprecated addresses as per
+			 * RFC 2462 and ipng discussion
+			 */
 			if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
 					       IN6_IFF_ANYCAST |
-					       IN6_IFF_DEPRECATED |
 					       IN6_IFF_NOTREADY))
 				/* Can't bind a non-existent addr. */
 				return (EINVAL);
 		}
 		/* we're not bound all */
 		ep->sctp_flags &= ~SCTP_PCB_FLAGS_BOUNDALL;
+#if 0 /* use sysctl now */
 		/* don't allow automatic addr changes from kernel */
 		ep->sctp_flags &= ~SCTP_PCB_FLAGS_AUTO_ASCONF;
+#endif
+		/* set the automatic addr changes from kernel flag */
+		if (sctp_auto_asconf == 0) {
+			ep->sctp_flags &= ~SCTP_PCB_FLAGS_AUTO_ASCONF;
+		} else {
+			ep->sctp_flags |= SCTP_PCB_FLAGS_AUTO_ASCONF;
+		}
 		/* allow bindx() to send ASCONF's for binding changes */
 		ep->sctp_flags |= SCTP_PCB_FLAGS_DO_ASCONF;
 		/* add this address to the endpoint list */
-#if defined(__FreeBSD__)
-		laddr = (struct sctp_laddr *)zalloci(sctppcbinfo.ipi_zone_laddr);
-#endif
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		laddr = (struct sctp_laddr *)pool_get(&sctppcbinfo.ipi_zone_laddr,
-						      PR_NOWAIT);
-#endif
-
-		if (laddr == NULL) {
-			/* out of memory? */
-			return (EINVAL);
-		}
-		sctppcbinfo.ipi_count_laddr++;
-		sctppcbinfo.ipi_gencnt_laddr++;
-		bzero(laddr, sizeof(*laddr));
-		laddr->ifa = ifa;
-#ifdef SCTP_DEBUG
-		if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-		        printf("Ok inserting laddr->ifa:%x\n",(u_int)laddr->ifa);
-		}
-#endif
-		LIST_INSERT_HEAD(&ep->sctp_addr_list, laddr, sctp_nxt_addr);
+		error = sctp_insert_laddr(&ep->sctp_addr_list, ifa);
+		if (error != 0)
+			return (error);
 		ep->laddr_count++;
 	}
 	/* find the bucket */
@@ -1654,7 +1649,7 @@ sctp_inpcb_bind(struct socket *so, struct sockaddr *addr, struct proc *p)
 	LIST_INSERT_HEAD(head, ep, sctp_hash);
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_PCB1) {
-	        printf("Main hash to bind at head:%x\n",(u_int)head);
+	        printf("Main hash to bind at head:%x, bound port:%d\n",(u_int)head, ntohs(lport));
 	}
 #endif
 	/* set in the port */
@@ -1710,18 +1705,33 @@ sctp_inpcb_free(struct sctp_inpcb *ep,int immediate)
 			    ((asoc->asoc.state & SCTP_STATE_MASK) == SCTP_STATE_COOKIE_ECHOED)) {
 				/* Just abandon things in the front states */
 				sctp_free_assoc(ep, asoc);
+				continue;
 			} else {
 				asoc->asoc.state |= SCTP_STATE_CLOSED_SOCKET;
-				if (asoc->asoc.total_output_queue_size == 0) {
-					/* nothing in queue send an abort */
-					sctp_send_abort_tcb(asoc, NULL);
-					sctp_free_assoc(ep, asoc);
-				} else {
-					/* Ok we have one with data in queue */
+			}
+			if ((asoc->asoc.size_on_delivery_queue  > 0) ||
+			    (asoc->asoc.size_on_reasm_queue > 0) ||
+			    (asoc->asoc.size_on_all_streams > 0)) {
+				/* Left with Data unread */
+				sctp_send_abort_tcb(asoc, NULL);
+				sctp_free_assoc(ep, asoc);
+				continue;
+			}else if (TAILQ_EMPTY(&asoc->asoc.send_queue) &&
+				  TAILQ_EMPTY(&asoc->asoc.sent_queue)){
+				if ((asoc->asoc.state & SCTP_STATE_MASK) != SCTP_STATE_SHUTDOWN_SENT) {
+					/* there is nothing queued to send, so I send shutdown */
+					sctp_send_shutdown(asoc,asoc->asoc.primary_destination);
+					asoc->asoc.state = SCTP_STATE_SHUTDOWN_SENT;
+					sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWN, asoc->sctp_ep, asoc,
+							 asoc->asoc.primary_destination);
+					sctp_timer_start(SCTP_TIMER_TYPE_SHUTDOWNGUARD, asoc->sctp_ep, asoc,
+							 asoc->asoc.primary_destination);
+					sctp_chunk_output(ep, asoc, 3);
+				}else{
 					/* mark into shutdown pending */
 					asoc->asoc.state |= SCTP_STATE_SHUTDOWN_PENDING;
-					cnt_in_sd++;
 				}
+				cnt_in_sd++;
 			}
 		}
 		/* now is there some left in our SHUTDOWN state? */
@@ -1730,7 +1740,6 @@ sctp_inpcb_free(struct sctp_inpcb *ep,int immediate)
 		}
 	}
 	rt = ip_pcb->inp_route.ro_rt;
-
 	/* First take care of socket level things */
 #ifdef IPSEC
 #ifdef __OpenBSD__
@@ -1740,7 +1749,7 @@ sctp_inpcb_free(struct sctp_inpcb *ep,int immediate)
 		TAILQ_REMOVE(&ip_pcb->inp_tdb_in->tdb_inp_in,
 			     ip_pcb, inp_tdb_in_next);
 	if (ip_pcb->inp_tdb_out)
-	        TAILQ_REMOVE(&ip_pcb->inp_tdb_out->tdb_inp_out, ip_pcb,
+		TAILQ_REMOVE(&ip_pcb->inp_tdb_out->tdb_inp_out, ip_pcb,
 			     inp_tdb_out_next);
 	if (ip_pcb->inp_ipsec_localid)
 		ipsp_reffree(ip_pcb->inp_ipsec_localid);
@@ -2119,8 +2128,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 		else
 			printf("None\n");
 		printf("Port:%d\n",
-		       ntohs(
-			       ((struct sockaddr_in *)firstaddr)->sin_port));
+		       ntohs(((struct sockaddr_in *)firstaddr)->sin_port));
 	}
 #endif /* SCTP_DEBUG */
 	if (firstaddr->sa_family == AF_INET) {
@@ -2198,7 +2206,7 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 		/* out of memory? */
 #ifdef SCTP_DEBUG
 	        if (sctp_debug_on & SCTP_DEBUG_PCB3) {
-			printf("tasoc is NULL?\n");
+			printf("aloc_assoc: no assoc mem left, tasoc=NULL\n");
 	        }
 #endif
 		*error = ENOMEM;
@@ -2239,6 +2247,11 @@ sctp_aloc_assoc(struct sctp_inpcb *ep, struct sockaddr *firstaddr,
 		pool_put(&sctppcbinfo.ipi_zone_asoc, tasoc);
 #endif
 		sctppcbinfo.ipi_count_asoc--;
+#ifdef SCTP_DEBUG
+	        if (sctp_debug_on & SCTP_DEBUG_PCB3) {
+			printf("aloc_assoc: couldn't add remote addr!\n");
+	        }
+#endif
 		*error = imp_ret;
 		return (NULL);
 	}
@@ -2310,10 +2323,10 @@ sctp_del_remote_addr(struct sctp_tcb *tasoc, struct sockaddr *rem)
 	for (net = TAILQ_FIRST(&asoc->nets); net != NULL; net = net_tmp) {
 		net_tmp = TAILQ_NEXT(net, sctp_next);
 		if (((struct sockaddr *)(&net->ra._l_addr))->sa_family !=
-		    rem->sa_family)
+		    rem->sa_family){
 			continue;
-		if (memcmp(((struct sockaddr *)(&net->ra._l_addr))->sa_data,
-			   rem->sa_data,rem->sa_len) == 0) {
+		}
+		if(sctp_cmpaddr((struct sockaddr *)&net->ra._l_addr,rem)){
 			/* we found the guy */
 			asoc->numnets--;
 			TAILQ_REMOVE(&asoc->nets, net, sctp_next);
@@ -2417,7 +2430,7 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 	struct sctp_asconf_addr *aparam;
 	int s;
 
-	/* first, lets purge the  entry from the hash table. */
+	/* first, lets purge the entry from the hash table. */
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 	s = splsoftnet();
 #else
@@ -2463,12 +2476,12 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *tasoc)
 		net = TAILQ_FIRST(&asoc->nets);
 		/* pull from list */
 		if ((sctppcbinfo.ipi_count_raddr == 0) || (prev == net)) {
-			printf("Something is very very wrong\n");
 			break;
 		}
 		prev = net;
 		TAILQ_REMOVE(&asoc->nets, net, sctp_next);
 		/* free it */
+		net->ref_count = 0;
 #if defined(__FreeBSD__)
 		zfreei(sctppcbinfo.ipi_zone_raddr, net);
 #endif
@@ -2814,7 +2827,7 @@ int
 sctp_add_local_addr_ep(struct sctp_inpcb *ep, struct ifaddr *ifa)
 {
 	struct sctp_laddr *laddr;
-	int fnd;
+	int fnd, error;
 	fnd = 0;
 
 	if (ep->sctp_flags & SCTP_PCB_FLAGS_BOUNDALL) {
@@ -2825,8 +2838,8 @@ sctp_add_local_addr_ep(struct sctp_inpcb *ep, struct ifaddr *ifa)
 		struct in6_ifaddr *ifa6;
 		ifa6 = (struct in6_ifaddr *)ifa;
 		if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
-				       IN6_IFF_ANYCAST |
 				       IN6_IFF_DEPRECATED |
+				       IN6_IFF_ANYCAST |
 				       IN6_IFF_NOTREADY))
 			/* Can't bind a non-existent addr. */
 			return (-1);
@@ -2841,25 +2854,9 @@ sctp_add_local_addr_ep(struct sctp_inpcb *ep, struct ifaddr *ifa)
 
 	if (((ep->sctp_flags & SCTP_PCB_FLAGS_BOUNDALL) == 0) && (fnd == 0)) {
 		/* Not bound to all */
-#if defined(__FreeBSD__)
-		laddr = (struct sctp_laddr *)zalloci(sctppcbinfo.ipi_zone_laddr);
-#endif
-#if defined(__NetBSD__) || defined(__OpenBSD__)
-		laddr = (struct sctp_laddr *)pool_get(&sctppcbinfo.ipi_zone_laddr,
-						      PR_NOWAIT);
-#endif
-
-
-		if (laddr == NULL) {
-			/* out of memory? */
-			return (EINVAL);
-		}
-		sctppcbinfo.ipi_count_laddr++;
-		sctppcbinfo.ipi_gencnt_laddr++;
-		bzero(laddr, sizeof(*laddr));
-		laddr->ifa = ifa;
-		/* insert it */
-		LIST_INSERT_HEAD(&ep->sctp_addr_list, laddr, sctp_nxt_addr);
+		error = sctp_insert_laddr(&ep->sctp_addr_list, ifa);
+		if (error != 0)
+			return (error);
 		ep->laddr_count++;
 		/* update inp_vflag flags */
 		if (ifa->ifa_addr->sa_family == AF_INET6) {
@@ -2973,14 +2970,15 @@ sctp_add_local_addr_assoc(struct sctp_tcb *tcb, struct ifaddr *ifa)
 {
 	struct sctp_inpcb *ep;
 	struct sctp_laddr *laddr;
+	int error;
 
 	ep = tcb->sctp_ep;
 	if (ifa->ifa_addr->sa_family == AF_INET6) {
 		struct in6_ifaddr *ifa6;
 		ifa6 = (struct in6_ifaddr *)ifa;
 		if (ifa6->ia6_flags & (IN6_IFF_DETACHED |
+/*				       IN6_IFF_DEPRECATED | */
 				       IN6_IFF_ANYCAST |
-				       IN6_IFF_DEPRECATED |
 				       IN6_IFF_NOTREADY))
 			/* Can't bind a non-existent addr. */
 			return (-1);
@@ -2993,6 +2991,26 @@ sctp_add_local_addr_assoc(struct sctp_tcb *tcb, struct ifaddr *ifa)
 	}
 
 	/* add to the list */
+	error = sctp_insert_laddr(&tcb->asoc.sctp_local_addr_list, ifa);
+	if (error != 0) 
+		return (error);
+	return (0);
+}
+
+/*
+ * insert an laddr entry with the given ifa for the desired list
+ */
+int
+sctp_insert_laddr(struct sctpladdr *list, struct ifaddr *ifa) {
+	struct sctp_laddr *laddr;
+	int s;
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
+
 #if defined(__FreeBSD__)
 	laddr = (struct sctp_laddr *)zalloci(sctppcbinfo.ipi_zone_laddr);
 #endif
@@ -3001,9 +3019,9 @@ sctp_add_local_addr_assoc(struct sctp_tcb *tcb, struct ifaddr *ifa)
 					      PR_NOWAIT);
 #endif
 
-
 	if (laddr == NULL) {
 		/* out of memory? */
+		splx(s);
 		return (EINVAL);
 	}
 	sctppcbinfo.ipi_count_laddr++;
@@ -3011,9 +3029,9 @@ sctp_add_local_addr_assoc(struct sctp_tcb *tcb, struct ifaddr *ifa)
 	bzero(laddr, sizeof(*laddr));
 	laddr->ifa = ifa;
 	/* insert it */
-	LIST_INSERT_HEAD(&tcb->asoc.sctp_local_addr_list, laddr,
-			 sctp_nxt_addr);
-	tcb->asoc.numnets++;
+	LIST_INSERT_HEAD(list, laddr, sctp_nxt_addr);
+
+	splx(s);
 	return (0);
 }
 
@@ -3023,6 +3041,12 @@ sctp_add_local_addr_assoc(struct sctp_tcb *tcb, struct ifaddr *ifa)
 void
 sctp_remove_laddr(struct sctp_laddr *laddr)
 {
+	int s;
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+	s = splsoftnet();
+#else
+	s = splnet();
+#endif
 	/* remove from the list */
 	LIST_REMOVE(laddr, sctp_nxt_addr);
 #if defined(__FreeBSD__)
@@ -3033,6 +3057,8 @@ sctp_remove_laddr(struct sctp_laddr *laddr)
 #endif
 	sctppcbinfo.ipi_count_laddr--;
 	sctppcbinfo.ipi_gencnt_laddr++;
+
+	splx(s);
 }
 
 /*
@@ -3063,6 +3089,7 @@ sctp_del_local_addr_assoc(struct sctp_tcb *tcb, struct ifaddr *ifa)
 			return (0);
 		}
 	}
+
 	/* address not found! */
 	return (-1);
 }
@@ -3131,15 +3158,27 @@ static char sctp_pcb_initialized = 0;
 #if defined(__FreeBSD__)
 
 static int sctp_max_number_of_assoc = SCTP_MAX_NUM_OF_ASOC;
+/* disable sysctl for now...
 SYSCTL_INT(_net_inet_sctp, SCTPCTL_ASOC_CNT, sctp_max_number_of_assoc,
 	   CTLFLAG_RW, &sctp_max_number_of_assoc, 0,
 	   "Size of number of associations for zone init");
+*/
 
 static int sctp_scale_up_for_address = SCTP_SCALE_FOR_ADDR;
+/* disable sysctl for now...
 SYSCTL_INT(_net_inet_sctp, SCTPCTL_SCALE_VAL, sctp_scale_up_for_address,
 	   CTLFLAG_RW, &sctp_scale_up_for_address, 0,
 	   "Scale up value (this * SCTPCTL_ASOC_CNT) yields address zinit");
-#endif
+*/
+#endif /* FreeBSD */
+
+int sctp_auto_asconf = SCTP_DEFAULT_AUTO_ASCONF;
+/* sysctl to enable/disable SCTP_PCB_FLAGS_AUTO_ASCONF for new EP's */
+#if defined(__FreeBSD__)
+SYSCTL_INT(_net_inet_sctp, SCTPCTL_AUTOASCONF, sctp_auto_asconf,
+	   CTLFLAG_RW, &sctp_auto_asconf, 0,
+	   "auto ASCONF flag enable(1)/disable(0)");
+#endif /* FreeBSD */
 
 #ifndef SCTP_TCBHASHSIZE
 #define SCTP_TCBHASHSIZE 1024
@@ -3343,8 +3382,8 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 	struct sockaddr *sa = (struct sockaddr *)&src_store;
 	struct sockaddr_storage dest_store;
 	struct sockaddr *localep_sa = (struct sockaddr *)&dest_store;
-	struct sockaddr_in sin,*sin_2;
-	struct sockaddr_in6 sin6,*sin6_2;
+	struct sockaddr_in sin, *sin_2;
+	struct sockaddr_in6 sin6, *sin6_2;
 
 
 	/* First get the destination address setup too. */
@@ -3410,11 +3449,6 @@ sctp_load_addresses_from_init(struct sctp_tcb *stcb,
 		} else if ((sa->sa_family == AF_INET6) &&
 			   (stcb->asoc.ipv6_addr_legal)) {
 			sctp_add_remote_addr(stcb, sa, 0);
-		} else {
-			printf("Source address is illegal to socket type fam:%d v4:%d v6:%d\n",
-			       sa->sa_family,
-			       stcb->asoc.ipv4_addr_legal,
-			       stcb->asoc.ipv6_addr_legal);
 		}
 	} else {
 		if ((net_tmp != NULL) && (t_tcb == stcb)) {

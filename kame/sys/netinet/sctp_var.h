@@ -1,4 +1,4 @@
-/*	$KAME: sctp_var.h,v 1.6 2002/06/09 16:29:55 itojun Exp $	*/
+/*	$KAME: sctp_var.h,v 1.7 2002/09/18 01:00:26 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_var.h,v 1.46 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef _NETINET_SCTP_VAR_H_
@@ -48,6 +48,7 @@
 #include <sys/socketvar.h>
 #endif
 
+#include <netinet/sctp_pcb.h>
 #include <netinet/sctp_uio.h>
 
 /* SCTP Kernel structures */
@@ -69,16 +70,20 @@ struct  xsctp_inpcb {
 #endif /* __FreeBSD__ */
 
 /*
- * Names for UDP sysctl objects
+ * Names for SCTP sysctl objects
  */
 #define SCTPCTL_STATS		1	/* statistics (read-only) */
 #define	SCTPCTL_MAXDGRAM	2	/* max datagram size */
 #define	SCTPCTL_RECVSPACE	3	/* default receive buffer space */
 #define	SCTPCTL_PCBLIST		4	/* list of PCBs for SCTP sockets */
+#if 0 /* skip 5 and 6 for now */
 #define SCTPCTL_ASOC_CNT	5	/* number of assoc for zinit */
 #define SCTPCTL_SCALE_VAL	6	/* how to scale up for addr's */
-#define SCTPCTL_MAXID		7
+#endif
+#define SCTPCTL_AUTOASCONF      5       /* auto asconf enable/disable flag */
+#define SCTPCTL_MAXID		6
 
+#if 0
 #define SCTPCTL_NAMES { \
 	{ 0, 0 }, \
 	{ "stats", CTLTYPE_STRUCT }, \
@@ -87,7 +92,18 @@ struct  xsctp_inpcb {
 	{ "pcblist", CTLTYPE_STRUCT }, \
 	{ "asoccount", CTLTYPE_INT }, \
 	{ "asocscale", CTLTYPE_INT }, \
+        { "autoasconf", CTLTYPE_INT }, \
 }
+#else
+#define SCTPCTL_NAMES { \
+	{ 0, 0 }, \
+	{ "stats", CTLTYPE_STRUCT }, \
+	{ "maxdgram", CTLTYPE_INT }, \
+	{ "recvspace", CTLTYPE_INT }, \
+	{ "pcblist", CTLTYPE_STRUCT }, \
+        { "autoasconf", CTLTYPE_INT }, \
+}
+#endif /* if 0 */
 
 #ifdef _KERNEL
 

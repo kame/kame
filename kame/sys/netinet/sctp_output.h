@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.h,v 1.3 2002/06/09 16:29:54 itojun Exp $	*/
+/*	$KAME: sctp_output.h,v 1.4 2002/09/18 01:00:25 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_output.h,v 1.33 2002/04/01 21:59:20 randall Exp	*/
 
 #ifndef __sctp_output_h__
@@ -72,6 +72,22 @@ sctp_send_heartbeat_ack(struct sctp_tcb *stcb,
 int
 sctp_is_addr_restricted(register struct sctp_tcb *tcb,
 			struct sockaddr *addr);
+
+struct in_addr
+sctp_ipv4_source_address_selection(register struct sctp_inpcb *inp,
+				   register struct sctp_tcb *tcb,
+				   struct sockaddr_in *to,
+				   struct route *rtp,
+				   struct sctp_nets *net,
+				   int non_asoc_addr_ok);
+
+struct in6_addr
+sctp_ipv6_source_address_selection(register struct sctp_inpcb *inp,
+				   register struct sctp_tcb *tcb,
+				   struct sockaddr_in6 *to,
+				   struct route *rtp,
+				   struct sctp_nets *net,
+				   int non_asoc_addr_ok);
 
 
 int

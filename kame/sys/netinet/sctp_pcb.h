@@ -1,4 +1,4 @@
-/*	$KAME: sctp_pcb.h,v 1.5 2002/07/30 04:12:35 itojun Exp $	*/
+/*	$KAME: sctp_pcb.h,v 1.6 2002/09/18 01:00:26 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_pcb.h,v 1.92 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_pcb_h__
@@ -338,6 +338,8 @@ struct sctp_tcb {
 
 #ifdef _KERNEL
 
+extern int sctp_auto_asconf;
+
 void sctp_fill_pcbinfo(struct sctp_pcbinfo *spcb);
 
 struct sctp_nets *
@@ -397,6 +399,9 @@ sctp_free_assoc(struct sctp_inpcb *ep, struct sctp_tcb *asoc);
 
 int
 sctp_add_local_addr_ep(struct sctp_inpcb *ep, struct ifaddr *laddr);
+
+int
+sctp_insert_laddr(struct sctpladdr *list, struct ifaddr *ifa);
 
 void
 sctp_remove_laddr(struct sctp_laddr *laddr);

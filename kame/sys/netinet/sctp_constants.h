@@ -1,4 +1,4 @@
-/*	$KAME: sctp_constants.h,v 1.3 2002/06/09 16:29:54 itojun Exp $	*/
+/*	$KAME: sctp_constants.h,v 1.4 2002/09/18 01:00:25 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_constants.h,v 1.61 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef __sctp_constants_h__
@@ -43,6 +43,9 @@
 #define SCTP_MAX_NUM_OF_ASOC	1000
 /* how many addresses per assoc remote and local */
 #define SCTP_SCALE_FOR_ADDR	2
+
+/* default AUTO_ASCONF mode enable(1)/disable(0) value (sysctl) */
+#define SCTP_DEFAULT_AUTO_ASCONF  0
 
 /*
  * If you wish to use MD5 instead of SLA uncomment the line below.
@@ -208,7 +211,7 @@
 
 /* bits for TOS field */
 #define SCTP_ECT0_BIT		0x02
-#define SCTP_ECT1_BIT		0x01
+#define SCTP_ECT1_BIT		0x02
 #define SCTP_CE_BITS		0x03
 
 /* below turns off above */
