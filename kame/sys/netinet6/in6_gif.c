@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.82 2001/10/25 11:54:07 jinmei Exp $	*/
+/*	$KAME: in6_gif.c,v 1.83 2001/10/25 12:22:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -213,39 +213,26 @@ in6_gif_output(ifp, family, m)
  sendit:
 #endif /* NBRIDGE */
 	/* See if out cached route is still valid */
-	if (sc->gif_ro6.ro_rt && (!(sc->gif_ro6.ro_rt->rt_flags & RTF_UP) ||
-				  dst->sin6_family != sin6_dst->sin6_family ||
-				  !IN6_ARE_ADDR_EQUAL(&dst->sin6_addr,
-						      &sin6_dst->sin6_addr) ||
+	if (sc->gif_ro6.ro_rt && (dst->sin6_family != sin6_dst->sin6_family ||
 				  sc->rtcache_expire == 0 ||
 				  time_second >= sc->rtcache_expire)) {
 		RTFREE(sc->gif_ro6.ro_rt);
 		sc->gif_ro6.ro_rt = NULL;
 	}
 
-	if (sc->gif_ro6.ro_rt == NULL) {
-		bzero(dst, sizeof(*dst));
-		dst->sin6_family = sin6_dst->sin6_family;
-		dst->sin6_len = sizeof(struct sockaddr_in6);
-		dst->sin6_addr = sin6_dst->sin6_addr;
+	error = ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL);
 
-		rtalloc((struct route *)&sc->gif_ro6);
-		if (sc->gif_ro6.ro_rt == NULL) {
-			m_freem(m);
-			return ENETUNREACH;
-		}
-
+	if (sc->gif_ro6.ro_rt && time_second >= sc->rtcache_expire)
 		sc->rtcache_expire = time_second + in6_gif_rtcachettl;
-	}
-	
-	return(ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL));
+
+	return(error);
 #else	/* !__OpenBSD__ */
 	struct gif_softc *sc = (struct gif_softc*)ifp;
 	struct sockaddr_in6 *dst = (struct sockaddr_in6 *)&sc->gif_ro6.ro_dst;
 	struct sockaddr_in6 *sin6_src = (struct sockaddr_in6 *)sc->gif_psrc;
 	struct sockaddr_in6 *sin6_dst = (struct sockaddr_in6 *)sc->gif_pdst;
 	struct ip6_hdr *ip6;
-	int proto;
+	int proto, error;
 	u_int8_t itos, otos;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second;
@@ -337,57 +324,38 @@ in6_gif_output(ifp, family, m)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	time_second = time.tv_sec;
 #endif
-	if (sc->gif_ro6.ro_rt && (!(sc->gif_ro6.ro_rt->rt_flags & RTF_UP) ||
-				  dst->sin6_family != sin6_dst->sin6_family ||
-				  !IN6_ARE_ADDR_EQUAL(&dst->sin6_addr,
-						      &sin6_dst->sin6_addr) ||
-				  sc->rtcache_expire == 0 ||
-				  time_second >= sc->rtcache_expire)) {
+	if (sc->gif_ro6.ro_rt &&(!dst->sin6_family != sin6_dst->sin6_family ||
+				 sc->rtcache_expire == 0 ||
+				 time_second >= sc->rtcache_expire)) {
 		/*
-		 * The cache route doesn't match, has been invalidated, or has
-		 * expired.
+		 * The address protocol family of the tunnel layer has changed
+		 * (can this really happen?) or the cached route has expired.
+		 * Clear the stale cache and let ip6_output make a new cached
+		 * route.
 		 */
 		RTFREE(sc->gif_ro6.ro_rt);
 		sc->gif_ro6.ro_rt = NULL;
 	}
 
-	if (sc->gif_ro6.ro_rt == NULL) {
-		bzero(dst, sizeof(*dst));
-		dst->sin6_family = sin6_dst->sin6_family;
-		dst->sin6_len = sizeof(struct sockaddr_in6);
-		dst->sin6_addr = sin6_dst->sin6_addr;
-
-#ifdef __bsdi__
-		rtcalloc((struct route *)&sc->gif_ro6);
-#else
-		rtalloc((struct route *)&sc->gif_ro6);
-#endif
-		if (sc->gif_ro6.ro_rt == NULL) {
-			m_freem(m);
-			return ENETUNREACH;
-		}
-
-		/* if it constitutes infinite encapsulation, punt. */
-		if (sc->gif_ro6.ro_rt->rt_ifp == ifp) {
-			RTFREE(sc->gif_ro6.ro_rt);
-			sc->gif_ro6.ro_rt = NULL;
-			m_freem(m);
-			return ENETUNREACH;	/* XXX */
-		}
-
-		sc->rtcache_expire = time_second + in6_gif_rtcachettl;
-	}
-	
 #ifdef IPV6_MINMTU
 	/*
 	 * force fragmentation to minimum MTU, to avoid path MTU discovery.
 	 * it is too painful to ask for resend of inner packet, to achieve
 	 * path MTU discovery for encapsulated packets.
 	 */
-	return(ip6_output(m, 0, &sc->gif_ro6, IPV6_MINMTU, 0, NULL));
+	error = ip6_output(m, 0, &sc->gif_ro6, IPV6_MINMTU, 0, NULL);
 #else
-	return(ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL));
+	error = ip6_output(m, 0, &sc->gif_ro6, 0, 0, NULL);
 #endif
+
+	/*
+	 * if a (new) cached route has been created in ip6_output(), extend
+	 * the expiration time.
+	 */
+	if (sc->gif_ro6.ro_rt && time_second >= sc->rtcache_expire)
+		sc->rtcache_expire = time_second + in6_gif_rtcachettl;
+
+	return(error);
 #endif	/* __OpenBSD__ */
 }
 

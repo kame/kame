@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.78 2001/10/25 09:32:18 jinmei Exp $	*/
+/*	$KAME: in_gif.c,v 1.79 2001/10/25 12:22:58 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -324,6 +324,16 @@ in_gif_output(ifp, family, m)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	time_second = time.tv_sec;
 #endif
+
+	/*
+	 * Check if the cached route is still valid.  If not, create another
+	 * one.
+	 * XXX: we should be able to let ip_output() to validate the cache
+	 * and to make a new route (see in6_gif_output()).  However, FreeBSD's
+	 * ip_output() does not make a clone for the new route, while we'd
+	 * like do so in case of route changes.  Thus, we reluctantly put
+	 * almost duplicated logic here.
+	 */
 	if (sc->gif_ro.ro_rt && (!(sc->gif_ro.ro_rt->rt_flags & RTF_UP) ||
 				 dst->sin_family != sin_dst->sin_family ||
 				 dst->sin_addr.s_addr !=
