@@ -2434,8 +2434,10 @@ tn(argc, argv)
 	if (1 /* retry */) {
 	    char hbuf[NI_MAXHOST];
 
-	    getnameinfo(res->ai_addr, res->ai_addrlen, hbuf, sizeof(hbuf),
-		NULL, 0, NI_NUMERICHOST);
+	    if (getnameinfo(res->ai_addr, res->ai_addrlen, hbuf, sizeof(hbuf),
+		    NULL, 0, NI_NUMERICHOST) != 0) {
+		strcpy(hbuf, "(invalid)");
+	    }
 	    printf("Trying %s...\r\n", hbuf);
 	}
 	net = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
@@ -2497,8 +2499,10 @@ tn(argc, argv)
 	if (connect(net, res->ai_addr, res->ai_addrlen) < 0) {
 	    char hbuf[NI_MAXHOST];
 
-	    getnameinfo(res->ai_addr, res->ai_addrlen, hbuf, sizeof(hbuf),
-		NULL, 0, NI_NUMERICHOST);
+	    if (getnameinfo(res->ai_addr, res->ai_addrlen, hbuf, sizeof(hbuf),
+		    NULL, 0, NI_NUMERICHOST) != 0) {
+		strcpy(hbuf, "(invalid)");
+	    }
 	    fprintf(stderr, "telnet: connect to address %s: ", hbuf);
 
 	    close(net);
