@@ -2662,9 +2662,9 @@ ip_getmopt_srcfilter(sop, imsfp)
 	for (msfsrc = LIST_FIRST(&head), j = 0; numsrc > j && msfsrc;
 			++j, msfsrc = LIST_NEXT(msfsrc, list)) {
 		sin = SIN(&msfsrc->src);
-		error = copyout((void *)&sin->sin_addr,
-				(void *)&(*imsfp)->imsf_slist[j].s_addr,
-				sizeof(u_int32_t));
+		error = copyout((void *)&sin,
+				(void *)&(*imsfp)->imsf_slist[j],
+				sin->sin_len);
 		if (error != 0) {
 			return error;
 		}
@@ -3235,9 +3235,9 @@ sock_getmopt_srcfilter(sop, grpfp)
 	for (msfsrc = LIST_FIRST(&head), j = 0; numsrc > j && msfsrc;
 	     ++j, msfsrc = LIST_NEXT(msfsrc, list)) {
 		sin = SIN(&msfsrc->src);
-		error = copyout((void *)&sin->sin_addr,
-				(void *)&SIN_ADDR(&((*grpfp)->gf_slist[j])),
-				sizeof(u_int32_t));
+		error = copyout((void *)sin,
+				(void *)&((*grpfp)->gf_slist[j]),
+				sin->sin_len);
 		if (error != 0) {
 			return error;
 		}
