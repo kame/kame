@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: policy.c,v 1.12 2000/01/12 16:21:58 itojun Exp $ */
+/* YIPS @(#)$Id: policy.c,v 1.13 2000/01/12 19:15:53 itojun Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -319,7 +319,7 @@ insipsa(new, ipsp)
 
 	for (p = ipsp->proposal; p != NULL; p = p->next) {
 		/* bundled SA ? */
-		if (new->prop_no == p->prop_no) {
+		if (new->prop_no == p->prop_no && new->proto_id != p->proto_id) {
 			if (p->bundles == NULL) {
 				p->bundles = new;
 				return;

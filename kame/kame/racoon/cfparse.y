@@ -48,6 +48,8 @@ struct proposalspec {
 };
 
 struct secprotospec {
+	int prop_no;
+	int trns_no;
 	int strength;		/* for isakmp/ipsec */
 	int encklen;		/* for isakmp/ipsec */
 	time_t lifetime;	/* for isakmp */
@@ -430,6 +432,7 @@ policy_specswrap
 				return -1;
 			}
 
+			ipsecdoi_printsa(cur_spidx->policy->proposal);
 			insspidx(cur_spidx);
 
 			cleanprhead();
@@ -971,12 +974,89 @@ set_ipsec_proposal(spidx, prspec)
 {
 	struct proposalspec *p;
 	struct secprotospec *s;
-	int prop_no = 1; 
-	int trns_no = 1;
+	struct proposalspec *new;
+	int prop_no; 
+	int trns_no;
 	u_int32_t types[MAXALGCLASS];
 
 	if (spidx->policy == NULL)
 		return -1;
+
+	/*
+	 * first, try to assign proposal/transform numbers to the table.
+	 */
+	for (p = prspec; p->next; p = p->next)
+		;
+	prop_no = 1;
+	while (p) {
+		for (s = p->spspec; s && s->next; s = s->next)
+			;
+		trns_no = 1;
+		while (s) {
+			s->prop_no = prop_no;
+			s->trns_no = trns_no;
+			trns_no++;
+			s = s->prev;
+		}
+
+		prop_no++;
+		p = p->prev;
+	}
+
+	/* split up proposals if necessary */
+	for (p = prspec; p && p->next; p = p->next)
+		;
+	while (p) {
+		int proto_id;
+
+		for (s = p->spspec; s && s->next; s = s->next)
+			;
+		if (s)
+			proto_id = s->proto_id;
+		new = NULL;
+		while (s) {
+			if (proto_id != s->proto_id) {
+				if (!new)
+					new = newprspec();
+				if (!new)
+					return -1;
+				new->lifetime = p->lifetime;
+				new->lifebyte = p->lifebyte;
+
+				/* detach it from old list */
+				if (s->prev)
+					s->prev->next = s->next;
+				else
+					p->spspec = s->next;
+				if (s->next)
+					s->next->prev = s->prev;
+				s->next = s->prev = NULL;
+
+				/* insert to new list */
+				insspspec(s, &new);
+			}
+			s = s->prev;
+		}
+
+		if (new) {
+			new->prev = p->prev;
+			p->prev->next = new;
+			new->next = p;
+			p->prev = new;
+			new = NULL;
+		}
+
+		p = p->prev;
+	}
+
+#if 0
+	for (p = prspec; p; p = p->next) {
+		fprintf(stderr, "prspec: %p next=%p prev=%p\n", p, p->next, p->prev);
+		for (s = p->spspec; s; s = s->next) {
+			fprintf(stderr, "    spspec: %p next=%p prev=%p prop:%d trns:%d\n", s, s->next, s->prev, s->prop_no, s->trns_no);
+		}
+	}
+#endif
 
 	for (p = prspec; p->next != NULL; p = p->next)
 		;
@@ -1005,8 +1085,8 @@ set_ipsec_proposal(spidx, prspec)
 
 				/* expanding spspec */
 				clean_tmpalgtype();
-				trns_no = expand_ipsecspec(prop_no, trns_no,
-						types,
+				trns_no = expand_ipsecspec(s->prop_no,
+						s->trns_no, types,
 						algclass_ipsec_enc,
 						algclass_ipsec_auth + 1,
 						p, s, spidx->policy);
@@ -1025,8 +1105,8 @@ set_ipsec_proposal(spidx, prspec)
 
 				/* expanding spspec */
 				clean_tmpalgtype();
-				trns_no = expand_ipsecspec(prop_no, trns_no,
-						types,
+				trns_no = expand_ipsecspec(s->prop_no,
+						s->trns_no, types,
 						algclass_ipsec_auth,
 						algclass_ipsec_auth + 1,
 						p, s, spidx->policy);
@@ -1045,8 +1125,8 @@ set_ipsec_proposal(spidx, prspec)
 
 				/* expanding spspec */
 				clean_tmpalgtype();
-				trns_no = expand_ipsecspec(prop_no, trns_no,
-						types,
+				trns_no = expand_ipsecspec(s->prop_no,
+						s->trns_no, types,
 						algclass_ipsec_comp,
 						algclass_ipsec_comp + 1,
 						p, s, spidx->policy);

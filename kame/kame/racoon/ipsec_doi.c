@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.26 2000/01/12 17:50:34 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.27 2000/01/12 19:15:52 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -3428,6 +3428,11 @@ ipsecdoi_printsa(s0)
 	const struct ipsecsa *s;
 	int level, i;
 
+	if (!s0) {
+		printf("(null)");
+		return;
+	}
+
 	level = 0;
 	for (i = 0; i < level; i++)
 		printf("\t");
@@ -3459,6 +3464,11 @@ ipsecdoi_printsa_bundle0(s0, level)
 	const struct ipsecsa *s;
 	int i;
 
+	if (!s0) {
+		printf("(null)");
+		return;
+	}
+
 	for (i = 0; i < level; i++)
 		printf("\t");
 	if (s0->bundles)
@@ -3479,6 +3489,11 @@ static void
 ipsecdoi_printsa_1(s)
 	const struct ipsecsa *s;
 {
+	if (!s) {
+		printf("(null)");
+		return;
+	}
+
 	printf("(proto_id=%s encmode=%s enctype=%s authtype=%s comptype=%s)",
 		s_ipsecdoi_proto(s->proto_id),
 		s_ipsecdoi_trns(IPSECDOI_PROTO_IPSEC_ESP, s->enctype),
