@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.163 2004/04/13 07:43:11 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.164 2004/04/13 08:06:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -415,7 +415,7 @@ str2number(p)
 	errno = 0;
 	v = (int)strtoul(p, &ep, 10);
 	if (errno == 0 && ep && *ep == '\0')
-		return (int)v;
+		return v;
 	else
 		return -1;
 }
