@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.22 2002/02/25 08:00:02 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.23 2002/03/01 10:46:55 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -276,10 +276,10 @@ main(argc, argv)
 		}
 		KREAD(nl[N_MIP6_CONFIG].n_value, &mip6_config, mip6_config);
 		switch (mip6_config.mcfg_type) {
-		case MIP6_CONFIG_TYPE_MN:
+		case MIP6_CONFIG_TYPE_MOBILENODE:
 			type = "mobile node";
 			break;
-		case MIP6_CONFIG_TYPE_HA:
+		case MIP6_CONFIG_TYPE_HOMEAGENT:
 			type = "home agent";
 			break;
 		default:
