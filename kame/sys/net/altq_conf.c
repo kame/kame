@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_conf.c,v 1.1 1999/08/05 17:18:22 itojun Exp $
+ * $Id: altq_conf.c,v 1.1.1.1 1999/10/02 05:52:29 itojun Exp $
  */
 
 #ifdef ALTQ
@@ -42,18 +42,12 @@
 #include <sys/socket.h>
 #include <sys/kernel.h>
 #include <sys/errno.h>
-#ifdef DEVFS
+#if defined(__FreeBSD__) && defined(DEVFS)
 #include <sys/devfsext.h>
 #endif /*DEVFS*/
-#include <net/if_altq.h>
+#include <net/if.h>
 #include <net/altq_conf.h>
-
-/* ioctl cmd type (copied from altq_var.h not to include netinet headers) */
-#if defined(__FreeBSD__) && (__FreeBSD__ < 3)
-typedef int ioctlcmd_t;
-#else
-typedef u_long ioctlcmd_t;
-#endif
+#include <netinet/altq.h>
 
 #ifdef CBQ
 altqdev_decl(cbq);
@@ -75,6 +69,15 @@ altqdev_decl(rio);
 #endif
 #ifdef LOCALQ
 altqdev_decl(localq);
+#endif
+#ifdef HFSC
+altqdev_decl(hfsc);
+#endif
+#ifdef CDNR
+altqdev_decl(cdnr);
+#endif
+#ifdef BLUE
+altqdev_decl(blue);
 #endif
 
 /*
@@ -117,6 +120,21 @@ static struct altqsw altqsw[] = {				/* minor */
 #else
 	{"noq",	noopen,		noclose,	noioctl},  /* 7 (local use) */
 #endif
+#ifdef HFSC
+	{"hfsc",hfscopen,	hfscclose,	hfscioctl},	/* 8 */
+#else
+	{"noq",	noopen,		noclose,	noioctl},	/* 8 */
+#endif
+#ifdef CDNR
+	{"cdnr",cdnropen,	cdnrclose,	cdnrioctl},	/* 9 */
+#else
+	{"noq",	noopen,		noclose,	noioctl},	/* 9 */
+#endif
+#ifdef BLUE
+	{"blue",blueopen,	blueclose,	blueioctl},	/* 10 */
+#else
+	{"noq",	noopen,		noclose,	noioctl},	/* 10 */
+#endif
 };
 
 /*
@@ -127,9 +145,17 @@ int	naltqsw = sizeof (altqsw) / sizeof (altqsw[0]);
 static	d_open_t	altqopen;
 static	d_close_t	altqclose;
 static	d_ioctl_t	altqioctl;
+#ifdef __FreeBSD__
 static void altq_drvinit __P((void *));
+#else
+void	altqattach __P((int));
+#endif
 
-#define CDEV_MAJOR 96 /* FreeBSD official number */
+#if defined(__FreeBSD__)
+#define CDEV_MAJOR 96		 /* FreeBSD official number */
+#elif defined(__NetBSD__)
+#define CDEV_MAJOR 65		 /* not official */
+#endif
 
 #ifndef __NetBSD__
 static struct cdevsw altq_cdevsw = 
@@ -185,7 +211,7 @@ altqioctl(dev, cmd, addr, flag, p)
 }
 
 
-static altq_devsw_installed = 0;
+static int altq_devsw_installed = 0;
 
 #ifdef __FreeBSD__
 #ifdef DEVFS

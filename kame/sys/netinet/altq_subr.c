@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_subr.c,v 1.1 1999/08/05 17:18:21 itojun Exp $
+ * $Id: altq_subr.c,v 1.1.1.1 1999/10/02 05:52:42 itojun Exp $
  */
 
 #ifdef ALTQ
@@ -64,6 +64,11 @@
 
 #include <net/altq_conf.h>
 #include <netinet/altq.h>
+
+#ifdef __FreeBSD__
+#include "opt_cpu.h"	/* for FreeBSD-2.2.8 to get i586_ctr_freq */
+#include <machine/clock.h>
+#endif
 
 /*
  * internal function prototypes
@@ -360,7 +365,7 @@ extract_ports4(m, ip, fin)
 			break;
 	if (m0 == NULL) {
 #ifdef ALTQ_DEBUG
-		printf("extract_ports4: can't locate header! ip=0x%x\n", ip);
+		printf("extract_ports4: can't locate header! ip=%p\n", ip);
 #endif
 		return (0);
 	}
@@ -447,7 +452,7 @@ extract_ports6(m, ip6, fin6)
 			break;
 	if (m0 == NULL) {
 #ifdef ALTQ_DEBUG
-		printf("extract_ports6: can't locate header! ip6=0x%x\n", ip6);
+		printf("extract_ports6: can't locate header! ip6=%p\n", ip6);
 #endif
 		return (0);
 	}
@@ -529,7 +534,7 @@ int acc_add_filter(classifier, filter, class, phandle)
 	void	*class;
 	u_long	*phandle;
 {
-	struct acc_filter *afp;
+	struct acc_filter *afp, *prev, *tmp;
 	int	i, s;
 
 #ifdef INET6
@@ -609,9 +614,22 @@ int acc_add_filter(classifier, filter, class, phandle)
 	afp->f_fbmask = filt2fibmask(filter);
 	classifier->acc_fbmask |= afp->f_fbmask;
 
-	/* add the filter to the head of the filter list. */
+	/*
+	 * add this filter to the filter list.
+	 * filters are ordered from the highest rule number.
+	 */
 	s = splimp();
-	LIST_INSERT_HEAD(&classifier->acc_filters[i], afp, f_chain);
+	prev = NULL;
+	LIST_FOREACH(tmp, &classifier->acc_filters[i], f_chain) {
+		if (tmp->f_filter.ff_ruleno > afp->f_filter.ff_ruleno)
+			prev = tmp;
+		else
+			break;
+	}
+	if (prev == NULL)
+		LIST_INSERT_HEAD(&classifier->acc_filters[i], afp, f_chain);
+	else
+		LIST_INSERT_AFTER(prev, afp, f_chain);
 	splx(s);
 
 	*phandle = afp->f_handle;
@@ -1151,5 +1169,127 @@ int altq_mkctlhdr(pr_hdr)
 	pr_hdr->ph_hdr = (caddr_t)ip;
 	return (0);
 }
+
+/*
+ * read and write diffserv field in IPv4 or IPv6 header
+ */
+u_int8_t
+read_dsfield(ph)
+	struct pr_hdr *ph;
+{
+	u_int8_t ds_field;
+	
+	if (ph->ph_family == AF_INET)
+		ds_field = ((struct ip *)ph->ph_hdr)->ip_tos;
+#ifdef INET6
+	else if (ph->ph_family == AF_INET6) {
+		u_int32_t flowlabel;
+		
+		flowlabel = ((struct ip6_hdr *)ph->ph_hdr)->ip6_flow;
+		ds_field = (ntohl(flowlabel) >> 20) & 0xff;
+	}
+#endif
+	else
+		ds_field = 0; /* XXX */
+
+	return (ds_field);
+}
+
+void
+write_dsfield(ph, dsfield)
+	struct pr_hdr *ph;
+	u_int8_t dsfield;
+{
+	if (ph->ph_family == AF_INET) {
+		struct ip *ip = (struct ip *)ph->ph_hdr;
+		u_int8_t old;
+		int32_t sum;
+		
+		old = ip->ip_tos;
+		dsfield |= old & 3;	/* leave CU bits */
+		if (old == dsfield)
+			return;
+		ip->ip_tos = dsfield;
+		/*
+		 * update checksum (from RFC1624)
+		 *	   HC' = ~(~HC + ~m + m')
+		 */
+		sum = ~ntohs(ip->ip_sum) & 0xffff;
+		sum += 0xff00 + (~old & 0xff) + dsfield;
+		sum = (sum >> 16) + (sum & 0xffff);
+		sum += (sum >> 16);  /* add carry */
+		
+		ip->ip_sum = htons(~sum & 0xffff);
+	}
+#ifdef INET6
+	else if (ph->ph_family == AF_INET6) {
+		struct ip6_hdr *ip6 = (struct ip6_hdr *)ph->ph_hdr;
+		u_int32_t flowlabel;
+
+		flowlabel = ntohl(ip6->ip6_flow);
+		flowlabel = (flowlabel & 0xf03fffff) | (dsfield << 20);
+		ip6->ip6_flow = htonl(flowlabel);
+	}
+#endif
+	return;
+}
+
+
+/*
+ * high resolution clock support taking advantage of a machine dependent
+ * high resolution time counter (e.g., timestamp counter of intel pentium).
+ * we assume
+ *  - 64-bit-long monotonically-increasing counter
+ *  - frequency range is 100M-1GHz (CPU speed)
+ */
+u_int32_t machclk_freq = 0;
+u_int32_t machclk_per_tick = 0;
+
+#if (_MACHINE_ARCH == i386)
+#ifdef __FreeBSD__
+void init_machclk(void) 
+{
+#if (__FreeBSD_version > 300000)
+	machclk_freq = tsc_freq;
+#else
+	machclk_freq = i586_ctr_freq;
+#endif
+	machclk_per_tick = machclk_freq / hz;
+}
+#else /* !__FreeBSD__ */
+/*
+ * measure Pentium TSC clock frequency 
+ */
+void init_machclk(void) 
+{
+	static int	hfscwait;
+	struct timeval	tv_start, tv_end;
+	u_int64_t	start, end, diff;
+	int		timo;
+
+	microtime(&tv_start);
+	start = read_machclk();
+	timo = hz;	/* 1 sec */
+	(void)tsleep(&hfscwait, PWAIT | PCATCH, "hfscopen", timo);
+	microtime(&tv_end);
+	end = read_machclk();
+	diff = (u_int64_t)(tv_end.tv_sec - tv_start.tv_sec) * 1000000
+		+ tv_end.tv_usec - tv_start.tv_usec;
+	if (diff != 0)
+		machclk_freq = (u_int)((end - start) * 1000000 / diff);
+	machclk_per_tick = machclk_freq / hz;
+
+	printf("altq: TSC clock: %uHz\n", machclk_freq);
+}
+#endif /* !__FreeBSD__ */
+#else /* _MACHINE_ARCH != i386 */
+/* use microtime() for now */
+void init_machclk(void) 
+{
+	machclk_freq = 1000000 << MACHCLK_SHIFT;
+	machclk_per_tick = machclk_freq / hz;
+	printf("altq: emulate %uHz cpu clock\n", machclk_freq);
+}
+#endif /* _MACHINE_ARCH != i386 */
 
 #endif /* ALTQ */

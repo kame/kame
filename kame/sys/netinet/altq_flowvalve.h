@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_flowvalve.h,v 1.1 1999/08/05 17:18:19 itojun Exp $
+ * $Id: altq_flowvalve.h,v 1.1.1.1 1999/10/02 05:52:43 itojun Exp $
  */
 
 #ifndef _NETINET_ALTQ_FLOWVALVE_H_

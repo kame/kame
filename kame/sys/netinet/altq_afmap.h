@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_afmap.h,v 1.2 1999/08/16 20:03:56 shin Exp $
+ * $Id: altq_afmap.h,v 1.1.1.1 1999/10/02 05:52:42 itojun Exp $
  */
 
 #ifndef _NETINET_ALTQ_AFMAP_H_

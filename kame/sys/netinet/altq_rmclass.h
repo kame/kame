@@ -1,4 +1,4 @@
-/* $Id: altq_rmclass.h,v 1.1 1999/08/05 17:18:20 itojun Exp $ */
+/* $Id: altq_rmclass.h,v 1.1.1.1 1999/10/02 05:52:42 itojun Exp $ */
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
  * All rights reserved.
@@ -35,7 +35,7 @@
 #ifndef _NETINET_ALTQ_RMCLASS_H_
 #define	_NETINET_ALTQ_RMCLASS_H_
 
-#pragma ident "@(#)rm_class.h  1.20     97/10/23 SMI"
+/* #pragma ident "@(#)rm_class.h  1.20     97/10/23 SMI" */
 
 #ifdef __cplusplus
 extern "C" {
@@ -48,8 +48,6 @@ typedef struct rm_ifdat		rm_ifdat_t;
 typedef struct rm_class		rm_class_t;
 
 struct red;
-
-#define	m_pktlen(m0)	((m0)->m_pkthdr.len)
 
 /*
  * Macros for dealing with time values.  We assume all times are
@@ -166,7 +164,9 @@ struct rm_class {
 
 	struct red	*red_;		/* RED state pointer */
 	struct pr_hdr	*pr_hdr_;	/* saved proto hdr used by RED/ECN */
+	int		flags_;
 
+	int		last_pkttime_;	/* saved pkt_time */
 	struct timeval	undertime_;	/* time can next send */
 	struct timeval	last_;		/* time last packet sent */
 	struct timeval	overtime_;
@@ -230,6 +230,7 @@ struct rm_ifdat {
 #define RMCF_ECN		0x0002
 #define RMCF_RIO		0x0004
 #define RMCF_FLOWVALVE		0x0008	/* use flowvalve (aka penalty-box) */
+#define RMCF_CLEARDSCP		0x0010  /* clear diffserv codepoint */
 
 /* flags for rmc_init */
 #define RMCF_WRR		0x0100

@@ -1,3 +1,4 @@
+/* $Id: altq_cbq.h,v 1.1.1.1 1999/10/02 05:52:42 itojun Exp $ */
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
  *
@@ -31,10 +32,13 @@
 #ifndef _NETINET_ALTQ_CBQ_H_
 #define	_NETINET_ALTQ_CBQ_H_
 
-#pragma ident "@(#)cbq.h  1.18     98/05/13 SMI"
+/* #pragma ident "@(#)cbq.h  1.18     98/05/13 SMI" */
 
 #include <sys/ioccom.h>
 #include <netinet/altq.h>
+#include <netinet/altq_red.h>
+#include <netinet/altq_rio.h>
+#include <netinet/altq_classq.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -106,6 +110,7 @@ typedef struct cbq_class_spec {
 #define CBQCLF_ECN		0x0002  /* use RED/ECN */
 #define CBQCLF_RIO		0x0004  /* use RIO */
 #define CBQCLF_FLOWVALVE	0x0008	/* use flowvalve (aka penalty-box) */
+#define CBQCLF_CLEARDSCP	0x0010  /* clear diffserv codepoint */
 
 /* class flags only for root class */
 #define CBQCLF_WRR		0x0100	/* weighted-round robin */
@@ -162,19 +167,9 @@ typedef struct _cbq_class_stats_ {
 	int		qcnt;		/* # packets in queue */
 	int		avgidle;
 
-	/* red related info */
-	int		q_avg;
-	u_int		xmit_packets;
-	u_int		drop_forced;
-	u_int		drop_unforced;
-	u_int		marked_packets;
-	/* rio related info */
-	int		in_avg;
-	u_int		in_xmit_packets;
-	u_int		in_drop_forced;
-	u_int		in_drop_unforced;
-	u_int		in_marked_packets;
-
+	/* red and rio related info */
+	int		qtype;
+	struct redstats	red[3];
 } class_stats_t;
 
 struct cbq_getstats {

@@ -56,7 +56,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_red.c,v 1.1 1999/08/05 17:18:19 itojun Exp $
+ * $Id: altq_red.c,v 1.1.1.1 1999/10/02 05:52:42 itojun Exp $
  */
 
 #ifndef _NO_OPT_ALTQ_H_
@@ -180,6 +180,11 @@
 
 /* red_list keeps all red_queue_t's allocated. */
 static red_queue_t *red_list = NULL;
+
+/* default red parameter values */
+static int default_th_min = TH_MIN;
+static int default_th_max = TH_MAX;
+static int default_inv_pmax = INV_P_MAX;
 
 /* internal function prototypes */
 static int red_enqueue __P((struct ifnet *, struct mbuf *,
@@ -439,6 +444,18 @@ redioctl(dev, cmd, addr, flag, p)
 
 		} while (0);
 		break;
+
+	case RED_SETDEFAULTS:
+		do {
+			struct redparams *rp;
+
+			rp = (struct redparams *)addr;
+
+			default_th_min = rp->th_min;
+			default_th_max = rp->th_max;
+			default_inv_pmax = rp->inv_pmax;
+		} while (0);
+		break;
 		
 	case RED_ACC_ENABLE:
 		/* enable accounting mode */
@@ -525,15 +542,15 @@ red_alloc(weight, inv_pmax, th_min, th_max, flags, pkttime)
 	else
 		rp->red_weight = weight;
 	if (inv_pmax == 0)
-		rp->red_inv_pmax = INV_P_MAX;
+		rp->red_inv_pmax = default_inv_pmax;
 	else
 		rp->red_inv_pmax = inv_pmax;
 	if (th_min == 0)
-		rp->red_thmin = TH_MIN;
+		rp->red_thmin = default_th_min;
 	else
 		rp->red_thmin = th_min;
 	if (th_max == 0)
-		rp->red_thmax = TH_MAX;
+		rp->red_thmax = default_th_max;
 	else
 		rp->red_thmax = th_max;
 
@@ -606,6 +623,21 @@ red_destroy(rp)
 #endif
 	wtab_destroy(rp->red_wtab);
 	FREE(rp, M_DEVBUF);
+}
+
+void 
+red_getstats(rp, sp)
+	red_t *rp;
+	struct redstats *sp;
+{
+	sp->q_avg 		= rp->red_avg >> rp->red_wshift;
+	sp->xmit_packets	= rp->red_stats.xmit_packets;
+	sp->drop_packets	= rp->red_stats.drop_packets;
+	sp->drop_forced		= rp->red_stats.drop_forced;
+	sp->drop_unforced	= rp->red_stats.drop_unforced;
+	sp->marked_packets	= rp->red_stats.marked_packets;
+	sp->xmit_bytes		= rp->red_stats.xmit_bytes;
+	sp->drop_bytes		= rp->red_stats.drop_bytes;
 }
 
 /*
@@ -801,7 +833,7 @@ int red_addq(rp, q, m, pr_hdr)
  *	    = (avg-th_min) / (2*(th_max-th_min)*inv_p_max - count*(avg-th_min))
  * here prob_a increases as successive undrop count increases.
  * (prob_a starts from prob/2, becomes prob when (count == (1 / prob)),
- * becomes 1 when (count >= (2 / probe))).
+ * becomes 1 when (count >= (2 / prob))).
  */
 int drop_early(fp_len, fp_probd, count)
 	int fp_len;	/* (avg - TH_MIN) in fixed-point */
@@ -1147,7 +1179,7 @@ static __inline struct fve *flowlist_lookup(fv, pr_hdr, now)
 		}
 		break;
 #ifdef INET6
-	case AF_INET:
+	case AF_INET6:
 		ip6 = (struct ip6_hdr *)pr_hdr->ph_hdr;
 		TAILQ_FOREACH(fve, &fv->fv_flowlist, fve_lru){
 			if (fve->fve_lastdrop.tv_sec == 0)
@@ -1156,7 +1188,7 @@ static __inline struct fve *flowlist_lookup(fv, pr_hdr, now)
 				fve->fve_lastdrop.tv_sec = 0;
 				break;
 			}
-			if (fve->fve_flow.flow_af = = AF_INET6 &&
+			if (fve->fve_flow.flow_af == AF_INET6 &&
 			    IN6_ARE_ADDR_EQUAL(&fve->fve_flow.flow_ip6.ip6_src,
 					       &ip6->ip6_src) &&
 			    IN6_ARE_ADDR_EQUAL(&fve->fve_flow.flow_ip6.ip6_dst,

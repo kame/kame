@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: if_altq.h,v 1.1 1999/08/05 17:18:22 itojun Exp $
+ * $Id: if_altq.h,v 1.1.1.1 1999/10/02 05:52:29 itojun Exp $
  */
 #ifndef _NET_IF_ALTQ_H_
 #define _NET_IF_ALTQ_H_
@@ -42,28 +42,20 @@ struct pr_hdr {
 #define ALTQF_READY	 0x01	/* driver supports alternate queueing */
 #define ALTQF_ENABLE	 0x02	/* altq is in use */
 #define ALTQF_ACCOUNTING 0x04	/* altq accounting is enabled */
+#define ALTQF_CNDTNING	 0x08	/* altq traffic conditioning is enabled */
 #define ALTQF_DRIVER1	 0x40	/* driver specific */
-
-/* if_altqtype */
-#define ALTQT_NONE	0	/* reserved */
-#define ALTQT_CBQ	1	/* cbq */
-#define ALTQT_WFQ	2	/* wfq */
-#define ALTQT_AFMAP	3	/* afmap */
-#define ALTQT_FIFOQ	4	/* fifoq */
-#define ALTQT_RED	5	/* red */
-#define ALTQT_RIO	6	/* rio */
-#define ALTQT_LOCALQ	7	/* local use */
-#define ALTQT_MAX	8
 
 /* if_altqflags set internally only: */
 #define	ALTQF_CANTCHANGE 	(ALTQF_READY)
 
 #define ALTQ_IS_READY(ifp)	((ifp)->if_altqflags & ALTQF_READY)
 #define ALTQ_IS_ON(ifp)		((ifp)->if_altqflags & ALTQF_ENABLE)
+#define ALTQ_IS_CNDTNING(ifp)	((ifp)->if_altqflags & ALTQF_CNDTNING)
 
 #define SET_ACCOUNTING(ifp)	((ifp)->if_altqflags |= ALTQF_ACCOUNTING)
 #define CLEAR_ACCOUNTING(ifp)	((ifp)->if_altqflags &= ~ALTQF_ACCOUNTING)
-
+#define SET_CNDTNING(ifp)	((ifp)->if_altqflags |= ALTQF_CNDTNING)
+#define CLEAR_CNDTNING(ifp)	((ifp)->if_altqflags &= ~ALTQF_CNDTNING)
 
 /* if_altqenqueue 4th arg */
 #define ALTEQ_NORMAL	0	/* normal queueing */

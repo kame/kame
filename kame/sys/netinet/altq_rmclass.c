@@ -1,4 +1,4 @@
-/* $Id: altq_rmclass.c,v 1.1 1999/08/05 17:18:20 itojun Exp $ */
+/* $Id: altq_rmclass.c,v 1.1.1.1 1999/10/02 05:52:43 itojun Exp $ */
 /*
  * Copyright (c) 1991-1997 Regents of the University of California.
  * All rights reserved.
@@ -34,7 +34,7 @@
  * LBL code modified by speer@eng.sun.com, May 1977.
  * For questions and/or comments, please send mail to cbq@ee.lbl.gov
  *
- * $Id: altq_rmclass.c,v 1.1 1999/08/05 17:18:20 itojun Exp $
+ * $Id: altq_rmclass.c,v 1.1.1.1 1999/10/02 05:52:43 itojun Exp $
  */
 
 #ident "@(#)rm_class.c  1.48     97/12/05 SMI"
@@ -65,12 +65,8 @@
 #include <netinet/altq_classq.h>
 #include <netinet/altq_rmclass.h>
 #include <netinet/altq_rmclass_debug.h>
-#ifdef CBQ_RED
 #include <netinet/altq_red.h>
-#ifdef CBQ_RIO
 #include <netinet/altq_rio.h>
-#endif
-#endif /* CBQ_RED */
 
 /*
  * Local Macros
@@ -256,8 +252,15 @@ rmc_newclass(pri, ifd, nsecPerByte, action, maxq, parent, borrow,
 	qlimit(cl->q_) = maxq;
 	qtype(cl->q_) = Q_DROPHEAD;
 	qlen(cl->q_) = 0;
+	cl->flags_ = flags;
 
+#if 1 /* minidle is also scaled in ALTQ */
+	cl->minidle_ = (minidle * (int)nsecPerByte) / 8;
+	if (cl->minidle_ > 0)
+		cl->minidle_ = 0;
+#else
 	cl->minidle_ = minidle;
+#endif
 	cl->maxidle_ = (maxidle * nsecPerByte) / 8;
 	if (cl->maxidle_ == 0)
 		cl->maxidle_ = 1;
@@ -281,7 +284,10 @@ rmc_newclass(pri, ifd, nsecPerByte, action, maxq, parent, borrow,
 			red_flags |= REDF_ECN;
 		if (flags & RMCF_FLOWVALVE)
 			red_flags |= REDF_FLOWVALVE;
-		
+#ifdef CBQ_RIO
+		if (flags & RMCF_CLEARDSCP)
+			red_flags |= RIOF_CLEARDSCP;
+#endif
 		red_pkttime = nsecPerByte * pktsize  / 1000;
 
 		if (flags & RMCF_RED) {
@@ -292,7 +298,7 @@ rmc_newclass(pri, ifd, nsecPerByte, action, maxq, parent, borrow,
 		}
 #ifdef CBQ_RIO
 		else {
-			cl->red_ = (red_t *)rio_alloc(0, 0, 0, 0, 0, 0, 0,
+			cl->red_ = (red_t *)rio_alloc(0, NULL,
 						      red_flags, red_pkttime);
 			if (cl->red_ != NULL)
 				qtype(cl->q_) = Q_RIO;
@@ -365,7 +371,13 @@ rmc_modclass(cl, nsecPerByte, maxq, maxidle, minidle, offtime, pktsize)
 
 	qlimit(cl->q_) = maxq;
 
+#if 1 /* minidle is also scaled in ALTQ */
+	cl->minidle_ = (minidle * nsecPerByte) / 8;
+	if (cl->minidle_ > 0)
+		cl->minidle_ = 0;
+#else
 	cl->minidle_ = minidle;
+#endif
 	cl->maxidle_ = (maxidle * nsecPerByte) / 8;
 	if (cl->maxidle_ == 0)
 		cl->maxidle_ = 1;
@@ -1268,9 +1280,9 @@ rmc_update_class_util(ifd)
 	struct rm_ifdat *ifd;
 {
 	int		idle, avgidle, pktlen;
+	int 		pkt_time, tidle;
 	rm_class_t	*cl, *borrowed;
 	rm_class_t	*borrows;
-	long 		pkt_time;
 	struct timeval	*nowp;
 
 	/*
@@ -1369,8 +1381,9 @@ rmc_update_class_util(ifd)
 				avgidle = cl->avgidle_ = cl->minidle_;
 #endif
 			/* set next idle to make avgidle 0 */
-			pkt_time += (1 - RM_POWER) * avgidle >> RM_FILTER_GAIN;
-			TV_ADD_DELTA(&ifd->ifnow_, pkt_time, &cl->undertime_);
+			tidle = pkt_time +
+				(((1 - RM_POWER) * avgidle) >> RM_FILTER_GAIN);
+			TV_ADD_DELTA(nowp, tidle, &cl->undertime_);
 			++cl->stats_.over;
 		} else {
 			cl->avgidle_ =
@@ -1390,6 +1403,7 @@ rmc_update_class_util(ifd)
 				borrows = NULL;
 		}
 		cl->last_ = ifd->ifnow_;
+		cl->last_pkttime_ = pkt_time;
 
 #if 1
 		if (cl->parent_ == NULL) {
@@ -1408,7 +1422,7 @@ rmc_update_class_util(ifd)
 	cl = ifd->class_[ifd->qo_];
 	if (borrowed && (ifd->cutoff_ >= borrowed->depth_)) {
 #if 1 /* ALTQ */
-		if ((qlen(cl->q_) <= 1) || TV_LT(nowp, &borrowed->undertime_)) {
+		if ((qlen(cl->q_) <= 0) || TV_LT(nowp, &borrowed->undertime_)) {
 			rmc_tl_satisfied(ifd, nowp);
 			CBQTRACE(rmc_update_class_util, 'broe', ifd->cutoff_);
 		}
@@ -1507,35 +1521,39 @@ void
 rmc_delay_action(cl, borrow)
 	struct rm_class *cl, *borrow;
 {
-	int	delay;
-	int	t;
+	int	delay, t, extradelay;
 
 	cl->stats_.overactions++;
-	if (TV_LT(&cl->overtime_, &cl->ifdat_->ifnow_))
-		cl->overtime_ = cl->ifdat_->ifnow_;
 	TV_DELTA(&cl->undertime_, &cl->overtime_, delay);
 #ifndef BORROW_OFFTIME
 	delay += cl->offtime_;
 #endif
 
-	if ((delay > 0) && !cl->sleeping_) {
+	if (!cl->sleeping_) {
 		CBQTRACE(rmc_delay_action, 'yled', cl->stats_.handle);
 #ifdef BORROW_OFFTIME
-		if (borrow != NULL) {
-			TV_ADD_DELTA(&cl->undertime_, borrow->offtime_, &cl->undertime_);
-			delay += borrow->offtime_;
+		if (borrow != NULL)
+			extradelay = borrow->offtime_;
+		else
+#endif
+			extradelay = cl->offtime_;
+
+#ifdef ALTQ
+		/*
+		 * XXX recalculate suspend time:
+		 * current undertime is (tidle + pkt_time) calculated
+		 * from the last transmission.
+		 *	tidle: time required to bring avgidle back to 0
+		 *	pkt_time: target waiting time for this class
+		 * we need to replace pkt_time by offtime
+		 */
+		extradelay -= cl->last_pkttime_;
+#endif
+		if (extradelay > 0) {
+			TV_ADD_DELTA(&cl->undertime_, extradelay, &cl->undertime_);
+			delay += extradelay;
 		}
-		else {
-			TV_ADD_DELTA(&cl->undertime_, cl->offtime_, &cl->undertime_);
-			delay += cl->offtime_;
-		}
-#else /* BORROW_OFFTIME */
-		TV_ADD_DELTA(&cl->undertime_, cl->offtime_, &cl->undertime_);
-#endif /* BORROW_OFFTIME */
-		/* this code cancels the undertime set in rmc_update_class_util. */
-		TV_ADD_DELTA(&cl->undertime_,
-			     -((1 - RM_POWER) * cl->avgidle_) >> RM_FILTER_GAIN,
-			     &cl->undertime_);
+
 		cl->sleeping_ = 1;
 		cl->stats_.delays++;
 
@@ -1546,8 +1564,15 @@ rmc_delay_action(cl, borrow)
 		 * NOTE:  If there's no other traffic, we need the timer as
 		 * a 'backstop' to restart this class.
 		 */  
-		if (delay > tick * 2)
+		if (delay > tick * 2) {
+#ifdef __FreeBSD__
+			/* FreeBSD rounds up the tick */
 			t = hzto(&cl->undertime_);
+#else
+			/* other BSDs round down the tick */
+			t = hzto(&cl->undertime_) + 1;
+#endif
+		}
 		else
 			t = 2;
 		TIMEOUT((timeout_t *)rmc_restart, (caddr_t)cl, t,
@@ -1633,10 +1658,14 @@ _rmc_addq(cl, m)
 			cl->stats_.drop_bytes += len;
 			return (-1);
 		}
+		return (0);
 	}
-	else
 #endif /* CBQ_RED */
-		_addq(cl->q_, m);
+
+	if (cl->flags_ & RMCF_CLEARDSCP)
+		write_dsfield(cl->pr_hdr_, 0);
+
+	_addq(cl->q_, m);
 	return (0);
 }
 

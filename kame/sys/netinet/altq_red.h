@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_red.h,v 1.1 1999/08/05 17:18:19 itojun Exp $
+ * $Id: altq_red.h,v 1.1.1.1 1999/10/02 05:52:42 itojun Exp $
  */
 
 #ifndef _NETINET_ALTQ_RED_H_
@@ -77,6 +77,29 @@ struct red_conf {
 #define REDF_ECN6	0x02	/* use packet marking for IPv6 packets */
 #define REDF_ECN	(REDF_ECN4 | REDF_ECN6)
 #define REDF_FLOWVALVE	0x04	/* use flowvalve (aka penalty-box) */
+
+/*
+ * simpler versions of red parameters and statistics used by other
+ * disciplines (e.g., CBQ)
+ */
+struct redparams {
+	int th_min;		/* red min threshold */
+	int th_max;		/* red max threshold */
+	int inv_pmax;		/* inverse of max drop probability */
+};
+
+struct redstats {
+	int		q_avg;
+	u_int		xmit_packets;
+	u_int		drop_packets;
+	u_int		drop_forced;
+	u_int		drop_unforced;
+	u_int		marked_packets;
+	u_quad_t	xmit_bytes;
+	u_quad_t	drop_bytes;
+};
+
+
 /* 
  * IOCTLs for RED
  */
@@ -88,6 +111,7 @@ struct red_conf {
 #define	RED_ACC_DISABLE		_IOW('Q', 6, struct red_interface)
 #define	RED_GETSTATS		_IOWR('Q', 7, struct red_stats)
 #define	RED_CONFIG		_IOWR('Q', 8, struct red_conf)
+#define	RED_SETDEFAULTS		_IOW('Q', 9, struct redparams)
 
 #if defined(KERNEL) || defined(_KERNEL)
 
@@ -156,6 +180,7 @@ typedef struct red_queue {
 
 extern red_t *red_alloc __P((int, int, int, int, int, int));
 extern void red_destroy __P((red_t *));
+extern void red_getstats __P((red_t *, struct redstats *));
 extern int red_addq __P((red_t *, class_queue_t *, struct mbuf *,
 			 struct pr_hdr *));
 extern struct mbuf *red_getq __P((red_t *, class_queue_t *));

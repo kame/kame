@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $Id: altq_afmap.c,v 1.2 1999/08/16 20:03:56 shin Exp $
+ * $Id: altq_afmap.c,v 1.1.1.1 1999/10/02 05:52:42 itojun Exp $
  */
 
 /*
@@ -58,6 +58,7 @@
 #include <net/altq_conf.h>
 
 #include <netinet/in.h>
+#include <netinet/altq.h>
 #include <netinet/altq_afmap.h>
 
 LIST_HEAD(, afm_head) afhead_chain;
@@ -262,29 +263,29 @@ afm_match6(head, fp)
 
 	for (afm = head->afh_head.lh_first; afm != NULL;
 	     afm = afm->afm_list.le_next) {
-		if (afm->afm_flowinfo6.fi_flowlabel != 0 &&
-		    afm->afm_flowinfo6.fi_flowlabel != fp->fi_flowlabel)
+		if (afm->afm_flowinfo6.fi6_flowlabel != 0 &&
+		    afm->afm_flowinfo6.fi6_flowlabel != fp->fi6_flowlabel)
 			continue;
 #ifdef notyet
-		if (!IN6_IS_ADDR_UNSPECIFIED(&afm->afm_flowinfo6.fi_dst) &&
-		    !IN6_ARE_ADDR_EQUAL(&afm->afm_flowinfo6.fi_dst,
-					&fp->fi_dst))
+		if (!IN6_IS_ADDR_UNSPECIFIED(&afm->afm_flowinfo6.fi6_dst) &&
+		    !IN6_ARE_ADDR_EQUAL(&afm->afm_flowinfo6.fi6_dst,
+					&fp->fi6_dst))
 			continue;
-		if (afm->afm_flowinfo6.fi_dport != 0 &&
-		    afm->afm_flowinfo6.fi_dport != fp->fi_dport)
+		if (afm->afm_flowinfo6.fi6_dport != 0 &&
+		    afm->afm_flowinfo6.fi6_dport != fp->fi6_dport)
 			continue;
 #endif
-		if (!IN6_IS_ADDR_UNSPECIFIED(&afm->afm_flowinfo6.fi_src) &&
-		    !IN6_ARE_ADDR_EQUAL(&afm->afm_flowinfo6.fi_src,
-					&fp->fi_src))
+		if (!IN6_IS_ADDR_UNSPECIFIED(&afm->afm_flowinfo6.fi6_src) &&
+		    !IN6_ARE_ADDR_EQUAL(&afm->afm_flowinfo6.fi6_src,
+					&fp->fi6_src))
 			continue;
 #ifdef notyet
-		if (afm->afm_flowinfo6.fi_sport != 0 &&
-		    afm->afm_flowinfo6.fi_sport != fp->fi_sport)
+		if (afm->afm_flowinfo6.fi6_sport != 0 &&
+		    afm->afm_flowinfo6.fi6_sport != fp->fi6_sport)
 			continue;
 #endif
-		if (afm->afm_flowinfo6.fi_proto != 0 &&
-		    afm->afm_flowinfo6.fi_proto != fp->fi_proto)
+		if (afm->afm_flowinfo6.fi6_proto != 0 &&
+		    afm->afm_flowinfo6.fi6_proto != fp->fi6_proto)
 			continue;
 		/* match found! */
 		return (afm);

@@ -1,4 +1,4 @@
-/* $Id: altq_rmclass_debug.h,v 1.1 1999/08/05 17:18:20 itojun Exp $ */
+/* $Id: altq_rmclass_debug.h,v 1.1.1.1 1999/10/02 05:52:42 itojun Exp $ */
 /*
  * Copyright (c) Sun Microsystems, Inc. 1998 All rights reserved.
  *
@@ -32,7 +32,7 @@
 #ifndef _NETINET_ALTQ_RMCLASS_DEBUG_H_
 #define	_NETINET_ALTQ_RMCLASS_DEBUG_H_
 
-#pragma ident	"@(#)rm_class_debug.h	1.7	98/05/04 SMI"
+/* #pragma ident	"@(#)rm_class_debug.h	1.7	98/05/04 SMI" */
 
 /*
  * Cbq debugging macros
