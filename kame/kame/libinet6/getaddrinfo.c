@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.123 2001/07/23 06:01:30 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.124 2001/08/01 01:21:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1168,7 +1168,7 @@ explore_numeric(pai, hostname, servname, res)
 					/*
 					 * Set the numeric address itself as
 					 * the canonical name, based on a
-					 * clarification in rfc2553bit-03.
+					 * clarification in rfc2553bis-03.
 					 */
 					GET_CANONNAME(cur->ai_next, hostname);
 				}
