@@ -387,6 +387,12 @@ tooshort:
 		} else
 			m_adj(m, ip->ip_len - m->m_pkthdr.len);
 	}
+
+#ifdef IPSEC
+	if (ipsec_gethist(m, NULL))
+		goto pass;
+#endif
+
 	/*
 	 * IpHack's section.
 	 * Right now when no processing on packet has done
