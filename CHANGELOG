@@ -1,6 +1,9 @@
-$Id: CHANGELOG,v 1.488 2000/01/26 15:30:35 itojun Exp $
+$Id: CHANGELOG,v 1.489 2000/01/26 21:20:33 sumikawa Exp $
 
 <200001>
+Thu Jan 27 06:20:08 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/irc: upgrade to 2.10.3.
+
 Thu Jan 27 00:29:51 JST 2000  itojun@iijlab.net
 	* kame/sys/netinet6/in6_pcb.c: make IPV6_PORTRANGE actually work.
 	  (netbsd/bsdi3/freebsd2)
