@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.83 2001/09/03 10:09:41 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.84 2001/11/07 02:04:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -88,7 +88,7 @@
 #include <sys/param.h>
 #include <sys/queue.h>
 #include <net/if.h>
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
 #endif
 #include <netinet/in.h>
