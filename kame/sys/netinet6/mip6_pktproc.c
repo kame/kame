@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.66 2002/10/05 18:33:25 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.67 2002/10/08 09:43:32 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -1537,6 +1537,7 @@ mip6_ip6mu_create(pktopt_mobility, src, dst, sc)
 #ifdef RR_DBG
 printf("MN: bu_size = %d, nonce_size= %d, auth_size = %d(AUTHSIZE:%d)\n", bu_size, nonce_size, auth_size, AUTH_SIZE);
 #endif
+	} else {
 		bu_size += PADLEN(bu_size, 8, 0);
 		nonce_size = auth_size = 0;
 	}
@@ -1789,24 +1790,25 @@ mip6_ip6ma_create(pktopt_mobility, src, dst, status, seqno, lifetime, refresh, m
 		htons((u_int16_t)(lifetime >> 2));	/* units of 4 secs */
 
 	/* padN */
-	p = (u_int8_t *)ip6ma + sizeof(struct ip6m_binding_ack);
 	if ((pad = ba_size - sizeof(struct ip6m_binding_ack)) >= 2) {
+		p = (u_int8_t *)ip6ma + sizeof(struct ip6m_binding_ack);
 		*p = IP6MOPT_PADN;
 		*(p + 1) = pad - 2;
 	}
 	if (refresh_size && 
-	    (p = (u_int8_t *)ip6ma + ba_size + sizeof(struct ip6m_opt_refresh)),
 	    (pad = refresh_size - sizeof(struct ip6m_opt_refresh)) >= 2) {
+		p = (u_int8_t *)ip6ma + ba_size + sizeof(struct ip6m_opt_refresh);
 		*p = IP6MOPT_PADN;
 		*(p + 1) = pad - 2;
 	}
-	if (auth_size && 
-	    (p = (u_int8_t *)ip6ma + ba_size + refresh_size + AUTH_SIZE),
+	if (auth_size &&
 	    (pad = auth_size - AUTH_SIZE) >= 2) {
+		p = (u_int8_t *)ip6ma + ba_size + refresh_size + AUTH_SIZE;
 		*p = IP6MOPT_PADN;
 		*(p + 1) = pad - 2;
 	}
-	if (pad + (pad = ip6ma_size - ba_size + refresh_size + auth_size) >= 2) {
+	if ((pad = ip6ma_size - (ba_size + refresh_size + auth_size)) >= 2) {
+		p = (u_int8_t *)ip6ma + ba_size + refresh_size + auth_size;
 		*p = IP6MOPT_PADN;
 		*(p + 1) += pad - 2;
 	}
