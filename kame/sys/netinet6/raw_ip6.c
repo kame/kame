@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.90 2001/07/26 08:48:24 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.91 2001/08/07 09:58:21 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -463,7 +463,7 @@ rip6_output(m, va_alist)
 	struct in6pcb *in6p;
 	u_int	plen = m->m_pkthdr.len;
 	int error = 0;
-	struct ip6_pktopts opt, *optp = NULL, *origoptp;
+	struct ip6_pktopts opt, *stickyopt = NULL;
 	struct ifnet *oifp = NULL;
 	int type, code;		/* for ICMPv6 output statistics only */
 	int priv = 0;
@@ -477,6 +477,7 @@ rip6_output(m, va_alist)
 	va_end(ap);
 
 	in6p = sotoin6pcb(so);
+	stickyopt = in6p->in6p_outputopts;
 
 	priv = 0;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
@@ -494,9 +495,8 @@ rip6_output(m, va_alist)
 	if (control) {
 		if ((error = ip6_setpktoptions(control, &opt, priv, 0)) != 0)
 			goto bad;
-		optp = &opt;
-	} else
-		optp = in6p->in6p_outputopts;
+		in6p->in6p_outputopts = &opt;
+	}
 
 	/*
 	 * For an ICMPv6 packet, we should know its type and code
@@ -518,13 +518,10 @@ rip6_output(m, va_alist)
 	ip6 = mtod(m, struct ip6_hdr *);
 
 	/* KAME hack: embed scopeid */
-	origoptp = in6p->in6p_outputopts;
-	in6p->in6p_outputopts = optp;
-	if (in6_embedscope(dst, dstsock, in6p, &oifp) != 0) {
+	if (in6_embedscope(dst, dstsock, in6p, NULL) != 0) {
 		error = EINVAL;
 		goto bad;
 	}
-	in6p->in6p_outputopts = origoptp;
 	ip6->ip6_dst = *dst;
 
 	/*
@@ -533,7 +530,7 @@ rip6_output(m, va_alist)
 	{
 		struct in6_addr *in6a;
 
-		if ((in6a = in6_selectsrc(dstsock, optp,
+		if ((in6a = in6_selectsrc(dstsock, in6p->in6p_outputopts,
 					  in6p->in6p_moptions,
 					  &in6p->in6p_route,
 					  &in6p->in6p_laddr,
@@ -595,7 +592,7 @@ rip6_output(m, va_alist)
 	if (in6p->in6p_flags & IN6P_MINMTU)
 		flags |= IPV6_MINMTU;
 	
-	error = ip6_output(m, optp, &in6p->in6p_route, flags,
+	error = ip6_output(m, in6p->in6p_outputopts, &in6p->in6p_route, flags,
 	    in6p->in6p_moptions, &oifp);
 	if (so->so_proto->pr_protocol == IPPROTO_ICMPV6) {
 		if (oifp)
@@ -612,8 +609,8 @@ rip6_output(m, va_alist)
 
  freectl:
 	if (control) {
-		if (optp == &opt)
-			ip6_clearpktopts(optp, 0, -1);
+		ip6_clearpktopts(in6p->in6p_outputopts, 0, -1);
+		in6p->in6p_outputopts = stickyopt;
 		m_freem(control);
 	}
 	return(error);
