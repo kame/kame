@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1462 2001/01/02 11:24:55 itojun Exp $
+$KAME: CHANGELOG,v 1.1463 2001/01/05 01:36:58 jinmei Exp $
 
 <200101>
+2001-01-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/contrib/bind/src/lib/irs/gethostent.c: allowed gethostbyname
+	to accept abbreviated IPv4 text addresses (like 127.1).
+	(XXX: this change is against a bind8 policy, but just for backward
+	compatibility.)
+
 2001-01-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd3/lib/libinet6/Makefile: do not link resolver files when
 	USE_LIBBIND6 is YES, so that enhanced libbind could be tested.
