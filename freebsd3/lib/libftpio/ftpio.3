@@ -22,7 +22,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\" $FreeBSD: src/lib/libftpio/ftpio.3,v 1.17.2.3 1999/09/20 09:49:51 phantom Exp $
+.\" $FreeBSD: src/lib/libftpio/ftpio.3,v 1.17.2.4 2000/03/03 14:59:37 sheldonh Exp $
 .\"
 .Dd June 17, 1996
 .Dt FTPIO 3
@@ -86,7 +86,8 @@ defaults to the standard ftp port of 21) and
 .Fa verbose
 fields.  If it is successful, a
 standard stream descriptor is returned which should be passed to
-subsequent FTP operations. On failure, NULL is returned and
+subsequent FTP operations.
+On failure, NULL is returned and
 .Fa retcode
 will have the error code returned by the foreign server.
 .Pp
