@@ -1,13 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.933 2000/05/25 07:14:44 jinmei Exp $
+$Id: CHANGELOG,v 1.934 2000/05/25 08:39:53 jinmei Exp $
 
 <200005>
 2000-05-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/net/route.c (ifa_ifwithroute): reverted a KAME
 	specific change introduced on 2000-02-25 (see this log file).
 	The change was an ad-hoc hack and broke BSDI's original
-	intentention, so we've wanted to clarify the code.
+	intention, so we've wanted to clarify the code.
 
 2000-05-25  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6_ifattach.c (in6_ifattach,
