@@ -1,4 +1,4 @@
-/*	$KAME: altq_rio.c,v 1.17 2003/07/10 12:07:49 kjc Exp $	*/
+/*	$KAME: altq_rio.c,v 1.18 2005/02/10 05:22:41 kjc Exp $	*/
 
 /*
  * Copyright (C) 1998-2003
@@ -126,7 +126,7 @@
  *
  *    low drop prec:    01
  *    medium drop prec: 10
- *    high drop prec:   01
+ *    high drop prec:   11
  */
 
 /* normal red parameters */
