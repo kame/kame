@@ -1,4 +1,4 @@
-/*	$OpenBSD: inet.c,v 1.68 2003/09/04 20:05:19 tedu Exp $	*/
+/*	$OpenBSD: inet.c,v 1.84 2004/03/13 22:02:13 deraadt Exp $	*/
 /*	$NetBSD: inet.c,v 1.14 1995/10/03 21:42:37 thorpej Exp $	*/
 
 /*
@@ -34,7 +34,7 @@
 #if 0
 static char sccsid[] = "from: @(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-static char *rcsid = "$OpenBSD: inet.c,v 1.68 2003/09/04 20:05:19 tedu Exp $";
+static const char *rcsid = "$OpenBSD: inet.c,v 1.84 2004/03/13 22:02:13 deraadt Exp $";
 #endif
 #endif /* not lint */
 
@@ -75,6 +75,10 @@ static char *rcsid = "$OpenBSD: inet.c,v 1.68 2003/09/04 20:05:19 tedu Exp $";
 #define DCCPSTATES
 #include <netinet/dccp_var.h>
 #endif
+#include <netinet/ip_carp.h>
+#include <net/if.h>
+#include <net/pfvar.h>
+#include <net/if_pfsync.h>
 
 #include <arpa/inet.h>
 #include <limits.h>
@@ -131,7 +135,7 @@ protopr0(u_long off, char *name, int af)
 	struct inpcbtable table;
 	struct inpcb *head, *next, *prev;
 	struct inpcb inpcb;
-	int istcp;
+	int istcp, israw;
 #ifdef DCCP
 	int isdccp;
 #endif
@@ -143,6 +147,7 @@ protopr0(u_long off, char *name, int af)
 	if (off == 0)
 		return;
 	istcp = strcmp(name, "tcp") == 0;
+	israw = strncmp(name, "ip", 2) == 0;
 #ifdef DCCP
 	isdccp = strcmp(name, "dccp") == 0;
 #endif
@@ -215,7 +220,7 @@ protopr0(u_long off, char *name, int af)
 				printf("%*p ", PLEN, prev);
 		}
 #ifdef INET6
-		if (inpcb.inp_flags & INP_IPV6) {
+		if (inpcb.inp_flags & INP_IPV6 && !israw) {
 			strlcpy(namebuf, name0, sizeof namebuf);
 			strlcat(namebuf, "6", sizeof namebuf);
 			name = namebuf;
@@ -243,6 +248,21 @@ protopr0(u_long off, char *name, int af)
 				printf(" %d", tcpcb.t_state);
 			else
 				printf(" %s", tcpstates[tcpcb.t_state]);
+		} else if (israw) {
+			struct protoent *pe = NULL;
+			u_int8_t proto;
+#ifdef INET6
+			if (inpcb.inp_flags & INP_IPV6)
+				proto = inpcb.inp_ipv6.ip6_nxt;
+			else
+#endif
+				proto = inpcb.inp_ip.ip_p;
+			if (!nflag)
+				pe = getprotobynumber(proto);
+			if (pe)
+				printf(" %s", pe->p_name);
+			else
+				printf(" %u", proto);
 		}
 #ifdef DCCP
 		if (isdccp) {
@@ -315,12 +335,16 @@ tcp_stats(u_long off, char *name)
 	p(tcps_rcvbadoff, "\t\t%u discarded for bad header offset field%s\n");
 	p1(tcps_rcvshort, "\t\t%u discarded because packet too short\n");
 	p1(tcps_rcvnosec, "\t\t%u discarded for missing IPsec protection\n");
+	p1(tcps_rcvmemdrop, "\t\t%u discarded due to memory shortage\n");
 	p(tcps_inhwcsum, "\t\t%u packet%s hardware-checksummed\n");
+	p(tcps_rcvbadsig, "\t\t%u bad/missing md5 checksum%s\n");
+	p(tcps_rcvgoodsig, "\t\t%qd good md5 checksum%s\n");
 	p(tcps_connattempt, "\t%u connection request%s\n");
 	p(tcps_accepts, "\t%u connection accept%s\n");
 	p(tcps_connects, "\t%u connection%s established (including accepts)\n");
 	p2(tcps_closed, tcps_drops,
 	    "\t%u connection%s closed (including %u drop%s)\n");
+	p(tcps_conndrained, "\t%qd connection%s drained\n");
 	p(tcps_conndrops, "\t%u embryonic connection%s dropped\n");
 	p2(tcps_rttupdated, tcps_segstimed,
 	    "\t%u segment%s updated rtt (of %u attempt%s)\n");
@@ -333,7 +357,6 @@ tcp_stats(u_long off, char *name)
 	p(tcps_predack, "\t%u correct ACK header prediction%s\n");
 	p(tcps_preddat, "\t%u correct data packet header prediction%s\n");
 	p3(tcps_pcbhashmiss, "\t%u PCB cache miss%s\n");
-	p(tcps_badsyn, "\t%u SYN packet%s received with same src/dst address/port\n");
 
 	p(tcps_ecn_accepts, "\t%u ECN connection%s accepted\n");
 	p(tcps_ecn_rcvece, "\t\t%u ECE packet%s received\n");
@@ -345,6 +368,21 @@ tcp_stats(u_long off, char *name)
 	p1(tcps_cwr_frecovery, "\t\t\tcwr by fastrecovery: %u\n");
 	p1(tcps_cwr_timeout, "\t\t\tcwr by timeout: %u\n");
 	p1(tcps_cwr_ecn, "\t\t\tcwr by ecn: %u\n");
+
+	p(tcps_badsyn, "\t%u bad connection attempt%s\n");
+	p1(tcps_sc_added, "\t%qd SYN cache entries added\n");
+	p(tcps_sc_collisions, "\t\t%qd hash collision%s\n");
+	p1(tcps_sc_completed, "\t\t%qd completed\n");
+	p1(tcps_sc_aborted, "\t\t%qd aborted (no space to build PCB)\n");
+	p1(tcps_sc_timed_out, "\t\t%qd timed out\n");
+	p1(tcps_sc_overflowed, "\t\t%qd dropped due to overflow\n");
+	p1(tcps_sc_bucketoverflow, "\t\t%qd dropped due to bucket overflow\n");
+	p1(tcps_sc_reset, "\t\t%qd dropped due to RST\n");
+	p1(tcps_sc_unreach, "\t\t%qd dropped due to ICMP unreachable\n");
+	p(tcps_sc_retransmitted, "\t%qd SYN,ACK%s retransmitted\n");
+	p(tcps_sc_dupesyn, "\t%qd duplicate SYN%s received for entries "
+		"already in the cache\n");
+	p(tcps_sc_dropped, "\t%qd SYN%s dropped (no route or no space)\n");
 
 #undef p
 #undef p1
@@ -766,7 +804,7 @@ inetname(struct in_addr *inp)
 		else
 			domain[0] = '\0';
 	}
-	cp = 0;
+	cp = NULL;
 	if (!nflag && inp->s_addr != INADDR_ANY) {
 		int net = inet_netof(*inp);
 		int lna = inet_lnaof(*inp);
@@ -776,12 +814,12 @@ inetname(struct in_addr *inp)
 			if (np)
 				cp = np->n_name;
 		}
-		if (cp == 0) {
+		if (cp == NULL) {
 			hp = gethostbyaddr((char *)inp, sizeof (*inp), AF_INET);
 			if (hp) {
 				if ((cp = strchr(hp->h_name, '.')) &&
 				    !strcmp(cp + 1, domain))
-					*cp = 0;
+					*cp = '\0';
 				cp = hp->h_name;
 			}
 		}
@@ -902,6 +940,9 @@ esp_stats(u_long off, char *name)
 	p(esps_invalid, "\t%u packet%s attempted to use an invalid TDB\n");
 	p(esps_toobig, "\t%u packet%s got larger than max IP packet size\n");
 	p(esps_crypto, "\t%u packet%s that failed crypto processing\n");
+	p(esps_udpencin, "\t%u input UDP encapsulated ESP packet%s\n");
+	p(esps_udpencout, "\t%u output UDP encapsulated ESP packet%s\n");
+	p(esps_udpinval, "\t%u UDP packet%s for non-encapsulating TDB received\n");
 	p(esps_ibytes, "\t%qu input byte%s\n");
 	p(esps_obytes, "\t%qu output byte%s\n");
 
@@ -935,6 +976,79 @@ ipip_stats(u_long off, char *name)
 	p(ipips_family, "\t%u protocol family mismatche%s\n");
 	p(ipips_unspec, "\t%u attempt%s to use tunnel with unspecified endpoint(s)\n");
 #undef p
+}
+
+/*
+ * Dump CARP statistics structure.
+ */
+void
+carp_stats(u_long off, char *name)
+{
+	struct carpstats carpstat;
+
+	if (off == 0)
+		return;
+	kread(off, (char *)&carpstat, sizeof(carpstat));
+	printf("%s:\n", name);
+
+#define p(f, m) if (carpstat.f || sflag <= 1) \
+	printf(m, carpstat.f, plural(carpstat.f))
+#define p2(f, m) if (carpstat.f || sflag <= 1) \
+	printf(m, carpstat.f)
+
+	p(carps_ipackets, "\t%lu packet%s received (IPv4)\n");
+	p(carps_ipackets6, "\t%lu packet%s received (IPv6)\n");
+	p(carps_badif, "\t\t%lu packet%s discarded for bad interface\n");
+	p(carps_hdrops, "\t\t%lu packet%s shorter than header\n");
+	p(carps_badsum, "\t\t%lu discarded for bad checksum%s\n");
+	p(carps_badver,	"\t\t%lu discarded packet%s with a bad version\n");
+	p2(carps_badlen, "\t\t%lu discarded because packet too short\n");
+	p2(carps_badauth, "\t\t%lu discarded for bad authentication\n");
+	p2(carps_badvhid, "\t\t%lu discarded for bad vhid\n");
+	p2(carps_badaddrs, "\t\t%lu discarded because of a bad address list\n");
+	p(carps_opackets, "\t%lu packet%s sent (IPv4)\n");
+	p(carps_opackets6, "\t%lu packet%s sent (IPv6)\n");
+#if notyet
+	p(carps_ostates, "\t\t%s state update%s sent\n");
+#endif
+#undef p
+#undef p2
+}
+
+/* 
+ * Dump pfsync statistics structure.
+ */
+void
+pfsync_stats(u_long off, char *name)
+{
+	struct pfsyncstats pfsyncstat;
+
+	if (off == 0)
+		return;
+	kread(off, (char *)&pfsyncstat, sizeof(pfsyncstat));
+	printf("%s:\n", name);
+
+#define p(f, m) if (pfsyncstat.f || sflag <= 1) \
+	printf(m, pfsyncstat.f, plural(pfsyncstat.f))
+#define p2(f, m) if (pfsyncstat.f || sflag <= 1) \
+	printf(m, pfsyncstat.f)
+
+	p(pfsyncs_ipackets, "\t%lu packet%s received (IPv4)\n");
+	p(pfsyncs_ipackets6, "\t%lu packet%s received (IPv6)\n");
+	p(pfsyncs_badif, "\t\t%lu packet%s discarded for bad interface\n");
+	p(pfsyncs_badttl, "\t\t%lu packet%s discarded for bad ttl\n");
+	p(pfsyncs_hdrops, "\t\t%lu packet%s shorter than header\n");
+	p(pfsyncs_badver,	"\t\t%lu discarded packet%s with a bad version\n");
+	p(pfsyncs_badact,	"\t\t%lu discarded packet%s with a bad action\n");
+	p2(pfsyncs_badlen, "\t\t%lu discarded because packet too short\n");
+	p2(pfsyncs_badauth, "\t\t%lu discarded for bad authentication\n");
+	p(pfsyncs_badstate, "\t%lu failed state lookup/insert%s\n");
+	p(pfsyncs_opackets, "\t%lu packet%s sent (IPv4)\n");
+	p(pfsyncs_opackets6, "\t%lu packet%s sent (IPv6)\n");
+	p2(pfsyncs_onomem, "\t\t%lu send failed due to mbuf memory error\n");
+	p2(pfsyncs_oerrors, "\t\t%lu send error\n");
+#undef p
+#undef p2
 }
 
 /*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.38 2003/06/26 21:59:11 deraadt Exp $	*/
+/*	$OpenBSD: main.c,v 1.44 2004/03/13 22:02:13 deraadt Exp $	*/
 /*	$NetBSD: main.c,v 1.9 1996/05/07 02:55:02 thorpej Exp $	*/
 
 /*
@@ -40,7 +40,7 @@ char copyright[] =
 #if 0
 static char sccsid[] = "from: @(#)main.c	8.4 (Berkeley) 3/1/94";
 #else
-static char *rcsid = "$OpenBSD: main.c,v 1.38 2003/06/26 21:59:11 deraadt Exp $";
+static char *rcsid = "$OpenBSD: main.c,v 1.44 2004/03/13 22:02:13 deraadt Exp $";
 #endif
 #endif /* not lint */
 
@@ -175,9 +175,17 @@ struct nlist nl[] = {
 	{ "_ipcompstat" },
 #define N_RIP6STAT	54
 	{ "_rip6stat" },
-#define N_DCCPSTAT	55
+#define N_CARPSTAT	55
+	{ "_carpstats" },
+#define	N_RAWIPTABLE	56
+	{ "_rawcbtable" },
+#define	N_RAWIP6TABLE	57
+	{ "_rawin6pcbtable" },
+#define N_PFSYNCSTAT	58
+	{ "_pfsyncstats" },
+#define N_DCCPSTAT	59
 	{ "_dccpstat" },
-#define	N_DCCPBTABLE	56
+#define	N_DCCPBTABLE	60
 	{ "_dccpbtable" },
 	{ ""},
 };
@@ -198,7 +206,7 @@ struct protox {
 	{ N_DCCPBTABLE,	N_DCCPSTAT,	1,	protopr,
 	  dccp_stats,	"dccp" },
 #endif	
-	{ -1,		N_IPSTAT,	1,	0,
+	{ N_RAWIPTABLE,	N_IPSTAT,	1,	protopr,
 	  ip_stats,	"ip" },
 	{ -1,		N_ICMPSTAT,	1,	0,
 	  icmp_stats,	"icmp" },
@@ -214,6 +222,10 @@ struct protox {
 	  etherip_stats,"etherip" },
 	{ -1,		N_IPCOMPSTAT,	1,	0,
 	  ipcomp_stats,	"ipcomp" },
+	{ -1,		N_CARPSTAT,	1,	0,
+	  carp_stats,	"carp" },
+	{ -1,		N_PFSYNCSTAT,	1,	0,
+	  pfsync_stats,	"pfsync" },
 	{ -1,		-1,		0,	0,
 	  0,		0 }
 };
@@ -228,7 +240,7 @@ struct protox ip6protox[] = {
 	{ N_DCCPBTABLE,	N_DCCPSTAT,	1,	ip6protopr,
 	  dccp_stats,	"dccp" },
 #endif	
-	{ -1,		N_IP6STAT,	1,	0,
+	{ N_RAWIP6TABLE,N_IP6STAT,	1,	ip6protopr,
 	  ip6_stats,	"ip6" },
 	{ -1,		N_ICMP6STAT,	1,	0,
 	  icmp6_stats,	"icmp6" },
@@ -379,7 +391,7 @@ main(int argc, char *argv[])
 		case 'p':
 			if ((tp = name2protox(optarg)) == NULL) {
 				(void)fprintf(stderr,
-				    "%s: %s: unknown or uninstrumented protocol\n",
+				    "%s: %s: unknown protocol\n",
 				    __progname, optarg);
 				exit(1);
 			}
@@ -656,6 +668,6 @@ usage(void)
 	(void)fprintf(stderr,
 "       %s [-M core] [-N system] [-p protocol]\n", __progname);
 	(void)fprintf(stderr,
-"       %s [-s] [-f address_family] [-i] [-I interface]\n", __progname);
+"       %s [-a] [-f address_family] [-i | -I interface]\n", __progname);
 	exit(1);
 }
