@@ -1,4 +1,4 @@
-.\"	$KAME: rtsold.8,v 1.21 2004/01/03 06:15:18 itojun Exp $
+.\"	$OpenBSD: rtsold.8,v 1.18 2004/01/05 20:32:50 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -37,15 +37,15 @@
 .\"
 .Sh SYNOPSIS
 .Nm rtsold
-.Op Fl dDfm1
+.Op Fl dDfFm1
 .Op Fl O Ar script-name
 .Ar interface ...
 .Nm rtsold
-.Op Fl dDfm1
+.Op Fl dDfFm1
 .Op Fl O Ar script-name
 .Fl a
 .Nm rtsol
-.Op Fl dD
+.Op Fl dDF
 .Op Fl O Ar script-name
 .Ar interface ...
 .Nm rtsol
@@ -177,6 +177,18 @@ from becoming a daemon (foreground mode).
 Warning messages are generated to standard error
 instead of
 .Xr syslog 3 .
+.It Fl F
+Configure
+.Xr sysctl 8
+variable related to
+.Nm
+by itself.
+Without
+.Fl F ,
+.Nm
+will not alter and obey the current
+.Xr sysctl 8
+settings.
 .It Fl m
 Enable mobility support.
 If this option is specified,
