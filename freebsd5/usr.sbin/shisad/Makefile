@@ -24,7 +24,8 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 
-SUBDIR+=mnd cnd had mdd
+SUBDIR+=mnd cnd had
+SUBDIR+=babymdd
 SUBDIR+=mrd nemonetd
 
 .include <bsd.subdir.mk>
