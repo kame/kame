@@ -1,8 +1,22 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.180 1999/10/09 02:34:36 itojun Exp $
+$Id: CHANGELOG,v 1.181 1999/10/10 06:45:13 itojun Exp $
 
 <199910>
+Sun Oct 10 15:44:07 JST 1999  itojun@iijlab.net
+	* kame/sys/netinet6/{icmp6.c,tcp6_subr.c,udp6_usrreq.c},
+	  openbsd/sys/netinet/{tcp_subr.c,udp_usrreq.c},
+	  netbsd/sys/netinet/tcp_subr.c,
+	  freebsd3/sys/netinet/tcp_subr.c, freebsd3/sys/netinet6/udp6_usrreq.c:
+	  Revisit xx_ctlinput().  We added extra args to xx6_ctlinput(),
+	  but it was wrong.  We cannot just invent function prototype for
+	  xx_ctlinput() as they will be called across protocol types
+	  (for example, see pfctlinput() in sys/kern).
+	  Made last arg of xx6_ctlinput() into void *, to meet standard
+	  practice.
+	  For passing info from icmp6 handler to xx6_ctlinput(), introduced
+	  struct ip6ctlparam.
+	  
 Sat Oct  9 11:35:32 JST 1999  itojun@iijlab.net
 	* openbsd/ports/net/bind8, netbsd/pkgsrc/net/bind8,
 	  freebsd[23]/ports/bind8: upgrade IPv6 patch.  AAAA dynamic update
