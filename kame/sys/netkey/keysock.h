@@ -1,4 +1,4 @@
-/*	$KAME: keysock.h,v 1.9 2002/03/21 14:00:14 itojun Exp $	*/
+/*	$KAME: keysock.h,v 1.10 2004/05/26 02:55:31 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -60,12 +60,16 @@ struct pfkeystat {
 #define KEY_SENDUP_ONE		0
 #define KEY_SENDUP_ALL		1
 #define KEY_SENDUP_REGISTERED	2
+#define KEY_SENDUP_CANWAIT	4
 
 #ifdef _KERNEL
 struct keycb {
 	struct rawcb kp_raw;	/* rawcb */
 	int kp_promisc;		/* promiscuous mode */
 	int kp_registered;	/* registered socket */
+	int (*kp_receive) (struct socket *, struct mbuf **, struct uio *,
+		struct mbuf **, struct mbuf **, int *);
+	struct mbuf *kp_queue;	/* queued mbufs, linked by m_nextpkt */
 };
 
 extern struct pfkeystat pfkeystat;

@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.328 2004/04/02 08:27:42 sakane Exp $	*/
+/*	$KAME: key.c,v 1.329 2004/05/26 02:55:30 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2619,7 +2619,8 @@ key_spddump(so, m, mhp)
 			    mhp->msg->sadb_msg_pid);
 
 			if (n)
-				key_sendup_mbuf(so, n, KEY_SENDUP_ONE);
+				key_sendup_mbuf(so, n,
+				    KEY_SENDUP_ONE | KEY_SENDUP_CANWAIT);
 		}
 	}
 
@@ -7116,7 +7117,8 @@ key_dump(so, m, mhp)
 				if (!n)
 					return key_senderror(so, m, ENOBUFS);
 
-				key_sendup_mbuf(so, n, KEY_SENDUP_ONE);
+				key_sendup_mbuf(so, n,
+				    KEY_SENDUP_ONE | KEY_SENDUP_CANWAIT);
 			}
 		}
 	}
