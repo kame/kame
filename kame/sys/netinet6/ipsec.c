@@ -3370,9 +3370,14 @@ ipsec_setsocket(m, so)
 	if (so && !n)
 		n = m_aux_add(m, AF_INET, IPPROTO_ESP);
 	if (n) {
-		if (so)
+		if (so) {
 			*mtod(n, struct socket **) = so;
-		else
+			/*
+			 * XXX think again about it when we put decryption
+			 * histrory into aux mbuf
+			 */
+			n->m_len = sizeof(struct socket *);
+		} else
 			m_aux_delete(m, n);
 	}
 }
@@ -3384,7 +3389,7 @@ ipsec_getsocket(m)
 	struct mbuf *n;
 
 	n = m_aux_find(m, AF_INET, IPPROTO_ESP);
-	if (n)
+	if (n && n->m_len >= sizeof(struct socket *))
 		return *mtod(n, struct socket **);
 	else
 		return NULL;
