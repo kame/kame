@@ -433,6 +433,17 @@ tcp_stats(u_long off __unused, char *name, int af __unused)
 	p(tcps_keepdrops, "\t\t%lu connection%s dropped by keepalive\n");
 	p(tcps_predack, "\t%lu correct ACK header prediction%s\n");
 	p(tcps_preddat, "\t%lu correct data packet header prediction%s\n");
+
+	p(tcps_ecn_accepts, "\t%lu ECN connection%s accepted\n");
+	p(tcps_ecn_rcvece, "\t\t%lu ECE packet%s received\n");
+	p(tcps_ecn_rcvcwr, "\t\t%lu CWR packet%s received\n");
+	p(tcps_ecn_rcvce, "\t\t%lu CE packet%s received\n");
+	p(tcps_ecn_sndect, "\t\t%lu ECT packet%s sent\n");
+	p(tcps_ecn_sndece, "\t\t%lu ECE packet%s sent\n");
+	p(tcps_ecn_sndcwr, "\t\t%lu CWR packet%s sent\n");
+	p1a(tcps_cwr_frecovery, "\t\t\tfastrecovery: %lu\n");
+	p1a(tcps_cwr_timeout, "\t\t\ttimeout: %lu\n");
+	p1a(tcps_cwr_ecn, "\t\t\tecn: %lu\n");
 #undef p
 #undef p1a
 #undef p2

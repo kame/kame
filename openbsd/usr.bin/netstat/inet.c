@@ -315,6 +315,18 @@ tcp_stats(off, name)
 	p(tcps_preddat, "\t%u correct data packet header prediction%s\n");
 	p3(tcps_pcbhashmiss, "\t%u PCB cache miss%s\n");
 	p(tcps_badsyn, "\t%u SYN packet%s received with same src/dst address/port\n");
+
+	p(tcps_ecn_accepts, "\t%u ECN connection%s accepted\n");
+	p(tcps_ecn_rcvece, "\t\t%u ECE packet%s received\n");
+	p(tcps_ecn_rcvcwr, "\t\t%u CWR packet%s received\n");
+	p(tcps_ecn_rcvce, "\t\t%u CE packet%s received\n");
+	p(tcps_ecn_sndect, "\t\t%u ECT packet%s sent\n");
+	p(tcps_ecn_sndece, "\t\t%u ECE packet%s sent\n");
+	p(tcps_ecn_sndcwr, "\t\t%u CWR packet%s sent\n");
+	p1(tcps_cwr_frecovery, "\t\t\tfastrecovery: %u\n");
+	p1(tcps_cwr_timeout, "\t\t\ttimeout: %u\n");
+	p1(tcps_cwr_ecn, "\t\t\tecn: %u\n");
+
 #undef p
 #undef p1
 #undef p2

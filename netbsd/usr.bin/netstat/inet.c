@@ -294,6 +294,17 @@ tcp_stats(off, name)
 		"already in the cache\n");
 	p(tcps_sc_dropped, "\t%llu SYN%s dropped (no route or no space)\n");
 
+	p(tcps_ecn_accepts, "\t%llu ECN connection%s accepted\n");
+	p(tcps_ecn_rcvece, "\t\t%llu ECE packet%s received\n");
+	p(tcps_ecn_rcvcwr, "\t\t%llu CWR packet%s received\n");
+	p(tcps_ecn_rcvce, "\t\t%llu CE packet%s received\n");
+	p(tcps_ecn_sndect, "\t\t%llu ECT packet%s sent\n");
+	p(tcps_ecn_sndece, "\t\t%llu ECE packet%s sent\n");
+	p(tcps_ecn_sndcwr, "\t\t%llu CWR packet%s sent\n");
+	ps(tcps_cwr_frecovery, "\t\t\tfastrecovery: %llu\n");
+	ps(tcps_cwr_timeout, "\t\t\ttimeout: %llu\n");
+	ps(tcps_cwr_ecn, "\t\t\tecn: %llu\n");
+
 #undef p
 #undef ps
 #undef p2
