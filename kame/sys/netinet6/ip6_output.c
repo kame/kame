@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.91 2000/04/04 08:48:26 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.92 2000/04/04 11:20:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -844,10 +844,8 @@ skip_ipsec2:;
 	/*
 	 * setsockopt(IPv6_USE_MIN_MTU) overrides mtu setting
 	 */
-#ifdef IPV6_MINMTU
 	if ((flags & IPV6_MINMTU) != 0 && mtu > IPV6_MMTU)
 		mtu = IPV6_MMTU;
-#endif
 
 	/*
 	 * Fake link-local scope-class addresses
@@ -1522,11 +1520,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 						OPTSET(IN6P_FAITH);
 						break;
 
-#ifdef IN6P_MINMTU
 					case IPV6_USE_MIN_MTU:
 						OPTSET(IN6P_MINMTU);
 						break;
-#endif
 
 #if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || (defined(__NetBSD__) && !defined(INET6_BINDV6ONLY))
 					case IPV6_BINDV6ONLY:
@@ -1883,11 +1879,9 @@ ip6_ctloutput(op, so, level, optname, mp)
 #endif
 					break;
 
-#ifdef IN6P_MINMTU
 				case IPV6_USE_MIN_MTU:
 					optval = OPTBIT(IN6P_MINMTU);
 					break;
-#endif
 
 				case IPV6_FAITH:
 					optval = OPTBIT(IN6P_FAITH);
