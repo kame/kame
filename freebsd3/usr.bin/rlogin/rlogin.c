@@ -346,7 +346,7 @@ main(argc, argv)
 	int sslen;
 	sslen = sizeof(ss);
 	if (getsockname(rem, (struct sockaddr *)&ss, &sslen) == 0 &&
-	    ss.__ss_family == AF_INET) {
+	    ss.ss_family == AF_INET) {
 		one = IPTOS_LOWDELAY;
 		if (setsockopt(rem, IPPROTO_IP, IP_TOS, (char *)&one,
 				sizeof(int)) < 0) {

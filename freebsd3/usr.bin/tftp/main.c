@@ -220,7 +220,7 @@ setpeer(argc, argv)
 	if (res->ai_next || verbose) {
 		char numhost[MAXHOSTNAMELEN];
 		char numserv[MAXHOSTNAMELEN];
-		getnameinfo((struct sockaddr *)&peeraddr, peeraddr.__ss_len,
+		getnameinfo((struct sockaddr *)&peeraddr, peeraddr.ss_len,
 			numhost, sizeof(numhost), numserv, sizeof(numserv),
 			NI_NUMERICHOST | NI_NUMERICSERV);
 		printf("%s/%s: connected to %s/%s\n", argv[1], port, numhost,
@@ -229,13 +229,13 @@ setpeer(argc, argv)
 
 	if (0 <= f)
 		close(f);
-	f = socket(peeraddr.__ss_family, SOCK_DGRAM, 0);
+	f = socket(peeraddr.ss_family, SOCK_DGRAM, 0);
 	if (f < 0)
 		err(3, "socket");
 	memset(&me, 0, sizeof(me));
-	me.__ss_family = peeraddr.__ss_family;
-	me.__ss_len = peeraddr.__ss_len;
-	if (bind(f, (struct sockaddr *)&me, me.__ss_len) < 0)
+	me.ss_family = peeraddr.ss_family;
+	me.ss_len = peeraddr.ss_len;
+	if (bind(f, (struct sockaddr *)&me, me.ss_len) < 0)
 		err(1, "bind");
 	connected = 1;
 }

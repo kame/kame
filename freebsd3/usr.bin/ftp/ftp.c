@@ -159,7 +159,7 @@ hookup(host, port)
 			return (0);
 		}
 		if (dobind && bind(s, (struct sockaddr *)&bindto,
-				   bindto.__ss_len) == -1) {
+				   bindto.ss_len) == -1) {
 			warn("bind");
 			goto next;
 		}
@@ -1159,7 +1159,7 @@ initconn()
 			return (1);
 		}
 		if (dobind && bind(data, (struct sockaddr *)&bindto,
-				bindto.__ss_len) == -1) {
+				bindto.ss_len) == -1) {
 			warn("bind");
 			goto bad;
 		}

@@ -262,7 +262,7 @@ url_get(origline, proxyenv)
 		}
 
 		if (dobind && bind(s, (struct sockaddr *)&bindto,
-				   bindto.__ss_len) == -1) {
+				   bindto.ss_len) == -1) {
 			warn("bind");
 			goto cleanup_url_get;
 		}

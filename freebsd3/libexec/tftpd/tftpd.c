@@ -241,19 +241,19 @@ main(argc, argv)
 	alarm(0);
 	close(0);
 	close(1);
-	peer = socket(from.__ss_family, SOCK_DGRAM, 0);
+	peer = socket(from.ss_family, SOCK_DGRAM, 0);
 	if (peer < 0) {
 		syslog(LOG_ERR, "socket: %m");
 		exit(1);
 	}
 	memset(&ss, 0, sizeof(ss));
-	ss.__ss_family = from.__ss_family;
-	ss.__ss_len = from.__ss_len;
-	if (bind(peer, (struct sockaddr *)&ss, ss.__ss_len) < 0) {
+	ss.ss_family = from.ss_family;
+	ss.ss_len = from.ss_len;
+	if (bind(peer, (struct sockaddr *)&ss, ss.ss_len) < 0) {
 		syslog(LOG_ERR, "bind: %m");
 		exit(1);
 	}
-	if (connect(peer, (struct sockaddr *)&from, from.__ss_len) < 0) {
+	if (connect(peer, (struct sockaddr *)&from, from.ss_len) < 0) {
 		syslog(LOG_ERR, "connect: %m");
 		exit(1);
 	}
@@ -328,14 +328,14 @@ again:
 		int err, result = HOSTNAME_INVALIDADDR;
 		char host[MAXHOSTNAMELEN];
 
-		err = getnameinfo((struct sockaddr *)&from, from.__ss_len,
+		err = getnameinfo((struct sockaddr *)&from, from.ss_len,
 				  host, sizeof(host), NULL, 0, 0);
 		if (err == NULL) {
 			struct addrinfo hints, *res, *ores;
 			struct sockaddr *sa;
 	
 			bzero(&hints, sizeof(struct addrinfo));
-			hints.ai_family = from.__ss_family;
+			hints.ai_family = from.ss_family;
 			hints.ai_socktype = SOCK_DGRAM;
 			hints.ai_protocol = IPPROTO_UDP;
 	
@@ -355,7 +355,7 @@ again:
 					result = HOSTNAME_INCORRECTNAME;
 					goto numeric;
 				}
-				if (sa->sa_len ==from.__ss_len &&
+				if (sa->sa_len ==from.ss_len &&
 				    !bcmp(sa, &from, sa->sa_len)) {
 					result = HOSTNAME_FOUND;
 					break;	/* OK! */
@@ -365,7 +365,7 @@ again:
 		} else {
 	    numeric:
 			err = getnameinfo((struct sockaddr *)&from,
-					  from.__ss_len, host, sizeof(host),
+					  from.ss_len, host, sizeof(host),
 					  NULL, 0, NI_NUMERICHOST);
 			/* XXX: do 'err' check */
 		}

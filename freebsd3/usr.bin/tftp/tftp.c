@@ -132,7 +132,7 @@ send_data:
 		if (trace)
 			tpacket("sent", dp, size + 4);
 		n = sendto(f, dp, size + 4, 0,
-		    (struct sockaddr *)&tpeer, tpeer.__ss_len);
+		    (struct sockaddr *)&tpeer, tpeer.ss_len);
 		if (n != size + 4) {
 			warn("sendto");
 			goto abort;
@@ -150,7 +150,7 @@ send_data:
 				warn("recvfrom");
 				goto abort;
 			}
-			switch (from.__ss_family) {
+			switch (from.ss_family) {
 			case AF_INET:
 				((struct sockaddr_in *)&tpeer)->sin_port
 					= ((struct sockaddr_in *)&from)->sin_port;
@@ -248,7 +248,7 @@ send_ack:
 		if (trace)
 			tpacket("sent", ap, size);
 		if (sendto(f, ackbuf, size, 0, (struct sockaddr *)&tpeer,
-		    tpeer.__ss_len) != size) {
+		    tpeer.ss_len) != size) {
 			alarm(0);
 			warn("sendto");
 			goto abort;
@@ -266,7 +266,7 @@ send_ack:
 				warn("recvfrom");
 				goto abort;
 			}
-			switch (from.__ss_family) {
+			switch (from.ss_family) {
 			case AF_INET:
 				((struct sockaddr_in *)&tpeer)->sin_port
 					= ((struct sockaddr_in *)&from)->sin_port;
@@ -318,7 +318,7 @@ abort:						/* ok to ack, since user */
 	ap->th_opcode = htons((u_short)ACK);	/* has seen err msg */
 	ap->th_block = htons((u_short)block);
 	(void) sendto(f, ackbuf, 4, 0, (struct sockaddr *)&tpeer,
-	    tpeer.__ss_len);
+	    tpeer.ss_len);
 	write_behind(file, convert);		/* flush last buffer */
 	fclose(file);
 	stopclock();
@@ -391,7 +391,7 @@ nak(error)
 	if (trace)
 		tpacket("sent", tp, length);
 	if (sendto(f, ackbuf, length, 0, (struct sockaddr *)&tpeer,
-	    tpeer.__ss_len) != length)
+	    tpeer.ss_len) != length)
 		warn("nak");
 }
 
