@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.2 2002/05/15 06:37:09 k-sugyou Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.3 2002/06/08 19:52:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -356,7 +356,7 @@ mip6_ip6ma_input(m, ip6ma, ip6malen)
                  * sequence number doesn't match.
                  */
 		goto check_mobility_options;
- 	}
+	}
 	if (seqno != mbu->mbu_seqno) {
                 mip6log((LOG_NOTICE,
                          "%s:%d: unmached sequence no "
@@ -635,7 +635,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 			 "%s:%d: ba destopt creation error (%d)\n",
 			 __FILE__, __LINE__, error));
 		m_freem(m);
- 		goto free_ip6pktopts;
+		goto free_ip6pktopts;
 	}
 
 #if 0
@@ -647,7 +647,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 				 "%s:%d: ba rthdr creation error (%d)\n",
 				 __FILE__, __LINE__, error));
 			m_freem(m);
- 			goto free_ip6pktopts;
+			goto free_ip6pktopts;
 		}
 		opt.ip6po_rthdr = pktopt_rthdr;
 	}
@@ -658,7 +658,7 @@ mip6_bc_send_ba(src, dst, dstcoa, status, seqno, lifetime, refresh)
 		mip6log((LOG_ERR,
 			 "%s:%d: sending ip packet error. (%d)\n",
 			 __FILE__, __LINE__, error));
- 		goto free_ip6pktopts;
+		goto free_ip6pktopts;
 	}
  free_ip6pktopts:
 #if 0

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.279 2002/06/08 11:16:51 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.280 2002/06/08 19:52:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -473,7 +473,7 @@ nd6_timer(ignored_arg)
 	struct ifnet *ifp;
 	struct in6_ifaddr *ia6, *nia6;
 	struct in6_addrlifetime *lt6;
-	
+
 #ifdef __NetBSD__
 	s = splsoftnet();
 #else
@@ -587,7 +587,7 @@ nd6_timer(ignored_arg)
 		}
 		ln = next;
 	}
-	
+
 	/* expire default router list */
 	dr = TAILQ_FIRST(&nd_defrouter);
 	while (dr) {
@@ -623,7 +623,7 @@ nd6_timer(ignored_arg)
 			 * addresses.  Although we may have to restart the
 			 * loop (see below), it must be after purging the
 			 * address.  Otherwise, we'd see an infinite loop of
-			 * regeneration. 
+			 * regeneration.
 			 */
 			if (ip6_use_tempaddr &&
 			    (ia6->ia6_flags & IN6_IFF_TEMPORARY) != 0) {
@@ -659,7 +659,7 @@ nd6_timer(ignored_arg)
 					 * would not cause disaster (because
 					 * it's not a deletion, but an
 					 * addition,) we'd rather restart the
-					 * loop just for safety.  Or does this 
+					 * loop just for safety.  Or does this
 					 * significantly reduce performance??
 					 */
 					goto addrloop;
@@ -1749,7 +1749,7 @@ nd6_ioctl(cmd, data, ifp)
 		nbi->isrouter = ln->ln_router;
 		nbi->expire = ln->ln_expire;
 		splx(s);
-		
+
 		break;
 	}
 	case SIOCGDEFIFACE_IN6:	/* XXX: should be implemented as a sysctl? */
@@ -2223,7 +2223,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	 * solicitation issued in nd6_timer() may be less than the specified
 	 * retransmission time.  This should not be a problem from a practical
 	 * point of view, because we'll typically see an immediate response
-	 * from the neighbor, which suppresses the succeeding solicitations. 
+	 * from the neighbor, which suppresses the succeeding solicitations.
 	 */
 	if (ln->ln_expire && ln->ln_asked == 0) {
 		ln->ln_asked++;
@@ -2232,7 +2232,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 		nd6_ns_output(ifp, NULL, dst, ln, 0);
 	}
 	return(0);
-	
+
   sendpkt:
 #if defined(__OpenBSD__) && defined(IPSEC)
 	/*
@@ -2270,7 +2270,7 @@ nd6_output(ifp, origifp, m0, dst, rt0)
 	if (m)
 		m_freem(m);
 	return (error);
-}	
+}
 #undef senderr
 
 int
@@ -2481,7 +2481,7 @@ fill_drlist(req)
 #else
 	s = splnet();
 #endif
-	
+
 #ifndef __FreeBSD__
 	if (oldp) {
 		d = (struct in6_defrouter *)oldp;

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.205 2002/06/08 19:18:58 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.206 2002/06/08 19:52:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -941,7 +941,7 @@ defrouter_select()
 		if (!installed_dr || !TAILQ_NEXT(installed_dr, dr_entry))
 			selected_dr = TAILQ_FIRST(&nd_defrouter);
 		else
- 			selected_dr = TAILQ_NEXT(installed_dr, dr_entry);
+			selected_dr = TAILQ_NEXT(installed_dr, dr_entry);
 	} else if (installed_dr &&
 	    (rt = nd6_lookup(&installed_dr->rtaddr, 0, installed_dr->ifp)) &&
 	    (ln = (struct llinfo_nd6 *)rt->rt_llinfo) &&
@@ -1377,7 +1377,7 @@ prelist_update(new, dr, m)
 	 * This should have been done in nd6_ra_input.
 	 */
 
- 	/*
+	/*
 	 * 5.5.3 (d). If the prefix advertised does not match the prefix of an
 	 * address already in the list, and the Valid Lifetime is not 0,
 	 * form an address.  Note that even a manually configured address

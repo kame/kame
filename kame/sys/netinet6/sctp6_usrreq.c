@@ -1,4 +1,4 @@
-/*	$KAME: sctp6_usrreq.c,v 1.5 2002/06/07 01:21:19 itojun Exp $	*/
+/*	$KAME: sctp6_usrreq.c,v 1.6 2002/06/08 19:52:07 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet6/sctp6_usrreq.c,v 1.81 2002/04/04 21:53:15 randall Exp	*/
 
 /*
@@ -584,7 +584,7 @@ sctp6_abort(struct socket *so)
 	if (inp == 0)
 		return EINVAL;	/* ??? possible? panic instead? */
 	soisdisconnected(so);
- 	s = splnet();
+	s = splnet();
 	sctp_inpcb_free(inp,1);
 	splx(s);
 	return 0;
@@ -872,7 +872,7 @@ sctp6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	 */
 	if ((inp->sctp_flags & SCTP_PCB_FLAGS_CONNECTED) &&
 	    (addr == NULL)) {
- 	        return sctp_output(inp, m, addr, control, p);
+	        return sctp_output(inp, m, addr, control, p);
 	}
 #endif
 	if (addr == NULL) {

@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.113 2002/05/27 04:21:26 itojun Exp $	*/
+/*	$KAME: in6_src.c,v 1.114 2002/06/08 19:52:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -167,20 +167,20 @@ static struct in6_addrpolicy *match_addrsel_policy __P((struct sockaddr_in6 *));
 		sizeof(ip6stat.ip6s_sources_rule[0])) /* check for safety */ \
 		ip6stat.ip6s_sources_rule[(r)]++; \
 	/* printf("in6_selectsrc: replace %s with %s by %d\n", ia_best ? ip6_sprintf(&ia_best->ia_addr.sin6_addr) : "none", ip6_sprintf(&ia->ia_addr.sin6_addr), (r)); */ \
- 	goto replace; \
+	goto replace; \
 } while(0)
 #define NEXT(r) do {\
 	if ((r) < sizeof(ip6stat.ip6s_sources_rule) / \
 		sizeof(ip6stat.ip6s_sources_rule[0])) /* check for safety */ \
 		ip6stat.ip6s_sources_rule[(r)]++; \
 	/* printf("in6_selectsrc: keep %s against %s by %d\n", ia_best ? ip6_sprintf(&ia_best->ia_addr.sin6_addr) : "none", ip6_sprintf(&ia->ia_addr.sin6_addr), (r)); */ \
- 	goto next; 		/* XXX: we can't use 'continue' here */ \
+	goto next; 		/* XXX: we can't use 'continue' here */ \
 } while(0)
 #define BREAK(r) do { \
 	if ((r) < sizeof(ip6stat.ip6s_sources_rule) / \
 		sizeof(ip6stat.ip6s_sources_rule[0])) /* check for safety */ \
 		ip6stat.ip6s_sources_rule[(r)]++; \
- 	goto out; 		/* XXX: we can't use 'break' here */ \
+	goto out; 		/* XXX: we can't use 'break' here */ \
 } while(0)
 
 struct sockaddr_in6 *
@@ -306,7 +306,7 @@ in6_selectsrc(dstsock, opts, mopts, ro, laddr, ifpp, errorp)
 			usecoa = 1;
 			break;
 		}
-  	}
+	}
 #ifdef MIP6_ALLOW_COA_FALLBACK
 	for (sc = TAILQ_FIRST(&hif_softc_list);
 	     sc;

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.71 2002/06/07 04:09:10 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.72 2002/06/08 19:52:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -2026,15 +2026,15 @@ pim6_input(mp, offp, proto)
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #if (__FreeBSD_version >= 410000)
- 		rc = if_simloop(mif6table[reg_mif_num].m6_ifp, m,
+		rc = if_simloop(mif6table[reg_mif_num].m6_ifp, m,
 				dst.sin6_family, NULL);
 #else
- 		rc = if_simloop(mif6table[reg_mif_num].m6_ifp, m,
+		rc = if_simloop(mif6table[reg_mif_num].m6_ifp, m,
 				(struct sockaddr *) &dst, NULL);
 
 #endif
 #else
- 		rc = looutput(mif6table[reg_mif_num].m6_ifp, m,
+		rc = looutput(mif6table[reg_mif_num].m6_ifp, m,
 			      (struct sockaddr *) &dst,
 			      (struct rtentry *) NULL);
 #endif

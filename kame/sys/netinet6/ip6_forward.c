@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.103 2002/06/08 19:10:36 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.104 2002/06/08 19:52:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -444,7 +444,7 @@ ip6_forward(m, srcrt)
 		dst->sin6_scope_id = 0;	/* XXX */
 #endif
 #ifdef __FreeBSD__
-  		rtalloc_ign((struct route *)&ip6_forward_rt, RTF_PRCLONING);
+		rtalloc_ign((struct route *)&ip6_forward_rt, RTF_PRCLONING);
 #else
 		rtalloc((struct route *)&ip6_forward_rt);
 #endif
@@ -536,7 +536,7 @@ ip6_forward(m, srcrt)
 		}
 		m_freem(m);
 		return;
- 	}
+	}
 
 	if (rt->rt_flags & RTF_GATEWAY)
 		dst = (struct sockaddr_in6 *)rt->rt_gateway;
@@ -655,7 +655,7 @@ ip6_forward(m, srcrt)
 	pfh = pfil_hook_get(PFIL_OUT, &inetsw[ip_protox[IPPROTO_IPV6]].pr_pfh);
 	for (; pfh; pfh = pfh->pfil_link.tqe_next)
 		if (pfh->pfil_func) {
-		    	rv = pfh->pfil_func(ip6, sizeof(*ip6), rt->rt_ifp, 1, &m1);
+			rv = pfh->pfil_func(ip6, sizeof(*ip6), rt->rt_ifp, 1, &m1);
 			if (rv) {
 				error = EHOSTUNREACH;
 				goto senderr;

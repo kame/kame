@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.282 2002/06/08 19:12:29 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.283 2002/06/08 19:52:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1503,7 +1503,7 @@ ip6_savecontrol(in6p, ip6, m, ctl)
 		privileged++;
 #elif defined(__FreeBSD__) && __FreeBSD__ >= 4
 	if (p && !suser(p))
- 		privileged++;
+		privileged++;
 #else
 #ifdef HAVE_NRL_INPCB
 	if ((in6p->inp_socket->so_state & SS_PRIV) != 0)

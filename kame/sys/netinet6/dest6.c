@@ -1,4 +1,4 @@
-/*	$KAME: dest6.c,v 1.40 2002/05/29 10:30:19 itojun Exp $	*/
+/*	$KAME: dest6.c,v 1.41 2002/06/08 19:52:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -300,7 +300,7 @@ dest6_send_bm(src, dst, home)
 				  IP6ME_STATUS_NO_BINDING, home);
 	if (error) {
 		m_freem(m);
- 		goto free_ip6pktopts;
+		goto free_ip6pktopts;
 	}
 				  
 	/* output a binding missing message. */

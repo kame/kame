@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_output.c,v 1.20 2002/04/19 07:53:57 jinmei Exp $	*/
+/*	$KAME: tcp6_output.c,v 1.21 2002/06/08 19:52:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -373,7 +373,7 @@ send:
 				optlen += 4;
 			}
 		}
- 	}
+	}
 
 	/* length occupied by IPv6 extension headers */
 	exthdrlen = ip6_optlen(t6p->t_in6pcb);
@@ -381,20 +381,20 @@ send:
 	exthdrlen += ipsec6_hdrsiz_tcp(t6p);
 #endif
 
- 	/*
+	/*
 	 * Send a timestamp and echo-reply if this is a SYN and our side
 	 * wants to use timestamps (TF_SEND_TSTMP is set) or both our side
 	 * and our peer have sent timestamps in our SYN's.
- 	 */
- 	if (t6p->t_flags & TF_SEND_TSTMP && (flags & TH_RST) == 0) {
+	 */
+	if (t6p->t_flags & TF_SEND_TSTMP && (flags & TH_RST) == 0) {
 		u_long *lp = (u_long *)(opt + optlen);
 
- 		/* Form timestamp option as shown in appendix A of RFC 1323. */
- 		*lp++ = htonl(TCP6OPT_TSTAMP_HDR);
- 		*lp++ = htonl(tcp6_now);
- 		*lp   = htonl(t6p->ts_recent);
- 		optlen += TCP6OLEN_TSTAMP_APPA;
- 	}
+		/* Form timestamp option as shown in appendix A of RFC 1323. */
+		*lp++ = htonl(TCP6OPT_TSTAMP_HDR);
+		*lp++ = htonl(tcp6_now);
+		*lp   = htonl(t6p->ts_recent);
+		optlen += TCP6OLEN_TSTAMP_APPA;
+	}
 
 #if 1 /* def already_accounted_for */
 	/*
@@ -414,10 +414,10 @@ send:
 	}
 #endif
 
- 	hdrlen += optlen;
+	hdrlen += optlen;
 
 #ifdef DIAGNOSTIC
- 	if (max_linkhdr + hdrlen > MHLEN)
+	if (max_linkhdr + hdrlen > MHLEN)
 		panic("tcp6hdr too big");
 #endif
 
