@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1421 2000/12/03 01:00:15 itojun Exp $
+$KAME: CHANGELOG,v 1.1422 2000/12/04 06:17:03 jinmei Exp $
 
 <200012>
+2000-12-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6[ds]d/mld6.c (make_mld6_msg):
+	* kame/kame/mld6query/mld6.c (make_msg):
+	* kame/kame/pim6dd/pim6.c (init_pim6):
+	made sure to use CMSG_LEN (not CMSG_SPACE) to set to cmsg_len.
+	based on a PR from Hajimu UMEMOTO <ume@mahoroba.org>
+
 2000-12-03  Koji Kawano <K.Kawano@rdmg.mgcs.mei.co.jp>
 	* sys/netinet6/in6_prefix.c: missing copy vltime & pltime to
 	  ifra(interface)
