@@ -1,4 +1,4 @@
-/*	$KAME: ip6protosw.h,v 1.30 2004/05/21 08:17:58 itojun Exp $	*/
+/*	$KAME: ip6protosw.h,v 1.31 2004/05/25 01:16:39 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -165,9 +165,6 @@ struct ip6protosw {
 #else
 	int	(*pr_sysctl)		/* sysctl for protocol */
 			__P((int *, u_int, void *, size_t *, void *, size_t));
-#endif
-#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
-	struct	pfil_head	pr_pfh;
 #endif
 };
 
