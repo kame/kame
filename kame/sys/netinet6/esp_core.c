@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.28 2000/08/28 14:26:31 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.29 2000/08/28 16:49:16 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -238,6 +238,7 @@ esp_schedule(algo, sav)
 	const struct esp_algorithm *algo;
 	struct secasvar *sav;
 {
+	int error;
 
 	if (_KEYBITS(sav->key_enc) < algo->keymin ||
 	    _KEYBITS(sav->key_enc) > algo->keymax) {
@@ -252,7 +253,12 @@ esp_schedule(algo, sav)
 		return 0;
 	if (!sav->sched || sav->schedlen != algo->schedlen)
 		panic("invalid sav->schedlen in esp_schedule");
-	return (*algo->schedule)(algo, sav);
+	error = (*algo->schedule)(algo, sav);
+	if (error) {
+		ipseclog((LOG_ERR, "esp_schedule %s: error %d\n",
+		    algo->name, error));
+	}
+	return error;
 }
 
 /*
@@ -1167,14 +1173,31 @@ esp_rijndael_schedule(algo, sav)
 	const struct esp_algorithm *algo;
 	struct secasvar *sav;
 {
-	keyInstance *p;
+	keyInstance *k;
+	char keymat[256 / 4 + 1];
+	u_char *p, *ep;
+	char *q, *eq;
 
-	p = (keyInstance *)sav->sched;
-	if (rijndael_makeKey(&p[0], DIR_DECRYPT, _KEYLEN(sav->key_enc),
-	    _KEYBUF(sav->key_enc)) < 0)
+	/* rijndael_makeKey wants hex string for the key */
+	if (_KEYLEN(sav->key_enc) * 2 > sizeof(keymat) - 1)
 		return -1;
-	if (rijndael_makeKey(&p[1], DIR_ENCRYPT, _KEYLEN(sav->key_enc),
-	    _KEYBUF(sav->key_enc)) < 0)
+	p = _KEYBUF(sav->key_enc); 
+	ep = p + _KEYLEN(sav->key_enc);
+	q = keymat;
+	eq = &keymat[sizeof(keymat) - 1];
+	while (p < ep && q < eq) {
+		sprintf(q, "%02x", *p);
+		q += 2;
+		p++;
+	}
+	*eq = '\0';
+
+	k = (keyInstance *)sav->sched;
+	if (rijndael_makeKey(&k[0], DIR_DECRYPT, _KEYLEN(sav->key_enc) * 8,
+	    keymat) < 0)
+		return -1;
+	if (rijndael_makeKey(&k[1], DIR_ENCRYPT, _KEYLEN(sav->key_enc) * 8,
+	    keymat) < 0)
 		return -1;
 	return 0;
 }
@@ -1194,7 +1217,7 @@ esp_rijndael_blockdecrypt(algo, sav, s, d)
 	if (rijndael_cipherInit(&c, MODE_CBC, NULL) < 0)
 		return -1;
 	p = (keyInstance *)sav->sched;
-	if (rijndael_blockDecrypt(&c, &p[0], s, algo->padbound, d) < 0)
+	if (rijndael_blockDecrypt(&c, &p[0], s, algo->padbound * 8, d) < 0)
 		return -1;
 	return 0;
 }
@@ -1214,7 +1237,7 @@ esp_rijndael_blockencrypt(algo, sav, s, d)
 	if (rijndael_cipherInit(&c, MODE_CBC, NULL) < 0)
 		return -1;
 	p = (keyInstance *)sav->sched;
-	if (rijndael_blockEncrypt(&c, &p[1], s, algo->padbound, d) < 0)
+	if (rijndael_blockEncrypt(&c, &p[1], s, algo->padbound * 8, d) < 0)
 		return -1;
 	return 0;
 }
@@ -1228,14 +1251,31 @@ esp_twofish_schedule(algo, sav)
 	const struct esp_algorithm *algo;
 	struct secasvar *sav;
 {
-	keyInstance *p;
+	keyInstance *k;
+	char keymat[256 / 4 + 1];
+	u_char *p, *ep;
+	char *q, *eq;
 
-	p = (keyInstance *)sav->sched;
-	if (twofish_makeKey(&p[0], DIR_DECRYPT, _KEYLEN(sav->key_enc),
-	    _KEYBUF(sav->key_enc)) < 0)
+	/* twofish_makeKey wants hex string for the key */
+	if (_KEYLEN(sav->key_enc) * 2 > sizeof(keymat) - 1)
 		return -1;
-	if (twofish_makeKey(&p[1], DIR_ENCRYPT, _KEYLEN(sav->key_enc),
-	    _KEYBUF(sav->key_enc)) < 0)
+	p = _KEYBUF(sav->key_enc); 
+	ep = p + _KEYLEN(sav->key_enc);
+	q = keymat;
+	eq = &keymat[sizeof(keymat) - 1];
+	while (p < ep && q < eq) {
+		sprintf(q, "%02x", *p);
+		q += 2;
+		p++;
+	}
+	*eq = '\0';
+
+	k = (keyInstance *)sav->sched;
+	if (twofish_makeKey(&k[0], DIR_DECRYPT, _KEYLEN(sav->key_enc) * 8,
+	    keymat) < 0)
+		return -1;
+	if (twofish_makeKey(&k[1], DIR_ENCRYPT, _KEYLEN(sav->key_enc) * 8,
+	    keymat) < 0)
 		return -1;
 	return 0;
 }
@@ -1255,7 +1295,7 @@ esp_twofish_blockdecrypt(algo, sav, s, d)
 	if (twofish_cipherInit(&c, MODE_CBC, NULL) < 0)
 		return -1;
 	p = (keyInstance *)sav->sched;
-	if (twofish_blockDecrypt(&c, &p[0], s, algo->padbound, d) < 0)
+	if (twofish_blockDecrypt(&c, &p[0], s, algo->padbound * 8, d) < 0)
 		return -1;
 	return 0;
 }
@@ -1275,7 +1315,7 @@ esp_twofish_blockencrypt(algo, sav, s, d)
 	if (twofish_cipherInit(&c, MODE_CBC, NULL) < 0)
 		return -1;
 	p = (keyInstance *)sav->sched;
-	if (twofish_blockEncrypt(&c, &p[1], s, algo->padbound, d) < 0)
+	if (twofish_blockEncrypt(&c, &p[1], s, algo->padbound * 8, d) < 0)
 		return -1;
 	return 0;
 }
@@ -1312,13 +1352,16 @@ esp_cbc_decrypt(m, off, sav, algo, ivlen)
 	int scutoff;
 	int i;
 
-	if (m->m_pkthdr.len < off) {
+	ivoff = off + sizeof(struct newesp);
+	bodyoff = off + sizeof(struct newesp) + ivlen;
+
+	if (m->m_pkthdr.len < bodyoff) {
 		ipseclog((LOG_ERR, "esp_cbc_decrypt %s: bad len %d/%d\n",
-		    algo->name, m->m_pkthdr.len, off));
+		    algo->name, m->m_pkthdr.len, bodyoff));
 		m_freem(m);
 		return EINVAL;
 	}
-	if ((m->m_pkthdr.len - off) % algo->padbound) {
+	if ((m->m_pkthdr.len - bodyoff) % algo->padbound) {
 		ipseclog((LOG_ERR, "esp_cbc_decrypt %s: "
 		    "payload length must be multiple of %d\n",
 		    algo->name, algo->padbound));
@@ -1331,6 +1374,7 @@ esp_cbc_decrypt(m, off, sav, algo, ivlen)
 		m_freem(m);
 		return EINVAL;
 	}
+	/* XXX maybe we should manage padbound/blocksize/ivlen separately */
 	if (ivlen != algo->padbound || ivlen != sav->ivlen) {
 		ipseclog((LOG_ERR, "esp_cbc_decrypt %s: "
 		    "unsupported ivlen %d\n", algo->name, ivlen));
@@ -1341,8 +1385,6 @@ esp_cbc_decrypt(m, off, sav, algo, ivlen)
 	s = m;
 	d = d0 = dp = NULL;
 	soff = doff = sn = dn = 0;
-	ivoff = off + sizeof(struct newesp);
-	bodyoff = off + sizeof(struct newesp) + ivlen;
 	m_copydata(m, ivoff, ivlen, iv);
 	ivp = sp = NULL;
 
@@ -1466,13 +1508,16 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	int scutoff;
 	int i;
 
-	if (m->m_pkthdr.len < off) {
+	ivoff = off + sizeof(struct newesp);
+	bodyoff = off + sizeof(struct newesp) + ivlen;
+
+	if (m->m_pkthdr.len < bodyoff) {
 		ipseclog((LOG_ERR, "esp_cbc_encrypt %s: bad len %d/%d\n",
-		    algo->name, m->m_pkthdr.len, off));
+		    algo->name, m->m_pkthdr.len, bodyoff));
 		m_freem(m);
 		return EINVAL;
 	}
-	if ((m->m_pkthdr.len - off) % algo->padbound) {
+	if ((m->m_pkthdr.len - bodyoff) % algo->padbound) {
 		ipseclog((LOG_ERR, "esp_cbc_encrypt %s: "
 		    "payload length must be multiple of %d\n",
 		    algo->name, algo->padbound));
@@ -1485,6 +1530,7 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 		m_freem(m);
 		return EINVAL;
 	}
+	/* XXX maybe we should manage padbound/blocksize/ivlen separately */
 	if (ivlen != algo->padbound || ivlen != sav->ivlen) {
 		ipseclog((LOG_ERR, "esp_cbc_encrypt %s: "
 		    "unsupported ivlen %d\n", algo->name, ivlen));
@@ -1495,8 +1541,6 @@ esp_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 	s = m;
 	d = d0 = dp = NULL;
 	soff = doff = sn = dn = 0;
-	ivoff = off + sizeof(struct newesp);
-	bodyoff = off + sizeof(struct newesp) + ivlen;
 	/* initialize iv - maybe it is better to overwrite dest, not source */
 	m_copyback(m, ivoff, ivlen, sav->iv);
 	bcopy(sav->iv, iv, ivlen);
