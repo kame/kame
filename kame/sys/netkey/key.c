@@ -2594,7 +2594,6 @@ key_spddump(so, m, mhp)
 	int cnt;
 	u_int dir;
 	struct mbuf *n;
-	struct keycb *kp;
 	int error = 0, needwait = 0;
 
 	/* sanity check */
@@ -2627,9 +2626,12 @@ key_spddump(so, m, mhp)
 		}
 	}
 
+#if 0
+	/* XXX: this can cause infinite loop. */
 	kp = (struct keycb *)sotorawcb(so);
 	while (needwait && kp->kp_queue)
 		sbwait(&so->so_rcv);
+#endif
 
 	m_freem(m);
 	return 0;
@@ -7062,7 +7064,6 @@ key_dump(so, m, mhp)
 	u_int8_t satype;
 	u_int8_t state;
 	int cnt, error = 0, needwait = 0;
-	struct keycb *kp;
 	struct mbuf *n;
 
 	/* sanity check */
@@ -7125,9 +7126,12 @@ key_dump(so, m, mhp)
 		}
 	}
 
+#if 0
+	/* XXX: this can cause infinite loop. */
 	kp = (struct keycb *)sotorawcb(so);
 	while (needwait && kp->kp_queue)
 		sbwait(&so->so_rcv);
+#endif
 
 	m_freem(m);
 	return 0;
