@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1005 2000/06/13 03:36:04 itojun Exp $
+$Id: CHANGELOG,v 1.1006 2000/06/13 05:09:29 itojun Exp $
 
 <200006>
+Tue Jun 13 14:07:24 JST 2000  itojun@iijlab.net
+	* kame/racoon/safefile.c: be more picky about secret file permission.
+	  now pre-shared key file (psk.txt) is required to be owned by the
+	  uid running racoon (= root), and must not be accessible by others
+	  (like 0400).
+
 2000-06-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6_rtr.c (in6_ifadd): made sure to gain a
 	reference counter to in6_ifaddr for the autoconfigured address
