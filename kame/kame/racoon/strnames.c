@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: strnames.c,v 1.9 2000/06/12 05:36:00 sakane Exp $ */
+/* YIPS @(#)$Id: strnames.c,v 1.10 2000/06/28 07:04:33 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -381,7 +381,7 @@ s_ipsecdoi_ltype(type)
 }
 
 static char *name_attr_ipsec_encmode[] = {
-	"",
+	"Any",
 	"Tunnel",
 	"Transport"
 };

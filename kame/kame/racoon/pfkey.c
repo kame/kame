@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.54 2000/06/28 05:59:33 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.55 2000/06/28 07:04:33 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -129,6 +129,8 @@ NULL,	/* SADB_X_SPDDELETE2 */
 };
 
 static int addnewsp __P((caddr_t *));
+static const char *sadbsecas2str __P((struct sockaddr *, struct sockaddr *,
+	int, u_int32_t, int));
 
 /*
  * PF_KEY packet handler
@@ -539,6 +541,8 @@ pfkey2ipsecdoi_mode(mode)
 		return IPSECDOI_ATTR_ENC_MODE_TUNNEL;
 	case IPSEC_MODE_TRANSPORT:
 		return IPSECDOI_ATTR_ENC_MODE_TRNS;
+	case IPSEC_MODE_ANY:
+		return IPSECDOI_ATTR_ENC_MODE_ANY;
 	default:
 		plog(logp, LOCATION, NULL, "Invalid mode type: %u\n", mode);
 		return ~0;
@@ -771,10 +775,9 @@ pk_sendgetspi(iph2)
 		}
 		YIPSDEBUG(DEBUG_PFKEY,
 			plog(logp, LOCATION, NULL,
-				"send pfkey GETSPI for %s/%s/%s\n",
-				s_ipsecdoi_proto(pr->proto_id),
-				s_ipsecdoi_encmode(pr->encmode),
-				saddrwop2str(iph2->dst)));
+				"pfkey GETSPI sent: %s\n",
+				sadbsecas2str(iph2->src, iph2->dst,
+					satype, 0, mode)));
 	}
 
 	return 0;
@@ -835,10 +838,11 @@ pk_recvgetspi(mhp)
 			notfound = 0;
 			YIPSDEBUG(DEBUG_PFKEY,
 				plog(logp, LOCATION, NULL,
-					"get SPI %08x for %s %s\n",
-					ntohl(sa->sadb_sa_spi),
-					saddrwop2str(iph2->dst),
-					s_ipsecdoi_proto(pr->proto_id)));
+					"pfkey GETSPI succeeded: %s\n",
+					sadbsecas2str(iph2->src, iph2->dst,
+					    msg->sadb_msg_satype,
+					    sa->sadb_sa_spi,
+					    ipsecdoi2pfkey_mode(pr->encmode))));
 		}
 		if (pr->spi == 0)
 			allspiok = 0;	/* not get all spi */
@@ -908,8 +912,7 @@ pk_sendupdate(iph2)
 			return -1;
 
 		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL,
-				"call pfkey_send_update\n"));
+			plog(logp, LOCATION, NULL, "call pfkey_send_update\n"));
 
 		if (pfkey_send_update(
 				lcconf->sock_pfkey,
@@ -941,10 +944,9 @@ pk_recvupdate(mhp)
 {
 	struct sadb_msg *msg;
 	struct sadb_sa *sa;
-	struct sadb_x_sa2 *sa2;
 	struct sockaddr *src, *dst;
 	struct ph2handle *iph2;
-	u_int proto_id, encmode;
+	u_int proto_id, encmode, sa_mode;
 	int incomplete = 0;
 	struct saproto *pr;
 
@@ -955,7 +957,6 @@ pk_recvupdate(mhp)
 	/* sanity check */
 	if (mhp[0] == NULL
 	 || mhp[SADB_EXT_SA] == NULL
-	 || mhp[SADB_X_EXT_SA2] == NULL
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
 		plog(logp, LOCATION, NULL,
@@ -966,7 +967,10 @@ pk_recvupdate(mhp)
 	src = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]);
 	dst = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]);
 	sa = (struct sadb_sa *)mhp[SADB_EXT_SA];
-	sa2 = (struct sadb_x_sa2 *)mhp[SADB_X_EXT_SA2];
+
+	sa_mode = mhp[SADB_X_EXT_SA2] == NULL
+		? IPSEC_MODE_ANY
+		: ((struct sadb_x_sa2 *)mhp[SADB_X_EXT_SA2])->sadb_x_sa2_mode;
 
 	iph2 = getph2byseq(msg->sadb_msg_seq);
 	if (iph2 == NULL) {
@@ -992,10 +996,10 @@ pk_recvupdate(mhp)
 				"invalid proto_id %d\n", msg->sadb_msg_satype);
 			return -1;
 		}
-		encmode = pfkey2ipsecdoi_mode(sa2->sadb_x_sa2_mode);
+		encmode = pfkey2ipsecdoi_mode(sa_mode);
 		if (encmode == ~0) {
 			plog(logp, LOCATION, NULL,
-				"invalid encmode %d\n", sa2->sadb_x_sa2_mode);
+				"invalid encmode %d\n", sa_mode);
 			return -1;
 		}
 
@@ -1003,14 +1007,12 @@ pk_recvupdate(mhp)
 		 && pr->spi == sa->sadb_sa_spi) {
 			pr->ok = 1;
 			YIPSDEBUG(DEBUG_PFKEY,
-				char *xsrc = strdup(saddrwop2str(iph2->src));
 				plog(logp, LOCATION, NULL,
-					"pfkey %s success %s/%s/%s->%s\n",
-					s_pfkey_type(msg->sadb_msg_type),
-					s_ipsecdoi_proto(pr->proto_id),
-					s_ipsecdoi_encmode(pr->encmode),
-					xsrc,
-					saddrwop2str(iph2->dst)));
+					"pfkey UPDATE succeeded: %s\n",
+					sadbsecas2str(iph2->src, iph2->dst,
+					    msg->sadb_msg_satype,
+					    sa->sadb_sa_spi,
+					    sa_mode)));
 		}
 
 		if (pr->ok == 0)
@@ -1046,16 +1048,11 @@ pk_recvupdate(mhp)
 	iph2->sce = sched_new(iph2->approval->lifetime,
 				isakmp_ph2expire, iph2);
 
-    {
-	char *xsrc = strdup(saddrwop2str(iph2->src));
 	plog(logp, LOCATION, NULL,
-		"IPsec-SA established %s-%s %s/%s spi:%ld\n",
-		xsrc, saddrwop2str(iph2->dst),
-		s_pfkey_satype(msg->sadb_msg_satype),
-		s_ipsecdoi_encmode(~sa2->sadb_x_sa2_mode & 3),
-		ntohl(sa->sadb_sa_spi));
-	free(xsrc);
-    }
+		"IPsec-SA established: %s\n",
+		sadbsecas2str(iph2->src, iph2->dst,
+			msg->sadb_msg_satype, sa->sadb_sa_spi, sa_mode));
+
 	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
 	return 0;
 }
@@ -1100,8 +1097,7 @@ pk_sendadd(iph2)
 			return -1;
 
 		YIPSDEBUG(DEBUG_PFKEY,
-			plog(logp, LOCATION, NULL,
-				"call pfkey_send_add(%u)\n"));
+			plog(logp, LOCATION, NULL, "call pfkey_send_add\n"));
 
 		if (pfkey_send_add(
 				lcconf->sock_pfkey,
@@ -1131,9 +1127,10 @@ pk_recvadd(mhp)
 	caddr_t *mhp;
 {
 	struct sadb_msg *msg;
-	struct sadb_x_sa2 *sa2;
+	struct sadb_sa *sa;
 	struct sockaddr *src, *dst;
 	struct ph2handle *iph2;
+	u_int sa_mode;
 
 	/* ignore this message becauase of local test mode. */
 	if (f_local)
@@ -1141,7 +1138,7 @@ pk_recvadd(mhp)
 
 	/* sanity check */
 	if (mhp[0] == NULL
-	 || mhp[SADB_X_EXT_SA2] == NULL
+	 || mhp[SADB_EXT_SA] == NULL
 	 || mhp[SADB_EXT_ADDRESS_SRC] == NULL
 	 || mhp[SADB_EXT_ADDRESS_DST] == NULL) {
 		plog(logp, LOCATION, NULL,
@@ -1151,7 +1148,11 @@ pk_recvadd(mhp)
 	msg = (struct sadb_msg *)mhp[0];
 	src = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]);
 	dst = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]);
-	sa2 = (struct sadb_x_sa2 *)mhp[SADB_X_EXT_SA2];
+	sa = (struct sadb_sa *)mhp[SADB_EXT_SA];
+
+	sa_mode = mhp[SADB_X_EXT_SA2] == NULL
+		? IPSEC_MODE_ANY
+		: ((struct sadb_x_sa2 *)mhp[SADB_X_EXT_SA2])->sadb_x_sa2_mode;
 
 	iph2 = getph2byseq(msg->sadb_msg_seq);
 	if (iph2 == NULL) {
@@ -1168,15 +1169,11 @@ pk_recvadd(mhp)
 	 */
 
 	YIPSDEBUG(DEBUG_PFKEY,
-		char *xsrc = strdup(saddrwop2str(iph2->src));
 		plog(logp, LOCATION, NULL,
-			"pfkey %s success %s/%s/%s->%s\n",
-			s_pfkey_type(msg->sadb_msg_type),
-			s_pfkey_satype(msg->sadb_msg_satype),
-			s_ipsecdoi_encmode(~sa2->sadb_x_sa2_mode & 3),
-			xsrc,
-			saddrwop2str(iph2->dst));
-		free(xsrc););
+			"pfkey ADD succeeded: %s\n",
+			sadbsecas2str(iph2->src, iph2->dst,
+				msg->sadb_msg_satype, sa->sadb_sa_spi,
+				sa_mode)));
 
 	YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
 	return 0;
@@ -1188,10 +1185,9 @@ pk_recvexpire(mhp)
 {
 	struct sadb_msg *msg;
 	struct sadb_sa *sa;
-	struct sadb_x_sa2 *sa2;
 	struct sockaddr *src, *dst;
 	struct ph2handle *iph2;
-	u_int proto_id;
+	u_int proto_id, sa_mode;
 
 	/* sanity check */
 	if (mhp[0] == NULL
@@ -1208,7 +1204,11 @@ pk_recvexpire(mhp)
 	sa = (struct sadb_sa *)mhp[SADB_EXT_SA];
 	src = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]);
 	dst = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]);
-	sa2 = (struct sadb_x_sa2 *)mhp[SADB_X_EXT_SA2];
+
+	sa_mode = mhp[SADB_X_EXT_SA2] == NULL
+		? IPSEC_MODE_ANY
+		: ((struct sadb_x_sa2 *)mhp[SADB_X_EXT_SA2])->sadb_x_sa2_mode;
+
 
 	proto_id = pfkey2ipsecdoi_proto(msg->sadb_msg_satype);
 	if (proto_id == ~0) {
@@ -1225,30 +1225,20 @@ pk_recvexpire(mhp)
 		 * is received.
 		 */
 		YIPSDEBUG(DEBUG_PFKEY,
-			char *xsrc = strdup(saddrwop2str(src));
 			plog(logp, LOCATION, NULL,
-				"no such a SA found %s/%s/%s->%s spi:%ld\n",
-				s_pfkey_satype(msg->sadb_msg_satype),
-				s_ipsecdoi_encmode(~sa2->sadb_x_sa2_mode & 3),
-				xsrc,
-				saddrwop2str(dst),
-				ntohl(sa->sadb_sa_spi));
-			free(xsrc));
+				"no such a SA found: %s\n",
+				sadbsecas2str(src, dst,
+				    msg->sadb_msg_satype, sa->sadb_sa_spi,
+				    sa_mode)));
 		return 0;
 	}
 
 	SCHED_KILL(iph2->sce);
 
-    {
-	char *xsrc = strdup(saddrwop2str(iph2->src));
 	plog(logp, LOCATION, NULL,
-		"IPsec-SA expired %s-%s %s/%s spi:%ld\n",
-		xsrc, saddrwop2str(iph2->dst),
-		s_pfkey_satype(msg->sadb_msg_satype),
-		s_ipsecdoi_encmode(~sa2->sadb_x_sa2_mode & 3),
-		ntohl(sa->sadb_sa_spi));
-	free(xsrc);
-    }
+		"IPsec-SA expired: %s\n",
+		sadbsecas2str(iph2->src, iph2->dst,
+			msg->sadb_msg_satype, sa->sadb_sa_spi, sa_mode));
 
 	iph2->status = PHASE2ST_EXPIRED;
 
@@ -1541,34 +1531,28 @@ pk_recvdelete(mhp)
 	if (iph2 == NULL) {
 		/* ignore */
 		YIPSDEBUG(DEBUG_PFKEY,
-			char *xsrc = strdup(saddrwop2str(src));
 			plog(logp, LOCATION, NULL,
-				"pfkey %s received, "
-				"but %s/%s->%s not interesting\n",
-				s_pfkey_type(msg->sadb_msg_type),
-				s_ipsecdoi_proto(proto_id),
-				xsrc,
-				saddrwop2str(dst),
-				ntohl(sa->sadb_sa_spi));
-			free(xsrc));
+				"no iph2 found: %s\n",
+				sadbsecas2str(src, dst, msg->sadb_msg_satype,
+					sa->sadb_sa_spi, IPSEC_MODE_ANY)));
 		return 0;
 	}
 
 	if (iph2->status != PHASE2ST_ESTABLISHED) {
 		/* ignore */
 		YIPSDEBUG(DEBUG_PFKEY,
-			char *xsrc = strdup(saddrwop2str(iph2->src));
 			plog(logp, LOCATION, NULL,
-				"pfkey %s received, "
-				"but %s/%s->%s not interesting\n",
-				s_pfkey_type(msg->sadb_msg_type),
-				s_ipsecdoi_proto(proto_id),
-				xsrc,
-				saddrwop2str(iph2->dst),
-				ntohl(sa->sadb_sa_spi));
-			free(xsrc));
+				"status mismatched: %s\n",
+				sadbsecas2str(iph2->src, iph2->dst,
+					msg->sadb_msg_satype,
+					sa->sadb_sa_spi, IPSEC_MODE_ANY)));
 		return 0;
 	}
+
+	plog(logp, LOCATION, NULL,
+		"pfkey DELETE received: %s\n",
+		sadbsecas2str(iph2->src, iph2->dst,
+			msg->sadb_msg_satype, sa->sadb_sa_spi, IPSEC_MODE_ANY));
 
 	/* send delete information */
 	isakmp_info_send_d2(iph2);
@@ -2047,3 +2031,45 @@ addnewsp(mhp)
 	return 0;
 }
 
+/* proto/mode/src->dst spi */
+static const char *
+sadbsecas2str(src, dst, proto, spi, mode)
+	struct sockaddr *src, *dst;
+	int proto;
+	u_int32_t spi;
+	int mode;
+{
+	static char buf[256];
+	u_int doi_proto, doi_mode;
+	char *p;
+	int blen, i;
+
+	doi_proto = pfkey2ipsecdoi_proto(proto);
+	if (doi_proto == ~0)
+		return NULL;
+	doi_mode = pfkey2ipsecdoi_mode(mode);
+	if (doi_mode == ~0)
+		return NULL;
+
+	blen = sizeof(buf) - 1;
+	p = buf;
+
+	i = snprintf(p, blen, "%s/%s ",
+		s_ipsecdoi_proto(doi_proto), s_ipsecdoi_encmode(doi_mode));
+	p += i;
+	blen -= i;
+
+	i = snprintf(p, blen, "%s->", saddrwop2str(src));
+	p += i;
+	blen -= i;
+
+	i = snprintf(p, blen, "%s ", saddrwop2str(dst));
+
+	if (spi) {
+		p += i;
+		blen -= i;
+		snprintf(p, blen, "spi=%ld(0x%lx)", ntohl(spi), ntohl(spi));
+	}
+
+	return buf;
+}

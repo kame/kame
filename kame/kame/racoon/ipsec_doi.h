@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.19 2000/06/12 09:35:06 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.20 2000/06/28 07:04:32 sakane Exp $ */
 
 /* refered to RFC2407 */
 
@@ -84,6 +84,7 @@
 #define IPSECDOI_ATTR_ENC_MODE                4 /* B */
 	/* default value: host dependent */
 #define   IPSECDOI_ATTR_ENC_MODE_DEFAULT        2
+#define   IPSECDOI_ATTR_ENC_MODE_ANY            0	/* NOTE:internal use */
 #define   IPSECDOI_ATTR_ENC_MODE_TUNNEL         1
 #define   IPSECDOI_ATTR_ENC_MODE_TRNS           2
 #define IPSECDOI_ATTR_AUTH                    5 /* B */
