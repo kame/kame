@@ -1,19 +1,40 @@
-*** lib/isc/unix/include/isc/Makefile.in-	Sat Apr 29 18:43:55 2000
---- lib/isc/unix/include/isc/Makefile.in	Sat Apr 29 18:44:08 2000
+Index: lib/isc/unix/socket.c
+===================================================================
+RCS file: /cvsroot/apps/bind9/lib/isc/unix/socket.c,v
+retrieving revision 1.1.1.2
+diff -c -r1.1.1.2 socket.c
+*** lib/isc/unix/socket.c	2000/05/24 01:06:31	1.1.1.2
+--- lib/isc/unix/socket.c	2000/06/06 05:41:45
 ***************
-*** 30,36 ****
-  	if [ ! -d ${DESTDIR}${includedir} ]; then \
-  		mkdir ${DESTDIR}${includedir} ; \
-  	fi
-! 	if [ ! -d ${DESTDIR)${includedir}/isc ]; then \
-  		mkdir ${DESTDIR}${includedir}/isc ; \
-  	fi
+*** 1162,1174 ****
+--- 1162,1191 ----
+  #endif /* SO_TIMESTAMP */
   
---- 30,36 ----
-  	if [ ! -d ${DESTDIR}${includedir} ]; then \
-  		mkdir ${DESTDIR}${includedir} ; \
-  	fi
-! 	if [ ! -d ${DESTDIR}${includedir}/isc ]; then \
-  		mkdir ${DESTDIR}${includedir}/isc ; \
-  	fi
+  #if defined(ISC_PLATFORM_HAVEIPV6)
++ #if defined(IPV6_RECVPKTINFO)	/* based on RFC2292bis */
+  		if ((pf == AF_INET6)
++ 		    && (setsockopt(sock->fd, IPPROTO_IPV6, IPV6_RECVPKTINFO,
++ 				   (void *)&on, sizeof (on)) < 0)) {
++ 			UNEXPECTED_ERROR(__FILE__, __LINE__,
++ 					 "setsockopt(%d) failed: %s",
++ 					 sock->fd, strerror(errno));
++ 		}
++ #else  /* old advanced API */
++ 		if ((pf == AF_INET6)
+  		    && (setsockopt(sock->fd, IPPROTO_IPV6, IPV6_PKTINFO,
+  				   (void *)&on, sizeof (on)) < 0)) {
+  			UNEXPECTED_ERROR(__FILE__, __LINE__,
+  					 "setsockopt(%d) failed: %s",
+  					 sock->fd, strerror(errno));
+  		}
++ #endif /* IPV6_RECVPKTINFO */
++ #ifdef IPV6_USE_MIN_MTU	/*2292bis, not too common yet*/
++ 		/* use minimum MTU */
++ 		if (pf == AF_INET6) {
++ 			(void)setsockopt(sock->fd, IPPROTO_IPV6,
++ 			    IPV6_USE_MIN_MTU, (void *)&on, sizeof (on));
++ 		}
++ #endif
+  #endif /* ISC_PLATFORM_HAVEIPV6 */
   
+  	}
