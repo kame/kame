@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.3 1999/08/10 04:05:55 itojun Exp $
+$Id: CHANGELOG,v 1.4 1999/08/11 12:20:29 itojun Exp $
 
 <199908>
+Wed Aug 11 21:18:08 JST 1999  itojun@iijlab.net
+	* netbsd/lib/libwrap: libwrap that handles IPv6 correctly.
+	  can't write IPv6 address in /etc/hosts.{allow,deny} yet.
+
 Tue Aug  9 JST 1999  itojun@iijlab.net
 	* repository reorganization: NetBSD and FreeBSD228 uses
 	  new repository at this moment.
