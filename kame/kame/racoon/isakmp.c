@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.36 2000/01/11 21:55:51 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.37 2000/01/11 22:10:18 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -358,13 +358,13 @@ isakmp_main(msg, remote, local)
 		}
 
 		/* receive */
-		YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
 		if (ph1exchange[etypesw(iph1->etype)]
-		                [iph1->side]
-		                [iph1->status] == NULL) {
-			/* ignore it */
+		               [iph1->side]
+		               [iph1->status] == NULL) {
+			/* inogre it */
 			return -1;
 		}
+		YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
 		if ((ph1exchange[etypesw(iph1->etype)]
 		                [iph1->side]
 		                [iph1->status])(iph1, msg) < 0) {
@@ -483,10 +483,16 @@ isakmp_main(msg, remote, local)
 			iph2->ph1->flags |= ISAKMP_FLAG_C;
 
 		/* receive */
+		if (ph2exchange[etypesw(isakmp->etype)]
+		               [iph2->side]
+		               [iph2->status]) {
+			/* ignore it */
+			return -1;
+		}
 		YIPSDEBUG(DEBUG_USEFUL, plog(logp, LOCATION, NULL, "===\n"));
 		error = (ph2exchange[etypesw(isakmp->etype)]
-		                   [iph2->side]
-		                   [iph2->status])(iph2, msg);
+		                    [iph2->side]
+		                    [iph2->status])(iph2, msg);
 		if (error != 0) {
 			YIPSDEBUG(DEBUG_NOTIFY,
 				plog(logp, LOCATION, remote,
@@ -1341,6 +1347,7 @@ isakmp_post_acquire(iph2)
 	/* begin quick mode */
 	bindph12(iph1, iph2);
 	iph2->status = PHASE2ST_STATUS2;
+
 	if ((ph2exchange[etypesw(ISAKMP_ETYPE_QUICK)]
 	                [iph2->side]
 	                [iph2->status])(iph2, NULL) != 0)
