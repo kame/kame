@@ -1,4 +1,4 @@
-# $Id: Makefile,v 1.5 1999/11/02 04:27:30 itojun Exp $
+# $Id: Makefile,v 1.6 1999/11/04 08:21:05 sumikawa Exp $
 #
 
 #SUBDIR+=	XFree86
@@ -28,6 +28,7 @@ SUBDIR+=	ncftp3
 SUBDIR+=	netperf
 SUBDIR+=	newbie
 SUBDIR+=	openssl
+SUBDIR+=	pchar
 SUBDIR+=	perl5
 SUBDIR+=	pfs
 SUBDIR+=	pident6d
