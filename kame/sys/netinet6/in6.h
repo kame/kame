@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.66 2000/11/15 04:35:11 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.67 2000/11/18 07:41:13 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -496,8 +496,8 @@ struct in6_pktinfo {
  * to the application is not determined, we use this our original structure.  
  */
 struct ip6_mtuinfo {
-	u_int32_t ip6mtu_mtu;
-	struct sockaddr_in6 ip6mtu_dst;	/* or sockaddr_storage? */
+	struct sockaddr_in6 ip6m_addr;	/* or sockaddr_storage? */
+	u_int32_t ip6m_mtu;
 };
 
 /*

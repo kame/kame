@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.134 2000/11/17 19:57:01 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.135 2000/11/18 07:41:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1885,8 +1885,8 @@ ip6_notify_pmtu(in6p, dst, mtu)
 #endif
 
 	bzero(&mtuctl, sizeof(mtuctl));	/* zero-clear for safety */
-	mtuctl.ip6mtu_mtu = *mtu;
-	mtuctl.ip6mtu_dst = *dst;
+	mtuctl.ip6m_mtu = ntohl(*mtu);
+	mtuctl.ip6m_addr = *dst;
 
 	if ((m_mtu = sbcreatecontrol((caddr_t)&mtuctl, sizeof(mtuctl),
 				     IPV6_PATHMTU, IPPROTO_IPV6)) == NULL)
