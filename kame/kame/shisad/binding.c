@@ -1,4 +1,4 @@
-/*      $KAME: binding.c,v 1.10 2005/03/08 08:37:08 mitsuya Exp $	*/
+/*      $KAME: binding.c,v 1.11 2005/03/10 23:43:26 t-momose Exp $	*/
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -386,7 +386,7 @@ mipscok_bc_request(bc, command)
         bcinfo->mipc_seqno = bc->bc_seqno;
         bcinfo->mipc_lifetime = bc->bc_lifetime;
 #ifdef MIP_MCOA
-	bcinfo->mipc_bid = bc->bc_bid;
+	coa_s6.sin6_port = bc->bc_bid;
 #endif /* MIP_MCOA */
 
         /* bcinfo->mipc_coa_ifname xxx */

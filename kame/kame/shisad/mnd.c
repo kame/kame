@@ -1,4 +1,4 @@
-/*	$KAME: mnd.c,v 1.10 2005/02/28 23:20:41 keiichi Exp $	*/
+/*	$KAME: mnd.c,v 1.11 2005/03/10 23:43:26 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -380,7 +380,7 @@ mipsock_bul_request(bul, command)
 	buinfo->mipu_flags = bul->bul_flags;
 	buinfo->mipu_hoa_ifindex = bul->bul_hoainfo->hinfo_ifindex;
 #ifdef MIP_MCOA
-	buinfo->mipu_bid = bul->bul_bid;
+	coa_s6.sin6_port = bul->bul_bid;
 #endif /* MIP_MCOA */
 	/* buinfo->mipu_coa_ifname xxx */
 	buinfo->mipu_state = bul->bul_state;
@@ -430,7 +430,7 @@ mipsock_recv_mdinfo(miphdr)
 		syslog(LOG_INFO, "new coa is %s", ip6_sprintf(&coa));
 
 #ifdef MIP_MCOA
-	bid = mdinfo->mipm_md_bid;
+	memcpy(&bid, &((struct sockaddr_in6 *)MIPD_COA(mdinfo))->sin6_port, sizeof(bid));
 #endif /* MIP_MCOA */
 	/* Update bul according to md_hint */
 	switch (mdinfo->mipm_md_command) {

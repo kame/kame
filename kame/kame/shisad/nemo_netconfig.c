@@ -1,4 +1,4 @@
-/*      $KAME: nemo_netconfig.c,v 1.9 2005/03/02 21:05:45 ryuji Exp $  */
+/*      $KAME: nemo_netconfig.c,v 1.10 2005/03/10 23:43:26 t-momose Exp $  */
 /*
  * Copyright (C) 2004 WIDE Project.  All rights reserved.
  *
@@ -684,7 +684,7 @@ mainloop() {
 				}
 
 				if (multiplecoa)
-					bid = mbu->mipu_bid;
+					memcpy(&bid, &((struct sockaddr_in6 *)MIPU_COA(mbu))->sin6_port, sizeof(bid));
 				nif = nemo_setup_forwarding((struct sockaddr *)&src, 
 							    (struct sockaddr *)&dst, hoa, bid);
 
@@ -732,7 +732,7 @@ mainloop() {
 					break;
 
 				if (multiplecoa) 
-					bid = mbu->mipu_bid;
+					memcpy(&bid, &((struct sockaddr_in6 *)MIPU_COA(mbu))->sin6_port, sizeof(bid));
 				nif = nemo_destroy_forwarding(hoa, bid);
 
 				for (npt = LIST_FIRST(&nemo_mnpthead); npt; npt = nptn) {
@@ -773,7 +773,7 @@ mainloop() {
        					((struct sockaddr_in6 *)MIPC_COA(mbc))->sin6_addr;
 
 				if (multiplecoa) 
-					bid = mbc->mipc_bid;
+					memcpy(&bid, &((struct sockaddr_in6 *)MIPC_COA(mbc))->sin6_port, sizeof(bid));
 
 				nif = nemo_setup_forwarding((struct sockaddr *)&src, 
 							    (struct sockaddr *)&dst, hoa, bid);
@@ -807,7 +807,7 @@ mainloop() {
 					break;
 
 				if (multiplecoa) 
-					bid = mbc->mipc_bid;
+					memcpy(&bid, &((struct sockaddr_in6 *)MIPC_COA(mbc))->sin6_port, sizeof(bid));
 				nif = nemo_destroy_forwarding(hoa, bid);
 
 				route_del(if_nametoindex(nif->ifname));
