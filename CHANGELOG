@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1390 2000/11/15 04:43:48 jinmei Exp $
+$KAME: CHANGELOG,v 1.1391 2000/11/15 16:18:19 itojun Exp $
 
 <200011>
+Thu Nov 16 01:16:07 JST 2000  itojun@iijlab.net
+	* freebsd2/ports/lukemftp: lukemftp (portable NetBSD ftp client),
+	  version 1.5.
+	* freebsd2/usr.bin/Makefile: we no longer build ftp client, to decrease
+	  our maintenance labor.  use lukemftp, or some other ftp client.
+
 2000-11-15  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.c (icmp6_input):
 	* bsdi4/sys/netinet6/raw_ipv6.c (rip6_ctlinput):
