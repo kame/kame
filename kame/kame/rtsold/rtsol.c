@@ -1,4 +1,4 @@
-/*	$KAME: rtsol.c,v 1.20 2003/04/11 10:14:56 jinmei Exp $	*/
+/*	$KAME: rtsol.c,v 1.21 2003/04/11 12:46:12 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -72,7 +72,7 @@ int rssock;
 static struct sockaddr_in6 sin6_allrouters =
 {sizeof(sin6_allrouters), AF_INET6};
 
-static void call_script __P((char *));
+static void call_script __P((char *, char *));
 static int safefile __P((const char *));
 
 int
@@ -369,7 +369,7 @@ rtsol_input(int s)
 		warnmsg(LOG_DEBUG, __func__,
 		    "OtherConfigFlag on %s is turned on", ifi->ifname);
 		ifi->otherconfig = 1;
-		call_script(otherconf_script);
+		call_script(otherconf_script, ifi->ifname);
 	}
 
 	ifi->racnt++;
@@ -387,8 +387,8 @@ rtsol_input(int s)
 }
 
 static void
-call_script(scriptpath)
-	char *scriptpath;
+call_script(scriptpath, ifname)
+	char *scriptpath, *ifname;
 {
 	pid_t pid, wpid;
 
@@ -416,11 +416,12 @@ call_script(scriptpath)
 			    "script \"%s\" terminated", scriptpath);
 		}
 	} else {
-		char *argv[2];
+		char *argv[3];
 		int fd;
 
 		argv[0] = scriptpath;
-		argv[1] = NULL;
+		argv[1] = ifname;
+		argv[2] = NULL;
 
 		if (safefile(scriptpath)) {
 			warnmsg(LOG_ERR, __func__,
