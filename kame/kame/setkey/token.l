@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.32 2001/08/17 06:15:31 itojun Exp $	*/
+/*	$KAME: token.l,v 1.33 2001/08/17 06:21:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -146,11 +146,11 @@ spdflush	{ return(SPDFLUSH); }
 		}
 
 	/* security protocols */
-ah		{ yylval.ulnum = 0; return(PR_AH); }
-esp		{ yylval.ulnum = 0; return(PR_ESP); }
-ah-old		{ yylval.ulnum = 1; return(PR_AH); }
-esp-old		{ yylval.ulnum = 1; return(PR_ESP); }
-ipcomp		{ yylval.ulnum = 0; return(PR_IPCOMP); }
+ah		{ yylval.num = 0; return(PR_AH); }
+esp		{ yylval.num = 0; return(PR_ESP); }
+ah-old		{ yylval.num = 1; return(PR_AH); }
+esp-old		{ yylval.num = 1; return(PR_ESP); }
+ipcomp		{ yylval.num = 0; return(PR_IPCOMP); }
 
 	/* authentication alogorithm */
 {hyphen}A	{ return(F_AUTH); }
@@ -184,13 +184,13 @@ lzs		{ yylval.num = SADB_X_CALG_LZS; return(ALG_COMP); }
 
 	/* extension */
 {hyphen}m	{ return(F_MODE); }
-transport	{ yylval.ulnum = IPSEC_MODE_TRANSPORT; return(MODE); }
-tunnel		{ yylval.ulnum = IPSEC_MODE_TUNNEL; return(MODE); }
+transport	{ yylval.num = IPSEC_MODE_TRANSPORT; return(MODE); }
+tunnel		{ yylval.num = IPSEC_MODE_TUNNEL; return(MODE); }
 {hyphen}u	{ return(F_REQID); }
 {hyphen}f	{ return(F_EXT); }
-random-pad	{ yylval.ulnum = SADB_X_EXT_PRAND; return(EXTENSION); }
-seq-pad		{ yylval.ulnum = SADB_X_EXT_PSEQ; return(EXTENSION); }
-zero-pad	{ yylval.ulnum = SADB_X_EXT_PZERO; return(EXTENSION); }
+random-pad	{ yylval.num = SADB_X_EXT_PRAND; return(EXTENSION); }
+seq-pad		{ yylval.num = SADB_X_EXT_PSEQ; return(EXTENSION); }
+zero-pad	{ yylval.num = SADB_X_EXT_PZERO; return(EXTENSION); }
 nocyclic-seq	{ return(NOCYCLICSEQ); }
 {hyphen}r	{ return(F_REPLAY); }
 {hyphen}lh	{ return(F_LIFETIME_HARD); }

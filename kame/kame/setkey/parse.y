@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.61 2001/08/17 06:19:19 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.62 2001/08/17 06:21:57 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -86,7 +86,6 @@ extern void yyerror __P((const char *));
 %union {
 	int num;
 	unsigned long ulnum;
-	unsigned int unum;
 	vchar_t val;
 	struct addrinfo *res;
 }
@@ -105,12 +104,11 @@ extern void yyerror __P((const char *));
 %token F_POLICY PL_REQUESTS
 %token F_AIFLAGS
 
-%type <num> prefix
+%type <num> prefix protocol_spec upper_spec
 %type <num> ALG_AUTH ALG_ENC ALG_ENC_DESDERIV ALG_ENC_DES32IV ALG_COMP
-%type <ulnum> EXTENSION MODE
-%type <ulnum> PR_ESP PR_AH PR_IPCOMP
+%type <num> PR_ESP PR_AH PR_IPCOMP
+%type <num> EXTENSION MODE
 %type <ulnum> DECSTRING
-%type <unum> protocol_spec upper_spec
 %type <val> PL_REQUESTS portstr key_string
 %type <val> policy_requests
 %type <val> QUOTEDSTRING HEXSTRING STRING
