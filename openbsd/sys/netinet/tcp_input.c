@@ -2952,6 +2952,12 @@ tcp_mss(tp, offer)
 			mss = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
 		}
 	}
+
+	/* the socket option overrides any other settings */
+	if (is_ipv6 && inp && (inp->inp_flags & IN6P_MINMTU) &&
+	    !IN6_IS_ADDR_V4MAPPED(&inp->inp_faddr6) &&
+	    mss > IPV6_MMTU - iphlen - sizeof(struct tcphdr))
+		mss = IPV6_MMTU - iphlen - sizeof(struct tcphdr);
 #endif /* INET6 */
 
 	/* Calculate the value that we offer in TCPOPT_MAXSEG */

@@ -400,6 +400,8 @@ tcp_respond(tp, template, m, ack, seq, flags)
 
 #ifdef INET6
 	if (is_ipv6) {
+		int ip6oflags;
+
 		((struct ip6_hdr *)ti)->ip6_flow   = htonl(0x60000000);
 		((struct ip6_hdr *)ti)->ip6_nxt  = IPPROTO_TCP;
 		((struct ip6_hdr *)ti)->ip6_hlim =
@@ -409,12 +411,15 @@ tcp_respond(tp, template, m, ack, seq, flags)
 		th->th_sum = in6_cksum(m, IPPROTO_TCP,
 		   sizeof(struct ip6_hdr), ((struct ip6_hdr *)ti)->ip6_plen);
 		HTONS(((struct ip6_hdr *)ti)->ip6_plen);
+		ip6oflags = 0;
+		if (tp && (tp->t_inpcb->inp_flags & IN6P_MINMTU))
+			ip6oflags |= IPV6_MINMTU;
 #ifdef NEW_STRUCT_ROUTE
 		ip6_output(m, tp ? tp->t_inpcb->inp_outputopts6 : NULL,
-			   ro, 0, NULL, NULL);
+		    ro, ip6oflags, NULL, NULL);
 #else
 		ip6_output(m, tp ? tp->t_inpcb->inp_outputopts6 : NULL,
-			   (struct route_in6 *)ro, 0, NULL, NULL);
+		    (struct route_in6 *)ro, ip6oflags, NULL, NULL);
 #endif
 	} else
 #endif /* INET6 */

@@ -214,6 +214,9 @@ tcp_output(tp)
 #ifdef TCP_SIGNATURE
 	unsigned int sigoff;
 #endif /* TCP_SIGNATURE */
+#ifdef INET6
+	int ip6oflags;
+#endif
 
 #if defined(TCP_SACK) && defined(TCP_SIGNATURE) && defined(DIAGNOSTIC)
 	if (!tp->sack_disable && (tp->t_flags & TF_SIGNATURE))
@@ -1053,9 +1056,11 @@ send:
 			ipv6->ip6_nxt = IPPROTO_TCP;
 			ipv6->ip6_hlim = in6_selecthlim(tp->t_inpcb, NULL);
 		}
+		ip6oflags = so->so_options & SO_DONTROUTE;
+		if (tp->t_inpcb->inp_flags & IN6P_MINMTU)
+			ip6oflags |= IPV6_MINMTU;
 		error = ip6_output(m, tp->t_inpcb->inp_outputopts6,
-			  &tp->t_inpcb->inp_route6,
-			  (so->so_options & SO_DONTROUTE), NULL, NULL);
+		    &tp->t_inpcb->inp_route6, ip6oflags, NULL, NULL);
 		break;
 #endif /* INET6 */
 #ifdef TUBA
