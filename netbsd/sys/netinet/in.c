@@ -298,16 +298,6 @@ in_len2mask(mask, len)
 		p[i] = (0xff00 >> (len % 8)) & 0xff;
 }
 
-#ifdef NATPT
-void	in4_len2mask __P((struct in_addr *, int));
-
-void
-in4_len2mask(struct in_addr *mask, int len)
-{
-	in_len2mask(mask, len);
-}
-#endif	/* NATPT */
-
 /*
  * Generic internet control operations (ioctl's).
  * Ifp is 0 if not an interface-specific ioctl.
