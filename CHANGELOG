@@ -1,5 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2422 2003/06/29 07:05:41 sakane Exp $
+$KAME: CHANGELOG,v 1.2423 2003/07/01 02:58:09 itojun Exp $
+
+<200307>
+Tue Jul  1 11:56:46 JST 2003  itojun@iijlab.net
+	* kame/sys/net/pf.c: PF now available on freebsd4 too.
+	* {net,open}bsd/sys/netinet/ip_mroute.c: better protection against
+	  interface removal, by ono@kame
 
 <200306>
 Sun Jun 29 16:01:35 JST 2003 sakane@kame.net
