@@ -126,6 +126,8 @@ struct mbuf {
 #define	M_PKTHDR	0x0002	/* start of record */
 #define	M_EOR		0x0004	/* end of record */
 
+#define	M_MIP6TUNNEL	0x0010	/* MIP6 temporary use */
+
 /* mbuf pkthdr flags, also in m_flags */
 #define	M_BCAST		0x0100	/* send/received as link-level broadcast */
 #define	M_MCAST		0x0200	/* send/received as link-level multicast */
