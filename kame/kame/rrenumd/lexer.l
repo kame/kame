@@ -38,6 +38,7 @@
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <net/if_var.h>
 #endif /* __FreeBSD__ >= 3 */
+#include <arpa/inet.h>
 
 #include <netinet/in.h>
 #include <netinet/in_var.h>

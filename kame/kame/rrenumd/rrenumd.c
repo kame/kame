@@ -35,6 +35,7 @@
 #include <string.h>
 
 #include <net/route.h>
+#include <arpa/inet.h>
 
 #include <netinet/in_systm.h>
 #include <netinet/in.h>
