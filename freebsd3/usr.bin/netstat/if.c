@@ -111,7 +111,7 @@ bdg_stats(u_long dummy, char *name) /* print bridge statistics */
 "Name          In      Out  Forward     Drop    Bcast    Mcast    Local  Unknown\n");
     for (i = 0 ; i < 16 ; i++) {
 	if (s.s[i].name[0])
-	printf("%-6s %9d%9d%9d%9d%9d%9d%9d%9d\n",
+	printf("%-6s %9lu%9lu%9lu%9lu%9lu%9lu%9lu%9lu\n",
 	  s.s[i].name,
 	  s.s[i].p_in[(int)BDG_IN],
 	  s.s[i].p_in[(int)BDG_OUT],
@@ -152,7 +152,7 @@ intpr(interval, ifnetaddr, pfunc)
 	u_long ifaddraddr;
 	u_long ifaddrfound;
 	u_long ifnetfound;
-	struct sockaddr *sa;
+	struct sockaddr *sa = NULL;
 	char name[32], tname[16];
 
 	if (ifnetaddr == 0) {

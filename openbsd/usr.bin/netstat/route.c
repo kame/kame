@@ -665,13 +665,12 @@ netname(in, mask)
 	char *cp = 0;
 	static char line[MAXHOSTNAMELEN];
 	struct netent *np = 0;
-	in_addr_t net, subnetshift;
 	int mbits;
 
 	in = ntohl(in);
 	mask = ntohl(mask);
 	if (!nflag && in != INADDR_ANY) {
-		if (np = getnetbyaddr(in, AF_INET))
+		if ((np = getnetbyaddr(in, AF_INET)) != NULL)
 			cp = np->n_name;
 	}
 	mbits = mask ? 33 - ffs(mask) : 0;
@@ -977,7 +976,7 @@ encap_print(rt)
 					   sen2.sen_ip_dst.s_addr),
 	       sen1.sen_dport, sen1.sen_proto);
 	
-	printf("%s/%08x/%-lu\n", inet_ntoa(sen3.sen_ipsp_dst),
+	printf("%s/%08x/%-u\n", inet_ntoa(sen3.sen_ipsp_dst),
 	       ntohl(sen3.sen_ipsp_spi), sen3.sen_ipsp_sproto);
 }
 

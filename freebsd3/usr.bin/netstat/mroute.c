@@ -65,7 +65,6 @@ void
 mroutepr(mfcaddr, vifaddr)
 	u_long mfcaddr, vifaddr;
 {
-	u_int mrtproto;
 	struct mfc *mfctable[MFCTBLSIZ];
 	struct vif viftable[MAXVIFS];
 	struct mfc mfc, *m;

@@ -276,7 +276,7 @@ main(argc, argv)
 	extern char *optarg;
 	extern int optind;
 	register struct protoent *p;
-	register struct protox *tp;	/* for printing cblocks & stats */
+	register struct protox *tp = NULL; /* for printing cblocks & stats */
 	int ch;
 	char *nlistf = NULL, *memf = NULL;
 	char buf[_POSIX2_LINE_MAX];

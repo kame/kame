@@ -266,8 +266,10 @@ main(argc, argv)
 	int argc;
 	char *argv[];
 {
+#if 0
 	register struct protoent *p;
-	register struct protox *tp;	/* for printing cblocks & stats */
+#endif
+	register struct protox *tp = NULL; /* for printing cblocks & stats */
 	int ch;
 
 	af = AF_UNSPEC;
@@ -641,11 +643,11 @@ name2protox(name)
 	 * Try to find the name in the list of "well-known" names. If that
 	 * fails, check if name is an alias for an Internet protocol.
 	 */
-	if (tp = knownname(name))
+	if ((tp = knownname(name)) != NULL)
 		return (tp);
 
 	setprotoent(1);			/* make protocol lookup cheaper */
-	while (p = getprotoent()) {
+	while ((p = getprotoent()) != NULL) {
 		/* assert: name not same as p->name */
 		for (alias = p->p_aliases; *alias; alias++)
 			if (strcmp(name, *alias) == 0) {

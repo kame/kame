@@ -110,7 +110,7 @@ unixdomainpr(so, soaddr)
 {
 	struct unpcb unpcb, *unp = &unpcb;
 	struct mbuf mbuf, *m;
-	struct sockaddr_un *sa;
+	struct sockaddr_un *sa = NULL;
 	static int first = 1;
 
 	if (kread((u_long)so->so_pcb, (char *)unp, sizeof (*unp)))
@@ -137,7 +137,7 @@ unixdomainpr(so, soaddr)
 	    PLEN, unp->unp_refs, PLEN, unp->unp_nextref);
 	if (m)
 		printf(" %.*s",
-		    m->m_len - (int)(sizeof(*sa) - sizeof(sa->sun_path)),
+		    (int)(m->m_len - (int)(sizeof(*sa) - sizeof(sa->sun_path))),
 		    sa->sun_path);
 	putchar('\n');
 }

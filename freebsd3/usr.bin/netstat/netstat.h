@@ -79,6 +79,9 @@ void	icmp6_ifstats __P((char *));
 void	pim6_stats __P((u_long, char *));
 void	mroute6pr __P((u_long, u_long));
 void	mrt6_stats __P((u_long));
+
+char *routename6 __P((struct sockaddr_in6 *));
+char *netname6 __P((struct sockaddr_in6 *, struct in6_addr *));
 #endif /*INET6*/
 
 void	bdg_stats __P((u_long, char *));
@@ -132,4 +135,3 @@ void	tp_stats __P((caddr_t, caddr_t));
 
 void	mroutepr __P((u_long, u_long));
 void	mrt_stats __P((u_long));
-
