@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.82 2000/07/06 09:22:25 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.83 2000/07/07 10:09:23 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -545,8 +545,6 @@ ph1_main(iph1, msg)
 			    [iph1->side]
 			    [iph1->status])(iph1, msg);
 	if (error != 0) {
-		plog(logp, LOCATION, iph1->remote,
-			"ERROR: failed to pre-process packet.\n");
 #if 0
 		/* XXX
 		 * When an invalid packet is received on phase1, it should
@@ -554,6 +552,8 @@ ph1_main(iph1, msg)
 		 * with a notify and delete phase 1 handler, OR not to respond
 		 * and keep phase 1 handler.
 		 */
+		plog(logp, LOCATION, iph1->remote,
+			"ERROR: failed to pre-process packet.\n");
 		return -1;
 #else
 		return 0;
