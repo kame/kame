@@ -1,4 +1,4 @@
-/*	$KAME: rrenumd.c,v 1.18 2000/11/07 17:46:32 jinmei Exp $	*/
+/*	$KAME: rrenumd.c,v 1.19 2000/11/08 02:09:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -612,7 +612,6 @@ main(int argc, char *argv[])
 
 	/* ADHOC: timeout each 30seconds */
 	memset(&timeout, 0, sizeof(timeout));
-	timeout.tv_sec = 30;
 
 	/* init temporary payload_list and send_counter*/
 	pl = pl_head;
@@ -631,7 +630,9 @@ main(int argc, char *argv[])
 				exit(0);
 			rrenum_snd_eachdst(pl);
 			send_counter--;
+			timeout.tv_sec = 30;
 			if (send_counter == 0) {
+				timeout.tv_sec = 0;
 				pl = pl->pl_next;
 				send_counter = retry + 1;
 			}
