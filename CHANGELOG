@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1112 2000/07/09 03:31:25 itojun Exp $
+$Id: CHANGELOG,v 1.1113 2000/07/09 04:41:22 itojun Exp $
 
 <200006>
+Sun Jul  9 13:39:22 JST 2000  itojun@iijlab.net
+	* libinet6/getaddrinfo.c: do not mistakenly accept empty scopeid.
+
 Sun Jul  9 12:29:24 JST 2000  itojun@iijlab.net
 	* freebsd4/sys/net/if_ethersubr.c: repair IPV6_JOIN_GROUP(::).
 
