@@ -375,10 +375,11 @@ void
 make_rthdr(char *name)
 {
 	char rtbuf[BUFSIZ], area[BUFSIZ];
+	char hopstr[BUFSIZ];	/* XXX */
 	char *bp = area, *addr;
 	struct ip6_rthdr *rthdr = (struct ip6_rthdr *)pbp;
 	struct ip6_rthdr0 *rthdr0;
-	int hops;
+	int i, hops;
 	int rthdrlen = 0;
 
 	if (tgetent(rtbuf, name) <= 0) {
@@ -404,38 +405,26 @@ make_rthdr(char *name)
 			exit(1);
 		}
 		else if (hops == 0)
-			hops = (rthdrlen - 8) / sizeof(struct ip6_hdr);
+			hops = (rthdrlen - 8) / sizeof(struct in6_addr);
 		rthdr0 = (struct ip6_rthdr0 *)rthdr;
 		rthdr0->ip6r0_reserved = 0;
-#ifdef COMPAT_RFC1883
-		bzero(rthdr0->ip6r0_slmap, 3);
 		for (i = 0; i < hops; i++) {
-			int slflag = 1;
-
-			sprintf(hopstr, "hops%d", i);
+			sprintf(hopstr, "hop%d", i);
 			addr = tgetstr(hopstr, &bp, rtbuf);
-			if (addr == NULL) {
-				slflag = 0;
-				sprintf(hopstr, "hopl%d", i);
-				addr = tgetstr(hopstr, &bp, rtbuf);
-			}
 			if (addr == NULL) {
 				fprintf(stderr,
 					"v6test: needs %dth addr for rthdr\n", i);
 				exit(1);
 			}
 			if (inet_pton(AF_INET6, addr,
-				      ((struct in6_addr *)rthdr0 + 1) + i) != 1) {
-				perror("inet_pton for %s", addr);
+				      (struct in6_addr *)(rthdr0 + 1) + i)
+			    != 1) {
+				fprintf(stderr,
+					"v6test: inet_pton for %s failed",
+					addr);
 				exit(1);
 			}
-			if (slflag && i < 24) {
-				int c, b;
-				c = i / 8; b = i % 8;
-				rthdr0->ip6r0_slmap[c] |= (1 << (7 - b));
-			}
 		}
-#endif
 		if (rthdrlen == 0)
 			rthdrlen = sizeof(struct ip6_rthdr0) +
 				sizeof(struct in6_addr) * (hops - 1);
