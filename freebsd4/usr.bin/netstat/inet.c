@@ -575,7 +575,6 @@ dccp_stats(u_long off, char *name, int af1)
 {
 	struct dccpstat dccpstat, zerostat;
 	size_t len = sizeof dccpstat;
-	u_long delivered;
 
 	if (zflag)
 		memset(&zerostat, 0, len);
