@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.89 2001/02/26 06:58:53 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.90 2001/03/14 11:40:42 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -552,6 +552,7 @@ ipsecproposal_spec
 			if ($2 == CF_LIFETYPE_TIME)
 				prhead->lifetime = $3 * $4;
 			else {
+				/* i.e. CF_LIFETYPE_BYTE */
 				prhead->lifebyte = $3 * $4;
 				if (prhead->lifebyte < 1024) {
 					yyerror("byte size should be more "
@@ -836,6 +837,7 @@ sainfo_spec
 			if ($2 == CF_LIFETYPE_TIME)
 				cur_sainfo->lifetime = $3 * $4;
 			else {
+				/* i.e. CF_LIFETYPE_BYTE */
 				cur_sainfo->lifebyte = $3 * $4;
 				if (cur_sainfo->lifebyte < 1024) {
 					yyerror("byte size should be more "
@@ -1096,6 +1098,7 @@ remote_spec
 			if ($2 == CF_LIFETYPE_TIME)
 				prhead->lifetime = $3 * $4;
 			else {
+				/* i.e. CF_LIFETYPE_BYTE */
 				prhead->lifebyte = $3 * $4;
 				/*
 				 * check size.
@@ -1199,6 +1202,7 @@ isakmpproposal_spec
 			if ($2 == CF_LIFETYPE_TIME)
 				prhead->spspec->lifetime = $3 * $4;
 			else {
+				/* i.e. CF_LIFETYPE_BYTE */
 				prhead->spspec->lifebyte = $3 * $4;
 				/*
 				 * check size.
