@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.78 1999/08/30 03:36:52 itojun Exp $
+$Id: CHANGELOG,v 1.79 1999/08/30 04:10:59 itojun Exp $
 
 <199908>
+Mon Aug 30 13:10:15 JST 1999  itojun@iijlab.net
+	* kame/rtsold: check for invalid RAs, like non-zero icmp6 code or
+	  non-linklocal source address.  Found by TAHI team.
+
 Mon Aug 30 11:48:41 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/net/zebra, freebsd[23]/ports/zebra: upgrade to 0.78a.
 
