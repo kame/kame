@@ -68,6 +68,9 @@ tree:
 
 # use it with caution - must be root for "make includes"
 autobuild:
+	@uname -a
+	@echo -n '${.TARGET} started at '
+	@date
 	(cd ${.CURDIR}; ${MAKE} clean update prepare)
 	(cd ${.CURDIR}/${TARGET}; ${MAKE} clean)
 	case ${TARGET} in \
