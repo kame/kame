@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.657 2000/03/06 18:04:48 sakane Exp $
+$Id: CHANGELOG,v 1.658 2000/03/06 22:18:25 sakane Exp $
 
 <200003>
+Tue Mar  7 07:16:29 JST 2000 sakane@ydc.co.jp
+	* kame/kame/setkey:
+	Fix replay window size as default to 0 when manual setting.
+	It means responder doesn't check sequence number.
+
 Mon Mar  6 16:54:29 JST 2000  itojun@iijlab.net
 	* kame/libinet6/getnameinfo.c: comment out NI_NOFQDN support,
 	  since the behavior is specwise incorrect.
