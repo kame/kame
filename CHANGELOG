@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2641 2004/07/10 08:04:41 jinmei Exp $
+$KAME: CHANGELOG,v 1.2642 2004/07/10 11:06:42 jinmei Exp $
 
 <200407>
 2004-07-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -15,8 +15,9 @@ $KAME: CHANGELOG,v 1.2641 2004/07/10 08:04:41 jinmei Exp $
 	implemented a sysctl option to force MLD version in MLDv2-ready kernel.
 
 2004-07-07  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
-	* kame/sys/netinet6/{in6.c, in6_src.c, nd6.c, nd6_rtr.c): freebsd5+kame 
-	starts up properly (other behavior is to be confirmed).
+	* kame/sys/netinet6/{in6.c, in6_src.c, nd6.c, nd6_rtr.c):
+	freebsd5+kame starts up properly (other behavior is to be
+	confirmed).
 
 2004-07-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netkey/key.c (key_spddump, key_dump): fixed possible
