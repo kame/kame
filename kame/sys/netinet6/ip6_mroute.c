@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.23 2000/05/19 02:38:53 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.24 2000/05/19 07:37:05 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1522,6 +1522,7 @@ ip6_mdq(m, ifp, rt)
 			 */
 			if ((mif6table[rt->mf6c_parent].m6_flags &
 			     MIFF_REGISTER) == 0 &&
+			    (mif6table[mifi].m6_flags & MIFF_REGISTER) == 0 &&
 			    (in6_addr2scopeid(ifp, &ip6->ip6_dst) !=
 			     in6_addr2scopeid(mif6table[mifi].m6_ifp,
 					      &ip6->ip6_dst) ||
