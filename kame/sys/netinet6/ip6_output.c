@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.419 2004/02/04 02:51:03 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.420 2004/02/04 09:13:55 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1096,9 +1096,7 @@ skip_ipsec2:;
 	}
 	if (rt == NULL) {
 		/* XXX */
-		ip6stat.ip6s_noroute++;
-		error = EHOSTUNREACH;
-		goto bad;
+		dst->sin6_addr = ip6->ip6_dst;
 	}
 
 	/*
