@@ -4,8 +4,8 @@
  
  # Defines for your operating system
  #
--DEFINES=-DINET6
-+DEFINES=-DINET6 -D_SKEY_INTERNAL
+-DEFINES=-DINET6 -Dss_family=__ss_family -Dss_len=__ss_len -DUSE_GETIPNODEBY
++DEFINES=-DINET6 -Dss_family=__ss_family -Dss_len=__ss_len -DUSE_GETIPNODEBY -D_SKEY_INTERNAL
  #DEFINES=-DSYSV -DSOLARIS
  
  # Options for your compiler (eg, "-g" for debugging, "-O" for

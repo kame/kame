@@ -3,3 +3,6 @@ practices designed to facilitate the building of network
 firewalls. Components of the toolkit, while designed to work together,
 can be used in isolation or can be combined with other firewall
 components.
+
+This port supports IPv4/IPv6 dual stack and IPv4 mapped IPv6 address.
+This port was tested on KAME/FreeBSD and KAME/FreeBSD3.
