@@ -790,7 +790,7 @@ netname6(sa6, mask)
 	struct sockaddr_in6 *sa6;
 	struct in6_addr *mask;
 {
-	static char line[MAXHOSTNAMELEN + 1];
+	static char line[NI_MAXHOST];
 	u_char *p;
 	u_char *lim;
 	int masklen, final = 0, illegal = 0, flag = NI_WITHSCOPEID;
@@ -851,14 +851,6 @@ netname6(sa6, mask)
 
 	if (masklen == 0 && IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr))
 		return("default");
-
-#ifdef KAME_SCOPEID
-	if (IN6_IS_ADDR_LINKLOCAL(&sa6->sin6_addr)) {
-		sa6->sin6_scope_id =
-			ntohs(*(u_int16_t *)&sa6->sin6_addr.s6_addr[2]);
-		sa6->sin6_addr.s6_addr[2] = sa6->sin6_addr.s6_addr[3] = 0;
-	}
-#endif
 
 	if (nflag)
 		flag |= NI_NUMERICHOST;
