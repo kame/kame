@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.105 2001/02/08 12:48:38 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.106 2001/02/08 12:58:23 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -73,6 +73,13 @@ struct icmp6_ifstat **icmp6_ifstat = NULL;
 size_t in6_ifstatmax = 0;
 size_t icmp6_ifstatmax = 0;
 unsigned long in6_maxmtu = 0;
+
+/* #define IN6_LINLLOCAL_AUTO 0	 for debug */
+#ifdef IN6_LINLLOCAL_AUTO
+int in6_linklocal_auto = IN6_LINLLOCAL_AUTO;
+#else
+int in6_linklocal_auto = 1;
+#endif
 
 #ifdef __NetBSD__
 struct callout in6_tmpaddrtimer_ch = CALLOUT_INITIALIZER;
@@ -907,6 +914,9 @@ in6_ifattach(ifp, altifp)
 	/*
 	 * assign a link-local address, if there's none. 
 	 */
+	if (!in6_linklocal_auto)
+		goto statinit;
+
 	ia = in6ifa_ifpforlinklocal(ifp, 0);
 	if (ia == NULL) {
 		if (in6_ifattach_linklocal(ifp, altifp) != 0)
