@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.167 2003/06/11 05:30:47 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.168 2003/06/20 12:00:22 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -189,9 +189,6 @@ struct tv32 {
 #define F_FQDN		0x1000
 #define F_INTERFACE	0x2000
 #define F_SRCADDR	0x4000
-#ifdef IPV6_REACHCONF
-#define F_REACHCONF	0x8000
-#endif
 #define F_HOSTNAME	0x10000
 #define F_FQDNOLD	0x20000
 #define F_NIGROUP	0x40000
@@ -354,7 +351,7 @@ main(argc, argv)
 #endif /*IPSEC_POLICY_IPSEC*/
 #endif
 	while ((ch = getopt(argc, argv,
-	    "a:b:c:dfHg:h:I:i:l:mnNp:qRS:s:tvwW" ADDOPTS)) != -1) {
+	    "a:b:c:dfHg:h:I:i:l:mnNp:qS:s:tvwW" ADDOPTS)) != -1) {
 #undef ADDOPTS
 		switch (ch) {
 		case 'a':
@@ -502,13 +499,6 @@ main(argc, argv)
 		case 'q':
 			options |= F_QUIET;
 			break;
-		case 'R':
-#ifdef IPV6_REACHCONF
-			options |= F_REACHCONF;
-			break;
-#else
-			errx(1, "-R is not supported in this configuration");
-#endif
 		case 'S':
 			memset(&hints, 0, sizeof(struct addrinfo));
 			hints.ai_flags = AI_NUMERICHOST; /* allow hostname? */
@@ -853,11 +843,6 @@ main(argc, argv)
 	if (hoplimit != -1)
 		ip6optlen += CMSG_SPACE(sizeof(int));
 
-#ifdef IPV6_REACHCONF
-	if (options & F_REACHCONF)
-		ip6optlen += CMSG_SPACE(0);
-#endif
-
 	/* set IP6 packet options */
 	if (ip6optlen) {
 		if ((scmsg = (char *)malloc(ip6optlen)) == 0)
@@ -894,15 +879,6 @@ main(argc, argv)
 
 		scmsgp = CMSG_NXTHDR(&smsghdr, scmsgp);
 	}
-#ifdef IPV6_REACHCONF
-	if (options & F_REACHCONF) {
-		scmsgp->cmsg_len = CMSG_LEN(0);
-		scmsgp->cmsg_level = IPPROTO_IPV6;
-		scmsgp->cmsg_type = IPV6_REACHCONF;
-
-		scmsgp = CMSG_NXTHDR(&smsghdr, scmsgp);
-	}
-#endif
 
 	if (argc > 1) {	/* some intermediate addrs are specified */
 		int hops, error;
@@ -2750,9 +2726,6 @@ usage()
 	    "m"
 #endif
 	    "nNqtvwW"
-#ifdef IPV6_REACHCONF
-	    "R"
-#endif
 #ifdef IPSEC
 #ifdef IPSEC_POLICY_IPSEC
 	    "] [-P policy"
