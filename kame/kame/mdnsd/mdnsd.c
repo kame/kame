@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.26 2000/06/04 01:16:39 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.27 2000/06/04 05:18:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -48,10 +48,12 @@
 #include <varargs.h>
 #endif
 #include <syslog.h>
+#include <signal.h>
 
 #include "mdnsd.h"
 #include "db.h"
 #include "mediator_compat.h"
+#include "pathnames.h"
 
 u_int16_t dnsid;
 const char *srcport = "53";
@@ -82,6 +84,7 @@ static int join __P((int, int, const char *));
 static int join0 __P((int, const struct addrinfo *));
 static int setif __P((int, int, const char *));
 static int iscanon __P((const char *));
+static RETSIGTYPE status __P((int));
 
 int
 main(argc, argv)
@@ -266,6 +269,8 @@ main(argc, argv)
 		hostname = hostnamebuf;
 	}
 	dprintf("hostname=\"%s\"\n", hostname);
+
+	signal(SIGUSR1, status);
 
 	if (!fflag) {
 		daemon(0, 0);
@@ -662,6 +667,98 @@ ismyaddr(sa)
 
 	freeifaddrs(ifap);
 	return ret;
+}
+
+/*
+ * NOTE: ctime(3) appends \n to output
+ */
+static RETSIGTYPE
+status(sig)
+	int sig;
+{
+	FILE *fp;
+	time_t t;
+	struct nsdb *ns;
+	struct sockdb *sd;
+	char hbuf[NI_MAXHOST], sbuf[NI_MAXSERV];
+	const char *p;
+	struct sockaddr_storage ss;
+	int sslen;
+
+	if (fflag)
+		fp = stderr;
+	else
+		fp = fopen(_PATH_DUMP, "a");
+	if (fp == NULL)
+		return;
+
+	t = time(NULL);
+	fprintf(fp, "mdnsd dump at %s", ctime(&t));
+	fprintf(fp, "\n");
+
+	fprintf(fp, "DNS servers:\n");
+	for (ns = LIST_FIRST(&nsdb); ns; ns = LIST_NEXT(ns, link)) {
+		if (getnameinfo((struct sockaddr *)&ns->addr, ns->addr.ss_len,
+		    hbuf, sizeof(hbuf), sbuf, sizeof(sbuf), niflags) != 0) {
+			strcpy(hbuf, "invalid");
+			strcpy(sbuf, "invalid");
+		}
+		switch (ns->type) {
+		case N_UNICAST:
+			p = "unicast";
+			break;
+		case N_MULTICAST:
+			p = "multicast";
+			break;
+		default:
+			p = "invalid type";
+			break;
+		}
+		fprintf(fp, "%*s%s port %s: %s (%s)\n", 4, "", hbuf, sbuf,
+		    ns->comment, p);
+
+#if 0
+		fprintf(fp, "%*sprio %d", 6, "", ns->prio);
+		t = (time_t)ns->expire.tv_sec;
+		if (t)
+			fprintf(fp, " expire %s", ctime(&t));
+		else
+			fprintf(fp, " expire %s", "never\n");
+#endif
+	}
+	fprintf(fp, "\n");
+
+	fprintf(fp, "sockets:\n");
+	for (sd = LIST_FIRST(&sockdb); sd; sd = LIST_NEXT(sd, link)) {
+		sslen = sizeof(ss);
+		if (getsockname(sd->s, (struct sockaddr *)&ss, &sslen) < 0) {
+			fprintf(fp, "%*s(invalid)\n", 4, "");
+			continue;
+		}
+		if (getnameinfo((struct sockaddr *)&ss, sslen,
+		    hbuf, sizeof(hbuf), sbuf, sizeof(sbuf), niflags) != 0) {
+			strcpy(hbuf, "invalid");
+			strcpy(sbuf, "invalid");
+		}
+		switch (sd->type) {
+		case S_UNICAST:
+			p = "unicast";
+			break;
+		case S_MULTICAST:
+			p = "multicast";
+			break;
+		case S_MEDIATOR:
+			p = "mediator";
+			break;
+		default:
+			p = "invalid type";
+			break;
+		}
+		fprintf(fp, "%*s%s port %s (%s)\n", 4, "", hbuf, sbuf, p);
+	}
+
+	if (!fflag)
+		fclose(fp);
 }
 
 int

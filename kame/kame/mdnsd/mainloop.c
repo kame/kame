@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.36 2000/06/01 10:33:25 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.37 2000/06/04 05:18:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -116,6 +116,8 @@ mainloop()
 		timeo = hz;
 		i = select(fdmax + 1, &rfds, &wfds, NULL, &timeo);
 		if (i < 0) {
+			if (errno == EINTR)
+				continue;
 			err(1, "select");
 			/*NOTREACHED*/
 		} else if (i == 0) {
