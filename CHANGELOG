@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2430 2003/07/08 10:00:59 keiichi Exp $
+$KAME: CHANGELOG,v 1.2431 2003/07/08 10:03:59 ono Exp $
 
 <200307>
+2003-07-08  Hideki ONO  <ono@soft.net.fujitsu.co.jp>
+	* kame/sys/netinet6/{in6_ifattach.c,ip6_mroute.c,ip6_mroute.h}
+	protect against interface removal.
+
 Tue Jul  8 18:51:06 JST 2003	keiichi@iij.ad.jp
 	* kame/sys/netinet6/mip6_mncore.c
 	insert alternate careof address sub-option when creating a
