@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.147 2001/01/23 08:55:34 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.148 2001/01/23 09:08:14 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -322,7 +322,7 @@ in6_ifremloop(struct ifaddr *ifa)
 	 */
 
 	/*
-	 * Delete the entry only if exact one ifa exists. More thane one ifa
+	 * Delete the entry only if exact one ifa exists. More than one ifa
 	 * can exist if we assign a same single address to multiple
 	 * (probably p2p) interfaces.
 	 * XXX: we should avoid such a configuration in IPv6...
