@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natptlog.c,v 1.7 2000/03/13 17:56:10 fujisawa Exp $
+ *	$Id: natptlog.c,v 1.8 2000/04/16 18:06:26 itojun Exp $
  */
 
 #include <stdio.h>
@@ -172,28 +172,24 @@ parseArgument(int argc, char *argv[])
     extern	char	*optarg;
     extern	int	 optind;
 
-    while ((ch = getopt(argc, argv, "b:d:h")) != EOF)
+    while ((ch = getopt(argc, argv, "bd:")) != EOF)
     {
 	switch (ch)
 	{
 	  case 'b':
-	    if ((*optarg == 'd') && (*(optarg+1) == '\0'))
-	    {
-		__op.b.daemon = 1;
-		__op.b.logsyslog = 1;
-		__op.b.logstderr = 0;
-		openLog();
-	    }
-	    else
-		goto	illegalopt;
+	    __op.b.daemon = 1;
+	    __op.b.logsyslog = 1;
+	    __op.b.logstderr = 0;
+	    openLog();
 	    break;
 
 	  case 'd':
-	    if (strncmp((optarg-1), "debug=", strlen("debug=")) == 0)	
-		__debug = strtoul(optarg+5, (char **)NULL, 0);
-	    else
-		goto	illegalopt;
+	    __debug = strtoul(optarg, (char **)NULL, 0);
 	    break;
+
+	  default:
+	    log(LOG_ERR, "parseArgument(): Illegal option name `-%c\'\n", ch);
+	    exit(1);
 	}
     }
 
@@ -201,10 +197,6 @@ parseArgument(int argc, char *argv[])
     argv += optind;
 
     return ;
-
-illegalopt:;
-    log(LOG_ERR, "parseArgument(): Illegal option name `%s\'\n", (optarg-1));
-    exit (errno);
 }
 
 
