@@ -226,7 +226,7 @@ main(argc, argv)
 			if (timeout == NULL)
 				break;
 
-			/* if all if have got RA packet, we are done */
+			/* if all interfaces have got RA packet, we are done */
 			for (ifi = iflist; ifi; ifi = ifi->next) {
 				if (ifi->state != IFS_DOWN && ifi->racnt == 0)
 					break;
