@@ -1,4 +1,4 @@
-.\"	$OpenBSD: fstat.1,v 1.24 2003/03/10 15:37:30 jmc Exp $
+.\"	$OpenBSD: fstat.1,v 1.27 2003/09/05 13:38:46 jmc Exp $
 .\"
 .\" Copyright (c) 1987, 1991, 1993
 .\"	The Regents of the University of California.  All rights reserved.
@@ -11,11 +11,7 @@
 .\" 2. Redistributions in binary form must reproduce the above copyright
 .\"    notice, this list of conditions and the following disclaimer in the
 .\"    documentation and/or other materials provided with the distribution.
-.\" 3. All advertising materials mentioning features or use of this software
-.\"    must display the following acknowledgement:
-.\"	This product includes software developed by the University of
-.\"	California, Berkeley and its contributors.
-.\" 4. Neither the name of the University nor the names of its contributors
+.\" 3. Neither the name of the University nor the names of its contributors
 .\"    may be used to endorse or promote products derived from this software
 .\"    without specific prior written permission.
 .\"
@@ -117,11 +113,11 @@ The process ID.
 The file number in the per-process open file table or one of the following
 special names:
 .Pp
-.Bd -literal -ragged -offset indent -compact
-text	- pure text inode
-wd 	- current working directory
-root	- root inode
-tr	- kernel trace file
+.Bd -literal -offset indent -compact
+text	\- pure text inode
+wd 	\- current working directory
+root	\- root inode
+tr	\- kernel trace file
 .Ed
 .Pp
 If the file number is followed by an asterisk
@@ -132,7 +128,7 @@ or there is an error.
 In this case the remainder of the line doesn't
 correspond to the remaining headers -- the format of the line
 is described later under
-.Sx Sockets .
+.Sx SOCKETS .
 .It Li MOUNT
 If the
 .Fl n
@@ -215,7 +211,7 @@ an arrow
 or
 .Dq -> ) ,
 and a full duplex socket shows a double arrow
-.Pq Dq <-> ) .
+.Pq Dq <-> .
 .Pp
 For
 .Dv AF_INET
@@ -240,9 +236,9 @@ indicates the direction the socket connection was created.
 Every pipe is printed as an address which is the same for both sides of
 the pipe and a state that is built of the letters
 .Dq RWE .
-W - The pipe blocks waiting for the reader to read data.
-R - The pipe blocks waiting for the writer to write data.
-E - The pipe is in EOF state.
+W \- The pipe blocks waiting for the reader to read data.
+R \- The pipe blocks waiting for the writer to write data.
+E \- The pipe is in EOF state.
 .Sh CRYPTO
 Each
 .Xr crypto 4

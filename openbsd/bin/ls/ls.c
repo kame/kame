@@ -1,4 +1,4 @@
-/*	$OpenBSD: ls.c,v 1.17 2002/03/12 01:05:15 millert Exp $	*/
+/*	$OpenBSD: ls.c,v 1.21 2003/08/06 19:09:09 tedu Exp $	*/
 /*	$NetBSD: ls.c,v 1.18 1996/07/09 09:16:29 mycroft Exp $	*/
 
 /*
@@ -16,11 +16,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -47,7 +43,7 @@ static char copyright[] =
 #if 0
 static char sccsid[] = "@(#)ls.c	8.7 (Berkeley) 8/5/94";
 #else
-static char rcsid[] = "$OpenBSD: ls.c,v 1.17 2002/03/12 01:05:15 millert Exp $";
+static char rcsid[] = "$OpenBSD: ls.c,v 1.21 2003/08/06 19:09:09 tedu Exp $";
 #endif
 #endif /* not lint */
 
@@ -89,6 +85,7 @@ int f_accesstime;		/* use time of last access */
 int f_column;			/* columnated format */
 int f_columnacross;		/* columnated format, sorted across */
 int f_flags;			/* show flags associated with a file */
+int f_humanval;			/* show human-readable file sizes */
 int f_inode;			/* print inode */
 int f_listdir;			/* list actual directory, not contents */
 int f_listdot;			/* list files beginning with . */
@@ -112,9 +109,7 @@ int f_whiteout;			/* show whiteout entries */
 int rval;
 
 int
-ls_main(argc, argv)
-	int argc;
-	char *argv[];
+ls_main(int argc, char *argv[])
 {
 	static char dot[] = ".", *dotav[] = { dot, NULL };
 	struct winsize win;
@@ -138,7 +133,7 @@ ls_main(argc, argv)
 		f_listdot = 1;
 
 	fts_options = FTS_PHYSICAL;
-	while ((ch = getopt(argc, argv, "1ACFLRSTWacdfgiklmnopqrstux")) != -1) {
+	while ((ch = getopt(argc, argv, "1ACFLRSTWacdfghiklmnopqrstux")) != -1) {
 		switch (ch) {
 		/*
 		 * The -1, -C and -l, -m and -x options all override each
@@ -205,6 +200,9 @@ ls_main(argc, argv)
 			f_nosort = 1;
 			break;
 		case 'g':		/* Compatibility with 4.3BSD. */
+			break;
+		case 'h':
+			f_humanval = 1;
 			break;
 		case 'i':
 			f_inode = 1;
@@ -342,9 +340,7 @@ static int output;			/* If anything output. */
  * a superset (may be exact set) of the files to be displayed.
  */
 static void
-traverse(argc, argv, options)
-	int argc, options;
-	char *argv[];
+traverse(int argc, char *argv[], int options)
 {
 	FTS *ftsp;
 	FTSENT *p, *chp;
@@ -408,8 +404,7 @@ traverse(argc, argv, options)
  * points to the parent directory of the display list.
  */
 static void
-display(p, list)
-	FTSENT *p, *list;
+display(FTSENT *p, FTSENT *list)
 {
 	struct stat *sp;
 	DISPLAY d;
@@ -503,21 +498,21 @@ display(p, list)
 					flen = 0;
 
 				if ((np = malloc(sizeof(NAMES) +
-				    ulen + glen + flen + 3)) == NULL)
+				    ulen + 1 + glen + 1 + flen + 1)) == NULL)
 					err(1, NULL);
 
 				np->user = &np->data[0];
-				(void)strcpy(np->user, user);
+				(void)strlcpy(np->user, user, ulen + 1);
 				np->group = &np->data[ulen + 1];
-				(void)strcpy(np->group, group);
+				(void)strlcpy(np->group, group, glen + 1);
 
 				if (S_ISCHR(sp->st_mode) ||
 				    S_ISBLK(sp->st_mode))
 					bcfile = 1;
 
 				if (f_flags) {
-					np->flags = &np->data[ulen + glen + 2];
-				  	(void)strcpy(np->flags, flags);
+					np->flags = &np->data[ulen + 1 + glen + 1];
+				  	(void)strlcpy(np->flags, flags, flen + 1);
 					if (*flags != '-')
 						free(flags);
 				}
@@ -564,8 +559,7 @@ display(p, list)
  * All other levels use the sort function.  Error entries remain unsorted.
  */
 static int
-mastercmp(a, b)
-	const FTSENT **a, **b;
+mastercmp(const FTSENT **a, const FTSENT **b)
 {
 	int a_info, b_info;
 

@@ -1,4 +1,4 @@
-/*	$OpenBSD: vmstat.c,v 1.38 2003/02/28 21:29:07 jason Exp $	*/
+/*	$OpenBSD: vmstat.c,v 1.41 2003/06/03 02:56:17 millert Exp $	*/
 /*	$NetBSD: vmstat.c,v 1.5 1996/05/10 23:16:40 thorpej Exp $	*/
 
 /*-
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "@(#)vmstat.c	8.2 (Berkeley) 1/12/94";
 #endif
-static char rcsid[] = "$OpenBSD: vmstat.c,v 1.38 2003/02/28 21:29:07 jason Exp $";
+static char rcsid[] = "$OpenBSD: vmstat.c,v 1.41 2003/06/03 02:56:17 millert Exp $";
 #endif /* not lint */
 
 /*
@@ -213,21 +209,21 @@ initkre(void)
 				nintr++;
 				KREAD(ihp, &ih, sizeof(ih));
 				KREAD(ih.ih_what, iname, 16);
-				namelen += 1 + strlen(iname);
+				namelen += strlen(iname) + 1;
 				ihp = ih.ih_next;
 			}
 		}
 		intrloc = calloc(nintr, sizeof (long));
 		intrname = calloc(nintr, sizeof (char *));
 		cp = intrnamebuf = malloc(namelen);
-		for (namelen = 0, i = 0, n = 0; i < 16; i++) {
+		for (i = 0, n = 0; i < 16; i++) {
 			ihp = intrhand[i];
 			while (ihp) {
 				KREAD(ihp, &ih, sizeof(ih));
 				KREAD(ih.ih_what, iname, 16);
-				/* XXX strcpy is safe, sized & malloc'd buffer */
-				strcpy(intrname[n++] = intrnamebuf + namelen, iname);
-				namelen += 1 + strlen(iname);
+				intrname[n++] = cp;
+				strlcpy(cp, iname, intrnamebuf + namelen - cp);
+				cp += strlen(iname) + 1;
 				ihp = ih.ih_next;
 			}
 		}

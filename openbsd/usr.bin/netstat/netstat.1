@@ -1,4 +1,4 @@
-.\"	$OpenBSD: netstat.1,v 1.28 2002/09/18 07:33:47 deraadt Exp $
+.\"	$OpenBSD: netstat.1,v 1.33 2003/08/26 08:33:12 itojun Exp $
 .\"	$NetBSD: netstat.1,v 1.11 1995/10/03 21:42:43 thorpej Exp $
 .\"
 .\" Copyright (c) 1983, 1990, 1992, 1993
@@ -12,11 +12,7 @@
 .\" 2. Redistributions in binary form must reproduce the above copyright
 .\"    notice, this list of conditions and the following disclaimer in the
 .\"    documentation and/or other materials provided with the distribution.
-.\" 3. All advertising materials mentioning features or use of this software
-.\"    must display the following acknowledgement:
-.\"	This product includes software developed by the University of
-.\"	California, Berkeley and its contributors.
-.\" 4. Neither the name of the University nor the names of its contributors
+.\" 3. Neither the name of the University nor the names of its contributors
 .\"    may be used to endorse or promote products derived from this software
 .\"    without specific prior written permission.
 .\"
@@ -47,7 +43,7 @@
 .Op Fl M Ar core
 .Op Fl N Ar system
 .Nm netstat
-.Op Fl bdgimnqrs
+.Op Fl bdgilmnqrstu
 .Op Fl f Ar address_family
 .Op Fl M Ar core
 .Op Fl N Ar system
@@ -58,13 +54,9 @@
 .Op Fl N Ar system
 .Op Fl w Ar wait
 .Nm netstat
-.Op Fl p Ar protocol
 .Op Fl M Ar core
 .Op Fl N Ar system
-.Nm netstat
 .Op Fl p Ar protocol
-.Op Fl i
-.Op Fl I Ar Interface
 .Nm netstat
 .Op Fl s
 .Op Fl f Ar address_family
@@ -89,8 +81,8 @@ interval specified,
 will continuously display the information regarding packet
 traffic on the configured network interfaces.
 The fourth form displays statistics about the named protocol.
-The fifth and sixth forms display per interface statistics for
-the specified protocol or address family.
+The fifth form displays per interface statistics for
+the specified address family.
 .Pp
 The options are as follows:
 .Bl -tag -width Ds
@@ -120,15 +112,15 @@ The following address families are recognized:
 .Pp
 .Bl -column "Address Family" "AF_APPLETA" "Description" -offset indent -compact
 .It Sy "Address Family" Ta Sy "Constant" Ta Sy "Description"
-.It "inet" Dv Ta "AF_INET" Ta "IP Version 4"
-.It "inet6" Dv Ta "AF_INET6" Ta "IP Version 6"
-.It "ipx" Dv Ta "AF_IPX" Ta "Novell IPX"
-.It "atalk" Dv Ta "AF_APPLETALK" Ta "AppleTalk"
-.It "ns" Dv Ta "AF_NS" Ta "Xerox NS Protocols"
-.It "iso" Dv Ta "AF_ISO" Ta "ISO Protocol Family"
-.It "encap" Dv Ta "PF_KEY" Ta "IPsec"
-.It "local" Dv Ta "AF_LOCAL" Ta "Local to Host (i.e., pipes)"
-.It "unix" Dv Ta "AF_UNIX" Ta "Local to Host (i.e., pipes)"
+.It "inet" Ta Dv "AF_INET" Ta "IP Version 4"
+.It "inet6" Ta Dv "AF_INET6" Ta "IP Version 6"
+.It "ipx" Ta Dv "AF_IPX" Ta "Novell IPX"
+.It "atalk" Ta Dv "AF_APPLETALK" Ta "AppleTalk"
+.It "ns" Ta Dv "AF_NS" Ta "Xerox NS Protocols"
+.It "iso" Ta Dv "AF_ISO" Ta "ISO Protocol Family"
+.It "encap" Ta Dv "PF_KEY" Ta "IPsec"
+.It "local" Ta Dv "AF_LOCAL" Ta "Local to Host (i.e., pipes)"
+.It "unix" Ta Dv "AF_UNIX" Ta "Local to Host (i.e., pipes)"
 .El
 .Pp
 .It Fl g
@@ -148,14 +140,9 @@ If the
 .Fl f Ar address_family
 option (with the
 .Fl s
-option) or the
-.Fl p Ar protocol
-option is present, show per-interface statistics on the given interface
-for the specified
-.Ar address_family
-or
-.Ar protocol ,
-respectively.
+option) is present, show per-interface
+statistics on the given interface for the specified
+.Ar address_family .
 .It Fl i
 Show the state of interfaces which have been auto-configured
 (interfaces statically configured into a system but not
@@ -172,14 +159,17 @@ If the
 .Fl f Ar address_family
 option (with the
 .Fl s
-option) or the
-.Fl p Ar protocol
-option is present, show per-interface statistics on all interfaces
+option) is present, show per-interface statistics on all interfaces
 for the specified
-.Ar address_family
-or
-.Ar protocol ,
-respectively.
+.Ar address_family .
+.It Fl l
+With the
+.Fl g
+option, display wider fields for the IPv6 multicast routing table
+.Qq Origin
+and
+.Qq Group
+columns.
 .It Fl M Ar core
 Extract values associated with the name list from the specified core
 instead of the running kernel.
@@ -217,6 +207,14 @@ option is also specified, show routing statistics instead.
 .It Fl s
 Show per-protocol statistics.
 If this option is repeated, counters with a value of zero are suppressed.
+.It Fl t
+With the
+.Fl i
+option, display the current value of the watchdog timer function.
+.It Fl u
+Limit statistics or address control block reports to the
+.Dv AF_UNIX
+address family.
 .It Fl v
 Be verbose.
 Avoids truncation of long addresses.
@@ -285,6 +283,7 @@ The mapping between letters and flags is:
 3	RTF_PROTO3	Protocol specific routing flag #3.
 B	RTF_BLACKHOLE	Just discard pkts (during updates).
 C	RTF_CLONING	Generate new routes on use.
+c	RTF_CLONED	Cloned routes (generated from RTF_CLONING)
 D	RTF_DYNAMIC	Created dynamically (by redirect).
 G	RTF_GATEWAY	Destination requires forwarding by intermediary.
 H	RTF_HOST	Host entry (net otherwise).

@@ -1,4 +1,4 @@
-/*	$OpenBSD: inet6.c,v 1.27 2003/03/16 19:10:46 sturm Exp $	*/
+/*	$OpenBSD: inet6.c,v 1.29 2003/06/03 02:56:13 millert Exp $	*/
 /*	BSDI inet.c,v 2.3 1995/10/24 02:19:29 prb Exp	*/
 /*
  * Copyright (c) 1983, 1988, 1993
@@ -12,11 +12,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-/*__RCSID("$OpenBSD: inet6.c,v 1.27 2003/03/16 19:10:46 sturm Exp $");*/
+/*__RCSID("$OpenBSD: inet6.c,v 1.29 2003/06/03 02:56:13 millert Exp $");*/
 /*__RCSID("KAME Id: inet6.c,v 1.10 2000/02/09 10:49:31 itojun Exp");*/
 #endif
 #endif /* not lint */
@@ -1117,7 +1113,7 @@ inet6name(struct in6_addr *in6p)
 		sin6.sin6_len = sizeof(sin6);
 		sin6.sin6_family = AF_INET6;
 		sin6.sin6_addr = *in6p;
-#ifdef KAME_SCOPEID
+#ifdef __KAME__
 		if (IN6_IS_ADDR_LINKLOCAL(in6p)) {
 			sin6.sin6_scope_id =
 			    ntohs(*(u_int16_t *)&in6p->s6_addr[2]);

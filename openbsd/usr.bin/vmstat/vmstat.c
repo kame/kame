@@ -1,5 +1,5 @@
 /*	$NetBSD: vmstat.c,v 1.29.4.1 1996/06/05 00:21:05 cgd Exp $	*/
-/*	$OpenBSD: vmstat.c,v 1.75 2003/02/24 00:28:37 grange Exp $	*/
+/*	$OpenBSD: vmstat.c,v 1.80 2003/07/28 06:16:35 tedu Exp $	*/
 
 /*
  * Copyright (c) 1980, 1986, 1991, 1993
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -44,7 +40,7 @@ static char copyright[] =
 #if 0
 static char sccsid[] = "@(#)vmstat.c	8.1 (Berkeley) 6/6/93";
 #else
-static char rcsid[] = "$NetBSD: vmstat.c,v 1.29.4.1 1996/06/05 00:21:05 cgd Exp $";
+static const char rcsid[] = "$OpenBSD: vmstat.c,v 1.80 2003/07/28 06:16:35 tedu Exp $";
 #endif
 #endif /* not lint */
 
@@ -367,7 +363,7 @@ dovmstat(u_int interval, int reps)
 {
 	struct vmtotal total;
 	time_t uptime, halfuptime;
-	void needhdr();
+	void needhdr(int);
 	int mib[2];
 	struct clockinfo clkinfo;
 	size_t size;
@@ -448,11 +444,11 @@ printhdr(void)
 
 	(void)printf(" procs   memory        page%*s", 20, "");
 	if (ndrives > 0)
-		(void)printf("%s %*sfaults     cpu\n",
+		(void)printf("%s %*straps         cpu\n",
 		   ((ndrives > 1) ? "disks" : "disk"),
 		   ((ndrives > 1) ? ndrives * 4 - 4 : 0), "");
 	else
-		(void)printf("%*s  faults     cpu\n",
+		(void)printf("%*s  traps          cpu\n",
 		   ndrives * 3, "");
 
 	(void)printf(" r b w    avm    fre   flt  re  pi  po  fr  sr ");
@@ -461,7 +457,7 @@ printhdr(void)
 			(void)printf("%c%c%c ", dr_name[i][0],
 			    dr_name[i][1],
 			    dr_name[i][strlen(dr_name[i]) - 1]);
-	(void)printf("  in    sy   cs us sy id\n");
+	(void)printf(" int   sys   cs us sy id\n");
 	hdrcnt = winlines - 2;
 }
 
@@ -469,7 +465,7 @@ printhdr(void)
  * Force a header to be prepended to the next output.
  */
 void
-needhdr(void)
+needhdr(int signo)
 {
 
 	hdrcnt = 1;
@@ -713,89 +709,12 @@ dointr(void)
 	u_long intrstray[16];
 	char iname[17], fname[31];
 	int i;
-#if 0
-	int mib[2], l, incflag;
-	size_t size;
-	char *intrnames, *intrcount, *intrn, *intrc, *buf1, *buf2;
-#endif
 
 	iname[16] = '\0';
 	uptime = getuptime();
 
 	(void)printf("interrupt             total     rate\n");
 
-#if 0  /* XXX Something else is needed here....get on with it Theo! */
-	if (nlistf == NULL && memf == NULL) {
-	 	mib[0] = CTL_MACHDEP;
-		mib[1] = CPU_INTRNAMES;
-		size = 0;
-		if (sysctl(mib, 2, NULL, &size, NULL, 0) < 0)
-			err(1, "could not get machdep.intrnames");
-		intrnames = calloc(size, sizeof(char));
-		if (intrnames == NULL)
-			err(1,
-			    "could not allocate memory for interrupt names");
-		if (sysctl(mib, 2, intrnames, &size, NULL, 0) < 0)
-			err(1, "could not get machdep.intrnames");
-
-		mib[1] = CPU_INTRCOUNT;
-		size = 0;
-		if (sysctl(mib, 2, NULL, &size, NULL, 0) < 0)
-			err(1, "could not get machdep.intrcount");
-		intrcount = calloc(size, sizeof(char));
-		if (intrcount == NULL)
-			err(1,
-			    "could not allocate memory for interrupt count");
-		if (sysctl(mib, 2, intrcount, &size, NULL, 0) < 0)
-			err(1, "could not get machdep.intrcount");
-
-		mib[1] = CPU_INTRSTRAY;
-		size = sizeof(intrstray);
-		if (sysctl(mib, 2, intrstray, &size, NULL, 0) < 0) {
-			warn("could not get machdep.intrstray");
-			bzero(intrstray, sizeof(intrstray));
-		}
-
-		buf1 = intrnames;
-		buf2 = intrcount;
-		i = 0;
-		while ((intrn = strsep(&buf1, ",/")) != NULL) {
-			/* Find what the next delimiter is */
-			for (l = 0; buf2[l] != '\0'; l++) {
-				if (buf2[l] == '/') {
-					/* Don't increase the irq count */
-					incflag = 0;
-					break;
-				} else if (buf2[l] == ',') {
-					incflag = 1;
-					break;
-				}
-			}
-
-			if ((intrc = strsep(&buf2, ",/")) == NULL)
-				errx(1, "unexpected failure matching interrupts with usage counters");
-
-			/* Unused interrupt ? If so, skip this entry */
-			if (intrn[0] == '\0')	{
-				if (incflag)
-					i++;
-				continue;
-			}
-
-			snprintf(fname, sizeof fname, "irq%d/%s", i, intrn);
-			printf("%-16.16s %10lu %8lu\n", fname,
-			       strtoul(intrc, NULL, 10),
-			       strtoul(intrc, NULL, 10) / uptime);
-			inttotal += strtoul(intrc, NULL, 10);
-
-			if (incflag)
-				i++;
-		}
-
-		free(intrnames);
-		free(intrcount);
-	} else
-#endif /* 0 */
 	{
 		kread(X_INTRHAND, intrhand, sizeof(intrhand));
 		kread(X_INTRSTRAY, intrstray, sizeof(intrstray));

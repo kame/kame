@@ -1,4 +1,4 @@
-/*	$OpenBSD: route.c,v 1.51 2003/02/12 14:41:08 jason Exp $	*/
+/*	$OpenBSD: route.c,v 1.56 2003/08/27 00:33:33 henric Exp $	*/
 /*	$NetBSD: route.c,v 1.15 1996/05/07 02:55:06 thorpej Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -38,7 +34,7 @@
 #if 0
 static char sccsid[] = "from: @(#)route.c	8.3 (Berkeley) 3/9/94";
 #else
-static char *rcsid = "$OpenBSD: route.c,v 1.51 2003/02/12 14:41:08 jason Exp $";
+static char *rcsid = "$OpenBSD: route.c,v 1.56 2003/08/27 00:33:33 henric Exp $";
 #endif
 #endif /* not lint */
 
@@ -94,7 +90,7 @@ struct radix_node_head *rt_tables[AF_MAX+1];
  * Definitions for showing gateway flags.
  */
 struct bits {
-	short	b_mask;
+	int	b_mask;
 	char	b_val;
 } bits[] = {
 	{ RTF_UP,	'U' },
@@ -113,6 +109,7 @@ struct bits {
 	{ RTF_PROTO1,	'1' },
 	{ RTF_PROTO2,	'2' },
 	{ RTF_PROTO3,	'3' },
+	{ RTF_CLONED,	'c' },
 	{ 0 }
 };
 
@@ -131,9 +128,9 @@ int	NewTree = 0;
 
 static struct sockaddr *kgetsa(struct sockaddr *);
 static void p_tree(struct radix_node *);
-static void p_rtnode();
+static void p_rtnode(void);
 static void p_rtflags(u_char);
-static void ntreestuff();
+static void ntreestuff(void);
 static void np_rtentry(struct rt_msghdr *);
 static void p_sockaddr(struct sockaddr *, struct sockaddr *, int, int);
 static void p_flags(int, char *);
@@ -233,7 +230,7 @@ pr_family(int af)
 #define	WID_GW(af)	18	/* width of gateway column */
 #else
 /* width of destination/gateway column */
-#ifdef KAME_SCOPEID
+#if 1
 /* strlen("fe80::aaaa:bbbb:cccc:dddd@gif0") == 30, strlen("/128") == 4 */
 #define	WID_DST(af)	((af) == AF_INET6 ? (nflag ? 34 : 18) : 18)
 #define	WID_GW(af)	((af) == AF_INET6 ? (nflag ? 30 : 18) : 18)
@@ -328,9 +325,7 @@ p_rtflags(u_char flags)
 		putchar('R');
 	if (flags & RNF_ACTIVE)
 		putchar('A');
-	if (flags & RNF_IGNORE)
-		putchar('I');
-	if (flags & ~(RNF_NORMAL | RNF_ROOT | RNF_ACTIVE | RNF_IGNORE))
+	if (flags & ~(RNF_NORMAL | RNF_ROOT | RNF_ACTIVE))
 		printf("/0x%02x", flags);
 	putchar('>');
 }
@@ -479,7 +474,7 @@ p_sockaddr(struct sockaddr *sa, struct sockaddr *mask, int flags, int width)
 	case AF_INET6:
 	    {
 		struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
-#ifdef KAME_SCOPEID
+#ifdef __KAME__
 		struct in6_addr *in6 = &sa6->sin6_addr;
 
 		/*

@@ -1,4 +1,4 @@
-/*	$OpenBSD: netstat.h,v 1.22 2002/06/07 21:58:38 itojun Exp $	*/
+/*	$OpenBSD: netstat.h,v 1.25 2003/06/26 21:59:11 deraadt Exp $	*/
 /*	$NetBSD: netstat.h,v 1.6 1996/05/07 02:55:05 thorpej Exp $	*/
 
 /*
@@ -13,11 +13,7 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
- * 4. Neither the name of the University nor the names of its contributors
+ * 3. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
  *
@@ -94,7 +90,7 @@ void	impstats(u_long, u_long);
 void	intpr(int, u_long);
 
 void	pr_rthdr(int);
-void	pr_encaphdr();
+void	pr_encaphdr(void);
 void	pr_family(int);
 void	rt_stats(u_long);
 char	*ns_phost(struct sockaddr *);
@@ -144,7 +140,7 @@ void	iso_protopr(u_long, char *);
 void	iso_protopr1(u_long, int);
 void	tp_protopr(u_long, char *);
 void	tp_inproto(u_long);
-void	tp_stats(caddr_t, caddr_t);
+void	tp_stats(u_long, char *);
 
 void	mroutepr(u_long, u_long, u_long, u_long);
 void	mrt_stats(u_long, u_long);
