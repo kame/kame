@@ -1,4 +1,4 @@
-/*	$NetBSD: inetd.c,v 1.62.2.4 2000/07/26 23:13:31 mycroft Exp $	*/
+/*	$NetBSD: inetd.c,v 1.76 2002/01/21 14:42:28 wiz Exp $	*/
 
 /*-
  * Copyright (c) 1998 The NetBSD Foundation, Inc.
@@ -77,7 +77,7 @@ __COPYRIGHT("@(#) Copyright (c) 1983, 1991, 1993, 1994\n\
 #if 0
 static char sccsid[] = "@(#)inetd.c	8.4 (Berkeley) 4/13/94";
 #else
-__RCSID("$NetBSD: inetd.c,v 1.62.2.4 2000/07/26 23:13:31 mycroft Exp $");
+__RCSID("$NetBSD: inetd.c,v 1.76 2002/01/21 14:42:28 wiz Exp $");
 #endif
 #endif /* not lint */
 
@@ -343,6 +343,7 @@ struct	servtab {
 #define NORM_TYPE	0
 #define MUX_TYPE	1
 #define MUXPLUS_TYPE	2
+#define FAITH_TYPE	3
 #define ISMUX(sep)	(((sep)->se_type == MUX_TYPE) || \
 			 ((sep)->se_type == MUXPLUS_TYPE))
 #define ISMUXPLUS(sep)	((sep)->se_type == MUXPLUS_TYPE)
@@ -382,7 +383,7 @@ void		unregister_rpc __P((struct servtab *sep));
 void		bump_nofile __P((void));
 void		inetd_setproctitle __P((char *, int));
 void		initring __P((void));
-long		machtime __P((void));
+uint32_t	machtime __P((void));
 int 		port_good_dg __P((struct sockaddr *sa));
 static int	getline __P((int, char *, int));
 int		main __P((int, char *[], char *[]));
@@ -432,7 +433,6 @@ u_int16_t bad_ports[] =  { 7, 9, 13, 19, 37, 0};
 char	*CONFIG = _PATH_INETDCONF;
 char	**Argv;
 char 	*LastArg;
-extern char	*__progname;
 
 int
 main(argc, argv, envp)
@@ -480,7 +480,7 @@ main(argc, argv, envp)
 
 	if (debug == 0)
 		daemon(0, 0);
-	openlog(__progname, LOG_PID | LOG_NOWAIT, LOG_DAEMON);
+	openlog("inetd", LOG_PID | LOG_NOWAIT, LOG_DAEMON);
 	pidfile(NULL);
 
 #ifdef RLIMIT_NOFILE
@@ -1074,6 +1074,9 @@ setsockopt(fd, SOL_SOCKET, opt, (char *)&on, sizeof (on))
 	    SO_RCVBUF, (char *)&sep->se_rcvbuf, sizeof(sep->se_rcvbuf)) < 0)
 		syslog(LOG_ERR, "setsockopt (SO_RCVBUF %d): %m",
 		    sep->se_rcvbuf);
+	if (sep->se_type == FAITH_TYPE && setsockopt(sep->se_fd, IPPROTO_IPV6,
+	    IPV6_FAITH, (char *)&on, sizeof(on)) < 0)
+		syslog(LOG_ERR, "setsockopt (IPV6_FAITH): %m");
 #ifdef IPSEC
 	if (ipsecsetup(sep->se_family, sep->se_fd, sep->se_policy) < 0 &&
 	    sep->se_policy) {
@@ -1129,7 +1132,7 @@ close_sep(sep)
 	}
 	sep->se_count = 0;
 	/*
-	 * Don't keep the pid of this running deamon: when reapchild()
+	 * Don't keep the pid of this running daemon: when reapchild()
 	 * reaps this pid, it would erroneously increment nsock.
 	 */
 	if (sep->se_wait > 1)
@@ -1211,7 +1214,7 @@ enter(cp)
 	sep = (struct servtab *)malloc(sizeof (*sep));
 	if (sep == (struct servtab *)0) {
 		syslog(LOG_ERR, "Out of memory.");
-		exit(-1);
+		exit(1);
 	}
 	*sep = *cp;
 	sep->se_fd = -1;
@@ -1290,7 +1293,7 @@ more:
 					syslog(LOG_ERR,
 						"%s: invalid ipsec policy \"%s\"",
 						CONFIG, p);
-					exit(-1);
+					exit(1);
 				} else {
 					if (policy)
 						free(policy);
@@ -1346,7 +1349,11 @@ more:
 	hostdelim = strrchr(arg, ':');
 	if (hostdelim) {
 		*hostdelim = '\0';
-		sep->se_hostaddr = newstr(arg);
+		if (arg[0] == '[' && hostdelim > arg && hostdelim[-1] == ']') {
+			hostdelim[-1] = '\0';
+			sep->se_hostaddr = newstr(arg + 1);
+		} else
+			sep->se_hostaddr = newstr(arg);
 		arg = hostdelim + 1;
 		/*
 		 * If the line is of the form `host:', then just change the
@@ -1389,7 +1396,13 @@ more:
 	else
 		sep->se_socktype = -1;
 
-	sep->se_proto = newstr(sskip(&cp));
+	arg = sskip(&cp);
+	if (sep->se_type == NORM_TYPE &&
+	    strncmp(arg, "faith/", strlen("faith/")) == 0) {
+		arg += strlen("faith/");
+		sep->se_type = FAITH_TYPE;
+	}
+	sep->se_proto = newstr(arg);
 
 #define	MALFORMED(arg) \
 do { \
@@ -1677,7 +1690,7 @@ sskip(cpp)
 	cp = skip(cpp);
 	if (cp == NULL) {
 		syslog(LOG_ERR, "%s: syntax error", CONFIG);
-		exit(-1);
+		exit(1);
 	}
 	return (cp);
 }
@@ -1736,7 +1749,7 @@ newstr(cp)
 	if ((cp = strdup(cp ? cp : "")))
 		return (cp);
 	syslog(LOG_ERR, "strdup: %m");
-	exit(-1);
+	exit(1);
 }
 
 void
@@ -1959,7 +1972,7 @@ chargen_dg(s, sep)		/* Character generator */
  * some seventy years Bell Labs was asleep.
  */
 
-long
+uint32_t
 machtime()
 {
 	struct timeval tv;
@@ -1967,10 +1980,10 @@ machtime()
 	if (gettimeofday(&tv, (struct timezone *)0) < 0) {
 		if (debug)
 			fprintf(stderr, "Unable to get time of day\n");
-		return (0L);
+		return (0);
 	}
-#define	OFFSET ((u_long)25567 * 24*60*60)
-	return (htonl((long)(tv.tv_sec + OFFSET)));
+#define	OFFSET ((uint32_t)25567 * 24*60*60)
+	return (htonl((uint32_t)(tv.tv_sec + OFFSET)));
 #undef OFFSET
 }
 
@@ -1980,7 +1993,7 @@ machtime_stream(s, sep)
 	int s;
 	struct servtab *sep;
 {
-	long result;
+	uint32_t result;
 
 	result = machtime();
 	(void) write(s, (char *) &result, sizeof(result));
@@ -1992,7 +2005,7 @@ machtime_dg(s, sep)
 	int s;
 	struct servtab *sep;
 {
-	long result;
+	uint32_t result;
 	struct sockaddr_storage ss;
 	struct sockaddr *sa;
 	int size;
@@ -2073,12 +2086,14 @@ print_service(action, sep)
 		    );
 	else
 		fprintf(stderr,
-		    "%s: %s proto=%s, wait:max=%d.%d, user:group=%s.%s builtin=%lx server=%s"
+		    "%s: %s proto=%s%s, wait:max=%d.%d, user:group=%s.%s builtin=%lx server=%s"
 #ifdef IPSEC
 		    " policy=%s"
 #endif
 		    "\n",
-		    action, sep->se_service, sep->se_proto,
+		    action, sep->se_service,
+		    sep->se_type == FAITH_TYPE ? "faith/" : "",
+		    sep->se_proto,
 		    sep->se_wait, sep->se_max, sep->se_user, sep->se_group,
 		    (long)sep->se_bi, sep->se_server
 #ifdef IPSEC
@@ -2092,9 +2107,9 @@ usage()
 {
 
 #ifdef LIBWRAP
-	(void)fprintf(stderr, "usage: %s [-dl] [conf]\n", __progname);
+	(void)fprintf(stderr, "usage: %s [-dl] [conf]\n", getprogname());
 #else
-	(void)fprintf(stderr, "usage: %s [-d] [conf]\n", __progname);
+	(void)fprintf(stderr, "usage: %s [-d] [conf]\n", getprogname());
 #endif
 	exit(1);
 }
@@ -2432,7 +2447,7 @@ int	ctrl;
 #endif
 
 /*
- * check if the port where send data to is one of the obvious ports
+ * check if the address/port where send data to is one of the obvious ports
  * that are used for denial of service attacks like two echo ports
  * just echoing data between them
  */
@@ -2440,6 +2455,10 @@ int
 port_good_dg(sa)
 	struct sockaddr *sa;
 {
+	struct in_addr in;
+#ifdef INET6
+	struct in6_addr *in6;
+#endif
 	u_int16_t port;
 	int i, bad;
 	char hbuf[NI_MAXHOST];
@@ -2448,11 +2467,28 @@ port_good_dg(sa)
 
 	switch (sa->sa_family) {
 	case AF_INET:
+		in.s_addr = ntohl(((struct sockaddr_in *)sa)->sin_addr.s_addr);
 		port = ntohs(((struct sockaddr_in *)sa)->sin_port);
+	v4chk:
+		if (IN_MULTICAST(in.s_addr))
+			goto bad;
+		switch ((in.s_addr & 0xff000000) >> 24) {
+		case 0: case 127: case 255:
+			goto bad;
+		}
+		/* XXX check for subnet broadcast using getifaddrs(3) */
 		break;
 #ifdef INET6
 	case AF_INET6:
+		in6 = &((struct sockaddr_in6 *)sa)->sin6_addr;
 		port = ntohs(((struct sockaddr_in6 *)sa)->sin6_port);
+		if (IN6_IS_ADDR_MULTICAST(in6) || IN6_IS_ADDR_UNSPECIFIED(in6))
+			goto bad;
+		if (IN6_IS_ADDR_V4MAPPED(in6) || IN6_IS_ADDR_V4COMPAT(in6)) {
+			memcpy(&in, &in6->s6_addr[12], sizeof(in));
+			in.s_addr = ntohl(in.s_addr);
+			goto v4chk;
+		}
 		break;
 #endif
 	default:
@@ -2460,20 +2496,18 @@ port_good_dg(sa)
 		return 1;
 	}
 
-	for (i = 0; bad_ports[i] != 0; i++)
-		if (port == bad_ports[i]) {
-			bad = 1;
-			break;
-		}
+	for (i = 0; bad_ports[i] != 0; i++) {
+		if (port == bad_ports[i])
+			goto bad;
+	}
 
-	if (bad) {
-		if (getnameinfo(sa, sa->sa_len, hbuf, sizeof(hbuf),
-				NULL, 0, niflags) != 0)
-			strcpy(hbuf, "?");
-		syslog(LOG_WARNING,"Possible DoS attack from %s, Port %d",
-			hbuf, port);
-		return (0);
-	} else
-		return (1);
+	return (1);
+
+bad:
+	if (getnameinfo(sa, sa->sa_len, hbuf, sizeof(hbuf),
+			NULL, 0, niflags) != 0)
+		strcpy(hbuf, "?");
+	syslog(LOG_WARNING,"Possible DoS attack from %s, Port %d",
+		hbuf, port);
+	return (0);
 }
-

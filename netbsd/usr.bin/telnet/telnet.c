@@ -1,4 +1,4 @@
-/*	$NetBSD: telnet.c,v 1.15.4.2 2001/03/11 21:24:15 he Exp $	*/
+/*	$NetBSD: telnet.c,v 1.20 2002/02/11 11:00:07 wiz Exp $	*/
 
 /*
  * Copyright (c) 1988, 1990, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)telnet.c	8.4 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: telnet.c,v 1.15.4.2 2001/03/11 21:24:15 he Exp $");
+__RCSID("$NetBSD: telnet.c,v 1.20 2002/02/11 11:00:07 wiz Exp $");
 #endif
 #endif /* not lint */
 
@@ -269,6 +269,7 @@ printring(va_alist)
 	    *ptr++ = i;
 	}
     }
+    va_end(ap);
     ring_supply_data(ring, buffer, ptr-buffer);
 }
 #endif
@@ -633,7 +634,7 @@ dontoption(option)
 
 /*
  * Given a buffer returned by tgetent(), this routine will turn
- * the pipe seperated list of names in the buffer into an array
+ * the pipe separated list of names in the buffer into an array
  * of pointers to null terminated names.  We toss out any bad,
  * duplicate, or verbose names (names with spaces).
  */
@@ -2018,7 +2019,7 @@ process_iac:
 		     * inserted into the suboption are all possibilities.
 		     * If we assume that the IAC was not doubled,
 		     * and really the IAC SE was left off, we could
-		     * get into an infinate loop here.  So, instead,
+		     * get into an infinite loop here.  So, instead,
 		     * we terminate the suboption, and process the
 		     * partial suboption if we can.
 		     */

@@ -1,4 +1,4 @@
-/*	$NetBSD: authenc.c,v 1.8.4.1 2000/06/22 07:09:05 thorpej Exp $	*/
+/*	$NetBSD: authenc.c,v 1.9 2000/06/22 06:47:48 thorpej Exp $	*/
 
 /*-
  * Copyright (c) 1991, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)authenc.c	8.1 (Berkeley) 6/6/93";
 #else
-__RCSID("$NetBSD: authenc.c,v 1.8.4.1 2000/06/22 07:09:05 thorpej Exp $");
+__RCSID("$NetBSD: authenc.c,v 1.9 2000/06/22 06:47:48 thorpej Exp $");
 #endif
 #endif /* not lint */
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: ring.c,v 1.8.10.1 2000/06/22 07:09:06 thorpej Exp $	*/
+/*	$NetBSD: ring.c,v 1.9 2000/06/22 06:47:48 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1988, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)ring.c	8.2 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: ring.c,v 1.8.10.1 2000/06/22 07:09:06 thorpej Exp $");
+__RCSID("$NetBSD: ring.c,v 1.9 2000/06/22 06:47:48 thorpej Exp $");
 #endif
 #endif /* not lint */
 

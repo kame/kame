@@ -1,4 +1,4 @@
-/*	$NetBSD: ring.h,v 1.7.10.1 2000/06/22 07:09:06 thorpej Exp $	*/
+/*	$NetBSD: ring.h,v 1.8 2000/06/22 06:47:48 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1988, 1993

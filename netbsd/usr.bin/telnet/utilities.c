@@ -1,4 +1,4 @@
-/*	$NetBSD: utilities.c,v 1.7.10.2 2000/06/22 07:12:36 thorpej Exp $	*/
+/*	$NetBSD: utilities.c,v 1.9 2000/06/22 07:11:11 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1988, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)utilities.c	8.3 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: utilities.c,v 1.7.10.2 2000/06/22 07:12:36 thorpej Exp $");
+__RCSID("$NetBSD: utilities.c,v 1.9 2000/06/22 07:11:11 thorpej Exp $");
 #endif
 #endif /* not lint */
 

@@ -1,4 +1,4 @@
-/*	$NetBSD: commands.c,v 1.42.4.1 2000/06/22 07:09:05 thorpej Exp $	*/
+/*	$NetBSD: commands.c,v 1.47 2002/01/06 01:02:47 sjg Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -67,7 +67,7 @@
 #if 0
 static char sccsid[] = "@(#)commands.c	8.4 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: commands.c,v 1.42.4.1 2000/06/22 07:09:05 thorpej Exp $");
+__RCSID("$NetBSD: commands.c,v 1.47 2002/01/06 01:02:47 sjg Exp $");
 #endif
 #endif /* not lint */
 
@@ -130,7 +130,7 @@ __RCSID("$NetBSD: commands.c,v 1.42.4.1 2000/06/22 07:09:05 thorpej Exp $");
 
 #ifndef	MAXHOSTNAMELEN
 #define	MAXHOSTNAMELEN 64
-#endif	MAXHOSTNAMELEN
+#endif	/* MAXHOSTNAMELEN */
 
 #if	defined(IPPROTO_IP) && defined(IP_TOS)
 int tos = -1;
@@ -2454,7 +2454,8 @@ tn(argc, argv)
 	/* use telnet negotiation if port number/name preceded by minus sign */
 	telnetport = 1;
 	portp++;
-    }
+    } else
+	telnetport = 0;
 
     memset(&hints, 0, sizeof(hints));
     hints.ai_family = AF_UNSPEC;
@@ -2739,6 +2740,9 @@ command(top, tbuf, cnt)
 	getline:
 	    if (rlogin != _POSIX_VDISABLE)
 		printf("%s> ", prompt);
+#if defined(TN3270)
+	    fflush(stdout);
+#endif
 	    if (fgets(line, sizeof(line), stdin) == NULL) {
 		if (feof(stdin) || ferror(stdin)) {
 		    (void) quit(0, NULL);
@@ -2830,12 +2834,12 @@ cmdrc(m1, m2)
     int gotmachine = 0;
     int l1 = strlen(m1);
     int l2 = strlen(m2);
-    char m1save[64];
+    char m1save[MAXHOSTNAMELEN + 1];
 
     if (skiprc)
 	return;
 
-    strcpy(m1save, m1);
+    strlcpy(m1save, m1, sizeof(m1save));
     m1 = m1save;
 
     if (rcname == 0) {

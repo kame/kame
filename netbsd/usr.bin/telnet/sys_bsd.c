@@ -1,4 +1,4 @@
-/*	$NetBSD: sys_bsd.c,v 1.16 1999/11/26 07:33:52 msaitoh Exp $	*/
+/*	$NetBSD: sys_bsd.c,v 1.18 2002/02/11 11:00:07 wiz Exp $	*/
 
 /*
  * Copyright (c) 1988, 1990, 1993
@@ -38,7 +38,7 @@
 #if 0
 from: static char sccsid[] = "@(#)sys_bsd.c	8.4 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: sys_bsd.c,v 1.16 1999/11/26 07:33:52 msaitoh Exp $");
+__RCSID("$NetBSD: sys_bsd.c,v 1.18 2002/02/11 11:00:07 wiz Exp $");
 #endif
 #endif /* not lint */
 
@@ -676,9 +676,9 @@ TerminalNewMode(f)
 	(void) signal(SIGTSTP, SIG_DFL);
 # ifndef SOLARIS
 	(void) sigsetmask(sigblock(0) & ~(1<<(SIGTSTP-1)));
-# else	SOLARIS
+# else	/* SOLARIS */
 	(void) sigrelse(SIGTSTP);
-# endif	SOLARIS
+# endif	/* SOLARIS */
 #endif	/* SIGTSTP */
 #ifndef USE_TERMIO
 	ltc = oltc;
@@ -1154,7 +1154,7 @@ process_rings(netin, netout, netex, ttyin, ttyout, poll)
 		    /*
 		     * Bogosity.  We have to do the read
 		     * to clear the atmark to get out of
-		     * an infinate loop.
+		     * an infinite loop.
 		     */
 		    i = read(net, netiring.supply + c, canread - c);
 		    if (i > 0)

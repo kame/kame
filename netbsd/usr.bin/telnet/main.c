@@ -1,4 +1,4 @@
-/*	$NetBSD: main.c,v 1.12.4.2 2001/03/11 21:23:57 he Exp $	*/
+/*	$NetBSD: main.c,v 1.15 2001/03/04 01:51:05 assar Exp $	*/
 
 /*
  * Copyright (c) 1988, 1990, 1993
@@ -43,7 +43,7 @@ __COPYRIGHT("@(#) Copyright (c) 1988, 1990, 1993\n\
 #if 0
 static char sccsid[] = "@(#)main.c	8.3 (Berkeley) 5/30/95";
 #else
-__RCSID("$NetBSD: main.c,v 1.12.4.2 2001/03/11 21:23:57 he Exp $");
+__RCSID("$NetBSD: main.c,v 1.15 2001/03/04 01:51:05 assar Exp $");
 #endif
 #endif /* not lint */
 
@@ -295,8 +295,8 @@ main(argc, argv)
 			break;
 		case 't':
 #if defined(TN3270) && defined(unix)
+			(void)strlcpy(tline, optarg, sizeof(tline));
 			transcom = tline;
-			(void)strcpy(transcom, optarg);
 #else
 			fprintf(stderr,
 			   "%s: Warning: -t ignored, no TN3270 support.\n",

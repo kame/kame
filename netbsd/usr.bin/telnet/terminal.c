@@ -1,4 +1,4 @@
-/*	$NetBSD: terminal.c,v 1.6.10.1 2000/06/22 07:09:06 thorpej Exp $	*/
+/*	$NetBSD: terminal.c,v 1.7 2000/06/22 06:47:49 thorpej Exp $	*/
 
 /*
  * Copyright (c) 1988, 1990, 1993
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "@(#)terminal.c	8.2 (Berkeley) 2/16/95";
 #else
-__RCSID("$NetBSD: terminal.c,v 1.6.10.1 2000/06/22 07:09:06 thorpej Exp $");
+__RCSID("$NetBSD: terminal.c,v 1.7 2000/06/22 06:47:49 thorpej Exp $");
 #endif
 #endif /* not lint */
 
