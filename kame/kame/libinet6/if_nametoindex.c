@@ -1,4 +1,4 @@
-/*	$KAME: if_nametoindex.c,v 1.5 2000/11/24 08:04:40 itojun Exp $	*/
+/*	$KAME: if_nametoindex.c,v 1.6 2000/11/24 08:18:54 itojun Exp $	*/
 
 /*-
  * Copyright (c) 1997, 2000
@@ -32,6 +32,7 @@
 #include <ifaddrs.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 /*
  * From RFC 2553:
