@@ -1,8 +1,20 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.762 2000/04/12 04:29:13 itojun Exp $
+$Id: CHANGELOG,v 1.763 2000/04/12 07:51:48 jinmei Exp $
 
 <200003>
+2000-04-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/pim6[ds]d/mld6.c (accept_mld6): reflected the change
+	of mrt6msg{}; check the overlaid MLD6 type field instead of
+	msg_controllen to detect if received packets are control messages
+	or real MLD6 messages.
+
+2000-04-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_mroute.h: changed the order of members of
+	mrt6msg{} to overlay the structure onto the MLD6 header (not IPv6
+	header.)
+	Suggested by: pavlin@catarina.usc.edu
+
 Wed Apr 12 13:28:35 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/mbone/vat6: pkgsrc for vat6 (IPv6-ready vat).
 	  From: ichiro@ichiro.org
