@@ -1,4 +1,4 @@
-/*	$KAME: in6_prefix.c,v 1.41 2001/01/22 09:59:19 jinmei Exp $	*/
+/*	$KAME: in6_prefix.c,v 1.42 2001/01/24 01:55:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -526,7 +526,7 @@ in6_prefix_add_ifid(int iilen, struct in6_ifaddr *ia)
 	if (ifpr == NULL) {
 		struct rr_prefix rp;
 		struct socket so;
-		int pplen = (plen == 128) ? 64 : plen;
+		int pplen = (plen == 128) ? 64 : plen; /* XXX hardcoded 64 is bad */
 
 		/* allocate a prefix for ia, with default properties */
 
