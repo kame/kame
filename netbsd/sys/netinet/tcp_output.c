@@ -1153,12 +1153,6 @@ send:
 		int ip6oflags;
 
 		ip6oflags = so->so_options & SO_DONTROUTE;
-		if (tp->t_in6pcb && tp->t_in6pcb &&
-		    tp->t_in6pcb->in6p_outputopts &&
-		    (tp->t_in6pcb->in6p_outputopts->ip6po_minmtu ==
-		     IP6PO_MINMTU_ALL)) {
-			ip6oflags |= IPV6_MINMTU;
-		}
 
 		if (tp->t_in6pcb)
 			opts = tp->t_in6pcb->in6p_outputopts;

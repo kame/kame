@@ -1132,11 +1132,6 @@ send:
 #endif
 		}
 		ip6oflags = so->so_options & SO_DONTROUTE;
-		if (tp->t_inpcb->in6p_outputopts &&
-		    (tp->t_inpcb->in6p_outputopts->ip6po_minmtu ==
-		     IP6PO_MINMTU_ALL)) {
-			ip6oflags |= IPV6_MINMTU;
-		}
 		if (!ip6_setpktaddrs(m, &tp->t_inpcb->in6p_lsa,
 				     &tp->t_inpcb->in6p_fsa)) {
 			m_freem(m);

@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_output.c,v 1.19 2002/04/19 07:30:00 jinmei Exp $	*/
+/*	$KAME: tcp6_output.c,v 1.20 2002/04/19 07:53:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -655,11 +655,6 @@ send:
 #endif /* IPSEC */
 
 	ip6oflags = 0;
-	if (t6p->t_in6pcb->in6p_outputopts &&
-	    (t6p->t_in6pcb->in6p_outputopts->ip6po_minmtu ==
-	     IP6PO_MINMTU_ALL)) {
-		ip6oflags |= IPV6_MINMTU;
-	}
 	ip6oflags |= (so->so_options & SO_DONTROUTE);
 
 	if (!ip6_setpktaddrs(m, &t6p->t_in6pcb->in6p_lsa,
