@@ -1,8 +1,8 @@
-$Id: CHANGELOG,v 1.519 2000/02/04 18:20:21 jinmei Exp $
+$Id: CHANGELOG,v 1.520 2000/02/04 18:22:01 jinmei Exp $
 
 <200002>
 2000-02-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* bsdi3/kame/libinet6/getaddrinfo.c (explore_numeric_scope): 
+	* kame/kame/libinet6/getaddrinfo.c (explore_numeric_scope): 
 	* kame/kame/libinet6/getnameinfo.c (getnameinfo):
 	Revised the format for scoped addresses by agreement with MSR.
 	Two big changes are included:
