@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.51 2002/05/24 07:04:48 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.52 2002/05/27 04:51:09 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -314,6 +314,10 @@ struct tSlot {
 	 */
 	struct cSlot	*csl;
 	union {
+		struct {
+			n_short		 icd_id;
+			n_short		 icd_seq;
+		}			 ih_idseq;
 		u_int32_t		 ids[2];	/* hold echo/request id/seq */
 		struct tcpstate		*tcps;
 	}				 suit;
