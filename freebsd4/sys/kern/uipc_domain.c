@@ -44,8 +44,6 @@
 #include <sys/systm.h>
 #include <vm/vm_zone.h>
 
-#include <net/if.h>
-
 /*
  * System initialization
  *
@@ -141,8 +139,6 @@ domaininit(void *dummy)
 
 	timeout(pffasttimo, (void *)0, 1);
 	timeout(pfslowtimo, (void *)0, 1);
-
-	if_attachdomain();
 }
 
 

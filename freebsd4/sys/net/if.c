@@ -75,6 +75,7 @@
  * System initialization
  */
 
+static void if_attachdomain __P((void *));
 static void if_attachdomain1 __P((struct ifnet *));
 static int ifconf __P((u_long, caddr_t));
 static void ifinit __P((void *));
@@ -154,7 +155,6 @@ if_attach(ifp)
 	register struct ifaddr *ifa;
 	static int if_indexlim = 8;
 	static int inited;
-	struct domain *dp;
 
 	if (!inited) {
 		TAILQ_INIT(&ifnet);
@@ -242,14 +242,16 @@ if_attach(ifp)
 		if_attachdomain1(ifp);
 }
 
-void
-if_attachdomain()
+static void
+if_attachdomain(dummy)
+	void *dummy;
 {
 	struct ifnet *ifp;
 
 	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list))
 		if_attachdomain1(ifp);
 }
+SYSINIT(domainifattach, SI_SUB_PROTO_IFATTACHDOMAIN, SI_ORDER_FIRST, if_attachdomain, NULL);
 
 static void
 if_attachdomain1(ifp)
