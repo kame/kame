@@ -1,4 +1,4 @@
-/*	$KAME: bcache.c,v 1.7 2001/03/29 05:34:28 itojun Exp $	*/
+/*	$KAME: bcache.c,v 1.8 2001/05/16 06:41:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -113,14 +113,14 @@ pr_bcentry(struct mip6_bc bcentry)
 {
 	char *cp;
 
-	cp = ip6addr_print(&bcentry.peer_home, -1);
+	cp = ip6addr_print(&bcentry.peer_home, -1, NULL);
 
 	if (nflag)
 		printf("%-*s ", WID_IP6, cp);
 	else
 		printf("%-*.*s ", WID_IP6, WID_IP6, cp);
 
-	cp = ip6addr_print(&bcentry.peer_coa, bcentry.prefixlen);
+	cp = ip6addr_print(&bcentry.peer_coa, bcentry.prefixlen, NULL);
 	if (nflag)
 		printf("%-*s ", WID_IP6, cp);
 	else

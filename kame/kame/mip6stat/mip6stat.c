@@ -1,4 +1,4 @@
-/*	$KAME: mip6stat.c,v 1.9 2001/05/16 06:25:55 jinmei Exp $	*/
+/*	$KAME: mip6stat.c,v 1.10 2001/05/16 06:41:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -175,7 +175,7 @@ trimdomain(char *cp)
 }
 
 char *
-ip6addr_print(struct in6_addr *in6, int plen)
+ip6addr_print(struct in6_addr *in6, int plen, char *ifname)
 {
 	static char line[NI_MAXHOST + 5];
 	struct sockaddr_in6 sa6;
@@ -185,6 +185,18 @@ ip6addr_print(struct in6_addr *in6, int plen)
 	sa6.sin6_family = AF_INET6;
 	sa6.sin6_len = sizeof(sa6);
 	sa6.sin6_addr = *in6;
+	if (IN6_IS_ADDR_LINKLOCAL(&sa6.sin6_addr) && ifname != NULL) {
+		/*
+		 * Deal with KAME's embedded link ID.
+		 * XXX: this function should take sockaddr_in6 with
+		 * an appropriate sin6_scope_id value.
+		 * XXX: this part assumes one-to-one mapping between
+		 * links and interfaces, but it is not always true.
+		 */
+		sa6.sin6_addr.s6_addr[2] = 0;
+		sa6.sin6_addr.s6_addr[3] = 0;
+		sa6.sin6_scope_id = if_nametoindex(ifname);
+	}
 
 	if (!nflag)
 		niflags |= NI_NUMERICHOST;

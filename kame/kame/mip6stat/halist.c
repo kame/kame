@@ -1,4 +1,4 @@
-/*	$KAME: halist.c,v 1.5 2001/03/29 05:34:29 itojun Exp $	*/
+/*	$KAME: halist.c,v 1.6 2001/05/16 06:41:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -101,14 +101,6 @@ pr_halentry(struct mip6_halst halentry)
 	char          *cp = "::";
 	char           ifname[IFNAMSIZ+1];
 	struct ifnet   ifp;
-	
-
-	cp = ip6addr_print(&halentry.ll_addr, -1);
-
-	if (nflag)
-		printf("%-*s ", WID_IP6, cp);
-	else
-		printf("%-*.*s ", WID_IP6, WID_IP6, cp);
 
 	kget(halentry.ifp, ifp);
 #if defined(__FreeBSD__) || defined(__bsdi__)
@@ -118,6 +110,13 @@ pr_halentry(struct mip6_halst halentry)
 	kget(ifp.if_xname, ifname);
 	printf("%6s ", ifname);
 #endif
+
+	cp = ip6addr_print(&halentry.ll_addr, -1, ifname);
+
+	if (nflag)
+		printf("%-*s ", WID_IP6, cp);
+	else
+		printf("%-*.*s ", WID_IP6, WID_IP6, cp);
 
 	printf("%8u ", halentry.lifetime);
 

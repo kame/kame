@@ -1,4 +1,4 @@
-/*	$KAME: foraddr.c,v 1.6 2001/03/29 05:34:29 itojun Exp $	*/
+/*	$KAME: foraddr.c,v 1.7 2001/05/16 06:41:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -104,7 +104,8 @@ pr_foraddrentry(struct mip6_static_addr foraddrentry)
 #endif
 	struct ifnet ifs;
 
-	cp = ip6addr_print(&foraddrentry.ip6_addr, foraddrentry.prefix_len);
+	cp = ip6addr_print(&foraddrentry.ip6_addr, foraddrentry.prefix_len,
+			   NULL);
 
 	if (nflag)
 		printf("%-*s ", WID_IP6P, cp);

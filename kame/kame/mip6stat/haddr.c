@@ -1,4 +1,4 @@
-/*	$KAME: haddr.c,v 1.7 2001/03/29 05:34:29 itojun Exp $	*/
+/*	$KAME: haddr.c,v 1.8 2001/05/16 06:41:48 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -107,21 +107,39 @@ pr_haentry(struct mip6_esm haentry)
 	char giface[IFNAMSIZ + 3] = { 0 };
 #endif
 
-	cp = ip6addr_print(&haentry.home_addr, haentry.prefixlen);
+	if (haentry.ifp) {
+#if !(defined(__OpenBSD__) || defined(__NetBSD__))
+		char if_name[IFNAMSIZ] = { 0 };
+#endif
+		struct ifnet ifs;
+
+		kget(haentry.ifp, ifs);
+#if defined(__OpenBSD__) || defined(__NetBSD__)
+		strncpy(iface, ifs.if_xname, sizeof(iface));
+		iface[sizeof(iface) - 1] = '\0';
+#else
+		if (ifs.if_name)
+			kgetp(ifs.if_name, if_name);
+		sprintf(iface, "%s%d", if_name, ifs.if_unit);
+#endif
+	}
+	printf("%6.6s ", iface);
+
+	cp = ip6addr_print(&haentry.home_addr, haentry.prefixlen, iface);
 
 	if (nflag)
 		printf("%-*s ", WID_IP6P, cp);
 	else
 		printf("%-*.*s ", WID_IP6P, WID_IP6P, cp);
 
-	cp = ip6addr_print(&haentry.ha_hn, -1);
+	cp = ip6addr_print(&haentry.ha_hn, -1, iface);
 	if (nflag)
 		printf("%-*s ", WID_IP6, cp);
 	else
 		printf("%-*.*s ", WID_IP6, WID_IP6, cp);
 
 	if (lflag) {
-		cp = ip6addr_print(&haentry.coa, -1);
+		cp = ip6addr_print(&haentry.coa, -1, iface);
 		if (nflag)
 			printf("%-*s ", WID_IP6, cp);
 		else
@@ -154,24 +172,6 @@ pr_haentry(struct mip6_esm haentry)
 		printf("%6.6s ", "Unkwn");
 		break;
 	}             
-
-	if (haentry.ifp) {
-#if !(defined(__OpenBSD__) || defined(__NetBSD__))
-		char if_name[IFNAMSIZ] = { 0 };
-#endif
-		struct ifnet ifs;
-
-		kget(haentry.ifp, ifs);
-#if defined(__OpenBSD__) || defined(__NetBSD__)
-		strncpy(iface, ifs.if_xname, sizeof(iface));
-		iface[sizeof(iface) - 1] = '\0';
-#else
-		if (ifs.if_name)
-			kgetp(ifs.if_name, if_name);
-		sprintf(iface, "%s%d", if_name, ifs.if_unit);
-#endif
-	}
-	printf("%6.6s ", iface);
 
 	if(lflag) {
 #if 0

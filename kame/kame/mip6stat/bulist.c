@@ -1,4 +1,4 @@
-/*	$KAME: bulist.c,v 1.6 2001/03/29 05:34:28 itojun Exp $	*/
+/*	$KAME: bulist.c,v 1.7 2001/05/16 06:41:47 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999 and 2000 WIDE Project.
@@ -109,7 +109,7 @@ pr_buentry(struct mip6_bul buentry)
 	char timebuf[64];
 	struct tm *tm;
 
-	cp = ip6addr_print(&buentry.peer_home, -1);
+	cp = ip6addr_print(&buentry.peer_home, -1, NULL);
 
 	if (nflag)
 		printf("%-*s ", WID_IP6, cp);
@@ -117,14 +117,14 @@ pr_buentry(struct mip6_bul buentry)
 		printf("%-*.*s ", WID_IP6, WID_IP6, cp);
 
 	if (lflag) {
-		cp = ip6addr_print(&buentry.local_home, -1);
+		cp = ip6addr_print(&buentry.local_home, -1, NULL);
 		if (nflag)
 			printf("%-*s ", WID_IP6, cp);
 		else
 			printf("%-*.*s ", WID_IP6, WID_IP6, cp);
 	}
 
-	cp = ip6addr_print(&buentry.local_coa, -1);
+	cp = ip6addr_print(&buentry.local_coa, -1, NULL);
 	if (nflag)
 		printf("%-*s ", WID_IP6, cp);
 	else

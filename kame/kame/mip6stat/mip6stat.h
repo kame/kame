@@ -1,4 +1,4 @@
-/*	$KAME: mip6stat.h,v 1.6 2001/03/29 05:34:29 itojun Exp $	*/
+/*	$KAME: mip6stat.h,v 1.7 2001/05/16 06:41:48 jinmei Exp $	*/
 
 /*
  * Copyright (c) 1999, 2000 and 2001 Ericsson Radio Systems AB
@@ -23,7 +23,7 @@ extern kvm_t *kd;
 
 extern int kread(u_long addr, char *buf, int size);
 extern void trimdomain(char *cp);
-extern char *ip6addr_print(struct in6_addr *in6, int plen);
+extern char *ip6addr_print(struct in6_addr *in6, int plen, char *);
 
 extern void bcachepr(u_long);
 extern void bulistpr(u_long);
