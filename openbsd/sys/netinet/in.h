@@ -535,8 +535,8 @@ struct in6_pktinfo {
 	{ 0, 0 }, \
 	{ 0, 0 }, \
 	{ 0, 0 }, \
-	{ 0, 0 }, \
-	{ "ipsec", CTLTYPE_NODE }, \
+	{ "esp", CTLTYPE_NODE }, \
+	{ "ah", CTLTYPE_NODE }, \
 }
 
 /*
