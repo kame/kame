@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.307 1999/12/01 02:03:31 itojun Exp $
+$Id: CHANGELOG,v 1.308 1999/12/01 11:22:00 sakane Exp $
 
 <199912>
+Wed Dec  1 20:16:04 JST 1999 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	Sync kernel.  Tunnel mode enabled again.  The status comes back 
+	before modifying the kernel.
+	XXX Policy management engine will be started to implement next.
+
 Wed Dec  1 10:29:16 JST 1999
 	* openbsd/sys/socket.h: remove #define for __ss_len and __ss_family.
 	  add some comments.
