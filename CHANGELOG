@@ -1,11 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.379 1999/12/27 18:19:58 sumikawa Exp $
+$Id: CHANGELOG,v 1.380 1999/12/27 20:20:10 sumikawa Exp $
 
 <199912>
+Tue Dec 28 05:19:33 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd3/ports/fetchmail: Upgrade to 5.2.1.
+
 Mon Dec 27 22:03:26 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/{include, etc, lib, libexec, sbin, usr.bin, usr.sbin}:
-	sync with FreeBSD 3.4-RELEASE
+	  sync with FreeBSD 3.4-RELEASE
 
 Mon Dec 27 21:34:51 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/ethereal: removed ethreal port. It's already
