@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: show.c,v 1.12 2000/10/17 08:01:16 fujisawa Exp $
+ *	$Id: show.c,v 1.13 2001/03/03 12:36:17 fujisawa Exp $
  */
 
 #include <sys/types.h>
@@ -73,8 +73,8 @@ kvm_t	*kd;
 
 static	struct nlist	nl[] =
 {
-    { "_cell_used" },
-    { "_cell_free" },
+    { "__cell_used" },
+    { "__cell_free" },
     { "_tSlotEntryUsed" },
     { "_tSlotEntryMax" },
     { "_natptStatic" },
@@ -204,10 +204,10 @@ showVariables()
     if (readNL((caddr_t)&value, sizeof(value), "_tSlotEntryMax") > 0)
 	printf("%12s: 0x%08x (%d)\n", "tSlotEntryMax", value, value);
 
-    if (readNL((caddr_t)&value, sizeof(value), "_cell_used") > 0)
+    if (readNL((caddr_t)&value, sizeof(value), "__cell_used") > 0)
 	printf("%12s: 0x%08x (%d)\n", "cell_used", value, value);
 
-    if (readNL((caddr_t)&value, sizeof(value), "_cell_free") > 0)
+    if (readNL((caddr_t)&value, sizeof(value), "__cell_free") > 0)
 	printf("%12s: 0x%08x (%d)\n", "cell_free", value, value);
 
     if (readNL((caddr_t)&value, sizeof(value), "_ip6_protocol_tr") > 0)
@@ -381,7 +381,8 @@ readNL(void *buf, int nbytes, char *n_name)
 
     for (nlp = nl; nlp->n_name; nlp++)
     {
-	if (strncmp(nlp->n_name, n_name, strlen(n_name)) == SAME)
+	if ((strlen(nlp->n_name) == strlen(n_name))
+	    && (strncmp(nlp->n_name, n_name, strlen(n_name)) == SAME))
 	    return (readKvm(buf, nbytes, nlp->n_value));
     }
 
