@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.29 2001/01/18 13:05:51 jinmei Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.30 2001/01/18 13:26:12 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -306,7 +306,7 @@ option to
 .Xr rtadvd 8 .
 .Bd -literal -offset
 ef0:\\
-	:addrs#1:addr="3ffe:501:4819:1000::":prefixlen#64:
+	:addrs#1:addr="3ffe:501:ffff:1000::":prefixlen#64:
 .Ed
 .Pp
 The following example presents the default values in an explicit manner.
@@ -319,7 +319,7 @@ default:\\
 ether:\\
 	:mtu#1500:tc=default:
 ef0:\\
-	:addrs#1:addr="3ffe:501:4819:1000::":prefixlen#64:tc=ether:
+	:addrs#1:addr="3ffe:501:ffff:1000::":prefixlen#64:tc=ether:
 .Ed
 .Sh SEE ALSO
 .Xr termcap 5 ,
