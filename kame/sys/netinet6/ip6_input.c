@@ -1100,7 +1100,7 @@ ip6_savecontrol(in6p, ip6, m, ctl, prevctl)
 				sizeof(struct ip6_hdr), hbhlen);
 			if (hbh == NULL) {
 				ip6stat.ip6s_tooshort++;
-				return;	XXX;
+				return;
 			}
 #endif
 
