@@ -28,7 +28,7 @@
  */
 
 #ifndef lint
-static char *rcsid = "@(#) pfkey.c $Revision: 1.11 $";
+static char *rcsid = "@(#) pfkey.c $Revision: 1.12 $";
 #endif
 
 #include <sys/types.h>
@@ -1278,7 +1278,7 @@ pfkey_setsadbmsg(buf, type, tlen, satype, mode, reqid, seq, pid)
 	u_int len;
 
 	p = (struct sadb_msg *)buf;
-	len = sizeof(struct sadb_sa);
+	len = sizeof(struct sadb_msg);
 
 	memset(p, 0, len);
 	p->sadb_msg_version = PF_KEY_V2;
