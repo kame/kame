@@ -1,7 +1,7 @@
 $NetBSD$
 
---- socket.c-	Wed Dec 22 17:26:20 1999
-+++ socket.c	Wed Dec 22 17:26:48 1999
+--- socket.c.orig	Mon Dec 20 05:02:24 1999
++++ socket.c	Wed Dec 22 17:52:09 1999
 @@ -127,7 +127,6 @@
      void *request = NULL;
      int requestlen;
@@ -10,7 +10,7 @@ $NetBSD$
  
  #ifdef HAVE_SOCKETPAIR
      if (plugin)
-@@ -154,7 +153,17 @@
+@@ -154,7 +153,20 @@
  
   ret:
  #else /* NET_SECURITY */
@@ -18,9 +18,12 @@ $NetBSD$
      i = inner_connect(ai, NULL, 0, NULL, NULL, "fetchmail", NULL);
 +#else
 +    i = socket(ai->ai_family, ai->ai_socktype, 0);
-+    if (i < 0)
++    if (i < 0) {
++	freeaddrinfo(ai);
 +	return -1;
++    }
 +    if (connect(i, (struct sockaddr *) ai->ai_addr, ai->ai_addrlen) < 0) {
++	freeaddrinfo(ai);
 +	close(i);
 +	return -1;
 +    }
