@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.125 2001/05/09 11:17:33 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.126 2001/05/17 03:39:08 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -257,6 +257,7 @@ struct in6_pktinfo *get_rcvpktinfo __P((struct msghdr *));
 void	 onsignal __P((int));
 void	 retransmit __P((void));
 void	 onint __P((int));
+size_t	 pingerlen __P((void));
 void	 pinger __P((void));
 const char *pr_addr __P((struct sockaddr *, int));
 void	 pr_icmph __P((struct icmp6_hdr *, u_char *));
@@ -630,13 +631,18 @@ main(argc, argv)
 			timing = 1;
 		} else
 			timing = 0;
+		/* in F_VERBOSE case, we may get non-echoreply packets*/
+		if (options & F_VERBOSE)
+			packlen = 2048 + IP6LEN + ICMP6ECHOLEN + EXTRA;
+		else
+			packlen = datalen + IP6LEN + ICMP6ECHOLEN + EXTRA;
 	} else {
 		/* suppress timing for node information query */
 		timing = 0;
 		datalen = 2048;
+		packlen = 2048 + IP6LEN + ICMP6ECHOLEN + EXTRA;
 	}
 
-	packlen = datalen + IP6LEN + ICMP6ECHOLEN + EXTRA;
 	if (!(packet = (u_char *)malloc((u_int)packlen)))
 		err(1, "Unable to allocate packet");
 	if (!(options & F_PINGFILLED))
@@ -963,7 +969,8 @@ main(argc, argv)
 		warn("setsockopt(IPV6_HOPLIMIT)"); /* XXX err? */
 #endif
 
-	printf("PING6(%d=40+8+%d bytes) ", datalen + 48, datalen);
+	printf("PING6(%lu=40+8+%lu bytes) ", (unsigned long)(40 + pingerlen()),
+	    (unsigned long)(pingerlen() - 8));
 	printf("%s --> ", pr_addr((struct sockaddr *)&src, sizeof(src)));
 	printf("%s\n", pr_addr((struct sockaddr *)&dst, sizeof(dst)));
 
@@ -1146,6 +1153,25 @@ retransmit()
  * of the data portion are used to hold a UNIX "timeval" struct in VAX
  * byte-order, to compute the round-trip time.
  */
+size_t
+pingerlen()
+{
+	size_t l;
+
+	if (options & F_FQDN)
+		l = ICMP6_NIQLEN + sizeof(dst.sin6_addr);
+	else if (options & F_FQDNOLD)
+		l = ICMP6_NIQLEN;
+	else if (options & F_NODEADDR)
+		l = ICMP6_NIQLEN + sizeof(dst.sin6_addr);
+	else if (options & F_SUPTYPES)
+		l = ICMP6_NIQLEN;
+	else
+		l = ICMP6ECHOLEN + datalen;
+
+	return l;
+}
+
 void
 pinger()
 {
@@ -1225,6 +1251,11 @@ pinger()
 					   &outpack[ICMP6ECHOLEN], NULL);
 		cc = ICMP6ECHOLEN + datalen;
 	}
+
+#ifdef DIAGNOSTIC
+	if (pingerlen() != cc)
+		errx(1, "internal error; length mismatch");
+#endif
 
 	smsghdr.msg_name = (caddr_t)&dst;
 	smsghdr.msg_namelen = sizeof(dst);
