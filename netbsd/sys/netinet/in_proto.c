@@ -217,13 +217,6 @@ struct protosw inetsw[] = {
   0,		0,		0,		0,
 },
 #endif /* INET6 */
-#if 0	/*visited from encap4_input*/
-{ SOCK_RAW,	&inetdomain,	IPPROTO_IPIP,	PR_ATOMIC|PR_ADDR,
-  ipip_input,	rip_output,	0,		rip_ctloutput,
-  rip_usrreq,	/* XXX */
-  0,		0,		0,		0,
-},
-#endif
 #if NGRE > 0
 { SOCK_RAW,	&inetdomain,	IPPROTO_GRE,	PR_ATOMIC|PR_ADDR,
   gre_input,	rip_output,	0,		rip_ctloutput,
@@ -277,6 +270,15 @@ struct protosw inetsw[] = {
   rip_init,	0,		0,		0,
 },
 };
+
+#if NIPIP > 0
+struct protosw ipip_protosw =
+{ SOCK_RAW,	&inetdomain,	IPPROTO_IPIP,	PR_ATOMIC|PR_ADDR,
+  ipip_input,	rip_output,	0,		rip_ctloutput,
+  rip_usrreq,	/* XXX */
+  0,		0,		0,		0,
+};
+#endif /* NIPIP */
 
 #if NGIF > 0
 struct protosw in_gif_protosw =
