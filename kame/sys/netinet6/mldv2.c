@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.29 2004/12/28 10:01:22 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.30 2004/12/31 03:53:03 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -787,7 +787,7 @@ mld_fasttimeo()
 	ifp = in6m->in6m_ifp;
 	while (in6m != NULL) {
 		if (in6m->in6m_timer == 0)
-			goto next_in6m; /* do nothing */
+			goto state_change_timer; /* do nothing */
 
 		--in6m->in6m_timer;
 		if (in6m->in6m_timer > 0) {

@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2707 2004/12/27 11:45:03 suz Exp $
+$KAME: CHANGELOG,v 1.2708 2004/12/31 03:54:54 suz Exp $
 
 <200412>
+2004-12-31  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/sys/netinet6/mldv2.c: fixed a bug that MLDv2 report is
+	not retransmitted RobustnessVariable times.
+
 2004-12-27  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/netinet6/mldv2.c: corrected an MLD-query handling
 	  when MaxResponseDelay=0.  (ToDo. Same thing for IGMPv3)
