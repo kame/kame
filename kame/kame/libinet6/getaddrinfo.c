@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.180 2004/04/21 07:16:11 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.181 2004/04/22 04:03:22 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -282,10 +282,7 @@ static int explore_fqdn __P((const struct addrinfo *, const char *,
 
 /* identify behavior of OS dependent portion */
 #if defined(__NetBSD__) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
-#define USE_FQDN_UNSPEC_LOOKUP	1
 #undef USE_GETIPNODEBY
-#else
-#undef USE_FQDN_UNSPEC_LOOKUP
 #endif
 
 static int reorder __P((struct addrinfo *));
@@ -585,36 +582,8 @@ getaddrinfo(hostname, servname, hints, res)
 	/*
 	 * hostname as alphabetical name.
 	 */
-#ifdef USE_FQDN_UNSPEC_LOOKUP
-	/*
-	 * the operating system supports PF_UNSPEC lookup in explore_fqdn().
-	 */
 	*pai = ai0;
 	error = explore_fqdn(pai, hostname, servname, &afai_unspec);
-#else
-	for (afd = afdl; afd->a_af; afd++) {
-		*pai = ai0;
-
-		if (!MATCH_FAMILY(pai->ai_family, afd->a_af, 1))
-			continue;
-
-#ifdef AI_ADDRCONFIG
-		/*
-		 * If AI_ADDRCONFIG is specified, check if we are
-		 * expected to return the address family or not.
-		 */
-		if ((pai->ai_flags & AI_ADDRCONFIG) != 0 &&
-		    !addrconfig(afd->a_af))
-			continue;
-#endif
-
-		if (pai->ai_family == PF_UNSPEC)
-			pai->ai_family = afd->a_af;
-
-		error = explore_fqdn(pai, hostname, servname,
-		    &afailist[afd - afdl]);
-	}
-#endif
 
 globcopy:
 	for (ex = explore; ex->e_af >= 0; ex++) {
