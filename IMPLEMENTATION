@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/10/04 15:06:57 $
+			$Date: 1999/10/04 15:09:05 $
 
 1. IPv6
 
@@ -1080,4 +1080,11 @@ Here are some points to be noted:
   deflate_policy in sys/netinet6/ipcomp_core.c (should it be sysctl accessible?
   or per-SAD configurable?)
 
-						<end of IMPLEMENTATION>
+6. ALTQ
+
+KAME kit includes ALTQ 2.0 code, which supports FreeBSD2, FreeBSD3 and
+NetBSD.  For other BSDs, ALTQ does not work.
+ALTQ in KAME supports (or tries to support) IPv6.  ALTQ-related userland
+tools must be built manually, using ports/altq or pkgsrc/net/altq.
+
+						 <end of IMPLEMENTATION>
