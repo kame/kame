@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.111 2000/12/10 09:16:37 itojun Exp $	*/
+/*	$KAME: isakmp.c,v 1.112 2000/12/12 08:03:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -182,6 +182,7 @@ isakmp_handler(so_isakmp)
 		goto end;
 	}
 
+#if 0 /*MSG_PEEK does not return total length*/
 	/* check bogus length */
 	if (ntohl(isakmp.len) > len) {
 		plog(logp, LOCATION, (struct sockaddr *)&remote,
@@ -194,6 +195,7 @@ isakmp_handler(so_isakmp)
 		}
 		goto end;
 	}
+#endif
 
 	/* read real message */
 	if ((buf = vmalloc(ntohl(isakmp.len))) == NULL) {
