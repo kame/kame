@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.120 2000/06/03 15:58:21 itojun Exp $	*/
+/*	$KAME: key.c,v 1.121 2000/06/09 06:47:08 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1711,7 +1711,7 @@ key_spdadd(so, m, mhp)
 
 	newsp->refcnt = 1;	/* do not reclaim until I say I do */
 	newsp->state = IPSEC_SPSTATE_ALIVE;
-	LIST_INSERT_HEAD(&sptree[newsp->spidx.dir], newsp, chain);
+	LIST_INSERT_TAIL(&sptree[newsp->spidx.dir], newsp, secpolicy, chain);
 
 	/* delete the entry in spacqtree */
 	if (mhp->msg->sadb_msg_type == SADB_X_SPDUPDATE) {
