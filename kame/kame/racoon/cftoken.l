@@ -90,7 +90,7 @@ quotedstring	\"[^"]*\"
 addrstring	[a-fA-F0-9:][a-fA-F0-9:\.]*
 protectedstring	[a-fA-F0-9:\._][a-fA-F0-9:\._]*
 decstring	{digit}+
-hexstring	0[xX]({hexdigit}{hexdigit})+
+hexstring	0x{hexdigit}+
 octetstring	{octet}({dot}{octet})+
 
 %s S_INI S_PTH S_INF S_LOG S_PAD S_LST S_RTRY
@@ -369,14 +369,12 @@ hour|hours		{ YYD; yylval.num = CF_UNITTYPE_H; return(UNITTYPE); }
 		}
 
 {hexstring}	{
-			int len = yyleng - 2; /* (str - "0x") */
-
 			YYD; 
 
-			yylval.val.l = (len & 1) + (len / 2);
+			yylval.val.l = yyleng + (yyleng & 1);
 
 			/* fixed string if length is odd. */
-			if (len & 1) {
+			if (yyleng & 1) {
 				yytext[1] = '0';
 				yylval.val.v = strdup(yytext + 1);
 			} else
