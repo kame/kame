@@ -1,4 +1,4 @@
-/*	$KAME: bf_enc.c,v 1.7 2002/02/27 01:33:59 itojun Exp $	*/
+/*	$KAME: bf_enc.c,v 1.8 2003/08/27 00:17:56 itojun Exp $	*/
 
 /* crypto/bf/bf_enc.c */
 /* Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
@@ -76,7 +76,7 @@ to modify the code.
 void
 BF_encrypt(data, key)
 	BF_LONG *data;
-	BF_KEY *key;
+	const BF_KEY *key;
 {
 	register BF_LONG l, r, *p, *s;
 
@@ -118,7 +118,7 @@ BF_encrypt(data, key)
 void
 BF_decrypt(data, key)
 	BF_LONG *data;
-	BF_KEY *key;
+	const BF_KEY *key;
 {
 	register BF_LONG l, r, *p, *s;
 

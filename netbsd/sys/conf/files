@@ -955,6 +955,7 @@ file	crypto/des/des_setkey.c		ipsec & ipsec_esp
 file	crypto/des/des_enc.c		ipsec & ipsec_esp & !crypto_md_des_enc
 #file    crypto/des/des_cbc.c		ipsec & ipsec_esp & !crypto_md_des_cbc
 file	crypto/blowfish/bf_enc.c	ipsec & ipsec_esp & !crypto_md_bf_enc
+file	crypto/blowfish/bf_ecb.c	ipsec & ipsec_esp & !crypto_md_bf_enc
 #file	crypto/blowfish/bf_cbc.c	ipsec & ipsec_esp & !crypto_md_bf_cbc
 file	crypto/blowfish/bf_skey.c	ipsec & ipsec_esp
 file	crypto/cast128/cast128.c	ipsec & ipsec_esp

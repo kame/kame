@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.64 2003/07/25 09:57:55 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.65 2003/08/27 00:17:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -494,16 +494,8 @@ esp_blowfish_blockdecrypt(algo, sav, s, d)
 	u_int8_t *s;
 	u_int8_t *d;
 {
-	/* HOLY COW!  BF_decrypt() takes values in host byteorder */
-	BF_LONG t[2];
 
-	bcopy(s, t, sizeof(t));
-	t[0] = ntohl(t[0]);
-	t[1] = ntohl(t[1]);
-	BF_decrypt(t, (BF_KEY *)sav->sched);
-	t[0] = htonl(t[0]);
-	t[1] = htonl(t[1]);
-	bcopy(t, d, sizeof(t));
+	BF_ecb_encrypt(s, d, (BF_KEY *)sav->sched, 0);
 	return 0;
 }
 
@@ -514,16 +506,8 @@ esp_blowfish_blockencrypt(algo, sav, s, d)
 	u_int8_t *s;
 	u_int8_t *d;
 {
-	/* HOLY COW!  BF_encrypt() takes values in host byteorder */
-	BF_LONG t[2];
 
-	bcopy(s, t, sizeof(t));
-	t[0] = ntohl(t[0]);
-	t[1] = ntohl(t[1]);
-	BF_encrypt(t, (BF_KEY *)sav->sched);
-	t[0] = htonl(t[0]);
-	t[1] = htonl(t[1]);
-	bcopy(t, d, sizeof(t));
+	BF_ecb_encrypt(s, d, (BF_KEY *)sav->sched, 1);
 	return 0;
 }
 
