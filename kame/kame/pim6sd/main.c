@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.23 2001/08/20 08:25:38 itojun Exp $	*/
+/*	$KAME: main.c,v 1.24 2001/10/18 23:12:36 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -189,7 +189,6 @@ static struct debugname
 
 static void handler __P((int));
 static void timer   __P((void *));
-static void cleanup __P((void));
 static void restart __P((int));
 static void cleanup __P((void));
 
