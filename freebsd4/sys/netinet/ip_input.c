@@ -515,7 +515,7 @@ pass:
 	 * NATPT (Network Address Translation - Protocol Translation)
 	 */
 	if (natpt_enable) {
-		struct mbuf	*m1 = NULL;
+		struct mbuf *m1 = NULL;
 		struct sockaddr_in6 sa6_src, sa6_dst;
 
 		switch (natpt_in4(m, &m1)) {
