@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.40 2002/02/22 15:02:05 sumikawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.41 2002/03/28 06:51:48 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -669,6 +669,17 @@ natpt_lookForHash(struct pcv *cv, struct tslhash *th, int side)
 
 	ats = TAILQ_FIRST(&th->tslhead);
 	while (ats) {
+		if (cv->ip_p != ats->ip_p) {
+			if ((cv->ip_p == IPPROTO_ICMP)
+			    && (ats->ip_p == IPPROTO_ICMPV6))
+				goto side;
+			if ((cv->ip_p == IPPROTO_ICMPV6)
+			    && (ats->ip_p == IPPROTO_ICMP))
+				goto side;
+			goto next;
+		}
+
+	side:;
 		if (side == NATPT_FROM) {
 			if (cv->sa_family != ats->local.sa_family)
 				goto next;
@@ -698,9 +709,9 @@ natpt_lookForHash(struct pcv *cv, struct tslhash *th, int side)
 				goto next;
 			if ((cv->ip_p == IPPROTO_TCP)
 			    || (cv->ip_p == IPPROTO_UDP)) {
-				if (cv->pyld.tcp6->th_sport != pad->port[0])
+				if (cv->pyld.tcp4->th_sport != pad->port[0])
 					goto next;
-				if (cv->pyld.tcp6->th_dport != pad->port[1])
+				if (cv->pyld.tcp4->th_dport != pad->port[1])
 					goto next;
 			}
 		}
