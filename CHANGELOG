@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1596 2001/03/08 02:18:08 onoe Exp $
+$KAME: CHANGELOG,v 1.1597 2001/03/09 13:36:11 itojun Exp $
 
 <200103>
 2001-03-08  Atsushi Onoe <onoe@sm.sony.co.jp>
@@ -291,6 +291,8 @@ Wed Feb  7 21:35:26 JST 2001  itojun@iijlab.net
 	  checked with SUSv2, XNET 5.2, and Stevens (unix network programming
 	  vol 1 2nd ed) section 5.11.
 	  bsdi3/freebsd[23] needs some other fix here, so they are left behind.
+
+	  NOTE: unix domain socket behavior needs checking.
 
 2001-02-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/usr.sbin/netstat/route.c (p_sockaddr): removed special
