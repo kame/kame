@@ -1,4 +1,4 @@
-/*	$KAME: ip6_id.c,v 1.1 2003/09/06 02:36:48 itojun Exp $	*/
+/*	$KAME: ip6_id.c,v 1.2 2003/09/06 02:47:22 itojun Exp $	*/
 /*	$OpenBSD: ip_id.c,v 1.6 2002/03/15 18:19:52 millert Exp $	*/
 
 /*
@@ -94,9 +94,16 @@
 #include <sys/socket.h>
 
 #include <net/if.h>
+#ifdef __FreeBSD__
+#include <net/route.h>
+#endif
 #include <netinet/in.h>
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
+
+#ifndef INT32_MAX
+#define INT32_MAX	0x7fffffffU
+#endif
 
 struct randomtab {
 	const long	ru_out;	/* Time after wich will be reseeded */
@@ -211,7 +218,11 @@ initid(struct randomtab *p)
 	p->ru_g = pmod(p->ru_gen, j, p->ru_n);
 	p->ru_counter = 0;
 
+#ifdef __FreeBSD__
+	p->ru_reseed = time_second + p->ru_out;
+#else
 	p->ru_reseed = time.tv_sec + p->ru_out;
+#endif
 	p->ru_msb = p->ru_msb == 0x80000000 ? 0 : 0x80000000;
 }
 
@@ -221,7 +232,11 @@ randomid(struct randomtab *p)
 	int i, n;
 	u_int32_t tmp;
 
+#ifdef __FreeBSD__
+	if (p->ru_counter >= p->ru_max || time_second > p->ru_reseed)
+#else
 	if (p->ru_counter >= p->ru_max || time.tv_sec > p->ru_reseed)
+#endif
 		initid(p);
 
 	tmp = arc4random();
