@@ -139,6 +139,7 @@ static struct afd {
 #endif
 
 
+static int str_isnumber __P((const char *));
 static int get_name __P((const char *, struct afd *,
 			  struct addrinfo **, char *, struct addrinfo *,
 			  int));
@@ -146,7 +147,13 @@ static int get_addr __P((const char *, int, struct addrinfo **,
 			struct addrinfo *, int));
 static int get_addr0 __P((const char *, int, struct addrinfo **,
 			struct addrinfo *, int));
-static int str_isnumber __P((const char *));
+static int get_canonname __P((const struct addrinfo *,
+	struct addrinfo *, const char *));
+static struct addrinfo *get_ai __P((const struct addrinfo *,
+	const struct afd *, const char *, const u_short));
+#if 0
+static struct addrinfo *ai_append __P((struct addrinfo *, struct addrinfo *));
+#endif
 	
 static char *ai_errlist[] = {
 	"Success",
@@ -166,46 +173,21 @@ static char *ai_errlist[] = {
 	"Unknown error", 				/* EAI_MAX        */
 };
 
-#define GET_CANONNAME(ai, str) \
-do { \
-	if (pai->ai_flags & AI_CANONNAME) {\
-		if (((ai)->ai_canonname = (char *)malloc(strlen(str) + 1)) \
-				!= NULL) {\
-			strcpy((ai)->ai_canonname, (str));\
-		} else {\
-			error = EAI_MEMORY;\
-			goto free;\
-		}\
-	} \
-} while (0)
-
-#ifdef HAVE_SOCKADDR_SA_LEN
-#define COPY_ADDRLEN(ai, afd) (ai)->ai_addr->sa_len = (ai)->ai_addrlen = (afd)->a_socklen
-#else
-#define COPY_ADDRLEN(ai, afd) (ai)->ai_addrlen = (afd)->a_socklen
-#endif
+/* XXX macros that make external reference is BAD. */
 
 #define GET_AI(ai, afd, addr, port) \
 do { \
-	char *p;\
-	if (((ai) = (struct addrinfo *)malloc(sizeof(struct addrinfo) +\
-					      ((afd)->a_socklen)))\
-	    == NULL) {\
-		error = EAI_MEMORY;\
-		goto free;\
-	}\
-	memcpy(ai, pai, sizeof(struct addrinfo));\
-	(ai)->ai_addr = (struct sockaddr *)((ai) + 1);\
-	memset((ai)->ai_addr, 0, (afd)->a_socklen);\
-	COPY_ADDRLEN(ai, afd);\
-	(ai)->ai_addr->sa_family = (ai)->ai_family = (afd)->a_af;\
-	((struct sockinet *)(ai)->ai_addr)->si_port = port;\
-	p = (char *)((ai)->ai_addr);\
-	memcpy(p + (afd)->a_off, (addr), (afd)->a_addrlen);\
+	/* external reference: pai, error, and label free */ \
+	(ai) = get_ai(pai, (afd), (addr), (port)); \
+	if ((ai) == NULL) { \
+		error = EAI_MEMORY; \
+		goto free; \
+	} \
 } while (0)
 
 #define ERR(err) \
 do { \
+	/* external reference: error, and label bad */ \
 	error = (err); \
 	goto bad; \
 } while (0)
@@ -419,13 +401,13 @@ getaddrinfo(hostname, servname, hints, res)
 			if (pai->ai_flags & AI_PASSIVE) {
 				GET_AI(cur->ai_next, afd, afd->a_addrany, port);
 				/* xxx meaningless?
-				 * GET_CANONNAME(cur->ai_next, "anyaddr");
+				 * get_canonname(pai, cur->ai_next, "anyaddr");
 				 */
 			} else {
 				GET_AI(cur->ai_next, afd, afd->a_loopback,
 					port);
 				/* xxx meaningless?
-				 * GET_CANONNAME(cur->ai_next, "localhost");
+				 * get_canonname(pai, cur->ai_next, "localhost");
 				 */
 			}
 			cur = cur->ai_next;
@@ -575,7 +557,9 @@ get_name(addr, afd, res, numaddr, pai, port0)
 #endif
 	if (hp && hp->h_name && hp->h_name[0] && hp->h_addr_list[0]) {
 		GET_AI(cur, afd, hp->h_addr_list[0], port);
-		GET_CANONNAME(cur, hp->h_name);
+		error = get_canonname(pai, cur, hp->h_name);
+		if (error)
+			goto free;
 	} else
 		GET_AI(cur, afd, numaddr, port);
 	
@@ -763,7 +747,9 @@ get_addr0(hostname, af, res, pai, port0)
 		GET_AI(cur->ai_next, afd, ap, port);
 		if (cur == &sentinel) {
 			top = cur->ai_next;
-			GET_CANONNAME(top, hp->h_name);
+			error = get_canonname(pai, top, hp->h_name);
+			if (error)
+				goto free;
 		}
 		cur = cur->ai_next;
 	}
@@ -783,3 +769,66 @@ get_addr0(hostname, af, res, pai, port0)
 	*res = NULL;
 	return error;
 }
+
+static int
+get_canonname(pai, ai, str)
+	const struct addrinfo *pai;
+	struct addrinfo *ai;
+	const char *str;
+{
+	if ((pai->ai_flags & AI_CANONNAME) != 0) {
+		ai->ai_canonname = (char *)malloc(strlen(str) + 1);
+		if (ai->ai_canonname == NULL)
+			return EAI_MEMORY;
+		strcpy(ai->ai_canonname, str);
+	}
+	return 0;
+}
+
+static struct addrinfo *
+get_ai(pai, afd, addr, port)
+	const struct addrinfo *pai;
+	const struct afd *afd;
+	const char *addr;
+	const u_short port;
+{
+	char *p;
+	struct addrinfo *ai;
+
+	ai = (struct addrinfo *)malloc(sizeof(struct addrinfo)
+		+ (afd->a_socklen));
+	if (ai == NULL)
+		return NULL;
+
+	memcpy(ai, pai, sizeof(struct addrinfo));
+	ai->ai_addr = (struct sockaddr *)(ai + 1);
+	memset(ai->ai_addr, 0, afd->a_socklen);
+#ifdef HAVE_SOCKADDR_SA_LEN
+	ai->ai_addr->sa_len = afd->a_socklen;
+#endif
+	ai->ai_addrlen = afd->a_socklen;
+	ai->ai_addr->sa_family = ai->ai_family = afd->a_af;
+	((struct sockinet *)ai->ai_addr)->si_port = port;
+	p = (char *)(ai->ai_addr);
+	memcpy(p + afd->a_off, addr, afd->a_addrlen);
+	return ai;
+}
+
+#if 0
+static struct addrinfo *
+ai_append(a, b)
+	struct addrinfo *a;
+	struct addrinfo *b;
+{
+	struct addrinfo *p;
+
+	for (p = a; p && p->ai_next; p = p->ai_next)
+		;
+	if (p == NULL)
+		return b;
+	else {
+		p->ai_next = b;
+		return a;
+	}
+}
+#endif
