@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.75 2000/07/09 04:22:58 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.76 2000/07/09 04:27:26 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -293,7 +293,7 @@ str_isnumber(p)
 
 	ep = NULL;
 	(void)strtoul(p, &ep, 10);
-	if (ep && *ep == '\0')
+	if (*p != '\0' && ep && *ep == '\0')
 		return YES;
 	else
 		return NO;
