@@ -1,4 +1,4 @@
-/*	$KAME: mtrace6.c,v 1.21 2003/09/23 11:03:20 itojun Exp $	*/
+/*	$KAME: mtrace6.c,v 1.22 2003/09/23 11:06:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -52,9 +52,7 @@
 #include <stdlib.h>
 #include <netdb.h>
 #include <err.h>
-#ifdef HAVE_GETIFADDRS
 #include <ifaddrs.h>
-#endif
 
 #include "trace.h"
 
@@ -73,11 +71,12 @@ static void mtrace_loop __P((void));
 static char *str_rflags __P((int));
 static void show_ip6_result __P((struct sockaddr_in6 *, int));
 static void show_result __P((struct sockaddr *, int));
-static void set_sockaddr __P((char *, struct addrinfo *, struct sockaddr *));
+static void set_sockaddr __P((char *, struct addrinfo *, struct sockaddr *,
+	size_t));
 static int is_multicast __P((struct sockaddr *));
 static char *all_routers_str __P((int));
 static int ip6_validaddr __P((char *, struct sockaddr_in6 *));
-static int get_my_sockaddr __P((int, struct sockaddr *));
+static int get_my_sockaddr __P((int, struct sockaddr *, size_t));
 static void set_hlim __P((int, struct sockaddr *, int));
 static void set_join __P((int, char *, struct sockaddr *));
 static void set_filter __P((int, int));
@@ -384,10 +383,11 @@ show_result(from, datalen)
 }
 
 static void
-set_sockaddr(addrname, hints, sap)
+set_sockaddr(addrname, hints, sap, l)
 	char *addrname;
 	struct addrinfo *hints;
 	struct sockaddr *sap;
+	size_t l;
 {
 	struct addrinfo *res;
 	int ret_ga;
@@ -397,6 +397,8 @@ set_sockaddr(addrname, hints, sap)
 		errx(1, "getaddrinfo faild: %s", gai_strerror(ret_ga));
 	if (!res->ai_addr)
 		errx(1, "getaddrinfo failed");
+	if (res->ai_addrlen > l)
+		errx(1, "sockaddr too big");
 	memcpy((void *)sap, (void *)res->ai_addr, res->ai_addr->sa_len);
 
 	freeaddrinfo(res);
@@ -469,11 +471,11 @@ ip6_validaddr(ifname, addr)
 }
 
 static int
-get_my_sockaddr(family, addrp)
+get_my_sockaddr(family, addrp, l)
 	int family;
 	struct sockaddr *addrp;
+	size_t l;
 {
-#ifdef HAVE_GETIFADDRS
 	struct ifaddrs *ifap, *ifa;
 
 	if (getifaddrs(&ifap) != 0) {
@@ -483,6 +485,8 @@ get_my_sockaddr(family, addrp)
 
 	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
 		if (ifa->ifa_addr->sa_family != family)
+			continue;
+		if (ifa->ifa_addr->sa_len > l)
 			continue;
 		switch(family) {
 		case AF_INET6:
@@ -499,49 +503,6 @@ get_my_sockaddr(family, addrp)
 	memcpy((void *)addrp, (void *)ifa->ifa_addr, ifa->ifa_addr->sa_len);
 	freeifaddrs(ifap);
 	return (0);
-#else
-#define IF_BUFSIZE 8192		/* XXX: adhoc...should be customizable? */
-	int i, s;
-	struct ifconf ifconf;
-	struct ifreq *ifrp;
-	static char ifbuf[IF_BUFSIZE];
-
-	if ((s = socket(family, SOCK_DGRAM, 0)) < 0)
-		err(1, "socket");
-
-	ifconf.ifc_buf = ifbuf;
-	ifconf.ifc_len = sizeof(ifbuf);
-
-	if (ioctl(s, SIOCGIFCONF, (char *)&ifconf) < 0)
-		err(1, "ioctl(SIOCGIFCONF)");
-	close(s);
-
-	for (i = 0; i < ifconf.ifc_len; ) {
-		ifrp = (struct ifreq *)(ifbuf + i);
-		if (ifrp->ifr_addr.sa_family == family) {
-			switch(family) {
-			case AF_INET6:
-				if (ip6_validaddr(ifrp->ifr_name,
-						  (struct sockaddr_in6 *)&ifrp->ifr_addr))
-					goto found;
-			}
-		}
-
-		i += IFNAMSIZ;
-		/* i += max(sizeof(sockaddr), ifr_addr.sa_len) */
-		if (ifrp->ifr_addr.sa_len > sizeof(struct sockaddr))
-			i += ifrp->ifr_addr.sa_len;
-		else
-			i += sizeof(struct sockaddr);
-	}
-
-	return(-1);		/* not found */
-
-  found:
-	memcpy((void *)addrp, (void *)&ifrp->ifr_addr, ifrp->ifr_addr.sa_len);
-	return(0);
-#undef IF_BUFSIZE	
-#endif
 }
 
 static void
@@ -620,43 +581,43 @@ open_socket()
 
 	/* multicast group(must be specified) */
 	grp_sock = (struct sockaddr *)&grp_ss;
-	set_sockaddr(group, &hints, grp_sock);
+	set_sockaddr(group, &hints, grp_sock, sizeof(grp_ss));
 	if (!is_multicast(grp_sock))
 		errx(1, "group(%s) is not a multicast address", group);
 
 	/* multicast source(must be specified) */
 	src_sock = (struct sockaddr *)&src_ss;
-	set_sockaddr(source, &hints, src_sock);
+	set_sockaddr(source, &hints, src_sock, sizeof(src_ss));
 	if (is_multicast(src_sock))
 		errx(1, "source(%s) is not a unicast address", source);
 
 	/* last hop gateway for the destination(if specified) */
 	gw_sock = (struct sockaddr *)&gw_ss;
 	if (gateway)		/* can be either multicast or unicast */
-		set_sockaddr(gateway, &hints, gw_sock);
+		set_sockaddr(gateway, &hints, gw_sock, sizeof(gw_ss));
 	else {
 		char *r = all_routers_str(grp_sock->sa_family);
 
-		set_sockaddr(r, &hints, gw_sock);
+		set_sockaddr(r, &hints, gw_sock, sizeof(gw_ss));
 	}
 
 	/* destination address for the trace */
 	dst_sock = (struct sockaddr *)&dst_ss;
 	if (destination) {
-		set_sockaddr(destination, &hints, dst_sock);
+		set_sockaddr(destination, &hints, dst_sock, sizeof(dst_ss));
 		if (is_multicast(dst_sock))
 			errx(1, "destination(%s) is not a unicast address",
 			     destination);
 	}
 	else {
 		/* XXX: consider interface? */
-		get_my_sockaddr(grp_sock->sa_family, dst_sock);
+		get_my_sockaddr(grp_sock->sa_family, dst_sock, sizeof(dst_ss));
 	}
 
 	/* response receiver(if specified) */
 	rcv_sock = (struct sockaddr *)&rcv_ss;
 	if (receiver) {		/* can be either multicast or unicast */
-		set_sockaddr(receiver, &hints, rcv_sock);
+		set_sockaddr(receiver, &hints, rcv_sock, sizeof(rcv_ss));
 		if (is_multicast(rcv_sock) &&
 		    intface == NULL) {
 #ifdef notyet
@@ -671,7 +632,7 @@ open_socket()
 	}
 	else {
 		/* XXX: consider interface? */
-		get_my_sockaddr(grp_sock->sa_family, rcv_sock);
+		get_my_sockaddr(grp_sock->sa_family, rcv_sock, sizeof(rcv_ss));
 	}
 
 	if ((mldsoc = socket(hints.ai_family, hints.ai_socktype,
