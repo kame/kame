@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.101 2002/01/18 02:03:24 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.102 2002/01/20 09:00:19 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -758,11 +758,13 @@ in6_selectroute(dstsock, opts, mopts, ro, retifp, retrt, clone)
 
 	/*
 	 * Use a cached route if it exists and is valid, else try to allocate
-	 * a new one.
+	 * a new one.  Note that we should check the address family of the
+	 * cached destination, in case of sharing the cache with IPv4. 
 	 */
 	if (ro) {
 		if (ro->ro_rt &&
 		    (!(ro->ro_rt->rt_flags & RTF_UP) ||
+		     ro->ro_dst.sa_family != AF_INET6 || 
 		     !IN6_ARE_ADDR_EQUAL(&satosin6(&ro->ro_dst)->sin6_addr,
 					dst))) {
 			RTFREE(ro->ro_rt);
