@@ -16,6 +16,8 @@ vs bluesteel
 	transport やろうとしたら敵が tunnel mode をネゴってた。
 	tunnel の時は敵が内側のアドレスを間違ってた。
 	と言う分けで OK.
+	phase 1: pre-shared/md5/des/dh1/10min
+	phase 2: esp/md5/des/10min
 
 	やっぱりネゴったポリシを突っ込む方が楽っす…
 
@@ -87,6 +89,26 @@ vs network associates
 vs intel
 	base mode: initiator/responder共に敵がHASHの計算間違っているらしい。
 		再戦予定。
+
+vs freeswan
+	group 5: phase1 ok.
+	phase2 で PFS してるのに KE が出ない時がある。
+	大量にracoon.conf書いて起動すると落ちずにパースに失敗する時がある。
+	結果、変な値が入る時がある。KEが出ないのはこのせい。
+
+	racoon.conf を少なめにして再挑戦。
+	今度は KE 出したのに失敗。
+	freeswan は informational exchange しないので、何が起きたかわからない。
+
+	phase2 のproposalを6個書いたら SPI=0 で出していた。
+	とりあえず少なめに書いて再挑戦。
+
+	phase2 でPFSを使った時は SA の group description を
+	書かないとエラーになる。
+
+	治してok. thanx hugh!
+	phase1: psk/sha1/3des/dh5/10min
+	phase2: esp/3des/md5/dh1/10min
 
 テストするには
 	psk.txtにエントリ追加。
