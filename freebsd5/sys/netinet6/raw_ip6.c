@@ -230,6 +230,7 @@ docontinue:
 #endif /*IPSEC*/
 		ip6stat.ip6s_delivered--;
 		/* do not inject data into pcb */
+		INP_UNLOCK(last);
 	} else
 #endif /*IPSEC || FAST_IPSEC*/
 	if (last) {
@@ -767,6 +768,7 @@ rip6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 			return ENOTCONN;
 		}
 		if (nam->sa_len != sizeof(struct sockaddr_in6)) {
+			INP_INFO_WUNLOCK(&ripcbinfo);
 			m_freem(m);
 			return(EINVAL);
 		}
@@ -782,10 +784,12 @@ rip6_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *nam,
 			    "unspec. Assume AF_INET6\n");
 			dst->sin6_family = AF_INET6;
 		} else if (dst->sin6_family != AF_INET6) {
+			INP_INFO_WUNLOCK(&ripcbinfo);
 			m_freem(m);
 			return(EAFNOSUPPORT);
 		}
 		if ((error = scope6_check_id(dst, ip6_use_defzone)) != 0) {
+			INP_INFO_WUNLOCK(&ripcbinfo);
 			m_freem(m);
 			return(error);
 		}
