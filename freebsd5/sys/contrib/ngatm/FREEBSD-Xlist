@@ -1,0 +1,15 @@
+#$FreeBSD: src/sys/contrib/ngatm/FREEBSD-Xlist,v 1.1 2004/08/11 12:25:09 harti Exp $
+*/README
+*/VERSION
+*/Makefile.in
+*/Makefile.pre
+*/Makefile.post
+*/aclocal.m4
+*/config
+*/configure
+*/configure.ac
+*/libngatm
+*/man
+*/snmp_atm
+*/snmp_ilmid
+*/sscop
