@@ -151,6 +151,7 @@ void plist __P((void));
 void pfx_flush __P((void));
 void rtr_flush __P((void));
 void harmonize_rtr __P((void));
+static void setdefif __P((char *));
 static char *sec2str __P((time_t t));
 static char *ether_str __P((struct sockaddr_dl *sdl));
 static void ts_print __P((const struct timeval *));
@@ -168,7 +169,7 @@ main(argc, argv)
 
 	pid = getpid();
 	thiszone = gmt2local(0);
-	while ((ch = getopt(argc, argv, "acndfilprstA:HPR")) != EOF)
+	while ((ch = getopt(argc, argv, "acndfI:ilprstA:HPR")) != EOF)
 		switch ((char)ch) {
 		case 'a':
 			aflag = 1;
@@ -180,6 +181,9 @@ main(argc, argv)
 		case 'd':
 			dflag = 1;
 			break;
+		case 'I':
+			setdefif(optarg);
+			exit(0);
 		case 'i' :
 			if (argc != 3)
 				usage();
@@ -981,6 +985,8 @@ rtr_flush()
 	strcpy(dummyif, "lo0"); /* dummy */
 	if (ioctl(s, SIOCSRTRFLUSH_IN6, (caddr_t)&dummyif) < 0)
  		err(1, "ioctl(SIOCSRTRFLUSH_IN6)");
+
+	close(s);
 }
 
 void
@@ -989,15 +995,28 @@ harmonize_rtr()
 	char dummyif[IFNAMSIZ+8];
 	int s;
 
-	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) {
-		perror("ndp: socket");
-		exit(1);
-	}
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
+		err(1, "ndp: socket");
 	strcpy(dummyif, "lo0"); /* dummy */
-	if (ioctl(s, SIOCSNDFLUSH_IN6, (caddr_t)&dummyif) < 0) {
- 		perror("ioctl (SIOCSNDFLUSH_IN6)");
- 		exit(1);
- 	}
+	if (ioctl(s, SIOCSNDFLUSH_IN6, (caddr_t)&dummyif) < 0)
+ 		err(1, "ioctl (SIOCSNDFLUSH_IN6)");
+
+	close(s);
+}
+
+static void
+setdefif(ifname)
+	char *ifname;
+{
+	int s;
+
+	if ((s = socket(AF_INET6, SOCK_DGRAM, 0)) < 0) 
+		err(1, "ndp: socket");
+
+	if (ioctl(s, SIOCSDEFIFACE_IN6, (caddr_t)ifname) < 0)
+ 		err(1, "ioctl (SIOCSDEFIFACE_IN6)");
+
+	close(s);
 }
 
 static char *
