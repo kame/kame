@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.321 2003/06/30 05:39:29 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.322 2003/06/30 07:59:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -441,6 +441,7 @@ ip6_input(m)
 	struct mbuf *m0;
 	int rv;
 #endif  /* PFIL_HOOKS */
+	int srcrt = 0;
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
 	/*
@@ -554,12 +555,16 @@ ip6_input(m)
 	if (1)
 #endif
 	{
+		struct in6_addr odst;
+
+		odst = ip6->ip6_dst;
 		if (pf_test6(PF_IN, m->m_pkthdr.rcvif, &m) != PF_PASS)
 			goto bad;
 		if (m == NULL)
 			return;
 
 		ip6 = mtod(m, struct ip6_hdr *);
+		srcrt = !IN6_ARE_ADDR_EQUAL(&odst, &ip6->ip6_dst);
 	}
 #endif
 
@@ -582,12 +587,16 @@ ip6_input(m)
 	if (1)
 #endif
 	{
+		struct in6_addr odst;
+
+		odst = ip6->ip6_dst;
 		if (pfil_run_hooks(&inet6_pfil_hook, &m, m->m_pkthdr.rcvif,
 				   PFIL_IN) != 0)
 			return;
 		if (m == NULL)
 			return;
 		ip6 = mtod(m, struct ip6_hdr *);
+		srcrt = !IN6_ARE_ADDR_EQUAL(&odst, &ip6->ip6_dst);
 	}
 #elif defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	m0 = m;
@@ -1163,7 +1172,7 @@ ip6_input(m)
 			return;
 		}
 	} else if (!ours) {
-		ip6_forward(m, 0);
+		ip6_forward(m, srcrt);
 		return;
 	}
 
