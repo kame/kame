@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.111 2002/09/25 11:41:24 itojun Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.112 2002/09/27 09:21:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -170,6 +170,19 @@ ip6_forward(m, srcrt)
 	}
 
 #ifdef IPSEC
+#ifdef MIP6
+	/* XXX skip integrity check if the next hop is me. */
+    {
+	struct in6_ifaddr *ia;
+
+	for (ia = in6_ifaddr; ia; ia = ia->ia_next) {
+		if ((ia->ia6_flags & IN6_IFF_NOTREADY) == 0 &&
+		    IN6_ARE_ADDR_EQUAL(&ia->ia_addr.sin6_addr,
+			&sa6_dst->sin6_addr))
+			goto skip_ipsec6_in_reject;
+	}
+    }
+#endif
 	/*
 	 * Check AH/ESP integrity.
 	 */
@@ -182,6 +195,9 @@ ip6_forward(m, srcrt)
 		m_freem(m);
 		return;
 	}
+#ifdef MIP6
+ skip_ipsec6_in_reject:
+#endif
 #endif /* IPSEC */
 
 	/*

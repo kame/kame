@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.336 2002/09/25 13:18:23 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.337 2002/09/27 09:21:24 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -746,6 +746,7 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 	    {
 		struct ip6_rthdr *rh = NULL;
 		int segleft_org = 0;
+		int segleft2_org = 0;
 		struct ipsec_output_state state;
 
 		if (exthdrs.ip6e_rthdr) {
@@ -753,6 +754,13 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			segleft_org = rh->ip6r_segleft;
 			rh->ip6r_segleft = 0;
 		}
+#ifdef MIP6
+		if (exthdrs.ip6e_rthdr2) {
+			rh = mtod(exthdrs.ip6e_rthdr2, struct ip6_rthdr *);
+			segleft2_org = rh->ip6r_segleft;
+			rh->ip6r_segleft = 0;
+		}
+#endif /* MIP6 */
 
 		bzero(&state, sizeof(state));
 		state.m = m;
@@ -783,6 +791,12 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 			/* ah6_output doesn't modify mbuf chain */
 			rh->ip6r_segleft = segleft_org;
 		}
+#ifdef MIP6
+		if (exthdrs.ip6e_rthdr2) {
+			/* ah6_output doesn't modify mbuf chain */
+			rh->ip6r_segleft = segleft2_org;
+		}
+#endif /* MIP6 */
 	    }
 skip_ipsec2:;
 #endif
@@ -791,7 +805,7 @@ skip_ipsec2:;
 #ifdef MIP6
 	if ((flags & IPV6_FORWARDING) == 0) {
 		/*
-		 * After the IPsec processing the IPv6 header source
+		 * after the IPsec processing, the IPv6 header source
 		 * address (this is the homeaddress of this node) and
 		 * the address currently stored in the Home Address
 		 * destination option (this is the coa of this node)
