@@ -433,7 +433,7 @@ tcp_respond(tp, iph, th, m, ack, seq, flags, isipv6)
 #endif /*IPSEC*/
 #ifdef INET6
 	if (isipv6) {
-		(void)ip6_output(m, NULL, ro6, 0, NULL);
+		(void)ip6_output(m, NULL, ro6, 0, NULL, NULL);
 		if (ro6 == &sro6 && ro6->ro_rt)
 			RTFREE(ro6->ro_rt);
 	} else {

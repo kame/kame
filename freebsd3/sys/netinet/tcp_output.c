@@ -873,7 +873,7 @@ send:
 			    tp->t_inpcb->in6p_outputopts,
 			    &tp->t_inpcb->in6p_route,
 			    (so->so_options & SO_DONTROUTE) /* | IP6_DONTFRAG */,
-			    NULL);
+			    NULL, NULL);
 	} else
 #endif /* INET6 */
 	{
