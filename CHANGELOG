@@ -1,11 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1073 2000/06/29 01:19:40 itojun Exp $
+$Id: CHANGELOG,v 1.1074 2000/06/29 01:36:16 itojun Exp $
 
 <200006>
 Thu Jun 29 10:14:47 JST 2000  itojun@iijlab.net
-	* faithd/faithd.c: be more careful about arg to syslog(3), to
-	  prevent possible buffer overrun.  From: deraadt@openbsd.org
+	* faithd/faithd.c, natptd/main.c, natptlog/natptlog.c: be more careful
+	  about arg to syslog(3), to prevent possible buffer overrun.
+	  From: deraadt@openbsd.org
 
 2000-06-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: several minor improvements:
