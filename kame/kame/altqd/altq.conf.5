@@ -1,4 +1,4 @@
-.\"	$KAME: altq.conf.5,v 1.13 2002/10/26 06:59:54 kjc Exp $
+.\"	$KAME: altq.conf.5,v 1.14 2002/11/08 06:35:01 kjc Exp $
 .\"
 .\" Copyright (C) 2000
 .\" Sony Computer Science Laboratories Inc.  All rights reserved.
@@ -455,6 +455,8 @@ first.
 If no packet is eligible for real-time scheduling, link-sharing
 scheduling is performed.
 HFSC does not use class hierarchy for real-time scheduling.
+Additionally, an upper-limit service curve can be specified for
+link-sharing to set the upper limit allowed for the class.
 .Bl -tag -width interface -offset indent
 .It Cm interface
 .Ar if_name
@@ -486,8 +488,11 @@ for HFSC.
 .Op Bq Cm sc Ar m1 d m2
 .Op Bq Cm rt Ar m1 d m2
 .Op Bq Cm ls Ar m1 d m2
+.Op Bq Cm ul Ar m1 d m2
 .Op Cm pshare Ar percent
 .Op Cm grate Ar bps
+.Op Cm bandwidth Ar bps
+.Op Cm ulimit Ar bps
 .Op Cm default
 .Op Cm qlimit Ar count
 .Op Cm red|rio
@@ -507,15 +512,19 @@ Service curves are specified by
 .Bq Ar type Ar m1 d m2 .
 .Ar type
 should be either
-.Cm sc, rt
+.Cm sc, rt, ls
 or
-.Cm ls .
+.Cm ul .
 .Cm sc
-(service curve) is used to set the same values to both service curves.
+(service curve) is used to set the same values to both real-time and
+link-sharing service curves.
 .Cm rt
 (real-time) is used to specify the real-time service curve.
 .Cm ls
 (link-sharing) is used to specify the link-sharing service curve.
+.Cm ul
+(upper-limit) is used to specify the upper-limit service curve for
+link-sharing.
 .Ar m1
 is the slope of the first segment specified in bits-per-second.
 .Ar d
@@ -564,6 +573,14 @@ Guaranteed rate.
 This specifies a linear real-time service curve.
 It is a short hand of
 .Li [rt 0 0 bps] .
+.It Cm bandwidth
+This is a short hand of
+.Li [sc 0 0 bps] .
+.It Cm ulimit
+Upper limit rate.
+This specifies a upper-limit service curve.
+It is a short hand of
+.Li [ul 0 0 bps] .
 .It Cm default
 Specify the default class.
 When this keyword is present, all packets that do not match some
@@ -1242,6 +1259,27 @@ class hfsc pvc0 pitt_other pitt  pshare 20 grate 10M
         filter pvc0 pitt_other  0 0 136.142.0.0  netmask 0xffff0000 0 0
 class hfsc pvc0 pitt_cs    pitt  pshare 20 grate  5M
         filter pvc0 pitt_cs     0 0 136.142.79.0 netmask 0xffffff00 0 0
+.Ed
+.Ss HFSC Example (simpler one with ulimit)
+.Bd -literal
+#
+interface fxp0 bandwidth 90M hfsc
+# reserve 20% for default class
+class hfsc fxp0 def_class root pshare 20 default
+# shared class for TCP and UDP
+class hfsc fxp0 shared_class root bandwidth 72M
+# shared class for all TCP
+class hfsc fxp0 tcp_shared shared_class bandwidth 40M ulimit 60M
+# generic tcp
+class hfsc fxp0 tcp_class tcp_shared bandwidth 15M ulimit 50M
+	filter fxp0 tcp_class 0 0 0 0 6
+# http
+class hfsc fxp0 http_class tcp_shared bandwidth 25M ulimit 40M
+	filter fxp0 http_class 0 80 0 0 6
+	filter fxp0 http_class 0 0 0 80 6
+# udp
+class hfsc fxp0 udp_class shared_class bandwidth 15M ulimit 20M
+	filter fxp0 udp_class 0 0 0 0 17
 .Ed
 .Ss PRIQ Example
 .Bd -literal

@@ -1,4 +1,4 @@
-/*	$KAME: qdisc_hfsc.c,v 1.5 2002/10/27 03:19:36 kjc Exp $	*/
+/*	$KAME: qdisc_hfsc.c,v 1.6 2002/11/08 06:35:00 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -60,6 +60,8 @@ hfsc_stat_loop(int fd, const char *ifname, int count, int interval)
 	double			sec;
 	int			cnt = count;
 	sigset_t		omask;
+	u_int64_t		stattime;
+	u_int32_t		machclk_freq;
 	
 	strlcpy(get_stats.iface.hfsc_ifname, ifname,
 		sizeof(get_stats.iface.hfsc_ifname));
@@ -81,9 +83,11 @@ hfsc_stat_loop(int fd, const char *ifname, int count, int interval)
 		gettimeofday(&cur_time, NULL);
 		sec = calc_interval(&cur_time, &last_time);
 
+		stattime = get_stats.cur_time;
+		machclk_freq = get_stats.machclk_freq;
 		printf("\ncur_time:%#llx %u classes %u packets in the tree\n",
-		       (ull)get_stats.cur_time,
-		       get_stats.hif_classes, get_stats.hif_packets);
+		    (ull)stattime,
+		    get_stats.hif_classes, get_stats.hif_packets);
 
 		for (i=0; i<get_stats.nclasses; i++) {
 			sp = &new[i];
@@ -95,26 +99,48 @@ hfsc_stat_loop(int fd, const char *ifname, int count, int interval)
 				continue;
 			}
 
-			printf("[%2d %s] handle:%#lx [rt %s %ums %s][ls %s %ums %s]\n",
+			printf("[%2d %s] handle:%#lx [rt %s %ums %s][ls %s %ums %s]",
 			       sp->class_id, clnames[i], sp->class_handle,
 			       rate2str((double)sp->rsc.m1), sp->rsc.d,
 			       rate2str((double)sp->rsc.m2),
 			       rate2str((double)sp->fsc.m1), sp->fsc.d,
 			       rate2str((double)sp->fsc.m2));
+			if (sp->usc.m1 != 0 || sp->usc.m2 != 0)
+				printf("[ul %s %ums %s]\n",
+				       rate2str((double)sp->usc.m1), sp->usc.d,
+				       rate2str((double)sp->usc.m2));
+			else
+				 printf("\n");
 			printf("  measured: %sbps [rt:%s ls:%s] qlen:%2d period:%u\n",
 			       rate2str(calc_rate(sp->total, lp->total, sec)),
 			       rate2str(calc_rate(sp->cumul, lp->cumul, sec)),
 			       rate2str(calc_rate(sp->total - sp->cumul,
 						  lp->total - lp->cumul, sec)),
 			       sp->qlength, sp->period);
-			printf("     packets:%llu (%llu bytes) drops:%llu\n",
+			printf("     packets:%llu (%llu bytes) drops:%llu (%llu bytes) \n",
 			       (ull)sp->xmit_cnt.packets,
 			       (ull)sp->xmit_cnt.bytes,
-			       (ull)sp->drop_cnt.packets);
+			       (ull)sp->drop_cnt.packets,
+			       (ull)sp->drop_cnt.bytes);
 			printf("     cumul:%#llx total:%#llx\n",
 			       (ull)sp->cumul, (ull)sp->total);
-			printf("     vt:%#llx d:%#llx e:%#llx\n",
-			       (ull)sp->vt, (ull)sp->d, (ull)sp->e);
+			printf("     e:%.2fus d:%.2fus f:%.2fus vt:%#llx\n",
+			    sp->e == 0 ? 0 : ((double)sp->e - (double)stattime)
+			    		     / machclk_freq * 1000000,
+			    sp->d == 0 ? 0 : ((double)sp->d - (double)stattime)
+			    		     / machclk_freq * 1000000,
+			    sp->f == 0 ? 0 : ((double)sp->f - (double)stattime)
+			    		     / machclk_freq * 1000000,
+			    (ull)sp->vt);
+			printf("     vtperiod:%u parentperiod:%u nactive:%d\n",
+			    sp->vtperiod, sp->parentperiod, sp->nactive);
+			printf("     initvt:%#llx cvtmax:%#llx vtoff:%#llx\n",
+			    (ull)sp->initvt, (ull)sp->cvtmax, (ull)sp->vtoff);
+
+			printf("     myf:%#llx cfmin:%#llx cvtmin:%#llx",
+			    (ull)sp->myf, (ull)sp->cfmin, (ull)sp->cvtmin);
+			printf(" myfadj:%#llx vtadj:%#llx\n",
+			    (ull)sp->myfadj, (ull)sp->vtadj);
 			if (sp->qtype == Q_RED)
 				print_redstats(sp->red);
 			else if (sp->qtype == Q_RIO)
