@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.140 2004/11/28 10:48:38 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.141 2004/11/28 11:29:36 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2069,7 +2069,7 @@ server6_send(type, ifp, origmsg, optinfo, from, fromlen,
 	dh6->dh6_msgtype = (u_int8_t)type;
 
 	/* set options in the reply message */
-	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),
+	if ((optlen = dhcp6_set_options(type, (struct dhcp6opt *)(dh6 + 1),
 	    (struct dhcp6opt *)(replybuf + sizeof(replybuf)), roptinfo)) < 0) {
 		dprintf(LOG_INFO, FNAME, "failed to construct reply options");
 		return (-1);
@@ -2129,7 +2129,7 @@ server6_send(type, ifp, origmsg, optinfo, from, fromlen,
 		    sizeof (dh6relay->dh6relay_peeraddr));
 
 		len = sizeof(*dh6relay);
-		if ((optlen = dhcp6_set_options(
+		if ((optlen = dhcp6_set_options(DH6_RELAY_REPLY,
 		    (struct dhcp6opt *)(dh6relay + 1),
 		    (struct dhcp6opt *)(replybuf + sizeof(replybuf)),
 		    &relayopt)) < 0) {

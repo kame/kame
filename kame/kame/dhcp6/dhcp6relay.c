@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6relay.c,v 1.50 2004/05/13 13:28:13 jinmei Exp $	*/
+/*	$KAME: dhcp6relay.c,v 1.51 2004/11/28 11:29:36 jinmei Exp $	*/
 /*
  * Copyright (C) 2000 WIDE Project.
  * All rights reserved.
@@ -746,7 +746,8 @@ relay_to_server(dh6, len, from, ifname, ifid)
 	}
 
 	relaylen = sizeof (*dh6relay);
-	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6relay + 1),
+	if ((optlen = dhcp6_set_options(DH6_RELAY_FORW,
+	    (struct dhcp6opt *)(dh6relay + 1),
 	    (struct dhcp6opt *)(relaybuf + sizeof (relaybuf)),
 	    &optinfo)) < 0) {
 		dprintf(LOG_INFO, FNAME,

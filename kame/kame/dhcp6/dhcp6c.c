@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.148 2004/11/28 10:52:19 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.149 2004/11/28 11:29:36 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1298,7 +1298,8 @@ client6_send(ev)
 	}
 
 	/* set options in the message */
-	if ((optlen = dhcp6_set_options((struct dhcp6opt *)(dh6 + 1),
+	if ((optlen = dhcp6_set_options(dh6->dh6_msgtype,
+	    (struct dhcp6opt *)(dh6 + 1),
 	    (struct dhcp6opt *)(buf + sizeof(buf)), &optinfo)) < 0) {
 		dprintf(LOG_INFO, FNAME, "failed to construct options");
 		goto end;

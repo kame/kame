@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.119 2004/11/28 10:48:38 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.120 2004/11/28 11:29:36 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1898,7 +1898,8 @@ copy_option(type, len, val, optp, ep, totallenp)
 }
 
 int
-dhcp6_set_options(optbp, optep, optinfo)
+dhcp6_set_options(type, optbp, optep, optinfo)
+	int type;
 	struct dhcp6opt *optbp, *optep;
 	struct dhcp6_optinfo *optinfo;
 {
@@ -1961,21 +1962,38 @@ dhcp6_set_options(optbp, optep, optinfo)
 	if (!TAILQ_EMPTY(&optinfo->reqopt_list)) {
 		struct dhcp6_listval *opt;
 		u_int16_t *valp;
+		int buflen;
 
 		tmpbuf = NULL;
-		optlen = dhcp6_count_list(&optinfo->reqopt_list) *
+		buflen = dhcp6_count_list(&optinfo->reqopt_list) *
 			sizeof(u_int16_t);
-		if ((tmpbuf = malloc(optlen)) == NULL) {
+		if ((tmpbuf = malloc(buflen)) == NULL) {
 			dprintf(LOG_ERR, FNAME,
 			    "memory allocation failed for options");
 			goto fail;
 		}
+		optlen = 0;
 		valp = (u_int16_t *)tmpbuf;
 		for (opt = TAILQ_FIRST(&optinfo->reqopt_list); opt;
-		     opt = TAILQ_NEXT(opt, link), valp++) {
+		     opt = TAILQ_NEXT(opt, link)) {
+			/*
+			 * Information request option can only be specified
+			 * in information-request messages.
+			 * [draft-ietf-dhc-lifetime-02.txt, Section 3.2]
+			 */
+			if (opt->val_num == DH6OPT_REFRESHTIME &&
+			    type != DH6_INFORM_REQ) {
+				dprintf(LOG_DEBUG, FNAME,
+				    "refresh time option is not requested "
+				    "for %s", dhcp6msgstr(type));
+			}
+
 			*valp = htons((u_int16_t)opt->val_num);
+			valp++;
+			optlen += sizeof(u_int16_t);
 		}
-		if (copy_option(DH6OPT_ORO, optlen, tmpbuf, &p,
+		if (optlen > 0 &&
+		    copy_option(DH6OPT_ORO, optlen, tmpbuf, &p,
 		    optep, &len) != 0) {
 			goto fail;
 		}

@@ -1,4 +1,4 @@
-/*	$KAME: common.h,v 1.39 2004/06/12 10:43:33 jinmei Exp $	*/
+/*	$KAME: common.h,v 1.40 2004/11/28 11:29:36 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -89,7 +89,7 @@ extern int dhcp6_copy_options __P((struct dhcp6_optinfo *,
 				   struct dhcp6_optinfo *));
 extern int dhcp6_get_options __P((struct dhcp6opt *, struct dhcp6opt *,
 				  struct dhcp6_optinfo *));
-extern int dhcp6_set_options __P((struct dhcp6opt *, struct dhcp6opt *,
+extern int dhcp6_set_options __P((int, struct dhcp6opt *, struct dhcp6opt *,
 				  struct dhcp6_optinfo *));
 extern void dhcp6_set_timeoparam __P((struct dhcp6_event *));
 extern void dhcp6_reset_timer __P((struct dhcp6_event *));
