@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.14 2000/11/11 03:53:56 itojun Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.15 2000/11/11 03:54:51 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -34,7 +34,7 @@
 .Nm rtadvd.conf
 .Nd config file for router advertisement daemon
 .Sh DESCRIPTION
-This file describes how the router advertisement packet must be constructed
+This file describes how the router advertisement packets must be constructed
 for each of the interfaces.
 As described in
 .Xr rtadvd 8 ,
@@ -88,10 +88,10 @@ and no greater than 1800 seconds.
 router advertisements
 .Pq unit: seconds .
 The default value is the one third of value of
-.Ic maxinterval .
+.Cm maxinterval .
 Its value must be no less than 3 seconds and no greater than .75 *
 the value of
-.Ic maxinterval .
+.Cm maxinterval .
 .El
 .Pp
 The following items are for ICMPv6 router advertisement message
