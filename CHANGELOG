@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1869 2001/09/11 08:00:43 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1870 2001/09/12 07:20:37 sakane Exp $
 
 <200109>
+Wed Sep 12 16:19:42 JST 2001 sakane@kame.net
+	* kame/racoon/proposal.c:
+	fixed to compare pfs values in two proposals in the case of
+	"claim" mode.  reported by <vanhu@free.fr>
+
 2001-09-03 Shin'ichi Fujisawa	<fujisawa@kame.net>
 	* kame/sys/netinet6/natpt_{rule.h,trans.c,var.h}:
 	- Support tftp translation.  Tftp6 client can connect to tftp4
