@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.131 2000/06/15 12:20:50 sakane Exp $	*/
+/*	$KAME: key.c,v 1.132 2000/06/15 13:41:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -446,7 +446,9 @@ static int key_delete __P((struct socket *, struct mbuf *,
 static int key_get __P((struct socket *, struct mbuf *,
 	const struct sadb_msghdr *));
 
+#ifdef IPSEC_ESP
 static struct mbuf *key_getcomb_esp __P((void));
+#endif
 static struct mbuf *key_getcomb_ah __P((void));
 static struct mbuf *key_getprop __P((const struct secasindex *));
 
@@ -2704,7 +2706,9 @@ key_setsaval(sav, m, mhp)
 	struct mbuf *m;
 	const struct sadb_msghdr *mhp;
 {
+#ifdef IPSEC_ESP
 	const struct esp_algorithm *algo;
+#endif
 	int error = 0;
 
 	/* sanity check */
@@ -5366,6 +5370,7 @@ key_get(so, m, mhp)
     }
 }
 
+#ifdef IPSEC_ESP
 /*
  * XXX reorder combinations by preference
  * XXX no idea if the user wants ESP authentication or not
@@ -5444,6 +5449,7 @@ key_getcomb_esp()
 		m_freem(result);
 	return NULL;
 }
+#endif
 
 /*
  * XXX reorder combinations by preference
@@ -5516,9 +5522,11 @@ key_getprop(saidx)
 	int totlen;
 
 	switch (saidx->proto)  {
+#ifdef IPSEC_ESP
 	case IPPROTO_ESP:
 		m = key_getcomb_esp();
 		break;
+#endif
 	case IPPROTO_AH:
 		m = key_getcomb_ah();
 		break;
