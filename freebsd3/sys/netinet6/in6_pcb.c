@@ -162,7 +162,7 @@ in6_pcbbind(inp, nam, p)
 			/*
 			 * XXX: bind to an anycast address might accidentally
 			 * cause sending a packet with anycast source address.
-			 * We should allow to bind a deprecated address, since
+			 * We should allow to bind to a deprecated address, since
 			 * the application dare to use it.
 			 */
 			if (ia &&
