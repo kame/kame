@@ -6,5 +6,6 @@ SUBDIR+=bgpd dtcp faithd gifconfig hroute6d icmp6dump ifmcstat mld6query mping \
 SUBDIR+=racoon
 SUBDIR+=altqd pvcbridge pvcsif pvctxctl
 #SUBDIR+=inet6d
+SUBDIR+=mip6config mip6stat
 
 .include <bsd.subdir.mk>
