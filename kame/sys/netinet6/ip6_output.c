@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.403 2003/11/06 08:03:27 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.404 2003/11/09 14:28:15 itojun Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -2593,7 +2593,7 @@ do { \
 				switch (optname) {
 				case IPV6_AUTH_LEVEL:
 				        if (optval < ipsec_auth_default_level &&
-					    suser(p->p_ucred, &p->p_acflag)) {
+					    suser(p, 0)) {
 						error = EACCES;
 						break;
 					}
@@ -2602,7 +2602,7 @@ do { \
 
 				case IPV6_ESP_TRANS_LEVEL:
 				        if (optval < ipsec_esp_trans_default_level &&
-					    suser(p->p_ucred, &p->p_acflag)) {
+					    suser(p, 0)) {
 						error = EACCES;
 						break;
 					}
@@ -2611,7 +2611,7 @@ do { \
 
 				case IPV6_ESP_NETWORK_LEVEL:
 				        if (optval < ipsec_esp_network_default_level &&
-					    suser(p->p_ucred, &p->p_acflag)) {
+					    suser(p, 0)) {
 						error = EACCES;
 						break;
 					}
@@ -2620,7 +2620,7 @@ do { \
 
 				case IPV6_IPCOMP_LEVEL:
 				        if (optval < ipsec_ipcomp_default_level &&
-					    suser(p->p_ucred, &p->p_acflag)) {
+					    suser(p, 0)) {
 						error = EACCES;
 						break;
 					}
@@ -3263,6 +3263,9 @@ ip6_pcbopts(pktopt, m, so)
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 	if (p && !suser(p))
 		priv = 1;
+#elif defined(__OpenBSD__)
+	if (p && !suser(p, 0))
+		priv = 1;
 #else
 	if (p && !suser(p->p_ucred, &p->p_acflag))
 		priv = 1;
@@ -3707,6 +3710,8 @@ ip6_setmoptions(optname, im6op, m)
 			 */
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 			if (suser(p))
+#elif defined(__OpenBSD__)
+			if (suser(p, 0))
 #else
 			if (suser(p->p_ucred, &p->p_acflag))
 #endif
@@ -3826,6 +3831,8 @@ ip6_setmoptions(optname, im6op, m)
 		if (IN6_IS_ADDR_UNSPECIFIED(&mreq->ipv6mr_multiaddr)) {
 #if defined(__FreeBSD__) && __FreeBSD__ >= 4
 			if (suser(p))
+#elif defined(__OpenBSD__)
+			if (suser(p, 0))
 #else
 			if (suser(p->p_ucred, &p->p_acflag))
 #endif
