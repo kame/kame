@@ -177,7 +177,6 @@ static int expand_isakmpspec __P((int prop_no, int trns_no, int *types,
 %type <res> ike_addrinfo_port
 %type <spidx> policy_index
 %type <saddr> remote_index
-%type <val> sainfo_name
 
 %%
 
@@ -672,17 +671,15 @@ keylength
 
 	/* sainfo */
 sainfo_statement
-	:	SAINFO IDENTIFIERTYPE sainfo_name
+	:	SAINFO
 		{
 			cur_sainfo = newsainfo();
 			if (cur_sainfo == NULL) {
 				yyerror("failed to allocate sainfo");
 				return -1;
 			}
-			cur_sainfo->identtype = idtype2doi($2);
-			cur_sainfo->name = $3;
 		}
-		BOC sainfo_specs
+		sainfo_name BOC sainfo_specs
 		{
 			/* default */
 			if (cur_sainfo->algs[algclass_ipsec_enc] == 0) {
@@ -708,29 +705,34 @@ sainfo_statement
 sainfo_name
 	:	ANONYMOUS
 		{
-			$$ = NULL;
+			cur_sainfo->identtype = 0;
+			cur_sainfo->name = NULL;
 		}
-	|	ADDRSTRING
+	|	IDENTIFIERTYPE ADDRSTRING
 		{
 			struct addrinfo *res;
 
-			res = parse_addr($1->v, NULL, AI_NUMERICHOST);
-			vfree($1);
+			res = parse_addr($2->v, NULL, AI_NUMERICHOST);
+			vfree($2);
 			if (!res)
 				return -1;
-			$$ = vmalloc(res->ai_addrlen);
-			if ($$ == NULL) {
+			cur_sainfo->name = vmalloc(res->ai_addrlen);
+			if (cur_sainfo->name == NULL) {
 				yyerror("vmalloc (%s)", strerror(errno));
 				freeaddrinfo(res);
 				return -1;
 			}
-			memcpy($$->v, res->ai_addr, $$->l);
+			memcpy(cur_sainfo->name->v, res->ai_addr,
+				cur_sainfo->name->l);
 			freeaddrinfo(res);
+
+			cur_sainfo->identtype = idtype2doi($1);
 		}
-	|	QUOTEDSTRING
+	|	IDENTIFIERTYPE QUOTEDSTRING
 		{
-			$1->l--;
-			$$ = $1;
+			$2->l--;
+			cur_sainfo->name = $2;
+			cur_sainfo->identtype = idtype2doi($1);
 		}
 	;
 sainfo_specs
