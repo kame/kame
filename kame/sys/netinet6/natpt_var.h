@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.8 2000/04/19 06:48:58 fujisawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.9 2000/04/25 07:52:56 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -105,7 +105,7 @@ struct _tSlot	*internOutgoingV4Hash		__P((int, struct _cSlot *, struct _cv *));
 struct _tSlot	*internIncomingV6Hash		__P((int, struct _cSlot *, struct _cv *));
 struct _tSlot	*internOutgoingV6Hash		__P((int, struct _cSlot *, struct _cv *));
 
-struct _tSlot	*checkTraceroute6Return		__P((struct _cv *));
+struct _tSlot	*checkTracerouteReturn		__P((struct _cv *));
 
 void		 init_hash			__P((void));
 void		 init_tslot			__P((void));

@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.11 2000/04/19 06:48:57 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.12 2000/04/25 07:52:54 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -277,7 +277,7 @@ natpt_incomingIPv4(int sess, struct ifBox *ifb, struct mbuf *m4, struct mbuf **m
 	return (IPPROTO_DONE);		/* discard this packet without free	*/
 
     cv.ats = lookingForIncomingV4Hash(&cv);
-    if ((ats = checkTraceroute6Return(&cv)) != NULL)
+    if ((ats = checkTracerouteReturn(&cv)) != NULL)
 	cv.ats = ats;
 
     if (cv.ats == NULL)

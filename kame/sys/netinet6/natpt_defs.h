@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.9 2000/04/19 06:48:57 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.10 2000/04/25 07:52:54 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -42,7 +42,7 @@
 #define	SIN4(s)		((struct sockaddr_in  *)s)
 #define	SIN6(s)		((struct sockaddr_in6 *)s)
 #define	SZSIN6		sizeof(struct sockaddr_in6)
-#define	SZSIN		sizeof(struct sockaddr_in)
+#define	SZSIN4		sizeof(struct sockaddr_in)
 
 #define	CAR(p)		((p)->car)
 #define	CDR(p)		((p)->cdr)
@@ -89,6 +89,7 @@
 #define	D_MATCHINGRULE4			0x00000004
 #define	D_TRANSLATINGIPV4		0x00000010
 #define	D_TRANSLATEDIPV4		0x00001000
+#define	D_FAKETRACEROUTE		0x00004000
 #define	D_TOONESELF4			0x00008000
 
 #define	D_DIVEIN6			0x00010000
@@ -98,7 +99,9 @@
 #define	D_TRANSLATINGIPV6		0x00100000
 #define	D_TRANSLATEDIPV6		0x01000000
 
-#define	fixSuMiReICMPBug	(0)
+#ifdef fixSuMiReICMPBug
+#undef fixSuMiReICMPBug
+#endif
 
 #ifdef fixSuMiReICMPBug
 #define	IPDST		(0xc48db2cb)		/* == 203.178.141.196	XXX	*/

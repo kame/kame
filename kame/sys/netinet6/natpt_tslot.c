@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.10 2000/04/19 06:48:58 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.11 2000/04/25 07:52:55 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -87,8 +87,12 @@ extern	struct in6_addr	 natpt_prefixmask;
 extern	struct in6_addr	 faith_prefix;
 extern	struct in6_addr	 faith_prefixmask;
 
+static struct pAddr	*fillupOutgoing4local	__P((struct _cSlot *, struct _cv *, struct pAddr *));
+static struct pAddr	*fillupOutgoing4Remote	__P((struct _cSlot *, struct _cv *, struct pAddr *));
 static struct pAddr	*fillupOutgoingV6local	__P((struct _cSlot *, struct _cv *, struct pAddr *));
 static struct pAddr	*fillupOutgoingV6Remote	__P((struct _cSlot *, struct _cv *, struct pAddr *));
+static struct pAddr	*remapRemote4Port	__P((struct _cSlot *, struct _cv *, struct pAddr *));
+
 
 static struct _tSlot	*registTSlotEntry	__P((struct _tSlot *));
 static void	 _expireTSlot			__P((void *));
@@ -358,62 +362,11 @@ internOutgoingV4Hash(int sess, struct _cSlot *acs, struct _cv *cv4)
 
     bzero(ats, sizeof(struct _tSlot));
 
-    local = &ats->local;
-    local->ip_p = IPPROTO_IPV4;
-    local->sa_family = AF_INET;
-    if ((cv4->ip_payload == IPPROTO_TCP)
-	|| (cv4->ip_payload == IPPROTO_UDP))
+    local = fillupOutgoing4local(acs, cv4, &ats->local);
+    if ((remote = fillupOutgoing4Remote(acs, cv4, &ats->remote)) == NULL)
     {
-	local->_sport = cv4->_payload._tcp4->th_dport;
-	local->_dport = cv4->_payload._tcp4->th_sport;
-    }
-
-    local->in4src = cv4->_ip._ip4->ip_dst;
-    local->in4dst = cv4->_ip._ip4->ip_src;
-
-    remote = &ats->remote;
-#ifdef NATPT_NAT
-    if (acs->remote.sa_family == AF_INET)
-    {
-	remote->ip_p = IPPROTO_IPV4;
-	remote->sa_family = AF_INET;
-	if ((cv4->ip_payload == IPPROTO_TCP)
-	    || (cv4->ip_payload == IPPROTO_UDP))
-	{
-	    remote->_sport = cv4->_payload._tcp4->th_sport;
-	    remote->_dport = cv4->_payload._tcp4->th_dport;
-	}
-	remote->in4src = acs->remote.in4src;
-	remote->in4dst = cv4->_ip._ip4->ip_dst;
-    }
-    else
-#endif
-    {
-	remote->ip_p = IPPROTO_IPV6;
-	remote->sa_family = AF_INET6;
-	if ((cv4->ip_payload == IPPROTO_TCP)
-	    || (cv4->ip_payload == IPPROTO_UDP))
-	{
-	    remote->_sport = cv4->_payload._tcp4->th_sport;
-	    remote->_dport = cv4->_payload._tcp4->th_dport;
-	}
-
-	if (acs->type == NATPT_FAITH)
-	{
-	    struct in6_ifaddr	*ia6;
-
-	    remote->in6dst.s6_addr32[0] = faith_prefix.s6_addr32[0];
-	    remote->in6dst.s6_addr32[1] = faith_prefix.s6_addr32[1];
-	    remote->in6dst.s6_addr32[3] = cv4->_ip._ip4->ip_dst.s_addr;
-
-	    ia6 = in6_ifawithscope(natpt_ip6src, &remote->in6dst);
-	    remote->in6src = ia6->ia_addr.sin6_addr;
-	}
-	else
-	{
-	    remote->in6src.s6_addr32[3] = cv4->_ip._ip4->ip_src.s_addr;
-	    remote->in6dst = acs->remote.in6src;
-	}
+	FREE(ats, M_TEMP);
+	return (NULL);
     }
 
     ats->ip_payload = cv4->ip_payload;
@@ -538,7 +491,7 @@ internOutgoingV6Hash(int sess, struct _cSlot *acs, struct _cv *cv6)
 
 
 struct _tSlot *
-checkTraceroute6Return(struct _cv *cv4)
+checkTracerouteReturn(struct _cv *cv4)
 {
     int			 hv;
     Cell		*p;
@@ -591,6 +544,80 @@ checkTraceroute6Return(struct _cv *cv4)
 
 
 static struct pAddr *
+fillupOutgoing4local(struct _cSlot *acs, struct _cv *cv4, struct pAddr *local)
+{
+    local->ip_p = IPPROTO_IPV4;
+    local->sa_family = AF_INET;
+    local->in4src = cv4->_ip._ip4->ip_dst;
+    local->in4dst = cv4->_ip._ip4->ip_src;
+
+    if ((cv4->ip_payload == IPPROTO_TCP)
+	|| (cv4->ip_payload == IPPROTO_UDP))
+    {
+	local->_sport = cv4->_payload._tcp4->th_dport;
+	local->_dport = cv4->_payload._tcp4->th_sport;
+    }
+
+    return (local);
+}
+
+
+static struct pAddr *
+fillupOutgoing4Remote(struct _cSlot *acs, struct _cv *cv4, struct pAddr *remote)
+{
+#ifdef NATPT_NAT
+    if (acs->remote.sa_family == AF_INET)
+    {
+	remote->ip_p = IPPROTO_IPV4;
+	remote->sa_family = AF_INET;
+	remote->in4src = acs->remote.in4src;
+	remote->in4dst = cv4->_ip._ip4->ip_dst;
+
+	if ((cv4->ip_payload == IPPROTO_TCP)
+	    || (cv4->ip_payload == IPPROTO_UDP))
+	{
+	    remote->_sport = cv4->_payload._tcp4->th_sport;
+	    remote->_dport = cv4->_payload._tcp4->th_dport;
+
+	    if (acs->map & NATPT_PORT_MAP_DYNAMIC)
+		remote = remapRemote4Port(acs, cv4, remote);
+	}
+    }
+    else
+#endif
+    {
+	remote->ip_p = IPPROTO_IPV6;
+	remote->sa_family = AF_INET6;
+	if ((cv4->ip_payload == IPPROTO_TCP)
+	    || (cv4->ip_payload == IPPROTO_UDP))
+	{
+	    remote->_sport = cv4->_payload._tcp4->th_sport;
+	    remote->_dport = cv4->_payload._tcp4->th_dport;
+	}
+
+	if (acs->type == NATPT_FAITH)
+	{
+	    struct in6_ifaddr	*ia6;
+
+	    remote->in6dst.s6_addr32[0] = faith_prefix.s6_addr32[0];
+	    remote->in6dst.s6_addr32[1] = faith_prefix.s6_addr32[1];
+	    remote->in6dst.s6_addr32[3] = cv4->_ip._ip4->ip_dst.s_addr;
+
+	    ia6 = in6_ifawithscope(natpt_ip6src, &remote->in6dst);
+	    remote->in6src = ia6->ia_addr.sin6_addr;
+	}
+	else
+	{
+	    remote->in6src.s6_addr32[3] = cv4->_ip._ip4->ip_src.s_addr;
+	    remote->in6dst = acs->remote.in6src;
+	}
+    }
+
+    return (remote);
+}
+
+
+static struct pAddr *
 fillupOutgoingV6local(struct _cSlot *acs, struct _cv *cv6, struct pAddr *local)
 {
     local->ip_p = IPPROTO_IPV6;
@@ -623,51 +650,59 @@ fillupOutgoingV6Remote(struct _cSlot *acs, struct _cv *cv6, struct pAddr *remote
 	remote->_sport = cv6->_payload._tcp6->th_sport;
 	remote->_dport = cv6->_payload._tcp6->th_dport;
 
-	/*
-	 * In case mappoing port number,	
-	 * acs->remote.port[0..1] has source port mapping range (from command line).
-	 *     remote->port[0..1] has actual translation slot info.
-	 */
 	if (acs->map & NATPT_PORT_MAP_DYNAMIC)
-	{
-	    int			firsttime = 0;
-	    u_short		cport, sport, eport;
-	    struct pAddr	pata;	/* pata.{s,d}port hold network byte order */
-
-	    cport = ntohs(acs->cport);
-	    sport = ntohs(acs->remote._sport);
-	    eport = ntohs(acs->remote._eport);
-
-	    if (cport == 0)
-		cport = sport - 1;
-
-	    bzero(&pata, sizeof(pata));
-	    pata.ip_p = IPPROTO_IPV4;
-	    pata.sa_family = AF_INET;
-	    pata.in4src = acs->remote.in4src;
-	    pata.in4dst.s_addr = cv6->_ip._ip6->ip6_dst.s6_addr32[3];
-	    pata._dport = remote->_dport;
-
-	    for (;;)
-	    {
-		while (++cport <= eport)
-		{
-		    pata._sport = htons(cport);
-		    if (_outsideHash[_hash_pat4(&pata)] == NULL)
-			goto found;
-		}
-
-		if (firsttime == 0)
-		    firsttime++,
-		    cport = sport - 1;
-		else
-		    return (NULL);
-	    }
-
-	found:;
-	    remote->_sport = acs->cport = htons(cport);
-	}
+	    remote = remapRemote4Port(acs, cv6, remote);
     }
+
+    return (remote);
+}
+
+
+static struct pAddr *
+remapRemote4Port(struct _cSlot *acs, struct _cv *cv4, struct pAddr *remote)
+{
+    int			firsttime = 0;
+    u_short		cport, sport, eport;
+    struct pAddr	pata;	/* pata.{s,d}port hold network byte order */
+
+    /*
+     * In case mapping port number,
+     * acs->remote.port[0..1] has source port mapping range (from command line).
+     *     remote->port[0..1] has actual translation slot info.
+     */
+
+    cport = ntohs(acs->cport);
+    sport = ntohs(acs->remote._sport);
+    eport = ntohs(acs->remote._eport);
+
+    if (cport == 0)
+	cport = sport - 1;
+
+    bzero(&pata, sizeof(pata));
+    pata.ip_p = IPPROTO_IPV4;
+    pata.sa_family = AF_INET;
+    pata.in4src = remote->in4src;
+    pata.in4dst = remote->in4dst;
+    pata._dport = remote->_dport;
+
+    for (;;)
+    {
+	while (++cport <= eport)
+	{
+	    pata._sport = htons(cport);
+	    if (_outsideHash[_hash_pat4(&pata)] == NULL)
+		goto found;
+	}
+
+	if (firsttime == 0)
+	    firsttime++,
+	    cport = sport - 1;
+	else
+	    return (NULL);
+    }
+
+found:;
+    remote->_sport = acs->cport = htons(cport);
 
     return (remote);
 }

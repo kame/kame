@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.14 2000/04/19 06:48:58 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.15 2000/04/25 07:52:55 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -92,6 +92,8 @@ int		 ip6_protocol_tr;
 
 extern	struct in6_addr	 natpt_prefix;
 extern	struct in6_addr	 natpt_prefixmask;
+
+void		 fakeTimxceed			__P((struct _cv *, struct mbuf *));
 
 struct mbuf	*translatingTCPUDPv4To4		__P((struct _cv *, struct pAddr *, struct _cv *));
 
@@ -196,13 +198,26 @@ translatingICMPv4To4(struct _cv *cv4from, struct pAddr *pad)
     cv4to._ip._ip4 = ip4to = mtod(m4, struct ip *);
     cv4to._payload._caddr = (caddr_t)cv4to._ip._ip4 + (ip4from->ip_hl << 2);
 
-    ip4to->ip_src = pad->in4src;	/* source address		*/
-    ip4to->ip_dst = pad->in4dst;	/* destination address		*/
+    ip4to->ip_dst = pad->in4dst;	/* rewrite destination address	*/
 
     switch (icmp4from->icmp_type)
     {
       case ICMP_ECHOREPLY:
+	ip4to->ip_src = pad->in4src;	/* rewrite source address	*/
+	break;
+
+      case ICMP_UNREACH:
+	if (icmp4from->icmp_code == ICMP_UNREACH_PORT)
+	    fakeTimxceed(cv4from, m4);
+	break;
+
+      case ICMP_TIMXCEED:
+	if (icmp4from->icmp_code == ICMP_TIMXCEED_INTRANS)
+	    fakeTimxceed(cv4from, m4);
+	break;
+
       case ICMP_ECHO:
+	ip4to->ip_src = pad->in4src;	/* rewrite source address	*/
 	break;
 
       default:
@@ -212,6 +227,62 @@ translatingICMPv4To4(struct _cv *cv4from, struct pAddr *pad)
 
     m4->m_len = cv4from->m->m_len;
     return (m4);
+}
+
+
+void
+fakeTimxceed(struct _cv *cv4from, struct mbuf *m4)
+{
+    struct ip		*ip4to;
+    struct icmp		*icmp4to;
+    struct ip		*innerip4to;
+    struct udphdr	*innerudp4to;
+    struct _tSlot	*ats;
+
+    if (isDump(D_FAKETRACEROUTE))
+	natpt_logMBuf(LOG_DEBUG, cv4from->m, "fakeTimxceed().");
+
+    ip4to = mtod(m4, struct ip *);
+    icmp4to = (struct icmp *)((caddr_t)ip4to + (ip4to->ip_hl << 2));
+    innerip4to = &icmp4to->icmp_ip;
+    innerudp4to = (struct udphdr *)((caddr_t)innerip4to + (innerip4to->ip_hl << 2));
+
+    ats = cv4from->ats;
+    innerip4to->ip_src = ats->local.in4dst;
+    innerudp4to->uh_sport = ats->local._dport;
+
+    {
+	int	cksum;
+	u_char	Dum[8], Dee[8];
+
+	*(u_long *)&Dum[0] = ats->remote.in4src.s_addr;
+	*(u_long *)&Dee[0] = ats->local.in4dst.s_addr;
+	cksum = adjustChecksum(ntohs(innerip4to->ip_sum),
+			       (u_char *)&Dum, 4,
+			       (u_char *)&Dee, 4);
+	innerip4to->ip_sum = htons(cksum);
+
+	*(u_short *)&Dum[4] = ats->remote._sport;
+	*(u_short *)&Dum[4] = ats->local._dport;
+	cksum = adjustChecksum(ntohs(icmp4to->icmp_cksum),
+				(u_char *)&Dum, 6,
+				(u_char *)&Dee, 6);
+	icmp4to->icmp_cksum = htons(cksum);
+    }
+    
+    {
+	int	hlen = ip4to->ip_hl << 2;
+	
+	m4->m_data += hlen;
+	m4->m_len  -= hlen;
+	icmp4to->icmp_cksum = 0;
+	icmp4to->icmp_cksum = in_cksum(m4, ip4to->ip_len - hlen);
+	m4->m_data -= hlen;
+	m4->m_len  += hlen;
+    }
+
+    if (isDump(D_FAKETRACEROUTE))
+	natpt_logMBuf(LOG_DEBUG, cv4from->m, "fakeTimxceed().");
 }
 
 
