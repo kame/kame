@@ -1,8 +1,15 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.911 2000/05/22 03:08:08 itojun Exp $
+$Id: CHANGELOG,v 1.912 2000/05/22 04:22:09 itojun Exp $
 
 <200005>
+Mon May 22 13:19:29 JST 2000  itojun@iijlab.net
+	* sys/netinet6/icmp6.c: to conform better with icmp-name-lookup-05,
+	  make the validation rule more strict for node information query.
+	  now, IPv6 destination address must be anycast/unicast for the node,
+	  or link-local multicast.
+	  there still are spec non-conformance - see comments in icmp6.c.
+
 Mon May 22 12:07:28 JST 2000  itojun@iijlab.net
 	* kame/gifconfig/gifconfig.c: correct gif outer (physical) address
 	  printing, on non-IPv6 kernel.
