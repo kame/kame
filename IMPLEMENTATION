@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/08/10 04:06:56 $
+			$Date: 1999/08/11 16:50:35 $
 
 1. IPv6
 
@@ -648,10 +648,6 @@ KAME requires three items to be added into the standard drivers:
 (2) multicast.  If "ifmcstat" yields no multicast group for a
     interface, that interface has to be patched.
 
-(3) If you are using notebook PCs, you'll need to be a one-liner for
-    initializing your interface when your card is plugged in.
-    (NOTE: KAME/NetBSD does not need this)
-
 To avoid troubles, we suggest you to comment out the device drivers
 for unsupported/unnecessary cards, from the configuration file.
 If you accidentally enable unsupported drivers, some of the userland
@@ -664,28 +660,28 @@ are using that ethernet card/driver frequently.
 
 Here is a list of FreeBSD 2.2.x-RELEASE drivers and its conditions:
 
-	driver	mbuf(1)		multicast(2)	PCMCIA		official
-						patch(3)	support?
-	---	---		---		---		---
+	driver	mbuf(1)		multicast(2)	official
+						support?
+	---	---		---		---
 	(Ethernet)
-	ar	looks ok	-		-		-
-	cnw	ok		ok		ok		yes (*)
-	ed	ok		ok		ok		yes
-	ep	ok		ok		ok		yes
-	fe	ok		ok		ok		yes
-	sn	looks ok	-		ok		-   (*)
-	vx	looks ok	-		-		-
-	wlp	ok		ok		ok		-   (*)
-	xl	ok		ok		-		yes
-	zp	ok		ok		-		-
+	ar	looks ok	-		-
+	cnw	ok		ok		yes (*)
+	ed	ok		ok		yes
+	ep	ok		ok		yes
+	fe	ok		ok		yes
+	sn	looks ok	-		-   (*)
+	vx	looks ok	-		-
+	wlp	ok		ok		-   (*)
+	xl	ok		ok		yes
+	zp	ok		ok		-
 	(FDDI)
-	fpa	looks ok	?		-		-
+	fpa	looks ok	?		-
 	(ATM)
-	en	ok		ok		-		yes
+	en	ok		ok		yes
 	(Serial)
-	lp	?		-		-		not work
-	sl	?		-		-		not work
-	sr	looks ok	ok		-		-   (**)
+	lp	?		-		not work
+	sl	?		-		not work
+	sr	looks ok	ok		-   (**)
 
 You may want to add an invocation of "rtsol" in "/etc/pccard_ether",
 if you are using notebook computers and PCMCIA ethernet card.
@@ -701,25 +697,25 @@ frame-relay support to come back, please contact KAME deverlopers.
 
 The following lists BSD/OS device drivers and its conditions:
 
-	driver	mbuf(1)		multicast(2)	PCMCIA		official
-						patch(3)	support?
-	---	---		---		---		---
+	driver	mbuf(1)		multicast(2)	official
+						support?
+	---	---		---		---
 	(Ethernet)
-	cnw	ok		ok		ok		yes
-	de	ok		ok		no need		-
-	ef	ok		ok		ok		yes
-	exp	ok		ok		no need		-
-	mz	ok		ok		ok		yes
-	ne	ok		ok		ok		yes
-	we	ok		ok		ok		-
+	cnw	ok		ok		yes
+	de	ok		ok		-
+	ef	ok		ok		yes
+	exp	ok		ok		-
+	mz	ok		ok		yes
+	ne	ok		ok		yes
+	we	ok		ok		-
 	(FDDI)
-	fpa	ok		ok		-		-
+	fpa	ok		ok		-
 	(ATM)
-	en	maybe		ok		-		-
+	en	maybe		ok		-
 	(Serial)
-	ntwo	ok		ok		-		yes
-	sl	?		-		-		not work
-	appp	?		-		-		not work
+	ntwo	ok		ok		yes
+	sl	?		-		not work
+	appp	?		-		not work
 
 You may want to use "@insert" directive in /etc/pccard.conf to invoke
 "rtsol" command right after dynamic insertion of PCMCIA ethernet cards.
@@ -743,18 +739,18 @@ Note that, for NetBSD, we do not need one-liner patch to PCMCIA driver.
 
 Here is a list of FreeBSD 3.x-RELEASE drivers and its conditions:
 
-	driver	mbuf(1)		multicast(2)	PCMCIA		official
-						patch(3)	support?
+	driver	mbuf(1)		multicast(2)	official
+						support?
 	---	---		---		---
 	(Ethernet)
-	fe	ok		ok		?		yes
-	fxp	ok		ok		-		yes
-	lnc	?		ok		-		-
-	cnw	ok		ok		ok(*)		-(**)
-	ep	ok		ok		ok(*)		-
-	sn	?		?		?		-(**)
-	xl	?		ok		?		-
-	ed	?		ok		?		-
+	fe	ok		ok		yes
+	fxp	ok		ok		yes
+	lnc	?		ok		-
+	cnw	ok		ok		-(**)
+	ep	ok		ok		-
+	sn	?		?		-(**)
+	xl	?		ok		-
+	ed	?		ok		-
 
 (*)  With PAO3 patch applied. (http://www.jp.freebsd.org/PAO/).
 (**) These drivers are distributed with PAO as PAO3
