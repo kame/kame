@@ -479,6 +479,7 @@ in_control(so, cmd, data, ifp, p)
 
 	case SIOCSIFADDR:
 		error = in_ifinit(ifp, ia, satosin(&ifr->ifr_addr), 1);
+#if 0
   undo:
 		if (error && newifaddr) {
 			TAILQ_REMOVE(&ifp->if_addrlist, &ia->ia_ifa, ifa_list);
@@ -487,6 +488,7 @@ in_control(so, cmd, data, ifp, p)
 			if ((ifp->if_flags & IFF_LOOPBACK) == 0)
 				in_interfaces--;
 		}
+#endif
 		return error;
 
 	case SIOCSIFNETMASK:
@@ -520,8 +522,10 @@ in_control(so, cmd, data, ifp, p)
 		if (ifra->ifra_addr.sin_family == AF_INET &&
 		    (hostIsNew || maskIsNew)) {
 			error = in_ifinit(ifp, ia, &ifra->ifra_addr, 0);
+#if 0
 			if (error)
 				goto undo;
+#endif
 		}
 		if ((ifp->if_flags & IFF_BROADCAST) &&
 		    (ifra->ifra_broadaddr.sin_family == AF_INET))

@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.60 2000/03/16 07:05:33 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.61 2000/03/17 15:57:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -755,6 +755,7 @@ in6_control(so, cmd, data, ifp)
 
 	case SIOCSIFADDR_IN6:
 		error = in6_ifinit(ifp, ia, &ifr->ifr_addr, 1);
+#if 0
   undo:
 		if (error && newifaddr) {
 #if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
@@ -791,6 +792,7 @@ in6_control(so, cmd, data, ifp)
 			}
 			IFAFREE(&ia->ia_ifa);
 		}
+#endif
 		return error;
 
 #ifdef COMPAT_IN6IFIOCTL		/* XXX should be unused */
@@ -873,8 +875,10 @@ in6_control(so, cmd, data, ifp)
 		}
 		if (hostIsNew || prefixIsNew) {
 			error = in6_ifinit(ifp, ia, &ifra->ifra_addr, 0);
+#if 0
 			if (error)
 				goto undo;
+#endif
 		}
 		if (hostIsNew && (ifp->if_flags & IFF_MULTICAST)) {
 			int error_local = 0;
