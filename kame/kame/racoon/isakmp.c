@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.150 2001/07/31 07:08:42 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.151 2001/08/07 14:29:12 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -641,7 +641,7 @@ ph1_main(iph1, msg)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_NOTICE, "%s(%s) %8.6f",
+	syslog(LOG_NOTICE, "%s(%s): %8.6f",
 		"phase1", s_isakmp_state(iph1->etype, iph1->side, iph1->status),
 		timedelta(&start, &end));
     }
@@ -765,7 +765,7 @@ quick_main(iph2, msg)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_NOTICE, "%s(%s) %8.6f",
+	syslog(LOG_NOTICE, "%s(%s): %8.6f",
 		"phase2",
 		s_isakmp_state(ISAKMP_ETYPE_QUICK, iph2->side, iph2->status),
 		timedelta(&start, &end));
@@ -844,7 +844,7 @@ isakmp_ph1begin_i(rmconf, remote)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_NOTICE, "%s(%s) %8.6f",
+	syslog(LOG_NOTICE, "%s(%s): %8.6f",
 		"phase1",
 		s_isakmp_state(iph1->etype, iph1->side, iph1->status),
 		timedelta(&start, &end));
@@ -944,7 +944,7 @@ isakmp_ph1begin_r(msg, remote, local, etype)
 	}
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_NOTICE, "%s(%s) %8.6f",
+	syslog(LOG_NOTICE, "%s(%s): %8.6f",
 		"phase1",
 		s_isakmp_state(iph1->etype, iph1->side, iph1->status),
 		timedelta(&start, &end));
@@ -1108,7 +1108,7 @@ isakmp_ph2begin_r(iph1, msg)
 	}
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_NOTICE, "%s(%s) %8.6f",
+	syslog(LOG_NOTICE, "%s(%s): %8.6f",
 		"phase2",
 		s_isakmp_state(ISAKMP_ETYPE_QUICK, iph2->side, iph2->status),
 		timedelta(&start, &end));
@@ -1796,7 +1796,7 @@ isakmp_post_getspi(iph2)
 		return -1;
 #ifdef ENABLE_STATS
 	gettimeofday(&end, NULL);
-	syslog(LOG_NOTICE, "%s(%s) %8.6f",
+	syslog(LOG_NOTICE, "%s(%s): %8.6f",
 		"phase2",
 		s_isakmp_state(ISAKMP_ETYPE_QUICK, iph2->side, iph2->status),
 		timedelta(&start, &end));
