@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.13 1999/10/19 04:36:51 sakane Exp $ */
+/* KAME $Id: key.c,v 1.14 1999/10/19 21:37:41 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -871,6 +871,7 @@ key_msg2sp(xpl0)
 		int tlen;
 		struct sadb_x_ipsecrequest *xisr;
 		struct ipsecrequest **p_isr = &newsp->req;
+		caddr_t paddr;
 
 		/* validity check */
 		if (PFKEY_UNUNIT64(xpl0->sadb_x_policy_len) <= sizeof(*xpl0)) {
@@ -894,18 +895,40 @@ key_msg2sp(xpl0)
 
 			(*p_isr)->next = NULL;
 
-			/* copy into saidx */
-		    {
-			caddr_t paddr;
+			/* length check */
+			if (xisr->sadb_x_ipsecrequest_len < sizeof(*xisr)) {
+				printf("key_msg2sp: "
+					"invalid ipsecrequest length.\n");
+				key_freesp(newsp);
+				return NULL;
+			}
 
+			/* copy into saidx */
 			paddr = (caddr_t)xisr + sizeof(*xisr);
+
+			/* validity check */
+			if (((struct sockaddr *)paddr)->sa_len
+			    > sizeof(struct sockaddr_storage)) {
+				printf("key_msg2sp: "
+					"invalid request address length.\n");
+				key_freesp(newsp);
+				return NULL;
+			}
 			bcopy(paddr, &(*p_isr)->saidx.src,
-				sizeof(struct sockaddr_storage));
+				((struct sockaddr *)paddr)->sa_len);
 
 			paddr += ((struct sockaddr *)paddr)->sa_len;
+
+			/* validity check */
+			if (((struct sockaddr *)paddr)->sa_len
+			    > sizeof(struct sockaddr_storage)) {
+				printf("key_msg2sp: "
+					"invalid request address length.\n");
+				key_freesp(newsp);
+				return NULL;
+			}
 			bcopy(paddr, &(*p_isr)->saidx.dst,
-				sizeof(struct sockaddr_storage));
-		    }
+				((struct sockaddr *)paddr)->sa_len);
 
 			switch (xisr->sadb_x_ipsecrequest_proto) {
 			case IPPROTO_ESP:

@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* $Id: keyv2.h,v 1.6 1999/10/19 21:05:42 sakane Exp $ */
+/* $Id: keyv2.h,v 1.7 1999/10/19 21:37:41 sakane Exp $ */
 
 /*
  * This file has been derived rfc 2367,
@@ -243,9 +243,9 @@ struct sadb_x_ipsecrequest {
   /*
    * followed by source IP address of SA, and immediately followed by
    * destination IP address of SA.  These encoded into two of sockaddr
-   * storage structure without any padding.  Must set each sa_len exactly.
+   * structure without any padding.  Must set each sa_len exactly.
    * Each of length of the sockaddr structure are not aligned to 64bits,
-   * but sum of x_policy, request and addresses is aligned to 64bits.
+   * but sum of x_request and addresses is aligned to 64bits.
    */
 };
 
