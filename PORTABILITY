@@ -1,6 +1,6 @@
 	Portability guideline
 	KAME project
-	$Id: PORTABILITY,v 1.49 2000/06/04 22:54:32 itojun Exp $
+	$Id: PORTABILITY,v 1.50 2000/06/12 14:37:14 itojun Exp $
 
 
 Source code in the "kame" directory will be shared among operating systems
@@ -315,3 +315,7 @@ across those possibilities.
 	.Nm foo
   to avoid portability issue (it is unfortunate that we need to place
   duplicated text...).
+
+- SADB_X_SA2 (in /usr/include/net/pfkeyv2.h) has completely different meaning
+  between KAME-based systems and openbsd systems.  take caution if you plan to
+  use it.
