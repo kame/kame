@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.314 2002/09/09 05:35:38 keiichi Exp $
+	$KAME: IMPLEMENTATION,v 1.315 2002/10/03 02:45:36 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1704,7 +1704,7 @@ including usage examples.
 
 4.1 Policy Management
 
-The kernel implements experimental policy management code.  There are two way
+The kernel implements experimental policy management code.  There are two ways
 to manage security policy.  One is to configure per-socket policy using
 setsockopt(3).  In this cases, policy configuration is described in
 ipsec_set_policy(3).  The other is to configure kernel packet filter-based
@@ -2095,7 +2095,7 @@ when you have one of the following requirements:
   normal routing table, and C (global side) will be picked for any outgoing
   traffic, even if the destination is B.  The resulting packet will be like
   this:
-	IP[C -> B] payloda
+	IP[C -> B] payload
   and will not match the policy (= sent in clear).
 - When you want to run routing protocols on top of the IPsec tunnel, it is
   not possible.  As there is no pseudo device that identifies the IPsec tunnel,
