@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.75 2000/08/31 17:40:40 itojun Exp $
+$KAME: COVERAGE,v 1.76 2000/08/31 23:28:03 itojun Exp $
 
 
 x: supported/integrated
@@ -40,6 +40,7 @@ faithd support in inetd
 		x	-	-	-	-	x	-
 
 
+
 (+): see above for KAME/*BSD differences
 
 		KAME	merged *-current	merged
@@ -60,17 +61,25 @@ IPv6 IPsec	KAME	KAME	openbsd	KAME	KAME	-	KAME
 	hardware acceleration is available.
 
 IPsec ESP, rc5-cbc
-		x	-	?	x	-	?	x
-			(*1)			(*1)
-    (*1) rc5-cbc omitted for possible patent issues
+		-	-	(*1)	x	-	(*1)	x
+    (*1) not based on kame
+
+IPsec ESP, blowfish/des on LP64
+		x	x	(*1)	-	x	(*1)	-
+    (*1) not based on kame
+
+IPsec ESP, crypto backend uses block cipher (esp_cbc_encrypt)
+		x	x	(*1)	-	x	(*1)	-
+    (*1) not based on kame
 
 RFC2367 conformance: sadb_msg
-		x	x	-	x	x	-	x
-    (*1) very old KAME declaration, violates RFC2367 (sadb_msg_mode)
+		x	x	(*1)	x	x	(*1)	x
+    (*1) not based on kame
 
 RFC2367 conformance: SADB_[EAC]ALG
-		x	x	-	(*1)	x	-	(*1)
+		x	x	(*2)	(*1)	x	(*2)	(*1)
     (*1) old KAME declaration, violates RFC2367 namespace
+    (*2) not based on kame
 
 TCP/UDP		see IMPLEMENTATION for details
 
@@ -90,9 +99,10 @@ advanced API	2292bis	2292	2292	2292	2292	2292	2292
 getifaddrs	x	x	x	x	x	x	x
 
 icmp6 nodeinfo	06	06	06	05	06	05-	05
-			(*1)	(*1)	(*1)	(*1)	(*1)	(*1)
+		(*2)	(*1/2)	(*1/2)	(*1/2)	(*1/2)	(*1/2)	(*1/2)
     (all) spec conformance is still low.  "05-" means 05/03 chimera.
     (*1) does not join NI group address
+    (*2) node addresses reply does not have TTL attached
 
 nd6_proxyall	-	-	-	-	-	-	-
 
@@ -133,7 +143,7 @@ getaddrinfo supports AI_ADDRCONFIG (2553bis)
     (*1) enabled by default, cannot turn it off
 
 getaddrinfo returns official hostname (leftmost) in ai_canonname
-		(*1)	x	x	x	-	-	x
+		(*1)	x	x	x	x	-	x
     (*1) netbsd, openbsd, freebsd4 are "x", others are "-"
 
 getnameinfo uses addr%numeric for scopeid > maxifindex
@@ -209,6 +219,12 @@ faithd		x	x	x	x	x	x	x
 
 syslogd		x	x	-	-	x	-	-
 lpr/lpd		x	x	-	-	x	-	-
+
+default sendmail is IPv6 ready
+		?	x	x	-	x	-	-
+
+default sendmail.cf is IPv6 ready
+		?	x	x	-	x	-	-
 
 racoon		latest	pkgsrc	-	ports
 			000730a		000718a
