@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1329 2000/10/10 14:57:07 itojun Exp $
+$KAME: CHANGELOG,v 1.1330 2000/10/10 15:45:26 itojun Exp $
 
 <200010>
 Tue Oct 10 23:54:17 JST 2000  itojun@iijlab.net
@@ -8,6 +8,10 @@ Tue Oct 10 23:54:17 JST 2000  itojun@iijlab.net
 	  we share tcp stack between IPv4/v6 and we are compiling a kernel
 	  with dual stack configuration (netbsd/openbsd/freebsd[34]/bsdi4).
 	  from enami@netbsd.org.
+	* sys/netinet6/icmp6.c: nuke net.inet6.icmp6.errratelimit.
+	* openbsd/sys/conf/GENERIC: move KAME mandatory flags into
+	  conf/GENERIC, so that they will get defined for all kernel
+	  configuration files.
 
 Tue Oct 10 15:43:58 JST 2000  itojun@iijlab.net
 	* kame/rtsold/rtsock.c: watch routing socket for pcmcia/cardbus
