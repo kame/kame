@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.87 2000/05/15 10:21:26 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.88 2000/05/19 19:10:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -469,19 +469,24 @@ ip6_input(m)
 		}
 	}
 
-	if (m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) {
-		if (IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst)) {
-			ours = 1;
-			deliverifp = m->m_pkthdr.rcvif;
-			goto hbhcheck;
-		}
-	} else {
+#ifndef FAKE_LOOPBACK_IF
+	if ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0)
+#else
+	if (1)
+#endif
+	{
 		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_src))
 			ip6->ip6_src.s6_addr16[1]
 				= htons(m->m_pkthdr.rcvif->if_index);
 		if (IN6_IS_SCOPE_LINKLOCAL(&ip6->ip6_dst))
 			ip6->ip6_dst.s6_addr16[1]
 				= htons(m->m_pkthdr.rcvif->if_index);
+	} else {
+		if (IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst)) {
+			ours = 1;
+			deliverifp = m->m_pkthdr.rcvif;
+			goto hbhcheck;
+		}
 	}
 
 	/*

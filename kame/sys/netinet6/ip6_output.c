@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.103 2000/05/19 05:13:21 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.104 2000/05/19 19:10:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -881,7 +881,7 @@ skip_ipsec2:;
 	else
 		origifp = ifp;
 #ifndef FAKE_LOOPBACK_IF
-	if ((ifp->if_flags & IFF_LOOPBACK) != 0)
+	if ((ifp->if_flags & IFF_LOOPBACK) == 0)
 #else
 	if (1)
 #endif
