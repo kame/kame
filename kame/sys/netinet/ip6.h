@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.41 2003/01/30 08:54:15 keiichi Exp $	*/
+/*	$KAME: ip6.h,v 1.42 2003/02/05 10:23:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -366,11 +366,10 @@ struct ip6m_binding_update {
 } __attribute__((__packed__));
 
 /* Binding Update flags */
-#define IP6MU_ACK	0x80	/* Request a binding ack */
-#define IP6MU_HOME	0x40	/* Home Registration */
-#define IP6MU_SINGLE	0x20	/* Update the specified address only */
-#define IP6MU_DAD	0x10	/* Perform Duplicate Address Detection */
-#define IP6MU_LINK	0x08	/* Link-Local Address Compatibility */
+#define IP6MU_ACK	0x80	/* request a binding ack */
+#define IP6MU_HOME	0x40	/* home registration */
+#define IP6MU_LINK	0x20	/* link-local address compatibility */
+#define IP6MU_KEY	0x10	/* key management mobility compatibility */
 #define IP6MU_CLONED	0x01
 
 /* Binding Acknowledgement (BA) message */

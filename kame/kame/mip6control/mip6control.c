@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.40 2002/12/11 11:56:59 keiichi Exp $	*/
+/*	$KAME: mip6control.c,v 1.41 2003/02/05 10:23:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -859,13 +859,11 @@ static const char *
 buflg_sprintf(flags)
 	u_int8_t flags;
 {
-	static char buf[] = "AHSDLc";
+	static char buf[] = "AHLc";
 
-	snprintf(buf, sizeof(buf), "%s%s%s%s%s%s",
+	snprintf(buf, sizeof(buf), "%s%s%s%s",
 		 (flags & IP6MU_ACK ?    "A" : "-"),
 		 (flags & IP6MU_HOME ?   "H" : "-"),
-		 (flags & IP6MU_SINGLE ? "S" : "-"),
-		 (flags & IP6MU_DAD ?    "D" : "-"),
 		 (flags & IP6MU_LINK ?   "L" : "-"),
 		 (flags & IP6MU_CLONED ? "c" : "-"));
 

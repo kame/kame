@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.103 2003/01/30 08:54:16 keiichi Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.104 2003/02/05 10:23:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -547,8 +547,7 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 	mip6stat.mip6s_bu++;
 	bzero(&bi, sizeof(bi));
 	bi.mbc_status = IP6MA_STATUS_ACCEPTED;
-	bi.mbc_send_ba = (ip6mu->ip6mu_flags & IP6MU_ACK) &&
-			 !(ip6mu->ip6mu_flags & IP6MU_DAD);
+	bi.mbc_send_ba = ip6mu->ip6mu_flags & IP6MU_ACK;
 
 #ifdef IPSEC
 	/*
@@ -759,11 +758,13 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 				bi.mbc_send_ba = 1;
 				goto send_ba;
 			}
+#if 0
 			/*
 			 * ignore 'S'&'L' bit (issue #66)
 			 */
 			bi.mbc_flags |= ~(IP6MU_SINGLE|IP6MU_LINK);
 			bi.mbc_flags |= (mbc->mbc_flags && (IP6MU_SINGLE|IP6MU_LINK));
+#endif
 			if (mip6_process_hurbu(&bi)) {
 				mip6log((LOG_ERR,
 					 "%s:%d: home unregistration failed\n",

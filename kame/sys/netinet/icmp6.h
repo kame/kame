@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.81 2003/01/21 06:49:12 t-momose Exp $	*/
+/*	$KAME: icmp6.h,v 1.82 2003/02/05 10:23:32 keiichi Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -426,7 +426,7 @@ struct dhaad_req {		/* HA Address Discovery Request */
 
 struct dhaad_rep {		/* HA Address Discovery Reply */
 	struct icmp6_hdr	dhaad_rep_hdr;
-	/* could be followed by Home Agent addresses */
+	/* could be followed by home agent addresses */
 } __attribute__((__packed__));
 
 #define dhaad_rep_type		dhaad_rep_hdr.icmp6_type
@@ -447,13 +447,17 @@ struct mobile_prefix_solicit {	/* Mobile Prefix Solicitation */
 
 struct mobile_prefix_advert {	/* Mobile Prefix Advertisement */
 	struct icmp6_hdr	mp_adv_hdr;
+	/* followed by options */
 } __attribute__((__packed__));
 
 #define mp_adv_type		mp_adv_hdr.icmp6_type
 #define mp_adv_code		mp_adv_hdr.icmp6_code
 #define mp_adv_cksum		mp_adv_hdr.icmp6_cksum
 #define mp_adv_id		mp_adv_hdr.icmp6_data16[0]
-#define mp_adv_opts		mp_adv_hdr.icmp6_data16[1]
+#define mp_adv_flags		mp_adv_hdr.icmp6_data8[2]
+#define mp_adv_reserved		mp_adv_hdr.icmp6_data8[3]
+#define MPADV_MANAGED		0x80
+#define MPADV_OTHER		0x40
 
 struct nd_opt_hdr {		/* Neighbor discovery option header */
 	u_int8_t	nd_opt_type;

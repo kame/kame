@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.168 2003/02/05 06:02:27 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.169 2003/02/05 10:23:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -387,9 +387,7 @@ mip6_home_registration(sc)
 				}
 
 				mbu = mip6_bu_create(haaddr, mpfx, &hif_coa,
-						     IP6MU_ACK|IP6MU_HOME|
-						     IP6MU_DAD|IP6MU_SINGLE
-
+						     IP6MU_ACK|IP6MU_HOME
 #ifndef MIP6_STATIC_HADDR
 						     |IP6MU_LINK
 #endif
@@ -1011,107 +1009,41 @@ mip6_process_hurbu(bi)
 		return (0); /* XXX is 0 OK? */
 	}
 
-	if ((bi->mbc_flags & IP6MU_SINGLE) == 0) {
-		int found = 0;
+	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &bi->mbc_phaddr);
+	if (mbc == NULL) {
+		/* XXX panic */
+		return (0);
+	}
+	if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
+		mip6_dad_stop(mbc);
+	} else {
+		/* remove rtable for proxy ND */
+		if (mip6_bc_proxy_control(&bi->mbc_phaddr, &bi->mbc_addr,
+			RTM_DELETE)) {
+			/* XXX UNSPECIFIED */
+			return (-1);
+		}
 
-		for (mbc = LIST_FIRST(&mip6_bc_list);
-		    mbc;
-		    mbc = mbc_next) {
-			mbc_next = LIST_NEXT(mbc, mbc_entry);
-
-			if (mbc->mbc_ifp != hifp)
-				continue;
-
-			if (IN6_IS_ADDR_LINKLOCAL(&mbc->mbc_phaddr.sin6_addr))
-				continue;
-
-			if (!mip6_are_ifid_equal(&mbc->mbc_phaddr.sin6_addr,
-						 &bi->mbc_phaddr.sin6_addr,
-						 64 /* XXX */))
-				continue;
-
-			found = 1;
-			if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
-				mip6_dad_stop(mbc);
-			}
-			else {
-				/* remove rtable for proxy ND */
-				error = mip6_bc_proxy_control(
-					&mbc->mbc_phaddr, &bi->mbc_addr, RTM_DELETE);
-				if (error) {
-					mip6log((LOG_ERR,
-						 "%s:%d: proxy control error (%d)\n",
-						 __FILE__, __LINE__, error));
-				}
-
-				/* remove encapsulation entry */
-				error = mip6_tunnel_control(MIP6_TUNNEL_DELETE,
-						    mbc,
-						    mip6_bc_encapcheck,
-						    &mbc->mbc_encap);
-				if (error) {
-					/* XXX UNSPECIFIED */
-					mip6log((LOG_ERR,
-						 "%s:%d: tunnel control error (%d)\n",
-						 __FILE__, __LINE__, error));
-					return (error);
-				}
-			}
-			/* remove a BC entry. */
-			error = mip6_bc_list_remove(&mip6_bc_list, mbc);
-			if (error) {
-				mip6log((LOG_ERR,
-					 "%s:%d: can't remove BC.\n",
-					 __FILE__, __LINE__));
-				bi->mbc_status = IP6MA_STATUS_UNSPECIFIED;
-				bi->mbc_send_ba = 1;
-				bi->mbc_lifetime = bi->mbc_refresh = 0;
-				return (error);
-			}
+		/* remove encapsulation entry */
+		if (mip6_tunnel_control(MIP6_TUNNEL_DELETE, mbc,
+			mip6_bc_encapcheck, &mbc->mbc_encap)) {
+			/* XXX UNSPECIFIED */
+			return (-1);
 		}
 	}
-	else {
-		/*
-		 * S=1
-		 */
-		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
-						   &bi->mbc_phaddr);
-		if (mbc == NULL) {
-			/* XXX panic */
-			return (0);
-		}
-		if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
-			mip6_dad_stop(mbc);
-		}
-		else {
-			/* remove rtable for proxy ND */
-			if (mip6_bc_proxy_control(&bi->mbc_phaddr, &bi->mbc_addr, RTM_DELETE)) {
-				/* XXX UNSPECIFIED */
-				return (-1);
-			}
 
-			/* remove encapsulation entry */
-			if (mip6_tunnel_control(MIP6_TUNNEL_DELETE,
-						mbc,
-						mip6_bc_encapcheck,
-						&mbc->mbc_encap)) {
-				/* XXX UNSPECIFIED */
-				return (-1);
-			}
-		}
-
-		/* remove a BC entry. */
-		error = mip6_bc_list_remove(&mip6_bc_list, mbc);
-		if (error) {
-			mip6log((LOG_ERR,
-				 "%s:%d: can't remove BC.\n",
-				 __FILE__, __LINE__));
-			bi->mbc_status = IP6MA_STATUS_UNSPECIFIED;
-			bi->mbc_send_ba = 1;
-			bi->mbc_lifetime = bi->mbc_refresh = 0;
-			return (error);
-		}
+	/* remove a BC entry. */
+	error = mip6_bc_list_remove(&mip6_bc_list, mbc);
+	if (error) {
+		mip6log((LOG_ERR,
+		    "%s:%d: can't remove BC.\n",
+		    __FILE__, __LINE__));
+		bi->mbc_status = IP6MA_STATUS_UNSPECIFIED;
+		bi->mbc_send_ba = 1;
+		bi->mbc_lifetime = bi->mbc_refresh = 0;
+		return (error);
 	}
+
 	mbc = NULL;
 	if ((bi->mbc_flags & IP6MU_LINK) != 0) {
 		for (mbc = LIST_FIRST(&mip6_bc_list);
@@ -1222,15 +1154,6 @@ mip6_process_hrbu(bi)
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
-	/*
-	   10.3.1. Primary Care-of Address Registration
-	   ...
-	    -  L=0:  Defend the given address.  The Single Address Only (S) bit
-	       is ignored in this case since we cannot derive other on-link
-	       addresses without knowing the interface identifier.
-	*/
-	if ((bi->mbc_flags & IP6MU_LINK) == 0)
-		bi->mbc_flags |= IP6MU_SINGLE;
 
 	/* find the home ifp of this homeaddress. */
 	for (pr = nd_prefix.lh_first;
@@ -1253,7 +1176,8 @@ mip6_process_hrbu(bi)
 		return (0); /* XXX is 0 OK? */
 	}
 
-	if ((bi->mbc_flags & (IP6MU_SINGLE|IP6MU_LINK)) != 0) {
+	/* find the link-local prefix of the home ifp. */
+	if ((bi->mbc_flags & IP6MU_LINK) != 0) {
 		for (pr = nd_prefix.lh_first;
 		     pr;
 		     pr = pr->ndpr_next) {
@@ -1261,21 +1185,10 @@ mip6_process_hrbu(bi)
 				/* this prefix is not a home prefix. */
 				continue;
 			}
-			/* save linklocal prefix */
+			/* save link-local prefix. */
 			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr)) {
 				llpr = pr;
 				continue;
-			}
-			/* 10.2.
-			 * - However, if the `S' it field in the Binding Update is zero, the
-			     lifetime for each Binding Cache entry MUST NOT be greater
-			     then the minimum remaining valid lifetime for all subnet prefixes
-			     on the mobile node's home link.
-			 */
-			if ((bi->mbc_flags & IP6MU_SINGLE) == 0) {
-				/* save minimum prefix lifetime for later use. */
-				if (prlifetime > pr->ndpr_vltime)
-					prlifetime = pr->ndpr_vltime;
 			}
 		}
 	}
@@ -1308,53 +1221,51 @@ mip6_process_hrbu(bi)
 		bi->mbc_lifetime = prlifetime;
 
 	/*
-	 * -  S=0 & L=0:  Defend all non link-local unicast addresses possible
-	 *    on link.
-	 * -  S=0 & L=1:  Defend all non link-local unicast addresses possible
-	 *    on link and the derived link-local.
-	 * -  S=1 & L=0:  Defend the given address.
-	 * -  S=1 & L=1:  Defend both the given non link-local unicast (home)
-	 *    address and the derived link-local.
+	 * - L=0: defend the given address.
+	 * - L=1: defend both the given non link-local unicast (home)
+	 *        address and the derived link-local.
 	 */
-
+	/*
+	 * at first, check an existing binding cache entry for the
+	 * link-local.
+	 */
 	if ((bi->mbc_flags & IP6MU_LINK) != 0 && llpr != NULL) {
 		mip6_create_addr(&haddr,
 				 (const struct sockaddr_in6 *)&bi->mbc_phaddr,
 				 llpr);
 		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &haddr);
 		if (mbc == NULL) {
-			/* create a BC entry. */
-			mbc = mip6_bc_create(&haddr, &bi->mbc_pcoa, &bi->mbc_addr, bi->mbc_flags,
-					     bi->mbc_seqno, bi->mbc_lifetime, hifp);
-			if (mbc == NULL)
+			/*
+			 * create a new binding cache entry for the
+			 * link-local.
+			 */
+			mbc = mip6_bc_create(&haddr, &bi->mbc_pcoa,
+			    &bi->mbc_addr, bi->mbc_flags, bi->mbc_seqno,
+			    bi->mbc_lifetime, hifp);
+			if (mbc == NULL) {
+				/* XXX INSUFFICIENT RESOURCE error */
 				return (-1);
-
-			if ((bi->mbc_flags & IP6MU_DAD)) {
-				mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
-				mip6_dad_start(mbc);
-			} else {
-				/* create encapsulation entry */
-				mip6_tunnel_control(MIP6_TUNNEL_ADD,
-						    mbc,
-						    mip6_bc_encapcheck,
-						    &mbc->mbc_encap);
-
-				/* add rtable for proxy ND */
-				mip6_bc_proxy_control(&haddr, &bi->mbc_addr, RTM_ADD);
 			}
+
+			/* start DAD processing. */
+			mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
+			mip6_dad_start(mbc);
 		} else if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
 			mbc->mbc_pcoa = bi->mbc_pcoa;
 			mbc->mbc_seqno = bi->mbc_seqno;
 			busy++;
 		} else {
-			/* update a BC entry. */
+			/*
+			 * update the existing binding cache entry for
+			 * the link-local.
+			 */
 			mbc->mbc_pcoa = bi->mbc_pcoa;
 			mbc->mbc_flags = bi->mbc_flags;
 			mbc->mbc_seqno = bi->mbc_seqno;
 			mbc->mbc_lifetime = bi->mbc_lifetime;
 			mbc->mbc_expire
 				= time_second + mbc->mbc_lifetime;
-			/* sanity check for overflow */
+			/* sanity check for overflow. */
 			if (mbc->mbc_expire < time_second)
 				mbc->mbc_expire = 0x7fffffff;
 #ifdef MIP6_CALLOUTTEST
@@ -1364,162 +1275,60 @@ mip6_process_hrbu(bi)
 			mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
 			/* modify encapsulation entry */
 			/* XXX */
-			mip6_tunnel_control(MIP6_TUNNEL_CHANGE,
-					    mbc,
-					    mip6_bc_encapcheck,
-					    &mbc->mbc_encap);
+			if (mip6_tunnel_control(MIP6_TUNNEL_CHANGE, mbc,
+				mip6_bc_encapcheck, &mbc->mbc_encap)) {
+				/* XXX error */
+			}
 		}
 		mbc->mbc_flags |= IP6MU_CLONED;
 	}
 
-	if ((bi->mbc_flags & IP6MU_SINGLE) == 0) {
-		/*
-		 * create/update binding cache entries for each
-		 * address derived from all the routing prefixes on
-		 * this router.
-		 */
-		for (pr = nd_prefix.lh_first;
-		    pr;
-		    pr = pr->ndpr_next) {
-			if (!pr->ndpr_raf_onlink)
-				continue;
-			if (pr->ndpr_ifp != hifp)
-				continue;
-			if (IN6_IS_ADDR_LINKLOCAL(&pr->ndpr_prefix.sin6_addr))
-				continue;
-			mip6_create_addr(&haddr,
-					 (const struct sockaddr_in6 *)&bi->mbc_phaddr,
-					 pr);
-			mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
-							   &haddr);
-			if (mbc == NULL) {
-				/* create a BC entry. */
-				mbc = mip6_bc_create(&haddr,
-						     &bi->mbc_pcoa,
-						     &bi->mbc_addr,
-						     bi->mbc_flags,
-						     bi->mbc_seqno,
-						     bi->mbc_lifetime,
-						     hifp);
-				if (mbc == NULL)
-					return (-1);
-
-				if ((bi->mbc_flags & IP6MU_DAD) != 0) {
-					mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
-					if (SA6_ARE_ADDR_EQUAL(&haddr, &bi->mbc_phaddr))
-						prim_mbc = mbc;
-					else
-						mip6_dad_start(mbc);
-				} else {
-					/* create encapsulation entry */
-					/* XXX */
-					mip6_tunnel_control(MIP6_TUNNEL_ADD,
-							    mbc,
-							    mip6_bc_encapcheck,
-							    &mbc->mbc_encap);
-
-					/* add rtable for proxy ND */
-					mip6_bc_proxy_control(&haddr, &bi->mbc_addr,
-							      RTM_ADD);
-				}
-			} else if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
-				mbc->mbc_pcoa = bi->mbc_pcoa;
-				mbc->mbc_seqno = bi->mbc_seqno;
-				busy++;
-			} else {
-				/* update a BC entry. */
-				mbc->mbc_pcoa = bi->mbc_pcoa;
-				mbc->mbc_flags = bi->mbc_flags;
-				mbc->mbc_seqno = bi->mbc_seqno;
-				mbc->mbc_lifetime = bi->mbc_lifetime;
-				mbc->mbc_expire
-					= time_second + mbc->mbc_lifetime;
-				/* sanity check for overflow */
-				if (mbc->mbc_expire < time_second)
-					mbc->mbc_expire = 0x7fffffff;
-#ifdef MIP6_CALLOUTTEST
-				mip6_timeoutentry_update(mbc->mbc_timeout, mbc->mbc_expire);
-				mip6_timeoutentry_update(mbc->mbc_brr_timeout, mbc->mbc_expire - mbc->mbc_lifetime / 4);
-#endif /* MIP6_CALLOUTTEST */
-				mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
-				/* modify encapsulation entry */
-				/* XXX */
-				mip6_tunnel_control(MIP6_TUNNEL_CHANGE,
-						    mbc,
-						    mip6_bc_encapcheck,
-						    &mbc->mbc_encap);
-			}
-			if (!SA6_ARE_ADDR_EQUAL(&haddr, &bi->mbc_phaddr))
-				mbc->mbc_flags |= IP6MU_CLONED;
-
-		}
-	}
-	else {
-		/*
-		 * if S=1, create a binding cache exactly
-		 * for the only address specified by the sender.
-		 */
-		mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
-						   &bi->mbc_phaddr);
+	/*
+	 * next, check an existing binding cache entry for the unicast
+	 * (home) address.
+	 */
+	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &bi->mbc_phaddr);
+	if (mbc == NULL) {
+		/* create a binding cache entry for the home address. */
+		mbc = mip6_bc_create(&bi->mbc_phaddr, &bi->mbc_pcoa,
+		    &bi->mbc_addr, bi->mbc_flags, bi->mbc_seqno,
+		    bi->mbc_lifetime, hifp);
 		if (mbc == NULL) {
-			/* create BC entry */
-			mbc = mip6_bc_create(&bi->mbc_phaddr,
-					     &bi->mbc_pcoa,
-					     &bi->mbc_addr,
-					     bi->mbc_flags,
-					     bi->mbc_seqno,
-					     bi->mbc_lifetime,
-					     hifp);
-			if (mbc == NULL) {
-				/* XXX STATUS_RESOUCE */
-				return (-1);
-			}
+			/* XXX STATUS_RESOUCE */
+			return (-1);
+		}
 
-			if (bi->mbc_flags & IP6MU_DAD) {
-				mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
-				prim_mbc = mbc;
-			}
-			else {
-				/* create encapsulation entry */
-				if (mip6_tunnel_control(MIP6_TUNNEL_ADD,
-							mbc,
-							mip6_bc_encapcheck,
-							&mbc->mbc_encap)) {
-					/* XXX UNSPECIFIED */
-					return (-1);
-				}
-
-				/* add rtable for proxy ND */
-				mip6_bc_proxy_control(&bi->mbc_phaddr, &bi->mbc_addr, RTM_ADD);
-			}
-		} else if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
-			mbc->mbc_pcoa = bi->mbc_pcoa;
-			mbc->mbc_seqno = bi->mbc_seqno;
-			busy++;
-		} else {
-			/* update a BC entry. */
-			mbc->mbc_pcoa = bi->mbc_pcoa;
-			mbc->mbc_flags = bi->mbc_flags;
-			mbc->mbc_seqno = bi->mbc_seqno;
-			mbc->mbc_lifetime = bi->mbc_lifetime;
-			mbc->mbc_expire = time_second + mbc->mbc_lifetime;
-			/* sanity check for overflow */
-			if (mbc->mbc_expire < time_second)
-				mbc->mbc_expire = 0x7fffffff;
-			mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
+		/* mark that we should do DAD later in this function. */
+		mbc->mbc_state |= MIP6_BC_STATE_DAD_WAIT;
+		prim_mbc = mbc;
+	} else if ((mbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
+		mbc->mbc_pcoa = bi->mbc_pcoa;
+		mbc->mbc_seqno = bi->mbc_seqno;
+		busy++;
+	} else {
+		/*
+		 * update the existing binding cache entry for the
+		 * home address.
+		 */
+		mbc->mbc_pcoa = bi->mbc_pcoa;
+		mbc->mbc_flags = bi->mbc_flags;
+		mbc->mbc_seqno = bi->mbc_seqno;
+		mbc->mbc_lifetime = bi->mbc_lifetime;
+		mbc->mbc_expire = time_second + mbc->mbc_lifetime;
+		/* sanity check for overflow. */
+		if (mbc->mbc_expire < time_second)
+			mbc->mbc_expire = 0x7fffffff;
+		mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
 #ifdef MIP6_CALLOUTTEST
-			mip6_timeoutentry_update(mbc->mbc_timeout, mbc->mbc_expire);
-			/* mip6_timeoutentry_update(mbc->mbc_brr_timeout, mbc->mbc_expire - mbc->mbc_lifetime / 4); */
+		mip6_timeoutentry_update(mbc->mbc_timeout, mbc->mbc_expire);
+		/* mip6_timeoutentry_update(mbc->mbc_brr_timeout, mbc->mbc_expire - mbc->mbc_lifetime / 4); */
 #endif /* MIP6_CALLOUTTEST */
 
-			/* modify encapsulation entry */
-			if (mip6_tunnel_control(MIP6_TUNNEL_CHANGE,
-						mbc,
-						mip6_bc_encapcheck,
-						&mbc->mbc_encap)) {
-				/* XXX UNSPECIFIED */
-				return (-1);
-			}
+		/* modify the encapsulation entry. */
+		if (mip6_tunnel_control(MIP6_TUNNEL_CHANGE, mbc,
+			mip6_bc_encapcheck, &mbc->mbc_encap)) {
+			/* XXX UNSPECIFIED */
+			return (-1);
 		}
 	}
 
@@ -1529,11 +1338,17 @@ mip6_process_hrbu(bi)
 		return(0);
 	}
 
-	if (prim_mbc) {	/* D=1 and new entry */
-		/* start DAD */
+	if (prim_mbc) {
+		/*
+		 * a new binding cache(es) is created. start DAD
+		 * proccesing.
+		 */
 		mip6_dad_start(prim_mbc);
-	} else {	/* D=0 or update */
-		/* return BA */
+	} else {
+		/*
+		 * a binding cache entry(ies) are update.  return a
+		 * binding ack.
+		 */
 		bi->mbc_refresh = bi->mbc_lifetime * MIP6_REFRESH_LIFETIME_RATE / 100;
 		if (bi->mbc_refresh < MIP6_REFRESH_MINLIFETIME)
 			bi->mbc_refresh = bi->mbc_lifetime < MIP6_REFRESH_MINLIFETIME ?
