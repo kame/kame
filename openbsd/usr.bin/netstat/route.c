@@ -1,4 +1,4 @@
-/*	$OpenBSD: route.c,v 1.29 1999/09/22 05:10:04 deraadt Exp $	*/
+/*	$OpenBSD: route.c,v 1.37 2000/05/18 01:32:12 itojun Exp $	*/
 /*	$NetBSD: route.c,v 1.15 1996/05/07 02:55:06 thorpej Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)route.c	8.3 (Berkeley) 3/9/94";
 #else
-static char *rcsid = "$OpenBSD: route.c,v 1.29 1999/09/22 05:10:04 deraadt Exp $";
+static char *rcsid = "$OpenBSD: route.c,v 1.37 2000/05/18 01:32:12 itojun Exp $";
 #endif
 #endif /* not lint */
 
@@ -99,6 +99,7 @@ struct bits {
 	{ RTF_GATEWAY,	'G' },
 	{ RTF_HOST,	'H' },
 	{ RTF_REJECT,	'R' },
+	{ RTF_BLACKHOLE, 'B' },
 	{ RTF_DYNAMIC,	'D' },
 	{ RTF_MODIFIED,	'M' },
 	{ RTF_DONE,	'd' }, /* Completed -- for routing messages only */
@@ -432,7 +433,7 @@ p_sockaddr(sa, mask, flags, width)
 	register char *cp = workbuf;
 	size_t n;
 
-	switch(sa->sa_family) {
+	switch (sa->sa_family) {
 	case AF_INET:
 	    {
 		register struct sockaddr_in *sin = (struct sockaddr_in *)sa;
@@ -984,21 +985,64 @@ encap_print(rt)
 	register struct rtentry *rt;
 {
 	struct sockaddr_encap sen1, sen2, sen3;
+#ifdef INET6
+	struct sockaddr_in6 s61, s62;
+	char ip6addr[64];
+#endif /* INET6 */
 
 	bcopy(kgetsa(rt_key(rt)), &sen1, sizeof(sen1));
 	bcopy(kgetsa(rt_mask(rt)), &sen2, sizeof(sen2));
 	bcopy(kgetsa(rt->rt_gateway), &sen3, sizeof(sen3));
 
-	printf("%-18s %-5u ", netname(sen1.sen_ip_src.s_addr, 
-				      sen2.sen_ip_src.s_addr),
-	       sen1.sen_sport);
-	
-	printf("%-18s %-5u %-5u ", netname(sen1.sen_ip_dst.s_addr, 
-					   sen2.sen_ip_dst.s_addr),
-	       sen1.sen_dport, sen1.sen_proto);
-	
-	printf("%s/%08x/%-u\n", inet_ntoa(sen3.sen_ipsp_dst),
-	       ntohl(sen3.sen_ipsp_spi), sen3.sen_ipsp_sproto);
+        if (sen1.sen_type == SENT_IP4)
+	{
+	    printf("%-18s %-5u ", netname(sen1.sen_ip_src.s_addr, 
+				          sen2.sen_ip_src.s_addr),
+	           ntohs(sen1.sen_sport));
+
+	    printf("%-18s %-5u %-5u ", netname(sen1.sen_ip_dst.s_addr, 
+					       sen2.sen_ip_dst.s_addr),
+	           ntohs(sen1.sen_dport), sen1.sen_proto);
+	}
+
+#ifdef INET6
+	if (sen1.sen_type == SENT_IP6)
+	{
+	    bzero(&s61, sizeof(s61));
+	    bzero(&s62, sizeof(s62));
+	    s61.sin6_family = s62.sin6_family = AF_INET6;
+	    s61.sin6_len = s62.sin6_len = sizeof(s61);
+	    bcopy(&sen1.sen_ip6_src, &s61.sin6_addr, sizeof(struct in6_addr));
+	    bcopy(&sen2.sen_ip6_src, &s62.sin6_addr, sizeof(struct in6_addr));
+
+	    printf("%-42s %-5u ", netname6(&s61, &s62.sin6_addr),
+		   ntohs(sen1.sen_ip6_sport));
+
+	    bzero(&s61, sizeof(s61));
+	    bzero(&s62, sizeof(s62));
+	    s61.sin6_family = s62.sin6_family = AF_INET6;
+	    s61.sin6_len = s62.sin6_len = sizeof(s61);
+	    bcopy(&sen1.sen_ip6_dst, &s61.sin6_addr, sizeof(struct in6_addr));
+	    bcopy(&sen2.sen_ip6_dst, &s62.sin6_addr, sizeof(struct in6_addr));
+
+	    printf("%-42s %-5u %-5u ", netname6(&s61, &s62.sin6_addr),
+	           ntohs(sen1.sen_ip6_dport), sen1.sen_ip6_proto);
+	}
+#endif /* INET6 */
+
+	if (sen3.sen_type == SENT_IPSP)
+	  printf("%s/%08x/%-u\n", inet_ntoa(sen3.sen_ipsp_dst),
+	         ntohl(sen3.sen_ipsp_spi), sen3.sen_ipsp_sproto);
+
+#ifdef INET6
+	if (sen3.sen_type == SENT_IPSP6)
+	{
+	    inet_ntop(AF_INET6, &sen3.sen_ipsp6_dst,
+		      ip6addr, sizeof(ip6addr));
+	    printf("%s/%08x/%-u\n", ip6addr, ntohl(sen3.sen_ipsp6_spi),
+		   sen3.sen_ipsp6_sproto);
+	}
+#endif /* INET6 */
 }
 
 void

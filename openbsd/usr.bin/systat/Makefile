@@ -1,4 +1,4 @@
-#	$OpenBSD: Makefile,v 1.8 1998/07/24 00:10:58 millert Exp $
+#	$OpenBSD: Makefile,v 1.11 2000/01/05 11:04:21 itojun Exp $
 
 PROG=	systat
 
@@ -13,6 +13,7 @@ BINGRP=	kmem
 BINMODE=2555
 
 CPPFLAGS+=-DINET6
+
 LDADD+= -L${.CURDIR}/../../lib/libinet6 \
 	-L${.CURDIR}/../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
@@ -21,3 +22,7 @@ DPADD+= ${.CURDIR}/../../lib/libinet6/libinet6.a \
 	/usr/local/v6/lib/libinet6.a
 
 .include <bsd.prog.mk>
+
+.if (${UVM} == "yes")
+CFLAGS+=-DUVM
+.endif

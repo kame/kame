@@ -1,4 +1,4 @@
-/*	$OpenBSD: inet.c,v 1.33 1999/04/11 19:41:40 niklas Exp $	*/
+/*	$OpenBSD: inet.c,v 1.47 2000/06/15 20:05:48 angelos Exp $	*/
 /*	$NetBSD: inet.c,v 1.14 1995/10/03 21:42:37 thorpej Exp $	*/
 
 /*
@@ -38,7 +38,7 @@
 #if 0
 static char sccsid[] = "from: @(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-static char *rcsid = "$OpenBSD: inet.c,v 1.33 1999/04/11 19:41:40 niklas Exp $";
+static char *rcsid = "$OpenBSD: inet.c,v 1.47 2000/06/15 20:05:48 angelos Exp $";
 #endif
 #endif /* not lint */
 
@@ -71,7 +71,8 @@ static char *rcsid = "$OpenBSD: inet.c,v 1.33 1999/04/11 19:41:40 niklas Exp $";
 #include <netinet/ip_ipsp.h>
 #include <netinet/ip_ah.h>
 #include <netinet/ip_esp.h>
-#include <netinet/ip_ip4.h>
+#include <netinet/ip_ipip.h>
+#include <netinet/ip_ether.h>
 
 #include <arpa/inet.h>
 #include <limits.h>
@@ -666,6 +667,7 @@ ah_stats(off, name)
 
 	p1(ahs_input, "\t%u input AH packets\n");
 	p1(ahs_output, "\t%u output AH packets\n");
+        p(ahs_nopf, "\t%u packet%s from unsupported protocol families\n");
         p(ahs_hdrops, "\t%u packet%s shorter than header shows\n");
         p(ahs_pdrops, "\t%u packet%s dropped due to policy\n");
         p(ahs_notdb, "\t%u packet%s for which no TDB was found\n");
@@ -678,11 +680,44 @@ ah_stats(off, name)
         p(ahs_badauthl, "\t%u packet%s with bad authenticator length received\n");
 	p(ahs_invalid, "\t%u packet%s attempted to use an invalid tdb\n");
 	p(ahs_toobig, "\t%u packet%s got larger than max IP packet size\n");
+	p(ahs_crypto, "\t%u packet%s that failed crypto processing\n");
 	p(ahs_ibytes, "\t%qu input byte%s\n");
 	p(ahs_obytes, "\t%qu output byte%s\n");
 
 #undef p
 #undef p1
+}
+
+/*
+ * Dump etherip statistics structure.
+ */
+void
+etherip_stats(off, name)
+	u_long off;
+	char *name;
+{
+        struct etheripstat etheripstat;
+
+	
+        if (off == 0)
+                return;
+        kread(off, (char *)&etheripstat, sizeof (etheripstat));
+        printf("%s:\n", name);
+
+#define p(f, m) if (etheripstat.f || sflag <= 1) \
+    printf(m, etheripstat.f, plural(etheripstat.f))
+
+
+        p(etherip_hdrops, "\t%u packet%s shorter than header shows\n");
+        p(etherip_qfull, "\t%u packet%s were dropped due to full output queue\n");
+	p(etherip_noifdrops, "\t%u packet%s were dropped because of no interface/bridge information\n");
+        p(etherip_pdrops, "\t%u packet%s dropped due to policy\n");
+        p(etherip_adrops, "\t%u packet%s dropped for other reasons\n");
+	p(etherip_ipackets, "\t%u input ethernet-in-IP packets\n");
+	p(etherip_opackets, "\t%u output ethernet-in-IP packets\n");
+	p(etherip_ibytes, "\t%qu input byte%s\n");
+	p(etherip_obytes, "\t%qu output byte%s\n");
+#undef p
 }
 
 /*
@@ -706,18 +741,21 @@ esp_stats(off, name)
 
 	p(esps_input, "\t%u input ESP packet%s\n");
 	p(esps_output, "\t%u output ESP packet%s\n");
+        p(esps_nopf, "\t%u packet%s from unsupported protocol families\n");
         p(esps_hdrops, "\t%u packet%s shorter than header shows\n");
         p(esps_pdrops, "\t%u packet%s dropped due to policy\n");
         p(esps_notdb, "\t%u packet%s for which no TDB was found\n");
         p(esps_badkcr, "\t%u input packet%s that failed to be processed\n");
+        p(esps_badenc, "\t%u packet%s with bad encryption received\n");
         p(esps_badauth, "\t%u packet%s that failed verification received\n");
         p(esps_noxform, "\t%u packet%s for which no XFORM was set in TDB received\n");   
         p(esps_qfull, "\t%u packet%s were dropped due to full output queue\n");
         p(esps_wrap, "\t%u packet%s where counter wrapping was detected\n");
         p(esps_replay, "\t%u possibly replayed packet%s received\n"); 
-        p(esps_badilen, "\t%u packet%s with payload not a multiple of 8 received\n");
+        p(esps_badilen, "\t%u packet%s with bad payload size or padding received\n");
 	p(esps_invalid, "\t%u packet%s attempted to use an invalid tdb\n");
 	p(esps_toobig, "\t%u packet%s got larger than max IP packet size\n");
+	p(esps_crypto, "\t%u packet%s that failed crypto processing\n");
 	p(esps_ibytes, "\t%qu input byte%s\n");
 	p(esps_obytes, "\t%qu output byte%s\n");
 
@@ -728,29 +766,29 @@ esp_stats(off, name)
  * Dump ESP statistics structure.
  */
 void
-ip4_stats(off, name)
+ipip_stats(off, name)
         u_long off;
         char *name;
 {
-        struct ip4stat ip4stat;
+        struct ipipstat ipipstat;
 
         if (off == 0)
                 return;
-        kread(off, (char *)&ip4stat, sizeof (ip4stat));
+        kread(off, (char *)&ipipstat, sizeof (ipipstat));
         printf("%s:\n", name);
 
-#define p(f, m) if (ip4stat.f || sflag <= 1) \
-    printf(m, ip4stat.f, plural(ip4stat.f))
+#define p(f, m) if (ipipstat.f || sflag <= 1) \
+    printf(m, ipipstat.f, plural(ipipstat.f))
 
-        p(ip4s_ipackets, "\t%u total input packet%s\n");
-        p(ip4s_opackets, "\t%u total output packet%s\n");
-        p(ip4s_hdrops, "\t%u packet%s shorter than header shows\n");
-        p(ip4s_pdrops, "\t%u packet%s dropped due to policy\n");
-        p(ip4s_spoof, "\t%u packet%s with possibly spoofed local addresses\n");
-        p(ip4s_notip4, "\t%u packet%s with internal header not IPv4 received\n");
-        p(ip4s_qfull, "\t%u packet%s were dropped due to full output queue\n");
-	p(ip4s_ibytes, "\t%qu input byte%s\n");
-	p(ip4s_obytes, "\t%qu output byte%s\n");
-
+        p(ipips_ipackets, "\t%u total input packet%s\n");
+        p(ipips_opackets, "\t%u total output packet%s\n");
+        p(ipips_hdrops, "\t%u packet%s shorter than header shows\n");
+        p(ipips_pdrops, "\t%u packet%s dropped due to policy\n");
+        p(ipips_spoof, "\t%u packet%s with possibly spoofed local addresses\n");
+        p(ipips_qfull, "\t%u packet%s were dropped due to full output queue\n");
+	p(ipips_ibytes, "\t%qu input byte%s\n");
+	p(ipips_obytes, "\t%qu output byte%s\n");
+	p(ipips_family, "\t%u protocol family mismatches\n");
+	p(ipips_unspec, "\t%u attempts to use tunnel with unspecified endpoint(s)\n");
 #undef p
 }

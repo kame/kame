@@ -1,4 +1,4 @@
-/*	$OpenBSD: main.c,v 1.17 1999/03/01 01:28:13 d Exp $	*/
+/*	$OpenBSD: main.c,v 1.21 2000/01/21 03:24:06 angelos Exp $	*/
 /*	$NetBSD: main.c,v 1.9 1996/05/07 02:55:02 thorpej Exp $	*/
 
 /*
@@ -44,7 +44,7 @@ char copyright[] =
 #if 0
 static char sccsid[] = "from: @(#)main.c	8.4 (Berkeley) 3/1/94";
 #else
-static char *rcsid = "$OpenBSD: main.c,v 1.17 1999/03/01 01:28:13 d Exp $";
+static char *rcsid = "$OpenBSD: main.c,v 1.21 2000/01/21 03:24:06 angelos Exp $";
 #endif
 #endif /* not lint */
 
@@ -146,28 +146,30 @@ struct nlist nl[] = {
 #define N_ESPSTAT	37
 	{ "_espstat"},
 #define N_IP4STAT	38
-	{ "_ip4stat"},
+	{ "_ipipstat"},
 #define N_DDPSTAT	39
 	{ "_ddpstat"},
 #define N_DDPCB		40
 	{ "_ddpcb"},
-#define N_IP6STAT	41
+#define N_ETHERIPSTAT	41
+	{ "_etheripstat"},
+#define N_IP6STAT	42
 	{ "_ip6stat" },
-#define N_ICMP6STAT	42
+#define N_ICMP6STAT	43
 	{ "_icmp6stat" },
-#define N_IPSECSTAT	43
+#define N_IPSECSTAT	44
 	{ "_ipsecstat" },
-#define N_IPSEC6STAT	44
+#define N_IPSEC6STAT	45
 	{ "_ipsec6stat" },
-#define N_PIM6STAT	45
+#define N_PIM6STAT	46
 	{ "_pim6stat" },
-#define N_MRT6PROTO	46
+#define N_MRT6PROTO	47
 	{ "_ip6_mrtproto" },
-#define N_MRT6STAT	47
+#define N_MRT6STAT	48
 	{ "_mrt6stat" },
-#define N_MF6CTABLE	48
+#define N_MF6CTABLE	49
 	{ "_mf6ctable" },
-#define N_MIF6TABLE	49
+#define N_MIF6TABLE	50
 	{ "_mif6table" },
 	{ ""},
 };
@@ -195,7 +197,9 @@ struct protox {
 	{ -1,		N_ESPSTAT,	1,	0,
 	  esp_stats,	"esp" },
 	{ -1,		N_IP4STAT,	1,	0,
-	  ip4_stats,	"ipencap" },
+	  ipip_stats,	"ipencap" },
+	{ -1,		N_ETHERIPSTAT,	1,	0,
+	  etherip_stats,"etherip" },
 	{ -1,		-1,		0,	0,
 	  0,		0 }
 };
@@ -218,8 +222,6 @@ struct protox ipxprotox[] = {
 	  ipx_stats,	"ipx" },
 	{ N_IPX,	N_SPXSTAT,	1,	ipxprotopr,
 	  spx_stats,	"spx" },
-	{ -1,		N_IPXERR,	1,	0,
-	  ipxerr_stats,	"ipx_err" },
 	{ -1,		-1,		0,	0,
 	  0,		0 }
 };
