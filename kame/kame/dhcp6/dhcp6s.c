@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.154 2005/03/27 06:09:45 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.155 2005/03/29 12:34:32 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -2783,7 +2783,7 @@ binding_timo(arg)
 			}
 		}
 
-		/* If all IA parameters has expired, remove the binding. */
+		/* If all IA parameters have expired, remove the binding. */
 		if (TAILQ_EMPTY(ia_list)) {
 			remove_binding(binding);
 			return (NULL);
