@@ -58,7 +58,9 @@ static	struct in6_addr llsol;
 
 struct in6_addr **in6_iflladdr = NULL;
 struct in6_ifstat **in6_ifstat = NULL;
+struct icmp6_ifstat **icmp6_ifstat = NULL;
 size_t in6_ifstatmax = 0;
+size_t icmp6_ifstatmax = 0;
 unsigned long in6_maxmtu = 0;
 
 int found_first_ifid = 0;
@@ -250,8 +252,9 @@ in6_ifattach(ifp, type, laddr, noloop)
 	 * since if_index will grow dynamically, they should grow too.
 	 *	struct in6_addr **in6_iflladdr
 	 *	struct in6_ifstat **in6_ifstat
+	 *	struct icmp6_ifstat **icmp6_ifstat
 	 */
-	if (in6_iflladdr == NULL || in6_ifstat == NULL
+	if (in6_iflladdr == NULL || in6_ifstat == NULL || icmp6_ifstat == NULL
 	 || if_index >= if_indexlim) {
 		size_t n;
 		caddr_t q;
@@ -283,6 +286,18 @@ in6_ifattach(ifp, type, laddr, noloop)
 		}
 		in6_ifstat = (struct in6_ifstat **)q;
 		in6_ifstatmax = if_indexlim;
+
+		/* grow icmp6_ifstat */
+		n = if_indexlim * sizeof(struct icmp6_ifstat *);
+		q = (caddr_t)malloc(n, M_IFADDR, M_WAITOK);
+		bzero(q, n);
+		if (icmp6_ifstat) {
+			bcopy((caddr_t)icmp6_ifstat, q,
+				olim * sizeof(struct icmp6_ifstat *));
+			free((caddr_t)icmp6_ifstat, M_IFADDR);
+		}
+		icmp6_ifstat = (struct icmp6_ifstat **)q;
+		icmp6_ifstatmax = if_indexlim;
 	}
 
 	/*
@@ -569,6 +584,11 @@ in6_ifattach(ifp, type, laddr, noloop)
 		in6_ifstat[ifp->if_index] = (struct in6_ifstat *)
 			malloc(sizeof(struct in6_ifstat), M_IFADDR, M_WAITOK);
 		bzero(in6_ifstat[ifp->if_index], sizeof(struct in6_ifstat));
+	}
+	if (icmp6_ifstat[ifp->if_index] == NULL) {
+		icmp6_ifstat[ifp->if_index] = (struct icmp6_ifstat *)
+			malloc(sizeof(struct icmp6_ifstat), M_IFADDR, M_WAITOK);
+		bzero(icmp6_ifstat[ifp->if_index], sizeof(struct icmp6_ifstat));
 	}
 
 	/* initialize NDP variables */

@@ -693,6 +693,20 @@ in6_control(so, cmd, data, ifp)
 			ifr->ifr_ifru.ifru_stat = *in6_ifstat[ifp->if_index];
 		break;
 
+	case SIOCGIFSTAT_ICMP6:
+		if (ifp == NULL)
+			/* I believe we can omit the check for if_index */
+			return EINVAL;
+		if (icmp6_ifstat == NULL || ifp->if_index >= icmp6_ifstatmax ||
+		    icmp6_ifstat[ifp->if_index] == NULL) {
+			/* return EAFNOSUPPORT? */
+			bzero(&ifr->ifr_ifru.ifru_stat,
+				sizeof(ifr->ifr_ifru.ifru_icmp6stat));
+		} else
+			ifr->ifr_ifru.ifru_icmp6stat =
+				*icmp6_ifstat[ifp->if_index];
+		break;
+
 	case SIOCSIFDSTADDR_IN6:
 		if ((ifp->if_flags & IFF_POINTOPOINT) == 0)
 			return(EINVAL);

@@ -144,6 +144,88 @@ struct in6_ifstat {
 	u_int64_t ifs6_out_mcast;	/* # of outbound multicast datagrams */
 };
 
+/*
+ * ICMPv6 interface statistics, as defined in RFC2466 Ipv6IfIcmpEntry.
+ * XXX: I'm not sure if this file is the right place for this structure...
+ */
+struct icmp6_ifstat {
+	/*
+	 * Input statistics
+	 */
+	/* ipv6IfIcmpInMsgs, total # of input messages */
+	u_int64_t ifs6_in_msg;
+	/* ipv6IfIcmpInErrors, # of input error messages */
+	u_int64_t ifs6_in_error;
+	/* ipv6IfIcmpInDestUnreachs, # of input dest unreach errors */
+	u_int64_t ifs6_in_dstunreach;
+	/* ipv6IfIcmpInAdminProhibs, # of input administratively prohibited errs */
+	u_int64_t ifs6_in_adminprohib;
+	/* ipv6IfIcmpInTimeExcds, # of input time exceeded errors */
+	u_int64_t ifs6_in_timeexceed;
+	/* ipv6IfIcmpInParmProblems, # of input parameter problem errors */
+	u_int64_t ifs6_in_paramprob;
+	/* ipv6IfIcmpInPktTooBigs, # of input packet too big errors */
+	u_int64_t ifs6_in_pkttoobig;
+	/* ipv6IfIcmpInEchos, # of input echo requests */
+	u_int64_t ifs6_in_echo;
+	/* ipv6IfIcmpInEchoReplies, # of input echo replies */
+	u_int64_t ifs6_in_echoreply;
+	/* ipv6IfIcmpInRouterSolicits, # of input router solicitations */
+	u_int64_t ifs6_in_routersolicit;
+	/* ipv6IfIcmpInRouterAdvertisements, # of input router advertisements */
+	u_int64_t ifs6_in_routeradvert;
+	/* ipv6IfIcmpInNeighborSolicits, # of input neighbor solicitations */
+	u_int64_t ifs6_in_neighborsolicit;
+	/* ipv6IfIcmpInNeighborAdvertisements, # of input neighbor advertisements */
+	u_int64_t ifs6_in_neighboradvert;
+	/* ipv6IfIcmpInRedirects, # of input redirects */
+	u_int64_t ifs6_in_redirect;
+	/* ipv6IfIcmpInGroupMembQueries, # of input MLD queries */
+	u_int64_t ifs6_in_mldquery;
+	/* ipv6IfIcmpInGroupMembResponses, # of input MLD responses */
+	u_int64_t ifs6_in_mldresponse;
+	/* ipv6IfIcmpInGroupMembReductions, # of input MLD done */
+	u_int64_t ifs6_in_mlddone;
+
+	/*
+	 * Output statistics. We should solve unresolved routing problem...  
+	 */
+	/* ipv6IfIcmpOutMsgs, total # of output messages */
+	u_int64_t ifs6_out_msg;
+	/* ipv6IfIcmpOutErrors, # of output error messages */
+	u_int64_t ifs6_out_error;
+	/* ipv6IfIcmpOutDestUnreachs, # of output dest unreach errors */
+	u_int64_t ifs6_out_dstunreach;
+	/* ipv6IfIcmpOutAdminProhibs, # of output administratively prohibited errs */
+	u_int64_t ifs6_out_adminprohib;
+	/* ipv6IfIcmpOutTimeExcds, # of output time exceeded errors */
+	u_int64_t ifs6_out_timeexceed;
+	/* ipv6IfIcmpOutParmProblems, # of output parameter problem errors */
+	u_int64_t ifs6_out_paramprob;
+	/* ipv6IfIcmpOutPktTooBigs, # of output packet too big errors */
+	u_int64_t ifs6_out_pkttoobig;
+	/* ipv6IfIcmpOutEchos, # of output echo requests */
+	u_int64_t ifs6_out_echo;
+	/* ipv6IfIcmpOutEchoReplies, # of output echo replies */
+	u_int64_t ifs6_out_echoreply;
+	/* ipv6IfIcmpOutRouterSolicits, # of output router solicitations */
+	u_int64_t ifs6_out_routersolicit;
+	/* ipv6IfIcmpOutRouterAdvertisements, # of output router advertisements */
+	u_int64_t ifs6_out_routeradvert;
+	/* ipv6IfIcmpOutNeighborSolicits, # of output neighbor solicitations */
+	u_int64_t ifs6_out_neighborsolicit;
+	/* ipv6IfIcmpOutNeighborAdvertisements, # of output neighbor advertisements */
+	u_int64_t ifs6_out_neighboradvert;
+	/* ipv6IfIcmpOutRedirects, # of output redirects */
+	u_int64_t ifs6_out_redirect;
+	/* ipv6IfIcmpOutGroupMembQueries, # of output MLD queries */
+	u_int64_t ifs6_out_mldquery;
+	/* ipv6IfIcmpOutGroupMembResponses, # of output MLD responses */
+	u_int64_t ifs6_out_mldresponse;
+	/* ipv6IfIcmpOutGroupMembReductions, # of output MLD done */
+	u_int64_t ifs6_out_mlddone;
+};
+
 struct	in6_ifreq {
 	char	ifr_name[IFNAMSIZ];
 	union {
@@ -155,6 +237,7 @@ struct	in6_ifreq {
 		caddr_t	ifru_data;
 		struct in6_addrlifetime ifru_lifetime;
 		struct in6_ifstat ifru_stat;
+		struct icmp6_ifstat ifru_icmp6stat;
 	} ifr_ifru;
 };
 
@@ -296,6 +379,7 @@ struct	in6_rrenumreq {
 #define SIOCGIFALIFETIME_IN6	_IOWR('i', 81, struct in6_ifreq)
 #define SIOCSIFALIFETIME_IN6	_IOWR('i', 82, struct in6_ifreq)
 #define SIOCGIFSTAT_IN6		_IOWR('i', 83, struct in6_ifreq)
+#define SIOCGIFSTAT_ICMP6	_IOWR('i', 84, struct in6_ifreq)
 
 #define SIOCSIFPREFIX_IN6	_IOW('i', 100, struct in6_prefixreq) /* set */
 #define SIOCGIFPREFIX_IN6	_IOWR('i', 101, struct in6_prefixreq) /* get */
@@ -325,6 +409,9 @@ extern struct in6_ifaddr *in6_ifaddr;
 
 extern struct in6_ifstat **in6_ifstat;
 extern size_t in6_ifstatmax;
+extern struct icmp6stat icmp6stat;
+extern struct icmp6_ifstat **icmp6_ifstat;
+extern size_t icmp6_ifstatmax;
 #define in6_ifstat_inc(ifp, tag) \
 do {								\
 	if ((ifp) && (ifp)->if_index < if_index			\

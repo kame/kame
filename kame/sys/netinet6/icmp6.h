@@ -579,7 +579,14 @@ void	icmp6_mtuexpire __P((struct rtentry *, struct rttimer *));
 int	icmp6_sysctl __P((int *, u_int, void *, size_t *, void *, size_t));
 #endif
 
-extern struct	icmp6stat icmp6stat;
+#define icmp6_ifstat_inc(ifp, tag) \
+do {								\
+	if ((ifp) && (ifp)->if_index < if_index			\
+	 && (ifp)->if_index < icmp6_ifstatmax			\
+	 && icmp6_ifstat && icmp6_ifstat[(ifp)->if_index]) {	\
+		icmp6_ifstat[(ifp)->if_index]->tag++;		\
+	}							\
+} while (0)
 extern int	icmp6_rediraccept;	/* accept/process redirects */
 extern int	icmp6_redirtimeout;	/* cache time for redirect routes */
 #endif /* _KERNEL */
