@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.202 1999/10/21 06:17:37 sakane Exp $
+$Id: CHANGELOG,v 1.203 1999/10/21 08:49:59 jinmei Exp $
 
 <199910>
+1999-10-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* *bsd*/usr.sbin/traceroute/Makefile: added OS-specific
+	compilation options, one of which would fix a problem of bad
+	checksums for probe packets.
+
 Thu Oct 21 15:12:16 JST 1999 skane@ydc.co.jp
 	* kame/kame/racoon:
 	Make it compilable on INRIA stack.
