@@ -1,4 +1,4 @@
-/*	$KAME: name6.c,v 1.31 2001/01/05 13:37:37 itojun Exp $	*/
+/*	$KAME: name6.c,v 1.32 2001/11/09 00:55:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -275,13 +275,6 @@ _hostconf_init(void)
 #else /* HOSTCONF_KWD */
 	n = 0;
 #endif /* HOSTCONF_KWD */
-#ifdef __V6D__
-	if ((p = getenv("V6ROOT")) != NULL) {
-		strcpy(buf, p);
-		strcat(buf, HOSTCONF);
-		p = buf;
-	} else
-#endif /* __V6D__ */
 	p = HOSTCONF;
 	if ((fp = fopen(p, "r")) == NULL)
 		return;
@@ -922,16 +915,6 @@ static FILE *
 _files_open(int *errp)
 {
 	FILE *fp;
-#ifdef __V6D__
-	char *p;
-	char path[BUFSIZ];
-
-	if ((p = getenv("V6ROOT")) != NULL) {
-		strcpy(path, p);
-		strcat(path, _PATH_HOSTS);
-		fp = fopen(path, "r");
-	} else
-#endif /* __V6D__ */
 	fp = fopen(_PATH_HOSTS, "r");
 	if (fp == NULL)
 		*errp = NO_RECOVERY;
