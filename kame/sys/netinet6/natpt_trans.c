@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.158 2002/12/11 12:06:10 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.159 2002/12/13 05:25:56 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -2179,14 +2179,11 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 	 * In case FTP6 server sends response to FTP4 client.
 	 */
 	switch (ts->ftpstate) {
+	case FTPS_EPSV:
 	case FTPS_PASV:
 		if (ftp6.cmd != 229)
 			return (0);
 
-		/*
-		 * getting:   229 Entering Extended Passive Mode (|||6446|)
-		 * expecting: 227 Entering Passive Mode (h1,h2,h3,h4,p1,p2).
-		 */
 		if (natpt_parse229(ftp6.arg, kk, &sin6) == NULL)
 			return (0);
 
@@ -2220,7 +2217,17 @@ natpt_translateFTP6CommandTo4(struct pcv *cv4)
 			return (0);
 
 		/*
+		 * If v4 FTP client speaks EPSV, translation is
+		 * unnecessary.
+		 */
+		if (ts->ftpstate == FTPS_EPSV)
+			return (0);
+
+		/*
 		 * Rewrite FTP reply
+		 *
+		 * getting:   229 Entering Extended Passive Mode (|||6446|)
+		 * expecting: 227 Entering Passive Mode (h1,h2,h3,h4,p1,p2).
 		 */
 
 		/* v4 client side */
@@ -2323,6 +2330,17 @@ natpt_translateFTP4ReplyTo6(struct pcv *cv6)
 
 		ts->rewrite[cv6->fromto] = 1;
 		delta = natpt_rewriteMbuf(cv6->m, kb, (kk-kb), Wow, strlen(Wow));
+		return (delta);
+
+
+	case FTP6_EPSV:
+		/*
+		 * Some v4 FTP clients (e.g. FTP on FreeBSD4 or later)
+		 * speak EPSV when connect to v4 FTP server.
+		 * Translation is unnecessary but preparation for
+		 * response from FTP server is needed.
+		 */
+		ts->ftpstate = FTPS_EPSV;
 		return (delta);
 	}
 
