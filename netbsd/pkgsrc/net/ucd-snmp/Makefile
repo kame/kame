@@ -3,7 +3,7 @@
 # Date created:				26 June 1996
 # Whom:					itojun@iijlab.net
 #
-# $Id: Makefile,v 1.8 1999/11/18 03:19:34 itojun Exp $
+# $Id: Makefile,v 1.9 2000/01/24 04:02:09 itojun Exp $
 #
 
 DISTNAME=	ucd-snmp-4.0.1
@@ -14,7 +14,7 @@ MASTER_SITES= 	ftp://ucd-snmp.ucdavis.edu/ \
 		ftp://ftp.win.or.jp/pub/network/snmp/ucd-snmp/
 
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	ucd-snmp-4.0.1-v6-19991118a.diff.gz
+PATCHFILES=	ucd-snmp-4.0.1-v6-20000124b.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@iijlab.net
