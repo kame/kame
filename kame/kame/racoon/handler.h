@@ -1,4 +1,4 @@
-/*	$KAME: handler.h,v 1.39 2001/04/06 14:23:47 sakane Exp $	*/
+/*	$KAME: handler.h,v 1.40 2001/04/11 05:27:23 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -137,10 +137,8 @@ struct ph1handle {
 	vchar_t *sig;			/* SIG minus general header */
 	vchar_t *sig_p;			/* peer's SIG minus general header */
 	cert_t *cert;			/* CERT minus general header */
-	cert_t *cert_p;			/* peer's CERT not including general *
-					 * header and certificate type.      */
-	cert_t *crl_p;			/* peer's CRL not including general  *
-					 * header and certificate type.      */
+	cert_t *cert_p;			/* peer's CERT minus general header */
+	cert_t *crl_p;			/* peer's CRL minus general header */
 	cert_t *cr_p;			/* peer's CR not including general */
 	vchar_t *id;			/* ID minus gen header */
 	vchar_t *id_p;			/* partner's ID minus general header */
