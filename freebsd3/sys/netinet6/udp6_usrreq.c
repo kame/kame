@@ -508,18 +508,19 @@ udp6_ctlinput(cmd, sa, d)
 	struct ip6_hdr *ip6;
 	struct mbuf *m;
 	int off = 0;
+	void (*notify) __P((struct inpcb *, int)) = udp_notify;
 
 	if (sa->sa_family != AF_INET6 ||
 	    sa->sa_len != sizeof(struct sockaddr_in6))
 		return;
 
-#if 0
-	if (cmd == PRC_IFNEWADDR)
-		in6_mrejoin(&udb6);
-	else
-#endif
-	if (!PRC_IS_REDIRECT(cmd) &&
-	    ((unsigned)cmd >= PRC_NCMDS || inet6ctlerrmap[cmd] == 0))
+	if ((unsigned)cmd >= PRC_NCMDS)
+		return;
+	if (PRC_IS_REDIRECT(cmd))
+		notify = in6_rtchange, d = NULL;
+	else if (cmd == PRC_HOSTDEAD)
+		d = NULL;
+	else if (inet6ctlerrmap[cmd] == 0)
 		return;
 
 	/* if the parameter is from icmp6, decode it. */
@@ -561,10 +562,10 @@ udp6_ctlinput(cmd, sa, d)
 			uhp = (struct udphdr *)(mtod(m, caddr_t) + off);
 		(void) in6_pcbnotify(&udb, (struct sockaddr *)&sa6,
 				     uhp->uh_dport, &s,
-				     uhp->uh_sport, cmd, udp_notify);
+				     uhp->uh_sport, cmd, notify);
 	} else
 		(void) in6_pcbnotify(&udb, (struct sockaddr *)&sa6, 0,
-				     &zeroin6_addr, 0, cmd, udp_notify);
+				     &zeroin6_addr, 0, cmd, notify);
 }
 
 static int
