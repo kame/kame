@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1655 2001/04/27 08:56:59 itojun Exp $
+$KAME: CHANGELOG,v 1.1656 2001/04/27 09:59:54 itojun Exp $
 
 <200104>
 Fri Apr 27 17:53:54 JST 2001  itojun@iijlab.net
@@ -15,6 +15,7 @@ Fri Apr 27 17:53:54 JST 2001  itojun@iijlab.net
 	  set by user.  it is useful to configure outgoing-only stf interface,
 	  like:
 	  # ifconfig stf0 inet6 2002:d2a0:5f68::1 prefixlen 16 alias deprecated 
+	* sys/net/if_stf.c: IFF_LINK0 disables the input path.
 
 2001-04-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_rtrequest): stop process if
