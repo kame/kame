@@ -1,4 +1,4 @@
-/*	$KAME: routesock.c,v 1.14 2002/05/28 12:24:22 suz Exp $	*/
+/*	$KAME: routesock.c,v 1.15 2002/05/29 12:02:42 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -79,6 +79,7 @@
 #include "vif.h"
 #include "debug.h"
 #include "routesock.h"
+#include "mrt.h"
 
 #ifdef HAVE_ROUTING_SOCKETS
 union sockunion
@@ -353,12 +354,37 @@ getmsg(rtm, msglen, rpfinfop)
 	   inet_ntop(AF_INET6, &sin6->sin6_addr, in6txt, INET6_ADDRSTRLEN));
     }
 
-    if (gate && rtm->rtm_flags & RTF_GATEWAY)
+    if (gate)
     {
 	sin6 = (struct sockaddr_in6 *) gate;
 	IF_DEBUG(DEBUG_RPF)
 	    log(LOG_DEBUG, 0, " gateway is: %s",
 	   inet_ntop(AF_INET6, &sin6->sin6_addr, in6txt, INET6_ADDRSTRLEN));
+
+    	/* RPF for static interface routes for P2P interface */
+	if (!(rtm->rtm_flags & RTF_GATEWAY)) 
+	{
+	    mifi_t p2pif;
+
+	    IF_DEBUG(DEBUG_RPF)
+		log(LOG_DEBUG, 0, " it's a static interface route for P2P I/F");
+
+	    /* gateway must be a local address of an interface in this case */
+	    p2pif = local_address(sin6);
+	    if (p2pif == NO_VIF)
+	    	return (FALSE);
+	    if ((uvifs[p2pif].uv_flags & VIFF_POINT_TO_POINT) == NULL)
+	    	return (FALSE);
+	    	
+	    /* the 1st peer would be the RPF */
+	    if (uvifs[p2pif].uv_flags & VIFF_NONBRS)
+	    	return (FALSE);
+	    *sin6 = uvifs[p2pif].uv_pim_neighbors->address;
+	    IF_DEBUG(DEBUG_RPF)
+		log(LOG_DEBUG, 0, " RPF neighbor is finally %s",
+		    inet_ntop(AF_INET6, &sin6->sin6_addr, in6txt, INET6_ADDRSTRLEN));
+	}
+		
 	rpfinfop->rpfneighbor = *sin6;
 
 	if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr))
