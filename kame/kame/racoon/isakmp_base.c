@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_base.c,v 1.41 2001/03/27 02:39:57 thorpej Exp $	*/
+/*	$KAME: isakmp_base.c,v 1.42 2001/10/05 02:47:07 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -238,7 +238,8 @@ base_i2recv(iph1, msg)
 	}
 
 	/* veryfy identifier */
-	if (ipsecdoi_checkid1(iph1) < 0) {
+	error = ipsecdoi_checkid1(iph1);
+	if (error != 0) {
 		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"invalid ID payload.\n");
 		goto end;
@@ -655,7 +656,8 @@ base_r1recv(iph1, msg)
 	}
 
 	/* verify identifier */
-	if (ipsecdoi_checkid1(iph1) < 0) {
+	error = ipsecdoi_checkid1(iph1);
+	if (error != 0) {
 		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"invalid ID payload.\n");
 		goto end;

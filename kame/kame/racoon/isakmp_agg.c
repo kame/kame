@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_agg.c,v 1.49 2001/03/27 02:39:57 thorpej Exp $	*/
+/*	$KAME: isakmp_agg.c,v 1.50 2001/10/05 02:47:07 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -352,7 +352,8 @@ agg_i2recv(iph1, msg)
 	/* XXX to be checked each authentication method. */
 
 	/* verify identifier */
-	if (ipsecdoi_checkid1(iph1) < 0) {
+	error = ipsecdoi_checkid1(iph1);
+	if (error != 0) {
 		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"invalid ID payload.\n");
 		goto end;
@@ -684,7 +685,8 @@ agg_r1recv(iph1, msg)
 	/* XXX to be checked each authentication method. */
 
 	/* verify identifier */
-	if (ipsecdoi_checkid1(iph1) < 0) {
+	error = ipsecdoi_checkid1(iph1);
+	if (error != 0) {
 		plog(LLV_ERROR, LOCATION, iph1->remote,
 			"invalid ID payload.\n");
 		goto end;

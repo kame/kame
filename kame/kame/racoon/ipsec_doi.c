@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.147 2001/09/26 05:30:34 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.148 2001/10/05 02:47:06 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2942,13 +2942,13 @@ ipsecdoi_checkid1(iph1)
 	if (iph1->id_p == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"invalid iph1 passed id_p == NULL\n");
-		return -1;
+		return ISAKMP_INTERNAL_ERROR;
 	}
 	if (iph1->id_p->l < sizeof(id_b)) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"invalid value passed as \"ident\" (len=%lu)\n",
 			(u_long)iph1->id_p->l);
-		return -1;
+		return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 	}
 
 	id_b = (struct ipsecdoi_id_b *)iph1->id_p->v;
@@ -2961,7 +2961,7 @@ ipsecdoi_checkid1(iph1)
 			plog(LLV_ERROR, LOCATION, NULL,
 				"Expecting IP address type in main mode, "
 				"but %s.\n", s_ipsecdoi_ident(id_b->type));
-			return -1;
+			return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 		}
 	}
 
@@ -3010,7 +3010,7 @@ ipsecdoi_checkid1(iph1)
 					plog(LLV_ERROR, LOCATION, NULL,
 						"invalid family: %d\n",
 						iph1->remote->sa_family);
-					return -1;
+					return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 				}
 				if (ntohs(id_b->port) != port) {
 					plog(LLV_WARNING, LOCATION, NULL,
@@ -3032,7 +3032,7 @@ ipsecdoi_checkid1(iph1)
 			plog(LLV_WARNING, LOCATION, NULL,
 				"ID type mismatched.\n");
 			if (iph1->rmconf->verify_identifier)
-				return -1;
+				return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 		}
 
 		/* compare defined ID with the ID sent by peer. */
@@ -3046,7 +3046,7 @@ ipsecdoi_checkid1(iph1)
 				plog(LLV_WARNING, LOCATION, NULL,
 					"ID value mismatched.\n");
 				if (iph1->rmconf->verify_identifier)
-					return -1;
+					return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 			}
 			break;
 		default:
@@ -3054,7 +3054,7 @@ ipsecdoi_checkid1(iph1)
 				plog(LLV_WARNING, LOCATION, NULL,
 					"ID value mismatched.\n");
 				if (iph1->rmconf->verify_identifier)
-					return -1;
+					return ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 			}
 			break;
 		}
