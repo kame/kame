@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.86 2000/07/14 11:13:37 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.87 2000/07/14 16:10:23 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -3075,7 +3075,7 @@ ipsecdoi_sockaddr2id(saddr, prefixlen, ul_proto)
 	 */
 	switch (saddr->sa_family) {
 	case AF_INET:
-		len1 = sizeof(struct ipsecdoi_id_b) + sizeof(struct in_addr);
+		len1 = sizeof(struct in_addr);
 		if (prefixlen == (sizeof(struct in_addr) << 3)) {
 			type = IPSECDOI_ID_IPV4_ADDR;
 			len2 = 0;
@@ -3133,7 +3133,7 @@ ipsecdoi_sockaddr2id(saddr, prefixlen, ul_proto)
 	/* set address */
 
 	/* set prefix */
-	if (len2 != 0) {
+	if (len2) {
 		u_char *p = new->v + sizeof(struct ipsecdoi_id_b) + len1;
 		u_int bits = prefixlen;
 
