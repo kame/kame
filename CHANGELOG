@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1524 2001/02/03 12:28:59 jinmei Exp $
+$KAME: CHANGELOG,v 1.1525 2001/02/03 12:38:28 jinmei Exp $
 
 <200102>
 2001-02-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -24,14 +24,14 @@ $KAME: CHANGELOG,v 1.1524 2001/02/03 12:28:59 jinmei Exp $
 <200101>
 Wed Jan 31 17:43:23 JST 2001 sakane@ydc.cojp
 	* racoon:
-	If the file for saving SA information is specified in the configuration
-	file, racoon will save a SA information to the file when negotiation
-	will succeed.  If you launch racoon with -B option and if the file is
-	specified, she will install SAs into the kernel during intializing.
-	racoon cleans the file file when she shutdowns normally.
-	The function is useful when an abnormal system shutdown happened.
-	Because SAs will remain at the peer.  In this case, you can use -B
-	option then SAs will revive.  
+	If the file for saving SA information is specified in the
+	configuration file, racoon will save a SA information to the file
+	when negotiation will succeed.  If you launch racoon with tye -B
+	option and if the file is specified, she will install SAs into the
+	kernel during intialization.  racoon cleans the file when she
+	shutdowns normally.  The function is useful when an abnormal
+	system shutdown happened, because SAs will remain at the peer.  In
+	this case, you can use the -B option then SAs will revive.
 
 	XXX racoon simply adds SAs to the end of the file specified.
 
