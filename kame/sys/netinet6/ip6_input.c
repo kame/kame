@@ -87,6 +87,9 @@
 #if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 #include <sys/proc.h>
 #endif
+#ifdef __OpenBSD__
+#include <dev/rndvar.h>
+#endif
 
 #include <net/if.h>
 #include <net/if_types.h>
@@ -123,10 +126,6 @@
 #endif
 
 #include <netinet6/ip6protosw.h>
-
-#ifdef __OpenBSD__
-#include <dev/rndvar.h>
-#endif
 
 /* we need it for NLOOP. */
 #ifndef __bsdi__

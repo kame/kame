@@ -38,6 +38,9 @@
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/syslog.h>
+#ifdef __OpenBSD__
+#include <dev/rndvar.h>
+#endif
 
 #include <net/if.h>
 #include <net/route.h>
@@ -50,10 +53,6 @@
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet6/icmp6.h>
-
-#ifdef __OpenBSD__
-#include <dev/rndvar.h>
-#endif
 
 #include <net/net_osdep.h>
 

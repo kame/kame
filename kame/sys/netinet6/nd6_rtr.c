@@ -40,6 +40,9 @@
 #include <sys/ioctl.h>
 #endif
 #include <sys/syslog.h>
+#ifdef __OpenBSD__
+#include <dev/rndvar.h>
+#endif
 
 #include <net/if.h>
 #include <net/if_types.h>

@@ -50,6 +50,9 @@
 #endif
 #include <sys/syslog.h>
 #include <sys/queue.h>
+#ifdef __OpenBSD__
+#include <dev/rndvar.h>
+#endif
 
 #include <net/if.h>
 #include <net/if_dl.h>

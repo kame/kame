@@ -48,6 +48,9 @@
 #endif 
 #include <sys/syslog.h>
 #include <sys/queue.h>
+#ifdef __OpenBSD__
+#include <dev/rndvar.h>
+#endif
 
 #include <net/if.h>
 #include <net/if_types.h>
@@ -61,10 +64,6 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/nd6.h>
 #include <netinet6/icmp6.h>
-
-#ifdef __OpenBSD__
-#include <dev/rndvar.h>
-#endif
 
 #include <net/net_osdep.h>
 

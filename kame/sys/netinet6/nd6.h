@@ -126,9 +126,15 @@ struct	in6_ndifreq {
 #define RETRANS_TIMER			1000	/* msec */
 #define MIN_RANDOM_FACTOR		512	/* 1024 * 0.5 */
 #define MAX_RANDOM_FACTOR		1536	/* 1024 * 1.5 */
+#ifndef __OpenBSD__
 #define ND_COMPUTE_RTIME(x) \
 		(((MIN_RANDOM_FACTOR * (x >> 10)) + (random() & \
 		((MAX_RANDOM_FACTOR - MIN_RANDOM_FACTOR) * (x >> 10)))) /1000)
+#else
+#define ND_COMPUTE_RTIME(x) \
+		(((MIN_RANDOM_FACTOR * (x >> 10)) + (arc4random() & \
+		((MAX_RANDOM_FACTOR - MIN_RANDOM_FACTOR) * (x >> 10)))) /1000)
+#endif
 
 TAILQ_HEAD(nd_drhead, nd_defrouter);
 struct	nd_defrouter {

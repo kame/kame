@@ -32,7 +32,11 @@
 
 #ifdef _KERNEL
 
+#ifndef __OpenBSD__
 #define MLD6_RANDOM_DELAY(X) (random() % (X) + 1)
+#else
+#define MLD6_RANDOM_DELAY(X) (arc4random() % (X) + 1)
+#endif
 
 /*
  * States for MLD stop-listening processing

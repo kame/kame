@@ -79,6 +79,9 @@
 #include <sys/socket.h>
 #include <sys/protosw.h>
 #include <sys/syslog.h>
+#ifdef __OpenBSD__
+#include <dev/rndvar.h>
+#endif
 
 #include <net/if.h>
 
