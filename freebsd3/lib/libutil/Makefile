@@ -3,8 +3,7 @@
 LIB=	util
 #SHLIB_MAJOR= 2
 #SHLIB_MINOR= 2
-CFLAGS+=-Wall -DLIBC_SCCS -I${.OBJDIR} -I${.CURDIR}/../../sys
-#CFLAGS+=LOGIN_CAP_AUTH
+CFLAGS+=-Wall -DLIBC_SCCS -I${.CURDIR} -I${.CURDIR}/../../sys
 SRCS=	login.c login_tty.c logout.c logwtmp.c pty.c setproctitle.c \
 	login_cap.c login_class.c login_auth.c login_times.c login_ok.c \
 	_secure_path.c uucplock.c property.c auth.c realhostname.c
