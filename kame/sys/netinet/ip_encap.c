@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.22 2000/03/30 18:55:46 sumikawa Exp $	*/
+/*	$KAME: ip_encap.c,v 1.23 2000/04/14 08:29:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -167,9 +167,10 @@ encap4_input(m, va_alist)
 	d.sin_addr = ip->ip_dst;
 
 	for (ep = LIST_FIRST(&encaptab); ep; ep = LIST_NEXT(ep, chain)) {
+		if (ep->af != AF_INET)
+			continue;
 		if (ep->proto >= 0 && ep->proto != proto)
 			continue;
-
 		if (ep->func) {
 			if ((*ep->func)(m, off, proto, ep->arg) == 0)
 				continue;
@@ -237,6 +238,8 @@ encap6_input(mp, offp, proto)
 	d.sin6_addr = ip6->ip6_dst;
 
 	for (ep = LIST_FIRST(&encaptab); ep; ep = LIST_NEXT(ep, chain)) {
+		if (ep->af != AF_INET6)
+			continue;
 		if (ep->proto >= 0 && ep->proto != proto)
 			continue;
 		if (ep->func) {
