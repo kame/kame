@@ -1,4 +1,4 @@
-/*	$KAME: pfkeyv2.h,v 1.27 2001/07/31 06:41:24 itojun Exp $	*/
+/*	$KAME: pfkeyv2.h,v 1.28 2002/08/23 05:06:31 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -239,9 +239,7 @@ struct sadb_x_policy {
  * This structure is aligned 8 bytes.
  */
 struct sadb_x_ipsecrequest {
-  u_int16_t sadb_x_ipsecrequest_len;	/* structure length aligned to 8 bytes.
-					 * This value is true length of bytes.
-					 * Not in units of 64 bits. */
+  u_int16_t sadb_x_ipsecrequest_len;	/* structure length in 64 bits. */
   u_int16_t sadb_x_ipsecrequest_proto;	/* See ipsec.h */
   u_int8_t sadb_x_ipsecrequest_mode;	/* See IPSEC_MODE_XX in ipsec.h. */
   u_int8_t sadb_x_ipsecrequest_level;	/* See IPSEC_LEVEL_XX in ipsec.h */
