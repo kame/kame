@@ -442,7 +442,8 @@ tcp_respond(tp, template, m, ack, seq, flags)
 		HTONS(((struct ip6_hdr *)ti)->ip6_plen);
 		ip6oflags = 0;
 		if (tp && tp->t_inpcb->in6p_outputopts &&
-		    (tp->t_inpcb->in6p_outputopts->ip6po_flags & IP6PO_MINMTU)) {
+		    (tp->t_inpcb->in6p_outputopts->ip6po_minmtu ==
+		     IP6PO_MINMTU_ALL)) {
 			ip6oflags |= IPV6_MINMTU;
 		}
 		if (!ip6_setpktaddrs(m, src6, dst6)) {

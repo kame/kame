@@ -776,8 +776,8 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 	case AF_INET6:
 		ip6oflags = 0;
 		if (tp && tp->t_in6pcb && tp->t_in6pcb->in6p_outputopts &&
-		    (tp->t_in6pcb->in6p_outputopts->ip6po_flags &
-		     IP6PO_MINMTU)) {
+		    (tp->t_in6pcb->in6p_outputopts->ip6po_minmtu ==
+		     IP6PO_MINMTU_ALL)) {
 			ip6oflags |= IPV6_MINMTU;
 		}
 		if (!ip6_setpktaddrs(m, src6, dst6)) {

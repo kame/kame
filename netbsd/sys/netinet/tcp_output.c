@@ -267,7 +267,7 @@ tcp_segsize(tp, txsegsizep, rxsegsizep)
 
 	/* the socket option overrides any other settings */
 	if (in6p && in6p->in6p_outputopts &&
-	    (in6p->in6p_outputopts->ip6po_flags & IP6PO_MINMTU) &&
+	    (in6p->in6p_outputopts->ip6po_minmtu == IP6PO_MINMTU_ALL) &&
 	    !IN6_IS_ADDR_V4MAPPED(&in6p->in6p_faddr) &&
 	    size > IPV6_MMTU - iphlen - sizeof(struct tcphdr))
 		size = IPV6_MMTU - iphlen - sizeof(struct tcphdr);
@@ -1155,8 +1155,8 @@ send:
 		ip6oflags = so->so_options & SO_DONTROUTE;
 		if (tp->t_in6pcb && tp->t_in6pcb &&
 		    tp->t_in6pcb->in6p_outputopts &&
-		    (tp->t_in6pcb->in6p_outputopts->ip6po_flags &
-		     IP6PO_MINMTU)) {
+		    (tp->t_in6pcb->in6p_outputopts->ip6po_minmtu ==
+		     IP6PO_MINMTU_ALL)) {
 			ip6oflags |= IPV6_MINMTU;
 		}
 
