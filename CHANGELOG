@@ -1,8 +1,16 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.622 2000/02/26 10:04:41 jinmei Exp $
+$Id: CHANGELOG,v 1.623 2000/02/26 11:48:56 itojun Exp $
 
 <200002>
+Sat Feb 26 20:46:03 JST 2000  itojun@iijlab.net
+	* sys/netinet6/esp_input.c: with IPv6 ESP, correctly handle
+	  off != sizeof(ip6) case.
+	* sys/netinet6/ah_input.c: with IPv4 AH (m_pulldown case),
+	  strip off AH from the packet.  this is to make some of IPv4
+	  transport layer code work correctly (specifically, ICMPv4 will
+	  transmit wrong packet if we don't strip AH here)
+
 2000-02-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* bsdi4/sys/netinet/tcp_input.c (tcp_input): made the variable
 	"ip" consistent with "ip6" in order to avoid possible pointer
