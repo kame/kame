@@ -33,7 +33,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/ifaddrlist.c,v 1.2 1999/11/09 21:09:48 itojun Exp $ (LBL)";
+    "@(#) $Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/ifaddrlist.c,v 1.3 2000/02/23 07:30:25 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -60,6 +60,9 @@ struct rtentry;
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#ifdef HAVE_GETIFADDRS
+#include <ifaddrs.h>
+#endif
 
 #include "gnuc.h"
 #ifdef HAVE_OS_PROTO_H
@@ -100,6 +103,55 @@ if_maxindex()
 int
 ifaddrlist(register struct ifaddrlist **ipaddrp, register char *errbuf)
 {
+#ifdef HAVE_GETIFADDRS
+	struct ifaddrs *ifap, *ifa;
+	int nipaddr;
+	struct ifaddrlist *al;
+	struct ifaddrlist *ifaddrlist;
+	struct ifreq ifr;
+	unsigned int maxif;
+	struct sockaddr_in *sin;
+
+#if 1
+	maxif = if_maxindex() * 3; /* 3 is a magic number... */
+#else
+	maxif = 64;
+#endif
+
+	ifaddrlist = (struct ifaddrlist *)malloc(maxif *
+		sizeof(struct ifaddrlist));
+	if (ifaddrlist == NULL)
+		return -1;
+
+	if (getifaddrs(&ifap) != 0)
+		return -1;
+
+	al = ifaddrlist;
+	nipaddr = 0;
+	for (ifa = ifap; ifa && nipaddr < maxif; ifa = ifa->ifa_next) {
+		if (ifa->ifa_addr->sa_family != AF_INET)
+			continue;
+		if ((ifa->ifa_flags & IFF_UP) == 0)
+			continue;
+#ifdef IFF_LOOPBACK
+		if ((ifa->ifa_flags & IFF_LOOPBACK) != 0)
+			continue;
+#else
+		if (strcmp(ifa->ifa_name, "lo0") == 0)
+			continue;
+#endif
+
+		sin = (struct sockaddr_in *)ifa->ifa_addr;
+		al->addr = sin->sin_addr.s_addr;
+		al->device = savestr(ifa->ifa_name);
+		++al;
+		++nipaddr;
+	}
+
+	*ipaddrp = ifaddrlist;
+	free(ifap);
+	return nipaddr;
+#else
 	register int fd, nipaddr;
 #ifdef HAVE_SOCKADDR_SA_LEN
 	register int n;
@@ -207,7 +259,7 @@ ifaddrlist(register struct ifaddrlist **ipaddrp, register char *errbuf)
 	(void)close(fd);
 
 	*ipaddrp = ifaddrlist;
-	free(ifaddrlist);
 	free(ibuf);
 	return (nipaddr);
+#endif
 }
