@@ -124,8 +124,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
  *	connections.
  */
 
-#define PULLDOWN_TEST
-
 #include "opt_inet.h"
 #include "opt_ipsec.h"
 
