@@ -2,7 +2,7 @@
 .include "${.CURDIR}/../Makefile.opsys"
 .endif
 
-SUBDIR=	man4
+SUBDIR=	man4 man9
 
 makedb:
 	/usr/libexec/makewhatis ${DESTDIR}/usr/share/man
