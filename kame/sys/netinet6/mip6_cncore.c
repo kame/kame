@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.55 2003/12/17 01:32:04 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.56 2003/12/17 07:52:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -186,8 +186,6 @@ u_int32_t mip6ctl_bu_maxlifetime = 420;
 u_int32_t mip6ctl_hrbu_maxlifetime = 420;
 
 struct mip6stat mip6stat;
-
-static int mip6_bc_count = 0;
 
 static int mip6_brr_maxtries = 2;	/* times */
 static int mip6_brr_tryinterval = 10;	/* second */
@@ -909,7 +907,6 @@ mip6_bc_list_insert(mbc_list, mbc)
 	mip6_bc_hash[id] = mbc;
 
 	mbc->mbc_refcnt++;
-	mip6_bc_count++;
 
 	return (0);
 }
@@ -974,8 +971,6 @@ mip6_bc_list_remove(mbc_list, mbc)
 	}
 #endif /* MIP6_HOME_AGENT */
 	FREE(mbc, M_TEMP);
-
-	mip6_bc_count--;
 
 	return (error);
 }
