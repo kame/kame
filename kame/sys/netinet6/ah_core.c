@@ -1,4 +1,4 @@
-/*	$KAME: ah_core.c,v 1.26 2000/03/09 16:05:38 itojun Exp $	*/
+/*	$KAME: ah_core.c,v 1.27 2000/03/09 19:18:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -660,7 +660,6 @@ ah_hmac_sha1_result(state, addr)
 /*
  * go generate the checksum.
  */
-
 static void
 ah_update_mbuf(m, off, len, algo, algos)
 	struct mbuf *m;
@@ -691,9 +690,10 @@ ah_update_mbuf(m, off, len, algo, algos)
 	for (/*nothing*/; n && len > 0; n = n->m_next) {
 		if (n->m_len == 0)
 			continue;
-		tlen = (n->m_len < len) ? n->m_len : len;
-		if (off)
-			tlen -= off;
+		if (n->m_len - off < len)
+			tlen = n->m_len - off;
+		else
+			tlen = len;
 
 		(algo->update)(algos, mtod(n, caddr_t) + off, tlen);
 
@@ -702,29 +702,36 @@ ah_update_mbuf(m, off, len, algo, algos)
 	}
 }
 
+/*
+ * Go generate the checksum. This function won't modify the mbuf chain
+ * except AH itself.
+ *
+ * NOTE: the function does not free mbuf on failure.
+ * Don't use m_copy(), it will try to share cluster mbuf by using refcnt.
+ */
 int
-ah4_calccksum(m0, ahdat, algo, sav)
-	struct mbuf *m0;
+ah4_calccksum(m, ahdat, algo, sav)
+	struct mbuf *m;
 	caddr_t ahdat;
 	struct ah_algorithm *algo;
 	struct secasvar *sav;
 {
-	struct mbuf *m;
+	int off;
 	int hdrtype;
-	u_char *p;
 	size_t advancewidth;
 	struct ah_algorithm_state algos;
-	int tlen;
 	u_char sumbuf[AH_MAXSUMSIZE];
 	int error = 0;
 	int ahseen;
+	struct mbuf *n = NULL;
+
+	if ((m->m_flags & M_PKTHDR) == 0)
+		return EINVAL;
 
 	ahseen = 0;
 	hdrtype = -1;	/*dummy, it is called IPPROTO_IP*/
 
-	m = m0;
-
-	p = mtod(m, u_char *);
+	off = 0;
 
 	(algo->init)(&algos, sav);
 
@@ -733,7 +740,7 @@ ah4_calccksum(m0, ahdat, algo, sav)
 again:
 	/* gory. */
 	switch (hdrtype) {
-	case -1:	/*first one*/
+	case -1:	/*first one only*/
 	    {
 		/*
 		 * copy ip hdr, modify to fit the AH checksum rule,
@@ -743,7 +750,7 @@ again:
 		struct ip iphdr;
 		size_t hlen;
 
-		bcopy((caddr_t)p, (caddr_t)&iphdr, sizeof(struct ip));
+		m_copydata(m, off, sizeof(iphdr), (caddr_t)&iphdr);
 #ifdef _IP_VHL
 		hlen = IP_VHL_HL(iphdr.ip_vhl) << 2;
 #else
@@ -751,22 +758,38 @@ again:
 #endif
 		iphdr.ip_ttl = 0;
 		iphdr.ip_sum = htons(0);
-		if (ip4_ah_cleartos) iphdr.ip_tos = 0;
+		if (ip4_ah_cleartos)
+			iphdr.ip_tos = 0;
 		iphdr.ip_off = htons(ntohs(iphdr.ip_off) & ip4_ah_offsetmask);
 		(algo->update)(&algos, (caddr_t)&iphdr, sizeof(struct ip));
 
 		if (hlen != sizeof(struct ip)) {
 			u_char *p;
-			int i, j;
-			int l, skip;
-			u_char dummy[4];
+			int i, l, skip;
+
+			if (hlen > MCLBYTES) {
+				error = EMSGSIZE;
+				goto fail;
+			}
+			MGET(n, M_DONTWAIT, MT_DATA);
+			if (n && hlen > MLEN) {
+				MCLGET(n, M_DONTWAIT);
+				if ((n->m_flags & M_EXT) == 0) {
+					m_free(n);
+					n = NULL;
+				}
+			}
+			if (n == NULL) {
+				error = ENOBUFS;
+				goto fail;
+			}
+			m_copydata(m, off, hlen, mtod(n, caddr_t));
 
 			/*
 			 * IP options processing.
 			 * See RFC2402 appendix A.
 			 */
-			bzero(dummy, sizeof(dummy));
-			p = mtod(m, u_char *);
+			p = mtod(n, u_char *);
 			i = sizeof(struct ip);
 			while (i < hlen) {
 				skip = 1;
@@ -795,19 +818,22 @@ again:
 					    "(type=%02x len=%02x)\n",
 					    p[i + IPOPT_OPTVAL],
 					    p[i + IPOPT_OLEN]));
-					break;
+					m_free(n);
+					n = NULL;
+					error = EINVAL;
+					goto fail;
 				}
-				if (skip) {
-					for (j = 0; j < l / sizeof(dummy); j++)
-						(algo->update)(&algos, dummy, sizeof(dummy));
-
-					(algo->update)(&algos, dummy, l % sizeof(dummy));
-				} else
-					(algo->update)(&algos, p + i, l);
+				if (skip)
+					bzero(p + i, l);
 				if (p[i + IPOPT_OPTVAL] == IPOPT_EOL)
 					break;
 				i += l;
 			}
+			p = mtod(n, u_char *) + sizeof(struct ip);
+			(algo->update)(&algos, p, hlen - sizeof(struct ip));
+
+			m_free(n);
+			n = NULL;
 		}
 
 		hdrtype = (iphdr.ip_p) & 0xff;
@@ -817,103 +843,71 @@ again:
 
 	case IPPROTO_AH:
 	    {
-		u_char dummy[4];
+		struct ah ah;
 		int siz;
 		int hdrsiz;
+		int totlen;
 
-		hdrsiz = (sav->flags & SADB_X_EXT_OLD) ?
-				sizeof(struct ah) : sizeof(struct newah);
-
-		(algo->update)(&algos, p, hdrsiz);
-
-		/* key data region. */
+		m_copydata(m, off, sizeof(ah), (caddr_t)&ah);
+		hdrsiz = (sav->flags & SADB_X_EXT_OLD)
+				? sizeof(struct ah)
+				: sizeof(struct newah);
 		siz = (*algo->sumsiz)(sav);
-		if (ahseen)
-			(algo->update)(&algos, p + hdrsiz, siz);
-		else {
-			bzero(&dummy[0], sizeof(dummy));
-			while (sizeof(dummy) <= siz) {
-				(algo->update)(&algos, dummy, sizeof(dummy));
-				siz -= sizeof(dummy);
-			}
-			/* can't happen, but just in case */
-			if (siz)
-				(algo->update)(&algos, dummy, siz);
+		totlen = (ah.ah_len + 2) << 2;
+
+		if (totlen > m->m_pkthdr.len - off || totlen > MCLBYTES) {
+			error = EMSGSIZE;
+			goto fail;
 		}
+		MGET(n, M_DONTWAIT, MT_DATA);
+		if (n && totlen > MLEN) {
+			MCLGET(n, M_DONTWAIT);
+			if ((n->m_flags & M_EXT) == 0) {
+				m_free(n);
+				n = NULL;
+			}
+		}
+		if (n == NULL) {
+			error = ENOBUFS;
+			goto fail;
+		}
+		m_copydata(m, off, totlen, mtod(n, caddr_t));
+
+		/*
+		 * special treatment is necessary for the first one, not others
+		 */
+		if (!ahseen)
+			bzero(mtod(n, caddr_t) + hdrsiz, siz);
+		(algo->update)(&algos, mtod(n, caddr_t), totlen);
+		m_free(n);
+		n = NULL;
 		ahseen++;
 
-		/* padding region, just in case */
-		siz = (((struct ah *)p)->ah_len << 2) - (*algo->sumsiz)(sav);
-		if ((sav->flags & SADB_X_EXT_OLD) == 0)
-			siz -= 4;		/* sequence number field */
-		if (0 < siz) {
-			/* RFC 1826 */
-			(algo->update)(&algos, p + hdrsiz + (*algo->sumsiz)(sav),
-				siz);
-		}
-
-		hdrtype = ((struct ah *)p)->ah_nxt;
-		advancewidth = hdrsiz;
-		advancewidth += ((struct ah *)p)->ah_len << 2;
-		if ((sav->flags & SADB_X_EXT_OLD) == 0)
-			advancewidth -= 4;	/* sequence number field */
+		hdrtype = ah.ah_nxt;
+		advancewidth = totlen;
 		break;
 	    }
 
 	default:
-		ipseclog((LOG_DEBUG, "ah4_calccksum: unexpected hdrtype=%x; "
-			"treating rest as payload\n", hdrtype));
-		/*fall through*/
-	case IPPROTO_ICMP:
-	case IPPROTO_IGMP:
-	case IPPROTO_IPIP:
-#ifdef INET6
-	case IPPROTO_IPV6:
-	case IPPROTO_ICMPV6:
-#endif
-	case IPPROTO_UDP:
-	case IPPROTO_TCP:
-	case IPPROTO_ESP:
-	case IPPROTO_IPCOMP:
-		while (m) {
-			tlen = m->m_len - (p - mtod(m, u_char *));
-			(algo->update)(&algos, p, tlen);
-			m = m->m_next;
-			p = m ? mtod(m, u_char *) : NULL;
-		}
-		
-		advancewidth = 0;	/*loop finished*/
+		ah_update_mbuf(m, off, m->m_pkthdr.len - off, algo, &algos);
+		advancewidth = m->m_pkthdr.len - off;
 		break;
 	}
 
-	if (advancewidth) {
-		/* is it safe? */
-		while (m && advancewidth) {
-			tlen = m->m_len - (p - mtod(m, u_char *));
-			if (advancewidth < tlen) {
-				p += advancewidth;
-				advancewidth = 0;
-			} else {
-				advancewidth -= tlen;
-				m = m->m_next;
-				if (m)
-					p = mtod(m, u_char *);
-				else {
-					ipseclog((LOG_DEBUG,
-					    "hit the end-of-mbuf...\n"));
-					p = NULL;
-				}
-			}
-		}
+	off += advancewidth;
+	if (off < m->m_pkthdr.len)
+		goto again;
 
-		if (m)
-			goto again;
-	}
-
-	/* for HMAC algorithms... */
 	(algo->result)(&algos, &sumbuf[0]);
 	bcopy(&sumbuf[0], ahdat, (*algo->sumsiz)(sav));
 
+	if (n)
+		m_free(n);
+	return error;
+
+fail:
+	if (n)
+		m_free(n);
 	return error;
 }
 
@@ -921,9 +915,9 @@ again:
 /*
  * Go generate the checksum. This function won't modify the mbuf chain
  * except AH itself.
- * Don't use m_copy(), it will try to share cluster mbuf by using refcnt.
  *
  * NOTE: the function does not free mbuf on failure.
+ * Don't use m_copy(), it will try to share cluster mbuf by using refcnt.
  */
 int
 ah6_calccksum(m, ahdat, algo, sav)
