@@ -718,10 +718,11 @@ netname6(sa6, mask)
 #else
 	int flag = 0;
 #endif
+	struct sockaddr_in6 sin6;
 
-	net6 = sa6->sin6_addr;
+	sin6 = *sa6;
 	for (i = 0; i < sizeof(net6); i++)
-		net6.s6_addr[i] &= mask->s6_addr[i];
+		sin6.sin6_addr.s6_addr[i] &= mask->s6_addr[i];
 	
 	masklen = 0;
 	lim = (u_char *)mask + 16;
@@ -781,7 +782,7 @@ netname6(sa6, mask)
 
 	if (nflag)
 		flag |= NI_NUMERICHOST;
-	getnameinfo((struct sockaddr *)sa6, sa6->sin6_len, hbuf, sizeof(hbuf),
+	getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len, hbuf, sizeof(hbuf),
 		    NULL, 0, flag);
 	snprintf(line, sizeof(line), "%s/%d", hbuf, masklen);
 	return line;

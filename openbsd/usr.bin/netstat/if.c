@@ -99,6 +99,7 @@ intpr(interval, ifnetaddr)
 	struct sockaddr *sa;
 	struct ifnet_head ifhead;	/* TAILQ_HEAD */
 	char name[IFNAMSIZ];
+	int n;
 
 	if (ifnetaddr == 0) {
 		printf("ifnet: symbol not defined\n");
@@ -202,10 +203,41 @@ intpr(interval, ifnetaddr)
 #ifdef INET6
 			case AF_INET6:
 				sin6 = (struct sockaddr_in6 *)sa;
-				printf("%-11.11s ",
-				    netname6(&ifaddr.in6.ia_addr,
-					&ifaddr.in6.ia_prefixmask.sin6_addr));
-				printf("%-17.17s ", routename6(sin6));
+				cp = netname6(&ifaddr.in6.ia_addr,
+					&ifaddr.in6.ia_prefixmask.sin6_addr);
+				if (vflag)
+					n = strlen(cp) < 11 ? 11 : strlen(cp);
+				else
+					n = 11;
+				printf("%-*.*s ", n, n, cp);
+				cp = routename6(sin6);
+				if (vflag)
+					n = strlen(cp) < 17 ? 17 : strlen(cp);
+				else
+					n = 17;
+				printf("%-*.*s ", n, n, cp);
+				if (aflag) {
+					u_long multiaddr;
+					struct in6_multi inm;
+					char ntop_buf[INET6_ADDRSTRLEN];
+		
+					multiaddr = (u_long)ifaddr.in6.ia6_multiaddrs.lh_first;
+					while (multiaddr != 0) {
+						kread(multiaddr, (char *)&inm,
+						    sizeof(inm));
+						multiaddr = (u_long)inm.in6m_entry.le_next;
+						inet_ntop(AF_INET6, &inm.in6m_addr,
+							ntop_buf, sizeof(ntop_buf));
+						cp = ntop_buf;
+						if (vflag)
+							n = strlen(cp) < 17 ? 17 : strlen(cp);
+						else
+							n = 17;
+						printf("\n%23s %-*.*s ", "",
+							n, n, ntop_buf,
+							inm.in6m_refcount);
+					}
+				}
 				break;
 #endif
 			case AF_IPX:
