@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.104 2002/04/25 07:29:54 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.105 2002/04/25 07:44:10 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -189,7 +189,6 @@ int		 natpt_icmp4MimicPayload	__P((struct pcv *, struct pcv *,
 					     struct pAddr *));
 struct mbuf	*natpt_translateTCPv4To6	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateUDPv4To6	__P((struct pcv *, struct pAddr *));
-struct mbuf	*natpt_translateUNKNOWNv4To6	__P((struct pcv *, struct pAddr *));
 struct mbuf	*natpt_translateTCPUDPv4To6 __P((struct pcv *, struct pAddr *,
 					     struct pcv *));
 void		 natpt_translatePYLD4To6	__P((struct pcv *));
@@ -809,6 +808,7 @@ natpt_translateIPv4To6(struct pcv *cv4, struct pAddr *pad)
 {
 	const char	*fn = __FUNCTION__;
 
+	struct pcv	cv6;
 	struct timeval	atv;
 	struct mbuf	*m6 = NULL;
 
@@ -832,7 +832,9 @@ natpt_translateIPv4To6(struct pcv *cv4, struct pAddr *pad)
 		break;
 
 	default:
-		m6 = natpt_translateUNKNOWNv4To6(cv4, pad);
+		bzero(&cv6, sizeof(struct pcv));
+		if ((m6 = natpt_translateTCPUDPv4To6(cv4, pad, &cv6)) == NULL)
+			return (NULL);
 		break;
 	}
 
@@ -1276,21 +1278,6 @@ natpt_translateUDPv4To6(struct pcv *cv4, struct pAddr *pad)
 
 	cv6.ip_p = IPPROTO_UDP;
 	natpt_fixTCPUDP64cksum(AF_INET, IPPROTO_UDP, &cv6, cv4);
-	return (m6);
-}
-
-
-struct mbuf *
-natpt_translateUNKNOWNv4To6(struct pcv *cv4, struct pAddr *pad)
-{
-	struct pcv	cv6;
-	struct mbuf	*m6;
-
-	bzero(&cv6, sizeof(struct pcv));
-	if ((m6 = natpt_translateTCPUDPv4To6(cv4, pad, &cv6)) == NULL)
-		return (NULL);
-
-	cv6.ip_p = cv4->ip_p;
 	return (m6);
 }
 
