@@ -569,6 +569,31 @@ pfkey_send_spdadd(so, src, prefs, dst, prefd, proto, policy, policylen, seq)
 }
 
 /*
+ * sending SADB_X_SPDUPDATE message to the kernel.
+ * OUT:
+ *	positive: success and return length sent.
+ *	-1	: error occured, and set errno.
+ */
+int
+pfkey_send_spdupdate(so, src, prefs, dst, prefd, proto, policy, policylen, seq)
+	int so;
+	struct sockaddr *src, *dst;
+	u_int prefs, prefd, proto;
+	caddr_t policy;
+	int policylen;
+	u_int32_t seq;
+{
+	int len;
+
+	if ((len = pfkey_send_x4(so, SADB_X_SPDUPDATE,
+				src, prefs, dst, prefd, proto,
+				policy, policylen, seq)) < 0)
+		return -1;
+
+	return len;
+}
+
+/*
  * sending SADB_X_SPDDELETE message to the kernel.
  * OUT:
  *	positive: success and return length sent.
@@ -591,6 +616,36 @@ pfkey_send_spddelete(so, src, prefs, dst, prefd, proto, policy, policylen, seq)
 	}
 
 	if ((len = pfkey_send_x4(so, SADB_X_SPDDELETE,
+				src, prefs, dst, prefd, proto,
+				policy, policylen, seq)) < 0)
+		return -1;
+
+	return len;
+}
+
+/*
+ * sending SADB_X_SPDGET message to the kernel.
+ * OUT:
+ *	positive: success and return length sent.
+ *	-1	: error occured, and set errno.
+ */
+int
+pfkey_send_spdget(so, src, prefs, dst, prefd, proto, policy, policylen, seq)
+	int so;
+	struct sockaddr *src, *dst;
+	u_int prefs, prefd, proto;
+	caddr_t policy;
+	int policylen;
+	u_int32_t seq;
+{
+	int len;
+
+	if (policylen != sizeof(struct sadb_x_policy)) {
+		__ipsec_errcode = EIPSEC_INVAL_ARGUMENT;
+		return -1;
+	}
+
+	if ((len = pfkey_send_x4(so, SADB_X_SPDGET,
 				src, prefs, dst, prefd, proto,
 				policy, policylen, seq)) < 0)
 		return -1;
