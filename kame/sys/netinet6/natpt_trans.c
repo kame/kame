@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.143 2002/08/13 08:09:02 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.144 2002/08/13 08:36:10 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -251,8 +251,8 @@ natpt_translateIPv6To4(struct pcv *cv6, struct pAddr *pad)
 
 	switch (cv6->ip_p) {
 	case IPPROTO_ICMPV6:
-		m4 = natpt_translateICMPv6To4(cv6, pad);
-		natpt_revertICMPv6To4address(cv6, m4);
+		if ((m4 = natpt_translateICMPv6To4(cv6, pad)) != NULL)
+			natpt_revertICMPv6To4address(cv6, m4);
 		break;
 
 	case IPPROTO_TCP:
