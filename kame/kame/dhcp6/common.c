@@ -141,7 +141,9 @@ transmit_sa(s, sa, hlim, buf, len)
 {
 	int error;
 
-	if (hlim && setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &hlim,
+	if (hlim == 0)
+		hlim = 64;
+	if (setsockopt(s, IPPROTO_IPV6, IPV6_MULTICAST_HOPS, &hlim,
 			sizeof(hlim)) < 0) {
 		err(1, "setsockopt(IPV6_MULTICAST_HOPS)");
 		/*NOTREACHED*/
