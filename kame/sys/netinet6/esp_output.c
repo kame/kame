@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.37 2001/01/23 08:59:37 itojun Exp $	*/
+/*	$KAME: esp_output.c,v 1.38 2001/02/28 12:27:11 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -432,13 +432,23 @@ esp_output(m, nexthdrp, md, isr, af)
 	if (extendsiz == 1)
 		extendsiz = padbound + 1;
 
+#ifdef DIAGNOSTIC
+	/*
+	 * MLEN limitation comes from the code fragment below.
+	 * 256 limitation comes from sequential padding.
+	 */
+	if (extendsiz > MLEN || extendsiz >= 256)
+		panic("extendsiz too big in esp_output");
+#endif
+
 	n = m;
 	while (n->m_next)
 		n = n->m_next;
 
 	/*
-	 * if M_EXT, the external part may be shared among
-	 * two consequtive TCP packets.
+	 * if M_EXT, the external mbuf data may be shared among
+	 * two consequtive TCP packets, and it may be unsafe to use the
+	 * trailing space.
 	 */
 	if (!(n->m_flags & M_EXT) && extendsiz < M_TRAILINGSPACE(n)) {
 		extend = mtod(n, u_char *) + n->m_len;
