@@ -1,11 +1,11 @@
-$Id: CHANGELOG,v 1.473 2000/01/22 07:56:49 jinmei Exp $
+$Id: CHANGELOG,v 1.474 2000/01/22 07:59:21 jinmei Exp $
 
 
 <200001>
 2000-01-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_input.c (ip6_reset_rcvopt): fixed a bug
 	that a freed pointer could not be re-initialized, which might
-	case kernel panic.
+	cause kernel panic.
 
 Sat Jan 22 02:01:57 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd3/ports/lftp: new port: lftp-2.1.6, ftp client.
