@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.4 2000/05/21 05:15:35 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.5 2000/05/21 06:34:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -411,6 +411,10 @@ relay(buf, len, from)
 	return 0;
 }
 
+/*
+ * XXX should defer transmission with random delay, and supress duplicated
+ * replies (mdns-00 page 3)
+ */
 static int
 serve(buf, len, from)
 	char *buf;

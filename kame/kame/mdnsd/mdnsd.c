@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.3 2000/05/21 05:15:35 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.4 2000/05/21 06:34:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -287,14 +287,21 @@ static int
 iscanon(n)
 	const char *n;
 {
+#if 0
 	struct addrinfo hints, *res;
 	int ret;
+#endif
 
 	if (strlen(n) == 0)
 		return 0;
 	if (n[strlen(n) - 1] != '.')
 		return 0;
 
+#if 0
+	/*
+	 * XXX the code fragment does not work.  /etc/resolv.conf will have
+	 * "nameserver 0.0.0.0" to point to mdnsd itself!
+	 */
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = PF_UNSPEC;
 	hints.ai_socktype = SOCK_DGRAM;		/*dummy*/
@@ -313,6 +320,9 @@ iscanon(n)
 		ret = 0;
 	freeaddrinfo(res);
 	return ret;
+#else
+	return 1;
+#endif
 }
 
 int
