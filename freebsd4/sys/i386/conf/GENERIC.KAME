@@ -356,3 +356,7 @@ options 	TCP_ECN		# ECN support in TCP
 pseudo-device	pf
 pseudo-device	pflog
 pseudo-device	pfsync
+
+# Datagram Congestion Control Protocol
+#options	DCCP
+#options	DCCP_TFRC
