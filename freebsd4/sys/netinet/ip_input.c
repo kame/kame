@@ -234,8 +234,8 @@ static struct	in_ifaddr *ip_rtaddr __P((struct in_addr));
 static void	ipintr __P((void));
 
 #ifdef NATPT
-extern	int			ip6_protocol_tr;
-int	natpt_in4		__P((struct mbuf *, struct mbuf **));
+extern	int			natpt_enable;
+extern	int natpt_in4		__P((struct mbuf *, struct mbuf **));
 extern	void ip6_forward	__P((struct mbuf *, int));
 #endif	/* NATPT */
 
@@ -520,7 +520,7 @@ pass:
 	/*
 	 * NATPT (Network Address Translation - Protocol Translation)
 	 */
-	if (ip6_protocol_tr) {
+	if (natpt_enable) {
 		struct mbuf	*m1 = NULL;
 
 		switch (natpt_in4(m, &m1)) {

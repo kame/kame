@@ -1,4 +1,4 @@
-/*	$KAME: natpt_usrreq.c,v 1.17 2001/10/17 07:02:49 fujisawa Exp $	*/
+/*	$KAME: natpt_usrreq.c,v 1.18 2002/01/13 06:11:07 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -116,7 +116,7 @@ void
 natpt_init()
 {
 	natpt_initialized = 1;
-	ip6_protocol_tr = 0;
+	natpt_enable = 0;
 
 	natpt_init_rule();
 	natpt_init_tslot();

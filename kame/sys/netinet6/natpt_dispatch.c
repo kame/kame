@@ -1,4 +1,4 @@
-/*	$KAME: natpt_dispatch.c,v 1.38 2001/12/27 07:24:09 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.39 2002/01/13 06:11:07 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -64,7 +64,7 @@
  *
  */
 
-int		ip6_protocol_tr;
+int		natpt_enable;
 int		natpt_initialized;
 u_int		natpt_debug;
 u_int		natpt_dump;

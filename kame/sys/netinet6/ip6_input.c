@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.250 2002/01/11 15:49:51 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.251 2002/01/13 06:11:07 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -256,9 +256,8 @@ static struct mbuf *ip6_pullexthdr __P((struct mbuf *, size_t, int));
 #endif
 
 #ifdef NATPT
-extern int ip6_protocol_tr;
-
-int natpt_in6 __P((struct mbuf *, struct mbuf **));
+extern int natpt_enable;
+extern int natpt_in6 __P((struct mbuf *, struct mbuf **));
 extern void ip_forward __P((struct mbuf *, int));
 #endif
 
@@ -1035,7 +1034,7 @@ ip6_input(m)
 	/*
 	 * NAT-PT (Network Address Translation - Protocol Translation)
 	 */
-	if (ip6_protocol_tr) {
+	if (natpt_enable) {
 		struct mbuf *m1 = NULL;
 
 		switch (natpt_in6(m, &m1)) {

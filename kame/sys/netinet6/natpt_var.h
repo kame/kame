@@ -1,4 +1,4 @@
-/*	$KAME: natpt_var.h,v 1.20 2001/12/12 13:14:33 fujisawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.21 2002/01/13 06:11:07 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-extern int		ip6_protocol_tr;
+extern int		natpt_enable;
 extern int		natpt_initialized;
 extern u_int		natpt_debug;
 extern u_int		natpt_dump;
