@@ -431,12 +431,15 @@ routename(sa)
 	case AF_INET6:
 	    {
 		struct sockaddr_in6 sin6;
-#ifdef NI_WITHSCOPEID
-		const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
-#else
-		const int niflags = NI_NUMERICHOST;
-#endif
+		int niflags;
 
+#ifdef NI_WITHSCOPEID
+		niflags = NI_WITHSCOPEID;
+#else
+		niflags = 0;
+#endif
+		if (nflag)
+			niflags |= NI_NUMERICHOST;
 		memset(&sin6, 0, sizeof(sin6));
 		memcpy(&sin6, sa, sa->sa_len);
 		sin6.sin6_len = sizeof(struct sockaddr_in6);
@@ -565,14 +568,35 @@ netname(sa)
 #ifndef SMALL
 #ifdef INET6
 	case AF_INET6:
-	    {	struct in6_addr in6;
-		int gap;
+	    {
+		struct sockaddr_in6 sin6;
+		int niflags;
 
-		in6 = ((struct sockaddr_in6 *)sa)->sin6_addr;
-		gap = 24 - sa->sa_len;
-		if (gap > 0)
-			bzero((char *)(&in6 + 1) - gap, gap);
-		return ((char *)inet_ntop(AF_INET6, &in6, ntop_buf, sizeof(ntop_buf)));
+#ifdef NI_WITHSCOPEID
+		niflags = NI_WITHSCOPEID;
+#else
+		niflags = 0;
+#endif
+		if (nflag)
+			niflags |= NI_NUMERICHOST;
+		memset(&sin6, 0, sizeof(sin6));
+		memcpy(&sin6, sa, sa->sa_len);
+		sin6.sin6_len = sizeof(struct sockaddr_in6);
+		sin6.sin6_family = AF_INET6;
+#ifdef __KAME__
+		if (sa->sa_len == sizeof(struct sockaddr_in6) &&
+		    IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr) &&
+		    sin6.sin6_scope_id == 0) {
+			sin6.sin6_scope_id =
+			    ntohs(*(u_int16_t *)&sin6.sin6_addr.s6_addr[2]);
+			sin6.sin6_addr.s6_addr[2] = 0;
+			sin6.sin6_addr.s6_addr[3] = 0;
+		}
+#endif
+		if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
+		    line, sizeof(line), NULL, 0, nflag ? niflags : 0) != 0)
+			strncpy(line, "invalid", sizeof(line));
+		break;
 	    }
 #endif
 
@@ -1028,8 +1052,7 @@ getaddr(which, s, hpp)
 			exit(1);
 		}
 		sin6 = (struct sockaddr_in6 *)res->ai_addr;
-		memcpy(&su->sin6.sin6_addr, &sin6->sin6_addr,
-		    sizeof(su->sin6.sin6_addr));
+		memcpy(&su->sin6, sin6, sizeof(su->sin6));
 #ifdef __KAME__
 		if (IN6_IS_ADDR_LINKLOCAL(&su->sin6.sin6_addr) &&
 		    sin6->sin6_scope_id) {
