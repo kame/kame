@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.83 2002/02/22 03:09:34 kjc Exp $	*/
+/*	$KAME: in_gif.c,v 1.84 2002/02/22 06:07:25 kjc Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -447,48 +447,51 @@ in_gif_input(m, va_alist)
 	switch (proto) {
 #ifdef INET
 	case IPPROTO_IPV4:
-		af = AF_INET;
-		if (gifp->if_flags & IFF_LINK1) {
-			/* allow ECN */
-			struct ip *ip;
+	    {
+		struct ip *ip;
 
-			if (m->m_len < sizeof(*ip)) {
-				m = m_pullup(m, sizeof(*ip));
-				if (!m)
-					return;
-			}
-			ip = mtod(m, struct ip *);
-			if (ip_ecn_egress(ECN_ALLOWED,
-					  &otos, &ip->ip_tos) == 0) {
-				m_freem(m);
+		af = AF_INET;
+		if (m->m_len < sizeof(*ip)) {
+			m = m_pullup(m, sizeof(*ip));
+			if (!m)
 				return;
-			}
+		}
+		ip = mtod(m, struct ip *);
+		if (ip_ecn_egress((gifp->if_flags & IFF_LINK1) ?
+				  ECN_ALLOWED : ECN_NOCARE,
+				  &otos, &ip->ip_tos) == 0) {
+			m_freem(m);
+			return;
 		}
 		break;
+	    }
 #endif
 #ifdef INET6
 	case IPPROTO_IPV6:
+	    {
+		struct ip6_hdr *ip6;
+		u_int8_t itos, oitos;
+
 		af = AF_INET6;
-		if (gifp->if_flags & IFF_LINK1) {
-			struct ip6_hdr *ip6;
-			u_int8_t itos, oitos;
-			if (m->m_len < sizeof(*ip6)) {
-				m = m_pullup(m, sizeof(*ip6));
-				if (!m)
-					return;
-			}
-			ip6 = mtod(m, struct ip6_hdr *);
-			itos = oitos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
-			if (ip_ecn_egress(ECN_ALLOWED, &otos, &itos) == 0) {
-				m_freem(m);
+		if (m->m_len < sizeof(*ip6)) {
+			m = m_pullup(m, sizeof(*ip6));
+			if (!m)
 				return;
-			}
-			if (itos != oitos) {
-				ip6->ip6_flow &= ~htonl(0xff << 20);
-				ip6->ip6_flow |= htonl((u_int32_t)itos << 20);
-			}
+		}
+		ip6 = mtod(m, struct ip6_hdr *);
+		itos = oitos = (ntohl(ip6->ip6_flow) >> 20) & 0xff;
+		if (ip_ecn_egress((gifp->if_flags & IFF_LINK1) ?
+				  ECN_ALLOWED : ECN_NOCARE,
+				  &otos, &itos) == 0) {
+			m_freem(m);
+			return;
+		}
+		if (itos != oitos) {
+			ip6->ip6_flow &= ~htonl(0xff << 20);
+			ip6->ip6_flow |= htonl((u_int32_t)itos << 20);
 		}
 		break;
+	    }
 #endif /* INET6 */
 #if defined(__NetBSD__) && defined(ISO)
 	case IPPROTO_EON:
