@@ -1,7 +1,7 @@
 SRCDIR=	${.CURDIR}/../../kame/rip6query
 
 PROG=	rip6query
-NOMAN=	yes
+MAN=	rip6query.8
 
 CPPFLAGS+=	-DINET6 -I${SRCDIR}/../route6d
 LDADD+=	-L${.CURDIR}/../../lib/libinet6 -L${.CURDIR}/../../lib/libinet6/obj \
