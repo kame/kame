@@ -310,8 +310,8 @@ tun_output(ifp, m0, dst, rt)
 	struct proc	*p;
 #ifdef INET
 	int		s;
-#endif
 	int		error;
+#endif
 	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	TUNDEBUG ("%s: tun_output\n", ifp->if_xname);
