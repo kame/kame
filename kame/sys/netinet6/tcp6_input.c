@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.33 2000/11/08 17:12:14 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.34 2000/11/08 17:20:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -677,6 +677,20 @@ findpcb:
 			 * getting established.  So drop the SYN packet.
 			 * Note that we cannot issue a RST as we cannot use
 			 * the address as the source.
+			 *
+			 * If we do not forbid deprecated addresses, we accept
+			 * the SYN packet.  RFC2462 does not suggest dropping
+			 * SYN in this case.
+			 * If we decipher RFC2462 5.5.4, it says like this:
+			 * 1. use of deprecated addr with existing
+			 *    communication is okay - "SHOULD continue to be
+			 *    used"
+			 * 2. use of it with new communication:
+			 *   (2a) "SHOULD NOT be used if no alternate address
+			 *        with sufficient scope is available"
+			 *   (2b) nothing mentioned otherwise.
+			 * Here we fall into (2b) case as we have no choice in
+			 * our souce address selection - we must obey the peer.
 			 *
 			 * The wording in RFC2462 is confusing, and there are
 			 * multiple description text for deprecated address
