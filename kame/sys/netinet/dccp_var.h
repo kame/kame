@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: dccp_var.h,v 1.1 2003/10/17 07:27:26 ono Exp $
+ * $Id: dccp_var.h,v 1.2 2003/10/17 12:08:25 ono Exp $
  */
 
 #ifndef _NETINET_DCCP_VAR_H_
@@ -213,7 +213,11 @@ void	dccp_init(void);
 void	dccp_input(struct mbuf *, int);
 int	dccp_ctloutput(struct socket *so, struct sockopt *sopt);
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 struct inpcb *
+#else
+void
+#endif
 	dccp_notify(struct inpcb *inp, int errno);
 struct dccpcb *
 	dccp_newdccpcb(struct inpcb *inp);

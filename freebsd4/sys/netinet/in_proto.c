@@ -43,6 +43,7 @@
 #include "opt_mpath.h"
 #endif
 #include "opt_sctp.h"
+#include "opt_dccp.h"
 #include <sys/param.h>
 #include <sys/kernel.h>
 #include <sys/socket.h>
@@ -103,6 +104,11 @@
 #include <netinet/sctp_var.h>
 #endif /* SCTP */
 
+#ifdef DCCP
+#include <netinet/dccp.h>
+#include <netinet/dccp_var.h>
+#endif /* DCCP */
+
 #ifdef NATPT
 void	natpt_init	__P((void));
 int	natpt_ctloutput	__P((int, struct socket *, int, int, struct mbuf **));
@@ -159,6 +165,15 @@ struct protosw inetsw[] = {
   &sctp_usrreqs
 },
 #endif /* SCTP */
+#ifdef DCCP
+{ SOCK_DCCP,	&inetdomain,	IPPROTO_DCCP,
+	PR_CONNREQUIRED|PR_IMPLOPCL|PR_ATOMIC,
+  dccp_input,	0,		dccp_ctlinput,	dccp_ctloutput,
+  0,
+  dccp_init,	0,              0,              0,
+  &dccp_usrreqs
+},
+#endif /* DCCP */
 { SOCK_RAW,	&inetdomain,	IPPROTO_RAW,	PR_ATOMIC|PR_ADDR,
   rip_input,	0,		rip_ctlinput,	rip_ctloutput,
   0,
@@ -318,6 +333,9 @@ SYSCTL_NODE(_net_inet, IPPROTO_TCP,	tcp,	CTLFLAG_RW, 0,	"TCP");
 #ifdef SCTP
 SYSCTL_NODE(_net_inet, IPPROTO_SCTP,	sctp,	CTLFLAG_RW, 0,	"SCTP");
 #endif /* SCTP */
+#ifdef DCCP
+SYSCTL_NODE(_net_inet, IPPROTO_DCCP,	dccp,	CTLFLAG_RW, 0,	"DCCP");
+#endif /* DCCP */
 SYSCTL_NODE(_net_inet, IPPROTO_IGMP,	igmp,	CTLFLAG_RW, 0,	"IGMP");
 #ifdef FAST_IPSEC
 /* XXX no protocol # to use, pick something "reserved" */

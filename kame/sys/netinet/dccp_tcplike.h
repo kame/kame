@@ -31,15 +31,15 @@
  * Current Revision:
  *
  * $Source: /usr/home/sumikawa/kame/kame/kame/sys/netinet/dccp_tcplike.h,v $
- * $Revision: 1.1 $
+ * $Revision: 1.2 $
  * $Author: ono $
- * $Date: 2003/10/17 07:27:26 $
+ * $Date: 2003/10/17 12:08:25 $
  *
  * Revision history:
  *
  * $Log: dccp_tcplike.h,v $
- * Revision 1.1  2003/10/17 07:27:26  ono
- * Initial revision
+ * Revision 1.2  2003/10/17 12:08:25  ono
+ * make it compilable on freebsd4
  *
  * Revision 1.27  2003/06/01 13:16:30  magerx-9
  * Correct(?) handling of Ack Ratio
@@ -143,7 +143,9 @@
 /* TCPlike sender congestion control block (ccb) */
 struct tcplike_send_ccb
 {
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	struct mtx mutex;
+#endif
 	struct dccpcb *pcb; /* Pointer to associated dccpcb */
 	u_int32_t cwnd; /* congestion window */
 	u_int32_t ssthresh;
@@ -216,7 +218,9 @@ struct ack_list
 
 /* TCPlike receiver congestion control block (ccb) */
 struct tcplike_recv_ccb {
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	struct mtx mutex;
+#endif
 	struct dccpcb *pcb;               /* Pointer to associated dccpcb */
 	/* No ack ratio or vector here. it's a global feature */
 	struct ack_list *av_list;

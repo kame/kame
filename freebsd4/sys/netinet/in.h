@@ -113,6 +113,7 @@
 #define	IPPROTO_NSP		31		/* Network Services */
 #define	IPPROTO_INP		32		/* Merit Internodal */
 #define	IPPROTO_SEP		33		/* Sequential Exchange */
+#define IPPROTO_DCCP		33		/* Datagram congestion Control Protocol */
 #define	IPPROTO_3PC		34		/* Third Party Connect */
 #define	IPPROTO_IDPR		35		/* InterDomain Policy Routing */
 #define	IPPROTO_XTP		36		/* XTP */

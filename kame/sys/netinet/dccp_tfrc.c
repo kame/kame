@@ -25,7 +25,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $Id: dccp_tfrc.c,v 1.1 2003/10/17 07:27:26 ono Exp $
+ * $Id: dccp_tfrc.c,v 1.2 2003/10/17 12:08:25 ono Exp $
  */
 
 /* This implementation conforms to the drafts of DCCP dated Mars 2003. The options used are window counter, elapsed time, loss event rate and receive rate.  No support for history discounting or oscillation prevention. */
@@ -42,7 +42,9 @@
 #include <sys/signalvar.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 #include <sys/sx.h>
+#endif
 #include <sys/sysctl.h>
 #include <sys/syslog.h>
 #include <sys/queue.h>
@@ -82,6 +84,16 @@
 #define TFRC_DEBUG_TIME(args) log args
 #else
 #define TFRC_DEBUG_TIME(args)
+#endif
+
+#if !defined(__FreeBSD__) || __FreeBSD_version < 500000
+#define	INP_INFO_LOCK_INIT(x,y)
+#define	INP_INFO_WLOCK(x)
+#define INP_INFO_WUNLOCK(x)
+#define	INP_INFO_RLOCK(x)
+#define INP_INFO_RUNLOCK(x)
+#define	INP_LOCK(x)
+#define INP_UNLOCK(x)
 #endif
 
 #include <netinet/dccp_tfrc_print.h>

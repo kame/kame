@@ -31,15 +31,15 @@
  * Current Revision:
  *
  * $Source: /usr/home/sumikawa/kame/kame/kame/sys/netinet/dccp_tcplike.c,v $
- * $Revision: 1.1 $
+ * $Revision: 1.2 $
  * $Author: ono $
- * $Date: 2003/10/17 07:27:26 $
+ * $Date: 2003/10/17 12:08:25 $
  *
  * Revision history:
  *
  * $Log: dccp_tcplike.c,v $
- * Revision 1.1  2003/10/17 07:27:26  ono
- * Initial revision
+ * Revision 1.2  2003/10/17 12:08:25  ono
+ * make it compilable on freebsd4
  *
  * Revision 1.48  2003/06/08 14:48:18  magerx-9
  * Added stats for TCPlike
@@ -182,6 +182,8 @@
  *
  **/
 
+#include "opt_dccp.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/domain.h>
@@ -194,7 +196,9 @@
 #include <sys/signalvar.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 #include <sys/sx.h>
+#endif
 #include <sys/sysctl.h>
 #include <sys/syslog.h>
 
@@ -222,6 +226,16 @@
 #define ACKRATIO_DEBUG(args)
 #define LOSS_DEBUG(args)
 #define TIMEOUT_DEBUG(args)
+
+#if !defined(__FreeBSD__) || __FreeBSD_version < 500000
+#define	INP_INFO_LOCK_INIT(x,y)
+#define	INP_INFO_WLOCK(x)
+#define INP_INFO_WUNLOCK(x)
+#define	INP_INFO_RLOCK(x)
+#define INP_INFO_RUNLOCK(x)
+#define	INP_LOCK(x)
+#define INP_UNLOCK(x)
+#endif
 
 /* Sender side */
 
@@ -259,7 +273,9 @@ void tcplike_rto_timeout(void *ccb)
 	struct inpcb *inp;
 	int s;
 	
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_lock(&(cb->mutex));
+#endif
 	
 	cb->ssthresh = cb->cwnd >>1;
 	cb->cwnd = 1; /* allowing 1 packet to be sent */
@@ -283,7 +299,9 @@ void tcplike_rto_timeout(void *ccb)
 	
 	LOSS_DEBUG((LOG_INFO, "Timeout. CWND value: %u , OUTSTANDING value: %u\n",
 		    cb->cwnd, cb->outstanding));
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
+#endif
 
 	/* lock'n run dccp_output */
 	s = splnet();
@@ -388,7 +406,9 @@ void *tcplike_send_init(struct dccpcb* pcb)
 	cb->ack_last = 0;
 	cb->ack_miss = 0;
 	
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_init(&(cb->mutex), "TCPlike Sender mutex", NULL, MTX_DEF);
+#endif
 	
 	TCPLIKE_DEBUG((LOG_INFO, "TCPlike sender initialised!\n"));
 	dccpstat.tcplikes_send_conn++;
@@ -401,7 +421,9 @@ void tcplike_send_term(void *ccb)
 	if (ccb == 0)
 		return;
 	
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_destroy(&(cb->mutex));
+#endif
 	free(cb, M_PCB);
 	TCPLIKE_DEBUG((LOG_INFO, "TCP-like sender is destroyed\n"));
 }
@@ -418,7 +440,9 @@ void tcplike_send_free(void *ccb)
 	if (ccb == 0)
 		return;
 	
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_lock(&(cb->mutex));
+#endif
 	
 	free(cb->cwndvector, M_PCB);
 	cb->cv_hs = cb->cv_ts = 0;
@@ -429,7 +453,9 @@ void tcplike_send_free(void *ccb)
 		untimeout(tcplike_rto_timeout, (void*) cb, cb->rto_timer);
 	}
 	
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
+#endif
 	timeout(tcplike_send_term, (void*)cb, 10*hz);
 }
 
@@ -451,7 +477,9 @@ int tcplike_send_packet(void *ccb, long datasize)
 		return 1;
 	}
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_lock(&(cb->mutex));
+#endif
 
 	if (cb->cwnd <= cb->outstanding) {
 		/* May not send. trigger RTO */
@@ -461,7 +489,9 @@ int tcplike_send_packet(void *ccb, long datasize)
 			ticks = (long)cb->rto;
 			cb->rto_timer = timeout(tcplike_rto_timeout, (void *)cb, ticks);
 		}
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 		mtx_unlock(&(cb->mutex));
+#endif
 		return 0;
 	}
 	
@@ -490,7 +520,9 @@ int tcplike_send_packet(void *ccb, long datasize)
 		cb->sample_rtt = 1;
 	}
 	
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
+#endif
 	return 1;
 	
 }
@@ -510,7 +542,9 @@ void tcplike_send_packet_sent(void *ccb, int moreToSend, long datasize)
 		return;
 	}
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_lock(&(cb->mutex));
+#endif
 	
 	cb->outstanding++;
 	TCPLIKE_DEBUG((LOG_INFO, "SENT. cwnd: %d, outstanding: %d\n",cb->cwnd, cb->outstanding));
@@ -521,7 +555,9 @@ void tcplike_send_packet_sent(void *ccb, int moreToSend, long datasize)
 	CWND_DEBUG((LOG_INFO, "Sent. CWND value: %u , OUTSTANDING value: %u\n",cb->cwnd, cb->outstanding));
 	
 	dccp_remove_feature(cb->pcb, DCCP_OPT_CHANGE, DCCP_FEATURE_ACKRATIO);
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
+#endif
 }
 
 /**
@@ -537,7 +573,9 @@ void tcplike_send_packet_recv(void *ccb, char *options, int optlen)
 	struct tcplike_send_ccb *cb = (struct tcplike_send_ccb *) ccb;
 
 	TCPLIKE_DEBUG((LOG_INFO, "Entering tcplike_send_ack_recv()\n"));
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_lock(&(cb->mutex));
+#endif
 
 	if (dccp_get_option(options, optlen, DCCP_OPT_TIMESTAMP_ECHO, av,10) > 0) {
 		u_int32_t echo, elapsed;
@@ -575,7 +613,9 @@ void tcplike_send_packet_recv(void *ccb, char *options, int optlen)
 		cb->ack_last = 0;
 		cb->ack_miss = 0;
 		ACKRATIO_DEBUG((LOG_INFO, "Clear Missing Acks state!\n"));
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 		mtx_unlock(&(cb->mutex));
+#endif
 		return;
 	}
 
@@ -638,7 +678,9 @@ void tcplike_send_packet_recv(void *ccb, char *options, int optlen)
 	CWND_DEBUG((LOG_INFO, "Decrease outstanding. was = %u , now = %u\n", prev_size, cb->outstanding));
 	if (prev_size == cb->outstanding) {
 		/* Nothing dropped from cwndvector  */
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 		mtx_unlock(&(cb->mutex));
+#endif
 		return;
 	}
 	
@@ -767,11 +809,15 @@ void tcplike_send_packet_recv(void *ccb, char *options, int optlen)
 		untimeout(tcplike_rto_timeout, (void*) cb, cb->rto_timer);
 		cb->rto_timer.callout = NULL;
 		
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 		mtx_unlock(&(cb->mutex));
+#endif
                 dccp_output(cb->pcb, 1);
 		return;
         }
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
+#endif
 }
 
 int _cwndvector_size(struct tcplike_send_ccb *cb)
@@ -975,7 +1021,9 @@ void *tcplike_recv_init(struct dccpcb *pcb)
 	ccb->pcb->remote_ackvector = 1;
 	dccp_use_ackvector(ccb->pcb);
 	
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_init(&(ccb->mutex), "TCPlike Receiver mutex", NULL, MTX_DEF);
+#endif
 	
 	TCPLIKE_DEBUG((LOG_INFO, "TCPlike receiver initialised!\n"));
 	dccpstat.tcplikes_recv_conn++;
@@ -988,7 +1036,9 @@ void tcplike_recv_term(void *ccb)
 	if (ccb == 0)
 		return;
 	
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_destroy(&(cb->mutex));
+#endif
 	free(cb, M_PCB);
 	TCPLIKE_DEBUG((LOG_INFO, "TCP-like receiver is destroyed\n"));
 }
@@ -999,13 +1049,16 @@ void tcplike_recv_term(void *ccb)
 void tcplike_recv_free(void *ccb)
 {
 	struct ack_list *a;
-	LOSS_DEBUG((LOG_INFO, "Entering tcplike_recv_free()\n"));
 	struct tcplike_recv_ccb *cb = (struct tcplike_recv_ccb *) ccb;
+
+	LOSS_DEBUG((LOG_INFO, "Entering tcplike_recv_free()\n"));
 
 	if (ccb == 0)
 		return;
 	
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_lock(&(cb->mutex));
+#endif
 
 	a = cb->av_list;
 	while (a) {
@@ -1017,7 +1070,9 @@ void tcplike_recv_free(void *ccb)
 	cb->pcb->av_size = 0;
 	free(cb->pcb->ackvector, M_PCB);
 	
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
+#endif
 	timeout(tcplike_recv_term, (void*)cb, 10*hz);
 }
 
@@ -1034,7 +1089,9 @@ void tcplike_recv_packet_recv(void *ccb, char *options, int optlen)
 	
 	TCPLIKE_DEBUG((LOG_INFO, "Entering tcplike_recv_packet()\n"));
 
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_lock(&(cb->mutex));
+#endif
 
 	if (cb->pcb->type_rcv == DCCP_TYPE_DATA ||
 	    cb->pcb->type_rcv == DCCP_TYPE_DATAACK)
@@ -1106,7 +1163,9 @@ void tcplike_recv_packet_recv(void *ccb, char *options, int optlen)
 			dccp_output(cb->pcb, 1);
 		}
 	}
+#if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	mtx_unlock(&(cb->mutex));
+#endif
 }
 
 void _avlist_add(struct tcplike_recv_ccb *cb, u_int32_t localseq, u_int32_t ackthru)
