@@ -39,7 +39,9 @@
 #include <net/if.h>
 #include <net/route.h>
 #include <netinet/in.h>
+#ifdef __OpenBSD__
 #include <netinet/ip_ipsp.h>
+#endif
 #include <net/pfvar.h>
 
 #define ACCEPT_FLAGS(oklist)			\

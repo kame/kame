@@ -33,7 +33,11 @@
 struct pfsync_softc {
 	struct ifnet	sc_if;
 
+#ifdef __OpenBSD__
 	struct timeout	sc_tmo;
+#else
+	struct callout sc_tmo;
+#endif
 	struct mbuf	*sc_mbuf;	/* current cummulative mbuf */
 	struct pf_state	*sc_ptr;	/* current ongoing state */
 	int		 sc_count;	/* number of states in one mtu */

@@ -713,7 +713,10 @@ struct	m_tag *m_tag_next(struct mbuf *, struct m_tag *);
 #define PACKET_TAG_PF_ROUTED			12 /* PF routed, no route loops */
 #define PACKET_TAG_PF_FRAGCACHE			13 /* PF fragment cached */
 #define PACKET_TAG_PF_QID			14 /* PF queue id */
-#define PACKET_TAG_INET6			15 /* IPv6 info */
+#define PACKET_TAG_PF_TAG			15 /* PF tags */
+
+#define PACKET_TAG_INET6			16 /* IPv6 info */
+
 
 #ifdef MBTYPES
 const int mbtypes[] = {				/* XXX */

@@ -38,7 +38,9 @@
 #include <sys/tree.h>
 
 #include <net/radix.h>
+#ifdef __OpenBSD__
 #include <netinet/ip_ipsp.h>
+#endif
 #include <netinet/tcp_fsm.h>
 
 #define	PF_TCPS_PROXY_SRC	((TCP_NSTATES)+0)
@@ -566,6 +568,14 @@ struct pfr_tstats {
 };
 #define	pfrts_name	pfrts_t.pfrt_name
 #define pfrts_flags	pfrts_t.pfrt_flags
+
+#ifndef __OpenBSD__
+union sockaddr_union {
+	struct sockaddr		sa;
+	struct sockaddr_in	sin;
+	struct sockaddr_in6	sin6;
+};
+#endif
 
 SLIST_HEAD(pfr_kentryworkq, pfr_kentry);
 struct pfr_kentry {
