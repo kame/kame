@@ -1,8 +1,22 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1653 2001/04/24 06:30:24 sumikawa Exp $
+$KAME: CHANGELOG,v 1.1654 2001/04/27 01:49:00 jinmei Exp $
 
 <200104>
+2001-04-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_rtrequest): stop process if
+	nd6_need_cache() is 0 and the route is not a host route (which
+	should probably be an interface direct route on a link that does
+	not need neighbor cahces).  Otherwise, the function would set the
+	RTF_LLINFO flag, which would annoy the ndp(8) command.
+
+	* kame/sys/netinet6/nd6_rtr.c (nd6_prefix_onlink): did not set
+	the RTF_GATEWAY flag even for !nd6_need_cache() cases.  The
+	intention was to prevent the process of nd6_rtrequest(), but we do
+	not need the flag, since we now explicitly disable the process.
+	Setting the RTF_GATEWAY flag is not the best way, because routes
+	with the flag can mistakenly be deleted by user applications.
+	
 Tue Apr 24 15:29:51 2001  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd4: sync with 4.3-RELEASE
 
