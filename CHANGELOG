@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.803 2000/04/23 05:22:47 itojun Exp $
+$Id: CHANGELOG,v 1.804 2000/04/24 04:09:05 itojun Exp $
 
 <200004>
+Mon Apr 24 13:08:42 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/mail/fetchmail: upgrade to 5.3.8.
+
 Sun Apr 23 14:21:32 JST 2000  itojun@iijlab.net
 	* freebsd2/usr.bin/ftp: use RFC2732 URL format for Host: HTTP directive.
 	* openbsd/usr.bin/ftp: support RFC2732 URL format (bracket around
