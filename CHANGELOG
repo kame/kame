@@ -1,7 +1,22 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2272 2002/11/05 06:04:15 itojun Exp $
+$KAME: CHANGELOG,v 1.2273 2002/11/07 03:26:08 itojun Exp $
 
 <200211>
+Thu Nov  7 12:57:55 JST 2002
+	* sctp changes from randall:
+	  - in_proto's need to NOT have PR_ATOMIC for SCTP
+	  - asconf (addip) would incorrectly add back addresses
+	  - clock granularity in wrong units
+	  - Incorrect data notification.
+	  - recepit of duplicate detected earlier when it is the same
+	    as the last TSN.
+	  - removal of some no longer used cwnd debugging variables
+	  - removal of debugging sockopts always slated to be removed
+	  - addition of setsockopt variable to control auto-asconf behavior
+	  - Fix of failed data notification so that it is correctly formed
+	    in the socket buffer.
+	  - honor so_linger
+
 Tue Nov  5 14:44:14 JST 2002  itojun@iijlab.net
 	* openbsd: synchronize to 3.2.  still needs testing.
 
