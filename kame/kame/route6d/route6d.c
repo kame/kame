@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.72 2001/08/09 22:21:23 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.73 2001/09/05 01:12:34 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.72 2001/08/09 22:21:23 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.73 2001/09/05 01:12:34 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -141,6 +141,7 @@ int	loopifindex = 0;	/* ditto */
 fd_set	sockvec;	/* vector to select() for receiving */
 int	rtsock;		/* the routing socket */
 int	ripsock;	/* socket to send/receive RIP datagram */
+int	maxfd;		/* maximum fd for select() */
 
 struct	rip6 *ripbuf;	/* packet buffer for sending */
 
@@ -461,7 +462,7 @@ main(argc, argv)
 
 		FD_COPY(&sockvec, &recvec);
 		signo = 0;
-		switch (select(FD_SETSIZE, &recvec, 0, 0, 0)) {
+		switch (select(maxfd + 1, &recvec, 0, 0, 0)) {
 		case -1:
 			if (errno != EINTR) {
 				fatal("select");
@@ -661,6 +662,7 @@ init()
 	memset(&sockvec, 0, sizeof(sockvec));
 #endif
 	FD_SET(ripsock, &sockvec);
+	maxfd = ripsock;
 
 	if (nflag == 0) {
 		if ((rtsock = socket(PF_ROUTE, SOCK_RAW, 0)) < 0) {
@@ -668,6 +670,8 @@ init()
 			/*NOTREACHED*/
 		}
 		FD_SET(rtsock, &sockvec);
+		if (rtsock > maxfd)
+			maxfd = rtsock;
 	} else
 		rtsock = -1;	/*just for safety */
 }
