@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.9 2002/01/13 12:51:28 fujisawa Exp $	*/
+/*	$KAME: main.c,v 1.10 2002/02/01 06:25:40 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -66,6 +66,7 @@ int
 main(int argc, char *argv[])
 {
 	char	*fname = NULL;
+	extern int	 yyerrno;
 	extern int	 yylineno;
 	extern char	*yyfilename;
 
@@ -101,7 +102,10 @@ main(int argc, char *argv[])
 
 	clean_misc();
 	clean_show();
-	return (0);
+
+	if (yyerrno)
+		fprintf(stderr, "%d error(s) detected.\n", yyerrno);
+	return (yyerrno);
 }
 
 

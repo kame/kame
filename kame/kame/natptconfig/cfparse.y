@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.22 2002/02/01 05:50:02 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.23 2002/02/01 06:25:40 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -52,6 +52,7 @@
 
 char		*yykeyword = NULL;
 char		*yyfilename;
+ int		 yyerrno;
 int		 yylineno;
 struct ruletab	 ruletab;
 
@@ -69,6 +70,8 @@ yyerror(char *msg, ...)
 	vfprintf(stderr, msg, ap);
 	fprintf(stderr, "\n");
 	va_end(ap);
+
+	yyerrno++;
 }
 %}
 
