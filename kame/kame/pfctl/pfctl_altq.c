@@ -86,8 +86,6 @@ u_int32_t	 eval_bwspec(struct node_queue_bw *, u_int32_t);
 void		 print_hfsc_sc(const char *, u_int, u_int, u_int,
 		     const struct node_hfsc_sc *);
 
-static u_int32_t	 max_qid = 1;
-
 void
 pfaltq_store(struct pf_altq *a)
 {
@@ -414,8 +412,6 @@ eval_pfqueue_cbq(struct pfctl *pf, struct pf_altq *pa)
 
 	if (pa->parent[0] == 0)
 		opts->flags |= (CBQCLF_ROOTCLASS | CBQCLF_WRR);
-	else if (pa->qid == 0 && (opts->flags & CBQCLF_DEFCLASS) == 0)
-		pa->qid = ++max_qid;
 
 	cbq_compute_idletime(pf, pa);
 	return (0);
@@ -599,9 +595,6 @@ eval_pfqueue_priq(struct pfctl *pf, struct pf_altq *pa)
 		}
 	}
 
-	if (pa->qid == 0)
-		pa->qid = ++max_qid;
-
 	return (0);
 }
 
@@ -671,13 +664,11 @@ eval_pfqueue_hfsc(struct pfctl *pf, struct pf_altq *pa)
 
 	if (pa->parent[0] == 0) {
 		/* root queue */
-		pa->qid = HFSC_ROOTCLASS_HANDLE;
 		opts->lssc_m1 = pa->ifbandwidth;
 		opts->lssc_m2 = pa->ifbandwidth;
 		opts->lssc_d = 0;
 		return (0);
-	} else if (pa->qid == 0)
-		pa->qid = ++max_qid;
+	}
 
 	LIST_INIT(&rtsc);
 	LIST_INIT(&lssc);

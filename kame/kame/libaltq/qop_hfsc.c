@@ -1,4 +1,4 @@
-/*	$KAME: qop_hfsc.c,v 1.10 2003/07/10 12:08:37 kjc Exp $	*/
+/*	$KAME: qop_hfsc.c,v 1.11 2003/09/17 14:27:37 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -427,7 +427,7 @@ qop_hfsc_add_if(struct ifinfo **rp, const char *ifname,
 	/* set enable hook */
 	ifinfo->enable_hook = qop_hfsc_enable_hook;
 
-	/* create a dummy root class */
+	/* create root class */
 	sc.m1 = bandwidth;
 	sc.d = 0;
 	sc.m2 = bandwidth;
@@ -1072,31 +1072,22 @@ hfsc_add_class(struct classinfo *clinfo)
 	struct hfsc_add_class class_add;
 	struct hfsc_classinfo *hfsc_clinfo;
 	struct hfsc_ifinfo *hfsc_ifinfo;
-#if 1
-	static u_int32_t max_qid = 1;
-#endif
-
-	/* root class is a dummy class */
-	if (clinfo->parent == NULL) {
-		clinfo->handle = HFSC_ROOTCLASS_HANDLE;
-		return (0);
-	}
 
 	hfsc_ifinfo = clinfo->ifinfo->private;
 	hfsc_clinfo = clinfo->private;
 
 	memset(&class_add, 0, sizeof(class_add));
 	strncpy(class_add.iface.hfsc_ifname, clinfo->ifinfo->ifname, IFNAMSIZ);
-	if (clinfo->parent == hfsc_ifinfo->root_class)
-		class_add.parent_handle = HFSC_ROOTCLASS_HANDLE;
+
+	if (clinfo->parent == NULL)
+		class_add.parent_handle = HFSC_NULLCLASS_HANDLE;
 	else
 		class_add.parent_handle = clinfo->parent->handle;
+
 	class_add.service_curve = hfsc_clinfo->rsc;
 	class_add.qlimit = hfsc_clinfo->qlimit;
 	class_add.flags = hfsc_clinfo->flags;
-#if 1
-	class_add.class_handle = ++max_qid;
-#endif
+
 	if (ioctl(hfsc_fd, HFSC_ADD_CLASS, &class_add) < 0) {
 		clinfo->handle = HFSC_NULLCLASS_HANDLE;
 		return (QOPERR_SYSCALL);
@@ -1138,8 +1129,7 @@ hfsc_delete_class(struct classinfo *clinfo)
 {
 	struct hfsc_delete_class class_delete;
 
-	if (clinfo->handle == HFSC_NULLCLASS_HANDLE ||
-	    clinfo->handle == HFSC_ROOTCLASS_HANDLE)
+	if (clinfo->handle == HFSC_NULLCLASS_HANDLE)
 		return (0);
 
 	memset(&class_delete, 0, sizeof(class_delete));

@@ -1,4 +1,4 @@
-/*	$KAME: qop_priq.c,v 1.5 2003/07/10 12:08:37 kjc Exp $	*/
+/*	$KAME: qop_priq.c,v 1.6 2003/09/17 14:27:37 kjc Exp $	*/
 /*
  * Copyright (C) 2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -431,9 +431,6 @@ priq_add_class(struct classinfo *clinfo)
 	struct priq_add_class class_add;
 	struct priq_classinfo *priq_clinfo;
 	struct priq_ifinfo *priq_ifinfo;
-#if 1
-	static u_int32_t max_qid = 1;
-#endif
 
 	priq_ifinfo = clinfo->ifinfo->private;
 	priq_clinfo = clinfo->private;
@@ -444,9 +441,7 @@ priq_add_class(struct classinfo *clinfo)
 	class_add.pri = priq_clinfo->pri;
 	class_add.qlimit = priq_clinfo->qlimit;
 	class_add.flags = priq_clinfo->flags;
-#if 1
-	class_add.class_handle = ++max_qid;
-#endif
+
 	if (ioctl(priq_fd, PRIQ_ADD_CLASS, &class_add) < 0) {
 		clinfo->handle = PRIQ_NULLCLASS_HANDLE;
 		return (QOPERR_SYSCALL);

@@ -1,4 +1,4 @@
-/*	$KAME: qdisc_cbq.c,v 1.6 2002/10/27 03:19:35 kjc Exp $	*/
+/*	$KAME: qdisc_cbq.c,v 1.7 2003/09/17 14:27:37 kjc Exp $	*/
 /*
  * Copyright (C) 1999-2000
  *	Sony Computer Science Laboratories, Inc.  All rights reserved.
@@ -97,24 +97,8 @@ cbq_stat_loop(int fd, const char *ifname, int count, int interval)
 				continue;
 			}
 
-			switch (sp->handle) {
-			case ROOT_CLASS_HANDLE:
-				printf("Root Class for Interface %s: %s\n",
-				       ifname, clnames[i]);
-				break;
-			case DEFAULT_CLASS_HANDLE:
-				printf("Default Class for Interface %s: %s\n",
-				       ifname, clnames[i]);
-				break;
-			case CTL_CLASS_HANDLE:
-				printf("Ctl Class for Interface %s: %s\n",
-				       ifname, clnames[i]);
-				break;
-			default:
-				printf("Class %d on Interface %s: %s\n",
-				       sp->handle, ifname, clnames[i]);
-				break;
-			}
+			printf("Class %d on Interface %s: %s\n",
+			    sp->handle, ifname, clnames[i]);
 
 			flow_bps = 8.0 / (double)sp->ns_per_byte
 			    * 1000*1000*1000;
