@@ -1,4 +1,4 @@
-/*	$KAME: ah_input.c,v 1.64 2001/09/04 08:43:19 itojun Exp $	*/
+/*	$KAME: ah_input.c,v 1.65 2001/10/19 05:20:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -464,14 +464,6 @@ ah4_input(m, va_alist)
 			ipsecstat.in_inval++;
 			goto fail;
 		}
-
-#if 0 /* XXX should we call ipfw rather than ipsec_in_reject? */
-		/* drop it if it does not match the default policy */
-		if (ipsec4_in_reject(m, NULL)) {
-			ipsecstat.in_polvio++;
-			goto fail;
-		}
-#endif
 
 #if 1
 		/*
@@ -950,14 +942,6 @@ ah6_input(mp, offp, proto)
 			ipsec6stat.in_inval++;
 			goto fail;
 		}
-
-#if 0 /* XXX should we call ipfw rather than ipsec_in_reject? */
-		/* drop it if it does not match the default policy */
-		if (ipsec6_in_reject(m, NULL)) {
-			ipsec6stat.in_polvio++;
-			goto fail;
-		}
-#endif
 
 #if 1
 		/*
