@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.72 1999/08/26 12:39:19 jinmei Exp $
+$Id: CHANGELOG,v 1.73 1999/08/26 12:40:01 jinmei Exp $
 
 <199908>
 1999-08-26  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
-	* kame/kame/pim6sd/vif.c: changed the return value of
+	* kame/kame/pim6sd/vif.c: changed the type of return value of
 	vif_forwarder() from if_set * to int.
 	Also, introduced a new function vif_and(), which is inteded to be
 	called from age_routes() instead of vif_forwarder(). The new
