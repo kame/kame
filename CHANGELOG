@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2605 2004/05/18 09:51:12 jinmei Exp $
+$KAME: CHANGELOG,v 1.2606 2004/05/19 09:13:06 jinmei Exp $
 
 <200405>
+2004-05-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/nd6.c (nd6_output): simply returned an error
+	if rtalloc1() provided a route to an unexpected interface.
+	Based on a discussion for KAME PR 615 with Luigi Rizzo.
+
 2004-05-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* {net,open}bsd/include/netdb.h (AI_ADDRCONFIG): defined the flag.
 
