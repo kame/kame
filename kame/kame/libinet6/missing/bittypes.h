@@ -1,4 +1,4 @@
-/*	$KAME: bittypes.h,v 1.2 2001/01/26 07:41:22 jinmei Exp $ */
+/*	$KAME: bittypes.h,v 1.3 2001/01/26 08:14:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.

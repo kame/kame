@@ -1,4 +1,4 @@
-/*	$KAME: ifaddrs.h,v 1.2 2001/01/26 07:41:22 jinmei Exp $ */
+/*	$KAME: ifaddrs.h,v 1.3 2001/01/26 08:14:55 itojun Exp $	*/
 
 /*
  * Copyright (c) 1995, 1999
