@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.49 2001/06/21 04:03:10 jinmei Exp $	*/
+/*	$KAME: net_osdep.h,v 1.50 2001/06/21 04:45:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -38,13 +38,13 @@
  * - whether the IPv4 input routine convert the byte order of some fileds
  *   of the IP header (x: convert to the host byte order, s: strip the header
  *   length for possible reassembly)
- *          ip_len ip_id ip_off
- * bsdi3:       xs     x      x
- * bsdi4:       xs            x
- * freebsd2:    xs     x      x 
- * freebsd4:    xs            x
- * NetBSD:       x            x
- * OpenBSD:     xs     x      x
+ *             ip_len ip_id ip_off
+ * bsdi3:          xs     x      x
+ * bsdi4:          xs            x
+ * freebsd[23]:    xs     x      x 
+ * freebsd4:       xs            x
+ * NetBSD:          x            x
+ * OpenBSD:        xs     x      x
  *
  * - ifa_ifwithaf()
  *   bsdi[34], netbsd, and openbsd define it in sys/net/if.c
