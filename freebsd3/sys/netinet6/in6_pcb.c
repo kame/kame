@@ -93,6 +93,9 @@
 #include <netinet6/nd6.h>
 #include <netinet/in_pcb.h>
 #include <netinet6/in6_pcb.h>
+#ifdef ENABLE_DEFAULT_SCOPE
+#include <netinet6/scope6_var.h> 
+#endif
 
 #include "faith.h"
 
@@ -134,6 +137,12 @@ in6_pcbbind(inp, nam, p)
 		if (nam->sa_family != AF_INET6)
 			return(EAFNOSUPPORT);
 		sin6 = (struct sockaddr_in6 *)nam;
+
+#ifdef ENABLE_DEFAULT_SCOPE
+		if (sin6->sin6_scope_id == 0)
+			sin6->sin6_scope_id =
+				scope6_addr2default(&sin6->sin6_addr);
+#endif
 
 		/*
 		 * If the scope of the destination is link-local, embed the
@@ -336,6 +345,11 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 		return (EAFNOSUPPORT);
 	if (sin6->sin6_port == 0)
 		return (EADDRNOTAVAIL);
+
+#ifdef ENABLE_DEFAULT_SCOPE
+      if (sin6->sin6_scope_id == 0) /* do not override if already specified */
+	      sin6->sin6_scope_id = scope6_addr2default(&sin6->sin6_addr);
+#endif
 
 	/*
 	 * If the scope of the destination is link-local, embed the interface
