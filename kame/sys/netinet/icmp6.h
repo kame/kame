@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.h,v 1.36 2001/01/28 09:44:53 itojun Exp $	*/
+/*	$KAME: icmp6.h,v 1.37 2001/01/28 10:18:25 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -306,11 +306,11 @@ struct nd_opt_advinterval {	/* Advertisement interval option */
 };
 
 struct nd_opt_homeagent_info {	/* Home Agent info */
-	uint8_t		nd_opt_hai_type;
-	uint8_t		nd_opt_hai_len;
-	uint16_t	nd_opt_hai_reserved;
+	u_int8_t	nd_opt_hai_type;
+	u_int8_t	nd_opt_hai_len;
+	u_int16_t	nd_opt_hai_reserved;
 	int16_t		nd_opt_hai_preference;
-	uint16_t	nd_opt_hai_lifetime;
+	u_int16_t	nd_opt_hai_lifetime;
 };
 
 /*
