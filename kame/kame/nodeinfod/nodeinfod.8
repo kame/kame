@@ -1,4 +1,4 @@
-.\"	$KAME: nodeinfod.8,v 1.5 2001/08/19 05:51:08 itojun Exp $
+.\"	$KAME: nodeinfod.8,v 1.6 2001/10/19 07:59:18 itojun Exp $
 .\"
 .\" Copyright (C) 2001 WIDE Project.
 .\" All rights reserved.
@@ -37,7 +37,7 @@
 .\"
 .Sh SYNOPSIS
 .Nm
-.Op Fl f
+.Op Fl df
 .Op Fl n Ar name
 .\"
 .Sh DESCRIPTION
@@ -59,6 +59,8 @@ runs
 .Nm
 in foreground mode
 .Pq do not become daemon .
+.Fl d
+is for debugging.
 .\"
 .Sh RETURN VALUES
 .Nm

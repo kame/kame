@@ -1,4 +1,4 @@
-/*	$KAME: nodeinfod.c,v 1.5 2001/08/19 05:51:08 itojun Exp $	*/
+/*	$KAME: nodeinfod.c,v 1.6 2001/10/19 07:59:19 itojun Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -80,6 +80,7 @@ int s;
 int mode = 7;	/* reply to all message types */
 char hostname[MAXHOSTNAMELEN];
 int foreground = 0;
+int debug = 0;
 
 int (*func[256]) __P((struct sockaddr *, socklen_t, const char *, ssize_t));
 
@@ -92,8 +93,11 @@ main(argc, argv)
 
 	gethostname(hostname, sizeof(hostname));
 
-	while ((ch = getopt(argc, argv, "fn:")) != -1) {
+	while ((ch = getopt(argc, argv, "dfn:")) != -1) {
 		switch (ch) {
+		case 'd':
+			debug++;
+			break;
 		case 'f':
 			foreground++;
 			break;
@@ -137,7 +141,7 @@ main(argc, argv)
 void
 usage()
 {
-	fprintf(stderr, "usage: nodeinfod [-f] [-n name]\n");
+	fprintf(stderr, "usage: nodeinfod [-df] [-n name]\n");
 }
 
 void
@@ -145,6 +149,9 @@ sockinit()
 {
 	struct addrinfo hints, *res;
 	int error;
+
+	if (debug)
+		warnx("sockinit");
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
@@ -186,6 +193,9 @@ joingroups(name)
 	unsigned int ifidx;
 	struct ipv6_mreq m6;
 	struct sockaddr_in6 *sin6;
+
+	if (debug)
+		warnx("joingroups");
 
 	memset(&hints, 0, sizeof(hints));
 	hints.ai_family = AF_INET6;
@@ -230,6 +240,9 @@ joingroups(name)
 
 		m6.ipv6mr_interface = ifidx;
 
+		if (debug)
+			warnx("joingroups: %s", ifa->ifa_name);
+
 		if (setsockopt(s, IPPROTO_IPV6, IPV6_JOIN_GROUP, &m6,
 		    sizeof(m6)) < 0) {
 			err(1, "setsockopt(IPV6_JOIN_GROUP)");
@@ -255,6 +268,9 @@ nigroup(name)
 	size_t l;
 	static char hbuf[NI_MAXHOST];
 	struct in6_addr in6;
+
+	if (debug)
+		warnx("nigroup");
 
 	p = strchr(name, '.');
 	if (!p)
@@ -302,6 +318,9 @@ mainloop()
 	struct icmp6_nodeinfo *ni6;
 	u_int16_t qtype;
 
+	if (debug)
+		warnx("mainloop");
+
 	if (s >= FD_SETSIZE) {
 		errx(1, "socket exceeds FD_SETSIZE");
 		/* NOTREACHED */
@@ -330,6 +349,10 @@ mainloop()
 			continue;
 		}
 		icmp6 = (struct icmp6_hdr *)buf;
+
+		if (debug)
+			warnx("incoming message, %u/%u", icmp6->icmp6_type,
+			    icmp6->icmp6_code);
 
 		switch (icmp6->icmp6_type) {
 		case ICMP6_WRUREQUEST:	/* ICMP6_FQDN_QUERY */
@@ -372,6 +395,9 @@ ni6_input_code0(from, fromlen, buf, l)
 	enum { WRU, FQDN } wrumode;
 	char reply[BUFSIZ];
 	char *p;
+
+	if (debug)
+		warnx("ni6_input_code0");
 
 	if (l == sizeof(struct icmp6_hdr) + 4)
 		wrumode = WRU;
@@ -426,6 +452,9 @@ ni6_input(from, fromlen, buf, l)
 	const char *subj = NULL;
 	ssize_t tlen;
 
+	if (debug)
+		warnx("ni6_input");
+
 	if (sizeof(*ni6) > l)
 		return -1;
 	ni6 = (const struct icmp6_nodeinfo *)buf;
@@ -461,6 +490,7 @@ ni6_input(from, fromlen, buf, l)
 
 	/* validate query Subject field. */
 	qtype = ntohs(ni6->ni_qtype);
+
 	subjlen = l - sizeof(struct icmp6_nodeinfo);
 	switch (qtype) {
 	case NI_QTYPE_NOOP:
@@ -507,7 +537,6 @@ ni6_input(from, fromlen, buf, l)
 			 *
 			 * We do not do proxy at this moment.
 			 */
-			/* m_pulldown instead of copy? */
 			memset(&sin6, 0, sizeof(sin6));
 			sin6.sin6_family = AF_INET6;
 			sin6.sin6_len = sizeof(struct sockaddr_in6);
@@ -583,7 +612,7 @@ ni6_input(from, fromlen, buf, l)
 		replylen += offsetof(struct ni_reply_fqdn, ni_fqdn_namelen);
 		break;
 	case NI_QTYPE_NODEADDR:
-		if (sizeof(replybuf) > l)
+		if (l > sizeof(replybuf))
 			goto bad;
 		memcpy(replybuf, buf, l);
 		nni6 = (struct icmp6_nodeinfo *)replybuf;
@@ -686,6 +715,9 @@ ni6_nametodns(name, cp0, buf, buflen, old)
 	int i, nterm;
 	int namelen = strlen(name);
 
+	if (debug)
+		warnx("ni6_nametodns");
+
 	if (old) {
 		i = strlen(name);
 		cp = cp0;
@@ -766,6 +798,9 @@ ni6_dnsmatch(a, alen, b, blen)
 	const char *a0, *b0;
 	int l;
 
+	if (debug)
+		warnx("ni6_dnsmatch");
+
 	/* simplest case - need validation? */
 	if (alen == blen && memcmp(a, b, alen) == 0)
 		return 1;
@@ -837,6 +872,9 @@ ni6_addrs(ni6, p, buf, buflen, sa, salen, subj)
 	struct in6_addr *in6;
 	int flags6;
 	time_t expire;
+
+	if (debug)
+		warnx("ni6_addrs");
 
 	cp = p;
 	if (buf)
@@ -960,7 +998,7 @@ ni6_addrs(ni6, p, buf, buflen, sa, salen, subj)
 				ltime = ND6_INFINITE_LIFETIME;
 			else {
 				if (expire > time(NULL))
-					ltime = expire;
+					ltime = expire - time(NULL);
 				else
 					ltime = 0;
 			}
