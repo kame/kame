@@ -4214,15 +4214,12 @@ if test "${with_opt_dns+set}" = set; then
 else
   dhcpopt_dns=0
 fi;
-if test $dhcpopt_dns = 0 ; then
-	dhcpopt_dns=25
-	echo "$as_me:$LINENO: result: unspecified and using $dhcpopt_dns" >&5
-echo "${ECHO_T}unspecified and using $dhcpopt_dns" >&6
-else
+if test $dhcpopt_dns != 0 ; then
 	echo "$as_me:$LINENO: result: using $dhcpopt_dns" >&5
 echo "${ECHO_T}using $dhcpopt_dns" >&6
-fi
+	DHCPOPT_DNS="-DDH6OPT_DNS=$dhcpopt_dns"
 
+fi
 
 echo "$as_me:$LINENO: checking for DHCP DNS_NAME option" >&5
 echo $ECHO_N "checking for DHCP DNS_NAME option... $ECHO_C" >&6
@@ -4234,15 +4231,12 @@ if test "${with_opt_dnsname+set}" = set; then
 else
   dhcpopt_dnsname=0
 fi;
-if test $dhcpopt_dnsname = 0 ; then
-	dhcpopt_dnsname=26
-	echo "$as_me:$LINENO: result: unspecified and using $dhcpopt_dnsname" >&5
-echo "${ECHO_T}unspecified and using $dhcpopt_dnsname" >&6
-else
+if test $dhcpopt_dnsname != 0 ; then
 	echo "$as_me:$LINENO: result: using $dhcpopt_dnsname" >&5
 echo "${ECHO_T}using $dhcpopt_dnsname" >&6
-fi
+	DH6OPT_DNSNAME="-DDH6OPT_DNSNAME=$dhcpopt_dnsname"
 
+fi
 
 echo "$as_me:$LINENO: checking for DHCP prefix delegation option" >&5
 echo $ECHO_N "checking for DHCP prefix delegation option... $ECHO_C" >&6
@@ -5091,8 +5085,8 @@ s,@EXEEXT@,$EXEEXT,;t t
 s,@OBJEXT@,$OBJEXT,;t t
 s,@CPP@,$CPP,;t t
 s,@LIBOBJS@,$LIBOBJS,;t t
-s,@dhcpopt_dns@,$dhcpopt_dns,;t t
-s,@dhcpopt_dnsname@,$dhcpopt_dnsname,;t t
+s,@DHCPOPT_DNS@,$DHCPOPT_DNS,;t t
+s,@DH6OPT_DNSNAME@,$DH6OPT_DNSNAME,;t t
 s,@dhcpopt_pdel@,$dhcpopt_pdel,;t t
 s,@dhcpopt_pinfo@,$dhcpopt_pinfo,;t t
 s,@dhcpopt_preq@,$dhcpopt_preq,;t t
