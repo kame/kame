@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.65 2001/08/22 10:56:05 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.66 2001/08/22 10:58:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -605,6 +605,8 @@ in6_gif_ctlinput(cmd, sa, d)
 
 	/*
 	 * for now we don't care which type it was, just flush the route cache.
+	 * XXX slow.  sc (or sc->encap_cookie6) should be passed from
+	 * ip_encap.c.
 	 */
 	for (i = 0; i < ngif; i++) {
 		sc = gif_softc + i;
