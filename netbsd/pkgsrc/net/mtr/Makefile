@@ -1,10 +1,10 @@
 # $NetBSD$
 
-DISTNAME=	mtr-0.41
+DISTNAME=	mtr-0.42
 CATEGORIES=	net
 MASTER_SITES=	ftp://ftp.bitwizard.nl/mtr/
 
-PATCHFILES=	mtr-041-v6-20000127a.diff.gz
+PATCHFILES=	mtr-042-v6-20000506.diff.gz
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
 PATCH_DIST_STRIP=	-p1
 
