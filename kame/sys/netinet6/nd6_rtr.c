@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.164 2001/09/11 11:24:43 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.165 2001/09/14 06:11:56 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2318,9 +2318,13 @@ nd6_setdefaultiface(ifindex)
 
 	if (nd6_defifindex != ifindex) {
 		nd6_defifindex = ifindex;
-		if (nd6_defifindex > 0)
+		if (nd6_defifindex > 0) {
+#if defined(__FreeBSD__) && __FreeBSD__ >= 5
+			nd6_defifp = ifnet_byindex[nd6_defifindex];
+#else
 			nd6_defifp = ifindex2ifnet[nd6_defifindex];
-		else
+#endif
+		} else
 			nd6_defifp = NULL;
 
 		/*
