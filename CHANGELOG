@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1040 2000/06/19 06:17:42 jinmei Exp $
+$Id: CHANGELOG,v 1.1041 2000/06/19 07:52:56 sakane Exp $
 
 <200006>
+Mon Jun 19 16:51:24 JST 2000 sakane@ydc.co.jp
+	* kame/kame/racoon:
+	If "non_auth" is defined in racoon.conf, any transform of AH proposal
+	including "non_auth" is not sent to the peer.
+
 2000-06-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c (ip6_output): jumped to the
 	"freehdrs" label before making the header chain in order to avoid
