@@ -626,20 +626,22 @@ ip6_stats(off, name)
 	} else {
 		p1(ip6s_pulldown_copy, "\t%qu mbuf copy in m_pulldown\n");
 	}
+	p(ip6s_pullup, "\t%qu call%s to m_pullup\n");
 	p(ip6s_pullup_alloc, "\t%qu mbuf allocation%s in m_pullup\n");
 	if (ip6stat.ip6s_pullup_copy != 1) {
 		p1(ip6s_pullup_copy, "\t%qu mbuf copies in m_pullup\n");
 	} else {
 		p1(ip6s_pullup_copy, "\t%qu mbuf copy in m_pullup\n");
 	}
-	p(ip6s_pullup_copy, "\t%qu failure%s in m_pullup\n");
+	p(ip6s_pullup_fail, "\t%qu failure%s in m_pullup\n");
+	p(ip6s_pullup2, "\t%qu call%s to m_pullup2\n");
 	p(ip6s_pullup2_alloc, "\t%qu mbuf allocation%s in m_pullup2\n");
 	if (ip6stat.ip6s_pullup2_copy != 1) {
 		p1(ip6s_pullup2_copy, "\t%qu mbuf copies in m_pullup2\n");
 	} else {
 		p1(ip6s_pullup2_copy, "\t%qu mbuf copy in m_pullup2\n");
 	}
-	p(ip6s_pullup2_copy, "\t%qu failure%s in m_pullup2\n");
+	p(ip6s_pullup2_fail, "\t%qu failure%s in m_pullup2\n");
 
 	/* for debugging source address selection */
 #define PRINT_SCOPESTAT(s,i) do {\

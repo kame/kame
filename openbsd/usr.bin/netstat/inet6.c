@@ -37,7 +37,7 @@
 #if 0
 static char sccsid[] = "@(#)inet.c	8.4 (Berkeley) 4/20/94";
 #else
-/*__RCSID("$Id: inet6.c,v 1.8 2000/02/03 12:05:37 itojun Exp $");*/
+/*__RCSID("$Id: inet6.c,v 1.9 2000/02/09 10:01:27 itojun Exp $");*/
 #endif
 #endif /* not lint */
 
@@ -512,20 +512,22 @@ ip6_stats(off, name)
 	} else {
 		p1(ip6s_pulldown_copy, "\t%qu mbuf copy in m_pulldown\n");
 	}
+	p(ip6s_pullup, "\t%qu call%s to m_pullup\n");
 	p(ip6s_pullup_alloc, "\t%qu mbuf allocation%s in m_pullup\n");
 	if (ip6stat.ip6s_pullup_copy != 1) {
 		p1(ip6s_pullup_copy, "\t%qu mbuf copies in m_pullup\n");
 	} else {
 		p1(ip6s_pullup_copy, "\t%qu mbuf copy in m_pullup\n");
 	}
-	p(ip6s_pullup_copy, "\t%qu failure%s in m_pullup\n");
+	p(ip6s_pullup_fail, "\t%qu failure%s in m_pullup\n");
+	p(ip6s_pullup2, "\t%qu call%s to m_pullup2\n");
 	p(ip6s_pullup2_alloc, "\t%qu mbuf allocation%s in m_pullup2\n");
 	if (ip6stat.ip6s_pullup2_copy != 1) {
 		p1(ip6s_pullup2_copy, "\t%qu mbuf copies in m_pullup2\n");
 	} else {
 		p1(ip6s_pullup2_copy, "\t%qu mbuf copy in m_pullup2\n");
 	}
-	p(ip6s_pullup2_copy, "\t%qu failure%s in m_pullup2\n");
+	p(ip6s_pullup2_fail, "\t%qu failure%s in m_pullup2\n");
 
 	/* for debugging source address selection */
 #define PRINT_SCOPESTAT(s,i) do {\
