@@ -662,7 +662,7 @@ server6_react_request(buf, siz, rcvpi)
 	 * The ``server-address'' field value MUST match one of the
 	 * server's addresses.
 	 */
-	if (getifaddr(&dh6r->dh6req_serveraddr, ifnam, &target, 128,
+	if (getifaddr(&target, ifnam, &dh6r->dh6req_serveraddr, 128,
 		      0, 0) != 0) {
 		warnx("server6_react_request: server-address %s does not match",
 		      in6addr2str(&dh6r->dh6req_serveraddr,
