@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.33 2002/06/07 02:06:08 fujisawa Exp $	*/
+/*	$KAME: cfparse.y,v 1.34 2002/06/28 02:17:26 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -511,6 +511,8 @@ opt_long
 		    { $$ = XLATE_LONG; }
 		| SSHORT
 		    { $$ = XLATE_SHORT; }
+		| STRACE
+		    { $$ = XLATE_TRACE; }
 		;
 
 opt_decimal

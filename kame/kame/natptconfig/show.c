@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.30 2002/06/19 07:13:44 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.31 2002/06/28 02:17:26 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -189,6 +189,18 @@ writeXlateHeader(int type)
 	/* 46 means strlen("0123:4567:89ab:cdef:0123:4567:89ab:cdef.65535 ") */
 
 	switch (type) {
+	case XLATE_TRACE:
+		printf("%-6s",	"Proto");
+		printf("%-22s", "Local Address (src)");
+		printf("%-22s", "Remote Address (dst)");
+		printf("%6s",  "Ipkts");
+		printf("%6s",  "Opkts");
+		printf(" ");
+
+		printf("%-8s",	"  Idle");
+		printf("%-8s",	" (state)");
+		break;
+
 	case XLATE_SHORT:
 		printf("%-6s",	"Proto");
 		printf("%-22s", "Local Address (src)");

@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.28 2002/06/28 01:08:51 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.29 2002/06/28 02:17:26 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -424,6 +424,7 @@ appendPAddrXL4(struct logmsg *lmsg, struct pAddr *pad, int type, int inv)
 
 	if (inv == XLATE_LOCAL) {
 		switch (type) {
+		case XLATE_TRACE:
 		case XLATE_SHORT:
 			inet_ntop(AF_INET, &pad->in4src, Bow, sizeof(Bow));
 			snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[0]));
@@ -442,6 +443,12 @@ appendPAddrXL4(struct logmsg *lmsg, struct pAddr *pad, int type, int inv)
 		}
 	} else {
 		switch (type) {
+		case XLATE_TRACE:
+			inet_ntop(AF_INET, &pad->in4src, Bow, sizeof(Bow));
+			snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[0]));
+			concat(lmsg, "%-22s", Wow);
+			break;
+
 		case XLATE_SHORT:
 			inet_ntop(AF_INET, &pad->in4dst, Bow, sizeof(Bow));
 			snprintf(Wow, sizeof(Wow), "%s.%d", Bow, ntohs(pad->port[1]));
@@ -467,6 +474,7 @@ appendPAddrXL6(struct logmsg *lmsg, struct pAddr *pad, int type, int inv)
 {
 	if (inv == XLATE_LOCAL) {
 		switch (type) {
+		case XLATE_TRACE:
 		case XLATE_SHORT:
 			appendpAddrXL6short(lmsg, &pad->in6src, pad->port[0]);
 			break;
@@ -483,6 +491,10 @@ appendPAddrXL6(struct logmsg *lmsg, struct pAddr *pad, int type, int inv)
 		}
 	} else {
 		switch (type) {
+		case XLATE_TRACE:
+			appendpAddrXL6short(lmsg, &pad->in6src, pad->port[0]);
+			break;
+
 		case XLATE_SHORT:
 			appendpAddrXL6short(lmsg, &pad->in6dst, pad->port[1]);
 			break;
