@@ -18,6 +18,8 @@ PLIST_SRC=	${WRKDIR}/PLIST
 # KAME
 USE_INET6=	YES
 MAKE_ENV+=	LIBRARY="-L/usr/local/v6/lib -linet6"
+CHOWN?=		/usr/sbin/chown
+GTAR?=		/usr/bin/tar
 
 BUILD_DEFS+=	USE_INET6
 
