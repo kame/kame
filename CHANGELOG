@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.229 1999/10/27 17:44:05 sakane Exp $
+$Id: CHANGELOG,v 1.230 1999/10/28 00:25:42 itojun Exp $
 
 <199910>
+Thu Oct 28 09:24:14 JST 1999  itojun@iijlab.net
+	* netbsd/pkgsrc/net/ucd-snmp, freebsd2/ports/ucd-snmp:
+	  upgrade to latest IPv6 patch.
+
 Thu Oct 28 01:41:00 JST 1999 sakane@ydc.co.jp
 	* kame/kame/netinet6/ipsec.c:
 	Fix mbuf memory leak.
