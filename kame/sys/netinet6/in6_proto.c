@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.139 2003/09/06 09:13:52 keiichi Exp $	*/
+/*	$KAME: in6_proto.c,v 1.140 2003/10/17 11:27:19 ono Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -75,6 +75,7 @@
 #include "opt_ipsec.h"
 #include "opt_iso.h"
 #include "opt_sctp.h"
+#include "opt_dccp.h"
 #endif
 
 #include <sys/param.h>
@@ -163,6 +164,12 @@
 #include <netinet/sctp_var.h>
 #include <netinet6/sctp6_var.h>
 #endif /* SCTP */
+
+#ifdef DCCP
+#include <netinet/dccp.h>
+#include <netinet/dccp_var.h>
+#include <netinet/dccp6_var.h>
+#endif /* DCCP */
 
 #include <netinet6/pim6_var.h>
 
@@ -354,6 +361,18 @@ struct ip6protosw inet6sw[] = {
 #endif
 },
 #endif /* SCTP */
+#ifdef DCCP
+{ SOCK_DCCP,	&inet6domain,	IPPROTO_DCCP,	PR_CONNREQUIRED|PR_IMPLOPCL|PR_ATOMIC,
+  dccp6_input,	0,		dccp6_ctlinput,	dccp_ctloutput,
+  0,
+#ifdef INET	/* don't call initialization */
+  0,		0,		0,		0,
+#else
+  dccp_init,	0,		0,		0,
+#endif
+  &dccp6_usrreqs,
+},
+#endif /* DCCP */
 { SOCK_RAW,	&inet6domain,	IPPROTO_RAW,	PR_ATOMIC|PR_ADDR,
   rip6_input,	rip6_output,	rip6_ctlinput,	rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
