@@ -1,6 +1,6 @@
 TODO list for the new advanced API (aka rfc2292bis)
 KAME project
-$KAME: TODO.2292bis,v 1.36 2001/12/21 04:36:15 jinmei Exp $
+$KAME: TODO.2292bis,v 1.37 2001/12/21 08:51:58 jinmei Exp $
 
 new socket options or ancillary data types:
 - IPV6_RTHDRDSTOPTS	done/20000102	jinmei
@@ -30,7 +30,7 @@ existing options whose semantics is changed in 2292bis:
 - IPV6_DSTOPTS		done/20000102	jinmei
 
 existing options simply not implmented yet:
-- IPV6_NEXTHOP		done (as an ancillary object only)
+- IPV6_NEXTHOP		done
 
 new library functions:
 Function		Status		Date		Commiter
