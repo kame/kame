@@ -1,4 +1,4 @@
-/*	$KAME: route.c,v 1.21 2002/06/28 09:03:13 jinmei Exp $	*/
+/*	$KAME: route.c,v 1.22 2002/09/17 10:01:14 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -540,8 +540,8 @@ change_interfaces(mrtentry_ptr, new_iif, new_joined_oifs_, new_pruned_oifs,
     rp_grp_entry_t *rp_grp_entry_ptr;
     grpentry_t     *grpentry_ptr;
     mrtentry_t     *mrtentry_srcs;
-    mrtentry_t     *mrtentry_wc;
-    mrtentry_t     *mrtentry_rp;
+    mrtentry_t     *mrtentry_wc = NULL;
+    mrtentry_t     *mrtentry_rp = NULL;
     int             delete_mrtentry_flag;
     int             return_value;
     int             fire_timer_flag;

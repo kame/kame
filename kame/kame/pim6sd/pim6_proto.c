@@ -1,4 +1,4 @@
-/*	$KAME: pim6_proto.c,v 1.54 2002/06/26 10:24:48 jinmei Exp $	*/
+/*	$KAME: pim6_proto.c,v 1.55 2002/09/17 09:59:56 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -1448,7 +1448,7 @@ receive_pim6_join_prune(src, dst, pim_message, datalen)
     struct in6_addr         	g_mask;
     u_int8          		s_flags;
     u_int8          		reserved;
-    rpentry_t      		*rpentry_ptr;
+    rpentry_t      		*rpentry_ptr = NULL;
     mrtentry_t     		*mrtentry_ptr;
     mrtentry_t     		*mrtentry_srcs;
     mrtentry_t     		*mrtentry_rp;
