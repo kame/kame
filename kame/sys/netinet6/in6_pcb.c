@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.45 2000/06/05 00:41:58 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.46 2000/06/06 10:20:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -167,7 +167,6 @@ in6_pcbbind(in6p, nam)
 	struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)NULL;
 	u_int16_t lport = 0;
 	int wild = 0, reuseport = (so->so_options & SO_REUSEPORT);
-	int error;
 
 	if (in6p->in6p_lport || !IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr))
 		return(EINVAL);
