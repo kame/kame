@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.2 1999/08/10 04:05:14 itojun Exp $
+$Id: CHANGELOG,v 1.3 1999/08/10 04:05:55 itojun Exp $
 
 <199908>
+Tue Aug  9 JST 1999  itojun@iijlab.net
+	* repository reorganization: NetBSD and FreeBSD228 uses
+	  new repository at this moment.
+
 Sun Aug  8 01:50:14 JST 1999  itojun@iijlab.net
 	* kit/ports/vic6 (FreeBSD228): vic video conference system.
 	  From: ichiro@ichiro.org
