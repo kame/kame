@@ -1,4 +1,4 @@
-/*	$KAME: handler.c,v 1.50 2001/10/02 03:49:12 sakane Exp $	*/
+/*	$KAME: handler.c,v 1.51 2001/10/02 04:05:27 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -312,31 +312,6 @@ initph1tree()
 }
 
 /* %%% management phase 2 handler */
-/*
- * search ph2handle with policyindex.
- */
-#if 0
-struct ph2handle *
-getph2byspidx(spidx)
-	struct policyindex *spidx;
-{
-	struct ph2handle *p;
-
-	LIST_FOREACH(p, &ph2tree, chain) {
-		/*
-		 * there are ph2handle independent on policy
-		 * such like informational exchange.
-		 */
-		if (p->spidx == NULL)
-			continue;
-		if (cmpspidx(spidx, p->spidx) == 0)
-			return p;
-	}
-
-	return NULL;
-}
-#endif
-
 /*
  * search ph2handle with policy id.
  */
