@@ -1,0 +1,24 @@
+--- lib/kernel/socket.c-	Tue Aug 24 23:19:15 1999
++++ lib/kernel/socket.c	Tue Aug 24 23:19:21 1999
+@@ -508,8 +508,8 @@
+         /* This is unnessesary when responding to a unicast address which
+            includes an index */
+ 
+-        mreq6.ipv6mr_multiaddr.s6_addr8[2] = (interface->index >> 8) & 0xff;
+-        mreq6.ipv6mr_multiaddr.s6_addr8[3] = interface->index & 0xff;
++        mreq6.ipv6mr_multiaddr.s6_addr[2] = (interface->index >> 8) & 0xff;
++        mreq6.ipv6mr_multiaddr.s6_addr[3] = interface->index & 0xff;
+ #endif /* __KAME__ */
+ 
+ #ifdef IPV6MR_INTERFACE_INDEX
+@@ -751,8 +751,8 @@
+             /* On KAME IPv6, it is required to modify the destination address
+                as to include the outgoing interface's index */
+ 
+-            sin6.sin6_addr.s6_addr8[2] = (interface->index >> 8) & 0xff;
+-            sin6.sin6_addr.s6_addr8[3] = interface->index & 0xff;
++            sin6.sin6_addr.s6_addr[2] = (interface->index >> 8) & 0xff;
++            sin6.sin6_addr.s6_addr[3] = interface->index & 0xff;
+         }
+ #endif /* __KAME__ */
+ 	memset (&mhdr, 0, sizeof (mhdr));

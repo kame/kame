@@ -1,0 +1,13 @@
+--- lib/kernel/bsd.c.orig	Tue Aug  3 12:33:21 1999
++++ lib/kernel/bsd.c	Tue Aug 24 23:15:03 1999
+@@ -187,8 +187,8 @@
+ #ifdef __KAME__
+ 	/* KAME IPV6 still requires an index here */
+ 	if (IN6_IS_ADDR_LINKLOCAL (&so_gate.sin6.sin6_addr)) {
+-       	    so_gate.sin6.sin6_addr.s6_addr8[2] = index >> 8;;
+-       	    so_gate.sin6.sin6_addr.s6_addr8[3] = index;
++       	    so_gate.sin6.sin6_addr.s6_addr[2] = index >> 8;;
++       	    so_gate.sin6.sin6_addr.s6_addr[3] = index;
+ 	}
+ #endif /* __KAME__ */
+ #ifdef notdef
