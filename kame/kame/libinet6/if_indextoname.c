@@ -1,3 +1,5 @@
+/*	$KAME: if_indextoname.c,v 1.2 2000/04/18 08:39:19 itojun Exp $	*/
+
 /*-
  * Copyright (c) 1997, 2000
  *	Berkeley Software Design, Inc.  All rights reserved.
@@ -20,7 +22,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	BSDI $Id: if_indextoname.c,v 1.1 2000/04/18 08:34:54 itojun Exp $
+ *	BSDI Id: if_indextoname.c,v 2.3 2000/04/17 22:38:05 dab Exp
  */
 
 #include <sys/types.h>
