@@ -215,6 +215,16 @@
 
 #endif	/* __FreeBSD__ */
 
+#ifdef ATM_PVCEXT
+# ifndef NATM
+   /* this is for for __KAME__ */
+#  include <netinet/in.h>
+# endif
+# if defined (__KAME__) && defined(INET6)
+#  include <netinet6/in6_ifattach.h>
+# endif
+#endif /*ATM_PVCEXT*/
+
 #include "bpfilter.h"
 #if NBPFILTER > 0
 #include <net/bpf.h>
@@ -1314,6 +1324,9 @@ caddr_t data;
 #else
 		    sprintf(ifr->ifr_name, "%s%d",
 			    sifp->if_name, sifp->if_unit);
+#endif
+#if defined(__KAME__) && defined(INET6)
+		    in6_ifattach(sifp, IN6_IFT_P2P802, sc->macaddr, 0);
 #endif
 		  }
 		  else
