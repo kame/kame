@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1328 2000/10/10 06:55:03 itojun Exp $
+$KAME: CHANGELOG,v 1.1329 2000/10/10 14:57:07 itojun Exp $
 
 <200010>
+Tue Oct 10 23:54:17 JST 2000  itojun@iijlab.net
+	* sys/netinet6/in6_proto.c: don't call tcp_init twice, if
+	  we share tcp stack between IPv4/v6 and we are compiling a kernel
+	  with dual stack configuration (netbsd/openbsd/freebsd[34]/bsdi4).
+	  from enami@netbsd.org.
+
 Tue Oct 10 15:43:58 JST 2000  itojun@iijlab.net
 	* kame/rtsold/rtsock.c: watch routing socket for pcmcia/cardbus
 	  interface removal.  cease RS if an interface gets removed.
