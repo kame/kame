@@ -1,4 +1,4 @@
-$KAME: README,v 1.3 2000/09/07 01:42:31 sumikawa Exp $
+$KAME: README,v 1.4 2000/09/13 18:31:56 sumikawa Exp $
 
 This directory contains kame related ports only. Generic IPv6-enable
 ports are distributed by original FreeBSD ports.
@@ -6,7 +6,13 @@ ports are distributed by original FreeBSD ports.
 You can get information about recent IPv6-enable ports at:
 	http://www.freebsd.org/ports/ipv6.html
 
-ports merging status:
+WARNING: Part of the following ports are available at ports-current
+only, not included in 4.x-RELEASE. But we do not support mixed
+kernel/application from different versions. You need to use
+ports-current at your own risk and you may require some knowledge to
+mix them.
+
+ports merging status at $Date: 2000/09/13 18:31:56 $
 	KAME/FreeBSD3	ports-current
         -----------------------------
 	XFree86		not yet(based version in KAME ports is old)
