@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.237 2001/12/21 03:47:22 itojun Exp $	*/
+/*	$KAME: ip6_input.c,v 1.238 2001/12/22 01:56:49 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2665,9 +2665,11 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	case IPV6CTL_DEFMCASTHLIM:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 				&ip6_defmcasthlim);
+#if NGIF > 0
 	case IPV6CTL_GIF_HLIM:
 		return sysctl_int(oldp, oldlenp, newp, newlen,
 				&ip6_gif_hlim);
+#endif
 	case IPV6CTL_KAME_VERSION:
 		return sysctl_rdstring(oldp, oldlenp, newp, __KAME_VERSION);
 	case IPV6CTL_USE_DEPRECATED:
