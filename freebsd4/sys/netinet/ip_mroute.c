@@ -1617,13 +1617,12 @@ encap_send(ip, vifp, m)
  */
 void
 #ifdef MROUTE_LKM
-X_ipip_input(m, off, proto)
+X_ipip_input(m, off)
 #else
-ipip_input(m, off, proto)
+ipip_input(m, off)
 #endif
 	register struct mbuf *m;
 	int off;
-	int proto;
 {
     struct ifnet *ifp = m->m_pkthdr.rcvif;
     register struct ip *ip = mtod(m, struct ip *);
@@ -1633,7 +1632,7 @@ ipip_input(m, off, proto)
     register struct vif *vifp;
 
     if (!have_encap_tunnel) {
-	    rip_input(m, off, proto);
+	    rip_input(m, off);
 	    return;
     }
     /*
@@ -2128,13 +2127,13 @@ ip_rsvp_force_done(so)
 }
 
 void
-rsvp_input(m, off, proto)		/* XXX must fixup manually */
+rsvp_input(m, off)
 	struct mbuf *m;
 	int off;
-	int proto;
 {
     int vifi;
     register struct ip *ip = mtod(m, struct ip *);
+    int proto = ip->ip_p;
     static struct sockaddr_in rsvp_src = { sizeof rsvp_src, AF_INET };
     register int s;
     struct ifnet *ifp;
@@ -2186,7 +2185,7 @@ rsvp_input(m, off, proto)		/* XXX must fixup manually */
 	if (ip_rsvpd != NULL) {
 	    if (rsvpdebug)
 		printf("rsvp_input: Sending packet up old-style socket\n");
-	    rip_input(m, off, proto);  /* xxx */
+	    rip_input(m, off);  /* xxx */
 	} else {
 	    if (rsvpdebug && vifi == numvifs)
 		printf("rsvp_input: Can't find vif for packet.\n");
