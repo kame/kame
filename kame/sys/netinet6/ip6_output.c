@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.194 2001/07/09 13:45:58 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.195 2001/07/09 13:47:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1953,8 +1953,39 @@ do { \
 				case IPV6_AUTOFLOWLABEL:
 					OPTSET(IN6P_AUTOFLOWLABEL);
 					break;
+
 				}
 				break;
+
+			case IPV6_TCLASS:
+				if (optlen != sizeof(u_int8_t)) {
+					error = EINVAL;
+					break;
+				}
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+				error = sooptcopyin(sopt, &optval,
+					sizeof optval, sizeof optval);
+				if (error)
+					break;
+#else
+				optval = *mtod(m, u_int8_t *);
+#endif
+				{
+					struct ip6_pktopts **optp;
+					u_int8_t tclass;
+#ifdef HAVE_NRL_INPCB
+					optp = &inp->inp_outputopts6;
+#else
+					optp = &in6p->in6p_outputopts;
+#endif
+					tclass = (u_int8_t) optval;
+					error = ip6_pcbopt(optname,
+							   (u_char *)&tclass,
+							   sizeof(tclass),
+							   optp,
+							   privileged);
+					break;
+				}
 
 			case IPV6_2292PKTINFO:
 			case IPV6_2292HOPLIMIT:
@@ -2357,6 +2388,7 @@ do { \
 #endif
 			case IPV6_RECVTCLASS:
 			case IPV6_AUTOFLOWLABEL:
+			case IPV6_TCLASS:
 				switch (optname) {
 
 				case IPV6_UNICAST_HOPS:
@@ -2441,6 +2473,20 @@ do { \
 				case IPV6_AUTOFLOWLABEL:
 					optval = OPTBIT(IN6P_AUTOFLOWLABEL);
 					break;
+#ifdef HAVE_NRL_INPCB
+#define in6p inp
+#define in6p_outputopts inp_outputopts6
+#endif
+				case IPV6_TCLASS:
+					error = ip6_getpcbopt(in6p->in6p_outputopts,
+							      optname, &optdata,
+							      &optdatalen);
+					optval = *((int *)optdata);
+					break;
+#ifdef HAVE_NRL_INPCB
+#undef in6p
+#undef in6p_outputopts
+#endif
 				}
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 				error = sooptcopyout(sopt, &optval,
