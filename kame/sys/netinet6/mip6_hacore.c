@@ -1,4 +1,4 @@
-/*	$KAME: mip6_hacore.c,v 1.3 2003/07/08 08:11:41 keiichi Exp $	*/
+/*	$KAME: mip6_hacore.c,v 1.4 2003/07/11 06:23:18 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -799,6 +799,10 @@ mip6_dad_error(ifa, err)
 	mbc->mbc_dad = NULL;
 
 	if ((mbc->mbc_flags & IP6MU_CLONED) != 0) {
+		/*
+		 * DAD for a link-local address failed.  clear all
+		 * references from other binding caches.
+		 */
 		llmbc = mbc;
 		for (tmpmbc = LIST_FIRST(&mip6_bc_list);
 		    tmpmbc;
@@ -809,12 +813,23 @@ mip6_dad_error(ifa, err)
 				llmbc->mbc_refcnt--; /* just for safety. */
 			}
 		}
+		error = mip6_bc_list_remove(&mip6_bc_list, llmbc);
+		if (error) {
+			mip6log((LOG_ERR, "%s:%d: can't remove BC.\n",
+				 __FILE__, __LINE__));
+			/* what should I do? */
+		}
 
 		/* no need to send an ack. */
 		return (0);
 	} else {
+		/*
+		 * if this binding cache has a related link-local
+		 * binding cache entry, decrement the refcnt of the
+		 * entry.
+		 */
 		llmbc = mbc->mbc_llmbc;
-		if (llmbc) {
+		if (llmbc != NULL) {
 			llmbc->mbc_refcnt--;
 			if (llmbc->mbc_refcnt == 0) {
 				if ((llmbc->mbc_state & MIP6_BC_STATE_DAD_WAIT) != 0) {
@@ -825,7 +840,8 @@ mip6_dad_error(ifa, err)
 						/* XXX */
 					}
 				}
-				error = mip6_bc_list_remove(&mip6_bc_list, llmbc);
+				error = mip6_bc_list_remove(&mip6_bc_list,
+				    llmbc);
 				if (error) {
 					mip6log((LOG_ERR,
 					    "%s:%d: can't remove BC.\n",
@@ -837,11 +853,8 @@ mip6_dad_error(ifa, err)
 	}
 
 	/* return a binding ack. */
-	mip6_bc_send_ba(&mbc->mbc_addr, &mbc->mbc_phaddr,
-			&mbc->mbc_pcoa,
-			err,
-			mbc->mbc_seqno,
-			0, 0, NULL);
+	mip6_bc_send_ba(&mbc->mbc_addr, &mbc->mbc_phaddr, &mbc->mbc_pcoa, err,
+	    mbc->mbc_seqno, 0, 0, NULL);
 	error = mip6_bc_list_remove(&mip6_bc_list, mbc);
 	if (error) {
 		mip6log((LOG_ERR,
