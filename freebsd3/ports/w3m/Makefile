@@ -4,7 +4,7 @@
 # Whom:				MANTANI Nobutaka <nobutaka@nobutaka.com>
 #
 # $FreeBSD: ports/www/w3m/Makefile,v 1.3 1999/11/18 21:56:34 sada Exp $
-# $Id: Makefile,v 1.3 1999/12/07 16:50:33 sumikawa Exp $
+# $Id: Makefile,v 1.4 1999/12/27 12:37:19 sumikawa Exp $
 #
 
 DISTNAME=	w3m-${W3M_DIST_VER}
@@ -43,10 +43,8 @@ DOCS_JP=	${DOCS} HISTORY HISTORY.kokb README.keymap README.kokb \
 .endif
 
 .if defined(USE_SSL)
-BUILD_DEPENDS=	openssl:${PORTSDIR}/security/openssl
-# If you using ports-current, enable below lines instead of above the line
-#LIB_DEPENDS+=	crypto.1:${PORTSDIR}/security/openssl \
-#		ssl.1:${PORTSDIR}/security/openssl
+LIB_DEPENDS+=	crypto.1:${PORTSDIR}/security/openssl \
+		ssl.1:${PORTSDIR}/security/openssl
 
 SSL_CFLAGS=	-I${LOCALBASE}/include/openssl
 SSL_LIBS=	-lssl -lcrypto

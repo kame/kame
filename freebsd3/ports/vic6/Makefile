@@ -3,11 +3,11 @@
 # Date created:		1999/8/7
 # Whom:			ichiro
 #
-# $Id: Makefile,v 1.3 1999/09/26 03:06:46 itojun Exp $
+# $Id: Makefile,v 1.4 1999/12/27 12:37:22 sumikawa Exp $
 #
 
 DISTNAME=	vic-2.8v6
-CATEGORIES=	mbone tk80
+CATEGORIES=	mbone tk82
 MASTER_SITES=	http://irl.cs.ucla.edu/software/IPv6/
 
 DISTFILES=	vic-2.8v6.tar.gz
@@ -18,7 +18,7 @@ PATCH_DIST_STRIP=       -p1
 
 MAINTAINER=	ichiro@ichiro.org
 
-LIB_DEPENDS=	tk80.1:${PORTSDIR}/x11-toolkits/tk80
+LIB_DEPENDS=	tk82.1:${PORTSDIR}/x11-toolkits/tk82
 
 USE_AUTOCONF=	yes
 USE_X_PREFIX=	yes

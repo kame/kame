@@ -3,15 +3,13 @@
 # Date created:         08 August 1995
 # Whom:                 jkh
 #
-# $Id: Makefile,v 1.2 1999/12/27 02:11:01 sumikawa Exp $
+# $Id: Makefile,v 1.3 1999/12/27 12:37:15 sumikawa Exp $
 # $FreeBSD: ports/lang/python/Makefile,v 1.55 1999/11/03 09:45:25 tg Exp $
 #
 
 DISTNAME=       py152
 PKGNAME=        python-1.5.2
-CATEGORIES=	lang python tk80
-# if you use ports-current, enable this line
-#CATEGORIES=	lang python tk82
+CATEGORIES=	lang python tk82
 MASTER_SITES=	ftp://www.python.org/pub/python/src/ \
 		ftp://ftp.cwi.nl/pub/python/src/
 EXTRACT_SUFX=	.tgz
@@ -43,9 +41,7 @@ SETUP_FILE=	Setup
 #
 WITH_TK?=	yes
 .if defined(WITH_TK) && $(WITH_TK) == yes
-TK_DEPENDS=	tk80.1:${PORTSDIR}/x11-toolkits/tk80
-# if you use ports-current, enable this line
-#TK_DEPENDS=	tk82.1:${PORTSDIR}/x11-toolkits/tk82
+TK_DEPENDS=	tk82.1:${PORTSDIR}/x11-toolkits/tk82
 SETUP_LOCAL=	Setup.tk
 PLIST_TK=	${PKGDIR}/PLIST.tk
 .endif

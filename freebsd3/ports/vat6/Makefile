@@ -3,12 +3,12 @@
 # Date created:		Fri Jul 10 17:29:13 JST 1998
 # Whom:			itojun
 #
-# $Id: Makefile,v 1.2 1999/08/20 12:31:47 itojun Exp $
+# $Id: Makefile,v 1.3 1999/12/27 12:37:20 sumikawa Exp $
 #
 
 DISTNAME=	vat6
 PKGNAME=	vat6-19981109
-CATEGORIES=	mbone tk80
+CATEGORIES=	mbone tk82
 MASTER_SITES=	http://irl.cs.ucla.edu/software/IPv6/ \
 		ftp://ftp.cs.tu-berlin.de/pub/local/kbs/tubmik/gsm/
 DISTFILES=	${DISTNAME}${EXTRACT_SUFX} ${GSM}${EXTRACT_SUFX}
@@ -19,8 +19,8 @@ PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@itojun.org
 
-LIB_DEPENDS=	tk80:${PORTSDIR}/x11-toolkits/tk80 \
-		gsm:${PORTSDIR}/audio/gsm
+LIB_DEPENDS=	tk82.1:${PORTSDIR}/x11-toolkits/tk82 \
+		gsm.1:${PORTSDIR}/audio/gsm
 
 USE_X11=	yes
 USE_AUTOCONF=	yes

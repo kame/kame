@@ -4,7 +4,7 @@
 # Whom:			sumikawa
 #
 # $FreeBSD: ports/security/openssh/Makefile,v 1.12 1999/11/17 20:12:17 green Exp $
-# $Id: Makefile,v 1.3 1999/11/17 22:24:16 sumikawa Exp $
+# $Id: Makefile,v 1.4 1999/12/27 12:37:11 sumikawa Exp $
 #
 
 DISTNAME=	src/usr.bin/ssh
@@ -19,9 +19,7 @@ PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	sumikawa@kame.net
 
-# for ports-curret
-#LIB_DEPENDS=	crypto.1:${PORTSDIR}/security/openssl
-BUILD_DEPENDS=	openssl:${PORTSDIR}/security/openssl
+LIB_DEPENDS=	crypto.1:${PORTSDIR}/security/openssl
 
 RESTRICTED=	"Links with cryptographic code."
 

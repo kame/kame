@@ -3,7 +3,7 @@
 # Date created:         20 February 1995
 # Whom:                 Tim Wilkinson <tim@sarc.city.ac.uk>
 #
-# $Id: Makefile,v 1.1 1999/08/17 09:09:55 itojun Exp $
+# $Id: Makefile,v 1.2 1999/12/27 12:37:09 sumikawa Exp $
 #
 
 DISTNAME=	kaffe-1.0.b1
@@ -23,8 +23,8 @@ IS_INTERACTIVE=	"funky two phase build requilred"
 MAINTAINER=	itojun@kame.net
 
 LIB_DEPENDS=	jpeg.9:${PORTSDIR}/graphics/jpeg \
-		gif.3:${PORTSDIR}/graphics/giflib \
-		png.2:${PORTSDIR}/graphics/png
+		gif.5:${PORTSDIR}/graphics/giflib \
+		png.3:${PORTSDIR}/graphics/png
 BUILD_DEPENDS=	zip:${PORTSDIR}/archivers/zip
 
 WRKSRC=		${WRKDIR}/kaffe-1.0.b1
