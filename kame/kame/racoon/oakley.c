@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.99 2001/08/16 06:17:12 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.100 2001/08/16 14:09:43 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -163,6 +163,9 @@ oakley_dh_compute(dh, pub, priv, pub_p, gxy)
 	const struct dhgroup *dh;
 	vchar_t *pub, *priv, *pub_p, **gxy;
 {
+#ifdef ENABLE_STATS
+	struct timeval start, end;
+#endif
 	if ((*gxy = vmalloc(dh->prime->l)) == NULL) {
 		plog(LLV_ERROR, LOCATION, NULL,
 			"failed to get DH buffer.\n");
@@ -170,8 +173,6 @@ oakley_dh_compute(dh, pub, priv, pub_p, gxy)
 	}
 
 #ifdef ENABLE_STATS
-    {
-	struct timeval start, end;
 	gettimeofday(&start, NULL);
 #endif
 	switch (dh->type) {
@@ -198,7 +199,6 @@ oakley_dh_compute(dh, pub, priv, pub_p, gxy)
 	syslog(LOG_NOTICE, "%s(%s%d): %8.6f", __FUNCTION__,
 		s_attr_isakmp_group(dh->type), dh->prime->l << 3,
 		timedelta(&start, &end));
-    }
 #endif
 
 	plog(LLV_DEBUG, LOCATION, NULL, "compute DH's shared.\n");
@@ -1145,10 +1145,11 @@ oakley_validate_auth(iph1)
 #ifdef HAVE_GSSAPI
 	vchar_t *gsshash = NULL;
 #endif
+#ifdef ENABLE_STATS
+	struct timeval start, end;
+#endif
 
 #ifdef ENABLE_STATS
-    {
-	struct timeval start, end;
 	gettimeofday(&start, NULL);
 #endif
 	switch (iph1->approval->authmethod) {
@@ -1409,7 +1410,6 @@ oakley_validate_auth(iph1)
 	syslog(LOG_NOTICE, "%s(%s): %8.6f", __FUNCTION__,
 		s_oakley_attr_method(iph1->approval->authmethod),
 		timedelta(&start, &end));
-    }
 #endif
 
 	return 0;

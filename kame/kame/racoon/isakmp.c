@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.154 2001/08/13 14:33:27 itojun Exp $	*/
+/*	$KAME: isakmp.c,v 1.155 2001/08/16 14:09:43 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -571,6 +571,9 @@ ph1_main(iph1, msg)
 	vchar_t *msg;
 {
 	int error;
+#ifdef ENABLE_STATS
+	struct timeval start, end;
+#endif
 
 	/* ignore a packet */
 	if (iph1->status == PHASE1ST_ESTABLISHED)
@@ -584,8 +587,6 @@ ph1_main(iph1, msg)
 	}
 
 #ifdef ENABLE_STATS
-    {
-	struct timeval start, end;
 	gettimeofday(&start, NULL);
 #endif
 	/* receive */
@@ -648,7 +649,6 @@ ph1_main(iph1, msg)
 	syslog(LOG_NOTICE, "%s(%s): %8.6f",
 		"phase1", s_isakmp_state(iph1->etype, iph1->side, iph1->status),
 		timedelta(&start, &end));
-    }
 #endif
 	if (iph1->status == PHASE1ST_ESTABLISHED) {
 
@@ -698,6 +698,9 @@ quick_main(iph2, msg)
 {
 	struct isakmp *isakmp = (struct isakmp *)msg->v;
 	int error;
+#ifdef ENABLE_STATS
+	struct timeval start, end;
+#endif
 
 	/* ignore a packet */
 	if (iph2->status == PHASE2ST_ESTABLISHED
@@ -712,10 +715,9 @@ quick_main(iph2, msg)
 	}
 
 #ifdef ENABLE_STATS
-    {
-	struct timeval start, end;
 	gettimeofday(&start, NULL);
 #endif
+
 	/* receive */
 	if (ph2exchange[etypesw2(isakmp->etype)]
 		       [iph2->side]
@@ -773,7 +775,6 @@ quick_main(iph2, msg)
 		"phase2",
 		s_isakmp_state(ISAKMP_ETYPE_QUICK, iph2->side, iph2->status),
 		timedelta(&start, &end));
-    }
 #endif
 	return 0;
 }
@@ -785,6 +786,9 @@ isakmp_ph1begin_i(rmconf, remote)
 	struct sockaddr *remote;
 {
 	struct ph1handle *iph1;
+#ifdef ENABLE_STATS
+	struct timeval start, end;
+#endif
 
 	/* get new entry to isakmp status table. */
 	iph1 = newph1();
@@ -828,11 +832,6 @@ isakmp_ph1begin_i(rmconf, remote)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&iph1->start, NULL);
-#endif
-
-#ifdef ENABLE_STATS
-    {
-	struct timeval start, end;
 	gettimeofday(&start, NULL);
 #endif
 	/* start exchange */
@@ -852,7 +851,6 @@ isakmp_ph1begin_i(rmconf, remote)
 		"phase1",
 		s_isakmp_state(iph1->etype, iph1->side, iph1->status),
 		timedelta(&start, &end));
-    }
 #endif
 
 	return 0;
@@ -869,6 +867,9 @@ isakmp_ph1begin_r(msg, remote, local, etype)
 	struct remoteconf *rmconf;
 	struct ph1handle *iph1;
 	struct etypes *etypeok;
+#ifdef ENABLE_STATS
+	struct timeval start, end;
+#endif
 
 	/* look for my configuration */
 	rmconf = getrmconf(remote);
@@ -926,11 +927,6 @@ isakmp_ph1begin_r(msg, remote, local, etype)
 
 #ifdef ENABLE_STATS
 	gettimeofday(&iph1->start, NULL);
-#endif
-
-#ifdef ENABLE_STATS
-    {
-	struct timeval start, end;
 	gettimeofday(&start, NULL);
 #endif
 	/* start exchange */
@@ -952,7 +948,6 @@ isakmp_ph1begin_r(msg, remote, local, etype)
 		"phase1",
 		s_isakmp_state(iph1->etype, iph1->side, iph1->status),
 		timedelta(&start, &end));
-    }
 #endif
 
 	if (add_recvedpkt(msg, &iph1->rlist)) {
@@ -1001,6 +996,9 @@ isakmp_ph2begin_r(iph1, msg)
 	struct isakmp *isakmp = (struct isakmp *)msg->v;
 	struct ph2handle *iph2 = 0;
 	int error;
+#ifdef ENABLE_STATS
+	struct timeval start, end;
+#endif
 
 	iph2 = newph2();
 	if (iph2 == NULL) {
@@ -1078,10 +1076,9 @@ isakmp_ph2begin_r(iph1, msg)
     }
 
 #ifdef ENABLE_STATS
-    {
-	struct timeval start, end;
 	gettimeofday(&start, NULL);
 #endif
+
 	error = (ph2exchange[etypesw2(ISAKMP_ETYPE_QUICK)]
 	                   [iph2->side]
 	                   [iph2->status])(iph2, msg);
@@ -1116,7 +1113,6 @@ isakmp_ph2begin_r(iph1, msg)
 		"phase2",
 		s_isakmp_state(ISAKMP_ETYPE_QUICK, iph2->side, iph2->status),
 		timedelta(&start, &end));
-    }
 #endif
 
 	if (add_recvedpkt(msg, &iph2->rlist)) {
@@ -1781,6 +1777,10 @@ int
 isakmp_post_getspi(iph2)
 	struct ph2handle *iph2;
 {
+#ifdef ENABLE_STATS
+	struct timeval start, end;
+#endif
+
 	/* don't process it because there is no suitable phase1-sa. */
 	if (iph2->ph1->status == PHASE2ST_EXPIRED) {
 		plog(LLV_ERROR, LOCATION, iph2->ph1->remote,
@@ -1790,8 +1790,6 @@ isakmp_post_getspi(iph2)
 	}
 
 #ifdef ENABLE_STATS
-    {
-	struct timeval start, end;
 	gettimeofday(&start, NULL);
 #endif
 	if ((ph2exchange[etypesw2(ISAKMP_ETYPE_QUICK)]
@@ -1804,7 +1802,6 @@ isakmp_post_getspi(iph2)
 		"phase2",
 		s_isakmp_state(ISAKMP_ETYPE_QUICK, iph2->side, iph2->status),
 		timedelta(&start, &end));
-    }
 #endif
 
 	return 0;
