@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2682 2004/11/19 04:51:50 jinmei Exp $
+$KAME: CHANGELOG,v 1.2683 2004/11/27 12:22:10 jinmei Exp $
 
 <200411>
+2004-11-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/libinet6/getaddrinfo.c: suppress AAAA queries if the
+	node does not have IPv6 addresses other than the loopback and
+	link-local addresses.  Additionally, AI_ADDRCONFIG is now more
+	specification compliant in that getaddrinfo() only issues AAAA
+	queries when the node has non-loopback addresses.
+
 2004-11-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_if2idlen): introduced a new
 	function, which was previously a local module "if2idlen", and
