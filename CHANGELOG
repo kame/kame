@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.926 2000/05/24 10:01:30 sakane Exp $
+$Id: CHANGELOG,v 1.927 2000/05/24 11:52:41 itojun Exp $
 
 <200005>
 Wed May 24 18:59:55 JST 2000 sakane@ydc.co.jp
@@ -24,6 +24,7 @@ Wed May 24 14:32:44 JST 2000 sakane@ydc.co.jp
 
 Wed May 24 01:29:46 JST 2000  itojun@iijlab.net
 	* netbsd/usr.sbin/pppd: pppd with IPv6 support.  from netbsd-current.
+	  no on-demand dialing support at this moment.
 	* netbsd/sys/net/if_ppp.c: async ppp kernel code with IPv6 support.
 	  from netbsd-current.  it will change ioctl API slightly,
 	  and stock netbsd142 pppd may choke.
