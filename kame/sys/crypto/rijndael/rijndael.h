@@ -1,4 +1,4 @@
-/*	$KAME: rijndael.h,v 1.5 2003/08/28 08:23:20 itojun Exp $	*/
+/*	$KAME: rijndael.h,v 1.6 2003/08/28 08:36:32 itojun Exp $	*/
 
 /**
  * rijndael-alg-fst.h
@@ -56,7 +56,6 @@
 #define	__RIJNDAEL_H
 
 #include <crypto/rijndael/rijndael-alg-fst.h>
-#include <crypto/rijndael/rijndael-api-fst.h>
 
 typedef struct {
 	int	decrypt;
