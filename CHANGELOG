@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2286 2002/12/05 15:36:13 jinmei Exp $
+$KAME: CHANGELOG,v 1.2287 2002/12/06 06:23:42 suz Exp $
 
 <200212>
+Fri Dec  6 15:18:08 JST 2002	suz@crl.hitachi.co.jp
+	* kame/kame/pim6sd: introduced a configuration option 
+	"default_phyint_status" to disable multicast routing on all
+	interfaces except explicitly enabled ones.
+
 2002-12-06  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/in6.c (in6_unlink_ifa): always decremented the
 	reference count of the associated prefix.  Otherwise, the prefix
