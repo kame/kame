@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1849 2001/08/28 08:48:31 jinmei Exp $
+$KAME: CHANGELOG,v 1.1850 2001/08/28 10:07:19 jinmei Exp $
 
 <200108>
+2001-08-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/in6_src.c (in6_selectsrc): corrected a
+	condition on temporary addresses.
+
 2001-08-22  kjc@csl.sony.co.jp
 	* bsdi4/sys/net/if.h:
 	add ALTQ-compat queue macros to bsdi4 in order to
