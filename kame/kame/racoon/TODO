@@ -1,4 +1,4 @@
-$Id: TODO,v 1.3 2000/01/09 21:45:39 sakane Exp $
+$Id: TODO,v 1.4 2000/01/12 00:33:50 itojun Exp $
 
 Sorry that `racoon' is not stable yet.  But she can exchange the key
 in limited environment.  Try to run with racoon.conf in the case
@@ -121,3 +121,33 @@ policy {
 	negotiation local 172.168.1.1 ;
 }
 
+o configuration should be made easier. 
+  one idea is to allow user to "define" certain set of directives, like:
+	TRANS_3DES = protocol esp {
+			level require;
+			mode transport;
+			encryption_algorithm 3des;
+			authentication_algorithm hmac_sha1;
+		};
+	TRANS_SHA1 = protocol ah {
+			level require;
+			mode transport;
+			authentication_algorithm hmac_sha1;
+		};
+
+	policy foo baa
+	{
+		pfs_group modp1024;
+		proposal {
+			TRANS_3DES;
+		}
+	}
+	policy foo baz
+	{
+		pfs_group modp1024;
+		proposal {
+			TRANS_3DES;
+			TRANS_SHA1;
+		}
+	}
+  may be too complex, use pre-processor like cpp?
