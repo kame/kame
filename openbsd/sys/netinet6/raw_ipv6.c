@@ -346,11 +346,12 @@ rip6_input(mp, offp, proto)
 #if __NetBSD__ || __OpenBSD__
   for (inp = rawin6pcbtable.inpt_queue.cqh_first;
        inp != (struct inpcb *)&rawin6pcbtable.inpt_queue;
-       inp = inp->inp_queue.cqe_next) {
+       inp = inp->inp_queue.cqe_next)
 #else /* __NetBSD__ || __OpenBSD__ */
-  for (inp = rawin6pcb.inp_next; inp != &rawin6pcb; inp = inp->inp_next) {
+  for (inp = rawin6pcb.inp_next; inp != &rawin6pcb; inp = inp->inp_next)
 #endif /* __NetBSD__ || __OpenBSD__ */
 #endif /* __FreeBSD__ */
+  {
     if (inp->inp_ipv6.ip6_nxt && inp->inp_ipv6.ip6_nxt != nexthdr)
       continue;
     if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_laddr6) && 
@@ -359,7 +360,7 @@ rip6_input(mp, offp, proto)
     if (!IN6_IS_ADDR_UNSPECIFIED(&inp->inp_faddr6) && 
 	!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, &ip6->ip6_src))
       continue;
-    if ((icmp6type >= 0) && 
+    if (inp->inp_icmp6filt && 
 	ICMP6_FILTER_WILLBLOCK(icmp6type, inp->inp_icmp6filt))
       continue;
 
