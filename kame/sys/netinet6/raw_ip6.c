@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.142 2003/09/21 09:33:43 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.143 2003/11/02 23:30:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -498,7 +498,7 @@ rip6_output(m, va_alist)
 #endif
 
 	if (control) {
-		if ((error = ip6_setpktoptions(control, &opt, stickyopt,
+		if ((error = ip6_setpktopts(control, &opt, stickyopt,
 		    priv, 0, so->so_proto->pr_protocol)) != 0) {
 			goto bad;
 		}
