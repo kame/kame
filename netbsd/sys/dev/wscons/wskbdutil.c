@@ -1,4 +1,4 @@
-/*	$NetBSD: wskbdutil.c,v 1.6 1998/09/17 18:10:53 drochner Exp $	*/
+/*	$NetBSD: wskbdutil.c,v 1.10 2001/11/15 09:48:19 lukem Exp $	*/
 
 /*-
  * Copyright (c) 1997 The NetBSD Foundation, Inc.
@@ -36,8 +36,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
+__KERNEL_RCSID(0, "$NetBSD: wskbdutil.c,v 1.10 2001/11/15 09:48:19 lukem Exp $");
+
 #include <sys/param.h>
-#include <sys/types.h>
 #include <sys/cdefs.h>
 #include <sys/errno.h>
 #include <sys/systm.h>
@@ -182,13 +184,12 @@ static struct compose_tab_s {
 
 static int compose_tab_inorder = 0;
 
-static inline int compose_tab_cmp __P((struct compose_tab_s *, struct compose_tab_s *));
-static keysym_t ksym_upcase __P((keysym_t));
-static void fillmapentry __P((const keysym_t *, int, struct wscons_keymap *));
+static inline int compose_tab_cmp(struct compose_tab_s *, struct compose_tab_s *);
+static keysym_t ksym_upcase(keysym_t);
+static void fillmapentry(const keysym_t *, int, struct wscons_keymap *);
 
 static inline int
-compose_tab_cmp(i, j)
-	struct compose_tab_s *i, *j;
+compose_tab_cmp(struct compose_tab_s *i, struct compose_tab_s *j)
 {
 	if (i->elem[0] == j->elem[0])
 		return(i->elem[1] - j->elem[1]);
@@ -197,8 +198,7 @@ compose_tab_cmp(i, j)
 }
 
 keysym_t
-wskbd_compose_value(compose_buf)
-	keysym_t *compose_buf;
+wskbd_compose_value(keysym_t *compose_buf)
 {
 	int i, j, r;
 	struct compose_tab_s v;
@@ -268,8 +268,7 @@ static const u_char latin1_to_upper[256] = {
 };
 
 static keysym_t
-ksym_upcase(ksym)
-	keysym_t ksym;
+ksym_upcase(keysym_t ksym)
 {
 	if (ksym >= KS_f1 && ksym <= KS_f20)
 		return(KS_F1 - KS_f1 + ksym);
@@ -282,10 +281,7 @@ ksym_upcase(ksym)
 }
 
 static void
-fillmapentry(kp, len, mapentry)
-	const keysym_t *kp;
-	int len;
-	struct wscons_keymap *mapentry;
+fillmapentry(const keysym_t *kp, int len, struct wscons_keymap *mapentry)
 {
 	switch (len) {
 	case 0:
@@ -327,10 +323,8 @@ fillmapentry(kp, len, mapentry)
 }
 
 void
-wskbd_get_mapentry(mapdata, kc, mapentry)
-	const struct wskbd_mapdata *mapdata;
-	int kc;
-	struct wscons_keymap *mapentry;
+wskbd_get_mapentry(const struct wskbd_mapdata *mapdata, int kc,
+	struct wscons_keymap *mapentry)
 {
 	kbd_t cur;
 	const keysym_t *kp;
@@ -343,7 +337,7 @@ wskbd_get_mapentry(mapdata, kc, mapentry)
 	mapentry->group2[0] = KS_voidSymbol;
 	mapentry->group2[1] = KS_voidSymbol;
 
-	for (cur = mapdata->layout; cur != 0; ) {
+	for (cur = mapdata->layout & ~KB_HANDLEDBYWSKBD; cur != 0; ) {
 		mp = mapdata->keydesc;
 		while (mp->map_size > 0) {
 			if (mp->name == cur)
@@ -356,16 +350,29 @@ wskbd_get_mapentry(mapdata, kc, mapentry)
 			return;
 
 		for (kp = mp->map; kp < mp->map + mp->map_size; kp++)
+#if 0
 			if (KS_GROUP(*kp) == KS_GROUP_Keycode &&
-			    KS_VALUE(*kp) == kc) {
+			    KS_VALUE(*kp) == kc)
+#else
+			if (0)
+#endif
+			{
 				/* First skip keycode and possible command */
 				kp++;
+#if 0
 				if (KS_GROUP(*kp) == KS_GROUP_Command ||
 				    *kp == KS_Cmd || *kp == KS_Cmd1 || *kp == KS_Cmd2)
+#else
+				if (0)
+#endif
 					mapentry->command = *kp++;
 
 				for (l = 0; kp + l < mp->map + mp->map_size; l++)
+#if 0
 					if (KS_GROUP(kp[l]) == KS_GROUP_Keycode)
+#else
+					if (0)
+#endif
 						break;
 				if (l > 4)
 					panic("wskbd_get_mapentry: %d(%d): bad entry",
@@ -379,10 +386,7 @@ wskbd_get_mapentry(mapdata, kc, mapentry)
 }
 
 void
-wskbd_init_keymap(newlen, map, maplen)
-	int newlen;
-	struct wscons_keymap **map;
-	int *maplen;
+wskbd_init_keymap(int newlen, struct wscons_keymap **map, int *maplen)
 {
 	int i;
 
@@ -404,17 +408,16 @@ wskbd_init_keymap(newlen, map, maplen)
 }
 
 int
-wskbd_load_keymap(mapdata, map, maplen)
-	const struct wskbd_mapdata *mapdata;
-	struct wscons_keymap **map;
-	int *maplen;
+wskbd_load_keymap(const struct wskbd_mapdata *mapdata, 
+	struct wscons_keymap **map, int *maplen)
 {
 	int i, s, kc, stack_ptr;
 	const keysym_t *kp;
 	const struct wscons_keydesc *mp, *stack[10];
 	kbd_t cur;
 
-	for (cur = mapdata->layout, stack_ptr = 0; cur != 0; stack_ptr++) {
+	for (cur = mapdata->layout & ~KB_HANDLEDBYWSKBD, stack_ptr = 0;
+	     cur != 0; stack_ptr++) {
 		mp = mapdata->keydesc;
 		while (mp->map_size > 0) {
 			if (cur == 0 || mp->name == cur) {
@@ -436,7 +439,11 @@ wskbd_load_keymap(mapdata, map, maplen)
 	for (i = 0, s = stack_ptr - 1; s >= 0; s--) {
 		mp = stack[s];
 		for (kp = mp->map; kp < mp->map + mp->map_size; kp++)
+#if 0
 			if (KS_GROUP(*kp) == KS_GROUP_Keycode && KS_VALUE(*kp) > i)
+#else
+			if (0)
+#endif
 				i = KS_VALUE(*kp);
 	}
 
@@ -445,7 +452,11 @@ wskbd_load_keymap(mapdata, map, maplen)
 	for (s = stack_ptr - 1; s >= 0; s--) {
 		mp = stack[s];
 		for (kp = mp->map; kp < mp->map + mp->map_size; ) {
+#if 0
 			if (KS_GROUP(*kp) != KS_GROUP_Keycode)
+#else
+			if (1)
+#endif
 				panic("wskbd_load_keymap: %d(%d): bad entry",
 				      mp->name, *kp);
 
@@ -453,13 +464,18 @@ wskbd_load_keymap(mapdata, map, maplen)
 			kp++;
 
 			if (KS_GROUP(*kp) == KS_GROUP_Command ||
-			    *kp == KS_Cmd || *kp == KS_Cmd1 || *kp == KS_Cmd2) {
+			    *kp == KS_Cmd || *kp == KS_Cmd1 || *kp == KS_Cmd2)
+			{
 				(*map)[kc].command = *kp;
 				kp++;
 			}
 
 			for (i = 0; kp + i < mp->map + mp->map_size; i++)
+#if 0
 				if (KS_GROUP(kp[i]) == KS_GROUP_Keycode)
+#else
+				if (0)
+#endif
 					break;
 
 			if (i > 4)
