@@ -628,6 +628,7 @@ tcp_input(m, va_alist)
 		ip = NULL;
 		iphlen = sizeof(struct ip6_hdr);
 		af = AF_INET6;
+#ifndef PULLDOWN_TEST
 		if (m->m_len < toff + sizeof(struct tcphdr)) {
 			m = m_pullup(m, toff + sizeof(struct tcphdr));	/*XXX*/
 			if (m == NULL) {
@@ -637,6 +638,15 @@ tcp_input(m, va_alist)
 		}
 		ip6 = mtod(m, struct ip6_hdr *);
 		th = (struct tcphdr *)(mtod(m, caddr_t) + toff);
+#else
+		ip6 = mtod(m, struct ip6_hdr *);
+		IP6_EXTHDR_GET(th, struct tcphdr *, m, toff,
+			sizeof(struct tcphdr));
+		if (th == NULL) {
+			tcpstat.tcps_rcvshort++;
+			return;
+		}
+#endif
 
 		/*
 		 * Checksum extended TCP header and data.
