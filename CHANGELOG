@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2688 2004/11/29 05:42:57 jinmei Exp $
+$KAME: CHANGELOG,v 1.2689 2004/11/30 14:38:35 jinmei Exp $
 
 <200411>
+2004-11-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet/tcp_subr.c (tcp_notify): implemented quick
+	fall-back optimization as described in
+	draft-gont-tcpm-tcp-soft-errors-01.
+
 2004-11-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6: catch up draft-ietf-dhc-lifetime-02.
 	Specifically,
