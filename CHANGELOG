@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1961 2001/11/04 06:32:24 suz Exp $
+$KAME: CHANGELOG,v 1.1962 2001/11/04 12:18:51 jinmei Exp $
 
 <200111>
+2001-11-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	clarified cached route manipulation:
+	* kame/sys/netinet6/in6_src.c (in6_selectroute): check if the
+	cached route is up before using the cache.  With this check, we
+	can select more appropriate source addresses.
+	* kame/sys/netinet6/ip6_output.c (ip6_output): removed the check
+	for the cached route to avoid redundancy.
+
 Sun Nov  4 15:29:28 JST 2001 suz@sdl.hitachi.co.jp
 	* kame/kame/v6test/cksum.c: calculates PIM checksum without 
 	encapsulated packet if it is a Register message.
