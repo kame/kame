@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc.c,v 1.7 2004/02/12 17:35:31 itojun Exp $	*/
+/*	$KAME: dccp_tfrc.c,v 1.8 2004/02/12 18:31:24 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson
@@ -103,10 +103,36 @@
 #define INP_UNLOCK(x)
 #endif
 
+
 #include <netinet/dccp_tfrc_print.h>
 
 /* Timeval operations */
 const struct timeval delta_half = {0, TFRC_OPSYS_TIME_GRAN / 2};
+
+#ifdef __FreeBSD__
+#define	timercmp(tvp, uvp, cmp)						\
+	(((tvp)->tv_sec == (uvp)->tv_sec) ?				\
+	    ((tvp)->tv_usec cmp (uvp)->tv_usec) :			\
+	    ((tvp)->tv_sec cmp (uvp)->tv_sec))
+#define	timeradd(tvp, uvp, vvp)						\
+	do {								\
+		(vvp)->tv_sec = (tvp)->tv_sec + (uvp)->tv_sec;		\
+		(vvp)->tv_usec = (tvp)->tv_usec + (uvp)->tv_usec;	\
+		if ((vvp)->tv_usec >= 1000000) {			\
+			(vvp)->tv_sec++;				\
+			(vvp)->tv_usec -= 1000000;			\
+		}							\
+	} while (/* CONSTCOND */ 0)
+#define	timersub(tvp, uvp, vvp)						\
+	do {								\
+		(vvp)->tv_sec = (tvp)->tv_sec - (uvp)->tv_sec;		\
+		(vvp)->tv_usec = (tvp)->tv_usec - (uvp)->tv_usec;	\
+		if ((vvp)->tv_usec < 0) {				\
+			(vvp)->tv_sec--;				\
+			(vvp)->tv_usec += 1000000;			\
+		}							\
+	} while (/* CONSTCOND */ 0)
+#endif
 /*
  * Half time value struct (accurate to +- 0.5us)
  * args:  tvp  -  pointer to timeval structure
@@ -165,7 +191,8 @@ void tfrc_time_no_feedback(void *);
 void tfrc_time_send(void *);
 void tfrc_set_send_timer(struct tfrc_send_ccb *, struct timeval);
 void tfrc_updateX(struct tfrc_send_ccb *, struct timeval);
-const struct fixpint *tfrc_calcX(u_int16_t, u_int32_t, const struct fixpoint *);
+const struct fixpoint *tfrc_calcX(u_int16_t, u_int32_t,
+	const struct fixpoint *);
 void tfrc_send_term(void *);
 
 static void normalize(long long *, long long *);
@@ -199,7 +226,7 @@ tfrc_calcX(u_int16_t s, u_int32_t r, const struct fixpoint *p)
 	x.num = 1000000 * s;
 	x.denom = 1 * r;
 	fixpoint_div(&x, &x, p);
-	return &result;
+	return &x;
 }
 
 /*
@@ -270,6 +297,7 @@ tfrc_set_send_timer(struct tfrc_send_ccb * cb, struct timeval t_now)
 	     t_ticks, (unsigned long)hz));
 	cb->ch_stimer = timeout(tfrc_time_send, (void *) cb, t_ticks);
 }
+
 /*
  * Update X by
  *    If (p > 0)
@@ -301,7 +329,7 @@ tfrc_updateX(struct tfrc_send_ccb * cb, struct timeval t_now)
 		temp2.denom *= TFRC_MAX_BACK_OFF_TIME;
 		if (fixpoint_cmp(&temp, &temp2) < 0)
 			cb->x = temp2;
-		normalize(&cb->x.num, cb->x.denom);
+		normalize(&cb->x.num, &cb->x.denom);
 		TFRC_DEBUG((LOG_INFO, "TFRC updated send rate to "));
 		PRINTFLOAT(&cb->x);
 		TFRC_DEBUG((LOG_INFO, " bytes/s (tfrc_updateX, p>0)\n"));

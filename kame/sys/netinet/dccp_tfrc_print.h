@@ -1,4 +1,4 @@
-/*	$KAME: dccp_tfrc_print.h,v 1.5 2003/11/25 07:34:52 ono Exp $	*/
+/*	$KAME: dccp_tfrc_print.h,v 1.6 2004/02/12 18:31:24 itojun Exp $	*/
 
 /*
  * Copyright (c) 2003  Nils-Erik Mattsson 
@@ -35,16 +35,10 @@
 #ifndef _NETINET_DCCP_TFRC_PRINT_H_
 #define _NETINET_DCCP_TFRC_PRINT_H_
 
-#define PRINTFLOAT(num) \
-        do{ \
-        if ((num) > 2000000000)  \
-           TFRC_DEBUG((LOG_INFO,"Large")); \
-        else if ((num) < 0.0)   \
-           TFRC_DEBUG((LOG_INFO,"Negative")); \
-        else { \
-           TFRC_DEBUG((LOG_INFO,"%u+%u*10^-6",(u_int32_t) (num),(u_int32_t) ((num - (double) ((u_int32_t) (num)))*1000000) )); \
-	} \
-        } while (0)
+#define PRINTFLOAT(x) \
+        do { \
+		TFRC_DEBUG((LOG_INFO, "%lld/%lld", (x)->num, (x)->denom)); \
+	} while (0)
 
 #define PRINTTIMEVALu(tvp)    \
         do{  TFRC_DEBUG((LOG_INFO,"%u s, %u us",(u_int32_t) (tvp)->tv_sec,(u_int32_t) (tvp)->tv_usec)); \
