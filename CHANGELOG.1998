@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit, 1998
 
-$Id: CHANGELOG.1998,v 1.1 1999/10/05 09:49:25 itojun Exp $
+$Id: CHANGELOG.1998,v 1.2 2000/06/15 12:27:57 sakane Exp $
 
 <199812>
 Thu Dec 31 20:56:12 JST 1998  itojun@iijlab.net
@@ -1357,7 +1357,7 @@ Fri Aug 28 14:39:27 JST 1998 sumikawa@ebina.hitachi.co.jp
 	* ip6_output.c: enbale to join all multicast group(::) for
 	super user.
 
-Fri Aug 28 13:29:58 JST 1998 sakane@kame.net
+Fri Aug 28 13:29:58 JST 1998 sakane@ydc.co.jp
 	* sys/netkey:
 	Fixed that reference count about SAD and SPD.
 
@@ -2068,7 +2068,7 @@ Thu Jun 18 04:36:01 JST 1998  sumikawa@ebina.hitachi.co.jp
 
 	* kit/ports/im: Email and NetNews user interface
 
-Thu Jun 18 04:36:43 JST 1998 sakane@kame.net
+Thu Jun 18 04:36:43 JST 1998 sakane@ydc.co.jp
 	sys/netkey/, sys/netinet{,6}/, kit/src/setkey/
 	* Restructed both SPD and SAD in kernel IPsec module.
 	  There are two SPD. One is the based socket, and the another is
@@ -2194,7 +2194,7 @@ Sun Jun  7 14:17:52 JST 1998  itojun@itojun.org
 	  advisory 98:03).
 	  Pointed out by: kenji rikitake
 
-Sun Jun  7 JST 1998  sakane@kame.net
+Sun Jun  7 JST 1998  sakane@ydc.co.jp
 	* ipsec code is now start working, but may need some more time to
 	  stabilize.
 
@@ -2205,7 +2205,7 @@ Sat Jun  6 JST 1998  itojun@itojun.org
 	* sys: ipsecstat is now visible via sysctl MIB.
 	* kit/usr.bin/netstat: show ipsec statistics on netstat -s.
 
-Sat Jun  6 JST 1998  sakane@kame.net
+Sat Jun  6 JST 1998  sakane@ydc.co.jp
 	* sys: pfkey v2 and SPD is merged into.
 	  NOTE: This breaks IPsec code, for the moment.
 	  Also, some of userland tools (for example kit/src/pluto) cannot

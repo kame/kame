@@ -1,19 +1,19 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1026 2000/06/15 12:23:31 sakane Exp $
+$Id: CHANGELOG,v 1.1027 2000/06/15 12:27:57 sakane Exp $
 
 <200006>
-Thu Jun 15 21:22:35 JST 2000 sakane@kame.net
+Thu Jun 15 21:22:35 JST 2000 sakane@ydc.co.jp
 	* kame/sys/netkey/key.c:
 	Fixed extension length of two key extension when dumping SA.
 	setkey was failed to print keys if SA has both encryption and
 	authentication keys.
 
-Thu Jun 15 14:44:30 JST 2000 sakane@kame.net
+Thu Jun 15 14:44:30 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	CR payload is only made if signature authentication method is applied.
 
-Thu Jun 15 13:29:29 JST 2000 sakane@kame.net
+Thu Jun 15 13:29:29 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon/cfparse.y:
 	In racoon.conf, the path of configuration file is complemented by
 	include directive only if there is no '/' in the path.
@@ -339,7 +339,7 @@ Sat Jun  3 08:08:43 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 Fri Jun  2 21:08:22 JST 2000  itojun@iijlab.net
 	* freebsd2/ports/{libpcap,tcpdump}: use 2000/5/29 weekly snap.
 
-Thu Jun  1 04:47:42 JST 2000 sakane@kame.net
+Thu Jun  1 04:47:42 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	- You must explicitly specify the file name of certificate and
 	  private key if you use a certificate.  See README.certificate.
@@ -1033,12 +1033,12 @@ Tue Apr 25 11:39:22 JST 2000  itojun@iijlab.net
 	* netbsd/usr.sbin/lpr: don't SEGV on rp=numerichost.
 	  From: hiro@takechi.org
 
-Tue Apr 25 04:09:09 JST 2000 sakane@kame.net
+Tue Apr 25 04:09:09 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	* kame/kame/setkey:
 	In the case of ICMP{,V6}, check address family and upper layer protocol.
 
-Tue Apr 25 03:54:32 JST 2000 sakane@kame.net
+Tue Apr 25 03:54:32 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	enable VPN negotiation again.
 
@@ -1051,13 +1051,13 @@ Tue Apr 25 03:54:32 JST 2000 sakane@kame.net
 Mon Apr 24 22:13:09 JST 2000  itojun@iijlab.net
 	* libpcap/tcpdump pkgsrc (netbsd/freebsd2): upgrade to 4/24 snapshot.
 
-Mon Apr 24 21:39:23 JST 2000 sakane@kame.net
+Mon Apr 24 21:39:23 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	- enable to define some algorithm each algorithm class.
 	- use internal SPD, don't SPDGET in order to get SP entry.
 	- fix to negotiate phase 2 with multiple transform in a single protocol.
 
-Mon Apr 24 17:22:51 JST 2000 sakane@kame.net
+Mon Apr 24 17:22:51 JST 2000 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	improve phase 2 configuration and parse phase 2 SA payload.
 	Racoon takes security protocols to be negotiated at phase 2 from
@@ -2248,7 +2248,7 @@ Wed Feb  9 01:09:21 JST 2000  itojun@iijlab.net
 	packet is going to break a scope boundary, return an icmp6
 	destination unreachable (beyond scope) error.
 
-Tue Feb  8 23:13:32 JST 2000 sakane@kame.net
+Tue Feb  8 23:13:32 JST 2000 sakane@ydc.co.jp
 	* kame/racoon:
 	  man page updated against recent modification.
 
@@ -2634,7 +2634,7 @@ Mon Jan 17 13:47:13 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/zebra, freebsd3/ports/zebra,
 	  openbsd/ports/net/zebra: upgrade to 0.84a.
 
-Mon Jan 17 2000  sakane@kame.net, itojun@kame.net
+Mon Jan 17 2000  sakane@ydc.co.jp, itojun@kame.net
 	* racoon: tons of improvements into our IKE daemon.
 	  - SA bundle is now handled correctly (both phase 1/2)
 	  - will not SEGV even if last packet in phase 1/2 get resent
@@ -2757,7 +2757,7 @@ Wed Jan 12 05:13:33 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	Now no nesting is allowed by default, since some systems do not
 	allow so many recursive calls in kernel.
 
-Sun Jan  9 10:32:59 JST 2000  sakane@kame.net
+Sun Jan  9 10:32:59 JST 2000  sakane@ydc.co.jp
 	massive clarification to racoon ISAKMP daemon.
 	- Merged Eric Lemiere's code for limited certificate support.
 	- There are two management hander.

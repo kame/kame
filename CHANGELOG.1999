@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit, 1999
 
-$Id: CHANGELOG.1999,v 1.1 2000/01/01 19:05:47 itojun Exp $
+$Id: CHANGELOG.1999,v 1.2 2000/06/15 12:27:58 sakane Exp $
 
 <199912>
 Fri Dec ?? JST 1999  itojun@iijab.net
@@ -1417,7 +1417,7 @@ Thu Sep  9 02:10:21 JST 1999  itojun@iijlab.net
 	  this is for pcmcia ethernet cards inserted after bootstrap time.
 	  (commits for other operating systems should follow)
 
-	  From: sakane@kame.net
+	  From: sakane@ydc.co.jp
 
 Wed Sep  8 19:34:57 JST 1999  itojun@iijlab.net
 	* netbsd/sys/dev/ic/sm91cxx.c: avoid duplicated multicast packet
@@ -1457,14 +1457,14 @@ Tue Sep  7 16:42:41 JST 1999  itojun@iijlab.net
 	* kame/tcpdump/print-ripng.c: format ripng information better
 	  if -v is specified (but it eats more lines on screen).
 
-Tue Sep  7 13:09:06 JST 1999 sakane@kame.net
+Tue Sep  7 13:09:06 JST 1999 sakane@ydc.co.jp
 	* kame/kame/sys/netinet6:
 	Implemented IPv6 forwarding with IPsec slightly.
 	It's enable if you define IPSEC_IPV6FWD option in kernel
 	configuration file.
 	XXX ICMPv6 for IPsec tunnel should be considered.
 
-Tue Sep  7 10:09:53 JST 1999 sakane@kame.net
+Tue Sep  7 10:09:53 JST 1999 sakane@ydc.co.jp
 	* kame/sys/netkey/key.c:
 	Fixed kernel crash when you set SP by spdadd command of setkey.
 
@@ -2934,7 +2934,7 @@ Wed May 12 10:33:32 JST 1999  itojun@iijlab.net
 	  NOTE: need recompilation in userland (ping6), and old KAME and new
 	  KAME will not interoperate due to the overwrap in number...
 
-Wed May 12 02:29:13 JST 1999 sakane@kame.net
+Wed May 12 02:29:13 JST 1999 sakane@ydc.co.jp
 	* sys/netkey/key.c (FreeBSD228/BSDI):
 	Fixed to expire SA.  It can't be sent SADB_EXPIRE message due
 	to my mistake.
@@ -2944,7 +2944,7 @@ Wed May 12 02:29:13 JST 1999 sakane@kame.net
 		e.g.	time limit = 22896000(s)
 			byte limit = 100(KB)
 
-Tue May 11 18:48:37 JST 1999  sakane@kame.net
+Tue May 11 18:48:37 JST 1999  sakane@ydc.co.jp
 	* kit/ports/icecast, kit/pkgsrc/audio/icecast: upgrade to latest
 	  IPv6 patch, with song name broadcasting/request hack.
 
