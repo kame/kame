@@ -479,9 +479,6 @@ age_routes()
 		 * last time a check of the datarate for the whole routing
 		 * table, then delete its kernel cache entry.
 		 */
-
-
-
 		for (kernel_cache_ptr = mrtentry_rp->kernel_cache;
 		     kernel_cache_ptr != (kernel_cache_t *) NULL;
 		     kernel_cache_ptr = kernel_cache_next)
@@ -527,6 +524,7 @@ age_routes()
 				continue;
 			    }
 #endif				/* KERNEL_MFC_WC_G */
+			    pim6dstat.pim6_trans_spt_forward++;
 			    switch_shortest_path(&kernel_cache_ptr->source,
 						 &kernel_cache_ptr->group);
 			    did_switch_flag = TRUE;
@@ -551,16 +549,14 @@ age_routes()
 				continue;
 			    }
 #endif				/* KERNEL_MFC_WC_G */
-
+			pim6dstat.pim6_trans_spt_rp++;
 			switch_shortest_path(&kernel_cache_ptr->source,
 					     &kernel_cache_ptr->group);
 		    }
 		}
 	    }
 
-
 	    /* Join/Prune timer */
-
 	    IF_TIMEOUT(mrtentry_rp->jp_timer)
 	    {
 

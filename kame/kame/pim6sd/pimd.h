@@ -513,6 +513,12 @@ struct pim6dstat {
 	u_quad_t pim6_bootstrap_timo;/* pim_bootstrap_timer */
 	u_quad_t pim6_rpgrp_timo; /* rp_grp_entry_ptr->holdtime */
 	u_quad_t pim6_rtentry_timo; /* routing entry */
+	/* kernel internals */
+	u_quad_t kern_add_cache;
+    	u_quad_t kern_add_cache_fail;
+	u_quad_t kern_del_cache;
+    	u_quad_t kern_del_cache_fail;
+	u_quad_t kern_sgcnt_fail;
 };
 
 extern struct pim6dstat pim6dstat;

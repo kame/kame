@@ -367,6 +367,13 @@ dump_stat()
 	fprintf(fp, "\t%qu pim6 routing entry timeouts\n",
 		pim6dstat.pim6_rtentry_timo);
 
+	fprintf(fp, "\t%qu kernel cache additions\n", pim6dstat.kern_add_cache);
+	fprintf(fp, "\t%qu kernel cache addition failures\n",
+		pim6dstat.kern_add_cache_fail);
+	fprintf(fp, "\t%qu kernel cache deletions\n", pim6dstat.kern_del_cache);
+	fprintf(fp, "\t%qu kernel cache deletion failures\n",
+		pim6dstat.kern_del_cache_fail);
+
 	fclose(fp);
 }
 

@@ -62,6 +62,7 @@
 #endif
 #include <netinet6/in6_var.h>
 #include <syslog.h>
+#include "pimd.h"
 #include "inet6.h"
 #include "vif.h"
 #include "mrt.h"
@@ -283,8 +284,10 @@ k_del_mfc(int socket, struct sockaddr_in6 * source, struct sockaddr_in6 * group)
     mc.mf6cc_origin = *source;
     mc.mf6cc_mcastgrp = *group;
 
+    pim6dstat.kern_del_cache++;
     if (setsockopt(socket, IPPROTO_IPV6, MRT6_DEL_MFC, (char *) &mc, sizeof(mc)) < 0)
     {
+	pim6dstat.kern_del_cache_fail++;
 	log(LOG_WARNING, errno, "setsockopt MRT6_DEL_MFC");	
 	return FALSE;
     }
@@ -331,9 +334,11 @@ k_chg_mfc(socket, source, group, iif, oifs, rp_addr)
     mc.mf6cc_rp_addr.s_addr = rp_addr;
 #endif
 
+    pim6dstat.kern_add_cache++;
     if (setsockopt(socket, IPPROTO_IPV6, MRT6_ADD_MFC, (char *) &mc,
 		   sizeof(mc)) < 0)
     {
+	pim6dstat.kern_add_cache_fail++;
 	log(LOG_WARNING, errno,
 	    "setsockopt MRT_ADD_MFC for source %s and group %s",
 	    inet6_fmt(&source->sin6_addr), inet6_fmt(&group->sin6_addr));
@@ -393,6 +398,7 @@ k_get_sg_cnt(socket, source, group, retval)
     sgreq.grp = *group;
     if (ioctl(socket, SIOCGETSGCNT_IN6, (char *) &sgreq) < 0)
     {
+	pim6dstat.kern_sgcnt_fail++;
 	log(LOG_WARNING, errno, "SIOCGETSGCNT_IN6 on (%s %s)",
 	    inet6_fmt(&source->sin6_addr), inet6_fmt(&group->sin6_addr));
 	retval->pktcnt = retval->bytecnt = retval->wrong_if = ~0;	/* XXX */
