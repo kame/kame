@@ -175,7 +175,7 @@ pfkey_sadump(m)
 	m_auth = (struct sadb_key *)mhp[SADB_EXT_KEY_AUTH];
 	m_enc = (struct sadb_key *)mhp[SADB_EXT_KEY_ENCRYPT];
 	m_sid = (struct sadb_ident *)mhp[SADB_EXT_IDENTITY_SRC];
-	m_did = (struct sadb_ident *)mhp[SADB_EXT_IDENTITY_SRC];
+	m_did = (struct sadb_ident *)mhp[SADB_EXT_IDENTITY_DST];
 	m_sens = (struct sadb_sens *)mhp[SADB_EXT_SENSITIVITY];
 
 	/* source address */
@@ -206,7 +206,7 @@ pfkey_sadump(m)
 	printf("mode=");
 	GETMSGSTR(_str_mode, m->sadb_msg_mode);
 
-	printf("spi=%u(0x%08x) reqid=%lu(0x%08x)\n",
+	printf("spi=%u(0x%08x) reqid=%u(0x%08x)\n",
 		(u_int32_t)ntohl(m_sa->sadb_sa_spi),
 		(u_int32_t)ntohl(m_sa->sadb_sa_spi),
 		(u_int32_t)m->sadb_msg_reqid,
@@ -291,7 +291,7 @@ pfkey_sadump(m)
 	}
 
 	/* XXX DEBUG */
-	printf("\trefcnt=%lu\n", m->sadb_msg_reserved2);
+	printf("\trefcnt=%u\n", m->sadb_msg_reserved2);
 
 	return;
 }
@@ -341,7 +341,7 @@ pfkey_spdump(m)
 		     _INPORTBYSA(m_daddr + 1)));
 
 	/* upper layer protocol */
-	if (m_saddr->sadb_address_proto != m_saddr->sadb_address_proto) {
+	if (m_saddr->sadb_address_proto != m_daddr->sadb_address_proto) {
 		printf("upper layer protocol mismatched.\n");
 		return;
 	}
@@ -370,7 +370,7 @@ pfkey_spdump(m)
 		(u_long)m->sadb_msg_pid);
 
 	/* XXX TEST */
-	printf("\trefcnt=%lu\n", m->sadb_msg_reserved2);
+	printf("\trefcnt=%u\n", m->sadb_msg_reserved2);
 
 	return;
 }

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: policy_parse.y,v 1.4 1999/11/08 13:39:11 itojun Exp $ */
+/* KAME $Id: policy_parse.y,v 1.5 1999/12/02 05:23:56 sakane Exp $ */
 
 /*
  * IN/OUT bound policy configuration take place such below:
@@ -82,8 +82,8 @@ static void policy_parse_request_init __P((void));
 static caddr_t policy_parse __P((char *msg, int msglen));
 
 extern void __policy__strbuffer__init__ __P((char *msg));
-extern int yyparse();
-extern int yylex();
+extern int yyparse __P((void));
+extern int yylex __P((void));
 
 %}
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* KAME $Id: setkey.c,v 1.7 1999/11/16 11:19:58 sakane Exp $ */
+/* KAME $Id: setkey.c,v 1.8 1999/12/02 05:23:59 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -102,7 +102,7 @@ main(ac, av)
 	char **av;
 {
 	FILE *fp = stdin;
-	int c, error;
+	int c;
 
 	pname = *av;
 

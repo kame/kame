@@ -262,7 +262,6 @@ any		{ PREPROC; return(ANY); }
 		}
 
 {blcl}any{elcl}	{
-			char *p = yytext;
 			PREPROC;
 			return(PORTANY);
 		}

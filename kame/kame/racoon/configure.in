@@ -308,9 +308,9 @@ fi
 AC_MSG_CHECKING(getaddrinfo bug)
 AC_TRY_RUN([
 #include <sys/types.h>
+#include <sys/socket.h>
 #include <netdb.h>
 #include <string.h>
-#include <sys/socket.h>
 #include <netinet/in.h>
 
 main()

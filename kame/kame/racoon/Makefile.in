@@ -1,4 +1,4 @@
-# YIPS $Id: Makefile.in,v 1.4 1999/10/21 12:57:09 sakane Exp $
+# YIPS $Id: Makefile.in,v 1.5 1999/12/02 05:24:01 sakane Exp $
 
 @SET_MAKE@
 srcdir=	@srcdir@
@@ -21,8 +21,9 @@ PROG=	racoon kmpstat eaytest
 #PROG+=	pfkey
 OBJS=	handler.o isakmp.o isakmp_inf.o ipsec_doi.o pfkey.o main.o \
 	post_com.o schedule.o session.o crypto.o cfparse.o cftoken.o \
-	admin.o misc.o vmbuf.o signing.o \
+	admin.o misc.o vmbuf.o \
 	@LIBOBJS@
+#OBJS+=	signing.o
 
 all: $(PROG)
 
