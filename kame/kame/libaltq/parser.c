@@ -1,4 +1,4 @@
-/*	$KAME: parser.c,v 1.7 2001/08/06 06:55:48 itojun Exp $	*/
+/*	$KAME: parser.c,v 1.8 2001/08/06 06:57:40 itojun Exp $	*/
 /*******************************************************************
 
   Copyright (c) 1996 by the University of Southern California
@@ -486,7 +486,7 @@ get_addr(char **cpp, struct in_addr *addr, struct in_addr *mask)
 		if (!next_word(&ocp, w))
 			return (0);
 		
-		if (inet_aton((char *)w, (struct in_addr *)&tmp) == 0)
+		if (inet_aton((char *)w, (struct in_addr *)&tmp) != 1)
 			return (0);
 
 		mask->s_addr = tmp.s_addr;
@@ -969,7 +969,7 @@ get_ip6addr(char **cpp, struct in6_addr *addr, struct in6_addr *mask)
 		*prefix++ = '\0';
 	}
 
-	if (inet_pton(AF_INET6, w, addr) <= 0)
+	if (inet_pton(AF_INET6, w, addr) != 1)
 		return (0);
 
 	if (IN6_IS_ADDR_UNSPECIFIED(addr) && prefix == NULL)
