@@ -4,7 +4,6 @@
 
 .include "../mk/bsd.prefs.mk"
 
-    SUBDIR += altq
     SUBDIR += bind8
     SUBDIR += ethereal
     SUBDIR += gated-ipv6

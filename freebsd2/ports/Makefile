@@ -1,8 +1,7 @@
-# $Id: Makefile,v 1.11 1999/12/27 07:30:07 itojun Exp $
+# $Id: Makefile,v 1.12 2000/01/19 11:22:02 kjc Exp $
 #
 
 #SUBDIR+=	XFree86
-SUBDIR+=	altq
 SUBDIR+=	apache13
 SUBDIR+=	bind8
 SUBDIR+=	ct
