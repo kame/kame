@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1675 2001/05/17 13:56:36 jinmei Exp $
+$KAME: CHANGELOG,v 1.1676 2001/05/18 05:55:06 sakane Exp $
 
 <200105>
+Fri May 18 14:50:56 JST 2001 sakane@ydc.co.jp
+	* kame/setkey:
+	Enabled to get a protocol number from /etc/protocol as upper layer
+	protocol.  "icmp6" and "ip4" still can be used.
+
 2001-05-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/frag6.c (frag6_input): plugged memory leak in
 	overlapping fragments cases.
