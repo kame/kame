@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.121 2004/04/09 09:46:26 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.122 2004/04/10 08:10:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -532,7 +532,9 @@ udp6_ctlinput(cmd, sa, d)
 			 * payload.
 			 */
 			if (in6_pcblookup_connect(&udb6, &sa6->sin6_addr,
-			    uh.uh_dport, &sa6_src->sin6_addr, uh.uh_sport, 0))
+			    uh.uh_dport,
+			    (struct in6_addr *)&sa6_src->sin6_addr,
+			    uh.uh_sport, 0))
 				valid++;
 #if 0
 			/*
