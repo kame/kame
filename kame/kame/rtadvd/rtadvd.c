@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.64 2002/05/22 07:56:18 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.65 2002/05/22 07:59:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -778,7 +778,7 @@ rs_input(int len, struct nd_router_solicit *rs,
 	memset(&ndopts, 0, sizeof(ndopts));
 	if (nd6_options((struct nd_opt_hdr *)(rs + 1),
 			len - sizeof(struct nd_router_solicit),
-			 &ndopts, NDOPT_FLAG_SRCLINKADDR)) {
+			&ndopts, NDOPT_FLAG_SRCLINKADDR)) {
 		syslog(LOG_DEBUG,
 		       "<%s> ND option check failed for an RS from %s on %s",
 		       __FUNCTION__,
