@@ -223,7 +223,6 @@ icmp_input(m, va_alist)
 	va_dcl
 #endif
 {
-	int proto;
 	register struct icmp *icp;
 	register struct ip *ip = mtod(m, struct ip *);
 	int icmplen = ip->ip_len;
@@ -237,7 +236,6 @@ icmp_input(m, va_alist)
 
 	va_start(ap, m);
 	hlen = va_arg(ap, int);
-	proto = va_arg(ap, int);
 	va_end(ap);
 
 	/*
@@ -529,7 +527,7 @@ reflect:
 	}
 
 raw:
-	rip_input(m, hlen, proto);
+	rip_input(m);
 	return;
 
 freeit:
