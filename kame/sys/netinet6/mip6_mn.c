@@ -33,7 +33,7 @@
  *
  * Author: Conny Larsson <conny.larsson@era.ericsson.se>
  *
- * $Id: mip6_mn.c,v 1.4 2000/02/09 13:48:42 itojun Exp $
+ * $Id: mip6_mn.c,v 1.5 2000/02/10 03:24:18 itojun Exp $
  *
  */
 
@@ -446,8 +446,12 @@ int          off;   /* Offset from start of mbuf to start of dest option */
     struct in6_addr  *from_src;   /* Source address in received packet */
     struct gif_softc *gif_ifp;    /* Tunnel interface */
     struct in6_addr   bind_addr;  /* Binding addr in BU causing this BA */
-    u_int8_t          var, hr_flag;
-    int               error, ii, offset;
+    u_int8_t          hr_flag;
+    int               error;
+#ifdef MIP6_DEBUG
+    u_int8_t          var;
+    int               ii, offset;
+#endif
 
     /* Make sure that the BA contains a valid AH or ESP header. */
 #ifdef IPSEC
@@ -506,6 +510,8 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 
         mip6_debug("Sub-options present (TLV coded)\n");
         for (ii = IP6OPT_BALEN; ii < mip6_indatap->ba_opt->len; ii++) {
+	    if (m->m_len < offset + 2 + ii + 1)
+		break;
             if ((ii - IP6OPT_BALEN) % 16 == 0)
                 mip6_debug("\t0x:");
             if ((ii - IP6OPT_BALEN) % 4 == 0)
@@ -633,10 +639,12 @@ int          off;   /* Offset from start of mbuf to start of dest option */
     struct mip6_bul        *bul_entry_ha;  /* HA entry in the BU list */
     struct mip6_subbuf     *subbuf = NULL; /* Sub-options for an option */
     struct mip6_subopt_coa  altcoa;        /* Alternate care-of address */
-    u_int8_t  var;
-    int       ii, offset;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
     long time_second = time.tv_sec;
+#endif
+#ifdef MIP6_DEBUG
+    u_int8_t  var;
+    int       ii, offset;
 #endif
 
     /* Make sure that the BA contains a valid AH or ESP header. */
@@ -657,6 +665,8 @@ int          off;   /* Offset from start of mbuf to start of dest option */
 
         mip6_debug("Sub-options present (TLV coded)\n");
         for (ii = IP6OPT_BRLEN; ii < mip6_indatap->br_opt->len; ii++) {
+	    if (m->m_len < offset + 2 + ii + 1)
+		break;
             if ((ii - IP6OPT_BRLEN) % 16 == 0)
                 mip6_debug("\t0x:");
             if ((ii - IP6OPT_BRLEN) % 4 == 0)
@@ -1016,7 +1026,6 @@ int           off;  /* Offset from start of mbuf to start of RA */
 }
 
 
-
 /*
  ******************************************************************************
  * Function:    mip6_check_packet
@@ -1041,8 +1050,9 @@ mip6_check_packet(m)
 struct mbuf *m;  /* Mbuf containing the entire IPv6 packet */
 {
     struct ip6_hdr  *ip6;     /* IPv6 header */
-    struct ip6_ext  *eh;      /* Extension Header prototype */
-    u_int8_t        *opt;
+    struct ip6_ext  eh;      /* Extension Header prototype */
+    struct ip6_opt  opt;
+    int		    len;
     int             offset;   /* Offset from start of IPv6 header */
     int             ii, nxt, res = 0;
 
@@ -1054,56 +1064,60 @@ struct mbuf *m;  /* Mbuf containing the entire IPv6 packet */
        Routing Header or a Destination Header including a Home Address
        option. If something found, exit the function.
        We assume that the DH is the last extension header. */
-    printf("mip6_check_packet: Entered function\n");
-    for (;;) {
-        if (nxt == IPPROTO_ROUTING) {
+    /*
+     * can't modify the mbuf chain here.  always m_copydata, not mtod.
+     */
+    while (m->m_pkthdr.len >= offset + sizeof(struct ip6_ext)) {
+	m_copydata(m, offset, sizeof(eh), (caddr_t)&eh);
+	if (nxt == IPPROTO_AH)
+            len = (eh.ip6e_len + 2) << 2;
+	else
+            len = (eh.ip6e_len + 1) << 3;
+
+	switch (nxt) {
+	case IPPROTO_ROUTING:
             if (!(mip6_indatap->flag & MIP6_IN_TUN_DH))
                 mip6_indatap->flag |= MIP6_IN_TUN_RH;
-            eh = (struct ip6_ext *)(mtod(m, caddr_t) + offset);
-            nxt = eh->ip6e_nxt;
-            offset += (eh->ip6e_len + 1) << 3;
-            printf("IPPROTO_ROUTING\n");
-            continue;
-        }
+	    break;
 
-        if (nxt == IPPROTO_DSTOPTS) {
-            eh = (struct ip6_ext *)(mtod(m, caddr_t) + offset);
-            nxt = eh->ip6e_nxt;
-            ii = offset + 2;
-            offset += (eh->ip6e_len + 1) << 3;
-            printf("IPPROTO_DSTOPTS\n");
+	case IPPROTO_DSTOPTS:
+            ii = sizeof(struct ip6_dest);
 
             /* Scan through all option and see if a Home Adddress option
                is included. */
-            opt = (u_int8_t *)(mtod(m, caddr_t) + ii);
-            while (ii < offset) {
-                if (*opt == IP6OPT_PAD1) {
-                    ii += 1;
-                    opt += 1;
+            while (ii < len && m->m_pkthdr.len >= offset + ii) {
+		m_copydata(m, offset + ii, sizeof(opt.ip6o_type),
+		    (caddr_t)&opt.ip6o_type);
+                if (opt.ip6o_type == IP6OPT_PAD1) {
+                    ii++;
                     continue;
                 }
-                if (*opt == IP6OPT_HOME_ADDRESS) {
+
+		m_copydata(m, offset + ii, sizeof(opt), (caddr_t)&opt);
+                if (opt.ip6o_type == IP6OPT_HOME_ADDRESS) {
                     mip6_indatap->flag |= ~MIP6_IN_TUN_RH;
                     mip6_indatap->flag |= MIP6_IN_TUN_DH;
                     break;
                 }
 
-                ii += *(opt + 1) + 2;
-                opt += *(opt + 1) + 2;
+                ii += opt.ip6o_len + sizeof(opt);
             }
-            continue;
+            break;
+
+        case IPPROTO_HOPOPTS:
+	case IPPROTO_FRAGMENT:
+	case IPPROTO_AH:
+	    break;
+
+	default:
+	    goto breakbreak;
         }
 
-        if ((nxt == IPPROTO_HOPOPTS) || (nxt == IPPROTO_FRAGMENT) ||
-            (nxt == IPPROTO_ESP) || (nxt == IPPROTO_AH)) {
-            eh = (struct ip6_ext *)(mtod(m, caddr_t) + offset);
-            nxt = eh->ip6e_nxt;
-            offset += (eh->ip6e_len + 1) << 3;
-            printf("IPPROTO_HOPOPTS IPPROTO_FRAGMENT\n");
-            continue;
-        }
-        break;
+	nxt = eh.ip6e_nxt;
+	offset += len;
     }
+
+breakbreak:
     printf("%s: End of scan loop\n", __FUNCTION__);
 
     /* No RH or DH with Home Address option present. Send a BU to the node
@@ -1264,10 +1278,13 @@ struct mip6_subbuf   *subbuf;
     struct mip6_opt_bu  *bu_opt;     /* Binding Update option */
     struct mip6_subbuf  *bu_subopt;  /* Binding Update sub-options */
     struct mip6_esm     *esp;        /* Home address entry */
-    int                  error, ii;
-    u_int8_t             var;
+    int			error;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
     long time_second = time.tv_sec;
+#endif
+#ifdef MIP6_DEBUG
+    int                  ii;
+    u_int8_t             var;
 #endif
 
     /* Make sure that it's allowed to send a BU */
