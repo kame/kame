@@ -1,4 +1,4 @@
-/*	$KAME: mip6control.c,v 1.39 2002/11/05 03:04:19 k-sugyou Exp $	*/
+/*	$KAME: mip6control.c,v 1.40 2002/12/11 11:56:59 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -65,16 +65,16 @@
 
 #define IOC_ENTRY_COUNT 100 /* XXX */
 
-static int getaddress __P((char *, struct sockaddr_in6 *));
-static const char *ip6_sprintf __P((const struct in6_addr *));
-static const char *raflg_sprintf __P((u_int8_t));
-static const char *buflg_sprintf __P((u_int8_t));
-static const char *bufpsmstate_sprintf __P((u_int8_t));
-static const char *bufssmstate_sprintf __P((u_int8_t));
-static const char *bustate_sprintf __P((u_int8_t));
-static const char *bcflg_sprintf __P((u_int8_t));
-static struct hif_softc *get_hif_softc __P((char *));
-static void kread __P((u_long, void *, int));
+static int getaddress(char *, struct sockaddr_in6 *);
+static const char *ip6_sprintf(const struct sockaddr_in6 *);
+static const char *raflg_sprintf(u_int8_t);
+static const char *buflg_sprintf(u_int8_t);
+static const char *bufpsmstate_sprintf(u_int8_t);
+static const char *bufssmstate_sprintf(u_int8_t);
+static const char *bustate_sprintf(u_int8_t);
+static const char *bcflg_sprintf(u_int8_t);
+static struct hif_softc *get_hif_softc(char *);
+static void kread(u_long, void *, int);
 static int parse_address_port(char *, struct in6_addr *, uint16_t *);
 
 static const char *pfx_desc[] = {
@@ -431,7 +431,7 @@ main(argc, argv)
 				KREAD(mspfx->mspfx_mpfx, &mip6_prefix, mip6_prefix);
 				mpfx = &mip6_prefix;
 				printf(ipaddr_fmt[longdisp],
-				       ip6_sprintf(&mpfx->mpfx_prefix.sin6_addr));
+				       ip6_sprintf(&mpfx->mpfx_prefix));
 				printf("%7u %7u %7ld %7u %7ld ",
 				       mpfx->mpfx_prefixlen,
 				       mpfx->mpfx_vltime,
@@ -439,7 +439,7 @@ main(argc, argv)
 				       mpfx->mpfx_pltime,
 				       mpfx->mpfx_plexpire - time.tv_sec);
 				printf(ipaddr_fmt[longdisp],
-				       ip6_sprintf(&mpfx->mpfx_haddr.sin6_addr));
+				       ip6_sprintf(&mpfx->mpfx_haddr));
 				printf("\n");
 			}
 		}
@@ -510,9 +510,9 @@ main(argc, argv)
 					KREAD(msha->msha_mha, &mip6_ha, mip6_ha);
 					mha = &mip6_ha;
 					printf(ipaddr_fmt[longdisp],
-					       ip6_sprintf(&mha->mha_lladdr.sin6_addr));
+					       ip6_sprintf(&mha->mha_lladdr));
 					printf(ipaddr_fmt[longdisp],
-					       ip6_sprintf(&mha->mha_gaddr.sin6_addr));
+					       ip6_sprintf(&mha->mha_gaddr));
 					printf("%-7s %7d %7d %7ld\n",
 					       raflg_sprintf(mha->mha_flags),
 					       mha->mha_pref,
@@ -538,11 +538,11 @@ main(argc, argv)
 			KREAD(mbu, &mip6_bu, mip6_bu);
 			mbu = &mip6_bu;
 			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mbu->mbu_paddr.sin6_addr));
+			       ip6_sprintf(&mbu->mbu_paddr));
 			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mbu->mbu_haddr.sin6_addr));
+			       ip6_sprintf(&mbu->mbu_haddr));
 			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mbu->mbu_coa.sin6_addr));
+			       ip6_sprintf(&mbu->mbu_coa));
 			printf("%7u %7ld %7u %7ld %7u %-7s %-7s %-7s %-7s\n",
 			       mbu->mbu_lifetime,
 			       mbu->mbu_expire - time.tv_sec,
@@ -576,11 +576,11 @@ main(argc, argv)
 			KREAD(mbc, &mip6_bc, mip6_bc);
 			mbc = &mip6_bc;
 			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mbc->mbc_phaddr.sin6_addr));
+			       ip6_sprintf(&mbc->mbc_phaddr));
 			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mbc->mbc_pcoa.sin6_addr));
+			       ip6_sprintf(&mbc->mbc_pcoa));
 			printf(ipaddr_fmt[longdisp],
-			       ip6_sprintf(&mbc->mbc_addr.sin6_addr));
+			       ip6_sprintf(&mbc->mbc_addr));
 			printf(
 #ifdef MIP6_DRAFT13
 			       "%-7s %7u %7u %7u %7ld %-7s\n",
@@ -635,9 +635,14 @@ main(argc, argv)
 		for (uh = LIST_FIRST(&mip6_unuse_hoa_list);
 		     uh;
 		     uh = LIST_NEXT(uh, unuse_entry)) {
+			struct sockaddr_in6 xxx;
 			KREAD(uh, &mip6_unuse_hoa, mip6_unuse_hoa);
 			uh = &mip6_unuse_hoa;
-			printf("%s", ip6_sprintf(&uh->unuse_addr));
+			bzero(&xxx, sizeof(xxx));
+			xxx.sin6_len = sizeof(xxx);
+			xxx.sin6_family = AF_INET6;
+			xxx.sin6_addr = uh->unuse_addr;
+			printf("%s", ip6_sprintf(&xxx));
 			if (uh->unuse_port)
 				printf("#%d", ntohs(uh->unuse_port));
 			printf("\n");
@@ -765,17 +770,29 @@ getaddress(char *address, struct sockaddr_in6 *sin6)
 
 static int ip6round = 0;
 const char *
-ip6_sprintf(addr)
-	const struct in6_addr *addr;
+ip6_sprintf(sa_addr)
+	const struct sockaddr_in6 *sa_addr;
 {
 	static char ip6buf[8][NI_MAXHOST];
-	static struct sockaddr_in6 sin6 = { sizeof(struct sockaddr_in6),
-					    AF_INET6 };
+	struct sockaddr_in6 sin6;
 	int flags = 0;
 
 	if (numerichost)
 		flags |= NI_NUMERICHOST;
-	sin6.sin6_addr = *addr;
+
+	bcopy(sa_addr, &sin6, sizeof(sin6));
+
+	/*
+	 * XXX: This is a special workaround for KAME kernels.
+	 * sin6_scope_id field of SA should be set in the future.
+	 */
+	if (IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr) ||
+	    IN6_IS_ADDR_MC_LINKLOCAL(&sin6.sin6_addr) ||
+	    IN6_IS_ADDR_MC_NODELOCAL(&sin6.sin6_addr)) {
+		/* XXX: override is ok? */
+		sin6.sin6_scope_id = (u_int32_t)ntohs(*(u_short *)&sin6.sin6_addr.s6_addr[2]);
+		*(u_short *)&sin6.sin6_addr.s6_addr[2] = 0;
+	}
 
 	ip6round = (ip6round + 1) & 7;
 
