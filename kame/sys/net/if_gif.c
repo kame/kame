@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.86 2001/10/02 08:56:43 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.87 2001/10/19 08:50:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -130,8 +130,6 @@ struct if_clone gif_cloner =
     IF_CLONE_INITIALIZER("gif", gif_clone_create, gif_clone_destroy);
 
 static int gifmodevent __P((module_t, int, void *));
-extern struct protosw in_gif_protosw;
-extern struct protosw in6_gif_protosw;
 #elif defined(__FreeBSD__) && __FreeBSD__ < 4
 void gifattach __P((void *));
 #else
