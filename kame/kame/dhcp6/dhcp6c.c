@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.60 2002/04/30 14:49:08 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.61 2002/05/01 04:13:53 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -157,7 +157,10 @@ main(argc, argv)
 
 	ifinit(device);
 
-	cfparse(DHCP6C_CONF);
+	if ((cfparse(DHCP6C_CONF)) != 0) {
+		dprintf(LOG_ERR, "failed to parse configuration file");
+		exit(1);
+	}
 
 	client6_init();
 
