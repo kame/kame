@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.193 2001/07/15 04:24:58 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.194 2001/07/15 05:19:20 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -976,6 +976,11 @@ in6_update_ifa(ifp, ifra, ia)
 	 */
 	if (ia == NULL) {
 		hostIsNew = 1;
+		/*
+		 * When in6_update_ifa() is called in a process of a received
+		 * RA, it is called under splnet().  So, we should call malloc
+		 * with M_NOWAIT.
+		 */
 		ia = (struct in6_ifaddr *)
 			malloc(sizeof(*ia), M_IFADDR, M_NOWAIT);
 		if (ia == NULL)
