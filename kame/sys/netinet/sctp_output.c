@@ -1,4 +1,4 @@
-/*	$KAME: sctp_output.c,v 1.37 2004/01/26 03:42:37 itojun Exp $	*/
+/*	$KAME: sctp_output.c,v 1.38 2004/02/11 21:06:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002, 2003 Cisco Systems Inc,
@@ -2076,14 +2076,8 @@ sctp_lowlevel_chunk_output(struct sctp_inpcb *inp,
 		sin6 = &tmp;
 
 		/* KAME hack: embed scopeid */
-#ifdef SCTP_BASE_FREEBSD
-		if (in6_embedscope(&sin6->sin6_addr, sin6, 
-				   (struct in6pcb *)inp, NULL) != 0)
+		if (in6_embedscope(&sin6->sin6_addr, sin6) != 0)
 			return (EINVAL);
-#else
-		if ((error = scope6_check_id(sin6, ip6_use_defzone)) != 0)
-			return (error);
-#endif /* SCTP_BASE_FREEBSD */
 		if (tcb != NULL) {
 			if ((tcb->asoc.ecn_allowed) && ecn_ok) {
 				/* Enable ECN */
@@ -2192,15 +2186,6 @@ sctp_lowlevel_chunk_output(struct sctp_inpcb *inp,
 		    (sin6->sin6_scope_id == 0)) {
 			sin6->sin6_scope_id = ntohs(sin6->sin6_addr.s6_addr16[1]);
 		}
-#ifdef SCTP_BASE_FREEBSD
-		/* nothing needed here... */
-#else
-		/* attach the full sockaddr_in6 addresses to the packet */
-		if (!ip6_setpktaddrs(m, lsa6, sin6)) {
-			m_freem(m);
-			return (ENOBUFS);
-		}
-#endif /* SCTP_BASE_FREEBSD */
 
 #ifdef SCTP_DEBUG
 		if (sctp_debug_on & SCTP_DEBUG_OUTPUT3) {
@@ -3147,7 +3132,7 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 			sin6->sin6_addr = ip6->ip6_src;
 			/* lookup address */
 			memcpy((caddr_t)stc.address, (caddr_t)&sin6->sin6_addr,
-			       sizeof(struct in6_addr));
+			    sizeof(struct in6_addr));
 			sin6->sin6_scope_id = 0;
 			stc.addr_type = SCTP_IPV6_ADDRESS;
 			stc.scope_id = 0;
@@ -3169,9 +3154,6 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 				stc.site_scope = 1;
 				stc.ipv4_scope = 1;
 			} else if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)) {
-#ifndef SCTP_BASE_FREEBSD
-				struct sockaddr_in6 src;
-#endif
 				/*
 				 * If the new destination is a LINK_LOCAL 
 				 * we must have common both site and local
@@ -3184,23 +3166,9 @@ sctp_send_initiate_ack(struct sctp_inpcb *inp,
 				stc.site_scope = 1;
 
 				/* pull out the scope_id from incoming pkt */
-#ifdef SCTP_BASE_FREEBSD
-				sin6->sin6_scope_id = stc.scope_id =
-				    in6_addr2scopeid(in_initpkt->m_pkthdr.rcvif,
-				    &ip6->ip6_dst);
-#else
-				if (ip6_getpktaddrs(in_initpkt, &src, NULL)) {
-					/* this is bad- can't get the scope! */
-#ifdef SCTP_DEBUG
-					if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
-						printf("send_initiate_ack: can't get scope of link-local addr\n");
-					}
-#endif /* SCTP_DEBUG */
-					return;	/* FIX: ??? send op_err? */
-				}
-				sin6->sin6_scope_id = src.sin6_scope_id;
-				stc.scope_id = src.sin6_scope_id;
-#endif /* SCTP_BASE_FREEBSD */
+				(void)in6_recoverscope(sin6, &ip6->ip6_dst,
+				    m->m_pkthdr.rcvif);
+				stc.scope_id = sin6->sin6_scope_id;
 			} else if (IN6_IS_ADDR_SITELOCAL(&sin6->sin6_addr)) {
 				/*
 				 * If the new destination is SITE_LOCAL
@@ -7634,9 +7602,6 @@ sctp_send_shutdown_complete2_v6(struct mbuf *m,
 	struct mbuf *mout;
 	struct sctp_shutdown_complete_msg *comp_cp;
 	struct ip6_hdr *iph6;
-#ifndef SCTP_BASE_FREEBSD
-	struct sockaddr_in6 lsa6, fsa6;
-#endif
 #ifdef NEW_STRUCT_ROUTE
 	struct route ro;
 #else
@@ -7679,53 +7644,6 @@ sctp_send_shutdown_complete2_v6(struct mbuf *m,
 	iph6->ip6_plen = htons(mout->m_pkthdr.len);
 	/* zap the rcvif, it should be null */
 	mout->m_pkthdr.rcvif = 0;
-
-#ifdef SCTP_BASE_FREEBSD
-	/* nothing needed... we swapped src and dest addrs above */
-#else
-	/* attach the full sockaddr_in6 addresses to the packet. */
-	bzero(&lsa6, sizeof(lsa6));
-	lsa6.sin6_family = AF_INET6;
-	lsa6.sin6_len = sizeof(lsa6);
-	lsa6.sin6_addr = oip->ip6_dst;
-
-	bzero(&fsa6, sizeof(fsa6));
-	fsa6.sin6_family = AF_INET6;
-	fsa6.sin6_len = sizeof(fsa6);
-	fsa6.sin6_addr = oip->ip6_src;
-
-	if (IN6_IS_ADDR_LINKLOCAL(&oip->ip6_src)) {
-		struct sockaddr_in6 src, dst;
-
-		/* pull out the scope_id from the incoming packet */
-		if (ip6_getpktaddrs(m, &src, &dst)) {
-			/* hmm... this is bad- can't get the scope! */
-#ifdef SCTP_DEBUG
-			if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
-				printf("send_abort: can't get scope of link-local addr\n");
-			}
-#endif /* SCTP_DEBUG */
-			return (0);	/* FIX: ??? send op_err? */
-		}
-		lsa6.sin6_scope_id = dst.sin6_scope_id;
-		fsa6.sin6_scope_id = src.sin6_scope_id;
-	}
-
-	/* make sure scope is embedded */
-	if (scope6_check_id(&lsa6, ip6_use_defzone) != 0) {
-		m_freem(mout);
-		return (0);
-	}
-	if (scope6_check_id(&fsa6, ip6_use_defzone) != 0) {
-		m_freem(mout);
-		return (0);
-	}
-
-	if (!ip6_setpktaddrs(mout, &lsa6, &fsa6)) {
-		m_freem(mout);
-		return (0);
-	}
-#endif /* SCTP_BASE_FREEBSD */
 
 	/* zap the stack pointer to the route */
 	bzero(&ro, sizeof ro);
@@ -8554,7 +8472,9 @@ sctp6_send_abort(struct mbuf *m,
 	struct mbuf *mout;
 	struct sctp_abort_msg *abm;
 	struct ip6_hdr *iph6;
+#ifdef SCTP_DEBUG
 	struct sockaddr_in6 lsa6, fsa6;
+#endif
 #ifdef NEW_STRUCT_ROUTE
 	struct route ro;
 #else
@@ -8633,52 +8553,6 @@ sctp6_send_abort(struct mbuf *m,
 	/* zap the rcvif, it should be null */
 	mout->m_pkthdr.rcvif = 0;
 
-#ifdef SCTP_BASE_FREEBSD
-	/* nothing needed?... we swapped src and dest addrs above */
-#else
-	/* attach the full sockaddr_in6 addresses to the packet. */
-	bzero(&lsa6, sizeof(lsa6));
-	lsa6.sin6_family = AF_INET6;
-	lsa6.sin6_len = sizeof(lsa6);
-	lsa6.sin6_addr = oip->ip6_dst;
-
-	bzero(&fsa6, sizeof(fsa6));
-	fsa6.sin6_family = AF_INET6;
-	fsa6.sin6_len = sizeof(fsa6);
-	fsa6.sin6_addr = oip->ip6_src;
-
-	if (IN6_IS_ADDR_LINKLOCAL(&oip->ip6_src)) {
-		struct sockaddr_in6 src, dst;
-
-		/* pull out the scope_id from the incoming packet */
-		if (ip6_getpktaddrs(m, &src, &dst)) {
-			/* hmm... this is bad- can't get the scope! */
-#ifdef SCTP_DEBUG
-			if (sctp_debug_on & SCTP_DEBUG_OUTPUT1) {
-				printf("send_abort: can't get scope of link-local addr\n");
-			}
-#endif /* SCTP_DEBUG */
-			return;	/* FIX: ??? send op_err? */
-		}
-		lsa6.sin6_scope_id = dst.sin6_scope_id;
-		fsa6.sin6_scope_id = src.sin6_scope_id;
-	}
-
-	/* make sure scope is embedded */
-	if (scope6_check_id(&lsa6, ip6_use_defzone) != 0) {
-		m_freem(mout);
-		return;
-	}
-	if (scope6_check_id(&fsa6, ip6_use_defzone) != 0) {
-		m_freem(mout);
-		return;
-	}
-
-	if (!ip6_setpktaddrs(mout, &lsa6, &fsa6)) {
-		m_freem(mout);
-		return;
-	}
-#endif /* SCTP_BASE_FREEBSD */
 #ifdef SCTP_DEBUG
 	if (sctp_debug_on & SCTP_DEBUG_OUTPUT2) {
 		printf("sctp_abort calling ipv6 output:\n");
