@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.80 2000/06/08 16:02:13 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.81 2000/06/12 09:35:06 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -611,6 +611,7 @@ ipsecdoi_selectph2proposal(iph2)
 		return -1;
 
 	/* make a SA to be replayed. */
+	/* SPI must be updated later. */
 	iph2->sa_ret = get_sabyproppair(ret, iph2->ph1);
 	free_proppair0(ret);
 	if (iph2->sa_ret == NULL)
@@ -1224,6 +1225,7 @@ get_transform(prop, pair, num_p)
 
 /*
  * make a new SA payload from prop_pair.
+ * NOTE: this function make spi value clear.
  */
 static vchar_t *
 get_sabyproppair(pair, iph1)
@@ -1275,6 +1277,7 @@ get_sabyproppair(pair, iph1)
 		((struct isakmp_pl_p *)bp)->h.len = htons(prophlen + trnslen);
 		((struct isakmp_pl_p *)bp)->num_t = 1;
 		np_p = &((struct isakmp_pl_p *)bp)->h.np;
+		memset(bp + sizeof(struct isakmp_pl_p), 0, p->prop->spi_size);
 		bp += prophlen;
 
 		/* create transform */
@@ -1285,6 +1288,53 @@ get_sabyproppair(pair, iph1)
 	}
 
 	return newsa;
+}
+
+/*
+ * update responder's spi
+ */
+int
+ipsecdoi_updatespi(iph2)
+	struct ph2handle *iph2;
+{
+	struct prop_pair **pair, *p;
+	struct saprop *pp;
+	struct saproto *pr;
+	int i;
+	int error = -1;
+
+	pair = get_proppair(iph2->sa_ret, IPSECDOI_TYPE_PH2);
+	if (pair == NULL)
+		return -1;
+	for (i = 0; i < MAXPROPPAIRLEN; i++) {
+		if (pair[i])
+			break;
+	}
+	if (i == MAXPROPPAIRLEN || pair[i]->tnext) {
+		/* multiple transform must be filtered by selectph2proposal.*/
+		goto end;
+	}
+
+	pp = iph2->approval;
+
+	/* create proposal payloads */
+	for (p = pair[i], pr = pp->head;
+	     p && pr;
+	     p = p->next, pr = pr->next) {
+
+		/* validity check */
+		if (p->prop->proto_id != pr->proto_id
+		 || p->trns->t_id != pr->head->trns_id)
+			goto end;
+
+		memcpy((caddr_t)p->prop + sizeof(*p->prop), &pr->spi,
+			pr->spisize);
+	}
+
+	error = 0;
+end:
+	free_proppair(pair);
+	return error;
 }
 
 /*

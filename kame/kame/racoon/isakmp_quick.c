@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.39 2000/06/08 16:02:13 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.40 2000/06/12 09:35:06 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1136,6 +1136,12 @@ quick_r2send(iph2, msg)
 	if (iph2->status != PHASE2ST_GETSPIDONE) {
 		plog(logp, LOCATION, NULL,
 			"status mismatched %d.\n", iph2->status);
+		goto end;
+	}
+
+	/* update responders SPI */
+	if (ipsecdoi_updatespi(iph2) < 0) {
+		plog(logp, LOCATION, NULL, "failed to update spi.\n");
 		goto end;
 	}
 
