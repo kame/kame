@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.806 2000/04/24 12:40:02 sakane Exp $
+$Id: CHANGELOG,v 1.807 2000/04/24 13:14:02 itojun Exp $
 
 <200004>
+Mon Apr 24 22:13:09 JST 2000  itojun@iijlab.net
+	* libpcap/tcpdump pkgsrc (netbsd/freebsd2): upgrade to 4/24 snapshot.
+
 Mon Apr 24 21:39:23 JST 2000 sakane@kame.net
 	* kame/kame/racoon:
 	- enable to define some algorithm each algorithm class.
