@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.199 2003/02/12 09:27:22 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.200 2003/03/03 22:50:07 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2655,7 +2655,8 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa, coa_sa, cache_req, status)
 
 	*status = IP6MA_STATUS_ACCEPTED;
 	/* Nonce index & Auth. data mobility options are required */
-	if ((mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA)) == 0) {
+	if ((mopt->valid_options & (MOPT_NONCE_IDX | MOPT_AUTHDATA)) 
+	     != (MOPT_NONCE_IDX | MOPT_AUTHDATA)) {
 		mip6log((LOG_ERR,
 			 "%s:%d: Nonce or Authdata is missed. (%02x)\n",
 			 __FILE__, __LINE__, mopt->valid_options));
