@@ -17,6 +17,8 @@
 # NEVER override the "regular" targets unless you want to open
 # a major can of worms.
 
+BROKEN=	"kame/netbsd/pkgsrc is obsolete, use NetBSD pkgsrc"
+
 # Get the operating system type
 OPSYS!=	uname -s
 
