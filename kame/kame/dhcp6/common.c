@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.61 2002/06/11 06:07:39 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.62 2002/06/14 15:32:55 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1396,6 +1396,8 @@ dhcp6_stcodestr(code)
 		return "auth fail";
 	case DH6OPT_STCODE_ADDRUNAVAIL:
 		return "address unavailable";
+	case DH6OPT_STCODE_NOADDRAVAIL:
+		return "no addresses";
 	case DH6OPT_STCODE_NOBINDING:
 		return "no binding";
 	case DH6OPT_STCODE_CONFNOMATCH:
@@ -1404,9 +1406,9 @@ dhcp6_stcodestr(code)
 		return "not on-link";
 	case DH6OPT_STCODE_USEMULTICAST:
 		return "use multicast";
-	  default:
-		  sprintf(genstr, "code%d", code);
-		  return(genstr);
+	default:
+		sprintf(genstr, "code%d", code);
+		return(genstr);
 	}
 }
 

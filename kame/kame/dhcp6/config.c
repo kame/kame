@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.19 2002/05/29 14:50:07 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.20 2002/06/14 15:32:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -655,6 +655,7 @@ add_options(opcode, ifc, cfl0)
 {
 	struct dhcp6_listval *opt;
 	struct cf_list *cfl;
+	int opttype;
 
 	for (cfl = cfl0; cfl; cfl = cfl->next) {
 		if (opcode ==  DHCPOPTCODE_REQUEST) {
@@ -689,16 +690,31 @@ add_options(opcode, ifc, cfl0)
 		case DHCPOPT_PREFIX_DELEGATION:
 			switch(opcode) {
 			case DHCPOPTCODE_REQUEST:
-				if ((opt = malloc(sizeof(*opt))) == NULL) {
-					dprintf(LOG_ERR, "%s"
-						"memory allocation failed",
-						FNAME);
+				opttype = DH6OPT_PREFIX_DELEGATION;
+				if (dhcp6_add_listval(&ifc->reqopt_list,
+				    &opttype, DHCP6_LISTVAL_NUM) == NULL) {
+					dprintf(LOG_ERR, "%s" "failed to "
+					    "configure an option", FNAME);
 					return(-1);
 				}
-				memset(opt, 0, sizeof(*opt));
-				opt->val_num = DH6OPT_PREFIX_DELEGATION;
-				TAILQ_INSERT_TAIL(&ifc->reqopt_list, opt,
-						  link);
+				break;
+			default:
+				dprintf(LOG_ERR, "%s" "invalid operation (%d) "
+					"for option type (%d)",
+					FNAME, opcode, cfl->type);
+				break;
+			}
+			break;
+		case DHCPOPT_DNS:
+			switch(opcode) {
+			case DHCPOPTCODE_REQUEST:
+				opttype = DH6OPT_DNS;
+				if (dhcp6_add_listval(&ifc->reqopt_list,
+				    &opttype, DHCP6_LISTVAL_NUM) == NULL) {
+					dprintf(LOG_ERR, "%s" "failed to "
+					    "configure an option", FNAME);
+					return(-1);
+				}
 				break;
 			default:
 				dprintf(LOG_ERR, "%s" "invalid operation (%d) "

@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.13 2002/05/29 14:50:07 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.14 2002/06/14 15:32:55 jinmei Exp $	*/
 
 %{
 /*
@@ -155,7 +155,7 @@ ecl		\}
 <S_CNF>sla-len { DECHO; return(SLA_LEN); }
 
 	/* duration */
-<S_CNF>infinite { DECHO; return(INFINITE); }
+<S_CNF>infinity { DECHO; return(INFINITY); }
 
 	/* misc */
 {ws}		{ ; }

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.87 2002/05/24 09:09:46 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.88 2002/06/14 15:32:56 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -932,7 +932,7 @@ server6_react_rebind(ifp, dh6, optinfo, from, fromlen)
 	struct dhcp6_binding *binding;
 	int add_success = 0;
 
-	/* message validation according to Section 15.7 of dhcpv6-24 */
+	/* message validation according to Section 15.7 of dhcpv6-26 */
 
 	/* the message must include a Client Identifier option */
 	if (optinfo->clientID.duid_len == 0) {
@@ -940,9 +940,11 @@ server6_react_rebind(ifp, dh6, optinfo, from, fromlen)
 		return -1;
 	}
 
+	/* the message must not include a server Identifier option */
 	if (optinfo->serverID.duid_len) {
 		dprintf(LOG_INFO, "%s" "server ID option is included in "
-		    "a rebind message", FNAME);	/* just drop a note */
+		    "a rebind message", FNAME);
+		return -1;
 	}
 
 	/*

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.30 2002/05/22 14:16:46 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.31 2002/06/14 15:32:55 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -152,10 +152,11 @@ struct dhcp6 {
 #  define DH6OPT_STCODE_UNSPECFAIL 1
 #  define DH6OPT_STCODE_AUTHFAILED 2
 #  define DH6OPT_STCODE_ADDRUNAVAIL 3
-#  define DH6OPT_STCODE_NOBINDING 4
-#  define DH6OPT_STCODE_CONFNOMATCH 5
-#  define DH6OPT_STCODE_NOTONLINK 6
-#  define DH6OPT_STCODE_USEMULTICAST 7
+#  define DH6OPT_STCODE_NOADDRAVAIL 4
+#  define DH6OPT_STCODE_NOBINDING 5
+#  define DH6OPT_STCODE_CONFNOMATCH 6
+#  define DH6OPT_STCODE_NOTONLINK 7
+#  define DH6OPT_STCODE_USEMULTICAST 8
 #define DH6OPT_RAPID_COMMIT 14
 #define DH6OPT_USER_CLASS 15
 #define DH6OPT_VENDOR_CLASS 16
@@ -166,14 +167,14 @@ struct dhcp6 {
 /*
  * The option type has not been assigned for the following options.
  * We temporarily adopt values used in the service specification document
- * (20020510 version) by NTT Communications.
+ * (200206xx version) by NTT Communications.
  * Note that we'll change the following definitions if different type values
  * are officially assigned.
  */
-#define DH6OPT_DNS 20
-#define DH6OPT_PREFIX_DELEGATION 25
-#define DH6OPT_PREFIX_INFORMATION 26
-#define DH6OPT_PREFIX_REQUEST 27
+#define DH6OPT_DNS 25
+#define DH6OPT_PREFIX_DELEGATION 30
+#define DH6OPT_PREFIX_INFORMATION 31
+#define DH6OPT_PREFIX_REQUEST 32
 
 struct dhcp6opt {
 	u_int16_t dh6opt_type;

@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.88 2002/05/24 09:09:46 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.89 2002/06/14 15:32:56 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -315,6 +315,34 @@ client6_init()
 	/* make the socket write-only */
 	if (shutdown(outsock, 0)) {
 		dprintf(LOG_ERR, "%s" "shutdown(outbound, 0): %s",
+			FNAME, strerror(errno));
+		exit(1);
+	}
+	freeaddrinfo(res);
+
+	/*
+	 * bind the well-known incoming port to the outgoing socket
+	 * for interoperability with some servers.
+	 */
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = PF_INET6;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_protocol = IPPROTO_UDP;
+	hints.ai_flags = AI_PASSIVE;
+	error = getaddrinfo(NULL, DH6PORT_DOWNSTREAM, &hints, &res);
+	if (error) {
+		dprintf(LOG_ERR, "%s" "getaddrinfo: %s",
+			FNAME, gai_strerror(error));
+		exit(1);
+	}
+	if (setsockopt(outsock, SOL_SOCKET, SO_REUSEPORT,
+		       &on, sizeof(on)) < 0) {
+		dprintf(LOG_ERR, "%s" "setsockopt(inbound, SO_REUSEPORT): %s",
+			FNAME, strerror(errno));
+		exit(1);
+	}
+	if (bind(outsock, res->ai_addr, res->ai_addrlen) < 0) {
+		dprintf(LOG_ERR, "%s" "bind(inbonud): %s",
 			FNAME, strerror(errno));
 		exit(1);
 	}

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.14 2002/05/29 14:50:07 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.15 2002/06/14 15:32:55 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -85,7 +85,7 @@ static void cleanup_cflist __P((struct cf_list *));
 %token HOST HOSTNAME DUID
 %token OPTION RAPID_COMMIT PREFIX_DELEGATION DNS_SERVERS
 %token INFO_ONLY
-%token NUMBER SLASH EOS BCL ECL STRING PREFIX INFINITE
+%token NUMBER SLASH EOS BCL ECL STRING PREFIX INFINITY
 %token COMMA
 
 %union {
@@ -153,13 +153,11 @@ host_statement:
 option_statement:
 	OPTION DNS_SERVERS address_list EOS
 	{
-		if (cf_dns_list == NULL) {
-			$3->next = NULL;
-			$3->tail = $3;
+		if (cf_dns_list == NULL)
 			cf_dns_list = $3;
-		} else {
+		else {
 			cf_dns_list->tail->next = $3;
-			cf_dns_list->tail = $3;
+			cf_dns_list->tail = $3->next;
 		}
 	}
 	;
@@ -301,6 +299,14 @@ dhcpoption:
 			/* currently no value */
 			$$ = l;
 		}
+	|	DNS_SERVERS	
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, DHCPOPT_DNS, NULL, NULL);
+			/* currently no value */
+			$$ = l;
+		}
 	;
 
 ifparams:
@@ -370,7 +376,7 @@ prefixparam:
 	}
 
 duration:
-		INFINITE
+		INFINITY
 		{
 			$$ = -1;
 		}
