@@ -1,4 +1,4 @@
-/*	$KAME: altq_cbq.c,v 1.5 2000/07/25 10:12:29 kjc Exp $	*/
+/*	$KAME: altq_cbq.c,v 1.6 2000/08/07 07:09:34 kjc Exp $	*/
 
 /*
  * Copyright (c) Sun Microsystems, Inc. 1993-1998 All rights reserved.
@@ -29,7 +29,7 @@
  *  
  * These notices must be retained in any copies of any part of this software.
  *
- * $Id: altq_cbq.c,v 1.5 2000/07/25 10:12:29 kjc Exp $
+ * $Id: altq_cbq.c,v 1.6 2000/08/07 07:09:34 kjc Exp $
  */
 
 #if defined(__FreeBSD__) || defined(__NetBSD__)
@@ -92,9 +92,7 @@ static int	cbq_ifdetach __P((struct cbq_interface *));
 static int	cbq_enqueue __P((struct ifaltq *, struct mbuf *,
 				 struct altq_pktattr *));
 static struct mbuf 	*cbq_dequeue __P((struct ifaltq *, int));
-#if 0
 static void	cbqrestart __P((struct ifaltq *));
-#endif
 static void 	get_class_stats __P((class_stats_t *, struct rm_class *));
 static int 	cbq_getstats __P((struct cbq_getstats *));
 static void	cbq_purge(cbq_state_t *);
@@ -249,7 +247,7 @@ cbq_class_create(cbqp, acp, parent, borrow)
 	 */
 	if (chandle == ROOT_CLASS_HANDLE) {
 		rmc_init(cbqp->ifnp.ifq_, &cbqp->ifnp, spec->nano_sec_per_byte,
-			 NULL, spec->maxq, RM_MAXQUEUED,
+			 cbqrestart, spec->maxq, RM_MAXQUEUED,
 			 spec->maxidle, spec->minidle, spec->offtime,
 			 spec->flags);
 		cl = cbqp->ifnp.root_;
@@ -760,7 +758,6 @@ cbq_dequeue(ifq, op)
 	return (m);
 }
 
-#if 0
 /*
  * void
  * cbqrestart(queue_t *) - Restart sending of data.
@@ -788,8 +785,6 @@ cbqrestart(ifq)
 	    cbqp->cbq_qlen > 0 && (ifp->if_flags & IFF_OACTIVE) == 0)
 		(*ifp->if_start)(ifp);
 }
-
-#endif
 
 static void cbq_purge(cbqp)
 	cbq_state_t *cbqp;
