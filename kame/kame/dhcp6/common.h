@@ -1,4 +1,4 @@
-/*	$KAME: common.h,v 1.14 2002/04/24 14:31:32 jinmei Exp $	*/
+/*	$KAME: common.h,v 1.15 2002/05/01 06:00:00 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -51,6 +51,8 @@ extern void dprintf __P((int, const char *, ...));
 extern int get_duid __P((char *, struct duid *));
 extern int get_dhcp6_option __P((struct dhcp6opt *, struct dhcp6opt *,
 				 int, void *));
+extern char *dhcpoptstr __P((int));
+extern char *dhcpmsgstr __P((int));
 
 /* missing */
 #ifndef HAVE_STRLCAT

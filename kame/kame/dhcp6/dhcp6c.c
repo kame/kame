@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.64 2002/05/01 04:58:07 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.65 2002/05/01 06:00:00 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -589,7 +589,6 @@ client6_send(ifp, s)
 	struct dhcp6 *dh6;
 	struct dhcp6opt *opt;
 	ssize_t len;
-	char *typestr;
 
 	dh6 = (struct dhcp6 *)buf;
 	memset(dh6, 0, sizeof(*dh6));
@@ -646,20 +645,8 @@ client6_send(ifp, s)
 		dprintf(LOG_ERR, "transmit failed");
 		return;
 	}
-
-	switch (ifp->state) {
-	case DHCP6S_SOLICIT:
-		typestr = "solicit";
-		break;
-	case DHCP6S_INFOREQ:
-		typestr = "information request";
-		break;
-	default:		/* XXX */
-		typestr = "???";
-		break;
-	}
 	
-	dprintf(LOG_DEBUG, "send %s to %s", typestr,
+	dprintf(LOG_DEBUG, "send %s to %s", dhcpmsgstr(dh6->dh6_msgtype),
 		addr2str((struct sockaddr *)&dst));
 }
 
@@ -687,6 +674,10 @@ client6_recv(ifp)
 	}
 
 	dh6 = (struct dhcp6 *)rbuf;
+
+	dprintf(LOG_DEBUG, "receive %s from %s", dhcpmsgstr(dh6->dh6_msgtype),
+		addr2str((struct sockaddr *)&from));
+
 	switch(dh6->dh6_msgtype) {
 	case DH6_REPLY:
 		/*

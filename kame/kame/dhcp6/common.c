@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.33 2002/04/25 02:39:02 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.34 2002/05/01 06:00:00 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -584,6 +584,52 @@ get_dhcp6_option(p, ep, opt, retbuf)
 
 	/* not found */
 	return(-1);
+}
+
+char *
+dhcpoptstr(type)
+	int type;
+{
+	static char genstr[sizeof("opt65535") + 1]; /* XXX thread unsafe */
+
+	if (type > 65535)
+		return "INVALID option";
+
+	switch(type) {
+	case DH6OPT_CLIENTID:
+		return "client ID";
+	case DH6OPT_SERVERID:
+		return "server ID";
+	case DH6OPT_DNS:
+		return "DNS";
+	case DH6OPT_RAPID_COMMIT:
+		return "rapid commit";
+	default:
+		sprintf(genstr, "opt%d", type);
+		return(genstr);
+	}
+}
+
+char *
+dhcpmsgstr(type)
+	int type;
+{
+	static char genstr[sizeof("msg255") + 1]; /* XXX thread unsafe */
+
+	if (type > 255)
+		return "INVALID msg";
+
+	switch(type) {
+	case DH6_SOLICIT:
+		return "solicit";
+	case DH6_REPLY:
+		return "reply";
+	case DH6_INFORM_REQ:
+		return "information request";
+	default:
+		sprintf(genstr, "msg%d", type);
+		return(genstr);
+	}
 }
 
 void
