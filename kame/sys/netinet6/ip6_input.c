@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.153 2001/02/02 15:21:17 jinmei Exp $	*/
+/*	$KAME: ip6_input.c,v 1.154 2001/02/03 13:19:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -322,10 +322,10 @@ ip6_init()
 	microtime(&tv);
 	ip6_flow_seq = random() ^ tv.tv_usec;
 	microtime(&tv);
-	ip6_anon_delay = (random() ^ tv.tv_usec) % MAX_ANON_RANDOM_DELAY;
+	ip6_desync_factor = (random() ^ tv.tv_usec) % MAX_TEMP_DESYNC_FACTOR;
 #else
 	ip6_flow_seq = arc4random();
-	ip6_anon_delay = arc4random() % MAX_ANON_RANDOM_DELAY;
+	ip6_desync_factor = arc4random() % MAX_TEMP_DESYNC_FACTOR;
 #endif
 
 #ifndef __FreeBSD__
@@ -378,12 +378,12 @@ ip6_init2(dummy)
 	/* timer for regeneranation of temporary addresses randomize ID */
 #ifdef __NetBSD__
 	callout_reset(&in6_tmpaddrtimer_ch,
-		      (ip6_anon_preferred_lifetime - ip6_anon_delay -
+		      (ip6_temp_preferred_lifetime - ip6_desync_factor -
 		       ip6_anon_regen_advance) * hz,
 		      in6_tmpaddrtimer, NULL);
 #else
 	timeout(in6_tmpaddrtimer, (caddr_t)0,
-		(ip6_anon_preferred_lifetime - ip6_anon_delay -
+		(ip6_temp_preferred_lifetime - ip6_desync_factor -
 			ip6_anon_regen_advance) * hz);
 #endif
 }

@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.83 2001/02/03 09:23:21 itojun Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.84 2001/02/03 13:19:16 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -104,13 +104,13 @@ int ip6_usetmpaddr = IPV6TMPADDR;
 int ip6_usetmpaddr = 0;
 #endif
 
-int ip6_anon_delay;
-int ip6_anon_preferred_lifetime = DEF_ANON_PREFERRED_LIFETIME;
-static int ip6_anon_valid_lifetime = DEF_ANON_VALID_LIFETIME;
+int ip6_desync_factor;
+int ip6_temp_preferred_lifetime = DEF_ANON_PREFERRED_LIFETIME;
+static int ip6_temp_valid_lifetime = DEF_ANON_VALID_LIFETIME;
 /*
  * shorter lifetimes for debugging purposes.
-int ip6_anon_preferred_lifetime = 800;
-static int ip6_anon_valid_lifetime = 1800;
+int ip6_temp_preferred_lifetime = 800;
+static int ip6_temp_valid_lifetime = 1800;
 */
 int ip6_anon_regen_advance = ANON_REGEN_ADVANCE;
 
@@ -1927,17 +1927,19 @@ in6_tmpifadd(ia0, forcegen)
 	if (ia0->ia6_lifetime.ia6t_expire != 0) {
 		vltime0 = (ia0->ia6_lifetime.ia6t_expire > time_second) ?
 			(ia0->ia6_lifetime.ia6t_expire - time_second) : 0;
-		if (vltime0 > ip6_anon_valid_lifetime)
-			vltime0 = ip6_anon_valid_lifetime;
+		if (vltime0 > ip6_temp_valid_lifetime)
+			vltime0 = ip6_temp_valid_lifetime;
 	} else
-		vltime0 = ip6_anon_valid_lifetime;
+		vltime0 = ip6_temp_valid_lifetime;
 	if (ia0->ia6_lifetime.ia6t_preferred != 0) {
 		pltime0 = (ia0->ia6_lifetime.ia6t_preferred > time_second) ?
 			(ia0->ia6_lifetime.ia6t_preferred - time_second) : 0;
-		if (pltime0 > ip6_anon_preferred_lifetime - ip6_anon_delay)
-			pltime0 = ip6_anon_preferred_lifetime - ip6_anon_delay;
+		if (pltime0 > ip6_temp_preferred_lifetime - ip6_desync_factor){
+			pltime0 = ip6_temp_preferred_lifetime -
+				ip6_desync_factor;
+		}
 	} else
-		pltime0 = ip6_anon_preferred_lifetime - ip6_anon_delay;
+		pltime0 = ip6_temp_preferred_lifetime - ip6_desync_factor;
 	ifra.ifra_lifetime.ia6t_vltime = vltime0;
 	ifra.ifra_lifetime.ia6t_pltime = pltime0;
 

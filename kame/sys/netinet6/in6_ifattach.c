@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.93 2001/02/02 15:21:17 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.94 2001/02/03 13:19:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1278,12 +1278,12 @@ in6_tmpaddrtimer(ignored_arg)
 
 #ifdef __NetBSD__
 	callout_reset(&in6_tmpaddrtimer_ch,
-		      (ip6_anon_preferred_lifetime - ip6_anon_delay -
+		      (ip6_temp_preferred_lifetime - ip6_desync_factor -
 		       ip6_anon_regen_advance) * hz,
 		      in6_tmpaddrtimer, NULL);
 #else
 	timeout(in6_tmpaddrtimer, (caddr_t)0,
-		(ip6_anon_preferred_lifetime - ip6_anon_delay -
+		(ip6_temp_preferred_lifetime - ip6_desync_factor -
 		 ip6_anon_regen_advance) * hz);
 #endif
 

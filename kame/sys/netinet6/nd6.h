@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.34 2001/02/02 14:23:41 jinmei Exp $	*/
+/*	$KAME: nd6.h,v 1.35 2001/02/03 13:19:15 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -160,7 +160,7 @@ struct	in6_ndifreq {
 #define DEF_ANON_VALID_LIFETIME		604800	/* 1 week */
 #define DEF_ANON_PREFERRED_LIFETIME	86400	/* 1 day */
 #define ANON_REGEN_ADVANCE		5	/* sec */
-#define MAX_ANON_RANDOM_DELAY		600	/* 10 min */
+#define MAX_TEMP_DESYNC_FACTOR		600	/* 10 min */
 #ifndef __OpenBSD__
 #define ND_COMPUTE_RTIME(x) \
 		(((MIN_RANDOM_FACTOR * (x >> 10)) + (random() & \
@@ -269,8 +269,8 @@ extern struct callout nd6_timer_ch;
 /* nd6_rtr.c */
 extern struct ifnet *nd6_defifp;  /* XXXYYY */
 extern int nd6_defifindex;
-extern int ip6_anon_delay;	/* seconds */
-extern int ip6_anon_preferred_lifetime; /* seconds */
+extern int ip6_desync_factor;	/* seconds */
+extern int ip6_temp_preferred_lifetime; /* seconds */
 extern int ip6_anon_regen_advance; /* seconds */
 
 union nd_opts {
