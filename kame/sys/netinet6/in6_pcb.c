@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.96 2001/06/19 07:03:37 itojun Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.97 2001/06/22 14:22:01 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -689,12 +689,39 @@ in6_pcbpurgeif(head, ifp)
 	struct ifnet *ifp;
 {
 	struct in6pcb *in6p, *nin6p;
+	struct ip6_moptions *im6o;
+	struct in6_multi_mship *imm, *nimm;
 
 	for (in6p = head->in6p_next; in6p != head; in6p = nin6p) {
 		nin6p = in6p->in6p_next;
 		if (in6p->in6p_route.ro_rt != NULL &&
 		    in6p->in6p_route.ro_rt->rt_ifp == ifp)
 			in6_rtchange(in6p, 0);
+		im6o = in6p->in6p_moptions;
+		if (im6o) {
+			/*
+			 * Unselect the outgoing interface if it is being
+			 * detached.
+			 */
+			if (im6o->im6o_multicast_ifp == ifp)
+				im6o->im6o_multicast_ifp = NULL;
+
+			/*
+			 * Drop multicast group membership if we joined
+			 * through the interface being detached.
+			 * XXX controversial - is it really legal for kernel
+			 * to force this?
+			 */
+			for (imm = im6o->im6o_memberships.lh_first;
+			     imm != NULL; imm = nimm) {
+				nimm = imm->i6mm_chain.le_next;
+				if (imm->i6mm_maddr->in6m_ifp == ifp) {
+					LIST_REMOVE(imm, i6mm_chain);
+					in6_delmulti(imm->i6mm_maddr);
+					free(imm, M_IPMADDR);
+				}
+			}
+		}
 	}
 }
 
