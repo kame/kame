@@ -364,6 +364,10 @@ main(argc, argv)
 			options |= F_INTERVAL;
 			break;
 		case 'l':
+			if (getuid()) {
+				errno = EPERM;
+				errx(1, "Must be superuser to preload");
+			}
 			preload = strtol(optarg, &e, 10);
 			if (preload < 0 || *optarg == '\0' || *e != '\0')
 				errx(1, "illegal preload value -- %s", optarg);
