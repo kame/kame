@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.233 2001/10/23 09:47:01 sumikawa Exp $	*/
+/*	$KAME: ip6_output.c,v 1.234 2001/10/23 11:00:59 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1092,6 +1092,14 @@ skip_ipsec2:;
 			 * if necessary.
 			 */
 			if (ip6_mrouter && (flags & IPV6_FORWARDING) == 0) {
+				/*
+				 * XXX: ip6_mforward expects that rcvif is NULL
+				 * when it is called from the originating path.
+				 * However, it is not always the case, since
+				 * some versions of MGETHDR() does not
+				 * initialize the field.  
+				 */
+				m->m_pkthdr.rcvif = NULL;
 				if (ip6_mforward(ip6, ifp, m) != 0) {
 					m_freem(m);
 					goto done;
