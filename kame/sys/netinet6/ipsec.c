@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.218 2004/04/08 13:26:09 jinmei Exp $	*/
+/*	$KAME: ipsec.c,v 1.219 2004/04/08 13:27:31 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3828,7 +3828,7 @@ ipsec6_tunnel_validate(m, off, nxt0, sav)
 		 * does not expect the case, so there is no other way than
 		 * panic.
 		 */
-		panic("ipsec6_tunnel_validate: ip6_getpktaddrs failed");
+		panic("ipsec6_tunnel_validate: ip6_recoverspace failed");
 	}
 
 	/* AF_INET should be supported, but at this moment we don't. */
