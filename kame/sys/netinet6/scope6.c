@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.1 2000/04/18 08:02:25 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.2 2000/04/18 08:54:33 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -33,11 +33,14 @@
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
+#include <sys/systm.h>
 
 #include <net/route.h>
 #include <net/if.h>
 
 #include <netinet/in.h>
+
+#include <netinet6/scope6_var.h>
 
 struct scope6_id {
 	/*
