@@ -1,4 +1,4 @@
-/*	$KAME: udp6_output.c,v 1.44 2001/10/24 10:15:38 keiichi Exp $	*/
+/*	$KAME: udp6_output.c,v 1.45 2001/11/12 05:06:04 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -106,6 +106,7 @@
 #endif
 #include <netinet/icmp6.h>
 #include <netinet6/ip6protosw.h>
+#include <netinet6/scope6_var.h>
 
 #ifdef __OpenBSD__
 #undef IPSEC
@@ -183,7 +184,7 @@ udp6_output(in6p, m, addr6, control)
 #endif
 #endif
 	int flags = 0;
-	struct sockaddr_in6 tmp;
+	struct sockaddr_in6 tmp, *sin6 = NULL;
 
 	priv = 0;
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 3)
@@ -196,13 +197,43 @@ udp6_output(in6p, m, addr6, control)
 	if ((in6p->in6p_socket->so_state & SS_PRIV) != 0)
 		priv = 1;
 #endif
+
+	if (addr6) {
+#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+		/* addr6 has been validated in udp6_send(). */
+		sin6 = (struct sockaddr_in6 *)addr6;
+#else
+		sin6 = mtod(addr6, struct sockaddr_in6 *);
+
+		if (addr6->m_len != sizeof(*sin6))
+			return(EINVAL);
+
+		if (sin6->sin6_family != AF_INET6)
+			return(EAFNOSUPPORT);
+#endif
+
+		/* protect *sin6 from overwrites */
+		tmp = *sin6;
+		sin6 = &tmp;
+
+		if (ip6_use_defzone && sin6->sin6_scope_id == 0) {
+			sin6->sin6_scope_id =
+				scope6_addr2default(&sin6->sin6_addr);
+		}
+		/* KAME hack: embed scopeid */
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(&sin6->sin6_addr, sin6, in6p, NULL) != 0)
+			return(EINVAL);
+#endif
+	}
+
 	if (control) {
 		if ((error = ip6_setpktoptions(control, &opt, priv, 0)) != 0)
 			goto release;
 		in6p->in6p_outputopts = &opt;
 	}
 
-	if (addr6) {
+	if (sin6) {
 		/*
 		 * IPv4 version of udp_output calls in_pcbconnect in this case,
 		 * which needs splnet and affects performance.
@@ -211,20 +242,6 @@ udp6_output(in6p, m, addr6, control)
 		 * and in6_pcbsetport in order to fill in the local address
 		 * and the local port.
 		 */
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
-		struct sockaddr_in6 *sin6 = (struct sockaddr_in6 *)addr6;
-#else
-		struct sockaddr_in6 *sin6 = mtod(addr6, struct sockaddr_in6 *);
-
-		if (addr6->m_len != sizeof(*sin6)) {
-			error = EINVAL;
-			goto release;
-		}
-		if (sin6->sin6_family != AF_INET6) {
-			error = EAFNOSUPPORT;
-			goto release;
-		}
-#endif
 		if (sin6->sin6_port == 0) {
 			error = EADDRNOTAVAIL;
 			goto release;
@@ -235,10 +252,6 @@ udp6_output(in6p, m, addr6, control)
 			error = EISCONN;
 			goto release;
 		}
-
-		/* protect *sin6 from overwrites */
-		tmp = *sin6;
-		sin6 = &tmp;
 
 		faddr = &sin6->sin6_addr;
 		fport = sin6->sin6_port; /* allow 0 port */
@@ -276,12 +289,6 @@ udp6_output(in6p, m, addr6, control)
 			}
 
 			af = AF_INET;
-		}
-
-		/* KAME hack: embed scopeid */
-		if (in6_embedscope(&sin6->sin6_addr, sin6, in6p, NULL) != 0) {
-			error = EINVAL;
-			goto release;
 		}
 
 		if (!IN6_IS_ADDR_V4MAPPED(faddr)) {
