@@ -365,16 +365,35 @@ routename(sa)
 
 #ifdef INET6
 	case AF_INET6:
-	    {	struct sockaddr_in6 *sin6;
-		int gap;
+	{
+		struct sockaddr_in6 sin6; /* use static var for safety */
+		int niflags = 0;
+#ifdef NI_WITHSCOPEID
+		niflags = NI_WITHSCOPEID;
+#endif
 
-		sin6 = (struct sockaddr_in6 *)sa;
-		gap = sizeof(struct sockaddr_in6) - sin6->sin6_len;
-		if (gap > 0)
-			bzero((char *)(sin6) + sin6->sin6_len, gap);
-		return (inet_ntop(AF_INET6, &sin6->sin6_addr,
-			ntop_buf, sizeof(ntop_buf)));
-	    }
+		memset(&sin6, 0, sizeof(sin6));
+		memcpy(&sin6, sa, sa->sa_len);
+		sin6.sin6_len = sizeof(struct sockaddr_in6);
+		sin6.sin6_family = AF_INET6;
+#ifdef __KAME__
+		if (sa->sa_len == sizeof(struct sockaddr_in6) &&
+		    IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr) &&
+		    sin6.sin6_scope_id == 0) {
+			sin6.sin6_scope_id =
+			    ntohs(*(u_int16_t *)&sin6.sin6_addr.s6_addr[2]);
+			sin6.sin6_addr.s6_addr[2] = 0;
+			sin6.sin6_addr.s6_addr[3] = 0;
+		}
+#endif
+		if (nflag)
+			niflags |= NI_NUMERICHOST;
+		if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
+		    line, sizeof(line), NULL, 0, niflags) != 0)
+			strncpy(line, "invalid", sizeof(line));
+
+		return(line);
+	}
 #endif
 
 	case AF_APPLETALK:
@@ -476,6 +495,36 @@ netname(sa)
 
 #ifdef INET6
 	case AF_INET6:
+	{
+		struct sockaddr_in6 sin6; /* use static var for safety */
+		int niflags = 0;
+#ifdef NI_WITHSCOPEID
+		niflags = NI_WITHSCOPEID;
+#endif
+
+		memset(&sin6, 0, sizeof(sin6));
+		memcpy(&sin6, sa, sa->sa_len);
+		sin6.sin6_len = sizeof(struct sockaddr_in6);
+		sin6.sin6_family = AF_INET6;
+#ifdef __KAME__
+		if (sa->sa_len == sizeof(struct sockaddr_in6) &&
+		    IN6_IS_ADDR_LINKLOCAL(&sin6.sin6_addr) &&
+		    sin6.sin6_scope_id == 0) {
+			sin6.sin6_scope_id =
+			    ntohs(*(u_int16_t *)&sin6.sin6_addr.s6_addr[2]);
+			sin6.sin6_addr.s6_addr[2] = 0;
+			sin6.sin6_addr.s6_addr[3] = 0;
+		}
+#endif
+		if (nflag)
+			niflags |= NI_NUMERICHOST;
+		if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
+		    line, sizeof(line), NULL, 0, niflags) != 0)
+			strncpy(line, "invalid", sizeof(line));
+
+		return(line);
+	}
+
 	    {	struct in6_addr in6;
 		int gap;
 
@@ -915,12 +964,32 @@ getaddr(which, s, hpp)
 	switch (afamily) {
 #ifdef INET6
 	case AF_INET6:
-		if (inet_pton(AF_INET6, s, (void *)&su->sin6.sin6_addr) != 1) {
+	{
+		struct addrinfo hints, *res;
+		struct sockaddr_in6 *sin6;
+
+		memset(&hints, 0, sizeof(hints));
+		hints.ai_family = afamily;
+		hints.ai_flags = AI_NUMERICHOST;
+		hints.ai_socktype = SOCK_DGRAM;		/*dummy*/
+		if (getaddrinfo(s, "0", &hints, &res) != 0) {
 			(void) fprintf(stderr, "%s: bad value\n", s);
 			exit(1);
 		}
-		return 0;
+		sin6 = (struct sockaddr_in6 *)res->ai_addr;
+		memcpy(&su->sin6.sin6_addr, &sin6->sin6_addr,
+		    sizeof(su->sin6.sin6_addr));
+#ifdef __KAME__
+		if (IN6_IS_ADDR_LINKLOCAL(&su->sin6.sin6_addr) &&
+		    sin6->sin6_scope_id) {
+			*(u_int16_t *)&su->sin6.sin6_addr.s6_addr[2] =
+				htons(sin6->sin6_scope_id);
+		}
 #endif
+		freeaddrinfo(res);
+		return (0);
+	}
+#endif /* INET6 */
 
 #ifdef NS
 	case AF_NS:
