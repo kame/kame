@@ -339,20 +339,28 @@ struct ip6protosw inet6sw[] = {
 #endif /* IPSEC */
 #if NGIF > 0
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR,
-  in6_gif_input,0,	 	0,		0,
-  0,	  
+  in6_gif_input, rip6_output,	 0,		rip6_ctloutput,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  0,
+#else
+  rip6_usrreq,
+#endif
   0,		0,		0,		0,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-  &nousrreqs
+  &rip6_usrreqs
 #endif
 },
 #ifdef INET6
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
-  in6_gif_input,0,	 	0,		0,
-  0,	  
+  in6_gif_input, rip6_output,	 0,	rip6_ctloutput,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  0,
+#else
+  rip6_usrreq,
+#endif
   0,		0,		0,		0,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
-  &nousrreqs
+  &rip6_usrreqs
 #endif
 },
 #endif /* INET6 */
