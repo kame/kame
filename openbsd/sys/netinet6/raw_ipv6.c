@@ -303,23 +303,16 @@ rip6_input(mp, offp, proto)
   bzero(&srcsa, sizeof(struct sockaddr_in6));
   srcsa.sin6_family = AF_INET6;
   srcsa.sin6_len = sizeof(struct sockaddr_in6);
-  srcsa.sin6_addr = ip6->ip6_src;
-
-	if (IN6_IS_SCOPE_LINKLOCAL(&srcsa.sin6_addr))
-		srcsa.sin6_addr.s6_addr16[1] = 0;
-	if (m->m_pkthdr.rcvif) {
-		if (IN6_IS_SCOPE_LINKLOCAL(&srcsa.sin6_addr))
-			srcsa.sin6_scope_id = m->m_pkthdr.rcvif->if_index;
-		else
-			srcsa.sin6_scope_id = 0;
-	} else
-		srcsa.sin6_scope_id = 0;
+  srcsa.sin6_flowinfo = ip6->ip6_flow & IPV6_FLOWINFO_MASK;
+  /* KAME hack: recover scopeid */
+  (void)in6_recoverscope(&srcsa, &ip6->ip6_src, m->m_pkthdr.rcvif);
 
 #if IPSEC
   bzero(&dstsa, sizeof(struct sockaddr_in6));
   dstsa.sin6_family = AF_INET6;
   dstsa.sin6_len = sizeof(struct sockaddr_in6);
-  dstsa.sin6_addr = ip6->ip6_dst;
+  /* KAME hack: recover scopeid */
+  (void)in6_recoverscope(&dstsa, &ip6->ip6_dst, m->m_pkthdr.rcvif);
 #endif /* IPSEC */
 
 #if 0
@@ -565,46 +558,16 @@ rip6_output(m, so, dst, control)
 
   M_PREPEND(m, sizeof(struct ip6_hdr), M_WAIT);
   ip6 = mtod(m, struct ip6_hdr *);
-  ip6->ip6_flow = 0;  /* Or possibly user flow label, in host order. */
+  ip6->ip6_flow = dst->sin6_flowinfo & IPV6_FLOWINFO_MASK;
   ip6->ip6_vfc &= ~IPV6_VERSION_MASK;
   ip6->ip6_vfc |= IPV6_VERSION;
   ip6->ip6_nxt = inp->inp_ipv6.ip6_nxt;
-  ip6->ip6_dst = dst->sin6_addr;
   /* ip6_src will be filled in later */
 
-  /*
-   * If the scope of the destination is link-local, embed the interface
-   * index in the address.
-   *
-   * XXX advanced-api value overrides sin6_scope_id 
-   */
-  if (IN6_IS_ADDR_LINKLOCAL(&ip6->ip6_dst) ||
-      IN6_IS_ADDR_MC_LINKLOCAL(&ip6->ip6_dst)) {
-    struct in6_pktinfo *pi;
-
-		/*
-		 * XXX Boundary check is assumed to be already done in
-		 * ip6_setpktoptions().
-		 */
-    if (optp && (pi = optp->ip6po_pktinfo) && pi->ipi6_ifindex) {
-      ip6->ip6_dst.s6_addr16[1] = htons(pi->ipi6_ifindex);
-      oifp = ifindex2ifnet[pi->ipi6_ifindex];
-    }
-    else if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst) &&
-	     inp->inp_moptions6 &&
-	     inp->inp_moptions6->im6o_multicast_ifp) {
-      oifp = inp->inp_moptions6->im6o_multicast_ifp;
-      ip6->ip6_dst.s6_addr16[1] = htons(oifp->if_index);
-    } else if (dst->sin6_scope_id) {
-      /* boundary check */
-      if (dst->sin6_scope_id < 0 
-	  || if_index < dst->sin6_scope_id) {
-	error = ENXIO;  /* XXX EINVAL? */
-	goto bad;
-      }
-      ip6->ip6_dst.s6_addr16[1]
-	= htons(dst->sin6_scope_id & 0xffff);/*XXX*/
-    }
+  /* KAME hack: embed scopeid */
+  if (in6_embedscope(&ip6->ip6_dst, dst, inp, &oifp) != 0) {
+    error = EINVAL;
+    goto bad;
   }
 
   /* source address selection */
