@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.255 1999/11/04 12:20:50 jinmei Exp $
+$Id: CHANGELOG,v 1.256 1999/11/04 16:23:30 itojun Exp $
 
 <199911>
+Fri Nov  5 01:22:42 JST 1999  itojun@iijlab.net
+	* kame/sys/netinet: rename in_cksum4() into in4_cksum(), to match
+	  in6_cksum().
+
 1999-11-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_rtrequest): changed the initial
 	state when creating a neighbor cache entry from INCOMPLETE to
