@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.119 2004/12/10 05:38:54 suz Exp $	*/
+/*	$KAME: if_stf.c,v 1.120 2005/02/02 12:35:57 suz Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -351,7 +351,6 @@ stf_encapcheck(m, off, proto, arg)
 	bcopy(GET_V4(sc, &ia6->ia_prefixmask.sin6_addr), &mask, sizeof(mask));
 	a.s_addr &= mask.s_addr;
 	b = ip.ip_src;
-	bcopy(GET_V4(sc, &ia6->ia_prefixmask.sin6_addr), &b, sizeof(b));
 	b.s_addr &= mask.s_addr;
 	if (a.s_addr != b.s_addr)
 		return 0;
