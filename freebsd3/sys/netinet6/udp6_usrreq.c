@@ -623,7 +623,7 @@ udp6_output(in6p, m, addr6, control, p)
 	if (control) {
 		if (error = ip6_setpktoptions(control, &opt,
 					      p &&
-					      suser(p->p_ucred, &p->p_acflag)))
+					      suser(p->p_ucred, &p->p_acflag), 0))
 			goto release;
 		in6p->in6p_outputopts = &opt;
 	}
@@ -715,6 +715,7 @@ release:
 
 releaseopt:
 	if (control) {
+		ip6_clearpktopts(in6p->in6p_outputopts, 0, -1);
 		in6p->in6p_outputopts = stickyopt;
 		m_freem(control);
 	}

@@ -718,17 +718,12 @@ in6_pcbdetach(inp)
 	sofree(so);
 	if (inp->in6p_options)
 		m_freem(inp->in6p_options);
-	if (inp->in6p_outputopts) {
-		if (inp->in6p_outputopts->ip6po_rthdr &&
-		    inp->in6p_outputopts->ip6po_route.ro_rt)
-			RTFREE(inp->in6p_outputopts->ip6po_route.ro_rt);
-		if (inp->in6p_outputopts->ip6po_m)
-			(void)m_free(inp->in6p_outputopts->ip6po_m);
-		free(inp->in6p_outputopts, M_IP6OPT);
-	}
+
+	ip6_freepcbopts(inp->in6p_outputopts);
+	ip6_freemoptions(inp->in6p_moptions);
+
 	if (inp->in6p_route.ro_rt)
 		rtfree(inp->in6p_route.ro_rt);
-	ip6_freemoptions(inp->in6p_moptions);
 	inp->inp_vflag = 0;
 	zfreei(ipi->ipi_zone, inp);
 }
