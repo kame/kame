@@ -1,6 +1,6 @@
 #!/bin/sh
 
-#	$KAME: prefix.sh,v 1.4 2001/02/04 03:24:24 itojun Exp $
+#	$KAME: prefix.sh,v 1.5 2001/02/04 03:27:30 jinmei Exp $
 
 # Copyright (c) 2001 WIDE Project. All rights reserved.
 #
@@ -35,7 +35,7 @@ usage() {
     echo "usage: prefix interface prefix [set|delete]"
 }
 
-if [ -z $iface -o -z $prefix ]; then
+if [ X"$iface" = X -o X"$prefix" = X ]; then
     usage
     exit 1
 fi
@@ -49,7 +49,7 @@ fi
 case $command in
     set)
 	laddr=`ifconfig $iface inet6 | grep 'inet6 fe80:' | head -1 | awk '{print $2}'` 
-	if [ -z $laddr ]; then
+	if [ X"$laddr" = X ]; then
 	    echo "prefix: no interface ID found"
 	    exit 1
 	fi
