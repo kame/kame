@@ -1,4 +1,4 @@
-/*	$KAME: rtadvd.c,v 1.29 2000/06/15 14:23:33 jinmei Exp $	*/
+/*	$KAME: rtadvd.c,v 1.30 2000/06/22 20:16:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -789,6 +789,19 @@ rs_input(int len, struct nd_router_solicit *rs,
 	{
 		long delay;	/* must not be greater than 1000000 */
 		struct timeval interval, now, min_delay, tm_tmp, *rest;
+		struct soliciter *sol;
+
+		/*
+		 * record sockaddr waiting for RA, if possible
+		 */
+		sol = (struct soliciter *)malloc(sizeof(*sol));
+		if (sol) {
+			sol->addr = *from;
+			/*XXX RFC2553 need clarification on flowinfo */
+			sol->addr.sin6_flowinfo = 0;	
+			sol->next = ra->soliciter;
+			ra->soliciter = sol->next;
+		}
 
 		/*
 		 * If there is already a waiting RS packet, don't
@@ -832,7 +845,7 @@ rs_input(int len, struct nd_router_solicit *rs,
 			TIMEVAL_ADD(&min_delay, &interval, &interval);
 		}
 		rtadvd_set_timer(&interval, ra->timer);
-			goto done;
+		goto done;
 	}
 
   done:
@@ -1346,9 +1359,9 @@ ra_output(rainfo)
 struct rainfo *rainfo;
 {
 	int i;
-
 	struct cmsghdr *cm;
 	struct in6_pktinfo *pi;
+	struct soliciter *sol, *nextsol;
 
 	if ((iflist[rainfo->ifindex]->ifm_flags & IFF_UP) == 0) {
 		syslog(LOG_DEBUG, "<%s> %s is not up, skip sending RA",
@@ -1393,6 +1406,28 @@ struct rainfo *rainfo;
 			       strerror(errno));
 		}
 	}
+
+	/*
+	 * unicast advertisements
+	 */
+	for (sol = rainfo->soliciter; sol; sol = nextsol) {
+		nextsol = sol->next;
+
+		sndmhdr.msg_name = (caddr_t)&sol->addr;
+		i = sendmsg(sock, &sndmhdr, 0);
+		if (i < 0 || i != rainfo->ra_datalen)  {
+			if (i < 0) {
+				syslog(LOG_ERR,
+				    "<%s> unicast sendmsg on %s: %s",
+				    __FUNCTION__, rainfo->ifname,
+				    strerror(errno));
+			}
+		}
+
+		sol->next = NULL;
+		free(sol);
+	}
+	rainfo->soliciter = NULL;
 
 	/* update counter */
 	if (rainfo->initcounter < MAX_INITIAL_RTR_ADVERTISEMENTS)
