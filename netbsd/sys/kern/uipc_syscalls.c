@@ -259,6 +259,7 @@ sys_accept(p, v, retval)
 	if (error) {
 		fdremove(fdp, fd);
 		ffree(fp);
+		soclose(so);
 	}
 	m_freem(nam);
 	splx(s);
