@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.264 1999/11/09 12:17:41 itojun Exp $
+$Id: CHANGELOG,v 1.265 1999/11/10 18:45:50 itojun Exp $
 
 <199911>
+Tue Nov  9 EST 1999  itojun@iijlab.net
+	* netbsd/sys/netinet/tcp_input.c: backout previous change for
+	  tcp_pullup(), as it degraded stability and made some wrong
+	  assumptions (see below, Nov 6).
+
 Tue Nov  9 07:14:23 EST 1999  itojun@iijlab.net
 	* kame/libpcap/scanner.l: make IPv6 parsing more strict.
 	  this makes arp[0:1] to work again ("0:1" was mistakingly
