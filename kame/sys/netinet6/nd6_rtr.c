@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.158 2001/08/03 11:56:03 keiichi Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.159 2001/08/28 08:49:00 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1374,7 +1374,7 @@ prelist_update(new, dr, m)
 		/*
 		 * An already autoconfigured address matched.  Now that we
 		 * are sure there is at least one matched address, we can
-		 * proceed to 5.5.3.  (e): update the lifetimes according to the
+		 * proceed to 5.5.3. (e): update the lifetimes according to the
 		 * "two hours" rule and the privacy extension.
 		 */
 #define TWOHOUR		(120*60)
