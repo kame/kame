@@ -143,7 +143,7 @@ faithattach(faith)
 	for (i = 0; i < NFAITH; i++) {
 		ifp = &faithif[i];
 		bzero(ifp, sizeof(faithif[i]));
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		sprintf(ifp->if_xname, "faith%d", i);
 #else
 		ifp->if_name = "faith";
@@ -326,9 +326,11 @@ faithioctl(ifp, cmd, data)
 		break;
 
 #ifdef SIOCSIFMTU
+#ifndef __OpenBSD__
 	case SIOCSIFMTU:
 		ifp->if_mtu = ifr->ifr_mtu;
 		break;
+#endif
 #endif
 
 	case SIOCSIFFLAGS:

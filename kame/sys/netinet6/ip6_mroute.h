@@ -44,12 +44,6 @@
 #ifndef _NETINET6_IP6_MROUTE_H_
 #define _NETINET6_IP6_MROUTE_H_
 
-#ifdef __NetBSD__
-# ifdef _KERNEL
-#  define KERNEL
-# endif
-#endif
-
 /*
  * Multicast Routing set/getsockopt commands.
  */
@@ -207,7 +201,7 @@ struct sioc_mif_req6 {
 	u_long obytes;		/* Output byte count on mif		*/
 };
 
-#ifdef KERNEL
+#ifdef _KERNEL
 /*
  * The kernel's multicast-interface structure.
  */
@@ -282,6 +276,6 @@ int	ip6_mrouter_get __P((int, struct socket *, struct mbuf **));
 #endif
 int	ip6_mrouter_done __P((void));
 int	mrt6_ioctl __P((int, caddr_t));
-#endif /* KERNEL */
+#endif /* _KERNEL */
 
 #endif /* !_NETINET6_IP6_MROUTE_H_ */

@@ -76,7 +76,7 @@
 #include <sys/socketvar.h>
 #include <sys/sockio.h>
 #include <sys/systm.h>
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 #include <sys/proc.h>
 #endif
 #include <sys/time.h>
@@ -92,7 +92,6 @@
 #endif
 #include <net/if_dl.h>
 
-#include <net/if.h>
 #include <netinet/in.h>
 #include <netinet/in_var.h>
 #ifdef __NetBSD__
@@ -132,7 +131,7 @@ const struct in6_addr in6mask64 = IN6MASK64;
 const struct in6_addr in6mask96 = IN6MASK96;
 const struct in6_addr in6mask128 = IN6MASK128;
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 static int in6_lifaddr_ioctl __P((struct socket *, u_long, caddr_t,
 	struct ifnet *, struct proc *));
 #else
@@ -441,7 +440,7 @@ int	in6_interfaces;		/* number of external internet interfaces */
 #define ia62ifa(ia6)	((struct ifaddr *)(ia6))
 
 int
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 in6_control(so, cmd, data, ifp, p)
 	struct	socket *so;
 	u_long cmd;
@@ -470,7 +469,7 @@ in6_control(so, cmd, data, ifp)
 	int privileged;
 
 	privileged = 0;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
 		privileged++;
 #else
@@ -537,7 +536,7 @@ in6_control(so, cmd, data, ifp)
 			return(EPERM);
 		/*fall through*/
 	case SIOCGLIFADDR:
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 		return in6_lifaddr_ioctl(so, cmd, data, ifp, p);
 #else
 		return in6_lifaddr_ioctl(so, cmd, data, ifp);
@@ -1013,7 +1012,7 @@ in6_control(so, cmd, data, ifp)
  * address encoding scheme. (see figure on page 8)
  */
 static int
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 in6_lifaddr_ioctl(so, cmd, data, ifp, p)
 	struct socket *so;
 	u_long cmd;
@@ -1133,7 +1132,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 		in6_len2mask(&ifra.ifra_prefixmask.sin6_addr, prefixlen);
 
 		ifra.ifra_flags = iflr->flags & ~IFLR_PREFIX;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 		return in6_control(so, SIOCAIFADDR_IN6, (caddr_t)&ifra, ifp, p);
 #else
 		return in6_control(so, SIOCAIFADDR_IN6, (caddr_t)&ifra, ifp);
@@ -1236,7 +1235,7 @@ in6_lifaddr_ioctl(so, cmd, data, ifp)
 				ia->ia_prefixmask.sin6_len);
 
 			ifra.ifra_flags = ia->ia6_flags;
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 			return in6_control(so, SIOCDIFADDR_IN6, (caddr_t)&ifra,
 				ifp, p);
 #else

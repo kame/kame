@@ -114,7 +114,7 @@ gifattach(dummy)
 	gif = sc = malloc (ngif * sizeof(struct gif_softc), M_DEVBUF, M_WAIT);
 	bzero(sc, ngif * sizeof(struct gif_softc));
 	for (i = 0; i < ngif; sc++, i++) {
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		sprintf(sc->gif_if.if_xname, "gif%d", i);
 #else
 		sc->gif_if.if_name = "gif";
@@ -372,6 +372,7 @@ gif_ioctl(ifp, cmd, data)
 		break;
 
 #ifdef	SIOCSIFMTU /* xxx */
+#ifndef __OpenBSD__
 	case SIOCGIFMTU:
 		break;
 	case SIOCSIFMTU:
@@ -389,6 +390,7 @@ gif_ioctl(ifp, cmd, data)
 			ifp->if_mtu = mtu;
 		}
 		break;
+#endif
 #endif /* SIOCSIFMTU */
 
 	case SIOCSIFPHYADDR:

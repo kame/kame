@@ -149,7 +149,7 @@ dummyattach(dummy)
 
 	for (i = 0; i < NDUMMY; i++) {
 		ifp = &dummyif[i];
-#ifdef __NetBSD__
+#if defined(__NetBSD__) || defined(__OpenBSD__)
 		sprintf(ifp->if_xname, "dummy%d", i);
 #else
 		ifp->if_name = "dummy";
@@ -367,9 +367,11 @@ dummyioctl(ifp, cmd, data)
 		break;
 
 #ifdef SIOCSIFMTU
+#ifndef __OpenBSD__
 	case SIOCSIFMTU:
 		ifp->if_mtu = ifr->ifr_mtu;
 		break;
+#endif
 #endif
 
 	case SIOCSIFFLAGS:

@@ -92,7 +92,7 @@
 #include <netinet6/ip6_var.h>
 #include <netinet6/icmp6.h>
 #include <netinet6/mld6_var.h>
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3) && !defined(__OpenBSD__)
 #include <netinet6/in6_pcb.h>
 #else
 #include <netinet/in_pcb.h>
