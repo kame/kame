@@ -2,7 +2,7 @@
 
 			KAME Project
 
-			$Date: 1999/10/18 09:09:03 $
+			$Date: 1999/10/26 17:21:01 $
 
 <<<Project Overview>>>
 
@@ -105,8 +105,8 @@ Wolfgang Rupprecht, YASUOKA Masahiko, Nobumichi Ozoe,
 Frederic SOULIER, Koji Kondo, David PATE, Kenjiro Komaki, Satosi KOBAYASI,
 Takashi Tanaka, Heiko W. Rupp, Kazuto Ushioda, Masahiro Ishiyama,
 Bill Sommerfeld, Jason Thorpe, Yasunari Momoi, Chris P. Ross,
-Hideaki Imaizumi, Alexander Fung, Scott Mace, Peter Tattam
-and Hideaki YOSHIFUJI. (in no particular order).
+Hideaki Imaizumi, Alexander Fung, Scott Mace, Peter Tattam,
+Hideaki YOSHIFUJI and Naoyasu Takenaka. (in no particular order).
 
 We also would like to thank BSDI (http://www.bsdi.com/) for donating
 BSD/OS licenses for development.
