@@ -1,4 +1,4 @@
-/*	$KAME: show.c,v 1.27 2002/05/30 06:42:44 fujisawa Exp $	*/
+/*	$KAME: show.c,v 1.28 2002/05/30 08:03:13 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -66,25 +66,8 @@
 
 kvm_t		*kd;
 
-static struct nlist	nl[] =
-{
-#define	NL_TR			0
-	{ "_ip6_protocol_tr" },
-#define	NL_PREFIX		1
-	{ "_natpt_prefix" },
-#define NL_CSLHEAD		2
-	{ "_csl_head" },
-#define NL_TSLHEAD		3
-	{ "_tsl_head" },
-#define NL_DEBUG		4
-	{ "_natpt_debug" },
-#define NL_DUMP			5
-	{ "_natpt_dump" },
-	{ NULL },
-};
 
-
-int		 readNL		__P((void *, int, int));
+int		 readTQH	__P((void *, int, int));
 int		 openKvm	__P((void));
 int		 readKvm	__P((void *, int, void *));
 void		 closeKvm	__P((void));
@@ -122,7 +105,7 @@ showRules(int cui)
 	TAILQ_HEAD(,cSlot)	 csl_head;
 	char			 Wow[BUFSIZ];
 
-	if (readNL(&csl_head, sizeof(csl_head), NL_CSLHEAD) <= 0)
+	if (readTQH(&csl_head, sizeof(csl_head), NATPTCTL_CSLHEAD) <= 0)
 		err(1, "%s(): failure on read csl_head", fn);
 
 	if ((csl_head.tqh_first == NULL)
@@ -156,7 +139,7 @@ showXlate(int type, int interval)
 	TAILQ_HEAD(,tSlot)	tsl_head;
 	char			Wow[BUFSIZ];
 
-	if (readNL(&tsl_head, sizeof(tsl_head), NL_TSLHEAD) <= 0)
+	if (readTQH(&tsl_head, sizeof(tsl_head), NATPTCTL_TSLHEAD) <= 0)
 		err(1, "%s(): line %d: failure on read tsl_head",
 		    fn, __LINE__);
 
@@ -192,7 +175,7 @@ showXlate(int type, int interval)
 			break;
 
 		sleep(interval);
-		if (readNL(&tsl_head, sizeof(tsl_head), NL_TSLHEAD) <= 0)
+		if (readTQH(&tsl_head, sizeof(tsl_head), NATPTCTL_TSLHEAD) <= 0)
 			err(1, "%s(): line %d: failure on read tsl_head",
 			    fn, __LINE__);
 	}
@@ -364,12 +347,19 @@ showVariables(char *word)
  */
 
 int
-readNL(void *buf, int nbytes, int n_idx)
+readTQH(void *buf, int nbytes, int n_idx)
 {
+	const char *fn = __FUNCTION__;
+
+	caddr_t	addr;
+
 	if ((kd == NULL) && (openKvm() < 0))
 		return (-1);
 
-	return (readKvm(buf, nbytes, (void *)nl[n_idx].n_value));
+	if (getValue(n_idx, (caddr_t)&addr) <= 0)
+		err(errno, "%s(): getvalue failure", fn);
+
+	return (readKvm(buf, nbytes, addr));
 }
 
 
@@ -378,15 +368,10 @@ openKvm()
 {
 	const char *fn = __FUNCTION__;
 
-	int	rv;
-
 	if ((kd = kvm_open(NULL, NULL, NULL, O_RDONLY, "kvm_open")) == NULL)
 		err(errno, "%s(): open failure", fn);
 
-	if ((rv = kvm_nlist(kd, nl)) < 0)
-		err(errno, "%s(): read failure", fn);
-
-	return (rv);
+	return (1);
 }
 
 
