@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.53 2001/10/09 10:25:15 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.54 2001/10/09 10:30:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -446,6 +446,11 @@ getconfig(intface)
 	}
 
 	/* route information */
+#ifndef ND_OPT_ROUTE_INFO
+	MAYHAVE(val, "routes", -1);
+	if (val != -1)
+		syslog(LOG_INFO, "route information option is not available");
+#else
 	MAYHAVE(val, "routes", 0);
 	if (val < 0 || val > 0xffffffff) {
 		/* does this check is really necessary? (jinmei) */
@@ -590,6 +595,7 @@ getconfig(intface)
 		}
 		rti->ltime = (u_int32_t)val64;
 	}
+#endif ND_OPT_ROUTE_INFO
 
 	/* okey */
 	tmp->next = ralist;
