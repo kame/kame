@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.341 2004/05/20 08:15:55 suz Exp $	*/
+/*	$KAME: ip6_input.c,v 1.342 2004/05/21 07:44:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,22 +66,15 @@
 
 #ifdef __FreeBSD__
 #include "opt_ip6fw.h"
-#if __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
 #include "opt_natpt.h"
 #include "opt_mip6.h"
 #endif
-#endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
 #include "opt_ipsec.h"
-#endif
-#if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 4)
-#include "pf.h"
-#else
-#define NPF 0
 #endif
 
 #include <sys/param.h>
@@ -96,9 +89,7 @@
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/syslog.h>
-#if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 #include <sys/proc.h>
-#endif
 
 #ifdef __OpenBSD__
 #include <dev/rndvar.h>
@@ -112,7 +103,7 @@
 #if (defined(__NetBSD__) && defined(PFIL_HOOKS)) || (defined(__FreeBSD__) && __FreeBSD_version > 502000)
 #include <net/pfil.h>
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 #include <net/intrq.h>
 #endif
 
@@ -125,19 +116,16 @@
 #include <netinet/ip6.h>
 #include <netinet6/in6_var.h>
 #include <netinet6/ip6_var.h>
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
+#if defined(__FreeBSD__) || defined(__OpenBSD__)
 #include <netinet/in_pcb.h>
 #endif
-#if !((defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802))
+#ifdef __NetBSD__
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>
 #include <netinet6/scope6_var.h>
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/nd6.h>
-#ifdef __bsdi__
-#include <netinet6/raw_ip6.h>
-#endif
 #ifdef MIP6
 #include <netinet/ip6mh.h>
 #include <net/if_hif.h>
@@ -155,21 +143,19 @@
 #include <netinet6/ipsec.h>
 #endif
 
-#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(IPV6FIREWALL) || defined(__FreeBSD__)
 #include <netinet6/ip6_fw.h>
 #endif
 
 #include <netinet6/ip6protosw.h>
 
 /* we need it for NLOOP. */
-#if !defined(__bsdi__) && !defined(__OpenBSD__)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #include "loop.h"
 #endif
 #include "faith.h"
 #include "gif.h"
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
-#include "bpfilter.h"
-#endif
+#include "pf.h"
 
 #if NGIF > 0
 #include <netinet6/in6_gif.h>
@@ -182,13 +168,6 @@
 #include <net/net_osdep.h>
 
 extern struct domain inet6domain;
-#ifdef __bsdi__
-#if _BSDI_VERSION < 199802
-extern struct ifnet loif;
-#else
-extern struct ifnet *loifp;
-#endif
-#endif
 
 u_char ip6_protox[IPPROTO_MAX];
 static int ip6qmaxlen = IFQ_MAXLEN;
@@ -200,7 +179,7 @@ struct ifqueue ip6intrq;
 #if defined(__NetBSD__)
 extern struct ifnet loif[NLOOP];
 #endif
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 extern struct callout in6_tmpaddrtimer_ch;
 #elif defined(__OpenBSD__)
 extern struct timeout in6_tmpaddrtimer_ch;
@@ -209,7 +188,7 @@ extern struct timeout in6_tmpaddrtimer_ch;
 int ip6_forward_srcrt;			/* XXX */
 int ip6_sourcecheck;			/* XXX */
 int ip6_sourcecheck_interval;		/* XXX */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 const int int6intrq_present = 1;
 #endif
 
@@ -217,12 +196,12 @@ const int int6intrq_present = 1;
 struct pfil_head inet6_pfil_hook;
 #endif
 
-#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(IPV6FIREWALL) || defined(__FreeBSD__)
 /* firewall hooks */
 ip6_fw_chk_t *ip6_fw_chk_ptr;
 ip6_fw_ctl_t *ip6_fw_ctl_ptr;
 #endif
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#if defined(__FreeBSD__)
 int ip6_fw_enable = 1;
 #endif
 
@@ -250,9 +229,6 @@ ip6_init()
 {
 	struct ip6protosw *pr;
 	int i;
-#ifdef __bsdi__
-	struct timeval tv;
-#endif
 
 #ifdef RADIX_ART
 	rt_tables[AF_INET6]->rnh_addrsize = sizeof(struct in6_addr);
@@ -287,22 +263,10 @@ ip6_init()
 	addrsel_policy_init();
 	nd6_init();
 	frag6_init();
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-#else
-#ifdef IPV6FIREWALL
+#if defined(IPV6FIREWALL) && !defined(__FreeBSD__)
 	ip6_fw_init();
 #endif
-#endif
-#ifdef __bsdi__
-	/*
-	 * in many cases, random() here does NOT return random number
-	 * as initialization during bootstrap time occur in fixed order.
-	 */
-	microtime(&tv);
-	ip6_desync_factor = (random() ^ tv.tv_usec) % MAX_TEMP_DESYNC_FACTOR;
-#else
 	ip6_desync_factor = arc4random() % MAX_TEMP_DESYNC_FACTOR;
-#endif
 
 #ifndef __FreeBSD__
 	ip6_init2((void *)0);
@@ -369,13 +333,8 @@ ip6_init2(dummy)
 }
 
 #ifdef __FreeBSD__
-/* cheat */
-#if __FreeBSD__ < 4
-SYSINIT(netinet6init2, SI_SUB_PROTO_DOMAIN, SI_ORDER_THIRD, ip6_init2, NULL);
-#else
 /* This must be after route_init(), which is now SI_ORDER_THIRD */
 SYSINIT(netinet6init2, SI_SUB_PROTO_DOMAIN, SI_ORDER_MIDDLE, ip6_init2, NULL);
-#endif
 #endif
 
 /*
@@ -401,7 +360,7 @@ ip6intr()
 	}
 }
 
-#if (defined(__FreeBSD__) && __FreeBSD__ <= 3)
+#ifdef __FreeBSD__
 NETISR_SET(NETISR_IPV6, ip6intr);
 #endif
 
@@ -411,7 +370,7 @@ extern struct	route ip6_forward_rt;
 extern struct	route_in6 ip6_forward_rt;
 
 /* FreeBSD requires NEW_STRUCT_ROUTE */
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #error NEW_STRUCT_ROUTE is required
 #endif
 #endif
@@ -431,9 +390,6 @@ ip6_input(m)
 #if 0
 	struct mbuf *mhist;	/* onion peeling history */
 	caddr_t hist;
-#endif
-#if defined(__bsdi__) && _BSDI_VERSION < 199802
-	struct ifnet *loifp = &loif;
 #endif
 #if defined(PFIL_HOOKS) && (defined(__FreeBSD__) && __FreeBSD_version >= 500000)
 	struct packet_filter_hook *pfh;
@@ -468,9 +424,7 @@ ip6_input(m)
 #define M2MMAX	(sizeof(ip6stat.ip6s_m2m)/sizeof(ip6stat.ip6s_m2m[0]))
 		if (m->m_next) {
 			if (m->m_flags & M_LOOP) {
-#ifdef __bsdi__
-				ip6stat.ip6s_m2m[loifp->if_index]++; /* XXX */
-#elif defined(__OpenBSD__)
+#ifdef __OpenBSD__
 				ip6stat.ip6s_m2m[lo0ifp->if_index]++; /* XXX */
 #else
 				ip6stat.ip6s_m2m[loif[0].if_index]++; /* XXX */
@@ -614,11 +568,11 @@ ip6_input(m)
 #endif /* FreeBSD5 */
 #endif /* PFIL_HOOKS */
 
-#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(IPV6FIREWALL) || defined(__FreeBSD__)
 	/*
 	 * Check with the firewall...
 	 */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 	if (ip6_fw_enable && ip6_fw_chk_ptr)
 #else
 	if (ip6_fw_chk_ptr)
@@ -912,14 +866,10 @@ ip6_input(m)
 			/* this address is ready */
 			ours = 1;
 			deliverifp = ia6->ia_ifp;	/* correct? */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#ifdef __FreeBSD__
 			/* Count the packet in the ip address stats */
 			ia6->ia_ifa.if_ipackets++;
 			ia6->ia_ifa.if_ibytes += m->m_pkthdr.len;
-#elif defined(__bsdi__) && _BSDI_VERSION >= 199802
-			/* Count the packet in the ip address stats */
-			ia6->ia_ifa.ifa_ipackets++;
-			ia6->ia_ifa.ifa_ibytes += m->m_pkthdr.len;
 #endif
 			goto hbhcheck;
 		} else {
@@ -1483,7 +1433,7 @@ ip6_unknown_opt(optp, m, off)
  */
 void
 ip6_savecontrol(in6p, m, mp)
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
+#if defined(__FreeBSD__) || defined(HAVE_NRL_INPCB)
 	struct inpcb *in6p;
 #else
 	struct in6pcb *in6p;
@@ -1494,23 +1444,20 @@ ip6_savecontrol(in6p, m, mp)
 #ifdef HAVE_NRL_INPCB
 # define in6p_flags	inp_flags
 #endif
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 #if defined(__FreeBSD__) && __FreeBSD_version >= 500000
 	struct thread *p = curthread;	/* XXX */
 #else
 	struct proc *p = curproc;	/* XXX */
 #endif
 #endif
-#ifdef __bsdi__
-# define sbcreatecontrol	so_cmsg
-#endif
 	int privileged = 0;
 	struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 3)
+#if defined(__NetBSD__)
 	if (p && !suser(p->p_ucred, &p->p_acflag))
 		privileged++;
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
+#elif defined(__FreeBSD__)
 	if (p && !suser(p))
 		privileged++;
 #else
@@ -1761,9 +1708,6 @@ ip6_savecontrol(in6p, m, mp)
 		;
 	}
 
-#ifdef __bsdi__
-# undef sbcreatecontrol
-#endif
 #ifdef __OpenBSD__
 # undef in6p_flags
 #endif
@@ -1772,7 +1716,7 @@ ip6_savecontrol(in6p, m, mp)
 
 void
 ip6_notify_pmtu(in6p, dst, mtu)
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
+#if defined(__FreeBSD__) || defined(HAVE_NRL_INPCB)
 	struct inpcb *in6p;
 #else
 	struct in6pcb *in6p;
@@ -1783,11 +1727,8 @@ ip6_notify_pmtu(in6p, dst, mtu)
 	struct socket *so;
 	struct mbuf *m_mtu;
 	struct ip6_mtuinfo mtuctl;
-#ifdef __bsdi__
-# define sbcreatecontrol	so_cmsg
-#endif
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(HAVE_NRL_INPCB)
+#if defined(__FreeBSD__) || defined(HAVE_NRL_INPCB)
 	so =  in6p->inp_socket;
 #else
 	so = in6p->in6p_socket;
@@ -1820,10 +1761,6 @@ ip6_notify_pmtu(in6p, dst, mtu)
 		sorwakeup(so);
 
 	return;
-
-#ifdef __bsdi__
-# undef sbcreatecontrol
-#endif
 }
 
 #ifdef PULLDOWN_TEST
@@ -2049,7 +1986,7 @@ ip6_lasthdr(m, off, proto, nxtp)
 	}
 }
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4) && !defined(__NetBSD__)
+#ifdef __OpenBSD__
 void
 pfctlinput2(cmd, sa, ctlparam)
 	int cmd;
@@ -2300,65 +2237,3 @@ ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
 	/* NOTREACHED */
 }
 #endif /* __NetBSD__ || __OpenBSD__ */
-
-#ifdef __bsdi__
-int *ip6_sysvars[] = IPV6CTL_VARS;
-
-int
-ip6_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
-	int	*name;
-	u_int	namelen;
-	void	*oldp;
-	size_t	*oldlenp;
-	void	*newp;
-	size_t	newlen;
-{
-	int error = 0;
-
-	if (name[0] >= IPV6CTL_MAXID)
-		return (EOPNOTSUPP);
-
-	switch (name[0]) {
-	case IPV6CTL_STATS:
-		return sysctl_rdtrunc(oldp, oldlenp, newp, &ip6stat,
-		    sizeof(ip6stat));
-	case IPV6CTL_KAME_VERSION:
-		return sysctl_rdstring(oldp, oldlenp, newp, __KAME_VERSION);
-	case IPV6CTL_TEMPPLTIME:
-		error = sysctl_int_arr(ip6_sysvars, name, namelen,
-		    oldp, oldlenp, newp, newlen);
-		if (ip6_temp_preferred_lifetime <
-		    ip6_desync_factor + ip6_temp_regen_advance) {
-			ip6_temp_preferred_lifetime = *(int *)oldp;
-			return (EINVAL);
-		}
-		return (error);
-	case IPV6CTL_TEMPVLTIME:
-		error = sysctl_int_arr(ip6_sysvars, name, namelen,
-		    oldp, oldlenp, newp, newlen);
-		if (ip6_temp_valid_lifetime < ip6_temp_preferred_lifetime) {
-			ip6_temp_valid_lifetime = *(int *)oldp;
-			return (EINVAL);
-		}
-		return (error);
-#if _BSDI_VERSION < 199802
-	case IPV6CTL_V6ONLY:
-		/* bsdi3: the variable is readonly */
-		return sysctl_rdint(oldp, oldlenp, newp, ip6_v6only);
-#endif
-	case IPV6CTL_RIP6STATS:
-		return sysctl_rdtrunc(oldp, oldlenp, newp, &rip6stat,
-		    sizeof(rip6stat));
-	case IPV6CTL_ADDRCTLPOLICY:
-		return in6_src_sysctl(oldp, oldlenp, newp, newlen);
-#ifdef ISATAP
-	case IPV6CTL_ISATAPRTR:
-		return fill_isatap_rtrlist(oldp, oldlenp,
-					   oldlenp ? *oldlenp : 0);
-#endif
-	default:
-		return (sysctl_int_arr(ip6_sysvars, name, namelen,
-		    oldp, oldlenp, newp, newlen));
-	}
-}
-#endif /* __bsdi__ */

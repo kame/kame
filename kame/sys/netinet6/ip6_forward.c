@@ -1,4 +1,4 @@
-/*	$KAME: ip6_forward.c,v 1.139 2004/05/20 08:15:54 suz Exp $	*/
+/*	$KAME: ip6_forward.c,v 1.140 2004/05/21 07:44:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -31,21 +31,14 @@
 
 #ifdef __FreeBSD__
 #include "opt_ip6fw.h"
-#if __FreeBSD__ >= 3
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
 #include "opt_mip6.h"
 #endif
-#endif
 #ifdef __NetBSD__
 #include "opt_inet.h"
 #include "opt_ipsec.h"
-#endif
-#if defined(__OpenBSD__) || defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 4)
-#include "pf.h"
-#else
-#define NPF 0
 #endif
 
 #include <sys/param.h>
@@ -74,12 +67,12 @@
 #include <netinet/icmp6.h>
 #include <netinet6/nd6.h>
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802)
 #include <netinet/in_pcb.h>
-#endif
-#if !((defined(__FreeBSD__) && __FreeBSD__ >= 3) || defined(__OpenBSD__) || (defined(__bsdi__) && _BSDI_VERSION >= 199802))
+#ifdef __NetBSD__
 #include <netinet6/in6_pcb.h>
 #endif
+
+#include "pf.h"
 
 #if NPF > 0
 #include <net/pfvar.h>
@@ -94,7 +87,7 @@
 #include <netkey/key.h>
 #endif /* IPSEC */
 
-#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(IPV6FIREWALL) || defined(__FreeBSD__)
 #include <netinet6/ip6_fw.h>
 #endif
 #if defined(__NetBSD__) && defined(PFIL_HOOKS)
@@ -161,7 +154,7 @@ ip6_forward(m, srcrt)
 #ifdef MIP6
 	int tunnel_out = 0;
 #endif
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	long time_second = time.tv_sec;
 #endif
 
@@ -703,15 +696,16 @@ ip6_forward(m, srcrt)
 		type = ND_REDIRECT;
 	}
 
-#if defined(IPV6FIREWALL) || (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#if defined(IPV6FIREWALL) || defined(__FreeBSD__)
 	/*
 	 * Check with the firewall...
 	 */
-#if defined(__FreeBSD__) && __FreeBSD__ >= 4
-	if (ip6_fw_enable && ip6_fw_chk_ptr) {
+#ifdef __FreeBSD__
+	if (ip6_fw_enable && ip6_fw_chk_ptr)
 #else
-	if (ip6_fw_chk_ptr) {
+	if (ip6_fw_chk_ptr)
 #endif
+	{
 		/* If ipfw says divert, we have to just drop packet */
 		if ((*ip6_fw_chk_ptr)(&ip6, rt->rt_ifp, &m)) {
 			m_freem(m);

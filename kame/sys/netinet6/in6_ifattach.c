@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.194 2004/05/18 13:18:52 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.195 2004/05/21 07:44:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,7 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 #include "opt_inet6.h"
 #include "opt_mip6.h"
 #endif
@@ -41,9 +41,7 @@
 #include <sys/sockio.h>
 #include <sys/kernel.h>
 #include <sys/syslog.h>
-#ifdef __bsdi__
-#include <crypto/md5.h>
-#elif defined(__OpenBSD__)
+#if defined(__OpenBSD__)
 #include <sys/md5k.h>
 #else
 #include <sys/md5.h>
@@ -63,7 +61,7 @@
 #ifndef __NetBSD__
 #include <netinet/if_ether.h>
 #endif
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifdef __FreeBSD__
 #include <netinet/in_pcb.h>
 #endif
 
@@ -71,7 +69,7 @@
 
 #include <netinet/ip6.h>
 #include <netinet6/in6_var.h>
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifdef __FreeBSD__
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet6/in6_ifattach.h>
@@ -108,7 +106,7 @@ struct callout in6_tmpaddrtimer_ch;
 struct timeout in6_tmpaddrtimer_ch;
 #endif
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
+#ifdef __FreeBSD__
 extern struct inpcbinfo udbinfo;
 extern struct inpcbinfo ripcbinfo;
 #endif
@@ -232,9 +230,6 @@ generate_tmp_ifid(seed0, seed1, ret)
 	MD5_CTX ctxt;
 	u_int8_t seed[16], digest[16], nullbuf[8];
 	u_int32_t val32;
-#ifdef __bsdi__
-	struct timeval tv;
-#endif
 	/*
 	 * interface ID for subnet anycast addresses.
 	 * XXX: we assume the unicast address range that requires IDs
@@ -251,12 +246,7 @@ generate_tmp_ifid(seed0, seed1, ret)
 		int i;
 
 		for (i = 0; i < 2; i++) {
-#ifdef __bsdi__
-			microtime(&tv);
-			val32 = random() ^ tv.tv_usec;
-#else
 			val32 = arc4random();
-#endif
 			bcopy(&val32, seed + sizeof(val32) * i, sizeof(val32));
 		}
 	} else
@@ -386,14 +376,9 @@ get_hw_ifid(ifp, in6)
 	static u_int8_t allone[8] =
 		{ 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next)
-#else
 	for (ifa = ifp->if_addrlist.tqh_first;
 	     ifa;
-	     ifa = ifa->ifa_list.tqe_next)
-#endif
-	{
+	     ifa = ifa->ifa_list.tqe_next) {
 		if (ifa->ifa_addr->sa_family != AF_LINK)
 			continue;
 		sdl = (struct sockaddr_dl *)ifa->ifa_addr;
@@ -546,12 +531,7 @@ get_ifid(ifp0, altifp, in6)
 	}
 
 	/* next, try to get it from some other hardware interface */
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifp = ifnet; ifp; ifp = ifp->if_next)
-#else
-	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next)
-#endif
-	{
+	for (ifp = ifnet.tqh_first; ifp; ifp = ifp->if_list.tqe_next) {
 		if (ifp == ifp0)
 			continue;
 		if (get_hw_ifid(ifp, in6) != 0)
@@ -906,7 +886,7 @@ in6_ifattach(ifp, altifp)
 		return;
 	}
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	/* create a multicast kludge storage (if we have not had one) */
 	in6_createmkludge(ifp);
 #endif
@@ -978,13 +958,10 @@ in6_ifdetach(ifp)
 {
 	struct in6_ifaddr *ia, *oia;
 	struct ifaddr *ifa, *next;
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	struct ifaddr *ifaprev = NULL;
-#endif
 	struct rtentry *rt;
 	short rtflags;
 	struct sockaddr_in6 sin6;
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifdef __FreeBSD__
 	struct in6_multi *in6m, *in6m_next;
 #endif
 	struct in6_multi_mship *imm;
@@ -996,42 +973,20 @@ in6_ifdetach(ifp)
 	nd6_purge(ifp);
 
 	/* nuke any of IPv6 addresses we have */
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = next)
-#else
-	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = next)
-#endif
-	{
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		next = ifa->ifa_next;
-#else
+	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = next) {
 		next = ifa->ifa_list.tqe_next;
-#endif
 		if (ifa->ifa_addr->sa_family != AF_INET6)
 			continue;
 		in6_purgeaddr(ifa);
 	}
 
 	/* undo everything done by in6_ifattach(), just in case */
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifp->if_addrlist; ifa; ifa = next)
-#else
-	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = next)
-#endif
-	{
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		next = ifa->ifa_next;
-#else
+	for (ifa = ifp->if_addrlist.tqh_first; ifa; ifa = next) {
 		next = ifa->ifa_list.tqe_next;
-#endif
 
 		if (ifa->ifa_addr->sa_family != AF_INET6 ||
-		    !IN6_IS_ADDR_LINKLOCAL(&satosin6(&ifa->ifa_addr)->sin6_addr)) {
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-			ifaprev = ifa;
-#endif
+		    !IN6_IS_ADDR_LINKLOCAL(&satosin6(&ifa->ifa_addr)->sin6_addr))
 			continue;
-		}
 
 		ia = (struct in6_ifaddr *)ifa;
 
@@ -1059,14 +1014,7 @@ in6_ifdetach(ifp)
 		}
 
 		/* remove from the linked list */
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-		if (ifaprev)
-			ifaprev->ifa_next = ifa->ifa_next;
-		else
-			ifp->if_addrlist = ifa->ifa_next;
-#else
 		TAILQ_REMOVE(&ifp->if_addrlist, (struct ifaddr *)ia, ifa_list);
-#endif
 		IFAFREE(&ia->ia_ifa);
 
 		/* also remove from the IPv6 address chain(itojun&jinmei) */
@@ -1088,13 +1036,11 @@ in6_ifdetach(ifp)
 		IFAFREE(&oia->ia_ifa);
 	}
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifdef __FreeBSD__
 	/* leave from all multicast groups joined */
 
-#if (defined(__FreeBSD__) && __FreeBSD__ >= 4)
 	in6_pcbpurgeif0(LIST_FIRST(udbinfo.listhead), ifp);
 	in6_pcbpurgeif0(LIST_FIRST(ripcbinfo.listhead), ifp);
-#endif
 
 	for (in6m = LIST_FIRST(&in6_multihead); in6m; in6m = in6m_next) {
 		in6m_next = LIST_NEXT(in6m, in6m_entry);
@@ -1105,7 +1051,7 @@ in6_ifdetach(ifp)
 	}
 #endif
 
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#ifndef __FreeBSD__
 	/* cleanup multicast address kludge table, if there is any */
 	in6_purgemkludge(ifp);
 #endif
@@ -1196,7 +1142,7 @@ in6_tmpaddrtimer(ignored_arg)
 	int s = splnet();
 #endif
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3)
+#if defined(__NetBSD__) || defined(__FreeBSD__)
 	callout_reset(&in6_tmpaddrtimer_ch,
 	    (ip6_temp_preferred_lifetime - ip6_desync_factor -
 	    ip6_temp_regen_advance) * hz, in6_tmpaddrtimer, NULL);
@@ -1212,12 +1158,7 @@ in6_tmpaddrtimer(ignored_arg)
 #endif
 
 	bzero(nullbuf, sizeof(nullbuf));
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifp = ifnet; ifp; ifp = ifp->if_next)
-#else
-	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list))
-#endif
-	{
+	for (ifp = TAILQ_FIRST(&ifnet); ifp; ifp = TAILQ_NEXT(ifp, if_list)) {
 		ndi = ND_IFINFO(ifp);
 		if (bcmp(ndi->randomid, nullbuf, sizeof(nullbuf)) != 0) {
 			/*
