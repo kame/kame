@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.225 2002/01/31 06:30:50 itojun Exp $	*/
+/*	$KAME: key.c,v 1.226 2002/01/31 07:03:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -4339,7 +4339,8 @@ key_bbcmp(p1, p2, bits)
  * XXX: year 2038 problem may remain.
  */
 void
-key_timehandler(void)
+key_timehandler(arg)
+	void *arg;
 {
 	u_int dir;
 	int s;
@@ -4603,10 +4604,9 @@ key_timehandler(void)
 	 * we don't bother to do that yet.
 	 */
 #ifdef __NetBSD__
-	callout_reset(&key_timehandler_ch, hz,
-	    (void *)key_timehandler, (void *)0);
+	callout_reset(&key_timehandler_ch, hz, key_timehandler, (void *)0);
 #else
-	(void)timeout((void *)key_timehandler, (void *)0, hz);
+	(void)timeout(key_timehandler, (void *)0, hz);
 #endif
 
 	splx(s);
@@ -7469,10 +7469,9 @@ key_init()
 #endif
 
 #ifdef __NetBSD__
-	callout_reset(&key_timehandler_ch, hz,
-	    (void *)key_timehandler, (void *)0);
+	callout_reset(&key_timehandler_ch, hz, key_timehandler, (void *)0);
 #else
-	timeout((void *)key_timehandler, (void *)0, hz);
+	timeout(key_timehandler, (void *)0, hz);
 #endif
 
 	/* initialize key statistics */
