@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)udp_usrreq.c	8.6 (Berkeley) 5/23/95
- * $FreeBSD: src/sys/netinet/udp_usrreq.c,v 1.143 2003/11/26 01:40:43 sam Exp $
+ * $FreeBSD: src/sys/netinet/udp_usrreq.c,v 1.162.2.3 2004/10/14 11:49:25 rwatson Exp $
  */
 
 /*
@@ -142,7 +138,7 @@ SYSCTL_INT(_net_inet_udp, UDPCTL_CHECKSUM, checksum, CTLFLAG_RW,
 		&udpcksum, 0, "");
 
 int	log_in_vain = 0;
-SYSCTL_INT(_net_inet_udp, OID_AUTO, log_in_vain, CTLFLAG_RW, 
+SYSCTL_INT(_net_inet_udp, OID_AUTO, log_in_vain, CTLFLAG_RW,
     &log_in_vain, 0, "Log all incoming UDP packets");
 
 static int	blackhole = 0;
@@ -182,10 +178,6 @@ struct udp_ip6 {
 
 static void udp_append(struct inpcb *last, struct ip *ip, struct mbuf *n,
 		int off);
-#ifdef INET6
-static void ip_2_ip6_hdr(struct ip6_hdr *ip6, struct ip *ip);
-#endif
-
 static int udp_detach(struct socket *so);
 static	int udp_output(struct inpcb *, struct mbuf *, struct sockaddr *,
 		struct mbuf *, struct thread *);
@@ -293,7 +285,7 @@ udp_input(m, off)
 			if (m->m_pkthdr.csum_flags & CSUM_PSEUDO_HDR)
 				uh->uh_sum = m->m_pkthdr.csum_data;
 			else
-	                	uh->uh_sum = in_pseudo(ip->ip_src.s_addr,
+				uh->uh_sum = in_pseudo(ip->ip_src.s_addr,
 				    ip->ip_dst.s_addr, htonl((u_short)len +
 				    m->m_pkthdr.csum_data + IPPROTO_UDP));
 			uh->uh_sum ^= 0xffff;
@@ -340,26 +332,23 @@ udp_input(m, off)
 		 */
 		last = NULL;
 		LIST_FOREACH(inp, &udb, inp_list) {
-			INP_LOCK(inp);
-			if (inp->inp_lport != uh->uh_dport) {
-		docontinue:
-				INP_UNLOCK(inp);
+			if (inp->inp_lport != uh->uh_dport)
 				continue;
-			}
 #ifdef INET6
 			if ((inp->inp_vflag & INP_IPV4) == 0)
-				goto docontinue;
+				continue;
 #endif
 			if (inp->inp_laddr.s_addr != INADDR_ANY) {
 				if (inp->inp_laddr.s_addr != ip->ip_dst.s_addr)
-					goto docontinue;
+					continue;
 			}
 			if (inp->inp_faddr.s_addr != INADDR_ANY) {
 				if (inp->inp_faddr.s_addr !=
 				    ip->ip_src.s_addr ||
 				    inp->inp_fport != uh->uh_sport)
-					goto docontinue;
+					continue;
 			}
+			INP_LOCK(inp);
 
 			/*
 			 * Check multicast packets to make sure they are only
@@ -380,8 +369,10 @@ udp_input(m, off)
 						break;
 					}
 				}
-				if (foundmship == 0)
-					goto docontinue;
+				if (foundmship == 0) {
+					INP_UNLOCK(inp);
+					continue;
+				}
 			}
 #undef NMSHIPS
 #undef MSHIP
@@ -440,9 +431,9 @@ udp_input(m, off)
 			udpstat.udps_noportbcast++;
 			goto badheadlocked;
 		}
-		INP_INFO_RUNLOCK(&udbinfo);
 		udp_append(last, ip, m, iphlen + sizeof(struct udphdr));
 		INP_UNLOCK(last);
+		INP_INFO_RUNLOCK(&udbinfo);
 		return;
 	}
 	/*
@@ -476,40 +467,21 @@ udp_input(m, off)
 		return;
 	}
 	INP_LOCK(inp);
-	INP_INFO_RUNLOCK(&udbinfo);
 	udp_append(inp, ip, m, iphlen + sizeof(struct udphdr));
 	INP_UNLOCK(inp);
+	INP_INFO_RUNLOCK(&udbinfo);
 	return;
 
 badheadlocked:
-	INP_INFO_RUNLOCK(&udbinfo);
 	if (inp)
 		INP_UNLOCK(inp);
+	INP_INFO_RUNLOCK(&udbinfo);
 badunlocked:
 	m_freem(m);
 	if (opts)
 		m_freem(opts);
 	return;
 }
-
-#ifdef INET6
-static void
-ip_2_ip6_hdr(ip6, ip)
-	struct ip6_hdr *ip6;
-	struct ip *ip;
-{
-	bzero(ip6, sizeof(*ip6));
-
-	ip6->ip6_vfc = IPV6_VERSION;
-	ip6->ip6_plen = ip->ip_len;
-	ip6->ip6_nxt = ip->ip_p;
-	ip6->ip6_hlim = ip->ip_ttl;
-	ip6->ip6_src.s6_addr32[2] = ip6->ip6_dst.s6_addr32[2] =
-		IPV6_ADDR_INT32_SMP;
-	ip6->ip6_src.s6_addr32[3] = ip->ip_src.s_addr;
-	ip6->ip6_dst.s6_addr32[3] = ip->ip_dst.s_addr;
-}
-#endif
 
 /*
  * subroutine of udp_input(), mainly for source code readability.
@@ -523,23 +495,21 @@ udp_append(last, ip, n, off)
 	int off;
 {
 	struct sockaddr *append_sa;
+	struct socket *so;
 	struct mbuf *opts = 0;
 
-#ifdef IPSEC
-	/* check AH/ESP integrity. */
-	if (ipsec4_in_reject_so(n, last->inp_socket)) {
-		ipsecstat.in_polvio++;
-		m_freem(n);
-		return;
-	}
-#endif /*IPSEC*/
-#ifdef FAST_IPSEC
+	INP_LOCK_ASSERT(last);
+
+#if defined(IPSEC) || defined(FAST_IPSEC)
 	/* check AH/ESP integrity. */
 	if (ipsec4_in_reject(n, last)) {
+#ifdef IPSEC
+		ipsecstat.in_polvio++;
+#endif /*IPSEC*/
 		m_freem(n);
 		return;
 	}
-#endif /*FAST_IPSEC*/
+#endif /*IPSEC || FAST_IPSEC*/
 #ifdef MAC
 	if (mac_check_inpcb_deliver(last, n) != 0) {
 		m_freem(n);
@@ -547,7 +517,7 @@ udp_append(last, ip, n, off)
 	}
 #endif
 	if (last->inp_flags & INP_CONTROLOPTS ||
-	    last->inp_socket->so_options & SO_TIMESTAMP) {
+	    last->inp_socket->so_options & (SO_TIMESTAMP | SO_BINTIME)) {
 #ifdef INET6
 		if (last->inp_vflag & INP_IPV6) {
 			int savedflags;
@@ -571,13 +541,17 @@ udp_append(last, ip, n, off)
 #endif
 	append_sa = (struct sockaddr *)&udp_in;
 	m_adj(n, off);
-	if (sbappendaddr(&last->inp_socket->so_rcv, append_sa, n, opts) == 0) {
+
+	so = last->inp_socket;
+	SOCKBUF_LOCK(&so->so_rcv);
+	if (sbappendaddr_locked(&so->so_rcv, append_sa, n, opts) == 0) {
 		m_freem(n);
 		if (opts)
 			m_freem(opts);
 		udpstat.udps_fullsock++;
+		SOCKBUF_UNLOCK(&so->so_rcv);
 	} else
-		sorwakeup(last->inp_socket);
+		sorwakeup_locked(so);
 }
 
 /*
@@ -604,13 +578,13 @@ udp_ctlinput(cmd, sa, vip)
 	struct ip *ip = vip;
 	struct udphdr *uh;
 	struct inpcb *(*notify)(struct inpcb *, int) = udp_notify;
-        struct in_addr faddr;
+	struct in_addr faddr;
 	struct inpcb *inp;
 	int s;
 
 	faddr = ((struct sockaddr_in *)sa)->sin_addr;
 	if (sa->sa_family != AF_INET || faddr.s_addr == INADDR_ANY)
-        	return;
+		return;
 
 	/*
 	 * Redirects don't need to be handled up here.
@@ -631,7 +605,7 @@ udp_ctlinput(cmd, sa, vip)
 		uh = (struct udphdr *)((caddr_t)ip + (ip->ip_hl << 2));
 		INP_INFO_RLOCK(&udbinfo);
 		inp = in_pcblookup_hash(&udbinfo, faddr, uh->uh_dport,
-                    ip->ip_src, uh->uh_sport, 0, NULL);
+		    ip->ip_src, uh->uh_sport, 0, NULL);
 		if (inp != NULL) {
 			INP_LOCK(inp);
 			if (inp->inp_socket != NULL) {
@@ -677,8 +651,10 @@ udp_pcblist(SYSCTL_HANDLER_ARGS)
 	INP_INFO_RUNLOCK(&udbinfo);
 	splx(s);
 
-	sysctl_wire_old_buffer(req, 2 * (sizeof xig)
+	error = sysctl_wire_old_buffer(req, 2 * (sizeof xig)
 		+ n * sizeof(struct xinpcb));
+	if (error != 0)
+		return (error);
 
 	xig.xig_len = sizeof xig;
 	xig.xig_count = n;
@@ -691,7 +667,7 @@ udp_pcblist(SYSCTL_HANDLER_ARGS)
 	inp_list = malloc(n * sizeof *inp_list, M_TEMP, M_WAITOK);
 	if (inp_list == 0)
 		return ENOMEM;
-	
+
 	s = splnet();
 	INP_INFO_RLOCK(&udbinfo);
 	for (inp = LIST_FIRST(udbinfo.listhead), i = 0; inp && i < n;
@@ -752,7 +728,7 @@ udp_getcred(SYSCTL_HANDLER_ARGS)
 	struct inpcb *inp;
 	int error, s;
 
-	error = suser_cred(req->td->td_ucred, PRISON_ROOT);
+	error = suser_cred(req->td->td_ucred, SUSER_ALLOWJAIL);
 	if (error)
 		return (error);
 	error = SYSCTL_IN(req, addrs, sizeof(addrs));
@@ -798,17 +774,19 @@ udp_output(inp, m, addr, control, td)
 	int error = 0;
 	int ipflags;
 	u_short fport, lport;
+	int unlock_udbinfo;
 
-	INP_LOCK_ASSERT(inp);
-#ifdef MAC
-	mac_create_mbuf_from_socket(inp->inp_socket, m);
-#endif
-
+	/*
+	 * udp_output() may need to temporarily bind or connect the current
+	 * inpcb.  As such, we don't know up front what inpcb locks we will
+	 * need.  Do any work to decide what is needed up front before
+	 * acquiring locks.
+	 */
 	if (len + sizeof(struct udpiphdr) > IP_MAXPACKET) {
-		error = EMSGSIZE;
 		if (control)
 			m_freem(control);
-		goto release;
+		m_freem(m);
+		return EMSGSIZE;
 	}
 
 	src.sin_addr.s_addr = INADDR_ANY;
@@ -818,9 +796,9 @@ udp_output(inp, m, addr, control, td)
 		 * is stored in a single mbuf.
 		 */
 		if (control->m_next) {
-			error = EINVAL;
 			m_freem(control);
-			goto release;
+			m_freem(m);
+			return EINVAL;
 		}
 		for (; control->m_len > 0;
 		    control->m_data += CMSG_ALIGN(cm->cmsg_len),
@@ -856,8 +834,23 @@ udp_output(inp, m, addr, control, td)
 		}
 		m_freem(control);
 	}
-	if (error)
-		goto release;
+	if (error) {
+		m_freem(m);
+		return error;
+	}
+
+	if (src.sin_addr.s_addr != INADDR_ANY ||
+	    addr != NULL) {
+		INP_INFO_WLOCK(&udbinfo);
+		unlock_udbinfo = 1;
+	} else
+		unlock_udbinfo = 0;
+	INP_LOCK(inp);
+
+#ifdef MAC
+	mac_create_mbuf_from_inpcb(inp, m);
+#endif
+
 	laddr = inp->inp_laddr;
 	lport = inp->inp_lport;
 	if (src.sin_addr.s_addr != INADDR_ANY) {
@@ -866,7 +859,7 @@ udp_output(inp, m, addr, control, td)
 			goto release;
 		}
 		error = in_pcbbind_setup(inp, (struct sockaddr *)&src,
-		    &laddr.s_addr, &lport, td);
+		    &laddr.s_addr, &lport, td->td_ucred);
 		if (error)
 			goto release;
 	}
@@ -880,7 +873,7 @@ udp_output(inp, m, addr, control, td)
 			goto release;
 		}
 		error = in_pcbconnect_setup(inp, addr, &laddr.s_addr, &lport,
-		    &faddr.s_addr, &fport, NULL, td);
+		    &faddr.s_addr, &fport, NULL, td->td_ucred);
 		if (error)
 			goto release;
 
@@ -903,15 +896,20 @@ udp_output(inp, m, addr, control, td)
 			goto release;
 		}
 	}
+
 	/*
-	 * Calculate data length and get a mbuf
-	 * for UDP and IP headers.
+	 * Calculate data length and get a mbuf for UDP, IP, and possible
+	 * link-layer headers.  Immediate slide the data pointer back forward
+	 * since we won't use that space at this layer.
 	 */
-	M_PREPEND(m, sizeof(struct udpiphdr), M_DONTWAIT);
-	if (m == 0) {
+	M_PREPEND(m, sizeof(struct udpiphdr) + max_linkhdr, M_DONTWAIT);
+	if (m == NULL) {
 		error = ENOBUFS;
 		goto release;
 	}
+	m->m_data += max_linkhdr;
+	m->m_len -= max_linkhdr;
+	m->m_pkthdr.len -= max_linkhdr;
 
 	/*
 	 * Fill in mbuf with extended UDP header
@@ -948,11 +946,17 @@ udp_output(inp, m, addr, control, td)
 	((struct ip *)ui)->ip_tos = inp->inp_ip_tos;	/* XXX */
 	udpstat.udps_opackets++;
 
+	if (unlock_udbinfo)
+		INP_INFO_WUNLOCK(&udbinfo);
 	error = ip_output(m, inp->inp_options, NULL, ipflags,
 	    inp->inp_moptions, inp);
+	INP_UNLOCK(inp);
 	return (error);
 
 release:
+	INP_UNLOCK(inp);
+	if (unlock_udbinfo)
+		INP_INFO_WUNLOCK(&udbinfo);
 	m_freem(m);
 	return (error);
 }
@@ -970,7 +974,7 @@ u_long	udp_recvspace = 40 * (1024 +
 #endif
 				      );
 SYSCTL_INT(_net_inet_udp, UDPCTL_RECVSPACE, recvspace, CTLFLAG_RW,
-    &udp_recvspace, 0, "Maximum incoming UDP datagram size");
+    &udp_recvspace, 0, "Maximum space for incoming UDP datagrams");
 
 static int
 udp_abort(struct socket *so)
@@ -1011,7 +1015,7 @@ udp_attach(struct socket *so, int proto, struct thread *td)
 		return error;
 	}
 	s = splnet();
-	error = in_pcballoc(so, &udbinfo, td, "udpinp");
+	error = in_pcballoc(so, &udbinfo, "udpinp");
 	splx(s);
 	if (error) {
 		INP_INFO_WUNLOCK(&udbinfo);
@@ -1041,7 +1045,7 @@ udp_bind(struct socket *so, struct sockaddr *nam, struct thread *td)
 	}
 	INP_LOCK(inp);
 	s = splnet();
-	error = in_pcbbind(inp, nam, td);
+	error = in_pcbbind(inp, nam, td->td_ucred);
 	splx(s);
 	INP_UNLOCK(inp);
 	INP_INFO_WUNLOCK(&udbinfo);
@@ -1071,7 +1075,7 @@ udp_connect(struct socket *so, struct sockaddr *nam, struct thread *td)
 	sin = (struct sockaddr_in *)nam;
 	if (td && jailed(td->td_ucred))
 		prison_remote_ip(td->td_ucred, 0, &sin->sin_addr.s_addr);
-	error = in_pcbconnect(inp, nam, td);
+	error = in_pcbconnect(inp, nam, td->td_ucred);
 	splx(s);
 	if (error == 0)
 		soisconnected(so);
@@ -1134,20 +1138,9 @@ udp_send(struct socket *so, int flags, struct mbuf *m, struct sockaddr *addr,
 	    struct mbuf *control, struct thread *td)
 {
 	struct inpcb *inp;
-	int ret;
 
-	INP_INFO_WLOCK(&udbinfo);
 	inp = sotoinpcb(so);
-	if (inp == 0) {
-		INP_INFO_WUNLOCK(&udbinfo);
-		m_freem(m);
-		return EINVAL;
-	}
-	INP_LOCK(inp);
-	ret = udp_output(inp, m, addr, control, td);
-	INP_UNLOCK(inp);
-	INP_INFO_WUNLOCK(&udbinfo);
-	return ret; 
+	return udp_output(inp, m, addr, control, td);
 }
 
 int
@@ -1169,8 +1162,8 @@ udp_shutdown(struct socket *so)
 }
 
 /*
- * This is the wrapper function for in_setsockaddr.  We just pass down 
- * the pcbinfo for in_setsockaddr to lock.  We don't want to do the locking 
+ * This is the wrapper function for in_setsockaddr.  We just pass down
+ * the pcbinfo for in_setsockaddr to lock.  We don't want to do the locking
  * here because in_setsockaddr will call malloc and might block.
  */
 static int
@@ -1190,9 +1183,9 @@ udp_peeraddr(struct socket *so, struct sockaddr **nam)
 }
 
 struct pr_usrreqs udp_usrreqs = {
-	udp_abort, pru_accept_notsupp, udp_attach, udp_bind, udp_connect, 
-	pru_connect2_notsupp, in_control, udp_detach, udp_disconnect, 
-	pru_listen_notsupp, udp_peeraddr, pru_rcvd_notsupp, 
+	udp_abort, pru_accept_notsupp, udp_attach, udp_bind, udp_connect,
+	pru_connect2_notsupp, in_control, udp_detach, udp_disconnect,
+	pru_listen_notsupp, udp_peeraddr, pru_rcvd_notsupp,
 	pru_rcvoob_notsupp, udp_send, pru_sense_null, udp_shutdown,
 	udp_sockaddr, sosend, soreceive, sopoll, in_pcbsosetlabel
 };

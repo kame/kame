@@ -69,7 +69,7 @@
  * Paul Mackerras (paulus@cs.anu.edu.au).
  */
 
-/* $FreeBSD: src/sys/net/if_ppp.c,v 1.94 2003/11/14 21:02:22 andre Exp $ */
+/* $FreeBSD: src/sys/net/if_ppp.c,v 1.100.2.1 2004/09/15 15:14:18 andre Exp $ */
 /* from if_sl.c,v 1.11 84/10/04 12:54:47 rick Exp */
 /* from NetBSD: if_ppp.c,v 1.15.2.2 1994/07/28 05:17:58 cgd Exp */
 
@@ -97,6 +97,7 @@
 #include <sys/module.h>
 
 #include <net/if.h>
+#include <net/if_clone.h>
 #include <net/if_types.h>
 #include <net/netisr.h>
 #include <net/bpf.h>
@@ -132,7 +133,15 @@
 
 #define PPPNAME		"ppp"
 static MALLOC_DEFINE(M_PPP, PPPNAME, "PPP interface");
+
+static struct mtx ppp_softc_list_mtx;
 static LIST_HEAD(, ppp_softc) ppp_softc_list;
+
+#define	PPP_LIST_LOCK_INIT()	mtx_init(&ppp_softc_list_mtx,		\
+				    "ppp_softc_list_mtx", NULL, MTX_DEF)
+#define	PPP_LIST_LOCK_DESTROY()	mtx_destroy(&ppp_softc_list_mtx)
+#define	PPP_LIST_LOCK()		mtx_lock(&ppp_softc_list_mtx)
+#define	PPP_LIST_UNLOCK()	mtx_unlock(&ppp_softc_list_mtx)
 
 /* XXX layering violation */
 extern void	pppasyncattach(void *);
@@ -152,8 +161,7 @@ static void	ppp_ifstart(struct ifnet *ifp);
 static int	ppp_clone_create(struct if_clone *, int);
 static void	ppp_clone_destroy(struct ifnet *);
 
-static struct if_clone ppp_cloner = IF_CLONE_INITIALIZER(PPPNAME,
-    ppp_clone_create, ppp_clone_destroy, 0, IF_MAXUNIT);
+IFC_SIMPLE_DECLARE(ppp, 0);
 
 /*
  * Some useful mbuf macros not in mbuf.h.
@@ -224,31 +232,49 @@ ppp_clone_create(struct if_clone *ifc, int unit)
 	mtx_init(&sc->sc_rawq.ifq_mtx, "ppp_rawq", NULL, MTX_DEF);
 	if_attach(&sc->sc_if);
 	bpfattach(&sc->sc_if, DLT_PPP, PPP_HDRLEN);
+
+	PPP_LIST_LOCK();
 	LIST_INSERT_HEAD(&ppp_softc_list, sc, sc_list);
+	PPP_LIST_UNLOCK();
 
 	return (0);
 }
 
 static void
-ppp_clone_destroy(struct ifnet *ifp)
+ppp_destroy(struct ppp_softc *sc)
 {
-	struct ppp_softc	*sc;
+	struct ifnet *ifp;
 
-	sc = ifp->if_softc;
-
-	LIST_REMOVE(sc, sc_list);
+	ifp = &sc->sc_if;
 	bpfdetach(ifp);
 	if_detach(ifp);
 	mtx_destroy(&sc->sc_rawq.ifq_mtx);
 	mtx_destroy(&sc->sc_fastq.ifq_mtx);
 	mtx_destroy(&sc->sc_inq.ifq_mtx);
+	free(sc, M_PPP);
+}
+
+static void
+ppp_clone_destroy(struct ifnet *ifp)
+{
+	struct ppp_softc *sc;
+
+	sc = ifp->if_softc;
+	PPP_LIST_LOCK();
+	LIST_REMOVE(sc, sc_list);
+	PPP_LIST_UNLOCK();
+	ppp_destroy(sc);
 }
 
 static int
 ppp_modevent(module_t mod, int type, void *data) 
-{ 
+{
+	struct ppp_softc *sc;
+
 	switch (type) { 
 	case MOD_LOAD: 
+		PPP_LIST_LOCK_INIT();
+		LIST_INIT(&ppp_softc_list);
 		if_clone_attach(&ppp_cloner);
 
 		netisr_register(NETISR_PPP, (netisr_t *)pppintr, NULL, 0);
@@ -266,10 +292,17 @@ ppp_modevent(module_t mod, int type, void *data)
 
 		if_clone_detach(&ppp_cloner);
 
-		while (!LIST_EMPTY(&ppp_softc_list))
-			ppp_clone_destroy(
-			    &LIST_FIRST(&ppp_softc_list)->sc_if);
+		PPP_LIST_LOCK();
+		while ((sc = LIST_FIRST(&ppp_softc_list)) != NULL) {
+			LIST_REMOVE(sc, sc_list);
+			PPP_LIST_UNLOCK();
+			ppp_destroy(sc);
+			PPP_LIST_LOCK();
+		}
+		PPP_LIST_LOCK_DESTROY();
 		break; 
+	default:
+		return EOPNOTSUPP;
 	} 
 	return 0; 
 } 
@@ -294,9 +327,11 @@ pppalloc(pid)
     struct ifnet *ifp;
     struct ppp_softc *sc;
 
+    PPP_LIST_LOCK();
     LIST_FOREACH(sc, &ppp_softc_list, sc_list) {
 	if (sc->sc_xfer == pid) {
 	    sc->sc_xfer = 0;
+	    PPP_LIST_UNLOCK();
 	    return sc;
 	}
     }
@@ -304,6 +339,7 @@ pppalloc(pid)
 	if (sc->sc_devp == NULL)
 	    break;
     }
+    PPP_LIST_UNLOCK();
     /* Try to clone an interface if we don't have a free one */
     if (sc == NULL) {
 	strcpy(tmpname, PPPNAME);
@@ -761,7 +797,9 @@ pppoutput(ifp, m0, dst, rtp)
     struct ifqueue *ifq;
     enum NPmode mode;
     int len;
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
     ALTQ_DECL(struct altq_pktattr pktattr;)
+#endif
 
 #ifdef MAC
     error = mac_check_ifnet_transmit(ifp, m0);
@@ -775,7 +813,9 @@ pppoutput(ifp, m0, dst, rtp)
 	goto bad;
     }
 
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
     IFQ_CLASSIFY(&ifp->if_snd, m0, dst->sa_family, &pktattr);
+#endif
 
     /*
      * Compute PPP header.
@@ -909,29 +949,19 @@ pppoutput(ifp, m0, dst, rtp)
 	sc->sc_npqtail = &m0->m_nextpkt;
     } else {
 	/* fastq and if_snd are emptied at spl[soft]net now */
-	if ((m0->m_flags & M_HIGHPRI)
-#ifdef ALTQ
-	    && !ALTQ_IS_ENABLED(&sc->sc_if.if_snd)
-#endif
-		) {
-	    ifq = &sc->sc_fastq;
-	    IF_LOCK(ifq);
-	    if (_IF_QFULL(ifq) && dst->sa_family != AF_UNSPEC) {
-		_IF_DROP(ifq);
-		m_freem(m0);
-		error = ENOBUFS;
-	    } else {
-		_IF_ENQUEUE(ifq, m0);
-		error = 0;
-	    }
+	ifq = (m0->m_flags & M_HIGHPRI)? &sc->sc_fastq:
+	    (struct ifqueue *)&ifp->if_snd;
+        IF_LOCK(ifq);
+	if (_IF_QFULL(ifq) && dst->sa_family != AF_UNSPEC) {
+	    _IF_DROP(ifq);
 	    IF_UNLOCK(ifq);
-	} else
-	    IFQ_ENQUEUE(&sc->sc_if.if_snd, m0, &pktattr, error);
-	if (error != 0) {
 	    sc->sc_if.if_oerrors++;
 	    sc->sc_stats.ppp_oerrors++;
-	    return (error);
-	}
+	    error = ENOBUFS;
+	    goto bad;
+	} else
+	_IF_ENQUEUE(ifq, m0);
+	IF_UNLOCK(ifq);
 	(*sc->sc_start)(sc);
     }
     getmicrotime(&ifp->if_lastchange);
@@ -956,8 +986,8 @@ ppp_requeue(sc)
     struct ppp_softc *sc;
 {
     struct mbuf *m, **mpp;
+    struct ifqueue *ifq;
     enum NPmode mode;
-    int error;
 
     for (mpp = &sc->sc_npqueue; (m = *mpp) != NULL; ) {
 	switch (PPP_PROTOCOL(mtod(m, u_char *))) {
@@ -975,14 +1005,9 @@ ppp_requeue(sc)
 	     */
 	    *mpp = m->m_nextpkt;
 	    m->m_nextpkt = NULL;
-	    if (m->m_flags & M_HIGHPRI) {
-		    if (! IF_HANDOFF(&sc->sc_fastq, m, NULL))
-			    error = ENOBUFS;
-		    else
-			    error = 0;
-	    } else
-		    IFQ_HANDOFF(&sc->sc_if, m, NULL, error);
-            if (error != 0) {
+	    ifq = (m->m_flags & M_HIGHPRI)? &sc->sc_fastq:
+	        (struct ifqueue *)&sc->sc_if.if_snd;
+            if (! IF_HANDOFF(ifq, m, NULL)) {
 		sc->sc_if.if_oerrors++;
 		sc->sc_stats.ppp_oerrors++;
 	    }
@@ -1159,6 +1184,7 @@ pppintr()
 
     GIANT_REQUIRED;
 
+    PPP_LIST_LOCK();
     LIST_FOREACH(sc, &ppp_softc_list, sc_list) {
 	s = splimp();
 	if (!(sc->sc_flags & SC_TBUSY)
@@ -1180,6 +1206,7 @@ pppintr()
 	    ppp_inproc(sc, m);
 	}
     }
+    PPP_LIST_UNLOCK();
 }
 
 #ifdef PPP_COMPRESS
@@ -1598,11 +1625,12 @@ ppp_inproc(sc, m)
     if (isr == -1)
       rv = IF_HANDOFF(&sc->sc_inq, m, NULL);
     else
-      rv = netisr_queue(isr, m);
-    if (!rv) {
+      rv = netisr_queue(isr, m);	/* (0) on success. */
+    if ((isr == -1 && !rv) || (isr != -1 && rv)) {
 	if (sc->sc_flags & SC_DEBUG)
 	    if_printf(ifp, "input queue full\n");
 	ifp->if_iqdrops++;
+	m = NULL;
 	goto bad;
     }
     ifp->if_ipackets++;

@@ -48,7 +48,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_sk.c,v 1.72.2.1 2004/01/25 05:06:48 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_sk.c,v 1.83.2.2 2004/08/25 21:19:06 jmg Exp $");
 
 /*
  * SysKonnect SK-NET gigabit ethernet driver for FreeBSD. Supports
@@ -91,6 +91,7 @@ __FBSDID("$FreeBSD: src/sys/pci/if_sk.c,v 1.72.2.1 2004/01/25 05:06:48 scottl Ex
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/queue.h>
 
@@ -135,7 +136,7 @@ MODULE_DEPEND(sk, miibus, 1, 1, 1);
 
 #ifndef lint
 static const char rcsid[] =
-  "$FreeBSD: src/sys/pci/if_sk.c,v 1.72.2.1 2004/01/25 05:06:48 scottl Exp $";
+  "$FreeBSD: src/sys/pci/if_sk.c,v 1.83.2.2 2004/08/25 21:19:06 jmg Exp $";
 #endif
 
 static struct sk_type sk_devs[] = {
@@ -155,6 +156,11 @@ static struct sk_type sk_devs[] = {
 		"Marvell Gigabit Ethernet"
 	},
 	{
+		VENDORID_MARVELL,
+		DEVICEID_BELKIN_5005,
+		"Belkin F5D5005 Gigabit Ethernet"
+	},
+	{
 		VENDORID_3COM,
 		DEVICEID_3COM_3C940,
 		"3Com 3C940 Gigabit Ethernet"
@@ -163,6 +169,11 @@ static struct sk_type sk_devs[] = {
 		VENDORID_LINKSYS,
 		DEVICEID_LINKSYS_EG1032,
 		"Linksys EG1032 Gigabit Ethernet"
+	},
+	{
+		VENDORID_DLINK,
+		DEVICEID_DLINK_DGE530T,
+		"D-Link DGE-530T Gigabit Ethernet"
 	},
 	{ 0, 0, NULL }
 };
@@ -465,6 +476,12 @@ sk_vpd_read(sc)
 
 	sk_vpd_read_res(sc, &res, pos);
 
+	/*
+	 * Bail out quietly if the eeprom appears to be missing or empty.
+	 */
+	if (res.vr_id == 0xff && res.vr_len == 0xff && res.vr_pad == 0xff)
+		return;
+
 	if (res.vr_id != VPD_RES_ID) {
 		printf("skc%d: bad VPD resource id: expected %x got %x\n",
 		    sc->sk_unit, VPD_RES_ID, res.vr_id);
@@ -711,8 +728,6 @@ sk_marv_miibus_statchg(sc_if)
 	return;
 }
 
-#define XMAC_POLY		0xEDB88320
-#define GMAC_POLY		0x04C11DB7L
 #define HASH_BITS		6
 
 static u_int32_t
@@ -720,54 +735,22 @@ sk_xmchash(addr)
 	const uint8_t *addr;
 {
 	uint32_t crc;
-	int idx, bit;
-	uint8_t data;
 
 	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (idx = 0; idx < 6; idx++) {
-		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1)
-			crc = (crc >> 1) ^ (((crc ^ data) & 1) ? XMAC_POLY : 0);
-	}
+	crc = ether_crc32_le(addr, ETHER_ADDR_LEN);
 
 	return (~crc & ((1 << HASH_BITS) - 1));
 }
 
+/* gmchash is just a big endian crc */
 static u_int32_t
 sk_gmchash(addr)
 	const uint8_t *addr;
 {
-	u_int32_t crc;
-	uint idx, bit;
-	uint8_t tmpData, data;
+	uint32_t crc;
 
 	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (idx = 0; idx < 6; idx++) {
-		data = *addr++;
-
-		/* Change bit order in byte. */
-		tmpData = data;
-		for (bit = 0; bit < 8; bit++) {
-			if (tmpData & 1) {
-				data |=  1 << (7 - bit);
-			} else {
-				data &= ~(1 << (7 - bit));
-			}
-			tmpData >>= 1;
-		}
-
-		crc ^= (data << 24);
-		for (bit = 0; bit < 8; bit++) {
-			if (crc & 0x80000000) {
-				crc = (crc << 1) ^ GMAC_POLY;
-			} else {
-				crc <<= 1;
-			}
-		}
-	}
+	crc = ether_crc32_be(addr, ETHER_ADDR_LEN);
 
 	return (crc & ((1 << HASH_BITS) - 1));
 }
@@ -1354,7 +1337,6 @@ sk_attach(dev)
 	error = 0;
 	sc_if = device_get_softc(dev);
 	sc = device_get_softc(device_get_parent(dev));
-	SK_LOCK(sc);
 	port = *(int *)device_get_ivars(dev);
 	free(device_get_ivars(dev), M_DEVBUF);
 	device_set_ivars(dev, NULL);
@@ -1369,6 +1351,40 @@ sk_attach(dev)
 	if (port == SK_PORT_B)
 		sc_if->sk_tx_bmu = SK_BMU_TXS_CSR1;
 
+	/* Allocate the descriptor queues. */
+	sc_if->sk_rdata = contigmalloc(sizeof(struct sk_ring_data), M_DEVBUF,
+	    M_NOWAIT, 0, 0xffffffff, PAGE_SIZE, 0);
+
+	if (sc_if->sk_rdata == NULL) {
+		printf("sk%d: no memory for list buffers!\n", sc_if->sk_unit);
+		error = ENOMEM;
+		goto fail;
+	}
+
+	bzero(sc_if->sk_rdata, sizeof(struct sk_ring_data));
+
+	/* Try to allocate memory for jumbo buffers. */
+	if (sk_alloc_jumbo_mem(sc_if)) {
+		printf("sk%d: jumbo buffer allocation failed\n",
+		    sc_if->sk_unit);
+		error = ENOMEM;
+		goto fail;
+	}
+
+	ifp = &sc_if->arpcom.ac_if;
+	ifp->if_softc = sc_if;
+	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
+	ifp->if_mtu = ETHERMTU;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_ioctl = sk_ioctl;
+	ifp->if_start = sk_start;
+	ifp->if_watchdog = sk_watchdog;
+	ifp->if_init = sk_init;
+	ifp->if_baudrate = 1000000000;
+	ifp->if_snd.ifq_maxlen = SK_TX_RING_CNT - 1;
+
+	callout_handle_init(&sc_if->sk_tick_ch);
+
 	/*
 	 * Get station address for this interface. Note that
 	 * dual port cards actually come with three station
@@ -1378,12 +1394,10 @@ sk_attach(dev)
 	 * are operating in failover mode. Currently we don't
 	 * use this extra address.
 	 */
+	SK_LOCK(sc);
 	for (i = 0; i < ETHER_ADDR_LEN; i++)
 		sc_if->arpcom.ac_enaddr[i] =
 		    sk_win_read_1(sc, SK_MAC0_0 + (port * 8) + i);
-
-	printf("sk%d: Ethernet address: %6D\n",
-	    sc_if->sk_unit, sc_if->arpcom.ac_enaddr, ":");
 
 	/*
 	 * Set up RAM buffer addresses. The NIC will have a certain
@@ -1434,49 +1448,17 @@ sk_attach(dev)
 		printf("skc%d: unsupported PHY type: %d\n",
 		    sc->sk_unit, sc_if->sk_phytype);
 		error = ENODEV;
+		SK_UNLOCK(sc);
 		goto fail;
 	}
 
-	/* Allocate the descriptor queues. */
-	sc_if->sk_rdata = contigmalloc(sizeof(struct sk_ring_data), M_DEVBUF,
-	    M_NOWAIT, 0, 0xffffffff, PAGE_SIZE, 0);
-
-	if (sc_if->sk_rdata == NULL) {
-		printf("sk%d: no memory for list buffers!\n", sc_if->sk_unit);
-		error = ENOMEM;
-		goto fail;
-	}
-
-	bzero(sc_if->sk_rdata, sizeof(struct sk_ring_data));
-
-	/* Try to allocate memory for jumbo buffers. */
-	if (sk_alloc_jumbo_mem(sc_if)) {
-		printf("sk%d: jumbo buffer allocation failed\n",
-		    sc_if->sk_unit);
-		error = ENOMEM;
-		goto fail;
-	}
-
-	ifp = &sc_if->arpcom.ac_if;
-	ifp->if_softc = sc_if;
-	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
-	ifp->if_mtu = ETHERMTU;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
-	ifp->if_ioctl = sk_ioctl;
-	ifp->if_output = ether_output;
-	ifp->if_start = sk_start;
-	ifp->if_watchdog = sk_watchdog;
-	ifp->if_init = sk_init;
-	ifp->if_baudrate = 1000000000;
-	IFQ_SET_MAXLEN(&ifp->if_snd, SK_TX_RING_CNT - 1);
-	IFQ_SET_READY(&ifp->if_snd);
-
-	callout_handle_init(&sc_if->sk_tick_ch);
 
 	/*
-	 * Call MI attach routine.
+	 * Call MI attach routine.  Can't hold locks when calling into ether_*.
 	 */
+	SK_UNLOCK(sc);
 	ether_ifattach(ifp, sc_if->arpcom.ac_enaddr);
+	SK_LOCK(sc);
 
 	/*
 	 * Do miibus setup.
@@ -1490,6 +1472,7 @@ sk_attach(dev)
 		break;
 	}
 
+	SK_UNLOCK(sc);
 	if (mii_phy_probe(dev, &sc_if->sk_miibus,
 	    sk_ifmedia_upd, sk_ifmedia_sts)) {
 		printf("skc%d: no PHY found!\n", sc_if->sk_unit);
@@ -1499,7 +1482,6 @@ sk_attach(dev)
 	}
 
 fail:
-	SK_UNLOCK(sc);
 	if (error) {
 		/* Access should be ok even though lock has been dropped */
 		sc->sk_if[port] = NULL;
@@ -1525,38 +1507,13 @@ skc_attach(dev)
 
 	mtx_init(&sc->sk_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-#ifndef BURN_BRIDGES
-	/*
-	 * Handle power management nonsense.
-	 */
-	if (pci_get_powerstate(dev) != PCI_POWERSTATE_D0) {
-		u_int32_t		iobase, membase, irq;
-
-		/* Save important PCI config data. */
-		iobase = pci_read_config(dev, SK_PCI_LOIO, 4);
-		membase = pci_read_config(dev, SK_PCI_LOMEM, 4);
-		irq = pci_read_config(dev, SK_PCI_INTLINE, 4);
-
-		/* Reset the power state. */
-		printf("skc%d: chip is in D%d power mode "
-		    "-- setting to D0\n", unit,
-		    pci_get_powerstate(dev));
-		pci_set_powerstate(dev, PCI_POWERSTATE_D0);
-
-		/* Restore PCI config data. */
-		pci_write_config(dev, SK_PCI_LOIO, iobase, 4);
-		pci_write_config(dev, SK_PCI_LOMEM, membase, 4);
-		pci_write_config(dev, SK_PCI_INTLINE, irq, 4);
-	}
-#endif
 	/*
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
 
 	rid = SK_RID;
-	sc->sk_res = bus_alloc_resource(dev, SK_RES, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->sk_res = bus_alloc_resource_any(dev, SK_RES, &rid, RF_ACTIVE);
 
 	if (sc->sk_res == NULL) {
 		printf("sk%d: couldn't map ports/memory\n", unit);
@@ -1569,7 +1526,7 @@ skc_attach(dev)
 
 	/* Allocate interrupt */
 	rid = 0;
-	sc->sk_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	sc->sk_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	    RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->sk_irq == NULL) {
@@ -1584,10 +1541,16 @@ skc_attach(dev)
 		sc->sk_type = SK_GENESIS;
 		break;
 	case DEVICEID_SK_V2:
+	case DEVICEID_BELKIN_5005:
 	case DEVICEID_3COM_3C940:
 	case DEVICEID_LINKSYS_EG1032:
+	case DEVICEID_DLINK_DGE530T:
 		sc->sk_type = SK_YUKON;
 		break;
+	default:
+		printf("skc%d: unknown device!\n", unit);
+		error = ENXIO;
+		goto fail;
 	}
 
 	/* Reset the adapter. */
@@ -1650,7 +1613,8 @@ skc_attach(dev)
 	}
 
 	/* Announce the product name. */
-	printf("skc%d: %s\n", sc->sk_unit, sc->sk_vpd_prodname);
+	if (sc->sk_vpd_prodname != NULL)
+	    printf("skc%d: %s\n", sc->sk_unit, sc->sk_vpd_prodname);
 	sc->sk_devs[SK_PORT_A] = device_add_child(dev, "sk", -1);
 	port = malloc(sizeof(int), M_DEVBUF, M_NOWAIT);
 	*port = SK_PORT_A;
@@ -1669,7 +1633,7 @@ skc_attach(dev)
 	bus_generic_attach(dev);
 
 	/* Hook interrupt last to avoid having to lock softc */
-	error = bus_setup_intr(dev, sc->sk_irq, INTR_TYPE_NET,
+	error = bus_setup_intr(dev, sc->sk_irq, INTR_TYPE_NET|INTR_MPSAFE,
 	    sk_intr, sc, &sc->sk_intrhand);
 
 	if (error) {
@@ -1707,14 +1671,24 @@ sk_detach(dev)
 	/* These should only be active if attach_xmac succeeded */
 	if (device_is_attached(dev)) {
 		sk_stop(sc_if);
+		/* Can't hold locks while calling detach */
+		SK_IF_UNLOCK(sc_if);
 		ether_ifdetach(ifp);
+		SK_IF_LOCK(sc_if);
 	}
-	if (sc_if->sk_miibus)
+	/*
+	 * We're generally called from skc_detach() which is using
+	 * device_delete_child() to get to here. It's already trashed
+	 * miibus for us, so don't do it here or we'll panic.
+	 */
+	/*
+	if (sc_if->sk_miibus != NULL)
 		device_delete_child(dev, sc_if->sk_miibus);
+	*/
 	bus_generic_detach(dev);
-	if (sc_if->sk_cdata.sk_jumbo_buf)
+	if (sc_if->sk_cdata.sk_jumbo_buf != NULL)
 		contigfree(sc_if->sk_cdata.sk_jumbo_buf, SK_JMEM, M_DEVBUF);
-	if (sc_if->sk_rdata) {
+	if (sc_if->sk_rdata != NULL) {
 		contigfree(sc_if->sk_rdata, sizeof(struct sk_ring_data),
 		    M_DEVBUF);
 	}
@@ -1731,7 +1705,6 @@ skc_detach(dev)
 
 	sc = device_get_softc(dev);
 	KASSERT(mtx_initialized(&sc->sk_mtx), ("sk mutex not initialized"));
-	SK_LOCK(sc);
 
 	if (device_is_alive(dev)) {
 		if (sc->sk_devs[SK_PORT_A] != NULL)
@@ -1748,7 +1721,6 @@ skc_detach(dev)
 	if (sc->sk_res)
 		bus_release_resource(dev, SK_RES, SK_RID, sc->sk_res);
 
-	SK_UNLOCK(sc);
 	mtx_destroy(&sc->sk_mtx);
 
 	return(0);
@@ -2413,7 +2385,8 @@ sk_init_xmac(sc_if)
 	return;
 }
 
-static void sk_init_yukon(sc_if)
+static void
+sk_init_yukon(sc_if)
 	struct sk_if_softc	*sc_if;
 {
 	u_int32_t		phy;

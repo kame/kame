@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_var.h	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/netinet/in_var.h,v 1.48 2003/11/14 21:02:21 andre Exp $
+ * $FreeBSD: src/sys/netinet/in_var.h,v 1.51 2004/08/16 18:32:07 rwatson Exp $
  */
 
 /*
@@ -120,11 +116,9 @@ struct	in_aliasreq {
 
 
 #ifdef	_KERNEL
-extern	struct	ifqueue	ipintrq;		/* ip packet input queue */
-extern	struct	in_addr zeroin_addr;
 extern	u_char	inetctlerrmap[];
 
-/* 
+/*
  * Hash table for IP addresses.
  */
 extern	LIST_HEAD(in_ifaddrhashhead, in_ifaddr) *in_ifaddrhashtbl;

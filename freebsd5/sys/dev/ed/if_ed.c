@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/ed/if_ed.c,v 1.223 2003/11/14 17:16:56 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/ed/if_ed.c,v 1.233.2.1 2004/09/17 10:14:49 glebius Exp $");
 
 /*
  * Device driver for National Semiconductor DS8390/WD83C690 based ethernet
@@ -67,7 +67,6 @@ __FBSDID("$FreeBSD: src/sys/dev/ed/if_ed.c,v 1.223 2003/11/14 17:16:56 obrien Ex
 #endif
 
 #include <net/bpf.h>
-#include <net/bridge.h>
 
 #include <machine/md_var.h>
 
@@ -100,11 +99,9 @@ static void	ed_hpp_writemem	(struct ed_softc *, unsigned char *,
 				    /* u_short */ int, /* u_short */ int);
 static u_short	ed_hpp_write_mbufs(struct ed_softc *, struct mbuf *, int);
 
-static u_short	ed_pio_write_mbufs(struct ed_softc *, struct mbuf *, int);
+static u_short	ed_pio_write_mbufs(struct ed_softc *, struct mbuf *, long);
 
 static void	ed_setrcr	(struct ed_softc *);
-
-static u_int32_t ds_mchash	(caddr_t addr);
 
 /*
  * Interrupt conversion table for WD/SMC ASIC/83C584
@@ -1149,7 +1146,8 @@ ed_probe_Novell_generic(dev, flags)
 	sc->tx_page_start = memsize / ED_PAGE_SIZE;
 
 	if (ED_FLAGS_GETTYPE(flags) == ED_FLAGS_GWETHER) {
-		int     x, i, mstart = 0, msize = 0;
+		int     x, i, msize = 0;
+		long    mstart = 0;
 		char    pbuf0[ED_PAGE_SIZE], pbuf[ED_PAGE_SIZE], tbuf[ED_PAGE_SIZE];
 
 		for (i = 0; i < ED_PAGE_SIZE; i++)
@@ -1198,14 +1196,14 @@ ed_probe_Novell_generic(dev, flags)
 		}
 
 		if (msize == 0) {
-			device_printf(dev, "Cannot find any RAM, start : %d, x = %d.\n", mstart, x);
+			device_printf(dev, "Cannot find any RAM, start : %ld, x = %d.\n", mstart, x);
 			return (ENXIO);
 		}
-		device_printf(dev, "RAM start at %d, size : %d.\n", mstart, msize);
+		device_printf(dev, "RAM start at %ld, size : %d.\n", mstart, msize);
 
 		sc->mem_size = msize;
-		sc->mem_start = (caddr_t) mstart;
-		sc->mem_end = (caddr_t) (msize + mstart);
+		sc->mem_start = (caddr_t)(uintptr_t) mstart;
+		sc->mem_end = (caddr_t)(uintptr_t) (msize + mstart);
 		sc->tx_page_start = mstart / ED_PAGE_SIZE;
 	}
 
@@ -1654,8 +1652,8 @@ ed_alloc_irq(dev, rid, flags)
 	struct ed_softc *sc = device_get_softc(dev);
 	struct resource *res;
 
-	res = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-				 0ul, ~0ul, 1, (RF_ACTIVE | flags));
+	res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+				     (RF_ACTIVE | flags));
 	if (res) {
 		sc->irq_rid = rid;
 		sc->irq_res = res;
@@ -1718,7 +1716,6 @@ ed_attach(dev)
 	 */
 	ifp->if_softc = sc;
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
-	ifp->if_output = ether_output;
 	ifp->if_start = ed_start;
 	ifp->if_ioctl = ed_ioctl;
 	ifp->if_watchdog = ed_watchdog;
@@ -1747,21 +1744,16 @@ ed_attach(dev)
 	 */
 	if (device_get_flags(dev) & ED_FLAGS_DISABLE_TRANCEIVER)
 		ifp->if_flags = (IFF_BROADCAST | IFF_SIMPLEX | 
-		    IFF_MULTICAST | IFF_ALTPHYS);
+		    IFF_MULTICAST | IFF_ALTPHYS | IFF_NEEDSGIANT);
 	else
 		ifp->if_flags = (IFF_BROADCAST | IFF_SIMPLEX |
-		    IFF_MULTICAST);
+		    IFF_MULTICAST | IFF_NEEDSGIANT);
 
 	/*
 	 * Attach the interface
 	 */
 	ether_ifattach(ifp, sc->arpcom.ac_enaddr);
 	/* device attach does transition from UNCONFIGURED to IDLE state */
-
-	/*
-	 * Print additional info when attached
-	 */
-	if_printf(ifp, "address %6D, ", sc->arpcom.ac_enaddr, ":");
 
 	if (sc->type_str && (*sc->type_str != 0))
 		printf("type %s ", sc->type_str);
@@ -1887,10 +1879,6 @@ ed_init(xsc)
 	int     i, s;
 
 	if (sc->gone)
-		return;
-
-	/* address not known */
-	if (TAILQ_EMPTY(&ifp->if_addrhead)) /* unlikely? XXX */
 		return;
 
 	/*
@@ -2215,7 +2203,7 @@ outloop:
 			}
 		}
 	} else {
-		len = ed_pio_write_mbufs(sc, m, (int)buffer);
+		len = ed_pio_write_mbufs(sc, m, (uintptr_t)buffer);
 		if (len == 0) {
 			m_freem(m0);
 			goto outloop;
@@ -2291,8 +2279,8 @@ ed_rint(sc)
 		if (sc->mem_shared)
 			packet_hdr = *(struct ed_ring *) packet_ptr;
 		else
-			ed_pio_readmem(sc, (int)packet_ptr, (char *) &packet_hdr,
-				       sizeof(packet_hdr));
+			ed_pio_readmem(sc, (uintptr_t)packet_ptr,
+			    (char *) &packet_hdr, sizeof(packet_hdr));
 		len = packet_hdr.count;
 		if (len > (ETHER_MAX_LEN - ETHER_CRC_LEN + sizeof(struct ed_ring)) ||
 		    len < (ETHER_MIN_LEN - ETHER_CRC_LEN + sizeof(struct ed_ring))) {
@@ -2762,7 +2750,7 @@ ed_ring_copy(sc, src, dst, amount)
 		if (sc->mem_shared)
 			bcopy(src, dst, tmp_amount);
 		else
-			ed_pio_readmem(sc, (int)src, dst, tmp_amount);
+			ed_pio_readmem(sc, (uintptr_t)src, dst, tmp_amount);
 
 		amount -= tmp_amount;
 		src = sc->mem_ring;
@@ -2771,7 +2759,7 @@ ed_ring_copy(sc, src, dst, amount)
 	if (sc->mem_shared)
 		bcopy(src, dst, amount);
 	else
-		ed_pio_readmem(sc, (int)src, dst, amount);
+		ed_pio_readmem(sc, (uintptr_t)src, dst, amount);
 
 	return (src + amount);
 }
@@ -2822,26 +2810,9 @@ ed_get_packet(sc, buf, len)
 	eh = mtod(m, struct ether_header *);
 
 	/*
-	 * Don't read in the entire packet if we know we're going to drop it
-	 * and no bpf is active.
+	 * Get packet, including link layer address, from interface.
 	 */
-	if (!ifp->if_bpf && BDG_ACTIVE( (ifp) ) ) {
-		struct ifnet *bif;
-
-		ed_ring_copy(sc, buf, (char *)eh, ETHER_HDR_LEN);
-		bif = bridge_in_ptr(ifp, eh) ;
-		if (bif == BDG_DROP) {
-			m_freem(m);
-			return;
-		}
-		if (len > ETHER_HDR_LEN)
-			ed_ring_copy(sc, buf + ETHER_HDR_LEN,
-				(char *)(eh + 1), len - ETHER_HDR_LEN);
-	} else
-		/*
-		 * Get packet, including link layer address, from interface.
-		 */
-		ed_ring_copy(sc, buf, (char *)eh, len);
+	ed_ring_copy(sc, buf, (char *)eh, len);
 
 	m->m_pkthdr.len = m->m_len = len;
 
@@ -2862,7 +2833,7 @@ ed_get_packet(sc, buf, len)
 void
 ed_pio_readmem(sc, src, dst, amount)
 	struct ed_softc *sc;
-	int src;
+	long src;
 	unsigned char *dst;
 	unsigned short amount;
 {
@@ -2952,7 +2923,7 @@ static u_short
 ed_pio_write_mbufs(sc, m, dst)
 	struct ed_softc *sc;
 	struct mbuf *m;
-	int dst;
+	long dst;
 {
 	struct ifnet *ifp = (struct ifnet *)sc;
 	unsigned short total_len, dma_len;
@@ -3530,30 +3501,6 @@ ed_setrcr(sc)
 }
 
 /*
- * Compute crc for ethernet address
- */
-static u_int32_t
-ds_mchash(addr)
-	caddr_t addr;
-{
-#define ED_POLYNOMIAL 0x04c11db6
-	register u_int32_t crc = 0xffffffff;
-	register int carry, idx, bit;
-	register u_char data;
-
-	for (idx = 6; --idx >= 0;) {
-		for (data = *addr++, bit = 8; --bit >= 0; data >>=1 ) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
-			crc <<= 1;
-			if (carry)
-				crc = (crc ^ ED_POLYNOMIAL) | carry;
-		}
-	}
-	return crc;
-#undef POLYNOMIAL
-}
-
-/*
  * Compute the multicast address filter from the
  * list of multicast addresses we need to listen to.
  */
@@ -3572,8 +3519,8 @@ ds_getmcaf(sc, mcaf)
 	TAILQ_FOREACH(ifma, &sc->arpcom.ac_if.if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		index = ds_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr))
-			>> 26;
+		index = ether_crc32_be(LLADDR((struct sockaddr_dl *)
+		    ifma->ifma_addr), ETHER_ADDR_LEN) >> 26;
 		af[index >> 3] |= 1 << (index & 7);
 	}
 }

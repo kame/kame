@@ -1,5 +1,5 @@
 /*	$NetBSD: if_arcsubr.c,v 1.36 2001/06/14 05:44:23 itojun Exp $	*/
-/*	$FreeBSD: src/sys/net/if_arcsubr.c,v 1.15 2003/11/14 21:02:22 andre Exp $ */
+/*	$FreeBSD: src/sys/net/if_arcsubr.c,v 1.22 2004/06/15 23:57:41 mlaier Exp $ */
 
 /*
  * Copyright (c) 1994, 1995 Ignatios Souvatzis
@@ -45,6 +45,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/protosw.h>
@@ -107,31 +108,21 @@ arc_output(ifp, m, dst, rt0)
 	struct sockaddr *dst;
 	struct rtentry *rt0;
 {
-	struct rtentry		*rt;
-	struct arccom		*ac;
 	struct arc_header	*ah;
 	int			error;
 	u_int8_t		atype, adst;
 	int			loop_copy = 0;
 	int			isphds;
-	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	if ((ifp->if_flags & (IFF_UP|IFF_RUNNING)) != (IFF_UP|IFF_RUNNING))
 		return(ENETDOWN); /* m, m1 aren't initialized yet */
 
 	error = 0;
-	ac = (struct arccom *)ifp;
-
-	error = rt_check(&rt, &rt0, dst);
-	if (error)
-		goto bad;
 
 	/*
 	 * if the queueing discipline needs packet classification,
 	 * do it before prepending link headers.
 	 */
-	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
-
 	switch (dst->sa_family) {
 #ifdef INET
 	case AF_INET:
@@ -143,22 +134,48 @@ arc_output(ifp, m, dst, rt0)
 			adst = arcbroadcastaddr; /* ARCnet broadcast address */
 		else if (ifp->if_flags & IFF_NOARP)
 			adst = ntohl(SIN(dst)->sin_addr.s_addr) & 0xFF;
-		else if (!arpresolve(ifp, rt, m, dst, &adst, rt0))
-			return 0;	/* not resolved yet */
+		else {
+			error = arpresolve(ifp, rt0, m, dst, &adst);
+			if (error)
+				return (error == EWOULDBLOCK ? 0 : error);
+		}
 
 		atype = (ifp->if_flags & IFF_LINK0) ?
 			ARCTYPE_IP_OLD : ARCTYPE_IP;
 		break;
+	case AF_ARP:
+	{
+		struct arphdr *ah;
+		ah = mtod(m, struct arphdr *);
+		ah->ar_hrd = htons(ARPHRD_ARCNET);
+
+		loop_copy = -1; /* if this is for us, don't do it */
+
+		switch(ntohs(ah->ar_op)) {
+		case ARPOP_REVREQUEST:
+		case ARPOP_REVREPLY:
+			atype = ARCTYPE_REVARP;
+			break;
+		case ARPOP_REQUEST:
+		case ARPOP_REPLY:
+		default:
+			atype = ARCTYPE_ARP;
+			break;
+		}
+
+		if (m->m_flags & M_BCAST)
+			bcopy(ifp->if_broadcastaddr, &adst, ARC_ADDR_LEN);
+		else
+			bcopy(ar_tha(ah), &adst, ARC_ADDR_LEN);
+        
+	}
+	break;
 #endif
 #ifdef INET6
 	case AF_INET6:
-#ifdef OLDIP6OUTPUT
-		if (!nd6_resolve(ifp, rt, m, dst, (u_char *)&adst))
-			return(0);	/* if not yet resolves */
-#else
-		if (!nd6_storelladdr(ifp, rt, m, dst, (u_char *)&adst))
-			return(0); /* it must be impossible, but... */
-#endif /* OLDIP6OUTPUT */
+		error = nd6_storelladdr(ifp, rt0, m, dst, (u_char *)&adst);
+		if (error)
+			return (error);
 		atype = ARCTYPE_INET6;
 		break;
 #endif
@@ -225,11 +242,7 @@ arc_output(ifp, m, dst, rt0)
 
 	BPF_MTAP(ifp, m);
 
-	IFQ_HANDOFF(ifp, m, &pktattr, error);
-	if (error) {
-		m = 0;
-		senderr(ENOBUFS);
-	}
+	IFQ_HANDOFF(ifp, m, error);
 
 	return (error);
 

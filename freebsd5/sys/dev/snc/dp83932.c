@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/dev/snc/dp83932.c,v 1.12 2003/11/01 23:24:38 brooks Exp $	*/
+/*	$FreeBSD: src/sys/dev/snc/dp83932.c,v 1.15 2004/08/13 23:47:01 rwatson Exp $	*/
 /*	$NecBSD: dp83932.c,v 1.5 1999/07/29 05:08:44 kmatsuda Exp $	*/
 /*	$NetBSD: if_snc.c,v 1.18 1998/04/25 21:27:40 scottr Exp $	*/
 
@@ -162,7 +162,6 @@ sncconfig(sc, media, nmedia, defmedia, myea)
 		camdump(sc);
 	}
 #endif
-	device_printf(sc->sc_dev, "address %6D\n", myea, ":");
 
 #ifdef SNCDEBUG
 	device_printf(sc->sc_dev,
@@ -175,10 +174,9 @@ sncconfig(sc, media, nmedia, defmedia, myea)
 	if_initname(ifp, device_get_name(sc->sc_dev),
 	    device_get_unit(sc->sc_dev));
 	ifp->if_ioctl = sncioctl;
-        ifp->if_output = ether_output;
 	ifp->if_start = sncstart;
 	ifp->if_flags =
-	    IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	    IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST | IFF_NEEDSGIANT;
 	ifp->if_watchdog = sncwatchdog;
         ifp->if_init = sncinit;
         ifp->if_mtu = ETHERMTU;

@@ -28,14 +28,11 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.198 2003/11/28 05:28:28 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.217.2.1 2004/09/25 22:21:09 mux Exp $");
 
 /*
  * Intel EtherExpress Pro/100B PCI Fast Ethernet driver
  */
-
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.198 2003/11/28 05:28:28 imp Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -43,6 +40,7 @@ __FBSDID("$FreeBSD: src/sys/dev/fxp/if_fxp.c,v 1.198 2003/11/28 05:28:28 imp Exp
 #include <sys/mbuf.h>
 		/* #include <sys/mutex.h> */
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 
@@ -171,7 +169,9 @@ static struct fxp_ident fxp_ident_table[] = {
     { 0x103D,	-1,	"Intel 82801DB (ICH4) Pro/100 VE Ethernet" },
     { 0x103E,	-1,	"Intel 82801DB (ICH4) Pro/100 VM Ethernet" },
     { 0x1050,	-1,	"Intel 82801BA (D865) Pro/100 VE Ethernet" },
+    { 0x1051,	-1,	"Intel 82562ET (ICH5/ICH5R) Pro/100 VE Ethernet" },
     { 0x1059,	-1,	"Intel 82551QM Pro/100 M Mobile Connection" },
+    { 0x1064,	-1,	"Intel 82562EZ (ICH6)" },
     { 0x1209,	-1,	"Intel 82559ER Embedded 10/100 Ethernet" },
     { 0x1229,	0x01,	"Intel 82557 Pro/100 Ethernet" },
     { 0x1229,	0x02,	"Intel 82557 Pro/100 Ethernet" },
@@ -211,9 +211,6 @@ static void		fxp_intr_body(struct fxp_softc *sc, struct ifnet *ifp,
 static void 		fxp_init(void *xsc);
 static void 		fxp_init_body(struct fxp_softc *sc);
 static void 		fxp_tick(void *xsc);
-#ifndef BURN_BRIDGES
-static void		fxp_powerstate_d0(device_t dev);
-#endif
 static void 		fxp_start(struct ifnet *ifp);
 static void 		fxp_start_body(struct ifnet *ifp);
 static void		fxp_stop(struct fxp_softc *sc);
@@ -281,13 +278,6 @@ static devclass_t fxp_devclass;
 DRIVER_MODULE(fxp, pci, fxp_driver, fxp_devclass, 0, 0);
 DRIVER_MODULE(fxp, cardbus, fxp_driver, fxp_devclass, 0, 0);
 DRIVER_MODULE(miibus, fxp, miibus_driver, miibus_devclass, 0, 0);
-
-static int fxp_rnr;
-SYSCTL_INT(_hw, OID_AUTO, fxp_rnr, CTLFLAG_RW, &fxp_rnr, 0, "fxp rnr events");
-
-static int fxp_noflow;
-SYSCTL_INT(_hw, OID_AUTO, fxp_noflow, CTLFLAG_RW, &fxp_noflow, 0, "fxp flow control disabled");
-TUNABLE_INT("hw.fxp_noflow", &fxp_noflow);
 
 /*
  * Wait for the previous command to be accepted (but not necessarily
@@ -358,34 +348,6 @@ fxp_probe(device_t dev)
 	return (ENXIO);
 }
 
-#ifndef BURN_BRIDGES
-static void
-fxp_powerstate_d0(device_t dev)
-{
-#if __FreeBSD_version >= 430002
-	u_int32_t iobase, membase, irq;
-
-	if (pci_get_powerstate(dev) != PCI_POWERSTATE_D0) {
-		/* Save important PCI config data. */
-		iobase = pci_read_config(dev, FXP_PCI_IOBA, 4);
-		membase = pci_read_config(dev, FXP_PCI_MMBA, 4);
-		irq = pci_read_config(dev, PCIR_INTLINE, 4);
-
-		/* Reset the power state. */
-		device_printf(dev, "chip is in D%d power mode "
-		    "-- setting to D0\n", pci_get_powerstate(dev));
-
-		pci_set_powerstate(dev, PCI_POWERSTATE_D0);
-
-		/* Restore PCI config data. */
-		pci_write_config(dev, FXP_PCI_IOBA, iobase, 4);
-		pci_write_config(dev, FXP_PCI_MMBA, membase, 4);
-		pci_write_config(dev, PCIR_INTLINE, irq, 4);
-	}
-#endif
-}
-#endif
-
 static void
 fxp_dma_map_addr(void *arg, bus_dma_segment_t *segs, int nseg, int error)
 {
@@ -409,11 +371,10 @@ fxp_attach(device_t dev)
 	u_int32_t val;
 	u_int16_t data, myea[ETHER_ADDR_LEN / 2];
 	int i, rid, m1, m2, prefer_iomap, maxtxseg;
-	int s, ipcbxmit_disable;
+	int s;
 
 	sc->dev = dev;
 	callout_init(&sc->stat_ch, CALLOUT_MPSAFE);
-	sysctl_ctx_init(&sc->sysctl_ctx);
 	mtx_init(&sc->sc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF);
 	ifmedia_init(&sc->sc_media, 0, fxp_serial_ifmedia_upd,
@@ -426,9 +387,7 @@ fxp_attach(device_t dev)
 	 */
 	pci_enable_busmaster(dev);
 	val = pci_read_config(dev, PCIR_COMMAND, 2);
-#ifndef BURN_BRIDGES
-	fxp_powerstate_d0(dev);
-#endif
+
 	/*
 	 * Figure out which we should try first - memory mapping or i/o mapping?
 	 * We default to memory mapping. Then we accept an override from the
@@ -445,14 +404,13 @@ fxp_attach(device_t dev)
 
 	sc->rtp = (m1 == PCIM_CMD_MEMEN)? SYS_RES_MEMORY : SYS_RES_IOPORT;
 	sc->rgd = (m1 == PCIM_CMD_MEMEN)? FXP_PCI_MMBA : FXP_PCI_IOBA;
-	sc->mem = bus_alloc_resource(dev, sc->rtp, &sc->rgd,
-	                                     0, ~0, 1, RF_ACTIVE);
+	sc->mem = bus_alloc_resource_any(dev, sc->rtp, &sc->rgd, RF_ACTIVE);
 	if (sc->mem == NULL) {
 		sc->rtp =
 		    (m2 == PCIM_CMD_MEMEN)? SYS_RES_MEMORY : SYS_RES_IOPORT;
 		sc->rgd = (m2 == PCIM_CMD_MEMEN)? FXP_PCI_MMBA : FXP_PCI_IOBA;
-		sc->mem = bus_alloc_resource(dev, sc->rtp, &sc->rgd,
-                                            0, ~0, 1, RF_ACTIVE);
+		sc->mem = bus_alloc_resource_any(dev, sc->rtp, &sc->rgd,
+                                            RF_ACTIVE);
 	}
 
 	if (!sc->mem) {
@@ -471,7 +429,7 @@ fxp_attach(device_t dev)
 	 * Allocate our interrupt.
 	 */
 	rid = 0;
-	sc->irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	sc->irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 				 RF_SHAREABLE | RF_ACTIVE);
 	if (sc->irq == NULL) {
 		device_printf(dev, "could not map interrupt\n");
@@ -498,34 +456,38 @@ fxp_attach(device_t dev)
 	    (data & FXP_PHY_SERIAL_ONLY))
 		sc->flags |= FXP_FLAG_SERIAL_MEDIA;
 
-	/*
-	 * Create the sysctl tree
-	 */
-	sc->sysctl_tree = SYSCTL_ADD_NODE(&sc->sysctl_ctx,
-	    SYSCTL_STATIC_CHILDREN(_hw), OID_AUTO,
-	    device_get_nameunit(dev), CTLFLAG_RD, 0, "");
-	if (sc->sysctl_tree == NULL) {
-		error = ENXIO;
-		goto fail;
-	}
-	SYSCTL_ADD_PROC(&sc->sysctl_ctx, SYSCTL_CHILDREN(sc->sysctl_tree),
-	    OID_AUTO, "int_delay", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_PRISON,
+	SYSCTL_ADD_PROC(device_get_sysctl_ctx(dev),
+	    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)),
+	    OID_AUTO, "int_delay", CTLTYPE_INT | CTLFLAG_RW,
 	    &sc->tunable_int_delay, 0, sysctl_hw_fxp_int_delay, "I",
 	    "FXP driver receive interrupt microcode bundling delay");
-	SYSCTL_ADD_PROC(&sc->sysctl_ctx, SYSCTL_CHILDREN(sc->sysctl_tree),
-	    OID_AUTO, "bundle_max", CTLTYPE_INT | CTLFLAG_RW | CTLFLAG_PRISON,
+	SYSCTL_ADD_PROC(device_get_sysctl_ctx(dev),
+	    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)),
+	    OID_AUTO, "bundle_max", CTLTYPE_INT | CTLFLAG_RW,
 	    &sc->tunable_bundle_max, 0, sysctl_hw_fxp_bundle_max, "I",
 	    "FXP driver receive interrupt microcode bundle size limit");
+	SYSCTL_ADD_INT(device_get_sysctl_ctx(dev),
+	    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)),
+	    OID_AUTO, "rnr", CTLFLAG_RD, &sc->rnr, 0,
+	    "FXP RNR events");
+	SYSCTL_ADD_INT(device_get_sysctl_ctx(dev),
+	    SYSCTL_CHILDREN(device_get_sysctl_tree(dev)),
+	    OID_AUTO, "noflow", CTLFLAG_RW, &sc->tunable_noflow, 0,
+	    "FXP flow control disabled");
 
 	/*
 	 * Pull in device tunables.
 	 */
 	sc->tunable_int_delay = TUNABLE_INT_DELAY;
 	sc->tunable_bundle_max = TUNABLE_BUNDLE_MAX;
+	sc->tunable_noflow = 0;
 	(void) resource_int_value(device_get_name(dev), device_get_unit(dev),
 	    "int_delay", &sc->tunable_int_delay);
 	(void) resource_int_value(device_get_name(dev), device_get_unit(dev),
 	    "bundle_max", &sc->tunable_bundle_max);
+	(void) resource_int_value(device_get_name(dev), device_get_unit(dev),
+	    "noflow", &sc->tunable_noflow);
+	sc->rnr = 0;
 
 	/*
 	 * Find out the chip revision; lump all 82557 revs together.
@@ -601,6 +563,9 @@ fxp_attach(device_t dev)
 
 		/* enable reception of long frames for VLAN */
 		sc->flags |= FXP_FLAG_LONG_PKT_EN;
+	} else {
+		/* a hack to get long VLAN frames on a 82557 */
+		sc->flags |= FXP_FLAG_SAVE_BAD;
 	}
 
 	/*
@@ -608,31 +573,9 @@ fxp_attach(device_t dev)
 	 * and later chips. Note: we need extended TXCB support
 	 * too, but that's already enabled by the code above.
 	 * Be careful to do this only on the right devices.
-	 *
-	 * At least some 82550 cards probed as "chip=0x12298086 rev=0x0d"
-	 * truncate packets that end with an mbuf containing 1 to 3 bytes
-	 * when used with this feature enabled in the previous version of the
-	 * driver.  This problem appears to be fixed now that the driver
-	 * always sets the hardware parse bit in the IPCB structure, which
-	 * the "Intel 8255x 10/100 Mbps Ethernet Controller Family Open
-	 * Source Software Developer Manual" says is necessary in the
-	 * cases where packet truncation was observed.
-	 *
-	 * The device hint "hint.fxp.UNIT_NUMBER.ipcbxmit_disable"
-	 * allows this feature to be disabled at boot time.
-	 *
-	 * If fxp is not compiled into the kernel, this feature may also
-	 * be disabled at run time:
-	 *    # kldunload fxp
-	 *    # kenv hint.fxp.0.ipcbxmit_disable=1
-	 *    # kldload fxp
 	 */
 
-	if (resource_int_value("fxp", device_get_unit(dev), "ipcbxmit_disable",
-	    &ipcbxmit_disable) != 0)
-		ipcbxmit_disable = 0;
-	if (ipcbxmit_disable == 0 && (sc->revision == FXP_REV_82550 ||
-	    sc->revision == FXP_REV_82550_C)) {
+	if (sc->revision == FXP_REV_82550 || sc->revision == FXP_REV_82550_C) {
 		sc->rfa_size = sizeof (struct fxp_rfa);
 		sc->tx_cmd = FXP_CB_COMMAND_IPCBXMIT;
 		sc->flags |= FXP_FLAG_EXT_RFA;
@@ -758,9 +701,6 @@ fxp_attach(device_t dev)
 	sc->arpcom.ac_enaddr[3] = myea[1] >> 8;
 	sc->arpcom.ac_enaddr[4] = myea[2] & 0xff;
 	sc->arpcom.ac_enaddr[5] = myea[2] >> 8;
-	device_printf(dev, "Ethernet address %6D%s\n",
-	    sc->arpcom.ac_enaddr, ":",
-	    sc->flags & FXP_FLAG_SERIAL_MEDIA ? ", 10Mbps" : "");
 	if (bootverbose) {
 		device_printf(dev, "PCI IDs: %04x %04x %04x %04x %04x\n",
 		    pci_get_vendor(dev), pci_get_device(dev),
@@ -794,7 +734,6 @@ fxp_attach(device_t dev)
 
 	ifp = &sc->arpcom.ac_if;
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
-	ifp->if_output = ether_output;
 	ifp->if_baudrate = 100000000;
 	ifp->if_init = fxp_init;
 	ifp->if_softc = sc;
@@ -804,12 +743,20 @@ fxp_attach(device_t dev)
 	ifp->if_watchdog = fxp_watchdog;
 	IFQ_SET_READY(&ifp->if_snd);
 
+	ifp->if_capabilities = ifp->if_capenable = 0;
+
 	/* Enable checksum offload for 82550 or better chips */
 	if (sc->flags & FXP_FLAG_EXT_RFA) {
 		ifp->if_hwassist = FXP_CSUM_FEATURES;
-		ifp->if_capabilities = IFCAP_HWCSUM;
-		ifp->if_capenable = ifp->if_capabilities;
+		ifp->if_capabilities |= IFCAP_HWCSUM;
+		ifp->if_capenable |= IFCAP_HWCSUM;
 	}
+
+#ifdef DEVICE_POLLING
+	/* Inform the world we support polling. */
+	ifp->if_capabilities |= IFCAP_POLLING;
+	ifp->if_capenable |= IFCAP_POLLING;
+#endif
 
 	/*
 	 * Attach the interface.
@@ -818,15 +765,20 @@ fxp_attach(device_t dev)
 
 	/*
 	 * Tell the upper layer(s) we support long frames.
+	 * Must appear after the call to ether_ifattach() because
+	 * ether_ifattach() sets ifi_hdrlen to the default value.
 	 */
 	ifp->if_data.ifi_hdrlen = sizeof(struct ether_vlan_header);
 	ifp->if_capabilities |= IFCAP_VLAN_MTU;
+	ifp->if_capenable |= IFCAP_VLAN_MTU; /* the hw bits already set */
 
 	/*
 	 * Let the system queue as many packets as we have available
 	 * TX descriptors.
 	 */
 	IFQ_SET_MAXLEN(&ifp->if_snd, FXP_NTXCB - 1);
+	ifp->if_snd.ifq_drv_maxlen = FXP_NTXCB - 1;
+	IFQ_SET_READY(&ifp->if_snd);
 
 	/* 
 	 * Hook our interrupt after all initialization is complete.
@@ -860,9 +812,9 @@ fxp_release(struct fxp_softc *sc)
 	struct fxp_tx *txp;
 	int i;
 
-	mtx_assert(&sc->sc_mtx, MA_NOTOWNED);
-	if (sc->ih)
-		panic("fxp_release() called with intr handle still active");
+	FXP_LOCK_ASSERT(sc, MA_NOTOWNED);
+	KASSERT(sc->ih == NULL,
+	    ("fxp_release() called with intr handle still active"));
 	if (sc->miibus)
 		device_delete_child(sc->dev, sc->miibus);
 	bus_generic_detach(sc->dev);
@@ -915,8 +867,6 @@ fxp_release(struct fxp_softc *sc)
 		bus_dma_tag_destroy(sc->cbl_tag);
 	if (sc->mcs_tag)
 		bus_dma_tag_destroy(sc->mcs_tag);
-
-        sysctl_ctx_free(&sc->sysctl_ctx);
 
 	mtx_destroy(&sc->sc_mtx);
 }
@@ -1022,9 +972,7 @@ fxp_resume(device_t dev)
 
 	FXP_LOCK(sc);
 	s = splimp();
-#ifndef BURN_BRIDGES
-	fxp_powerstate_d0(dev);
-#endif
+
 	/* better way to do this? */
 	for (i = 0; i < 5; i++)
 		pci_write_config(dev, PCIR_BAR(i), sc->saved_maps[i], 4);
@@ -1294,7 +1242,7 @@ fxp_start_body(struct ifnet *ifp)
 	struct mbuf *mb_head;
 	int error;
 
-	mtx_assert(&sc->sc_mtx, MA_OWNED);
+	FXP_LOCK_ASSERT(sc, MA_OWNED);
 	/*
 	 * See if we need to suspend xmit until the multicast filter
 	 * has been reprogrammed (which can only be done at the head
@@ -1312,12 +1260,13 @@ fxp_start_body(struct ifnet *ifp)
 	 * NOTE: One TxCB is reserved to guarantee that fxp_mc_setup() can add
 	 *       a NOP command when needed.
 	 */
-	while (!IFQ_IS_EMPTY(&ifp->if_snd) && sc->tx_queued < FXP_NTXCB - 1) {
+	while (!IFQ_DRV_IS_EMPTY(&ifp->if_snd) &&
+	    sc->tx_queued < FXP_NTXCB - 1) {
 
 		/*
 		 * Grab a packet to transmit.
 		 */
-		IFQ_DEQUEUE(&ifp->if_snd, mb_head);
+		IFQ_DRV_DEQUEUE(&ifp->if_snd, mb_head);
 		if (mb_head == NULL)
 			break;
 
@@ -1526,6 +1475,10 @@ fxp_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
 	u_int8_t statack;
 
 	FXP_LOCK(sc);
+	if (!(ifp->if_capenable & IFCAP_POLLING)) {
+		ether_poll_deregister(ifp);
+		cmd = POLL_DEREGISTER;
+	}
 	if (cmd == POLL_DEREGISTER) {	/* final call, enable interrupts */
 		CSR_WRITE_1(sc, FXP_CSR_SCB_INTRCNTL, 0);
 		FXP_UNLOCK(sc);
@@ -1573,7 +1526,8 @@ fxp_intr(void *xsc)
 		FXP_UNLOCK(sc);
 		return;
 	}
-	if (ether_poll_register(fxp_poll, ifp)) {
+	if ((ifp->if_capenable & IFCAP_POLLING) &&
+	    ether_poll_register(fxp_poll, ifp)) {
 		/* disable interrupts */
 		CSR_WRITE_1(sc, FXP_CSR_SCB_INTRCNTL, FXP_SCB_INTR_DISABLE);
 		FXP_UNLOCK(sc);
@@ -1635,9 +1589,9 @@ fxp_intr_body(struct fxp_softc *sc, struct ifnet *ifp, u_int8_t statack,
 	struct fxp_rfa *rfa;
 	int rnr = (statack & FXP_SCB_STATACK_RNR) ? 1 : 0;
 
-	mtx_assert(&sc->sc_mtx, MA_OWNED);
+	FXP_LOCK_ASSERT(sc, MA_OWNED);
 	if (rnr)
-		fxp_rnr++;
+		sc->rnr++;
 #ifdef DEVICE_POLLING
 	/* Pick up a deferred RNR condition if `count' ran out last time. */
 	if (sc->flags & FXP_FLAG_DEFERRED_RNR) {
@@ -1670,7 +1624,7 @@ fxp_intr_body(struct fxp_softc *sc, struct ifnet *ifp, u_int8_t statack,
 		/*
 		 * Try to start more packets transmitting.
 		 */
-		if (!IFQ_IS_EMPTY(&ifp->if_snd))
+		if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
 			fxp_start_body(ifp);
 	}
 
@@ -1994,7 +1948,7 @@ fxp_init_body(struct fxp_softc *sc)
 	struct fxp_cb_mcs *mcsp;
 	int i, prm, s;
 
-	mtx_assert(&sc->sc_mtx, MA_OWNED);
+	FXP_LOCK_ASSERT(sc, MA_OWNED);
 	s = splimp();
 	/*
 	 * Cancel any pending I/O
@@ -2085,7 +2039,7 @@ fxp_init_body(struct fxp_softc *sc)
 	cbp->ext_txcb_dis = 	sc->flags & FXP_FLAG_EXT_TXCB ? 0 : 1;
 	cbp->ext_stats_dis = 	1;	/* disable extended counters */
 	cbp->keep_overrun_rx = 	0;	/* don't pass overrun frames to host */
-	cbp->save_bf =		sc->revision == FXP_REV_82557 ? 1 : prm;
+	cbp->save_bf =		sc->flags & FXP_FLAG_SAVE_BAD ? 1 : prm;
 	cbp->disc_short_rx =	!prm;	/* discard short packets */
 	cbp->underrun_retry =	1;	/* retry mode (once) on DMA underrun */
 	cbp->two_frames =	0;	/* do not limit FIFO to 2 frames */
@@ -2124,7 +2078,7 @@ fxp_init_body(struct fxp_softc *sc)
 	cbp->mc_all =		sc->flags & FXP_FLAG_ALL_MCAST ? 1 : 0;
 	cbp->gamla_rx =		sc->flags & FXP_FLAG_EXT_RFA ? 1 : 0;
 
-	if (fxp_noflow || sc->revision == FXP_REV_82557) {
+	if (sc->tunable_noflow || sc->revision == FXP_REV_82557) {
 		/*
 		 * The 82557 has no hardware flow control, the values
 		 * below are the defaults for the chip.
@@ -2429,13 +2383,13 @@ fxp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 	struct fxp_softc *sc = ifp->if_softc;
 	struct ifreq *ifr = (struct ifreq *)data;
 	struct mii_data *mii;
-	int s, error = 0;
+	int flag, mask, s, error = 0;
 
 	/*
 	 * Detaching causes us to call ioctl with the mutex owned.  Preclude
 	 * that by saying we're busy if the lock is already held.
 	 */
-	if (mtx_owned(&sc->sc_mtx))
+	if (FXP_LOCKED(sc))
 		return (EBUSY);
 
 	FXP_LOCK(sc);
@@ -2494,6 +2448,22 @@ fxp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		}
 		break;
 
+	case SIOCSIFCAP:
+		mask = ifp->if_capenable ^ ifr->ifr_reqcap;
+		if (mask & IFCAP_POLLING)
+			ifp->if_capenable ^= IFCAP_POLLING;
+		if (mask & IFCAP_VLAN_MTU) {
+			ifp->if_capenable ^= IFCAP_VLAN_MTU;
+			if (sc->revision != FXP_REV_82557)
+				flag = FXP_FLAG_LONG_PKT_EN;
+			else /* a hack to get long frames on the old chip */
+				flag = FXP_FLAG_SAVE_BAD;
+			sc->flags ^= flag;
+			if (ifp->if_flags & IFF_UP)
+				fxp_init_body(sc);
+		}
+		break;
+
 	default:
 		/* 
 		 * ether_ioctl() will eventually call fxp_start() which
@@ -2502,7 +2472,7 @@ fxp_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 		FXP_UNLOCK(sc);
 		error = ether_ioctl(ifp, command, data);
 	}
-	if (mtx_owned(&sc->sc_mtx))
+	if (FXP_LOCKED(sc))
 		FXP_UNLOCK(sc);
 	splx(s);
 	return (error);
@@ -2564,6 +2534,7 @@ fxp_mc_setup(struct fxp_softc *sc)
 	struct fxp_tx *txp;
 	int count;
 
+	FXP_LOCK_ASSERT(sc, MA_OWNED);
 	/*
 	 * If there are queued commands, we must wait until they are all
 	 * completed. If we are already waiting, then add a NOP command

@@ -173,7 +173,7 @@ WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
 */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/wl/if_wl.c,v 1.57 2003/11/14 19:00:31 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/wl/if_wl.c,v 1.63 2004/05/30 20:08:46 phk Exp $");
 
 
 /*
@@ -195,6 +195,7 @@ __FBSDID("$FreeBSD: src/sys/dev/wl/if_wl.c,v 1.57 2003/11/14 19:00:31 sam Exp $"
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/sockio.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
@@ -365,8 +366,6 @@ static void     wl_cache_zero(struct wl_softc *sc);
 static int irqvals[16] = { 
     0, 0, 0, 0x01, 0x02, 0x04, 0, 0x08, 0, 0, 0x10, 0x20, 0x40, 0, 0, 0x80 
 };
-/* mask of valid IRQs */
-#define WL_IRQS (IRQ3|IRQ4|IRQ5|IRQ7|IRQ10|IRQ11|IRQ12|IRQ15)
 
 /*
  * wlprobe:
@@ -556,7 +555,6 @@ wlattach(device_t device)
 #endif	/* MULTICAST */
     if_initname(ifp, device_get_name(device), device_get_unit(device));
     ifp->if_init = wlinit;
-    ifp->if_output = ether_output;
     ifp->if_start = wlstart;
     ifp->if_ioctl = wlioctl;
     ifp->if_timer = 0;   /* paranoia */
@@ -570,8 +568,7 @@ wlattach(device_t device)
     ether_ifattach(ifp, &sc->wl_addr[0]);
 
     bcopy(&sc->wl_addr[0], sc->wl_ac.ac_enaddr, WAVELAN_ADDR_SIZE);
-    printf("%s: address %6D, NWID 0x%02x%02x", ifp->if_xname,
-           sc->wl_ac.ac_enaddr, ":", sc->nwid[0], sc->nwid[1]);
+    if_printf(ifp, "NWID 0x%02x%02x", sc->nwid[0], sc->nwid[1]);
     if (sc->freq24) 
 	printf(", Freq %d MHz",sc->freq24); 		/* 2.4 Gz       */
     printf("\n");                                       /* 2.4 Gz       */
@@ -624,8 +621,8 @@ wl_allocate_resources(device_t device)
     if (sc->res_ioport == NULL)
 	goto errexit;
 
-    sc->res_irq = bus_alloc_resource(device, SYS_RES_IRQ,
-	&sc->rid_irq, 0ul, ~0ul, 1, RF_SHAREABLE|RF_ACTIVE);
+    sc->res_irq = bus_alloc_resource_any(device, SYS_RES_IRQ,
+	&sc->rid_irq, RF_SHAREABLE|RF_ACTIVE);
     if (sc->res_irq == NULL)
 	goto errexit;
     return (0);
@@ -808,8 +805,6 @@ wlinit(void *xsc)
     if (sc->wl_if.if_flags & IFF_DEBUG)
 	printf("wl%d: entered wlinit()\n",sc->unit);
 #endif
-    if (TAILQ_FIRST(&ifp->if_addrhead) == (struct ifaddr *)0)
-	return;
     WL_LOCK(sc);
     oldpri = splimp();
     if ((stat = wlhwrst(sc)) == TRUE) {

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if_loop.c	8.2 (Berkeley) 1/9/95
- * $FreeBSD: src/sys/net/if_loop.c,v 1.92 2003/11/20 20:07:37 andre Exp $
+ * $FreeBSD: src/sys/net/if_loop.c,v 1.101.2.1 2004/09/15 15:14:18 andre Exp $
  */
 
 /*
@@ -42,12 +38,10 @@
 #include "opt_inet.h"
 #include "opt_inet6.h"
 #include "opt_ipx.h"
-#include "opt_mac.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
-#include <sys/mac.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/module.h>
@@ -58,6 +52,7 @@
 #include <sys/sysctl.h>
 
 #include <net/if.h>
+#include <net/if_clone.h>
 #include <net/if_types.h>
 #include <net/netisr.h>
 #include <net/route.h>
@@ -109,19 +104,19 @@ static void	lo_altqstart(struct ifnet *);
 #endif
 int		looutput(struct ifnet *ifp, struct mbuf *m,
 		    struct sockaddr *dst, struct rtentry *rt);
-int		lo_clone_create(struct if_clone *, int);
-void		lo_clone_destroy(struct ifnet *);
+static int	lo_clone_create(struct if_clone *, int);
+static void	lo_clone_destroy(struct ifnet *);
 
 struct ifnet *loif = NULL;			/* Used externally */
 
 static MALLOC_DEFINE(M_LO, LONAME, "Loopback Interface");
 
+static struct mtx lo_mtx;
 static LIST_HEAD(lo_list, lo_softc) lo_list;
 
-struct if_clone lo_cloner = IF_CLONE_INITIALIZER(LONAME,
-    lo_clone_create, lo_clone_destroy, 1, IF_MAXUNIT);
+IFC_SIMPLE_DECLARE(lo, 1);
 
-void
+static void
 lo_clone_destroy(ifp)
 	struct ifnet *ifp;
 {
@@ -132,13 +127,15 @@ lo_clone_destroy(ifp)
 	/* XXX: destroying lo0 will lead to panics. */
 	KASSERT(loif != ifp, ("%s: destroying lo0", __func__));
 
+	mtx_lock(&lo_mtx);
+	LIST_REMOVE(sc, sc_next);
+	mtx_unlock(&lo_mtx);
 	bpfdetach(ifp);
 	if_detach(ifp);
-	LIST_REMOVE(sc, sc_next);
 	free(sc, M_LO);
 }
 
-int
+static int
 lo_clone_create(ifc, unit)
 	struct if_clone *ifc;
 	int unit;
@@ -161,7 +158,9 @@ lo_clone_create(ifc, unit)
 	sc->sc_if.if_softc = sc;
 	if_attach(&sc->sc_if);
 	bpfattach(&sc->sc_if, DLT_NULL, sizeof(u_int));
+	mtx_lock(&lo_mtx);
 	LIST_INSERT_HEAD(&lo_list, sc, sc_next);
+	mtx_unlock(&lo_mtx);
 	if (loif == NULL)
 		loif = &sc->sc_if;
 
@@ -173,12 +172,15 @@ loop_modevent(module_t mod, int type, void *data)
 { 
 	switch (type) { 
 	case MOD_LOAD: 
+		mtx_init(&lo_mtx, "lo_mtx", NULL, MTX_DEF);
 		LIST_INIT(&lo_list);
 		if_clone_attach(&lo_cloner);
 		break; 
 	case MOD_UNLOAD: 
 		printf("loop module unload - not possible for this module type\n"); 
 		return EINVAL; 
+	default:
+		return EOPNOTSUPP;
 	} 
 	return 0; 
 } 
@@ -259,22 +261,14 @@ if_simloop(ifp, m, af, hlen)
 
 	/* Let BPF see incoming packet */
 	if (ifp->if_bpf) {
-		struct mbuf m0, *n = m;
-
 		if (ifp->if_bpf->bif_dlt == DLT_NULL) {
+			u_int32_t af1 = af;	/* XXX beware sizeof(af) != 4 */
 			/*
-			 * We need to prepend the address family as
-			 * a four byte field.  Cons up a dummy header
-			 * to pacify bpf.  This is safe because bpf
-			 * will only read from the mbuf (i.e., it won't
-			 * try to free it or keep a pointer a to it).
+			 * We need to prepend the address family.
 			 */
-			m0.m_next = m;
-			m0.m_len = 4;
-			m0.m_data = (char *)&af;
-			n = &m0;
-		}
-		BPF_MTAP(ifp, n);
+			bpf_mtap2(ifp->if_bpf, &af1, sizeof(af1), m);
+		} else
+			bpf_mtap(ifp->if_bpf, m);
 	}
 
 	/* Strip away media header */
@@ -289,7 +283,7 @@ if_simloop(ifp, m, af, hlen)
 			    (char *)(mtod(m, vm_offset_t) 
 				- (mtod(m, vm_offset_t) & 3)),
 			    m->m_len);
-			mtod(m,vm_offset_t) -= (mtod(m, vm_offset_t) & 3);
+			m->m_data -= (mtod(m,vm_offset_t) & 3);
 		}
 #endif
 	}
@@ -354,7 +348,7 @@ if_simloop(ifp, m, af, hlen)
 	}
 	ifp->if_ipackets++;
 	ifp->if_ibytes += m->m_pkthdr.len;
-	netisr_queue(isr, m);
+	netisr_queue(isr, m);	/* mbuf is free'd on failure. */
 	return (0);
 }
 

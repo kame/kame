@@ -39,7 +39,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)kernel.h	8.3 (Berkeley) 1/21/94
- * $FreeBSD: src/sys/sys/kernel.h,v 1.113 2003/10/17 15:46:31 ume Exp $
+ * $FreeBSD: src/sys/sys/kernel.h,v 1.117.2.1 2004/09/03 03:09:54 rwatson Exp $
  */
 
 #ifndef _SYS_KERNEL_H_
@@ -52,9 +52,6 @@
 /* for intrhook below */
 #include <sys/queue.h>
 
-/* THIS MUST DIE! */
-#include <sys/module.h>
-
 /* Global variables for the kernel. */
 
 /* 1.1 */
@@ -64,9 +61,6 @@ extern int hostnamelen;
 extern char domainname[MAXHOSTNAMELEN];
 extern int domainnamelen;
 extern char kernelname[MAXPATHLEN];
-
-/* 1.2 */
-extern struct timeval boottime;
 
 extern int tick;			/* usec per tick (1000000 / hz) */
 extern int hz;				/* system clock's frequency */
@@ -112,6 +106,7 @@ enum sysinit_sub_id {
 	SI_SUB_TUNABLES		= 0x0700000,	/* establish tunable values */
 	SI_SUB_CONSOLE		= 0x0800000,	/* console*/
 	SI_SUB_COPYRIGHT	= 0x0800001,	/* first use of console*/
+	SI_SUB_SETTINGS		= 0x0880000,	/* check and recheck settings */
 	SI_SUB_MTX_POOL_STATIC	= 0x0900000,	/* static mutex pool */
 	SI_SUB_LOCKMGR		= 0x0980000,	/* lockmgr locks */
 	SI_SUB_VM		= 0x1000000,	/* virtual memory system init*/
@@ -265,6 +260,9 @@ void	sysinit_add(struct sysinit **set, struct sysinit **set_end);
  * Infrastructure for tunable 'constants'.  Value may be specified at compile
  * time or kernel load time.  Rules relating tunables together can be placed
  * in a SYSINIT function at SI_SUB_TUNABLES with SI_ORDER_LAST.
+ *
+ * WARNING: developers should never use the reserved suffixes specified in
+ * loader.conf(5) for any tunables or conflicts will result.
  */
 
 extern void tunable_int_init(void *);
@@ -360,6 +358,11 @@ extern struct linker_set execsw_set;
 
 
 
+
+void	net_warn_not_mpsafe(const char *component);
+#define	NET_NEEDS_GIANT(component)					\
+	SYSINIT(__net_warn_not_mpsafe_ ## __FILE__,			\
+	    SI_SUB_SETTINGS, SI_ORDER_SECOND, net_warn_not_mpsafe, component);
 
 struct intr_config_hook {
 	TAILQ_ENTRY(intr_config_hook) ich_links;

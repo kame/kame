@@ -36,7 +36,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_de.c,v 1.149 2003/10/31 18:32:13 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_de.c,v 1.158.4.1 2004/10/23 03:12:33 jmg Exp $");
 
 #define	TULIP_HDR_DATA
 
@@ -48,6 +48,7 @@ __FBSDID("$FreeBSD: src/sys/pci/if_de.c,v 1.149 2003/10/31 18:32:13 brooks Exp $
 #include <sys/sockio.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/eventhandler.h>
 #include <machine/bus.h>
 #include <machine/resource.h>
@@ -111,27 +112,32 @@ __FBSDID("$FreeBSD: src/sys/pci/if_de.c,v 1.149 2003/10/31 18:32:13 brooks Exp $
  *	the DEC 21041 PCI Ethernet Controller.
  *	the DEC 21140 PCI Fast Ethernet Controller.
  */
-static void tulip_mii_autonegotiate(tulip_softc_t * const sc, const unsigned phyaddr);
-static void tulip_intr_shared(void *arg);
-static void tulip_intr_normal(void *arg);
-static void tulip_init(tulip_softc_t * const sc);
-static void tulip_ifinit(void *);
-static void tulip_reset(tulip_softc_t * const sc);
-static void tulip_ifstart_one(struct ifnet *ifp);
-static void tulip_ifstart(struct ifnet *ifp);
-static struct mbuf *tulip_txput(tulip_softc_t * const sc, struct mbuf *m);
-static void tulip_txput_setup(tulip_softc_t * const sc);
-static void tulip_rx_intr(tulip_softc_t * const sc);
-static void tulip_addr_filter(tulip_softc_t * const sc);
-static unsigned tulip_mii_readreg(tulip_softc_t * const sc, unsigned devaddr, unsigned regno);
-static void tulip_mii_writereg(tulip_softc_t * const sc, unsigned devaddr, unsigned regno, unsigned data);
-static int tulip_mii_map_abilities(tulip_softc_t * const sc, unsigned abilities);
-static tulip_media_t tulip_mii_phy_readspecific(tulip_softc_t * const sc);
-static int tulip_srom_decode(tulip_softc_t * const sc);
-static int tulip_ifmedia_change(struct ifnet * const ifp);
-static void tulip_ifmedia_status(struct ifnet * const ifp, struct ifmediareq *req);
-/* static void tulip_21140_map_media(tulip_softc_t *sc); */
-
+static void	tulip_addr_filter(tulip_softc_t * const sc);
+static void	tulip_ifinit(void *);
+static int	tulip_ifmedia_change(struct ifnet * const ifp);
+static void	tulip_ifmedia_status(struct ifnet * const ifp,
+		    struct ifmediareq *req);
+static void	tulip_ifstart(struct ifnet *ifp);
+static void	tulip_init(tulip_softc_t * const sc);
+static void	tulip_intr_shared(void *arg);
+static void	tulip_intr_normal(void *arg);
+static void	tulip_mii_autonegotiate(tulip_softc_t * const sc,
+		    const unsigned phyaddr);
+static int	tulip_mii_map_abilities(tulip_softc_t * const sc,
+		    unsigned abilities);
+static tulip_media_t
+		tulip_mii_phy_readspecific(tulip_softc_t * const sc);
+static unsigned	tulip_mii_readreg(tulip_softc_t * const sc, unsigned devaddr,
+		    unsigned regno);
+static void	tulip_mii_writereg(tulip_softc_t * const sc, unsigned devaddr,
+		    unsigned regno, unsigned data);
+static void	tulip_reset(tulip_softc_t * const sc);
+static void	tulip_rx_intr(tulip_softc_t * const sc);
+static int	tulip_srom_decode(tulip_softc_t * const sc);
+static struct mbuf *
+		tulip_txput(tulip_softc_t * const sc, struct mbuf *m);
+static void	tulip_txput_setup(tulip_softc_t * const sc);
+
 static void
 tulip_timeout_callback(
     void *arg)
@@ -1513,7 +1519,7 @@ tulip_null_media_poll(
 #endif
 }
 
-__inline__ static void
+__inline static void
 tulip_21140_mediainit(
     tulip_softc_t * const sc,
     tulip_media_info_t * const mip,
@@ -1991,31 +1997,10 @@ tulip_mii_writereg(
 #endif
 }
 
-#define	tulip_mchash(mca)	(tulip_crc32(mca, 6) & 0x1FF)
+#define	tulip_mchash(mca)	(ether_crc32_le(mca, 6) & 0x1FF)
 #define	tulip_srom_crcok(databuf)	( \
-    ((tulip_crc32(databuf, 126) & 0xFFFFU) ^ 0xFFFFU) == \
+    ((ether_crc32_le(databuf, 126) & 0xFFFFU) ^ 0xFFFFU) == \
      ((databuf)[126] | ((databuf)[127] << 8)))
-
-static unsigned
-tulip_crc32(
-    const unsigned char *databuf,
-    size_t datalen)
-{
-    u_int idx, crc = 0xFFFFFFFFUL;
-    static const u_int crctab[] = {
-	0x00000000, 0x1db71064, 0x3b6e20c8, 0x26d930ac,
-	0x76dc4190, 0x6b6b51f4, 0x4db26158, 0x5005713c,
-	0xedb88320, 0xf00f9344, 0xd6d6a3e8, 0xcb61b38c,
-	0x9b64c2b0, 0x86d3d2d4, 0xa00ae278, 0xbdbdf21c
-    };
-
-    for (idx = 0; idx < datalen; idx++) {
-	crc ^= *databuf++;
-	crc = (crc >> 4) ^ crctab[crc & 0xf];
-	crc = (crc >> 4) ^ crctab[crc & 0xf];
-    }
-    return crc;
-}
 
 static void
 tulip_identify_dec_nic(
@@ -4639,36 +4624,19 @@ tulip_ifstart(
 	if ((sc->tulip_flags & (TULIP_WANTSETUP|TULIP_TXPROBE_ACTIVE)) == TULIP_WANTSETUP)
 	    tulip_txput_setup(sc);
 
-	while (sc->tulip_if.if_snd.ifq_head != NULL) {
+	while (!IFQ_DRV_IS_EMPTY(&sc->tulip_if.if_snd)) {
 	    struct mbuf *m;
-	    IF_DEQUEUE(&sc->tulip_if.if_snd, m);
+	    IFQ_DRV_DEQUEUE(&sc->tulip_if.if_snd, m);
+	    if(m == NULL)
+		break;
 	    if ((m = tulip_txput(sc, m)) != NULL) {
-		IF_PREPEND(&sc->tulip_if.if_snd, m);
+		IFQ_DRV_PREPEND(&sc->tulip_if.if_snd, m);
 		break;
 	    }
 	}
-	if (sc->tulip_if.if_snd.ifq_head == NULL)
-	    sc->tulip_if.if_start = tulip_ifstart_one;
     }
 
     TULIP_PERFEND(ifstart);
-}
-
-static void
-tulip_ifstart_one(
-    struct ifnet * const ifp)
-{
-    TULIP_PERFSTART(ifstart_one)
-    tulip_softc_t * const sc = (tulip_softc_t *)ifp->if_softc;
-
-    if ((sc->tulip_if.if_flags & IFF_RUNNING)
-	    && sc->tulip_if.if_snd.ifq_head != NULL) {
-	struct mbuf *m;
-	IF_DEQUEUE(&sc->tulip_if.if_snd, m);
-	if ((m = tulip_txput(sc, m)) != NULL)
-	    IF_PREPEND(&sc->tulip_if.if_snd, m);
-    }
-    TULIP_PERFEND(ifstart_one);
 }
 
 /*
@@ -4769,12 +4737,11 @@ tulip_attach(
     /* XXX: driver name/unit should be set some other way */
     ifp->if_dname = "de";
     ifp->if_dunit = sc->tulip_unit;
-    ifp->if_flags = IFF_BROADCAST|IFF_SIMPLEX|IFF_MULTICAST;
+    ifp->if_flags = IFF_BROADCAST|IFF_SIMPLEX|IFF_MULTICAST|IFF_NEEDSGIANT;
     ifp->if_ioctl = tulip_ifioctl;
     ifp->if_start = tulip_ifstart;
     ifp->if_watchdog = tulip_ifwatchdog;
     ifp->if_timer = 1;
-    ifp->if_output = ether_output;
     ifp->if_init = tulip_ifinit;
   
     printf("%s: %s%s pass %d.%d%s\n",
@@ -4785,8 +4752,10 @@ tulip_attach(
 	   sc->tulip_revinfo & 0x0F,
 	   (sc->tulip_features & (TULIP_HAVE_ISVSROM|TULIP_HAVE_OKSROM))
 		 == TULIP_HAVE_ISVSROM ? " (invalid EESPROM checksum)" : "");
+#ifndef __FreeBSD__
     printf("%s: address %6D\n",
 	   sc->tulip_xname, sc->tulip_enaddr, ":");
+#endif
 
 #if defined(__alpha__)
     /*
@@ -4807,7 +4776,9 @@ tulip_attach(
     tulip_reset(sc);
 
     ether_ifattach(&(sc)->tulip_if, sc->tulip_enaddr);
-    ifp->if_snd.ifq_maxlen = ifqmaxlen;
+    IFQ_SET_MAXLEN(&ifp->if_snd, ifqmaxlen);
+    ifp->if_snd.ifq_drv_maxlen = ifqmaxlen;
+    IFQ_SET_READY(&ifp->if_snd);
 }
 
 #if defined(TULIP_BUS_DMA)
@@ -5150,12 +5121,10 @@ tulip_pci_attach(device_t dev)
     sc->tulip_if.if_softc = sc;
 #if defined(TULIP_IOMAPPED)
     rid = PCI_CBIO;
-    res = bus_alloc_resource(dev, SYS_RES_IOPORT, &rid,
-			     0, ~0, 1, RF_ACTIVE);
+    res = bus_alloc_resource_any(dev, SYS_RES_IOPORT, &rid, RF_ACTIVE);
 #else
     rid = PCI_CBMA;
-    res = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-			     0, ~0, 1, RF_ACTIVE);
+    res = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid, RF_ACTIVE);
 #endif
     if (!res)
 	return ENXIO;
@@ -5218,8 +5187,8 @@ tulip_pci_attach(device_t dev)
 	    void *ih;
 
 	    rid = 0;
-	    res = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-				     0, ~0, 1, RF_SHAREABLE | RF_ACTIVE);
+	    res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+					 RF_SHAREABLE | RF_ACTIVE);
 	    if (res == 0 || bus_setup_intr(dev, res, INTR_TYPE_NET,
 					   intr_rtn, sc, &ih)) {
 		printf("%s: couldn't map interrupt\n",

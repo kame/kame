@@ -17,7 +17,7 @@
  *
  * From: Version 2.4, Thu Apr 30 17:17:21 MSD 1997
  *
- * $FreeBSD: src/sys/net/if_spppsubr.c,v 1.104 2003/10/31 18:32:08 brooks Exp $
+ * $FreeBSD: src/sys/net/if_spppsubr.c,v 1.113.2.1 2004/09/15 15:14:18 andre Exp $
  */
 
 #include <sys/param.h>
@@ -281,7 +281,7 @@ static struct callout_handle keepalive_ch;
  *
  * XXX is this really still necessary?  - joerg -
  */
-static u_short interactive_ports[8] = {
+static const u_short interactive_ports[8] = {
 	0,	513,	0,	0,
 	0,	21,	0,	23,
 };
@@ -484,9 +484,8 @@ sppp_modevent(module_t mod, int type, void *unused)
 		break;
 	case MOD_UNLOAD:
 		return EACCES;
-		break;
 	default:
-		break;
+		return EOPNOTSUPP;
 	}
 	return 0;
 }
@@ -716,11 +715,11 @@ sppp_input(struct ifnet *ifp, struct mbuf *m)
 		goto drop;
 
 	/* Check queue. */
-	if (! netisr_queue(isr, m)) {
+	if (netisr_queue(isr, m)) {	/* (0) on success. */
 		if (debug)
 			log(LOG_DEBUG, SPP_FMT "protocol queue overflow\n",
 				SPP_ARGS(ifp));
-		goto drop;
+		goto drop2;
 	}
 	if (do_account)
 		/*
@@ -744,7 +743,6 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 	int s, error, rv = 0;
 	int ipproto = PPP_IP;
 	int debug = ifp->if_flags & IFF_DEBUG;
-	ALTQ_DECL(struct altq_pktattr pktattr;)
 
 	s = splimp();
 
@@ -782,13 +780,6 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 		s = splimp();
 	}
 
-#ifdef ALTQ
-	/*
-	 * if the queueing discipline needs packet classification,
-	 * do it before prepending link headers.
-	 */
-	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
-#endif
 #ifdef INET
 	if (dst->sa_family == AF_INET) {
 		/* XXX Check mbuf length here? */
@@ -818,9 +809,11 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 
 		/*
 		 * Put low delay, telnet, rlogin and ftp control packets
-		 * in front of the queue.
+		 * in front of the queue or let ALTQ take care.
 		 */
-		if (_IF_QFULL(&sp->pp_fastq))
+		if (ALTQ_IS_ENABLED(&ifp->if_snd))
+			;
+		else if (_IF_QFULL(&sp->pp_fastq))
 			;
 		else if (ip->ip_tos & IPTOS_LOWDELAY)
 			ifq = &sp->pp_fastq;
@@ -946,14 +939,11 @@ sppp_output(struct ifnet *ifp, struct mbuf *m,
 	 * Queue message on interface, and start output if interface
 	 * not yet active.
 	 */
-	if (ifq != NULL) {
-		if (! IF_HANDOFF_ADJ(ifq, m, ifp, 3))
-			error = ENOBUFS;
-		else
-			error = 0;
-	} else
-		IFQ_HANDOFF(ifp, m, NULL, error);
-	if (error != 0) {
+	if (ifq != NULL)
+		error = !(IF_HANDOFF_ADJ(ifq, m, ifp, 3));
+	else
+		IFQ_HANDOFF_ADJ(ifp, m, 3, error);
+	if (error) {
 		++ifp->if_oerrors;
 		splx (s);
 		return (rv? rv: ENOBUFS);
@@ -975,7 +965,7 @@ sppp_attach(struct ifnet *ifp)
 	struct sppp *sp = (struct sppp*) ifp;
 
 	/* Initialize keepalive handler. */
-	if (! spppq)
+	if (spppq == NULL)
 		TIMEOUT(sppp_keepalive, 0, hz * 10, keepalive_ch);
 
 	/* Insert new entry into the keepalive list. */
@@ -1034,7 +1024,7 @@ sppp_detach(struct ifnet *ifp)
 		}
 
 	/* Stop keepalive handler. */
-	if (! spppq)
+	if (spppq == NULL)
 		UNTIMEOUT(sppp_keepalive, 0, keepalive_ch);
 
 	for (i = 0; i < IDX_COUNT; i++)
@@ -1052,7 +1042,7 @@ sppp_flush(struct ifnet *ifp)
 {
 	struct sppp *sp = (struct sppp*) ifp;
 
-	IFQ_PURGE(&sp->pp_if.if_snd);
+	sppp_qflush ((struct ifqueue *)&sp->pp_if.if_snd);
 	sppp_qflush (&sp->pp_fastq);
 	sppp_qflush (&sp->pp_cpq);
 }
@@ -1322,15 +1312,9 @@ sppp_cisco_send(struct sppp *sp, int type, long par1, long par2)
 	struct ppp_header *h;
 	struct cisco_packet *ch;
 	struct mbuf *m;
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	struct timeval tv;
-#else
-	u_long t = (time.tv_sec - boottime.tv_sec) * 1000;
-#endif
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	getmicrouptime(&tv);
-#endif
 
 	MGETHDR (m, M_DONTWAIT, MT_DATA);
 	if (! m)
@@ -1349,13 +1333,8 @@ sppp_cisco_send(struct sppp *sp, int type, long par1, long par2)
 	ch->par2 = htonl (par2);
 	ch->rel = -1;
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 	ch->time0 = htons ((u_short) (tv.tv_sec >> 16));
 	ch->time1 = htons ((u_short) tv.tv_sec);
-#else
-	ch->time0 = htons ((u_short) (t >> 16));
-	ch->time1 = htons ((u_short) t);
-#endif
 
 	if (debug)
 		log(LOG_DEBUG,
@@ -2401,7 +2380,8 @@ sppp_lcp_RCR(struct sppp *sp, struct lcp_header *h, int len)
 				lcp.Down(sp);
 				lcp.Up(sp);
 			}
-		} else if (++sp->fail_counter[IDX_LCP] >= sp->lcp.max_failure) {
+		} else if (!sp->pp_loopcnt &&
+			   ++sp->fail_counter[IDX_LCP] >= sp->lcp.max_failure) {
 			if (debug)
 				log(-1, " max_failure (%d) exceeded, "
 				       "send conf-rej\n",

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_pcb.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.135.2.1 2004/01/27 15:54:05 ume Exp $
+ * $FreeBSD: src/sys/netinet/in_pcb.c,v 1.153.2.1.2.1 2004/10/21 09:30:47 rwatson Exp $
  */
 
 /*
@@ -73,7 +69,6 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
-#include <sys/limits.h>
 #include <sys/mac.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
@@ -120,8 +115,6 @@
 #include <netipsec/key.h>
 #endif /* FAST_IPSEC */
 
-struct	in_addr zeroin_addr;
-
 /*
  * These configure the range of local port addresses assigned to
  * "unspecified" outgoing connections/packets/whatever.
@@ -141,6 +134,9 @@ int	ipport_hilastauto  = IPPORT_HILASTAUTO;		/* 65535 */
 int	ipport_reservedhigh = IPPORT_RESERVED - 1;	/* 1023 */
 int	ipport_reservedlow = 0;
 
+/* Shall we allocate ephemeral ports in random order? */
+int	ipport_randomized = 1;
+
 #define RANGECHK(var, min, max) \
 	if ((var) < (min)) { (var) = (min); } \
 	else if ((var) > (max)) { (var) = (max); }
@@ -148,17 +144,18 @@ int	ipport_reservedlow = 0;
 static int
 sysctl_net_ipport_check(SYSCTL_HANDLER_ARGS)
 {
-	int error = sysctl_handle_int(oidp,
-		oidp->oid_arg1, oidp->oid_arg2, req);
-	if (!error) {
+	int error;
+
+	error = sysctl_handle_int(oidp, oidp->oid_arg1, oidp->oid_arg2, req);
+	if (error == 0) {
 		RANGECHK(ipport_lowfirstauto, 1, IPPORT_RESERVED - 1);
 		RANGECHK(ipport_lowlastauto, 1, IPPORT_RESERVED - 1);
-		RANGECHK(ipport_firstauto, IPPORT_RESERVED, USHRT_MAX);
-		RANGECHK(ipport_lastauto, IPPORT_RESERVED, USHRT_MAX);
-		RANGECHK(ipport_hifirstauto, IPPORT_RESERVED, USHRT_MAX);
-		RANGECHK(ipport_hilastauto, IPPORT_RESERVED, USHRT_MAX);
+		RANGECHK(ipport_firstauto, IPPORT_RESERVED, IPPORT_MAX);
+		RANGECHK(ipport_lastauto, IPPORT_RESERVED, IPPORT_MAX);
+		RANGECHK(ipport_hifirstauto, IPPORT_RESERVED, IPPORT_MAX);
+		RANGECHK(ipport_hilastauto, IPPORT_RESERVED, IPPORT_MAX);
 	}
-	return error;
+	return (error);
 }
 
 #undef RANGECHK
@@ -181,6 +178,8 @@ SYSCTL_INT(_net_inet_ip_portrange, OID_AUTO, reservedhigh,
 	   CTLFLAG_RW|CTLFLAG_SECURE, &ipport_reservedhigh, 0, "");
 SYSCTL_INT(_net_inet_ip_portrange, OID_AUTO, reservedlow,
 	   CTLFLAG_RW|CTLFLAG_SECURE, &ipport_reservedlow, 0, "");
+SYSCTL_INT(_net_inet_ip_portrange, OID_AUTO, randomized,
+	   CTLFLAG_RW, &ipport_randomized, 0, "");
 
 /*
  * in_pcb.c: manage the Protocol Control Blocks.
@@ -194,10 +193,9 @@ SYSCTL_INT(_net_inet_ip_portrange, OID_AUTO, reservedlow,
  * Allocate a PCB and associate it with the socket.
  */
 int
-in_pcballoc(so, pcbinfo, td, type)
+in_pcballoc(so, pcbinfo, type)
 	struct socket *so;
 	struct inpcbinfo *pcbinfo;
-	struct thread *td;
 	const char *type;
 {
 	register struct inpcb *inp;
@@ -215,7 +213,9 @@ in_pcballoc(so, pcbinfo, td, type)
 	error = mac_init_inpcb(inp, M_NOWAIT);
 	if (error != 0)
 		goto out;
+	SOCK_LOCK(so);
 	mac_create_inpcb_from_socket(so, inp);
+	SOCK_UNLOCK(so);
 #endif
 #if defined(IPSEC) || defined(FAST_IPSEC)
 #ifdef FAST_IPSEC
@@ -250,10 +250,10 @@ out:
 }
 
 int
-in_pcbbind(inp, nam, td)
+in_pcbbind(inp, nam, cred)
 	register struct inpcb *inp;
 	struct sockaddr *nam;
-	struct thread *td;
+	struct ucred *cred;
 {
 	int anonport, error;
 
@@ -265,7 +265,7 @@ in_pcbbind(inp, nam, td)
 	anonport = inp->inp_lport == 0 && (nam == NULL ||
 	    ((struct sockaddr_in *)nam)->sin_port == 0);
 	error = in_pcbbind_setup(inp, nam, &inp->inp_laddr.s_addr,
-	    &inp->inp_lport, td);
+	    &inp->inp_lport, cred);
 	if (error)
 		return (error);
 	if (in_pcbinshash(inp) != 0) {
@@ -288,12 +288,12 @@ in_pcbbind(inp, nam, td)
  * On error, the values of *laddrp and *lportp are not changed.
  */
 int
-in_pcbbind_setup(inp, nam, laddrp, lportp, td)
+in_pcbbind_setup(inp, nam, laddrp, lportp, cred)
 	struct inpcb *inp;
 	struct sockaddr *nam;
 	in_addr_t *laddrp;
 	u_short *lportp;
-	struct thread *td;
+	struct ucred *cred;
 {
 	struct socket *so = inp->inp_socket;
 	unsigned short *lastport;
@@ -327,7 +327,7 @@ in_pcbbind_setup(inp, nam, laddrp, lportp, td)
 			return (EAFNOSUPPORT);
 #endif
 		if (sin->sin_addr.s_addr != INADDR_ANY)
-			if (prison_ip(td->td_ucred, 0, &sin->sin_addr.s_addr))
+			if (prison_ip(cred, 0, &sin->sin_addr.s_addr))
 				return(EINVAL);
 		if (sin->sin_port != *lportp) {
 			/* Don't allow the port to change. */
@@ -358,9 +358,9 @@ in_pcbbind_setup(inp, nam, laddrp, lportp, td)
 			/* GROSS */
 			if (ntohs(lport) <= ipport_reservedhigh &&
 			    ntohs(lport) >= ipport_reservedlow &&
-			    td && suser_cred(td->td_ucred, PRISON_ROOT))
+			    suser_cred(cred, SUSER_ALLOWJAIL))
 				return (EACCES);
-			if (td && jailed(td->td_ucred))
+			if (jailed(cred))
 				prison = 1;
 			if (so->so_cred->cr_uid != 0 &&
 			    !IN_MULTICAST(ntohl(sin->sin_addr.s_addr))) {
@@ -371,33 +371,19 @@ in_pcbbind_setup(inp, nam, laddrp, lportp, td)
 	 * XXX
 	 * This entire block sorely needs a rewrite.
 	 */
-				if (t && (t->inp_vflag & INP_TIMEWAIT)) {
-					if ((ntohl(sin->sin_addr.s_addr) != INADDR_ANY ||
-					    ntohl(t->inp_laddr.s_addr) != INADDR_ANY ||
-					    (intotw(t)->tw_so_options & SO_REUSEPORT) == 0) &&
-					    (so->so_cred->cr_uid != intotw(t)->tw_cred->cr_uid))
-						return (EADDRINUSE);
-				} else
 				if (t &&
+				    ((t->inp_vflag & INP_TIMEWAIT) == 0) &&
+				    (so->so_type != SOCK_STREAM ||
+				     ntohl(t->inp_faddr.s_addr) == INADDR_ANY) &&
 				    (ntohl(sin->sin_addr.s_addr) != INADDR_ANY ||
 				     ntohl(t->inp_laddr.s_addr) != INADDR_ANY ||
 				     (t->inp_socket->so_options &
 					 SO_REUSEPORT) == 0) &&
 				    (so->so_cred->cr_uid !=
-				     t->inp_socket->so_cred->cr_uid)) {
-#if defined(INET6)
-					if (ntohl(sin->sin_addr.s_addr) !=
-					    INADDR_ANY ||
-					    ntohl(t->inp_laddr.s_addr) !=
-					    INADDR_ANY ||
-					    INP_SOCKAF(so) ==
-					    INP_SOCKAF(t->inp_socket))
-#endif /* defined(INET6) */
+				     t->inp_socket->so_cred->cr_uid))
 					return (EADDRINUSE);
-				}
 			}
-			if (prison &&
-			    prison_ip(td->td_ucred, 0, &sin->sin_addr.s_addr))
+			if (prison && prison_ip(cred, 0, &sin->sin_addr.s_addr))
 				return (EADDRNOTAVAIL);
 			t = in_pcblookup_local(pcbinfo, sin->sin_addr,
 			    lport, prison ? 0 : wild);
@@ -426,7 +412,7 @@ in_pcbbind_setup(inp, nam, laddrp, lportp, td)
 		int count;
 
 		if (laddr.s_addr != INADDR_ANY)
-			if (prison_ip(td->td_ucred, 0, &laddr.s_addr))
+			if (prison_ip(cred, 0, &laddr.s_addr))
 				return (EINVAL);
 
 		if (inp->inp_flags & INP_HIGHPORT) {
@@ -434,8 +420,7 @@ in_pcbbind_setup(inp, nam, laddrp, lportp, td)
 			last  = ipport_hilastauto;
 			lastport = &pcbinfo->lasthi;
 		} else if (inp->inp_flags & INP_LOWPORT) {
-			if (td && (error = suser_cred(td->td_ucred,
-			    PRISON_ROOT)) != 0)
+			if ((error = suser_cred(cred, SUSER_ALLOWJAIL)) != 0)
 				return error;
 			first = ipport_lowfirstauto;	/* 1023 */
 			last  = ipport_lowlastauto;	/* 600 */
@@ -456,6 +441,9 @@ in_pcbbind_setup(inp, nam, laddrp, lportp, td)
 			/*
 			 * counting down
 			 */
+			if (ipport_randomized)
+				*lastport = first -
+					    (arc4random() % (first - last));
 			count = first - last;
 
 			do {
@@ -471,6 +459,9 @@ in_pcbbind_setup(inp, nam, laddrp, lportp, td)
 			/*
 			 * counting up
 			 */
+			if (ipport_randomized)
+				*lastport = first +
+					    (arc4random() % (last - first));
 			count = last - first;
 
 			do {
@@ -484,7 +475,7 @@ in_pcbbind_setup(inp, nam, laddrp, lportp, td)
 			    wild));
 		}
 	}
-	if (prison_ip(td->td_ucred, 0, &laddr.s_addr))
+	if (prison_ip(cred, 0, &laddr.s_addr))
 		return (EINVAL);
 	*laddrp = laddr.s_addr;
 	*lportp = lport;
@@ -498,20 +489,23 @@ in_pcbbind_setup(inp, nam, laddrp, lportp, td)
  * then pick one.
  */
 int
-in_pcbconnect(inp, nam, td)
+in_pcbconnect(inp, nam, cred)
 	register struct inpcb *inp;
 	struct sockaddr *nam;
-	struct thread *td;
+	struct ucred *cred;
 {
 	u_short lport, fport;
 	in_addr_t laddr, faddr;
 	int anonport, error;
 
+	INP_INFO_WLOCK_ASSERT(inp->inp_pcbinfo);
+	INP_LOCK_ASSERT(inp);
+
 	lport = inp->inp_lport;
 	laddr = inp->inp_laddr.s_addr;
 	anonport = (lport == 0);
 	error = in_pcbconnect_setup(inp, nam, &laddr, &lport, &faddr, &fport,
-	    NULL, td);
+	    NULL, cred);
 	if (error)
 		return (error);
 
@@ -557,7 +551,7 @@ in_pcbconnect(inp, nam, td)
  * is set to NULL.
  */
 int
-in_pcbconnect_setup(inp, nam, laddrp, lportp, faddrp, fportp, oinpp, td)
+in_pcbconnect_setup(inp, nam, laddrp, lportp, faddrp, fportp, oinpp, cred)
 	register struct inpcb *inp;
 	struct sockaddr *nam;
 	in_addr_t *laddrp;
@@ -565,16 +559,19 @@ in_pcbconnect_setup(inp, nam, laddrp, lportp, faddrp, fportp, oinpp, td)
 	in_addr_t *faddrp;
 	u_short *fportp;
 	struct inpcb **oinpp;
-	struct thread *td;
+	struct ucred *cred;
 {
 	struct sockaddr_in *sin = (struct sockaddr_in *)nam;
 	struct in_ifaddr *ia;
 	struct sockaddr_in sa;
-	struct ucred *cred;
+	struct ucred *socred;
 	struct inpcb *oinp;
 	struct in_addr laddr, faddr;
 	u_short lport, fport;
 	int error;
+
+	INP_INFO_WLOCK_ASSERT(inp->inp_pcbinfo);
+	INP_LOCK_ASSERT(inp);
 
 	if (oinpp != NULL)
 		*oinpp = NULL;
@@ -588,14 +585,14 @@ in_pcbconnect_setup(inp, nam, laddrp, lportp, faddrp, fportp, oinpp, td)
 	lport = *lportp;
 	faddr = sin->sin_addr;
 	fport = sin->sin_port;
-	cred = inp->inp_socket->so_cred;
-	if (laddr.s_addr == INADDR_ANY && jailed(cred)) {
+	socred = inp->inp_socket->so_cred;
+	if (laddr.s_addr == INADDR_ANY && jailed(socred)) {
 		bzero(&sa, sizeof(sa));
-		sa.sin_addr.s_addr = htonl(prison_getip(cred));
+		sa.sin_addr.s_addr = htonl(prison_getip(socred));
 		sa.sin_len = sizeof(sa);
 		sa.sin_family = AF_INET;
 		error = in_pcbbind_setup(inp, (struct sockaddr *)&sa,
-		    &laddr.s_addr, &lport, td);
+		    &laddr.s_addr, &lport, cred);
 		if (error)
 			return (error);
 	}
@@ -651,9 +648,7 @@ in_pcbconnect_setup(inp, nam, laddrp, lportp, faddrp, fportp, oinpp, td)
 			if (ia == 0)
 				ia = ifatoia(ifa_ifwithnet(sintosa(&sa)));
 			if (ia == 0)
-				ia = TAILQ_FIRST(&in_ifaddrhead);
-			if (ia == 0)
-				return (EADDRNOTAVAIL);
+				return (ENETUNREACH);
 		}
 		/*
 		 * If the destination address is multicast and an outgoing
@@ -686,7 +681,8 @@ in_pcbconnect_setup(inp, nam, laddrp, lportp, faddrp, fportp, oinpp, td)
 		return (EADDRINUSE);
 	}
 	if (lport == 0) {
-		error = in_pcbbind_setup(inp, NULL, &laddr.s_addr, &lport, td);
+		error = in_pcbbind_setup(inp, NULL, &laddr.s_addr, &lport,
+		    cred);
 		if (error)
 			return (error);
 	}
@@ -728,6 +724,8 @@ in_pcbdetach(inp)
 	inp->inp_gencnt = ++ipi->ipi_gencnt;
 	in_pcbremlists(inp);
 	if (so) {
+		ACCEPT_LOCK();
+		SOCK_LOCK(so);
 		so->so_pcb = 0;
 		sotryfree(so);
 	}
@@ -1197,7 +1195,7 @@ in_pcbrehash(inp)
 	u_int32_t hashkey_faddr;
 
 	INP_INFO_WLOCK_ASSERT(pcbinfo);
-	/* XXX? INP_LOCK_ASSERT(inp); */
+	INP_LOCK_ASSERT(inp);
 #ifdef INET6
 	if (inp->inp_vflag & INP_IPV6)
 		hashkey_faddr = inp->in6p_faddr.s6_addr32[3] /* XXX */;
@@ -1250,20 +1248,11 @@ in_pcbsosetlabel(so)
 #ifdef MAC
 	struct inpcb *inp;
 
-	/* XXX: Will assert socket lock when we have them. */
 	inp = (struct inpcb *)so->so_pcb;
 	INP_LOCK(inp);
+	SOCK_LOCK(so);
 	mac_inpcb_sosetlabel(so, inp);
+	SOCK_UNLOCK(so);
 	INP_UNLOCK(inp);
 #endif
-}
-
-int
-prison_xinpcb(struct thread *td, struct inpcb *inp)
-{
-	if (!jailed(td->td_ucred))
-		return (0);
-	if (ntohl(inp->inp_laddr.s_addr) == prison_getip(td->td_ucred))
-		return (0);
-	return (1);
 }

@@ -14,10 +14,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -35,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)igmp.c	8.1 (Berkeley) 7/19/93
- * $FreeBSD: src/sys/netinet/igmp.c,v 1.44 2003/08/28 22:15:05 rwatson Exp $
+ * $FreeBSD: src/sys/netinet/igmp.c,v 1.46 2004/06/11 03:42:37 rwatson Exp $
  */
 
 /*
@@ -135,6 +131,14 @@ SYSCTL_INT(_net_inet_igmp, IGMPCTL_SOMAXSRC, somaxsrc, CTLFLAG_RW,
 SYSCTL_INT(_net_inet_igmp, IGMPCTL_ALWAYS_V3, always_v3, CTLFLAG_RW,
 	&igmpalways_v3, 0, "");
 
+/*
+ * igmp_mtx protects all mutable global variables in igmp.c, as well as
+ * the data fields in struct router_info.  In general, a router_info
+ * structure will be valid as long as the referencing struct in_multi is
+ * valid, so no reference counting is used.  We allow unlocked reads of
+ * router_info data when accessed via an in_multi read-only.
+ */
+static struct mtx igmp_mtx;
 static int igmp_timers_are_running;
 static int interface_timers_are_running;
 static int state_change_timers_are_running;
@@ -211,8 +215,14 @@ int igmp_create_group_record(struct mbuf *, int *, struct in_multi *,
 			     u_int16_t, u_int16_t *, u_int8_t);
 void igmp_cancel_pending_response(struct ifnet *, struct router_info *);
 
+/*
+ * XXXRW: can we define these such that these can be made const?  In any
+ * case, these shouldn't be changed after igmp_init() and therefore don't
+ * need locking.
+ */
 static u_long igmp_all_hosts_group;
 static u_long igmp_all_rtrs_group;
+
 static struct mbuf *router_alert;
 static struct route igmprt;
 
@@ -249,6 +259,7 @@ igmp_init(void)
 	ra->ipopt_list[3] = 0x00;
 	router_alert->m_len = sizeof(ra->ipopt_dst) + ra->ipopt_list[1];
 
+	mtx_init(&igmp_mtx, "igmp_mtx", NULL, MTX_DEF);
 	SLIST_INIT(&router_info_head);
 }
 
@@ -258,6 +269,9 @@ rti_init(ifp)
 {
 	struct router_info *rti;
 
+	/*
+	 * XXXRW: return value of malloc not checked, despite M_NOWAIT.
+	 */
 	MALLOC(rti, struct router_info *, sizeof *rti, M_IGMP, M_NOWAIT);
 	if (rti == NULL)
 		return NULL;
@@ -285,6 +299,7 @@ find_rti(struct ifnet *ifp)
 {
 	struct router_info *rti;
 
+	mtx_assert(&igmp_mtx, MA_OWNED);
 	IGMP_PRINTF("[igmp.c, _find_rti] --> entering \n");
 	SLIST_FOREACH(rti, &router_info_head, rti_list) {
 		if (rti->rti_ifp == ifp) {
@@ -295,7 +310,6 @@ find_rti(struct ifnet *ifp)
 	}
 	if ((rti = rti_init(ifp)) == NULL)
 		return NULL;
-
 	IGMP_PRINTF("[igmp.c, _find_rti] --> created an entry \n");
 	return rti;
 }
@@ -389,6 +403,9 @@ igmp_input(register struct mbuf *m, int off)
 	struct in_multistep step;
 	struct router_info *rti;
 	int timer; /** timer value in the igmp query header **/
+#ifdef IGMPV3
+	int error;
+#endif
 
 	ip = mtod(m, struct ip *);
 	igmplen = ip->ip_len;
@@ -426,8 +443,10 @@ igmp_input(register struct mbuf *m, int off)
 	timer = igmp->igmp_code * PR_FASTHZ / IGMP_TIMER_SCALE;
 	if (timer == 0)
 		timer = 1;
-	rti = find_rti(ifp);
 
+	mtx_lock(&igmp_mtx);
+	rti = find_rti(ifp);
+	mtx_unlock(&igmp_mtx);
 	if (rti == NULL) {
 		++igmpstat.igps_rcv_query_fails;
 		m_freem(m);
@@ -477,14 +496,16 @@ igmp_input(register struct mbuf *m, int off)
 		 */
 		if ((igmp->igmp_code == 0) && (query_ver != IGMP_v3_QUERY)) {
 
+			mtx_lock(&igmp_mtx);
+#ifndef IGMPV3
 			query_ver = IGMP_v1_QUERY; /* overwrite */
 			rti->rti_type = IGMP_v1_ROUTER;
-#ifndef IGMPV3
 			rti->rti_time = 0;
 #else
 			if (igmpalways_v3 == 0)
 				igmp_set_hostcompat(ifp, rti, query_ver);
 #endif
+			mtx_unlock(&igmp_mtx);
 
 			timer = IGMP_MAX_HOST_REPORT_DELAY * PR_FASTHZ;
 
@@ -557,9 +578,11 @@ igmpv2_query:
 		 * Querier Present Timeout seconds whenever an IGMPv2
 		 * General Query is received.
 		*/
+		mtx_lock(&igmp_mtx);
 		if (igmpalways_v3 == 0 &&
 		    igmp->igmp_group.s_addr == zeroin_addr.s_addr)
 			igmp_set_hostcompat(ifp, rti, query_ver);
+		mtx_unlock(&igmp_mtx);
 #endif
 		break;
 
@@ -619,8 +642,10 @@ igmpv3_query:
 			else if (rti->rti_type == IGMP_v2_ROUTER)
 				goto igmpv2_query;
 
-			if (igmp_set_timer(ifp, rti, igmp, igmplen, query_type)
-					!= 0) {
+			mtx_lock(&igmp_mtx);
+			error = igmp_set_timer(ifp, rti, igmp, igmplen, query_type);
+			mtx_unlock(&igmp_mtx);
+			if (error != 0) {
 #ifdef IGMPV3_DEBUG
 				printf("igmp_input: receive bad query\n");
 #endif
@@ -701,7 +726,9 @@ igmp_joingroup(struct in_multi *inm)
 		inm->inm_timer = 0;
 		inm->inm_state = IGMP_OTHERMEMBER;
 	} else {
+		mtx_lock(&igmp_mtx);
 		inm->inm_rti = find_rti(inm->inm_ifp);
+		mtx_unlock(&igmp_mtx);
 		igmp_sendpkt(inm, inm->inm_rti->rti_type, 0);
 		inm->inm_timer = IGMP_RANDOM_DELAY(
 					IGMP_MAX_HOST_REPORT_DELAY*PR_FASTHZ);
@@ -857,6 +884,7 @@ igmp_slowtimo(void)
 	struct router_info *rti;
 
 	IGMP_PRINTF("[igmp.c,_slowtimo] -- > entering \n");
+	mtx_lock(&igmp_mtx);
 	SLIST_FOREACH(rti, &router_info_head, rti_list) {
 #ifndef IGMPV3
 		if (rti->rti_type == IGMP_V1_ROUTER) {
@@ -879,6 +907,7 @@ igmp_slowtimo(void)
 		}
 #endif
 	}
+	mtx_unlock(&igmp_mtx);
 	IGMP_PRINTF("[igmp.c,_slowtimo] -- > exiting \n");
 	splx(s);
 }

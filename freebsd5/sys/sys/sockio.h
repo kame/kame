@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)sockio.h	8.1 (Berkeley) 3/28/94
- * $FreeBSD: src/sys/sys/sockio.h,v 1.25 2002/02/10 16:55:35 rwatson Exp $
+ * $FreeBSD: src/sys/sys/sockio.h,v 1.27 2004/04/07 04:19:49 imp Exp $
  */
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -113,6 +109,7 @@
 #define	SIOCGIFINDEX	_IOWR('i', 32, struct ifreq)	/* get IF index */
 #define	SIOCGIFMAC	_IOWR('i', 38, struct ifreq)	/* get IF MAC label */
 #define	SIOCSIFMAC	 _IOW('i', 39, struct ifreq)	/* set IF MAC label */
+#define	SIOCSIFNAME	 _IOW('i', 40, struct ifreq)	/* set IF name */
 
 #define	SIOCADDMULTI	 _IOW('i', 49, struct ifreq)	/* add m'cast addr */
 #define	SIOCDELMULTI	 _IOW('i', 50, struct ifreq)	/* del m'cast addr */

@@ -28,7 +28,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/my/if_my.c,v 1.21 2003/11/14 19:00:30 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/my/if_my.c,v 1.26 2004/06/09 14:34:01 naddy Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -142,7 +142,6 @@ static void     my_autoneg_mii(struct my_softc *, int, int);
 static void     my_setmode_mii(struct my_softc *, int);
 static void     my_getmode_mii(struct my_softc *);
 static void     my_setcfg(struct my_softc *, int);
-static u_int32_t my_mchash(caddr_t);
 static void     my_setmulti(struct my_softc *);
 static void     my_reset(struct my_softc *);
 static int      my_list_rx_init(struct my_softc *);
@@ -313,34 +312,6 @@ my_phy_writereg(struct my_softc * sc, int reg, int data)
 	return;
 }
 
-static u_int32_t
-my_mchash(caddr_t addr)
-{
-	u_int32_t       crc, carry;
-	int             idx, bit;
-	u_int8_t        data;
-
-	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF;	/* initial value */
-
-	for (idx = 0; idx < 6; idx++) {
-		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
-			crc <<= 1;
-			if (carry)
-				crc = (crc ^ 0x04c11db6) | carry;
-		}
-	}
-
-	/*
-	 * return the filter bit position Note: I arrived at the following
-	 * nonsense through experimentation. It's not the usual way to
-	 * generate the bit position but it's the only thing I could come up
-	 * with that works.
-	 */
-	return (~(crc >> 26) & 0x0000003F);
-}
-
 
 /*
  * Program the 64-bit multicast hash filter.
@@ -379,7 +350,8 @@ my_setmulti(struct my_softc * sc)
 	TAILQ_FOREACH(ifma, &ifp->if_multiaddrs, ifma_link) {
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = my_mchash(LLADDR((struct sockaddr_dl *) ifma->ifma_addr));
+		h = ~ether_crc32_be(LLADDR((struct sockaddr_dl *)
+		    ifma->ifma_addr), ETHER_ADDR_LEN) >> 26;
 		if (h < 32)
 			hashes[0] |= (1 << h);
 		else
@@ -918,8 +890,7 @@ my_attach(device_t dev)
 	}
 
 	rid = MY_RID;
-	sc->my_res = bus_alloc_resource(dev, MY_RES, &rid,
-					0, ~0, 1, RF_ACTIVE);
+	sc->my_res = bus_alloc_resource_any(dev, MY_RES, &rid, RF_ACTIVE);
 
 	if (sc->my_res == NULL) {
 		printf("my%d: couldn't map ports/memory\n", unit);
@@ -930,8 +901,8 @@ my_attach(device_t dev)
 	sc->my_bhandle = rman_get_bushandle(sc->my_res);
 
 	rid = 0;
-	sc->my_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
-					RF_SHAREABLE | RF_ACTIVE);
+	sc->my_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+					    RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->my_irq == NULL) {
 		printf("my%d: couldn't map interrupt\n", unit);
@@ -960,11 +931,6 @@ my_attach(device_t dev)
 	 */
 	for (i = 0; i < ETHER_ADDR_LEN; ++i)
 		eaddr[i] = CSR_READ_1(sc, MY_PAR0 + i);
-
-	/*
-	 * A Myson chip was detected. Inform the world.
-	 */
-	printf("my%d: Ethernet address: %6D\n", unit, eaddr, ":");
 
 	sc->my_unit = unit;
 	bcopy(eaddr, (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
@@ -996,7 +962,6 @@ my_attach(device_t dev)
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
 	ifp->if_ioctl = my_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = my_start;
 	ifp->if_watchdog = my_watchdog;
 	ifp->if_init = my_init;

@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip.h	8.2 (Berkeley) 6/1/94
- * $FreeBSD: src/sys/netinet/ip.h,v 1.25 2003/10/29 15:07:03 ume Exp $
+ * $FreeBSD: src/sys/netinet/ip.h,v 1.28 2004/04/07 20:46:13 imp Exp $
  */
 
 #ifndef _NETINET_IP_H_
@@ -193,4 +189,16 @@ struct	ip_timestamp {
 
 #define	IP_MSS		576		/* default maximum segment size */
 
+/*
+ * This is the real IPv4 pseudo header, used for computing the TCP and UDP
+ * checksums. For the Internet checksum, struct ipovly can be used instead.
+ * For stronger checksums, the real thing must be used.
+ */
+struct ippseudo {
+	struct	in_addr	ippseudo_src;	/* source internet address */
+	struct	in_addr	ippseudo_dst;	/* destination internet address */
+	u_char		ippseudo_pad;	/* pad, must be zero */
+	u_char		ippseudo_p;	/* protocol */
+	u_short		ippseudo_len;	/* protocol length */
+};
 #endif

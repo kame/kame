@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_sf.c,v 1.63 2003/11/14 19:00:31 sam Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_sf.c,v 1.72.2.1 2004/09/02 20:57:40 rwatson Exp $");
 
 /*
  * Adaptec AIC-6915 "Starfire" PCI fast ethernet driver for FreeBSD.
@@ -85,6 +85,7 @@ __FBSDID("$FreeBSD: src/sys/pci/if_sf.c,v 1.63 2003/11/14 19:00:31 sam Exp $");
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 
 #include <net/if.h>
@@ -159,7 +160,6 @@ static int sf_setvlan		(struct sf_softc *, int, u_int32_t);
 #endif
 
 static u_int8_t sf_read_eeprom	(struct sf_softc *, int);
-static u_int32_t sf_mchash	(caddr_t);
 
 static int sf_miibus_readreg	(device_t, int, int);
 static int sf_miibus_writereg	(device_t, int, int, int);
@@ -255,31 +255,6 @@ csr_write_4(sc, reg, val)
 #else
 	CSR_WRITE_4(sc, (reg + SF_RMAP_INTREG_BASE), val);
 #endif
-	return;
-}
-
-static u_int32_t
-sf_mchash(addr)
-	caddr_t		addr;
-{
-	u_int32_t	crc, carry;
-	int		idx, bit;
-	u_int8_t	data;
-
-	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (idx = 0; idx < 6; idx++) {
-		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
-			crc <<= 1;
-			if (carry)
-				crc = (crc ^ 0x04c11db6) | carry;
-		}
-	}
-
-	/* return the filter bit position */
-	return(crc >> 23 & 0x1FF);
 }
 
 /*
@@ -324,12 +299,12 @@ sf_sethash(sc, mac, prio)
 	caddr_t			mac;
 	int			prio;
 {
-	u_int32_t		h = 0;
+	u_int32_t		h;
 
 	if (mac == NULL)
 		return(EINVAL);
 
-	h = sf_mchash(mac);
+	h = ether_crc32_be(mac, ETHER_ADDR_LEN) >> 23;
 
 	if (prio) {
 		SF_SETBIT(sc, SF_RXFILT_HASH_BASE + SF_RXFILT_HASH_PRIOOFF +
@@ -427,8 +402,6 @@ sf_miibus_statchg(dev)
 		SF_CLRBIT(sc, SF_MACCFG_1, SF_MACCFG1_FULLDUPLEX);
 		csr_write_4(sc, SF_BKTOBKIPG, SF_IPGT_HDX);
 	}
-
-	return;
 }
 
 static void
@@ -474,8 +447,6 @@ sf_setmulti(sc)
 			    LLADDR((struct sockaddr_dl *)ifma->ifma_addr), 0);
 		}
 	}
-
-	return;
 }
 
 /*
@@ -518,8 +489,6 @@ sf_ifmedia_sts(ifp, ifmr)
 	mii_pollstat(mii);
 	ifmr->ifm_active = mii->mii_media_active;
 	ifmr->ifm_status = mii->mii_media_status;
-
-	return;
 }
 
 static int
@@ -599,7 +568,6 @@ sf_reset(sc)
 
 	/* Wait a little while for the chip to get its brains in order. */
 	DELAY(1000);
-	return;
 }
 
 /*
@@ -673,38 +641,13 @@ sf_attach(dev)
 
 	mtx_init(&sc->sf_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-#ifndef BURN_BRIDGES
-	/*
-	 * Handle power management nonsense.
-	 */
-	if (pci_get_powerstate(dev) != PCI_POWERSTATE_D0) {
-		u_int32_t		iobase, membase, irq;
-
-		/* Save important PCI config data. */
-		iobase = pci_read_config(dev, SF_PCI_LOIO, 4);
-		membase = pci_read_config(dev, SF_PCI_LOMEM, 4);
-		irq = pci_read_config(dev, SF_PCI_INTLINE, 4);
-
-		/* Reset the power state. */
-		printf("sf%d: chip is in D%d power mode "
-		    "-- setting to D0\n", unit,
-		    pci_get_powerstate(dev));
-		pci_set_powerstate(dev, PCI_POWERSTATE_D0);
-
-		/* Restore PCI config data. */
-		pci_write_config(dev, SF_PCI_LOIO, iobase, 4);
-		pci_write_config(dev, SF_PCI_LOMEM, membase, 4);
-		pci_write_config(dev, SF_PCI_INTLINE, irq, 4);
-	}
-#endif
 	/*
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
 
 	rid = SF_RID;
-	sc->sf_res = bus_alloc_resource(dev, SF_RES, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->sf_res = bus_alloc_resource_any(dev, SF_RES, &rid, RF_ACTIVE);
 
 	if (sc->sf_res == NULL) {
 		printf ("sf%d: couldn't map ports\n", unit);
@@ -717,7 +660,7 @@ sf_attach(dev)
 
 	/* Allocate interrupt */
 	rid = 0;
-	sc->sf_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	sc->sf_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	    RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->sf_irq == NULL) {
@@ -736,12 +679,6 @@ sf_attach(dev)
 	for (i = 0; i < ETHER_ADDR_LEN; i++)
 		sc->arpcom.ac_enaddr[i] =
 		    sf_read_eeprom(sc, SF_EE_NODEADDR + ETHER_ADDR_LEN - i);
-
-	/*
-	 * An Adaptec chip was detected. Inform the world.
-	 */
-	printf("sf%d: Ethernet address: %6D\n", unit,
-	    sc->arpcom.ac_enaddr, ":");
 
 	sc->sf_unit = unit;
 
@@ -769,9 +706,9 @@ sf_attach(dev)
 	ifp->if_softc = sc;
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ifp->if_ioctl = sf_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = sf_start;
 	ifp->if_watchdog = sf_watchdog;
 	ifp->if_init = sf_init;
@@ -888,8 +825,6 @@ sf_init_tx_ring(sc)
 
 	ld->sf_tx_dlist[SF_TX_DLIST_CNT - 1].sf_end = 1;
 	sc->sf_tx_cnt = 0;
-
-	return;
 }
 
 static int
@@ -1000,8 +935,6 @@ sf_rxeof(sc)
 	    (rxcons & ~SF_CQ_CONSIDX_RXQ1) | cmpconsidx);
 	csr_write_4(sc, SF_RXDQ_PTR_Q1,
 	    (rxprod & ~SF_RXDQ_PRODIDX) | bufprodidx);
-
-	return;
 }
 
 /*
@@ -1054,8 +987,6 @@ sf_txeof(sc)
 	csr_write_4(sc, SF_CQ_CONSIDX,
 	    (txcons & ~SF_CQ_CONSIDX_TXQ) |
 	    ((cmpconsidx << 16) & 0xFFFF0000));
-
-	return;
 }
 
 static void
@@ -1078,8 +1009,6 @@ sf_txthresh_adjust(sc)
 #endif
 		csr_write_4(sc, SF_TX_FRAMCTL, txfctl);
 	}
-
-	return;
 }
 
 static void
@@ -1139,7 +1068,6 @@ sf_intr(arg)
 		sf_start(ifp);
 
 	SF_UNLOCK(sc);
-	return;
 }
 
 static void
@@ -1253,8 +1181,6 @@ sf_init(xsc)
 	sc->sf_stat_ch = timeout(sf_stats_update, sc, hz);
 
 	SF_UNLOCK(sc);
-
-	return;
 }
 
 static int
@@ -1399,8 +1325,6 @@ sf_start(ifp)
 	ifp->if_timer = 5;
 
 	SF_UNLOCK(sc);
-
-	return;
 }
 
 static void
@@ -1445,8 +1369,6 @@ sf_stop(sc)
 
 	ifp->if_flags &= ~(IFF_RUNNING|IFF_OACTIVE);
 	SF_UNLOCK(sc);
-
-	return;
 }
 
 /*
@@ -1455,7 +1377,7 @@ sf_stop(sc)
  * between setting the indirect address register and reading from the
  * indirect data register, the contents of the address register could
  * be changed out from under us.
- */     
+ */
 static void
 sf_stats_update(xsc)
 	void			*xsc;
@@ -1496,8 +1418,6 @@ sf_stats_update(xsc)
 	sc->sf_stat_ch = timeout(sf_stats_update, sc, hz);
 
 	SF_UNLOCK(sc);
-
-	return;
 }
 
 static void
@@ -1521,8 +1441,6 @@ sf_watchdog(ifp)
 		sf_start(ifp);
 
 	SF_UNLOCK(sc);
-
-	return;
 }
 
 static void
@@ -1534,6 +1452,4 @@ sf_shutdown(dev)
 	sc = device_get_softc(dev);
 
 	sf_stop(sc);
-
-	return;
 }

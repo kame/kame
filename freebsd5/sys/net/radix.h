@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)radix.h	8.2 (Berkeley) 10/31/94
- * $FreeBSD: src/sys/net/radix.h,v 1.23 2003/08/19 17:23:07 sam Exp $
+ * $FreeBSD: src/sys/net/radix.h,v 1.25 2004/04/18 11:48:35 luigi Exp $
  */
 
 #ifndef _RADIX_H_
@@ -104,15 +100,6 @@ struct radix_mask {
 #define	rm_mask rm_rmu.rmu_mask
 #define	rm_leaf rm_rmu.rmu_leaf		/* extra field would make 32 bytes */
 
-#define MKGet(m) {\
-	if (rn_mkfreelist) {\
-		m = rn_mkfreelist; \
-		rn_mkfreelist = (m)->rm_mklist; \
-	} else \
-		R_Malloc(m, struct radix_mask *, sizeof (*(m))); }\
-
-#define MKFree(m) { (m)->rm_mklist = rn_mkfreelist; rn_mkfreelist = (m);}
-
 typedef int walktree_f_t(struct radix_node *, void *);
 
 struct radix_node_head {
@@ -126,8 +113,7 @@ struct radix_node_head {
 		(void *v, void *mask,
 		     struct radix_node_head *head, struct radix_node nodes[]);
 	struct	radix_node *(*rnh_deladdr)	/* remove based on sockaddr */
-		(void *v, void *mask, struct radix_node_head *head,
-		     struct radix_node *rn);
+		(void *v, void *mask, struct radix_node_head *head);
 	struct	radix_node *(*rnh_delpkt)	/* remove based on packet hdr */
 		(void *v, void *mask, struct radix_node_head *head);
 	struct	radix_node *(*rnh_matchaddr)	/* locate based on sockaddr */
@@ -151,16 +137,10 @@ struct radix_node_head {
 };
 
 #ifndef _KERNEL
-#define Bcmp(a, b, n) bcmp(((char *)(a)), ((char *)(b)), (n))
-#define Bcopy(a, b, n) bcopy(((char *)(a)), ((char *)(b)), (unsigned)(n))
-#define Bzero(p, n) bzero((char *)(p), (int)(n));
 #define R_Malloc(p, t, n) (p = (t) malloc((unsigned int)(n)))
 #define R_Zalloc(p, t, n) (p = (t) calloc(1,(unsigned int)(n)))
 #define Free(p) free((char *)p);
 #else
-#define Bcmp(a, b, n) bcmp(((caddr_t)(a)), ((caddr_t)(b)), (unsigned)(n))
-#define Bcopy(a, b, n) bcopy(((caddr_t)(a)), ((caddr_t)(b)), (unsigned)(n))
-#define Bzero(p, n) bzero((caddr_t)(p), (unsigned)(n));
 #define R_Malloc(p, t, n) (p = (t) malloc((unsigned long)(n), M_RTABLE, M_NOWAIT))
 #define R_Zalloc(p, t, n) (p = (t) malloc((unsigned long)(n), M_RTABLE, M_NOWAIT | M_ZERO))
 #define Free(p) free((caddr_t)p, M_RTABLE);
@@ -180,8 +160,7 @@ struct radix_node
 	 *rn_addmask(void *, int, int),
 	 *rn_addroute (void *, void *, struct radix_node_head *,
 			struct radix_node [2]),
-	 *rn_delete(void *, void *, struct radix_node_head *,
-			struct radix_node *),
+	 *rn_delete(void *, void *, struct radix_node_head *),
 	 *rn_lookup (void *v_arg, void *m_arg,
 		        struct radix_node_head *head),
 	 *rn_match(void *, struct radix_node_head *);

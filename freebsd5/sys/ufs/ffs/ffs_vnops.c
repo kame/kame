@@ -19,10 +19,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -39,11 +35,13 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
+ *	from: @(#)ufs_readwrite.c	8.11 (Berkeley) 5/8/95
+ * from: $FreeBSD: .../ufs/ufs_readwrite.c,v 1.96 2002/08/12 09:22:11 phk ...
  *	@(#)ffs_vnops.c	8.15 (Berkeley) 5/14/95
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_vnops.c,v 1.119 2003/10/04 20:38:32 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/ufs/ffs/ffs_vnops.c,v 1.133 2004/08/15 06:24:42 jmg Exp $");
 
 #include <sys/param.h>
 #include <sys/bio.h>
@@ -350,7 +348,6 @@ ffs_read(ap)
 	int error, orig_resid;
 	int seqcount;
 	int ioflag;
-	vm_object_t object;
 
 	vp = ap->a_vp;
 	uio = ap->a_uio;
@@ -373,7 +370,7 @@ ffs_read(ap)
 
 	GIANT_REQUIRED;
 
-	seqcount = ap->a_ioflag >> 16;
+	seqcount = ap->a_ioflag >> IO_SEQSHIFT;
 	ip = VTOI(vp);
 
 #ifdef DIAGNOSTIC
@@ -386,35 +383,19 @@ ffs_read(ap)
 	} else if (vp->v_type != VREG && vp->v_type != VDIR)
 		panic("ffs_read: type %d",  vp->v_type);
 #endif
-	fs = ip->i_fs;
-	if ((u_int64_t)uio->uio_offset > fs->fs_maxfilesize)
-		return (EFBIG);
-
 	orig_resid = uio->uio_resid;
-	if (orig_resid <= 0)
+	KASSERT(orig_resid >= 0, ("ffs_read: uio->uio_resid < 0"));
+	if (orig_resid == 0)
 		return (0);
+	KASSERT(uio->uio_offset >= 0, ("ffs_read: uio->uio_offset < 0"));
+	fs = ip->i_fs;
+	if (uio->uio_offset < ip->i_size &&
+	    uio->uio_offset >= fs->fs_maxfilesize)
+		return (EOVERFLOW);
 
-	object = vp->v_object;
-
-	bytesinfile = ip->i_size - uio->uio_offset;
-	if (bytesinfile <= 0) {
-		if ((vp->v_mount->mnt_flag & MNT_NOATIME) == 0)
-			ip->i_flag |= IN_ACCESS;
-		return 0;
-	}
-
-	if (object) {
-		vm_object_reference(object);
-	}
-
-	/*
-	 * Ok so we couldn't do it all in one vm trick...
-	 * so cycle around trying smaller bites..
-	 */
 	for (error = 0, bp = NULL; uio->uio_resid > 0; bp = NULL) {
 		if ((bytesinfile = ip->i_size - uio->uio_offset) <= 0)
 			break;
-
 		lbn = lblkno(fs, uio->uio_offset);
 		nextlbn = lbn + 1;
 
@@ -508,15 +489,8 @@ ffs_read(ap)
 			xfersize = size;
 		}
 
-		{
-			/*
-			 * otherwise use the general form
-			 */
-			error =
-				uiomove((char *)bp->b_data + blkoffset,
-					(int)xfersize, uio);
-		}
-
+		error = uiomove((char *)bp->b_data + blkoffset,
+		    (int)xfersize, uio);
 		if (error)
 			break;
 
@@ -556,10 +530,6 @@ ffs_read(ap)
 		}
 	}
 
-	if (object) {
-		VM_OBJECT_LOCK(object);
-		vm_object_vndeallocate(object);
-	}
 	if ((error == 0 || uio->uio_resid != orig_resid) &&
 	    (vp->v_mount->mnt_flag & MNT_NOATIME) == 0)
 		ip->i_flag |= IN_ACCESS;
@@ -588,7 +558,6 @@ ffs_write(ap)
 	off_t osize;
 	int seqcount;
 	int blkoffset, error, extended, flags, ioflag, resid, size, xfersize;
-	vm_object_t object;
 
 	vp = ap->a_vp;
 	uio = ap->a_uio;
@@ -597,74 +566,58 @@ ffs_write(ap)
 #ifdef notyet
 		return (ffs_extwrite(vp, uio, ioflag, ap->a_cred));
 #else
-		panic("ffs_read+IO_EXT");
+		panic("ffs_write+IO_EXT");
 #endif
 
 	GIANT_REQUIRED;
 
 	extended = 0;
-	seqcount = ap->a_ioflag >> 16;
+	seqcount = ap->a_ioflag >> IO_SEQSHIFT;
 	ip = VTOI(vp);
-
-	object = vp->v_object;
-	if (object) {
-		vm_object_reference(object);
-	}
 
 #ifdef DIAGNOSTIC
 	if (uio->uio_rw != UIO_WRITE)
-		panic("ffswrite: mode");
+		panic("ffs_write: mode");
 #endif
 
 	switch (vp->v_type) {
 	case VREG:
 		if (ioflag & IO_APPEND)
 			uio->uio_offset = ip->i_size;
-		if ((ip->i_flags & APPEND) && uio->uio_offset != ip->i_size) {
-			if (object) {
-				VM_OBJECT_LOCK(object);
-				vm_object_vndeallocate(object);
-			}
+		if ((ip->i_flags & APPEND) && uio->uio_offset != ip->i_size)
 			return (EPERM);
-		}
 		/* FALLTHROUGH */
 	case VLNK:
 		break;
 	case VDIR:
-		panic("ffswrite: dir write");
+		panic("ffs_write: dir write");
 		break;
 	default:
-		panic("ffswrite: type %p %d (%d,%d)", vp, (int)vp->v_type,
+		panic("ffs_write: type %p %d (%d,%d)", vp, (int)vp->v_type,
 			(int)uio->uio_offset,
 			(int)uio->uio_resid
 		);
 	}
 
+	KASSERT(uio->uio_resid >= 0, ("ffs_write: uio->uio_resid < 0"));
+	KASSERT(uio->uio_offset >= 0, ("ffs_write: uio->uio_offset < 0"));
 	fs = ip->i_fs;
-	if (uio->uio_offset < 0 ||
-	    (u_int64_t)uio->uio_offset + uio->uio_resid > fs->fs_maxfilesize) {
-		if (object) {
-			VM_OBJECT_LOCK(object);
-			vm_object_vndeallocate(object);
-		}
+	if ((uoff_t)uio->uio_offset + uio->uio_resid > fs->fs_maxfilesize)
 		return (EFBIG);
-	}
 	/*
 	 * Maybe this should be above the vnode op call, but so long as
 	 * file servers have no limits, I don't think it matters.
 	 */
 	td = uio->uio_td;
-	if (vp->v_type == VREG && td &&
-	    uio->uio_offset + uio->uio_resid >
-	    td->td_proc->p_rlimit[RLIMIT_FSIZE].rlim_cur) {
+	if (vp->v_type == VREG && td != NULL) {
 		PROC_LOCK(td->td_proc);
-		psignal(td->td_proc, SIGXFSZ);
-		PROC_UNLOCK(td->td_proc);
-		if (object) {
-			VM_OBJECT_LOCK(object);
-			vm_object_vndeallocate(object);
+		if (uio->uio_offset + uio->uio_resid >
+		    lim_cur(td->td_proc, RLIMIT_FSIZE)) {
+			psignal(td->td_proc, SIGXFSZ);
+			PROC_UNLOCK(td->td_proc);
+			return (EFBIG);
 		}
-		return (EFBIG);
+		PROC_UNLOCK(td->td_proc);
 	}
 
 	resid = uio->uio_resid;
@@ -682,7 +635,6 @@ ffs_write(ap)
 		xfersize = fs->fs_bsize - blkoffset;
 		if (uio->uio_resid < xfersize)
 			xfersize = uio->uio_resid;
-
 		if (uio->uio_offset + xfersize > ip->i_size)
 			vnode_pager_setsize(vp, uio->uio_offset + xfersize);
 
@@ -715,7 +667,7 @@ ffs_write(ap)
 
 		if (uio->uio_offset + xfersize > ip->i_size) {
 			ip->i_size = uio->uio_offset + xfersize;
-			DIP(ip, i_size) = ip->i_size;
+			DIP_SET(ip, i_size, ip->i_size);
 			extended = 1;
 		}
 
@@ -768,12 +720,12 @@ ffs_write(ap)
 	 * tampering.
 	 */
 	if (resid > uio->uio_resid && ap->a_cred && 
-	    suser_cred(ap->a_cred, PRISON_ROOT)) {
+	    suser_cred(ap->a_cred, SUSER_ALLOWJAIL)) {
 		ip->i_mode &= ~(ISUID | ISGID);
-		DIP(ip, i_mode) = ip->i_mode;
+		DIP_SET(ip, i_mode, ip->i_mode);
 	}
 	if (resid > uio->uio_resid)
-		VN_KNOTE(vp, NOTE_WRITE | (extended ? NOTE_EXTEND : 0));
+		VN_KNOTE_UNLOCKED(vp, NOTE_WRITE | (extended ? NOTE_EXTEND : 0));
 	if (error) {
 		if (ioflag & IO_UNIT) {
 			(void)UFS_TRUNCATE(vp, osize,
@@ -784,12 +736,6 @@ ffs_write(ap)
 		}
 	} else if (resid > uio->uio_resid && (ioflag & IO_SYNC))
 		error = UFS_UPDATE(vp, 1);
-
-	if (object) {
-		VM_OBJECT_LOCK(object);
-		vm_object_vndeallocate(object);
-	}
-
 	return (error);
 }
 
@@ -971,20 +917,14 @@ ffs_extread(struct vnode *vp, struct uio *uio, int ioflag)
 
 #endif
 	orig_resid = uio->uio_resid;
-	if (orig_resid <= 0)
+	KASSERT(orig_resid >= 0, ("ffs_extread: uio->uio_resid < 0"));
+	if (orig_resid == 0)
 		return (0);
-
-	bytesinfile = dp->di_extsize - uio->uio_offset;
-	if (bytesinfile <= 0) {
-		if ((vp->v_mount->mnt_flag & MNT_NOATIME) == 0)
-			ip->i_flag |= IN_ACCESS;
-		return 0;
-	}
+	KASSERT(uio->uio_offset >= 0, ("ffs_extread: uio->uio_offset < 0"));
 
 	for (error = 0, bp = NULL; uio->uio_resid > 0; bp = NULL) {
 		if ((bytesinfile = dp->di_extsize - uio->uio_offset) <= 0)
 			break;
-
 		lbn = lblkno(fs, uio->uio_offset);
 		nextlbn = lbn + 1;
 
@@ -1131,14 +1071,14 @@ ffs_extwrite(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *ucred)
 
 #ifdef DIAGNOSTIC
 	if (uio->uio_rw != UIO_WRITE || fs->fs_magic != FS_UFS2_MAGIC)
-		panic("ext_write: mode");
+		panic("ffs_extwrite: mode");
 #endif
 
 	if (ioflag & IO_APPEND)
 		uio->uio_offset = dp->di_extsize;
-
-	if (uio->uio_offset < 0 ||
-	    (u_int64_t)uio->uio_offset + uio->uio_resid > NXADDR * fs->fs_bsize)
+	KASSERT(uio->uio_offset >= 0, ("ffs_extwrite: uio->uio_offset < 0"));
+	KASSERT(uio->uio_resid >= 0, ("ffs_extwrite: uio->uio_resid < 0"));
+	if ((uoff_t)uio->uio_offset + uio->uio_resid > NXADDR * fs->fs_bsize)
 		return (EFBIG);
 
 	resid = uio->uio_resid;
@@ -1218,7 +1158,7 @@ ffs_extwrite(struct vnode *vp, struct uio *uio, int ioflag, struct ucred *ucred)
 	 * tampering.
 	 */
 	if (resid > uio->uio_resid && ucred && 
-	    suser_cred(ucred, PRISON_ROOT)) {
+	    suser_cred(ucred, SUSER_ALLOWJAIL)) {
 		ip->i_mode &= ~(ISUID | ISGID);
 		dp->di_mode = ip->i_mode;
 	}

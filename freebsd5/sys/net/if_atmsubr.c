@@ -35,7 +35,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/net/if_atmsubr.c,v 1.33 2003/10/31 18:32:08 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/net/if_atmsubr.c,v 1.35 2004/04/25 09:24:51 luigi Exp $");
 
 #include "opt_inet.h"
 #include "opt_inet6.h"
@@ -126,7 +126,6 @@ atm_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,
 	u_int16_t etype = 0;			/* if using LLC/SNAP */
 	struct atm_pseudohdr atmdst, *ad;
 	struct mbuf *m = m0;
-	struct rtentry *rt;
 	struct atmllc *atmllc;
 	struct atmllc *llc_hdr = NULL;
 	u_int32_t atm_flags;
@@ -143,20 +142,6 @@ atm_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,
 		senderr(ENETDOWN);
 
 	/*
-	 * if the queueing discipline needs packet classification,
-	 * do it before prepending link headers.
-	 */
-	IFQ_CLASSIFY(&ifp->if_snd, m,
-		     (dst != NULL ? dst->sa_family : AF_UNSPEC), &pktattr);
-
-	/*
-	 * check route
-	 */
-	error = rt_check(&rt, &rt0, dst);
-	if (error)
-		goto bad;
-
-	/*
 	 * check for non-native ATM traffic   (dst != NULL)
 	 */
 	if (dst) {
@@ -168,7 +153,15 @@ atm_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,
 #endif
 #ifdef INET6
 		case AF_INET6:
-#endif
+		{
+			struct rtentry *rt;
+			/*  
+			 * check route
+			 */
+			error = rt_check(&rt, &rt0, dst);
+			if (error)
+				goto bad;
+
 			if (dst->sa_family == AF_INET6)
 			        etype = ETHERTYPE_IPV6;
 			else
@@ -188,6 +181,7 @@ atm_output(struct ifnet *ifp, struct mbuf *m0, struct sockaddr *dst,
 				/* XXX: put ATMARP stuff here */
 				/* XXX: watch who frees m on failure */
 			}
+		}
 			break;
 #endif /* INET || INET6 */
 
@@ -271,7 +265,9 @@ atm_input(struct ifnet *ifp, struct atm_pseudohdr *ah, struct mbuf *m,
 {
 	int isr;
 	u_int16_t etype = ETHERTYPE_IP;		/* default */
+#ifdef NATM
 	int s;
+#endif
 
 	if ((ifp->if_flags & IFF_UP) == 0) {
 		m_freem(m);

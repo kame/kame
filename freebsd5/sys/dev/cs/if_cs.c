@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/cs/if_cs.c,v 1.28 2003/11/04 02:59:57 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/cs/if_cs.c,v 1.33 2004/08/13 23:03:11 rwatson Exp $");
 
 /*
  *
@@ -551,8 +551,8 @@ int cs_alloc_irq(device_t dev, int rid, int flags)
         struct cs_softc *sc = device_get_softc(dev);
         struct resource *res;
 
-        res = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-                                 0ul, ~0ul, 1, (RF_ACTIVE | flags));
+        res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+                                     (RF_ACTIVE | flags));
         if (res) {
                 sc->irq_rid = rid;
                 sc->irq_res = res;
@@ -600,7 +600,6 @@ cs_attach(device_t dev)
 
 	ifp->if_softc=sc;
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
-	ifp->if_output=ether_output;
 	ifp->if_start=cs_start;
 	ifp->if_ioctl=cs_ioctl;
 	ifp->if_watchdog=cs_watchdog;
@@ -615,7 +614,8 @@ cs_attach(device_t dev)
 	ifp->if_linkmiblen=sizeof sc->mibdata;
 	*/
 
-	ifp->if_flags=(IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST );
+	ifp->if_flags=(IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT);
 
 	/*
 	 * this code still in progress (DMA support)
@@ -687,10 +687,6 @@ cs_attach(device_t dev)
 
 	ether_ifattach(ifp, sc->arpcom.ac_enaddr);
 
-	if (bootverbose)
-		if_printf(ifp, "ethernet address %6D\n",
-		       sc->arpcom.ac_enaddr, ":");
-
 	return (0);
 }
 
@@ -703,10 +699,6 @@ cs_init(void *xsc)
 	struct cs_softc *sc=(struct cs_softc *)xsc;
 	struct ifnet *ifp = &sc->arpcom.ac_if;
 	int i, s, rx_cfg;
-
-	/* address not known */
-	if (TAILQ_EMPTY(&ifp->if_addrhead)) /* unlikely? XXX */
-		return;
 
 	/*
 	 * reset whatchdog timer

@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/syscons/syscons.c,v 1.409 2003/10/29 20:48:13 njl Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/syscons/syscons.c,v 1.427.2.1 2004/09/30 17:49:15 nectar Exp $");
 
 #include "opt_syscons.h"
 #include "opt_splash.h"
@@ -38,6 +38,7 @@ __FBSDID("$FreeBSD: src/sys/dev/syscons/syscons.c,v 1.409 2003/10/29 20:48:13 nj
 #include <sys/conf.h>
 #include <sys/cons.h>
 #include <sys/consio.h>
+#include <sys/kdb.h>
 #include <sys/eventhandler.h>
 #include <sys/fbio.h>
 #include <sys/kbio.h>
@@ -54,7 +55,7 @@ __FBSDID("$FreeBSD: src/sys/dev/syscons/syscons.c,v 1.409 2003/10/29 20:48:13 nj
 #include <sys/power.h>
 
 #include <machine/clock.h>
-#ifdef __sparc64__
+#if __sparc64__ || __powerpc__
 #include <machine/sc_machdep.h>
 #else
 #include <machine/pc/display.h>
@@ -97,7 +98,10 @@ static	int		sc_console_unit = -1;
 static	int		sc_saver_keyb_only = 1;
 static  scr_stat    	*sc_console;
 static	struct tty	*sc_console_tty;
+static  struct consdev	*sc_consptr;
 static	void		*kernel_console_ts;
+static	scr_stat	main_console;
+static	struct cdev *main_devs[MAXCONS];
 
 static  char        	init_done = COLD;
 static  char		shutdown_in_progress = FALSE;
@@ -131,7 +135,7 @@ static	bios_values_t	bios_value;
 
 static	int		enable_panic_key;
 SYSCTL_INT(_machdep, OID_AUTO, enable_panic_key, CTLFLAG_RW, &enable_panic_key,
-	   0, "");
+	   0, "Enable panic via keypress specified in kbdmap(5)");
 
 #define SC_CONSOLECTL	255
 
@@ -145,14 +149,13 @@ static	int		debugger;
 static int scvidprobe(int unit, int flags, int cons);
 static int sckbdprobe(int unit, int flags, int cons);
 static void scmeminit(void *arg);
-static int scdevtounit(dev_t dev);
+static int scdevtounit(struct cdev *dev);
 static kbd_callback_func_t sckbdevent;
 static int scparam(struct tty *tp, struct termios *t);
 static void scstart(struct tty *tp);
 static void scinit(int unit, int flags);
-#if __i386__ || __ia64__ || __amd64__ || __sparc64__
+static scr_stat *sc_get_stat(struct cdev *devptr);
 static void scterm(int unit, int flags);
-#endif
 static void scshutdown(void *arg, int howto);
 static u_int scgetc(sc_softc_t *sc, u_int flags);
 #define SCGETC_CN	1
@@ -193,8 +196,6 @@ static int update_kbd_state(scr_stat *scp, int state, int mask);
 static int update_kbd_leds(scr_stat *scp, int which);
 static timeout_t blink_screen;
 
-#define	CDEV_MAJOR	12
-
 static cn_probe_t	sccnprobe;
 static cn_init_t	sccninit;
 static cn_getc_t	sccngetc;
@@ -202,10 +203,6 @@ static cn_checkc_t	sccncheckc;
 static cn_putc_t	sccnputc;
 static cn_dbctl_t	sccndbctl;
 static cn_term_t	sccnterm;
-
-#if __alpha__
-void sccnattach(void);
-#endif
 
 CONS_DRIVER(sc, sccnprobe, sccninit, sccnterm, sccngetc, sccncheckc, sccnputc,
 	    sccndbctl);
@@ -217,17 +214,14 @@ static	d_ioctl_t	scioctl;
 static	d_mmap_t	scmmap;
 
 static struct cdevsw sc_cdevsw = {
+	.d_version =	D_VERSION,
 	.d_open =	scopen,
 	.d_close =	scclose,
 	.d_read =	scread,
-	.d_write =	ttywrite,
 	.d_ioctl =	scioctl,
-	.d_poll =	ttypoll,
 	.d_mmap =	scmmap,
 	.d_name =	"sc",
-	.d_maj =	CDEV_MAJOR,
-	.d_flags =	D_TTY,
-	.d_kqfilter =	ttykqfilter
+	.d_flags =	D_TTY | D_NEEDGIANT,
 };
 
 int
@@ -304,7 +298,7 @@ sc_attach_unit(int unit, int flags)
     video_info_t info;
 #endif
     int vc;
-    dev_t dev;
+    struct cdev *dev;
 
     flags &= ~SC_KERNEL_CONSOLE;
 
@@ -335,7 +329,7 @@ sc_attach_unit(int unit, int flags)
 
     sc = sc_get_softc(unit, flags & SC_KERNEL_CONSOLE);
     sc->config = flags;
-    scp = SC_STAT(sc->dev[0]);
+    scp = sc_get_stat(sc->dev[0]);
     if (sc_console == NULL)	/* sc_console_unit < 0 */
 	sc_console = scp;
 
@@ -388,9 +382,14 @@ sc_attach_unit(int unit, int flags)
 			      (void *)(uintptr_t)unit, SHUTDOWN_PRI_DEFAULT);
 
     for (vc = 0; vc < sc->vtys; vc++) {
-	dev = make_dev(&sc_cdevsw, vc + unit * MAXCONS,
-	    UID_ROOT, GID_WHEEL, 0600, "ttyv%r", vc + unit * MAXCONS);
-	sc->dev[vc] = dev;
+	if (sc->dev[vc] == NULL) {
+		dev = make_dev(&sc_cdevsw, vc + unit * MAXCONS,
+		    UID_ROOT, GID_WHEEL, 0600, "ttyv%r", vc + unit * MAXCONS);
+		sc->dev[vc] = dev;
+	    	sc->dev[vc]->si_tty = ttymalloc(sc->dev[vc]->si_tty);
+		if (vc == 0 && sc->dev == main_devs)
+			SC_STAT(sc->dev[0]) = &main_console;
+	}
 	/*
 	 * The first vty already has struct tty and scr_stat initialized
 	 * in scinit().  The other vtys will have these structs when
@@ -438,7 +437,7 @@ scmeminit(void *arg)
 SYSINIT(sc_mem, SI_SUB_KMEM, SI_ORDER_ANY, scmeminit, NULL);
 
 static int
-scdevtounit(dev_t dev)
+scdevtounit(struct cdev *dev)
 {
     int vty = SC_VTY(dev);
 
@@ -451,7 +450,7 @@ scdevtounit(dev_t dev)
 }
 
 static int
-scopen(dev_t dev, int flag, int mode, struct thread *td)
+scopen(struct cdev *dev, int flag, int mode, struct thread *td)
 {
     int unit = scdevtounit(dev);
     sc_softc_t *sc;
@@ -491,15 +490,15 @@ scopen(dev_t dev, int flag, int mode, struct thread *td)
 	tp->t_lflag = TTYDEF_LFLAG;
 	tp->t_ispeed = tp->t_ospeed = TTYDEF_SPEED;
 	scparam(tp, &tp->t_termios);
-	(*linesw[tp->t_line].l_modem)(tp, 1);
+	ttyld_modem(tp, 1);
     }
     else
 	if (tp->t_state & TS_XCLUDE && suser(td))
 	    return(EBUSY);
 
-    error = (*linesw[tp->t_line].l_open)(dev, tp);
+    error = ttyld_open(tp, dev);
 
-    scp = SC_STAT(dev);
+    scp = sc_get_stat(dev);
     if (scp == NULL) {
 	scp = SC_STAT(dev) = alloc_scp(sc, SC_VTY(dev));
 	if (ISGRAPHSC(scp))
@@ -514,19 +513,19 @@ scopen(dev_t dev, int flag, int mode, struct thread *td)
 }
 
 static int
-scclose(dev_t dev, int flag, int mode, struct thread *td)
+scclose(struct cdev *dev, int flag, int mode, struct thread *td)
 {
     struct tty *tp = dev->si_tty;
     scr_stat *scp;
     int s;
 
     if (SC_VTY(dev) != SC_CONSOLECTL) {
-	scp = SC_STAT(tp->t_dev);
+	scp = sc_get_stat(tp->t_dev);
 	/* were we in the middle of the VT switching process? */
 	DPRINTF(5, ("sc%d: scclose(), ", scp->sc->unit));
 	s = spltty();
 	if ((scp == scp->sc->cur_scp) && (scp->sc->unit == sc_console_unit))
-	    cons_unavail = FALSE;
+	    cnavailable(sc_consptr, TRUE);
 	if (finish_vt_rel(scp, TRUE, &s) == 0)	/* force release */
 	    DPRINTF(5, ("reset WAIT_REL, "));
 	if (finish_vt_acq(scp) == 0)		/* force acknowledge */
@@ -557,14 +556,14 @@ scclose(dev_t dev, int flag, int mode, struct thread *td)
 	DPRINTF(5, ("done.\n"));
     }
     spltty();
-    (*linesw[tp->t_line].l_close)(tp, flag);
-    ttyclose(tp);
+    ttyld_close(tp, flag);
+    tty_close(tp);
     spl0();
     return(0);
 }
 
 static int
-scread(dev_t dev, struct uio *uio, int flag)
+scread(struct cdev *dev, struct uio *uio, int flag)
 {
     if (!sc_saver_keyb_only)
 	sc_touch_scrn_saver();
@@ -614,23 +613,23 @@ sckbdevent(keyboard_t *thiskbd, int event, void *arg)
 
 	switch (KEYFLAGS(c)) {
 	case 0x0000: /* normal key */
-	    (*linesw[cur_tty->t_line].l_rint)(KEYCHAR(c), cur_tty);
+	    ttyld_rint(cur_tty, KEYCHAR(c));
 	    break;
 	case FKEY:  /* function key, return string */
 	    cp = kbd_get_fkeystr(thiskbd, KEYCHAR(c), &len);
 	    if (cp != NULL) {
 	    	while (len-- >  0)
-		    (*linesw[cur_tty->t_line].l_rint)(*cp++, cur_tty);
+		    ttyld_rint(cur_tty, *cp++);
 	    }
 	    break;
 	case MKEY:  /* meta is active, prepend ESC */
-	    (*linesw[cur_tty->t_line].l_rint)(0x1b, cur_tty);
-	    (*linesw[cur_tty->t_line].l_rint)(KEYCHAR(c), cur_tty);
+	    ttyld_rint(cur_tty, 0x1b);
+	    ttyld_rint(cur_tty, KEYCHAR(c));
 	    break;
 	case BKEY:  /* backtab fixed sequence (esc [ Z) */
-	    (*linesw[cur_tty->t_line].l_rint)(0x1b, cur_tty);
-	    (*linesw[cur_tty->t_line].l_rint)('[', cur_tty);
-	    (*linesw[cur_tty->t_line].l_rint)('Z', cur_tty);
+	    ttyld_rint(cur_tty, 0x1b);
+	    ttyld_rint(cur_tty, '[');
+	    ttyld_rint(cur_tty, 'Z');
 	    break;
 	}
     }
@@ -650,7 +649,7 @@ scparam(struct tty *tp, struct termios *t)
 }
 
 static int
-scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
+scioctl(struct cdev *dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 {
     int error;
     int i;
@@ -684,7 +683,7 @@ scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	return error;
 #endif
 
-    scp = SC_STAT(tp->t_dev);
+    scp = sc_get_stat(tp->t_dev);
     /* assert(scp != NULL) */
     /* scp is sc_console, if SC_VTY(dev) == SC_CONSOLECTL. */
     sc = scp->sc;
@@ -875,7 +874,7 @@ scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	frbp = scp->vtb.vtb_buffer + scp->ysize * lsize + ptr->x *
 	       sizeof(u_int16_t);
 	/* Pointer to the last line of target buffer */
-	(vm_offset_t)outp += ptr->ysize * csize;
+	outp = (char *)outp + ptr->ysize * csize;
 	/* Pointer to the last line of history buffer */
 	if (scp->history != NULL)
 	    hstp = scp->history->vtb_buffer + sc_vtb_tail(scp->history) *
@@ -895,7 +894,7 @@ scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	    }
 	    if (lnum < ptr->y)
 		continue;
-	    (vm_offset_t)outp -= csize;
+	    outp = (char *)outp - csize;
 	    retval = copyout((void *)frbp, outp, csize);
 	    if (retval != 0)
 		break;
@@ -929,7 +928,7 @@ scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	    scp->pid = 0;
 	    DPRINTF(5, ("VT_AUTO, "));
 	    if ((scp == sc->cur_scp) && (sc->unit == sc_console_unit))
-		cons_unavail = FALSE;
+		cnavailable(sc_consptr, TRUE);
 	    /* were we in the middle of the vty switching process? */
 	    if (finish_vt_rel(scp, TRUE, &s) == 0)
 		DPRINTF(5, ("reset WAIT_REL, "));
@@ -947,7 +946,7 @@ scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	    scp->proc = td->td_proc;
 	    scp->pid = scp->proc->p_pid;
 	    if ((scp == sc->cur_scp) && (sc->unit == sc_console_unit))
-		cons_unavail = TRUE;
+		cnavailable(sc_consptr, FALSE);
 	}
 	splx(s);
 	DPRINTF(5, ("\n"));
@@ -1019,7 +1018,7 @@ scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	splx(s);
 	if (error)
 	    return error;
-	scp = SC_STAT(SC_DEV(sc, i));
+	scp = sc_get_stat(SC_DEV(sc, i));
 	if (scp == scp->sc->cur_scp)
 	    return 0;
 	while ((error=tsleep(&scp->smode, PZERO|PCATCH,
@@ -1342,13 +1341,7 @@ scioctl(dev_t dev, u_long cmd, caddr_t data, int flag, struct thread *td)
 	break;
     }
 
-    error = (*linesw[tp->t_line].l_ioctl)(tp, cmd, data, flag, td);
-    if (error != ENOIOCTL)
-	return(error);
-    error = ttioctl(tp, cmd, data, flag);
-    if (error != ENOIOCTL)
-	return(error);
-    return(ENOTTY);
+    return (ttyioctl(dev, cmd, data, flag, td));
 }
 
 static void
@@ -1357,9 +1350,10 @@ scstart(struct tty *tp)
     struct clist *rbp;
     int s, len;
     u_char buf[PCBURST];
-    scr_stat *scp = SC_STAT(tp->t_dev);
+    scr_stat *scp = sc_get_stat(tp->t_dev);
 
-    if (scp->status & SLKED || scp->sc->blink_in_progress)
+    if (scp->status & SLKED ||
+	(scp == scp->sc->cur_scp && scp->sc->blink_in_progress))
 	return;
     s = spltty();
     if (!(tp->t_state & (TS_TIMEOUT | TS_BUSY | TS_TTSTOP))) {
@@ -1380,7 +1374,6 @@ scstart(struct tty *tp)
 static void
 sccnprobe(struct consdev *cp)
 {
-#if __i386__ || __ia64__ || __amd64__ || __sparc64__
     int unit;
     int flags;
 
@@ -1398,34 +1391,19 @@ sccnprobe(struct consdev *cp)
 
     /* initialize required fields */
     sprintf(cp->cn_name, "consolectl");
-#endif /* __i386__ || __ia64__ || __amd64__ || __sparc64__ */
-
-#if __alpha__
-    /*
-     * alpha use sccnattach() rather than cnprobe()/cninit()/cnterm()
-     * interface to install the console.  Always return CN_DEAD from
-     * here.
-     */
-    cp->cn_pri = CN_DEAD;
-#endif /* __alpha__ */
 }
 
 static void
 sccninit(struct consdev *cp)
 {
-#if __i386__ || __ia64__ || __amd64__ || __sparc64__
     int unit;
     int flags;
 
     sc_get_cons_priority(&unit, &flags);
     scinit(unit, flags | SC_KERNEL_CONSOLE);
     sc_console_unit = unit;
-    sc_console = SC_STAT(sc_get_softc(unit, SC_KERNEL_CONSOLE)->dev[0]);
-#endif /* __i386__ || __ia64__ || __amd64__ || __sparc64__ */
-
-#if __alpha__
-    /* SHOULDN'T REACH HERE */
-#endif /* __alpha__ */
+    sc_console = sc_get_stat(sc_get_softc(unit, SC_KERNEL_CONSOLE)->dev[0]);
+    sc_consptr = cp;
 }
 
 static void
@@ -1436,52 +1414,15 @@ sccnterm(struct consdev *cp)
     if (sc_console_unit < 0)
 	return;			/* shouldn't happen */
 
-#if __i386__ || __ia64__ || __amd64__ || __sparc64__
 #if 0 /* XXX */
     sc_clear_screen(sc_console);
     sccnupdate(sc_console);
 #endif
+
     scterm(sc_console_unit, SC_KERNEL_CONSOLE);
     sc_console_unit = -1;
     sc_console = NULL;
-#endif /* __i386__ || __ia64__ || __amd64__ || __sparc64__ */
-
-#if __alpha__
-    /* do nothing XXX */
-#endif /* __alpha__ */
 }
-
-#ifdef __alpha__
-
-void
-sccnattach(void)
-{
-    static struct consdev consdev;
-    int unit;
-    int flags;
-
-    bcopy(&sc_consdev, &consdev, sizeof(sc_consdev));
-    consdev.cn_pri = sc_get_cons_priority(&unit, &flags);
-
-    /* a video card is always required */
-    if (!scvidprobe(unit, flags, TRUE))
-	consdev.cn_pri = CN_DEAD;
-
-    /* alpha doesn't allow the console being without a keyboard... Why? */
-    if (!sckbdprobe(unit, flags, TRUE))
-	consdev.cn_pri = CN_DEAD;
-
-    if (consdev.cn_pri == CN_DEAD)
-	return;
-
-    scinit(unit, flags | SC_KERNEL_CONSOLE);
-    sc_console_unit = unit;
-    sc_console = SC_STAT(sc_get_softc(unit, SC_KERNEL_CONSOLE)->dev[0]);
-    sprintf(consdev.cn_name, "ttyv%r", 0);
-    cnadd(&consdev);
-}
-
-#endif /* __alpha__ */
 
 static void
 sccnputc(struct consdev *cd, int c)
@@ -2313,7 +2254,7 @@ sc_switch_scr(sc_softc_t *sc, u_int next_scr)
     ++sc->switch_in_progress;
     sc->delayed_next_scr = 0;
     sc->old_scp = cur_scp;
-    sc->new_scp = SC_STAT(SC_DEV(sc, next_scr));
+    sc->new_scp = sc_get_stat(SC_DEV(sc, next_scr));
     if (sc->new_scp == sc->old_scp) {
 	sc->switch_in_progress = 0;
 	/*
@@ -2358,7 +2299,7 @@ sc_switch_scr(sc_softc_t *sc, u_int next_scr)
 
     sc->switch_in_progress = 0;
     if (sc->unit == sc_console_unit)
-	cons_unavail = FALSE;
+	cnavailable(sc_consptr,  TRUE);
     splx(s);
     DPRINTF(5, ("switch done\n"));
 
@@ -2380,7 +2321,7 @@ do_switch_scr(sc_softc_t *sc, int s)
     if (!signal_vt_acq(sc->cur_scp)) {
 	sc->switch_in_progress = 0;
 	if (sc->unit == sc_console_unit)
-	    cons_unavail = FALSE;
+	    cnavailable(sc_consptr,  TRUE);
     }
 
     return s;
@@ -2422,7 +2363,7 @@ signal_vt_acq(scr_stat *scp)
     if (scp->smode.mode != VT_PROCESS)
 	return FALSE;
     if (scp->sc->unit == sc_console_unit)
-	cons_unavail = TRUE;
+	cnavailable(sc_consptr,  FALSE);
     scp->status |= SWITCH_WAIT_ACQ;
     PROC_LOCK(scp->proc);
     psignal(scp->proc, scp->smode.acqsig);
@@ -2597,7 +2538,7 @@ void
 sc_change_cursor_shape(scr_stat *scp, int flags, int base, int height)
 {
     sc_softc_t *sc;
-    dev_t dev;
+    struct cdev *dev;
     int s;
     int i;
 
@@ -2623,9 +2564,9 @@ sc_change_cursor_shape(scr_stat *scp, int flags, int base, int height)
     }
 
     for (i = sc->first_vty; i < sc->first_vty + sc->vtys; ++i) {
-	if ((dev = SC_DEV(sc, i)) == NODEV)
+	if ((dev = SC_DEV(sc, i)) == NULL)
 	    continue;
-	if ((scp = SC_STAT(dev)) == NULL)
+	if ((scp = sc_get_stat(dev)) == NULL)
 	    continue;
 	scp->dflt_curs_attr = sc->curs_attr;
 	change_cursor_shape(scp, CONS_RESET_CURSOR, -1, -1);
@@ -2643,9 +2584,6 @@ scinit(int unit, int flags)
      * static buffers for the console.  This is less than ideal, 
      * but is necessry evil for the time being.  XXX
      */
-    static scr_stat main_console;
-    static dev_t main_devs[MAXCONS];
-    static struct tty main_tty;
 #ifdef PC98
     static u_short sc_buffer[ROW*COL*2];/* XXX */
 #else
@@ -2728,10 +2666,12 @@ scinit(int unit, int flags)
 	sc->first_vty = unit*MAXCONS;
 	sc->vtys = MAXCONS;		/* XXX: should be configurable */
 	if (flags & SC_KERNEL_CONSOLE) {
+	    /*
+	     * Set up devs structure but don't use it yet, calling make_dev()
+	     * might panic kernel.  Wait for sc_attach_unit() to actually
+	     * create the devices.
+	     */
 	    sc->dev = main_devs;
-	    sc->dev[0] = makedev(CDEV_MAJOR, unit*MAXCONS);
-	    sc->dev[0]->si_tty = &main_tty;
-	    ttyregister(&main_tty);
 	    scp = &main_console;
 	    init_scp(sc, sc->first_vty, scp);
 	    sc_vtb_init(&scp->vtb, VTB_MEMORY, scp->xsize, scp->ysize,
@@ -2743,12 +2683,13 @@ scinit(int unit, int flags)
 					 kernel_default.rev_color);
 	} else {
 	    /* assert(sc_malloc) */
-	    sc->dev = malloc(sizeof(dev_t)*sc->vtys, M_DEVBUF, M_WAITOK|M_ZERO);
-	    sc->dev[0] = makedev(CDEV_MAJOR, unit*MAXCONS);
+	    sc->dev = malloc(sizeof(struct cdev *)*sc->vtys, M_DEVBUF, M_WAITOK|M_ZERO);
+	    sc->dev[0] = make_dev(&sc_cdevsw, unit * MAXCONS,
+	        UID_ROOT, GID_WHEEL, 0600, "ttyv%r", unit * MAXCONS);
 	    sc->dev[0]->si_tty = ttymalloc(sc->dev[0]->si_tty);
 	    scp = alloc_scp(sc, sc->first_vty);
+	    SC_STAT(sc->dev[0]) = scp;
 	}
-	SC_STAT(sc->dev[0]) = scp;
 	sc->cur_scp = scp;
 
 #ifndef __sparc64__
@@ -2825,7 +2766,7 @@ scinit(int unit, int flags)
 #endif
 
 #ifdef DEV_SPLASH
-	if (!(sc->flags & SC_SPLASH_SCRN) && (flags & SC_KERNEL_CONSOLE)) {
+	if (!(sc->flags & SC_SPLASH_SCRN)) {
 	    /* we are ready to put up the splash image! */
 	    splash_init(sc->adp, scsplash_callback, sc);
 	    sc->flags |= SC_SPLASH_SCRN;
@@ -2847,7 +2788,6 @@ scinit(int unit, int flags)
     sc->flags |= SC_INIT_DONE;
 }
 
-#if __i386__ || __ia64__ || __amd64__ || __sparc64__
 static void
 scterm(int unit, int flags)
 {
@@ -2878,7 +2818,7 @@ scterm(int unit, int flags)
 	vid_release(sc->adp, &sc->adapter);
 
     /* stop the terminal emulator, if any */
-    scp = SC_STAT(sc->dev[0]);
+    scp = sc_get_stat(sc->dev[0]);
     if (scp->tsw)
 	(*scp->tsw->te_term)(scp, &scp->ts);
     if (scp->ts != NULL)
@@ -2903,7 +2843,6 @@ scterm(int unit, int flags)
     sc->keyboard = -1;
     sc->adapter = -1;
 }
-#endif /* __i386__ || __ia64__ || __amd64__ || __sparc64__ */
 
 static void
 scshutdown(void *arg, int howto)
@@ -3343,15 +3282,9 @@ next_code:
 		break;
 
 	    case DBG:
-#ifndef SC_DISABLE_DDBKEY
-#ifdef DDB
-		Debugger("manual escape to debugger");
-#else
-		printf("No debugger in kernel\n");
+#ifndef SC_DISABLE_KDBKEY
+		kdb_enter("manual escape to debugger");
 #endif
-#else /* SC_DISABLE_DDBKEY */
-		/* do nothing */
-#endif /* SC_DISABLE_DDBKEY */
 		break;
 
 	    case PNC:
@@ -3407,11 +3340,11 @@ next_code:
 }
 
 static int
-scmmap(dev_t dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
+scmmap(struct cdev *dev, vm_offset_t offset, vm_paddr_t *paddr, int nprot)
 {
     scr_stat *scp;
 
-    scp = SC_STAT(dev);
+    scp = sc_get_stat(dev);
     if (scp != scp->sc->cur_scp)
 	return -1;
     return (*vidsw[scp->sc->adapter]->mmap)(scp->sc->adp, offset, paddr, nprot);
@@ -3572,7 +3505,7 @@ sc_paste(scr_stat *scp, u_char *p, int count)
 	return;
     rmap = scp->sc->scr_rmap;
     for (; count > 0; --count)
-	(*linesw[tp->t_line].l_rint)(rmap[*p++], tp);
+	ttyld_rint(tp, rmap[*p++]);
 }
 
 void
@@ -3619,4 +3552,21 @@ blink_screen(void *arg)
 	scp->sc->blink_in_progress--;
 	timeout(blink_screen, scp, hz / 10);
     }
+}
+
+/*
+ * Until sc_attach_unit() gets called no dev structures will be available
+ * to store the per-screen current status.  This is the case when the
+ * kernel is initially booting and needs access to its console.  During
+ * this early phase of booting the console's current status is kept in
+ * one statically defined scr_stat structure, and any pointers to the
+ * dev structures will be NULL.
+ */
+
+static scr_stat *
+sc_get_stat(struct cdev *devptr)
+{
+	if (devptr == NULL)
+		return (&main_console);
+	return (SC_STAT(devptr));
 }

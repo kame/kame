@@ -26,7 +26,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/safe/safe.c,v 1.4 2003/08/22 07:04:09 imp Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/safe/safe.c,v 1.7 2004/05/30 20:08:40 phk Exp $");
 
 /*
  * SafeNet SafeXcel-1141 hardware crypto accelerator
@@ -40,6 +40,7 @@ __FBSDID("$FreeBSD: src/sys/dev/safe/safe.c,v 1.4 2003/08/22 07:04:09 imp Exp $"
 #include <sys/malloc.h>
 #include <sys/kernel.h>
 #include <sys/mbuf.h>
+#include <sys/module.h>
 #include <sys/lock.h>
 #include <sys/mutex.h>
 #include <sys/sysctl.h>
@@ -241,8 +242,8 @@ safe_attach(device_t dev)
 	 * Setup memory-mapping of PCI registers.
 	 */
 	rid = BS_BAR;
-	sc->sc_sr = bus_alloc_resource(dev, SYS_RES_MEMORY, &rid,
-				       0, ~0, 1, RF_ACTIVE);
+	sc->sc_sr = bus_alloc_resource_any(dev, SYS_RES_MEMORY, &rid,
+					   RF_ACTIVE);
 	if (sc->sc_sr == NULL) {
 		device_printf(dev, "cannot map register space\n");
 		goto bad;
@@ -254,8 +255,8 @@ safe_attach(device_t dev)
 	 * Arrange interrupt line.
 	 */
 	rid = 0;
-	sc->sc_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid,
-					0, ~0, 1, RF_SHAREABLE|RF_ACTIVE);
+	sc->sc_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
+					    RF_SHAREABLE|RF_ACTIVE);
 	if (sc->sc_irq == NULL) {
 		device_printf(dev, "could not map interrupt\n");
 		goto bad1;
@@ -2102,11 +2103,11 @@ safe_dump_ringstate(struct safe_softc *sc, const char *tag)
 	u_int32_t estat = READ_REG(sc, SAFE_PE_ERNGSTAT);
 
 	/* NB: assume caller has lock on ring */
-	printf("%s: ERNGSTAT %x (next %u) back %u front %u\n",
+	printf("%s: ERNGSTAT %x (next %u) back %lu front %lu\n",
 		tag,
 		estat, (estat >> SAFE_PE_ERNGSTAT_NEXT_S),
-		sc->sc_back - sc->sc_ring,
-		sc->sc_front - sc->sc_ring);
+		(unsigned long)(sc->sc_back - sc->sc_ring),
+		(unsigned long)(sc->sc_front - sc->sc_ring));
 }
 
 static void
@@ -2130,7 +2131,7 @@ safe_dump_request(struct safe_softc *sc, const char* tag, struct safe_ringentry 
 		for (nsegs = re->re_src.nsegs; nsegs; nsegs--) {
 			printf(" spd[%u] %p: %p size %u flags %x"
 				, ix, &sc->sc_spring[ix]
-				, (caddr_t) sc->sc_spring[ix].pd_addr
+				, (caddr_t)(uintptr_t) sc->sc_spring[ix].pd_addr
 				, sc->sc_spring[ix].pd_size
 				, sc->sc_spring[ix].pd_flags
 			);
@@ -2147,7 +2148,7 @@ safe_dump_request(struct safe_softc *sc, const char* tag, struct safe_ringentry 
 		for (nsegs = re->re_dst.nsegs; nsegs; nsegs--) {
 			printf(" dpd[%u] %p: %p flags %x\n"
 				, ix, &sc->sc_dpring[ix]
-				, (caddr_t) sc->sc_dpring[ix].pd_addr
+				, (caddr_t)(uintptr_t) sc->sc_dpring[ix].pd_addr
 				, sc->sc_dpring[ix].pd_flags
 			);
 			if (++ix == SAFE_TOTAL_DPART)

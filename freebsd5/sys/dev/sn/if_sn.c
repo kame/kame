@@ -30,7 +30,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sn/if_sn.c,v 1.34 2003/11/14 17:16:57 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sn/if_sn.c,v 1.41 2004/06/09 14:34:02 naddy Exp $");
 
 /*
  * This is a driver for SMC's 9000 series of Ethernet adapters.
@@ -133,7 +133,6 @@ static void snwatchdog(struct ifnet *);
 
 static void sn_setmcast(struct sn_softc *);
 static int sn_getmcf(struct arpcom *ac, u_char *mcf);
-static uint32_t sn_mchash(const uint8_t *addr);
 
 /* I (GB) have been unlucky getting the hardware padding
  * to work properly.
@@ -159,8 +158,6 @@ sn_attach(device_t dev)
 	struct ifnet    *ifp = &sc->arpcom.ac_if;
 	uint16_t        i, w;
 	uint8_t         *p;
-	struct ifaddr   *ifa;
-	struct sockaddr_dl *sdl;
 	int             rev;
 	uint16_t        address;
 	int		j;
@@ -201,12 +198,10 @@ sn_attach(device_t dev)
 		p[i + 1] = address >> 8;
 		p[i] = address & 0xFF;
 	}
-	printf(" MAC address %6D\n", sc->arpcom.ac_enaddr, ":");
 	ifp->if_softc = sc;
 	if_initname(ifp, device_get_name(dev), device_get_unit(dev));
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
-	ifp->if_output = ether_output;
 	ifp->if_start = snstart;
 	ifp->if_ioctl = snioctl;
 	ifp->if_watchdog = snwatchdog;
@@ -216,24 +211,6 @@ sn_attach(device_t dev)
 	ifp->if_timer = 0;
 
 	ether_ifattach(ifp, sc->arpcom.ac_enaddr);
-
-	/*
-	 * Fill the hardware address into ifa_addr if we find an AF_LINK
-	 * entry. We need to do this so bpf's can get the hardware addr of
-	 * this card. netstat likes this too!
-	 */
-	ifa = TAILQ_FIRST(&ifp->if_addrhead);
-	while ((ifa != 0) && (ifa->ifa_addr != 0) &&
-	       (ifa->ifa_addr->sa_family != AF_LINK))
-		ifa = TAILQ_NEXT(ifa, ifa_link);
-
-	if ((ifa != 0) && (ifa->ifa_addr != 0)) {
-		sdl = (struct sockaddr_dl *) ifa->ifa_addr;
-		sdl->sdl_type = IFT_ETHER;
-		sdl->sdl_alen = ETHER_ADDR_LEN;
-		sdl->sdl_slen = 0;
-		bcopy(sc->arpcom.ac_enaddr, LLADDR(sdl), ETHER_ADDR_LEN);
-	}
 
 	/*
 	 * Activate the interrupt so we can get card interrupts.  This
@@ -1260,8 +1237,8 @@ sn_activate(device_t dev)
 	}
 
 	sc->irq_rid = 0;
-	sc->irq_res = bus_alloc_resource(dev, SYS_RES_IRQ, &sc->irq_rid, 
-	    0, ~0, 1, RF_ACTIVE);
+	sc->irq_res = bus_alloc_resource_any(dev, SYS_RES_IRQ, &sc->irq_rid, 
+	    RF_ACTIVE);
 	if (!sc->irq_res) {
 		if (bootverbose)
 			device_printf(dev, "Cannot allocate irq\n");
@@ -1455,8 +1432,8 @@ sn_getmcf(struct arpcom *ac, uint8_t *mcf)
 	TAILQ_FOREACH(ifma, &ac->ac_if.if_multiaddrs, ifma_link) {
 	    if (ifma->ifma_addr->sa_family != AF_LINK)
 		return 0;
-	    index = sn_mchash(
-		LLADDR((struct sockaddr_dl *)ifma->ifma_addr)) & 0x3f;
+	    index = ether_crc32_le(LLADDR((struct sockaddr_dl *)
+		ifma->ifma_addr), ETHER_ADDR_LEN) & 0x3f;
 	    index2 = 0;
 	    for (i = 0; i < 6; i++) {
 		index2 <<= 1;
@@ -1466,23 +1443,4 @@ sn_getmcf(struct arpcom *ac, uint8_t *mcf)
 	    af[index2 >> 3] |= 1 << (index2 & 7);
 	}
 	return 1;  /* use multicast filter */
-}
-
-static uint32_t
-sn_mchash(const uint8_t *addr)
-{
-	const uint32_t poly = 0xedb88320;
-	uint32_t crc;
-	int idx, bit;
-	uint8_t data;
-
-	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (idx = 0; idx < ETHER_ADDR_LEN; idx++) {
-		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
-			crc = (crc >> 1)^(((crc ^ data) & 0x01) ? poly : 0);
-		}
-	}
-	return crc;
 }

@@ -1,4 +1,4 @@
-/*	$FreeBSD: src/sys/netinet6/in6_pcb.h,v 1.10 2003/11/04 20:22:33 ume Exp $	*/
+/*	$FreeBSD: src/sys/netinet6/in6_pcb.h,v 1.15 2004/08/06 03:45:45 rwatson Exp $	*/
 /*	$KAME: in6_pcb.h,v 1.13 2001/02/06 09:16:53 itojun Exp $	*/
 
 /*
@@ -43,10 +43,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -76,9 +72,8 @@
 
 void	in6_pcbpurgeif0 __P((struct in6pcb *, struct ifnet *));
 void	in6_losing __P((struct inpcb *));
-int	in6_pcballoc __P((struct socket *, struct inpcbinfo *, struct thread *));
-int	in6_pcbbind __P((struct inpcb *, struct sockaddr *, struct thread *));
-int	in6_pcbconnect __P((struct inpcb *, struct sockaddr *, struct thread *));
+int	in6_pcbbind __P((struct inpcb *, struct sockaddr *, struct ucred *));
+int	in6_pcbconnect __P((struct inpcb *, struct sockaddr *, struct ucred *));
 void	in6_pcbdetach __P((struct inpcb *));
 void	in6_pcbdisconnect __P((struct inpcb *));
 int	in6_pcbladdr __P((struct inpcb *, struct sockaddr *,
@@ -90,7 +85,7 @@ struct	inpcb *
 	in6_pcblookup_hash __P((struct inpcbinfo *, struct in6_addr *,
 				u_int, struct in6_addr *,
 				u_int, int, struct ifnet *));
-void	in6_pcbnotify __P((struct inpcbhead *, struct sockaddr *,
+void	in6_pcbnotify __P((struct inpcbinfo *, struct sockaddr *,
 			   u_int, const struct sockaddr *, u_int, int, void *,
 			   struct inpcb *(*)(struct inpcb *, int)));
 struct inpcb *
@@ -104,7 +99,7 @@ int	in6_setsockaddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_mapped_sockaddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_mapped_peeraddr __P((struct socket *so, struct sockaddr **nam));
 int	in6_selecthlim __P((struct in6pcb *, struct ifnet *));
-int	in6_pcbsetport(struct in6_addr *, struct inpcb *, struct thread *);
+int	in6_pcbsetport __P((struct in6_addr *, struct inpcb *, struct ucred *));
 void	init_sin6 __P((struct sockaddr_in6 *sin6, struct mbuf *m));
 #endif /* _KERNEL */
 

@@ -262,7 +262,7 @@ firewire_output(struct ifnet *ifp, struct mbuf *m, struct sockaddr *dst,
 				 * datagram, copying our tags over.
 				 */
 				mtail = m_split(m, fsize, M_DONTWAIT);
-				m_tag_copy_chain(mtail, m, M_NOWAIT);
+				m_tag_copy_chain(mtail, m);
 			} else {
 				mtail = 0;
 			}

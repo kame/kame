@@ -1,4 +1,4 @@
-# $FreeBSD: src/sys/conf/options,v 1.426 2003/11/16 12:26:09 akiyama Exp $
+# $FreeBSD: src/sys/conf/options,v 1.475.2.4 2004/09/22 19:23:37 andre Exp $
 #
 #        On the handling of kernel options
 #
@@ -30,77 +30,65 @@
 # If filename is missing, the default is
 # opt_<name-of-option-in-lower-case>.h
 
-# Adaptec Array Controller driver options
-AAC_DEBUG		opt_aac.h	# Debugging levels:
-					# 0 - quiet, only emit warnings
-					# 1 - noisy, emit major function
-					#     points and things done
-					# 2 - extremely noisy, emit trace
-					#     items in loops, etc.
+AAC_DEBUG		opt_aac.h
+AHC_ALLOW_MEMIO		opt_aic7xxx.h
+AHC_TMODE_ENABLE	opt_aic7xxx.h
+AHC_DUMP_EEPROM		opt_aic7xxx.h
+AHC_DEBUG		opt_aic7xxx.h
+AHC_DEBUG_OPTS		opt_aic7xxx.h
+AHC_REG_PRETTY_PRINT    opt_aic7xxx.h
+AHD_DEBUG		opt_aic79xx.h
+AHD_DEBUG_OPTS		opt_aic79xx.h
+AHD_TMODE_ENABLE	opt_aic79xx.h	
+AHD_REG_PRETTY_PRINT	opt_aic79xx.h
+ADW_ALLOW_MEMIO		opt_adw.h
 
-# Adaptec aic7xxx SCSI controller options
-AHC_ALLOW_MEMIO		opt_aic7xxx.h	# Allow PCI devices to use memory
-					# mapped I/O
+TWA_DEBUG		opt_twa.h
+TWA_FLASH_FIRMWARE	opt_twa.h
 
-AHC_TMODE_ENABLE	opt_aic7xxx.h	# Bitmap of units to enable
-					# targetmode operations.
-
-AHC_DUMP_EEPROM		opt_aic7xxx.h	# Dump the contents of our
-					# configuration prom.
-
-AHC_DEBUG		opt_aic7xxx.h	# Compile in Aic7xxx Debugging code.
-
-AHC_DEBUG_OPTS		opt_aic7xxx.h	# Aic7xxx driver debugging options.
-					# See sys/dev/aic7xxx/aic7xxx.h
-
-AHC_REG_PRETTY_PRINT    opt_aic7xxx.h	# Print register bitfields in debug
-					# output.  Adds ~128k to driver.
-
-# Adaptec aic79xx SCSI controller options
-AHD_DEBUG		opt_aic79xx.h	# Compile in Aic79xx Debugging code.
-
-AHD_DEBUG_OPTS		opt_aic79xx.h	# Aic79xx driver debugging options.
-					# See sys/dev/aic7xxx/aic79xx.h   
-
-AHD_TMODE_ENABLE	opt_aic79xx.h	# Bitmap of units to enable
-					# targetmode operations.
-
-AHD_REG_PRETTY_PRINT	opt_aic79xx.h	# Print register bitfields in debug
-					# output.  Adds ~215k to driver.
-
-ADW_ALLOW_MEMIO		opt_adw.h	# Allow PCI devices to use memory
-					# mapped I/O
+# Debugging options.
+DDB
+DDB_NUMSYM	opt_ddb.h
+GDB
+GDBSPEED	opt_gdb.h
+KDB		opt_global.h
+KDB_TRACE	opt_kdb.h
+KDB_UNATTENDED	opt_kdb.h
 
 # Miscellaneous options.
-ADAPTIVE_MUTEXES
+ADAPTIVE_GIANT	opt_adaptive_mutexes.h
+NO_ADAPTIVE_MUTEXES	opt_adaptive_mutexes.h
 ALQ
 CODA_COMPAT_5	opt_coda.h
 COMPAT_43	opt_compat.h
 COMPAT_FREEBSD4	opt_compat.h
-COMPAT_SUNOS	opt_compat.h
 COMPILING_LINT	opt_global.h
 CONSPEED	opt_comconsole.h
 CY_PCI_FASTINTR
-DDB
-DDB_NOKLDSYM	opt_ddb.h
-DDB_TRACE
-DDB_UNATTENDED
-GDB_REMOTE_CHAT	opt_ddb.h
-GDBSPEED	opt_ddb.h
+DIRECTIO	opt_directio.h
+FULL_PREEMPTION	opt_sched.h
+PREEMPTION	opt_sched.h
 GEOM_AES	opt_geom.h
 GEOM_APPLE	opt_geom.h
 GEOM_BDE	opt_geom.h
 GEOM_BSD	opt_geom.h
+GEOM_CONCAT	opt_geom.h
 GEOM_FOX	opt_geom.h
+GEOM_GATE	opt_geom.h
 GEOM_GPT	opt_geom.h
+GEOM_LABEL	opt_geom.h
 GEOM_MBR	opt_geom.h
 GEOM_MIRROR	opt_geom.h
+GEOM_NOP	opt_geom.h
 GEOM_PC98	opt_geom.h
+GEOM_RAID3	opt_geom.h
+GEOM_STRIPE	opt_geom.h
 GEOM_SUNLABEL	opt_geom.h
+GEOM_UZIP	opt_geom.h
 GEOM_VOL	opt_geom.h
 HW_WDOG
-KSTACK_PAGES
 KSTACK_MAX_PAGES
+KSTACK_PAGES
 KTRACE
 KTRACE_REQUEST_POOL	opt_ktrace.h
 LIBICONV
@@ -116,11 +104,14 @@ MAC_NONE	opt_dontuse.h
 MAC_PARTITION	opt_dontuse.h
 MAC_PORTACL	opt_dontuse.h
 MAC_SEEOTHERUIDS	opt_dontuse.h
+MAC_STATIC	opt_mac.h
 MAC_STUB	opt_dontuse.h
 MAC_TEST	opt_dontuse.h
 MD_ROOT		opt_md.h
 MD_ROOT_SIZE	opt_md.h
-NDGBPORTS	opt_dgb.h
+MPROF_BUFFERS	opt_mprof.h
+MPROF_HASH_SIZE	opt_mprof.h
+MUTEX_WAKE_ALL
 NSWBUF_MIN	opt_swap.h
 PANIC_REBOOT_WAIT_TIME	opt_panic.h
 PPS_SYNC	opt_ntp.h
@@ -129,6 +120,7 @@ QUOTA
 SCHED_4BSD	opt_sched.h
 SCHED_ULE	opt_sched.h
 SHOW_BUSYBUFS
+SLEEPQUEUE_PROFILING
 SPX_HACK
 SUIDDIR		opt_suiddir.h
 MSGMNB		opt_sysvipc.h
@@ -152,15 +144,16 @@ SHMSEG		opt_sysvipc.h
 SYSVMSG		opt_sysvipc.h
 SYSVSEM		opt_sysvipc.h
 SYSVSHM		opt_sysvipc.h
+SW_WATCHDOG	opt_watchdog.h
+TURNSTILE_PROFILING
+TTYHOG		opt_tty.h
 VFS_AIO
 WLCACHE		opt_wavelan.h
 WLDEBUG		opt_wavelan.h
-TTYHOG		opt_tty.h
-DIRECTIO	opt_directio.h
 
 # POSIX kernel options
-_KPOSIX_PRIORITY_SCHEDULING	opt_posix.h
 P1003_1B_SEMAPHORES		opt_posix.h
+_KPOSIX_PRIORITY_SCHEDULING	opt_posix.h
 
 # Do we want the config file compiled into the kernel?
 INCLUDE_CONFIG_FILE	opt_config.h
@@ -234,6 +227,9 @@ NFS_ROOT	opt_nfsroot.h
 NETSMB			opt_netsmb.h
 NETSMBCRYPTO		opt_netsmb.h
 
+# Experimental support for large MS-DOS filesystems; SEE WARNING IN "NOTES"!
+MSDOSFS_LARGE	opt_msdosfs.h
+
 # Options used only in subr_param.c.
 HZ		opt_param.h
 MAXFILES	opt_param.h
@@ -263,8 +259,6 @@ SCSI_NO_OP_STRINGS	opt_scsi.h
 # Options used only in cam/scsi/scsi_cd.c
 CHANGER_MIN_BUSY_SECONDS	opt_cd.h
 CHANGER_MAX_BUSY_SECONDS	opt_cd.h
-
-DA_OLD_QUIRKS		opt_da.h
 
 # Options used only in cam/scsi/scsi_sa.c.
 SA_IO_TIMEOUT		opt_sa.h
@@ -306,40 +300,52 @@ ISP_FW_CRASH_DUMP	opt_isp.h
 ATA_STATIC_ID		opt_ata.h
 ATA_NOPCI		opt_ata.h
 DEV_ATADISK		opt_ata.h
-DEV_ATARAID		opt_ata.h
 DEV_ATAPICD		opt_ata.h
 DEV_ATAPIST		opt_ata.h
 DEV_ATAPIFD		opt_ata.h
 DEV_ATAPICAM		opt_ata.h
+DEV_ATARAID		opt_ata.h
 
 # Net stuff.
 # altq stuff
-ALTQ			opt_global.h
-ALTQ_CBQ		opt_altq.h
-ALTQ_WFQ		opt_altq.h
-ALTQ_AFMAP		opt_altq.h
-ALTQ_FIFOQ		opt_altq.h
-ALTQ_RED		opt_altq.h
-ALTQ_FLOWVALVE		opt_altq.h
-ALTQ_RIO		opt_altq.h
-ALTQ_IPSEC		opt_altq.h
-ALTQ_LOCALQ		opt_altq.h
-ALTQ_HFSC		opt_altq.h
-ALTQ_JOBS		opt_altq.h
-ALTQ_CDNR		opt_altq.h
-ALTQ_BLUE		opt_altq.h
-ALTQ_PRIQ		opt_altq.h
-ALTQ_NOPCC		opt_altq.h
-ALTQ_DEBUG		opt_altq.h
+#ALTQ			opt_global.h
+#ALTQ_CBQ		opt_altq.h
+#ALTQ_WFQ		opt_altq.h
+#ALTQ_AFMAP		opt_altq.h
+#ALTQ_FIFOQ		opt_altq.h
+#ALTQ_RED		opt_altq.h
+#ALTQ_FLOWVALVE		opt_altq.h
+#ALTQ_RIO		opt_altq.h
+#ALTQ_IPSEC		opt_altq.h
+#ALTQ_LOCALQ		opt_altq.h
+#ALTQ_HFSC		opt_altq.h
+#ALTQ_JOBS		opt_altq.h
+#ALTQ_CDNR		opt_altq.h
+#ALTQ_BLUE		opt_altq.h
+#ALTQ_PRIQ		opt_altq.h
+#ALTQ_NOPCC		opt_altq.h
+#ALTQ_DEBUG		opt_altq.h
  
 ACCEPT_FILTER_DATA
 ACCEPT_FILTER_HTTP
+ALTQ			opt_global.h
+ALTQ_CBQ		opt_altq.h
+ALTQ_RED		opt_altq.h
+ALTQ_RIO		opt_altq.h
+ALTQ_HFSC		opt_altq.h
+ALTQ_CDNR		opt_altq.h
+ALTQ_PRIQ		opt_altq.h
+ALTQ_NOPCC		opt_altq.h
+ALTQ_DEBUG		opt_altq.h
 BOOTP			opt_bootp.h
 BOOTP_COMPAT		opt_bootp.h
 BOOTP_NFSROOT		opt_bootp.h
 BOOTP_NFSV3		opt_bootp.h
 BOOTP_WIRED_TO		opt_bootp.h
 BRIDGE			opt_bdg.h
+DEV_PF			opt_pf.h
+DEV_PFLOG		opt_pf.h
+DEV_PFSYNC		opt_pf.h
 ETHER_II		opt_ef.h
 ETHER_8023		opt_ef.h
 ETHER_8022		opt_ef.h
@@ -374,11 +380,11 @@ DUMMYNET		opt_ipdn.h
 IPFILTER		opt_ipfilter.h
 IPFILTER_LOG		opt_ipfilter.h
 IPFILTER_DEFAULT_BLOCK	opt_ipfilter.h
-PFIL_HOOKS		opt_pfil_hooks.h
 IPFIREWALL		opt_ipfw.h
 IPFIREWALL_VERBOSE	opt_ipfw.h
 IPFIREWALL_VERBOSE_LIMIT	opt_ipfw.h
 IPFIREWALL_DEFAULT_TO_ACCEPT	opt_ipfw.h
+IPFIREWALL_FORWARD	opt_ipfw.h
 IPV6FIREWALL		opt_ip6fw.h
 IPV6FIREWALL_VERBOSE	opt_ip6fw.h
 IPV6FIREWALL_VERBOSE_LIMIT	opt_ip6fw.h
@@ -388,8 +394,10 @@ IPX
 IPXIP			opt_ipx.h
 LIBMBPOOL
 LIBMCHAIN
+MBUF_STRESS_TEST	opt_mbuf_stress_test.h
 NCP
 NETATALK		opt_atalk.h
+NET_WITH_GIANT		opt_net.h
 PPP_BSDCOMP		opt_ppp.h
 PPP_DEFLATE		opt_ppp.h
 PPP_FILTER		opt_ppp.h
@@ -405,10 +413,11 @@ SLIP_IFF_OPTS		opt_slip.h
 DCCP			opt_dccp.h
 DCCP_TFRC		opt_dccp.h
 TCPDEBUG
+TCP_SIGNATURE		opt_inet.h
+TCP_SACK_DEBUG		opt_tcp_sack.h 
 TCP_DROP_SYNFIN		opt_tcp_input.h
 TCP_ECN			opt_global.h
 XBONEHACK
-MBUF_STRESS_TEST		opt_mbuf_stress_test.h
 
 # Netgraph(4). Use option NETGRAPH to enable the base netgraph code.
 # Each netgraph node type can be either be compiled into the kernel
@@ -416,11 +425,24 @@ MBUF_STRESS_TEST		opt_mbuf_stress_test.h
 # option below. Each type has its own man page, e.g. ng_async(4).
 NETGRAPH
 NETGRAPH_ASYNC		opt_netgraph.h
+NETGRAPH_ATMLLC		opt_netgraph.h
+NETGRAPH_ATM_ATMPIF	opt_netgraph.h
+NETGRAPH_BLUETOOTH	opt_netgraph.h
+NETGRAPH_BLUETOOTH_BT3C	opt_netgraph.h
+NETGRAPH_BLUETOOTH_H4	opt_netgraph.h
+NETGRAPH_BLUETOOTH_HCI	opt_netgraph.h
+NETGRAPH_BLUETOOTH_L2CAP	opt_netgraph.h
+NETGRAPH_BLUETOOTH_SOCKET	opt_netgraph.h
+NETGRAPH_BLUETOOTH_UBT	opt_netgraph.h
+NETGRAPH_BLUETOOTH_UBTBCMFW	opt_netgraph.h
 NETGRAPH_BPF		opt_netgraph.h
 NETGRAPH_BRIDGE		opt_netgraph.h
 NETGRAPH_CISCO		opt_netgraph.h
+NETGRAPH_DEVICE		opt_netgraph.h
 NETGRAPH_ECHO		opt_netgraph.h
+NETGRAPH_EIFACE		opt_netgraph.h
 NETGRAPH_ETHER		opt_netgraph.h
+NETGRAPH_FEC		opt_netgraph.h
 NETGRAPH_FRAME_RELAY	opt_netgraph.h
 NETGRAPH_GIF		opt_netgraph.h
 NETGRAPH_GIF_DEMUX	opt_netgraph.h
@@ -440,11 +462,11 @@ NETGRAPH_PPTPGRE	opt_netgraph.h
 NETGRAPH_RFC1490	opt_netgraph.h
 NETGRAPH_SOCKET		opt_netgraph.h
 NETGRAPH_SPLIT		opt_netgraph.h
+NETGRAPH_SPPP		opt_netgraph.h
 NETGRAPH_TEE		opt_netgraph.h
 NETGRAPH_TTY		opt_netgraph.h
 NETGRAPH_UI		opt_netgraph.h
 NETGRAPH_VJC		opt_netgraph.h
-NETGRAPH_ATM_ATMPIF	opt_netgraph.h
 
 # NgATM options
 NGATM_ATM		opt_netgraph.h
@@ -452,6 +474,7 @@ NGATM_ATMBASE		opt_netgraph.h
 NGATM_SSCOP		opt_netgraph.h
 NGATM_SSCFU		opt_netgraph.h
 NGATM_UNI		opt_netgraph.h
+NGATM_CCATM		opt_netgraph.h
 
 # DRM options
 DRM_DEBUG		opt_drm.h
@@ -478,9 +501,6 @@ DPT_TIMEOUT_FACTOR	opt_dpt.h
 DPT_LOST_IRQ		opt_dpt.h
 DPT_RESET_HBA		opt_dpt.h
 
-# Adaptec ASR and DPT V/VI controller options
-ASR_MEASURE_PERFORMANCE	opt_asr.h
-
 # Misc debug flags.  Most of these should probably be replaced with
 # 'DEBUG', and then let people recompile just the interesting modules
 # with 'make CC="cc -DDEBUG"'.
@@ -490,13 +510,10 @@ VP0_DEBUG		opt_vpo.h
 LPT_DEBUG		opt_lpt.h
 PLIP_DEBUG		opt_plip.h
 LOCKF_DEBUG		opt_debug_lockf.h
-MUTEX_DEBUG		opt_global.h
-MUTEX_NOINLINE		opt_global.h
-MUTEX_PROFILING		opt_global.h
 NPX_DEBUG		opt_debug_npx.h
 NETATALKDEBUG		opt_atalk.h
 SI_DEBUG		opt_debug_si.h
-WATCHDOG		opt_watchdog.h
+SX_DEBUG		opt_debug_sx.h
 
 # Fb options
 FB_DEBUG		opt_fb.h
@@ -520,6 +537,9 @@ INVARIANT_SUPPORT	opt_global.h
 INVARIANTS		opt_global.h
 LOOKUP_SHARED		opt_global.h
 MCLSHIFT		opt_global.h
+MUTEX_DEBUG		opt_global.h
+MUTEX_NOINLINE		opt_global.h
+MUTEX_PROFILING		opt_global.h
 MSIZE			opt_global.h
 REGRESSION		opt_global.h
 RESTARTABLE_PANICS	opt_global.h
@@ -575,13 +595,6 @@ BKTR_SIS_VIA_MODE		opt_bktr.h
 BKTR_USE_FREEBSD_SMBUS		opt_bktr.h
 BKTR_NEW_MSP34XX_DRIVER		opt_bktr.h
 
-# meteor opt_meteor.h
-METEOR_ALLOC_PAGES	opt_meteor.h
-METEOR_TEST_VIDEO	opt_meteor.h
-METEOR_SYSTEM_DEFAULT	opt_meteor.h
-METEOR_DEALLOC_PAGES	opt_meteor.h
-METEOR_DEALLOC_ABOVE	opt_meteor.h
-
 # options for serial support
 COM_ESP			opt_sio.h
 COM_MULTIPORT		opt_sio.h
@@ -596,6 +609,7 @@ BUS_DEBUG		opt_bus.h
 
 # options for USB support
 USB_DEBUG		opt_usb.h
+USBVERBOSE		opt_usb.h
 UKBD_DFLT_KEYMAP	opt_ukbd.h
 UPLCOM_INTR_INTERVAL	opt_uplcom.h
 UVSCOM_DEFAULT_OPKTSIZE	opt_uvscom.h
@@ -614,10 +628,6 @@ PCFCLOCK_VERBOSE	opt_pcfclock.h
 PCFCLOCK_MAX_RETRIES	opt_pcfclock.h
 TDFX_LINUX		opt_tdfx.h
 
-# RAIDframe options
-RAID_AUTOCONFIG		opt_raid.h
-RAID_DEBUG		opt_raid.h
-
 KTR			opt_global.h
 KTR_ALQ			opt_ktr.h
 KTR_MASK		opt_ktr.h
@@ -626,7 +636,7 @@ KTR_COMPILE		opt_global.h
 KTR_ENTRIES		opt_global.h
 KTR_VERBOSE		opt_ktr.h
 WITNESS			opt_global.h
-WITNESS_DDB		opt_witness.h
+WITNESS_KDB		opt_witness.h
 WITNESS_SKIPSPIN	opt_witness.h
 
 # options for ACPI support
@@ -640,9 +650,9 @@ NDEVFSINO		opt_devfs.h
 NDEVFSOVERFLOW		opt_devfs.h
 
 # various 'device presence' options.
+DEV_BPF			opt_bpf.h
 DEV_ISA			opt_isa.h
 DEV_MCA			opt_mca.h
-DEV_BPF			opt_bpf.h
 DEV_SPLASH		opt_splash.h
 
 EISA_SLOTS		opt_eisa.h
@@ -679,7 +689,7 @@ SC_CUT_SPACES2TABS	opt_syscons.h
 SC_CUT_SEPCHARS		opt_syscons.h
 SC_DEBUG_LEVEL		opt_syscons.h
 SC_DFLT_FONT		opt_syscons.h
-SC_DISABLE_DDBKEY	opt_syscons.h
+SC_DISABLE_KDBKEY	opt_syscons.h
 SC_DISABLE_REBOOT	opt_syscons.h
 SC_HISTORY_SIZE		opt_syscons.h
 SC_KERNEL_CONS_ATTR	opt_syscons.h
@@ -688,13 +698,13 @@ SC_MOUSE_CHAR		opt_syscons.h
 SC_NO_CUTPASTE		opt_syscons.h
 SC_NO_FONT_LOADING	opt_syscons.h
 SC_NO_HISTORY		opt_syscons.h
+SC_NO_SUSPEND_VTYSWITCH	opt_syscons.h
 SC_NO_SYSMOUSE		opt_syscons.h
 SC_NORM_ATTR		opt_syscons.h
 SC_NORM_REV_ATTR	opt_syscons.h
 SC_PIXEL_MODE		opt_syscons.h
 SC_RENDER_DEBUG		opt_syscons.h
 SC_TWOBUTTON_MOUSE	opt_syscons.h
-SC_NO_SUSPEND_VTYSWITCH	opt_syscons.h
 
 # kbd options
 KBD_DISABLE_KEYMAP_LOAD	opt_kbd.h

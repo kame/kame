@@ -23,7 +23,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_ef.c,v 1.27 2003/11/14 21:02:22 andre Exp $
+ * $FreeBSD: src/sys/net/if_ef.c,v 1.32 2004/07/28 06:48:36 kan Exp $
  */
 
 #include "opt_inet.h"
@@ -120,7 +120,6 @@ ef_attach(struct efnet *sc)
 	struct ifaddr *ifa2;
 	struct sockaddr_dl *sdl2;
 
-	ifp->if_output = ether_output;
 	ifp->if_start = ef_start;
 	ifp->if_watchdog = NULL;
 	ifp->if_init = ef_init;
@@ -227,8 +226,8 @@ ef_start(struct ifnet *ifp)
 		if (m == 0)
 			break;
 		BPF_MTAP(ifp, m);
-		IFQ_HANDOFF(p, m, NULL, error);
-		if (error != 0) {
+		IFQ_HANDOFF(p, m, error);
+		if (error) {
 			ifp->if_oerrors++;
 			continue;
 		}
@@ -326,6 +325,7 @@ ef_input(struct ifnet *ifp, struct ether_header *eh, struct mbuf *m)
 	int isr;
 
 	ether_type = ntohs(eh->ether_type);
+	l = NULL;
 	if (ether_type < ETHERMTU) {
 		l = mtod(m, struct llc*);
 		if (l->llc_dsap == 0xff && l->llc_ssap == 0xff) {
@@ -374,13 +374,7 @@ ef_input(struct ifnet *ifp, struct ether_header *eh, struct mbuf *m)
 	eifp->if_ibytes += m->m_pkthdr.len + sizeof (*eh);
 	m->m_pkthdr.rcvif = eifp;
 
-	if (eifp->if_bpf) {
-		struct mbuf m0;
-		m0.m_next = m;
-		m0.m_len = ETHER_HDR_LEN;
-		m0.m_data = (char *)eh;
-		BPF_MTAP(eifp, &m0);
-	}
+	BPF_MTAP2(eifp, eh, ETHER_HDR_LEN, m);
 	/*
 	 * Now we ready to adjust mbufs and pass them to protocol intr's
 	 */
@@ -591,7 +585,7 @@ if_ef_modevent(module_t mod, int type, void *data)
 	    case MOD_UNLOAD:
 		return ef_unload();
 	    default:
-		break;
+		return EOPNOTSUPP;
 	}
 	return 0;
 }

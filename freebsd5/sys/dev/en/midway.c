@@ -33,7 +33,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/en/midway.c,v 1.59 2003/10/31 18:31:59 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/en/midway.c,v 1.63 2004/08/02 00:18:34 green Exp $");
 
 /*
  *
@@ -127,6 +127,7 @@ enum {
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#include <sys/kdb.h>
 #include <sys/queue.h>
 #include <sys/sockio.h>
 #include <sys/socket.h>
@@ -436,25 +437,21 @@ en_dump_packet(struct en_softc *sc, struct mbuf *m)
  *
  * LOCK: any, not needed
  */
-static void
-en_map_ctor(void *mem, int size, void *arg)
+static int
+en_map_ctor(void *mem, int size, void *arg, int flags)
 {
 	struct en_softc *sc = arg;
 	struct en_map *map = mem;
 	int err;
 
-	if (map->sc == NULL)
-		map->sc = sc;
-
-	if (!(map->flags & ENMAP_ALLOC)) {
-		err = bus_dmamap_create(sc->txtag, 0, &map->map);
-		if (err != 0)
-			if_printf(&sc->ifatm.ifnet,
-			    "cannot create DMA map %d\n", err);
-		else
-			map->flags |= ENMAP_ALLOC;
+	err = bus_dmamap_create(sc->txtag, 0, &map->map);
+	if (err != 0) {
+		if_printf(&sc->ifatm.ifnet, "cannot create DMA map %d\n", err);
+		return (err);
 	}
-	map->flags &= ~ENMAP_LOADED;
+	map->flags = ENMAP_ALLOC;
+	map->sc = sc;
+	return (0);
 }
 
 /*
@@ -489,8 +486,7 @@ en_map_fini(void *mem, int size)
 {
 	struct en_map *map = mem;
 
-	if (map->flags & ENMAP_ALLOC)
-		bus_dmamap_destroy(map->sc->txtag, map->map);
+	bus_dmamap_destroy(map->sc->txtag, map->map);
 }
 
 /*********************************************************************/
@@ -1028,6 +1024,11 @@ en_start(struct ifnet *ifp)
 		    (int)M_TRAILINGSPACE(lastm)));
 
 		/*
+		 * From here on we need access to sc
+		 */
+		EN_LOCK(sc);
+
+		/*
 		 * Allocate a map. We do this here rather then in en_txdma,
 		 * because en_txdma is also called from the interrupt handler
 		 * and we are going to have a locking problem then. We must
@@ -1035,19 +1036,14 @@ en_start(struct ifnet *ifp)
 		 * locks.
 		 */
 		map = uma_zalloc_arg(sc->map_zone, sc, M_NOWAIT);
-		if (map == NULL || !(map->flags & ENMAP_ALLOC)) {
+		if (map == NULL) {
 			/* drop that packet */
 			EN_COUNT(sc->stats.txnomap);
-			if (map != NULL)
-				uma_zfree(sc->map_zone, map);
+			EN_UNLOCK(sc);
 			m_freem(m);
 			continue;
 		}
 
-		/*
-		 * From here on we need access to sc
-		 */
-		EN_LOCK(sc);
 		if ((ifp->if_flags & IFF_RUNNING) == 0) {
 			EN_UNLOCK(sc);
 			uma_zfree(sc->map_zone, map);
@@ -1413,10 +1409,7 @@ en_reset_ul(struct en_softc *sc)
 	/*
 	 * Unstop all waiters
 	 */
-	while (!cv_waitq_empty(&sc->cv_close)) {
-		cv_broadcast(&sc->cv_close);
-		DELAY(100);
-	}
+	cv_broadcast(&sc->cv_close);
 }
 
 /*
@@ -2330,13 +2323,11 @@ en_service(struct en_softc *sc)
 	if (m != NULL) {
 		/* M_NOWAIT - called from interrupt context */
 		map = uma_zalloc_arg(sc->map_zone, sc, M_NOWAIT);
-		if (map == NULL || !(map->flags & ENMAP_ALLOC)) {
+		if (map == NULL) {
 			rx.post_skip += mlen;
 			m_freem(m);
 			DBG(sc, SERV, ("rx%td: out of maps",
 			    slot - sc->rxslot));
-			if (map->map != NULL)
-				uma_zfree(sc->map_zone, map);
 			goto skip;
 		}
 		rx.m = m;
@@ -2443,9 +2434,7 @@ en_intr(void *arg)
 		if_printf(&sc->ifatm.ifnet, "unexpected interrupt=0x%b, "
 		    "resetting\n", reg, MID_INTBITS);
 #ifdef EN_DEBUG
-#ifdef DDB
-		Debugger("en: unexpected error");
-#endif	/* DDB */
+		kdb_enter("en: unexpected error");
 		sc->ifatm.ifnet.if_flags &= ~IFF_RUNNING; /* FREEZE! */
 #else
 		en_reset_ul(sc);

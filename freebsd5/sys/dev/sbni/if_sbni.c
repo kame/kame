@@ -27,7 +27,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/sbni/if_sbni.c,v 1.14 2003/10/31 18:32:04 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/sbni/if_sbni.c,v 1.18 2004/08/13 23:41:00 rwatson Exp $");
 
 /*
  * Device driver for Granch SBNI12 leased line adapters
@@ -231,7 +231,6 @@ sbni_attach(struct sbni_softc *sc, int unit, struct sbni_flags flags)
 	if_initname(ifp, "sbni", unit);
 	ifp->if_init	= sbni_init;
 	ifp->if_start	= sbni_start;
-	ifp->if_output	= ether_output;
 	ifp->if_ioctl	= sbni_ioctl;
 	ifp->if_watchdog	= sbni_watchdog;
 	IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
@@ -242,12 +241,12 @@ sbni_attach(struct sbni_softc *sc, int unit, struct sbni_flags flags)
 	ifp->if_baudrate =
 		(csr0 & 0x01 ? 500000 : 2000000) / (1 << flags.rate);
 
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ether_ifattach(ifp, sc->arpcom.ac_enaddr);
 	/* device attach does transition from UNCONFIGURED to IDLE state */
 
-	if_printf(ifp, "speed %ld, address %6D, rxl ",
-	       ifp->if_baudrate, sc->arpcom.ac_enaddr, ":");
+	if_printf(ifp, "speed %ld, rxl ", ifp->if_baudrate);
 	if (sc->delta_rxl)
 		printf("auto\n");
 	else
@@ -265,10 +264,6 @@ sbni_init(void *xsc)
 
 	sc = (struct sbni_softc *)xsc;
 	ifp = &sc->arpcom.ac_if;
-
-	/* address not known */
-	if (TAILQ_EMPTY(&ifp->if_addrhead))
-		return;
 
 	/*
 	 * kludge to avoid multiple initialization when more than once

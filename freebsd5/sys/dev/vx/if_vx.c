@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/vx/if_vx.c,v 1.48 2003/10/31 18:32:06 brooks Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/vx/if_vx.c,v 1.51 2004/08/14 00:12:42 rwatson Exp $");
 
 /*
  * Created from if_ep.c driver by Fred Gray (fgray@rice.edu) to support
@@ -155,13 +155,11 @@ vxattach(dev)
         sc->arpcom.ac_enaddr[(i << 1) + 1] = x;
     }
 
-    printf(" address %6D\n", sc->arpcom.ac_enaddr, ":");
-
     if_initname(ifp, device_get_name(dev), device_get_unit(dev));
     ifp->if_mtu = ETHERMTU;
-    IFQ_SET_MAXLEN(&ifp->if_snd, IFQ_MAXLEN);
-    ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
-    ifp->if_output = ether_output;
+    ifp->if_snd.ifq_maxlen = IFQ_MAXLEN;
+    ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	IFF_NEEDSGIANT;
     ifp->if_start = vxstart;
     ifp->if_ioctl = vxioctl;
     ifp->if_init = vxinit;

@@ -18,13 +18,13 @@
 # latest information.
 #
 # An exhaustive list of options and more detailed explanations of the
-# device lines is also present in the ../../conf/NOTES and NOTES files. 
-# If you are in doubt as to the purpose or necessity of a line, check first 
+# device lines is also present in the ../../conf/NOTES and NOTES files.
+# If you are in doubt as to the purpose or necessity of a line, check first
 # in NOTES.
 #
 # For hardware specific information check HARDWARE.TXT
 #
-# $FreeBSD: src/sys/alpha/conf/GENERIC,v 1.164.2.3 2004/01/26 19:42:11 nectar Exp $
+# $FreeBSD: src/sys/alpha/conf/GENERIC,v 1.174.2.5 2004/09/22 19:23:36 andre Exp $
 
 machine		alpha
 cpu		EV4
@@ -33,8 +33,6 @@ ident		GENERIC
 
 #To statically compile in device wiring instead of /boot/device.hints
 #hints		"GENERIC.hints"
-
-#makeoptions	DEBUG=-g		#Build kernel with gdb(1) debug symbols
 
 # Platforms supported
 options 	API_UP1000		# UP1000, UP1100 (Nautilus)
@@ -47,7 +45,6 @@ options 	DEC_KN20AA		# AlphaStation 500, 600
 options 	DEC_ST550		# Personal Workstation 433, 500, 600
 options 	DEC_ST6600		# XP1000, DP264, DS20, DS10, family
 options 	DEC_1000A		# AlphaServer 1000, 1000A, 800
-options 	DEC_KN8AE		# AlphaServer 8200/8400 (Turbolaser)
 options 	DEC_KN300		# AlphaServer 4100 (Rawhide),
 					# AlphaServer 1200 (Tincup)
 
@@ -66,22 +63,15 @@ options 	MSDOSFS			#MSDOS Filesystem
 options 	CD9660			#ISO 9660 Filesystem
 options 	PROCFS			#Process filesystem (requires PSEUDOFS)
 options 	PSEUDOFS		#Pseudo-filesystem framework
+options 	GEOM_GPT		#GUID Partition Tables.
 options 	COMPAT_43		#Compatible with BSD 4.3 [KEEP THIS!]
 options 	COMPAT_FREEBSD4		#Compatible with FreeBSD4
-options 	SCSI_DELAY=15000	#Delay (in ms) before probing SCSI 
+options 	SCSI_DELAY=15000	#Delay (in ms) before probing SCSI
 options 	KTRACE			#ktrace(1) syscall trace support
 options 	SYSVSHM			#SYSV-style shared memory
 options 	SYSVMSG			#SYSV-style message queues
 options 	SYSVSEM			#SYSV-style semaphores
 options 	_KPOSIX_PRIORITY_SCHEDULING #Posix P1003_1B real-time extensions
-options 	PFIL_HOOKS		# pfil(9) framework
-
-# Debugging for use in -current
-#options 	DDB			#Enable the kernel debugger
-#options 	INVARIANTS		#Enable calls of extra sanity checking
-options 	INVARIANT_SUPPORT	#Extra sanity checks of internal structures, required by INVARIANTS
-#options 	WITNESS			#Enable checks to detect deadlocks and cycles
-#options         WITNESS_SKIPSPIN	#Don't run witness on spinlocks for speed
 
 # To make an SMP kernel, the next line is needed
 options 	SMP			# Symmetric MultiProcessor Kernel
@@ -118,8 +108,10 @@ device		cd		# CD
 device		pass		# Passthrough device (direct SCSI access)
 device		ses		# SCSI Environmental Services (and SAF-TE)
 
-# RAID controllers
+# RAID controllers interfaced to the SCSI subsystem
 device		amr		# AMI MegaRAID
+
+# RAID controllers
 device		mlx		# Mylex DAC960 family
 
 # atkbdc0 controls both the keyboard and the PS/2 mouse
@@ -128,7 +120,6 @@ device		atkbd		# AT keyboard
 device		psm		# PS/2 mouse
 
 device		vga		# VGA video card driver
-device		tga		# TGA video card driver
 
 device		splash		# Splash screen and screen saver support
 
@@ -146,12 +137,12 @@ device		ppbus		# Parallel port bus (required)
 device		lpt		# Printer
 device		ppi		# Parallel port interface device
 #device		vpo		# Requires scbus and da
- 
+
 # If you've got a "dumb" serial or parallel PCI card that is
 # supported by the puc(4) glue driver, uncomment the following
 # line to enable it (connects to the sio and/or ppc drivers):
 #device         puc
- 
+
 # PCI Ethernet NICs.
 device		de		# DEC/Intel DC21x4x (``Tulip'')
 device		txp		# 3Com 3cR990 (``Typhoon'')
@@ -171,9 +162,10 @@ device		vr		# VIA Rhine, Rhine II
 device		wb		# Winbond W89C840F
 device		xl		# 3Com 3c90x (``Boomerang'', ``Cyclone'')
 
-# Pseudo devices - the number indicates how many units to allocated.
-device		random		# Entropy device
+# Pseudo devices.
 device		loop	1	# Network loopback
+device		mem		# Memory and kernel memory devices
+device		random		# Entropy device
 device		ether		# Ethernet support
 device		sl		# Kernel SLIP
 device		ppp		# Kernel PPP
@@ -198,10 +190,10 @@ device		ulpt		# Printer
 device		umass		# Disks/Mass storage - Requires scbus and da0
 device		ums		# Mouse
 # USB Ethernet
-device		aue		# ADMtek USB ethernet
-device		axe		# ASIX Electronics USB ethernet
-device		cue		# CATC USB ethernet
-device		kue		# Kawasaki LSI USB ethernet
+device		aue		# ADMtek USB Ethernet
+device		axe		# ASIX Electronics USB Ethernet
+device		cue		# CATC USB Ethernet
+device		kue		# Kawasaki LSI USB Ethernet
 
 # FireWire support
 device		firewire	# FireWire bus code

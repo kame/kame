@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/usb/if_aue.c,v 1.76 2003/11/14 11:09:45 johan Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/usb/if_aue.c,v 1.86 2004/08/11 03:38:55 rwatson Exp $");
 
 /*
  * ADMtek AN986 Pegasus and AN8511 Pegasus II USB to ethernet driver.
@@ -68,6 +68,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/if_aue.c,v 1.76 2003/11/14 11:09:45 johan Ex
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 
 #include <net/if.h>
@@ -88,7 +89,7 @@ __FBSDID("$FreeBSD: src/sys/dev/usb/if_aue.c,v 1.76 2003/11/14 11:09:45 johan Ex
 #include <dev/usb/usbdi.h>
 #include <dev/usb/usbdi_util.h>
 #include <dev/usb/usbdivar.h>
-#include <dev/usb/usbdevs.h>
+#include "usbdevs.h"
 #include <dev/usb/usb_ethersubr.h>
 
 #include <dev/mii/mii.h>
@@ -131,6 +132,7 @@ Static const struct aue_type aue_devs[] = {
  {{ USB_VENDOR_ACCTON,		USB_PRODUCT_ACCTON_SS1001},	  PII },
  {{ USB_VENDOR_ADMTEK,		USB_PRODUCT_ADMTEK_PEGASUS},	  PNA },
  {{ USB_VENDOR_ADMTEK,		USB_PRODUCT_ADMTEK_PEGASUSII},	  PII },
+ {{ USB_VENDOR_ADMTEK,		USB_PRODUCT_ADMTEK_PEGASUSII_2},  PII },
  {{ USB_VENDOR_BELKIN,		USB_PRODUCT_BELKIN_USB2LAN},	  PII },
  {{ USB_VENDOR_BILLIONTON,	USB_PRODUCT_BILLIONTON_USB100},	  0 },
  {{ USB_VENDOR_BILLIONTON,	USB_PRODUCT_BILLIONTON_USBLP100}, PNA },
@@ -152,6 +154,7 @@ Static const struct aue_type aue_devs[] = {
  {{ USB_VENDOR_ELECOM,		USB_PRODUCT_ELECOM_LDUSBLTX},	  PII },
  {{ USB_VENDOR_ELSA,		USB_PRODUCT_ELSA_USB2ETHERNET},	  0 },
  {{ USB_VENDOR_HAWKING,		USB_PRODUCT_HAWKING_UF100},       PII },
+ {{ USB_VENDOR_HP,		USB_PRODUCT_HP_HN210E},           PII },
  {{ USB_VENDOR_IODATA,		USB_PRODUCT_IODATA_USBETTX},	  0 },
  {{ USB_VENDOR_IODATA,		USB_PRODUCT_IODATA_USBETTXS},	  PII },
  {{ USB_VENDOR_KINGSTON,	USB_PRODUCT_KINGSTON_KNU101TX},   0 },
@@ -172,8 +175,6 @@ Static const struct aue_type aue_devs[] = {
  {{ USB_VENDOR_SOHOWARE,	USB_PRODUCT_SOHOWARE_NUB100},	  0 },
 };
 #define aue_lookup(v, p) ((const struct aue_type *)usb_lookup(aue_devs, v, p))
-
-Static struct usb_qdat aue_qdat;
 
 Static int aue_match(device_ptr_t);
 Static int aue_attach(device_ptr_t);
@@ -207,7 +208,6 @@ Static int aue_miibus_writereg(device_ptr_t, int, int, int);
 Static void aue_miibus_statchg(device_ptr_t);
 
 Static void aue_setmulti(struct aue_softc *);
-Static u_int32_t aue_mchash(caddr_t);
 Static void aue_reset(struct aue_softc *);
 
 Static int aue_csr_read_1(struct aue_softc *, int);
@@ -518,26 +518,7 @@ aue_miibus_statchg(device_ptr_t dev)
 	return;
 }
 
-#define AUE_POLY	0xEDB88320
 #define AUE_BITS	6
-
-Static u_int32_t
-aue_mchash(caddr_t addr)
-{
-	u_int32_t	crc;
-	int		idx, bit;
-	u_int8_t	data;
-
-	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (idx = 0; idx < 6; idx++) {
-		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1)
-			crc = (crc >> 1) ^ (((crc ^ data) & 1) ? AUE_POLY : 0);
-	}
-
-	return (crc & ((1 << AUE_BITS) - 1));
-}
 
 Static void
 aue_setmulti(struct aue_softc *sc)
@@ -568,7 +549,8 @@ aue_setmulti(struct aue_softc *sc)
 	{
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
-		h = aue_mchash(LLADDR((struct sockaddr_dl *)ifma->ifma_addr));
+		h = ether_crc32_le(LLADDR((struct sockaddr_dl *)
+		    ifma->ifma_addr), ETHER_ADDR_LEN) & ((1 << AUE_BITS) - 1);
 		AUE_SETBIT(sc, AUE_MAR + (h >> 3), 1 << (h & 0x7));
 	}
 
@@ -729,20 +711,15 @@ USB_ATTACH(aue)
 	 */
 	aue_read_eeprom(sc, (caddr_t)&eaddr, 0, 3, 0);
 
-	/*
-	 * A Pegasus chip was detected. Inform the world.
-	 */
-	printf("aue%d: Ethernet address: %6D\n", sc->aue_unit, eaddr, ":");
-
 	bcopy(eaddr, (char *)&sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
 
 	ifp = &sc->arpcom.ac_if;
 	ifp->if_softc = sc;
 	if_initname(ifp, "aue", sc->aue_unit);
 	ifp->if_mtu = ETHERMTU;
-	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST |
+	    IFF_NEEDSGIANT;
 	ifp->if_ioctl = aue_ioctl;
-	ifp->if_output = ether_output;
 	ifp->if_start = aue_start;
 	ifp->if_watchdog = aue_watchdog;
 	ifp->if_init = aue_init;
@@ -773,8 +750,8 @@ USB_ATTACH(aue)
 		USB_ATTACH_ERROR_RETURN;
 	}
 
-	aue_qdat.ifp = ifp;
-	aue_qdat.if_rxstart = aue_rxstart;
+	sc->aue_qdat.ifp = ifp;
+	sc->aue_qdat.if_rxstart = aue_rxstart;
 
 	/*
 	 * Call MI attach routine.
@@ -1040,7 +1017,7 @@ aue_rxeof(usbd_xfer_handle xfer, usbd_private_handle priv, usbd_status status)
 	total_len -= (4 + ETHER_CRC_LEN);
 
 	ifp->if_ipackets++;
-	m->m_pkthdr.rcvif = (struct ifnet *)&aue_qdat;
+	m->m_pkthdr.rcvif = (struct ifnet *)&sc->aue_qdat;
 	m->m_pkthdr.len = m->m_len = total_len;
 
 	/* Put the packet on the special USB input queue. */

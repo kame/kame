@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_icmp.h	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/netinet/ip_icmp.h,v 1.20 2003/03/21 15:28:10 mdodd Exp $
+ * $FreeBSD: src/sys/netinet/ip_icmp.h,v 1.22 2004/04/07 20:46:13 imp Exp $
  */
 
 #ifndef _NETINET_IP_ICMP_H_
@@ -153,8 +149,11 @@ struct icmp {
 #define		ICMP_REDIRECT_HOST	1		/* for host */
 #define		ICMP_REDIRECT_TOSNET	2		/* for tos and net */
 #define		ICMP_REDIRECT_TOSHOST	3		/* for tos and host */
+#define	ICMP_ALTHOSTADDR	6		/* alternate host address */
 #define	ICMP_ECHO		8		/* echo service */
 #define	ICMP_ROUTERADVERT	9		/* router advertisement */
+#define		ICMP_ROUTERADVERT_NORMAL		0	/* normal advertisement */
+#define		ICMP_ROUTERADVERT_NOROUTE_COMMON	16	/* selective routing */
 #define	ICMP_ROUTERSOLICIT	10		/* router solicitation */
 #define	ICMP_TIMXCEED		11		/* time exceeded, code: */
 #define		ICMP_TIMXCEED_INTRANS	0		/* ttl==0 in transit */
@@ -169,8 +168,20 @@ struct icmp {
 #define	ICMP_IREQREPLY		16		/* information reply */
 #define	ICMP_MASKREQ		17		/* address mask request */
 #define	ICMP_MASKREPLY		18		/* address mask reply */
+#define	ICMP_TRACEROUTE		30		/* traceroute */
+#define	ICMP_DATACONVERR	31		/* data conversion error */
+#define	ICMP_MOBILE_REDIRECT	32		/* mobile host redirect */
+#define	ICMP_IPV6_WHEREAREYOU	33		/* IPv6 where-are-you */
+#define	ICMP_IPV6_IAMHERE	34		/* IPv6 i-am-here */
+#define	ICMP_MOBILE_REGREQUEST	35		/* mobile registration req */
+#define	ICMP_MOBILE_REGREPLY	36		/* mobile registration reply */
+#define	ICMP_SKIP		39		/* SKIP */
+#define	ICMP_PHOTURIS		40		/* Photuris */
+#define		ICMP_PHOTURIS_UNKNOWN_INDEX	1	/* unknown sec index */
+#define		ICMP_PHOTURIS_AUTH_FAILED	2	/* auth failed */
+#define		ICMP_PHOTURIS_DECRYPT_FAILED	3	/* decrypt failed */
 
-#define	ICMP_MAXTYPE		18
+#define	ICMP_MAXTYPE		40
 
 #define	ICMP_INFOTYPE(type) \
 	((type) == ICMP_ECHOREPLY || (type) == ICMP_ECHO || \
@@ -182,8 +193,6 @@ struct icmp {
 #ifdef _KERNEL
 void	icmp_error(struct mbuf *, int, int, n_long, struct ifnet *);
 void	icmp_input(struct mbuf *, int);
-
-extern struct icmpstat icmpstat;
 #endif
 
 #endif

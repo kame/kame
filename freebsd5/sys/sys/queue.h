@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)queue.h	8.5 (Berkeley) 8/20/94
- * $FreeBSD: src/sys/sys/queue.h,v 1.56 2003/08/14 14:49:26 kan Exp $
+ * $FreeBSD: src/sys/sys/queue.h,v 1.58 2004/04/07 04:19:49 imp Exp $
  */
 
 #ifndef _SYS_QUEUE_H_
@@ -621,7 +617,7 @@ struct quehead {
 	struct quehead *qh_rlink;
 };
 
-#ifdef	__GNUC__
+#if defined(__GNUC__) || defined(__INTEL_COMPILER)
 
 static __inline void
 insque(void *a, void *b)
@@ -645,12 +641,12 @@ remque(void *a)
 	element->qh_rlink = 0;
 }
 
-#else /* !__GNUC__ */
+#else /* !(__GNUC__ || __INTEL_COMPILER) */
 
 void	insque(void *a, void *b);
 void	remque(void *a);
 
-#endif /* __GNUC__ */
+#endif /* __GNUC__ || __INTEL_COMPILER */
 
 #endif /* _KERNEL */
 

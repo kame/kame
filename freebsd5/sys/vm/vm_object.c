@@ -13,10 +13,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -67,7 +63,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/vm/vm_object.c,v 1.317 2003/11/09 05:25:35 alc Exp $");
+__FBSDID("$FreeBSD: src/sys/vm/vm_object.c,v 1.331 2004/08/02 00:18:36 green Exp $");
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -153,7 +149,7 @@ static int next_index;
 static uma_zone_t obj_zone;
 #define VM_OBJECTS_INIT 256
 
-static void vm_object_zinit(void *mem, int size);
+static int vm_object_zinit(void *mem, int size, int flags);
 
 #ifdef INVARIANTS
 static void vm_object_zdtor(void *mem, int size, void *arg);
@@ -179,19 +175,20 @@ vm_object_zdtor(void *mem, int size, void *arg)
 }
 #endif
 
-static void
-vm_object_zinit(void *mem, int size)
+static int
+vm_object_zinit(void *mem, int size, int flags)
 {
 	vm_object_t object;
 
 	object = (vm_object_t)mem;
 	bzero(&object->mtx, sizeof(object->mtx));
-	VM_OBJECT_LOCK_INIT(object);
+	VM_OBJECT_LOCK_INIT(object, "standard object");
 
 	/* These are true for any object that has been freed */
 	object->paging_in_progress = 0;
 	object->resident_page_count = 0;
 	object->shadow_count = 0;
+	return (0);
 }
 
 void
@@ -238,16 +235,11 @@ vm_object_init(void)
 	TAILQ_INIT(&vm_object_list);
 	mtx_init(&vm_object_list_mtx, "vm object_list", NULL, MTX_DEF);
 	
-	VM_OBJECT_LOCK_INIT(&kernel_object_store);
+	VM_OBJECT_LOCK_INIT(&kernel_object_store, "kernel object");
 	_vm_object_allocate(OBJT_DEFAULT, OFF_TO_IDX(VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS),
 	    kernel_object);
 
-	/*
-	 * The kmem object's mutex is given a unique name, instead of
-	 * "vm object", to avoid false reports of lock-order reversal
-	 * with a system map mutex.
-	 */
-	mtx_init(VM_OBJECT_MTX(kmem_object), "kmem object", NULL, MTX_DEF);
+	VM_OBJECT_LOCK_INIT(&kmem_object_store, "kmem object");
 	_vm_object_allocate(OBJT_DEFAULT, OFF_TO_IDX(VM_MAX_KERNEL_ADDRESS - VM_MIN_KERNEL_ADDRESS),
 	    kmem_object);
 
@@ -450,13 +442,20 @@ vm_object_deallocate(vm_object_t object)
 {
 	vm_object_t temp;
 
-	if (object != kmem_object)
-		mtx_lock(&Giant);
 	while (object != NULL) {
+		/*
+		 * In general, the object should be locked when working with
+		 * its type.  In this case, in order to maintain proper lock
+		 * ordering, an exception is possible because a vnode-backed
+		 * object never changes its type.
+		 */
+		if (object->type == OBJT_VNODE)
+			mtx_lock(&Giant);
 		VM_OBJECT_LOCK(object);
 		if (object->type == OBJT_VNODE) {
 			vm_object_vndeallocate(object);
-			goto done;
+			mtx_unlock(&Giant);
+			return;
 		}
 
 		KASSERT(object->ref_count != 0,
@@ -471,7 +470,7 @@ vm_object_deallocate(vm_object_t object)
 		object->ref_count--;
 		if (object->ref_count > 1) {
 			VM_OBJECT_UNLOCK(object);
-			goto done;
+			return;
 		} else if (object->ref_count == 1) {
 			if (object->shadow_count == 0) {
 				vm_object_set_flag(object, OBJ_ONEMAPPING);
@@ -492,6 +491,13 @@ vm_object_deallocate(vm_object_t object)
 					 */
 					object->ref_count++;
 					VM_OBJECT_UNLOCK(object);
+					/*
+					 * More likely than not the thread
+					 * holding robject's lock has lower
+					 * priority than the current thread.
+					 * Let the lower priority thread run.
+					 */
+					tsleep(&proc0, PVM, "vmo_de", 1);
 					continue;
 				}
 				if ((robject->handle == NULL) &&
@@ -530,7 +536,7 @@ retry:
 				VM_OBJECT_UNLOCK(robject);
 			}
 			VM_OBJECT_UNLOCK(object);
-			goto done;
+			return;
 		}
 doterm:
 		temp = object->backing_object;
@@ -553,9 +559,6 @@ doterm:
 			VM_OBJECT_UNLOCK(object);
 		object = temp;
 	}
-done:
-	if (object != kmem_object)
-		mtx_unlock(&Giant);
 }
 
 /*
@@ -569,7 +572,6 @@ void
 vm_object_terminate(vm_object_t object)
 {
 	vm_page_t p;
-	int s;
 
 	VM_OBJECT_LOCK_ASSERT(object, MA_OWNED);
 
@@ -613,7 +615,6 @@ vm_object_terminate(vm_object_t object)
 	 * removes them from paging queues. Don't free wired pages, just
 	 * remove them from the object. 
 	 */
-	s = splvm();
 	vm_page_lock_queues();
 	while ((p = TAILQ_FIRST(&object->memq)) != NULL) {
 		KASSERT(!p->busy && (p->flags & PG_BUSY) == 0,
@@ -629,7 +630,6 @@ vm_object_terminate(vm_object_t object)
 		}
 	}
 	vm_page_unlock_queues();
-	splx(s);
 
 	/*
 	 * Let the pager know object is dead.
@@ -859,7 +859,6 @@ static int
 vm_object_page_collect_flush(vm_object_t object, vm_page_t p, int curgeneration, int pagerflags)
 {
 	int runlen;
-	int s;
 	int maxf;
 	int chkb;
 	int maxb;
@@ -869,13 +868,11 @@ vm_object_page_collect_flush(vm_object_t object, vm_page_t p, int curgeneration,
 	vm_page_t mab[vm_pageout_page_count];
 	vm_page_t ma[vm_pageout_page_count];
 
-	s = splvm();
 	mtx_assert(&vm_page_queue_mtx, MA_OWNED);
 	pi = p->pindex;
 	while (vm_page_sleep_if_busy(p, TRUE, "vpcwai")) {
 		vm_page_lock_queues();
 		if (object->generation != curgeneration) {
-			splx(s);
 			return(0);
 		}
 	}
@@ -948,7 +945,6 @@ vm_object_page_collect_flush(vm_object_t object, vm_page_t p, int curgeneration,
 	}
 	runlen = maxb + maxf + 1;
 
-	splx(s);
 	vm_pageout_flush(ma, runlen, pagerflags);
 	for (i = 0; i < runlen; i++) {
 		if (ma[i]->valid & ma[i]->dirty) {
@@ -990,9 +986,9 @@ vm_object_sync(vm_object_t object, vm_ooffset_t offset, vm_size_t size,
 	VM_OBJECT_LOCK(object);
 	while ((backing_object = object->backing_object) != NULL) {
 		VM_OBJECT_LOCK(backing_object);
+		offset += object->backing_object_offset;
 		VM_OBJECT_UNLOCK(object);
 		object = backing_object;
-		offset += object->backing_object_offset;
 		if (object->size < OFF_TO_IDX(offset + size))
 			size = IDX_TO_OFF(object->size) - offset;
 	}
@@ -1028,10 +1024,12 @@ vm_object_sync(vm_object_t object, vm_ooffset_t offset, vm_size_t size,
 	}
 	if ((object->type == OBJT_VNODE ||
 	     object->type == OBJT_DEVICE) && invalidate) {
+		boolean_t purge;
+		purge = old_msync || (object->type == OBJT_DEVICE);
 		vm_object_page_remove(object,
 		    OFF_TO_IDX(offset),
 		    OFF_TO_IDX(offset + size + PAGE_MASK),
-		    old_msync ? FALSE : TRUE);
+		    purge ? FALSE : TRUE);
 	}
 	VM_OBJECT_UNLOCK(object);
 }
@@ -1101,9 +1099,9 @@ shadowlookup:
 			if (backing_object == NULL)
 				goto unlock_tobject;
 			VM_OBJECT_LOCK(backing_object);
+			tpindex += OFF_TO_IDX(tobject->backing_object_offset);
 			VM_OBJECT_UNLOCK(tobject);
 			tobject = backing_object;
-			tpindex += OFF_TO_IDX(tobject->backing_object_offset);
 			goto shadowlookup;
 		}
 		/*
@@ -1209,6 +1207,11 @@ vm_object_shadow(
 	 * shadowed object.
 	 */
 	result->backing_object = source;
+	/*
+	 * Store the offset into the source object, and fix up the offset into
+	 * the new object.
+	 */
+	result->backing_object_offset = *offset;
 	if (source != NULL) {
 		VM_OBJECT_LOCK(source);
 		LIST_INSERT_HEAD(&source->shadow_head, result, shadow_list);
@@ -1226,11 +1229,6 @@ vm_object_shadow(
 		    PQ_L2_MASK;
 	}
 
-	/*
-	 * Store the offset into the source object, and fix up the offset into
-	 * the new object.
-	 */
-	result->backing_object_offset = *offset;
 
 	/*
 	 * Return the new things
@@ -1251,31 +1249,25 @@ vm_object_split(vm_map_entry_t entry)
 {
 	vm_page_t m;
 	vm_object_t orig_object, new_object, source;
-	vm_offset_t s, e;
 	vm_pindex_t offidxstart, offidxend;
 	vm_size_t idx, size;
-	vm_ooffset_t offset;
-
-	GIANT_REQUIRED;
 
 	orig_object = entry->object.vm_object;
 	if (orig_object->type != OBJT_DEFAULT && orig_object->type != OBJT_SWAP)
 		return;
 	if (orig_object->ref_count <= 1)
 		return;
+	VM_OBJECT_UNLOCK(orig_object);
 
-	offset = entry->offset;
-	s = entry->start;
-	e = entry->end;
-
-	offidxstart = OFF_TO_IDX(offset);
-	offidxend = offidxstart + OFF_TO_IDX(e - s);
+	offidxstart = OFF_TO_IDX(entry->offset);
+	offidxend = offidxstart + OFF_TO_IDX(entry->end - entry->start);
 	size = offidxend - offidxstart;
 
-	new_object = vm_pager_allocate(orig_object->type,
-		NULL, IDX_TO_OFF(size), VM_PROT_ALL, 0LL);
-	if (new_object == NULL)
-		return;
+	/*
+	 * If swap_pager_copy() is later called, it will convert new_object
+	 * into a swap object.
+	 */
+	new_object = vm_object_allocate(OBJT_DEFAULT, size);
 
 	VM_OBJECT_LOCK(new_object);
 	VM_OBJECT_LOCK(orig_object);
@@ -1290,7 +1282,7 @@ vm_object_split(vm_map_entry_t entry)
 		vm_object_clear_flag(source, OBJ_ONEMAPPING);
 		VM_OBJECT_UNLOCK(source);
 		new_object->backing_object_offset = 
-			orig_object->backing_object_offset + offset;
+			orig_object->backing_object_offset + entry->offset;
 		new_object->backing_object = source;
 	}
 	for (idx = 0; idx < size; idx++) {
@@ -1338,6 +1330,7 @@ vm_object_split(vm_map_entry_t entry)
 	entry->object.vm_object = new_object;
 	entry->offset = 0LL;
 	vm_object_deallocate(orig_object);
+	VM_OBJECT_LOCK(new_object);
 }
 
 #define	OBSC_TEST_ALL_SHADOWED	0x0001
@@ -1347,13 +1340,11 @@ vm_object_split(vm_map_entry_t entry)
 static int
 vm_object_backing_scan(vm_object_t object, int op)
 {
-	int s;
 	int r = 1;
 	vm_page_t p;
 	vm_object_t backing_object;
 	vm_pindex_t backing_offset_index;
 
-	s = splvm();
 	VM_OBJECT_LOCK_ASSERT(object, MA_OWNED);
 	VM_OBJECT_LOCK_ASSERT(object->backing_object, MA_OWNED);
 
@@ -1374,7 +1365,6 @@ vm_object_backing_scan(vm_object_t object, int op)
 		 * shadow test may succeed! XXX
 		 */
 		if (backing_object->type != OBJT_DEFAULT) {
-			splx(s);
 			return (0);
 		}
 	}
@@ -1540,7 +1530,6 @@ vm_object_backing_scan(vm_object_t object, int op)
 		}
 		p = next;
 	}
-	splx(s);
 	return (r);
 }
 
@@ -1671,7 +1660,6 @@ vm_object_collapse(vm_object_t object)
 			object->backing_object = backing_object->backing_object;
 			object->backing_object_offset +=
 			    backing_object->backing_object_offset;
-/* XXX */		VM_OBJECT_UNLOCK(object);
 
 			/*
 			 * Discard backing_object.
@@ -1691,7 +1679,6 @@ vm_object_collapse(vm_object_t object)
 			);
 			mtx_unlock(&vm_object_list_mtx);
 
-/* XXX */		VM_OBJECT_LOCK(object);
 			uma_zfree(obj_zone, backing_object);
 
 			object_collapses++;
@@ -1804,7 +1791,7 @@ again:
 		if (vm_page_sleep_if_busy(p, TRUE, "vmopar"))
 			goto again;
 		if (clean_only && p->valid) {
-			vm_page_test_dirty(p);
+			pmap_page_protect(p, VM_PROT_READ | VM_PROT_EXECUTE);
 			if (p->valid & p->dirty)
 				continue;
 		}
@@ -1829,17 +1816,14 @@ again:
  *	Parameters:
  *		prev_object	First object to coalesce
  *		prev_offset	Offset into prev_object
- *		next_object	Second object into coalesce
- *		next_offset	Offset into next_object
- *
  *		prev_size	Size of reference to prev_object
- *		next_size	Size of reference to next_object
+ *		next_size	Size of reference to the second object
  *
  *	Conditions:
  *	The object must *not* be locked.
  */
 boolean_t
-vm_object_coalesce(vm_object_t prev_object, vm_pindex_t prev_pindex,
+vm_object_coalesce(vm_object_t prev_object, vm_ooffset_t prev_offset,
 	vm_size_t prev_size, vm_size_t next_size)
 {
 	vm_pindex_t next_pindex;
@@ -1870,7 +1854,7 @@ vm_object_coalesce(vm_object_t prev_object, vm_pindex_t prev_pindex,
 
 	prev_size >>= PAGE_SHIFT;
 	next_size >>= PAGE_SHIFT;
-	next_pindex = prev_pindex + prev_size;
+	next_pindex = OFF_TO_IDX(prev_offset) + prev_size;
 
 	if ((prev_object->ref_count > 1) &&
 	    (prev_object->size != next_pindex)) {

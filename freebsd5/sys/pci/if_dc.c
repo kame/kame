@@ -31,7 +31,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/pci/if_dc.c,v 1.137.2.2 2004/01/25 05:23:21 scottl Exp $");
+__FBSDID("$FreeBSD: src/sys/pci/if_dc.c,v 1.148.2.2 2004/10/16 00:53:44 green Exp $");
 
 /*
  * DEC "tulip" clone ethernet driver. Supports the DEC/Intel 21143
@@ -98,6 +98,7 @@ __FBSDID("$FreeBSD: src/sys/pci/if_dc.c,v 1.137.2.2 2004/01/25 05:23:21 scottl E
 #include <sys/mbuf.h>
 #include <sys/malloc.h>
 #include <sys/kernel.h>
+#include <sys/module.h>
 #include <sys/socket.h>
 #include <sys/sysctl.h>
 
@@ -165,8 +166,8 @@ static struct dc_type dc_devs[] = {
 		"ADMtek ADM9511 10/100BaseTX" },
 	{ DC_VENDORID_ADMTEK, DC_DEVICEID_ADM9513,
 		"ADMtek ADM9513 10/100BaseTX" },
- 	{ DC_VENDORID_ADMTEK, DC_DEVICEID_FA511,
- 		"Netgear FA511 10/100BaseTX" },
+	{ DC_VENDORID_ADMTEK, DC_DEVICEID_FA511,
+		"Netgear FA511 10/100BaseTX" },
 	{ DC_VENDORID_ASIX, DC_DEVICEID_AX88140A,
 		"ASIX AX88140A 10/100BaseTX" },
 	{ DC_VENDORID_ASIX, DC_DEVICEID_AX88140A,
@@ -225,13 +226,9 @@ static int dc_attach		(device_t);
 static int dc_detach		(device_t);
 static int dc_suspend		(device_t);
 static int dc_resume		(device_t);
-#ifndef BURN_BRIDGES
-static void dc_acpi		(device_t);
-#endif
 static struct dc_type *dc_devtype	(device_t);
 static int dc_newbuf		(struct dc_softc *, int, int);
 static int dc_encap		(struct dc_softc *, struct mbuf **);
-static int dc_coal		(struct dc_softc *, struct mbuf **);
 static void dc_pnic_rx_bug_war	(struct dc_softc *, int);
 static int dc_rx_resync		(struct dc_softc *);
 static void dc_rxeof		(struct dc_softc *);
@@ -587,7 +584,7 @@ dc_eeprom_getword(struct dc_softc *sc, int addr, u_int16_t *dest)
  * Read a sequence of words from the EEPROM.
  */
 static void
-dc_read_eeprom(struct dc_softc *sc, caddr_t dest, int off, int cnt, int swap)
+dc_read_eeprom(struct dc_softc *sc, caddr_t dest, int off, int cnt, int be)
 {
 	int i;
 	u_int16_t word = 0, *ptr;
@@ -600,10 +597,10 @@ dc_read_eeprom(struct dc_softc *sc, caddr_t dest, int off, int cnt, int swap)
 		else
 			dc_eeprom_getword(sc, off + i, &word);
 		ptr = (u_int16_t *)(dest + (i * 2));
-		if (swap)
-			*ptr = ntohs(word);
+		if (be)
+			*ptr = be16toh(word);
 		else
-			*ptr = word;
+			*ptr = le16toh(word);
 	}
 }
 
@@ -1023,7 +1020,6 @@ dc_miibus_mediainit(device_t dev)
 		ifmedia_add(ifm, IFM_ETHER | IFM_HPNA_1, 0, NULL);
 }
 
-#define DC_POLY		0xEDB88320
 #define DC_BITS_512	9
 #define DC_BITS_128	7
 #define DC_BITS_64	6
@@ -1032,16 +1028,9 @@ static uint32_t
 dc_mchash_le(struct dc_softc *sc, const uint8_t *addr)
 {
 	uint32_t crc;
-	int idx, bit;
-	uint8_t data;
 
 	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (idx = 0; idx < 6; idx++) {
-		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1)
-			crc = (crc >> 1) ^ (((crc ^ data) & 1) ? DC_POLY : 0);
-	}
+	crc = ether_crc32_le(addr, ETHER_ADDR_LEN);
 
 	/*
 	 * The hash table on the PNIC II and the MX98715AEC-C/D/E
@@ -1073,22 +1062,10 @@ dc_mchash_le(struct dc_softc *sc, const uint8_t *addr)
 static uint32_t
 dc_mchash_be(const uint8_t *addr)
 {
-	uint32_t crc, carry;
-	int idx, bit;
-	uint8_t data;
+	uint32_t crc;
 
 	/* Compute CRC for the address value. */
-	crc = 0xFFFFFFFF; /* initial value */
-
-	for (idx = 0; idx < 6; idx++) {
-		for (data = *addr++, bit = 0; bit < 8; bit++, data >>= 1) {
-			carry = ((crc & 0x80000000) ? 1 : 0) ^ (data & 0x01);
-			data >>= 1;
-			crc <<= 1;
-			if (carry)
-				crc = (crc ^ 0x04c11db6) | carry;
-		}
-	}
+	crc = ether_crc32_be(addr, ETHER_ADDR_LEN);
 
 	/* Return the filter bit position. */
 	return ((crc >> 26) & 0x0000003F);
@@ -1650,35 +1627,6 @@ dc_probe(device_t dev)
 	return (ENXIO);
 }
 
-#ifndef BURN_BRIDGES
-static void
-dc_acpi(device_t dev)
-{
-	int unit;
-	u_int32_t iobase, membase, irq;
-
-	unit = device_get_unit(dev);
-
-	if (pci_get_powerstate(dev) != PCI_POWERSTATE_D0) {
-		/* Save important PCI config data. */
-		iobase = pci_read_config(dev, DC_PCI_CFBIO, 4);
-		membase = pci_read_config(dev, DC_PCI_CFBMA, 4);
-		irq = pci_read_config(dev, DC_PCI_CFIT, 4);
-
-		/* Reset the power state. */
-		printf("dc%d: chip is in D%d power mode "
-		    "-- setting to D0\n", unit,
-		    pci_get_powerstate(dev));
-		pci_set_powerstate(dev, PCI_POWERSTATE_D0);
-
-		/* Restore PCI config data. */
-		pci_write_config(dev, DC_PCI_CFBIO, iobase, 4);
-		pci_write_config(dev, DC_PCI_CFBMA, membase, 4);
-		pci_write_config(dev, DC_PCI_CFIT, irq, 4);
-	}
-}
-#endif
-
 static void
 dc_apply_fixup(struct dc_softc *sc, int media)
 {
@@ -1896,20 +1844,14 @@ dc_attach(device_t dev)
 
 	mtx_init(&sc->dc_mtx, device_get_nameunit(dev), MTX_NETWORK_LOCK,
 	    MTX_DEF | MTX_RECURSE);
-#ifndef BURN_BRIDGES
-	/*
-	 * Handle power management nonsense.
-	 */
-	dc_acpi(dev);
-#endif
+
 	/*
 	 * Map control/status registers.
 	 */
 	pci_enable_busmaster(dev);
 
 	rid = DC_RID;
-	sc->dc_res = bus_alloc_resource(dev, DC_RES, &rid,
-	    0, ~0, 1, RF_ACTIVE);
+	sc->dc_res = bus_alloc_resource_any(dev, DC_RES, &rid, RF_ACTIVE);
 
 	if (sc->dc_res == NULL) {
 		printf("dc%d: couldn't map ports/memory\n", unit);
@@ -1922,7 +1864,7 @@ dc_attach(device_t dev)
 
 	/* Allocate interrupt. */
 	rid = 0;
-	sc->dc_irq = bus_alloc_resource(dev, SYS_RES_IRQ, &rid, 0, ~0, 1,
+	sc->dc_irq = bus_alloc_resource_any(dev, SYS_RES_IRQ, &rid,
 	    RF_SHAREABLE | RF_ACTIVE);
 
 	if (sc->dc_irq == NULL) {
@@ -2121,7 +2063,7 @@ dc_attach(device_t dev)
 		for (i = 0; i < ETHER_ADDR_LEN; i++)
 			if (eaddr[i] != 0x00)
 				break;
-		if (i >= ETHER_ADDR_LEN && OF_getetheraddr2(dev, eaddr) == -1)
+		if (i >= ETHER_ADDR_LEN)
 			OF_getetheraddr(dev, eaddr);
 #endif
 		break;
@@ -2152,11 +2094,6 @@ dc_attach(device_t dev)
 		dc_read_eeprom(sc, (caddr_t)&eaddr, DC_EE_NODEADDR, 3, 0);
 		break;
 	}
-
-	/*
-	 * A 21143 or clone chip was detected. Inform the world.
-	 */
-	printf("dc%d: Ethernet address: %6D\n", unit, eaddr, ":");
 
 	sc->dc_unit = unit;
 	bcopy(eaddr, &sc->arpcom.ac_enaddr, ETHER_ADDR_LEN);
@@ -2225,7 +2162,7 @@ dc_attach(device_t dev)
 
 	/* Create the TX/RX busdma maps. */
 	for (i = 0; i < DC_TX_LIST_CNT; i++) {
-		error = bus_dmamap_create(sc->dc_mtag, 0, 
+		error = bus_dmamap_create(sc->dc_mtag, 0,
 		    &sc->dc_cdata.dc_tx_map[i]);
 		if (error) {
 			printf("dc%d: failed to init TX ring\n", unit);
@@ -2234,7 +2171,7 @@ dc_attach(device_t dev)
 		}
 	}
 	for (i = 0; i < DC_RX_LIST_CNT; i++) {
-		error = bus_dmamap_create(sc->dc_mtag, 0, 
+		error = bus_dmamap_create(sc->dc_mtag, 0,
 		    &sc->dc_cdata.dc_rx_map[i]);
 		if (error) {
 			printf("dc%d: failed to init RX ring\n", unit);
@@ -2255,12 +2192,15 @@ dc_attach(device_t dev)
 	/* XXX: bleah, MTU gets overwritten in ether_ifattach() */
 	ifp->if_mtu = ETHERMTU;
 	ifp->if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	if (!IS_MPSAFE)
+		ifp->if_flags |= IFF_NEEDSGIANT;
 	ifp->if_ioctl = dc_ioctl;
 	ifp->if_start = dc_start;
 	ifp->if_watchdog = dc_watchdog;
 	ifp->if_init = dc_init;
 	ifp->if_baudrate = 10000000;
 	IFQ_SET_MAXLEN(&ifp->if_snd, DC_TX_LIST_CNT - 1);
+	ifp->if_snd.ifq_drv_maxlen = DC_TX_LIST_CNT - 1;
 	IFQ_SET_READY(&ifp->if_snd);
 
 	/*
@@ -2328,6 +2268,10 @@ dc_attach(device_t dev)
 	 */
 	ifp->if_data.ifi_hdrlen = sizeof(struct ether_vlan_header);
 	ifp->if_capabilities |= IFCAP_VLAN_MTU;
+#ifdef DEVICE_POLLING
+	ifp->if_capabilities |= IFCAP_POLLING;
+#endif
+	ifp->if_capenable = ifp->if_capabilities;
 
 	callout_init(&sc->dc_stat_ch, IS_MPSAFE ? CALLOUT_MPSAFE : 0);
 
@@ -2571,7 +2515,7 @@ dc_newbuf(struct dc_softc *sc, int i, int alloc)
 		}
 		if (sc->dc_cdata.dc_rx_err != 0) {
 			m_freem(m_new);
-			return (sc->dc_cdata.dc_rx_err); 
+			return (sc->dc_cdata.dc_rx_err);
 		}
 		bus_dmamap_unload(sc->dc_mtag, sc->dc_cdata.dc_rx_map[i]);
 		tmp = sc->dc_cdata.dc_rx_map[i];
@@ -3022,7 +2966,7 @@ dc_tick(void *xsc)
 	if (!sc->dc_link && mii->mii_media_status & IFM_ACTIVE &&
 	    IFM_SUBTYPE(mii->mii_media_active) != IFM_NONE) {
 		sc->dc_link++;
-		if (!IFQ_IS_EMPTY(&ifp->if_snd))
+		if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
 			dc_start(ifp);
 	}
 
@@ -3091,6 +3035,10 @@ dc_poll(struct ifnet *ifp, enum poll_cmd cmd, int count)
 {
 	struct dc_softc *sc = ifp->if_softc;
 
+	if (!(ifp->if_capenable & IFCAP_POLLING)) {
+		ether_poll_deregister(ifp);
+		cmd = POLL_DEREGISTER;
+	}
 	if (cmd == POLL_DEREGISTER) { /* final call, enable interrupts */
 		/* Re-enable interrupts. */
 		CSR_WRITE_4(sc, DC_IMR, DC_INTRS);
@@ -3161,7 +3109,8 @@ dc_intr(void *arg)
 #ifdef DEVICE_POLLING
 	if (ifp->if_flags & IFF_POLLING)
 		goto done;
-	if (ether_poll_register(dc_poll, ifp)) { /* ok, disable interrupts */
+	if ((ifp->if_capenable & IFCAP_POLLING) &&
+	    ether_poll_register(dc_poll, ifp)) { /* ok, disable interrupts */
 		CSR_WRITE_4(sc, DC_IMR, 0x00000000);
 		goto done;
 	}
@@ -3227,7 +3176,7 @@ dc_intr(void *arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, DC_IMR, DC_INTRS);
 
-	if (!IFQ_IS_EMPTY(&ifp->if_snd))
+	if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
 		dc_start(ifp);
 
 #ifdef DEVICE_POLLING
@@ -3338,7 +3287,7 @@ dc_encap(struct dc_softc *sc, struct mbuf **m_head)
 	if (error)
 		return (error);
 	if (sc->dc_cdata.dc_tx_err != 0)
-		return (sc->dc_cdata.dc_tx_err); 
+		return (sc->dc_cdata.dc_tx_err);
 	bus_dmamap_sync(sc->dc_mtag, sc->dc_cdata.dc_tx_map[idx],
 	    BUS_DMASYNC_PREWRITE);
 	bus_dmamap_sync(sc->dc_ltag, sc->dc_lmap,
@@ -3346,36 +3295,6 @@ dc_encap(struct dc_softc *sc, struct mbuf **m_head)
 	return (0);
 }
 
-/*
- * Coalesce an mbuf chain into a single mbuf cluster buffer.
- * Needed for some really badly behaved chips that just can't
- * do scatter/gather correctly.
- */
-static int
-dc_coal(sc, m_head)
-	struct dc_softc		*sc;
-	struct mbuf		**m_head;
-{
-	struct mbuf		*m_new, *m;
-
-	m = *m_head;
-	MGETHDR(m_new, M_DONTWAIT, MT_DATA);
-	if (m_new == NULL)
-		return(ENOBUFS);
-	if (m->m_pkthdr.len > MHLEN) {
-		MCLGET(m_new, M_DONTWAIT);
-		if (!(m_new->m_flags & M_EXT)) {
-			m_freem(m_new);
-			return(ENOBUFS);
-		}
-	}
-	m_copydata(m, 0, m->m_pkthdr.len, mtod(m_new, caddr_t));
-	m_new->m_pkthdr.len = m_new->m_len = m->m_pkthdr.len;
-	m_freem(m);
-	*m_head = m_new;
-
-	return(0);
-}
 /*
  * Main transmit routine. To avoid having to do mbuf copies, we put pointers
  * to the mbuf data regions directly in the transmit lists. We also save a
@@ -3388,7 +3307,8 @@ dc_start(struct ifnet *ifp)
 {
 	struct dc_softc *sc;
 	struct mbuf *m_head = NULL, *m;
-	int idx, coalesced;
+	unsigned int queued = 0;
+	int idx;
 
 	sc = ifp->if_softc;
 
@@ -3407,52 +3327,31 @@ dc_start(struct ifnet *ifp)
 	idx = sc->dc_cdata.dc_tx_first = sc->dc_cdata.dc_tx_prod;
 
 	while (sc->dc_cdata.dc_tx_chain[idx] == NULL) {
-		IFQ_LOCK(&ifp->if_snd);
-		IFQ_POLL_NOLOCK(&ifp->if_snd, m_head);
-		if (m_head == NULL) {
-			IFQ_UNLOCK(&ifp->if_snd);
+		IFQ_DRV_DEQUEUE(&ifp->if_snd, m_head);
+		if (m_head == NULL)
 			break;
-		}
 
 		if (sc->dc_flags & DC_TX_COALESCE &&
 		    (m_head->m_next != NULL ||
 		     sc->dc_flags & DC_TX_ALIGN)) {
-#ifdef ALTQ
-			/* note: dc_coal breaks the poll-and-dequeue rule.
-			 * if dc_coal fails, we lose the packet.
-			 */
-#endif
-			IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m_head);
-			IFQ_UNLOCK(&ifp->if_snd);
-			if (dc_coal(sc, &m_head)) {
-				m_freem(m_head);
+			m = m_defrag(m_head, M_DONTWAIT);
+			if (m == NULL) {
+				IFQ_DRV_PREPEND(&ifp->if_snd, m_head);
 				ifp->if_flags |= IFF_OACTIVE;
 				break;
 			} else {
 				m_head = m;
 			}
-			coalesced = 1;
 		} else
-			coalesced = 0;
 
 		if (dc_encap(sc, &m_head)) {
-			if (coalesced)
-				m_freem(m_head);
-			else
-				IF_PREPEND(&ifp->if_snd, m_head);
+			IFQ_DRV_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
 		idx = sc->dc_cdata.dc_tx_prod;
 
-		/* now we are committed to transmit the packet */
-		if (coalesced) {
-			/* if mbuf is coalesced, it is already dequeued */
-		} else {
-			IFQ_DEQUEUE_NOLOCK(&ifp->if_snd, m_head);
-			IFQ_UNLOCK(&ifp->if_snd);
-		}
-
+		queued++;
 		/*
 		 * If there's a BPF listener, bounce a copy of this frame
 		 * to him.
@@ -3469,14 +3368,16 @@ dc_start(struct ifnet *ifp)
 		return;
 	}
 
-	/* Transmit */
-	if (!(sc->dc_flags & DC_TX_POLL))
-		CSR_WRITE_4(sc, DC_TXSTART, 0xFFFFFFFF);
+	if (queued > 0) {
+		/* Transmit */
+		if (!(sc->dc_flags & DC_TX_POLL))
+			CSR_WRITE_4(sc, DC_TXSTART, 0xFFFFFFFF);
 
-	/*
-	 * Set a timeout in case the chip goes out to lunch.
-	 */
-	ifp->if_timer = 5;
+		/*
+		 * Set a timeout in case the chip goes out to lunch.
+		 */
+		ifp->if_timer = 5;
+	}
 
 	DC_UNLOCK(sc);
 }
@@ -3762,6 +3663,10 @@ dc_ioctl(struct ifnet *ifp, u_long command, caddr_t data)
 			sc->dc_srm_media = 0;
 #endif
 		break;
+	case SIOCSIFCAP:
+		ifp->if_capenable &= ~IFCAP_POLLING;
+		ifp->if_capenable |= ifr->ifr_reqcap & IFCAP_POLLING;
+		break;
 	default:
 		error = ether_ioctl(ifp, command, data);
 		break;
@@ -3788,7 +3693,7 @@ dc_watchdog(struct ifnet *ifp)
 	dc_reset(sc);
 	dc_init(sc);
 
-	if (!IFQ_IS_EMPTY(&ifp->if_snd))
+	if (!IFQ_DRV_IS_EMPTY(&ifp->if_snd))
 		dc_start(ifp);
 
 	DC_UNLOCK(sc);
@@ -3868,21 +3773,12 @@ static int
 dc_suspend(device_t dev)
 {
 	struct dc_softc *sc;
-	int i, s;
+	int s;
 
 	s = splimp();
 
 	sc = device_get_softc(dev);
-
 	dc_stop(sc);
-
-	for (i = 0; i < 5; i++)
-		sc->saved_maps[i] = pci_read_config(dev, PCIR_BAR(i), 4);
-	sc->saved_biosaddr = pci_read_config(dev, PCIR_BIOS, 4);
-	sc->saved_intline = pci_read_config(dev, PCIR_INTLINE, 1);
-	sc->saved_cachelnsz = pci_read_config(dev, PCIR_CACHELNSZ, 1);
-	sc->saved_lattimer = pci_read_config(dev, PCIR_LATTIMER, 1);
-
 	sc->suspended = 1;
 
 	splx(s);
@@ -3899,26 +3795,12 @@ dc_resume(device_t dev)
 {
 	struct dc_softc *sc;
 	struct ifnet *ifp;
-	int i, s;
+	int s;
 
 	s = splimp();
 
 	sc = device_get_softc(dev);
 	ifp = &sc->arpcom.ac_if;
-#ifndef BURN_BRIDGES
-	dc_acpi(dev);
-#endif
-	/* better way to do this? */
-	for (i = 0; i < 5; i++)
-		pci_write_config(dev, PCIR_BAR(i), sc->saved_maps[i], 4);
-	pci_write_config(dev, PCIR_BIOS, sc->saved_biosaddr, 4);
-	pci_write_config(dev, PCIR_INTLINE, sc->saved_intline, 1);
-	pci_write_config(dev, PCIR_CACHELNSZ, sc->saved_cachelnsz, 1);
-	pci_write_config(dev, PCIR_LATTIMER, sc->saved_lattimer, 1);
-
-	/* reenable busmastering */
-	pci_enable_busmaster(dev);
-	pci_enable_io(dev, DC_RES);
 
 	/* reinitialize interface if necessary */
 	if (ifp->if_flags & IFF_UP)

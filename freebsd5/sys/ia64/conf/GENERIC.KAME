@@ -24,7 +24,7 @@
 #
 # For hardware specific information check HARDWARE.TXT
 #
-# $FreeBSD: src/sys/ia64/conf/GENERIC,v 1.58.2.1 2004/01/26 19:42:12 nectar Exp $
+# $FreeBSD: src/sys/ia64/conf/GENERIC,v 1.66.2.3 2004/09/22 19:23:38 andre Exp $
 
 machine		ia64
 cpu		ITANIUM
@@ -34,10 +34,12 @@ makeoptions	DEBUG=-g	# Build kernel with debug information.
 
 options 	CD9660		# ISO 9660 Filesystem
 options 	COMPAT_43	# Compatible with BSD 4.3 [KEEP THIS!]
-options 	DDB		# Enable the kernel debugger
+options 	DDB		# Support DDB
 options 	FFS		# Berkeley Fast Filesystem
+options 	GDB		# Support remote GDB
 options 	INET		# InterNETworking
 options 	INET6		# IPv6 communications protocols
+options 	KDB		# Enable kernel debugger support
 options 	KTRACE		# ktrace(1) syscall trace support
 options 	MD_ROOT		# MD usable as root device
 options 	MSDOSFS		# MSDOS Filesystem
@@ -47,6 +49,7 @@ options 	NFS_ROOT	# NFS usable as root device
 options 	PROCFS		# Process filesystem (/proc)
 options 	PSEUDOFS	# Pseudo-filesystem framework
 options 	SCHED_4BSD	# 4BSD scheduler
+#options 	SCHED_ULE	# ULE scheduler
 options 	SCSI_DELAY=5000	# Delay (in ms) before probing SCSI
 #options 	SMP		# SMP support
 options 	SOFTUPDATES	# Enable FFS soft updates support
@@ -56,12 +59,11 @@ options 	SYSVSHM		# SYSV-style shared memory
 options 	UFS_ACL		# Support for access control lists
 options 	UFS_DIRHASH	# Hash-based directory lookup scheme
 options 	_KPOSIX_PRIORITY_SCHEDULING	# Posix P1003_1B RT extensions
-options 	PFIL_HOOKS	# pfil(9) framework
 
 # Various "busses"
 device 		acpi		# ACPI support (mandatory)
 device		firewire	# FireWire bus code
-device		miibus		# MII bus support (ethernet)
+device		miibus		# MII bus support (Ethernet)
 device		pci		# PCI bus support
 device		scbus		# SCSI bus (required for SCSI)
 device		usb		# USB Bus (required for USB)
@@ -81,7 +83,6 @@ device		mpt		# LSI-Logic MPT-Fusion
 device		sym		# NCR/Symbios Logic
 
 # RAID controllers interfaced to the SCSI subsystem
-device		asr		# DPT SmartRAID V, VI and Adaptec RAID
 device		ciss		# Compaq Smart RAID 5*
 device		dpt		# DPT Smartcache III, IV
 device		iir		# Intel Integrated RAID
@@ -96,6 +97,8 @@ device		sa		# Sequential Access (ie tape)
 device		ses		# Environmental Services (and SAF-TE)
 
 # RAID controllers
+device		aac		# Adaptec FSA RAID
+device		aacp		# SCSI passthrough for aac (requires CAM)
 device		amr		# AMI MegaRAID
 device		ida		# Compaq Smart RAID
 device		mlx		# Mylex DAC960 family
@@ -129,9 +132,9 @@ device		sis		# Silicon Integrated Systems SiS 900/SiS 7016
 device		xl		# 3Com 3c90x ("Boomerang", "Cyclone")
 
 # USB Ethernet
-device		aue		# ADMtek USB ethernet
-device		cue		# CATC USB ethernet
-device		kue		# Kawasaki LSI USB ethernet
+device		aue		# ADMtek USB Ethernet
+device		cue		# CATC USB Ethernet
+device		kue		# Kawasaki LSI USB Ethernet
 
 # FireWire support
 device		sbp		# SCSI over FireWire (need scbus & da)
@@ -142,6 +145,7 @@ device		faith		# IPv6-to-IPv4 relaying (translation)
 device		gif		# IPv6 and IPv4 tunneling
 device		loop		# Network loopback
 device		md		# Memory "disks"
+device		mem		# Memory and kernel memory devices
 device		pty		# Pseudo-ttys (telnet etc)
 device		puc		# Multi I/O cards and multi-channel UARTs
 device		random		# Entropy device

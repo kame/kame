@@ -29,7 +29,7 @@
  */
 
 #include <sys/cdefs.h>
-__FBSDID("$FreeBSD: src/sys/dev/lnc/if_lnc.c,v 1.100 2003/11/14 17:16:56 obrien Exp $");
+__FBSDID("$FreeBSD: src/sys/dev/lnc/if_lnc.c,v 1.110 2004/08/13 23:20:50 rwatson Exp $");
 
 /*
 #define DIAGNOSTIC
@@ -189,24 +189,6 @@ lance_probe(struct lnc_softc *sc)
 		return (UNKNOWN);
 }
 
-static __inline u_int32_t
-lnc_mchash(caddr_t ether_addr)
-{
-#define LNC_POLYNOMIAL		0xEDB88320UL
-    u_int32_t crc = 0xFFFFFFFFUL;
-    int idx, bit;
-    u_int8_t data;
-
-    for (idx = 0; idx < ETHER_ADDR_LEN; idx++) {
-	for (data = *ether_addr++, bit = 0; bit < MULTICAST_FILTER_LEN; bit++) {
-	    crc = (crc >> 1) ^ (((crc ^ data) & 1) ? LNC_POLYNOMIAL : 0);   
-	    data >>= 1;
-	}
-    }
-    return crc;
-#undef LNC_POLYNOMIAL
-}
-
 void
 lnc_release_resources(device_t dev)
 {
@@ -261,8 +243,8 @@ lnc_setladrf(struct lnc_softc *sc)
 		if (ifma->ifma_addr->sa_family != AF_LINK)
 			continue;
 
-		index = lnc_mchash(
-		    LLADDR((struct sockaddr_dl *)ifma->ifma_addr)) >> 26;
+		index = ether_crc32_le(LLADDR((struct sockaddr_dl *)
+		    ifma->ifma_addr), ETHER_ADDR_LEN) >> 26;
 		sc->init_block->ladrf[index >> 3] |= 1 << (index & 7);
 	}
 }
@@ -875,14 +857,15 @@ lnc_attach_common(device_t dev)
 	sc->arpcom.ac_if.if_softc = sc;
 	if_initname(&sc->arpcom.ac_if, device_get_name(dev),
 	    device_get_unit(dev));
-	sc->arpcom.ac_if.if_flags = IFF_BROADCAST | IFF_SIMPLEX | IFF_MULTICAST;
+	sc->arpcom.ac_if.if_flags = IFF_BROADCAST | IFF_SIMPLEX |
+	    IFF_MULTICAST | IFF_NEEDSGIANT;
 	sc->arpcom.ac_if.if_timer = 0;
-	sc->arpcom.ac_if.if_output = ether_output;
 	sc->arpcom.ac_if.if_start = lnc_start;
 	sc->arpcom.ac_if.if_ioctl = lnc_ioctl;
 	sc->arpcom.ac_if.if_watchdog = lnc_watchdog;
 	sc->arpcom.ac_if.if_init = lnc_init;
 	IFQ_SET_MAXLEN(&sc->arpcom.ac_if.if_snd, IFQ_MAXLEN);
+	sc->arpcom.ac_if.if_snd.ifq_drv_maxlen = IFQ_MAXLEN;
 	IFQ_SET_READY(&sc->arpcom.ac_if.if_snd);
 
 	/* Extract MAC address from PROM */
@@ -895,13 +878,11 @@ lnc_attach_common(device_t dev)
 
 	ether_ifattach(&sc->arpcom.ac_if, sc->arpcom.ac_enaddr);
 
-	printf("%s: ", sc->arpcom.ac_if.if_xname);
 	if (sc->nic.ic == LANCE || sc->nic.ic == C_LANCE)
-		printf("%s (%s)",
+		if_printf(&sc->arpcom.ac_if, "%s (%s)\n",
 		       nic_ident[sc->nic.ident], ic_ident[sc->nic.ic]);
 	else
-		printf("%s", ic_ident[sc->nic.ic]);
-	printf(" address %6D\n", sc->arpcom.ac_enaddr, ":");
+		if_printf(&sc->arpcom.ac_if, "%s\n", ic_ident[sc->nic.ic]);
 
 	return (1);
 }
@@ -913,13 +894,6 @@ lnc_init(xsc)
 	struct lnc_softc *sc = xsc;
 	int s, i;
 	char *lnc_mem;
-
-	/* Check that interface has valid address */
-
-	if (TAILQ_EMPTY(&sc->arpcom.ac_if.if_addrhead)) { /* XXX unlikely */
-printf("XXX no address?\n");
-		return;
-	}
 
 	/* Shut down interface */
 
@@ -942,14 +916,14 @@ printf("XXX no address?\n");
 	sc->trans_next = 0;
 
 	if (sc->nic.mem_mode == SHMEM)
-		lnc_mem = (char *) sc->nic.iobase;
+		lnc_mem = (char *)(uintptr_t)sc->nic.iobase;
 	else
 		lnc_mem = (char *) (sc->trans_ring + NDESC(sc->ntdre));
 
-	lnc_mem = (char *)(((int)lnc_mem + 1) & ~1);
-	sc->init_block = (struct init_block *) ((int) lnc_mem & ~1);
+	lnc_mem = (char *)(((long)lnc_mem + 1) & ~1);
+	sc->init_block = (struct init_block *) ((long) lnc_mem & ~1);
 	lnc_mem = (char *) (sc->init_block + 1);
-	lnc_mem = (char *)(((int)lnc_mem + 7) & ~7);
+	lnc_mem = (char *)(((long)lnc_mem + 7) & ~7);
 
 	/* Initialise pointers to descriptor entries */
 	for (i = 0; i < NDESC(sc->nrdre); i++) {
@@ -1242,7 +1216,7 @@ lnc_start(struct ifnet *ifp)
 
 	do {
 
-		IFQ_DEQUEUE(&sc->arpcom.ac_if.if_snd, head);
+		IFQ_DRV_DEQUEUE(&sc->arpcom.ac_if.if_snd, head);
 		if (!head)
 			return;
 

@@ -1,5 +1,5 @@
 /*      $NetBSD: if_atm.h,v 1.7 1996/11/09 23:02:27 chuck Exp $       */
-/* $FreeBSD: src/sys/net/if_atm.h,v 1.20 2003/08/06 14:53:26 harti Exp $ */
+/* $FreeBSD: src/sys/net/if_atm.h,v 1.21 2004/01/26 12:13:11 harti Exp $ */
 
 /*
  *
@@ -62,6 +62,7 @@
 #define	ATM_DEVICE_IDTABR155	11	/* 77252 based card 155MBit */
 #define	ATM_DEVICE_PROATM25	12	/* 77252 based ProSum card 25MBit */
 #define	ATM_DEVICE_PROATM155	13	/* 77252 based ProSum card 155MBit */
+#define	ATM_DEVICE_VIRTUAL	14	/* virtual ATM device (netgraph) */
 
 /* map to strings and vendors */
 #define	ATM_DEVICE_NAMES						\
@@ -78,7 +79,8 @@
 	{ "IDT77252/25",	"IDT" },				\
 	{ "IDT77252/155",	"IDT" },				\
 	{ "ProATM/25",		"ProSum" },				\
-	{ "ProATM/155",		"ProSum" },
+	{ "ProATM/155",		"ProSum" },				\
+	{ "Virtual",		"NetGraph" },
 
 /*
  * This is the common link layer MIB for all ATM interfaces. Much of the

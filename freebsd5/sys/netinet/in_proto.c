@@ -10,10 +10,6 @@
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. All advertising materials mentioning features or use of this software
- *    must display the following acknowledgement:
- *	This product includes software developed by the University of
- *	California, Berkeley and its contributors.
  * 4. Neither the name of the University nor the names of its contributors
  *    may be used to endorse or promote products derived from this software
  *    without specific prior written permission.
@@ -31,7 +27,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)in_proto.c	8.2 (Berkeley) 2/9/95
- * $FreeBSD: src/sys/netinet/in_proto.c,v 1.67 2003/11/08 23:09:42 sam Exp $
+ * $FreeBSD: src/sys/netinet/in_proto.c,v 1.73 2004/08/16 18:32:07 rwatson Exp $
  */
 
 #include "opt_ipdivert.h"
@@ -45,6 +41,8 @@
 #endif
 #include "opt_sctp.h"
 #include "opt_dccp.h"
+#include "opt_pf.h"
+
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/kernel.h>
@@ -65,6 +63,7 @@
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
 #include <netinet/ip_icmp.h>
+#include <netinet/ip_divert.h>
 #include <netinet/igmp_var.h>
 #ifdef PIM
 #include <netinet/pim_var.h>
@@ -112,6 +111,11 @@
 void	natpt_init(void);
 int	natpt_ctloutput(int, struct socket *, int, int, struct mbuf **);
 extern struct pr_usrreqs natpt_usrreqs;
+#endif
+
+#ifdef DEV_PFSYNC
+#include <net/pfvar.h>
+#include <net/if_pfsync.h>
 #endif
 
 extern	struct domain inetdomain;
@@ -198,48 +202,48 @@ struct protosw inetsw[] = {
 },
 #ifdef IPSEC
 { SOCK_RAW,	&inetdomain,	IPPROTO_AH,	PR_ATOMIC|PR_ADDR,
-  ah4_input,	0,	 	0,		0,
-  0,	  
+  ah4_input,	0,		0,		0,
+  0,
   0,		0,		0,		0,
   &nousrreqs
 },
 #ifdef IPSEC_ESP
 { SOCK_RAW,	&inetdomain,	IPPROTO_ESP,	PR_ATOMIC|PR_ADDR,
-  esp4_input,	0,	 	0,		0,
-  0,	  
+  esp4_input,	0,		0,		0,
+  0,
   0,		0,		0,		0,
   &nousrreqs
 },
 #endif
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPCOMP,	PR_ATOMIC|PR_ADDR,
-  ipcomp4_input, 0,	 	0,		0,
-  0,	  
+  ipcomp4_input, 0,		0,		0,
+  0,
   0,		0,		0,		0,
   &nousrreqs
 },
 #endif /* IPSEC */
 #ifdef FAST_IPSEC
 { SOCK_RAW,	&inetdomain,	IPPROTO_AH,	PR_ATOMIC|PR_ADDR,
-  ah4_input,	0,	 	ah4_ctlinput,	0,
-  0,	  
+  ah4_input,	0,		ah4_ctlinput,	0,
+  0,
   0,		0,		0,		0,
   &nousrreqs
 },
 { SOCK_RAW,	&inetdomain,	IPPROTO_ESP,	PR_ATOMIC|PR_ADDR,
-  esp4_input,	0,	 	esp4_ctlinput,	0,
-  0,	  
+  esp4_input,	0,		esp4_ctlinput,	0,
+  0,
   0,		0,		0,		0,
   &nousrreqs
 },
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPCOMP,	PR_ATOMIC|PR_ADDR,
-  ipcomp4_input,	0,	 	0,		0,
-  0,	  
+  ipcomp4_input,	0,		0,		0,
+  0,
   0,		0,		0,		0,
   &nousrreqs
 },
 #endif /* FAST_IPSEC */
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
-  encap4_input,	0,	 	0,		rip_ctloutput,
+  encap4_input,	0,		0,		rip_ctloutput,
   0,
   encap_init,		0,		0,		0,
   &rip_usrreqs
@@ -258,7 +262,7 @@ struct protosw inetsw[] = {
 },
 # ifdef INET6
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR|PR_LASTHDR,
-  encap4_input,	0,	 	0,		rip_ctloutput,
+  encap4_input,	0,		0,		rip_ctloutput,
   0,
   encap_init,	0,		0,		0,
   &rip_usrreqs
@@ -266,7 +270,7 @@ struct protosw inetsw[] = {
 #endif
 #ifdef IPDIVERT
 { SOCK_RAW,	&inetdomain,	IPPROTO_DIVERT,	PR_ATOMIC|PR_ADDR,
-  div_input,	0,	 	div_ctlinput,	ip_ctloutput,
+  div_input,	0,		div_ctlinput,	ip_ctloutput,
   0,
   div_init,	0,		0,		0,
   &div_usrreqs,
@@ -296,6 +300,14 @@ struct protosw inetsw[] = {
   &rip_usrreqs
 },
 #endif	/* PIM */
+#ifdef DEV_PFSYNC
+{ SOCK_RAW,	&inetdomain,	IPPROTO_PFSYNC,	PR_ATOMIC|PR_ADDR,
+  pfsync_input,	0,		0,		rip_ctloutput,
+  0,
+  0,		0,		0,		0,
+  &rip_usrreqs
+},
+#endif	/* DEV_PFSYNC */
 	/* raw wildcard */
 { SOCK_RAW,	&inetdomain,	0,		PR_ATOMIC|PR_ADDR|PR_LASTHDR,
   rip_input,	0,		0,		rip_ctloutput,
@@ -308,7 +320,7 @@ struct protosw inetsw[] = {
 extern int in_inithead(void **, int);
 
 struct domain inetdomain =
-    { AF_INET, "internet", 0, 0, 0, 
+    { AF_INET, "internet", 0, 0, 0,
       inetsw,
       &inetsw[sizeof(inetsw)/sizeof(inetsw[0])], 0,
 #if defined(RADIX_MPATH)

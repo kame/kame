@@ -2603,7 +2603,11 @@ pf_calc_mss(struct pf_addr *addr, sa_family_t af, u_int16_t offer)
 #endif /* INET */
 #ifdef INET6
 	struct sockaddr_in6	*dst6;
+#ifdef NEW_STRUCT_ROUTE
+#define ro6 ro
+#else
 	struct route_in6	 ro6;
+#endif
 #endif /* INET6 */
 	struct rtentry		*rt = NULL;
 	int			 hlen = 0;	/* make the compiler happy */
@@ -5225,7 +5229,7 @@ pf_route(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 		if ((m0 = m_copym2(*m, 0, M_COPYALL, M_NOWAIT)) == NULL)
 #endif
 			return;
-#ifdef __FreeBSD__
+#if 0
 		if ((mtag = m_tag_copy(mtag, M_DONTWAIT)) == NULL)
 #else
 		if ((mtag = m_tag_copy(mtag)) == NULL)
@@ -5474,8 +5478,13 @@ pf_route6(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 {
 	struct mbuf		*m0;
 	struct m_tag		*mtag;
+#ifdef NEW_STRUCT_ROUTE
+	struct route		 ip6route;
+	struct route		*ro;
+#else
 	struct route_in6	 ip6route;
 	struct route_in6	*ro;
+#endif
 	struct sockaddr_in6	*dst;
 	struct ip6_hdr		*ip6;
 	struct ifnet		*ifp = NULL;
@@ -5512,7 +5521,7 @@ pf_route6(struct mbuf **m, struct pf_rule *r, int dir, struct ifnet *oifp,
 		if ((m0 = m_copym2(*m, 0, M_COPYALL, M_NOWAIT)) == NULL)
 #endif
 			return;
-#ifdef __FreeBSD__
+#if 0
 		if ((mtag = m_tag_copy(mtag, M_DONTWAIT)) == NULL)
 #else
 		if ((mtag = m_tag_copy(mtag)) == NULL)
