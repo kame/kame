@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.69 2001/01/24 05:46:25 sakane Exp $
+.\"	$KAME: racoon.conf.5,v 1.70 2001/01/25 03:31:55 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -222,7 +222,11 @@ The followings are the list of statements.
 .Bl -tag -width Ds -compact
 .\"
 .It Ic exchange_mode ( main \*(Ba aggressive \*(Ba base ) ;
-defined exchange mode of phase 1.
+defined the exchange mode of phase 1 when racoon initiates.
+Also it means the acceptable exchange mode when racoon is responder.
+They can be lined with single comma as the separator.
+All of the modes are acceptable.
+The only first exchange mode means racoon uses it when initiating.
 .\"
 .It Ic doi Ic ipsec_doi ;
 means to use IPSEC-DOI specified RFC 2407.
@@ -496,7 +500,8 @@ does not have the list of security protocols to be negotiated.
 The list of security protocols are passed by SPD in the kernel.
 Therefore you have to define all of the potential algorithms
 in phase 2 proposals even if there is a algorithm which will not be used.
-These algorithms are define by using the following three directives.
+These algorithms are define by using the following three directives,
+and they are lined with single comma as the separator.
 .Xr racoon 8
 will compute actual phase 2 proposals by computing permutation of the specified
 algorithms, and then combining them with security protocol specified by SPD.
