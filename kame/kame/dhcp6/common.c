@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.81 2003/05/16 20:04:36 itojun Exp $	*/
+/*	$KAME: common.c,v 1.82 2003/07/10 15:13:56 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -819,6 +819,12 @@ dhcp6_clear_options(optinfo)
 	dhcp6_clear_list(&optinfo->dns_list);
 	dhcp6_clear_list(&optinfo->prefix_list);
 
+	if (optinfo->relaymsg_msg)
+		free(optinfo->relaymsg_msg);
+
+	if (optinfo->ifidopt_id)
+		free(optinfo->ifidopt_id);
+
 	dhcp6_init_options(optinfo);
 }
 
@@ -843,6 +849,21 @@ dhcp6_copy_options(dst, src)
 	if (dhcp6_copy_list(&dst->prefix_list, &src->prefix_list))
 		goto fail;
 	dst->pref = src->pref;
+
+	if (src->relaymsg_msg) {
+		if ((dst->relaymsg_msg = malloc(src->relaymsg_len)) == NULL)
+			goto fail;
+		dst->relaymsg_len = src->relaymsg_len;
+		memcpy(dst->relaymsg_msg, src->relaymsg_msg,
+		    src->relaymsg_len);
+	}
+
+	if (src->ifidopt_id) {
+		if ((dst->ifidopt_id = malloc(src->ifidopt_len)) == NULL)
+			goto fail;
+		dst->ifidopt_len = src->ifidopt_len;
+		memcpy(dst->ifidopt_id, src->ifidopt_id, src->ifidopt_len);
+	}
 
 	return (0);
 
@@ -1324,7 +1345,7 @@ get_delegated_prefixes(p, ep, optinfo)
 		memcpy((p) + 1, (v), (l)); \
 	(p) = (struct dhcp6opt *)((char *)((p) + 1) + (l)); \
  	(len) += sizeof(struct dhcp6opt) + (l); \
-	dprintf(LOG_DEBUG, FNAME, "set %s", dhcp6optstr((t))); \
+	dprintf(LOG_DEBUG, FNAME, "set %s (len %d)", dhcp6optstr((t)), (l)); \
 } while (0)
 
 int
@@ -1475,6 +1496,17 @@ dhcp6_set_options(bp, ep, optinfo)
 		free(tmpbuf);
 		     
 	}
+
+	if (optinfo->relaymsg_len) {
+		COPY_OPTION(DH6OPT_RELAY_MSG, optinfo->relaymsg_len,
+			    optinfo->relaymsg_msg, p);
+	}
+
+	if (optinfo->ifidopt_id) {
+		COPY_OPTION(DH6OPT_INTERFACE_ID, optinfo->ifidopt_len,
+			    optinfo->ifidopt_id, p);
+	}
+
 	return (len);
 
   fail:
@@ -1746,16 +1778,38 @@ dhcp6optstr(type)
 		return ("client ID");
 	case DH6OPT_SERVERID:
 		return ("server ID");
+	case DH6OPT_IA:
+		return ("identity association");
+	case DH6OPT_IA_TMP:
+		return ("IA for temporary");
+	case DH6OPT_IADDR:
+		return ("IA address");
 	case DH6OPT_ORO:
 		return ("option request");
 	case DH6OPT_PREFERENCE:
 		return ("preference");
 	case DH6OPT_ELAPSED_TIME:
 		return ("elapsed time");
+	case DH6OPT_RELAY_MSG:
+		return ("relay message");
+	case DH6OPT_AUTH:
+		return ("authentication");
+	case DH6OPT_UNICAST:
+		return ("server unicast");
 	case DH6OPT_STATUS_CODE:
 		return ("status code");
 	case DH6OPT_RAPID_COMMIT:
 		return ("rapid commit");
+	case DH6OPT_USER_CLASS:
+		return ("user class");
+	case DH6OPT_VENDOR_CLASS:
+		return ("vendor class");
+	case DH6OPT_VENDOR_OPTS:
+		return ("vendor specific info");
+	case DH6OPT_INTERFACE_ID:
+		return ("interface ID");
+	case DH6OPT_RECONF_MSG:
+		return ("reconfigure message");
 	case DH6OPT_DNS:
 		return ("DNS");
 	case DH6OPT_PREFIX_DELEGATION:
@@ -1798,8 +1852,16 @@ dhcp6msgstr(type)
 		return ("reply");
 	case DH6_RELEASE:
 		return ("release");
+	case DH6_DECLINE:
+		return ("decline");
+	case DH6_RECONFIGURE:
+		return ("reconfigure");
 	case DH6_INFORM_REQ:
 		return ("information request");
+	case DH6_RELAY_FORW:
+		return ("relay-forward");
+	case DH6_RELAY_REPLY:
+		return ("relay-reply");
 	default:
 		snprintf(genstr, sizeof(genstr), "msg%d", type);
 		return (genstr);

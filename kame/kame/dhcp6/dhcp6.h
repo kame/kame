@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.38 2003/02/06 13:43:31 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.39 2003/07/10 15:13:56 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -47,7 +47,11 @@
 #define DH6_REBIND	6
 #define DH6_REPLY	7
 #define DH6_RELEASE	8
+#define DH6_DECLINE	9
+#define DH6_RECONFIGURE	10
 #define DH6_INFORM_REQ	11
+#define DH6_RELAY_FORW	12
+#define DH6_RELAY_REPLY	13
 
 /* Predefined addresses */
 #define DH6ADDR_ALLAGENT	"ff02::1:2"
@@ -75,6 +79,8 @@
 
 #define DHCP6_DURATITION_INFINITE 0xffffffff
 #define DHCP6_DURATITION_MIN 30
+
+#define DHCP6_RELAY_MULTICAST_HOPS 32
 
 /* DUID: DHCP unique Identifier */
 struct duid {
@@ -136,6 +142,20 @@ struct dhcp6_optinfo {
 	struct dhcp6_list stcode_list; /* status code */
 	struct dhcp6_list dns_list; /* DNS server list */
 	struct dhcp6_list prefix_list; /* prefix list */
+
+	struct {		/* relay message */
+		size_t len;
+		void *msg;
+	} relay_msg;
+#define relaymsg_len relay_msg.len
+#define relaymsg_msg relay_msg.msg
+
+	struct {		/* Interface-id */
+		size_t len;
+		void *id;
+	} ifidopt;
+#define ifidopt_len ifidopt.len
+#define ifidopt_id ifidopt.id
 };
 
 /* DHCP6 base packet format */
@@ -150,6 +170,15 @@ struct dhcp6 {
 #define dh6_xid		dh6_msgtypexid.x
 #define DH6_XIDMASK	0x00ffffff
 
+/* DHCPv6 relay messages */
+struct dhcp6_relay {
+	u_int8_t dh6relay_msgtype;
+	u_int8_t dh6relay_hcnt;
+	struct in6_addr dh6relay_linkaddr; /* XXX: badly aligned */
+	struct in6_addr dh6relay_peeraddr; /* ditto */
+	/* options follow */
+} __attribute__ ((__packed__));
+
 /* options */
 #define DH6OPT_CLIENTID	1
 #define DH6OPT_SERVERID	2
@@ -162,8 +191,8 @@ struct dhcp6 {
 #  define DH6OPT_PREF_MAX 255
 #define DH6OPT_ELAPSED_TIME 8
 #  define DH6OPT_ELAPSED_TIME_UNDEF -1
-#define DH6OPT_CLIENT_MSG 9
-#define DH6OPT_SERVER_MSG 10
+#define DH6OPT_RELAY_MSG 9
+/* #define DH6OPT_SERVER_MSG 10: deprecated */
 #define DH6OPT_AUTH 11
 #define DH6OPT_UNICAST 12
 #define DH6OPT_STATUS_CODE 13

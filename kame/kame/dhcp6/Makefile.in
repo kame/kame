@@ -1,5 +1,5 @@
 #
-# $Id: Makefile.in,v 1.20 2003/04/11 07:13:21 jinmei Exp $
+# $Id: Makefile.in,v 1.21 2003/07/10 15:13:55 jinmei Exp $
 #
 
 srcdir=	@srcdir@
@@ -8,7 +8,7 @@ LDFLAGS=@LDFLAGS@
 LIBOBJS=@LIBOBJS@
 LIBS=	@LIBS@ -ly -ll
 CC=	@CC@
-TARGET=	dhcp6c dhcp6s
+TARGET=	dhcp6c dhcp6s dhcp6relay
 
 INSTALL=@INSTALL@
 INSTALL_PROGRAM=@INSTALL_PROGRAM@
@@ -31,7 +31,7 @@ GENSRCS=cfparse.c cftoken.c
 CLIENTOBJS=	dhcp6c.o common.o config.o prefixconf.o dhcp6c_ia.o timer.o \
 	dhcp6c_script.o $(GENSRCS:%.c=%.o)
 SERVOBJS=	dhcp6s.o common.o config.o timer.o $(GENSRCS:%.c=%.o)
-RELAYOBJS =	dhcp6relay.o common.o
+RELAYOBJS =	dhcp6relay.o common.o timer.o
 
 all:	$(TARGET) 
 dhcp6c:	$(CLIENTOBJS) $(LIBOBJS)
