@@ -1,4 +1,4 @@
-$Id: question,v 1.18 2000/09/20 22:41:42 sakane Exp $
+$Id: question,v 1.19 2000/09/21 05:30:42 sakane Exp $
 
 Q: how may policy matters are.  can we interoperate ?
 
@@ -30,6 +30,13 @@ Q: phase2 PFS and KE payload
 		reject the proposal and quit the phase 2.
 		accept it.
 	it's policy issue.
+
+Q. If tye type of ID payload is SUBNET, should it be allowed ::1/128 as host
+   address ?
+A. yes.  consensus at bake-off.
+
+Q. how many proposal can we send ?
+	30? 300? infinite ?
 
 Q. Is there only one payload of RESPONDER-LIFETIME in a IKE message
    even if SA bundle is required ?
@@ -105,6 +112,7 @@ Q. I don't know the situation to initiate acknowledged informational.
 
 Q. How many certificate payload in a packet are sent ?
    isakmp-test.ssh.fi send both CRL and CERT in a packet.
+A. multiple CERT payload can be sent.  Or use PKCS#7.
 
 Q. What should we do if nonce size is greater than size of RSA modulus
    in authentication with public key encryption, also size of body of
@@ -151,8 +159,8 @@ A: (2) for normal case, and allow (1) for backward compatibility
    (responder case I bet).  <draft-shacham-ippcp-rfc2393bis-05.txt>
 
 Q. INITIAL-CONTACT message.
-   When should we issue an INITIAL-CONTACT message?
-	-> see jenkins rekey draft
+   When should we send an INITIAL-CONTACT message?
+A. see jenkins rekey draft
 
    We must ignore unencrypted INITIAL-CONTACT message.
 
@@ -166,6 +174,7 @@ Q. INITIAL-CONTACT message.
 	  |	      \/	  |
 	  |	      /\	  |
 	  |<---------/  \-------->|
+	  |			  |
 	  |----------\  /---------| INITIAL-CONTACT
 	  |	      \/	  |
 	  |	      /\	  |
@@ -192,17 +201,18 @@ Q: IPv6 neighbor discovery.
 	  such packet, like icmp6 type/code filters.
 
 Q: When there are no ID payloads in phase 2 ?
-	Guess from the pair of address of IKE peer.
+A. guess from the pair of address of IKE peer.
 
-Q: Which SPI should I carry on Delete notify ?
+Q: Delete payload.
+	Which SPI should I carry on Delete notify ?
 	There is no documentation.
 
 	An initiator should send a set of SPI of inbound SAs.
 	A responder should delete a set of outbound SAs which are sent by
 	an initiator.
 
-	When an IKE node deletes old SAs, it will send DELETE notify to
-	a peer.
+	When an IKE node deletes old SAs, should it send DELETE notify to
+	a peer ?
 
 	When does a node send DELETE notify ?
 		when a IKE node deletes old SAs expilicitly.
@@ -211,7 +221,7 @@ Q: Which SPI should I carry on Delete notify ?
 
 	When a DELETE notify packet is dropped, SA will get inconsistent
 	between peers.
-		We can prevent from it by using "heartbeat".
+		We can prevent from it by using "heartbeat" ?
 
 Q: "heartbeat"
 	It means a signal of "I'm alive".
@@ -225,9 +235,7 @@ Q: "heartbeat"
 Q: responder's action in a normal case.
 	A responder should never initiate both phase 1 and phase 2 at anytime.
 	Once we have decided which side we are (initiator/responder), the
-	relationship will never change.  (sakane)
-
-	On phase 1, it is good for a responder not to initiate. (watanabe)
+	relationship will never change.
 
 Q: only the byte type of lifetime on phase 2, not exist the type of time.
 	No ducumentation states explicitly.
@@ -241,6 +249,9 @@ Q: phase 2 lifetime negotiation
 	- use my lifetime, then send RESPONDER LIFETIME.
 	- during negotiation obey the initiator.  install SA lifetime based
 	  on the lifetime we have decided (not from the negotiation).
+
+Q: phase 1 lifetime negotiation
+	can we do like phase 2 ?
 
 Q: Does RFC2407 4.5.4 Lifetime Notification say for phase 2 ? or phase 1 ?
 	responder lifetime may be inapproprite for phase1 because
@@ -295,7 +306,7 @@ Q: order of proposals in IKE phase 2 packet, and IPsec processing order
 			ah/tunnel + esp/tunnel ?
 
 Q: what should we do if phase 1 SA expires, during phase2 SA negotiation?
-	restart phase 2 negotiation from scratch
+A. restart phase 2 negotiation from scratch
 
 Q: what kind of notification message a node should send on decode failure?
 	ISAKMP_NTYPE_INVALID_PAYLOAD_TYPE
