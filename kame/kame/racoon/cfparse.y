@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.115 2003/05/08 07:57:43 itojun Exp $	*/
+/*	$KAME: cfparse.y,v 1.116 2003/05/23 05:22:09 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -1323,7 +1323,7 @@ cfparse()
 
 	yycf_init_buffer();
 
-	if (yycf_set_buffer(lcconf->racoon_conf) != 0)
+	if (yycf_switch_buffer(lcconf->racoon_conf) != 0)
 		return -1;
 
 	prhead = NULL;
@@ -1365,7 +1365,7 @@ cfreparse()
 	clean_tmpalgtype();
 	yycf_init_buffer();
 
-	if (yycf_set_buffer(lcconf->racoon_conf) != 0)
+	if (yycf_switch_buffer(lcconf->racoon_conf) != 0)
 		return -1;
 
 	return(cfparse());
