@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.71 2000/05/29 11:49:56 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.72 2000/05/30 01:58:47 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2108,6 +2108,7 @@ setph1attr(sa, buf)
 		}
 	}
 
+#ifndef INTEROP_NEC
 	if (sa->lifebyte) {
 		attrlen += sizeof(struct isakmp_data)
 			+ sizeof(struct isakmp_data);
@@ -2126,6 +2127,7 @@ setph1attr(sa, buf)
 			}
 		}
 	}
+#endif
 	if (sa->enctype) {
 		attrlen += sizeof(struct isakmp_data);
 		if (buf)
@@ -2227,12 +2229,14 @@ ipsecdoi_setph2proposal0(iph2, pp, pr)
 			if (pp->lifetime > 0xffff)
 				attrlen += sizeof(u_int32_t);
 		}
+#ifndef INTEROP_NEC
 		if (pp->lifebyte) {
 			attrlen += sizeof(struct isakmp_data)
 				+ sizeof(struct isakmp_data);
 			if (pp->lifebyte > 0xffff)
 				attrlen += sizeof(u_int32_t);
 		}
+#endif
 		attrlen += sizeof(struct isakmp_data);	/* enc mode */
 		if (tr->encklen)
 			attrlen += sizeof(struct isakmp_data);
@@ -2276,6 +2280,7 @@ ipsecdoi_setph2proposal0(iph2, pp, pr)
 			}
 		}
 
+#ifndef INTEROP_NEC
 		if (pp->lifebyte) {
 			x = isakmp_set_attr_l(x, IPSECDOI_ATTR_SA_LD_TYPE,
 						IPSECDOI_ATTR_SA_LD_TYPE_KB);
@@ -2288,6 +2293,7 @@ ipsecdoi_setph2proposal0(iph2, pp, pr)
 							pp->lifebyte);
 			}
 		}
+#endif
 
 		x = isakmp_set_attr_l(x, IPSECDOI_ATTR_ENC_MODE, pr->encmode);
 

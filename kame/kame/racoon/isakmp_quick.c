@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_quick.c,v 1.29 2000/05/23 16:25:09 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_quick.c,v 1.30 2000/05/30 01:58:47 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1014,6 +1014,16 @@ quick_r1recv(iph2, msg0)
 		error = ISAKMP_NTYPE_INVALID_ID_INFORMATION;
 		goto end;
 	}
+#ifdef INTEROP_NEC
+	if (iph2->id_p != NULL) {
+		vfree(iph2->id_p);
+		iph2->id_p = NULL;
+	}
+	if (iph2->id != NULL) {
+		vfree(iph2->id);
+		iph2->id = NULL;
+	}
+#endif
 
 	/* get sainfo */
 	if (get_sainfo_r(iph2) < 0) {
