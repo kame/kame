@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.130 2002/06/17 02:03:42 k-sugyou Exp $	*/
+/*	$KAME: mip6.c,v 1.131 2002/06/18 02:32:48 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -2196,7 +2196,7 @@ mip6_add_subopt2dh(subopt, opt, dh)
 	/* Add sub-option to Destination option */
 	type = *subopt;
 	switch (type) {
-		case MIP6SUBOPT_AUTHDATA:
+		case MIP6OPT_AUTHDATA:
 			/*
 			 * Authentication Data alignment requirement
 			 * (8n + 6)
@@ -2207,7 +2207,7 @@ mip6_add_subopt2dh(subopt, opt, dh)
 				/* Add a PADN option with length X */
 				len = 6 - rest - 2;
 				bzero((caddr_t)dh->buf + dh->off, len + 2);
-				*(u_int8_t *)((caddr_t)dh->buf + dh->off) = MIP6SUBOPT_PADN;
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off) = MIP6OPT_PADN;
 				*(u_int8_t *)((caddr_t)dh->buf + dh->off + 1) = len;
 				suboptlen = len + 2;
 			} else if (rest == 5) {
@@ -2217,7 +2217,7 @@ mip6_add_subopt2dh(subopt, opt, dh)
 			} else if (rest == 7) {
 				/* Add a PADN option with length 5 */
 				bzero((caddr_t)dh->buf + dh->off, 5/*len*/ + 2);
-				*(u_int8_t *)((caddr_t)dh->buf + dh->off) = MIP6SUBOPT_PADN;
+				*(u_int8_t *)((caddr_t)dh->buf + dh->off) = MIP6OPT_PADN;
 				*(u_int8_t *)((caddr_t)dh->buf + dh->off + 1) = 5;
 				suboptlen = 5 + 2;
 			}

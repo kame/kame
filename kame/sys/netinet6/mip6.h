@@ -1,4 +1,4 @@
-/*	$KAME: mip6.h,v 1.52 2002/06/18 02:11:06 k-sugyou Exp $	*/
+/*	$KAME: mip6.h,v 1.53 2002/06/18 02:32:48 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -63,33 +63,40 @@ struct mip6_req {
 #define MIP6_BA_INITIAL_TIMEOUT    1
 #define MIP6_BA_MAX_TIMEOUT        256
 
-/* sub-option type. */
-#define MIP6SUBOPT_PAD1     0x00
-#define MIP6SUBOPT_PADN     0x01
-#define MIP6SUBOPT_UNIQID   0x02
-#define MIP6SUBOPT_ALTCOA   0x03
-#define MIP6SUBOPT_AUTHDATA 0x04
+/* mobility header options type. */
+#define MIP6OPT_PAD1     0x00
+#define MIP6OPT_PADN     0x01
+#define MIP6OPT_UNIQID   0x02
+#define MIP6OPT_ALTCOA   0x03
+#define MIP6OPT_AUTHDATA 0x04
 
-/* Unique Identifier sub-option format. */
-struct mip6_subopt_uniqid {
-	u_int8_t type; /* 0x02 */
-	u_int8_t len;  /* == 2 */
-	u_int16_t id;  /* uniqid */
+/* Unique Identifier option format. */
+struct mip6_opt_uniqid {
+	u_int8_t type;		/* 0x02 */
+	u_int8_t len;		/* == 4 */
+	u_int16_t id;		/* Unique Identifier */
 } __attribute__ ((__packed__));
 
-/* Alternate Care-of Address sub-option format. */
-struct mip6_subopt_altcoa {
-	u_int8_t type;    /* 0x04 for draft-13, 0x03 for newer drafts */
-	u_int8_t len;     /* == 16 */
-	u_int8_t coa[16]; /* Alternate COA */
+/* Alternate Care-of Address option format. */
+struct mip6_opt_altcoa {
+	u_int8_t type;		/* 0x03 */
+	u_int8_t len;		/* == 18 */
+	u_int8_t coa[16];	/* Alternate Care-of Address */
+} __attribute__ ((__packed__));
+
+/* Nonce Indices */
+struct mip6_opt_nonceix {
+	u_int8_t type;		/* 0x04 */
+	u_int8_t len;		/* == 6 */
+	u_int16_t hoix;		/* Home Nonce Index */
+	u_int16_t coix;		/* Care-of Nonce Index */
 } __attribute__ ((__packed__));
 
 /* Autnentication Data sub-option format. */
-struct mip6_subopt_authdata {
-	u_int8_t type; /* 0x04 */
-	u_int8_t len;
-	u_int8_t spi[4]; /* security parameter index */
-	/* followed by authentication data (variable length) */
+struct mip6_opt_authdata {
+	u_int8_t type;		/* 0x05 */
+	u_int8_t len;		/* 2 + n */
+	/* followed by Authenticator (variable length) */
 } __attribute__ ((__packed__));
 
 /* Binding Ack status code. */
