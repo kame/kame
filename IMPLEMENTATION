@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 2000/01/20 12:07:50 $
+			$Date: 2000/01/24 02:25:13 $
 
 1. IPv6
 
@@ -1176,6 +1176,10 @@ The following algorithms are NOT supported:
 	HMAC MD5 with 128bit crypto checksum + 64bit replay prevention
 		(rfc2085.txt)
 	keyed SHA1 with 160bit crypto checksum + 32bit padding (rfc1852.txt)
+
+The key/policy management API is based on the following document, with fair
+amount of extensions:
+	RFC2367: PF_KEY key management API
 
 4.6 ECN consideration on IPsec tunnels
 
