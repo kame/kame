@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.50 2001/02/16 12:23:40 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.51 2001/02/16 12:49:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -153,6 +153,23 @@ struct in6_prefix {
 	u_short advrtrs; /* number of advertisement routers */
 	/* struct sockaddr_in6 advrtr[] */
 } __attribute__((__packed__));
+
+#ifdef _KERNEL
+struct	in6_ondireq {
+	char ifname[IFNAMSIZ];
+	struct {
+		u_int32_t linkmtu;	/* LinkMTU */
+		u_int32_t maxmtu;	/* Upper bound of LinkMTU */
+		u_int32_t basereachable; /* BaseReachableTime */
+		u_int32_t reachable;	/* Reachable Time */
+		u_int32_t retrans;	/* Retrans Timer */
+		u_int32_t flags;	/* Flags */
+		int recalctm;		/* BaseReacable re-calculation timer */
+		u_int8_t chlim;		/* CurHopLimit */
+		u_int8_t receivedra;
+	} ndi;
+};
+#endif
 
 struct	in6_ndireq {
 	char ifname[IFNAMSIZ];

@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.125 2001/02/16 12:27:41 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.126 2001/02/16 12:49:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1650,6 +1650,22 @@ nd6_ioctl(cmd, data, ifp)
 	      }
 		splx(s);
 
+		break;
+	case OSIOCGIFINFO_IN6:
+		if (!nd_ifinfo || i >= nd_ifinfo_indexlim) {
+			error = EINVAL;
+			break;
+		}
+		ndi->ndi.linkmtu = nd_ifinfo[ifp->if_index].linkmtu;
+		ndi->ndi.maxmtu = nd_ifinfo[ifp->if_index].maxmtu;
+		ndi->ndi.basereachable =
+		    nd_ifinfo[ifp->if_index].basereachable;
+		ndi->ndi.reachable = nd_ifinfo[ifp->if_index].reachable;
+		ndi->ndi.retrans = nd_ifinfo[ifp->if_index].retrans;
+		ndi->ndi.flags = nd_ifinfo[ifp->if_index].flags;
+		ndi->ndi.recalctm = nd_ifinfo[ifp->if_index].recalctm;
+		ndi->ndi.chlim = nd_ifinfo[ifp->if_index].chlim;
+		ndi->ndi.receivedra = nd_ifinfo[ifp->if_index].receivedra;
 		break;
 	case SIOCGIFINFO_IN6:
 		if (!nd_ifinfo || i >= nd_ifinfo_indexlim) {
