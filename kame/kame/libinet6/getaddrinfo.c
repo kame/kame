@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.182 2004/04/24 07:59:15 jinmei Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.183 2004/04/24 08:20:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -642,10 +642,6 @@ globcopy:
 		while (cur && cur->ai_next)
 			cur = cur->ai_next;
 	}
-
-	/* XXX inhibit errors if we have the result */
-	if (sentinel.ai_next)
-		error = 0;
 
 	/*
 	 * ensure we return either:
