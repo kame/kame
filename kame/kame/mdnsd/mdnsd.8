@@ -1,4 +1,4 @@
-.\"	$KAME: mdnsd.8,v 1.30 2001/03/28 07:08:29 itojun Exp $
+.\"	$KAME: mdnsd.8,v 1.31 2001/05/02 12:11:49 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -237,3 +237,11 @@ to be available and in
 .Dv IFF_UP
 state, on invocation.
 This may be too much to ask for laptop usage.
+.Pp
+.Nm
+does not support EDNS0 option.
+Also,
+.Nm
+handles DNS queries/replies over virtual connection
+.Pq Tn TCP
+naively.
