@@ -1,4 +1,4 @@
-/*	$KAME: mip6_cncore.c,v 1.12 2003/07/08 06:51:28 keiichi Exp $	*/
+/*	$KAME: mip6_cncore.c,v 1.13 2003/07/10 11:05:01 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -1188,6 +1188,10 @@ mip6_bc_timeout(dummy)
 	struct mip6_timeout_entry *mtoe, *mtoe_next;
 #else
 	struct mip6_bc *mbc, *mbc_next;
+#ifdef MIP6_HOME_AGENT
+	struct mip6_bc *llmbc;
+	int error;
+#endif /* MIP6_HOME_AGENT */
 #endif /* MIP6_CALLOUTTEST */
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
@@ -1222,8 +1226,41 @@ mip6_bc_timeout(dummy)
 	for (mbc = LIST_FIRST(&mip6_bc_list); mbc; mbc = mbc_next) {
 		mbc_next = LIST_NEXT(mbc, mbc_entry);
 
-		/* expiration check */
+#ifdef MIP6_HOME_AGENT
+		/*
+		 * a cloned entry must be removed only when the last
+		 * entry of original entries is removed.
+		 */
+		if ((mbc->mbc_flags & IP6MU_CLONED) != 0)
+			continue;
+#endif /* MIP6_HOME_AGENT */
+
+		/* expiration check. */
 		if (mbc->mbc_expire < time_second) {
+#ifdef MIP6_HOME_AGENT
+			llmbc = mbc->mbc_llmbc;
+			if (llmbc != NULL) {
+				llmbc->mbc_refcnt--;
+				if (llmbc->mbc_refcnt == 0) {
+					/* remove a cloned entry. */
+					error = mip6_bc_list_remove(
+					    &mip6_bc_list,
+					    llmbc);
+					if (error) {
+						mip6log((LOG_ERR,
+						    "%s:%d: failed to remove a cloned binding cache entry.\n",
+						    __FILE__, __LINE__));
+					}
+				}
+			}
+			/*
+			 * we must reset mbc_next.  since a removal of
+			 * a mbc may cause another removal of a
+			 * related cloned mbc, mbc_next may have a
+			 * bogus pointer.
+			 */
+			mbc_next = LIST_NEXT(mbc, mbc_entry);
+#endif /* MIP6_HOME_AGENT */
 			mip6_bc_list_remove(&mip6_bc_list, mbc);
 		}
 
