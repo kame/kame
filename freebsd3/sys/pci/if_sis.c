@@ -945,7 +945,8 @@ sis_attach(config_id, unit)
 	ifp->if_watchdog = sis_watchdog;
 	ifp->if_init = sis_init;
 	ifp->if_baudrate = 10000000;
-	ifp->if_snd.ifq_maxlen = SIS_TX_LIST_CNT - 1;
+	IFQ_SET_MAXLEN(&ifp->if_snd, SIS_TX_LIST_CNT - 1);
+	IFQ_SET_READY(&ifp->if_snd);
 
 	if (bootverbose)
 		printf("sis%d: probing for a PHY\n", sc->sis_unit);
@@ -1335,7 +1336,7 @@ static void sis_intr(arg)
 	/* Re-enable interrupts. */
 	CSR_WRITE_4(sc, SIS_IER, 1);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		sis_start(ifp);
 
 	return;
@@ -1415,15 +1416,17 @@ static void sis_start(ifp)
 		return;
 
 	while(sc->sis_ldata->sis_tx_list[idx].sis_mbuf == NULL) {
-		IF_DEQUEUE(&ifp->if_snd, m_head);
+		IFQ_POLL(&ifp->if_snd, m_head);
 		if (m_head == NULL)
 			break;
 
 		if (sis_encap(sc, m_head, &idx)) {
-			IF_PREPEND(&ifp->if_snd, m_head);
 			ifp->if_flags |= IFF_OACTIVE;
 			break;
 		}
+
+		/* now we are committed to transmit the packet */
+		IFQ_DEQUEUE(&ifp->if_snd, m_head);
 
 #if NBPFILTER > 0
 		/*
@@ -1434,6 +1437,8 @@ static void sis_start(ifp)
 			bpf_mtap(ifp, m_head);
 #endif
 	}
+	if (idx == sc->sis_cdata.sis_tx_prod)
+		return;
 
 	/* Transmit */
 	sc->sis_cdata.sis_tx_prod = idx;
@@ -1685,7 +1690,7 @@ static void sis_watchdog(ifp)
 	sis_reset(sc);
 	sis_init(sc);
 
-	if (ifp->if_snd.ifq_head != NULL)
+	if (!IFQ_IS_EMPTY(&ifp->if_snd))
 		sis_start(ifp);
 
 	return;
