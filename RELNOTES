@@ -1,6 +1,6 @@
 	RELNOTES of KAME kit
 	KAME Project
-	$KAME: RELNOTES,v 1.51 2000/07/26 08:07:08 itojun Exp $
+	$KAME: RELNOTES,v 1.52 2000/07/26 16:25:25 itojun Exp $
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
 
@@ -81,9 +81,6 @@ Many of old ones have been solved.
 
 - libinet6 resolver code does not support NIS lookup.
 
-- openbsd: 3COM 3C905B card driver (xl) does not handle multicast properly,
-  and will have a major problem with IPv6.  already corrected in SNAP kits.
-
-- netbsd: faithd(8) kernel support does not work right.
+- kame/openbsd27 seems to have some issue with IPv6 TCP path mtu discovery.
 
 							<end of RELNOTES>
