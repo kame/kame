@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.306 2002/09/20 13:30:35 suz Exp $	*/
+/*	$KAME: in6.c,v 1.307 2002/09/20 21:57:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1236,6 +1236,14 @@ in6_update_ifa(ifp, ifra, ia)
 	 * source address.
 	 */
 	ia->ia6_flags = ifra->ifra_flags;
+	/*
+	 * backward compatibility - if IN6_IFF_DEPRECATED is set from the
+	 * userland, make it deprecated.
+	 */
+	if ((ifra->ifra_flags & IN6_IFF_DEPRECATED) != 0) {
+		ia->ia6_lifetime.ia6t_pltime = 0;
+		ia->ia6_lifetime.ia6t_preferred = time_second;
+	}
 	ia->ia6_flags &= ~IN6_IFF_DUPLICATED;	/* safety */
 #ifdef MIP6
 	if (hostIsNew && in6if_do_dad(ifp) && mip6_ifa_need_dad(ia))
