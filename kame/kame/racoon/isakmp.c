@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.78 2000/07/04 09:23:39 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.79 2000/07/04 09:38:42 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -549,8 +549,10 @@ ph1_main(iph1, msg)
 			"ERROR: failed to pre-process packet.\n");
 #if 0
 		/* XXX
-		 * To be responded with a notify and delete phase 1 handler,
-		 * OR not to be responded and keep phase 1 handler.
+		 * When an invalid packet is received on phase1, it should
+		 * be selected to process this packet.  That is to respond
+		 * with a notify and delete phase 1 handler, OR not to respond
+		 * and keep phase 1 handler.
 		 */
 		return -1;
 #else
