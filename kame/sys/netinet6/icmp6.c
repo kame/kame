@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.375 2004/02/16 09:03:16 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.376 2004/02/17 11:40:25 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -143,6 +143,10 @@
 #include <netinet6/mip6_mncore.h>
 #endif /* MIP6_MOBILE_NODE */
 #endif /* MIP6 */
+
+#ifdef MLDV2
+#include <netinet6/in6_msf.h>
+#endif
 
 #include <net/net_osdep.h>
 
@@ -651,6 +655,30 @@ icmp6_input(mp, offp, proto)
 		goto freeit;
 	}
 #endif /* MIP6 && MIP6_HOME_AGENT */
+
+#ifdef MLDV2
+	/* 
+	 * see whether the received packet matches with per-interface MSF,
+	 * if it is handled only within kernel (i.e. via icmp6_reflect()).
+	 */
+	if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
+		struct in6_multi *in6m = NULL;
+
+		switch (icmp6->icmp6_type) {
+		case ICMP6_ECHO_REQUEST:
+		case ICMP6_WRUREQUEST:	/* ICMP6_FQDN_QUERY */
+			IN6_LOOKUP_MULTI(ip6->ip6_dst, m->m_pkthdr.rcvif, in6m);
+			if (in6m == NULL)
+				goto freeit;	/* XXX: impossible */
+			if (match_msf6_per_if(in6m, &ip6->ip6_src,
+					      &ip6->ip6_dst) == 0)
+				goto freeit;
+			break;
+		default:
+			break;
+		}
+	}
+#endif
 	switch (icmp6->icmp6_type) {
 	case ICMP6_DST_UNREACH:
 		icmp6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_dstunreach);
@@ -2387,6 +2415,21 @@ icmp6_rip6_input(mp, off)
 		    ICMP6_FILTER_WILLBLOCK(icmp6->icmp6_type,
 		    in6p->in6p_icmp6filt))
 			continue;
+#ifdef MLDV2
+		/*
+		 * every multicast packet (except MLDv2 packet) is a target
+		 * of per-socket MSF
+		 */
+		if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
+			if (icmp6->icmp6_type != MLDV2_LISTENER_REPORT &&
+			    icmp6->icmp6_type != MLD_LISTENER_QUERY) {
+				if (match_msf6_per_socket(in6p, &ip6->ip6_src,
+							  &ip6->ip6_dst) == 0) {
+					continue;
+				}
+			}
+		}
+#endif
 		if (last) {
 			struct	mbuf *n = NULL;
 

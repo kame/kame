@@ -105,6 +105,10 @@
 #include <netipsec/ipsec6.h>
 #endif /* FAST_IPSEC */
 
+#ifdef MLDV2
+#include <netinet6/in6_msf.h>
+#endif
+
 #include <machine/stdarg.h>
 
 #define	satosin6(sa)	((struct sockaddr_in6 *)(sa))
@@ -168,6 +172,13 @@ rip6_input(mp, offp, proto)
 				continue;
 			}
 		}
+#ifdef MLDV2
+		if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
+			if (match_msf6_per_socket(in6p, &ip6->ip6_src,
+						  &ip6->ip6_dst) == 0)
+				continue;
+		}
+#endif
 		if (last) {
 			struct mbuf *n = m_copy(m, 0, (int)M_COPYALL);
 

@@ -1,4 +1,4 @@
-/*	$KAME: ip6_input.c,v 1.338 2004/02/13 02:52:09 keiichi Exp $	*/
+/*	$KAME: ip6_input.c,v 1.339 2004/02/17 11:40:25 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -132,9 +132,6 @@
 #include <netinet6/in6_pcb.h>
 #endif
 #include <netinet/icmp6.h>
-#ifdef MLDV2
-#include <netinet6/in6_msf.h>
-#endif
 #include <netinet6/scope6_var.h>
 #include <netinet6/in6_ifattach.h>
 #include <netinet6/nd6.h>
@@ -768,75 +765,32 @@ ip6_input(m)
 	 */
 	if (IN6_IS_ADDR_MULTICAST(&ip6->ip6_dst)) {
 	  	struct in6_multi *in6m = 0;
-#ifdef MLDV2
-		struct in6_multi_source *in6ms;
-		struct in6_addr_source *i6as;
-#endif
 
 		in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_mcast);
 		/*
 		 * See if we belong to the destination multicast group on the
 		 * arrival interface.
+		 *
+		 * Note: we intentionally skipped per-interface multicast-
+		 * source-filter(MSF) checking, to prevent an MSF matching 
+		 * failure for MLDv2 Group-Specific/Source-Group-Specific 
+		 * Query packet. (per-interface MSF is applied in 
+		 * icmpv6_input() for ICMPv6 ECHO/ECHO-REPLY).
+		 * 
 		 */
 		IN6_LOOKUP_MULTI(ip6->ip6_dst, m->m_pkthdr.rcvif, in6m);
-		if (!in6m)
-			goto nomatch;
-#ifdef MLDV2
-		in6ms = in6m->in6m_source;
-		/* in6ms is NULL only in case of ff02::1 and ff0{0,1}:: */
-		if (in6ms == NULL) {
-			/* assumes ff0{0,1} case has already been eliminated */
-			if (IN6_IS_LOCAL_GROUP(&ip6->ip6_dst)) {
-				ours = 1;	
-				goto matched;
-			}
-			printf("grp found, but src is NULL. impossible\n");
-			goto nomatch;
-		}
-		if (in6ms->i6ms_grpjoin > 0) {
-			ours = 1;	
-			goto matched;
-		}
-		if (in6ms->i6ms_cur == NULL || in6ms->i6ms_cur->head == NULL) {
-			goto nomatch;
-		}
-		LIST_FOREACH(i6as, in6ms->i6ms_cur->head, i6as_list) {
-			if (i6as->i6as_addr.sin6_family != AF_INET6)	/*???*/
-				continue;
-
-			/* matching src address found */
-			if (SS_CMP(&i6as->i6as_addr, ==, &ip6->ip6_src)) {
-				if (in6ms->i6ms_mode == MCAST_INCLUDE)
-					break;
-				goto nomatch;
-			}
-			/* matching src address not found */
-			if (SS_CMP(&i6as->i6as_addr, >, &ip6->ip6_src)) {
-				if (in6ms->i6ms_mode == MCAST_INCLUDE)
-					goto nomatch;
-				break;
-			}
-			continue;
-		}
-		if (i6as == NULL && in6ms->i6ms_mode == MCAST_INCLUDE)
-			goto nomatch;
-#endif /* MLDV2 */
-		ours = 1;
-		goto matched;
-
-	nomatch:
-		if (!ip6_mrouter) {
+		if (in6m)
+			ours = 1;
+		else if (!ip6_mrouter) {
 			ip6stat.ip6s_notmember++;
 			ip6stat.ip6s_cantforward++;
 			in6_ifstat_inc(m->m_pkthdr.rcvif, ifs6_in_discard);
 			goto bad;
 		}
-	matched:
 		deliverifp = m->m_pkthdr.rcvif;
+		goto hbhcheck;
 	}
 
-	if (deliverifp)		/* if the multicast packet has to be received */
-		goto hbhcheck;
 
 	/*
 	 *  Unicast check
