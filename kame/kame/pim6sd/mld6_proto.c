@@ -274,7 +274,7 @@ accept_listener_query(src, dst, group, tmo)
 		IF_DEBUG(DEBUG_MLD)
 		    log(LOG_DEBUG, 0,
 			"timer for grp %s on mif %d "
-			"set to %d",
+			"set to %ld",
 			inet6_fmt(group),
 			mifi, g->al_timer);
 		break;
@@ -426,7 +426,7 @@ accept_listener_done(src, dst, group)
 
     IF_DEBUG(DEBUG_MLD)
 	log(LOG_INFO, 0,
-	    "accepting listener done message: src %s, dst% s, grp %s",
+	    "accepting listener done message: src %s, dst %s, grp %s",
 	    inet6_fmt(&src->sin6_addr),
 	    inet6_fmt(dst), inet6_fmt(group));
 
@@ -448,7 +448,7 @@ accept_listener_done(src, dst, group)
 	{
 	    IF_DEBUG(DEBUG_MLD)
 		log(LOG_DEBUG, 0,
-		    "[accept_done_message] %d %d \n",
+		    "[accept_done_message] %d %ld\n",
 		    g->al_old, g->al_query);
 
 	    /*

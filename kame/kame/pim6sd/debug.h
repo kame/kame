@@ -133,7 +133,8 @@ extern char *packet_kind        __P((u_int proto, u_int type,
                          u_int code));
 extern int  debug_kind      __P((u_int proto, u_int type,
                          u_int code));
-extern void log         __P((int, int, char *, ...));
+extern void log         __P((int, int, char *, ...))
+	__attribute__((__format__(__printf__, 3, 4)));
 extern int  log_level       __P((u_int proto, u_int type,
                          u_int code));
 extern void dump            __P((int i));

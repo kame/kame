@@ -367,7 +367,7 @@ int recvlen;
 	if (IN6_IS_ADDR_MC_NODELOCAL(&mldh->mld6_addr))
 	{
 		log(LOG_INFO, 0,
-		    "RECV %s with an invalid scope: %s from %s",
+		    "RECV with an invalid scope: %s from %s",
 		    inet6_fmt(&mldh->mld6_addr),
 		    inet6_fmt(&src->sin6_addr));
 		return;			/* discard */

@@ -579,7 +579,7 @@ dump_mldqueriers(fp)
  */
 #ifdef __STDC__
 void
-log(int severity, int syserr, char *format,...)
+log(int severity, int syserr, char *format, ...)
 {
     va_list         ap;
     static char     fmt[211] = "warning - ";
