@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.210 2001/08/03 11:56:03 keiichi Exp $	*/
+/*	$KAME: ip6_output.c,v 1.211 2001/08/03 21:04:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -796,7 +796,7 @@ skip_ipsec2:;
 		m->m_flags &= ~(M_BCAST | M_MCAST);	/* just in case */
 
 		/* Callee frees mbuf */
-		error = ipsp_process_packet(m, tdb, AF_INET6);
+		error = ipsp_process_packet(m, tdb, AF_INET6, 0, NULL);
 		splx(s);
 
 		return error;  /* Nothing more to be done */
