@@ -1,4 +1,4 @@
-/*	$KAME: mdnsd.c,v 1.35 2001/04/25 12:29:29 itojun Exp $	*/
+/*	$KAME: mdnsd.c,v 1.36 2001/05/02 12:09:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -556,7 +556,7 @@ addserv(n, ttl, comment)
 	switch (res->ai_family) {
 	case AF_INET:
 		sin = (struct sockaddr_in *)res->ai_addr;
-		multicast = IN_MULTICAST(sin->sin_addr.s_addr) ? 1 : 0;
+		multicast = IN_MULTICAST(ntohl(sin->sin_addr.s_addr)) ? 1 : 0;
 		break;
 	case AF_INET6:
 		sin6 = (struct sockaddr_in6 *)res->ai_addr;
