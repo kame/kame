@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.1131 2000/07/15 16:09:45 itojun Exp $
+$Id: CHANGELOG,v 1.1132 2000/07/16 04:28:34 itojun Exp $
 
 <200006>
+Sun Jul 16 13:26:12 JST 2000  itojun@iijlab.net
+	* sys/netinet6/icmp6.c: ICMPv6 node information query now based on
+	  06 draft (ping6 -w).
+
 Sun Jul 16 00:57:23 JST 2000  itojun@iijlab.net
 	* sys/netinet6/in6.h; do not pull sys/queue.h in (it is not
 	  necessary anyways)
