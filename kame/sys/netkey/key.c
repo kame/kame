@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.152 2000/09/19 17:38:01 itojun Exp $	*/
+/*	$KAME: key.c,v 1.153 2000/09/19 23:55:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2559,25 +2559,38 @@ key_delsav(sav)
 	if (sav->key_auth != NULL) {
 		bzero(_KEYBUF(sav->key_auth), _KEYLEN(sav->key_auth));
 		KFREE(sav->key_auth);
+		sav->key_auth = NULL;
 	}
 	if (sav->key_enc != NULL) {
 		bzero(_KEYBUF(sav->key_enc), _KEYLEN(sav->key_enc));
 		KFREE(sav->key_enc);
+		sav->key_enc = NULL;
 	}
 	if (sav->sched) {
 		bzero(sav->sched, sav->schedlen);
 		KFREE(sav->sched);
+		sav->sched = NULL;
 	}
-	if (sav->replay != NULL)
+	if (sav->replay != NULL) {
 		keydb_delsecreplay(sav->replay);
-	if (sav->lft_c != NULL)
+		sav->replay = NULL;
+	}
+	if (sav->lft_c != NULL) {
 		KFREE(sav->lft_c);
-	if (sav->lft_h != NULL)
+		sav->lft_c = NULL;
+	}
+	if (sav->lft_h != NULL) {
 		KFREE(sav->lft_h);
-	if (sav->lft_s != NULL)
+		sav->lft_h = NULL;
+	}
+	if (sav->lft_s != NULL) {
 		KFREE(sav->lft_s);
-	if (sav->iv != NULL)
+		sav->lft_s = NULL;
+	}
+	if (sav->iv != NULL) {
 		KFREE(sav->iv);
+		sav->iv = NULL;
+	}
 
 	KFREE(sav);
 
@@ -2941,22 +2954,38 @@ key_setsaval(sav, m, mhp)
 
  fail:
 	/* initialization */
-	if (sav->replay != NULL)
+	if (sav->replay != NULL) {
 		keydb_delsecreplay(sav->replay);
-	if (sav->key_auth != NULL)
+		sav->replay = NULL;
+	}
+	if (sav->key_auth != NULL) {
 		KFREE(sav->key_auth);
-	if (sav->key_enc != NULL)
+		sav->key_auth = NULL;
+	}
+	if (sav->key_enc != NULL) {
 		KFREE(sav->key_enc);
-	if (sav->sched)
+		sav->key_enc = NULL;
+	}
+	if (sav->sched) {
 		KFREE(sav->sched);
-	if (sav->iv != NULL)
+		sav->sched = NULL;
+	}
+	if (sav->iv != NULL) {
 		KFREE(sav->iv);
-	if (sav->lft_c != NULL)
+		sav->iv = NULL;
+	}
+	if (sav->lft_c != NULL) {
 		KFREE(sav->lft_c);
-	if (sav->lft_h != NULL)
+		sav->lft_c = NULL;
+	}
+	if (sav->lft_h != NULL) {
 		KFREE(sav->lft_h);
-	if (sav->lft_s != NULL)
+		sav->lft_h = NULL;
+	}
+	if (sav->lft_s != NULL) {
 		KFREE(sav->lft_s);
+		sav->lft_s = NULL;
+	}
 
 	return error;
 }
@@ -5066,6 +5095,7 @@ key_setident(sah, m, mhp)
 	KMALLOC(sah->identd, struct sadb_ident *, iddstlen);
 	if (sah->identd == NULL) {
 		KFREE(sah->idents);
+		sah->idents = NULL;
 #ifdef IPSEC_DEBUG
 		printf("key_setident: No more memory.\n");
 #endif
