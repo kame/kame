@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.61 2002/10/05 18:33:25 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.62 2002/10/22 01:59:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -71,7 +71,7 @@ typedef u_int8_t mip6_careof_cookie_t[CAREOF_COOKIE_SIZE];
 
 /* Callout table for MIP6 structures */
 struct mip6_timeout {
-	LIST_ENTRY(mip6_timeout)	mto_entry;
+	TAILQ_ENTRY(mip6_timeout)	mto_entry;
 	time_t				mto_expire;
 	LIST_HEAD(, mip6_timeout_entry)	mto_timelist;
 };
@@ -207,6 +207,7 @@ struct mip6_bc {
 	void		      *mbc_dad;	     /* dad handler */
 #ifdef MIP6_CALLOUTTEST
 	struct mip6_timeout_entry *mbc_timeout;
+	struct mip6_timeout_entry *mbc_brr_timeout;
 #endif /* MIP6_CALLOUTTEST */
 };
 LIST_HEAD(mip6_bc_list, mip6_bc);

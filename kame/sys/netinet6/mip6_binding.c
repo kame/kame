@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.143 2002/10/21 06:16:10 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.144 2002/10/22 01:59:22 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -95,7 +95,7 @@ extern struct protosw mip6_tunnel_protosw;
 extern struct mip6_prefix_list mip6_prefix_list;
 
 struct mip6_bc_list mip6_bc_list;
-LIST_HEAD(, mip6_timeout) mip6_bc_timeout_list;
+TAILQ_HEAD(, mip6_timeout) mip6_bc_timeout_list;
 
 #ifndef MIP6_BC_HASH_SIZE
 #define MIP6_BC_HASH_SIZE 35			/* XXX */
@@ -139,7 +139,9 @@ static int mip6_bc_encapcheck __P((const struct mbuf *, int, int, void *));
 
 #ifdef MIP6_CALLOUTTEST
 static struct mip6_timeout_entry *mip6_timeoutentry_insert __P((time_t, caddr_t));
-static void mip6_bc_timeoutentry_remove __P((struct mip6_timeout_entry *));
+static int mip6_timeoutentry_insert_with_mtoe __P((time_t, struct mip6_timeout_entry *));
+static void mip6_timeoutentry_remove __P((struct mip6_timeout_entry *));
+static void mip6_timeoutentry_update __P((struct mip6_timeout_entry *, time_t));
 #endif /* MIP6_CALLOUTTEST */
 
 static int mip6_dad_start __P((struct mip6_bc *));
@@ -1266,6 +1268,10 @@ mip6_process_hrbu(bi)
 			/* sanity check for overflow */
 			if (mbc->mbc_expire < time_second)
 				mbc->mbc_expire = 0x7fffffff;
+#ifdef MIP6_CALLOUTTEST
+			mip6_timeoutentry_update(mbc->mbc_timeout, mbc->mbc_expire);
+			mip6_timeoutentry_update(mbc->mbc_brr_timeout, mbc->mbc_expire - mbc->mbc_lifetime / 4);
+#endif /* MIP6_CALLOUTTEST */
 			mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
 			/* modify encapsulation entry */
 			/* XXX */
@@ -1340,6 +1346,10 @@ mip6_process_hrbu(bi)
 				/* sanity check for overflow */
 				if (mbc->mbc_expire < time_second)
 					mbc->mbc_expire = 0x7fffffff;
+#ifdef MIP6_CALLOUTTEST
+				mip6_timeoutentry_update(mbc->mbc_timeout, mbc->mbc_expire);
+				mip6_timeoutentry_update(mbc->mbc_brr_timeout, mbc->mbc_expire - mbc->mbc_lifetime / 4);
+#endif /* MIP6_CALLOUTTEST */
 				mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
 				/* modify encapsulation entry */
 				/* XXX */
@@ -1407,6 +1417,10 @@ mip6_process_hrbu(bi)
 			if (mbc->mbc_expire < time_second)
 				mbc->mbc_expire = 0x7fffffff;
 			mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
+#ifdef MIP6_CALLOUTTEST
+			mip6_timeoutentry_update(mbc->mbc_timeout, mbc->mbc_expire);
+			/* mip6_timeoutentry_update(mbc->mbc_brr_timeout, mbc->mbc_expire - mbc->mbc_lifetime / 4); */
+#endif /* MIP6_CALLOUTTEST */
 
 			/* modify encapsulation entry */
 			if (mip6_tunnel_control(MIP6_TUNNEL_CHANGE,
@@ -2055,8 +2069,10 @@ mip6_bc_update(mbc, coa_sa, dst_sa, flags, seqno, lifetime)
 	/* sanity check for overflow */
 	if (mbc->mbc_expire < time_second)
 		mbc->mbc_expire = 0x7fffffff;
-#ifdef MIP6_CALLOUT_TEST
-#endif
+#ifdef MIP6_CALLOUTTEST
+	mip6_timeoutentry_update(mbc->mbc_timeout, mbc->mbc_expire);
+	mip6_timeoutentry_update(mbc->mbc_brr_timeout, mbc->mbc_expire - mbc->mbc_lifetime / 4);
+#endif /* MIP6_CALLOUTTEST */
 	mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
 
 	return (0);
@@ -2120,6 +2136,9 @@ mip6_bc_create(phaddr, pcoa, addr, flags, seqno, lifetime, ifp)
 	/* sanity check for overflow */
 	if (mbc->mbc_expire < time_second)
 		mbc->mbc_expire = 0x7fffffff;
+#ifdef MIP6_CALLOUTTEST
+	/* It isn't necessary to create timeout entry here because it will be done when inserting mbc to the list */
+#endif /* MIP6_CALLOUTTEST */
 	mbc->mbc_state = 0;
 	mbc->mbc_ifp = ifp;
 
@@ -2132,18 +2151,44 @@ mip6_timeoutentry_insert(expire, content)
 	time_t expire;
 	caddr_t content;
 {
-	struct mip6_timeout *mto, *newmto = NULL;
 	struct mip6_timeout_entry *mtoe = NULL;
+
+	MALLOC(mtoe, struct mip6_timeout_entry *,
+	       sizeof(struct mip6_timeout_entry), M_TEMP, M_NOWAIT);
+	if (!mtoe) {
+		mip6log((LOG_ERR,
+			 "%s:%d: memory allocation failed.\n",
+			 __FILE__, __LINE__));
+		return (NULL);
+	}
+
+	bzero(mtoe, sizeof(struct mip6_timeout_entry));
+	mtoe->mtoe_ptr = content;
+
+	if (mip6_timeoutentry_insert_with_mtoe(expire, mtoe)) {
+		FREE(mtoe, M_TEMP);
+		mtoe = NULL;
+	}
+
+	return (mtoe);
+}
+
+static int
+mip6_timeoutentry_insert_with_mtoe(expire, mtoe)
+	time_t expire;
+	struct mip6_timeout_entry *mtoe;
+{
+	struct mip6_timeout *mto, *newmto = NULL;
 
 /* XXX splxxx ?? */
 	/* Search appropriate positon to insert a timeout slot */
-	for (mto = LIST_FIRST(&mip6_bc_timeout_list); mto && LIST_NEXT(mto, mto_entry);
-	     mto = LIST_NEXT(mto, mto_entry)) {
+	for (mto = TAILQ_FIRST(&mip6_bc_timeout_list); mto;
+	     mto = TAILQ_NEXT(mto, mto_entry)) {
 		if (mto->mto_expire >= expire)
 			break;
 	}
 
-	/* Allocate a new timeout slot when a sutable slot is not found */
+	/* Allocate a new timeout slot when a suitable slot is not found */
 	if (mto == NULL || mto->mto_expire != expire) {
 		MALLOC(newmto, struct mip6_timeout *,
 		       sizeof(struct mip6_timeout), M_TEMP, M_NOWAIT);
@@ -2151,47 +2196,47 @@ mip6_timeoutentry_insert(expire, content)
 			mip6log((LOG_ERR,
 				 "%s:%d: memory allocation failed.\n",
 				 __FILE__, __LINE__));
-			return (NULL);
+			return (ENOMEM);
 		}
 		bzero(newmto, sizeof(struct mip6_timeout));
 		if (!mto) {
-			LIST_INSERT_HEAD(&mip6_bc_timeout_list, newmto, mto_entry);
+			TAILQ_INSERT_TAIL(&mip6_bc_timeout_list, 
+				newmto, mto_entry);
 		} else if (mto->mto_expire > expire) {
-			LIST_INSERT_BEFORE(mto, newmto, mto_entry);
-		} else {
-			LIST_INSERT_AFTER(mto, newmto, mto_entry);
+			TAILQ_INSERT_BEFORE(mto, newmto, mto_entry);
 		}
 		mto = newmto;
 	}
 
-	MALLOC(mtoe, struct mip6_timeout_entry *,
-	       sizeof(struct mip6_timeout_entry), M_TEMP, M_NOWAIT);
-	if (!mtoe) {
-		if (newmto)
-			FREE(newmto, M_TEMP);
-		mip6log((LOG_ERR,
-			 "%s:%d: memory allocation failed.\n",
-			 __FILE__, __LINE__));
-		return (NULL);
-	}
-	bzero(mtoe, sizeof(struct mip6_timeout_entry));
 	mtoe->mtoe_timeout = mto;
-	mtoe->mtoe_ptr = content;
 	LIST_INSERT_HEAD(&mto->mto_timelist, mtoe, mtoe_entry);
 
-	return (mtoe);
+	return (0);
 }
 
 static void
-mip6_bc_timeoutentry_remove(mtoe)
+mip6_timeoutentry_update(mtoe, newexpire)
+	struct mip6_timeout_entry *mtoe;
+	time_t newexpire;
+{
+	if (mtoe->mtoe_timeout->mto_expire == newexpire)
+		return;
+
+	mip6_timeoutentry_remove(mtoe);
+	mip6_timeoutentry_insert_with_mtoe(newexpire, mtoe);
+}
+
+static void
+mip6_timeoutentry_remove(mtoe)
 	struct mip6_timeout_entry *mtoe;
 {
 /* XXX splxxx ?? */
 	LIST_REMOVE(mtoe, mtoe_entry);
 	if (LIST_EMPTY(&mtoe->mtoe_timeout->mto_timelist)) {
-		LIST_REMOVE(mtoe->mtoe_timeout, mto_entry);
+		TAILQ_REMOVE(&mip6_bc_timeout_list, mtoe->mtoe_timeout, mto_entry);
 		FREE(mtoe->mtoe_timeout, M_TEMP);
 	}
+	/* Content of this timeout entry (mtoe_ptr) isn't cared in this function */
 	FREE(mtoe, M_TEMP);
 
 	mip6log((LOG_INFO, "%s:%d: Removed timeout entry.\n",
@@ -2215,7 +2260,7 @@ mip6_bc_list_insert(mbc_list, mbc)
 
 #ifdef MIP6_CALLOUTTEST
 	mbc->mbc_timeout = mip6_timeoutentry_insert(mbc->mbc_expire, (caddr_t)mbc); /* For BC expiration */
-	mip6_timeoutentry_insert(mbc->mbc_expire - mbc->mbc_lifetime / 4, (caddr_t)mbc); /* For BR */
+	mbc->mbc_brr_timeout = mip6_timeoutentry_insert(mbc->mbc_expire - mbc->mbc_lifetime / 4, (caddr_t)mbc); /* For BRR */
 #endif
 
 	if (mip6_bc_count == 0) {
@@ -2252,7 +2297,7 @@ mip6_bc_list_remove(mbc_list, mbc)
 	}
 #ifdef MIP6_CALLOUTTEST
 	if (mbc->mbc_timeout) {
-		mip6_bc_timeoutentry_remove(mbc->mbc_timeout);
+		mip6_timeoutentry_remove(mbc->mbc_timeout);
 	}
 #endif
 	LIST_REMOVE(mbc, mbc_entry);
@@ -2337,8 +2382,8 @@ mip6_bc_timeout(dummy)
 #endif
 
 #ifdef MIP6_CALLOUTTEST
-	for (mto = LIST_FIRST(&mip6_bc_timeout_list); mto; mto = mto_next) {
-		mto_next = LIST_NEXT(mto, mto_entry);
+	for (mto = TAILQ_FIRST(&mip6_bc_timeout_list); mto; mto = mto_next) {
+		mto_next = TAILQ_NEXT(mto, mto_entry);
 
 		if (mto->mto_expire > time_second)
 			break;
@@ -2346,11 +2391,12 @@ mip6_bc_timeout(dummy)
 			mtoe_next = LIST_NEXT(mtoe, mtoe_entry);
 			mbc = (struct mip6_bc *)mtoe->mtoe_ptr;
 			if (mbc->mbc_expire < time_second) {
-				mip6_bc_list_remove(&mip6_bc_list, (struct mip6_bc *)mtoe->mtoe_ptr);
-			} else if ((mbc->mbc_expire - time_second)
-			    < (mbc->mbc_lifetime / 4)) { /* XXX */
+				mip6_bc_list_remove(&mip6_bc_list, 
+					(struct mip6_bc *)mtoe->mtoe_ptr);
+			} else {
+				/* This entry shows BRR timeout */
 				mbc->mbc_state |= MIP6_BC_STATE_BR_WAITSENT;
-				mip6_bc_timeoutentry_remove(mtoe);
+				mip6_timeoutentry_remove(mtoe);
 			}
 		}
 	}
