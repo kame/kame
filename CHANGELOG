@@ -1,9 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2549 2004/02/19 18:02:09 itojun Exp $
+$KAME: CHANGELOG,v 1.2550 2004/02/23 04:04:40 itojun Exp $
 
 <200402>
 Fri Feb 20 03:00:51 JST 2004  itojun@iijlab.net
-	* kame/ss/netinet6/ipsec.c: implement ipcomp tunnel mode for IPv6.
+	* kame/sys/netinet6/ipsec.c: implement ipcomp tunnel mode (outbound)
+	  for IPv6.  inbound processing is not implemented yet.
 
 2004-02-17  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/netinet6/icmp6.c, ip6_input.c,
