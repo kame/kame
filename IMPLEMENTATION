@@ -2,7 +2,7 @@
 
 			KAME Project
 			http://www.kame.net/
-			$Date: 1999/09/08 13:32:08 $
+			$Date: 1999/09/20 08:44:34 $
 
 1. IPv6
 
@@ -508,7 +508,7 @@ different between them.  To summarize:
   AF_INET6.  It is enabled by default.  You can disable those two by runtime
   and kernel compile configuration.
   (you can't enable only one of them: they come together)
-- KAME/NetBSD supports both, for TCP only.  This is always enabled.
+- KAME/NetBSD supports both.  This is always enabled.
 
 The following sections will give you the details, and how you can
 configure the behavior.
@@ -626,12 +626,12 @@ If the following events happen, KAME/FreeBSD3x will behave like this:
 
 1.12.4 KAME/NetBSD
 
-On KAME/NetBSD, TCP stack is merged into one, but differently from
-KAME/FreeBSD3x.  It will use shared tcp4/6 code (from sys/netinet/tcp*).
-In this configuration, udp4/6 behaves just like in KAME/BSDI (see
-1.12.1 for details).  tcp4/6 supports IPv4 mapped address/special
-AF_INET6 wildcard bind and are enabled by default.  At this moment
-there is no way to disable it.
+KAME/NetBSD uses shared tcp4/6 code (from sys/netinet/tcp*) and shared
+udp4/6 code (from sys/netinet/udp*).  The implementation is made differently
+from KAME/FreeBSD3x.  KAME/NetBSD uses separate inpcb/in6pcb structures,
+while KAME/FreeBSD3x uses merged inpcb structure.
+Supports for IPv4 mapped address/special AF_INET6 wildcard bind are
+enabled by default.  At this moment there is no way to disable it.
 
 1.12.5 configuration and implementation
 
