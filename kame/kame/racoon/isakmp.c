@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.46 2000/01/18 05:00:48 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.47 2000/01/18 09:54:49 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -439,7 +439,7 @@ isakmp_main(msg, remote, local)
 			return -1;
 		}
 
-		if (isakmp_info_recv(iph1, msg, remote) < 0)
+		if (isakmp_info_recv(iph1, msg) < 0)
 			return -1;
 		break;
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.24 2000/01/14 21:41:43 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.25 2000/01/18 09:54:49 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -81,8 +81,8 @@
 #include "strnames.h"
 
 /* information exchange */
-static int isakmp_info_recv_n __P((struct ph1handle *, vchar_t *, struct sockaddr *));
-static int isakmp_info_recv_d __P((struct ph1handle *, vchar_t *, struct sockaddr *));
+static int isakmp_info_recv_n __P((struct ph1handle *, vchar_t *));
+static int isakmp_info_recv_d __P((struct ph1handle *, vchar_t *));
 
 static void purge_spi __P((int, u_int32_t *, size_t));
 
@@ -93,10 +93,9 @@ static void purge_spi __P((int, u_int32_t *, size_t));
  * receive Information
  */
 int
-isakmp_info_recv(iph1, msg0, from)
+isakmp_info_recv(iph1, msg0)
 	struct ph1handle *iph1;
 	vchar_t *msg0;
-	struct sockaddr *from;
 {
 	vchar_t *msg = NULL;
 	int error = -1;
@@ -135,7 +134,7 @@ isakmp_info_recv(iph1, msg0, from)
 			}
 			/*FALLTHRU*/
 		default:
-			plog(logp, LOCATION, from,
+			plog(logp, LOCATION, iph1->remote,
 				"ignore, the packet must be encrypted.\n");
 			goto end;
 		}
@@ -155,25 +154,23 @@ isakmp_info_recv(iph1, msg0, from)
 		
 	switch (np) {
 	case ISAKMP_NPTYPE_N:
-		if (isakmp_info_recv_n(iph1, msg, from) < 0)
+		if (isakmp_info_recv_n(iph1, msg) < 0)
 			goto end;
 		break;
 	case ISAKMP_NPTYPE_D:
-		if (isakmp_info_recv_d(iph1, msg, from) < 0)
+		if (isakmp_info_recv_d(iph1, msg) < 0)
 			goto end;
 		break;
 	case ISAKMP_NPTYPE_NONCE:
 		/* XXX to be 6.4.2 ike-01.txt */
 		/* XXX IV is to be synchronized. */
-		plog(logp, LOCATION,
-			from,
+		plog(logp, LOCATION, iph1->remote,
 			"ignore Acknowledged Informational\n");
 		break;
 	default:
 		/* don't send information, see isakmp_ident_r1() */
 		error = 0;
-		plog(logp, LOCATION,
-			from,
+		plog(logp, LOCATION, iph1->remote,
 			"ignore the packet, "
 			"received unexpecting payload type %d.\n",
 			gen->np);
@@ -669,10 +666,9 @@ err:
  * handling to receive Notification payload
  */
 static int
-isakmp_info_recv_n(iph1, msg, remote)
+isakmp_info_recv_n(iph1, msg)
 	struct ph1handle *iph1;
 	vchar_t *msg;
-	struct sockaddr *remote;
 {
 	struct isakmp_pl_n *n = NULL;
 	u_int type;
@@ -722,13 +718,14 @@ isakmp_info_recv_n(iph1, msg, remote)
 		/* XXX there is a potential of dos attack. */
 		if (msgid == 0) {
 			/* delete ph1 */
-			plog(logp, LOCATION, remote, "delete phase1 handle.\n");
+			plog(logp, LOCATION, iph1->remote,
+				"delete phase1 handle.\n");
 			remph1(iph1);
 			delph1(iph1);
 		} else {
 			iph2 = getph2bymsgid(iph1, msgid);
 			if (iph2 == NULL) {
-				plog(logp, LOCATION, remote,
+				plog(logp, LOCATION, iph1->remote,
 					"unknown notify message, "
 					"no phase2 handle found.\n");
 			} else {
@@ -744,12 +741,12 @@ isakmp_info_recv_n(iph1, msg, remote)
 
 	/* get spi and allocate */
 	if (ntohs(n->h.len) != sizeof(*n) + n->spi_size) {
-		plog(logp, LOCATION, remote,
+		plog(logp, LOCATION, iph1->remote,
 			"invalid spi_size in notification payload.\n");
 	}
 	spi = val2str((u_char *)(n + 1), n->spi_size);
 
-	plog(logp, LOCATION, remote,
+	plog(logp, LOCATION, iph1->remote,
 		"notification message %d:%s, "
 		"doi=%d proto_id=%d spi=%s(size=%d).\n",
 		type, s_isakmp_notify_msg(type),
@@ -837,10 +834,9 @@ purge_spi(proto, spi, n)
  * handling to receive Deletion payload
  */
 static int
-isakmp_info_recv_d(iph1, msg, remote)
+isakmp_info_recv_d(iph1, msg)
 	struct ph1handle *iph1;
 	vchar_t *msg;
-	struct sockaddr *remote;
 {
 	struct isakmp_pl_d *d;
 	u_int32_t *spi;
@@ -867,7 +863,7 @@ isakmp_info_recv_d(iph1, msg, remote)
 #if 0
 			isakmp_info_send_n1(iph1, ISAKMP_NTYPE_INVALID_PAYLOAD_TYPE, NULL);
 #endif
-			plog(logp, LOCATION, remote,
+			plog(logp, LOCATION, iph1->remote,
 				"received next payload type %d "
 				"in wrong place (must be the first payload).\n",
 				pap->type);
@@ -875,7 +871,7 @@ isakmp_info_recv_d(iph1, msg, remote)
 			return -1;
 		default:
 			/* don't send information, see isakmp_ident_r1() */
-			plog(logp, LOCATION, remote,
+			plog(logp, LOCATION, iph1->remote,
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pap->type);
@@ -892,7 +888,7 @@ isakmp_info_recv_d(iph1, msg, remote)
 
 		if (ntohl(d->doi) != IPSEC_DOI) {
 			YIPSDEBUG(DEBUG_DMISC,
-				plog(logp, LOCATION, remote,
+				plog(logp, LOCATION, iph1->remote,
 					"deletion message received, "
 					"doi=%d proto_id=%d unsupported DOI.\n",
 					ntohl(d->doi), d->proto_id));
@@ -900,7 +896,7 @@ isakmp_info_recv_d(iph1, msg, remote)
 		}
 		if (d->spi_size != sizeof(u_int32_t)) {
 			YIPSDEBUG(DEBUG_DMISC,
-				plog(logp, LOCATION, remote,
+				plog(logp, LOCATION, iph1->remote,
 					"deletion message received, "
 					"doi=%d proto_id=%d: strange spi "
 					"size %d.\n",
@@ -914,7 +910,7 @@ isakmp_info_recv_d(iph1, msg, remote)
 		num_spi = ntohs(d->num_spi);
 
 		if (tlen != num_spi * d->spi_size) {
-			plog(logp, LOCATION, remote,
+			plog(logp, LOCATION, iph1->remote,
 				"deletion payload with invalid length.\n");
 			vfree(pbuf);
 			return(-1);
