@@ -527,7 +527,7 @@ in6_addr_slistentry(struct in6_addr_slist *ias, char *heading)
 	KREAD(head.lh_first, &src, struct in6_addr_source);
 	while (1) {
 		printf("\t\t\t\t\tsource %s (ref=%d)\n",
-			inet6_n2a(&src.i6as_addr),
+			inet6_n2a(&src.i6as_addr.sin6_addr),
 			src.i6as_refcount);
 		if (src.i6as_list.le_next == NULL)
 			break;
