@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.681 2000/03/11 15:38:29 itojun Exp $
+$Id: CHANGELOG,v 1.682 2000/03/11 15:51:39 itojun Exp $
 
 <200003>
 Sun Mar 12 00:25:06 JST 2000  itojun@iijlab.net
@@ -10,9 +10,9 @@ Sun Mar 12 00:25:06 JST 2000  itojun@iijlab.net
 	  types to 0xf0 and upwards.
 
 Fri Mar 10 23:00:45 JST 2000  itojun@iijlab.net
-	* {bsdi3,bsdi4,netbsd}/sys/net/rtsock.c: fix problem in route_output,
-	  when rnh_lookup returned RNF_ROOT radix node.  This seems to be BSD
-	  problem, not KAME problem.  we'll try to check other platforms soon.
+	* {bsdi3,bsdi4,freebsd2,netbsd}/sys/net/rtsock.c: fix problem in
+	  route_output, when rnh_lookup returned RNF_ROOT radix node.
+	  This seems to be BSD problem, not KAME problem.
 	  (freebsd3 have already fixed this in a different manner)
 	  KAME PR: 217
 
