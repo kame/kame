@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.37 2000/08/30 11:18:33 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.38 2000/08/31 13:52:53 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -580,7 +580,7 @@ ident_i4recv(iph1, msg0)
 
 	YIPSDEBUG(DEBUG_MISC,
 		plog(logp, LOCATION, iph1->remote, "ID ");
-		hexdump((caddr_t)iph1->id_p, iph1->id_p->l));
+		PVDUMP(iph1->id_p));
 
 	iph1->status = PHASE1ST_MSG4RECEIVED;
 
@@ -1106,7 +1106,7 @@ ident_r3recv(iph1, msg0)
 
 	YIPSDEBUG(DEBUG_MISC,
 		plog(logp, LOCATION, iph1->remote, "ID ");
-		hexdump((caddr_t)iph1->id_p, iph1->id_p->l));
+		PVDUMP(iph1->id_p));
 
 	iph1->status = PHASE1ST_MSG3RECEIVED;
 
