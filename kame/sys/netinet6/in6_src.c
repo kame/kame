@@ -1,4 +1,4 @@
-/*	$KAME: in6_src.c,v 1.93 2001/12/19 14:30:34 jinmei Exp $	*/
+/*	$KAME: in6_src.c,v 1.94 2001/12/19 14:36:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -141,11 +141,6 @@ static int in6_selectif __P((struct sockaddr_in6 *, struct ip6_pktopts *,
 #endif
 
 static struct in6_addrpolicy *lookup_addrsel_policy __P((struct sockaddr_in6 *));
-
-#ifndef __FreeBSD__
-static int set_addrsel_policy __P((void *, size_t));
-static int get_addrsel_policy __P((void *, size_t *));
-#endif
 
 static void init_policy_queue __P((void));
 static int add_addrsel_policyent __P((struct in6_addrpolicy *));
@@ -1333,7 +1328,7 @@ in6_src_ioctl(cmd, data)
 		return(delete_addrsel_policyent(&ent0));
 	}
 
-	/* NOTREACHED */
+	return(0);		/* XXX: compromise compilers */
 }
 
 /*
