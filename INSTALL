@@ -1,21 +1,52 @@
 	Installation procedure - preparation of the tree
 	KAME project
-	$Id: INSTALL,v 1.19 2000/02/18 04:38:17 itojun Exp $
+	$Id: INSTALL,v 1.20 2000/04/03 09:14:00 itojun Exp $
 
 Let's call the entire file-tree under this directory "the KAME tree".
 
-This directory contains several information files and two
-directories. The "kame" directory contains files created by the KAME
-project, which are shareable among NetBSD, FreeBSD, and other
-operating systems.
+This directory contains several information files and two directories.
+The "kame" directory contains files created by the KAME project,
+which are shareable among NetBSD, FreeBSD, and other operating
+systems.  The other directory is for your target operating system.
+For example, if you are on NetBSD, the KAME tree looks like this:
 
-The other directory is for your target operating system. In most
-cases, sufficient files are provided and ready for IPv6. So, you don't
-have to apply any patches.
+kame --+-- INSTALL		(the document you are looking at)
+       +-- kame --+-- sys	(kernel source code shared among OSes)
+       |          +-- kame --+-- libinet6
+       |		     +-- ....
+       |			(userland source code shared among OSes)
+       |
+       +-- netbsd --+-- INSTALL	(NetBSD-specific installation document)
+		    +-- sys	(kernel source code specific to NetBSD)
+		    +-- lib --+-- libinet6
+		    |	      +-- ...
+		    +-- ...	(userland source code specific to NetBSD)
 
-However, due to license issues, some necessary files are not provided
-for some operating systems. In this case you have to complete the KAME
-tree by yourself (in the step 2).
+The KAME tree has no direct relationship with "/usr/src" tree.
+You do not need to care at all about /usr/src.  Please follow the
+following instructions as is.
+
+Except for bsdi[34], sufficient files are provided in the KAME tree to
+bulid complete set of IPv6/IPsec binaries.  You don't have to apply
+any patches.
+For bsdi[34], due to license restrictions, some necessary files are not
+provided (we are not allowed to redistribute the whole source code tree).
+In this case you have to complete the KAME tree by yourself.
+For example, for bsdi[34], we cannot ship entire "sys" tree under
+kame/bsdi3/sys.  "sys.diff" is included in the KAME kit instead.
+You will need to extract "sys" tree under kame/bsdi3/sys by following step
+2 in this document.
+
+kame --+-- INSTALL
+       +-- kame --+-- sys
+       |          +-- kame --+-- libinet6
+       |		     +-- ....
+       |
+       +-- bsdi3 --+-- INSTALL
+		   +-- sys.diff		<--- need to extract "sys" tree here
+		   +-- lib --+-- libinet6
+		   |	      +-- ...
+		   +-- ...
 
 NOTE: On some operating systems it is possible to perform "make obj"
 before building.  However, it is not recommended since it might cause
