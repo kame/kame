@@ -2635,7 +2635,7 @@ add_jp_entry(pim_nbr, holdtime, group, grp_msklen, source, src_msklen,
 
     if (bjpm != (build_jp_message_t *) NULL)
     {
-	if ((!inet6_equal(&bjpm->curr_group ,group)
+	if ((!inet6_equal(&bjpm->curr_group, group)
 	    || (bjpm->curr_group_msklen != grp_msklen)
 	    || (bjpm->holdtime != holdtime)))
 	{
@@ -2661,8 +2661,8 @@ add_jp_entry(pim_nbr, holdtime, group, grp_msklen, source, src_msklen,
     bjpm->curr_group = *group;
     bjpm->curr_group_msklen = grp_msklen;
 
-    if (inet6_equal(group,&sockaddr6_d )
-	&& (grp_msklen == STAR_STAR_RP_MSK6LEN))
+    if (inet6_equal(group, &sockaddr6_d) &&
+	(grp_msklen == STAR_STAR_RP_MSK6LEN))
 	rp_flag = TRUE;
     else
 	rp_flag = FALSE;
@@ -2838,7 +2838,17 @@ pack_jp6_message(pim_nbr)
     data_ptr += bjpm->prune_list_size;
     bjpm->jp_message_size = (data_ptr - bjpm->jp_message);
     bjpm->join_list_size = 0;
+    bjpm->join_addr_number = 0;
+#if 0				/* isn't this necessary? */
+    bjpm->rp_list_join_size = 0;
+    bjpm->rp_list_join_number = 0;
+#endif
     bjpm->prune_list_size = 0;
+    bjpm->prune_addr_number = 0;
+#if 0				/* isn't this necessary? */
+    bjpm->rp_list_prune_size = 0;
+    bjpm->rp_list_prune_number = 0;
+#endif
     (*bjpm->num_groups_ptr)++;
     bjpm->curr_group = sockaddr6_any;
     bjpm->curr_group_msklen = 0;
