@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2250 2002/10/16 15:08:45 jinmei Exp $
+$KAME: CHANGELOG,v 1.2251 2002/10/16 15:16:47 jinmei Exp $
 
 <200210>
 2002-10-17  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -8,6 +8,8 @@ $KAME: CHANGELOG,v 1.2250 2002/10/16 15:08:45 jinmei Exp $
 	to prefix management.  This should fix the problem that the direct
 	route to a prefix was removed when one of the addresses sharing the
 	prefix was removed.
+	(In response to a report from Thierry Legras
+	<Thierry.Legras@alcatel.fr>)
 
 Wed Oct 16 16:56:06 JST 2002	suz@crl.hitachi.co.jp
 	* kame/sys/netinet/in_msf.c: fixed a kernel crash caused by the 
