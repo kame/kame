@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.72 2001/01/26 06:18:33 sakane Exp $
+.\"	$KAME: racoon.conf.5,v 1.73 2001/01/26 10:16:26 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -231,7 +231,7 @@ The following are valid statements.
 .It Ic exchange_mode ( main \*(Ba aggressive \*(Ba base ) ;
 defines the exchange mode for phase 1 when racoon is the initiator.
 Also it means the acceptable exchange mode when racoon is responder.
-They can be lined with single comma as the separator.
+More than one mode can be specified by separating them with a comma.
 All of the modes are acceptable.
 The first exchange mode is what racoon uses when it is the initiator.
 .\"
