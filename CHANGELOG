@@ -1,7 +1,25 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1716 2001/06/10 10:19:14 keiichi Exp $
+$KAME: CHANGELOG,v 1.1717 2001/06/13 04:33:39 fujisawa Exp $
 
 <200106>
+2001-06-13  Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* sys/i386/conf/GENERIC.KAME
+	- Add NATPT-NAT and add some notes.
+
+	* kame/sys/netinet6/natpt_{defs.h,trans.c,tslot.c}
+	- Support FTP4 non-passive mode.
+
+	  You can connect IPv4 FTP client to IPv4 FTP server with
+	  passive mode or non passive mode.  This is a part of
+	  facility of NAT-PT.
+
+	  If you want to use this facility (IPv4 NAT), it is necessary
+	  to do uncomment of both following kernel options in
+	  sys/i386/conf/GENERIC.KAME and compile/link kernel.
+
+	    #options	NATPT
+	    #options	NATPT-NAT
+
 2001-06-10 Keiichi SHIMA <keiichi@iij.ad.jp>
 	Remove MIP6 code from KAME source tree. MIP6 code is now
 	under reconstruction. The last KAME snap that includes MIP6 is
