@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.213 2001/06/04 08:53:12 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.214 2001/06/18 07:59:28 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1697,8 +1697,12 @@ ni6_nametodns(name, namelen, old)
 			/* result does not fit into mbuf */
 			if (cp + i + 1 >= ep)
 				goto fail;
-			/* DNS label length restriction, RFC1035 page 8 */
-			if (i >= 64)
+			/*
+			 * DNS label length restriction, RFC1035 page 8.
+			 * "i == 0" case is included here to avoid returning
+			 * 0-length label on "foo..bar".
+			 */
+			if (i <= 0 || i >= 64)
 				goto fail;
 			*cp++ = i;
 			bcopy(p, cp, i);
