@@ -475,8 +475,8 @@ clnp_route(dst, ro, flags, first_hop, ifa)
 			RTFREE(ro->ro_rt);
 			ro->ro_rt = 0;
 		}
-		bzero((caddr_t) & ro->ro_dst, sizeof(ro->ro_dst));
 		siso = (struct sockaddr_iso *)&ro->ro_dst;
+		bzero(siso, sizeof(*siso));
 		bcopy((caddr_t) dst, (caddr_t) &siso->siso_addr,
 		      1 + (unsigned) dst->isoa_len);
 		siso->siso_family = AF_ISO;
@@ -518,8 +518,8 @@ clnp_route(dst, ro, flags, first_hop, ifa)
 
 	if (ro->ro_rt == 0) {
 		/* set up new route structure */
-		bzero((caddr_t) & ro->ro_dst, sizeof(ro->ro_dst));
 		siso = (struct sockaddr_iso *)&ro->ro_dst;
+		bzero(siso, sizeof(*siso));
 		siso->siso_len = sizeof(*siso);
 		siso->siso_family = AF_ISO;
 		Bcopy(dst, &siso->siso_addr, 1 + dst->isoa_len);
