@@ -1,7 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2468 2003/09/08 07:26:03 itojun Exp $
+$KAME: CHANGELOG,v 1.2469 2003/09/10 01:35:40 itojun Exp $
 
 <200309>
+Wed Sep 10 10:33:48 JST 2003  itojun@iijlab.net
+	* netbsd/sys/netinet/tcp_input.c: if inbound IPsec policy mismatches
+	  (like IPsec is required and plaintext packet comes in), respond to
+	  SYN with RST instead of silently discard the packet.  it will allow
+	  TCP client to react quickly against the connection failure due to
+	  IPsec policy mismatch.
+
 Mon Sep  8 16:25:00 JST 2003  itojun@iijlab.net
 	* setkey: support reading PF_KEY formatted files.
 	* netbsd/sys/miscfs/kernfs: support /kern/ipsec{sa,sp} for inspecting
