@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)inet.c	8.5 (Berkeley) 5/24/95";
 */
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/inet.c,v 1.37.2.4 2001/08/10 09:07:09 ru Exp $";
+  "$FreeBSD: src/usr.bin/netstat/inet.c,v 1.37.2.9 2001/12/17 20:03:59 jlemon Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -100,7 +100,7 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 	int istcp;
 	static int first = 1;
 	char *buf;
-	const char *mibvar;
+	const char *mibvar, *vchar;
 	struct tcpcb *tp = NULL;
 	struct inpcb *inp;
 	struct xinpgen *xig, *oxig;
@@ -215,8 +215,8 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 			if (Aflag)
 				printf("%-8.8s ", "Socket");
 			if (Lflag)
-				printf("%-14.14s %-22.22s\n",
-					"Listen", "Local Address");
+				printf("%-5.5s %-14.14s %-22.22s\n",
+					"Proto", "Listen", "Local Address");
 			else
 				printf((Aflag && !Wflag) ?
 		"%-5.5s %-6.6s %-6.6s  %-18.18s %-18.18s %s\n" :
@@ -226,38 +226,35 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 					"(state)");
 			first = 0;
 		}
+		if (Lflag && so->so_qlimit == 0)
+			continue;
 		if (Aflag) {
 			if (istcp)
 				printf("%8lx ", (u_long)inp->inp_ppcb);
 			else
 				printf("%8lx ", (u_long)so->so_pcb);
 		}
-		if (Lflag)
-			if (so->so_qlimit) {
-				char buf[15];
-
-				snprintf(buf, 15, "%d/%d/%d", so->so_qlen,
-					 so->so_incqlen, so->so_qlimit);
-				printf("%-14.14s ", buf);
-			} else
-				continue;
-		else {
-			const char *vchar;
-
 #ifdef INET6
-			if ((inp->inp_vflag & INP_IPV6) != 0)
-				vchar = ((inp->inp_vflag & INP_IPV4) != 0)
-					? "46" : "6 ";
-			else
-#endif
+		if ((inp->inp_vflag & INP_IPV6) != 0)
 			vchar = ((inp->inp_vflag & INP_IPV4) != 0)
-					? "4 " : "  ";
+				? "46" : "6 ";
+		else
+#endif
+		vchar = ((inp->inp_vflag & INP_IPV4) != 0)
+				? "4 " : "  ";
+		printf("%-3.3s%-2.2s ", name, vchar);
+		if (Lflag) {
+			char buf[15];
 
-			printf("%-3.3s%-2.2s %6ld %6ld  ", name, vchar,
+			snprintf(buf, 15, "%d/%d/%d", so->so_qlen,
+				 so->so_incqlen, so->so_qlimit);
+			printf("%-14.14s ", buf);
+		} else {
+			printf("%6ld %6ld  ",
 			       so->so_rcv.sb_cc,
 			       so->so_snd.sb_cc);
 		}
-		if (nflag) {
+		if (numeric_port) {
 			if (inp->inp_vflag & INP_IPV4) {
 				inetprint(&inp->inp_laddr, (int)inp->inp_lport,
 					  name, 1);
@@ -348,10 +345,13 @@ protopr(u_long proto,		/* for sysctl version we pass proto # */
 void
 tcp_stats(u_long off __unused, char *name, int af __unused)
 {
-	struct tcpstat tcpstat;
+	struct tcpstat tcpstat, zerostat;
 	size_t len = sizeof tcpstat;
 	
-	if (sysctlbyname("net.inet.tcp.stats", &tcpstat, &len, 0, 0) < 0) {
+	if (zflag)
+		memset(&zerostat, 0, len);
+	if (sysctlbyname("net.inet.tcp.stats", &tcpstat, &len,
+	    zflag ? &zerostat : NULL, zflag ? len : 0) < 0) {
 		warn("sysctl: net.inet.tcp.stats");
 		return;
 	}
@@ -433,6 +433,22 @@ tcp_stats(u_long off __unused, char *name, int af __unused)
 	p(tcps_keepdrops, "\t\t%lu connection%s dropped by keepalive\n");
 	p(tcps_predack, "\t%lu correct ACK header prediction%s\n");
 	p(tcps_preddat, "\t%lu correct data packet header prediction%s\n");
+
+	p(tcps_sc_added, "\t%lu syncache entries added\n"); 
+	p(tcps_sc_retransmitted, "\t\t%lu retransmitted\n"); 
+	p(tcps_sc_dupsyn, "\t\t%lu dupsyn\n"); 
+	p(tcps_sc_dropped, "\t\t%lu dropped\n"); 
+	p(tcps_sc_completed, "\t\t%lu completed\n"); 
+	p(tcps_sc_bucketoverflow, "\t\t%lu bucket overflow\n"); 
+	p(tcps_sc_cacheoverflow, "\t\t%lu cache overflow\n"); 
+	p(tcps_sc_reset, "\t\t%lu reset\n"); 
+	p(tcps_sc_stale, "\t\t%lu stale\n"); 
+	p(tcps_sc_aborted, "\t\t%lu aborted\n"); 
+	p(tcps_sc_badack, "\t\t%lu badack\n"); 
+	p(tcps_sc_unreach, "\t\t%lu unreach\n"); 
+	p(tcps_sc_zonefail, "\t\t%lu zone failures\n"); 
+	p(tcps_sc_sendcookie, "\t%lu cookies sent\n"); 
+	p(tcps_sc_recvcookie, "\t%lu cookies received\n"); 
 #undef p
 #undef p1a
 #undef p2
@@ -446,11 +462,14 @@ tcp_stats(u_long off __unused, char *name, int af __unused)
 void
 udp_stats(u_long off __unused, char *name, int af __unused)
 {
-	struct udpstat udpstat;
+	struct udpstat udpstat, zerostat;
 	size_t len = sizeof udpstat;
 	u_long delivered;
 
-	if (sysctlbyname("net.inet.udp.stats", &udpstat, &len, 0, 0) < 0) {
+	if (zflag)
+		memset(&zerostat, 0, len);
+	if (sysctlbyname("net.inet.udp.stats", &udpstat, &len,
+	    zflag ? &zerostat : NULL, zflag ? len : 0) < 0) {
 		warn("sysctl: net.inet.udp.stats");
 		return;
 	}
@@ -497,10 +516,13 @@ udp_stats(u_long off __unused, char *name, int af __unused)
 void
 ip_stats(u_long off __unused, char *name, int af __unused)
 {
-	struct ipstat ipstat;
+	struct ipstat ipstat, zerostat;
 	size_t len = sizeof ipstat;
 
-	if (sysctlbyname("net.inet.ip.stats", &ipstat, &len, 0, 0) < 0) {
+	if (zflag)
+		memset(&zerostat, 0, len);
+	if (sysctlbyname("net.inet.ip.stats", &ipstat, &len,
+	    zflag ? &zerostat : NULL, zflag ? len : 0) < 0) {
 		warn("sysctl: net.inet.ip.stats");
 		return;
 	}
@@ -577,7 +599,7 @@ static	char *icmpnames[] = {
 void
 icmp_stats(u_long off __unused, char *name, int af __unused)
 {
-	struct icmpstat icmpstat;
+	struct icmpstat icmpstat, zerostat;
 	int i, first;
 	int mib[4];		/* CTL_NET + PF_INET + IPPROTO_ICMP + req */
 	size_t len;
@@ -588,9 +610,13 @@ icmp_stats(u_long off __unused, char *name, int af __unused)
 	mib[3] = ICMPCTL_STATS;
 
 	len = sizeof icmpstat;
-	memset(&icmpstat, 0, len);
-	if (sysctl(mib, 4, &icmpstat, &len, (void *)0, 0) < 0)
-		return;		/* XXX should complain, but not traditional */
+	if (zflag)
+		memset(&zerostat, 0, len);
+	if (sysctl(mib, 4, &icmpstat, &len,
+	    zflag ? &zerostat : NULL, zflag ? len : 0) < 0) {
+		warn("sysctl: net.inet.icmp.stats");
+		return;
+	}
 
 	printf("%s:\n", name);
 
@@ -598,6 +624,8 @@ icmp_stats(u_long off __unused, char *name, int af __unused)
     printf(m, icmpstat.f, plural(icmpstat.f))
 #define	p1a(f, m) if (icmpstat.f || sflag <= 1) \
     printf(m, icmpstat.f)
+#define	p2(f, m) if (icmpstat.f || sflag <= 1) \
+    printf(m, icmpstat.f, plurales(icmpstat.f))
 
 	p(icps_error, "\t%lu call%s to icmp_error\n");
 	p(icps_oldicmp,
@@ -627,8 +655,11 @@ icmp_stats(u_long off __unused, char *name, int af __unused)
 				icmpstat.icps_inhist[i]);
 		}
 	p(icps_reflect, "\t%lu message response%s generated\n");
+	p2(icps_badaddr, "\t%lu invalid return address%s\n");
+	p(icps_badaddr, "\t%lu no return route%s\n");
 #undef p
 #undef p1a
+#undef p2
 	mib[3] = ICMPCTL_MASKREPL;
 	len = sizeof i;
 	if (sysctl(mib, 4, &i, &len, (void *)0, 0) < 0)
@@ -643,10 +674,13 @@ icmp_stats(u_long off __unused, char *name, int af __unused)
 void
 igmp_stats(u_long off __unused, char *name, int af __unused)
 {
-	struct igmpstat igmpstat;
+	struct igmpstat igmpstat, zerostat;
 	size_t len = sizeof igmpstat;
 
-	if (sysctlbyname("net.inet.igmp.stats", &igmpstat, &len, 0, 0) < 0) {
+	if (zflag)
+		memset(&zerostat, 0, len);
+	if (sysctlbyname("net.inet.igmp.stats", &igmpstat, &len,
+	    zflag ? &zerostat : NULL, zflag ? len : 0) < 0) {
 		warn("sysctl: net.inet.igmp.stats");
 		return;
 	}
@@ -700,7 +734,7 @@ inetprint(struct in_addr *in, int port, char *proto, int numeric_port)
 
 /*
  * Construct an Internet address representation.
- * If the nflag has been supplied, give
+ * If numeric_addr has been supplied, give
  * numeric value, otherwise try for symbolic name.
  */
 char *
@@ -712,7 +746,7 @@ inetname(struct in_addr *inp)
 	struct netent *np;
 
 	cp = 0;
-	if (!nflag && inp->s_addr != INADDR_ANY) {
+	if (!numeric_addr && inp->s_addr != INADDR_ANY) {
 		int net = inet_netof(*inp);
 		int lna = inet_lnaof(*inp);
 

@@ -42,7 +42,7 @@ char const copyright[] =
 static char sccsid[] = "@(#)main.c	8.4 (Berkeley) 3/1/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/main.c,v 1.34.2.7 2001/08/10 09:07:09 ru Exp $";
+  "$FreeBSD: src/usr.bin/netstat/main.c,v 1.34.2.12 2001/09/17 15:17:46 ru Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -312,15 +312,16 @@ int	bflag;		/* show i/f total bytes in/out */
 int	dflag;		/* show i/f dropped packets */
 int	gflag;		/* show group (multicast) routing or stats */
 int	iflag;		/* show interfaces */
-int	lflag;		/* show routing table with use and ref */
 int	Lflag;		/* show size of listen queues */
 int	mflag;		/* show memory stats */
-int	nflag;		/* show addresses numerically */
+int	numeric_addr;	/* show addresses numerically */
+int	numeric_port;	/* show ports numerically */
 static int pflag;	/* show given protocol */
 int	rflag;		/* show routing tables (or routing stats) */
 int	sflag;		/* show protocol statistics */
 int	tflag;		/* show i/f watchdog timers */
 int	Wflag;		/* wide display */
+int	zflag;		/* zero stats */
 
 int	interval;	/* repeat interval for i/f stats */
 
@@ -339,7 +340,7 @@ main(argc, argv)
 
 	af = AF_UNSPEC;
 
-	while ((ch = getopt(argc, argv, "Aabdf:gI:iLlM:mN:np:rstuWw:")) != -1)
+	while ((ch = getopt(argc, argv, "Aabdf:gI:iLlM:mN:np:rSstuWw:z")) != -1)
 		switch(ch) {
 		case 'A':
 			Aflag = 1;
@@ -382,6 +383,8 @@ main(argc, argv)
 			else if (strcmp(optarg, "iso") == 0)
 				af = AF_ISO;
 #endif
+			else if (strcmp(optarg, "link") == 0)
+				af = AF_LINK;
 			else {
 				errx(1, "%s: unknown address family", optarg);
 			}
@@ -401,9 +404,6 @@ main(argc, argv)
 		case 'i':
 			iflag = 1;
 			break;
-		case 'l':
-			lflag = 1;
-			break;
 		case 'L':
 			Lflag = 1;
 			break;
@@ -417,7 +417,7 @@ main(argc, argv)
 			nlistf = optarg;
 			break;
 		case 'n':
-			nflag = 1;
+			numeric_addr = numeric_port = 1;
 			break;
 		case 'p':
 			if ((tp = name2protox(optarg)) == NULL) {
@@ -433,6 +433,9 @@ main(argc, argv)
 		case 's':
 			++sflag;
 			break;
+		case 'S':
+			numeric_addr = 1;
+			break;
 		case 't':
 			tflag = 1;
 			break;
@@ -440,11 +443,15 @@ main(argc, argv)
 			af = AF_UNIX;
 			break;
 		case 'W':
+		case 'l':
 			Wflag = 1;
 			break;
 		case 'w':
 			interval = atoi(optarg);
 			iflag = 1;
+			break;
+		case 'z':
+			zflag = 1;
 			break;
 		case '?':
 		default:
@@ -730,11 +737,19 @@ name2protox(char *name)
 static void
 usage(void)
 {
-	(void)fprintf(stderr, "%s\n%s\n%s\n%s\n%s\n",
-"usage: netstat [-AaLlnW] [-f address_family] [-M core] [-N system]",
-"       netstat [-abdgilnrs] [-f address_family] [-M core] [-N system]",
-"       netstat [-bdn] [-I interface] [-M core] [-N system] [-w wait]",
+	(void)fprintf(stderr, "%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n%s\n",
+"usage: netstat [-AaLnSW] [-f protocol_family | -p protocol]\n"
+"               [-M core] [-N system]",
+"       netstat -i | -I interface [-abdnt] [-f address_family]\n"
+"               [-M core] [-N system]",
+"       netstat -w wait [-I interface] [-d] [-M core] [-N system]",
+"       netstat -s [-s] [-z] [-f protocol_family | -p protocol] [-M core]",
+"       netstat -i | -I interface -s [-f protocol_family | -p protocol]\n"
+"               [-M core] [-N system]",
 "       netstat -m [-M core] [-N system]",
-"       netstat [-M core] [-N system] [-p protocol]");
+"       netstat -r [-AanW] [-f address_family] [-M core] [-N system]",
+"       netstat -rs [-s] [-M core] [-N system]",
+"       netstat -g [-W] [-f address_family] [-M core] [-N system]",
+"       netstat -gs [-s] [-f address_family] [-M core] [-N system]");
 	exit(1);
 }

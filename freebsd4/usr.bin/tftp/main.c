@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)main.c	8.1 (Berkeley) 6/6/93";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/tftp/main.c,v 1.8 1999/08/28 01:06:24 peter Exp $";
+  "$FreeBSD: src/usr.bin/tftp/main.c,v 1.8.2.1 2002/01/07 09:01:53 guido Exp $";
 #endif /* not lint */
 
 /* Many bug fixes are from Jim Guyton <guyton@rand-unix> */
@@ -198,7 +198,7 @@ setpeer(argc, argv)
 		argc = margc;
 		argv = margv;
 	}
-	if (argc > 3) {
+	if ((argc < 2) || (argc > 3)) {
 		printf("usage: %s host-name [port]\n", argv[0]);
 		return;
 	}

@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)if.c	8.3 (Berkeley) 4/28/95";
 */
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/if.c,v 1.32.2.8 2001/08/10 09:07:08 ru Exp $";
+  "$FreeBSD: src/usr.bin/netstat/if.c,v 1.32.2.9 2001/09/17 14:35:46 ru Exp $";
 #endif /* not lint */
 
 #include <sys/types.h>
@@ -251,7 +251,6 @@ intpr(int interval, u_long ifnetaddr, void (*pfunc)(char *))
 			*cp = '\0';
 			ifaddraddr = (u_long)TAILQ_FIRST(&ifnet.if_addrhead);
 		}
-		printf("%-5.5s %-5lu ", name, ifnet.if_mtu);
 		ifaddrfound = ifaddraddr;
 
 		/*
@@ -269,6 +268,7 @@ intpr(int interval, u_long ifnetaddr, void (*pfunc)(char *))
 		drops = ifnet.if_snd.ifq_drops;
 
 		if (ifaddraddr == 0) {
+			printf("%-5.5s %-5lu ", name, ifnet.if_mtu);
 			printf("%-13.13s ", "none");
 			printf("%-15.15s ", "none");
 		} else {
@@ -280,6 +280,12 @@ intpr(int interval, u_long ifnetaddr, void (*pfunc)(char *))
 			cp = (CP(ifaddr.ifa.ifa_addr) - CP(ifaddraddr)) +
 				CP(&ifaddr);
 			sa = (struct sockaddr *)cp;
+			if (af != AF_UNSPEC && sa->sa_family != af) {
+				ifaddraddr =
+				    (u_long)TAILQ_NEXT(&ifaddr.ifa, ifa_link);
+				continue;
+			}
+			printf("%-5.5s %-5lu ", name, ifnet.if_mtu);
 			switch (sa->sa_family) {
 			case AF_UNSPEC:
 				printf("%-13.13s ", "none");

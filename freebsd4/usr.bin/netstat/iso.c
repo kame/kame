@@ -36,7 +36,7 @@ static char sccsid[] = "@(#)iso.c	8.1 (Berkeley) 6/6/93";
 #endif /* not lint */
 
 /*
- * $FreeBSD: src/usr.bin/netstat/iso.c,v 1.4.2.1 2001/08/10 09:07:09 ru Exp $
+ * $FreeBSD: src/usr.bin/netstat/iso.c,v 1.4.2.2 2001/09/17 14:53:17 ru Exp $
  */
 /*******************************************************************************
 	          Copyright IBM Corporation 1987
@@ -353,7 +353,8 @@ tp_inproto(u_long pcb)
 
 /*
  * Pretty print an iso address (net address + port).
- * If the nflag was specified, use numbers instead of names.
+ * If the numeric_addr or numeric_port were specified,
+ * use numbers instead of names.
  */
 
 #ifdef notdef
@@ -373,7 +374,7 @@ isonetname(struct iso_addr *iso)
 		sa.siso_addr = *iso;
 		sa.siso_tsuffix = 0;
 
-		if (!nflag )
+		if ( !numeric_addr )
 			ihe = iso_gethostentrybyaddr( &sa, 0, 0 );
 		if( ihe ) {
 			Ihe = *ihe;
@@ -408,7 +409,7 @@ isonetprint(struct iso_addr *iso, char *sufx, u_short sufxlen, int islocal)
 	if(Aflag)
 		islocal += 10 ;
 
-	if(!nflag) {
+	if(!numeric_addr) {
 		if( (cp -line)>10 ) {
 			cp = line+10;
 			bzero(cp, sizeof(line)-10);
@@ -417,7 +418,7 @@ isonetprint(struct iso_addr *iso, char *sufx, u_short sufxlen, int islocal)
 
 	*cp++ = '.';
 	if(sufxlen) {
-		if( !Aflag && !nflag && (ihe=iso_getserventrybytsel(sufx, sufxlen))) {
+		if( !Aflag && !numeric_port && (ihe=iso_getserventrybytsel(sufx, sufxlen))) {
 			Ihe = *ihe;
 			ihe = &Ihe;
 		}

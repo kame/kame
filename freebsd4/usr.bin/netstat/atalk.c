@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)atalk.c	1.1 (Whistle) 6/6/96";
 */
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/netstat/atalk.c,v 1.13.2.1 2001/08/10 09:07:08 ru Exp $";
+  "$FreeBSD: src/usr.bin/netstat/atalk.c,v 1.13.2.2 2001/09/17 14:53:17 ru Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -115,7 +115,7 @@ static	char mybuf[50];
 	case 0xff:
 		return "????";
 	default:
-		if (nflag) {
+		if (numeric_port) {
 			(void)snprintf(mybuf, sizeof(mybuf), "%d",
 			    (unsigned int)sat->sat_port);
 		} else {

@@ -36,7 +36,7 @@
 static char sccsid[] = "@(#)ttymsg.c	8.2 (Berkeley) 11/16/93";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/usr.bin/wall/ttymsg.c,v 1.4.2.1 2000/07/01 12:38:24 ps Exp $";
+  "$FreeBSD: src/usr.bin/wall/ttymsg.c,v 1.4.2.3 2001/10/18 08:08:17 des Exp $";
 #endif /* not lint */
 
 #include <sys/types.h>
@@ -51,6 +51,8 @@ static const char rcsid[] =
 #include <stdlib.h>
 #include <unistd.h>
 
+#include "ttymsg.h"
+
 /*
  * Display the contents of a uio structure on a terminal.  Used by wall(1),
  * syslogd(8), and talkd(8).  Forks and finishes in child if write would block,
@@ -58,27 +60,25 @@ static const char rcsid[] =
  * error; string is not newline-terminated.  Various "normal" errors are
  * ignored (exclusive-use, lack of permission, etc.).
  */
-char *
-ttymsg(iov, iovcnt, line, tmout)
-	struct iovec *iov;
-	int iovcnt;
-	char *line;
-	int tmout;
+const char *
+ttymsg(struct iovec *iov, int iovcnt, const char *line, int tmout)
 {
+	struct iovec localiov[7];
+	ssize_t left, wret;
+	int cnt, fd;
 	static char device[MAXNAMLEN] = _PATH_DEV;
 	static char errbuf[1024];
-	register int cnt, fd, left, wret;
-	struct iovec localiov[7];
-	int forked = 0;
+	int forked;
 
-	if (iovcnt > sizeof(localiov) / sizeof(localiov[0]))
+	forked = 0;
+	if (iovcnt > (int)(sizeof(localiov) / sizeof(localiov[0])))
 		return ("too many iov's (change code in wall/ttymsg.c)");
 
-	(void) strcpy(device + sizeof(_PATH_DEV) - 1, line);
+	strlcpy(device + sizeof(_PATH_DEV) - 1, line, sizeof(device));
 	if (strchr(device + sizeof(_PATH_DEV) - 1, '/')) {
 		/* A slash is an attempt to break security... */
-		(void) snprintf(errbuf, sizeof(errbuf), "'/' in \"%s\"",
-		    device);
+		(void) snprintf(errbuf, sizeof(errbuf),
+		    "Too many '/' in \"%s\"", device);
 		return (errbuf);
 	}
 
@@ -89,12 +89,12 @@ ttymsg(iov, iovcnt, line, tmout)
 	if ((fd = open(device, O_WRONLY|O_NONBLOCK, 0)) < 0) {
 		if (errno == EBUSY || errno == EACCES)
 			return (NULL);
-		(void) snprintf(errbuf, sizeof(errbuf),
-		    "%s: %s", device, strerror(errno));
+		(void) snprintf(errbuf, sizeof(errbuf), "%s: %s", device,
+		    strerror(errno));
 		return (errbuf);
 	}
 
-	for (cnt = left = 0; cnt < iovcnt; ++cnt)
+	for (cnt = 0, left = 0; cnt < iovcnt; ++cnt)
 		left += iov[cnt].iov_len;
 
 	for (;;) {
@@ -104,11 +104,11 @@ ttymsg(iov, iovcnt, line, tmout)
 		if (wret >= 0) {
 			left -= wret;
 			if (iov != localiov) {
-				bcopy(iov, localiov,
+				bcopy(iov, localiov, 
 				    iovcnt * sizeof(struct iovec));
 				iov = localiov;
 			}
-			for (cnt = 0; wret >= iov->iov_len; ++cnt) {
+			for (cnt = 0; (size_t)wret >= iov->iov_len; ++cnt) {
 				wret -= iov->iov_len;
 				++iov;
 				--iovcnt;
