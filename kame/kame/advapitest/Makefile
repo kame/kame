@@ -40,13 +40,13 @@ LDFLAGS = -L/usr/local/v6/lib
 all: $(TARGET)
 
 sender: sender.o common.o
-	$(CC) $(CFLAGS) -o $@  $? $(LDFLAGS) $(LIBS)
+	$(CC) $(CFLAGS) -o $@  sender.o common.o $(LDFLAGS) $(LIBS)
 
-receiver: receiver.o
-	$(CC) $(CFLAGS) -o $@  receiver.o $(LDFLAGS) $(LIBS)
+#receiver: receiver.o
+#	$(CC) $(CFLAGS) -o $@  receiver.o $(LDFLAGS) $(LIBS)
 
 accept: accept.o common.o
-	$(CC) $(CFLAGS) -o $@ $? $(LDFLAGS) $(LIBS)
+	$(CC) $(CFLAGS) -o $@ sender.o common.o $(LDFLAGS) $(LIBS)
 
 connect: connect.o
 	$(CC) $(CFLAGS) -o $@ connect.o $(LDFLAGS) $(LIBS)
