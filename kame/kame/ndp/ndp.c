@@ -418,7 +418,7 @@ get(host)
 	if (found_entry == 0) {
 		getnameinfo((struct sockaddr *)&sin, sin->sin6_len, host_buf,
 			    sizeof(host_buf), NULL ,0,
-			    NI_WITHSCOPEID | nflag ? NI_NUMERICHOST : 0);
+			    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
 		printf("%s (%s) -- no entry\n", host, host_buf);
 		exit(1);
 	}
@@ -474,8 +474,8 @@ delete:
 		printf("%s (%s) deleted\n", host,
 		       getnameinfo((struct sockaddr *)&sin, 
 				   sin->sin6_len, host_buf,
-				   sizeof(host_buf), NULL ,0,
-				   NI_WITHSCOPEID | nflag ? NI_NUMERICHOST : 0));
+				   sizeof(host_buf), NULL, 0,
+				   NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0)));
 	return 0;
 }
 
@@ -541,7 +541,7 @@ again:;
 
 		getnameinfo((struct sockaddr *)sin, sin->sin6_len, host_buf,
 			    sizeof(host_buf), NULL, 0,
-			    NI_WITHSCOPEID | nflag ? NI_NUMERICHOST : 0);
+			    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
 		gettimeofday(&time, 0);
 		if (tflag)
 			ts_print(&time);
@@ -825,7 +825,7 @@ rtrlist()
 		sin6.sin6_addr = DR.rtaddr;
 		getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len, host_buf,
 			    sizeof(host_buf), NULL, 0,
-			    NI_WITHSCOPEID | nflag ? NI_NUMERICHOST : 0);
+			    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
 		
 		printf("%s if=%s", host_buf,
 		       if_indextoname(DR.if_index, ifix_buf));
@@ -899,7 +899,7 @@ plist()
 				getnameinfo((struct sockaddr *)&sin6,
 					    sin6.sin6_len, host_buf,
 					    sizeof(host_buf), NULL, 0,
-					    NI_WITHSCOPEID | nflag ? NI_NUMERICHOST : 0);
+					    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
 
 				printf("    %s\n", host_buf);
 			}
