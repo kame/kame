@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.c,v 1.5 1999/10/21 06:12:04 sakane Exp $ */
+/* YIPS @(#)$Id: handler.c,v 1.6 1999/12/01 11:16:55 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1028,16 +1028,8 @@ isakmp_post_acquire(pst)
 	YIPSDEBUG(DEBUG_STAMP, plog(LOCATION, "begin.\n"));
 
     {
-	struct sockaddr *tmp;
-
-	/* get remote address */
-	if (pst->proxy != NULL)
-		tmp = pst->proxy;
-	else
-		tmp = pst->dst;
-
 	/* search appropreate configuration with masking port. */
-	cfp = isakmp_cfbypeer(tmp);
+	cfp = isakmp_cfbypeer(pst->dst);
 	if (cfp == NULL) {
 		plog(LOCATION,
 			"no configuration is found for peer address.\n");
@@ -1045,7 +1037,7 @@ isakmp_post_acquire(pst)
 	}
 
 	/* get remote complete address */
-	GET_NEWBUF(remote, struct sockaddr *, tmp, tmp->sa_len);
+	GET_NEWBUF(remote, struct sockaddr *, pst->dst, pst->dst->sa_len);
 	if (remote == NULL) {
 		plog(LOCATION,
 			"no buffer available.\n");

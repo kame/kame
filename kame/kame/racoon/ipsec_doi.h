@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.2 1999/09/01 05:39:36 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.3 1999/12/01 11:16:56 sakane Exp $ */
 
 /* conformed to RFC2407 */
 
@@ -185,6 +185,6 @@ extern int ipsecdoi_id2sockaddr __P((vchar_t *buf, struct sockaddr **addr,
 extern int ipsecdoi_get_id2 __P((struct isakmp_ph2 *));
 struct isakmp_cf_sa;
 extern vchar_t *ipsecdoi_make_mysa __P((struct isakmp_cf_sa *cf_sa,
-	u_int32_t spi, int proptype, struct sockaddr *proxy));
+	u_int32_t spi, int proptype, u_int8_t mode));
 
 #endif /* !defined(_IPSEC_DOI_H_) */

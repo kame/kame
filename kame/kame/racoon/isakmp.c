@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.6 1999/09/01 05:39:37 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.7 1999/12/01 11:16:56 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1371,7 +1371,7 @@ isakmp_quick_i2(msg, from, iph2)
 	if ((iph2->sa = ipsecdoi_make_mysa(&iph2->ph1->cfp->ph[1]->sa,
 				iph2->pst->spi,
 				iph2->pst->ipsec_proto,
-				iph2->pst->proxy)) == NULL) {
+				iph2->pst->mode)) == NULL) {
 		plog(LOCATION, "no matching proposal found.\n");
 		goto end;
 	}
@@ -1767,7 +1767,7 @@ isakmp_quick_r1(msg0, from, iph2)
 
 	/* create the entry for IPsec SA management */
     {
-	struct sockaddr *ipsec_src = NULL, *ipsec_dst = NULL, *proxy;
+	struct sockaddr *ipsec_src = NULL, *ipsec_dst = NULL;
 	u_int prefs, prefd, ul_proto;
 
 	/* make both src and dst address */
@@ -1805,19 +1805,13 @@ isakmp_quick_r1(msg0, from, iph2)
 		ul_proto = 0;
 	}
 
-	/* if mode == IPSECDOI_ATTR_ENC_MODE_TUNNEL */
-	if (iph2->isa->mode == IPSECDOI_ATTR_ENC_MODE_TUNNEL)
-		proxy = iph2->ph1->remote;
-	else
-		proxy = NULL;
-
 	/* allocate buffer for status management of pfkey message */
 	if ((iph2->pst = pfkey_new_pst(
 			iph2->isa->proto_id,
 			ipsec_src, prefs,
 			ipsec_dst, prefd,
 			ul_proto,
-			proxy,
+			iph2->isa->mode,
 			0)) == NULL)
 		return NULL;
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: kmpstat.c,v 1.2 1999/11/04 03:16:52 sakane Exp $ */
+/* YIPS @(#)$Id: kmpstat.c,v 1.3 1999/12/01 11:16:57 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -156,8 +156,6 @@ Usage()
 "    <saopts>: \"isakmp\" <family> <src> <dst>\n"
 "            : {\"esp\",\"ah\"} <family> <src/prefixlen/port> <dst/prefixlen/port>\n"
 "                              <ul_proto>\n"
-"            : {\"esp\",\"ah\"} <family> <src/prefixlen/port> <dst/prefixlen/port>\n"
-"                              <ul_proto> <family> <proxy>\n"
 "    <family>: \"inet\" or \"inet6\"\n"
 "    <ul_proto>: \"icmp\", \"tcp\", \"udp\" or \"any\"\n",
 	pname, pname, pname, pname, pname);
@@ -587,25 +585,6 @@ set_combuf_indexes(buf, ac, av)
 	/* checking the string of upper layer protocol */
 	if ((index_buf->ul_proto = set_combuf_ul_proto(*av)) == (u_int8_t)~0)
 		return -1;
-	av++;
-
-	/* proxy's family if not present. */
-	if (*av == NULL)
-		return 0;
-
-	/* checking the string of family */
-	if ((family = set_combuf_family(*av)) == ~0)
-		return -1;
-	av++;
-
-	/* proxy's address if not present. */
-	if (*av == NULL) {
-		printf("Invalid proxy address.\n");
-		return -1;
-	}
-
-	if (set_combuf_sockaddr(&index_buf->proxy, family, *av, NULL) < 0)
-		return -1;
 
 	return sizeof(struct admin_com_indexes);
 }
@@ -859,20 +838,20 @@ dump_internal(buf, tlen)
 
 /*
 short header;
- source address         destination address    proxy address
- 1234567890123456789012 1234567890123456789012 1234567890123456789012 
+ source address         destination address    
+ 1234567890123456789012 1234567890123456789012 
 */
 char *short_h1 = 
-"Source                 Destination            Proxy                 ";
+"Source                 Destination            ";
 
 /*
 long header;
- source address                                destination address                           proxy address
- 123456789012345678901234567890123456789012345 123456789012345678901234567890123456789012345 123456789012345678901234567890123456789012345
+ source address                                destination address                           
+ 123456789012345678901234567890123456789012345 123456789012345678901234567890123456789012345 
  0000:0000:0000:0000:0000:0000:0000:0000.00000 0000:0000:0000:0000:0000:0000:0000:0000.00000 0000:0000:0000:0000:0000:0000:0000:0000.00000
 */
 char *long_h1 = 
-"Source                                        Destination                                  Proxy                                         ";
+"Source                                        Destination                                  ";
 
 	printf("%s\n", long_format ? long_h1 : short_h1);
 
@@ -893,15 +872,6 @@ char *long_h1 =
 			: fixed_addr(_addr1_, _addr2_, 22));
 		addr++;
 		tlen -= addr->sa_len;
-
-		if (pst->proxy != NULL) {
-			GETNAMEINFO(addr, _addr1_, _addr2_);
-			printf("%s ", long_format ?
-				  fixed_addr(_addr1_, _addr2_, 45)
-				: fixed_addr(_addr1_, _addr2_, 22));
-			addr++;
-			tlen -= addr->sa_len;
-		}
 
 		printf("\n");
 	}

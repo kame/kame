@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.h,v 1.2 1999/09/01 05:39:40 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.h,v 1.3 1999/12/01 11:16:57 sakane Exp $ */
 
 #if !defined(_PFKEY_H_)
 #define _PFKEY_H_
@@ -60,7 +60,6 @@ struct pfkey_st {
 	u_int8_t enctype;		/* cipher type and transform id */
 	u_int8_t hashtype;		/* hash type */
 	u_int8_t mode;			/* tunnel or transport */
-	struct sockaddr *proxy;		/* proxy address */
 	u_int32_t ld_time;		/* life time for seconds */
 	u_int32_t ld_bytes;		/* life time for bytes */
 
@@ -99,7 +98,7 @@ extern void pfkey_set_acquire_time __P((u_int time));
 extern struct pfkey_st *pfkey_new_pst __P((u_int ipsec_proto,
 	struct sockaddr *src, u_int prefs,
 	struct sockaddr *dst, u_int prefd,
-	u_int ul_proto, struct sockaddr *proxy,
+	u_int ul_proto, u_int8_t mode,
 	u_int32_t seq));
 extern void pfkey_free_pst __P((struct pfkey_st *pst));
 extern vchar_t *pfkey_dump_pst __P((int *error));
@@ -108,7 +107,7 @@ extern void pfkey_flush_pst __P((void));
 extern struct pfkey_st *pfkey_get_pst __P((u_int ipsec_proto,
 	struct sockaddr *src, u_int prefs,
 	struct sockaddr *dst, u_int prefd,
-	u_int ul_proto, struct sockaddr *proxy,
+	u_int ul_proto, u_int8_t mode,
 	u_int32_t spi, int which_spi));
 
 extern struct pfkey_st *pfkey_get_pst_wrap __P((caddr_t *mhp,

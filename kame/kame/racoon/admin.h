@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: admin.h,v 1.1 1999/08/08 23:31:19 itojun Exp $ */
+/* YIPS @(#)$Id: admin.h,v 1.2 1999/12/01 11:16:55 sakane Exp $ */
 
 #if !defined(_ADMIN_H_)
 #define _ADMIN_H_
@@ -78,7 +78,6 @@ struct admin_com_indexes {
 	u_int8_t reserved;
 	struct sockaddr_storage src;
 	struct sockaddr_storage dst;
-	struct sockaddr_storage proxy;
 };
 
 extern int sock_admin;

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_inf.c,v 1.5 1999/10/21 06:12:05 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_inf.c,v 1.6 1999/12/01 11:16:56 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -181,7 +181,8 @@ int isakmp_info_send_d2_pf(msg)
 	struct isakmp_ph1 *iph1 = NULL;
 	caddr_t mhp[SADB_EXT_MAX + 1];
 	struct sadb_sa *sa;
-	struct sadb_address *src, *dst, *proxy;
+	struct sadb_address *src, *dst;
+	u_int8_t mode;
 	vchar_t *payload = NULL;
 	int tlen;
 	int error = 0;
@@ -207,12 +208,9 @@ int isakmp_info_send_d2_pf(msg)
 	sa = (struct sadb_sa *)mhp[SADB_EXT_SA];
 	src = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_SRC];
 	dst = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_DST];
-	proxy = (struct sadb_address *)mhp[SADB_EXT_ADDRESS_PROXY];
 
 	/* first try me -> other guy */
-	if (proxy)
-		iph1 = isakmp_ph1byaddr((struct sockaddr *)(proxy + 1));
-	else if (dst) {
+	if (dst) {
 		saddr = (struct sockaddr *)(dst + 1);
 		if (dst->sadb_address_prefixlen ==
 				_INALENBYAF(saddr->sa_family) << 3) {
@@ -221,9 +219,7 @@ int isakmp_info_send_d2_pf(msg)
 	}
 	/* other guy -> me */
 	if (!iph1) {
-		if (proxy)
-			iph1 = isakmp_ph1byaddr((struct sockaddr *)(proxy + 1));
-		else if (src) {
+		if (src) {
 			saddr = (struct sockaddr *)(src + 1);
 			if (src->sadb_address_prefixlen ==
 					_INALENBYAF(saddr->sa_family) << 3) {
@@ -280,14 +276,8 @@ int isakmp_info_send_d2_pst(pst)
 		plog(LOCATION, "src %s[%s]\n", _addr1_, _addr2_);
 		GETNAMEINFO(pst->dst, _addr1_, _addr2_);
 		plog(LOCATION, "dst %s[%s]\n", _addr1_, _addr2_);
-		if (pst->proxy) {
-			GETNAMEINFO(pst->proxy, _addr1_, _addr2_);
-			plog(LOCATION, "proxy %s[%s]\n", _addr1_, _addr2_);
-		}
 		);
-	if (pst->proxy)
-		iph1 = isakmp_ph1byaddr(pst->proxy);
-	else if (pst->dst) {
+	if (pst->dst) {
 		if (pst->prefd != _INALENBYAF(pst->dst->sa_family) << 3)
 			return EINVAL;
 		iph1 = isakmp_ph1byaddr(pst->dst);

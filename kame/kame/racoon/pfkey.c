@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.6 1999/11/04 00:34:17 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.7 1999/12/01 11:16:57 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -92,6 +92,7 @@ static u_int ipsecdoi2pfkey_ealg __P((u_int t_id));
 static u_int ipsecdoi2pfkey_calg __P((u_int t_id));
 static u_int ipsecdoi2pfkey_proto __P((u_int proto));
 static u_int ipsecdoi2pfkey_mode __P((u_int mode));
+static u_int pfkey2ipsecdoi_mode __P((u_int mode));
 static u_int keylen_aalg __P((u_int hashtype));
 static u_int keylen_ealg __P((u_int t_id));
 
@@ -582,7 +583,7 @@ struct pfkey_st *pfkey_new_pst(
 	struct sockaddr *src, u_int prefs,
 	struct sockaddr *dst, u_int prefd,
 	u_int ul_proto,
-	struct sockaddr *proxy,
+	u_int8_t mode,
 	u_int32_t seq)
 {
 	struct pfkey_st *pst;
@@ -602,7 +603,11 @@ struct pfkey_st *pfkey_new_pst(
 	pst->ul_proto = ul_proto;
 	pst->spi = 0;
 	pst->spi_p = 0;
+#if 1
+	pst->mode = mode;
+#else	/* old version by proxy */
 	pst->mode = IPSECDOI_ATTR_ENC_MODE_DEFAULT;
+#endif
 
 	/* get src address */
 	GET_NEWBUF(pst->src, struct sockaddr *, src, src->sa_len);
@@ -613,13 +618,6 @@ struct pfkey_st *pfkey_new_pst(
 	GET_NEWBUF(pst->dst, struct sockaddr *, dst, dst->sa_len);
 	if (pst->dst == NULL)
 		goto err;
-
-	/* get proxy address if present */
-	if (proxy != NULL) {
-		GET_NEWBUF(pst->proxy, struct sockaddr *, proxy, proxy->sa_len);
-		if (pst->proxy == NULL)
-			goto err;
-	}
 
 #if 0
 	/* get proposal if present */
@@ -657,7 +655,6 @@ pfkey_free_pst(pst)
 	if (pst->sc != NULL) sched_kill(&pst->sc);
 	if (pst->src != NULL) free(pst->src);
 	if (pst->dst != NULL) free(pst->dst);
-	if (pst->proxy != NULL) free(pst->proxy);
 
 #if notyet
 	if (pst->prop != NULL) free(pst->prop);
@@ -692,8 +689,6 @@ pfkey_dump_pst(error)
 		tlen += sizeof(*var);
 		tlen += var->src->sa_len;
 		tlen += var->dst->sa_len;
-		if (var->proxy != NULL)
-			tlen += var->proxy->sa_len;
 	}
 
 	if (tlen == 0) {
@@ -726,11 +721,6 @@ pfkey_dump_pst(error)
 		bufp += var->src->sa_len;
 		memcpy(bufp, var->dst, var->dst->sa_len);
 		bufp += var->dst->sa_len;
-
-		if (var->proxy != NULL) {
-			memcpy(bufp, var->proxy, var->proxy->sa_len);
-			bufp += var->proxy->sa_len;
-		}
 	}
 
 	return buf;
@@ -765,14 +755,14 @@ pfkey_flush_pst()
  */
 struct pfkey_st *
 pfkey_get_pst(ipsec_proto, src, prefs, dst, prefd,
-		ul_proto, proxy, spi, which_spi)
+		ul_proto, mode, spi, which_spi)
 	u_int ipsec_proto;
 	struct sockaddr *src;
 	u_int prefs;
 	struct sockaddr *dst;
 	u_int prefd;
 	u_int ul_proto;
-	struct sockaddr *proxy;
+	u_int8_t mode;
 	u_int32_t spi;
 	int which_spi;
 {
@@ -784,11 +774,11 @@ pfkey_get_pst(ipsec_proto, src, prefs, dst, prefd,
 		GETNAMEINFO(dst, _addr2_, p2);
 		plog(LOCATION,
 			"obj:%2u %8x src:%s/%u[%s] dst:%s/%u[%s] "
-			"ulp=%u proxy=%p\n",
+			"ulp=%u mode=%u\n",
 			ipsec_proto, spi,
 			_addr1_, prefs, p1,
 			_addr2_, prefd, p2,
-			ul_proto, proxy));
+			ul_proto, mode));
 
 #ifdef LIST_FOREACH
 	LIST_FOREACH(var, &pfkey_list, list)
@@ -803,16 +793,17 @@ pfkey_get_pst(ipsec_proto, src, prefs, dst, prefd,
 			GETNAMEINFO(var->dst, _addr2_, p2);
 			plog(LOCATION,
 				"lis:%2u %8x src:%s/%u[%s] dst:%s/%u[%s] "
-				"ulp=%u proxy=%p\n",
+				"ulp=%u mode=%u\n",
 				var->ipsec_proto, var->spi,
 				_addr1_, var->prefs, p1,
 				_addr2_, var->prefd, p2,
-				var->ul_proto, proxy));
+				var->ul_proto, var->mode));
 
 		if (var->ipsec_proto != ipsec_proto
 		 || var->ul_proto != ul_proto
 		 || var->prefs != prefs
-		 || var->prefd != prefd)
+		 || var->prefd != prefd
+		 || var->mode != mode)
 			continue;
 		if (spi != 0) {
 			if (which_spi == 0) {
@@ -825,9 +816,6 @@ pfkey_get_pst(ipsec_proto, src, prefs, dst, prefd,
 		}
 		if (saddrcmp(var->src, src)
 		 || saddrcmp(var->dst, dst))
-			continue;
-		if (proxy != NULL
-		 && saddrcmp_woport(var->proxy, proxy))
 			continue;
 
 		/* found */
@@ -842,8 +830,9 @@ pfkey_new_pst_wrap(mhp)
 	caddr_t *mhp;
 {
 	struct pfkey_st *pst;
-	struct sockaddr *proxy;
+	struct sadb_msg *msg;
 	u_int proto;
+	u_int mode;
 
 	/* sanity check */
 	if (mhp[0] == NULL
@@ -852,6 +841,7 @@ pfkey_new_pst_wrap(mhp)
 		plog(LOCATION, "invalid pointer was passed.\n");
 		return NULL;
 	}
+	msg = (struct sadb_msg *)mhp[0];
 
 	/* get upper layer proto */
 	if (PFKEY_ADDR_PROTO(mhp[SADB_EXT_ADDRESS_SRC])
@@ -862,17 +852,10 @@ pfkey_new_pst_wrap(mhp)
 	}
 
 	/* validity check */
-    {
-	struct sadb_msg *msg = (struct sadb_msg *)mhp[0];
 	if ((proto = pfkey2ipsecdoi_proto(msg->sadb_msg_satype)) == ~0)
 		return NULL;
-    }
-
-	/* get proxy address if present */
-	if (mhp[SADB_EXT_ADDRESS_PROXY] != NULL)
-		proxy = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_PROXY]);
-	else
-		proxy = NULL;
+	if ((mode = pfkey2ipsecdoi_mode(msg->sadb_msg_mode)) == ~0)
+		return NULL;
 
 	/* allocate buffer for status management of pfkey message */
 	if ((pst = pfkey_new_pst(
@@ -882,8 +865,8 @@ pfkey_new_pst_wrap(mhp)
 			PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_DST]),
 			PFKEY_ADDR_PREFIX(mhp[SADB_EXT_ADDRESS_DST]),
 			PFKEY_ADDR_PROTO(mhp[SADB_EXT_ADDRESS_SRC]),
-			proxy,
-			((struct sadb_msg *)mhp[0])->sadb_msg_seq)) == NULL)
+			mode,
+			msg->sadb_msg_seq)) == NULL)
 		return NULL;
 
 	return pst;
@@ -894,9 +877,9 @@ pfkey_new_pst_wrap(mhp)
  *	N_ADDRS
  *	R_ADDRS
  * how_spi:	the way to compare w/o SPI.
- *	WO_SPI	without spi and with proxy address if present.
- *	W_SPI	with spi and without proxy address.
- *	W_SPI_P	with spi_p and without proxy address.
+ *	WO_SPI	without spi.
+ *	W_SPI	with spi.
+ *	W_SPI_P	with spi_p.
  */
 struct pfkey_st *
 pfkey_get_pst_wrap(mhp, how_addrs, how_spi)
@@ -904,8 +887,9 @@ pfkey_get_pst_wrap(mhp, how_addrs, how_spi)
 	int how_addrs, how_spi;
 {
 	struct pfkey_st *pst;
-	struct sockaddr *src, *dst, *proxy;
-	u_int prefs, prefd, proto;
+	struct sadb_msg *msg;
+	struct sockaddr *src, *dst;
+	u_int prefs, prefd, proto, mode;
 	u_int32_t spi;
 	int which_spi;
 
@@ -916,6 +900,7 @@ pfkey_get_pst_wrap(mhp, how_addrs, how_spi)
 		plog(LOCATION, "invalid pointer was passed.\n");
 		return NULL;
 	}
+	msg = (struct sadb_msg *)mhp[0];
 
 	if (how_addrs == N_ADDRS) {
 		src = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_SRC]);
@@ -938,8 +923,6 @@ pfkey_get_pst_wrap(mhp, how_addrs, how_spi)
 		return NULL;
 	}
 
-	which_spi = 0;
-
 	switch (how_spi) {
 	case W_SPI:
 	case W_SPI_P:
@@ -956,40 +939,29 @@ pfkey_get_pst_wrap(mhp, how_addrs, how_spi)
 			return NULL;
 		}
 
-		/* mask proxy */
-		proxy = NULL;
-
-		if (how_spi == W_SPI_P)
-			which_spi = 1;
+		which_spi = (how_spi == W_SPI_P ? 1 : 0);
 		break;
 
 	case WO_SPI:
 	default:
 		/* compare without SPI */
 		spi = 0;
-
-		/* get proxy address if present */
-		if (mhp[SADB_EXT_ADDRESS_PROXY] != NULL)
-			proxy = PFKEY_ADDR_SADDR(mhp[SADB_EXT_ADDRESS_PROXY]);
-		else
-			proxy = NULL;
+		which_spi = 0;
 		break;
 	}
 
 	/* validity check */
-    {
-	struct sadb_msg *msg = (struct sadb_msg *)mhp[0];
 	if ((proto = pfkey2ipsecdoi_proto(msg->sadb_msg_satype)) == ~0)
 		return NULL;
-    }
+	if ((mode = pfkey2ipsecdoi_mode(msg->sadb_msg_mode)) == ~0)
+		return NULL;
 
 	if ((pst = pfkey_get_pst(
 			proto,
 			src, prefs,
 			dst, prefd,
 			PFKEY_ADDR_PROTO(mhp[SADB_EXT_ADDRESS_SRC]),
-			proxy,
-			spi, which_spi)) == NULL)
+			mode, spi, which_spi)) == NULL)
 		return NULL;
 
 	return pst;
@@ -1074,7 +1046,6 @@ pfkey_send_update_wrap(sock_pfkey, iph2)
 			&e_type, &e_keylen, &a_type, &a_keylen, &flags) < 0)
 		return -1;
 
-	/* I believe that proxy address is always equal to iph1->local. */
 	if (pfkey_send_update(
 			sock_pfkey,
 			satype,
@@ -1119,7 +1090,6 @@ pfkey_send_add_wrap(sock_pfkey, iph2)
 			&e_type, &e_keylen, &a_type, &a_keylen, &flags) < 0)
 		return -1;
 
-	/* I believe that proxy address is always equal to iph1->remote. */
 	if (pfkey_send_add(
 			sock_pfkey,
 			satype,
@@ -1278,6 +1248,27 @@ ipsecdoi2pfkey_proto(proto)
 	/*NOTREACHED*/
 }
 
+/* SADB_SATYPE -> IPSECDOI_PROTO */
+u_int
+pfkey2ipsecdoi_proto(satype)
+	u_int satype;
+{
+	switch (satype) {
+	case SADB_SATYPE_AH:
+		return IPSECDOI_PROTO_IPSEC_AH;
+	case SADB_SATYPE_ESP:
+		return IPSECDOI_PROTO_IPSEC_ESP;
+	case SADB_X_SATYPE_IPCOMP:
+		return IPSECDOI_PROTO_IPCOMP;
+
+	default:
+		plog(LOCATION,
+			"Invalid pfkey proto: %u\n", satype);
+		return ~0;
+	}
+	/*NOTREACHED*/
+}
+
 /* IPSECDOI_ATTR_ENC_MODE -> IPSEC_MODE */
 static u_int
 ipsecdoi2pfkey_mode(mode)
@@ -1295,22 +1286,18 @@ ipsecdoi2pfkey_mode(mode)
 	/*NOTREACHED*/
 }
 
-/* SADB_SATYPE -> IPSECDOI_PROTO */
-u_int
-pfkey2ipsecdoi_proto(satype)
-	u_int satype;
+/* IPSECDOI_ATTR_ENC_MODE -> IPSEC_MODE */
+static u_int
+pfkey2ipsecdoi_mode(mode)
+	u_int mode;
 {
-	switch (satype) {
-	case SADB_SATYPE_AH:
-		return IPSECDOI_PROTO_IPSEC_AH;
-	case SADB_SATYPE_ESP:
-		return IPSECDOI_PROTO_IPSEC_ESP;
-	case SADB_X_SATYPE_IPCOMP:
-		return IPSECDOI_PROTO_IPCOMP;
-
+	switch (mode) {
+	case IPSEC_MODE_TUNNEL:
+		return IPSECDOI_ATTR_ENC_MODE_TUNNEL;
+	case IPSEC_MODE_TRANSPORT:
+		return IPSECDOI_ATTR_ENC_MODE_TRNS;
 	default:
-		plog(LOCATION,
-			"Invalid pfkey proto: %u\n", satype);
+		plog(LOCATION, "Invalid mode type: %u\n", mode);
 		return ~0;
 	}
 	/*NOTREACHED*/
