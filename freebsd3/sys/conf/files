@@ -689,6 +689,8 @@ netinet/in_gif.c	optional gif inet
 netinet6/in6_gif.c	optional gif inet6
 netinet/ip_ecn.c	optional inet
 netinet/ip_ecn.c	optional inet6
+netinet/ip_encap.c	optional inet
+netinet/ip_encap.c	optional inet6
 netinet6/in6.c		optional inet6
 netinet6/in6_ifattach.c	optional inet6
 netinet6/in6_cksum.c	optional inet6

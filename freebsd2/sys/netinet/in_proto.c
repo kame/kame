@@ -97,6 +97,7 @@
 #endif
 #include <netinet/udp.h>
 #include <netinet/udp_var.h>
+#include <netinet/ip_encap.h>
 /*
  * TCP/IP protocol family: IP, ICMP, UDP, TCP.
  */
@@ -205,26 +206,25 @@ struct protosw inetsw[] = {
   0,		0,		0,		0,
 },
 #endif /* IPSEC */
-#if NGIF > 0
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR,
-  in_gif_input,	0,	 	0,		0,
-  0,	  
+  encap4_input,	0,	 	0,		rip_ctloutput,
+  rip_usrreq,	  
   0,		0,		0,		0,
 },
-# ifdef INET6
+#ifdef INET6
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
-  in_gif_input,	0,	 	0,		0,
-  0,	  
+  encap4_input,	0,	 	0,		rip_ctloutput,
+  rip_usrreq,	  
   0,		0,		0,		0,
 },
-# endif /* INET6 */
-#else /*NGIF*/
+#endif /* INET6 */
+#if 0
 { SOCK_RAW,	&inetdomain,	IPPROTO_IPIP,	PR_ATOMIC|PR_ADDR,
   ipip_input,	0,	 	0,		rip_ctloutput,
   rip_usrreq,
   0,		0,		0,		0,
 },
-#endif /* NGIF */
+#endif
 #ifdef IPDIVERT
 { SOCK_RAW,	&inetdomain,	IPPROTO_DIVERT,	PR_ATOMIC|PR_ADDR,
   div_input,	0,	 	0,		ip_ctloutput,
@@ -283,6 +283,22 @@ struct protosw inetsw[] = {
   rip_init,	0,		0,		0,
 },
 };
+
+#if NGIF > 0
+struct protosw in_gif_protosw =
+{ SOCK_RAW,	&inetdomain,	0/*IPPROTO_IPV[4]*/,	PR_ATOMIC|PR_ADDR,
+  in_gif_input, rip_output,	0,		rip_ctloutput,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  0,
+#else
+  rip_usrreq,
+#endif
+  0,            0,              0,              0,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  &rip_usrreqs
+#endif
+};
+#endif /*NGIF*/
 
 extern int in_inithead(void **, int);
 
