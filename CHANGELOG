@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1299 2000/09/23 22:34:59 itojun Exp $
+$KAME: CHANGELOG,v 1.1300 2000/09/25 23:02:16 itojun Exp $
 
 <200009>
+Tue Sep 26 07:56:17 JST 2000  itojun@iijlab.net
+	* libinet6/getnameinfo.c: off-by-1 error in string length valildation.
+	  From: Pavel Kankovsky <peak@argo.troja.mff.cuni.cz>
+	  NOTE: all users are suggested to upgrade their userland.
+
 Sun Sep 24 07:31:53 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/{libpcap,tcpdump}: use 2000/9/18 weekly snap
 	  from tcpdump.org.
