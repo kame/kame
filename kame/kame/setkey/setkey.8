@@ -1,4 +1,4 @@
-.\"	$KAME: setkey.8,v 1.62 2001/08/17 06:39:37 itojun Exp $
+.\"	$KAME: setkey.8,v 1.63 2001/08/17 06:54:04 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -110,10 +110,13 @@ socket.
 .Fl xx
 makes each timestamps unformatted.
 .El
-.Pp
-Operations have the following grammar.
-Note that lines starting with
-hashmarks ('#') are treated as comment lines.
+.Ss Configuration syntax
+With the
+.Fl c
+flag,
+.Nm
+accepts the following configuration sytnax.
+Lines starting with hash signs ('#') are treated as comment lines.
 .Bl -tag -width Ds
 .It Xo
 .Li add
@@ -158,6 +161,8 @@ Remove all SAD entries that match the specification.
 .Li ;
 .Xc
 Clear all SAD entries matched by the options.
+.Fl F
+on the command line achieves the same functionality.
 .\"
 .It Xo
 .Li dump
@@ -165,6 +170,8 @@ Clear all SAD entries matched by the options.
 .Li ;
 .Xc
 Dumps all SAD entries matched by the options.
+.Fl D
+on the command line achieves the same functionality.
 .\"
 .It Xo
 .Li spdadd
@@ -187,12 +194,16 @@ Delete an SPD entry.
 .Li ;
 .Xc
 Clear all SPD entries.
+.Fl FP
+on the command line achieves the same functionality.
 .\"
 .It Xo
 .Li spddump
 .Li ;
 .Xc
 Dumps all SPD entries.
+.Fl DP
+on the command line achieves the same functionality.
 .El
 .\"
 .Pp
@@ -235,19 +246,20 @@ AH based on rfc2402
 .It Li ah-old
 AH based on rfc1826
 .It Li ipcomp
-IPCOMP
+IPComp
 .El
 .\"
 .Pp
 .It Ar spi
-Security Parameter Index (SPI) for the SAD and the SPD.
-It must be decimal number or hexadecimal number
-You can not use the set of SPI values in the range 0 through 255.
-.Po
-with
-.Li 0x
-attached
-.Pc .
+Security Parameter Index
+.Pq SPI
+for the SAD and the SPD.
+.Ar spi
+must be a decimal number, or a hexadecimal number with
+.Dq Li 0x
+prefix.
+SPI values between 0 and 255 are reserved for future use by IANA
+and they cannot be used.
 .\"
 .Pp
 .It Ar extensions
@@ -302,59 +314,36 @@ Specify hard/soft life time duration of the SA.
 .It Ar algorithm
 .Bl -tag -width Fl -compact
 .It Fl E Ar ealgo Ar key
-Specify a encryption algorithm.
+Specify a encryption algorithm
+.Ar ealgo
+for ESP.
+.It Xo
+.Fl E Ar ealgo Ar key
+.Fl A Ar aalgo Ar key
+.Xc
+Specify a encryption algorithm
+.Ar ealgo ,
+as well as a payload authentication algorith
+.Ar aalgo ,
+for ESP.
 .It Fl A Ar aalgo Ar key
-Specify a authentication algorithm.
-If
-.Fl A
-is used with
-.Ar protocol Li esp ,
-it will be treated as ESP payload authentication algorithm.
+Specify an authentication algorithm for AH.
 .It Fl C Ar calgo Op Fl R
-Specify compression algorithm.
+Specify a compression algorithm for IPComp.
 If
 .Fl R
-is not specified with
-.Li ipcomp
-line, the kernel will use well-known IPComp CPI
+is specified,
+.Ar spi
+field value will be used as the IPComp CPI
 .Pq compression parameter index
-on IPComp CPI field on packets, and
-.Ar spi
-field will be ignored.
-.Ar spi
-field is only for kernel internal use in this case.
-.\"Therefore, compression protocol number will appear on IPComp CPI field.
+on wire as is.
 If
 .Fl R
-is used,
-the value on
+is not specified,
+the kernel will use well-known CPI on wire, and
 .Ar spi
-field will appear on IPComp CPI field on outgoing packets.
-.Ar spi
-field needs to be smaller than
-.Li 0x10000
-in this case.
+field will be used only as an index for kernel internal usage.
 .El
-.Pp
-.Ar protocol Li esp
-accepts
-.Fl E
-and
-.Fl A .
-.Ar protocol Li esp-old
-accepts
-.Fl E
-only.
-.Ar protocol Li ah
-and
-.Li ah-old
-accept
-.Fl A
-only.
-.Ar protocol Li ipcomp
-accepts
-.Fl C
-only.
 .Pp
 .Ar key
 must be double-quoted character string, or a series of hexadecimal digits
@@ -539,7 +528,7 @@ for detail.
 .El
 .Pp
 .\"
-.Sh ALGORITHMS
+.Ss Algorithms
 The following list shows the supported algorithms.
 .Sy protocol
 and
