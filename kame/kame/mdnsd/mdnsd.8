@@ -1,4 +1,4 @@
-.\"     $KAME: mdnsd.8,v 1.16 2000/05/31 17:03:48 itojun Exp $
+.\"     $KAME: mdnsd.8,v 1.17 2000/05/31 17:20:27 itojun Exp $
 .\"
 .\" Copyright (C) 2000 WIDE Project.
 .\" All rights reserved.
@@ -91,6 +91,7 @@ will listen to all the available address families.
 .It Fl D
 Enable trace messages for debugging.
 .It Fl f
+Run in foreground mode.
 Do not daemonize on invocation.
 .It Fl d Ar dnsserv
 .Nm
@@ -184,6 +185,7 @@ specify them on the command line.
 DNS queries will be sent to both multicast and unicast servers.
 .Bd -literal -offset indent
 # mdnsd -6 -i wi0 3ffe:501:4819::42
+# mdnsd -i wi0 0.0.0.0
 .Ed
 .\"
 .Sh SEE ALSO

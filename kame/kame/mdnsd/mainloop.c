@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.31 2000/05/31 16:41:52 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.32 2000/05/31 17:20:27 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -619,9 +619,13 @@ getans(buf, len, from)
 		goto fail;
 
 	hp->id = ohp->id;
-	hp->ra = 0;	/* recursion not supported */
+	hp->ra = 1;	/* XXX recursion?? */
 	if (dflag)
 		dnsdump("getans O", buf, len, (struct sockaddr *)&qc->from);
+	if (len > PACKETSZ) {
+		len = PACKETSZ;
+		hp->tc = 1;
+	}
 	if (sendto(qc->sd->s, buf, len, 0, (struct sockaddr *)&qc->from,
 	    qc->from.ss_len) != len) {
 		delqcache(qc);
@@ -678,6 +682,10 @@ relay(sd, buf, len, from)
 
 		ord = hp->rd;
 
+		if (len > PACKETSZ) {
+			len = PACKETSZ;
+			hp->tc = 1;
+		}
 		qc->id = hp->id = htons(dnsid);
 		dnsid = (dnsid + 1) % 0x10000;
 
@@ -786,6 +794,10 @@ serve(sd, buf, len, from)
 		if (dflag)
 			dnsdump("serve O", replybuf, p - replybuf, from);
 
+		if (p - replybuf > PACKETSZ) {
+			p = replybuf + PACKETSZ;
+			hp->tc = 1;
+		}
 		sendto(sd->s, replybuf, p - replybuf, 0, from, from->sa_len);
 
 		if (n) {
@@ -835,6 +847,10 @@ serve(sd, buf, len, from)
 		if (dflag)
 			dnsdump("serve D", replybuf, p - replybuf, from);
 
+		if (p - replybuf > PACKETSZ) {
+			p = replybuf + PACKETSZ;
+			hp->tc = 1;
+		}
 		sendto(sd->s, replybuf, p - replybuf, 0, from, from->sa_len);
 
 		if (n) {
