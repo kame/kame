@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.277 2002/05/27 22:17:30 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.278 2002/05/28 05:11:39 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2851,8 +2851,8 @@ in6_domifattach(ifp)
 	bzero(ext->in6_ifstat, sizeof(*ext->in6_ifstat));
 
 	ext->icmp6_ifstat =
-	    (struct icmp6_ifstat *)malloc(sizeof(struct icmp6_ifstat), M_IFADDR,
-	    M_WAITOK);
+	    (struct icmp6_ifstat *)malloc(sizeof(struct icmp6_ifstat),
+	    M_IFADDR, M_WAITOK);
 	bzero(ext->icmp6_ifstat, sizeof(*ext->icmp6_ifstat));
 
 	ext->nd_ifinfo = nd6_ifattach(ifp);
