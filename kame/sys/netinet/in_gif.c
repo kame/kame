@@ -264,6 +264,9 @@ in_gif_input(m, va_alist)
 			continue;
 		}
 
+		if ((sc->gif_if.if_flags & IFF_UP) == 0)
+			continue;
+
 		if ((sc->gif_if.if_flags & IFF_LINK0)
 		 && satosin(sc->gif_psrc)->sin_addr.s_addr == ip->ip_dst.s_addr
 		 && satosin(sc->gif_pdst)->sin_addr.s_addr == INADDR_ANY) {

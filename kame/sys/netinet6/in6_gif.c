@@ -229,6 +229,8 @@ int in6_gif_input(mp, offp, proto)
 		    sc->gif_pdst->sa_family != AF_INET6) {
 			continue;
 		}
+		if ((sc->gif_if.if_flags & IFF_UP) == 0)
+			continue;
 		if ((sc->gif_if.if_flags & IFF_LINK0) &&
 		    IN6_ARE_ADDR_EQUAL(&satoin6(sc->gif_psrc), &ip6->ip6_dst) &&
 		    IN6_IS_ADDR_UNSPECIFIED(&satoin6(sc->gif_pdst))) {
