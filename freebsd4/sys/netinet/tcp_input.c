@@ -2679,7 +2679,7 @@ tcp_mss(tp, offer)
 	{
 		mss =
 #ifdef INET6
-			(isipv6 ? nd_ifinfo[rt->rt_ifp->if_index].linkmtu :
+			(isipv6 ? IN6_LINKMTU(rt->rt_ifp) :
 #endif
 			 ifp->if_mtu
 #ifdef INET6
@@ -2822,7 +2822,7 @@ tcp_mssopt(tp)
 
 	return
 #ifdef INET6
-		isipv6 ? nd_ifinfo[rt->rt_ifp->if_index].linkmtu :
+		isipv6 ? IN6_LINKMTU(rt->rt_ifp) :
 #endif
 		rt->rt_ifp->if_mtu - min_protoh;
 }
