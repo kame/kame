@@ -1,4 +1,4 @@
-/*	$KAME: dccp6_usrreq.c,v 1.8 2004/12/16 08:26:28 itojun Exp $	*/
+/*	$KAME: dccp6_usrreq.c,v 1.9 2004/12/16 11:29:28 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -205,7 +205,11 @@ dccp6_bind(struct socket *so, struct mbuf *m, struct proc *td)
 #endif
 	
 #ifdef __FreeBSD__
+#if __FreeBSD_version >= 503000
+	error = in6_pcbbind(inp, nam, td->td_ucred);
+#else
 	error = in6_pcbbind(inp, nam, td);
+#endif
 #elif __NetBSD__
 	error = in6_pcbbind(in6p, m, td);
 #else
@@ -385,7 +389,11 @@ dccp6_listen(struct socket *so, struct proc *td)
 		inp->inp_vflag &= ~INP_IPV4;
 		if ((inp->inp_flags & IN6P_IPV6_V6ONLY) == 0)
 			inp->inp_vflag |= INP_IPV4;
+#if __FreeBSD_version >= 503000
+		error = in6_pcbbind(inp, (struct sockaddr *)0, td->td_ucred);
+#else
 		error = in6_pcbbind(inp, (struct sockaddr *)0, td);
+#endif
 #endif
 	}
 #else

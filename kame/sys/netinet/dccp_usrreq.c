@@ -1,4 +1,4 @@
-/*	$KAME: dccp_usrreq.c,v 1.38 2004/12/16 11:18:36 itojun Exp $	*/
+/*	$KAME: dccp_usrreq.c,v 1.39 2004/12/16 11:29:28 t-momose Exp $	*/
 
 /*
  * Copyright (c) 2003 Joacim Häggmark, Magnus Erixzon, Nils-Erik Mattsson 
@@ -1136,8 +1136,12 @@ dccp_ctlinput(int cmd, struct sockaddr *sa, void *vip)
 #endif
 
 	if (PRC_IS_REDIRECT(cmd)) {
+#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+		return;
+#else
 		ip = 0;
 		notify = in_rtchange;
+#endif
 	} else if (cmd == PRC_HOSTDEAD)
 		ip = 0;
 	else if ((unsigned)cmd >= PRC_NCMDS || inetctlerrmap[cmd] == 0)
@@ -1834,7 +1838,12 @@ again:
 #endif
 	{
 		DCCP_DEBUG((LOG_INFO, "Calling ip_output, mbuf->m_len = %u, mbuf->m_pkthdr.len = %u\n", m->m_len, m->m_pkthdr.len));
-		error = ip_output(m, inp->inp_options, &inp->inp_route,
+		error = ip_output(m, inp->inp_options,
+#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+				  NULL,
+#else				  
+				  &inp->inp_route,
+#endif
 		    (inp->inp_socket->so_options & SO_DONTROUTE), 0, inp);
 	}
 
@@ -2008,7 +2017,11 @@ dccp_attach(struct socket *so, int proto, struct proc *td)
 	error = soreserve(so, dccp_sendspace, dccp_recvspace);
 	if (error)
 		goto out;
+#if defined(__FreeBSD__) && __FreeBSD_version >= 503000
+	error = in_pcballoc(so, &dccpbinfo, "dccpinp");
+#else
 	error = in_pcballoc(so, &dccpbinfo, td);
+#endif
 	if (error)
 		goto out;
 
@@ -2169,7 +2182,11 @@ dccp_bind(struct socket *so, struct mbuf *m, struct proc *td)
 	}
 	INP_LOCK(inp);
 #ifdef __FreeBSD__
+#if __FreeBSD_version >= 503000
+	error = in_pcbbind(inp, nam, td->td_ucred);
+#else
 	error = in_pcbbind(inp, nam, td);
+#endif
 #elif defined(__NetBSD__)
 	error = in_pcbbind(inp, m, td);
 #else
@@ -2340,6 +2357,8 @@ dccp_doconnect(struct socket *so, struct mbuf *m, struct proc *td, int isipv6)
 			error = in6_pcbbind(in6p, (struct mbuf *)0, td);
 #elif defined(__OpenBSD__)
 			error = in6_pcbbind(inp, (struct mbuf *)0);
+#elif defined(__FreeBSD__) && __FreeBSD_version >= 503000
+			error = in6_pcbbind(inp, (struct sockaddr *)0, td->td_ucred);
 #else
 			error = in6_pcbbind(inp, (struct sockaddr *)0, td);
 #endif
@@ -2350,6 +2369,8 @@ dccp_doconnect(struct socket *so, struct mbuf *m, struct proc *td, int isipv6)
 			error = in_pcbbind(inp, (struct mbuf *)0, td);
 #elif defined(__OpenBSD__)
 			error = in_pcbbind(inp, (struct mbuf *)0);
+#elif defined(__FreeBSD__) && __FreeBSD_version >= 503000
+			error = in6_pcbbind(inp, (struct sockaddr *)0, td->td_ucred);
 #else
 			error = in_pcbbind(inp, (struct sockaddr *)0, td);
 #endif
@@ -2364,6 +2385,8 @@ dccp_doconnect(struct socket *so, struct mbuf *m, struct proc *td, int isipv6)
 		error = in6_pcbconnect(in6p, m);
 #elif defined(__OpenBSD__)
 		error = in6_pcbconnect(inp, m);
+#elif defined(__FreeBSD__) && __FreeBSD_version >= 503000
+		error = in6_pcbconnect(inp, nam, td->td_ucred);
 #else
 		error = in6_pcbconnect(inp, nam, td);
 #endif
@@ -2371,7 +2394,9 @@ dccp_doconnect(struct socket *so, struct mbuf *m, struct proc *td, int isipv6)
 	} else
 #endif
 #ifdef __FreeBSD__
-#if __FreeBSD_version >= 500000
+#if __FreeBSD_version >= 503000
+		error = in_pcbconnect(inp, nam, td->td_ucred);
+#elif __FreeBSD_version >= 500000
 		error = in_pcbconnect(inp, nam, td);
 #else
 	{
@@ -2701,7 +2726,11 @@ dccp_listen(struct socket *so, struct proc *td)
 	dp = (struct dccpcb *)inp->inp_ppcb;
 	if (inp->inp_lport == 0)
 #ifdef __FreeBSD__
+#if  __FreeBSD_version >= 503000
+		error = in_pcbbind(inp, (struct sockaddr *)0, td->td_ucred);
+#else
 		error = in_pcbbind(inp, (struct sockaddr *)0, td);
+#endif
 #elif defined(__NetBSD__)
 		error = in_pcbbind(inp, (struct mbuf *)0, td);
 #else

@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.154 2004/12/09 02:19:05 t-momose Exp $	*/
+/*	$KAME: in6_proto.c,v 1.155 2004/12/16 11:29:28 t-momose Exp $	*/
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
  * All rights reserved.
@@ -162,6 +162,7 @@
 #endif /* SCTP */
 
 #ifdef DCCP
+#include <netinet/in_pcb.h>
 #include <netinet/dccp.h>
 #include <netinet/dccp_var.h>
 #include <netinet6/dccp6_var.h>
