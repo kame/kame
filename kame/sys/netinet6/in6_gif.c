@@ -1,4 +1,4 @@
-/*	$KAME: in6_gif.c,v 1.64 2001/08/16 16:26:28 itojun Exp $	*/
+/*	$KAME: in6_gif.c,v 1.65 2001/08/22 10:56:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -52,6 +52,7 @@
 #endif
 #include <sys/queue.h>
 #include <sys/syslog.h>
+#include <sys/protosw.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <sys/malloc.h>
@@ -72,6 +73,7 @@
 #include <netinet6/in6_gif.h>
 #include <netinet6/in6_var.h>
 #endif
+#include <netinet6/ip6protosw.h>
 #include <netinet/ip_ecn.h>
 #ifdef __OpenBSD__
 #include <netinet/ip_ipsp.h>
@@ -554,4 +556,72 @@ in6_gif_detach(sc)
 	if (error == 0)
 		sc->encap_cookie6 = NULL;
 	return error;
+}
+
+void
+in6_gif_ctlinput(cmd, sa, d)
+	int cmd;
+	struct sockaddr *sa;
+	void *d;
+{
+	struct gif_softc *sc;
+	int i;
+	struct ip6ctlparam *ip6cp = NULL;
+	struct mbuf *m;
+	struct ip6_hdr *ip6;
+	int off;
+	void *cmdarg;
+	const struct sockaddr_in6 *sa6_src = NULL;
+	struct sockaddr_in6 *dst6;
+
+	if (sa->sa_family != AF_INET6 ||
+	    sa->sa_len != sizeof(struct sockaddr_in6))
+		return;
+
+	if ((unsigned)cmd >= PRC_NCMDS)
+		return;
+	if (cmd == PRC_HOSTDEAD)
+		d = NULL;
+	else if (inet6ctlerrmap[cmd] == 0)
+		return;
+
+	/* if the parameter is from icmp6, decode it. */
+	if (d != NULL) {
+		ip6cp = (struct ip6ctlparam *)d;
+		m = ip6cp->ip6c_m;
+		ip6 = ip6cp->ip6c_ip6;
+		off = ip6cp->ip6c_off;
+		cmdarg = ip6cp->ip6c_cmdarg;
+		sa6_src = ip6cp->ip6c_src;
+	} else {
+		m = NULL;
+		ip6 = NULL;
+		cmdarg = NULL;
+		sa6_src = &sa6_any;
+	}
+
+	if (!ip6)
+		return;
+
+	/*
+	 * for now we don't care which type it was, just flush the route cache.
+	 */
+	for (i = 0; i < ngif; i++) {
+		sc = gif_softc + i;
+
+		if ((sc->gif_if.if_flags & IFF_RUNNING) == 0)
+			continue;
+		if (sc->gif_psrc->sa_family != AF_INET6)
+			continue;
+		if (!sc->gif_ro6.ro_rt)
+			continue;
+
+		dst6 = (struct sockaddr_in6 *)&sc->gif_ro6.ro_dst;
+		/* XXX scope */
+		if (IN6_ARE_ADDR_EQUAL(&ip6->ip6_dst, &dst6->sin6_addr)) {
+			/* flush route cache */
+			RTFREE(sc->gif_ro6.ro_rt);
+			sc->gif_ro6.ro_rt = NULL;
+		}
+	}
 }

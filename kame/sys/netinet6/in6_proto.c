@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.105 2001/08/22 10:28:04 itojun Exp $	*/
+/*	$KAME: in6_proto.c,v 1.106 2001/08/22 10:56:05 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -452,7 +452,7 @@ struct ip6protosw inet6sw[] = {
 #if NGIF > 0
 struct ip6protosw in6_gif_protosw =
 { SOCK_RAW,	&inet6domain,	0/* IPPROTO_IPV[46] */,	PR_ATOMIC|PR_ADDR,
-  in6_gif_input, rip6_output,	0,		rip6_ctloutput,
+  in6_gif_input, rip6_output,	in6_gif_ctlinput, rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
 #else
