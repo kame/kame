@@ -1,4 +1,4 @@
- /*	$KAME: wru.c,v 1.9 2002/03/03 12:25:04 jinmei Exp $	*/
+ /*	$KAME: wru.c,v 1.10 2003/04/16 09:51:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -211,15 +211,9 @@ main(argc, argv)
 		char *newhost, *cp;
 
 		/* construct host%zone */
-		newhostlen = strlen(host) + strlen(zone) + 1;
-		if ((newhost = malloc(newhostlen)) == NULL)
-			err(1, "malloc(%d)", newhostlen);
-		cp = newhost;
-		strcpy(cp, host);
-		cp += strlen(host);
-		*cp++ = '%';
-		strcpy(cp, zone);
-
+		if (asprintf(&newhost, "%s%%%s", host, zone) < 0)
+			err(1, "malloc");
+			/* NOTREACHED */
 		host = newhost;
 	}
 
