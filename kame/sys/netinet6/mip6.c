@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.70 2001/10/26 08:48:55 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.71 2001/10/26 13:26:33 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -118,13 +118,15 @@ static int mip6_rthdr_create_withdst __P((struct ip6_rthdr **,
 					  struct in6_addr *));
 static int mip6_haddr_destopt_create __P((struct ip6_dest **,
 					  struct in6_addr *,
-					  struct in6_addr *,
 					  struct hif_softc *));
 static int mip6_bu_destopt_create __P((struct ip6_dest **,
 				       struct in6_addr *,
 				       struct in6_addr *,
 				       struct ip6_pktopts *,
 				       struct hif_softc *));
+static int mip6_babr_destopt_create __P((struct ip6_dest **,
+					 struct in6_addr *,
+					 struct ip6_pktopts *));
 static void mip6_find_offset __P((struct mip6_buffer *));
 static void mip6_align_destopt __P((struct mip6_buffer *));
 static caddr_t mip6_add_opt2dh __P((caddr_t, struct mip6_buffer *));
@@ -1220,7 +1222,6 @@ mip6_exthdr_create(m, opt, mip6opt)
 	struct in6_addr *dst;
 	struct hif_softc *sc;
 	struct mip6_bu *mbu;
-	struct mip6_bc *mbc;
 	int s, error = 0;
 
 	mip6opt->mip6po_rthdr = NULL;
@@ -1271,31 +1272,26 @@ mip6_exthdr_create(m, opt, mip6opt)
 	/*
 	 * insert BA/BR if pending BA/BR exist.
 	 */
-	/* XXX */
 #ifdef __NetBSD__
 	s = splsoftnet();
 #else
 	s = splnet();
 #endif
-	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, dst);
-	if (mbc) {
-		/*
-		 * there is a binding cache for the src host.  check
-		 * its status and insert BR/BA if needed.
-		 */
-		
+	error = mip6_babr_destopt_create(&mip6opt->mip6po_dest2, dst, opt);
+	if (error) {
+		mip6log((LOG_ERR,
+			 "%s:%d: BA/BR destopt insertion failed.\n",
+			 __FILE__, __LINE__));
+		splx(s);
+		goto bad;
 	}
-	splx(s);
 
 	/* following stuff is applied only for MN. */
-	if (!MIP6_IS_MN)
+	if (!MIP6_IS_MN) {
+		splx(s);
 		return (0);
+	}
 
-#ifdef __NetBSD__
-	s = splsoftnet();
-#else
-	s = splnet();
-#endif
 	/*
 	 * find hif that has a home address that is the same
 	 * to the source address of this sending ip packet
@@ -1338,8 +1334,7 @@ mip6_exthdr_create(m, opt, mip6opt)
 	}
 
 	/* create haddr destopt. */
-	error = mip6_haddr_destopt_create(&mip6opt->mip6po_haddr,
-					  src, dst, sc);
+	error = mip6_haddr_destopt_create(&mip6opt->mip6po_haddr, dst, sc);
 	if (error) {
 		mip6log((LOG_ERR,
 			 "%s:%d: homeaddress insertion failed.\n",
@@ -1417,7 +1412,7 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	struct mip6_buffer optbuf;
 	struct mip6_bu *mbu;
 	struct mip6_bu *hrmbu;
-	int size, error = 0;
+	int error = 0;
 
 	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, dst);
 	hrmbu = mip6_bu_list_find_home_registration(&sc->hif_bu_list, src);
@@ -1425,29 +1420,44 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 	    (hrmbu->mbu_reg_state == MIP6_BU_REG_STATE_REG)) {
 		struct mip6_prefix *mpfx;
 
+		/*
+		 * there is no binding update entry for this dst node.
+		 * but we have a home registration entry and we are
+		 * foreign now.  we should create a new binding update
+		 * entry for the dst node.
+		 */
+
 		mpfx = mip6_prefix_list_find_withhaddr(&mip6_prefix_list, src);
 		if (mpfx == NULL)
 			return (0);
 
-		/* create a BU entry. */
+		/* create a binding update entry. */
 		mbu = mip6_bu_create(dst, mpfx, &hrmbu->mbu_coa, 0, sc);
 		if (mbu == NULL) {
-			/* XXX return error? */
+			mip6log((LOG_ERR,
+				 "%s:%d: "
+				 "a mbu entry creation failed.\n",
+				 __FILE__, __LINE__));
 			return (0);
 		}
 		mbu->mbu_state = MIP6_BU_STATE_WAITSENT;
 		mip6_bu_list_insert(&sc->hif_bu_list, mbu);
 	}
 	if (mbu == NULL) {
-		/* this is the case that the home registration is on going. */
+		/*
+		 * this is the case that the home registration is on
+		 * going.  that is, (mbu == NULL) && (hrmbu != NULL)
+		 * but hrmbu->reg_state != STATE_REG.
+		 */
 		return (0);
 	}
 	if (mbu->mbu_dontsend) {
 		/*
-		 * mbu_dontsend is set when we receive ICMP6_PARAM_PROB
-		 * against the BU sent before.
-		 * this means the peer doesn't support MIP6 (at least
-		 * BU destopt).  we should not send BU to such a peer.
+		 * mbu_dontsend is set when we receive
+		 * ICMP6_PARAM_PROB against the binding update sent
+		 * before.  this means the peer doesn't support MIP6
+		 * (at least the BU destopt).  we should not send any
+		 * BU to such a peer.
 		 */
 		return (0);
 	}
@@ -1467,14 +1477,6 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		/* no need to send */
 		return (0);
 	}
-
-	/* XXX IPV6_MIMMTU is OK?? */
-	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
-	if (optbuf.buf == NULL) {
-		return (ENOMEM);
-	}
-	bzero(optbuf.buf, MIP6_BUFFER_SIZE);
-	optbuf.off = 2;
 
 	bzero(&bu_opt, sizeof(struct ip6_opt_binding_update));
 	bu_opt.ip6ou_type = IP6OPT_BINDING_UPDATE;
@@ -1520,11 +1522,36 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		mbu->mbu_seqno++;
 	}
 
+	/* XXX IPV6_MIMMTU is OK?? */
+	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
+	if (optbuf.buf == NULL) {
+		return (ENOMEM);
+	}
+	bzero(optbuf.buf, MIP6_BUFFER_SIZE);
+	optbuf.off = 2;
+
 	if (opts && opts->ip6po_dest2) {
-		/* destination option 2 already exists.  merge them. */
-		size = (opts->ip6po_dest2->ip6d_len + 1) << 3;
-		bcopy((caddr_t)opts->ip6po_dest2, (caddr_t)optbuf.buf, size);
-		optbuf.off = size;
+		int dstoptlen;
+		if (*pktopt_mip6dest2 == NULL) {
+			/*
+			 * destination option 2 already exists and
+			 * have not merged yet.  merge them.
+			 */
+			dstoptlen = (opts->ip6po_dest2->ip6d_len + 1) << 3;
+			bcopy((caddr_t)opts->ip6po_dest2, (caddr_t)optbuf.buf,
+			      dstoptlen);
+		} else {
+			/*
+			 * destination option 2 already exists and
+			 * have merged before.  copy them.
+			 */
+			dstoptlen =
+				((*pktopt_mip6dest2)->ip6d_len + 1) << 3;
+			bcopy((void *)(*pktopt_mip6dest2),
+			      (void *)optbuf.buf,
+			      dstoptlen);
+		}
+		optbuf.off = dstoptlen;
 		mip6_find_offset(&optbuf);
 	}
 
@@ -1541,9 +1568,8 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 }
 
 static int
-mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
+mip6_haddr_destopt_create(pktopt_haddr, dst, sc)
 	struct ip6_dest **pktopt_haddr;
-	struct in6_addr *src;
 	struct in6_addr *dst;
 	struct hif_softc *sc;
 {
@@ -1578,8 +1604,7 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 		return (ENOMEM);
 	}
 	bzero((caddr_t)optbuf.buf, MIP6_BUFFER_SIZE);
-	/* homeaddr alignment restriction == 0 */
-	optbuf.off = 0;
+	optbuf.off = 2;
 
 	/* Add Home Address option  */
 	mip6_add_opt2dh((u_int8_t *)&haddr_opt, &optbuf);
@@ -1590,20 +1615,89 @@ mip6_haddr_destopt_create(pktopt_haddr, src, dst, sc)
 	return (0);
 }
 
-void
-mip6_destopt_discard(mip6opt)
-	struct mip6_pktopts *mip6opt;
+int
+mip6_babr_destopt_create(pktopt_mip6dest2, dst, opts)
+	struct ip6_dest **pktopt_mip6dest2;
+	struct in6_addr *dst;
+	struct ip6_pktopts *opts;
 {
-	if (mip6opt->mip6po_rthdr)
-		free(mip6opt->mip6po_rthdr, M_TEMP);
+	struct ip6_opt_binding_request br_opt;
+	struct mip6_buffer optbuf;
+	struct mip6_bc *mbc;
+	int error = 0;
 
-	if (mip6opt->mip6po_haddr)
-		free(mip6opt->mip6po_haddr, M_TEMP);
+	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, dst);
+	if (mbc == NULL) {
+		/*
+		 * there is no binding cache for the dst node.
+		 * nothing to do.
+		 */
+		return (0);
+	}
+	if (((mbc->mbc_state & MIP6_BC_STATE_BR_WAITSENT) == 0) &&
+	    ((mbc->mbc_state & MIP6_BC_STATE_BA_WAITSENT) == 0)) {
+		/* check first to avoid needless bzero. */
+		return (0);
+	}
 
-	if (mip6opt->mip6po_dest2)
-		free(mip6opt->mip6po_dest2, M_TEMP);
+	/* XXX IPV6_MIMMTU is OK?? */
+	optbuf.buf = (u_int8_t *)malloc(MIP6_BUFFER_SIZE, M_TEMP, M_NOWAIT);
+	if (optbuf.buf == NULL) {
+		return (ENOMEM);
+	}
+	bzero(optbuf.buf, MIP6_BUFFER_SIZE);
+	optbuf.off = 0;
 
-	return;
+	if (opts && opts->ip6po_dest2) {
+		int dstoptlen;
+		if (*pktopt_mip6dest2 == NULL) {
+			/*
+			 * destination option 2 already exists and
+			 * have not merged yet.  merge them.
+			 */
+			dstoptlen = (opts->ip6po_dest2->ip6d_len + 1) << 3;
+			bcopy((caddr_t)opts->ip6po_dest2, (caddr_t)optbuf.buf,
+			      dstoptlen);
+		} else {
+			/*
+			 * destination option 2 already exists and
+			 * have merged before.  copy them.
+			 */
+			dstoptlen =
+				((*pktopt_mip6dest2)->ip6d_len + 1) << 3;
+			bcopy((void *)(*pktopt_mip6dest2),
+			      (void *)optbuf.buf,
+			      dstoptlen);
+		}
+		optbuf.off = dstoptlen;
+		mip6_find_offset(&optbuf);
+	}
+
+	if ((mbc->mbc_state & MIP6_BC_STATE_BR_WAITSENT) != 0) {
+		/* add a binding request. */
+		br_opt.ip6or_type = IP6OPT_BINDING_REQ;
+		br_opt.ip6or_len = IP6OPT_BRLEN;
+		mip6_add_opt2dh((u_int8_t *)&br_opt, &optbuf);
+		/*
+		 * hoping that the binding request will be sent with
+		 * no accident.
+		 */
+		mbc->mbc_state &= ~MIP6_BC_STATE_BR_WAITSENT;
+		/*
+		 * TODO: XXX
+		 * suboptions.
+		 */
+		/* alignment will be done at the end of this function. */
+	}
+	
+	if ((mbc->mbc_state & MIP6_BC_STATE_BA_WAITSENT) != 0) {
+		/* add a binding ack. */
+		/* XXX TODO */
+	}
+	
+	mip6_align_destopt(&optbuf);
+
+	return (error);
 }
 
 int
@@ -1622,7 +1716,7 @@ mip6_ba_destopt_create(pktopt_badest2, status, seqno, lifetime, refresh)
 		return (ENOMEM);
 	}
 	bzero(optbuf.buf, MIP6_BUFFER_SIZE);
-	optbuf.off = 3;
+	optbuf.off = 3; /* insert leading PAD1 first for optimization. */
 
 	bzero(&ba_opt, sizeof(struct ip6_opt_binding_ack));
 	ba_opt.ip6oa_type = IP6OPT_BINDING_ACK;
@@ -1644,6 +1738,21 @@ mip6_ba_destopt_create(pktopt_badest2, status, seqno, lifetime, refresh)
 	
 }
 
+void
+mip6_destopt_discard(mip6opt)
+	struct mip6_pktopts *mip6opt;
+{
+	if (mip6opt->mip6po_rthdr)
+		free(mip6opt->mip6po_rthdr, M_TEMP);
+
+	if (mip6opt->mip6po_haddr)
+		free(mip6opt->mip6po_haddr, M_TEMP);
+
+	if (mip6opt->mip6po_dest2)
+		free(mip6opt->mip6po_dest2, M_TEMP);
+
+	return;
+}
 
 /*
  ******************************************************************************
@@ -1747,7 +1856,8 @@ mip6_add_opt2dh(opt, dh)
 
 	/* Verify input */
 	pos = NULL;
-	if (opt == NULL || dh == NULL) return pos;
+	if (opt == NULL || dh == NULL)
+		return pos;
 	if (dh->off < 2) {
 		bzero((caddr_t)dh->buf, 2);
 		dh->off = 2;
@@ -1786,17 +1896,15 @@ mip6_add_opt2dh(opt, dh)
 			bzero((caddr_t)dh->buf + off, len);
 			bcopy((caddr_t)bu, (caddr_t)dh->buf + off, len);
 
+			/* store lifetime in a network byte order. */
 			bu = (struct ip6_opt_binding_update *)(dh->buf + off);
-#ifdef DIAGNOSTIC
-			if (sizeof(t) != sizeof(bu->ip6ou_lifetime))
-				panic("bcopy problem");
-#endif
 			t = htonl(*(u_int32_t *)bu->ip6ou_lifetime);
 			bcopy((caddr_t)&t, bu->ip6ou_lifetime, sizeof(t));
 			
 			pos = dh->buf + off;
 			dh->off += len;
 			break;
+
 		case IP6OPT_BINDING_ACK:
 			/* BA alignment requirement (4n + 3) */
 			rest = dh->off % 4;
@@ -1826,23 +1934,17 @@ mip6_add_opt2dh(opt, dh)
 			bzero((caddr_t)dh->buf + off, len);
 			bcopy((caddr_t)ba, (caddr_t)dh->buf + off, len);
 
+			/* store time values in a network byte order. */
 			ba = (struct ip6_opt_binding_ack *)(dh->buf + off);
-#ifdef DIAGNOSTIC
-			if (sizeof(t) != sizeof(ba->ip6oa_lifetime))
-				panic("bcopy problem");
-#endif
 			t = htonl(*(u_int32_t *)ba->ip6oa_lifetime);
 			bcopy((caddr_t)&t, ba->ip6oa_lifetime,sizeof(t));
-#ifdef DIAGNOSTIC
-			if (sizeof(t) != sizeof(ba->ip6oa_refresh))
-				panic("bcopy problem");
-#endif
 			t = htonl(*(u_int32_t *)ba->ip6oa_refresh);
 			bcopy((caddr_t)&t, ba->ip6oa_refresh, sizeof(t));
 			
 			pos = dh->buf + off;
 			dh->off += len;
 			break;
+
 		case IP6OPT_BINDING_REQ:
 			/* Copy option to DH */
 			len = IP6OPT_BRLEN + IP6OPT_MINLEN;
@@ -1855,6 +1957,7 @@ mip6_add_opt2dh(opt, dh)
 			pos = dh->buf + off;
 			dh->off += len;
 			break;
+
 		case IP6OPT_HOME_ADDRESS:
 			/* HA alignment requirement (8n + 6) */
 			rest = dh->off % 8;
