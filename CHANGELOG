@@ -1,7 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2556 2004/03/10 10:27:15 jinmei Exp $
+$KAME: CHANGELOG,v 1.2557 2004/03/10 12:03:48 jinmei Exp $
 
 <200403>
+2004-03-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_mroute.c (ip6_mdq): recovered scope zone
+	check.
+
 2004-03-10  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/icmp6.c (icmp6_reflect): made sure to provide
 	a valid sockaddr_in6 structure with regards to scope zone.  With
