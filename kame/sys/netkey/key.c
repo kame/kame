@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.217 2001/10/30 01:21:15 sakane Exp $	*/
+/*	$KAME: key.c,v 1.218 2001/10/30 08:41:54 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -42,10 +42,6 @@
 #include "opt_inet.h"
 #include "opt_ipsec.h"
 #endif
-
-/* this is for backward compatibility. we should not touch those. */
-#define ss_len		__ss_len
-#define ss_family	__ss_family
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -525,7 +521,6 @@ key_allocsp(spidx, dir)
 	u_int dir;
 {
 	struct secpolicy *sp;
-	struct timeval tv;
 	int s;
 
 	/* sanity check */
@@ -570,8 +565,11 @@ found:
 	KEY_CHKSPDIR(sp->spidx.dir, dir, "key_allocsp");
 
 	/* found a SPD entry */
-	microtime(&tv);
-	sp->lastused = tv.tv_sec;
+#ifdef __FreeBSD__
+	sp->lastused = time_second;
+#else
+	sp->lastused = time.tv_sec;
+#endif
 	sp->refcnt++;
 	splx(s);
 	KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
@@ -591,7 +589,6 @@ key_gettunnel(osrc, odst, isrc, idst)
 {
 	struct secpolicy *sp;
 	const int dir = IPSEC_DIR_INBOUND;
-	struct timeval tv;
 	int s;
 	struct ipsecrequest *r1, *r2, *p;
 	struct sockaddr *os, *od, *is, *id;
@@ -651,8 +648,11 @@ key_gettunnel(osrc, odst, isrc, idst)
 	return NULL;
 
 found:
-	microtime(&tv);
-	sp->lastused = tv.tv_sec;
+#ifdef __FreeBSD__
+	sp->lastused = time_second;
+#else
+	sp->lastused = time.tv_sec;
+#endif
 	sp->refcnt++;
 	splx(s);
 	return sp;
@@ -1753,7 +1753,6 @@ key_spdadd(so, m, mhp)
 	struct secpolicyindex spidx;
 	struct secpolicy *newsp;
 	struct ipsecrequest *req;
-	struct timeval tv;
 	int error;
 
 	/* sanity check */
@@ -1938,9 +1937,13 @@ key_spdadd(so, m, mhp)
 	}
 #endif
 
-	microtime(&tv);
-	newsp->created = tv.tv_sec;
-	newsp->lastused = tv.tv_sec;
+#ifdef __FreeBSD__
+	newsp->created = time_second;
+	newsp->lastused = time_second;
+#else
+	newsp->created = time.tv_sec;
+	newsp->lastused = time.tv_sec;
+#endif
 	newsp->lifetime = lft ? lft->sadb_lifetime_addtime : 0;
 	newsp->validtime = lft ? lft->sadb_lifetime_usetime : 0;
 
@@ -1953,8 +1956,11 @@ key_spdadd(so, m, mhp)
 		struct secspacq *spacq;
 		if ((spacq = key_getspacq(&spidx)) != NULL) {
 			/* reset counter in order to deletion by timehandler. */
-			microtime(&tv);
-			spacq->created = tv.tv_sec;
+#ifdef __FreeBSD__
+			spacq->created = time_second;
+#else
+			spacq->created = time.tv_sec;
+#endif
 			spacq->count = 0;
 		}
     	}
@@ -2860,11 +2866,11 @@ key_newsav(m, mhp, sah, errp)
 	}
 
 	/* reset created */
-    {
-	struct timeval tv;
-	microtime(&tv);
-	newsav->created = tv.tv_sec;
-    }
+#ifdef __FreeBSD__
+	newsav->created = time_second;
+#else
+	newsav->created = time.tv_sec;
+#endif
 
 	newsav->pid = mhp->msg->sadb_msg_pid;
 
@@ -3048,7 +3054,6 @@ key_setsaval(sav, m, mhp)
 	const struct esp_algorithm *algo;
 #endif
 	int error = 0;
-	struct timeval tv;
 
 	/* sanity check */
 	if (m == NULL || mhp == NULL || mhp->msg == NULL)
@@ -3203,8 +3208,11 @@ key_setsaval(sav, m, mhp)
 	}
 
 	/* reset created */
-	microtime(&tv);
-	sav->created = tv.tv_sec;
+#ifdef __FreeBSD__
+	sav->created = time_second;
+#else
+	sav->created = time.tv_sec;
+#endif
 
 	/* make lifetime for CURRENT */
 	KMALLOC(sav->lft_c, struct sadb_lifetime *,
@@ -3215,14 +3223,16 @@ key_setsaval(sav, m, mhp)
 		goto fail;
 	}
 
-	microtime(&tv);
-
 	sav->lft_c->sadb_lifetime_len =
 	    PFKEY_UNIT64(sizeof(struct sadb_lifetime));
 	sav->lft_c->sadb_lifetime_exttype = SADB_EXT_LIFETIME_CURRENT;
 	sav->lft_c->sadb_lifetime_allocations = 0;
 	sav->lft_c->sadb_lifetime_bytes = 0;
-	sav->lft_c->sadb_lifetime_addtime = tv.tv_sec;
+#ifdef __FreeBSD__
+	sav->lft_c->sadb_lifetime_addtime = time_second;
+#else
+	sav->lft_c->sadb_lifetime_addtime = time.tv_sec;
+#endif
 	sav->lft_c->sadb_lifetime_usetime = 0;
 
 	/* lifetimes for HARD and SOFT */
@@ -4334,7 +4344,11 @@ key_timehandler(void)
 	int s;
 	struct timeval tv;
 
+#ifdef __FreeBSD__
 	microtime(&tv);
+#else
+	tv = time;
+#endif
 
 #ifdef __NetBSD__
 	s = splsoftnet();	/*called from softclock()*/
@@ -4846,9 +4860,11 @@ key_getspi(so, m, mhp)
 		struct secacq *acq;
 		if ((acq = key_getacqbyseq(mhp->msg->sadb_msg_seq)) != NULL) {
 			/* reset counter in order to deletion by timehandler. */
-			struct timeval tv;
-			microtime(&tv);
-			acq->created = tv.tv_sec;
+#ifdef __FreeBSD__
+			acq->created = time_second;
+#else
+			acq->created = time.tv_sec;
+#endif
 			acq->count = 0;
 		}
     	}
@@ -6163,7 +6179,6 @@ key_newacq(saidx)
 	struct secasindex *saidx;
 {
 	struct secacq *newacq;
-	struct timeval tv;
 
 	/* get new entry */
 	KMALLOC(newacq, struct secacq *, sizeof(struct secacq));
@@ -6176,8 +6191,11 @@ key_newacq(saidx)
 	/* copy secindex */
 	bcopy(saidx, &newacq->saidx, sizeof(newacq->saidx));
 	newacq->seq = (acq_seq == ~0 ? 1 : ++acq_seq);
-	microtime(&tv);
-	newacq->created = tv.tv_sec;
+#ifdef __FreeBSD__
+	newacq->created = time_second;
+#else
+	newacq->created = time.tv_sec;
+#endif
 	newacq->count = 0;
 
 	return newacq;
@@ -6217,7 +6235,6 @@ key_newspacq(spidx)
 	struct secpolicyindex *spidx;
 {
 	struct secspacq *acq;
-	struct timeval tv;
 
 	/* get new entry */
 	KMALLOC(acq, struct secspacq *, sizeof(struct secspacq));
@@ -6229,8 +6246,11 @@ key_newspacq(spidx)
 
 	/* copy secindex */
 	bcopy(spidx, &acq->spidx, sizeof(acq->spidx));
-	microtime(&tv);
-	acq->created = tv.tv_sec;
+#ifdef __FreeBSD__
+	acq->created = time_second;
+#else
+	acq->created = time.tv_sec;
+#endif
 	acq->count = 1;
 
 	return acq;
@@ -6289,7 +6309,6 @@ key_acquire2(so, m, mhp)
 	if (mhp->msg->sadb_msg_len == PFKEY_UNIT64(sizeof(struct sadb_msg))) {
 #ifndef IPSEC_NONBLOCK_ACQUIRE
 		struct secacq *acq;
-		struct timeval tv;
 
 		/* check sequence number */
 		if (mhp->msg->sadb_msg_seq == 0) {
@@ -6308,8 +6327,11 @@ key_acquire2(so, m, mhp)
 		}
 
 		/* reset acq counter in order to deletion by timehander. */
-		microtime(&tv);
-		acq->created = tv.tv_sec;
+#ifdef __FreeBSD__
+		acq->created = time_second;
+#else
+		acq->created = time.tv_sec;
+#endif
 		acq->count = 0;
 #endif
 		m_freem(m);
@@ -7590,9 +7612,11 @@ key_sa_recordxfer(sav, m)
 	 *	<-----> SOFT
 	 */
     {
-	struct timeval tv;
-	microtime(&tv);
-	sav->lft_c->sadb_lifetime_usetime = tv.tv_sec;
+#ifdef __FreeBSD__
+	sav->lft_c->sadb_lifetime_usetime = time_second;
+#else
+	sav->lft_c->sadb_lifetime_usetime = time.tv_sec;
+#endif
 	/* XXX check for expires? */
     }
 
