@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.309 2003/09/08 01:47:06 itojun Exp $	*/
+/*	$KAME: key.c,v 1.310 2003/09/08 02:23:44 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3071,7 +3071,11 @@ key_setspi(sav, spi)
 {
 	int s;
 
+#ifdef __NetBSD__
 	s = splsoftnet();
+#else
+	s = splnet();
+#endif
 	sav->spi = spi;
 	if (sav->spihash.le_prev || sav->spihash.le_next)
 		LIST_REMOVE(sav, spihash);
