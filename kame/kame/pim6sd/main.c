@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.22 2001/08/09 08:46:57 suz Exp $	*/
+/*	$KAME: main.c,v 1.23 2001/08/20 08:25:38 itojun Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -392,7 +392,8 @@ usage:
 	    log(LOG_ERR, errno, "fopen(%s)", logfilename);
     setlinebuf(log_fp);
 
-    sprintf(versionstring, "pim6sd version %s", todaysversion);
+    snprintf(versionstring, sizeof(versionstring),
+	"pim6sd version %s", todaysversion);
 
     log(LOG_INFO, 0, "%s starting", versionstring);
 

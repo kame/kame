@@ -1,4 +1,4 @@
-/*	$KAME: inet6.c,v 1.11 2001/08/09 08:46:56 suz Exp $	*/
+/*	$KAME: inet6.c,v 1.12 2001/08/20 08:25:38 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -300,16 +300,16 @@ net6name(struct in6_addr * prefix, struct in6_addr * mask)
 {
     static char     ip6buf[8][INET6_ADDRSTRLEN + 4];	/* length of addr/plen */
     static int      ip6round = 0;
-    char           *cp;
+    char *cp;
+    char *ep;
 
     ip6round = (ip6round + 1) & 7;
     cp = ip6buf[ip6round];
+    ep = &ip6buf[ip6round][sizeof(ip6buf[ip6round])];
 
     inet_ntop(AF_INET6, prefix, cp, INET6_ADDRSTRLEN);
     cp += strlen(cp);
-    *cp = '/';
-    cp++;
-    sprintf(cp, "%d", inet6_mask2plen(mask));
+    snprintf(cp, ep - cp, "/%d", inet6_mask2plen(mask));
 
     return (ip6buf[ip6round]);
 }

@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.6 2000/12/10 08:29:14 itojun Exp $	*/
+/*	$KAME: main.c,v 1.7 2001/08/20 08:25:37 itojun Exp $	*/
 
 /*
  *  Copyright (c) 1998 by the University of Oregon.
@@ -334,7 +334,8 @@ main(argc, argv)
 #else
     (void)openlog("pim6dd", LOG_PID);
 #endif /* LOG_DAEMON */
-    sprintf(versionstring, "pim6dd version %s", todaysversion);
+    snprintf(versionstring, sizeof(versionstring),
+	"pim6dd version %s", todaysversion);
     
     log(LOG_DEBUG, 0, "%s starting", versionstring);
     

@@ -1,4 +1,4 @@
-/*	$KAME: debug.c,v 1.46 2001/08/14 02:03:10 suz Exp $	*/
+/*	$KAME: debug.c,v 1.47 2001/08/20 08:25:37 itojun Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -102,6 +102,8 @@ sec2str(total)
 	int days, hours, mins, secs;
 	int first = 1;
 	char *p = result;
+	char *ep = &result[sizeof(result)];
+	int n;
 
 	days = total / 3600 / 24;
 	hours = (total / 3600) % 24;
@@ -110,17 +112,26 @@ sec2str(total)
 
 	if (days) {
 		first = 0;
-		p += sprintf(p, "%dd", days);
+		n = snprintf(p, ep - p, "%dd", days);
+		if (n < 0 || n >= ep - p)
+			return "?";
+		p += n;
 	}
 	if (!first || hours) {
 		first = 0;
-		p += sprintf(p, "%dh", hours);
+		n = snprintf(p, ep - p, "%dh", hours);
+		if (n < 0 || n >= ep - p)
+			return "?";
+		p += n;
 	}
 	if (!first || mins) {
 		first = 0;
-		p += sprintf(p, "%dm", mins);
+		n = snprintf(p, ep - p, "%dm", mins);
+		if (n < 0 || n >= ep - p)
+			return "?";
+		p += n;
 	}
-	sprintf(p, "%ds", secs);
+	snprintf(p, ep - p, "%ds", secs);
 
 	return(result);
 }
@@ -145,7 +156,7 @@ packet_kind(proto, type, code)
 	case MLD6_LISTENER_DONE:
 	    return "Multicast Listener Done     ";
 	default:
-	    sprintf(unknown,
+	    snprintf(unknown, sizeof(unknown),
 		    "UNKNOWN ICMPv6 message: type = 0x%02x, code = 0x%02x ",
 		    type, code);
 	    return unknown;
@@ -173,11 +184,13 @@ packet_kind(proto, type, code)
 	case PIM_V2_CAND_RP_ADV:
 	    return "PIM v2 Cand. RP Adv.     ";
 	default:
-	    sprintf(unknown, "UNKNOWN PIM v2 message type =%3d ", type);
+	    snprintf(unknown, sizeof(unknown),
+		"UNKNOWN PIM v2 message type =%3d ", type);
 	    return unknown;
 	}
     default:
-	sprintf(unknown, "UNKNOWN proto =%3d               ", proto);
+	snprintf(unknown, sizeof(unknown),
+	    "UNKNOWN proto =%3d               ", proto);
 	return unknown;
     }
 }
@@ -604,7 +617,7 @@ va_dcl
 
     va_start(ap);
 #endif
-    vsprintf(&fmt[10], format, ap);
+    vsnprintf(&fmt[10], sizeof(fmt) - 10, format, ap);
     va_end(ap);
     msg = (severity == LOG_WARNING) ? fmt : &fmt[10];
 
