@@ -1,7 +1,10 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1818 2001/07/26 14:15:56 itojun Exp $
+$KAME: CHANGELOG,v 1.1819 2001/07/26 16:32:53 jinmei Exp $
 
 <200107>
+2001-07-27  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* bsdi4/sys/net/if_loop.c (looutput): set M_LOOP for IPv6 packets.
+
 Thu Jul 26 23:13:06 JST 2001  itojun@iijlab.net
 	* mdnsd: IPv4 support.  PR 370 from assar@assaris.sics.se
 
