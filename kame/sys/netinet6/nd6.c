@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.371 2005/03/14 08:53:36 suz Exp $	*/
+/*	$KAME: nd6.c,v 1.372 2005/03/14 09:45:39 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1896,7 +1896,7 @@ nd6_ioctl(cmd, data, ifp)
 		}
 
 		if (ND.basereachable != 0) {
-			int obasereachable = ND_IFINFO(ifp)->basereachable);
+			int obasereachable = ND_IFINFO(ifp)->basereachable;
 
 			ND_IFINFO(ifp)->basereachable = ND.basereachable;
 			if (ND.basereachable != obasereachable)
