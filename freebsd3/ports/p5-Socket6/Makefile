@@ -15,9 +15,9 @@ MASTER_SITE_SUBDIR=	Socket6
 MAINTAINER=	ume@FreeBSD.org
 
 USE_PERL5=	yes
-GNU_CONFIGURE=	yes
 
-post-configure:
-	@cd ${WRKSRC}; ${SETENV} ${MAKE_ENV} ${PERL5} Makefile.PL
+do-configure:
+	@cd ${WRKSRC}; ${SETENV} ${MAKE_ENV} ${PERL5} Makefile.PL \
+		CCFLAGS="${CFLAGS}"
 
 .include <bsd.port.mk>
