@@ -398,6 +398,10 @@ do {									\
  * Place the successor, if any, in n.
  */
 #define	MFREE(m, n) \
+	if (((m)->m_flags & M_PKTHDR) && (m)->m_pkthdr.aux) { \
+		m_freem((m)->m_pkthdr.aux); \
+		(m)->m_pkthdr.aux = NULL; \
+	} \
 	MBUFLOCK( \
 		mbstat.m_mtypes[(m)->m_type]--; \
 		if ((m)->m_flags & M_EXT) { \
