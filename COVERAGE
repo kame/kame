@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$KAME: COVERAGE,v 1.71 2000/08/23 03:39:30 itojun Exp $
+$KAME: COVERAGE,v 1.72 2000/08/29 09:12:01 itojun Exp $
 
 
 x: supported/integrated
@@ -166,6 +166,17 @@ scoped addr in /etc/resolv.conf "nameserver" line
 
 ipsec socket passing to ip{6,}_output
 		aux	aux	-	aux	aux	-	aux
+
+ipsec esp, encryption logic
+		new	new	old	old	old	old	old
+    new: unified cbc logic, old: per-algorithm cbc logic
+
+ipsec esp, blowfish-cbc codebase (before/after aug28, 2000)
+		new	new	old	old	old	old	old
+
+ipsec esp, rijndael/twofish support
+		(*1)	-	-	-	-	-	-
+    (*1) experimental, based on draft-ietf-ipsec-ciph-aes-cbc-00.txt
 
 router renumbering declaration does not use bitfield (sys/netinet/icmp6.h)
 		x	x	x	x	x	-	x
