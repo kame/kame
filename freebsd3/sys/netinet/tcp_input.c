@@ -870,7 +870,7 @@ findpcb:
 
 #ifdef INET6
 	/* save packet options if user wanted */
-	if (inp->in6p_flags & INP_CONTROLOPTS) {
+	if (isipv6 && (inp->in6p_flags & INP_CONTROLOPTS) != 0) {
 		struct ip6_recvpktopts opts6;
 
 		/*
