@@ -1,4 +1,4 @@
-/*	$KAME: ipcomp_output.c,v 1.20 2000/10/01 12:37:20 itojun Exp $	*/
+/*	$KAME: ipcomp_output.c,v 1.21 2000/10/23 04:19:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -43,14 +43,18 @@
 
 #include <sys/param.h>
 #include <sys/systm.h>
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #include <sys/malloc.h>
+#endif
 #include <sys/mbuf.h>
 #include <sys/domain.h>
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/errno.h>
 #include <sys/time.h>
+#if !(defined(__FreeBSD__) && __FreeBSD__ >= 4)
 #include <sys/kernel.h>
+#endif
 #include <sys/syslog.h>
 
 #include <net/if.h>
