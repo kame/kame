@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.37 2001/08/16 11:18:02 sakane Exp $	*/
+/*	$KAME: proposal.c,v 1.38 2001/09/12 07:19:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -253,10 +253,7 @@ cmpsaprop_alloc(ph1, pp1, pp2, side)
 		}
 
 		/* lifebyte */
-		if (pp1->lifebyte <= pp2->lifebyte) {
-			newpp->lifebyte = pp1->lifebyte;
-			break;
-		} else {
+		if (pp1->lifebyte > pp2->lifebyte) {
 			newpp->lifebyte = pp2->lifebyte;
 			newpp->claim |= IPSECDOI_ATTR_SA_LD_TYPE_SEC;
 			plog(LLV_NOTIFY, LOCATION, NULL,
@@ -264,6 +261,7 @@ cmpsaprop_alloc(ph1, pp1, pp2, side)
 				"my:%d peer:%d\n",
 				pp2->lifebyte, pp1->lifebyte);
 		}
+		newpp->lifebyte = pp1->lifebyte;
 
     		goto prop_pfs_check;
 		break;
