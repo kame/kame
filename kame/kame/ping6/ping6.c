@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.133 2001/07/24 06:04:25 itojun Exp $	*/
+/*	$KAME: ping6.c,v 1.134 2001/07/24 14:26:41 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -892,41 +892,43 @@ main(argc, argv)
 
 	if (!(options & F_SRCADDR)) {
 		/*
-		 * source selection
+		 * get the source address. XXX since we revoked the root
+		 * privilege, we cannot use a raw socket for this.
 		 */
 		int dummy, len = sizeof(src);
 
-		if ((dummy = socket(AF_INET6, SOCK_RAW, IPPROTO_ICMPV6)) < 0)
-			err(1, "raw socket");
+		if ((dummy = socket(AF_INET6, SOCK_DGRAM, 0)) < 0)
+			err(1, "UDP socket");
 
 		src.sin6_family = AF_INET6;
 		src.sin6_addr = dst.sin6_addr;
+		src.sin6_port = ntohs(DUMMY_PORT);
 		src.sin6_scope_id = dst.sin6_scope_id;
 
 #ifdef USE_RFC2292BIS
 		if (pktinfo &&
 		    setsockopt(dummy, IPPROTO_IPV6, IPV6_PKTINFO,
 		    (void *)pktinfo, sizeof(*pktinfo)))
-			err(1, "dummy setsockopt(IPV6_PKTINFO)");
+			err(1, "UDP setsockopt(IPV6_PKTINFO)");
 
 		if (hoplimit != -1 &&
 		    setsockopt(dummy, IPPROTO_IPV6, IPV6_HOPLIMIT,
 		    (void *)&hoplimit, sizeof(hoplimit)))
-			err(1, "dummy setsockopt(IPV6_HOPLIMIT)");
+			err(1, "UDP setsockopt(IPV6_HOPLIMIT)");
 
 		if (rthdr &&
 		    setsockopt(dummy, IPPROTO_IPV6, IPV6_RTHDR,
 		    (void *)rthdr, (rthdr->ip6r_len + 1) << 3))
-			err(1, "dummy setsockopt(IPV6_RTHDR)");
+			err(1, "UDP setsockopt(IPV6_RTHDR)");
 #else  /* old advanced API */
 		if (smsghdr.msg_control &&
 		    setsockopt(dummy, IPPROTO_IPV6, IPV6_PKTOPTIONS,
 		    (void *)smsghdr.msg_control, smsghdr.msg_controllen))
-			err(1, "dummy setsockopt(IPV6_PKTOPTIONS)");
+			err(1, "UDP setsockopt(IPV6_PKTOPTIONS)");
 #endif
 
 		if (connect(dummy, (struct sockaddr *)&src, len) < 0)
-			err(1, "dummy connect");
+			err(1, "UDP connect");
 
 		if (getsockname(dummy, (struct sockaddr *)&src, &len) < 0)
 			err(1, "getsockname");
