@@ -1,5 +1,5 @@
 #!/bin/sh
-# $Id: mobileip6,v 1.1 2003/04/07 10:27:05 keiichi Exp $
+# $Id: mobileip6,v 1.2 2003/08/07 09:02:24 keiichi Exp $
 
 # REQUIRE: network
 # PROVIDE: mobileip6
@@ -18,36 +18,41 @@ mobileip6_start()
 
 	case ${ipv6_mobile_nodetype} in
 	[Mm][Oo][Bb][Ii][Ll][Ee]_[Nn][Oo][Dd][Ee])
-		case ${ipv6_mobile_home_prefixes} in
-		'')
-			echo ' '
-			echo -n '	Please specify home prefix!!' 
-			;;
-		*)
-			echo -n ' Mobile Node:'
-			# setup SPD/SA
-			echo -n ' security'
-			for node_dir in ${ipv6_mobile_config_dir}/*
-			do
-				if [ ! -e ${node_dir}/add ]; then
-					continue;
-				fi
-				setkey -f ${node_dir}/add
-				setkey -f ${node_dir}/spdadd_mobile_node
-			done
-			mip6control -S 1
-			for home_prefix in ${ipv6_mobile_home_prefixes}
+		echo -n ' Mobile Node:'
+
+		# setup SPD/SA
+		echo -n ' security'
+		for node_dir in ${ipv6_mobile_config_dir}/*
+		do
+			if [ ! -e ${node_dir}/add ]; then
+				continue;
+			fi
+			setkey -f ${node_dir}/add
+			setkey -f ${node_dir}/spdadd_mobile_node
+		done
+		mip6control -S 1
+
+		# home prefixes
+		ipv6_mobile_home_prefixes_0=${ipv6_mobile_home_prefixes}
+		home_network=0
+		while : ; do
+			eval ipv6_mobile_home_prefixes_arg=\$ipv6_mobile_home_prefixes_${home_network}
+			if [ -z "${ipv6_mobile_home_prefixes_arg}" ]; then
+				break;
+			fi
+			for home_prefix in ${ipv6_mobile_home_prefixes_arg}
 			do
 				prefix=`expr "${home_prefix}" : "\(.*\)/.*"`
 				prefixlen=`expr "${home_prefix}" : ".*/\(.*\)"`
-				mip6control -H ${prefix} -P ${prefixlen}
+				mip6control -ihif${home_network} -H ${prefix} -P ${prefixlen}
 			done
-			echo -n ' enable'
-			mip6control -m
-			echo -n ' rtsold'
-			rtsold -a -m
-			;;
-		esac
+			home_network=$((${home_network} + 1))
+		done
+
+		echo -n ' enable'
+		mip6control -m
+		echo -n ' rtsold'
+		rtsold -a -m
 		;;
 	[Hh][Oo][Mm][Ee]_[Aa][Gg][Ee][Nn][Tt])
 		case ${ipv6_mobile_home_link} in
@@ -69,7 +74,7 @@ mobileip6_start()
 			echo -n ' enable'
 			for home_prefix in ${ipv6_mobile_home_prefixes}
 			do
-				prefix=`expr "${home_prefix}" : "\(.*\)/.*"`
+				prefix=`expr "${home_prefix}" : "\(.*\)::/.*"`
 				# XXX desribe the case plen != 64
 				ifconfig ${ipv6_mobile_home_link} inet6 ${prefix}:fdff:ffff:ffff:fffe prefixlen 64 anycast alias
 			done
