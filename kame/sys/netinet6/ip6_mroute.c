@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.44 2001/03/08 12:14:22 jinmei Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.45 2001/03/25 08:38:51 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1691,12 +1691,9 @@ phyint_send(ip6, mifp, m)
 			log(LOG_DEBUG, "phyint_send on mif %d err %d\n",
 			    mifp - mif6table, error);
 #endif
-	}
-	else {
+	} else {
 #ifdef MULTICAST_PMTUD
 		icmp6_error(mb_copy, ICMP6_PACKET_TOO_BIG, 0, ifp->if_mtu);
-		splx(s);
-		return;
 #else
 #ifdef MRT6DEBUG
 		if (mrt6debug & DEBUG_XMIT)
@@ -1709,10 +1706,10 @@ phyint_send(ip6, mifp, m)
 			    mb_copy->m_pkthdr.len);
 #endif /* MRT6DEBUG */
 		m_freem(mb_copy); /* simply discard the packet */
-		splx(s);
-		return;
 #endif
 	}
+
+	splx(s);
 }
 
 static int
