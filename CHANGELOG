@@ -1,13 +1,14 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2656 2004/08/01 07:34:57 suz Exp $
+$KAME: CHANGELOG,v 1.2657 2004/08/02 01:14:08 jinmei Exp $
 
-<200407>
+<200408>
 2004-08-01  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/freebsd5/usr.sbin/dhcp6: builds DHCPv6 in FreeBSD5
 
 Sun Aug  1 04:07:45 2004  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* freebsd4: Upgrade to 4.10-RELEASE
 
+<200407>
 2004-07-31  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/dhcp6/dhcp6c.c (main): made sure to dump the correct
 	PID in the background mode.
