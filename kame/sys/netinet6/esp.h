@@ -1,4 +1,4 @@
-/*	$KAME: esp.h,v 1.13 2000/08/28 08:29:54 itojun Exp $	*/
+/*	$KAME: esp.h,v 1.14 2000/09/19 15:15:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -95,6 +95,7 @@ struct esp_algorithm {
 };
 
 extern const struct esp_algorithm *esp_algorithm_lookup __P((int));
+extern int esp_max_ivlen __P((void));
 
 /* crypt routines */
 extern int esp4_output __P((struct mbuf *, struct ipsecrequest *));

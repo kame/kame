@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.32 2000/09/19 14:57:49 itojun Exp $	*/
+/*	$KAME: esp_output.c,v 1.33 2000/09/19 15:15:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -145,12 +145,12 @@ esp_hdrsiz(isr)
 	/*
 	 * ASSUMING:
 	 *	sizeof(struct newesp) > sizeof(struct esp).
-	 *	16 = max ivlen for CBC mode (from AES ciphers).
+	 *	esp_max_ivlen() = max ivlen for CBC mode
 	 *	9 = (maximum padding length without random padding length)
 	 *	   + (Pad Length field) + (Next Header field).
 	 *	16 = maximum ICV we support.
 	 */
-	return sizeof(struct newesp) + 8 + 9 + 16;
+	return sizeof(struct newesp) + esp_max_ivlen() + 9 + 16;
 }
 
 /*

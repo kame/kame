@@ -1,4 +1,4 @@
-/*	$KAME: esp_core.c,v 1.42 2000/09/18 21:06:37 itojun Exp $	*/
+/*	$KAME: esp_core.c,v 1.43 2000/09/19 15:15:12 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -137,47 +137,48 @@ static void esp_increment_iv __P((struct secasvar *));
 
 #define MAXIVLEN	16
 
+static const struct esp_algorithm esp_algorithms[] = {
+	{ 8, -1, esp_descbc_mature, 64, 64, sizeof(des_key_schedule),
+		"des-cbc",
+		esp_descbc_ivlen, esp_cbc_decrypt,
+		esp_cbc_encrypt, esp_des_schedule,
+		esp_des_blockdecrypt, esp_des_blockencrypt, },
+	{ 8, 8, esp_cbc_mature, 192, 192, sizeof(des_key_schedule) * 3,
+		"3des-cbc",
+		esp_common_ivlen, esp_cbc_decrypt,
+		esp_cbc_encrypt, esp_3des_schedule,
+		esp_3des_blockdecrypt, esp_3des_blockencrypt, },
+	{ 1, 0, esp_null_mature, 0, 2048, 0, "null",
+		esp_common_ivlen, esp_null_decrypt,
+		esp_null_encrypt, NULL, },
+	{ 8, 8, esp_cbc_mature, 40, 448, sizeof(BF_KEY), "blowfish-cbc",
+		esp_common_ivlen, esp_cbc_decrypt,
+		esp_cbc_encrypt, esp_blowfish_schedule,
+		esp_blowfish_blockdecrypt, esp_blowfish_blockencrypt, },
+	{ 8, 8, esp_cbc_mature, 40, 128, sizeof(u_int32_t) * 32,
+		"cast128-cbc",
+		esp_common_ivlen, esp_cbc_decrypt,
+		esp_cbc_encrypt, esp_cast128_schedule,
+		esp_cast128_blockdecrypt, esp_cast128_blockencrypt, },
+#ifndef IPSEC_ESP_TWOFISH
+	{ 16, 16, esp_cbc_mature, 128, 256, sizeof(keyInstance) * 2,
+		"rijndael-cbc",
+		esp_common_ivlen, esp_cbc_decrypt,
+		esp_cbc_encrypt, esp_rijndael_schedule,
+		esp_rijndael_blockdecrypt, esp_rijndael_blockencrypt },
+#else
+	{ 16, 16, esp_cbc_mature, 128, 256, sizeof(keyInstance) * 2,
+		"twofish-cbc",
+		esp_common_ivlen, esp_cbc_decrypt,
+		esp_cbc_encrypt, esp_twofish_schedule,
+		esp_twofish_blockdecrypt, esp_twofish_blockencrypt },
+#endif
+};
+
 const struct esp_algorithm *
 esp_algorithm_lookup(idx)
 	int idx;
 {
-	static struct esp_algorithm esp_algorithms[] = {
-		{ 8, -1, esp_descbc_mature, 64, 64, sizeof(des_key_schedule),
-			"des-cbc",
-			esp_descbc_ivlen, esp_cbc_decrypt,
-			esp_cbc_encrypt, esp_des_schedule,
-			esp_des_blockdecrypt, esp_des_blockencrypt, },
-		{ 8, 8, esp_cbc_mature, 192, 192, sizeof(des_key_schedule) * 3,
-			"3des-cbc",
-			esp_common_ivlen, esp_cbc_decrypt,
-			esp_cbc_encrypt, esp_3des_schedule,
-			esp_3des_blockdecrypt, esp_3des_blockencrypt, },
-		{ 1, 0, esp_null_mature, 0, 2048, 0, "null",
-			esp_common_ivlen, esp_null_decrypt,
-			esp_null_encrypt, NULL, },
-		{ 8, 8, esp_cbc_mature, 40, 448, sizeof(BF_KEY), "blowfish-cbc",
-			esp_common_ivlen, esp_cbc_decrypt,
-			esp_cbc_encrypt, esp_blowfish_schedule,
-			esp_blowfish_blockdecrypt, esp_blowfish_blockencrypt, },
-		{ 8, 8, esp_cbc_mature, 40, 128, sizeof(u_int32_t) * 32,
-			"cast128-cbc",
-			esp_common_ivlen, esp_cbc_decrypt,
-			esp_cbc_encrypt, esp_cast128_schedule,
-			esp_cast128_blockdecrypt, esp_cast128_blockencrypt, },
-#ifndef IPSEC_ESP_TWOFISH
-		{ 16, 16, esp_cbc_mature, 128, 256, sizeof(keyInstance) * 2,
-			"rijndael-cbc",
-			esp_common_ivlen, esp_cbc_decrypt,
-			esp_cbc_encrypt, esp_rijndael_schedule,
-			esp_rijndael_blockdecrypt, esp_rijndael_blockencrypt },
-#else
-		{ 16, 16, esp_cbc_mature, 128, 256, sizeof(keyInstance) * 2,
-			"twofish-cbc",
-			esp_common_ivlen, esp_cbc_decrypt,
-			esp_cbc_encrypt, esp_twofish_schedule,
-			esp_twofish_blockdecrypt, esp_twofish_blockencrypt },
-#endif
-	};
 
 	switch (idx) {
 	case SADB_EALG_DESCBC:
@@ -199,6 +200,22 @@ esp_algorithm_lookup(idx)
 	default:
 		return NULL;
 	}
+}
+
+int
+esp_max_ivlen()
+{
+	int idx;
+	int ivlen;
+
+	ivlen = 0;
+	for (idx = 0; idx < sizeof(esp_algorithms)/sizeof(esp_algorithms[0]);
+	     idx++) {
+		if (esp_algorithms[idx].ivlenval > ivlen)
+			ivlen = esp_algorithms[idx].ivlenval;
+	}
+
+	return ivlen;
 }
 
 int
