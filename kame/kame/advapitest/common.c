@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.12 2001/12/27 14:31:48 jinmei Exp $ */
+/*	$KAME: common.c,v 1.13 2001/12/27 15:40:57 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -355,9 +355,7 @@ print_options(mh)
 {
 	struct cmsghdr *cm;
 	struct in6_pktinfo *pi = NULL;
-	int *hlimp = NULL;
 	char ntop_buf[INET6_ADDRSTRLEN];
-	void *hbh = NULL, *dst1 = NULL, *dst2 = NULL, *rthdr = NULL;
 	char ifnambuf[IF_NAMESIZE];
 	/* XXX: KAME specific at this moment */
 #ifdef __KAME__
@@ -368,6 +366,8 @@ print_options(mh)
 		printf("No IPv6 option is received\n");
 		return;
 	}
+
+	printf("Received IPv6 options (size %d):\n", mh->msg_controllen);
 	
 	/* extract optional information via Advanced API */
 	for (cm = (struct cmsghdr *)CMSG_FIRSTHDR(mh);
@@ -384,96 +384,63 @@ print_options(mh)
 #ifdef IPV6_PKTINFO
 		case IPV6_PKTINFO:
 			if (cm->cmsg_len ==
-			    CMSG_LEN(sizeof(struct in6_pktinfo)))
+			    CMSG_LEN(sizeof(struct in6_pktinfo))) {
 				pi = (struct in6_pktinfo *)(CMSG_DATA(cm));
+				printf("  Packetinfo: dst=%s, "
+				       "I/F=(%s, id=%d)\n",
+				       inet_ntop(AF_INET6, &pi->ipi6_addr,
+						 ntop_buf, sizeof(ntop_buf)),
+				       if_indextoname(pi->ipi6_ifindex,
+						      ifnambuf),
+				       pi->ipi6_ifindex);
+			}
 		break;
 #endif
 
 #ifdef IPV6_HOPLIMIT
 		case IPV6_HOPLIMIT:
-			if (cm->cmsg_len == CMSG_LEN(sizeof(int)))
-				hlimp = (int *)CMSG_DATA(cm);
+			if (cm->cmsg_len == CMSG_LEN(sizeof(int))) {
+				printf("  Hoplimit = %d\n",
+				       *(int *)CMSG_DATA(cm));
+			}
 			break;
 #endif
 
 #ifdef IPV6_RTHDR
 		case IPV6_RTHDR:
-			if (rthdr)
-				printf("there're more than one rthdr (ignored).\n");
-			else
-				rthdr = CMSG_DATA(cm);
+			printf("  Routing Header\n");
+			print_rthdr(CMSG_DATA(cm));
 			break;
 #endif
 
 #ifdef IPV6_HOPOPTS
 		case IPV6_HOPOPTS:
-			hbh = CMSG_DATA(cm);
-			break;
-#endif
-
-#ifdef IPV6_RTHDRDSTOPTS
-		case IPV6_RTHDRDSTOPTS:
-			if (dst1)
-				printf("there's more than one dstopt hdr "
-				       "before a rthdr (ignored)\n");
-			else
-				dst1 = CMSG_DATA(cm);
+			printf("  HbH Options Header\n");
+			print_opthdr(CMSG_DATA(cm));
 			break;
 #endif
 
 #ifdef IPV6_DSTOPTS
 		case IPV6_DSTOPTS:
-			if (dst2)
-				printf("there's more than one dstopt hdr "
-				       "after a rthdr (ignored)\n");
-			else
-				dst2 = CMSG_DATA(cm);
+			printf("  Destination Options Header\n");
+			print_opthdr(CMSG_DATA(cm));
 			break;
 #endif
 
 #if defined(IPV6_PATHMTU) && defined(__KAME__)
 		case IPV6_PATHMTU:
-			if (cm->cmsg_len == CMSG_LEN(sizeof(*mtuinfo)))
+			if (cm->cmsg_len == CMSG_LEN(sizeof(*mtuinfo))) {
 				mtuinfo = (struct ip6_mtuinfo *)CMSG_DATA(cm);
+				printf("  Path MTU: destination=%s, "
+				       "from=%s, mtu=%lu\n",
+				       ip6str(&mtuinfo->ip6m_addr),
+				       ip6str((struct sockaddr_in6 *)mh->msg_name),
+				       (u_long)mtuinfo->ip6m_mtu);
+			}
 			break;
 		}
 #endif
 	}
-
-	printf("Received IPv6 options (size %d):\n", mh->msg_controllen);
-	if (pi) {
-		printf("  Packetinfo: dst=%s, I/F=(%s, id=%d)\n",
-		       inet_ntop(AF_INET6, &pi->ipi6_addr, ntop_buf,
-				 sizeof(ntop_buf)),
-		       if_indextoname(pi->ipi6_ifindex, ifnambuf),
-		       pi->ipi6_ifindex);
-	}
-	if (hlimp)
-		printf("  Hoplimit = %d\n", *hlimp);
-	if (hbh) {
-		printf("  HbH Options Header\n");
-		print_opthdr(hbh);
-	}
-	if (dst1) {
-		printf("  Destination Options Header (before rthdr)\n");
-		print_opthdr(dst1);
-	}
-	if (rthdr) {
-		printf("  Routing Header\n");
-		print_rthdr(rthdr);
-	}
-	if (dst2) {
-		printf("  Destination Options Header (after rthdr)\n");
-		print_opthdr(dst2);
-	}
-#ifdef __KAME__
-	if (mtuinfo) {
-		printf("  Path MTU: destination=%s, from=%s, mtu=%lu\n",
-		       ip6str(&mtuinfo->ip6m_addr),
-		       ip6str((struct sockaddr_in6 *)mh->msg_name),
-		       (u_long)mtuinfo->ip6m_mtu);
-	}
-#endif
 }
 
 void
