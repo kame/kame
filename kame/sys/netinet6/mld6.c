@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.84 2003/08/15 06:30:11 suz Exp $	*/
+/*	$KAME: mld6.c,v 1.85 2003/08/15 06:33:36 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -1734,32 +1734,33 @@ mld_send_state_change_report(m0, buflenp, in6m, type, timer_init)
 	 * Note that numsrc may or may not be 0.
 	 */
 	if (type == CHANGE_TO_EXCLUDE_MODE) {
-		numsrc = in6mm_src->i6ms_toex->numsrc;
+		if (in6mm_src->i6ms_toex != NULL)
+			numsrc = in6mm_src->i6ms_toex->numsrc;
 		if (max_len < SOURCE_RECORD_LEN(numsrc)
 			+ sizeof(struct ip6_hdr) + rhdrlen + ghdrlen)
 			/* toex's numsrc should be fit in a single message. */
 			numsrc = (max_len - sizeof(struct ip6_hdr)
 				- rhdrlen - ghdrlen) / addrlen;
 	} else if (type == CHANGE_TO_INCLUDE_MODE) {
-		numsrc = in6mm_src->i6ms_toin->numsrc;
+		if (in6mm_src->i6ms_toin != NULL)
+			numsrc = in6mm_src->i6ms_toin->numsrc;
 	} else { /* ALLOW_NEW_SOURCES and/or BLOCK_OLD_SOURCES */
-		numsrc = 0;
 		if (in6mm_src->i6ms_alw != NULL)
 			numsrc = in6mm_src->i6ms_alw->numsrc;
 		if (in6mm_src->i6ms_blk != NULL)
 			numsrc = max(numsrc, in6mm_src->i6ms_blk->numsrc);
-		if (numsrc == 0) {
-			/*
-			 * XXX following is tentative process. this should not
-		 	 * be executed. this is just to avoid "loop" by timer.
-			 */
-			if (*m0 != NULL) {
-			 	mld_sendbuf(*m0, in6m->in6m_ifp);
-				*m0 = NULL;
-			} else if (in6mm_src->i6ms_robvar > 0)
-				--in6mm_src->i6ms_robvar;
-			return;
-		}
+	}
+	/*
+	 * XXX following is tentative process. this should not be executed.
+	 * this is just to avoid "loop" by timer.
+	 */
+	if (numsrc == 0) {
+		if (*m0 != NULL) {
+		 	mld_sendbuf(*m0, in6m->in6m_ifp);
+			*m0 = NULL;
+		} else if (in6mm_src->i6ms_robvar > 0)
+			--in6mm_src->i6ms_robvar;
+		return;
 	}
 
 	if (m == NULL) {
