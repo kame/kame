@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mpool.h	8.2 (Berkeley) 7/14/94
- * $FreeBSD: src/include/mpool.h,v 1.5.6.1 2000/08/17 08:10:05 jhb Exp $
+ * $FreeBSD: src/include/mpool.h,v 1.5.6.2 2001/03/05 23:05:08 obrien Exp $
  */
 
 #ifndef _MPOOL_H_
@@ -51,8 +51,8 @@
 
 /* The BKT structures are the elements of the queues. */
 typedef struct _bkt {
-	CIRCLEQ_ENTRY(_bkt) hq;		/* hash queue */
-	CIRCLEQ_ENTRY(_bkt) q;		/* lru queue */
+	TAILQ_ENTRY(_bkt) hq;		/* hash queue */
+	TAILQ_ENTRY(_bkt) q;		/* lru queue */
 	void    *page;			/* page */
 	pgno_t   pgno;			/* page number */
 
@@ -62,9 +62,9 @@ typedef struct _bkt {
 } BKT;
 
 typedef struct MPOOL {
-	CIRCLEQ_HEAD(_lqh, _bkt) lqh;	/* lru queue head */
+	TAILQ_HEAD(_lqh, _bkt) lqh;	/* lru queue head */
 					/* hash queue array */
-	CIRCLEQ_HEAD(_hqh, _bkt) hqh[HASHSIZE];
+	TAILQ_HEAD(_hqh, _bkt) hqh[HASHSIZE];
 	pgno_t	curcache;		/* current number of cached pages */
 	pgno_t	maxcache;		/* max number of cached pages */
 	pgno_t	npages;			/* number of pages in the file */

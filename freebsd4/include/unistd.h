@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)unistd.h	8.12 (Berkeley) 4/27/95
- * $FreeBSD: src/include/unistd.h,v 1.35.2.3 2000/09/20 11:19:50 green Exp $
+ * $FreeBSD: src/include/unistd.h,v 1.35.2.6 2001/03/05 12:45:48 obrien Exp $
  */
 
 #ifndef _UNISTD_H_
@@ -141,7 +141,7 @@ int	 getdtablesize __P((void));
 int	 getgrouplist __P((const char *, int, int *, int *));
 long	 gethostid __P((void));
 int	 gethostname __P((char *, int));
-char	*getlogin_r __P((char *, int));
+int	 getlogin_r __P((char *, int));
 mode_t	 getmode __P((const void *, mode_t));
 int	 getpagesize __P((void)) __pure2;
 char	*getpass __P((const char *));
@@ -177,6 +177,7 @@ int	 readlink __P((const char *, char *, int));
 int	 reboot __P((int));
 int	 revoke __P((const char *));
 pid_t	 rfork __P((int));
+pid_t	 rfork_thread __P((int, void *, int (*) __P((void *)), void *));
 int	 rresvport __P((int *));
 int	 rresvport_af __P((int *, int));
 int	 ruserok __P((const char *, int, const char *, const char *));

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)stdlib.h	8.5 (Berkeley) 5/19/95
- * $FreeBSD: src/include/stdlib.h,v 1.16 1999/12/23 15:58:20 bde Exp $
+ * $FreeBSD: src/include/stdlib.h,v 1.16.2.1 2001/03/02 09:45:19 obrien Exp $
  */
 
 #ifndef _STDLIB_H_
@@ -104,8 +104,12 @@ void	*realloc __P((void *, size_t));
 void	 srand __P((unsigned));
 double	 strtod __P((const char *, char **));
 long	 strtol __P((const char *, char **, int));
+long long	 
+	 strtoll __P((const char *, char **, int));
 unsigned long
 	 strtoul __P((const char *, char **, int));
+unsigned long long
+	 strtoull __P((const char *, char **, int));
 int	 system __P((const char *));
 
 int	 mblen __P((const char *, size_t));

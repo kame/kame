@@ -1,5 +1,5 @@
 #	@(#)Makefile	8.2 (Berkeley) 1/4/94
-# $FreeBSD: src/include/Makefile,v 1.109.2.8 2000/11/12 18:01:51 adrian Exp $
+# $FreeBSD: src/include/Makefile,v 1.109.2.9 2001/03/05 12:54:39 obrien Exp $
 #
 # Doing a make install builds /usr/include
 #
@@ -66,8 +66,12 @@ osreldate.h:	${.CURDIR}/../sys/conf/newvers.sh \
 	setvar PARAMFILE ${.CURDIR}/../sys/sys/param.h; \
 	. ${.CURDIR}/../sys/conf/newvers.sh;			\
 	echo "$$COPYRIGHT" > osreldate.h;			\
+	echo "#ifdef _KERNEL" >> osreldate.h;			\
+	echo '#error "osreldate.h must not be used in the kernel, use sys/param.h"' >> osreldate.h; \
+	echo "#else" >> osreldate.h;				\
 	echo \#'undef __FreeBSD_version' >> osreldate.h;	\
-	echo \#'define __FreeBSD_version' $$RELDATE >> osreldate.h
+	echo \#'define __FreeBSD_version' $$RELDATE >> osreldate.h; \
+	echo "#endif" >> osreldate.h
 
 beforeinstall: ${SHARED}
 	@rm -f ${DESTDIR}/usr/include/timepps.h

@@ -31,6 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)telnet.h	8.2 (Berkeley) 12/15/93
+ * $FreeBSD: src/include/arpa/telnet.h,v 1.5.6.1 2001/03/05 12:46:40 obrien Exp $
  */
 
 #ifndef _ARPA_TELNET_H_
@@ -213,7 +214,7 @@ char *telopts[NTELOPTS+1] = {
 #define	NSLC		30
 
 /*
- * For backwards compatability, we define SLC_NAMES to be the
+ * For backwards compatibility, we define SLC_NAMES to be the
  * list of names if SLC_NAMES is not defined.
  */
 #define	SLC_NAMELIST	"0", "SYNCH", "BRK", "IP", "AO", "AYT", "EOR",	\
