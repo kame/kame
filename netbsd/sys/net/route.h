@@ -308,7 +308,7 @@ do { \
 
 #define	RTUSE(rt) \
 	do { \
-		extern struct timeval time; \
+		extern volatile struct timeval time; \
 		int i; \
 		(rt)->rt_use++; \
 		(rt)->rt_lastreftime = time.tv_sec; \
