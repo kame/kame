@@ -1,4 +1,4 @@
-/*	$KAME: mip6_mncore.c,v 1.6 2003/06/12 11:11:04 t-momose Exp $	*/
+/*	$KAME: mip6_mncore.c,v 1.7 2003/06/16 09:33:22 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.  All rights reserved.
@@ -2856,6 +2856,8 @@ mip6_ip6mc_input(m, ip6mc, ip6mclen)
 			    SA6_ARE_ADDR_EQUAL(&src_sa, &mbu->mbu_paddr))
 				break;
 		}
+		if (mbu != NULL)
+			break;
 	}
 	if (mbu == NULL) {
 		mip6log((LOG_NOTICE,
