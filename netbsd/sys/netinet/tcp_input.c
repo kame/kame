@@ -3367,7 +3367,7 @@ syn_cache_respond(sc, m)
 #ifdef INET6
 	case AF_INET6:
 		error = ip6_output(m, NULL /*XXX*/, (struct route_in6 *)ro,
-			0, NULL);
+			0, NULL, NULL);
 		break;
 #endif
 	default:

@@ -1060,18 +1060,12 @@ send:
 	    {
 		struct ip6_pktopts *opts;
 
-#if BSD >= 43
 		if (tp->t_in6pcb)
 			opts = tp->t_in6pcb->in6p_outputopts;
 		else
 			opts = NULL;
 		error = ip6_output(m, opts, (struct route_in6 *)ro,
-			so->so_options & SO_DONTROUTE, 0);
-#else
-		opts = NULL;
-		error = ip6_output(m, opts, (struct route_in6 *)ro,
-			so->so_options & SO_DONTROUTE);
-#endif
+			so->so_options & SO_DONTROUTE, 0, NULL);
 		break;
 	    }
 #endif

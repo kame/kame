@@ -657,7 +657,8 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 		break;
 #ifdef INET6
 	case AF_INET6:
-		error = ip6_output(m, NULL, (struct route_in6 *)ro, 0, NULL);
+		error = ip6_output(m, NULL, (struct route_in6 *)ro, 0, NULL,
+			NULL);
 		break;
 #endif
 	default:
