@@ -1,4 +1,4 @@
-/*	$KAME: ip6_id.c,v 1.11 2003/09/15 23:39:12 itojun Exp $	*/
+/*	$KAME: ip6_id.c,v 1.12 2003/09/16 00:30:52 itojun Exp $	*/
 /*	$OpenBSD: ip_id.c,v 1.6 2002/03/15 18:19:52 millert Exp $	*/
 
 /*
@@ -161,13 +161,13 @@ static u_int32_t randomid(struct randomtab *);
  */
 
 static u_int32_t
-pmod(u_int32_t gen, u_int32_t exp, u_int32_t mod)
+pmod(u_int32_t gen, u_int32_t expo, u_int32_t mod)
 {
 	u_int64_t s, t, u;
 
 	s = 1;
 	t = gen;
-	u = exp;
+	u = expo;
 
 	while (u) {
 		if (u & 1)
