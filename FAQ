@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.73 2001/11/22 10:28:11 itojun Exp $
+$KAME: FAQ,v 1.74 2001/12/04 05:53:53 jinmei Exp $
 
 
 GENERAL
@@ -521,6 +521,11 @@ Q: I have problem dianosing IPsec issues.  Are there any good tools?
 	% netstat -sn >/tmp/2
 	% diff -c1 /tmp/1 /tmp/2
 
+Q: How can I configure NAT-PT?
+	Natptconfig is a command for configuration of KAME NAT-PT.
+	The manual for the command is natptconfig(8), and the manual
+	for the configuration file is natpt.conf(5).
+	kame/kame/natptconfig/natpt.conf is a simple configuration sample.
 
 LICENSE AND CRYPTO EXPORT
 =========================
