@@ -1,4 +1,4 @@
-/*	$KAME: mip6_fsm.c,v 1.10 2002/09/18 07:54:33 keiichi Exp $	*/
+/*	$KAME: mip6_fsm.c,v 1.11 2002/10/21 06:16:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -175,6 +175,8 @@ mip6_bu_fsm(mbu, event, data)
 			/*
 			 * send CoTI, restart retrans and failure timers.
 			 */
+			if (mip6_bu_send_coti(mbu) != 0)
+				break;
 
 			/* XXX */
 
@@ -262,6 +264,8 @@ mip6_bu_fsm(mbu, event, data)
 			/*
 			 * send CoTI, restart retrans and failure timers.
 			 */
+			if (mip6_bu_send_coti(mbu) != 0)
+				break;
 
 			/* XXX */
 
@@ -401,6 +405,8 @@ mip6_bu_fsm(mbu, event, data)
 
 		case MIP6_BU_FSM_EVENT_MOVEMENT:
 			/* send CoTI, restart retran and failure timers. */
+			if (mip6_bu_send_coti(mbu) != 0)
+				break;
 
 			/* XXX */
 
@@ -586,6 +592,8 @@ mip6_bu_fsm(mbu, event, data)
 				 * send CoTI, start retrans and
 				 * failure timers.
 				 */
+				if (mip6_bu_send_coti(mbu) != 0)
+					break;
 
 				/* XXX */
 
@@ -595,6 +603,10 @@ mip6_bu_fsm(mbu, event, data)
 				 * send HoTI, CoTI, start retrans nad
 				 * failure timers.
 				 */
+				if (mip6_bu_send_hoti(mbu) != 0)
+					break;
+				if (mip6_bu_send_coti(mbu) != 0)
+					break;
 
 				/* XXX */
 

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.142 2002/10/15 11:43:10 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.143 2002/10/21 06:16:10 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -523,8 +523,12 @@ mip6_bu_list_notify_binding_change(sc)
 		/* sanity check for overflow */
 		if (mbu->mbu_refexpire < time_second)
 			mbu->mbu_refexpire = 0x7fffffff;
-		mbu->mbu_state |= MIP6_BU_STATE_WAITSENT;
-		mip6_bu_send_bu(mbu);
+		if (mip6_bu_fsm(mbu, MIP6_BU_FSM_EVENT_MOVEMENT, NULL) != 0) {
+			mip6log((LOG_ERR,
+			    "%s:%d: "
+			    "state transition failed.\n",
+			    __FILE__, __LINE__));
+		}
 	}
 
 	return (0);
