@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.63 2002/05/01 04:55:08 jinmei Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.64 2002/05/01 04:58:07 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -440,6 +440,8 @@ client6_sleep()
 	fd_set r;
 	struct sockaddr *sa, *dst, *mask, *rti_info[RTAX_MAX];
 
+	dprintf(LOG_DEBUG, "client6_sleep: start sleeping");
+
 	if (signal(SIGHUP, client6_hup) == SIG_ERR) {
 		dprintf(LOG_WARNING,
 			"client6_sleep: failed to set signal: %s",
@@ -550,6 +552,7 @@ client6_sleep()
 		dprintf(LOG_WARNING,
 			"client6_sleep: failed to reset signal: %s",
 			strerror(errno));
+	dprintf(LOG_DEBUG, "client6_sleep: activated");
 	return;
 }
 
