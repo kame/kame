@@ -1,3 +1,5 @@
+/*	$KAME: bindtest.c,v 1.10 2000/10/20 16:46:48 itojun Exp $	*/
+
 /*
  * Copyright (C) 2000 USAGI Project.
  * All rights reserved.
@@ -26,6 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
 /*
  * Copyright (C) 1999 WIDE Project.
  * All rights reserved.
@@ -53,9 +56,6 @@
  * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
- */
-/*
- * $Id: bindtest.c,v 1.9 2000/10/20 16:42:06 itojun Exp $
  */
 
 #include <sys/types.h>
