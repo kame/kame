@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: pfkey.c,v 1.27 2000/04/20 09:29:00 sakane Exp $ */
+/* YIPS @(#)$Id: pfkey.c,v 1.28 2000/04/21 06:59:00 sakane Exp $ */
 
 #define _PFKEY_C_
 
@@ -83,9 +83,6 @@ static int admin2pfkey_proto __P((u_int proto));
 static u_int ipsecdoi2pfkey_aalg __P((u_int hashtype));
 static u_int ipsecdoi2pfkey_ealg __P((u_int t_id));
 static u_int ipsecdoi2pfkey_calg __P((u_int t_id));
-static u_int ipsecdoi2pfkey_proto __P((u_int proto));
-static u_int pfkey2ipsecdoi_mode __P((u_int mode));
-static u_int ipsecdoi2pfkey_mode __P((u_int mode));
 static u_int keylen_aalg __P((u_int hashtype));
 static u_int keylen_ealg __P((u_int t_id, int encklen));
 
@@ -519,7 +516,7 @@ ipsecdoi2pfkey_calg(t_id)
 }
 
 /* IPSECDOI_PROTO -> SADB_SATYPE */
-static u_int
+u_int
 ipsecdoi2pfkey_proto(proto)
 	u_int proto;
 {
@@ -561,7 +558,7 @@ pfkey2ipsecdoi_proto(satype)
 }
 
 /* IPSECDOI_ATTR_ENC_MODE -> IPSEC_MODE */
-static u_int
+u_int
 ipsecdoi2pfkey_mode(mode)
 	u_int mode;
 {
@@ -578,7 +575,7 @@ ipsecdoi2pfkey_mode(mode)
 }
 
 /* IPSECDOI_ATTR_ENC_MODE -> IPSEC_MODE */
-static u_int
+u_int
 pfkey2ipsecdoi_mode(mode)
 	u_int mode;
 {
