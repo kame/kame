@@ -920,7 +920,7 @@ udp6_realinput(af, src, dst, m, off)
 			for (imm = LIST_FIRST(&im6o->im6o_memberships);
 			     imm != NULL;
 			     imm = LIST_NEXT(imm, i6mm_chain)) {
-				if (SS_CMP(&imm->i6mm_maddr->in6m_sa, !=, src))
+				if (SS_CMP(&imm->i6mm_maddr->in6m_sa, !=, dst))
 					continue;
 				
 				if (imm->i6mm_msf == NULL) {
