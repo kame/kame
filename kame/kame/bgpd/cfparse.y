@@ -1061,7 +1061,6 @@ param_config()
 	if (yy_clusterid != -1) {
 		ipv4id.s_addr = clusterId = yy_clusterid;
 		cprint("set %s to the BGP cluster ID\n", inet_ntoa(ipv4id));
-
 	}
 }
 
