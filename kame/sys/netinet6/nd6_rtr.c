@@ -1,4 +1,4 @@
-/*	$KAME: nd6_rtr.c,v 1.175 2001/10/31 10:14:42 jinmei Exp $	*/
+/*	$KAME: nd6_rtr.c,v 1.176 2001/10/31 11:22:25 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -998,7 +998,12 @@ defrtrlist_update(new)
 
 			/*
 			 * preferred router may be changed, so relocate
-			 * this router
+			 * this router.
+			 * XXX: calling TAILQ_REMOVE directly is a bad manner.
+			 * However, since defrtrlist_del() has many side
+			 * effects, we intentionally do so here.
+			 * defrouter_select() below will handle routing
+			 * changes later.
 			 */
 			TAILQ_REMOVE(&nd_defrouter, dr, dr_entry);
 			n = dr;
