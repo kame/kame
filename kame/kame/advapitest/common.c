@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.13 2001/12/27 15:40:57 jinmei Exp $ */
+/*	$KAME: common.c,v 1.14 2002/01/10 11:57:07 jinmei Exp $ */
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -108,11 +108,13 @@ dump_localopt(s, socktype, proto)
 	optlen = sizeof(optbuf);
 	if (getsockopt(s, IPPROTO_IPV6, IPV6_NEXTHOP, optbuf, &optlen))
 		warn("getsockopt(IPV6_NEXTHOP)");
+	else if (optlen == 0) {
+		printf("no option\n");
 	/* XXX: we assume the kernel only supports AF_NET6 nexthops */
-	else if (optlen == sizeof(struct sockaddr_in6))
+	} else if (optlen == sizeof(struct sockaddr_in6)) {
 		printf("IPV6_NEXTHOP: %s\n",
 		       ip6str((struct sockaddr_in6 *)optbuf));
-	else
+	} else
 		warnx("IPV6_NEXTHOP: invalid option length: %d", optlen);
 #endif
 
