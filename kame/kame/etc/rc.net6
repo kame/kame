@@ -5,9 +5,11 @@ ip6mrouter=NO
 inet6d_enable=NO
 ipv6rtsold=NO
 ipv6_mobile_enable=NO
-ipv6_mobile_nodetype=mobilenode
-#ipv6_mobile_nodetype=homeagent
-ipv6_mobile_prefixes="2001:200:0:4819::/64"
+#ipv6_mobile_config_dir="/usr/local/v6/etc/mobileip6"
+#ipv6_mobile_nodetype=mobile_node
+#ipv6_mobile_home_prefixes="2001:200:0:4819::/64"
+#ipv6_mobile_nodetype=home_agent
+#ipv6_mobile_home_link="fxp0"
 ipv6_ipv4mapping=NO
 
 if [ X"${ip6router}" = X"YES" ]; then
@@ -52,6 +54,8 @@ gifconfig=/usr/local/v6/sbin/gifconfig
 route=/usr/local/v6/sbin/route
 ndp=/usr/local/v6/sbin/ndp
 mip6control=/usr/local/v6/sbin/mip6control
+had=/usr/local/v6/sbin/had
+setkey=/usr/local/v6/sbin/setkey
 if [ -x /usr/local/v6/sbin/sysctl ]; then
 	sysctl=/usr/local/v6/sbin/sysctl
 else
@@ -213,11 +217,19 @@ else
 	# mobile ipv6 setup
 	if [ X"${ipv6_mobile_enable}" = X"YES" ]; then
 	    case ${ipv6_mobile_nodetype} in
-	    [Mm][Oo][Bb][Ii][Ll][Ee][Nn][Oo][Dd][Ee])
+	    [Mm][Oo][Bb][Ii][Ll][Ee]_[Nn][Oo][Dd][Ee])
 		case ${ipv6_mobile_home_prefixes} in
 		'')
 		    ;;
 		*)
+		    for node_dir in ${ipv6_mobile_config_dir}/*
+		    do
+			if [ ! -e ${node_dir}/add ]; then
+			    continue;
+			fi
+			$setkey -f ${node_dir}/add
+			$setkey -f ${node_dir}/spdadd_mobile_node
+		    done
 		    for home_prefix in ${ipv6_mobile_home_prefixes}
 		    do
 			prefix=`expr "${home_prefix}" : "\(.*\)/.*"`
@@ -229,9 +241,23 @@ else
 		    ;;
 		esac
 		;;
-	    [Hh][Oo][Mm][Ee][Aa][Gg][Ee][Nn][Tt])
-		$mip6control -g
-		;;
+	    [Hh][Oo][Mm][Ee]_[Aa][Gg][Ee][Nn][Tt])
+		case ${ipv6_mobile_home_link} in
+		'')
+		    ;;
+		*)
+		    for node_dir in ${ipv6_mobile_config_dir}/*
+		    do
+			if [ ! -e ${node_dir}/add ]; then
+			    continue;
+			fi
+			$setkey -f ${node_dir}/add
+			$setkey -f ${node_dir}/spdadd_home_agent
+		    done
+		    $mip6control -g
+		    $had ${ipv6_mobile_home_link}
+		    ;;
+		esac
 	    *)
 		;;
 	    esac
