@@ -403,15 +403,14 @@ hour|hours		{ YYD; yylval.num = CF_UNITTYPE_H; return(UNITTYPE); }
 
 			YYD;
 			while (*++p != '"') ;
-			*p = NULL;
-			yytext++;
+			*p = '\0';
 
 			yylval.val = vmalloc(yyleng - 1);
 			if (yylval.val == NULL) {
 				yyerror("vmalloc failed: %s\n");
 				return -1;
 			}
-			memcpy(yylval.val->v, yytext, yylval.val->l);
+			memcpy(yylval.val->v, &yytext[1], yylval.val->l);
 
 			return(QUOTEDSTRING);
 		}
