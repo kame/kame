@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.99 2002/04/18 16:39:03 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.100 2002/04/18 17:32:34 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -185,8 +185,6 @@ int		 natpt_icmp4EchoReply	__P((struct pcv *, struct pcv *));
 void		 natpt_icmp4Unreach	__P((struct pcv *, struct pcv *,
 					     struct pAddr *));
 int		 natpt_icmp4Echo		__P((struct pcv *, struct pcv *));
-void		 natpt_icmp4Timxceed	__P((struct pcv *, struct pcv *,
-					     struct pAddr *));
 void		 natpt_icmp4Paramprob	__P((struct pcv *, struct pcv *));
 int		 natpt_icmp4MimicPayload	__P((struct pcv *, struct pcv *,
 					     struct pAddr *));
@@ -844,6 +842,7 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 	struct ip	*ip4 = mtod(cv4->m, struct ip *);
 	struct ip6_hdr	*ip6;
 	struct ip6_frag	*frag6;
+	struct icmp6_hdr *icmp6;
 	caddr_t		icmp4end;
 	int		icmp4len;
 	int		icmp6len = 0;
@@ -895,7 +894,9 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 		break;
 
 	case ICMP_TIMXCEED:
-		natpt_icmp4Timxceed(cv4, &cv6, pad);
+		icmp6 = cv6.pyld.icmp6;
+		icmp6->icmp6_type = ICMP6_TIME_EXCEEDED;
+		icmp6->icmp6_code = cv4->pyld.icmp4->icmp_code;
 		icmp6len = natpt_icmp4MimicPayload(cv4, &cv6, pad);
 		break;
 
@@ -1064,16 +1065,6 @@ natpt_icmp4Echo(struct pcv *cv4, struct pcv *cv6)
 
 		return (dlen);
 	}
-}
-
-
-void
-natpt_icmp4Timxceed(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
-{
-	struct icmp6_hdr	*icmp6 = cv6->pyld.icmp6;
-
-	icmp6->icmp6_type = ICMP6_TIME_EXCEEDED;
-	icmp6->icmp6_code = 0;
 }
 
 
