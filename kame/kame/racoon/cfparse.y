@@ -774,6 +774,12 @@ sainfo_id
 		{
 			struct ipsecdoi_id_b *id_b;
 
+			if ($1 == LC_IDENTTYPE_CERTNAME
+			 || $1 == LC_IDENTTYPE_CERTALTNAME) {
+				yyerror("forbidden using such id type: %d", $1);
+				return -1;
+			}
+
 			$2->l--;
 
 			$$ = vmalloc(sizeof(*id_b) + $2->l);
@@ -784,6 +790,7 @@ sainfo_id
 
 			id_b = (struct ipsecdoi_id_b *)$$->v;
 			id_b->type = idtype2doi($1);
+
 			id_b->proto_id = 0;
 			id_b->port = 0;
 
@@ -826,7 +833,13 @@ sainfo_spec
 		algorithms EOS
 	|	IDENTIFIER IDENTIFIERTYPE
 		{
-			cur_sainfo->myidenttype = idtype2doi($2);
+			if ($2 == LC_IDENTTYPE_CERTNAME
+			 || $2 == LC_IDENTTYPE_CERTALTNAME) {
+				yyerror("forbidden using such id type: %d", $2);
+				return -1;
+			}
+
+			cur_sainfo->myidenttype = $2;
 		}
 		EOS
 	;
@@ -919,6 +932,14 @@ remote_statement
 		}
 		BOC remote_specs EOC
 		{
+			if ((cur_rmconf->identtype == LC_IDENTTYPE_CERTNAME
+			  || cur_rmconf->identtype == LC_IDENTTYPE_CERTALTNAME)
+			 && cur_rmconf->mycertfile == NULL) {
+				yyerror("id type mismatched due to "
+					"no CERT defined.\n");
+				return -1;
+			}
+
 			if (set_isakmp_proposal(cur_rmconf, prhead) != 0)
 				return -1;
 
@@ -990,10 +1011,7 @@ remote_spec
 			vfree($2);
 		}
 		EOS
-	|	IDENTIFIER IDENTIFIERTYPE EOS
-		{
-			cur_rmconf->identtype = idtype2doi($2);
-		}
+	|	IDENTIFIER IDENTIFIERTYPE EOS { cur_rmconf->identtype = $2; }
 	|	NONCE_SIZE NUMBER EOS { cur_rmconf->nonce_size = $2; }
 	|	DH_GROUP
 		{

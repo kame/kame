@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.96 2000/08/28 17:50:59 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.97 2000/08/31 14:39:06 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -76,6 +76,7 @@
 #include "algorithm.h"
 #include "sainfo.h"
 #include "proposal.h"
+#include "crypto_openssl.h"
 #include "strnames.h"
 
 static vchar_t *get_ph1approval __P((struct ph1handle *, struct prop_pair **));
@@ -2894,6 +2895,23 @@ err:
 	return -1;
 }
 
+static int
+genid2doi(genid)
+	int genid;
+{
+	switch (genid) {
+	case GENT_IPADD:
+		return 0;
+	case GENT_DNS:
+		return IPSECDOI_ID_FQDN;
+	case GENT_EMAIL:
+		return IPSECDOI_ID_USER_FQDN;
+	default:
+		return -1;
+	}
+	/*NOTREACHED*/
+}
+
 /*
  * create ID payload for phase 1 and set into iph1->id.
  * NOT INCLUDING isakmp general header.
@@ -2905,32 +2923,48 @@ ipsecdoi_setid1(iph1)
 {
 	vchar_t *ret = NULL;
 	struct ipsecdoi_id_b id_b;
-	int lctype;
-	vchar_t *ident = NULL, idtmp;
-
-	lctype = doi2idtype(iph1->rmconf->identtype);
+	vchar_t *ident, idtmp;
+	char idbuf[128]; /* XXX */
+	char *altname;
+	int len, type;
 
 	/* init */
-	id_b.type = iph1->rmconf->identtype;
 	id_b.proto_id = 0;
 	id_b.port = 0;
+	ident = NULL;
 
 	switch (iph1->rmconf->identtype) {
-	case IPSECDOI_ID_FQDN:
-		ident = lcconf->ident[lctype];
+	case LC_IDENTTYPE_FQDN:
+	case LC_IDENTTYPE_USERFQDN:
+	case LC_IDENTTYPE_KEYID:
+		id_b.type = idtype2doi(iph1->rmconf->identtype);
+		ident = lcconf->ident[iph1->rmconf->identtype];
 		break;
-	case IPSECDOI_ID_USER_FQDN:
-		ident = lcconf->ident[lctype];
+	case LC_IDENTTYPE_CERTNAME:
+		id_b.type = IPSECDOI_ID_DER_ASN1_DN;
+		if (oakley_getmycert(iph1) < 0)
+			goto err;
+		ident = eay_get_x509asn1subjectname(&iph1->cert->cert);
 		break;
-	case IPSECDOI_ID_KEY_ID:
-		ident = lcconf->ident[lctype];
+	case LC_IDENTTYPE_CERTALTNAME:
+		if (oakley_getmycert(iph1) < 0)
+			goto err;
+		if (eay_get_x509subjectaltname(&iph1->cert->cert,
+				&altname, &type) < 0)
+			goto err;
+		id_b.type = genid2doi(type);
+		if (id_b.type == 0) {
+			printf("XXXX");
+			goto err;
+		}
+		len = snprintf(idbuf, sizeof(idbuf), "%s", altname);
+		idtmp.l = strlen(altname);
+		idtmp.v = idbuf;
+		ident = &idtmp;
+		free(altname);
 		break;
+	case LC_IDENTTYPE_ADDRESS:
 	default:
-		ident = NULL;
-	}
-
-	/* use local IP address as identifier */
-	if (ident == NULL) {
 		/* use IP address */
 		switch (iph1->local->sa_family) {
 		case AF_INET:
@@ -2991,26 +3025,11 @@ int
 ipsecdoi_setid2(iph2)
 	struct ph2handle *iph2;
 {
-	int lctype;
 	vchar_t *ident = NULL;
 	struct secpolicy *sp;
 
-	/* local side */
-	lctype = doi2idtype(iph2->sainfo->myidenttype);
-
-	switch (iph2->sainfo->myidenttype) {
-	case IPSECDOI_ID_FQDN:
-		ident = lcconf->ident[lctype];
-		break;
-	case IPSECDOI_ID_USER_FQDN:
-		ident = lcconf->ident[lctype];
-		break;
-	case IPSECDOI_ID_KEY_ID:
-		ident = lcconf->ident[lctype];
-		break;
-	default:
-		ident = NULL;
-	}
+	/* init */
+	ident = lcconf->ident[iph2->sainfo->myidenttype];
 
 	/* check there is phase 2 handler ? */
 	sp = getspbyspid(iph2->spid);
@@ -3036,7 +3055,7 @@ ipsecdoi_setid2(iph2)
 	} else {
 		struct ipsecdoi_id_b id_b;
 
-		id_b.type = iph2->sainfo->myidenttype;
+		id_b.type = idtype2doi(iph2->sainfo->myidenttype);
 		id_b.proto_id = 0;
 		id_b.port = 0;
 

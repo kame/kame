@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sainfo.h,v 1.3 2000/06/08 06:43:52 sakane Exp $ */
+/* YIPS @(#)$Id: sainfo.h,v 1.4 2000/08/31 14:39:06 sakane Exp $ */
 
 #include <sys/queue.h>
 
@@ -42,8 +42,8 @@ struct sainfo {
 
 	time_t lifetime;
 	int lifebyte;
-	int pfs_group;			/* only use when pfs is required. */
-	int myidenttype;		/* local identifier type */
+	int pfs_group;		/* only use when pfs is required. */
+	int myidenttype;	/* local identifier type, see localconf.h */
 	struct sainfoalg *algs[MAXALGCLASS];
 
 	LIST_ENTRY(sainfo) chain;

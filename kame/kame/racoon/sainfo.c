@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: sainfo.c,v 1.7 2000/08/30 11:18:34 sakane Exp $ */
+/* YIPS @(#)$Id: sainfo.c,v 1.8 2000/08/31 14:39:06 sakane Exp $ */
 
 #include <sys/param.h>
 #include <sys/types.h>
@@ -110,6 +110,7 @@ newsainfo()
 	if (new == NULL)
 		return NULL;
 
+	new->myidenttype = LC_IDENTTYPE_ADDRESS;
 	new->lifetime = IPSECDOI_ATTR_SA_LD_SEC_DEFAULT;
 	new->lifebyte = ~(1 << ((sizeof(new->lifebyte) << 3) - 1));
 

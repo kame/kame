@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: localconf.c,v 1.18 2000/08/30 17:26:51 sakane Exp $ */
+/* YIPS @(#)$Id: localconf.c,v 1.19 2000/08/31 14:39:06 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -274,7 +274,7 @@ static int lc_doi2idtype[] = {
 	-1,
 	-1,
 	-1,
-	-1,
+	LC_IDENTTYPE_CERTNAME,
 	-1,
 	LC_IDENTTYPE_KEYID,
 };
@@ -297,7 +297,9 @@ static int lc_idtype2doi[] = {
 	IPSECDOI_ID_FQDN,
 	IPSECDOI_ID_USER_FQDN,
 	IPSECDOI_ID_KEY_ID,
-	0,	/* When type is "address", then it's dealed with default. */
+	-1,	/* if type is "address", it expands to 4 types. */
+	IPSECDOI_ID_DER_ASN1_DN,
+	-1,	/* if type is "certaltname", it expands to a lot of type. */
 };
 
 /*

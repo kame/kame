@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: remoteconf.h,v 1.12 2000/08/09 17:23:21 sakane Exp $ */
+/* YIPS @(#)$Id: remoteconf.h,v 1.13 2000/08/31 14:39:06 sakane Exp $ */
 
 /* remote configuration */
 
@@ -46,7 +46,7 @@ struct remoteconf {
 					 * is a type to be sent first. */
 	int doitype;			/* doi type */
 	int sittype;			/* situation type */
-	int identtype;			/* identifier type */
+	int identtype;			/* identifier type, see localconf.h */
 	int certtype;			/* certificate type if need */
 	char *mycertfile;		/* file name of my certificate */
 	char *myprivfile;		/* file name of my private key file */

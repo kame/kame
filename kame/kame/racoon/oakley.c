@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.50 2000/08/30 11:39:58 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.51 2000/08/31 14:39:06 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -108,9 +108,8 @@ static struct cipher_algorithm cipher[] = {
 
 static int oakley_compute_keymat_x __P((struct ph2handle *, int, int));
 static int get_cert_fromlocal __P((struct ph1handle *, int));
-#if 0
+static int oakley_check_certid __P((struct ph1handle *iph1));
 static int check_typeofcertname __P((int, int));
-#endif
 static cert_t *save_certbuf __P((struct isakmp_gen *));
 
 int
@@ -1141,6 +1140,10 @@ oakley_validate_auth(iph1)
 
 		/* don't cache the certificate passed. */
 
+		/* check ID payload and certificate name */
+		if (oakley_check_certid(iph1) == -1)
+			return -1;
+
 		switch (iph1->rmconf->certtype) {
 		case ISAKMP_CERT_X509SIGN:
 			error = eay_check_x509cert(&iph1->cert_p->cert,
@@ -1235,6 +1238,9 @@ int
 oakley_getmycert(iph1)
 	struct ph1handle *iph1;
 {
+	if (iph1->cert)
+		return 0;	/* There is CERT. */
+
 	return get_cert_fromlocal(iph1, 1);
 }
 
@@ -1375,9 +1381,82 @@ end:
 
 	return error;
 }
+
+/*
+ * compare certificate name and ID value.
+ */
+static int
+oakley_check_certid(iph1)
+	struct ph1handle *iph1;
+{
+	struct ipsecdoi_id_b *id_b;
+	vchar_t *name;
+	char *altname;
+	int idlen, type;
+	int error;
+
+	if (iph1->id_p == NULL || iph1->cert_p == NULL) {
+		plog(logp, LOCATION, NULL, "ERROR: no ID nor CERT found.\n");
+		return -1;
+	}
+
+	id_b = (struct ipsecdoi_id_b *)iph1->id_p->v;
+	idlen = iph1->id_p->l - sizeof(*id_b);
+
+	switch (id_b->type) {
+	case IPSECDOI_ID_DER_ASN1_DN:
+		name = eay_get_x509asn1subjectname(&iph1->cert_p->cert);
+		if (!name) {
+			plog(logp, LOCATION, NULL,
+				"ERROR: Invalid SubjectName.\n");
+			return -1;
+		}
+		if (idlen != name->l) {
+			plog(logp, LOCATION, NULL,
+				"ERROR: Invalid ID length.\n");
+			vfree(name);
+			return -1;
+		}
+		error = memcmp(id_b + 1, name->v, idlen);
+		vfree(name);
+		return error == 0 ? 0 : -1;
+	case IPSECDOI_ID_FQDN:
+	case IPSECDOI_ID_USER_FQDN:
+	case IPSECDOI_ID_IPV4_ADDR:
+	case IPSECDOI_ID_IPV6_ADDR:
+		if (eay_get_x509subjectaltname(&iph1->cert_p->cert,
+				&altname, &type) !=0){
+			plog(logp, LOCATION, NULL,
+				"ERROR: Invalid SubjectAltName.\n");
+		}
+		if (idlen != strlen(altname)) {
+			plog(logp, LOCATION, NULL,
+				"ERROR: Invalid ID length.\n");
+			free(altname);
+			return -1;
+		}
+		if (check_typeofcertname(id_b->type, type) != 0) {
+			plog(logp, LOCATION, NULL,
+				"ERROR: ID type mismatched. ID: %s CERT: %s.\n",
+				s_ipsecdoi_ident(id_b->type),
+				s_ipsecdoi_ident(type));
+			free(altname);
+			return -1;
+		}
+		error = memcmp(id_b + 1, altname, idlen);
+		free(altname);
+		return error == 0 ? 0 : -1;
+	default:
+		plog(logp, LOCATION, NULL,
+			"ERROR: Inpropper ID type passed: %s.\n",
+			s_ipsecdoi_ident(id_b->type));
+		return -1;
+	}
+	/*NOTREACHED*/
+}
+	
 #endif
 
-#if 0
 static int
 check_typeofcertname(doi, genid)
 	int doi, genid;
@@ -1393,11 +1472,11 @@ check_typeofcertname(doi, genid)
 			return -1;
 		return 0;
 	case IPSECDOI_ID_FQDN:
-		if (genid != IPSECDOI_ID_FQDN)
+		if (genid != GENT_DNS)
 			return -1;
 		return 0;
 	case IPSECDOI_ID_USER_FQDN:
-		if (genid != IPSECDOI_ID_USER_FQDN)
+		if (genid != GENT_EMAIL)
 			return -1;
 		return 0;
 	case IPSECDOI_ID_DER_ASN1_DN: /* should not be passed to this function*/
@@ -1408,7 +1487,6 @@ check_typeofcertname(doi, genid)
 	}
 	/*NOTREACHED*/
 }
-#endif
 
 /*
  * save certificate including certificate type.
@@ -1452,6 +1530,35 @@ oakley_savecert(iph1, gen)
 		plog(logp, LOCATION, NULL,
 			"Failed to get CERT buffer.\n");
 		return -1;
+	}
+
+	switch ((*c)->type) {
+	case ISAKMP_CERT_PKCS7:
+	case ISAKMP_CERT_PGP:
+	case ISAKMP_CERT_DNS:
+	case ISAKMP_CERT_X509SIGN:
+	case ISAKMP_CERT_KERBEROS:
+	case ISAKMP_CERT_SPKI:
+		YIPSDEBUG(DEBUG_CERT,
+			plog(logp, LOCATION, NULL, "CERT saved:\n"));
+		YIPSDEBUG(DEBUG_CERT, PVDUMP(&(*c)->cert));
+		YIPSDEBUG(DEBUG_CERT,
+			char *p = eay_get_x509text(&(*c)->cert);
+			plog(logp, LOCATION, NULL, "%s", p ? p : "\n");
+			free(p));
+		break;
+	case ISAKMP_CERT_CRL:
+		YIPSDEBUG(DEBUG_CERT,
+			plog(logp, LOCATION, NULL, "CRL saved:\n"));
+		YIPSDEBUG(DEBUG_CERT, PVDUMP(&(*c)->cert));
+		break;
+	case ISAKMP_CERT_X509KE:
+	case ISAKMP_CERT_X509ATTR:
+	case ISAKMP_CERT_ARL:
+	default:
+		/* XXX */
+		oakley_delcert((*c));
+		return NULL;
 	}
 
 	return 0;
@@ -1499,6 +1606,10 @@ oakley_savecr(iph1, gen)
 		return -1;
 	}
 
+	YIPSDEBUG(DEBUG_CERT,
+		plog(logp, LOCATION, NULL, "CR saved:\n"));
+	YIPSDEBUG(DEBUG_CERT, PVDUMP(&(*c)->cert));
+
 	return 0;
 }
 
@@ -1526,35 +1637,6 @@ save_certbuf(gen)
 	new->type = new->pl->v[0] & 0xff;
 	new->cert.v = new->pl->v + 1;
 	new->cert.l = new->pl->l - 1;
-
-	switch (new->type) {
-	case ISAKMP_CERT_PKCS7:
-	case ISAKMP_CERT_PGP:
-	case ISAKMP_CERT_DNS:
-	case ISAKMP_CERT_X509SIGN:
-	case ISAKMP_CERT_KERBEROS:
-	case ISAKMP_CERT_SPKI:
-		YIPSDEBUG(DEBUG_CERT,
-			plog(logp, LOCATION, NULL, "CERT saved:\n"));
-		YIPSDEBUG(DEBUG_CERT,
-			char *p = eay_get_x509text(new->pl);
-			plog(logp, LOCATION, NULL, "%s", p ? p : "\n");
-			free(p));
-		YIPSDEBUG(DEBUG_CERT, PVDUMP(new->pl));
-		break;
-	case ISAKMP_CERT_CRL:
-		YIPSDEBUG(DEBUG_CERT,
-			plog(logp, LOCATION, NULL, "CRL saved:\n"));
-		YIPSDEBUG(DEBUG_CERT, PVDUMP(new->pl));
-		break;
-	case ISAKMP_CERT_X509KE:
-	case ISAKMP_CERT_X509ATTR:
-	case ISAKMP_CERT_ARL:
-	default:
-		/* XXX */
-		oakley_delcert(new);
-		return NULL;
-	}
 
 	return new;
 }
