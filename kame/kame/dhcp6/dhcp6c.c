@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c.c,v 1.151 2005/01/12 06:06:11 suz Exp $	*/
+/*	$KAME: dhcp6c.c,v 1.152 2005/01/30 02:44:05 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -1677,8 +1677,7 @@ client6_recvadvert(ifp, dh6, len, optinfo)
 			dprintf(LOG_NOTICE, FNAME, "can't copy server ID");
 			return (-1); /* XXX: better recovery? */
 		}
-		if (construct_reqdata(ifp,
-		    &ev->current_server->optinfo, ev)) {
+		if (construct_reqdata(ifp, &ev->current_server->optinfo, ev)) {
 			dprintf(LOG_NOTICE, FNAME,
 			    "failed to construct request data");
 			return (-1); /* XXX */
