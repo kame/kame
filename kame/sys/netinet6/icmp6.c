@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.346 2003/04/23 09:15:49 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.347 2003/06/03 03:29:21 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3202,6 +3202,7 @@ icmp6_redirect_output(m0, rt)
 				/* truncate */
 				m_adj(m0, -extra);
 			}
+			len = m0->m_pkthdr.len + sizeof(*nd_opt_rh);
 		}
 
 		nd_opt_rh = (struct nd_opt_rd_hdr *)p;
