@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.c,v 1.58 2000/07/12 11:24:25 jinmei Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.59 2000/07/12 12:58:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -543,6 +543,8 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 		nin6p = in6p->in6p_next;
 
 		if (do_rtchange) {
+			struct sockaddr_in6 *dst;
+
 			/*
 			 * Since a non-connected PCB might have a cached route,
 			 * we always call in6_rtchange without matching
@@ -550,8 +552,8 @@ in6_pcbnotify(head, dst, fport_arg, laddr6, lport_arg, cmd, notify)
 			 *
 			 * XXX: we assume in6_rtchange does not free the PCB.
 			 */
-			if (IN6_ARE_ADDR_EQUAL(&in6p->in6p_route.ro_dst.sin6_addr,
-					       &faddr6))
+			dst6 = &in6p->in6p_route.ro_dst;
+			if (IN6_ARE_ADDR_EQUAL(&dst6->sin6_addr, &faddr6))
 				in6_rtchange(in6p, errno);
 
 			if (notify == in6_rtchange)
