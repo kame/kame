@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.127 2001/09/21 05:14:18 sakane Exp $	*/
+/*	$KAME: ipsec.c,v 1.128 2001/09/21 06:59:37 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1261,7 +1261,7 @@ ipsec6_get_ulp(m, spidx, needport)
 		break;
 	case IPPROTO_ICMPV6:
 		spidx->ul_proto = nxt;
-		if (off + sizeof(struct udphdr) > m->m_pkthdr.len)
+		if (off + sizeof(struct icmp6_hdr) > m->m_pkthdr.len)
 			break;
 		m_copydata(m, off, sizeof(ih), (caddr_t)&ih);
 		((struct sockaddr_in6 *)&spidx->src)->sin6_port =
