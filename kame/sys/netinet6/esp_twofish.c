@@ -1,4 +1,4 @@
-/*	$KAME: esp_twofish.c,v 1.1 2000/09/20 18:15:23 itojun Exp $	*/
+/*	$KAME: esp_twofish.c,v 1.2 2000/10/02 14:20:29 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -40,6 +40,7 @@
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/socket.h>
+#include <sys/queue.h>
 
 #include <net/if.h>
 #include <net/route.h>
