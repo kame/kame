@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.28 2000/02/25 00:32:22 itojun Exp $	*/
+/*	$KAME: in6_var.h,v 1.29 2000/02/25 05:20:58 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -359,7 +359,7 @@ struct	in6_rrenumreq {
 #define SIOCSIFADDR_IN6		 _IOW('i', 12, struct in6_ifreq)
 #define SIOCGIFADDR_IN6		_IOWR('i', 33, struct in6_ifreq)
 
-#ifdef COMPAT_IN6IFIOCTL
+#ifdef _KERNEL
 /*
  * SIOCSxxx ioctls should be unused (see comments in in6.c), but
  * we do not shift numbers for binary compatibility.
