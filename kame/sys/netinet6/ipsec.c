@@ -1,4 +1,4 @@
-/*	$KAME: ipsec.c,v 1.70 2000/08/18 14:15:34 itojun Exp $	*/
+/*	$KAME: ipsec.c,v 1.71 2000/08/18 15:13:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3246,11 +3246,6 @@ ipsec6_tunnel_validate(ip6, nxt0, sav)
  * allocate a new cluster and copy the data to the new cluster.
  * XXX: this hack is inefficient, but is necessary to handle cases
  * of TCP retransmission...
- *
- * XXX the code assumes that mbuf with M_EXT has the cluster of MCLBYTES
- * (was allocated by MCLGET()).
- * the assumption does not hold for cluster mbufs initialized by
- * MEXTALLOC() or MEXTADD().
  */
 struct mbuf *
 ipsec_copypkt(m)
