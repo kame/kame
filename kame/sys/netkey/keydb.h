@@ -1,4 +1,4 @@
-/*	$KAME: keydb.h,v 1.10 2000/03/25 07:24:13 sumikawa Exp $	*/
+/*	$KAME: keydb.h,v 1.11 2000/06/15 12:20:50 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -78,9 +78,7 @@ struct secasvar {
 	u_int32_t flags;		/* holder for SADB_KEY_FLAGS */
 
 	struct sadb_key *key_auth;	/* Key for Authentication */
-					/* length has been shifted up to 3. */
 	struct sadb_key *key_enc;	/* Key for Encryption */
-					/* length has been shifted up to 3. */
 	caddr_t iv;			/* Initilization Vector */
 	u_int ivlen;			/* length of IV */
 #if 0
