@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/in6_pcb.c,v 1.10.2.4 2001/08/13 16:26:17 ume Exp $	*/
-/*	$KAME: in6_pcb.c,v 1.35 2001/09/26 06:12:58 keiichi Exp $	*/
+/*	$KAME: in6_pcb.c,v 1.36 2001/10/23 09:29:41 sumikawa Exp $	*/
   
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -99,6 +99,9 @@
 #include <netinet6/nd6.h>
 #include <netinet/in_pcb.h>
 #include <netinet6/in6_pcb.h>
+#ifdef ENABLE_DEFAULT_SCOPE
+#include <netinet6/scope6_var.h>
+#endif
 
 #include "faith.h"
 #if defined(NFAITH) && NFAITH > 0
@@ -141,6 +144,12 @@ in6_pcbbind(inp, nam, p)
 		if (nam->sa_family != AF_INET6)
 			return(EAFNOSUPPORT);
 
+#ifdef ENABLE_DEFAULT_SCOPE
+		if (sin6->sin6_scope_id == 0) {	/* not change if specified  */
+			sin6->sin6_scope_id =
+				scope6_addr2default(&sin6->sin6_addr);
+		}
+#endif
 #ifndef SCOPEDROUTING
 		/* KAME hack: embed scopeid */
 		if (in6_embedscope(&sin6->sin6_addr, sin6, inp, NULL) != 0)
@@ -285,6 +294,12 @@ in6_pcbladdr(inp, nam, plocal_addr6)
 	if (sin6->sin6_port == 0)
 		return (EADDRNOTAVAIL);
 
+#ifdef ENABLE_DEFAULT_SCOPE
+	if (sin6->sin6_scope_id == 0) {	/* not change if specified  */
+		sin6->sin6_scope_id =
+			scope6_addr2default(&sin6->sin6_addr);
+	}
+#endif
 #ifndef SCOPEDROUTING
 	/* KAME hack: embed scopeid */
 	if (in6_embedscope(&sin6->sin6_addr, sin6, inp, &ifp) != 0)
@@ -346,7 +361,8 @@ in6_pcbconnect(inp, nam, p)
 	int error;
 
 	/*
-	 *   Call inner routine, to assign local interface address.
+	 * Call inner routine, to assign local interface address.
+	 * in6_pcbladdr() may automatically fill in sin6_scope_id.
 	 */
 	if ((error = in6_pcbladdr(inp, nam, &addr6)) != 0)
 		return(error);
@@ -669,12 +685,10 @@ in6_setsockaddr(so, nam)
 	sin6->sin6_port = inp->inp_lport;
 	sin6->sin6_addr = inp->in6p_laddr;
 	splx(s);
-	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		sin6->sin6_scope_id = ntohs(sin6->sin6_addr.s6_addr16[1]);
-	else
-		sin6->sin6_scope_id = 0;	/*XXX*/
-	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		sin6->sin6_addr.s6_addr16[1] = 0;
+
+#ifndef SCOPEDROUTING
+	in6_recoverscope(sin6, &inp->in6p_laddr, NULL);
+#endif
 
 	*nam = (struct sockaddr *)sin6;
 	return 0;
@@ -707,12 +721,10 @@ in6_setpeeraddr(so, nam)
 	sin6->sin6_port = inp->inp_fport;
 	sin6->sin6_addr = inp->in6p_faddr;
 	splx(s);
-	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		sin6->sin6_scope_id = ntohs(sin6->sin6_addr.s6_addr16[1]);
-	else
-		sin6->sin6_scope_id = 0;	/*XXX*/
-	if (IN6_IS_SCOPE_LINKLOCAL(&sin6->sin6_addr))
-		sin6->sin6_addr.s6_addr16[1] = 0;
+
+#ifndef SCOPEDROUTING
+	in6_recoverscope(sin6, &inp->in6p_faddr, NULL);
+#endif
 
 	*nam = (struct sockaddr *)sin6;
 	return 0;
@@ -731,6 +743,7 @@ in6_mapped_sockaddr(struct socket *so, struct sockaddr **nam)
 		if (error == 0)
 			in6_sin_2_v4mapsin6_in_sock(nam);
 	} else
+	/* scope issues will be handled in in6_setsockaddr(). */
 	error = in6_setsockaddr(so, nam);
 
 	return error;
@@ -749,6 +762,7 @@ in6_mapped_peeraddr(struct socket *so, struct sockaddr **nam)
 		if (error == 0)
 			in6_sin_2_v4mapsin6_in_sock(nam);
 	} else
+	/* scope issues will be handled in in6_setpeeraddr(). */
 	error = in6_setpeeraddr(so, nam);
 
 	return error;
