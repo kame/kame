@@ -1,4 +1,4 @@
-/*	$KAME: sctp_usrreq.c,v 1.24 2003/04/15 06:01:30 itojun Exp $	*/
+/*	$KAME: sctp_usrreq.c,v 1.25 2003/04/17 03:08:40 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_usrreq.c,v 1.151 2002/04/04 16:49:14 lei Exp	*/
 
 /*
@@ -3608,5 +3608,50 @@ sctp_usrreq(so, req, m, nam, control)
 	};
 	splx(s);
 	return (error);
+}
+#endif
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+/*
+ * Sysctl for sctp variables.
+ */
+int
+sctp_sysctl(name, namelen, oldp, oldlenp, newp, newlen)
+	int *name;
+	u_int namelen;
+	void *oldp;
+	size_t *oldlenp;
+	void *newp;
+	size_t newlen;
+{
+
+	/* All sysctl names at this level are terminal. */
+	if (namelen != 1)
+		return (ENOTDIR);
+
+	switch (name[0]) {
+#if 0
+	case SCTPCTL_MAXDGRAM:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		     &sctp_sendspace));
+	case SCTPCTL_RECVSPACE:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &sctp_recvspace));
+#endif
+#if 0
+	case SCTPCTL_ASOC_CNT:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &sctp_max_number_of_assoc));
+	case SCTPCTL_SCALE_VAL:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &sctp_scale_up_for_address));
+#endif
+	case SCTPCTL_AUTOASCONF:
+		return (sysctl_int(oldp, oldlenp, newp, newlen,
+		    &sctp_auto_asconf));
+	default:
+		return (ENOPROTOOPT);
+	}
+	/* NOTREACHED */
 }
 #endif

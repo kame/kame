@@ -1,4 +1,4 @@
-/*	$KAME: sctp_var.h,v 1.8 2002/10/09 18:01:22 itojun Exp $	*/
+/*	$KAME: sctp_var.h,v 1.9 2003/04/17 03:08:40 itojun Exp $	*/
 /*	Header: /home/sctpBsd/netinet/sctp_var.h,v 1.46 2002/04/04 16:53:46 randall Exp	*/
 
 #ifndef _NETINET_SCTP_VAR_H_
@@ -48,8 +48,10 @@
 #include <sys/socketvar.h>
 #endif
 
+#if 0
 #include <netinet/sctp_pcb.h>
 #include <netinet/sctp_uio.h>
+#endif
 
 /* SCTP Kernel structures */
 
@@ -57,6 +59,8 @@
  * SCTP_INPCB structure exported to user-land via sysctl(3).
  * Evil hack: declare only if in_pcb.h and sys/socketvar.h have been
  * included.  Not all of our clients do.
+ *
+ * XXX don't do this, as sctp_inpcb and stuff are not exposed to userland!
  */
 #ifdef __FreeBSD__
 struct  xsctp_inpcb {
@@ -129,6 +133,11 @@ int sctp_usrreq __P((struct socket *, int, struct mbuf *, struct mbuf *,
 extern u_long	sctp_sendspace;
 extern u_long	sctp_recvspace;
 
+struct sctp_nets;
+struct sctp_inpcb;
+struct sctp_tcb;
+struct sctphdr;
+
 #if defined(__OpenBSD__)
 void sctp_fasttim(void);
 #endif
@@ -159,7 +168,8 @@ void ip_2_ip6_hdr __P((struct ip6_hdr *, struct ip *));
 int sctp_bindx(struct socket *, int, struct sockaddr_storage *,
 	int, int, struct proc *);
 
-int sctp_peeloff(struct socket *, struct socket *, int, sctp_assoc_t, int *);
+/* can't use sctp_assoc_t here */
+int sctp_peeloff(struct socket *, struct socket *, int, caddr_t, int *);
 
 int sctp_ingetaddr(struct socket *,
 #if defined(__FreeBSD__)
@@ -186,6 +196,10 @@ int sctp_accept(struct socket *,
 		struct sockaddr *
 #endif
 );
+
+#if defined(__NetBSD__) || defined(__OpenBSD__)
+int	 sctp_sysctl(int *, u_int, void *, size_t *, void *, size_t);
+#endif
 
 #endif /* _KERNEL */
 

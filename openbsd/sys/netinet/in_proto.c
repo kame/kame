@@ -213,20 +213,17 @@ struct protosw inetsw[] = {
 { SOCK_DGRAM,	&inetdomain,	IPPROTO_SCTP,	PR_ADDR_OPT|PR_WANTRCVD,
   sctp_input,	0,		sctp_ctlinput,	sctp_ctloutput,
   sctp_usrreq,
-  sctp_init,	sctp_fasttim,	0,		sctp_drain,
-  0
+  sctp_init,	sctp_fasttim,	0,		sctp_drain,	sctp_sysctl
 },
 { SOCK_SEQPACKET,&inetdomain,	IPPROTO_SCTP,	PR_ADDR_OPT|PR_WANTRCVD,
   sctp_input,	0,		sctp_ctlinput,	sctp_ctloutput,
   sctp_usrreq,
-  0,		sctp_fasttim,	0,		sctp_drain,
-  0
+  0,		sctp_fasttim,	0,		sctp_drain,	sctp_sysctl
 },
 { SOCK_STREAM,	&inetdomain,	IPPROTO_SCTP,	PR_ADDR_OPT|PR_WANTRCVD,
   sctp_input,	0,		sctp_ctlinput,	sctp_ctloutput,
   sctp_usrreq,
-  0,		0,		0,		sctp_drain,
-  0
+  0,		0,		0,		sctp_drain,	sctp_sysctl
 },
 #endif /* SCTP */
 { SOCK_RAW,	&inetdomain,	IPPROTO_RAW,	PR_ATOMIC|PR_ADDR,

@@ -427,7 +427,7 @@ struct group_filter {
  * Third level is protocol number.
  * Fourth level is desired variable within that protocol.
  */
-#define	IPPROTO_MAXID	(IPPROTO_IPCOMP + 1)	/* don't list to IPPROTO_MAX */
+#define	IPPROTO_MAXID	(IPPROTO_SCTP + 1)	/* don't list to IPPROTO_MAX */
 
 #define	CTL_IPPROTO_NAMES { \
 	{ "ip", CTLTYPE_NODE }, \
@@ -539,6 +539,14 @@ struct group_filter {
 	{ 0, 0 }, \
 	{ 0, 0 }, \
 	{ "ipcomp", CTLTYPE_NODE }, \
+	{ 0, 0 }, \
+/*110*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, \
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, \
+/*120*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, \
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, \
+/*130*/	{ 0, 0 }, \
+	{ 0, 0 }, \
+	{ "sctp", CTLTYPE_NODE }, \
 }
 
 /*

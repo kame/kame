@@ -81,6 +81,7 @@ static char *rcsid = "$OpenBSD: sysctl.c,v 1.84 2002/07/06 19:14:20 nordin Exp $
 #include <netinet/tcp_var.h>
 #include <netinet/ip_gre.h>
 #include <netinet/ip_ipcomp.h>
+#include <netinet/sctp_var.h>
 
 #ifdef INET6
 #include <netinet/ip6.h>
@@ -1194,7 +1195,9 @@ sysctl_swpenc(char *string, char **bufpp, int mib[], int flags, int *typep)
 struct ctlname inetname[] = CTL_IPPROTO_NAMES;
 struct ctlname ipname[] = IPCTL_NAMES;
 struct ctlname icmpname[] = ICMPCTL_NAMES;
+#ifdef IGMPCTL_NAMES
 struct ctlname igmpname[] = IGMPCTL_NAMES;
+#endif
 struct ctlname ipipname[] = IPIPCTL_NAMES;
 struct ctlname tcpname[] = TCPCTL_NAMES;
 struct ctlname udpname[] = UDPCTL_NAMES;
@@ -1204,117 +1207,78 @@ struct ctlname etheripname[] = ETHERIPCTL_NAMES;
 struct ctlname grename[] = GRECTL_NAMES;
 struct ctlname mobileipname[] = MOBILEIPCTL_NAMES;
 struct ctlname ipcompname[] = IPCOMPCTL_NAMES;
+struct ctlname sctpname[] = SCTPCTL_NAMES;
 struct list inetlist = { inetname, IPPROTO_MAXID };
 struct list inetvars[] = {
-	{ ipname, IPCTL_MAXID },	/* ip */
+/*0*/	{ ipname, IPCTL_MAXID },	/* ip */
 	{ icmpname, ICMPCTL_MAXID },	/* icmp */
+#ifdef IGMPCTL_NAMES
 	{ igmpname, IGMPCTL_MAXID },	/* igmp */
+#else
+	{ 0, 0 },			/* ggmp */
+#endif
 	{ 0, 0 },			/* ggmp */
 	{ ipipname, IPIPCTL_MAXID },	/* ipencap */
-	{ 0, 0 },
+/*5*/	{ 0, 0 },
 	{ tcpname, TCPCTL_MAXID },	/* tcp */
 	{ 0, 0 },
 	{ 0, 0 },			/* egp */
 	{ 0, 0 },
-	{ 0, 0 },
+/*10*/	{ 0, 0 },
 	{ 0, 0 },
 	{ 0, 0 },			/* pup */
 	{ 0, 0 },
 	{ 0, 0 },
-	{ 0, 0 },
+/*15*/	{ 0, 0 },
 	{ 0, 0 },
 	{ udpname, UDPCTL_MAXID },	/* udp */
 	{ 0, 0 },
 	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
+/*20*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+/*30*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+/*40*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+/*45*/	{ 0, 0 },
 	{ 0, 0 },
 	{ grename, GRECTL_MAXID }, /* GRE */
 	{ 0, 0 },
 	{ 0, 0 },
-	{ espname, ESPCTL_MAXID },	/* esp */
+/*50*/	{ espname, ESPCTL_MAXID },	/* esp */
 	{ ahname, AHCTL_MAXID },	/* ah */
 	{ 0, 0 },
 	{ 0, 0 },
 	{ 0, 0 },
-	{ mobileipname, MOBILEIPCTL_MAXID }, /* mobileip */
+/*55*/	{ mobileipname, MOBILEIPCTL_MAXID }, /* mobileip */
 	{ 0, 0 },
 	{ 0, 0 },
 	{ 0, 0 },
 	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
+/*60*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+/*70*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+/*80*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+/*90*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+/*95*/	{ 0, 0 },
 	{ 0, 0 },
 	{ etheripname, ETHERIPCTL_MAXID },
 	{ 0, 0 },
 	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
-	{ 0, 0 },
+/*100*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+/*105*/	{ 0, 0 },
 	{ 0, 0 },
 	{ 0, 0 },
 	{ ipcompname, IPCOMPCTL_MAXID },
+	{ 0, 0 },
+/*110*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+/*120*/	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+	{ 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 }, { 0, 0 },
+/*130*/	{ 0, 0 },
+	{ 0, 0 },
+	{ sctpname, SCTPCTL_MAXID },
 };
 
 struct list kernmalloclist = { kernmallocname, KERN_MALLOC_MAXID };
