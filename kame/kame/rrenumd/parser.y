@@ -1,4 +1,4 @@
-/*	$KAME: parser.y,v 1.7 2000/11/08 02:40:53 itojun Exp $	*/
+/*	$KAME: parser.y,v 1.8 2000/11/08 03:03:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -578,8 +578,8 @@ raf_decrprefd:
 	;
 
 flag:
-		ON
-	|	OFF
+		ON { $$ = ON; }
+	|	OFF { $$ = OFF; }
 	;
 
 lifetime:
