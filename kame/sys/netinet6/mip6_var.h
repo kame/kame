@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.23 2002/02/01 14:46:24 k-sugyou Exp $	*/
+/*	$KAME: mip6_var.h,v 1.24 2002/02/13 03:37:03 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -134,7 +134,7 @@ struct mip6_bu {
 #define MIP6_BU_STATE_MIP6NOTSUPP 0x80
 
 #define MIP6_BU_TIMEOUT_INTERVAL 1
-#define MIP6_BU_SAWAIT_INTERVAL 10
+#define MIP6_BU_SAWAIT_INTERVAL 4
 
 struct mip6_bc {
 	LIST_ENTRY(mip6_bc)   mbc_entry;
@@ -177,6 +177,8 @@ struct mip6_bc {
 LIST_HEAD(mip6_bc_list, mip6_bc);
 
 #define MIP6_BC_TIMEOUT_INTERVAL 1
+#define MIP6_REFRESH_MINLIFETIME 2
+#define MIP6_REFRESH_LIFETIME_RATE 50
 
 #ifdef MIP6_DRAFT13
 /* Macro for modulo 2^^16 comparison */
@@ -191,6 +193,10 @@ struct mip6_config {
 	u_int8_t mcfg_use_ipsec;
 	u_int8_t mcfg_use_authdata;
 	u_int8_t mcfg_debug;
+	u_int32_t mcfg_bc_lifetime_limit;
+	u_int32_t mcfg_hrbc_lifetime_limit;
+	u_int32_t mcfg_bu_maxlifetime;
+	u_int32_t mcfg_hrbu_maxlifetime;
 };
 #define MIP6_CONFIG_TYPE_MN 1
 #define MIP6_CONFIG_TYPE_HA 2

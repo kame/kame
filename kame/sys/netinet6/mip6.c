@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.114 2002/02/08 04:51:13 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.115 2002/02/13 03:37:03 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -106,6 +106,18 @@
 #ifndef MIP6_CONFIG_USE_AUTHDATA
 #define MIP6_CONFIG_USE_AUTHDATA 1
 #endif /* !MIP6CONFIG_USE_AUTHDATA */
+#ifndef MIP6_CONFIG_BC_LIFETIME_LIMIT
+#define MIP6_CONFIG_BC_LIFETIME_LIMIT 0
+#endif /* !MIP6_CONFIG_BC_LIFETIME_LIMIT */
+#ifndef MIP6_CONFIG_HRBC_LIFETIME_LIMIT
+#define MIP6_CONFIG_HRBC_LIFETIME_LIMIT 0
+#endif /* !MIP6_CONFIG_HRBC_LIFETIME_LIMIT */
+#ifndef MIP6_CONFIG_BU_MAXLIFETIME
+#define MIP6_CONFIG_BU_MAXLIFETIME 0
+#endif /* !MIP6_CONFIG_BU_MAXLIFETIME */
+#ifndef MIP6_CONFIG_HRBU_MAXLIFETIME
+#define MIP6_CONFIG_HRBU_MAXLIFETIME 0
+#endif /* !MIP6_CONFIG_HRBU_MAXLIFETIME */
 
 extern struct mip6_subnet_list mip6_subnet_list;
 extern struct mip6_prefix_list mip6_prefix_list;
@@ -178,6 +190,10 @@ mip6_init()
 	mip6_config.mcfg_use_ipsec = MIP6_CONFIG_USE_IPSEC;
 	mip6_config.mcfg_use_authdata = MIP6_CONFIG_USE_AUTHDATA;
 	mip6_config.mcfg_debug = MIP6_CONFIG_DEBUG;
+	mip6_config.mcfg_bc_lifetime_limit = MIP6_CONFIG_BC_LIFETIME_LIMIT;
+	mip6_config.mcfg_hrbc_lifetime_limit = MIP6_CONFIG_HRBC_LIFETIME_LIMIT;
+	mip6_config.mcfg_bu_maxlifetime = MIP6_CONFIG_BU_MAXLIFETIME;
+	mip6_config.mcfg_hrbu_maxlifetime = MIP6_CONFIG_HRBU_MAXLIFETIME;
 
 #if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ >= 3) 
         callout_init(&mip6_pfx_ch);
@@ -1750,11 +1766,16 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		mbu->mbu_state &= ~MIP6_BU_STATE_WAITACK; /* XXX */
 		if ((mbu->mbu_flags & IP6_BUF_HOME) == 0) {
 			/* XXX */
+			/* try again when piggyback
 			mbu->mbu_state |= MIP6_BU_STATE_BUNOTSUPP;
+			*/
 		}
 		else {
 			/* XXX */
-			mbu->mbu_expire = time_second + MIP6_BU_SAWAIT_INTERVAL;
+			mbu->mbu_lifetime = MIP6_BU_SAWAIT_INTERVAL;
+			mbu->mbu_refresh = mbu->mbu_lifetime;
+			mbu->mbu_expire = time_second + mbu->mbu_lifetime;
+			mbu->mbu_refexpire = mbu->mbu_expire;
 		}
 		error = EACCES;
 		goto freesp;
@@ -1782,6 +1803,35 @@ mip6_bu_destopt_create(pktopt_mip6dest2, src, dst, opts, sc)
 		coa_lifetime = mip6_coa_get_lifetime(&mbu->mbu_coa);
 		lifetime = haddr_lifetime < coa_lifetime ?
 			haddr_lifetime : coa_lifetime;
+		if ((mbu->mbu_flags & IP6_BUF_HOME) == 0) {
+			if (mip6_config.mcfg_bu_maxlifetime > 0 &&
+			    lifetime > mip6_config.mcfg_bu_maxlifetime)
+				lifetime = mip6_config.mcfg_bu_maxlifetime;
+		} else {
+			if (mip6_config.mcfg_hrbu_maxlifetime > 0 &&
+			    lifetime > mip6_config.mcfg_hrbu_maxlifetime)
+				lifetime = mip6_config.mcfg_hrbu_maxlifetime;
+		}
+#ifdef MIP6_SYNC_SA_LIFETIME
+		/* XXX k-sugyou */
+		if (sav != NULL) {
+			u_int32_t sa_lifetime = 0;
+#if 0
+			if (sav->lft_s != NULL &&
+			    sav->lft_s->sadb_lifetime_addtime != 0) {
+				sa_lifetime = sav->lft_s->sadb_lifetime_addtime
+					      - (time_second - sav->created);
+			} else
+#endif
+			if (sav->lft_h != NULL &&
+			    sav->lft_h->sadb_lifetime_addtime != 0) {
+				sa_lifetime = sav->lft_h->sadb_lifetime_addtime
+					      - (time_second - sav->created);
+			}
+			if (sa_lifetime > 0 && lifetime > sa_lifetime)
+				lifetime = sa_lifetime;
+		}
+#endif /* MIP6_SYNC_SA_LIFETIME */
 		bcopy((caddr_t)&lifetime, (caddr_t)bu_opt.ip6ou_lifetime,
 		      sizeof(lifetime));
 		mbu->mbu_lifetime = lifetime;

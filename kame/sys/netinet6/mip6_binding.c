@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.81 2002/02/08 03:22:32 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.82 2002/02/13 03:37:03 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -902,6 +902,54 @@ mip6_validate_bu(m, opt)
 		return (1);
 	}
 
+	/*
+	 * check if the received sequence number of the binding update
+	 * > the last received sequence number.
+	 */
+	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &ip6a->ip6a_home);
+	if (mbc == NULL) {
+		/* no binding cache entry yet.  create it later. */
+		goto check_suboptions;
+	}
+#ifdef MIP6_DRAFT13
+	GET_NETVAL_S(bu_opt->ip6ou_seqno, seqno);
+#else
+	seqno = bu_opt->ip6ou_seqno;
+#endif
+	if (MIP6_LEQ(seqno, mbc->mbc_seqno)) {
+		ip6stat.ip6s_badoptions++;
+		mip6log((LOG_NOTICE,
+			 "%s:%d: received sequence no (%d) <= current "
+			 "seq no (%d) in BU from host %s.\n",
+			 __FILE__, __LINE__,
+			 seqno,
+			 mbc->mbc_seqno, ip6_sprintf(&ip6->ip6_src)));
+#ifndef MIP6_DRAFT13
+		/*
+		 * the seqno of this binding update is smaller than the
+		 * corresponding binding cache.  we send TOO_SMALL
+		 * binding ack as an error.  in this case, we use the
+		 * coa of the incoming packet instead of the coa
+		 * stored in the binding cache as a destination
+		 * addrress.  because the sending mobile node's coa
+		 * might have changed after it had registered before.
+		 */
+		error = mip6_bc_send_ba(&mbc->mbc_addr,
+					&mbc->mbc_phaddr, &ip6a->ip6a_coa,
+					MIP6_BA_STATUS_SEQNO_TOO_SMALL,
+					mbc->mbc_seqno,
+					0, 0);
+		if (error) {
+			mip6log((LOG_ERR,
+				 "%s:%d: sending a binding ack failed.\n",
+				 __FILE__, __LINE__));
+		}
+#endif /* !MIP6_DRAFT13 */
+		/* silently ignore. */
+		return (1);
+	}
+
+ check_suboptions:
 	/* check sub-option(s). */
 	if (bu_opt->ip6ou_len > IP6OPT_BULEN) {
 		/* we have sub-option(s). */
@@ -993,53 +1041,6 @@ mip6_validate_bu(m, opt)
 #endif /* !MIP6_DRAFT13 */
 #endif /* IPSEC && !__OpenBSD__ */
 
-	/*
-	 * check if the received sequence number of the binding update
-	 * > the last received sequence number.
-	 */
-	mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list, &ip6a->ip6a_home);
-	if (mbc == NULL) {
-		/* no binding cache entry yet.  create it later. */
-		return (0);
-	}
-#ifdef MIP6_DRAFT13
-	GET_NETVAL_S(bu_opt->ip6ou_seqno, seqno);
-#else
-	seqno = bu_opt->ip6ou_seqno;
-#endif
-	if (MIP6_LEQ(seqno, mbc->mbc_seqno)) {
-		ip6stat.ip6s_badoptions++;
-		mip6log((LOG_NOTICE,
-			 "%s:%d: received sequence no (%d) <= current "
-			 "seq no (%d) in BU from host %s.\n",
-			 __FILE__, __LINE__,
-			 seqno,
-			 mbc->mbc_seqno, ip6_sprintf(&ip6->ip6_src)));
-#ifndef MIP6_DRAFT13
-		/*
-		 * the seqno of this binding update is smaller than the
-		 * corresponding binding cache.  we send TOO_SMALL
-		 * binding ack as an error.  in this case, we use the
-		 * coa of the incoming packet instead of the coa
-		 * stored in the binding cache as a destination
-		 * addrress.  because the sending mobile node's coa
-		 * might have changed after it had registered before.
-		 */
-		error = mip6_bc_send_ba(&mbc->mbc_addr,
-					&mbc->mbc_phaddr, &ip6a->ip6a_coa,
-					MIP6_BA_STATUS_SEQNO_TOO_SMALL,
-					mbc->mbc_seqno,
-					0, 0);
-		if (error) {
-			mip6log((LOG_ERR,
-				 "%s:%d: sending a binding ack failed.\n",
-				 __FILE__, __LINE__));
-		}
-#endif /* !MIP6_DRAFT13 */
-		/* silently ignore. */
-		return (1);
-	}
-
 	/* we have a valid binding update. */
 	return (0);
 }
@@ -1109,6 +1110,9 @@ mip6_process_bu(m, opt)
 	if ((lifetime != 0) && (!IN6_ARE_ADDR_EQUAL(&ip6a->ip6a_home, pcoa))) {
 		/* check home registration flag. */
 		if (bu_opt->ip6ou_flags & IP6_BUF_HOME) {
+			if (mip6_config.mcfg_hrbc_lifetime_limit > 0 &&
+			    lifetime > mip6_config.mcfg_hrbc_lifetime_limit)
+				lifetime = mip6_config.mcfg_hrbc_lifetime_limit;
 			/* a request for a home registration. */
 			if (MIP6_IS_HA) {
 				/* XXX TODO write code of section 9.1 */
@@ -1136,6 +1140,9 @@ mip6_process_bu(m, opt)
 				return (0); /* XXX is 0 OK? */
 			}
 		} else {
+			if (mip6_config.mcfg_bc_lifetime_limit > 0 &&
+			    lifetime > mip6_config.mcfg_bc_lifetime_limit)
+				lifetime = mip6_config.mcfg_bc_lifetime_limit;
 			/* a request to cache binding. */
 			mbc = mip6_bc_list_find_withphaddr(&mip6_bc_list,
 							   &ip6a->ip6a_home);
@@ -1499,7 +1506,7 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 	struct mip6_bc *mbc = NULL;
 	struct mip6_bc *dad_mbc = NULL;
 	struct in6_addr lladdr = in6addr_any;
-	u_int32_t prlifetime;
+	u_int32_t prlifetime, refresh;
 #if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
 	long time_second = time.tv_sec;
 #endif
@@ -1752,11 +1759,15 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 	}
 	else {
 		/* return BA */
+		refresh = lifetime * MIP6_REFRESH_LIFETIME_RATE / 100;
+		if (refresh < MIP6_REFRESH_MINLIFETIME)
+			refresh = lifetime < MIP6_REFRESH_MINLIFETIME ?
+				  lifetime : MIP6_REFRESH_MINLIFETIME;
 		if (mip6_bc_send_ba(haaddr, haddr0, coa,
 				    MIP6_BA_STATUS_ACCEPTED,
 				    seqno,
 				    lifetime,
-				    lifetime / 2 /* XXX */)) {
+				    refresh)) {
 			mip6log((LOG_ERR,
 				 "%s:%d: sending BA to %s(%s) failed. "
 				 "send it later.\n",
@@ -2375,7 +2386,65 @@ mip6_validate_ba(m, opt)
 		return (1);
 	}
 
+	/*
+	 * check if the sequence number of the binding update sent ==
+	 * the sequence number of the binding ack received.
+	 */
+	sc = hif_list_find_withhaddr(&ip6->ip6_dst);
+	if (sc == NULL) {
+		/*
+		 * if we receive a binding ack before sending binding
+		 * updates(!), sc will be NULL.  because we search the
+		 * hif interface that have a binding update entry having
+		 * ip6_dst as a home address.
+		 */
+		mip6log((LOG_NOTICE,
+			 "%s:%d: no matching binding update entry found.\n",
+			 __FILE__, __LINE__));
+		/* silently ignore. */
+		return (1);
+	}
+	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &ip6->ip6_src);
+	if (mbu == NULL) {
+		mip6log((LOG_NOTICE,
+			 "%s:%d: no matching binding update entry found.\n",
+			 __FILE__, __LINE__));
+		/* silently ignore */
+		return (1);
+	}
+#ifdef MIP6_DRAFT13
+	GET_NETVAL_S(ba_opt->ip6oa_seqno, seqno);
+#else
+	seqno = ba_opt->ip6oa_seqno;
+	if (ba_opt->ip6oa_status == MIP6_BA_STATUS_SEQNO_TOO_SMALL) {
+		/*
+		 * our home agent has a greater sequence number in its
+		 * binging cache entriy of mine.  we should resent
+		 * binding update with greater than the sequence
+		 * number of the binding cache already exists in our
+		 * home agent.  this binding ack is valid though the
+		 * sequence number doesn't match.
+		 */
+		goto check_suboptions;
+	}
+	else
+#endif /* MIP6_DRAFT13 */
+	if (seqno != mbu->mbu_seqno) {
+		ip6stat.ip6s_badoptions++;
+		mip6log((LOG_NOTICE,
+			 "%s:%d: unmached sequence no "
+			 "(%d recv, %d sent) from host %s.\n",
+			 __FILE__, __LINE__,
+			 seqno,
+			 mbu->mbu_seqno,
+			 ip6_sprintf(&ip6->ip6_src)));
+		/* silently ignore. */
+		return (1);
+	}
 
+#ifndef MIP6_DRAFT13
+ check_suboptions:
+#endif
 	/* check sub-option(s). */
 	if (ba_opt->ip6oa_len > IP6OPT_BALEN) {
 		/* we have sub-option(s). */
@@ -2461,65 +2530,6 @@ mip6_validate_ba(m, opt)
 #endif /* !MIP6_DRAFT13 */
 #endif /* IPSEC && !__OpenBSD__ */
 
-	/*
-	 * check if the sequence number of the binding update sent ==
-	 * the sequence number of the binding ack received.
-	 */
-	sc = hif_list_find_withhaddr(&ip6->ip6_dst);
-	if (sc == NULL) {
-		/*
-		 * if we receive a binding ack before sending binding
-		 * updates(!), sc will be NULL.  because we search the
-		 * hif interface that have a binding update entry having
-		 * ip6_dst as a home address.
-		 */
-		mip6log((LOG_NOTICE,
-			 "%s:%d: no matching binding update entry found.\n",
-			 __FILE__, __LINE__));
-		/* silently ignore. */
-		return (1);
-	}
-	mbu = mip6_bu_list_find_withpaddr(&sc->hif_bu_list, &ip6->ip6_src);
-	if (mbu == NULL) {
-		mip6log((LOG_NOTICE,
-			 "%s:%d: no matching binding update entry found.\n",
-			 __FILE__, __LINE__));
-		/* silently ignore */
-		return (1);
-	}
-#ifdef MIP6_DRAFT13
-	GET_NETVAL_S(ba_opt->ip6oa_seqno, seqno);
-#else
-	seqno = ba_opt->ip6oa_seqno;
-	if (ba_opt->ip6oa_status == MIP6_BA_STATUS_SEQNO_TOO_SMALL) {
-		/*
-		 * our home agent has a greater sequence number in its
-		 * binging cache entriy of mine.  we should resent
-		 * binding update with greater than the sequence
-		 * number of the binding cache already exists in our
-		 * home agent.  this binding ack is valid though the
-		 * sequence number doesn't match.
-		 */
-		goto validate_ba_valid;
-	}
-	else
-#endif /* MIP6_DRAFT13 */
-	if (seqno != mbu->mbu_seqno) {
-		ip6stat.ip6s_badoptions++;
-		mip6log((LOG_NOTICE,
-			 "%s:%d: unmached sequence no "
-			 "(%d recv, %d sent) from host %s.\n",
-			 __FILE__, __LINE__,
-			 seqno,
-			 mbu->mbu_seqno,
-			 ip6_sprintf(&ip6->ip6_src)));
-		/* silently ignore. */
-		return (1);
-	}
-
-#ifndef MIP6_DRAFT13
- validate_ba_valid:
-#endif /* !MIP6_DRAFT13 */
 	/* we have a valid binding ack. */
 	return (0);
 }
