@@ -1,5 +1,21 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2065 2002/01/29 14:18:16 fujisawa Exp $
+$KAME: CHANGELOG,v 1.2066 2002/02/02 12:34:41 jinmei Exp $
+
+<200202>
+2002-02-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* many kernel files: totally revised IPv6 scoped address
+	architecture in the kernel.
+	- sticked to use sockaddr_in6, not in6_addr, as much as possible
+	- did not refer to ip6_src/ip6_dst (which may have ambiguity on
+	  scope zones), but used full sockaddr_in6 structures attached to
+	  the packet
+	- replaced special cases for link-local addresses with code that
+	  used generic functions such as in6_addr2zoneid()
+        - additional cleanups mainly for scoped address handling
+
+	The change is so big and we'll need some more time to stabilize
+	the code.  It is not recommended to use the latest code for
+	purposes that need stable behavior.
 
 <200201>
 2002-01-29 Shin'ichi Fujisawa	<fujisawa@kame.net>
