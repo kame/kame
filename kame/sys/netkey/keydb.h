@@ -1,4 +1,4 @@
-/*	$KAME: keydb.h,v 1.14 2000/08/02 17:58:26 sakane Exp $	*/
+/*	$KAME: keydb.h,v 1.15 2002/05/22 09:44:49 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -104,7 +104,7 @@ struct secreplay {
 	u_int32_t seq;		/* used by sender */
 	u_int32_t lastseq;	/* used by receiver */
 	caddr_t bitmap;		/* used by receiver */
-	int overflow;		/* overflow flag */
+	int overflow;		/* what round does the counter take. */
 };
 
 /* socket table due to send PF_KEY messages. */
