@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.53 2000/01/17 10:11:15 itojun Exp $ */
+/* KAME $Id: key.c,v 1.54 2000/01/17 10:50:07 itojun Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -301,13 +301,8 @@ static struct sadb_msg *key_spdadd __P((caddr_t *mhp));
 static struct sadb_msg *key_spddelete __P((caddr_t *mhp));
 static struct sadb_msg *key_spdflush __P((caddr_t *mhp));
 static int key_spddump __P((caddr_t *mhp, struct socket *so, int target));
-#if 0
-static u_int key_setdumpsp __P((struct sadb_msg *newmsg, struct secpolicy *sp,
-				u_int8_t type, u_int32_t seq, u_int32_t pid));
-#else
 static struct mbuf *key_setdumpsp __P((struct secpolicy *sp,
 				u_int8_t type, u_int32_t seq, u_int32_t pid));
-#endif
 static u_int key_getspmsglen __P((struct secpolicy *sp));
 static u_int key_getspreqmsglen __P((struct secpolicy *sp));
 static struct secashead *key_newsah __P((struct secasindex *saidx));
@@ -1564,14 +1559,8 @@ key_spddump(mhp, so, target)
 	struct sadb_msg *msg0;
 	struct secpolicy *sp;
 	int cnt;
-#if 0
-	int len;
-	struct sadb_msg *newmsg;
-#endif
 	u_int dir;
-#if 1
 	struct mbuf *m;
-#endif
 
 	/* sanity check */
 	if (mhp == NULL || mhp[0] == NULL)
@@ -1590,44 +1579,20 @@ key_spddump(mhp, so, target)
 	if (cnt == 0)
 		return ENOENT;
 
-#if 0
-	newmsg = NULL;
-#endif
 	for (dir = 0; dir < IPSEC_DIR_MAX; dir++) {
 		__LIST_FOREACH(sp, &sptree[dir], chain) {
 			--cnt;
-#if 0
-			len = key_getspmsglen(sp);
-
-			/* making buffer */
-			KMALLOC(newmsg, struct sadb_msg *, len);
-			if (newmsg == NULL) {
-				printf("key_spddump: No more memory.\n");
-				return ENOBUFS;
-			}
-			bzero((caddr_t)newmsg, len);
-
-			(void)key_setdumpsp(newmsg, sp, SADB_X_SPDDUMP,
-			                    cnt, msg0->sadb_msg_pid);
-
-			key_sendup(so, newmsg, len, target);
-
-			KFREE(newmsg);
-			newmsg = NULL;
-#else
 			m = key_setdumpsp(sp, SADB_X_SPDDUMP,
 			                    cnt, msg0->sadb_msg_pid);
 
 			if (m)
 				key_sendup_mbuf(so, m, target);
-#endif
 		}
 	}
 
 	return 0;
 }
 
-#if 1
 static struct mbuf *
 key_setdumpsp(sp, type, seq, pid)
 	struct secpolicy *sp;
@@ -1715,63 +1680,6 @@ key_setdumpsp(sp, type, seq, pid)
 
 	return m;
 }
-#else
-static u_int
-key_setdumpsp(newmsg, sp, type, seq, pid)
-	struct sadb_msg *newmsg;
-	struct secpolicy *sp;
-	u_int8_t type;
-	u_int32_t seq, pid;
-{
-	u_int tlen;
-	caddr_t p;
-
-	tlen = key_getspmsglen(sp);
-
-	p = key_setsadbmsg((caddr_t)newmsg, type, tlen,
-	                   SADB_SATYPE_UNSPEC, seq, pid,
-	                   IPSEC_MODE_ANY, 0,
-			   0, sp->refcnt);
-
-	p = key_setsadbaddr(p,
-	                    SADB_EXT_ADDRESS_SRC,
-	                    (struct sockaddr *)&sp->spidx.src,
-	                    sp->spidx.prefs,
-	                    sp->spidx.ul_proto);
-	p = key_setsadbaddr(p,
-	                    SADB_EXT_ADDRESS_DST,
-	                    (struct sockaddr *)&sp->spidx.dst,
-	                    sp->spidx.prefd,
-	                    sp->spidx.ul_proto);
-
-    {
-	struct mbuf *n;
-	struct sadb_x_policy *tmp;
-
-	n = key_sp2msg(sp);
-	if (!n || n->m_len < sizeof(*tmp)) {
-#ifdef IPSEC_DEBUG
-		printf("key_setdumpsp: No more memory.\n");
-#endif
-		return ENOBUFS;
-	}
-	tmp = mtod(n, struct sadb_x_policy *);
-
-	/* validity check */
-	if (key_getspreqmsglen(sp) != PFKEY_UNUNIT64(tmp->sadb_x_policy_len)
-	 || n->m_len != PFKEY_UNUNIT64(tmp->sadb_x_policy_len))
-		panic("key_setdumpsp: length mismatch."
-		      "sp:%d msg:%d\n",
-			key_getspreqmsglen(sp),
-			PFKEY_UNUNIT64(tmp->sadb_x_policy_len));
-	
-	m_copydata(n, 0, M_COPYALL, p);
-	m_freem(n);
-    }
-
-	return tlen;
-}
-#endif
 
 /* get sadb message length for a SP. */
 static u_int
