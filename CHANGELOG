@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1431 2000/12/07 12:13:19 jinmei Exp $
+$KAME: CHANGELOG,v 1.1432 2000/12/08 07:06:50 itojun Exp $
 
 <200012>
+Fri Dec  8 16:05:04 JST 2000  itojun@iijlab.net
+	* netbsd/sys/nfs: avoid IPv6 path MTU discovery if UDP is used as the
+	  transport layer.  TODO: make NFS aware of path MTU discovery.
+
 2000-12-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ipsec.c (ipsec6_output_trans): when an ipsec
 	SA cannot be found while ipsec is required, send an icmp6
