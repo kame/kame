@@ -1,6 +1,6 @@
 	Installation procedure - preparation of the tree
 	KAME project
-	$Id: INSTALL,v 1.18 2000/02/14 06:58:53 itojun Exp $
+	$Id: INSTALL,v 1.19 2000/02/18 04:38:17 itojun Exp $
 
 Let's call the entire file-tree under this directory "the KAME tree".
 
@@ -69,6 +69,7 @@ perform "make obj" unless you are ready to tackle those troubles.
 	Note that we do not support ports-current/pkgsrc-current.  Please
 	stick to the ports/pkgsrc came the FreeBSD/NetBSD you are using.
 	In this case you should have /usr/{pkg,local}/include/openssl/des.h.
+	We do not support ports/pkgsrc with non-standard LOCALBASE/PREFIX.
 
    If you install OpenSSL with some other ways, the KAME tree
    may fail to find OpenSSL and omit compilation of, for
