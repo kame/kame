@@ -1,5 +1,11 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2144 2002/04/30 15:05:30 jinmei Exp $
+$KAME: CHANGELOG,v 1.2145 2002/05/01 06:15:17 jinmei Exp $
+
+<200205>
+2002-05-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/dhcp6c.c (client6_send): ensured that the
+	transaction-ID unchanged in retransmissions of a message according
+	to Section 15.1 of dhcpv6-24.
 
 <200204>
 2002-04-30  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
