@@ -128,6 +128,7 @@ struct yy_aggrinfo {
 	struct yy_aggrinfo *next;
 	struct in6_prefix prefix;
 	struct attr_list *aggrinfo;
+	int line;
 };
 
 struct yy_rtproto {
@@ -816,6 +817,7 @@ add_aggregation(prefix, aggrinfo)
 	memset(info, 0, sizeof(*info));
 	info->prefix = *prefix;
 	info->aggrinfo = aggrinfo;
+	info->line = lineno;
 
 	info->next = yy_aggr_head;
 	yy_aggr_head = info;
@@ -1712,6 +1714,7 @@ aggregate_config()
 	struct yy_aggrinfo *info;
 	struct attr_list *attr;
 	struct rt_entry *aggregated;
+	extern struct rt_entry *aggregations;
 
 	cprint("Aggregation config\n");
 	for (info = yy_aggr_head; info; info = info->next) {
@@ -1749,6 +1752,22 @@ aggregate_config()
 				break;
 			}
 			cprint("\n");
+		}
+
+		if (aggregations) {
+			if (find_rte(aggregated, aggregations)) {
+				warnx("%s line %d: aggregate route doubly "
+				      "doubly defined: %s/%d",
+				      configfilename, info->line,
+				      ip6str(&info->prefix.paddr.sin6_addr, 0),
+				      info->prefix.plen);
+				return(-1);
+			}
+			insque(aggregated, aggregations);
+		} else {
+			aggregated->rt_next = aggregated;
+			aggregated->rt_prev = aggregated;
+			aggregations = aggregated;
 		}
 	}
 
