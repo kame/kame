@@ -1,5 +1,5 @@
 KAME FAQ
-$KAME: FAQ,v 1.33 2001/07/16 03:32:29 itojun Exp $
+$KAME: FAQ,v 1.34 2001/07/23 15:13:26 itojun Exp $
 
 
 GENERAL
@@ -480,3 +480,15 @@ Q: What is "KAME"?  Why did you choose the name?
 	turtle please help me debug my code...".
 	(http://www.itojun.org/diary/19970930-1005/kame.html) This
 	is the real reason for the name.
+
+Q: Official stuffed turtles?
+	Itojun have distributed official stuffed turtles at IETFs and other
+	events, however, they are out of stock already.  Too bad.  Plat'home
+	(www.plathome.co.jp) may still have some, so order them over the web
+	(not sure about overseas shipping).
+
+	History: Nakajima corporation (specialized in stuffed animals)
+	had a really cute turtle, but they were discontinued.  Some people
+	at KAME project and friends have ordered 2400 of them for re-issue.
+	The official turtles had a special label on them, which has the
+	URL of the KAME project webpage.
