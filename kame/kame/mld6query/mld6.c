@@ -193,11 +193,12 @@ make_msg(int index, struct in6_addr *addr, u_int type)
 		errx(1, "inet6_opt_append(0) failed");
 	if ((hbhlen = inet6_opt_finish(NULL, 0, hbhlen)) == -1)
 		errx(1, "inet6_opt_finish(0) failed");
+	cmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(hbhlen);
 #else
 	hbhlen = sizeof(raopt); 
+	cmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) +
+	    inet6_option_space(hbhlen);
 #endif 
-
-	cmsglen = CMSG_SPACE(sizeof(struct in6_pktinfo)) + CMSG_SPACE(hbhlen);
 
 	if ((cmsgbuf = malloc(cmsglen)) == NULL)
 		errx(1, "can't allocate enough memory for cmsg");
