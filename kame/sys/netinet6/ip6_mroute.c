@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.81 2002/09/23 13:16:30 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.82 2002/10/01 07:04:42 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -636,7 +636,8 @@ ip6_mrouter_done()
 	 */
 	if (inet6domain.dom_ifdetach) {
 		ifp = &multicast_register_if;
-		inet6domain.dom_ifdetach(ifp, ifp->if_afdata[AF_INET6]);
+		if (ifp->if_afdata[AF_INET6])
+			inet6domain.dom_ifdetach(ifp, ifp->if_afdata[AF_INET6]);
 		ifp->if_afdata[AF_INET6] = NULL;
 	}
 	reg_mif_num = -1;
