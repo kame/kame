@@ -1,4 +1,4 @@
-/*	$KAME: in6_pcb.h,v 1.10 2000/11/30 12:55:16 jinmei Exp $	*/
+/*	$KAME: in6_pcb.h,v 1.11 2001/01/20 15:55:07 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -115,6 +115,7 @@ int in6_embedscope __P((struct in6_addr *, const struct sockaddr_in6 *,
 	struct inpcb *, struct ifnet **));
 int in6_recoverscope __P((struct sockaddr_in6 *, const struct in6_addr *,
 	struct ifnet *));
+void in6_clearscope __P((struct in6_addr *));
 #endif /* KERNEL */
 
 #endif /* !_NETINET6_IN6_PCB_H_ */
