@@ -1,0 +1,17 @@
+vs microsoft
+    as responder
+	phase 1の最後のパケットを再送してくる。kame側のstate machineの
+	null pointer checkが足りず落ちた。明日再挑戦。
+
+vs bluesteel
+	うまくいったらしい。
+
+vs racoon
+	rekey問題を解決したあと
+	- phase 2を5秒に1回rekey
+	- phase 1を8秒に1回rekey
+	などのいじめをしているが、おおむね快調。
+	たまにphase 2の失敗がある(pingしてると10秒くらい穴があく)。
+
+vs ashley laurent
+	phase 1 keyid supportいれてよんと言われた。今回間に合うのかな。
