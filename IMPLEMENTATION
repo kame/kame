@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.289 2001/12/20 09:14:15 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.290 2001/12/20 09:19:39 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -667,7 +667,7 @@ sent from a user application as follows:
    Note that this item/option overrides the bound address of the
    corresponding (datagram) socket.
 
-2. if the corresponding socket is bound, use the address.
+2. if the corresponding socket is bound, use the bound address.
 
 3. otherwise, the kernel first tries to find the outgoing interface of
    the packet.  If it fails, the source address selection also fails.
