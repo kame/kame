@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.201 2001/02/16 12:23:40 itojun Exp $	*/
+/*	$KAME: icmp6.c,v 1.202 2001/03/01 16:15:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -539,14 +539,6 @@ icmp6_input(mp, offp, proto)
 		default:
 			goto freeit;
 		}
-	}
-#endif
-
-#ifdef IPSEC
-	/* drop it if it does not match the default policy */
-	if (ipsec6_in_reject(m, NULL)) {
-		ipsec6stat.in_polvio++;
-		goto freeit;
 	}
 #endif
 
