@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.159 2001/07/17 03:28:55 itojun Exp $	*/
+/*	$KAME: nd6.c,v 1.160 2001/07/18 11:51:57 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -152,6 +152,7 @@ static struct sockaddr_in6 all1_sa;
 
 static void nd6_slowtimo __P((void *));
 static int regen_tmpaddr __P((struct in6_ifaddr *));
+static struct llinfo_nd6 *nd6_free __P((struct rtentry *));
 
 #ifdef __NetBSD__
 struct callout nd6_slowtimo_ch = CALLOUT_INITIALIZER;
@@ -1041,7 +1042,7 @@ nd6_is_addr_neighbor(addr, ifp)
 /*
  * Free an nd6 llinfo entry.
  */
-struct llinfo_nd6 *
+static struct llinfo_nd6 *
 nd6_free(rt)
 	struct rtentry *rt;
 {
