@@ -105,11 +105,6 @@
 #include <netinet6/ipcomp.h>
 #endif /* IPSEC */
 
-#include "gif.h"
-#if NGIF > 0
-#include <netinet/in_gif.h>
-#endif
-
 #ifdef IPXIP
 #include <netipx/ipx_ip.h>
 #endif
@@ -271,16 +266,6 @@ struct protosw inetsw[] = {
   &rip_usrreqs
 },
 };
-
-#if NGIF > 0
-struct protosw in_gif_protosw =
-{ SOCK_RAW,	&inetdomain,	0/*IPPROTO_IPV[46]*/,	PR_ATOMIC|PR_ADDR,
-  in_gif_input, rip_output,	0,		rip_ctloutput,
-  0,
-  0,            0,              0,              0,
-  &rip_usrreqs
-};
-#endif /*NGIF*/
 
 extern int in_inithead __P((void **, int));
 

@@ -1,4 +1,4 @@
-/*	$KAME: in_gif.c,v 1.71 2001/09/04 08:43:18 itojun Exp $	*/
+/*	$KAME: in_gif.c,v 1.72 2001/10/19 09:50:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -58,6 +58,7 @@
 #include <sys/ioctl.h>
 #endif
 #include <sys/syslog.h>
+#include <sys/protosw.h>
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <sys/malloc.h>
@@ -105,7 +106,21 @@ int ip_gif_ttl = 0;
 SYSCTL_INT(_net_inet_ip, IPCTL_GIF_TTL, gifttl, CTLFLAG_RW,
 	&ip_gif_ttl,	0, "");
 #endif
-extern struct protosw in_gif_protosw;
+
+extern struct domain inetdomain;
+struct protosw in_gif_protosw =
+{ SOCK_RAW,	&inetdomain,	0/*IPPROTO_IPV[46]*/,	PR_ATOMIC|PR_ADDR,
+  in_gif_input, rip_output,	0,		rip_ctloutput,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  0,
+#else
+  rip_usrreq,
+#endif
+  0,            0,              0,              0,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  &rip_usrreqs
+#endif
+};
 
 #ifndef offsetof
 #define offsetof(s, e) ((int)&((s *)0)->e)

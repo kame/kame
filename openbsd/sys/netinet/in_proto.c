@@ -119,11 +119,6 @@ didn't get a copy, you may request one from <license@ipv6.nrl.navy.mil>.
  * TCP/IP protocol family: IP, ICMP, UDP, TCP.
  */
 
-#include "gif.h"
-#if NGIF > 0
-#include <netinet/in_gif.h>
-#endif
-
 #ifdef NSIP
 #include <netns/ns_var.h>
 #include <netns/idp_var.h>
@@ -279,15 +274,6 @@ struct protosw inetsw[] = {
   rip_init,	0,		0,		0,
 },
 };
-
-#if NGIF > 0
-struct protosw in_gif_protosw =
-{ SOCK_RAW,	&inetdomain,	0/*IPPROTO_IPV[46]*/,	PR_ATOMIC|PR_ADDR,
-  in_gif_input, rip_output,	0,		rip_ctloutput,
-  rip_usrreq,
-  0,            0,              0,              0,
-};
-#endif /*NGIF*/
 
 struct domain inetdomain =
     { AF_INET, "internet", 0, 0, 0, 
