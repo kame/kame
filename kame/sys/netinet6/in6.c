@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.317 2002/09/25 13:52:47 keiichi Exp $	*/
+/*	$KAME: in6.c,v 1.318 2002/09/26 09:26:12 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -498,11 +498,11 @@ in6_control(so, cmd, data, ifp)
 	case SIOCSMIP6CFG:
 	case SIOCSUNUSEHA:
 	case SIOCDUNUSEHA:
+	case SIOCDBC:
 		if (!privileged)
 			return (EPERM);
 		return (mip6_ioctl(cmd, data));
 	case SIOCGBC:
-	case SIOCDBC:
 	case SIOCSPREFERREDIFNAMES:
 		return (mip6_ioctl(cmd, data));
 	}

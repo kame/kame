@@ -1,4 +1,4 @@
-/*	$KAME: mip6_pktproc.c,v 1.56 2002/09/26 08:19:20 t-momose Exp $	*/
+/*	$KAME: mip6_pktproc.c,v 1.57 2002/09/26 09:26:12 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.  All rights reserved.
@@ -623,6 +623,8 @@ mip6_ip6mu_input(m, ip6mu, ip6mulen)
 			m_freem(m);
 			mip6stat.mip6s_rrauthfail++;
 			error = EINVAL;
+			bi.mbc_status = IP6MA_STATUS_INVAL_AUTHENTICATOR;
+			bi.mbc_send_ba = 1;
 			goto send_ba;
 		}
 		if (bi.mbc_lifetime > MIP6_MAX_RR_BINDING_LIFE)
