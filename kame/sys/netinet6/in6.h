@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.122 2002/05/01 03:39:01 jinmei Exp $	*/
+/*	$KAME: in6.h,v 1.123 2002/05/01 03:39:51 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -925,8 +925,11 @@ extern int inet6_rth_reverse __P((const void *, void *));
 extern int inet6_rth_segments __P((const void *));
 extern struct in6_addr *inet6_rth_getaddr __P((const void *, int));
 
-/* the followings two are experimental.  should not merge them to *BSD. */
-struct sockaddr;		/* XXX */
+/*
+ * the followings two functions are experimental.
+ * should not merge them to *BSD.
+ */
+struct sockaddr;		/* XXX: to suppress compilation warnings */
 
 extern int addr2scopetype __P((struct sockaddr *));
 extern int inet_zoneid __P((int, int, char *, u_int32_t *));
