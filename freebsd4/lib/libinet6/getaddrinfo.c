@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.18 2001/01/05 04:22:03 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.19 2001/01/05 04:33:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -113,10 +113,10 @@
 # define FAITH
 #endif
 
-#define	SUCCESS 0
-#define	ANY 0
-#define	YES 1
-#define	NO  0
+#define SUCCESS 0
+#define ANY 0
+#define YES 1
+#define NO  0
 
 static const char in_addrany[] = { 0, 0, 0, 0 };
 static const char in6_addrany[] = {
@@ -137,14 +137,14 @@ static const struct afd {
 	int a_scoped;
 } afdl [] = {
 #ifdef INET6
-#define	N_INET6 0
+#define N_INET6 0
 	{PF_INET6, sizeof(struct in6_addr),
 	 sizeof(struct sockaddr_in6),
 	 offsetof(struct sockaddr_in6, sin6_addr),
 	 in6_addrany, in6_loopback, 1},
-#define	N_INET 1
+#define N_INET 1
 #else
-#define	N_INET 0
+#define N_INET 0
 #endif
 	{PF_INET, sizeof(struct in_addr),
 	 sizeof(struct sockaddr_in),
@@ -159,9 +159,9 @@ struct explore {
 	int e_protocol;
 	const char *e_protostr;
 	int e_wild;
-#define	WILD_AF(ex)		((ex)->e_wild & 0x01)
-#define	WILD_SOCKTYPE(ex)	((ex)->e_wild & 0x02)
-#define	WILD_PROTOCOL(ex)	((ex)->e_wild & 0x04)
+#define WILD_AF(ex)		((ex)->e_wild & 0x01)
+#define WILD_SOCKTYPE(ex)	((ex)->e_wild & 0x02)
+#define WILD_PROTOCOL(ex)	((ex)->e_wild & 0x04)
 };
 
 static const struct explore explore[] = {
@@ -180,9 +180,9 @@ static const struct explore explore[] = {
 };
 
 #ifdef INET6
-#define	PTON_MAX	16
+#define PTON_MAX	16
 #else
-#define	PTON_MAX	4
+#define PTON_MAX	4
 #endif
 
 #if PACKETSZ > 1024
@@ -249,7 +249,6 @@ static int res_searchN __P((const char *, struct res_target *));
 static int res_querydomainN __P((const char *, const char *,
 	struct res_target *));
 
-
 static char *ai_errlist[] = {
 	"Success",
 	"Address family for hostname not supported",	/* EAI_ADDRFAMILY */
@@ -274,7 +273,7 @@ static char *ai_errlist[] = {
 /*
  * Select order host function.
  */
-#define	MAXHOSTCONF	4
+#define MAXHOSTCONF	4
 
 #ifndef HOSTCONF
 #  define	HOSTCONF	"/etc/host.conf"
@@ -299,7 +298,7 @@ static void	_hostconf_init(void);
 
 /* XXX macros that make external reference is BAD. */
 
-#define	GET_AI(ai, afd, addr) \
+#define GET_AI(ai, afd, addr) \
 do { \
 	/* external reference: pai, error, and label free */ \
 	(ai) = get_ai(pai, (afd), (addr)); \
@@ -309,7 +308,7 @@ do { \
 	} \
 } while (/*CONSTCOND*/0)
 
-#define	GET_PORT(ai, serv) \
+#define GET_PORT(ai, serv) \
 do { \
 	/* external reference: error and label free */ \
 	error = get_port((ai), (serv), 0); \
@@ -317,7 +316,7 @@ do { \
 		goto free; \
 } while (/*CONSTCOND*/0)
 
-#define	GET_CANONNAME(ai, str) \
+#define GET_CANONNAME(ai, str) \
 do { \
 	/* external reference: pai, error and label free */ \
 	error = get_canonname(pai, (ai), (str)); \
@@ -325,7 +324,7 @@ do { \
 		goto free; \
 } while (/*CONSTCOND*/0)
 
-#define	ERR(err) \
+#define ERR(err) \
 do { \
 	/* external reference: error, and label bad */ \
 	error = (err); \
@@ -333,9 +332,9 @@ do { \
 	/*NOTREACHED*/ \
 } while (/*CONSTCOND*/0)
 
-#define	MATCH_FAMILY(x, y, w) \
+#define MATCH_FAMILY(x, y, w) \
 	((x) == (y) || (/*CONSTCOND*/(w) && ((x) == PF_UNSPEC || (y) == PF_UNSPEC)))
-#define	MATCH(x, y, w) \
+#define MATCH(x, y, w) \
 	((x) == (y) || (/*CONSTCOND*/(w) && ((x) == ANY || (y) == ANY)))
 
 char *
@@ -480,7 +479,7 @@ getaddrinfo(hostname, servname, hints, res)
 	 */
 	if (MATCH_FAMILY(pai->ai_family, PF_INET, 1)
 #ifdef PF_INET6
-	    || MATCH_FAMILY(pai->ai_family, PF_INET6, 1)
+	 || MATCH_FAMILY(pai->ai_family, PF_INET6, 1)
 #endif
 	    ) {
 		ai0 = *pai;	/* backup *pai */

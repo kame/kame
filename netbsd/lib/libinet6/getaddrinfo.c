@@ -1,4 +1,4 @@
-/*	$KAME: getaddrinfo.c,v 1.34 2001/01/05 04:32:40 itojun Exp $	*/
+/*	$KAME: getaddrinfo.c,v 1.35 2001/01/05 04:33:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -373,7 +373,7 @@ getaddrinfo(hostname, servname, hints, res)
 	pai->ai_canonname = NULL;
 	pai->ai_addr = NULL;
 	pai->ai_next = NULL;
-	
+
 	if (hostname == NULL && servname == NULL)
 		return EAI_NONAME;
 	if (hints) {
