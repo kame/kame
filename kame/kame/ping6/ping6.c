@@ -1361,7 +1361,8 @@ pr_addr(addr)
 		flag |= NI_NUMERICHOST;
 	flag |= NI_WITHSCOPEID;
 
-	getnameinfo(addr, sizeof(*addr), buf, sizeof(buf), NULL, 0, flag);
+	getnameinfo((struct sockaddr *)addr, addr->sin6_len, buf, sizeof(buf),
+		NULL, 0, flag);
 
 	return (buf);
 }
