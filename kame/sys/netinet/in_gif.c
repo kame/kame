@@ -53,6 +53,10 @@
 #endif
 #include <sys/protosw.h>
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include <sys/malloc.h>
+#endif
+
 #include <net/if.h>
 #include <net/route.h>
 #include <net/if_gif.h>

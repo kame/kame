@@ -91,6 +91,12 @@
 
 #include <net/net_osdep.h>
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#include <sys/kernel.h>
+#include <sys/malloc.h>
+MALLOC_DEFINE(M_NETADDR, "Export Host", "Export host address structure");
+#endif
+
 struct encaptab {
 	LIST_ENTRY(encaptab) chain;
 	int af;
