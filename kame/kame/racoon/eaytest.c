@@ -1,4 +1,4 @@
-/*	$KAME: eaytest.c,v 1.42 2003/11/13 19:51:43 sakane Exp $	*/
+/*	$KAME: eaytest.c,v 1.43 2004/04/08 09:15:10 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,7 +64,9 @@ u_int32_t loglevel = 4;
 /* prototype */
 
 void rsatest __P((int, char **));
+#if 0
 static vchar_t *pem_read_buf __P((char *));
+#endif
 void certtest __P((int, char **));
 static char **getcerts __P((char *));
 void ciphertest __P((int, char **));
@@ -85,6 +87,7 @@ rsatest(ac, av)
 	int ac;
 	char **av;
 {
+#if 0
 	char *text = "this is test.";
 	vchar_t src;
 	vchar_t *priv, *pub, *sig;
@@ -133,8 +136,11 @@ rsatest(ac, av)
 		printf("verifying failed.\n");
 	else
 		printf("verified.\n");
+#endif
+	return;
 }
 
+#if 0
 static vchar_t *
 pem_read_buf(buf)
 	char *buf;
@@ -157,6 +163,7 @@ pem_read_buf(buf)
 
 	return ret;
 }
+#endif
 
 void
 certtest(ac, av)
