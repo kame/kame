@@ -214,7 +214,8 @@ options 	TCP_ECN		# ECN support in TCP
 
 #device		atm	1
 device  	dummy	1
-device		stf	1
+device		stf	1	# 6to4
+device		ist	1	# ISATAP
 
 # Mobile IPv6
 #options 	MIP6
