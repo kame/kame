@@ -42,7 +42,7 @@ static const char copyright[] =
 static char sccsid[] = "@(#)ifconfig.c	8.2 (Berkeley) 2/16/94";
 #endif
 static const char rcsid[] =
-  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.38.2.2 1999/12/13 02:02:20 jkh Exp $";
+  "$FreeBSD: src/sbin/ifconfig/ifconfig.c,v 1.38.2.3 2000/01/11 12:31:04 ru Exp $";
 #endif /* not lint */
 
 #include <sys/param.h>
@@ -606,10 +606,10 @@ ifconfig(argc, argv, afp)
 		}
 	}
 	if (newaddr) {
-		if (afp->af_ridreq == NULL || afp->af_difaddr == 0) {
+		if (afp->af_addreq == NULL || afp->af_aifaddr == 0) {
 			warnx("interface %s cannot change %s addresses!",
 			      name, afp->af_name);
-			newaddr = NULL;
+			newaddr = 0;
 		}
 	}
 	if (newaddr) {
@@ -633,6 +633,8 @@ setifaddr(addr, param, s, afp)
 	int s;
 	const struct afswtch *afp;
 {
+	if (*afp->af_getaddr == NULL)
+		return;
 	/*
 	 * Delay the ioctl to set the interface addr until flags are all set.
 	 * The address interpretation may depend on the flags,
@@ -651,6 +653,8 @@ setifnetmask(addr, dummy, s, afp)
 	int s;
 	const struct afswtch *afp;
 {
+	if (*afp->af_getaddr == NULL)
+		return;
 	(*afp->af_getaddr)(addr, MASK);
 }
 
@@ -691,6 +695,8 @@ setifbroadaddr(addr, dummy, s, afp)
 	int s;
 	const struct afswtch *afp;
 {
+	if (*afp->af_getaddr == NULL)
+		return;
 	(*afp->af_getaddr)(addr, DSTADDR);
 }
 
@@ -735,6 +741,8 @@ setifdstaddr(addr, param, s, afp)
 	int s;
 	const struct afswtch *afp;
 {
+	if (*afp->af_getaddr == NULL)
+		return;
 	(*afp->af_getaddr)(addr, DSTADDR);
 }
 
