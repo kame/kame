@@ -1,4 +1,4 @@
-/*	$KAME: esp_output.c,v 1.42 2001/03/01 07:08:55 itojun Exp $	*/
+/*	$KAME: esp_output.c,v 1.43 2001/03/01 07:10:45 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -451,9 +451,8 @@ esp_output(m, nexthdrp, md, isr, af)
 	if (randpadmax < 0 || plen + extendsiz >= randpadmax)
 		;
 	else {
-		int m, n;
+		int n;
 
-		m = randpadmax;
 		/* round */
 		randpadmax = (randpadmax / padbound) * padbound;
 		n = (randpadmax - plen + extendsiz) / padbound;
