@@ -35,7 +35,7 @@ CLEANFILES+= lex.yy.c y.tab.h y.tab.c
 CFLAGS+= -g
 CFLAGS+=-I${.OBJDIR}
 CFLAGS+=-DINET6 -DPIM -DIOCTL_OK_ON_RAW_SOCKET -DUSE_RFC2292BIS -I${SRCDIR}
-CFLAGS+=-DHAVE_STDARG_H
+CFLAGS+=-DHAVE_STDARG_H -DYY_NO_UNPUT
 LDADD+=	-L${.CURDIR}/../../../lib/libinet6 \
 	-L${.CURDIR}/../../../lib/libinet6/obj \
 	-L/usr/local/v6/lib -linet6
