@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.43 2001/01/15 03:53:36 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.44 2001/01/15 03:55:09 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.43 2001/01/15 03:53:36 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.44 2001/01/15 03:55:09 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -1564,7 +1564,7 @@ rtrecv()
 	struct ifa_msghdr *ifam;
 	struct if_msghdr *ifm;
 	int len;
-	struct ifc *ifcp,*ic;
+	struct ifc *ifcp, *ic;
 	int iface = 0, rtable = 0;
 	struct sockaddr_in6 *rta[RTAX_MAX];
 	int i, addrs;
@@ -1985,7 +1985,7 @@ ifrt(ifcp, again)
 	int again;
 {
 	struct ifac *ifa;
-	struct riprt *rrt,*search_rrt,*prev_rrt,*loop_rrt;
+	struct riprt *rrt, *search_rrt, *prev_rrt, *loop_rrt;
 	struct netinfo6 *np;
 	time_t t_lifetime;
 	int need_trigger = 0;
@@ -2194,7 +2194,7 @@ ifrt_p2p(ifcp, again)
 			rrt->rrt_info.rip6_metric = 1 + ifcp->ifc_metric;
 			memset(&rrt->rrt_gw, 0, sizeof(struct in6_addr));
 			np = &rrt->rrt_info;
-			if (rtsearch(np ,NULL) == NULL) {
+			if (rtsearch(np, NULL) == NULL) {
 				/* Attach the route to the list */
 				trace(1, "route: %s/%d: register route "
 				    "(%s on %s%s)\n",
