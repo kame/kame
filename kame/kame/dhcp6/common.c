@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.99 2004/05/13 13:28:13 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.100 2004/05/13 13:48:07 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -945,6 +945,7 @@ dhcp6_get_options(p, ep, optinfo)
 	char *cp, *val;
 	u_int16_t val16;
 	u_int32_t val32;
+	struct in6_addr valaddr;
 	struct dhcp6opt_ia optia;
 	struct dhcp6_ia ia;
 	struct dhcp6_list sublist;
@@ -1119,19 +1120,21 @@ dhcp6_get_options(p, ep, optinfo)
 				goto malformed;
 			for (val = cp; val < cp + optlen;
 			     val += sizeof(struct in6_addr)) {
+				memcpy(&valaddr, val, sizeof(valaddr));
 				if (dhcp6_find_listval(&optinfo->sip_list,
-				    DHCP6_LISTVAL_ADDR6, val, 0)) {
+				    DHCP6_LISTVAL_ADDR6, &valaddr, 0)) {
 					dprintf(LOG_INFO, FNAME, "duplicated "
 					    "SIP server address (%s)",
-					    in6addr2str((struct in6_addr *)val,
-						0));
+					    in6addr2str(&valaddr, 0));
 					goto nextsip;
 				}
 
 				if (dhcp6_add_listval(&optinfo->sip_list,
-				    DHCP6_LISTVAL_ADDR6, val, NULL) == NULL) {
+				    DHCP6_LISTVAL_ADDR6, &valaddr, NULL)
+				    == NULL) {
 					dprintf(LOG_ERR, FNAME,
-					    "failed to copy SIP server address");
+					    "failed to copy "
+					    "SIP server address");
 					goto fail;
 				}
 			  nextsip:
@@ -1143,17 +1146,18 @@ dhcp6_get_options(p, ep, optinfo)
 				goto malformed;
 			for (val = cp; val < cp + optlen;
 			     val += sizeof(struct in6_addr)) {
+				memcpy(&valaddr, val, sizeof(valaddr));
 				if (dhcp6_find_listval(&optinfo->dns_list,
-				    DHCP6_LISTVAL_ADDR6, val, 0)) {
+				    DHCP6_LISTVAL_ADDR6, &valaddr, 0)) {
 					dprintf(LOG_INFO, FNAME, "duplicated "
 					    "DNS address (%s)",
-					    in6addr2str((struct in6_addr *)val,
-						0));
+					    in6addr2str(&valaddr, 0));
 					goto nextdns;
 				}
 
 				if (dhcp6_add_listval(&optinfo->dns_list,
-				    DHCP6_LISTVAL_ADDR6, val, NULL) == NULL) {
+				    DHCP6_LISTVAL_ADDR6, &valaddr, NULL)
+				    == NULL) {
 					dprintf(LOG_ERR, FNAME,
 					    "failed to copy DNS address");
 					goto fail;
@@ -1192,17 +1196,18 @@ dhcp6_get_options(p, ep, optinfo)
 				goto malformed;
 			for (val = cp; val < cp + optlen;
 			     val += sizeof(struct in6_addr)) {
+				memcpy(&valaddr, val, sizeof(valaddr));
 				if (dhcp6_find_listval(&optinfo->ntp_list,
-				    DHCP6_LISTVAL_ADDR6, val, 0)) {
+				    DHCP6_LISTVAL_ADDR6, &valaddr, 0)) {
 					dprintf(LOG_INFO, FNAME, "duplicated "
 					    "NTP server address (%s)",
-					    in6addr2str((struct in6_addr *)val,
-						0));
+					    in6addr2str(&valaddr, 0));
 					goto nextntp;
 				}
 
 				if (dhcp6_add_listval(&optinfo->ntp_list,
-				    DHCP6_LISTVAL_ADDR6, val, NULL) == NULL) {
+				    DHCP6_LISTVAL_ADDR6, &valaddr, NULL)
+				    == NULL) {
 					dprintf(LOG_ERR, FNAME, "failed to "
 					    "copy NTP server address");
 					goto fail;
@@ -2045,8 +2050,9 @@ copyout_option(p, ep, optval)
 		    htonl(optval->val_prefix6.vltime);
 		pd_prefix.dh6_iapd_prefix_prefix_len =
 		    optval->val_prefix6.plen;
-		pd_prefix.dh6_iapd_prefix_prefix_addr =
-		    optval->val_prefix6.addr;
+		/* XXX: prefix_addr is badly aligned, so we need memcpy */
+		memcpy(&pd_prefix.dh6_iapd_prefix_prefix_addr,
+		    &optval->val_prefix6.addr, sizeof(struct in6_addr));
 		break;
 	case DHCP6_LISTVAL_STCODE:
 		stcodeopt.dh6_stcode_code = htons(optval->val_num16);
