@@ -228,7 +228,7 @@ in6_pcbbind(inp, nam)
       if (lport)
 	{
 	  struct inpcb *t;
-#if 0
+#if 0 /* we don't support IPv4 mapped address */
 	  struct in_addr fa,la;
 #endif
 
@@ -244,7 +244,7 @@ in6_pcbbind(inp, nam)
 	      (error = suser(p->p_ucred, &p->p_acflag)))
 	    return error;
 
-#if 0
+#if 0 /* we don't support IPv4 mapped address */
 	  if (IN6_IS_ADDR_V4MAPPED(&sin6->sin6_addr))
 	    {
 	      fa.s_addr = 0;
@@ -616,14 +616,11 @@ in6_pcbnotify(head, dst, fport_arg, la, lport_arg, cmd, notify)
 	 *
 	 * XXX: we assume in_rtchange does not free the PCB.
 	 */
-	if (IN6_ARE_ADDR_EQUAL(&inp->inp_route6.ro_dst.sin6_addr, faddr)) {
-	    {
-	      in_rtchange(inp, errno);
-	    }
+	if (IN6_ARE_ADDR_EQUAL(&inp->inp_route6.ro_dst.sin6_addr, faddr))
+	  in_rtchange(inp, errno);
 
-	  if (notify == in_rtchange)
-		  continue;		/* there's nothing to do any more */
-	}
+	if (notify == in_rtchange)
+	  continue;		/* there's nothing to do any more */
       }
 
       if (!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, faddr) ||
@@ -663,16 +660,8 @@ in6_setsockaddr(inp, nam)
   sin6->sin6_len = sizeof(struct sockaddr_in6);
   sin6->sin6_port = inp->inp_lport;
   sin6->sin6_addr = inp->inp_laddr6;
-  /* XXX: KAME specific: move embedded link ID to sin6_scope_id */
-  if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)  ||
-      IN6_IS_ADDR_MC_LINKLOCAL(&sin6->sin6_addr)) {
-      sin6->sin6_scope_id = ntohs(sin6->sin6_addr.s6_addr16[1]);
-  }
-  else
-      sin6->sin6_scope_id = 0;	/* XXX */
-  if (IN6_IS_ADDR_LINKLOCAL(&sin6->sin6_addr)  ||
-      IN6_IS_ADDR_MC_LINKLOCAL(&sin6->sin6_addr))
-      sin6->sin6_addr.s6_addr16[1] = 0;
+  /* KAME hack: recover scopeid */
+  (void)in6_recoverscope(sin6, &inp->inp_laddr6, NULL);
 
   return 0;
 }
