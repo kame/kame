@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.385 2005/03/17 08:29:18 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.386 2005/03/19 02:49:13 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -232,6 +232,11 @@ RFC3776: Using IPsec to Protect Mobile IPv6 Signaling between Mobile
 	Nodes and Home Agents
 RFC3810: Multicast Listener Discovery Version 2 (MLDv2) for IPv6
     * host-side implementation & router-side implementation (pim6sd).
+RFC4007: IPv6 Scoped Address Architecture
+    * some part of the documentation (especially about the routing
+      model) is not supported yet.
+    * zone indices that contain scope types have not been supported yet.
+
 draft-chakrabarti-mobileip-mipext-advapi-02.txt:
 	Extension to Sockets API for Mobile IPv6
     * See section 6 about these MIP6 related issues.
@@ -239,12 +244,6 @@ draft-ietf-ipngwg-router-selection-01.txt:
 	Default Router Preferences and More-Specific Routes
     * router-side: both router preference and specific routes are supported.
     * host-side: only router preference is supported.
-draft-ietf-ipv6-scoping-arch-02.txt:
-	The architecture, text representation, and usage of IPv6
-	scoped addresses.
-    * some part of the documentation (especially about the routing
-      model) is not supported yet.
-    * zone indices that contain scope types have not been supported yet.
 draft-ietf-ipv6-privacy-addrs-v2-01.txt:
 	Privacy Extensions for Stateless Address Autoconfiguration in IPv6
     * a revised version of RFC 3041.
