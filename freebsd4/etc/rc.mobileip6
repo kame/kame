@@ -1,5 +1,5 @@
 #! /bin/sh -x
-# $Id: rc.mobileip6,v 1.10 2004/12/09 02:17:53 t-momose Exp $
+# $Id: rc.mobileip6,v 1.11 2004/12/14 08:49:18 t-momose Exp $
 
 # Mobile IPv6 startup
 
@@ -83,6 +83,9 @@ mobileip6_pass2() {
 			;;
 		esac
 		;;
+	*)
+		echo -n ' cnd'
+		cnd -n
 	esac
 
 	echo ''
