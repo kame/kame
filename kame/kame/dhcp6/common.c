@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.97 2004/03/21 14:40:51 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.98 2004/03/31 14:47:21 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -521,39 +521,6 @@ in6_addrscopebyif(addr, ifnam)
 		return (1);	/* XXX */
 
 	return (1);		/* treat it as global */
-}
-
-/* XXX: this code assumes getifaddrs(3) */
-const char *
-getdev(addr)
-	struct sockaddr_in6 *addr;
-{
-	struct ifaddrs *ifap, *ifa;
-	struct sockaddr_in6 *a6;
-	static char ret_ifname[IF_NAMESIZE];
-
-	if (getifaddrs(&ifap) != 0) {
-		err(1, "getdev: getifaddrs");
-		/* NOTREACHED */
-	}
-
-	for (ifa = ifap; ifa; ifa = ifa->ifa_next) {
-		if (ifa->ifa_addr->sa_family != AF_INET6)
-			continue;
-
-		a6 = (struct sockaddr_in6 *)ifa->ifa_addr;
-		if (!IN6_ARE_ADDR_EQUAL(&a6->sin6_addr, &addr->sin6_addr) ||
-		    a6->sin6_scope_id != addr->sin6_scope_id)
-			continue;
-
-		break;
-	}
-
-	if (ifa)
-		strlcpy(ret_ifname, ifa->ifa_name, sizeof(ret_ifname));
-	freeifaddrs(ifap);
-
-	return (ifa ? ret_ifname : NULL);
 }
 
 int

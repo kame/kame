@@ -1,4 +1,4 @@
-/*	$KAME: common.h,v 1.36 2003/08/01 01:20:05 jinmei Exp $	*/
+/*	$KAME: common.h,v 1.37 2004/03/31 14:47:21 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -75,7 +75,6 @@ extern int prefix6_mask __P((struct in6_addr *, int));
 extern int sa6_plen2mask __P((struct sockaddr_in6 *, int));
 extern char *addr2str __P((struct sockaddr *));
 extern char *in6addr2str __P((struct in6_addr *, int));
-extern const char *getdev __P((struct sockaddr_in6 *));
 extern int in6_addrscopebyif __P((struct in6_addr *, char *));
 extern int in6_scope __P((struct in6_addr *));
 extern void setloglevel __P((int));
