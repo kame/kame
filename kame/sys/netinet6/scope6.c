@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.22 2001/11/10 09:13:55 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.23 2001/11/11 16:51:49 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -44,7 +44,11 @@
 #include <netinet6/in6_var.h>
 #include <netinet6/scope6_var.h>
 
+#ifdef ENABLE_DEFAULT_SCOPE
+int ip6_use_defzone = 1;
+#else
 int ip6_use_defzone = 0;
+#endif
 
 struct scope6_id {
 	/*
