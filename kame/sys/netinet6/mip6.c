@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.86 2001/12/07 10:30:32 keiichi Exp $	*/
+/*	$KAME: mip6.c,v 1.87 2001/12/12 00:32:53 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -99,10 +99,10 @@ struct callout mip6_pfx_ch;
 #endif
 int mip6_pfx_timer_running = 0;
 
-static int mip6_determine_location_withpinfo __P((struct hif_softc *,
-						  struct in6_addr *,
-						  struct nd_prefix *,
-						  struct nd_defrouter *));
+static int mip6_prefix_list_update_sub __P((struct hif_softc *,
+					    struct in6_addr *,
+					    struct nd_prefix *,
+					    struct nd_defrouter *));
 static int mip6_haddr_config __P((struct hif_softc *));
 static int mip6_attach_haddrs __P((struct hif_softc *));
 static int mip6_detach_haddrs __P((struct hif_softc *));
@@ -161,7 +161,7 @@ mip6_init()
  * from the advertised prefix, we can find our current location.
  */
 int
-mip6_process_pinfo(saddr, ndpr, dr, m)
+mip6_prefix_list_update(saddr, ndpr, dr, m)
 	struct in6_addr *saddr;
 	struct nd_prefix *ndpr;
 	struct nd_defrouter *dr;
@@ -186,7 +186,7 @@ mip6_process_pinfo(saddr, ndpr, dr, m)
 		 * determine the current location from the advertised
 		 * prefix and router information.
 		 */
-		error = mip6_determine_location_withpinfo(sc, saddr, ndpr, dr);
+		error = mip6_prefix_list_update_sub(sc, saddr, ndpr, dr);
 		if (error) {
 			mip6log((LOG_ERR,
 				 "%s:%d: error while determining location.\n",
@@ -213,7 +213,8 @@ mip6_process_pinfo(saddr, ndpr, dr, m)
 }
 
 /*
- * determine the current location according to the following algorithm.
+ * check the recieved prefix information and associate it with the
+ * existing prefix/homeagent list.
  *
  * if (ndpr == homepr) {
  *   we are home
@@ -227,7 +228,7 @@ mip6_process_pinfo(saddr, ndpr, dr, m)
  * }
  */
 static int
-mip6_determine_location_withpinfo(sc, rtaddr, ndpr, dr)
+mip6_prefix_list_update_sub(sc, rtaddr, ndpr, dr)
 	struct hif_softc *sc;
 	struct in6_addr *rtaddr;
 	struct nd_prefix *ndpr;
