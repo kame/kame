@@ -1,4 +1,4 @@
-$Id: CHANGELOG,v 1.463 2000/01/18 17:40:13 itojun Exp $
+$Id: CHANGELOG,v 1.464 2000/01/18 18:28:10 itojun Exp $
 
 
 <200001>
@@ -12,6 +12,7 @@ Wed Jan 19 00:15:50 JST 2000  itojun@iijlab.net
 	  debate in ipngwg mailing list, so I thought it would be good to
 	  bring it in and try using it, to see any pros/cons we might have
 	  in particular proposal (and other proposals).
+	  (available in netbsd, openbsd, freebsd2 and freebsd3)
 
 Tue Jan 18 22:48:35 JST 2000  itojun@iijlab.net
 	* kame/libinet6/rresvport_af.c: preserve old rresvport() behavior.
