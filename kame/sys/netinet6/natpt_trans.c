@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.100 2002/04/18 17:32:34 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.101 2002/04/19 06:30:33 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -185,7 +185,6 @@ int		 natpt_icmp4EchoReply	__P((struct pcv *, struct pcv *));
 void		 natpt_icmp4Unreach	__P((struct pcv *, struct pcv *,
 					     struct pAddr *));
 int		 natpt_icmp4Echo		__P((struct pcv *, struct pcv *));
-void		 natpt_icmp4Paramprob	__P((struct pcv *, struct pcv *));
 int		 natpt_icmp4MimicPayload	__P((struct pcv *, struct pcv *,
 					     struct pAddr *));
 struct mbuf	*natpt_translateTCPv4To6	__P((struct pcv *, struct pAddr *));
@@ -901,7 +900,10 @@ natpt_translateICMPv4To6(struct pcv *cv4, struct pAddr *pad)
 		break;
 
 	case ICMP_PARAMPROB:
-		natpt_icmp4Paramprob(cv4, &cv6);
+		icmp6 = cv6.pyld.icmp6;
+		icmp6->icmp6_type = ICMP6_PARAM_PROB;
+		icmp6->icmp6_code = 0;
+		icmp6len = natpt_icmp4MimicPayload(cv4, &cv6, pad);
 		break;
 
 	case ICMP_REDIRECT:
@@ -1068,16 +1070,6 @@ natpt_icmp4Echo(struct pcv *cv4, struct pcv *cv6)
 }
 
 
-void
-natpt_icmp4Paramprob(struct pcv *cv4, struct pcv *cv6)
-{
-	struct icmp6_hdr	*icmp6 = cv6->pyld.icmp6;
-
-	icmp6->icmp6_type = ICMP6_PARAM_PROB;
-	icmp6->icmp6_code = 0;
-}
-
-
 int
 natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 {
@@ -1085,6 +1077,8 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 	int		icmp6rest;
 	struct ip	*icmpip4, *ip4 = cv4->ip.ip4;
 	struct ip6_hdr	*icmpip6;
+	struct icmp	*icmp4;
+	struct icmp6_hdr *icmp6;
 	caddr_t		icmp4off, icmp4dgramoff;
 	caddr_t		icmp6off, icmp6dgramoff;
 	caddr_t		icmp4end = (caddr_t)ip4 + cv4->m->m_pkthdr.len;
@@ -1115,13 +1109,9 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 
 	switch (cv4->pyld.icmp4->icmp_type) {
 	case ICMP_ECHO:	/* ping unreach */
-		{
-			struct icmp6_hdr	*icmp6;
-
-			icmp6 = (struct icmp6_hdr *)((caddr_t)icmpip6 +
-						     sizeof(struct ip6_hdr));
-			icmp6->icmp6_type = ICMP6_ECHO_REQUEST;
-		}
+		icmp6 = (struct icmp6_hdr *)((caddr_t)icmpip6 +
+					     sizeof(struct ip6_hdr));
+		icmp6->icmp6_type = ICMP6_ECHO_REQUEST;
 		break;
 
 	case ICMP_UNREACH:
@@ -1134,6 +1124,21 @@ natpt_icmp4MimicPayload(struct pcv *cv4, struct pcv *cv6, struct pAddr *pad)
 			icmpudp6->uh_sport = pad->port[0];
 			icmpudp6->uh_dport = pad->port[1];
 		}
+		break;
+
+		case ICMP_PARAMPROB:
+		icmp4 = cv4->pyld.icmp4;
+		icmp6 = cv6->pyld.icmp6;
+		icmp6->icmp6_pptr
+			= (icmp4->icmp_pptr == 0) ? 0   /* version */
+			: (icmp4->icmp_pptr == 2) ? 4   /* payload length */
+			: (icmp4->icmp_pptr == 8) ? 7   /* hop limit */
+			: (icmp4->icmp_pptr == 9) ? 6   /* next header */
+			: (icmp4->icmp_pptr == 12) ? 8  /* source address */
+			: (icmp4->icmp_pptr == 16) ? 24 /* destination address */
+			: 0xffffffff; /* XXX */
+
+		HTONL(icmp6->icmp6_pptr);
 		break;
 	}
 
