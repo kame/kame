@@ -1,7 +1,21 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.1730 2001/06/18 08:02:22 itojun Exp $
+$KAME: CHANGELOG,v 1.1731 2001/06/18 14:36:56 fujisawa Exp $
 
 <200106>
+2001-06-18 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_trans.c (translatingICMPv4To6):
+	- Hop limit of translated IPv6 packet uses ttl of original
+	  IPv4 packet, so that a hop limit is decremented in
+	  ip6_forward().
+
+	* kame/sys/netinet6/natpt_trans.c (tr_icmp4MimicPayload):
+	- Correct UDP port number stored in ICMP_UNREACH packet
+	  returned from IPv4 network.  It was not enough in the change
+	  that I put in 09 Jun 2001.
+
+	  Now, KAME NAT-PT can process traceroute6 from IPv6 host to
+	  IPv4 host.
+
 Mon Jun 18 16:59:35 JST 2001  itojun@iijlab.net
 	* sys/netinet6/icmp6.c: on icmp6 node information query (FQDN),
 	  do not respond with hostnames with two dots (like "foo..bar").
