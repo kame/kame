@@ -1,4 +1,4 @@
-/*	$KAME: showsubs.c,v 1.14 2002/02/06 08:00:00 fujisawa Exp $	*/
+/*	$KAME: showsubs.c,v 1.15 2002/03/25 07:38:23 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -193,6 +193,7 @@ makeCUI46Line(struct logmsg *lmsg, struct cSlot *csl)
 		concat(lmsg, "static");
 		appendPAddr4(lmsg, csl, (struct mAddr *)&csl->local);
 		appendPAddr6(lmsg, csl, (struct mAddr *)&csl->remote);
+		appendProto(lmsg, csl);
 		concat(lmsg, " 4to6");
 	} else {
 		concat(lmsg, "redirect");
