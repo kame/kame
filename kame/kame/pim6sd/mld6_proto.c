@@ -1,4 +1,4 @@
-/*	$KAME: mld6_proto.c,v 1.28 2002/10/30 06:27:34 suz Exp $	*/
+/*	$KAME: mld6_proto.c,v 1.29 2002/10/30 08:53:17 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -310,7 +310,7 @@ accept_listener_report(src, dst, group)
 	group_sa.sin6_addr = *group;
 	group_sa.sin6_scope_id = inet6_uvif2scopeid(&group_sa, v);
 
-	if (v->uv_mld_version & MLDv1 == 0) {
+	if ((v->uv_mld_version & MLDv1) == 0) {
 		log(LOG_DEBUG, 0,
 		    "ignores MLDv1 report for %s on non-MLDv1 Mif %s",
 		    inet6_fmt(group), v->uv_name);
@@ -443,7 +443,7 @@ accept_listener_done(src, dst, group)
 	 *  on whether an older version report was heard in the last 
 	 *  Older Version Host Present Timeout seconds.
 	 */
-	if (v->uv_mld_version & MLDv1 == 0) {
+	if ((v->uv_mld_version & MLDv1) == 0) {
 		log(LOG_DEBUG, 0,
 		    "ignores MLDv1 done for %s on non-MLDv1 Mif %s",
 		    inet6_fmt(group), v->uv_name);
