@@ -32,7 +32,7 @@
  * Sun Jan  9 06:23:42 JST 2000
  *    Merged into new racoon with trivial modification.
  */
-/* $Id: signing.c,v 1.3 2000/01/18 23:31:12 sakane Exp $ */
+/* $Id: signing.c,v 1.4 2000/01/31 15:52:42 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -66,6 +66,17 @@ int apps_startup() { return 0;}
 #include "debug.h"
 #include "localconf.h"
 #include "signing.h"
+
+/* get openssl/ssleay version number */
+#ifdef HAVE_OPENSSLV_H
+#include <opensslv.h>
+#define SSLVER	OPENSSL_VERSION_NUMBER
+#else
+#ifdef HAVE_CVERSION_H
+#include <cversion.h>
+#define SSLVER	SSLEAY_VERSION_NUMBER
+#endif
+#endif
 
 /* Buffer used:	3072 bytes for data to be signed
  *		1024 bytes for signature buffer
@@ -127,7 +138,7 @@ sign(donnees_source, taille_donnees_source, user, signature, taille_signature)
 	strcat(data, PRIVKEYFILE);
 	fp = fopen (data, "r");
 	if (fp == NULL) return (-1);
-#if (defined(SSLVER) && SSLVER >= 94)
+#if (defined(SSLVER) && SSLVER >= 0x0940)
 	pkey = (EVP_PKEY*)PEM_ASN1_read (  (char *(*)())d2i_PrivateKey,
         	                           PEM_STRING_EVP_PKEY,
                 	                   fp,
@@ -211,7 +222,7 @@ check_signature(donnees_source, taille_donnees_source, user, signature, taille_s
 	strcat(data, CERTFILE);
 	fp 	= fopen (data, "r");   if (fp == NULL) {printf("Bad user. Stop.\n");return (-1);}
 
-#if (defined(SSLVER) && SSLVER >= 94)
+#if (defined(SSLVER) && SSLVER >= 0x0940)
 	x509 	= (X509 *)PEM_ASN1_read ((char *(*)())d2i_X509,
         	                           PEM_STRING_X509,
                 	                   fp, NULL, NULL, NULL);
@@ -373,7 +384,7 @@ get_certificate(user, certificate_size, certificate)
 	fstat(fileno(fp), statistics);
 	*certificate_size = statistics->st_size;
 	free(statistics);
-#if (defined(SSLVER) && SSLVER >= 94)
+#if (defined(SSLVER) && SSLVER >= 0x0940)
 	x509 	= (X509 *)PEM_ASN1_read ((char *(*)())d2i_X509,
         	                           PEM_STRING_X509,
                 	                   fp, NULL, NULL, NULL);
@@ -485,7 +496,7 @@ check(ctx, file)
 			}
 		}
 
-#if (defined(SSLVER) && SSLVER >= 94)
+#if (defined(SSLVER) && SSLVER >= 0x0940)
 	x=PEM_read_bio_X509(in,NULL,NULL,NULL);
 #else
 	x=PEM_read_bio_X509(in,NULL,NULL);

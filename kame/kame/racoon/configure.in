@@ -148,13 +148,13 @@ AC_CHECK_LIB(ssl, ssl_ok, [dnl
 	echo
 	], [], -lcrypto)
 
-AC_MSG_CHECKING(SSLeay version number)
-ssleay_version="`$ssleay_cmd version | cut -d' ' -f2 | tr -d '[a-zA-Z\.]' | tr -d '^0'`"
-if test -z "$ssleay_version"; then
-	ssleay_version="0"
-fi;
-AC_DEFINE_UNQUOTED(SSLVER, $ssleay_version)
-AC_MSG_RESULT("$ssleay_version")
+dnl AC_MSG_CHECKING(SSLeay version number)
+dnl ssleay_version="`$ssleay_cmd version | cut -d' ' -f2 | tr -d '[a-zA-Z\.]' | tr -d '^0'`"
+dnl if test -z "$ssleay_version"; then
+dnl 	ssleay_version="0"
+dnl fi;
+dnl AC_DEFINE_UNQUOTED(SSLVER, $ssleay_version)
+dnl AC_MSG_RESULT("$ssleay_version")
 
 AC_CHECK_LIB(crypto, des_cbc_encrypt)
 AC_CHECK_LIB(l, yywrap)
@@ -507,6 +507,7 @@ if test $signing = "yes"; then
 	LIBOBJS="$LIBOBJS signing.o"
 	AC_DEFINE(HAVE_SIGNING_C)
 fi
+AC_CHECK_HEADERS(cversion.h opensslv.h)
 
 dnl Checks for typedefs, structures, and compiler characteristics.
 AC_C_CONST
