@@ -1,4 +1,4 @@
-/*	$KAME: grabmyaddr.c,v 1.30 2002/04/15 08:13:00 sakane Exp $	*/
+/*	$KAME: grabmyaddr.c,v 1.31 2002/05/25 22:40:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -422,7 +422,7 @@ update_myaddrs()
 		plog(LLV_ERROR, LOCATION, NULL,
 			"routing socket version mismatch\n");
 		close(lcconf->rtsock);
-		lcconf->rtsock = 0;
+		lcconf->rtsock = -1;
 		return 0;
 	}
 	switch (rtm->rtm_type) {

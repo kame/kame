@@ -1,4 +1,4 @@
-/*	$KAME: session.c,v 1.28 2001/12/10 18:11:20 sakane Exp $	*/
+/*	$KAME: session.c,v 1.29 2002/05/25 22:40:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -161,7 +161,7 @@ session(void)
 		if (FD_ISSET(lcconf->sock_pfkey, &rfds))
 			pfkey_handler();
 
-		if (FD_ISSET(lcconf->rtsock, &rfds)) {
+		if (lcconf->rtsock >= 0 && FD_ISSET(lcconf->rtsock, &rfds)) {
 			if (update_myaddrs() && lcconf->autograbaddr)
 				sched_new(5, check_rtsock, NULL);
 			initfds();
@@ -209,8 +209,10 @@ initfds()
 #endif
 	FD_SET(lcconf->sock_pfkey, &mask0);
 	nfds = (nfds > lcconf->sock_pfkey ? nfds : lcconf->sock_pfkey);
-	FD_SET(lcconf->rtsock, &mask0);
-	nfds = (nfds > lcconf->rtsock ? nfds : lcconf->rtsock);
+	if (lcconf->rtsock >= 0) {
+		FD_SET(lcconf->rtsock, &mask0);
+		nfds = (nfds > lcconf->rtsock ? nfds : lcconf->rtsock);
+	}
 
 	for (p = lcconf->myaddrs; p; p = p->next) {
 		if (!p->addr)
