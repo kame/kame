@@ -27,7 +27,7 @@
  * SUCH DAMAGE.
  */
 
-/* KAME $Id: key.c,v 1.16 1999/10/25 13:27:01 sakane Exp $ */
+/* KAME $Id: key.c,v 1.17 1999/10/27 05:41:57 sakane Exp $ */
 
 /*
  * This code is referd to RFC 2367
@@ -429,18 +429,21 @@ key_checkrequest(isr)
 	level = ipsec_get_reqlevel(isr);
 
 	/*
-	 * new SA allocation for current policy
-	 * NOTE: We allocate a SA for the SP each time because new SA may
-	 * have configurated.
+	 * We don't allocate new SA if the state of SA in the holder is
+	 * SADB_SASTATE_MATURE, and if this is newer one.
 	 */
-	if (isr->sav != NULL) {
+	if (isr->sav != NULL
+	 && isr->sav != (struct secasvar *)LIST_FIRST(&isr->sav->sah->savtree[SADB_SASTATE_MATURE])) {
 		KEYDEBUG(KEYDEBUG_IPSEC_STAMP,
-			printf("DP checkrequest calls free SA:%p\n", isr->sav));
+			printf("DP checkrequest calls free SA:%p\n",
+				isr->sav));
 		key_freesav(isr->sav);
 		isr->sav = NULL;
 	}
 
-	isr->sav = key_allocsa_policy(isr);
+	/* new SA allocation if no SA found. */
+	if (isr->sav == NULL)
+		isr->sav = key_allocsa_policy(isr);
 
 	/* When there is SA. */
 	if (isr->sav != NULL)
