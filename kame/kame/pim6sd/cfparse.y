@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.13 2000/12/04 06:45:28 itojun Exp $	*/
+/*	$KAME: cfparse.y,v 1.14 2001/06/19 10:36:00 suz Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -961,7 +961,7 @@ cf_post_config()
 	if (debugonly)
 		goto cleanup;
 
-	param_config();		/* must be called before phyint_conifg() */
+	param_config();		/* must be called before phyint_config() */
 
 	phyint_config();
 
