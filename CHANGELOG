@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2412 2003/06/19 03:38:41 jinmei Exp $
+$KAME: CHANGELOG,v 1.2413 2003/06/19 07:50:38 jinmei Exp $
 
 <200306>
+2003-06-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_setpktoption): deprecated
+	the IPV6_REACHCONF socket option and ancillary data item.  It was
+	once introduced during the migration from RFC 2292 to RFC 3542,
+	but was dropped in the migration process.
+
 2003-06-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_rtrequest): changed a condition to
 	decide whether to create an empty llinfo stricter so that a user
@@ -20,6 +26,7 @@ Mon Jun 16 18:49:02 JST 2003	keiichi@iij.ad.jp
 	address instead of its care-of address.
 	reported by Yukiyo Akisada <Yukiyo.Akisada@jp.yokogawa.com>.
 
+>>>>>>> 1.2412
 2003-06-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd4/sys/net/if.c (if_detach): be sure to free the link
 	ifaddr at the end of the function.  (A supplement fix to another
