@@ -1,4 +1,4 @@
-/*	$KAME: vif.h,v 1.25 2003/01/22 06:47:02 suz Exp $	*/
+/*	$KAME: vif.h,v 1.26 2004/06/01 08:42:19 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -131,7 +131,7 @@ struct listaddr {
 
 	/* 
 	 * al_timer is used for many purposes.
-	 *	- last-listener-query timer (MLDv1)
+	 *	- last-listener-query timer (MLDv1,MLDv2)
 	 *	- old-listener-present timer (MLDv2)
 	 *	- PIM neighboring timeout (PIM)
 	 */
@@ -174,40 +174,40 @@ enum { LESSTHANLLQI = 1, MORETHANLLQI };
  */
 struct uvif {
 	u_int uv_flags;		
-	u_char uv_metric;		/* VIFF_ flags defined below            */
-	u_char uv_admetric;		/* advertised cost of this vif          */
-	u_int uv_rate_limit;		/* rate limit on this vif               */
+	u_char uv_metric;		/* VIFF_ flags defined below */
+	u_char uv_admetric;		/* advertised cost of this vif */
+	u_int uv_rate_limit;		/* rate limit on this vif */
 
-	struct phaddr *uv_linklocal;	/* link-local address of this vif      */
-	struct sockaddr_in6 uv_rmt_addr;/* remote end-point addr (tunnels only) */	
-	struct sockaddr_in6 uv_dst_addr;/* destination for PIM messages         */	
-	struct sockaddr_in6 uv_prefix;	/* prefix (phyints only) */	
-	struct in6_addr	uv_subnetmask;	/* subnet mask (phyints only) */	
+	struct phaddr *uv_linklocal;	/* link-local address of this vif */
+	struct sockaddr_in6 uv_rmt_addr;/* remote end-point addr (tunnels only)*/
+	struct sockaddr_in6 uv_dst_addr;/* destination for PIM messages */
+	struct sockaddr_in6 uv_prefix;	/* prefix (phyints only) */
+	struct in6_addr	uv_subnetmask;	/* subnet mask (phyints only) */
 
-	char uv_name[IFNAMSIZ];	/* interface name */	
+	char uv_name[IFNAMSIZ];	/* interface name */
 	u_int uv_ifindex;	/* index of the interface */
 	u_int uv_siteid;	/* index of the site on the interface */
 
 	struct listaddr *uv_groups; /* list of local groups  (phyints only) */
 	struct lisaddr *uv_dvmrp_neighbors;
 	nbrbitmap_t uv_nbrmap;	/* bitmap of active neighboring routers */
-	struct listaddr	*uv_querier; /* MLD querier on vif */	
+	struct listaddr	*uv_querier; /* MLD querier on vif */
 	int uv_prune_lifetime;	/* Prune lifetime or 0 for default  */
-	struct vif_acl *uv_acl;	/* access control list of groups        */	
+	struct vif_acl *uv_acl;	/* access control list of groups */
 	int uv_leaftimer;	/* time until this vif is considrd leaf */
-	struct phaddr *uv_addrs; /* Additional addresses on this vif     */
-	struct vif_filter *uvfilter; /* Route filters on this vif            */
-	u_int16 uv_pim_hello_timer; /* timer for sending PIM hello msgs  */
-	u_int16	uv_gq_timer;	/* Group Query timer                    */
-	u_int16	uv_jp_timer;	/* Join/Prune timer 			*/	
+	struct phaddr *uv_addrs; /* Additional addresses on this vif */
+	struct vif_filter *uvfilter; /* Route filters on this vif */
+	u_int16 uv_pim_hello_timer; /* timer for sending PIM hello msgs */
+	u_int16	uv_gq_timer;	/* Group Query timer */
+	u_int16	uv_jp_timer;	/* Join/Prune timer */
 	u_int16 uv_stquery_cnt;	/* Startup Query Count */
 	u_int16 uv_mld_version;	/* mld version of this mif */
 	u_int16 uv_mld_robustness; /* robustness variable of this vif (mld6 protocol) */
 	u_int32 uv_mld_query_interval; /* query interval of this vif (mld6 protocol) */
 	u_int32 uv_mld_query_rsp_interval;  /* query response interval of this vif (mld6 protocol) */
 	u_int32 uv_mld_llqi; /* last listener query interval */
-	int uv_local_pref;	/* default local preference for assert  */	
-	int uv_local_metric;	/* default local metric for assert     */
+	int uv_local_pref;	/* default local preference for assert */
+	int uv_local_metric;	/* default local metric for assert */
 	struct pim_nbr_entry *uv_pim_neighbors;	/* list of PIM nbr routers */
 
 	void *config_attr;	/* temporary buffer while parsing config */
@@ -242,20 +242,20 @@ struct uvif {
 };
 
 struct phaddr {
-	struct phaddr 			*pa_next;
+	struct phaddr 		*pa_next;
 	struct sockaddr_in6 	pa_addr;
 	struct sockaddr_in6 	pa_rmt_addr;	/* valid only in case of P2P I/F */
 	struct sockaddr_in6 	pa_prefix;
-	struct in6_addr 		pa_subnetmask;
+	struct in6_addr 	pa_subnetmask;
 };
 
 
 /* The Access Control List (list with scoped addresses) member */
 
 struct vif_acl {
-	struct vif_acl 			*acl_next;
+	struct vif_acl 		*acl_next;
 	struct sockaddr_in6 	acl_addr;
-	struct in6_addr			acl_mask;
+	struct in6_addr		acl_mask;
 };
 
 /*  
@@ -277,7 +277,7 @@ extern void    stop_all_vifs __P((void));
 extern void    check_vif_state __P((void));
 struct sockaddr_in6 * max_global_address __P((void));
 struct sockaddr_in6 * uv_global __P((mifi_t));
-extern mifi_t   local_address       __P((struct sockaddr_in6 *src));
+extern mifi_t   local_address  __P((struct sockaddr_in6 *src));
 struct sockaddr_in6 * local_iface __P((char *ifname));
 extern mifi_t   find_vif_direct     __P((struct sockaddr_in6 *src));
 extern mifi_t  find_vif_direct_local   __P((struct sockaddr_in6 *src));
