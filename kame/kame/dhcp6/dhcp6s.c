@@ -698,11 +698,11 @@ server6_react_request(buf, siz, rcvpi)
 		}
 
 		/*
-		 * If the relay address has a larger scope than the scope of
-		 * the request's destination, the responded response
-		 * message might be able to break a scope boundary.
+		 * If the relay address has a smaller scope than the scope of
+		 * the request's destination, the request message might have
+		 * broken a scope boundary.
 		 */
-		if (in6_scope(&dh6r->dh6req_relayaddr) >
+		if (in6_scope(&dh6r->dh6req_relayaddr) <
 		    in6_scope(&rcvpi->ipi6_addr)) {
 			dprintf((stderr,
 				 "react_request: bad relay address %s with dst %s\n",
