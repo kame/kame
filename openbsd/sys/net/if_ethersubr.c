@@ -652,8 +652,10 @@ altq_etherclassify(struct ifaltq *ifq, struct mbuf *m,
 		 * now (but it shouldn't ever happen, really, anyhow).
 		 * XXX Should use m_pulldown().
 		 */
+#if 0		/* this can happen for openbsd's bridged broadcast! */
 		printf("altq_etherclassify: headers span multiple mbufs: "
 		    "%d < %d\n", m->m_len, (hlen + hdrsize));
+#endif
 		goto bad;
 	}
 
