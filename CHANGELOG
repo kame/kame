@@ -1,7 +1,24 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2544 2004/02/13 03:06:25 keiichi Exp $
+$KAME: CHANGELOG,v 1.2545 2004/02/13 12:00:13 jinmei Exp $
 
 <200402>
+2004-02-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/ping6/ping6.c (pr_pack): printed the arriving
+	interface index explicitly with the -v option, instead of setting
+	sin6_scope_id to the index automatically (the latter is not always
+	correct).
+
+2004-02-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_error2): introduced as a
+	wrapper for icmp6_error() to recover lost scope zone information
+	(if any).  This also fixed a recent bug that an ICMPv6 error when
+	ND failed cannot be returned for a scoped destination.
+
+2004-02-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_reflect): fixed a very recent
+	bug that source address selection did not check the correct
+	address.
+
 Fri Feb 13 12:03:32 JST 2004	keiichi@iij.ad.jp
 	draft-ietf-mip6-mipext-advapi-00 support.
 
