@@ -1,4 +1,4 @@
-/*	$KAME: misc.c,v 1.18 2001/10/27 10:00:57 fujisawa Exp $	*/
+/*	$KAME: misc.c,v 1.19 2001/10/29 02:36:48 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -132,7 +132,7 @@ setRules(int type, struct ruletab *ruletab)
 	}
 
 	if (ruletab->dports) {
-		f->map = NATPT_COPY_DPORT;
+		f->map = NATPT_REDIRECT_PORT;
 		f->local.dport = ruletab->dports[0];
 		f->remote.dport = ruletab->dports[1];
 	}

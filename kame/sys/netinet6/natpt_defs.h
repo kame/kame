@@ -1,4 +1,4 @@
-/*	$KAME: natpt_defs.h,v 1.28 2001/10/27 09:59:40 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.29 2001/10/29 02:36:16 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -171,7 +171,8 @@ struct	cSlot					/* sizeof(): 140[byte]	*/
 
 	u_char		 map;
 #define	NATPT_REMAP_SPORT	0x01
-#define	NATPT_COPY_DPORT	0x02
+#define	NATPT_REDIRECT_ADDR	0x02
+#define	NATPT_REDIRECT_PORT	0x04
 #define	NATPT_BIDIR		0x10
 
 	u_short		 cport;		/* current port, with host byte order	*/

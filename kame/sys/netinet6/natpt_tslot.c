@@ -1,4 +1,4 @@
-/*	$KAME: natpt_tslot.c,v 1.30 2001/10/27 09:59:40 fujisawa Exp $	*/
+/*	$KAME: natpt_tslot.c,v 1.31 2001/10/29 02:36:17 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -264,7 +264,7 @@ natpt_internHash4(struct cSlot *acs, struct pcv *cv4)
 			remote->port[0] = cv4->pyld.tcp4->th_dport;
 			remote->port[1] = cv4->pyld.tcp4->th_sport;
 
-			if (acs->map & NATPT_COPY_DPORT)
+			if (acs->map & NATPT_REDIRECT_PORT)
 				remote->port[0] = acs->remote.dport;
 			else if (acs->map & NATPT_REMAP_SPORT)
 				natpt_remapRemote4Port(acs, remote);

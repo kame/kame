@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.56 2001/10/27 09:59:40 fujisawa Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.57 2001/10/29 02:36:16 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -714,7 +714,7 @@ natpt_watchUDP6(struct pcv *cv4)
 		MALLOC(cst, struct cSlot *, sizeof(struct cSlot), M_NATPT, M_NOWAIT);
 		bzero(cst, sizeof(struct cSlot));
 		cst->proto = NATPT_UDP;
-		cst->map   = NATPT_COPY_DPORT;
+		cst->map   = NATPT_REDIRECT_PORT;
 		cst->lifetime = 32;
 
 		cst->Local.sa_family = AF_INET;
