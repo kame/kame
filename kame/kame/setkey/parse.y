@@ -1,4 +1,4 @@
-/*	$KAME: parse.y,v 1.47 2001/08/16 18:58:30 itojun Exp $	*/
+/*	$KAME: parse.y,v 1.48 2001/08/16 19:01:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -474,10 +474,17 @@ spddelete_command
 
 			src = parse_addr($3.buf, $5.buf);
 			dst = parse_addr($6.buf, $8.buf);
-			if (src->ai_next || dst->ai_next) {
-				yyerror("multiple address specified");
+			if (!src || !dst) {
+				/* yyerror is already called */
 				return -1;
 			}
+			if (src->ai_next || dst->ai_next) {
+				yyerror("multiple address specified");
+				freeaddrinfo(src);
+				freeaddrinfo(dst);
+				return -1;
+			}
+
 			status = setkeymsg_spdaddr(SADB_X_SPDDELETE, $9, &$10,
 			    src, $4, dst, $7);
 			if (status < 0)
