@@ -473,7 +473,8 @@ server6_react_solicit(agent, buf, siz)
 	dh6a->dh6adv_pref = 255;	/*XXX*/
 
 	if (transmit_sa(outsock, (struct sockaddr *)&dst, hlim, sbuf, len) != 0) {
-		err(1, "transmit failed");
+		err(1, "transmit to %s failed",
+		    addr2str((struct sockaddr *)&dst));
 		/* NOTREACHED */
 	}
 }
@@ -649,7 +650,8 @@ server6_react_request(agent, buf, siz)
 	}
 
 	if (transmit_sa(outsock, (struct sockaddr *)&dst, hlim, sbuf, len) != 0) {
-		err(1, "transmit failed");
+		err(1, "transmit to %s failed",
+		    addr2str((struct sockaddr *)&dst));
 		/* NOTREACHED */
 	}
 }
