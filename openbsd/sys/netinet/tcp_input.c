@@ -3071,19 +3071,11 @@ tcp_mss(tp, offer)
 	}
 #ifdef INET6
 	else if (is_ipv6) {
-		if (inp && IN6_IS_ADDR_V4MAPPED(&inp->inp_faddr6)) {
-			/* mapped addr case */
-			struct in_addr d;
-			bcopy(&inp->inp_faddr6.s6_addr32[3], &d, sizeof(d));
-			if (ip_mtudisc || in_localaddr(d))
-				mss = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
-		} else {
-			/*
-			 * for IPv6, path MTU discovery is always turned on,
-			 * or the node must use packet size <= 1280.
-			 */
-			mss = IN6_LINKMTU(ifp) - iphlen - sizeof(struct tcphdr);
-		}
+		/*
+		 * for IPv6, path MTU discovery is always turned on,
+		 * or the node must use packet size <= 1280.
+		 */
+		mss = IN6_LINKMTU(ifp) - iphlen - sizeof(struct tcphdr);
 	}
 #endif /* INET6 */
 
