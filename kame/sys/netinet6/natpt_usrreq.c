@@ -1,4 +1,4 @@
-/*	$KAME: natpt_usrreq.c,v 1.7 2000/03/12 21:41:09 fujisawa Exp $	*/
+/*	$KAME: natpt_usrreq.c,v 1.8 2000/03/13 17:51:27 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_usrreq.c,v 1.7 2000/03/12 21:41:09 fujisawa Exp $
+ *	$Id: natpt_usrreq.c,v 1.8 2000/03/13 17:51:27 fujisawa Exp $
  */
 
 #include <sys/types.h>
@@ -104,15 +104,17 @@ int	natpt_usrreq	__P((struct socket *, int,
 
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
+int	natpt_uabort	__P((struct socket *));
 int	natpt_uattach	__P((struct socket *, int, struct proc *));
+int	natpt_ubind	__P((struct socket *, struct sockaddr *, struct proc *));
+int	natpt_uconnect	__P((struct socket *, struct sockaddr *, struct proc *));
 int	natpt_udetach	__P((struct socket *));
-int	natpt_control	__P((struct socket *, u_long, caddr_t, struct ifnet *, struct proc *));
-#else
-int	natpt_control	__P((struct socket *, int, caddr_t, struct ifnet *));
+int	natpt_ucontrol	__P((struct socket *, u_long, caddr_t, struct ifnet *, struct proc *));
 #endif	/* defined(__FreeBSD__) && __FreeBSD__ >= 3	*/
 
-int	natpt_attach	__P((struct socket *, int));
-int	natpt_detach	__P((struct socket *));
+int	natpt_attach	 __P((struct socket *, int));
+int	natpt_control	 __P((struct socket *, int, caddr_t, struct ifnet *));
+int	natpt_detach	 __P((struct socket *));
 int	natpt_disconnect __P((struct socket *));
 
 
@@ -120,20 +122,20 @@ int	natpt_disconnect __P((struct socket *));
 #if __FreeBSD__ >= 3
 struct pr_usrreqs natpt_usrreqs =
 {
-	NULL,		NULL,	natpt_uattach,	NULL,
-	NULL,		NULL,	natpt_control,	natpt_udetach,
-	natpt_disconnect,	NULL,	NULL,		NULL,
-	NULL,		NULL,	NULL,		NULL,
-	NULL
+    natpt_uabort,	NULL,		natpt_uattach,	natpt_ubind,
+    natpt_uconnect,	NULL,		natpt_ucontrol,	natpt_udetach,
+    natpt_disconnect,	NULL,		NULL,		NULL,
+    NULL,		NULL,		NULL,		NULL,
+    NULL,		sosend,		soreceive,	sopoll
 };
 #else
 struct pr_usrreqs natpt_usrreqs =
 {
-	NULL,		NULL,	natpt_attach,	NULL,
-	NULL,		NULL,	natpt_control,	natpt_detach,
-	natpt_disconnect,	NULL,	NULL,		NULL,
-	NULL,		NULL,	NULL,		NULL,
-	NULL
+    NULL,		NULL,		natpt_attach,	NULL,
+    NULL,		NULL,		natpt_control,	natpt_detach,
+    natpt_disconnect,	NULL,		NULL,		NULL,
+    NULL,		NULL,		NULL,		NULL,
+    NULL
 };
 #endif	/* __FreeBSD__ >= 3 */
 #endif	/* __FreeBSD__      */
@@ -305,6 +307,22 @@ natpt_usrreq(struct socket *so, int req,
 
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
 int
+natpt_uabort(struct socket *so)
+{
+    struct rawcb *rp = sotorawcb(so);
+
+    if (rp == 0)
+	return (EINVAL);
+
+    raw_disconnect(rp);
+    sofree(so);
+    soisdisconnected(so);
+
+    return (0);
+}
+
+
+int
 natpt_uattach(struct socket *so, int proto, struct proc *p)
 {
     int		error;
@@ -313,6 +331,28 @@ natpt_uattach(struct socket *so, int proto, struct proc *p)
 	return (error);
 
     return (natpt_attach(so, proto));
+}
+
+
+int
+natpt_ubind(struct socket *so, struct sockaddr *nam, struct proc *p)
+{
+    return (EINVAL);
+}
+
+
+int
+natpt_uconnect(struct socket *so, struct sockaddr *nam, struct proc *p)
+{
+    return (EINVAL);
+}
+
+
+int
+natpt_ucontrol(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
+	       struct proc *p)
+{
+    return (natpt_control(so, cmd, data, ifp));
 }
 
 
@@ -326,6 +366,7 @@ natpt_udetach(struct socket *so)
 
     return (natpt_detach(so));
 }
+
 #endif	/* defined(__FreeBSD__) && __FreeBSD__ >= 3	*/
 
 
@@ -375,10 +416,11 @@ natpt_detach(struct socket *so)
 
     so->so_pcb = NULL;
     sofree(so);
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-    LIST_REMOVE(rp, list);
-#else
+
+#if defined(__bsdi__) || defined(__FreeBSD__) && __FreeBSD__ <= 2
     remque(rp);
+#else
+    LIST_REMOVE(rp, rcb_list);
 #endif
     if (rp->rcb_laddr)
 	m_freem(dtom(rp->rcb_laddr));
@@ -395,6 +437,9 @@ natpt_disconnect(struct socket *so)
 {
     struct rawcb	*rp = sotorawcb(so);
 
+    if (rp == NULL)
+	return (EINVAL);
+
     if (rp->rcb_faddr == NULL)
 	return (ENOTCONN);
 
@@ -407,12 +452,7 @@ natpt_disconnect(struct socket *so)
 
 
 int
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-natpt_control(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
-	      struct proc *p)
-#else
 natpt_control(struct socket *so, int cmd, caddr_t data, struct ifnet *ifp)
-#endif
 {
     if (natpt_initialized == 0)
 	natpt_initialize();
