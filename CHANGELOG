@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.879 2000/05/15 13:48:59 itojun Exp $
+$Id: CHANGELOG,v 1.880 2000/05/16 00:49:42 itojun Exp $
 
 <200005>
+Tue May 16 09:44:50 JST 2000  itojun@iijlab.net
+	* netbsd/usr.bin/ftp/fetch.c: parse RFC2372 ftp URL correctly.
+	  (the code is different from netbsd-current code - netbsd-current
+	  code works just right, and our version will go away when we switch
+	  to kame/netbsd15)
+
 Mon May 15 22:39:20 JST 2000  itojun@iijlab.net
 	* openbsd/usr.bin/ftp/fetch.c: parse RFC2372 ftp URL correctly.
 
