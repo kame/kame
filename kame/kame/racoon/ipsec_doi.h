@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.14 2000/05/11 08:05:08 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.15 2000/05/30 02:10:56 sakane Exp $ */
 
 /* refered to RFC2407 */
 
@@ -87,6 +87,7 @@
 #define   IPSECDOI_ATTR_ENC_MODE_TUNNEL         1
 #define   IPSECDOI_ATTR_ENC_MODE_TRNS           2
 #define IPSECDOI_ATTR_AUTH                    5 /* B */
+	/* 0 means not to use authentication. */
 #define   IPSECDOI_ATTR_AUTH_HMAC_MD5           1
 #define   IPSECDOI_ATTR_AUTH_HMAC_SHA1          2
 #define   IPSECDOI_ATTR_AUTH_DES_MAC            3

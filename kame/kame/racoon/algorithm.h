@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: algorithm.h,v 1.3 2000/01/12 17:20:24 itojun Exp $ */
+/* YIPS @(#)$Id: algorithm.h,v 1.4 2000/05/30 02:10:56 sakane Exp $ */
 
 /* algorithm strength */
 enum {
@@ -72,8 +72,8 @@ enum {
 enum {
 	/* ipsec auth */
 	/* algtype_nothing = 0 */
+	algtype_non_auth = 0,
 	algtype_hmac_md5 = 1, algtype_hmac_sha1, algtype_des_mac, algtype_kpdk,
-	algtype_non_auth,
 };
 
 enum {
