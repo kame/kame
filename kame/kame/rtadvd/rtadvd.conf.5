@@ -1,4 +1,4 @@
-.\"	$KAME: rtadvd.conf.5,v 1.30 2001/01/18 13:26:12 itojun Exp $
+.\"	$KAME: rtadvd.conf.5,v 1.31 2001/01/19 05:29:12 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -315,7 +315,7 @@ YOU DO NOT NEED TO HAVE IT AT ALL.
 .Bd -literal -offset
 default:\\
 	:chlim#64:raflags#0:rltime#1800:rtime#0:retrans#0:\\
-	:pinfoflags#192:vltime#2592000:pltime#604800:mtu#1500:
+	:pinfoflags#192:vltime#2592000:pltime#604800:mtu#0:
 ether:\\
 	:mtu#1500:tc=default:
 ef0:\\
