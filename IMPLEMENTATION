@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.186 2001/02/04 17:47:20 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.187 2001/02/07 02:06:20 itojun Exp $
 
 1. IPv6
 
@@ -250,6 +250,17 @@ upper-layer hints to be accepted.
 (from April 2000 to June 2000, we rejected setsockopt(IPV6_REACHCONF) from
 non-root process - after local discussion, it looks that hints are not
 that trustworthy even if they are from privileged processes)
+
+If inbound ND packets carry invalid values, the KAME kernel will
+drop these packet and increment statistics variable.  See
+"netstat -sn", icmp6 section.  For detailed debugging session, you can
+turn on syslog output from the kernel on errors, by turning on sysctl MIB
+net.inet6.icmp6.nd6_debug.  nd6_debug can be turned on at bootstrap
+time, by defining ND6_DEBUG kernel compilation option (so you can
+debug behavior during bootstrap).  nd6_debug configuration should
+only be used for test/debug purposes - for production environment,
+nd6_debug must be set to 0.  If you leave it to 1, malicious parties
+can inject broken packet and fill up /var/log partition.
 
 1.3 Scope Index
 
