@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.61 2001/08/09 07:32:19 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.62 2001/08/11 13:46:35 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -47,11 +47,8 @@ int yyerrorcount = 0;
 #  define YYDB plog(LLV_DEBUG2, LOCATION, NULL,                                \
 		"begin <%d>%s\n", yy_start, yytext);
 #  define YYD {                                                                \
-	plog(LLV_DEBUG2, LOCATION, NULL, "<%d>", yy_start);                    \
-	if (loglevel >= LLV_DEBUG2) {                                          \
-		ECHO ;                                                         \
-		printf("\n");                                                  \
-	}                                                                      \
+	plog(LLV_DEBUG2, LOCATION, NULL, "<%d>%s",                             \
+	    yy_start, loglevel >= LLV_DEBUG2 ? "\n" : "");                     \
 }
 #else
 #  define YYDB
