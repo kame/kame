@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.43 2000/06/12 04:27:03 itojun Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.44 2000/08/06 16:43:17 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -32,11 +32,9 @@
 /*
  * Issues to be discussed:
  * - Thread safe-ness must be checked
- * - Return values.  There seems to be no standard for return value (RFC2553)
- *   but INRIA implementation returns EAI_xxx defined for getaddrinfo().
  * - RFC2553 says that we should raise error on short buffer.  X/Open says
  *   we need to truncate the result.  We obey RFC2553 (and X/Open should be
- *   modified).
+ *   modified).  ipngwg rough consensus seems to follow RFC2553.
  * - What is "local" in NI_FQDN?
  * - NI_NAMEREQD and NI_NUMERICHOST conflict with each other.
  * - (KAME extension) NI_WITHSCOPEID when called with global address,
@@ -99,6 +97,7 @@ static int ip6_parsenumeric __P((const struct sockaddr *, const char *, char *,
 static int ip6_sa2str __P((const struct sockaddr_in6 *, char *, size_t, int));
 #endif
 
+/* 2553bis: use EAI_xx for getnameinfo */
 #define ENI_NOSOCKET 	EAI_FAIL		/*XXX*/
 #define ENI_NOSERVNAME	EAI_NONAME
 #define ENI_NOHOSTNAME	EAI_NONAME
