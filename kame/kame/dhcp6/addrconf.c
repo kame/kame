@@ -1,4 +1,4 @@
-/*	$KAME: addrconf.c,v 1.1 2005/03/02 07:20:13 suz Exp $	*/
+/*	$KAME: addrconf.c,v 1.2 2005/03/29 13:49:09 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -167,7 +167,7 @@ update_address(ia, addr, dhcpifp, ctlp, callback)
 	sa->addr.pltime = addr->pltime;
 	sa->addr.vltime = addr->vltime;
 	sa->dhcpif = dhcpifp;
-	dprintf(LOG_DEBUG, FNAME, "%s a address %s pltime=%lu, vltime=%lu",
+	dprintf(LOG_DEBUG, FNAME, "%s an address %s pltime=%lu, vltime=%lu",
 	    sacreate ? "create" : "update",
 	    in6addr2str(&addr->addr, 0), addr->pltime, addr->vltime);
 
