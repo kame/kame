@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.147 2002/01/12 01:57:02 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.148 2002/02/04 03:23:56 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -303,7 +303,7 @@ main(argc, argv)
 	int cc, i;
 	int ch, hold, packlen, preload, optval, ret_ga;
 	u_char *datap, *packet;
-	char *e, *target, *ifname = NULL;
+	char *e, *target, *ifname = NULL, *gateway = NULL;
 	int ip6optlen = 0;
 	struct cmsghdr *scmsgp = NULL;
 	int sockbufsize = 0;
@@ -335,7 +335,7 @@ main(argc, argv)
 #endif /*IPSEC_POLICY_IPSEC*/
 #endif
 	while ((ch = getopt(argc, argv,
-	    "a:b:c:dfHh:I:i:l:mnNp:qRS:s:tvwW" ADDOPTS)) != -1) {
+	    "a:b:c:dfHg:h:I:i:l:mnNp:qRS:s:tvwW" ADDOPTS)) != -1) {
 #undef ADDOPTS
 		switch (ch) {
 		case 'a':
@@ -405,6 +405,9 @@ main(argc, argv)
 			}
 			options |= F_FLOOD;
 			setbuf(stdout, (char *)NULL);
+			break;
+		case 'g':
+			gateway = optarg;
 			break;
 		case 'H':
 			options |= F_HOSTNAME;
@@ -482,7 +485,7 @@ main(argc, argv)
 			errx(1, "-R is not supported in this configuration");
 #endif
 		case 'S':
-			bzero(&hints, sizeof(struct addrinfo));
+			memset(&hints, 0, sizeof(struct addrinfo));
 			hints.ai_flags = AI_NUMERICHOST; /* allow hostname? */
 			hints.ai_family = AF_INET6;
 			hints.ai_socktype = SOCK_RAW;
@@ -586,7 +589,7 @@ main(argc, argv)
 		target = argv[argc - 1];
 
 	/* getaddrinfo */
-	bzero(&hints, sizeof(struct addrinfo));
+	memset(&hints, 0, sizeof(struct addrinfo));
 	hints.ai_flags = AI_CANONNAME;
 	hints.ai_family = AF_INET6;
 	hints.ai_socktype = SOCK_RAW;
@@ -613,6 +616,32 @@ main(argc, argv)
 	if ((options & F_SRCADDR) &&
 	    bind(s, (struct sockaddr *)&src, srclen) != 0) {
 		err(1, "bind");
+	}
+
+	/* set the gateway (next hop) if specified */
+	if (gateway) {
+		struct addrinfo ghints, *gres;
+		int e;
+
+		memset(&ghints, 0, sizeof(ghints));
+		ghints.ai_family = AF_INET6;
+		ghints.ai_socktype = SOCK_RAW;
+		ghints.ai_protocol = IPPROTO_ICMPV6;
+
+		e = getaddrinfo(gateway, NULL, &hints, &gres);
+		if (e) {
+			errx(1, "getaddrinfo for the gateway %s",
+			     gateway, gai_strerror(e));
+		}
+		if (gres->ai_next && (options & F_VERBOSE))
+			warnx("gateway resolves to multiple addresses");
+
+		if (setsockopt(s, IPPROTO_IPV6, IPV6_NEXTHOP,
+			       gres->ai_addr, gres->ai_addrlen)) {
+			err(1, "setsockopt(IPV6_NEXTHOP)");
+		}
+
+		freeaddrinfo(gres);
 	}
 
 	/*
@@ -2647,7 +2676,7 @@ nigroup(name)
 	}
 
 	/* generate 8 bytes of pseudo-random value. */
-	bzero(&ctxt, sizeof(ctxt));
+	memset(&ctxt, 0, sizeof(ctxt));
 	MD5Init(&ctxt);
 	c = l & 0xff;
 	MD5Update(&ctxt, &c, sizeof(c));
@@ -2686,6 +2715,6 @@ usage()
 	    "] [-a [aAclsg]] [-b sockbufsiz] [-c count] \n"
             "\t[-I interface] [-i wait] [-l preload] [-p pattern] "
 	    "[-S sourceaddr]\n"
-            "\t[-s packetsize] [-h hoplimit] [hops...] host\n");
+            "\t[-s packetsize] [-h hoplimit] [hops...] [-g gateway] host\n");
 	exit(1);
 }
