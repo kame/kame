@@ -1,4 +1,4 @@
-/*	$KAME: setkey.c,v 1.32 2003/09/08 12:33:10 itojun Exp $	*/
+/*	$KAME: setkey.c,v 1.33 2003/09/08 15:43:40 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -96,7 +96,8 @@ void
 usage()
 {
 
-	printf("usage: setkey [-v] -c\n");
+	printf("usage: setkey [-v] file ...\n");
+	printf("       setkey [-v] -c\n");
 	printf("       setkey [-v] -f filename\n");
 	printf("       setkey [-Palv] -D\n");
 	printf("       setkey [-Pv] -F\n");
