@@ -1,5 +1,5 @@
 #	@(#)Makefile	8.2 (Berkeley) 1/4/94
-# $FreeBSD: src/include/Makefile,v 1.109 2000/01/26 17:38:51 peter Exp $
+# $FreeBSD: src/include/Makefile,v 1.109.2.4 2000/07/15 07:24:05 kris Exp $
 #
 # Doing a make install builds /usr/include
 #
@@ -10,7 +10,7 @@ CLEANFILES= osreldate.h version vers.c
 SUBDIR= rpcsvc
 FILES=	a.out.h ar.h assert.h bitstring.h ctype.h db.h dirent.h disktab.h \
 	dlfcn.h elf.h err.h fnmatch.h fstab.h \
-	fts.h glob.h grp.h strhash.h histedit.h ieeefp.h iso646.h \
+	fts.h glob.h grp.h strhash.h histedit.h ieeefp.h ifaddrs.h iso646.h \
 	limits.h link.h locale.h malloc.h memory.h mpool.h \
 	ndbm.h netdb.h nl_types.h nlist.h objformat.h \
 	paths.h pthread.h pthread_np.h pwd.h \
@@ -47,10 +47,10 @@ LDIRS=	cam msdosfs net netatalk netatm netgraph netinet netinet6 \
 LDIRS+=	altq
 
 LNOHEADERDIRS=	isofs ufs dev
-LSUBDIRS=	isofs/cd9660 ufs/ffs ufs/mfs ufs/ufs cam/scsi dev/usb
+LSUBDIRS=	isofs/cd9660 ufs/ffs ufs/mfs ufs/ufs cam/scsi dev/ppbus dev/usb
 
 # For SHARED=symlinks, cam is a symlink, so cam/scsi is taken care of
-LSYMSUBDIRS=	isofs/cd9660 ufs/ffs ufs/mfs ufs/ufs dev/usb
+LSYMSUBDIRS=	isofs/cd9660 ufs/ffs ufs/mfs ufs/ufs dev/ppbus dev/usb
 
 # Define SHARED to indicate whether you want symbolic links to the system
 # source (``symlinks''), or a separate copy (``copies'').  ``symlinks'' is
@@ -98,10 +98,13 @@ beforeinstall: ${SHARED}
 .endfor
 
 copies:
-.for i in ${LDIRS} ${LNOHEADERDIRS} machine
+.for i in ${LDIRS} ${LSYMSUBDIRS} machine
 	if [ -h ${DESTDIR}/usr/include/$i ]; then \
 		rm -f ${DESTDIR}/usr/include/$i; \
 	fi
+.endfor
+.for i in ${LNOHEADERDIRS}
+	rm -rf ${DESTDIR}/usr/include/$i
 .endfor
 	mtree -deU -f ${.CURDIR}/../etc/mtree/BSD.include.dist \
 		-p ${DESTDIR}/usr/include
