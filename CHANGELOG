@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.400 2000/01/04 14:59:03 jinmei Exp $
+$Id: CHANGELOG,v 1.401 2000/01/04 17:38:45 jinmei Exp $
 
 <200001>
+2000-01-05  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/{bgpd, pim6[ds]d, ping6, traceroute6}: were modified
+	to use rfc2292bis by default. Related Makefiles were also
+	modified.
+
 2000-01-04  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/{ip6opt.c, rthdr.c}: implemented some new
 	functions introduced in rfc2292bis (see TODO.2292bis for more
