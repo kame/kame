@@ -527,12 +527,6 @@ dump(addr)
 		       "St", "Flgs", "Prbs");
 
 again:;
-	if (repeat) {
-		struct timeval tv;
-		gettimeofday(&tv, NULL);
-		printf("%u.%06u\n", (u_int)tv.tv_sec, (u_int)tv.tv_usec);
-	}
-
 	mib[0] = CTL_NET;
 	mib[1] = PF_ROUTE;
 	mib[2] = 0;
