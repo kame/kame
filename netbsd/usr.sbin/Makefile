@@ -3,7 +3,7 @@ SUBDIR+=sysctl inetd trpt tcpdchk tcpdmatch wiconfig cnwctl syslogd
 
 SUBDIR+=bgpd dtcp faithd gifconfig hroute6d icmp6dump ifmcstat mld6query mping \
 	ndp pim6dd pim6sd prefix route6d rrenumd setkey traceroute \
-	traceroute6 rtsold rtadvd rip6query lpr
+	traceroute6 rtsold rtadvd rip6query lpr dhcp6
 SUBDIR+=natptconfig natptd natptlog
 SUBDIR+=racoon
 SUBDIR+=pvcbridge pvcsif pvctxctl
