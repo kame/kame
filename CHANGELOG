@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.242 1999/11/02 04:28:10 itojun Exp $
+$Id: CHANGELOG,v 1.243 1999/11/02 04:43:33 itojun Exp $
 
 <199911>
 Tue Nov  2 13:27:36 JST 1999  itojun@iijlab.net
@@ -9,7 +9,8 @@ Tue Nov  2 13:27:36 JST 1999  itojun@iijlab.net
 
 Tue Nov  2 01:46:01 JST 1999  itojun@iijlab.net
 	* bsdi3/bin/ping6: move bsdi3/sbin/ping6 into bsdi3/bin/ping6, as
-	  bsdi3 puts ping into bin/ping.
+	  bsdi3 puts ping into bin/ping.  You may want to remove
+	  /usr/local/v6/sbin/ping6 to get rid of old binary.
 
 Mon Nov  1 21:29:59 JST 1999  itojun@iijlab.net
 	* netbsd/pkgsrc/net/mrt, freebsd[23]/ports/mrt: upgrade to 2.0.1a.
