@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.33 2000/10/07 06:22:55 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.34 2000/11/24 07:47:18 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -526,7 +526,7 @@ main(argc, argv)
 	argc -= optind;
 	argv += optind;
 
-	if (argc < 1)
+	if (argc < 1 || argc > 2)
 		usage();
 
 #if 1
@@ -1305,7 +1305,7 @@ void
 usage()
 {
 	(void)fprintf(stderr,
-"usage: traceroute6 [-dlnrv] [-f first_hop] [-m max_hops] [-p port#] \n"
-"       [-q nqueries] [-s src_addr] [-g gateway] [-w wait] host [data size]\n");
+"usage: traceroute6 [-dlnrv] [-f firsthop] [-g gateway] [-m hoplimit] [-p port]\n"
+"       [-q probes] [-s src] [-w waittime] target [datalen]\n");
 	exit(1);
 }
