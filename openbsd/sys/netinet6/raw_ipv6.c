@@ -350,7 +350,7 @@ rip6_input(mp, offp, proto)
 	!IN6_ARE_ADDR_EQUAL(&inp->inp_faddr6, &ip6->ip6_src))
       continue;
     if ((icmp6type >= 0) && 
-	ICMP6_FILTER_WILLBLOCK(icmp6type, &inp->inp_icmp6filt))
+	ICMP6_FILTER_WILLBLOCK(icmp6type, inp->inp_icmp6filt))
       continue;
 
     DPRINTF(IDL_EVENT, ("Found a raw pcb (>1)\n"));
@@ -429,6 +429,7 @@ rip6_output(m, so, dst, control)
   register struct ip6_hdr *ip6;
   register struct inpcb *inp;
   int flags;
+  int error = 0;
 #if 0
   struct ifnet *forceif = NULL;
   struct ip6_pktopts opt, *optp = NULL;
@@ -436,12 +437,12 @@ rip6_output(m, so, dst, control)
 #if __OpenBSD__
   va_list ap;
   struct socket *so;
-  struct in6_addr *dst;
+  struct sockaddr_in6 *dst;
   struct mbuf *control;
 
   va_start(ap, m);
   so = va_arg(ap, struct socket *);
-  dst = va_arg(ap, struct in6_addr *);
+  dst = va_arg(ap, struct sockaddr_in6 *);
   control = va_arg(ap, struct mbuf *);
   va_end(ap);
 #endif /* __OpenBSD__ */
@@ -460,13 +461,24 @@ rip6_output(m, so, dst, control)
   else
 #endif
     {
+      struct in6_addr *in6a;
+
+      in6a = in6_selectsrc(dst, NULL /*XXX optp*/, inp->inp_moptions6,
+		&inp->inp_route6, &inp->inp_laddr6, &error);
+      if (in6a == NULL) {
+	if (error == 0)
+	  error = EADDRNOTAVAIL;
+	goto bad;
+      }
+
       M_PREPEND(m, sizeof(struct ip6_hdr), M_WAIT);
       ip6 = mtod(m, struct ip6_hdr *);
+      ip6->ip6_flow = 0;  /* Or possibly user flow label, in host order. */
+      ip6->ip6_vfc = IPV6_VERSION;
       ip6->ip6_nxt = inp->inp_ipv6.ip6_nxt;
       ip6->ip6_hlim = 255;	/*XXX*/
-      ip6->ip6_src = inp->inp_laddr6;
-      ip6->ip6_dst = *dst;
-      ip6->ip6_flow = 0;  /* Or possibly user flow label, in host order. */
+      bcopy(in6a, &ip6->ip6_src, sizeof(*in6a));
+      ip6->ip6_dst = dst->sin6_addr;
       /*
        * Question:  How do I handle options?
        *
@@ -504,11 +516,16 @@ rip6_output(m, so, dst, control)
       csum = (uint16_t *)(mtod(m, uint8_t *) + payload + inp->inp_csumoffset);
 
       *csum = 0;
-      *csum = in6_cksum(m, nexthdr, m->m_pkthdr.len - payload, payload);
+      *csum = in6_cksum(m, nexthdr, payload, m->m_pkthdr.len - payload);
     };
   };
 
   return ip6_output(m, NULL/*XXX*/, &inp->inp_route6, flags, inp->inp_moptions6, NULL /*XXX*/);
+
+bad:
+  if (m)
+    m_freem(m);
+  return error;
 }
 
 /*----------------------------------------------------------------------
@@ -603,21 +620,22 @@ rip6_ctloutput (op, so, level, optname, m)
           if (error)
             return error;
 
-          inp->inp_icmp6filt = icmp6_filter;
+          bcopy(&icmp6_filter, inp->inp_icmp6filt, sizeof(icmp6_filter));
 
           return 0;
         } else
-          return sooptcopyout(sopt, &inp->inp_icmp6filt,
+          return sooptcopyout(sopt, inp->inp_icmp6filt,
             sizeof(struct icmp6_filter));
 #else /* __FreeBSD__ */
         if (!m || !*m || (*m)->m_len != sizeof(struct icmp6_filter))
 	  RETURN_ERROR(EINVAL);
         if (op == PRCO_SETOPT) {
-          inp->inp_icmp6filt = *mtod(*m, struct icmp6_filter *);
+	  bcopy(mtod(*m, struct icmp6_filter *), inp->inp_icmp6filt,
+		sizeof(struct icmp6_filter));
           m_freem(*m);
         } else {
           (*m)->m_len = sizeof(struct icmp6_filter);
-          *mtod(*m, struct icmp6_filter *) = inp->inp_icmp6filt;
+          *mtod(*m, struct icmp6_filter *) = *inp->inp_icmp6filt;
         };
         return 0;
 #endif /* __FreeBSD__ */
@@ -761,6 +779,9 @@ MAYBESTATIC MAYBEINLINE int rip6_usrreq_attach(struct socket *so, int proto)
 #endif
   if (inp->inp_ipv6.ip6_nxt == IPPROTO_ICMPV6)
      inp->inp_csumoffset = 2;
+  inp->inp_icmp6filt = (struct icmp6_filter *)
+    malloc(sizeof(struct icmp6_filter), M_PCB, M_NOWAIT);
+  ICMP6_FILTER_SETPASSALL(inp->inp_icmp6filt);
   return error;
 }
 
@@ -773,6 +794,10 @@ MAYBESTATIC MAYBEINLINE int rip6_usrreq_detach(struct socket *so)
 #ifdef MROUTING
       /* More MROUTING stuff. */
 #endif
+  if (inp->inp_icmp6filt) {
+    free(inp->inp_icmp6filt, M_PCB);
+    inp->inp_icmp6filt = NULL;
+  }
   in_pcbdetach(inp);
   return 0;
 }
@@ -870,7 +895,7 @@ static int rip6_usrreq_send(struct socket *so, int flags, struct mbuf *m,
 {
   register struct inpcb *inp = sotoinpcb(so);
   register int error = 0;
-  struct in6_addr *dst;
+  struct sockaddr_in6 *dst, tmp;
 
    if (inp == 0) {
       m_freem(m);
@@ -886,14 +911,18 @@ static int rip6_usrreq_send(struct socket *so, int flags, struct mbuf *m,
        if (addr)
 	   return EISCONN;
 
-       dst = &(inp->inp_faddr6); 
+       bzero(&tmp, sizeof(tmp));
+       tmp.sin6_family = AF_INET6;
+       tmp.sin6_len = sizeof(tmp);
+       tmp.sin6_addr = inp->inp_faddr6;
+       dst = &tmp;
      }
    else
      {
        if (addr == NULL)
 	   return ENOTCONN;
 
-       dst = &((struct sockaddr_in6 *)addr)->sin6_addr;
+       dst = (struct sockaddr_in6 *)addr;
      }
 
    error = rip6_output(m,so,dst,control);
@@ -989,9 +1018,9 @@ rip6_usrreq(so, req, m, nam, control, p)
     {
     case PRU_ATTACH:
 #if __NetBSD__
-      error = rip6_usrreq_attach(so, 0, p);  /* XXX */
+      error = rip6_usrreq_attach(so, (long)nam, p);
 #else /* __NetBSD__ */
-      error = rip6_usrreq_attach(so, 0);  /* XXX */
+      error = rip6_usrreq_attach(so, (long)nam);
 #endif /* __NetBSD__ */
       break;
     case PRU_DISCONNECT:

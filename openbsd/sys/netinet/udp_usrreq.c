@@ -129,6 +129,29 @@ udp_init()
 	in_pcbinit(&udbtable, udbhashsize);
 }
 
+#if defined(INET6) && !defined(TCP6)
+int
+udp6_input(mp, offp, proto)
+	struct mbuf **mp;
+	int *offp, proto;
+{
+	struct mbuf *m = *mp;
+
+#if defined(NFAITH) && 0 < NFAITH
+	if (m->m_pkthdr.rcvif) {
+		if (m->m_pkthdr.rcvif->if_type == IFT_FAITH) {
+			/* XXX send icmp6 host/port unreach? */
+			m_freem(m);
+			return IPPROTO_DONE;
+		}
+	}
+#endif
+
+	udp_input(m, *offp, proto);
+	return IPPROTO_DONE;
+}
+#endif
+
 void
 #if __STDC__
 udp_input(struct mbuf *m, ...)
@@ -642,6 +665,19 @@ udp_notify(inp, errno)
 	sowwakeup(inp->inp_socket);
 }
 
+#if defined(INET6) && !defined(TCP6)
+void
+udp6_ctlinput(cmd, sa, ip6, m, off)
+	int cmd;
+	struct sockaddr *sa;
+	struct ip6_hdr *ip6;
+	struct mbuf *m;
+	int off;
+{
+	(void)udp_ctlinput(cmd, sa, (void *)ip6);
+}
+#endif
+
 void *
 udp_ctlinput(cmd, sa, v)
 	int cmd;
@@ -928,6 +964,19 @@ release:
 u_int	udp_sendspace = 9216;		/* really max datagram size */
 u_int	udp_recvspace = 40 * (1024 + sizeof(struct sockaddr_in));
 					/* 40 1K datagrams */
+
+#if defined(INET6) && !defined(TCP6)
+/*ARGSUSED*/
+int
+udp6_usrreq(so, req, m, addr, control, p)
+	struct socket *so;
+	int req;
+	struct mbuf *m, *addr, *control;
+	struct proc *p;
+{
+	return udp_usrreq(so, req, m, addr, control);
+}
+#endif
 
 /*ARGSUSED*/
 int

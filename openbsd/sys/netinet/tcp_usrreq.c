@@ -100,6 +100,18 @@ extern	struct baddynamicports baddynamicports;
 
 int tcp_ident __P((void *, size_t *, void *, size_t));
 
+#if defined(INET6) && !defined(TCP6)
+int
+tcp6_usrreq(so, req, m, nam, control, p)
+	struct socket *so;
+	int req;
+	struct mbuf *m, *nam, *control;
+	struct proc *p;
+{
+	return tcp_usrreq(so, req, m, nam, control);
+}
+#endif
+
 /*
  * Process a TCP user request for TCP tb.  If this is a send request
  * then m is the mbuf chain of send data.  If this is a timer expiration

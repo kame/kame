@@ -90,6 +90,13 @@ struct	udpstat {
 struct	inpcbtable udbtable;
 struct	udpstat udpstat;
 
+#if defined(INET6) && !defined(TCP6)
+void	udp6_ctlinput __P((int, struct sockaddr *, struct ip6_hdr *,
+		struct mbuf *, int));
+int	udp6_input __P((struct mbuf **, int *, int));
+int	udp6_usrreq __P((struct socket *,
+	    int, struct mbuf *, struct mbuf *, struct mbuf *, struct proc *));
+#endif
 void	 *udp_ctlinput __P((int, struct sockaddr *, void *));
 void	 udp_init __P((void));
 void	 udp_input __P((struct mbuf *, ...));

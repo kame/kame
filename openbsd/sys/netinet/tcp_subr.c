@@ -649,6 +649,19 @@ tcp_notify(inp, error)
 	sowwakeup(so);
 }
 
+#if defined(INET6) && !defined(TCP6)
+void
+tcp6_ctlinput(cmd, sa, ip6, m, off)
+	int cmd;
+	struct sockaddr *sa;
+	struct ip6_hdr *ip6;
+	struct mbuf *m;
+	int off;
+{
+	(void)tcp_ctlinput(cmd, sa, (void *)ip6);
+}
+#endif
+
 void *
 tcp_ctlinput(cmd, sa, v)
 	int cmd;

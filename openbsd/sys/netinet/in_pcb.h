@@ -136,7 +136,7 @@ struct inpcb {
 	struct tdb     *inp_tdb;	/* If tdb_dst matches our dst, use */
 	int	inp_fflowinfo;          /* Foreign flowlabel & priority */
 	int	inp_csumoffset;
-	struct	icmp6_filter inp_icmp6filt;
+	struct	icmp6_filter *inp_icmp6filt;
 #if 0 /*KAME IPSEC*/
 	struct secpolicy *inp_sp;	/* security policy. It may not be
 					 * used according to policy selection.
@@ -245,4 +245,10 @@ extern struct sockaddr_in *in_selectsrc __P((struct sockaddr_in *,
 int	in6_pcbnotify __P((struct inpcbtable *, struct sockaddr *,
 			   u_int, struct in6_addr *, u_int, int,
 			   void (*)(struct inpcb *, int)));
+struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
+				     struct ip6_pktopts *,
+				     struct ip6_moptions *,
+				     struct route_in6 *,
+				     struct in6_addr *, int *));
+int	in6_selecthlim __P((struct in6pcb *, struct ifnet *));
 #endif

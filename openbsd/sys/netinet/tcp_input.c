@@ -419,6 +419,44 @@ done:
 	splx(s);
 }
 
+#if defined(INET6) && !defined(TCP6)
+int
+tcp6_input(mp, offp, proto)
+	struct mbuf **mp;
+	int *offp, proto;
+{
+	struct mbuf *m = *mp;
+
+#if defined(NFAITH) && 0 < NFAITH
+	if (m->m_pkthdr.rcvif) {
+		if (m->m_pkthdr.rcvif->if_type == IFT_FAITH) {
+			/* XXX send icmp6 host/port unreach? */
+			m_freem(m);
+			return IPPROTO_DONE;
+		}
+	}
+#endif
+
+	/*
+	 * draft-itojun-ipv6-tcp-to-anycast
+	 * better place to put this in?
+	 */
+	if (m->m_flags & M_ANYCAST6) {
+		if (m->m_len >= sizeof(struct ip6_hdr)) {
+			struct ip6_hdr *ip6 = mtod(m, struct ip6_hdr *);
+			icmp6_error(m, ICMP6_DST_UNREACH,
+				ICMP6_DST_UNREACH_ADDR,
+				(caddr_t)&ip6->ip6_dst - (caddr_t)ip6);
+		} else
+			m_freem(m);
+		return IPPROTO_DONE;
+	}
+
+	tcp_input(m, *offp, proto);
+	return IPPROTO_DONE;
+}
+#endif
+
 /*
  * TCP input routine, follows pages 65-76 of the
  * protocol specification dated September, 1981 very closely.
