@@ -6,10 +6,10 @@
 #
 
 PORTNAME=	lynx
-PORTVERSION=    2.8.4d9
+PORTVERSION=    2.8.4d10
 CATEGORIES=	www ipv6
 MASTER_SITES=   http://lynx.isc.org/current/
-DISTNAME=       ${PORTNAME}2.8.4dev.9
+DISTNAME=       ${PORTNAME}2.8.4dev.10
 
 MAINTAINER=	k-sugyou@kame.net
 
