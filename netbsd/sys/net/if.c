@@ -402,6 +402,12 @@ if_detach(ifp)
 	 * Do an if_down() to give protocols a chance to do something.
 	 */
 	if_down(ifp);
+#ifdef ALTQ
+	if (ALTQ_IS_ENABLED(&ifp->if_snd))
+		altq_disable(&ifp->if_snd);
+	if (ALTQ_IS_ATTACHED(&ifp->if_snd))
+		altq_detach(&ifp->if_snd);
+#endif
 
 	/*
 	 * Rip all the addresses off the interface.  This should make
