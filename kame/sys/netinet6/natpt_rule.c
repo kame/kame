@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.55 2002/08/21 23:34:37 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.56 2002/12/02 13:59:29 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -272,9 +272,10 @@ natpt_matchIn6addr(struct pcv *cv6, struct cSlot *csl, struct mAddr *from)
 	    && (cv6->ip_p != IPPROTO_TCP))
 		return (1);
 
-	if (csl->map & NATPT_REDIRECT_PORT) {
-		if (cv6->pyld.tcp6->th_dport != from->dport)
-			return (0);
+	if ((csl->map & NATPT_REDIRECT_PORT)
+	    && (from->dport != 0)
+	    && (from->dport != cv6->pyld.tcp6->th_dport)) {
+		return (0);
 	}
 
 	return (1);
