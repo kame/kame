@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.41 2000/01/14 05:36:56 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.42 2000/01/14 06:37:38 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -252,7 +252,7 @@ get_ph1approval(iph1, pair)
 {
 	vchar_t *newsa;
 	struct isakmpsa *sa;
-	struct prop_pair *s;
+	struct prop_pair *s, *p;
 	int prophlen;
 	int i;
 
@@ -265,9 +265,11 @@ get_ph1approval(iph1, pair)
 			prophlen = sizeof(struct isakmp_pl_p)
 					+ s->prop->spi_size;
 			/* compare proposal and select one */
-			sa = get_ph1approvalx(s, iph1->rmconf->proposal);
-			if (sa != NULL)
-				goto found;
+			for (p = s; p; p = p->tnext) {
+				sa = get_ph1approvalx(p, iph1->rmconf->proposal);
+				if (sa != NULL)
+					goto found;
+			}
 		}
 	}
 
