@@ -1,4 +1,4 @@
-.\"	$KAME: faithd.8,v 1.35 2002/05/09 09:41:24 itojun Exp $
+.\"	$KAME: faithd.8,v 1.36 2002/05/09 13:59:16 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -167,8 +167,6 @@ Use privileged TCP port number as source port,
 for IPv4 TCP connection toward final destination.
 For relaying
 .Xr ftp 1
-and
-.Xr rlogin 1 ,
 this flag is not necessary as special program code is supplied.
 .El
 .Pp
@@ -177,9 +175,7 @@ will relay both normal and out-of-band TCP data.
 It is capable of emulating TCP half close as well.
 .Nm
 includes special support for protocols used by
-.Xr ftp 1
-and
-.Xr rlogin 1 .
+.Xr ftp 1 .
 When translating FTP protocol,
 .Nm
 translates network level addresses in
@@ -187,13 +183,6 @@ translates network level addresses in
 and
 .Li PASV/LPSV/EPSV
 commands.
-For RLOGIN protocol,
-.Nm
-will relay back connection from
-.Xr rlogind 8
-on the server to
-.Xr rlogin 1
-on client.
 .Pp
 Inactive sessions will be disconnected in 30 minutes,
 to avoid stale sessions from chewing up resources.
