@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.131 2001/10/16 14:49:58 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.132 2001/10/19 05:31:22 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1741,15 +1741,20 @@ getsadbpolicy(policy0, policylen0, type, iph2)
 	struct saproto *pr;
 	caddr_t policy, p;
 	int policylen;
+	int xisrlen;
 	u_int satype, mode;
 
 	/* get policy buffer size */
 	policylen = sizeof(struct sadb_x_policy);
 	if (type != SADB_X_SPDDELETE) {
 		for (pr = iph2->approval->head; pr; pr = pr->next) {
-			policylen += PFKEY_ALIGN8(sizeof(*xisr)
-					   + iph2->src->sa_len
-					   + iph2->dst->sa_len);
+			xisrlen = sizeof(*xisr);
+			if (pr->encmode == IPSECDOI_ATTR_ENC_MODE_TUNNEL) {
+				xisrlen += (iph2->src->sa_len
+				          + iph2->dst->sa_len);
+			}
+
+			policylen += PFKEY_ALIGN8(xisrlen);
 		}
 	}
 
@@ -1799,15 +1804,19 @@ getsadbpolicy(policy0, policylen0, type, iph2)
 		xisr->sadb_x_ipsecrequest_reqid = 0;
 		p = (caddr_t)(xisr + 1);
 
-		memcpy(p, iph2->src, iph2->src->sa_len);
-		p += iph2->src->sa_len;
+		xisrlen = sizeof(*xisr);
 
-		memcpy(p, iph2->dst, iph2->dst->sa_len);
-		p += iph2->dst->sa_len;
+		if (pr->encmode == IPSECDOI_ATTR_ENC_MODE_TUNNEL) {
+			xisrlen += (iph2->src->sa_len + iph2->dst->sa_len);
 
-		xisr->sadb_x_ipsecrequest_len = PFKEY_ALIGN8(sizeof(*xisr)
-		                                           + iph2->src->sa_len
-		                                           + iph2->dst->sa_len);
+			memcpy(p, iph2->src, iph2->src->sa_len);
+			p += iph2->src->sa_len;
+
+			memcpy(p, iph2->dst, iph2->dst->sa_len);
+			p += iph2->dst->sa_len;
+		}
+
+		xisr->sadb_x_ipsecrequest_len = PFKEY_ALIGN8(xisrlen);
 	}
 
 end:
