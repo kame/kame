@@ -1,4 +1,4 @@
-/*	$KAME: mainloop.c,v 1.76 2001/07/30 23:38:33 itojun Exp $	*/
+/*	$KAME: mainloop.c,v 1.77 2001/07/31 04:06:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -150,6 +150,10 @@ static int serve __P((struct sockdb *, char *, int, struct sockaddr *));
 
 #define RECVBUFSIZ	(8 * 1024)
 
+#define SERVE_DONE	0
+#define SERVE_RELAY	1
+#define SERVE_GETANS	2
+
 void
 mainloop()
 {
@@ -289,24 +293,27 @@ recv_dns0(sd, vclen)
 		ns->nresponse++;
 	}
 
-	if (ismyaddr((struct sockaddr *)&from)) {
+	switch (serve(sd, buf, l, (struct sockaddr *)&from)) {
+	case SERVE_DONE:
+		break;
+	case SERVE_RELAY:
 		/*
 		 * if we are the authoritative server, send
 		 * answer back directly.
 		 * otherwise, relay lookup request from local
 		 * node to multicast-capable servers.
 		 */
-		if (serve(sd, buf, l, (struct sockaddr *)&from) != 0)
-			relay(sd, buf, l, (struct sockaddr *)&from);
-	} else {
+		relay(sd, buf, l, (struct sockaddr *)&from);
+		break;
+	case SERVE_GETANS:
 		/*
 		 * if got a query from remote, try to transmit answer.
 		 * if we got a reply to our multicast query,
 		 * fill it into our local answer cache and send
 		 * the reply to the originator.
 		 */
-		if (serve(sd, buf, l, (struct sockaddr *)&from) != 0)
-			getans_dns(buf, l, (struct sockaddr *)&from);
+		getans_dns(buf, l, (struct sockaddr *)&from);
+		break;
 	}
 
 	return 0;
@@ -1866,9 +1873,11 @@ serve(sd, buf, len, from)
 
 	/* we handle queries only */
 	if (sizeof(*hp) > len)
-		return -1;
+		return SERVE_RELAY;
 	hp = (HEADER *)buf;
-	if (hp->qr != 0 || hp->opcode != QUERY)
+	if (hp->qr != 0)
+		return SERVE_GETANS;
+	if (hp->opcode != QUERY)
 		goto fail;
 	if (ntohs(hp->qdcount) != 1)	/*XXX*/
 		goto fail;
@@ -1931,7 +1940,7 @@ serve(sd, buf, len, from)
 			/* LINTED const cast */
 			free((char *)n);
 		}
-		return 0;
+		return SERVE_DONE;
 	} else if (type == T_PTR && match_ptrquery(n)) {
 		/* ptr record for reverse query - advertise my name */
 		memcpy(replybuf, buf, d - buf);
@@ -1982,13 +1991,14 @@ serve(sd, buf, len, from)
 			/* LINTED const cast */
 			free((char *)n);
 		}
-		return 0;
-	}
+		return SERVE_DONE;
+	} else
+		return SERVE_RELAY;
 
 fail:
 	if (n) {
 		/* LINTED const cast */
 		free((char *)n);
 	}
-	return -1;
+	return SERVE_DONE;	/* error */
 }
