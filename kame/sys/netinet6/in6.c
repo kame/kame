@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.237 2001/09/25 08:41:44 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.238 2001/09/26 05:51:11 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1041,22 +1041,23 @@ in6_update_ifa(ifp, ifra, ia)
 		if (plen != 128) {
 			log(LOG_INFO, "in6_update_ifa: prefixlen should be "
 			    "128 when dstaddr is specified\n");
-		}
 #ifdef FORCE_P2PPLEN
-		/*
-		 * To be compatible with old configurations, such as
-		 * ifconfig gif0 inet6 2001::1 2001::2 prefixlen 126,
-		 * we override the specified prefixmask as if the prefix length
-		 * was 128.
-		 */
-		ifra->ifra_prefixmask.sin6_len = sizeof(struct sockaddr_in6); 
-		for (i = 0; i < 4; i++)
-			ifra->ifra_prefixmask.sin6_addr.s6_addr32[i] =
-				0xffffffff;
-		plen = 128;
+			/*
+			 * To be compatible with old configurations,
+			 * such as ifconfig gif0 inet6 2001::1 2001::2
+			 * prefixlen 126, we override the specified
+			 * prefixmask as if the prefix length was 128.
+			 */
+			ifra->ifra_prefixmask.sin6_len
+				= sizeof(struct sockaddr_in6); 
+			for (i = 0; i < 4; i++)
+				ifra->ifra_prefixmask.sin6_addr.s6_addr32[i] =
+					0xffffffff;
+			plen = 128;
 #else
-		return(EINVAL);
+			return(EINVAL);
 #endif
+		}
 	}
 	/* lifetime consistency check */
 	lt = &ifra->ifra_lifetime;
