@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.367 2003/05/09 08:40:56 suz Exp $	*/
+/*	$KAME: ip6_output.c,v 1.368 2003/06/03 11:17:20 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -256,7 +256,7 @@ static int ip6_splithdr __P((struct mbuf *, struct ip6_exthdrs *));
 static int ip6_getpmtu __P((struct route *, struct route *, struct ifnet *,
 	struct sockaddr_in6 *, u_long *, int *));
 #else
-static int ip6_getpmtu __P((struct route *, struct route *, struct ifnet *,
+static int ip6_getpmtu __P((struct route_in6 *, struct route_in6 *, struct ifnet *,
 	struct sockaddr_in6 *, u_long *, int *));
 #endif
 
