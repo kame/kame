@@ -3,7 +3,7 @@
 # Date created:		Tue Nov 16 19:45:46 JST 1999
 # Whom:			sumikawa
 #
-# $Id: Makefile,v 1.1 1999/11/16 11:10:13 sumikawa Exp $
+# $Id: Makefile,v 1.2 1999/11/16 12:48:05 sumikawa Exp $
 #
 
 DISTNAME=	OpenSSH-1.2
@@ -15,6 +15,8 @@ PATCHFILES=	openssh-12-v6-19991116.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	sumikawa@kame.net
+
+BROKEN=		"distfile does not exist"
 
 # for ports-curret
 #LIB_DEPENDS=	crypto.1:${PORTSDIR}/security/openssl
