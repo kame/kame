@@ -1,4 +1,4 @@
-$Id: TODO,v 1.15 2000/09/20 19:01:25 itojun Exp $
+$Id: TODO,v 1.16 2000/09/20 20:46:17 sakane Exp $
 
 Please send any questions or bug reports to snap-users@kame.net.
 
@@ -8,12 +8,11 @@ UGENT
 o The documents for users convenience.
 o split log file based on client.  printf-like config directive, i.e.
   "logfile racoon.%s.log", should be useful here.
-o DSA signature authentication method.
+o fix flag for logging
 o variable-length SPI on phase 2 (for IPComp), endian issue
 
 MUST
 o Certificate type handling.  e.g. CRL, CR, PGP...
-o To be checked signer of certificate.
 o To consider the use with certificate infrastructure.  PXIX ???
 o Support scoped (link-local and site-local) IPv6 addresses.
   It needs pfkey modification for scope IDs, and advanced API (RFC2292)
@@ -21,16 +20,16 @@ o Support scoped (link-local and site-local) IPv6 addresses.
 o kmstat should be improved.
 o aggressive mode DH group checks/handling on responder side.
 o Informational Exchange processing properly.
+o mandatory configuration check.
 
 SHOULD
-o fix flag for logging
+o DSA signature authentication method.
 o more acceptable check.
 o New group mode should be considered.
 o Dynamically retry to exchange and resend the packet per nodes.
 o Remote maintenance with secure connection.
 o To make the list of supported algorithm by sadb_supported payload
   in the SADB_REGISTER message which happens asynchronously.
-o support DN type of ID payload.
 o fix the structure of ph2handle.
   We can handle the below case.
 
@@ -60,7 +59,6 @@ o fix the structure of ph2handle.
                             A=B
                             A=C
 
-o mandatory configuration check.
 o consistency of function name.
 o deep copy configuration entry to hander.  It's easy to reload configuration.
 o don't keep to hold keymat values, do it ?
@@ -103,9 +101,7 @@ o for lifetime and key length, something like this should be useful.
 o wildcard "accept any proposal" policy should be allowed.
 
 MAY
-o To be supported bytes lifetimes for ISAKMP-SA.
 o Effective code.
-o more fix strnames.c.
 
 TO BE TESTED.
 o IKE retransmit behavior
