@@ -32,7 +32,7 @@
  * Sun Jan  9 06:23:42 JST 2000
  *    Merged into new racoon with trivial modification.
  */
-/* $Id: signing.c,v 1.9 2000/02/08 15:55:20 itojun Exp $ */
+/* $Id: signing.c,v 1.10 2000/02/08 17:55:07 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -91,12 +91,6 @@
 #include "localconf.h"
 #include "signing.h"
 
-/* Buffer used:	3072 bytes for data to be signed
- *		1024 bytes for signature buffer
- */
-#define BUFFER_SIZE 4096
-#define BUFFER_SIZE_PATH 256
-
 #ifdef WIN16
 #define MS_CALLBACK	_far _loadds
 #else
@@ -127,12 +121,12 @@ sign(donnees_source, taille_donnees_source, user, signature, taille_signature)
 {
 	/* Declaration */
 	static char	keyfile[]		= USERS_PATH;
-	char		buf[BUFFER_SIZE],
+	char		buf[BUFSIZ],
 			*sig_buf,
 			*data,
 			*sig;
 	int		err,
-			sig_len			= BUFFER_SIZE;
+			sig_len			= BUFSIZ;
 	EVP_MD_CTX	md_ctx;
 	EVP_PKEY	*pkey;
 	FILE		*fp;
@@ -213,7 +207,7 @@ check_signature(donnees_source, taille_donnees_source, user, signature, taille_s
 {
 	/* Declaration */
 	static const char	certfile[]		= USERS_PATH;
-	char			buf[BUFFER_SIZE],
+	char			buf[BUFSIZ],
 				*data,
 				*sig_buf;
 	int 			err;
@@ -371,7 +365,7 @@ get_certificate(user, certificate_size, certificate)
 /* Declaration */
 	static const char	certfile[]		= USERS_PATH;
 	struct stat 		*statistics;
-	char			buf[BUFFER_SIZE_PATH],
+	char			buf[MAXPATHLEN],
 				*data;
 	FILE 			*fp			= 	NULL;
 	X509 			*x509;
@@ -593,8 +587,8 @@ check_certificate(user, cryptCert, certificate_size)
 {
 
 	static  char	certfile[]		= USERS_PATH;
-	char	buf[BUFFER_SIZE],
-		buf_string[BUFFER_SIZE],
+	char	buf[BUFSIZ],
+		buf_string[BUFSIZ],
 		*file_name,
 		*file_name_temp,
 		*CA_FILE			= CA_PATH "cacert.pem";
