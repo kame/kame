@@ -1,4 +1,4 @@
-/*	$KAME: isakmp_quick.c,v 1.67 2000/10/04 17:41:01 itojun Exp $	*/
+/*	$KAME: isakmp_quick.c,v 1.68 2000/10/24 08:37:35 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -211,6 +211,7 @@ quick_i1send(iph2, msg)
 	/*
 	 * we do not attach IDci nor IDcr, under the following condition:
 	 * - all proposals are transport mode
+	 * - no MIP6
 	 * - id payload suggests to encrypt all the traffic (no specific
 	 *   protocol type)
 	 */
@@ -218,6 +219,7 @@ quick_i1send(iph2, msg)
 	id_p = (struct ipsecdoi_id_b *)iph2->id_p->v;
 	if (id->proto_id == 0
 	 && id_p->proto_id == 0
+	 && iph2->ph1->rmconf->support_mip6 == 0
 	 && ipsecdoi_transportmode(iph2)) {
 		/* XXX debug message? */
 		idci = idcr = 0;
