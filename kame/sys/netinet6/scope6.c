@@ -1,4 +1,4 @@
-/*	$KAME: scope6.c,v 1.8 2000/05/17 05:07:27 jinmei Exp $	*/
+/*	$KAME: scope6.c,v 1.9 2000/05/18 15:03:26 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -175,7 +175,7 @@ scope6_get(ifp, idlist)
  * Get a scope of the address. Node-local, link-local, site-local or global.
  */
 int
-in6_addrscope (addr)
+in6_addrscope(addr)
 struct in6_addr *addr;
 {
 	int scope;
@@ -291,4 +291,11 @@ scope6_get_default(idlist)
 	      sizeof(scope6_ids[0].s6id_list));
 
 	return(0);
+}
+
+u_int32_t
+scope6_addr2default(addr)
+	struct in6_addr *addr;
+{
+	return(scope6_ids[0].s6id_list[in6_addrscope(addr)]);
 }
