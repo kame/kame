@@ -1,4 +1,4 @@
-/*	$KAME: tcp.c,v 1.12 2003/08/20 02:10:53 itojun Exp $	*/
+/*	$KAME: tcp.c,v 1.13 2003/09/02 22:49:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -44,9 +44,6 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
-#ifdef HAVE_POLL_H
-#include <poll.h>
-#endif
 
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -57,11 +54,7 @@
 static char tcpbuf[16*1024];
 	/* bigger than MSS and may be lesser than window size */
 static int tblen, tboff, oob_exists;
-#ifdef HAVE_POLL_H
-static struct pollfd pfd[2];
-#else
 static fd_set readfds, writefds, exceptfds;
-#endif
 static char atmark_buf[2];
 static pid_t cpid = (pid_t)0;
 static pid_t ppid = (pid_t)0;
@@ -162,13 +155,9 @@ send_data(int s_rcv, int s_snd, const char *service, int direction)
 		if (cc == -1)
 			goto retry_or_err;
 		oob_exists = 0;
-#ifdef HAVE_POLL_H
-		pfd[0].events |= POLLRDBAND;
-#else
 		if (s_rcv >= FD_SETSIZE)
 			exit_failure("descriptor too big");
 		FD_SET(s_rcv, &exceptfds);
-#endif
 	}
 
 	for (; tboff < tblen; tboff += cc) {
@@ -186,80 +175,55 @@ send_data(int s_rcv, int s_snd, const char *service, int direction)
 	}
 #endif /* DEBUG */
 	tblen = 0; tboff = 0;
-#ifdef HAVE_POLL_H
-	pfd[1].events &= ~POLLOUT;
-	pfd[0].events |= POLLIN;
-#else
 	if (s_snd >= FD_SETSIZE)
 		exit_failure("descriptor too big");
 	FD_CLR(s_snd, &writefds);
 	if (s_rcv >= FD_SETSIZE)
 		exit_failure("descriptor too big");
 	FD_SET(s_rcv, &readfds);
-#endif
 	return;
     retry_or_err:
 	if (errno != EAGAIN)
 		exit_failure("writing relay data failed: %s", strerror(errno));
-#ifdef HAVE_POLL_H
-	pfd[1].events |= POLLOUT;
-#else
 	if (s_snd >= FD_SETSIZE)
 		exit_failure("descriptor too big");
 	FD_SET(s_snd, &writefds);
-#endif
 }
 
 static void
 relay(int s_rcv, int s_snd, const char *service, int direction)
 {
-	int atmark, error;
+	int atmark, error, maxfd;
 	struct timeval tv;
-#ifndef HAVE_POLL_H
 	fd_set oreadfds, owritefds, oexceptfds;
-	int maxfd;
-#endif
 
-	fcntl(s_snd, F_SETFD, O_NONBLOCK);
-#ifdef HAVE_POLL_H
-	pfd[0].fd = s_snd;
-	pfd[0].events = 0;
-	pfd[1].fd = s_rcv;
-	pfd[1].events = POLLIN | POLLRDBAND;
-#else
 	FD_ZERO(&readfds);
 	FD_ZERO(&writefds);
 	FD_ZERO(&exceptfds);
+	fcntl(s_snd, F_SETFD, O_NONBLOCK);
 	oreadfds = readfds; owritefds = writefds; oexceptfds = exceptfds;
 	if (s_rcv >= FD_SETSIZE)
 		exit_failure("descriptor too big");
 	FD_SET(s_rcv, &readfds);
 	FD_SET(s_rcv, &exceptfds);
-	maxfd = (s_rcv > s_snd) ? s_rcv : s_snd;
-#endif
 	oob_exists = 0;
+	maxfd = (s_rcv > s_snd) ? s_rcv : s_snd;
 
 	for (;;) {
 		tv.tv_sec = FAITH_TIMEOUT / 4;
 		tv.tv_usec = 0;
-#ifdef HAVE_POLL_H
-		error = poll(pfd, sizeof(pfd)/sizeof(pfd[0]), tv.tv_sec * 1000);
-#else
 		oreadfds = readfds;
 		owritefds = writefds;
 		oexceptfds = exceptfds;
 		error = select(maxfd + 1, &readfds, &writefds, &exceptfds, &tv);
-#endif
 		if (error == -1) {
 			if (errno == EINTR)
 				continue;
 			exit_failure("select: %s", strerror(errno));
 		} else if (error == 0) {
-#ifndef HAVE_POLL_H
 			readfds = oreadfds;
 			writefds = owritefds;
 			exceptfds = oexceptfds;
-#endif
 			notify_inactive();
 			continue;
 		}
@@ -267,29 +231,19 @@ relay(int s_rcv, int s_snd, const char *service, int direction)
 		/* activity notification */
 		notify_active();
 
-#ifdef HAVE_POLL_H
-		if (pfd[1].revents & POLLRDBAND)
-#else
-		if (FD_ISSET(s_rcv, &exceptfds))
-#endif
-		{
+		if (FD_ISSET(s_rcv, &exceptfds)) {
 			error = ioctl(s_rcv, SIOCATMARK, &atmark);
 			if (error != -1 && atmark == 1) {
 				int cc;
 			    oob_read_retry:
 				cc = read(s_rcv, atmark_buf, 1);
 				if (cc == 1) {
-#ifdef HAVE_POLL_H
-					pfd[1].events &= ~POLLRDBAND;
-					pfd[0].events |= POLLOUT;
-#else
 					if (s_rcv >= FD_SETSIZE)
 						exit_failure("descriptor too big");
 					FD_CLR(s_rcv, &exceptfds);
 					if (s_snd >= FD_SETSIZE)
 						exit_failure("descriptor too big");
 					FD_SET(s_snd, &writefds);
-#endif
 					oob_exists = 1;
 				} else if (cc == -1) {
 					if (errno == EINTR)
@@ -300,12 +254,7 @@ relay(int s_rcv, int s_snd, const char *service, int direction)
 				}
 			}
 		}
-#ifdef HAVE_POLL_H
-		if (pfd[0].revents & POLLIN)
-#else
-		if (FD_ISSET(s_rcv, &readfds))
-#endif
-		{
+		if (FD_ISSET(s_rcv, &readfds)) {
 		    relaydata_read_retry:
 			tblen = read(s_rcv, tcpbuf, sizeof(tcpbuf));
 			tboff = 0;
@@ -320,34 +269,22 @@ relay(int s_rcv, int s_snd, const char *service, int direction)
 			case 0:
 				/* to close opposite-direction relay process */
 				shutdown(s_snd, 0);
-#ifdef HAVE_POLL_H
-				pfd[0].fd = -1;
-#endif
 
 				close(s_rcv);
 				close(s_snd);
 				exit_success("terminating %s relay", service);
 				/* NOTREACHED */
 			default:
-#ifdef HAVE_POLL_H
-				pfd[1].events &= ~POLLIN;
-				pfd[0].events |= POLLOUT;
-#else
 				if (s_rcv >= FD_SETSIZE)
 					exit_failure("descriptor too big");
 				FD_CLR(s_rcv, &readfds);
 				if (s_snd >= FD_SETSIZE)
 					exit_failure("descriptor too big");
 				FD_SET(s_snd, &writefds);
-#endif
 				break;
 			}
 		}
-#ifdef HAVE_POLL_H
-		if (pfd[0].revents & POLLOUT)
-#else
 		if (FD_ISSET(s_snd, &writefds))
-#endif
 			send_data(s_rcv, s_snd, service, direction);
 	}
 }
