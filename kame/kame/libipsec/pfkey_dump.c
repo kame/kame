@@ -1,4 +1,4 @@
-/*	$KAME: pfkey_dump.c,v 1.16 2000/05/19 11:04:02 itojun Exp $	*/
+/*	$KAME: pfkey_dump.c,v 1.17 2000/05/23 14:11:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -295,10 +295,12 @@ void
 pfkey_spdump(m)
 	struct sadb_msg *m;
 {
+	char pbuf[NI_MAXSERV];
 	caddr_t mhp[SADB_EXT_MAX + 1];
 	struct sadb_address *m_saddr, *m_daddr;
 	struct sadb_x_policy *m_xpl;
 	struct sockaddr *sa;
+	u_int16_t port;
 
 	/* check pfkey message. */
 	if (pfkey_align(m, mhp)) {
@@ -320,11 +322,22 @@ pfkey_spdump(m)
 		return;
 	}
 	sa = (struct sockaddr *)(m_saddr + 1);
-	printf("%s%s ",
-		str_ipaddr(sa),
-		str_prefport(sa->sa_family,
-		     m_saddr->sadb_address_prefixlen,
-		     _INPORTBYSA(m_saddr + 1)));
+	switch (sa->sa_family) {
+	case AF_INET:
+	case AF_INET6:
+		if (getnameinfo(sa, sa->sa_len, NULL, 0, pbuf, sizeof(pbuf),
+		    NI_NUMERICSERV) != 0)
+			port = 0;	/*XXX*/
+		else
+			port = atoi(pbuf);
+		printf("%s%s ", str_ipaddr(sa),
+			str_prefport(sa->sa_family,
+			    m_saddr->sadb_address_prefixlen, port));
+		break;
+	default:
+		printf("unknown-af ");
+		break;
+	}
 
 	/* destination address */
 	if (m_daddr == NULL) {
@@ -332,11 +345,22 @@ pfkey_spdump(m)
 		return;
 	}
 	sa = (struct sockaddr *)(m_daddr + 1);
-	printf("%s%s ",
-		str_ipaddr(sa),
-		str_prefport(sa->sa_family,
-		     m_daddr->sadb_address_prefixlen,
-		     _INPORTBYSA(m_daddr + 1)));
+	switch (sa->sa_family) {
+	case AF_INET:
+	case AF_INET6:
+		if (getnameinfo(sa, sa->sa_len, NULL, 0, pbuf, sizeof(pbuf),
+		    NI_NUMERICSERV) != 0)
+			port = 0;	/*XXX*/
+		else
+			port = atoi(pbuf);
+		printf("%s%s ", str_ipaddr(sa),
+			str_prefport(sa->sa_family,
+			    m_daddr->sadb_address_prefixlen, port));
+		break;
+	default:
+		printf("unknown-af ");
+		break;
+	}
 
 	/* upper layer protocol */
 	if (m_saddr->sadb_address_proto != m_daddr->sadb_address_proto) {
@@ -427,7 +451,7 @@ str_prefport(family, pref, port)
 	if (port == IPSEC_PORT_ANY)
 		snprintf(portbuf, sizeof(portbuf), "[%s]", "any");
 	else
-		snprintf(portbuf, sizeof(portbuf), "[%u]", ntohs(port));
+		snprintf(portbuf, sizeof(portbuf), "[%u]", port);
 
 	snprintf(buf, sizeof(buf), "%s%s", prefbuf, portbuf);
 
