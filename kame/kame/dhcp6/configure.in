@@ -113,18 +113,4 @@ AC_ARG_ENABLE(pedant, [  --enable-pedant         pedantic compilation],
 	fi], [enableval=no])
 AC_MSG_RESULT($enableval);
 
-AC_MSG_CHECKING(if --enable-pad4 option is specified)
-AC_ARG_ENABLE(pad4, [  --enable-pad4           pad extensions to 4 byte boundary],
-	[if test "$enableval" = "yes"; then
-		AC_DEFINE(USE_DHCP6EXT_PAD4)
-	fi], [enableval=no])
-AC_MSG_RESULT($enableval);
-
-AC_MSG_CHECKING(if --enable-nulterm option is specified)
-AC_ARG_ENABLE(nulterm, [  --enable-nulterm        terminate string extensions with NUL],
-	[if test "$enableval" = "yes"; then
-		AC_DEFINE(USE_DHCP6EXT_NULTERM)
-	fi], [enableval=no])
-AC_MSG_RESULT($enableval);
-
 AC_OUTPUT(Makefile)

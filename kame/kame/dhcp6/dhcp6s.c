@@ -657,8 +657,11 @@ server6_react_solicit(buf, siz, rcvpi)
 }
 
 /*
- * XXX SPEC ISSUE: padding requirement for extension
- * XXX SPEC ISSUE: string termination requirement for extension
+ * 15 draft is silent about padding requirement, and
+ * string termination requirement for extensions.
+ * at IETF48 dhc session, author confirmed that:
+ * - no string termination character
+ * - no padding (= unaligned extensions)
  */
 /* 11.6.1. Receipt of Request messages */
 /* 11.6.3. Creation and sending of Reply messages */
@@ -682,12 +685,12 @@ server6_react_request(buf, siz, rcvpi)
 	struct tm *tm;
 	struct dhcp6e extbuf;
 	int agent;
-#ifdef USE_DHCP6EXT_NULTERM
+#if 0 /*def USE_DHCP6EXT_NULTERM - author confirmed, no zero termination */
 #define PADLEN0(x)	((x) + 1)
 #else
 #define PADLEN0(x)	((x))
 #endif
-#ifdef USE_DHCP6EXT_PAD4
+#if 0 /*def USE_DHCP6EXT_PAD4 - author confirmed, no padding */
 #define PADLEN(x)	((PADLEN0((x)) + 3) & ~3)
 #else
 #define PADLEN(x)	(PADLEN0((x)))
