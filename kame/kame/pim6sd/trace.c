@@ -62,7 +62,7 @@
  *  Questions concerning this software should be directed to 
  *  Pavlin Ivanov Radoslavov (pavlin@catarina.usc.edu)
  *
- *  $Id: trace.c,v 1.5 1999/09/10 16:39:51 jinmei Exp $
+ *  $Id: trace.c,v 1.6 1999/09/11 05:52:06 jinmei Exp $
  */
 /*
  * Part of this program has been derived from mrouted.
@@ -100,6 +100,7 @@
 #include "debug.h"
 #include "mld6_proto.h"
 #include "route.h"
+#include "rp.h"
 #include "trace.h"
 
 /* TODO */
@@ -134,6 +135,7 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 	struct sockaddr_in6 resp_sa6 = {sizeof(resp_sa6), AF_INET6};
 	struct sockaddr_in6 grp_sa6 = {sizeof(grp_sa6), AF_INET6};
 	struct sockaddr_in6 *sa_global;
+	rpentry_t *rpentry_ptr;
 
 	/* Remember qid across invocations */
 	static u_int32 oqid = 0;
@@ -439,6 +441,13 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 #endif /* 0 */
 	}
 
+	/*
+	 * If we're the RP for the trace group, note it.
+	 */
+	rpentry_ptr = rp_match(&grp_sa6);
+	if (rpentry_ptr && local_address(&rpentry_ptr->address) != NO_VIF)
+		resp->tr_rflags = TR_RP;
+
   sendit:
 	/*
 	 * if metric is 1 or no. of reports is 1, send response to requestor
@@ -466,12 +475,19 @@ accept_mtrace(src, dst, group, ifindex, data, no, datalen)
 	{
 #if 0
 		if (!can_mtrace(rt->rt_parent, rt->rt_gateway)) {
-			dst = qry->tr_raddr;
+			resp_sa6.sin6_addr = qry->tr_raddr;
 			resp->tr_rflags = TR_OLD_ROUTER;
 			resptype = MLD6_MTRACE_RESP;
 		} else
 #endif /* 0 */
-		{
+		if (mrt->incoming &&
+		    (uvifs[mrt->incoming].uv_flags & MIFF_REGISTER)) {
+			log(LOG_DEBUG, 0,
+			    "incoming i/f is for register. "
+			    "Can't be forwarded anymore.");
+				resp_sa6.sin6_addr = qry->tr_raddr;
+				resptype = MLD6_MTRACE_RESP;
+		} else {
 			if (mrt->upstream != (pim_nbr_entry_t *)NULL)
 				parent_address =
 					mrt->upstream->address.sin6_addr;
