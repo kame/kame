@@ -1,6 +1,12 @@
-$Id: CHANGELOG,v 1.507 2000/02/01 17:54:17 itojun Exp $
+$Id: CHANGELOG,v 1.508 2000/02/02 03:57:49 itojun Exp $
 
 <200002>
+Wed Feb  2 12:55:44 JST 2000  itojun@iijlab.net
+	* kame/rtadvd: router renumbering input needs to be explicitly
+	  enabled with command line option (-R).  this is for security issue
+	  in router renumbering protocol - it requires use of IPv6 IPsec
+	  over site-local multicast.  (IPsec issue should be improved)
+
 Tue Feb  1 12:45:02 JST 2000  itojun@iijlab.net
 	* {netbsd/pkgsrc/games/quake6, freebsd[23]/ports/quake6}:
 	  quake over IPv6.
