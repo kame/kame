@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2127 2002/04/19 07:35:00 jinmei Exp $
+$KAME: CHANGELOG,v 1.2128 2002/04/19 08:05:29 jinmei Exp $
 
 <200204>
+2002-04-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/netinet/tcp_subr.c (tcp_respond): if
+	IPV6_USE_MIN_MTU is specified for the option tell ip6_output to
+	fragment the packet at the minimum MTU.
+
 2002-04-19  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_output.c: changed the policy about
 	performing path MTU discovery; from now on multicast packets will
