@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.59 2001/07/18 08:32:52 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.60 2001/07/24 08:37:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -705,9 +705,6 @@ int	in6_matchlen __P((struct in6_addr *, struct in6_addr *));
 int	in6_are_prefix_equal __P((struct in6_addr *p1, struct in6_addr *p2,
 				  int len));
 void	in6_prefixlen2mask __P((struct in6_addr *maskp, int len));
-int	in6_prefix_ioctl __P((struct socket *so, u_long cmd, caddr_t data,
-			      struct ifnet *ifp));
-int	in6_prefix_add_ifid __P((int iilen, struct in6_ifaddr *ia));
 void	in6_prefix_remove_ifid __P((int iilen, struct in6_ifaddr *ia));
 void	in6_purgeprefix __P((struct ifnet *));
 
