@@ -17,7 +17,7 @@ DIRS=	$(PREFIX) $(PREFIX)/bin $(PREFIX)/sbin $(PREFIX)/lib $(PREFIX)/etc \
 	$(PREFIX)/libexec $(PREFIX)/man $(PREFIX)/share/doc/kame
 SECTIONS=1 2 3 4 5 6 7 8 9 n
 DOCS=	CHANGELOG COPYRIGHT COPYRIGHT.jp IMPLEMENTATION INSTALL INSTALL.cvsup \
-	INSTALL.anoncvs README RELNOTES TODO USAGE
+	INSTALL.anoncvs PORTABILITY README RELNOTES TODO USAGE
 
 beforeinstall:
 	for i in $(DIRS); do \
@@ -35,5 +35,10 @@ afterinstall:
 		cp kame/inet6d/inet6d.conf $(PREFIX)/etc/inet6d.conf.sample; \
 	fi
 	cp kame/etc/rc.net6 $(PREFIX)/etc/rc.net6.sample
+	for i in $(DOCS); do \
+		if test -f ../$$i; then \
+			cp ../$$i $(PREFIX)/share/doc/kame; \
+		fi \
+	done
 
 .include <bsd.subdir.mk>
