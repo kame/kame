@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.19 2000/01/10 16:28:55 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.20 2000/01/10 19:52:11 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1220,7 +1220,6 @@ isakmp_ph2expire(iph2)
 			plog(logp, LOCATION, iph2->dst,
 				"failed to begin ipsec sa "
 				"negotication.\n");
-			delph2(iph2);
 			unbindph12(iph2);
 			remph2(iph2);
 			delph2(iph2);
