@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6c_script.c,v 1.6 2003/07/31 23:20:25 jinmei Exp $	*/
+/*	$KAME: dhcp6c_script.c,v 1.7 2003/08/01 07:06:53 suz Exp $	*/
 
 /*
  * Copyright (C) 2003 WIDE Project.
@@ -164,7 +164,7 @@ client6_script(ifp, state, optinfo)
 		elen = sizeof (dnsname_str) + dnsnamelen + 1;
 		if ((s = envp[i++] = malloc(elen)) == NULL) {
 			dprintf(LOG_NOTICE, FNAME,
-			    "failed to allocate strings for NTP servers");
+			    "failed to allocate strings for DNS name");
 			goto clean;
 		}
 		memset(s, 0, elen);
