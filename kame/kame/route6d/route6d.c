@@ -1,4 +1,4 @@
-/*	$KAME: route6d.c,v 1.23 2000/05/17 04:01:10 itojun Exp $	*/
+/*	$KAME: route6d.c,v 1.24 2000/05/17 04:02:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -30,7 +30,7 @@
  */
 
 #ifndef	lint
-static char _rcsid[] = "$KAME: route6d.c,v 1.23 2000/05/17 04:01:10 itojun Exp $";
+static char _rcsid[] = "$KAME: route6d.c,v 1.24 2000/05/17 04:02:53 itojun Exp $";
 #endif
 
 #include <stdio.h>
@@ -202,7 +202,6 @@ int logopened = 0;
 
 static	u_long	seq = 0;
 
-/* XXX bsdi4/freebsd/openbsd: can collide with net/route.h settings */
 #define	RRTF_AGGREGATE		0x08000000
 #define	RRTF_NOADVERTISE	0x10000000
 #define	RRTF_NH_NOT_LLADDR	0x20000000
