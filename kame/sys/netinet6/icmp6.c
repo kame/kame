@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.360 2003/10/01 12:13:03 keiichi Exp $	*/
+/*	$KAME: icmp6.c,v 1.361 2003/10/02 13:37:27 t-momose Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -484,6 +484,9 @@ icmp6_error(m, type, code, param)
 				goto freeit;
 			}
 		}
+#ifdef MIP6
+		ip6a->ip6a_flags |= IP6A_NOTUSEBC;
+#endif
 	}
 
 	if (m->m_pkthdr.len >= ICMPV6_PLD_MAXLEN)
