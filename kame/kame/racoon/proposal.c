@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.42 2001/10/18 23:47:59 itojun Exp $	*/
+/*	$KAME: proposal.c,v 1.43 2001/10/26 01:06:22 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -942,27 +942,26 @@ set_proposal_from_policy(iph2, sp_main, sp_sub)
     skip1:
 	for (req = sp_main->req; req; req = req->next) {
 		struct saproto *newpr;
-		struct sockaddr *psaddr = NULL;
-		struct sockaddr *pdaddr = NULL;
+		caddr_t paddr = NULL;
 
-		/* XXX check if SA bundle ? */
+		/*
+		 * check if SA bundle ?
+		 * nested SAs negotiation is NOT supported.
+		 *       me +--- SA1 ---+ peer1
+		 *       me +--- SA2 --------------+ peer2
+		 */
 		if (req->saidx.src.ss_len && req->saidx.dst.ss_len) {
 
-			psaddr = (struct sockaddr *)&req->saidx.src;
-			pdaddr = (struct sockaddr *)&req->saidx.dst;
+			/* check the end of ip addresses of SA */
+			if (iph2->side == INITIATOR)
+				paddr = (caddr_t)&req->saidx.dst;
+			else
+				paddr = (caddr_t)&req->saidx.src;
 
-			/* check end addresses of SA */
-			if (memcmp(iph2->src, psaddr, iph2->src->sa_len)
-			 || memcmp(iph2->dst, pdaddr, iph2->dst->sa_len)){
-				/*
-				 * XXX nested SAs with each destination
-				 * address are different.
-				 *       me +--- SA1 ---+ peer1
-				 *       me +--- SA2 --------------+ peer2
-				 */
+			if (memcmp(iph2->dst, paddr, iph2->dst->sa_len)){
 				plog(LLV_ERROR, LOCATION, NULL,
-					"not supported nested SA. Ignore.\n");
-				break;
+					"not supported nested SA.");
+				goto err;
 			}
 		}
 
