@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1666 2001/05/07 08:50:03 fujisawa Exp $
+$KAME: CHANGELOG,v 1.1667 2001/05/08 02:38:50 jinmei Exp $
 
 <200105>
+2001-05-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/bindtest: added supplement tests to see which sockets
+	receive which packets.
+	Two new option -1 and -2 were added to support TCP cases of the
+	above test.
+	Another new option -6 was also added to support the IPV6_V6ONLY
+	option if available.
+	* kame/kame/bindtest/test.sh: added new tests based on the above
+	enhancement.
+
 2001-05-07  Shin'ichi Fujisawa  <fujisawa@kame.net>
 	* sys/netinet6/natpt_{defs.h,trans.c}
 	  Support EPSV command/response pair to/from PASV command/respons
