@@ -148,7 +148,7 @@ struct protosw inetsw[] = {
   &sctp_usrreqs
 },
 
-{ SOCK_STREAM,	&inetdomain,	IPPROTO_SCTP,	PR_ATOMIC|PR_ADDR_OPT|PR_WANTRCVD,
+{ SOCK_STREAM,	&inetdomain,	IPPROTO_SCTP,	PR_ADDR_OPT|PR_WANTRCVD,
   sctp_input,	0,		sctp_ctlinput,	sctp_ctloutput,
   0,
   0,		0,		0,		sctp_drain,
