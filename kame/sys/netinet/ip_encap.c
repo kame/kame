@@ -1,4 +1,4 @@
-/*	$KAME: ip_encap.c,v 1.16 2000/03/06 04:34:20 itojun Exp $	*/
+/*	$KAME: ip_encap.c,v 1.17 2000/03/11 09:36:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -382,7 +382,7 @@ encap_attach_func(af, proto, func, psw, arg)
 	 * We should be careful putting them in specific-one-first order.
 	 * The question is, since we have two "mask" portion, we cannot really
 	 * define total order between entries.
-	 * For example, which of these should be preferred?
+	 * For example, which of these should be checked first?
 	 *	src=3ffe::/16, dst=3ffe:501::/32
 	 *	src=3ffe:501::/32, dst=3ffe::/16
 	 *
