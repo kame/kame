@@ -1,4 +1,4 @@
-/*	$KAME: pfkey_dump.c,v 1.20 2000/07/20 09:50:42 itojun Exp $	*/
+/*	$KAME: pfkey_dump.c,v 1.21 2000/08/28 16:41:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -150,6 +150,8 @@ static struct val2str str_alg_enc[] = {
 #endif
 	{ SADB_X_EALG_CAST128CBC, "cast128-cbc", },
 	{ SADB_X_EALG_BLOWFISHCBC, "blowfish-cbc", },
+	{ SADB_X_EALG_RIJNDAELCBC, "rijndael-cbc", },
+	{ SADB_X_EALG_TWOFISHCBC, "twofish-cbc", },
 	{ -1, NULL, },
 };
 

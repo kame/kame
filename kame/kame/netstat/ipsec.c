@@ -134,6 +134,8 @@ static struct val2str ipsec_espnames[] = {
 #endif
 	{ SADB_X_EALG_CAST128CBC, "cast128-cbc", },
 	{ SADB_X_EALG_BLOWFISHCBC, "blowfish-cbc", },
+	{ SADB_X_EALG_RIJNDAELCBC, "rijndael-cbc", },
+	{ SADB_X_EALG_TWOFISHCBC, "twofish-cbc", },
 	{ -1, NULL },
 };
 

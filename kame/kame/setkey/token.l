@@ -1,4 +1,4 @@
-/*	$KAME: token.l,v 1.15 2000/08/18 14:52:54 itojun Exp $	*/
+/*	$KAME: token.l,v 1.16 2000/08/28 16:41:10 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -172,6 +172,8 @@ blowfish-cbc	{ PREPROC; yylval.num = SADB_X_EALG_BLOWFISHCBC; return(ALG_ENC); }
 cast128-cbc	{ PREPROC; yylval.num = SADB_X_EALG_CAST128CBC; return(ALG_ENC); }
 des-deriv	{ PREPROC; yylval.num = SADB_EALG_DESCBC; return(ALG_ENC_DESDERIV); }
 des-32iv	{ PREPROC; yylval.num = SADB_EALG_DESCBC; return(ALG_ENC_DES32IV); }
+twofish-cbc	{ PREPROC; yylval.num = SADB_X_EALG_TWOFISHCBC; return(ALG_ENC); }
+rijndael-cbc	{ PREPROC; yylval.num = SADB_X_EALG_RIJNDAELCBC; return(ALG_ENC); }
 
 	/* compression algorithms */
 {hyphen}C	{ PREPROC; return(F_COMP); }

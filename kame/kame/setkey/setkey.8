@@ -1,4 +1,4 @@
-.\"     $KAME: setkey.8,v 1.29 2000/08/18 15:53:23 itojun Exp $
+.\"     $KAME: setkey.8,v 1.30 2000/08/28 16:41:10 itojun Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
 .\" All rights reserved.
@@ -504,6 +504,8 @@ blowfish-cbc	40 to 448	rfc2451
 cast128-cbc	40 to 128	rfc2451
 des-deriv	64		ipsec-ciph-des-derived-01 (expired)
 3des-deriv	192		no document
+rijndael-cbc	128/192/256	draft-ietf-ipsec-ciph-aes-cbc-00
+twofish-cbc	0 to 256	draft-ietf-ipsec-ciph-aes-cbc-00
 .Ed
 .Pp
 Followings are the list of compression algorithms that can be used as
