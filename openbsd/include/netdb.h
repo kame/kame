@@ -1,4 +1,4 @@
-/*	$OpenBSD: netdb.h,v 1.9 2000/02/09 12:22:08 itojun Exp $	*/
+/*	$OpenBSD: netdb.h,v 1.11 2000/10/04 22:54:23 espie Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -261,11 +261,12 @@ void		setnetent __P((int));
 void		setprotoent __P((int));
 void		setservent __P((int));
 
-int		getaddrinfo __P((const char *, const char *service,
+int		getaddrinfo __P((const char *, const char *,
 		    const struct addrinfo *, struct addrinfo **));
 void		freeaddrinfo __P((struct addrinfo *));
 int		getnameinfo __P((const struct sockaddr *, socklen_t,
-		    char *, size_t, char *, size_t, int));
+		    char *, size_t, char *, size_t,
+		    int));
 char		*gai_strerror __P((int));
 int		net_addrcmp __P((struct sockaddr *, struct sockaddr *));
 __END_DECLS
