@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.35 1999/08/19 15:26:38 itojun Exp $
+$Id: CHANGELOG,v 1.36 1999/08/19 19:20:17 sumikawa Exp $
 
 <199908>
+Fri Aug 20 04:16:11 JST 1999  sumikawa@ebina.hitachi.co.jp
+	* freebsd[23]/ports/newbie: update to 0.22.
+
 Fri Aug 20 00:23:42 JST 1999  itojun@iijlab.net
 	* usr.sbin/racoon/racoon: fix SEGV due to duplicated free().
 	  From: "Heiko W.Rupp" <hwr@pilhuhn.de>
