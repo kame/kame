@@ -28,5 +28,8 @@ natptconfig.y.h:	natptconfig.y showvar.h
 natptconfig.l.c:	natptconfig.l
 		${LEX} -t -L ${SRCDIR}/natptconfig.l > natptconfig.l.c
 
+main.o:	natptconfig.y.h
+misc.o:	natptconfig.y.h
+yylex.o:	natptconfig.y.h
 
 .include <bsd.prog.mk>
