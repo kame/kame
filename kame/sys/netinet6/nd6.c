@@ -1,4 +1,4 @@
-/*	$KAME: nd6.c,v 1.189 2001/08/28 11:44:26 jinmei Exp $	*/
+/*	$KAME: nd6.c,v 1.190 2001/08/28 12:26:50 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -564,9 +564,9 @@ nd6_timer(ignored_arg)
 				if (m) {
 					if (rt->rt_ifp) {
 						/*
-						 * Fake rcvif to make ICMP error
-						 * more helpful in diagnosing
-						 * for the receiver.
+						 * Fake rcvif to make the ICMP
+						 * error more helpful in
+						 * diagnosing for the receiver.
 						 * XXX: should we consider
 						 * older rcvif?
 						 */
