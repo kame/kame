@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.219 2001/09/12 16:52:39 jinmei Exp $	*/
+/*	$KAME: ip6_output.c,v 1.220 2001/09/13 16:02:36 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -259,6 +259,11 @@ ip6_output(m0, opt, ro, flags, im6o, ifpp)
 #ifdef MIP6
 	struct ip6_dest *pktopt_haddr, *pktopt_mip6dest2;
 	struct ip6_rthdr *pktopt_mip6rthdr;
+#ifdef NEW_STRUCT_ROUTE
+	struct route mip6_ip6route;
+#else
+	struct route_in6 mip6_ip6route;
+#endif
 #endif /* MIP6 */
 #ifdef IPSEC
 #ifdef __OpenBSD__
@@ -730,6 +735,21 @@ skip_ipsec2:;
 	ro_pmtu = ro;
 	if (opt && opt->ip6po_rthdr)
 		ro = &opt->ip6po_route;
+#ifdef MIP6
+	else if (exthdrs.ip6e_rthdr) {
+		struct sockaddr_in6 *firsthop;
+		struct ip6_hdr *ip6
+			= mtod(m, struct ip6_hdr *); /* needed ? */;
+
+		ro = &mip6_ip6route;
+		bzero((caddr_t)ro, sizeof(*ro));
+		firsthop = (struct sockaddr_in6 *)&ro->ro_dst;
+		bzero(firsthop, sizeof(*firsthop));
+		firsthop->sin6_family = AF_INET6;
+		firsthop->sin6_len = sizeof(struct sockaddr_in6);
+		firsthop->sin6_addr = ip6->ip6_dst;
+	}
+#endif /* MIP6 */
 	dst = (struct sockaddr_in6 *)&ro->ro_dst;
 	/*
 	 * If there is a cached route,
