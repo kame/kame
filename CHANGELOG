@@ -1,7 +1,10 @@
-$Id: CHANGELOG,v 1.470 2000/01/21 04:00:44 itojun Exp $
+$Id: CHANGELOG,v 1.471 2000/01/21 12:18:12 itojun Exp $
 
 
 <200001>
+Fri Jan 21 21:17:35 JST 2000  itojun@iijlab.net
+	* netbsd/pkgsrc/net/irc: upgrade to 2.10.3, make it buildable again.
+
 Fri Jan 21 12:59:51 JST 2000  itojun@iijlab.net
 	* netbsd/pkgsrc/net/totd, openbsd/ports/net/totd,
 	  freebsd[23]/ports/totd: upgrade to 1.1p2.
