@@ -395,10 +395,16 @@ in6_pcbconnect(in6p, nam)
 		mapped.s6_addr16[5] = htons(0xffff);
 		bcopy(&sinp->sin_addr, &mapped.s6_addr32[3], sizeof(sinp->sin_addr));
 		in6a = &mapped;
-	} else if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
+	} else {
+		/*
+		 * XXX: in6_selectsrc might replace the bound local address
+		 * with the address specified by setsockopt(IPV6_PKTINFO).
+		 * Is it the intended behavior?
+		 */
 		in6a = in6_selectsrc(sin6, in6p->in6p_outputopts,
-				  in6p->in6p_moptions, &in6p->in6p_route,
-				  &error);
+				     in6p->in6p_moptions,
+				     &in6p->in6p_route,
+				     &in6p->in6p_laddr, &error);
 		if (in6a == 0) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
@@ -454,16 +460,17 @@ in6_pcbconnect(in6p, nam)
  * an entry to the caller for later use.
  */
 struct in6_addr *
-in6_selectsrc(dstsock, opts, mopts, ro, errorp)
+in6_selectsrc(dstsock, opts, mopts, ro, laddr, errorp)
 	struct sockaddr_in6 *dstsock;
 	struct ip6_pktopts *opts;
 	struct ip6_moptions *mopts;
 	struct route_in6 *ro;
+	struct in6_addr *laddr;
 	int *errorp;
 {
 	struct in6_addr *dst;
 	struct in6_ifaddr *ia6 = 0;
-	struct in6_pktinfo *pi;
+	struct in6_pktinfo *pi = NULL;
 
 	dst = &dstsock->sin6_addr;
 	*errorp = 0;
@@ -471,23 +478,32 @@ in6_selectsrc(dstsock, opts, mopts, ro, errorp)
 	/*
 	 * If the source address is explicitly specified by the caller,
 	 * use it.
+	 */
+	if (opts && (pi = opts->ip6po_pktinfo) &&
+	    !IN6_IS_ADDR_UNSPECIFIED(&pi->ipi6_addr))
+		return(&pi->ipi6_addr);
+
+	/*
+	 * If the source address is not specified but the socket(if any)
+	 * is already bound, use the bound address.
+	 */
+	if (laddr && !IN6_IS_ADDR_UNSPECIFIED(laddr))
+		return(laddr);
+
+	/*
 	 * If the caller doesn't specify the source address but
 	 * the outgoing interface, use an address associated with
 	 * the interface.
 	 */
-	if (opts && (pi = opts->ip6po_pktinfo)) {
-		if (!IN6_IS_ADDR_UNSPECIFIED(&pi->ipi6_addr))
-			return(&pi->ipi6_addr);
-		else if (pi->ipi6_ifindex) {
-			/* XXX boundary check is assumed to be already done. */
-			ia6 = in6_ifawithscope(ifindex2ifnet[pi->ipi6_ifindex],
-					       dst);
-			if (ia6 == 0) {
-				*errorp = EADDRNOTAVAIL;
-				return(0);
-			}
-			return(&satosin6(&ia6->ia_addr)->sin6_addr);
+	if (pi && pi->ipi6_ifindex) {
+		/* XXX boundary check is assumed to be already done. */
+		ia6 = in6_ifawithscope(ifindex2ifnet[pi->ipi6_ifindex],
+				       dst);
+		if (ia6 == 0) {
+			*errorp = EADDRNOTAVAIL;
+			return(0);
 		}
+		return(&satosin6(&ia6->ia_addr)->sin6_addr);
 	}
 
 	/*

@@ -568,6 +568,11 @@ udp6_output(in6p, m, addr6, control)
 #else
 		s = splnet();
 #endif
+		/*
+		 * XXX: the user might want to overwrite the local address
+		 * via an ancillary data.
+		 */
+		bzero(&in6p->in6p_laddr, sizeof(struct in6_addr));
 		error = in6_pcbconnect(in6p, addr6);
 		if (error) {
 			splx(s);

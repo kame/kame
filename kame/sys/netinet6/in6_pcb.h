@@ -160,8 +160,10 @@ void	in6_rtchange __P((struct in6pcb *, int));
 void	in6_setpeeraddr __P((struct in6pcb *, struct mbuf *));
 void	in6_setsockaddr __P((struct in6pcb *, struct mbuf *));
 struct 	in6_addr *in6_selectsrc __P((struct sockaddr_in6 *,
-			struct ip6_pktopts *, struct ip6_moptions *,
-			struct route_in6 *, int *));
+				     struct ip6_pktopts *,
+				     struct ip6_moptions *,
+				     struct route_in6 *,
+				     struct in6_addr *, int *));
 
 #ifndef TCP6
 extern struct rtentry *

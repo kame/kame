@@ -666,7 +666,10 @@ icmp6_input(mp, offp, proto)
 		break;
 
 	default:
-		printf("icmp6_input: unknown type %d\n", icmp6->icmp6_type);
+		printf("icmp6_input: unknown type %d(src=%s, dst=%s, ifid=%d)\n",
+		       icmp6->icmp6_type, ip6_sprintf(&ip6->ip6_src),
+		       ip6_sprintf(&ip6->ip6_dst),
+		       m->m_pkthdr.rcvif ? m->m_pkthdr.rcvif->if_index : 0);
 		if (icmp6->icmp6_type < ICMP6_ECHO_REQUEST) {
 			/* ICMPv6 error: MUST deliver it by spec... */
 			code = PRC_NCMDS;

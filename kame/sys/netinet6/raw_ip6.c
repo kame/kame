@@ -316,12 +316,16 @@ rip6_output(m, va_alist)
 		}
 	}
 
-	if (IN6_IS_ADDR_UNSPECIFIED(&in6p->in6p_laddr)) {
+	/*
+	 * Source address selection.
+	 */
+	{
 		struct in6_addr *in6a;
 
 		if ((in6a = in6_selectsrc(dstsock, optp,
 					  in6p->in6p_moptions,
 					  &in6p->in6p_route,
+					  &in6p->in6p_laddr,
 					  &error)) == 0) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
@@ -330,8 +334,7 @@ rip6_output(m, va_alist)
 		ip6->ip6_src = *in6a;
 		if (in6p->in6p_route.ro_rt)
 			oifp = ifindex2ifnet[in6p->in6p_route.ro_rt->rt_ifp->if_index];
-	} else
-		ip6->ip6_src = in6p->in6p_laddr;
+	}
 
 	ip6->ip6_flow = in6p->in6p_flowinfo & IPV6_FLOWINFO_MASK;
 	ip6->ip6_vfc  = IPV6_VERSION;
@@ -590,11 +593,12 @@ rip6_usrreq(so, req, m, nam, control, p)
 		}
 
 		/* Source address selection. XXX: need pcblookup? */
-		in6a = &in6p->in6p_laddr;
-		if (IN6_IS_ADDR_UNSPECIFIED(in6a) &&
-		    (in6a = in6_selectsrc(addr, in6p->in6p_outputopts,
-					  in6p->in6p_moptions, &in6p->in6p_route,
-					  &error)) == NULL) {
+		in6a = in6_selectsrc(addr, in6p->in6p_outputopts,
+				     in6p->in6p_moptions,
+				     &in6p->in6p_route,
+				     &in6p->in6p_laddr,
+				     &error);
+		if (in6a == NULL) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
 			break;
