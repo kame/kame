@@ -5,6 +5,7 @@
 .include "../mk/bsd.prefs.mk"
 
     SUBDIR += fetchmail
+    SUBDIR += postfix-current
     SUBDIR += qpopper
     SUBDIR += sendmail.beta
     SUBDIR += sendmail

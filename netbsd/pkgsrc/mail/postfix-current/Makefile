@@ -12,6 +12,11 @@ PATCH_DIST_STRIP=	-p1
 MAINTAINER=	packages@netbsd.org
 HOMEPAGE=	http://www.postfix.org/
 
+# cope with bsd.pkg.mk differences
+CHMOD?=		/bin/chmod
+CHOWN?=		/usr/sbin/chown
+TEST?=		/bin/test
+
 MIRROR_DISTFILE= no
 DIST_SUBDIR=	postfix
 
