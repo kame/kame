@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.h,v 1.22 2000/09/13 04:50:25 itojun Exp $	*/
+/*	$KAME: ipsec_doi.h,v 1.23 2000/09/18 22:59:34 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.h,v 1.22 2000/09/13 04:50:25 itojun Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.h,v 1.23 2000/09/18 22:59:34 sakane Exp $ */
 
 /* refered to RFC2407 */
 
@@ -88,7 +88,7 @@
 #define IPSECDOI_ATTR_GRP_DESC                3 /* B */
 #define IPSECDOI_ATTR_ENC_MODE                4 /* B */
 	/* default value: host dependent */
-#define   IPSECDOI_ATTR_ENC_MODE_DEFAULT        2
+#define   IPSECDOI_ATTR_ENC_MODE_DEFAULT        2	/* NOTE:internal use */
 #define   IPSECDOI_ATTR_ENC_MODE_ANY            0	/* NOTE:internal use */
 #define   IPSECDOI_ATTR_ENC_MODE_TUNNEL         1
 #define   IPSECDOI_ATTR_ENC_MODE_TRNS           2
