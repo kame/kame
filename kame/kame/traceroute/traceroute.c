@@ -24,7 +24,7 @@ static const char copyright[] =
     "@(#) Copyright (c) 1988, 1989, 1991, 1994, 1995, 1996, 1997\n\
 The Regents of the University of California.  All rights reserved.\n";
 static const char rcsid[] =
-    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.11 2000/01/27 20:00:53 itojun Exp $ (LBL)";
+    "@(#)$Header: /usr/home/sumikawa/kame/kame/kame/kame/traceroute/traceroute.c,v 1.12 2000/02/23 12:13:22 jinmei Exp $ (LBL)";
 #endif
 
 /*
@@ -1010,6 +1010,11 @@ send_probe(register int seq, int ttl, register struct timeval *tp)
 			ui->ui_prev = 0;
 #endif
 #endif
+#ifdef HAVE_UDPIPHDR_X00	/* XXX: for bsdi4 */
+			ui->ui_x00 = 0;
+			ui->ui_x01 = 0;
+#endif 
+
 			memset(&ui->ui_x1, 0, sizeof(ui->ui_x1));
 			ui->ui_len = outudp->uh_ulen;
 			outudp->uh_sum = 0;
