@@ -1,4 +1,4 @@
-/*	$KAME: proposal.c,v 1.46 2001/12/13 17:11:24 sakane Exp $	*/
+/*	$KAME: proposal.c,v 1.47 2002/04/16 04:10:23 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1031,7 +1031,7 @@ int
 set_proposal_from_proposal(iph2)
 	struct ph2handle *iph2;
 {
-        struct saprop *newpp = NULL, *pp0, *pp_peer;
+        struct saprop *newpp = NULL, *pp0, *pp_peer = NULL;
 	struct saproto *newpr = NULL, *pr;
 	struct prop_pair **pair;
 	int error = -1;
@@ -1108,6 +1108,8 @@ end:
 	if (error && newpp)
 		flushsaprop(newpp);
 
+	if (pp_peer)
+		flushsaprop(pp_peer);
 	free_proppair(pair);
 	return error;
 }
