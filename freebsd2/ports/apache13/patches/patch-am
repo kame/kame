@@ -1,0 +1,581 @@
+This patch is against Apache 1.3.11.  It may be updated as the situation
+warrants.
+
+Last updated: Wed Feb  2 01:09:23 MST 2000
+
+Index: htdocs/manual/mod/core.html
+===================================================================
+RCS file: /export/home/cvs/apache-1.3/htdocs/manual/mod/core.html,v
+retrieving revision 1.162
+diff -u -r1.162 core.html
+--- core.html	2000/01/18 19:32:49	1.162
++++ core.html	2000/02/02 07:59:17
+@@ -23,6 +23,8 @@
+ <UL>
+ <LI><A HREF="#accessconfig">AccessConfig</A>
+ <LI><A HREF="#accessfilename">AccessFileName</A>
++<LI><A HREF="#adddefaultcharset">AddDefaultCharset</A>
++<LI><A HREF="#adddefaultcharsetname">AddDefaultCharsetName</A>
+ <LI><A HREF="#addmodule">AddModule</A>
+ <LI><A HREF="#allowoverride">AllowOverride</A>
+ <LI><A HREF="#authname">AuthName</A>
+@@ -162,6 +164,42 @@
+ &lt;Directory /&gt;<BR>
+ AllowOverride None<BR>
+ &lt;/Directory&gt;</CODE></BLOCKQUOTE><P><HR>
++
++<H2><A NAME="adddefaultcharset">AddDefaultCharset directive</A></H2>
++<A HREF="directive-dict.html#Syntax" REL="Help"><STRONG>Syntax:</STRONG></A> 
++AddDefaultCharset <EM>on / off</EM><BR>
++<A HREF="directive-dict.html#Context" REL="Help" ><STRONG>Context:</STRONG></A> 
++all<BR>
++<A HREF="directive-dict.html#Status" REL="Help" ><STRONG>Status:</STRONG></A> 
++core<BR>
++<A HREF="directive-dict.html#Default" REL="Help"><STRONG>Default:</STRONG></A>
++<CODE>AddDefaultCharset off</CODE><BR>
++<A HREF="directive-dict.html#Compatibility" REL="Help"><STRONG>Compatibility:
++</STRONG></A> AddDefaultCharset is only available in Apache 1.3.12 and later<P>
++If enabled, any response that does not have any parameter on the content 
++type in the HTTP headers will have a charset parameter added specifying 
++the character set the client should use for the document.  This will 
++override any character set specified in the body of the document via a 
++<CODE>META</CODE> tag.  The character set added is specified by the 
++<CODE>AddDefaultCharsetName</CODE> directive.
++<P><HR>
++
++<H2><A NAME="adddefaultcharsetname">AddDefaultCharsetName directive</A></H2>
++<A HREF="directive-dict.html#Syntax" REL="Help"><STRONG>Syntax:</STRONG></A> 
++AddDefaultCharsetName <EM>charset</EM><BR>
++<A HREF="directive-dict.html#Context" REL="Help" ><STRONG>Context:</STRONG></A> 
++all<BR>
++<A HREF="directive-dict.html#Status" REL="Help" ><STRONG>Status:</STRONG></A> 
++core<BR>
++<A HREF="directive-dict.html#Default" REL="Help"><STRONG>Default:</STRONG></A>
++<CODE>AddDefaultCharsetName iso-8859-1</CODE><BR>
++<A HREF="directive-dict.html#Compatibility" REL="Help"><STRONG>Compatibility:
++</STRONG></A> AddDefaultCharsetName is only available in Apache 1.3.12 and 
++later<P>
++This directive specifies the name of the character set that will be added
++if the <A HREF="#adddefaultcharset">AddDefaultCharset</A> directive is 
++enabled.
++<P><HR>
+ 
+ <H2><A NAME="addmodule">AddModule directive</A></H2>
+ <!--%plaintext &lt;?INDEX {\tt AddModule} directive&gt; -->
+Index: htdocs/manual/mod/directives.html
+===================================================================
+RCS file: /export/home/cvs/apache-1.3/htdocs/manual/mod/directives.html,v
+retrieving revision 1.60
+diff -u -r1.60 directives.html
+--- directives.html     1999/12/19 16:34:32     1.60
++++ directives.html     2000/02/02 08:09:07
+@@ -30,6 +30,9 @@
+ <LI><A HREF="mod_autoindex.html#addalt">AddAlt</A>
+ <LI><A HREF="mod_autoindex.html#addaltbyencoding">AddAltByEncoding</A>
+ <LI><A HREF="mod_autoindex.html#addaltbytype">AddAltByType</A>
++<LI><A HREF="mod_mime.html#addcharset">AddCharset</A>
++<LI><A HREF="core.html#adddefaultcharset">AddDefaultCharset</A>
++<LI><A HREF="core.html#adddefaultcharsetname">AddDefaultCharsetName</A>
+ <LI><A HREF="mod_autoindex.html#adddescription">AddDescription</A>
+ <LI><A HREF="mod_mime.html#addencoding">AddEncoding</A>
+ <LI><A HREF="mod_mime.html#addhandler">AddHandler</A>
+Index: htdocs/manual/mod/mod_include.html
+===================================================================
+RCS file: /export/home/cvs/apache-1.3/htdocs/manual/mod/mod_include.html,v
+retrieving revision 1.23
+diff -u -r1.23 mod_include.html
+--- mod_include.html	1998/09/17 12:06:40	1.23
++++ mod_include.html	2000/02/02 07:59:18
+@@ -89,15 +89,34 @@
+ routine when printing dates.
+ </DL>
+ 
++<A NAME="echo">
+ <DT><STRONG>echo</STRONG>
+ <DD>
+ This command prints one of the include variables, defined below.
+ If the variable is unset, it is printed as <CODE>(none)</CODE>.
+ Any dates printed are subject to the currently configured <CODE>timefmt</CODE>.
++
+ Attributes:
+ <DL>
+ <DT>var
+ <DD>The value is the name of the variable to print.
++<DT>encoding 
++<DD>Specifies how Apache should encode special characters contained
++in the variable before outputting them.  If set to "none", no encoding
++will be done.  If set to "url", then URL encoding (also known as
++%-encoding; this is appropriate for use within URLs in links, etc.)
++will be performed.  At the start of an <CODE>echo</CODE> element,
++the default is set to "entity", resulting in entity encoding (which
++is appropriate in the context of a block-level HTML element, eg.
++a paragraph of text).  This can be changed by adding an
++<CODE>encoding</CODE> attribute, which will remain in effect until
++the next <CODE>encoding</CODE> attribute is encountered or the
++element ends, whichever comes first.  Note that only special
++characters as defined in the ISO-8859-1 character encoding will be
++encoded.  This encoding process may not have the desired result if
++a different character encoding is in use.  Apache 1.3.12 and above; previous
++versions do no encoding.
++
+ </DL>
+ 
+ <DT><STRONG>exec</STRONG>
+@@ -181,7 +200,9 @@
+ 
+ <DT><STRONG>printenv</STRONG>
+ <DD>This prints out a listing of all existing variables and their values.
+-    No attributes.
++   Starting with Apache 1.3.12, special characters are entity encoded (see the 
++   <A HREF="#echo"><CODE>echo</CODE></A> element for details) before being
++   output.  No attributes.
+ <DD>For example: <CODE>&lt;!--#printenv --&gt;</CODE>
+ <DD>Apache 1.2 and above.
+ 
+Index: src/CHANGES
+===================================================================
+RCS file: /export/home/cvs/apache-1.3/src/CHANGES,v
+retrieving revision 1.1502
+diff -u -r1.1502 CHANGES
+--- CHANGES     2000/01/18 17:12:13     1.1502
++++ CHANGES     2000/02/02 08:09:11
+@@ -1,3 +1,31 @@
++Changes with Apache 1.3.12
++
++  *) Add an explicit charset=iso-8859-1 to pages generated by
++     ap_send_error_response(), such as the default 404 page.
++     [Marc Slemko]
++
++  *) Add the AddDefaultCharset and AddDefaultCharsetName directives.  
++     These allow you to tell Apache to specify the given character
++     set on any document that does not have one explicitly specified in 
++     the headers.  [Marc Slemko]
++
++  *) Properly escape various messages output to the client from a number
++     of modules and places in the core code.  [Marc Slemko]
++
++  *) Change mod_actions, mod_autoindex, mod_expires, and mod_log_config to
++     not consider any parameters such as charset when making decisions 
++     based on content type.  This does remove some functionality for 
++     some users, but means that when these modules are configured to do 
++     particular things with particular MIME types, the charset should 
++     not be included.  A better way of addressing this for users who 
++     want to set things on a per charset basis is necessary in the future.  
++     [Marc Slemko]
++
++  *) mod_include now entity encodes output from "printenv" and "echo var"
++     by default.  The encoding for "echo var" can be set to URL encoding
++     or no encoding using the new "encoding" attribute to the echo tag.
++     [Marc Slemko]
++
+ Changes with Apache 1.3.11
+ 
+   *) MPE builds are no longer stripped, which caused the executable
+Index: src/include/http_core.h
+===================================================================
+RCS file: /export/home/cvs/apache-1.3/src/include/http_core.h,v
+retrieving revision 1.59
+diff -u -r1.59 http_core.h
+--- http_core.h	1999/06/28 22:38:25	1.59
++++ http_core.h	2000/02/02 07:59:24
+@@ -243,6 +243,15 @@
+      */
+     unsigned d_is_fnmatch : 1;
+ 
++    /* should we force a charset on any outgoing parameterless content-type?
++     * if so, which charset?
++     */
++#define ADD_DEFAULT_CHARSET_OFF   (0)
++#define ADD_DEFAULT_CHARSET_ON    (1)
++#define ADD_DEFAULT_CHARSET_UNSET (2)
++    unsigned add_default_charset : 2;
++    char *add_default_charset_name;
++
+     /* System Resource Control */
+ #ifdef RLIMIT_CPU
+     struct rlimit *limit_cpu;
+Index: src/include/httpd.h
+===================================================================
+RCS file: /export/home/cvs/apache-1.3/src/include/httpd.h,v
+retrieving revision 1.303
+diff -u -r1.303 httpd.h
+--- httpd.h	2000/01/30 19:46:11	1.303
++++ httpd.h	2000/02/02 07:59:24
+@@ -409,6 +409,12 @@
+ #endif /* default limit on number of request header fields */
+ 
+ /*
++ * The default default character set name to add if AddDefaultCharset is 
++ * enabled.  Overridden with AddDefaultCharsetName.
++ */
++#define DEFAULT_ADD_DEFAULT_CHARSET_NAME "iso-8859-1"
++
++/*
+  * The below defines the base string of the Server: header. Additional
+  * tokens can be added via the ap_add_version_component() API call.
+  *
+Index: src/main/http_core.c
+===================================================================
+RCS file: /export/home/cvs/apache-1.3/src/main/http_core.c,v
+retrieving revision 1.277
+diff -u -r1.277 http_core.c
+--- http_core.c	2000/01/11 14:13:40	1.277
++++ http_core.c	2000/02/02 07:59:25
+@@ -154,6 +154,9 @@
+ 
+     conf->server_signature = srv_sig_unset;
+ 
++    conf->add_default_charset = ADD_DEFAULT_CHARSET_UNSET;
++    conf->add_default_charset_name = DEFAULT_ADD_DEFAULT_CHARSET_NAME;
++
+     return (void *)conf;
+ }
+ 
+@@ -281,6 +284,14 @@
+ 	conf->server_signature = new->server_signature;
+     }
+ 
++    if (new->add_default_charset != ADD_DEFAULT_CHARSET_UNSET) {
++	conf->add_default_charset = new->add_default_charset;
++    }
++
++    if (new->add_default_charset_name) {
++	conf->add_default_charset_name = new->add_default_charset_name;
++    }
++
+     return (void*)conf;
+ }
+ 
+@@ -1035,6 +1046,28 @@
+ }
+ #endif /*GPROF*/
+ 
++static const char *set_add_default_charset(cmd_parms *cmd, 
++	core_dir_config *d, int arg)
++{
++    const char *err = ap_check_cmd_context(cmd, NOT_IN_LIMIT);
++    if (err != NULL) {
++        return err;
++    }
++    d->add_default_charset = arg != 0;
++    return NULL;
++}
++
++static const char *set_add_default_charset_name(cmd_parms *cmd, 
++	core_dir_config *d, char *arg)
++{
++    const char *err = ap_check_cmd_context(cmd, NOT_IN_LIMIT);
++    if (err != NULL) {
++        return err;
++    }
++    d->add_default_charset_name = arg;
++    return NULL;
++}
++
+ static const char *set_document_root(cmd_parms *cmd, void *dummy, char *arg)
+ {
+     void *sconf = cmd->server->module_config;
+@@ -2786,6 +2819,10 @@
+ { "GprofDir", set_gprof_dir, NULL, RSRC_CONF, TAKE1,
+   "Directory to plop gmon.out files" },
+ #endif
++{ "AddDefaultCharset", set_add_default_charset, NULL, OR_FILEINFO, FLAG,
++  "whether or not to add a default charset to any Content-Type without one" },
++{ "AddDefaultCharsetName", set_add_default_charset_name, NULL, OR_FILEINFO, 
++  TAKE1, "The name of the charset to add if AddDefaultCharset is enabled" },
+ 
+ /* Old resource config file commands */
+   
+Index: src/main/http_log.c
+===================================================================
+RCS file: /export/home/cvs/apache-1.3/src/main/http_log.c,v
+retrieving revision 1.82
+diff -u -r1.82 http_log.c
+--- http_log.c	2000/01/31 22:24:07	1.82
++++ http_log.c	2000/02/02 07:59:25
+@@ -487,7 +487,8 @@
+     if (((level & APLOG_LEVELMASK) <= APLOG_WARNING)
+ 	&& (ap_table_get(r->notes, "error-notes") == NULL)) {
+ 	ap_table_setn(r->notes, "error-notes",
+-		      ap_pvsprintf(r->pool, fmt, args));
++		      ap_escape_html(r->pool, ap_pvsprintf(r->pool, fmt, 
++		      args)));
+     }
+     va_end(args);
+ }
+Index: src/main/http_protocol.c
+===================================================================
+RCS file: /export/home/cvs/apache-1.3/src/main/http_protocol.c,v
+retrieving revision 1.286
+diff -u -r1.286 http_protocol.c
+--- http_protocol.c	2000/01/11 14:13:41	1.286
++++ http_protocol.c	2000/02/02 07:59:28
+@@ -103,6 +103,35 @@
+ 
+ #endif /*CHARSET_EBCDIC*/
+ 
++/*
++ * Builds the content-type that should be sent to the client from the
++ * content-type specified.  The following rules are followed:
++ *    - if type is NULL, type is set to ap_default_type(r)
++ *    - if charset adding is disabled, stop processing and return type.
++ *    - then, if there are no parameters on type, add the default charset
++ *    - return type
++ */
++static const char *make_content_type(request_rec *r, const char *type) {
++    const char *i;
++    core_dir_config *conf = (core_dir_config *)ap_get_module_config(
++	r->per_dir_config, &core_module);
++    if (!type) type = ap_default_type(r);
++    if (conf->add_default_charset != ADD_DEFAULT_CHARSET_ON) return type;
++
++    i = type;
++    while (*i && *i != ';') i++;
++    if (*i && *i == ';') {
++	/* already has parameter, do nothing */
++	/* XXX should check for actual charset=, but then we need real 
++	 * parsing code 
++	 */
++    } else {
++	type = ap_pstrcat(r->pool, type, "; charset=", 
++	    conf->add_default_charset_name, NULL);
++    }
++    return type;
++}
++
+ static int parse_byterange(char *range, long clength, long *start, long *end)
+ {
+     char *dash = strchr(range, '-');
+@@ -265,7 +294,7 @@
+     }
+ 
+     if (r->byterange > 1) {
+-        const char *ct = r->content_type ? r->content_type : ap_default_type(r);
++        const char *ct = make_content_type(r, r->content_type);
+         char ts[MAX_STRING_LEN];
+ 
+         ap_snprintf(ts, sizeof(ts), "%ld-%ld/%ld", range_start, range_end,
+@@ -1636,10 +1665,8 @@
+         ap_table_setn(r->headers_out, "Content-Type",
+                   ap_pstrcat(r->pool, "multipart", use_range_x(r) ? "/x-" : "/",
+                           "byteranges; boundary=", r->boundary, NULL));
+-    else if (r->content_type)
+-        ap_table_setn(r->headers_out, "Content-Type", r->content_type);
+-    else
+-        ap_table_setn(r->headers_out, "Content-Type", ap_default_type(r));
++    else ap_table_setn(r->headers_out, "Content-Type", make_content_type(r, 
++	r->content_type));
+ 
+     if (r->content_encoding)
+         ap_table_setn(r->headers_out, "Content-Encoding", r->content_encoding);
+@@ -2550,7 +2577,7 @@
+         r->content_languages = NULL;
+         r->content_encoding = NULL;
+         r->clength = 0;
+-        r->content_type = "text/html";
++        r->content_type = "text/html; charset=iso-8859-1";
+ 
+         if ((status == METHOD_NOT_ALLOWED) || (status == NOT_IMPLEMENTED))
+             ap_table_setn(r->headers_out, "Allow", make_allow(r));
+Index: src/main/util.c
+===================================================================
+RCS file: /export/home/cvs/apache-1.3/src/main/util.c,v
+retrieving revision 1.176
+diff -u -r1.176 util.c
+--- util.c	2000/01/12 20:57:48	1.176
++++ util.c	2000/02/02 07:59:29
+@@ -127,6 +127,8 @@
+ {
+     const char *semi;
+ 
++    if (intype == NULL) return NULL;
++
+     semi = strchr(intype, ';');
+     if (semi == NULL) {
+ 	return ap_pstrdup(p, intype);
+Index: src/modules/proxy/proxy_util.c
+===================================================================
+RCS file: /export/home/cvs/apache-1.3/src/modules/proxy/proxy_util.c,v
+retrieving revision 1.83
+diff -u -r1.83 proxy_util.c
+--- proxy_util.c	2000/01/11 14:13:47	1.83
++++ proxy_util.c	2000/02/02 07:59:29
+@@ -844,9 +844,12 @@
+     ap_table_setn(r->notes, "error-notes",
+ 		  ap_pstrcat(r->pool, 
+ 			     "The proxy server could not handle the request "
+-			     "<EM><A HREF=\"", r->uri, "\">",
+-			     r->method, "&nbsp;", r->uri, "</A></EM>.<P>\n"
+-			     "Reason: <STRONG>", message, "</STRONG>", NULL));
++			     "<EM><A HREF=\"", ap_escape_uri(r->pool, r->uri),
++			     "\">", r->method, "&nbsp;", 
++			     ap_escape_html(r->pool, r->uri), "</A></EM>.<P>\n"
++			     "Reason: <STRONG>",
++			     ap_escape_html(r->pool, message), 
++			     "</STRONG>", NULL));
+ 
+     /* Allow the "error-notes" string to be printed by ap_send_error_response() */
+     ap_table_setn(r->notes, "verbose-error-to", ap_pstrdup(r->pool, "*"));
+Index: src/modules/standard/mod_actions.c
+===================================================================
+RCS file: /export/home/cvs/apache-1.3/src/modules/standard/mod_actions.c,v
+retrieving revision 1.33
+diff -u -r1.33 mod_actions.c
+--- mod_actions.c	2000/01/11 14:23:03	1.33
++++ mod_actions.c	2000/02/02 07:59:30
+@@ -195,7 +195,8 @@
+ {
+     action_dir_config *conf = (action_dir_config *)
+         ap_get_module_config(r->per_dir_config, &action_module);
+-    const char *t, *action = r->handler ? r->handler : r->content_type;
++    const char *t, *action = r->handler ? r->handler : 
++	ap_field_noparam(r->pool, r->content_type);
+     const char *script;
+     int i;
+ 
+Index: src/modules/standard/mod_autoindex.c
+===================================================================
+RCS file: /export/home/cvs/apache-1.3/src/modules/standard/mod_autoindex.c,v
+retrieving revision 1.113
+diff -u -r1.113 mod_autoindex.c
+--- mod_autoindex.c	1999/12/31 05:35:52	1.113
++++ mod_autoindex.c	2000/02/02 07:59:30
+@@ -732,7 +732,7 @@
+ 
+ static char *find_item(request_rec *r, array_header *list, int path_only)
+ {
+-    const char *content_type = r->content_type;
++    const char *content_type = ap_field_noparam(r->pool, r->content_type);
+     const char *content_encoding = r->content_encoding;
+     char *path = r->filename;
+ 
+Index: src/modules/standard/mod_expires.c
+===================================================================
+RCS file: /export/home/cvs/apache-1.3/src/modules/standard/mod_expires.c,v
+retrieving revision 1.33
+diff -u -r1.33 mod_expires.c
+--- mod_expires.c	1999/10/21 20:45:26	1.33
++++ mod_expires.c	2000/02/02 07:59:30
+@@ -437,7 +437,8 @@
+     if (r->content_type == NULL)
+         code = NULL;
+     else
+-        code = (char *) ap_table_get(conf->expiresbytype, r->content_type);
++        code = (char *) ap_table_get(conf->expiresbytype, 
++		ap_field_noparam(r->pool, r->content_type));
+ 
+     if (code == NULL) {
+         /* no expires defined for that type, is there a default? */
+Index: src/modules/standard/mod_include.c
+===================================================================
+RCS file: /export/home/cvs/apache-1.3/src/modules/standard/mod_include.c,v
+retrieving revision 1.121
+diff -u -r1.121 mod_include.c
+--- mod_include.c	1999/12/31 05:35:52	1.121
++++ mod_include.c	2000/02/02 07:59:30
+@@ -922,7 +922,10 @@
+ {
+     char tag[MAX_STRING_LEN];
+     char *tag_val;
++    enum {E_NONE, E_URL, E_ENTITY} encode;
+ 
++    encode = E_ENTITY;
++
+     while (1) {
+         if (!(tag_val = get_tag(r->pool, in, tag, sizeof(tag), 1))) {
+             return 1;
+@@ -931,7 +934,15 @@
+             const char *val = ap_table_get(r->subprocess_env, tag_val);
+ 
+             if (val) {
+-                ap_rputs(val, r);
++		if (encode == E_NONE) {
++		    ap_rputs(val, r);
++		}
++		else if (encode == E_URL) {
++		    ap_rputs(ap_escape_uri(r->pool, val), r);
++		}
++		else if (encode == E_ENTITY) {
++		    ap_rputs(ap_escape_html(r->pool, val), r);
++		}
+             }
+             else {
+                 ap_rputs("(none)", r);
+@@ -940,6 +951,19 @@
+         else if (!strcmp(tag, "done")) {
+             return 0;
+         }
++	else if (!strcmp(tag, "encoding")) {
++	    if (!strcasecmp(tag_val, "none")) encode = E_NONE;
++	    else if (!strcasecmp(tag_val, "url")) encode = E_URL;
++	    else if (!strcasecmp(tag_val, "entity")) encode = E_ENTITY;
++	    else {
++		ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
++			    "unknown value \"%s\" to parameter \"encoding\" of "
++			    "tag echo in %s",
++			    tag_val, r->filename);
++		ap_rputs(error, r);
++	    }
++	}
++
+         else {
+             ap_log_rerror(APLOG_MARK, APLOG_NOERRNO|APLOG_ERR, r,
+                         "unknown parameter \"%s\" to tag echo in %s",
+@@ -2116,7 +2140,8 @@
+     }
+     else if (!strcmp(tag, "done")) {
+         for (i = 0; i < arr->nelts; ++i) {
+-            ap_rvputs(r, elts[i].key, "=", elts[i].val, "\n", NULL);
++            ap_rvputs(r, ap_escape_html(r->pool, elts[i].key), "=", 
++		ap_escape_html(r->pool, elts[i].val), "\n", NULL);
+         }
+         return 0;
+     }
+Index: src/modules/standard/mod_log_config.c
+===================================================================
+RCS file: /export/home/cvs/apache-1.3/src/modules/standard/mod_log_config.c,v
+retrieving revision 1.80
+diff -u -r1.80 mod_log_config.c
+--- mod_log_config.c	1999/12/15 23:04:22	1.80
++++ mod_log_config.c	2000/02/02 07:59:30
+@@ -391,7 +391,7 @@
+ {
+     const char *cp = ap_table_get(r->headers_out, a);
+     if (!strcasecmp(a, "Content-type") && r->content_type) {
+-        cp = r->content_type;
++        cp = ap_field_noparam(r->pool, r->content_type);
+     }
+     if (cp) {
+         return cp;
+Index: src/modules/standard/mod_status.c
+===================================================================
+RCS file: /export/home/cvs/apache-1.3/src/modules/standard/mod_status.c,v
+retrieving revision 1.110
+diff -u -r1.110 mod_status.c
+--- mod_status.c	2000/01/12 15:55:02	1.110
++++ mod_status.c	2000/02/02 07:59:31
+@@ -597,9 +597,10 @@
+ 			format_byte_out(r, bytes);
+ 			ap_rputs(")\n", r);
+ 			ap_rprintf(r, " <i>%s {%s}</i> <b>[%s]</b><br>\n\n",
+-			    score_record.client,
++			    ap_escape_html(r->pool, score_record.client),
+ 			    ap_escape_html(r->pool, score_record.request),
+-			    vhost ? vhost->server_hostname : "(unavailable)");
++			    vhost ? ap_escape_html(r->pool, 
++				vhost->server_hostname) : "(unavailable)");
+ 		    }
+ 		    else {		/* !no_table_report */
+ 			if (score_record.status == SERVER_DEAD)
+@@ -671,8 +672,9 @@
+ 			else
+ 			    ap_rprintf(r,
+ 			     "<td>%s<td nowrap>%s<td nowrap>%s</tr>\n\n",
+-			     score_record.client,
+-			     vhost ? vhost->server_hostname : "(unavailable)",
++			     ap_escape_html(r->pool, score_record.client),
++			     vhost ? ap_escape_html(r->pool, 
++				vhost->server_hostname) : "(unavailable)",
+ 			     ap_escape_html(r->pool, score_record.request));
+ 		    }		/* no_table_report */
+ 		}			/* !short_report */

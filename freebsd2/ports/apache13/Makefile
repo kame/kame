@@ -3,12 +3,11 @@
 # Date created:         Fri Aug 25 16:42:36 CDT 1995
 # Whom:                 ache@freebsd.org
 #
-# $FreeBSD: ports/www/apache13/Makefile,v 1.75 1999/09/03 16:07:23 ache Exp $
-# $Id: Makefile,v 1.3 1999/12/07 14:32:20 sumikawa Exp $
+# $FreeBSD: ports/www/apache13/Makefile,v 1.77 2000/02/02 21:14:03 ache Exp $
 #
 
-DISTNAME=       apache_1.3.9
-PKGNAME=        apache-1.3.9
+DISTNAME=       apache_1.3.11
+PKGNAME=        apache-1.3.11
 CATEGORIES=	www
 MASTER_SITES=   http://www.apache.org/dist/ \
 		ftp://ftp.ccs.neu.edu/net/mirrors/ftp.apache.org/apache/dist/ \
@@ -26,8 +25,11 @@ MASTER_SITES=   http://www.apache.org/dist/ \
 		ftp://ftp.iodynamics.com/pub/mirror/apache/dist/ \
 		ftp://apache.nextpath.com/pub/apache/dist/
 
+#put the below patch as patch-am
+#PATCH_SITES=    http://www.apache.org/info/css-security/
+#PATCHFILES=     apache_1.3.11_css_patch.txt
 PATCH_SITES=	ftp://ftp.kame.net/pub/kame/misc/
-PATCHFILES=	apache-139-v6-19991013a.diff.gz
+PATCHFILES=	apache-1.3.11-v6-20000208a.diff.gz
 PATCH_DIST_STRIP=	-p1
 
 MAINTAINER=	itojun@kame.net
@@ -41,6 +43,7 @@ HAS_CONFIGURE=  yes
 CONFIGURE_SCRIPT=	configure.v6
 CONFIGURE_ARGS= \
 		 --prefix=${PREFIX} \
+		 --server-gid=nogroup \
 		 --with-perl=${PERL} \
 		 --with-layout=${FILESDIR}/FreeBSD.layout:FreeBSD \
 		 --suexec-docroot=${PREFIX}/www/data \
@@ -72,7 +75,7 @@ post-install:
 		${ECHO} "Installing ${PREFIX}/etc/rc.d/apache.sh startup file."; \
 		${ECHO} "#!/bin/sh" > ${PREFIX}/etc/rc.d/apache.sh; \
 		${ECHO} "[ -x ${PREFIX}/sbin/apachectl ] && ${PREFIX}/sbin/apachectl start > /dev/null && ${ECHO} -n ' apache'" >> ${PREFIX}/etc/rc.d/apache.sh; \
-		chmod 751 ${PREFIX}/etc/rc.d/apache.sh; \
+		${CHMOD} 751 ${PREFIX}/etc/rc.d/apache.sh; \
 	fi
 
 .include <bsd.port.mk>
