@@ -1,10 +1,10 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1322 2000/10/07 07:02:09 itojun Exp $
+$KAME: CHANGELOG,v 1.1323 2000/10/07 07:09:23 itojun Exp $
 
 <200010>
 Sat Oct  7 16:01:12 JST 2000  itojun@iijlab.net
-	* ping6, traceroute, traceroute6, mtrace6: plug fd_set hole.
+	* ping6, traceroute, traceroute6, mtrace6, icmp6dump: plug fd_set hole.
 	  see openbsd select(2).  from deraadt@openbsd.
 
 Thu Oct  5 12:31:12 JST 2000  itojun@iijlab.net
