@@ -1,4 +1,4 @@
-/*	$KAME: mld6.c,v 1.43 2002/06/26 10:24:47 jinmei Exp $	*/
+/*	$KAME: mld6.c,v 1.44 2002/08/01 03:34:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -133,7 +133,7 @@ u_int8_t raopt[IP6OPT_RTALERT_LEN];
 #endif 
 char *sndcmsgbuf;
 int ctlbuflen = 0;
-static u_short rtalert_code;
+static u_int16_t rtalert_code;
 
 /* local functions */
 
@@ -252,7 +252,7 @@ init_mld6()
 #ifndef USE_RFC2292BIS
     raopt[0] = IP6OPT_ROUTER_ALERT;
     raopt[1] = IP6OPT_RTALERT_LEN - 2;
-    memcpy(&raopt[2], (caddr_t) & rtalert_code, sizeof(u_short));
+    memcpy(&raopt[2], (caddr_t) & rtalert_code, sizeof(u_int16_t));
 #endif 
 
     /* register MLD message handler */

@@ -1,4 +1,4 @@
-/*	$KAME: pim6.c,v 1.22 2002/06/26 10:24:48 jinmei Exp $	*/
+/*	$KAME: pim6.c,v 1.23 2002/08/01 03:34:02 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 LSIIT Laboratory.
@@ -125,7 +125,7 @@ static int rcvcmsglen;
  */
 static void pim6_read   __P((int f, fd_set *rfd));
 static void accept_pim6 __P((int recvlen));
-static int pim6_cksum __P((u_short *, struct in6_addr *,
+static int pim6_cksum __P((u_int16_t *, struct in6_addr *,
                struct in6_addr *, int));
 
 
@@ -469,11 +469,11 @@ send_pim6(char *buf, struct sockaddr_in6 *src,
 #define REDUCE {l_util.l = sum; sum = l_util.s[0] + l_util.s[1]; ADDCARRY(sum);}
     
 static union { 
-    u_short phs[4]; 
+    u_int16_t phs[4]; 
     struct {
-        u_long  ph_len; 
-        u_char  ph_zero[3];
-        u_char  ph_nxt; 
+        u_int32_t ph_len; 
+        u_int8_t ph_zero[3];
+        u_int8_t ph_nxt; 
     } ph;   
 } uph;
     
@@ -482,17 +482,17 @@ static union {
  * sequential 16 bit words to it, and at the end, fold back all the 
  * carry bits from the top 16 bits into the lower 16 bits.
  */ 
-int pim6_cksum(u_short *addr, struct in6_addr *src ,struct in6_addr *dst , int len )
+int pim6_cksum(u_int16_t *addr, struct in6_addr *src ,struct in6_addr *dst , int len )
 {   
     register int nleft = len;
-    register u_short *w;
-    register int sum = 0;
-    u_short answer = 0;
+    register u_int16_t *w;
+    register int32_t sum = 0;
+    u_int16_t answer = 0;
     
     /*
      * First create IP6 pseudo header and calculate a summary.
      */      
-    w = (u_short *)src;
+    w = (u_int16_t *)src;
     uph.ph.ph_len = htonl(len);
     uph.ph.ph_nxt = IPPROTO_PIM;
     
@@ -504,7 +504,7 @@ int pim6_cksum(u_short *addr, struct in6_addr *src ,struct in6_addr *dst , int l
     sum += w[2]; sum += w[3]; sum += w[4]; sum += w[5];
     sum += w[6]; sum += w[7];
     /* IPv6 destination address */
-    w = (u_short *)dst;
+    w = (u_int16_t *)dst;
     sum += w[0];
     /* XXX: necessary? */
     if (!(IN6_IS_ADDR_LINKLOCAL(dst) || IN6_IS_ADDR_MC_LINKLOCAL(dst)))
