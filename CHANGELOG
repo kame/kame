@@ -1,8 +1,11 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1224 2000/08/23 03:33:37 itojun Exp $
+$KAME: CHANGELOG,v 1.1225 2000/08/23 04:23:49 sumikawa Exp $
 
 <200008>
+Wed Aug 23 13:19:59 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* kame/freebsd3/ports/squid11: use latest IPv6 patch.
+
 Wed Aug 23 12:30:02 JST 2000  itojun@iijlab.net
 	* sys/netinet6/route6.c: dropped COMPAT_RFC2292 clause.
 	  it still have binary backward compatible behavior with RFC2292,
