@@ -1,4 +1,4 @@
-/*	$KAME: in6.h,v 1.44 2000/05/24 08:50:17 itojun Exp $	*/
+/*	$KAME: in6.h,v 1.45 2000/06/08 20:40:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -451,15 +451,15 @@ struct route_in6 {
  */
 struct ipv6_mreq {
 	struct in6_addr	ipv6mr_multiaddr;
-	u_int		ipv6mr_interface;
+	unsigned int	ipv6mr_interface;
 };
 
 /*
  * IPV6_PKTINFO: Packet information(RFC2292 sec 5)
  */
 struct in6_pktinfo {
-	struct in6_addr ipi6_addr;	/* src/dst IPv6 address */
-	u_int ipi6_ifindex;		/* send/recv interface index */
+	struct in6_addr	ipi6_addr;	/* src/dst IPv6 address */
+	unsigned int	ipi6_ifindex;	/* send/recv interface index */
 };
 
 /*
