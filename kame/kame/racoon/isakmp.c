@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.165 2001/12/06 07:16:30 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.166 2001/12/07 03:58:24 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -185,21 +185,6 @@ isakmp_handler(so_isakmp)
 		}
 		goto end;
 	}
-
-#if 0 /*MSG_PEEK does not return total length*/
-	/* check bogus length */
-	if (ntohl(isakmp.len) > len) {
-		plog(LLV_ERROR, LOCATION, (struct sockaddr *)&remote,
-			"packet shorter than isakmp header length field.\n");
-		/* dummy receive */
-		if ((len = recvfrom(so_isakmp, (char *)&isakmp, sizeof(isakmp),
-			    0, (struct sockaddr *)&remote, &remote_len)) < 0) {
-			plog(LLV_ERROR, LOCATION, NULL,
-				"failed to receive isakmp packet\n");
-		}
-		goto end;
-	}
-#endif
 
 	/* read real message */
 	if ((buf = vmalloc(ntohl(isakmp.len))) == NULL) {
