@@ -25,7 +25,7 @@
 .\" OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 .\" SUCH DAMAGE.
 .\"
-.\"	$Id: pim6sd.conf.5,v 1.1.2.1 1999/10/06 04:28:02 jinmei Exp $
+.\"	$Id: pim6sd.conf.5,v 1.1.2.2 1999/10/06 04:45:38 jinmei Exp $
 .\"
 .Dd Oct 6, 1999
 .Dt PIM6SD.CONF 5
@@ -106,7 +106,7 @@ Specifies timer granularity in seconds.
 .Ar Period
 specifies the period in second between 2 hello messages.
 .Ar Coef
-is the coefficient to deterimine the hello holdtime;
+is the coefficient to determine the hello holdtime;
 the holdtime will be
 .Ar period
 *
@@ -118,7 +118,7 @@ the holdtime will be
 .Ar Period
 specifies the period in second between 2 join/prune messages.
 .Ar Coef
-is the coefficient to deterimine the join/prune holdtime;
+is the coefficient to determine the join/prune holdtime;
 the holdtime will be
 .Ar period
 *
@@ -149,7 +149,7 @@ receiving a Register-Stop.
 .Xc
 .Ar Interval
 specifies the interval between the last time an Assert is received and
-the time at wich the assert is timeout.
+the time at which the assert is timeout.
 .\"
 .It Xo
 .Ic cand_rp
