@@ -2,7 +2,7 @@
 
 			     KAME Project
 
-		     $Date: 2000/01/18 11:32:53 $
+		     $Date: 2000/01/30 12:26:32 $
 
 
 For list of changes from past KAME kit, please refer to CHANGELOG.
@@ -18,6 +18,9 @@ and the next STABLE release,
 - Some of the userland tool may not work properly, if you configure more than
   500 interfaces.  (libinet6 is fixed for this, but there are some places
   where max # of interfaces is hardcoded)
+  Also, some of non-KAME binaries may not be ready to handle tons of
+  interfaces.  If a code uses fixed-size buffer for SIOCGIFCONF, the code
+  is not friendly with tons-of-interface kernel.
 - Notebooks/laptops problem: multicast hardware filter on ethernet card will
   not be properly initialized after suspend/resume session, and this makes
   trouble with IPv6 commuincation (which heavily uses multicast).
@@ -30,6 +33,7 @@ and the next STABLE release,
   This problem occurs only with specific revision of the card, and with
   specific operating system platform (openbsd, and maybe freebsd[23]).
   It is not KAME problem, it is problem in fxp driver.
+  KAME/OpenBSD contains workaround for this.
 
 PLATFORM DIFFERENCES
 ====================
