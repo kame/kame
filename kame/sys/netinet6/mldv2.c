@@ -1,4 +1,4 @@
-/*	$KAME: mldv2.c,v 1.18 2004/04/20 09:03:28 suz Exp $	*/
+/*	$KAME: mldv2.c,v 1.19 2004/04/22 02:47:16 suz Exp $	*/
 
 /*
  * Copyright (c) 2002 INRIA. All rights reserved.
@@ -3478,8 +3478,7 @@ in6_joingroup(ifp, addr, errorp)
 		*errorp = error;
 		return NULL;
 	}
-	imm->i6mm_maddr = in6_addmulti2(addr, ifp, errorp, 0, NULL,
-					MCAST_EXCLUDE, 1);
+	imm->i6mm_maddr = in6_addmulti(addr, ifp, errorp);
 	imm->i6mm_msf->msf_grpjoin++;
 	if (*errorp != 0) {
 		IMO_MSF_FREE(imm->i6mm_msf);
