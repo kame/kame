@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_input.c,v 1.29 2000/07/27 02:54:09 itojun Exp $	*/
+/*	$KAME: tcp6_input.c,v 1.30 2000/07/27 08:43:35 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -509,7 +509,7 @@ tcp6_input(mp, offp, proto)
 	 */
 	if (IN6_IS_ADDR_UNSPECIFIED(&ip6->ip6_src)) {
 		/* XXX stat */
-		goto bad;
+		goto drop;
 	}
 
 	/*
