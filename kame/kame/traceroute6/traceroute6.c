@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.67 2004/01/25 03:24:39 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.68 2004/01/25 11:16:12 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -300,7 +300,7 @@ struct opacket {
 	u_char hops;		/* hop limit of the packet */
 	u_char pad[2];
 	struct tv32 tv;		/* time packet left */
-} __packed;
+} __attribute__((__packed__));
 
 u_char	packet[512];		/* last inbound (icmp) packet */
 struct opacket	*outpacket;	/* last output (udp) packet */
