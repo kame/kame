@@ -255,6 +255,7 @@ main(argc, argv)
 		if (argc != 1)
 			usage();
 		delete(argv[0]);
+		exit(0);
 	}
 	if (pflag) {
 		plist();
