@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.218 1999/10/26 17:19:18 sumikawa Exp $
+$Id: CHANGELOG,v 1.219 1999/10/26 18:29:16 sumikawa Exp $
 
 <199910>
+Wed Oct 27 03:27:13 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
+	* freebsd[23]/sys/conf/newver.sh: RELEASE="${REVISION}-${BRANCH}"
+	instead of specified keywords, such as 2.2.8-RELEASE.
+
+	Submitted by: Martti Kuparinen <martti@research.zopps.fi>
+
 Tue Oct 26 23:45:15 1999  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
 	* bsdi3/libexec/ftpd/ftpd/ftpcmd.y: appllied Y2K patch of
 	  ftpd(wu-ftpd)
