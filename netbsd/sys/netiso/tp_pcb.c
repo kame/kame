@@ -961,8 +961,8 @@ tp_pcbbind(v, nam, p)
 				tlen = 2;
 			if (satosin(siso)->sin_addr.s_addr == 0)
 				siso = 0;
-		}
 #endif
+		}
 	}
 	if (tpcb->tp_lsuffixlen == 0) {
 		if (tlen) {
