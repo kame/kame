@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.31 2000/10/07 03:14:05 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.32 2000/10/07 03:20:55 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -517,7 +517,8 @@ gif_ioctl(ifp, cmd, data)
 			if (src->sa_len != sizeof(struct sockaddr_in) ||
 			    dst->sa_len != sizeof(struct sockaddr_in))
 				return EINVAL;
-			if (src->sa_family != AF_INET || dst->sa_len != AF_INET)
+			if (src->sa_family != AF_INET ||
+			    dst->sa_family != AF_INET)
 				return EAFNOSUPPORT;
 			break;
 #endif
@@ -531,7 +532,7 @@ gif_ioctl(ifp, cmd, data)
 			    dst->sa_len != sizeof(struct sockaddr_in6))
 				return EINVAL;
 			if (src->sa_family != AF_INET6 ||
-			    dst->sa_len != AF_INET6)
+			    dst->sa_family != AF_INET6)
 				return EAFNOSUPPORT;
 			break;
 #endif
