@@ -1,4 +1,4 @@
-/*	$KAME: ip6_mroute.c,v 1.87 2003/01/21 06:33:04 itojun Exp $	*/
+/*	$KAME: ip6_mroute.c,v 1.88 2003/01/21 23:30:56 suz Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -1753,7 +1753,10 @@ phyint_send(ip6, mifp, m, src, dst)
 	 * If we belong to the destination multicast group
 	 * on the outgoing interface, loop back a copy.
 	 */
-	/* ToDo: SSM consideration */
+	/* 
+	 * Does not have to check source info, as it's alreay covered by 
+	 * ip6_input
+	 */
 	IN6_LOOKUP_MULTI(dst, ifp, in6m);
 	if (in6m != NULL) {
 		if (ip6_setpktaddrs(m, src, dst))
