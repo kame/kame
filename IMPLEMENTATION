@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.204 2001/04/24 19:07:57 jinmei Exp $
+	$KAME: IMPLEMENTATION,v 1.205 2001/04/24 19:10:26 jinmei Exp $
 
 1. IPv6
 
@@ -283,7 +283,7 @@ architecture is that the link scope is (theoretically) larger than the
 interface scope.  That is, two different interfaces can belong to a
 same single link.  However, in a normal operation, we can assume that
 there is 1-to-1 relationship between links and interfaces.  In
-otherwise, we can usually put links and interfaces in the same scope
+other words, we can usually put links and interfaces in the same scope
 type.  The current KAME implementation assumes the 1-to-1
 relationship.  In particular, we use interface names such as "ne1" as
 unique link identifiers.  This would be much more human-readable and
