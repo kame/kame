@@ -37,15 +37,15 @@ name="network_ipv6_mobile"
 rcvar=`set_rcvar ipv6_mobile`
 start_cmd="network_ipv6_mobile_start"
 
-${ipv6_mobile_enable:=NO}
-${ipv6_mobile_virtual_home_interfaces:=mip0}
-${ipv6_mobile_mdd_program:=babymdd}
+echo ${ipv6_mobile_enable:=NO} > /dev/null
+echo ${ipv6_mobile_virtual_home_interfaces:=mip0} > /dev/null
+echo ${ipv6_mobile_mdd_program:=babymdd} > /dev/null
 
 network_ipv6_mobile_start()
 {
 	echo 'Doing Mobile IPv6 network setup:'
 
-	if ! ${SYSCTL_N} net.inet6.mip6.debug 2> /dev/null; then
+	if ! ${SYSCTL_N} net.inet6.mip6.debug > /dev/null; then
 		echo 'No MIP6 kernel'
 		return
 	fi
