@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.64 2003/09/02 23:31:42 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.65 2003/09/02 23:32:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -482,7 +482,7 @@ play_child(int s_src, struct sockaddr *srcaddr)
 	}
 
 	getnameinfo((struct sockaddr *)&dstaddr6, len,
-		dst6, sizeof(dst6), NULL, 0, NI_NUMERICHOST);
+	    dst6, sizeof(dst6), NULL, 0, NI_NUMERICHOST);
 	syslog(LOG_INFO, "the client is connecting to %s", dst6);
 	
 	if (!faith_prefix((struct sockaddr *)&dstaddr6)) {
@@ -529,7 +529,7 @@ play_child(int s_src, struct sockaddr *srcaddr)
 
 	sa4 = (struct sockaddr *)&dstaddr4;
 	getnameinfo(sa4, sa4->sa_len,
-		dst4, sizeof(dst4), NULL, 0, NI_NUMERICHOST);
+	    dst4, sizeof(dst4), NULL, 0, NI_NUMERICHOST);
 
 	conf = config_match(srcaddr, sa4);
 	if (!conf || !conf->permit) {
@@ -833,8 +833,8 @@ grab_myaddrs()
 		if (dflag) {
 			char hbuf[NI_MAXHOST];
 			getnameinfo(p->addr, p->addr->sa_len,
-				hbuf, sizeof(hbuf), NULL, 0,
-				NI_NUMERICHOST);
+			    hbuf, sizeof(hbuf), NULL, 0,
+			    NI_NUMERICHOST);
 			syslog(LOG_INFO, "my interface: %s %s", hbuf,
 			    ifa->ifa_name);
 		}
