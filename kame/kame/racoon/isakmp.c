@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.141 2001/06/01 03:48:57 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.142 2001/06/07 01:57:58 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1695,7 +1695,8 @@ isakmp_chkph1there(iph2)
 		plog(LLV_ERROR, LOCATION, iph2->dst,
 			"phase2 negotiation failed "
 			"due to time up waiting for phase1. %s\n",
-			isakmp_pindex(&iph2->ph1->index, iph2->msgid));
+			sadbsecas2str(iph2->dst, iph2->src,
+				iph2->satype, 0, 0));
 		plog(LLV_INFO, LOCATION, NULL,
 			"delete phase 2 handler.\n");
 

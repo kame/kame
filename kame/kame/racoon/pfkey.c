@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.113 2001/05/28 10:10:42 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.114 2001/06/07 01:59:22 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -135,8 +135,6 @@ NULL,	/* SADB_X_SPDDELETE2 */
 };
 
 static int addnewsp __P((caddr_t *));
-static const char *sadbsecas2str __P((struct sockaddr *, struct sockaddr *,
-	int, u_int32_t, int));
 
 /* cope with old kame headers - ugly */
 #ifndef SADB_X_AALG_MD5
@@ -2337,7 +2335,7 @@ addnewsp(mhp)
 }
 
 /* proto/mode/src->dst spi */
-static const char *
+const char *
 sadbsecas2str(src, dst, proto, spi, mode)
 	struct sockaddr *src, *dst;
 	int proto;
@@ -2345,22 +2343,26 @@ sadbsecas2str(src, dst, proto, spi, mode)
 	int mode;
 {
 	static char buf[256];
-	u_int doi_proto, doi_mode;
+	u_int doi_proto, doi_mode = 0;
 	char *p;
 	int blen, i;
 
 	doi_proto = pfkey2ipsecdoi_proto(proto);
 	if (doi_proto == ~0)
 		return NULL;
-	doi_mode = pfkey2ipsecdoi_mode(mode);
-	if (doi_mode == ~0)
-		return NULL;
+	if (mode) {
+		doi_mode = pfkey2ipsecdoi_mode(mode);
+		if (doi_mode == ~0)
+			return NULL;
+	}
 
 	blen = sizeof(buf) - 1;
 	p = buf;
 
-	i = snprintf(p, blen, "%s/%s ",
-		s_ipsecdoi_proto(doi_proto), s_ipsecdoi_encmode(doi_mode));
+	i = snprintf(p, blen, "%s%s%s ",
+		s_ipsecdoi_proto(doi_proto),
+		mode ? "/" : "",
+		mode ? s_ipsecdoi_encmode(doi_mode) : "");
 	p += i;
 	blen -= i;
 

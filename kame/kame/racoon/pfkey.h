@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.h,v 1.17 2001/04/06 14:23:48 sakane Exp $	*/
+/*	$KAME: pfkey.h,v 1.18 2001/06/07 01:59:22 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,3 +64,5 @@ extern u_int ipsecdoi2pfkey_mode __P((u_int));
 extern int pfkey_convertfromipsecdoi __P(( u_int, u_int, u_int,
 	u_int *, u_int *, u_int *, u_int *, u_int *));
 extern u_int32_t pk_getseq __P((void));
+extern const char *sadbsecas2str
+	__P((struct sockaddr *, struct sockaddr *, int, u_int32_t, int));
