@@ -1,4 +1,4 @@
-/*	$KAME: in6_var.h,v 1.49 2001/02/01 13:36:54 jinmei Exp $	*/
+/*	$KAME: in6_var.h,v 1.50 2001/02/06 03:21:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -689,7 +689,7 @@ void	in6_purgemkludge __P((struct ifnet *));
 struct in6_ifaddr *in6ifa_ifpforlinklocal __P((struct ifnet *, int));
 struct in6_ifaddr *in6ifa_ifpwithaddr __P((struct ifnet *,
 					     struct in6_addr *));
-char	*ip6_sprintf __P((struct in6_addr *));
+char	*ip6_sprintf __P((const struct in6_addr *));
 int	in6_addr2scopeid __P((struct ifnet *, struct in6_addr *));
 int	in6_matchlen __P((struct in6_addr *, struct in6_addr *));
 int	in6_are_prefix_equal __P((struct in6_addr *p1, struct in6_addr *p2,
@@ -705,8 +705,8 @@ int	in6_is_addr_deprecated __P((struct sockaddr_in6 *));
 
 #ifdef MEASURE_PERFORMANCE
 void in6h_hashinit __P((void));
-void in6h_addifa __P((struct in6_ifaddr *));
-struct in6hash *in6h_lookup __P((struct in6_addr *, struct ifnet *));
+void in6h_addifa __P((const struct in6_ifaddr *));
+struct in6hash *in6h_lookup __P((const struct in6_addr *, struct ifnet *));
 void in6h_rebuild __P((int));
 #endif
 #endif /* _KERNEL */

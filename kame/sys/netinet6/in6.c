@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.170 2001/02/06 02:31:58 jinmei Exp $	*/
+/*	$KAME: in6.c,v 1.171 2001/02/06 03:21:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -2193,7 +2193,7 @@ static char digits[] = "0123456789abcdef";
 static int ip6round = 0;
 char *
 ip6_sprintf(addr)
-struct in6_addr *addr;
+	const struct in6_addr *addr;
 {
 	static char ip6buf[8][48];
 	int i;
@@ -2952,7 +2952,7 @@ in6h_rebuild(newhashsiz)
 /* Remove hash entries for local address on an in6_ifaddr. */
 void
 in6h_delifa(ia)
-	struct in6_ifaddr *ia;
+	const struct in6_ifaddr *ia;
 {
 	if (IN6_IS_ADDR_UNSPECIFIED(&ia->ia6_hash.in6h_addr))
 		return;
@@ -3001,7 +3001,7 @@ in6h_delhash(ih)
  */
 struct in6hash *
 in6h_lookup(addr, ifp) 
-	struct in6_addr *addr;
+	const struct in6_addr *addr;
 	struct ifnet *ifp;
 {
 	struct in6hash *ih, *maybe_ih = NULL;
