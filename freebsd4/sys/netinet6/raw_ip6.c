@@ -227,7 +227,7 @@ rip6_ctlinput(cmd, sa, d)
 	struct mbuf *m;
 	int off = 0;
 	struct ip6ctlparam *ip6cp = NULL;
-	struct sockaddr_in6 *sa6_src = NULL;
+	const struct sockaddr_in6 *sa6_src = NULL;
 	void *cmdarg;
 	void (*notify) __P((struct inpcb *, int)) = in6_rtchange;
 

@@ -718,7 +718,8 @@ tcp6_ctlinput(cmd, sa, d)
 	struct tcphdr th;
 	void (*notify) __P((struct inpcb *, int)) = tcp_notify;
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *sa6_src = NULL, *sa6 = (struct sockaddr_in6 *)sa;
+	const struct sockaddr_in6 *sa6_src = NULL;
+	struct sockaddr_in6 *sa6 = (struct sockaddr_in6 *)sa;
 	struct mbuf *m;
 	int off;
 	struct {

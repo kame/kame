@@ -1,4 +1,4 @@
-/*	$KAME: tcp6_subr.c,v 1.30 2000/11/30 16:06:13 jinmei Exp $	*/
+/*	$KAME: tcp6_subr.c,v 1.31 2000/11/30 16:49:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -560,7 +560,7 @@ tcp6_ctlinput(cmd, sa, d)
 	int nmatch;
 	struct mbuf *m;
 	struct ip6_hdr *ip6;
-	struct sockaddr_in6 *sa6_src = NULL;
+	const struct sockaddr_in6 *sa6_src = NULL;
 	int off;
 	struct tcp_portonly {
 		u_int16_t th_sport;

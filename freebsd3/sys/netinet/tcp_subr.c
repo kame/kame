@@ -929,7 +929,7 @@ tcp6_ctlinput(cmd, sa, d)
 	struct ip6_hdr *ip6;
 	struct mbuf *m;
 	struct ip6ctlparam *ip6cp = NULL;
-	struct sockaddr_in6 *sa6_src = NULL;
+	const struct sockaddr_in6 *sa6_src = NULL;
 	int off = 0;
 	struct tcp_portonly {
 		u_int16_t th_sport;

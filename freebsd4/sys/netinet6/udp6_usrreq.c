@@ -1,5 +1,5 @@
 /*	$FreeBSD: src/sys/netinet6/udp6_usrreq.c,v 1.6.2.4 2000/10/31 19:07:09 ume Exp $	*/
-/*	$KAME: udp6_usrreq.c,v 1.24 2000/11/30 15:22:09 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.25 2000/11/30 16:49:47 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -412,7 +412,7 @@ udp6_ctlinput(cmd, sa, d)
 	struct mbuf *m;
 	int off = 0;
 	struct ip6ctlparam *ip6cp = NULL;
-	struct sockaddr_in6 *sa6_src = NULL;
+	const struct sockaddr_in6 *sa6_src = NULL;
 	void *cmdarg;
 	void (*notify) __P((struct inpcb *, int)) = udp_notify;
 	struct udp_portonly {

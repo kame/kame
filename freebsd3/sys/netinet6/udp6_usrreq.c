@@ -1,4 +1,4 @@
-/*	$KAME: udp6_usrreq.c,v 1.43 2000/11/30 12:55:16 jinmei Exp $	*/
+/*	$KAME: udp6_usrreq.c,v 1.44 2000/11/30 16:49:46 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -412,7 +412,7 @@ udp6_ctlinput(cmd, sa, d)
 	int off = 0;
 	void *cmdarg;
 	struct ip6ctlparam *ip6cp = NULL;
-	struct sockaddr_in6 *sa6_src = NULL;
+	const struct sockaddr_in6 *sa6_src = NULL;
 	void (*notify) __P((struct inpcb *, int)) = udp_notify;
 	struct udp_portonly {
 		u_int16_t uh_sport;
