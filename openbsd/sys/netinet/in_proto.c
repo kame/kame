@@ -215,7 +215,6 @@ struct protosw inetsw[] = {
   0,		0,		0,		0,		ip4_sysctl
 },
 #endif
-#endif /*NGIF*/
 { SOCK_RAW,	&inetdomain,	IPPROTO_IGMP,	PR_ATOMIC|PR_ADDR,
   igmp_input,	rip_output,	0,		rip_ctloutput,
   rip_usrreq,
