@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.437 2000/01/14 08:04:47 jinmei Exp $
+$Id: CHANGELOG,v 1.438 2000/01/14 08:06:50 jinmei Exp $
 
 <200001>
+2000-01-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/ip6_output.c (ip6_copypktopts): was added in
+	order to copy the in6p_outputopts member from a listening PCB to a
+	corresponding accepting one. TCP input routines are also modified
+	to call the function.
+
 2000-01-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_input.c (ip6_savecontrol): was modified in
 	order to conform to Section 4.1 of rfc2292bis-01; TCP
