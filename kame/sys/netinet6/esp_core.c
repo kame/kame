@@ -41,6 +41,7 @@
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <sys/kernel.h>
+#include <sys/syslog.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -173,25 +174,28 @@ esp_descbc_mature(sav)
 	struct esp_algorithm *algo;
 
 	if (!(sav->flags & SADB_X_EXT_OLD) && (sav->flags & SADB_X_EXT_IV4B)) {
-		printf("esp_cbc_mature: algorithm incompatible with 4 octets IV length\n");
+		ipseclog((LOG_ERR, "esp_cbc_mature: "
+		    "algorithm incompatible with 4 octets IV length\n"));
 		return 1;
 	}
 
 	if (!sav->key_enc) {
-		printf("esp_descbc_mature: no key is given.\n");
+		ipseclog((LOG_ERR, "esp_descbc_mature: no key is given.\n"));
 		return 1;
 	}
 	algo = &esp_algorithms[sav->alg_enc];
 	if (_KEYBITS(sav->key_enc) < algo->keymin
 	 || algo->keymax < _KEYBITS(sav->key_enc)) {
-		printf("esp_descbc_mature: invalid key length %d.\n",
-			_KEYBITS(sav->key_enc));
+		ipseclog((LOG_ERR,
+		    "esp_descbc_mature: invalid key length %d.\n",
+		    _KEYBITS(sav->key_enc)));
 		return 1;
 	}
 
 	/* weak key check */
 	if (des_is_weak_key((C_Block *)_KEYBUF(sav->key_enc))) {
-		printf("esp_descbc_mature: weak key was passed.\n");
+		ipseclog((LOG_ERR,
+		    "esp_descbc_mature: weak key was passed.\n"));
 		return 1;
 	}
 
@@ -229,14 +233,14 @@ esp_descbc_decrypt(m, off, sav, algo, ivlen)
 	derived = 0;
 	/* sanity check */
 	if (ivlen != sav->ivlen) {
-		printf("esp_descbc_decrypt: bad ivlen %d/%d\n",
-			ivlen, sav->ivlen);
+		ipseclog((LOG_ERR, "esp_descbc_decrypt: bad ivlen %d/%d\n",
+		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
 	if (_KEYBITS(sav->key_enc) < algo->keymin
 	 || algo->keymax < _KEYBITS(sav->key_enc)) {
-		printf("esp_descbc_decrypt: bad keylen %d\n",
-			_KEYBITS(sav->key_enc));
+		ipseclog((LOG_ERR, "esp_descbc_decrypt: bad keylen %d\n",
+		    _KEYBITS(sav->key_enc)));
 		return EINVAL;
 	}
 
@@ -276,7 +280,8 @@ esp_descbc_decrypt(m, off, sav, algo, ivlen)
 		iv = &tiv[0];
 		m_copydata(m, ivoff, 8, &tiv[0]);
 	} else {
-		printf("esp_descbc_decrypt: unsupported ivlen %d\n", ivlen);
+		ipseclog((LOG_ERR, "esp_descbc_decrypt: unsupported ivlen %d\n",
+		    ivlen));
 		return EINVAL;
 	}
 
@@ -287,8 +292,8 @@ esp_descbc_decrypt(m, off, sav, algo, ivlen)
 	plen -= bodyoff;
 
 	if (plen % 8) {
-		printf("esp_descbc_decrypt: "
-			"payload length must be multiple of 8\n");
+		ipseclog((LOG_ERR, "esp_descbc_decrypt: "
+		    "payload length must be multiple of 8\n"));
 		return EINVAL;
 	}
 
@@ -298,7 +303,8 @@ esp_descbc_decrypt(m, off, sav, algo, ivlen)
 
 	deserr = des_key_sched((C_Block *)_KEYBUF(sav->key_enc), ks);
 	if (deserr != 0) {
-		printf("esp_descbc_decrypt: key error %d\n", deserr);
+		ipseclog((LOG_ERR,
+		    "esp_descbc_decrypt: key error %d\n", deserr));
 		return EINVAL;
 	}
 
@@ -333,19 +339,19 @@ esp_descbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	/* sanity check */
 	if (plen % 8) {
-		printf("esp_descbc_encrypt: "
-			"payload length must be multiple of 8\n");
+		ipseclog((LOG_ERR, "esp_descbc_encrypt: "
+		    "payload length must be multiple of 8\n"));
 		return EINVAL;
 	}
 	if (sav->ivlen != ivlen) {
-		printf("esp_descbc_encrypt: bad ivlen %d/%d\n",
-			ivlen, sav->ivlen);
+		ipseclog((LOG_ERR, "esp_descbc_encrypt: bad ivlen %d/%d\n",
+		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
 	if (_KEYBITS(sav->key_enc) < algo->keymin
 	 || algo->keymax < _KEYBITS(sav->key_enc)) {
-		printf("esp_descbc_encrypt: bad keylen %d\n",
-			_KEYBITS(sav->key_enc));
+		ipseclog((LOG_ERR, "esp_descbc_encrypt: bad keylen %d\n",
+		    _KEYBITS(sav->key_enc)));
 		return EINVAL;
 	}
 
@@ -405,7 +411,8 @@ esp_descbc_encrypt(m, off, plen, sav, algo, ivlen)
 	} else if (ivlen == 8)
 		bcopy((caddr_t)sav->iv, (caddr_t)iv, ivlen);
 	else {
-		printf("esp_descbc_encrypt: unsupported ivlen %d\n", ivlen);
+		ipseclog((LOG_ERR,
+		    "esp_descbc_encrypt: unsupported ivlen %d\n", ivlen));
 		return EINVAL;
 	}
 
@@ -415,7 +422,8 @@ esp_descbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	deserr = des_key_sched((C_Block *)_KEYBUF(sav->key_enc), ks);
 	if (deserr != 0) {
-		printf("esp_descbc_encrypt: key error %d\n", deserr);
+		ipseclog((LOG_ERR,
+		    "esp_descbc_encrypt: key error %d\n", deserr));
 		return EINVAL;
 	}
 
@@ -441,23 +449,26 @@ esp_cbc_mature(sav)
 	struct esp_algorithm *algo;
 
 	if (sav->flags & SADB_X_EXT_OLD) {
-		printf("esp_cbc_mature: algorithm incompatible with esp-old\n");
+		ipseclog((LOG_ERR,
+		    "esp_cbc_mature: algorithm incompatible with esp-old\n"));
 		return 1;
 	}
 	if (sav->flags & SADB_X_EXT_DERIV) {
-		printf("esp_cbc_mature: algorithm incompatible with derived\n");
+		ipseclog((LOG_ERR,
+		    "esp_cbc_mature: algorithm incompatible with derived\n"));
 		return 1;
 	}
 
 	if (!sav->key_enc) {
-		printf("esp_cbc_mature: no key is given.\n");
+		ipseclog((LOG_ERR,
+		    "esp_cbc_mature: no key is given.\n"));
 		return 1;
 	}
 	algo = &esp_algorithms[sav->alg_enc];
 	keylen = sav->key_enc->sadb_key_bits;
 	if (keylen < algo->keymin || algo->keymax < keylen) {
-		printf("esp_cbc_mature: invalid key length %d.\n",
-			sav->key_enc->sadb_key_bits);
+		ipseclog((LOG_ERR, "esp_cbc_mature: invalid key length %d.\n",
+		    sav->key_enc->sadb_key_bits));
 		return 1;
 	}
 	switch (sav->alg_enc) {
@@ -466,7 +477,8 @@ esp_cbc_mature(sav)
 		if (des_is_weak_key((C_Block *)_KEYBUF(sav->key_enc))
 		 || des_is_weak_key((C_Block *)(_KEYBUF(sav->key_enc) + 8))
 		 || des_is_weak_key((C_Block *)(_KEYBUF(sav->key_enc) + 16))) {
-			printf("esp_cbc_mature: weak key was passed.\n");
+			ipseclog((LOG_ERR,
+			    "esp_cbc_mature: weak key was passed.\n"));
 			return 1;
 		}
 		break;
@@ -497,24 +509,27 @@ esp_blowfish_cbc_decrypt(m, off, sav, algo, ivlen)
 
 	/* sanity check */
 	if (sav->ivlen != ivlen) {
-		printf("esp_blowfish_cbc_decrypt: bad ivlen %d/%d\n",
-			ivlen, sav->ivlen);
+		ipseclog((LOG_ERR,
+		    "esp_blowfish_cbc_decrypt: bad ivlen %d/%d\n",
+		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
 	if (_KEYBITS(sav->key_enc) < algo->keymin
 	 || algo->keymax < _KEYBITS(sav->key_enc)) {
-		printf("esp_blowfish_cbc_decrypt: unsupported key length %d: "
-			"need %d to %d bits\n", _KEYBITS(sav->key_enc),
-			algo->keymin, algo->keymax);
+		ipseclog((LOG_ERR,
+		    "esp_blowfish_cbc_decrypt: unsupported key length %d: "
+		    "need %d to %d bits\n", _KEYBITS(sav->key_enc),
+		    algo->keymin, algo->keymax));
 		return EINVAL;
 	}
 	if (sav->flags & SADB_X_EXT_OLD) {
-		printf("esp_blowfish_cbc_decrypt: unsupported ESP version\n");
+		ipseclog((LOG_ERR,
+		    "esp_blowfish_cbc_decrypt: unsupported ESP version\n"));
 		return EINVAL;
 	}
 	if (ivlen != 8) {
-		printf("esp_blowfish_cbc_decrypt: unsupported ivlen %d "
-			"(this should never happen)\n", ivlen);
+		ipseclog((LOG_ERR,
+		    "esp_blowfish_cbc_decrypt: unsupported ivlen %d\n", ivlen));
 		return EINVAL;
 	}
 
@@ -530,8 +545,8 @@ esp_blowfish_cbc_decrypt(m, off, sav, algo, ivlen)
 	plen -= bodyoff;
 
 	if (plen % 8) {
-		printf("esp_blowfish_cbc_decrypt: "
-			"payload length must be multiple of 8\n");
+		ipseclog((LOG_ERR, "esp_blowfish_cbc_decrypt: "
+			"payload length must be multiple of 8\n"));
 		return EINVAL;
 	}
 
@@ -572,29 +587,32 @@ esp_blowfish_cbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	/* sanity check */
 	if (plen % 8) {
-		printf("esp_blowfish_cbc_encrypt: "
-			"payload length must be multiple of 8\n");
+		ipseclog((LOG_ERR, "esp_blowfish_cbc_encrypt: "
+		    "payload length must be multiple of 8\n"));
 		return EINVAL;
 	}
 	if (sav->ivlen != ivlen) {
-		printf("esp_blowfish_cbc_encrypt: bad ivlen %d/%d\n",
-			ivlen, sav->ivlen);
+		ipseclog((LOG_ERR,
+		    "esp_blowfish_cbc_encrypt: bad ivlen %d/%d\n",
+		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
 	if (_KEYBITS(sav->key_enc) < algo->keymin
 	 || algo->keymax < _KEYBITS(sav->key_enc)) {
-		printf("esp_blowfish_cbc_encrypt: unsupported key length %d: "
-			"need %d to %d bits\n", _KEYBITS(sav->key_enc),
-			algo->keymin, algo->keymax);
+		ipseclog((LOG_ERR,
+		    "esp_blowfish_cbc_encrypt: unsupported key length %d: "
+		    "need %d to %d bits\n", _KEYBITS(sav->key_enc),
+		    algo->keymin, algo->keymax));
 		return EINVAL;
 	}
 	if (sav->flags & SADB_X_EXT_OLD) {
-		printf("esp_blowfish_cbc_encrypt: unsupported ESP version\n");
+		ipseclog((LOG_ERR,
+		    "esp_blowfish_cbc_encrypt: unsupported ESP version\n"));
 		return EINVAL;
 	}
 	if (ivlen != 8) {
-		printf("esp_blowfish_cbc_encrypt: unsupported ivlen %d "
-			"(this should never happen)\n", ivlen);
+		ipseclog((LOG_ERR,
+		    "esp_blowfish_cbc_encrypt: unsupported ivlen %d\n", ivlen));
 		return EINVAL;
 	}
 
@@ -657,24 +675,26 @@ esp_cast128cbc_decrypt(m, off, sav, algo, ivlen)
 
 	/* sanity check */
 	if (ivlen != sav->ivlen) {
-		printf("esp_cast128cbc_decrypt: bad ivlen %d/%d\n",
-			ivlen, sav->ivlen);
+		ipseclog((LOG_ERR, "esp_cast128cbc_decrypt: bad ivlen %d/%d\n",
+		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
 	if (_KEYBITS(sav->key_enc) < algo->keymin
 	 || _KEYBITS(sav->key_enc) > algo->keymax) {
-		printf("esp_cast128cbc_decrypt: unsupported key length %d: "
-			"need %d to %d bits\n", _KEYBITS(sav->key_enc),
-			algo->keymin, algo->keymax);
+		ipseclog((LOG_ERR,
+		    "esp_cast128cbc_decrypt: unsupported key length %d: "
+		    "need %d to %d bits\n", _KEYBITS(sav->key_enc),
+		    algo->keymin, algo->keymax));
 		return EINVAL;
 	}
 	if (sav->flags & SADB_X_EXT_OLD) {
-		printf("esp_cast128cbc_decrypt: unsupported ESP version\n");
+		ipseclog((LOG_ERR,
+		    "esp_cast128cbc_decrypt: unsupported ESP version\n"));
 		return EINVAL;
 	}
 	if (ivlen != 8) {
-		printf("esp_cast128cbc_decrypt: unsupported ivlen %d "
-			"(this should never happen)\n", ivlen);
+		ipseclog((LOG_ERR,
+		    "esp_cast128cbc_decrypt: unsupported ivlen %d\n", ivlen));
 		return EINVAL;
 	}
 
@@ -692,8 +712,8 @@ esp_cast128cbc_decrypt(m, off, sav, algo, ivlen)
 	plen -= bodyoff;
 
 	if (plen % 8) {
-		printf("esp_cast128cbc_decrypt: "
-			"payload length must be multiple of 8\n");
+		ipseclog((LOG_ERR, "esp_cast128cbc_decrypt: "
+		    "payload length must be multiple of 8\n"));
 		return EINVAL;
 	}
 
@@ -732,29 +752,31 @@ esp_cast128cbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	/* sanity check */
 	if (plen % 8) {
-		printf("esp_cast128cbc_encrypt: "
-			"payload length must be multiple of 8\n");
+		ipseclog((LOG_ERR, "esp_cast128cbc_encrypt: "
+		    "payload length must be multiple of 8\n"));
 		return EINVAL;
 	}
 	if (sav->ivlen != ivlen) {
-		printf("esp_cast128cbc_encrypt: bad ivlen %d/%d\n",
-			ivlen, sav->ivlen);
+		ipseclog((LOG_ERR, "esp_cast128cbc_encrypt: bad ivlen %d/%d\n",
+		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
 	if (_KEYBITS(sav->key_enc) < algo->keymin
 	 || _KEYBITS(sav->key_enc) > algo->keymax) {
-		printf("esp_cast128cbc_encrypt: unsupported key length %d: "
-			"needs %d to %d bits\n", _KEYBITS(sav->key_enc),
-			algo->keymin, algo->keymax);
+		ipseclog((LOG_ERR,
+		    "esp_cast128cbc_encrypt: unsupported key length %d: "
+		    "needs %d to %d bits\n", _KEYBITS(sav->key_enc),
+		    algo->keymin, algo->keymax));
 		return EINVAL;
 	}
 	if (sav->flags & SADB_X_EXT_OLD) {
-		printf("esp_cast128cbc_encrypt: unsupported ESP version\n");
+		ipseclog((LOG_ERR,
+		    "esp_cast128cbc_encrypt: unsupported ESP version\n"));
 		return EINVAL;
 	}
 	if (ivlen != 8) {
-		printf("esp_cast128cbc_encrypt: unsupported ivlen %d "
-			"(this should never happen)\n", ivlen);
+		ipseclog((LOG_ERR,
+		    "esp_cast128cbc_encrypt: unsupported ivlen %d\n", ivlen));
 		return EINVAL;
 	}
 
@@ -814,23 +836,24 @@ esp_3descbc_decrypt(m, off, sav, algo, ivlen)
 
 	/* sanity check */
 	if (ivlen != sav->ivlen) {
-		printf("esp_3descbc_decrypt: bad ivlen %d/%d\n",
-			ivlen, sav->ivlen);
+		ipseclog((LOG_ERR, "esp_3descbc_decrypt: bad ivlen %d/%d\n",
+		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
 	if (_KEYBITS(sav->key_enc) < algo->keymin
 	 || algo->keymax < _KEYBITS(sav->key_enc)) {
-		printf("esp_3descbc_decrypt: bad keylen %d\n",
-			_KEYBITS(sav->key_enc));
+		ipseclog((LOG_ERR, "esp_3descbc_decrypt: bad keylen %d\n",
+		    _KEYBITS(sav->key_enc)));
 		return EINVAL;
 	}
 	if (sav->flags & SADB_X_EXT_OLD) {
-		printf("esp_3descbc_decrypt: unsupported ESP version\n");
+		ipseclog((LOG_ERR,
+		    "esp_3descbc_decrypt: unsupported ESP version\n"));
 		return EINVAL;
 	}
 	if (ivlen != 8) {
-		printf("esp_3descbc_decrypt: unsupported ivlen %d "
-			"(this should never happen)\n", ivlen);
+		ipseclog((LOG_ERR,
+		    "esp_3descbc_decrypt: unsupported ivlen %d\n", ivlen));
 		return EINVAL;
 	}
 
@@ -847,8 +870,8 @@ esp_3descbc_decrypt(m, off, sav, algo, ivlen)
 	plen -= bodyoff;
 
 	if (plen % 8) {
-		printf("esp_3descbc_decrypt: "
-			"payload length must be multiple of 8\n");
+		ipseclog((LOG_ERR, "esp_3descbc_decrypt: "
+		    "payload length must be multiple of 8\n"));
 		return EINVAL;
 	}
 
@@ -861,8 +884,8 @@ esp_3descbc_decrypt(m, off, sav, algo, ivlen)
 	deserr[1] = des_key_sched((C_Block *)(_KEYBUF(sav->key_enc) + 8), ks[1]);
 	deserr[2] = des_key_sched((C_Block *)(_KEYBUF(sav->key_enc) + 16), ks[2]);
 	if ((deserr[0] != 0) || (deserr[1] != 0) || (deserr[2] != 0)) {
-		printf("esp_3descbc_decrypt: key error %d/%d/%d\n",
-			deserr[0], deserr[1], deserr[2]);
+		ipseclog((LOG_ERR, "esp_3descbc_decrypt: key error %d/%d/%d\n",
+		    deserr[0], deserr[1], deserr[2]));
 		return EINVAL;
 	}
 
@@ -893,28 +916,29 @@ esp_3descbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	/* sanity check */
 	if (plen % 8) {
-		printf("esp_3descbc_encrypt: "
-			"payload length must be multiple of 8\n");
+		ipseclog((LOG_ERR, "esp_3descbc_encrypt: "
+		    "payload length must be multiple of 8\n"));
 		return EINVAL;
 	}
 	if (sav->ivlen != ivlen) {
-		printf("esp_3descbc_encrypt: bad ivlen %d/%d\n",
-			ivlen, sav->ivlen);
+		ipseclog((LOG_ERR, "esp_3descbc_encrypt: bad ivlen %d/%d\n",
+		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
 	if (_KEYBITS(sav->key_enc) < algo->keymin
 	 || algo->keymax < _KEYBITS(sav->key_enc)) {
-		printf("esp_3descbc_encrypt: bad keylen %d\n",
-			_KEYBITS(sav->key_enc));
+		ipseclog((LOG_ERR, "esp_3descbc_encrypt: bad keylen %d\n",
+		    _KEYBITS(sav->key_enc)));
 		return EINVAL;
 	}
 	if (sav->flags & SADB_X_EXT_OLD) {
-		printf("esp_3descbc_encrypt: unsupported ESP version\n");
+		ipseclog((LOG_ERR,
+		    "esp_3descbc_encrypt: unsupported ESP version\n"));
 		return EINVAL;
 	}
 	if (ivlen != 8) {
-		printf("esp_3descbc_encrypt: unsupported ivlen %d "
-			"(this should never happen)\n", ivlen);
+		ipseclog((LOG_ERR,
+		    "esp_3descbc_encrypt: unsupported ivlen %d\n", ivlen));
 		return EINVAL;
 	}
 
@@ -938,8 +962,8 @@ esp_3descbc_encrypt(m, off, plen, sav, algo, ivlen)
 	deserr[1] = des_key_sched((C_Block *)(_KEYBUF(sav->key_enc) + 8), ks[1]);
 	deserr[2] = des_key_sched((C_Block *)(_KEYBUF(sav->key_enc) + 16), ks[2]);
 	if ((deserr[0] != 0) || (deserr[1] != 0) || (deserr[2] != 0)) {
-		printf("esp_3descbc_encrypt: key error %d/%d/%d\n",
-			deserr[0], deserr[1], deserr[2]);
+		ipseclog((LOG_ERR, "esp_3descbc_encrypt: key error %d/%d/%d\n",
+		    deserr[0], deserr[1], deserr[2]));
 		return EINVAL;
 	}
 
@@ -976,22 +1000,24 @@ esp_rc5cbc_decrypt(m, off, sav, algo, ivlen)
 
 	/* sanity check */
 	if (sav->ivlen != ivlen) {
-		printf("esp_rc5cbc_decrypt: bad ivlen %d/%d\n",
-			ivlen, sav->ivlen);
+		ipseclog((LOG_ERR, "esp_rc5cbc_decrypt: bad ivlen %d/%d\n",
+		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
 	if ((_KEYBITS(sav->key_enc) < 40) || (_KEYBITS(sav->key_enc) > 2040)) {
-		printf("esp_rc5cbc_decrypt: unsupported key length %d: "
-			"need 40 to 2040 bit\n", _KEYBITS(sav->key_enc));
+		ipseclog((LOG_ERR,
+		    "esp_rc5cbc_decrypt: unsupported key length %d: "
+		    "need 40 to 2040 bit\n", _KEYBITS(sav->key_enc)));
 		return EINVAL;
 	}
 	if (sav->flags & SADB_X_EXT_OLD) {
-		printf("esp_rc5cbc_decrypt: unsupported ESP version\n");
+		ipseclog((LOG_ERR,
+		    "esp_rc5cbc_decrypt: unsupported ESP version\n"));
 		return EINVAL;
 	}
 	if (ivlen != 8) {
-		printf("esp_rc5cbc_decrypt: unsupported ivlen %d "
-			"(this should never happen)\n", ivlen);
+		ipseclog((LOG_ERR, "esp_rc5cbc_decrypt: unsupported ivlen %d\n",
+		    ivlen));
 		return EINVAL;
 	}
 
@@ -1009,8 +1035,8 @@ esp_rc5cbc_decrypt(m, off, sav, algo, ivlen)
 	plen -= bodyoff;
 
 	if (plen % 8) {
-		printf("esp_rc5cbc_decrypt: "
-			"payload length must be multiple of 8\n");
+		ipseclog((LOG_ERR, "esp_rc5cbc_decrypt: "
+		    "payload length must be multiple of 8\n"));
 		return EINVAL;
 	}
 
@@ -1044,29 +1070,31 @@ esp_rc5cbc_encrypt(m, off, plen, sav, algo, ivlen)
 
 	/* sanity check */
 	if (plen % 8) {
-		printf("esp_rc5cbc_encrypt: "
-			"payload length must be multiple of 8\n");
+		ipseclog((LOG_ERR, "esp_rc5cbc_encrypt: "
+		    "payload length must be multiple of 8\n"));
 		return EINVAL;
 	}
 	if (sav->ivlen != ivlen) {
-		printf("esp_rc5cbc_encrypt: bad ivlen %d/%d\n",
-			ivlen, sav->ivlen);
+		ipseclog((LOG_ERR, "esp_rc5cbc_encrypt: bad ivlen %d/%d\n",
+		    ivlen, sav->ivlen));
 		return EINVAL;
 	}
 	if (_KEYBITS(sav->key_enc) < algo->keymin
 	 || _KEYBITS(sav->key_enc) > algo->keymax) {
-		printf("esp_rc5cbc_encrypt: unsupported key length %d: "
-			"need %d to %d bits\n", _KEYBITS(sav->key_enc),
-			algo->keymin, algo->keymax);
+		ipseclog((LOG_ERR,
+		    "esp_rc5cbc_encrypt: unsupported key length %d: "
+		    "need %d to %d bits\n", _KEYBITS(sav->key_enc),
+		    algo->keymin, algo->keymax));
 		return EINVAL;
 	}
 	if (sav->flags & SADB_X_EXT_OLD) {
-		printf("esp_rc5cbc_encrypt: unsupported ESP version\n");
+		ipseclog((LOG_ERR,
+		    "esp_rc5cbc_encrypt: unsupported ESP version\n"));
 		return EINVAL;
 	}
 	if (ivlen != 8) {
-		printf("esp_rc5cbc_encrypt: unsupported ivlen %d "
-			"(this should never happen)\n", ivlen);
+		ipseclog((LOG_ERR, "esp_rc5cbc_encrypt: unsupported ivlen %d\n",
+		    ivlen));
 		return EINVAL;
 	}
 
@@ -1167,11 +1195,12 @@ esp_auth(m0, skip, length, sav, sum)
 
 	/* sanity checks */
 	if (m0->m_pkthdr.len < skip) {
-		printf("esp_auth: mbuf length < skip\n");
+		ipseclog((LOG_DEBUG, "esp_auth: mbuf length < skip\n"));
 		return EINVAL;
 	}
 	if (m0->m_pkthdr.len < skip + length) {
-		printf("esp_auth: mbuf length < skip + length\n");
+		ipseclog((LOG_DEBUG,
+		    "esp_auth: mbuf length < skip + length\n"));
 		return EINVAL;
 	}
 	/*
@@ -1179,15 +1208,17 @@ esp_auth(m0, skip, length, sav, sum)
 	 * since nexthdr must be at offset 4n+3.
 	 */
 	if (length % 4) {
-		printf("esp_auth: length is not multiple of 4\n");
+		ipseclog((LOG_ERR, "esp_auth: length is not multiple of 4\n"));
 		return EINVAL;
 	}
 	if (!sav) {
-		printf("esp_auth: NULL SA passed\n");
+		ipseclog((LOG_DEBUG, "esp_auth: NULL SA passed\n"));
 		return EINVAL;
 	}
 	if (!sav->alg_auth) {
-		printf("esp_auth: bad ESP auth algorithm passed: %d\n", sav->alg_auth);
+		ipseclog((LOG_ERR,
+		    "esp_auth: bad ESP auth algorithm passed: %d\n",
+		    sav->alg_auth));
 		return EINVAL;
 	}
 
@@ -1197,8 +1228,9 @@ esp_auth(m0, skip, length, sav, sum)
 	algo = &ah_algorithms[sav->alg_auth];
 	siz = (((*algo->sumsiz)(sav) + 3) & ~(4 - 1));
 	if (sizeof(sumbuf) < siz) {
-		printf("esp_auth: AH_MAXSUMSIZE is too small: siz=%lu\n",
-		    (u_long)siz);
+		ipseclog((LOG_DEBUG,
+		    "esp_auth: AH_MAXSUMSIZE is too small: siz=%lu\n",
+		    (u_long)siz));
 		return EINVAL;
 	}
 

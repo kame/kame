@@ -206,7 +206,7 @@ esp_output(m, nexthdrp, md, isr, af)
 		break;
 #endif
 	default:
-		printf("esp_output: unsupported af %d\n", af);
+		ipseclog((LOG_ERR, "esp_output: unsupported af %d\n", af));
 		return 0;	/* no change at all */
 	}
 
@@ -219,12 +219,11 @@ esp_output(m, nexthdrp, md, isr, af)
 			struct ip *ip;
 
 			ip = mtod(m, struct ip *);
-			printf("esp4_output: internal error: "
-				"sav->replay is null: "
-				"%x->%x, SPI=%u\n",
+			ipseclog((LOG_DEBUG, "esp4_output: internal error: "
+				"sav->replay is null: %x->%x, SPI=%u\n",
 				(u_int32_t)ntohl(ip->ip_src.s_addr),
 				(u_int32_t)ntohl(ip->ip_dst.s_addr),
-				(u_int32_t)ntohl(sav->spi));
+				(u_int32_t)ntohl(sav->spi)));
 			ipsecstat.out_inval++;
 			m_freem(m);
 			return EINVAL;
@@ -236,9 +235,9 @@ esp_output(m, nexthdrp, md, isr, af)
 			struct ip6_hdr *ip6;
 
 			ip6 = mtod(m, struct ip6_hdr *);
-			printf("esp6_output: internal error: "
+			ipseclog((LOG_DEBUG, "esp6_output: internal error: "
 				"sav->replay is null: SPI=%u\n",
-				(u_int32_t)ntohl(sav->spi));
+				(u_int32_t)ntohl(sav->spi)));
 			ipsec6stat.out_inval++;
 			m_freem(m);
 			return EINVAL;
@@ -287,7 +286,8 @@ esp_output(m, nexthdrp, md, isr, af)
 	for (mprev = m; mprev && mprev->m_next != md; mprev = mprev->m_next)
 		;
 	if (mprev == NULL || mprev->m_next != md) {
-		printf("esp%d_output: md is not in chain\n", afnumber);
+		ipseclog((LOG_DEBUG, "esp%d_output: md is not in chain\n",
+		    afnumber));
 		m_freem(m);
 		return EINVAL;
 	}
@@ -358,7 +358,8 @@ esp_output(m, nexthdrp, md, isr, af)
 		if (esphlen < (IP_MAXPACKET - ntohs(ip->ip_len)))
 			ip->ip_len = htons(ntohs(ip->ip_len) + esphlen);
 		else {
-			printf("IPv4 ESP output: size exceeds limit\n");
+			ipseclog((LOG_ERR,
+			    "IPv4 ESP output: size exceeds limit\n"));
 			ipsecstat.out_inval++;
 			m_freem(m);
 			error = EMSGSIZE;
@@ -382,8 +383,9 @@ esp_output(m, nexthdrp, md, isr, af)
 		if (sav->replay->count == ~0) {
 			if ((sav->flags & SADB_X_EXT_CYCSEQ) == 0) {
 				/* XXX Is it noisy ? */
-				log(LOG_AUTH, "replay counter overflowed. %s\n",
-					ipsec_logsastr(sav));
+				ipseclog((LOG_WARNING,
+				    "replay counter overflowed. %s\n",
+				    ipsec_logsastr(sav)));
 				ipsecstat.out_inval++;
 				m_freem(m);
 				return EINVAL;
@@ -460,7 +462,8 @@ esp_output(m, nexthdrp, md, isr, af)
 
 		MGET(nn, M_DONTWAIT, MT_DATA);
 		if (!nn) {
-			printf("esp%d_output: can't alloc mbuf", afnumber);
+			ipseclog((LOG_DEBUG, "esp%d_output: can't alloc mbuf",
+			    afnumber));
 			m_freem(m);
 			error = ENOBUFS;
 			goto fail;
@@ -510,7 +513,8 @@ esp_output(m, nexthdrp, md, isr, af)
 		if (extendsiz < (IP_MAXPACKET - ntohs(ip->ip_len)))
 			ip->ip_len = htons(ntohs(ip->ip_len) + extendsiz);
 		else {
-			printf("IPv4 ESP output: size exceeds limit\n");
+			ipseclog((LOG_ERR,
+			    "IPv4 ESP output: size exceeds limit\n"));
 			ipsecstat.out_inval++;
 			m_freem(m);
 			error = EMSGSIZE;
@@ -533,7 +537,7 @@ esp_output(m, nexthdrp, md, isr, af)
 	if (!algo->encrypt)
 		panic("internal error: no encrypt function");
 	if ((*algo->encrypt)(m, espoff, plen + extendsiz, sav, algo, ivlen)) {
-		printf("packet encryption failure\n");
+		ipseclog((LOG_ERR, "packet encryption failure\n"));
 		m_freem(m);
 		switch (af) {
 #ifdef INET
@@ -587,7 +591,8 @@ esp_output(m, nexthdrp, md, isr, af)
 
 		MGET(nn, M_DONTWAIT, MT_DATA);
 		if (!nn) {
-			printf("can't alloc mbuf in esp%d_output", afnumber);
+			ipseclog((LOG_DEBUG, "can't alloc mbuf in esp%d_output",
+			    afnumber));
 			m_freem(m);
 			error = ENOBUFS;
 			goto fail;
@@ -609,7 +614,8 @@ esp_output(m, nexthdrp, md, isr, af)
 		if (siz < (IP_MAXPACKET - ntohs(ip->ip_len)))
 			ip->ip_len = htons(ntohs(ip->ip_len) + siz);
 		else {
-			printf("IPv4 ESP output: size exceeds limit\n");
+			ipseclog((LOG_ERR,
+			    "IPv4 ESP output: size exceeds limit\n"));
 			ipsecstat.out_inval++;
 			m_freem(m);
 			error = EMSGSIZE;
@@ -626,9 +632,10 @@ esp_output(m, nexthdrp, md, isr, af)
     }
 
 noantireplay:
-	if (!m)
-		printf("NULL mbuf after encryption in esp%d_output", afnumber);
-	else {
+	if (!m) {
+		ipseclog((LOG_ERR,
+		    "NULL mbuf after encryption in esp%d_output", afnumber));
+	} else {
 		switch (af) {
 #ifdef INET
 		case AF_INET:
@@ -673,7 +680,7 @@ esp4_output(m, isr)
 {
 	struct ip *ip;
 	if (m->m_len < sizeof(struct ip)) {
-		printf("esp4_output: first mbuf too short\n");
+		ipseclog((LOG_DEBUG, "esp4_output: first mbuf too short\n"));
 		m_freem(m);
 		return NULL;
 	}
@@ -692,7 +699,7 @@ esp6_output(m, nexthdrp, md, isr)
 	struct ipsecrequest *isr;
 {
 	if (m->m_len < sizeof(struct ip6_hdr)) {
-		printf("esp6_output: first mbuf too short\n");
+		ipseclog((LOG_DEBUG, "esp6_output: first mbuf too short\n"));
 		m_freem(m);
 		return NULL;
 	}

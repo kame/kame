@@ -58,6 +58,7 @@
 #include <sys/errno.h>
 #include <sys/time.h>
 #include <sys/kernel.h>
+#include <sys/syslog.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -183,7 +184,8 @@ ah_none_mature(sav)
 	struct secasvar *sav;
 {
 	if (sav->sah->saidx.proto == IPPROTO_AH) {
-		printf("ah_none_mature: protocol and algorithm mismatch.\n");
+		ipseclog((LOG_ERR,
+		    "ah_none_mature: protocol and algorithm mismatch.\n"));
 		return 1;
 	}
 	return 0;
@@ -316,14 +318,15 @@ ah_keyed_sha1_mature(sav)
 	struct ah_algorithm *algo;
 
 	if (!sav->key_auth) {
-		printf("ah_keyed_sha1_mature: no key is given.\n");
+		ipseclog((LOG_ERR, "ah_keyed_sha1_mature: no key is given.\n"));
 		return 1;
 	}
 	algo = &ah_algorithms[sav->alg_auth];
 	if (sav->key_auth->sadb_key_bits < algo->keymin
 	 || algo->keymax < sav->key_auth->sadb_key_bits) {
-		printf("ah_keyed_sha1_mature: invalid key length %d.\n",
-			sav->key_auth->sadb_key_bits);
+		ipseclog((LOG_ERR,
+		    "ah_keyed_sha1_mature: invalid key length %d.\n",
+		    sav->key_auth->sadb_key_bits));
 		return 1;
 	}
 
@@ -433,14 +436,15 @@ ah_hmac_md5_mature(sav)
 	struct ah_algorithm *algo;
 
 	if (!sav->key_auth) {
-		printf("ah_hmac_md5_mature: no key is given.\n");
+		ipseclog((LOG_ERR, "ah_hmac_md5_mature: no key is given.\n"));
 		return 1;
 	}
 	algo = &ah_algorithms[sav->alg_auth];
 	if (sav->key_auth->sadb_key_bits < algo->keymin
 	 || algo->keymax < sav->key_auth->sadb_key_bits) {
-		printf("ah_hmac_md5_mature: invalid key length %d.\n",
-			sav->key_auth->sadb_key_bits);
+		ipseclog((LOG_ERR,
+		    "ah_hmac_md5_mature: invalid key length %d.\n",
+		    sav->key_auth->sadb_key_bits));
 		return 1;
 	}
 
@@ -548,14 +552,15 @@ ah_hmac_sha1_mature(sav)
 	struct ah_algorithm *algo;
 
 	if (!sav->key_auth) {
-		printf("ah_hmac_sha1_mature: no key is given.\n");
+		ipseclog((LOG_ERR, "ah_hmac_sha1_mature: no key is given.\n"));
 		return 1;
 	}
 	algo = &ah_algorithms[sav->alg_auth];
 	if (sav->key_auth->sadb_key_bits < algo->keymin
 	 || algo->keymax < sav->key_auth->sadb_key_bits) {
-		printf("ah_hmac_sha1_mature: invalid key length %d.\n",
-			sav->key_auth->sadb_key_bits);
+		ipseclog((LOG_ERR,
+		    "ah_hmac_sha1_mature: invalid key length %d.\n",
+		    sav->key_auth->sadb_key_bits));
 		return 1;
 	}
 
@@ -749,10 +754,11 @@ again:
 					break;
 				}
 				if (l <= 0 || hlen - i < l) {
-					printf("ah4_calccksum: invalid IP option "
-						"(type=%02x len=%02x)\n",
-						p[i + IPOPT_OPTVAL],
-						p[i + IPOPT_OLEN]);
+					ipseclog((LOG_ERR,
+					    "ah4_calccksum: invalid IP option "
+					    "(type=%02x len=%02x)\n",
+					    p[i + IPOPT_OPTVAL],
+					    p[i + IPOPT_OLEN]));
 					break;
 				}
 				if (skip) {
@@ -814,8 +820,8 @@ again:
 	    }
 
 	default:
-		printf("ah4_calccksum: unexpected hdrtype=%x; "
-			"treating rest as payload\n", hdrtype);
+		ipseclog((LOG_DEBUG, "ah4_calccksum: unexpected hdrtype=%x; "
+			"treating rest as payload\n", hdrtype));
 		/*fall through*/
 	case IPPROTO_ICMP:
 	case IPPROTO_IGMP:
@@ -852,7 +858,8 @@ again:
 				if (m)
 					p = mtod(m, u_char *);
 				else {
-					printf("ERR: hit the end-of-mbuf...\n");
+					ipseclog((LOG_DEBUG,
+					    "hit the end-of-mbuf...\n"));
 					p = NULL;
 				}
 			}
@@ -1089,12 +1096,12 @@ again:
 		 break;
 	 }
 	default:
-		printf("ah6_calccksum: unexpected hdrtype=%x; "
-			"treating rest as payload\n", hdrtype);
+		ipseclog((LOG_DEBUG, "ah6_calccksum: unexpected hdrtype=%x; "
+			"treating rest as payload\n", hdrtype));
 		/*fall through*/
 	case IPPROTO_ICMP:
 	case IPPROTO_IGMP:
-	case IPPROTO_IPIP:	/*?*/
+	case IPPROTO_IPIP:
 	case IPPROTO_IPV6:
 	case IPPROTO_ICMPV6:
 	case IPPROTO_UDP:
@@ -1125,7 +1132,8 @@ again:
 				if (m)
 					p = mtod(m, u_char *);
 				else {
-					printf("ERR: hit the end-of-mbuf...\n");
+					ipseclog((LOG_DEBUG,
+					    "hit the end-of-mbuf...\n"));
 					p = NULL;
 				}
 			}

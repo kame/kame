@@ -131,7 +131,7 @@ ipcomp_output(m, nexthdrp, md, isr, af)
 		break;
 #endif
 	default:
-		printf("ipcomp_output: unsupported af %d\n", af);
+		ipseclog((LOG_ERR, "ipcomp_output: unsupported af %d\n", af));
 		return 0;	/* no change at all */
 	}
 
@@ -172,7 +172,20 @@ ipcomp_output(m, nexthdrp, md, isr, af)
 	for (mprev = m; mprev && mprev->m_next != md; mprev = mprev->m_next)
 		;
 	if (mprev == NULL || mprev->m_next != md) {
-		printf("ipcomp%d_output: md is not in chain\n", afnumber);
+		ipseclog((LOG_DEBUG, "ipcomp%d_output: md is not in chain\n",
+		    afnumber));
+		switch (af) {
+#ifdef INET
+		case AF_INET:
+			ipsecstat.out_inval++;
+			break;
+#endif
+#ifdef INET6
+		case AF_INET6:
+			ipsec6stat.out_inval++;
+			break;
+#endif
+		}
 		m_freem(m);
 		m_freem(md0);
 		return EINVAL;
@@ -188,7 +201,7 @@ ipcomp_output(m, nexthdrp, md, isr, af)
 
 	/* compress data part */
 	if ((*algo->compress)(m, md, &plen) || mprev->m_next == NULL) {
-		printf("packet compression failure\n");
+		ipseclog((LOG_ERR, "packet compression failure\n"));
 		m = NULL;
 		m_freem(md0);
 		switch (af) {
@@ -205,6 +218,18 @@ ipcomp_output(m, nexthdrp, md, isr, af)
 		}
 		error = EINVAL;
 		goto fail;
+	}
+	switch (af) {
+#ifdef INET
+	case AF_INET:
+		ipsecstat.out_comphist[sav->alg_enc]++;
+		break;
+#endif
+#ifdef INET6
+	case AF_INET6:
+		ipsec6stat.out_comphist[sav->alg_enc]++;
+		break;
+#endif
 	}
 	md = mprev->m_next;
 
@@ -292,7 +317,8 @@ ipcomp_output(m, nexthdrp, md, isr, af)
 		if (compoff + complen + plen < IP_MAXPACKET)
 			ip->ip_len = htons(compoff + complen + plen);
 		else {
-			printf("IPv4 ESP output: size exceeds limit\n");
+			ipseclog((LOG_ERR,
+			    "IPv4 ESP output: size exceeds limit\n"));
 			ipsecstat.out_inval++;
 			m_freem(m);
 			error = EMSGSIZE;
@@ -309,8 +335,21 @@ ipcomp_output(m, nexthdrp, md, isr, af)
     }
 
 	if (!m) {
-		printf("NULL mbuf after compression in ipcomp%d_output",
-			afnumber);
+		ipseclog((LOG_DEBUG,
+		    "NULL mbuf after compression in ipcomp%d_output",
+		    afnumber));
+		switch (af) {
+#ifdef INET
+		case AF_INET:
+			ipsecstat.out_inval++;
+			break;
+#endif
+#ifdef INET6
+		case AF_INET6:
+			ipsec6stat.out_inval++;
+			break;
+#endif
+		}
 	} else {
 		switch (af) {
 #ifdef INET
@@ -358,7 +397,8 @@ ipcomp4_output(m, isr)
 {
 	struct ip *ip;
 	if (m->m_len < sizeof(struct ip)) {
-		printf("ipcomp4_output: first mbuf too short\n");
+		ipseclog((LOG_DEBUG, "ipcomp4_output: first mbuf too short\n"));
+		ipsecstat.out_inval++;
 		m_freem(m);
 		return NULL;
 	}
@@ -377,7 +417,8 @@ ipcomp6_output(m, nexthdrp, md, isr)
 	struct ipsecrequest *isr;
 {
 	if (m->m_len < sizeof(struct ip6_hdr)) {
-		printf("ipcomp6_output: first mbuf too short\n");
+		ipseclog((LOG_DEBUG, "ipcomp6_output: first mbuf too short\n"));
+		ipsec6stat.out_inval++;
 		m_freem(m);
 		return NULL;
 	}

@@ -46,6 +46,7 @@
 #include <sys/time.h>
 #include <sys/kernel.h>
 #include <sys/syslog.h>
+#include <sys/queue.h>
 
 #include <net/if.h>
 #include <net/route.h>
@@ -54,6 +55,7 @@
 #include <machine/cpu.h>
 
 #include <netinet6/ipcomp.h>
+#include <netinet6/ipsec.h>
 
 #include <machine/stdarg.h>
 
@@ -232,18 +234,18 @@ deflate_common(m, md, lenp, mode)
 		} else if (zerror == Z_STREAM_END)
 			break;
 		else {
-			printf("ipcomp_%scompress: %sflate: %s\n",
+			ipseclog((LOG_ERR, "ipcomp_%scompress: %sflate: %s\n",
 				mode ? "de" : "", mode ? "in" : "de",
-				zs.msg ? zs.msg : "unknown error");
+				zs.msg ? zs.msg : "unknown error"));
 			error = EINVAL;
 			goto fail;
 		}
 	}
 	zerror = mode ? inflateEnd(&zs) : deflateEnd(&zs);
 	if (zerror != Z_OK) {
-		printf("ipcomp_%scompress: %sflate: %s\n",
+		ipseclog((LOG_ERR, "ipcomp_%scompress: %sflate: %s\n",
 			mode ? "de" : "", mode ? "in" : "de",
-			zs.msg ? zs.msg : "unknown error");
+			zs.msg ? zs.msg : "unknown error"));
 		error = EINVAL;
 		goto fail;
 	}

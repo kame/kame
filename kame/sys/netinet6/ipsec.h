@@ -164,6 +164,7 @@ struct ipsecstat {
 			/* security policy violation for inbound process */
 	u_quad_t in_nosa;     /* inbound SA is unavailable */
 	u_quad_t in_inval;    /* inbound processing failed due to EINVAL */
+	u_quad_t in_nomem;    /* inbound processing failed due to ENOBUFS */
 	u_quad_t in_badspi;   /* failed getting a SPI */
 	u_quad_t in_ahreplay; /* AH replay check failed */
 	u_quad_t in_espreplay; /* ESP replay check failed */
@@ -171,16 +172,19 @@ struct ipsecstat {
 	u_quad_t in_ahauthfail; /* AH authentication failure */
 	u_quad_t in_espauthsucc; /* ESP authentication success */
 	u_quad_t in_espauthfail; /* ESP authentication failure */
-	u_quad_t in_esphist[SADB_EALG_MAX];
-	u_quad_t in_ahhist[SADB_AALG_MAX];
+	u_quad_t in_esphist[256];
+	u_quad_t in_ahhist[256];
+	u_quad_t in_comphist[256];
 	u_quad_t out_success; /* succeeded outbound process */
 	u_quad_t out_polvio; 
 			/* security policy violation for outbound process */
 	u_quad_t out_nosa;    /* outbound SA is unavailable */
 	u_quad_t out_inval;   /* outbound process failed due to EINVAL */
+	u_quad_t out_nomem;    /* inbound processing failed due to ENOBUFS */
 	u_quad_t out_noroute; /* there is no route */
-	u_quad_t out_esphist[SADB_EALG_MAX];
-	u_quad_t out_ahhist[SADB_AALG_MAX];
+	u_quad_t out_esphist[256];
+	u_quad_t out_ahhist[256];
+	u_quad_t out_comphist[256];
 };
 
 /*
@@ -200,7 +204,8 @@ struct ipsecstat {
 #define	IPSECCTL_AH_OFFSETMASK		9
 #define	IPSECCTL_DFBIT			10
 #define	IPSECCTL_ECN			11
-#define IPSECCTL_MAXID			12
+#define	IPSECCTL_DEBUG			12
+#define IPSECCTL_MAXID			13
 
 #define IPSECCTL_NAMES { \
 	{ 0, 0 }, \
@@ -215,6 +220,7 @@ struct ipsecstat {
 	{ "ah_offsetmask", CTLTYPE_INT }, \
 	{ "dfbit", CTLTYPE_INT }, \
 	{ "ecn", CTLTYPE_INT }, \
+	{ "debug", CTLTYPE_INT }, \
 }
 
 #define IPSEC6CTL_NAMES { \
@@ -230,6 +236,7 @@ struct ipsecstat {
 	{ 0, 0 }, \
 	{ 0, 0 }, \
 	{ "ecn", CTLTYPE_INT }, \
+	{ "debug", CTLTYPE_INT }, \
 }
 
 #define IPSECCTL_VARS { \
@@ -245,6 +252,7 @@ struct ipsecstat {
 	&ip4_ah_offsetmask, \
 	&ip4_ipsec_dfbit, \
 	&ip4_ipsec_ecn, \
+	&ipsec_debug, \
 }
 
 #define IPSEC6CTL_VARS { \
@@ -260,6 +268,7 @@ struct ipsecstat {
 	0, \
 	0, \
 	&ip6_ipsec_ecn, \
+	&ipsec_debug, \
 }
 
 #ifdef _KERNEL
@@ -269,6 +278,9 @@ struct ipsec_output_state {
 	struct sockaddr *dst;
 };
 
+extern int ipsec_debug;
+
+#ifdef INET
 extern struct ipsecstat ipsecstat;
 extern struct secpolicy ip4_def_policy;
 extern int ip4_esp_trans_deflev;
@@ -280,6 +292,7 @@ extern int ip4_ah_cleartos;
 extern int ip4_ah_offsetmask;
 extern int ip4_ipsec_dfbit;
 extern int ip4_ipsec_ecn;
+#endif
 
 #ifdef INET6
 extern struct ipsecstat ipsec6stat;
@@ -291,6 +304,8 @@ extern int ip6_ah_net_deflev;
 extern int ip6_inbound_call_ike;
 extern int ip6_ipsec_ecn;
 #endif
+
+#define ipseclog(x)	do { if (ipsec_debug) log x; } while (0)
 
 extern struct secpolicy *ipsec4_getpolicybysock
 	__P((struct mbuf *, u_int, struct socket *, int *));

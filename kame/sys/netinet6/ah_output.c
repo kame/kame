@@ -164,12 +164,11 @@ ah4_output(m, isr)
 		struct ip *ip;
 
 		ip = mtod(m, struct ip *);
-		printf("ah4_output: internal error: "
-			"sav->replay is null: "
-			"%x->%x, SPI=%u\n",
+		ipseclog((LOG_DEBUG, "ah4_output: internal error: "
+			"sav->replay is null: %x->%x, SPI=%u\n",
 			(u_int32_t)ntohl(ip->ip_src.s_addr),
 			(u_int32_t)ntohl(ip->ip_dst.s_addr),
-			(u_int32_t)ntohl(sav->spi));
+			(u_int32_t)ntohl(sav->spi)));
 		ipsecstat.out_inval++;
 		m_freem(m);
 		return EINVAL;
@@ -207,7 +206,8 @@ ah4_output(m, isr)
 		struct mbuf *n;
 		MGET(n, M_DONTWAIT, MT_DATA);
 		if (!n) {
-			printf("ENOBUFS in ah4_output %d\n", __LINE__);
+			ipseclog((LOG_DEBUG, "ENOBUFS in ah4_output %d\n",
+			    __LINE__));
 			m_freem(m);
 			return ENOBUFS;
 		}
@@ -250,8 +250,9 @@ ah4_output(m, isr)
 		if (sav->replay->count == ~0) {
 			if ((sav->flags & SADB_X_EXT_CYCSEQ) == 0) {
 				/* XXX Is it noisy ? */
-				log(LOG_AUTH, "replay counter overflowed. %s\n",
-					ipsec_logsastr(sav));
+				ipseclog((LOG_WARNING,
+				    "replay counter overflowed. %s\n",
+				    ipsec_logsastr(sav)));
 				ipsecstat.out_inval++;
 				m_freem(m);
 				return EINVAL;
@@ -273,7 +274,7 @@ ah4_output(m, isr)
 	if (ahlen < (IP_MAXPACKET - ntohs(ip->ip_len)))
 		ip->ip_len = htons(ntohs(ip->ip_len) + ahlen);
 	else {
-		printf("IPv4 AH output: size exceeds limit\n");
+		ipseclog((LOG_ERR, "IPv4 AH output: size exceeds limit\n"));
 		ipsecstat.out_inval++;
 		m_freem(m);
 		return EMSGSIZE;
@@ -298,7 +299,8 @@ ah4_output(m, isr)
 	 */
 	error = ah4_calccksum(m, (caddr_t)ahsumpos, algo, sav);
 	if (error) {
-		printf("error after ah4_calccksum, called from ah4_output");
+		ipseclog((LOG_ERR,
+		    "error after ah4_calccksum, called from ah4_output"));
 		m = NULL;
 		ipsecstat.out_inval++;
 		return error;
@@ -360,7 +362,7 @@ ah6_output(m, nexthdrp, md, isr)
 	struct ip6_hdr *ip6;
 
 	if (m->m_len < sizeof(struct ip6_hdr)) {
-		printf("ah6_output: first mbuf too short\n");
+		ipseclog((LOG_DEBUG, "ah6_output: first mbuf too short\n"));
 		m_freem(m);
 		return EINVAL;
 	}
@@ -372,7 +374,7 @@ ah6_output(m, nexthdrp, md, isr)
 	for (mprev = m; mprev && mprev->m_next != md; mprev = mprev->m_next)
 		;
 	if (!mprev || mprev->m_next != md) {
-		printf("ah6_output: md is not in chain\n");
+		ipseclog((LOG_DEBUG, "ah6_output: md is not in chain\n"));
 		m_freem(m);
 		return EINVAL;
 	}
@@ -397,7 +399,8 @@ ah6_output(m, nexthdrp, md, isr)
 
 	/* fix plen */
 	if (m->m_pkthdr.len - sizeof(struct ip6_hdr) > IPV6_MAXPACKET) {
-		printf("ip6_output: AH with IPv6 jumbogram is not supported\n");
+		ipseclog((LOG_ERR,
+		    "ip6_output: AH with IPv6 jumbogram is not supported\n"));
 		m_freem(m);
 		return EINVAL;
 	}
@@ -405,9 +408,9 @@ ah6_output(m, nexthdrp, md, isr)
 	ip6->ip6_plen = htons(m->m_pkthdr.len - sizeof(struct ip6_hdr));
 
 	if ((sav->flags & SADB_X_EXT_OLD) == 0 && !sav->replay) {
-		printf("ah6_output: internal error: "
+		ipseclog((LOG_DEBUG, "ah6_output: internal error: "
 			"sav->replay is null: SPI=%u\n",
-			(u_int32_t)ntohl(sav->spi));
+			(u_int32_t)ntohl(sav->spi)));
 		ipsec6stat.out_inval++;
 		return 0;	/* no change at all */
 	}
@@ -442,8 +445,9 @@ ah6_output(m, nexthdrp, md, isr)
 		if (sav->replay->count == ~0) {
 			if ((sav->flags & SADB_X_EXT_CYCSEQ) == 0) {
 				/* XXX Is it noisy ? */
-				log(LOG_AUTH, "replay counter overflowed. %s\n",
-					ipsec_logsastr(sav));
+				ipseclog((LOG_WARNING,
+				    "replay counter overflowed. %s\n",
+				    ipsec_logsastr(sav)));
 				ipsecstat.out_inval++;
 				m_freem(m);
 				return EINVAL;
@@ -498,7 +502,8 @@ ah4_finaldst(m)
 	hlen = (ip->ip_hl << 2);
 
 	if (m->m_len < hlen) {
-		printf("ah4_finaldst: parameter mbuf wrong (not pulled up)\n");
+		ipseclog((LOG_DEBUG,
+		    "ah4_finaldst: parameter mbuf wrong (not pulled up)\n"));
 		return NULL;
 	}
 
@@ -507,7 +512,8 @@ ah4_finaldst(m)
 
 	optlen = hlen - sizeof(struct ip);
 	if (optlen < 0) {
-		printf("ah4_finaldst: wrong optlen %d\n", optlen);
+		ipseclog((LOG_DEBUG, "ah4_finaldst: wrong optlen %d\n",
+		    optlen));
 		return NULL;
 	}
 
@@ -525,9 +531,10 @@ ah4_finaldst(m)
 		case IPOPT_SSRR:
 			if (q[i + IPOPT_OLEN] <= 0
 			 || optlen - i < q[i + IPOPT_OLEN]) {
-				printf("ip_finaldst: invalid IP option "
-					"(code=%02x len=%02x)\n",
-					q[i + IPOPT_OPTVAL], q[i + IPOPT_OLEN]);
+				ipseclog((LOG_ERR,
+				    "ip_finaldst: invalid IP option "
+				    "(code=%02x len=%02x)\n",
+				    q[i + IPOPT_OPTVAL], q[i + IPOPT_OLEN]));
 				return NULL;
 			}
 			i += q[i + IPOPT_OLEN] - sizeof(struct in_addr);
@@ -535,9 +542,10 @@ ah4_finaldst(m)
 		default:
 			if (q[i + IPOPT_OLEN] <= 0
 			 || optlen - i < q[i + IPOPT_OLEN]) {
-				printf("ip_finaldst: invalid IP option "
-					"(code=%02x len=%02x)\n",
-					q[i + IPOPT_OPTVAL], q[i + IPOPT_OLEN]);
+				ipseclog((LOG_ERR,
+				    "ip_finaldst: invalid IP option "
+				    "(code=%02x len=%02x)\n",
+				    q[i + IPOPT_OPTVAL], q[i + IPOPT_OLEN]));
 				return NULL;
 			}
 			i += q[i + IPOPT_OLEN];

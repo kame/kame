@@ -116,8 +116,8 @@ ah4_input(m, va_alist)
 	if (m->m_len < off + sizeof(struct newah)) {
 		m = m_pullup(m, off + sizeof(struct newah));
 		if (!m) {
-			printf("IPv4 AH input: can't pullup;"
-				"dropping the packet for simplicity\n");
+			ipseclog((LOG_DEBUG, "IPv4 AH input: can't pullup;"
+				"dropping the packet for simplicity\n"));
 			ipsecstat.in_inval++;
 			goto fail;
 		}
@@ -129,8 +129,8 @@ ah4_input(m, va_alist)
 	ip = mtod(m, struct ip *);
 	IP6_EXTHDR_GET(ah, struct ah *, m, off, sizeof(struct newah));
 	if (ah == NULL) {
-		printf("IPv4 AH input: can't pullup;"
-			"dropping the packet for simplicity\n");
+		ipseclog((LOG_DEBUG, "IPv4 AH input: can't pullup;"
+			"dropping the packet for simplicity\n"));
 		ipsecstat.in_inval++;
 		goto fail;
 	}
@@ -148,9 +148,9 @@ ah4_input(m, va_alist)
 	if ((sav = key_allocsa(AF_INET,
 	                      (caddr_t)&ip->ip_src, (caddr_t)&ip->ip_dst,
 	                      IPPROTO_AH, spi)) == 0) {
-		printf("IPv4 AH input: no key association found for spi %u;"
-			"dropping the packet for simplicity\n",
-			(u_int32_t)ntohl(spi));
+		ipseclog((LOG_WARNING,
+		    "IPv4 AH input: no key association found for spi %u\n",
+		    (u_int32_t)ntohl(spi)));
 		ipsecstat.in_nosa++;
 		goto fail;
 	}
@@ -158,17 +158,16 @@ ah4_input(m, va_alist)
 		printf("DP ah4_input called to allocate SA:%p\n", sav));
 	if (sav->state != SADB_SASTATE_MATURE
 	 && sav->state != SADB_SASTATE_DYING) {
-		printf("IPv4 AH input: non-mature/dying SA found for spi %u; "
-			"dropping the packet for simplicity\n",
-			(u_int32_t)ntohl(spi));
+		ipseclog((LOG_DEBUG,
+		    "IPv4 AH input: non-mature/dying SA found for spi %u\n",
+		    (u_int32_t)ntohl(spi)));
 		ipsecstat.in_badspi++;
 		goto fail;
 	}
 	if (sav->alg_auth == SADB_AALG_NONE) {
-		printf("IPv4 AH input: unspecified authentication algorithm "
-			"for spi %u;"
-			"dropping the packet for simplicity\n",
-			(u_int32_t)ntohl(spi));
+		ipseclog((LOG_DEBUG, "IPv4 AH input: "
+		    "unspecified authentication algorithm for spi %u\n",
+		    (u_int32_t)ntohl(spi)));
 		ipsecstat.in_badspi++;
 		goto fail;
 	}
@@ -187,10 +186,10 @@ ah4_input(m, va_alist)
 	sizoff = (sav->flags & SADB_X_EXT_OLD) ? 0 : 4;
 
 	if ((ah->ah_len << 2) - sizoff != siz1) {
-		log(LOG_NOTICE, "sum length mismatch in IPv4 AH input "
+		ipseclog((LOG_NOTICE, "sum length mismatch in IPv4 AH input "
 			"(%d should be %u): %s\n",
 			(ah->ah_len << 2) - sizoff, (unsigned int)siz1,
-			ipsec4_logpacketstr(ip, spi));
+			ipsec4_logpacketstr(ip, spi)));
 		ipsecstat.in_inval++;
 		goto fail;
 	}
@@ -199,8 +198,7 @@ ah4_input(m, va_alist)
 	if (m->m_len < off + sizeof(struct ah) + sizoff + siz1) {
 		m = m_pullup(m, off + sizeof(struct ah) + sizoff + siz1);
 		if (!m) {
-			printf("IPv4 AH input: can't pullup;"
-				"dropping the packet for simplicity\n");
+			ipseclog((LOG_DEBUG, "IPv4 AH input: can't pullup\n"));
 			ipsecstat.in_inval++;
 			goto fail;
 		}
@@ -212,8 +210,7 @@ ah4_input(m, va_alist)
 	IP6_EXTHDR_GET(ah, struct ah *, m, off,
 		sizeof(struct ah) + sizoff + siz1);
 	if (ah == NULL) {
-		printf("IPv4 AH input: can't pullup;"
-			"dropping the packet for simplicity\n");
+		ipseclog((LOG_DEBUG, "IPv4 AH input: can't pullup\n"));
 		ipsecstat.in_inval++;
 		goto fail;
 	}
@@ -228,9 +225,9 @@ ah4_input(m, va_alist)
 			; /*okey*/
 		else {
 			ipsecstat.in_ahreplay++;
-			log(LOG_AUTH, "replay packet in IPv4 AH input: %s %s\n",
-				ipsec4_logpacketstr(ip, spi),
-				ipsec_logsastr(sav));
+			ipseclog((LOG_WARNING,
+			    "replay packet in IPv4 AH input: %s %s\n",
+			    ipsec4_logpacketstr(ip, spi), ipsec_logsastr(sav)));
 			goto fail;
 		}
 	}
@@ -241,7 +238,8 @@ ah4_input(m, va_alist)
 	 */
 	cksum = malloc(siz1, M_TEMP, M_NOWAIT);
 	if (!cksum) {
-		printf("IPv4 AH input: couldn't alloc temporary region for cksum\n");
+		ipseclog((LOG_DEBUG, "IPv4 AH input: "
+		    "couldn't alloc temporary region for cksum\n"));
 		ipsecstat.in_inval++;
 		goto fail;
 	}
@@ -292,9 +290,9 @@ ah4_input(m, va_alist)
 	}
 
 	if (bcmp(sumpos, cksum, siz) != 0) {
-		log(LOG_AUTH, "checksum mismatch in IPv4 AH input: %s %s\n",
-			ipsec4_logpacketstr(ip, spi),
-			ipsec_logsastr(sav));
+		ipseclog((LOG_WARNING,
+		    "checksum mismatch in IPv4 AH input: %s %s\n",
+		    ipsec4_logpacketstr(ip, spi), ipsec_logsastr(sav)));
 		free(cksum, M_TEMP);
 		ipsecstat.in_ahauthfail++;
 		goto fail;
@@ -321,8 +319,8 @@ ah4_input(m, va_alist)
 			m = m_pullup(m, off + sizeof(struct ah)
 					+ sizoff + siz1 + hlen);
 			if (!m) {
-				printf("IPv4 AH input: can't pullup;"
-					"dropping the packet for simplicity\n");
+				ipseclog((LOG_DEBUG,
+				    "IPv4 AH input: can't pullup\n"));
 				ipsecstat.in_inval++;
 				goto fail;
 			}
@@ -346,15 +344,14 @@ ah4_input(m, va_alist)
 	if (m->m_flags & M_AUTHIPHDR
 	 && m->m_flags & M_AUTHIPDGM) {
 #if 0
-		printf("IPv4 AH input: authentication succeess\n");
-#else
-		;
+		ipseclog((LOG_DEBUG,
+		    "IPv4 AH input: authentication succeess\n"));
 #endif
 		ipsecstat.in_ahauthsucc++;
 	} else {
-		log(LOG_AUTH, "authentication failed in IPv4 AH input: %s %s\n",
-			ipsec4_logpacketstr(ip, spi),
-			ipsec_logsastr(sav));
+		ipseclog((LOG_WARNING,
+		    "authentication failed in IPv4 AH input: %s %s\n",
+		    ipsec4_logpacketstr(ip, spi), ipsec_logsastr(sav)));
 		ipsecstat.in_ahauthfail++;
 		goto fail;
 	}
@@ -402,9 +399,9 @@ ah4_input(m, va_alist)
 		ip_ecn_egress(ip4_ipsec_ecn, &tos, &ip->ip_tos);
 		if (!key_checktunnelsanity(sav, AF_INET,
 			    (caddr_t)&ip->ip_src, (caddr_t)&ip->ip_dst)) {
-			log(LOG_NOTICE, "ipsec tunnel address mismatch in IPv4 AH input: %s %s\n",
-				ipsec4_logpacketstr(ip, spi),
-				ipsec_logsastr(sav));
+			ipseclog((LOG_NOTICE, "ipsec tunnel address mismatch "
+			    "in IPv4 AH input: %s %s\n",
+			    ipsec4_logpacketstr(ip, spi), ipsec_logsastr(sav)));
 			ipsecstat.in_inval++;
 			goto fail;
 		}
@@ -543,8 +540,7 @@ ah6_input(mp, offp, proto)
 #else
 	IP6_EXTHDR_GET(ah, struct ah *, m, off, sizeof(struct newah));
 	if (ah == NULL) {
-		printf("IPv6 AH input: can't pullup;"
-			"dropping the packet for simplicity\n");
+		ipseclog((LOG_DEBUG, "IPv6 AH input: can't pullup\n"));
 		ipsecstat.in_inval++;
 		return IPPROTO_DONE;
 	}
@@ -556,7 +552,8 @@ ah6_input(mp, offp, proto)
 	spi = ah->ah_spi;
 
 	if (ntohs(ip6->ip6_plen) == 0) {
-		printf("IPv6 AH input: AH with IPv6 jumbogram is not supported.\n");
+		ipseclog((LOG_ERR, "IPv6 AH input: "
+		    "AH with IPv6 jumbogram is not supported.\n"));
 		ipsec6stat.in_inval++;
 		goto fail;
 	}
@@ -564,9 +561,9 @@ ah6_input(mp, offp, proto)
 	if ((sav = key_allocsa(AF_INET6,
 	                      (caddr_t)&ip6->ip6_src, (caddr_t)&ip6->ip6_dst,
 	                      IPPROTO_AH, spi)) == 0) {
-		printf("IPv6 AH input: no key association found for spi %u;"
-			"dropping the packet for simplicity\n",
-			(u_int32_t)ntohl(spi));
+		ipseclog((LOG_WARNING,
+		    "IPv6 AH input: no key association found for spi %u\n",
+		    (u_int32_t)ntohl(spi)));
 		ipsec6stat.in_nosa++;
 		goto fail;
 	}
@@ -574,17 +571,16 @@ ah6_input(mp, offp, proto)
 		printf("DP ah6_input called to allocate SA:%p\n", sav));
 	if (sav->state != SADB_SASTATE_MATURE
 	 && sav->state != SADB_SASTATE_DYING) {
-		printf("IPv6 AH input: non-mature/dying SA found for spi %u; "
-			"dropping the packet for simplicity\n",
-			(u_int32_t)ntohl(spi));
+		ipseclog((LOG_DEBUG,
+		    "IPv6 AH input: non-mature/dying SA found for spi %u; ",
+		    (u_int32_t)ntohl(spi)));
 		ipsec6stat.in_badspi++;
 		goto fail;
 	}
 	if (sav->alg_auth == SADB_AALG_NONE) {
-		printf("IPv6 AH input: unspecified authentication algorithm "
-			"for spi %u;"
-			"dropping the packet for simplicity\n",
-			(u_int32_t)ntohl(spi));
+		ipseclog((LOG_DEBUG, "IPv6 AH input: "
+		    "unspecified authentication algorithm for spi %u\n",
+		    (u_int32_t)ntohl(spi)));
 		ipsec6stat.in_badspi++;
 		goto fail;
 	}
@@ -603,10 +599,10 @@ ah6_input(mp, offp, proto)
 	sizoff = (sav->flags & SADB_X_EXT_OLD) ? 0 : 4;
 
 	if ((ah->ah_len << 2) - sizoff != siz1) {
-		log(LOG_NOTICE, "sum length mismatch in IPv6 AH input "
+		ipseclog((LOG_NOTICE, "sum length mismatch in IPv6 AH input "
 			"(%d should be %u): %s\n",
 			(ah->ah_len << 2) - sizoff, (unsigned int)siz1,
-			ipsec6_logpacketstr(ip6, spi));
+			ipsec6_logpacketstr(ip6, spi)));
 		ipsec6stat.in_inval++;
 		goto fail;
 	}
@@ -616,7 +612,7 @@ ah6_input(mp, offp, proto)
 	IP6_EXTHDR_GET(ah, struct ah *, m, off,
 		sizeof(struct ah) + sizoff + siz1);
 	if (ah == NULL) {
-		log(LOG_NOTICE, "couldn't pullup gather IPv6 AH checksum part");
+		ipseclog((LOG_NOTICE, "couldn't pullup gather IPv6 AH checksum part");
 		ipsecstat.in_inval++;
 		m = NULL;
 		goto fail;
@@ -632,9 +628,10 @@ ah6_input(mp, offp, proto)
 			; /*okey*/
 		else {
 			ipsec6stat.in_ahreplay++;
-			log(LOG_AUTH, "replay packet in IPv6 AH input: %s %s\n",
-				ipsec6_logpacketstr(ip6, spi),
-				ipsec_logsastr(sav));
+			ipseclog((LOG_WARNING,
+			    "replay packet in IPv6 AH input: %s %s\n",
+			    ipsec6_logpacketstr(ip6, spi),
+			    ipsec_logsastr(sav)));
 			goto fail;
 		}
 	}
@@ -645,7 +642,8 @@ ah6_input(mp, offp, proto)
 	 */
 	cksum = malloc(siz1, M_TEMP, M_NOWAIT);
 	if (!cksum) {
-		printf("IPv6 AH input: couldn't alloc temporary region for cksum\n");
+		ipseclog((LOG_DEBUG, "IPv6 AH input: "
+		    "couldn't alloc temporary region for cksum\n"));
 		ipsec6stat.in_inval++;
 		goto fail;
 	}
@@ -669,9 +667,9 @@ ah6_input(mp, offp, proto)
 	}
 
 	if (bcmp(sumpos, cksum, siz) != 0) {
-		log(LOG_AUTH, "checksum mismatch in IPv6 AH input: %s %s\n",
-			ipsec6_logpacketstr(ip6, spi),
-			ipsec_logsastr(sav));
+		ipseclog((LOG_WARNING,
+		    "checksum mismatch in IPv6 AH input: %s %s\n",
+		    ipsec6_logpacketstr(ip6, spi), ipsec_logsastr(sav)));
 		free(cksum, M_TEMP);
 		ipsec6stat.in_ahauthfail++;
 		goto fail;
@@ -715,15 +713,14 @@ ah6_input(mp, offp, proto)
 	if (m->m_flags & M_AUTHIPHDR
 	 && m->m_flags & M_AUTHIPDGM) {
 #if 0
-		printf("IPv6 AH input: authentication succeess\n");
-#else
-		;
+		ipseclog((LOG_DEBUG,
+		    "IPv6 AH input: authentication succeess\n"));
 #endif
 		ipsec6stat.in_ahauthsucc++;
 	} else {
-		log(LOG_AUTH, "authentication failed in IPv6 AH input: %s %s\n",
-			ipsec6_logpacketstr(ip6, spi),
-			ipsec_logsastr(sav));
+		ipseclog((LOG_WARNING,
+		    "authentication failed in IPv6 AH input: %s %s\n",
+		    ipsec6_logpacketstr(ip6, spi), ipsec_logsastr(sav)));
 		ipsec6stat.in_ahauthfail++;
 		goto fail;
 	}
@@ -775,9 +772,10 @@ ah6_input(mp, offp, proto)
 		ip6_ecn_egress(ip6_ipsec_ecn, &flowinfo, &ip6->ip6_flow);
 		if (!key_checktunnelsanity(sav, AF_INET6,
 			    (caddr_t)&ip6->ip6_src, (caddr_t)&ip6->ip6_dst)) {
-			log(LOG_NOTICE, "ipsec tunnel address mismatch in IPv6 AH input: %s %s\n",
-				ipsec6_logpacketstr(ip6, spi),
-				ipsec_logsastr(sav));
+			ipseclog((LOG_NOTICE, "ipsec tunnel address mismatch "
+			    "in IPv6 AH input: %s %s\n",
+			    ipsec6_logpacketstr(ip6, spi),
+			    ipsec_logsastr(sav)));
 			ipsec6stat.in_inval++;
 			goto fail;
 		}
