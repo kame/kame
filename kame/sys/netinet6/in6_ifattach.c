@@ -84,6 +84,10 @@ laddr_to_eui64(dst, src, len)
 	u_int8_t *src;
 	size_t len;
 {
+	static u_int8_t zero[8];
+
+	bzero(zero, sizeof(zero));
+
 	switch (len) {
 	case 1:
 		bzero(dst, 7);
@@ -92,6 +96,8 @@ laddr_to_eui64(dst, src, len)
 		dst[0] |= 0x02;
 		break;
 	case 6:
+		if (bcmp(zero, src, 6) == 0)
+			return EINVAL;
 		dst[0] = src[0];
 		dst[1] = src[1];
 		dst[2] = src[2];
@@ -102,6 +108,8 @@ laddr_to_eui64(dst, src, len)
 		dst[7] = src[5];
 		break;
 	case 8:
+		if (bcmp(zero, src, 8) == 0)
+			return EINVAL;
 		bcopy(src, dst, len);
 		break;
 	default:
