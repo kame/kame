@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.35 2000/01/13 23:57:08 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.36 2000/01/14 00:24:43 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -1084,7 +1084,7 @@ cmpproposal(p1, p2)
 			goto fail;
 		break;
 	case IPSECDOI_PROTO_IPCOMP:
-		if (p1->comptype == p2->comptype)
+		if (p1->comptype != p2->comptype)
 			goto fail;
 		break;
 	default:
