@@ -76,7 +76,6 @@
 #include <netinet/ip6.h>
 #include <netinet6/ip6_var.h>
 #include <netinet6/in6_gif.h>
-#include <netinet6/in6_ifattach.h>
 #endif /* INET6 */
 
 #include <net/if_gif.h>
@@ -397,15 +396,6 @@ gif_ioctl(ifp, cmd, data)
 #ifdef INET6
 	case SIOCSIFPHYADDR_IN6:
 #endif /* INET6 */
-#ifdef INET6
-		if (found_first_ifid) 
-			in6_ifattach(ifp, IN6_IFT_P2P, NULL, 1);
-		else {
-			error = ENXIO; /* xxx */
-			goto bad;
-		}
-#endif /* INET6 */
-
 		switch (ifr->ifr_addr.sa_family) {
 #ifdef INET
 		case AF_INET:
