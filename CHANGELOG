@@ -1,7 +1,20 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2076 2002/02/14 05:35:46 jinmei Exp $
+$KAME: CHANGELOG,v 1.2077 2002/02/17 15:12:01 fujisawa Exp $
 
 <200202>
+2002-02-18 Shin'ichi Fujisawa	<fujisawa@kame.net>
+	* kame/sys/netinet6/natpt_*.[ch]:
+	* kame/kame/natptconfig/*.[chly58]:
+	- About natptcofig command
+	  - Add "-q" option to suppress error message.
+	  - Change it to return non ZERO value when detects syntax error.
+	- NAT-PT rule has rule number.
+	  You can omit rule number when setting NAT-PT.  In this case,
+	  behaviour of natptconfig command is same as previous.
+	  Rules can be deleted individually; Rule number can be
+	  renumbered;
+	- see natptconfig(8) and natpt.conf(5) for more detail.
+
 2002-02-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_input.c (ip6_input): cleanup; removed a
 	duplicated check for mapped source or destination addresses.
