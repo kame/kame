@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2539 2004/02/02 15:24:34 suz Exp $
+$KAME: CHANGELOG,v 1.2540 2004/02/03 07:27:50 itojun Exp $
 
 <200402>
+Tue Feb  3 16:26:08 JST 2004  itojun@iijlab.net
+	* sys: move away from in6_{get,set}pktaddrs framework, go back to
+	  embedded scopeid in s6_addr16[1].  this is to make *BSD merge easier.
+
+	  for now MLDv2, MIP6, SCTP, DCCP, non-netbsd are broken.
+
 2004-02-02  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/netinet6/in6_msf.[ch], ip6_output.c: sync with 
 	mldv2-20031021 to prohibit improper MSF delta-API call.
