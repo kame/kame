@@ -5611,6 +5611,14 @@ done:
 
 	/* XXX handle IPv6 options, if not allowed. not implemented. */
 
+	/* tag all packets, not just the first one */
+	if (action == PF_PASS && s != NULL && r->tag) {
+		if (pf_tag_packet(m, NULL, r->tag)) {
+			REASON_SET(&reason, PFRES_MEMORY);
+			action = PF_DROP;
+		}
+	}
+
 #ifdef ALTQ
 	if (action == PF_PASS && r->qid) {
 		struct m_tag	*mtag;
