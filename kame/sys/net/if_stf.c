@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.28 2000/04/12 16:38:11 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.29 2000/04/14 08:29:15 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -199,19 +199,21 @@ stfattach(dummy)
 	for (i = 0; i < nstf; i++) {
 		sc = &stf[i];
 		bzero(sc, sizeof(*sc));
-
-		p = encap_attach_func(AF_INET, IPPROTO_IPV6, stf_encapcheck,
-		    &in_stf_protosw, sc);
-		if (p == NULL)
-			continue;
-		sc->encap_cookie = p;
-
 #if defined(__NetBSD__) || defined(__OpenBSD__)
 		sprintf(sc->sc_if.if_xname, "stf%d", i);
 #else
 		sc->sc_if.if_name = "stf";
 		sc->sc_if.if_unit = i;
 #endif
+
+		p = encap_attach_func(AF_INET, IPPROTO_IPV6, stf_encapcheck,
+		    &in_stf_protosw, sc);
+		if (p == NULL) {
+			printf("%s: attach failed\n", if_name(&sc->sc_if));
+			continue;
+		}
+		sc->encap_cookie = p;
+
 		sc->sc_if.if_mtu    = IPV6_MMTU;
 		sc->sc_if.if_flags  = 0;
 		sc->sc_if.if_ioctl  = stf_ioctl;
