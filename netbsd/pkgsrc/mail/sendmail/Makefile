@@ -3,7 +3,7 @@
 # Date created:		1 Oct 1997
 # Whom:			itojun@itojun.org
 #
-# $Id: Makefile,v 1.2 1999/10/12 05:29:08 itojun Exp $
+# $Id: Makefile,v 1.3 1999/11/02 04:18:38 itojun Exp $
 #
 
 DISTNAME=	sendmail.${SENDMAILVER}
@@ -20,9 +20,9 @@ PATCH_SITES=	${MASTER_SITES}
 PATCHFILES+=	sendmail${WIDEPATCHVER}.patch.gz
 
 # ipsec hack
-MASTER_SITES+=	ftp://ftp.kame.net/pub/kame/misc/
-IPSECHACK=	sendmail.893+W3.2.kame-ipsec.19990521.diff.gz
-DISTFILES+=	${IPSECHACK}
+#MASTER_SITES+=	ftp://ftp.kame.net/pub/kame/misc/
+#IPSECHACK=	sendmail.893+W3.2.kame-ipsec.19990521.diff.gz
+#DISTFILES+=	${IPSECHACK}
 
 MAINTAINER=	itojun@itojun.org
 
