@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.78 2001/01/21 03:45:00 jinmei Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.79 2001/01/21 03:58:43 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -617,7 +617,7 @@ in6_ifattach_addaddr(ifp, ia)
 static int
 in6_ifattach_linklocal(ifp, altifp)
 	struct ifnet *ifp;
-	struct ifnet *altifp;	/*secondary EUI64 source*/
+	struct ifnet *altifp;	/* secondary EUI64 source */
 {
 	struct in6_ifaddr *ia;
 
