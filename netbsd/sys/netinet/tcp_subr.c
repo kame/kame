@@ -768,7 +768,7 @@ tcp_respond(tp, template, m, th0, ack, seq, flags)
 	}
 	switch (family) {
 	case AF_INET:
-		if (ip_mtudisc != 0 && (rt->rt_rmx.rmx_locks & RTV_MTU) == 0)
+		if (tp && tp->t_mtudisc && (rt->rt_rmx.rmx_locks & RTV_MTU) == 0)
 			ip->ip_off |= IP_DF;
 
 		error = ip_output(m, NULL, ro, 0, NULL);
@@ -854,10 +854,13 @@ tcp_newtcpcb(family, aux)
 	switch (family) {
 	case PF_INET:
 		tp->t_inpcb = (struct inpcb *)aux;
+		tp->t_mtudisc = ip_mtudisc;
 		break;
 #ifdef INET6
 	case PF_INET6:
 		tp->t_in6pcb = (struct in6pcb *)aux;
+		/* for IPv6, always try to run path MTU discovery */
+		tp->t_mtudisc = 1;
 		break;
 #endif
 	}
@@ -1341,7 +1344,7 @@ tcp_ctlinput(cmd, sa, v)
 		notify = tcp_quench;
 	else if (PRC_IS_REDIRECT(cmd))
 		notify = in_rtchange, ip = 0;
-	else if (cmd == PRC_MSGSIZE && ip_mtudisc)
+	else if (cmd == PRC_MSGSIZE)
 		notify = tcp_mtudisc, ip = 0;
 	else if (cmd == PRC_HOSTDEAD)
 		ip = 0;

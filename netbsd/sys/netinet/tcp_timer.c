@@ -336,7 +336,7 @@ tcp_timers(tp, timer)
 		TCPT_RANGESET(tp->t_rxtcur, rto * tcp_backoff[tp->t_rxtshift],
 		    tp->t_rttmin, TCPTV_REXMTMAX);
 		TCP_TIMER_ARM(tp, TCPT_REXMT, tp->t_rxtcur);
-#if 0
+
 		/* 
 		 * If we are losing and we are trying path MTU discovery,
 		 * try turning it off.  This will avoid black holes in
@@ -345,19 +345,19 @@ tcp_timers(tp, timer)
 		 * lots more sophisticated searching to find the right
 		 * value here...
 		 */
-		if (ip_mtudisc && tp->t_rxtshift > TCP_MAXRXTSHIFT / 6) {
-			struct rtentry *rt = NULL;
-
+		if (tp->t_mtudisc && tp->t_rxtshift > TCP_MAXRXTSHIFT / 6) {
+			/* try turning pmtud off */
 			if (tp->t_inpcb)
-				rt = in_pcbrtentry(tp->t_inpcb);
+				tp->t_mtudisc = 0;
 #ifdef INET6
-			else if (tp->t_in6pcb)
-				rt = in6_pcbrtentry(tp->t_in6pcb);
+			/* try using IPv6 minimum MTU */
+			if (tp->t_in6pcb)
+				tp->t_mtudisc = 0;
 #endif
 
-			/* XXX:  Black hole recovery code goes here */
+			/* XXX: more sophisticated Black hole recovery code? */
 		}
-#endif
+
 		/*
 		 * If losing, let the lower level know and try for
 		 * a better route.  Also, if we backed off this far,

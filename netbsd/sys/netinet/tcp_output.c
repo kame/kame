@@ -246,7 +246,7 @@ tcp_segsize(tp, txsegsizep, rxsegsizep)
 		size = rt->rt_rmx.rmx_mtu - iphlen - sizeof(struct tcphdr);
 	else if ((ifp->if_flags & IFF_LOOPBACK) != 0)
 		size = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
-	else if (inp && ip_mtudisc)
+	else if (inp && tp->t_mtudisc)
 		size = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
 	else if (inp && in_localaddr(inp->inp_faddr))
 		size = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
@@ -256,14 +256,15 @@ tcp_segsize(tp, txsegsizep, rxsegsizep)
 			/* mapped addr case */
 			struct in_addr d;
 			bcopy(&in6p->in6p_faddr.s6_addr32[3], &d, sizeof(d));
-			if (ip_mtudisc || in_localaddr(d))
+			if (tp->t_mtudisc || in_localaddr(d))
 				size = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
 		} else {
 			/*
 			 * for IPv6, path MTU discovery is always turned on,
 			 * or the node must use packet size <= 1280.
 			 */
-			size = IN6_LINKMTU(ifp) - iphlen - sizeof(struct tcphdr);
+			size = tp->t_mtudisc ? IN6_LINKMTU(ifp) : IPV6_MMTU;
+			size -= (iphlen + sizeof(struct tcphdr));
 		}
 	}
 
@@ -1132,7 +1133,7 @@ send:
 	    {
 		struct mbuf *opts;
 
-		if (ip_mtudisc != 0 && (rt->rt_rmx.rmx_locks & RTV_MTU) == 0)
+		if (tp->t_mtudisc != 0 && (rt->rt_rmx.rmx_locks & RTV_MTU) == 0)
 			ip->ip_off |= IP_DF;
 
 #if BSD >= 43

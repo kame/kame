@@ -278,6 +278,7 @@ tcp_stats(off, name)
 	ps(tcps_noport, "\t%llu dropped due to no socket\n");
 	p(tcps_connsdrained, "\t%llu connection%s drained due to memory "
 		"shortage\n");
+	p(tcps_connsdrained, "\t%llu PMTUD blackhole%s detected\n");
 
 	p(tcps_badsyn, "\t%llu bad connection attempt%s\n");
 	ps(tcps_sc_added, "\t%llu SYN cache entries added\n");

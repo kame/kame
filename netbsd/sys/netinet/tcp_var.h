@@ -234,6 +234,9 @@ struct tcpcb {
 /* SACK stuff */
 	struct ipqehead timeq;		/* time sequenced queue (for SACK) */
 
+/* path MTU discovery blackhole detection */
+	int t_mtudisc;			/* perform mtudisc for this tcb */
+ 
 /* pointer for syn cache entries*/
 	LIST_HEAD(, syn_cache) t_sc;	/* list of entries by this tcb */
 };
@@ -465,6 +468,7 @@ struct	tcpstat {
 	u_quad_t tcps_persistdrops;	/* connections dropped in persist */
 	u_quad_t tcps_connsdrained;	/* connections drained due to memory
 					   shortage */
+	u_quad_t tcps_pmtublackhole;	/* PMTUD blackhole detected */
 
 	u_quad_t tcps_sndtotal;		/* total packets sent */
 	u_quad_t tcps_sndpack;		/* data packets sent */
