@@ -65,6 +65,10 @@ __RCSID("$NetBSD: show.c,v 1.8 1998/10/23 05:36:43 lukem Exp $");
 
 #include "extern.h"
 
+#define ROUNDUP(a) \
+	((a) > 0 ? (1 + (((a) - 1) | (sizeof(long) - 1))) : sizeof(long))
+#define ADVANCE(x, n) (x += ROUNDUP((n)->sa_len))
+
 /*
  * Definitions for showing gateway flags.
  */
@@ -194,7 +198,7 @@ p_rtentry(rtm)
 		p_sockaddr(sa, rtm->rtm_flags, 16);
 		if (sa->sa_len == 0)
 			sa->sa_len = sizeof(long);
-		sa = (struct sockaddr *)(sa->sa_len + (char *)sa);
+		sa = (struct sockaddr *)(ROUNDUP(sa->sa_len) + (char *)sa);
 		p_sockaddr(sa, 0, 18);
 	}
 	p_flags(rtm->rtm_flags & interesting, "%-6.6s ");
