@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.108 2001/12/12 21:18:33 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.109 2001/12/13 07:14:20 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -470,12 +470,6 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 		encklen = authklen = 0;
 		switch (pr->proto_id) {
 		case IPSECDOI_PROTO_IPSEC_ESP:
-#if 0
-			/* safety: ESP uses max 192bit, for fixed-keylen */
-			/* safety: ESP hash uses max 512bit, for fixed-keylen */
-			encklen = 192;
-			authklen = 512;
-#endif
 			for (tr = pr->head; tr; tr = tr->next) {
 				l = alg_ipsec_encdef_keylen(tr->trns_id,
 				    tr->encklen);
@@ -488,10 +482,6 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 			}
 			break;
 		case IPSECDOI_PROTO_IPSEC_AH:
-#if 0
-			/* safety: AH uses max 512bit, for fixed-keylen */
-			authklen = 512;
-#endif
 			for (tr = pr->head; tr; tr = tr->next) {
 				l = alg_ipsec_hmacdef_hashlen(tr->trns_id);
 				if (l > authklen)
@@ -499,23 +489,18 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 			}
 			break;
 		default:
-#if 0
-			/* safety: ESP 192 + AH 512 */
-			encklen = 192;
-			authklen = 512;
-#endif
 			break;
 		}
 		plog(LLV_DEBUG, LOCATION, NULL, "encklen=%d authklen=%d\n",
-		    encklen, authklen);
+			encklen, authklen);
 
 		dupkeymat = (encklen + authklen) / 8 / res->l;
 		dupkeymat += 2;	/* safety mergin */
 		if (dupkeymat < 3)
 			dupkeymat = 3;
 		plog(LLV_DEBUG, LOCATION, NULL,
-		    "generating %d bits of key (dupkeymat=%d)\n",
-		    dupkeymat * 8 * res->l, dupkeymat);
+			"generating %d bits of key (dupkeymat=%d)\n",
+			dupkeymat * 8 * res->l, dupkeymat);
 		if (0 < --dupkeymat) {
 			vchar_t *prev = res;	/* K(n-1) */
 			vchar_t *seed = NULL;	/* seed for Kn */
@@ -523,13 +508,13 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 
 			/*
 			 * generating long key (isakmp-oakley-08 5.5)
-			 *	KEYMAT = K1 | K2 | K3 | ...
+			 *   KEYMAT = K1 | K2 | K3 | ...
 			 * where
-			 *	src = [ g(qm)^xy | ] protocol | SPI | Ni_b | Nr_b
-			 *	K1 = prf(SKEYID_d, src)
-			 *	K2 = prf(SKEYID_d, K1 | src)
-			 *	K3 = prf(SKEYID_d, K2 | src)
-			 *	Kn = prf(SKEYID_d, K(n-1) | src)
+			 *   src = [ g(qm)^xy | ] protocol | SPI | Ni_b | Nr_b
+			 *   K1 = prf(SKEYID_d, src)
+			 *   K2 = prf(SKEYID_d, K1 | src)
+			 *   K3 = prf(SKEYID_d, K2 | src)
+			 *   Kn = prf(SKEYID_d, K(n-1) | src)
 			 */
 			plog(LLV_DEBUG, LOCATION, NULL,
 				"generating K1...K%d for KEYMAT.\n",
@@ -549,7 +534,8 @@ oakley_compute_keymat_x(iph2, side, sa_dir)
 
 				memcpy(seed->v, prev->v, prev->l);
 				memcpy(seed->v + prev->l, buf->v, buf->l);
-				this = oakley_prf(iph2->ph1->skeyid_d, seed, iph2->ph1);
+				this = oakley_prf(iph2->ph1->skeyid_d, seed,
+							iph2->ph1);
 				if (!this) {
 					plog(LLV_ERROR, LOCATION, NULL,
 						"oakley_prf memory overflow\n");
