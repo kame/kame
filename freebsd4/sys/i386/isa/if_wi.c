@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF
  * THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/if_wi.c,v 1.18.2.5 2000/09/07 17:10:41 wpaul Exp $
+ * $FreeBSD: src/sys/i386/isa/if_wi.c,v 1.18.2.6 2001/03/12 11:03:45 assar Exp $
  */
 
 /*
@@ -109,7 +109,7 @@
 
 #if !defined(lint)
 static const char rcsid[] =
-  "$FreeBSD: src/sys/i386/isa/if_wi.c,v 1.18.2.5 2000/09/07 17:10:41 wpaul Exp $";
+  "$FreeBSD: src/sys/i386/isa/if_wi.c,v 1.18.2.6 2001/03/12 11:03:45 assar Exp $";
 #endif
 
 #ifdef foo
@@ -293,7 +293,7 @@ static int wi_pccard_attach(device_t dev)
 	    sizeof(WI_DEFAULT_IBSS) - 1);
 
 	sc->wi_portnum = WI_DEFAULT_PORT;
-	sc->wi_ptype = WI_PORTTYPE_ADHOC;
+	sc->wi_ptype = WI_PORTTYPE_BSS;
 	sc->wi_ap_density = WI_DEFAULT_AP_DENSITY;
 	sc->wi_rts_thresh = WI_DEFAULT_RTS_THRESH;
 	sc->wi_tx_rate = WI_DEFAULT_TX_RATE;

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	From: @(#)tcp_usrreq.c	8.2 (Berkeley) 1/3/94
- * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.51 2000/01/09 19:17:28 shin Exp $
+ * $FreeBSD: src/sys/netinet/tcp_usrreq.c,v 1.51.2.3 2001/04/18 17:55:24 kris Exp $
  */
 
 #include "opt_ipsec.h"
@@ -99,7 +99,7 @@ static struct tcpcb *
 		tcp_usrclosed __P((struct tcpcb *));
 
 #ifdef TCPDEBUG
-#define	TCPDEBUG0	int ostate
+#define	TCPDEBUG0	int ostate = 0
 #define	TCPDEBUG1()	ostate = tp ? tp->t_state : 0
 #define	TCPDEBUG2(req)	if (tp && (so->so_options & SO_DEBUG)) \
 				tcp_trace(TA_USER, ostate, tp, 0, 0, req)
@@ -415,9 +415,19 @@ tcp_usr_accept(struct socket *so, struct sockaddr **nam)
 	int s = splnet();
 	int error = 0;
 	struct inpcb *inp = sotoinpcb(so);
-	struct tcpcb *tp;
+	struct tcpcb *tp = NULL;
+	TCPDEBUG0;
 
-	COMMON_START();
+	if (so->so_state & SS_ISDISCONNECTED) {
+		error = ECONNABORTED;
+		goto out;
+	}
+	if (inp == 0) {
+		splx(s);
+		return (EINVAL);
+	}
+	tp = intotcpcb(inp);
+	TCPDEBUG1();
 	in_setpeeraddr(so, nam);
 	COMMON_END(PRU_ACCEPT);
 }
@@ -429,9 +439,19 @@ tcp6_usr_accept(struct socket *so, struct sockaddr **nam)
 	int s = splnet();
 	int error = 0;
 	struct inpcb *inp = sotoinpcb(so);
-	struct tcpcb *tp;
+	struct tcpcb *tp = NULL;
+	TCPDEBUG0;
 
-	COMMON_START();
+	if (so->so_state & SS_ISDISCONNECTED) {
+		error = ECONNABORTED;
+		goto out;
+	}
+	if (inp == 0) {
+		splx(s);
+		return (EINVAL);
+	}
+	tp = intotcpcb(inp);
+	TCPDEBUG1();
 	in6_mapped_peeraddr(so, nam);
 	COMMON_END(PRU_ACCEPT);
 }
@@ -739,7 +759,12 @@ tcp_connect(tp, nam, p)
 	tcpstat.tcps_connattempt++;
 	tp->t_state = TCPS_SYN_SENT;
 	callout_reset(tp->tt_keep, tcp_keepinit, tcp_timer_keep, tp);
-	tp->iss = tcp_iss; tcp_iss += TCP_ISSINCR/2;
+#ifdef TCP_COMPAT_42
+	tp->iss = tcp_iss;
+	tcp_iss += TCP_ISSINCR/2;
+#else  /* TCP_COMPAT_42 */
+	tp->iss = tcp_rndiss_next();
+#endif /* !TCP_COMPAT_42 */
 	tcp_sendseqinit(tp);
 
 	/*
@@ -831,7 +856,11 @@ tcp6_connect(tp, nam, p)
 	tcpstat.tcps_connattempt++;
 	tp->t_state = TCPS_SYN_SENT;
 	callout_reset(tp->tt_keep, tcp_keepinit, tcp_timer_keep, tp);
+#ifdef TCP_COMPAT_42
 	tp->iss = tcp_iss; tcp_iss += TCP_ISSINCR/2;
+#else
+	tp->iss = tcp_rndiss_next();
+#endif /* TCP_COMPAT_42 */
 	tcp_sendseqinit(tp);
 
 	/*

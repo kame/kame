@@ -13,7 +13,7 @@
  * UCL. This driver is based much more on read/write/poll mode of
  * operation though.
  *
- * $FreeBSD: src/sys/net/if_tun.c,v 1.74.2.2 2000/11/01 00:01:39 brian Exp $
+ * $FreeBSD: src/sys/net/if_tun.c,v 1.74.2.3 2001/03/06 00:42:44 obrien Exp $
  */
 
 #include "opt_inet.h"
@@ -206,8 +206,7 @@ tunclose(dev, foo, bar, p)
 
 		s = splimp();
 		/* find internet addresses and delete routes */
-		for (ifa = ifp->if_addrhead.tqh_first; ifa;
-		    ifa = ifa->ifa_link.tqe_next)
+		TAILQ_FOREACH(ifa, &ifp->if_addrhead, ifa_link)
 			if (ifa->ifa_addr->sa_family == AF_INET)
 				rtinit(ifa, (int)RTM_DELETE,
 				    tp->tun_flags & TUN_DSTADDR ? RTF_HOST : 0);
@@ -228,29 +227,35 @@ tuninit(ifp)
 {
 	struct tun_softc *tp = ifp->if_softc;
 	register struct ifaddr *ifa;
+	int error = 0;
 
 	TUNDEBUG("%s%d: tuninit\n", ifp->if_name, ifp->if_unit);
 
 	ifp->if_flags |= IFF_UP | IFF_RUNNING;
 	getmicrotime(&ifp->if_lastchange);
 
-	for (ifa = ifp->if_addrhead.tqh_first; ifa; 
-	     ifa = ifa->ifa_link.tqe_next) {
+	for (ifa = TAILQ_FIRST(&ifp->if_addrhead); ifa; 
+	     ifa = TAILQ_NEXT(ifa, ifa_link)) {
+		if (ifa->ifa_addr == NULL)
+			error = EFAULT;
+			/* XXX: Should maybe return straight off? */
+		else {
 #ifdef INET
-		if (ifa->ifa_addr->sa_family == AF_INET) {
-		    struct sockaddr_in *si;
+			if (ifa->ifa_addr->sa_family == AF_INET) {
+			    struct sockaddr_in *si;
 
-		    si = (struct sockaddr_in *)ifa->ifa_addr;
-		    if (si && si->sin_addr.s_addr)
-			    tp->tun_flags |= TUN_IASET;
+			    si = (struct sockaddr_in *)ifa->ifa_addr;
+			    if (si->sin_addr.s_addr)
+				    tp->tun_flags |= TUN_IASET;
 
-		    si = (struct sockaddr_in *)ifa->ifa_dstaddr;
-		    if (si && si->sin_addr.s_addr)
-			    tp->tun_flags |= TUN_DSTADDR;
-		}
+			    si = (struct sockaddr_in *)ifa->ifa_dstaddr;
+			    if (si && si->sin_addr.s_addr)
+				    tp->tun_flags |= TUN_DSTADDR;
+			}
 #endif
+		}
 	}
-	return 0;
+	return (error);
 }
 
 /*
@@ -274,16 +279,16 @@ tunifioctl(ifp, cmd, data)
 		if (tp->tun_pid)
 			sprintf(ifs->ascii + strlen(ifs->ascii),
 			    "\tOpened by PID %d\n", tp->tun_pid);
-		return(0);
+		break;
 	case SIOCSIFADDR:
-		tuninit(ifp);
-		TUNDEBUG("%s%d: address set\n",
-			 ifp->if_name, ifp->if_unit);
+		error = tuninit(ifp);
+		TUNDEBUG("%s%d: address set, error=%d\n",
+			 ifp->if_name, ifp->if_unit, error);
 		break;
 	case SIOCSIFDSTADDR:
-		tuninit(ifp);
-		TUNDEBUG("%s%d: destination address set\n",
-			 ifp->if_name, ifp->if_unit);
+		error = tuninit(ifp);
+		TUNDEBUG("%s%d: destination address set, error=%d\n",
+			 ifp->if_name, ifp->if_unit, error);
 		break;
 	case SIOCSIFMTU:
 		ifp->if_mtu = ifr->ifr_mtu;
@@ -293,8 +298,6 @@ tunifioctl(ifp, cmd, data)
 	case SIOCADDMULTI:
 	case SIOCDELMULTI:
 		break;
-
-
 	default:
 		error = EINVAL;
 	}

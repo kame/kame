@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)protosw.h	8.1 (Berkeley) 6/2/93
- * $FreeBSD: src/sys/sys/protosw.h,v 1.28 1999/12/29 04:24:45 peter Exp $
+ * $FreeBSD: src/sys/sys/protosw.h,v 1.28.2.1 2001/03/01 20:00:08 jlemon Exp $
  */
 
 #ifndef _SYS_PROTOSW_H_
@@ -270,8 +270,9 @@ int	pru_sense_null __P((struct socket *so, struct stat *sb));
 #define	PRC_TIMXCEED_INTRANS	18	/* packet lifetime expired in transit */
 #define	PRC_TIMXCEED_REASS	19	/* lifetime expired on reass q */
 #define	PRC_PARAMPROB		20	/* header incorrect */
+#define	PRC_UNREACH_ADMIN_PROHIB	21	/* packet administrativly prohibited */
 
-#define	PRC_NCMDS		21
+#define	PRC_NCMDS		22
 
 #define	PRC_IS_REDIRECT(cmd)	\
 	((cmd) >= PRC_REDIRECT_NET && (cmd) <= PRC_REDIRECT_TOSHOST)
@@ -283,7 +284,7 @@ char	*prcrequests[] = {
 	"NET-UNREACH", "HOST-UNREACH", "PROTO-UNREACH", "PORT-UNREACH",
 	"#12", "SRCFAIL-UNREACH", "NET-REDIRECT", "HOST-REDIRECT",
 	"TOSNET-REDIRECT", "TOSHOST-REDIRECT", "TX-INTRANS", "TX-REASS",
-	"PARAMPROB"
+	"PARAMPROB", "ADMIN-UNREACH"
 };
 #endif
 

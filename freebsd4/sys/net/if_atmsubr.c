@@ -31,7 +31,7 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/net/if_atmsubr.c,v 1.10 1999/12/07 17:39:03 shin Exp $
+ * $FreeBSD: src/sys/net/if_atmsubr.c,v 1.10.2.1 2001/03/06 00:29:26 obrien Exp $
  */
 
 /*
@@ -47,7 +47,6 @@
 #include <sys/mbuf.h>
 #include <sys/socket.h>
 #include <sys/sockio.h>
-#include <sys/malloc.h>
 #include <sys/errno.h>
 
 #include <net/if.h>
@@ -383,11 +382,11 @@ atm_ifattach(ifp)
 	IFQ_SET_MAXLEN(&ifp->if_snd, 50);	/* dummy */
 
 #if defined(__NetBSD__) || defined(__OpenBSD__)
-	for (ifa = ifp->if_addrlist.tqh_first; ifa != 0;
-	    ifa = ifa->ifa_list.tqe_next)
+	for (ifa = TAILQ_FIRST(&ifp->if_addrlist); ifa != 0;
+	    ifa = TAILQ_NEXT(ifa, ifa_list))
 #elif defined(__FreeBSD__) && (__FreeBSD__ > 2)
-	for (ifa = ifp->if_addrhead.tqh_first; ifa; 
-	    ifa = ifa->ifa_link.tqe_next)
+	for (ifa = TAILQ_FIRST(&ifp->if_addrhead); ifa; 
+	    ifa = TAILQ_NEXT(ifa, ifa_link))
 #elif defined(__FreeBSD__) || defined(__bsdi__)
 	for (ifa = ifp->if_addrlist; ifa; ifa = ifa->ifa_next) 
 #endif

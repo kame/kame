@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_subr.c	8.2 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_subr.c,v 1.73.2.6 2000/10/31 19:07:09 ume Exp $
+ * $FreeBSD: src/sys/netinet/tcp_subr.c,v 1.73.2.13 2001/04/18 17:55:23 kris Exp $
  */
 
 #include "opt_compat.h"
@@ -39,7 +39,6 @@
 #include "opt_ipsec.h"
 #include "opt_tcpdebug.h"
 
-#include <stddef.h>
 #include <sys/param.h>
 #include <sys/systm.h>
 #include <sys/callout.h>
@@ -54,6 +53,7 @@
 #include <sys/socket.h>
 #include <sys/socketvar.h>
 #include <sys/protosw.h>
+#include <sys/random.h>
 
 #include <vm/vm_zone.h>
 
@@ -126,11 +126,15 @@ SYSCTL_INT(_net_inet_tcp, OID_AUTO, tcbhashsize, CTLFLAG_RD,
      &tcp_tcbhashsize, 0, "Size of TCP control-block hashtable");
 
 static int	do_tcpdrain = 1;
-SYSCTL_INT(_debug, OID_AUTO, do_tcpdrain, CTLFLAG_RW, &do_tcpdrain, 0,
-     "Enable non Net3 compliant tcp_drain");
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, do_tcpdrain, CTLFLAG_RW, &do_tcpdrain, 0,
+     "Enable tcp_drain routine for extra help when low on mbufs");
 
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, pcbcount, CTLFLAG_RD, 
     &tcbinfo.ipi_count, 0, "Number of active PCBs");
+
+static int	icmp_may_rst = 1;
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, icmp_may_rst, CTLFLAG_RW, &icmp_may_rst, 0, 
+    "Certain ICMP unreachable messages may abort connections in SYN_SENT");
 
 static void	tcp_cleartaocache __P((void));
 static void	tcp_notify __P((struct inpcb *, int));
@@ -175,7 +179,9 @@ tcp_init()
 {
 	int hashsize;
 	
-	tcp_iss = arc4random();	/* wrong, but better than a constant */
+#ifdef TCP_COMPAT_42
+	tcp_iss = 1;		/* wrong */
+#endif /* TCP_COMPAT_42 */
 	tcp_ccgen = 1;
 	tcp_cleartaocache();
 
@@ -735,8 +741,8 @@ tcp_drain()
 	 * 	where we're really low on mbufs, this is potentially
 	 *  	usefull.	
 	 */
-		for (inpb = tcbinfo.listhead->lh_first; inpb;
-	    		inpb = inpb->inp_list.le_next) {
+		for (inpb = LIST_FIRST(tcbinfo.listhead); inpb;
+	    		inpb = LIST_NEXT(inpb, inp_list)) {
 				if ((tcpb = intotcpcb(inpb))) {
 					while ((te = LIST_FIRST(&tcpb->t_segq))
 					       != NULL) {
@@ -754,14 +760,16 @@ tcp_drain()
  * Notify a tcp user of an asynchronous error;
  * store error as soft error, but wake up user
  * (for now, won't do anything until can select for soft error).
+ *
+ * Do not wake up user since there currently is no mechanism for
+ * reporting soft errors (yet - a kqueue filter may be added).
  */
 static void
 tcp_notify(inp, error)
 	struct inpcb *inp;
 	int error;
 {
-	register struct tcpcb *tp = (struct tcpcb *)inp->inp_ppcb;
-	register struct socket *so = inp->inp_socket;
+	struct tcpcb *tp = (struct tcpcb *)inp->inp_ppcb;
 
 	/*
 	 * Ignore some errors if we are hooked up.
@@ -776,12 +784,14 @@ tcp_notify(inp, error)
 		return;
 	} else if (tp->t_state < TCPS_ESTABLISHED && tp->t_rxtshift > 3 &&
 	    tp->t_softerror)
-		so->so_error = error;
+		tcp_drop(tp, error);
 	else
 		tp->t_softerror = error;
+#if 0
 	wakeup((caddr_t) &so->so_timeo);
 	sorwakeup(so);
 	sowwakeup(so);
+#endif
 }
 
 static int
@@ -827,8 +837,8 @@ tcp_pcblist(SYSCTL_HANDLER_ARGS)
 		return ENOMEM;
 	
 	s = splnet();
-	for (inp = tcbinfo.listhead->lh_first, i = 0; inp && i < n;
-	     inp = inp->inp_list.le_next) {
+	for (inp = LIST_FIRST(tcbinfo.listhead), i = 0; inp && i < n;
+	     inp = LIST_NEXT(inp, inp_list)) {
 		if (inp->inp_gencnt <= gencnt && !prison_xinpcb(req->p, inp))
 			inp_list[i++] = inp;
 	}
@@ -961,24 +971,49 @@ tcp_ctlinput(cmd, sa, vip)
 	struct sockaddr *sa;
 	void *vip;
 {
-	register struct ip *ip = vip;
-	register struct tcphdr *th;
+	struct ip *ip = vip;
+	struct tcphdr *th;
+	struct in_addr faddr;
+	struct inpcb *inp;
+	struct tcpcb *tp;
 	void (*notify) __P((struct inpcb *, int)) = tcp_notify;
+	tcp_seq icmp_seq;
+	int s;
+
+	faddr = ((struct sockaddr_in *)sa)->sin_addr;
+	if (sa->sa_family != AF_INET || faddr.s_addr == INADDR_ANY)
+		return;
 
 	if (cmd == PRC_QUENCH)
 		notify = tcp_quench;
+	else if (icmp_may_rst && (cmd == PRC_UNREACH_ADMIN_PROHIB ||
+		cmd == PRC_UNREACH_PORT) && ip)
+		notify = tcp_drop_syn_sent;
 	else if (cmd == PRC_MSGSIZE)
 		notify = tcp_mtudisc;
-	else if (!PRC_IS_REDIRECT(cmd) &&
-		 ((unsigned)cmd > PRC_NCMDS || inetctlerrmap[cmd] == 0))
+	else if (PRC_IS_REDIRECT(cmd)) {
+		ip = 0;
+		notify = in_rtchange;
+	} else if (cmd == PRC_HOSTDEAD)
+		ip = 0;
+	else if ((unsigned)cmd > PRC_NCMDS || inetctlerrmap[cmd] == 0)
 		return;
 	if (ip) {
+		s = splnet();
 		th = (struct tcphdr *)((caddr_t)ip 
 				       + (IP_VHL_HL(ip->ip_vhl) << 2));
-		in_pcbnotify(&tcb, sa, th->th_dport, ip->ip_src, th->th_sport,
-			cmd, notify);
+		inp = in_pcblookup_hash(&tcbinfo, faddr, th->th_dport,
+		    ip->ip_src, th->th_sport, 0, NULL);
+		if (inp != NULL && inp->inp_socket != NULL) {
+			icmp_seq = htonl(th->th_seq);
+			tp = intotcpcb(inp);
+			if (SEQ_GEQ(icmp_seq, tp->snd_una) &&
+			    SEQ_LT(icmp_seq, tp->snd_max))
+				(*notify)(inp, inetctlerrmap[cmd]);
+		}
+		splx(s);
 	} else
-		in_pcbnotify(&tcb, sa, 0, zeroin_addr, 0, cmd, notify);
+		in_pcbnotifyall(&tcb, faddr, inetctlerrmap[cmd], notify);
 }
 
 #ifdef INET6
@@ -1048,6 +1083,63 @@ tcp6_ctlinput(cmd, sa, d)
 }
 #endif /* INET6 */
 
+#define TCP_RNDISS_ROUNDS	16
+#define TCP_RNDISS_OUT	7200
+#define TCP_RNDISS_MAX	30000
+
+u_int8_t tcp_rndiss_sbox[128];
+u_int16_t tcp_rndiss_msb;
+u_int16_t tcp_rndiss_cnt;
+long tcp_rndiss_reseed;
+
+u_int16_t
+tcp_rndiss_encrypt(val)
+	u_int16_t val;
+{
+	u_int16_t sum = 0, i;
+  
+	for (i = 0; i < TCP_RNDISS_ROUNDS; i++) {
+		sum += 0x79b9;
+		val ^= ((u_int16_t)tcp_rndiss_sbox[(val^sum) & 0x7f]) << 7;
+		val = ((val & 0xff) << 7) | (val >> 8);
+	}
+
+	return val;
+}
+
+void
+tcp_rndiss_init()
+{
+	struct timeval time;
+
+	getmicrotime(&time);
+	read_random_unlimited(tcp_rndiss_sbox, sizeof(tcp_rndiss_sbox));
+
+	tcp_rndiss_reseed = time.tv_sec + TCP_RNDISS_OUT;
+	tcp_rndiss_msb = tcp_rndiss_msb == 0x8000 ? 0 : 0x8000; 
+	tcp_rndiss_cnt = 0;
+}
+
+tcp_seq
+tcp_rndiss_next()
+{
+	u_int32_t tmp;
+	struct timeval time;
+
+	getmicrotime(&time);
+
+        if (tcp_rndiss_cnt >= TCP_RNDISS_MAX ||
+	    time.tv_sec > tcp_rndiss_reseed)
+                tcp_rndiss_init();
+	
+	tmp = arc4random();
+
+	/* (tmp & 0x7fff) ensures a 32768 byte gap between ISS */
+	return ((tcp_rndiss_encrypt(tcp_rndiss_cnt++) | tcp_rndiss_msb) <<16) |
+		(tmp & 0x7fff);
+}
+
+
 /*
  * When a source quench is received, close congestion window
  * to one segment.  We will gradually open it again as we proceed.
@@ -1061,6 +1153,22 @@ tcp_quench(inp, errno)
 
 	if (tp)
 		tp->snd_cwnd = tp->t_maxseg;
+}
+
+/*
+ * When a specific ICMP unreachable message is received and the
+ * connection state is SYN-SENT, drop the connection.  This behavior
+ * is controlled by the icmp_may_rst sysctl.
+ */
+void
+tcp_drop_syn_sent(inp, errno)
+	struct inpcb *inp;
+	int errno;
+{
+	struct tcpcb *tp = intotcpcb(inp);
+
+	if (tp && tp->t_state == TCPS_SYN_SENT)
+		tcp_drop(tp, errno);
 }
 
 /*

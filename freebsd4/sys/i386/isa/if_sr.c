@@ -27,7 +27,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/i386/isa/if_sr.c,v 1.34.2.1 2000/05/16 10:48:41 jhay Exp $
+ * $FreeBSD: src/sys/i386/isa/if_sr.c,v 1.34.2.2 2001/02/28 19:08:56 jhay Exp $
  */
 
 /*
@@ -1816,8 +1816,10 @@ sr_init_msci(struct sr_softc *sc)
 		printf("sr%d: External Clock Selected.\n", portndx);
 #endif
 
-		SRC_PUT8(hc->sca_base, msci->rxs, 0);
-		SRC_PUT8(hc->sca_base, msci->txs, 0);
+		SRC_PUT8(hc->sca_base, msci->rxs,
+			 SCA_RXS_CLK_RXC0 | SCA_RXS_DIV1);
+		SRC_PUT8(hc->sca_base, msci->txs,
+			 SCA_TXS_CLK_RX | SCA_TXS_DIV1);
 		break;
 
 	case SR_FLAGS_EXT_SEP_CLK:
@@ -1825,20 +1827,10 @@ sr_init_msci(struct sr_softc *sc)
 		printf("sr%d: Split Clocking Selected.\n", portndx);
 #endif
 
-#if	1
-		SRC_PUT8(hc->sca_base, msci->rxs, 0);
-		SRC_PUT8(hc->sca_base, msci->txs, 0);
-#else
 		SRC_PUT8(hc->sca_base, msci->rxs,
 			 SCA_RXS_CLK_RXC0 | SCA_RXS_DIV1);
-
-		/*
-		 * We need to configure the internal bit clock for the
-		 * transmitter's channel...
-		 */
 		SRC_PUT8(hc->sca_base, msci->txs,
-			 SCA_TXS_CLK_RX | SCA_TXS_DIV1);
-#endif
+			 SCA_TXS_CLK_TXC | SCA_TXS_DIV1);
 		break;
 
 	case SR_FLAGS_INT_CLK:

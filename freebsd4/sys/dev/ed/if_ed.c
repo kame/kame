@@ -24,7 +24,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * $FreeBSD: src/sys/dev/ed/if_ed.c,v 1.173.2.8 2000/09/10 08:45:11 nyan Exp $
+ * $FreeBSD: src/sys/dev/ed/if_ed.c,v 1.173.2.10 2001/02/08 23:00:23 luigi Exp $
  */
 
 /*
@@ -901,43 +901,6 @@ ed_probe_3Com(dev, port_rid, flags)
 			return (ENXIO);
 		}
 	return (0);
-}
-
-/*
- * Probe the Ethernet MAC addrees for PCMCIA Linksys EtherFast 10/100 
- * and compatible cards (DL10019C Ethernet controller).
- *
- * Note: The PAO patches try to use more memory for the card, but that
- * seems to fail for my card.  A future optimization would add this back
- * conditionally.
- */
-int
-ed_get_Linksys(sc)
-	struct ed_softc *sc;
-{
-	u_char sum;
-	int i;
-
-	/*
-	 * Linksys registers(offset from ASIC base)
-	 *
-	 * 0x04-0x09 : Physical Address Register 0-5 (PAR0-PAR5)
-	 * 0x0A      : Card ID Register (CIR)
-	 * 0x0B      : Check Sum Register (SR)
-	 */
-	for (sum = 0, i = 0x04; i < 0x0c; i++)
-		sum += ed_asic_inb(sc, i);
-	if (sum != 0xff)
-		return (0);		/* invalid DL10019C */
-	for (i = 0; i < ETHER_ADDR_LEN; i++) {
-		sc->arpcom.ac_enaddr[i] = ed_asic_inb(sc, 0x04 + i);
-	}
-
-	ed_nic_outb(sc, ED_P0_DCR, ED_DCR_WTS | ED_DCR_FT1 | ED_DCR_LS);
-	sc->isa16bit = 1;
-	sc->type = ED_TYPE_NE2000;
-	sc->type_str = "Linksys";
-	return (1);
 }
 
 /*
@@ -2206,8 +2169,10 @@ ed_rint(sc)
 		 * we have a length that will fit into one mbuf cluster or less;
 		 * the upper layer protocols can then figure out the length from
 		 * their own length field(s).
+		 * But make sure that we have at least a full ethernet header
+		 * or we would be unable to call ether_input() later.
 		 */
-		if ((len > sizeof(struct ed_ring)) &&
+		if ((len >= sizeof(struct ed_ring) + ETHER_HDR_LEN) &&
 		    (len <= MCLBYTES) &&
 		    (packet_hdr.next_packet >= sc->rec_page_start) &&
 		    (packet_hdr.next_packet < sc->rec_page_stop)) {
@@ -2674,17 +2639,21 @@ ed_get_packet(sc, buf, len)
 #ifdef BRIDGE
 	/*
 	 * Don't read in the entire packet if we know we're going to drop it
+	 * and no bpf is active.
 	 */
-	if (do_bridge) {
+	if (!sc->arpcom.ac_if.if_bpf &&
+			do_bridge && BDG_USED( (&sc->arpcom.ac_if) ) ) {
 		struct ifnet *bif;
 
 		ed_ring_copy(sc, buf, (char *)eh, ETHER_HDR_LEN);
-		if ((bif = bridge_in(&sc->arpcom.ac_if, eh)) == BDG_DROP) {
+		bif = bridge_in(&sc->arpcom.ac_if, eh) ;
+		if (bif == BDG_DROP) {
 			m_freem(m);
 			return;
 		}
-		ed_ring_copy(sc, buf + ETHER_HDR_LEN,
-		    (char *)eh + ETHER_HDR_LEN, len - ETHER_HDR_LEN);
+		if (len > ETHER_HDR_LEN)
+			ed_ring_copy(sc, buf + ETHER_HDR_LEN,
+				(char *)(eh + 1), len - ETHER_HDR_LEN);
 	} else
 #endif
 	/*

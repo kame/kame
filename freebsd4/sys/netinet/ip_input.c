@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_input.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_input.c,v 1.130.2.11 2000/11/01 11:24:44 ru Exp $
+ * $FreeBSD: src/sys/netinet/ip_input.c,v 1.130.2.21 2001/03/08 23:14:54 iedowse Exp $
  */
 
 #define	_IP_VHL
@@ -44,8 +44,6 @@
 #include "opt_ipstealth.h"
 #include "opt_ipsec.h"
 #include "opt_natpt.h"
-
-#include <stddef.h>
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -124,6 +122,23 @@ static int	ip_keepfaith = 0;
 SYSCTL_INT(_net_inet_ip, IPCTL_KEEPFAITH, keepfaith, CTLFLAG_RW,
 	&ip_keepfaith,	0,
 	"Enable packet capture for FAITH IPv4->IPv6 translater daemon");
+
+/*
+ * XXX - Setting ip_checkinterface mostly implements the receive side of
+ * the Strong ES model described in RFC 1122, but since the routing table
+ * and transmit implementation do not implement the Strong ES model,
+ * setting this to 1 results in an odd hybrid.
+ *
+ * XXX - ip_checkinterface currently must be disabled if you use ipnat
+ * to translate the destination address to another local interface.
+ *
+ * XXX - ip_checkinterface must be disabled if you add IP aliases
+ * to the loopback interface instead of the interface where the
+ * packets for those addresses are received.
+ */
+static int	ip_checkinterface = 0;
+SYSCTL_INT(_net_inet_ip, OID_AUTO, check_interface, CTLFLAG_RW,
+    &ip_checkinterface, 0, "Verify packet arrives on correct interface");
 
 #ifdef DIAGNOSTIC
 static int	ipprintfs = 0;
@@ -264,10 +279,11 @@ ip_input(struct mbuf *m)
 {
 	struct ip *ip;
 	struct ipq *fp;
-	struct in_ifaddr *ia;
-	int    i, hlen, mff;
+	struct in_ifaddr *ia = NULL;
+	int    i, hlen, mff, checkif;
 	u_short sum;
 	u_int16_t divert_cookie;		/* firewall cookie */
+	struct in_addr pkt_dst;
 #ifdef IPDIVERT
 	u_int32_t divert_info = 0;		/* packet divert/tee info */
 #endif
@@ -388,6 +404,17 @@ tooshort:
 			m_adj(m, ip->ip_len - m->m_pkthdr.len);
 	}
 
+	/*
+	 * Don't accept packets with a loopback destination address
+	 * unless they arrived via the loopback interface.
+	 */
+	if ((ntohl(ip->ip_dst.s_addr) & IN_CLASSA_NET) ==
+	    (IN_LOOPBACKNET << IN_CLASSA_NSHIFT) && 
+	    (m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0) {
+		ipstat.ips_badaddr++;
+		goto bad;
+	}
+
 #ifdef IPSEC
 	if (ipsec_gethist(m, NULL))
 		goto pass;
@@ -434,8 +461,12 @@ iphack:
 		 */
 		i = (*ip_fw_chk_ptr)(&ip,
 		    hlen, NULL, &divert_cookie, &m, &rule, &ip_fw_fwd_addr);
-		if (m == NULL)		/* Packet discarded by firewall */
-			return;
+		if ( (i & IP_FW_PORT_DENY_FLAG) || m == NULL) { /* drop */
+                        if (m)
+                                m_freem(m);
+			return ;
+                }
+		ip = mtod(m, struct ip *); /* just in case m changed */
 		if (i == 0 && ip_fw_fwd_addr == NULL)	/* common case */
 			goto pass;
 #ifdef DUMMYNET
@@ -533,34 +564,59 @@ checkaddresses:;
 	    (m->m_flags & (M_MCAST|M_BCAST)) == 0)
 		goto ours;
 
-	for (ia = TAILQ_FIRST(&in_ifaddrhead); ia;
-					ia = TAILQ_NEXT(ia, ia_link)) {
+	/*
+	 * Cache the destination address of the packet; this may be
+	 * changed by use of 'ipfw fwd'.
+	 */
+	pkt_dst = ip_fw_fwd_addr == NULL ?
+	    ip->ip_dst : ip_fw_fwd_addr->sin_addr;
+
+	/*
+	 * Enable a consistency check between the destination address
+	 * and the arrival interface for a unicast packet (the RFC 1122
+	 * strong ES model) if IP forwarding is disabled and the packet
+	 * is not locally generated and the packet is not subject to
+	 * 'ipfw fwd'.
+	 *
+	 * XXX - Checking also should be disabled if the destination
+	 * address is ipnat'ed to a different interface.
+	 *
+	 * XXX - Checking is incompatible with IP aliases added
+	 * to the loopback interface instead of the interface where
+	 * the packets are received.
+	 */
+	checkif = ip_checkinterface && (ipforwarding == 0) && 
+	    ((m->m_pkthdr.rcvif->if_flags & IFF_LOOPBACK) == 0) &&
+	    (ip_fw_fwd_addr == NULL);
+
+	TAILQ_FOREACH(ia, &in_ifaddrhead, ia_link) {
 #define	satosin(sa)	((struct sockaddr_in *)(sa))
 
 #ifdef BOOTP_COMPAT
 		if (IA_SIN(ia)->sin_addr.s_addr == INADDR_ANY)
 			goto ours;
 #endif
-#ifdef IPFIREWALL_FORWARD
 		/*
-		 * If the addr to forward to is one of ours, we pretend to
-		 * be the destination for this packet.
+		 * If the address matches, verify that the packet
+		 * arrived via the correct interface if checking is
+		 * enabled.
 		 */
-		if (ip_fw_fwd_addr == NULL) {
-			if (IA_SIN(ia)->sin_addr.s_addr == ip->ip_dst.s_addr)
-				goto ours;
-		} else if (IA_SIN(ia)->sin_addr.s_addr ==
-					 ip_fw_fwd_addr->sin_addr.s_addr)
+		if (IA_SIN(ia)->sin_addr.s_addr == pkt_dst.s_addr && 
+		    (!checkif || ia->ia_ifp == m->m_pkthdr.rcvif))
 			goto ours;
-#else
-		if (IA_SIN(ia)->sin_addr.s_addr == ip->ip_dst.s_addr)
-			goto ours;
-#endif
-		if (ia->ia_ifp && ia->ia_ifp->if_flags & IFF_BROADCAST) {
+		/*
+		 * Only accept broadcast packets that arrive via the
+		 * matching interface.  Reception of forwarded directed
+		 * broadcasts would be handled via ip_forward() and
+		 * ether_output() with the loopback into the stack for
+		 * SIMPLEX interfaces handled by ether_output().
+		 */
+		if (ia->ia_ifp == m->m_pkthdr.rcvif &&
+		    ia->ia_ifp && ia->ia_ifp->if_flags & IFF_BROADCAST) {
 			if (satosin(&ia->ia_broadaddr)->sin_addr.s_addr ==
-			    ip->ip_dst.s_addr)
+			    pkt_dst.s_addr)
 				goto ours;
-			if (ip->ip_dst.s_addr == ia->ia_netbroadcast.s_addr)
+			if (ia->ia_netbroadcast.s_addr == pkt_dst.s_addr)
 				goto ours;
 		}
 	}
@@ -620,7 +676,6 @@ checkaddresses:;
 		return;
 	}
 #endif
-
 	/*
 	 * Not for us; forward if possible and desirable.
 	 */
@@ -635,6 +690,11 @@ checkaddresses:;
 	return;
 
 ours:
+	/* Count the packet in the ip address stats */
+	if (ia != NULL) {
+		ia->ia_ifa.if_ipackets++;
+		ia->ia_ifa.if_ibytes += m->m_pkthdr.len;
+	}
 
 	/*
 	 * If offset or IP_MF are set, must reassemble.
@@ -1526,7 +1586,7 @@ u_char inetctlerrmap[PRC_NCMDS] = {
 	EHOSTUNREACH,	EHOSTUNREACH,	ECONNREFUSED,	ECONNREFUSED,
 	EMSGSIZE,	EHOSTUNREACH,	0,		0,
 	0,		0,		0,		0,
-	ENOPROTOOPT
+	ENOPROTOOPT,	ENETRESET
 };
 
 /*
@@ -1609,17 +1669,20 @@ ip_forward(m, srcrt)
 	}
 
 	/*
-	 * Save at most 64 bytes of the packet in case
-	 * we need to generate an ICMP message to the src.
-	 * Pullup to avoid sharing mbuf cluster between m and mcopy.
+	 * Save the IP header and at most 8 bytes of the payload,
+	 * in case we need to generate an ICMP message to the src.
+	 *
+	 * We don't use m_copy() because it might return a reference
+	 * to a shared cluster. Both this function and ip_output()
+	 * assume exclusive access to the IP header in `m', so any
+	 * data in a cluster may change before we reach icmp_error().
 	 */
-	mcopy = m_copym(m, 0, imin((int)ip->ip_len, 64), M_DONTWAIT);
-	if (mcopy) {
-#ifdef _IP_VHL
-		mcopy = m_pullup(mcopy, IP_VHL_HL(ip->ip_vhl) << 2);
-#else
-		mcopy = m_pullup(mcopy, ip->ip_hl << 2);
-#endif
+	MGET(mcopy, M_DONTWAIT, m->m_type);
+	if (mcopy != NULL) {
+		M_COPY_PKTHDR(mcopy, m);
+		mcopy->m_len = imin((IP_VHL_HL(ip->ip_vhl) << 2) + 8,
+		    (int)ip->ip_len);
+		m_copydata(m, 0, mcopy->m_len, mtod(mcopy, caddr_t));
 	}
 
 #ifdef IPSTEALTH
@@ -1777,8 +1840,6 @@ ip_forward(m, srcrt)
 		m_freem(mcopy);
 		return;
 	}
-	if (mcopy->m_flags & M_EXT)
-		m_copyback(mcopy, 0, sizeof(struct ip), mtod(mcopy, caddr_t));
 	icmp_error(mcopy, type, code, dest, destifp);
 }
 

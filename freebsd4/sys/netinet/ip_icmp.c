@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)ip_icmp.c	8.2 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.39.2.3 2000/11/02 11:00:47 ru Exp $
+ * $FreeBSD: src/sys/netinet/ip_icmp.c,v 1.39.2.7 2001/03/29 10:10:02 jesper Exp $
  */
 
 #include "opt_ipsec.h"
@@ -172,6 +172,11 @@ icmp_error(n, type, code, dest, destifp)
 	if (m == NULL)
 		goto freeit;
 	icmplen = min(oiplen + 8, oip->ip_len);
+	if (icmplen < sizeof(struct ip)) {
+		printf("icmp_error: bad length\n");
+		m_free(m);
+		goto freeit;
+	}
 	m->m_len = icmplen + ICMP_MINLEN;
 	MH_ALIGN(m, m->m_len);
 	icp = mtod(m, struct icmp *);
@@ -197,7 +202,7 @@ icmp_error(n, type, code, dest, destifp)
 	}
 
 	icp->icmp_code = code;
-	bcopy((caddr_t)oip, (caddr_t)&icp->icmp_ip, icmplen);
+	m_copydata(n, 0, icmplen, (caddr_t)&icp->icmp_ip);
 	nip = &icp->icmp_ip;
 
 	/*
@@ -315,33 +320,34 @@ icmp_input(m, off, proto)
 		switch (code) {
 			case ICMP_UNREACH_NET:
 			case ICMP_UNREACH_HOST:
-			case ICMP_UNREACH_PROTOCOL:
-			case ICMP_UNREACH_PORT:
 			case ICMP_UNREACH_SRCFAIL:
-				code += PRC_UNREACH_NET;
+			case ICMP_UNREACH_NET_UNKNOWN:
+			case ICMP_UNREACH_HOST_UNKNOWN:
+			case ICMP_UNREACH_ISOLATED:
+			case ICMP_UNREACH_TOSNET:
+			case ICMP_UNREACH_TOSHOST:
+			case ICMP_UNREACH_HOST_PRECEDENCE:
+			case ICMP_UNREACH_PRECEDENCE_CUTOFF:
+				code = PRC_UNREACH_NET;
 				break;
 
 			case ICMP_UNREACH_NEEDFRAG:
 				code = PRC_MSGSIZE;
 				break;
 
-			case ICMP_UNREACH_NET_UNKNOWN:
-			case ICMP_UNREACH_NET_PROHIB:
-			case ICMP_UNREACH_TOSNET:
-				code = PRC_UNREACH_NET;
-				break;
-
-			case ICMP_UNREACH_HOST_UNKNOWN:
-			case ICMP_UNREACH_ISOLATED:
-			case ICMP_UNREACH_HOST_PROHIB:
-			case ICMP_UNREACH_TOSHOST:
-				code = PRC_UNREACH_HOST;
-				break;
-
-			case ICMP_UNREACH_FILTER_PROHIB:
-			case ICMP_UNREACH_HOST_PRECEDENCE:
-			case ICMP_UNREACH_PRECEDENCE_CUTOFF:
+			/*
+			 * RFC 1122, Sections 3.2.2.1 and 4.2.3.9.
+			 * Treat subcodes 2,3 as immediate RST
+			 */
+			case ICMP_UNREACH_PROTOCOL:
+			case ICMP_UNREACH_PORT:
 				code = PRC_UNREACH_PORT;
+				break;
+
+			case ICMP_UNREACH_NET_PROHIB:
+			case ICMP_UNREACH_HOST_PROHIB:
+			case ICMP_UNREACH_FILTER_PROHIB:
+				code = PRC_UNREACH_ADMIN_PROHIB;
 				break;
 
 			default:
@@ -448,7 +454,12 @@ icmp_input(m, off, proto)
 			break;
 		}
 		icp->icmp_type = ICMP_ECHOREPLY;
-		goto reflect;
+#ifdef ICMP_BANDLIM
+		if (badport_bandlim(BANDLIM_ICMP_ECHO) < 0)
+			goto freeit;
+		else
+#endif
+			goto reflect;
 
 	case ICMP_TSTAMP:
 		if (!icmpbmcastecho
@@ -463,7 +474,12 @@ icmp_input(m, off, proto)
 		icp->icmp_type = ICMP_TSTAMPREPLY;
 		icp->icmp_rtime = iptime();
 		icp->icmp_ttime = icp->icmp_rtime;	/* bogus, do later! */
-		goto reflect;
+#ifdef ICMP_BANDLIM
+		if (badport_bandlim(BANDLIM_ICMP_TSTAMP) < 0)
+			goto freeit;
+		else
+#endif
+			goto reflect;
 
 	case ICMP_MASKREQ:
 #define	satosin(sa)	((struct sockaddr_in *)(sa))
@@ -821,16 +837,23 @@ ip_next_mtu(mtu, dir)
 int
 badport_bandlim(int which)
 {
-	static int lticks[2];
-	static int lpackets[2];
+	static int lticks[BANDLIM_MAX + 1];
+	static int lpackets[BANDLIM_MAX + 1];
 	int dticks;
+	const char *bandlimittype[] = {
+		"Limiting icmp unreach response",
+		"Limiting icmp ping response",
+		"Limiting icmp tstamp response",
+		"Limiting closed port RST response",
+		"Limiting open port RST response"
+		};
 
 	/*
 	 * Return ok status if feature disabled or argument out of
 	 * ranage.
 	 */
 
-	if (icmplim <= 0 || which >= 2 || which < 0)
+	if (icmplim <= 0 || which > BANDLIM_MAX || which < 0)
 		return(0);
 	dticks = ticks - lticks[which];
 
@@ -840,7 +863,8 @@ badport_bandlim(int which)
 
 	if ((unsigned int)dticks > hz) {
 		if (lpackets[which] > icmplim) {
-			printf("icmp-response bandwidth limit %d/%d pps\n",
+			printf("%s from %d to %d packets per second\n",
+				bandlimittype[which],
 				lpackets[which],
 				icmplim
 			);

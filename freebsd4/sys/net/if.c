@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)if.c	8.3 (Berkeley) 1/4/94
- * $FreeBSD: src/sys/net/if.c,v 1.85.2.4 2000/10/31 18:58:54 ume Exp $
+ * $FreeBSD: src/sys/net/if.c,v 1.85.2.5 2001/03/29 09:45:04 yar Exp $
  */
 
 #include "opt_compat.h"
@@ -1312,6 +1312,12 @@ if_delmulti(ifp, sa)
 	sa = ifma->ifma_lladdr;
 	s = splimp();
 	LIST_REMOVE(ifma, ifma_link);
+	/*
+	 * Make sure the interface driver is notified
+	 * in the case of a link layer mcast group being left.
+	 */
+	if (ifma->ifma_addr->sa_family == AF_LINK && sa == 0)
+		ifp->if_ioctl(ifp, SIOCDELMULTI, 0);
 	splx(s);
 	free(ifma->ifma_addr, M_IFMADDR);
 	free(ifma, M_IFMADDR);

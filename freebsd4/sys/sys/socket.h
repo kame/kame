@@ -31,11 +31,16 @@
  * SUCH DAMAGE.
  *
  *	@(#)socket.h	8.4 (Berkeley) 2/21/94
- * $FreeBSD: src/sys/sys/socket.h,v 1.39.2.3 2000/09/22 14:44:16 asmodai Exp $
+ * $FreeBSD: src/sys/sys/socket.h,v 1.39.2.6 2001/02/26 07:24:22 ume Exp $
  */
 
 #ifndef _SYS_SOCKET_H_
 #define	_SYS_SOCKET_H_
+
+#include <machine/ansi.h>
+#define _NO_NAMESPACE_POLLUTION
+#include <machine/param.h>
+#undef _NO_NAMESPACE_POLLUTION
 
 /*
  * Definitions related to sockets: types, address families, options.
@@ -103,9 +108,9 @@ struct	linger {
 	int	l_linger;		/* linger time */
 };
 
-struct accept_filter_arg {
-	char    af_name[16];
-	char    af_arg[256-16];
+struct	accept_filter_arg {
+	char	af_name[16];
+	char	af_arg[256-16];
 };
 
 /*

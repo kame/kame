@@ -35,7 +35,7 @@
  * SUCH DAMAGE.
  *
  *	from: @(#)machdep.c	7.4 (Berkeley) 6/3/91
- * $FreeBSD: src/sys/i386/i386/machdep.c,v 1.385.2.9 2000/10/27 09:07:22 ps Exp $
+ * $FreeBSD: src/sys/i386/i386/machdep.c,v 1.385.2.11 2001/03/05 13:08:59 obrien Exp $
  */
 
 #include "apm.h"
@@ -236,8 +236,6 @@ static vm_offset_t buffer_sva, buffer_eva;
 vm_offset_t clean_sva, clean_eva;
 static vm_offset_t pager_sva, pager_eva;
 
-#define offsetof(type, member)	((size_t)(&((type *)0)->member))
-
 static void
 cpu_startup(dummy)
 	void *dummy;
@@ -372,6 +370,7 @@ again:
 			(nbuf*BKVASIZE) + (nswbuf*MAXPHYS) + pager_map_size);
 	buffer_map = kmem_suballoc(clean_map, &buffer_sva, &buffer_eva,
 				(nbuf*BKVASIZE));
+	buffer_map->system_map = 1;
 	pager_map = kmem_suballoc(clean_map, &pager_sva, &pager_eva,
 				(nswbuf*MAXPHYS) + pager_map_size);
 	pager_map->system_map = 1;

@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_socket2.c	8.1 (Berkeley) 6/10/93
- * $FreeBSD: src/sys/kern/uipc_socket2.c,v 1.55.2.7 2000/09/07 19:13:37 truckman Exp $
+ * $FreeBSD: src/sys/kern/uipc_socket2.c,v 1.55.2.8 2001/02/04 14:49:45 dwmalone Exp $
  */
 
 #include "opt_param.h"
@@ -718,8 +718,10 @@ sbcompress(sb, m, n)
 			m = m_free(m);
 			continue;
 		}
-		if (n && (n->m_flags & (M_EXT | M_EOR)) == 0 &&
-		    (n->m_data + n->m_len + m->m_len) < &n->m_dat[MLEN] &&
+		if (n && (n->m_flags & M_EOR) == 0 &&
+		    M_WRITABLE(n) &&
+		    m->m_len <= MCLBYTES / 4 && /* XXX: Don't copy too much */
+		    m->m_len <= M_TRAILINGSPACE(n) &&
 		    n->m_type == m->m_type) {
 			bcopy(mtod(m, caddr_t), mtod(n, caddr_t) + n->m_len,
 			    (unsigned)m->m_len);

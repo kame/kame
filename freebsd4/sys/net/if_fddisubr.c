@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  *
  *	from: if_ethersubr.c,v 1.5 1994/12/13 22:31:45 wollman Exp
- * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.41.2.4 2000/11/07 07:41:12 ume Exp $
+ * $FreeBSD: src/sys/net/if_fddisubr.c,v 1.41.2.5 2001/03/11 06:35:37 bmilekic Exp $
  */
 
 #include "opt_atalk.h"
@@ -184,7 +184,7 @@ fddi_output(ifp, m, dst, rt0)
 			return (0);	/* if not yet resolved */
 #else
 		if (!nd6_storelladdr(&ac->ac_if, rt, m, dst, (u_char *)edst)) {
-			/* something bad happened */
+			/* Something bad happened */
 			return(0);
 		}
 #endif /* OLDIP6OUTPUT */

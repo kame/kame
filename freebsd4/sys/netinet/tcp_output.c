@@ -31,14 +31,12 @@
  * SUCH DAMAGE.
  *
  *	@(#)tcp_output.c	8.4 (Berkeley) 5/24/95
- * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.39.2.6 2000/09/13 04:27:06 archie Exp $
+ * $FreeBSD: src/sys/netinet/tcp_output.c,v 1.39.2.8 2001/03/05 13:09:03 obrien Exp $
  */
 
 #include "opt_inet6.h"
 #include "opt_ipsec.h"
 #include "opt_tcpdebug.h"
-
-#include <stddef.h>
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -95,6 +93,9 @@ int ss_fltsz_local = TCP_MAXWIN;               /* something large */
 SYSCTL_INT(_net_inet_tcp, OID_AUTO, local_slowstart_flightsize, CTLFLAG_RW,
 	&ss_fltsz_local, 1, "Slow start flight size for local networks");
 
+int     tcp_do_newreno = 1;
+SYSCTL_INT(_net_inet_tcp, OID_AUTO, newreno, CTLFLAG_RW, &tcp_do_newreno,
+        0, "Enable NewReno Algorithms");
 /*
  * Tcp output routine: figure out what should be sent and send it.
  */
@@ -115,6 +116,7 @@ tcp_output(tp)
 	u_char opt[TCP_MAXOLEN];
 	unsigned ipoptlen, optlen, hdrlen;
 	int idle, sendalot;
+	int maxburst = TCP_MAXBURST;
 	struct rmxp_tao *taop;
 	struct rmxp_tao tao_noncached;
 #ifdef INET6
@@ -918,7 +920,7 @@ out:
 	tp->t_flags &= ~TF_ACKNOW;
 	if (tcp_delack_enabled)
 		callout_stop(tp->tt_delack);
-	if (sendalot)
+	if (sendalot && (!tcp_do_newreno || --maxburst))
 		goto again;
 	return (0);
 }

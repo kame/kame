@@ -13,10 +13,9 @@
  *
  * This software is provided ``AS IS'' without any warranties of any kind.
  *
- * $FreeBSD: src/sys/netinet/ip_fw.c,v 1.131.2.10 2000/11/07 09:50:58 ru Exp $
+ * $FreeBSD: src/sys/netinet/ip_fw.c,v 1.131.2.23 2001/03/28 05:19:00 simokawa Exp $
  */
 
-#define STATEFUL       1
 #define        DEB(x)
 #define        DDB(x) x
 
@@ -49,6 +48,7 @@
 #include <net/route.h>
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
+#include <netinet/in_var.h>
 #include <netinet/in_pcb.h>
 #include <netinet/ip.h>
 #include <netinet/ip_var.h>
@@ -79,17 +79,23 @@ static int fw_verbose_limit = IPFIREWALL_VERBOSE_LIMIT;
 static int fw_verbose_limit = 0;
 #endif
 
+/*
+ * Right now, two fields in the IP header are changed to host format
+ * by the IP layer before calling the firewall. Ideally, we would like
+ * to have them in network format so that the packet can be
+ * used as it comes from the device driver (and is thus readonly).
+ */
+
 static u_int64_t counter;	/* counter for ipfw_report(NULL...) */
 struct ipfw_flow_id last_pkt ;
 
 #define	IPFW_DEFAULT_RULE	((u_int)(u_short)~0)
 
-LIST_HEAD (ip_fw_head, ip_fw_chain) ip_fw_chain;
+LIST_HEAD (ip_fw_head, ip_fw_chain) ip_fw_chain_head;
 
 MALLOC_DEFINE(M_IPFW, "IpFw/IpAcct", "IpFw/IpAcct chain's");
 
 #ifdef SYSCTL_NODE
-SYSCTL_DECL(_net_inet_ip);
 SYSCTL_NODE(_net_inet_ip, OID_AUTO, fw, CTLFLAG_RW, 0, "Firewall");
 SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, enable, CTLFLAG_RW,
     &fw_enable, 0, "Enable ipfw");
@@ -103,7 +109,6 @@ SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, verbose, CTLFLAG_RW,
 SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, verbose_limit, CTLFLAG_RW, 
     &fw_verbose_limit, 0, "Set upper limit of matches of ipfw rules logged");
 
-#if STATEFUL
 /*
  * Extension for stateful ipfw.
  *
@@ -174,7 +179,6 @@ SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, dyn_rst_lifetime, CTLFLAG_RW,
     &dyn_rst_lifetime, 0, "Lifetime of dyn. rules for rst");
 SYSCTL_INT(_net_inet_ip_fw, OID_AUTO, dyn_short_lifetime, CTLFLAG_RW,
     &dyn_short_lifetime, 0, "Lifetime of dyn. rules for other situations");
-#endif /* STATEFUL */
 
 #endif
 
@@ -198,7 +202,7 @@ static __inline int
 				int range_flag, int mask));
 static int	tcpflg_match __P((struct tcphdr *tcp, struct ip_fw *f));
 static int	icmptype_match __P((struct icmp *  icmp, struct ip_fw * f));
-static void	ipfw_report __P((struct ip_fw *f, struct ip *ip,
+static void	ipfw_report __P((struct ip_fw *f, struct ip *ip, int offset,
 				struct ifnet *rif, struct ifnet *oif));
 
 static void flush_rule_ptrs(void);
@@ -244,10 +248,16 @@ static int
 tcpflg_match(struct tcphdr *tcp, struct ip_fw *f)
 {
 	u_char		flg_set, flg_clr;
-	
-	if ((f->fw_tcpf & IP_FW_TCPF_ESTAB) &&
-	    (tcp->th_flags & (IP_FW_TCPF_RST | IP_FW_TCPF_ACK)))
-		return 1;
+
+	/*
+	 * If an established connection is required, reject packets that
+	 * have only SYN of RST|ACK|SYN set.  Otherwise, fall through to
+	 * other flag requirements.
+	 */
+	if ((f->fw_ipflg & IP_FW_IF_TCPEST) &&
+	    ((tcp->th_flags & (IP_FW_TCPF_RST | IP_FW_TCPF_ACK |
+	    IP_FW_TCPF_SYN)) == IP_FW_TCPF_SYN))
+		return 0;
 
 	flg_set = tcp->th_flags & f->fw_tcpf;
 	flg_clr = tcp->th_flags & f->fw_tcpnf;
@@ -439,8 +449,7 @@ iface_match(struct ifnet *ifp, union ip_fw_if *ifu, int byname)
 	} else if (ifu->fu_via_ip.s_addr != 0) {	/* Zero == wildcard */
 		struct ifaddr *ia;
 
-		for (ia = ifp->if_addrhead.tqh_first;
-		    ia != NULL; ia = ia->ifa_link.tqe_next) {
+		TAILQ_FOREACH(ia, &ifp->if_addrhead, ifa_link) {
 			if (ia->ifa_addr == NULL)
 				continue;
 			if (ia->ifa_addr->sa_family != AF_INET)
@@ -456,7 +465,7 @@ iface_match(struct ifnet *ifp, union ip_fw_if *ifu, int byname)
 }
 
 static void
-ipfw_report(struct ip_fw *f, struct ip *ip,
+ipfw_report(struct ip_fw *f, struct ip *ip, int offset,
 	struct ifnet *rif, struct ifnet *oif)
 {
     struct tcphdr *const tcp = (struct tcphdr *) ((u_int32_t *) ip+ ip->ip_hl);
@@ -541,33 +550,33 @@ ipfw_report(struct ip_fw *f, struct ip *ip,
     case IPPROTO_TCP:
 	    len = snprintf(SNPARGS(proto, 0), "TCP %s",
 		inet_ntoa(ip->ip_src));
-	    if ((ip->ip_off & IP_OFFMASK) == 0)
+	    if (offset == 0)
 		    len += snprintf(SNPARGS(proto, len), ":%d ",
 			ntohs(tcp->th_sport));
 	    else
 		    len += snprintf(SNPARGS(proto, len), " ");
 	    len += snprintf(SNPARGS(proto, len), "%s",
 		inet_ntoa(ip->ip_dst));
-	    if ((ip->ip_off & IP_OFFMASK) == 0)
+	    if (offset == 0)
 		    snprintf(SNPARGS(proto, len), ":%d",
 			ntohs(tcp->th_dport));
 	    break;
     case IPPROTO_UDP:
 	    len = snprintf(SNPARGS(proto, 0), "UDP %s",
 		inet_ntoa(ip->ip_src));
-	    if ((ip->ip_off & IP_OFFMASK) == 0)
+	    if (offset == 0)
 		    len += snprintf(SNPARGS(proto, len), ":%d ",
 			ntohs(udp->uh_sport));
 	    else
 		    len += snprintf(SNPARGS(proto, len), " ");
 	    len += snprintf(SNPARGS(proto, len), "%s",
 		inet_ntoa(ip->ip_dst));
-	    if ((ip->ip_off & IP_OFFMASK) == 0)
+	    if (offset == 0)
 		    snprintf(SNPARGS(proto, len), ":%d",
 			ntohs(udp->uh_dport));
 	    break;
     case IPPROTO_ICMP:
-	    if ((ip->ip_off & IP_OFFMASK) == 0)
+	    if (offset == 0)
 		    len = snprintf(SNPARGS(proto, 0), "ICMP:%u.%u ",
 			icmp->icmp_type, icmp->icmp_code);
 	    else
@@ -583,9 +592,9 @@ ipfw_report(struct ip_fw *f, struct ip *ip,
 	    break;
     }
 
-    if ((ip->ip_off & IP_OFFMASK))
+    if (offset != 0)
 	    snprintf(SNPARGS(fragment, 0), " Fragment = %d",
-		ip->ip_off & IP_OFFMASK);
+		offset);
     else
 	    fragment[0] = '\0';
     if (oif)
@@ -605,7 +614,6 @@ ipfw_report(struct ip_fw *f, struct ip *ip,
 		f ? f->fw_number : -1);
 }
 
-#if STATEFUL
 static __inline int
 hash_packet(struct ipfw_flow_id *id)
 {
@@ -730,7 +738,7 @@ found:
 	case TH_SYN | (TH_SYN << 8) | TH_FIN :
 	case TH_SYN | (TH_SYN << 8) | (TH_FIN << 8) :
 	    /* one side tries to close */
-	    q->expire = time_second + dyn_fin_lifetime ;
+	    q->expire = time_second + dyn_ack_lifetime ;
 	    break ;
 	case TH_SYN | (TH_SYN << 8) | TH_FIN | (TH_FIN << 8) :
 	    /* both sides closed */
@@ -780,20 +788,18 @@ add_dyn_rule(struct ipfw_flow_id *id, struct ipfw_flow_id *mask,
            if (ipfw_dyn_v != NULL)
 		free(ipfw_dyn_v, M_IPFW);
            ipfw_dyn_v = malloc(curr_dyn_buckets * sizeof r,
-                   M_IPFW, M_DONTWAIT);
+                   M_IPFW, M_DONTWAIT | M_ZERO);
 	   if (ipfw_dyn_v == NULL)
 		return ; /* failed ! */
-           bzero(ipfw_dyn_v, curr_dyn_buckets * sizeof r);
        }
     }
     i = hash_packet(id);
 
-    r = malloc(sizeof *r, M_IPFW, M_DONTWAIT);
+    r = malloc(sizeof *r, M_IPFW, M_DONTWAIT | M_ZERO);
     if (r == NULL) {
        printf ("sorry cannot allocate state\n");
        return ;
     }
-    bzero (r, sizeof (*r) );
 
     if (mask)
 	r->mask = *mask ;
@@ -855,7 +861,6 @@ install_state(struct ip_fw_chain *chain)
     }
     q = lookup_dyn_rule(&last_pkt, NULL) ; /* XXX this just sets the lifetime ... */
 }
-#endif /* STATEFUL */
 
 /*
  * given an ip_fw_chain *, lookup_next_rule will return a pointer
@@ -874,10 +879,10 @@ lookup_next_rule(struct ip_fw_chain *me)
     int rule = me->rule->fw_skipto_rule ; /* guess... */
 
     if ( (me->rule->fw_flg & IP_FW_F_COMMAND) == IP_FW_F_SKIPTO )
-	for (chain = me->chain.le_next; chain ; chain = chain->chain.le_next )
+	for (chain = LIST_NEXT(me,next); chain ; chain = LIST_NEXT(chain,next))
 	    if (chain->rule->fw_number >= rule)
                 return chain ;
-    return me->chain.le_next ; /* failure or not a skipto */
+    return LIST_NEXT(me,next) ; /* failure or not a skipto */
 }
 
 /*
@@ -895,6 +900,7 @@ lookup_next_rule(struct ip_fw_chain *me)
  *
  * Return value:
  *
+ *	IP_FW_PORT_DENY_FLAG	the packet must be dropped.
  *	0	The packet is to be accepted and routed normally OR
  *      	the packet was denied/rejected and has been dropped;
  *		in the latter case, *m is equal to NULL upon return.
@@ -917,22 +923,24 @@ ip_fw_chk(struct ip **pip, int hlen,
 	struct ip_fw *f = NULL, *rule = NULL;
 	struct ip *ip = *pip;
 	struct ifnet *const rif = (*m)->m_pkthdr.rcvif;
+	struct ifnet *tif;
 	u_short offset = 0 ;
 	u_short src_port = 0, dst_port = 0;
 	struct in_addr src_ip, dst_ip; /* XXX */
 	u_int8_t proto= 0, flags = 0 ; /* XXX */
 	u_int16_t skipto, bridgeCookie;
+	u_int16_t ip_len;
 
-#if STATEFUL
 	int dyn_checked = 0 ; /* set after dyn.rules have been checked. */
 	int direction = MATCH_FORWARD ; /* dirty trick... */
 	struct ipfw_dyn_rule *q = NULL ;
-#endif
 
 	/* Special hack for bridging (as usual) */
 	if (cookie == NULL) {
 		bridgeCookie = 0;
 		cookie = &bridgeCookie;
+#define BRIDGED	(cookie == &bridgeCookie)
+		hlen = ip->ip_hl << 2;
 	}
 
 	/* Grab and reset cookie */
@@ -941,6 +949,7 @@ ip_fw_chk(struct ip **pip, int hlen,
 
 #define PULLUP_TO(len)	do {						\
 			    if ((*m)->m_len < (len)) {			\
+				ip = NULL ;				\
 				if ((*m = m_pullup(*m, (len))) == 0)	\
 				    goto bogusfrag;			\
 				ip = mtod(*m, struct ip *);		\
@@ -954,7 +963,13 @@ ip_fw_chk(struct ip **pip, int hlen,
 	proto = ip->ip_p;
 	src_ip = ip->ip_src;
 	dst_ip = ip->ip_dst;
-	offset = (ip->ip_off & IP_OFFMASK);
+	if (0 && BRIDGED) { /* not yet... */
+	    offset = (ntohs(ip->ip_off) & IP_OFFMASK);
+	    ip_len = ntohs(ip->ip_len);
+	} else {
+	    offset = (ip->ip_off & IP_OFFMASK);
+	    ip_len = ip->ip_len;
+	}
 	if (offset == 0) {
 	    struct tcphdr *tcp;
 	    struct udphdr *udp;
@@ -1001,7 +1016,7 @@ ip_fw_chk(struct ip **pip, int hlen,
 		 * Packet has already been tagged. Look for the next rule
 		 * to restart processing.
 		 */
-		chain = LIST_NEXT(*flow_id, chain);
+		chain = LIST_NEXT(*flow_id, next);
 
 		if ((chain = (*flow_id)->rule->next_rule_ptr) == NULL)
 			chain = (*flow_id)->rule->next_rule_ptr =
@@ -1013,25 +1028,24 @@ ip_fw_chk(struct ip **pip, int hlen,
 		 * Go down the chain, looking for enlightment.
 		 * If we've been asked to start at a given rule, do so.
 		 */
-		chain = LIST_FIRST(&ip_fw_chain);
+		chain = LIST_FIRST(&ip_fw_chain_head);
 		if (skipto != 0) {
 			if (skipto >= IPFW_DEFAULT_RULE)
 				goto dropit;
 			while (chain && chain->rule->fw_number <= skipto)
-				chain = LIST_NEXT(chain, chain);
+				chain = LIST_NEXT(chain, next);
 			if (chain == NULL)
 				goto dropit;
 		}
 	}
 
 
-	for (; chain; chain = LIST_NEXT(chain, chain)) {
+	for (; chain; chain = LIST_NEXT(chain, next)) {
 again:
 		f = chain->rule;
 		if (f->fw_number == IPFW_DEFAULT_RULE)
 		    goto got_match ;
 
-#if STATEFUL
 		/*
 		 * dynamic rules are checked at the first keep-state or
 		 * check-state occurrence.
@@ -1048,17 +1062,16 @@ again:
 			chain = q->chain ;
 			f = chain->rule ;
 			q->pcnt++ ;
-			q->bcnt += ip->ip_len;
+			q->bcnt += ip_len;
 			goto got_match ; /* random not allowed here */
 		    }
 		    /* if this was a check-only rule, continue with next */
 		    if (f->fw_flg & IP_FW_F_CHECK_S)
 			continue ;
 		}
-#endif /* stateful ipfw */
 
 		/* Check if rule only valid for bridged packets */
-		if ((f->fw_flg & IP_FW_BRIDGED) != 0 && cookie != &bridgeCookie)
+		if ((f->fw_flg & IP_FW_BRIDGED) != 0 && !(BRIDGED))
 			continue;
 
 		if (oif) {
@@ -1075,6 +1088,16 @@ again:
 		if ((f->fw_flg & IP_FW_F_FRAG) && offset == 0 )
 			continue;
 
+		if (f->fw_flg & IP_FW_F_SME) {
+			INADDR_TO_IFP(src_ip, tif);
+			if (tif == NULL)
+				continue;
+		}
+		if (f->fw_flg & IP_FW_F_DME) {
+			INADDR_TO_IFP(dst_ip, tif);
+			if (tif == NULL)
+				continue;
+		}
 		/* If src-addr doesn't match, not this rule. */
 		if (((f->fw_flg & IP_FW_F_INVSRC) != 0) ^ ((src_ip.s_addr
 		    & f->fw_smsk.s_addr) != f->fw_src.s_addr))
@@ -1202,6 +1225,7 @@ again:
 				 * we consider the rule a non-match.
 				 */
 				if (f->fw_nports != 0 ||
+				    f->fw_tcpopt != f->fw_tcpnopt ||
 				    f->fw_tcpf != f->fw_tcpnf)
 					continue;
 
@@ -1211,7 +1235,9 @@ again:
 
 			if (f->fw_tcpopt != f->fw_tcpnopt && !tcpopts_match(tcp, f))
 				continue;
-			if (f->fw_tcpf != f->fw_tcpnf && !tcpflg_match(tcp, f))
+			if (((f->fw_tcpf != f->fw_tcpnf) ||
+			    (f->fw_ipflg & IP_FW_IF_TCPEST)) &&
+			    !tcpflg_match(tcp, f))
 				continue;
 			goto check_ports;
 		    }
@@ -1257,8 +1283,8 @@ check_ports:
 			break;
 
 bogusfrag:
-		if (fw_verbose)
-			ipfw_report(NULL, ip, rif, oif);
+		if (fw_verbose && ip != NULL)
+			ipfw_report(NULL, ip, offset, rif, oif);
 		goto dropit;
 
 		}
@@ -1268,23 +1294,21 @@ rnd_then_got_match:
 		    random() < ((struct ip_fw_ext *)f)->dont_match_prob )
 			continue ;
 got_match:
-#if STATEFUL   /* stateful ipfw */
 		/*
 		 * If not a dynamic match (q == NULL) and keep-state, install
 		 * a new dynamic entry.
 		 */
 		if (q == NULL && f->fw_flg & IP_FW_F_KEEP_S)
 		    install_state(chain);
-#endif
 		*flow_id = chain ; /* XXX set flow id */
 		/* Update statistics */
 		f->fw_pcnt += 1;
-		f->fw_bcnt += ip->ip_len;
+		f->fw_bcnt += ip_len;
 		f->timestamp = time_second;
 
 		/* Log to console if desired */
 		if ((f->fw_flg & IP_FW_F_PRN) && fw_verbose)
-			ipfw_report(f, ip, rif, oif);
+			ipfw_report(f, ip, offset, rif, oif);
 
 		/* Take appropriate action */
 		switch (f->fw_flg & IP_FW_F_COMMAND) {
@@ -1355,6 +1379,7 @@ got_match:
 		switch (rule->fw_reject_code) {
 		case IP_FW_REJECT_RST:
 		  {
+			/* XXX warning, this code writes into the mbuf */
 			struct tcphdr *const tcp =
 				(struct tcphdr *) ((u_int32_t *)ip + ip->ip_hl);
 			struct tcpiphdr ti, *const tip = (struct tcpiphdr *) ip;
@@ -1366,10 +1391,10 @@ got_match:
 			bcopy(&ti, ip, sizeof(ti));
 			NTOHL(tip->ti_seq);
 			NTOHL(tip->ti_ack);
-			tip->ti_len = ip->ip_len - hlen - (tip->ti_off << 2);
+			tip->ti_len = ip_len - hlen - (tip->ti_off << 2);
 			if (tcp->th_flags & TH_ACK) {
 				tcp_respond(NULL, (void *)ip, tcp, *m,
-				    (tcp_seq)0, ntohl(tcp->th_ack), TH_RST);
+				    (tcp_seq)0, tcp->th_ack, TH_RST);
 			} else {
 				if (tcp->th_flags & TH_SYN)
 					tip->ti_len++;
@@ -1392,11 +1417,8 @@ dropit:
 	/*
 	 * Finally, drop the packet.
 	 */
-	if (*m) {
-		m_freem(*m);
-		*m = NULL;
-	}
-	return(0);
+	return(IP_FW_PORT_DENY_FLAG);
+#undef BRIDGED
 }
 
 /*
@@ -1410,7 +1432,7 @@ flush_rule_ptrs()
 {
     struct ip_fw_chain *fcp ;
 
-    for (fcp = ip_fw_chain.lh_first; fcp; fcp = fcp->chain.le_next) {
+    LIST_FOREACH(fcp, &ip_fw_chain_head, next) {
 	fcp->rule->next_rule_ptr = NULL ;
     }
 }
@@ -1425,7 +1447,7 @@ add_entry(struct ip_fw_head *chainptr, struct ip_fw *frwl)
 	int s;
 
 	fwc = malloc(sizeof *fwc, M_IPFW, M_DONTWAIT);
-	ftmp_ext = malloc(sizeof *ftmp_ext, M_IPFW, M_DONTWAIT);
+	ftmp_ext = malloc(sizeof *ftmp_ext, M_IPFW, M_DONTWAIT | M_ZERO);
 	ftmp = &ftmp_ext->rule ;
 	if (!fwc || !ftmp) {
 		dprintf(("%s malloc said no\n", err_prefix));
@@ -1434,7 +1456,6 @@ add_entry(struct ip_fw_head *chainptr, struct ip_fw *frwl)
 		return (ENOSPC);
 	}
 
-	bzero(ftmp_ext, sizeof(*ftmp_ext)); /* play safe! */
 	bcopy(frwl, ftmp, sizeof(*ftmp));
 	if (ftmp->fw_flg & IP_FW_F_RND_MATCH)
 		ftmp_ext->dont_match_prob = (intptr_t)ftmp->pipe_ptr;
@@ -1450,15 +1471,15 @@ add_entry(struct ip_fw_head *chainptr, struct ip_fw *frwl)
 	
 	s = splnet();
 
-	if (chainptr->lh_first == 0) {
-		LIST_INSERT_HEAD(chainptr, fwc, chain);
+	if (LIST_FIRST(chainptr) == 0) {
+		LIST_INSERT_HEAD(chainptr, fwc, next);
 		splx(s);
 		return(0);
         }
 
 	/* If entry number is 0, find highest numbered rule and add 100 */
 	if (ftmp->fw_number == 0) {
-		for (fcp = LIST_FIRST(chainptr); fcp; fcp = LIST_NEXT(fcp, chain)) {
+		LIST_FOREACH(fcp, chainptr, next) {
 			if (fcp->rule->fw_number != (u_short)-1)
 				nbr = fcp->rule->fw_number;
 			else
@@ -1470,12 +1491,12 @@ add_entry(struct ip_fw_head *chainptr, struct ip_fw *frwl)
 	}
 
 	/* Got a valid number; now insert it, keeping the list ordered */
-	for (fcp = LIST_FIRST(chainptr); fcp; fcp = LIST_NEXT(fcp, chain)) {
+	LIST_FOREACH(fcp, chainptr, next) {
 		if (fcp->rule->fw_number > ftmp->fw_number) {
 			if (fcpl) {
-				LIST_INSERT_AFTER(fcpl, fwc, chain);
+				LIST_INSERT_AFTER(fcpl, fwc, next);
 			} else {
-				LIST_INSERT_HEAD(chainptr, fwc, chain);
+				LIST_INSERT_HEAD(chainptr, fwc, next);
 			}
 			break;
 		} else {
@@ -1495,7 +1516,7 @@ del_entry(struct ip_fw_head *chainptr, u_short number)
 
 	fcp = LIST_FIRST(chainptr);
 	if (number != (u_short)-1) {
-		for (; fcp; fcp = LIST_NEXT(fcp, chain)) {
+		for (; fcp; fcp = LIST_NEXT(fcp, next)) {
 			if (fcp->rule->fw_number == number) {
 				int s;
 
@@ -1504,11 +1525,9 @@ del_entry(struct ip_fw_head *chainptr, u_short number)
 				while (fcp && fcp->rule->fw_number == number) {
 					struct ip_fw_chain *next;
 
-#if STATEFUL
-					remove_dyn_rule(fcp, 1 /* force_delete */);
-#endif
-					next = LIST_NEXT(fcp, chain);
-					LIST_REMOVE(fcp, chain);
+					remove_dyn_rule(fcp, 1 /* delete */);
+					next = LIST_NEXT(fcp, next);
+					LIST_REMOVE(fcp, next);
 #ifdef DUMMYNET
 					dn_rule_delete(fcp) ;
 #endif
@@ -1534,7 +1553,7 @@ zero_entry(struct ip_fw *frwl)
 
 	if (frwl == 0) {
 		s = splnet();
-		for (fcp = LIST_FIRST(&ip_fw_chain); fcp; fcp = LIST_NEXT(fcp, chain)) {
+		LIST_FOREACH(fcp, &ip_fw_chain_head, next) {
 			fcp->rule->fw_bcnt = fcp->rule->fw_pcnt = 0;
 			fcp->rule->fw_loghighest = fcp->rule->fw_logamount;
 			fcp->rule->timestamp = 0;
@@ -1549,7 +1568,7 @@ zero_entry(struct ip_fw *frwl)
 		 *	same number, so we don't stop after finding the first
 		 *	match if zeroing a specific entry.
 		 */
-		for (fcp = LIST_FIRST(&ip_fw_chain); fcp; fcp = LIST_NEXT(fcp, chain))
+		LIST_FOREACH(fcp, &ip_fw_chain_head, next)
 			if (frwl->fw_number == fcp->rule->fw_number) {
 				s = splnet();
 				while (fcp && frwl->fw_number == fcp->rule->fw_number) {
@@ -1557,7 +1576,7 @@ zero_entry(struct ip_fw *frwl)
 					fcp->rule->fw_loghighest =
 					    fcp->rule->fw_logamount;
 					fcp->rule->timestamp = 0;
-					fcp = LIST_NEXT(fcp, chain);
+					fcp = LIST_NEXT(fcp, next);
 				}
 				splx(s);
 				cleared = 1;
@@ -1588,7 +1607,7 @@ resetlog_entry(struct ip_fw *frwl)
 	if (frwl == 0) {
 		s = splnet();
 		counter = 0;
-		for (fcp = LIST_FIRST(&ip_fw_chain); fcp; fcp = LIST_NEXT(fcp, chain))
+		LIST_FOREACH(fcp, &ip_fw_chain_head, next)
 			fcp->rule->fw_loghighest = fcp->rule->fw_pcnt +
 			    fcp->rule->fw_logamount;
 		splx(s);
@@ -1601,14 +1620,14 @@ resetlog_entry(struct ip_fw *frwl)
 		 *	same number, so we don't stop after finding the first
 		 *	match if zeroing a specific entry.
 		 */
-		for (fcp = LIST_FIRST(&ip_fw_chain); fcp; fcp = LIST_NEXT(fcp, chain))
+		LIST_FOREACH(fcp, &ip_fw_chain_head, next)
 			if (frwl->fw_number == fcp->rule->fw_number) {
 				s = splnet();
 				while (fcp && frwl->fw_number == fcp->rule->fw_number) {
 					fcp->rule->fw_loghighest =
 					    fcp->rule->fw_pcnt +
 					    fcp->rule->fw_logamount;
-					fcp = LIST_NEXT(fcp, chain);
+					fcp = LIST_NEXT(fcp, next);
 				}
 				splx(s);
 				cleared = 1;
@@ -1780,10 +1799,9 @@ ip_fw_ctl(struct sockopt *sopt)
 
 	switch (sopt->sopt_name) {
 	case IP_FW_GET:
-		for (fcp = LIST_FIRST(&ip_fw_chain), size = 0; fcp;
-		     fcp = LIST_NEXT(fcp, chain))
-			size += sizeof *fcp->rule;
-#if STATEFUL
+		size = 0 ;
+		LIST_FOREACH(fcp, &ip_fw_chain_head, next)
+		    size += sizeof(struct ip_fw) ;
 		if (ipfw_dyn_v) {
 		    int i ;
 		    struct ipfw_dyn_rule *p ;
@@ -1792,15 +1810,14 @@ ip_fw_ctl(struct sockopt *sopt)
 			for ( p = ipfw_dyn_v[i] ; p != NULL ; p = p->next )
 			    size += sizeof(*p) ;
 		}
-#endif
 		buf = malloc(size, M_TEMP, M_WAITOK);
 		if (buf == 0) {
 			error = ENOBUFS;
 			break;
 		}
 
-		for (fcp = LIST_FIRST(&ip_fw_chain), bp = buf; fcp;
-		     fcp = LIST_NEXT(fcp, chain)) {
+		bp = buf ;
+		LIST_FOREACH(fcp, &ip_fw_chain_head, next) {
 			bcopy(fcp->rule, bp, sizeof *fcp->rule);
 			bp->pipe_ptr = (void *)(intptr_t)
 			    ((struct ip_fw_ext *)fcp->rule)->dont_match_prob;
@@ -1808,7 +1825,6 @@ ip_fw_ctl(struct sockopt *sopt)
 			    ((struct ip_fw_ext *)fcp->rule)->dyn_type;
 			bp++;
 		}
-#if STATEFUL
 		if (ipfw_dyn_v) {
 		    int i ;
 		    struct ipfw_dyn_rule *p, *dst, *last = NULL ;
@@ -1828,22 +1844,18 @@ ip_fw_ctl(struct sockopt *sopt)
 		    if (last != NULL)
 			last->next = NULL ;
 		}
-#endif
 		error = sooptcopyout(sopt, buf, size);
 		FREE(buf, M_TEMP);
 		break;
 
 	case IP_FW_FLUSH:
-#if STATEFUL
-               s = splnet();
-               remove_dyn_rule(NULL, 1 /* force delete */);
-               splx(s);
-#endif
-		for (fcp = ip_fw_chain.lh_first; 
-		     fcp != 0 && fcp->rule->fw_number != IPFW_DEFAULT_RULE;
-		     fcp = ip_fw_chain.lh_first) {
+		s = splnet();
+		remove_dyn_rule(NULL, 1 /* force delete */);
+		splx(s);
+		while ( (fcp = LIST_FIRST(&ip_fw_chain_head)) &&
+		     fcp->rule->fw_number != IPFW_DEFAULT_RULE ) {
 			s = splnet();
-			LIST_REMOVE(fcp, chain);
+			LIST_REMOVE(fcp, next);
 #ifdef DUMMYNET
 			dn_rule_delete(fcp);
 #endif
@@ -1874,7 +1886,7 @@ ip_fw_ctl(struct sockopt *sopt)
 				 (unsigned)IPFW_DEFAULT_RULE));
 			error = EINVAL;
 		} else {
-			error = add_entry(&ip_fw_chain, &frwl);
+			error = add_entry(&ip_fw_chain_head, &frwl);
 			if (!error && sopt->sopt_dir == SOPT_GET)
 				error = sooptcopyout(sopt, &frwl, sizeof frwl);
 		}
@@ -1890,7 +1902,7 @@ ip_fw_ctl(struct sockopt *sopt)
 				 (unsigned)IPFW_DEFAULT_RULE));
 			error = EINVAL;
 		} else {
-			error = del_entry(&ip_fw_chain, frwl.fw_number);
+			error = del_entry(&ip_fw_chain_head, frwl.fw_number);
 		}
 		break;
 
@@ -1922,7 +1934,7 @@ ip_fw_init(void)
 
 	ip_fw_chk_ptr = ip_fw_chk;
 	ip_fw_ctl_ptr = ip_fw_ctl;
-	LIST_INIT(&ip_fw_chain);
+	LIST_INIT(&ip_fw_chain_head);
 
 	bzero(&default_rule, sizeof default_rule);
 	default_rule.fw_prot = IPPROTO_IP;
@@ -1934,10 +1946,10 @@ ip_fw_init(void)
 #endif
 	default_rule.fw_flg |= IP_FW_F_IN | IP_FW_F_OUT;
 	if (check_ipfw_struct(&default_rule) != 0 ||
-	    add_entry(&ip_fw_chain, &default_rule))
+	    add_entry(&ip_fw_chain_head, &default_rule))
 		panic("ip_fw_init");
 
-	ip_fw_default_rule = ip_fw_chain.lh_first ;
+	ip_fw_default_rule = LIST_FIRST(&ip_fw_chain_head) ;
 	printf("IP packet filtering initialized, "
 #ifdef IPDIVERT
 		"divert enabled, "
@@ -1972,6 +1984,7 @@ static int
 ipfw_modevent(module_t mod, int type, void *unused)
 {
 	int s;
+	struct ip_fw_chain *fcp;
 	
 	switch (type) {
 	case MOD_LOAD:
@@ -1987,12 +2000,9 @@ ipfw_modevent(module_t mod, int type, void *unused)
 		s = splnet();
 		ip_fw_chk_ptr =  old_chk_ptr;
 		ip_fw_ctl_ptr =  old_ctl_ptr;
-#if STATEFUL
 		remove_dyn_rule(NULL, 1 /* force delete */);
-#endif
-		while (LIST_FIRST(&ip_fw_chain) != NULL) {
-			struct ip_fw_chain *fcp = LIST_FIRST(&ip_fw_chain);
-			LIST_REMOVE(LIST_FIRST(&ip_fw_chain), chain);
+		while ( (fcp = LIST_FIRST(&ip_fw_chain_head)) != NULL) {
+			LIST_REMOVE(fcp, next);
 #ifdef DUMMYNET
 			dn_rule_delete(fcp);
 #endif

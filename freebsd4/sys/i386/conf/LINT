@@ -2,7 +2,7 @@
 # LINT -- config file for checking all the sources, tries to pull in
 #	as much of the source tree as it can.
 #
-# $FreeBSD: src/sys/i386/conf/LINT,v 1.749.2.38 2000/11/18 09:22:07 non Exp $
+# $FreeBSD: src/sys/i386/conf/LINT,v 1.749.2.49 2001/04/17 19:55:44 alfred Exp $
 #
 # NB: You probably don't want to try running a kernel built from this
 # file.  Instead, you should start from GENERIC, and add options from
@@ -294,7 +294,7 @@ options 	SEMUME=11	# max number of undo entries per process
 
 # System V message queues and tunable parameters
 options 	SYSVMSG		# include support for message queues
-options 	MSGMNB=2049	# max characters per message
+options 	MSGMNB=2049	# max characters per message queue
 options 	MSGMNI=41	# max number of message queue identifiers
 options 	MSGSEG=2049	# max number of message segments in the system
 options 	MSGSSZ=16	# size of a message segment MUST be power of 2
@@ -477,6 +477,7 @@ device		mn	# Munich32x/Falc54 Nx64kbit/sec cards.
 # See pppd(8) for more details.
 #
 pseudo-device	ether			#Generic Ethernet
+pseudo-device	vlan	1		#VLAN support
 pseudo-device	token			#Generic TokenRing
 pseudo-device	fddi			#Generic FDDI
 pseudo-device	sppp			#Generic Synchronous PPP
@@ -554,6 +555,7 @@ options 	IPV6FIREWALL_DEFAULT_TO_ACCEPT
 options 	IPDIVERT		#divert sockets
 options 	IPFILTER		#ipfilter support
 options 	IPFILTER_LOG		#ipfilter logging
+options		IPFILTER_DEFAULT_BLOCK	#block all packets by default
 options 	IPSTEALTH		#support for stealth forwarding
 options 	TCPDEBUG
 
@@ -677,7 +679,12 @@ options 	MD_ROOT
 options 	MD_NSECT=40000
 
 # Allow this many swap-devices.
-options 	NSWAPDEV=20
+#
+# In order to manage swap, the system must reserve bitmap space that
+# scales with the largest mounted swap device multiplied by NSWAPDEV, 
+# irregardless of whether other swap devices exist or not.  So it
+# is not a good idea to make this value too large.
+options 	NSWAPDEV=5
 
 # Disk quotas are supported when this option is enabled.
 options 	QUOTA			#enable disk quotas
@@ -1108,6 +1115,16 @@ device		nsp
 device		stg0	at isa? port 0x140 irq 11
 
 #
+# Adaptec FSA RAID controllers, including integrated DELL controller,
+# the Dell PERC 2/QC and the HP NetRAID-4M
+#
+# AAC_COMPAT_LINUX	Include code to support Linux-binary management
+#			utilities (requires Linux compatibility
+#			support).
+#
+device		aac
+
+#
 # Compaq Smart RAID, Mylex DAC960 and AMI MegaRAID controllers.  Only
 # one entry is needed; the code will find and configure all supported
 # controllers.
@@ -1127,16 +1144,11 @@ device		atapicd		# ATAPI CDROM drives
 device		atapifd		# ATAPI floppy drives
 device		atapist		# ATAPI tape drives
 
-#The folliwing options are valid on the ATA driver:
+#The following options are valid on the ATA driver:
 #
 # ATA_STATIC_ID:	controller numbering is static (like the old driver)
 #			else the device numbers are dynamically allocated.
-# ATA_ENABLE_ATAPI_DMA:	enable DMA on ATAPI device, since many ATAPI devices
-#			claim to support DMA but doesn't actually work, this
-#			is not enabled as default.
-
 options 	ATA_STATIC_ID
-options 	ATA_ENABLE_ATAPI_DMA
 
 #
 # For older non-PCI systems, these are the lines to use:
@@ -1298,12 +1310,14 @@ options 	COM_MULTIPORT		#code for some cards with shared IRQs
 # rdp: RealTek RTL 8002-based pocket ethernet adapters
 # sr: RISCom/N2 hdlc sync 1/2 port V.35/X.21 serial driver (requires sppp)
 # wl: Lucent Wavelan (ISA card only).
+# awi: IEEE 802.11b PRISM I cards.
 # wi: Lucent WaveLAN/IEEE 802.11 PCMCIA adapters. Note: this supports both
 #     the PCMCIA and ISA cards: the ISA card is really a PCMCIA to ISA
 #     bridge with a PCMCIA adapter plugged into it.
 # an: Aironet 4500/4800 802.11 wireless adapters. Supports the PCMCIA,
 #     PCI and ISA varieties.
 # xe: Xircom/Intel EtherExpress Pro100/16 PC Card ethernet controller.
+# ray: Raytheon Raylink 802.11 wireless NICs, OEM as Webgear Aviator 2.4GHz
 # oltr: Olicom ISA token-ring adapters OC-3115, OC-3117, OC-3118 and OC-3133
 #       (no options needed)
 #
@@ -1322,12 +1336,14 @@ device lnc0 at isa? port 0x280 irq 10 drq 0
 device rdp0 at isa? port 0x378 irq 7 flags 2
 device sr0 at isa? port 0x300 irq 5 iomem 0xd0000
 device sn0 at isa? port 0x300 irq 10
+device awi
 device wi
 device an
 options 	WLCACHE		# enables the signal-strength cache
 options 	WLDEBUG		# enables verbose debugging output
 device wl0 at isa? port 0x300
 device xe
+device ray
 
 device oltr0 at isa?
 
@@ -1827,67 +1843,13 @@ device		pci
 device		ahc		# AHA2940 and onboard AIC7xxx devices
 device		amd		# AMD 53C974 (Teckram DC-390(T))
 device		isp		# Qlogic family
+device		ispfw		# Firmware for QLogic HBAs
 device		ncr		# NCR/Symbios Logic
 device		sym		# NCR/Symbios Logic (newer chipsets)
 #
 # Options for ISP
 #
-#	SCSI_ISP_NO_FWLOAD_MASK	- mask of isp unit numbers (obviously
-#				  a max of 32) that you wish to disable
-#				  to disable the loading of firmware on.
-#	SCSI_ISP_NO_NVRAM_MASK	- mask of isp unit numbers (obviously
-#				  a max of 32) that you wish to disable
-#				  them picking up information from NVRAM
-#				  (for broken cards you can't fix the NVRAM
-#				  on- very rare, or for systems you can't
-#				  change NVRAM on (e.g. alpha) and you don't
-#				  like what's in there)
-#	SCSI_ISP_PREFER_MEM_MAP	- control preference for using memory mappings
-#				  instead of I/O space mappings. It defaults
-#				  to 1 for i386, 0 for alpha. Set to 1 to
-#				  unconditionally prefer mapping memory,
-#				  else it will use I/O space mappings. Of
-#				  course, this can fail if the PCI implement-
-#				  ation doesn't support what you want.
-#
-#	SCSI_ISP_FCDUPLEX	- mask of isp unit numbers (obviously
-#				  a max of 32) that you wish to set fibre
-#				  channel full duplex mode on.
-#				  to disable the loading of firmware on.
-#	SCSI_ISP_FABRIC		  enable loading of Fabric f/w flavor (2100).
-#	SCSI_ISP_SCCLUN		  enable loading of expanded lun f/w (2100).
-#	SCSI_ISP_WWN		- define a WWN to use as a default
-#
-#	ISP_DISABLE_1020_SUPPORT	Disable support for 1020/1040 cards
-#	ISP_DISABLE_1080_SUPPORT	Disable support for 1080/1240 cards
-#	ISP_DISABLE_12160_SUPPORT	Disable support for 12160 cards
-#	ISP_DISABLE_2100_SUPPORT	Disable support for 2100 cards
-#	(these really just to save some code space)
-#	(use of all four will cause the kernel to not compile)
-#
-#	ISP_COMPILE_FW		-	compile all firmware in
-#	ISP_COMPILE_1020_FW	-	compile in 1020/1040 firmware
-#	ISP_COMPILE_1080_FW	-	compile in 1080/1240/1280 firmware
-#	ISP_COMPILE_12160_FW	-	compile in 12160 firmware
-#	ISP_COMPILE_2100_FW	-	compile in 2100 firmware
-#	ISP_COMPILE_2200_FW	-	compile in 2200 firmware
-#
 #	ISP_TARGET_MODE		-	enable target mode operation
-#
-#options 	SCSI_ISP_NO_FWLOAD_MASK=0x12	# disable FW load for isp1, isp4
-#options 	SCSI_ISP_NO_NVRAM_MASK=0x1	# disable NVRAM for isp0
-#options 	SCSI_ISP_PREFER_MEM_MAP=0	# prefer I/O mapping
-#options 	SCSI_ISP_FCDUPLEX=0x4		# isp2 is a Fibre Channel card
-						# we want in full duplex mode.
-#options 	SCSI_ISP_WWN="0x5000000099990000"
-#options 	ISP_DISABLE_1020_SUPPORT
-#options 	ISP_DISABLE_1080_SUPPORT
-#options 	ISP_DISABLE_12160_SUPPORT
-#options 	ISP_DISABLE_2100_SUPPORT
-#options 	ISP_COMPILE_1020_FW=1
-#options 	ISP_COMPILE_1080_FW=1
-#options 	ISP_COMPILE_2100_FW=1
-#options 	ISP_COMPILE_2200_FW=1
 #options 	ISP_TARGET_MODE=1
 
 # Options used in dev/sym/ (Symbios SCSI driver).

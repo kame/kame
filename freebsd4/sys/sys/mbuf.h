@@ -31,7 +31,7 @@
  * SUCH DAMAGE.
  *
  *	@(#)mbuf.h	8.5 (Berkeley) 2/19/95
- * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.7 2000/10/12 16:36:10 ru Exp $
+ * $FreeBSD: src/sys/sys/mbuf.h,v 1.44.2.8 2001/02/04 14:49:59 dwmalone Exp $
  */
 
 #ifndef _SYS_MBUF_H_
@@ -484,6 +484,12 @@ union mcluster {
 #define	MH_ALIGN(m, len) do {						\
 	(m)->m_data += (MHLEN - (len)) & ~(sizeof(long) - 1);		\
 } while (0)
+
+/*
+ * Check if we can write to an mbuf.
+ */
+#define M_WRITABLE(m) (!((m)->m_flags & M_EXT) || \
+    ((m)->m_ext.ext_free == NULL && mclrefcnt[mtocl((m)->m_ext.ext_buf)] == 1))
 
 /*
  * Compute the amount of space available

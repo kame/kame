@@ -31,8 +31,10 @@
  * SUCH DAMAGE.
  *
  *	@(#)uipc_socket.c	8.3 (Berkeley) 4/15/94
- * $FreeBSD: src/sys/kern/uipc_socket.c,v 1.68.2.10 2000/11/17 19:47:27 jkh Exp $
+ * $FreeBSD: src/sys/kern/uipc_socket.c,v 1.68.2.15 2001/03/09 16:41:20 jlemon Exp $
  */
+
+#include "opt_inet.h"
 
 #include <sys/param.h>
 #include <sys/systm.h>
@@ -58,23 +60,22 @@
 
 #include <machine/limits.h>
 
+#ifdef INET
 static int	 do_setopt_accept_filter(struct socket *so, struct sockopt *sopt);
+#endif /* INET */
 
-static int 	filt_sorattach(struct knote *kn);
 static void 	filt_sordetach(struct knote *kn);
 static int 	filt_soread(struct knote *kn, long hint);
-static int 	filt_sowattach(struct knote *kn);
 static void 	filt_sowdetach(struct knote *kn);
 static int	filt_sowrite(struct knote *kn, long hint);
 static int	filt_solisten(struct knote *kn, long hint);
 
 static struct filterops solisten_filtops = 
-	{ 1, filt_sorattach, filt_sordetach, filt_solisten };
-
-struct filterops so_rwfiltops[] = {
-	{ 1, filt_sorattach, filt_sordetach, filt_soread },
-	{ 1, filt_sowattach, filt_sowdetach, filt_sowrite },
-};
+	{ 1, NULL, filt_sordetach, filt_solisten };
+static struct filterops soread_filtops =
+	{ 1, NULL, filt_sordetach, filt_soread };
+static struct filterops sowrite_filtops = 
+	{ 1, NULL, filt_sowdetach, filt_sowrite };
 
 struct	vm_zone *socket_zone;
 so_gen_t	so_gencnt;	/* generation count for sockets */
@@ -195,6 +196,7 @@ sodealloc(so)
 	if (so->so_snd.sb_hiwat)
 		(void)chgsbsize(so->so_cred->cr_uidinfo,
 		    &so->so_snd.sb_hiwat, 0, RLIM_INFINITY);
+#ifdef INET
 	if (so->so_accf != NULL) {
 		if (so->so_accf->so_accept_filter != NULL && 
 			so->so_accf->so_accept_filter->accf_destroy != NULL) {
@@ -203,6 +205,7 @@ sodealloc(so)
 		if (so->so_accf->so_accept_filter_str != NULL)
 			FREE(so->so_accf->so_accept_filter_str, M_ACCF);
 		FREE(so->so_accf, M_ACCF);
+#endif /* INET */
 	}
 	crfree(so->so_cred);
 	zfreei(so->so_zone, so);
@@ -357,13 +360,7 @@ soaccept(so, nam)
 	if ((so->so_state & SS_NOFDREF) == 0)
 		panic("soaccept: !NOFDREF");
 	so->so_state &= ~SS_NOFDREF;
- 	if ((so->so_state & SS_ISDISCONNECTED) == 0)
-		error = (*so->so_proto->pr_usrreqs->pru_accept)(so, nam);
-	else {
-		if (nam)
-			*nam = 0;
-		error = ECONNABORTED;
-	}
+	error = (*so->so_proto->pr_usrreqs->pru_accept)(so, nam);
 	splx(s);
 	return (error);
 }
@@ -958,10 +955,12 @@ soshutdown(so, how)
 {
 	register struct protosw *pr = so->so_proto;
 
-	how++;
-	if (how & FREAD)
+	if (!(how == SHUT_RD || how == SHUT_WR || how == SHUT_RDWR))
+		return (EINVAL);
+
+	if (how != SHUT_WR)
 		sorflush(so);
-	if (how & FWRITE)
+	if (how != SHUT_RD)
 		return ((*pr->pr_usrreqs->pru_shutdown)(so));
 	return (0);
 }
@@ -992,6 +991,7 @@ sorflush(so)
 	sbrelease(&asb, so);
 }
 
+#ifdef INET
 static int
 do_setopt_accept_filter(so, sopt)
 	struct	socket *so;
@@ -1068,6 +1068,7 @@ out:
 		FREE(afap, M_TEMP);
 	return (error);
 }
+#endif /* INET */
 
 /*
  * Perhaps this routine, and sooptcopyout(), below, ought to come in
@@ -1121,6 +1122,13 @@ sosetopt(so, sopt)
 		error = ENOPROTOOPT;
 	} else {
 		switch (sopt->sopt_name) {
+#ifdef INET
+		case SO_ACCEPTFILTER:
+			error = do_setopt_accept_filter(so, sopt);
+			if (error)
+				goto bad;
+			break;
+#endif /* INET */
 		case SO_LINGER:
 			error = sooptcopyin(sopt, &l, sizeof l, sizeof l);
 			if (error)
@@ -1228,12 +1236,6 @@ sosetopt(so, sopt)
 				break;
 			}
 			break;
-
-		case SO_ACCEPTFILTER:
-			error = do_setopt_accept_filter(so, sopt);
-			if (error)
-				goto bad;
-			break;
 		default:
 			error = ENOPROTOOPT;
 			break;
@@ -1298,6 +1300,7 @@ sogetopt(so, sopt)
 			return (ENOPROTOOPT);
 	} else {
 		switch (sopt->sopt_name) {
+#ifdef INET
 		case SO_ACCEPTFILTER:
 			if ((so->so_options & SO_ACCEPTCONN) == 0)
 				return (EINVAL);
@@ -1312,6 +1315,7 @@ sogetopt(so, sopt)
 			error = sooptcopyout(sopt, afap, sizeof(*afap));
 			FREE(afap, M_TEMP);
 			break;
+#endif /* INET */
 			
 		case SO_LINGER:
 			l.l_onoff = so->so_options & SO_LINGER;
@@ -1530,16 +1534,32 @@ sopoll(struct socket *so, int events, struct ucred *cred, struct proc *p)
 	return (revents);
 }
 
-static int
-filt_sorattach(struct knote *kn)
+int
+sokqfilter(struct file *fp, struct knote *kn)
 {
 	struct socket *so = (struct socket *)kn->kn_fp->f_data;
-	int s = splnet();
+	struct sockbuf *sb;
+	int s;
 
-	if (so->so_options & SO_ACCEPTCONN)
-		kn->kn_fop = &solisten_filtops;
-	SLIST_INSERT_HEAD(&so->so_rcv.sb_sel.si_note, kn, kn_selnext);
-	so->so_rcv.sb_flags |= SB_KNOTE;
+	switch (kn->kn_filter) {
+	case EVFILT_READ:
+		if (so->so_options & SO_ACCEPTCONN)
+			kn->kn_fop = &solisten_filtops;
+		else
+			kn->kn_fop = &soread_filtops;
+		sb = &so->so_rcv;
+		break;
+	case EVFILT_WRITE:
+		kn->kn_fop = &sowrite_filtops;
+		sb = &so->so_snd;
+		break;
+	default:
+		return (1);
+	}
+
+	s = splnet();
+	SLIST_INSERT_HEAD(&sb->sb_sel.si_note, kn, kn_selnext);
+	sb->sb_flags |= SB_KNOTE;
 	splx(s);
 	return (0);
 }
@@ -1565,23 +1585,14 @@ filt_soread(struct knote *kn, long hint)
 	kn->kn_data = so->so_rcv.sb_cc;
 	if (so->so_state & SS_CANTRCVMORE) {
 		kn->kn_flags |= EV_EOF; 
+		kn->kn_fflags = so->so_error;
 		return (1);
 	}
 	if (so->so_error)	/* temporary udp error */
 		return (1);
+	if (kn->kn_sfflags & NOTE_LOWAT)
+		return (kn->kn_data >= kn->kn_sdata);
 	return (kn->kn_data >= so->so_rcv.sb_lowat);
-}
-
-static int
-filt_sowattach(struct knote *kn)
-{
-	struct socket *so = (struct socket *)kn->kn_fp->f_data;
-	int s = splnet();
-
-	SLIST_INSERT_HEAD(&so->so_snd.sb_sel.si_note, kn, kn_selnext);
-	so->so_snd.sb_flags |= SB_KNOTE;
-	splx(s);
-	return (0);
 }
 
 static void
@@ -1605,6 +1616,7 @@ filt_sowrite(struct knote *kn, long hint)
 	kn->kn_data = sbspace(&so->so_snd);
 	if (so->so_state & SS_CANTSENDMORE) {
 		kn->kn_flags |= EV_EOF; 
+		kn->kn_fflags = so->so_error;
 		return (1);
 	}
 	if (so->so_error)	/* temporary udp error */
@@ -1612,6 +1624,8 @@ filt_sowrite(struct knote *kn, long hint)
 	if (((so->so_state & SS_ISCONNECTED) == 0) &&
 	    (so->so_proto->pr_flags & PR_CONNREQUIRED))
 		return (0);
+	if (kn->kn_sfflags & NOTE_LOWAT)
+		return (kn->kn_data >= kn->kn_sdata);
 	return (kn->kn_data >= so->so_snd.sb_lowat);
 }
 
