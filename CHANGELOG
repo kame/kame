@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.339 1999/12/14 07:56:27 jinmei Exp $
+$Id: CHANGELOG,v 1.340 1999/12/14 08:21:52 itojun Exp $
 
 <199912>
 1999-12-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -13,6 +13,11 @@ $Id: CHANGELOG,v 1.339 1999/12/14 07:56:27 jinmei Exp $
 	* kame/sys/netinet6/{in6_pcb.c, ip6_output.c, tcp6_input.c,
 	tcp_subr.c}: rtcalloc was reverted for bsdi where it was necessary
 	to make a cloned route for path MTU discovery.
+
+Tue Dec 14 01:26:01 JST 1999  itojun@iijlab.net
+	* kame/libinet6/getaddrinfo.c: fix cases when getipnodeby*() is not
+	  available.  "hp" will be broken if you call resolver function again,
+	  so we need to deep-copy the necessary portion of results.
 
 1999-12-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/ndp/ndp.c (getdefif): was added to allow the -I option
