@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.54 2000/02/24 16:34:49 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.55 2000/02/25 00:32:23 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -373,7 +373,7 @@ in6_control(so, cmd, data, ifp)
 	struct	in6_ifaddr *ia = NULL, *oia;
 	struct	in6_aliasreq *ifra = (struct in6_aliasreq *)data;
 	struct	sockaddr_in6 oldaddr;
-#ifdef COMPAT_IFIOCTL
+#ifdef COMPAT_IN6IFIOCTL
 	struct sockaddr_in6 net;
 #endif 
 	int	error = 0, hostIsNew, prefixIsNew;
@@ -542,7 +542,7 @@ in6_control(so, cmd, data, ifp)
 		/* FALLTHROUGH */
 	case SIOCAIFADDR_IN6:
 	case SIOCSIFADDR_IN6:
-#ifdef COMPAT_IFIOCTL
+#ifdef COMPAT_IN6IFIOCTL
 	case SIOCSIFDSTADDR_IN6:
 	case SIOCSIFNETMASK_IN6:
 		/*
@@ -690,7 +690,7 @@ in6_control(so, cmd, data, ifp)
 				*icmp6_ifstat[ifp->if_index];
 		break;
 
-#ifdef COMPAT_IFIOCTL		/* should be unused */
+#ifdef COMPAT_IN6IFIOCTL		/* should be unused */
 	case SIOCSIFDSTADDR_IN6:
 		if ((ifp->if_flags & IFF_POINTOPOINT) == 0)
 			return(EINVAL);
@@ -748,7 +748,7 @@ in6_control(so, cmd, data, ifp)
 	case SIOCSIFADDR_IN6:
 		return(in6_ifinit(ifp, ia, &ifr->ifr_addr, 1));
 
-#ifdef COMPAT_IFIOCTL		/* XXX should be unused */
+#ifdef COMPAT_IN6IFIOCTL		/* XXX should be unused */
 	case SIOCSIFNETMASK_IN6:
 		ia->ia_prefixmask = ifr->ifr_addr;
 		bzero(&net, sizeof(net));
