@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2541 2004/02/05 10:09:23 suz Exp $
+$KAME: CHANGELOG,v 1.2542 2004/02/06 10:38:11 suz Exp $
 
 <200402>
+2004-02-06  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
+	* kame/sys/netinet6/in6_msf.[ch]
+	  freebsd4/sys/netinet6/udp6_usrreq.c: implemented per-socket/interface
+	  MSF-check functions, instead of embedding in UDP layer.
+
 2004-02-05  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/sys/netinet6/{in6.c, mld6.c, mldv2.c}: creates mldv2.c to
 	  concentrate almost all the MLDv2-related functions on this file
