@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.89 2002/02/20 06:39:43 k-sugyou Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.90 2002/02/20 09:43:49 k-sugyou Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -3025,7 +3025,7 @@ mip6_bu_authdata_calc(sav, src, dst, coa, bu_opt, authdata, sumbuf)
 	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_flags, 1);
 	bytes += 1;
-	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_reserved, 2);
+	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_reserved[0], 2);
 	bytes += 2;
 	(algo->update)(&algos, (caddr_t)&bu_opt->ip6ou_seqno, 1);
 	bytes += 1;
@@ -3038,7 +3038,7 @@ mip6_bu_authdata_calc(sav, src, dst, coa, bu_opt, authdata, sumbuf)
 	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&authdata->len, 1);
 	bytes += 1;
-	(algo->update)(&algos, (caddr_t)&authdata->spi, 4);
+	(algo->update)(&algos, (caddr_t)&authdata->spi[0], 4);
 	bytes += 4;
 	/* calculate the result. */
 	(algo->result)(&algos, sumbuf);
@@ -3115,7 +3115,7 @@ mip6_ba_authdata_calc(sav, src, dst, ba_opt, authdata, sumbuf)
 	bytes += 1;
 	(algo->update)(&algos, (caddr_t)&authdata->len, 1);
 	bytes += 1;
-	(algo->update)(&algos, (caddr_t)&authdata->spi, 4);
+	(algo->update)(&algos, (caddr_t)&authdata->spi[0], 4);
 	bytes += 4;
 	/* calculate the result. */
 	(algo->result)(&algos, sumbuf);
