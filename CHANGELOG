@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1636 2001/04/04 10:50:17 itojun Exp $
+$KAME: CHANGELOG,v 1.1637 2001/04/04 13:54:45 sakane Exp $
 
 <200104>
+Wed Apr  4 22:47:27 JST 2001 sakane@ydc.co.jp
+	* racoon:
+	support scopeid.  base code was from <Francis.Dupont@enst-bretagne.fr>.
+	it should be considered more.
+
 Wed Apr  4 19:49:39 JST 2001  itojun@iijlab.net
 	* sys/netinet6/icmp6.c: make sure we do not pass mbuf with 
 	  bogus m->m_pkthdr.rcvif, to icmp6_reflect(), on icmp6 error
