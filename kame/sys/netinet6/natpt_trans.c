@@ -1,4 +1,4 @@
-/*	$KAME: natpt_trans.c,v 1.9 2000/02/22 14:04:29 itojun Exp $	*/
+/*	$KAME: natpt_trans.c,v 1.10 2000/03/09 04:39:11 fujisawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -28,7 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- *	$Id: natpt_trans.c,v 1.9 2000/02/22 14:04:29 itojun Exp $
+ *	$Id: natpt_trans.c,v 1.10 2000/03/09 04:39:11 fujisawa Exp $
  */
 
 #include <sys/param.h>
@@ -1075,62 +1075,6 @@ translatingTCPUDPv6To4(struct _cv *cv6, struct pAddr *pad, struct _cv *cv4)
     struct ip		*ip4;
     struct ip6_hdr	*ip6;
     struct tcpiphdr	*ti;
-
-#if	0
-    if ((cv6->m->m_flags & M_EXT)
-	&& (cv6->plen + sizeof(struct ip) > MHLEN))
-    {
-#if	1
-	caddr_t	m4data;
-
-	m4 = m_copym(cv6->m, 0, M_COPYALL, M_NOWAIT);
-	ReturnEnobufs(m4);
-
-	m4data = m4->m_data;
-	m4->m_data = cv6->_payload._caddr - sizeof(struct ip);
-	m4->m_data = m4data;
-	m4->m_data += sizeof(struct ip6_hdr) - sizeof(struct ip);
-#else
-	MGETHDR(m4, M_NOWAIT, MT_HEADER);
-	MCLGET(m4, M_NOWAIT);
-
-	bcopy(cv6->m->m_data, m4->m_data, cv6->m->m_len);
-
-	m4->m_data += sizeof(struct ip6_hdr) - sizeof(struct ip);
-#endif
-	m4->m_pkthdr.len = m4->m_len = sizeof(struct ip) + cv6->plen;
-
-	ip4 = mtod(m4, struct ip *);
-	cv4->m = m4;
-	cv4->plen = cv6->plen;
-	cv4->poff = sizeof(struct ip);
-	cv4->_ip._ip4 = mtod(m4, struct ip *);
-	cv4->_payload._caddr = (caddr_t)cv4->_ip._ip4 + sizeof(struct ip);
-    }
-    else
-    {
-	int	tcp6len;
-	caddr_t	tcp4;
-	caddr_t	tcp6;
-
-	MGETHDR(m4, M_NOWAIT, MT_HEADER);
-	ReturnEnobufs(m4);
-
-	ip4 = mtod(m4, struct ip *);
-
-	tcp4 = (caddr_t)ip4 + sizeof(struct ip);
-	tcp6 = (caddr_t)cv6->_payload._tcp6;
-	tcp6len = (cv6->m->m_data + cv6->m->m_len) - tcp6;
-	bcopy(tcp6, tcp4, tcp6len);
-
-	m4->m_pkthdr.len = m4->m_len = sizeof(struct ip) + tcp6len;
-
-	cv4->m = m4;
-	cv4->plen = tcp6len;
-	cv4->_ip._ip4 = mtod(m4, struct ip *);
-	cv4->_payload._caddr = (caddr_t)cv4->_ip._ip4 + sizeof(struct ip);
-    }
-#endif
 
     m4 = m_copym(cv6->m, 0, M_COPYALL, M_NOWAIT);
     ReturnEnobufs(m4);
