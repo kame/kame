@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.146 2001/08/17 12:18:02 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.147 2001/09/26 05:30:34 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3022,20 +3022,20 @@ ipsecdoi_checkid1(iph1)
 		}
 	}
 
-	/* XXX check peers and defined id type */
-
 	/* compare with the ID if specified. */
 	if (iph1->rmconf->idv_p) {
 		vchar_t *ident0 = NULL;
 		vchar_t ident;
 
-		/* XXX to be moved above "XXX" */
+		/* check the type of both IDs */
 		if (iph1->rmconf->idvtype_p != doi2idtype(id_b->type)) {
 			plog(LLV_WARNING, LOCATION, NULL,
 				"ID type mismatched.\n");
-			/*FALLTHROUGH*/
+			if (iph1->rmconf->verify_identifier)
+				return -1;
 		}
 
+		/* compare defined ID with the ID sent by peer. */
 		ident0 = getidval(iph1->rmconf->idvtype_p, iph1->rmconf->idv_p);
 
 		switch (iph1->rmconf->idvtype_p) {
@@ -3045,14 +3045,16 @@ ipsecdoi_checkid1(iph1)
 			if (eay_cmp_asn1dn(ident0, &ident)) {
 				plog(LLV_WARNING, LOCATION, NULL,
 					"ID value mismatched.\n");
-				/*FALLTHROUGH*/
+				if (iph1->rmconf->verify_identifier)
+					return -1;
 			}
 			break;
 		default:
 			if (memcmp(ident0->v, id_b + 1, ident0->l)) {
 				plog(LLV_WARNING, LOCATION, NULL,
 					"ID value mismatched.\n");
-				/*FALLTHROUGH*/
+				if (iph1->rmconf->verify_identifier)
+					return -1;
 			}
 			break;
 		}

@@ -1,4 +1,4 @@
-/*	$KAME: remoteconf.h,v 1.25 2001/05/24 06:43:24 sakane Exp $	*/
+/*	$KAME: remoteconf.h,v 1.26 2001/09/26 05:30:35 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -61,6 +61,7 @@ struct remoteconf {
 	int send_cert;			/* send to CERT or not */
 	int send_cr;			/* send to CR or not */
 	int verify_cert;		/* verify a CERT strictly */
+	int verify_identifier;		/* vefify the peer's identifier */
 	int nonce_size;			/* the number of bytes of nonce */
 	int keepalive;			/* XXX may not use */
 	int passive;			/* never initiate */

@@ -1,4 +1,4 @@
-/*	$KAME: oakley.c,v 1.102 2001/08/17 13:24:11 sakane Exp $	*/
+/*	$KAME: oakley.c,v 1.103 2001/09/26 05:30:34 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1288,7 +1288,6 @@ oakley_validate_auth(iph1)
 			case ISAKMP_CERT_X509SIGN:
 				error = eay_check_x509cert(&iph1->cert_p->cert,
 					lcconf->pathinfo[LC_PATHTYPE_CERT]);
-				/* XXX to be checked subjectAltName */
 				break;
 			default:
 				plog(LLV_ERROR, LOCATION, NULL,

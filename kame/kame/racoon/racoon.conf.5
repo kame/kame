@@ -1,4 +1,4 @@
-.\"	$KAME: racoon.conf.5,v 1.89 2001/08/17 07:16:38 itojun Exp $
+.\"	$KAME: racoon.conf.5,v 1.90 2001/09/26 05:30:35 sakane Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
 .\" All rights reserved.
@@ -277,13 +277,25 @@ will get DN from Subject field in the certificate.
 .El 
 .\"
 .It Ic peers_identifier Ar idtype ... ;
-specifies the peer's identifier as it is specified with
-.Ic my_identifier .
+specifies the peer's identifier to be received.
 If it is not defined then
 .Xr racoon 8
 will not verify the peer's identifier in ID payload transmitted from the peer.
-.Xr racoon 8
-will just warn it at the moment even if you defined it.
+If it is defined, the behavior of the verification depends on the flag of
+.Ic verify_identifier .
+The usage of
+.Ar idtype
+is same to
+.Ic my_identifier .
+.\"
+.It Ic verify_identifier (on \(ba off) ;
+If you want to verify the peer's identifier,
+set this to on.
+In this case, if the value defined by
+.Ic peers_identifier
+is not same to the peer's identifier in the ID payload,
+the negotiation will failed.
+The default is off.
 .\"
 .It Ic certificate_type Ar certspec ;
 specifies a certificate specification.
@@ -320,7 +332,7 @@ If you do not want to send a certificate request for some reason, set this to of
 The default is on.
 .\"
 .It Ic verify_cert (on \(ba off) ;
-If you do not want to verify the remote peer's certificate for some reason,
+If you do not want to verify the peer's certificate for some reason,
 set this to off.
 The default is on.
 .\"

@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.64 2001/08/13 17:47:59 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.65 2001/09/26 05:30:34 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -246,6 +246,7 @@ hexstring	0x{hexdigit}+
 <S_RMTS>identifier	{ YYD; yywarn("it is obsoleted.  use \"my_identifier\"."); return(IDENTIFIER); }
 <S_RMTS>my_identifier	{ YYD; return(MY_IDENTIFIER); }
 <S_RMTS>peers_identifier	{ YYD; return(PEERS_IDENTIFIER); }
+<S_RMTS>verify_identifier	{ YYD; return(VERIFY_IDENTIFIER); }
 <S_RMTS>certificate_type	{ YYD; return(CERTIFICATE_TYPE); }
 <S_RMTS>x509		{ YYD; yylval.num = ISAKMP_CERT_X509SIGN; return(CERT_X509); }
 <S_RMTS>peers_certfile	{ YYD; return(PEERS_CERTFILE); }

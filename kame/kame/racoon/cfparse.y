@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.107 2001/08/16 20:24:59 sakane Exp $	*/
+/*	$KAME: cfparse.y,v 1.108 2001/09/26 05:30:34 sakane Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -146,7 +146,7 @@ static int fix_lifebyte __P((u_long));
 %token REMOTE ANONYMOUS
 %token EXCHANGE_MODE EXCHANGETYPE DOI DOITYPE SITUATION SITUATIONTYPE
 %token CERTIFICATE_TYPE CERTTYPE PEERS_CERTFILE VERIFY_CERT SEND_CERT SEND_CR
-%token IDENTIFIERTYPE MY_IDENTIFIER PEERS_IDENTIFIER
+%token IDENTIFIERTYPE MY_IDENTIFIER PEERS_IDENTIFIER VERIFY_IDENTIFIER
 %token DNSSEC CERT_X509
 %token NONCE_SIZE DH_GROUP KEEPALIVE PASSIVE INITIAL_CONTACT
 %token PROPOSAL_CHECK PROPOSAL_CHECK_LEVEL
@@ -1054,6 +1054,7 @@ remote_spec
 			cur_rmconf->idvtype_p = $2;
 		}
 		EOS
+	|	VERIFY_IDENTIFIER SWITCH { cur_rmconf->verify_identifier = $2; } EOS
 	|	NONCE_SIZE NUMBER { cur_rmconf->nonce_size = $2; } EOS
 	|	DH_GROUP
 		{
