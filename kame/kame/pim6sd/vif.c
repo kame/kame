@@ -1,4 +1,4 @@
-/*	$KAME: vif.c,v 1.22 2001/11/28 03:38:42 itojun Exp $	*/
+/*	$KAME: vif.c,v 1.23 2001/11/30 02:26:14 suz Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -413,6 +413,9 @@ void stop_vif( mifi_t vifi )
 
 		while( v->uv_groups!=NULL )
 		{
+			a=v->uv_groups;
+			v->uv_groups=a->al_next;
+
 			/* reset all the timers */
 			if (a->al_query) {
 			    timer_clearTimer(a->al_query);
@@ -423,15 +426,13 @@ void stop_vif( mifi_t vifi )
 
 			/* frees all the related sources */
 			while (v->uv_groups->sources != NULL) {
-			    a = v->uv_groups->sources;
-			    v->uv_groups->sources = a->al_next;
-			    free((char *)a);
+			    struct listaddr *curr = v->uv_groups->sources;
+			    v->uv_groups->sources = curr->al_next;
+			    free((char *)curr);
 			}
 			v->uv_groups->sources = NULL;
 
 			/* discard the group */
-			a=v->uv_groups;
-			v->uv_groups=a->al_next;
 			free((char *)a);
 		}
 		v->uv_groups = NULL;
