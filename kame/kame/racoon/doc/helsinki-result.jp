@@ -1,5 +1,5 @@
 Mon Aug 13 2001 - Fri Aug 17 2001
-$KAME: helsinki-result.jp,v 1.34 2001/08/16 11:28:31 itojun Exp $
+$KAME: helsinki-result.jp,v 1.35 2001/08/16 12:42:57 sakane Exp $
 
 
 generic
@@ -76,6 +76,9 @@ Compaq Tru54 UNIX X5.1B-BL4
 	明日12:00 RSA signature modeで再戦
 	むむ、authentication-failedで失敗。こっちの問題か？
 
+	Fitecと現象は一緒。openssl 0.9.6 を使うと問題なし。
+	opensslのバージョン下げちゃったので
+	ipv6 address as subjectAltName は出来ず。
 
 IBM AIX 5.1
 	Tue Aug 14 17:33:43 JST 2001
