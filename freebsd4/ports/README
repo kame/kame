@@ -1,5 +1,95 @@
+$KAME: README,v 1.3 2000/09/07 01:42:31 sumikawa Exp $
+
 This directory contains kame related ports only. Generic IPv6-enable
 ports are distributed by original FreeBSD ports.
 
 You can get information about recent IPv6-enable ports at:
 	http://www.freebsd.org/ports/ipv6.html
+
+ports merging status:
+	KAME/FreeBSD3	ports-current
+        -----------------------------
+	XFree86		not yet(based version in KAME ports is old)
+	apache13	merged as www/apache13+ipv6
+	bind8		not yet(based version in KAME ports is old)
+	bind9		not yet
+	ct		do not merge since this is KAME related port
+	echoping	not yet
+	emacs20		merged as editror/emacs20, editror/emacs20+dl
+	fetchmail	merged as mail/fetchmail
+	fwtk6		not yet
+	gated-ipv6	not yet
+	gbatnav		not yet
+	geta		not yet
+	heimdal		merged in original distribution
+	icecast		not yet(based version in KAME ports is old)
+	inn		not yet
+	ipv6socket_scrub not yet
+	irc		merged as irc/irc
+	irssi		merged as irc/irssi
+	ja-mnews	merged as japanese/mnews
+	ja-w3m		merged as japanese/w3m
+	ja-w3m-ssl	merged as japanese/w3m-ssl
+	kaffe		not yet(broken)
+	leafnode+	not yet
+	lftp		merged as ftp/lftp
+	libident6	not yet
+	libpcap		not yet(should be merged in original distribution)
+	lynx		will be merged as www/lynx-current
+	mediator	do not merge()
+	mmosaic		not yet
+	mod_perl	not yet
+	mozilla		merged as www/mozilla+ipv6
+	mpg123		merged as audio/mpg123
+	mrt		merged as net/mrt
+	mtr		merged as net/mtr
+	ncftp3		not yet
+	netperf		not yet
+	netris		merged as games/netris
+	newbie		not yet
+	openssh		merged in original distribution
+	p5-Socket6	merged as net/p5-Socket6
+	pchar		merged as net/pchar
+	pfs		not yet
+	pident6d	not yet
+	popper		not yet
+	postfix		not yet
+	ppp		not yet(should be merged in original distribution)
+	python		merged as lang/python+ipv6
+	qmail		not yet
+	quake6		not yet
+	quakedata	not yet
+	rat		not yet(maybe)
+	rev_v6_address	not yet
+	rsync		merged as net/rsync
+	ruby		merged as lang/ruby
+	sdr		not yet(maybe)
+	sendmail.beta	merged in original distribution
+	sendmail6	no need to merge because newer version is merged
+	socks5		not yet
+	socks64		not yet
+	solidpop3d	not yet
+	squid11		not yet(based version in KAME ports is old)
+	ssh		merged as lang/ruby
+	tcp_wrapper	not yet
+	tcpd		not yet
+	tcpdump		not yet(should be merged in original distribution)
+	tcptrace	not yet
+	totd		not yet
+	ucd-snmp	merged as net/ucd-snmp
+	v6eval		do not merge since this is KAME related port
+	v6tun		not yet
+	vat6		not yet(maybe)
+	vic6		not yet(maybe)
+	vnc		not yet(based version in KAME ports is old)
+	w3m		merged as www/w3m
+	w3m-ssl		merged as www/w3m-ssl
+	wbd		not yet(maybe)
+	wget		not yet
+	wu-ftpd		not yet(based version in KAME ports is old)
+	wwwoffle	not yet(based version in KAME ports is old)
+	wyvern		not yet
+	xemacs21	not yet
+	xmms		not yet
+	xtris		merged as games/xtris
+	zebra		merged as net/zebra
