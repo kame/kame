@@ -1,7 +1,12 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2698 2004/12/02 11:27:45 suz Exp $
+$KAME: CHANGELOG,v 1.2699 2004/12/02 13:03:48 jinmei Exp $
 
 <200412>
+2004-12-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6/config.c (configure_commit): corrected list
+	management operation.  (mostly harmless, but it was incorrect.)
+	From: Nicolas Dichtel
+
 2004-12-02  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd5/lib/libinet6: imported some res_* files and related
 	header files from FreeBSD's source tree to be synchronized with
@@ -37,7 +42,7 @@ $KAME: CHANGELOG,v 1.2698 2004/12/02 11:27:45 suz Exp $
 	* kame/kame/dhcp6: catch up draft-ietf-dhc-lifetime-02.
 	Specifically,
 	- renamed "lifetime" to "refreshtime".  Note that configuration
-	  compatibility was lost.
+	  compatibility was lost
 	- implemented the default and minimum timer values
 	- clarified that the refresh time option can only be available for
 	  Information-request and reply exchanges
