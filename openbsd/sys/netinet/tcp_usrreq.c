@@ -803,11 +803,17 @@ tcp_ident(oldp, oldlenp, newp, newlen)
 #ifdef INET6
 	case AF_INET6:
 		fin6 = (struct sockaddr_in6 *)&tir.faddr;
-		error = in6_embedscope(&f6, fin6);
+		/*
+		 * intentionally disable using the default zone, since this is
+		 * for identification.
+		 */
+		if ((error = scope6_check_id(fin6, 0)) != 0)
+			return (error);
 		if (error)
 			return EINVAL;
 		lin6 = (struct sockaddr_in6 *)&tir.laddr;
-		error = in6_embedscope(&l6, lin6);
+		if ((error = scope6_check_id(lin6, 0)) != 0)
+			return(error);
 		if (error)
 			return EINVAL;
 		break;
