@@ -1,15 +1,12 @@
-#	$OpenBSD: Makefile,v 1.7 2000/09/03 18:41:16 espie Exp $
+#	$OpenBSD: Makefile,v 1.7 2000/04/14 02:40:01 itojun Exp $
 
-PROG=	sysctl
-MAN=	sysctl.8
+PROG=	ifconfig
+MAN=	ifconfig.8
 
-CPPFLAGS+=	-DINET6
+CPPFLAGS+=-DINET6
+CPPFLAGS+=-DHAVE_IFADDRS_H
 
-afterinstall:
-	(cd ${DESTDIR}/usr/sbin; ln -sf ../../sbin/sysctl .)
+# kame scopeid hack
+CPPFLAGS+=-DKAME_SCOPEID
 
 .include <bsd.prog.mk>
-
-.if (${UVM:L} == "yes")
-CFLAGS+=-DUVM
-.endif
