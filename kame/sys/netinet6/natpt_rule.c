@@ -1,4 +1,4 @@
-/*	$KAME: natpt_rule.c,v 1.43 2002/02/08 07:22:40 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.44 2002/02/22 14:45:23 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
@@ -57,9 +57,9 @@
 #include <netinet6/natpt_var.h>
 
 
-time_t			cSlotTimer;
-int			csl_expire;
-TAILQ_HEAD(,cSlot)	csl_head;
+static time_t cSlotTimer;
+static int csl_expire;
+static TAILQ_HEAD(,cSlot) csl_head;
 
 #ifdef __FreeBSD__
 MALLOC_DECLARE(M_NATPT);
@@ -69,28 +69,23 @@ MALLOC_DECLARE(M_NATPT);
 /*
  *
  */
-
-static int	 natpt_matchIn4addr	__P((struct pcv *, struct cSlot *, struct mAddr *));
-static int	 natpt_matchIn6addr	__P((struct pcv *, struct cSlot *, struct mAddr *));
-void		 natpt_expireCSlot	__P((void *));
+static int natpt_matchIn4addr __P((struct pcv *, struct cSlot *, struct mAddr *));
+static int natpt_matchIn6addr __P((struct pcv *, struct cSlot *, struct mAddr *));
+void natpt_expireCSlot __P((void *));
 
 
 /*
  *
  */
-
 struct cSlot *
 natpt_lookForRule6(struct pcv *cv6)
 {
-	const char	*fn = __FUNCTION__;
-
-	int		 s;
-	struct cSlot	*csl;
+	const char *fn = __FUNCTION__;
+	int s;
+	struct cSlot *csl;
 
 	s = splnet();
-	for (csl = TAILQ_FIRST(&csl_head);
-	     csl;
-	     csl = TAILQ_NEXT(csl, csl_list)) {
+	for (csl = TAILQ_FIRST(&csl_head); csl; csl = TAILQ_NEXT(csl, csl_list)) {
 		if (csl->Local.sa_family != AF_INET6)
 			continue;
 
@@ -135,15 +130,12 @@ natpt_lookForRule6(struct pcv *cv6)
 struct cSlot *
 natpt_lookForRule4(struct pcv *cv4)
 {
-	const char	*fn = __FUNCTION__;
-
-	int		 s;
-	struct cSlot	*csl;
+	const char *fn = __FUNCTION__;
+	int s;
+	struct cSlot *csl;
 
 	s = splnet();
-	for (csl = TAILQ_FIRST(&csl_head);
-	     csl;
-	     csl = TAILQ_NEXT(csl, csl_list)) {
+	for (csl = TAILQ_FIRST(&csl_head); csl; csl = TAILQ_NEXT(csl, csl_list)) {
 		if (csl->Local.sa_family != AF_INET)
 			continue;
 
@@ -180,11 +172,12 @@ natpt_lookForRule4(struct pcv *cv4)
 		}
 
 		if (csl->map & NATPT_BIDIR) {
-			struct in_addr	 in4to = cv4->ip.ip4->ip_dst;
+			struct in_addr in4to = cv4->ip.ip4->ip_dst;
 
 			if (in4to.s_addr == csl->Remote.in4Addr.s_addr) {
 				if (isDump(D_MATCHINGRULE4))
-					natpt_logIp4(LOG_DEBUG, cv4->ip.ip4, "%s():", fn);
+					natpt_logIp4(LOG_DEBUG, cv4->ip.ip4,
+						     "%s():", fn);
 				cv4->fromto = NATPT_TO;
 				splx(s);
 				return (csl);
@@ -200,8 +193,8 @@ natpt_lookForRule4(struct pcv *cv4)
 static int
 natpt_matchIn6addr(struct pcv *cv6, struct cSlot *csl, struct mAddr *from)
 {
-	struct in6_addr	*in6from = &cv6->ip.ip6->ip6_src;
-	struct in6_addr	 match;
+	struct in6_addr *in6from = &cv6->ip.ip6->ip6_src;
+	struct in6_addr match;
 
 	switch (from->saddr.aType) {
 	case ADDR_ANY:
@@ -243,8 +236,8 @@ natpt_matchIn6addr(struct pcv *cv6, struct cSlot *csl, struct mAddr *from)
 static int
 natpt_matchIn4addr(struct pcv *cv4, struct cSlot *csl, struct mAddr *from)
 {
-	struct in_addr	in4from = cv4->ip.ip4->ip_src;
-	struct in_addr	in4masked;
+	struct in_addr in4from = cv4->ip.ip4->ip_src;
+	struct in_addr in4masked;
 
 	switch (from->saddr.aType) {
 	case ADDR_ANY:
@@ -273,7 +266,7 @@ natpt_matchIn4addr(struct pcv *cv4, struct cSlot *csl, struct mAddr *from)
 
 	/* check redirect destination address */
 	if (csl->map & NATPT_REDIRECT_ADDR) {
-		struct in_addr	 in4to = cv4->ip.ip4->ip_dst;
+		struct in_addr in4to = cv4->ip.ip4->ip_dst;
 
 		if (in4to.s_addr != from->daddr.in4.s_addr)
 			return (0);
@@ -299,11 +292,11 @@ natpt_matchIn4addr(struct pcv *cv4, struct cSlot *csl, struct mAddr *from)
 int
 natpt_setRules(caddr_t addr)
 {
-	int			 s;
-	struct timeval		 atv;
-	struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
-	struct cSlot		*cst;
-	struct pAddr		*from = NULL;
+	int s;
+	struct timeval atv;
+	struct natpt_msgBox *mbx = (struct natpt_msgBox *)addr;
+	struct cSlot *cst;
+	struct pAddr *from = NULL;
 
 	MALLOC(cst, struct cSlot *, sizeof(struct cSlot), M_NATPT, M_NOWAIT);
 	if (cst == NULL)
@@ -365,8 +358,8 @@ natpt_setRules(caddr_t addr)
 int
 natpt_prependRule(struct cSlot *cst)
 {
-	int		 s;
-	struct timeval	 atv;
+	int s;
+	struct timeval atv;
 
 	microtime(&atv);
 	cst->tstamp = atv.tv_sec;
@@ -386,18 +379,20 @@ natpt_prependRule(struct cSlot *cst)
 int
 natpt_renumRules(caddr_t addr)
 {
-	int			 s;
-	int			 rnum, interval;
-	struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
-	struct cSlot		*csl;
+	int s;
+	int rnum, interval;
+	struct natpt_msgBox *mbx = (struct natpt_msgBox *)addr;
+	struct cSlot *csl;
 
-	rnum     = mbx->m_int0; if (rnum < 0)	    rnum     = 100;
-	interval = mbx->m_int1;	if (interval < 0)   interval = 100;
+	rnum = mbx->m_int0;
+	if (rnum < 0)
+		rnum = 100;
+	interval = mbx->m_int1;
+	if (interval < 0)
+		interval = 100;
 
 	s = splnet();
-	for (csl = TAILQ_FIRST(&csl_head);
-	     csl;
-	     csl = TAILQ_NEXT(csl, csl_list)) {
+	for (csl = TAILQ_FIRST(&csl_head); csl; csl = TAILQ_NEXT(csl, csl_list)) {
 		csl->rnum = rnum;
 		rnum += interval;
 	}
@@ -410,10 +405,10 @@ natpt_renumRules(caddr_t addr)
 int
 natpt_rmRules(caddr_t addr)
 {
-	int			 s;
-	int			 rnum;
-	struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
-	struct cSlot		*csl, *csln;
+	int s;
+	int rnum;
+	struct natpt_msgBox *mbx = (struct natpt_msgBox *)addr;
+	struct cSlot *csl, *csln;
 
 	rnum = mbx->m_uint;
 	s = splnet();
@@ -435,9 +430,9 @@ natpt_rmRules(caddr_t addr)
 int
 natpt_flushRules(caddr_t addr)
 {
-	int			 s;
-	struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
-	struct cSlot		*csl, *csln;
+	int s;
+	struct natpt_msgBox *mbx = (struct natpt_msgBox *)addr;
+	struct cSlot *csl, *csln;
 
 	s = splnet();
 	csl = TAILQ_FIRST(&csl_head);
@@ -458,10 +453,10 @@ natpt_flushRules(caddr_t addr)
 void
 natpt_expireCSlot(void *ignored_arg)
 {
-	int		 s;
-	int		 c = 0;
-	struct timeval	 atv;
-	struct cSlot	 *csl, *csln;
+	int s;
+	int c = 0;
+	struct timeval atv;
+	struct cSlot *csl, *csln;
 
 	microtime(&atv);
 	s = splnet();
@@ -490,7 +485,7 @@ natpt_expireCSlot(void *ignored_arg)
 int
 natpt_setOnOff(int cmd)
 {
-	const char	*fn = __FUNCTION__;
+	const char *fn = __FUNCTION__;
 
 	natpt_logMsg(LOG_INFO, "%s():", fn);
 
