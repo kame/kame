@@ -1,4 +1,4 @@
-/*	$KAME: ping6.c,v 1.61 2000/08/03 15:22:19 jinmei Exp $	*/
+/*	$KAME: ping6.c,v 1.62 2000/08/03 16:39:06 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -307,45 +307,45 @@ main(argc, argv)
 #endif /*IPSEC_POLICY_IPSEC*/
 #endif
 	{
-		switch(ch) {
-		 case 'a':
-		 {
-			 char *cp;
+		switch (ch) {
+		case 'a':
+		{
+			char *cp;
 
-			 options &= ~F_NOUSERDATA;
-			 options |= F_NODEADDR;
-			 for (cp = optarg; *cp != '\0'; cp++) {
-				 switch(*cp) {
-				 case 'a':
-					 naflags |= NI_NODEADDR_FLAG_ALL;
-					 break;
-				 case 'c':
-				 case 'C':
-					 naflags |= NI_NODEADDR_FLAG_COMPAT;
-					 break;
-				 case 'l':
-				 case 'L':
-					 naflags |= NI_NODEADDR_FLAG_LINKLOCAL;
-					 break;
-				 case 's':
-				 case 'S':
-					 naflags |= NI_NODEADDR_FLAG_SITELOCAL;
-					 break;
-				 case 'g':
-				 case 'G':
-					 naflags |= NI_NODEADDR_FLAG_GLOBAL;
-					 break;
-				 case 'A': /* experimental. not in the spec */
-					 naflags |= NI_NODEADDR_FLAG_ANYCAST;
-					 break;
-				 default:
-					 usage();
-					 /*NOTREACHED*/
-				 }
-			 }
-			 break;
-		 }
-		 case 'b':
+			options &= ~F_NOUSERDATA;
+			options |= F_NODEADDR;
+			for (cp = optarg; *cp != '\0'; cp++) {
+				switch (*cp) {
+				case 'a':
+					naflags |= NI_NODEADDR_FLAG_ALL;
+					break;
+				case 'c':
+				case 'C':
+					naflags |= NI_NODEADDR_FLAG_COMPAT;
+					break;
+				case 'l':
+				case 'L':
+					naflags |= NI_NODEADDR_FLAG_LINKLOCAL;
+					break;
+				case 's':
+				case 'S':
+					naflags |= NI_NODEADDR_FLAG_SITELOCAL;
+					break;
+				case 'g':
+				case 'G':
+					naflags |= NI_NODEADDR_FLAG_GLOBAL;
+					break;
+				case 'A': /* experimental. not in the spec */
+					naflags |= NI_NODEADDR_FLAG_ANYCAST;
+					break;
+				default:
+					usage();
+					/*NOTREACHED*/
+				}
+			}
+			break;
+		}
+		case 'b':
 #if defined(SO_SNDBUF) && defined(SO_RCVBUF)
 			sockbufsize = atoi(optarg);
 #else
@@ -1225,28 +1225,28 @@ pr_pack(buf, cc, mhdr)
 		(void)printf("%d bytes from %s: ", cc,
 			     pr_addr(from));
 
-		switch(ntohs(ni->ni_qtype)) {
-		 case NI_QTYPE_NOOP:
-			 printf("NodeInfo NOOP");
-			 break;
-		 case NI_QTYPE_SUPTYPES:
-			 printf("NodeInfo Supported Qtypes");
-			 if ((ni->ni_flags & NI_SUPTYPE_FLAG_COMPRESS) != 0) {
+		switch (ntohs(ni->ni_qtype)) {
+		case NI_QTYPE_NOOP:
+			printf("NodeInfo NOOP");
+			break;
+		case NI_QTYPE_SUPTYPES:
+			printf("NodeInfo Supported Qtypes");
+			if ((ni->ni_flags & NI_SUPTYPE_FLAG_COMPRESS) != 0) {
 				printf(", compressed bitmap");
 				break;
-			 }
-			 cp = (u_char *)(ni + 1);
-			 if (cp + 4 != end) {
+			}
+			cp = (u_char *)(ni + 1);
+			if (cp + 4 != end) {
 				printf(", invalid length");
 				break;
-			 }
-			 printf(", bitmap = 0x%08x", ntohl(*(u_int32_t *)cp));
-			 break;
-		 case NI_QTYPE_NODEADDR:
-			 pr_nodeaddr(ni, end - (u_char *)ni);
-			 break;
-		 case NI_QTYPE_FQDN:
-		 default:	/* XXX: for backward compatibility */
+			}
+			printf(", bitmap = 0x%08x", ntohl(*(u_int32_t *)cp));
+			break;
+		case NI_QTYPE_NODEADDR:
+			pr_nodeaddr(ni, end - (u_char *)ni);
+			break;
+		case NI_QTYPE_FQDN:
+		default:	/* XXX: for backward compatibility */
 			cp = (u_char *)ni + ICMP6_NIRLEN;
 			if (buf[off + ICMP6_NIRLEN] ==
 			    cc - off - ICMP6_NIRLEN - 1)
@@ -1294,7 +1294,7 @@ pr_pack(buf, cc, mhdr)
 
 				(void)printf(" (");	/*)*/
 
-				switch(ni->ni_code) {
+				switch (ni->ni_code) {
 				case ICMP6_NI_REFUSED:
 					(void)printf("refused");
 					comma++;
@@ -1312,13 +1312,13 @@ pr_pack(buf, cc, mhdr)
 				ttl = (int32_t)ntohl(*(u_long *)&buf[off+ICMP6ECHOLEN+8]);
 				if (comma)
 					printf(",");
-				if (!(ni->ni_flags & NI_FQDN_FLAG_VALIDTTL))
+				if (!(ni->ni_flags & NI_FQDN_FLAG_VALIDTTL)) {
 					(void)printf("TTL=%d:meaningless",
-						     (int)ttl);
-				else {
+					    (int)ttl);
+				} else {
 					if (ttl < 0) {
 						(void)printf("TTL=%d:invalid",
-						    ttl);
+						   ttl);
 					} else
 						(void)printf("TTL=%d", ttl);
 				}
@@ -1344,22 +1344,21 @@ pr_pack(buf, cc, mhdr)
 					if (comma)
 						printf(",");
 					(void)printf("invalid namelen:%d/%lu",
-						     buf[off + ICMP6_NIRLEN],
-						     (u_long)cc - off - ICMP6_NIRLEN - 1);
+					    buf[off + ICMP6_NIRLEN],
+					    (u_long)cc - off - ICMP6_NIRLEN - 1);
 					comma++;
 				}
 				/*(*/
 				putchar(')');
 			}
-		 fqdnend:
+		fqdnend:
 			;
 		}
 	} else {
 		/* We've got something other than an ECHOREPLY */
 		if (!(options & F_VERBOSE))
 			return;
-		(void)printf("%d bytes from %s: ", cc,
-			     pr_addr(from));
+		(void)printf("%d bytes from %s: ", cc, pr_addr(from));
 		pr_icmph(icp, end);
 	}
 
@@ -1383,7 +1382,7 @@ pr_exthdrs(mhdr)
 		if (cm->cmsg_level != IPPROTO_IPV6)
 			continue;
 
-		switch(cm->cmsg_type) {
+		switch (cm->cmsg_type) {
 		case IPV6_HOPOPTS:
 			printf("  HbH Options: ");
 			pr_ip6opt(CMSG_DATA(cm));
@@ -1516,13 +1515,13 @@ pr_nodeaddr(ni, nilen)
 	nilen -= sizeof(struct icmp6_nodeinfo);
 
 	if (options & F_VERBOSE) {
-		switch(ni->ni_code) {
-		 case ICMP6_NI_REFUSED:
-			 (void)printf("refused");
-			 break;
-		 case ICMP6_NI_UNKNOWN:
-			 (void)printf("unknown qtype");
-			 break;
+		switch (ni->ni_code) {
+		case ICMP6_NI_REFUSED:
+			(void)printf("refused");
+			break;
+		case ICMP6_NI_UNKNOWN:
+			(void)printf("unknown qtype");
+			break;
 		}
 		if (ni->ni_flags & NI_NODEADDR_FLAG_ALL)
 			(void)printf(" truncated");
@@ -1675,9 +1674,9 @@ pr_icmph(icp, end)
 {
 	char ntop_buf[INET6_ADDRSTRLEN];
 
-	switch(icp->icmp6_type) {
+	switch (icp->icmp6_type) {
 	case ICMP6_DST_UNREACH:
-		switch(icp->icmp6_code) {
+		switch (icp->icmp6_code) {
 		case ICMP6_DST_UNREACH_NOROUTE:
 			(void)printf("No Route to Destination\n");
 			break;
@@ -1708,7 +1707,7 @@ pr_icmph(icp, end)
 		pr_retip((struct ip6_hdr *)(icp + 1), end);
 		break;
 	case ICMP6_TIME_EXCEEDED:
-		switch(icp->icmp6_code) {
+		switch (icp->icmp6_code) {
 		case ICMP6_TIME_EXCEED_TRANSIT:
 			(void)printf("Time to live exceeded\n");
 			break;
@@ -1724,19 +1723,19 @@ pr_icmph(icp, end)
 		break;
 	case ICMP6_PARAM_PROB:
 		(void)printf("Parameter problem: ");
-		switch(icp->icmp6_code) {
-		 case ICMP6_PARAMPROB_HEADER:
-			 (void)printf("Erroneous Header ");
-			 break;
-		 case ICMP6_PARAMPROB_NEXTHEADER:
-			 (void)printf("Unknown Nextheader ");
-			 break;
-		 case ICMP6_PARAMPROB_OPTION:
-			 (void)printf("Unrecognized Option ");
-			 break;
-		 default:
-			 (void)printf("Bad code(%d) ", icp->icmp6_code);
-			 break;
+		switch (icp->icmp6_code) {
+		case ICMP6_PARAMPROB_HEADER:
+			(void)printf("Erroneous Header ");
+			break;
+		case ICMP6_PARAMPROB_NEXTHEADER:
+			(void)printf("Unknown Nextheader ");
+			break;
+		case ICMP6_PARAMPROB_OPTION:
+			(void)printf("Unrecognized Option ");
+			break;
+		default:
+			(void)printf("Bad code(%d) ", icp->icmp6_code);
+			break;
 		}
 		(void)printf("pointer = 0x%02x\n",
 			     (int)ntohl(icp->icmp6_pptr));
@@ -1872,53 +1871,52 @@ pr_retip(ip6, end)
 	cp += hlen;
 	while (end - cp >= 8) {
 		switch (nh) {
-		 case IPPROTO_HOPOPTS:
-			 printf("HBH ");
-			 hlen = (((struct ip6_hbh *)cp)->ip6h_len+1) << 3;
-			 nh = ((struct ip6_hbh *)cp)->ip6h_nxt;
-			 break;
-		 case IPPROTO_DSTOPTS:
-			 printf("DSTOPT ");
-			 hlen = (((struct ip6_dest *)cp)->ip6d_len+1) << 3;
-			 nh = ((struct ip6_dest *)cp)->ip6d_nxt;
-			 break;
-		 case IPPROTO_FRAGMENT:
-			 printf("FRAG ");
-			 hlen = sizeof(struct ip6_frag);
-			 nh = ((struct ip6_frag *)cp)->ip6f_nxt;
-			 break;
-		 case IPPROTO_ROUTING:
-			 printf("RTHDR ");
-			 hlen = (((struct ip6_rthdr *)cp)->ip6r_len+1) << 3;
-			 nh = ((struct ip6_rthdr *)cp)->ip6r_nxt;
-			 break;
+		case IPPROTO_HOPOPTS:
+			printf("HBH ");
+			hlen = (((struct ip6_hbh *)cp)->ip6h_len+1) << 3;
+			nh = ((struct ip6_hbh *)cp)->ip6h_nxt;
+			break;
+		case IPPROTO_DSTOPTS:
+			printf("DSTOPT ");
+			hlen = (((struct ip6_dest *)cp)->ip6d_len+1) << 3;
+			nh = ((struct ip6_dest *)cp)->ip6d_nxt;
+			break;
+		case IPPROTO_FRAGMENT:
+			printf("FRAG ");
+			hlen = sizeof(struct ip6_frag);
+			nh = ((struct ip6_frag *)cp)->ip6f_nxt;
+			break;
+		case IPPROTO_ROUTING:
+			printf("RTHDR ");
+			hlen = (((struct ip6_rthdr *)cp)->ip6r_len+1) << 3;
+			nh = ((struct ip6_rthdr *)cp)->ip6r_nxt;
+			break;
 #ifdef IPSEC
-		 case IPPROTO_AH:
-			 printf("AH ");
-			 hlen = (((struct ah *)cp)->ah_len+2) << 2;
-			 nh = ((struct ah *)cp)->ah_nxt;
-			 break;
+		case IPPROTO_AH:
+			printf("AH ");
+			hlen = (((struct ah *)cp)->ah_len+2) << 2;
+			nh = ((struct ah *)cp)->ah_nxt;
+			break;
 #endif
-		 case IPPROTO_ICMPV6:
-			 printf("ICMP6: type = %d, code = %d\n",
-				*cp, *(cp + 1));
-			 return;
-		 case IPPROTO_ESP:
-			 printf("ESP\n");
-			 return;
-		 case IPPROTO_TCP:
-			 printf("TCP: from port %u, to port %u (decimal)\n",
-				(*cp * 256 + *(cp + 1)),
-				(*(cp + 2) * 256 + *(cp + 3)));
-			 return;
-		 case IPPROTO_UDP:
-			 printf("UDP: from port %u, to port %u (decimal)\n",
-				(*cp * 256 + *(cp + 1)),
-				(*(cp + 2) * 256 + *(cp + 3)));
-			 return;
-		 default:
-			 printf("Unknown Header(%d)\n", nh);
-			 return;
+		case IPPROTO_ICMPV6:
+			printf("ICMP6: type = %d, code = %d\n", *cp, *(cp + 1));
+			return;
+		case IPPROTO_ESP:
+			printf("ESP\n");
+			return;
+		case IPPROTO_TCP:
+			printf("TCP: from port %u, to port %u (decimal)\n",
+			    (*cp * 256 + *(cp + 1)),
+			    (*(cp + 2) * 256 + *(cp + 3)));
+			return;
+		case IPPROTO_UDP:
+			printf("UDP: from port %u, to port %u (decimal)\n",
+			    (*cp * 256 + *(cp + 1)),
+			    (*(cp + 2) * 256 + *(cp + 3)));
+			return;
+		default:
+			printf("Unknown Header(%d)\n", nh);
+			return;
 		}
 
 		if ((cp += hlen) >= end)
