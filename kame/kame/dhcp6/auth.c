@@ -1,4 +1,4 @@
-/*	$KAME: auth.c,v 1.3 2004/06/17 13:09:55 jinmei Exp $	*/
+/*	$KAME: auth.c,v 1.4 2004/09/07 05:03:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -75,7 +75,6 @@
 #define IPAD 0x36
 #define OPAD 0x5C
 
-#define MD5_DIGESTLENGTH 16
 #define HMACMD5_KEYLENGTH 64
 
 typedef struct {

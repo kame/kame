@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6_ctl.c,v 1.3 2004/06/12 12:40:43 jinmei Exp $	*/
+/*	$KAME: dhcp6_ctl.c,v 1.4 2004/09/07 05:03:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -46,14 +46,18 @@
 #include <netinet/in.h>
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 #include <syslog.h>
+#include <netdb.h>
 #include <errno.h>
 
 #include <dhcp6.h>
 #include <config.h>
 #include <common.h>
+#include <auth.h>
+#include <base64.h>
 #include <control.h>
 #include <dhcp6_ctl.h>
 
@@ -74,19 +78,127 @@ struct dhcp6_commandctx {
 };
 
 int
-dhcp6_ctl_init(max)
-	int max;
+dhcp6_ctl_init(addr, port, max, sockp)
+	char *addr, *port;
+	int max, *sockp;
 {
+	struct addrinfo hints, *res = NULL;
+	int on;
+	int error;
+	int ctlsock = -1;
+
+	memset(&hints, 0, sizeof(hints));
+	hints.ai_family = AF_INET6;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
+	error = getaddrinfo(addr, port, &hints, &res);
+	if (error) {
+		dprintf(LOG_ERR, FNAME, "getaddrinfo: %s",
+		    gai_strerror(error));
+		return (-1);
+	}
+	ctlsock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+	if (ctlsock < 0) {
+		dprintf(LOG_ERR, FNAME, "socket(control sock): %s",
+		    strerror(errno));
+		goto fail;
+	}
+	on = 1;
+	if (setsockopt(ctlsock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on))
+	    < 0) {
+		dprintf(LOG_ERR, FNAME,
+		    "setsockopt(control sock, SO_REUSEADDR: %s",
+		    strerror(errno));
+		goto fail;
+	}
+	if (bind(ctlsock, res->ai_addr, res->ai_addrlen) < 0) {
+		dprintf(LOG_ERR, FNAME, "bind(control sock): %s",
+		    strerror(errno));
+		goto fail;
+	}
+	freeaddrinfo(res);
+	if (listen(ctlsock, 1)) {
+		dprintf(LOG_ERR, FNAME, "listen(control sock): %s",
+		    strerror(errno));
+		goto fail;
+	}
+
 	TAILQ_INIT(&commandqueue_head);
 
 	if (max <= 0) {
 		dprintf(LOG_ERR, FNAME,
 		    "invalid maximum number of commands (%d)", max_commands);
-		return (-1);
+		goto fail;
 	}
 	max_commands = max;
 
+	*sockp = ctlsock;
 	return (0);
+
+  fail:
+	if (res != NULL)
+		freeaddrinfo(res);
+	if  (ctlsock >= 0)
+		close(ctlsock);
+
+	return (-1);
+}
+
+int
+dhcp6_ctl_authinit(keyfile, keyinfop, digestlenp)
+	char *keyfile;
+	struct keyinfo **keyinfop;
+	int *digestlenp;
+{
+	FILE *fp = NULL;
+	struct keyinfo *ctlkey = NULL;
+	char line[1024], secret[1024];
+	int secretlen;
+
+	/* Currently, we only support HMAC-MD5 for authentication. */
+	*digestlenp = MD5_DIGESTLENGTH;
+
+	if ((fp = fopen(keyfile, "r")) == NULL) {
+		dprintf(LOG_ERR, FNAME, "failed to open %s: %s", keyfile,
+		    strerror(errno));
+		return (-1);
+	}
+	if (fgets(line, sizeof(line), fp) == NULL && ferror(fp)) {
+		dprintf(LOG_ERR, FNAME, "failed to read key file: %s",
+		    strerror(errno));
+		goto fail;
+	}
+	if ((secretlen = base64_decodestring(line, secret, sizeof(secret)))
+	    < 0) {
+		dprintf(LOG_ERR, FNAME, "failed to decode base64 string");
+		goto fail;
+	}
+	if ((ctlkey = malloc(sizeof(*ctlkey))) == NULL) {
+		dprintf(LOG_WARNING, FNAME, "failed to allocate control key");
+		goto fail;
+	}
+	memset(ctlkey, 0, sizeof(*ctlkey));
+	if ((ctlkey->secret = malloc(secretlen)) == NULL) {
+		dprintf(LOG_WARNING, FNAME, "failed to allocate secret key");
+		goto fail;
+	}
+	ctlkey->secretlen = (size_t)secretlen;
+	memcpy(ctlkey->secret, secret, secretlen);
+
+	fclose(fp);
+
+	*keyinfop = ctlkey;
+	return (0);
+
+  fail:
+	if (fp != NULL)
+		fclose(fp);
+	if (ctlkey != NULL && ctlkey->secret != NULL)
+		free(ctlkey->secret);
+	if (ctlkey != NULL)
+		free(ctlkey);
+
+	return (-1);
 }
 
 int

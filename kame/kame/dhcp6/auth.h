@@ -1,4 +1,4 @@
-/*	$KAME: auth.h,v 1.2 2004/06/12 10:43:34 jinmei Exp $	*/
+/*	$KAME: auth.h,v 1.3 2004/09/07 05:03:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -28,6 +28,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+
+#define MD5_DIGESTLENGTH 16
 
 /* secret key information for delayed authentication */
 struct keyinfo {

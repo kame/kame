@@ -1,4 +1,4 @@
-/*	$KAME: control.h,v 1.5 2004/06/17 13:11:28 jinmei Exp $	*/
+/*	$KAME: control.h,v 1.6 2004/09/07 05:03:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -29,19 +29,28 @@
  * SUCH DAMAGE.
  */
 
-#define DEFAULT_CONTROL_ADDR "::1" /* default IPv6 address for
-				    * control socket */
-#define DEFAULT_CONTROL_PORT "5546" /* default TCP port for control socket */
+#define DEFAULT_SERVER_CONTROL_ADDR "::1" /* default IPv6 address for server
+					   * control socket */
+#define DEFAULT_SERVER_CONTROL_PORT "5547" /* default TCP port for server
+					    * control socket */
+#define DEFAULT_CLIENT_CONTROL_ADDR "::1" /* default IPv6 address for client
+					   * control socket */
+#define DEFAULT_CLIENT_CONTROL_PORT "5546" /* default TCP port for client
+					    * control socket */
 
 #define DHCP6CTL_VERSION 0
 
+/* control commands */
 #define DHCP6CTL_COMMAND_RELOAD 1
 #define DHCP6CTL_COMMAND_REMOVE 2
+#define DHCP6CTL_COMMAND_START 3
+#define DHCP6CTL_COMMAND_STOP 4
 
+/* control objects */
 #define DHCP6CTL_BINDING 1
-#define DHCP6CTL_BINDING_IA 1
-
-#define DHCP6CTL_IA_PD 1
+#define DHCP6CTL_BINDING_IA 2
+#define DHCP6CTL_IA_PD 3
+#define DHCP6CTL_INTERFACE 4
 
 /*
  * Hash protocol/algorithm types.  Use same values for DHCPv6 protocol

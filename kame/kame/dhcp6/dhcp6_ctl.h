@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6_ctl.h,v 1.1 2004/06/12 10:46:00 jinmei Exp $	*/
+/*	$KAME: dhcp6_ctl.h,v 1.2 2004/09/07 05:03:03 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2004 WIDE Project.
@@ -37,7 +37,8 @@
 
 struct dhcp6_commandctx;	/* opaque type */
 
-extern int dhcp6_ctl_init __P((int));
+extern int dhcp6_ctl_init __P((char *, char *, int, int *));
+extern int dhcp6_ctl_authinit __P((char *, struct keyinfo **, int *));
 extern int dhcp6_ctl_acceptcommand __P((int, int (*)__P((char *, ssize_t))));
 extern void dhcp6_ctl_closecommand __P((struct dhcp6_commandctx *));
 extern int dhcp6_ctl_readcommand __P((fd_set *));

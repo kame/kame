@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.136 2004/09/04 09:26:38 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.137 2004/09/07 05:03:03 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -76,7 +76,6 @@
 
 #define DUID_FILE LOCALDBDIR "/dhcp6s_duid"
 #define DHCP6S_CONF SYSCONFDIR "/dhcp6s.conf"
-#define MD5_DIGESTLENGTH 16
 #define DEFAULT_KEYFILE SYSCONFDIR "/dhcp6sctlkey"
 
 #define CTLSKEW 300
@@ -127,8 +126,8 @@ char *device = NULL;
 int insock;			/* inbound UDP port */
 int outsock;			/* outbound UDP port */
 int ctlsock = -1;		/* control TCP port */
-char *ctladdr = DEFAULT_CONTROL_ADDR;
-char *ctlport = DEFAULT_CONTROL_PORT;
+char *ctladdr = DEFAULT_SERVER_CONTROL_ADDR;
+char *ctlport = DEFAULT_SERVER_CONTROL_PORT;
 
 static const struct sockaddr_in6 *sa6_any_downstream, *sa6_any_relay;
 static struct msghdr rmh;
@@ -147,10 +146,10 @@ static inline int get_val __P((char **, int *, void *, size_t));
 
 static void usage __P((void));
 static void server6_init __P((void));
-static int ctlauthinit __P((void));
 static void server6_mainloop __P((void));
-static int server6_do_command __P((char *, ssize_t));
+static int server6_do_ctlcommand __P((char *, ssize_t));
 static void server6_reload __P((void));
+static void server6_stop __P((void));
 static void server6_recv __P((int));
 static void free_relayinfo __P((struct relayinfo *));
 static int process_relayforw __P((struct dhcp6 **, struct dhcp6opt **,
@@ -345,7 +344,7 @@ server6_init()
 		exit(1);
 	}
 
-	if (ctlauthinit() != 0) {
+	if (dhcp6_ctl_authinit(ctlkeyfile, &ctlkey, &ctldigestlen) != 0) {
 		dprintf(LOG_NOTICE, FNAME,
 		    "failed initialize control message authentication");
 		/* run the server anyway */
@@ -523,104 +522,17 @@ server6_init()
 		(const struct sockaddr_in6*)&sa6_any_relay_storage;
 	freeaddrinfo(res);
 
-	/* open control socket */
-	if (ctlkey == NULL) {
+	/* set up control socket */
+	if (ctlkey == NULL)
 		dprintf(LOG_NOTICE, FNAME, "skip opening control port");
-		return;
-	}
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_INET6;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = IPPROTO_TCP;
-	error = getaddrinfo(ctladdr, ctlport, &hints, &res);
-	if (error) {
-		dprintf(LOG_ERR, FNAME, "getaddrinfo: %s",
-		    gai_strerror(error));
-		exit(1);
-	}
-	ctlsock = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
-	if (ctlsock < 0) {
-		dprintf(LOG_ERR, FNAME, "socket(control sock): %s",
-		    strerror(errno));
-		exit(1);
-	}
-	on = 1;
-	if (setsockopt(ctlsock, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on))
-	    < 0) {
-		dprintf(LOG_ERR, FNAME,
-		    "setsockopt(control sock, SO_REUSEADDR: %s",
-		    strerror(errno));
-		exit(1);
-	}
-	if (bind(ctlsock, res->ai_addr, res->ai_addrlen) < 0) {
-		dprintf(LOG_ERR, FNAME, "bind(control sock): %s",
-		    strerror(errno));
-		exit(1);
-	}
-	freeaddrinfo(res);
-	if (listen(ctlsock, 1)) {
-		dprintf(LOG_ERR, FNAME, "listen(control sock): %s",
-		    strerror(errno));
-		exit(1);
-	}
-
-	if (dhcp6_ctl_init(DHCP6CTL_DEF_COMMANDQUEUELEN)) {
+	else if (dhcp6_ctl_init(ctladdr, ctlport,
+	    DHCP6CTL_DEF_COMMANDQUEUELEN, &ctlsock)) {
 		dprintf(LOG_ERR, FNAME,
 		    "failed to initialize control channel");
 		exit(1);
 	}
-}
 
-static int
-ctlauthinit()
-{
-	FILE *fp = NULL;
-	char line[1024], secret[1024];
-	int secretlen;
-
-	/* Currently, we only support HMAC-MD5 for authentication. */
-	ctldigestlen = MD5_DIGESTLENGTH;
-
-	if ((fp = fopen(ctlkeyfile, "r")) == NULL) {
-		dprintf(LOG_ERR, FNAME, "failed to open %s: %s",
-		    ctlkeyfile, strerror(errno));
-		return (-1);
-	}
-	if (fgets(line, sizeof(line), fp) == NULL && ferror(fp)) {
-		dprintf(LOG_ERR, FNAME, "failed to read key file: %s",
-		    strerror(errno));
-		goto fail;
-	}
-	if ((secretlen = base64_decodestring(line, secret, sizeof(secret)))
-	    < 0) {
-		dprintf(LOG_ERR, FNAME, "failed to decode base64 string");
-		goto fail;
-	}
-	if ((ctlkey = malloc(sizeof(*ctlkey))) == NULL) {
-		dprintf(LOG_WARNING, FNAME, "failed to allocate control key");
-		return (-1);
-	}
-	memset(ctlkey, 0, sizeof(*ctlkey));
-	if ((ctlkey->secret = malloc(secretlen)) == NULL) {
-		dprintf(LOG_WARNING, FNAME, "failed to allocate secret key");
-		goto fail;
-	}
-	ctlkey->secretlen = (size_t)secretlen;
-	memcpy(ctlkey->secret, secret, secretlen);
-
-	fclose(fp);
-
-	return (0);
-
-  fail:
-	if (fp != NULL)
-		fclose(fp);
-	if (ctlkey->secret != NULL)
-		free(ctlkey->secret);
-	if (ctlkey != NULL)
-		free(ctlkey);
-	ctlkey = NULL;
-	return (-1);
+	return;
 }
 
 static void
@@ -656,12 +568,13 @@ server6_mainloop()
 		default:
 			break;
 		}
+
 		if (FD_ISSET(insock, &r))
 			server6_recv(insock);
 		if (ctlsock >= 0) {
 			if (FD_ISSET(ctlsock, &r)) {
 				(void)dhcp6_ctl_acceptcommand(ctlsock,
-				    server6_do_command);
+				    server6_do_ctlcommand);
 			}
 			(void)dhcp6_ctl_readcommand(&r);
 		}
@@ -712,7 +625,7 @@ get_val(bpp, lenp, valp, vallen)
 }
 
 static int
-server6_do_command(buf, len)
+server6_do_ctlcommand(buf, len)
 	char *buf;
 	ssize_t len;
 {
@@ -777,12 +690,21 @@ server6_do_command(buf, len)
 		}
 		server6_reload();
 		break;
+	case DHCP6CTL_COMMAND_STOP:
+		if (commandlen != 0) {
+			dprintf(LOG_INFO, FNAME, "invalid command length "
+			    "for stop: %d", commandlen);
+			return (DHCP6CTL_R_DONE);
+		}
+		server6_stop();
+		break;
 	case DHCP6CTL_COMMAND_REMOVE:
 		if (get_val32(&bp, &commandlen, &p32))
 			return (DHCP6CTL_R_FAILURE);
 		if (p32 != DHCP6CTL_BINDING) {
 			dprintf(LOG_INFO, FNAME,
 			    "unknown remove target: %ul", p32);
+			return (DHCP6CTL_R_FAILURE);
 		}
 
 		if (get_val32(&bp, &commandlen, &p32))
@@ -825,7 +747,6 @@ server6_do_command(buf, len)
 		    "unknown control command: %d (len=%d)",
 		    (int)command, commandlen);
 		return (DHCP6CTL_R_FAILURE);
-		break;
 	}
 
   	return (DHCP6CTL_R_DONE);
@@ -844,6 +765,16 @@ server6_reload()
 	dprintf(LOG_NOTICE, FNAME, "server reloaded");
 
 	return;
+}
+
+static void
+server6_stop()
+{
+	/* Right now, we simply stop running */
+
+	dprintf(LOG_NOTICE, FNAME, "exiting");
+
+	exit (0);
 }
 
 static void
