@@ -1,7 +1,15 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2349 2003/02/18 11:46:36 suz Exp $
+$KAME: CHANGELOG,v 1.2350 2003/02/18 14:43:04 jinmei Exp $
 
 <200302>
+2003-02-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* freebsd4/sys/sys/mbuf.h (M_MOVE_PKTHDR): ported from OpenBSD to
+	"move" mtag from one mbuf to another.
+	* kame/sys/netinet6/{icmp6.c, ip6_output, ipsec.c}: used
+	M_MOVE_PKTHDR instead of M_COPY_PKTHDR when appropriate, in order
+	to avoid mtag leakage.
+	(We may need to change more, including support for other OSes)
+
 Tue Feb 18 20:43:42 JST 2003	suz@crl.hitachi.co.jp
 	* {freebsd4,netbsd,openbsd}/sys/netinet/udp_usrreq.c
 	  properly handles IPv4 UDP packet for IPv4 broadcast address
