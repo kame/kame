@@ -24,21 +24,14 @@ beforeinstall:
 	done
 
 afterinstall:
-#	cp ${.CURDIR}/kame/rtadvd/rtadvd.conf \
-#		${DESTDIR}$(PREFIX)/etc/rtadvd.conf.sample
+	cp ${.CURDIR}/kame/rtadvd/rtadvd.conf \
+		${DESTDIR}$(PREFIX)/etc/rtadvd.conf.sample
 	cp ${.CURDIR}/kame/bgpd/bgpd.conf \
 		${DESTDIR}$(PREFIX)/etc/bgpd.conf.sample
 	cp ${.CURDIR}/kame/racoon/samples/racoon.conf.sample \
 		${DESTDIR}$(PREFIX)/etc/
 	cp ${.CURDIR}/kame/racoon/samples/psk.txt.sample \
 		${DESTDIR}$(PREFIX)/etc/
-#	if test -x ${DESTDIR}$(PREFIX)/sbin/inet6d || \
-#	test -x ${DESTDIR}$(PREFIX)/sbin/inet46d; then \
-#		cp ${.CURDIR}/kame/inet6d/inet6d.conf \
-#			${DESTDIR}$(PREFIX)/etc/inet6d.conf.sample; \
-#	fi
-#	cp ${.CURDIR}/kame/etc/rc.net6 \
-#		${DESTDIR}$(PREFIX)/etc/rc.net6.sample
 	for i in $(DOCS); do \
 		if test -f ${.CURDIR}/../$$i; then \
 			cp ${.CURDIR}/../$$i \

@@ -34,7 +34,6 @@ afterinstall:
 		cp ${.CURDIR}/kame/inet6d/inet6d.conf \
 			${DESTDIR}${PREFIX}/etc/inet6d.conf.sample; \
 	fi
-	cp ${.CURDIR}/kame/etc/rc.net6 ${PREFIX}/etc/rc.net6.sample
 	for i in ${DOCS}; do \
 		if test -f ${.CURDIR}/../$$i; then \
 			cp ${.CURDIR}/../$$i ${DESTDIR}${PREFIX}/share/doc/kame; \
