@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.5 2000/01/10 19:48:13 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.6 2000/01/10 23:47:29 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -225,7 +225,6 @@ agg_i2recv(iph1, msg)
 			"received invalid next payload type %d, "
 			"expecting %d.\n",
 			pa->type, ISAKMP_NPTYPE_SA);
-		vfree(pbuf);
 		goto end;
 	}
 	sa_tmp = (struct ipsecdoi_pl_sa *)pa->ptr;
@@ -455,7 +454,6 @@ agg_r1recv(iph1, msg)
 			"received invalid next payload type %d, "
 			"expecting %d.\n",
 			pa->type, ISAKMP_NPTYPE_SA);
-		vfree(pbuf);
 		goto end;
 	}
 	sa_tmp = (struct ipsecdoi_pl_sa *)pa->ptr;
@@ -495,7 +493,6 @@ agg_r1recv(iph1, msg)
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
-			vfree(pbuf);
 			goto end;
 		}
 	}
@@ -734,7 +731,6 @@ agg_r2recv(iph1, msg0)
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
-			vfree(pbuf);
 			goto end;
 		}
 	}

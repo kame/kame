@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.6 2000/01/10 19:48:13 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.7 2000/01/10 23:47:29 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -200,7 +200,6 @@ ident_i2recv(iph1, msg)
 			"received invalid next payload type %d, "
 			"expecting %d.\n",
 			pa->type, ISAKMP_NPTYPE_SA);
-		vfree(pbuf);
 		goto end;
 	}
 	sa_tmp = (struct ipsecdoi_pl_sa *)pa->ptr;
@@ -223,7 +222,6 @@ ident_i2recv(iph1, msg)
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
-			vfree(pbuf);
 			goto end;
 		}
 	}
@@ -366,7 +364,6 @@ ident_i3recv(iph1, msg)
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
-			vfree(pbuf);
 			goto end;
 		}
 	}
@@ -538,7 +535,6 @@ ident_i4recv(iph1, msg0)
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
-			vfree(pbuf);
 			goto end;
 		}
 	}
@@ -1031,7 +1027,6 @@ ident_r3recv(iph1, msg0)
 				"ignore the packet, "
 				"received unexpecting payload type %d.\n",
 				pa->type);
-			vfree(pbuf);
 			goto end;
 		}
 	}
