@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.135 2001/03/23 03:58:40 thorpej Exp $	*/
+/*	$KAME: isakmp.c,v 1.136 2001/03/23 15:02:31 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -349,7 +349,7 @@ isakmp_main(msg, remote, local)
 			saddr_db = strdup(saddr2str(iph1->remote));
 			saddr_act = strdup(saddr2str(remote));
 
-			plog(LLV_ERROR, LOCATION, remote,
+			plog(LLV_WARNING, LOCATION, remote,
 				"remote address mismatched. db=%s, act=%s\n",
 				saddr_db, saddr_act);
 
