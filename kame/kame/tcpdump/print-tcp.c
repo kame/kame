@@ -21,7 +21,7 @@
 
 #ifndef lint
 static const char rcsid[] =
-    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-tcp.c,v 1.3 1999/10/18 04:43:19 itojun Exp $ (LBL)";
+    "@(#) $Header: /cvsroot/kame/kame/kame/kame/tcpdump/print-tcp.c,v 1.4 1999/12/10 05:12:53 itojun Exp $ (LBL)";
 #endif
 
 #include <sys/param.h>
@@ -113,7 +113,7 @@ tcp_print(register const u_char *bp, register u_int length,
 	register u_char flags;
 	register int hlen;
 	register char ch;
-	u_short sport, dport, win, urp;
+	u_int16_t sport, dport, win, urp;
 	u_int32_t seq, ack;
 #ifdef INET6
 	register const struct ip6_hdr *ip6;
@@ -173,10 +173,11 @@ tcp_print(register const u_char *bp, register u_int length,
 		return;
 	}
 #ifdef TH_ECN
-	if ((flags = tp->th_flags) & (TH_SYN|TH_FIN|TH_RST|TH_PUSH|TH_ECN)) {
+	if ((flags = tp->th_flags) & (TH_SYN|TH_FIN|TH_RST|TH_PUSH|TH_ECN))
 #else
-	if ((flags = tp->th_flags) & (TH_SYN|TH_FIN|TH_RST|TH_PUSH)) {
+	if ((flags = tp->th_flags) & (TH_SYN|TH_FIN|TH_RST|TH_PUSH))
 #endif
+	{
 		if (flags & TH_SYN)
 			putchar('S');
 		if (flags & TH_FIN)
