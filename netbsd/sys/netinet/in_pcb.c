@@ -937,8 +937,9 @@ in_selectsrc(sin, ro, soopts, mopts, errorp)
 	 * our src addr is taken from the i/f, else punt.
 	 */
 	if (ro->ro_rt &&
-	    (!in_hosteq(satosin(&ro->ro_dst)->sin_addr, sin->sin_addr) ||
-	    soopts & SO_DONTROUTE)) {
+	    (ro->ro_dst.sa_family != AF_INET ||
+	     !in_hosteq(satosin(&ro->ro_dst)->sin_addr, sin->sin_addr) ||
+	     soopts & SO_DONTROUTE)) {
 		RTFREE(ro->ro_rt);
 		ro->ro_rt = (struct rtentry *)0;
 	}
