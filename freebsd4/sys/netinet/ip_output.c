@@ -2894,7 +2894,7 @@ in_getmopt_ifargs(sopt, ifp, ia_grp, index)
 	/*
 	 * If the interface is specified, validate it.
 	 */
-	if (index < 0 || if_index < index)
+	if (index < 0 || if_indexlim < index)
 		return ENXIO;	/* XXX EINVAL? */
 
 	switch (optname) {
