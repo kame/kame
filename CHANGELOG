@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.359 1999/12/22 07:12:22 jinmei Exp $
+$Id: CHANGELOG,v 1.360 1999/12/22 07:13:55 jinmei Exp $
 
 <199912>
 1999-12-22  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -17,8 +17,8 @@ $Id: CHANGELOG,v 1.359 1999/12/22 07:12:22 jinmei Exp $
 	will not work correctly any more because of this fix.
 	If your applications use these non-standard options, I strognly
 	recommend you to change the applications not to use the options.
-	The definitions in in6.h will be removed after a transition period
-	(maybe two weeks or so).
+	The definitions in in6.h will also be removed after a transition
+	period (maybe two weeks or so).
 	
 Wed Dec 22 00:37:56 JST 1999  itojun@iijlab.net
 	* many platforms:
