@@ -1,4 +1,4 @@
-/*	$KAME: mip6_binding.c,v 1.31 2001/11/07 03:31:41 keiichi Exp $	*/
+/*	$KAME: mip6_binding.c,v 1.32 2001/11/07 08:59:49 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -1334,6 +1334,9 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 						    mbc,
 						    mip6_bc_encapcheck,
 						    &mbc->mbc_encap);
+
+				/* add rtable for proxy ND */
+				mip6_bc_proxy_control(&haddr, haaddr, RTM_ADD);
 			} else {
 				/* update a BC entry. */
 				mbc->mbc_pcoa = *coa;
@@ -1352,9 +1355,6 @@ mip6_process_hrbu(haddr0, coa, bu_opt, seqno, lifetime, haaddr)
 						    mip6_bc_encapcheck,
 						    &mbc->mbc_encap);
 			}
-
-			/* add rtable for proxy ND */
-			mip6_bc_proxy_control(&haddr, haaddr, RTM_ADD);
 		}
 	}
 
@@ -1860,8 +1860,8 @@ mip6_process_ba(m, opt)
 
 			/* for safty. */
 			mbu->mbu_reg_state = MIP6_BU_REG_STATE_NOTREG;
-		}
-		else if (mbu->mbu_reg_state == MIP6_BU_REG_STATE_REGWAITACK) {
+		} else if (mbu->mbu_reg_state
+			   == MIP6_BU_REG_STATE_REGWAITACK) {
 			/* home registration completed */
 			mbu->mbu_reg_state = MIP6_BU_REG_STATE_REG;
 
@@ -1885,6 +1885,8 @@ mip6_process_ba(m, opt)
 					 __FILE__, __LINE__));
 				return (error);
 			}
+		} else if (mbu->mbu_reg_state == MIP6_BU_REG_STATE_REG) {
+			/* nothing to do. */
 		} else {
 			mip6log((LOG_NOTICE,
 				 "%s:%d: unexpected condition.\n",
@@ -2055,12 +2057,16 @@ mip6_bc_list_remove(mbc_list, mbc)
 	}
 
 	LIST_REMOVE(mbc, mbc_entry);
-	error = mip6_bc_proxy_control(&mbc->mbc_phaddr, NULL, RTM_DELETE);
-	if (error) {
-		mip6log((LOG_ERR,
-			 "%s:%d: can't delete a proxy ND entry for %s.\n",
-			 __FILE__, __LINE__,
-			 ip6_sprintf(&mbc->mbc_phaddr)));
+	if (mbc->mbc_flags & IP6_BUF_HOME) {
+		error = mip6_bc_proxy_control(&mbc->mbc_phaddr, NULL,
+					      RTM_DELETE);
+		if (error) {
+			mip6log((LOG_ERR,
+				 "%s:%d: can't delete a proxy ND entry "
+				 "for %s.\n",
+				 __FILE__, __LINE__,
+				 ip6_sprintf(&mbc->mbc_phaddr)));
+		}
 	}
 	FREE(mbc, M_TEMP);
 
