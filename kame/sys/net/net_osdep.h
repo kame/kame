@@ -1,4 +1,4 @@
-/*	$KAME: net_osdep.h,v 1.76 2003/02/07 10:17:07 suz Exp $	*/
+/*	$KAME: net_osdep.h,v 1.77 2003/04/28 06:42:55 suz Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -294,8 +294,9 @@
  *	a bunch of the large branch will be embedded in the kernel code.
  *
  * - M_COPY_PKTHDR
- *	openbsd30: M_COPY_PKTHDR is deprecated.  use M_MOVE_PKTHDR or
- *		M_DUP_PKTHDR, depending on how you want to handle m_tag.
+ *	openbsd30, freebsd4(after 4.8): M_COPY_PKTHDR is deprecated.
+ *		use M_MOVE_PKTHDR or M_DUP_PKTHDR, depending on how you want 
+ *		to handle m_tag.
  *	others: M_COPY_PKTHDR is available as usual.
  *
  * - M_READONLY() macro
