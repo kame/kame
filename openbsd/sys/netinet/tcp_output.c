@@ -873,7 +873,7 @@ send:
 	  ((struct ip6_hdr *)ti6)->ip6_hlim = 
 	    tp->t_inpcb->inp_ipv6.ip6_hlim;*/
 
-	  error = ip6_output(m, NULL, &tp->t_inpcb->inp_route6, (so->so_options & SO_DONTROUTE), NULL, NULL);
+	  error = ip6_output(m, tp->t_inpcb->inp_outputopts6, &tp->t_inpcb->inp_route6, (so->so_options & SO_DONTROUTE), NULL, NULL);
 	} else
 #endif /* INET6 */
     {
