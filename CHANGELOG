@@ -1,8 +1,13 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.996 2000/06/11 17:47:35 jinmei Exp $
+$Id: CHANGELOG,v 1.997 2000/06/11 23:53:33 itojun Exp $
 
 <200006>
+Mon Jun 12 08:51:25 JST 2000  itojun@iijlab.net
+	* sys/netkey/key.c: correct prefix length match on destination address.
+	  the code used source prefix len on comparision by mistake.
+	  From: Ronald van der Pol <Ronald.vanderPol@surfnet.nl>
+
 2000-06-12  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* *bsd*/usr.[s]bin/netstat/inet6.c (icmp6_stats): printed new
 	statistics counters about error messages (see below).
