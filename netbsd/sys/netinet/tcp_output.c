@@ -217,7 +217,9 @@ tcp_segsize(tp, txsegsizep, rxsegsizep)
 		size = rt->rt_rmx.rmx_mtu - iphlen - sizeof(struct tcphdr);
 	else if ((ifp->if_flags & IFF_LOOPBACK) != 0)
 		size = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
-	else if (inp && (ip_mtudisc || in_localaddr(inp->inp_faddr)))
+	else if (inp && ip_mtudisc)
+		size = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
+	else if (inp && in_localaddr(inp->inp_faddr))
 		size = ifp->if_mtu - iphlen - sizeof(struct tcphdr);
 #ifdef INET6
 	else if (in6p) {
