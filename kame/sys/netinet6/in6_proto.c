@@ -1,4 +1,4 @@
-/*	$KAME: in6_proto.c,v 1.48 2000/03/30 09:11:08 sumikawa Exp $	*/
+/*	$KAME: in6_proto.c,v 1.49 2000/04/19 04:03:07 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -349,26 +349,9 @@ struct ip6protosw inet6sw[] = {
 #endif
 },
 #endif /* IPSEC */
+#ifdef INET
 { SOCK_RAW,	&inet6domain,	IPPROTO_IPV4,	PR_ATOMIC|PR_ADDR,
   encap6_input,	rip6_output, 	0,		rip6_ctloutput,
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-  0,
-#else
-  rip6_usrreq,
-#endif
-#ifndef INET
-  encap_init,
-#else
-  0,
-#endif
-  0,		0,		0,
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-  &rip6_usrreqs
-#endif
-},
-#ifdef INET6
-{ SOCK_RAW,	&inet6domain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
-  encap6_input, rip6_output,	 0,	rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
   0,
 #else
@@ -379,7 +362,23 @@ struct ip6protosw inet6sw[] = {
   &rip6_usrreqs
 #endif
 },
-#endif /*INET6*/
+#endif /*INET*/
+{ SOCK_RAW,	&inet6domain,	IPPROTO_IPV6,	PR_ATOMIC|PR_ADDR,
+  encap6_input, rip6_output,	 0,	rip6_ctloutput,
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  0,
+#else
+  rip6_usrreq,
+#endif
+#ifndef INET
+  encap_init,	0,		0,		0,
+#else
+  0,		0,		0,		0,
+#endif
+#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+  &rip6_usrreqs
+#endif
+},
 { SOCK_RAW,     &inet6domain,	IPPROTO_PIM,	PR_ATOMIC|PR_ADDR,
   pim6_input,    rip6_output,	0,              rip6_ctloutput,
 #if defined(__FreeBSD__) && __FreeBSD__ >= 3
