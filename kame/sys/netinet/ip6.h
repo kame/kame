@@ -1,4 +1,4 @@
-/*	$KAME: ip6.h,v 1.21 2001/07/05 23:38:19 itojun Exp $	*/
+/*	$KAME: ip6.h,v 1.22 2001/07/09 01:24:13 keiichi Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -219,8 +219,13 @@ struct ip6_opt_router {
 struct ip6_opt_binding_update {
 	u_int8_t ip6ou_type;
 	u_int8_t ip6ou_len;
-	u_int8_t ip6ou_flags;
-	u_int8_t ip6ou_prefixlen;
+	union {
+		u_int16_t ip6ou_un1_flags;		/* first 9 bits */
+		struct {
+			u_int8_t ip6ou_un2_dummy;
+			u_int8_t ip6ou_un2_prefixlen;	/* valid only 7bits */
+		} ip6ou_un2;
+	} ip6ou_un;
 	u_int8_t ip6ou_authdatalen;
 	u_int8_t ip6ou_seqno;
 	u_int8_t ip6ou_lifetime[4];
@@ -228,12 +233,27 @@ struct ip6_opt_binding_update {
 	/* followed by authentication data */
 	/* followed by sub-options */
 } __attribute__((__packed__));
+#define ip6ou_flags ip6ou_un.ip6ou_un1_flags
+#define ip6ou_prefixlen ip6ou_un.ip6ou_un2.ip6ou_un2_prefixlen
 
 /* Binding Update Flags */
-#define IP6_BUF_ACK	0x80	/* Request a binding ack */
-#define IP6_BUF_HOME	0x40	/* Home Registration */
-#define IP6_BUF_ROUTER	0x20	/* Sending mobile node is a router */
-#define IP6_BUF_DAD	0x10	/* Perform Duplicate Address Detection */
+#if BYTE_ORDER == BIG_ENDIAN
+#define IP6_BUF_ACK	0x8000	/* Request a binding ack */
+#define IP6_BUF_HOME	0x4000	/* Home Registration */
+#define IP6_BUF_ROUTER	0x2000	/* Sending mobile node is a router */
+#define IP6_BUF_DAD	0x1000	/* Perform Duplicate Address Detection */
+#else /* BYTE_ORDER == LITTLE_ENDIAN */
+#define IP6_BUF_ACK	0x0080	/* Request a binding ack */
+#define IP6_BUF_HOME	0x0040	/* Home Registration */
+#define IP6_BUF_ROUTER	0x0020	/* Sending mobile node is a router */
+#define IP6_BUF_DAD	0x0010	/* Perform Duplicate Address Detection */
+#endif /* BYTE_ORDER == LITTLE_ENDIAN */
+
+/* Binding Update prefixlen manipulation */
+#define IP6_BU_SETPREFIXLEN(bu_opt, plen) do {				\
+		(bu_opt)->ip6ou_prefixlen |= ((plen) & 0x7f);		\
+	} while (0);
+#define IP6_BU_GETPREFIXLEN(bu_opt) (((bu_opt)->ip6ou_prefixlen) & 0x7f)
 
 /* Binding Ack Option */
 struct ip6_opt_binding_ack {
