@@ -1,10 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.433 2000/01/12 08:24:47 sumikawa Exp $
+$Id: CHANGELOG,v 1.434 2000/01/13 17:18:19 itojun Exp $
 
 <200001>
+Fri Jan 14 02:16:16 JST 2000  itojun@itojun.org
+	* kame/libpcap/inet.c: improve warning message when libpcap fails to
+	  get IPv4 address on the interface it runs on.
+
 Wed Jan 12 17:21:40 2000  SUMIKAWA Munechika  <sumikawa@ebina.hitachi.co.jp>
-	* Upgrade to 1.4.3 and sync with FreeBSD-cuurent. No extra IPv6
+	* Upgrade to 1.4.3 and sync with FreeBSD-current. No extra IPv6
 	  patch is necessary anymore.
 
 Wed Jan 12 15:40:05 JST 2000  itojun@iijlab.net
