@@ -2,7 +2,7 @@
 
 	KAME Project
 	http://www.kame.net/
-	$KAME: IMPLEMENTATION,v 1.223 2001/06/10 10:19:15 keiichi Exp $
+	$KAME: IMPLEMENTATION,v 1.224 2001/06/17 04:29:16 jinmei Exp $
 
 
 NOTE: The document tries to describe behaviors/implementation choices
@@ -1921,6 +1921,30 @@ to make the distributed develoment smooth.
   included automatically.
 - when editting a third-party package, keep its own coding style as
   much as possible, even if the style does not follow the items above.
+- it is recommended to always surround an expression containing
+  bitwise operators by parentheses, especially when the expression is
+  combined with relational operators, in order to avoid unintentional
+  mismatch of operators.  Thus, we should write
+  if ((a & b) == 0)  /* (A) */
+  or
+  if (a & (b == 0))  /* (B) */
+  instead of
+  if (a & b == 0)    /* (C) */
+  even if the programmer's intention was (C), which is equivalent to
+  (B) according to the grammar of the language C.
+  Thus, we should write a code to test if a bit-flag is set for a
+  given variable as follows:
+  if ((flag & FLAG_A) == 0)  /* (D) the FLAG_A is NOT set */
+  if ((flag & FLAG_A) != 0)  /* (E) the FLAG_A is set */
+  Some developers in the KAME project rather prefer the following style:
+  if (!(flag & FLAG_A))  /* (F) the FLAG_A is NOT set */
+  if ((flag & FLAG_A))   /* (G) the FLAG_A is set */
+  because it would be more intuitive in terms of the relationship
+  between the negation operator (!) and the semantics of the
+  condition.  The KAME developers have discussed the style, and have
+  agreed that all the styles from (D) to (G) are valid.  So, when you
+  see styles like (D) and (E) in the KAME code and feel a bit strange,
+  please just keep them.  They are intentional.
 
 When you want to contribute something to the KAME project, and if *you
 do not mind* the agreement, it would be helpful for the project to
