@@ -85,6 +85,7 @@ __RCSID("$NetBSD: fstat.c,v 1.34 1999/02/18 06:09:25 lukem Exp $");
 #include <netinet6/in6_pcb.h>
 #endif
 
+#include <netdb.h>
 #include <arpa/inet.h>
 
 #include <ctype.h>
@@ -595,6 +596,38 @@ getmnton(m)
 	return (mt->mntonname);
 }
 
+#ifdef INET6
+const char *
+inet6_addrstr(p)
+	struct in6_addr *p;
+{
+	struct sockaddr_in6 sin6;
+	static char hbuf[NI_MAXHOST];
+#ifdef NI_WITHSCOPEID
+	const int niflags = NI_NUMERICHOST | NI_WITHSCOPEID;
+#else
+	const int niflags = NI_NUMERICHOST
+#endif
+
+	memset(&sin6, 0, sizeof(sin6));
+	sin6.sin6_family = AF_INET6;
+	sin6.sin6_len = sizeof(struct sockaddr_in6);
+	sin6.sin6_addr = *p;
+	if (IN6_IS_ADDR_LINKLOCAL(p) &&
+	    *(u_int16_t *)&sin6.sin6_addr.s6_addr[2] != 0) {
+		sin6.sin6_scope_id =
+			ntohs(*(u_int16_t *)&sin6.sin6_addr.s6_addr[2]);
+		sin6.sin6_addr.s6_addr[2] = sin6.sin6_addr.s6_addr[3] = 0;
+	}
+
+	if (getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
+			hbuf, sizeof(hbuf), NULL, 0, niflags))
+		return "invalid";
+
+	return hbuf;
+}
+#endif
+
 void
 socktrans(sock, i)
 	struct socket *sock;
@@ -620,8 +653,7 @@ socktrans(sock, i)
 	int len;
 	char dname[32];
 #ifdef INET6
-	char addrbuf[INET6_ADDRSTRLEN];
-	char xaddrbuf[INET6_ADDRSTRLEN + 2];
+	char xaddrbuf[NI_MAXHOST + 2];
 #endif
 
 	PREFIX(i);
@@ -721,17 +753,15 @@ socktrans(sock, i)
 				goto bad;
 			}
 			printf(" %lx", (long)in6pcb.in6p_ppcb);
-			sprintf(xaddrbuf, "[%s]", 
- 			    inet_ntop(AF_INET6, &in6pcb.in6p_laddr,
-				addrbuf, sizeof(addrbuf)));
+			sprintf(xaddrbuf, "[%s]",
+			    inet6_addrstr(&in6pcb.in6p_laddr));
 			printf(" %s:%d",
 			    IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_laddr) ? "*" :
 			    xaddrbuf,
 			    ntohs(in6pcb.in6p_lport));
 			if (in6pcb.in6p_fport) {
 				sprintf(xaddrbuf, "[%s]", 
-				    inet_ntop(AF_INET6, &in6pcb.in6p_faddr,
-					addrbuf, sizeof(addrbuf)));
+				    inet6_addrstr(&in6pcb.in6p_faddr));
 				printf(" <-> %s:%d",
 			            IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_faddr) ? "*" :
 				    xaddrbuf,
@@ -747,16 +777,14 @@ socktrans(sock, i)
 			}
 			printf(" %lx", (long)so.so_pcb);
 			sprintf(xaddrbuf, "[%s]", 
-			    inet_ntop(AF_INET6, &in6pcb.in6p_laddr,
-				addrbuf, sizeof(addrbuf)));
+			    inet6_addrstr(&in6pcb.in6p_laddr));
 			printf(" %s:%d",
 		            IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_laddr) ? "*" :
 			    xaddrbuf,
 			    ntohs(in6pcb.in6p_lport));
 			if (in6pcb.in6p_fport) {
 				sprintf(xaddrbuf, "[%s]", 
-				    inet_ntop(AF_INET6, &in6pcb.in6p_faddr,
-					addrbuf, sizeof(addrbuf)));
+				    inet6_addrstr(&in6pcb.in6p_faddr));
 				printf(" <-> %s:%d",
 			            IN6_IS_ADDR_UNSPECIFIED(&in6pcb.in6p_faddr) ? "*" :
 				    xaddrbuf,
