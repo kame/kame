@@ -36,8 +36,8 @@ AC_DEFUN(AC_CHECK_AF_INET6, [
 		$1=yes,
 		$1=no))
 	AC_MSG_RESULT($$1)
-		if test $$1 = yes ; then
-			AC_DEFINE(HAVE_AF_INET6)
+	if test $$1 = yes ; then
+		AC_DEFINE(HAVE_AF_INET6)
 	fi
 ])
 
@@ -54,8 +54,26 @@ AC_DEFUN(AC_CHECK_SA_LEN, [
 		$1=yes,
 		$1=no))
 	AC_MSG_RESULT($$1)
-		if test $$1 = yes ; then
-			AC_DEFINE(HAVE_SOCKADDR_SA_LEN)
+	if test $$1 = yes ; then
+		AC_DEFINE(HAVE_SOCKADDR_SA_LEN)
+	fi
+])
+
+dnl
+dnl Checks to see if the sockaddr struct has the Posix socklen_t member
+dnl borrowed from LBL libpcap
+AC_DEFUN(AC_CHECK_SOCKLEN_T, [
+	AC_MSG_CHECKING(if socklen_t is available)
+	AC_CACHE_VAL($1,
+	AC_TRY_COMPILE([
+#		include <sys/types.h>
+#		include <sys/socket.h>],
+		[socklen_t x;],
+		$1=yes,
+		$1=no))
+	AC_MSG_RESULT($$1)
+	if test $$1 = yes ; then
+		AC_DEFINE(HAVE_SOCKLEN_T)
 	fi
 ])
 

@@ -52,6 +52,10 @@ if test "$ac_cv_sockaddr_has_sa_len" = no; then
 fi
 
 dnl
+dnl Check for sa_len
+AC_CHECK_SOCKLEN_T(ac_cv_have_socklen_t)
+
+dnl
 dnl check __P macro
 AC_CHECK_PORTABLE_PROTO(ac_cv_portable_proto)
 if test "$ac_cv_portable_proto" = no; then
