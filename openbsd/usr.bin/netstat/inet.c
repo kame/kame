@@ -1015,6 +1015,7 @@ carp_stats(u_long off, char *name)
 #undef p2
 }
 
+#if 0
 /* 
  * Dump pfsync statistics structure.
  */
@@ -1050,6 +1051,7 @@ pfsync_stats(u_long off, char *name)
 #undef p
 #undef p2
 }
+#endif
 
 /*
  * Dump IPCOMP statistics structure.

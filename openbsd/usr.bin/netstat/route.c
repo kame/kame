@@ -649,24 +649,8 @@ p_rtentry(struct rtentry *rt)
 		    rt->rt_nodes[0].rn_dupedkey ? " =>" : "");
 	}
 	putchar('\n');
-	if (vflag) {
-		printf("\texpire   %10lu%c  recvpipe %10ld%c  "
-		    "sendpipe %10ld%c\n",
-		    rt->rt_rmx.rmx_expire,
-		    (rt->rt_rmx.rmx_locks & RTV_EXPIRE) ? 'L' : ' ',
-		    rt->rt_rmx.rmx_recvpipe,
-		    (rt->rt_rmx.rmx_locks & RTV_RPIPE) ? 'L' : ' ',
-		    rt->rt_rmx.rmx_sendpipe,
-		    (rt->rt_rmx.rmx_locks & RTV_SPIPE) ? 'L' : ' ');
-		printf("\tssthresh %10lu%c  rtt      %10ld%c  "
-		    "rttvar   %10ld%c\n",
-		    rt->rt_rmx.rmx_ssthresh,
-		    (rt->rt_rmx.rmx_locks & RTV_SSTHRESH) ? 'L' : ' ',
-		    rt->rt_rmx.rmx_rtt,
-		    (rt->rt_rmx.rmx_locks & RTV_RTT) ? 'L' : ' ',
-		    rt->rt_rmx.rmx_rttvar,
-		    (rt->rt_rmx.rmx_locks & RTV_RTTVAR) ? 'L' : ' ');
-	}
+	if (vflag)
+		printf("\texpire   %10lu%c\n");
 }
 
 char *

@@ -224,8 +224,10 @@ struct protox {
 	  ipcomp_stats,	"ipcomp" },
 	{ -1,		N_CARPSTAT,	1,	0,
 	  carp_stats,	"carp" },
+#if 0
 	{ -1,		N_PFSYNCSTAT,	1,	0,
 	  pfsync_stats,	"pfsync" },
+#endif
 	{ -1,		-1,		0,	0,
 	  0,		0 }
 };
