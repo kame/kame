@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.640 2000/03/01 03:38:58 itojun Exp $
+$Id: CHANGELOG,v 1.641 2000/03/01 07:08:39 itojun Exp $
 
 <200003>
 Wed Mar  1 12:38:07 JST 2000  itojun@iijlab.net
@@ -10,6 +10,8 @@ Wed Mar  1 12:38:07 JST 2000  itojun@iijlab.net
 Wed Mar  1 03:27:06 JST 2000  itojun@iijlab.net
 	* libinet6/rthdr.c: fix alignment constraint in rthdr_*.
 	  From: shin@kame.net for freebsd-current
+	* */sys/kern/uipc_socket2.c: fix ancillary data padding at the end,
+	  in sbcreatecontrol().
 
 Wed Mar  1 01:30:43 JST 2000  itojun@iijlab.net
 	* netbsd/sys/netinet/udp_usrreq.c: always use in4_cksum() for
