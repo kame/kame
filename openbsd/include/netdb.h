@@ -322,7 +322,7 @@ void		setprotoent __P((int));
 #if !defined(_XOPEN_SOURCE)
 int		getaddrinfo __P((const char *, const char *,
 				 const struct addrinfo *, struct addrinfo **));
-int		getnameinfo __P((const struct sockaddr *, size_t, char *,
+int		getnameinfo __P((const struct sockaddr *, socklen_t, char *,
 				 size_t, char *, size_t, int));
 void		freeaddrinfo __P((struct addrinfo *));
 char		*gai_strerror __P((int));

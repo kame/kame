@@ -1,4 +1,4 @@
-/*	$KAME: getnameinfo.c,v 1.38 2000/04/26 15:58:50 itojun Exp $	*/
+/*	$KAME: getnameinfo.c,v 1.39 2000/05/05 15:29:14 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -110,7 +110,11 @@ static int ip6_sa2str __P((const struct sockaddr_in6 *, char *, size_t, int));
 int
 getnameinfo(sa, salen, host, hostlen, serv, servlen, flags)
 	const struct sockaddr *sa;
-	size_t salen;
+#ifdef HAVE_SOCKLEN_T
+	socklen_t salen;
+#else
+	unsigned int salen;
+#endif
 	char *host;
 	size_t hostlen;
 	char *serv;
