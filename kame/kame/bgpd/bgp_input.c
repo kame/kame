@@ -115,7 +115,7 @@ bgp_read_data(bnp)
 {
 	struct bgphdr *bh;
 	int length;
-#ifdef DEBUG
+#if (defined(DEBUG_BGP) || defined(DEBUG_BGPINPUT))
 	extern char *bgp_msgstr[], *bgp_statestr[];
 #endif
 
@@ -131,7 +131,7 @@ bgp_read_data(bnp)
 	bnp->rp_inlen = 0;
 
 	bh = (struct bgphdr *)bnp->rp_inpkt;
-#ifdef DEBUG
+#if (defined(DEBUG_BGP) || defined(DEBUG_BGPINPUT))
 	syslog(LOG_DEBUG,
 	       "BGP+ RECV %s+%d -> %s+%d",
 	       ip6str(&bnp->rp_addr.sin6_addr, 0),
@@ -224,6 +224,8 @@ bgp_read(struct rpcb *bnp, int total)
 		  total - bnp->rp_incc);
 	if (cc == 0) {
 		/* This would occur when the peer close the connection */
+		syslog(LOG_NOTICE, "<%s>: connection was reset by %s",
+		       __FUNCTION__, bgp_peerstr(bnp));
 		bgp_cease(bnp);
 		return(-1);
 	}
