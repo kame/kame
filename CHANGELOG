@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.867 2000/05/13 06:14:46 jinmei Exp $
+$Id: CHANGELOG,v 1.868 2000/05/13 06:56:01 jinmei Exp $
 
 <200005>
+2000-05-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/gifconfig/gifconfig.c (in6_status): use getnameinfo
+	(instead of inet_ntop) to print IPv6 addresses.
+
 2000-05-13  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* {bsdi4,openbsd}/sys/netinet6/in6_pcb.c (in6_setsockaddr): move
 	the embedded link ID of a link-local address to the sin6_scope_id
