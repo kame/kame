@@ -1,4 +1,4 @@
-/*	$KAME: pfkey.c,v 1.90 2000/11/15 08:04:22 sakane Exp $	*/
+/*	$KAME: pfkey.c,v 1.91 2000/12/06 06:27:39 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1325,6 +1325,21 @@ pk_recvexpire(mhp)
 				    sa_mode)));
 		return 0;
 	}
+	if (iph2->status != PHASE2ST_ESTABLISHED) {
+		/*
+		 * If the status is not equal to PHASE2ST_ESTABLISHED,
+		 * racoon ignores this expire message.  There are two reason.
+		 * One is that the phase 2 probably starts becuase there is
+		 * a potential that racoon receives the acquire message
+		 * without receiving a expire message.  Another is that racoon
+		 * may receive the multiple expire messages from the kernel.
+		 */
+		YIPSDEBUG(DEBUG_PFKEY,
+			plog(logp, LOCATION, NULL,
+				"the expire message is received "
+				"but the handler has not been established.\n"));
+		return 0;
+	}
 
 	/* turn off the timer for calling isakmp_ph2expire() */ 
 	SCHED_KILL(iph2->sce);
@@ -1421,12 +1436,31 @@ pk_recvacquire(mhp)
 	}
     }
 
-	/* check there is phase 2 handler ? */
-	if (getph2byspid(xpl->sadb_x_policy_id) != NULL) {
-		YIPSDEBUG(DEBUG_PFKEY,
+	/*
+	 * If there is a phase 2 handler against the policy identifier in
+	 * the acquire message, and if
+	 *    1. its state is less than PHASE2ST_ESTABLISHED, then racoon
+	 *       should ignore such a acquire message becuase the phase 2
+	 *       is just negotiating.
+	 *    2. its state is equal to PHASE2ST_ESTABLISHED, then racoon
+	 *       has to prcesss such a acquire message becuase racoon may
+	 *       lost the expire message.
+	 *    3. its state is equal to PHASE2ST_EXPIRED, then it must be
+	 *       something error.
+	 */
+	iph2[0] = getph2byspid(xpl->sadb_x_policy_id);
+	if (iph2[0] != NULL) {
+		if (iph2[0]->status < PHASE2ST_ESTABLISHED) {
+			YIPSDEBUG(DEBUG_PFKEY,
+				plog(logp, LOCATION, NULL,
+					"ph2 found. ignore it.\n"));
+			return -1;
+		}
+		if (iph2[0]->status == PHASE2ST_EXPIRED) {
 			plog(logp, LOCATION, NULL,
-				"ph2 found. ignore it.\n"));
-		return -1;
+				"FATAL: why ph2 is expired ?.\n");
+			return -1;
+		}
 	}
 
 	/* search for proper policyindex */
