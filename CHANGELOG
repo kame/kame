@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1429 2000/12/07 11:49:13 jinmei Exp $
+$KAME: CHANGELOG,v 1.1430 2000/12/07 11:55:35 jinmei Exp $
 
 <200012>
+2000-12-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/sys/netinet6/icmp6.c (icmp6_reflect):
+	- processed scoped addresses in a generic manner.
+	- used in6_selectsrc to determine the source address of the
+	  reflected packet.
+
 2000-12-07  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netkey/key.c (key_cmpspidx_withmask): compared
 	sin6_scope_id values only when both two values were
