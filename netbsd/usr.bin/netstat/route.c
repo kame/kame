@@ -802,7 +802,7 @@ netname6(sa6, mask)
 	struct in6_addr *mask;
 {
 	static char line[NI_MAXHOST];
-	u_char *p;
+	u_char *p, *q;
 	u_char *lim;
 	int masklen, final = 0, illegal = 0;
 #ifdef KAME_SCOPEID
@@ -811,13 +811,18 @@ netname6(sa6, mask)
 	int flag = 0;
 #endif
 	int error;
+	struct sockaddr_in6 sin6;
 
+	sin6 = *sa6;
 	if (mask) {
 		masklen = 0;
 		lim = (u_char *)mask + 16;
-		for (p = (u_char *)mask; p < lim; p++) {
+		for (p = (u_char *)mask, q = (u_char *)&sin6.sin6_addr;
+		     p < lim;
+		     p++, q++) {
 			if (final && *p) {
 				illegal++;
+				*q = 0;
 				continue;
 			}
 
@@ -861,17 +866,22 @@ netname6(sa6, mask)
 				 illegal++;
 				 break;
 			}
+
+			if (!illegal)
+				*q &= *p;
+			else
+				*q = 0;
 		}
 	}
 	else
 		masklen = 128;
 
-	if (masklen == 0 && IN6_IS_ADDR_UNSPECIFIED(&sa6->sin6_addr))
+	if (masklen == 0 && IN6_IS_ADDR_UNSPECIFIED(&sin6.sin6_addr))
 		return("default");
 
 	if (nflag)
 		flag |= NI_NUMERICHOST;
-	error = getnameinfo((struct sockaddr *)sa6, sa6->sin6_len,
+	error = getnameinfo((struct sockaddr *)&sin6, sin6.sin6_len,
 			line, sizeof(line), NULL, 0, flag);
 	if (error)
 		strcpy(line, "invalid");
