@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6.h,v 1.21 2002/05/08 10:36:16 jinmei Exp $	*/
+/*	$KAME: dhcp6.h,v 1.22 2002/05/08 15:53:18 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -60,6 +60,8 @@
 #define INF_TIMEOUT	500	/* msec */
 #define INF_MAX_RT	30000	/* msec */
 
+#define DHCP6_DURATITION_INFINITE 0xffffffff
+
 /* Internal data structure */
 
 /* DUID: DHCP unique Identifier */
@@ -74,6 +76,18 @@ struct dnslist {
 	struct in6_addr addr;
 };
 TAILQ_HEAD(dnsq, dnslist);
+
+struct delegated_prefix_info {		/* delegated prefix information */
+	struct in6_addr addr;
+	int plen;
+	u_int32_t duration;
+};
+
+struct delegated_prefix {
+	TAILQ_ENTRY(delegated_prefix) link;
+	struct delegated_prefix_info prefix;
+};
+TAILQ_HEAD(delegated_prefix_list, delegated_prefix);
 
 struct dhcp6_optinfo {
 	struct duid clientID;	/* DUID */

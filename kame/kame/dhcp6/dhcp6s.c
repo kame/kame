@@ -1,4 +1,4 @@
-/*	$KAME: dhcp6s.c,v 1.70 2002/05/08 10:54:58 jinmei Exp $	*/
+/*	$KAME: dhcp6s.c,v 1.71 2002/05/08 15:53:18 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -458,6 +458,7 @@ server6_react_solicit(ifp, buf, siz, optinfo, from, fromlen)
 	int fromlen;
 {
 	struct dhcp6_optinfo roptinfo;
+	struct host_conf *client_conf;
 
 	/*
 	 * Servers MUST discard any Solicit messages that do not include a
@@ -467,6 +468,15 @@ server6_react_solicit(ifp, buf, siz, optinfo, from, fromlen)
 		dprintf(LOG_INFO,
 			"server6_react_solicit: no client ID option");
 		return(-1);
+	} else {
+		dprintf(LOG_DEBUG, "server6_react_solicit: client ID %s",
+			duidstr(&optinfo->clientID));
+	}
+
+	/* get per-host configuration for the client, if any. */
+	if ((client_conf = find_hostconf(&optinfo->clientID))) {
+		dprintf(LOG_DEBUG, "server6_react_solicit: "
+			"found a host configuration for the client");
 	}
 
 	/*

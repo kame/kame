@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.7 2002/05/08 10:36:16 jinmei Exp $	*/
+/*	$KAME: cftoken.l,v 1.8 2002/05/08 15:53:17 jinmei Exp $	*/
 
 %{
 /*
@@ -80,6 +80,7 @@ number		{integer}|({digit}*\.{integer})
 hexdigit	[0-9A-Fa-f]
 hexpair		{hexdigit}{hexdigit}
 hexstring	0[xX]{hexpair}+
+duid 		{hexpair}(:{hexpair})*
 ifname		[a-zA-Z]+[0-9]+
 slash		\/
 bcl		\{
@@ -87,6 +88,8 @@ ecl		\}
 
 %s S_CNF
 %s S_IFACE
+%s S_HOST
+%s S_DUID
 
 %%
 %{
@@ -103,6 +106,25 @@ ecl		\}
 	BEGIN S_CNF;
 	return(IFNAME);
 }
+
+	/* host configuration */
+<S_CNF>host { DECHO; BEGIN S_HOST; return(HOST); }
+<S_HOST>{string} {
+	DECHO;
+	yylval.str = strdup(yytext);
+	BEGIN S_CNF;
+	return(HOSTNAME);
+}
+
+<S_CNF>duid { DECHO; BEGIN S_DUID; return(DUID); }
+<S_DUID>{duid} {
+	DECHO;
+	yylval.str = strdup(yytext);
+	BEGIN S_CNF;
+	return(DUID_ID);
+}
+
+<S_CNF>prefix { DECHO; return(PREFIX); }
 
 	/* request */
 <S_CNF>request { DECHO; return(REQUEST); }
@@ -123,11 +145,18 @@ ecl		\}
 <S_CNF>prefix-interface { DECHO; BEGIN S_IFACE; return(PREFIX_INTERFACE); }
 <S_CNF>sla-id { DECHO; return(SLA_ID); }
 
+	/* duration */
+<S_CNF>infinite { DECHO; return(INFINITE); }
+
 	/* misc */
 {ws}		{ ; }
 {nl}		{ lineno++; }
 {comment}	{ DP("comment"); }
-{number} 	{ DECHO; yylval.num = atoi(yytext); return(NUMBER); }
+{number} 	{
+	DECHO;
+	yylval.num = strtoll(yytext, NULL, 10);
+	return(NUMBER);
+}
 {slash} { DECHO; return(SLASH); }
 {semi} { DP("end sentence"); return(EOS); }
 {bcl} { DP("begin closure"); return(BCL); }

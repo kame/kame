@@ -1,4 +1,4 @@
-/*	$KAME: config.h,v 1.7 2002/05/08 07:18:09 jinmei Exp $	*/
+/*	$KAME: config.h,v 1.8 2002/05/08 15:53:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -90,6 +90,15 @@ struct prefix_ifconf {
 	char ifid[16];		/* up to 128bits */
 };
 
+/* per-host configuration */
+struct host_conf {
+	struct host_conf *next;
+
+	char *name;
+	struct delegated_prefix_list prefix;
+	struct duid duid;
+};
+
 #define IFID_LEN_DEFAULT 64
 
 /* DHCP option information */
@@ -101,9 +110,9 @@ struct dhcp6_optconf {
 };
 
 /* structures and definitions used in the config file parser */
-struct cf_iflist {
-	struct cf_iflist *next;
-	char *ifname;
+struct cf_namelist {
+	struct cf_namelist *next;
+	char *name;
 	struct cf_list *params;
 };
 
@@ -112,21 +121,25 @@ struct cf_list {
 	int type;
 
 	/* type dependent values: */
-	int num;
+	long long num;
 	struct cf_list *list;
 	void *ptr;
 };
 
-enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY, DECL_REQUEST,
+enum {DECL_SEND, DECL_ALLOW, DECL_INFO_ONLY, DECL_REQUEST, DECL_DUID,
+      DECL_PREFIX,
       IFPARAM_SLA_ID,
       DHCPOPT_RAPID_COMMIT, DHCPOPT_PREFIX_DELEGATION};
 
 extern struct dhcp6_ifconf *dhcp6_iflist;
 
 extern void ifinit __P((char *));
-extern int configure_interface __P((struct cf_iflist *));
+extern int configure_interface __P((struct cf_namelist *));
+extern int configure_prefix_interface __P((struct cf_namelist *));
+extern int configure_host __P((struct cf_namelist *));
 extern void configure_cleanup __P((void));
 extern void configure_commit __P((void));
 extern int cfparse __P((char *));
 extern struct dhcp6_if *find_ifconf __P((char *));
 extern struct prefix_ifconf *find_prefixifconf __P((char *));
+extern struct host_conf *find_hostconf __P((struct duid *));

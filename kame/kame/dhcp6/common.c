@@ -1,4 +1,4 @@
-/*	$KAME: common.c,v 1.42 2002/05/08 14:48:52 jinmei Exp $	*/
+/*	$KAME: common.c,v 1.43 2002/05/08 15:53:17 jinmei Exp $	*/
 /*
  * Copyright (C) 1998 and 1999 WIDE Project.
  * All rights reserved.
@@ -258,6 +258,23 @@ random_between(x, y)
 	while ((y - x) * ratio < (y - x))
 		ratio = ratio / 2;
 	return x + ((y - x) * (ratio - 1) / random() & (ratio - 1));
+}
+
+int
+prefix6_mask(in6, plen)
+	struct in6_addr *in6;
+	int plen;
+{
+	struct sockaddr_in6 mask6;
+	int i;
+
+	if (sa6_plen2mask(&mask6, plen))
+		return(-1);
+
+	for (i = 0; i < 16; i++)
+		in6->s6_addr[i] &= mask6.sin6_addr.s6_addr[i];
+
+	return(0);
 }
 
 int

@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.7 2002/05/08 10:36:16 jinmei Exp $	*/
+/*	$KAME: config.c,v 1.8 2002/05/08 15:53:18 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -37,6 +37,7 @@
 #include <netinet/in.h>
 
 #include <syslog.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <ifaddrs.h>
@@ -50,13 +51,17 @@ struct dhcp6_if *dhcp6_if;
 
 static struct dhcp6_ifconf *dhcp6_ifconflist;
 static struct prefix_ifconf *prefix_ifconflist0, *prefix_ifconflist;
+static struct host_conf *host_conflist0, *host_conflist;
 
 enum { DHCPOPTCODE_SEND, DHCPOPTCODE_REQUEST, DHCPOPTCODE_ALLOW };
 
 static int add_options __P((int, struct dhcp6_ifconf *, struct cf_list *));
+static int add_prefix __P((struct host_conf *, struct delegated_prefix_info *));
 static void clear_ifconf __P((struct dhcp6_ifconf *));
 static void clear_prefixifconf __P((struct prefix_ifconf *));
+static void clear_hostconf __P((struct host_conf *));
 static void clear_options __P((struct dhcp6_optconf *));
+static int configure_duid __P((char *, struct duid *));
 static int get_default_ifid __P((struct prefix_ifconf *));
 
 void
@@ -70,7 +75,7 @@ ifinit(ifname)
 		return;
 	}
 
-	if ((ifp = (struct dhcp6_if *)malloc(sizeof(*ifp))) == NULL) {
+	if ((ifp = malloc(sizeof(*ifp))) == NULL) {
 		dprintf(LOG_ERR, "malloc failed");
 		goto die;
 	}
@@ -107,24 +112,24 @@ ifinit(ifname)
 
 int
 configure_interface(iflist)
-	struct cf_iflist *iflist;
+	struct cf_namelist *iflist;
 {
-	struct cf_iflist *ifp;
+	struct cf_namelist *ifp;
 	struct dhcp6_ifconf *ifc;
 
 	for (ifp = iflist; ifp; ifp = ifp->next) {
 		struct cf_list *cfl;
 
-		if ((ifc = (struct dhcp6_ifconf *)malloc(sizeof(*ifc)))
-		    == NULL) {
-			dprintf(LOG_ERR, "malloc failed");
+		if ((ifc = malloc(sizeof(*ifc))) == NULL) {
+			dprintf(LOG_ERR, "memory allocation for %s failed",
+				ifp->name);
 			goto bad;
 		}
 		memset(ifc, 0, sizeof(*ifc));
 		ifc->next = dhcp6_ifconflist;
 		dhcp6_ifconflist = ifc;
 
-		if ((ifc->ifname = strdup(ifp->ifname)) == NULL) {
+		if ((ifc->ifname = strdup(ifp->name)) == NULL) {
 			dprintf(LOG_ERR, "failed to copy ifname");
 			goto bad;
 		}
@@ -170,17 +175,17 @@ configure_interface(iflist)
 
 int
 configure_prefix_interface(iflist)
-	struct cf_iflist *iflist;
+	struct cf_namelist *iflist;
 {
-	struct cf_iflist *ifp;
+	struct cf_namelist *ifp;
 	struct prefix_ifconf *pif;
 
 	for (ifp = iflist; ifp; ifp = ifp->next) {
 		struct cf_list *cfl;
 
-		if ((pif = (struct prefix_ifconf *)malloc(sizeof(*pif)))
-		    == NULL) {
-			dprintf(LOG_ERR, "malloc failed");
+		if ((pif = malloc(sizeof(*pif))) == NULL) {
+			dprintf(LOG_ERR, "memory allocation for %s failed",
+				ifp->name);
 			goto bad;
 		}
 		memset(pif, 0, sizeof(*pif));
@@ -188,12 +193,12 @@ configure_prefix_interface(iflist)
 		prefix_ifconflist0 = pif;
 
 		/* validate and copy ifname */
-		if (if_nametoindex(ifp->ifname) == 0) {
+		if (if_nametoindex(ifp->name) == 0) {
 			dprintf(LOG_ERR, "invalid interface (%s): %s",
-				ifp->ifname, strerror(errno));
+				ifp->name, strerror(errno));
 			goto bad;
 		}
-		if ((pif->ifname = strdup(ifp->ifname)) == NULL) {
+		if ((pif->ifname = strdup(ifp->name)) == NULL) {
 			dprintf(LOG_ERR, "failed to copy ifname");
 			goto bad;
 		}
@@ -218,8 +223,126 @@ configure_prefix_interface(iflist)
 	return(0);
 
   bad:
-	clear_prefixifconf(prefix_ifconflist);
-	prefix_ifconflist = NULL;
+	/* there is currently nothing special to recover the error */
+	return(-1);
+}
+
+int
+configure_host(hostlist)
+	struct cf_namelist *hostlist;
+{
+	struct cf_namelist *host;
+	struct host_conf *hconf;
+
+	for (host = hostlist; host; host = host->next) {
+		struct cf_list *cfl;
+
+		if ((hconf = malloc(sizeof(*hconf))) == NULL) {
+			dprintf(LOG_ERR, "memory allocation failed "
+				"for host %s", host->name);
+			goto bad;
+		}
+		memset(hconf, 0, sizeof(*hconf));
+		TAILQ_INIT(&hconf->prefix);
+		hconf->next = host_conflist0;
+		host_conflist0 = hconf;
+
+		if ((hconf->name = strdup(host->name)) == NULL) {
+			dprintf(LOG_ERR, "failed to copy host name: %s",
+				host->name);
+			goto bad;
+		}
+
+		for (cfl = host->params; cfl; cfl = cfl->next) {
+			switch(cfl->type) {
+			case DECL_DUID:
+				if (hconf->duid.duid_id) {
+					dprintf(LOG_ERR,
+						"duplicated DUID for %s",
+						host->name);
+					goto bad;
+				}
+				if ((configure_duid((char *)cfl->ptr,
+						    &hconf->duid)) != 0) {
+					dprintf(LOG_ERR, "failed to configure "
+						"DUID for %s", host->name);
+					goto bad;
+				}
+				dprintf(LOG_DEBUG, "configure DUID for %s: %s",
+					host->name, duidstr(&hconf->duid));
+				break;
+			case DECL_PREFIX:
+				if (add_prefix(hconf, cfl->ptr)) {
+					dprintf(LOG_ERR, "failed to configure "
+						"prefix for %s", host->name);
+					goto bad;
+				}
+				break;
+			default:
+				dprintf(LOG_ERR, "invalid host configuration "
+					"for %s", host->name);
+				goto bad;
+			}
+		}
+	}
+
+	return(0);
+
+  bad:
+	/* there is currently nothing special to recover the error */
+	return(-1);
+}
+
+static int
+configure_duid(str, duid)
+	char *str;		/* this is a valid DUID string */
+	struct duid *duid;
+{
+	char *cp, *bp;
+	char *idbuf = NULL;
+	int duidlen, slen;
+
+	/* calculate DUID len */
+	slen = strlen(str);
+	if (slen < 2)
+		goto bad;
+	duidlen = 1;
+	slen -= 2;
+	if ((slen % 3) != 0)
+		goto bad;
+	duidlen += (slen / 3);
+	if (duidlen > 256) {
+		dprintf(LOG_ERR, "configure_duid: too long DUID (%d)",
+			duidlen);
+		return(-1);
+	}
+
+	if ((idbuf = malloc(sizeof(duidlen))) == NULL) {
+		dprintf(LOG_ERR, "configure_duid: memory allocation failed");
+		return(-1);
+	}
+
+	for (cp = str, bp = idbuf; *cp;) {
+		if (*cp == ':') {
+			cp++;
+			continue;
+		}
+
+		if (sscanf(cp, "%02x", bp) != 1)
+			goto bad;
+		cp += 2;
+		bp++;
+	}
+
+	duid->duid_len = duidlen;
+	duid->duid_id = idbuf;
+
+	return(0);
+
+  bad:
+	if (idbuf)
+		free(idbuf);
+	dprintf(LOG_ERR, "configure_duid: assumption failure (bad string)");
 	return(-1);
 }
 
@@ -282,6 +405,10 @@ configure_cleanup()
 {
 	clear_ifconf(dhcp6_ifconflist);
 	dhcp6_ifconflist = NULL;
+	clear_prefixifconf(prefix_ifconflist0);
+	prefix_ifconflist0 = NULL;
+	clear_hostconf(host_conflist0);
+	host_conflist0 = NULL;
 }
 
 void
@@ -311,6 +438,14 @@ configure_commit()
 	}
 	prefix_ifconflist = prefix_ifconflist0;
 	prefix_ifconflist0 = NULL;
+
+	/* commit prefix configuration */
+	if (host_conflist) {
+		/* clear previous configuration. (need more work?) */
+		clear_hostconf(host_conflist);
+	}
+	host_conflist = host_conflist0;
+	host_conflist0 = NULL;
 }
 
 static void
@@ -340,6 +475,26 @@ clear_prefixifconf(iflist)
 
 		free(pif->ifname);
 		free(pif);
+	}
+}
+
+static void
+clear_hostconf(hlist)
+	struct host_conf *hlist;
+{
+	struct host_conf *host, *host_next;
+	struct delegated_prefix *p, *np;
+
+	for (host = hlist; host; host = host_next) {
+		host_next = host->next;
+
+		free(host->name);
+		for (p = TAILQ_FIRST(&host->prefix); p;
+		     p = np) {
+			np = TAILQ_NEXT(p, link);
+			free(p);
+		}
+		free(host);
 	}
 }
 
@@ -386,8 +541,7 @@ add_options(opcode, ifc, cfl0)
 		case DHCPOPT_PREFIX_DELEGATION:
 			switch(opcode) {
 			case DHCPOPTCODE_REQUEST:
-				if ((opt = (struct dhcp6_optconf *)
-				     malloc(sizeof(*opt))) == NULL) {
+				if ((opt = malloc(sizeof(*opt))) == NULL) {
 					dprintf(LOG_ERR, "add_options: "
 						"memory allocation failed");
 					return(-1);
@@ -409,6 +563,68 @@ add_options(opcode, ifc, cfl0)
 				return(-1);
 		}
 	}
+
+	return(0);
+}
+
+static int
+add_prefix(hconf, prefix0)
+	struct host_conf *hconf;
+	struct delegated_prefix_info *prefix0;
+{
+	struct delegated_prefix_info oprefix;
+	struct delegated_prefix *p, *pent;
+
+	oprefix = *prefix0;
+
+	/* additional validation of parameters */
+	if (oprefix.plen < 0 || oprefix.plen > 128) {
+		dprintf(LOG_ERR, "add_prefix: invalid prefix: %d",
+			oprefix.plen);
+		return(-1);
+	}
+	/* clear trailing bits */
+	prefix6_mask(&oprefix.addr, oprefix.plen);
+	if (!IN6_ARE_ADDR_EQUAL(&prefix0->addr, &oprefix.addr)) {
+		dprintf(LOG_WARNING, "add_prefix: prefix %s/%d for %s "
+			"has a trailing garbage.  It should be %s/%d",
+			in6addr2str(&prefix0->addr, 0), prefix0->plen,
+			hconf->name,
+			in6addr2str(&oprefix.addr, 0), oprefix.plen);
+		/* ignore the error */
+	}
+
+	/* avoid invalid prefix addresses */
+	if (IN6_IS_ADDR_MULTICAST(&oprefix.addr) ||
+	    IN6_IS_ADDR_LINKLOCAL(&oprefix.addr) ||
+	    IN6_IS_ADDR_SITELOCAL(&oprefix.addr)) {
+		dprintf(LOG_ERR,
+			"add_prefix: invalid prefix address: %s",
+			in6addr2str(&oprefix.addr, 0));
+		return(-1);
+	}
+
+	/* prefix duplication check */
+	for (p = TAILQ_FIRST(&hconf->prefix); p; p = TAILQ_NEXT(p, link)) {
+		if (IN6_ARE_ADDR_EQUAL(&p->prefix.addr, &oprefix.addr) &&
+		    p->prefix.plen == oprefix.plen) {
+			dprintf(LOG_ERR,
+				"add_prefix: duplicated prefix: %s/%d for %s",
+				in6addr2str(&oprefix.addr, 0), oprefix.plen,
+				hconf->name);
+			return(-1);
+		}
+	}
+
+	/* allocate memory for the new prefix and insert it to the chain */
+	if ((pent = malloc(sizeof(*pent))) == NULL) {
+		dprintf(LOG_ERR, "add_prefix: memory allocation failed for %s",
+			hconf->name);
+		return(-1);
+	}
+	memset(pent, 0, sizeof(*pent));
+	pent->prefix = oprefix;
+	TAILQ_INSERT_TAIL(&hconf->prefix, pent, link);
 
 	return(0);
 }
@@ -436,6 +652,23 @@ find_prefixifconf(ifname)
 	for (ifp = prefix_ifconflist; ifp; ifp = ifp->next) {
 		if (strcmp(ifp->ifname, ifname) == NULL)
 			return(ifp);
+	}
+
+	return(NULL);
+}
+
+struct host_conf *
+find_hostconf(duid)
+	struct duid *duid;
+{
+	struct host_conf *host;
+
+	for (host = host_conflist; host; host = host->next) {
+		if (host->duid.duid_len == duid->duid_len &&
+		    memcmp(host->duid.duid_id, duid->duid_id,
+			   host->duid.duid_len) == 0) {
+			return(host);
+		}
 	}
 
 	return(NULL);

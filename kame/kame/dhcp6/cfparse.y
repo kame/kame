@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.y,v 1.7 2002/05/08 07:18:08 jinmei Exp $	*/
+/*	$KAME: cfparse.y,v 1.8 2002/05/08 15:53:17 jinmei Exp $	*/
 
 /*
  * Copyright (C) 2002 WIDE Project.
@@ -30,48 +30,70 @@
  */
 %{
 #include <sys/types.h>
+#include <sys/socket.h>
+#include <sys/queue.h>
 
+#include <netinet/in.h>
+
+#include "dhcp6.h"
 #include "config.h"
 
 extern int lineno;
 extern int cfdebug;
 
-#define MAKE_CFLIST(l, t) do { \
+#define MAKE_NAMELIST(l, n, p) do { \
+	(l) = (struct cf_namelist *)malloc(sizeof(*(l))); \
+	if ((l) == NULL) { \
+		yywarn("can't allocate memory"); \
+		if (p) cleanup_cflist(p); \
+		return(-1); \
+	} \
+	memset((l), 0, sizeof(*(l))); \
+	l->name = (n); \
+	l->params = (p); \
+	} while (0)
+
+#define MAKE_CFLIST(l, t, pp, pl) do { \
 	(l) = (struct cf_list *)malloc(sizeof(*(l))); \
 	if ((l) == NULL) { \
 		yywarn("can't allocate memory"); \
+		if (pp) free(pp); \
+		if (pl) cleanup_cflist(pl); \
 		return(-1); \
 	} \
 	memset((l), 0, sizeof(*(l))); \
 	l->type = (t); \
+	l->ptr = (pp); \
+	l->list = (pl); \
 	} while (0)
 
-static struct cf_iflist *iflist_head, *piflist_head; 
+static struct cf_namelist *iflist_head, *piflist_head, *hostlist_head; 
 
 extern int yylex __P((void));
 static void cleanup __P((void));
-static void cleanup_interface __P((struct cf_iflist *));
+static void cleanup_namelist __P((struct cf_namelist *));
 static void cleanup_cflist __P((struct cf_list *));
 %}
 
 %token INTERFACE IFNAME
-%token PREFIX_INTERFACE SLA_ID
-%token REQUEST
-%token SEND
-%token ALLOW
+%token PREFIX_INTERFACE SLA_ID DUID_ID
+%token REQUEST SEND ALLOW
+%token HOST HOSTNAME DUID
 %token RAPID_COMMIT PREFIX_DELEGATION
 %token INFO_ONLY
-%token NUMBER SLASH EOS BCL ECL STRING
+%token NUMBER SLASH EOS BCL ECL STRING PREFIX INFINITE
 
 %union {
-	int num;
+	long long num;
 	char* str;
 	struct cf_list *list;
+	struct delegated_prefix_info *prefix;
 }
 
-%type <str> IFNAME
-%type <num> NUMBER
+%type <str> IFNAME HOSTNAME DUID_ID STRING
+%type <num> NUMBER duration
 %type <list> declaration declarations dhcpoption ifparam ifparams
+%type <prefix> prefixparam
 
 %%
 statements:
@@ -82,21 +104,17 @@ statements:
 statement:
 		interface_statement
 	|	prefix_interface_statement
+	|	host_statement
 	;
 
 interface_statement:
 	INTERFACE IFNAME BCL declarations ECL 
 	{
-		struct cf_iflist *ifl;
+		struct cf_namelist *ifl;
 
-		if ((ifl = (struct cf_iflist *)malloc(sizeof(*ifl))) == NULL) {
-			yywarn("memory allocation failed");
-			return(-1);
-		}
-		memset(ifl, 0, sizeof(*ifl));
-		ifl->ifname = $2;
-		ifl->params = $4;
-		if (add_interface(ifl, &iflist_head))
+		MAKE_NAMELIST(ifl, $2, $4);
+
+		if (add_namelist(ifl, &iflist_head))
 			return(-1);
 	}
 	;
@@ -104,16 +122,23 @@ interface_statement:
 prefix_interface_statement:
 	PREFIX_INTERFACE IFNAME BCL ifparams ECL
 	{
-		struct cf_iflist *ifl;
+		struct cf_namelist *ifl;
 
-		if ((ifl = (struct cf_iflist *)malloc(sizeof(*ifl))) == NULL) {
-			yywarn("memory allocation failed");
+		MAKE_NAMELIST(ifl, $2, $4);
+
+		if (add_namelist(ifl, &piflist_head))
 			return(-1);
-		}
-		memset(ifl, 0, sizeof(*ifl));
-		ifl->ifname = $2;
-		ifl->params = $4;
-		if (add_interface(ifl, &piflist_head))
+	}
+	;
+
+host_statement:
+	HOST HOSTNAME BCL declarations ECL
+	{
+		struct cf_namelist *host;
+
+		MAKE_NAMELIST(host, $2, $4);
+
+		if (add_namelist(host, &hostlist_head))
 			return(-1);
 	}
 	;
@@ -132,23 +157,23 @@ declaration:
 		{
 			struct cf_list *l;
 
-			MAKE_CFLIST(l, DECL_SEND);
-			l->list = $2;
+			MAKE_CFLIST(l, DECL_SEND, NULL, $2);
+
 			$$ = l;
 		}
 	|	REQUEST dhcpoption EOS
 		{
 			struct cf_list *l;
 
-			MAKE_CFLIST(l, DECL_REQUEST);
-			l->list = $2;
+			MAKE_CFLIST(l, DECL_REQUEST, NULL, $2);
+
 			$$ = l;
 		}
 	|	INFO_ONLY EOS
 		{
 			struct cf_list *l;
 
-			MAKE_CFLIST(l, DECL_INFO_ONLY);
+			MAKE_CFLIST(l, DECL_INFO_ONLY, NULL, NULL);
 			/* no value */
 			$$ = l;
 		}
@@ -156,8 +181,24 @@ declaration:
 		{
 			struct cf_list *l;
 
-			MAKE_CFLIST(l, DECL_ALLOW);
-			l->list = $2;
+			MAKE_CFLIST(l, DECL_ALLOW, NULL, $2);
+
+			$$ = l;
+		}
+	|	DUID DUID_ID EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, DECL_DUID, $2, NULL);
+
+			$$ = l;
+		}
+	|	PREFIX prefixparam EOS
+		{
+			struct cf_list *l;
+
+			MAKE_CFLIST(l, DECL_PREFIX, $2, NULL);
+
 			$$ = l;
 		}
 	;
@@ -167,7 +208,7 @@ dhcpoption:
 		{
 			struct cf_list *l;
 
-			MAKE_CFLIST(l, DHCPOPT_RAPID_COMMIT);
+			MAKE_CFLIST(l, DHCPOPT_RAPID_COMMIT, NULL, NULL);
 			/* no value */
 			$$ = l;
 		}
@@ -175,7 +216,7 @@ dhcpoption:
 		{
 			struct cf_list *l;
 
-			MAKE_CFLIST(l, DHCPOPT_PREFIX_DELEGATION);
+			MAKE_CFLIST(l, DHCPOPT_PREFIX_DELEGATION, NULL, NULL);
 			/* currently no value */
 			$$ = l;
 		}
@@ -195,26 +236,65 @@ ifparam:
 	{
 		struct cf_list *l;
 
-		MAKE_CFLIST(l, IFPARAM_SLA_ID);
+		MAKE_CFLIST(l, IFPARAM_SLA_ID, NULL, NULL);
 		l->num = $2;
 		$$ = l;
 	}
 	;
 
+prefixparam:
+	STRING SLASH NUMBER duration
+	{
+		struct delegated_prefix_info pconf0, *pconf;		
+
+		memset(&pconf0, 0, sizeof(pconf0));
+		if (inet_pton(AF_INET6, $1, &pconf0.addr) != 1) {
+			yywarn("invalid IPv6 address: %s", $1);
+			free($1);
+			return(-1);
+		}
+		free($1);
+		/* validate other parameters later */
+		pconf0.plen = $3;
+		if ($4 < 0)
+			pconf0.duration = DHCP6_DURATITION_INFINITE;
+		else
+			pconf0.duration = (u_int32_t)$4;
+
+		if ((pconf = malloc(sizeof(*pconf))) == NULL) {
+			yywarn("can't allocate memory");
+			return(-1);
+		}
+		*pconf = pconf0;
+
+		$$ = pconf;
+	}
+
+duration:
+		INFINITE
+		{
+			$$ = -1;
+		}
+	|	NUMBER
+		{
+			$$ = $1;
+		}
+	;
+
 %%
 /* supplement routines for configuration */
 static int
-add_interface(new, headp)
-	struct cf_iflist *new, **headp;
+add_namelist(new, headp)
+	struct cf_namelist *new, **headp;
 {
-	struct cf_iflist *ifp;
+	struct cf_namelist *ifp;
 
 	/* check for duplicated configuration */
 	for (ifp = *headp; ifp; ifp = ifp->next) {
-		if (strcmp(ifp->ifname, new->ifname) == 0) {
+		if (strcmp(ifp->name, new->name) == 0) {
 			yywarn("duplicated interface: %s (ignored)",
-			       new->ifname);
-			cleanup_interface(new);
+			       new->name);
+			cleanup_namelist(new);
 			return(0);
 		}
 	}
@@ -229,20 +309,21 @@ add_interface(new, headp)
 static void
 cleanup()
 {
-	cleanup_interface(iflist_head);
-	cleanup_interface(piflist_head);
+	cleanup_namelist(iflist_head);
+	cleanup_namelist(piflist_head);
+	cleanup_namelist(hostlist_head);
 }
 
 static void
-cleanup_interface(head)
-	struct cf_iflist *head;
+cleanup_namelist(head)
+	struct cf_namelist *head;
 {
-	struct cf_iflist *ifp, *ifp_next;
+	struct cf_namelist *ifp, *ifp_next;
 
 	for (ifp = head; ifp; ifp = ifp_next) {
 		ifp_next = ifp->next;
 		cleanup_cflist(ifp->params);
-		free(ifp->ifname);
+		free(ifp->name);
 		free(ifp);
 	}
 }
@@ -276,6 +357,9 @@ cf_post_config()
 		config_fail();
 
 	if (configure_prefix_interface(piflist_head))
+		config_fail();
+
+	if (configure_host(hostlist_head))
 		config_fail();
 
 	configure_commit();
