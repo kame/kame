@@ -1,4 +1,4 @@
-/*	$KAME: key.c,v 1.288 2003/06/30 10:02:15 sakane Exp $	*/
+/*	$KAME: key.c,v 1.289 2003/07/01 03:20:00 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -1796,6 +1796,7 @@ key_spdadd(so, m, mhp)
 #if NPF > 0
 	u_int16_t tagvalue;
 #endif
+	int spidxmode;
 
 	/* sanity check */
 	if (so == NULL || m == NULL || mhp == NULL || mhp->msg == NULL)
@@ -1838,7 +1839,10 @@ key_spdadd(so, m, mhp)
 		lft = (struct sadb_lifetime *)mhp->ext[SADB_EXT_LIFETIME_HARD];
 	}
 
-	if (mhp->ext[SADB_EXT_ADDRESS_SRC]) {
+	/* spidx mode, or tag mode */
+	spidxmode = (mhp->ext[SADB_EXT_ADDRESS_SRC] != NULL);
+
+	if (spidxmode) {
 		src0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_SRC];
 		dst0 = (struct sadb_address *)mhp->ext[SADB_EXT_ADDRESS_DST];
 		/* make secindex */
@@ -1885,7 +1889,7 @@ key_spdadd(so, m, mhp)
 	 */
 	if (xpl0->sadb_x_policy_id != 0)
 		newsp = key_getspbyid(xpl0->sadb_x_policy_id);
-	else if (mhp->ext[SADB_EXT_ADDRESS_SRC])
+	else if (spidxmode)
 		newsp = key_getsp(&spidx, xpl0->sadb_x_policy_dir);
 	else {
 #if NPF > 0
@@ -1918,13 +1922,13 @@ key_spdadd(so, m, mhp)
 	/* allocation new SP entry */
 	if ((newsp = key_msg2sp(xpl0, PFKEY_EXTLEN(xpl0), &error)) == NULL) {
 #if NPF > 0
-		if (!mhp->ext[SADB_EXT_ADDRESS_SRC])
+		if (!spidxmode)
 			pf_tag_unref(tagvalue);
 #endif
 		return key_senderror(so, m, error);
 	}
 
-	if (mhp->ext[SADB_EXT_ADDRESS_SRC]) {
+	if (spidxmode) {
 		error = keydb_setsecpolicyindex(newsp, &spidx);
 		if (error) {
 			keydb_delsecpolicy(newsp);
