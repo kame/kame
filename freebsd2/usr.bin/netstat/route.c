@@ -582,9 +582,9 @@ p_rtentry(rt)
 	if (lflag) {
 		printf("%6d %8ld", rt->rt_refcnt, rt->rt_use);
 		if (rt->rt_rmx.rmx_mtu != 0)
-			printf("%6lu", rt->rt_rmx.rmx_mtu);
+			printf("%6lu ", rt->rt_rmx.rmx_mtu);
 		else
-			printf("%6s", "");
+			printf("%6s ", "");
 	}
 	if (rt->rt_ifp) {
 		if (rt->rt_ifp != lastif) {
