@@ -760,7 +760,7 @@ dump_rp_set(fp)
     fprintf(fp, "Current BSR address: %s Priority: %d\n",
 	    inet6_fmt(&curr_bsr_address.sin6_addr), curr_bsr_priority);
     fprintf(fp, "%-40s %-3s  Group prefix   Prio Hold Age\n",
-	    "RP-address", "IN ");
+	    "RP-address", "IN");
 
     for (rp = cand_rp_list; rp != (cand_rp_t *) NULL; rp = rp->next)
     {
