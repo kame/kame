@@ -1,4 +1,4 @@
-.\"	$KAME: natptconfig.8,v 1.10 2001/09/02 19:32:28 fujisawa Exp $
+.\"	$KAME: natptconfig.8,v 1.11 2001/09/30 21:04:49 fujisawa Exp $
 .\"
 .\" Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
 .\" All rights reserved.
@@ -41,24 +41,186 @@
 .Nd configure IPv6-to-IPv4 translator
 .\"
 .Sh SYNOPSIS
+.Nm
+.Op Fl d Ar debuglevel
+.Fl f Ar configfile
+.Nm
+.Op Fl d Ar debuglevel
+subcommand
+.Op Ar args ...
 .\"
 .Sh DESCRIPTION
+.Nm
+configures and control the IPv6-to-IPv4 translator implemented in the
+kernel.
+.Pp
+.Nm
+takes the following command line options.
+.Bl -tag witdh Ds
+.It Fl d Ar debuglevel
+Set debug level to
+.Ar debuglevel .
+This option is for debug.
+.It Fl f Ar configfile
+Evaluate the contents of file specified as configfile.  By specifying
+.Ql -
+as a file name, standard input is used.
+.El
+.Pp
+The first form
+.Pq with Fl f
+takes directives from the specified configuration file.  The second
+form is to give single directive directly from the command line.
 .\"
 .Sh DIRECTIVES
+Keywords and special characters that the parser expects exactly are
+displayed using
+.Sy this
+font.  Parameters are specified with
+.Em this
+font.  Square brackets (
+.Ql \&[
+and
+.Ql \&]
+) are used to show optional keywords and parameters.  Parentheses(
+.Ql \&(
+and
+.Ql \&)
+) are used to group keywords and parameters when necessary.  The
+vertical bar
+.Pq Ql \&|
+is used to indicate a choice between optional
+parameters.
+.Pp
+The following directives are available in interactive use.
+.Bl -tag -width Ds -offset indent
 .\"
-.Sh RUNNING NAT-PT
+.It Xo Sy \&?
+.Xc
+Show available actions on each stage.
+.Pp
+Value can use decimal or hexadecimal (begin with 0x) notation.
 .\"
-.Sh EXAMPLE 1
-.Sh EXAMPLE 2
-.\"
-.Sh TABLE FORMAT
+.It Xo Sy show Ar subcommand
+.Op Ar args ...
+.Xc
+Show various useful information.
+.Nm
+read this information from kernel, so you must have read permission of
+/dev/kmem.  Available subcommands are listed below.
+.Bl -tag -width XXX
+.It Xo Sy \&?
+.Xc
+Show available subcommands on this stage.
+.It Xo Sy prefix
+.Xc
+Show NAT-PT prefix and prefix mask.
+.It Xo Sy rules
+.Xc
+Show NAT-PT rules
+.It Xo Sy xlate
+.Op Sy long
+.Op Ar interval
+.Xc
+Show NAT-PT current translation table entry.  An entry of this table
+is empty at first.  Kernel forms an entry that packet flows, 1 entry
+per 1 TCP session, 1 entry per 1 UDP/ICMP packet.
+.Bl -bullet -offset indent
+.It
+.Qq long
+shows with long format.
+.It
+.Ql interval
+is a number, and this option specified,
+.Nm
+will continuously display the information which is shown with xlate
+subcommand in specified second interval.
+.El
+.Pp
+By default, this command display IPv6 as short format (22 columns per
+address), when
+.Qq long
+specified, this command display IPv6 address
+without omitting it.
+.Pp
+It is useful to see this
+table entry when this translator seems not to work.  See
+.Em TABLE FORMAT
+section below for more detail.
+.It Xo Sy variables
+.Xc
+Show variables set with set subcommand.
+.It Xo Sy mapping
+.Xc
+Show current mapping status.  Status is displayed as "enable" or
+"disable".
+.El
+.It Xo Sy test Ar subcommand
+.Op Ar args ...
+.Xc
+Test the log system.  You must run natptlog command.  When only log
+specified, send LOGTESTPATTERN to translator, and translator send this
+pattern to log system.  When you running natptlog command, this
+command display LOGTESTPATTERN.  Current available subcommands are
+shown.
+.Bl -tag -width XXX
+.It Xo Sy \&?
+.Xc
+Show available subcommands on this stage.
+.It Xo Sy log
+.Xc
+Send predefined pattern LOGTESTPATTERN to the log system.
+.It Xo Sy log Li name
+.Xc
+Send one word to the log system.
+.It Xo Sy log Qq string
+.Xc
+Send double quoted string to the log system.
+.El
+.Pp
+This is for log sysgem debug.
+.El
 .\"
 .Sh FILES
+.Bl -tag -width /dev/kmemxxx -compact
+.It Pa /kernel
+default kernel namelist
+.It Pa /dev/kmem
+default memory file
+.El
+.\"
+.Sh TABLE FORMAT
+This section describes a table format indicated with
+.Dl # natptconfig show xlate
+command.
+.Pp
+.Pq to be written
 .\"
 .Sh SEE ALSO
-.\"
-.Sh DIAGNOSTICS
-.\"
-.Sh BUGS
+.Xr natpt.conf 5 ,
+.Xr natptlog 8
+.Rs
+.%A Eric Nordmark
+.%R RFC
+.%N 2765
+.%D February 2000
+.%T Stateless IP/ICMP Translation Algorithm (SIIT)
+.Re
+.Rs
+.%A George Tsirtsis
+.%R RFC
+.%N 2766
+.%D February 2000
+.%T Network Address Translation - Protocol Translation (NAT-PT)
+.Re
 .\"
 .Sh HISTORY
+The
+.Nm
+command first appeared in WIDE/KAME IPv6 protocol stack kit.
+.\"
+.Sh BUGS
+The
+.Nm
+command is now under development.  It's user interface and overall
+functionality are subjects to future improvements and changes.
