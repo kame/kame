@@ -1,7 +1,13 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2572 2004/03/19 12:14:48 suz Exp $
+$KAME: CHANGELOG,v 1.2573 2004/03/21 14:53:56 jinmei Exp $
 
 <200403>
+2004-03-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: added experimental support for the lifetime
+	option based on draft-ietf-dhc-lifetime-00.txt.  dhcp6c now
+	restart information-request/reply exchanges when it has received
+	the option and the lifetime expires.
+
 2004-03-19  SUZUKI, Shinsuke <suz@crl.hitachi.co.jp>
 	* kame/kame/mld6query: to receive an MLD report for any group, 
 	it behaves like an IPv6 multicast daemon, instead of joining to ::.
