@@ -1,11 +1,14 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.705 2000/03/20 13:10:56 itojun Exp $
+$Id: CHANGELOG,v 1.706 2000/03/20 15:00:16 itojun Exp $
 
 <200003>
 Mon Mar 20 21:16:30 JST 2000  itojun@iijlab.net
-	* netbsd/pkgsrc/net/{libpcap,tcpdump}, freebsd2/ports/{libpcap,tcpdump}:
-	  upgrade to weekly snapshot as of 2000/03/20.
+	* netbsd/pkgsrc/net/{libpcap,tcpdump},
+	  freebsd[23]/ports/{libpcap,tcpdump}: upgrade to weekly snapshot
+	  as of 2000/03/20.
+	* netbsd/pkgsrc/mail/sendmail.beta, freebsd2/ports/sendmail.beta:
+	  upgrade to 8.10.0 (not really beta).
 
 2000-03-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/nd6.c (nd6_output): just sent packets on a p2p
