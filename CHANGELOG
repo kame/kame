@@ -1,8 +1,12 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.16 1999/08/13 15:22:28 sakane Exp $
+$Id: CHANGELOG,v 1.17 1999/08/13 17:04:31 jinmei Exp $
 
 <199908>
+1999-08-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/pim6sd: correctly supported restarting by SIGHUP.
+	Thanks to <mhoerdt@iutsud.u-strasbg.fr> for sending patch.
+
 Sat Aug 14 00:18:57 JST 1999 sakane@ydc.co.jp
 	* kame/kame/racoon:
 	Added man page of racoon.conf.
