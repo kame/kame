@@ -1,7 +1,7 @@
-/*	$KAME: natpt_dispatch.c,v 1.24 2001/07/15 19:34:05 fujisawa Exp $	*/
+/*	$KAME: natpt_dispatch.c,v 1.25 2001/09/02 19:06:25 fujisawa Exp $	*/
 
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,912 +29,292 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #include "opt_natpt.h"
 #endif
 
 #include <sys/param.h>
+#include <sys/kernel.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
+#include <sys/proc.h>
 #include <sys/socket.h>
 #include <sys/syslog.h>
 #include <sys/systm.h>
-
-#ifdef __FreeBSD__
-# include <sys/kernel.h>
-#endif
-
-#include <net/if.h>
-#include <net/route.h>
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
 #include <netinet/ip_icmp.h>
-
 #include <netinet/ip6.h>
-#include <netinet6/ip6_var.h>
 #include <netinet/icmp6.h>
 
 #include <netinet6/natpt_defs.h>
-#include <netinet6/natpt_list.h>
 #include <netinet6/natpt_log.h>
+#include <netinet6/natpt_soctl.h>
 #include <netinet6/natpt_var.h>
 
-#include <net/net_osdep.h>
 
 /*
  *
  */
 
+int		ip6_protocol_tr;
 int		natpt_initialized;
-int		natpt_gotoOneself;
 u_int		natpt_debug;
 u_int		natpt_dump;
-
-u_long		mtuInside;
-u_long		mtuOutside;
-
-
-static	struct _cell	*ifBox;
-
-struct in6_addr	 faith_prefix
-			= {{{0x00000000, 0x00000000, 0x00000000, 0x00000000}}};
-struct in6_addr	 faith_prefixmask
-			= {{{0x00000000, 0x00000000, 0x00000000, 0x00000000}}};
-struct in6_addr	 natpt_prefix
-			= {{{0x00000000, 0x00000000, 0x00000000, 0x00000000}}};
-struct in6_addr	 natpt_prefixmask
-			= {{{0x00000000, 0x00000000, 0x00000000, 0x00000000}}};
-
-
-int		 natpt_in4		__P((struct mbuf *, struct mbuf **));
-int		 natpt_in6		__P((struct mbuf *, struct mbuf **));
-int		 natpt_out4		__P((struct mbuf *, struct mbuf **));
-int		 natpt_out6		__P((struct mbuf *, struct mbuf **));
-int		 natpt_incomingIPv4	__P((int, struct ifBox *, struct mbuf *, struct mbuf **));
-int		 natpt_outgoingIPv4	__P((int, struct ifBox *, struct mbuf *, struct mbuf **));
-int		 natpt_incomingIPv6	__P((int, struct ifBox *, struct mbuf *, struct mbuf **));
-int		 natpt_outgoingIPv6	__P((int, struct ifBox *, struct mbuf *, struct mbuf **));
-
-int		 configCv4		__P((int, struct mbuf *, struct _cv *));
-int		 configCv6		__P((int, struct mbuf *, struct _cv *));
-caddr_t		 foundFinalPayload	__P((struct mbuf *, int *, int *));
-int		 sanityCheckIn4		__P((struct _cv *));
-int		 sanityCheckOut6	__P((struct _cv *));
-int		 checkMTU		__P((struct _cv *));
-int		 toOneself4		__P((struct ifBox *, struct _cv *));
-
-void		 setMTU			__P((void));
-int		 checkMTU4		__P((u_long , struct _cv *));
-
-#ifdef NATPT_FRAGMENT
-struct _fragment	*internFragmented	__P((struct _cv *, int));
-struct _tSlot		*lookForFragmented	__P((struct _cv *, int));
-#endif
-
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-MALLOC_DEFINE(M_NATPT, "NATPT", "Network Address Translation - Protocol Translation");
-#endif
+struct in6_addr	natpt_prefix;
 
 
 /*
  *
  */
 
-int
-natpt_in4(struct mbuf *m4, struct mbuf **m6)
-{
-    Cell	    *p;
-    struct ifnet    *ifnet;
-    struct ifBox    *ifb;
-    int		     rv = IPPROTO_IP;
+int		natpt_in6		__P((struct mbuf *, struct mbuf **));
+int		natpt_in4		__P((struct mbuf *, struct mbuf **));
+int		natpt_config6		__P((struct mbuf *, struct pcv *));
+int		natpt_config4		__P((struct mbuf *, struct pcv *));
+caddr_t		natpt_lastpyld		__P((struct mbuf *, int *, int *));
 
-    if (natpt_initialized == 0)
-	return (IPPROTO_IP);			/* goto ours		*/
+MALLOC_DEFINE(M_NATPT, "NATPT", "Network Address Translation - Protocol Translation");
 
-    if (isDump(D_DIVEIN4))
-	natpt_logMBuf(LOG_DEBUG, m4, "natpt_in4().");
 
-    ifnet = m4->m_pkthdr.rcvif;
-    for (p = ifBox; p; p = CDR(p))
-    {
-	ifb = (struct ifBox *)CAR(p);
-	if (ifb->ifnet == ifnet)
-	{
-	    if (ifb->side == outSide)
-		rv = natpt_incomingIPv4(NATPT_INBOUND,	ifb, m4, m6);
-	    else
-		rv = natpt_outgoingIPv4(NATPT_OUTBOUND, ifb, m4, m6);
-	    goto    exit;
-	}
-    }
-
-  exit:;
-    return (rv);
-}
-
+/*
+ *
+ */
 
 int
 natpt_in6(struct mbuf *m6, struct mbuf **m4)
 {
-    Cell	    *p;
-    struct ifnet    *ifnet;
-    struct ifBox    *ifb;
-    struct ip6_hdr  *ip6;
-    struct in6_addr  cand;
-    int		     rv = IPPROTO_IP;
+	const char	*fn = __FUNCTION__;
 
-    if (natpt_initialized == 0)
-	return (IPPROTO_IP);			/* goto mcastcheck	*/
+	struct pcv	 cv6;
+	struct ip6_hdr	*ip6;
+	struct in6_addr	 match;
+	struct pAddr	*pad;
 
-    if (isDump(D_DIVEIN6))
-	natpt_logMBuf(LOG_DEBUG, m6, "natpt_in6().");
+	if (natpt_initialized == 0)
+		return (IPPROTO_IP);
 
-    ip6 = mtod(m6, struct ip6_hdr *);
-
-    cand.s6_addr32[0] = ip6->ip6_dst.s6_addr32[0] & natpt_prefixmask.s6_addr32[0];
-    cand.s6_addr32[1] = ip6->ip6_dst.s6_addr32[1] & natpt_prefixmask.s6_addr32[1];
-    cand.s6_addr32[2] = ip6->ip6_dst.s6_addr32[2] & natpt_prefixmask.s6_addr32[2];
-    cand.s6_addr32[3] = ip6->ip6_dst.s6_addr32[3] & natpt_prefixmask.s6_addr32[3];
-
-    if ((cand.s6_addr32[0] != natpt_prefix.s6_addr32[0])
-	|| (cand.s6_addr32[1] != natpt_prefix.s6_addr32[1])
-	|| (cand.s6_addr32[2] != natpt_prefix.s6_addr32[2])
-	|| (cand.s6_addr32[3] != natpt_prefix.s6_addr32[3]))
-    {
-	if (isDump(D_IN6REJECT))
-	    natpt_logMBuf(LOG_DEBUG, m6, "v6 translation rejected.");
-
-	return (IPPROTO_IP);			/* goto mcastcheck	*/
-    }
-
-    if (isDump(D_IN6ACCEPT))
-	natpt_logMBuf(LOG_DEBUG, m6, "v6 translation start.");
-
-    ifnet = m6->m_pkthdr.rcvif;
-    for (p = ifBox; p; p = CDR(p))
-    {
-	ifb = (struct ifBox *)CAR(p);
-	if (ifb->ifnet == ifnet)
-	{
-	    if (ifb->side == outSide)
-		rv = natpt_incomingIPv6(NATPT_INBOUND,	ifb, m6, m4);
-	    else
-		rv = natpt_outgoingIPv6(NATPT_OUTBOUND, ifb, m6, m4);
-	    goto    exit;
-	}
-    }
-
-  exit:;
-    return (rv);
-}
-
-
-int
-natpt_out4(struct mbuf *m4, struct mbuf **m6)
-{
-    Cell	    *p;
-    struct ifnet    *ifnet;
-    struct ifBox    *ifb;
-    int		     rv = IPPROTO_IP;
-
-    if (natpt_initialized == 0)
-	return (IPPROTO_IP);			/* goto ours		*/
-
-    if (isDump(D_DIVEIN4))
-	natpt_logMBuf(LOG_DEBUG, m4, "natpt_out4().");
-
-    ifnet = m4->m_pkthdr.rcvif;
-    for (p = ifBox; p; p = CDR(p))
-    {
-	ifb = (struct ifBox *)CAR(p);
-	if (ifb->ifnet == ifnet)
-	{
-	    if (ifb->side == outSide)
-		rv = natpt_outgoingIPv4(NATPT_OUTBOUND, ifb, m4, m6);
-	    else
-		rv = natpt_incomingIPv4(NATPT_INBOUND,	ifb, m4, m6);
-	    goto    exit;
-	}
-    }
-
-  exit:;
-    return (rv);
-}
-
-
-
-int
-natpt_out6(struct mbuf *m6, struct mbuf **m4)
-{
-    Cell	    *p;
-    struct ifnet    *ifnet;
-    struct ifBox    *ifb;
-    int		     rv = IPPROTO_IP;
-
-    ifnet = m6->m_pkthdr.rcvif;
-    for (p = ifBox; p; p = CDR(p))
-    {
-	ifb = (struct ifBox *)CAR(p);
-	if (ifb->ifnet == ifnet)
-	{
-	    if (ifb->side == outSide)
-		rv = natpt_outgoingIPv6(NATPT_OUTBOUND, ifb, m6, m4);
-	    else
-		rv = natpt_incomingIPv6(NATPT_INBOUND,	ifb, m6, m4);
-	    goto    exit;
-	}
-    }
-
-  exit:;
-    return (rv);
-}
-
-
-int
-natpt_incomingIPv4(int sess, struct ifBox *ifb, struct mbuf *m4, struct mbuf **m6)
-{
-    int			 rv;
-    struct _cv		 cv;
-    struct _cSlot	*acs;
-    struct _tSlot	*ats;
-#ifdef NATPT_FRAGMENT
-    struct ip		*ip4;
-    struct _fragment	*frg = NULL;
-#endif
-
-    if ((rv = configCv4(sess, m4, &cv)) == IPPROTO_IP)
-	return (rv);			/* goto the following process		*/
-
-    if ((rv = sanityCheckIn4(&cv)) != IPPROTO_IPV4)
-	return (IPPROTO_DONE);		/* discard this packet without free	*/
-
-#if defined(NATPT_NAT) && defined(NATPT_FRAGMENT)
-    ip4 = mtod(m4, struct ip *);
-    if ((ip4->ip_off & IP_MF)
-	&& (ip4->ip_off & IP_OFFMASK) == 0)	/* first fragmented packet	*/
-    {
-	frg = internFragmented(&cv, sess);
-    }
-    
-    if ((ip4->ip_off & IP_OFFMASK) != 0)	/* second fragmented packet	*/
-    {
-	struct _tSlot	*tsl;
-
-	if ((tsl = lookForFragmented(&cv, sess)) != NULL)
-	{
-	    if (isDump(D_FRAGMENTED))
-	    {
-		char	Wow[256];
-
-		sprintf(Wow, "2nd slotentry  in: %p", tsl);
-		natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
-
-		sprintf(Wow, "2nd paddr  in: %p", &tsl->remote);
-		natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
-	    }
-
-	    cv.ats = tsl;
-	    if ((*m6 = translatingIPv4To4frag(&cv, &tsl->local)) != NULL)
-		return (IPPROTO_IPV4);
-	}
-
-	return (IPPROTO_MAX);
-    }
-#endif	/* if defined(NATPT_NAT) && defined(NATPT_FRAGMENT)	*/
-
-    cv.ats = lookingForIncomingV4Hash(&cv);
-    if ((ats = checkIncomingICMP(&cv)) != NULL)
-	cv.ats = ats;
-
-    if (cv.ats == NULL)
-    {
-	if ((acs = lookingForIncomingV4Rule(ifb, &cv)) == NULL)
-	    return (IPPROTO_IP);			/* goto ours		*/
-
-	if ((cv.ats = internIncomingV4Hash(sess, acs, &cv)) == NULL)
-	    return (IPPROTO_IP);			/* goto ours		*/
-    }
-
-    cv.ats->inbound++;
-
-#ifdef NATPT_FRAGMENT
-    if (frg != NULL)
-    {
-	frg->tslot = cv.ats;
-	if (isDump(D_FRAGMENTED))
-	{
-	    char	Wow[256];
-
-	    sprintf(Wow, "1st slotentry  in: %p", cv.ats);
-	    natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
-	}
-    }
-#endif
-
-#ifdef NATPT_NAT
-    if (cv.ats->local.sa_family == AF_INET)
-    {
-	if (isDump(D_FRAGMENTED))
-	{
-	    char	Wow[256];
-
-	    sprintf(Wow, "1st paddr  in: %p", &cv.ats->local);
-	    natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
-	}
-
-	if (checkMTU4(mtuInside, &cv) == IPPROTO_DONE)
-	    return (IPPROTO_DONE);
-
-	if ((*m6 = translatingIPv4To4(&cv, &cv.ats->local)) != NULL)
-	    return (IPPROTO_IPV4);
-    }
-    else
-#endif
-    {
-	if (checkMTU(&cv) != IPPROTO_IPV4)
-	    return (IPPROTO_DONE);	/* discard this packet without free	*/
-
-	if ((*m6 = translatingIPv4To6(&cv, &cv.ats->local)) != NULL)
-	    return (IPPROTO_IPV6);
-    }
-
-    return (IPPROTO_MAX);				/* discard this packet	*/
-}
-
-
-int
-natpt_outgoingIPv4(int sess, struct ifBox *ifb, struct mbuf *m4, struct mbuf **m6)
-{
-    int			 rv;
-    struct _cv		 cv;
-    struct _cSlot	*acs;
-    struct ip		*ip4;
-#ifdef NATPT_FRAGMENT
-    struct _fragment	*frg = NULL;
-#endif
-
-    if ((rv = configCv4(sess, m4, &cv)) == IPPROTO_IP)
-	return (rv);			/* goto the following process		*/
-
-#if defined(NATPT_NAT) && defined(NATPT_FRAGMENT)
-    ip4 = mtod(m4, struct ip *);
-    if ((ip4->ip_off & IP_MF)
-	&& (ip4->ip_off & IP_OFFMASK) == 0)	/* first fragmented packet	*/
-    {
-	frg = internFragmented(&cv, sess);
-    }
-    
-    if ((ip4->ip_off & IP_OFFMASK) != 0)	/* second fragmented packet	*/
-    {
-	struct _tSlot	*tsl;
-
-	if ((tsl = lookForFragmented(&cv, sess)) != NULL)
-	{
-	    if (isDump(D_FRAGMENTED))
-	    {
-		char	Wow[256];
-
-		sprintf(Wow, "2nd slotentry out: %p", tsl);
-		natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
-
-		sprintf(Wow, "2nd paddr out: %p", &tsl->remote);
-		natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
-	    }
-
-	    cv.ats = tsl;
-	    if ((*m6 = translatingIPv4To4frag(&cv, &tsl->remote)) != NULL)
-		return (IPPROTO_IPV4);
-	}
-
-	return (IPPROTO_MAX);
-    }
-#endif	/* if defined(NATPT_NAT) && defined(NATPT_FRAGMENT)	*/
-
-    if ((cv.ats = lookingForOutgoingV4Hash(&cv)) == NULL)
-    {
-	if ((acs = lookingForOutgoingV4Rule(ifb, &cv)) == NULL)
-	    return (IPPROTO_IP);			/* goto ours		*/
-
-	ip4 = mtod(m4, struct ip *);
-	if (ip4->ip_ttl <= IPTTLDEC)
-	{
-	    n_long	dest = 0;
-
-	    icmp_error(m4, ICMP_TIMXCEED, ICMP_TIMXCEED_INTRANS, dest, 0);
-	    return (IPPROTO_DONE);	/* discard this packet without free	*/
-	}
-	
-	if ((cv.ats = internOutgoingV4Hash(sess, acs, &cv)) == NULL)
-	    return (IPPROTO_IP);			/* goto ours		*/
-    }
-
-    cv.ats->outbound++;
-
-#ifdef NATPT_FRAGMENT
-    if (frg != NULL)
-    {
-	frg->tslot = cv.ats;
-	if (isDump(D_FRAGMENTED))
-	{
-	    char	Wow[256];
-
-	    sprintf(Wow, "1st slotentry out: %p", cv.ats);
-	    natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
-	}
-    }
-#endif
-
-#ifdef NATPT_NAT
-    if (cv.ats->remote.sa_family == AF_INET)
-    {
-	if (isDump(D_FRAGMENTED))
-	{
-	    char	Wow[256];
-
-	    sprintf(Wow, "1st paddr out: %p", &cv.ats->remote);
-	    natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
-	}
-
-	if (checkMTU4(mtuInside, &cv) == IPPROTO_DONE)
-	    return (IPPROTO_DONE);
-
-	if ((*m6 = translatingIPv4To4(&cv, &cv.ats->remote)) != NULL)
-	    return (IPPROTO_IPV4);
-    }
-    else
-#endif
-    {
-	if ((*m6 = translatingIPv4To6(&cv, &cv.ats->remote)) != NULL)
-	    return (IPPROTO_IPV6);
-    }
-
-    return (IPPROTO_MAX);				/* discard this packet	*/
-}
-
-
-int
-natpt_incomingIPv6(int sess, struct ifBox *ifb, struct mbuf *m6, struct mbuf **m4)
-{
-    int			 rv;
-    struct _cv		 cv;
-    struct _cSlot	*acs;
-    struct ip6_hdr	*ip6;
-
-    if ((rv = configCv6(sess, m6, &cv)) == IPPROTO_IP)
-	return (rv);				/* goto the following process	*/
-
-    if ((cv.ats = lookingForIncomingV6Hash(&cv)) == NULL)
-    {
-	if ((acs = lookingForIncomingV6Rule(ifb, &cv)) == NULL)
-	    return (IPPROTO_IP);			/* goto mcastcheck	*/
+	if (isDump(D_DIVEIN6))
+		natpt_logMBuf(LOG_DEBUG, m6, "%s():", fn);
 
 	ip6 = mtod(m6, struct ip6_hdr *);
-	if (ip6->ip6_hlim <= IPV6_HLIMDEC)
-	{
-	    icmp6_error(m6, ICMP6_TIME_EXCEEDED, ICMP6_TIME_EXCEED_TRANSIT, 0);
-	    return (IPPROTO_MAX);			/* discard this packet	*/
+
+	bcopy(&ip6->ip6_dst, &match, sizeof(struct in6_addr));
+	match.s6_addr32[0] &= in6mask96.s6_addr32[0];
+	match.s6_addr32[1] &= in6mask96.s6_addr32[1];
+	match.s6_addr32[2] &= in6mask96.s6_addr32[2];
+	match.s6_addr32[3] &= in6mask96.s6_addr32[3];
+
+	if (!IN6_ARE_ADDR_EQUAL(&natpt_prefix, &match))	{
+		if (isDump(D_IN6REJECT))
+			natpt_logMBuf(LOG_DEBUG, m6,
+				      "%s(): v6 translation rejected.", fn);
+
+		return (IPPROTO_IP);
 	}
 
-	if ((cv.ats = internIncomingV6Hash(sess, acs, &cv)) == NULL)
-	    return (IPPROTO_IP);			/* goto mcastcheck	*/
-    }
+	if (isDump(D_IN6ACCEPT))
+		natpt_logMBuf(LOG_DEBUG, m6, "%s(): v6 translation accepted.", fn);
 
-    cv.ats->inbound++;
+	if (natpt_config6(m6, &cv6) == IPPROTO_IP)
+		return (IPPROTO_IP);
 
-    if ((*m4 = translatingIPv6To4(&cv, &cv.ats->local)) != NULL)
-	return (IPPROTO_IPV4);
-
-    return (IPPROTO_MAX);				/* discard this packet	*/
-}
-
-
-int
-natpt_outgoingIPv6(int sess, struct ifBox *ifb, struct mbuf *m6, struct mbuf **m4)
-{
-    int			 rv;
-    struct _cv		 cv6;
-    struct _cSlot	*acs;
-
-    if ((rv = configCv6(sess, m6, &cv6)) == IPPROTO_IP)
-	return (rv);				/* goto the following process	*/
-
-    if ((rv = sanityCheckOut6(&cv6)) != IPPROTO_IPV6)
-	return (IPPROTO_DONE);				/* discard this packet	*/
-
-    if (isDump(D_PEEKOUTGOINGV6))
-	natpt_logIp6(LOG_DEBUG, cv6._ip._ip6, NULL);
-
-    if ((cv6.ats = lookingForOutgoingV6Hash(&cv6)) == NULL)
-    {
-	if ((acs = lookingForOutgoingV6Rule(ifb, &cv6)) == NULL)
-	    return (IPPROTO_IP);			/* goto mcastcheck	*/
-
-	if ((cv6.ats = internOutgoingV6Hash(sess, acs, &cv6)) == NULL)
-	    return (IPPROTO_IP);			/* goto mcastcheck	*/
-    }
-
-    cv6.ats->outbound++;
-
-    if ((*m4 = translatingIPv6To4(&cv6, &cv6.ats->remote)) != NULL)
-	return (IPPROTO_IPV4);
-
-    return (IPPROTO_MAX);				/* discard this packet	*/
-}
-
-
-int
-configCv4(int sess, struct mbuf *m, struct _cv *cv)
-{
-    struct ip	*ip = mtod(m, struct ip *);
-
-    bzero(cv, sizeof(struct _cv));
-    cv->ip_p = ip->ip_p;
-    cv->m = m;
-    cv->_ip._ip4 = ip;
-    cv->inout  = sess;
-
-    switch (ip->ip_p)
-    {
-      case IPPROTO_ICMP:
-      case IPPROTO_TCP:
-      case IPPROTO_UDP:
-	cv->ip_payload = ip->ip_p;
-	cv->_payload._caddr = (caddr_t)((u_long *)ip + ip->ip_hl);
-	cv->poff = cv->_payload._caddr - (caddr_t)cv->_ip._ip4;
-	cv->plen = (caddr_t)m->m_data + m->m_len - cv->_payload._caddr;
-	return (ip->ip_p);
-    }
-
-    return (IPPROTO_IP);
-}
-
-
-int
-configCv6(int sess, struct mbuf *m, struct _cv *cv)
-{
-    int			 proto;
-    int			 offset;
-    caddr_t		 tcpudp;
-
-    bzero(cv, sizeof(struct _cv));
-    cv->m = m;
-    cv->_ip._ip6 = mtod(m, struct ip6_hdr *);
-    cv->inout  = sess;
-
-    if ((tcpudp = foundFinalPayload(m, &proto, &offset)))
-    {
-	switch (proto)
-	{
-	  case IPPROTO_ICMP:
-	  case IPPROTO_ICMPV6:
-	  case IPPROTO_TCP:
-	  case IPPROTO_UDP:
-	    cv->ip_p = proto;
-	    cv->ip_payload = proto;
-	    if (proto == IPPROTO_ICMPV6)
-		cv->ip_payload = IPPROTO_ICMP;
-	    cv->_payload._caddr = tcpudp;	
-	    cv->poff = offset;
-	    cv->plen = (caddr_t)m->m_data + m->m_len - cv->_payload._caddr;
-	    return (proto);
+	if (cv6.ip.ip6->ip6_hlim <= IPV6_HLIMDEC) {
+		icmp6_error(m6, ICMP6_TIME_EXCEEDED, ICMP6_TIME_EXCEED_TRANSIT, 0);
+		return (IPPROTO_DONE);	/* discard this packet without free */
 	}
-    }
 
-    return (IPPROTO_IP);
+	if ((cv6.ats = natpt_lookForHash6(&cv6)) == NULL) {
+		struct cSlot	*acs;
+
+		if ((acs = natpt_lookForRule6(&cv6)) == NULL)
+			return (IPPROTO_IP);
+
+		if ((cv6.ats = natpt_internHash6(acs, &cv6)) == NULL)
+			return (IPPROTO_IP);
+	}
+
+	if (cv6.fromto == NATPT_FROM){
+		pad = &cv6.ats->remote;
+		cv6.ats->fromto++;
+	} else {
+		pad = &cv6.ats->local;
+		cv6.ats->tofrom++;
+	}
+
+	if ((*m4 = natpt_translateIPv6To4(&cv6, pad)) == NULL)
+		return (IPPROTO_MAX);
+
+	return (IPPROTO_IPV4);
+}
+
+
+int
+natpt_in4(struct mbuf *m4, struct mbuf **m6)
+{
+	const char	*fn = __FUNCTION__;
+
+	struct pcv	 cv4;
+	struct tSlot	*ats;
+	struct pAddr	*pad;
+
+	if (natpt_initialized == 0)
+		return (IPPROTO_IP);
+
+	if (isDump(D_DIVEIN4))
+		natpt_logMBuf(LOG_DEBUG, m4, "%s():", fn);
+
+	if (natpt_config4(m4, &cv4) == IPPROTO_IP)
+		return (IPPROTO_IP);
+
+	if (cv4.ip.ip4->ip_ttl <= IPTTLDEC) {
+		n_long	dest = 0;
+
+		icmp_error(m4, ICMP_TIMXCEED, ICMP_TIMXCEED_INTRANS, dest, 0);
+		return (IPPROTO_DONE);	/* discard this packet without free. */
+	}
+
+	cv4.ats = natpt_lookForHash4(&cv4);
+	if ((cv4.ats == NULL)
+	    && ((ats = natpt_checkICMP(&cv4)) != NULL))
+		cv4.ats = ats;
+
+	if (cv4.ats == NULL ){
+		struct cSlot	*csl;
+
+	if ((csl = natpt_lookForRule4(&cv4)) == NULL)
+			return (IPPROTO_IP);
+		if ((cv4.ats = natpt_internHash4(csl, &cv4)) == NULL)
+			return (IPPROTO_IP);
+	}
+
+	if (cv4.fromto == NATPT_FROM){
+		pad = &cv4.ats->remote;
+		cv4.ats->fromto++;
+	} else {
+		pad = &cv4.ats->local;
+		cv4.ats->tofrom++;
+	}
+
+#ifdef NATPT_NAT
+	if (pad->sa_family == AF_INET) {
+		if ((*m6 = natpt_translateIPv4To4(&cv4, pad)) == NULL)
+			return (IPPROTO_MAX);
+		return (IPPROTO_IPV4);
+	} else
+#endif
+	if ((*m6 = natpt_translateIPv4To6(&cv4, pad)) == NULL)
+	    return (IPPROTO_MAX);
+
+	return (IPPROTO_IPV6);
+}
+
+
+int
+natpt_config6(struct mbuf *m, struct pcv *cv6)
+{
+	int		 proto;
+	int		 offset;
+	caddr_t		 tcpudp;
+
+	bzero(cv6, sizeof(struct pcv));
+	cv6->sa_family = AF_INET6;
+	cv6->m = m;
+	cv6->ip.ip6 = mtod(m, struct ip6_hdr *);
+
+	if ((tcpudp = natpt_lastpyld(m, &proto, &offset))) {
+		switch (proto) {
+		case IPPROTO_ICMP:
+		case IPPROTO_ICMPV6:
+		case IPPROTO_TCP:
+		case IPPROTO_UDP:
+			cv6->ip_p = proto;
+			cv6->pyld.caddr = tcpudp;
+			cv6->poff = offset;
+			cv6->plen = (caddr_t)m->m_data + m->m_len - cv6->pyld.caddr;
+			return (proto);
+		}
+	}
+
+	return (IPPROTO_IP);
 }
 
 
 caddr_t
-foundFinalPayload(struct mbuf *m, int *proto, int *offset)
+natpt_lastpyld(struct mbuf *m, int *proto, int *offset)
 {
-    struct ip6_hdr	*ip6;
-    caddr_t		 ip6end;
-    caddr_t		 pyld;
+	struct ip6_hdr	*ip6;
+	caddr_t		 ip6end;
+	caddr_t		 pyld;
 
-    ip6 = mtod(m, struct ip6_hdr *);
-    ip6end = (caddr_t)(ip6 + 1) + ntohs(ip6->ip6_plen);
-    if ((pyld = natpt_pyldaddr(ip6, ip6end, proto)) == NULL)
-	return (NULL);
-    *offset = pyld - (caddr_t)ip6;
-    return (pyld);
-}
-
-
-int
-sanityCheckIn4(struct _cv *cv4)
-{
-    struct mbuf	*m4  = cv4->m;
-    struct ip	*ip4 = mtod(m4, struct ip *);
-
-    if (ip4->ip_ttl <= IPTTLDEC)
-    {
-	n_long	dest = 0;
-
-	icmp_error(m4, ICMP_TIMXCEED, ICMP_TIMXCEED_INTRANS, dest, 0);
-	return (IPPROTO_DONE);		/* discard this packet without free	*/
-    }
-
-    return (IPPROTO_IPV4);
-}
-
-
-int
-sanityCheckOut6(struct _cv *cv6)
-{
-    struct mbuf		*m6 = cv6->m;
-    struct ip6_hdr	*ip6 = mtod(m6, struct ip6_hdr *);
-
-    if (ip6->ip6_hlim <= IPV6_HLIMDEC)
-    {
-	icmp6_error(m6, ICMP6_TIME_EXCEEDED, ICMP6_TIME_EXCEED_TRANSIT, 0);
-	return (IPPROTO_DONE);			/* discard this packet	*/
-    }
-
-    return (IPPROTO_IPV6);
-}
-
-
-int
-checkMTU(struct _cv *cv4)
-{
-    int		 mmtu;
-    struct mbuf	*m4  = cv4->m;
-    struct ip	*ip4 = mtod(m4, struct ip *);
-
-    mmtu = IPV6_MMTU - sizeof(struct ip6_hdr) - sizeof(struct ip6_frag);
-						/* This should be 1232[byte]	*/
-
-    if ((m4->m_flags & M_PKTHDR)
-	&& (m4->m_pkthdr.len > mmtu))
-    {
-	if (ip4->ip_off & IP_DF)
-	{
-	    n_long		dest = 0;
-	    struct ifnet	destif;
-
-	    bzero(&destif, sizeof(struct ifnet));
-	    destif.if_mtu = mmtu;
-
-	    icmp_error(m4, ICMP_UNREACH, ICMP_UNREACH_NEEDFRAG, dest, &destif);
-	    return (IPPROTO_DONE);	/* discard this packet without free	*/
-	}
-	
-	cv4->flags |= NATPT_NEEDFRAGMENT;	/* fragment, then translate	*/
-    }
-
-    return (IPPROTO_IPV4);
-}
-
-
-int
-toOneself4(struct ifBox *ifb, struct _cv *cv)
-{
-    struct ifaddr	*ifa;
-    struct in_addr	*dstaddr;
-
-    dstaddr = &cv->_ip._ip4->ip_dst;
-
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-    for (ifa = ifb->ifnet->if_addrlist; ifa; ifa = ifa->ifa_next)
-#else
-    for (ifa = ifb->ifnet->if_addrlist.tqh_first; ifa;
-	 ifa = ifa->ifa_list.tqe_next)
-#endif
-    {
-	if (ifa->ifa_addr->sa_family != AF_INET)
-	    continue;
-
-	if (isDump(D_TOONESELF4))
-	{
-	    char	Wow[256];
-
-	    sprintf(Wow, "toOneself4(): %s: %s:%s",
-		    ifb->ifName,
-		    ip4_sprintf(&SIN4(ifa->ifa_addr)->sin_addr),
-		    ip4_sprintf(dstaddr));
-	    natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
-	}
-	if (SIN4(ifa->ifa_addr)->sin_addr.s_addr == dstaddr->s_addr)
-	    return (1);
-
-#ifdef BOOTP_COMPAT
-	if (SIN4(ifa->ifa_addr)->sin_addr.s_addr  == INADDR_ANY)
-	    return (1);
-#endif
-
-	if (ifa->ifa_ifp && (ifa->ifa_ifp->if_flags & IFF_BROADCAST))
-	{
-	    if (isDump(D_TOONESELF4))
-	    {
-		char	Wow[256];
-
-		sprintf(Wow, "toOneself4(): %s: %s:%s",
-			ifb->ifName,
-			ip4_sprintf(&SIN4(ifa->ifa_broadaddr)->sin_addr),
-			ip4_sprintf(dstaddr));
-		natpt_logMsg(LOG_DEBUG, Wow, strlen(Wow));
-	    }
-	    if (SIN4(ifa->ifa_broadaddr)->sin_addr.s_addr == dstaddr->s_addr)
-		return (1);
-	}
-    }
-
-    return (0);
-}
-
-
-char *
-ip4_sprintf(struct in_addr *addr)
-{
-    static char	 ip4buf[32];
-    u_char	*s = (u_char *)&addr->s_addr;
-
-    sprintf(ip4buf, "%d.%d.%d.%d%c", s[0], s[1], s[2], s[3], '\0');
-    return (ip4buf);
+	ip6 = mtod(m, struct ip6_hdr *);
+	ip6end = (caddr_t)(ip6 + 1) + ntohs(ip6->ip6_plen);
+	if ((pyld = natpt_pyldaddr(ip6, ip6end, proto)) == NULL)
+		return (NULL);
+	*offset = pyld - (caddr_t)ip6;
+	return (pyld);
 }
 
 
 caddr_t
 natpt_pyldaddr(struct ip6_hdr *ip6, caddr_t ip6end, int *proto)
 {
-    int			 nxt;
-    caddr_t		 ip6ext;
+	int			 nxt;
+	caddr_t		 ip6ext;
 
-    if (proto)
-	*proto = 0;
-    ip6ext = (caddr_t)((struct ip6_hdr *)(ip6 + 1));
+	if (proto)
+		*proto = 0;
+	ip6ext = (caddr_t)((struct ip6_hdr *)(ip6 + 1));
 
-    nxt = ip6->ip6_nxt;
-    while ((nxt != IPPROTO_NONE) && (ip6ext < ip6end))
-    {
-	switch (nxt)
-	{
-	  case IPPROTO_HOPOPTS:
-	  case IPPROTO_ROUTING:
-	  case IPPROTO_DSTOPTS:
-	    ip6ext += ((((struct ip6_ext *)ip6ext)->ip6e_len + 1) << 3);
-	    break;
+	nxt = ip6->ip6_nxt;
+	while ((nxt != IPPROTO_NONE) && (ip6ext < ip6end)) {
+		switch (nxt) {
+		case IPPROTO_HOPOPTS:
+		case IPPROTO_ROUTING:
+		case IPPROTO_DSTOPTS:
+			ip6ext += ((((struct ip6_ext *)ip6ext)->ip6e_len + 1) << 3);
+			break;
 
-	  case IPPROTO_ICMPV6:
-	  case IPPROTO_TCP:
-	  case IPPROTO_UDP:
-	    if (proto)
-		*proto = nxt;
-	    return (ip6ext);
+		case IPPROTO_ICMPV6:
+		case IPPROTO_TCP:
+		case IPPROTO_UDP:
+			if (proto)
+				*proto = nxt;
+			return (ip6ext);
 
-	  default:
-	    return (NULL);
+		default:
+			return (NULL);
+		}
 	}
-    }
 
-    return (NULL);
-}
-
-
-/*
- *
- */
-
-
-struct ifBox *
-natpt_asIfBox(char *ifName)
-{
-    Cell	*p;
-
-    for (p = ifBox; p; p = CDR(p))
-    {
-      if (strcmp(ifName, ((struct ifBox *)CAR(p))->ifName) == SAME)
-	return ((struct ifBox *)CAR(p));
-    }
-
-    return (NULL);
-}
-
-
-struct ifBox *
-natpt_setIfBox(char *ifName)
-{
-    struct ifnet	*p;
-    struct ifBox	*q;
-    char		 Wow[IFNAMSIZ];
-
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-    for (p = ifnet; p; p = p->if_next)
-#else
-    for (p = TAILQ_FIRST(&ifnet); p; p = TAILQ_NEXT(p, if_list))
-#endif
-    {
-#ifdef __NetBSD__
-	sprintf(Wow, "%s%c",  p->if_xname, '\0');
-#else
-	sprintf(Wow, "%s%d%c", p->if_name, p->if_unit, '\0');
-#endif
-	if (strcmp(ifName, Wow) != SAME)
-	    continue;
-
-	MALLOC(q, struct ifBox *, sizeof(struct ifBox), M_NATPT, M_WAITOK);
-	bzero(q, sizeof(struct ifBox));
-
-	q->ifnet = p;
-#ifdef __NetBSD__
-	sprintf(q->ifName, "%s%c",  p->if_xname, '\0');
-#else
-	sprintf(q->ifName, "%s%d%c", p->if_name, p->if_unit, '\0');
-#endif
-
-	LST_hookup_list((Cell**)&ifBox, q);
-	return (q);
-    }
-    return (NULL);
-}
-
-
-void
-setMTU()
-{
-    struct _cell	*p;
-    struct ifnet	*ifnet;
-    struct ifBox	*ifb;
-    char		 Wow[256];
-
-    for (p = ifBox; p; p = CDR(p))
-    {
-	ifb = (struct ifBox *)CAR(p);
-	ifnet = ifb->ifnet;
-
-	if (ifnet->if_flags & IFF_LOOPBACK)
-	    continue;
-
-	if (ifb->side == outSide)
-	{
-	    mtuOutside = ifnet->if_data.ifi_mtu;
-	    sprintf(Wow, "set mtuOutside: %ld\n", mtuOutside);
-	    printf(Wow);
-	    natpt_logMsg(LOG_INFO, Wow, strlen(Wow));
-	}
-	else
-	{
-	    mtuInside  = ifnet->if_data.ifi_mtu;
-	    sprintf(Wow, "set mtuInside: %ld\n", mtuInside);
-	    natpt_logMsg(LOG_INFO, Wow, strlen(Wow));
-	    printf(Wow);
-	}
-    }
+	return (NULL);
 }
 
 
 int
-checkMTU4(u_long mtu, struct _cv *cv4)
+natpt_config4(struct mbuf *m, struct pcv *cv4)
 {
-    struct mbuf	*m4  = cv4->m;
-    struct ip	*ip4 = mtod(m4, struct ip *);
+	struct ip	*ip = mtod(m, struct ip *);
 
-    if ((m4->m_flags & M_PKTHDR)
-	&& (m4->m_pkthdr.len > mtu))
-    {
-	if (ip4->ip_off & IP_DF)
-	{
-	    n_long		dest = 0;
-	    struct ifnet	destif;
-	    char		Wow[246];
+	bzero(cv4, sizeof(struct pcv));
+	cv4->sa_family = AF_INET;
+	cv4->m = m;
+	cv4->ip.ip4 = ip;
+	cv4->ip_p = ip->ip_p;
 
-	    sprintf(Wow, "checkMTU4(): need fragment (%d > %ld)", m4->m_pkthdr.len, mtu);
-	    natpt_logMsg(LOG_INFO, Wow, strlen(Wow));
-
-	    bzero(&destif, sizeof(struct ifnet));
-	    destif.if_mtu = mtu;
-
-	    NTOHS(ip4->ip_id);
-	    icmp_error(m4, ICMP_UNREACH, ICMP_UNREACH_NEEDFRAG, dest, &destif);
-	    return (IPPROTO_DONE);	/* discard this packet without free	*/
+	switch (ip->ip_p) {
+	case IPPROTO_ICMP:
+	case IPPROTO_TCP:
+	case IPPROTO_UDP:
+		cv4->pyld.caddr = (caddr_t)ip + (ip->ip_hl << 2);
+		cv4->poff = cv4->pyld.caddr - (caddr_t)cv4->ip.ip4;
+		cv4->plen = (caddr_t)m->m_data + m->m_len - cv4->pyld.caddr;
+		return (ip->ip_p);
 	}
-	
-	cv4->flags |= NATPT_NEEDFRAGMENT;	/* fragment, then translate	*/
-    }
 
-    return (IPPROTO_IPV4);
+	return (IPPROTO_IP);
 }
 
 
@@ -942,70 +322,58 @@ checkMTU4(u_long mtu, struct _cv *cv4)
  *
  */
 
-void
-natpt_debugProbe()
+int
+natpt_setPrefix(caddr_t addr)
 {
-    printf("DebugProbe");
+	natpt_prefix = ((struct natpt_msgBox *)addr)->m_in6addr;
+	natpt_logIN6addr(LOG_INFO, "NATPT prefix: ", &natpt_prefix);
+
+	return (0);
 }
 
 
-void
-natpt_assert(const char *file, int line, const char *expr)
+int
+natpt_setValue(caddr_t addr)
 {
-    char	Wow[128];
+	struct natpt_msgBox	*mbox = (struct natpt_msgBox *)addr;
 
-    sprintf(Wow, "natpt assertion \"%s\" failed: file \"%s\", line %d\n",
-	    expr, file, line);
-    panic("Wow");
-    /* NOTREACHED */
-}
+	switch (mbox->flags) {
+	case NATPT_DEBUG:
+		natpt_debug = mbox->m_uint;
+		break;
 
-
-/*
- *
- */
-
-void
-natpt_initialize()
-{
-    struct ifnet	*ifn;
-    struct ifaddr	*ifa;
-    struct ifBox	*ibox;
-
-    if (natpt_initialized)
-	return;
-
-    natpt_initialized = 1;
-    natpt_gotoOneself = TRUE;		/* Allow go to ours packet	*/
-
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-    for (ifn = ifnet; ifn; ifn = ifn->if_next)
-#else
-    for (ifn = TAILQ_FIRST(&ifnet); ifn; ifn = TAILQ_NEXT(ifn, if_list))
-#endif
-    {
-#if defined(__bsdi__) || (defined(__FreeBSD__) && __FreeBSD__ < 3)
-	for (ifa = ifn->if_addrlist; ifa; ifa = ifa->ifa_next)
-#else
-	for (ifa = ifn->if_addrlist.tqh_first; ifa;
-	     ifa = ifa->ifa_list.tqe_next)
-#endif
-	{
-	    if (((ifa->ifa_addr->sa_family) == AF_INET)
-		|| ((ifa->ifa_addr->sa_family) == AF_INET6))
-	    {
-		MALLOC(ibox, struct ifBox *, sizeof(struct ifBox), M_NATPT, M_WAITOK);
-#ifdef __NetBSD__
-		sprintf(ibox->ifName, "%s",  ifn->if_xname);
-#else
-		sprintf(ibox->ifName, "%s%d", ifn->if_name, ifn->if_unit);
-#endif
-		ibox->ifnet = ifn;
-		ibox->side = NULL;
-		LST_hookup_list(&ifBox, ibox);
-		goto nextif;
-	    }
+	case NATPT_DUMP:
+		natpt_dump = mbox->m_uint;
+		break;
 	}
-      nextif:
-    }
+
+	return (0);
+}
+
+
+int
+natpt_testLog(caddr_t addr)
+{
+	struct natpt_msgBox	*mbox = (struct natpt_msgBox *)addr;
+	char			*fragile;
+
+	MALLOC(fragile, char *, mbox->size, M_NATPT, M_WAITOK);
+	if (fragile == NULL)
+		return (ENOBUFS);
+	copyin(mbox->freight, fragile, mbox->size);
+
+	natpt_logMsg(LOG_DEBUG, fragile, mbox->size);
+
+	FREE(fragile, M_NATPT);
+	return (0);
+}
+
+
+int
+natpt_break()
+{
+	const char	*fn = __FUNCTION__;
+
+	printf("%s(): break", fn);
+	return (0);
 }

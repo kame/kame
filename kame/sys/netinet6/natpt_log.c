@@ -1,7 +1,7 @@
-/*	$KAME: natpt_log.c,v 1.11 2001/05/24 05:00:10 itojun Exp $	*/
+/*	$KAME: natpt_log.c,v 1.12 2001/09/02 19:06:25 fujisawa Exp $	*/
 
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,23 +29,22 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #include "opt_natpt.h"
 #endif
 
-#include <sys/errno.h>
 #include <sys/param.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
 #include <sys/socket.h>
-#include <sys/types.h>
+#include <sys/syslog.h>
 #include <sys/systm.h>
 
-#include <net/if.h>
+#include <machine/stdarg.h>
+
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-
 #include <netinet/ip6.h>
 
 #include <netinet6/natpt_defs.h>
@@ -57,11 +56,8 @@
  *
  */
 
-static struct sockaddr	_natpt_dst = {2, PF_INET};
-static struct sockaddr	_natpt_src = {2, PF_INET};
-
-
-struct mbuf	*natpt_lbuf	__P((int type, int priorities, size_t size));
+static struct sockaddr	natpt_dst = {2, PF_INET};
+static struct sockaddr	natpt_src = {2, PF_INET};
 
 
 /*
@@ -69,122 +65,158 @@ struct mbuf	*natpt_lbuf	__P((int type, int priorities, size_t size));
  */
 
 void
-natpt_logMsg(int priorities, void *item, size_t size)
+natpt_logMsg(int priorities, char *format, ...)
 {
-    natpt_log(LOG_MSG, priorities, item, size+1);
+	int		 rv;
+	u_char		 wow[256];
+	va_list		 ap;
+
+	va_start(ap, format);
+	rv = vsnprintf(wow, sizeof(wow), format, ap);
+	natpt_log(LOG_MSG, priorities, (void *)wow, strlen(wow)+1);
+	va_end(ap);
 }
 
 
 void
-natpt_logMBuf(int priorities, struct mbuf *m, char *msg)
+natpt_logMBuf(int priorities, struct mbuf *m, ...)
 {
-    if (msg)
-	natpt_log(LOG_MSG,  priorities, (void *)msg, strlen(msg)+1);
-    natpt_log(LOG_MBUF, priorities, (void *)m->m_data, min(m->m_len, LBFSZ));
+	int		 rv;
+	char		*format;
+	u_char		 wow[256];
+	va_list		 ap;
+
+	va_start(ap, m);
+	if ((format = va_arg(ap, char *)) != NULL) {
+		rv = vsnprintf(wow, sizeof(wow), format, ap);
+		natpt_log(LOG_MSG,  priorities, (void *)wow, strlen(wow)+1);
+	}
+	va_end(ap);
+
+	natpt_log(LOG_DUMP, priorities, (void *)m->m_data, min(m->m_len, LBFSZ));
 }
 
 
 void
-natpt_logIp4(int priorities, struct ip *ip4, char *msg)
+natpt_logIp6(int priorities, struct ip6_hdr *ip6, ...)
 {
-    if (msg)
-	natpt_log(LOG_MSG,  priorities, (void *)msg, strlen(msg)+1);
+	int		 rv;
+	char		*format;
+	u_char		 wow[256];
+	va_list		 ap;
 
-    natpt_log(LOG_IP4, priorities, (void *)ip4, ((ip4->ip_hl << 2) + 20));
+	va_start(ap, ip6);
+	if ((format = va_arg(ap, char *)) != NULL) {
+		rv = vsnprintf(wow, sizeof(wow), format, ap);
+		natpt_log(LOG_MSG,  priorities, (void *)wow, strlen(wow)+1);
+	}
+	va_end(ap);
+
+	natpt_log(LOG_IP6, priorities, (void *)ip6, sizeof(struct ip6_hdr)+8);
 }
 
 
 void
-natpt_logIp6(int priorities, struct ip6_hdr *ip6, char *msg)
+natpt_logIp4(int priorities, struct ip *ip4, ...)
 {
-    if (msg)
-	natpt_log(LOG_MSG,  priorities, (void *)msg, strlen(msg)+1);
-    natpt_log(LOG_IP6, priorities, (void *)ip6, sizeof(struct ip6_hdr)+8);
+	int		 rv;
+	char		*format;
+	u_char		 wow[256];
+	va_list		 ap;
+
+	va_start(ap, ip4);
+	if ((format = va_arg(ap, char *)) != NULL) {
+		rv = vsnprintf(wow, sizeof(wow), format, ap);
+		natpt_log(LOG_MSG,  priorities, (void *)wow, strlen(wow)+1);
+	}
+	va_end(ap);
+
+	natpt_log(LOG_IP4, priorities, (void *)ip4, ((ip4->ip_hl << 2) + 20));
 }
 
 
 int
 natpt_log(int type, int priorities, void *item, size_t size)
 {
-    struct sockproto	 proto;
-    struct	mbuf	*m;
-    struct	lbuf	*p;
+	struct sockproto	 proto;
+	struct	mbuf	*m;
+	struct	lbuf	*p;
 
-    if ((m = natpt_lbuf(type, priorities, size)) == NULL)
-	return (ENOBUFS);
+	if ((m = natpt_lbuf(type, priorities, size)) == NULL)
+		return (ENOBUFS);
 
-    p = (struct lbuf *)m->m_data;
-    m_copyback(m, sizeof(struct l_hdr), p->l_hdr.lh_size, (caddr_t)item);
+	p = (struct lbuf *)m->m_data;
+	m_copyback(m, sizeof(struct l_hdr), p->l_hdr.lh_size, (caddr_t)item);
 
-    proto.sp_family = AF_INET;
-    proto.sp_protocol = IPPROTO_AHIP;
-    natpt_input(m, &proto, &_natpt_src, &_natpt_dst);
+	proto.sp_family = AF_INET;
+	proto.sp_protocol = IPPROTO_AHIP;
+	natpt_input(m, &proto, &natpt_src, &natpt_dst);
 
-    return (0);
+	return (0);
 }
 
 
 int
 natpt_logIN6addr(int priorities, char *msg, struct in6_addr *sin6addr)
 {
-    int		size, msgsz;
-    struct	mbuf	*m;
-    struct	lbuf	*p;
+	int		 size, msgsz;
+	struct	mbuf	*m;
+	struct	lbuf	*p;
 
-    msgsz = strlen(msg)+1;
-    size = sizeof(struct l_hdr) + IN6ADDRSZ + msgsz;
+	msgsz = strlen(msg)+1;
+	size = sizeof(struct l_hdr) + IN6ADDRSZ + msgsz;
 
-    m = natpt_lbuf(LOG_IN6ADDR, priorities, size);
-    if (m == NULL)
-	return (ENOBUFS);
+	if ((m = natpt_lbuf(LOG_IN6ADDR, priorities, size)) == NULL)
+		return (ENOBUFS);
 
-    {
-	struct sockproto	proto;
+	{
+		struct sockproto	proto;
 
-	p = (struct lbuf *)m->m_pktdat;
-	bcopy(sin6addr, p->l_addr.in6addr, sizeof(struct in6_addr));
-	strncpy(p->l_msg, msg, min(msgsz, MSGSZ-1));
-	p->l_msg[MSGSZ-1] = '\0';
+		p = (struct lbuf *)m->m_pktdat;
+		bcopy(sin6addr, p->l_addr.in6addr, sizeof(struct in6_addr));
+		strncpy(p->l_msg, msg, min(msgsz, MSGSZ-1));
+		p->l_msg[MSGSZ-1] = '\0';
 
-	proto.sp_family = AF_INET;
-	proto.sp_protocol = IPPROTO_AHIP;
-	natpt_input(m, &proto, &_natpt_src, &_natpt_dst);
-    }
+		proto.sp_family = AF_INET;
+		proto.sp_protocol = IPPROTO_AHIP;
+		natpt_input(m, &proto, &natpt_src, &natpt_dst);
+	}
 
-    return (0);
+	return (0);
 }
 
 
 struct mbuf *
 natpt_lbuf(int type, int priorities, size_t size)
 {
-    struct	mbuf	*m;
-    struct	lbuf	*p;
-    int maxlen;
+	struct	mbuf	*m;
+	struct	lbuf	*p;
+	int		 maxlen;
 
-    if (size + sizeof(struct l_hdr) > MCLBYTES)
-	return NULL;
-    MGETHDR(m, M_NOWAIT, MT_DATA);
-    maxlen = MHLEN;
-    if (size + sizeof(struct l_hdr) > MHLEN) {
-	MCLGET(m, M_NOWAIT);
-	maxlen = MCLBYTES;
-	if ((m->m_flags & M_EXT) == 0) {
-	    m_freem(m);
-	    m = NULL;
+	if (size + sizeof(struct l_hdr) > MCLBYTES)
+		return (NULL);
+
+	MGETHDR(m, M_NOWAIT, MT_DATA);
+	maxlen = MHLEN;
+	if (size + sizeof(struct l_hdr) > MHLEN) {
+		MCLGET(m, M_NOWAIT);
+		maxlen = MCLBYTES;
+		if ((m->m_flags & M_EXT) == 0) {
+			m_freem(m);
+			m = NULL;
+		}
 	}
-    }
-    if (m == NULL)
-	return (NULL);
+	if (m == NULL)
+		return (NULL);
 
-    m->m_pkthdr.len = m->m_len = maxlen;
-    m->m_pkthdr.rcvif = NULL;
+	m->m_pkthdr.len = m->m_len = maxlen;
+	m->m_pkthdr.rcvif = NULL;
 
-    p = (struct lbuf *)m->m_data;
-    p->l_hdr.lh_type = type;
-    p->l_hdr.lh_pri  = priorities;
-    p->l_hdr.lh_size = size;
-    microtime((struct timeval *)&p->l_hdr.lh_sec);
+	p = (struct lbuf *)m->m_data;
+	p->l_hdr.lh_type = type;
+	p->l_hdr.lh_pri	 = priorities;
+	p->l_hdr.lh_size = size;
+	microtime((struct timeval *)&p->l_hdr.lh_sec);
 
-    return (m);
+	return (m);
 }

@@ -1,7 +1,7 @@
-/*	$KAME: natpt_defs.h,v 1.18 2001/06/13 04:31:18 fujisawa Exp $	*/
+/*	$KAME: natpt_defs.h,v 1.19 2001/09/02 19:06:23 fujisawa Exp $	*/
 
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,163 +29,79 @@
  * SUCH DAMAGE.
  */
 
-#ifndef FALSE
-#define	FALSE		0
-#define	TRUE		1
-#endif
+#define	NATPTHASHSZ		(397)
+#define	MAXTSLOTENTRY		(4096)
 
-#define	SAME		(0)
+#define	SIN4(s)			((struct sockaddr_in  *)s)
+#define	SIN6(s)			((struct sockaddr_in6 *)s)
+#define	SZSIN4			sizeof(struct sockaddr_in)
+#define	SZSIN6			sizeof(struct sockaddr_in6)
 
-#define	NATPT_MAXHASH	(397)
-#define	MAXTSLOTENTRY	(4096)
-
-#define	SIN4(s)		((struct sockaddr_in  *)s)
-#define	SIN6(s)		((struct sockaddr_in6 *)s)
-#define	SZSIN6		sizeof(struct sockaddr_in6)
-#define	SZSIN4		sizeof(struct sockaddr_in)
-
-#define	CAR(p)		((p)->car)
-#define	CDR(p)		((p)->cdr)
-#define	CAAR(p)		(CAR(CAR(p)))
-#define	CADR(p)		(CAR(CDR(p)))
-#define	CDAR(p)		(CDR(CAR(p)))
-#define	CDDR(p)		(CDR(CDR(p)))
-
-#ifndef TCP6
-#define	tcp6hdr		tcphdr
-#endif
-
-
-#if defined(NATPT_ASSERT) && (NATPT_ASSERT != 0)
-# if defined(__STDC__)
-#  define	ASSERT(e)	((e) ? (void)0 : natpt_assert(__FILE__, __LINE__, #e))
-# else	/* PCC */
-#  define	ASSERT(e)	((e) ? (void)0 : natpt_assert(__FILE__, __LINE__, "e"))
-# endif
-#else
-# undef NATPT_ASSERT
-# define	ASSERT(e)	((void)0)
-#endif
-
-
-#define	IN4_ARE_ADDR_EQUAL(a, b)					\
-	((a)->s_addr == (b)->s_addr)
-
-
-#define	ReturnEnobufs(m)	if (m == NULL) { errno = ENOBUFS; return (NULL); }
-
-
-#if (defined(KERNEL)) || (defined(_KERNEL))
-
-#define	isDebug(d)	(natpt_debug & (d))
-#define	isDump(d)	(natpt_dump  & (d))
-#define	isOn(s,d)	((s & d) != 0)
-
-#define	F_TOONESELF4			0x00000001
-#define	F_TCPFSM			0x00000010
-
-#define	D_DIVEIN4			0x00000001
-#define	D_PEEKOUTGOINGV4		0x00000002
-#define	D_MATCHINGRULE4			0x00000004
-#define	D_TRANSLATINGIPV4		0x00000010
-#define	D_FRAGMENTED			0x00000100
-#define	D_TRANSLATEDIPV4		0x00001000
-#define	D_FAKETRACEROUTE		0x00004000
-#define	D_TOONESELF4			0x00008000
-
-#define	D_DIVEIN6			0x00010000
-#define	D_IN6REJECT			0x00020000
-#define	D_IN6ACCEPT			0x00040000
-#define	D_PEEKOUTGOINGV6		0x00080000
-#define	D_TRANSLATINGIPV6		0x00100000
-#define	D_TRANSLATEDIPV6		0x01000000
-
-#endif	/* defined(KERNEL)			*/
-
-/*
- *	OS dependencies
- */
 
 #ifdef _KERNEL
+#define	isDebug(d)		(natpt_debug & (d))
+#define	D_CHECKSUM		0x00000001
 
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-#define	rcb_list		list
-#endif
+#define	isDump(d)		(natpt_dump  & (d))
 
-#ifdef __NetBSD__
+#define	D_DIVEIN4		0x00000001
+#define	D_MATCHINGRULE4		0x00000004
+#define	D_TRANSLATEIPV4		0x00000010
+#define	D_FRAGMENTED		0x00000100
+#define	D_TRANSLATEDIPV4	0x00001000
+#define	D_FAKETRACEROUTE	0x00004000
+
+#define	D_DIVEIN6		0x00010000
+#define	D_IN6REJECT		0x00020000
+#define	D_IN6ACCEPT		0x00040000
+#define	D_MATCHINGRULE6		0x00080000
+#define	D_TRANSLATEIPV6		0x00100000
+#endif	/* _KERNEL */
+
+
 /*
- * Macros for type conversion
- * dtom(x) -	convert data pointer within mbuf to mbuf pointer (XXX)
- */
-#define	dtom(x)		((struct mbuf *)((long)(x) & ~(MSIZE-1)))
-#endif
-
-#endif	/* _KERNEL	*/
-
-
-/*
- *	Structure definitions.
+ *
  */
 
-typedef	struct	_cell
+struct pcv					/* sizeof(): 32[byte]	*/
 {
-    struct  _cell   *car;
-    struct  _cell   *cdr;
-}   Cell;
+	u_char	 sa_family;
+	u_char	 ip_p;			/* IPPROTO_(ICMP[46]|TCP|UDP)	*/
 
+	u_char	 type;
+#define	NATPT_MAP64		1
+#define	NATPT_MAP46		2
+#define	NATPT_MAP44		3
+#define	NATPT_MAPDPORT		4
+#define	NATPT_MAPBIDIR		5
 
-/* Interface Box structure						*/
+	u_char	 fromto;
+#define	NATPT_FROM		0
+#define	NATPT_TO		1
 
-struct ifBox
-{
-    int			 side;
-#define	noSide			(0)
-#define	inSide			(1)
-#define	outSide			(2)
-    char		 ifName[IFNAMSIZ];
-    struct ifnet	*ifnet;
+	u_char	 flags;
+#define	NATPT_TRACEROUTE	0x01		/* does not use now	*/
+#define	NATPT_NEEDFRAGMENT	0x02
+
+	int		 poff;		/* payload offset		*/
+	int		 plen;		/* payload length		*/
+
+	struct mbuf	*m;
+	struct tSlot	*ats;
+	union {
+		struct ip	*ip4;
+		struct ip6_hdr	*ip6;
+	}		 ip;
+	union {
+		caddr_t		  caddr;
+		struct icmp	 *icmp4;
+		struct icmp6_hdr *icmp6;
+		struct tcphdr	 *tcp4;
+		struct tcp6hdr	 *tcp6;
+		struct udphdr	 *udp;
+	}		pyld;
 };
 
-
-/* IP ...								*/
-
-struct _cv						/* 28[byte]	*/
-{
-    u_char	 ip_p;			/* IPPROTO_(ICMP[46]|TCP|UDP)	*/
-    u_char	 ip_payload;		/* IPPROTO_(ICMP|TCP|UDP)	*/
-
-    u_char	 inout;
-/*	#define	NATPT_UNSPEC		(0)				*/
-/*	#define	NATPT_INBOUND		(1)				*/
-/*	#define	NATPT_OUTBOUND		(2)				*/
-
-    u_char	 flags;
-#define		NATPT_TRACEROUTE	(0x01)	/* does not use now	*/
-#define		NATPT_NEEDFRAGMENT	(0x02)
-
-    int		 poff;			/* payload offset		*/
-    int		 plen;			/* payload length		*/
-
-    struct mbuf		*m;
-    struct _tSlot	*ats;
-    union
-    {
-	struct ip	*_ip4;
-	struct ip6_hdr	*_ip6;
-    }		 _ip;
-    union
-    {
-	caddr_t		  _caddr;
-	struct icmp	 *_icmp4;
-	struct icmp6_hdr *_icmp6;
-	struct tcphdr	 *_tcp4;
-	struct tcp6hdr	 *_tcp6;
-	struct udphdr	 *_udp;
-    }		 _payload;
-};
-
-
-/* IP address structure							*/
 
 union inaddr					/* sizeof():  16[byte]	*/
 {
@@ -194,39 +110,24 @@ union inaddr					/* sizeof():  16[byte]	*/
 };
 
 
-#ifdef NATPT_FRAGMENT
-struct _fragment
+struct pAddr					/* sizeof():  40[byte]	*/
 {
-    struct in_addr	 ip_src;			/* source address	*/
-    struct in_addr	 ip_dst;			/* destination address	*/
-    u_short		 ip_id;				/* identification	*/
-    u_char		 ip_p;				/* protocol		*/
-    u_char		 inout;
-/*	#define	NATPT_UNSPEC		(0)					*/
-/*	#define	NATPT_INBOUND		(1)					*/
-/*	#define	NATPT_OUTBOUND		(2)					*/
+	u_char		sa_family;		/* address family	*/
 
-    struct _tSlot	*tslot;
-    time_t		 tstamp;
-};
-#endif
+	u_char		pType;			/* port range type	*/
+#define	PORT_MINUS		1
+#define	PORT_COLON		2
 
+	u_char		prefix;			/* address mask length */
+	u_char		aType;			/* address type	*/
+#define	ADDR_ANY		0
+#define	ADDR_SINGLE		1
+#define	ADDR_MASK		2
+#define	ADDR_RANGE		3
 
-struct pAddr					/* sizeof():  44[byte]	*/
-{
-    u_char		ip_p;		/* protocol family (within struct _tSlot)	*/
-    u_char		sa_family;	/* address family  (within struct _cSlot)	*/
+	u_short		port[2];
 
-    u_short		port[2];
-#define	_port0			port[0]
-#define	_port1			port[1]
-
-#define	_sport			port[0]
-#define	_dport			port[1]
-#define	_eport			port[1]
-
-    union inaddr	addr[2];
-
+	union inaddr	addr[2];
 #define	in4src			addr[0].in4
 #define	in4dst			addr[1].in4
 #define	in4Addr			addr[0].in4
@@ -238,119 +139,87 @@ struct pAddr					/* sizeof():  44[byte]	*/
 #define	in6dst			addr[1].in6
 #define	in6Addr			addr[0].in6
 #define	in6Mask			addr[1].in6
-
-    struct
-    {
-	u_char		type;
-#define	ADDR_ANY		(0)
-#define	ADDR_SINGLE		(1)
-#define	ADDR_MASK		(2)
-#define	ADDR_RANGE		(3)
-
-	u_char		prefix;
-    }			ad;
 };
 
 
 /* Configuration slot entry						*/
 
-struct	_cSlot					/* sizeof(): 100[byte]	*/
+struct	cSlot					/* sizeof(): 100[byte]	*/
 {
-    u_char		 type;
-#define	NATPT_STATIC		(1)	/* Rule was set statically	*/
-#define	NATPT_DYNAMIC		(2)	/* Rule was set dynamically	*/
+	TAILQ_ENTRY(cSlot)	csl_list;
 
-    u_char		 dir;
-#define	NATPT_UNSPEC		(0x00)
-#define	NATPT_INBOUND		(0x01)
-#define	NATPT_OUTBOUND		(0x02)
-#define	NATPT_BIDIRECTIONAL	(0x03)	/* inbound and outgound		*/
+	u_char		 type;
+#define	NATPT_RULE_STATIC	1	/* rule was set by hand.	*/
+#define	NATPT_RULE_DYNAMIC	2	/* rule was set by program.	*/
 
-    u_char		 map;
-#define	NATPT_PORT_MAP		(0x01)	/* Mapping dest port		   */
-#define	NATPT_PORT_MAP_DYNAMIC	(0x02)	/* Mapping dest port dynamically */
-#define	NATPT_ADDR_MAP		(0x04)	/* Mapping dest addr		   */
-#define	NATPT_ADDR_MAP_DYNAMIC	(0x08)	/* Mapping dest addr dynamically */
+	u_char		 proto;
+#define	NATPT_ICMPV6		0x01
+#define	NATPT_ICMP		0x01
+#define	NATPT_TCP		0x02
+#define	NATPT_UDP		0x04
 
-    u_char		 proto;
+	u_char		 map;
+#define	NATPT_REMAP_SPORT	0x01
+#define	NATPT_COPY_SPORT	0x02
+#define	NATPT_COPY_DPORT	0x10
 
-    u_short		 prefix;
-    u_short		 cport;		/* current port			*/
+	u_short		 cport;		/* current port, with host byte order	*/
 
-    struct pAddr	 local;
-    struct pAddr	 remote;
-    struct _cSlotAux	*aux;		/* place holder			*/
+	time_t		 tstamp;
+	struct pAddr	 local;
+	struct pAddr	 remote;
 };
-
-
-#if	0
-/* Configuration slot auxiliary entry					*/
-/* currently not used							*/
-
-struct	_cSlotAux				/* sizeof():   0[byte]	*/
-{
-};
-#endif
 
 
 /* Translation slot entry						*/
 
-struct	_tSlot					/* sizeof(): 104[byte]	*/
+struct tSlot					/* sizeof(): 132[byte]	*/
 {
-    u_char	ip_payload;
+	TAILQ_ENTRY(tSlot)	tsl_list;
+	TAILQ_ENTRY(tSlot)	tsl_hashl;	/* Hash chain.		*/
+	TAILQ_ENTRY(tSlot)	tsl_hashr;	/* Hash chain.		*/
 
-    u_char	session;
-/* #define	NATPT_UNSPEC		(0)		*/
-/* #define	NATPT_INBOUND		(1)		*/
-/* #define	NATPT_OUTBOUND		(2)		*/
+	u_char		 ip_p;			/* next level protocol	*/
 
-    u_char	remap;
-/* #define	NATPT_PORT_REMAP	(0x01)		*/
-/* #define	NATPT_ADDR_REMAP	(0x02)		*/
+	u_short		 hvl;
+	u_short		 hvr;
+	struct pAddr	 local;
+	struct pAddr	 remote;
+	time_t		 tstamp;
+	u_long		 fromto;		/* counter	*/
+	u_long		 tofrom;		/* counter	*/
 
-/* #define NATPT_STATIC		(0x1)			 */
-/* #define NATPT_DYNAMIC	(0x2)			 */
+	/* This pointer is used in order to open connection from FTP
+	 * server when FTP non passive mode.
+	 */
+	struct cSlot	*csl;
+	union {
+		struct {
+			n_short		 icd_id;
+			n_short		 icd_seq;
+		}			 ih_idseq;
+		struct tcpstate		*tcps;
+	}				 suit;
 
-    struct pAddr	local;
-    struct pAddr	remote;
-    time_t		tstamp;
-    int			lcount;
-    u_long		inbound;
-    u_long		outbound;
-
-    /* This pointer is used in order to open connection from FTP
-     * server when FTP non passive mode.
-     */
-    struct _cSlot      *csl;
-
-    union
-    {
-	struct _idseq
-	{
-	    n_short		 icd_id;
-	    n_short		 icd_seq;
-	}			 ih_idseq;
-	struct _tcpstate	*tcp;
-    }				 suit;
 };
 
 
-struct _tcpstate				/* sizeof():  32[byte]	*/
+struct tcpstate					/* sizeof(): 32[byte]	*/
 {
-    short	_state;
-    short	_session;
+	u_char		state;		/* tcp status */
+	char		ftpstate;
+	char		rewrite[2];
 
-    u_short	lport;		/* FTP PORT command argument		*/
-    u_short	rport;		/* port to be connected to from outside	*/
+	u_short		lport;		/* FTP PORT command argument	*/
+	u_short		rport;		/* port connected from outside */
 
-    int		ftpstate;
-    long	delta[2];	/*    [0]: outgoingDelta			*/
-				/*	outgoingSeq	increment		*/
-				/*	incomingAck	decrement		*/
-				/*    [1]: incomingDelta			*/
-				/*	incomingSeq	increment		*/
-				/*	outgoingAck	decrement		*/
+	long		delta[2];	/* [0]: outgoingDelta		*/
+					/*	outgoingSeq - increment	*/
+					/*	incomingAck - decrement	*/
+					/* [1]: incomingDelta		*/
+					/*	incomingSeq - increment	*/
+					/*	outgoingAck - decrement	*/
 
-    u_int32_t	seq[2];
-    u_int32_t	ack[2];
+	u_int32_t	seq[2];
+	u_int32_t	ack[2];
 };

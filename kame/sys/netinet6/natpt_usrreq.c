@@ -1,7 +1,7 @@
-/*	$KAME: natpt_usrreq.c,v 1.15 2001/05/05 11:19:04 fujisawa Exp $	*/
+/*	$KAME: natpt_usrreq.c,v 1.16 2001/09/02 19:06:26 fujisawa Exp $	*/
 
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,36 +29,29 @@
  * SUCH DAMAGE.
  */
 
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 #include "opt_natpt.h"
 #endif
 
-#include <sys/types.h>
 #include <sys/param.h>
+#include <sys/domain.h>
+#include <sys/ioccom.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
-#include <sys/domain.h>
-/*	FreeBSD330 compiler complain that do not #include ioctl.h in the kernel,	*/
-/*	Include xxxio.h instead								*/
-/*	#include <sys/ioctl.h>	*/
-#include <sys/ioccom.h>
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
 #include <sys/proc.h>
-#endif
 #include <sys/protosw.h>
 #include <sys/socket.h>
 #include <sys/socketvar.h>
-#include <sys/syslog.h>
 #include <sys/systm.h>
 
-#include <net/if.h>
 #include <net/raw_cb.h>
 
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
+#include <netinet/ip.h>
+#include <netinet/ip6.h>
 
 #include <netinet6/natpt_defs.h>
-#include <netinet6/natpt_log.h>
 #include <netinet6/natpt_soctl.h>
 #include <netinet6/natpt_var.h>
 
@@ -73,79 +66,46 @@
 u_long	natpt_sendspace = NATPTSNDQ;
 u_long	natpt_recvspace = NATPTRCVQ;
 
-#if defined(__bsdi__) || defined(__FreeBSD__) && __FreeBSD__ <= 2
-static struct rawcb		ptrcb;
-#else
-LIST_HEAD(, rawcb)		ptrcb;
+LIST_HEAD(,rawcb)		ptrcb;
+
+#ifdef __FreeBSD__
+MALLOC_DECLARE(M_NATPT);
 #endif
 
-static struct sockaddr	natpt_dst = {2, PF_INET};
-#ifdef notused
-static struct sockaddr	natpt_src = {2, PF_INET};
-#endif
 
-#if	0
-int	natpt_sosetopt	__P((struct socket *, int, struct mbuf *));
-int	natpt_sogetopt	__P((struct socket *, int, struct mbuf *));
-#endif
+/*
+ *
+ */
 
-static	int	_natptSetIf	__P((caddr_t));
-static	int	_natptGetIf	__P((caddr_t));
-static	int	_natptSetValue	__P((caddr_t));
-static	int	_natptTestLog	__P((caddr_t));
-
-void	natpt_init	__P((void));
-
-#ifdef __bsdi__
-int	natpt_usrreq	__P((struct socket *, int,
-			     struct mbuf *, struct mbuf *, struct mbuf *));
-#elif defined(__NetBSD__)
-int	natpt_usrreq	__P((struct socket *, int,
-			     struct mbuf *, struct mbuf *, struct mbuf *, struct proc *));
-#endif	/* defined(__bsdi__) || defined(__NetBSD__)	*/
-
-
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-int	natpt_uabort	__P((struct socket *));
-int	natpt_uattach	__P((struct socket *, int, struct proc *));
-int	natpt_ubind	__P((struct socket *, struct sockaddr *, struct proc *));
-int	natpt_uconnect	__P((struct socket *, struct sockaddr *, struct proc *));
-int	natpt_udetach	__P((struct socket *));
-int	natpt_ucontrol	__P((struct socket *, u_long, caddr_t, struct ifnet *, struct proc *));
-#endif	/* defined(__FreeBSD__) && __FreeBSD__ >= 3	*/
-
-int	natpt_attach	 __P((struct socket *, int));
-int	natpt_control	 __P((struct socket *, int, caddr_t, struct ifnet *));
-int	natpt_detach	 __P((struct socket *));
-int	natpt_disconnect __P((struct socket *));
+void		natpt_init		__P((void));
 
 
 #ifdef __FreeBSD__
-#if __FreeBSD__ >= 3
-struct pr_usrreqs natpt_usrreqs =
-{
-    natpt_uabort,	NULL,		natpt_uattach,	natpt_ubind,
-    natpt_uconnect,	NULL,		natpt_ucontrol,	natpt_udetach,
-    natpt_disconnect,	NULL,		NULL,		NULL,
-    NULL,		NULL,		NULL,		NULL,
-    NULL,		sosend,		soreceive,	sopoll
-};
-#else
-struct pr_usrreqs natpt_usrreqs =
-{
-    NULL,		NULL,		natpt_attach,	NULL,
-    NULL,		NULL,		natpt_control,	natpt_detach,
-    natpt_disconnect,	NULL,		NULL,		NULL,
-    NULL,		NULL,		NULL,		NULL,
-    NULL
-};
-#endif	/* __FreeBSD__ >= 3 */
-#endif	/* __FreeBSD__      */
-
-
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
-MALLOC_DECLARE(M_NATPT);
+int		natpt_uabort		__P((struct socket *));
+int		natpt_uattach		__P((struct socket *, int proto, struct proc *));
+int		natpt_ubind		__P((struct socket *, struct sockaddr *,
+					     struct proc *));
+int		natpt_uconnect		__P((struct socket *, struct sockaddr *,
+					     struct proc *));
+int		natpt_ucontrol		__P((struct socket *, u_long, caddr_t, struct ifnet *,
+					     struct proc *));
+int		natpt_udetach		__P((struct socket *));
 #endif
+
+int		natpt_attach		__P((struct socket *, int));
+int		natpt_detach		__P((struct socket *));
+int		natpt_disconnect	__P((struct socket *));
+int		natpt_control		__P((struct socket *, int, caddr_t, struct ifnet *));
+
+
+struct pr_usrreqs natpt_usrreqs =
+{
+	natpt_uabort,		NULL,		natpt_uattach,	natpt_ubind,
+	natpt_uconnect,		NULL,		natpt_ucontrol,	natpt_udetach,
+	natpt_disconnect,	NULL,		NULL,		NULL,
+	NULL,			NULL,		NULL,		NULL,
+	NULL,			sosend,		soreceive,	sopoll
+};
 
 
 /*
@@ -155,211 +115,109 @@ MALLOC_DECLARE(M_NATPT);
 void
 natpt_init()
 {
-    natpt_initialized = 0;
-    ip6_protocol_tr = 0;
+	natpt_initialized = 1;
+	ip6_protocol_tr = 0;
 
-    init_tslot();
+	natpt_init_rule();
+	natpt_init_tslot();
 
-#if defined(__bsdi__) || defined(__FreeBSD__) && __FreeBSD__ <= 2
-    ptrcb.rcb_next = ptrcb.rcb_prev = &ptrcb;
-#else
-    LIST_INIT(&ptrcb);
-#endif
+	LIST_INIT(&ptrcb);
 
-    printf("NATPT: initialized.\n");
+	printf("NATPT initialized\n");
 }
 
 
 void
 natpt_input(struct mbuf *m0, struct sockproto *proto,
-	 struct sockaddr *src, struct sockaddr *dst)
+	    struct sockaddr *src, struct sockaddr *dst)
 {
-    struct rawcb	*rp;
-    struct mbuf		*m = m0;
-    struct socket	*last;
-    int	sockets;
+	struct rawcb	*rp;
+	struct mbuf	*m = m0;
+	struct socket	*last;
 
-    last = 0;
-#if defined(__bsdi__) || defined(__FreeBSD__) && __FreeBSD__ <= 2
-    for (rp = ptrcb.rcb_next; rp != &ptrcb; rp = rp->rcb_next)
-#else
-    for (rp = ptrcb.lh_first; rp != 0; rp = rp->rcb_list.le_next)
-#endif
-    {
-	if (rp->rcb_proto.sp_family != proto->sp_family)
-	    continue;
-	if (rp->rcb_proto.sp_protocol
-	    && (rp->rcb_proto.sp_protocol != proto->sp_protocol))
-	    continue;
+	last = 0;
+	for (rp = ptrcb.lh_first; rp != 0; rp = rp->list.le_next) {
+		if (rp->rcb_proto.sp_family != proto->sp_family)
+			continue;
+		if (rp->rcb_proto.sp_protocol
+		    && (rp->rcb_proto.sp_protocol != proto->sp_protocol))
+			continue;
 
 #define	equal(a1, a2)	(bcmp((caddr_t)(a1), (caddr_t)(a2), a1->sa_len) == 0)
 
-	if (rp->rcb_laddr && !equal(rp->rcb_laddr, dst))
-	    continue;
-	if (rp->rcb_faddr && !equal(rp->rcb_faddr, src))
-	    continue;
+		if (rp->rcb_laddr && !equal(rp->rcb_laddr, dst))
+			continue;
+		if (rp->rcb_faddr && !equal(rp->rcb_faddr, src))
+			continue;
 
-	if (last)
-	{
-	    struct mbuf *n;
+		if (last) {
+			struct mbuf *n;
 
-	    if ((n = m_copy(m, 0, (int)M_COPYALL)) != NULL)
-	    {
-		if (sbappendaddr(&last->so_rcv, src, n, (struct mbuf *)NULL) == 0)
-		    m_freem(n);		/* should notify about lost packet */
-		else
-		{
-		    sorwakeup(last);
-		    sockets++;
+			if ((n = m_copy(m, 0, (int)M_COPYALL)) != NULL)	{
+				if (sbappendaddr(&last->so_rcv, src, n,
+						 (struct mbuf *)NULL) == 0)
+					/* should notify about lost packet */
+					m_freem(n);
+				else {
+					sorwakeup(last);
+				}
+			}
 		}
-	    }
+		last = rp->rcb_socket;
 	}
-	last = rp->rcb_socket;
-    }
 
-    if (last)
-    {
-	if (sbappendaddr(&last->so_rcv, src, m, (struct mbuf *)NULL) == 0)
-	    m_freem(m);
+	if (last) {
+		if (sbappendaddr(&last->so_rcv, src, m, (struct mbuf *)NULL) == 0)
+			m_freem(m);
+		else {
+			sorwakeup(last);
+		}
+	}
 	else
-	{
-	    sorwakeup(last);
-	    sockets++;
-	}
-    }
-    else
-	m_freem(m);
+		m_freem(m);
 }
 
 
-#if defined(__bsdi__) || defined(__NetBSD__)
-int
-natpt_usrreq(struct socket *so, int req,
-	     struct mbuf *m, struct mbuf *nam, struct mbuf *control
-#ifdef __NetBSD__
-	     ,struct proc *p
-#endif
-	     )
-{
-    struct rawcb	*rp = sotorawcb(so);
-    int			 error = 0;
-
-    if ((rp == NULL) && (req != PRU_ATTACH))
-    {
-	m_freem(m);
-	return (EINVAL);
-    }
-
-    switch (req)
-    {
-      case PRU_ATTACH:
-	error = natpt_attach(so, (int)nam);
-	break;
-
-      case PRU_DETACH:
-	error = natpt_detach(so);
-	break;
-
-      case PRU_DISCONNECT:
-	if (rp->rcb_faddr == NULL)
-	{
-	    error = ENOTCONN;
-	    break;
-	}
-	rp->rcb_faddr = NULL;
-	raw_disconnect(rp);
-	soisdisconnected(so);
-	break;
-
-      case PRU_SEND:
-      case PRU_BIND:
-      case PRU_LISTEN:
-      case PRU_CONNECT:
-      case PRU_ACCEPT:
-      case PRU_SHUTDOWN:
-      case PRU_RCVD:
-      case PRU_ABORT:
-	error = EOPNOTSUPP;
-	break;
-
-      case PRU_CONTROL:
-	error = natpt_control(so, (int)m, (caddr_t)nam, (struct ifnet *)NULL);
-	return (error);
-	break;
-
-      case PRU_SENSE:
-      case PRU_RCVOOB:
-      case PRU_SENDOOB:
-      case PRU_SOCKADDR:
-      case PRU_PEERADDR:
-      case PRU_CONNECT2:
-      case PRU_FASTTIMO:
-      case PRU_SLOWTIMO:
-      case PRU_PROTORCV:
-      case PRU_PROTOSEND:
-	error = EOPNOTSUPP;
-	break;
-
-      default:
-	panic("raw_usrreq");
-    }
-
-    if (m != NULL)
-	m_freem(m);
-
-    return (error);
-}
-#endif	/* defined(__bsdi__) || defined(__NetBSD__)	*/
-
-
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 int
 natpt_uabort(struct socket *so)
 {
-    struct rawcb *rp = sotorawcb(so);
+	struct rawcb	*rp = sotorawcb(so);
 
-    if (rp == 0)
-	return (EINVAL);
+	if (rp == 0)
+		return (EINVAL);
 
-    raw_disconnect(rp);
-    sofree(so);
-    soisdisconnected(so);
+	raw_disconnect(rp);
+	sofree(so);
+	soisdisconnected(so);
 
-    return (0);
+	return (0);
 }
 
 
 int
 natpt_uattach(struct socket *so, int proto, struct proc *p)
 {
-	int privileged;
+	int		 error;
 
-#if defined(__NetBSD__) || (defined(__FreeBSD__) && __FreeBSD__ == 3)
-	privileged = (p == 0 || suser(p->p_ucred, &p->p_acflag)) ? 0 : 1;
-#elif defined(__FreeBSD__) && __FreeBSD__ >= 4
-	privileged = (p == 0 || suser(p)) ? 0 : 1;
-#else
-	privileged = (so->so_state & SS_PRIV);
-#endif
+	if (p && (error = suser(p)) != 0)
+		return (error);
 
-	if (privileged)
-		return (natpt_attach(so, proto));
-	else
-		return(EPERM);
+	return (natpt_attach(so, proto));
 }
 
 
 int
 natpt_ubind(struct socket *so, struct sockaddr *nam, struct proc *p)
 {
-    return (EINVAL);
+	return (EINVAL);
 }
 
 
 int
 natpt_uconnect(struct socket *so, struct sockaddr *nam, struct proc *p)
 {
-    return (EINVAL);
+	return (EINVAL);
 }
 
 
@@ -367,226 +225,123 @@ int
 natpt_ucontrol(struct socket *so, u_long cmd, caddr_t data, struct ifnet *ifp,
 	       struct proc *p)
 {
-    return (natpt_control(so, cmd, data, ifp));
+	return (natpt_control(so, cmd, data, ifp));
 }
 
 
 int
 natpt_udetach(struct socket *so)
 {
-    struct rawcb *rp = sotorawcb(so);
+	struct rawcb	*rp = sotorawcb(so);
 
-    if (rp == 0)
-	return (EINVAL);
+	if (rp == 0)
+		return (EINVAL);
 
-    return (natpt_detach(so));
+	return (natpt_detach(so));
 }
 
-#endif	/* defined(__FreeBSD__) && __FreeBSD__ >= 3	*/
+#endif	/* __FreeBSD__*/
 
 
 int
 natpt_attach(struct socket *so, int proto)
 {
-    struct rawcb *rp;
-    int	error;
+	struct rawcb	*rp;
+	int		 error;
 
-    if (so->so_pcb == NULL)
-    {
-	MALLOC(rp, struct rawcb *, sizeof(*rp), M_PCB, M_WAITOK);
-	so->so_pcb = (caddr_t)rp;
-	bzero(rp, sizeof(*rp));
-    }
+	if (so->so_pcb == NULL)	{
+		MALLOC(rp, struct rawcb *, sizeof(*rp), M_PCB, M_WAITOK);
+		if (rp == NULL)
+			return (ENOBUFS);
+		bzero(rp, sizeof(*rp));
+		so->so_pcb = (caddr_t)rp;
+	}
 
-    if ((rp = sotorawcb(so)) == NULL)
-	return (ENOBUFS);
-    if ((error = soreserve(so, natpt_sendspace, natpt_recvspace)))
-	return (error);
+	if ((rp = sotorawcb(so)) == NULL)
+		return (ENOBUFS);
+	if ((error = soreserve(so, natpt_sendspace, natpt_recvspace)))
+		return (error);
 
-    rp->rcb_socket = so;
-    rp->rcb_proto.sp_family = so->so_proto->pr_domain->dom_family;
-    rp->rcb_proto.sp_protocol = proto;
-#if defined(__bsdi__) || defined(__FreeBSD__) && __FreeBSD__ <= 2
-    insque(rp, &ptrcb);
-#else
-    LIST_INSERT_HEAD(&ptrcb, rp, rcb_list);
-#endif
+	rp->rcb_socket = so;
+	rp->rcb_proto.sp_family = so->so_proto->pr_domain->dom_family;
+	rp->rcb_proto.sp_protocol = proto;
+	LIST_INSERT_HEAD(&ptrcb, rp, list);
 
-    /* The socket is always "connected" because
-	  we always know "where" to send the packet */
-    rp->rcb_faddr = &natpt_dst;
-    soisconnected(so);
-
-    return (0);
+	return (0);
 }
 
 
 int
 natpt_detach(struct socket *so)
 {
-    struct rawcb	*rp = sotorawcb(so);
+	struct rawcb	*rp = sotorawcb(so);
 
-    if (rp == NULL)
-	return (ENOTCONN);
+	if (rp == NULL)
+		return (ENOTCONN);
 
-    so->so_pcb = NULL;
-    sofree(so);
+	so->so_pcb = NULL;
+	sofree(so);
 
-#if defined(__bsdi__) || defined(__FreeBSD__) && __FreeBSD__ <= 2
-    remque(rp);
-#else
-    LIST_REMOVE(rp, rcb_list);
-#endif
-    if (rp->rcb_laddr)
-	m_freem(dtom(rp->rcb_laddr));
-    if (rp->rcb_faddr)
-	m_freem(dtom(rp->rcb_faddr));
-    FREE(rp, M_PCB);
+	LIST_REMOVE(rp, list);
 
-    return (0);
+	if (rp->rcb_laddr)
+		m_freem(dtom(rp->rcb_laddr));
+	if (rp->rcb_faddr)
+		m_freem(dtom(rp->rcb_faddr));
+	FREE(rp, M_PCB);
+
+	return (0);
 }
 
 
 int
 natpt_disconnect(struct socket *so)
 {
-    struct rawcb	*rp = sotorawcb(so);
+	struct rawcb	*rp = sotorawcb(so);
 
-    if (rp == NULL)
-	return (EINVAL);
+	if (rp == NULL)
+		return (EINVAL);
 
-    if (rp->rcb_faddr == NULL)
-	return (ENOTCONN);
+	if (rp->rcb_faddr == NULL)
+		return (ENOTCONN);
 
-    rp->rcb_faddr = NULL;
-    raw_disconnect(rp);
-    soisdisconnected(so);
+	rp->rcb_faddr = NULL;
+	raw_disconnect(rp);
+	soisdisconnected(so);
 
-    return (0);
+	return (0);
 }
 
 
 int
 natpt_control(struct socket *so, int cmd, caddr_t data, struct ifnet *ifp)
 {
-    if (natpt_initialized == 0)
-	natpt_initialize();
+	switch (cmd) {
+	case SIOCSETPREFIX:
+		return (natpt_setPrefix(data));
 
-    switch (cmd)
-    {
-      case SIOCSETIF:		return (_natptSetIf(data));
-      case SIOCGETIF:		return (_natptGetIf(data));
-      case SIOCENBTRANS:	return (_natptEnableTrans(data));
-      case SIOCDSBTRANS:	return (_natptDisableTrans(data));
-      case SIOCSETRULE:		return (_natptSetRule(data));
-      case SIOCFLUSHRULE:	return (_natptFlushRule(data));
-      case SIOCSETPREFIX:	return (_natptSetPrefix(data));
-      case SIOCSETVALUE:	return (_natptSetValue(data));
+	case SIOCSETRULES:
+		return (natpt_setRules(data));
 
-      case SIOCTESTLOG:		return (_natptTestLog(data));
+	case SIOCFLUSHRULE:
+		return (natpt_flushRules(data));
 
-      case SIOCBREAK:		return (_natptBreak());
-    }
+	case SIOCENBTRANS:
+	case SIOCDSBTRANS:
+		return (natpt_setOnOff(cmd));
 
-    return (EINVAL);
-}
+	case SIOCSETVALUE:
+		return (natpt_setValue(data));
 
+	case SIOCTESTLOG:
+		return (natpt_testLog(data));
 
-/*
- *
- */
+	case SIOCBREAK:
+		return (natpt_break());
 
-static int
-_natptSetIf(caddr_t addr)
-{
-    struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
-    struct ifBox	*ifb;
-
-    if (((ifb = natpt_asIfBox(mbx->m_ifName)) == NULL)
-      && ((ifb = natpt_setIfBox(mbx->m_ifName)) == NULL))
-     return (ENXIO);
-
-    if (ifb->side != noSide)
-    {
-	char	WoW[LBFSZ];
-
-	sprintf(WoW, "[natpt]: interface `%s\' already configured.", mbx->m_ifName);
-	natpt_logMsg(LOG_WARNING, WoW, strlen(WoW));
-	return (EALREADY);
-    }
-
-    {
-	char	 WoW[LBFSZ];
-	char	*s;
-
-	if (mbx->flags == IF_EXTERNAL)
-	    ifb->side = outSide, s = "outside";
-	else
-	    ifb->side = inSide,	 s = "inside";
-
-	sprintf(WoW, "[natpt]: interface `%s\' set as %s.", mbx->m_ifName, s);
-	natpt_logMsg(LOG_INFO, WoW, strlen(WoW));
-    }
-
-    return (0);
-}
-
-
-static int
-_natptGetIf(caddr_t addr)
-{
-    struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
-    struct ifBox	*ifb;
-
-    if (((ifb = natpt_asIfBox(mbx->m_ifName)) == NULL)
-      && ((ifb = natpt_setIfBox(mbx->m_ifName)) == NULL))
-     return (ENXIO);
-
-    {
-	switch (ifb->side)
-	{
-	  case outSide:	mbx->flags |= IF_EXTERNAL;	break;
-	  case inSide:	mbx->flags |= IF_INTERNAL;	break;
-	  default:	mbx->flags  = -1;		break;
+	default:
+		break;
 	}
-    }
 
-    return (0);
+	return (EINVAL);
 }
-
-
-static int
-_natptSetValue(caddr_t addr)
-{
-    struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
-
-    switch (mbx->flags)
-    {
-      case NATPT_DEBUG:
-	natpt_debug = *((u_int *)mbx->m_aux);
-	break;
-
-      case NATPT_DUMP:
-	natpt_dump = *((u_int *)mbx->m_aux);
-	break;
-    }
-
-    return (0);
-}
-
-
-static int
-_natptTestLog(caddr_t addr)
-{
-    char		*fragile;
-    struct natpt_msgBox	*mbox = (struct natpt_msgBox *)addr;
-
-    MALLOC(fragile, char *, mbox->size, M_NATPT, M_WAITOK);
-    copyin(mbox->freight, fragile, mbox->size);
-
-    natpt_logMsg(LOG_DEBUG, fragile, mbox->size);
-
-    FREE(fragile, M_NATPT);
-    return (0);
-}
-

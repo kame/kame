@@ -1,7 +1,7 @@
-/*	$KAME: natpt_soctl.h,v 1.10 2001/05/05 11:19:04 fujisawa Exp $	*/
+/*	$KAME: natpt_soctl.h,v 1.11 2001/09/02 19:06:26 fujisawa Exp $	*/
 
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -39,7 +39,7 @@
 #define SIOCGETIF	_IOWR('n',   1, struct natpt_msgBox)	/* Get interface sidde	*/
 #define	SIOCENBTRANS	_IOW ('n',   2, struct natpt_msgBox)	/* Enable  translation	*/
 #define SIOCDSBTRANS	_IOW ('n',   3, struct natpt_msgBox)	/* Disable translation	*/
-#define	SIOCSETRULE	_IOW ('n',   4, struct natpt_msgBox)	/* Set rule		*/
+#define	SIOCSETRULES	_IOW ('n',   4, struct natpt_msgBox)	/* Set rules		*/
 #define	SIOCGETRULE	_IOWR('n',   5, struct natpt_msgBox)	/* Get rule		*/
 #define SIOCFLUSHRULE	_IOW ('n',   6, struct natpt_msgBox)	/* Flush rule		*/
 #define	SIOCSETPREFIX	_IOW ('n',   8, struct natpt_msgBox)	/* Set prefix		*/
@@ -52,38 +52,23 @@
 #define SIOCBREAK	_IO  ('n', 255)				/* stop			*/
 
 
-typedef	struct natpt_msgBox				/* sizeof():  44[byte]	*/
+struct natpt_msgBox
 {
-    int		 flags;
-/* in case SIOC(GET|SET)IF		*/
-#define	IF_EXTERNAL		(0x01)
-#define	IF_INTERNAL		(0x02)
+	int	size;
+	int	flags;
+#define NATPT_FLUSH		0
+#define NATPT_FLUSHALL		1
 
-/* in case SIOT(SET|GET)RULE		*/
-#ifndef NATPT_STATIC
-#define	NATPT_STATIC		(0x01)
-#define	NATPT_DYNAMIC		(0x02)
-#endif
+#define	NATPT_DEBUG		1
+#define	NATPT_DUMP		2
 
-/* in case SIOCFLUSHRULE ... bitwise	*/
-#define	FLUSH_STATIC		(0x01)
-#define	FLUSH_DYNAMIC		(0x02)
+	caddr_t	freight;
+	union {
+		u_int		M_uint;
+		struct in6_addr	M_in6addr;
+	}	M_data;
+};
 
-/* in case SIOC(GET|SET)PREFIX		*/
-#define	PREFIX_NATPT		(0x02)
 
-/* in case SIOC(GET|SET)VALUE		*/
-#define	NATPT_DEBUG		(0x01)		/* natpt_debug := <value>	*/
-#define	NATPT_DUMP		(0x02)		/* natpt_dump  := <value>	*/
-
-    int		 size;				/* sizeof(*freight)		*/
-    char	*freight;
-    union
-    {
-	char	 M_ifName[IFNAMSIZ];
-	char	 M_aux[32];
-    }		 M_dat;
-}   natpt_msgBox;
-
-#define	m_ifName	M_dat.M_ifName
-#define	m_aux		M_dat.M_aux
+#define	m_uint		M_data.M_uint
+#define m_in6addr	M_data.M_in6addr

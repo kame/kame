@@ -1,7 +1,7 @@
-/*	$KAME: natpt_rule.c,v 1.19 2001/07/12 07:58:08 fujisawa Exp $	*/
+/*	$KAME: natpt_rule.c,v 1.20 2001/09/02 19:06:26 fujisawa Exp $	*/
 
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,60 +29,37 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/errno.h>
+#ifdef __FreeBSD__
+#include "opt_natpt.h"
+#endif
+
 #include <sys/param.h>
+#include <sys/ioccom.h>
 #include <sys/malloc.h>
 #include <sys/mbuf.h>
+#include <sys/proc.h>
+#include <sys/queue.h>
 #include <sys/socket.h>
 #include <sys/syslog.h>
 #include <sys/systm.h>
 
 #include <net/if.h>
-
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
+#include <netinet/ip6.h>
 #include <netinet/tcp.h>
 
-#include <netinet/ip6.h>
-#if (defined(__FreeBSD__) && __FreeBSD__ < 3) || defined(__bsdi__)
-#include <netinet6/tcp6.h>
-#endif
-
 #include <netinet6/in6_var.h>
-
 #include <netinet6/natpt_defs.h>
-#include <netinet6/natpt_list.h>
 #include <netinet6/natpt_log.h>
 #include <netinet6/natpt_soctl.h>
 #include <netinet6/natpt_var.h>
 
 
-/*
- *
- */
+TAILQ_HEAD(,cSlot)	csl_head;
 
-Cell		*natptStatic;		/* list of struct _cSlot	*/
-Cell		*natptDynamic;		/* list of struct _cSlot	*/
-Cell		*natptFaith;		/* list of struct _cSlot	*/
-
-int		 matchIn4addr		__P((struct _cv *, struct pAddr *));
-int		 matchIn6addr		__P((struct _cv *, struct pAddr *));
-static void	 _flushPtrRules		__P((struct _cell **));
-
-
-extern	struct in6_addr	 faith_prefix;
-extern	struct in6_addr	 faith_prefixmask;
-extern	struct in6_addr	 natpt_prefix;
-extern	struct in6_addr	 natpt_prefixmask;
-
-extern	int	toOneself4	__P((struct ifBox *, struct _cv *));
-extern	void	setMTU		__P((void));
-
-static	void	natpt_in4_len2mask	__P((struct in_addr *, int));
-
-
-#if defined(__FreeBSD__) && __FreeBSD__ >= 3
+#ifdef __FreeBSD__
 MALLOC_DECLARE(M_NATPT);
 #endif
 
@@ -91,408 +68,190 @@ MALLOC_DECLARE(M_NATPT);
  *
  */
 
-struct _cSlot	*
-lookingForIncomingV4Rule(struct ifBox *ifb, struct _cv *cv)
+static int	 natpt_matchIn4addr	__P((struct pcv *, struct pAddr *));
+static int	 natpt_matchIn6addr	__P((struct pcv *, struct pAddr *));
+
+
+/*
+ *
+ */
+
+struct cSlot *
+natpt_lookForRule6(struct pcv *cv6)
 {
-    Cell		*p;
-    struct _cSlot	*acs;
+	const char	*fn = __FUNCTION__;
 
-    for (p = natptStatic; p; p = CDR(p))
-    {
-	acs = (struct _cSlot *)CAR(p);
+	struct cSlot	*acs;
 
-	if (isOn(acs->dir, NATPT_INBOUND)
-	    && ((acs->proto == 0)
-		|| (acs->proto == cv->ip_payload))
-	    && (matchIn4addr(cv, &acs->remote) != 0))
-	{
-	    if (isDump(D_MATCHINGRULE4))
-	    {
-		char	Wow[256];
+	for (acs = TAILQ_FIRST(&csl_head);
+	     acs;
+	     acs = TAILQ_NEXT(acs, csl_list)) {
+		if ((acs->proto != 0)
+		    && (acs->proto != cv6->ip_p))
+			continue;
 
-		sprintf(Wow, "lookingForIncomingV4Rule(): %s", ifb->ifName);
-		natpt_logIp4(LOG_DEBUG, cv->_ip._ip4, Wow);
-	    }
-	    return (acs);
+		if (acs->local.sa_family != AF_INET6)
+			continue;
+
+		if (natpt_matchIn6addr(cv6, &acs->local) != 0) {
+			if (isDump(D_MATCHINGRULE6))
+				natpt_logIp6(LOG_DEBUG, cv6->ip.ip6, "%s():", fn);
+			cv6->fromto = NATPT_FROM;
+			return (acs);
+		}
 	}
-    }
-
-    for (p = natptDynamic; p; p = CDR(p))
-    {
-	acs = (struct _cSlot *)CAR(p);
-	if (isOn(acs->dir, NATPT_INBOUND)
-	    && ((acs->proto == 0)
-		|| (acs->proto == cv->ip_payload))
-	    && (matchIn4addr(cv, &acs->remote) != 0))
-	{
-	    if (isDump(D_MATCHINGRULE4))
-		natpt_logIp4(LOG_DEBUG, cv->_ip._ip4, NULL);
-	    return (acs);
-	}
-    }
-
-    return (NULL);
-}
-
-
-struct _cSlot	*
-lookingForOutgoingV4Rule(struct ifBox *ifb, struct _cv *cv)
-{
-    Cell		*p;
-    struct _cSlot	*acs;
-
-    /*
-     * If incoming IPv4 packet is addressed to oneself,
-     * this packet is not subject to translate.
-     */
-    if ((natpt_gotoOneself == TRUE)
-	&& toOneself4(ifb, cv))
-	return (NULL);					/* goto ours	*/
-
-    for (p = natptStatic; p; p = CDR(p))
-    {
-	acs = (struct _cSlot *)CAR(p);
-
-	if (isOn(acs->dir, NATPT_OUTBOUND)
-	    && (matchIn4addr(cv, &acs->local) != 0))
-	{
-	    if (isDump(D_MATCHINGRULE4))
-	    {
-		char	Wow[256];
-
-		sprintf(Wow, "lookingForOutgoingV4Rule(): %s", ifb->ifName);
-		natpt_logIp4(LOG_DEBUG, cv->_ip._ip4, Wow);
-	    }
-	    return (acs);
-	}
-    }
-
-    for (p = natptDynamic; p; p = CDR(p))
-    {
-	acs = (struct _cSlot *)CAR(p);
-	if (isOn(acs->dir,NATPT_OUTBOUND)
-	    && (matchIn4addr(cv, &acs->local) != 0))
-	{
-	    if (isDump(D_MATCHINGRULE4))
-		natpt_logIp4(LOG_DEBUG, cv->_ip._ip4, NULL);
-	    return (acs);
-	}
-    }
-
-    return (NULL);
-}
-
-
-struct _cSlot	*
-lookingForIncomingV6Rule(struct ifBox *ifb, struct _cv *cv)
-{
-    Cell		*p;
-    struct _cSlot	*acs;
-
-    for (p = natptStatic; p; p = CDR(p))
-    {	
-	acs = (struct _cSlot *)CAR(p);
-	if ((acs->dir == NATPT_INBOUND)
-	    && (matchIn6addr(cv, &acs->remote)) != 0)
-	    return (acs);
-    }
-
-    for (p = natptDynamic; p; p = CDR(p))
-    {	
-	acs = (struct _cSlot *)CAR(p);
-	if ((acs->dir == NATPT_INBOUND)
-	    && (matchIn6addr(cv, &acs->remote)) != 0)
-	    return (acs);
-    }
-
-    return (NULL);
-}
-
-
-struct _cSlot	*
-lookingForOutgoingV6Rule(struct ifBox *ifb, struct _cv *cv)
-{
-    Cell		*p;
-    struct _cSlot	*acs;
-
-    for (p = natptStatic; p; p = CDR(p))
-    {	
-	acs = (struct _cSlot *)CAR(p);
-	if ((acs->dir == NATPT_OUTBOUND)
-	    && ((acs->proto == 0)
-		|| (acs->proto == cv->ip_payload))
-	    && (matchIn6addr(cv, &acs->local)) != 0)
-	    return (acs);
-    }
-
-    for (p = natptDynamic; p; p = CDR(p))
-    {	
-	acs = (struct _cSlot *)CAR(p);
-	if ((acs->dir == NATPT_OUTBOUND)
-	    && ((acs->proto == 0)
-		|| (acs->proto == cv->ip_payload))
-	    && (matchIn6addr(cv, &acs->local)) != 0)
-	    return (acs);
-    }
-
-    for (p = natptFaith; p; p = CDR(p))
-    {	
-	acs = (struct _cSlot *)CAR(p);
-	if ((acs->dir == NATPT_OUTBOUND)
-	    && ((acs->proto == 0)
-		|| (acs->proto == cv->ip_payload))
-	    && (matchIn6addr(cv, &acs->local)) != 0)
-	    return (acs);
-    }
-
-    return (NULL);
-}
-
-
-int
-matchIn4addr(struct _cv *cv4, struct pAddr *from)
-{
-    struct in_addr	in4from = cv4->_ip._ip4->ip_src;
-    struct in_addr	in4masked;
-
-    if (from->sa_family != AF_INET)
-	return (0);
-
-    switch (from->ad.type)
-    {
-      case ADDR_ANY:						goto port;
-
-      case ADDR_SINGLE:
-	if (in4from.s_addr == from->in4Addr.s_addr)		goto port;
-	return (0);
-
-      case ADDR_MASK:
-	in4masked.s_addr = in4from.s_addr & from->in4Mask.s_addr;
-	if (in4masked.s_addr == from->in4Addr.s_addr)		goto port;
-	return (0);
-
-      case ADDR_RANGE:
-	if ((in4from.s_addr >= from->in4RangeStart.s_addr)
-	    && (in4from.s_addr <= from->in4RangeEnd.s_addr))	goto port;
-	return (0);
-
-      default:
-	return (0);
-    }
-
-port:;
-    if ((cv4->ip_payload != IPPROTO_UDP)
-	&& (cv4->ip_payload != IPPROTO_TCP)
-	&& (from->_port0 == 0)
-	&& (from->_port1 == 0))					return (1);
-
-    if (from->_port0 == 0)					return (1);
-
-    if (from->_port1 == 0)
-    {
-	if ((cv4->_payload._tcp4->th_dport == from->_port0))	return (1);
-    }
-    else
-    {
-	u_short	dport = ntohs(cv4->_payload._tcp4->th_dport);
-	u_short	port0 = ntohs(from->_port0);
-	u_short	port1 = ntohs(from->_port1);
-
-	if ((dport >= port0)
-	    && (dport <= port1))				return (1);
-    }
-
-    return (0);
-}
-
-
-int
-matchIn6addr(struct _cv *cv6, struct pAddr *from)
-{
-    struct in6_addr		*in6from = &cv6->_ip._ip6->ip6_src;
-    struct in6_addr		 in6masked;
-
-    if (from->sa_family != AF_INET6)
-	return (0);
-
-    switch (from->ad.type)
-    {
-      case ADDR_ANY:						goto port;
-
-      case ADDR_SINGLE:
-	if (IN6_ARE_ADDR_EQUAL(in6from, &from->in6Addr))	goto port;
-	return (0);
-
-      case ADDR_MASK:
-	in6masked.s6_addr32[0] = in6from->s6_addr32[0] & from->in6Mask.s6_addr32[0];
-	in6masked.s6_addr32[1] = in6from->s6_addr32[1] & from->in6Mask.s6_addr32[1];
-	in6masked.s6_addr32[2] = in6from->s6_addr32[2] & from->in6Mask.s6_addr32[2];
-	in6masked.s6_addr32[3] = in6from->s6_addr32[3] & from->in6Mask.s6_addr32[3];
 	
-	if (IN6_ARE_ADDR_EQUAL(&in6masked, &from->in6Addr))	goto port;
-	return (0);
-
-      default:
-	return (0);
-    }
-
-port:;
-    if ((cv6->ip_payload != IPPROTO_UDP)
-	&& (cv6->ip_payload != IPPROTO_TCP))			return (1);
-
-    if (from->_port0 == 0)					return (1);
-
-    if (from->_port1 == 0)
-    {
-	if (cv6->_payload._tcp6->th_dport == from->_port0)	return (1);
-    }
-    else
-    {
-	u_short	dport = ntohs(cv6->_payload._tcp6->th_dport);
-#ifdef UnusedVariable
-	u_short	port0 = ntohs(from->_port0);
-	u_short	port1 = ntohs(from->_port1);
-#endif
-
-	if ((dport >= from->_port0)
-	    && (dport <= from->_port1))				return (1);
-    }
-
-
-    return (0);
-}
-/*
- *
- */
-
-int
-_natptEnableTrans(caddr_t addr)
-{
-    char	Wow[64];
-
-    sprintf(Wow, "map enable");
-    natpt_logMsg(LOG_INFO, Wow, strlen(Wow));
-
-    setMTU();
-    ip6_protocol_tr = 1;
-    return (0);
+	return (NULL);
 }
 
 
-int
-_natptDisableTrans(caddr_t addr)
+struct cSlot *
+natpt_lookForRule4(struct pcv *cv4)
 {
-    char	Wow[64];
+	const char	*fn = __FUNCTION__;
 
-    sprintf(Wow, "map disable");
-    natpt_logMsg(LOG_INFO, Wow, strlen(Wow));
+	struct cSlot	*csl;
 
-    ip6_protocol_tr = 0;
-    return (0);
-}
+	for (csl = TAILQ_FIRST(&csl_head);
+	     csl;
+	     csl = TAILQ_NEXT(csl, csl_list)) {
+		if ((csl->proto != 0)
+		    && (csl->proto != cv4->ip_p))
+			continue;
 
+		if (csl->local.sa_family != AF_INET)
+			continue;
 
-int
-_natptSetRule(caddr_t addr)
-{
-    struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
-    struct _cSlot	*cst;
-    Cell		**anchor;
-
-#if	0
-    if (((ifb = natpt_asIfBox(mbx->m_ifName)) == NULL)
-      && ((ifb = natpt_setIfBox(mbx->m_ifName)) == NULL))
-     return (ENXIO);
-#endif
-
-    MALLOC(cst, struct _cSlot *, sizeof(struct _cSlot), M_NATPT, M_WAITOK);
-    copyin(mbx->freight, cst, sizeof(struct _cSlot));
-
-    {
-	struct pAddr	*from;
-
-	from = &cst->local;
-	if (cst->dir == NATPT_INBOUND)			/* inbound only	*/
-	    from = &cst->remote;
-
-	if (from->ad.type == ADDR_MASK)
-	{
-	    if (from->sa_family == AF_INET)
-	    {
-		natpt_in4_len2mask(&from->in4Mask, cst->prefix);
-		from->in4Addr.s_addr &= from->in4Mask.s_addr;
-	    }
-	    else
-	    {
-		in6_prefixlen2mask(&from->in6Mask, cst->prefix);
-		from->in6Addr.s6_addr32[0]
-		    = from->in6Addr.s6_addr32[0] & from->in6Mask.s6_addr32[0];
-		from->in6Addr.s6_addr32[1]
-		    = from->in6Addr.s6_addr32[1] & from->in6Mask.s6_addr32[1];
-		from->in6Addr.s6_addr32[2]
-		    = from->in6Addr.s6_addr32[2] & from->in6Mask.s6_addr32[2];
-		from->in6Addr.s6_addr32[3]
-		    = from->in6Addr.s6_addr32[3] & from->in6Mask.s6_addr32[3];
-	    }
+		if (natpt_matchIn4addr(cv4, &csl->local) != 0) {
+			if (isDump(D_MATCHINGRULE4))
+				natpt_logIp4(LOG_DEBUG, cv4->ip.ip4, "%s():", fn);
+			cv4->fromto = NATPT_FROM;
+			return (csl);
+		}
 	}
-    }
-
-    natpt_log(LOG_CSLOT, LOG_DEBUG, (void *)cst, sizeof(struct _cSlot));
-
-    anchor = &natptStatic;
-    if (cst->type == NATPT_DYNAMIC)
-	anchor = &natptDynamic;
-
-    LST_hookup_list(anchor, cst);
-
-    return (0);
+	
+	return (NULL);
 }
 
 
-int
-_natptFlushRule(caddr_t addr)
+static int
+natpt_matchIn6addr(struct pcv *cv6, struct pAddr *from)
 {
-    struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
+	struct in6_addr	*in6from = &cv6->ip.ip6->ip6_src;
+	struct in6_addr	 match;
 
-    if (mbx->flags & FLUSH_STATIC)
-	_flushPtrRules(&natptStatic);
+	switch (from->aType) {
+	case ADDR_ANY:
+		goto proto;
 
-    if (mbx->flags & FLUSH_DYNAMIC)
-	_flushPtrRules(&natptDynamic);
+	case ADDR_SINGLE:
+		if (IN6_ARE_ADDR_EQUAL(in6from, &from->in6Addr))
+			goto proto;
+		return (0);
 
-    return (0);
+	case ADDR_MASK:
+		bcopy(in6from, &match, sizeof(struct in6_addr));
+		match.s6_addr32[0] &= from->in6Mask.s6_addr32[0];
+		match.s6_addr32[1] &= from->in6Mask.s6_addr32[1];
+		match.s6_addr32[2] &= from->in6Mask.s6_addr32[2];
+		match.s6_addr32[3] &= from->in6Mask.s6_addr32[3];
+	
+		if (IN6_ARE_ADDR_EQUAL(&match, &from->in6Addr))
+			goto proto;
+		return (0);
+	
+	default:
+		return (0);
+	}
+
+ proto:;
+	if ((cv6->ip_p != IPPROTO_UDP)
+	    && (cv6->ip_p != IPPROTO_TCP))
+		return (1);
+
+	if (from->port[0] == 0) {
+		if (from->port[1] == 0) {
+			return (1);
+		} else {
+			if (cv6->pyld.tcp6->th_dport == from->port[1])
+				return (1);
+		}
+	} else {
+		if (from->port[1] == 0) {
+			if (cv6->pyld.tcp6->th_sport == from->port[0])
+				return (1);
+		} else {
+			u_short	dport = ntohs(cv6->pyld.tcp6->th_sport);
+			u_short	port0 = ntohs(from->port[0]);
+			u_short	port1 = ntohs(from->port[1]);
+
+			if ((dport >= port0) && (dport <= port1))
+				return (1);
+		}
+	}
+
+	return (0);
 }
 
 
-int
-_natptSetPrefix(caddr_t addr)
+static int
+natpt_matchIn4addr(struct pcv *cv4, struct pAddr *from)
 {
-    struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
-    struct pAddr	*load;
+	struct in_addr	in4from = cv4->ip.ip4->ip_src;
+	struct in_addr	in4masked;
 
-    MALLOC(load, struct pAddr *, sizeof(struct pAddr), M_NATPT, M_WAITOK);
-    copyin(mbx->freight, load, SZSIN6 * 2);
+	switch (from->aType) {
+	case ADDR_ANY:
+		goto proto;
 
-    if (mbx->flags & PREFIX_NATPT)
-    {
-	natpt_prefix	 =  load->addr[0].in6;
-	natpt_prefixmask =  load->addr[1].in6;
+	case ADDR_SINGLE:
+		if (in4from.s_addr == from->in4Addr.s_addr)
+			goto proto;
+		return (0);
 
-	natpt_logIN6addr(LOG_INFO, "NATPT prefix: ", &natpt_prefix);
-	natpt_logIN6addr(LOG_INFO, "NATPT prefixmask: ", &natpt_prefixmask);
-    }
+	case ADDR_MASK:
+		in4masked.s_addr = in4from.s_addr & from->in4Mask.s_addr;
+		if (in4masked.s_addr == from->in4Addr.s_addr)
+			goto proto;
+		return (0);
 
-    FREE(load, M_NATPT);
-    return (0);
-}
+	case ADDR_RANGE:
+		if ((in4from.s_addr >= from->in4RangeStart.s_addr)
+		    && (in4from.s_addr <= from->in4RangeEnd.s_addr))
+			goto proto;
+		return (0);
 
+	default:
+		return (0);
+	}
 
-int
-_natptBreak()
-{
-    printf("break");
+ proto:;
+	if ((cv4->ip_p != IPPROTO_UDP)
+	    && (cv4->ip_p != IPPROTO_TCP))
+		return (1);
 
-    return (0);
+	if (from->port[0] == 0) {
+		if (from->port[1] == 0) {
+			return (1);
+		} else {
+			if (cv4->pyld.tcp4->th_dport == from->port[1])
+				return (1);
+		}
+	} else {
+		if (from->port[1] == 0) {
+			if (cv4->pyld.tcp4->th_sport == from->port[0])
+				return (1);
+		} else {
+			u_short	dport = ntohs(cv4->pyld.tcp4->th_sport);
+			u_short	port0 = ntohs(from->port[0]);
+			u_short	port1 = ntohs(from->port[1]);
+
+			if ((dport >= port0) && (dport <= port1))
+				return (1);
+		}
+	}
+
+	return (0);
 }
 
 
@@ -500,30 +259,99 @@ _natptBreak()
  *
  */
 
-static void
-_flushPtrRules(struct _cell **anchor)
+int
+natpt_setRules(caddr_t addr)
 {
-    struct _cell	*p0, *p1;
-    struct _cSlot	*cslt;
+	int			 s;
+	struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
+	struct cSlot		*cst;
+	struct pAddr		*from = NULL;
 
-    p0 = *anchor;
-    while (p0)
-    {
-	p1 = p0;
-	p0 = CDR(p0);
+	MALLOC(cst, struct cSlot *, sizeof(struct cSlot), M_NATPT, M_NOWAIT);
+	if (cst == NULL)
+		return (ENOBUFS);
 
-	cslt = (struct _cSlot *)CAR(p1);
-	FREE(cslt, M_NATPT);
-	LST_free(p1);
-    }
+	copyin(mbx->freight, cst, sizeof(struct cSlot));
+	from = &cst->local;
+	if (from->aType == ADDR_MASK) {
+		switch (from->sa_family) {
+		case AF_INET:
+			from->in4Mask.s_addr = htonl(0xffffffff << (32 - from->prefix));
+			from->in4Addr.s_addr &= from->in4Mask.s_addr;
+			break;
 
-    *anchor = NULL;
+		case AF_INET6:
+			in6_prefixlen2mask(&from->in6Mask, from->prefix);
+			from->in6Addr.s6_addr32[0] &= from->in6Mask.s6_addr32[0];
+			from->in6Addr.s6_addr32[1] &= from->in6Mask.s6_addr32[1];
+			from->in6Addr.s6_addr32[2] &= from->in6Mask.s6_addr32[2];
+			from->in6Addr.s6_addr32[3] &= from->in6Mask.s6_addr32[3];
+			break;
+
+		default:
+		}
+	}
+
+	natpt_log(LOG_CSLOT, LOG_DEBUG, (void *)cst, sizeof(struct cSlot));
+
+	s = splnet();
+	TAILQ_INSERT_TAIL(&csl_head, cst, csl_list);
+	splx(s);
+
+	return (0);
 }
 
-static void
-natpt_in4_len2mask(mask, len)
-    struct in_addr *mask;
-    int len;
+
+int
+natpt_flushRules(caddr_t addr)
 {
-	mask->s_addr = htonl(0xffffffff << (32 - len));
+	struct natpt_msgBox	*mbx = (struct natpt_msgBox *)addr;
+
+	struct cSlot		*csl, *csln;
+
+	csl = TAILQ_FIRST(&csl_head);
+	while (csl) {
+		csln = TAILQ_NEXT(csl, csl_list);
+		if ((csl->type == NATPT_RULE_STATIC)
+		    || ((csl->type == NATPT_RULE_DYNAMIC)
+			&& (mbx->flags == NATPT_FLUSHALL))) {
+			TAILQ_REMOVE(&csl_head, csl, csl_list);
+			FREE(csl, M_NATPT);
+		}
+		csl = csln;
+	}
+
+	return (0);
+}
+
+
+int
+natpt_setOnOff(int cmd)
+{
+	const char	*fn = __FUNCTION__;
+
+	natpt_logMsg(LOG_INFO, "%s():", fn);
+
+	switch (cmd) {
+	case SIOCENBTRANS:
+		ip6_protocol_tr = TRUE;
+		break;
+
+	case SIOCDSBTRANS:
+		ip6_protocol_tr = FALSE;
+		break;
+	}
+	
+	return (0);
+}
+
+
+/*
+ *
+ */
+
+void
+natpt_init_rule()
+{
+	TAILQ_INIT(&csl_head);
 }

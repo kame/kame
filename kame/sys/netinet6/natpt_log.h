@@ -1,7 +1,7 @@
-/*	$KAME: natpt_log.h,v 1.7 2000/04/19 06:48:57 fujisawa Exp $	*/
+/*	$KAME: natpt_log.h,v 1.8 2001/09/02 19:06:25 fujisawa Exp $	*/
 
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,27 +37,24 @@
 
 /*  Header at beginning of logged packet.				*/
 
-struct	l_pkt
-{
-    char	ifName[IFNAMSIZ];
-    char	__buf[4];
+struct	l_pkt {
+	char	__buf[4];
 };
 
 
 /*  Header at beginning of active Transration Table			*/
 
-struct	l_att
-{
-    u_int		_stub;
+struct	l_att {
+	u_int		_stub;
 #define	ATT_ALLOC	(0)
 #define	ATT_REMOVE	(1)
 #define	ATT_FASTEN	(2)
 #define	ATT_UNFASTEN	(3)
 #define	ATT_REGIST	(4)
-    caddr_t		_addr;
+	caddr_t		_addr;
 #if	0
-    struct  _aTT	_att;
-    struct  _tcpstate	_state;
+	struct	_aTT	_att;
+	struct	_tcpstate	_state;
 #endif
 };
 #endif	/* defined(KERNEL)	*/
@@ -74,52 +71,47 @@ struct	l_att
 #define	MSGSZ	(LBFSZ	- IN6ADDRSZ)		/* max message size	*/
 
 
-enum
-{
-    LOG_MSG,
-    LOG_MBUF,
-    LOG_IP4,
-    LOG_IP6,
-    LOG_IN4ADDR,
-    LOG_IN6ADDR,
-    LOG_CSLOT,
-    LOG_TSLOT,
-    LOG_RULE,
-    LOG_TCPFSM,
+enum {
+	LOG_MSG,
+	LOG_DUMP,
+	LOG_IP4,
+	LOG_IP6,
+	LOG_IN4ADDR,
+	LOG_IN6ADDR,
+	LOG_CSLOT,
+	LOG_TSLOT,
+	LOG_RULE,
+	LOG_TCPFSM,
 };
 
 
-struct	l_hdr
-{
-    u_short	 lh_type;	/* Type of data in this lbuf		*/
-    u_short	 lh_pri;	/* Priorities of thie message		*/
-    size_t	 lh_size;	/* Amount of data in this lbuf		*/
-    u_long	 lh_sec;	/* Timestamp in second			*/
-    u_long	 lh_usec;	/* Timestamp in microsecond		*/
+struct	l_hdr {
+	u_short	 lh_type;	/* Type of data in this lbuf		*/
+	u_short	 lh_pri;	/* Priorities of thie message		*/
+	size_t	 lh_size;	/* Amount of data in this lbuf		*/
+	u_long	 lh_sec;	/* Timestamp in second			*/
+	u_long	 lh_usec;	/* Timestamp in microsecond		*/
 };
 
 
-struct	l_addr
-{
-    char	in6addr[IN6ADDRSZ];
-    char	__msg[MSGSZ];
+struct	l_addr {
+	char	in6addr[IN6ADDRSZ];
+	char	__msg[MSGSZ];
 };
 
 
 /*  Definition of whole lbuf						*/
 
-struct	lbuf
-{
-    struct	l_hdr	l_hdr;
-    union
-    {
+struct	lbuf {
+	struct	l_hdr	l_hdr;
+	union {
 #ifdef _KERNEL
-	struct	l_pkt	l_pkt;
-	struct	l_att	l_att;
+		struct	l_pkt	l_pkt;
+		struct	l_att	l_att;
 #endif	/* defined(_KERNEL)	*/
-	struct	l_addr	__laddr;
-	char		__buf[LBFSZ];
-    }		l_dat;
+		struct	l_addr	__laddr;
+		char		__buf[LBFSZ];
+	}		l_dat;
 };
 
 

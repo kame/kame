@@ -1,7 +1,7 @@
-/*	$KAME: natpt_var.h,v 1.14 2001/07/15 09:42:33 fujisawa Exp $	*/
+/*	$KAME: natpt_var.h,v 1.15 2001/09/02 19:06:27 fujisawa Exp $	*/
 
 /*
- * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
+ * Copyright (C) 1995, 1996, 1997, 1998, 1999, 2000 and 2001 WIDE Project.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,91 +29,62 @@
  * SUCH DAMAGE.
  */
 
-
-extern int		 ip6_protocol_tr;
-extern int		 natpt_initialized;
-extern int		 natpt_gotoOneself;
-extern u_int		 natpt_debug;
-extern u_int		 natpt_dump;
-
-/*	natpt_dispatch.c	*/
-char		*ip4_sprintf			__P((struct in_addr *));
-caddr_t		 natpt_pyldaddr			__P((struct ip6_hdr *, caddr_t, int *));
+extern int		ip6_protocol_tr;
+extern int		natpt_initialized;
+extern u_int		natpt_debug;
+extern u_int		natpt_dump;
+extern struct in6_addr	natpt_prefix;
 
 
-/*	natpt_log.c		*/
-void		 natpt_logMsg			__P((int, void *, size_t));
-void		 natpt_logMBuf			__P((int, struct mbuf *, char *));
-void		 natpt_logIp4			__P((int, struct ip *, char *));
-void		 natpt_logIp6			__P((int, struct ip6_hdr *, char *));
-int		 natpt_log			__P((int, int, void *, size_t));
-int		 natpt_logIN6addr		__P((int, char *, struct in6_addr *));
+/*
+ *
+ */
 
-void		 natpt_debugProbe		__P((void));
-void		 natpt_assert			__P((const char *, int, const char *));
-void		 natpt_initialize		__P((void));
-
-
-/*	natpt_rule.c		*/
-struct _cSlot	*lookingForIncomingV4Rule	__P((struct ifBox *, struct _cv *));
-struct _cSlot	*lookingForOutgoingV4Rule	__P((struct ifBox *, struct _cv *));
-struct _cSlot	*lookingForIncomingV6Rule	__P((struct ifBox *, struct _cv *));
-struct _cSlot	*lookingForOutgoingV6Rule	__P((struct ifBox *, struct _cv *));
-int		 _natptEnableTrans		__P((caddr_t));
-int		 _natptDisableTrans		__P((caddr_t));
-int		 _natptSetRule			__P((caddr_t));
-int		 _natptFlushRule		__P((caddr_t));
-int		 _natptSetPrefix		__P((caddr_t));
-
-int		 _natptBreak			__P((void));
+/*  natpt_dispatch.c  */
+caddr_t		 natpt_pyldaddr		__P((struct ip6_hdr *, caddr_t, int *));
+int		 natpt_setPrefix	__P((caddr_t));
+int		 natpt_setValue		__P((caddr_t));
+int		 natpt_testLog		__P((caddr_t));
+int		 natpt_break		__P((void));
 
 
-struct ifBox	*natpt_asIfBox			__P((char *));
-struct ifBox	*natpt_setIfBox			__P((char *));
+/*  natpt_log.c	 */
+void		 natpt_logMsg		__P((int, char *, ...));
+void		 natpt_logMBuf		__P((int, struct mbuf *, ...));
+void		 natpt_logIp4		__P((int, struct ip *, ...));
+void		 natpt_logIp6		__P((int, struct ip6_hdr *, ...));
+int		 natpt_log		__P((int, int, void *, size_t));
+int		 natpt_logIN6addr	__P((int, char *, struct in6_addr *));
+struct mbuf	*natpt_lbuf		__P((int, int, size_t));
 
 
-/*	natpt_trans.c		*/
-#ifdef NATPT_NAT
-struct mbuf	*translatingIPv4To4		__P((struct _cv *, struct pAddr *));
-struct mbuf	*translatingICMPv4To4		__P((struct _cv *, struct pAddr *));
-struct mbuf	*translatingTCPv4To4		__P((struct _cv *, struct pAddr *));
-struct mbuf	*translatingUDPv4To4		__P((struct _cv *, struct pAddr *));
-#ifdef NATPT_FRAGMENT
-struct mbuf	*translatingIPv4To4frag		__P((struct _cv *, struct pAddr *));
-#endif	/* ifdef NATPT_FRAGMENT	*/
-#endif	/* ifdef NATPT_NAT	*/
-
-struct mbuf	*translatingIPv4To6		__P((struct _cv *, struct pAddr *));
-struct mbuf	*translatingICMPv4To6		__P((struct _cv *, struct pAddr *));
-struct mbuf	*translatingTCPv4To6		__P((struct _cv *, struct pAddr *));
-struct mbuf	*translatingUDPv4To6		__P((struct _cv *, struct pAddr *));
-struct mbuf	*translatingTCPUDPv4To6		__P((struct _cv *, struct pAddr *, struct _cv *));
-
-struct mbuf	*translatingIPv6To4		__P((struct _cv *, struct pAddr *));
-struct mbuf	*translatingICMPv6To4		__P((struct _cv *, struct pAddr *));
-struct mbuf	*translatingTCPv6To4		__P((struct _cv *, struct pAddr *));
-struct mbuf	*translatingUDPv6To4		__P((struct _cv *, struct pAddr *));
-struct mbuf	*translatingTCPUDPv6To4		__P((struct _cv *, struct pAddr *, struct _cv *));
-
-/*	natpt_tslot.c		*/
-struct _tSlot	*lookingForOutgoingV4Hash	__P((struct _cv *));
-struct _tSlot	*lookingForIncomingV4Hash	__P((struct _cv *));
-struct _tSlot	*lookingForOutgoingV6Hash	__P((struct _cv *));
-struct _tSlot	*lookingForIncomingV6Hash	__P((struct _cv *));
-struct _tSlot	*internIncomingV4Hash		__P((int, struct _cSlot *, struct _cv *));
-struct _tSlot	*internOutgoingV4Hash		__P((int, struct _cSlot *, struct _cv *));
-struct _tSlot	*internIncomingV6Hash		__P((int, struct _cSlot *, struct _cv *));
-struct _tSlot	*internOutgoingV6Hash		__P((int, struct _cSlot *, struct _cv *));
-struct pAddr	*remapRemote4Port		__P((struct _cSlot *, struct _cv *, struct pAddr *));
-
-struct _tSlot	*openIncomingV4Conn		__P((int, struct pAddr *, struct pAddr *));
-struct _tSlot	*checkIncomingICMP		__P((struct _cv *));
-
-void		 init_hash			__P((void));
-void		 init_tslot			__P((void));
+/*  natpt_rule.c  */
+struct cSlot	*natpt_lookForRule4	__P((struct pcv *));
+struct cSlot	*natpt_lookForRule6	__P((struct pcv *));
+int		 natpt_setRules		__P((caddr_t));
+int		 natpt_flushRules	__P((caddr_t));
+int		 natpt_setOnOff		__P((int));
+void		 natpt_init_rule	__P((void));
 
 
-/*	natpt_usrreq.c		*/
-void		 natpt_input	__P((struct mbuf *, struct sockproto *,
-				     struct sockaddr *src, struct sockaddr *dst));
+/*  natpt_trans.c  */
+struct mbuf	*natpt_translateIPv6To4	__P((struct pcv *, struct pAddr *));
+struct mbuf	*natpt_translateIPv4To6	__P((struct pcv *, struct pAddr *));
+struct mbuf	*natpt_translateIPv4To4	__P((struct pcv *, struct pAddr *));
 
+
+/*  natpt_tslot.c  */
+struct tSlot	*natpt_lookForHash4	__P((struct pcv *));
+struct tSlot	*natpt_lookForHash6	__P((struct pcv *));
+struct tSlot	*natpt_openIncomingV4Conn __P((int, struct pAddr *, struct pAddr *));
+struct tSlot	*natpt_checkICMP	__P((struct pcv *));
+struct tSlot	*natpt_internHash4	__P((struct cSlot *, struct pcv *));
+struct tSlot	*natpt_internHash6	__P((struct cSlot *, struct pcv *));
+struct pAddr	*natpt_remapRemote4Port	__P((struct cSlot *, struct pAddr *));
+
+void		 natpt_init_tslot	__P((void));
+
+
+/*  natpt_usrreq.c  */
+void		 natpt_input		__P((struct mbuf *, struct sockproto *,
+					     struct sockaddr *, struct sockaddr *));
