@@ -5,7 +5,8 @@ SRCS=	main.c session.c isakmp.c handler.c \
 	pfkey.c admin.c ipsec_doi.c oakley.c grabmyaddr.c signing.c \
 	policy.c localconf.c remoteconf.c crypto_openssl.c algorithm.c \
 	cfparse.c cftoken.c strnames.c \
-	vmbuf.c plog.c logger.c schedule.c str2val.c misc.c sockmisc.c
+	vmbuf.c plog.c logger.c schedule.c str2val.c misc.c sockmisc.c \
+	proposal.c sainfo.c
 
 # debugging code with print-isakmp.c
 SRCS+=	print-isakmp.c

@@ -5,7 +5,8 @@ SRCS=	main.c session.c isakmp.c handler.c \
 	pfkey.c admin.c ipsec_doi.c oakley.c grabmyaddr.c signing.c \
 	policy.c localconf.c remoteconf.c crypto_openssl.c algorithm.c \
 	cfparse.c cftoken.c strnames.c \
-	vmbuf.c plog.c logger.c schedule.c str2val.c misc.c sockmisc.c
+	vmbuf.c plog.c logger.c schedule.c str2val.c misc.c sockmisc.c \
+	proposal.c sainfo.c
 
 # debugging code with print-isakmp.c
 SRCS+=	print-isakmp.c
@@ -14,6 +15,9 @@ CFLAGS+=-I${SRCDIR}/../tcpdump -I${SRCDIR}/../tcpdump/lbl \
 
 MAN5=	racoon.conf.5
 MAN8=	racoon.8
+
+y.tab.h:	cfparse.o
+cftoken.o:	y.tab.h cftoken.l
 
 .include <bsd.prog.mk>
 
