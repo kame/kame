@@ -1,11 +1,12 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1508 2001/01/25 03:25:47 sakane Exp $
+$KAME: CHANGELOG,v 1.1509 2001/01/25 13:09:59 itojun Exp $
 
 <200101>
 Thu Jan 25 12:26:32 JST 2001 sakane@ydc.co.jp
 	* racoon:
-	Fixed to handle the DH shared secret. from <yamaya@inf.furukawa.co.jp>
+	Fixed to handle variable-length DH shared secret correctly.
+	from <yamaya@inf.furukawa.co.jp>
 
 Wed Jan 24 10:31:29 JST 2001  itojun@iijlab.net
 	* sys/netinet6/ip6_fw.[ch]: pull security patch (fixes "established"
