@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: oakley.c,v 1.8 2000/01/12 22:33:48 sakane Exp $ */
+/* YIPS @(#)$Id: oakley.c,v 1.9 2000/01/14 19:22:25 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -2003,7 +2003,13 @@ oakley_do_encrypt(iph1, msg, ivep, ivp)
 			"vmalloc (%s)\n", strerror(errno));
 		goto end;
 	}
-	memcpy(buf->v, pl, len);
+        if (padlen) {
+                int i;
+		char *p = &buf->v[len];
+                for (i = 0; i < padlen; i++)
+                        *p++ = (char)random();
+        }
+        memcpy(buf->v, pl, len);
 
 	/* make pad into tail */
 	if (lcconf->pad_excltail)
