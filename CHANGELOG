@@ -1,7 +1,16 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2686 2004/11/28 06:03:26 jinmei Exp $
+$KAME: CHANGELOG,v 1.2687 2004/11/28 13:35:21 jinmei Exp $
 
 <200411>
+2004-11-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
+	* kame/kame/dhcp6: catch up draft-ietf-dhc-lifetime-02.
+	Specifically,
+	- renamed "lifetime" to "refreshtime".  Note that configuration
+	  compatibility was lost.
+	- implemented the default and minimum timer values
+	- clarified that the refresh time option can only be available for
+	  Information-request and reply exchanges
+
 2004-11-28  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/kame/libinet6/getaddrinfo.c (res_queryN): set an
 	appropriate limit of query timeouts in order to mitigate hopeless
