@@ -1,4 +1,4 @@
-/*	$KAME: isakmp.c,v 1.152 2001/08/11 09:42:29 sakane Exp $	*/
+/*	$KAME: isakmp.c,v 1.153 2001/08/11 10:03:58 sakane Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -299,6 +299,13 @@ isakmp_main(msg, remote, local)
 	isakmp_printpacket(msg, remote, local, 0);
 #endif
 
+	/* the initiator's cookie must not be zero */
+	if (memcmp(&isakmp->i_ck, r_ck0, sizeof(cookie_t)) == 0) {
+		plog(LLV_ERROR, LOCATION, remote,
+			"malformed cookie received.\n");
+		return -1;
+	}
+
 	/* Check the Major and Minor Version fields. */
 	/*
 	 * XXX Is is right to check version here ?
@@ -390,12 +397,11 @@ isakmp_main(msg, remote, local)
 
 				/* validity check */
 				if (memcmp(&isakmp->r_ck, r_ck0,
-					sizeof(cookie_t)) != 0
-				 || memcmp(&isakmp->i_ck, r_ck0,
-					sizeof(cookie_t)) == 0) {
+					sizeof(cookie_t)) != 0) {
 
-					plog(LLV_ERROR, LOCATION, remote,
-						"malformed cookie.\n");
+					plog(LLV_DEBUG, LOCATION, remote,
+						"malformed cookie received"
+						"or the spi expired.\n");
 					return -1;
 				}
 
