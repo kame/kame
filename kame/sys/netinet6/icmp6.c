@@ -1,4 +1,4 @@
-/*	$KAME: icmp6.c,v 1.162 2000/11/30 08:22:58 jinmei Exp $	*/
+/*	$KAME: icmp6.c,v 1.163 2000/11/30 09:06:02 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -939,8 +939,9 @@ icmp6_notify_error(m, off, icmp6len, code)
 	int off, icmp6len;
 {
 	struct icmp6_hdr *icmp6;
+	struct ip6_hdr *eip6;
 	u_int32_t notifymtu;
-	struct sockaddr_in6 icmp6dst;
+	struct sockaddr_in6 icmp6src, icmp6dst;
 
 	if (icmp6len < sizeof(struct icmp6_hdr) + sizeof(struct ip6_hdr)) {
 		icmp6stat.icp6s_tooshort++;
@@ -959,15 +960,10 @@ icmp6_notify_error(m, off, icmp6len, code)
 		return(-1);
 	}
 #endif
-	bzero(&icmp6dst, sizeof(icmp6dst));
-	icmp6dst.sin6_len = sizeof(struct sockaddr_in6);
-	icmp6dst.sin6_family = AF_INET6;
-	icmp6dst.sin6_addr = ((struct ip6_hdr *)(icmp6 + 1))->ip6_dst;
 
 	/* Detect the upper level protocol */
 	{
 		void (*ctlfunc) __P((int, struct sockaddr *, void *));
-		struct ip6_hdr *eip6 = (struct ip6_hdr *)(icmp6 + 1);
 		u_int8_t nxt = eip6->ip6_nxt;
 		int eoff = off + sizeof(struct icmp6_hdr) +
 			sizeof(struct ip6_hdr);
@@ -979,6 +975,7 @@ icmp6_notify_error(m, off, icmp6len, code)
 		struct ip6_rthdr0 *rth0;
 		int rthlen;
 
+		eip6 = (struct ip6_hdr *)(icmp6 + 1);
 		while (1) { /* XXX: should avoid inf. loop explicitly? */
 			struct ip6_ext *eh;
 
@@ -1113,13 +1110,52 @@ icmp6_notify_error(m, off, icmp6len, code)
 			return(-1);
 		}
 #endif
+
+		eip6 = (struct ip6_hdr *)(icmp6 + 1);
+		bzero(&icmp6dst, sizeof(icmp6dst));
+		icmp6dst.sin6_len = sizeof(struct sockaddr_in6);
+		icmp6dst.sin6_family = AF_INET6;
+		icmp6dst.sin6_addr = eip6->ip6_dst;
+		icmp6dst.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+							  &icmp6dst.sin6_addr);
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(&icmp6dst.sin6_addr, &icmp6dst,
+				   NULL, NULL)) {
+			/* should be impossbile */
+			printf("icmp6_notify_error: in6_embedscope failed\n");
+			goto freeit;
+		}
+#endif
+
+		/*
+		 * retrieve parameters from the inner IPv6 header, and convert
+		 * them into sockaddr structures.
+		 */
+		bzero(&icmp6src, sizeof(icmp6src));
+		icmp6src.sin6_len = sizeof(struct sockaddr_in6);
+		icmp6src.sin6_family = AF_INET6;
+		icmp6src.sin6_addr = eip6->ip6_src;
+		icmp6src.sin6_scope_id = in6_addr2scopeid(m->m_pkthdr.rcvif,
+							  &icmp6src.sin6_addr);
+#ifndef SCOPEDROUTING
+		if (in6_embedscope(&icmp6src.sin6_addr, &icmp6src,
+				   NULL, NULL)) {
+			/* should be impossbile */
+			printf("icmp6_notify_error: in6_embedscope failed\n");
+			goto freeit;
+		}
+#endif
+		icmp6src.sin6_flowinfo =
+			(eip6->ip6_flow & IPV6_FLOWLABEL_MASK);
+
 		if (finaldst == NULL)
-			finaldst = &((struct ip6_hdr *)(icmp6 + 1))->ip6_dst;
+			finaldst = &eip6->ip6_dst;
 		ip6cp.ip6c_m = m;
 		ip6cp.ip6c_icmp6 = icmp6;
 		ip6cp.ip6c_ip6 = (struct ip6_hdr *)(icmp6 + 1);
 		ip6cp.ip6c_off = eoff;
 		ip6cp.ip6c_finaldst = finaldst;
+		ip6cp.ip6c_src = &icmp6src;
 
 		if (icmp6type == ICMP6_PACKET_TOO_BIG) {
 			notifymtu = ntohl(icmp6->icmp6_mtu);
