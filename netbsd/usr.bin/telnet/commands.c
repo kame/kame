@@ -2360,12 +2360,12 @@ tn(argc, argv)
 	}
 
 #if defined(IPSEC) && defined(IPSEC_POLICY_IPSEC)
-        if (setpolicy(net, res, ipsec_policy_in) < 0) {
+	if (setpolicy(net, res, ipsec_policy_in) < 0) {
 	    (void) NetClose(net);
 	    net = -1;
 	    continue;
 	}
-        if (setpolicy(net, res, ipsec_policy_out) < 0) {
+	if (setpolicy(net, res, ipsec_policy_out) < 0) {
 	    (void) NetClose(net);
 	    net = -1;
 	    continue;
