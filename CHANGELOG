@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2600 2004/05/13 15:42:30 jinmei Exp $
+$KAME: CHANGELOG,v 1.2601 2004/05/13 15:55:12 jinmei Exp $
 
 <200405>
 2004-05-14  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -8,7 +8,7 @@ $KAME: CHANGELOG,v 1.2600 2004/05/13 15:42:30 jinmei Exp $
 	- avoided casting when pointers can be unnaturally aligned,
 	  for alignment sensitive architectures
 	- fixed the bug that IA_PD sub options were not correctly
-	  recognized when more than one options were provided
+	  recognized when more than one option was provided
 	- dropped DHCPv6 packets when IA_PD_PREFIX appears outside of
 	  IA_PD (this seems to be a saner behavior)
 	- corrected some log message formats
