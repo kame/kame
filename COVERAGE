@@ -1,6 +1,6 @@
 Support coverage table for KAME/*BSD and KAME-merged *BSD
 KAME project
-$Id: COVERAGE,v 1.28 2000/04/25 09:11:51 itojun Exp $
+$Id: COVERAGE,v 1.29 2000/04/26 03:43:57 itojun Exp $
 
 
 x: supported/integrated
@@ -29,7 +29,7 @@ mobile-ip6	(*1)	(*1)	(*1)	(*1)	?	(*1)	(*1)
 getaddrinfo obeys configured resolv order
 		x	x	-	-	-	-	-
 
-resolver support for IPv6 transport
+KAME extended resolver (IPv6 transport, EDNS0, bogus address filtering)
 		x	x	x	x	-	x	-
 
 
