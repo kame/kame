@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: ipsec_doi.c,v 1.90 2000/07/15 22:18:41 sakane Exp $ */
+/* YIPS @(#)$Id: ipsec_doi.c,v 1.91 2000/07/17 09:05:33 sakane Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -3160,6 +3160,13 @@ ipsecdoi_id2sockaddr(
 	struct ipsecdoi_id_b *id_b = (struct ipsecdoi_id_b *)buf->v;
 	u_int plen = 0;
 
+	/*
+	 * When a ID payload of subnet type with a IP address of full bit
+	 * masked, it has to be processed as host address.
+	 * e.g. below 2 type are same.
+	 *      type = ipv6 subnet, data = 2001::1/128
+	 *      type = ipv6 address, data = 2001::1
+	 */
 	switch (id_b->type) {
 	case IPSECDOI_ID_IPV4_ADDR:
 	case IPSECDOI_ID_IPV4_ADDR_SUBNET:
