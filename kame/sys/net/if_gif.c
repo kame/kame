@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.39 2001/02/20 07:40:26 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.40 2001/02/20 07:41:36 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -347,7 +347,7 @@ gif_output(ifp, m, dst, rt)
 	return error;
 }
 
-#ifndef __OpenBSD__	/* ipip_input() does it instead */
+#ifndef __OpenBSD__	/* on openbsd, ipip_input() does it instead */
 void
 gif_input(m, af, gifp)
 	struct mbuf *m;
