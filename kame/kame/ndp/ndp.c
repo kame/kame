@@ -1,4 +1,4 @@
-/*	$KAME: ndp.c,v 1.45 2000/10/09 09:06:30 sumikawa Exp $	*/
+/*	$KAME: ndp.c,v 1.46 2000/10/09 09:17:10 sumikawa Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, 1998, and 1999 WIDE Project.
@@ -600,24 +600,23 @@ again:;
 			found_entry = 1;
 		} else if (IN6_IS_ADDR_MULTICAST(&sin->sin6_addr))
 			continue;
-		if (cflag == 1) {
-			delete((char *)inet_ntop(AF_INET6, &sin->sin6_addr,
-						 ntop_buf, sizeof(ntop_buf)));
-			continue;
-		}
-
 		if (IN6_IS_ADDR_LINKLOCAL(&sin->sin6_addr) ||
 		    IN6_IS_ADDR_MC_LINKLOCAL(&sin->sin6_addr)) {
 			/* XXX: should scope id be filled in the kernel? */
 			if (sin->sin6_scope_id == 0)
 				sin->sin6_scope_id = sdl->sdl_index;
-
-			/* XXX: KAME specific hack; removed the embedded id */
+#ifdef __KAME__
+			/* KAME specific hack; removed the embedded id */
 			*(u_int16_t *)&sin->sin6_addr.s6_addr[2] = 0;
+#endif
 		}
 		getnameinfo((struct sockaddr *)sin, sin->sin6_len, host_buf,
 			    sizeof(host_buf), NULL, 0,
 			    NI_WITHSCOPEID | (nflag ? NI_NUMERICHOST : 0));
+		if (cflag == 1) {
+			delete(host_buf);
+			continue;
+		}
 		gettimeofday(&time, 0);
 		if (tflag)
 			ts_print(&time);
