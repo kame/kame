@@ -1391,7 +1391,7 @@ pr_addr(addr)
 
 	if (options & F_NUMERIC)
 		flag |= NI_NUMERICHOST;
-#ifdef NI_WITHSCOPEID	/*KAME_SCOPEID*/
+#ifdef KAME_SCOPEID
 	flag |= NI_WITHSCOPEID;
 #endif
 
