@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: handler.h,v 1.13 2000/02/16 07:27:09 sakane Exp $ */
+/* YIPS @(#)$Id: handler.h,v 1.14 2000/03/24 11:17:46 sakane Exp $ */
 
 /* Phase 1 handler */
 /*
@@ -169,6 +169,7 @@ struct ph1handle {
 };
 
 /* Phase 2 handler */
+/* allocated per a SA or SA bundles of a pair of peer's IP addresses. */
 /*
  *      initiator               responder
  *  0   (---)                   (---)
@@ -197,6 +198,10 @@ struct ph1handle {
 #define PHASE2ST_MAX		11
 
 struct ph2handle {
+	struct sockaddr *src;		/* my address of SA. */
+	struct sockaddr *dst;		/* peer's address of SA. */
+
+	u_int32_t spid;			/* policy id by kernel */
 	struct policyindex *spidx;	/* pointer to policy */
 			/* initiator set when get acquire msg.
 			 * responder set after check 1st phase 2 msg. */
@@ -229,12 +234,6 @@ struct ph2handle {
 	struct ipsecsa *approval;	/* SA(s) approved. */
 			/* point to one of the proposals in policyindex. */
 	struct ipsecsakeys *keys;
-
-	struct sockaddr *src;		/* my address of SA. */
-	struct sockaddr *dst;		/* peer's address of SA. */
-		/* requested from kernel. */
-		/* XXX it must be listed. */
-		/* XXX it must be each addresses in approval. */
 
 	vchar_t *dhpriv;		/* DH; private value */
 	vchar_t *dhpub;			/* DH; public value */
