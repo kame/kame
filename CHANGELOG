@@ -1,5 +1,5 @@
 			CHANGELOG for KAME kit
-$KAME: CHANGELOG,v 1.2614 2004/06/01 02:07:41 jinmei Exp $
+$KAME: CHANGELOG,v 1.2615 2004/06/02 06:01:52 suz Exp $
 
 <200406>
 2004-06-01  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -9,6 +9,14 @@ $KAME: CHANGELOG,v 1.2614 2004/06/01 02:07:41 jinmei Exp $
 	getting the information.
 
 <200405>
+2004-05-31  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
+	* kame/kame/pim6sd/mld6v2_proto.c: MLDv2 bug fixes:
+	 - recognizes source list in CHANGE_TO_INCLUDE_MODE report.
+	 - initializes MLD compatibile mode field when MLD group record
+	   is created.
+	* kame/kame/pim6sd/mld6v2.c: sanity check not to advertise MLDv2 Query
+	  in non-querier state.
+
 2004-05-28  SUZUKI, Shinsuke  <suz@crl.hitachi.co.jp>
 	* freebsd[45]/sys: FreeBSD Security Advisory: FreeBSD-SA-04:11.msync
 
