@@ -1,4 +1,4 @@
-/*	$KAME: mip6.c,v 1.141 2002/07/11 04:44:39 t-momose Exp $	*/
+/*	$KAME: mip6.c,v 1.142 2002/07/13 17:55:24 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -199,7 +199,6 @@ static int mip6_haddr_destopt_create __P((struct ip6_dest **,
 #ifdef MIP6_DRAFT17
 static void mip6_create_nonce __P((mip6_nonce_t *));
 static void mip6_create_nodekey __P((mip6_nodekey_t *));
-static int mip6_get_nodekey __P((int, mip6_nodekey_t *));
 #endif /* MIP6_DRAFT17 */
 
 #if defined(IPSEC) && !defined(__OpenBSD__)
@@ -2613,20 +2612,12 @@ mip6_is_valid_bu(ip6, ip6mu, ip6mulen, mopt, hoa_sa)
 		return (EINVAL);
 
 	/* Calculate home cookie */
-	hmac_init(&hmac_ctx, (u_int8_t *)&home_nodekey,
-		  sizeof(home_nodekey), HMAC_SHA1);
-	hmac_loop(&hmac_ctx, (u_int8_t *)&ip6mu->ip6mu_addr,
-		  sizeof(ip6mu->ip6mu_addr));
-	hmac_loop(&hmac_ctx, (u_int8_t *)&home_nonce, sizeof(home_nonce));
-	hmac_result(&hmac_ctx, (u_int8_t *)&home_cookie);
+	mip6_create_cookie(&ip6mu->ip6mu_addr,
+			   &home_nodekey, &home_nonce, &home_cookie);
 
 	/* Calculate care-of cookie */
-	hmac_init(&hmac_ctx, (u_int8_t *)&coa_nodekey,
-		  sizeof(coa_nodekey), HMAC_SHA1);
-	hmac_loop(&hmac_ctx, (u_int8_t *)&ip6->ip6_src,
-		  sizeof(ip6->ip6_src));
-	hmac_loop(&hmac_ctx, (u_int8_t *)&careof_nonce, sizeof(careof_nonce));
-	hmac_result(&hmac_ctx, (u_int8_t *)&careof_cookie);
+	mip6_create_cookie(&ip6->ip6_src, 
+			   &coa_nodekey, &careof_nonce, &careof_cookie);
 
 	/* Calculate K_bu */
 	SHA1Init(&sha1_ctx);
@@ -2715,4 +2706,23 @@ mip6_get_mobility_options(ip6mu, ip6mulen, mopt)
 	
 	return (0);
 }
+
+void
+mip6_create_cookie(addr, nodekey, nonce, cookie)
+	struct in6_addr *addr;
+	mip6_nodekey_t *nodekey;
+	mip6_nonce_t *nonce;
+	void *cookie;
+{
+	/* Generatie cookie */
+	/* cookie = MAC_Kcn(saddr | nonce) */
+	HMAC_CTX hmac_ctx;
+	
+	hmac_init(&hmac_ctx, (u_int8_t *)nodekey,
+		  sizeof(mip6_nodekey_t), HMAC_SHA1);
+	hmac_loop(&hmac_ctx, (u_int8_t *)addr, sizeof(struct in6_addr));
+	hmac_loop(&hmac_ctx, (u_int8_t *)nonce, sizeof(mip6_nonce_t));
+	hmac_result(&hmac_ctx, (u_int8_t *)cookie);
+}
+
 #endif /* MIP6_DRAFT17 */

@@ -1,4 +1,4 @@
-/*	$KAME: mip6_var.h,v 1.40 2002/07/11 04:44:39 t-momose Exp $	*/
+/*	$KAME: mip6_var.h,v 1.41 2002/07/13 17:55:24 t-momose Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -144,9 +144,9 @@ struct mip6_bu {
 	u_int8_t            mbu_flags;      /* BU flags */
 	u_int32_t           mbu_mobile_cookie;
 	u_int16_t           mbu_home_nonce_index;
-	u_int8_t            mbu_home_cookie[HOME_COOKIE_SIZE];
+	mip6_home_cookie_t  mbu_home_cookie;
 	u_int16_t           mbu_careof_nonce_index;
-	u_int8_t            mbu_careof_cookie[CAREOF_COOKIE_SIZE];
+        mip6_careof_cookie_t mbu_careof_cookie;
 	u_int8_t            mbu_state;
 	u_int8_t            mbu_fsm_state;  /* registration status */
 	struct hif_softc    *mbu_hif;       /* back pointer to hif */
@@ -570,11 +570,15 @@ void mip6_ha_print __P((struct mip6_ha *));
 int mip6_setpktaddrs __P((struct mbuf *));
 #ifdef MIP6_DRAFT17
 int mip6_get_nonce __P((int, mip6_nonce_t *));
+int mip6_get_nodekey __P((int, mip6_nodekey_t *));
 int mip6_is_valid_bu (struct ip6_hdr *, struct ip6m_binding_update *,
 		      int, struct mip6_mobility_options *,
 		      struct sockaddr_in6 *);
 int mip6_get_mobility_options __P((struct ip6m_binding_update *,
 				   int, struct mip6_mobility_options *));
+void mip6_create_cookie __P((struct in6_addr *,
+			     mip6_nodekey_t *, mip6_nonce_t *,
+			     void *));
 #endif /* MIP6_DRAFT17 */
 
 #endif /* _KERNEL */
