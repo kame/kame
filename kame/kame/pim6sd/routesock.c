@@ -1,4 +1,4 @@
-/*	$KAME: routesock.c,v 1.15 2002/05/29 12:02:42 suz Exp $	*/
+/*	$KAME: routesock.c,v 1.16 2002/06/19 17:05:36 itojun Exp $	*/
 
 /*
  * Copyright (c) 1998-2001
@@ -271,7 +271,6 @@ k_req_incoming(source, rpfp)
     return (TRUE);
 }
 
-
 /*
  * Returns TRUE on success, FALSE otherwise. rpfinfo contains the result.
  */
@@ -292,15 +291,13 @@ getmsg(rtm, msglen, rpfinfop)
     struct sockaddr_in6 *sin6;
     mifi_t          vifi;
     struct uvif    *v;
-    char            in6txt[INET6_ADDRSTRLEN];
 
     if (rpfinfop == (struct rpfctl *) NULL)
 	return (FALSE);
 
     sin6 = (struct sockaddr_in6 *) & so_dst;
     IF_DEBUG(DEBUG_RPF)
-	log(LOG_DEBUG, 0, "route to: %s",
-	    inet_ntop(AF_INET6, &sin6->sin6_addr, in6txt, INET6_ADDRSTRLEN));
+	log(LOG_DEBUG, 0, "route to: %s", inet6_fmt(&sin6->sin6_addr));
     cp = ((char *) (rtm + 1));
     if (rtm->rtm_addrs)
 	for (i = 1; i; i <<= 1)
@@ -341,7 +338,7 @@ getmsg(rtm, msglen, rpfinfop)
 	IF_DEBUG(DEBUG_RPF)
 	    log(LOG_DEBUG, 0,
 		"No incoming interface for destination %s",
-	   inet_ntop(AF_INET6, &sin6->sin6_addr, in6txt, INET6_ADDRSTRLEN));
+		inet6_fmt(&sin6->sin6_addr));
 	return (FALSE);
     }
     if (dst && mask)
@@ -351,15 +348,14 @@ getmsg(rtm, msglen, rpfinfop)
 	sin6 = (struct sockaddr_in6 *) dst;
 	IF_DEBUG(DEBUG_RPF)
 	    log(LOG_DEBUG, 0, " destination is: %s",
-	   inet_ntop(AF_INET6, &sin6->sin6_addr, in6txt, INET6_ADDRSTRLEN));
+		inet6_fmt(&sin6->sin6_addr));
     }
 
     if (gate)
     {
 	sin6 = (struct sockaddr_in6 *) gate;
 	IF_DEBUG(DEBUG_RPF)
-	    log(LOG_DEBUG, 0, " gateway is: %s",
-	   inet_ntop(AF_INET6, &sin6->sin6_addr, in6txt, INET6_ADDRSTRLEN));
+	    log(LOG_DEBUG, 0, " gateway is: %s", inet6_fmt(&sin6->sin6_addr));
 
     	/* RPF for static interface routes for P2P interface */
 	if (!(rtm->rtm_flags & RTF_GATEWAY)) 
@@ -382,7 +378,7 @@ getmsg(rtm, msglen, rpfinfop)
 	    *sin6 = uvifs[p2pif].uv_pim_neighbors->address;
 	    IF_DEBUG(DEBUG_RPF)
 		log(LOG_DEBUG, 0, " RPF neighbor is finally %s",
-		    inet_ntop(AF_INET6, &sin6->sin6_addr, in6txt, INET6_ADDRSTRLEN));
+		    inet6_fmt(&sin6->sin6_addr));
 	}
 		
 	rpfinfop->rpfneighbor = *sin6;
@@ -419,7 +415,7 @@ getmsg(rtm, msglen, rpfinfop)
 	IF_DEBUG(DEBUG_RPF)
 	    log(LOG_DEBUG, 0,
 		"Invalid incoming interface for destination %s, because of invalid virtual interface",
-	   inet_ntop(AF_INET6, &sin6->sin6_addr, in6txt, INET6_ADDRSTRLEN));
+		inet6_fmt(&sin6->sin6_addr));
 	return (FALSE);		/* invalid iif */
     }
 
