@@ -2,13 +2,3 @@ exclude altq_conf.c
 exclude altq_conf.h
 exclude if_altq.h
 exclude pfkeyv2.h
-conflict pf.c
-conflict pf_ioctl.c
-conflict pf_norm.c
-conflict pf_osfp.c
-conflict pf_table.c
-conflict pfvar.h
-conflict if_pflog.c
-conflict if_pflog.h
-conflict if_pfsync.c
-conflict if_pfsync.h
