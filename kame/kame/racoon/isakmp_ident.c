@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_ident.c,v 1.33 2000/06/15 05:29:16 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_ident.c,v 1.34 2000/07/04 13:15:52 sakane Exp $ */
 
 /* Identity Protecion Exchange (Main Mode) */
 
@@ -623,15 +623,6 @@ ident_i4send(iph1, msg)
 
 	iph1->status = PHASE1ST_ESTABLISHED;
 
-	/* save created date. */
-	(void)time(&iph1->created);
-
-	/* add to the schedule to expire, and seve back pointer. */
-	iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
-
-	log_ph1established(iph1);
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
-
 	error = 0;
 
 end:
@@ -1175,21 +1166,6 @@ ident_r3send(iph1, msg0)
 		goto end;
 
 	iph1->status = PHASE1ST_ESTABLISHED;
-
-	/* save created date. */
-	(void)time(&iph1->created);
-
-#if 0 /* XXX: How resend ? */
-	/* add to the schedule to resend, and seve back pointer. */
-	iph1->retry_counter = iph1->rmconf->retry_counter;
-	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-			isakmp_ph1resend, iph1);
-#endif
-	/* add to the schedule to expire, and seve back pointer. */
-	iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
-
-	log_ph1established(iph1);
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
 
 	error = 0;
 

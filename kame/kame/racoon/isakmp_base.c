@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_base.c,v 1.25 2000/06/14 09:20:12 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_base.c,v 1.26 2000/07/04 13:15:51 sakane Exp $ */
 
 /* Base Exchange (Base Mode) */
 
@@ -533,15 +533,6 @@ base_i3recv(iph1, msg)
 
 	iph1->status = PHASE1ST_ESTABLISHED;
 
-	/* save created date. */
-	(void)time(&iph1->created);
-
-	/* add to the schedule to expire, and seve back pointer. */
-	iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
-
-	log_ph1established(iph1);
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
-
 	error = 0;
 
 end:
@@ -1018,18 +1009,6 @@ base_r2send(iph1, msg)
 		goto end;
 
 	iph1->status = PHASE1ST_ESTABLISHED;
-
-	iph1->retry_counter = iph1->rmconf->retry_counter;
-	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-			isakmp_ph1resend, iph1);
-
-	/* save created date. */
-	(void)time(&iph1->created);
-
-	iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
-
-	log_ph1established(iph1);
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
 
 	error = 0;
 

@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp_agg.c,v 1.33 2000/06/15 05:29:16 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp_agg.c,v 1.34 2000/07/04 13:15:51 sakane Exp $ */
 
 /* Aggressive Exchange (Aggressive Mode) */
 
@@ -489,19 +489,6 @@ agg_i2send(iph1, msg)
 		goto end;
 
 	iph1->status = PHASE1ST_ESTABLISHED;
-
-	/* save created date. */
-	(void)time(&iph1->created);
-
-#if 0 /* XXX: How resend ? */
-	iph1->retry_counter = iph1->rmconf->retry_counter;
-	iph1->scr = sched_new(iph1->rmconf->retry_interval,
-			isakmp_ph1resend, iph1);
-#endif
-	iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
-
-	log_ph1established(iph1);
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
 
 	error = 0;
 
@@ -1001,14 +988,6 @@ agg_r2send(iph1, msg)
 
 	/* change status of isakmp status entry */
 	iph1->status = PHASE1ST_ESTABLISHED;
-
-	/* save created date. */
-	(void)time(&iph1->created);
-
-	iph1->sce = sched_new(iph1->approval->lifetime, isakmp_ph1expire, iph1);
-
-	log_ph1established(iph1);
-	YIPSDEBUG(DEBUG_STAMP, plog(logp, LOCATION, NULL, "===\n"));
 
 	error = 0;
 
