@@ -1,4 +1,4 @@
-/*	$KAME: mip6_halist.c,v 1.5 2003/08/26 04:27:49 keiichi Exp $	*/
+/*	$KAME: mip6_halist.c,v 1.6 2003/08/26 08:44:14 keiichi Exp $	*/
 
 /*
  * Copyright (C) 2001 WIDE Project.  All rights reserved.
@@ -116,25 +116,6 @@ mip6_ha_create(addr, flags, pref, lifetime)
 }
 
 void
-mip6_ha_print(mha)
-	struct mip6_ha *mha;
-{
-#if !(defined(__FreeBSD__) && __FreeBSD__ >= 3)
-	long time_second = time.tv_sec;
-#endif
-
-	mip6log((LOG_INFO,
-		 "addr    %s\n"
-		 "pref     %u\n"
-		 "lifetime %u\n"
-		 "remain   %ld\n",
-		 ip6_sprintf(&mha->mha_addr.sin6_addr),
-		 mha->mha_pref,
-		 mha->mha_lifetime,
-		 mha->mha_expire - time_second));
-}
-
-void
 mip6_ha_list_insert(mha_list, mha)
 	struct mip6_ha_list *mha_list;
 	struct mip6_ha *mha;
@@ -169,9 +150,7 @@ mip6_ha_list_remove(mha_list, mha)
 		return (EINVAL);
 	}
 
-#ifdef MIP6_DEBUG
-	mip6_ha_print(mha);
-#endif
+	/* remove all refernces from mip6_prefix entries. */
 	for (mpfx = LIST_FIRST(&mip6_prefix_list); mpfx;
 	    mpfx = LIST_NEXT(mpfx, mpfx_entry)) {
 		for (mpfxha = LIST_FIRST(&mpfx->mpfx_ha_list); mpfxha;
