@@ -1,4 +1,4 @@
-/*	$KAME: cftoken.l,v 1.67 2001/12/12 18:23:41 sakane Exp $	*/
+/*	$KAME: cftoken.l,v 1.68 2002/09/27 05:55:52 itojun Exp $	*/
 
 %{
 #include <sys/types.h>
@@ -27,8 +27,8 @@
 #include "debug.h"
 
 #include "algorithm.h"
-#include "cfparse.h"
-#include "cftoken.h"
+#include "cfparse_proto.h"
+#include "cftoken_proto.h"
 #include "localconf.h"
 #include "oakley.h"
 #include "isakmp_var.h"

@@ -1,4 +1,4 @@
-/*	$KAME: ipsec_doi.c,v 1.157 2002/06/10 05:13:39 sakane Exp $	*/
+/*	$KAME: ipsec_doi.c,v 1.158 2002/09/27 05:55:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -64,7 +64,7 @@
 #include "plog.h"
 #include "debug.h"
 
-#include "cfparse.h"
+#include "cfparse_proto.h"
 #include "isakmp_var.h"
 #include "isakmp.h"
 #include "ipsec_doi.h"

@@ -1,4 +1,4 @@
-/*	$KAME: main.c,v 1.46 2002/07/01 04:08:27 itojun Exp $	*/
+/*	$KAME: main.c,v 1.47 2002/09/27 05:55:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -60,7 +60,7 @@
 #include "plog.h"
 #include "debug.h"
 
-#include "cfparse.h"
+#include "cfparse_proto.h"
 #include "isakmp_var.h"
 #include "remoteconf.h"
 #include "localconf.h"

@@ -1,4 +1,4 @@
-/*	$KAME: cfparse.h,v 1.11 2001/03/15 11:44:08 sakane Exp $	*/
+/*	$KAME: cftoken_proto.h,v 1.1 2002/09/27 05:55:52 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -29,7 +29,13 @@
  * SUCH DAMAGE.
  */
 
-/* cfparse.y */
-extern int yyparse __P((void));
-extern int cfparse __P((void));
-extern int cfreparse __P((void));
+extern int yyerrorcount;
+
+extern int yylex __P((void));
+extern void yyerror __P((char *, ...));
+extern void yywarn __P((char *, ...));
+
+extern int yycf_switch_buffer __P((char *));
+extern int yycf_set_buffer __P((char *));
+extern void yycf_init_buffer __P((void));
+extern void yycf_clean_buffer __P((void));

@@ -1,4 +1,4 @@
-/*	$KAME: session.c,v 1.29 2002/05/25 22:40:20 itojun Exp $	*/
+/*	$KAME: session.c,v 1.30 2002/09/27 05:55:53 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -69,7 +69,7 @@
 #include "schedule.h"
 #include "session.h"
 #include "grabmyaddr.h"
-#include "cfparse.h"
+#include "cfparse_proto.h"
 #include "isakmp_var.h"
 #include "admin_var.h"
 #include "oakley.h"
