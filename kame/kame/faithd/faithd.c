@@ -1,4 +1,4 @@
-/*	$KAME: faithd.c,v 1.32 2000/11/14 22:21:09 itojun Exp $	*/
+/*	$KAME: faithd.c,v 1.33 2000/11/19 09:57:13 itojun Exp $	*/
 
 /*
  * Copyright (C) 1997 and 1998 WIDE Project.
@@ -531,7 +531,7 @@ play_child(int s_src, struct sockaddr *srcaddr)
 		dst4, sizeof(dst4), NULL, 0, NI_NUMERICHOST);
 
 	conf = config_match(srcaddr, sa4);
-	if (!conf->permit) {
+	if (!conf || !conf->permit) {
 		close(s_src);
 		exit_failure("translation to %s not permitted for %s", dst4,
 		    prefix_string(&conf->match));
