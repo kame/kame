@@ -1,4 +1,4 @@
-$KAME: README,v 1.23 2001/03/05 10:54:03 sumikawa Exp $
+$KAME: README,v 1.24 2001/04/12 05:35:57 sumikawa Exp $
 
 This directory contains kame related ports only. Generic IPv6-enable
 ports are distributed by original FreeBSD ports.
@@ -12,7 +12,7 @@ kernel/application from different versions. You need to use
 ports-current at your own risk and you may require some knowledge to
 mix them.
 
-ports merging status at $Date: 2001/03/05 10:54:03 $
+ports merging status at $Date: 2001/04/12 05:35:57 $
 	KAME/FreeBSD3	ports-current
         -----------------------------
 	XFree86		not yet(based version in KAME ports is old
@@ -41,7 +41,7 @@ ports merging status at $Date: 2001/03/05 10:54:03 $
 	leafnode+	not yet
 	lftp		merged as ftp/lftp
 	libident6	not yet
-	libpcap		not yet(should be merged in original distribution)
+	libpcap		merged in original distribution
 	lynx		merged as www/lynx-current
 	mediator	do not merge(license issue)
 	mmosaic		not yet
@@ -80,7 +80,7 @@ ports merging status at $Date: 2001/03/05 10:54:03 $
 	ssh		merged as security/ssh
 	tcp_wrapper	merged in original distribution
 	tcpd		not yet
-	tcpdump		not yet(should be merged in original distribution)
+	tcpdump		merged in original distribution
 	tcptrace	not yet
 	totd		merged as net/totd
 	ucd-snmp	merged as net/ucd-snmp
@@ -92,7 +92,7 @@ ports merging status at $Date: 2001/03/05 10:54:03 $
 	w3m		merged as www/w3m
 	w3m-ssl		merged as www/w3m-ssl
 	wbd		not yet(maybe)
-	wget		merged as ftp/wget (pretty old?)
+	wget		merged as ftp/wget
 	wu-ftpd		not yet
 	wwwoffle	merged as www/wwwoffle
 	wyvern		merged as www/wyvern
