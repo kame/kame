@@ -59,11 +59,20 @@
 #define DH6PORT_UPSTREAM	"547"
 
 /* Protocol constants */
-#define MIN_SOLICIT_DELAY	1	/* sec */
-#define MAX_SOLICIT_DELAY	5	/* sec */
 #define ADV_CLIENT_WAIT		2	/* sec */
+#define DEFAULT_SOLICIT_HOPCOUNT	4
 #define SERVER_MIN_ADV_DELAY	100	/* msec */
 #define SERVER_MAX_ADV_DELAY	1000	/* msec */
+#define REPLY_MSG_TIMEOUT	2	/* sec */
+#define REQUEST_MSG_MIN_RETRANS	10	/* retransmissions */
+#define RECONF_MSG_MIN_RETRANS	10	/* retransmissions */
+#define RECONF_MSG_RETRANS_INTERVAL	12	/* sec */
+#define RECONF_MMSG_MIN_RESP	2	/* sec */
+#define RECONF_MMSG_MAX_RESP	10	/* sec */
+#define RECONF_MULTICAST_REQUEST_WAIT	120	/* sec */
+#define MIN_SOLICIT_DELAY	1	/* sec */
+#define MAX_SOLICIT_DELAY	5	/* sec */
+#define XID_TIMEOUT		600	/* sec */
 
 /* DHCP6 base packet format */
 struct dhcp6_solicit {
@@ -98,7 +107,7 @@ struct dhcp6_request {
 	u_int16_t dh6req_xid;		/* transaction-ID */
 	struct in6_addr dh6req_cliaddr;	/* client's lladdr */
 	struct in6_addr dh6req_relayaddr; /* relay agent's (non-ll) addr */
-	struct in6_addr dh6req_serveraddr; /* server's addr */
+	/* struct in6_addr dh6req_serveraddr; optional: server's addr */
 	/* extensions */
 };
 
@@ -108,7 +117,7 @@ struct dhcp6_reply {
 #define DH6REP_CLIPRESENT	0x80
 #define DH6REP_STATMASK		0x7f
 	u_int16_t dh6rep_xid;		/* transaction-ID */
-	struct in6_addr dh6rep_cliaddr;	/* client's lladdr */
+	/* struct in6_addr dh6rep_cliaddr;	optional: client's lladdr */
 	/* extensions */
 };
 
