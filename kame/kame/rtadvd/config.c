@@ -1,4 +1,4 @@
-/*	$KAME: config.c,v 1.75 2003/04/02 09:55:05 ono Exp $	*/
+/*	$KAME: config.c,v 1.76 2003/04/10 11:56:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1998 WIDE Project.
@@ -90,7 +90,7 @@ getconfig(intface)
 	int64_t val64;
 	char buf[BUFSIZ];
 	char *bp = buf;
-	char *addr;
+	char *addr, *flagstr;
 	static int forwarding = -1;
 
 #define MUSTHAVE(var, cap)	\
@@ -195,12 +195,34 @@ getconfig(intface)
 	MAYHAVE(val, "chlim", DEF_ADVCURHOPLIMIT);
 	tmp->hoplimit = val & 0xff;
 
+	if ((flagstr = (char *)agetstr("raflags", &bp))) {
+		val = 0;
+		if (strchr(flagstr, 'm'))
+			val |= ND_RA_FLAG_MANAGED;
+		if (strchr(flagstr, 'o'))
+			val |= ND_RA_FLAG_OTHER;
+		if (strchr(flagstr, 'h'))
+			val |= ND_RA_FLAG_RTPREF_HIGH;
+		if (strchr(flagstr, 'l')) {
+			if ((val & ND_RA_FLAG_RTPREF_HIGH)) {
+				syslog(LOG_ERR, "<%s> the \'h\' and \'l\'"
+				    " router flags are exclusive", __func__);
+				exit(1);
+			}
+			val |= ND_RA_FLAG_RTPREF_LOW;
+		}
 #ifdef MIP6
-	/* XXX TODO: check of home-link interface */
-	MAYHAVE(val, "raflags", mobileip6 ? ND_RA_FLAG_HOME_AGENT : 0);
-#else
-	MAYHAVE(val, "raflags", 0);
+		if (strchr(flagstr, 'a'))
+			val |= ND_RA_FLAG_HOME_AGENT;
 #endif
+	} else {
+#ifdef MIP6
+		/* XXX TODO: check of home-link interface */
+		MAYHAVE(val, "raflags", mobileip6 ? ND_RA_FLAG_HOME_AGENT : 0);
+#else
+		MAYHAVE(val, "raflags", 0);
+#endif
+	}
 	tmp->managedflg = val & ND_RA_FLAG_MANAGED;
 	tmp->otherflg = val & ND_RA_FLAG_OTHER;
 #ifdef MIP6
@@ -301,7 +323,7 @@ getconfig(intface)
 	/* prefix information */
 
 	/*
-	 * This is an implementation specific parameter to consinder
+	 * This is an implementation specific parameter to consider
 	 * link propagation delays and poorly synchronized clocks when
 	 * checking consistency of advertised lifetimes.
 	 */
@@ -364,8 +386,16 @@ getconfig(intface)
 		pfx->prefixlen = (int)val;
 
 		makeentry(entbuf, sizeof(entbuf), i, "pinfoflags");
-		MAYHAVE(val, entbuf,
-			(ND_OPT_PI_FLAG_ONLINK|ND_OPT_PI_FLAG_AUTO));
+		if ((flagstr = (char *)agetstr(entbuf, &bp))) {
+			val = 0;
+			if (strchr(flagstr, 'l'))
+				val |= ND_OPT_PI_FLAG_ONLINK;
+			if (strchr(flagstr, 'a'))
+				val |= ND_OPT_PI_FLAG_AUTO;
+		} else {
+			MAYHAVE(val, entbuf,
+			    (ND_OPT_PI_FLAG_ONLINK|ND_OPT_PI_FLAG_AUTO));
+		}
 		pfx->onlinkflg = val & ND_OPT_PI_FLAG_ONLINK;
 		pfx->autoconfflg = val & ND_OPT_PI_FLAG_AUTO;
 #ifdef MIP6
@@ -522,7 +552,22 @@ getconfig(intface)
 		rti->prefixlen = (int)val;
 
 		makeentry(entbuf, sizeof(entbuf), i, "rtflags");
-		MAYHAVE(val, entbuf, 256); /* XXX */
+		if ((flagstr = (char *)agetstr(entbuf, &bp))) {
+			val = 0;
+			if (strchr(flagstr, 'h'))
+				val |= ND_RA_FLAG_RTPREF_HIGH;
+			if (strchr(flagstr, 'l')) {
+				if ((val & ND_RA_FLAG_RTPREF_HIGH)) {
+					syslog(LOG_ERR,
+					    "<%s> the \'h\' and \'l\' route"
+					    " preferences are exclusive",
+					    __func__);
+					exit(1);
+				}
+				val |= ND_RA_FLAG_RTPREF_LOW;
+			}
+		} else
+			MAYHAVE(val, entbuf, 256); /* XXX */
 		if (val == 256) {
 			makeentry(oentbuf, sizeof(oentbuf), i, "rtrflags");
 			MAYHAVE(val, oentbuf, 256);
