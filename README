@@ -2,7 +2,7 @@
 
 			KAME Project
 
-			$Date: 2000/01/30 12:17:38 $
+			$Date: 2000/02/08 20:01:20 $
 
 <<<Project Overview>>>
 
@@ -111,8 +111,8 @@ Thorpe, Yasunari Momoi, Chris P. Ross, Hideaki Imaizumi, Alexander
 Fung, Scott Mace, Peter Tattam, Hideaki YOSHIFUJI, Naoyasu Takenaka,
 Wada Keiji, Theo de Raadt, Niels Baggesen, Takahiro Yugawa, Laine
 Stump, Hans-Joachim Knobloch, Angelos D. Keromytis, KOIE Hidetaka,
-Markus Friedl, Ryota HIROSE, Shigeya Suzuki, and Assar Westerlund.
-(in no particular order).
+Markus Friedl, Ryota HIROSE, Shigeya Suzuki, Assar Westerlund and
+Bruce A. Mah. (in no particular order).
 
 We would also like to thank BSDI (http://www.bsdi.com/) for donating
 BSD/OS licenses for development.
