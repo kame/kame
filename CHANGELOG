@@ -1,6 +1,6 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.808 2000/04/24 13:33:03 jinmei Exp $
+$Id: CHANGELOG,v 1.809 2000/04/24 14:03:58 jinmei Exp $
 
 <200004>
 2000-04-24  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
@@ -39,11 +39,10 @@ Sun Apr 23 14:21:32 JST 2000  itojun@iijlab.net
 
 2000-04-23  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/ip6_mroute.c (ip6_mdq): do not check scope
-	boundary check for packets through the PIM register
-	tunnel. Without this change, an RP will not be able to forward
-	packets received on a register tunnel. However, this blindly
-	relies on the routing daemon's behavior. We'll eventually need
-	more reliable fix.
+	boundary for packets through a PIM register tunnel. Without this
+	change, an RP will not be able to forward packets received on a
+	register tunnel. However, this blindly relies on the routing
+	daemon's behavior. We'll eventually need more reliable fix.
 
 2000-04-21  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* freebsd3/usr.bin/netstat/route.c (routename6): fill in the
@@ -104,7 +103,7 @@ Wed Apr 19 10:52:56 JST 2000  itojun@iijlab.net
 
 2000-04-18  JINMEI, Tatuya  <jinmei@isl.rdc.toshiba.co.jp>
 	* kame/sys/netinet6/scope6.c: added to configure/mangement IPv6
-	scopes. Two new ioctls were also to added to set/get scope zone
+	scopes. Two new ioctls were also added to set/get scope zone
 	identifiers.
 
 Tue Apr 18 13:12:40 JST 2000  itojun@iijlab.net
