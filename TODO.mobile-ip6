@@ -1,4 +1,4 @@
-$KAME: TODO.mobile-ip6,v 1.39 2003/11/12 17:17:49 keiichi Exp $
+$KAME: TODO.mobile-ip6,v 1.40 2004/01/16 09:04:43 keiichi Exp $
 
 TODOs for mobile-ip6
 KAME project
@@ -26,3 +26,4 @@ KAME project
 <<Usage>>
 
 See the KAME newsletter "KAME Mobile IPv6 How To" for detail.
+You can find the document at http://www.kame.net/newsletter/.
