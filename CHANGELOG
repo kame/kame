@@ -1,8 +1,14 @@
 			CHANGELOG for KAME kit
 
-$KAME: CHANGELOG,v 1.1497 2001/01/22 18:45:19 itojun Exp $
+$KAME: CHANGELOG,v 1.1498 2001/01/23 04:52:55 itojun Exp $
 
 <200101>
+Tue Jan 23 13:51:34 JST 2001  itojun@iijlab.net
+	* sys/netinet6/ipsec.c: record IPsec decapsulation history information,
+	  so that we can use it for validating inbound packets at L4.
+	* netbsd: run ipfilter only for wire format packets, not the IPsec-
+	  decapsulated ones.
+	  
 Tue Jan 23 03:44:03 JST 2001  itojun@iijlab.net
 	* netbsd/openbsd: make sure do not return garbage, when accept(2) is
 	  called after socket is disconnected (like RST right after TCP
