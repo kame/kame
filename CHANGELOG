@@ -1,8 +1,18 @@
 			CHANGELOG for KAME kit
 
-$Id: CHANGELOG,v 1.961 2000/05/31 17:46:53 itojun Exp $
+$Id: CHANGELOG,v 1.962 2000/05/31 19:58:55 sakane Exp $
 
 <200005>
+Thu Jun  1 04:47:42 JST 2000 sakane@kame.net
+	* kame/kame/racoon:
+	- You must explicitly specify the file name of certificate and
+	  private key if you use a certificate.  See README.certificate.
+	- fixed to make a index of SPD in responder side when ID type in ID
+	  paload is subnet, or when there is no ID payload.
+	- supported to negotiate the IPsec-SA of ESP without authentication.
+	- Added the direction as an item to compare policy.
+	- fixed some crash problems.
+
 Thu Jun  1 02:43:31 JST 2000  itojun@iijlab.net
 	* kame/mdnsd: multicast DNS resolver, as specified in
 	  draft-aboba-dnsext-mdns-00.txt.  Note that spec conformance is
