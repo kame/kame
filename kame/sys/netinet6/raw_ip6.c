@@ -1,4 +1,4 @@
-/*	$KAME: raw_ip6.c,v 1.121 2002/03/02 09:56:16 jinmei Exp $	*/
+/*	$KAME: raw_ip6.c,v 1.122 2002/06/07 20:48:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -406,11 +406,10 @@ rip6_ctlinput(cmd, sa, d)
 		in6p = NULL;
 #ifdef __NetBSD__
 		in6p = in6_pcblookup_connect(&rawin6pcb, sa6, 0,
-					     (struct sockaddr_in6 *)sa6_src,
-					     0, 0);
+		    (struct sockaddr_in6 *)sa6_src, 0, 0);
 #elif defined(__OpenBSD__)
 		in6p = in6_pcbhashlookup(&rawin6pcbtable, sa6, 0,
-					 (struct sockaddr_in6 *)sa6_src, 0);
+		    (struct sockaddr_in6 *)sa6_src, 0);
 #endif
 #if 0
 		if (!in6p) {
@@ -425,8 +424,7 @@ rip6_ctlinput(cmd, sa, d)
 			in6p = in6_pcblookup_bind(&rawin6pcb, sa6, 0, 0);
 #elif defined(__OpenBSD__)
 			in6p = in_pcblookup(&rawin6pcbtable, sa6, 0,
-					    sa6_src, 0,
-					    INPLOOKUP_WILDCARD | INPLOOKUP_IPV6);
+			    sa6_src, 0, INPLOOKUP_WILDCARD | INPLOOKUP_IPV6);
 #endif
 		}
 #endif /* 0 */
@@ -443,7 +441,7 @@ rip6_ctlinput(cmd, sa, d)
 		 * - ignore the MTU change notification.
 		 */
 		icmp6_mtudisc_update((struct ip6ctlparam *)d,
-				     (struct sockaddr_in6 *)sa, valid);
+		    (struct sockaddr_in6 *)sa, valid);
 
 		/*
 		 * regardless of if we called icmp6_mtudisc_update(),
@@ -517,9 +515,7 @@ rip6_output(m, va_alist)
 
 	if (control) {
 		if ((error = ip6_setpktoptions(control, &opt, stickyopt,
-					       priv, 0,
-					       so->so_proto->pr_protocol))
-		    != 0) {
+		    priv, 0, so->so_proto->pr_protocol)) != 0) {
 			goto bad;
 		}
 		in6p->in6p_outputopts = &opt;
@@ -546,10 +542,8 @@ rip6_output(m, va_alist)
 
 	/* Source address selection. */
 	if ((sa6 = in6_selectsrc(dstsock, in6p->in6p_outputopts,
-				  in6p->in6p_moptions,
-				  &in6p->in6p_route,
-				  &in6p->in6p_lsa, &oifp,
-				  &error)) == 0) {
+	    in6p->in6p_moptions, &in6p->in6p_route, &in6p->in6p_lsa, &oifp,
+	    &error)) == 0) {
 		if (error == 0)
 			error = EADDRNOTAVAIL;
 		goto bad;
@@ -619,7 +613,7 @@ rip6_output(m, va_alist)
 		struct sockaddr_in6 sa6_src = *sa6;
 
 		if ((error = in6_recoverscope(&sa6_src, &sa6->sin6_addr,
-					      NULL)) != 0) {
+		    NULL)) != 0) {
 			goto bad;
 		}
 		sa6_src.sin6_addr = sa6->sin6_addr; /* XXX */
@@ -686,7 +680,7 @@ rip6_ctloutput(op, so, level, optname, mp)
 				error = EINVAL;
 			return (error);
 		case IPV6_CHECKSUM:
-			return(ip6_raw_ctloutput(op, so, level, optname, mp));
+			return (ip6_raw_ctloutput(op, so, level, optname, mp));
 		default:
 			return (ip6_ctloutput(op, so, level, optname, mp));
 		}
@@ -696,7 +690,7 @@ rip6_ctloutput(op, so, level, optname, mp)
 		 * XXX: is it better to call icmp6_ctloutput() directly
 		 * from protosw?
 		 */
-		return(icmp6_ctloutput(op, so, level, optname, mp));
+		return (icmp6_ctloutput(op, so, level, optname, mp));
 
 	default:
 		if (op == PRCO_SETOPT && *mp)
@@ -735,7 +729,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 
 	if (req == PRU_CONTROL)
 		return (in6_control(so, (u_long)m, (caddr_t)nam,
-				    (struct ifnet *)control
+		    (struct ifnet *)control
 #if !defined(__bsdi__) && !(defined(__FreeBSD__) && __FreeBSD__ < 3)
 				    , p
 #endif
@@ -786,7 +780,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 		in6p->in6p_cksum = -1;
 		
 		MALLOC(in6p->in6p_icmp6filt, struct icmp6_filter *,
-			sizeof(struct icmp6_filter), M_PCB, M_NOWAIT);
+		    sizeof(struct icmp6_filter), M_PCB, M_NOWAIT);
 		if (in6p->in6p_icmp6filt == NULL) {
 			in6_pcbdetach(in6p);
 			error = ENOMEM;
@@ -908,10 +902,8 @@ rip6_usrreq(so, req, m, nam, control, p)
 
 		/* Source address selection. XXX: need pcblookup? */
 		src = in6_selectsrc(addr, in6p->in6p_outputopts,
-				     in6p->in6p_moptions,
-				     &in6p->in6p_route,
-				     &in6p->in6p_lsa, &ifp,
-				     &error);
+		    in6p->in6p_moptions, &in6p->in6p_route,
+		    &in6p->in6p_lsa, &ifp, &error);
 		if (src == NULL) {
 			if (error == 0)
 				error = EADDRNOTAVAIL;
@@ -926,7 +918,7 @@ rip6_usrreq(so, req, m, nam, control, p)
 		src_storage.sin6_family = AF_INET6;
 		src_storage.sin6_len = sizeof(src_storage);
 		if ((error = in6_recoverscope(&src_storage, &src->sin6_addr,
-				      NULL)) != 0) {
+		    NULL)) != 0) {
 			return(error);
 		}
 		src_storage.sin6_addr = src->sin6_addr;	/* XXX */

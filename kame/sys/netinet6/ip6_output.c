@@ -1,4 +1,4 @@
-/*	$KAME: ip6_output.c,v 1.308 2002/06/07 14:28:33 itojun Exp $	*/
+/*	$KAME: ip6_output.c,v 1.309 2002/06/07 20:48:43 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -3029,7 +3029,7 @@ ip6_raw_ctloutput(op, so, level, optname, mp)
 				/* the API assumes even offset values */
 				error = EINVAL;
 			} else if (so->so_proto->pr_protocol ==
-				   IPPROTO_ICMPV6) {
+			    IPPROTO_ICMPV6) {
 				if (optval != icmp6off)
 					error = EINVAL;
 			} else
