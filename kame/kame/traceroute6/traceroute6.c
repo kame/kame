@@ -1,4 +1,4 @@
-/*	$KAME: traceroute6.c,v 1.57 2002/08/09 08:49:13 itojun Exp $	*/
+/*	$KAME: traceroute6.c,v 1.58 2002/08/27 00:33:39 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -573,6 +573,13 @@ main(argc, argv)
 	if (!hostname) {
 		fprintf(stderr, "traceroute6: not enough core\n");
 		exit(1);
+	}
+	if (res->ai_next) {
+		if (getnameinfo(res->ai_addr, res->ai_addrlen, hbuf,
+		    sizeof(hbuf), NULL, 0, NI_NUMERICHOST) != 0)
+			strlcpy(hbuf, "?", sizeof(hbuf));
+		fprintf(stderr, "traceroute6: Warning: %s has multiple "
+		    "addresses; using %s\n", hostname, hbuf);
 	}
 
 	if (*++argv) {
