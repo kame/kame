@@ -83,7 +83,7 @@ struct dhcp6_solicit {
 	u_int8_t dh6sol_prefixsiz;	/* prefix-size */
 	struct in6_addr dh6sol_cliaddr;	/* client's lladdr */
 	struct in6_addr dh6sol_relayaddr; /* relay agent's lladdr */
-};
+} __attribute__ ((packed));
 
 /* NOTE: dhcpv6-12 and dhcpv6-13+n are not compatible at all */
 struct dhcp6_advert {
@@ -96,7 +96,7 @@ struct dhcp6_advert {
 	struct in6_addr dh6adv_relayaddr; /* relay agent's (non-ll) addr */
 	struct in6_addr dh6adv_serveraddr; /* server's addr */
 	/* extensions */
-};
+} __attribute__ ((packed));
 
 struct dhcp6_request {
 	u_int8_t dh6req_msgtype;		/* DH6_REQUEST */
@@ -119,7 +119,7 @@ struct dhcp6_reply {
 	u_int16_t dh6rep_xid;		/* transaction-ID */
 	/* struct in6_addr dh6rep_cliaddr;	optional: client's lladdr */
 	/* extensions */
-};
+} __attribute__ ((packed));
 
 struct dhcp6_release {
 	u_int8_t dh6rel_msgtype;		/* DH6_RELEASE */
@@ -130,7 +130,7 @@ struct dhcp6_release {
 	struct in6_addr dh6rel_relayaddr; /* relay agent's (non-ll) addr */
 	struct in6_addr dh6rel_reladdr; /* server's addr to be released */
 	/* extensions */
-};
+} __attribute__ ((packed));
 
 struct dhcp6_reconfig {
 	u_int8_t dh6cfg_msgtype;		/* DH6_RECONFIG */
@@ -139,7 +139,7 @@ struct dhcp6_reconfig {
 	u_int16_t dh6cfg_xid;		/* transaction-ID */
 	struct in6_addr dh6cfg_servaddr; /* server's addr */
 	/* extensions */
-};
+} __attribute__ ((packed));
 
 union dhcp6 {
 	u_int8_t dh6_msgtype;
@@ -149,14 +149,14 @@ union dhcp6 {
 	struct dhcp6_reply dh6_rep;
 	struct dhcp6_release dh6_rel;
 	struct dhcp6_reconfig dh6_cfg;
-};
+} __attribute__ ((packed));
 
 /* DHCP6 extension */
 struct dhcp6e {
 	u_int16_t dh6e_type;
 	u_int16_t dh6e_len;
 	/* value, variable length */
-};
+} __attribute__ ((packed));
 
 #define DH6EX_IP		1	/* IP address - see dhcp6e_ipaddr */
 #define	DH6EX_TZOFFSET		2	/* Time Offset */
@@ -204,6 +204,6 @@ struct dhcp6e_ipaddr {
 	/* u_int: preferred lifetime (if L bit = 1) */
 	/* u_int: valid lifetime (if L bit = 1) */
 	/* string: DNS name */
-};
+} __attribute__ ((packed));
 
 #endif /*__DHCP6_H_DEFINED*/
