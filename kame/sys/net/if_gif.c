@@ -1,4 +1,4 @@
-/*	$KAME: if_gif.c,v 1.21 2000/04/19 06:20:11 itojun Exp $	*/
+/*	$KAME: if_gif.c,v 1.22 2000/04/26 06:38:20 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -86,7 +86,12 @@
 #include <net/if_gif.h>
 
 #include "gif.h"
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#include "bpf.h"
+#define NBPFILTER	NBPF
+#else
 #include "bpfilter.h"
+#endif
 
 #include <net/net_osdep.h>
 

@@ -1,4 +1,4 @@
-/*	$KAME: if_stf.c,v 1.34 2000/04/21 11:47:31 itojun Exp $	*/
+/*	$KAME: if_stf.c,v 1.35 2000/04/26 06:38:21 itojun Exp $	*/
 
 /*
  * Copyright (C) 2000 WIDE Project.
@@ -118,7 +118,12 @@
 
 #include <net/net_osdep.h>
 
+#if defined(__FreeBSD__) && __FreeBSD__ >= 4
+#include "bpf.h"
+#define NBPFILTER	NBPF
+#else
 #include "bpfilter.h"
+#endif
 #include "stf.h"
 #include "gif.h"	/*XXX*/
 
