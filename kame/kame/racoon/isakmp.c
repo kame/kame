@@ -26,7 +26,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* YIPS @(#)$Id: isakmp.c,v 1.29 2000/01/11 02:03:52 sakane Exp $ */
+/* YIPS @(#)$Id: isakmp.c,v 1.30 2000/01/11 02:17:18 itojun Exp $ */
 
 #include <sys/types.h>
 #include <sys/param.h>
@@ -558,7 +558,7 @@ isakmp_ph1begin_i(rmconf, remote)
 	iph1->flags = 0;
 
 	/* XXX copy remote address */
-	if (copy_ph1addresses(iph1, rmconf) < 0)
+	if (copy_ph1addresses(iph1, rmconf, remote) < 0)
 		return -1;
 
 	(void)insph1(iph1);
@@ -637,7 +637,7 @@ isakmp_ph1begin_r(msg, remote, etype)
 	iph1->msgid = 0;
 
 	/* XXX copy remote address */
-	if (copy_ph1addresses(iph1, rmconf) < 0)
+	if (copy_ph1addresses(iph1, rmconf, remote) < 0)
 		return -1;
 
 	(void)insph1(iph1);
@@ -1791,18 +1791,31 @@ doit:
 
 /* XXX for anonymous configuration. */
 int
-copy_ph1addresses(iph1, rmconf)
+copy_ph1addresses(iph1, rmconf, remote)
 	struct ph1handle *iph1;
 	struct remoteconf *rmconf;
+	struct sockaddr *remote;
 {
-	/* XXX the reason is described in handler.h */
-	/* If anonymous configuration */
-	iph1->remote = dupsaddr(rmconf->remote);
+	/* address portion must be grabbed from real remote address "remote" */
+	iph1->remote = dupsaddr(remote);
 	if (iph1->remote == NULL) {
 		delph1(iph1);
 		return -1;
 	}
-	_INPORTBYSA(iph1->remote) = _INPORTBYSA(rmconf->remote);
+
+	/*
+	 * if remote has no port # (in case of initiator - from ACQUIRE msg,
+	 * - if remote.conf specifies port #, use that
+	 * - if remote.conf does not, use 500
+	 * if remote has port # (in case of responder - from recvfrom(),
+	 * respect content of "remote".
+	 */
+	if (!_INPORTBYSA(iph1->remote)) {
+		if (_INPORTBYSA(rmconf->remote))
+			_INPORTBYSA(iph1->remote) = _INPORTBYSA(rmconf->remote);
+		else
+			_INPORTBYSA(iph1->remote) = htons(PORT_ISAKMP);
+	}
 	iph1->local = getlocaladdr(iph1->remote);
 	if (iph1->local == NULL) {
 		delph1(iph1);
@@ -1812,4 +1825,3 @@ copy_ph1addresses(iph1, rmconf)
 
 	return 0;
 }
-
