@@ -1278,7 +1278,7 @@ bgp_input_filter(bnp, rte)
 				&rte->rt_ripinfo)) {
 		syslog(LOG_DEBUG,
 		       "<%s>: input route %s/%d to %s was filtered",
-		       __FUNCTION__, &rte->rt_ripinfo.rip6_dest,
+		       __FUNCTION__, ip6str(&rte->rt_ripinfo.rip6_dest, 0),
 		       rte->rt_ripinfo.rip6_plen,
 		       bgp_peerstr(bnp));
 		return(1);
@@ -1305,7 +1305,7 @@ bgp_output_filter(bnp, rte)
 				&rte->rt_ripinfo)) {
 		syslog(LOG_DEBUG,
 		       "<%s>: output route %s/%d to %s was filtered",
-		       __FUNCTION__, &rte->rt_ripinfo.rip6_dest,
+		       __FUNCTION__, ip6str(&rte->rt_ripinfo.rip6_dest, 0),
 		       rte->rt_ripinfo.rip6_plen,
 		       bgp_peerstr(bnp));
 		return(1);
