@@ -2,7 +2,7 @@
 
 			KAME Project
 
-			$Date: 1999/10/26 17:21:01 $
+			$Date: 1999/12/07 11:37:57 $
 
 <<<Project Overview>>>
 
@@ -106,7 +106,8 @@ Frederic SOULIER, Koji Kondo, David PATE, Kenjiro Komaki, Satosi KOBAYASI,
 Takashi Tanaka, Heiko W. Rupp, Kazuto Ushioda, Masahiro Ishiyama,
 Bill Sommerfeld, Jason Thorpe, Yasunari Momoi, Chris P. Ross,
 Hideaki Imaizumi, Alexander Fung, Scott Mace, Peter Tattam,
-Hideaki YOSHIFUJI and Naoyasu Takenaka. (in no particular order).
+Hideaki YOSHIFUJI, Naoyasu Takenaka and Wada Keiji.
+(in no particular order).
 
 We also would like to thank BSDI (http://www.bsdi.com/) for donating
 BSD/OS licenses for development.
