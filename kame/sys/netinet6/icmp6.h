@@ -497,18 +497,18 @@ struct icmp6_filter {
  */
 struct icmp6stat {
 /* statistics related to icmp6 packets generated */
-	u_long	icp6s_error;		/* # of calls to icmp6_error */
-	u_long	icp6s_canterror;	/* no error 'cuz old was icmp */
-	u_long	icp6s_toofreq;		/* no error 'cuz rate limitation */
-	u_long	icp6s_outhist[256];
-/* statistics related to input messages proccesed */
-	u_long	icp6s_badcode;		/* icmp6_code out of range */
-	u_long	icp6s_tooshort;		/* packet < sizeof(struct icmp6_hdr) */
-	u_long	icp6s_checksum;		/* bad checksum */
-	u_long	icp6s_badlen;		/* calculated bound mismatch */
-	u_long	icp6s_reflect;		/* number of responses */
-	u_long	icp6s_inhist[256];	
-	u_long	icp6s_nd_toomanyopt;	/* too many ND options */
+	u_quad_t icp6s_error;		/* # of calls to icmp6_error */
+	u_quad_t icp6s_canterror;	/* no error 'cuz old was icmp */
+	u_quad_t icp6s_toofreq;		/* no error 'cuz rate limitation */
+	u_quad_t icp6s_outhist[256];
+/* statistics related to input message processed */
+	u_quad_t icp6s_badcode;		/* icmp6_code out of range */
+	u_quad_t icp6s_tooshort;	/* packet < sizeof(struct icmp6_hdr) */
+	u_quad_t icp6s_checksum;	/* bad checksum */
+	u_quad_t icp6s_badlen;		/* calculated bound mismatch */
+	u_quad_t icp6s_reflect;		/* number of responses */
+	u_quad_t icp6s_inhist[256];	
+	u_quad_t icp6s_nd_toomanyopt;	/* too many ND options */
 };
 
 /*

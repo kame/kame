@@ -297,74 +297,74 @@ struct syn_cache_head6 {
  * but that's inconvenient at the moment.
  */
 struct	tcp6stat {
-	u_long	tcp6s_connattempt;	/* connections initiated */
-	u_long	tcp6s_accepts;		/* connections accepted */
-	u_long	tcp6s_connects;		/* connections established */
-	u_long	tcp6s_drops;		/* connections dropped */
-	u_long	tcp6s_conndrops;		/* embryonic connections dropped */
-	u_long	tcp6s_closed;		/* conn. closed (includes drops) */
-	u_long	tcp6s_segstimed;		/* segs where we tried to get rtt */
-	u_long	tcp6s_rttupdated;	/* times we succeeded */
-	u_long	tcp6s_delack;		/* delayed acks sent */
-	u_long	tcp6s_timeoutdrop;	/* conn. dropped in rxmt timeout */
-	u_long	tcp6s_rexmttimeo;	/* retransmit timeouts */
-	u_long	tcp6s_persisttimeo;	/* persist timeouts */
-	u_long	tcp6s_keeptimeo;		/* keepalive timeouts */
-	u_long	tcp6s_keepprobe;		/* keepalive probes sent */
-	u_long	tcp6s_keepdrops;		/* connections dropped in keepalive */
+	u_quad_t tcp6s_connattempt;	/* connections initiated */
+	u_quad_t tcp6s_accepts;		/* connections accepted */
+	u_quad_t tcp6s_connects;	/* connections established */
+	u_quad_t tcp6s_drops;		/* connections dropped */
+	u_quad_t tcp6s_conndrops;	/* embryonic connections dropped */
+	u_quad_t tcp6s_closed;		/* conn. closed (includes drops) */
+	u_quad_t tcp6s_segstimed;	/* segs where we tried to get rtt */
+	u_quad_t tcp6s_rttupdated;	/* times we succeeded */
+	u_quad_t tcp6s_delack;		/* delayed acks sent */
+	u_quad_t tcp6s_timeoutdrop;	/* conn. dropped in rxmt timeout */
+	u_quad_t tcp6s_rexmttimeo;	/* retransmit timeouts */
+	u_quad_t tcp6s_persisttimeo;	/* persist timeouts */
+	u_quad_t tcp6s_keeptimeo;	/* keepalive timeouts */
+	u_quad_t tcp6s_keepprobe;	/* keepalive probes sent */
+	u_quad_t tcp6s_keepdrops;	/* connections dropped in keepalive */
 
-	u_long	tcp6s_sndtotal;		/* total packets sent */
-	u_long	tcp6s_sndpack;		/* data packets sent */
-	u_long	tcp6s_sndbyte;		/* data bytes sent */
-	u_long	tcp6s_sndrexmitpack;	/* data packets retransmitted */
-	u_long	tcp6s_sndrexmitbyte;	/* data bytes retransmitted */
-	u_long	tcp6s_sndrexmitfast;	/* Fast retransmits */
-	u_long	tcp6s_sndacks;		/* ack-only packets sent */
-	u_long	tcp6s_sndprobe;		/* window probes sent */
-	u_long	tcp6s_sndurg;		/* packets sent with URG only */
-	u_long	tcp6s_sndwinup;		/* window update-only packets sent */
-	u_long	tcp6s_sndctrl;		/* control (SYN|FIN|RST) packets sent */
+	u_quad_t tcp6s_sndtotal;	/* total packets sent */
+	u_quad_t tcp6s_sndpack;		/* data packets sent */
+	u_quad_t tcp6s_sndbyte;		/* data bytes sent */
+	u_quad_t tcp6s_sndrexmitpack;	/* data packets retransmitted */
+	u_quad_t tcp6s_sndrexmitbyte;	/* data bytes retransmitted */
+	u_quad_t tcp6s_sndrexmitfast;	/* Fast retransmits */
+	u_quad_t tcp6s_sndacks;		/* ack-only packets sent */
+	u_quad_t tcp6s_sndprobe;	/* window probes sent */
+	u_quad_t tcp6s_sndurg;		/* packets sent with URG only */
+	u_quad_t tcp6s_sndwinup;	/* window update-only packets sent */
+	u_quad_t tcp6s_sndctrl;		/* control (SYN|FIN|RST) packets sent */
 
-	u_long	tcp6s_rcvtotal;		/* total packets received */
-	u_long	tcp6s_rcvpack;		/* packets received in sequence */
-	u_long	tcp6s_rcvbyte;		/* bytes received in sequence */
-	u_long	tcp6s_rcvbadsum;		/* packets received with ccksum errs */
-	u_long	tcp6s_rcvbadoff;		/* packets received with bad offset */
-	u_long	tcp6s_rcvshort;		/* packets received too short */
-	u_long	tcp6s_rcvduppack;	/* duplicate-only packets received */
-	u_long	tcp6s_rcvdupbyte;	/* duplicate-only bytes received */
-	u_long	tcp6s_rcvpartduppack;	/* packets with some duplicate data */
-	u_long	tcp6s_rcvpartdupbyte;	/* dup. bytes in part-dup. packets */
-	u_long	tcp6s_rcvoopack;		/* out-of-order packets received */
-	u_long	tcp6s_rcvoobyte;		/* out-of-order bytes received */
-	u_long	tcp6s_rcvpackafterwin;	/* packets with data after window */
-	u_long	tcp6s_rcvbyteafterwin;	/* bytes rcvd after window */
-	u_long	tcp6s_rcvafterclose;	/* packets rcvd after "close" */
-	u_long	tcp6s_rcvwinprobe;	/* rcvd window probe packets */
-	u_long	tcp6s_rcvdupack;		/* rcvd duplicate acks */
-	u_long	tcp6s_rcvacktoomuch;	/* rcvd acks for unsent data */
-	u_long	tcp6s_rcvackpack;	/* rcvd ack packets */
-	u_long	tcp6s_rcvackbyte;	/* bytes acked by rcvd acks */
-	u_long	tcp6s_rcvwinupd;		/* rcvd window update packets */
-	u_long	tcp6s_pawsdrop;		/* segments dropped due to PAWS */
-	u_long	tcp6s_predack;		/* times hdr predict ok for acks */
-	u_long	tcp6s_preddat;		/* times hdr predict ok for data pkts */
-	u_long	tcp6s_pcbcachemiss;
-	u_long	tcp6s_persistdrop;	/* timeout in persist state */
-	u_long	tcp6s_badsyn;		/* bogus SYN, e.g. premature ACK */
-	u_long	tcp6s_droppedsyn;	/* dropped SYN's because sonewconn() failed */
+	u_quad_t tcp6s_rcvtotal;	/* total packets received */
+	u_quad_t tcp6s_rcvpack;		/* packets received in sequence */
+	u_quad_t tcp6s_rcvbyte;		/* bytes received in sequence */
+	u_quad_t tcp6s_rcvbadsum;	/* packets received with ccksum errs */
+	u_quad_t tcp6s_rcvbadoff;	/* packets received with bad offset */
+	u_quad_t tcp6s_rcvshort;	/* packets received too short */
+	u_quad_t tcp6s_rcvduppack;	/* duplicate-only packets received */
+	u_quad_t tcp6s_rcvdupbyte;	/* duplicate-only bytes received */
+	u_quad_t tcp6s_rcvpartduppack;	/* packets with some duplicate data */
+	u_quad_t tcp6s_rcvpartdupbyte;	/* dup. bytes in part-dup. packets */
+	u_quad_t tcp6s_rcvoopack;	/* out-of-order packets received */
+	u_quad_t tcp6s_rcvoobyte;	/* out-of-order bytes received */
+	u_quad_t tcp6s_rcvpackafterwin;	/* packets with data after window */
+	u_quad_t tcp6s_rcvbyteafterwin;	/* bytes rcvd after window */
+	u_quad_t tcp6s_rcvafterclose;	/* packets rcvd after "close" */
+	u_quad_t tcp6s_rcvwinprobe;	/* rcvd window probe packets */
+	u_quad_t tcp6s_rcvdupack;	/* rcvd duplicate acks */
+	u_quad_t tcp6s_rcvacktoomuch;	/* rcvd acks for unsent data */
+	u_quad_t tcp6s_rcvackpack;	/* rcvd ack packets */
+	u_quad_t tcp6s_rcvackbyte;	/* bytes acked by rcvd acks */
+	u_quad_t tcp6s_rcvwinupd;	/* rcvd window update packets */
+	u_quad_t tcp6s_pawsdrop;	/* segments dropped due to PAWS */
+	u_quad_t tcp6s_predack;		/* times hdr predict ok for acks */
+	u_quad_t tcp6s_preddat;		/* times hdr predict ok for data pkts */
+	u_quad_t tcp6s_pcbcachemiss;
+	u_quad_t tcp6s_persistdrop;	/* timeout in persist state */
+	u_quad_t tcp6s_badsyn;		/* bogus SYN, e.g. premature ACK */
+	u_quad_t tcp6s_droppedsyn;	/* dropped SYN's because sonewconn() failed */
 
 	/* These statistics deal with the SYN cache. */
-	u_long	tcp6s_sc_added;		/* # of entries added */
-	u_long	tcp6s_sc_completed;	/* # of connections completed */
-	u_long	tcp6s_sc_timed_out;	/* # of entries timed out */
-	u_long	tcp6s_sc_overflowed;	/* # dropped due to overflow */
-	u_long	tcp6s_sc_reset;		/* # dropped due to RST */
-	u_long	tcp6s_sc_unreach;	/* # dropped due to ICMP unreach */
-	u_long	tcp6s_sc_bucketoverflow;/* # dropped due to bucket overflow */
-	u_long	tcp6s_sc_aborted;	/* # of entries aborted (no mem) */
-	u_long	tcp6s_sc_dupesyn;	/* # of duplicate SYNs received */
-	u_long	tcp6s_sc_dropped;	/* # of SYNs dropped (no route/mem) */
+	u_quad_t tcp6s_sc_added;	/* # of entries added */
+	u_quad_t tcp6s_sc_completed;	/* # of connections completed */
+	u_quad_t tcp6s_sc_timed_out;	/* # of entries timed out */
+	u_quad_t tcp6s_sc_overflowed;	/* # dropped due to overflow */
+	u_quad_t tcp6s_sc_reset;	/* # dropped due to RST */
+	u_quad_t tcp6s_sc_unreach;	/* # dropped due to ICMP unreach */
+	u_quad_t tcp6s_sc_bucketoverflow;/* # dropped due to bucket overflow */
+	u_quad_t tcp6s_sc_aborted;	/* # of entries aborted (no mem) */
+	u_quad_t tcp6s_sc_dupesyn;	/* # of duplicate SYNs received */
+	u_quad_t tcp6s_sc_dropped;	/* # of SYNs dropped (no route/mem) */
 };
 
 #ifdef _KERNEL

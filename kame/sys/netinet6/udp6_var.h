@@ -65,25 +65,25 @@
 #ifndef _NETINET6_UDP6_VAR_H_
 #define _NETINET6_UDP6_VAR_H_
 
-#if defined(__FreeBSD__) || defined(__NetBSD__)
 /*
  * UDP Kernel structures and variables.
  */
 struct	udp6stat {
 				/* input statistics: */
-	u_long	udp6s_ipackets;		/* total input packets */
-	u_long	udp6s_hdrops;		/* packet shorter than header */
-	u_long	udp6s_badsum;		/* checksum error */
-	u_long	udp6s_nosum;		/* no checksum */
-	u_long	udp6s_badlen;		/* data length larger than packet */
-	u_long	udp6s_noport;		/* no socket on port */
-	u_long	udp6s_noportmcast;	/* of above, arrived as broadcast */
-	u_long	udp6s_fullsock;		/* not delivered, input socket full */
-	u_long	udp6ps_pcbcachemiss;	/* input packets missing pcb cache */
+	u_quad_t udp6s_ipackets;	/* total input packets */
+	u_quad_t udp6s_hdrops;		/* packet shorter than header */
+	u_quad_t udp6s_badsum;		/* checksum error */
+	u_quad_t udp6s_nosum;		/* no checksum */
+	u_quad_t udp6s_badlen;		/* data length larger than packet */
+	u_quad_t udp6s_noport;		/* no socket on port */
+	u_quad_t udp6s_noportmcast;	/* of above, arrived as broadcast */
+	u_quad_t udp6s_fullsock;	/* not delivered, input socket full */
+	u_quad_t udp6ps_pcbcachemiss;	/* input packets missing pcb cache */
 				/* output statistics: */
-	u_long	udp6s_opackets;		/* total output packets */
+	u_quad_t udp6s_opackets;		/* total output packets */
 };
 
+#if defined(__FreeBSD__) || defined(__NetBSD__)
 /*
  * Names for UDP sysctl objects
  */
@@ -104,24 +104,6 @@ struct	udp6stat {
 }
 #endif /*__FreeBSD__||__NetBSD__*/
 #ifdef __bsdi__
-/*
- * UDP Kernel structures and variables.
- */
-struct	udp6stat {
-				/* input statistics: */
-	u_quad_t udp6s_ipackets;	/* total input packets */
-	u_quad_t udp6s_hdrops;		/* packet shorter than header */
-	u_quad_t udp6s_badsum;		/* checksum error */
-	u_quad_t udp6s_nosum;		/* no checksum */
-	u_quad_t udp6s_badlen;		/* data length larger than packet */
-	u_quad_t udp6s_noport;		/* no socket on port */
-	u_quad_t udp6s_noportmcast;	/* of above, arrived as broadcast */
-	u_quad_t udp6s_fullsock;	/* not delivered, input socket full */
-	u_quad_t udp6ps_pcbcachemiss;	/* input packets missing pcb cache */
-				/* output statistics: */
-	u_quad_t udp6s_opackets;		/* total output packets */
-};
-
 /*
  * Names for UDP sysctl objects
  */
