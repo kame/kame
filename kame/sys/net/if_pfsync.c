@@ -130,7 +130,7 @@ pfsyncattach(int npfsync)
 #ifndef __FreeBSD__
 	strlcpy(ifp->if_xname, "pfsync0", sizeof ifp->if_xname);
 #else
-	strlcpy(ifp->if_name, "pfsync", sizeof ifp->if_name);
+	ifp->if_name = "pfsync";
 	ifp->if_unit = 0;
 #endif
 	ifp->if_softc = &pfsyncif;

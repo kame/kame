@@ -128,7 +128,7 @@ pflogattach(int npflog)
 #ifndef __FreeBSD__
 		snprintf(ifp->if_xname, sizeof ifp->if_xname, "pflog%d", i);
 #else
-		snprintf(ifp->if_name, sizeof ifp->if_name, "pflog");
+		ifp->if_name = "pflog";
 		ifp->if_unit = i;
 #endif
 		ifp->if_softc = &pflogif[i];
