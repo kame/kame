@@ -1,0 +1,29 @@
+--- Makefile.in-	Tue Nov 30 21:36:54 1999
++++ Makefile.in	Tue Nov 30 21:37:12 1999
+@@ -10,7 +10,7 @@
+ TOUCH	= touch
+ SHELL   = /bin/sh
+ 
+-SUBDIRS  = lib clients server include shlib
++SUBDIRS  = lib clients server include
+ AUTOCONF = @AUTOCONF@
+ AUTOHDR  = @AUTOHDR@
+ 
+@@ -18,7 +18,7 @@
+ exec_prefix = @exec_prefix@
+ mandir      = $(prefix)/man
+ 
+-all:	Makefile server lib clients shlib
++all:	Makefile server lib clients
+ 
+ Makefile: ./config.status $(srcdir)/Makefile.in 
+ 	CONFIG_FILES=$@ CONFIG_HEADERS= ./config.status
+@@ -41,7 +41,7 @@
+ 	date > ${srcdir}/stamp-h.in
+ 
+ .PHONY : install
+-install:: all clients.install server.install lib.install shlib.install
++install:: all clients.install server.install lib.install
+ 
+ ##
+ # Client stuff.

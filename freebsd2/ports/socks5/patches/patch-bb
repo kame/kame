@@ -1,0 +1,10 @@
+--- configure.in.orig	Tue Nov 30 21:11:09 1999
++++ configure.in	Tue Nov 30 21:20:49 1999
+@@ -240,6 +240,7 @@
+ 	if test $is_kame = yes; then
+ 	    AC_MSG_RESULT(KAME)
+ 	    AC_DEFINE(KAME)
++	    LDFLAGS="$LDFLAGS -L/usr/local/v6/lib"
+ 	    ipv6probe=ok
+ 	fi
+     fi
