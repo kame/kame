@@ -1,4 +1,4 @@
-/*	$KAME: in6.c,v 1.59 2000/03/11 09:30:48 itojun Exp $	*/
+/*	$KAME: in6.c,v 1.60 2000/03/16 07:05:33 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -463,6 +463,7 @@ in6_control(so, cmd, data, ifp)
 	case SIOCSPFXFLUSH_IN6:
 	case SIOCSRTRFLUSH_IN6:
 	case SIOCSDEFIFACE_IN6:
+	case SIOCSIFINFO_FLAGS:
 		if (!privileged)
 			return(EPERM);
 		/*fall through*/

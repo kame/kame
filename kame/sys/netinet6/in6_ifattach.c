@@ -1,4 +1,4 @@
-/*	$KAME: in6_ifattach.c,v 1.40 2000/03/02 09:38:23 itojun Exp $	*/
+/*	$KAME: in6_ifattach.c,v 1.41 2000/03/16 07:05:34 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -422,6 +422,9 @@ in6_ifattach(ifp, type, laddr, noloop)
 		rtflag = RTF_CLONING;
 		/* fall through */
 	case IN6_IFT_P2P802:
+		ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
+		ia->ia_ifa.ifa_flags |= RTF_CLONING;
+		rtflag = RTF_CLONING;
 		if (laddr == NULL)
 			break;
 		/* XXX use laddrlen */
@@ -438,6 +441,9 @@ in6_ifattach(ifp, type, laddr, noloop)
 		ia->ia_dstaddr.sin6_family = AF_INET6;
 		break;
 	case IN6_IFT_P2P:
+		ia->ia_ifa.ifa_rtrequest = nd6_rtrequest;
+		ia->ia_ifa.ifa_flags |= RTF_CLONING;
+		rtflag = RTF_CLONING;
 		bcopy((caddr_t)first_ifid,
 		      (caddr_t)&ia->ia_addr.sin6_addr.s6_addr8[8],
 		      IFID_LEN);

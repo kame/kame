@@ -1,4 +1,4 @@
-/*	$KAME: nd6.h,v 1.16 2000/02/24 16:34:51 itojun Exp $	*/
+/*	$KAME: nd6.h,v 1.17 2000/03/16 07:05:35 jinmei Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -66,10 +66,13 @@ struct nd_ifinfo {
 	u_int32_t basereachable;	/* BaseReachableTime */
 	u_int32_t reachable;		/* Reachable Time */
 	u_int32_t retrans;		/* Retrans Timer */
+	u_int32_t flags;		/* Flags */
 	int recalctm;			/* BaseReacable re-calculation timer */
 	u_int8_t chlim;			/* CurHopLimit */
 	u_int8_t receivedra;
 };
+
+#define ND6_IFF_PERFOMNUD	0x1
 
 struct in6_nbrinfo {
 	char ifname[IFNAMSIZ];	/* if name, e.g. "en0" */
