@@ -1,4 +1,4 @@
-/*	$KAME: ip_ecn.c,v 1.8 2000/10/01 12:37:17 itojun Exp $	*/
+/*	$KAME: ip_ecn.c,v 1.9 2000/10/01 12:44:48 itojun Exp $	*/
 
 /*
  * Copyright (C) 1999 WIDE Project.
@@ -51,11 +51,7 @@
 #include <netinet/in.h>
 #include <netinet/in_systm.h>
 #include <netinet/ip.h>
-
 #ifdef INET6
-#ifndef INET
-#include <netinet/in.h>
-#endif
 #include <netinet/ip6.h>
 #endif
 
