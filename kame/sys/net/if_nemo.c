@@ -1,4 +1,4 @@
-/*	$KAME: if_nemo.c,v 1.1 2004/12/09 02:18:58 t-momose Exp $	*/
+/*	$KAME: if_nemo.c,v 1.2 2005/01/17 15:05:01 mitsuya Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -339,11 +339,13 @@ nemo_output(ifp, m, dst, rt)
 	struct nemo_softc *sc = (struct nemo_softc*)ifp;
 	int error = 0;
 	static int called = 0;	/* XXX: MUTEX */
-	ALTQ_DECL(struct altq_pktattr pktattr;)
 	int s;
 	struct m_tag *mtag;
 
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+	ALTQ_DECL(struct altq_pktattr pktattr;)
 	IFQ_CLASSIFY(&ifp->if_snd, m, dst->sa_family, &pktattr);
+#endif
 
 	/*
 	 * nemo may cause infinite recursion calls when misconfigured.
@@ -409,7 +411,11 @@ nemo_output(ifp, m, dst, rt)
 	*mtod(m, int *) = dst->sa_family;
 
 	s = splnet();
+#if (defined(__FreeBSD__) && __FreeBSD_version >= 503000)
+	IFQ_ENQUEUE(&ifp->if_snd, m, error);
+#else
 	IFQ_ENQUEUE(&ifp->if_snd, m, &pktattr, error);
+#endif
 	if (error) {
 		splx(s);
 		goto end;
@@ -576,7 +582,9 @@ nemo_input(m, af, ifp)
 	switch (af) {
 #ifdef INET
 	case AF_INET:
+#if !(defined(__FreeBSD__) && __FreeBSD_version >= 503000)
 		ifq = &ipintrq;
+#endif
 		isr = NETISR_IP;
 		break;
 #endif
