@@ -1,4 +1,4 @@
-/*	$KAME: ip6_var.h,v 1.62 2001/05/03 14:51:48 itojun Exp $	*/
+/*	$KAME: ip6_var.h,v 1.63 2001/06/19 10:01:56 itojun Exp $	*/
 
 /*
  * Copyright (C) 1995, 1996, 1997, and 1998 WIDE Project.
@@ -158,15 +158,8 @@ struct	ip6_pktopts {
 	int ip6po_flags;
 #define IP6PO_REACHCONF	0x01	/* upper-layer reachability confirmation */
 #define IP6PO_MINMTU	0x02	/* use minimum MTU (IPV6_USE_MIN_MTU) */
-#define IP6PO_MIP6OPT	0x04	/* pktopts memory allocated by MIP6 */
-#define IP6PO_NEWDH1	0x08	/* new DH1 allocated by MIP6 */
-#define IP6PO_NEWDH2	0x10	/* new DH2 allocated by MIP6 */
-#define IP6PO_NEWRH0	0x20	/* new RH type 0 allocated by MIP6 */
 
 	int	needfree;	/* members dynamically allocated */
-	struct ip6_dest		*ip6po_orgdh1;  /* Original DH1 or NULL */
-	struct ip6_dest		*ip6po_orgdh2;  /* Original DH2 or NULL */
-	struct ip6_rthdr	*ip6po_orgrh0;  /* Original RH type 0 or NULL*/
 };
 
 /*
@@ -264,7 +257,6 @@ struct ip6aux {
 	/* ip6.ip6_src */
 	struct in6_addr ip6a_careof;	/* care-of address of the peer */
 	struct in6_addr ip6a_home;	/* home address of the peer */
-	u_int16_t	ip6a_bruid;	/* BR unique identifier */
 
 	/* ip6.ip6_dst */
 	struct in6_ifaddr *ip6a_dstia6;	/* my ifaddr that matches ip6_dst */
